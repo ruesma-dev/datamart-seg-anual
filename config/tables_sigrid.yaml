@@ -1,0 +1,102 @@
+# config/tables_sigrid.yaml
+#
+# Declara qué tablas de Sigrid se extraen al esquema raw de Postgres.
+#
+# Cada entrada define:
+#   source_table       : nombre de la tabla en Sigrid (esquema dbo)
+#   target_table       : nombre destino en Postgres (esquema raw)
+#   id_column          : columna usada como cursor de paginación (típicamente "ide")
+#   incremental_column : columna timestamp para carga incremental (típicamente "tiemod")
+#   where              : filtro SQL opcional (sin la palabra WHERE)
+#   exclude_columns    : columnas binarias o pesadas que no queremos extraer
+#   page_size          : filas por petición HTTP (opcional, default SIGRID_API_PAGE_SIZE).
+#                        Bájalo para tablas con columnas texto/blob pesadas (ej. obrparpre.planif).
+#
+# El ETL determina dinámicamente los tipos consultando INFORMATION_SCHEMA.COLUMNS
+# de Sigrid y los mapea a tipos Postgres. No hace falta hardcodear columnas aquí.
+
+tables:
+
+  - source_table: con
+    target_table: con
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - ima    # imagen del concepto, binario pesado
+      - tex    # texto libre largo, no lo usamos en seguimiento
+    # page_size: omitido → usa default global
+
+  - source_table: conext
+    target_table: conext
+    id_column: ide
+    incremental_column: null   # conext no tiene tiemod estándar; refresco completo
+    where: null
+    exclude_columns: []
+
+  - source_table: obr
+    target_table: obr
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+
+  - source_table: obrparpar
+    target_table: obrparpar
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex    # descripción larga, no usada en seguimiento
+      - med    # medición desglosada (binario)
+      - des    # descomposición desglose (texto largo)
+
+  - source_table: obrparpre
+    target_table: obrparpre
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex    # descripción larga
+      - med    # medición desglosada (binario pesado)
+      - des    # descomposición desglose
+      # planif SÍ lo necesitamos (cadena de planificación temporal)
+    # planif es TEXT ilimitado; bajamos el page_size para no saturar memoria
+    # de la Function App si las cadenas planif son muy largas.
+    page_size: 5000
+
+  - source_table: obrfas
+    target_table: obrfas
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+
+  - source_table: obrfasamb
+    target_table: obrfasamb
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+    # Fases × Ámbito. Aporta `plafec`: fecha de inicio de planificación por
+    # (obride, amb, fas). El parser de la columna `planif` de obrparpre usa esta
+    # fecha como ancla del mes 1; mes 2 = plafec + 1 mes, etc.
+
+  - source_table: auxobramb
+    target_table: auxobramb
+    id_column: ide
+    incremental_column: null   # catálogo estable, refresco completo
+    where: null
+    exclude_columns: []
+
+  - source_table: auxobrtca
+    target_table: auxobrtca
+    id_column: ide
+    incremental_column: null   # catálogo estable, refresco completo
+    where: null
+    exclude_columns: []
+    # Catálogo de "tipos de capítulo" (CD/CI/CP/...) referenciado por
+    # obrparpar.tcaide. Nos permite clasificar categorías de partida
+    # directamente desde Sigrid sin depender de heurísticas sobre el
+    # código del capítulo raíz.
+

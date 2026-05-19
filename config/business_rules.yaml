@@ -1,0 +1,126 @@
+# config/business_rules.yaml
+#
+# Constantes de negocio centralizadas. Aquí vive cualquier valor que pueda cambiar
+# por decisión de Negocio sin tocar código Python ni SQL.
+
+sigrid:
+  # ===========================================================================
+  # REGLA CRÍTICA DE ÁMBITOS PARA EL SEGUIMIENTO MENSUAL
+  # ===========================================================================
+  # El data mart de seguimiento mensual usa CUATRO ámbitos de obrparpre,
+  # explosionados todos con la misma mecánica (parser de obrparpre.planif):
+  #
+  #   amb = 3  (COSTE real)        → distribución mensual del COSTE REAL.
+  #                                   Estructura: una sola fila por partida
+  #                                   con fas=0 y planif. plafec informado,
+  #                                   res vacía (la rellenamos con literal
+  #                                   "Coste real").
+  #
+  #   amb = 7  (VENTA real)        → distribución mensual de la PRODUCCIÓN
+  #                                   REAL. Misma estructura que amb=3.
+  #
+  #   amb = 8  (MASTER COSTE)      → fuente de Coste Directo, Indirecto y
+  #                                   Proporcional PLANIFICADOS. Múltiples
+  #                                   versiones (fas = 2, 3, 4, ...), cada una
+  #                                   identificada con "Versión N (DD/MM/YYYY)"
+  #                                   en obrfasamb.res. Las tres categorías
+  #                                   comparten ámbito y se diferencian por
+  #                                   el tipo de partida (aux.tipo_partida:
+  #                                   DIRECTO / INDIRECTO /
+  #                                   INDIRECTO_INFRAESTRUCTURA / PROPORCIONAL).
+  #
+  #   amb = 11 (MASTER VENTA)      → fuente de Producción PLANIFICADA.
+  #                                   Mismo patrón que amb=8.
+  #
+  # Los demás ámbitos (5 CERTIFICACION, 10 COSTE PENDIENTE, 13 CER_PEC...) NO
+  # se usan en el seguimiento mensual.
+  #
+  # La comparativa en mart es:
+  #     amb=3  (real coste)         vs  amb=8  (master coste planificado)
+  #     amb=7  (real venta/producc) vs  amb=11 (master venta planificado)
+  #
+  # Para cada mes real, la versión de master que rige es la que estaba
+  # vigente entonces (regla temporal basada en obrfasamb.fec, resuelta en
+  # mart con stg.plan_mensual.version_fec_creacion).
+  # ===========================================================================
+  ambitos:
+    seguimiento:
+      coste_real_id:    3   # Coste incurrido real
+      venta_real_id:    7   # Venta / producción real
+      master_coste_id:  8   # Master de coste → CD, CI, CP planificados
+      master_venta_id:  11  # Master de venta → Producción planificada
+
+    # Tipos lógicos que asigna la vista stg.ambitos basándose en res.
+    # Tabla de mapeo (basada en raw.auxobramb real de Ruesma):
+    #   ide  cod      res                     tipo
+    #   3    COS      COSTE                   COSTE                ← usado (real)
+    #   5    VEN      CERTIFICACION           CERTIFICACION
+    #   7    PROD     VENTA                   VENTA                ← usado (real)
+    #   8    MAS      MASTER COSTE            MASTER_COSTE         ← usado (master)
+    #   9    MASV     MASTER CERTIFICACION    MASTER_CERTIFICACION
+    #   10   COP      COSTE PENDIENTE         COSTE
+    #   11   MASP     MASTER VENTA            MASTER_VENTA         ← usado (master)
+    #   13   CER_PEC  CERTIFICACIÓN PEC       CERTIFICACION
+    #   15   PRO_JO   PRODUCCIÓN REAL         PRODUCCION_REAL
+    #   resto                                 OTRO
+
+  # Campo extendido (tabla conext) que indica la versión vigente del master
+  # de cada obra. Sigrid guarda la versión activa con cod='15' y valn=<n>.
+  # NOTA: stg.plan_mensual NO filtra por esto (trae todas las versiones).
+  # Lo usa mart para identificar "la última conocida" en el cierre actual.
+  campos_extendidos:
+    cod_version_master_vigente: "15"
+
+  # ===========================================================================
+  # PRECISIÓN DE CÁLCULOS DE IMPORTE
+  # ===========================================================================
+  # En Sigrid de Ruesma, la columna obrparpre.pre se almacena con 4 decimales
+  # (ej: 18.8085) pero TODOS los cálculos visibles de Sigrid en la pestaña de
+  # Seguimiento usan internamente el precio REDONDEADO a 2 decimales (18,81).
+  #
+  # Ejemplo real (obra 0707, partida 01.02 EXCAVACION VACIADOS, amb=7 venta):
+  #   - can = 18.378,23
+  #   - pre = 18.8085  (lo que devuelve la API)
+  #   - can * pre              = 345.666,94  ← cálculo "puro"
+  #   - can * ROUND(pre, 2)    = 345.694,51  ← lo que muestra Sigrid ✓
+  #
+  # Para que el seguimiento cuadre céntimo a céntimo con Sigrid, nuestro modelo
+  # calcula DOS VERSIONES de cada importe:
+  #
+  #   - importe_mes / importe_origen        (usan precio redondeado, cuadra con Sigrid)
+  #   - importe_mes_raw / importe_origen_raw (usan precio sin redondear, cálculo puro)
+  #
+  # Ambas conviven en stg.plan_mensual y mart.fact_seguimiento_mensual. Power BI
+  # puede consumir la que prefiera. Las versiones _raw son útiles para detectar
+  # discrepancias o investigar diferencias.
+  precision:
+    # Decimales a los que redondear el precio antes de calcular los importes
+    # "compatibles con Sigrid". Cambiar a null para deshabilitar (importe = raw).
+    redondear_precio_a_decimales: 2
+
+
+# Las 5 categorías del seguimiento mensual. Orden importa para que la matriz
+# de Power BI muestre las filas en este orden.
+categorias_seguimiento:
+  - { categoria: "Venta",           orden: 1 }
+  - { categoria: "Coste Directo",   orden: 2 }
+  - { categoria: "Coste Indirecto", orden: 3 }
+  - { categoria: "Gasto General",   orden: 4 }
+  - { categoria: "Beneficio",       orden: 5 }
+
+
+escenarios:
+  - { escenario: "Real",        orden: 1 }
+  - { escenario: "Planificado", orden: 2 }
+
+
+# Métodos de amortización soportados para partidas tipo INDIRECTO_INFRAESTRUCTURA.
+# Hoy solo LINEAL (importe total / plazo en meses). Mañana se podrán añadir
+# ACELERADA, AL_FINAL, CURVA_S, etc. sin tocar el pipeline:
+#   1. Añadir la rama en sql/mart/fact_seguimiento_mensual.sql.j2
+#   2. Documentar parámetros aquí
+#   3. Negocio cambia el método en la columna metodo_amortizacion del Excel
+amortizacion:
+  default_metodo: LINEAL
+  metodos_soportados:
+    - LINEAL

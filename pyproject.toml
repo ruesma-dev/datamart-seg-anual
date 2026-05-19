@@ -1,0 +1,22 @@
+# pyproject.toml
+[project]
+name = "etl-sigrid-seguimiento"
+version = "0.1.0"
+description = "ETL del data mart de seguimiento mensual de obras Ruesma"
+requires-python = ">=3.12"
+readme = "README.md"
+
+[project.scripts]
+etl-sigrid = "main:cli"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
