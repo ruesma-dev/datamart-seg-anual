@@ -20,8 +20,8 @@
 -- ===========================================================================
 -- En reales, `fas` es MES de cierre mensual del seguimiento.
 --   fas=0  = "Previsto" (snapshot vivo actual, NO es un cierre histórico → EXCLUIR)
---   fas=1  = primer cierre mensual (en obra 0707 → Agosto 2025)
---   fas=2  = segundo cierre (Septiembre 2025)
+--   fas=1  = primer cierre mensual
+--   fas=2  = segundo cierre
 --   fas=N  = N-ésimo cierre
 --
 -- Los nombres del mes ("Octubre 2025", "Enero 2026"...) viven en raw.obrfas
@@ -33,9 +33,33 @@
 --
 -- Cálculos:
 --   importe_origen = can * pre                    (acumulado a ese cierre)
---   importe_mes    = importe_origen − LAG(importe_origen) particionado por
---                                     (obra, partida, ámbito) ordenado por fas
+--   importe_mes    = importe_origen − prev_origen
+--                    donde prev_origen = importe_origen de fas=(N-1) si existe,
+--                                        0 si no existe (LAG estricto M-1)
 --   anio_mes       = make_date(obrfas.ano, obrfas.mes, 1)
+--
+-- IMPORTANTE — LAG estricto M-1 (Opción B):
+--   El LAG no busca "la última fila previa disponible", sino "la fila
+--   inmediatamente anterior en numeración de fas".
+--   Esto replica el comportamiento de Sigrid en su columna "Importe Parcial",
+--   donde un cierre sin fila previa (fas anterior NO existe) se imputa por
+--   completo al mes actual en lugar de generar un estorno.
+--
+--   Caso 1 - cierre consecutivo: fas=8 existe, fas=9 existe
+--     → importe_mes(9) = origen(9) - origen(8)  [como antes]
+--
+--   Caso 2 - estorno con cierre previo: fas=8 con totinc=0, fas=9 con totinc=419
+--     → importe_mes(9) = 419 - 0 = 419  [funciona, fas=8 existe aunque sea 0]
+--
+--   Caso 3 - estorno con cierre previo en 0 (CI.03A.8 obra 0675):
+--     fas=1=183, fas=2=0, fas=3=419
+--     → importe_mes(2) = 0 - 183 = -183   [estorno legítimo, fas=1 existe]
+--     → importe_mes(3) = 419 - 0 = 419    [correcto, fas=2 existe]
+--
+--   Caso 4 - cierre con HUECO previo (SISTEMA MEDICION obra 0696):
+--     fas=3..7=95.20, fas=8 NO EXISTE, fas=9=0
+--     → importe_mes(9) = 0 - 0 = 0    [Opción B: fas=8 no existe → prev=0]
+--     (antes este caso daba -95.20 porque el LAG saltaba a fas=7)
 --
 -- NOTA: para reales NO se explosiona planif. La columna planif que aparece
 -- en obrparpre amb=3 fas=0 es un eco/prevision; no la usamos.
@@ -178,12 +202,24 @@ reales_base AS (
       AND f.mes  IS NOT NULL
 ),
 reales_con_lag AS (
-    -- Importe del mes = importe a origen − importe a origen del cierre anterior
-    -- de la MISMA partida en el MISMO ámbito. Cantidad del mes = idem.
-    -- Si no hay fila anterior, importe_mes = importe_origen completo.
+    -- LAG ESTRICTO M-1 (Opción B):
     --
-    -- Calculamos LAG sobre las dos versiones del importe (con y sin redondeo
-    -- de precio) para que la diferencia mensual sea consistente con el método.
+    -- Calculamos LAG(importe_origen) y también LAG(mes_fase_num).
+    -- Solo aceptamos el LAG si LAG(mes_fase_num) = mes_fase_num - 1.
+    -- Si no, el "valor previo" se considera 0 (no había cierre el mes anterior).
+    --
+    -- Esto replica el comportamiento de Sigrid en su columna "Importe Parcial":
+    -- ante un hueco de cierres, no genera estornos artificiales.
+    --
+    -- Casos de uso:
+    --   fas consecutivos [1,2,3]:     LAG(2)→fas=1, LAG(3)→fas=2  [todo OK]
+    --   fas con hueco [1,2,5,9]:
+    --     fas=5: LAG(5)→fas=2, pero 2 != 4 → prev=0
+    --            ⇒ importe_mes = origen(5) - 0 = origen(5)
+    --     fas=9: LAG(9)→fas=5, pero 5 != 8 → prev=0
+    --            ⇒ importe_mes = origen(9) - 0 = origen(9)
+    --
+    -- Cantidad: idéntica lógica.
     SELECT
         presupuesto_id, obra_id, partida_id, ambito_id,
         mes_fase_num,
@@ -195,35 +231,32 @@ reales_con_lag AS (
         total_incurrido_raw,
         res_descripcion,
         anio_mes,
-        cantidad - COALESCE(
-            LAG(cantidad) OVER (
-                PARTITION BY obra_id, partida_id, ambito_id
-                ORDER BY mes_fase_num
-            ),
-            0
-        ) AS cantidad_mes,
-        importe_origen_round - COALESCE(
-            LAG(importe_origen_round) OVER (
-                PARTITION BY obra_id, partida_id, ambito_id
-                ORDER BY mes_fase_num
-            ),
-            0
-        ) AS importe_mes_round,
-        importe_origen_raw - COALESCE(
-            LAG(importe_origen_raw) OVER (
-                PARTITION BY obra_id, partida_id, ambito_id
-                ORDER BY mes_fase_num
-            ),
-            0
-        ) AS importe_mes_raw,
-        total_incurrido_raw - COALESCE(
-            LAG(total_incurrido_raw) OVER (
-                PARTITION BY obra_id, partida_id, ambito_id
-                ORDER BY mes_fase_num
-            ),
-            0
-        ) AS total_incurrido_mes_calc
+        -- LAG estricto: solo válido si LAG.mes_fase_num = current.mes_fase_num - 1
+        CASE
+            WHEN LAG(mes_fase_num) OVER w = mes_fase_num - 1
+            THEN cantidad - COALESCE(LAG(cantidad) OVER w, 0)
+            ELSE cantidad   -- no había mes previo válido: todo el acumulado a este mes
+        END AS cantidad_mes,
+        CASE
+            WHEN LAG(mes_fase_num) OVER w = mes_fase_num - 1
+            THEN importe_origen_round - COALESCE(LAG(importe_origen_round) OVER w, 0)
+            ELSE importe_origen_round
+        END AS importe_mes_round,
+        CASE
+            WHEN LAG(mes_fase_num) OVER w = mes_fase_num - 1
+            THEN importe_origen_raw - COALESCE(LAG(importe_origen_raw) OVER w, 0)
+            ELSE importe_origen_raw
+        END AS importe_mes_raw,
+        CASE
+            WHEN LAG(mes_fase_num) OVER w = mes_fase_num - 1
+            THEN total_incurrido_raw - COALESCE(LAG(total_incurrido_raw) OVER w, 0)
+            ELSE total_incurrido_raw
+        END AS total_incurrido_mes_calc
     FROM reales_base
+    WINDOW w AS (
+        PARTITION BY obra_id, partida_id, ambito_id
+        ORDER BY mes_fase_num
+    )
 )
 
 -- ===========================================================================
