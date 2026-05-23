@@ -22,30 +22,18 @@ CREATE INDEX IF NOT EXISTS idx_obras_codigo ON stg.obras (codigo_obra);
 -- ---------------------------------------------------------------------------
 -- stg.partidas: una fila por partida de obra (incluye capítulos)
 -- ---------------------------------------------------------------------------
--- Sigrid organiza el presupuesto en un árbol: cada partida tiene `padide`
--- apuntando al capítulo padre (puede ser 0 si es raíz). Los capítulos raíz
--- típicos en Ruesma son CD (Costes Directos), CI (Costes Indirectos),
--- CP (Costes Proporcionales).
---
--- Calculamos:
---   - capitulo_raiz_cod : código del capítulo raíz (CD / CI / CP / OTRO)
---   - capitulo_raiz_id  : ide del capítulo raíz
---   - categoria         : CD / CI / CP / OTRO  (derivada del raíz)
---   - ruta_capitulos    : "CD > 01 > 01.02" (legibilidad)
---   - nivel             : profundidad en el árbol (0=raíz, 1, 2...)
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stg.partidas (
     partida_id         BIGINT       PRIMARY KEY,
     obra_id            BIGINT       NOT NULL,
     codigo_partida     VARCHAR(24),
     capitulo_padre_id  BIGINT,
     descripcion_corta  VARCHAR(128),
-    unidad_medida      VARCHAR(16),                -- m3, m2, ud, kg... (obrparpar.unimed)
-    capitulo_raiz_id   BIGINT,                     -- ide del capítulo raíz (CD/CI/CP)
-    capitulo_raiz_cod  VARCHAR(24),                -- código del raíz: "CD", "CI", "CP", o el que sea
-    categoria          VARCHAR(8),                 -- CD / CI / CP / OTRO (normalizado)
-    ruta_capitulos     TEXT,                       -- "CD > 01 > 01.02 EXCAVACION VACIADOS"
-    nivel              INTEGER,                    -- 0 = raíz, 1, 2...
+    unidad_medida      VARCHAR(16),
+    capitulo_raiz_id   BIGINT,
+    capitulo_raiz_cod  VARCHAR(24),
+    categoria          VARCHAR(8),
+    ruta_capitulos     TEXT,
+    nivel              INTEGER,
     activa             BOOLEAN      NOT NULL DEFAULT TRUE,
     _built_at          TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -63,9 +51,9 @@ CREATE TABLE IF NOT EXISTS stg.fases (
     fecha_inicio   DATE,
     fecha_fin      DATE,
     plazo_meses    INTEGER,
-    anio           INTEGER,                            -- obrfas.ano  (ej: 2025)
-    mes            INTEGER,                            -- obrfas.mes  (1..12)
-    nombre_mes     VARCHAR(48),                        -- obrfas.res  (ej: "Octubre 2025")
+    anio           INTEGER,
+    mes            INTEGER,
+    nombre_mes     VARCHAR(48),
     _built_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_fases_obra_num   ON stg.fases (obra_id, numero_fase);
@@ -74,7 +62,23 @@ CREATE INDEX IF NOT EXISTS idx_fases_fecha_fin  ON stg.fases (fecha_fin);
 
 -- ---------------------------------------------------------------------------
 -- stg.presupuesto: una fila por (obra × partida × ámbito × fase)
--- Solo con importe efectivo (can * pre <> 0). Importe pre-calculado.
+--
+-- IMPORTANTE - precisión del PRECIO:
+--   Sigrid almacena `pre` en double precision con hasta 6 decimales reales
+--   (ej: 115.294961). Si guardamos `precio` con menos decimales, el
+--   ROUND(precio, 2) posterior puede divergir del ROUND(pre_crudo, 2).
+--   Caso real obra 0696 partida P4.04.01.02 (residual 1,70 €).
+--
+-- IMPORTANTE - precisión de la CANTIDAD:
+--   Sigrid usa `can` para porcentajes o coeficientes con hasta 6 decimales
+--   (ej: 0.00025 en CP.4 AVALES = 0,025% del presupuesto venta). Si guardamos
+--   `cantidad` con NUMERIC(18,4), 0.00025 se redondea a 0.0003 (+20%) y
+--   propaga gap a importe_mes / importe_origen.
+--   Caso real obra 0696 partida CP.4: gap +83,71 € en plan mes mayo 2025.
+--
+--   Solución: NUMERIC(20,6) para AMBOS (cantidad y precio).
+--   - Escala 6: preserva los 6 decimales reales de Sigrid
+--   - Precisión total 20: mantiene 14 dígitos enteros para no overflow.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stg.presupuesto (
     presupuesto_id  BIGINT           PRIMARY KEY,
@@ -82,8 +86,8 @@ CREATE TABLE IF NOT EXISTS stg.presupuesto (
     partida_id      BIGINT           NOT NULL,
     ambito_id       INTEGER          NOT NULL,
     fase_num        INTEGER          NOT NULL,
-    cantidad        NUMERIC(18,4),
-    precio          NUMERIC(18,4),
+    cantidad        NUMERIC(20,6),                  -- 6 decimales para porcentajes/coeficientes Sigrid
+    precio          NUMERIC(20,6),                  -- 6 decimales para precisión Sigrid
     importe         NUMERIC(18,2),
     _source_tiemod  DOUBLE PRECISION,
     _built_at       TIMESTAMP        NOT NULL DEFAULT NOW()
@@ -92,17 +96,49 @@ CREATE INDEX IF NOT EXISTS idx_pres_obra_amb         ON stg.presupuesto (obra_id
 CREATE INDEX IF NOT EXISTS idx_pres_obra_part_amb    ON stg.presupuesto (obra_id, partida_id, ambito_id);
 CREATE INDEX IF NOT EXISTS idx_pres_obra_part_amb_fa ON stg.presupuesto (obra_id, partida_id, ambito_id, fase_num);
 
+-- Migración defensiva para PRECIO: si tabla ya existía con menos precisión.
+DO $$
+DECLARE
+    v_precision INTEGER;
+    v_scale     INTEGER;
+BEGIN
+    SELECT numeric_precision, numeric_scale
+    INTO v_precision, v_scale
+    FROM information_schema.columns
+    WHERE table_schema = 'stg'
+      AND table_name   = 'presupuesto'
+      AND column_name  = 'precio';
+
+    IF v_precision IS NOT NULL AND (v_precision < 20 OR v_scale < 6) THEN
+        ALTER TABLE stg.presupuesto ALTER COLUMN precio TYPE NUMERIC(20,6);
+        RAISE NOTICE 'Migrado stg.presupuesto.precio de NUMERIC(%, %) a NUMERIC(20, 6)',
+                     v_precision, v_scale;
+    END IF;
+END $$;
+
+-- Migración defensiva para CANTIDAD: si tabla ya existía con menos precisión.
+DO $$
+DECLARE
+    v_precision INTEGER;
+    v_scale     INTEGER;
+BEGIN
+    SELECT numeric_precision, numeric_scale
+    INTO v_precision, v_scale
+    FROM information_schema.columns
+    WHERE table_schema = 'stg'
+      AND table_name   = 'presupuesto'
+      AND column_name  = 'cantidad';
+
+    IF v_precision IS NOT NULL AND (v_precision < 20 OR v_scale < 6) THEN
+        ALTER TABLE stg.presupuesto ALTER COLUMN cantidad TYPE NUMERIC(20,6);
+        RAISE NOTICE 'Migrado stg.presupuesto.cantidad de NUMERIC(%, %) a NUMERIC(20, 6)',
+                     v_precision, v_scale;
+    END IF;
+END $$;
+
 
 -- ---------------------------------------------------------------------------
--- stg.version_master_vigente: una fila por obra con su versión "oficial".
---
--- Origen: raw.conext WHERE cod = '15' (campo extendido de Sigrid).
---
--- IMPORTANTE: este campo guarda la versión que el jefe de obra ha marcado
--- como "vigente" para la comparación actual. NO sirve para reconstruir
--- el histórico de seguimiento (donde cada mes se compara contra la
--- versión que estaba activa entonces). Para eso se usa la fecha de
--- creación de cada versión (obrfasamb.fec) y se reconstruye en mart.
+-- stg.version_master_vigente
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stg.version_master_vigente (
     obra_id          BIGINT       PRIMARY KEY,
@@ -112,38 +148,7 @@ CREATE TABLE IF NOT EXISTS stg.version_master_vigente (
 
 
 -- ---------------------------------------------------------------------------
--- stg.plan_mensual: tabla unificada con la distribución mensual de los 4 ámbitos
--- del seguimiento (3 coste real, 7 venta real, 8 master coste, 11 master venta).
---
--- Se alimenta con DOS RAMAS de lógica:
---
--- MASTER (amb 8, 11):
---   - Una fila por (obra × partida × ámbito × VERSIÓN × mes).
---   - Múltiples versiones por obra (fas = 2, 3, 4...) = planif inicial, ABC,
---     Cuatrim 1, Cuatrim 2... Trae TODAS las versiones para que mart pueda
---     reconstruir, mes a mes, contra qué versión se compara cada periodo.
---   - pct_acumulado/pct_mes vienen del split de obrparpre.planif.
---   - version_descripcion = obrfasamb.res ("Versión N (DD/MM/YYYY)").
---   - version_fec_creacion = obrfasamb.fec (cuándo se hizo la versión).
---   - total_incurrido = NULL (no aplica al master).
---
--- REALES (amb 3, 7):
---   - Una fila por (obra × partida × ámbito × MES_FASE).
---   - `version` aquí guarda el número de fase mensual (1=Agosto, 2=Sept...).
---   - version_descripcion = stg.fases.nombre_mes ("Octubre 2025"...).
---   - version_fec_creacion = NULL.
---   - pct_acumulado / pct_mes = NULL (no se explosiona planif).
---   - importe_origen = can*ROUND(pre,2); importe_mes = diff vs cierre anterior.
---   - total_incurrido = obrparpre.totinc (acumulado calculado por Sigrid, ≠ can*pre).
---
--- IMPORTANTE - REDONDEO DEL PRECIO:
---   Sigrid almacena `pre` con 4 decimales (ej: 18.8085) pero internamente
---   redondea a 2 decimales para todos los cálculos visibles en la UI de
---   Seguimiento (18,81). Para que nuestro mart cuadre con Sigrid céntimo
---   a céntimo, guardamos:
---     - importe_mes / importe_origen     : usan can × ROUND(pre, 2). Cuadran con Sigrid.
---     - importe_mes_raw / importe_origen_raw : usan can × pre. Referencia (sin redondeo).
---   El campo precio_unitario se guarda CRUDO (4 decimales) para trazabilidad.
+-- stg.plan_mensual: tabla unificada con la distribución mensual de los 4 ámbitos.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stg.plan_mensual (
     plan_id              BIGSERIAL    PRIMARY KEY,
@@ -151,26 +156,63 @@ CREATE TABLE IF NOT EXISTS stg.plan_mensual (
     obra_id              BIGINT       NOT NULL,
     partida_id           BIGINT       NOT NULL,
     ambito_id            INTEGER      NOT NULL,
-    version              INTEGER      NOT NULL,    -- versión master (8,11) o mes-fase (3,7)
-    version_descripcion  TEXT         NULL,        -- res: "Versión 6 (06/03/2026)" | "Octubre 2025"
-    version_tex          TEXT         NULL,        -- tex: texto libre JO ("ABC", "PLANIFICACION CUATRIMESTRAL FEB-26"...)
-    version_fec_creacion DATE         NULL,        -- solo master (cuándo se generó la versión)
-    anio_mes             DATE         NOT NULL,    -- siempre día 1 del mes
-    posicion_mes         INTEGER      NOT NULL,    -- master: 1..N en planif; reales: mismo que version
-    pct_acumulado        NUMERIC(18,6) NULL,       -- solo master
-    pct_mes              NUMERIC(18,6) NULL,       -- solo master
-    precio_unitario      NUMERIC(18,4) NOT NULL,           -- pre crudo de obrparpre
-    can_mes              NUMERIC(18,4) NOT NULL,
-    can_origen           NUMERIC(18,4) NOT NULL,
-    importe_mes          NUMERIC(18,2) NOT NULL,           -- can_mes × ROUND(pre, 2) — cuadra con Sigrid
-    importe_origen       NUMERIC(18,2) NOT NULL,           -- can_origen × ROUND(pre, 2) — cuadra con Sigrid
-    importe_mes_raw      NUMERIC(18,2) NULL,               -- can_mes × pre (sin redondear precio) — referencia
-    importe_origen_raw   NUMERIC(18,2) NULL,               -- can_origen × pre (sin redondear precio) — referencia
-    total_incurrido      NUMERIC(18,2) NULL,               -- obrparpre.totinc (solo reales) - a origen
-    total_incurrido_mes  NUMERIC(18,2) NULL,               -- diff con fase anterior (solo reales) - del mes
+    version              INTEGER      NOT NULL,
+    version_descripcion  TEXT         NULL,
+    version_tex          TEXT         NULL,
+    version_fec_creacion DATE         NULL,
+    anio_mes             DATE         NOT NULL,
+    posicion_mes         INTEGER      NOT NULL,
+    pct_acumulado        NUMERIC(18,6) NULL,
+    pct_mes              NUMERIC(18,6) NULL,
+    precio_unitario      NUMERIC(20,6) NOT NULL,
+    can_mes              NUMERIC(20,6) NOT NULL,           -- 6 decimales (porcentajes Sigrid)
+    can_origen           NUMERIC(20,6) NOT NULL,           -- 6 decimales (porcentajes Sigrid)
+    importe_mes          NUMERIC(18,2) NOT NULL,
+    importe_origen       NUMERIC(18,2) NOT NULL,
+    importe_mes_raw      NUMERIC(18,2) NULL,
+    importe_origen_raw   NUMERIC(18,2) NULL,
+    total_incurrido      NUMERIC(18,2) NULL,
+    total_incurrido_mes  NUMERIC(18,2) NULL,
     _built_at            TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_plan_mensual_obra_amb        ON stg.plan_mensual (obra_id, ambito_id);
 CREATE INDEX IF NOT EXISTS idx_plan_mensual_obra_part_amb_v ON stg.plan_mensual (obra_id, partida_id, ambito_id, version);
 CREATE INDEX IF NOT EXISTS idx_plan_mensual_anio_mes        ON stg.plan_mensual (anio_mes);
 CREATE INDEX IF NOT EXISTS idx_plan_mensual_presupuesto     ON stg.plan_mensual (presupuesto_id);
+
+-- Migración defensiva para precio_unitario, can_mes, can_origen.
+DO $$
+DECLARE
+    v_precision INTEGER;
+    v_scale     INTEGER;
+BEGIN
+    -- precio_unitario
+    SELECT numeric_precision, numeric_scale
+    INTO v_precision, v_scale
+    FROM information_schema.columns
+    WHERE table_schema = 'stg' AND table_name = 'plan_mensual' AND column_name = 'precio_unitario';
+    IF v_precision IS NOT NULL AND (v_precision < 20 OR v_scale < 6) THEN
+        ALTER TABLE stg.plan_mensual ALTER COLUMN precio_unitario TYPE NUMERIC(20,6);
+        RAISE NOTICE 'Migrado stg.plan_mensual.precio_unitario a NUMERIC(20, 6)';
+    END IF;
+
+    -- can_mes
+    SELECT numeric_precision, numeric_scale
+    INTO v_precision, v_scale
+    FROM information_schema.columns
+    WHERE table_schema = 'stg' AND table_name = 'plan_mensual' AND column_name = 'can_mes';
+    IF v_precision IS NOT NULL AND (v_precision < 20 OR v_scale < 6) THEN
+        ALTER TABLE stg.plan_mensual ALTER COLUMN can_mes TYPE NUMERIC(20,6);
+        RAISE NOTICE 'Migrado stg.plan_mensual.can_mes a NUMERIC(20, 6)';
+    END IF;
+
+    -- can_origen
+    SELECT numeric_precision, numeric_scale
+    INTO v_precision, v_scale
+    FROM information_schema.columns
+    WHERE table_schema = 'stg' AND table_name = 'plan_mensual' AND column_name = 'can_origen';
+    IF v_precision IS NOT NULL AND (v_precision < 20 OR v_scale < 6) THEN
+        ALTER TABLE stg.plan_mensual ALTER COLUMN can_origen TYPE NUMERIC(20,6);
+        RAISE NOTICE 'Migrado stg.plan_mensual.can_origen a NUMERIC(20, 6)';
+    END IF;
+END $$;
