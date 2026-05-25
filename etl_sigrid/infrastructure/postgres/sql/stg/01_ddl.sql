@@ -149,6 +149,16 @@ CREATE TABLE IF NOT EXISTS stg.version_master_vigente (
 
 -- ---------------------------------------------------------------------------
 -- stg.plan_mensual: tabla unificada con la distribución mensual de los 4 ámbitos.
+--
+-- COLUMNAS DE FECHA DE VERSIÓN:
+--   version_fec_creacion: fecha real en que el JO creó la versión en Sigrid
+--                         (raw.obrfasamb.fec). Origen de verdad y siempre
+--                         presente.
+--   version_fec_efectiva: fecha que se usa para seleccionar la versión vigente.
+--                         Igual a version_fec_creacion en la mayoría de casos.
+--                         Solo difiere cuando una cuatrimestral fue entregada
+--                         tarde y el guard rail detecta el desplazamiento
+--                         (ver stg.fn_master_fecha_efectiva).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stg.plan_mensual (
     plan_id              BIGSERIAL    PRIMARY KEY,
@@ -160,6 +170,7 @@ CREATE TABLE IF NOT EXISTS stg.plan_mensual (
     version_descripcion  TEXT         NULL,
     version_tex          TEXT         NULL,
     version_fec_creacion DATE         NULL,
+    version_fec_efectiva DATE         NULL,
     anio_mes             DATE         NOT NULL,
     posicion_mes         INTEGER      NOT NULL,
     pct_acumulado        NUMERIC(18,6) NULL,
@@ -180,7 +191,7 @@ CREATE INDEX IF NOT EXISTS idx_plan_mensual_obra_part_amb_v ON stg.plan_mensual 
 CREATE INDEX IF NOT EXISTS idx_plan_mensual_anio_mes        ON stg.plan_mensual (anio_mes);
 CREATE INDEX IF NOT EXISTS idx_plan_mensual_presupuesto     ON stg.plan_mensual (presupuesto_id);
 
--- Migración defensiva para precio_unitario, can_mes, can_origen.
+-- Migración defensiva para precio_unitario, can_mes, can_origen, version_fec_efectiva.
 DO $$
 DECLARE
     v_precision INTEGER;
@@ -214,5 +225,15 @@ BEGIN
     IF v_precision IS NOT NULL AND (v_precision < 20 OR v_scale < 6) THEN
         ALTER TABLE stg.plan_mensual ALTER COLUMN can_origen TYPE NUMERIC(20,6);
         RAISE NOTICE 'Migrado stg.plan_mensual.can_origen a NUMERIC(20, 6)';
+    END IF;
+
+    -- version_fec_efectiva (añadida con la regla del guard rail cuatrimestral)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg' AND table_name = 'plan_mensual'
+          AND column_name = 'version_fec_efectiva'
+    ) THEN
+        ALTER TABLE stg.plan_mensual ADD COLUMN version_fec_efectiva DATE NULL;
+        RAISE NOTICE 'Añadida columna stg.plan_mensual.version_fec_efectiva';
     END IF;
 END $$;

@@ -60,6 +60,21 @@
 --    Abr 26:  Sigrid 1.542.255,23 vs Regla 1.542.255,24  diff +0,01 ✓
 --
 -- ===========================================================================
+-- FECHA EFECTIVA DE LA VERSIÓN
+-- ===========================================================================
+-- Para cada versión se calcula además fec_efectiva = stg.fn_master_fecha_efectiva.
+-- Es igual a fec_creacion en el caso general. Solo difiere cuando se cumple
+-- todo lo siguiente:
+--   - la versión es cuatrimestral (tex contiene CUATRIM o VALORADA)
+--   - el tex o el res parsean un mes representado
+--   - mes parseado ≠ mes de fec_creacion
+--   - mes de fec_creacion ∉ {2, 6, 10} (meses cuatrimestrales oficiales)
+-- En ese caso fec_efectiva = primer día (año, mes parseado).
+-- Caso real obra 0704 V11 "_CUAT FEB-26" creada 04/03/2026
+--   → fec_efectiva = 2026-02-01 (en lugar de 2026-03-04).
+-- Esto es lo que usa 02_build_fact.sql para seleccionar la versión vigente.
+--
+-- ===========================================================================
 -- BRANCH B: REALES (amb=3 coste real, amb=7 venta real) — sin cambios
 -- ===========================================================================
 
@@ -81,6 +96,7 @@ WITH master_planif AS (
         op.planif,
         date_trunc('month', fa.plafec_date)::DATE AS mes_ancla,
         fa.fec_creacion,
+        fa.fec_efectiva,
         fa.res_descripcion,
         fa.tex_descripcion
     FROM stg.presupuesto pp
@@ -92,6 +108,16 @@ WITH master_planif AS (
             fa.fas                               AS version_master,
             stg.fn_sigrid_date_to_date(fa.plafec) AS plafec_date,
             stg.fn_sigrid_date_to_date(fa.fec)   AS fec_creacion,
+            -- Fecha efectiva: aplica guard rail para CUAT entregadas tarde.
+            -- Si el JO crea la versión en un mes no oficial (no feb/jun/oct)
+            -- y el texto declara otro mes representado, se usa el mes
+            -- parseado del texto. En todos los demás casos devuelve
+            -- fec_creacion. Ver stg.fn_master_fecha_efectiva.
+            stg.fn_master_fecha_efectiva(
+                COALESCE(NULLIF(TRIM(fa.tex), ''), NULLIF(TRIM(fa_coste.tex), '')),
+                fa.res,
+                stg.fn_sigrid_date_to_date(fa.fec)
+            )                                    AS fec_efectiva,
             COALESCE(
                 NULLIF(TRIM(fa.res), ''),
                 CASE fa.amb
@@ -128,7 +154,8 @@ master_explosion AS (
     SELECT
         pp.presupuesto_id, pp.obra_id, pp.partida_id, pp.ambito_id,
         pp.version_master, pp.cantidad, pp.precio, pp.importe,
-        pp.mes_ancla, pp.fec_creacion, pp.res_descripcion, pp.tex_descripcion,
+        pp.mes_ancla, pp.fec_creacion, pp.fec_efectiva,
+        pp.res_descripcion, pp.tex_descripcion,
         u.position::INTEGER AS posicion_mes,
         CASE
             WHEN u.valor ~ '^-?\d+([.,]\d+)?$'
@@ -186,7 +213,7 @@ master_con_ultimo_positivo AS (
 master_pct_efectivo AS (
     SELECT
         presupuesto_id, obra_id, partida_id, ambito_id, version_master,
-        cantidad, precio, importe, mes_ancla, fec_creacion,
+        cantidad, precio, importe, mes_ancla, fec_creacion, fec_efectiva,
         res_descripcion, tex_descripcion,
         posicion_mes,
         pct_acumulado_raw,
@@ -204,7 +231,7 @@ master_pct_efectivo AS (
 master_con_pct_mes AS (
     SELECT
         presupuesto_id, obra_id, partida_id, ambito_id, version_master,
-        cantidad, precio, importe, mes_ancla, fec_creacion,
+        cantidad, precio, importe, mes_ancla, fec_creacion, fec_efectiva,
         res_descripcion, tex_descripcion,
         posicion_mes, pct_acumulado,
         -- pct_mes = pct_acum efectivo actual - pct_acum efectivo mes anterior
@@ -289,7 +316,8 @@ reales_con_lag AS (
 -- ===========================================================================
 INSERT INTO stg.plan_mensual (
     presupuesto_id, obra_id, partida_id, ambito_id,
-    version, version_descripcion, version_tex, version_fec_creacion,
+    version, version_descripcion, version_tex,
+    version_fec_creacion, version_fec_efectiva,
     anio_mes, posicion_mes, pct_acumulado, pct_mes,
     precio_unitario, can_mes, can_origen,
     importe_mes, importe_origen,
@@ -303,6 +331,7 @@ SELECT
     res_descripcion                                           AS version_descripcion,
     tex_descripcion                                           AS version_tex,
     fec_creacion                                              AS version_fec_creacion,
+    fec_efectiva                                              AS version_fec_efectiva,
     (mes_ancla + ((posicion_mes - 1) * INTERVAL '1 month'))::DATE AS anio_mes,
     posicion_mes,
     pct_acumulado,
@@ -337,6 +366,7 @@ SELECT
     res_descripcion                                           AS version_descripcion,
     NULL::TEXT                                                AS version_tex,
     NULL::DATE                                                AS version_fec_creacion,
+    NULL::DATE                                                AS version_fec_efectiva,
     anio_mes,
     mes_fase_num                                              AS posicion_mes,
     NULL::NUMERIC(18,6)                                       AS pct_acumulado,

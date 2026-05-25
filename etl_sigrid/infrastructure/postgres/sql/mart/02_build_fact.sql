@@ -8,21 +8,37 @@
 -- IMPORTANTE: la "versión vigente del master" para un mes NO se calcula
 -- entre las versiones que tienen fila en plan_mensual para ese mes. Se
 -- calcula entre TODAS las versiones del master de esa obra/ámbito, eligiendo
--- la más reciente con fec_creacion <= primer_día_del_mes_siguiente. Luego se
+-- la más reciente con fec_efectiva <= primer_día_del_mes_siguiente. Luego se
 -- busca el dato mensual en plan_mensual: si existe, se usa; si no, importes = 0.
 --
 -- Esto cubre el caso: una versión creada en feb 2026 cuyo planif acaba en
 -- enero (último mes con %>0) DEBE seguir siendo la vigente en feb, aunque
 -- ese mes no tenga importe.
 --
+-- =========================================================================
+-- FECHA EFECTIVA vs FECHA DE CREACIÓN
+-- =========================================================================
+-- El predicado temporal usa version_fec_efectiva, que es igual a
+-- version_fec_creacion en el caso general. Solo se distancia cuando el
+-- guard rail de stg.fn_master_fecha_efectiva detecta una cuatrimestral
+-- entregada tarde (fuera de feb/jun/oct) cuyo texto declara un mes
+-- distinto al de la fec_creacion.
+--
+-- Caso real: obra 0704 V11 "Versión 11 (04/03/2026)_CUAT FEB-26".
+--   - fec_creacion: 2026-03-04 (mes 3, no oficial)
+--   - tex parsea:  2026-02 (febrero)
+--   - fec_efectiva: 2026-02-01
+--   - Resultado: V11 es vigente para febrero 2026, no V6 CUAT OCT-25.
+--
 -- Pasos:
 --   1) `versiones_master`: catálogo (obra × ámbito × versión × fec_creacion
---      × descripción) de TODAS las versiones del master para amb 8 y 11.
+--      × fec_efectiva × descripción) de TODAS las versiones del master
+--      para amb 8 y 11.
 --   2) `meses_objetivo`: el conjunto de meses para los que tenemos algún
 --      dato en plan_mensual (reales o master). Sobre estos meses se proyecta
 --      el planificado.
 --   3) `version_vigente_por_mes`: por cada (obra, ámbito, mes) escoge la
---      versión cuya fec_creacion es la más reciente ≤ último día del mes.
+--      versión cuya fec_efectiva es la más reciente ≤ último día del mes.
 --   4) `master_proyectado`: LEFT JOIN entre versión vigente y plan_mensual
 --      por (obra, partida, ámbito, versión, mes). Si no hay fila → 0.
 --      Trae también can_origen / importe_origen / etc. cuando existen.
@@ -42,11 +58,13 @@ versiones_master AS (
         ambito_id,
         version,
         version_fec_creacion,
+        version_fec_efectiva,
         version_descripcion,
         version_tex
     FROM stg.plan_mensual
     WHERE ambito_id IN (8, 11)
       AND version_fec_creacion IS NOT NULL
+      AND version_fec_efectiva IS NOT NULL
 ),
 -- =========================================================================
 -- 1b) Tipo de master derivado del texto libre `tex` (obrfasamb.tex)
@@ -82,7 +100,7 @@ versiones_master AS (
 --   5. Sin clasificar       → resto
 versiones_tipadas AS (
     SELECT
-        obra_id, ambito_id, version, version_fec_creacion,
+        obra_id, ambito_id, version, version_fec_creacion, version_fec_efectiva,
         version_descripcion, version_tex,
         CASE
             WHEN version_tex IS NULL OR length(trim(version_tex)) = 0
@@ -125,8 +143,11 @@ meses_partida_master AS (
 --    queda SIN master vigente (importe planificado vacío) — eso indica
 --    que la obra está mal configurada en Sigrid.
 --
---    Predicado temporal: version_fec_creacion < primer_día_del_mes_siguiente.
---    Equivale a fec <= último día del mes (independiente del día exacto).
+--    Predicado temporal: version_fec_efectiva < primer_día_del_mes_siguiente.
+--    fec_efectiva = fec_creacion en el caso general, pero para versiones
+--    cuatrimestrales entregadas tarde (fuera de feb/jun/oct) se sustituye
+--    por el primer día del mes que el texto declara representar.
+--    Ver stg.fn_master_fecha_efectiva en 00_functions.sql.
 -- =========================================================================
 version_vigente_por_mes AS (
     SELECT *
@@ -134,16 +155,16 @@ version_vigente_por_mes AS (
         SELECT
             mpm.obra_id, mpm.partida_id, mpm.ambito_id, mpm.anio_mes,
             vt.version, vt.version_descripcion, vt.version_tex,
-            vt.version_fec_creacion, vt.tipo_master,
+            vt.version_fec_creacion, vt.version_fec_efectiva, vt.tipo_master,
             ROW_NUMBER() OVER (
                 PARTITION BY mpm.obra_id, mpm.partida_id, mpm.ambito_id, mpm.anio_mes
-                ORDER BY vt.version_fec_creacion DESC, vt.version DESC
+                ORDER BY vt.version_fec_efectiva DESC, vt.version DESC
             ) AS rn
         FROM meses_partida_master mpm
         JOIN versiones_tipadas vt
             ON vt.obra_id   = mpm.obra_id
            AND vt.ambito_id = mpm.ambito_id
-        WHERE vt.version_fec_creacion < (mpm.anio_mes + INTERVAL '1 month')
+        WHERE vt.version_fec_efectiva < (mpm.anio_mes + INTERVAL '1 month')
           AND vt.tipo_master IN ('Planif Inicial', 'ABC', 'Cuatrimestral')
     ) sub
     WHERE rn = 1
@@ -158,7 +179,7 @@ master_proyectado AS (
     SELECT
         vvm.obra_id, vvm.partida_id, vvm.ambito_id, vvm.anio_mes,
         vvm.version, vvm.version_descripcion, vvm.version_tex,
-        vvm.version_fec_creacion, vvm.tipo_master,
+        vvm.version_fec_creacion, vvm.version_fec_efectiva, vvm.tipo_master,
         COALESCE(pm.importe_mes,        0)::NUMERIC(18,2) AS importe_mes,
         COALESCE(pm.importe_origen,     0)::NUMERIC(18,2) AS importe_origen,
         COALESCE(pm.importe_mes_raw,    0)::NUMERIC(18,2) AS importe_mes_raw,

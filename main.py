@@ -1451,5 +1451,114 @@ def inspect_month(obra_id: int, anio_mes: str, top: int, ambito: str) -> None:
         click.echo("")
 
 
+@cli.command("inspect-cp-tipologia")
+@click.option("--obra", "obra_id", type=int, default=None,
+              help="obra_id; si se omite muestra todas las obras.")
+@click.option("--anio", type=int, default=None,
+              help="año concreto (ej. 2025); si se omite muestra todos los años.")
+def inspect_cp_tipologia(obra_id: int | None, anio: int | None) -> None:
+    """
+    Muestra el detalle anual de Costes Proporcionales por tipología desde
+    mart.v_pbi_cp_tipologia. Útil para validar el mapping CP.x → tipología
+    antes/después de actualizar el visual de Power BI.
+
+    Salida pivotada por tipología con columnas Plan / Real / Desviación.
+    """
+    pg = _get_pg()
+
+    where: list[str] = []
+    params: dict = {}
+    if obra_id is not None:
+        where.append("obra_id = %(obra)s")
+        params["obra"] = obra_id
+    if anio is not None:
+        where.append("anio = %(anio)s")
+        params["anio"] = anio
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+
+    sql = f"""
+        SELECT obra_id, anio, tipologia, orden_tipologia,
+               cp_real, cp_planificado, cp_desviacion
+          FROM mart.v_pbi_cp_tipologia
+        {where_sql}
+         ORDER BY obra_id, anio, orden_tipologia
+    """
+
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+        if not rows:
+            click.secho(
+                "No hay datos en mart.v_pbi_cp_tipologia para el filtro indicado.",
+                fg="yellow",
+            )
+            return
+
+        titulo = "Detalle anual CP por tipología"
+        if obra_id is not None:
+            titulo += f" · obra={obra_id}"
+        if anio is not None:
+            titulo += f" · año={anio}"
+        click.secho(f"\n=== {titulo} ===\n", fg="cyan", bold=True)
+
+        click.echo(
+            f"  {'obra':>10}  {'año':>6}  {'tipologia':<16}  "
+            f"{'CP_plan':>14}  {'CP_real':>14}  {'desviacion':>14}"
+        )
+        click.echo("  " + "-" * 84)
+
+        def fmt(v):
+            if v is None:
+                return f"{'-':>14}"
+            return f"{float(v):>14,.2f}"
+
+        last_key = None
+        sub_real = sub_plan = sub_desv = 0.0
+        totals: dict[tuple[int, int], dict[str, float]] = {}
+
+        for r in rows:
+            o_id, an, tip, _orden, cpr, cpp, cpd = r
+            key = (o_id, an)
+
+            # Inserta separador y subtotal cuando cambiamos de (obra, año)
+            if last_key is not None and key != last_key:
+                click.echo(
+                    f"  {'':>10}  {'':>6}  {'TOTAL OBRA-AÑO':<16}  "
+                    f"{fmt(sub_plan)}  {fmt(sub_real)}  {fmt(sub_desv)}"
+                )
+                click.echo("")
+                sub_real = sub_plan = sub_desv = 0.0
+
+            click.echo(
+                f"  {o_id:>10}  {an:>6}  {tip:<16}  "
+                f"{fmt(cpp)}  {fmt(cpr)}  {fmt(cpd)}"
+            )
+            sub_plan += float(cpp or 0)
+            sub_real += float(cpr or 0)
+            sub_desv += float(cpd or 0)
+            totals[key] = {"plan": sub_plan, "real": sub_real, "desv": sub_desv}
+            last_key = key
+
+        # Subtotal del último grupo
+        if last_key is not None:
+            click.echo(
+                f"  {'':>10}  {'':>6}  {'TOTAL OBRA-AÑO':<16}  "
+                f"{fmt(sub_plan)}  {fmt(sub_real)}  {fmt(sub_desv)}"
+            )
+            click.echo("")
+
+        click.secho(
+            "Notas:\n"
+            "  - Año pasado:   suma enero-diciembre + última versión CUAT/ABC ≤ 31/12.\n"
+            "  - Año en curso: suma enero-mes_actual + última versión CUAT/ABC ≤ hoy.\n"
+            "  - Para auditar el mapping CP.x → tipología partida por partida usa\n"
+            "    la consulta de auditoría descrita en docs/MODELO_BI.md.",
+            fg="white",
+        )
+        click.echo("")
+
+
 if __name__ == "__main__":
     cli()
