@@ -1,7 +1,7 @@
 -- etl_sigrid/infrastructure/postgres/sql/stg/03_obras.sql
 --
 -- Materializa stg.obras combinando raw.obr con raw.con, deduplicando por
--- el mecanismo de Sigrid `conext.cod='15'`.
+-- el mecanismo de Sigrid `conext.cod='15'` y filtrando códigos no válidos.
 --
 -- ===========================================================================
 -- Modelo Sigrid
@@ -18,6 +18,32 @@
 --   - El campo del nombre legible es `con.res` (Resumen, varchar). En Sigrid
 --     no hay columna llamada `nom`; el patrón estándar es `cod` (código) y
 --     `res` (descripción corta/resumen).
+--
+-- ===========================================================================
+-- FILTROS APLICADOS
+-- ===========================================================================
+--
+-- 1) Códigos administrativos EXCLUIDOS.
+--    Son "papeleras" de Sigrid (centros de personal, gastos generales, etc.),
+--    no obras reales del negocio. Lista cerrada y revisada:
+--      0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT
+--
+-- 2) Códigos con secuencia numérica de 5+ dígitos EXCLUIDOS.
+--    Convención de Ruesma: el número de obra es de 4 dígitos. Sufijos
+--    alfabéticos o separadores son válidos (0675, 0675B, 0675-B), pero
+--    códigos como 02586A o 065879 son errores de captura o legacy mal
+--    catalogado y no deben entrar al mart.
+--    Regex aplicada: `con.cod !~ '[0-9]{5,}'` (no debe contener 5+
+--    dígitos consecutivos en ninguna posición del código).
+--
+--    Casos:
+--      '0675'      → OK (4 dígitos)
+--      '0675B'     → OK (4 dígitos + letra)
+--      '0675-B'    → OK (separador)
+--      '0675/2'    → OK (4 dígitos + 1 dígito tras separador)
+--      '02586A'    → FUERA (5 dígitos)
+--      '065879'    → FUERA (6 dígitos)
+--      '12345-9'   → FUERA (5 dígitos)
 --
 -- ===========================================================================
 -- DEDUPLICACIÓN POR conext.cod='15'
@@ -37,9 +63,7 @@
 --     → ese es el bueno (lo elige automáticamente el ranking).
 --
 --   Caso 2 (32%, 17 obras): ningún ide marcado en conext. Dos subcasos:
---     2A: códigos administrativos (0001-0005, CM, CP, GG, VAR, POSTV*,
---         BD*, GGD, GINT, OT) que no son obras reales sino "papeleras".
---         EXCLUIDOS del mart por el WHERE de abajo.
+--     2A: códigos administrativos → ya excluidos por el WHERE de arriba.
 --     2B: obras antiguas legítimas pre-conext. Fallback automático:
 --         MAX(tiemod), el registro modificado más recientemente.
 --
@@ -78,7 +102,7 @@ WITH ranked AS (
     LEFT JOIN raw.conext cx15
            ON cx15.conide = obr.ide
           AND cx15.cod = '15'
-    -- Excluir códigos administrativos (papeleras, no obras reales del negocio)
+    -- Excluir códigos administrativos (papeleras, no obras reales)
     WHERE con.cod NOT IN (
         '0001','0002','0003','0004','0005',
         'CM','CP','GG','VAR','POSTV','POSTV2',
@@ -86,6 +110,11 @@ WITH ranked AS (
         'BDDIAMAD','BDDIASUR','BDDIANORTE','BDDIAGRANADA',
         'GGD','GINT','OT'
     )
+    -- Excluir códigos con 5+ dígitos consecutivos (numeración inválida)
+    AND con.cod !~ '[0-9]{5,}'
+    -- Excluir códigos NULL o vacíos por sanidad
+    AND con.cod IS NOT NULL
+    AND length(trim(con.cod)) > 0
 )
 SELECT
     obra_id,
