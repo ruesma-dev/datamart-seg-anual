@@ -29,6 +29,7 @@ import click  # noqa: E402
 
 from config.settings import get_settings  # noqa: E402
 from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
+from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
 from etl_sigrid.application.steps.build_stg_step import BuildStgStep  # noqa: E402
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: E402
@@ -1558,6 +1559,317 @@ def inspect_cp_tipologia(obra_id: int | None, anio: int | None) -> None:
             fg="white",
         )
         click.echo("")
+
+
+@cli.command("build-cierre")
+def build_cierre() -> None:
+    """
+    Materializa el schema `cierre` (cierre mensual de obra).
+
+    Lógica (Tanda 1.4):
+      EJECUTADO ← stg.plan_mensual amb 3/7 fas>=1
+      FINAL    ← versión master CIERRE del mes (amb 8/11) parseando el
+                  texto de la versión; fallback a fase 0 si mes en curso
+                  sin master.
+
+    INDEPENDIENTE del mart principal. Solo lee de stg.*.
+    """
+    settings = get_settings()
+    result = BuildCierreStep(settings).run()
+    _print_result(result)
+    if result.status == StepStatus.FAILED:
+        sys.exit(1)
+
+
+@cli.command("reset-cierre")
+def reset_cierre() -> None:
+    """
+    Borra todo el schema `cierre`. Limpia también restos previos en `mart`
+    de entregas anteriores. Tras esto, lanzar `build-cierre`.
+
+    Tanda 1.4 NO usa tabla histórica (snapshot eliminado): reset y build
+    pueden hacerse libremente sin perder nada irrecuperable.
+    """
+    pg = _get_pg()
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute("DROP VIEW  IF EXISTS mart.v_pbi_cierre_resumen      CASCADE")
+        cur.execute("DROP VIEW  IF EXISTS mart.v_pbi_dim_concepto_cierre CASCADE")
+        cur.execute("DROP TABLE IF EXISTS mart.fact_cierre_mensual       CASCADE")
+        cur.execute("DROP SCHEMA IF EXISTS cierre CASCADE")
+        conn.commit()
+    click.secho(
+        "Schema cierre eliminado. Lanza `python main.py build-cierre`.",
+        fg="green",
+    )
+
+
+@cli.command("find-obra")
+@click.option("--codigo", "codigo", type=str, default=None,
+              help="codigo_obra a buscar (p.ej. '0664'). Si se omite, lista todas.")
+@click.option("--nombre", "nombre", type=str, default=None,
+              help="filtra por nombre_obra (LIKE %nombre%).")
+def find_obra(codigo: str | None, nombre: str | None) -> None:
+    """Busca obras en stg.obras por codigo_obra o nombre_obra."""
+    pg = _get_pg()
+    where: list[str] = []
+    params: dict = {}
+    if codigo:
+        where.append("codigo_obra LIKE %(cod)s")
+        params["cod"] = f"%{codigo}%"
+    if nombre:
+        where.append("UPPER(nombre_obra) LIKE UPPER(%(nom)s)")
+        params["nom"] = f"%{nombre}%"
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+
+    sql = f"""
+        SELECT obra_id, codigo_obra, nombre_obra
+          FROM stg.obras
+        {where_sql}
+         ORDER BY codigo_obra NULLS LAST, obra_id
+    """
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    if not rows:
+        click.secho("No se encontró ninguna obra con esos filtros.", fg="yellow")
+        return
+
+    click.secho(f"=== Obras encontradas ({len(rows)}) ===\n", fg="cyan", bold=True)
+    click.echo(f"  {'obra_id':>12}  {'codigo':<10}  {'nombre'}")
+    click.echo("  " + "-" * 90)
+    for obra_id, cod, nom in rows:
+        click.echo(f"  {obra_id:>12}  {(cod or ''):<10}  {(nom or '')[:80]}")
+    click.echo("")
+
+
+@cli.command("list-master-cierre")
+@click.option("--codigo", "codigo_obra", type=str, default=None)
+@click.option("--obra", "obra_id", type=int, default=None)
+def list_master_cierre(codigo_obra: str | None, obra_id: int | None) -> None:
+    """
+    Lista las versiones master CIERRE de una obra, mostrando el mes que
+    parsea cada una con cierre.fn_mes_de_version_master(version_tex, descripcion).
+
+    Útil para diagnosticar por qué un mes resuelve a 'fase_0' o 'sin_dato'
+    en vez de 'master'.
+    """
+    pg = _get_pg()
+    if codigo_obra and obra_id is None:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT obra_id FROM stg.obras WHERE codigo_obra = %s",
+                (codigo_obra,),
+            )
+            row = cur.fetchone()
+            if not row:
+                click.secho(f"No existe obra con codigo='{codigo_obra}'",
+                            fg="red", err=True)
+                sys.exit(2)
+            obra_id = row[0]
+    if obra_id is None:
+        click.secho("Debes pasar --obra o --codigo.", fg="red", err=True)
+        sys.exit(2)
+
+    sql = """
+        SELECT DISTINCT
+            ambito_id, version, version_tex, version_descripcion,
+            cierre.fn_mes_de_version_master(version_tex, version_descripcion) AS mes_parseado,
+            version_fec_creacion
+          FROM stg.plan_mensual
+         WHERE obra_id = %s
+           AND ambito_id IN (8, 11)
+           AND version_tex IS NOT NULL
+           AND UPPER(version_tex) LIKE '%%CIERRE%%'
+           AND UPPER(version_tex) NOT LIKE '%%ABC%%'
+           AND UPPER(version_tex) NOT LIKE '%%INICIAL%%'
+           AND UPPER(version_tex) NOT LIKE '%%VALORADA%%'
+           AND UPPER(version_tex) NOT LIKE '%%CUATRIM%%'
+         ORDER BY ambito_id, version DESC
+    """
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, (obra_id,))
+        rows = cur.fetchall()
+
+    if not rows:
+        click.secho(
+            f"No hay versiones master CIERRE para obra_id={obra_id}.",
+            fg="yellow",
+        )
+        return
+
+    click.secho(f"\n=== Versiones master CIERRE · obra_id={obra_id} ===\n",
+                fg="cyan", bold=True)
+    click.echo(f"  {'amb':>4}  {'v':>4}  {'mes_parseado':<14}  "
+               f"{'fec_creac':<12}  {'tex':<50}")
+    click.echo("  " + "-" * 110)
+    for amb, ver, tex, desc, mes_p, fec_c in rows:
+        amb_lbl = {8: 'coste', 11: 'venta'}.get(amb, str(amb))
+        mes_lbl = mes_p.isoformat() if mes_p else click.style('NO PARSEA', fg='red')
+        fec_lbl = fec_c.isoformat() if fec_c else '-'
+        click.echo(f"  {amb_lbl:>4}  {ver:>4}  {mes_lbl:<14}  "
+                   f"{fec_lbl:<12}  {(tex or '')[:50]}")
+    click.echo("")
+
+
+@cli.command("inspect-cierre")
+@click.option("--obra", "obra_id", type=int, default=None)
+@click.option("--codigo", "codigo_obra", type=str, default=None)
+@click.option("--mes", "anio_mes", type=str, default=None,
+              help="YYYY-MM-DD. Si se omite, muestra todos.")
+def inspect_cierre(
+    obra_id: int | None, codigo_obra: str | None, anio_mes: str | None
+) -> None:
+    """
+    Muestra el resumen ejecutivo del cierre con trazabilidad del FINAL.
+    Cabecera de cada mes incluye: fase del ejecutado, fuente del FINAL
+    (master/fase_0/sin_dato) y, si es master, el texto de la versión.
+    """
+    if obra_id is None and not codigo_obra:
+        click.secho("Debes pasar --obra <id> o --codigo <codigo_obra>.",
+                    fg="red", err=True)
+        sys.exit(2)
+
+    pg = _get_pg()
+
+    if codigo_obra:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
+                (codigo_obra,),
+            )
+            row = cur.fetchone()
+        if not row:
+            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
+            sys.exit(2)
+        obra_id, _nom = row
+        click.secho(
+            f"obra '{codigo_obra}' → obra_id={obra_id} ({_nom})",
+            fg="white", dim=True,
+        )
+
+    where = ["obra_id = %(obra)s"]
+    params: dict = {"obra": obra_id}
+    if anio_mes:
+        where.append("anio_mes = %(mes)s")
+        params["mes"] = anio_mes
+
+    sql = f"""
+    SELECT
+        anio_mes, nombre_mes, concepto, orden_concepto,
+        ejecutado_origen, ejecutado_anterior, ejecutado_mes,
+        final_importe, final_anterior, pendiente_importe, variacion_importe,
+        ejecutado_origen_pct, ejecutado_anterior_pct, ejecutado_mes_pct,
+        pendiente_pct, variacion_pct,
+        fase_numero, fase_nombre_mes,
+        final_fuente, final_version_master, final_version_tex
+      FROM cierre.v_pbi_cierre_resumen
+     WHERE {' AND '.join(where)}
+     ORDER BY anio_mes, orden_concepto
+    """
+
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    if not rows:
+        click.secho(
+            f"No hay datos para obra_id={obra_id}.", fg="yellow",
+        )
+        return
+
+    titulo = f"Cierre mensual · obra_id={obra_id}"
+    if anio_mes:
+        titulo += f" · mes={anio_mes}"
+    click.secho(f"\n=== {titulo} ===\n", fg="cyan", bold=True)
+
+    def fmt(v):
+        return f"{'-':>14}" if v is None else f"{float(v):>14,.2f}"
+
+    def fpct(v):
+        return f"{'-':>7}" if v is None else f"{float(v):>7,.2f}"
+
+    # Localiza la metadata de cada mes desde una fila de COSTE (no derivada)
+    meta_por_mes: dict = {}
+    for r in rows:
+        mes_v = r[0]
+        fnum, fnm = r[16], r[17]
+        ffuente, fvm, fvt = r[18], r[19], r[20]
+        if mes_v not in meta_por_mes and fnum is not None:
+            meta_por_mes[mes_v] = (fnum, fnm, ffuente, fvm, fvt)
+
+    last_mes = None
+    for r in rows:
+        (mes, nm_mes, concepto, _orden,
+         eo, ea, em,
+         fi, fa, pi_imp, var,
+         eo_pct, ea_pct, em_pct, pen_pct, var_pct,
+         _fase_num, _fase_nm,
+         _ffuente, _fvm, _fvt) = r
+
+        if mes != last_mes:
+            if last_mes is not None:
+                click.echo("")
+            meta = meta_por_mes.get(mes, (None, None, None, None, None))
+            fnum_show, fnm_show, ffuente_show, fvm_show, fvt_show = meta
+            fase_info = (
+                f"fase {fnum_show} · {fnm_show}"
+                if fnum_show is not None else "fase: -"
+            )
+            if ffuente_show == 'master':
+                final_info = (
+                    f"FINAL: master v{fvm_show} ({(fvt_show or '')[:35]})"
+                )
+                fuente_color = "green"
+            elif ffuente_show == 'fase_0':
+                final_info = "FINAL: fase_0 (mes en curso, sin master)"
+                fuente_color = "yellow"
+            else:
+                final_info = "FINAL: sin_dato"
+                fuente_color = "red"
+            click.secho(f"\n▸ {nm_mes}  ({fase_info})", fg="blue", bold=True)
+            click.secho(f"   {final_info}", fg=fuente_color, dim=True)
+            click.echo(
+                f"  {'concepto':<12}  "
+                f"{'EJEC MES':>14} {'%':>7}  "
+                f"{'EJEC ANT':>14} {'%':>7}  "
+                f"{'EJEC ORIG':>14} {'%':>7}  "
+                f"{'PENDIENTE':>14} {'%':>7}  "
+                f"{'FINAL':>14}  "
+                f"{'VAR MES':>14} {'%':>7}"
+            )
+            click.echo("  " + "-" * 175)
+            last_mes = mes
+
+        color = None
+        if concepto == "BENEFICIO":
+            color = "red" if (eo is not None and float(eo) < 0) else "green"
+
+        line = (
+            f"  {concepto:<12}  "
+            f"{fmt(em)} {fpct(em_pct)}  "
+            f"{fmt(ea)} {fpct(ea_pct)}  "
+            f"{fmt(eo)} {fpct(eo_pct)}  "
+            f"{fmt(pi_imp)} {fpct(pen_pct)}  "
+            f"{fmt(fi)}  "
+            f"{fmt(var)} {fpct(var_pct)}"
+        )
+        if color:
+            click.secho(line, fg=color,
+                        bold=(concepto in ("VENTA", "GASTOS", "BENEFICIO")))
+        else:
+            click.echo(line)
+
+    click.echo("")
+    click.secho("Leyenda:", bold=True)
+    click.echo("  - FINAL: master v<N> (<tex>)  → versión master CIERRE del mes")
+    click.echo("  - FINAL: fase_0               → mes en curso sin master; usa Previsto vivo")
+    click.echo("  - FINAL: sin_dato             → ni master ni fase 0 para ese mes")
+    click.echo("")
+    click.secho("Mapping al Excel CONTROL DE GESTIÓN:", bold=True)
+    click.echo("  R20 VENTA  | R22 INDIRECTOS | R23 DIRECTOS | R24 GENERALES")
+    click.echo("  R21 GASTOS (=I+D+G) | R25 BENEFICIO (=VENTA-GASTOS)")
+    click.echo("")
 
 
 if __name__ == "__main__":

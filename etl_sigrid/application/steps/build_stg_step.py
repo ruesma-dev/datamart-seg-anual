@@ -178,7 +178,7 @@ class BuildStgStep(PipelineStep):
             ("raw", "obrparpar"): ["ide", "obride", "padide", "cod", "res", "tipdes", "unimed", "tcaide"],
             ("raw", "obrfas"):    ["ide", "obride", "fasnum", "fecini", "fecfin", "ano", "mes", "res"],
             ("raw", "obrfasamb"): ["ide", "obride", "amb", "fas", "plafec", "fec", "res", "tex"],
-            ("raw", "obrparpre"): ["ide", "obride", "paride", "amb", "fas", "can", "pre", "planif", "totinc"],
+            ("raw", "obrparpre"): ["ide", "obride", "paride", "amb", "fas", "can", "pre", "planif", "totinc", "impcoe"],
             ("raw", "conext"):    ["conide", "cod", "valn"],
             ("raw", "auxobramb"): ["ide", "cod", "res"],
             ("raw", "auxobrtca"): ["ide", "cod", "res"],

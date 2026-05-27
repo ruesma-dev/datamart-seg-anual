@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS stg.presupuesto (
     fase_num        INTEGER          NOT NULL,
     cantidad        NUMERIC(20,6),                  -- 6 decimales para porcentajes/coeficientes Sigrid
     precio          NUMERIC(20,6),                  -- 6 decimales para precisión Sigrid
-    importe         NUMERIC(18,2),
+    importe         NUMERIC(18,2),                  -- ROUND(can*pre, 2) — usado por mart/plan_mensual
+    importe_oficial NUMERIC(18,2),                  -- COALESCE(impcoe Sigrid, importe) — usado por cierre
     _source_tiemod  DOUBLE PRECISION,
     _built_at       TIMESTAMP        NOT NULL DEFAULT NOW()
 );
@@ -133,6 +134,23 @@ BEGIN
         ALTER TABLE stg.presupuesto ALTER COLUMN cantidad TYPE NUMERIC(20,6);
         RAISE NOTICE 'Migrado stg.presupuesto.cantidad de NUMERIC(%, %) a NUMERIC(20, 6)',
                      v_precision, v_scale;
+    END IF;
+END $$;
+
+-- Migración defensiva para IMPORTE_OFICIAL: si tabla ya existía sin esta columna.
+-- importe_oficial = COALESCE(impcoe Sigrid, importe). Lo usa el schema cierre
+-- para que el FINAL master cuadre con lo que muestra la pantalla de Sigrid.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg'
+          AND table_name   = 'presupuesto'
+          AND column_name  = 'importe_oficial'
+    ) THEN
+        ALTER TABLE stg.presupuesto
+            ADD COLUMN importe_oficial NUMERIC(18,2);
+        RAISE NOTICE 'Añadida columna stg.presupuesto.importe_oficial';
     END IF;
 END $$;
 
