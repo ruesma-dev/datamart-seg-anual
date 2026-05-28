@@ -1,18 +1,19 @@
 # etl_sigrid/application/steps/build_cierre_step.py
 """
-Step que materializa el schema `cierre` (Tanda 1.4 — FINAL desde master CIERRE).
+Step que materializa el schema `cierre` (Tanda 2 — añade detalle fino).
 
 Encadena los archivos SQL en orden:
-    00_setup.sql      - PERSISTENTE: schema + funciones (parseo mes, fase, master)
-    01_ddl_fact.sql   - DROP + CREATE de cierre.fact_cierre_mensual
-    02_build_fact.sql - INSERT del fact con la lógica:
-                          · EJECUTADO desde stg.plan_mensual amb 3/7 fas>=1
-                          · FINAL desde versión master CIERRE del mes
-                            (amb 8/11), fallback a fase 0 si no hay master
-    03_views.sql      - Vistas Power BI
+    00_setup.sql          - schema + funciones helper (idempotente)
+    01_ddl_fact.sql       - DROP + CREATE cierre.fact_cierre_mensual
+    02_build_fact.sql     - INSERT del fact con EJECUTADO + FINAL master/fase0
+    03_views.sql          - Vista principal v_pbi_cierre_resumen
+    04_views_detalle.sql  - (NUEVO) Vistas de detalle:
+                              · v_pbi_cierre_indirectos_detalle
+                              · v_pbi_cierre_generales_detalle
+                              · v_pbi_dim_subcategoria_ci
+                              · v_pbi_dim_tipologia_cp
 
-El schema cierre es INDEPENDIENTE de mart. Lee stg.plan_mensual + stg.fases
-+ stg.partidas, sin modificar nada del data mart principal.
+INDEPENDIENTE del mart principal. Solo lee de stg.*.
 """
 
 from __future__ import annotations
@@ -66,22 +67,20 @@ class BuildCierreStep(PipelineStep):
 
         sql_dir = (
             Path(__file__).resolve().parents[2]
-            / "infrastructure"
-            / "postgres"
-            / "sql"
-            / "cierre"
+            / "infrastructure" / "postgres" / "sql" / "cierre"
         )
 
         sub_steps: list[_SubStep] = [
-            _SubStep(name="setup",      sql_file="00_setup.sql"),
-            _SubStep(name="ddl_fact",   sql_file="01_ddl_fact.sql"),
+            _SubStep(name="setup",         sql_file="00_setup.sql"),
+            _SubStep(name="ddl_fact",      sql_file="01_ddl_fact.sql"),
             _SubStep(
                 name="build_fact",
                 sql_file="02_build_fact.sql",
                 target_schema="cierre",
                 target_table="fact_cierre_mensual",
             ),
-            _SubStep(name="views",      sql_file="03_views.sql"),
+            _SubStep(name="views",         sql_file="03_views.sql"),
+            _SubStep(name="views_detalle", sql_file="04_views_detalle.sql"),
         ]
 
         total_rows = 0
@@ -100,9 +99,7 @@ class BuildCierreStep(PipelineStep):
                 duration = (datetime.utcnow() - t0).total_seconds()
                 logger.error(
                     "cierre_substep_failed",
-                    sub_step=sub.name,
-                    duration_s=duration,
-                    exc_info=True,
+                    sub_step=sub.name, duration_s=duration, exc_info=True,
                 )
                 result.status = StepStatus.FAILED
                 result.error_message = f"Fallo en {sub.name}: {e}"
@@ -115,8 +112,7 @@ class BuildCierreStep(PipelineStep):
                 total_rows += rows
             logger.info(
                 "cierre_substep_done",
-                sub_step=sub.name,
-                rows=rows,
+                sub_step=sub.name, rows=rows,
                 duration_s=round((datetime.utcnow() - t0).total_seconds(), 2),
             )
 

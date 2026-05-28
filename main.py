@@ -1872,5 +1872,211 @@ def inspect_cierre(
     click.echo("")
 
 
+@cli.command("inspect-indirectos-detalle")
+@click.option("--obra", "obra_id", type=int, default=None)
+@click.option("--codigo", "codigo_obra", type=str, default=None)
+@click.option("--mes", "anio_mes", type=str, default=None,
+              help="YYYY-MM-DD. Si se omite, último mes con datos.")
+def inspect_indirectos_detalle(
+    obra_id: int | None, codigo_obra: str | None, anio_mes: str | None
+) -> None:
+    """
+    Muestra el desglose de INDIRECTOS por (grupo CI × subcategoría) para
+    una obra y mes. Replica las filas R27-R66 del Excel CONTROL DE GESTIÓN.
+
+    Grupo = nivel 2 de ruta_capitulos (CI.MOI, CI.INFRA, CI.MAQ, CI.CONS).
+    Subcategoría = nivel 3 (Jefe de obra, Vallado, Casetas, ...).
+    """
+    if obra_id is None and not codigo_obra:
+        click.secho("Debes pasar --obra <id> o --codigo <codigo_obra>.",
+                    fg="red", err=True)
+        sys.exit(2)
+
+    pg = _get_pg()
+
+    if codigo_obra:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
+                (codigo_obra,),
+            )
+            row = cur.fetchone()
+        if not row:
+            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
+            sys.exit(2)
+        obra_id, _nom = row
+        click.secho(
+            f"obra '{codigo_obra}' → obra_id={obra_id} ({_nom})",
+            fg="white", dim=True,
+        )
+
+    # Si no se da mes, tomar el último con datos
+    if not anio_mes:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT MAX(anio_mes) FROM cierre.v_pbi_cierre_indirectos_detalle "
+                "WHERE obra_id = %s",
+                (obra_id,),
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                anio_mes = row[0].isoformat()
+            else:
+                click.secho("No hay datos de detalle INDIRECTOS para esta obra.",
+                            fg="yellow")
+                return
+
+    sql = """
+    SELECT
+        grupo_cod, subcategoria_cod,
+        grupo_nombre, subcategoria_nombre,
+        ejecutado_origen, ejecutado_anterior, ejecutado_mes
+      FROM cierre.v_pbi_cierre_indirectos_detalle
+     WHERE obra_id = %(obra)s AND anio_mes = %(mes)s
+     ORDER BY grupo_nombre, subcategoria_nombre
+    """
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, {"obra": obra_id, "mes": anio_mes})
+        rows = cur.fetchall()
+
+    if not rows:
+        click.secho(f"No hay datos para obra={obra_id} mes={anio_mes}",
+                    fg="yellow")
+        return
+
+    click.secho(
+        f"\n=== Detalle INDIRECTOS · obra_id={obra_id} · mes={anio_mes} ===\n",
+        fg="cyan", bold=True,
+    )
+    click.echo(
+        f"  {'grupo':<32}  {'subcategoría':<42}  "
+        f"{'EJEC MES':>14}  {'EJEC ANT':>14}  {'EJEC ORIG':>14}"
+    )
+    click.echo("  " + "-" * 124)
+
+    last_grupo = None
+    total_origen = 0.0
+    for grupo_cod, subcat_cod, grupo_nm, subcat_nm, eo, ea, em in rows:
+        if grupo_nm != last_grupo:
+            if last_grupo is not None:
+                click.echo("")
+            last_grupo = grupo_nm
+        # Mostrar el nombre principalmente; el código entre paréntesis para
+        # trazabilidad en caso de homonimias.
+        grupo_label = f"{(grupo_nm or '')[:24]} ({grupo_cod})"
+        subcat_label = f"{(subcat_nm or '')[:34]} ({subcat_cod})"
+        click.echo(
+            f"  {grupo_label:<32}  {subcat_label:<42}  "
+            f"{float(em):>14,.2f}  {float(ea):>14,.2f}  {float(eo):>14,.2f}"
+        )
+        total_origen += float(eo)
+
+    click.echo("  " + "-" * 124)
+    click.secho(
+        f"  {'TOTAL INDIRECTOS':<76}  {'':>14}  {'':>14}  {total_origen:>14,.2f}",
+        fg="cyan", bold=True,
+    )
+    click.echo("")
+    click.echo("Validación: este total debe coincidir EXACTAMENTE con la fila")
+    click.echo("INDIRECTOS de `inspect-cierre` (ejecutado origen).")
+    click.echo("")
+
+
+@cli.command("inspect-generales-detalle")
+@click.option("--obra", "obra_id", type=int, default=None)
+@click.option("--codigo", "codigo_obra", type=str, default=None)
+@click.option("--mes", "anio_mes", type=str, default=None,
+              help="YYYY-MM-DD. Si se omite, último mes con datos.")
+def inspect_generales_detalle(
+    obra_id: int | None, codigo_obra: str | None, anio_mes: str | None
+) -> None:
+    """
+    Muestra el desglose de GENERALES por tipología (Levantamiento, Seguros,
+    Avales, Contratación, Medio Ambiente, Aporte GG).
+    """
+    if obra_id is None and not codigo_obra:
+        click.secho("Debes pasar --obra <id> o --codigo <codigo_obra>.",
+                    fg="red", err=True)
+        sys.exit(2)
+
+    pg = _get_pg()
+
+    if codigo_obra:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
+                (codigo_obra,),
+            )
+            row = cur.fetchone()
+        if not row:
+            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
+            sys.exit(2)
+        obra_id, _nom = row
+        click.secho(
+            f"obra '{codigo_obra}' → obra_id={obra_id} ({_nom})",
+            fg="white", dim=True,
+        )
+
+    if not anio_mes:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT MAX(anio_mes) FROM cierre.v_pbi_cierre_generales_detalle "
+                "WHERE obra_id = %s",
+                (obra_id,),
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                anio_mes = row[0].isoformat()
+            else:
+                click.secho("No hay datos de detalle GENERALES para esta obra.",
+                            fg="yellow")
+                return
+
+    sql = """
+    SELECT
+        tipologia, orden_tipologia,
+        ejecutado_origen, ejecutado_anterior, ejecutado_mes
+      FROM cierre.v_pbi_cierre_generales_detalle
+     WHERE obra_id = %(obra)s AND anio_mes = %(mes)s
+     ORDER BY orden_tipologia
+    """
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, {"obra": obra_id, "mes": anio_mes})
+        rows = cur.fetchall()
+
+    if not rows:
+        click.secho(f"No hay datos para obra={obra_id} mes={anio_mes}",
+                    fg="yellow")
+        return
+
+    click.secho(
+        f"\n=== Detalle GENERALES · obra_id={obra_id} · mes={anio_mes} ===\n",
+        fg="cyan", bold=True,
+    )
+    click.echo(
+        f"  {'tipología':<18}  "
+        f"{'EJEC MES':>14}  {'EJEC ANT':>14}  {'EJEC ORIG':>14}"
+    )
+    click.echo("  " + "-" * 72)
+
+    total_origen = 0.0
+    for tipo, _orden, eo, ea, em in rows:
+        click.echo(
+            f"  {tipo:<18}  "
+            f"{float(em):>14,.2f}  {float(ea):>14,.2f}  {float(eo):>14,.2f}"
+        )
+        total_origen += float(eo)
+
+    click.echo("  " + "-" * 72)
+    click.secho(
+        f"  {'TOTAL GENERALES':<18}  {'':>14}  {'':>14}  {total_origen:>14,.2f}",
+        fg="cyan", bold=True,
+    )
+    click.echo("")
+    click.echo("Validación: este total debe coincidir EXACTAMENTE con la fila")
+    click.echo("GENERALES de `inspect-cierre` (ejecutado origen).")
+    click.echo("")
+
+
 if __name__ == "__main__":
     cli()
