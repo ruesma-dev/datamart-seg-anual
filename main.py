@@ -2078,5 +2078,116 @@ def inspect_generales_detalle(
     click.echo("")
 
 
+@cli.command("inspect-cabecera")
+@click.option("--obra", "obra_id", type=int, default=None)
+@click.option("--codigo", "codigo_obra", type=str, default=None)
+def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
+    """
+    Muestra la cabecera del cierre (parte superior del Excel CONTROL DE
+    GESTIÓN): identificación de la obra, cliente, técnico responsable,
+    fechas, plazo y presupuestos inicial/vigente.
+
+    Marca los campos vacíos en Sigrid como "(no disponible)".
+    """
+    if obra_id is None and not codigo_obra:
+        click.secho("Debes pasar --obra <id> o --codigo <codigo_obra>.",
+                    fg="red", err=True)
+        sys.exit(2)
+
+    pg = _get_pg()
+
+    if codigo_obra:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT obra_id FROM stg.obras WHERE codigo_obra = %s",
+                (codigo_obra,),
+            )
+            row = cur.fetchone()
+        if not row:
+            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
+            sys.exit(2)
+        obra_id = row[0]
+
+    sql = """
+    SELECT
+        codigo_obra, nombre_obra,
+        cliente_nombre, tecnico_responsable,
+        centro_coste_ide, tipo_obra_ide, clase_obra_ide,
+        fecha_inicio_previsto, fecha_fin_previsto,
+        fecha_inicio_real, fecha_fin_real, fecha_adjudicacion,
+        plazo_meses, coeficiente_indirectos, superficie_total,
+        presupuesto_inicial_venta, version_inicial,
+        presupuesto_vigente_venta, version_vigente,
+        modificados_aprobados
+      FROM cierre.v_pbi_cierre_cabecera
+     WHERE obra_id = %s
+    """
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, (obra_id,))
+        row = cur.fetchone()
+
+    if not row:
+        click.secho(f"No hay cabecera para obra_id={obra_id}.", fg="yellow")
+        return
+
+    (codigo, nombre, cliente, tecnico,
+     cc_ide, tipo_ide, clase_ide,
+     fini_p, ffin_p, fini_r, ffin_r, fadj,
+     plazo, coef, sup,
+     pres_ini, ver_ini, pres_vig, ver_vig, modif) = row
+
+    def show(v, fmt=None):
+        if v is None:
+            return click.style("(no disponible)", fg="yellow", dim=True)
+        if fmt == "money":
+            return f"{float(v):,.2f} €"
+        if fmt == "date":
+            return v.isoformat()
+        if fmt == "num":
+            return f"{float(v):,.2f}"
+        return str(v)
+
+    click.secho(f"\n=== Cabecera · {codigo} · {nombre} ===\n",
+                fg="cyan", bold=True)
+
+    click.secho("IDENTIFICACIÓN", bold=True)
+    click.echo(f"  Código obra ........... {codigo}")
+    click.echo(f"  Nombre ................ {nombre}")
+    click.echo(f"  Cliente ............... {show(cliente)}")
+    click.echo(f"  Técnico responsable ... {show(tecnico)}")
+    click.echo(f"  Centro de coste (id) .. {show(cc_ide)}")
+    click.echo(f"  Tipo de obra (id) ..... {show(tipo_ide)}")
+    click.echo(f"  Clase de obra (id) .... {show(clase_ide)}")
+    click.echo("")
+
+    click.secho("PLAZOS", bold=True)
+    click.echo(f"  Inicio previsto ....... {show(fini_p, 'date')}")
+    click.echo(f"  Fin previsto .......... {show(ffin_p, 'date')}")
+    click.echo(f"  Inicio real ........... {show(fini_r, 'date')}")
+    click.echo(f"  Fin real .............. {show(ffin_r, 'date')}")
+    click.echo(f"  Adjudicación .......... {show(fadj, 'date')}")
+    click.echo(f"  Plazo (meses) ......... {show(plazo, 'num')}")
+    click.echo("")
+
+    click.secho("CARACTERÍSTICAS", bold=True)
+    click.echo(f"  Coef. indirectos ...... {show(coef, 'num')}")
+    click.echo(f"  Superficie total ...... {show(sup, 'num')}")
+    click.echo("")
+
+    click.secho("PRESUPUESTO (VENTA, de master CIERRE)", bold=True)
+    click.echo(f"  Inicial ............... {show(pres_ini, 'money')}"
+               + (f"   [{ver_ini}]" if ver_ini else ""))
+    click.echo(f"  Vigente ............... {show(pres_vig, 'money')}"
+               + (f"   [{ver_vig}]" if ver_vig else ""))
+    click.echo(f"  Modificados aprobados . {show(modif, 'money')}")
+    click.echo("")
+
+    click.secho("Notas:", bold=True)
+    click.echo("  - (no disponible) = el campo viene vacío/0 en Sigrid.")
+    click.echo("  - Centro/Tipo/Clase se muestran como ID hasta ingestar")
+    click.echo("    los catálogos (cen, auxobrtip, auxobrcla) — Tanda 3.1.")
+    click.echo("")
+
+
 if __name__ == "__main__":
     cli()

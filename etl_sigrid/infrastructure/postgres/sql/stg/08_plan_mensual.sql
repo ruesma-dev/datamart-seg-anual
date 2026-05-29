@@ -93,6 +93,9 @@ WITH master_planif AS (
         pp.cantidad,
         pp.precio,
         pp.importe,
+        pp.dec_cantidades,
+        pp.dec_precios,
+        pp.dec_importes,
         op.planif,
         date_trunc('month', fa.plafec_date)::DATE AS mes_ancla,
         fa.fec_creacion,
@@ -154,6 +157,7 @@ master_explosion AS (
     SELECT
         pp.presupuesto_id, pp.obra_id, pp.partida_id, pp.ambito_id,
         pp.version_master, pp.cantidad, pp.precio, pp.importe,
+        pp.dec_cantidades, pp.dec_precios, pp.dec_importes,
         pp.mes_ancla, pp.fec_creacion, pp.fec_efectiva,
         pp.res_descripcion, pp.tex_descripcion,
         u.position::INTEGER AS posicion_mes,
@@ -213,7 +217,8 @@ master_con_ultimo_positivo AS (
 master_pct_efectivo AS (
     SELECT
         presupuesto_id, obra_id, partida_id, ambito_id, version_master,
-        cantidad, precio, importe, mes_ancla, fec_creacion, fec_efectiva,
+        cantidad, precio, importe, dec_cantidades, dec_precios, dec_importes,
+        mes_ancla, fec_creacion, fec_efectiva,
         res_descripcion, tex_descripcion,
         posicion_mes,
         pct_acumulado_raw,
@@ -231,7 +236,8 @@ master_pct_efectivo AS (
 master_con_pct_mes AS (
     SELECT
         presupuesto_id, obra_id, partida_id, ambito_id, version_master,
-        cantidad, precio, importe, mes_ancla, fec_creacion, fec_efectiva,
+        cantidad, precio, importe, dec_cantidades, dec_precios, dec_importes,
+        mes_ancla, fec_creacion, fec_efectiva,
         res_descripcion, tex_descripcion,
         posicion_mes, pct_acumulado,
         -- pct_mes = pct_acum efectivo actual - pct_acum efectivo mes anterior
@@ -256,8 +262,18 @@ reales_base AS (
         pp.fase_num                                AS mes_fase_num,
         pp.cantidad,
         pp.precio,
-        ROUND(pp.precio::NUMERIC, 2)               AS precio_redondeado,
-        ROUND((pp.cantidad * ROUND(pp.precio::NUMERIC, 2))::NUMERIC, 2)  AS importe_origen_round,
+        pp.dec_cantidades,
+        pp.dec_precios,
+        pp.dec_importes,
+        ROUND(pp.precio::NUMERIC, pp.dec_precios)  AS precio_redondeado,
+        -- importe a origen con decimales propios de la obra:
+        --   redondea can a decc y pre a decp antes de multiplicar; resultado a deci
+        -- cantidad SIN redondear (partidas % necesitan precisión completa);
+        -- solo precio a dec_precios, resultado a dec_importes
+        ROUND(
+            pp.cantidad::NUMERIC * ROUND(pp.precio::NUMERIC, pp.dec_precios),
+            pp.dec_importes
+        )                                          AS importe_origen_round,
         ROUND((pp.cantidad * pp.precio)::NUMERIC, 2)                     AS importe_origen_raw,
         op.totinc                                  AS total_incurrido_raw,
         f.nombre_mes                               AS res_descripcion,
@@ -278,6 +294,9 @@ reales_con_lag AS (
         mes_fase_num,
         cantidad,
         precio,
+        dec_cantidades,
+        dec_precios,
+        dec_importes,
         precio_redondeado,
         importe_origen_round,
         importe_origen_raw,
@@ -339,8 +358,18 @@ SELECT
     precio                                                    AS precio_unitario,
     ROUND((cantidad * pct_mes)::NUMERIC, 6)                   AS can_mes,
     ROUND((cantidad * pct_acumulado)::NUMERIC, 6)             AS can_origen,
-    ROUND((cantidad * pct_mes * ROUND(precio::NUMERIC, 2))::NUMERIC, 2)        AS importe_mes,
-    ROUND((cantidad * pct_acumulado * ROUND(precio::NUMERIC, 2))::NUMERIC, 2)  AS importe_origen,
+    -- importe con decimales propios de la obra (decc/decp/deci de stg.presupuesto):
+    --   redondea cantidad a decc y precio a decp antes de multiplicar; resultado a deci
+    -- La cantidad NO se redondea (ver nota en 06_presupuesto.sql: partidas %).
+    -- Solo se redondea el precio a dec_precios; el resultado a dec_importes.
+    ROUND(
+        (cantidad * pct_mes) * ROUND(precio::NUMERIC, dec_precios),
+        dec_importes
+    )                                                          AS importe_mes,
+    ROUND(
+        (cantidad * pct_acumulado) * ROUND(precio::NUMERIC, dec_precios),
+        dec_importes
+    )                                                          AS importe_origen,
     ROUND((cantidad * pct_mes * precio)::NUMERIC, 2)                           AS importe_mes_raw,
     ROUND((cantidad * pct_acumulado * precio)::NUMERIC, 2)                     AS importe_origen_raw,
     NULL::NUMERIC                                             AS total_incurrido,

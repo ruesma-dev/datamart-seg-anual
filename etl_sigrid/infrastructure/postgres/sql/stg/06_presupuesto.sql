@@ -7,21 +7,37 @@
 -- DEDUPLICACIÓN: DISTINCT ON por clave de negocio (obra, partida, amb, fase)
 -- quedándonos con el `ide` MAYOR (la corrección más reciente de Sigrid).
 --
--- PRECISIÓN (ambas columnas NUMERIC(20,6)):
---   - precio: raw.obrparpre.pre tiene hasta 6 decimales reales (ej. 115.294961)
+-- PRECISIÓN (cantidad y precio en NUMERIC(20,6)):
+--   - precio: raw.obrparpre.pre tiene hasta 6 decimales reales.
 --   - cantidad: raw.obrparpre.can para CP* contiene porcentajes con hasta
---     6 decimales (ej. 0.00025 para CP.4 AVALES). Truncar a 4 decimales
---     causa gap material en el Plan (caso real 0696 mayo 2025: +83,71 €).
+--     6 decimales. Truncar a 4 causa gap material en el Plan.
+--   Se guardan SIEMPRE con 6 decimales (precisión máxima). El redondeo por
+--   decimales de obra se aplica SOLO al calcular el importe (ver abajo).
 --
--- COLUMNAS DE IMPORTE (Tanda 1.6):
---   - importe         = ROUND(can*pre, 2). Usado por mart/plan_mensual y toda
---                       la planificación valorada. NO se altera para no
---                       introducir regresión en lo existente.
---   - importe_oficial = COALESCE(NULLIF(impcoe, 0), importe). Usado por el
---                       schema cierre para que el FINAL master cuadre con
---                       la pantalla de Sigrid (que usa impcoe).
---                       Si impcoe está vacío (≈70% de los registros), cae al
---                       importe calculado (comportamiento idéntico al actual).
+-- ===========================================================================
+-- DECIMALES POR OBRA (decc/decp/deci de raw.obr)
+-- ===========================================================================
+-- Cada obra define en Sigrid cuántos decimales usa para cantidades (decc),
+-- precios (decp) e importes (deci). Sigrid redondea cantidad y precio a esos
+-- decimales ANTES de multiplicar, y el resultado a deci. Replicamos esa
+-- mecánica para que el importe cuadre al céntimo con la pantalla de Sigrid:
+--
+--   importe = ROUND( ROUND(can, decc) * ROUND(pre, decp), deci )
+--
+-- Defaults si la obra no los tiene informados: decc=3, decp=2, deci=2.
+-- (En Ruesma típicamente decc=3, decp=3, deci=2 — ver pantalla obra 0710.)
+--
+-- ===========================================================================
+-- COLUMNAS DE IMPORTE
+-- ===========================================================================
+--   - importe         = ROUND(ROUND(can,decc)*ROUND(pre,decp), deci).
+--                       Decimales propios de la obra. Lo usan mart/plan_mensual
+--                       y el cierre (costes).
+--   - importe_oficial = COALESCE(NULLIF(impcoe,0), importe). Lo usa el cierre
+--                       para VENTA (Sigrid aplica coeficientes solo en venta).
+--   - dec_cantidades / dec_precios / dec_importes = decc/decp/deci de la obra,
+--                       expuestos para que 08_plan_mensual reaplique el mismo
+--                       redondeo al explotar el plan mensual.
 
 TRUNCATE TABLE stg.presupuesto;
 
@@ -35,6 +51,9 @@ INSERT INTO stg.presupuesto (
     precio,
     importe,
     importe_oficial,
+    dec_cantidades,
+    dec_precios,
+    dec_importes,
     _source_tiemod
 )
 SELECT DISTINCT ON (pp.obride, pp.paride, pp.amb, COALESCE(pp.fas, 0))
@@ -45,14 +64,30 @@ SELECT DISTINCT ON (pp.obride, pp.paride, pp.amb, COALESCE(pp.fas, 0))
     COALESCE(pp.fas, 0)                               AS fase_num,
     pp.can::NUMERIC(20,6)                             AS cantidad,
     pp.pre::NUMERIC(20,6)                             AS precio,
-    ROUND((pp.can::NUMERIC(20,6) * pp.pre::NUMERIC(20,6))::NUMERIC, 2) AS importe,
-    -- importe_oficial: prioriza impcoe (Sigrid con coeficientes aplicados)
-    -- y cae a can*pre si impcoe es NULL o 0 (≈70% de los registros).
+    -- importe con decimales propios de la obra:
+    --   redondea can a decc y pre a decp ANTES de multiplicar; resultado a deci
+    -- NOTA: la cantidad NO se redondea. Las partidas tipo porcentaje (CP
+    -- avales/seguros) tienen cantidades como 0.0015 (=0.15%) que, redondeadas
+    -- a decc=3, se convertirían en 0.002 e inflarían el importe. Sigrid solo
+    -- redondea el PRECIO a decp; la cantidad mantiene su precisión completa.
+    ROUND(
+        pp.can::NUMERIC * ROUND(pp.pre::NUMERIC, COALESCE(o.decp::INT, 2)),
+        COALESCE(o.deci::INT, 2)
+    )                                                 AS importe,
+    -- importe_oficial: prioriza impcoe (Sigrid con coeficientes en venta);
+    -- si impcoe es NULL/0 (todo coste, ~70% de filas) cae al importe calculado.
     COALESCE(
         NULLIF(pp.impcoe::NUMERIC(18,2), 0),
-        ROUND((pp.can::NUMERIC(20,6) * pp.pre::NUMERIC(20,6))::NUMERIC, 2)
+        ROUND(
+            pp.can::NUMERIC * ROUND(pp.pre::NUMERIC, COALESCE(o.decp::INT, 2)),
+            COALESCE(o.deci::INT, 2)
+        )
     )                                                 AS importe_oficial,
+    COALESCE(o.decc::INT, 3)                          AS dec_cantidades,
+    COALESCE(o.decp::INT, 2)                          AS dec_precios,
+    COALESCE(o.deci::INT, 2)                          AS dec_importes,
     pp._source_tiemod
 FROM raw.obrparpre pp
+JOIN raw.obr o ON o.ide = pp.obride       -- decimales propios de la obra
 WHERE pp.obride IS NOT NULL
 ORDER BY pp.obride, pp.paride, pp.amb, COALESCE(pp.fas, 0), pp.ide DESC;

@@ -1,19 +1,19 @@
 # etl_sigrid/application/steps/build_cierre_step.py
 """
-Step que materializa el schema `cierre` (Tanda 2 — añade detalle fino).
+Step que materializa el schema `cierre` (Tanda 3 — añade cabecera).
 
 Encadena los archivos SQL en orden:
     00_setup.sql          - schema + funciones helper (idempotente)
     01_ddl_fact.sql       - DROP + CREATE cierre.fact_cierre_mensual
     02_build_fact.sql     - INSERT del fact con EJECUTADO + FINAL master/fase0
     03_views.sql          - Vista principal v_pbi_cierre_resumen
-    04_views_detalle.sql  - (NUEVO) Vistas de detalle:
-                              · v_pbi_cierre_indirectos_detalle
-                              · v_pbi_cierre_generales_detalle
-                              · v_pbi_dim_subcategoria_ci
-                              · v_pbi_dim_tipologia_cp
+    04_views_detalle.sql  - Vistas de detalle INDIRECTOS / GENERALES
+    05_views_cabecera.sql - (NUEVO) Vista cabecera v_pbi_cierre_cabecera
+                            (identificación obra, cliente, técnico, fechas,
+                             plazo, presupuestos inicial/vigente)
 
-INDEPENDIENTE del mart principal. Solo lee de stg.*.
+INDEPENDIENTE del mart principal. Lee de stg.* y de raw.obr/raw.con (estas
+últimas solo lectura, para los datos identificativos de cabecera).
 """
 
 from __future__ import annotations
@@ -71,16 +71,17 @@ class BuildCierreStep(PipelineStep):
         )
 
         sub_steps: list[_SubStep] = [
-            _SubStep(name="setup",         sql_file="00_setup.sql"),
-            _SubStep(name="ddl_fact",      sql_file="01_ddl_fact.sql"),
+            _SubStep(name="setup",          sql_file="00_setup.sql"),
+            _SubStep(name="ddl_fact",       sql_file="01_ddl_fact.sql"),
             _SubStep(
                 name="build_fact",
                 sql_file="02_build_fact.sql",
                 target_schema="cierre",
                 target_table="fact_cierre_mensual",
             ),
-            _SubStep(name="views",         sql_file="03_views.sql"),
-            _SubStep(name="views_detalle", sql_file="04_views_detalle.sql"),
+            _SubStep(name="views",          sql_file="03_views.sql"),
+            _SubStep(name="views_detalle",  sql_file="04_views_detalle.sql"),
+            _SubStep(name="views_cabecera", sql_file="05_views_cabecera.sql"),
         ]
 
         total_rows = 0

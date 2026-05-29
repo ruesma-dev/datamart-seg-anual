@@ -88,8 +88,11 @@ CREATE TABLE IF NOT EXISTS stg.presupuesto (
     fase_num        INTEGER          NOT NULL,
     cantidad        NUMERIC(20,6),                  -- 6 decimales para porcentajes/coeficientes Sigrid
     precio          NUMERIC(20,6),                  -- 6 decimales para precisión Sigrid
-    importe         NUMERIC(18,2),                  -- ROUND(can*pre, 2) — usado por mart/plan_mensual
-    importe_oficial NUMERIC(18,2),                  -- COALESCE(impcoe Sigrid, importe) — usado por cierre
+    importe         NUMERIC(18,2),                  -- importe con decimales por obra (decc/decp/deci)
+    importe_oficial NUMERIC(18,2),                  -- COALESCE(impcoe Sigrid, importe) — usado por cierre venta
+    dec_cantidades  INTEGER,                        -- obr.decc — decimales de cantidad de la obra
+    dec_precios     INTEGER,                        -- obr.decp — decimales de precio de la obra
+    dec_importes    INTEGER,                        -- obr.deci — decimales de importe de la obra
     _source_tiemod  DOUBLE PRECISION,
     _built_at       TIMESTAMP        NOT NULL DEFAULT NOW()
 );
@@ -151,6 +154,23 @@ BEGIN
         ALTER TABLE stg.presupuesto
             ADD COLUMN importe_oficial NUMERIC(18,2);
         RAISE NOTICE 'Añadida columna stg.presupuesto.importe_oficial';
+    END IF;
+END $$;
+
+-- Migración defensiva para DECIMALES POR OBRA (decc/decp/deci de raw.obr).
+-- Se usan para redondear cantidad y precio con los decimales propios de la
+-- obra ANTES de multiplicar, replicando exactamente lo que hace Sigrid.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg' AND table_name = 'presupuesto'
+          AND column_name = 'dec_cantidades'
+    ) THEN
+        ALTER TABLE stg.presupuesto ADD COLUMN dec_cantidades INTEGER;
+        ALTER TABLE stg.presupuesto ADD COLUMN dec_precios    INTEGER;
+        ALTER TABLE stg.presupuesto ADD COLUMN dec_importes   INTEGER;
+        RAISE NOTICE 'Añadidas columnas stg.presupuesto.dec_cantidades/dec_precios/dec_importes';
     END IF;
 END $$;
 
