@@ -1,6 +1,19 @@
 -- etl_sigrid/infrastructure/postgres/sql/cierre/03_views.sql
 --
--- Vistas Power BI del cierre (Tanda 1.4).
+-- Vistas Power BI del cierre.
+--
+-- TANDA 4 — Porcentajes redefinidos según la lógica del Excel:
+--   Para cada columna (ORIGEN/ANTERIOR/MES/PENDIENTE/FINAL), el % de
+--   cualquier concepto se calcula contra la VENTA de ESA MISMA columna
+--   y MISMO mes. Excepto:
+--     · VENTA FINAL %  = VENTA_FINAL / PRESUPUESTO_APROBADO_VENTA
+--
+-- Ejemplo (obra de la imagen):
+--   INDIRECTOS MES % = INDIRECTOS_MES / VENTA_MES = 77.964,95 / 571.473,05 = 13,64%
+--   INDIRECTOS FINAL % = INDIRECTOS_FINAL / VENTA_FINAL = 1.579.836,17 / 9.620.299,18 = 16,42%
+--
+-- El presupuesto_aprobado_venta viene de cierre.v_pbi_cierre_cabecera
+-- (que por defecto = presupuesto_inicial_venta).
 
 DROP VIEW IF EXISTS cierre.v_pbi_cierre_resumen CASCADE;
 DROP VIEW IF EXISTS cierre.v_pbi_dim_concepto   CASCADE;
@@ -19,7 +32,7 @@ SELECT * FROM (VALUES
 ) AS t(concepto, orden, descripcion);
 
 -- ---------------------------------------------------------------------------
--- Vista principal: 6 filas por (obra × mes) con todas las métricas € y %
+-- Vista principal: 6 filas por (obra × mes) con todas las métricas € y %.
 -- ---------------------------------------------------------------------------
 CREATE VIEW cierre.v_pbi_cierre_resumen AS
 WITH
@@ -50,8 +63,6 @@ gastos AS (
         SUM(pendiente_importe) ::NUMERIC(18,2) AS pendiente_importe,
         CASE WHEN BOOL_AND(variacion_importe IS NULL) THEN NULL
              ELSE SUM(COALESCE(variacion_importe, 0))::NUMERIC(18,2) END AS variacion_importe,
-        -- Si todos los costes son master/fase_0/sin_dato igual, se mantiene;
-        -- si hay mezcla, gana la fuente "peor" (sin_dato > fase_0 > master).
         CASE
             WHEN BOOL_OR(final_fuente = 'sin_dato') THEN 'sin_dato'
             WHEN BOOL_OR(final_fuente = 'fase_0')   THEN 'fase_0'
@@ -97,31 +108,111 @@ beneficio AS (
     WHERE v.concepto = 'VENTA'
 ),
 
+-- =======================================================================
+-- VENTA por (obra × mes): valores en cada columna que sirven como BASE
+-- para calcular los % del resto de conceptos.
+-- =======================================================================
+venta_por_mes AS (
+    SELECT
+        obra_id, anio_mes,
+        ejecutado_origen   AS venta_origen,
+        ejecutado_anterior AS venta_anterior,
+        ejecutado_mes      AS venta_mes,
+        pendiente_importe  AS venta_pendiente,
+        final_importe      AS venta_final
+    FROM base
+    WHERE concepto = 'VENTA'
+),
+
+-- =======================================================================
+-- Presupuesto aprobado VENTA (de la cabecera) por obra.
+-- Si no existe (caso muy raro), fallback al primer venta_final disponible.
+-- =======================================================================
+aprobado_por_obra AS (
+    SELECT
+        obra_id,
+        presupuesto_aprobado_venta AS aprobado_venta
+    FROM cierre.v_pbi_cierre_cabecera
+),
+
 todos AS (
     SELECT * FROM base
     UNION ALL SELECT * FROM gastos
     UNION ALL SELECT * FROM beneficio
 )
 SELECT
-    obra_id, codigo_obra, nombre_obra,
-    anio_mes, anio, mes, nombre_mes,
-    concepto, orden_concepto,
-    ejecutado_origen, ejecutado_anterior, ejecutado_mes,
-    final_importe, final_anterior, pendiente_importe, variacion_importe,
-    CASE WHEN final_importe = 0 THEN NULL
-         ELSE ROUND(ejecutado_origen   * 100.0 / final_importe, 2) END AS ejecutado_origen_pct,
-    CASE WHEN final_importe = 0 THEN NULL
-         ELSE ROUND(ejecutado_anterior * 100.0 / final_importe, 2) END AS ejecutado_anterior_pct,
-    CASE WHEN final_importe = 0 THEN NULL
-         ELSE ROUND(ejecutado_mes      * 100.0 / final_importe, 2) END AS ejecutado_mes_pct,
-    CASE WHEN final_importe = 0 THEN NULL
-         ELSE ROUND(pendiente_importe  * 100.0 / final_importe, 2) END AS pendiente_pct,
-    CASE WHEN final_anterior IS NULL OR final_anterior = 0 THEN NULL
-         ELSE ROUND(variacion_importe  * 100.0 / final_anterior, 2) END AS variacion_pct,
-    final_fuente, final_version_master, final_version_tex,
-    fase_numero, fase_nombre_mes
-FROM todos;
+    t.obra_id, t.codigo_obra, t.nombre_obra,
+    t.anio_mes, t.anio, t.mes, t.nombre_mes,
+    t.concepto, t.orden_concepto,
+    -- Importes
+    t.ejecutado_origen, t.ejecutado_anterior, t.ejecutado_mes,
+    t.final_importe, t.final_anterior, t.pendiente_importe, t.variacion_importe,
+    -- =================================================================
+    -- PORCENTAJES (lógica Excel CONTROL DE GESTIÓN):
+    -- Para cada columna, el % se calcula contra la VENTA de la MISMA
+    -- columna y MISMO mes. Excepción: VENTA FINAL % va contra el
+    -- PRESUPUESTO APROBADO de la obra (de la cabecera).
+    -- =================================================================
+    CASE
+        WHEN t.concepto = 'VENTA' THEN
+            CASE WHEN v.venta_final = 0 OR v.venta_final IS NULL THEN NULL
+                 ELSE ROUND(t.ejecutado_origen * 100.0 / v.venta_final, 2) END
+        ELSE
+            CASE WHEN v.venta_origen = 0 OR v.venta_origen IS NULL THEN NULL
+                 ELSE ROUND(t.ejecutado_origen * 100.0 / v.venta_origen, 2) END
+    END                                       AS ejecutado_origen_pct,
+
+    CASE
+        WHEN t.concepto = 'VENTA' THEN
+            CASE WHEN v.venta_final = 0 OR v.venta_final IS NULL THEN NULL
+                 ELSE ROUND(t.ejecutado_anterior * 100.0 / v.venta_final, 2) END
+        ELSE
+            CASE WHEN v.venta_anterior = 0 OR v.venta_anterior IS NULL THEN NULL
+                 ELSE ROUND(t.ejecutado_anterior * 100.0 / v.venta_anterior, 2) END
+    END                                       AS ejecutado_anterior_pct,
+
+    CASE
+        WHEN t.concepto = 'VENTA' THEN
+            CASE WHEN v.venta_final = 0 OR v.venta_final IS NULL THEN NULL
+                 ELSE ROUND(t.ejecutado_mes * 100.0 / v.venta_final, 2) END
+        ELSE
+            CASE WHEN v.venta_mes = 0 OR v.venta_mes IS NULL THEN NULL
+                 ELSE ROUND(t.ejecutado_mes * 100.0 / v.venta_mes, 2) END
+    END                                       AS ejecutado_mes_pct,
+
+    CASE
+        WHEN t.concepto = 'VENTA' THEN
+            CASE WHEN v.venta_final = 0 OR v.venta_final IS NULL THEN NULL
+                 ELSE ROUND(t.pendiente_importe * 100.0 / v.venta_final, 2) END
+        ELSE
+            CASE WHEN v.venta_pendiente = 0 OR v.venta_pendiente IS NULL THEN NULL
+                 ELSE ROUND(t.pendiente_importe * 100.0 / v.venta_pendiente, 2) END
+    END                                       AS pendiente_pct,
+
+    -- FINAL %:
+    --   VENTA FINAL % = VENTA_FINAL / PRESUPUESTO_APROBADO
+    --   Resto FINAL % = importe_FINAL / VENTA_FINAL
+    CASE
+        WHEN t.concepto = 'VENTA' THEN
+            CASE WHEN a.aprobado_venta = 0 OR a.aprobado_venta IS NULL THEN NULL
+                 ELSE ROUND(t.final_importe * 100.0 / a.aprobado_venta, 2) END
+        ELSE
+            CASE WHEN v.venta_final = 0 OR v.venta_final IS NULL THEN NULL
+                 ELSE ROUND(t.final_importe * 100.0 / v.venta_final, 2) END
+    END                                       AS final_pct,
+
+    -- Variación % sobre el FINAL del mes anterior (queda como antes).
+    CASE WHEN t.final_anterior IS NULL OR t.final_anterior = 0 THEN NULL
+         ELSE ROUND(t.variacion_importe * 100.0 / t.final_anterior, 2) END AS variacion_pct,
+
+    -- Trazabilidad
+    t.final_fuente, t.final_version_master, t.final_version_tex,
+    t.fase_numero, t.fase_nombre_mes
+FROM todos t
+LEFT JOIN venta_por_mes     v ON v.obra_id = t.obra_id AND v.anio_mes = t.anio_mes
+LEFT JOIN aprobado_por_obra a ON a.obra_id = t.obra_id;
 
 COMMENT ON VIEW cierre.v_pbi_cierre_resumen IS
-'Cierre mensual de obra (Tanda 1.4). 6 conceptos × (obra × mes) con '
-'importes y %. final_fuente: master | fase_0 | sin_dato.';
+'Cierre mensual de obra (Tanda 4). Porcentajes según Excel CONTROL DE GESTIÓN: '
+'cada columna usa la VENTA de la misma columna como divisor; VENTA FINAL '
+'usa presupuesto_aprobado_venta de la cabecera.';

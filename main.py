@@ -1760,7 +1760,7 @@ def inspect_cierre(
         ejecutado_origen, ejecutado_anterior, ejecutado_mes,
         final_importe, final_anterior, pendiente_importe, variacion_importe,
         ejecutado_origen_pct, ejecutado_anterior_pct, ejecutado_mes_pct,
-        pendiente_pct, variacion_pct,
+        pendiente_pct, final_pct, variacion_pct,
         fase_numero, fase_nombre_mes,
         final_fuente, final_version_master, final_version_tex
       FROM cierre.v_pbi_cierre_resumen
@@ -1793,8 +1793,8 @@ def inspect_cierre(
     meta_por_mes: dict = {}
     for r in rows:
         mes_v = r[0]
-        fnum, fnm = r[16], r[17]
-        ffuente, fvm, fvt = r[18], r[19], r[20]
+        fnum, fnm = r[17], r[18]
+        ffuente, fvm, fvt = r[19], r[20], r[21]
         if mes_v not in meta_por_mes and fnum is not None:
             meta_por_mes[mes_v] = (fnum, fnm, ffuente, fvm, fvt)
 
@@ -1803,7 +1803,7 @@ def inspect_cierre(
         (mes, nm_mes, concepto, _orden,
          eo, ea, em,
          fi, fa, pi_imp, var,
-         eo_pct, ea_pct, em_pct, pen_pct, var_pct,
+         eo_pct, ea_pct, em_pct, pen_pct, fi_pct, var_pct,
          _fase_num, _fase_nm,
          _ffuente, _fvm, _fvt) = r
 
@@ -1835,10 +1835,10 @@ def inspect_cierre(
                 f"{'EJEC ANT':>14} {'%':>7}  "
                 f"{'EJEC ORIG':>14} {'%':>7}  "
                 f"{'PENDIENTE':>14} {'%':>7}  "
-                f"{'FINAL':>14}  "
+                f"{'FINAL':>14} {'%':>7}  "
                 f"{'VAR MES':>14} {'%':>7}"
             )
-            click.echo("  " + "-" * 175)
+            click.echo("  " + "-" * 184)
             last_mes = mes
 
         color = None
@@ -1851,7 +1851,7 @@ def inspect_cierre(
             f"{fmt(ea)} {fpct(ea_pct)}  "
             f"{fmt(eo)} {fpct(eo_pct)}  "
             f"{fmt(pi_imp)} {fpct(pen_pct)}  "
-            f"{fmt(fi)}  "
+            f"{fmt(fi)} {fpct(fi_pct)}  "
             f"{fmt(var)} {fpct(var_pct)}"
         )
         if color:
@@ -1877,15 +1877,32 @@ def inspect_cierre(
 @click.option("--codigo", "codigo_obra", type=str, default=None)
 @click.option("--mes", "anio_mes", type=str, default=None,
               help="YYYY-MM-DD. Si se omite, último mes con datos.")
+@click.option("--variante", "variante",
+              type=click.Choice(["prod", "prod_inc", "lineal", "lineal_inc"]),
+              default="prod",
+              help="Variante de periodificación a mostrar: prod (producción), "
+                   "prod_inc (producción con incurrido), lineal (meses), "
+                   "lineal_inc (lineal con incurrido). Default: prod.")
+@click.option("--todas", is_flag=True, default=False,
+              help="Mostrar las 4 variantes lado a lado (output ancho).")
 def inspect_indirectos_detalle(
-    obra_id: int | None, codigo_obra: str | None, anio_mes: str | None
+    obra_id: int | None, codigo_obra: str | None,
+    anio_mes: str | None, variante: str, todas: bool,
 ) -> None:
     """
-    Muestra el desglose de INDIRECTOS por (grupo CI × subcategoría) para
-    una obra y mes. Replica las filas R27-R66 del Excel CONTROL DE GESTIÓN.
+    Muestra el desglose de INDIRECTOS por (grupo CI × subcategoría).
 
-    Grupo = nivel 2 de ruta_capitulos (CI.MOI, CI.INFRA, CI.MAQ, CI.CONS).
-    Subcategoría = nivel 3 (Jefe de obra, Vallado, Casetas, ...).
+    Cuatro variantes de periodificación (Tanda 4.2), solo para INFRAESTRUCTURA:
+
+    \b
+      prod         = fase0 × (venta_origen / venta_final)
+      prod_inc     = igual pero solo desde el primer mes con incurrido
+      lineal       = fase0 × (mes_actual / plazo_total)    [sin cap al 100%]
+      lineal_inc   = lineal pero solo desde el primer mes con incurrido
+
+    El PARCIAL de cada variante = origen_periodif[M] − ejecutado_origen[M−1]
+    (Ruesma ajusta el ejecutado_origen anterior en Sigrid al periodif del
+    cierre previo, para que el parcial sea el delta del ratio del mes).
     """
     if obra_id is None and not codigo_obra:
         click.secho("Debes pasar --obra <id> o --codigo <codigo_obra>.",
@@ -1930,7 +1947,18 @@ def inspect_indirectos_detalle(
     SELECT
         grupo_cod, subcategoria_cod,
         grupo_nombre, subcategoria_nombre,
-        ejecutado_origen, ejecutado_anterior, ejecutado_mes
+        ejecutado_origen, ejecutado_anterior, ejecutado_mes,
+        es_infraestructura, importe_fase0, plazo_total_meses,
+        -- Var 1: prod
+        ratio_periodif, pct_periodificacion,
+        ejecutado_origen_periodif, ejecutado_mes_periodif,
+        -- Var 2: prod_inc
+        ejecutado_origen_periodif_inc, ejecutado_mes_periodif_inc,
+        -- Var 3: lineal
+        ratio_lineal, pct_periodificacion_lineal,
+        ejecutado_origen_periodif_lineal, ejecutado_mes_periodif_lineal,
+        -- Var 4: lineal_inc
+        ejecutado_origen_periodif_lineal_inc, ejecutado_mes_periodif_lineal_inc
       FROM cierre.v_pbi_cierre_indirectos_detalle
      WHERE obra_id = %(obra)s AND anio_mes = %(mes)s
      ORDER BY grupo_nombre, subcategoria_nombre
@@ -1944,42 +1972,181 @@ def inspect_indirectos_detalle(
                     fg="yellow")
         return
 
+    plazo_info = next((r[9] for r in rows if r[9] is not None), None)
+
+    # Selección de columnas según variante / todas
+    # Mapeo (variante → índice en row de origen, índice de parcial, índice de %)
+    VAR_INFO = {
+        "prod":       ("PROD",       12, 13, 11),   # origen, mes, pct
+        "prod_inc":   ("PROD INC",   14, 15, None),
+        "lineal":     ("LINEAL",     18, 19, 17),
+        "lineal_inc": ("LINEAL INC", 20, 21, None),
+    }
+    VAR_DESC = {
+        "prod":       "fase0 × (venta_origen / venta_final)",
+        "prod_inc":   "PROD pero solo desde el primer mes con incurrido",
+        "lineal":     "fase0 × (mes_actual / plazo_total)  [sin cap al 100%]",
+        "lineal_inc": "LINEAL pero solo desde el primer mes con incurrido",
+    }
+
     click.secho(
         f"\n=== Detalle INDIRECTOS · obra_id={obra_id} · mes={anio_mes} ===\n",
         fg="cyan", bold=True,
     )
-    click.echo(
-        f"  {'grupo':<32}  {'subcategoría':<42}  "
-        f"{'EJEC MES':>14}  {'EJEC ANT':>14}  {'EJEC ORIG':>14}"
-    )
-    click.echo("  " + "-" * 124)
+    if plazo_info is not None:
+        click.secho(
+            f"  Plazo total de la obra: {float(plazo_info):,.1f} meses",
+            fg="white", dim=True,
+        )
+
+    def f12(v): return f"{'-':>12}" if v is None else f"{float(v):>12,.2f}"
+    def f7(v):  return f"{'-':>7}"  if v is None else f"{float(v):>6,.2f}%"
+    def f14(v): return f"{'-':>14}" if v is None else f"{float(v):>14,.2f}"
+    def f8(v):  return f"{'-':>8}"  if v is None else f"{float(v):>7,.2f}%"
+
+    if todas:
+        # 4 variantes lado a lado: muy ancho
+        click.echo(
+            f"  {'grupo':<26}  {'subcategoría':<36}  "
+            f"{'EJEC MES':>11}  {'EJEC ORIG':>11}  "
+            f"{'PROD':>11}  {'P_INC':>11}  "
+            f"{'LIN':>11}  {'L_INC':>11}"
+        )
+        click.echo("  " + "-" * 154)
+    else:
+        var_label = VAR_INFO[variante][0]
+        click.echo(
+            f"  {'grupo':<30}  {'subcategoría':<40}  "
+            f"{'EJEC MES':>14}  {'EJEC ANT':>14}  {'EJEC ORIG':>14}  "
+            f"{var_label+' ORIG':>14}  {var_label+' MES':>14}  {'% '+var_label:>10}"
+        )
+        click.echo("  " + "-" * 170)
 
     last_grupo = None
     total_origen = 0.0
-    for grupo_cod, subcat_cod, grupo_nm, subcat_nm, eo, ea, em in rows:
+    totales_periodif = {"prod_orig": 0.0, "prod_mes": 0.0,
+                        "pi_orig": 0.0, "pi_mes": 0.0,
+                        "lin_orig": 0.0, "lin_mes": 0.0,
+                        "li_orig": 0.0, "li_mes": 0.0}
+
+    for r in rows:
+        (grupo_cod, subcat_cod, grupo_nm, subcat_nm,
+         eo, ea, em,
+         es_infra, imp_f0, _plazo,
+         _r_p, pct_p, eo_p, em_p,
+         eo_pi, em_pi,
+         _r_l, pct_l, eo_l, em_l,
+         eo_li, em_li) = r
+
         if grupo_nm != last_grupo:
             if last_grupo is not None:
                 click.echo("")
             last_grupo = grupo_nm
-        # Mostrar el nombre principalmente; el código entre paréntesis para
-        # trazabilidad en caso de homonimias.
-        grupo_label = f"{(grupo_nm or '')[:24]} ({grupo_cod})"
-        subcat_label = f"{(subcat_nm or '')[:34]} ({subcat_cod})"
-        click.echo(
-            f"  {grupo_label:<32}  {subcat_label:<42}  "
-            f"{float(em):>14,.2f}  {float(ea):>14,.2f}  {float(eo):>14,.2f}"
-        )
+
+        if todas:
+            grupo_label = f"{(grupo_nm or '')[:18]} ({grupo_cod})"
+            subcat_label = f"{(subcat_nm or '')[:28]} ({subcat_cod})"
+            click.echo(
+                f"  {grupo_label:<26}  {subcat_label:<36}  "
+                f"{f12(em)}  {f12(eo)}  "
+                f"{f12(eo_p)}  {f12(eo_pi)}  "
+                f"{f12(eo_l)}  {f12(eo_li)}"
+            )
+            if es_infra:
+                if eo_p is not None: totales_periodif["prod_orig"] += float(eo_p)
+                if em_p is not None: totales_periodif["prod_mes"]  += float(em_p)
+                if eo_pi is not None: totales_periodif["pi_orig"] += float(eo_pi)
+                if em_pi is not None: totales_periodif["pi_mes"]  += float(em_pi)
+                if eo_l is not None: totales_periodif["lin_orig"] += float(eo_l)
+                if em_l is not None: totales_periodif["lin_mes"]  += float(em_l)
+                if eo_li is not None: totales_periodif["li_orig"] += float(eo_li)
+                if em_li is not None: totales_periodif["li_mes"]  += float(em_li)
+        else:
+            # Una sola variante
+            _, idx_o, idx_m, idx_pct = VAR_INFO[variante]
+            v_o = r[idx_o]
+            v_m = r[idx_m]
+            v_pct = r[idx_pct] if idx_pct is not None else None
+            grupo_label = f"{(grupo_nm or '')[:22]} ({grupo_cod})"
+            subcat_label = f"{(subcat_nm or '')[:32]} ({subcat_cod})"
+            if es_infra and v_o is not None:
+                p_orig_s = f14(v_o)
+                p_mes_s  = f14(v_m)
+                p_pct_s  = f"{'-':>10}" if v_pct is None else f"{float(v_pct):>9,.2f}%"
+                totales_periodif["prod_orig"] += float(v_o)
+                totales_periodif["prod_mes"]  += float(v_m or 0)
+            else:
+                p_orig_s = f"{'-':>14}"
+                p_mes_s  = f"{'-':>14}"
+                p_pct_s  = f"{'-':>10}"
+            click.echo(
+                f"  {grupo_label:<30}  {subcat_label:<40}  "
+                f"{float(em):>14,.2f}  {float(ea):>14,.2f}  {float(eo):>14,.2f}  "
+                f"{p_orig_s}  {p_mes_s}  {p_pct_s}"
+            )
         total_origen += float(eo)
 
-    click.echo("  " + "-" * 124)
-    click.secho(
-        f"  {'TOTAL INDIRECTOS':<76}  {'':>14}  {'':>14}  {total_origen:>14,.2f}",
-        fg="cyan", bold=True,
-    )
+    sep_len = 154 if todas else 170
+    click.echo("  " + "-" * sep_len)
+
+    if todas:
+        click.secho(
+            f"  {'TOTAL INDIRECTOS':<66}  "
+            f"{'':>11}  {total_origen:>11,.2f}  "
+            f"{'':>11}  {'':>11}  {'':>11}  {'':>11}",
+            fg="cyan", bold=True,
+        )
+        if any(v > 0 for v in totales_periodif.values()):
+            click.secho(
+                f"  {'  INFRAESTRUCTURA (origen)':<66}  "
+                f"{'':>11}  {'':>11}  "
+                f"{totales_periodif['prod_orig']:>11,.2f}  "
+                f"{totales_periodif['pi_orig']:>11,.2f}  "
+                f"{totales_periodif['lin_orig']:>11,.2f}  "
+                f"{totales_periodif['li_orig']:>11,.2f}",
+                fg="white", dim=True,
+            )
+            click.secho(
+                f"  {'  INFRAESTRUCTURA (mes)':<66}  "
+                f"{'':>11}  {'':>11}  "
+                f"{totales_periodif['prod_mes']:>11,.2f}  "
+                f"{totales_periodif['pi_mes']:>11,.2f}  "
+                f"{totales_periodif['lin_mes']:>11,.2f}  "
+                f"{totales_periodif['li_mes']:>11,.2f}",
+                fg="white", dim=True,
+            )
+    else:
+        var_label = VAR_INFO[variante][0]
+        click.secho(
+            f"  {'TOTAL INDIRECTOS':<74}  {'':>14}  {'':>14}  {total_origen:>14,.2f}  "
+            f"{'':>14}  {'':>14}",
+            fg="cyan", bold=True,
+        )
+        if totales_periodif["prod_orig"] > 0:
+            click.secho(
+                f"  {f'  INFRAESTRUCTURA ({var_label})':<74}  "
+                f"{'':>14}  {'':>14}  {'':>14}  "
+                f"{totales_periodif['prod_orig']:>14,.2f}  "
+                f"{totales_periodif['prod_mes']:>14,.2f}",
+                fg="white", dim=True,
+            )
+
     click.echo("")
-    click.echo("Validación: este total debe coincidir EXACTAMENTE con la fila")
-    click.echo("INDIRECTOS de `inspect-cierre` (ejecutado origen).")
+    click.echo("Notas:")
+    click.echo("  - EJEC = incurrido real (leído de plan_mensual amb=3).")
+    if todas:
+        click.echo("  - PROD   = fase0 × (venta_origen / venta_final).")
+        click.echo("  - P_INC  = PROD pero solo desde el primer mes con incurrido.")
+        click.echo("  - LIN    = fase0 × (mes_actual / plazo_total)  [sin cap].")
+        click.echo("  - L_INC  = LIN pero solo desde el primer mes con incurrido.")
+    else:
+        click.echo(f"  - {VAR_INFO[variante][0]:<10} = {VAR_DESC[variante]}")
+        click.echo("  - Usa --todas para ver las 4 variantes a la vez.")
+        click.echo("    O --variante prod_inc|lineal|lineal_inc.")
+    click.echo("  - Parcial de cada variante = origen[M] − ejecutado_origen[M−1].")
+    click.echo("    Ruesma ajusta ejec_origen[M−1] en Sigrid al periodif previo.")
     click.echo("")
+
 
 
 @cli.command("inspect-generales-detalle")
@@ -2118,6 +2285,7 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
         plazo_meses, coeficiente_indirectos, superficie_total,
         presupuesto_inicial_venta, version_inicial,
         presupuesto_vigente_venta, version_vigente,
+        presupuesto_aprobado_venta,
         modificados_aprobados
       FROM cierre.v_pbi_cierre_cabecera
      WHERE obra_id = %s
@@ -2134,7 +2302,7 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
      cc_ide, tipo_ide, clase_ide,
      fini_p, ffin_p, fini_r, ffin_r, fadj,
      plazo, coef, sup,
-     pres_ini, ver_ini, pres_vig, ver_vig, modif) = row
+     pres_ini, ver_ini, pres_vig, ver_vig, pres_aprob, modif) = row
 
     def show(v, fmt=None):
         if v is None:
@@ -2179,6 +2347,8 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
                + (f"   [{ver_ini}]" if ver_ini else ""))
     click.echo(f"  Vigente ............... {show(pres_vig, 'money')}"
                + (f"   [{ver_vig}]" if ver_vig else ""))
+    click.echo(f"  APROBADO .............. {show(pres_aprob, 'money')}   "
+               f"(divisor de VENTA FINAL %; por defecto = inicial)")
     click.echo(f"  Modificados aprobados . {show(modif, 'money')}")
     click.echo("")
 
@@ -2186,6 +2356,121 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
     click.echo("  - (no disponible) = el campo viene vacío/0 en Sigrid.")
     click.echo("  - Centro/Tipo/Clase se muestran como ID hasta ingestar")
     click.echo("    los catálogos (cen, auxobrtip, auxobrcla) — Tanda 3.1.")
+    click.echo("")
+
+
+@cli.command("inspect-planif-vs-real")
+@click.option("--obra", "obra_id", type=int, default=None)
+@click.option("--codigo", "codigo_obra", type=str, default=None)
+@click.option("--mes", "anio_mes", type=str, default=None,
+              help="YYYY-MM-DD. Si se omite, último mes con datos.")
+def inspect_planif_vs_real(
+    obra_id: int | None, codigo_obra: str | None, anio_mes: str | None,
+) -> None:
+    """
+    Muestra el cuadro PLANIFICADO vs REAL del mes para una obra.
+
+    Replica el cuadro del Excel: 6 conceptos (PRODUCCIÓN, COSTES DIRECTOS /
+    INDIRECTOS / PROPORCIONALES, TOTAL COSTES, BENEFICIO) con planificado,
+    real, diferencia (= Real − Planificado) y % desviación (= Diff / Planif).
+
+    Importes DEL MES (parcial), no a origen. Fuente: mart de planificación.
+    """
+    if obra_id is None and not codigo_obra:
+        click.secho("Debes pasar --obra <id> o --codigo <codigo_obra>.",
+                    fg="red", err=True)
+        sys.exit(2)
+
+    pg = _get_pg()
+
+    # Resolver obra_id desde código si toca
+    if codigo_obra:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT obra_id, nombre_obra FROM stg.obras WHERE codigo_obra = %s",
+                (codigo_obra,),
+            )
+            row = cur.fetchone()
+        if not row:
+            click.secho(f"No existe obra '{codigo_obra}'", fg="red", err=True)
+            sys.exit(2)
+        obra_id, nombre = row
+        click.echo(f"obra '{codigo_obra}' → obra_id={obra_id} ({nombre})")
+
+    # Resolver mes si no se ha pasado
+    if not anio_mes:
+        with pg.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT MAX(anio_mes) FROM cierre.v_pbi_planif_vs_real WHERE obra_id = %s",
+                (obra_id,),
+            )
+            r = cur.fetchone()
+        if not r or not r[0]:
+            click.secho(f"No hay datos planif vs real para obra_id={obra_id}",
+                        fg="yellow")
+            return
+        anio_mes = r[0].isoformat()
+        click.secho(f"Mes no especificado, usando el último disponible: {anio_mes}",
+                    fg="white", dim=True)
+
+    sql = """
+    SELECT
+        concepto_cuadro, planificado, real, diferencia, desviacion_pct
+      FROM cierre.v_pbi_planif_vs_real
+     WHERE obra_id = %(obra)s AND anio_mes = %(mes)s
+     ORDER BY orden_concepto
+    """
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, {"obra": obra_id, "mes": anio_mes})
+        rows = cur.fetchall()
+
+    if not rows:
+        click.secho(f"No hay datos para obra={obra_id} mes={anio_mes}",
+                    fg="yellow")
+        return
+
+    click.secho(
+        f"\n=== PLANIFICADO vs REAL · obra_id={obra_id} · mes={anio_mes} ===\n",
+        fg="cyan", bold=True,
+    )
+
+    click.echo(
+        f"  {'concepto':<24}  "
+        f"{'PLANIFICADO':>16}  {'REAL':>16}  "
+        f"{'DIFERENCIA':>16}  {'DESVIACIÓN':>12}"
+    )
+    click.echo("  " + "-" * 92)
+
+    def fmt(v):
+        return "-" if v is None else f"{float(v):>16,.2f}"
+
+    def fmt_pct(v):
+        if v is None:
+            return f"{'-':>12}"
+        return f"{float(v):>11,.2f}%"
+
+    for concepto, planif, real, diff, desv in rows:
+        # Color: rojo si Real es peor que Planif (diff negativa en producción/beneficio,
+        # o diff positiva en costes). Simplificación: rojo si desv > 10% en módulo.
+        line = (
+            f"  {concepto:<24}  "
+            f"{fmt(planif):>16}  {fmt(real):>16}  "
+            f"{fmt(diff):>16}  {fmt_pct(desv):>12}"
+        )
+        # Negrita para TOTAL COSTES y BENEFICIO
+        if concepto in ("TOTAL COSTES", "BENEFICIO"):
+            click.secho(line, bold=True)
+        else:
+            click.echo(line)
+
+    click.echo("")
+    click.echo("Notas:")
+    click.echo("  - Importes DEL MES (parcial), no a origen.")
+    click.echo("  - Fuente: mart.fact_seguimiento_categoria (mart de planificación).")
+    click.echo("  - PRODUCCIÓN = VENTA (mart). TOTAL COSTES = CD + CI + CP.")
+    click.echo("  - BENEFICIO = PRODUCCIÓN − TOTAL COSTES.")
+    click.echo("  - DIFERENCIA = Real − Planificado.")
+    click.echo("  - DESVIACIÓN % = Diferencia / Planificado × 100.")
     click.echo("")
 
 

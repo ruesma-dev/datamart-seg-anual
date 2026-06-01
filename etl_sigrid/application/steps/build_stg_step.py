@@ -175,6 +175,9 @@ class BuildStgStep(PipelineStep):
         required_by_table: dict[tuple[str, str], list[str]] = {
             ("raw", "con"):       ["ide", "cod", "res"],
             ("raw", "obr"):       ["ide", "decc", "decp", "deci"],
+            ("raw", "obrctr"):    ["ide", "obride", "fecreaact",
+                                   "fecreaini", "fecreafin",
+                                   "fecpreini", "fecprefin"],
             ("raw", "obrparpar"): ["ide", "obride", "padide", "cod", "res", "tipdes", "unimed", "tcaide"],
             ("raw", "obrfas"):    ["ide", "obride", "fasnum", "fecini", "fecfin", "ano", "mes", "res"],
             ("raw", "obrfasamb"): ["ide", "obride", "amb", "fas", "plafec", "fec", "res", "tex"],

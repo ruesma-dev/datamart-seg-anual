@@ -82,6 +82,20 @@ tables:
     # (obride, amb, fas). El parser de la columna `planif` de obrparpre usa esta
     # fecha como ancla del mes 1; mes 2 = plafec + 1 mes, etc.
 
+  - source_table: obrctr
+    target_table: obrctr
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex    # descripción larga del contrato (no usamos)
+      - obs    # observaciones del contrato (texto libre)
+    # Contratos de obra. Aporta las fechas reales/previstas (fecreaact,
+    # fecprefin, fecreaini, fecreafin, fecpreini, etc.) que en Ruesma están
+    # mejor mantenidas aquí que en raw.obr. Una obra puede tener varios
+    # contratos; en stg se elige el más antiguo (inicio) y el más reciente
+    # con fecprefin (fin). Cruce: obrctr.obride → obr.ide.
+
   - source_table: auxobramb
     target_table: auxobramb
     id_column: ide
@@ -99,4 +113,3 @@ tables:
     # obrparpar.tcaide. Nos permite clasificar categorías de partida
     # directamente desde Sigrid sin depender de heurísticas sobre el
     # código del capítulo raíz.
-

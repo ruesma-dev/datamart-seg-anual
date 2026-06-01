@@ -79,9 +79,14 @@ class BuildCierreStep(PipelineStep):
                 target_schema="cierre",
                 target_table="fact_cierre_mensual",
             ),
+            # Cabecera ANTES que las vistas de resumen, porque el resumen
+            # consume v_pbi_cierre_cabecera (Tanda 4: presupuesto_aprobado_venta).
+            _SubStep(name="views_cabecera", sql_file="05_views_cabecera.sql"),
             _SubStep(name="views",          sql_file="03_views.sql"),
             _SubStep(name="views_detalle",  sql_file="04_views_detalle.sql"),
-            _SubStep(name="views_cabecera", sql_file="05_views_cabecera.sql"),
+            # NUEVO Tanda 4.3: cuadro PLANIFICADO vs REAL del mes.
+            # Depende de mart.fact_seguimiento_categoria (que ya existe en mart).
+            _SubStep(name="views_planif_real", sql_file="06_views_planif_vs_real.sql"),
         ]
 
         total_rows = 0
