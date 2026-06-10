@@ -9,17 +9,26 @@
 -- ===========================================================================
 -- LÓGICA DE AGREGACIÓN ANUAL
 -- ===========================================================================
--- Para cada (obra, año) la vista determina:
+-- Para cada (obra, año) la vista determina un CORTE temporal común a Plan y
+-- Real, y suma ambos sobre la MISMA ventana [enero .. mes_corte]:
 --
---   1. Si el año es PASADO (anio < año_actual):
---      - Real: SUM(importe_mes) de enero a diciembre, escenario Coste Real.
---      - Plan: SUM(importe_mes) de enero a diciembre, escenario Coste Planificado,
---              usando la ÚLTIMA versión CUAT/ABC con fec_efectiva ≤ 31/12 del año.
+--   * Año PASADO (anio < año_actual):
+--       mes_corte = 12 (periodo cerrado completo).
+--   * Año EN CURSO (anio = año_actual):
+--       mes_corte = último mes con cierre real (ambito_id=3) de esa obra.
+--       Si la obra aún no tiene ningún cierre este año, se cae a mes_actual
+--       para no dejar el Plan vacío.
 --
---   2. Si el año es EN CURSO (anio = año_actual):
---      - Real: SUM(importe_mes) de enero a mes_actual, escenario Coste Real.
---      - Plan: SUM(importe_mes) de enero a mes_actual, escenario Coste Planificado,
---              usando la ÚLTIMA versión CUAT/ABC disponible (fec_efectiva ≤ hoy).
+-- Por qué el corte = último mes con real (y no mes_actual):
+--   los cierres llegan con retraso (abril se cierra en mayo, etc.). Si el
+--   Plan se cortara en el mes de calendario, incluiría meses futuros aún sin
+--   cierre y siempre saldría "por delante" del Real, haciendo la comparación
+--   Real-vs-Planif engañosa. Cortando ambos en el último mes con cierre real
+--   se comparan periodos homogéneos y cerrados.
+--
+--   - Plan: SUM(importe_mes) sobre la ventana, escenario Coste Planificado,
+--           usando la ÚLTIMA versión CUAT/ABC vigente (v_master_vigente_anual).
+--   - Real: SUM(importe_mes) sobre la ventana, escenario Coste Real.
 --
 -- ===========================================================================
 -- MAPPING DE TIPOLOGÍAS
@@ -134,9 +143,51 @@ WITH params AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3a) REAL anual.
---     Suma importes mensuales de coste real (ambito_id=3) sobre el rango
---     de meses permitido por el año (1-12 si pasado, 1-mes_actual si curso).
+-- 3a) Último mes con coste real cargado (ambito_id=3) por (obra, año).
+--     Define el extremo superior de la ventana cerrada para el año en curso.
+-- --------------------------------------------------------------------------
+ultimo_real AS (
+    SELECT
+        obra_id,
+        EXTRACT(YEAR  FROM anio_mes)::INT      AS anio,
+        MAX(EXTRACT(MONTH FROM anio_mes)::INT) AS mes
+    FROM stg.plan_mensual
+    WHERE ambito_id = 3
+    GROUP BY 1, 2
+),
+
+-- --------------------------------------------------------------------------
+-- 3b) Corte temporal COMÚN a Plan y Real, por (obra, año).
+--     Construido sobre el universo (obra, año) de plan_mensual para cubrir
+--     también obras con Plan pero sin Real todavía.
+--       * año pasado   → 12
+--       * año en curso → último mes con cierre real; fallback a mes_actual
+--                        si la obra aún no tiene ningún cierre este año.
+--       * año futuro   → 0 (no se muestra)
+-- --------------------------------------------------------------------------
+corte AS (
+    SELECT
+        ao.obra_id,
+        ao.anio,
+        CASE
+            WHEN ao.anio <  par.anio_actual THEN 12
+            WHEN ao.anio =  par.anio_actual THEN COALESCE(ur.mes, par.mes_actual)
+            ELSE 0
+        END AS mes_corte
+    FROM (
+        SELECT DISTINCT obra_id, EXTRACT(YEAR FROM anio_mes)::INT AS anio
+        FROM stg.plan_mensual
+    ) ao
+    CROSS JOIN params par
+    LEFT JOIN ultimo_real ur
+        ON ur.obra_id = ao.obra_id
+       AND ur.anio    = ao.anio
+),
+
+-- --------------------------------------------------------------------------
+-- 3c) REAL anual.
+--     Suma importes mensuales de coste real (ambito_id=3) sobre la ventana
+--     [enero .. mes_corte] de cada (obra, año).
 -- --------------------------------------------------------------------------
 real_anual AS (
     SELECT
@@ -149,24 +200,20 @@ real_anual AS (
         SUM(pm.importe_mes)::NUMERIC(18,2)  AS cp_real
     FROM stg.plan_mensual pm
     JOIN stg.partidas p ON p.partida_id = pm.partida_id
-    CROSS JOIN params par
+    JOIN corte c
+        ON c.obra_id = pm.obra_id
+       AND c.anio    = EXTRACT(YEAR FROM pm.anio_mes)::INT
     WHERE pm.ambito_id = 3                  -- Coste Real
       AND p.categoria  = 'CP'
-      AND (
-            EXTRACT(YEAR FROM pm.anio_mes)::INT < par.anio_actual
-            OR (
-                EXTRACT(YEAR  FROM pm.anio_mes)::INT = par.anio_actual
-                AND EXTRACT(MONTH FROM pm.anio_mes)::INT <= par.mes_actual
-            )
-          )
+      AND EXTRACT(MONTH FROM pm.anio_mes)::INT <= c.mes_corte
     GROUP BY 1, 2, 3, 4, 5, 6
 ),
 
 -- --------------------------------------------------------------------------
--- 3b) PLAN anual.
+-- 3d) PLAN anual.
 --     Suma importes mensuales de coste planificado (ambito_id=8) restringido
 --     a la versión vigente anual de mart.v_master_vigente_anual.
---     Mismo filtro temporal que real_anual.
+--     MISMA ventana [enero .. mes_corte] que real_anual.
 -- --------------------------------------------------------------------------
 plan_anual AS (
     SELECT
@@ -184,21 +231,17 @@ plan_anual AS (
        AND va.ambito_id = 8
        AND va.anio      = EXTRACT(YEAR FROM pm.anio_mes)::INT
        AND va.version   = pm.version
-    CROSS JOIN params par
+    JOIN corte c
+        ON c.obra_id = pm.obra_id
+       AND c.anio    = EXTRACT(YEAR FROM pm.anio_mes)::INT
     WHERE pm.ambito_id = 8                  -- Coste Planificado
       AND p.categoria  = 'CP'
-      AND (
-            EXTRACT(YEAR FROM pm.anio_mes)::INT < par.anio_actual
-            OR (
-                EXTRACT(YEAR  FROM pm.anio_mes)::INT = par.anio_actual
-                AND EXTRACT(MONTH FROM pm.anio_mes)::INT <= par.mes_actual
-            )
-          )
+      AND EXTRACT(MONTH FROM pm.anio_mes)::INT <= c.mes_corte
     GROUP BY 1, 2, 3, 4, 5, 6
 ),
 
 -- --------------------------------------------------------------------------
--- 3c) Outer join entre real y plan para preservar partidas con solo uno
+-- 3e) Outer join entre real y plan para preservar partidas con solo uno
 --     de los dos lados.
 -- --------------------------------------------------------------------------
 detalle_partida AS (
@@ -219,7 +262,7 @@ detalle_partida AS (
 ),
 
 -- --------------------------------------------------------------------------
--- 3d) Mapping a tipología.
+-- 3f) Mapping a tipología.
 --
 -- Lógica en cascada:
 --   1) Si el subcapítulo es DEFINITORIO (CP.1..CP.4, CP.6, CP.9, CP.12),
@@ -297,4 +340,4 @@ GROUP BY obra_id, anio, tipologia
 HAVING SUM(cp_real) <> 0 OR SUM(cp_planificado) <> 0;
 
 COMMENT ON VIEW mart.v_pbi_cp_tipologia IS
-'Detalle anual de Costes Proporcionales por tipología agregada. Granularidad: obra × año × tipología. Real: meses 1-12 (año pasado) o 1-mes_actual (año curso). Plan: misma ventana, usando la última versión CUAT/ABC vigente al cierre.';
+'Detalle anual de Costes Proporcionales por tipología agregada. Granularidad: obra × año × tipología. Plan y Real se suman sobre la MISMA ventana [enero .. mes_corte]: 12 para años pasados, último mes con cierre real (ambito_id=3) para el año en curso (fallback mes_actual si no hay cierre aún).';

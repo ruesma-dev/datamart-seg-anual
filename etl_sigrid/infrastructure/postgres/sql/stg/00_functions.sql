@@ -42,16 +42,24 @@ COMMENT ON FUNCTION stg.fn_sigrid_date_to_date(INTEGER) IS
 -- Patrones reconocidos:
 --   tex: "PLANIFICACION CUATRIMESTRAL <MES_LARGO>-<YY|YYYY>"
 --        Ej: "PLANIFICACION CUATRIMESTRAL FEBRERO-26"
---   tex: "PLANIFICACION CUATRIMESTRAL <MES_LARGO> <YY|YYYY>"
---        (con espacio en vez de guión)
+--   tex: "PLANIFICACION CUATRIMESTRAL <MES_CORTO>-<YY|YYYY>"
+--        Ej: "PLANIFICACION CUATRIMESTRAL FEB-26"   (obra 0676-B V17)
+--   tex: "PLANIFICACION VALORADA <MES_LARGO|MES_CORTO>-<YY|YYYY>"
+--        Ej: "PLANIFICACION VALORADA JUN-25"
 --   res: "<algo>_CUAT <MES_CORTO>-<YY|YYYY>"
---        Ej: "Versión 11 (04/03/2026)_CUAT FEB-26"
+--        Ej: "Versión 11 (04/03/2026)_CUAT FEB-26"   (obra 0704 V11)
 --
 -- Devuelve NULL si no parsea (indica al pipeline que use fec_creacion).
 -- Es IMMUTABLE para que el optimizador pueda inlinar y precomputar.
 --
+-- IMPORTANTE: los patrones de "mes largo" se evalúan ANTES que los de
+-- "mes corto" para evitar que un mes corto (p.ej. "MAY") muerda dentro de
+-- un mes largo ("MAYO"). El orden de los bloques es deliberado.
+--
 -- Ejemplos:
 --   fn_master_mes_representado('PLANIFICACION CUATRIMESTRAL FEBRERO-26', NULL)
+--     → '2026-02-01'::DATE
+--   fn_master_mes_representado('PLANIFICACION CUATRIMESTRAL FEB-26', NULL)
 --     → '2026-02-01'::DATE
 --   fn_master_mes_representado(NULL, 'Versión 11 (04/03/2026)_CUAT FEB-26')
 --     → '2026-02-01'::DATE
@@ -81,6 +89,28 @@ BEGIN
         v_mes_num := array_position(
             ARRAY['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
                   'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'],
+            v_match[1]
+        );
+        v_anno := CASE WHEN length(v_match[2]) = 2
+                       THEN 2000 + v_match[2]::INTEGER
+                       ELSE v_match[2]::INTEGER END;
+        RETURN make_date(v_anno, v_mes_num, 1);
+    END IF;
+
+    -- Patrón 1b: tex contiene "CUATRIM... <MES_CORTO>-<YY|YYYY>"
+    -- (formato "PLANIFICACION CUATRIMESTRAL FEB-26": palabra larga +
+    --  abreviatura de mes. Caso real obra 0676-B V17, cuya versión NO lleva
+    --  el sufijo "_CUAT" en el res, por lo que el Patrón 4 no lo cubre.)
+    -- Va DESPUÉS del Patrón 1 a propósito: si fuese mes largo, ya habría
+    -- retornado arriba.
+    v_match := regexp_match(
+        upper(COALESCE(p_tex, '')),
+        '(?:CUATRIM\w*)\s+(' || v_meses_corto || ')[-\s]*(\d{2,4})'
+    );
+    IF v_match IS NOT NULL THEN
+        v_mes_num := array_position(
+            ARRAY['ENE','FEB','MAR','ABR','MAY','JUN',
+                  'JUL','AGO','SEP','OCT','NOV','DIC'],
             v_match[1]
         );
         v_anno := CASE WHEN length(v_match[2]) = 2
@@ -150,7 +180,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION stg.fn_master_mes_representado(TEXT, TEXT) IS
-'Devuelve el primer día del mes que una versión cuatrimestral pretende representar (a partir de tex/res). NULL si no parsea.';
+'Devuelve el primer día del mes que una versión cuatrimestral pretende representar (a partir de tex/res). Cubre CUATRIM/VALORADA con mes largo o corto en tex, y _CUAT con mes corto en res. NULL si no parsea.';
 
 
 -- ---------------------------------------------------------------------------
@@ -173,6 +203,15 @@ COMMENT ON FUNCTION stg.fn_master_mes_representado(TEXT, TEXT) IS
 -- Esto cubre el caso real obra 0704 V11 "Versión 11 (04/03/2026)_CUAT FEB-26":
 --   - es cuatrimestral (tex contiene CUATRIM)
 --   - parsea como febrero 2026
+--   - mes parseado (2) ≠ mes fec_creacion (3)
+--   - mes fec_creacion (3) ∉ {2, 6, 10}
+--   → fec_efectiva = 2026-02-01
+--
+-- También cubre obra 0676-B V17 "PLANIFICACION CUATRIMESTRAL FEB-26"
+-- (creada 02/03/2026), gracias al nuevo Patrón 1b de
+-- fn_master_mes_representado:
+--   - es cuatrimestral
+--   - parsea como febrero 2026 (mes corto en tex)
 --   - mes parseado (2) ≠ mes fec_creacion (3)
 --   - mes fec_creacion (3) ∉ {2, 6, 10}
 --   → fec_efectiva = 2026-02-01

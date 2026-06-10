@@ -1,0 +1,22 @@
+# Variables (cambia obra y mes)
+$OBRA = "0676-B"
+$MES  = "2026-03-01"
+
+# 1. Resumen del cierre del mes: 6 conceptos con € y % en 5 columnas
+python main.py inspect-cierre --codigo $OBRA --mes $MES
+
+# 2. Cabecera identificativa (cliente, técnico, plazos, presupuestos…)
+python main.py inspect-cabecera --codigo $OBRA
+
+# 3. Detalle de INDIRECTOS (4 variantes de periodificación si quieres)
+python main.py inspect-indirectos-detalle --codigo $OBRA --mes $MES
+python main.py inspect-indirectos-detalle --codigo $OBRA --mes $MES --todas
+
+# 4. Detalle de GENERALES (6 tipologías de costes proporcionales)
+python main.py inspect-generales-detalle --codigo $OBRA --mes $MES
+
+# 5. Cuadro PLANIFICADO vs REAL del mes (6 conceptos del Excel con desviación %)
+python main.py inspect-planif-vs-real --codigo $OBRA --mes $MES
+
+# 6. Versiones master CIERRE disponibles (auditoría: ver qué master se usa)
+python main.py list-master-cierre --codigo $OBRA

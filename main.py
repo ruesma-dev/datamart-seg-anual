@@ -30,6 +30,7 @@ import click  # noqa: E402
 from config.settings import get_settings  # noqa: E402
 from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
+from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
 from etl_sigrid.application.steps.build_stg_step import BuildStgStep  # noqa: E402
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: E402
@@ -1581,6 +1582,22 @@ def build_cierre() -> None:
         sys.exit(1)
 
 
+@cli.command("build-maestros")
+def build_maestros() -> None:
+    """
+    Materializa el schema `maestro` (catálogos para consulta externa):
+    maestro.obras, maestro.proveedores y maestro.proveedores_obra.
+
+    INDEPENDIENTE del seguimiento/cierre. Solo lee de raw.*. Requiere que la
+    ingesta (raw) esté hecha; no necesita stage ni mart.
+    """
+    settings = get_settings()
+    result = BuildMaestrosStep(settings).run()
+    _print_result(result)
+    if result.status == StepStatus.FAILED:
+        sys.exit(1)
+
+
 @cli.command("reset-cierre")
 def reset_cierre() -> None:
     """
@@ -2279,7 +2296,9 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
     SELECT
         codigo_obra, nombre_obra,
         cliente_nombre, tecnico_responsable,
-        centro_coste_ide, tipo_obra_ide, clase_obra_ide,
+        centro_coste_ide, centro_coste_nombre,
+        tipo_obra_ide, tipo_obra_nombre,
+        clase_obra_ide, clase_obra_nombre,
         fecha_inicio_previsto, fecha_fin_previsto,
         fecha_inicio_real, fecha_fin_real, fecha_adjudicacion,
         plazo_meses, coeficiente_indirectos, superficie_total,
@@ -2299,7 +2318,7 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
         return
 
     (codigo, nombre, cliente, tecnico,
-     cc_ide, tipo_ide, clase_ide,
+     cc_ide, cc_nom, tipo_ide, tipo_nom, clase_ide, clase_nom,
      fini_p, ffin_p, fini_r, ffin_r, fadj,
      plazo, coef, sup,
      pres_ini, ver_ini, pres_vig, ver_vig, pres_aprob, modif) = row
@@ -2323,9 +2342,17 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
     click.echo(f"  Nombre ................ {nombre}")
     click.echo(f"  Cliente ............... {show(cliente)}")
     click.echo(f"  Técnico responsable ... {show(tecnico)}")
-    click.echo(f"  Centro de coste (id) .. {show(cc_ide)}")
-    click.echo(f"  Tipo de obra (id) ..... {show(tipo_ide)}")
-    click.echo(f"  Clase de obra (id) .... {show(clase_ide)}")
+    def show_with_id(nombre, ide):
+        """Muestra '<nombre>  (id: N)' si hay nombre, '(no disponible)' si no."""
+        if nombre is None and ide is None:
+            return click.style("(no disponible)", fg="yellow", dim=True)
+        if nombre is None:
+            return f"(id={ide}, sin texto en catálogo)"
+        return f"{nombre}  (id: {ide})"
+
+    click.echo(f"  Centro de coste ....... {show_with_id(cc_nom, cc_ide)}")
+    click.echo(f"  Tipo de obra .......... {show_with_id(tipo_nom, tipo_ide)}")
+    click.echo(f"  Clase de obra ......... {show_with_id(clase_nom, clase_ide)}")
     click.echo("")
 
     click.secho("PLAZOS", bold=True)
@@ -2354,8 +2381,8 @@ def inspect_cabecera(obra_id: int | None, codigo_obra: str | None) -> None:
 
     click.secho("Notas:", bold=True)
     click.echo("  - (no disponible) = el campo viene vacío/0 en Sigrid.")
-    click.echo("  - Centro/Tipo/Clase se muestran como ID hasta ingestar")
-    click.echo("    los catálogos (cen, auxobrtip, auxobrcla) — Tanda 3.1.")
+    click.echo("  - (id=N, sin texto en catálogo) = el ID existe pero no tiene")
+    click.echo("    fila correspondiente en cen/auxobrtip/auxobrcla.")
     click.echo("")
 
 

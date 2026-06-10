@@ -73,8 +73,11 @@ SELECT
     NULLIF(obr.empide, 0)                                      AS tecnico_ide,
     tec.res                                                    AS tecnico_responsable,
     NULLIF(obr.cenide, 0)                                      AS centro_coste_ide,
+    cenc.res                                                   AS centro_coste_nombre,
     NULLIF(obr.obrtipide, 0)                                   AS tipo_obra_ide,
+    ot.res                                                     AS tipo_obra_nombre,
     NULLIF(obr.obrclaide, 0)                                   AS clase_obra_ide,
+    oc2.res                                                    AS clase_obra_nombre,
 
     -- ==========================================================
     -- FECHAS — cascada de prioridad por extremo
@@ -168,13 +171,18 @@ FROM stg.obras o
 LEFT JOIN raw.obr   obr ON obr.ide   = o.obra_id
 LEFT JOIN raw.con   cli ON cli.ide   = obr.entide
 LEFT JOIN raw.con   tec ON tec.ide   = NULLIF(obr.empide, 0)
+LEFT JOIN raw.cen        cen ON cen.ide  = NULLIF(obr.cenide,    0)
+LEFT JOIN raw.con        cenc ON cenc.ide = NULLIF(obr.cenide,   0)
+LEFT JOIN raw.auxobrtip  ot  ON ot.ide   = NULLIF(obr.obrtipide, 0)
+LEFT JOIN raw.auxobrcla  oc2 ON oc2.ide  = NULLIF(obr.obrclaide, 0)
 LEFT JOIN fechas_obrctr oc ON oc.obra_id = o.obra_id
 LEFT JOIN venta_inicial vi ON vi.obra_id = o.obra_id
 LEFT JOIN venta_vigente vv ON vv.obra_id = o.obra_id;
 
 COMMENT ON VIEW cierre.v_pbi_cierre_cabecera IS
-'Cabecera del cierre (Tanda 4.3). Las fechas siguen una cascada de prioridad: '
+'Cabecera del cierre (Tanda 3.1). Las fechas siguen una cascada de prioridad: '
 'inicio real prioriza fecreaini (fisico) sobre fecreaact (admin); adjudicación '
 'cae a fecreafir si no hay fecreaadj; inicio/fin previstos caen al primer/último '
 'mes con master del cierre cuando obrctr y obr están vacíos. Cliente y técnico '
-'salen de con.res via FK. Presupuesto aprobado = inicial por defecto.';
+'salen de con.res via FK. Tanda 3.1: centro de coste, tipo y clase de obra ahora '
+'muestran texto via JOIN con cen/auxobrtip/auxobrcla. Presupuesto aprobado = inicial.';

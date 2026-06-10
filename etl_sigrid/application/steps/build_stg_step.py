@@ -178,6 +178,11 @@ class BuildStgStep(PipelineStep):
             ("raw", "obrctr"):    ["ide", "obride", "fecreaact",
                                    "fecreaini", "fecreafin",
                                    "fecpreini", "fecprefin"],
+            # Catálogos para mostrar texto en la cabecera del cierre (Tanda 3.1)
+            # OJO: cen NO tiene 'res' propio - hereda de con (Tanda 3.1.1).
+            ("raw", "cen"):       ["ide"],
+            ("raw", "auxobrtip"): ["ide", "res"],
+            ("raw", "auxobrcla"): ["ide", "res"],
             ("raw", "obrparpar"): ["ide", "obride", "padide", "cod", "res", "tipdes", "unimed", "tcaide"],
             ("raw", "obrfas"):    ["ide", "obride", "fasnum", "fecini", "fecfin", "ano", "mes", "res"],
             ("raw", "obrfasamb"): ["ide", "obride", "amb", "fas", "plafec", "fec", "res", "tex"],

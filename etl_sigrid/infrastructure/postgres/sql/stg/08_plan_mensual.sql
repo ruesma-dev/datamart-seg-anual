@@ -16,42 +16,50 @@
 -- Posiciones VACÍAS al final del string (separadores "||" sin valor) =
 -- fuera del horizonte del planif (la partida no aporta nada en esas pos).
 --
--- Posiciones con "0" tienen DOS SIGNIFICADOS según el contexto:
+-- Posiciones con "0" antes de cualquier valor positivo (la partida aún no
+-- empieza): pct_acum_efectivo = 0.
 --
--- 1. "0" antes de cualquier valor positivo (partida que aún no empieza):
---    → pct_acum_efectivo = 0. La partida no aporta al acumulado.
+-- Posiciones con "0" DESPUÉS de un valor positivo: lo único que decide el
+-- trato de Sigrid es si el 0 es FINAL (no hay NINGÚN positivo en posiciones
+-- posteriores) o INTERMEDIO (hay actividad después). NO interviene el % máximo
+-- alcanzado (no hay umbral).
 --
--- 2. "0" después de un valor positivo:
+--    Caso A — "0" FINAL tras un positivo (partida cerrada):
+--      → FORWARD FILL del ÚLTIMO VALOR POSITIVO declarado (no del máximo),
+--        sea cual sea ese % (100 %, 93 %, 50 %...). "Ya no se mueve más".
+--      Caso real 0696 V22 P4.04.01.10 (último pos=1.00001): pos 16+ = 0
+--      finales → se mantiene en 1.00001.
+--      Caso real 0677 V34 40.04.04 (REVISIÓN MUROS, planif ...|0.93|0|0):
+--      llega al 93 % en ene-26 y los ceros de feb/mar son FINALES → se
+--      mantiene en 0,93 (Sigrid lo arrastra; NO lo estorna). Es lo que
+--      cerraba el descuadre de producción 0677 feb (−2.324,96).
+--      (El ffill al ÚLTIMO POSITIVO y no al máximo evita el pseudo-incremento
+--       espurio en partidas con sobrepaso, ej. P4.03.06 último=1.0 con max=1.054.)
 --
---    Caso A — partida con max histórico >= 0.95 (completada o casi):
---      → Sigrid hace FORWARD FILL del ÚLTIMO VALOR POSITIVO declarado
---        (no del máximo histórico).
---      → Significa "la partida ya está cerrada, no se mueve más".
---      Caso real obra 0696 V22 P4.04.01.10 (max=1.00001): llega a 1.00001
---      en pos 15, luego pos 16+ = 0. pct_efectivo se mantiene en 1.00001
---      desde pos 15. NO genera estornos espurios.
---      Caso crítico: si la partida tuvo SOBREPASO (max=1.054, ej. P4.03.06)
---      y luego raw=1.0 y después raw=0, el ffill al MAX (1.054) generaba
---      un pseudo-incremento de +0.054 € espurio. El ffill al ÚLTIMO POSITIVO
---      lo mantiene en 1.0 → sin estorno espurio.
+--    Caso B — "0" INTERMEDIO (hay un positivo en posiciones posteriores):
+--      → 0 LITERAL ese mes (estorno). Un 0 con plan después no es "cerrada":
+--        es una bajada planificada de ese tramo.
+--      Caso real 0696 V22 P5.19.04.01 (...|0.501|0.501|0.501|0|0|0|0|0|0|
+--      0.2|0.4|0.7|1|...): los ceros de feb-jul 26 son INTERMEDIOS (reaparece
+--      0,2 en ago-26) → estorno a 0 en feb (−0.501). NO baja por ser 50 %,
+--      baja por ser intermedio.
+--      Caso real 0677 V34 cap. 08.06 (08.06.19/41/42, patrón 100→0→50→100):
+--      el 0 intermedio se respeta → 08.06 feb cuadra (−10.469,22 €) y CD feb
+--      0677 → 867.483,31. Confirmado en 0705 V11 (CD +560,34).
 --
---    Caso B — partida con max histórico < 0.95 (anulación deliberada):
---      → Sigrid trata el 0 LITERALMENTE (la partida deja de aportar).
---      → El JO está anulando avances intencionadamente.
---      Caso real obra 0696 V22 P5.19.04.01 (max=0.501): llega a 50,10% en
---      pos 13-15 y luego pos 16-21 = 0. Sigrid muestra vacío en cols
---      16-21 tanto en hoja como en padre. pct_efectivo cae a 0 →
---      estorno legítimo de -0.501.
+--    "0" de pre-arranque (sin ningún positivo antes) → 0.
 --
--- Regla final aplicada (validada al céntimo contra Sigrid V22 obra 0696
--- en feb/mar/abr 2026):
+-- Regla final aplicada (validada al céntimo contra Sigrid: 0696 V22
+-- feb/mar/abr 2026 y 0677/0705 feb 2026):
 --    Si pct_acum_raw > 0:
 --        pct_efectivo = pct_acum_raw                    (literal positivo)
 --    Si pct_acum_raw = 0:
---        Si max_hasta_aqui >= 0.95:
---            pct_efectivo = ultimo_valor_positivo       (ffill al último positivo)
---        Si max_hasta_aqui < 0.95:
---            pct_efectivo = 0                           (anulación / estorno)
+--        Si hay un positivo en posiciones POSTERIORES (0 intermedio):
+--            pct_efectivo = 0                           (estorno literal)
+--        Si NO lo hay pero SÍ hubo un positivo antes (0 final):
+--            pct_efectivo = ultimo_valor_positivo       (ffill, partida cerrada)
+--        Si no hubo ningún positivo antes (pre-arranque):
+--            pct_efectivo = 0
 --    pct_mes = pct_efectivo - LAG(pct_efectivo)
 --
 -- Validación cuantitativa V22 obra 0696 (importe mensual CD):
@@ -183,7 +191,16 @@ master_con_metricas AS (
             PARTITION BY presupuesto_id
             ORDER BY posicion_mes
             ROWS UNBOUNDED PRECEDING
-        ) AS max_hasta_aqui
+        ) AS max_hasta_aqui,
+        -- max_posterior: máximo de las posiciones POSTERIORES a la actual.
+        -- Distingue un "0" FINAL (sin ningún positivo después → partida
+        -- cerrada) de un "0" INTERMEDIO (hay un positivo después → caída
+        -- planificada literal de ese mes). NULL en la última posición.
+        MAX(pct_acumulado_raw) OVER (
+            PARTITION BY presupuesto_id
+            ORDER BY posicion_mes
+            ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING
+        ) AS max_posterior
     FROM master_explosion
 ),
 -- Asignación de grupos para "forward fill al último valor positivo":
@@ -211,9 +228,11 @@ master_con_ultimo_positivo AS (
     FROM master_con_grupos
 ),
 -- Aplicar la regla de Sigrid:
---   - pct_acum_raw > 0           → literal positivo
---   - pct_acum_raw = 0, max ≥0.95 → forward fill al ÚLTIMO POSITIVO
---   - resto                       → 0 (estorno legítimo o pre-arranque)
+--   - pct_acum_raw > 0                          → literal positivo
+--   - pct_acum_raw = 0 y hay positivo DESPUÉS    → 0 literal (0 intermedio = estorno)
+--   - pct_acum_raw = 0, final, hubo positivo antes → ffill al ÚLTIMO POSITIVO (partida cerrada)
+--   - pct_acum_raw = 0, sin positivo antes        → 0 (pre-arranque)
+-- (Sin umbral: el corte es FINAL vs INTERMEDIO, no el % alcanzado.)
 master_pct_efectivo AS (
     SELECT
         presupuesto_id, obra_id, partida_id, ambito_id, version_master,
@@ -227,9 +246,11 @@ master_pct_efectivo AS (
         CASE
             WHEN pct_acumulado_raw IS NOT NULL AND pct_acumulado_raw > 0
                 THEN pct_acumulado_raw                  -- literal positivo
-            WHEN COALESCE(max_hasta_aqui, 0) >= 0.95
-                THEN ultimo_positivo                     -- ffill al último positivo
-            ELSE 0                                       -- pre-arranque o anulación
+            WHEN COALESCE(max_posterior, 0) > 0
+                THEN 0                                   -- 0 INTERMEDIO (hay positivo después) -> 0 literal (estorno)
+            WHEN ultimo_positivo IS NOT NULL
+                THEN ultimo_positivo                     -- 0 FINAL tras un positivo -> arrastra (partida cerrada)
+            ELSE 0                                       -- 0 de pre-arranque (sin positivo previo)
         END AS pct_acumulado
     FROM master_con_ultimo_positivo
 ),

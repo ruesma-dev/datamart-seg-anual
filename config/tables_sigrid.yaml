@@ -96,6 +96,34 @@ tables:
     # contratos; en stg se elige el más antiguo (inicio) y el más reciente
     # con fecprefin (fin). Cruce: obrctr.obride → obr.ide.
 
+  - source_table: cen
+    target_table: cen
+    id_column: ide
+    incremental_column: null   # catálogo estable, refresco completo
+    where: null
+    exclude_columns:
+      - tex    # observaciones largas si existieran
+    # Centros de coste. Tabla con MUCHAS columnas según el PDF (cnaeide,
+    # ctacot, calcabide, direcciones, teléfonos…) pero a nosotros nos basta
+    # con ide + res para mostrar el texto en la cabecera del cierre. El ETL
+    # acepta cualquier columna que venga; aquí solo evitamos texto libre.
+
+  - source_table: auxobrtip
+    target_table: auxobrtip
+    id_column: ide
+    incremental_column: null   # catálogo estable, refresco completo
+    where: null
+    exclude_columns: []
+    # Tipos de obra (referenciado por obr.obrtipide).
+
+  - source_table: auxobrcla
+    target_table: auxobrcla
+    id_column: ide
+    incremental_column: null   # catálogo estable, refresco completo
+    where: null
+    exclude_columns: []
+    # Clases de obra (referenciado por obr.obrclaide).
+
   - source_table: auxobramb
     target_table: auxobramb
     id_column: ide
@@ -113,3 +141,72 @@ tables:
     # obrparpar.tcaide. Nos permite clasificar categorías de partida
     # directamente desde Sigrid sin depender de heurísticas sobre el
     # código del capítulo raíz.
+
+  # ===========================================================================
+  # MAESTROS para consulta externa: direcciones de obra y proveedores.
+  # No intervienen en el seguimiento/cierre; alimentan el schema `maestro`.
+  # ===========================================================================
+
+  - source_table: condir
+    target_table: condir
+    id_column: ide
+    incremental_column: null     # no consta tiemod en la doc; refresco completo
+    where: null
+    exclude_columns:
+      - dirtex   # observaciones de la dirección (texto ilimitado)
+      - eiotex   # descripción con. envío (texto ilimitado)
+    # Direcciones de conceptos (1N). conide → con.ide. Como la OBRA es un `con`
+    # (obr.ide = con.ide) y el PROVEEDOR también (prv.ide = con.ide), esta tabla
+    # da la dirección tanto de obras como de proveedores. Campos útiles:
+    # dir1, dir2, dircpo (CP), munide→auxmun, proide→auxpro, dir (completa),
+    # tel, ele (email). Una entidad puede tener varias direcciones (pos/tipo).
+
+  - source_table: obrprv
+    target_table: obrprv
+    id_column: ide
+    incremental_column: null     # no consta tiemod en la doc; refresco completo
+    where: null
+    exclude_columns:
+      - tex    # observaciones largas
+    # Obras: Proveedores (1N). Lista de proveedores por obra.
+    # Cruce: obrprv.obride → obr.ide. Trae cod (código proveedor) y
+    # res (nombre proveedor). El enlace al maestro de proveedor (CIF) se
+    # resolverá en stg/maestro tras verificar la clave real (probable por cod).
+
+  - source_table: prv
+    target_table: prv
+    id_column: ide
+    incremental_column: null     # extiende con; sin tiemod propio garantizado
+    where: null
+    exclude_columns: []
+    # Proveedores (Propiedades de con, mismo ide). Aporta cif (CIF/NIF),
+    # raz (razón social), tipsub (subcontratista). La dirección viene de
+    # condir (conide = prv.ide). El nombre también está en con.res.
+
+  - source_table: auxpro
+    target_table: auxpro
+    id_column: ide
+    incremental_column: null   # catálogo estable, refresco completo
+    where: null
+    exclude_columns: []
+    # Provincias. Decodifica condir.proide → res (nombre provincia).
+
+  - source_table: auxmun
+    target_table: auxmun
+    id_column: ide
+    incremental_column: null   # catálogo estable, refresco completo
+    where: null
+    exclude_columns: []
+    # Municipios. Decodifica condir.munide → res (nombre municipio).
+
+  - source_table: ctr
+    target_table: ctr
+    id_column: ide
+    incremental_column: tiemod   # si diera error, ponlo a null (refresco completo)
+    where: null
+    exclude_columns:
+      - tex    # texto largo
+      - obs    # observaciones
+    # Contratos de compra. Vínculo obra↔proveedor: ctr.obride → obr.ide,
+    # ctr.entide → con/prv (proveedor). Aporta importes (totdoc, tot…).
+    # Fuente de "proveedores de la obra X".
