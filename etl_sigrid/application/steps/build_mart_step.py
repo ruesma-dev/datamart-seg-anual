@@ -5,14 +5,16 @@ Step que materializa el esquema mart.* a partir de stg.*.
 Flujo:
     1. Asegura schema mart (idempotente, vía PostgresClient auto-bootstrap).
     2. Ejecuta en orden los archivos SQL de sql/mart/:
-        01_ddl.sql                  - DROP + CREATE mart.fact_seguimiento_mensual
-        02_build_fact.sql           - TRUNCATE + INSERT con la lógica de comparativa
-        03_agg_categoria.sql        - Pre-agregado CD/CI/CP por obra × mes × escenario
-        04_view_periodificado.sql   - Tabla aux.periodificacion_partida + vista
-                                      mart.v_fact_periodificado (placeholder)
-        05_views_powerbi.sql        - Vistas v_pbi_* consumidas por Power BI
-        06_views_cp_tipologia.sql   - Vistas para el detalle anual CP por tipología
-                                      (helpers + v_pbi_cp_tipologia)
+        01_ddl.sql                       - DROP + CREATE mart.fact_seguimiento_mensual
+        02_build_fact.sql                - TRUNCATE + INSERT con la lógica de comparativa
+        03_agg_categoria.sql             - Pre-agregado CD/CI/CP por obra × mes × escenario
+        04_view_periodificado.sql        - Tabla aux.periodificacion_partida + vista
+                                           mart.v_fact_periodificado (placeholder)
+        05_views_powerbi.sql             - Vistas v_pbi_* consumidas por Power BI
+        05b_view_dim_partida_niveles.sql - Vista mart.v_pbi_dim_partida_niveles
+                                           (DimPartida + nivel_1..6 para el visual árbol)
+        06_views_cp_tipologia.sql        - Vistas para el detalle anual CP por tipología
+                                           (helpers + v_pbi_cp_tipologia)
 
 Cada sub-step se registra en logs con tiempo y filas procesadas.
 
@@ -97,6 +99,11 @@ class BuildMartStep(PipelineStep):
                 name="views_powerbi",
                 sql_file="05_views_powerbi.sql",
                 # Vistas, no cuenta filas
+            ),
+            _SubStep(
+                name="dim_partida_niveles",
+                sql_file="05b_view_dim_partida_niveles.sql",
+                # Vista (DimPartida + nivel_1..6 para el visual árbol), no cuenta filas
             ),
             _SubStep(
                 name="views_cp_tipologia",
