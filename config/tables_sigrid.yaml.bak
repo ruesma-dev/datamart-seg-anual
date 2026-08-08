@@ -334,16 +334,6 @@ tables:
       - serdesdat
       - texobs
       - coestr
-      - dircon1
-      - dircon2
-      - dircon3
-      - dirdir1
-      - dirdir2
-      - dirdir3
-      - eittra
-      - pagfor
-      - pagtex
-      - texent
     # Cabecera de albarán de compra (tip=14). ctride → contrato (0 = directo).
     # Código/serie/fecha viven en con (mismo ide). Series Ruesma:
     # AC (albarán), PROF (proforma/cert. subcontrata), NTC (nota).
@@ -391,16 +381,6 @@ tables:
       - serdesdat
       - texobs
       - coestr
-      - dircon1
-      - dircon2
-      - dircon3
-      - dirdir1
-      - dirdir2
-      - dirdir3
-      - eittra
-      - pagfor
-      - pagtex
-      - texent
     # Cabecera de factura de compra (tip=15). Series: FR/FRGG (factura),
     # AB/ABGG (abono, importes negativos).
 

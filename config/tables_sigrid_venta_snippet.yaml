@@ -1,0 +1,81 @@
+# config/tables_sigrid_venta_snippet.yaml
+# ============================================================================
+# OPCIONAL — facturas de VENTA (dvf / dvfpro)
+#
+# NO son necesarias para que funcione el módulo de retenciones: los SQL ya se
+# adaptan si no existen (la obra se resuelve por `cenide` del efecto, que cubre
+# la gran mayoría de los casos).
+#
+# Añádelas si quieres:
+#   · activar el respaldo de atribución de obra para las retenciones de CLIENTE
+#     (cuando el cobro no lleva cenide);
+#   · preparar el terreno para la Tanda 5 (facturación de venta / R30-R37).
+#
+# Volúmenes en Ruesma: dvf 15.423 filas · dvfpro 28.789 filas (pequeñas).
+#
+# INSTRUCCIONES: pega estas dos entradas al final de la lista `tables:` de tu
+# config/tables_sigrid.yaml, y después lanza:
+#     python scripts\fix_exclusiones_yaml.py --tabla dvf
+#     python scripts\fix_exclusiones_yaml.py --tabla dvfpro
+#     python main.py ingest
+#     python main.py build-retenciones
+#
+# Las exclusiones de abajo son las mismas que ya funcionan en dcf/dcfpro (son
+# tablas gemelas: factura de venta vs de compra). El corrector completará lo
+# que falte consultando a Sigrid.
+# ============================================================================
+
+  - source_table: dvf
+    target_table: dvf
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - med
+      - des
+      - obs
+      - ima
+      - emptex
+      - dirtex
+      - eiotex
+      - desesp
+      - texcom
+      - serdesdat
+      - texobs
+      - coestr
+      - dircon1
+      - dircon2
+      - dircon3
+      - dirdir1
+      - dirdir2
+      - dirdir3
+      - eittra
+      - pagfor
+      - pagtex
+      - texent
+    # Cabecera de factura de VENTA (con.tip = 11). Es de donde nacen los
+    # cobros con retención (el diagnóstico mostró que el 100 % de los cobros
+    # con retide vienen de documentos tip=11).
+
+  - source_table: dvfpro
+    target_table: dvfpro
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - med
+      - des
+      - obs
+      - ima
+      - emptex
+      - dirtex
+      - eiotex
+      - desesp
+      - texcom
+      - serdesdat
+      - texobs
+      - coestr
+    # Líneas de factura de venta. Aportan `obride`, que permite deducir la obra
+    # de un cobro cuando el efecto no trae `cenide`.

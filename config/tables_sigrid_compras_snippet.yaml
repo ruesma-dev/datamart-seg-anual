@@ -1,0 +1,124 @@
+# config/tables_sigrid_compras_snippet.yaml
+# ============================================================================
+# TANDA C1 — Tablas de COMPRAS a añadir a config/tables_sigrid.yaml
+#
+# INSTRUCCIONES: copia las entradas de abajo y pégalas AL FINAL de la lista
+# `tables:` de tu config/tables_sigrid.yaml real (mismo nivel de indentación
+# que las entradas existentes). Este archivo NO sustituye al YAML: es solo el
+# bloque nuevo, para no pisar tu versión actual.
+#
+# Notas:
+#   - ctr y prv YA están en tu YAML (no se repiten aquí).
+#   - dcapropar y dcfpropar NO se ingieren: están vacías en Ruesma (0 filas);
+#     la partida viene directamente en la línea (dcapro.paride / dcfpro.paride).
+#   - Volúmenes (diagnóstico 2026-07): dcapro 1,13M · dcfpro 1,08M ·
+#     dca 305k · dcf 163k · ctrpro 241k · com 20k. Con page_size estándar
+#     la primera ingesta completa ronda los 10-15 min.
+#   - IMPORTANTE: los `con` de los documentos (tip 14/15/44) deben estar en
+#     raw.con para resolver código/serie/fecha. Si tu entrada de `con` tiene
+#     un WHERE que filtra por tipos, amplíalo para incluir 5,13,14,15,44.
+# ============================================================================
+
+  # --- COMPRAS: comparativos -------------------------------------------------
+  - source_table: com
+    target_table: com
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+    # Comparativos de ofertas. com.obride = obra; ctr.comide / dca.comide /
+    # dcf.comide referencian el comparativo origen.
+
+  - source_table: comlin
+    target_table: comlin
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+    # Detalle del comparativo (líneas por oferta).
+
+  - source_table: comprv
+    target_table: comprv
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+    # Proveedores invitados/ofertantes del comparativo.
+
+  # --- COMPRAS: líneas de contrato -------------------------------------------
+  - source_table: ctrpro
+    target_table: ctrpro
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - med
+      - desesp
+      - texcom
+    # Líneas de contrato de compra. docide→ctr, paride (partida), canser
+    # (cantidad servida), tot (importe línea sin IVA).
+
+  # --- COMPRAS: albaranes (incluye PROFORMAS y NOTAS por serie) ---------------
+  - source_table: dca
+    target_table: dca
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - emptex
+    # Cabecera de albarán de compra (tip=14). ctride enlaza al contrato
+    # (0 = albarán directo). El código/serie/fecha viven en con (mismo ide).
+    # Series en Ruesma: AC (albarán), PROF (proforma/cert. subcontrata), NTC.
+
+  - source_table: dcapro
+    target_table: dcapro
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - med
+      - desesp
+      - texcom
+    # Líneas de albarán. obride/paride en la propia línea. canfac = cantidad
+    # ya facturada (clave para "albaranado sin facturar"). linoriide→ctrpro
+    # con docoritip=44 = trazabilidad a la línea de contrato.
+
+  # --- COMPRAS: facturas (incluye ABONOS por serie) ---------------------------
+  - source_table: dcf
+    target_table: dcf
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - emptex
+    # Cabecera de factura de compra (tip=15). Series: FR/FRGG (factura),
+    # AB/ABGG (abono).
+
+  - source_table: dcfpro
+    target_table: dcfpro
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns:
+      - tex
+      - med
+      - desesp
+      - texcom
+      - serdesdat
+    # Líneas de factura. Estructura gemela de dcapro: obride/paride propios,
+    # linoriide→dcapro.ide con docoritip=14 (factura de albarán) o
+    # linoriide→ctrpro.ide con docoritip=44 (factura directa de contrato).
+
+  - source_table: dcfprodes
+    target_table: dcfprodes
+    id_column: ide
+    incremental_column: null   # tabla pequeña (~267 filas), refresco completo
+    where: null
+    exclude_columns: []
+    # Destinos de líneas de factura. Residual en Ruesma; se ingiere por
+    # completitud de trazabilidad.
