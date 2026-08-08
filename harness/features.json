@@ -48,18 +48,6 @@
       "branch": "feature/F-009-inventario-azure"
     },
     {
-      "id": "F-004",
-      "title": "Ejecutar el ETL en Azure sin dependencias locales",
-      "description": "CORREGIDO 2026-08-08 tras la spec: la premisa anterior era falsa. LoadExcelAuxStep NO lee hoy ficheros locales: es un stub que devuelve SKIPPED, y las variables AUX_EXCEL_* existen en config/settings.py pero nadie las lee, asi que el pipeline no esta roto hoy en un contenedor por este motivo. La feature construye la CAPACIDAD de lectura: que el step resuelva los tres Excels auxiliares indistintamente desde ruta local o desde Azure Blob Storage con identidad gestionada, los abra y valide que son legibles. NO los carga a aux.*: las tablas destino no existen y el esquema de los ficheros no esta en el repositorio (ver DA-4.1). Incluye auditar el resto de steps en busca de dependencias del sistema de ficheros local.",
-      "acceptance": [
-        "Definida en detalle por specs/F-004-etl-sin-dependencias-locales/ (sdd=true)"
-      ],
-      "status": "spec_ready",
-      "sdd": true,
-      "priority": 3,
-      "branch": "feature/F-004-etl-sin-dependencias-locales"
-    },
-    {
       "id": "F-005",
       "title": "Postgres del datamart en Azure",
       "description": "CORREGIDO 2026-08-08 tras el inventario de F-009: NO se aprovisiona ningun servidor. Se reutiliza psql-albaranes-rs9k2 (PostgreSQL 16, Standard_B1ms, 32 GB), que ya sirve a albaranes y partes, creando dentro la base sigrid_dm. Cubre: esquemas por capa, un rol de grupo propietario para el ETL (identidad gestionada del job + cuenta Entra del humano) y un rol de solo lectura para el MCP, autenticacion Entra para el ETL y contrasena en Key Vault para el MCP, reglas de firewall, carga inicial completa con medicion de tiempos por paso, y verificacion de que las vistas de consumo responden igual que en local. Puertas bloqueantes: comprobar espacio libre antes de la carga y desactivar el auto-bootstrap PG_AUTO_CREATE_DB contra un servidor compartido de produccion.",
@@ -68,7 +56,7 @@
       ],
       "status": "spec_ready",
       "sdd": true,
-      "priority": 4,
+      "priority": 3,
       "branch": "feature/F-005-postgres-azure"
     },
     {
@@ -80,7 +68,7 @@
       ],
       "status": "spec_ready",
       "sdd": true,
-      "priority": 5,
+      "priority": 4,
       "branch": "feature/F-003-infra-caj"
     },
     {
@@ -92,7 +80,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 6,
+      "priority": 5,
       "blocked_by_decisions": [
         "D1",
         "D4"
@@ -116,7 +104,7 @@
       ],
       "status": "done",
       "sdd": false,
-      "priority": 7,
+      "priority": 6,
       "branch": "feature/F-008-docs-referencia-sigrid-acens"
     },
     {
@@ -128,7 +116,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 8,
+      "priority": 7,
       "branch": "feature/F-011-carga-incremental"
     },
     {
@@ -140,7 +128,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 9,
+      "priority": 8,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -159,8 +147,32 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 10,
+      "priority": 9,
       "branch": "feature/F-012-auditoria-costes-azure"
+    },
+    {
+      "id": "F-004",
+      "title": "Ejecutar el ETL en Azure sin dependencias locales",
+      "description": "CORREGIDO 2026-08-08 tras la spec: la premisa anterior era falsa. LoadExcelAuxStep NO lee hoy ficheros locales: es un stub que devuelve SKIPPED, y las variables AUX_EXCEL_* existen en config/settings.py pero nadie las lee, asi que el pipeline no esta roto hoy en un contenedor por este motivo. La feature construye la CAPACIDAD de lectura: que el step resuelva los tres Excels auxiliares indistintamente desde ruta local o desde Azure Blob Storage con identidad gestionada, los abra y valide que son legibles. NO los carga a aux.*: las tablas destino no existen y el esquema de los ficheros no esta en el repositorio (ver DA-4.1). Incluye auditar el resto de steps en busca de dependencias del sistema de ficheros local.",
+      "acceptance": [
+        "Definida en detalle por specs/F-004-etl-sin-dependencias-locales/ (sdd=true)"
+      ],
+      "status": "spec_ready",
+      "sdd": true,
+      "priority": 10,
+      "branch": "feature/F-004-etl-sin-dependencias-locales"
+    },
+    {
+      "id": "F-013",
+      "title": "Cargar los Excels auxiliares a la capa aux",
+      "description": "FEATURE FUTURA, aplazada por el humano el 2026-08-08. Volcar a la base los tres Excels auxiliares que F-004 deja leidos y validados, creando las tablas destino de la capa aux y definiendo las reglas de negocio que las relacionan con mart. Estructura ya inspeccionada: TipoCoste 108 filas (ide, Nombre, subtipo, tipo); TipoPartida 864 filas (codigo partida, codigo obra, ide_tipo, ide); mapeo_proporcionales 2408 filas (codigo_obra, ide, tipo de coste, porcentaje). Son ~3400 filas en total, asi que el reto no es el volumen sino acordar el modelo destino y para que se usa cada columna. Propuesta del lider, pendiente de acordar: aux.tipo_coste, aux.tipo_partida y aux.mapeo_proporcionales con carga replace transaccional.",
+      "acceptance": [
+        "Definida en detalle por specs/F-013-carga-excels-aux/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 11,
+      "branch": "feature/F-013-carga-excels-aux"
     },
     {
       "id": "F-010",
@@ -171,7 +183,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -183,7 +195,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]
