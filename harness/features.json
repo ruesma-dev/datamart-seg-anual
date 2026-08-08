@@ -42,7 +42,7 @@
         "progress/decisiones_abiertas.md actualizado con lo que el inventario permita cerrar",
         "bash harness/init.sh en verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "priority": 2,
       "branch": "feature/F-009-inventario-azure"

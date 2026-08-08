@@ -6,25 +6,27 @@ los 8 criterios `acceptance` de `harness/features.json` y contra
 `CHECKPOINTS.md`.
 
 Fecha de la review: 2026-08-08.
+Primera pasada: CHANGES_REQUESTED. **Segunda pasada (commit `ff5a434`):
+APPROVED.**
 
 ---
 
 ## Veredicto
 
-**CHANGES_REQUESTED**
+**APPROVED**
 
-Un único bloqueo, en C3 bis, y es de dos líneas: la cabecera del inventario
-declara **tres** nombres de recurso redactados y en el cuerpo hay **cuatro**.
-El cuarto (`<GUID>`) no está anotado en el bloque «Redactado».
+En la primera pasada quedó un único bloqueo, en C3 bis: la cabecera del
+inventario declaraba **tres** nombres de recurso redactados y en el cuerpo
+había **cuatro** (faltaba `VisualStudioOnline-<GUID>`). **Corregido en el
+commit `ff5a434` y verificado por mí** — detalle en «Segunda pasada» al final.
 
-**Todo lo demás está aprobado**, incluida la parte más delicada: el barrido
-de datos sensibles salió **limpio en todos los patrones** y la excepción de
-escritura está declarada de forma visible, honesta y **verificada por mí
-contra Azure**. El trabajo es de calidad alta y de una exactitud poco común
-—cada dato que he podido contrastar contra la suscripción real ha coincidido
-exactamente—. No estoy rechazando el fondo, sino cerrando una inconsistencia
-en el único bloque del documento cuya función es garantizar que no falta
-nada por declarar.
+Todo lo demás ya estaba aprobado en la primera pasada, incluida la parte más
+delicada: el barrido de datos sensibles salió **limpio en todos los patrones**
+y la excepción de escritura está declarada de forma visible, honesta y
+**verificada por mí contra Azure**. El trabajo es de calidad alta y de una
+exactitud poco común —cada dato que he podido contrastar contra la suscripción
+real ha coincidido exactamente, incluido un aviso predictivo que se cumplió al
+segundo—.
 
 ---
 
@@ -89,10 +91,12 @@ nada por declarar.
 - [x] **Barrido de datos sensibles ejecutado por mí.** Resultado y patrones
       en la sección «Barrido» de abajo. **Limpio.**
 
-- [ ] **Lo que se haya redactado está anotado en la cabecera.** **FALLA.**
-      Es el único checkbox vacío del informe. Motivo y arreglo en «Cambios
-      requeridos» nº 1: se han redactado cuatro nombres de recurso y la
-      cabecera declara tres.
+- [x] **Lo que se haya redactado está anotado en la cabecera.**
+      **Vacío en la primera pasada, corregido en `ff5a434`.** La cabecera
+      (líneas 17-23) declara ahora las **cuatro** excepciones, incluido
+      `VisualStudioOnline-<GUID>` con explicación de qué identificador lleva
+      incrustado. Verificado: los cuatro nombres redactados del cuerpo
+      (líneas 72, 74, 529, 532) están todos cubiertos por la cabecera.
 
 ### C4 — La verificación es real
 
@@ -284,7 +288,7 @@ futuro no confundirá la foto con el estado permanente, porque la cabecera fija
 | # | Criterio | Veredicto | Evidencia |
 |---|---|---|---|
 | 1 | SOLO LECTURA, prohibido create/update/delete/deployment | **Cumplido con excepción declarada y autorizada** | Una escritura: la regla de firewall. Declarada en 4 sitios y verificada por mí contra Azure. Ninguna otra escritura detectada. |
-| 2 | Existe `04_azure_inventario_dev.md` con la cabecera de `README.md` | **Cumplido, con el defecto nº 1** | Cabecera «Caso 2» correcta (líneas 4-7) + bloque «Redactado» (9-24). El bloque declara tres nombres redactados y hay cuatro. |
+| 2 | Existe `04_azure_inventario_dev.md` con la cabecera de `README.md` | **Cumplido** (tras `ff5a434`) | Cabecera «Caso 2» correcta (líneas 4-7) + bloque «Redactado» (9-26), que ya declara las cuatro excepciones. |
 | 3 | Cubre RGs, VNets, peerings, subredes, VPN y estado, Firewall, storages, Key Vaults, ACR, Postgres y el contenido de `rg-seguimiento-dev` y `rg-sigrid-dev-data-api` | **Cumplido** | §1 (17 RG), §3.1-3.2, §3.3 (VPN `Connected`), §3.4, §4.1 (8 storages), §4.2 (4 KV), §5.1 (1 ACR), §5.3 (1 Postgres, 1 SQL). `rg-sigrid-dev-data-api` en §1. `rg-seguimiento-dev` **no existe** y se documenta como tal (§6.3) en vez de inventarse: es la respuesta correcta. **Verificado**: `az group exists -n rg-seguimiento-dev` → `false`. |
 | 4 | Contrasta con `02_azure_landing_zone_acens.md` y señala diferencias | **Cumplido** | §6.1 (10 elementos que se cumplen) y §6.2 (7 diferencias, con la VPN P2S inexistente y los cero private endpoints a la cabeza). |
 | 5 | Sin ID de suscripción, sin IPs internas, sin secretos; redactado como el resto | **Cumplido** | Barrido propio: limpio en los 11 patrones. |
@@ -354,11 +358,12 @@ tomado con el mismo cuidado.
 
 ---
 
-## Cambios requeridos
+## Cambios requeridos (primera pasada) — RESUELTO
 
-Uno solo, y es de dos líneas.
+Uno solo, y era de dos líneas. **Atendido en el commit `ff5a434`.** Se
+conserva el enunciado como registro de la review.
 
-### 1. La cabecera declara tres nombres de recurso redactados; hay cuatro
+### 1. La cabecera declara tres nombres de recurso redactados; hay cuatro — ✅ RESUELTO
 
 **Fichero:** `docs/referencia/04_azure_inventario_dev.md`
 **Líneas del defecto:** 17-21 (la declaración) contra la línea 72 (el caso no
@@ -412,6 +417,31 @@ cuarto caso):
 
 No hace falta tocar nada más del documento.
 
+**Cómo se resolvió.** El commit `ff5a434` aplicó exactamente eso —el recuento
+pasa a «Cuatro excepciones» y se añade el caso que faltaba—, con una redacción
+algo más informativa que la que yo proponía: nombra el recurso
+(`VisualStudioOnline-<GUID>`) y explica que lo incrustado es el identificador
+de la organización de Azure DevOps. Mejor así.
+
+---
+
+## Segunda pasada (commit `ff5a434`) — verificación
+
+No me fío del «ya está corregido»: lo comprobé.
+
+| Qué verifiqué | Cómo | Resultado |
+|---|---|---|
+| El cambio es el pedido | `git show ff5a434` | Un único *hunk* en el documento, en la cabecera (línea 15 en adelante), `+5/-3`. La cabecera declara ya **«Cuatro excepciones»** y nombra `VisualStudioOnline-<GUID>`. |
+| **El cuerpo no se ha tocado** | El diff del documento en ese commit es solo el *hunk* de cabecera | **Confirmado.** Por eso el barrido de datos sensibles y la verificación de la excepción de escritura de la primera pasada **siguen siendo válidos sin repetirse**, como afirmaba el coordinador. |
+| Los cuatro nombres redactados están cubiertos | `grep` de los cuatro patrones | Líneas 72 (`DefaultWorkspace-<ID-SUSCRIPCION>-ESC`), 74 (`VisualStudioOnline-<GUID>`), 529 (`cn-<IP-PUBLICA-SEDE>-remota`) y 532 (`<IP-PUBLICA-SEDE>-remota`). **Los cuatro declarados** en la cabecera. |
+| El parche no introduce datos sensibles | Re-barrido de los patrones de GUID, hex≥32, IPv4/CIDR, correo y token≥40 sobre el fichero completo | **Limpio.** Única coincidencia, `0.0.0.0` (ahora línea 198, antes 196: el desplazamiento de +2 cuadra exactamente con el crecimiento de la cabecera). El `<GUID>` de la cabecera es el marcador, no un identificador real. |
+| `harness/init.sh` | Ejecutado por mí | **Verde**: exit 0, 22 tests, `ENTORNO LISTO`. |
+| Árbol limpio y rama correcta | `git status --porcelain -uall` / `git branch` | Vacío; `feature/F-009-inventario-azure`. |
+| `features.json` intacto | Sin cambios en `ff5a434` | F-003 y F-005 siguen sin tocarse. |
+
+Con esto, **los cuatro checkboxes de C3 bis quedan marcados** y no queda
+ninguno vacío en C1–C5.
+
 ---
 
 ## Observaciones no bloqueantes
@@ -460,15 +490,29 @@ de vista.**
 
 ---
 
-## Qué hay que hacer para cerrar
+## Qué queda para cerrar la feature
 
-1. Aplicar el cambio nº 1 (dos líneas en la cabecera de
-   `docs/referencia/04_azure_inventario_dev.md`).
-2. Commit `F-009: declarar el cuarto nombre redactado en la cabecera`.
-3. Nueva review. No hace falta repetir el barrido completo: lo daré por
-   válido salvo que cambie el cuerpo del documento.
+La review está **aprobada**. Lo que resta no es trabajo del implementer:
 
-Todo lo demás de esta feature está aprobado.
+1. **Commitear este informe actualizado** (`progress/review_F-009.md` queda
+   modificado por esta segunda pasada; la versión que entró en `ff5a434` es la
+   de la primera).
+2. **Pasar F-009 a `done`** en `harness/features.json` y anotar su resumen en
+   `progress/history.md`, como exige C2 para toda feature `done`.
+3. **Vaciar `progress/current.md`** al cerrar la sesión — pero **sin perder
+   las dos decisiones pendientes** que hoy solo viven ahí: la retirada de la
+   regla de firewall y la autorización para leer las tablas de control. Ambas
+   están ya replicadas en `decisiones_abiertas.md` (D7), así que basta con
+   comprobar que no se pierden.
+
+### Y una cosa que el humano tiene que decidir, no el arnés
+
+**La regla `dev-puesto-pgris-2026-08-08` sigue activa** en
+`sql-sigridetl-dev-8yv7pj`. Aprobar esta feature **no** la retira ni la
+convierte en permanente: solo certifica que está correctamente declarada.
+Mientras exista, esa IP alcanza un servidor con acceso público que contiene
+datos personales y bancarios. **Conviene decidirlo pronto**, y borrarla es una
+escritura que nadie ha autorizado todavía.
 
 ---
 
