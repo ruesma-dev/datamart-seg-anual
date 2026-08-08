@@ -3,27 +3,134 @@
 
 Fecha: 2026-08-08 · Rama revisada: `feature/F-008-docs-referencia-sigrid-acens`
 Base de comparación: `dev` · Commits revisados: `e8cd88e`, `c8e90ea`,
-`f8864a7`, `f61512c`
+`f8864a7`, `f61512c` y, en la segunda pasada, `38cde59`.
 Feature `sdd=false`: se valida contra los `acceptance` de `harness/features.json`
 y contra `CHECKPOINTS.md`.
 
 ## Veredicto
 
-**CHANGES_REQUESTED**
+**APPROVED** (segunda revisión, 2026-08-08)
 
-El trabajo sustantivo está bien y verificado de forma independiente: los tres
+Los tres cambios requeridos en la primera pasada están corregidos en `38cde59`.
+Con ellos, los cinco checkpoints C1–C5 quedan completos y los nueve criterios
+`acceptance` se cumplen. Nada del contenido revisado en la primera pasada se ha
+tocado —`38cde59` no entra en `docs/`—, así que el barrido de secretos y la
+comprobación de que los PDF originales no están en el repositorio siguen siendo
+válidos sin repetirse.
+
+Queda constancia del veredicto anterior y de su justificación en la sección
+«Primera revisión», más abajo, para que el historial no se reescriba.
+
+## Segunda revisión — verificación de `38cde59`
+
+### Los tres cambios requeridos
+
+| # | Cambio pedido | Verificado |
+|---|---|---|
+| 1 | Eliminar el párrafo obsoleto «F-008 no puede arrancar hasta que el humano entregue las rutas locales de los dos PDF» | Hecho. Ya no existe en `progress/current.md`; el fichero describe la feature como completada y a la espera de veredicto (líneas 4-23) |
+| 2 | Corregir «dos documentos» → tres, e incluir `f61512c` | Hecho. `current.md:6-10` lista los tres con su commit (`e8cd88e`, `c8e90ea`, `f61512c`), y `:12-15` explica qué más trae `f61512c` |
+| 3 | Eliminar el resto de la sesión de F-001 | Hecho. No queda mención a F-001 en `current.md`; su cierre vive solo en `progress/history.md`, que es donde corresponde |
+
+`progress/current.md` describe ahora **solo** la sesión activa. El checkpoint
+C2 que bloqueaba el cierre pasa a `[x]`.
+
+### Cambios adicionales del mismo commit (fuera de mis cambios requeridos)
+
+`38cde59` trae además dos cosas pedidas por el humano en la misma sesión. Las
+he verificado porque entran en la rama de F-008 y, por tanto, en el merge a
+`dev`:
+
+**Alta de F-009 y F-010 en `harness/features.json`.** Verificado sobre el JSON
+parseado, no sobre el diff textual, precisamente por la reescritura con
+`json.dump`:
+
+- Comparados los objetos de la versión `f61512c` y la actual, feature a feature
+  y campo a campo. **No se ha perdido nada**: las ocho features previas siguen
+  ahí y el **único** campo que cambia en cualquiera de ellas es `priority`.
+  Título, descripción, `acceptance`, `status`, `sdd` y `branch` intactos en las
+  ocho, incluida F-008.
+- `$schema_doc`, `$decisions_doc` y `rules` idénticos.
+- Prioridades tras la renumeración: 1..10 sin huecos ni empates
+  (F-001=1, F-009=2, F-004=3, F-005=4, F-003=5, F-006=6, F-008=7, F-002=8,
+  F-010=9, F-007=10), exactamente lo anunciado.
+- F-009 y F-010 traen los ocho campos obligatorios, `status` válido y rama
+  conforme a `feature/F-XXX-slug`.
+- El reindentado no ha roto la codificación: sin escapes `\uXXXX`, acentos y
+  eñes literales en UTF-8, saltos de línea LF. Un `json.dump` descuidado
+  (`ensure_ascii=True`) habría dejado el fichero ilegible en un diff; no es el
+  caso.
+- `init.sh` lo valida y cuenta 10 features, 9 abiertas, **una sola**
+  `in_progress` (F-008).
+
+Sobre el contenido de F-009: su primer criterio `acceptance` es «SOLO LECTURA:
+exclusivamente comandos `az ... list` y `az ... show`. Prohibido cualquier
+create, update, delete o deployment». Encaja con la regla dura de `CLAUDE.md`
+que prohíbe escribir contra producción, y la refuerza al llevarla al criterio
+de aceptación. Su criterio 5 exige el mismo tratamiento de redacción que el
+resto de `docs/referencia/`, coherente con lo hecho en F-008. Bien planteada.
+
+**D5 marcada como parcialmente cerrada** en `progress/decisiones_abiertas.md`.
+La nota es honesta: dice qué se cierra (los Excels van a Azure), qué se saca a
+F-010, que F-004 no depende de F-010, y qué sigue abierto (qué storage account
+y quién mantiene los ficheros). No cierra de más.
+
+Un apunte menor, sin efecto sobre F-008 y fuera de su alcance: F-004 conserva
+`"blocked_by_decisions": ["D5"]`. Es correcto mientras D5 siga parcialmente
+abierta, pero cuando F-009 identifique la storage account convendrá revisar si
+ese bloqueo sigue vigente, para que no quede una feature bloqueada por una
+decisión ya resuelta.
+
+### Estado del entorno en la segunda pasada
+
+- `bash harness/init.sh`: **exit 0**. 22 tests pasando, `features.json` válido,
+  rama de feature correcta, un único `in_progress`.
+- `git status --porcelain -uall`: vacío. Sin ficheros temporales ni artefactos.
+- `38cde59` toca cuatro ficheros: `harness/features.json`,
+  `progress/current.md`, `progress/decisiones_abiertas.md` y
+  `progress/review_F-008.md` (este informe, versionado por el líder).
+  **Ninguno bajo `docs/`**, así que el contenido de los tres documentos de
+  referencia es idéntico al ya auditado.
+- Las cinco propuestas de automejora (P1–P5) **no** se han aplicado, tal y como
+  corresponde: son propuestas para el humano, no cambios del reviewer. Constan
+  como pendientes en `current.md:25-27`.
+- El mensaje de `38cde59` empieza por `F-008: …`, más cerca de la convención de
+  `.claude/agents/implementer.md` que los cuatro anteriores. La observación O1
+  se mantiene solo para los commits `docs(F-008): …`.
+
+## Checkpoints C1–C5 tras la corrección
+
+- **C1** `[x]` `[x]` — sin cambios, `init.sh` en verde.
+- **C2** `[x]` `[x]` `[x]` `[x]` — el tercer punto, que era el único `[ ]`,
+  queda resuelto por `38cde59`.
+- **C3** `[x]` `[x]` `[x]` `[x]` — sin cambios; `38cde59` no toca código ni
+  documentos de referencia.
+- **C4** `[x]` `[x]` `[x]` — sin cambios.
+- **C5** `[x]` `[x]` `[x]` — sin cambios; el árbol sigue limpio y
+  `features.json` sigue reflejando F-008 como `in_progress`, a la espera de que
+  el líder la marque `done` con este APROBADO.
+
+Ningún checkpoint queda vacío. Procede el cierre de F-008 y el merge a `dev`.
+
+---
+
+# Primera revisión — 2026-08-08 (histórico)
+
+## Veredicto de la primera pasada
+
+**CHANGES_REQUESTED** — resuelto por `38cde59`.
+
+El trabajo sustantivo estaba bien y verificado de forma independiente: los tres
 documentos existen con su cabecera, los nombres siguen la convención, **no hay
 ni un secreto ni un dato sensible** en ninguno de los tres, los PDF originales
 no han entrado al repositorio ni al árbol de trabajo, y `bash harness/init.sh`
 termina en verde. Los nueve criterios `acceptance` se cumplen.
 
-Lo que bloquea el cierre es una sola cosa, barata de arreglar: **C2 —
-`progress/current.md` contiene información obsoleta y contradictoria sobre la
-propia F-008**, además de un resto de la sesión de F-001. Es exactamente el
-fallo que el fichero de memoria existe para evitar. Son cuatro líneas en un
-único fichero; corregidas, esta feature es APROBADA sin más cambios.
+Lo que bloqueaba el cierre era una sola cosa, barata de arreglar: **C2 —
+`progress/current.md` contenía información obsoleta y contradictoria sobre la
+propia F-008**, además de un resto de la sesión de F-001. Era exactamente el
+fallo que el fichero de memoria existe para evitar.
 
-## Checkpoints (C1–C5)
+## Checkpoints (C1–C5) — evaluación de la primera pasada
 
 ### C1 — El arnés está completo y en verde
 
@@ -177,9 +284,9 @@ confirmación del humano antes de escribir nada». Hablan de cosas distintas
 están a diez líneas una de otra y un lector apresurado puede leerlas como
 contradictorias.
 
-## Cambios requeridos
+## Cambios requeridos (los tres, ya resueltos en `38cde59`)
 
-Todos en `progress/current.md`. Ninguno afecta al contenido de la feature.
+Todos en `progress/current.md`. Ninguno afectaba al contenido de la feature.
 
 1. **`progress/current.md:16-18`** — «F-008 no puede arrancar hasta que el
    humano entregue las rutas locales de los dos PDF; la conversión se hará con

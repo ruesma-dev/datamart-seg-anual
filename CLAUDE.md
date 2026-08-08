@@ -19,6 +19,10 @@ humano decidirá si relanza la sesión desde una terminal limpia o si acepta
 que trabajes sin delegar. Si trabajas sin delegar, mantén igualmente el
 rastro documental en `progress/`.
 
+Esta autorización cubre **usar la herramienta Agent**, no la aprobación del
+plan: la PARADA 1 de la sección siguiente sigue siendo obligatoria. Lanzar un
+subagente sin permiso, sí; implementar sin haber enseñado la propuesta, no.
+
 ## Ritmo de trabajo con el humano (obligatorio)
 
 Dos paradas fijas en todo trabajo, por pequeño que sea:

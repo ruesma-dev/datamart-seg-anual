@@ -39,12 +39,39 @@ entra el Markdown. Anota en la cabecera de cada fichero de dónde salió y de
 qué fecha es, porque un manual desactualizado que parece vigente hace más
 daño que no tenerlo.
 
-Cabecera recomendada:
+Cabecera obligatoria. La primera línea del bloque de origen es siempre la
+misma; la segunda depende de cómo llegó el documento.
+
+**Caso 1 — llegó en PDF u ofimática y se convirtió:**
 
 ```markdown
 <!-- docs/referencia/NN_tema.md -->
 # Título
 
 > Origen: <fichero o sistema de procedencia> · Fecha del documento: AAAA-MM-DD
-> Convertido a Markdown el AAAA-MM-DD.
+> Convertido a Markdown el AAAA-MM-DD con la herramienta MCP `markitdown`.
+> El original vive fuera del repositorio.
 ```
+
+**Caso 2 — llegó ya en Markdown:**
+
+```markdown
+> Origen: <fichero o sistema de procedencia> · Fecha del documento: AAAA-MM-DD
+> Incorporado a `docs/referencia/` el AAAA-MM-DD.
+> Llegó ya en Markdown: no requirió conversión con `markitdown`.
+```
+
+No escribas «convertido» si no hubo conversión: la trazabilidad de cómo entró
+un documento es justo lo que un reviewer no puede reconstruir después.
+
+**Tercer bloque, obligatorio si se ha redactado algo.** Cuando el documento
+traiga material sensible que se sustituya por marcadores, dilo en la cabecera
+y di exactamente qué se sustituyó:
+
+```markdown
+> **Redactado.** Se han sustituido por marcadores <qué: rangos de red, IDs de
+> suscripción, correos…>. El detalle está en el original, fuera del repositorio.
+```
+
+Si el original impone restricciones de uso (confidencialidad de un proveedor,
+por ejemplo), cítalas también en la cabecera.

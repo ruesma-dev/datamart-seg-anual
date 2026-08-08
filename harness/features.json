@@ -126,7 +126,7 @@
         "docs/referencia/README.md menciona los dos documentos nuevos si procede",
         "bash harness/init.sh en verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "priority": 7,
       "branch": "feature/F-008-docs-referencia-sigrid-acens"
