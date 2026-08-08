@@ -39,7 +39,7 @@ comando exacto y **no las ejecuta**.
       **Verificación**: `test_f005_r3_*`, `test_f005_r4_*`, `test_f005_r5_*`
       con una credencial doble; ninguna llamada de red.
 
-- [ ] **T4**: Crear `etl_sigrid/infrastructure/postgres/conninfo.py`
+- [x] **T4**: Crear `etl_sigrid/infrastructure/postgres/conninfo.py`
       (`build_conninfo`, `make_conninfo_provider`,
       `make_admin_conninfo_provider`, `safe_dsn`, `is_azure_host`) y hacer que
       `PostgresSettings.conninfo` delegue en él sin cambiar su firma.

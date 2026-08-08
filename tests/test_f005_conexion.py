@@ -206,6 +206,66 @@ def test_f005_r5_sin_paquete_azure_identity_error_explicito(
 
 
 # ---------------------------------------------------------------------------
+# R6 · nada de contraseñas ni tokens en los logs
+# ---------------------------------------------------------------------------
+
+def test_f005_r6_safe_dsn_redacta_password_y_token() -> None:
+    """`safe_dsn` es lo único que puede registrarse. Redacta el secreto."""
+    secreto = "Un4-Cl4ve-Muy-Larga"
+    pg = _pg(host=AZURE_HOST, password=secreto)
+    dsn = conninfo.build_conninfo(pg, secreto)
+
+    redactado = conninfo.safe_dsn(dsn)
+
+    assert secreto not in redactado
+    assert "password=***" in redactado
+    # Lo demás sigue siendo legible: si no, el log no sirve para diagnosticar.
+    assert f"host={AZURE_HOST}" in redactado
+    assert "dbname=sigrid_dm" in redactado
+    assert "sslmode=require" in redactado
+
+    # Un token de Entra ocupa el mismo sitio que la contraseña y se redacta igual.
+    dsn_token = conninfo.build_conninfo(pg, "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.carga.firma")
+    assert "eyJ0eXAi" not in conninfo.safe_dsn(dsn_token)
+
+    # Contraseña con espacios y comillas: make_conninfo la cita, y el redactor
+    # tiene que llevarse la cita entera, no media.
+    dsn_raro = conninfo.build_conninfo(pg, "clave con espacios y ' comilla")
+    assert "espacios" not in conninfo.safe_dsn(dsn_raro)
+
+
+# ---------------------------------------------------------------------------
+# R8 · el modo de hoy (contraseña, host local) no cambia
+# ---------------------------------------------------------------------------
+
+def test_f005_r8_modo_password_local_sin_regresion() -> None:
+    """
+    Un .env local intacto sigue produciendo la misma conexión: mismos host,
+    puerto, base, usuario y contraseña, y `sslmode=prefer`, que es el valor
+    por defecto de libpq y por tanto no cambia el comportamiento.
+    """
+    pg = _pg(host="localhost", port=5432, db="sigrid_dm", user="postgres", password="local")
+
+    dsn = pg.conninfo
+    assert "host=localhost" in dsn
+    assert "port=5432" in dsn
+    assert "dbname=sigrid_dm" in dsn
+    assert "user=postgres" in dsn
+    assert "password=local" in dsn
+    assert "sslmode=prefer" in dsn
+
+    admin = pg.admin_conninfo
+    assert "dbname=postgres" in admin
+    assert "dbname=sigrid_dm" not in admin
+
+    # Y los defectos de los campos nuevos son los del comportamiento actual.
+    assert pg.auth_mode == "password"
+    assert pg.auto_create_db is True
+    assert pg.set_role == ""
+    assert pg.readonly_role == ""
+
+
+# ---------------------------------------------------------------------------
 # R41 · la descripción de la feature en el arnés ya no dice "aprovisionar"
 # ---------------------------------------------------------------------------
 
