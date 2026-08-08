@@ -1,0 +1,45 @@
+{
+  "$schema_doc": "Estados: pending -> spec_ready (aprueba humano) -> in_progress -> done. 'blocked' = parada con motivo anotado en progress/current.md. Máximo UNA feature in_progress (lo valida init.sh). sdd=false salta la fase de spec: entonces 'acceptance' hace de mini-spec y el reviewer valida contra ella.",
+  "rules": {
+    "one_feature_at_a_time": true,
+    "require_init_green_to_close": true,
+    "valid_status": ["pending", "spec_ready", "in_progress", "done", "blocked"]
+  },
+  "features": [
+    {
+      "id": "F-001",
+      "title": "Comando 'version' en el CLI",
+      "description": "Añadir 'python main.py version' que imprima la versión del ETL y la fecha de build. Feature de calentamiento para probar el arnés.",
+      "acceptance": [
+        "Existe constante ETL_VERSION en config/settings.py",
+        "`python main.py version` imprime la versión y sale con código 0",
+        "Test en tests/ que valida la salida sin tocar red ni BBDD"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "branch": "feature/F-001-cli-version"
+    },
+    {
+      "id": "F-002",
+      "title": "PLAN_VIGENTE: serie de planificación consolidada",
+      "description": "Implementar la serie PLAN_VIGENTE en capa cierre: para meses pasados, datos de fase 0 (Previsto); para meses futuros, la última versión del master vigente (conext cod='15'). Exponer vista para Power BI. Respetar semántica importe_origen/importe_mes.",
+      "acceptance": [
+        "Definida en detalle por specs/F-002-plan-vigente/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "branch": "feature/F-002-plan-vigente"
+    },
+    {
+      "id": "F-003",
+      "title": "Infra: despliegue como Container Apps Job",
+      "description": "Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev. Dockerfile ya en raíz; scripts PowerShell en infra/.",
+      "acceptance": [
+        "Definida en detalle por specs/F-003-infra-caj/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "branch": "feature/F-003-infra-caj"
+    }
+  ]
+}

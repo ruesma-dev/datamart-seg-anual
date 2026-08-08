@@ -1,0 +1,39 @@
+{
+  "$schema_comment": "Hooks: la verificación la ejecuta el arnés, no el agente, así que no se puede saltar. Adaptado a pytest y Git Bash en Windows.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m pytest -q --tb=line 2>&1 | tail -5",
+            "description": "Tras editar o escribir ficheros, corre los tests y muestra el resumen."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash harness/init.sh > /tmp/harness_init.log 2>&1 && echo '[arnes] init.sh OK' || (echo '[arnes] init.sh FALLO - revisa antes de cerrar:' && tail -20 /tmp/harness_init.log)",
+            "description": "Al terminar cada turno, fuerza una verificación completa del entorno."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(bash harness/init.sh)",
+      "Bash(python -m pytest*)",
+      "Bash(python -m compileall*)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git branch --show-current)",
+      "Bash(git log*)"
+    ]
+  }
+}
