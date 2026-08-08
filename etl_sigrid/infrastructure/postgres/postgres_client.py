@@ -30,6 +30,7 @@ from psycopg import sql
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
+from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
 
 logger = get_logger(__name__)
 
@@ -402,6 +403,62 @@ class PostgresClient:
             cur.execute(query)
             row = cur.fetchone()
             return int(row[0]) if row else 0
+
+    # ---------------------------------------------------------------------
+    # Permisos del rol de solo lectura
+    # ---------------------------------------------------------------------
+
+    def role_exists(self, role: str) -> bool:
+        """True si el rol existe en el servidor."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
+            return cur.fetchone() is not None
+
+    def list_schemas(self) -> list[str]:
+        """Esquemas que existen realmente en la BBDD."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT schema_name FROM information_schema.schemata")
+            return [row[0] for row in cur.fetchall()]
+
+    def apply_readonly_grants(
+        self,
+        readonly_role: str,
+        owner_role: str,
+        schemas: Iterable[str],
+    ) -> list[str]:
+        """
+        Reaplica los permisos de lectura y devuelve las sentencias ejecutadas.
+
+        Solo se conceden permisos sobre los esquemas que existen: `run-all` no
+        construye `cierre`, `compras`, `maestro` ni `retenciones` (van en
+        comandos aparte), así que en una base recién creada esos esquemas
+        pueden no estar todavía. Intentarlo daría error y tumbaría el paso por
+        algo que no es un problema.
+        """
+        existentes = set(self.list_schemas())
+        pedidos = list(schemas)
+        aplicables = [s for s in pedidos if s in existentes]
+        ausentes = [s for s in pedidos if s not in existentes]
+        if ausentes:
+            logger.warning("grants_esquemas_inexistentes", schemas=ausentes)
+
+        sentencias = build_readonly_grant_statements(
+            readonly_role, owner_role, aplicables, database=self._target_db
+        )
+        if not sentencias:
+            return []
+
+        with self.connection() as conn, conn.cursor() as cur:
+            for stmt in sentencias:
+                cur.execute(stmt)
+
+        logger.info(
+            "grants_aplicados",
+            role=readonly_role,
+            schemas=aplicables,
+            statements=len(sentencias),
+        )
+        return sentencias
 
     # ---------------------------------------------------------------------
     # Ejecución de archivos SQL (DDL, transformaciones stg/mart)

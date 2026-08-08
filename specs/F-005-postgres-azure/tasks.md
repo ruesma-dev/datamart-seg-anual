@@ -53,7 +53,7 @@ comando exacto y **no las ejecuta**.
       **Verificación**: `test_f005_r7_*`, `test_f005_r9_*`, `test_f005_r10_*`
       con un doble de `psycopg.connect` que registra las sentencias.
 
-- [ ] **T6**: Crear `etl_sigrid/infrastructure/postgres/grants.py` con
+- [x] **T6**: Crear `etl_sigrid/infrastructure/postgres/grants.py` con
       `build_readonly_grant_statements` (función pura) y añadir a
       `PostgresClient` los métodos `role_exists` y `apply_readonly_grants`.
       **Verificación**: `test_f005_r14_*` (solo esquemas de consumo; ni una
