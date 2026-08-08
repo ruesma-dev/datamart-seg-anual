@@ -333,3 +333,26 @@ lista:
 - **F-005 nº3 · CERRADA → el MCP lee todo, de momento.** Sin restringir a los
   esquemas de consumo. Se revisará cuando se cierre D4 y se sepa qué consulta
   realmente el MCP.
+
+---
+
+## 2026-08-08 · D4 cerrada y salvedades del humano al aprobar las specs
+
+- **D4 · CERRADA.** El MCP está en `C:\Users\pgris\PycharmProjects\mcp-bbdd`:
+  prototipo local, arquitectura hexagonal, pipeline de validación de solo
+  lectura y servicio de catálogo. **No es un repositorio git.**
+- **El MCP pasa a cloud.** Decisión del humano: «debe ser accesible desde
+  otros equipos sin que mi PC deba estar conectado; en local era una prueba».
+  Y será **multi-base**, no solo `sigrid_dm`. En consecuencia vive en **su
+  propio repositorio y su propio servicio**, y F-006 se reformula: de
+  «repuntar el MCP» a «MCP de bases de datos como servicio en cloud».
+- **Permisos del MCP, pregunta del humano resuelta.** Se destruyen cada noche
+  porque el ETL reconstruye sus vistas con `DROP VIEW ... CASCADE` +
+  `CREATE`, y en PostgreSQL los privilegios viven pegados al objeto. Se
+  reconstruyen **automáticamente** por dos vías: `ALTER DEFAULT PRIVILEGES`
+  para el rol propietario en cada esquema (mecanismo de fondo) y el paso
+  `apply_grants` al final de `run-all` (red de seguridad para objetos
+  previos, esquemas nuevos y objetos creados por otro rol). Sin intervención
+  manual. Alternativa descartada: `CREATE OR REPLACE VIEW` conserva permisos
+  pero no admite cambiar tipos, nombres ni orden de columnas.
+- **Specs de F-005, F-003 y F-004 APROBADAS** por el humano. Arranca F-005.
