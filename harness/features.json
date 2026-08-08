@@ -16,7 +16,7 @@
         "La salida incluye el tag de imagen leído de la variable de entorno IMAGE_TAG cuando está definida, y un valor 'local' cuando no",
         "Test en tests/ que valida la salida con CliRunner, sin tocar red ni BBDD"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "priority": 1,
       "branch": "feature/F-001-cli-version"
