@@ -13,12 +13,15 @@ import json
 import time
 from pathlib import Path
 
+import psycopg
 import pytest
+from psycopg.sql import Composable
 
 from config.settings import PostgresSettings
 from etl_sigrid.infrastructure.azure import entra_token
 from etl_sigrid.infrastructure.azure.entra_token import EntraTokenProvider
 from etl_sigrid.infrastructure.postgres import conninfo
+from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client_from
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -263,6 +266,165 @@ def test_f005_r8_modo_password_local_sin_regresion() -> None:
     assert pg.auto_create_db is True
     assert pg.set_role == ""
     assert pg.readonly_role == ""
+
+
+# ---------------------------------------------------------------------------
+# R7, R9, R10 · comportamiento del cliente al abrir sesión
+# ---------------------------------------------------------------------------
+
+class _CursorFalso:
+    """Cursor que apunta lo que se ejecuta y devuelve lo que se le diga."""
+
+    def __init__(self, conn: _ConexionFalsa) -> None:
+        self._conn = conn
+
+    def __enter__(self) -> _CursorFalso:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def execute(self, query: object, params: object = None) -> None:
+        # psycopg compone las sentencias con identificadores citados; se
+        # renderizan igual que las mandaría al servidor.
+        if isinstance(query, Composable):
+            self._conn.sentencias.append(query.as_string(None))
+        else:
+            self._conn.sentencias.append(str(query))
+
+    def fetchone(self) -> tuple[object, ...] | None:
+        return self._conn.fetchone_devuelve
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        return []
+
+
+class _ConexionFalsa:
+    """Doble de psycopg.Connection: no habla con nada."""
+
+    def __init__(self, dsn: str, autocommit: bool = False) -> None:
+        self.dsn = dsn
+        self.autocommit = autocommit
+        self.sentencias: list[str] = []
+        self.cerrada = False
+        self.fetchone_devuelve: tuple[object, ...] | None = (1,)
+
+    def cursor(self) -> _CursorFalso:
+        return _CursorFalso(self)
+
+    def commit(self) -> None:
+        return None
+
+    def rollback(self) -> None:
+        return None
+
+    def close(self) -> None:
+        self.cerrada = True
+
+
+class _Psycopg:
+    """Registro de todas las conexiones abiertas durante un test."""
+
+    def __init__(self, fallo_en: str | None = None) -> None:
+        self.conexiones: list[_ConexionFalsa] = []
+        self._fallo_en = fallo_en
+
+    def connect(self, dsn: str, autocommit: bool = False) -> _ConexionFalsa:
+        if self._fallo_en and self._fallo_en in dsn:
+            raise psycopg.OperationalError('database "sigrid_dm" does not exist')
+        conn = _ConexionFalsa(dsn, autocommit=autocommit)
+        self.conexiones.append(conn)
+        return conn
+
+    @property
+    def dsns(self) -> list[str]:
+        return [c.dsn for c in self.conexiones]
+
+    @property
+    def sentencias(self) -> list[str]:
+        return [s for c in self.conexiones for s in c.sentencias]
+
+
+def _instalar_psycopg_falso(
+    monkeypatch: pytest.MonkeyPatch, fallo_en: str | None = None
+) -> _Psycopg:
+    doble = _Psycopg(fallo_en=fallo_en)
+    monkeypatch.setattr(psycopg, "connect", doble.connect)
+    return doble
+
+
+def test_f005_r7_set_role_es_la_primera_sentencia(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Con PG_SET_ROLE configurado, cada sesión empieza con SET ROLE. Si no fuera
+    la primera sentencia, los objetos creados antes tendrían otro propietario.
+    """
+    doble = _instalar_psycopg_falso(monkeypatch)
+    cliente = build_postgres_client_from(
+        _pg(host=AZURE_HOST, set_role="sigrid_dm_etl", auto_create_db=False)
+    )
+
+    with cliente.connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1")
+
+    for conexion in doble.conexiones:
+        assert conexion.sentencias, "toda sesión ejecuta algo"
+        assert conexion.sentencias[0] == 'SET ROLE "sigrid_dm_etl"'
+
+    # Sin rol configurado (desarrollo local) no se emite ningún SET ROLE.
+    doble_local = _instalar_psycopg_falso(monkeypatch)
+    cliente_local = build_postgres_client_from(_pg(set_role=""))
+    with cliente_local.connection():
+        pass
+    assert not any("SET ROLE" in s for s in doble_local.sentencias)
+
+
+def test_f005_r9_sin_autocreate_no_toca_la_base_admin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Con PG_AUTO_CREATE_DB=false no se abre conexión contra la base admin ni se
+    ejecuta CREATE DATABASE. Es la salvaguarda contra el servidor compartido:
+    albaranes y partes viven ahí.
+    """
+    doble = _instalar_psycopg_falso(monkeypatch)
+    cliente = build_postgres_client_from(
+        _pg(host=AZURE_HOST, auto_create_db=False, admin_db="postgres")
+    )
+
+    with cliente.connection():
+        pass
+
+    assert all("dbname=postgres" not in dsn for dsn in doble.dsns)
+    assert all("CREATE DATABASE" not in s.upper() for s in doble.sentencias)
+    assert all("pg_database" not in s for s in doble.sentencias)
+
+    # Contraste: con auto_create_db=True sí se consulta la base admin.
+    doble_auto = _instalar_psycopg_falso(monkeypatch)
+    build_postgres_client_from(_pg(auto_create_db=True)).connection().__enter__()
+    assert any("dbname=postgres" in dsn for dsn in doble_auto.dsns)
+
+
+def test_f005_r10_base_ausente_mensaje_remite_al_runbook(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Si la base no existe y no se puede autocrear, el error dice qué ejecutar,
+    no intenta crearla, y no filtra la contraseña.
+    """
+    doble = _instalar_psycopg_falso(monkeypatch, fallo_en="dbname=sigrid_dm")
+    cliente = build_postgres_client_from(
+        _pg(host=AZURE_HOST, auto_create_db=False, password="ESTA-NO-DEBE-VIAJAR")
+    )
+
+    with pytest.raises(RuntimeError) as exc, cliente.connection():
+        pass
+
+    mensaje = str(exc.value)
+    assert "infra/sql/01_create_database.sql" in mensaje
+    assert "docs/runbook_postgres_azure.md" in mensaje
+    assert "ESTA-NO-DEBE-VIAJAR" not in mensaje
+    assert "password=***" in mensaje
+    assert not doble.conexiones, "no se abrió ninguna conexión útil, ni a la admin"
 
 
 # ---------------------------------------------------------------------------

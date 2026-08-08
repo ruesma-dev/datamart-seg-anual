@@ -18,7 +18,7 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -29,12 +29,18 @@ from psycopg import sql
 
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
+from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 
 logger = get_logger(__name__)
 
 
 # Schemas del data mart
 SCHEMAS = ("raw", "aux", "stg", "mart", "_meta")
+
+# Una cadena de conexión, o algo que la produzca. Es callable porque con
+# autenticación Entra la "contraseña" es un token que caduca y hay que
+# resolverlo en cada conexión, no una vez al arrancar.
+ConnInfo = str | Callable[[], str]
 
 
 class PostgresClient:
@@ -46,17 +52,58 @@ class PostgresClient:
         admin_conninfo : conexión a una BBDD admin existente (ej. postgres) para
                          poder hacer CREATE DATABASE si la nuestra no existe
         target_db      : nombre de la BBDD a crear si no existe
+        auto_create_db : si es False, NUNCA se ejecuta CREATE DATABASE ni se
+                         abre conexión contra la BBDD admin; la base tiene que
+                         existir ya. Es lo obligatorio contra el servidor
+                         compartido de Azure, donde viven albaranes y partes.
+        set_role       : rol de grupo al que hacer SET ROLE al abrir cada
+                         sesión, para que todos los objetos tengan el mismo
+                         propietario conecte quien conecte.
     """
 
-    def __init__(self, conninfo: str, admin_conninfo: str, target_db: str) -> None:
+    def __init__(
+        self,
+        conninfo: ConnInfo,
+        admin_conninfo: ConnInfo,
+        target_db: str,
+        *,
+        auto_create_db: bool = True,
+        set_role: str | None = None,
+    ) -> None:
         self._conninfo = conninfo
         self._admin_conninfo = admin_conninfo
         self._target_db = target_db
+        self._auto_create_db = auto_create_db
+        self._set_role = (set_role or "").strip()
         self._bootstrap_done = False
 
     # ---------------------------------------------------------------------
     # Conexión (con auto-bootstrap)
     # ---------------------------------------------------------------------
+
+    @staticmethod
+    def _resolve(conninfo: ConnInfo) -> str:
+        """Resuelve la cadena de conexión (puede venir de un proveedor callable)."""
+        return conninfo() if callable(conninfo) else conninfo
+
+    def _connect(self, conninfo: ConnInfo, *, autocommit: bool = False) -> psycopg.Connection:
+        """
+        Abre una conexión y le aplica `SET ROLE` como PRIMERA sentencia de la
+        sesión (R7). Todo el cliente pasa por aquí: si alguna ruta se saltara
+        el SET ROLE, crearía objetos con otro propietario y el siguiente
+        proceso no podría recrearlos.
+        """
+        conn = psycopg.connect(self._resolve(conninfo), autocommit=autocommit)
+        if self._set_role:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        sql.SQL("SET ROLE {}").format(sql.Identifier(self._set_role))
+                    )
+            except Exception:
+                conn.close()
+                raise
+        return conn
 
     @contextmanager
     def connection(self) -> psycopg.Connection:
@@ -69,7 +116,7 @@ class PostgresClient:
             self._auto_bootstrap()
             self._bootstrap_done = True
 
-        conn = psycopg.connect(self._conninfo, autocommit=False)
+        conn = self._connect(self._conninfo)
         try:
             yield conn
             conn.commit()
@@ -96,18 +143,43 @@ class PostgresClient:
     def _auto_bootstrap(self) -> None:
         """
         Idempotente. Asegura:
-          1. La BBDD `target_db` existe (la crea si no).
+          1. La BBDD `target_db` existe (la crea si no, y solo si
+             `auto_create_db`; contra Azure la crea el humano una vez).
           2. Los schemas (raw, aux, stg, mart, _meta) existen.
           3. La tabla _meta.etl_runs existe.
         """
-        created = self._ensure_database()
-        if created:
-            logger.info("postgres_db_created", db=self._target_db)
+        if self._auto_create_db:
+            created = self._ensure_database()
+            if created:
+                logger.info("postgres_db_created", db=self._target_db)
+            else:
+                logger.debug("postgres_db_already_exists", db=self._target_db)
         else:
-            logger.debug("postgres_db_already_exists", db=self._target_db)
+            self._assert_database_reachable()
 
         self._bootstrap_schemas_and_meta()
         logger.debug("postgres_bootstrap_done", schemas=list(SCHEMAS))
+
+    def _assert_database_reachable(self) -> None:
+        """
+        Con `auto_create_db=False` no se toca la BBDD admin ni se crea nada
+        (R9): lo único que se hace es comprobar que la base ya existe abriendo
+        una conexión contra ella. Si no responde, el mensaje remite al script de
+        provisión y al runbook en vez de intentar crearla (R10).
+        """
+        try:
+            conn = self._connect(self._conninfo)
+        except psycopg.OperationalError as e:
+            raise RuntimeError(
+                f"No puedo conectar a la BBDD '{self._target_db}' y "
+                f"PG_AUTO_CREATE_DB=false, así que NO se intenta crearla: este "
+                f"servidor puede estar compartido con otras bases en producción. "
+                f"Créala con infra/sql/01_create_database.sql y sus roles con "
+                f"infra/sql/02_roles.sql, siguiendo docs/runbook_postgres_azure.md. "
+                f"Conexión usada: {safe_dsn(self._resolve(self._conninfo))}. "
+                f"Detalle: {e}"
+            ) from e
+        conn.close()
 
     def _ensure_database(self) -> bool:
         """
@@ -118,7 +190,7 @@ class PostgresClient:
         usamos autocommit=True para esta conexión administrativa.
         """
         try:
-            admin_conn = psycopg.connect(self._admin_conninfo, autocommit=True)
+            admin_conn = self._connect(self._admin_conninfo, autocommit=True)
         except psycopg.OperationalError as e:
             raise RuntimeError(
                 f"No puedo conectar a la BBDD admin para verificar/crear "
@@ -152,7 +224,7 @@ class PostgresClient:
         with ddl_path.open(encoding="utf-8") as f:
             ddl_meta = f.read()
 
-        conn = psycopg.connect(self._conninfo, autocommit=False)
+        conn = self._connect(self._conninfo)
         try:
             with conn.cursor() as cur:
                 for schema in SCHEMAS:

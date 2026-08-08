@@ -37,6 +37,10 @@ from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: 
 from etl_sigrid.application.steps.load_excel_aux_step import LoadExcelAuxStep  # noqa: E402
 from etl_sigrid.domain.entities import StepStatus  # noqa: E402
 from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger  # noqa: E402
+from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
+    make_admin_conninfo_provider,
+    make_conninfo_provider,
+)
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  # noqa: E402
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  # noqa: E402
 
@@ -55,12 +59,19 @@ def cli(ctx: click.Context) -> None:
 
 
 def _get_pg() -> PostgresClient:
-    """Construye el cliente Postgres con auto-bootstrap perezoso."""
-    settings = get_settings()
+    """
+    Construye el cliente Postgres con auto-bootstrap perezoso.
+
+    La cadena de conexión se pasa como proveedor callable, no como cadena: con
+    PG_AUTH_MODE=entra el token caduca y hay que resolverlo en cada conexión.
+    """
+    pg = get_settings().postgres
     return PostgresClient(
-        conninfo=settings.postgres.conninfo,
-        admin_conninfo=settings.postgres.admin_conninfo,
-        target_db=settings.postgres.db,
+        conninfo=make_conninfo_provider(pg),
+        admin_conninfo=make_admin_conninfo_provider(pg),
+        target_db=pg.db,
+        auto_create_db=pg.auto_create_db,
+        set_role=pg.set_role,
     )
 
 

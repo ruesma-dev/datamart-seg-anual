@@ -27,6 +27,7 @@ from config.settings import Settings
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus, TableSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
+from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
     SigridApiClient,
@@ -74,11 +75,7 @@ class IngestRawStep(PipelineStep):
                 result.finished_at = datetime.utcnow()
                 return result
 
-        pg = PostgresClient(
-            conninfo=self._settings.postgres.conninfo,
-            admin_conninfo=self._settings.postgres.admin_conninfo,
-            target_db=self._settings.postgres.db,
-        )
+        pg = build_postgres_client(self._settings)
         # El auto-bootstrap se ejecutará lazy en la primera conexión.
         # No hace falta llamada explícita.
 

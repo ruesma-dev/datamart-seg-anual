@@ -46,7 +46,7 @@ comando exacto y **no las ejecuta**.
       **Verificación**: `test_f005_r6_*` (redactado) y `test_f005_r8_*`
       (sin regresión en modo password local).
 
-- [ ] **T5**: Modificar `postgres_client.py`: aceptar proveedores callables,
+- [x] **T5**: Modificar `postgres_client.py`: aceptar proveedores callables,
       `auto_create_db` y `set_role`; saltar `_ensure_database` y verificar
       existencia cuando `auto_create_db=False`; emitir `SET ROLE` como primera
       sentencia de cada sesión. `main.py::_get_pg()` pasa a construirlo así.
