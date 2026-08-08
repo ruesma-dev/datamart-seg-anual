@@ -18,56 +18,56 @@ comando exacto y **no las ejecuta**.
 
 ## Fase 1 — Código
 
-- [ ] **T1**: Corregir la descripción de F-005 en `harness/features.json` para
+- [x] **T1**: Corregir la descripción de F-005 en `harness/features.json` para
       que refleje que se reutiliza `psql-albaranes-rs9k2` y que el alcance es
       la base `sigrid_dm`, no aprovisionar un servidor.
       **Verificación**: `test_f005_r41_descripcion_de_la_feature_actualizada`
       (comprueba que la descripción no contiene «Aprovisionar» y sí nombra
       `sigrid_dm`) + `bash harness/init.sh` valida el JSON.
 
-- [ ] **T2**: Añadir a `PostgresSettings` (`config/settings.py`) los campos
+- [x] **T2**: Añadir a `PostgresSettings` (`config/settings.py`) los campos
       `sslmode`, `auth_mode`, `auto_create_db`, `set_role`, `readonly_role` y
       `consumption_schemas`, con los valores por defecto que reproducen el
       comportamiento actual. Incluir el validador que rechaza TLS débil contra
       host de Azure.
       **Verificación**: `test_f005_r1_*`, `test_f005_r2_*`, `test_f005_r8_*`.
 
-- [ ] **T3**: Crear `etl_sigrid/infrastructure/azure/entra_token.py` con
+- [x] **T3**: Crear `etl_sigrid/infrastructure/azure/entra_token.py` con
       `EntraTokenProvider` (import perezoso de `azure.identity`, caché con
       margen de 5 min, credencial inyectable) y añadir
       `azure-identity>=1.17` a `requirements.txt`.
       **Verificación**: `test_f005_r3_*`, `test_f005_r4_*`, `test_f005_r5_*`
       con una credencial doble; ninguna llamada de red.
 
-- [ ] **T4**: Crear `etl_sigrid/infrastructure/postgres/conninfo.py`
+- [x] **T4**: Crear `etl_sigrid/infrastructure/postgres/conninfo.py`
       (`build_conninfo`, `make_conninfo_provider`,
       `make_admin_conninfo_provider`, `safe_dsn`, `is_azure_host`) y hacer que
       `PostgresSettings.conninfo` delegue en él sin cambiar su firma.
       **Verificación**: `test_f005_r6_*` (redactado) y `test_f005_r8_*`
       (sin regresión en modo password local).
 
-- [ ] **T5**: Modificar `postgres_client.py`: aceptar proveedores callables,
+- [x] **T5**: Modificar `postgres_client.py`: aceptar proveedores callables,
       `auto_create_db` y `set_role`; saltar `_ensure_database` y verificar
       existencia cuando `auto_create_db=False`; emitir `SET ROLE` como primera
       sentencia de cada sesión. `main.py::_get_pg()` pasa a construirlo así.
       **Verificación**: `test_f005_r7_*`, `test_f005_r9_*`, `test_f005_r10_*`
       con un doble de `psycopg.connect` que registra las sentencias.
 
-- [ ] **T6**: Crear `etl_sigrid/infrastructure/postgres/grants.py` con
+- [x] **T6**: Crear `etl_sigrid/infrastructure/postgres/grants.py` con
       `build_readonly_grant_statements` (función pura) y añadir a
       `PostgresClient` los métodos `role_exists` y `apply_readonly_grants`.
       **Verificación**: `test_f005_r14_*` (solo esquemas de consumo; ni una
       sentencia menciona `raw`, `stg`, `aux`, `_meta` ni `public`),
       `test_f005_r15_*` (default privileges presentes).
 
-- [ ] **T7**: Crear `etl_sigrid/application/steps/apply_grants_step.py` y
+- [x] **T7**: Crear `etl_sigrid/application/steps/apply_grants_step.py` y
       registrarlo en `run-all`; añadir el comando
       `python main.py apply-grants`.
       **Verificación**: `test_f005_r16_*` (el paso está en la composición de
       `run-all`), `test_f005_r17_*` (no-op sin rol), `test_f005_r18_*` (rol
       inexistente: avisa y no falla).
 
-- [ ] **T8**: Crear `etl_sigrid/application/ports.py` con el Protocol
+- [x] **T8**: Crear `etl_sigrid/application/ports.py` con el Protocol
       `StepRunRecorder` y
       `etl_sigrid/infrastructure/postgres/step_run_recorder.py` con el
       adaptador; añadir `PostgresClient.record_run_completed`. Dar a
@@ -77,12 +77,12 @@ comando exacto y **no las ejecuta**.
       por paso, con etapa, duración y estado), `test_f005_r29_*` (grabador que
       revienta no rompe el pipeline).
 
-- [ ] **T9**: Añadir `PostgresClient.fetch_timings` y el comando
+- [x] **T9**: Añadir `PostgresClient.fetch_timings` y el comando
       `python main.py timings [--last N]`, con la función pura de formato.
       **Verificación**: `test_f005_r30_*` sobre la función de formato y con
       `CliRunner` mockeando el cliente.
 
-- [ ] **T10**: Crear `etl_sigrid/infrastructure/postgres/fingerprint.py`
+- [x] **T10**: Crear `etl_sigrid/infrastructure/postgres/fingerprint.py`
       (construcción de consultas, `escribir_csv`/`leer_csv` simétricos según
       `docs/CONVENTIONS.md`, `comparar`, `veredicto`) y los comandos
       `fingerprint-views` y `compare-fingerprints`.
@@ -91,7 +91,7 @@ comando exacto y **no las ejecuta**.
       `test_f005_r34_*` (vista ausente = fallo), `test_f005_r35_*` (código de
       salida). Todo sobre listas y ficheros temporales.
 
-- [ ] **T11**: Documentación y provisión, sin ejecutar nada:
+- [x] **T11**: Documentación y provisión, sin ejecutar nada:
       `infra/sql/01_create_database.sql`, `infra/sql/02_roles.sql`,
       `infra/sql/03_diagnostico.sql`, `infra/15_provision_db.ps1`,
       `docs/runbook_postgres_azure.md`; variables de Postgres en
@@ -213,5 +213,5 @@ Ninguna la ejecuta un agente. Todos los comandos van con
 
 ---
 
-- [ ] **T21**: Ejecutar `bash harness/init.sh` en verde.
+- [x] **T21**: Ejecutar `bash harness/init.sh` en verde.
       **Verificación**: exit code 0.

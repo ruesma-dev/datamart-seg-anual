@@ -15,7 +15,20 @@ $CAE        = "cae-seguimiento-dev"         # Container Apps environment
 $JOB        = "caj-datamart-seg"            # Container Apps Job
 $CRON       = "0 3 * * *"                   # nocturno 03:00 UTC
 
-# Postgres destino (el flexible server del datamart)
-$PG_HOST    = "TODO_pg_flexible_server.postgres.database.azure.com"
+# -----------------------------------------------------------------------------
+# Postgres destino (F-005)
+#
+# NO se aprovisiona ningún servidor: se reutiliza el que ya sirve a albaranes y
+# partes, creando dentro la base sigrid_dm. Ese servidor es de OTRO resource
+# group ($PG_RG), y todo lo que se haga sobre él se acota a sigrid_dm.
+# -----------------------------------------------------------------------------
+$PG_RG         = "rg-albaranes-dev"
+$PG_SERVER     = "psql-albaranes-rs9k2"
+$PG_HOST       = "$PG_SERVER.postgres.database.azure.com"
+$PG_DB         = "sigrid_dm"
 
-Write-Host "Vars cargadas. IMG=${IMG} RG=${RG}"
+$PG_OWNER_ROLE = "sigrid_dm_etl"            # grupo NOLOGIN, propietario de todo
+$PG_APP_ROLE   = "sigrid_dm_app"            # login del ETL, contraseña en Key Vault
+$PG_RO_ROLE    = "mcp_sigrid_dm_ro"         # solo lectura, para el MCP (F-006)
+
+Write-Host "Vars cargadas. IMG=${IMG} RG=${RG} PG=${PG_HOST}/${PG_DB}"

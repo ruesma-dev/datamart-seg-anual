@@ -14,6 +14,18 @@ CLI del ETL. Comandos:
     python main.py build-mart         - (pendiente) stg → mart
     python main.py run-all            - Pipeline completo
     python main.py status             - Estado de tablas raw y últimos runs
+
+Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
+
+    python main.py apply-grants       - Reaplica los permisos del rol de lectura
+                                        del MCP. Obligatorio tras build-cierre,
+                                        build-compras, build-maestros y
+                                        build-retenciones: recrean vistas con
+                                        DROP + CREATE y un DROP se lleva los GRANT
+    python main.py timings            - Tiempos por paso de _meta.etl_runs
+    python main.py fingerprint-views  - Huella de las vistas de consumo a CSV
+    python main.py compare-fingerprints LOCAL AZURE
+                                      - Compara dos huellas; sale != 0 si hay fallo
 """
 
 from __future__ import annotations
@@ -29,6 +41,7 @@ import click  # noqa: E402
 
 from config.settings import get_build_info, get_settings  # noqa: E402
 from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
+from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep  # noqa: E402
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
@@ -37,7 +50,23 @@ from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: 
 from etl_sigrid.application.steps.load_excel_aux_step import LoadExcelAuxStep  # noqa: E402
 from etl_sigrid.domain.entities import StepStatus  # noqa: E402
 from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger  # noqa: E402
+from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
+    make_admin_conninfo_provider,
+    make_conninfo_provider,
+)
+from etl_sigrid.infrastructure.postgres.fingerprint import (  # noqa: E402
+    comparar,
+    construir_huella,
+    escribir_csv,
+    leer_csv,
+    mes_a_fecha,
+    veredicto,
+)
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  # noqa: E402
+from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
+    PostgresStepRunRecorder,
+)
+from etl_sigrid.infrastructure.postgres.timings import format_timings  # noqa: E402
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  # noqa: E402
 
 
@@ -55,12 +84,19 @@ def cli(ctx: click.Context) -> None:
 
 
 def _get_pg() -> PostgresClient:
-    """Construye el cliente Postgres con auto-bootstrap perezoso."""
-    settings = get_settings()
+    """
+    Construye el cliente Postgres con auto-bootstrap perezoso.
+
+    La cadena de conexión se pasa como proveedor callable, no como cadena: con
+    PG_AUTH_MODE=entra el token caduca y hay que resolverlo en cada conexión.
+    """
+    pg = get_settings().postgres
     return PostgresClient(
-        conninfo=settings.postgres.conninfo,
-        admin_conninfo=settings.postgres.admin_conninfo,
-        target_db=settings.postgres.db,
+        conninfo=make_conninfo_provider(pg),
+        admin_conninfo=make_admin_conninfo_provider(pg),
+        target_db=pg.db,
+        auto_create_db=pg.auto_create_db,
+        set_role=pg.set_role,
     )
 
 
@@ -198,18 +234,40 @@ def build_mart() -> None:
         sys.exit(1)
 
 
-@cli.command("run-all")
-@click.option("--full", "full_refresh", is_flag=True, default=False)
-def run_all(full_refresh: bool) -> None:
-    """Ejecuta el pipeline completo en orden: ingest → load_aux → stage → build_mart."""
-    settings = get_settings()
-    steps = [
+def build_pipeline_steps(settings, full_refresh: bool = False) -> list:
+    """
+    Composición del pipeline de `run-all`.
+
+    Está fuera del comando para poder comprobar en un test que `apply_grants`
+    forma parte del pipeline y va después de `build_mart`: si algún día alguien
+    lo quita, el MCP se queda sin permisos la noche siguiente y nadie se entera
+    hasta que alguien pregunta algo.
+    """
+    return [
         IngestRawStep(settings, full_refresh=full_refresh),
         LoadExcelAuxStep(settings),
         BuildStgStep(settings),
         BuildMartStep(settings),
+        ApplyGrantsStep(settings),
     ]
-    orchestrator = Orchestrator(steps)
+
+
+@cli.command("run-all")
+@click.option("--full", "full_refresh", is_flag=True, default=False)
+def run_all(full_refresh: bool) -> None:
+    """
+    Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
+    apply_grants.
+
+    OJO: `cierre`, `compras`, `maestro` y `retenciones` NO están aquí; se
+    construyen con sus comandos propios. Como también recrean vistas, tras
+    ejecutarlos hay que lanzar `python main.py apply-grants`.
+    """
+    settings = get_settings()
+    steps = build_pipeline_steps(settings, full_refresh)
+    # El grabador deja una fila por paso en _meta.etl_runs: es lo que después
+    # lee `python main.py timings`. Si falla, el orquestador solo lo loguea.
+    orchestrator = Orchestrator(steps, recorder=PostgresStepRunRecorder(_get_pg()))
     results = orchestrator.run_all()
 
     click.echo("")
@@ -219,6 +277,115 @@ def run_all(full_refresh: bool) -> None:
 
     failed = sum(1 for r in results if r.status == StepStatus.FAILED)
     if failed:
+        sys.exit(1)
+
+
+@cli.command("fingerprint-views")
+@click.option(
+    "--out",
+    "salida",
+    type=click.Path(dir_okay=False, path_type=Path),
+    required=True,
+    help="Fichero CSV donde escribir la huella.",
+)
+@click.option(
+    "--periodo-hasta",
+    "periodo_hasta",
+    type=str,
+    default=None,
+    help="Último mes CERRADO, AAAA-MM. Activa el bloque de comparación exacta.",
+)
+@click.option(
+    "--schemas",
+    "schemas",
+    type=str,
+    default=None,
+    help="Esquemas a fotografiar, separados por comas. Por defecto, "
+         "PG_CONSUMPTION_SCHEMAS.",
+)
+def fingerprint_views(salida: Path, periodo_hasta: str | None, schemas: str | None) -> None:
+    """
+    Escribe la huella de las vistas de consumo: estructura, agregados de los
+    meses cerrados y agregados del periodo vivo.
+
+    Se ejecuta una vez contra el Postgres local y otra contra Azure, con el
+    MISMO commit del repositorio a los dos lados, y luego se comparan con
+    `compare-fingerprints`.
+    """
+    settings = get_settings()
+    lista = (
+        [s.strip() for s in schemas.split(",") if s.strip()]
+        if schemas
+        else settings.postgres.consumption_schema_list
+    )
+    hasta = mes_a_fecha(periodo_hasta) if periodo_hasta else None
+    if hasta is None:
+        click.secho(
+            "AVISO: sin --periodo-hasta no se genera el bloque de meses cerrados, "
+            "que es el único con criterio de igualdad exacta.",
+            fg="yellow",
+        )
+
+    metricas = construir_huella(_get_pg(), lista, hasta)
+    escribir_csv(metricas, salida)
+
+    vistas = len({(m.esquema, m.vista) for m in metricas})
+    click.secho(
+        f"✓ Huella escrita en {salida}: {vistas} vistas, {len(metricas)} métricas.",
+        fg="green",
+    )
+
+
+@cli.command("compare-fingerprints")
+@click.argument("huella_a", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("huella_b", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def compare_fingerprints(huella_a: Path, huella_b: Path) -> None:
+    """
+    Compara dos huellas (típicamente local y Azure) y emite el veredicto.
+
+    Estructura y meses cerrados se exigen idénticos; las diferencias del
+    periodo vivo se informan como avisos, porque Sigrid sigue cambiando entre
+    las dos capturas. Sale con código distinto de 0 si hay algún FALLO.
+    """
+    diferencias = comparar(leer_csv(huella_a), leer_csv(huella_b))
+    codigo, informe = veredicto(diferencias)
+    click.echo(informe)
+    if codigo:
+        sys.exit(codigo)
+
+
+@cli.command("timings")
+@click.option(
+    "--last",
+    "last",
+    type=int,
+    default=1,
+    help="Cuántas ejecuciones del pipeline mostrar (por defecto la última).",
+)
+def timings(last: int) -> None:
+    """
+    Tiempos por paso de las últimas ejecuciones, leídos de _meta.etl_runs.
+
+    Es la entrada del veredicto sobre el SKU del servidor: si build_mart o
+    build_cierre se disparan, el dato está aquí y no en una impresión.
+    """
+    pg = _get_pg()
+    click.echo(format_timings(pg.fetch_timings(last=last)))
+
+
+@cli.command("apply-grants")
+def apply_grants() -> None:
+    """
+    Reaplica los permisos de lectura del rol del MCP (PG_READONLY_ROLE).
+
+    Hay que lanzarlo tras `build-cierre`, `build-compras`, `build-maestros` y
+    `build-retenciones`: esos comandos recrean vistas con DROP + CREATE y un
+    DROP se lleva los GRANT concedidos.
+    """
+    settings = get_settings()
+    result = ApplyGrantsStep(settings).run()
+    _print_result(result)
+    if result.status == StepStatus.FAILED:
         sys.exit(1)
 
 

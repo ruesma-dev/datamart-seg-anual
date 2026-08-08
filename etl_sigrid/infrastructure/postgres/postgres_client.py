@@ -18,7 +18,7 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -26,15 +26,29 @@ from typing import Any
 
 import psycopg
 from psycopg import sql
+from psycopg.types.json import Json
 
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
+from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
+from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
+from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
+from etl_sigrid.infrastructure.postgres.timings import Timing
 
 logger = get_logger(__name__)
 
 
 # Schemas del data mart
 SCHEMAS = ("raw", "aux", "stg", "mart", "_meta")
+
+# Cuántas mediciones devolver cuando no hay un arranque de `ingest_raw` al que
+# anclarse. Evita volcar el histórico entero de _meta.etl_runs.
+TIMINGS_SIN_ANCLA = 100
+
+# Una cadena de conexión, o algo que la produzca. Es callable porque con
+# autenticación Entra la "contraseña" es un token que caduca y hay que
+# resolverlo en cada conexión, no una vez al arrancar.
+ConnInfo = str | Callable[[], str]
 
 
 class PostgresClient:
@@ -46,17 +60,58 @@ class PostgresClient:
         admin_conninfo : conexión a una BBDD admin existente (ej. postgres) para
                          poder hacer CREATE DATABASE si la nuestra no existe
         target_db      : nombre de la BBDD a crear si no existe
+        auto_create_db : si es False, NUNCA se ejecuta CREATE DATABASE ni se
+                         abre conexión contra la BBDD admin; la base tiene que
+                         existir ya. Es lo obligatorio contra el servidor
+                         compartido de Azure, donde viven albaranes y partes.
+        set_role       : rol de grupo al que hacer SET ROLE al abrir cada
+                         sesión, para que todos los objetos tengan el mismo
+                         propietario conecte quien conecte.
     """
 
-    def __init__(self, conninfo: str, admin_conninfo: str, target_db: str) -> None:
+    def __init__(
+        self,
+        conninfo: ConnInfo,
+        admin_conninfo: ConnInfo,
+        target_db: str,
+        *,
+        auto_create_db: bool = True,
+        set_role: str | None = None,
+    ) -> None:
         self._conninfo = conninfo
         self._admin_conninfo = admin_conninfo
         self._target_db = target_db
+        self._auto_create_db = auto_create_db
+        self._set_role = (set_role or "").strip()
         self._bootstrap_done = False
 
     # ---------------------------------------------------------------------
     # Conexión (con auto-bootstrap)
     # ---------------------------------------------------------------------
+
+    @staticmethod
+    def _resolve(conninfo: ConnInfo) -> str:
+        """Resuelve la cadena de conexión (puede venir de un proveedor callable)."""
+        return conninfo() if callable(conninfo) else conninfo
+
+    def _connect(self, conninfo: ConnInfo, *, autocommit: bool = False) -> psycopg.Connection:
+        """
+        Abre una conexión y le aplica `SET ROLE` como PRIMERA sentencia de la
+        sesión (R7). Todo el cliente pasa por aquí: si alguna ruta se saltara
+        el SET ROLE, crearía objetos con otro propietario y el siguiente
+        proceso no podría recrearlos.
+        """
+        conn = psycopg.connect(self._resolve(conninfo), autocommit=autocommit)
+        if self._set_role:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        sql.SQL("SET ROLE {}").format(sql.Identifier(self._set_role))
+                    )
+            except Exception:
+                conn.close()
+                raise
+        return conn
 
     @contextmanager
     def connection(self) -> psycopg.Connection:
@@ -69,7 +124,7 @@ class PostgresClient:
             self._auto_bootstrap()
             self._bootstrap_done = True
 
-        conn = psycopg.connect(self._conninfo, autocommit=False)
+        conn = self._connect(self._conninfo)
         try:
             yield conn
             conn.commit()
@@ -96,18 +151,43 @@ class PostgresClient:
     def _auto_bootstrap(self) -> None:
         """
         Idempotente. Asegura:
-          1. La BBDD `target_db` existe (la crea si no).
+          1. La BBDD `target_db` existe (la crea si no, y solo si
+             `auto_create_db`; contra Azure la crea el humano una vez).
           2. Los schemas (raw, aux, stg, mart, _meta) existen.
           3. La tabla _meta.etl_runs existe.
         """
-        created = self._ensure_database()
-        if created:
-            logger.info("postgres_db_created", db=self._target_db)
+        if self._auto_create_db:
+            created = self._ensure_database()
+            if created:
+                logger.info("postgres_db_created", db=self._target_db)
+            else:
+                logger.debug("postgres_db_already_exists", db=self._target_db)
         else:
-            logger.debug("postgres_db_already_exists", db=self._target_db)
+            self._assert_database_reachable()
 
         self._bootstrap_schemas_and_meta()
         logger.debug("postgres_bootstrap_done", schemas=list(SCHEMAS))
+
+    def _assert_database_reachable(self) -> None:
+        """
+        Con `auto_create_db=False` no se toca la BBDD admin ni se crea nada
+        (R9): lo único que se hace es comprobar que la base ya existe abriendo
+        una conexión contra ella. Si no responde, el mensaje remite al script de
+        provisión y al runbook en vez de intentar crearla (R10).
+        """
+        try:
+            conn = self._connect(self._conninfo)
+        except psycopg.OperationalError as e:
+            raise RuntimeError(
+                f"No puedo conectar a la BBDD '{self._target_db}' y "
+                f"PG_AUTO_CREATE_DB=false, así que NO se intenta crearla: este "
+                f"servidor puede estar compartido con otras bases en producción. "
+                f"Créala con infra/sql/01_create_database.sql y sus roles con "
+                f"infra/sql/02_roles.sql, siguiendo docs/runbook_postgres_azure.md. "
+                f"Conexión usada: {safe_dsn(self._resolve(self._conninfo))}. "
+                f"Detalle: {e}"
+            ) from e
+        conn.close()
 
     def _ensure_database(self) -> bool:
         """
@@ -118,7 +198,7 @@ class PostgresClient:
         usamos autocommit=True para esta conexión administrativa.
         """
         try:
-            admin_conn = psycopg.connect(self._admin_conninfo, autocommit=True)
+            admin_conn = self._connect(self._admin_conninfo, autocommit=True)
         except psycopg.OperationalError as e:
             raise RuntimeError(
                 f"No puedo conectar a la BBDD admin para verificar/crear "
@@ -152,7 +232,7 @@ class PostgresClient:
         with ddl_path.open(encoding="utf-8") as f:
             ddl_meta = f.read()
 
-        conn = psycopg.connect(self._conninfo, autocommit=False)
+        conn = self._connect(self._conninfo)
         try:
             with conn.cursor() as cur:
                 for schema in SCHEMAS:
@@ -332,6 +412,86 @@ class PostgresClient:
             return int(row[0]) if row else 0
 
     # ---------------------------------------------------------------------
+    # Huella de las vistas de consumo
+    # ---------------------------------------------------------------------
+
+    def list_view_columns(self, schemas: Iterable[str]) -> list[tuple]:
+        """
+        Columnas de todas las VISTAS de los esquemas dados:
+        (esquema, vista, posición, columna, tipo), en orden estable.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(build_estructura_query(list(schemas)))
+            return list(cur.fetchall())
+
+    def fetch_aggregates(self, query: str) -> tuple:
+        """
+        Ejecuta una consulta de agregados de una sola fila y devuelve sus
+        valores. La consulta la construye `fingerprint.build_agregado_query`,
+        que cita los identificadores; aquí no se concatena nada.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(query)
+            fila = cur.fetchone()
+            return tuple(fila) if fila else ()
+
+    # ---------------------------------------------------------------------
+    # Permisos del rol de solo lectura
+    # ---------------------------------------------------------------------
+
+    def role_exists(self, role: str) -> bool:
+        """True si el rol existe en el servidor."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
+            return cur.fetchone() is not None
+
+    def list_schemas(self) -> list[str]:
+        """Esquemas que existen realmente en la BBDD."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT schema_name FROM information_schema.schemata")
+            return [row[0] for row in cur.fetchall()]
+
+    def apply_readonly_grants(
+        self,
+        readonly_role: str,
+        owner_role: str,
+        schemas: Iterable[str],
+    ) -> list[str]:
+        """
+        Reaplica los permisos de lectura y devuelve las sentencias ejecutadas.
+
+        Solo se conceden permisos sobre los esquemas que existen: `run-all` no
+        construye `cierre`, `compras`, `maestro` ni `retenciones` (van en
+        comandos aparte), así que en una base recién creada esos esquemas
+        pueden no estar todavía. Intentarlo daría error y tumbaría el paso por
+        algo que no es un problema.
+        """
+        existentes = set(self.list_schemas())
+        pedidos = list(schemas)
+        aplicables = [s for s in pedidos if s in existentes]
+        ausentes = [s for s in pedidos if s not in existentes]
+        if ausentes:
+            logger.warning("grants_esquemas_inexistentes", schemas=ausentes)
+
+        sentencias = build_readonly_grant_statements(
+            readonly_role, owner_role, aplicables, database=self._target_db
+        )
+        if not sentencias:
+            return []
+
+        with self.connection() as conn, conn.cursor() as cur:
+            for stmt in sentencias:
+                cur.execute(stmt)
+
+        logger.info(
+            "grants_aplicados",
+            role=readonly_role,
+            schemas=aplicables,
+            statements=len(sentencias),
+        )
+        return sentencias
+
+    # ---------------------------------------------------------------------
     # Ejecución de archivos SQL (DDL, transformaciones stg/mart)
     # ---------------------------------------------------------------------
 
@@ -450,6 +610,114 @@ class PostgresClient:
             )
             row = cur.fetchone()
             return int(row[0])
+
+    def fetch_timings(self, last: int = 1) -> list[Timing]:
+        """
+        Mediciones de las `last` ejecuciones más recientes del pipeline.
+
+        Una "ejecución" se ancla al arranque de `ingest_raw`, que es el primer
+        paso de `run-all`: se devuelven todas las filas desde el arranque
+        número `last` hacia atrás. Así entran también los pasos que se lanzan
+        después con comandos sueltos (build-cierre, apply-grants), que es
+        justo lo que interesa medir en la carga inicial.
+
+        Si todavía no hay ningún `ingest_raw` registrado —caso de una base
+        cargada antes de que el orquestador instrumentara los pasos— se
+        devuelven las últimas `TIMINGS_SIN_ANCLA` filas en vez del histórico
+        entero, que puede ser de años.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT MIN(started_at) FROM (
+                    SELECT started_at
+                    FROM _meta.etl_runs
+                    WHERE step = 'ingest_raw'
+                    ORDER BY started_at DESC
+                    LIMIT %s
+                ) AS arranques
+                """,
+                (last,),
+            )
+            row = cur.fetchone()
+            desde = row[0] if row else None
+
+            if desde is not None:
+                cur.execute(
+                    """
+                    SELECT stage, step, started_at, finished_at, status, rows_processed
+                    FROM _meta.etl_runs
+                    WHERE started_at >= %s
+                    ORDER BY started_at, id
+                    """,
+                    (desde,),
+                )
+                filas = cur.fetchall()
+            else:
+                cur.execute(
+                    """
+                    SELECT stage, step, started_at, finished_at, status, rows_processed
+                    FROM _meta.etl_runs
+                    ORDER BY started_at DESC, id DESC
+                    LIMIT %s
+                    """,
+                    (TIMINGS_SIN_ANCLA,),
+                )
+                filas = list(reversed(cur.fetchall()))
+
+            return [
+                Timing(
+                    stage=fila[0],
+                    step=fila[1],
+                    started_at=fila[2],
+                    finished_at=fila[3],
+                    status=fila[4],
+                    rows_processed=int(fila[5] or 0),
+                )
+                for fila in filas
+            ]
+
+    def record_run_completed(
+        self,
+        stage: str,
+        step: str,
+        started_at: datetime | None,
+        finished_at: datetime | None,
+        status: str,
+        rows_processed: int = 0,
+        error_message: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        """
+        Inserta de una vez la fila de un paso YA terminado, y devuelve su id.
+
+        Es distinto de `record_run_start` + `record_run_end`: ese par lo usan
+        los steps que se instrumentan a sí mismos. Este lo usa el orquestador
+        para dejar rastro de TODOS los pasos, incluidos los que no se
+        instrumentan por dentro (build_mart, build_cierre), que son los pesados.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO _meta.etl_runs
+                    (stage, step, started_at, finished_at, status,
+                     rows_processed, error_message, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    stage,
+                    step,
+                    started_at or datetime.utcnow(),
+                    finished_at,
+                    status,
+                    rows_processed,
+                    error_message,
+                    Json(metadata) if metadata else None,
+                ),
+            )
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
 
     def record_run_end(
         self,

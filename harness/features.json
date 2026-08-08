@@ -50,11 +50,11 @@
     {
       "id": "F-005",
       "title": "Postgres del datamart en Azure",
-      "description": "CORREGIDO 2026-08-08 tras el inventario de F-009: NO se aprovisiona ningun servidor. Se reutiliza psql-albaranes-rs9k2 (PostgreSQL 16, Standard_B1ms, 32 GB), que ya sirve a albaranes y partes, creando dentro la base sigrid_dm. Cubre: esquemas por capa, un rol de grupo propietario para el ETL (identidad gestionada del job + cuenta Entra del humano) y un rol de solo lectura para el MCP, autenticacion Entra para el ETL y contrasena en Key Vault para el MCP, reglas de firewall, carga inicial completa con medicion de tiempos por paso, y verificacion de que las vistas de consumo responden igual que en local. Puertas bloqueantes: comprobar espacio libre antes de la carga y desactivar el auto-bootstrap PG_AUTO_CREATE_DB contra un servidor compartido de produccion.",
+      "description": "CORREGIDO 2026-08-08 tras el inventario de F-009: NO se aprovisiona ningun servidor. Se reutiliza psql-albaranes-rs9k2 (PostgreSQL 16, Standard_B1ms, 32 GB), que ya sirve a albaranes y partes, creando dentro la base sigrid_dm. Cubre: esquemas por capa, un rol de grupo propietario para el ETL (sigrid_dm_etl) y un rol de solo lectura para el MCP (mcp_sigrid_dm_ro), reglas de firewall, carga inicial completa con medicion de tiempos por paso, y verificacion de que las vistas de consumo responden igual que en local. Autenticacion: el humano descarto el 2026-08-08 habilitar Entra en el servidor porque es una operacion de servidor que afectaria a albaranes y partes, ambas en uso; se aplica el plan B previsto en la spec, roles nativos con contrasena en Key Vault, igual que hacen esas dos bases. El modo PG_AUTH_MODE=entra queda implementado y probado pero inactivo. Puertas bloqueantes: comprobar espacio libre antes de la carga y desactivar el auto-bootstrap PG_AUTO_CREATE_DB contra un servidor compartido de produccion.",
       "acceptance": [
         "Definida en detalle por specs/F-005-postgres-azure/ (sdd=true)"
       ],
-      "status": "spec_ready",
+      "status": "done",
       "sdd": true,
       "priority": 3,
       "branch": "feature/F-005-postgres-azure"
@@ -73,18 +73,14 @@
     },
     {
       "id": "F-006",
-      "title": "Repuntar el MCP al Postgres de Azure",
-      "description": "El MCP que hoy consulta el Postgres local debe apuntar al de Azure con el rol de solo lectura de F-005, sin credenciales en claro y sin perder ninguna de las consultas que ya funcionan. Vive fuera de este repositorio: la spec debe localizarlo y documentar el cambio de configuración y su verificación.",
+      "title": "MCP de bases de datos como servicio en cloud",
+      "description": "REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno).",
       "acceptance": [
         "Definida en detalle por specs/F-006-mcp-azure/ (sdd=true)"
       ],
       "status": "pending",
       "sdd": true,
       "priority": 5,
-      "blocked_by_decisions": [
-        "D1",
-        "D4"
-      ],
       "branch": "feature/F-006-mcp-azure"
     },
     {

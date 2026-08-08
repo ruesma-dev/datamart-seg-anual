@@ -1,6 +1,131 @@
 <!-- progress/current.md -->
 # Trabajo en curso
 
+**F-005 · código implementado** el 2026-08-08 por el `implementer`, pendiente
+de review y de las verificaciones manuales. Informe completo en
+`progress/impl_F-005.md`. Fase 1 (T1-T11) terminada, `bash harness/init.sh` en
+verde, 65 tests. **No se ha ejecutado NADA contra Azure ni contra
+`psql-albaranes-rs9k2`**: la Fase 2 son las tareas T12-T20, que ejecuta el
+humano siguiendo `docs/runbook_postgres_azure.md`.
+
+## F-005 · verificaciones MANUAL (humano) pendientes
+
+Ninguna la ejecuta un agente. El procedimiento completo, con su contexto y sus
+puertas, está en `docs/runbook_postgres_azure.md`; aquí van los comandos.
+
+**T12 · Fotografía previa del servidor (solo lectura).** Guardar las salidas.
+
+```
+az postgres flexible-server show -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o json
+az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
+psql "host=psql-albaranes-rs9k2.postgres.database.azure.com dbname=postgres user=<admin> sslmode=require" -f infra/sql/03_diagnostico.sql
+```
+
+**T13 · Puerta de espacio (R25, R26). Bloqueante.** Si quedan menos de **14 GB
+libres**, PARAR, anotarlo aquí y marcar la feature `blocked`. Ampliar
+almacenamiento es irreversible.
+
+```
+az monitor metrics list --resource $(az postgres flexible-server show -g rg-albaranes-dev -n psql-albaranes-rs9k2 --query id -o tsv) --metric storage_percent --interval PT1H -o table
+```
+
+**T14 · Autenticación. RESUELTA por decisión del humano: plan B.** No se
+habilita Entra en el servidor. Se usan roles nativos con contraseña en Key
+Vault, como ya hacen `albaranes` y `partes`. No hay nada que ejecutar de la
+tarea original; lo que sí hay que hacer es generar y guardar las dos
+contraseñas (§4 del runbook) **antes** de T15.
+
+**T15 · Crear la base y los roles.** Idempotente; reejecutar `02_roles.sql` es
+además la forma de rotar las contraseñas. La identidad gestionada
+`id-datamart-seg-dev` **ya no la crea F-005**: sin Entra no hace falta ningún
+principal en la base, así que queda para F-003.
+
+```
+export APP_PWD=$(az keyvault secret show --vault-name <kv> --name pg-sigrid-dm-app --query value -o tsv)
+export MCP_PWD=$(az keyvault secret show --vault-name <kv> --name pg-mcp-sigrid-dm-ro --query value -o tsv)
+psql "host=<host> dbname=postgres  user=<admin> sslmode=require" -v ON_ERROR_STOP=1 -f infra/sql/01_create_database.sql
+psql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require" -v ON_ERROR_STOP=1 -v app_pwd="$APP_PWD" -v mcp_pwd="$MCP_PWD" -f infra/sql/02_roles.sql
+```
+
+Comprobar después (R13): nueve esquemas y `sigrid_dm_etl` como propietario.
+Y que **`albaranes` y `partes` siguen conectando**.
+
+**T16 · Firewall (R22, R23).** Comparar primero con el listado de T12; crear
+regla solo si la IP no está cubierta. Ojo: la regla que necesitará el MCP es la
+**IP de salida del entorno de Container Apps** donde se despliegue (F-006 pasó
+a ser un servicio en cloud), no la IP de un puesto. No se crea hasta que ese
+entorno exista.
+
+```
+az postgres flexible-server firewall-rule create -g rg-albaranes-dev -n psql-albaranes-rs9k2 --rule-name <uso>-<origen>-<AAAA-MM-DD> --start-ip-address <IP> --end-ip-address <IP>
+az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
+```
+
+**T17 · Huella local, antes de tocar Azure**, con el mes cerrado que fije el
+humano (decisión abierta 5).
+
+```
+python main.py fingerprint-views --out progress/fingerprint_local.csv --periodo-hasta AAAA-MM
+```
+
+**T18 · Carga inicial contra Azure**, con el `.env` en el perfil Azure
+(`PG_AUTO_CREATE_DB=false`, `PG_SET_ROLE=sigrid_dm_etl`, `PG_SSLMODE=require`,
+`PG_USER=sigrid_dm_app`).
+
+```
+python main.py check-pg
+python main.py run-all --full
+python main.py build-cierre
+python main.py build-maestros
+python main.py build-compras
+python main.py build-retenciones
+python main.py apply-grants
+```
+
+**T19 · Medición y veredicto sobre el SKU (R31).** Escribir
+`progress/medicion_carga_inicial.md` con tiempos por paso, tamaño por esquema y
+una conclusión explícita: `Standard_B1ms` aguanta o hay que escalar. Es la
+entrada de F-011.
+
+```
+python main.py timings --last 1
+psql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require" -f infra/sql/03_diagnostico.sql
+```
+
+**T20 · Verificación funcional (R20, R33, R36, R37).** Mismo commit a los dos
+lados.
+
+```
+python main.py fingerprint-views --out progress/fingerprint_azure.csv --periodo-hasta AAAA-MM
+python main.py compare-fingerprints progress/fingerprint_local.csv progress/fingerprint_azure.csv
+psql "host=<host> dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require" -c "INSERT INTO mart.fact_seguimiento_mensual VALUES (1);"   # debe dar permission denied
+psql "host=<host> dbname=albaranes user=mcp_sigrid_dm_ro sslmode=require" -c "\dt"                                                     # ninguna tabla legible
+```
+
+Y abrir el informe de Power BI contra `sigrid_dm` en Azure y refrescarlo.
+
+## F-005 · decisiones del humano ya cerradas (2026-08-08)
+
+1. **Entra NO se habilita** en `psql-albaranes-rs9k2`: es operación de servidor
+   y afectaría a `albaranes` y `partes`, que están en uso. Plan B: roles
+   nativos con contraseña en Key Vault. Cierra la decisión abierta 1.
+2. **No se ejecuta `REVOKE CONNECT ... FROM PUBLIC`** en `albaranes` ni
+   `partes`. **Riesgo aceptado y anotado**: `mcp_sigrid_dm_ro` podrá abrir
+   sesión contra esas bases y leer su catálogo —nombres de tablas y columnas—,
+   aunque no los datos. Cierra la decisión abierta 4.
+3. **El MCP lee todos los esquemas de `sigrid_dm`**, no solo los cinco de
+   consumo. Se revisará al rediseñar el MCP en F-006. Cierra la decisión
+   abierta 3.
+4. **F-006 pasa a ser un servicio en cloud, multi-base y en su propio
+   repositorio.** Consecuencia para F-005: el rol de solo lectura lo usará un
+   servicio en Azure, así que la regla de firewall será la IP de salida de un
+   entorno de Container Apps. No se cablea ninguna IP de puesto.
+5. **Identidad gestionada `id-datamart-seg-dev`**: sin Entra, F-005 ya no la
+   necesita. Queda para F-003. Cierra la decisión abierta 2.
+
+Sigue abierta la decisión 5 de la spec: **qué mes se toma como último cerrado**
+para T17/T20. Lo fija el humano al ejecutar la verificación.
+
 **F-004 · spec escrita** por el `spec-author` el 2026-08-08, pendiente de
 aprobación del humano. Tres ficheros en
 `specs/F-004-etl-sin-dependencias-locales/`: `requirements.md` (16 requisitos

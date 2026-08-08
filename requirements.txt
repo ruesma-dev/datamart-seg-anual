@@ -8,5 +8,8 @@ structlog>=24.0.0
 tenacity>=8.2.0
 click>=8.1.0
 openpyxl>=3.1.0
+# Autenticación Microsoft Entra contra Azure Database for PostgreSQL
+# (PG_AUTH_MODE=entra). Se importa de forma perezosa: el ETL arranca sin él.
+azure-identity>=1.17
 Jinja2>=3.1.0
 pytest>=8.0.0

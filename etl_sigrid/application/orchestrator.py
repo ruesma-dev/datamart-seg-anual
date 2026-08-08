@@ -10,6 +10,7 @@ de debuggear.
 
 from __future__ import annotations
 
+from etl_sigrid.application.ports import StepRunRecorder
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.infrastructure.logging_config import get_logger
@@ -20,10 +21,34 @@ logger = get_logger(__name__)
 class Orchestrator:
     """Ejecuta una colección de Steps respetando sus dependencias."""
 
-    def __init__(self, steps: list[PipelineStep]) -> None:
+    def __init__(
+        self,
+        steps: list[PipelineStep],
+        recorder: StepRunRecorder | None = None,
+    ) -> None:
         self._steps = steps
         self._by_name = {s.name: s for s in steps}
+        self._recorder = recorder
         self._validate_dag()
+
+    def _record(self, stage: str, result: StepResult) -> None:
+        """
+        Deja rastro del paso en el grabador, si hay.
+
+        Envuelto en try/except a propósito (R29): una caída midiendo no puede
+        tumbar una carga de horas. Se avisa en el log y se sigue.
+        """
+        if self._recorder is None:
+            return
+        try:
+            self._recorder.record(stage, result)
+        except Exception as e:  # medir nunca rompe el pipeline
+            logger.warning(
+                "step_run_no_registrado",
+                step=result.step_name,
+                stage=stage,
+                error=str(e),
+            )
 
     def run_all(self) -> list[StepResult]:
         """Ejecuta todos los Steps en orden topológico."""
@@ -45,6 +70,7 @@ class Orchestrator:
                 )
                 logger.warning("step_skipped", step=step.name)
                 results.append(skipped)
+                self._record(step.stage, skipped)
                 continue
 
             logger.info("step_starting", step=step.name, stage=step.stage)
@@ -67,6 +93,7 @@ class Orchestrator:
                 duration_s=round(r.duration_seconds, 2),
             )
             results.append(r)
+            self._record(step.stage, r)
 
         return results
 

@@ -132,3 +132,62 @@ escribió nada en ella; los datos forenses se capturaron antes de conectar.
 Commits: ca1146c, 32a59ec, 27e2e57, 047c450, más los del esquema y ff5a434.
 
 ---
+
+## F-005 · Postgres del datamart en Azure (Fase 1)
+
+Cerrada el 2026-08-08. `sdd=true`, spec en `specs/F-005-postgres-azure/`.
+Rama `feature/F-005-postgres-azure`. APROBADA en segunda revisión
+(`progress/review_F-005.md`). 14 commits. Tests: 22 → **65**.
+
+**Fase 1 (código) completa. Fase 2 (ejecución contra Azure) NO ejecutada**:
+queda como runbook para el humano en `progress/impl_F-005.md` §7. Nada se
+escribió contra Azure ni contra `psql-albaranes-rs9k2`, que tiene dos bases
+en producción; verificado de forma independiente por el reviewer.
+
+### Qué se construyó
+
+- **Base `sigrid_dm` dentro del servidor compartido**, no un servidor nuevo:
+  tres ficheros `.sql` de provisión idempotentes, un rol de grupo propietario
+  (`NOLOGIN`) con la identidad del job y la cuenta del humano como miembros,
+  y un rol de solo lectura para el MCP. El rol de grupo existe para que el
+  dueño de los objetos sea siempre el mismo, los cree quien los cree.
+- **`apply_grants`** como paso final de `run-all` y como comando suelto, más
+  `ALTER DEFAULT PRIVILEGES`. Resuelve que las vistas se reconstruyen con
+  `DROP VIEW ... CASCADE` y en PostgreSQL los privilegios mueren con el
+  objeto: sin esto, el MCP perdería el acceso cada noche.
+- **Telemetría real**: el orquestador deja rastro de cada paso en
+  `_meta.etl_runs` —antes solo lo hacían `ingest_raw` y `build_stg`— y un
+  comando `timings` con los tiempos por paso. Es la entrada de F-011.
+- **Huella de las vistas de consumo** y comparador local ↔ Azure, con
+  criterio explícito por bloques (estructura exacta, meses cerrados con
+  tolerancia de 0,01 €, bloque vivo solo con avisos).
+- **`PG_AUTO_CREATE_DB=false`**: se desactiva el auto-bootstrap que ejecutaba
+  `CREATE DATABASE` si la base no existía. Contra un servidor compartido de
+  producción era un accidente esperando.
+- Autenticación **Entra implementada y probada pero inactiva**, por decisión
+  del humano de no tocar el servidor: se usa contraseña en Key Vault, como
+  `albaranes` y `partes`. Habilitarla el día de mañana es configuración, no
+  código.
+
+### Verificación que merece constar
+
+Los `.sql` de provisión **se ejecutaron de verdad** contra el PostgreSQL
+local con los objetos renombrados y borrados al terminar: idempotencia,
+`permiso denegado` real del rol de solo lectura al insertar y al crear, y
+`ALTER DEFAULT PRIVILEGES` comprobado sobre objetos creados *después* de los
+`GRANT`. Encontró así dos errores que habrían reventado delante del humano
+contra producción: `pg_database.datowner` no existe (es `datdba`) y
+`pg_size_pretty(32 * 1024^3 - ...)` falla por tipo. Y un control negativo del
+barrido de secretos: inyectó una contraseña falsa en `.env.example` para
+comprobar que la alarma suena.
+
+### El rechazo de la primera revisión
+
+Un **byte NUL** en `infra/00_vars.ps1`, introducido al escribir `.\00_vars.ps1`
+en un comentario. No afectaba a la ejecución, pero hacía que git clasificara
+el fichero como binario: `infra/00_vars.ps1` desaparecía de los diffs, y es
+justo el fichero con el ID de suscripción. El propio reviewer constató que su
+primer barrido de GUID sobre el diff salió limpio por ese motivo. La regla
+dura «no entran secretos» se estaba volviendo inauditable en silencio.
+
+---

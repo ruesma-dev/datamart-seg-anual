@@ -29,16 +29,12 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config.settings import get_settings  # noqa: E402
-from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  # noqa: E402
+from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client  # noqa: E402
 
 
 def main() -> None:
     settings = get_settings()
-    pg = PostgresClient(
-        conninfo=settings.postgres.conninfo,
-        admin_conninfo=settings.postgres.admin_conninfo,
-        target_db=settings.postgres.db,
-    )
+    pg = build_postgres_client(settings)
 
     sql_dir = (
         Path(__file__).resolve().parents[1]
