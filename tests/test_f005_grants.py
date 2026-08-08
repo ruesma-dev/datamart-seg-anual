@@ -11,7 +11,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
+import main
+from etl_sigrid.application.orchestrator import Orchestrator
+from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
+from etl_sigrid.domain.entities import StepStatus
 from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -204,3 +209,105 @@ def test_f005_r11_barrido_estatico_sql_no_toca_otras_bases() -> None:
         )
     for patron in (*PATRONES_PROHIBIDOS, *PATRONES_BASE_AJENA, r"\bCREATE\s+DATABASE\b"):
         assert not re.search(patron, generadas, re.IGNORECASE)
+
+
+# ---------------------------------------------------------------------------
+# R16, R17, R18 · el paso del pipeline que reaplica los permisos
+# ---------------------------------------------------------------------------
+
+class _ClienteFalso:
+    """Cliente Postgres de mentira: apunta qué se le pide y no abre nada."""
+
+    def __init__(self, rol_existe: bool = True) -> None:
+        self.rol_existe = rol_existe
+        self.llamadas: list[str] = []
+        self.grants: list[tuple[str, str, list[str]]] = []
+
+    def role_exists(self, role: str) -> bool:
+        self.llamadas.append(f"role_exists({role})")
+        return self.rol_existe
+
+    def apply_readonly_grants(
+        self, readonly_role: str, owner_role: str, schemas: object
+    ) -> list[str]:
+        esquemas = list(schemas)  # type: ignore[call-overload]
+        self.llamadas.append("apply_readonly_grants")
+        self.grants.append((readonly_role, owner_role, esquemas))
+        return build_readonly_grant_statements(readonly_role, owner_role, esquemas)
+
+
+def _settings_falso(**postgres: object) -> SimpleNamespace:
+    """Lo mínimo de Settings que mira el step."""
+    base: dict[str, object] = {
+        "readonly_role": "mcp_sigrid_dm_ro",
+        "set_role": "sigrid_dm_etl",
+        "consumption_schema_list": ["mart", "cierre"],
+    }
+    base.update(postgres)
+    return SimpleNamespace(postgres=SimpleNamespace(**base))
+
+
+def test_f005_r16_run_all_incluye_el_paso_de_grants() -> None:
+    """
+    `run-all` compone apply_grants, y el orquestador lo ordena DESPUÉS de
+    build_mart: reaplicar permisos antes de recrear las vistas no serviría de
+    nada.
+    """
+    steps = main.build_pipeline_steps(_settings_falso(), full_refresh=False)
+
+    nombres = [s.name for s in steps]
+    assert "apply_grants" in nombres
+
+    paso = next(s for s in steps if s.name == "apply_grants")
+    assert isinstance(paso, ApplyGrantsStep)
+    assert paso.depends_on == ["build_mart"]
+    assert paso.stage == "grants"
+
+    orden = [s.name for s in Orchestrator(steps)._topological_sort()]
+    assert orden.index("apply_grants") > orden.index("build_mart")
+    assert orden[-1] == "apply_grants"
+
+
+def test_f005_r17_sin_rol_configurado_el_paso_es_noop() -> None:
+    """Sin PG_READONLY_ROLE el paso termina en SUCCESS sin ejecutar nada."""
+    cliente = _ClienteFalso()
+    paso = ApplyGrantsStep(_settings_falso(readonly_role=""), client=cliente)
+
+    resultado = paso.run()
+
+    assert resultado.status == StepStatus.SUCCESS
+    assert resultado.rows_processed == 0
+    assert cliente.llamadas == [], "ni siquiera se preguntó al servidor"
+
+
+def test_f005_r18_rol_inexistente_avisa_y_no_falla() -> None:
+    """
+    Un rol configurado pero inexistente no puede tumbar la carga nocturna: se
+    avisa y el paso termina en SUCCESS.
+    """
+    cliente = _ClienteFalso(rol_existe=False)
+    paso = ApplyGrantsStep(_settings_falso(), client=cliente)
+
+    resultado = paso.run()
+
+    assert resultado.status == StepStatus.SUCCESS
+    assert resultado.rows_processed == 0
+    assert cliente.llamadas == ["role_exists(mcp_sigrid_dm_ro)"]
+    assert "no existe" in (resultado.metadata.get("motivo") or "")
+
+
+def test_f005_r16_el_paso_aplica_los_grants_con_el_propietario_correcto() -> None:
+    """El camino normal: se aplican los permisos de los esquemas configurados."""
+    cliente = _ClienteFalso()
+    paso = ApplyGrantsStep(_settings_falso(), client=cliente)
+
+    resultado = paso.run()
+
+    assert resultado.status == StepStatus.SUCCESS
+    assert resultado.rows_processed > 0
+    rol, propietario, esquemas = cliente.grants[0]
+    assert rol == "mcp_sigrid_dm_ro"
+    # El propietario es el rol de grupo: los privilegios por defecto van por
+    # rol creador, y quien crea los objetos es sigrid_dm_etl vía SET ROLE.
+    assert propietario == "sigrid_dm_etl"
+    assert esquemas == ["mart", "cierre"]

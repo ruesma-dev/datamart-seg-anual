@@ -60,7 +60,7 @@ comando exacto y **no las ejecuta**.
       sentencia menciona `raw`, `stg`, `aux`, `_meta` ni `public`),
       `test_f005_r15_*` (default privileges presentes).
 
-- [ ] **T7**: Crear `etl_sigrid/application/steps/apply_grants_step.py` y
+- [x] **T7**: Crear `etl_sigrid/application/steps/apply_grants_step.py` y
       registrarlo en `run-all`; añadir el comando
       `python main.py apply-grants`.
       **Verificación**: `test_f005_r16_*` (el paso está en la composición de

@@ -29,6 +29,7 @@ import click  # noqa: E402
 
 from config.settings import get_build_info, get_settings  # noqa: E402
 from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
+from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep  # noqa: E402
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
@@ -209,17 +210,37 @@ def build_mart() -> None:
         sys.exit(1)
 
 
-@cli.command("run-all")
-@click.option("--full", "full_refresh", is_flag=True, default=False)
-def run_all(full_refresh: bool) -> None:
-    """Ejecuta el pipeline completo en orden: ingest → load_aux → stage → build_mart."""
-    settings = get_settings()
-    steps = [
+def build_pipeline_steps(settings, full_refresh: bool = False) -> list:
+    """
+    Composición del pipeline de `run-all`.
+
+    Está fuera del comando para poder comprobar en un test que `apply_grants`
+    forma parte del pipeline y va después de `build_mart`: si algún día alguien
+    lo quita, el MCP se queda sin permisos la noche siguiente y nadie se entera
+    hasta que alguien pregunta algo.
+    """
+    return [
         IngestRawStep(settings, full_refresh=full_refresh),
         LoadExcelAuxStep(settings),
         BuildStgStep(settings),
         BuildMartStep(settings),
+        ApplyGrantsStep(settings),
     ]
+
+
+@cli.command("run-all")
+@click.option("--full", "full_refresh", is_flag=True, default=False)
+def run_all(full_refresh: bool) -> None:
+    """
+    Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
+    apply_grants.
+
+    OJO: `cierre`, `compras`, `maestro` y `retenciones` NO están aquí; se
+    construyen con sus comandos propios. Como también recrean vistas, tras
+    ejecutarlos hay que lanzar `python main.py apply-grants`.
+    """
+    settings = get_settings()
+    steps = build_pipeline_steps(settings, full_refresh)
     orchestrator = Orchestrator(steps)
     results = orchestrator.run_all()
 
@@ -230,6 +251,22 @@ def run_all(full_refresh: bool) -> None:
 
     failed = sum(1 for r in results if r.status == StepStatus.FAILED)
     if failed:
+        sys.exit(1)
+
+
+@cli.command("apply-grants")
+def apply_grants() -> None:
+    """
+    Reaplica los permisos de lectura del rol del MCP (PG_READONLY_ROLE).
+
+    Hay que lanzarlo tras `build-cierre`, `build-compras`, `build-maestros` y
+    `build-retenciones`: esos comandos recrean vistas con DROP + CREATE y un
+    DROP se lleva los GRANT concedidos.
+    """
+    settings = get_settings()
+    result = ApplyGrantsStep(settings).run()
+    _print_result(result)
+    if result.status == StepStatus.FAILED:
         sys.exit(1)
 
 
