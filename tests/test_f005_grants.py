@@ -311,3 +311,85 @@ def test_f005_r16_el_paso_aplica_los_grants_con_el_propietario_correcto() -> Non
     # rol creador, y quien crea los objetos es sigrid_dm_etl vía SET ROLE.
     assert propietario == "sigrid_dm_etl"
     assert esquemas == ["mart", "cierre"]
+
+
+# ---------------------------------------------------------------------------
+# R21, R40 · ni una contraseña en el repositorio
+# ---------------------------------------------------------------------------
+
+# Ficheros que F-005 añade o modifica y que podrían llevar un secreto dentro.
+FICHEROS_VIGILADOS = (
+    ".env.example",
+    "requirements.txt",
+    "infra/00_vars.ps1",
+    "infra/15_provision_db.ps1",
+    "infra/sql/01_create_database.sql",
+    "infra/sql/02_roles.sql",
+    "infra/sql/03_diagnostico.sql",
+    "docs/runbook_postgres_azure.md",
+    "docs/ARCHITECTURE.md",
+)
+
+# Asignaciones con valor a la derecha. Lo que se busca NO es la palabra
+# 'password' —aparece por todas partes de forma legítima— sino que alguien haya
+# escrito un valor detrás.
+PATRONES_SECRETO = (
+    # PG_PASSWORD=algo (se admite vacío y se admiten referencias tipo $VAR)
+    r"PG_PASSWORD\s*=\s*(?!\s*$)(?![#\$%<])\S+",
+    # password=algo dentro de una cadena de conexión
+    r"\bpassword\s*=\s*(?![#\$%<'\"]|\*)\S+",
+    # PASSWORD 'literal' en SQL (lo legítimo es PASSWORD :'variable')
+    r"\bPASSWORD\s+'[^']+'",
+    # Cadenas con pinta de clave generada: 24+ caracteres de base64
+    r"[A-Za-z0-9+/]{24,}={0,2}(?![A-Za-z0-9+/=])",
+)
+
+
+def test_f005_r21_barrido_de_secretos_en_el_arbol() -> None:
+    """
+    Ninguno de los ficheros que toca F-005 contiene una contraseña.
+
+    La contraseña del rol del MCP la genera el humano, vive en Key Vault y no
+    entra en el repositorio, ni en specs/, ni en progress/, ni en un log.
+    """
+    for relativo in FICHEROS_VIGILADOS:
+        fichero = REPO_ROOT / relativo
+        assert fichero.exists(), f"falta {relativo}"
+        texto = fichero.read_text(encoding="utf-8-sig")
+
+        for patron in PATRONES_SECRETO:
+            encontrado = re.search(patron, texto)
+            assert encontrado is None, (
+                f"{relativo} parece contener un secreto: {encontrado.group(0)!r} "
+                f"(patrón {patron})"
+            )
+
+
+def test_f005_r40_ni_env_example_ni_infra_contienen_secretos() -> None:
+    """
+    `.env.example` documenta las variables nuevas con valor vacío, y los
+    scripts de provisión reciben las contraseñas por variable, nunca literal.
+    """
+    env_example = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    for variable in (
+        "PG_SSLMODE",
+        "PG_AUTH_MODE",
+        "PG_AUTO_CREATE_DB",
+        "PG_SET_ROLE",
+        "PG_READONLY_ROLE",
+        "PG_CONSUMPTION_SCHEMAS",
+    ):
+        assert variable in env_example, f"{variable} no está documentada"
+
+    # PG_PASSWORD sigue existiendo, y sigue vacía.
+    assert re.search(r"^PG_PASSWORD=\s*$", env_example, re.MULTILINE)
+
+    # El SQL de roles recibe las contraseñas por variable de psql.
+    roles = (REPO_ROOT / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+    assert ":'app_pwd'" in roles
+    assert ":'mcp_pwd'" in roles
+
+    # Y el .env real jamás se versiona.
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert re.search(r"^\.env$", gitignore, re.MULTILINE)

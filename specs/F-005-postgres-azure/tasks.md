@@ -91,7 +91,7 @@ comando exacto y **no las ejecuta**.
       `test_f005_r34_*` (vista ausente = fallo), `test_f005_r35_*` (código de
       salida). Todo sobre listas y ficheros temporales.
 
-- [ ] **T11**: Documentación y provisión, sin ejecutar nada:
+- [x] **T11**: Documentación y provisión, sin ejecutar nada:
       `infra/sql/01_create_database.sql`, `infra/sql/02_roles.sql`,
       `infra/sql/03_diagnostico.sql`, `infra/15_provision_db.ps1`,
       `docs/runbook_postgres_azure.md`; variables de Postgres en

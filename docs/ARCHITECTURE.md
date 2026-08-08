@@ -53,10 +53,40 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
 - Solo LECTURA de Sigrid desde este proyecto. Las escrituras del datamart van
   al PostgreSQL propio (local en dev, Flexible Server en Azure).
 
+### El datamart en Azure (F-005)
+
+- **No hay servidor propio.** La base `sigrid_dm` vive dentro de
+  `psql-albaranes-rs9k2.postgres.database.azure.com` (`rg-albaranes-dev`,
+  PostgreSQL 16, `Standard_B1ms`, 32 GB), que ya sirve a `albaranes` y
+  `partes`, **las dos en uso**. Base propia y no esquema compartido: PostgreSQL
+  no permite consultas entre bases, y esa es la frontera que impide que el rol
+  de lectura vea `albaranes`.
+- **Tres roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
+  `sigrid_dm_app` (login, contraseña en Key Vault) es el que usa el ETL y es
+  miembro del grupo; `mcp_sigrid_dm_ro` (login) es de solo lectura, para el
+  MCP. Autenticación por contraseña: habilitar Entra es una operación de
+  servidor y se descartó para no tocar las otras dos bases. El modo
+  `PG_AUTH_MODE=entra` existe en el código, probado, pero inactivo.
+- **`PG_SET_ROLE=sigrid_dm_etl`** en cada sesión: los objetos deben tener
+  siempre el mismo dueño, porque las vistas se recrean en cada ejecución y
+  quien no es dueño no puede hacer `DROP`.
+- **`PG_AUTO_CREATE_DB=false`** contra Azure: el ETL no ejecuta
+  `CREATE DATABASE` ni abre la base admin en un servidor de producción
+  compartido. La base la crea el humano con `infra/sql/`.
+- **Los permisos de lectura se reaplican en cada ejecución** (paso
+  `apply_grants` y comando `apply-grants`): siete ficheros SQL recrean vistas
+  con `DROP VIEW ... CASCADE` y un `DROP` se lleva los `GRANT`.
+- **La recuperación es volver a ejecutar el ETL, no restaurar**: el PITR es de
+  servidor entero y arrastraría `albaranes` y `partes` al pasado.
+- Procedimiento completo: `docs/runbook_postgres_azure.md`.
+
 ## Infra
 
 - `Dockerfile` en raíz. `infra/` con scripts PowerShell 5.1 (UTF-8 BOM, CRLF)
   siguiendo el patrón `00_vars.ps1` como única fuente de verdad de nombres.
+- `infra/sql/` contiene la provisión de `sigrid_dm` (base, roles, diagnóstico).
+  Se ejecuta a mano con `psql`, nunca desde el ETL: usa bloques `$$`, que el
+  troceador de sentencias de `postgres_client.py` no sabe manejar.
 - Destino: Azure Container Apps Job programado en `rg-seguimiento-dev`,
   región `spaincentral`. Tags de imagen fechados (`rYYYYMMDD-HHmm`), nunca
   reescribir tags.
