@@ -15,10 +15,12 @@
 > obtiene con `az` contra la suscripción.
 >
 > Los **nombres de recursos se conservan**: son identificadores operativos y
-> ya figuran en el repositorio. Única excepción, tres nombres que llevan un
+> ya figuran en el repositorio. **Cuatro excepciones**, nombres que llevan un
 > dato sensible incrustado y se redactan dentro del propio nombre: la
-> conexión y el gateway local de la VPN (contienen la IP pública de la sede) y
-> el workspace por defecto de Defender (contiene el ID de suscripción).
+> conexión y el gateway local de la VPN (contienen la IP pública de la sede),
+> el workspace por defecto de Defender (contiene el ID de suscripción) y el
+> resource group de Visual Studio Online (`VisualStudioOnline-<GUID>`, que
+> lleva incrustado el identificador de la organización de Azure DevOps).
 >
 > De Key Vault se listan **solo nombres de secretos**. Ningún valor de
 > secreto, cadena de conexión ni clave se ha leído ni figura aquí.
