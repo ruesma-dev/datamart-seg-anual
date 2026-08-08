@@ -1,0 +1,10 @@
+# requirements-dev.txt
+# Herramientas de desarrollo y del arnés. NO se instalan en la imagen de
+# contenedor: el Dockerfile solo lee requirements.txt.
+#
+#   pip install -r requirements-dev.txt
+
+ruff>=0.6.0
+
+# pytest vive en requirements.txt porque hoy la imagen lo instala; moverlo
+# aquí adelgazaría la imagen, pero es un cambio con más alcance que este.

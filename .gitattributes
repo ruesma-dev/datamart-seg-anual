@@ -10,6 +10,13 @@
 *.txt   text eol=lf
 *.env   text eol=lf
 
+# Excepción a la línea base: docs/CONVENTIONS.md pide PowerShell en UTF-8 con
+# BOM y CRLF. Sin esta regla, `* text=auto eol=lf` los materializaba en LF.
+*.ps1   text eol=crlf
+
+# Los ejecuta Git Bash: explícito para que ninguna regla futura los pase a CRLF.
+*.sh    text eol=lf
+
 *.png   binary
 *.jpg   binary
 *.jpeg  binary

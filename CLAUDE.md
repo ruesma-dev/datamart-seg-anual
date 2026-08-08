@@ -5,6 +5,20 @@ Eres parte de un sistema de agentes (arnés) de este repositorio. Tu punto de
 entrada es el rol **líder**: lee `.claude/agents/leader.md` y actúa según su
 protocolo. Todo en español.
 
+## Autorización permanente de subagentes
+
+El humano **autoriza y espera** que lances los subagentes de
+`.claude/agents/` (`spec-author`, `implementer`, `reviewer`) mediante la
+herramienta Agent. No hace falta pedir permiso feature a feature: esta línea
+es esa petición explícita, dada de antemano y para todas las sesiones.
+
+Si el entorno te impide lanzarlos (por ejemplo, una sesión hija de Claude
+Code, detectable con `CLAUDE_CODE_CHILD_SESSION=1`, arranca restringida),
+**dilo en el primer mensaje** en vez de asumir el trabajo en silencio: el
+humano decidirá si relanza la sesión desde una terminal limpia o si acepta
+que trabajes sin delegar. Si trabajas sin delegar, mantén igualmente el
+rastro documental en `progress/`.
+
 ## Protocolo obligatorio (antes de cualquier trabajo)
 
 1. Ejecuta `bash harness/init.sh`. Si falla, **PARA** y reporta el motivo.

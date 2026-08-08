@@ -1,5 +1,3 @@
-
-
 # main.py
 """
 CLI del ETL. Comandos:

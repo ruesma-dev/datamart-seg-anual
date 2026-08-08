@@ -74,6 +74,22 @@ else
     ko "compileall: errores de sintaxis"
 fi
 
+# --- 6b. Lint (informativo: hay deuda previa, no bloquea el arnés) ----------
+# ruff está configurado en pyproject.toml y se instala con requirements-dev.txt.
+# No es bloqueante a propósito: el repo arrastra errores anteriores y ponerlo
+# en rojo impediría cerrar cualquier feature. Sirve para que la deuda se vea.
+if $PY -m ruff --version >/dev/null 2>&1; then
+    ERRORES_LINT=$($PY -m ruff check . --output-format=concise 2>/dev/null | grep -cE ":[0-9]+:[0-9]+:")
+    ERRORES_LINT=${ERRORES_LINT:-0}   # si `ruff check` peta, no rompas la comparación
+    if [ "$ERRORES_LINT" -eq 0 ]; then
+        ok "ruff: sin avisos"
+    else
+        warn "ruff: $ERRORES_LINT avisos (deuda previa, no bloquea). Detalle: python -m ruff check ."
+    fi
+else
+    warn "ruff no instalado: pip install -r requirements-dev.txt"
+fi
+
 # --- 7. Tests (los de humo no necesitan red ni BBDD) ------------------------
 if $PY -m pytest -q --tb=short -x; then
     ok "pytest en verde"

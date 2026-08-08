@@ -12,6 +12,9 @@ etl-sigrid = "main:cli"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# patches/ son recortes de código pensados para pegar en otro fichero, no
+# módulos ejecutables: analizarlos solo produce falsos undefined-name.
+exclude = ["patches"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
