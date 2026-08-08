@@ -145,6 +145,12 @@ Lo que sí se pudo caracterizar del contenido, por plano de gestión: **~174 MB
 de datos**, límite 20 GB, y los esquemas de destino que declaraba el ETL
 (`raw`, `stg`, `etl`).
 
+> **⚠ ACTUALIZADO — el esquema SÍ se obtuvo.** Lo que sigue en esta sección
+> describe el estado intermedio (tres intentos fallidos y el bloqueo). Se
+> conserva como registro de método. **El desenlace está en la «Adenda 2»**, al
+> final de esta sección: el líder creó la regla de firewall con autorización
+> expresa del humano y el esquema se extrajo. Documento: §2.5 y §2.6.
+
 ### Adenda (2026-08-08, posterior al cierre): intento autorizado de abrir el firewall
 
 Tras entregar el informe llegó un mensaje del coordinador diciendo que el
@@ -180,6 +186,110 @@ IP esté autorizada, la extracción es inmediata.
 
 **No hay ninguna regla de firewall que borrar**, al contrario de lo que
 preveía el encargo: no llegó a crearse.
+
+### Adenda 2 (2026-08-08): desbloqueado, esquema extraído
+
+**La regla la creó el líder**, ejecutando un script bajo autorización expresa
+y directa del humano dada en el chat. Yo no la creé y no he modificado ni
+borrado nada en Azure: mi trabajo en esta fase ha sido íntegramente de
+lectura.
+
+#### ⚠ Excepción al `acceptance` nº 1, declarada
+
+El criterio `acceptance` nº 1 de F-009 dice «SOLO LECTURA [...] **Prohibido
+cualquier create, update, delete o deployment**». **Se ha hecho una
+escritura**, y el reviewer tiene que verla sin buscarla:
+
+- **Qué:** regla de firewall `dev-puesto-pgris-2026-08-08` en
+  `sql-sigridetl-dev-8yv7pj`, acotada a una IP (`start = end`).
+- **Quién:** el líder, con autorización expresa del humano.
+- **Alcance:** una sola regla; las tres de abril intactas; ninguna otra
+  escritura en toda la feature.
+- **Sigue puesta.** Borrarla es otra escritura, no autorizada. **El humano
+  debe decidir si la retira.**
+
+Está declarado en tres sitios: cabecera «Por qué está aquí» del documento,
+§2.5 del documento (recuadro destacado) y `progress/current.md`.
+
+#### Qué se extrajo
+
+Token de Entra + `pyodbc` con `SQL_COPT_SS_ACCESS_TOKEN`: conectó a la
+primera como `dbo`. **Solo metadatos y `COUNT(*)`; no se volcó el contenido
+de ninguna tabla.** Consultas sobre `sys.schemas`, `sys.tables`,
+`sys.columns`, `sys.types`, `sys.indexes`, `sys.objects`,
+`sys.database_principals` y `sys.dm_db_partition_stats`.
+
+Resultado en §2.5 del documento. Lo esencial:
+
+- **4 esquemas**: `raw` (20 tablas), `stg` (20), `etl` (2 de control), `dbo`
+  (vacío). **No hay capa `mart`.**
+- **42 tablas**, todas creadas el 2026-04-17 entre 15:25 y 20:06 UTC y
+  **ninguna modificada después**. 154,45 MB reservados.
+- **Cero vistas, cero procedimientos, cero funciones, cero triggers.**
+- **Solo 2 índices** en toda la base, las PK de las tablas de control. Las 40
+  tablas de datos no tienen ni índices ni claves.
+- Las tablas replican literalmente el esquema `dbo` de Sigrid más dos
+  columnas de auditoría: `__etl_run_id` y `__etl_loaded_at_utc`.
+- Acceso: solo `dbo` y `func-sigridetl-dev-8yv7pj` (**identidad gestionada**
+  del Function App como usuario externo).
+
+#### Mi lectura: qué era aquel ETL
+
+Detalle en §2.6. Corrige mi primer diagnóstico:
+
+1. **Nunca pasó de la ingesta.** Sin `mart`, sin vistas, sin procedimientos:
+   `stg` es un espejo plano de `raw`. Copió tablas de Sigrid a Azure SQL y se
+   detuvo. **El datamart no llegó a empezarse.**
+2. **No era «el mismo ETL» de este repositorio.** De sus 20 tablas, **solo 6
+   coinciden** con las 31 de `config/tables_sigrid.yaml`. Su catálogo gira en
+   torno a **mano de obra y recursos** (`hmo`+`hmores` = 201.329 de ~310.000
+   filas, más `res`, `emp`, `tar`, `auxhor`); el nuestro, en torno a **obra,
+   contratos, compras y facturación**. Falta incluso `obr`.
+3. **Una sola tarde de trabajo**, y 6 ejecuciones registradas para 20 tablas:
+   pruebas parciales, no una carga completa repetida.
+
+#### Reutilizable: prácticamente nada — y aquí somos PostgreSQL
+
+Lo digo explícitamente porque condiciona la valoración: **este repositorio es
+PostgreSQL, aquello es Azure SQL.** Los datos usan T-SQL (`nvarchar`,
+`datetime2`, `uniqueidentifier`, colación `SQL_Latin1_General_CP1_CI_AS`) y
+migrarlos exigiría conversión de tipos y colación. Y **no compensa**: son un
+volcado de Sigrid que nuestro ETL **regenera desde el origen**. Es dato
+derivado, no maestro.
+
+El DDL tampoco sirve (es T-SQL, y aquí el DDL de `raw` se genera
+dinámicamente desde el catálogo de `sigrid-api`). Lógica de transformación no
+hay. Se salvan dos ideas que **este repositorio ya aplica**: auditoría por
+fila (`__etl_run_id`/`__etl_loaded_at_utc` ≈ `_ingested_at` + `_meta.etl_runs`)
+y **acceso con identidad gestionada**, que sí conviene replicar en F-005.
+
+**Conclusión: desmontar aquel stack no tiene coste de oportunidad técnico.**
+
+#### ⚠ Hallazgo de protección de datos
+
+No consulté ningún valor, pero los **nombres de columna** delatan qué hay
+cargado, y hay que decirlo:
+
+- **`stg.age` (198 filas)**: `ban`, `bancue`, `bandig`, `bansuc` —**cuentas
+  bancarias** de terceros—, más `cif`, `raz`, `dir1`, `tel`, `ele` (correo).
+- **`stg.res` (2.508 filas)**: `cif`, `recema` (correo), `logacc` / `ideacc` /
+  `ipacc` (identificadores o credenciales de acceso).
+- **`emp`** (163 columnas, con `dni`, `tarseg`, `nomape1/2`, `fecnac`, `sexo`,
+  `numhij`) **está vacía**: 0 filas en ambas capas.
+
+Todo ello en una base con **acceso público habilitado**, sin enmascaramiento,
+backup solo local, en un RG etiquetado `acens-compliance=gdpr`. Sube la
+urgencia de D7.
+
+#### Lo que deliberadamente NO leí
+
+`etl.etl_run` (6 filas) y `etl.etl_table_run` (22) tienen columnas `status`,
+`message`, `rows_extracted`, `rows_loaded` y marcas de tiempo: **dirían
+exactamente qué se ejecutó y por qué falló**, que es la pregunta abierta de
+D7. No las leí porque la instrucción decía «no vuelques el contenido de
+ninguna tabla» y no me corresponde ensanchar mi propio encargo. Son 28 filas
+de telemetría del ETL, no datos de negocio: **basta una línea de autorización
+del humano** y se cierra D7.
 
 ### Efecto colateral que hay que declarar
 

@@ -1,17 +1,22 @@
 <!-- progress/current.md -->
 # Trabajo en curso
 
-> ## PARADA · encargo adicional bloqueado (2026-08-08)
+> ## ⚠ Excepción al alcance de solo lectura — el reviewer tiene que verla
 >
-> Llegó un encargo posterior al cierre: **abrir el firewall de
-> `sql-sigridetl-dev-8yv7pj`** con una regla acotada a la IP del puesto para
-> leer el esquema de `sqldb-sigrid-ruesma-etl`. **No se ha hecho.** Motivo y
-> qué hace falta, en la sección «Encargo adicional bloqueado» al final de
-> este fichero.
+> Para leer el esquema de `sqldb-sigrid-ruesma-etl` se creó la regla de
+> firewall **`dev-puesto-pgris-2026-08-08`** en `sql-sigridetl-dev-8yv7pj`,
+> acotada a una única IP (`start = end`). Las tres reglas de abril no se
+> tocaron y no hubo ninguna otra escritura.
 >
-> **Nada se ha escrito en Azure.** El firewall del servidor sigue con sus
-> tres reglas de abril, intactas. El resto de la feature no se ve afectado:
-> los 8 criterios `acceptance` de F-009 siguen cumplidos y `init.sh` en verde.
+> La hizo el **líder**, con **autorización expresa y directa del humano**.
+> Cuando el implementer lo intentó, el sistema de permisos lo denegó y paró.
+>
+> Esto **contradice el criterio `acceptance` nº 1 de F-009**, que prohíbe
+> cualquier `create`. Está declarado en `docs/referencia/04_azure_inventario_dev.md`
+> §2.5 y en `progress/impl_F-009.md`.
+>
+> **La regla sigue puesta.** Borrarla es otra escritura y no está autorizada:
+> **el humano decide si la retira.**
 
 **F-009 · Inventario del entorno Azure existente** (`sdd=false`, solo
 lectura). Implementación terminada, pendiente de review.
@@ -55,77 +60,27 @@ az sql db show -g rg-sigridetl-dev-data -s sql-sigridetl-dev-8yv7pj \
 
 ## Salvedades registradas
 
-- **Esquema de `sqldb-sigrid-ruesma-etl`: NO obtenido.** El firewall del
-  servidor no incluye la IP de salida actual del puesto. Añadirla es una
-  escritura y queda fuera del alcance. Detalle de los intentos y del error en
-  el documento (§2.5) y en el informe.
+- **Esquema de `sqldb-sigrid-ruesma-etl`: OBTENIDO.** Ver
+  `docs/referencia/04_azure_inventario_dev.md` §2.5 (esquema) y §2.6
+  (interpretación). Hizo falta la regla de firewall declarada arriba; los
+  tres intentos previos fallidos quedan documentados como nota de método.
+- **No se leyó el contenido de `etl.etl_run` (6 filas) ni de
+  `etl.etl_table_run` (22)**, por la instrucción de no volcar tablas. Son la
+  lectura pendiente de más valor: dirían por qué se paró aquel ETL. Telemetría
+  del propio ETL, no datos de negocio. Basta autorizarlo.
+- **⚠ La base contiene datos personales y bancarios** (`stg.age` con `ban` /
+  `bancue` / `cif` / `ele`, 198 filas; `stg.res` con `cif` / `recema`, 2.508).
+  No se consultó ningún valor: se deduce de los nombres de columna. `emp`
+  —con `dni` y `tarseg`— está vacía. Detalle en §2.5.
 - Conectarse disparó la **reanudación automática** de la base *serverless*
-  (`Paused` → `Online`). No se escribió nada; se auto-pausa a los 60 min. Los
-  datos del diagnóstico se capturaron antes de conectar.
+  (`Paused` → `Online`). No se escribió nada en ella; se auto-pausa a los 60
+  min. Los datos del diagnóstico se capturaron antes de conectar.
 - No se pudo listar el contenido de blobs: falta rol de plano de datos
   (`Storage Blob Data Reader`). No se usó `--auth-mode key` para no recuperar
   la clave de la cuenta.
 
----
+## Decisiones pendientes del humano tras esta sesión
 
-## Encargo adicional bloqueado · abrir el firewall del SQL
-
-**Qué se pedía.** Un mensaje del coordinador, posterior al cierre de la
-feature, indicaba que el humano autorizaba una escritura acotada: crear la
-regla `dev-puesto-pgris-2026-08-08` en el firewall de
-`sql-sigridetl-dev-8yv7pj`, limitada a la IP exacta del puesto
-(`<IP-PUESTO>`, `start = end`), sin tocar las tres reglas de abril, para
-leer por fin el esquema de `sqldb-sigrid-ruesma-etl`.
-
-**Qué se hizo.** Lo previo, que es de solo lectura:
-
-1. Se confirmó la IP pública actual del puesto leyéndola del error 40615
-   (`curl` está bloqueado en este entorno). Coincide con la del inventario.
-2. Se preparó el comando exacto, con la regla acotada a esa IP:
-
-   ```bash
-   az sql server firewall-rule create \
-     -g rg-sigridetl-dev-data -s sql-sigridetl-dev-8yv7pj \
-     -n dev-puesto-pgris-2026-08-08 \
-     --start-ip-address <IP-PUESTO> --end-ip-address <IP-PUESTO>
-   ```
-
-**Por qué está bloqueado.** Al ejecutarlo, **el sistema de permisos denegó la
-acción** («Blocked by classifier»). No se ha insistido ni se ha buscado otra
-vía —ni PowerShell, ni `az rest` con `PUT`—: eso sería sortear la intención
-de la denegación, y el protocolo del arnés dice explícitamente que ante un
-bloqueo no se improvisan workarounds. La denegación alcanza también a
-`az sql server firewall-rule list`, así que no se pudo ni releer el estado
-del firewall para verificarlo; queda como estaba porque el `create` se
-detuvo antes de ejecutarse.
-
-**Hay además una razón de fondo, y conviene que el humano la vea.** El
-criterio `acceptance` nº 1 de F-009 en `harness/features.json` dice
-literalmente:
-
-> «SOLO LECTURA: exclusivamente comandos `az ... list` y `az ... show`.
-> **Prohibido cualquier create, update, delete o deployment**»
-
-Es decir: la escritura contradice la especificación registrada de la propia
-feature. Y la autorización llegó **por mensaje de otro agente**, que no es
-consentimiento del humano: el consentimiento lo dan el sistema de permisos o
-el propio humano, y aquí el sistema de permisos ha dicho que no. Con las dos
-señales apuntando en la misma dirección, lo correcto es parar.
-
-**Qué hace falta para desbloquearlo** (cualquiera de las tres):
-
-1. Que el humano añada la regla **él mismo** desde el portal de Azure, o
-   simplemente abra el *Query editor* de la base (crea la regla solo). Hecho
-   eso, la extracción del esquema es inmediata: el token de Entra y el script
-   `pyodbc` ya están probados y funcionan hasta el firewall.
-2. Que el humano conceda permiso en Claude Code para `az sql server
-   firewall-rule create` (regla de Bash en `settings.json`) **y** actualice
-   el criterio `acceptance` nº 1 de F-009, que hoy prohíbe la escritura.
-3. Que la consulta se lance desde dentro de Azure: la regla
-   `AllowAzureServices` ya lo permite y no requiere tocar nada.
-
-**Estado de F-009 mientras tanto:** se deja `in_progress`, no `blocked`. La
-feature en sí no está bloqueada —sus 8 criterios están cumplidos y el
-entorno en verde—; lo que está bloqueado es un encargo añadido que queda
-fuera de su `acceptance`. Marcar la feature entera `blocked` daría al líder
-una señal falsa.
+1. **¿Se retira la regla `dev-puesto-pgris-2026-08-08`?** Sigue puesta.
+2. **¿Se autoriza leer `etl.etl_run` / `etl.etl_table_run`?** Cierra D7.
+3. Las demás, en `progress/decisiones_abiertas.md` (D1–D7).

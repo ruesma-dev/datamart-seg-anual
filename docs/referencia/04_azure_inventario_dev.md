@@ -33,8 +33,15 @@ intento anterior de este mismo ETL**, sobre otra pila tecnológica y
 abandonado desde abril: ver la sección 2.
 
 Método: `az account/group/resource list`, `az ... show` y lecturas del ARM
-REST API por `GET`. Ninguna escritura. Las salvedades de acceso están
-anotadas en cada punto.
+REST API por `GET`. Las salvedades de acceso están anotadas en cada punto.
+
+> **Una sola escritura en toda la feature, declarada.** El inventario es de
+> solo lectura con **una excepción**: para poder leer el esquema de
+> `sqldb-sigrid-ruesma-etl` se creó la regla de firewall
+> `dev-puesto-pgris-2026-08-08` en `sql-sigridetl-dev-8yv7pj`, acotada a una
+> única IP. La hizo el **líder** del arnés con **autorización expresa del
+> humano**, y **la regla sigue puesta**. El detalle completo, y por qué esto
+> es una excepción al criterio `acceptance` nº 1 de F-009, está en **§2.5**.
 
 ---
 
@@ -124,9 +131,15 @@ sensibles leídos; los sensibles no se han tocado):
 | `SIGRID_API_BASE_URL`, `SIGRID_API_FUNCTION_KEY` | *(no volcados)* | Consumía el mismo `sigrid-api`. |
 | `TARGET_SQL_CONNECTIONSTRING` | *(no volcado)* | Destino: el Azure SQL de al lado. |
 
-Es decir: **el mismo ETL que este repositorio, con el mismo origen y el mismo
-modelo de capas, pero escribiendo en Azure SQL en vez de PostgreSQL y
-ejecutándose como Azure Function programada en vez de Container Apps Job.**
+Es decir: **una ingesta del mismo tipo y sobre el mismo origen, pero
+escribiendo en Azure SQL en vez de PostgreSQL y ejecutándose como Azure
+Function programada en vez de Container Apps Job.**
+
+> **Matiz importante, de §2.6.** A la vista del esquema real, **no era «el
+> mismo ETL» de este repositorio**: cargaba otro catálogo de tablas —orientado
+> a mano de obra, no a seguimiento económico— y **nunca pasó de la ingesta**
+> (sin capa `mart`, sin una sola vista ni procedimiento). Léase §2.6 antes de
+> sacar conclusiones de este apartado.
 
 ### 2.3 Estado real: parado desde el 18 de abril
 
@@ -185,52 +198,273 @@ una o dos veces el 17–18 de abril, cargó datos, y se abandonó.
   `QueryEditorClientIPAddress_...` (`<IP-PUESTO-ABRIL-2>`), ambas de un rango
   de salida que **ya no es el del puesto**.
 
-### 2.5 Esquema de la base: NO obtenido — bloqueado por el firewall
+### 2.5 Esquema de la base `sqldb-sigrid-ruesma-etl`
 
-Encargo específico del humano, **no completado**. Se documenta con detalle
-porque el bloqueo es de configuración, no de permisos, y se resuelve en un
-minuto cuando se decida.
+> ### ⚠ Excepción al alcance de solo lectura — léase antes que la sección
+>
+> El criterio `acceptance` nº 1 de F-009 en `harness/features.json` dice
+> «SOLO LECTURA [...] **Prohibido cualquier create, update, delete o
+> deployment**». Para obtener este esquema **se ha hecho una escritura en
+> Azure**, y hay que verla sin buscarla:
+>
+> - **Qué:** se creó la regla de firewall **`dev-puesto-pgris-2026-08-08`**
+>   en el servidor `sql-sigridetl-dev-8yv7pj`, acotada a una única IP
+>   (`<IP-PUESTO>`, `start = end`).
+> - **Quién:** el **líder** del arnés, con **autorización expresa y directa
+>   del humano**, no el implementer y no por iniciativa propia. Cuando el
+>   implementer intentó la escritura, el sistema de permisos la denegó y paró.
+> - **Alcance:** una sola regla. **Las tres reglas de abril no se tocaron.**
+>   Ninguna otra escritura en toda la feature.
+> - **La regla SIGUE PUESTA.** Borrarla es otra escritura y no está
+>   autorizada. **El humano debe decidir si la retira**, y conviene que lo
+>   decida: mientras exista, esa IP puede llegar al servidor.
 
-Lo que se intentó, en orden:
+#### Nota de método: por qué hizo falta la regla
 
-1. **`sqlcmd -G`** (ODBC Driver 17, `ActiveDirectoryIntegrated`) contra
-   `sql-sigridetl-dev-8yv7pj.database.windows.net`.
-   → Falla en el **cliente**, antes de salir a la red:
-   `Failed to authenticate the user '' in Active Directory
-   (Authentication option is 'ActiveDirectoryIntegrated'). Error code
-   0xCAA50017 [...] Failed to resolve the UPN for the current windows
-   account.` El puesto no está unido a Entra ID, así que la autenticación
-   integrada no puede resolver el UPN. `sqlcmd` 16.0.1000.6 no admite pasar
-   un token de acceso.
-2. **Token de la sesión de `az` + `pyodbc`**, la vía que se indicó:
-   `az account get-access-token --resource https://database.windows.net/`,
-   token pasado en el atributo ODBC `SQL_COPT_SS_ACCESS_TOKEN` (1256).
-   Probado con **ODBC Driver 18** y con **ODBC Driver 17** (ambos instalados
-   en el puesto).
-   → Ambos fallan **en el firewall del servidor**, antes de la
-   autenticación: `Cannot open server 'sql-sigridetl-dev-8yv7pj' requested by
-   the login. Client with IP address '<IP-PUESTO>' is not allowed to access
-   the server. (40615)`.
+Antes de la regla se intentó el acceso por tres vías, todas fallidas. Se
+conserva el registro porque explica qué funciona y qué no contra este
+servidor desde un puesto que **no está unido a Entra ID**:
 
-**Qué haría falta:** añadir la IP de salida actual del puesto a las reglas de
-firewall del servidor —o conectarse desde una IP ya autorizada—. Es una
-**escritura** sobre Azure, así que **no se ha hecho**, conforme al alcance de
-solo lectura de esta feature. Alternativas para cuando se decida: el *Query
-editor* del portal (crea él mismo la regla), o ejecutar la consulta desde un
-recurso dentro de Azure (la regla `AllowAzureServices` ya lo permite).
+| # | Vía | Dónde falla | Error |
+|---|---|---|---|
+| 1 | `sqlcmd -G` (ODBC 17, `ActiveDirectoryIntegrated`) | **En el cliente**, antes de salir a la red | `Error code 0xCAA50017 [...] Failed to resolve the UPN for the current windows account`. El puesto no está unido a Entra ID. `sqlcmd` 16.0.1000.6 no admite pasar un token de acceso. |
+| 2 | Token de `az` + `pyodbc`, **ODBC Driver 18** | **En el firewall del servidor**, antes de autenticar | `Cannot open server [...] Client with IP address '<IP-PUESTO>' is not allowed to access the server. (40615)` |
+| 3 | Token de `az` + `pyodbc`, **ODBC Driver 17** | Igual que la 2 | Mismo error 40615. Descarta que fuera cosa del driver. |
 
-Consecuencia: no se ha podido listar esquemas, tablas, filas por tabla,
-columnas, vistas ni procedimientos. **Lo que sí sabemos del contenido** es
-que hay ~174 MB de datos y que la configuración del ETL apuntaba a los
-esquemas `raw`, `stg` y `etl` (sección 2.2).
+Las tres reglas de firewall que había eran de abril y apuntaban a un rango de
+salida que ya no es el del puesto. **La vía buena es la 2**: token de Entra de
+la sesión de `az` (`az account get-access-token --resource
+https://database.windows.net/`) pasado en el atributo ODBC
+`SQL_COPT_SS_ACCESS_TOKEN` (1256). En cuanto la IP estuvo autorizada,
+funcionó a la primera y conectó como `dbo`.
 
-> **Efecto colateral a dejar por escrito.** La base era *serverless* y estaba
+> **Efecto colateral, ya registrado.** La base es *serverless* y estaba
 > pausada. El primer intento de conexión —una lectura— **disparó la
-> reanudación automática** que ese tier hace por diseño: pasó a `Online` a
-> las 2026-08-08 16:03:43 UTC. No se ha escrito nada en ella y volverá a
-> pausarse sola a los 60 minutos de inactividad. Los datos que sostienen el
-> diagnóstico (`pausedDate = 2026-04-18T04:15:50Z`, `resumedDate = null`) se
-> capturaron **antes** de conectar y quedan registrados arriba.
+> reanudación automática** que ese tier hace por diseño: pasó a `Online` el
+> 2026-08-08 a las 16:03:43 UTC. No se ha escrito nada en ella y se auto-pausa
+> a los 60 minutos de inactividad. Los datos del diagnóstico
+> (`pausedDate = 2026-04-18T04:15:50Z`, `resumedDate = null`) se capturaron
+> **antes** de conectar.
+
+Todo lo que sigue son **metadatos y `COUNT(*)`**. No se ha volcado el
+contenido de ninguna tabla.
+
+#### Esquemas
+
+Cuatro esquemas de usuario. **No hay capa `mart`**:
+
+| Esquema | Objetos | Qué es |
+|---|---|---|
+| `raw` | 20 | Ingesta cruda desde Sigrid |
+| `stg` | 20 | Staging, espejo de `raw` |
+| `etl` | 6 | **Control del propio ETL**, no datos de negocio |
+| `dbo` | 0 | Vacío |
+
+Motor: `Microsoft SQL Azure (RTM) - 12.0.2000.8`. Tamaño total según
+`sys.dm_db_partition_stats`: **154,45 MB reservados, 150,94 MB usados**.
+
+#### Tablas con datos
+
+Las 20 tablas existen duplicadas en `raw` y `stg` (40), más las 2 de control
+en `etl`: **42 tablas en total**. Todas creadas el **2026-04-17 entre las
+15:25 y las 20:06 UTC**, y **ninguna modificada después**: `create_date` y
+`modify_date` coinciden en las 42.
+
+| Esquema.tabla | Filas | MB | Qué es en Sigrid |
+|---|---:|---:|---|
+| `stg.hmores` | **194.700** | 59,13 | Líneas de horas de mano de obra |
+| `stg.dcf` | **74.900** | 69,07 | Documentos de factura |
+| `raw.tar` / `stg.tar` | 13.777 | 3,57 / 3,70 | Tareas |
+| `stg.pro` | 12.700 | 7,20 | Productos |
+| `raw.hmo` / `stg.hmo` | 6.629 | 0,76 | Cabeceras de mano de obra |
+| `raw.obrfas` / `stg.obrfas` | 4.413 | 0,45 / 0,51 | Fases de obra |
+| `raw.res` / `stg.res` | 2.508 | 0,63 | Recursos |
+| `raw.age` / `stg.age` | 198 | 0,07 | Agentes / terceros |
+| `raw.auxhor` / `stg.auxhor` | 60 | 0,07 | Auxiliar de horarios |
+| `raw.defext` / `stg.defext` | 23 | 0,07 | Definición de campos extra |
+| `etl.etl_table_run` | 22 | 0,07 | **Control**: una fila por tabla y ejecución |
+| `raw.auxobramb` / `stg.auxobramb` | 14 | 0,07 | Auxiliar de ámbitos de obra |
+| `etl.etl_run` | 6 | 0,07 | **Control**: una fila por ejecución |
+| `raw.auxrotval` / `stg.auxrotval` | 3 | 0,07 | Auxiliar de rótulos |
+
+**Vacías (0 filas):** en `raw` → `conext`, `dcf`, `emp`, `hmores`,
+`obrfasamb`, `obrlba`, `obrlbatar`, `obrparpre`, `obrpas`, `obrper`, `pro`;
+en `stg` → `conext`, `emp`, `obrfasamb`, `obrlba`, `obrlbatar`, `obrparpre`,
+`obrpas`, `obrper`.
+
+Nótese la asimetría: `hmores`, `dcf` y `pro` tienen datos en `stg` pero
+**cero en `raw`**, mientras que `tar`, `hmo`, `obrfas`, `res`, `age`,
+`auxhor`, `defext`, `auxobramb` y `auxrotval` tienen lo mismo en ambas. Encaja
+con un `raw` que se vacía tras promover a `stg` en las tablas grandes, o con
+ejecuciones interrumpidas a medias.
+
+#### Vistas, procedimientos, índices y claves
+
+- **Cero vistas. Cero procedimientos almacenados. Cero funciones. Cero
+  triggers.** La consulta sobre `sys.objects` devuelve lista vacía para
+  `V`, `P`, `FN`, `IF`, `TF`, `TR`.
+- **Solo dos índices en toda la base**, ambos claves primarias
+  autogeneradas, y ambos en las tablas de control: `etl.etl_run` y
+  `etl.etl_table_run`.
+- **Las 40 tablas de `raw` y `stg` no tienen ni un índice, ni una clave
+  primaria, ni una clave ajena.** Son volcados planos.
+
+#### Estructura de las tablas
+
+Las tablas reproducen **literalmente** el esquema `dbo` de Sigrid —mismos
+nombres de columna, en minúsculas y abreviados—, más **dos columnas de
+auditoría** que añade el framework y que aparecen al final de las 40 tablas:
+
+- `__etl_run_id` · `uniqueidentifier`
+- `__etl_loaded_at_utc` · `datetime2`
+
+Anchura de las tablas cargadas (sin contar las dos de auditoría):
+
+| Tabla | Cols. | Muestra de columnas |
+|---|---:|---|
+| `emp` | 163 | `ide`, `nomnom`, `nomape1`, `nomape2`, `dni`, `tarseg`, `fecnac`, `sexo`, … |
+| `dcf` | 147 | `ide`, `entcif`, `fecdoc`, `totbas`, `totiva`, `totdoc`, `obride`, `ano`, `mes`, `fas`, … |
+| `pro` | 110 | `ide`, `fabide`, `prvide`, `pvp`, `pco`, `puc`, `famide`, … |
+| `age` | 76 | `ide`, `cif`, `raz`, `ban`, `bancue`, `tel`, `ele`, `dir1`, … |
+| `hmores` | 58 | `ide`, `hmoide`, `reside`, `obride`, `paride`, `fec`, `can`, `pre`, `tot`, `ano`, `mes`, … |
+| `res` | 57 | `ide`, `cif`, `logacc`, `ideacc`, `recema`, `cenide`, … |
+| `obrfasamb` | 44 | `ide`, `obride`, `fas`, `amb`, `est`, `feccie`, `beopor`, `coepas`, … |
+| `tar` | 35 | `ide`, `obride`, `empide`, `can`, `tot`, `coscan`, `cospre`, `costot`, … |
+| `auxhor` | 25 | `ide`, `cod`, `res`, `pre`, `prenom`, `preven`, … |
+| `obrparpre` | 24 | `ide`, `obride`, `paride`, `amb`, `fas`, `can`, `pre`, `totinc`, … |
+| `defext` | 19 | `ide`, `tip`, `cod`, `camtab`, `cladef`, … |
+| `hmo` | 18 | `ide`, `cenide`, `obride`, `ano`, `mes`, `feccie`, … |
+| `auxobramb` | 16 | `ide`, `cod`, `res`, `ambcla`, `planif`, … |
+| `obrfas` | 13 | `ide`, `obride`, `mes`, `ano`, `fasnum`, `numedi`, … |
+| `obrpas` | 13 | `ide`, `obride`, `paride`, `fas`, `can`, `avance`, … |
+| `conext` | 13 | `ide`, `conide`, `cod`, `camtab`, `valt`, `valn`, … |
+| `obrper` | 12 | `ide`, `obride`, `per`, `fecini`, `fecfin`, `eje`, … |
+| `obrlba` | 11 | `ide`, `obride`, `feclba`, `lbanum`, … |
+| `auxrotval` | 10 | `ide`, `cod`, `res`, `numtab`, `tex` |
+| `obrlbatar` | 9 | `ide`, `obride`, `taride`, `can`, … |
+
+Tablas de control (`etl`):
+
+- **`etl.etl_run`** (9 cols): `run_id` (uniqueidentifier, PK),
+  `initiated_by`, `requested_tables`, `continue_on_error`,
+  `batch_size_override`, `status`, `message`, `started_at_utc`,
+  `finished_at_utc`.
+- **`etl.etl_table_run`** (11 cols): `etl_table_run_id` (bigint identity, PK),
+  `run_id`, `table_name`, `status`, `rows_extracted`, `rows_loaded`, …
+
+#### Acceso a la base
+
+Solo dos *principals*: `dbo` y **`func-sigridetl-dev-8yv7pj`**, usuario
+externo creado el 2026-04-17 10:13 — la **identidad gestionada del Function
+App**. Es decir, el ETL se autenticaba contra la base con *managed identity*,
+buen patrón y reutilizable en F-003/F-005.
+
+> **⚠ Datos personales y sensibles cargados.** No se ha consultado ningún
+> valor, pero los **nombres de columna** delatan qué hay:
+>
+> - **`stg.age` (198 filas)** contiene `cif`, `raz`, `dir1`, `tel`, `ele`
+>   (correo) y, sobre todo, **`ban`, `bancue`, `bandig`, `bansuc`: cuentas
+>   bancarias** de terceros.
+> - **`stg.res` (2.508 filas)** contiene `cif`, `recema` (correo) y
+>   `logacc` / `ideacc` / `ipacc`, que parecen credenciales o
+>   identificadores de acceso.
+> - **`emp`** (163 columnas, con `dni`, `tarseg` —nº de la Seguridad
+>   Social—, `nomape1/2`, `fecnac`, `sexo`, `numhij`) **está vacía en las dos
+>   capas**: 0 filas. Ese dato no llegó a cargarse.
+>
+> Es material sujeto a GDPR —el propio resource group se etiqueta
+> `acens-compliance=gdpr`— en una base **sin cifrado a nivel de columna, sin
+> enmascaramiento, con acceso público habilitado y backup solo local**. Pesa
+> a favor de decidir pronto qué se hace con este stack (D7).
+
+### 2.6 Qué era aquel ETL, a la vista del esquema
+
+Ahora se puede afinar el diagnóstico de §2.2, y **corrige** la primera
+lectura: no era «el mismo ETL» de este repositorio, sino **el mismo tipo de
+ingesta genérica sobre el mismo origen, pero con otro catálogo funcional y
+sin llegar nunca al datamart**.
+
+#### Nunca pasó de la ingesta
+
+Es el hallazgo que más pesa. Aquel ETL **no construyó nada**:
+
+- **No hay capa `mart`.** Los esquemas son `raw`, `stg` y `etl` (control).
+  Este repositorio, en cambio, tiene `mart`, `cierre`, `compras`, `maestro`,
+  `retenciones` y `auxiliar` además de `raw` y `stg`.
+- **Cero vistas y cero procedimientos.** No hay una sola transformación
+  declarada en la base. Toda la lógica de negocio del datamart —lo que en
+  este repositorio vive en `etl_sigrid/infrastructure/postgres/sql/`— sigue
+  sin existir allí.
+- `stg` es un **espejo plano de `raw`**, con las mismas columnas y los
+  mismos nombres de Sigrid. No hay renombrado, ni tipado de negocio, ni
+  semántica `amb`/`fas`, ni `importe_origen` / `importe_mes`.
+
+Dicho de otra forma: llegó a **copiar tablas de Sigrid a Azure SQL** y ahí se
+detuvo. El datamart, que es el objeto de este proyecto, no llegó a empezarse.
+
+#### Otro catálogo de tablas
+
+De las 20 tablas que cargó, **solo 6 coinciden** con las 31 que declara
+`config/tables_sigrid.yaml` de este repositorio:
+
+- **En ambos (6):** `auxobramb`, `conext`, `dcf`, `obrfas`, `obrfasamb`,
+  `obrparpre`.
+- **Solo en Azure (14):** `age`, `auxhor`, `auxrotval`, `defext`, `emp`,
+  `hmo`, `hmores`, `obrlba`, `obrlbatar`, `obrpas`, `obrper`, `pro`, `res`,
+  `tar`.
+- **Solo en este repositorio (25):** `auxmun`, `auxobrcla`, `auxobrtca`,
+  `auxobrtip`, `auxpro`, `cen`, `cob`, `com`, `comlin`, `comprv`, `con`,
+  `condir`, `ctr`, `ctrpro`, `dca`, `dcapro`, `dcfpro`, `dcfprodes`, `obr`,
+  `obrctr`, `obrparpar`, `obrprv`, `pag`, `prv`, `rec`.
+
+Los dos catálogos apuntan a sitios distintos. El de Azure gira en torno a
+**mano de obra y recursos** (`hmo` + `hmores` son 201.329 de las ~310.000
+filas cargadas, y arrastra `res`, `emp`, `auxhor`, `tar`): parece un ETL de
+**control de horas y producción**. El de este repositorio gira en torno a
+**obra, contratos, compras y facturación** (`obr`, `con`, `ctr`, `com`,
+`comlin`, `dca`, `dcf`, `prv`, `cob`, `pag`, `rec`), que es el seguimiento
+económico anual. Falta en Azure incluso `obr`, la tabla de obra, que aquí es
+central.
+
+#### Qué se ejecutó
+
+`etl.etl_run` tiene **6 filas** y `etl.etl_table_run` **22**: seis
+ejecuciones y veintidós cargas de tabla. Poco para 20 tablas: encaja con
+pruebas parciales, no con una carga completa repetida. Todas las tablas se
+crearon el 2026-04-17 entre las 15:25 y las 20:06 UTC —una sola tarde de
+trabajo— y **ninguna se modificó después**. El día siguiente la base se pausó
+y ahí sigue.
+
+> No se ha leído el contenido de `etl.etl_run` ni de `etl.etl_table_run`,
+> conforme a la instrucción de no volcar tablas. **Son, con diferencia, la
+> lectura más valiosa que queda pendiente**: sus columnas `status`,
+> `message`, `rows_extracted`, `rows_loaded`, `started_at_utc` y
+> `finished_at_utc` dirían **exactamente qué se ejecutó, qué falló y por
+> qué** se abandonó — que es la pregunta abierta de D7. Son 28 filas de
+> telemetría del propio ETL, no datos de negocio. Basta una línea de
+> autorización del humano.
+
+#### Qué sería reutilizable — y qué no
+
+**Este repositorio es PostgreSQL, no Azure SQL.** Eso condiciona todo lo que
+sigue y conviene decirlo sin rodeos:
+
+| Elemento | ¿Reutilizable? | Por qué |
+|---|---|---|
+| **Los datos cargados** | **No** | Están en Azure SQL (T-SQL, `nvarchar`, `datetime2`, `uniqueidentifier`, `bit`, `float`, colación `SQL_Latin1_General_CP1_CI_AS`). Migrarlos a PostgreSQL exige conversión de tipos y de colación. Y no compensa: son un volcado de Sigrid que el ETL de este repositorio **regenera desde el origen** en cada ejecución. Es dato derivado, no dato maestro: no hay nada que perder. |
+| **El DDL de las tablas** | **No directamente** | Tipos y sintaxis son de T-SQL. Además este repositorio **genera el DDL de `raw` dinámicamente** desde el catálogo de `sigrid-api` (`postgres_client.py`), así que no hay un DDL que portar. |
+| **La lógica de transformación** | **No hay nada que reutilizar** | Cero vistas, cero procedimientos. No existe. |
+| **El catálogo de tablas** | **Parcialmente, como referencia** | Las 14 tablas que solo están en Azure (`hmo`, `hmores`, `res`, `tar`, `pro`…) son un mapa útil **si algún día el datamart incorpora mano de obra**. Hoy no está en el alcance. |
+| **El patrón de auditoría** | **Sí, como idea** | `__etl_run_id` + `__etl_loaded_at_utc` por fila, y `etl_run` / `etl_table_run` como control. Este repositorio ya tiene su equivalente: `_meta.etl_runs` y la columna `_ingested_at`. Confirma el diseño, no lo cambia. |
+| **La identidad gestionada contra la base** | **Sí, conceptualmente** | El Function App entraba en el SQL como usuario externo, sin contraseña. Es el patrón que conviene replicar en F-005 con el Container Apps Job contra PostgreSQL. |
+| **La infraestructura** (Function App, plan FC1, Azure SQL) | **No** | Otra pila: Functions en vez de Container Apps Job, Azure SQL en vez de PostgreSQL. F-003 y F-005 no se apoyan en nada de esto. |
+
+**Conclusión:** de aquel intento **no se hereda nada técnico de valor**. Lo
+que se hereda es información: que se probó, hasta dónde se llegó, y —cuando
+se lean las tablas de control— por qué se paró. La base de 154 MB es un
+volcado regenerable, no un activo. Eso simplifica la decisión D7: **no hay
+coste de oportunidad en desmontarlo**, más allá de conservar la respuesta a
+«qué pasó».
 
 ---
 

@@ -188,19 +188,62 @@ funciones desplegadas, y la base `sqldb-sigrid-ruesma-etl` **lleva pausada
 desde el 2026-04-18** —el día siguiente a crearse— sin una sola reanudación.
 Pero **tiene ~174 MB de datos reales**: llegó a cargarse.
 
+> **Esquema ya leído (2026-08-08).** El acceso se desbloqueó creando la regla
+> de firewall `dev-puesto-pgris-2026-08-08` —escritura autorizada
+> expresamente por el humano y ejecutada por el líder—. **La regla sigue
+> puesta y hay que decidir si se retira.** El esquema completo está en
+> `docs/referencia/04_azure_inventario_dev.md` §2.5, y la interpretación en
+> §2.6. Lo que cambia respecto a la primera lectura:
+>
+> - **Nunca pasó de la ingesta.** Esquemas `raw`, `stg` y `etl` (control);
+>   **no hay capa `mart`**, ni una sola vista, ni un procedimiento
+>   almacenado, ni índices ni claves en las 40 tablas de datos. `stg` es un
+>   espejo plano de `raw`. **El datamart no llegó a empezarse.**
+> - **No era «el mismo ETL» de este repositorio.** De sus 20 tablas, solo **6**
+>   coinciden con las 31 de `config/tables_sigrid.yaml`. Su catálogo gira en
+>   torno a **mano de obra y recursos** (`hmo` + `hmores` = 201.329 de las
+>   ~310.000 filas cargadas, más `res`, `emp`, `tar`, `auxhor`); el nuestro,
+>   en torno a **obra, contratos, compras y facturación**. Falta incluso
+>   `obr`. Parece un ETL de **control de horas**, no de seguimiento económico.
+> - **Una sola tarde de trabajo.** Las 42 tablas se crearon el 2026-04-17
+>   entre las 15:25 y las 20:06 UTC y **ninguna se modificó después**.
+> - **Nada técnico que heredar.** Los datos están en Azure SQL (aquí somos
+>   **PostgreSQL**) y son un volcado de Sigrid **regenerable** desde el
+>   origen, no dato maestro. El DDL es T-SQL y además aquí se genera
+>   dinámicamente. No hay lógica de transformación que portar. Se salvan dos
+>   ideas que este repositorio **ya aplica**: auditoría por fila
+>   (`__etl_run_id` / `__etl_loaded_at_utc` ≈ nuestro `_ingested_at` y
+>   `_meta.etl_runs`) y **acceso con identidad gestionada**, que sí conviene
+>   replicar en F-005.
+> - **⚠ Hay datos personales y bancarios cargados.** `stg.age` (198 filas)
+>   incluye columnas `ban`/`bancue` —**cuentas bancarias** de terceros—, `cif`,
+>   `tel` y `ele`; `stg.res` (2.508 filas) incluye `cif`, `recema` y
+>   `logacc`/`ideacc`. La tabla `emp` (con `dni` y `tarseg`) **está vacía**.
+>   Todo ello en una base con acceso público habilitado, sin enmascaramiento
+>   y con backup solo local, en un RG etiquetado `acens-compliance=gdpr`.
+>   **Esto sube la urgencia de la decisión.**
+>
+> **Consecuencia para la decisión:** desmontarlo **no tiene coste de
+> oportunidad técnico**. Lo único que se perdería es la respuesta a «por qué
+> se paró», y esa respuesta está en las tablas de control, no en los datos.
+
 Preguntas para el humano:
 
-1. ¿Qué fue ese intento y **por qué se paró**? Puede haber ahí una razón
-   técnica que convenga conocer antes de repetir el ejercicio.
-2. ¿Se conserva, se archiva o se borra? Mientras la base siga existiendo
-   sigue generando coste de almacenamiento, y su contenido no está
-   inventariado (ver punto 3).
-3. ¿Interesa **ver el esquema y los datos** de esa base antes de decidir?
-   F-009 no pudo: el firewall del servidor no incluye la IP de salida actual
-   del puesto y **añadirla es una escritura**, fuera del alcance de solo
-   lectura. Se resuelve en un minuto por el portal cuando se decida.
+1. ¿Qué fue ese intento y **por qué se paró**? Sigue sin respuesta, pero ahora
+   se sabe **dónde está**: en `etl.etl_run` (6 filas) y `etl.etl_table_run`
+   (22 filas), cuyas columnas `status`, `message`, `rows_extracted`,
+   `rows_loaded` y las marcas de tiempo dirían exactamente qué se ejecutó y
+   qué falló. **No se leyeron** por la instrucción de no volcar contenido de
+   tablas. Son 28 filas de telemetría del propio ETL, no datos de negocio:
+   **basta una línea de autorización para cerrarlo.**
+2. ¿Se conserva, se archiva o se borra? Ahora con dos datos nuevos: no hay
+   nada técnico que heredar, y **contiene datos personales y bancarios** que
+   nadie está vigilando.
+3. **¿Se retira la regla de firewall `dev-puesto-pgris-2026-08-08`?** Sigue
+   activa. Borrarla es una escritura y no está autorizada.
 4. Si el datamart va a PostgreSQL (F-005), ¿el Azure SQL sobra del todo, o
-   había un motivo para elegirlo?
+   había un motivo para elegirlo? El esquema no da ninguna pista de que lo
+   hubiera: no se usó ninguna capacidad específica de SQL Server.
 
 ## Decisiones ya cerradas
 
