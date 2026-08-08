@@ -76,12 +76,13 @@
     },
     {
       "id": "F-008",
-      "title": "Documentación de referencia: tablas de Sigrid y landing zone de acens",
-      "description": "Incorporar a docs/referencia/ dos documentos que hoy solo existen en PDF fuera del repositorio: (1) la información de tablas del sistema origen Sigrid, base para entender y auditar la ingesta y config/tables_sigrid.yaml; (2) el documento de acens sobre cómo han montado la landing zone de Azure, contexto necesario para el bloque F-005/F-003. Conversión con la herramienta MCP markitdown, según la regla de CLAUDE.md. El humano aporta los PDF; los originales NO se versionan.",
+      "title": "Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api",
+      "description": "Incorporar a docs/referencia/ tres documentos que hoy viven fuera del repositorio: (1) la información de tablas del sistema origen Sigrid, base para entender y auditar la ingesta y config/tables_sigrid.yaml; (2) el documento de acens sobre cómo han montado la landing zone de Azure, contexto necesario para el bloque F-005/F-003; (3) la documentación del microservicio sigrid-api, único punto de acceso a la BBDD de Sigrid y a quien llama etl_sigrid/infrastructure/sigrid/. Los dos primeros llegan en PDF y se convierten con la herramienta MCP markitdown según la regla de CLAUDE.md; el tercero llega ya en Markdown. Los originales NO se versionan.",
       "acceptance": [
-        "Ambos documentos convertidos con la herramienta MCP markitdown (no leídos ni transcritos a mano)",
+        "Los documentos que llegan en PDF, convertidos con la herramienta MCP markitdown (no leídos ni transcritos a mano)",
         "Existe docs/referencia/01_sigrid_tablas.md con la cabecera de origen y fecha que exige docs/referencia/README.md",
         "Existe docs/referencia/02_azure_landing_zone_acens.md con la misma cabecera",
+        "Existe docs/referencia/03_sigrid_api.md con la misma cabecera",
         "Nombres conformes a la convención NN_tema.md de docs/referencia/README.md",
         "Los PDF originales no entran en el repositorio (ni versionados ni copiados al árbol de trabajo)",
         "Revisado que ninguno de los dos Markdown contiene secretos ni datos sensibles (credenciales, IDs de suscripción, tenant, rangos de IP internos); si los hubiera, se redactan antes del commit y se anota qué se redactó",

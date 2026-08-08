@@ -19,6 +19,30 @@ humano decidirá si relanza la sesión desde una terminal limpia o si acepta
 que trabajes sin delegar. Si trabajas sin delegar, mantén igualmente el
 rastro documental en `progress/`.
 
+## Ritmo de trabajo con el humano (obligatorio)
+
+Dos paradas fijas en todo trabajo, por pequeño que sea:
+
+1. **Antes de implementar.** Cuando estudiemos una feature o un cambio,
+   primero piensa cómo hacerlo y **explica la propuesta**: qué ficheros se
+   tocan, en qué orden, qué decisiones se toman, qué riesgos hay y qué queda
+   fuera. Luego **espera confirmación del humano antes de escribir nada**.
+   Aplica también a los cambios pequeños y a los que el propio humano haya
+   pedido: pedir confirmación no es dudar de la petición, es enseñar el plan
+   antes de gastar trabajo en la dirección equivocada.
+2. **Después de implementar.** Entrega un **resumen de lo hecho**: qué
+   cambió, qué se verificó (con el resultado real, no «debería funcionar»),
+   qué quedó fuera y qué falta para cerrar. El detalle largo vive en
+   `progress/`; por el chat va solo el resumen.
+
+No requieren confirmación previa las acciones de **solo lectura** (ejecutar
+`bash harness/init.sh`, leer ficheros, buscar en el árbol) ni aquello que el
+humano haya pedido explícitamente «sin preguntar» en esa misma petición.
+
+Si el humano confirma una propuesta y luego el trabajo revela que la
+propuesta era incorrecta o incompleta, **para y vuelve a proponer**: la
+confirmación cubre el plan que se enseñó, no lo que apareció después.
+
 ## Protocolo obligatorio (antes de cualquier trabajo)
 
 1. Ejecuta `bash harness/init.sh`. Si falla, **PARA** y reporta el motivo.

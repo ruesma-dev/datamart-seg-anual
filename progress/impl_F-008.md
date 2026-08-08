@@ -53,7 +53,44 @@ ni correo. No había credenciales, IDs de suscripción ni tenant en el original.
 El resto del contenido es fiel al documento. El detalle redactado sigue
 disponible en el PDF original, fuera del repositorio.
 
+### `03_sigrid_api.md`
+
+Origen: `sigrid_api.md` (documentación del repositorio `sigrid-api`, fuera de
+este proyecto), fechado el 2026-06-07. Llegó **ya en Markdown**, así que no
+requirió `markitdown`: la regla de conversión aplica a PDF y ofimática.
+
+Documenta el microservicio que es el único punto de acceso a la BBDD de
+Sigrid y a quien llama `etl_sigrid/infrastructure/sigrid/`: arquitectura
+hexagonal, endpoints de lectura/escritura, límites y modos de fallo.
+
+**Versión redactada**, por decisión del humano: sustituidos el ID de
+suscripción de Azure y el host:puerto del SQL Server on-prem. Se mantienen
+los nombres de recursos (function app, Key Vault, resource group) por ser
+identificadores operativos necesarios y coincidentes con los de `infra/`.
+No había contraseñas: viven en Key Vault y la function key se obtiene con
+`az functionapp keys list`. Verificado por búsqueda que el resultado no
+contiene GUID de suscripción, IP interna ni el puerto.
+
 También se añade un índice a `docs/referencia/README.md`.
+
+## Regla nueva del humano: dos paradas obligatorias
+
+Petición del humano en la misma sesión, implementada aquí:
+
+1. **Antes de implementar**: explicar la propuesta y esperar confirmación.
+2. **Después de implementar**: entregar un resumen de lo hecho.
+
+Escrita en `CLAUDE.md` (sección «Ritmo de trabajo con el humano», con la
+excepción para acciones de solo lectura y la obligación de volver a proponer
+si la propuesta confirmada se revela incorrecta), enganchada al flujo SDD de
+`.claude/agents/leader.md` como PARADA 1 y PARADA 2 —incluidas las filas
+`pending`, `in_progress` y «revisión OK» de su tabla de estados— y reflejada
+en `.claude/agents/implementer.md`, cuyo informe es la materia prima de la
+PARADA 2.
+
+La copia de `CLAUDE.md` en el directorio padre (`C:\Users\pgris\PycharmProjects\`)
+queda **sin tocar** por decisión del humano: está fuera del repositorio y ya
+desincronizada.
 
 ## Estado de los criterios de aceptación
 

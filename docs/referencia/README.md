@@ -23,6 +23,7 @@ está en el código sino en una norma de negocio.
 |---|---|
 | `01_sigrid_tablas.md` | Diccionario de la BBDD de Sigrid: tablas, campos, tipos e índices. Referencia del sistema origen y base para auditar `config/tables_sigrid.yaml`. |
 | `02_azure_landing_zone_acens.md` | Diseño de la Landing Zone de Azure entregado por acens. Contexto del despliegue (F-005, F-003, F-006). **Versión redactada**: sin rangos de red ni correos. |
+| `03_sigrid_api.md` | Documentación del microservicio `sigrid-api`, único punto de acceso a la BBDD de Sigrid y a quien llama `etl_sigrid/infrastructure/sigrid/`. **Versión redactada**: sin ID de suscripción ni host del SQL on-prem. |
 
 ## Formato
 

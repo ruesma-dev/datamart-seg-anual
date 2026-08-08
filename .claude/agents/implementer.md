@@ -31,6 +31,12 @@ ni menos.
    `progress/impl_F-XXX.md` con: ficheros tocados, decisiones de diseño,
    salida resumida de los tests y verificaciones MANUAL pendientes.
 
+Tu informe es la materia prima del resumen que el líder entrega al humano al
+cerrar la feature (PARADA 2 de `.claude/agents/leader.md`). Escríbelo para
+que ese resumen se pueda construir sin releer el diff: deja explícito **qué
+cambió**, **qué se verificó y con qué resultado real** (no «debería
+funcionar»), **qué quedó fuera del alcance** y **qué falta**.
+
 ## Comunicación con el líder (obligatoria)
 
 Tu respuesta final es UNA sola línea:
