@@ -75,6 +75,26 @@
       "branch": "feature/F-006-mcp-azure"
     },
     {
+      "id": "F-008",
+      "title": "Documentación de referencia: tablas de Sigrid y landing zone de acens",
+      "description": "Incorporar a docs/referencia/ dos documentos que hoy solo existen en PDF fuera del repositorio: (1) la información de tablas del sistema origen Sigrid, base para entender y auditar la ingesta y config/tables_sigrid.yaml; (2) el documento de acens sobre cómo han montado la landing zone de Azure, contexto necesario para el bloque F-005/F-003. Conversión con la herramienta MCP markitdown, según la regla de CLAUDE.md. El humano aporta los PDF; los originales NO se versionan.",
+      "acceptance": [
+        "Ambos documentos convertidos con la herramienta MCP markitdown (no leídos ni transcritos a mano)",
+        "Existe docs/referencia/01_sigrid_tablas.md con la cabecera de origen y fecha que exige docs/referencia/README.md",
+        "Existe docs/referencia/02_azure_landing_zone_acens.md con la misma cabecera",
+        "Nombres conformes a la convención NN_tema.md de docs/referencia/README.md",
+        "Los PDF originales no entran en el repositorio (ni versionados ni copiados al árbol de trabajo)",
+        "Revisado que ninguno de los dos Markdown contiene secretos ni datos sensibles (credenciales, IDs de suscripción, tenant, rangos de IP internos); si los hubiera, se redactan antes del commit y se anota qué se redactó",
+        "docs/referencia/README.md menciona los dos documentos nuevos si procede",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "in_progress",
+      "sdd": false,
+      "priority": 6,
+      "requires_human_input": "Rutas de los PDF entregadas el 2026-08-08. Pendiente: decidir si el documento de acens entra literal o redactado (confidencialidad, rangos de red y correos personales).",
+      "branch": "feature/F-008-docs-referencia-sigrid-acens"
+    },
+    {
       "id": "F-002",
       "title": "PLAN_VIGENTE: serie de planificación consolidada",
       "description": "Implementar la serie PLAN_VIGENTE en capa cierre: para meses pasados, datos de fase 0 (Previsto); para meses futuros, la última versión del master vigente (conext cod='15'). Exponer vista para Power BI. Respetar semántica importe_origen/importe_mes.",
@@ -83,7 +103,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -95,7 +115,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]
