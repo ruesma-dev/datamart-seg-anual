@@ -5,6 +5,13 @@
 > checkboxes al cerrar cada feature y rechaza el cierre si queda alguno
 > vacío en C1–C5. El humano puede usarlos igual antes de mergear a dev.
 
+> **Features `sdd=false`.** No tienen `specs/F-XXX-slug/`, así que léase
+> `acceptance` de `harness/features.json` donde estos checkpoints digan
+> «requisito EARS» o «spec», y `F-XXX: <descripción>` como formato mínimo de
+> mensaje de commit donde digan `F-XXX Tn:`. Lo que dependa de `tasks.md` es
+> N/A. Marcar N/A es legítimo, pero **hay que justificarlo por escrito** en el
+> informe de review: un N/A sin motivo se trata como checkbox vacío.
+
 ## C1 — El arnés está completo y en verde
 
 - [ ] `bash harness/init.sh` termina con exit code 0.
@@ -30,6 +37,23 @@
       hardcodeados, sin dependencias nuevas no previstas en la spec.
 - [ ] Semántica Sigrid respetada (amb/fas, importe_origen vs importe_mes,
       `fasnum` vs `fas`) según `docs/ARCHITECTURE.md`.
+
+## C3 bis — Los documentos que entran de fuera son seguros
+
+Aplica a toda feature que añada o modifique ficheros en `docs/referencia/`.
+Si no toca ninguno, es N/A.
+
+- [ ] Cada documento nuevo lleva cabecera con **origen y fecha** del original,
+      según la plantilla de `docs/referencia/README.md`.
+- [ ] Los originales en PDF u ofimática **no** están en el repositorio ni en
+      el árbol de trabajo (compruébalo también con `git log --diff-filter=A`:
+      no basta con que no estén ahora).
+- [ ] Se ha ejecutado un **barrido de datos sensibles** sobre los documentos
+      nuevos —correos, IPs, GUID de suscripción o tenant, credenciales,
+      tokens, cadenas tipo clave— y **su resultado consta en el informe de
+      review**, con los patrones usados. El barrido lo ejecuta el reviewer:
+      no vale darlo por bueno leyendo el informe del implementer.
+- [ ] Lo que se haya redactado está anotado en la cabecera del documento.
 
 ## C4 — La verificación es real
 

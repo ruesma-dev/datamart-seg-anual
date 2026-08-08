@@ -4,7 +4,13 @@
   "rules": {
     "one_feature_at_a_time": true,
     "require_init_green_to_close": true,
-    "valid_status": ["pending", "spec_ready", "in_progress", "done", "blocked"]
+    "valid_status": [
+      "pending",
+      "spec_ready",
+      "in_progress",
+      "done",
+      "blocked"
+    ]
   },
   "features": [
     {
@@ -23,6 +29,25 @@
       "branch": "feature/F-001-cli-version"
     },
     {
+      "id": "F-009",
+      "title": "Inventario del entorno Azure existente",
+      "description": "Antes de añadir la base de datos del datamart, revisar qué hay ya montado en Azure y dejarlo documentado: suscripción y resource groups, redes virtuales y peerings, VPN gateway y su estado, Azure Firewall, storage accounts, Key Vaults, registros de contenedores, y qué contienen hoy rg-seguimiento-dev y rg-sigrid-dev-data-api. Sirve para no duplicar infraestructura ni contradecir el diseño de la landing zone de acens, y para cerrar decisiones abiertas del bloque Azure.",
+      "acceptance": [
+        "SOLO LECTURA: exclusivamente comandos 'az ... list' y 'az ... show'. Prohibido cualquier create, update, delete o deployment",
+        "Existe docs/referencia/04_azure_inventario_dev.md con la cabecera de origen y fecha que exige docs/referencia/README.md",
+        "El inventario cubre: resource groups, VNets y peerings, subredes, VPN gateway y estado de la conexión, Azure Firewall, storage accounts, Key Vaults, container registries, Postgres existentes (si los hay) y el contenido de rg-seguimiento-dev y rg-sigrid-dev-data-api",
+        "Contrasta lo encontrado con lo que describe docs/referencia/02_azure_landing_zone_acens.md y señala las diferencias entre diseño y realidad",
+        "Sin ID de suscripción, sin IPs internas y sin secretos en el documento; se redactan igual que en el resto de docs/referencia/",
+        "Responde explícitamente a D2 (nombre real del ACR, o constatar que no existe) y aporta lo que se encuentre sobre D1, D3 y la storage account de D5",
+        "progress/decisiones_abiertas.md actualizado con lo que el inventario permita cerrar",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "priority": 2,
+      "branch": "feature/F-009-inventario-azure"
+    },
+    {
       "id": "F-004",
       "title": "Ejecutar el ETL en Azure sin dependencias locales",
       "description": "Prerrequisito del despliegue: hoy 'run-all' incluye LoadExcelAuxStep, que lee los Excels auxiliares (TipoPartida, TipoCoste, mapeo_proporcionales) desde rutas locales o de red vía AUX_EXCEL_*. En un contenedor de Azure esas rutas no existen y el pipeline falla. Mover esos ficheros a Azure Blob Storage y hacer que el step los lea indistintamente de ruta local o de blob. Auditar el resto de steps en busca de dependencias del sistema de ficheros local.",
@@ -31,8 +56,10 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 2,
-      "blocked_by_decisions": ["D5"],
+      "priority": 3,
+      "blocked_by_decisions": [
+        "D5"
+      ],
       "branch": "feature/F-004-etl-sin-dependencias-locales"
     },
     {
@@ -44,8 +71,11 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 3,
-      "blocked_by_decisions": ["D1", "D3"],
+      "priority": 4,
+      "blocked_by_decisions": [
+        "D1",
+        "D3"
+      ],
       "branch": "feature/F-005-postgres-azure"
     },
     {
@@ -57,8 +87,12 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 4,
-      "blocked_by_decisions": ["D2", "D3", "D6"],
+      "priority": 5,
+      "blocked_by_decisions": [
+        "D2",
+        "D3",
+        "D6"
+      ],
       "branch": "feature/F-003-infra-caj"
     },
     {
@@ -70,9 +104,32 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 5,
-      "blocked_by_decisions": ["D1", "D4"],
+      "priority": 6,
+      "blocked_by_decisions": [
+        "D1",
+        "D4"
+      ],
       "branch": "feature/F-006-mcp-azure"
+    },
+    {
+      "id": "F-008",
+      "title": "Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api",
+      "description": "Incorporar a docs/referencia/ tres documentos que hoy viven fuera del repositorio: (1) la información de tablas del sistema origen Sigrid, base para entender y auditar la ingesta y config/tables_sigrid.yaml; (2) el documento de acens sobre cómo han montado la landing zone de Azure, contexto necesario para el bloque F-005/F-003; (3) la documentación del microservicio sigrid-api, único punto de acceso a la BBDD de Sigrid y a quien llama etl_sigrid/infrastructure/sigrid/. Los dos primeros llegan en PDF y se convierten con la herramienta MCP markitdown según la regla de CLAUDE.md; el tercero llega ya en Markdown. Los originales NO se versionan.",
+      "acceptance": [
+        "Los documentos que llegan en PDF, convertidos con la herramienta MCP markitdown (no leídos ni transcritos a mano)",
+        "Existe docs/referencia/01_sigrid_tablas.md con la cabecera de origen y fecha que exige docs/referencia/README.md",
+        "Existe docs/referencia/02_azure_landing_zone_acens.md con la misma cabecera",
+        "Existe docs/referencia/03_sigrid_api.md con la misma cabecera",
+        "Nombres conformes a la convención NN_tema.md de docs/referencia/README.md",
+        "Los PDF originales no entran en el repositorio (ni versionados ni copiados al árbol de trabajo)",
+        "Revisado que ninguno de los dos Markdown contiene secretos ni datos sensibles (credenciales, IDs de suscripción, tenant, rangos de IP internos); si los hubiera, se redactan antes del commit y se anota qué se redactó",
+        "docs/referencia/README.md menciona los dos documentos nuevos si procede",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "done",
+      "sdd": false,
+      "priority": 7,
+      "branch": "feature/F-008-docs-referencia-sigrid-acens"
     },
     {
       "id": "F-002",
@@ -83,8 +140,20 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 6,
+      "priority": 8,
       "branch": "feature/F-002-plan-vigente"
+    },
+    {
+      "id": "F-010",
+      "title": "Carga y mantenimiento de los Excels auxiliares en Azure",
+      "description": "Mecanismo para que una persona de negocio suba y actualice los Excels auxiliares (TipoPartida, TipoCoste, mapeo_proporcionales) en Azure sin pasar por un técnico ni por un despliegue: a través de la app web de F-007 o del sistema equivalente que se diseñe. Incluye autorización de quién puede subir, validación del fichero antes de aceptarlo (columnas esperadas), versionado o histórico de la subida, y visibilidad de qué versión está usando el ETL. F-004 no depende de esta feature: para F-004 basta con que el ETL lea del blob, aunque el fichero se suba a mano.",
+      "acceptance": [
+        "Definida en detalle por specs/F-010-carga-excels-auxiliares/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 9,
+      "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
       "id": "F-007",
@@ -95,7 +164,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 7,
+      "priority": 10,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]

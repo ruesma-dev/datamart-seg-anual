@@ -19,3 +19,14 @@ logs/
 
 # backups de configuracion
 *.bak
+
+# Originales de docs/referencia/: al repositorio entra SOLO el Markdown.
+# Convierte en mecanismo la regla dura de CLAUDE.md, para que un `git add .`
+# con un PDF suelto en el arbol no lo versione por descuido.
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+*.doc
+*.xls
+*.ppt

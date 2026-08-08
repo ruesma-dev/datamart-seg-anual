@@ -17,6 +17,14 @@ está en el código sino en una norma de negocio.
 | Documentos que llegan en PDF, Word o Excel, convertidos a Markdown | Especificaciones de features → `specs/` |
 | Capturas o extractos de informes de referencia | Notas de trabajo de una sesión → `progress/` |
 
+## Índice
+
+| Fichero | Qué es |
+|---|---|
+| `01_sigrid_tablas.md` | Diccionario de la BBDD de Sigrid: tablas, campos, tipos e índices. Referencia del sistema origen y base para auditar `config/tables_sigrid.yaml`. |
+| `02_azure_landing_zone_acens.md` | Diseño de la Landing Zone de Azure entregado por acens. Contexto del despliegue (F-005, F-003, F-006). **Versión redactada**: sin rangos de red ni correos. |
+| `03_sigrid_api.md` | Documentación del microservicio `sigrid-api`, único punto de acceso a la BBDD de Sigrid y a quien llama `etl_sigrid/infrastructure/sigrid/`. **Versión redactada**: sin ID de suscripción ni host del SQL on-prem. |
+
 ## Formato
 
 Todo en **Markdown**. Los documentos que lleguen en PDF u ofimática se
@@ -31,12 +39,39 @@ entra el Markdown. Anota en la cabecera de cada fichero de dónde salió y de
 qué fecha es, porque un manual desactualizado que parece vigente hace más
 daño que no tenerlo.
 
-Cabecera recomendada:
+Cabecera obligatoria. La primera línea del bloque de origen es siempre la
+misma; la segunda depende de cómo llegó el documento.
+
+**Caso 1 — llegó en PDF u ofimática y se convirtió:**
 
 ```markdown
 <!-- docs/referencia/NN_tema.md -->
 # Título
 
 > Origen: <fichero o sistema de procedencia> · Fecha del documento: AAAA-MM-DD
-> Convertido a Markdown el AAAA-MM-DD.
+> Convertido a Markdown el AAAA-MM-DD con la herramienta MCP `markitdown`.
+> El original vive fuera del repositorio.
 ```
+
+**Caso 2 — llegó ya en Markdown:**
+
+```markdown
+> Origen: <fichero o sistema de procedencia> · Fecha del documento: AAAA-MM-DD
+> Incorporado a `docs/referencia/` el AAAA-MM-DD.
+> Llegó ya en Markdown: no requirió conversión con `markitdown`.
+```
+
+No escribas «convertido» si no hubo conversión: la trazabilidad de cómo entró
+un documento es justo lo que un reviewer no puede reconstruir después.
+
+**Tercer bloque, obligatorio si se ha redactado algo.** Cuando el documento
+traiga material sensible que se sustituya por marcadores, dilo en la cabecera
+y di exactamente qué se sustituyó:
+
+```markdown
+> **Redactado.** Se han sustituido por marcadores <qué: rangos de red, IDs de
+> suscripción, correos…>. El detalle está en el original, fuera del repositorio.
+```
+
+Si el original impone restricciones de uso (confidencialidad de un proveedor,
+por ejemplo), cítalas también en la cabecera.
