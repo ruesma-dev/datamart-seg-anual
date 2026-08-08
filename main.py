@@ -14,6 +14,18 @@ CLI del ETL. Comandos:
     python main.py build-mart         - (pendiente) stg → mart
     python main.py run-all            - Pipeline completo
     python main.py status             - Estado de tablas raw y últimos runs
+
+Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
+
+    python main.py apply-grants       - Reaplica los permisos del rol de lectura
+                                        del MCP. Obligatorio tras build-cierre,
+                                        build-compras, build-maestros y
+                                        build-retenciones: recrean vistas con
+                                        DROP + CREATE y un DROP se lleva los GRANT
+    python main.py timings            - Tiempos por paso de _meta.etl_runs
+    python main.py fingerprint-views  - Huella de las vistas de consumo a CSV
+    python main.py compare-fingerprints LOCAL AZURE
+                                      - Compara dos huellas; sale != 0 si hay fallo
 """
 
 from __future__ import annotations

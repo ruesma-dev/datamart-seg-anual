@@ -213,5 +213,5 @@ Ninguna la ejecuta un agente. Todos los comandos van con
 
 ---
 
-- [ ] **T21**: Ejecutar `bash harness/init.sh` en verde.
+- [x] **T21**: Ejecutar `bash harness/init.sh` en verde.
       **Verificación**: exit code 0.
