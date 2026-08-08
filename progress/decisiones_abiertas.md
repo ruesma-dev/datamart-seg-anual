@@ -27,6 +27,13 @@ fuera.
 
 Sin cerrar esto no se puede diseñar F-005 ni verificar F-006.
 
+> **Material nuevo (2026-08-08, F-008).** El diseño de acens en
+> `docs/referencia/02_azure_landing_zone_acens.md` describe un hub&spoke en
+> Spain Central con Azure Firewall (Basic), **VPN Site-to-Site permanente
+> contra la red de la sede** y VPN SSL para puestos. La opción B ya no
+> implica montar la VPN desde cero. Ojo: no se provisionan NSGs, el filtrado
+> es del firewall central.
+
 ## D2 · Qué Azure Container Registry usar — afecta a F-003
 
 `infra/00_vars.ps1` tiene `$ACR = "TODO_acr_existente"` con el comentario
@@ -38,6 +45,11 @@ nombre del registro y confirmar que el Container Apps Job puede tirar de él.
 Todo apunta hoy a `rg-seguimiento-dev`. Si va a haber un entorno productivo,
 los scripts de `infra/` deben parametrizar el entorno desde el principio en
 vez de duplicarse después.
+
+> **Material nuevo (2026-08-08, F-008).** El diseño de acens ya contempla
+> división por entorno **DEV/STA/PRO**, con rangos de red reservados para PRO
+> y para DEV/POC, y despliegue por Terraform vía pipelines de Azure DevOps.
+> Apunta a parametrizar `infra/` por entorno desde el principio.
 
 ## D4 · Dónde vive el MCP — afecta a F-006
 

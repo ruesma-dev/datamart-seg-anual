@@ -1,7 +1,11 @@
 <!-- progress/current.md -->
 # Trabajo en curso
 
-(vacío — ninguna feature en ejecución)
+**F-008 · in_progress** — rama `feature/F-008-docs-referencia-sigrid-acens`.
+Los dos documentos ya están convertidos y commiteados (`e8cd88e`, `c8e90ea`)
+e `init.sh` está en verde. Detalle en `progress/impl_F-008.md`.
+Pendiente para cerrarla: **veredicto del `reviewer`** contra `CHECKPOINTS.md`
+y merge a `dev`.
 
 F-001 cerrada el 2026-08-08, resumen en `progress/history.md`.
 Siguiente por prioridad: F-004 (ETL sin dependencias locales), que necesita
