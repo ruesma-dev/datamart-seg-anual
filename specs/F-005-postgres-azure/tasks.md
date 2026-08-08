@@ -67,7 +67,7 @@ comando exacto y **no las ejecuta**.
       `run-all`), `test_f005_r17_*` (no-op sin rol), `test_f005_r18_*` (rol
       inexistente: avisa y no falla).
 
-- [ ] **T8**: Crear `etl_sigrid/application/ports.py` con el Protocol
+- [x] **T8**: Crear `etl_sigrid/application/ports.py` con el Protocol
       `StepRunRecorder` y
       `etl_sigrid/infrastructure/postgres/step_run_recorder.py` con el
       adaptador; añadir `PostgresClient.record_run_completed`. Dar a

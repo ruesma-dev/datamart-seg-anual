@@ -26,6 +26,7 @@ from typing import Any
 
 import psycopg
 from psycopg import sql
+from psycopg.types.json import Json
 
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
@@ -579,6 +580,48 @@ class PostgresClient:
             )
             row = cur.fetchone()
             return int(row[0])
+
+    def record_run_completed(
+        self,
+        stage: str,
+        step: str,
+        started_at: datetime | None,
+        finished_at: datetime | None,
+        status: str,
+        rows_processed: int = 0,
+        error_message: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        """
+        Inserta de una vez la fila de un paso YA terminado, y devuelve su id.
+
+        Es distinto de `record_run_start` + `record_run_end`: ese par lo usan
+        los steps que se instrumentan a sí mismos. Este lo usa el orquestador
+        para dejar rastro de TODOS los pasos, incluidos los que no se
+        instrumentan por dentro (build_mart, build_cierre), que son los pesados.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO _meta.etl_runs
+                    (stage, step, started_at, finished_at, status,
+                     rows_processed, error_message, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    stage,
+                    step,
+                    started_at or datetime.utcnow(),
+                    finished_at,
+                    status,
+                    rows_processed,
+                    error_message,
+                    Json(metadata) if metadata else None,
+                ),
+            )
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
 
     def record_run_end(
         self,

@@ -43,6 +43,9 @@ from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
     make_conninfo_provider,
 )
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  # noqa: E402
+from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
+    PostgresStepRunRecorder,
+)
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  # noqa: E402
 
 
@@ -241,7 +244,9 @@ def run_all(full_refresh: bool) -> None:
     """
     settings = get_settings()
     steps = build_pipeline_steps(settings, full_refresh)
-    orchestrator = Orchestrator(steps)
+    # El grabador deja una fila por paso en _meta.etl_runs: es lo que después
+    # lee `python main.py timings`. Si falla, el orquestador solo lo loguea.
+    orchestrator = Orchestrator(steps, recorder=PostgresStepRunRecorder(_get_pg()))
     results = orchestrator.run_all()
 
     click.echo("")
