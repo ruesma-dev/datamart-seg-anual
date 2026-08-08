@@ -82,3 +82,53 @@ quién los mantiene.
 Commits: e8cd88e, c8e90ea, f8864a7, f61512c, 38cde59 y el de cierre.
 
 ---
+
+## F-009 · Inventario del entorno Azure existente
+
+Cerrada el 2026-08-08. `sdd=false`, solo lectura. Rama
+`feature/F-009-inventario-azure`. APROBADA en segunda revisión
+(`progress/review_F-009.md`).
+
+Entregable: `docs/referencia/04_azure_inventario_dev.md`, inventario de los
+99 recursos de los 17 resource groups de la suscripción «Ruesma», redactado
+y contrastado contra el diseño de la landing zone de acens.
+
+### Hallazgos que cambiaron el plan
+
+- **`rg-sigridetl-dev-data` es un intento anterior de este mismo ETL**,
+  abandonado: Azure Functions + Azure SQL, los diez recursos creados el
+  2026-04-17 en cuatro minutos, Function App sin funciones desplegadas y base
+  pausada desde el 2026-04-18. Nunca pasó de la ingesta —sin capa `mart`, sin
+  vistas ni procedimientos— y su catálogo giraba en torno a mano de obra
+  (`hmo`, `hmores`, `res`, `tar`), no al seguimiento económico: solo 6 de sus
+  20 tablas coinciden con `config/tables_sigrid.yaml`. **No se hereda nada
+  técnico**: los datos son un volcado regenerable desde Sigrid. Abre **D7**.
+- **Existe ya un PostgreSQL Flexible Server compartido**,
+  `psql-albaranes-rs9k2` (PG 16, `Standard_B1ms`, 32 GB), sirviendo a
+  `albaranes` y `partes`. Un servidor, varias bases, cada proyecto en su
+  propio resource group. Es el patrón de la casa y el precedente directo de
+  D1: la opción A —endpoint público con reglas de firewall— ya está en uso.
+- **`infra/00_vars.ps1` apunta a recursos que no existen**:
+  `rg-seguimiento-dev`, `cae-seguimiento-dev` y `caj-datamart-seg`. No hay
+  ningún Container Apps Job en la suscripción.
+- **D2 resuelta**: `acralbaranesdev` es el único ACR, con usuario admin
+  deshabilitado.
+- **Riesgo de datos personales**: `stg.age` contiene cuentas bancarias de
+  terceros y `stg.res` correos e identificadores de acceso, en una base con
+  acceso público y sin cifrado de columna, etiquetada `acens-compliance=gdpr`.
+
+### Excepción declarada
+
+El criterio `acceptance` nº 1 prohíbe cualquier `create`. Para leer el esquema
+de `sqldb-sigrid-ruesma-etl` se creó **una regla de firewall** acotada a la IP
+del puesto, ejecutada por el líder con autorización expresa y repetida del
+humano. Queda declarada en el documento y en el informe, y verificada por el
+reviewer contra Azure. **La regla sigue puesta**: el humano decide si la
+retira.
+
+Salvedad: conectarse reanudó automáticamente la base *serverless*. No se
+escribió nada en ella; los datos forenses se capturaron antes de conectar.
+
+Commits: ca1146c, 32a59ec, 27e2e57, 047c450, más los del esquema y ff5a434.
+
+---
