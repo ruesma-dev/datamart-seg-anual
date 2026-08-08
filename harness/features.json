@@ -50,11 +50,11 @@
     {
       "id": "F-004",
       "title": "Ejecutar el ETL en Azure sin dependencias locales",
-      "description": "Prerrequisito del despliegue: hoy 'run-all' incluye LoadExcelAuxStep, que lee los Excels auxiliares (TipoPartida, TipoCoste, mapeo_proporcionales) desde rutas locales o de red vía AUX_EXCEL_*. En un contenedor de Azure esas rutas no existen y el pipeline falla. Mover esos ficheros a Azure Blob Storage y hacer que el step los lea indistintamente de ruta local o de blob. Auditar el resto de steps en busca de dependencias del sistema de ficheros local.",
+      "description": "CORREGIDO 2026-08-08 tras la spec: la premisa anterior era falsa. LoadExcelAuxStep NO lee hoy ficheros locales: es un stub que devuelve SKIPPED, y las variables AUX_EXCEL_* existen en config/settings.py pero nadie las lee, asi que el pipeline no esta roto hoy en un contenedor por este motivo. La feature construye la CAPACIDAD de lectura: que el step resuelva los tres Excels auxiliares indistintamente desde ruta local o desde Azure Blob Storage con identidad gestionada, los abra y valide que son legibles. NO los carga a aux.*: las tablas destino no existen y el esquema de los ficheros no esta en el repositorio (ver DA-4.1). Incluye auditar el resto de steps en busca de dependencias del sistema de ficheros local.",
       "acceptance": [
         "Definida en detalle por specs/F-004-etl-sin-dependencias-locales/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "priority": 3,
       "branch": "feature/F-004-etl-sin-dependencias-locales"
@@ -62,11 +62,11 @@
     {
       "id": "F-005",
       "title": "Postgres del datamart en Azure",
-      "description": "Aprovisionar el Azure Database for PostgreSQL Flexible Server que sustituye al Postgres local, con la red y la seguridad definidas: acceso del Container Apps Job, acceso del MCP desde puestos autorizados, y un rol de solo lectura para el MCP distinto del rol de escritura del ETL. Incluye la carga inicial completa del datamart y la verificación de que las vistas de consumo (Power BI, MCP) responden igual que en local.",
+      "description": "CORREGIDO 2026-08-08 tras el inventario de F-009: NO se aprovisiona ningun servidor. Se reutiliza psql-albaranes-rs9k2 (PostgreSQL 16, Standard_B1ms, 32 GB), que ya sirve a albaranes y partes, creando dentro la base sigrid_dm. Cubre: esquemas por capa, un rol de grupo propietario para el ETL (identidad gestionada del job + cuenta Entra del humano) y un rol de solo lectura para el MCP, autenticacion Entra para el ETL y contrasena en Key Vault para el MCP, reglas de firewall, carga inicial completa con medicion de tiempos por paso, y verificacion de que las vistas de consumo responden igual que en local. Puertas bloqueantes: comprobar espacio libre antes de la carga y desactivar el auto-bootstrap PG_AUTO_CREATE_DB contra un servidor compartido de produccion.",
       "acceptance": [
         "Definida en detalle por specs/F-005-postgres-azure/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "priority": 4,
       "branch": "feature/F-005-postgres-azure"
@@ -78,7 +78,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-003-infra-caj/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "priority": 5,
       "branch": "feature/F-003-infra-caj"
