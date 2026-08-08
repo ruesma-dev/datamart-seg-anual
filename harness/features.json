@@ -91,7 +91,6 @@
       "status": "in_progress",
       "sdd": false,
       "priority": 6,
-      "requires_human_input": "Rutas de los PDF entregadas el 2026-08-08. Pendiente: decidir si el documento de acens entra literal o redactado (confidencialidad, rangos de red y correos personales).",
       "branch": "feature/F-008-docs-referencia-sigrid-acens"
     },
     {

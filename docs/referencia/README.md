@@ -17,6 +17,13 @@ está en el código sino en una norma de negocio.
 | Documentos que llegan en PDF, Word o Excel, convertidos a Markdown | Especificaciones de features → `specs/` |
 | Capturas o extractos de informes de referencia | Notas de trabajo de una sesión → `progress/` |
 
+## Índice
+
+| Fichero | Qué es |
+|---|---|
+| `01_sigrid_tablas.md` | Diccionario de la BBDD de Sigrid: tablas, campos, tipos e índices. Referencia del sistema origen y base para auditar `config/tables_sigrid.yaml`. |
+| `02_azure_landing_zone_acens.md` | Diseño de la Landing Zone de Azure entregado por acens. Contexto del despliegue (F-005, F-003, F-006). **Versión redactada**: sin rangos de red ni correos. |
+
 ## Formato
 
 Todo en **Markdown**. Los documentos que lleguen en PDF u ofimática se
