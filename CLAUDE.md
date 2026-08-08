@@ -62,8 +62,12 @@ Cuando el humano pase un PDF —o un `.docx`, `.xlsx`, `.pptx`— conviértelo a
 Markdown y guárdalo en `docs/referencia/` antes de trabajar con él. El
 original NO se versiona: al repositorio entra solo el Markdown.
 
-- Usa la herramienta MCP `markitdown` si está conectada. Si no lo está,
-  conviértelo leyendo el documento directamente; no es motivo para parar.
+- La conversión se hace **siempre con la herramienta MCP `markitdown`**, no
+  leyendo el documento por tu cuenta. Única excepción: que el humano lo
+  indique explícitamente en esa petición.
+- Si `markitdown` no está conectada, **PARA y dilo**. No improvises otra vía
+  de conversión: el resultado saldría distinto según quién lo convierta y el
+  Markdown va a quedar versionado en git.
 - Nombra el fichero según la convención de `docs/referencia/README.md` y
   ponle la cabecera con origen y fecha del documento.
 - Si el documento trae datos sensibles (precios de proveedor, datos

@@ -20,8 +20,10 @@ está en el código sino en una norma de negocio.
 ## Formato
 
 Todo en **Markdown**. Los documentos que lleguen en PDF u ofimática se
-convierten al entrar (ver la regla en `CLAUDE.md`), para que sean legibles,
-buscables con grep y diffeables entre versiones.
+convierten al entrar con la herramienta MCP `markitdown` (ver la regla en
+`CLAUDE.md`), para que sean legibles, buscables con grep y diffeables entre
+versiones, y para que el resultado sea el mismo lo convierta quien lo
+convierta.
 
 Convención de nombres: `NN_tema.md` cuando haya un orden natural de lectura,
 o `tema.md` si no. El original queda **fuera del repositorio**: aquí solo
