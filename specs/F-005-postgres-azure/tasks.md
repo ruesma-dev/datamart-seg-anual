@@ -32,7 +32,7 @@ comando exacto y **no las ejecuta**.
       host de Azure.
       **Verificación**: `test_f005_r1_*`, `test_f005_r2_*`, `test_f005_r8_*`.
 
-- [ ] **T3**: Crear `etl_sigrid/infrastructure/azure/entra_token.py` con
+- [x] **T3**: Crear `etl_sigrid/infrastructure/azure/entra_token.py` con
       `EntraTokenProvider` (import perezoso de `azure.identity`, caché con
       margen de 5 min, credencial inyectable) y añadir
       `azure-identity>=1.17` a `requirements.txt`.
