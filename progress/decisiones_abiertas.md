@@ -68,6 +68,15 @@ Recomendación: llevarlos a Azure Blob Storage y que el step lea
 indistintamente de ruta local o de blob. Falta confirmar la cuenta de
 almacenamiento y quién mantiene esos ficheros.
 
+> **Parcialmente cerrada el 2026-08-08.** El humano confirma que **los Excels
+> auxiliares se suben a Azure**. El mecanismo de subida para gente de negocio
+> (app web o sistema equivalente) se saca a feature propia, **F-010**, que
+> depende de F-007; F-004 no la necesita, le basta con leer del blob aunque
+> el fichero se suba a mano.
+>
+> Sigue pendiente: **qué storage account** concreta —debería salir del
+> inventario de F-009— y **quién mantiene** los ficheros.
+
 ## D6 · Horario del job nocturno y avisos de fallo — afecta a F-003
 
 `infra/00_vars.ps1` propone `0 3 * * *` (03:00 UTC, que en horario de verano
