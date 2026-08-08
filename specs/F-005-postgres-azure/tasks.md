@@ -82,7 +82,7 @@ comando exacto y **no las ejecuta**.
       **Verificación**: `test_f005_r30_*` sobre la función de formato y con
       `CliRunner` mockeando el cliente.
 
-- [ ] **T10**: Crear `etl_sigrid/infrastructure/postgres/fingerprint.py`
+- [x] **T10**: Crear `etl_sigrid/infrastructure/postgres/fingerprint.py`
       (construcción de consultas, `escribir_csv`/`leer_csv` simétricos según
       `docs/CONVENTIONS.md`, `comparar`, `veredicto`) y los comandos
       `fingerprint-views` y `compare-fingerprints`.

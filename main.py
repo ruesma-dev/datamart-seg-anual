@@ -42,6 +42,14 @@ from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
     make_admin_conninfo_provider,
     make_conninfo_provider,
 )
+from etl_sigrid.infrastructure.postgres.fingerprint import (  # noqa: E402
+    comparar,
+    construir_huella,
+    escribir_csv,
+    leer_csv,
+    mes_a_fecha,
+    veredicto,
+)
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  # noqa: E402
 from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
     PostgresStepRunRecorder,
@@ -258,6 +266,80 @@ def run_all(full_refresh: bool) -> None:
     failed = sum(1 for r in results if r.status == StepStatus.FAILED)
     if failed:
         sys.exit(1)
+
+
+@cli.command("fingerprint-views")
+@click.option(
+    "--out",
+    "salida",
+    type=click.Path(dir_okay=False, path_type=Path),
+    required=True,
+    help="Fichero CSV donde escribir la huella.",
+)
+@click.option(
+    "--periodo-hasta",
+    "periodo_hasta",
+    type=str,
+    default=None,
+    help="Último mes CERRADO, AAAA-MM. Activa el bloque de comparación exacta.",
+)
+@click.option(
+    "--schemas",
+    "schemas",
+    type=str,
+    default=None,
+    help="Esquemas a fotografiar, separados por comas. Por defecto, "
+         "PG_CONSUMPTION_SCHEMAS.",
+)
+def fingerprint_views(salida: Path, periodo_hasta: str | None, schemas: str | None) -> None:
+    """
+    Escribe la huella de las vistas de consumo: estructura, agregados de los
+    meses cerrados y agregados del periodo vivo.
+
+    Se ejecuta una vez contra el Postgres local y otra contra Azure, con el
+    MISMO commit del repositorio a los dos lados, y luego se comparan con
+    `compare-fingerprints`.
+    """
+    settings = get_settings()
+    lista = (
+        [s.strip() for s in schemas.split(",") if s.strip()]
+        if schemas
+        else settings.postgres.consumption_schema_list
+    )
+    hasta = mes_a_fecha(periodo_hasta) if periodo_hasta else None
+    if hasta is None:
+        click.secho(
+            "AVISO: sin --periodo-hasta no se genera el bloque de meses cerrados, "
+            "que es el único con criterio de igualdad exacta.",
+            fg="yellow",
+        )
+
+    metricas = construir_huella(_get_pg(), lista, hasta)
+    escribir_csv(metricas, salida)
+
+    vistas = len({(m.esquema, m.vista) for m in metricas})
+    click.secho(
+        f"✓ Huella escrita en {salida}: {vistas} vistas, {len(metricas)} métricas.",
+        fg="green",
+    )
+
+
+@cli.command("compare-fingerprints")
+@click.argument("huella_a", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("huella_b", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def compare_fingerprints(huella_a: Path, huella_b: Path) -> None:
+    """
+    Compara dos huellas (típicamente local y Azure) y emite el veredicto.
+
+    Estructura y meses cerrados se exigen idénticos; las diferencias del
+    periodo vivo se informan como avisos, porque Sigrid sigue cambiando entre
+    las dos capturas. Sale con código distinto de 0 si hay algún FALLO.
+    """
+    diferencias = comparar(leer_csv(huella_a), leer_csv(huella_b))
+    codigo, informe = veredicto(diferencias)
+    click.echo(informe)
+    if codigo:
+        sys.exit(codigo)
 
 
 @cli.command("timings")

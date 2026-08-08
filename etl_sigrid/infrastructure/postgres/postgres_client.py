@@ -31,6 +31,7 @@ from psycopg.types.json import Json
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
+from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
 from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
 from etl_sigrid.infrastructure.postgres.timings import Timing
 
@@ -409,6 +410,30 @@ class PostgresClient:
             cur.execute(query)
             row = cur.fetchone()
             return int(row[0]) if row else 0
+
+    # ---------------------------------------------------------------------
+    # Huella de las vistas de consumo
+    # ---------------------------------------------------------------------
+
+    def list_view_columns(self, schemas: Iterable[str]) -> list[tuple]:
+        """
+        Columnas de todas las VISTAS de los esquemas dados:
+        (esquema, vista, posición, columna, tipo), en orden estable.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(build_estructura_query(list(schemas)))
+            return list(cur.fetchall())
+
+    def fetch_aggregates(self, query: str) -> tuple:
+        """
+        Ejecuta una consulta de agregados de una sola fila y devuelve sus
+        valores. La consulta la construye `fingerprint.build_agregado_query`,
+        que cita los identificadores; aquí no se concatena nada.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(query)
+            fila = cur.fetchone()
+            return tuple(fila) if fila else ()
 
     # ---------------------------------------------------------------------
     # Permisos del rol de solo lectura
