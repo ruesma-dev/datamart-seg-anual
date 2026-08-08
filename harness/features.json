@@ -1,5 +1,6 @@
 {
   "$schema_doc": "Estados: pending -> spec_ready (aprueba humano) -> in_progress -> done. 'blocked' = parada con motivo anotado en progress/current.md. Máximo UNA feature in_progress (lo valida init.sh). sdd=false salta la fase de spec: entonces 'acceptance' hace de mini-spec y el reviewer valida contra ella.",
+  "$decisions_doc": "'blocked_by_decisions' lista decisiones del humano pendientes de cerrar antes de escribir la spec de esa feature. El detalle y las opciones de cada Dn están en progress/decisiones_abiertas.md.",
   "rules": {
     "one_feature_at_a_time": true,
     "require_init_green_to_close": true,
@@ -31,6 +32,7 @@
       "status": "pending",
       "sdd": true,
       "priority": 2,
+      "blocked_by_decisions": ["D5"],
       "branch": "feature/F-004-etl-sin-dependencias-locales"
     },
     {
@@ -43,6 +45,7 @@
       "status": "pending",
       "sdd": true,
       "priority": 3,
+      "blocked_by_decisions": ["D1", "D3"],
       "branch": "feature/F-005-postgres-azure"
     },
     {
@@ -55,6 +58,7 @@
       "status": "pending",
       "sdd": true,
       "priority": 4,
+      "blocked_by_decisions": ["D2", "D3", "D6"],
       "branch": "feature/F-003-infra-caj"
     },
     {
@@ -67,6 +71,7 @@
       "status": "pending",
       "sdd": true,
       "priority": 5,
+      "blocked_by_decisions": ["D1", "D4"],
       "branch": "feature/F-006-mcp-azure"
     },
     {
