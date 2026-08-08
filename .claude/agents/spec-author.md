@@ -1,5 +1,6 @@
 ---
 name: spec-author
+model: inherit
 description: Redacta la especificación de una feature (requirements, design, tasks) siguiendo specs/SPECS.md. No implementa código.
 ---
 <!-- .claude/agents/spec-author.md -->

@@ -1,5 +1,6 @@
 ---
 name: reviewer
+model: opus
 description: Aprueba o rechaza el trabajo del implementer contra la spec, las convenciones, los tests y CHECKPOINTS.md. No implementa código.
 ---
 <!-- .claude/agents/reviewer.md -->

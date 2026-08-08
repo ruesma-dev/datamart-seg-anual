@@ -2,6 +2,7 @@
 """
 CLI del ETL. Comandos:
 
+    python main.py version            - Versión del ETL e imagen en ejecución
     python main.py check-api          - Smoke test conectividad sigrid-api
     python main.py check-pg           - Smoke test conectividad Postgres
     python main.py bootstrap          - Crear schemas y tabla _meta.etl_runs
@@ -17,6 +18,7 @@ CLI del ETL. Comandos:
 
 from __future__ import annotations
 
+import platform
 import sys
 from pathlib import Path
 
@@ -25,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import click  # noqa: E402
 
-from config.settings import get_settings  # noqa: E402
+from config.settings import get_build_info, get_settings  # noqa: E402
 from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
@@ -40,8 +42,14 @@ from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  
 
 
 @click.group()
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """ETL Sigrid → Postgres → Power BI (data mart seguimiento mensual)."""
+    # 'version' se salta la configuración a propósito: get_settings() aborta si
+    # faltan SIGRID_API_BASE_URL o SIGRID_API_FUNCTION_KEY, y este comando es
+    # justo el que se usa para diagnosticar un contenedor mal configurado.
+    if ctx.invoked_subcommand == "version":
+        return
     settings = get_settings()
     configure_logging(level=settings.logging.log_level, fmt=settings.logging.log_format)
 
@@ -54,6 +62,22 @@ def _get_pg() -> PostgresClient:
         admin_conninfo=settings.postgres.admin_conninfo,
         target_db=settings.postgres.db,
     )
+
+
+@cli.command("version")
+def version() -> None:
+    """
+    Imprime la versión del ETL y los metadatos de la imagen en ejecución.
+
+    Es el primer comando a lanzar cuando algo va mal en Azure: dice qué build
+    está corriendo realmente. No lee .env ni toca red ni BBDD, así que
+    funciona incluso con la configuración rota.
+    """
+    info = get_build_info()
+    click.echo(f"etl-sigrid-seguimiento {info['version']}")
+    click.echo(f"image: {info['image_tag']}")
+    click.echo(f"build: {info['build_date']}")
+    click.echo(f"python: {platform.python_version()}")
 
 
 @cli.command("check-api")

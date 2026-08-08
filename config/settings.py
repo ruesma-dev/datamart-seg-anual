@@ -8,12 +8,35 @@ la app aborta al arrancar con un mensaje claro en lugar de fallar a mitad del pi
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
 import yaml
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Versión del ETL. Mantener sincronizada con [project].version de pyproject.toml.
+ETL_VERSION = "0.1.0"
+
+# Marca de "no desplegado": el valor que toman los metadatos de build cuando
+# el ETL corre desde el repositorio en vez de desde una imagen de contenedor.
+BUILD_UNKNOWN = "local"
+
+
+def get_build_info() -> dict[str, str]:
+    """
+    Metadatos de la build en curso, para diagnóstico.
+
+    En Azure los inyecta el Dockerfile como variables de entorno en tiempo de
+    build (ver infra/20_build_image.ps1). Ejecutando desde el repositorio no
+    existen, y entonces valen BUILD_UNKNOWN.
+    """
+    return {
+        "version": ETL_VERSION,
+        "image_tag": os.getenv("IMAGE_TAG") or BUILD_UNKNOWN,
+        "build_date": os.getenv("BUILD_DATE") or BUILD_UNKNOWN,
+    }
 
 
 class SigridApiSettings(BaseSettings):
