@@ -54,7 +54,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-005-postgres-azure/ (sdd=true)"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "priority": 3,
       "branch": "feature/F-005-postgres-azure"
