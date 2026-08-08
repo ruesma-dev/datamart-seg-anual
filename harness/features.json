@@ -75,7 +75,8 @@
         "La regla de propagacion queda escrita en el CLAUDE.md de este proyecto y en el del directorio padre: si una mejora del arnes es general, se porta a arnes-base en el mismo trabajo",
         "El documento de arnes-base se anade a azure-apps siguiendo su convencion",
         "Verificado de verdad: el instalador se prueba contra una carpeta temporal vacia y contra una copia de un proyecto existente, y se deja constancia del resultado real",
-        "bash harness/init.sh de este repositorio en verde"
+        "bash harness/init.sh de este repositorio en verde",
+        "ANADIDO por el humano el 2026-08-09, ya iniciada la feature: el arnes impide que Windows suspenda o hiberne el equipo mientras hay una sesion de Claude Code abierta, para no cortar ejecuciones largas. Script con SetThreadExecutionState mas hooks SessionStart/SessionEnd, en arnes-base y en este proyecto, documentado en GUIA_INSTALACION.md"
       ],
       "status": "in_progress",
       "sdd": false,

@@ -439,3 +439,63 @@ decidirlo, porque `arnes-base` aún no tiene remoto.
 | 10 | Documento en `azure-apps` según su convención | OK — commit `74c72b0` |
 | 11 | Probado contra carpeta vacía y copia de proyecto | OK — §7, seis pruebas con salida real |
 | 12 | `bash harness/init.sh` de este repositorio en verde | OK — 65 tests, exit 0 |
+
+---
+
+## Añadido el 2026-08-09, ya iniciada la feature: el equipo no se suspende
+
+Petición del humano durante la implementación, incorporada como criterio
+`acceptance` nº 13 para que quede sujeta a revisión y no entre por la puerta
+de atrás.
+
+**El problema**: Windows suspendiendo el equipo a media carga inicial, o con
+varios subagentes en marcha, corta el trabajo sin avisar.
+
+**La solución**, en los dos repositorios (regla de propagación aplicada en el
+mismo trabajo, no después):
+
+- `scripts/mantener_despierto.ps1` — mantiene el equipo despierto mientras
+  viva el proceso, con `SetThreadExecutionState`. Sin `ES_DISPLAY_REQUIRED`,
+  así que la pantalla puede apagarse; `-ConPantalla` la mantiene encendida.
+  Tiene además `-Prueba`, que activa, verifica y restaura sin dejar nada.
+- `scripts/despierto_hook.sh` — envoltorio de los hooks. Lee el `session_id`
+  del JSON que entrega el hook y etiqueta con él el guardián: **cada sesión
+  gestiona el suyo**, así dos sesiones a la vez no se pisan y cerrar una no
+  desprotege a la otra. El arranque es idempotente.
+- `.claude/settings.json` — hooks `SessionStart` y `SessionEnd`, **fusionados**
+  con los `PostToolUse` y `Stop` que ya existían y con los 7 permisos previos.
+- `arnes-base` sube a **1.1.0** y lo documenta en `GUIA_INSTALACION.md`.
+
+**Dos fallos reales encontrados al probarlo**, ambos comentados en el propio
+script para que nadie los "simplifique" de vuelta:
+
+1. El literal `0x80000000` lo parsea PowerShell 5.1 como `Int32`, o sea
+   `-2147483648`, antes de cualquier conversión.
+2. `-bor` sobre `[uint32]` promociona a entero **con signo**, así que combinar
+   banderas vuelve a producir el negativo.
+
+El script de partida esquivaba ambos por casualidad, porque pasaba la
+constante `0x80000001` ya combinada; se rompía en cuanto se añadía
+`ES_DISPLAY_REQUIRED`. Resuelto escribiendo las banderas en decimal y
+combinándolas en 64 bits.
+
+**Verificación real, no «debería funcionar»:**
+
+| Prueba | Resultado |
+|---|---|
+| Parseo con PowerShell 5.1 | Sin errores |
+| `-Prueba` y `-Prueba -ConPantalla` | Activan, verifican y restauran, exit 0 |
+| Banderas calculadas | `2147483649` y `2147483651`, correctas |
+| Hook `arrancar` por tubería | exit 0, proceso vivo, fichero PID escrito |
+| Segundo `arrancar` (idempotencia) | Mismo PID: **no duplica** |
+| Hook `parar` | Proceso terminado y fichero PID borrado |
+| `settings.json` tras fusionar | JSON válido, 4 eventos, 7 permisos intactos |
+| Sin permisos de administrador | `powercfg` avisa y el script sigue funcionando |
+
+**Lo que NO cubre**, escrito en la cabecera del script: cerrar la tapa de un
+portátil, una directiva de grupo que fuerce la suspensión, y la hibernación
+por batería crítica.
+
+**Fuera de Windows**: `despierto_hook.sh` sale en silencio con código 0 si no
+encuentra el `.ps1`. Un hook que rompe el arranque de la sesión sería peor que
+un equipo que se suspende.
