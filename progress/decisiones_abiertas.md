@@ -300,3 +300,36 @@ lista:
 - **No renombrar `psql-albaranes-rs9k2`.** Un Flexible Server no se puede
   renombrar: el nombre es su endpoint DNS. Se hará el día que otro motivo
   obligue a recrearlo, migrando las tres bases de una vez.
+
+---
+
+## Decisiones del humano · 2026-08-08 (tarde)
+
+- **DA-4.1 · CERRADA → F-004 SÍ carga los Excels a la base.** «Ya veremos
+  dónde»: el destino concreto lo propone el líder. Estructura inspeccionada
+  (solo lectura, los ficheros no se versionan): `TipoCoste` 108 filas
+  (`ide`, `Nombre`, `subtipo`, `tipo`); `TipoPartida` 864 filas
+  (`codigo partida`, `codigo obra`, `ide_tipo`, `ide`);
+  `mapeo_proporcionales` 2.408 filas (`codigo_obra`, `ide`, `tipo de coste`,
+  `porcentaje`). Son tablas pequeñas: ~3.400 filas en total.
+  **Aviso**: `.env.example` apunta a `OneDrive - Construcciones Ruesma`, ruta
+  que ya no existe. Los ficheros están hoy en
+  `OneDrive - Ruesma/Documentos/Sigrid/tablas_auxiliares/`.
+
+- **F-005 nº1 y nº4 · CERRADAS → NO se toca nada a nivel de servidor.** El
+  humano: «las bbdd de partes y albaranes se están usando en las apps y no
+  quiero romper eso, podemos seguir como hasta ahora». En consecuencia:
+  - **No** se habilita autenticación Entra en `psql-albaranes-rs9k2`. El ETL
+    usa un rol nativo de PostgreSQL con **contraseña en Key Vault**, que es
+    exactamente lo que ya hacen `albaranes` y `partes` (`PG_PASSWORD` como
+    referencia a Key Vault en la Container App).
+  - **No** se ejecuta `REVOKE CONNECT ... FROM PUBLIC` sobre `albaranes` ni
+    `partes`.
+  - Coste asumido conscientemente: un secreto que rotar, y que
+    `mcp_sigrid_dm_ro` pueda abrir sesión contra las otras bases y leer su
+    catálogo (nombres de tablas y columnas, no datos). Revisable el día que
+    haya un motivo que ya obligue a tocar el servidor.
+
+- **F-005 nº3 · CERRADA → el MCP lee todo, de momento.** Sin restringir a los
+  esquemas de consumo. Se revisará cuando se cierre D4 y se sepa qué consulta
+  realmente el MCP.

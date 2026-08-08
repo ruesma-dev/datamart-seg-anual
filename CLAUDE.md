@@ -80,6 +80,23 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   (manuales de Sigrid, criterios de cierre, documentación que llega de
   fuera), toda en Markdown. Consúltala cuando la pregunta sea «por qué el
   ETL hace esto» y la respuesta no esté en el código. Ver su `README.md`.
+
+## Los otros proyectos: `azure-apps/`
+
+Este ETL no vive solo. `C:\Users\pgris\PycharmProjects\azure-apps` es un
+repositorio git con un documento por proyecto del ecosistema —`sigrid-api`,
+`albaranes`, `partes`, `remesas`, `portal` y este mismo— explicando qué
+expone cada uno, qué consume y qué se rompe si cambia.
+
+**Consúltalo antes de diseñar nada que cruce la frontera del proyecto**: una
+llamada a `sigrid-api`, el PostgreSQL compartido `psql-albaranes-rs9k2`, el
+ACR común `acralbaranesdev`.
+
+Dos reglas: el documento de este proyecto
+(`azure-apps/datamart_seg_anual.md`) **se actualiza cuando cambie lo que
+exponemos o consumimos**, en el mismo trabajo y no después; y **no se
+duplican aquí** los documentos de otros proyectos, se enlazan. Ya pasó con
+`sigrid_api.md`: dos copias, una de 515 líneas y otra de 890.
 - `CHECKPOINTS.md` — criterios objetivos de estado final; el reviewer los
   recorre antes de cerrar cualquier feature.
 - `infra/` — scripts PowerShell de despliegue a Azure + `Dockerfile` en raíz.
