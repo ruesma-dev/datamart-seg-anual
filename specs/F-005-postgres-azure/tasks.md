@@ -77,7 +77,7 @@ comando exacto y **no las ejecuta**.
       por paso, con etapa, duración y estado), `test_f005_r29_*` (grabador que
       revienta no rompe el pipeline).
 
-- [ ] **T9**: Añadir `PostgresClient.fetch_timings` y el comando
+- [x] **T9**: Añadir `PostgresClient.fetch_timings` y el comando
       `python main.py timings [--last N]`, con la función pura de formato.
       **Verificación**: `test_f005_r30_*` sobre la función de formato y con
       `CliRunner` mockeando el cliente.

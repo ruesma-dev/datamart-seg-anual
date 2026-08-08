@@ -32,12 +32,17 @@ from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
+from etl_sigrid.infrastructure.postgres.timings import Timing
 
 logger = get_logger(__name__)
 
 
 # Schemas del data mart
 SCHEMAS = ("raw", "aux", "stg", "mart", "_meta")
+
+# Cuántas mediciones devolver cuando no hay un arranque de `ingest_raw` al que
+# anclarse. Evita volcar el histórico entero de _meta.etl_runs.
+TIMINGS_SIN_ANCLA = 100
 
 # Una cadena de conexión, o algo que la produzca. Es callable porque con
 # autenticación Entra la "contraseña" es un token que caduca y hay que
@@ -580,6 +585,72 @@ class PostgresClient:
             )
             row = cur.fetchone()
             return int(row[0])
+
+    def fetch_timings(self, last: int = 1) -> list[Timing]:
+        """
+        Mediciones de las `last` ejecuciones más recientes del pipeline.
+
+        Una "ejecución" se ancla al arranque de `ingest_raw`, que es el primer
+        paso de `run-all`: se devuelven todas las filas desde el arranque
+        número `last` hacia atrás. Así entran también los pasos que se lanzan
+        después con comandos sueltos (build-cierre, apply-grants), que es
+        justo lo que interesa medir en la carga inicial.
+
+        Si todavía no hay ningún `ingest_raw` registrado —caso de una base
+        cargada antes de que el orquestador instrumentara los pasos— se
+        devuelven las últimas `TIMINGS_SIN_ANCLA` filas en vez del histórico
+        entero, que puede ser de años.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT MIN(started_at) FROM (
+                    SELECT started_at
+                    FROM _meta.etl_runs
+                    WHERE step = 'ingest_raw'
+                    ORDER BY started_at DESC
+                    LIMIT %s
+                ) AS arranques
+                """,
+                (last,),
+            )
+            row = cur.fetchone()
+            desde = row[0] if row else None
+
+            if desde is not None:
+                cur.execute(
+                    """
+                    SELECT stage, step, started_at, finished_at, status, rows_processed
+                    FROM _meta.etl_runs
+                    WHERE started_at >= %s
+                    ORDER BY started_at, id
+                    """,
+                    (desde,),
+                )
+                filas = cur.fetchall()
+            else:
+                cur.execute(
+                    """
+                    SELECT stage, step, started_at, finished_at, status, rows_processed
+                    FROM _meta.etl_runs
+                    ORDER BY started_at DESC, id DESC
+                    LIMIT %s
+                    """,
+                    (TIMINGS_SIN_ANCLA,),
+                )
+                filas = list(reversed(cur.fetchall()))
+
+            return [
+                Timing(
+                    stage=fila[0],
+                    step=fila[1],
+                    started_at=fila[2],
+                    finished_at=fila[3],
+                    status=fila[4],
+                    rows_processed=int(fila[5] or 0),
+                )
+                for fila in filas
+            ]
 
     def record_run_completed(
         self,

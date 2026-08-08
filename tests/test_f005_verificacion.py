@@ -9,10 +9,16 @@ texto y los CSV se escriben en ficheros temporales.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
+import pytest
+from click.testing import CliRunner
+
+import main
 from etl_sigrid.application.orchestrator import Orchestrator
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus
+from etl_sigrid.infrastructure.postgres.timings import Timing, format_timings
 
 # ---------------------------------------------------------------------------
 # Dobles
@@ -164,3 +170,110 @@ def test_f005_r29_fallo_del_grabador_no_rompe_el_pipeline() -> None:
     assert [r.status for r in resultados] == [StepStatus.SUCCESS, StepStatus.SUCCESS]
     assert [r.rows_processed for r in resultados] == [10, 20]
     assert grabador.intentos == 2, "se intentó registrar cada paso, no solo el primero"
+
+
+# ---------------------------------------------------------------------------
+# R30 · el comando timings
+# ---------------------------------------------------------------------------
+
+def _timing(
+    stage: str,
+    step: str,
+    minuto: int,
+    duracion_s: float,
+    filas: int,
+    status: str = "SUCCESS",
+) -> Timing:
+    inicio = datetime(2026, 8, 8, 3, minuto, 0)
+    return Timing(
+        stage=stage,
+        step=step,
+        started_at=inicio,
+        finished_at=inicio + timedelta(seconds=duracion_s),
+        status=status,
+        rows_processed=filas,
+    )
+
+
+def test_f005_r30_timings_formatea_la_tabla() -> None:
+    """Etapa, paso, duración, filas y estado, en orden cronológico y con total."""
+    mediciones = [
+        # A propósito desordenadas: el formateador las ordena.
+        _timing("build_mart", "build_mart", 20, 300.5, 800),
+        _timing("ingest", "ingest_raw", 0, 120.0, 1000),
+        _timing("stage", "build_stg", 10, 60.0, 900),
+    ]
+
+    salida = format_timings(mediciones)
+    lineas = salida.splitlines()
+
+    for columna in ("etapa", "paso", "inicio", "duración_s", "filas", "estado"):
+        assert columna in lineas[0]
+
+    filas_datos = [ln for ln in lineas if "2026-08-08" in ln]
+    assert [ln.split()[1] for ln in filas_datos] == [
+        "ingest_raw",
+        "build_stg",
+        "build_mart",
+    ], "orden cronológico, no el de la lista de entrada"
+
+    assert "300.5" in salida
+    assert "SUCCESS" in salida
+
+    total = [ln for ln in lineas if ln.startswith("TOTAL")]
+    assert len(total) == 1
+    assert "480.5" in total[0], "el total suma 120 + 60 + 300,5 segundos"
+    assert "2,700" in total[0], "y las filas de los tres pasos"
+
+
+def test_f005_r30_timings_sin_mediciones_lo_dice() -> None:
+    """Una tabla vacía no es una tabla vacía: es un aviso de que no hay datos."""
+    salida = format_timings([])
+    assert "Sin mediciones" in salida
+    assert "run-all" in salida
+
+
+def test_f005_r30_timings_tolera_pasos_sin_cerrar() -> None:
+    """Un paso interrumpido (sin finished_at) no rompe la tabla."""
+    abierto = Timing(
+        stage="ingest",
+        step="ingest_raw",
+        started_at=datetime(2026, 8, 8, 3, 0, 0),
+        finished_at=None,
+        status="RUNNING",
+        rows_processed=0,
+    )
+    salida = format_timings([abierto])
+    assert "RUNNING" in salida
+    assert "0.0" in salida
+
+
+def test_f005_r30_comando_timings_imprime_la_tabla(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El comando existe, lee del cliente y escribe la tabla. Sin BBDD."""
+    mediciones = [_timing("build_cierre", "build_cierre", 30, 45.0, 77)]
+
+    class _ClienteFalso:
+        def fetch_timings(self, last: int = 1) -> list[Timing]:
+            self.last = last
+            return mediciones
+
+    cliente = _ClienteFalso()
+    monkeypatch.setattr(main, "get_settings", lambda: _settings_minimo())
+    monkeypatch.setattr(main, "configure_logging", lambda **kwargs: None)
+    monkeypatch.setattr(main, "_get_pg", lambda: cliente)
+
+    resultado = CliRunner().invoke(main.cli, ["timings", "--last", "3"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "build_cierre" in resultado.output
+    assert "TOTAL" in resultado.output
+    assert cliente.last == 3
+
+
+def _settings_minimo() -> SimpleNamespace:
+    """Lo justo para que el grupo de comandos arranque sin leer .env."""
+    return SimpleNamespace(
+        logging=SimpleNamespace(log_level="INFO", log_format="console")
+    )

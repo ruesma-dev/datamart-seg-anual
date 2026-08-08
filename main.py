@@ -46,6 +46,7 @@ from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  #
 from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
     PostgresStepRunRecorder,
 )
+from etl_sigrid.infrastructure.postgres.timings import format_timings  # noqa: E402
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  # noqa: E402
 
 
@@ -257,6 +258,25 @@ def run_all(full_refresh: bool) -> None:
     failed = sum(1 for r in results if r.status == StepStatus.FAILED)
     if failed:
         sys.exit(1)
+
+
+@cli.command("timings")
+@click.option(
+    "--last",
+    "last",
+    type=int,
+    default=1,
+    help="Cuántas ejecuciones del pipeline mostrar (por defecto la última).",
+)
+def timings(last: int) -> None:
+    """
+    Tiempos por paso de las últimas ejecuciones, leídos de _meta.etl_runs.
+
+    Es la entrada del veredicto sobre el SKU del servidor: si build_mart o
+    build_cierre se disparan, el dato está aquí y no en una impresión.
+    """
+    pg = _get_pg()
+    click.echo(format_timings(pg.fetch_timings(last=last)))
 
 
 @cli.command("apply-grants")
