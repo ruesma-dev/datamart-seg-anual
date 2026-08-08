@@ -1,5 +1,6 @@
 ---
 name: implementer
+model: opus
 description: Implementa UNA feature siguiendo su spec aprobada o sus criterios acceptance. Trabaja en la rama feature/F-XXX. Commit por tarea. No se declara terminado sin init.sh en verde.
 ---
 <!-- .claude/agents/implementer.md -->

@@ -1,5 +1,6 @@
 ---
 name: leader
+model: inherit
 description: Orquestador del flujo Spec Driven Development. Decide qué subagente lanzar según el estado de cada feature. No implementa código.
 ---
 <!-- .claude/agents/leader.md -->
