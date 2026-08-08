@@ -14,6 +14,40 @@ La regla de propagación ya está escrita en el `CLAUDE.md` de este proyecto y
 en el del directorio padre, deliberadamente **antes** de implementar la
 feature: si no, la próxima mejora se vuelve a perder.
 
+## Estado: implementación terminada, pendiente de review
+
+Informe completo en **`progress/impl_F-014.md`**. Los 12 criterios
+`acceptance` quedan cubiertos. Resumen: `arnes-base` es ya un repositorio git
+(commit `212179b`) con el arnés genérico v1.0.0, guía de instalación de tres
+caminos e instalador con modo actualizar que enseña el diff. Documento
+añadido a `azure-apps` (commit `74c72b0`). `bash harness/init.sh` de este
+repositorio en verde, 65 tests.
+
+**Ojo, reviewer**: la feature toca **tres repositorios** con commits
+independientes. Los de `arnes-base` y `azure-apps` no salen en el diff de
+esta rama; están listados en el §1 del informe.
+
+### Verificaciones MANUAL pendientes (humano)
+
+1. **Modo interactivo del instalador en consola real** (se probó con
+   respuestas por stdin, no tecleando):
+   ```powershell
+   cd C:\Users\pgris\PycharmProjects\arnes-base
+   .\instalar_arnes.ps1 -Destino "C:\ruta\copia-de-pruebas" -Modo actualizar
+   ```
+2. **Decidir el remoto de `arnes-base`.** Hoy no tiene. Antes de publicarlo,
+   decidir si las rutas locales `C:\Users\pgris\...` deben salir: el
+   historial de git no suelta lo que entra, y ahora es el momento barato.
+
+### Decisiones que quedan para el humano (no bloquean el cierre)
+
+- **Portar hacia este proyecto** las cuatro mejoras que el arnés genérico
+  tiene y este repositorio no (LÍMITE DE MICROSERVICIO, `init.sh` con
+  `LINT_BLOQUEA`/`REQUIERE_ENV`/aviso de `[ADAPTAR]`). Merece feature propia.
+- **Convertir la regla de propagación en mecanismo**: hoy es una norma
+  escrita y nada impide incumplirla. Candidato: un punto en `CHECKPOINTS.md`
+  que el reviewer recorra cuando la feature haya tocado ficheros del arnés.
+
 F-005 cerrada el 2026-08-08, resumen en `progress/history.md`.
 
 ## Pendiente del humano: runbook de F-005 (Fase 2)
