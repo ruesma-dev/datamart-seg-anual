@@ -16,3 +16,6 @@ build/
 logs/
 *.log
 *.zip
+
+# backups de configuracion
+*.bak
