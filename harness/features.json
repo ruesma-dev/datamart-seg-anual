@@ -9,15 +9,65 @@
     {
       "id": "F-001",
       "title": "Comando 'version' en el CLI",
-      "description": "Añadir 'python main.py version' que imprima la versión del ETL y la fecha de build. Feature de calentamiento para probar el arnés.",
+      "description": "Añadir 'python main.py version' que imprima la versión del ETL, la fecha de build y el tag de imagen (si viene por entorno). Feature de calentamiento del arnés y, a la vez, herramienta de diagnóstico imprescindible para saber qué imagen corre en Azure.",
       "acceptance": [
         "Existe constante ETL_VERSION en config/settings.py",
         "`python main.py version` imprime la versión y sale con código 0",
-        "Test en tests/ que valida la salida sin tocar red ni BBDD"
+        "La salida incluye el tag de imagen leído de la variable de entorno IMAGE_TAG cuando está definida, y un valor 'local' cuando no",
+        "Test en tests/ que valida la salida con CliRunner, sin tocar red ni BBDD"
+      ],
+      "status": "in_progress",
+      "sdd": false,
+      "priority": 1,
+      "branch": "feature/F-001-cli-version"
+    },
+    {
+      "id": "F-004",
+      "title": "Ejecutar el ETL en Azure sin dependencias locales",
+      "description": "Prerrequisito del despliegue: hoy 'run-all' incluye LoadExcelAuxStep, que lee los Excels auxiliares (TipoPartida, TipoCoste, mapeo_proporcionales) desde rutas locales o de red vía AUX_EXCEL_*. En un contenedor de Azure esas rutas no existen y el pipeline falla. Mover esos ficheros a Azure Blob Storage y hacer que el step los lea indistintamente de ruta local o de blob. Auditar el resto de steps en busca de dependencias del sistema de ficheros local.",
+      "acceptance": [
+        "Definida en detalle por specs/F-004-etl-sin-dependencias-locales/ (sdd=true)"
       ],
       "status": "pending",
-      "sdd": false,
-      "branch": "feature/F-001-cli-version"
+      "sdd": true,
+      "priority": 2,
+      "branch": "feature/F-004-etl-sin-dependencias-locales"
+    },
+    {
+      "id": "F-005",
+      "title": "Postgres del datamart en Azure",
+      "description": "Aprovisionar el Azure Database for PostgreSQL Flexible Server que sustituye al Postgres local, con la red y la seguridad definidas: acceso del Container Apps Job, acceso del MCP desde puestos autorizados, y un rol de solo lectura para el MCP distinto del rol de escritura del ETL. Incluye la carga inicial completa del datamart y la verificación de que las vistas de consumo (Power BI, MCP) responden igual que en local.",
+      "acceptance": [
+        "Definida en detalle por specs/F-005-postgres-azure/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 3,
+      "branch": "feature/F-005-postgres-azure"
+    },
+    {
+      "id": "F-003",
+      "title": "Infra: despliegue como Container Apps Job diario",
+      "description": "Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev, escribiendo contra el Postgres de F-005. Dockerfile ya en raíz y scripts PowerShell esbozados en infra/ con varios TODO por cerrar (ACR, host de Postgres, secretos). Secretos en Key Vault, nunca en el repo. Incluye observabilidad: logs consultables y aviso ante fallo del job.",
+      "acceptance": [
+        "Definida en detalle por specs/F-003-infra-caj/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 4,
+      "branch": "feature/F-003-infra-caj"
+    },
+    {
+      "id": "F-006",
+      "title": "Repuntar el MCP al Postgres de Azure",
+      "description": "El MCP que hoy consulta el Postgres local debe apuntar al de Azure con el rol de solo lectura de F-005, sin credenciales en claro y sin perder ninguna de las consultas que ya funcionan. Vive fuera de este repositorio: la spec debe localizarlo y documentar el cambio de configuración y su verificación.",
+      "acceptance": [
+        "Definida en detalle por specs/F-006-mcp-azure/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 5,
+      "branch": "feature/F-006-mcp-azure"
     },
     {
       "id": "F-002",
@@ -28,18 +78,20 @@
       ],
       "status": "pending",
       "sdd": true,
+      "priority": 6,
       "branch": "feature/F-002-plan-vigente"
     },
     {
-      "id": "F-003",
-      "title": "Infra: despliegue como Container Apps Job",
-      "description": "Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev. Dockerfile ya en raíz; scripts PowerShell en infra/.",
+      "id": "F-007",
+      "title": "Disparo manual de la actualización desde web",
+      "description": "Más adelante, no ahora. Botón en una app web (o sistema equivalente) para que usuarios autorizados lancen una actualización total o parcial del datamart bajo demanda, además de la nocturna programada. Requiere autenticación y autorización (Entra ID), disparo del Container Apps Job con parámetros de alcance, control de ejecuciones concurrentes y visibilidad del estado de la ejecución. Depende de que el ETL admita alcance parcial por CLI.",
       "acceptance": [
-        "Definida en detalle por specs/F-003-infra-caj/ (sdd=true)"
+        "Definida en detalle por specs/F-007-disparo-manual-web/ (sdd=true)"
       ],
       "status": "pending",
       "sdd": true,
-      "branch": "feature/F-003-infra-caj"
+      "priority": 7,
+      "branch": "feature/F-007-disparo-manual-web"
     }
   ]
 }
