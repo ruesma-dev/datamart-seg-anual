@@ -119,6 +119,24 @@ original NO se versiona: al repositorio entra solo el Markdown.
   personales, credenciales), **no lo conviertas sin preguntar**: acabaría
   versionado en git.
 
+## El arnés genérico: `arnes-base`
+
+Este arnés no es solo de este proyecto. Su versión genérica y reutilizable
+vive en **`C:\Users\pgris\PycharmProjects\arnes-base`**, y desde ahí se
+instala en los demás repositorios.
+
+**Regla de propagación (obligatoria).** Si mejoras algo del arnés —`CLAUDE.md`,
+`.claude/agents/`, `CHECKPOINTS.md`, `harness/init.sh`, `specs/SPECS.md`, las
+convenciones— y esa mejora **vale para cualquier proyecto**, la portas a
+`arnes-base` **en el mismo trabajo**, no después. Si es específica de este
+proyecto (Sigrid, las capas del datamart, el `.env` de aquí), se queda aquí.
+
+No es una recomendación: el 2026-08-08 se perdieron **cinco mejoras en una
+sola tarde** —las dos paradas con el humano, C3 bis, la nota de features
+`sdd=false`, el `.gitignore` de originales y las convenciones de
+`docs/referencia/`— porque `arnes-base` era una copia suelta sin versionar y
+nadie la refrescó. Es la misma regla de propiedad que rige `azure-apps`.
+
 ## Reglas duras (no negociables)
 
 - PROHIBIDO marcar una feature como `done` sin que `bash harness/init.sh`
