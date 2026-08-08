@@ -48,9 +48,27 @@ rastro documental en `progress/`.
 - `progress/` — memoria externa del arnés (`current.md`, `history.md`,
   informes `impl_*.md` / `review_*.md` / `explore_*.md` por subagente).
 - `docs/` — `ARCHITECTURE.md`, `CONVENTIONS.md`.
+- `docs/referencia/` — información adicional de negocio y del sistema origen
+  (manuales de Sigrid, criterios de cierre, documentación que llega de
+  fuera), toda en Markdown. Consúltala cuando la pregunta sea «por qué el
+  ETL hace esto» y la respuesta no esté en el código. Ver su `README.md`.
 - `CHECKPOINTS.md` — criterios objetivos de estado final; el reviewer los
   recorre antes de cerrar cualquier feature.
 - `infra/` — scripts PowerShell de despliegue a Azure + `Dockerfile` en raíz.
+
+## Documentos que llegan de fuera (PDF y ofimática)
+
+Cuando el humano pase un PDF —o un `.docx`, `.xlsx`, `.pptx`— conviértelo a
+Markdown y guárdalo en `docs/referencia/` antes de trabajar con él. El
+original NO se versiona: al repositorio entra solo el Markdown.
+
+- Usa la herramienta MCP `markitdown` si está conectada. Si no lo está,
+  conviértelo leyendo el documento directamente; no es motivo para parar.
+- Nombra el fichero según la convención de `docs/referencia/README.md` y
+  ponle la cabecera con origen y fecha del documento.
+- Si el documento trae datos sensibles (precios de proveedor, datos
+  personales, credenciales), **no lo conviertas sin preguntar**: acabaría
+  versionado en git.
 
 ## Reglas duras (no negociables)
 
