@@ -13,8 +13,16 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from etl_sigrid.infrastructure.postgres.conninfo import (
+    SSLMODES_DEBILES,
+    default_sslmode,
+    is_azure_host,
+    make_admin_conninfo_provider,
+    make_conninfo_provider,
+)
 
 # Versión del ETL. Mantener sincronizada con [project].version de pyproject.toml.
 ETL_VERSION = "0.1.0"
@@ -52,6 +60,20 @@ class SigridApiSettings(BaseSettings):
     max_retries: int = Field(3, description="Reintentos automáticos en errores transitorios")
 
 
+# Esquemas sobre los que se concede lectura al rol del MCP.
+#
+# La spec de F-005 proponía restringirlo a los cinco esquemas de consumo
+# (mart, cierre, compras, maestro, retenciones). El humano decidió el
+# 2026-08-08 que, de momento, el MCP lee todo; se revisará al rediseñar el MCP
+# en F-006. Sigue siendo un parámetro (PG_CONSUMPTION_SCHEMAS) precisamente
+# para poder estrecharlo entonces sin tocar código.
+DEFAULT_CONSUMPTION_SCHEMAS = (
+    "mart,cierre,compras,maestro,retenciones,raw,stg,aux,_meta"
+)
+
+AUTH_MODES = ("password", "entra")
+
+
 class PostgresSettings(BaseSettings):
     """Conexión a Postgres destino."""
 
@@ -67,22 +89,96 @@ class PostgresSettings(BaseSettings):
         description="BBDD a la que conectarse para crear la nuestra si no existe. "
                     "Por defecto 'postgres', que siempre existe en cualquier servidor.",
     )
+    sslmode: str = Field(
+        "",
+        description="Modo TLS de libpq. Vacío = 'require' si el host es de Azure, "
+                    "'prefer' (el defecto de libpq) si no.",
+    )
+    auth_mode: str = Field(
+        "password",
+        description="'password' (contraseña de PG_PASSWORD, que en Azure viene de "
+                    "Key Vault) o 'entra' (token de identidad gestionada).",
+    )
+    auto_create_db: bool = Field(
+        True,
+        description="Si es False, el ETL nunca ejecuta CREATE DATABASE ni abre "
+                    "conexión contra la BBDD admin. Obligatorio contra el servidor "
+                    "compartido de Azure, donde viven albaranes y partes.",
+    )
+    set_role: str = Field(
+        "",
+        description="Rol de grupo al que se hace SET ROLE al abrir cada sesión, para "
+                    "que todos los objetos tengan el mismo propietario conecte quien "
+                    "conecte. Contra Azure: 'sigrid_dm_etl'.",
+    )
+    readonly_role: str = Field(
+        "",
+        description="Rol de solo lectura al que se le reaplican los GRANT tras cada "
+                    "ejecución. Vacío (desarrollo local) = no se aplica nada.",
+    )
+    consumption_schemas: str = Field(
+        DEFAULT_CONSUMPTION_SCHEMAS,
+        description="Esquemas, separados por comas, sobre los que el rol de solo "
+                    "lectura recibe USAGE + SELECT.",
+    )
+
+    @field_validator("auth_mode")
+    @classmethod
+    def _validar_auth_mode(cls, v: str) -> str:
+        modo = v.strip().lower()
+        if modo not in AUTH_MODES:
+            raise ValueError(
+                f"PG_AUTH_MODE='{v}' no es válido. Valores admitidos: "
+                f"{', '.join(AUTH_MODES)}."
+            )
+        return modo
+
+    @field_validator("sslmode")
+    @classmethod
+    def _normalizar_sslmode(cls, v: str) -> str:
+        return v.strip().lower()
+
+    @model_validator(mode="after")
+    def _rechazar_tls_debil_contra_azure(self) -> PostgresSettings:
+        """
+        R2: contra un servidor de Azure con endpoint público, un sslmode que
+        permita conexión en claro se rechaza al construir la configuración.
+        Abortar aquí es preferible a descubrirlo cuando la contraseña ya ha
+        viajado sin cifrar.
+        """
+        if self.sslmode and self.sslmode in SSLMODES_DEBILES and is_azure_host(self.host):
+            raise ValueError(
+                f"PG_SSLMODE='{self.sslmode}' deja la conexión sin cifrar y el host "
+                f"'{self.host}' es un servidor de Azure. Usa PG_SSLMODE=require "
+                f"(o déjalo vacío: contra Azure el valor por defecto ya es 'require')."
+            )
+        return self
+
+    @property
+    def effective_sslmode(self) -> str:
+        """Modo TLS efectivo: el configurado, o el que corresponde al host (R1)."""
+        return self.sslmode or default_sslmode(self.host)
+
+    @property
+    def consumption_schema_list(self) -> list[str]:
+        """`consumption_schemas` como lista, sin blancos ni entradas vacías."""
+        return [s.strip() for s in self.consumption_schemas.split(",") if s.strip()]
 
     @property
     def conninfo(self) -> str:
-        """Cadena de conexión psycopg-compatible a la BBDD del data mart."""
-        return (
-            f"host={self.host} port={self.port} dbname={self.db} "
-            f"user={self.user} password={self.password.get_secret_value()}"
-        )
+        """
+        Cadena de conexión psycopg-compatible a la BBDD del data mart.
+
+        Se mantiene por compatibilidad con el código existente. Con
+        PG_AUTH_MODE=entra resuelve un token en cada acceso; el camino
+        recomendado es el proveedor callable de `conninfo.make_conninfo_provider`.
+        """
+        return make_conninfo_provider(self)()
 
     @property
     def admin_conninfo(self) -> str:
         """Cadena de conexión a la BBDD admin (para CREATE DATABASE si hace falta)."""
-        return (
-            f"host={self.host} port={self.port} dbname={self.admin_db} "
-            f"user={self.user} password={self.password.get_secret_value()}"
-        )
+        return make_admin_conninfo_provider(self)()
 
 
 class AuxExcelSettings(BaseSettings):

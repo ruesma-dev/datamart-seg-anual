@@ -18,14 +18,14 @@ comando exacto y **no las ejecuta**.
 
 ## Fase 1 — Código
 
-- [ ] **T1**: Corregir la descripción de F-005 en `harness/features.json` para
+- [x] **T1**: Corregir la descripción de F-005 en `harness/features.json` para
       que refleje que se reutiliza `psql-albaranes-rs9k2` y que el alcance es
       la base `sigrid_dm`, no aprovisionar un servidor.
       **Verificación**: `test_f005_r41_descripcion_de_la_feature_actualizada`
       (comprueba que la descripción no contiene «Aprovisionar» y sí nombra
       `sigrid_dm`) + `bash harness/init.sh` valida el JSON.
 
-- [ ] **T2**: Añadir a `PostgresSettings` (`config/settings.py`) los campos
+- [x] **T2**: Añadir a `PostgresSettings` (`config/settings.py`) los campos
       `sslmode`, `auth_mode`, `auto_create_db`, `set_role`, `readonly_role` y
       `consumption_schemas`, con los valores por defecto que reproducen el
       comportamiento actual. Incluir el validador que rechaza TLS débil contra
