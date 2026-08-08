@@ -57,9 +57,6 @@
       "status": "pending",
       "sdd": true,
       "priority": 3,
-      "blocked_by_decisions": [
-        "D5"
-      ],
       "branch": "feature/F-004-etl-sin-dependencias-locales"
     },
     {
@@ -72,10 +69,6 @@
       "status": "pending",
       "sdd": true,
       "priority": 4,
-      "blocked_by_decisions": [
-        "D1",
-        "D3"
-      ],
       "branch": "feature/F-005-postgres-azure"
     },
     {
@@ -88,11 +81,6 @@
       "status": "pending",
       "sdd": true,
       "priority": 5,
-      "blocked_by_decisions": [
-        "D2",
-        "D3",
-        "D6"
-      ],
       "branch": "feature/F-003-infra-caj"
     },
     {
@@ -132,6 +120,18 @@
       "branch": "feature/F-008-docs-referencia-sigrid-acens"
     },
     {
+      "id": "F-011",
+      "title": "Carga incremental del datamart",
+      "description": "Hoy el job nocturno ejecuta siempre --full. Conseguir que las cargas que no sean la inicial sean rapidas. HALLAZGO QUE CONDICIONA EL DISENO (F-009): Sigrid NO tiene una marca de ultima modificacion fiable — en el diccionario 'fecalt' aparece en 16 tablas, 'fecmod' en 3 y 'sello' en 2 — asi que no hay watermark directo y hay que construirlo. Palancas: ventana de negocio (ejercicio en curso y obras abiertas, con recarga completa semanal), altas nuevas por el 'ide' autoincremental, y un watermark propio mantenido por el ETL en _meta. Sospecha a verificar antes de disenar nada: el cuello de botella puede no estar en la base sino en la extraccion, porque sigrid-api limita a 1000 filas por peticion y el balanceador corta a los 230 s; encaja con que el intento de abril muriera en la ingesta. La spec debe empezar por medir, no por optimizar.",
+      "acceptance": [
+        "Definida en detalle por specs/F-011-carga-incremental/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 8,
+      "branch": "feature/F-011-carga-incremental"
+    },
+    {
       "id": "F-002",
       "title": "PLAN_VIGENTE: serie de planificación consolidada",
       "description": "Implementar la serie PLAN_VIGENTE en capa cierre: para meses pasados, datos de fase 0 (Previsto); para meses futuros, la última versión del master vigente (conext cod='15'). Exponer vista para Power BI. Respetar semántica importe_origen/importe_mes.",
@@ -140,8 +140,27 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-002-plan-vigente"
+    },
+    {
+      "id": "F-012",
+      "title": "Auditoria y limpieza de Azure para reducir costes",
+      "description": "Revisar todo lo desplegado en la suscripcion Ruesma, cuantificar en que se va el gasto y retirar lo que no sirve. Parte del inventario de F-009 (docs/referencia/04_azure_inventario_dev.md), que ya identifico recursos huerfanos: el resto de rg-sigridetl-dev-data tras borrar su base (Function App sin funciones, storage, Key Vault, Log Analytics, App Insights), un Recovery Services vault que no protege ningun elemento, y rg-pericial-bc en westeurope, fuera de la region unica del diseno. La auditoria es de solo lectura; CADA borrado necesita aprobacion explicita del humano, recurso a recurso.",
+      "acceptance": [
+        "Fase 1 AUDITORIA, solo lectura: informe con el coste real por resource group y por recurso de los ultimos 30 dias (az consumption / Cost Management), y para cada recurso si esta en uso, huerfano o sobredimensionado",
+        "El informe propone una lista priorizada de retiradas con el ahorro estimado de cada una y su riesgo",
+        "Revisa tambien el dimensionamiento de lo que SI se usa: SKU de psql-albaranes-rs9k2, retencion de logs, tier de las storage accounts",
+        "Fase 2 LIMPIEZA: ningun recurso se borra sin aprobacion explicita del humano para ESE recurso concreto. Prohibido borrar en bloque",
+        "Antes de cada borrado se comprueba y se deja anotado que el recurso no lo usa ninguna de las apps en produccion (albaranes, partes, remesas) ni el datamart",
+        "Los hallazgos de seguridad del inventario que no sean de coste (acceso publico a blobs, vaults sin restriccion de red) se listan aparte, sin actuar sobre ellos en esta feature",
+        "docs/referencia/04_azure_inventario_dev.md actualizado con el estado posterior a la limpieza",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "priority": 10,
+      "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
       "id": "F-010",
@@ -152,7 +171,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 9,
+      "priority": 11,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -164,7 +183,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 10,
+      "priority": 12,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]

@@ -252,3 +252,51 @@ Preguntas para el humano:
   PLAN_VIGENTE.
 - **2026-08-08 · Subagentes.** El humano confirma la autorización permanente
   de subagentes recogida en `CLAUDE.md`.
+
+---
+
+## Cierre del bloque Azure · 2026-08-08
+
+El humano confirma el diseño de despliegue propuesto tras el inventario de
+F-009. Con ello se cierran cinco decisiones y queda **D4** como única abierta.
+
+- **D1 · CERRADA → opción A.** Endpoint público con reglas de firewall. Es lo
+  que ya hace `psql-albaranes-rs9k2` en producción para `albaranes` y
+  `partes`. La opción B partía de cero: cero private endpoints y cero zonas
+  DNS privadas en toda la suscripción, y la VPN punto a sitio sin configurar,
+  así que hoy ni siquiera serviría al MCP fuera de la oficina.
+- **D2 · CERRADA → `acralbaranesdev`.** Único ACR de la suscripción. SKU
+  Basic y usuario admin deshabilitado: el job tirará de identidad gestionada
+  con `AcrPull`.
+- **D3 · CERRADA → parametrizar el entorno desde el principio, desplegar solo
+  `dev`.** Existe `rg-spoke-prod-spaincentral` y el diseño de acens ya prevé
+  DEV/STA/PRO, así que parametrizar ahora es barato y duplicar scripts
+  después, caro.
+- **D5 · CERRADA.** Los Excels auxiliares van a Azure Blob Storage, en una
+  cuenta nueva del proyecto con contenedor `aux`, dentro de
+  `rg-datamart-seg-dev`. El mecanismo de subida para gente de negocio es
+  **F-010**, que depende de la app web; F-004 solo necesita leer del blob.
+- **D6 · CERRADA → `0 2 * * *` UTC** (04:00 en verano español, 03:00 en
+  invierno) y alerta de fallo del job por Azure Monitor al mismo canal de
+  correo que ya usan las alertas de coste y seguridad de la landing zone.
+- **D7 · CERRADA.** El humano decide **no** leer las tablas de control y
+  borrar. Se eliminó **solo la base** `sqldb-sigrid-ruesma-etl` el
+  2026-08-08; el servidor SQL queda vacío y sin coste, y el resto de
+  `rg-sigridetl-dev-data` pasa a **F-012** (auditoría y limpieza de costes).
+  Nota: Azure conserva la base eliminada durante la ventana de retención
+  PITR (~7 días), así que los datos personales de `stg.age` siguen en copias
+  hasta que caduque.
+- **D4 · SIGUE ABIERTA.** Dónde vive el repositorio o la configuración del
+  MCP. Bloquea F-006.
+
+Decisiones de diseño complementarias, sin número porque no estaban en la
+lista:
+
+- **Base de datos propia `sigrid_dm`**, no un esquema dentro de otra base.
+  PostgreSQL no permite consultas entre bases, así que el rol de solo lectura
+  del MCP no puede ver `albaranes` —precios de proveedor, facturas, datos
+  bancarios—. Es una frontera real y no de disciplina. Si algún día hay que
+  cruzar datos entre proyectos, `postgres_fdw` dentro del mismo servidor.
+- **No renombrar `psql-albaranes-rs9k2`.** Un Flexible Server no se puede
+  renombrar: el nombre es su endpoint DNS. Se hará el día que otro motivo
+  obligue a recrearlo, migrando las tres bases de una vez.
