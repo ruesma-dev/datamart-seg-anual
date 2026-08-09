@@ -1,0 +1,67 @@
+{
+  "$doc": "Datos del entorno. Es el UNICO sitio del despliegue donde se escribe el nombre de un recurso: los .ps1 leen todo de aqui ($CFG) y por eso crear otro entorno consiste en copiar este fichero, no en duplicar scripts. Prohibido meter aqui la suscripcion, el tenant, una clave, una contrasena o un correo (R4): la suscripcion sale del contexto de 'az' o de $env:AZ_SUBSCRIPTION_ID.",
+  "$aviso_pgAuthMode": "DA-4, ABIERTA. Este fichero declara 'entra' porque lo exigen R10 y R12 de la spec aprobada, pero el servidor psql-albaranes-rs9k2 NO tiene habilitada la autenticacion Entra: el humano lo descarto el 2026-08-08 porque es una operacion de servidor que afecta a albaranes y partes. Mientras eso siga asi, el job se crearia bien y fallaria al conectar todas las noches. 05_check_prereqs.ps1 lo detecta y aborta. Ver infra/README.md y progress/current.md antes de ejecutar T23.",
+
+  "environment": "dev",
+  "location": "spaincentral",
+
+  "resourceGroup": "rg-datamart-seg-dev",
+  "logAnalytics": "log-datamart-seg-dev",
+  "logRetentionDays": 30,
+  "containerAppsEnv": "cae-datamart-seg-dev",
+  "job": "caj-datamart-seg-dev",
+
+  "storageAccount": "stdatamartsegdev",
+  "auxContainer": "aux",
+  "auxBlobs": {
+    "tipo_partida": "TipoPartida.xlsx",
+    "tipo_coste": "TipoCoste.xlsx",
+    "mapeo_proporcionales": "mapeo_proporcionales.xlsx"
+  },
+
+  "keyVault": "kv-datamart-seg-dev",
+  "sigridSecretName": "SIGRID-API-FUNCTION-KEY",
+  "jobSecretName": "sigrid-api-key",
+  "managedIdentity": "id-datamart-seg-dev",
+
+  "acrName": "acralbaranesdev",
+  "acrResourceGroup": "rg-albaranes-dev",
+  "imageRepository": "datamart-seg-anual",
+
+  "cron": "0 2 * * *",
+  "replicaTimeoutSeconds": 7200,
+  "replicaRetryLimit": 1,
+  "parallelism": 1,
+  "replicaCompletionCount": 1,
+  "cpu": "1.0",
+  "memory": "2.0Gi",
+
+  "sigridApiBaseUrl": "https://func-sigridapi-dev-huyke.azurewebsites.net",
+
+  "pgHost": "psql-albaranes-rs9k2.postgres.database.azure.com",
+  "pgPort": 5432,
+  "pgDatabase": "sigrid_dm",
+  "pgUser": "sigrid_dm_app",
+  "pgAuthMode": "entra",
+  "pgSetRole": "sigrid_dm_etl",
+  "pgReadonlyRole": "mcp_sigrid_dm_ro",
+  "pgAutoCreateDb": "false",
+  "pgResourceGroup": "rg-albaranes-dev",
+
+  "logLevel": "INFO",
+  "logFormat": "json",
+
+  "alertName": "alert-caj-datamart-seg-dev-failed",
+  "alertActionGroupName": "ag-datamart-seg-dev",
+  "alertActionGroupResourceGroup": "rg-datamart-seg-dev",
+
+  "tags": {
+    "acens-project": "datamart-seg-anual",
+    "acens-environment": "dev",
+    "acens-customer": "ruesma",
+    "acens-costcenter": "pendiente",
+    "acens-compliance": "gdpr",
+    "acens-responsable-iac": "manual",
+    "acens-support": "manual"
+  }
+}
