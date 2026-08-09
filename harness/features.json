@@ -149,7 +149,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 11,
+      "priority": 13,
       "branch": "feature/F-006-mcp-azure"
     },
     {
@@ -186,6 +186,30 @@
       "branch": "feature/F-011-carga-incremental"
     },
     {
+      "id": "F-017",
+      "title": "Cierre mensual: incorporar los costes indirectos (CI)",
+      "description": "Anadida el 2026-08-09 a peticion del humano ('avanzar con cierre mensual, tabla de CI'; CI = costes indirectos, confirmado). Avanzar el cierre mensual incorporando el tratamiento de los costes indirectos a la capa cierre (cierre.fact_cierre_mensual y sus vistas). Contexto existente: el CLI ya tiene inspect-indirectos-detalle e inspect-generales-detalle, config/business_rules.yaml define reglas de negocio, y el mapeo de proporcionales por obra vive en el Excel mapeo_proporcionales que F-004 dejo legible (su carga a aux.* es F-013, posible dependencia). El alcance exacto -que conceptos de indirecto entran, como se reparten a obra/mes y como se reflejan en la tabla principal- lo fija la spec con el humano.",
+      "acceptance": [
+        "Definida en detalle por specs/F-017-cierre-costes-indirectos/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 11,
+      "branch": "feature/F-017-cierre-costes-indirectos"
+    },
+    {
+      "id": "F-018",
+      "title": "Validar los numeros de cierre.fact_cierre_mensual",
+      "description": "Anadida el 2026-08-09 a peticion del humano ('revisar cierre mensual, tabla principal'; alcance confirmado: validar sus numeros). Contrastar los importes que produce cierre.fact_cierre_mensual (ejecutado origen/anterior/mes, final con su trazabilidad master/fase_0, pendiente, variacion) contra Sigrid y los criterios de cierre del negocio, sobre meses cerrados de obras representativas elegidas por el humano. Documentar cada desviacion con su causa (dato origen, regla de negocio o defecto del SQL) y corregir las que procedan. La spec debe fijar con el humano que obras y meses son el patron de contraste y cual es la tolerancia aceptable.",
+      "acceptance": [
+        "Definida en detalle por specs/F-018-validacion-cierre-mensual/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 12,
+      "branch": "feature/F-018-validacion-cierre-mensual"
+    },
+    {
       "id": "F-002",
       "title": "PLAN_VIGENTE: serie de planificación consolidada",
       "description": "Implementar la serie PLAN_VIGENTE en capa cierre: para meses pasados, datos de fase 0 (Previsto); para meses futuros, la última versión del master vigente (conext cod='15'). Exponer vista para Power BI. Respetar semántica importe_origen/importe_mes.",
@@ -194,7 +218,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 12,
+      "priority": 14,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -213,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 13,
+      "priority": 15,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -238,7 +262,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 14,
+      "priority": 16,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -250,7 +274,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 15,
+      "priority": 17,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -262,7 +286,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 16,
+      "priority": 18,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]
