@@ -335,8 +335,8 @@ orden, está en `progress/current.md` §F-003 y en `infra/README.md`.
 
 | Evidencia | Valor real |
 |---|---|
-| **Tests ejecutados** | `python -m pytest -q` → **251 passed**, 0 failed (baseline en `dev`: 221; **+30** de F-003: 26 de infraestructura + 4 de autenticación Entra) |
-| **Tiempo de la suite** | **2,22 s** (`pytest -q`); 4,53 s bajo medición de cobertura dentro de `init.sh` |
+| **Tests ejecutados** | `python -m pytest -q` → **254 passed**, 0 failed (baseline en `dev`: 221; **+33** de F-003: 26 de infraestructura + 4 de autenticación Entra + **3 de la puerta de F-019**, §10) |
+| **Tiempo de la suite** | **2,09 s** (`pytest -q`); 4,36 s bajo medición de cobertura dentro de `init.sh` |
 | **Cobertura de las líneas cambiadas** | **N/A con motivo impreso** por `init.sh`: `PUERTA COBERTURA: N/A (F-003: las líneas cambiadas no contienen sentencias ejecutables)`. El alcance Python es **1 línea** (`config/settings.py:40`), y es una línea de docstring. El entregable de F-003 es PowerShell, JSON y documentación, que la puerta no mide por diseño (`harness/alcance.es_produccion` solo admite `.py`) |
 | **Mutantes generados / supervivientes** | **0 / 0** (`progress/mutacion_F-003.md`). Alcance: 1 fichero, 1 línea. Cero mutantes porque esa única línea es docstring: no hay operador, literal ni condición que mutar |
 | **`bash harness/init.sh`** | **ENTORNO LISTO**, exit 0 |
@@ -352,7 +352,7 @@ mide y muta `.py` fuera de `tests/`, `specs/`, `progress/` y `docs/`. La
 verificación equivalente que sí se ha hecho, y que es la que el reviewer debe
 juzgar:
 
-- **26 tests que analizan los `.ps1` y el JSON como texto** y por introspección
+- **29 tests que analizan los `.ps1` y el JSON como texto** y por introspección
   de `config/settings.py`, con fase RED demostrada (§3): cubren R1–R11, R16–R19,
   R25 y R26.
 - **4 tests de R12–R14** sobre el código de F-005 que el job va a usar, que
@@ -369,6 +369,138 @@ Queda anotado como propuesta, no como deuda de F-003.
 ## 9. Estado
 
 - **T1–T17: completas.** `tasks.md` marcado.
-- **T18–T28: del humano**, y bloqueadas por el disco y por DA-4.
+- **T18–T28: del humano**, y bloqueadas por `F-019` (T23) y por DA-4.
 - `harness/features.json`: F-003 sigue en **`in_progress`**. No se marca `done`:
   falta el veredicto del reviewer y todo el bloque 5.
+
+---
+
+## 10. Correcciones tras la review (CHANGES_REQUESTED)
+
+`progress/review_F-003.md` rechazó la feature por un solo defecto bloqueante:
+**la puerta que impide armar el cron nocturno estaba condicionada a «hasta que
+se decida qué hacer con el disco», y esa decisión ya se había tomado** —la
+opción B, que es `F-019` en `harness/features.json`, creada el 2026-08-09—. Leída
+al pie de la letra, la salvaguarda se daba por cumplida. Lo que protege de
+repetir el incidente no es haber decidido: es haber **implementado** `F-019`.
+
+### 10.1 Qué se cambió
+
+| # | Fichero | Cambio |
+|---|---|---|
+| 1 | `infra/README.md` §«Antes de desplegar» | La condición pasa a ser **«hasta que `F-019` esté implementada y verificada contra Azure»**. Se dice explícitamente que la opción B ya está elegida y que lo que falta es ejecutarla. Se añade por qué las dos comprobaciones existentes no frenan hoy (el disco volvió al 42 %, y `dev.json` ya declara `entra`). El encabezado deja de llamarlas «decisiones abiertas» y las llama **puertas cerradas** |
+| 2 | `infra/README.md`, tabla de orden | El paso 9 dice ahora «**está bloqueado por `F-019`**» |
+| 3 | `progress/current.md` §«DOS PUERTAS…» punto 1 | Misma corrección. Antes decía «hasta que se decida entre A, B o C», que además contradecía a `features.json` |
+| 4 | `specs/F-003-infra-caj/tasks.md` **T23** | Nota de bloqueo por `F-019`, con la misma forma que la de DA-2 en T22. Quien trabaje desde las tareas ya ve la puerta |
+| 5 | `infra/80_create_job.ps1` cabecera y avisos | La puerta 1 del comentario nombra a `F-019`; el aviso de `-Confirmar` y el mensaje final dejan de hablar de «decidirse» |
+| 6 | `infra/env/dev.json` | Nueva clave **`jobProgramable: false`** con su `$aviso_jobProgramable`: qué protege, por qué está en `false` y cuándo pasarla a `true` (`F-019` cerrada **y** verificada) |
+| 7 | `infra/80_create_job.ps1` §1 Puertas | `if (-not $CFG.jobProgramable) { throw ... }` **antes que ninguna otra comprobación**, con el identificador `F-019` en el mensaje |
+| 8 | `infra/00_vars.ps1` | `jobProgramable` entra en `$clavesObligatorias`: un entorno nuevo que la olvide **aborta**, no se queda sin puerta (fail-closed) |
+| 9 | `tests/test_f003_infra.py` | `jobProgramable` en `CLAVES_OBLIGATORIAS` (la clave es **obligatoria**, coherente con R1/R2/R3) y **tres tests nuevos** |
+
+La mejora del punto 2 —hacer la puerta **detectable por máquina**— la señalaba
+el reviewer como «lo más robusto» sin exigirla; el líder la pidió. La razón de
+fondo: `-Confirmar` demuestra que alguien quiso ejecutar el script, no que
+supiera que la carga completa sigue sin caber en el servidor compartido.
+
+**Qué NO se ha tocado**, por instrucción expresa: los demás scripts, DA-4 (la
+está cerrando el humano) y los tests que ya pasaban.
+
+### 10.2 Los tres tests nuevos
+
+| Test | Qué sujeta |
+|---|---|
+| `test_f003_la_puerta_del_job_programado_es_detectable_por_maquina` | La clave es un **booleano** JSON (como cadena, `"false"` sería *cierto* en PowerShell y la puerta no frenaría nada), el script la comprueba con `throw` y lo hace **antes** de `az containerapp job create` |
+| `test_f003_la_puerta_solo_se_abre_cuando_la_feature_bloqueante_esta_cerrada` | Si alguien pone `jobProgramable: true` con `F-019` sin `done` en `harness/features.json`, **la suite se pone en rojo**. Y si `F-019` desapareciera del fichero, también: una puerta no puede apuntar a una referencia muerta |
+| `test_f003_la_puerta_nombra_la_feature_bloqueante_en_la_documentacion` | `infra/README.md` y `tasks.md` nombran `F-019`. Es el segundo afinado que propone la review: un identificador se contrasta con `features.json`; una condición en prosa envejece sola |
+
+El segundo es la respuesta directa al defecto: la puerta ya no depende de una
+decisión, sino de **una condición verificable y todavía no cumplida**.
+
+### 10.3 Fase RED (obligatoria en `critico`)
+
+**Paso 1 — los tres tests escritos antes de tocar nada más.**
+
+```
+$ python -m pytest tests/test_f003_infra.py -q
+
+>       assert isinstance(cfg["jobProgramable"], bool), (
+E       KeyError: 'jobProgramable'
+tests\test_f003_infra.py:686: KeyError
+
+>       if _config("dev")["jobProgramable"]:
+E       KeyError: 'jobProgramable'
+tests\test_f003_infra.py:723: KeyError
+
+>       assert FEATURE_BLOQUEANTE in readme, (
+E       AssertionError: infra/README.md no nombra F-019 al explicar por qué el job
+        no debe quedar programado
+tests\test_f003_infra.py:742: AssertionError
+
+FAILED tests/test_f003_infra.py::test_f003_r1_dev_json_tiene_todas_las_claves_obligatorias
+FAILED tests/test_f003_infra.py::test_f003_r2_todos_los_env_json_validan_igual[dev.json]
+FAILED tests/test_f003_infra.py::test_f003_r3_ningun_valor_obligatorio_vacio_ni_TODO[dev.json]
+FAILED tests/test_f003_infra.py::test_f003_la_puerta_del_job_programado_es_detectable_por_maquina
+FAILED tests/test_f003_infra.py::test_f003_la_puerta_solo_se_abre_cuando_la_feature_bloqueante_esta_cerrada
+FAILED tests/test_f003_infra.py::test_f003_la_puerta_nombra_la_feature_bloqueante_en_la_documentacion
+6 failed, 23 passed in 0.67s
+```
+
+Los tres fallos de R1/R2/R3 son **parte del mismo rojo**: al declarar
+`jobProgramable` obligatoria, el esquema del fichero de entorno deja de
+cumplirse hasta que la clave existe. Es la consecuencia buscada de haberla hecho
+obligatoria y no opcional.
+
+**Paso 2 — con la clave ya en `dev.json` pero *sin* la puerta en el `.ps1`.**
+Es el rojo que importa: demuestra que el test caza la ausencia del `throw`, no
+solo la de la clave.
+
+```
+$ python -m pytest tests/test_f003_infra.py -q -k "puerta_del_job"
+
+>       assert re.search(r"if\s*\(\s*-not\s+\$CFG\.jobProgramable\s*\)\s*\{[^}]*throw", texto), (
+            "80_create_job.ps1 no aborta cuando el entorno declara jobProgramable = false"
+        )
+E       AssertionError: 80_create_job.ps1 no aborta cuando el entorno declara jobProgramable = false
+E       assert None
+E        +  where None = <function search ...>('if\\s*\\(\\s*-not\\s+\\$CFG\\.jobProgramable\\s*\\)\\s*\\{[^}]*throw', '# infra/80_create_job.ps1\n...')
+tests\test_f003_infra.py:693: AssertionError
+
+FAILED tests/test_f003_infra.py::test_f003_la_puerta_del_job_programado_es_detectable_por_maquina
+1 failed, 28 deselected in 0.52s
+```
+
+**Paso 3 — verde, ya con la puerta y las tres correcciones de texto.**
+
+```
+$ python -m pytest tests/test_f003_infra.py -q
+29 passed in 0.60s
+```
+
+Hubo un rojo intermedio no previsto que conviene dejar escrito, porque es el
+tipo de cosa que se arregla mal: al nombrar `80_create_job.ps1` en el §1 del
+README, `test_f003_r6_readme_menciona_todos_los_scripts_en_orden` falló
+(`At index 0 diff: 2828 != 1523`) — el script quedaba mencionado antes que
+`00_vars.ps1`. **No se tocó el test**: se reescribió la frase como «el script
+del paso 9», que es como el README se refiere ya a los pasos.
+
+### 10.4 Evidencias tras la corrección
+
+| Evidencia | Valor real |
+|---|---|
+| **Tests ejecutados** | `python -m pytest -q` → **254 passed**, 0 failed (251 antes de la review, **+3**) |
+| **Tiempo de la suite** | **2,09 s**; 4,36 s bajo cobertura dentro de `init.sh` |
+| **Cobertura de las líneas cambiadas** | **N/A con motivo**, sin cambios: la corrección no añade ni una línea de Python de producción (`PUERTA COBERTURA: N/A (F-003: las líneas cambiadas no contienen sentencias ejecutables)`) |
+| **Mutantes / supervivientes** | **0 / 0**. Campaña relanzada tras el cambio: `python -m harness.mutacion --feature F-003` → «1 fichero(s), 1 línea(s) de producción … 0 mutantes evaluados, 0 muertos, 0 supervivientes». El alcance sigue siendo `config/settings.py:40`, docstring |
+| **`bash harness/init.sh`** | **ENTORNO LISTO**, exit 0 |
+| **Avisos de `ruff` propios** | **0** (`ruff check tests/test_f003_infra.py` → *All checks passed*) |
+| **Codificación de los `.ps1`** | Los dos scripts tocados se han parcheado **byte a byte** para no perder el BOM ni el CRLF; `test_f003_r5_ps1_utf8_bom_crlf_y_cabecera_de_ruta` en verde sobre los 13 |
+
+### 10.5 Lo que sigue pendiente (no lo cierra esta corrección)
+
+- **`F-019` sigue en `pending`.** La puerta está bien puesta, no abierta. T23 no
+  se puede ejecutar.
+- **DA-4 sigue abierta** y la decide el humano; no se ha tocado.
+- Las observaciones 3 y 5 de la review (las contraseñas de F-005 en el vault
+  antiguo, el hallazgo anotado para F-016) siguen como estaban: no eran
+  bloqueantes y no entraban en el encargo.
