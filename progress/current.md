@@ -26,9 +26,11 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-**F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 6 y 11 hechos el
-2026-08-09. Faltan el 7 y el 8, que dependen del humano, y el 9 y el 10, que
-dependen del 8.
+**F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 7 y 11 hechos el
+2026-08-09. El 8 (carga inicial) está **corriendo ahora**: el primer intento
+murió el 2026-08-09 a las 11:46 por un corte de red local del puesto (el
+`COPY` de `obrparpre` colgado 9 min y luego `getaddrinfo failed`; el servidor
+estaba bien) y el humano la relanzó. Los pasos 9 y 10 dependen del 8.
 
 ## Lo ejecutado contra Azure
 
@@ -38,8 +40,8 @@ dependen del 8.
 | 4 · Contraseñas en Key Vault | Hecho: `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro` en `kv-albaranes-rs9k2` |
 | 5 · Base y roles | Hecho: `sigrid_dm`, 3 roles, 9 esquemas, todos propiedad de `sigrid_dm_etl` |
 | 6 · Firewall | Añadida `datamart-puesto-pgris-2026-08-09`; las 3 reglas previas, intactas |
-| 7 · `.env` | **PENDIENTE DEL HUMANO** (regla dura: los agentes no tocan `.env`) |
-| 8 · Carga inicial | Pendiente del paso 7 |
+| 7 · `.env` | Hecho y verificado por el humano el 2026-08-09 |
+| 8 · Carga inicial | **EN CURSO** (relanzada tras el corte de red del primer intento) |
 | 9 · Medición y veredicto del SKU | Pendiente del 8 |
 | 10 · Verificación de vistas | Pendiente del 8 |
 | 11 · Frontera de seguridad | Hecho, ver abajo |
@@ -95,3 +97,33 @@ Se han guardado en **`kv-albaranes-rs9k2`** porque el vault propio del
 datamart (`kv-datamart-seg-dev`) **lo crea F-003 y todavía no existe**. Es una
 decisión de conveniencia, no de diseño: **F-003 debe moverlas** a su vault y
 actualizar la referencia. Anotado para que no se quede así por inercia.
+
+---
+
+# F-015 · CERRADA (2026-08-09) — pendientes elevados al humano
+
+Implementada y **APROBADA** por el reviewer a la primera
+(`progress/review_F-015.md`). Resumen en `progress/history.md`. Quedan
+cuatro cosas del humano, ninguna bloqueante:
+
+1. **MANUAL de R20** — verificar el portado a `arnes-base` 1.2.0:
+
+   ```
+   git -C C:/Users/pgris/PycharmProjects/arnes-base log --oneline -5
+   grep ARNES_VERSION C:/Users/pgris/PycharmProjects/arnes-base/arnes-base/harness/VERSION
+   grep -rl "mutacion" C:/Users/pgris/PycharmProjects/arnes-base/arnes-base/harness/
+   grep -n "mutaci" C:/Users/pgris/PycharmProjects/arnes-base/GUIA_INSTALACION.md | head
+   ```
+
+   Resultado esperado (ya contrastado por implementer y reviewer): commit
+   `5006ee8`, `ARNES_VERSION=1.2.0`, herramientas presentes, guía con sección.
+2. **Decisión** — ¿feature de refuerzo de tests para los 6 huecos de riesgo
+   alto que la línea base destapó en F-005 (55/101 mutantes vivos, detalle en
+   `progress/mutacion_F-005.md`)? El más serio: ningún test fija el valor por
+   defecto de `auto_create_db`.
+3. **Decisión** — las 9 features no empezadas heredan rigor `critico` por
+   omisión; decidir el `rigor` de cada una al abrirla.
+4. **Decisión** — automejora del reviewer propuesta en
+   `progress/review_F-015.md` § 6: que verifique siempre los totales de
+   mutación de forma independiente. Si se aprueba, se porta a `arnes-base`.
+

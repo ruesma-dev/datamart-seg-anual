@@ -6,5 +6,9 @@
 
 ruff>=0.6.0
 
+# Medicion de cobertura. La usa harness/init.sh para la puerta de cobertura
+# de las lineas cambiadas (harness/cobertura.py). NUNCA en la imagen.
+coverage>=7.4
+
 # pytest vive en requirements.txt porque hoy la imagen lo instala; moverlo
 # aquí adelgazaría la imagen, pero es un cambio con más alcance que este.

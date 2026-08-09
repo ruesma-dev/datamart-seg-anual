@@ -1,0 +1,33 @@
+{
+  "$doc": "Niveles de rigor del arnes. El umbral de cobertura, el timeout de mutacion y lo que exige cada nivel se editan AQUI, nunca en init.sh ni en el codigo. Si una feature no declara 'rigor' en features.json se le aplica 'nivel_por_defecto', que es el mas exigente: omitir el nivel no puede ser la via facil.",
+  "nivel_por_defecto": "critico",
+  "cobertura": {
+    "umbral_lineas_cambiadas": 80
+  },
+  "mutacion": {
+    "timeout_por_mutante_s": 120
+  },
+  "niveles": {
+    "documental": {
+      "$doc": "Solo documentacion, especificaciones o notas de sesion: ni codigo ni SQL.",
+      "fase_red": false,
+      "cobertura": false,
+      "mutacion": false,
+      "supervivientes_maximos": null
+    },
+    "estandar": {
+      "$doc": "Codigo sin riesgo sobre sistemas compartidos. Los supervivientes se documentan y el reviewer juzga.",
+      "fase_red": true,
+      "cobertura": true,
+      "mutacion": true,
+      "supervivientes_maximos": null
+    },
+    "critico": {
+      "$doc": "Infraestructura compartida, produccion, seguridad o dinero. Cada superviviente exige un test nuevo o una justificacion escrita aceptada por el humano.",
+      "fase_red": true,
+      "cobertura": true,
+      "mutacion": true,
+      "supervivientes_maximos": 0
+    }
+  }
+}

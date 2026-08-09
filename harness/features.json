@@ -25,6 +25,7 @@
       ],
       "status": "done",
       "sdd": false,
+      "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-001-cli-version"
     },
@@ -44,6 +45,7 @@
       ],
       "status": "done",
       "sdd": false,
+      "rigor": "documental",
       "priority": 2,
       "branch": "feature/F-009-inventario-azure"
     },
@@ -56,6 +58,7 @@
       ],
       "status": "done",
       "sdd": true,
+      "rigor": "critico",
       "priority": 3,
       "branch": "feature/F-005-postgres-azure"
     },
@@ -80,6 +83,7 @@
       ],
       "status": "done",
       "sdd": false,
+      "rigor": "estandar",
       "priority": 4,
       "branch": "feature/F-014-arnes-generico"
     },
@@ -113,8 +117,9 @@
         "Portado a arnes-base en el mismo trabajo, con subida de version y documentado en GUIA_INSTALACION.md",
         "bash harness/init.sh en verde"
       ],
-      "status": "pending",
+      "status": "done",
       "sdd": true,
+      "rigor": "estandar",
       "priority": 6,
       "branch": "feature/F-015-verificar-tests"
     },
@@ -147,6 +152,7 @@
       ],
       "status": "done",
       "sdd": false,
+      "rigor": "documental",
       "priority": 8,
       "branch": "feature/F-008-docs-referencia-sigrid-acens"
     },
