@@ -38,15 +38,24 @@ contra Azure**. Hay dos cosas que deben cerrarse antes de llegar al job:
    transacción del incidente el disco volvió al 42 % y esa comprobación
    pasaría.
 
-2. **DA-4 · autenticación contra Postgres.** El job no puede llevar contraseña
-   (requisito R10), así que el fichero de entorno declara
-   `pgAuthMode = "entra"`. Pero **el servidor tiene la autenticación Entra
-   deshabilitada** y habilitarla es una operación de servidor que afecta a las
-   otras bases; el humano la descartó el 2026-08-08. Mientras siga así, el job
-   se crearía correctamente y **fallaría al conectar todas las noches**.
-   El comprobador de prerrequisitos lo detecta y aborta. Las dos salidas posibles —
-   habilitar Entra en el servidor, o enmendar R10 para permitir la contraseña
-   como referencia a Key Vault— las decide el humano.
+2. **DA-4 · autenticación contra Postgres. CERRADA el 2026-08-10: opción B.**
+   La spec original decía «sin contraseñas, autenticación Entra», pero **el
+   servidor tiene la autenticación Entra deshabilitada** y habilitarla es una
+   operación de servidor que afecta a las otras bases; el humano la descartó el
+   2026-08-08. Tal cual, el job se creaba correctamente y **fallaba al conectar
+   todas las noches**.
+
+   **Resolución:** el job se autentica como el rol nativo `sigrid_dm_app` con su
+   contraseña, que viaja como **referencia a Key Vault resuelta por la identidad
+   gestionada** — exactamente el mismo mecanismo que la clave de `sigrid-api`.
+   Ningún valor de secreto entra en el repositorio, en un script ni en la línea
+   de comandos. El modo `entra` queda implementado y **dormido** por si algún
+   día se habilita en el servidor. La enmienda está escrita en
+   `specs/F-003-infra-caj/requirements.md` §Enmiendas.
+
+   **Lo que esto añade al despliegue:** un **paso 8 bis** —migrar las
+   contraseñas al vault del proyecto— que va **antes** de crear el job. Está
+   abajo, en «Pasos que exigen autorización expresa».
 
 ---
 
@@ -71,9 +80,11 @@ repetirlos no rompe nada. Se ejecutan desde la raíz del repositorio.
 | — | `85_update_job.ps1` | Despliegue habitual: apunta el job a una imagen nueva. | Sí |
 | 10 | `90_create_alert.ps1` | Grupo de acción (reutiliza el que haya) y alerta de fallo. | Sí |
 
-Entre medias hay dos pasos **que no son scripts** y que hace el humano: cargar
-el secreto en el vault (después del 6) y autorizar la regla de firewall del
-Postgres (después del 4). Están abajo.
+Entre medias hay **tres** pasos **que no son scripts** y que hace el humano:
+cargar la clave de la API en el vault (después del 6), autorizar la regla de
+firewall del Postgres (después del 4) y **migrar las contraseñas de Postgres al
+vault del proyecto** (paso **8 bis**, después del 8 y **antes del 9**). Están
+abajo.
 
 ### Despliegue habitual, cuando ya está todo montado
 
@@ -116,7 +127,69 @@ El servidor tiene además una regla que autoriza a cualquier recurso de Azure.
 **No se debe depender de ella**: autoriza también a suscripciones ajenas.
 Revisarla es materia de otra feature, no de esta.
 
-### 3. Rol de plano de datos sobre la cuenta de almacenamiento
+### 3. Paso 8 bis · Migrar las contraseñas de Postgres al vault del proyecto
+
+Las contraseñas del datamart (`pg-sigrid-dm-app`, la que usa el job, y
+`pg-mcp-sigrid-dm-ro`, la del MCP) viven desde F-005 en **`kv-albaranes-rs9k2`**,
+el vault de otro proyecto. Con DA-4 cerrada, el job las necesita en **su propio
+vault**, que es sobre el que la identidad gestionada tiene
+`Key Vault Secrets User`. Se migran **antes de crear el job**: el paso 9 aborta
+si el secreto no está.
+
+Hace falta: `Key Vault Secrets User` (o superior) sobre el vault **de origen** y
+`Key Vault Secrets Officer` sobre el **de destino**.
+
+```powershell
+$origen  = "kv-albaranes-rs9k2"
+$destino = "<keyVault>"                     # del fichero de entorno
+
+foreach ($nombre in @("<pgSecretName>", "<pgReadonlySecretName>")) {
+    $valor = az keyvault secret show --vault-name $origen -n $nombre --query value -o tsv
+    if (-not $valor) { throw "no se ha podido leer '$nombre' de $origen" }
+    az keyvault secret set --vault-name $destino -n $nombre --value $valor -o none
+    if ($LASTEXITCODE -ne 0) { throw "no se ha podido escribir '$nombre' en $destino" }
+    $valor = $null
+}
+[System.GC]::Collect()
+```
+
+**Por qué así y no de otra forma** (importa, y no es paranoia):
+
+- **`show` siempre asignado a una variable, nunca suelto.** Un `show` a secas
+  imprime la contraseña en la consola, y de ahí pasa al scrollback y a cualquier
+  captura o registro de sesión.
+- **`-o none` en el `set`.** Sin él, `az keyvault secret set` devuelve el objeto
+  del secreto **incluyendo su valor**: el secreto acabaría en pantalla justo en
+  el paso que pretendía protegerlo.
+- **Nada de ficheros temporales.** Es la alternativa que parece más limpia y es
+  peor: deja el valor en disco, y en PowerShell 5.1 la redirección (`>`,
+  `Out-File`, `Set-Content`) añade BOM y salto de línea, con lo que además
+  **corrompería la contraseña** — el job fallaría al autenticar con un error que
+  no apunta a nada.
+- **Nada de canalizar `show` a `set --value @-`.** La tubería de PowerShell
+  añade igualmente el salto de línea final, con el mismo resultado.
+- El **historial del shell** guarda la línea tal cual se escribió: `$valor`, no
+  la contraseña. Por eso el valor nunca se teclea.
+- **Riesgo residual, asumido y consciente:** durante el instante de la llamada,
+  la contraseña está en la línea de comandos del proceso `az`, visible para otro
+  proceso del mismo usuario en la misma máquina. Es el puesto del propio
+  administrador que la conoce, y las alternativas (fichero en disco) son
+  peores.
+
+Verificación, **solo por nombre**:
+
+```powershell
+az keyvault secret list --vault-name <keyVault> --query "[].name" -o tsv
+```
+
+Deben aparecer los dos nombres, más `SIGRID-API-FUNCTION-KEY`. **Nunca uses
+`az keyvault secret show` para «comprobar» que se copió bien.**
+
+**Las copias viejas de `kv-albaranes-rs9k2` no se borran todavía**: se retiran
+cuando el job haya completado una ejecución correcta (después del paso 10 de
+verificación). Hasta entonces son la vuelta atrás.
+
+### 4. Rol de plano de datos sobre la cuenta de almacenamiento
 
 La cuenta se crea **sin clave compartida**, así que ni las herramientas
 gráficas entran con la clave: todo el acceso es por identidad. Para crear el

@@ -46,7 +46,7 @@ de tiempo. Falta el nuevo veredicto del reviewer.
 
 **No se ha ejecutado ni un comando `az` de escritura, ni `python main.py`.**
 
-## ⚠ DOS PUERTAS QUE BLOQUEAN EL BLOQUE 5
+## ⚠ LAS DOS PUERTAS DEL BLOQUE 5 (una sigue cerrada, la otra ya se resolvió)
 
 **1 · El disco (incidente del 2026-08-09, más abajo).** El job nocturno
 ejecuta la misma carga que llenó el disco del servidor compartido. Entre A, B y
@@ -63,26 +63,27 @@ alguien lo pone a `true` con `F-019` sin cerrar. Además
 `80_create_job.ps1` no hace nada sin `-Confirmar`, pero ninguna de esas dos
 frena hoy: el disco volvió al 42,3 % al revertirse la transacción.
 
-**2 · DA-4, NUEVA · autenticación contra Postgres.** La spec aprobada prohíbe
-pasar contraseña al job (R10) y manda token de Entra (R12), pero
-`psql-albaranes-rs9k2` **tiene Entra deshabilitado** y habilitarlo es una
-operación de servidor que afecta a `albaranes` y `partes` — la descartaste el
-2026-08-08, y F-005 se desplegó con contraseña en Key Vault. Tal cual, **el job
-se crearía perfecto y fallaría al conectar todas las noches**. Además, en modo
-`entra` el usuario tendría que ser el nombre de la identidad gestionada, y ese
-rol no existe en `sigrid_dm`.
+**2 · DA-4 · autenticación contra Postgres. CERRADA por ti el 2026-08-10:
+OPCIÓN B, ya aplicada.** La spec aprobada prohibía pasar contraseña al job (R10)
+y mandaba token de Entra (R12), pero `psql-albaranes-rs9k2` **tiene Entra
+deshabilitado** y habilitarlo es una operación de servidor que afecta a
+`albaranes` y `partes` — la descartaste el 2026-08-08, y F-005 se desplegó con
+contraseña en Key Vault. Tal cual, **el job se creaba perfecto y fallaba al
+conectar todas las noches**.
 
-Las dos únicas salidas, y **las decides tú**:
+Cómo queda: el job se autentica como `sigrid_dm_app` con su contraseña, que
+viaja como **referencia a Key Vault resuelta por la identidad gestionada**,
+igual que la clave de `sigrid-api`. **Ningún valor de secreto** en el
+repositorio, en un script ni en la línea de comandos. `pgAuthMode` pasa a
+`password`; el modo `entra` queda implementado, probado y **dormido**. La
+enmienda está escrita y fechada en `specs/F-003-infra-caj/requirements.md`
+§Enmiendas, sin borrar el texto original de R10 ni el bloque C.
 
-- **(A)** Habilitar Entra en el servidor + crear el rol de la identidad en la
-  base. Es lo que dice la spec; toca un servidor con dos aplicaciones vivas.
-- **(B)** Enmendar R10 para que la contraseña del rol nativo viaje como
-  referencia a Key Vault, igual que la clave de la API. Coherente con lo que ya
-  hacen `albaranes` y `partes` y con tu decisión del 2026-08-08. Exige
-  modificar la spec, `infra/env/dev.json` y `80_create_job.ps1`.
-
-No se ha improvisado ninguna de las dos: los scripts cumplen la spec al pie de
-la letra y las puertas están escritas **y** son detectables por máquina.
+Esta puerta **ya no bloquea T23**; la única que queda es `F-019`. Lo que sí
+añade es un paso nuevo al bloque 5: **T22 bis, migrar las dos contraseñas** de
+`kv-albaranes-rs9k2` a `kv-datamart-seg-dev`, que también aprobaste. Va antes de
+crear el job, y el procedimiento seguro (el valor no pasa por pantalla, ni por
+fichero, ni por el historial) está en `infra/README.md` §«Paso 8 bis».
 
 ## Guion del bloque 5 (T18–T28), listo para ejecutar
 
@@ -100,7 +101,8 @@ Todo el detalle (comandos exactos, qué exige autorización, KQL de logs) está 
 | **T20** | `az keyvault secret set --vault-name kv-datamart-seg-dev -n SIGRID-API-FUNCTION-KEY --file <ruta>` | `secret list` devuelve el nombre. **Nunca `secret show`**; el valor no se escribe en ningún fichero. Necesitas `Key Vault Secrets Officer`. |
 | **T21** | `pwsh -File infra/70_build_image.ps1` | R20. **Anotar el tag.** |
 | **T22** | Regla de firewall para la IP de T18 sobre `psql-albaranes-rs9k2` | ⚠ **Escritura sobre un recurso de `albaranes`**: autorización expresa, la ejecutas tú. Después, `firewall-rule list` debe traer las de antes **más** la nueva. |
-| **T23** | `pwsh -File infra/80_create_job.ps1 -Confirmar` | **BLOQUEADA** por las dos puertas de arriba. R21. |
+| **T22 bis** | Migrar `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro` de `kv-albaranes-rs9k2` a `kv-datamart-seg-dev` | **DA-4 opción B (R27).** Procedimiento exacto en `infra/README.md` §«Paso 8 bis»: `show` **siempre** asignado a variable, `set` con `-o none`, sin ficheros temporales. Comprobar con `secret list` (**nunca `show`**). Las copias viejas se borran **después** de T24. |
+| **T23** | `pwsh -File infra/80_create_job.ps1 -Confirmar` | **BLOQUEADA por `F-019`** (DA-4 ya no bloquea). Exige que T22 bis esté hecha: el script aborta si falta el secreto. R21. |
 | **T24** | `az containerapp job start` + `job start --command python --args main.py,version` | `Succeeded` y el tag coincide con T21. |
 | **T25** | KQL de `infra/README.md` | Salen las líneas de T24. Si una columna no cuadra, `getschema` y **corregir el README**. |
 | **T26** | `az monitor metrics list-definitions --resource <id-job>` y luego `90_create_alert.ps1` | Correcto **solo si llega el correo**. Anotar hora del fallo y de recepción. |
@@ -285,6 +287,11 @@ Se han guardado en **`kv-albaranes-rs9k2`** porque el vault propio del
 datamart (`kv-datamart-seg-dev`) **lo crea F-003 y todavía no existe**. Es una
 decisión de conveniencia, no de diseño: **F-003 debe moverlas** a su vault y
 actualizar la referencia. Anotado para que no se quede así por inercia.
+
+> **Al día 2026-08-10:** deja de ser una nota suelta. Con DA-4 cerrada (opción
+> B) la migración es **T22 bis** del bloque 5, con procedimiento escrito en
+> `infra/README.md` §«Paso 8 bis» y requisito propio (**R27**). Sigue
+> pendiente de ejecutar: el vault de destino aún no existe.
 
 ---
 

@@ -1,7 +1,7 @@
 <!-- progress/mutacion_F-003.md -->
 # F-003 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-003` el 2026-08-10 00:36.
+Generado por `python -m harness.mutacion --feature F-003` el 2026-08-10 00:53.
 
 ## Alcance
 

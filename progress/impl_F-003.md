@@ -10,6 +10,12 @@ ninguna forma.
 
 ## 0. Lo que hay que leer aunque no se lea nada más
 
+> ⚠ **Esta sección refleja el estado al terminar T17. Lo posterior está en §10
+> (correcciones tras la review) y §11 (DA-4 aplicada, 2026-08-10).** Se conserva
+> tal cual porque es lo que se entregó a revisión. **Al día de hoy: la puerta 1
+> sigue cerrada y pasa a depender de `F-019`; la puerta 2 (DA-4) está resuelta
+> con la opción B.**
+
 `infra/` está reescrito y completo, pero **el despliegue no debe empezar
 todavía**. Hay dos puertas abiertas, y ninguna la puede cerrar un agente:
 
@@ -239,6 +245,10 @@ Anotado en `infra/README.md` y en el guion del humano.
 
 ## 5. DA-4 · la contradicción entre la spec y el servidor (BLOQUEA T23)
 
+> ✅ **CERRADA el 2026-08-10 con la opción B. Aplicada en §11.** Lo que sigue es
+> el planteamiento tal como se elevó al humano; se conserva porque es el
+> razonamiento sobre el que decidió.
+
 - **R10** prohíbe pasar contraseña alguna al contenedor: «el único secreto del
   job es la clave de `sigrid-api`». **R12** manda usar token de Entra.
 - **La realidad**: `psql-albaranes-rs9k2` tiene la autenticación Entra
@@ -333,6 +343,10 @@ orden, está en `progress/current.md` §F-003 y en `infra/README.md`.
 
 ## 8. Evidencias
 
+> Números **al terminar T17**. Los de las dos rondas posteriores están en §10.4
+> (tras la review) y §11.7 (tras DA-4). Estado final vigente: **258 tests**,
+> 1,93 s, cobertura N/A con motivo, 0/0 mutantes.
+
 | Evidencia | Valor real |
 |---|---|
 | **Tests ejecutados** | `python -m pytest -q` → **254 passed**, 0 failed (baseline en `dev`: 221; **+33** de F-003: 26 de infraestructura + 4 de autenticación Entra + **3 de la puerta de F-019**, §10) |
@@ -369,7 +383,8 @@ Queda anotado como propuesta, no como deuda de F-003.
 ## 9. Estado
 
 - **T1–T17: completas.** `tasks.md` marcado.
-- **T18–T28: del humano**, y bloqueadas por `F-019` (T23) y por DA-4.
+- **T18–T28 (más T22 bis, §11): del humano.** T23 sigue bloqueada por `F-019`;
+  DA-4 ya no bloquea (§11).
 - `harness/features.json`: F-003 sigue en **`in_progress`**. No se marca `done`:
   falta el veredicto del reviewer y todo el bloque 5.
 
@@ -500,7 +515,202 @@ del paso 9», que es como el README se refiere ya a los pasos.
 
 - **`F-019` sigue en `pending`.** La puerta está bien puesta, no abierta. T23 no
   se puede ejecutar.
-- **DA-4 sigue abierta** y la decide el humano; no se ha tocado.
+- **DA-4 sigue abierta** y la decide el humano; no se ha tocado. *(Se cerró al
+  día siguiente: ver §11.)*
 - Las observaciones 3 y 5 de la review (las contraseñas de F-005 en el vault
   antiguo, el hallazgo anotado para F-016) siguen como estaban: no eran
-  bloqueantes y no entraban en el encargo.
+  bloqueantes y no entraban en el encargo. *(La 3 entra en el alcance en §11.)*
+
+---
+
+## 11. DA-4 aplicada: opción B (2026-08-10)
+
+El humano cerró DA-4 el 2026-08-10 con la **opción B**: el job se autentica
+contra PostgreSQL como el rol nativo `sigrid_dm_app` **con su contraseña**, que
+viaja como **referencia a Key Vault resuelta por la identidad gestionada** —el
+mismo mecanismo que la clave de `sigrid-api`—. La opción A (habilitar Entra en el
+servidor) queda descartada: es una operación de servidor que afecta a `albaranes`
+y `partes`, ya rechazada el 2026-08-08.
+
+Aprobó además **migrar las contraseñas al vault propio dentro de F-003**, lo que
+cierra la deuda que la review señalaba en su observación 3.
+
+### 11.1 La enmienda de la spec, fechada y sin borrar nada
+
+`specs/F-003-infra-caj/requirements.md` gana una sección **§Enmiendas** con la
+enmienda del 2026-08-10: qué cambia, por qué, **qué NO cambia** y una tabla de
+requisitos afectados. Los textos originales **se conservan**:
+
+- **R10** lleva ahora su texto original **citado en bloque** («no puede existir
+  `PG_PASSWORD`… el único secreto del job…») y debajo el texto vigente. Se ve de
+  un vistazo qué decía antes y qué dice ahora.
+- El **bloque C (R12–R14)** lleva un aviso al principio: **implementado, probado
+  y dormido**. No se borra ni se deja de verificar, porque es el camino de vuelta
+  si algún día se habilita Entra. Sus cuatro tests siguen en verde.
+- **R27, nuevo** [MANUAL]: la contraseña vive en el Key Vault del proyecto y la
+  migración no puede exponer el valor.
+
+Lo mismo se refleja donde el diseño se contradecía: `design.md` §5 (claves nuevas
+del fichero de entorno y `pgAuthMode = "password"`), §6 (la llamada real con los
+**dos** secretos) y la tabla de alternativas descartadas, donde «Contraseña de
+Postgres en Key Vault» pasa a estar **tachada con la explicación del porqué se
+revierte** —el razonamiento era bueno, pero daba por disponible un Entra que el
+servidor no tiene—. Y en `tasks.md`, el bloque 3 avisa de que T12–T14 **no se
+rehacen ni se revierten**.
+
+**Por qué así y no reescribiendo los requisitos**: una spec que se reescribe
+sobre la marcha deja de servir para juzgar el trabajo. Quien revise esto dentro
+de seis meses tiene que poder ver que R10 decía otra cosa, quién cambió el
+criterio y con qué argumento.
+
+### 11.2 Qué cambia en el código
+
+| Fichero | Cambio |
+|---|---|
+| `infra/env/dev.json` | `pgAuthMode`: `entra` → **`password`**. Tres claves nuevas —`pgSecretName` (el secreto en el vault), `pgJobSecretName` (cómo se llama dentro del job) y `pgReadonlySecretName` (la del MCP, que el job no usa pero la migración sí)— con un `$doc_secretos_pg` que aclara que son **nombres, nunca valores**. `$aviso_pgAuthMode` reescrito: cuenta la resolución, qué se descartó y **cómo se reactiva** el modo `entra` |
+| `infra/00_vars.ps1` | Las tres claves entran en `$clavesObligatorias`: fail-closed |
+| `infra/80_create_job.ps1` | Nuevo apartado **«2 bis»**: comprueba que el secreto de la contraseña está en el vault —**por nombre, sin leer el valor**—, y construye `$secretosJob` y `$varsAuth`. En modo `password` añade el segundo `keyvaultref` y `PG_PASSWORD=secretref:…`; en modo `entra` no genera ninguno de los dos. La puerta de DA-4 (`-ne "entra"` → `throw`) se convierte en **lista blanca** (`-notin @("password","entra")`), porque cerrar la decisión no es motivo para dejar pasar una errata |
+| `infra/05_check_prereqs.ps1` | El `if/else` de DA-4 pasa a `switch` de tres ramas: `entra` mantiene íntegra la comprobación contra `authConfig.activeDirectoryAuth`, `password` informa de dónde saldrá el secreto, y `default` **falla** ante un modo inexistente |
+
+El detalle que decide el diseño del script: las variables de entorno y los
+secretos **se construyen antes** de llamar a `az`, en dos arrays. Alternativa
+descartada: duplicar la llamada a `az containerapp job create` bajo un `if`. Dos
+llamadas de veinte líneas que hay que mantener idénticas salvo en dos renglones
+es exactamente cómo se termina programando el job con la CPU de un entorno y la
+memoria de otro.
+
+### 11.3 Lo que NO cambia, y es lo que sujeta la enmienda
+
+La prohibición real de R10 nunca fue la palabra `PG_PASSWORD`: era que **un valor
+de secreto no aparezca en el repositorio, en un script ni en una línea de
+comandos**. Eso sigue igual de cerrado, y con tests:
+
+- Ningún `--secrets` con valor literal: **todos** por `keyvaultref` + `identityref`.
+- `PG_PASSWORD` solo admite `secretref:<nombre>`; cualquier otra cosa es un fallo.
+- El script **no lee** el secreto: comprueba que el **nombre** está en
+  `az keyvault secret list`. Sigue sin haber un solo `secret show` en `infra/`.
+
+### 11.4 Los tests, y un fallo propio que la fase RED destapó
+
+Cuatro tests nuevos y uno reescrito:
+
+| Test | Qué sujeta |
+|---|---|
+| `test_f003_r10_ninguna_contrasena_literal_en_los_scripts` | Reescritura del antiguo `..._sin_pg_password_ni_secretos_literales_...`: mismo requisito, expresado sobre la invariante que sobrevive a la enmienda (valores, no nombres) |
+| `test_f003_r10_la_contrasena_de_postgres_viaja_por_keyvaultref` | El mecanismo **está**: segundo secreto por `keyvaultref` + `identityref` y `PG_PASSWORD=secretref:$($CFG.pgJobSecretName)`. Sin este test, «no hay contraseñas» se cumpliría también borrándolo todo |
+| `test_f003_r10_el_job_solo_admite_los_dos_modos_de_autenticacion_previstos` | La lista blanca de modos: un `pgAuthMode` con errata aborta |
+| `test_f003_el_usuario_de_postgres_cuadra_con_el_modo_de_autenticacion` | Cierra la **observación 2 de la review**: en `entra` el usuario debe ser la identidad gestionada; en `password`, no puede serlo. Cambiar el modo sin cambiar el usuario deja la suite en rojo |
+| `test_f003_los_prerrequisitos_comprueban_el_modo_de_autenticacion_declarado` | Que el modo `entra` no se quede sin red de seguridad al dejar de usarse |
+
+**El fallo propio, que merece constar.** La primera versión del ayudante
+`_valores_de_secretos` seguía las variables que aparecían **dentro** de un
+literal entrecomillado, y con ello daba por «secreto literal» el
+`$uriSecreto = "{0}secrets/{1}"`:
+
+```
+E   AssertionError: 80_create_job.ps1 pasa un secreto literal: '{0}secrets/{1}'
+```
+
+Era un falso positivo del test, no un defecto del script. Se corrigió tokenizando
+el argumento (una cadena entrecomillada se consume entera antes de mirar si hay
+variables) en vez de relajar la aserción, que era la salida fácil y la que habría
+dejado el test sin morder.
+
+El ayudante existe por una razón que conviene dejar escrita: al volverse
+condicionales, los secretos pasaron a construirse en una variable, y un test que
+solo mirase `--secrets "..."` se habría quedado **verde por no encontrar nada**,
+que es la peor forma de estar verde.
+
+### 11.5 Fase RED (nivel `critico`)
+
+Los cinco tests, escritos y ejecutados **antes** de tocar el JSON y los scripts:
+
+```
+$ python -m pytest tests/test_f003_infra.py -q
+
+E       AssertionError: en modo entra el usuario de Postgres tiene que ser el nombre
+        de la identidad gestionada, que es lo que el servidor reconoce
+E       assert 'sigrid_dm_app' == 'id-datamart-seg-dev'
+
+E       AssertionError: el modo con contraseña no se reconoce
+E       assert '"password"' in '# infra/05_check_prereqs.ps1\n...'
+
+E       AssertionError: 80_create_job.ps1 no aborta ante un modo de autenticación desconocido
+E       assert None
+
+FAILED tests/test_f003_infra.py::test_f003_r1_dev_json_tiene_todas_las_claves_obligatorias
+FAILED tests/test_f003_infra.py::test_f003_r1_los_ps1_no_contienen_nombres_de_recurso
+FAILED tests/test_f003_infra.py::test_f003_r2_todos_los_env_json_validan_igual[dev.json]
+FAILED tests/test_f003_infra.py::test_f003_r3_ningun_valor_obligatorio_vacio_ni_TODO[dev.json]
+FAILED tests/test_f003_infra.py::test_f003_r10_el_job_solo_admite_los_dos_modos_de_autenticacion_previstos
+FAILED tests/test_f003_infra.py::test_f003_el_usuario_de_postgres_cuadra_con_el_modo_de_autenticacion
+FAILED tests/test_f003_infra.py::test_f003_los_prerrequisitos_comprueban_el_modo_de_autenticacion_declarado
+7 failed, 25 passed, 1 skipped in 0.72s
+```
+
+Dos lecturas que importan de ese rojo:
+
+- **El `1 skipped` es `test_f003_r10_la_contrasena_de_postgres_viaja_por_keyvaultref`.**
+  Se salta solo mientras el entorno no declare modo `password`; en cuanto
+  `dev.json` cambió, pasó a ejecutarse. Queda dicho para que nadie lo lea como
+  un test que se salta siempre.
+- `test_f003_r10_ninguna_contrasena_literal_en_los_scripts` **nació en verde** y
+  siguió en verde: es la invariante que la enmienda **no** toca. Lo contrario
+  sería la señal de alarma.
+
+Y el verde, ya con `dev.json`, `00_vars.ps1`, `80_create_job.ps1` y
+`05_check_prereqs.ps1` aplicados:
+
+```
+$ python -m pytest tests/test_f003_infra.py -q
+33 passed in 0.59s
+```
+
+### 11.6 El paso 8 bis: migrar las contraseñas sin enseñarlas
+
+`infra/README.md` gana el procedimiento, `tasks.md` la tarea **T22 bis** (antes
+de T23) y `current.md` su fila en el guion. La forma elegida en PowerShell 5.1:
+`show` **siempre asignado a una variable**, `set` con **`-o none`**, y la
+variable a `$null` al terminar.
+
+Lo que se descartó, y por qué —está escrito en el README, no solo aquí—:
+
+- **Fichero temporal**: deja el valor en disco y, en PowerShell 5.1, la
+  redirección añade BOM y salto de línea. No es solo menos seguro: **corrompe la
+  contraseña**, y el job fallaría a autenticar con un error que no apunta a nada.
+- **Canalizar `show` a `set --value @-`**: la tubería añade igualmente el salto
+  de línea final. Mismo resultado.
+- **`-o none` no es cosmético**: `az keyvault secret set` devuelve el objeto del
+  secreto **con su valor**. Sin él, el paso que protege el secreto lo imprime.
+- **Riesgo residual declarado**: durante la llamada, el valor está en la línea de
+  comandos del proceso `az`, visible para otro proceso del mismo usuario en esa
+  máquina. Se asume: es el puesto del administrador que ya conoce la contraseña,
+  y las alternativas son peores.
+
+Verificación por **nombre** (`secret list`), nunca `show`. Y las copias de
+`kv-albaranes-rs9k2` **no se borran** hasta que el job complete una ejecución:
+son la vuelta atrás.
+
+### 11.7 Evidencias
+
+| Evidencia | Valor real |
+|---|---|
+| **Tests ejecutados** | `python -m pytest -q` → **258 passed**, 0 failed (254 antes de la enmienda, **+4**) |
+| **Tiempo de la suite** | **1,93 s**; 2,94 s bajo cobertura dentro de `init.sh` |
+| **Cobertura de las líneas cambiadas** | **N/A con motivo**, sin cambios: la enmienda no añade Python de producción (`PUERTA COBERTURA: N/A (F-003: las líneas cambiadas no contienen sentencias ejecutables)`) |
+| **Mutantes / supervivientes** | **0 / 0**. Campaña relanzada: «1 fichero(s), 1 línea(s) de producción … 0 mutantes evaluados, 0 muertos, 0 supervivientes» |
+| **`bash harness/init.sh`** | **ENTORNO LISTO**, exit 0 |
+| **Avisos de `ruff` propios** | **0** (`ruff check tests/test_f003_infra.py`). El total del repo sigue en 127, deuda previa |
+| **Sintaxis de los 13 `.ps1`** | Validada con el parser de PowerShell **sin ejecutarlos**: 13 OK, incluidos el `switch` y los arrays nuevos |
+| **Barrido de secretos** | `test_f003_r4_sin_secretos_ni_identificadores_en_infra_y_spec` en verde tras la enmienda: los nombres de secreto añadidos son nombres, y el README documenta el procedimiento **sin** ningún valor |
+
+### 11.8 Lo que queda pendiente
+
+- **T22 bis no está ejecutada**: la migración la hace el humano y necesita que
+  exista `kv-datamart-seg-dev` (paso 6). El job aborta si el secreto falta, así
+  que el orden está protegido por el propio script.
+- **`F-019` sigue en `pending`** y sigue siendo la única puerta que bloquea T23.
+- **En `kv-albaranes-rs9k2` siguen las copias**, y así debe ser hasta que el job
+  funcione.
+- No se ha ejecutado ni un `az` de escritura, ni `python main.py`, ni una
+  conexión a la base o a la API.
