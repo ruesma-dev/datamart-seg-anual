@@ -52,6 +52,20 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   Tope duro 10.000 filas/petición; timeout de red efectivo 230 s.
 - Solo LECTURA de Sigrid desde este proyecto. Las escrituras del datamart van
   al PostgreSQL propio (local en dev, Flexible Server en Azure).
+- **Los tres Excels auxiliares de Negocio (F-004)** se leen de una ruta del
+  sistema de ficheros **o** de Azure Blob Storage, y lo decide la FORMA del
+  valor de `AUX_EXCEL_*`: una URI
+  `https://<cuenta>.blob.core.windows.net/<contenedor>/<blob>` va a Blob
+  Storage; cualquier otra cosa, al disco. No hay variable de modo que mantener
+  coherente. La autenticación es `DefaultAzureCredential` —identidad
+  gestionada en el job, sesión de `az` en el puesto—, con el rol
+  `Storage Blob Data Reader` sobre la cuenta: **ni cadenas de conexión, ni
+  claves, ni SAS** (una URI con query string se rechaza al arrancar el paso).
+  El contenido se obtiene **en memoria**, sin ficheros temporales, porque el
+  contenedor no tiene dónde escribirlos. Puerto e implementaciones en
+  `etl_sigrid/infrastructure/excel/`; el step `load_excel_aux` no sabe de
+  Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
+  esquema de los libros no están definidos todavía.
 
 ### El datamart en Azure (F-005)
 
