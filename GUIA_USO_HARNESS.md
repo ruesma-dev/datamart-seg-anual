@@ -99,17 +99,19 @@ El humano hace merge y push, nunca el agente.
 
 ## 4. Despliegue a Azure (F-003 o cuando toque)
 
-1. Rellenar los `TODO_` de `infra/00_vars.ps1` (ACR y host de Postgres).
-2. Una sola vez: `.\infra\10_create_rg.ps1`.
-3. Por despliegue:
+1. Revisar `infra/env/<entorno>.json`: es el único sitio con nombres de
+   recurso. Ningún `.ps1` lleva ninguno, y la suscripción no está en el repo.
+2. Primer despliegue de un entorno: `infra/README.md` da el orden completo
+   (`05_check_prereqs` → `10` → `20` → `30` → `40` → `50` → `60` → `70` →
+   `80`), qué pasos exige autorización del humano y cuáles son idempotentes.
+3. Despliegues siguientes:
    ```
-   .\infra\20_build_image.ps1     # build en ACR con tag fechado rYYYYMMDD-HHmm
-   .\infra\30_create_job.ps1      # primera vez (crea el job con secretos)
-   .\infra\40_update_job.ps1      # despliegues siguientes
-   az containerapp job start -g rg-seguimiento-dev -n caj-datamart-seg   # prueba manual
+   pwsh -File infra\70_build_image.ps1   # build en el registro, tag fechado
+   pwsh -File infra\85_update_job.ps1    # apunta el job a la imagen nueva
    ```
-4. Recuerda: el `.env` NO viaja a Azure; los secretos van como secrets del
-   job. Tags fechados siempre (los Container Apps fijan el digest).
+4. Recuerda: el `.env` NO viaja a Azure. El job no lleva contraseñas: usa una
+   identidad gestionada y una referencia a Key Vault. Tags fechados siempre
+   (los Container Apps fijan el digest).
 
 ## 5. Mantenimiento del arnés
 

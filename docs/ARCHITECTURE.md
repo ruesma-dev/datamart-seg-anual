@@ -97,10 +97,26 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
 ## Infra
 
 - `Dockerfile` en raíz. `infra/` con scripts PowerShell 5.1 (UTF-8 BOM, CRLF)
-  siguiendo el patrón `00_vars.ps1` como única fuente de verdad de nombres.
+  numerados por orden de ejecución. Procedimiento y datos están separados:
+  **los nombres de recurso viven solo en `infra/env/<entorno>.json`** y ningún
+  `.ps1` escribe uno. Montar `sta` o `pro` es copiar ese fichero y ejecutar con
+  `-Entorno <nombre>`; `00_vars.ps1` lo carga, lo valida y aborta antes de la
+  primera llamada a `az` si falta un valor. Lo verifican los tests
+  `test_f003_r1..r11` sin tocar Azure.
+- **Ni la suscripción ni ningún secreto están en el repositorio.** La
+  suscripción sale de `$env:AZ_SUBSCRIPTION_ID` o del contexto de `az`.
 - `infra/sql/` contiene la provisión de `sigrid_dm` (base, roles, diagnóstico).
   Se ejecuta a mano con `psql`, nunca desde el ETL: usa bloques `$$`, que el
   troceador de sentencias de `postgres_client.py` no sabe manejar.
-- Destino: Azure Container Apps Job programado en `rg-seguimiento-dev`,
-  región `spaincentral`. Tags de imagen fechados (`rYYYYMMDD-HHmm`), nunca
-  reescribir tags.
+- Destino: **Container Apps Job programado** (`0 2 * * *` UTC, siempre
+  `run-all --full`) en un resource group propio del datamart, región
+  `spaincentral`, con entorno **sin integración de red virtual** — así tiene IP
+  de salida estática, que es lo que se autoriza en el firewall del Postgres.
+  Tags de imagen fechados (`rYYYYMMDD-HHmm`), nunca reescritos.
+- **Sin contraseñas en el job.** Corre con una **identidad gestionada asignada
+  por el usuario** que tiene exactamente tres permisos: bajar la imagen del
+  registro, leer el único secreto (la clave de `sigrid-api`) del Key Vault del
+  proyecto y leer los Excels auxiliares del blob. Esa misma identidad es la que
+  `AZURE_CLIENT_ID` señala dentro del contenedor.
+- Orden de ejecución, pasos que exigen autorización del humano y consulta de
+  logs: `infra/README.md`.

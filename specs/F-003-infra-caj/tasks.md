@@ -114,7 +114,7 @@ agente escribe en Azure.
       **Verificación**: `pip install -r requirements.txt` en el venv y
       `python -c "import azure.identity"`.
 
-- [ ] **T15**: Actualizar la sección «Infra» de `docs/ARCHITECTURE.md`
+- [x] **T15**: Actualizar la sección «Infra» de `docs/ARCHITECTURE.md`
       (resource group real, `infra/env/<entorno>.json`, identidad gestionada,
       sin contraseñas).
       **Verificación**: revisión del reviewer; ninguna mención a
