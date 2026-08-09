@@ -91,6 +91,32 @@ barras.
 
 ---
 
+## ⚠ INCIDENTE 2026-08-09 ~21:00 · disco del servidor compartido casi lleno
+
+Tercer intento del paso 8: `raw` completa (incl. `dca`), pero
+`stage`/`build_plan_mensual` **llenó el disco de 32 GB** del servidor
+compartido: storage_percent subió a **93,4 %** a las 20:55 y Azure activó la
+protección → servidor **en solo-lectura ~10 min** (20:55–21:05) y conexión
+matada (`AdminShutdown`). La transacción se revirtió y el disco volvió a
+**42,3 %** (≈13,5 GB usados: base previa 4,1 + `raw` del datamart ≈9,4).
+`albaranes` y `partes` pudieron fallar escrituras en esa ventana (sábado
+noche; revisar sus logs).
+
+**Causa raíz**: `stg/08_plan_mensual.sql` explota `raw.obrparpre` (13,76 M
+filas) con `CROSS JOIN LATERAL unnest(string_to_array(planif,'|'))`; en el
+B1ms (2 GB RAM) los sorts derraman a ficheros temporales sobre el mismo disco
+→ 16+ GB de temporales/WAL y 103 min sin terminar. En local no pasa porque
+sobra RAM. **Veredicto anticipado del paso 9: `Standard_B1ms` + 32 GB NO
+aguanta el build completo de stg tal como está escrito.**
+
+**PROHIBIDO relanzar `stage` contra Azure hasta decidir** (lo volvería a
+llenar). Decisión del humano pendiente entre: (A) crecer el disco 32→64 GB
+(operación online pero **irreversible** y sobre el servidor compartido; da
+más IOPS), (B) trocear/optimizar el build de `plan_mensual` para acotar el
+pico de temporales, (C) subir el SKU. La recomendación del líder es B
+primero: A y C tocan el servidor de producción compartido y no arreglan que
+1 vCPU se arrastre.
+
 **F-005 · Fase 2 contra Azure, paso 8 a medias.** Pasos 3 a 7 y 11 hechos el
 2026-08-09. Del paso 8 (carga inicial) van **dos intentos fallidos**: el
 primero por corte de red local (11:46, `getaddrinfo failed`); el segundo llegó
