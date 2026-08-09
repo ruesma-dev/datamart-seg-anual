@@ -9,15 +9,22 @@ límite del adaptador. El SDK de Azure NO se importa en ningún test.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from config.settings import AuxExcelSettings
 from etl_sigrid.infrastructure.excel.aux_file_source import (
+    BLOB_HOST_SUFFIX,
     AuxFileConfigError,
+    AuxFileError,
+    AuxFileNotFoundError,
+    LocalAuxFileSource,
+    get_aux_file_source,
     parse_aux_file_ref,
 )
 
-SAS = "sv=2024-11-04&sig=FIRMA-SECRETA-QUE-NO-DEBE-SALIR&se=2030-01-01"
+SAS ="sv=2024-11-04&sig=FIRMA-SECRETA-QUE-NO-DEBE-SALIR&se=2030-01-01"
 
 
 def _aux(**kwargs: str) -> AuxExcelSettings:
@@ -259,3 +266,73 @@ def test_f004_r7_una_cuenta_vacia_tambien_se_rechaza() -> None:
             "AUX_EXCEL_TIPO_PARTIDA",
             "https://.blob.core.windows.net/aux/TipoPartida.xlsx",
         )
+
+
+# ---------------------------------------------------------------------------
+# R3 · el adaptador local lee de verdad un .xlsx del sistema de ficheros
+# ---------------------------------------------------------------------------
+
+def _xlsx(destino, hojas=("Hoja1",)) -> bytes:
+    """Genera un .xlsx real con openpyxl y devuelve sus bytes."""
+    from openpyxl import Workbook
+
+    libro = Workbook()
+    libro.active.title = hojas[0]
+    for hoja in hojas[1:]:
+        libro.create_sheet(hoja)
+    libro.active["A1"] = "codigo"
+    libro.save(destino)
+    return Path(destino).read_bytes()
+
+
+def test_f004_r3_lee_un_xlsx_real_del_sistema_de_ficheros(tmp_path) -> None:
+    """El camino local sigue funcionando: es requisito, no cortesía."""
+    fichero = tmp_path / "TipoPartida.xlsx"
+    esperado = _xlsx(fichero)
+
+    ref = parse_aux_file_ref("tipo_partida", "AUX_EXCEL_TIPO_PARTIDA", str(fichero))
+    datos = LocalAuxFileSource().read_bytes(ref)
+
+    assert datos == esperado
+    assert datos[:2] == b"PK"
+
+
+def test_f004_r3_la_fabrica_devuelve_el_adaptador_local_para_una_ruta(tmp_path) -> None:
+    """get_aux_file_source elige por el origen de la referencia, no por configuración."""
+    ref = parse_aux_file_ref(
+        "tipo_partida", "AUX_EXCEL_TIPO_PARTIDA", str(tmp_path / "x.xlsx")
+    )
+
+    assert isinstance(get_aux_file_source(ref), LocalAuxFileSource)
+
+
+# ---------------------------------------------------------------------------
+# R8 · el error de un fichero local ausente tiene que ser accionable a las 3 AM
+# ---------------------------------------------------------------------------
+
+def test_f004_r8_ruta_local_inexistente_produce_mensaje_accionable(tmp_path) -> None:
+    """Nombre lógico, variable responsable, ruta recibida y la pista del contenedor."""
+    ausente = tmp_path / "no_existe" / "TipoPartida.xlsx"
+    ref = parse_aux_file_ref("tipo_partida", "AUX_EXCEL_TIPO_PARTIDA", str(ausente))
+
+    with pytest.raises(AuxFileNotFoundError) as exc:
+        LocalAuxFileSource().read_bytes(ref)
+
+    mensaje = str(exc.value)
+    assert "tipo_partida" in mensaje
+    assert "AUX_EXCEL_TIPO_PARTIDA" in mensaje
+    assert str(ausente) in mensaje
+    assert "contenedor" in mensaje
+    assert BLOB_HOST_SUFFIX in mensaje
+
+
+def test_f004_r8_un_directorio_en_vez_de_un_fichero_tambien_falla_nombrando_la_variable(
+    tmp_path,
+) -> None:
+    """Apuntar a una carpeta es un error de configuración frecuente; no puede reventar feo."""
+    ref = parse_aux_file_ref("tipo_coste", "AUX_EXCEL_TIPO_COSTE", str(tmp_path))
+
+    with pytest.raises(AuxFileError) as exc:
+        LocalAuxFileSource().read_bytes(ref)
+
+    assert "AUX_EXCEL_TIPO_COSTE" in str(exc.value)

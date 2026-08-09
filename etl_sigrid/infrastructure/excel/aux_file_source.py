@@ -16,6 +16,8 @@ entorno es justo lo que este diseño evita.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
 from urllib.parse import urlsplit
 
 #: Sufijo del host de cualquier cuenta de Azure Blob Storage.
@@ -163,3 +165,51 @@ def _parse_blob_uri(logical_name: str, env_var: str, valor: str) -> AuxFileRef:
         container=container,
         blob_name=blob_name,
     )
+
+
+class AuxFileSource(Protocol):
+    """Puerto: devuelve el contenido de un Excel auxiliar, venga de donde venga."""
+
+    def read_bytes(self, ref: AuxFileRef) -> bytes:
+        """Contenido completo del fichero, en memoria. Nunca escribe en disco."""
+        ...
+
+
+class LocalAuxFileSource:
+    """Adaptador del sistema de ficheros: disco local, unidad de red o UNC."""
+
+    def read_bytes(self, ref: AuxFileRef) -> bytes:
+        """Lee el fichero entero y traduce los fallos del SO a la jerarquía del puerto."""
+        ruta = Path(str(ref.local_path))
+        try:
+            return ruta.read_bytes()
+        except (FileNotFoundError, NotADirectoryError, IsADirectoryError) as exc:
+            raise AuxFileNotFoundError(
+                f"No se encuentra el Excel auxiliar '{ref.logical_name}' en la ruta "
+                f"local '{ref.local_path}' (variable {ref.env_var}). Comprueba que la "
+                f"ruta existe y es accesible para el usuario que ejecuta el ETL. "
+                f"En un contenedor de Azure las rutas locales NO existen: usa una URI "
+                f"de blob con la forma {BLOB_URI_FORM} y sube el fichero al contenedor."
+            ) from exc
+        except OSError as exc:
+            raise AuxFileAccessError(
+                f"No se puede leer el Excel auxiliar '{ref.logical_name}' en la ruta "
+                f"local '{ref.local_path}' (variable {ref.env_var}): {exc}. Comprueba "
+                f"que apunta a un fichero (no a una carpeta) y que el usuario que "
+                f"ejecuta el ETL tiene permiso de lectura sobre él."
+            ) from exc
+
+
+def get_aux_file_source(ref: AuxFileRef) -> AuxFileSource:
+    """
+    Adaptador que corresponde a una referencia ya clasificada.
+
+    El adaptador de blob se importa de forma PEREZOSA a propósito: un entorno
+    sin el SDK de Azure instalado sigue ejecutando el camino local y toda la
+    batería de tests.
+    """
+    if ref.origin == ORIGIN_BLOB:
+        from etl_sigrid.infrastructure.excel.blob_aux_file_source import BlobAuxFileSource
+
+        return BlobAuxFileSource()
+    return LocalAuxFileSource()
