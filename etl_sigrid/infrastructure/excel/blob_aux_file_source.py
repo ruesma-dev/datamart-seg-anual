@@ -79,7 +79,7 @@ class BlobAuxFileSource:
         cliente = self._blob_client_factory(ref)
         try:
             return bytes(cliente.download_blob().readall())
-        except Exception as exc:  # noqa: BLE001 - se reclasifica y se relanza
+        except Exception as exc:  # se reclasifica y se relanza, nunca se traga
             raise self._traducir(ref, exc) from exc
 
     # -- Cliente por defecto -------------------------------------------------

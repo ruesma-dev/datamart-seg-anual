@@ -97,7 +97,7 @@ class LoadExcelAuxStep(PipelineStep):
                 ficheros[logical_name] = self._leer_uno(logical_name, env_var, valor)
             except AuxFileError as exc:
                 errores.append(str(exc))
-            except Exception as exc:  # noqa: BLE001 - el fallo de uno no tumba a los demás
+            except Exception as exc:  # el fallo de uno no puede tumbar a los demás
                 # Red de seguridad: cualquier fallo no previsto de la fuente se
                 # convierte igualmente en un error atribuido a SU fichero, para
                 # que el mensaje final siga listándolos todos.
@@ -134,7 +134,7 @@ class LoadExcelAuxStep(PipelineStep):
 
         try:
             libro = load_workbook(BytesIO(datos), read_only=True, data_only=True)
-        except Exception as exc:  # noqa: BLE001 - openpyxl lanza de todo ante un fichero roto
+        except Exception as exc:  # openpyxl lanza de todo ante un fichero roto
             raise AuxFileError(
                 f"El Excel auxiliar '{logical_name}' se obtuvo de {ref.display} "
                 f"(variable {env_var}, {len(datos)} bytes) pero no abre como libro de "

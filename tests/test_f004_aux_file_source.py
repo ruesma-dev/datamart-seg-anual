@@ -12,6 +12,7 @@ from __future__ import annotations
 import dataclasses
 import inspect
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -386,7 +387,7 @@ class _DefaultAzureCredentialFalsa:
 class _BlobClientFalso:
     """Registra con qué argumentos lo construye el adaptador."""
 
-    construidos: list[dict] = []
+    construidos: ClassVar[list[dict]] = []
 
     def __init__(self, **kwargs: object) -> None:
         type(self).construidos.append(kwargs)
