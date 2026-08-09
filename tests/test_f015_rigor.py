@@ -130,7 +130,9 @@ def test_f015_r14_checkpoints_define_los_tres_niveles_y_sus_exigencias(
 def test_f015_r14_una_feature_documental_no_puede_requerir_mutacion() -> None:
     texto = checkpoints()
     bloque = texto[texto.lower().index("niveles de rigor") :][:2000].lower()
-    fila = next(l for l in bloque.splitlines() if l.startswith("| **documental**"))
+    fila = next(
+        linea for linea in bloque.splitlines() if linea.startswith("| **documental**")
+    )
 
     assert "sin" in fila and "mutaci" in fila
 
