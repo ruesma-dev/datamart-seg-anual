@@ -26,7 +26,14 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-004 · CERRADA (2026-08-09)
+# F-004 · CERRADA (2026-08-09) — MERGE A `dev` PENDIENTE
+
+> ⚠ El merge de `feature/F-004-etl-sin-dependencias-locales` a `dev` está
+> **pendiente**: `dev` está ocupado por el worktree `datamart-carga`, donde el
+> humano ejecuta la recuperación de la carga (visto `main.py stage` en
+> ejecución). En cuanto termine: `git worktree remove ../datamart-carga`,
+> `git checkout dev`, merge `--no-ff` y `bash harness/init.sh`. Hasta
+> entonces, no crear la rama de F-003 (debe salir de `dev` ya mergeado).
 
 **APPROVED sin condiciones** (`progress/review_F-004.md`), rigor `estandar`.
 Resumen en `progress/history.md`; detalle en `progress/impl_F-004.md` y
