@@ -78,7 +78,7 @@
         "bash harness/init.sh de este repositorio en verde",
         "ANADIDO por el humano el 2026-08-09, ya iniciada la feature: el arnes impide que Windows suspenda o hiberne el equipo mientras hay una sesion de Claude Code abierta, para no cortar ejecuciones largas. Script con SetThreadExecutionState mas hooks SessionStart/SessionEnd, en arnes-base y en este proyecto, documentado en GUIA_INSTALACION.md"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "priority": 4,
       "branch": "feature/F-014-arnes-generico"
@@ -96,6 +96,29 @@
       "branch": "feature/F-003-infra-caj"
     },
     {
+      "id": "F-015",
+      "title": "Verificar que los tests son de verdad: mutacion, fase RED, cobertura y niveles de rigor",
+      "description": "Hoy el arnes comprueba que los tests PASAN, pero nada comprueba que sean tests de verdad. Un test que pasa siempre es peor que no tener test: da falsa tranquilidad y ademas cuesta mantenerlo. Adoptado del arnes de Uncle Bob (github.com/betta-tech/harness-sdd, rama uncle-bob-harness) y de la skill old-coder (github.com/AmazingAng/old-coder), cuya tesis es que el humano no revisa codigo sino evidencias: un plan de pruebas antes y un informe con numeros reales despues. Precedente propio: el implementer de F-005 inyecto una contrasena falsa en .env.example para comprobar que el barrido de secretos saltaba. Eso ya es mutation testing sobre un test; esta feature lo generaliza. NO se adopta Gherkin: ya tenemos requisitos EARS con test trazable (test_fXXX_rN_*), que da la misma trazabilidad sin un tercer artefacto que mantener. NO se adopta que el reviewer pueda podar features: las features salen de decisiones de negocio del humano. Es una mejora GENERICA: se porta a arnes-base en el mismo trabajo.",
+      "acceptance": [
+        "MUTACION. Existe un comando del arnes que aplica mutaciones a las lineas que toca la feature (no al repositorio entero, que seria inviable) y reporta cuantas sobrevivieron. Una mutacion superviviente es un test que no comprueba lo que dice comprobar",
+        "MUTACION. El alcance se calcula desde el diff de la rama contra dev, no a mano: si el implementer toca un fichero nuevo, entra solo",
+        "MUTACION. El resultado se escribe en progress/mutacion_F-XXX.md con el detalle de cada superviviente: fichero, linea, mutacion aplicada y por que ningun test la caza",
+        "FASE RED. El protocolo del implementer exige demostrar, para los requisitos centrales, que el test FALLABA antes de existir el codigo: salida real del fallo en el informe. Es la defensa directa contra el test escrito a posteriori para que pase",
+        "COBERTURA. harness/init.sh mide la cobertura de las lineas cambiadas y falla por debajo del umbral configurado. El umbral vive en un fichero, no cableado en el script",
+        "NIVELES DE RIGOR. CHECKPOINTS.md define niveles y que exige cada uno. Una feature documental no puede requerir mutation testing; una que toca infraestructura compartida en produccion debe exigir mas de lo que hoy exigimos",
+        "NIVELES DE RIGOR. Cada feature declara su nivel en harness/features.json, y el reviewer valida contra el nivel declarado. Si no lo declara, se aplica el nivel mas exigente: la omision no puede ser la via facil",
+        "EVIDENCIAS. El informe del implementer tiene una seccion de evidencias con numeros reales y comparables entre features: tests, cobertura de lo cambiado, mutaciones supervivientes y tiempo de ejecucion",
+        "Verificado de verdad sobre el codigo YA existente del repositorio, no sobre un ejemplo de juguete: se ejecuta la mutacion sobre al menos una feature ya cerrada y se deja constancia de cuantas mutaciones sobreviven hoy. Ese numero es la linea base y probablemente incomode",
+        "Ninguna de estas puertas puede saltarse marcando N/A sin justificacion escrita, conforme a la nota de CHECKPOINTS.md sobre features sdd=false",
+        "Portado a arnes-base en el mismo trabajo, con subida de version y documentado en GUIA_INSTALACION.md",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 6,
+      "branch": "feature/F-015-verificar-tests"
+    },
+    {
       "id": "F-006",
       "title": "MCP de bases de datos como servicio en cloud",
       "description": "REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno).",
@@ -104,7 +127,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-006-mcp-azure"
     },
     {
@@ -124,7 +147,7 @@
       ],
       "status": "done",
       "sdd": false,
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-008-docs-referencia-sigrid-acens"
     },
     {
@@ -136,7 +159,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-011-carga-incremental"
     },
     {
@@ -148,7 +171,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -167,7 +190,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -179,7 +202,7 @@
       ],
       "status": "spec_ready",
       "sdd": true,
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-004-etl-sin-dependencias-locales"
     },
     {
@@ -191,7 +214,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -203,7 +226,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -215,7 +238,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]

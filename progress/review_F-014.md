@@ -7,19 +7,57 @@
 
 ## Veredicto
 
-**CHANGES_REQUESTED**
+**APPROVED** (segunda vuelta, 2026-08-09)
 
-Cuatro cambios concretos, todos pequeños. Dos son de fondo:
+Los cuatro cambios requeridos en la primera vuelta están corregidos y
+**verificados por mí, no dados por buenos**. Detalle en §0. Los 13 criterios
+`acceptance` quedan cubiertos y `CHECKPOINTS.md` sale sin ningún `[ ]`.
 
-1. Un fichero del arnés genérico sigue nombrando las capas `stg`/`mart`/
-   `cierre` de este proyecto, que es literalmente lo que prohíbe el criterio
-   `acceptance` nº 6.
-2. El documento de `azure-apps` quedó en la versión 1.0.0 cuando el arnés
-   subió a 1.1.0 con el añadido del final. Es la regla de propagación
-   incumplida dentro de la propia feature que existe para que eso no pase.
+> **Veredicto de la primera vuelta: CHANGES_REQUESTED.** Se conserva el
+> informe íntegro más abajo, con los hallazgos y el razonamiento, porque es
+> el rastro de por qué la feature cierra como cierra. Los cuatro cambios de
+> §6 están todos resueltos.
 
-El resto del trabajo es sólido y la mayor parte de lo afirmado en
-`progress/impl_F-014.md` lo he reproducido y confirmado por mi cuenta.
+---
+
+## 0. Segunda vuelta: verificación de las correcciones
+
+Tres commits, uno por repositorio: `aa6a495` (`arnes-base`), `a094739`
+(`azure-apps`), `f3c151a` (este repo).
+
+| # | Cambio requerido | Comprobación del reviewer | Estado |
+|---|---|---|---|
+| 1 | `spec-author.md` nombraba `stg`/`mart`/`cierre` | `spec-author.md:25-27` dice ahora «en qué capa o esquema del **proyecto**» y «la arquitectura descrita en `docs/ARCHITECTURE.md`». **Rehíce el barrido con el patrón corregido** (`git grep -w` por palabra completa, sin barra) sobre todo el payload: **cero** aciertos de `stg`, `mart`, `raw`, `dwh`. Los cuatro de `cierre` son la palabra española («rechaza el cierre», «comentario de cierre»), no la capa. `sigrid`/`datamart`/`fasnum`/`importe_origen`/`etl_sigrid`: limpio | **Resuelto** |
+| 2 | `azure-apps/arnes_base.md` en 1.0.0 | Cabecera `l.4` con commit `8f4d701`, `l.13` con «Versión actual: 1.1.0», y sección nueva «Novedades de 1.1.0» (`l.16-23`) que describe el guardián de energía y los hooks. Cumple las reglas 1 y 2 del `README.md` de `azure-apps` | **Resuelto** |
+| 3 | `progress/current.md` desfasado | `l.18-26`: «Los **13** criterios», «v**1.1.0**», y `824e23f` añadido a la lista de commits de la rama | **Resuelto** |
+| 4 | `mantener_despierto.ps1` sin BOM | Los **dos** ficheros empiezan por `239 187 191`, y siguen siendo byte a byte idénticos entre repos. **Ejecutados por mí en PowerShell 5.1 real** tras el cambio: `-Prueba` y `-Prueba -ConPantalla` activan, verifican y restauran, exit 0. El BOM no rompió nada | **Resuelto** |
+
+**Comprobaciones de no-regresión, porque un arreglo puede romper otra cosa:**
+
+- `bash harness/init.sh` de este repositorio: **exit 0**, 65 tests en verde.
+- Instalador contra una carpeta vacía nueva, con el payload ya corregido:
+  `Nuevos: 18`, `scripts/` incluido, `ARNES_VERSION.md -> v1.1.0`. Sigue
+  funcionando.
+- `despierto_hook.sh`: **exit 0** sin el `.ps1` al lado y **exit 0** con el
+  `.ps1` presente pero sin PowerShell en el `PATH`. No puede romper el
+  arranque de una sesión.
+- `.claude/settings.json`: 4 eventos (`PostToolUse`, `SessionEnd`,
+  `SessionStart`, `Stop`) y **los 7 permisos**, íntegros y en su orden.
+- Alcance real de los tres commits: `git diff 8f4d701..HEAD --stat` en
+  `arnes-base` toca **solo** esos dos ficheros. Ni el instalador, ni
+  `harness/VERSION`, ni los hooks, ni el resto del payload se han movido.
+  Confirmado: mi barrido de datos sensibles y las comprobaciones del añadido
+  del 2026-08-09 siguen siendo válidos sin repetirse.
+
+Sobre el hallazgo del patrón: la lección no es que faltara un fichero, es que
+**un barrido con un patrón demasiado estrecho da un falso verde y se firma
+igual**. Merece la pena que quede escrito en algún sitio: si el barrido busca
+un identificador que en Markdown viaja entre comillas invertidas, el patrón
+va por palabra completa, no con el separador pegado.
+
+Las seis recomendaciones de §7 y el hallazgo de `azure-apps/partes.md:273`
+siguen abiertos y **no bloquean el cierre**: ninguno es un criterio
+`acceptance` de F-014.
 
 ---
 
@@ -49,10 +87,9 @@ El resto del trabajo es sólido y la mayor parte de lo afirmado en
 
 - [x] Una sola feature `in_progress` (F-014). Lo valida `init.sh`.
 - [x] Rama `feature/F-014-arnes-generico`, no `main`.
-- [ ] **`progress/current.md` NO describe el estado real.** Dice «Los 12
-      criterios `acceptance` quedan cubiertos» y «arnés genérico v1.0.0»
-      (líneas 19-24). Los criterios son 13 y la versión es 1.1.0. Ver cambio
-      requerido nº 3.
+- [x] `progress/current.md` describe el estado real. *(1ª vuelta: `[ ]` —
+      decía «12 criterios» y «v1.0.0». Corregido en `f3c151a` y verificado:
+      13 criterios, v1.1.0 y `824e23f` en la lista de commits.)*
 - [x] F-005 tiene su resumen en `progress/history.md`.
 
 ### C3 — El código respeta arquitectura y convenciones
@@ -64,11 +101,10 @@ El resto del trabajo es sólido y la mayor parte de lo afirmado en
       shebang, como `harness/init.sh`) y `scripts/mantener_despierto.ps1:1`.
 - [x] Sin `print()` de debug, sin TODOs sueltos, sin secretos, sin
       dependencias nuevas.
-- [ ] **Convención de PowerShell incumplida.** `docs/CONVENTIONS.md:41`
-      exige «PowerShell: UTF-8 con BOM y CRLF».
-      `scripts/mantener_despierto.ps1` **no tiene BOM** (primeros bytes
-      `35 32 115`, o sea `# s`). Los seis `.ps1` de `infra/` sí lo llevan
-      (`239 187 191`). Ver cambio requerido nº 4.
+- [x] Convención de PowerShell (`docs/CONVENTIONS.md:41`, «UTF-8 con BOM y
+      CRLF») cumplida. *(1ª vuelta: `[ ]` — `scripts/mantener_despierto.ps1`
+      empezaba por `35 32 115`, sin BOM. Corregido en los dos repositorios;
+      verificado `239 187 191` y que el script sigue ejecutándose.)*
 - [x] Semántica de dominio: N/A. La feature no toca datos ni esquemas de
       Sigrid; no hay regla de negocio en juego.
 
@@ -108,10 +144,9 @@ El resto del trabajo es sólido y la mayor parte de lo afirmado en
       `azure-apps`).
 - [x] `git status` limpio, sin ficheros sin trackear. Las pruebas del
       instalador quedaron en el scratchpad de sesión, no en el repo.
-- [ ] **`features.json` no refleja el estado real**: colateral del mismo
-      desfase de C2 (13 criterios, versión 1.1.0 vs. lo escrito en
-      `current.md`). El `status: in_progress` sí es correcto: lo cambia el
-      líder tras el APPROVED.
+- [x] `features.json` refleja el estado real. *(1ª vuelta: `[ ]` por el mismo
+      desfase de C2, ya corregido.)* El `status: in_progress` es correcto
+      ahora mismo: lo pasa a `done` el líder tras este APPROVED.
 
 ## 3. Barrido de datos sensibles (ejecutado por el reviewer)
 
@@ -162,14 +197,14 @@ es una decisión que caduca en cuanto haya `git push`.
 | 3 | `harness/VERSION` semántico + `init.sh` la imprime | **OK** | `ARNES_VERSION=1.1.0`, `ARNES_FECHA=2026-08-09`. Ejecutado: es la primera línea de la salida. Sin el fichero, avisa. (Este repositorio no lleva `VERSION` porque no se instaló el arnés genérico aquí; el criterio 12 es el que habla de «este repositorio» y se cumple aparte) |
 | 4 | El instalador registra la versión en el destino | **OK** | `harness/ARNES_VERSION.md` generado en mi prueba con v1.1.0, fecha, modo y el comando de actualización |
 | 5 | Modo `actualizar` con diff; `instalar` conservado | **OK** | Reproducidos los dos. `instalar` deja el hash intacto; `actualizar -SoloDiff` enseña el diff real sin escribir. Guardarraíl anti-bucle en `instalar_arnes.ps1:151-160` |
-| 6 | Genérico separado de específico | **NO** | `arnes-base/arnes-base/.claude/agents/spec-author.md:25-27`. Cambio requerido nº 1 |
+| 6 | Genérico separado de específico | **OK** (2ª vuelta) | 1ª vuelta: **NO**, por `spec-author.md:25-27`. Corregido en `aa6a495`. Rebarrido con patrón por palabra completa: cero menciones de `stg`/`mart`/`raw`/`dwh` y cero de Sigrid o el datamart en todo el payload |
 | 7 | `init.sh` degrada o declara Python-only | **OK** | Degrada, y la decisión está razonada en la cabecera del propio `init.sh:6-23` y en `GUIA_INSTALACION.md:148`. Ejecutado sobre un destino no Python: salta compilación/lint/tests con AVISO y sigue validando `features.json` |
 | 8 | `GUIA_INSTALACION.md` con los tres caminos | **OK** | A (l.17), B (l.44), C (l.69), más `[ADAPTAR]` (115), no-Python (148), fuera de Ruesma (175) |
 | 9 | Regla de propagación en ambos `CLAUDE.md` | **OK** | `CLAUDE.md:122-150` de este repo (con el comando concreto del modo actualizar) y `../CLAUDE.md:47-67` |
-| 10 | Documento en `azure-apps` según su convención | **NO** | Existe y sigue el formato, pero quedó desfasado. Cambio requerido nº 2 |
+| 10 | Documento en `azure-apps` según su convención | **OK** (2ª vuelta) | 1ª vuelta: **NO**, desfasado en 1.0.0. Corregido en `a094739`: commit de origen `8f4d701`, versión 1.1.0 y sección de novedades |
 | 11 | Probado contra carpeta vacía y contra copia de proyecto | **OK** | La constancia está en el informe §7 con salida real (seis pruebas). Reproduje las equivalentes a 1, 2a y 2b **ya sobre 1.1.0** y coinciden, con el matiz de que ahora se copian 18 ficheros y no 16 |
 | 12 | `bash harness/init.sh` de este repositorio en verde | **OK** | exit 0, 65 tests |
-| 13 | El equipo no se suspende (añadido 2026-08-09) | **OK con un pero** | Ver §5. Funciona y está bien construido; el «pero» es el BOM del `.ps1` (cambio requerido nº 4) |
+| 13 | El equipo no se suspende (añadido 2026-08-09) | **OK** (2ª vuelta) | Ver §5. Funciona y está bien construido. El «pero» de la 1ª vuelta era el BOM del `.ps1`, ya corregido y reejecutado |
 
 ## 5. El añadido del 2026-08-09, punto por punto
 
@@ -213,7 +248,10 @@ efectivamente se parsea como `Int32 = -2147483648`. Los dos comentarios de
 cubre y con la salida en no-Windows. El instalador los copia (verificado: 18
 ficheros, `scripts/` incluido).
 
-## 6. Cambios requeridos
+## 6. Cambios requeridos en la 1ª vuelta — **los cuatro, resueltos**
+
+> Se conservan tal cual se escribieron. La verificación de cada corrección
+> está en §0.
 
 ### 1. `spec-author.md` del arnés genérico nombra las capas de este proyecto
 
@@ -348,7 +386,13 @@ escrito en vez de dejarlo al criterio de cada review.
 
 ---
 
-**Veredicto: CHANGES_REQUESTED.** Los cuatro cambios son acotados y ninguno
-obliga a rehacer nada. Con ellos resueltos, F-014 cierra: el arnés genérico
-está bien construido, el instalador hace lo que promete —lo he ejecutado— y
-el añadido del 2026-08-09 está mejor verificado que la media.
+**Veredicto final: APPROVED.** Los cuatro cambios están resueltos y
+verificados uno a uno, sin daños colaterales: el arnés genérico ya no
+menciona nada de este proyecto, el instalador sigue haciendo lo que promete
+—lo he vuelto a ejecutar—, los hooks y los 7 permisos están intactos y el
+añadido del 2026-08-09 está mejor verificado que la media.
+
+F-014 puede cerrarse. Quedan para el humano, sin bloquear: las dos
+verificaciones `MANUAL` de `progress/current.md`, las seis recomendaciones de
+§7, la IP de `azure-apps/partes.md:273` (anterior a esta feature) y la
+propuesta de protocolo de §8.
