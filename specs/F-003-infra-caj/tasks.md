@@ -123,7 +123,7 @@ agente escribe en Azure.
 
 ## Bloque 4 — Alerta y documentación
 
-- [ ] **T16**: `infra/90_create_alert.ps1` — reutiliza el action group existente
+- [x] **T16**: `infra/90_create_alert.ps1` — reutiliza el action group existente
       si lo hay; si no, lo crea con destinatarios pasados por `-AlertEmail`.
       Alerta de métrica según §6, con la alternativa de consulta programada
       documentada en comentario.
