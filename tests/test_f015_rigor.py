@@ -101,6 +101,52 @@ def test_f015_r11_sin_fichero_de_configuracion_tambien_para(tmp_path: Path) -> N
         cargar_rigor(tmp_path / "no_existe.json")
 
 
+# --- R14 y R17: los niveles y las puertas nuevas en CHECKPOINTS.md ----------
+
+
+def checkpoints() -> str:
+    return (RAIZ / "CHECKPOINTS.md").read_text(encoding="utf-8")
+
+
+def test_f015_r14_checkpoints_define_los_tres_niveles_y_sus_exigencias(
+    rigor: dict,
+) -> None:
+    texto = checkpoints()
+    minusculas = texto.lower()
+
+    assert "niveles de rigor" in minusculas
+    # Los tres niveles, con los mismos nombres que usa la configuración.
+    for nivel in rigor["niveles"]:
+        assert nivel in minusculas, nivel
+    # Y qué exige exactamente cada uno.
+    for exigencia in ("trazable", "red", "cobertura", "mutaci", "manual"):
+        assert exigencia in minusculas, exigencia
+    # El nivel más exigente se aplica por omisión.
+    assert rigor["nivel_por_defecto"] in minusculas
+    # Existe el bloque que comprueba que el rigor declarado se cumple.
+    assert "C4 bis" in texto
+
+
+def test_f015_r14_una_feature_documental_no_puede_requerir_mutacion() -> None:
+    texto = checkpoints()
+    bloque = texto[texto.lower().index("niveles de rigor") :][:2000].lower()
+    fila = next(l for l in bloque.splitlines() if l.startswith("| **documental**"))
+
+    assert "sin" in fila and "mutaci" in fila
+
+
+def test_f015_r17_na_sin_justificacion_prohibido_tambien_en_puertas_nuevas() -> None:
+    minusculas = checkpoints().lower()
+
+    # La nota de N/A tiene que cubrir las puertas nuevas por su nombre.
+    assert "n/a" in minusculas
+    for puerta in ("mutaci", "fase red", "cobertura"):
+        assert puerta in minusculas, puerta
+    assert "justificar" in minusculas or "justificaci" in minusculas
+    # Y decir qué pasa con un N/A sin motivo.
+    assert "checkbox vac" in minusculas
+
+
 # --- R15: resolución del nivel ----------------------------------------------
 
 

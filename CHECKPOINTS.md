@@ -12,6 +12,38 @@
 > N/A. Marcar N/A es legítimo, pero **hay que justificarlo por escrito** en el
 > informe de review: un N/A sin motivo se trata como checkbox vacío.
 
+> **La regla del N/A vale también para las puertas de verificación.** Ninguna
+> de las puertas de C4 bis —campaña de **mutación**, **fase RED** y
+> **cobertura** de las líneas cambiadas— puede saltarse marcando N/A a secas.
+> Para declararlas N/A hay que justificar por escrito en el informe de review
+> *por qué* no aplican en esta feature (por ejemplo: nivel `documental`, o la
+> puerta de cobertura se declaró N/A con su motivo impreso por `init.sh`). Un
+> N/A sin motivo escrito se trata como checkbox vacío, y un checkbox vacío en
+> C1–C5 es CHANGES_REQUESTED. Omitir la herramienta —no instalar `coverage`,
+> no lanzar la campaña— no es un motivo: es el hueco que esto viene a tapar.
+
+## Niveles de rigor
+
+No todas las features merecen la misma vigilancia. Cada una declara su nivel
+en el campo `rigor` de su entrada de `harness/features.json`; lo que exige
+cada nivel vive en `harness/rigor.json` y lo valida `bash harness/init.sh`.
+
+**Si una feature no declara nivel se le aplica el más exigente (`critico`).**
+La omisión no puede ser la vía fácil para saltarse las puertas.
+
+| Nivel | Para qué features | Exige |
+|---|---|---|
+| **documental** | Solo documentación, specs o notas de sesión: ni código ni SQL | C1–C3, C3 bis y C5. **Sin** fase RED, **sin** cobertura y **sin** mutación: una feature documental no puede requerir mutation testing |
+| **estandar** | Código sin riesgo sobre sistemas compartidos | Todo lo anterior + tests trazables (C4) + **fase RED** en los requisitos centrales + **cobertura** de las líneas cambiadas ≥ umbral + **campaña de mutación** con los supervivientes documentados y analizados |
+| **critico** | Infraestructura compartida, producción, seguridad o dinero | Todo lo de `estandar` + **cero supervivientes** sin justificación escrita aceptada por el humano + verificaciones `MANUAL (humano)` listadas con su comando exacto y su resultado real |
+
+Comandos de las puertas:
+
+```bash
+bash harness/init.sh                        # cobertura de las líneas cambiadas
+python -m harness.mutacion --feature F-XXX  # campaña de mutación
+```
+
 ## C1 — El arnés está completo y en verde
 
 - [ ] `bash harness/init.sh` termina con exit code 0.
@@ -63,6 +95,32 @@ Si no toca ninguno, es N/A.
 - [ ] Las verificaciones `MANUAL (humano)` están listadas en
       `progress/current.md` con su comando exacto, pendientes de que el
       humano las ejecute.
+
+## C4 bis — El rigor declarado se cumple
+
+Comprobar que los tests son de verdad, no solo que pasan. El reviewer resuelve
+primero el nivel de la feature (campo `rigor`, o `critico` por omisión) y
+recorre estos puntos **contra ese nivel**.
+
+- [ ] La feature declara `rigor` en `harness/features.json` con un valor
+      válido, o consta por escrito que se le aplica el más exigente.
+- [ ] **Fase RED** (niveles `estandar` y `critico`): el informe
+      `progress/impl_F-XXX.md` contiene, para los requisitos centrales, la
+      **salida real** del fallo del test antes de existir el código. No vale
+      «se hizo TDD»: vale la traza pegada.
+- [ ] **Cobertura** (niveles `estandar` y `critico`): la puerta de
+      `bash harness/init.sh` sale en `[OK]` con el porcentaje de las líneas
+      cambiadas, o en `N/A` **con el motivo impreso**.
+- [ ] **Mutación** (niveles `estandar` y `critico`): existe
+      `progress/mutacion_F-XXX.md`, generado por la herramienta, con sus
+      totales reales.
+- [ ] Cada superviviente de esa campaña tiene su sección de análisis
+      **completada** (ninguna en `PENDIENTE`). En nivel `critico`, además,
+      cero supervivientes salvo justificación escrita aceptada por el humano.
+- [ ] El informe del implementer trae la sección **«Evidencias»** con los
+      cuatro números: tests ejecutados y resultado, cobertura de las líneas
+      cambiadas, mutantes generados y supervivientes, y tiempo de la suite.
+- [ ] Ningún punto de este bloque marcado N/A sin justificación escrita.
 
 ## C5 — La sesión se cerró bien
 
