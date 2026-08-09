@@ -9,6 +9,7 @@ límite del adaptador. El SDK de Azure NO se importa en ningún test.
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import pytest
@@ -16,12 +17,18 @@ import pytest
 from config.settings import AuxExcelSettings
 from etl_sigrid.infrastructure.excel.aux_file_source import (
     BLOB_HOST_SUFFIX,
+    AuxFileAccessError,
     AuxFileConfigError,
     AuxFileError,
     AuxFileNotFoundError,
+    AuxFileRef,
     LocalAuxFileSource,
     get_aux_file_source,
     parse_aux_file_ref,
+)
+from etl_sigrid.infrastructure.excel.blob_aux_file_source import (
+    BlobAuxFileSource,
+    _importar_sdk,
 )
 
 SAS ="sv=2024-11-04&sig=FIRMA-SECRETA-QUE-NO-DEBE-SALIR&se=2030-01-01"
@@ -336,3 +343,270 @@ def test_f004_r8_un_directorio_en_vez_de_un_fichero_tambien_falla_nombrando_la_v
         LocalAuxFileSource().read_bytes(ref)
 
     assert "AUX_EXCEL_TIPO_COSTE" in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# Dobles del cliente de blob. Se inyectan en el límite del adaptador: el SDK de
+# Azure no se importa, no se parchea y no hace falta tenerlo instalado.
+# ---------------------------------------------------------------------------
+
+class _DescargaFalsa:
+    def __init__(self, datos: bytes) -> None:
+        self._datos = datos
+
+    def readall(self) -> bytes:
+        return self._datos
+
+
+class _ClienteFalso:
+    """Cliente que devuelve bytes o revienta con la excepción que se le diga."""
+
+    def __init__(self, datos: bytes = b"PK-datos", error: Exception | None = None) -> None:
+        self._datos = datos
+        self._error = error
+        self.descargas = 0
+
+    def download_blob(self) -> _DescargaFalsa:
+        self.descargas += 1
+        if self._error is not None:
+            raise self._error
+        return _DescargaFalsa(self._datos)
+
+
+class _DefaultAzureCredentialFalsa:
+    """Homónima de la del SDK: el adaptador la instancia por su papel, no por su origen."""
+
+    instancias = 0
+
+    def __init__(self) -> None:
+        type(self).instancias += 1
+
+
+class _BlobClientFalso:
+    """Registra con qué argumentos lo construye el adaptador."""
+
+    construidos: list[dict] = []
+
+    def __init__(self, **kwargs: object) -> None:
+        type(self).construidos.append(kwargs)
+        self.kwargs = kwargs
+
+    def download_blob(self) -> _DescargaFalsa:
+        return _DescargaFalsa(b"PK-datos")
+
+
+class ResourceNotFoundError(Exception):
+    """Doble homónimo de azure.core.exceptions.ResourceNotFoundError."""
+
+
+class ClientAuthenticationError(Exception):
+    """Homónima de azure.core.exceptions.ClientAuthenticationError."""
+
+
+class CredentialUnavailableError(Exception):
+    """Homónima de azure.identity.CredentialUnavailableError."""
+
+
+class HttpResponseError(Exception):
+    """Homónima de azure.core.exceptions.HttpResponseError, con status_code."""
+
+    def __init__(self, status_code: int, mensaje: str = "fallo http") -> None:
+        super().__init__(mensaje)
+        self.status_code = status_code
+
+
+def _ref_blob(logico: str = "tipo_coste") -> AuxFileRef:
+    return parse_aux_file_ref(
+        logico,
+        f"AUX_EXCEL_{logico.upper()}",
+        f"https://stdatamartsegdev.blob.core.windows.net/aux/{logico}.xlsx",
+    )
+
+
+def _fuente(cliente: object) -> BlobAuxFileSource:
+    """BlobAuxFileSource con el cliente doblado en el límite del adaptador."""
+    return BlobAuxFileSource(blob_client_factory=lambda ref: cliente)
+
+
+# ---------------------------------------------------------------------------
+# R1 · la misma llamada sirve para ruta local y para URI de blob
+# ---------------------------------------------------------------------------
+
+def test_f004_r1_la_misma_llamada_sirve_para_ruta_local_y_para_uri_de_blob(tmp_path) -> None:
+    """Quien lee no sabe de dónde viene el fichero: read_bytes(ref) y punto."""
+    fichero = tmp_path / "TipoPartida.xlsx"
+    contenido = _xlsx(fichero)
+
+    ref_local = parse_aux_file_ref("tipo_partida", "AUX_EXCEL_TIPO_PARTIDA", str(fichero))
+    ref_blob = _ref_blob("tipo_partida")
+
+    fuente_local = get_aux_file_source(ref_local)
+    fuente_blob = _fuente(_ClienteFalso(datos=contenido))
+
+    assert isinstance(get_aux_file_source(ref_blob), BlobAuxFileSource)
+    assert fuente_local.read_bytes(ref_local) == contenido
+    assert fuente_blob.read_bytes(ref_blob) == contenido
+
+
+# ---------------------------------------------------------------------------
+# R4 · autenticación por DefaultAzureCredential, sin cadenas ni claves
+# ---------------------------------------------------------------------------
+
+def test_f004_r4_el_cliente_de_blob_se_construye_con_default_azure_credential() -> None:
+    """La cuenta sale de la URI, la credencial es DefaultAzureCredential y se reutiliza."""
+    _BlobClientFalso.construidos.clear()
+    _DefaultAzureCredentialFalsa.instancias = 0
+
+    fuente = BlobAuxFileSource(
+        importar_sdk=lambda: (_BlobClientFalso, _DefaultAzureCredentialFalsa)
+    )
+    fuente.read_bytes(_ref_blob("tipo_partida"))
+    fuente.read_bytes(_ref_blob("tipo_coste"))
+
+    assert len(_BlobClientFalso.construidos) == 2
+    primero = _BlobClientFalso.construidos[0]
+    assert primero["account_url"] == "https://stdatamartsegdev.blob.core.windows.net"
+    assert primero["container_name"] == "aux"
+    assert primero["blob_name"] == "tipo_partida.xlsx"
+    assert isinstance(primero["credential"], _DefaultAzureCredentialFalsa)
+    assert "connection_string" not in primero
+    # Una sola credencial por instancia, reutilizada para los tres ficheros.
+    assert _DefaultAzureCredentialFalsa.instancias == 1
+    assert primero["credential"] is _BlobClientFalso.construidos[1]["credential"]
+
+
+def test_f004_r4_el_sdk_se_importa_de_forma_perezosa_y_es_el_oficial() -> None:
+    """
+    El import real vive en una sola función y se comprueba por su fuente: con el
+    SDK sin instalar (el caso de este puesto) ningún doble puede fingir esto.
+    """
+    fuente_del_import = inspect.getsource(_importar_sdk)
+
+    assert "from azure.identity import DefaultAzureCredential" in fuente_del_import
+    assert "from azure.storage.blob import BlobClient" in fuente_del_import
+
+
+def test_f004_r4_sin_el_sdk_instalado_el_error_dice_como_arreglarlo() -> None:
+    """Un ImportError del import perezoso no puede salir como un traceback críptico."""
+    def _revienta() -> tuple[type, type]:
+        raise ImportError("No module named 'azure'")
+
+    fuente = BlobAuxFileSource(importar_sdk=_revienta)
+
+    with pytest.raises(AuxFileAccessError) as exc:
+        fuente.read_bytes(_ref_blob())
+
+    mensaje = str(exc.value)
+    assert "requirements.txt" in mensaje
+    assert "azure-storage-blob" in mensaje
+
+
+def test_f004_r4_no_hay_cadenas_de_conexion_ni_claves_en_el_codigo() -> None:
+    """Barrido del código que viaja en la imagen: ni claves de cuenta ni SAS."""
+    prohibidos = (
+        "AccountKey",
+        "DefaultEndpointsProtocol",
+        "connection_string",
+        "from_connection_string",
+        "SharedKeyCredential",
+        "AzureNamedKeyCredential",
+        "sas_token",
+    )
+    raiz = Path(__file__).resolve().parents[1]
+    ficheros = [
+        *(raiz / "etl_sigrid").rglob("*.py"),
+        *(raiz / "config").rglob("*.py"),
+        raiz / "main.py",
+    ]
+
+    hallazgos = [
+        f"{fichero.relative_to(raiz).as_posix()}: {prohibido}"
+        for fichero in ficheros
+        for prohibido in prohibidos
+        if prohibido in fichero.read_text(encoding="utf-8")
+    ]
+
+    assert hallazgos == []
+
+
+# ---------------------------------------------------------------------------
+# R9 · blob inexistente: el mensaje dice cuenta, contenedor y blob
+# ---------------------------------------------------------------------------
+
+def test_f004_r9_blob_inexistente_produce_mensaje_con_cuenta_contenedor_y_blob() -> None:
+    """Traducido por NOMBRE de clase, para no atarse a la jerarquía de azure-core."""
+    fuente = _fuente(_ClienteFalso(error=ResourceNotFoundError("blob does not exist")))
+
+    with pytest.raises(AuxFileNotFoundError) as exc:
+        fuente.read_bytes(_ref_blob("tipo_coste"))
+
+    mensaje = str(exc.value)
+    assert "stdatamartsegdev" in mensaje
+    assert "aux" in mensaje
+    assert "tipo_coste.xlsx" in mensaje
+    assert "AUX_EXCEL_TIPO_COSTE" in mensaje
+    assert "sube" in mensaje.lower()
+
+
+# ---------------------------------------------------------------------------
+# R10 · permisos y credencial: el mensaje nombra el rol y las dos salidas
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ClientAuthenticationError("no autorizado"),
+        HttpResponseError(403),
+        HttpResponseError(401),
+    ],
+)
+def test_f004_r10_error_de_permisos_menciona_el_rol_y_las_dos_salidas(error: Exception) -> None:
+    """403, 401 y error de autenticación acaban en el mismo mensaje accionable."""
+    fuente = _fuente(_ClienteFalso(error=error))
+
+    with pytest.raises(AuxFileAccessError) as exc:
+        fuente.read_bytes(_ref_blob("tipo_coste"))
+
+    mensaje = str(exc.value)
+    assert "Storage Blob Data Reader" in mensaje
+    assert "stdatamartsegdev" in mensaje
+    assert "az login" in mensaje
+    assert "identidad gestionada" in mensaje
+
+
+def test_f004_r10_falta_de_credencial_menciona_az_login_e_identidad_gestionada() -> None:
+    """Sin credencial disponible el diagnóstico es otro; el remedio, el mismo."""
+    fuente = _fuente(_ClienteFalso(error=CredentialUnavailableError("sin credencial")))
+
+    with pytest.raises(AuxFileAccessError) as exc:
+        fuente.read_bytes(_ref_blob("tipo_partida"))
+
+    mensaje = str(exc.value)
+    assert "az login" in mensaje
+    assert "identidad gestionada" in mensaje
+    assert "Storage Blob Data Reader" in mensaje
+
+
+def test_f004_r10_un_error_http_que_no_es_de_permisos_no_se_disfraza() -> None:
+    """Un 500 no es un problema de rol: se reporta como fallo genérico con su tipo."""
+    fuente = _fuente(_ClienteFalso(error=HttpResponseError(500, "servidor caido")))
+
+    with pytest.raises(AuxFileError) as exc:
+        fuente.read_bytes(_ref_blob())
+
+    mensaje = str(exc.value)
+    assert "Storage Blob Data Reader" not in mensaje
+    assert "HttpResponseError" in mensaje
+    assert "servidor caido" in mensaje
+
+
+def test_f004_r11_el_adaptador_de_blob_devuelve_bytes_sin_tocar_el_disco(tmp_path) -> None:
+    """Descarga a memoria: ni temporales ni ficheros nuevos en el directorio de trabajo."""
+    cliente = _ClienteFalso(datos=b"PK-contenido-del-libro")
+    antes = set(tmp_path.iterdir())
+
+    datos = _fuente(cliente).read_bytes(_ref_blob())
+
+    assert datos == b"PK-contenido-del-libro"
+    assert cliente.descargas == 1
+    assert set(tmp_path.iterdir()) == antes
