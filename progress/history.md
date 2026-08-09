@@ -249,3 +249,45 @@ Commits: 53d1127, be54b6c, e33d929, 824e23f, f3c151a en este repositorio;
 más los suyos en `arnes-base` y `azure-apps`.
 
 ---
+
+# F-015 · Verificar que los tests son de verdad (cerrada 2026-08-09)
+
+**APPROVED a la primera** (`progress/review_F-015.md`), rigor `estandar`,
+16/16 tareas, `init.sh` en verde. Spec SDD completa (R1–R20) escrita y
+aprobada el mismo día con DA-1..DA-6 tal como se propusieron.
+
+Qué añadió al arnés (todo genérico, portado a `arnes-base` **1.2.0**, commit
+local `5006ee8` allí):
+
+- `harness/{alcance,mutacion,cobertura,rigor}.py` + `rigor.json`: mutador
+  propio (stdlib, `ast`) sobre las líneas del diff contra `dev`, con informe
+  `progress/mutacion_F-XXX.md`, restauración garantizada y timeout por
+  mutante; puerta de cobertura de líneas cambiadas; niveles de rigor.
+- `init.sh` ejecuta pytest bajo `coverage` y **falla** si la cobertura de las
+  líneas cambiadas baja del umbral (80 %, en `rigor.json`). Dependencia nueva
+  `coverage>=7.4` en `requirements-dev.txt`.
+- `CHECKPOINTS.md`: niveles `documental`/`estandar`/`critico` (default el más
+  exigente) + C4 bis. `implementer.md`: fase RED con salida real y sección
+  «Evidencias». `reviewer.md`: valida contra el nivel declarado.
+- Rigor retroactivo declarado en `features.json` (DA-4).
+
+Evidencias: 166 tests en 1,2 s; 97,5 % de cobertura de lo cambiado (538/552);
+autoaplicación 175 mutantes → 13 supervivientes tras cerrar 24 huecos que ni
+la fase RED ni el 96,7 % de cobertura habían visto; **línea base F-005: 101
+mutantes, 55 supervivientes (45,5 %)**, los 55 analizados, 6 huecos de riesgo
+alto (el peor: ningún test fija el default de `auto_create_db`). No se
+parchearon: eran el objeto de la medición.
+
+Desviación aceptada por el reviewer: la campaña F-005 corrió en un
+`git worktree` aparte (había un `run-all --full` contra Azure en el árbol
+vivo); se añadió `--raiz` a la CLI y quedó documentado como práctica
+recomendada en la guía de `arnes-base`.
+
+Pendientes elevados al humano (ver `current.md`): MANUAL R20, ¿feature de
+refuerzo para los huecos de F-005?, `rigor` de las 9 features sin abrir, y la
+automejora del reviewer propuesta en `review_F-015.md` § 6.
+
+Commits: `7ad2e0f` (spec), `8dfa63f` (aprobación), `F-015 T1..T16` (14
+commits del implementer), cierre; `5006ee8` en `arnes-base`.
+
+---

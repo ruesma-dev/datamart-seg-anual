@@ -117,7 +117,7 @@
         "Portado a arnes-base en el mismo trabajo, con subida de version y documentado en GUIA_INSTALACION.md",
         "bash harness/init.sh en verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 6,

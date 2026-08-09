@@ -26,9 +26,11 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-**F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 6 y 11 hechos el
-2026-08-09. Faltan el 7 y el 8, que dependen del humano, y el 9 y el 10, que
-dependen del 8.
+**F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 7 y 11 hechos el
+2026-08-09. El 8 (carga inicial) está **corriendo ahora**: el primer intento
+murió el 2026-08-09 a las 11:46 por un corte de red local del puesto (el
+`COPY` de `obrparpre` colgado 9 min y luego `getaddrinfo failed`; el servidor
+estaba bien) y el humano la relanzó. Los pasos 9 y 10 dependen del 8.
 
 ## Lo ejecutado contra Azure
 
@@ -38,8 +40,8 @@ dependen del 8.
 | 4 · Contraseñas en Key Vault | Hecho: `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro` en `kv-albaranes-rs9k2` |
 | 5 · Base y roles | Hecho: `sigrid_dm`, 3 roles, 9 esquemas, todos propiedad de `sigrid_dm_etl` |
 | 6 · Firewall | Añadida `datamart-puesto-pgris-2026-08-09`; las 3 reglas previas, intactas |
-| 7 · `.env` | **PENDIENTE DEL HUMANO** (regla dura: los agentes no tocan `.env`) |
-| 8 · Carga inicial | Pendiente del paso 7 |
+| 7 · `.env` | Hecho y verificado por el humano el 2026-08-09 |
+| 8 · Carga inicial | **EN CURSO** (relanzada tras el corte de red del primer intento) |
 | 9 · Medición y veredicto del SKU | Pendiente del 8 |
 | 10 · Verificación de vistas | Pendiente del 8 |
 | 11 · Frontera de seguridad | Hecho, ver abajo |
@@ -98,82 +100,30 @@ actualizar la referencia. Anotado para que no se quede así por inercia.
 
 ---
 
-# F-015 · Implementada (2026-08-09, implementer) — pendiente de review
+# F-015 · CERRADA (2026-08-09) — pendientes elevados al humano
 
-**Estado:** las 16 tareas de `specs/F-015-verificar-tests/tasks.md` en `[x]`,
-un commit por tarea, `bash harness/init.sh` en verde con la puerta de
-cobertura nueva ejecutándose de verdad. **Informe completo:
-`progress/impl_F-015.md`.** Nivel de rigor declarado: `estandar`.
+Implementada y **APROBADA** por el reviewer a la primera
+(`progress/review_F-015.md`). Resumen en `progress/history.md`. Quedan
+cuatro cosas del humano, ninguna bloqueante:
 
-## Evidencias, en una línea cada una
+1. **MANUAL de R20** — verificar el portado a `arnes-base` 1.2.0:
 
-| Evidencia | Valor |
-|---|---|
-| Tests | **166 pasan**, 0 fallan (101 nuevos), en **1,2 s** |
-| Cobertura de líneas cambiadas | **97,5 %** (538/552, umbral 80 %) |
-| Mutación de F-015 | 175 mutantes, **13 supervivientes** (92,6 %) |
-| Mutación de F-005 (línea base) | 101 mutantes, **55 supervivientes** (45,5 %) |
+   ```
+   git -C C:/Users/pgris/PycharmProjects/arnes-base log --oneline -5
+   grep ARNES_VERSION C:/Users/pgris/PycharmProjects/arnes-base/arnes-base/harness/VERSION
+   grep -rl "mutacion" C:/Users/pgris/PycharmProjects/arnes-base/arnes-base/harness/
+   grep -n "mutaci" C:/Users/pgris/PycharmProjects/arnes-base/GUIA_INSTALACION.md | head
+   ```
 
-## Lo que hay que saber sin leer el informe
+   Resultado esperado (ya contrastado por implementer y reviewer): commit
+   `5006ee8`, `ARNES_VERSION=1.2.0`, herramientas presentes, guía con sección.
+2. **Decisión** — ¿feature de refuerzo de tests para los 6 huecos de riesgo
+   alto que la línea base destapó en F-005 (55/101 mutantes vivos, detalle en
+   `progress/mutacion_F-005.md`)? El más serio: ningún test fija el valor por
+   defecto de `auto_create_db`.
+3. **Decisión** — las 9 features no empezadas heredan rigor `critico` por
+   omisión; decidir el `rigor` de cada una al abrirla.
+4. **Decisión** — automejora del reviewer propuesta en
+   `progress/review_F-015.md` § 6: que verifique siempre los totales de
+   mutación de forma independiente. Si se aprueba, se porta a `arnes-base`.
 
-- **La línea base de F-005 destapó 6 huecos de riesgo alto.** El más
-  incómodo: el valor por defecto de `auto_create_db` —la puerta bloqueante
-  que la propia F-005 declaró contra el servidor compartido de producción—
-  **no lo fija ningún test**, ni en `config/settings.py` ni en
-  `postgres_client.py`. Tampoco el autocommit de la conexión administrativa,
-  ni la comparación de huellas de `fingerprint.py`, ni la detección de un
-  paso fallido en `main.py`. Detalle en `progress/mutacion_F-005.md`. **No se
-  han parcheado**: los tests de F-005 son el objeto de la medición.
-- **La campaña sobre F-015 se ejecutó dos veces**: 37 supervivientes la
-  primera, 13 tras añadir tests. Los 24 huecos cerrados no los había visto ni
-  la fase RED ni el 96,7 % de cobertura de entonces.
-- **La campaña de F-005 se ejecutó en un `git worktree` aparte**, no en el
-  árbol vivo, porque había una carga `run-all --full` corriendo contra Azure
-  desde este mismo directorio y la mutación escribe ficheros en disco. Se
-  añadió la opción `--raiz` a la herramienta para poder hacerlo.
-- **Novedad que afecta a todo trabajo futuro**: `bash harness/init.sh` ahora
-  ejecuta la suite bajo `coverage` y **falla** si la cobertura de las líneas
-  que cambia la feature en curso baja del 80 %. Hace falta
-  `pip install -r requirements-dev.txt` (dependencia nueva: `coverage>=7.4`).
-- **`arnes-base` está en 1.2.0** con todo esto portado (commit local
-  `5006ee8`, sin push).
-
-## Pendiente del humano
-
-1. **MANUAL de R20**: los cuatro comandos de verificación del portado a
-   `arnes-base`, listados en `progress/impl_F-015.md` § 6 con el resultado ya
-   obtenido.
-2. **Decisión**: ¿se abre una feature de refuerzo de tests para los 6 huecos
-   de riesgo alto de F-005?
-3. **Decisión**: las 9 features aún no empezadas no declaran `rigor` y por
-   tanto heredan `critico` (el más exigente). Es lo correcto por diseño, pero
-   conviene decidirlo antes de abrir cada una, no descubrirlo.
-
----
-
-# F-015 · Spec escrita (2026-08-09, spec-author)
-
-Escrita `specs/F-015-verificar-tests/` (`requirements.md` con R1–R20 en EARS,
-`design.md`, `tasks.md` T1–T16). Sin tocar código, `features.json` ni commits.
-Piezas: mutador propio del arnés sobre las líneas del diff contra `dev`
-(`python -m harness.mutacion --feature F-XXX` → `progress/mutacion_F-XXX.md`),
-puerta de cobertura de líneas cambiadas en `init.sh` con umbral en
-`harness/rigor.json`, niveles de rigor en `CHECKPOINTS.md` (+ C4 bis) con
-default el más exigente, fase RED y sección «Evidencias» en el implementer,
-reviewer validando contra el nivel, línea base sobre F-005 (alcance
-reconstruido desde el merge `c7500d4`) y portado a `arnes-base` con versión
-`1.2.0`.
-
-## Decisiones abiertas que el humano debe validar (design.md, antes de implementar)
-
-- **DA-1** Herramienta de mutación: se propone mutador propio mínimo (stdlib,
-  `ast`); mutmut descartado (sin soporte Windows), cosmic-ray descartado
-  (demasiado peso para portarlo a arnes-base).
-- **DA-2** Umbral de cobertura de líneas cambiadas: propuesta **80 %**.
-- **DA-3** Niveles de rigor: `documental` / `estandar` / `critico`, default
-  `critico` para quien no declare.
-- **DA-4** Rigor retroactivo: F-001 `estandar`, F-008 `documental`, F-009
-  `documental`, F-005 `critico`, F-014 `estandar`, F-015 `estandar`.
-- **DA-5** Línea base F-005: si la campaña supera ~45 min, ¿muestra
-  reproducible con semilla o campaña completa aunque tarde horas?
-- **DA-6** Dependencia nueva `coverage>=7.4` en `requirements-dev.txt`.
