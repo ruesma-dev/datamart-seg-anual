@@ -26,14 +26,84 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-004 · CERRADA (2026-08-09) — MERGE A `dev` PENDIENTE
+# F-003 · EN CURSO — bloques 1–4 hechos, bloque 5 es del humano
 
-> ⚠ El merge de `feature/F-004-etl-sin-dependencias-locales` a `dev` está
-> **pendiente**: `dev` está ocupado por el worktree `datamart-carga`, donde el
-> humano ejecuta la recuperación de la carga (visto `main.py stage` en
-> ejecución). En cuanto termine: `git worktree remove ../datamart-carga`,
-> `git checkout dev`, merge `--no-ff` y `bash harness/init.sh`. Hasta
-> entonces, no crear la rama de F-003 (debe salir de `dev` ya mergeado).
+Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** (13
+scripts de `infra/` reescritos o creados, `infra/env/dev.json`, 30 tests
+nuevos, `infra/README.md`). Informe completo: `progress/impl_F-003.md`.
+Campaña de mutación: `progress/mutacion_F-003.md`. `bash harness/init.sh` en
+verde, **251 tests** (eran 221).
+
+**No se ha ejecutado ni un comando `az` de escritura, ni `python main.py`.**
+
+## ⚠ DOS PUERTAS QUE BLOQUEAN EL BLOQUE 5
+
+**1 · El disco (incidente del 2026-08-09, más abajo).** El job nocturno
+ejecuta la misma carga que llenó el disco del servidor compartido. **NO
+crear el job programado (T23) hasta que se decida entre A, B o C.**
+`infra/05_check_prereqs.ps1` falla si la ocupación supera el 60 %, y
+`80_create_job.ps1` no hace nada sin `-Confirmar`.
+
+**2 · DA-4, NUEVA · autenticación contra Postgres.** La spec aprobada prohíbe
+pasar contraseña al job (R10) y manda token de Entra (R12), pero
+`psql-albaranes-rs9k2` **tiene Entra deshabilitado** y habilitarlo es una
+operación de servidor que afecta a `albaranes` y `partes` — la descartaste el
+2026-08-08, y F-005 se desplegó con contraseña en Key Vault. Tal cual, **el job
+se crearía perfecto y fallaría al conectar todas las noches**. Además, en modo
+`entra` el usuario tendría que ser el nombre de la identidad gestionada, y ese
+rol no existe en `sigrid_dm`.
+
+Las dos únicas salidas, y **las decides tú**:
+
+- **(A)** Habilitar Entra en el servidor + crear el rol de la identidad en la
+  base. Es lo que dice la spec; toca un servidor con dos aplicaciones vivas.
+- **(B)** Enmendar R10 para que la contraseña del rol nativo viaje como
+  referencia a Key Vault, igual que la clave de la API. Coherente con lo que ya
+  hacen `albaranes` y `partes` y con tu decisión del 2026-08-08. Exige
+  modificar la spec, `infra/env/dev.json` y `80_create_job.ps1`.
+
+No se ha improvisado ninguna de las dos: los scripts cumplen la spec al pie de
+la letra y las puertas están escritas **y** son detectables por máquina.
+
+## Guion del bloque 5 (T18–T28), listo para ejecutar
+
+Antes de nada: `pip install -r requirements.txt`. `azure-identity` y
+`azure-storage-blob` están declaradas pero **no instaladas** en el puesto, y la
+verificación 1 de F-004 fallaría con `ModuleNotFoundError`.
+
+Todo el detalle (comandos exactos, qué exige autorización, KQL de logs) está en
+**`infra/README.md`**. Resumen operativo:
+
+| Tarea | Comando | Comprobar |
+|---|---|---|
+| **T18** | `pwsh -File infra/05_check_prereqs.ps1` → `10_create_rg.ps1` → `20_create_observability.ps1` → `30_create_env.ps1` | R15 y R16. **Anotar la IP de salida del entorno.** |
+| **T19** | `40_create_storage.ps1` → `50_create_keyvault.ps1` → `60_create_identity.ps1` | R17 y R19 (tres roles, ni uno más). **Anotar el `clientId`.** |
+| **T20** | `az keyvault secret set --vault-name kv-datamart-seg-dev -n SIGRID-API-FUNCTION-KEY --file <ruta>` | `secret list` devuelve el nombre. **Nunca `secret show`**; el valor no se escribe en ningún fichero. Necesitas `Key Vault Secrets Officer`. |
+| **T21** | `pwsh -File infra/70_build_image.ps1` | R20. **Anotar el tag.** |
+| **T22** | Regla de firewall para la IP de T18 sobre `psql-albaranes-rs9k2` | ⚠ **Escritura sobre un recurso de `albaranes`**: autorización expresa, la ejecutas tú. Después, `firewall-rule list` debe traer las de antes **más** la nueva. |
+| **T23** | `pwsh -File infra/80_create_job.ps1 -Confirmar` | **BLOQUEADA** por las dos puertas de arriba. R21. |
+| **T24** | `az containerapp job start` + `job start --command python --args main.py,version` | `Succeeded` y el tag coincide con T21. |
+| **T25** | KQL de `infra/README.md` | Salen las líneas de T24. Si una columna no cuadra, `getschema` y **corregir el README**. |
+| **T26** | `az monitor metrics list-definitions --resource <id-job>` y luego `90_create_alert.ps1` | Correcto **solo si llega el correo**. Anotar hora del fallo y de recepción. |
+| **F-004** | Las tres verificaciones heredadas (blob desde el puesto, blob desde el job, prueba negativa de permisos) | Sección de F-004, más abajo. Van después de T19+T20. |
+
+Antes de T26 hace falta el nombre del grupo de acción de la landing zone
+(**DA-3**, sigue abierta): `az monitor action-group list --query "[].{n:name, rg:resourceGroup}" -o table`
+y pasarlo con `-ActionGroupName` / `-ActionGroupRg`. Si no existe ninguno
+reutilizable, `-AlertEmail`. **Ningún correo entra en el repositorio.**
+
+## Deuda que dejas decidir a ti
+
+El **ID de suscripción sigue en el historial de git** (estuvo en
+`infra/00_vars.ps1` hasta esta feature). Del árbol de trabajo ha desaparecido y
+hay un test que impide que vuelva; reescribir la historia es decisión tuya.
+
+---
+
+# F-004 · CERRADA (2026-08-09) — MERGEADA A `dev`
+
+> Merge hecho: `79c48e2 Merge branch 'feature/F-004-etl-sin-dependencias-locales'
+> into dev`. La rama de F-003 sale de ahí.
 
 **APPROVED sin condiciones** (`progress/review_F-004.md`), rigor `estandar`.
 Resumen en `progress/history.md`; detalle en `progress/impl_F-004.md` y
@@ -221,13 +291,14 @@ pendientes que elevó, cerrados por el humano el 2026-08-09:
 # Rumbo confirmado por el humano (2026-08-09): el ETL debe correr en Azure
 
 Nuevo orden de prioridades de las features abiertas: ~~F-004~~ (**cerrada el
-2026-08-09**) → **F-003** (Container Apps Job nocturno `--full` + disparo
-manual, spec_ready) → **F-016** (refuerzo tests F-005) → **F-011**
-(incremental) → resto. Los dos fallos consecutivos de la carga local refuerzan
-la urgencia de F-003. Siguiente paso: **aprobar la spec de F-003**, teniendo
-en cuenta dos recomendaciones del reviewer de F-004: enganchar las tres
-verificaciones MANUAL de F-004 como criterios de aceptación de F-003, y no
-olvidar `AZURE_CLIENT_ID` si la identidad del job es user-assigned.
+2026-08-09**) → **F-003** (Container Apps Job nocturno `--full`; spec aprobada
+el 2026-08-09, **bloques 1–4 implementados el 2026-08-10**, ver arriba) →
+**F-016** (refuerzo tests F-005) → **F-011** (incremental) → resto.
+
+Las dos recomendaciones del reviewer de F-004 están **incorporadas**: las tres
+verificaciones MANUAL de F-004 viven ahora en el guion del bloque 5 y en
+`infra/README.md`, y `AZURE_CLIENT_ID` se inyecta en el job con su propio test
+(`test_f003_r7_el_job_inyecta_azure_client_id_de_la_identidad`).
 
 Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
 `opus`; leader y spec-author siguen en `inherit`.

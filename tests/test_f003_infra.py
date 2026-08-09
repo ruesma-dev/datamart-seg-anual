@@ -250,7 +250,7 @@ def test_f003_r2_todos_los_env_json_validan_igual(fichero: str) -> None:
 
 
 @pytest.mark.parametrize("fichero", [p.name for p in _entornos()] or ["dev.json"])
-def test_f003_r3_ningun_valor_obligatorio_vacio_ni_TODO(fichero: str) -> None:
+def test_f003_r3_ningun_valor_obligatorio_vacio_ni_TODO(fichero: str) -> None:  # noqa: N802
     """Un `TODO_` olvidado en el fichero de entorno es un despliegue a medias."""
     cfg = _config(Path(fichero).stem)
 
