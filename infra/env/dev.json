@@ -53,7 +53,7 @@
 
   "alertName": "alert-caj-datamart-seg-dev-failed",
   "alertActionGroupName": "ag-datamart-seg-dev",
-  "alertActionGroupResourceGroup": "rg-datamart-seg-dev",
+  "alertActionGroupRg": "rg-datamart-seg-dev",
 
   "tags": {
     "acens-project": "datamart-seg-anual",

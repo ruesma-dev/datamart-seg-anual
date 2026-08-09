@@ -75,7 +75,7 @@ CLAVES_OBLIGATORIAS = (
     "logFormat",
     "alertName",
     "alertActionGroupName",
-    "alertActionGroupResourceGroup",
+    "alertActionGroupRg",
     "tags",
 )
 
@@ -113,7 +113,7 @@ CLAVES_NOMBRE_DE_RECURSO = (
     "pgResourceGroup",
     "alertName",
     "alertActionGroupName",
-    "alertActionGroupResourceGroup",
+    "alertActionGroupRg",
 )
 
 # `auxContainer` ("aux") queda fuera de la lista de arriba a propósito: son tres
@@ -207,13 +207,20 @@ def test_f003_r2_00_vars_resuelve_el_entorno_por_parametro_o_variable() -> None:
     """`-Entorno` manda; luego `$env:DATAMART_ENV`; y solo entonces el defecto."""
     texto = _script(CARGADOR)
 
-    assert re.search(r"param\s*\(", texto), "00_vars.ps1 debe admitir parámetros"
-    assert "$Entorno" in texto
-    assert "$env:DATAMART_ENV" in texto
+    assert re.search(r"param\s*\(\s*(\[[^\]]*\]\s*)*\$Entorno", texto), (
+        "00_vars.ps1 debe admitir el parámetro -Entorno"
+    )
 
-    pos_param = texto.index("$Entorno")
-    pos_env = texto.index("$env:DATAMART_ENV")
-    assert pos_param < pos_env, "el parámetro debe evaluarse antes que la variable"
+    # El orden es el que decide quién manda: primero el parámetro (que llega ya
+    # asignado), luego la variable de entorno y solo entonces el defecto.
+    de_variable = re.search(r"\$Entorno\s*=\s*\$env:DATAMART_ENV", texto)
+    de_defecto = re.search(r"\$Entorno\s*=\s*[\"']\w+[\"']", texto)
+
+    assert de_variable, "no se consulta $env:DATAMART_ENV"
+    assert de_defecto, "no hay entorno por defecto"
+    assert de_variable.start() < de_defecto.start(), (
+        "el defecto se aplica antes que $env:DATAMART_ENV: la variable no serviría"
+    )
 
     # El literal del entorno por defecto solo puede aparecer en el cargador.
     for script in _ps1():
