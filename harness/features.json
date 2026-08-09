@@ -96,7 +96,7 @@
       ],
       "status": "spec_ready",
       "sdd": true,
-      "priority": 5,
+      "priority": 7,
       "branch": "feature/F-003-infra-caj"
     },
     {
@@ -124,6 +124,23 @@
       "branch": "feature/F-015-verificar-tests"
     },
     {
+      "id": "F-016",
+      "title": "Refuerzo de tests para los huecos de riesgo alto de F-005",
+      "description": "Creada el 2026-08-09 por decision del humano tras la linea base de mutacion de F-015 (progress/mutacion_F-005.md): 101 mutantes sobre las lineas de F-005, 55 supervivientes (45,5%), de los que 6 son de riesgo ALTO. F-005 esta declarada rigor critico y hoy no pasaria su propio nivel. Esta feature cierra SOLO los 6 huecos de riesgo alto: (1) el valor por defecto de auto_create_db en config/settings.py y postgres_client.py, la puerta bloqueante contra el servidor compartido de produccion; (2) el autocommit de la conexion administrativa, sin el que CREATE DATABASE falla; (3) la igualdad de textos y la clasificacion de una diferencia como FALLO en fingerprint.py; (4) la deteccion de un paso fallido del pipeline en main.py, que invertida daria por buena una ejecucion fallida. Los 27 huecos de riesgo medio y los 14 de riesgo bajo quedan fuera como deuda anotada.",
+      "acceptance": [
+        "Tests nuevos que fijan los 6 huecos de riesgo ALTO listados en progress/mutacion_F-005.md (seccion 'Los seis de riesgo ALTO'), sin red ni BBDD",
+        "Relanzada la campana de mutacion sobre el alcance de F-005: los 6 mutantes de riesgo ALTO mueren. Como se reconstruye el alcance (arbol actual o worktree del merge c7500d4 con --raiz) lo decide el implementer y lo deja documentado en el informe",
+        "El resultado va a un informe nuevo (progress/mutacion_F-005_tras_refuerzo.md); la linea base historica progress/mutacion_F-005.md NO se sobrescribe ni se retoca",
+        "Los supervivientes de riesgo medio y bajo que sigan vivos quedan contabilizados en el informe nuevo como deuda, no se tapan en esta feature",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 9,
+      "branch": "feature/F-016-refuerzo-tests-f005"
+    },
+    {
       "id": "F-006",
       "title": "MCP de bases de datos como servicio en cloud",
       "description": "REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno).",
@@ -132,7 +149,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 7,
+      "priority": 11,
       "branch": "feature/F-006-mcp-azure"
     },
     {
@@ -165,7 +182,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-011-carga-incremental"
     },
     {
@@ -177,7 +194,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 10,
+      "priority": 12,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -196,7 +213,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 11,
+      "priority": 13,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -208,7 +225,7 @@
       ],
       "status": "spec_ready",
       "sdd": true,
-      "priority": 12,
+      "priority": 5,
       "branch": "feature/F-004-etl-sin-dependencias-locales"
     },
     {
@@ -220,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -232,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -244,7 +261,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]

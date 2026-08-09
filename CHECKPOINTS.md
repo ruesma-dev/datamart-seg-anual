@@ -113,7 +113,9 @@ recorre estos puntos **contra ese nivel**.
       cambiadas, o en `N/A` **con el motivo impreso**.
 - [ ] **Mutación** (niveles `estandar` y `critico`): existe
       `progress/mutacion_F-XXX.md`, generado por la herramienta, con sus
-      totales reales.
+      totales reales, **verificados de forma independiente por el reviewer**
+      (alcance y nº de mutantes recalculados con `harness.alcance` y
+      `harness.mutacion`; cálculo puro, sin ejecutar la suite).
 - [ ] Cada superviviente de esa campaña tiene su sección de análisis
       **completada** (ninguna en `PENDIENTE`). En nivel `critico`, además,
       cero supervivientes salvo justificación escrita aceptada por el humano.

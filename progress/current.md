@@ -100,30 +100,33 @@ actualizar la referencia. Anotado para que no se quede así por inercia.
 
 ---
 
-# F-015 · CERRADA (2026-08-09) — pendientes elevados al humano
+# F-015 · CERRADA (2026-08-09) — pendientes resueltos el mismo día
 
 Implementada y **APROBADA** por el reviewer a la primera
-(`progress/review_F-015.md`). Resumen en `progress/history.md`. Quedan
-cuatro cosas del humano, ninguna bloqueante:
+(`progress/review_F-015.md`). Resumen en `progress/history.md`. Los cuatro
+pendientes que elevó, cerrados por el humano el 2026-08-09:
 
-1. **MANUAL de R20** — verificar el portado a `arnes-base` 1.2.0:
+1. **MANUAL de R20 · VERIFICADO por el humano**: los cuatro comandos
+   devolvieron lo esperado (commit `5006ee8`, `ARNES_VERSION=1.2.0`,
+   herramientas presentes, guía con la sección de mutación en su línea 287).
+2. **Refuerzo de F-005 · SÍ**: creada **F-016** (`sdd=false`, rigor
+   `estandar`, prioridad 9) para los 6 huecos de riesgo ALTO. Los de riesgo
+   medio y bajo quedan como deuda anotada en `progress/mutacion_F-005.md`.
+3. **Rigor de las 9 features sin abrir**: se decidirá al abrir cada una;
+   mientras tanto heredan `critico`, que es el comportamiento buscado.
+4. **Automejora del reviewer · APROBADA y aplicada**: `reviewer.md` (paso 4
+   de la validación de rigor) y `CHECKPOINTS.md` (C4 bis) exigen ahora
+   verificar los totales de mutación de forma independiente. Portada a
+   `arnes-base` **1.2.1**.
 
-   ```
-   git -C C:/Users/pgris/PycharmProjects/arnes-base log --oneline -5
-   grep ARNES_VERSION C:/Users/pgris/PycharmProjects/arnes-base/arnes-base/harness/VERSION
-   grep -rl "mutacion" C:/Users/pgris/PycharmProjects/arnes-base/arnes-base/harness/
-   grep -n "mutaci" C:/Users/pgris/PycharmProjects/arnes-base/GUIA_INSTALACION.md | head
-   ```
+# Rumbo confirmado por el humano (2026-08-09): el ETL debe correr en Azure
 
-   Resultado esperado (ya contrastado por implementer y reviewer): commit
-   `5006ee8`, `ARNES_VERSION=1.2.0`, herramientas presentes, guía con sección.
-2. **Decisión** — ¿feature de refuerzo de tests para los 6 huecos de riesgo
-   alto que la línea base destapó en F-005 (55/101 mutantes vivos, detalle en
-   `progress/mutacion_F-005.md`)? El más serio: ningún test fija el valor por
-   defecto de `auto_create_db`.
-3. **Decisión** — las 9 features no empezadas heredan rigor `critico` por
-   omisión; decidir el `rigor` de cada una al abrirla.
-4. **Decisión** — automejora del reviewer propuesta en
-   `progress/review_F-015.md` § 6: que verifique siempre los totales de
-   mutación de forma independiente. Si se aprueba, se porta a `arnes-base`.
+Nuevo orden de prioridades de las features abiertas: **F-004** (ETL sin
+dependencias locales, spec_ready) → **F-003** (Container Apps Job nocturno
+`--full` + disparo manual, spec_ready) → **F-016** (refuerzo tests F-005) →
+**F-011** (incremental) → resto. La spec de F-003 exige F-004 y F-005
+cerradas antes de su T1. Siguiente paso: aprobar la spec de F-004.
+
+Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
+`opus`; leader y spec-author siguen en `inherit`.
 
