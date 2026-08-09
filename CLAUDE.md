@@ -80,6 +80,9 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   (manuales de Sigrid, criterios de cierre, documentación que llega de
   fuera), toda en Markdown. Consúltala cuando la pregunta sea «por qué el
   ETL hace esto» y la respuesta no esté en el código. Ver su `README.md`.
+- `CHECKPOINTS.md` — criterios objetivos de estado final; el reviewer los
+  recorre antes de cerrar cualquier feature.
+- `infra/` — scripts PowerShell de despliegue a Azure + `Dockerfile` en raíz.
 
 ## Los otros proyectos: `azure-apps/`
 
@@ -97,9 +100,6 @@ Dos reglas: el documento de este proyecto
 exponemos o consumimos**, en el mismo trabajo y no después; y **no se
 duplican aquí** los documentos de otros proyectos, se enlazan. Ya pasó con
 `sigrid_api.md`: dos copias, una de 515 líneas y otra de 890.
-- `CHECKPOINTS.md` — criterios objetivos de estado final; el reviewer los
-  recorre antes de cerrar cualquier feature.
-- `infra/` — scripts PowerShell de despliegue a Azure + `Dockerfile` en raíz.
 
 ## Documentos que llegan de fuera (PDF y ofimática)
 
@@ -118,6 +118,36 @@ original NO se versiona: al repositorio entra solo el Markdown.
 - Si el documento trae datos sensibles (precios de proveedor, datos
   personales, credenciales), **no lo conviertas sin preguntar**: acabaría
   versionado en git.
+
+## El arnés genérico: `arnes-base`
+
+Este arnés no es solo de este proyecto. Su versión genérica y reutilizable
+vive en **`C:\Users\pgris\PycharmProjects\arnes-base`**, hoy ya un
+repositorio git versionado, y desde ahí se instala y se actualiza en los
+demás repositorios. Su `GUIA_INSTALACION.md` explica los tres caminos:
+proyecto nuevo, proyecto en marcha y actualizar a una versión posterior.
+
+**Regla de propagación (obligatoria).** Si mejoras algo del arnés —`CLAUDE.md`,
+`.claude/agents/`, `CHECKPOINTS.md`, `harness/init.sh`, `specs/SPECS.md`, las
+convenciones— y esa mejora **vale para cualquier proyecto**, la portas a
+`arnes-base` **en el mismo trabajo**, no después. Si es específica de este
+proyecto (Sigrid, las capas del datamart, el `.env` de aquí), se queda aquí.
+
+No es una recomendación: el 2026-08-08 se perdieron **cinco mejoras en una
+sola tarde** —las dos paradas con el humano, C3 bis, la nota de features
+`sdd=false`, el `.gitignore` de originales y las convenciones de
+`docs/referencia/`— porque `arnes-base` era una copia suelta sin versionar y
+nadie la refrescó. Es la misma regla de propiedad que rige `azure-apps`.
+
+Para propagar, **usa el modo actualizar del instalador**, que enseña el diff
+de cada fichero y deja decidir; el modo instalar salta en silencio lo que ya
+existe, que es justo lo que hay que cambiar:
+
+```powershell
+# desde arnes-base, primero mirar y luego decidir
+.\instalar_arnes.ps1 -Destino "<ruta-del-proyecto>" -Modo actualizar -SoloDiff
+.\instalar_arnes.ps1 -Destino "<ruta-del-proyecto>" -Modo actualizar
+```
 
 ## Reglas duras (no negociables)
 

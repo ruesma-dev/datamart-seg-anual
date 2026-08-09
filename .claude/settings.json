@@ -1,6 +1,30 @@
 {
   "$schema_comment": "Hooks: la verificación la ejecuta el arnés, no el agente, así que no se puede saltar. Adaptado a pytest y Git Bash en Windows.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/despierto_hook.sh arrancar",
+            "description": "Impide que Windows suspenda el equipo mientras hay sesión abierta, para no cortar ejecuciones largas.",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/despierto_hook.sh parar",
+            "description": "Devuelve el comportamiento normal de energía al cerrar la sesión.",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

@@ -191,3 +191,61 @@ primer barrido de GUID sobre el diff salió limpio por ese motivo. La regla
 dura «no entran secretos» se estaba volviendo inauditable en silencio.
 
 ---
+
+## F-014 · Arnés genérico versionado, reutilizable en cualquier proyecto
+
+Cerrada el 2026-08-09. `sdd=false`, 13 criterios `acceptance`. Rama
+`feature/F-014-arnes-generico`. APROBADA en segunda revisión
+(`progress/review_F-014.md`). Toca **tres repositorios**.
+
+### Qué se construyó
+
+- **`arnes-base` es ya un repositorio git versionado** (v1.1.0), con el arnés
+  genérico separado de lo específico del datamart, `harness/VERSION` que
+  `init.sh` imprime, `GUIA_INSTALACION.md` con tres caminos —proyecto nuevo,
+  proyecto en marcha, actualizar— e instalador con **modo actualizar que
+  enseña el diff** en vez de saltar en silencio lo que ya existe, que era
+  justo lo que impedía propagar mejoras.
+- **La regla de propagación**, escrita en el `CLAUDE.md` de este proyecto y en
+  el del directorio padre **antes** de implementar la feature: si una mejora
+  del arnés vale para cualquier proyecto, se porta a `arnes-base` en el mismo
+  trabajo.
+- **El `CLAUDE.md` del directorio padre** era una copia desactualizada del de
+  este proyecto y se cargaba en TODOS los repositorios de `PycharmProjects`:
+  mandaba ejecutar `harness/init.sh` y leer `.claude/agents/leader.md` en
+  proyectos donde eso no existe. Reescrito como fichero transversal.
+- **Documento en `azure-apps`** siguiendo su convención.
+
+### Añadido el 2026-08-09, ya iniciada la feature (criterio nº 13)
+
+Petición del humano: que el arnés impida que Windows suspenda el equipo
+mientras hay sesión abierta, para no cortar ejecuciones largas.
+`scripts/mantener_despierto.ps1` (API `SetThreadExecutionState`) más los
+hooks `SessionStart` / `SessionEnd` vía `scripts/despierto_hook.sh`. Cada
+sesión gestiona **su** guardián, etiquetado con el `session_id`, y el
+arranque es idempotente. Se incorporó como criterio `acceptance` en vez de
+colarse sin revisión.
+
+Dos trampas de PowerShell 5.1 encontradas al probarlo, comentadas en el
+código: el literal `0x80000000` se parsea como `Int32` negativo, y `-bor`
+sobre `[uint32]` promociona a entero con signo. El script de partida las
+esquivaba por casualidad y se rompía al añadir una bandera.
+
+### Lo que rechazó la primera revisión
+
+Cuatro cambios, dos de fondo. El arnés genérico **seguía nombrando las capas
+`stg`/`mart`/`cierre`** en `spec-author.md`, que es lo que su propio criterio
+nº 6 prohíbe; sobrevivió porque el barrido buscaba `stg/` con barra y el
+fichero lo escribía entre comillas invertidas. Y `azure-apps/arnes_base.md`
+**se quedó en 1.0.0** cuando el arnés subió a 1.1.0: la regla de propagación
+incumplida dentro de la propia feature que existe para evitarlo. Es el
+argumento vivo de F-015: una regla escrita no basta si nadie comprueba que se
+aplicó.
+
+Los otros dos: `current.md` desactualizado y los `.ps1` de energía sin BOM,
+contra la convención de PowerShell del proyecto.
+
+Commits: 53d1127, be54b6c, e33d929, 824e23f, f3c151a en este repositorio;
+más los suyos en `arnes-base` y `azure-apps`.
+
+---
