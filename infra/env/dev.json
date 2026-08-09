@@ -1,7 +1,7 @@
 {
   "$doc": "Datos del entorno. Es el UNICO sitio del despliegue donde se escribe el nombre de un recurso: los .ps1 leen todo de aqui ($CFG) y por eso crear otro entorno consiste en copiar este fichero, no en duplicar scripts. Prohibido meter aqui la suscripcion, el tenant, una clave, una contrasena o un correo (R4): la suscripcion sale del contexto de 'az' o de $env:AZ_SUBSCRIPTION_ID.",
   "$aviso_jobProgramable": "PUERTA DEL INCIDENTE DEL DISCO (2026-08-09), CERRADA. Esta en 'false' a proposito y 80_create_job.ps1 aborta con throw mientras lo siga estando: el job nocturno ejecuta la MISMA carga completa que lleno el disco de 32 GB del servidor compartido y lo dejo en solo lectura diez minutos, afectando a albaranes y partes. La decision ya se tomo (opcion B), asi que lo que falta NO es decidir: es implementarla. Pasar esta clave a true SOLO cuando F-019 (build de stg.plan_mensual por tramos) este implementada Y verificada contra Azure; ponerla a true con F-019 sin cerrar en harness/features.json deja la suite de tests en rojo.",
-  "$aviso_pgAuthMode": "DA-4, ABIERTA. Este fichero declara 'entra' porque lo exigen R10 y R12 de la spec aprobada, pero el servidor psql-albaranes-rs9k2 NO tiene habilitada la autenticacion Entra: el humano lo descarto el 2026-08-08 porque es una operacion de servidor que afecta a albaranes y partes. Mientras eso siga asi, el job se crearia bien y fallaria al conectar todas las noches. 05_check_prereqs.ps1 lo detecta y aborta. Ver infra/README.md y progress/current.md antes de ejecutar T23.",
+  "$aviso_pgAuthMode": "DA-4, CERRADA el 2026-08-10 por el humano: OPCION B. El job se autentica como el rol nativo 'sigrid_dm_app' con su contrasena, que viaja como REFERENCIA a Key Vault resuelta por la identidad gestionada, igual que la clave de sigrid-api; ningun valor de secreto entra en el repositorio ni en los scripts. Se descarto la opcion A (habilitar Entra en el servidor) porque es una operacion de SERVIDOR que afecta a albaranes y partes, ya descartada el 2026-08-08. El modo 'entra' queda implementado y probado pero DORMIDO: para reactivarlo hay que habilitar Entra en el servidor, poner aqui 'entra' y cambiar pgUser al nombre de la identidad gestionada (hay un test que lo exige). Enmienda escrita en specs/F-003-infra-caj/requirements.md, seccion Enmiendas.",
 
   "environment": "dev",
   "location": "spaincentral",
@@ -40,11 +40,16 @@
 
   "sigridApiBaseUrl": "https://func-sigridapi-dev-huyke.azurewebsites.net",
 
+  "$doc_secretos_pg": "Nombres, nunca valores. 'pgSecretName' es el secreto del vault del proyecto (keyVault, arriba) que guarda la contrasena de pgUser; 'pgJobSecretName' es como se llama ese secreto DENTRO del job, y es lo que referencia PG_PASSWORD. 'pgReadonlySecretName' no lo usa el job: es la contrasena del rol de solo lectura del MCP, y esta aqui porque el bloque 5 la migra al vault del proyecto junto con la otra (paso 8 bis del README). Las dos vivian en kv-albaranes-rs9k2 desde F-005.",
+  "pgSecretName": "pg-sigrid-dm-app",
+  "pgJobSecretName": "pg-password",
+  "pgReadonlySecretName": "pg-mcp-sigrid-dm-ro",
+
   "pgHost": "psql-albaranes-rs9k2.postgres.database.azure.com",
   "pgPort": 5432,
   "pgDatabase": "sigrid_dm",
   "pgUser": "sigrid_dm_app",
-  "pgAuthMode": "entra",
+  "pgAuthMode": "password",
   "pgSetRole": "sigrid_dm_etl",
   "pgReadonlyRole": "mcp_sigrid_dm_ro",
   "pgAutoCreateDb": "false",

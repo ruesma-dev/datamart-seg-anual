@@ -57,6 +57,7 @@ $clavesObligatorias = @(
     "cron", "jobProgramable", "replicaTimeoutSeconds", "replicaRetryLimit",
     "parallelism", "replicaCompletionCount", "cpu", "memory",
     "sigridApiBaseUrl",
+    "pgSecretName", "pgJobSecretName", "pgReadonlySecretName",
     "pgHost", "pgPort", "pgDatabase", "pgUser", "pgAuthMode",
     "pgSetRole", "pgReadonlyRole", "pgAutoCreateDb", "pgResourceGroup",
     "logLevel", "logFormat",

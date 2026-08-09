@@ -65,6 +65,11 @@ CLAVES_OBLIGATORIAS = (
     "cpu",
     "memory",
     "sigridApiBaseUrl",
+    # DA-4 opción B (enmienda del 2026-08-10): la contraseña de Postgres viaja
+    # como referencia a Key Vault, así que el entorno declara dónde vive.
+    "pgSecretName",
+    "pgJobSecretName",
+    "pgReadonlySecretName",
     "pgHost",
     "pgPort",
     "pgDatabase",
@@ -108,6 +113,8 @@ CLAVES_NOMBRE_DE_RECURSO = (
     "acrResourceGroup",
     "imageRepository",
     "sigridApiBaseUrl",
+    "pgSecretName",
+    "pgReadonlySecretName",
     "pgHost",
     "pgDatabase",
     "pgUser",
@@ -522,35 +529,169 @@ def test_f003_r9_cron_del_entorno_dev_es_0_2() -> None:
 
 
 # ---------------------------------------------------------------------------
-# R10 · ni una contraseña viaja al contenedor
+# R10 · ningún valor de secreto viaja al contenedor
 # ---------------------------------------------------------------------------
+#
+# ENMIENDA 2026-08-10 (DA-4, opción B, aprobada por el humano). R10 decía «el
+# sistema no debe pasar ninguna contraseña al contenedor: no puede existir
+# PG_PASSWORD». El servidor tiene la autenticación Entra deshabilitada y
+# habilitarla afecta a `albaranes` y `partes`, así que el job se autentica como
+# `sigrid_dm_app` con su contraseña. Lo que cambia es el nombre de la variable
+# que se admite; lo que NO cambia —y es lo que estos tests sujetan— es que un
+# VALOR de secreto no puede aparecer nunca: la contraseña viaja igual que la
+# clave de sigrid-api, como referencia a Key Vault resuelta por la identidad
+# gestionada. Ver specs/F-003-infra-caj/requirements.md §Enmiendas.
 
 
-def test_f003_r10_sin_pg_password_ni_secretos_literales_en_los_scripts() -> None:
+def _valores_de_secretos(texto: str) -> list[str]:
     """
-    No hay `PG_PASSWORD`, ni credenciales de registro, ni un `--secrets` con el
-    valor escrito. Un secreto que no existe no se filtra ni hay que rotarlo.
+    Los valores que un script pasa en `--secrets`, estén escritos en la llamada
+    o dentro del array que se le pasa por variable.
+
+    Mirar solo a los literales de la llamada era suficiente cuando el job tenía
+    un secreto fijo. Al volverse condicional (la contraseña solo existe en modo
+    `password`), el array pasó a construirse antes, y un test que solo mirase
+    `--secrets "..."` se quedaría mirando a un sitio vacío: verde por no
+    encontrar nada, que es la peor forma de estar verde.
+    """
+    valores: list[str] = []
+
+    # Un argumento es una cadena entre comillas o una variable suelta. El orden
+    # de la alternancia importa: la cadena se consume entera, para no confundir
+    # una variable interpolada DENTRO del literal con el argumento en sí.
+    argumento = r'"[^"]+"|\$\w+'
+    for bloque in re.findall(rf"--secrets\s+((?:{argumento})(?:\s*`?\s*(?:{argumento}))*)", texto):
+        for token in re.findall(argumento, bloque):
+            if token.startswith('"'):
+                valores.append(token.strip('"'))
+            else:
+                # Variable: valen las cadenas que se le asignan o se le añaden.
+                valores += re.findall(rf'\{token}\s*\+?=\s*@?\(?\s*"([^"]+)"', texto)
+
+    return valores
+
+
+def test_f003_r10_ninguna_contrasena_literal_en_los_scripts() -> None:
+    """
+    Ni credenciales de registro, ni un `--secrets` con el valor escrito, ni un
+    `PG_PASSWORD` con nada que no sea una referencia.
+
+    Un secreto que no está escrito no se filtra por el repositorio ni hay que
+    rotarlo cuando alguien clona el proyecto.
     """
     for script in _ps1():
         texto = _script(script.name)
-        assert "PG_PASSWORD" not in texto, f"{script.name} pasa una contraseña de Postgres"
         assert "--registry-password" not in texto, f"{script.name} usa credenciales de ACR"
         assert "--registry-username" not in texto, f"{script.name} usa credenciales de ACR"
 
-        for secreto in re.findall(r'--secrets\s+"([^"]+)"', texto):
+        for secreto in _valores_de_secretos(texto):
             assert "keyvaultref:" in secreto, (
                 f"{script.name} pasa un secreto literal: {secreto!r}"
             )
 
+        for asignacion in re.finditer(r"PG_PASSWORD\s*=\s*(\S*)", texto):
+            valor = asignacion.group(1)
+            assert valor.startswith("secretref:"), (
+                f"{script.name} asigna a PG_PASSWORD algo que no es una referencia al "
+                f"secreto del job: {valor!r}"
+            )
+
 
 def test_f003_r10_el_secreto_de_sigrid_se_pasa_por_keyvaultref() -> None:
-    """El único secreto del job es la clave de sigrid-api, resuelta por identidad."""
+    """La clave de sigrid-api viaja como referencia, resuelta por la identidad."""
     texto = _script("80_create_job.ps1")
 
     assert "keyvaultref:" in texto
     assert "identityref:" in texto
     assert "secretref:" in texto, "la variable de entorno debe referenciar el secreto"
     assert "$CFG.sigridSecretName" in texto, "el nombre del secreto sale del entorno"
+
+
+def test_f003_r10_la_contrasena_de_postgres_viaja_por_keyvaultref() -> None:
+    """
+    ENMIENDA DA-4 (B). En modo `password`, el job declara un segundo secreto —la
+    contraseña de `sigrid_dm_app`— por referencia a Key Vault, y la variable
+    `PG_PASSWORD` apunta a ese secreto, nunca a un valor.
+
+    El contraste importa: el test no vale si se limita a comprobar que no hay
+    contraseñas. Aquí se exige que el mecanismo **esté**, porque sin él el job
+    se crea perfecto y falla al conectar todas las noches.
+    """
+    cfg = _config("dev")
+    texto = _script("80_create_job.ps1")
+
+    if cfg["pgAuthMode"] != "password":
+        pytest.skip("el entorno no usa contraseña; ver test del modo entra")
+
+    assert "$CFG.pgSecretName" in texto, (
+        "el nombre del secreto de Postgres en el vault sale del fichero de entorno"
+    )
+    assert re.search(r'"PG_PASSWORD=secretref:\$\(\$CFG\.pgJobSecretName\)"', texto), (
+        "PG_PASSWORD debe referenciar el secreto del job, y su nombre sale de $CFG"
+    )
+
+    declaracion = [s for s in _valores_de_secretos(texto) if "pgJobSecretName" in s]
+    assert declaracion, "el job no declara el secreto de la contraseña de Postgres"
+    for secreto in declaracion:
+        assert "keyvaultref:" in secreto and "identityref:" in secreto, (
+            f"el secreto de la contraseña no se resuelve con la identidad gestionada: "
+            f"{secreto!r}"
+        )
+
+
+def test_f003_r10_el_job_solo_admite_los_dos_modos_de_autenticacion_previstos() -> None:
+    """
+    Un `pgAuthMode` con una errata no puede crear un job a medias: aborta.
+
+    Antes de la enmienda el script exigía `entra` y lanzaba `throw` con
+    cualquier otra cosa, que era la puerta de DA-4. Cerrada la decisión, la
+    puerta no desaparece: se convierte en una lista blanca.
+    """
+    texto = _script("80_create_job.ps1")
+
+    assert re.search(
+        r"if\s*\(\s*\$CFG\.pgAuthMode\s+-notin\s+@\([^)]*\)\s*\)\s*\{[^}]*throw", texto
+    ), "80_create_job.ps1 no aborta ante un modo de autenticación desconocido"
+
+
+def test_f003_el_usuario_de_postgres_cuadra_con_el_modo_de_autenticacion() -> None:
+    """
+    En modo `entra` el usuario **es** la identidad gestionada; en modo
+    `password` es un rol nativo de la base y no puede ser la identidad.
+
+    La review de F-003 señaló esta incoherencia (`pgUser: sigrid_dm_app` con
+    `pgAuthMode: entra`). Con DA-4 cerrada queda resuelta, y este test impide
+    que vuelva: cambiar el modo sin cambiar el usuario deja la suite en rojo.
+    """
+    cfg = _config("dev")
+
+    if cfg["pgAuthMode"] == "entra":
+        assert cfg["pgUser"] == cfg["managedIdentity"], (
+            "en modo entra el usuario de Postgres tiene que ser el nombre de la "
+            "identidad gestionada, que es lo que el servidor reconoce"
+        )
+    else:
+        assert cfg["pgUser"] != cfg["managedIdentity"], (
+            "en modo password el usuario es un rol nativo de la base, no la identidad"
+        )
+
+
+def test_f003_los_prerrequisitos_comprueban_el_modo_de_autenticacion_declarado() -> None:
+    """
+    `05_check_prereqs.ps1` sigue siendo quien detecta el desajuste entre lo que
+    el entorno declara y lo que el servidor admite.
+
+    Con DA-4 cerrada el modo esperado es `password`, pero el modo `entra` queda
+    implementado y dormido: si alguien lo reactiva, la comprobación contra
+    `authConfig.activeDirectoryAuth` tiene que seguir ahí, o el job volvería a
+    crearse perfecto y a fallar de noche.
+    """
+    texto = _script("05_check_prereqs.ps1")
+
+    assert '"entra"' in texto, "se ha perdido la comprobación del modo entra"
+    assert '"password"' in texto, "el modo con contraseña no se reconoce"
+    assert "activeDirectoryAuth" in texto, "ya no se consulta si el servidor admite Entra"
+    assert "DA-4" in texto, "el rastro de la decisión desaparece del script"
 
 
 # ---------------------------------------------------------------------------

@@ -14,10 +14,15 @@
 #      por tramos) este implementada Y verificada contra Azure, el job NO
 #      debe quedar programado. No es solo prosa: el fichero de entorno trae
 #      jobProgramable = false y este script aborta si lo lee.
-#   2. DECISION DA-4. El entorno declara autenticacion Entra contra Postgres
-#      porque el job no puede llevar contrasena (R10), pero el servidor tiene
-#      esa autenticacion deshabilitada y habilitarla afecta a las otras bases.
-#      05_check_prereqs.ps1 lo comprueba y falla si no cuadra.
+#   2. DECISION DA-4, CERRADA el 2026-08-10 con la OPCION B. El job se
+#      autentica como el rol nativo de la base con su contrasena, que viaja
+#      como REFERENCIA a Key Vault resuelta por la identidad gestionada, igual
+#      que la clave de sigrid-api: aqui no se escribe ningun valor. Antes de
+#      ejecutar este script, el secreto tiene que estar ya en el vault del
+#      proyecto (README, paso 8 bis: migracion desde el vault de albaranes).
+#      El modo 'entra' sigue implementado y dormido; 05_check_prereqs.ps1
+#      comprueba que lo que declara el entorno case con lo que admite el
+#      servidor.
 #
 # Lo que este script NO hace, a proposito:
 #
@@ -46,8 +51,8 @@ $ErrorActionPreference = "Stop"
 if (-not $Confirmar) {
     Write-Host ""
     Write-Host "Este script deja el job PROGRAMADO ($($CFG.cron), UTC)." -ForegroundColor Yellow
-    Write-Host "Lee la cabecera del fichero: hay dos puertas abiertas (F-019, por el" -ForegroundColor Yellow
-    Write-Host "disco del servidor, y DA-4) que deben cerrarse antes." -ForegroundColor Yellow
+    Write-Host "Lee la cabecera del fichero: F-019 (el disco del servidor) sigue" -ForegroundColor Yellow
+    Write-Host "bloqueando este paso." -ForegroundColor Yellow
     Write-Host "Cuando lo tengas claro, repite con -Confirmar."
     exit 0
 }
@@ -64,9 +69,13 @@ if (-not $CFG.jobProgramable) {
            "verificada contra Azure.")
 }
 
-if ($CFG.pgAuthMode -ne "entra") {
-    throw ("el entorno pide autenticacion '$($CFG.pgAuthMode)' contra Postgres y este " +
-           "script no puede pasar credenciales al contenedor (R10). Cierra DA-4 antes.")
+# DA-4 cerrada, pero la puerta no desaparece: se convierte en lista blanca. Un
+# modo con una errata crearia un job que no conecta, y eso no se ve hasta la
+# primera noche.
+if ($CFG.pgAuthMode -notin @("password", "entra")) {
+    throw ("el entorno declara pgAuthMode='$($CFG.pgAuthMode)', que no existe. " +
+           "Valores validos: 'password' (contrasena por referencia a Key Vault, " +
+           "que es la opcion B de DA-4) o 'entra' (token de identidad gestionada).")
 }
 
 $yaExiste = az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv 2>$null
@@ -94,6 +103,28 @@ if (($secretos -split "`n") -notcontains $CFG.sigridSecretName) {
 }
 
 $uriSecreto = "{0}secrets/{1}" -f $vaultUri, $CFG.sigridSecretName
+
+# --- 2 bis. El secreto de la contrasena de Postgres (DA-4, opcion B) --------
+#
+# Mismo mecanismo que la clave de sigrid-api: el job guarda una REFERENCIA al
+# vault y la resuelve con la identidad gestionada. Aqui no se lee ni se escribe
+# el valor; solo se comprueba que el nombre esta en el listado del vault.
+
+$secretosJob = @(
+    "$($CFG.jobSecretName)=keyvaultref:$uriSecreto,identityref:$($uami.id)"
+)
+$varsAuth = @("PG_AUTH_MODE=$($CFG.pgAuthMode)")
+
+if ($CFG.pgAuthMode -eq "password") {
+    if (($secretos -split "`n") -notcontains $CFG.pgSecretName) {
+        throw ("falta el secreto '$($CFG.pgSecretName)' en el vault del proyecto. Es la " +
+               "migracion del paso 8 bis del README: se copia desde el vault de albaranes " +
+               "sin que el valor pase por pantalla ni por el historial del shell.")
+    }
+    $uriPassword  = "{0}secrets/{1}" -f $vaultUri, $CFG.pgSecretName
+    $secretosJob += "$($CFG.pgJobSecretName)=keyvaultref:$uriPassword,identityref:$($uami.id)"
+    $varsAuth    += "PG_PASSWORD=secretref:$($CFG.pgJobSecretName)"
+}
 
 # --- 3. La imagen: la que se diga, o la ultima publicada --------------------
 
@@ -126,7 +157,7 @@ az containerapp job create `
     --mi-user-assigned $uami.id `
     --registry-server "$($CFG.acrName).azurecr.io" `
     --registry-identity $uami.id `
-    --secrets "$($CFG.jobSecretName)=keyvaultref:$uriSecreto,identityref:$($uami.id)" `
+    --secrets $secretosJob `
     --tags @(Get-EtiquetasCli) `
     --env-vars `
         "SIGRID_API_BASE_URL=$($CFG.sigridApiBaseUrl)" `
@@ -135,7 +166,7 @@ az containerapp job create `
         "PG_PORT=$($CFG.pgPort)" `
         "PG_DB=$($CFG.pgDatabase)" `
         "PG_USER=$($CFG.pgUser)" `
-        "PG_AUTH_MODE=$($CFG.pgAuthMode)" `
+        $varsAuth `
         "PG_SET_ROLE=$($CFG.pgSetRole)" `
         "PG_READONLY_ROLE=$($CFG.pgReadonlyRole)" `
         "PG_AUTO_CREATE_DB=$($CFG.pgAutoCreateDb)" `

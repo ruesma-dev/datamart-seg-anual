@@ -87,22 +87,34 @@ if ($LASTEXITCODE -ne 0 -or -not $servidor) {
     $pg = $servidor | ConvertFrom-Json
     Escribir-Ok "Postgres $($pg.version) ($($pg.sku), $($pg.discoGB) GB) accesible"
 
-    # DA-4. El modo de autenticacion declarado tiene que existir de verdad en el
-    # servidor. Sin esta comprobacion, el job se crea perfecto y falla al
-    # conectar todas las noches a las 02:00, que es el fallo mas caro de
-    # diagnosticar: nadie esta mirando.
-    if ($CFG.pgAuthMode -eq "entra") {
-        if ($pg.entra -eq "Enabled") {
-            Escribir-Ok "el servidor admite autenticacion Entra"
-        } else {
-            $texto = "el entorno pide autenticacion Entra y el servidor la tiene en " +
-                     "'$($pg.entra)'. Habilitarla es una operacion de SERVIDOR que afecta " +
-                     "a las demas bases alojadas ahi: NO la ejecutes por tu cuenta. " +
-                     "Decision DA-4, ver infra/README.md."
-            Escribir-Fallo $texto
+    # DA-4, CERRADA el 2026-08-10 (opcion B): el modo esperado es 'password' y
+    # la contrasena viaja como referencia a Key Vault. El modo 'entra' queda
+    # implementado y dormido, y esta comprobacion es la que evita que
+    # reactivarlo salga barato en apariencia: sin ella el job se crea perfecto
+    # y falla al conectar todas las noches a las 02:00, que es el fallo mas
+    # caro de diagnosticar porque nadie esta mirando.
+    switch ($CFG.pgAuthMode) {
+        "entra" {
+            if ($pg.entra -eq "Enabled") {
+                Escribir-Ok "el servidor admite autenticacion Entra"
+            } else {
+                $texto = "el entorno pide autenticacion Entra y el servidor la tiene en " +
+                         "'$($pg.entra)'. Habilitarla es una operacion de SERVIDOR que afecta " +
+                         "a las demas bases alojadas ahi: NO la ejecutes por tu cuenta. " +
+                         "DA-4 se cerro con la opcion B (contrasena por Key Vault); volver a " +
+                         "Entra exige reabrirla. Ver infra/README.md."
+                Escribir-Fallo $texto
+            }
         }
-    } else {
-        Escribir-Aviso "el entorno no pide autenticacion Entra; revisa DA-4 antes de crear el job"
+        "password" {
+            $texto = "autenticacion por contrasena (DA-4 opcion B): el job la recibe como " +
+                     "referencia al secreto '$($CFG.pgSecretName)' del vault del proyecto. " +
+                     "Ese secreto se migra a mano ANTES de crear el job (README, paso 8 bis)."
+            Escribir-Ok $texto
+        }
+        default {
+            Escribir-Fallo "el entorno declara pgAuthMode='$($CFG.pgAuthMode)', que no existe. Valores validos: 'password' o 'entra' (DA-4)."
+        }
     }
 
     # Espacio en disco. El 2026-08-09 una carga completa lleno el disco del
