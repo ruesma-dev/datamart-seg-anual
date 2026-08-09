@@ -130,7 +130,7 @@ agente escribe en Azure.
       **Verificación**: `pytest tests/test_f003_infra.py -k "r25 or r26" -q`
       (sin correos literales, alerta apuntando al job y a un action group).
 
-- [ ] **T17**: `infra/README.md` — orden de ejecución, idempotencia, pasos que
+- [x] **T17**: `infra/README.md` — orden de ejecución, idempotencia, pasos que
       exigen autorización del humano, KQL de logs de R24 y cómo añadir un
       entorno nuevo.
       **Verificación**: `pytest tests/test_f003_infra.py -k r6 -q`.
