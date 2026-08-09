@@ -1,6 +1,31 @@
 <!-- progress/current.md -->
 # Trabajo en curso
 
+> ## ⚠ LEE ESTO PRIMERO: `.env` APUNTA A AZURE
+>
+> Desde el 2026-08-09, `.env` está configurado contra
+> **`psql-albaranes-rs9k2`**, el servidor compartido que sirve también a
+> `albaranes` y `partes` en producción. **NO** apunta al Postgres local.
+>
+> Consecuencia inmediata: `check-pg`, `status`, `run-all` y cualquier cosa que
+> abra conexión **van contra Azure**. Antes de lanzar nada que escriba,
+> asegúrate de que es lo que quieres. Para volver a local, el humano guardó
+> copia en `.env.local.bak`.
+>
+> Los tests de pytest **no** tocan red ni BBDD, así que `harness/init.sh`
+> sigue siendo seguro de ejecutar.
+>
+> Datos útiles de entorno para no redescubrirlos:
+> - `psql.exe` está en `C:\Program Files\PostgreSQL\16\bin` (no está en el
+>   `PATH` por defecto). No hace falta instalar nada.
+> - Las contraseñas del datamart están en **`kv-albaranes-rs9k2`**, secretos
+>   `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro`. Nunca en ficheros del repo.
+> - Al conectar con `psql`, **las opciones van ANTES** de la cadena de
+>   conexión: este build deja de parsearlas tras el primer argumento
+>   posicional.
+> - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
+>   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
+
 **F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 6 y 11 hechos el
 2026-08-09. Faltan el 7 y el 8, que dependen del humano, y el 9 y el 10, que
 dependen del 8.
@@ -46,15 +71,23 @@ este fichero **solo podía romperse contra Azure**, y solo al ejecutarlo.
 Corregido quitando `NOSUPERUSER`, que era redundante: `CREATE ROLE` ya crea
 sin superusuario, y así se verificó (`rolsuper = f` en los tres roles).
 
-## Lo que falta, y es del humano
+## Lo que falta
 
-1. **`.env`**: copiar el bloque del perfil Azure (está en `.env.example`,
-   sección «Perfil Azure (F-005)») y poner en `PG_PASSWORD` el secreto
-   `pg-sigrid-dm-app` de `kv-albaranes-rs9k2`. Guardar antes copia del `.env`
-   local. Ojo a `PG_AUTO_CREATE_DB=false`.
-2. **Carga inicial**: `python main.py run-all --full`. El `apply-grants` final
-   no es opcional.
-3. Avisar al líder para hacer los pasos 9, 10 y el veredicto sobre el SKU.
+1. **`.env` · HECHO y verificado** el 2026-08-09. Los once valores correctos:
+   host de Azure, `sigrid_dm`, `sigrid_dm_app`, contraseña de 32 caracteres
+   que coincide con Key Vault, `sslmode=require`, **`PG_AUTO_CREATE_DB=False`**,
+   `SET ROLE` y rol de solo lectura. `check-pg` responde PostgreSQL **16.14**
+   (Azure; el local es 16.4). La contraseña está tipada como `SecretStr`, así
+   que no puede colarse en un log.
+2. **Carga inicial · PENDIENTE, la lanza el humano**:
+   `python main.py run-all --full`. El `apply-grants` final no es opcional.
+   Puede tardar: ~4 GB a través de una API que sirve 1.000 filas por petición,
+   contra un servidor de 1 vCPU. Es repetible: si hay que abortarla porque
+   `albaranes` o `partes` se resienten, se relanza sin más.
+3. **Pasos 9 y 10, del líder, en cuanto termine la carga**: medición con
+   `python main.py timings` y **veredicto explícito sobre si `Standard_B1ms`
+   aguanta** —es la entrada de F-011—, y comparación de la huella de vistas
+   local contra Azure con el mes cerrado que fije el humano.
 
 ## Nota sobre dónde viven las contraseñas
 
