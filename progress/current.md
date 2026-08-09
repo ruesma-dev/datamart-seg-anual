@@ -98,6 +98,59 @@ actualizar la referencia. Anotado para que no se quede así por inercia.
 
 ---
 
+# F-015 · Implementada (2026-08-09, implementer) — pendiente de review
+
+**Estado:** las 16 tareas de `specs/F-015-verificar-tests/tasks.md` en `[x]`,
+un commit por tarea, `bash harness/init.sh` en verde con la puerta de
+cobertura nueva ejecutándose de verdad. **Informe completo:
+`progress/impl_F-015.md`.** Nivel de rigor declarado: `estandar`.
+
+## Evidencias, en una línea cada una
+
+| Evidencia | Valor |
+|---|---|
+| Tests | **166 pasan**, 0 fallan (101 nuevos), en **1,2 s** |
+| Cobertura de líneas cambiadas | **97,5 %** (538/552, umbral 80 %) |
+| Mutación de F-015 | 175 mutantes, **13 supervivientes** (92,6 %) |
+| Mutación de F-005 (línea base) | 101 mutantes, **55 supervivientes** (45,5 %) |
+
+## Lo que hay que saber sin leer el informe
+
+- **La línea base de F-005 destapó 6 huecos de riesgo alto.** El más
+  incómodo: el valor por defecto de `auto_create_db` —la puerta bloqueante
+  que la propia F-005 declaró contra el servidor compartido de producción—
+  **no lo fija ningún test**, ni en `config/settings.py` ni en
+  `postgres_client.py`. Tampoco el autocommit de la conexión administrativa,
+  ni la comparación de huellas de `fingerprint.py`, ni la detección de un
+  paso fallido en `main.py`. Detalle en `progress/mutacion_F-005.md`. **No se
+  han parcheado**: los tests de F-005 son el objeto de la medición.
+- **La campaña sobre F-015 se ejecutó dos veces**: 37 supervivientes la
+  primera, 13 tras añadir tests. Los 24 huecos cerrados no los había visto ni
+  la fase RED ni el 96,7 % de cobertura de entonces.
+- **La campaña de F-005 se ejecutó en un `git worktree` aparte**, no en el
+  árbol vivo, porque había una carga `run-all --full` corriendo contra Azure
+  desde este mismo directorio y la mutación escribe ficheros en disco. Se
+  añadió la opción `--raiz` a la herramienta para poder hacerlo.
+- **Novedad que afecta a todo trabajo futuro**: `bash harness/init.sh` ahora
+  ejecuta la suite bajo `coverage` y **falla** si la cobertura de las líneas
+  que cambia la feature en curso baja del 80 %. Hace falta
+  `pip install -r requirements-dev.txt` (dependencia nueva: `coverage>=7.4`).
+- **`arnes-base` está en 1.2.0** con todo esto portado (commit local
+  `5006ee8`, sin push).
+
+## Pendiente del humano
+
+1. **MANUAL de R20**: los cuatro comandos de verificación del portado a
+   `arnes-base`, listados en `progress/impl_F-015.md` § 6 con el resultado ya
+   obtenido.
+2. **Decisión**: ¿se abre una feature de refuerzo de tests para los 6 huecos
+   de riesgo alto de F-005?
+3. **Decisión**: las 9 features aún no empezadas no declaran `rigor` y por
+   tanto heredan `critico` (el más exigente). Es lo correcto por diseño, pero
+   conviene decidirlo antes de abrir cada una, no descubrirlo.
+
+---
+
 # F-015 · Spec escrita (2026-08-09, spec-author)
 
 Escrita `specs/F-015-verificar-tests/` (`requirements.md` con R1–R20 en EARS,

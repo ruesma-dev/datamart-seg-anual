@@ -68,9 +68,9 @@
       `harness/features.json` según la lista acordada (si no la aprobó,
       saltar esta tarea y dejarlo anotado en `progress/current.md`).
       | Verificación: `bash harness/init.sh` valida los valores.
-- [ ] T15: Actualizar `progress/current.md` (estado, verificaciones MANUAL
+- [x] T15: Actualizar `progress/current.md` (estado, verificaciones MANUAL
       pendientes) y escribir `progress/impl_F-015.md` con las salidas RED
       reales y la sección «Evidencias».
       | Verificación: ficheros presentes y completos.
-- [ ] T16: Ejecutar `bash harness/init.sh` en verde.
+- [x] T16: Ejecutar `bash harness/init.sh` en verde.
       | Verificación: exit code 0, salida pegada en el informe.
