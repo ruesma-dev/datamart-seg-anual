@@ -45,9 +45,22 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mcp_sigrid_dm_ro')
 ALTER ROLE sigrid_dm_app    WITH LOGIN PASSWORD :'app_pwd';
 ALTER ROLE mcp_sigrid_dm_ro WITH LOGIN PASSWORD :'mcp_pwd';
 
--- Ninguno de los dos crea bases ni roles ni hereda nada por su cuenta.
-ALTER ROLE sigrid_dm_app    WITH NOSUPERUSER NOCREATEDB NOCREATEROLE;
-ALTER ROLE mcp_sigrid_dm_ro WITH NOSUPERUSER NOCREATEDB NOCREATEROLE;
+-- Ninguno de los dos crea bases ni roles.
+--
+-- SIN `NOSUPERUSER`, a propósito. En Azure Database for PostgreSQL Flexible
+-- Server el administrador NO es superusuario (es miembro de `azure_pg_admin`),
+-- y PostgreSQL exige el atributo SUPERUSER para cambiarlo, aunque sea para
+-- ponerlo a NO:
+--     ERROR: permission denied to alter role
+--     DETALLE: Only roles with the SUPERUSER attribute may change the
+--              SUPERUSER attribute.
+-- No se pierde nada: `CREATE ROLE` ya crea NOSUPERUSER por defecto, y así se
+-- verificó contra el servidor real (`rolsuper = f` en los tres roles).
+-- Contra un PostgreSQL local no fallaba porque allí el admin sí es superusuario:
+-- este fichero solo podía romperse contra Azure. Encontrado el 2026-08-09 al
+-- ejecutar la Fase 2 del runbook.
+ALTER ROLE sigrid_dm_app    WITH NOCREATEDB NOCREATEROLE;
+ALTER ROLE mcp_sigrid_dm_ro WITH NOCREATEDB NOCREATEROLE;
 
 -- 2. El rol del ETL es miembro del grupo propietario.
 GRANT sigrid_dm_etl TO sigrid_dm_app;
