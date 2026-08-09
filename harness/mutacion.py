@@ -495,7 +495,9 @@ def _analizar_argumentos(argv: list[str] | None) -> argparse.Namespace:
             "cuántas mutaciones sobreviven a la suite de tests."
         ),
     )
-    analizador.add_argument("--feature", required=True, help="Identificador, p. ej. F-001")
+    analizador.add_argument(
+        "--feature", required=True, help="Identificador de la feature, p. ej. F-XXX"
+    )
     analizador.add_argument("--base", default="dev", help="Rama de integración")
     analizador.add_argument("--rama", default=None, help="Rama de la feature")
     analizador.add_argument("--raiz", default=".", help="Raíz del repositorio a mutar")

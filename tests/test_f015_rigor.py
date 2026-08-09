@@ -174,6 +174,40 @@ def test_f015_r16_reviewer_valida_contra_el_nivel_de_rigor(rigor: dict) -> None:
     assert "justificaci" in protocolo
 
 
+# --- R19: las herramientas del arnés son genéricas --------------------------
+
+#: Nada de esto puede aparecer en las herramientas: se portan tal cual a
+#: cualquier repositorio, y una mención al proyecto de origen las ata a él.
+PALABRAS_DEL_PROYECTO = (
+    r"sigrid",
+    r"datamart",
+    r"ruesma",
+    r"azure",
+    r"postgres",
+    r"psql",
+    r"power\s*bi",
+    r"\betl\b",
+    r"\bstg\b",
+    r"\bmart\b",
+    r"\bcierre\b",
+    r"\bobra\b",
+    r"\bobras\b",
+    r"\bamb\b",
+    r"\bfas\b",
+    r"f-0\d\d",
+)
+
+
+def test_f015_r19_herramientas_del_arnes_sin_menciones_especificas() -> None:
+    ficheros = [*sorted((RAIZ / "harness").glob("*.py")), RUTA_RIGOR]
+
+    assert len(ficheros) >= 5, "faltan herramientas que revisar"
+    for fichero in ficheros:
+        texto = fichero.read_text(encoding="utf-8").lower()
+        for patron in PALABRAS_DEL_PROYECTO:
+            assert not re.search(patron, texto), f"{fichero.name} menciona {patron}"
+
+
 # --- R15: resolución del nivel ----------------------------------------------
 
 
