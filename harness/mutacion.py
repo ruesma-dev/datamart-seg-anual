@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from harness.alcance import Alcance, alcance_de_feature
+from harness.rigor import RUTA_RIGOR, cargar_rigor, timeout_mutacion
 
 Posicion = tuple[int, int]
 
@@ -505,10 +506,24 @@ def _analizar_argumentos(argv: list[str] | None) -> argparse.Namespace:
     return analizador.parse_args(argv)
 
 
+def _timeout_configurado() -> int:
+    """Timeout por mutante de `harness/rigor.json`, con red de seguridad.
+
+    Se lee la configuración del arnés que ejecuta la campaña (el directorio
+    actual), no la del repositorio mutado, que puede ser un árbol antiguo sin
+    arnés. Un proyecto sin configuración de rigor cae en el valor por defecto;
+    lo que nunca se cablea en el código es el umbral de cobertura.
+    """
+    try:
+        return timeout_mutacion(cargar_rigor(RUTA_RIGOR))
+    except ValueError:
+        return TIMEOUT_POR_DEFECTO
+
+
 def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
     """Punto de entrada: 0 sin supervivientes, 1 con ellos, 2 error de uso."""
     opciones = _analizar_argumentos(argv)
-    timeout_s = opciones.timeout or TIMEOUT_POR_DEFECTO
+    timeout_s = opciones.timeout or _timeout_configurado()
 
     try:
         alcance = alcance_de_feature(

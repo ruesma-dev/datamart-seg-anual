@@ -25,6 +25,7 @@ from harness.mutacion import (
     escribir_informe,
     generar_mutantes,
 )
+from harness.rigor import cargar_rigor, timeout_mutacion
 
 
 def mutantes_de(fuente: str, lineas: set[int] | None = None) -> list[Mutante]:
@@ -140,9 +141,11 @@ class EjecutorFalso:
         self.vigilar = vigilar
         self.llamadas = 0
         self.vistos: list[str] = []
+        self.timeouts_recibidos: list[int] = []
 
     def ejecutar(self, timeout_s: int) -> str:
         self.llamadas += 1
+        self.timeouts_recibidos.append(timeout_s)
         if self.vigilar is not None:
             self.vistos.append(self.vigilar.read_text(encoding="utf-8"))
         indice = min(self.llamadas - 1, len(self.veredictos) - 1)
@@ -234,6 +237,29 @@ def test_f015_r1_alcance_vacio_no_muta_nada(
     assert codigo == 0
     assert ejecutor.llamadas == 0
     assert salida.is_file()
+
+
+def test_f015_r11_el_timeout_por_mutante_sale_de_la_configuracion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, alcance = preparar(tmp_path, lineas={2})
+    monkeypatch.setattr(mutacion, "alcance_de_feature", lambda *a, **k: alcance)
+    ejecutor = EjecutorFalso([MUERTO])
+
+    mutacion.main(
+        [
+            "--feature",
+            "F-042",
+            "--raiz",
+            str(tmp_path),
+            "--salida",
+            str(tmp_path / "informe.md"),
+        ],
+        ejecutor=ejecutor,
+    )
+
+    esperado = timeout_mutacion(cargar_rigor())
+    assert ejecutor.timeouts_recibidos == [esperado]
 
 
 def test_f015_r1_muestreo_reproducible_con_semilla(tmp_path: Path) -> None:
