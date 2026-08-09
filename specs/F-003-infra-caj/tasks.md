@@ -37,7 +37,7 @@ agente escribe en Azure.
       suscripción, extensión `containerapp`, existencia del ACR, alcance del
       Postgres de F-005 y permiso para crear asignaciones de rol.
       **Verificación**: `pytest tests/test_f003_infra.py -k "r5" -q` +
-      MANUAL (humano): `pwsh -File infra/05_check_prereqs.ps1` termina con
+      MANUAL (humano): `powershell -NoProfile -File infra/05_check_prereqs.ps1` termina con
       diagnóstico y código 0.
 
 ## Bloque 2 — Scripts de aprovisionamiento (escritos, no ejecutados)
@@ -149,7 +149,7 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
 
 - [ ] **T18**: Prerrequisitos y creación de la base de infraestructura.
       **Verificación**: MANUAL (humano):
-      `pwsh -File infra/05_check_prereqs.ps1`, luego `10_create_rg.ps1`,
+      `powershell -NoProfile -File infra/05_check_prereqs.ps1`, luego `10_create_rg.ps1`,
       `20_create_observability.ps1`, `30_create_env.ps1`; comprobar con los
       comandos de **R15** y **R16**. Anotar la `staticIp` del entorno.
 
@@ -169,7 +169,7 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       dejar el secreto en el historial del shell.
 
 - [ ] **T21**: Construir y publicar la imagen.
-      **Verificación**: MANUAL (humano): `pwsh -File infra/70_build_image.ps1`
+      **Verificación**: MANUAL (humano): `powershell -NoProfile -File infra/70_build_image.ps1`
       y comprobar con **R20**. Anotar el tag publicado.
 
 - [ ] **T22**: Autorizar y crear la regla de firewall del Postgres para la IP
@@ -200,7 +200,7 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       tanto `infra/env/dev.json` declara `jobProgramable: false` y
       `80_create_job.ps1` aborta con `throw`; abrir la puerta es poner esa
       clave a `true`, y hay un test que lo impide si `F-019` no está `done`.
-      **Verificación**: MANUAL (humano): `pwsh -File infra/80_create_job.ps1` y
+      **Verificación**: MANUAL (humano): `powershell -NoProfile -File infra/80_create_job.ps1` y
       comprobar con **R21**.
 
 - [ ] **T24**: Ejecución de prueba y verificación de la build.
@@ -215,7 +215,7 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       corregir el KQL de `infra/README.md`.
 
 - [ ] **T26**: Crear la alerta y **probar que el correo llega**.
-      **Verificación**: MANUAL (humano): `pwsh -File infra/90_create_alert.ps1`
+      **Verificación**: MANUAL (humano): `powershell -NoProfile -File infra/90_create_alert.ps1`
       (antes, la comprobación de métricas de §6:
       `az monitor metrics list-definitions --resource <job-id> -o table`), y
       después la prueba de fallo forzado de **R25**. Correcto **solo si se

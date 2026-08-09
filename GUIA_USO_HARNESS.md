@@ -106,8 +106,8 @@ El humano hace merge y push, nunca el agente.
    `80`), qué pasos exige autorización del humano y cuáles son idempotentes.
 3. Despliegues siguientes:
    ```
-   pwsh -File infra\70_build_image.ps1   # build en el registro, tag fechado
-   pwsh -File infra\85_update_job.ps1    # apunta el job a la imagen nueva
+   powershell -NoProfile -File infra\70_build_image.ps1   # build en el registro, tag fechado
+   powershell -NoProfile -File infra\85_update_job.ps1    # apunta el job a la imagen nueva
    ```
 4. Recuerda: el `.env` NO viaja a Azure. El job no lleva contraseñas: usa una
    identidad gestionada y una referencia a Key Vault. Tags fechados siempre

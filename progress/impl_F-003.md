@@ -704,7 +704,7 @@ son la vuelta atrás.
 | **Sintaxis de los 13 `.ps1`** | Validada con el parser de PowerShell **sin ejecutarlos**: 13 OK, incluidos el `switch` y los arrays nuevos |
 | **Barrido de secretos** | `test_f003_r4_sin_secretos_ni_identificadores_en_infra_y_spec` en verde tras la enmienda: los nombres de secreto añadidos son nombres, y el README documenta el procedimiento **sin** ningún valor |
 
-### 11.8 Lo que queda pendiente
+### 11.8 Lo que queda pendiente (al cerrar la ronda de DA-4)
 
 - **T22 bis no está ejecutada**: la migración la hace el humano y necesita que
   exista `kv-datamart-seg-dev` (paso 6). El job aborta si el secreto falta, así
@@ -714,3 +714,195 @@ son la vuelta atrás.
   funcione.
 - No se ha ejecutado ni un `az` de escritura, ni `python main.py`, ni una
   conexión a la base o a la API.
+
+---
+
+## 12. Dos defectos reales encontrados desplegando (2026-08-10)
+
+Los scripts estaban «probados como texto» y **no habían corrido nunca**. Al
+ejecutarlos de verdad aparecieron dos defectos que ningún test textual podía
+ver, los dos del intérprete y no de la lógica. Los dos se manifiestan **solo en
+Windows PowerShell 5.1**, que es lo único que hay en el puesto: **`pwsh` no está
+instalado**, comprobado. La suposición «esto correrá en PowerShell 7» estaba en
+el aire y era falsa.
+
+### 12.1 Defecto 1 · la consulta que `cmd.exe` parte por la mitad
+
+**Síntoma** (paso 1 del bloque 5, `05_check_prereqs.ps1`):
+
+```
+az : No se esperaba -o en este momento.
+```
+
+**Causa.** La línea era:
+
+```powershell
+$consultaMetrica = "max(value[0].timeseries[0].data[?maximum!=null].maximum)"
+... --query $consultaMetrica -o tsv
+```
+
+`az` en Windows es un **`.cmd`**, así que la línea ya expandida la vuelve a
+interpretar `cmd.exe`. La expresión **no lleva espacios**, así que PowerShell no
+la entrecomilla, y los paréntesis llegan crudos: `cmd` los toma por agrupación de
+órdenes y se atraganta con lo que viene detrás. Que el mensaje culpe a `-o` es lo
+que despista.
+
+**Corrección.** La métrica se pide con `-o json` **sin filtro** y el máximo se
+calcula en PowerShell recorriendo los puntos. Es más código y no depende de cómo
+quede entrecomillado nada. Lo mismo con el filtro de roles de la §5, que llevaba
+`[?…]` y `||`: ahora se piden los nombres (`[].roleDefinitionName`) y se filtran
+con `-contains`.
+
+**Verificado** con la carga real de la métrica, incluyendo huecos:
+
+```
+maximo calculado: 93.4 (esperado 93.4)     # datos con maximum:null intercalados
+sin datos -> ocupacion nula: True          # caso degenerado, da el aviso
+```
+
+Los `93.4` no son un número al azar: es el porcentaje al que llegó el disco la
+noche del incidente.
+
+### 12.2 Defecto 2 · el script muere justo antes de crear lo que falta
+
+**Síntoma** (paso 3, `20_create_observability.ps1`): el script terminó con
+`NativeCommandError` y **el workspace no se creó**.
+
+**Causa.** La comprobación de idempotencia era `az … show … 2>$null` seguida de
+un `if ($LASTEXITCODE -eq 0 …)`. En 5.1, **redirigir el stderr de un ejecutable
+nativo envuelve cada línea en un ErrorRecord**, y con
+`$ErrorActionPreference = "Stop"` ese error es **terminante**. Como `az` contesta
+`ResourceNotFound` por stderr, el patrón fallaba exactamente en el caso que venía
+a cubrir: **el recurso todavía no existe**, que es el 100 % de un primer
+despliegue. El mismo patrón estaba en **21 sitios** de 10 scripts.
+
+**Comprobado en el puesto** (5.1.26100), con un `az` de mentira:
+
+| Forma | ¿Aborta con `$ErrorActionPreference = "Stop"`? |
+|---|---|
+| `az … 2>$null` | **Sí** |
+| `$x = az … 2>&1` | **Sí** |
+| `az … 2>&1 \| Out-Null` | **Sí** |
+| `az …` sin redirigir | No |
+| `Invoke-Az` (preferencia bajada + captura) | No |
+
+### 12.3 La corrección: un solo punto de entrada
+
+`00_vars.ps1` define **`Invoke-Az`**, y **las 65 llamadas** de los 13 scripts
+pasan por ella. Hace cuatro cosas, todas por un motivo que costó un despliegue:
+
+1. Baja `$ErrorActionPreference` a `Continue` **solo durante la llamada** y lo
+   restaura en un `finally` —si no, un fallo la dejaría bajada para el resto—.
+2. Captura la salida y separa los ErrorRecord: devuelve la **salida estándar**
+   como cadena y deja el mensaje de error en `$AzUltimoError`. `$LASTEXITCODE`
+   se sigue consultando como siempre, así que **ningún sitio de llamada cambió
+   su lógica**: solo el nombre del comando.
+3. Añade `--only-show-errors`, para que los avisos de `az` no se cuelen en lo
+   que el script interpreta.
+4. Concentra en un sitio la regla de las consultas: ninguna `--query` lleva
+   `(`, `?`, `|` ni `!`.
+
+`Confirmar-Exito` ahora incluye `$AzUltimoError` en el mensaje: antes, con la
+salida de error tragada, un fallo real se diagnosticaba a ciegas.
+
+**Por qué una función y no «quitar el `2>$null`»**: quitar la redirección
+también evita el aborto (está en la tabla), pero deja el error de `az` pintado en
+rojo en la consola cada vez que se pregunta por algo que aún no existe —o sea,
+todo el rato en un primer despliegue— y pierde el mensaje cuando sí importa.
+Además, con la salida del host redirigida a un fichero el comportamiento vuelve a
+cambiar. La función se comporta igual en los dos casos, y eso está probado.
+
+### 12.4 Prueba de extremo a extremo, no solo textual
+
+Con un `az` simulado (que responde `ResourceNotFound` mientras el recurso no
+existe y lo «crea» después), ejecutando **el script real** con
+`powershell -NoProfile -File`:
+
+```
+=== 20_create_observability.ps1 con el workspace INEXISTENTE (el caso que moria) ===
+Creando el workspace 'log-datamart-seg-dev'...
+Workspace listo. customerId = identificador-de-workspace
+### codigo de salida: 0
+
+=== segunda pasada: ahora ya existe (idempotencia) ===
+El workspace 'log-datamart-seg-dev' ya existe; no se recrea.
+### codigo de salida: 0
+```
+
+Y el contraste, con la versión anterior sacada de `git show HEAD:` y el mismo
+`az` simulado:
+
+```
+az : ERROR: (ResourceNotFound) Workspace no encontrado
+    + FullyQualifiedErrorId : NativeCommandError
+### codigo de salida: 1
+### se creo el workspace? False
+```
+
+Es el defecto reproducido y corregido, medido por los dos lados.
+
+**Un riesgo que había que descartar antes de dar esto por bueno**: al pasar las
+llamadas por una función, los argumentos que son **array** (`--tags`,
+`--secrets`, `--env-vars`) llegan a `$args` como un elemento anidado. Comprobado
+que el *splatting* los aplana igual: la línea que recibe `az` es **idéntica**
+carácter a carácter a la de antes, tanto para los tags como para la forma mixta
+del job (literal + array + literal). Si no lo fuera, los recursos se habrían
+creado con las etiquetas mal puestas y nadie lo habría notado hasta la factura.
+
+### 12.5 Tests que fijan la técnica
+
+| Test | Qué impide |
+|---|---|
+| `test_f003_ninguna_consulta_a_az_lleva_metacaracteres_de_cmd` | Que vuelva a colarse un `--query` con `(`, `?`, `\|` o `!`. Resuelve también las consultas guardadas en variable, que son justo las largas |
+| `test_f003_solo_el_ayudante_redirige_la_salida_de_error_de_az` | Un `2>$null` nuevo en cualquier script |
+| `test_f003_todas_las_llamadas_a_az_pasan_por_el_ayudante` | Una llamada suelta a `az`, con su contraste: cada script debe seguir llamando a Azure por algún sitio |
+| `test_f003_el_ayudante_de_az_esta_endurecido_para_powershell_51` | Que `Invoke-Az` pierda cualquiera de sus cuatro piezas (preferencia bajada, `finally`, `--only-show-errors`, `$AzUltimoError`) |
+| `test_f003_los_prerrequisitos_siguen_midiendo_el_disco_del_servidor` | La salida fácil: dejar de tener consultas problemáticas dejando de comprobar cosas |
+
+**Fase RED**, con la salida real antes de tocar los scripts:
+
+```
+E   AssertionError: 05_check_prereqs.ps1: la consulta
+    'max(value[0].timeseries[0].data[?maximum!=null].maximum)' lleva ['!', '(', ')', '?'],
+    que cmd.exe reinterpreta al invocar az.cmd. Pide -o json y filtra en PowerShell
+
+E   AssertionError: 05_check_prereqs.ps1:45 redirige la salida de error: con
+    ErrorActionPreference=Stop eso aborta el script en 5.1
+
+E   AssertionError: no existe el ayudante Invoke-Az en 00_vars.ps1
+```
+
+**Dos defectos de los propios tests**, encontrados y corregidos sin relajar
+ninguna aserción: no entendían los comentarios de bloque `<# … #>` de PowerShell
+(señalaban la prosa que explica por qué no hay que llamar a `az` así) ni las
+cadenas de texto (el mensaje «Ejecuta `az login`» no es una invocación). Un test
+que da falsos positivos se acaba desactivando, y entonces no sujeta nada.
+
+### 12.6 Además: `pwsh` no existe en el puesto
+
+Todos los comandos de ejemplo pasan de `pwsh -File` a
+**`powershell -NoProfile -File`**: `infra/README.md` (con una sección nueva que
+explica las dos trampas y remite a `Invoke-Az`), `tasks.md`, `progress/current.md`
+y `GUIA_USO_HARNESS.md`, más las cabeceras de tres scripts. Copiar y pegar un
+comando con `pwsh` en ese puesto no arranca.
+
+### 12.7 Evidencias
+
+| Evidencia | Valor real |
+|---|---|
+| **Tests ejecutados** | **263 passed**, 0 failed (258 antes de esta ronda, **+5**) |
+| **Tiempo de la suite** | **2,41 s**; 3,21 s bajo cobertura dentro de `init.sh` |
+| **Cobertura de las líneas cambiadas** | **N/A con motivo**, sin cambios: la corrección es PowerShell y documentación |
+| **Mutantes / supervivientes** | **0 / 0**, campaña relanzada |
+| **`bash harness/init.sh`** | **ENTORNO LISTO**, exit 0 |
+| **Sintaxis de los 13 `.ps1`** | 13 OK con el parser de PowerShell, tras convertir las 65 llamadas |
+| **Ejecución real** | `20_create_observability.ps1` con `az` simulado: **crea y es idempotente**; la versión anterior, **muere sin crear** |
+| **Avisos de `ruff` propios** | **0** |
+
+### 12.8 Lo que esto deja pendiente
+
+- Los scripts siguen **sin ejecutarse contra Azure de verdad**: lo probado es el
+  intérprete, no las respuestas de la nube. Del paso 3 en adelante sigue siendo
+  el humano quien ejecuta.
+- Si aparece un tercer defecto de este tipo, el sitio donde arreglarlo ya es uno
+  solo.
