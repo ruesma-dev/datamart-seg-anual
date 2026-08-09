@@ -26,11 +26,110 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-**F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 7 y 11 hechos el
-2026-08-09. El 8 (carga inicial) está **corriendo ahora**: el primer intento
-murió el 2026-08-09 a las 11:46 por un corte de red local del puesto (el
-`COPY` de `obrparpre` colgado 9 min y luego `getaddrinfo failed`; el servidor
-estaba bien) y el humano la relanzó. Los pasos 9 y 10 dependen del 8.
+# F-004 · CERRADA (2026-08-09) — MERGE A `dev` PENDIENTE
+
+> ⚠ El merge de `feature/F-004-etl-sin-dependencias-locales` a `dev` está
+> **pendiente**: `dev` está ocupado por el worktree `datamart-carga`, donde el
+> humano ejecuta la recuperación de la carga (visto `main.py stage` en
+> ejecución). En cuanto termine: `git worktree remove ../datamart-carga`,
+> `git checkout dev`, merge `--no-ff` y `bash harness/init.sh`. Hasta
+> entonces, no crear la rama de F-003 (debe salir de `dev` ya mergeado).
+
+**APPROVED sin condiciones** (`progress/review_F-004.md`), rigor `estandar`.
+Resumen en `progress/history.md`; detalle en `progress/impl_F-004.md` y
+`progress/mutacion_F-004.md`. Quedan vivas las secciones siguientes: las tres
+verificaciones MANUAL (bloqueadas hasta F-003), la decisión DA-1 (la carga a
+`aux.*` es de F-013), la dependencia `AZURE_CLIENT_ID` hacia F-003 y el
+hallazgo del barrido de secretos para F-016.
+
+**Pendiente del humano**: el reviewer propone dos afinados nuevos de
+protocolo (`review_F-004.md` § «Automejora»): (1) al muestrear supervivientes,
+contrastar también que las mutaciones PELIGROSAS vecinas de la misma línea
+murieron; (2) exigir en C4 que el reviewer deje constancia de CÓMO comprobó
+que la suite no toca red (barrido de imports, SDK ausente, o ambos).
+
+## Verificaciones MANUAL (humano) de F-004 · BLOQUEADAS hasta F-003
+
+Las tres necesitan la storage account y el contenedor `aux`, que **crea
+F-003**. No bloquean el cierre de F-004; sí deben ejecutarse antes de dar por
+buena la lectura de blobs en Azure.
+
+1. Con `az login` activo y el rol `Storage Blob Data Reader` sobre la cuenta,
+   apuntar la variable al blob real y ejecutar:
+   `python main.py load-aux`
+   Esperado: `SUCCESS` y, en el detalle, `origen=blob` con las hojas del libro.
+2. Desde el Container Apps Job, con identidad gestionada:
+   `az containerapp job start -n <job> -g <rg>` y buscar en los logs el evento
+   `aux_file_read`. Esperado: los tres ficheros leídos y **ninguna ruta local**.
+3. Prueba negativa del mensaje de permisos: retirar temporalmente el rol,
+   ejecutar `python main.py load-aux` y comprobar que el error dice qué rol
+   falta y qué hacer. **Volver a asignarlo después.**
+
+## Decisión abierta DA-1 · ¿quién carga los Excels a `aux.*`?
+
+F-004 deja los tres libros **leídos y validados**, no volcados. Motivo: las
+tablas destino no existen (`aux` solo tiene `periodificacion_partida`, vacía) y
+**el esquema de los tres Excel no está en el repositorio** —columnas, hojas,
+claves— ni las reglas que los mapean a `mart`. Inventarlo sería inventar el
+modelo de datos de Negocio. Necesita decisión del humano y feature propia.
+
+## Dependencia de F-004 hacia F-003
+
+Si el job **no** usa identidad *system-assigned*, F-003 debe inyectar
+`AZURE_CLIENT_ID` en el entorno del contenedor: `DefaultAzureCredential` lo lee
+solo, pero alguien tiene que ponerlo. Y la identidad necesita el rol
+`Storage Blob Data Reader` sobre la cuenta.
+
+## Hallazgo para F-016 (refuerzo de los tests de F-005)
+
+`test_f005_r21_barrido_de_secretos_en_el_arbol` da **falso positivo con rutas
+largas**: su patrón de base64 (`[A-Za-z0-9+/]{24,}`) casó con
+`sigrid/infrastructure/excel/` al añadir una línea a `docs/ARCHITECTURE.md` y
+puso `init.sh` en rojo. No se ha tocado el test de otra feature: se reformuló
+la frase. Conviene exigir contexto de asignación o excluir cadenas con varias
+barras.
+
+---
+
+## ⚠ INCIDENTE 2026-08-09 ~21:00 · disco del servidor compartido casi lleno
+
+Tercer intento del paso 8: `raw` completa (incl. `dca`), pero
+`stage`/`build_plan_mensual` **llenó el disco de 32 GB** del servidor
+compartido: storage_percent subió a **93,4 %** a las 20:55 y Azure activó la
+protección → servidor **en solo-lectura ~10 min** (20:55–21:05) y conexión
+matada (`AdminShutdown`). La transacción se revirtió y el disco volvió a
+**42,3 %** (≈13,5 GB usados: base previa 4,1 + `raw` del datamart ≈9,4).
+`albaranes` y `partes` pudieron fallar escrituras en esa ventana (sábado
+noche; revisar sus logs).
+
+**Causa raíz**: `stg/08_plan_mensual.sql` explota `raw.obrparpre` (13,76 M
+filas) con `CROSS JOIN LATERAL unnest(string_to_array(planif,'|'))`; en el
+B1ms (2 GB RAM) los sorts derraman a ficheros temporales sobre el mismo disco
+→ 16+ GB de temporales/WAL y 103 min sin terminar. En local no pasa porque
+sobra RAM. **Veredicto anticipado del paso 9: `Standard_B1ms` + 32 GB NO
+aguanta el build completo de stg tal como está escrito.**
+
+**PROHIBIDO relanzar `stage` contra Azure hasta decidir** (lo volvería a
+llenar). Decisión del humano pendiente entre: (A) crecer el disco 32→64 GB
+(operación online pero **irreversible** y sobre el servidor compartido; da
+más IOPS), (B) trocear/optimizar el build de `plan_mensual` para acotar el
+pico de temporales, (C) subir el SKU. La recomendación del líder es B
+primero: A y C tocan el servidor de producción compartido y no arreglan que
+1 vCPU se arrastre.
+
+**F-005 · Fase 2 contra Azure, paso 8 a medias.** Pasos 3 a 7 y 11 hechos el
+2026-08-09. Del paso 8 (carga inicial) van **dos intentos fallidos**: el
+primero por corte de red local (11:46, `getaddrinfo failed`); el segundo llegó
+a **30 de 31 tablas** (19,7 M filas, 63 min) y solo falló **`dca`** (causa sin
+confirmar; el humano sospecha equipo desatendido/suspensión — si fue eso, el
+guardián anti-suspensión de F-014 no cumplió y hay que revisarlo). Como la
+ingesta es transaccional por tabla, lo cargado se conserva. **Recuperación
+preparada**: worktree limpio de `dev` en
+`C:\Users\pgris\PycharmProjects\datamart-carga` (para no importar código a
+medio editar del árbol de F-004); el humano copia `.env` y lanza
+`ingest --table dca --full` + `stage` + `build-mart` + `apply-grants`.
+Alternativa aceptada: esperar a F-003 y hacer la carga completa desde el job
+de Azure. Los pasos 9 y 10 dependen de que la base quede completa.
 
 ## Lo ejecutado contra Azure
 
@@ -41,7 +140,7 @@ estaba bien) y el humano la relanzó. Los pasos 9 y 10 dependen del 8.
 | 5 · Base y roles | Hecho: `sigrid_dm`, 3 roles, 9 esquemas, todos propiedad de `sigrid_dm_etl` |
 | 6 · Firewall | Añadida `datamart-puesto-pgris-2026-08-09`; las 3 reglas previas, intactas |
 | 7 · `.env` | Hecho y verificado por el humano el 2026-08-09 |
-| 8 · Carga inicial | **EN CURSO** (relanzada tras el corte de red del primer intento) |
+| 8 · Carga inicial | **A MEDIAS**: 30/31 tablas; falta `dca` y los pasos posteriores (ver arriba) |
 | 9 · Medición y veredicto del SKU | Pendiente del 8 |
 | 10 · Verificación de vistas | Pendiente del 8 |
 | 11 · Frontera de seguridad | Hecho, ver abajo |
@@ -121,11 +220,14 @@ pendientes que elevó, cerrados por el humano el 2026-08-09:
 
 # Rumbo confirmado por el humano (2026-08-09): el ETL debe correr en Azure
 
-Nuevo orden de prioridades de las features abiertas: **F-004** (ETL sin
-dependencias locales, spec_ready) → **F-003** (Container Apps Job nocturno
-`--full` + disparo manual, spec_ready) → **F-016** (refuerzo tests F-005) →
-**F-011** (incremental) → resto. La spec de F-003 exige F-004 y F-005
-cerradas antes de su T1. Siguiente paso: aprobar la spec de F-004.
+Nuevo orden de prioridades de las features abiertas: ~~F-004~~ (**cerrada el
+2026-08-09**) → **F-003** (Container Apps Job nocturno `--full` + disparo
+manual, spec_ready) → **F-016** (refuerzo tests F-005) → **F-011**
+(incremental) → resto. Los dos fallos consecutivos de la carga local refuerzan
+la urgencia de F-003. Siguiente paso: **aprobar la spec de F-003**, teniendo
+en cuenta dos recomendaciones del reviewer de F-004: enganchar las tres
+verificaciones MANUAL de F-004 como criterios de aceptación de F-003, y no
+olvidar `AZURE_CLIENT_ID` si la identidad del job es user-assigned.
 
 Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
 `opus`; leader y spec-author siguen en `inherit`.

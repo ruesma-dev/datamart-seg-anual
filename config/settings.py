@@ -182,13 +182,43 @@ class PostgresSettings(BaseSettings):
 
 
 class AuxExcelSettings(BaseSettings):
-    """Rutas locales (o de red) de los Excels que carga el step load_aux."""
+    """
+    Ubicación de los Excels auxiliares que lee el step load_aux.
+
+    Cada valor admite DOS formas, y el step decide por la forma del valor (no
+    hay variable de modo que mantener coherente):
+
+    - Ruta del sistema de ficheros: Windows (``C:/datos/X.xlsx``), POSIX
+      (``/datos/X.xlsx``) o de red UNC (``\\\\servidor\\recurso\\X.xlsx``).
+    - URI de Azure Blob Storage:
+      ``https://<cuenta>.blob.core.windows.net/<contenedor>/<blob>``. Se lee
+      con identidad gestionada (``DefaultAzureCredential``); NO se admiten
+      cadenas de conexión, claves de cuenta ni tokens SAS.
+
+    Vacío = ese fichero se omite. Las tres vacías = el step queda SKIPPED.
+    """
 
     model_config = SettingsConfigDict(env_prefix="AUX_EXCEL_", env_file=".env", extra="ignore")
 
-    tipo_partida: str = Field("", description="Ruta a TipoPartida.xlsx")
-    tipo_coste: str = Field("", description="Ruta a TipoCoste.xlsx")
-    mapeo_proporcionales: str = Field("", description="Ruta a mapeo_proporcionales.xlsx")
+    tipo_partida: str = Field("", description="Ruta local o URI de blob de TipoPartida.xlsx")
+    tipo_coste: str = Field("", description="Ruta local o URI de blob de TipoCoste.xlsx")
+    mapeo_proporcionales: str = Field(
+        "", description="Ruta local o URI de blob de mapeo_proporcionales.xlsx"
+    )
+
+    def entries(self) -> tuple[tuple[str, str, str], ...]:
+        """
+        (nombre_lógico, variable_de_entorno, valor) de los tres ficheros.
+
+        Existe para que el step no tenga que repetir los nombres `AUX_EXCEL_*`:
+        el mensaje de error que apunta a la variable responsable (R8-R10) sale
+        de aquí, no de una lista duplicada en otro módulo.
+        """
+        prefijo = str(self.model_config.get("env_prefix") or "")
+        return tuple(
+            (nombre, f"{prefijo}{nombre.upper()}", str(getattr(self, nombre)))
+            for nombre in type(self).model_fields
+        )
 
 
 class LoggingSettings(BaseSettings):

@@ -8,8 +8,14 @@ structlog>=24.0.0
 tenacity>=8.2.0
 click>=8.1.0
 openpyxl>=3.1.0
-# Autenticación Microsoft Entra contra Azure Database for PostgreSQL
-# (PG_AUTH_MODE=entra). Se importa de forma perezosa: el ETL arranca sin él.
+# Identidad de Azure, con dos usos: autenticación Microsoft Entra contra Azure
+# Database for PostgreSQL (PG_AUTH_MODE=entra) y DefaultAzureCredential para
+# leer los Excels auxiliares de Blob Storage (F-004). Import perezoso en los
+# dos casos: el ETL arranca sin él y la suite de tests corre sin él.
 azure-identity>=1.17
+# Lectura de los Excels auxiliares desde Azure Blob Storage cuando AUX_EXCEL_*
+# es una URI de blob (F-004). Sin claves de cuenta ni SAS: la credencial la
+# pone azure-identity. azure-core entra como dependencia transitiva.
+azure-storage-blob>=12.20.0
 Jinja2>=3.1.0
 pytest>=8.0.0
