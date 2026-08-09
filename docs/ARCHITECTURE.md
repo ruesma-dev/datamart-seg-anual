@@ -62,8 +62,8 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   `Storage Blob Data Reader` sobre la cuenta: **ni cadenas de conexión, ni
   claves, ni SAS** (una URI con query string se rechaza al arrancar el paso).
   El contenido se obtiene **en memoria**, sin ficheros temporales, porque el
-  contenedor no tiene dónde escribirlos. Puerto e implementaciones en
-  `etl_sigrid/infrastructure/excel/`; el step `load_excel_aux` no sabe de
+  contenedor no tiene dónde escribirlos. Puerto y adaptadores en el paquete,
+  bajo `infrastructure/excel/`; el step `load_excel_aux` no sabe de
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 

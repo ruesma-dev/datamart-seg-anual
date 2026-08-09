@@ -610,3 +610,18 @@ def test_f004_r11_el_adaptador_de_blob_devuelve_bytes_sin_tocar_el_disco(tmp_pat
     assert datos == b"PK-contenido-del-libro"
     assert cliente.descargas == 1
     assert set(tmp_path.iterdir()) == antes
+
+
+def test_f004_r10_un_error_nuestro_no_se_vuelve_a_envolver() -> None:
+    """
+    Si la fuente ya lanza un error del puerto (p. ej. el ImportError traducido
+    al construir el cliente), se propaga tal cual: envolverlo otra vez añadiría
+    una capa de ruido al mensaje que alguien tiene que leer a las 3 AM.
+    """
+    original = AuxFileAccessError("mensaje ya traducido")
+    fuente = _fuente(_ClienteFalso(error=original))
+
+    with pytest.raises(AuxFileAccessError) as exc:
+        fuente.read_bytes(_ref_blob())
+
+    assert exc.value is original
