@@ -95,3 +95,32 @@ Se han guardado en **`kv-albaranes-rs9k2`** porque el vault propio del
 datamart (`kv-datamart-seg-dev`) **lo crea F-003 y todavía no existe**. Es una
 decisión de conveniencia, no de diseño: **F-003 debe moverlas** a su vault y
 actualizar la referencia. Anotado para que no se quede así por inercia.
+
+---
+
+# F-015 · Spec escrita (2026-08-09, spec-author)
+
+Escrita `specs/F-015-verificar-tests/` (`requirements.md` con R1–R20 en EARS,
+`design.md`, `tasks.md` T1–T16). Sin tocar código, `features.json` ni commits.
+Piezas: mutador propio del arnés sobre las líneas del diff contra `dev`
+(`python -m harness.mutacion --feature F-XXX` → `progress/mutacion_F-XXX.md`),
+puerta de cobertura de líneas cambiadas en `init.sh` con umbral en
+`harness/rigor.json`, niveles de rigor en `CHECKPOINTS.md` (+ C4 bis) con
+default el más exigente, fase RED y sección «Evidencias» en el implementer,
+reviewer validando contra el nivel, línea base sobre F-005 (alcance
+reconstruido desde el merge `c7500d4`) y portado a `arnes-base` con versión
+`1.2.0`.
+
+## Decisiones abiertas que el humano debe validar (design.md, antes de implementar)
+
+- **DA-1** Herramienta de mutación: se propone mutador propio mínimo (stdlib,
+  `ast`); mutmut descartado (sin soporte Windows), cosmic-ray descartado
+  (demasiado peso para portarlo a arnes-base).
+- **DA-2** Umbral de cobertura de líneas cambiadas: propuesta **80 %**.
+- **DA-3** Niveles de rigor: `documental` / `estandar` / `critico`, default
+  `critico` para quien no declare.
+- **DA-4** Rigor retroactivo: F-001 `estandar`, F-008 `documental`, F-009
+  `documental`, F-005 `critico`, F-014 `estandar`, F-015 `estandar`.
+- **DA-5** Línea base F-005: si la campaña supera ~45 min, ¿muestra
+  reproducible con semilla o campaña completa aunque tarde horas?
+- **DA-6** Dependencia nueva `coverage>=7.4` en `requirements-dev.txt`.

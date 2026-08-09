@@ -113,7 +113,7 @@
         "Portado a arnes-base en el mismo trabajo, con subida de version y documentado en GUIA_INSTALACION.md",
         "bash harness/init.sh en verde"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "priority": 6,
       "branch": "feature/F-015-verificar-tests"
