@@ -26,6 +26,69 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# F-004 · IMPLEMENTADA (2026-08-09) — pendiente de revisión
+
+Las 11 tareas de `specs/F-004-etl-sin-dependencias-locales/tasks.md` hechas y
+marcadas, un commit por tarea, en `feature/F-004-etl-sin-dependencias-locales`.
+Informe completo: **`progress/impl_F-004.md`**. Campaña de mutación:
+`progress/mutacion_F-004.md`.
+
+`bash harness/init.sh` **en verde (exit 0)**: 221 tests, 2,85 s; cobertura de
+líneas cambiadas **98,2 %** (umbral 80); mutación **92,6 %** (27 mutantes, 2
+supervivientes, los dos equivalentes por construcción y razonados).
+
+El step `load_excel_aux` ya resuelve los tres Excels desde **ruta local o URI
+de blob** (`https://<cuenta>.blob.core.windows.net/...`), autentica con
+`DefaultAzureCredential` —sin claves, sin cadenas de conexión y **rechazando**
+las URIs con SAS sin filtrar el token en el mensaje—, lee **en memoria** y
+valida con openpyxl. **No carga nada a `aux.*`.** F-004 no ha aprovisionado
+nada en Azure ni ha ejecutado `python main.py` (la carga de F-005 estaba
+corriendo). `features.json` sigue en `in_progress`: lo mueve el líder tras el
+APROBADO del reviewer.
+
+## Verificaciones MANUAL (humano) de F-004 · BLOQUEADAS hasta F-003
+
+Las tres necesitan la storage account y el contenedor `aux`, que **crea
+F-003**. No bloquean el cierre de F-004; sí deben ejecutarse antes de dar por
+buena la lectura de blobs en Azure.
+
+1. Con `az login` activo y el rol `Storage Blob Data Reader` sobre la cuenta,
+   apuntar la variable al blob real y ejecutar:
+   `python main.py load-aux`
+   Esperado: `SUCCESS` y, en el detalle, `origen=blob` con las hojas del libro.
+2. Desde el Container Apps Job, con identidad gestionada:
+   `az containerapp job start -n <job> -g <rg>` y buscar en los logs el evento
+   `aux_file_read`. Esperado: los tres ficheros leídos y **ninguna ruta local**.
+3. Prueba negativa del mensaje de permisos: retirar temporalmente el rol,
+   ejecutar `python main.py load-aux` y comprobar que el error dice qué rol
+   falta y qué hacer. **Volver a asignarlo después.**
+
+## Decisión abierta DA-1 · ¿quién carga los Excels a `aux.*`?
+
+F-004 deja los tres libros **leídos y validados**, no volcados. Motivo: las
+tablas destino no existen (`aux` solo tiene `periodificacion_partida`, vacía) y
+**el esquema de los tres Excel no está en el repositorio** —columnas, hojas,
+claves— ni las reglas que los mapean a `mart`. Inventarlo sería inventar el
+modelo de datos de Negocio. Necesita decisión del humano y feature propia.
+
+## Dependencia de F-004 hacia F-003
+
+Si el job **no** usa identidad *system-assigned*, F-003 debe inyectar
+`AZURE_CLIENT_ID` en el entorno del contenedor: `DefaultAzureCredential` lo lee
+solo, pero alguien tiene que ponerlo. Y la identidad necesita el rol
+`Storage Blob Data Reader` sobre la cuenta.
+
+## Hallazgo para F-016 (refuerzo de los tests de F-005)
+
+`test_f005_r21_barrido_de_secretos_en_el_arbol` da **falso positivo con rutas
+largas**: su patrón de base64 (`[A-Za-z0-9+/]{24,}`) casó con
+`sigrid/infrastructure/excel/` al añadir una línea a `docs/ARCHITECTURE.md` y
+puso `init.sh` en rojo. No se ha tocado el test de otra feature: se reformuló
+la frase. Conviene exigir contexto de asignación o excluir cadenas con varias
+barras.
+
+---
+
 **F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 7 y 11 hechos el
 2026-08-09. El 8 (carga inicial) está **corriendo ahora**: el primer intento
 murió el 2026-08-09 a las 11:46 por un corte de red local del puesto (el

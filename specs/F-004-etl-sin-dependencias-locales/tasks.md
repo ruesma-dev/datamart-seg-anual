@@ -16,14 +16,14 @@ Recordatorios que aplican a **todas** las tareas:
 
 ---
 
-- [ ] **T1**: En `config/settings.py`, actualizar el docstring de
+- [x] **T1**: En `config/settings.py`, actualizar el docstring de
       `AuxExcelSettings` (el valor puede ser ruta local/de red **o** URI de
       blob) y añadir `entries() -> tuple[tuple[str, str, str], ...]` que
       devuelva `(nombre_lógico, variable_de_entorno, valor)` de los tres
       ficheros. Sin cambiar tipos ni nombres de campo.
       **Verificación**: `test_f004_r1_settings_declara_las_tres_variables_con_su_nombre_de_entorno`
 
-- [ ] **T2**: Crear `etl_sigrid/infrastructure/excel/aux_file_source.py` con
+- [x] **T2**: Crear `etl_sigrid/infrastructure/excel/aux_file_source.py` con
       `AuxFileRef`, la jerarquía de errores (`AuxFileError`,
       `AuxFileConfigError`, `AuxFileNotFoundError`, `AuxFileAccessError`) y
       `parse_aux_file_ref()`, aplicando las reglas de clasificación y
@@ -36,7 +36,7 @@ Recordatorios que aplican a **todas** las tareas:
       `test_f004_r6_el_mensaje_de_rechazo_no_filtra_el_token`,
       `test_f004_r7_uri_sin_contenedor_o_sin_blob_es_error_de_configuracion`
 
-- [ ] **T3**: En el mismo módulo, `AuxFileSource` (Protocol),
+- [x] **T3**: En el mismo módulo, `AuxFileSource` (Protocol),
       `LocalAuxFileSource.read_bytes()` con traducción de errores y el mensaje
       accionable de R8, y la fábrica `get_aux_file_source()` con import
       perezoso del adaptador de blob.
@@ -44,7 +44,7 @@ Recordatorios que aplican a **todas** las tareas:
       (fixture que genera el `.xlsx` en `tmp_path` con `openpyxl`),
       `test_f004_r8_ruta_local_inexistente_produce_mensaje_accionable`
 
-- [ ] **T4**: Crear `etl_sigrid/infrastructure/excel/blob_aux_file_source.py`
+- [x] **T4**: Crear `etl_sigrid/infrastructure/excel/blob_aux_file_source.py`
       con `BlobAuxFileSource`, la fábrica de cliente por defecto
       (`DefaultAzureCredential` + `BlobClient`, import perezoso) y la
       traducción de errores del SDK por nombre de clase.
@@ -54,14 +54,14 @@ Recordatorios que aplican a **todas** las tareas:
       `test_f004_r10_error_de_permisos_menciona_el_rol_y_las_dos_salidas`,
       `test_f004_r10_falta_de_credencial_menciona_az_login_e_identidad_gestionada`
 
-- [ ] **T5**: Añadir `azure-identity>=1.17.0` y `azure-storage-blob>=12.20.0`
+- [x] **T5**: Añadir `azure-identity>=1.17.0` y `azure-storage-blob>=12.20.0`
       a `requirements.txt` (justificación en diseño §7). No tocar
       `requirements-dev.txt`.
       **Verificación**: `pip install -r requirements.txt` sin errores y
       `python -c "import azure.identity, azure.storage.blob"` sin excepción.
       Además `test_f004_r4_no_hay_cadenas_de_conexion_ni_claves_en_el_codigo`
 
-- [ ] **T6**: Reescribir
+- [x] **T6**: Reescribir
       `etl_sigrid/application/steps/load_excel_aux_step.py` según el diseño
       §5.4: fábrica inyectable, lectura en memoria, `openpyxl` sobre
       `BytesIO`, acumulación de todos los errores, `SKIPPED` sin configuración,
@@ -73,7 +73,7 @@ Recordatorios que aplican a **todas** las tareas:
       `test_f004_r14_fichero_ilegible_da_failed_nombrando_el_fichero`,
       `test_f004_r14_dos_fallos_se_reportan_los_dos_en_el_mismo_mensaje`
 
-- [ ] **T7**: Crear `tests/test_f004_sin_dependencias_locales.py` con la
+- [x] **T7**: Crear `tests/test_f004_sin_dependencias_locales.py` con la
       auditoría automatizada: barrido de rutas absolutas sobre
       `etl_sigrid/**/*.py`, `config/**/*.py` y `main.py` (patrones:
       `["']<letra>:[\\/]`, UNC `\\\\`, `/home/`, `/Users/`, `/mnt/`;
@@ -85,7 +85,7 @@ Recordatorios que aplican a **todas** las tareas:
       `test_f004_r16_los_directorios_sql_de_cada_capa_existen_en_el_paquete`,
       `test_f004_r16_el_dockerfile_copia_config_y_el_paquete_y_no_copia_env`
 
-- [ ] **T8**: Recorrer a mano la tabla de auditoría del diseño §8 sobre el
+- [x] **T8**: Recorrer a mano la tabla de auditoría del diseño §8 sobre el
       código actual y anotar en `progress/impl_F-004.md` la confirmación de
       cada punto y **cualquier hallazgo nuevo** que no esté en la tabla. Si
       aparece uno que sea dependencia real del sistema de ficheros local, NO
@@ -93,18 +93,18 @@ Recordatorios que aplican a **todas** las tareas:
       **Verificación**: `progress/impl_F-004.md` contiene los 9 puntos
       revisados uno a uno, con veredicto.
 
-- [ ] **T9**: Actualizar `.env.example`: documentar las dos formas admitidas,
+- [x] **T9**: Actualizar `.env.example`: documentar las dos formas admitidas,
       sustituir la ruta personal de OneDrive por un ejemplo neutro y añadir el
       ejemplo de URI de blob comentado, advirtiendo de que no se admite SAS.
       **Verificación**: revisión del reviewer; `bash harness/init.sh` sigue
       encontrando `.env` y en verde.
 
-- [ ] **T10**: Añadir a `docs/ARCHITECTURE.md`, sección «Acceso a datos», la
+- [x] **T10**: Añadir a `docs/ARCHITECTURE.md`, sección «Acceso a datos», la
       línea sobre los Excels auxiliares: ruta local o Azure Blob Storage, con
       identidad gestionada y sin claves.
       **Verificación**: revisión del reviewer contra `CHECKPOINTS.md` C3.
 
-- [ ] **T11**: Ejecutar `bash harness/init.sh` en verde (incluye `pytest`) y
+- [x] **T11**: Ejecutar `bash harness/init.sh` en verde (incluye `pytest`) y
       dejar `progress/current.md` con las verificaciones **MANUAL (humano)**
       pendientes y su comando exacto.
       **Verificación**: `bash harness/init.sh` termina con exit code 0.

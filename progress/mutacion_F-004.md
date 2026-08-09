@@ -1,7 +1,7 @@
 <!-- progress/mutacion_F-004.md -->
 # F-004 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-004` el 2026-08-09 19:10.
+Generado por `python -m harness.mutacion --feature F-004` el 2026-08-09 19:12, sobre el commit `635db3a` (árbol final de la feature).
 
 ## Alcance
 
@@ -24,7 +24,7 @@ Origen del diff: **rama** (`4741db17b8d82bc7faad094c1a66e9901fd625b9` .. `featur
 | Muertos | 25 |
 | Supervivientes | 2 |
 | Timeouts | 0 |
-| Tiempo total | 41.4 s |
+| Tiempo total | 42.5 s |
 | Muestreo | no: campaña completa |
 
 **Puntuación de mutación: 25 / 27 = 92,6 %.**
@@ -53,7 +53,9 @@ Origen del diff: **rama** (`4741db17b8d82bc7faad094c1a66e9901fd625b9` .. `featur
   informe de F-005 no lo dice y es una trampa silenciosa.
 - **Suite de referencia verde antes de empezar**: 221 tests en 3,1 s en ese
   árbol, sin `.env`, sin red y sin BBDD.
-- **Campaña completa, sin muestreo**: 27 mutantes en 41 s.
+- **Campaña completa, sin muestreo**: 27 mutantes en 42,5 s.
+- **Repetida sobre el árbol final** (`635db3a`), tras el último commit de
+  código, con resultado idéntico: 27 generados, 25 muertos, 2 supervivientes.
 
 ## Dos vueltas, y la segunda es el resultado interesante
 
