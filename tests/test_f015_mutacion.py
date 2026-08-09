@@ -88,6 +88,35 @@ def test_f015_r6_operador_not() -> None:
     assert mutados("if not activo:\n    pass\n", "not") == ["if activo:"]
 
 
+def test_f015_r6_operador_en_asignacion_aumentada() -> None:
+    assert mutados("total += 1\n", "aritmetico") == ["total -= 1"]
+    assert mutados("total *= 2\n", "aritmetico") == ["total //= 2"]
+
+
+def test_f015_r6_comparacion_encadenada_muta_cada_operador() -> None:
+    assert mutados("x = a < b < c\n", "comparacion") == ["x = a <= b < c", "x = a < b <= c"]
+
+
+def test_f015_r6_operador_logico_encadenado_muta_cada_hueco() -> None:
+    assert mutados("x = a and b and c\n", "logico") == [
+        "x = a or b and c",
+        "x = a and b or c",
+    ]
+
+
+def test_f015_r6_fuente_que_no_compila_no_da_mutantes() -> None:
+    assert mutantes_de("def f(:\n") == []
+
+
+def test_f015_r6_operador_repartido_en_varias_lineas() -> None:
+    fuente = "x = (\n    a\n    == b\n)\n"
+
+    (mutante,) = [m for m in mutantes_de(fuente) if m.operador == "comparacion"]
+
+    assert mutante.linea == 3
+    assert mutante.mutado == "!= b"
+
+
 def test_f015_r6_un_mutante_un_solo_cambio() -> None:
     fuente = "y = (a + b) * c\n"
 

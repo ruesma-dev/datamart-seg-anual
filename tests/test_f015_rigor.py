@@ -13,14 +13,17 @@ import pytest
 
 from harness.rigor import (
     PUERTAS,
+    cargar_features,
     cargar_rigor,
     exige,
+    feature_de_rama,
     nivel_de_feature,
     supervivientes_maximos,
     timeout_mutacion,
     umbral_cobertura,
     validar_features,
 )
+from harness.rigor import main as rigor_main
 
 RAIZ = Path(__file__).resolve().parents[1]
 RUTA_RIGOR = RAIZ / "harness" / "rigor.json"
@@ -68,6 +71,34 @@ def test_f015_r11_configuracion_invalida_se_rechaza(tmp_path: Path) -> None:
 
 def test_f015_r11_timeout_de_mutacion_tambien_es_configuracion(rigor: dict) -> None:
     assert timeout_mutacion(rigor) > 0
+    with pytest.raises(ValueError, match="timeout_por_mutante_s"):
+        timeout_mutacion({"mutacion": {"timeout_por_mutante_s": 0}})
+
+
+@pytest.mark.parametrize(
+    "contenido",
+    [
+        "{esto no es json",
+        "[1, 2, 3]",
+        '{"nivel_por_defecto": "critico"}',
+        '{"nivel_por_defecto": "critico", "niveles": {"critico": "no soy objeto"}}',
+        '{"nivel_por_defecto": "critico", "niveles": {"critico": {"fase_red": "si"}}}',
+        '{"nivel_por_defecto": "critico", "niveles": {}}',
+    ],
+)
+def test_f015_r11_toda_configuracion_incoherente_para_el_arnes(
+    tmp_path: Path, contenido: str
+) -> None:
+    roto = tmp_path / "rigor.json"
+    roto.write_text(contenido, encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        cargar_rigor(roto)
+
+
+def test_f015_r11_sin_fichero_de_configuracion_tambien_para(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="No existe"):
+        cargar_rigor(tmp_path / "no_existe.json")
 
 
 # --- R15: resolución del nivel ----------------------------------------------
@@ -126,3 +157,64 @@ def test_f015_r15_las_features_del_repositorio_declaran_niveles_validos(
     datos = json.loads((RAIZ / "harness" / "features.json").read_text(encoding="utf-8"))
 
     assert validar_features(datos["features"], rigor) == []
+
+
+def test_f015_r15_init_valida_valores_de_rigor(tmp_path: Path) -> None:
+    # (a) El portero del arnés llama a la validación.
+    guion = (RAIZ / "harness" / "init.sh").read_text(encoding="utf-8")
+    assert "harness.rigor" in guion
+    assert "--validar" in guion
+
+    # (b) Y esa validación rechaza de verdad un features.json con rigor inválido.
+    features = tmp_path / "features.json"
+    features.write_text(
+        json.dumps({"features": [{"id": "F-042", "rigor": "flojito"}]}),
+        encoding="utf-8",
+    )
+
+    codigo = rigor_main(
+        ["--validar", "--config", str(RUTA_RIGOR), "--features", str(features)]
+    )
+
+    assert codigo == 1
+
+
+def test_f015_r15_la_validacion_para_si_la_configuracion_es_ilegible(
+    tmp_path: Path,
+) -> None:
+    assert rigor_main(["--validar", "--config", str(tmp_path / "no_existe.json")]) == 1
+
+
+def test_f015_r15_sin_inventario_no_hay_features_que_validar(tmp_path: Path) -> None:
+    assert cargar_features(tmp_path / "no_existe.json") == []
+    raro = tmp_path / "raro.json"
+    raro.write_text('{"features": "no soy una lista"}', encoding="utf-8")
+    assert cargar_features(raro) == []
+
+
+def test_f015_r15_la_feature_en_curso_se_localiza_por_rama() -> None:
+    features = [
+        {"id": "F-042", "branch": "feature/F-042-x", "status": "done"},
+        {"id": "F-043", "branch": "feature/F-043-y", "status": "in_progress"},
+    ]
+
+    assert feature_de_rama("feature/F-042-x", features)["id"] == "F-042"
+    # Una rama que no está declarada cae en la feature en curso...
+    assert feature_de_rama("feature/F-999-z", features)["id"] == "F-043"
+    # ...y si tampoco la hay, no se inventa ninguna.
+    assert feature_de_rama("feature/F-999-z", [features[0]]) is None
+    assert feature_de_rama("", []) is None
+
+
+def test_f015_r15_la_validacion_pasa_con_el_inventario_real() -> None:
+    codigo = rigor_main(
+        [
+            "--validar",
+            "--config",
+            str(RUTA_RIGOR),
+            "--features",
+            str(RAIZ / "harness" / "features.json"),
+        ]
+    )
+
+    assert codigo == 0

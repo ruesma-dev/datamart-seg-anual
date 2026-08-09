@@ -7,13 +7,19 @@ texto y el ejecutor de git se inyecta como doble.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from harness.alcance import (
     alcance_de_feature,
+    ejecutar_git,
     es_produccion,
     filtrar_produccion,
+    git_en,
     parsear_diff,
+    rama_de_feature,
     resolver_refs,
 )
 
@@ -174,6 +180,32 @@ def test_f015_r4_diff_de_merge_usa_primer_padre() -> None:
     # El diff se pide entre el primer padre y el propio merge.
     diffs = [c for c in git.llamadas if c and c[0] == "diff"]
     assert diffs == [["diff", "merge777^1", "merge777"]]
+
+
+def test_f015_r4_ejecutar_git_de_verdad_devuelve_vacio_si_git_falla() -> None:
+    # git es de solo lectura y local: aquí no hay red ni BBDD.
+    assert ejecutar_git(["rev-parse", "--verify", "--quiet", "rama-que-no-existe"]) == ""
+    assert ejecutar_git(["rev-parse", "--abbrev-ref", "HEAD"]).strip() != ""
+    assert git_en(".")(["rev-parse", "--verify", "--quiet", "HEAD"]).strip() != ""
+
+
+def test_f015_r4_la_rama_sale_del_inventario_de_features(tmp_path: Path) -> None:
+    inventario = tmp_path / "features.json"
+    inventario.write_text(
+        json.dumps(
+            {"features": [{"id": "F-042", "branch": "feature/F-042-x"}, {"id": "F-043"}]}
+        ),
+        encoding="utf-8",
+    )
+
+    assert rama_de_feature("F-042", str(inventario)) == "feature/F-042-x"
+    assert rama_de_feature("F-043", str(inventario)) is None
+    assert rama_de_feature("F-999", str(inventario)) is None
+    # Sin inventario (o con uno ilegible) no se revienta: se cae al merge.
+    assert rama_de_feature("F-042", str(tmp_path / "no_existe.json")) is None
+    roto = tmp_path / "roto.json"
+    roto.write_text("{esto no es json", encoding="utf-8")
+    assert rama_de_feature("F-042", str(roto)) is None
 
 
 def test_f015_r4_total_de_lineas_del_alcance() -> None:

@@ -26,8 +26,8 @@ fi
 ok "Python: $($PY --version 2>&1)"
 
 # --- 2. Ficheros del arnés -------------------------------------------------
-for f in CLAUDE.md CHECKPOINTS.md harness/features.json specs/SPECS.md \
-         progress/current.md progress/history.md \
+for f in CLAUDE.md CHECKPOINTS.md harness/features.json harness/rigor.json \
+         specs/SPECS.md progress/current.md progress/history.md \
          docs/ARCHITECTURE.md docs/CONVENTIONS.md; do
     if [ -f "$f" ]; then ok "Existe $f"; else ko "Falta $f"; fi
 done
@@ -59,6 +59,16 @@ except Exception as exc:  # noqa: BLE001
 EOF
 if [ $? -eq 0 ]; then ok "features.json válido"; else ko "features.json inválido (o >1 in_progress)"; fi
 
+# --- 3b. Niveles de rigor: configuración válida y niveles declarados válidos -
+# Lo que exige cada nivel vive en harness/rigor.json. Una feature que no
+# declara nivel NO es un error: se le aplica el más exigente. Declarar uno
+# inexistente sí lo es.
+if $PY -m harness.rigor --validar; then
+    ok "harness/rigor.json y niveles declarados: válidos"
+else
+    ko "harness/rigor.json o el campo 'rigor' de alguna feature no son válidos"
+fi
+
 # --- 4. Aviso de features bloqueadas (no bloquea, pero se ve) ---------------
 if $PY -c "import json,sys; d=json.load(open('harness/features.json',encoding='utf-8')); sys.exit(0 if any(f['status']=='blocked' for f in d['features']) else 1)" 2>/dev/null; then
     warn "Hay features en estado blocked: revisa progress/current.md"
@@ -68,7 +78,7 @@ fi
 if [ -f ".env" ]; then ok "Existe .env (no versionado)"; else ko "Falta .env — copiar de .env.example"; fi
 
 # --- 6. Compilación de todo el código Python --------------------------------
-if $PY -m compileall -q main.py config etl_sigrid scripts tests >/dev/null 2>&1; then
+if $PY -m compileall -q main.py config etl_sigrid scripts tests harness >/dev/null 2>&1; then
     ok "compileall: sin errores de sintaxis"
 else
     ko "compileall: errores de sintaxis"
@@ -91,10 +101,35 @@ else
 fi
 
 # --- 7. Tests (los de humo no necesitan red ni BBDD) ------------------------
-if $PY -m pytest -q --tb=short -x; then
-    ok "pytest en verde"
+# Si la medición de cobertura está disponible, la suite se ejecuta bajo ella
+# para que la puerta de la sección 7b tenga datos con los que trabajar.
+if $PY -c "import coverage" >/dev/null 2>&1; then
+    rm -f coverage.json
+    if $PY -m coverage run -m pytest -q --tb=short -x; then
+        ok "pytest en verde (con medición de cobertura)"
+    else
+        ko "pytest en rojo"
+    fi
+    $PY -m coverage json -q -o coverage.json >/dev/null 2>&1 \
+        || warn "coverage no pudo escribir coverage.json"
 else
-    ko "pytest en rojo"
+    warn "coverage no instalado: pip install -r requirements-dev.txt"
+    if $PY -m pytest -q --tb=short -x; then
+        ok "pytest en verde"
+    else
+        ko "pytest en rojo"
+    fi
+fi
+
+# --- 7b. Puerta de cobertura de las LÍNEAS CAMBIADAS por la feature ---------
+# La puerta decide sola si aplica (rama actual, diff frente a dev y nivel de
+# rigor de la feature) y explica el motivo cuando se declara N/A. El umbral
+# vive en harness/rigor.json: aquí no hay ningún número que tocar.
+SALIDA_COBERTURA=$($PY -m harness.cobertura --base dev --config harness/rigor.json 2>&1)
+if [ $? -eq 0 ]; then
+    ok "$SALIDA_COBERTURA"
+else
+    ko "$SALIDA_COBERTURA"
 fi
 
 # --- 8. Rama actual (informativo + guardarraíl) -----------------------------

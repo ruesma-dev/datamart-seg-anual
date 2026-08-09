@@ -8,6 +8,7 @@ se ejecuta coverage de verdad, ni pytest, ni se abre conexión alguna.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -165,6 +166,29 @@ def test_f015_r10_exit_0_sobre_el_umbral(
     assert "100" in capsys.readouterr().out
 
 
+def test_f015_r10_init_llama_a_la_puerta_de_cobertura() -> None:
+    guion = (RAIZ / "harness" / "init.sh").read_text(encoding="utf-8")
+
+    assert "harness.cobertura" in guion
+    # Y la medición se hace de verdad, no se da por buena.
+    assert "coverage run" in guion
+    assert "coverage json" in guion
+
+
+def test_f015_r11_init_sh_sin_umbral_cableado() -> None:
+    guion = (RAIZ / "harness" / "init.sh").read_text(encoding="utf-8")
+    umbral = json.loads(RUTA_RIGOR.read_text(encoding="utf-8"))["cobertura"][
+        "umbral_lineas_cambiadas"
+    ]
+
+    # El número del umbral no aparece por ninguna parte del guion...
+    assert str(umbral) not in guion
+    # ...ni ningún otro porcentaje cableado...
+    assert not re.search(r"\d+\s*%", guion)
+    # ...y el guion apunta al fichero donde sí vive.
+    assert "harness/rigor.json" in guion
+
+
 # --- R12: cuándo la puerta NO aplica ----------------------------------------
 
 
@@ -236,6 +260,86 @@ def test_f015_r13_sin_coverage_ko_si_aplica_aviso_si_no(
     codigo = cobertura.main(argumentos(entorno))
     assert codigo == 0
     assert "N/A" in capsys.readouterr().out
+
+
+def test_f015_r13_init_explica_como_instalar_la_medicion() -> None:
+    guion = (RAIZ / "harness" / "init.sh").read_text(encoding="utf-8")
+
+    assert "coverage" in guion
+    assert "requirements-dev.txt" in guion
+
+
+def test_f015_r13_la_disponibilidad_de_la_medicion_se_consulta_de_verdad() -> None:
+    assert isinstance(cobertura.hay_coverage(), bool)
+
+
+def test_f015_r12_la_rama_actual_se_lee_de_git() -> None:
+    # git local, de solo lectura: ni red ni BBDD.
+    assert cobertura.rama_actual(str(RAIZ)) != ""
+
+
+def test_f015_r13_configuracion_de_rigor_ilegible_es_ko(
+    entorno: dict, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    preparar(monkeypatch)
+    argumentos_rotos = argumentos(entorno)
+    argumentos_rotos[1] = str(entorno["tmp"] / "no_existe.json")
+
+    codigo = cobertura.main(argumentos_rotos)
+
+    assert codigo == 1
+    assert "PUERTA COBERTURA" in capsys.readouterr().err
+
+
+def test_f015_r13_cobertura_json_corrupto_es_ko(
+    entorno: dict, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    preparar(monkeypatch)
+    entorno["cov"].write_text("{no soy json", encoding="utf-8")
+
+    codigo = cobertura.main(argumentos(entorno))
+
+    assert codigo == 1
+    assert "JSON" in capsys.readouterr().err
+
+
+def test_f015_r12_alcance_irresoluble_es_na_con_motivo(
+    entorno: dict, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setattr(cobertura, "rama_actual", lambda *a, **k: "feature/F-042-x")
+
+    def no_hay_alcance(*args: object, **kwargs: object) -> None:
+        raise SystemExit("ni rama ni merge")
+
+    monkeypatch.setattr(cobertura, "alcance_de_feature", no_hay_alcance)
+
+    codigo = cobertura.main(argumentos(entorno))
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "N/A" in salida and "ni rama ni merge" in salida
+
+
+def test_f015_r12_lineas_cambiadas_sin_sentencias_es_na(
+    entorno: dict, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    preparar(monkeypatch, lineas={"modulo_x.py": {3}})  # solo comentarios
+
+    codigo = cobertura.main(argumentos(entorno))
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "N/A" in salida and "ejecutables" in salida
+
+
+def test_f015_r10_fichero_ni_medido_ni_existente_se_ignora(tmp_path: Path) -> None:
+    assert cobertura_lineas_cambiadas(
+        {"files": {}}, {"borrado.py": {1, 2}}, raiz=str(tmp_path)
+    ) == (0, 0)
+
+
+def test_f015_r10_fuente_que_no_compila_no_tiene_lineas_ejecutables() -> None:
+    assert lineas_ejecutables("def f(:\n") == set()
 
 
 def test_f015_r13_sin_fichero_de_cobertura_ko_si_aplica(
