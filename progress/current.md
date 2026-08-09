@@ -16,12 +16,15 @@ feature: si no, la próxima mejora se vuelve a perder.
 
 ## Estado: implementación terminada, pendiente de review
 
-Informe completo en **`progress/impl_F-014.md`**. Los 12 criterios
-`acceptance` quedan cubiertos. Resumen: `arnes-base` es ya un repositorio git
-(commit `212179b`) con el arnés genérico v1.0.0, guía de instalación de tres
-caminos e instalador con modo actualizar que enseña el diff. Documento
-añadido a `azure-apps` (commit `74c72b0`). `bash harness/init.sh` de este
-repositorio en verde, 65 tests.
+Informe completo en **`progress/impl_F-014.md`**. Los **13** criterios
+`acceptance` quedan cubiertos —el nº 13 lo añadió el humano el 2026-08-09,
+ya iniciada la feature—. Resumen: `arnes-base` es ya un repositorio git con
+el arnés genérico **v1.1.0**, guía de instalación de tres caminos e
+instalador con modo actualizar que enseña el diff. Documento actualizado en
+`azure-apps`. `bash harness/init.sh` de este repositorio en verde, 65 tests.
+
+Commits de esta rama: `53d1127`, `be54b6c`, `e33d929`, `824e23f` (el añadido
+de que Windows no suspenda el equipo) y el de corrección de la review.
 
 **Ojo, reviewer**: la feature toca **tres repositorios** con commits
 independientes. Los de `arnes-base` y `azure-apps` no salen en el diff de

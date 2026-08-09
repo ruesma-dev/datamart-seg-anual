@@ -1,4 +1,4 @@
-# scripts/mantener_despierto.ps1
+﻿# scripts/mantener_despierto.ps1
 # Impide que Windows suspenda o hiberne el equipo MIENTRAS esta ventana siga
 # abierta. Pensado para no cortar ejecuciones largas del arnes (cargas
 # iniciales, subagentes, despliegues).
