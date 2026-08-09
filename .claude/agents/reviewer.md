@@ -50,6 +50,13 @@ nivel de rigor dice cuánta evidencia hay que exigir.
    reales, y **ningún superviviente con su análisis en `PENDIENTE`**. En
    nivel `critico`, cero supervivientes salvo justificación escrita aceptada
    por el humano.
+   **Verifica los totales de forma independiente**, no te los creas del
+   informe: recalcula el alcance con `harness.alcance` y el número de
+   mutantes con `harness.mutacion.generar_mutantes` (cálculo puro: no
+   ejecuta la suite ni escribe en disco) y comprueba que coinciden. Muestrea
+   además dos o tres supervivientes y confirma que existen como mutantes
+   reales, con el mismo operador y el mismo texto original→mutado. Es la
+   única defensa contra un informe de mutación escrito a mano.
 5. El informe del implementer debe traer la sección **«Evidencias»** con los
    cuatro números (tests, cobertura de lo cambiado, mutantes y
    supervivientes, tiempo de la suite).
