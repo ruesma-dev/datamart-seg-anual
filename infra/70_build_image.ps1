@@ -27,8 +27,8 @@ $etiqueta  = "{0}:{1}" -f $CFG.imageRepository, $TAG
 
 # --- 1. El tag no puede existir ---------------------------------------------
 
-$publicados = az acr repository show-tags -n $CFG.acrName `
-    --repository $CFG.imageRepository -o tsv 2>$null
+$publicados = Invoke-Az acr repository show-tags -n $CFG.acrName `
+    --repository $CFG.imageRepository -o tsv
 
 if ($LASTEXITCODE -eq 0 -and ($publicados -split "`n") -contains $TAG) {
     throw "el tag '$TAG' ya esta publicado. Espera un minuto: el tag lleva la hora."
@@ -39,7 +39,7 @@ if ($LASTEXITCODE -eq 0 -and ($publicados -split "`n") -contains $TAG) {
 Write-Host "Construyendo $etiqueta desde $contexto..." -ForegroundColor Cyan
 Write-Host "  (la construccion ocurre en Azure; puede tardar varios minutos)"
 
-az acr build `
+Invoke-Az acr build `
     -r $CFG.acrName `
     -g $CFG.acrResourceGroup `
     -t $etiqueta `
@@ -50,7 +50,7 @@ Confirmar-Exito "la construccion de la imagen ha fallado"
 
 # --- 3. Comprobacion --------------------------------------------------------
 
-az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository -o tsv
+Invoke-Az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository -o tsv
 
 Write-Host ""
 Write-Host "Imagen publicada: $IMG" -ForegroundColor Green

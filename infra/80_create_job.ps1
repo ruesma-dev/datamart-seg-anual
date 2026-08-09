@@ -78,25 +78,25 @@ if ($CFG.pgAuthMode -notin @("password", "entra")) {
            "que es la opcion B de DA-4) o 'entra' (token de identidad gestionada).")
 }
 
-$yaExiste = az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv 2>$null
+$yaExiste = Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv
 if ($LASTEXITCODE -eq 0 -and $yaExiste) {
     throw "el job '$($CFG.job)' ya existe. Para cambiarle la imagen usa 85_update_job.ps1."
 }
 
 # --- 2. Piezas que tienen que existir ya ------------------------------------
 
-$identidad = az identity show -g $CFG.resourceGroup -n $CFG.managedIdentity `
+$identidad = Invoke-Az identity show -g $CFG.resourceGroup -n $CFG.managedIdentity `
     --query "{id:id, clientId:clientId}" -o json
 Confirmar-Exito "no se encuentra la identidad gestionada: ejecuta antes 60_create_identity.ps1"
 $uami = $identidad | ConvertFrom-Json
 
-$vaultUri = az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault `
+$vaultUri = Invoke-Az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault `
     --query properties.vaultUri -o tsv
 Confirmar-Exito "no se encuentra el Key Vault: ejecuta antes 50_create_keyvault.ps1"
 
 # Se comprueba que el secreto ESTA, sin leer su valor: basta con el listado de
 # nombres. Si falta, el job arrancaria y moriria al llamar a la API.
-$secretos = az keyvault secret list --vault-name $CFG.keyVault --query "[].name" -o tsv
+$secretos = Invoke-Az keyvault secret list --vault-name $CFG.keyVault --query "[].name" -o tsv
 Confirmar-Exito "no se puede listar el contenido del vault (te falta rol sobre el vault)"
 if (($secretos -split "`n") -notcontains $CFG.sigridSecretName) {
     throw "falta el secreto '$($CFG.sigridSecretName)' en el vault. Es la tarea T20 del humano."
@@ -129,7 +129,7 @@ if ($CFG.pgAuthMode -eq "password") {
 # --- 3. La imagen: la que se diga, o la ultima publicada --------------------
 
 if (-not $Tag) {
-    $Tag = az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
+    $Tag = Invoke-Az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
         --orderby time_desc --top 1 -o tsv
     Confirmar-Exito "no hay ninguna imagen publicada: ejecuta antes 70_build_image.ps1"
 }
@@ -146,7 +146,7 @@ $baseAux = "https://{0}.blob.core.windows.net/{1}" -f $CFG.storageAccount, $CFG.
 
 Write-Host "Creando el job '$($CFG.job)' con la imagen $imagen..." -ForegroundColor Cyan
 
-az containerapp job create `
+Invoke-Az containerapp job create `
     -g $CFG.resourceGroup -n $CFG.job --environment $CFG.containerAppsEnv `
     --trigger-type Schedule --cron-expression $CFG.cron `
     --replica-timeout $CFG.replicaTimeoutSeconds `
@@ -187,7 +187,7 @@ Confirmar-Exito "no se ha podido crear el job"
 
 # --- 5. Comprobacion ---------------------------------------------------------
 
-az containerapp job show -g $CFG.resourceGroup -n $CFG.job `
+Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job `
     --query "{disparo:properties.configuration.triggerType, programacion:properties.configuration.scheduleTriggerConfig.cronExpression, identidad:identity.type, registro:properties.configuration.registries[0].identity, secretos:properties.configuration.secrets[].name, imagen:properties.template.containers[0].image}" `
     -o json
 Confirmar-Exito "el job no responde despues de crearlo"

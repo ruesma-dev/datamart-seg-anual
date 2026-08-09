@@ -28,13 +28,13 @@ $ErrorActionPreference = "Stop"
 
 $etiquetas = @(Get-EtiquetasCli)
 
-$existente = az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault --query id -o tsv 2>$null
+$existente = Invoke-Az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault --query id -o tsv
 
 if ($LASTEXITCODE -eq 0 -and $existente) {
     Write-Host "El vault '$($CFG.keyVault)' ya existe; no se recrea." -ForegroundColor Yellow
 } else {
     Write-Host "Creando el vault '$($CFG.keyVault)'..." -ForegroundColor Cyan
-    az keyvault create `
+    Invoke-Az keyvault create `
         -g $CFG.resourceGroup -n $CFG.keyVault -l $CFG.location `
         --enable-rbac-authorization true `
         --retention-days 7 `
@@ -42,7 +42,7 @@ if ($LASTEXITCODE -eq 0 -and $existente) {
     Confirmar-Exito "no se ha podido crear el Key Vault"
 }
 
-az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault `
+Invoke-Az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault `
     --query "{nombre:name, rbac:properties.enableRbacAuthorization, borradoLogico:properties.enableSoftDelete}" `
     -o table
 Confirmar-Exito "el vault no responde despues de crearlo"

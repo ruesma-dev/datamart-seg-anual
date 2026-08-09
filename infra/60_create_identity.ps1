@@ -30,18 +30,18 @@ $etiquetas = @(Get-EtiquetasCli)
 
 # --- 1. La identidad --------------------------------------------------------
 
-$existente = az identity show -g $CFG.resourceGroup -n $CFG.managedIdentity --query id -o tsv 2>$null
+$existente = Invoke-Az identity show -g $CFG.resourceGroup -n $CFG.managedIdentity --query id -o tsv
 
 if ($LASTEXITCODE -eq 0 -and $existente) {
     Write-Host "La identidad '$($CFG.managedIdentity)' ya existe; no se recrea." -ForegroundColor Yellow
 } else {
     Write-Host "Creando la identidad '$($CFG.managedIdentity)'..." -ForegroundColor Cyan
-    az identity create -g $CFG.resourceGroup -n $CFG.managedIdentity -l $CFG.location `
+    Invoke-Az identity create -g $CFG.resourceGroup -n $CFG.managedIdentity -l $CFG.location `
         --tags $etiquetas -o none
     Confirmar-Exito "no se ha podido crear la identidad gestionada"
 }
 
-$identidad = az identity show -g $CFG.resourceGroup -n $CFG.managedIdentity `
+$identidad = Invoke-Az identity show -g $CFG.resourceGroup -n $CFG.managedIdentity `
     --query "{id:id, principalId:principalId, clientId:clientId}" -o json
 Confirmar-Exito "no se ha podido leer la identidad recien creada"
 $uami = $identidad | ConvertFrom-Json
@@ -51,7 +51,7 @@ $uami = $identidad | ConvertFrom-Json
 # intermitente, que es la peor manera de fallar.
 $intento = 0
 while ($intento -lt 12) {
-    az ad sp show --id $uami.principalId --query id -o tsv 2>$null | Out-Null
+    Invoke-Az ad sp show --id $uami.principalId --query id -o tsv | Out-Null
     if ($LASTEXITCODE -eq 0) { break }
     $intento++
     Write-Host "  esperando a que el directorio publique la identidad ($intento)..."
@@ -60,13 +60,13 @@ while ($intento -lt 12) {
 
 # --- 2. Los ambitos: se preguntan, no se escriben ---------------------------
 
-$idAcr = az acr show -n $CFG.acrName -g $CFG.acrResourceGroup --query id -o tsv
+$idAcr = Invoke-Az acr show -n $CFG.acrName -g $CFG.acrResourceGroup --query id -o tsv
 Confirmar-Exito "no se encuentra el registro de contenedores"
 
-$idVault = az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault --query id -o tsv
+$idVault = Invoke-Az keyvault show -g $CFG.resourceGroup -n $CFG.keyVault --query id -o tsv
 Confirmar-Exito "no se encuentra el Key Vault: ejecuta antes 50_create_keyvault.ps1"
 
-$idCuenta = az storage account show -g $CFG.resourceGroup -n $CFG.storageAccount --query id -o tsv
+$idCuenta = Invoke-Az storage account show -g $CFG.resourceGroup -n $CFG.storageAccount --query id -o tsv
 Confirmar-Exito "no se encuentra la cuenta de almacenamiento: ejecuta antes 40_create_storage.ps1"
 
 # --- 3. Las tres asignaciones -----------------------------------------------
@@ -76,31 +76,31 @@ Confirmar-Exito "no se encuentra la cuenta de almacenamiento: ejecuta antes 40_c
 
 Write-Host "Asignando permisos..." -ForegroundColor Cyan
 
-az role assignment create --role "AcrPull" `
+Invoke-Az role assignment create --role "AcrPull" `
     --assignee-object-id $uami.principalId --assignee-principal-type ServicePrincipal `
-    --scope $idAcr -o none 2>$null
+    --scope $idAcr -o none
 
-az role assignment create --role "Key Vault Secrets User" `
+Invoke-Az role assignment create --role "Key Vault Secrets User" `
     --assignee-object-id $uami.principalId --assignee-principal-type ServicePrincipal `
-    --scope $idVault -o none 2>$null
+    --scope $idVault -o none
 
-az role assignment create --role "Storage Blob Data Reader" `
+Invoke-Az role assignment create --role "Storage Blob Data Reader" `
     --assignee-object-id $uami.principalId --assignee-principal-type ServicePrincipal `
-    --scope $idCuenta -o none 2>$null
+    --scope $idCuenta -o none
 
 # --- 4. Verificacion --------------------------------------------------------
 #
 # No basta con que los comandos no hayan protestado: se comprueba el resultado.
 # Repetir el script no debe fallar por asignaciones que ya existian.
 
-$asignados = az role assignment list --assignee $uami.principalId --all `
+$asignados = Invoke-Az role assignment list --assignee $uami.principalId --all `
     --query "[].roleDefinitionName" -o tsv
 Confirmar-Exito "no se han podido listar las asignaciones de rol"
 
 $esperados = @("AcrPull", "Key Vault Secrets User", "Storage Blob Data Reader")
 $faltan = $esperados | Where-Object { $asignados -notcontains $_ }
 
-az role assignment list --assignee $uami.principalId --all `
+Invoke-Az role assignment list --assignee $uami.principalId --all `
     --query "[].{rol:roleDefinitionName, ambito:scope}" -o table
 
 if ($faltan) {

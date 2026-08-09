@@ -9,7 +9,7 @@
 # reutiliza. Solo si no existe se crea uno propio, y entonces los destinatarios
 # llegan por parametro:
 #
-#     pwsh -File infra/90_create_alert.ps1 -AlertEmail "quien@ejemplo" "otro@ejemplo"
+#     powershell -NoProfile -File infra/90_create_alert.ps1 -AlertEmail "quien@ejemplo" "otro@ejemplo"
 #
 # NINGUNA direccion de correo entra en el repositorio (R26). Si no sabes cual es
 # el grupo de la landing zone, lo dice:
@@ -54,14 +54,14 @@ $rgAg     = if ($ActionGroupRg)   { $ActionGroupRg }   else { $CFG.alertActionGr
 
 # --- 1. El job tiene que existir --------------------------------------------
 
-$idJob = az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv 2>$null
+$idJob = Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $idJob) {
     throw "el job '$($CFG.job)' no existe todavia: no hay nada que vigilar. Ejecuta antes 80_create_job.ps1."
 }
 
 # --- 2. El canal de aviso ---------------------------------------------------
 
-$idAg = az monitor action-group show -g $rgAg -n $nombreAg --query id -o tsv 2>$null
+$idAg = Invoke-Az monitor action-group show -g $rgAg -n $nombreAg --query id -o tsv
 
 if ($LASTEXITCODE -eq 0 -and $idAg) {
     Write-Host "Reutilizando el grupo de accion '$nombreAg' de '$rgAg'." -ForegroundColor Green
@@ -80,11 +80,11 @@ if ($LASTEXITCODE -eq 0 -and $idAg) {
     $corto = "dm" + $CFG.environment
     if ($corto.Length -gt 12) { $corto = $corto.Substring(0, 12) }
 
-    az monitor action-group create -g $rgAg -n $nombreAg --short-name $corto `
+    Invoke-Az monitor action-group create -g $rgAg -n $nombreAg --short-name $corto `
         --action $receptores -o none
     Confirmar-Exito "no se ha podido crear el grupo de accion"
 
-    $idAg = az monitor action-group show -g $rgAg -n $nombreAg --query id -o tsv
+    $idAg = Invoke-Az monitor action-group show -g $rgAg -n $nombreAg --query id -o tsv
     Confirmar-Exito "el grupo de accion no responde despues de crearlo"
 } else {
     throw ("no existe el grupo de accion '$nombreAg' en '$rgAg' y no se han dado " +
@@ -95,8 +95,8 @@ if ($LASTEXITCODE -eq 0 -and $idAg) {
 
 # --- 3. La alerta -----------------------------------------------------------
 
-$yaExiste = az monitor metrics alert show -g $CFG.resourceGroup -n $CFG.alertName `
-    --query id -o tsv 2>$null
+$yaExiste = Invoke-Az monitor metrics alert show -g $CFG.resourceGroup -n $CFG.alertName `
+    --query id -o tsv
 
 if ($LASTEXITCODE -eq 0 -and $yaExiste) {
     Write-Host "La alerta '$($CFG.alertName)' ya existe; no se recrea." -ForegroundColor Yellow
@@ -106,7 +106,7 @@ if ($LASTEXITCODE -eq 0 -and $yaExiste) {
     $condicion = "total JobExecutionCount > 0 where Status includes Failed"
 
     Write-Host "Creando la alerta '$($CFG.alertName)'..." -ForegroundColor Cyan
-    az monitor metrics alert create `
+    Invoke-Az monitor metrics alert create `
         -g $CFG.resourceGroup -n $CFG.alertName `
         --scopes $idJob `
         --condition $condicion `
@@ -118,7 +118,7 @@ if ($LASTEXITCODE -eq 0 -and $yaExiste) {
     Confirmar-Exito "no se ha podido crear la alerta"
 }
 
-az monitor metrics alert show -g $CFG.resourceGroup -n $CFG.alertName `
+Invoke-Az monitor metrics alert show -g $CFG.resourceGroup -n $CFG.alertName `
     --query "{nombre:name, activa:enabled, severidad:severity, ambito:scopes[0]}" -o table
 
 Write-Host ""

@@ -5,7 +5,7 @@
 # diagnostico si falta alguna. Ejecutalo SIEMPRE antes del primer despliegue de
 # un entorno y despues de cualquier cambio en su fichero de configuracion.
 #
-#     pwsh -File infra/05_check_prereqs.ps1
+#     powershell -NoProfile -File infra/05_check_prereqs.ps1
 #
 # Codigo de salida 0 = se puede continuar. Distinto de 0 = PARA.
 
@@ -42,7 +42,7 @@ Write-Host "=== Prerrequisitos del despliegue (solo lectura) ===" -ForegroundCol
 
 # --- 1. Sesion de Azure y suscripcion ---------------------------------------
 
-$cuenta = az account show --query "{nombre:name, id:id, estado:state}" -o json 2>$null
+$cuenta = Invoke-Az account show --query "{nombre:name, id:id, estado:state}" -o json
 if ($LASTEXITCODE -ne 0 -or -not $cuenta) {
     Escribir-Fallo "no hay sesion de Azure iniciada. Ejecuta 'az login'."
 } else {
@@ -55,7 +55,7 @@ if ($LASTEXITCODE -ne 0 -or -not $cuenta) {
 
 # --- 2. Extension containerapp de la CLI ------------------------------------
 
-$extension = az extension show -n containerapp --query version -o tsv 2>$null
+$extension = Invoke-Az extension show -n containerapp --query version -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $extension) {
     Escribir-Fallo "falta la extension 'containerapp' de la CLI: az extension add -n containerapp"
 } else {
@@ -64,7 +64,7 @@ if ($LASTEXITCODE -ne 0 -or -not $extension) {
 
 # --- 3. El registro de contenedores existe ----------------------------------
 
-$admin = az acr show -n $CFG.acrName -g $CFG.acrResourceGroup --query adminUserEnabled -o tsv 2>$null
+$admin = Invoke-Az acr show -n $CFG.acrName -g $CFG.acrResourceGroup --query adminUserEnabled -o tsv
 if ($LASTEXITCODE -ne 0) {
     Escribir-Fallo "no se ve el registro de contenedores '$($CFG.acrName)' en '$($CFG.acrResourceGroup)'"
 } else {
@@ -78,8 +78,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $consultaPg = "{id:id, version:version, sku:sku.name, discoGB:storage.storageSizeGb, " +
               "entra:authConfig.activeDirectoryAuth}"
-$servidor = az postgres flexible-server show -g $CFG.pgResourceGroup -n $PG_SERVER `
-    --query $consultaPg -o json 2>$null
+$servidor = Invoke-Az postgres flexible-server show -g $CFG.pgResourceGroup -n $PG_SERVER `
+    --query $consultaPg -o json
 
 if ($LASTEXITCODE -ne 0 -or -not $servidor) {
     Escribir-Fallo "no se ve el servidor de Postgres '$PG_SERVER' en '$($CFG.pgResourceGroup)'"
@@ -120,11 +120,31 @@ if ($LASTEXITCODE -ne 0 -or -not $servidor) {
     # Espacio en disco. El 2026-08-09 una carga completa lleno el disco del
     # servidor y lo dejo en solo lectura diez minutos. El job nocturno ejecuta
     # esa misma carga.
-    $consultaMetrica = "max(value[0].timeseries[0].data[?maximum!=null].maximum)"
-    $ocupacion = az monitor metrics list --resource $pg.id --metric storage_percent `
-        --aggregation Maximum --interval PT15M --query $consultaMetrica -o tsv 2>$null
+    #
+    # La metrica se pide en JSON y el maximo se calcula AQUI. Hacerlo con la
+    # consulta 'max(value[0].timeseries[0].data[?maximum!=null].maximum)' era mas
+    # corto y no funciona en Windows: 'az' es un .cmd, cmd.exe vuelve a parsear la
+    # linea ya expandida y los parentesis y el '?' la rompen con el mensaje
+    # 'No se esperaba -o en este momento'. Como la expresion no lleva espacios,
+    # PowerShell tampoco la entrecomilla. Filtrar en PowerShell evita el problema
+    # de raiz y se comporta igual en 5.1 que en 7.
+    $metricas = Invoke-Az monitor metrics list --resource $pg.id --metric storage_percent `
+        --aggregation Maximum --interval PT15M -o json
 
-    if ($LASTEXITCODE -eq 0 -and $ocupacion) {
+    $ocupacion = $null
+    if ($LASTEXITCODE -eq 0 -and $metricas) {
+        $series = ($metricas | ConvertFrom-Json).value
+        if ($series -and $series[0].timeseries) {
+            foreach ($punto in $series[0].timeseries[0].data) {
+                if ($null -ne $punto.maximum -and
+                    ($null -eq $ocupacion -or $punto.maximum -gt $ocupacion)) {
+                    $ocupacion = $punto.maximum
+                }
+            }
+        }
+    }
+
+    if ($null -ne $ocupacion) {
         $porcentaje = [double]$ocupacion
         $legible = "{0:N1}" -f $porcentaje
         if ($porcentaje -ge 60) {
@@ -144,14 +164,18 @@ if ($LASTEXITCODE -ne 0 -or -not $servidor) {
 # 60_create_identity.ps1 crea tres. Sin uno de estos dos roles fallara ahi, con
 # medio entorno ya aprovisionado.
 
-$yo = az ad signed-in-user show --query id -o tsv 2>$null
+$yo = Invoke-Az ad signed-in-user show --query id -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $yo) {
     Escribir-Aviso "no se ha podido identificar al usuario de la sesion (permisos de Graph)"
 } else {
-    $consultaRoles = "[?roleDefinitionName=='Owner' || " +
-                     "roleDefinitionName=='User Access Administrator'].roleDefinitionName"
-    $roles = az role assignment list --assignee $yo --all --query $consultaRoles -o tsv 2>$null
-    $rolesTexto = (($roles -split "`n") | Where-Object { $_ }) -join ", "
+    # Mismo motivo que arriba: el filtro equivalente en JMESPath llevaba '[?' y
+    # '||', que cmd.exe reinterpreta. Se piden los nombres y se filtra aqui.
+    $conPermiso = @("Owner", "User Access Administrator")
+    $roles = Invoke-Az role assignment list --assignee $yo --all `
+        --query "[].roleDefinitionName" -o tsv
+    $rolesTexto = (($roles -split "`n") |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $conPermiso -contains $_ }) -join ", "
     if ($rolesTexto) {
         Escribir-Ok "la cuenta puede crear asignaciones de rol ($rolesTexto)"
     } else {
@@ -161,7 +185,7 @@ if ($LASTEXITCODE -ne 0 -or -not $yo) {
 
 # --- 6. Nombres globalmente unicos todavia libres ---------------------------
 
-$libre = az storage account check-name --name $CFG.storageAccount --query nameAvailable -o tsv 2>$null
+$libre = Invoke-Az storage account check-name --name $CFG.storageAccount --query nameAvailable -o tsv
 if ($LASTEXITCODE -eq 0 -and $libre -eq "false") {
     Escribir-Aviso "el nombre de la cuenta de almacenamiento ya esta tomado (o ya es tuyo); si no es tuyo, cambialo en el fichero de entorno y no toques ningun script"
 }

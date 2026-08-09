@@ -794,6 +794,202 @@ def test_f003_r25_la_alerta_apunta_al_job_y_a_un_action_group() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Cómo se llama a `az` desde Windows PowerShell 5.1
+# ---------------------------------------------------------------------------
+#
+# Defecto encontrado ejecutando de verdad `05_check_prereqs.ps1` contra Azure
+# (bloque 5, paso 1). Dos trampas del intérprete, las dos silenciosas hasta que
+# alguien despliega:
+#
+#   1. `az` en Windows es un `.cmd`, así que lo que se le pasa lo vuelve a
+#      parsear `cmd.exe`. Una expresión JMESPath con paréntesis, `?`, `|` o `!`
+#      que PowerShell no entrecomille (no lleva espacios) llega cruda al
+#      intérprete de órdenes y revienta: «az : No se esperaba -o en este
+#      momento.»
+#   2. Redirigir la salida de error de un ejecutable nativo (`2>$null` o
+#      `2>&1`) hace que PowerShell 5.1 envuelva cada línea en un ErrorRecord;
+#      con `$ErrorActionPreference = "Stop"` eso ABORTA el script. Y como el
+#      patrón se usaba justo en las comprobaciones de idempotencia («¿existe ya
+#      el recurso?»), fallaba precisamente en el primer despliegue, que es
+#      cuando el recurso no existe todavía.
+#
+# Comprobado en el puesto (PowerShell 5.1.26100): `2>$null` y `2>&1` lanzan;
+# `2>&1 | Out-Null` también; no redirigir, no. La técnica elegida es la única
+# que sobrevive: **no se redirige nunca**, se mira `$LASTEXITCODE`, y el
+# mensaje de `az` se ve, que en un script de diagnóstico es una ventaja.
+
+# Metacaracteres que `cmd.exe` reinterpreta al recibir la línea ya expandida.
+METACARACTERES_DE_CMD = "()?|!<>^&"
+
+
+def _consultas_jmespath(texto: str) -> list[str]:
+    """
+    Lo que un script pasa en `--query`, siga un literal o una variable.
+
+    Las consultas largas se escriben en una variable por legibilidad, y son
+    justo las que más probabilidades tienen de llevar un filtro `[?…]`: mirar
+    solo a los literales dejaría fuera el caso peligroso.
+    """
+    consultas: list[str] = []
+
+    for token in re.findall(r'--query\s+("[^"]*"|\$\w+)', texto):
+        if token.startswith('"'):
+            consultas.append(token.strip('"'))
+        else:
+            consultas += re.findall(rf'\{token}\s*=\s*"([^"]*)"', texto)
+
+    return consultas
+
+
+def test_f003_ninguna_consulta_a_az_lleva_metacaracteres_de_cmd() -> None:
+    """
+    Ninguna expresión `--query` puede llevar caracteres que `cmd.exe` reparse.
+
+    Lo que se filtra o se agrega se hace **en PowerShell**, sobre el JSON ya
+    devuelto. Es más código, pero funciona igual en 5.1 que en 7 y no depende
+    de si el argumento llevaba un espacio que obligara a entrecomillarlo.
+    """
+    for script in _ps1():
+        for consulta in _consultas_jmespath(_texto(script)):
+            malos = sorted({c for c in consulta if c in METACARACTERES_DE_CMD})
+            assert not malos, (
+                f"{script.name}: la consulta {consulta!r} lleva {malos}, que cmd.exe "
+                f"reinterpreta al invocar az.cmd. Pide -o json y filtra en PowerShell"
+            )
+
+
+def _lineas_de_codigo(script: Path) -> list[tuple[int, str]]:
+    """
+    Líneas del script que no son comentario, con su número.
+
+    Contempla las dos formas de PowerShell: la de línea (`#`) y la de bloque
+    (`<# … #>`), que es donde viven las explicaciones largas de las funciones.
+    Sin lo segundo, un test que busca llamadas a `az` acaba señalando la prosa
+    que documenta por qué no hay que llamarlo así.
+    """
+    lineas: list[tuple[int, str]] = []
+    en_bloque = False
+
+    for numero, linea in enumerate(_texto(script).splitlines(), start=1):
+        if en_bloque:
+            if "#>" in linea:
+                en_bloque = False
+            continue
+        if "<#" in linea:
+            en_bloque = "#>" not in linea
+            continue
+        if linea.lstrip().startswith("#"):
+            continue
+        lineas.append((numero, linea))
+
+    return lineas
+
+
+def test_f003_solo_el_ayudante_redirige_la_salida_de_error_de_az() -> None:
+    """
+    Ningún script redirige el stderr de `az`… salvo `Invoke-Az`, que es el
+    único sitio donde hacerlo es correcto porque baja antes la preferencia de
+    errores.
+
+    Con `$ErrorActionPreference = "Stop"`, redirigir el stderr de un nativo
+    convierte cada línea en un ErrorRecord **terminante**: el script muere en la
+    comprobación que solo pretendía preguntar si algo existe. Le pasó de verdad
+    a `20_create_observability.ps1` en el primer despliegue, y el workspace no
+    se creó.
+    """
+    for script in _ps1():
+        for numero, linea in _lineas_de_codigo(script):
+            if not re.search(r"2>\s*(?:\$null|&1)", linea):
+                continue
+            assert script.name == CARGADOR and "@args" in linea, (
+                f"{script.name}:{numero} redirige la salida de error de az fuera de "
+                f"Invoke-Az. Con ErrorActionPreference=Stop eso aborta el script en "
+                f"5.1: llama a través del ayudante"
+            )
+
+
+def test_f003_todas_las_llamadas_a_az_pasan_por_el_ayudante() -> None:
+    """
+    Ni una invocación de `az` suelta: todas por `Invoke-Az`.
+
+    Un solo punto de entrada es lo que permite arreglar de una vez —y para
+    siempre— las rarezas de Windows PowerShell 5.1. El puesto del humano **no
+    tiene `pwsh`**: los scripts corren con `powershell -NoProfile -File`, así
+    que 5.1 no es un caso raro, es el único.
+    """
+    # Las cadenas se descartan antes de buscar: un mensaje que le dice al humano
+    # «ejecuta az login» no es una invocación, y un test que no distingue las dos
+    # cosas se acaba desactivando.
+    sin_cadenas = re.compile(r"\"[^\"]*\"|'[^']*'")
+
+    for script in _ps1():
+        for numero, linea in _lineas_de_codigo(script):
+            assert not re.search(r"(?<![\w-])az\s+\w", sin_cadenas.sub("", linea)), (
+                f"{script.name}:{numero} invoca az directamente: usa Invoke-Az, que "
+                f"es donde están resueltas las trampas de PowerShell 5.1"
+            )
+
+    # Contraste: que nadie «apruebe» este test dejando de llamar a az.
+    for script in _ps1():
+        if script.name == CARGADOR:
+            continue
+        assert "Invoke-Az " in _script(script.name), (
+            f"{script.name} no llama a Azure por ningún sitio"
+        )
+
+
+def test_f003_el_ayudante_de_az_esta_endurecido_para_powershell_51() -> None:
+    """
+    `Invoke-Az` tiene que hacer las cuatro cosas que lo justifican.
+
+    Comprobado en el puesto (5.1.26100) con un `az` de mentira: con este patrón
+    el script sobrevive tanto en consola como con la salida redirigida a un
+    fichero, `$LASTEXITCODE` sigue siendo legible al volver y el mensaje de
+    error queda disponible en vez de perderse.
+    """
+    cargador = _script(CARGADOR)
+
+    assert re.search(r"function\s+Invoke-Az\b", cargador), (
+        "no existe el ayudante Invoke-Az en 00_vars.ps1"
+    )
+
+    cuerpo = cargador[cargador.index("function Invoke-Az"):]
+    cuerpo = cuerpo[: cuerpo.index("\nfunction ")] if "\nfunction " in cuerpo else cuerpo
+
+    assert '$ErrorActionPreference = "Continue"' in cuerpo, (
+        "Invoke-Az no baja la preferencia de errores: el stderr de az volvería a "
+        "ser terminante"
+    )
+    assert "finally" in cuerpo, (
+        "la preferencia de errores debe restaurarse en un finally, o un fallo la "
+        "dejaría bajada para el resto del script"
+    )
+    assert "--only-show-errors" in cuerpo, "faltan los avisos silenciados de az"
+    assert "AzUltimoError" in cuerpo, (
+        "el mensaje de error de az debe quedar disponible; si no, un fallo real se "
+        "diagnostica a ciegas"
+    )
+
+
+def test_f003_los_prerrequisitos_siguen_midiendo_el_disco_del_servidor() -> None:
+    """
+    Contraste de los dos anteriores: la forma más fácil de dejar de tener
+    consultas problemáticas es dejar de comprobar cosas.
+
+    La medición del disco es la que nació del incidente del 2026-08-09, así que
+    se exige que siga ahí: la métrica, el umbral y el cálculo en PowerShell.
+    """
+    texto = _script("05_check_prereqs.ps1")
+
+    assert "storage_percent" in texto, "ya no se mide la ocupación del disco"
+    assert "ConvertFrom-Json" in texto, (
+        "el máximo de la métrica debe calcularse en PowerShell sobre el JSON, "
+        "no con una función JMESPath que cmd.exe rompe"
+    )
+    assert re.search(r"-ge\s+60", texto), "se ha perdido el umbral del 60 %"
+
+
+# ---------------------------------------------------------------------------
 # La puerta del disco (incidente del 2026-08-09), detectable por máquina
 # ---------------------------------------------------------------------------
 #
@@ -841,7 +1037,7 @@ def test_f003_la_puerta_del_job_programado_es_detectable_por_maquina() -> None:
     )
 
     puerta = texto.index("$CFG.jobProgramable")
-    creacion = texto.index("az containerapp job create")
+    creacion = texto.index("containerapp job create")
     assert puerta < creacion, "la puerta se comprueba después de crear el job"
 
 

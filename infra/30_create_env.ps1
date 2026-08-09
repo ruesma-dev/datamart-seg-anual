@@ -22,24 +22,24 @@ $ErrorActionPreference = "Stop"
 
 $etiquetas = @(Get-EtiquetasCli)
 
-$existente = az containerapp env show -g $CFG.resourceGroup -n $CFG.containerAppsEnv `
-    --query id -o tsv 2>$null
+$existente = Invoke-Az containerapp env show -g $CFG.resourceGroup -n $CFG.containerAppsEnv `
+    --query id -o tsv
 
 if ($LASTEXITCODE -eq 0 -and $existente) {
     Write-Host "El entorno '$($CFG.containerAppsEnv)' ya existe; no se recrea." -ForegroundColor Yellow
 } else {
-    $customerId = az monitor log-analytics workspace show `
+    $customerId = Invoke-Az monitor log-analytics workspace show `
         -g $CFG.resourceGroup -n $CFG.logAnalytics --query customerId -o tsv
     Confirmar-Exito "no se encuentra el workspace: ejecuta antes 20_create_observability.ps1"
 
     # La clave del workspace vive solo en esta variable y durante esta ejecucion:
     # no se imprime, no se guarda y no entra en el repositorio.
-    $claveWorkspace = az monitor log-analytics workspace get-shared-keys `
+    $claveWorkspace = Invoke-Az monitor log-analytics workspace get-shared-keys `
         -g $CFG.resourceGroup -n $CFG.logAnalytics --query primarySharedKey -o tsv
     Confirmar-Exito "no se ha podido leer la clave del workspace"
 
     Write-Host "Creando el entorno '$($CFG.containerAppsEnv)'..." -ForegroundColor Cyan
-    az containerapp env create `
+    Invoke-Az containerapp env create `
         -g $CFG.resourceGroup -n $CFG.containerAppsEnv -l $CFG.location `
         --logs-destination log-analytics `
         --logs-workspace-id $customerId `
@@ -51,11 +51,11 @@ if ($LASTEXITCODE -eq 0 -and $existente) {
 
 # --- La IP de salida: entrada de la regla de firewall de R23 ----------------
 
-$ip = az containerapp env show -g $CFG.resourceGroup -n $CFG.containerAppsEnv `
+$ip = Invoke-Az containerapp env show -g $CFG.resourceGroup -n $CFG.containerAppsEnv `
     --query properties.staticIp -o tsv
 Confirmar-Exito "el entorno no responde despues de crearlo"
 
-az containerapp env show -g $CFG.resourceGroup -n $CFG.containerAppsEnv `
+Invoke-Az containerapp env show -g $CFG.resourceGroup -n $CFG.containerAppsEnv `
     --query "{nombre:name, estado:properties.provisioningState, vnet:properties.vnetConfiguration, logs:properties.appLogsConfiguration.destination}" `
     -o json
 

@@ -10,8 +10,8 @@
 #
 # Uso habitual, despues de 70_build_image.ps1:
 #
-#     pwsh -File infra/85_update_job.ps1                 # la ultima publicada
-#     pwsh -File infra/85_update_job.ps1 -Tag r20260810-0200
+#     powershell -NoProfile -File infra/85_update_job.ps1                 # la ultima publicada
+#     powershell -NoProfile -File infra/85_update_job.ps1 -Tag r20260810-0200
 
 [CmdletBinding()]
 param(
@@ -23,19 +23,19 @@ $ErrorActionPreference = "Stop"
 
 . "$PSScriptRoot\00_vars.ps1" -Entorno $Entorno
 
-$existente = az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv 2>$null
+$existente = Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $existente) {
     throw "el job '$($CFG.job)' no existe todavia. Crealo con 80_create_job.ps1."
 }
 
 if (-not $Tag) {
-    $Tag = az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
+    $Tag = Invoke-Az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
         --orderby time_desc --top 1 -o tsv
     Confirmar-Exito "no hay ninguna imagen publicada: ejecuta antes 70_build_image.ps1"
 }
 $imagen = "{0}.azurecr.io/{1}:{2}" -f $CFG.acrName, $CFG.imageRepository, $Tag
 
-$anterior = az containerapp job show -g $CFG.resourceGroup -n $CFG.job `
+$anterior = Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job `
     --query "properties.template.containers[0].image" -o tsv
 
 Write-Host "Imagen actual : $anterior"
@@ -46,10 +46,10 @@ if ($anterior -eq $imagen) {
     exit 0
 }
 
-az containerapp job update -g $CFG.resourceGroup -n $CFG.job --image $imagen -o none
+Invoke-Az containerapp job update -g $CFG.resourceGroup -n $CFG.job --image $imagen -o none
 Confirmar-Exito "no se ha podido actualizar el job"
 
-az containerapp job show -g $CFG.resourceGroup -n $CFG.job `
+Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job `
     --query "{imagen:properties.template.containers[0].image, disparo:properties.configuration.triggerType}" `
     -o table
 

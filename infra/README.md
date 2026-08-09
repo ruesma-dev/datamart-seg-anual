@@ -59,6 +59,33 @@ contra Azure**. Hay dos cosas que deben cerrarse antes de llegar al job:
 
 ---
 
+## Cómo se ejecutan (Windows PowerShell 5.1)
+
+Todos cargan primero `00_vars.ps1` y se lanzan igual, desde la raíz del
+repositorio:
+
+```powershell
+powershell -NoProfile -File infra\05_check_prereqs.ps1
+```
+
+**No uses `pwsh`**: en el puesto donde se despliega **no está instalado**, y los
+scripts están escritos y probados para **Windows PowerShell 5.1**, que es la que
+viene con el sistema. Eso no es un detalle cosmético: 5.1 tiene dos trampas al
+llamar a un ejecutable nativo que costaron un despliegue a medias el 2026-08-10.
+
+- El **stderr** de un programa nativo se convierte en un error **terminante**
+  cuando la preferencia de errores es `Stop`. Y `az` contesta por stderr algo tan
+  normal como `ResourceNotFound`, que es la respuesta esperada de cualquier
+  comprobación «¿existe ya?» en un primer despliegue.
+- `az` es un **`.cmd`**, así que `cmd.exe` vuelve a interpretar la línea: una
+  consulta `--query` con paréntesis, `?`, `|` o `!` se rompe con «No se esperaba
+  -o en este momento».
+
+Las dos están resueltas **en un solo sitio**: la función `Invoke-Az` de
+`00_vars.ps1`, por la que pasan **todas** las llamadas (hay un test que lo
+comprueba). Si añades una llamada a Azure, úsala; no escribas `az` directamente
+ni filtres con JMESPath usando esos caracteres.
+
 ## Orden de ejecución
 
 Todos los scripts admiten `-Entorno <nombre>` y todos son **idempotentes**:
@@ -89,8 +116,8 @@ abajo.
 ### Despliegue habitual, cuando ya está todo montado
 
 ```powershell
-pwsh -File infra/70_build_image.ps1     # publica una imagen nueva
-pwsh -File infra/85_update_job.ps1      # el job pasa a usarla
+powershell -NoProfile -File infra/70_build_image.ps1     # publica una imagen nueva
+powershell -NoProfile -File infra/85_update_job.ps1      # el job pasa a usarla
 ```
 
 ---
@@ -257,7 +284,7 @@ No se toca ni se duplica ningún script:
 
 ```powershell
 Copy-Item infra/env/dev.json infra/env/pro.json    # y se ajustan los nombres
-pwsh -File infra/05_check_prereqs.ps1 -Entorno pro
+powershell -NoProfile -File infra/05_check_prereqs.ps1 -Entorno pro
 ```
 
 El entorno se resuelve, por este orden: el parámetro `-Entorno`, la variable

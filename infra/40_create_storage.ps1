@@ -28,14 +28,14 @@ $etiquetas = @(Get-EtiquetasCli)
 
 # --- 1. La cuenta -----------------------------------------------------------
 
-$existente = az storage account show -g $CFG.resourceGroup -n $CFG.storageAccount `
-    --query id -o tsv 2>$null
+$existente = Invoke-Az storage account show -g $CFG.resourceGroup -n $CFG.storageAccount `
+    --query id -o tsv
 
 if ($LASTEXITCODE -eq 0 -and $existente) {
     Write-Host "La cuenta '$($CFG.storageAccount)' ya existe; no se recrea." -ForegroundColor Yellow
 } else {
     Write-Host "Creando la cuenta '$($CFG.storageAccount)'..." -ForegroundColor Cyan
-    az storage account create `
+    Invoke-Az storage account create `
         -g $CFG.resourceGroup -n $CFG.storageAccount -l $CFG.location `
         --sku Standard_LRS --kind StorageV2 `
         --https-only true `
@@ -53,7 +53,7 @@ if ($LASTEXITCODE -eq 0 -and $existente) {
 # suscripcion no basta: son planos distintos, y esa es la sorpresa clasica.
 
 Write-Host "Creando el contenedor de los Excels auxiliares..." -ForegroundColor Cyan
-az storage container create `
+Invoke-Az storage container create `
     --account-name $CFG.storageAccount `
     --name $CFG.auxContainer `
     --auth-mode login `
@@ -71,11 +71,11 @@ if ($LASTEXITCODE -ne 0) {
 
 # --- 3. Comprobacion --------------------------------------------------------
 
-az storage account show -g $CFG.resourceGroup -n $CFG.storageAccount `
+Invoke-Az storage account show -g $CFG.resourceGroup -n $CFG.storageAccount `
     --query "{publico:allowBlobPublicAccess, clave:allowSharedKeyAccess, tls:minimumTlsVersion}" `
     -o table
 
-az storage container list --account-name $CFG.storageAccount --auth-mode login `
+Invoke-Az storage container list --account-name $CFG.storageAccount --auth-mode login `
     --query "[].name" -o tsv
 
 Write-Host ""

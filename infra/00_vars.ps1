@@ -106,12 +106,71 @@ if ($CFG.environment -ne $Entorno) {
     throw "El fichero '$rutaCfg' declara environment='$($CFG.environment)' y se ha pedido '$Entorno'."
 }
 
+# --- 2 bis. Como se llama a 'az' (leer antes de tocar cualquier script) -----
+
+$global:AzUltimoError = ""
+
+function Invoke-Az {
+    <#
+        UNICO punto de entrada a la CLI de Azure en todo infra/. Nadie llama a
+        'az' a pelo, y hay un test que lo comprueba.
+
+        El puesto donde se ejecuta esto NO tiene pwsh: corre Windows PowerShell
+        5.1 con 'powershell -NoProfile -File'. Ahi hay tres trampas que cuestan
+        un despliegue a medias, y las tres se resuelven aqui:
+
+          1. Con $ErrorActionPreference = "Stop", el stderr de un ejecutable
+             nativo se envuelve en un ErrorRecord (NativeCommandError) que es
+             TERMINANTE. Y az escribe por stderr algo tan normal como
+             'ResourceNotFound', que es la respuesta esperada de toda
+             comprobacion "existe ya?" en un primer despliegue. Resultado: el
+             script moria justo antes de crear el recurso que faltaba. Le paso
+             a 20_create_observability.ps1 el 2026-08-10. Por eso aqui se baja
+             la preferencia a "Continue" durante la llamada, y se restaura en
+             un finally: si no, un fallo la dejaria bajada para el resto.
+          2. 'az' es un .cmd, asi que cmd.exe vuelve a parsear la linea ya
+             expandida. Los parentesis, '?', '|' y '!' de una expresion JMESPath
+             la rompen ("No se esperaba -o en este momento") cuando PowerShell
+             no la entrecomilla, que es siempre que no lleva espacios. Por eso
+             ninguna consulta --query de infra/ lleva esos caracteres: lo que
+             haya que filtrar o agregar se hace en PowerShell sobre el JSON.
+          3. Los avisos de az (actualizacion disponible, comandos en preview)
+             se cuelan en la salida capturada y confunden un diagnostico:
+             --only-show-errors los calla.
+
+        Devuelve la SALIDA ESTANDAR como cadena. El codigo de salida se
+        consulta como siempre, en $LASTEXITCODE, y el texto del error de az
+        queda en $AzUltimoError. No lanza: decide quien llama.
+
+        Se usa exactamente igual que az, sin el 'az':
+
+            $id = Invoke-Az group show -n $CFG.resourceGroup --query id -o tsv
+            if ($LASTEXITCODE -ne 0) { ... }
+    #>
+    $anterior = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $salida = & az @args --only-show-errors 2>&1
+    } finally {
+        $ErrorActionPreference = $anterior
+    }
+
+    $errores = @($salida |
+        Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
+    $normal = @($salida |
+        Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] })
+
+    $global:AzUltimoError = ($errores -join " ").Trim()
+
+    ($normal -join "`n")
+}
+
 # --- 3. Suscripcion: del entorno o de la sesion, nunca del repositorio ------
 
 if ($env:AZ_SUBSCRIPTION_ID) {
     $SUB = $env:AZ_SUBSCRIPTION_ID
 } else {
-    $SUB = (az account show --query id -o tsv)
+    $SUB = (Invoke-Az account show --query id -o tsv)
     if ($LASTEXITCODE -ne 0 -or -not $SUB) {
         throw "No hay sesion de Azure iniciada. Ejecuta 'az login', o define AZ_SUBSCRIPTION_ID."
     }
@@ -146,7 +205,8 @@ function Confirmar-Exito {
     param([Parameter(Mandatory = $true)][string]$Mensaje)
 
     if ($LASTEXITCODE -ne 0) {
-        throw "$Mensaje (codigo de salida $LASTEXITCODE)"
+        $detalle = if ($AzUltimoError) { " -> $AzUltimoError" } else { "" }
+        throw "$Mensaje (codigo de salida $LASTEXITCODE)$detalle"
     }
 }
 

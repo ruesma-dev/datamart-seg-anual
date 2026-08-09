@@ -19,10 +19,10 @@ $etiquetas = @(Get-EtiquetasCli)
 
 Write-Host "Creando el resource group '$($CFG.resourceGroup)' en $($CFG.location)..." -ForegroundColor Cyan
 
-az group create --name $CFG.resourceGroup --location $CFG.location --tags $etiquetas -o none
+Invoke-Az group create --name $CFG.resourceGroup --location $CFG.location --tags $etiquetas -o none
 Confirmar-Exito "no se ha podido crear el resource group '$($CFG.resourceGroup)'"
 
-az group show --name $CFG.resourceGroup --query "{nombre:name, region:location, tags:tags}" -o json
+Invoke-Az group show --name $CFG.resourceGroup --query "{nombre:name, region:location, tags:tags}" -o json
 Confirmar-Exito "el resource group no responde despues de crearlo"
 
 Write-Host "Resource group listo." -ForegroundColor Green

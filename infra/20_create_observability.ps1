@@ -20,14 +20,14 @@ $ErrorActionPreference = "Stop"
 
 $etiquetas = @(Get-EtiquetasCli)
 
-$existente = az monitor log-analytics workspace show `
-    -g $CFG.resourceGroup -n $CFG.logAnalytics --query id -o tsv 2>$null
+$existente = Invoke-Az monitor log-analytics workspace show `
+    -g $CFG.resourceGroup -n $CFG.logAnalytics --query id -o tsv
 
 if ($LASTEXITCODE -eq 0 -and $existente) {
     Write-Host "El workspace '$($CFG.logAnalytics)' ya existe; no se recrea." -ForegroundColor Yellow
 } else {
     Write-Host "Creando el workspace '$($CFG.logAnalytics)'..." -ForegroundColor Cyan
-    az monitor log-analytics workspace create `
+    Invoke-Az monitor log-analytics workspace create `
         -g $CFG.resourceGroup -n $CFG.logAnalytics -l $CFG.location `
         --retention-time $CFG.logRetentionDays `
         --tags $etiquetas -o none
@@ -36,11 +36,11 @@ if ($LASTEXITCODE -eq 0 -and $existente) {
 
 # El identificador que necesita el entorno de Container Apps NO es el resource
 # id, sino el customerId del workspace. Confundirlos es el error clasico aqui.
-$customerId = az monitor log-analytics workspace show `
+$customerId = Invoke-Az monitor log-analytics workspace show `
     -g $CFG.resourceGroup -n $CFG.logAnalytics --query customerId -o tsv
 Confirmar-Exito "no se ha podido leer el identificador del workspace"
 
-az monitor log-analytics workspace show -g $CFG.resourceGroup -n $CFG.logAnalytics `
+Invoke-Az monitor log-analytics workspace show -g $CFG.resourceGroup -n $CFG.logAnalytics `
     --query "{nombre:name, sku:sku.name, retencionDias:retentionInDays}" -o table
 
 Write-Host ""

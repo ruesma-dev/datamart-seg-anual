@@ -53,7 +53,7 @@ if (-not $AdminUser) {
 
 # --- 1. Fotografia previa, solo lectura -------------------------------------
 Write-Host "--- Estado actual del servidor (solo lectura) ---" -ForegroundColor Cyan
-az postgres flexible-server show -g $CFG.pgResourceGroup -n $PG_SERVER `
+Invoke-Az postgres flexible-server show -g $CFG.pgResourceGroup -n $PG_SERVER `
     --query "{sku:sku.name, version:version, almacenamientoGB:storage.storageSizeGb, ha:highAvailability.mode, retencionDias:backup.backupRetentionDays}" `
     -o table
 
@@ -61,7 +61,7 @@ Write-Host ""
 Write-Host "--- Reglas de firewall existentes ---" -ForegroundColor Cyan
 Write-Host "Guarda esta salida: tras cualquier cambio debe contener EXACTAMENTE" -ForegroundColor Yellow
 Write-Host "estas mismas reglas mas las nuevas." -ForegroundColor Yellow
-az postgres flexible-server firewall-rule list -g $CFG.pgResourceGroup -n $PG_SERVER -o table
+Invoke-Az postgres flexible-server firewall-rule list -g $CFG.pgResourceGroup -n $PG_SERVER -o table
 
 Write-Host ""
 Write-Host "--- Diagnostico de la base (solo lectura) ---" -ForegroundColor Cyan
