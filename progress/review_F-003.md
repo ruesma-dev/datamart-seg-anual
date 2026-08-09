@@ -362,3 +362,226 @@ Un segundo afinado, más barato: cuando una feature quede bloqueada por otra,
 **nombrar el `F-XXX` bloqueante** en el README y en `tasks.md`, no describir el
 problema. Un identificador se puede comprobar contra `features.json`; una
 descripción en prosa, no.
+
+---
+---
+
+# RE-REVIEW · 2026-08-10 (segunda pasada)
+
+**Veredicto: APPROVED**
+
+Dos rondas del implementer sobre la misma rama: la corrección del defecto
+bloqueante y la aplicación de la enmienda DA-4 (opción B). **El defecto §1 está
+resuelto, y resuelto mejor de lo que pedí**: además de las tres correcciones de
+texto exigidas, se ha implementado la variante que yo daba como opcional —la
+puerta detectable por máquina—, y se ha implementado bien. La enmienda DA-4 es
+coherente en spec, scripts, tests y guion, y no cuela ningún valor de secreto.
+
+Sigue sin cerrarse la feature: F-003 permanece en `in_progress`, el bloque 5
+(T18–T28) es del humano y T23 está bloqueada por F-019. **Esto aprueba T1–T17
+y la corrección; no autoriza a armar el cron nocturno.**
+
+---
+
+## (a) El cambio bloqueante §1 — RESUELTO
+
+Las tres correcciones que exigí, verificadas una a una en el árbol:
+
+| Lo que pedí | Dónde está ahora | Estado |
+|---|---|---|
+| `infra/README.md` §«Antes de desplegar»: condicionar a F-019, no a «que se decida» | `infra/README.md:28` — «**Hasta que `F-019` (build de `stg.plan_mensual` por tramos)…**»; `:34` explica cuándo pasar la clave a `true`; `:79` la tabla marca el paso 9 «**está bloqueado por `F-019`**» | [x] |
+| `progress/current.md` punto 1: misma corrección | `current.md:53-55` — dice explícitamente que A/B/C «**ya se decidió: la B**, y es `F-019`», y que el bloqueo dura hasta que esté implementada | [x] |
+| `specs/.../tasks.md` T23: nota de bloqueo | `tasks.md:195` — «**BLOQUEADA POR `F-019`**», con la misma forma que la de DA-2 en T22 | [x] |
+
+**Y la variante robusta que sugerí como opcional, implementada:**
+
+- `infra/env/dev.json:33` → `"jobProgramable": false`, **booleano JSON**, no la
+  cadena `"false"` (que en PowerShell sería *cierta* y no frenaría nada). Con su
+  `$aviso_jobProgramable` explicando qué protege y cuándo abrirla.
+- `infra/80_create_job.ps1:64` → `if (-not $CFG.jobProgramable) { throw … }`,
+  con `F-019` nombrado en el mensaje. Verificado que **precede** a
+  `az containerapp job create` y a cualquier otra comprobación.
+- `infra/00_vars.ps1:57` → `jobProgramable` entra en `$clavesObligatorias`:
+  un entorno nuevo que la olvide **aborta**. Fail-closed, correcto.
+
+### Verificación adversaria: la puerta muerde de verdad
+
+No me he quedado en comprobar que el regex del test casa. He **abierto la
+puerta a mano** para ver si la suite se entera:
+
+```
+$ (jobProgramable: false -> true en infra/env/dev.json)
+$ python -m pytest tests/test_f003_infra.py -q -k "puerta"
+
+E   AssertionError: el entorno permite programar el job, pero F-019 está en
+    'pending': el job nocturno volvería a lanzar la carga que llenó el disco
+    del servidor compartido
+E   assert 'pending' == 'done'
+1 failed, 2 passed, 30 deselected in 0.52s
+```
+
+Fichero restaurado inmediatamente (`git checkout --`), `git status --porcelain`
+vacío y `jobProgramable: false` confirmado de vuelta. **La puerta no es
+decorativa.** `test_f003_la_puerta_solo_se_abre_cuando_la_feature_bloqueante_
+esta_cerrada` ata la apertura a `features.json["F-019"]["status"] == "done"`, y
+falla también si F-019 desapareciera del fichero —una puerta no puede apuntar a
+una referencia muerta—. Es exactamente la «condición verificable y todavía no
+cumplida» que echaba en falta.
+
+---
+
+## (b) La enmienda DA-4 (opción B) — COHERENTE Y SIN FUGAS
+
+### La spec se enmienda, no se reescribe
+
+`specs/F-003-infra-caj/requirements.md:33` abre una sección **§Enmiendas** con
+la del 2026-08-10. Verificado que **los textos originales se conservan**: R10
+(`:179`) lleva la marca «**ENMENDADO el 2026-08-10**» con su redacción anterior
+citada en bloque y la vigente debajo; el bloque C (`:215`) queda marcado como
+implementado y **dormido**, no borrado, y sus cuatro tests siguen en verde;
+R27 (`:83`) es nuevo y [MANUAL]. `design.md` y `tasks.md` reflejan el cambio.
+
+Esto es lo correcto y merece decirse: una spec que se reescribe sobre la marcha
+deja de servir para juzgar el trabajo. Aquí se puede ver qué decía R10, quién
+cambió el criterio y con qué argumento.
+
+### Coherencia spec ↔ scripts ↔ tests ↔ guion
+
+| Pieza | Verificado |
+|---|---|
+| `dev.json` | `pgAuthMode: "password"`; tres claves nuevas `pgSecretName`/`pgJobSecretName`/`pgReadonlySecretName`, con un `$doc_secretos_pg` que aclara que son **nombres, nunca valores** |
+| `00_vars.ps1` | Las tres en `$clavesObligatorias` (`:60`). Fail-closed |
+| `80_create_job.ps1` | Apartado «2 bis»: comprueba el secreto **por nombre** con `secret list` y construye `$secretosJob`/`$varsAuth`. Una sola llamada a `az`, no dos ramas duplicadas |
+| `80_create_job.ps1:75` | La puerta de DA-4 pasa a **lista blanca** `-notin @("password","entra")` → `throw`. Cerrar la decisión no es motivo para dejar pasar una errata. Bien pensado |
+| `05_check_prereqs.ps1` | `switch` de tres ramas; `default` **falla**; la rama `entra` conserva íntegra la comprobación de `authConfig.activeDirectoryAuth` |
+| Guion | `tasks.md:181` **T22 bis** (antes de T23), `current.md` con su fila, `infra/README.md` §3 con el procedimiento |
+
+### R4 / R7 / R10 tras la enmienda — barridos propios
+
+**R7 — re-cruzado de forma independiente.** Extraídas las 17 variables del
+script y cruzadas por introspección con los modelos pydantic: **16/16 con
+prefijo existen**, incluida la nueva `PG_PASSWORD → PostgresSettings.password`.
+`AZURE_CLIENT_ID` sigue siendo la del SDK, con su test propio. Ninguna huérfana.
+
+**R10 — no se ha relajado, se ha reexpresado sobre la invariante correcta.**
+Este era el riesgo real de la enmienda: que «prohibido `PG_PASSWORD`» se
+convirtiera en «permitido todo». No ha pasado. Verificado sobre los scripts:
+
+- `--secrets` recibe `$secretosJob`, y **todos** sus elementos son
+  `keyvaultref:…,identityref:…`. Ningún valor literal.
+- `PG_PASSWORD` solo aparece como `PG_PASSWORD=secretref:$($CFG.pgJobSecretName)`
+  (`80_create_job.ps1:126`). El test lo exige con `valor.startswith("secretref:")`.
+- Ni un `az keyvault secret show` en ningún `.ps1` de `infra/`.
+- Sin `--registry-username` ni `--registry-password`.
+
+Merece constar que el implementer documenta un **fallo propio** que su fase RED
+destapó: el ayudante `_valores_de_secretos` daba un falso positivo con
+`"{0}secrets/{1}"`, y lo arregló **tokenizando el argumento** en vez de relajar
+la aserción. La salida fácil habría dejado el test sin morder; no la tomó.
+
+**R4 — barrido propio repetido** (mismos 6 patrones: GUID, correo, IPv4,
+asignación tipo `password|secret|token|…`, `postgres://`, base64 ≥40).
+**12 coincidencias, las 12 benignas**: las 9 de la primera pasada más tres
+nuevas que son **referencias, no valores** —`PG_PASSWORD=secretref:$(…)` en el
+script y dos ejemplos `keyvaultref:`/`secretref:` en `design.md`—. **Cero GUID,
+cero correos, cero claves, cero cadenas de conexión.**
+
+### El paso 8 bis (migración de contraseñas) — bien resuelto
+
+Cierra mi observación 3. El procedimiento de `infra/README.md` §3 es correcto y,
+lo que es más útil, **explica lo que descartó y por qué**: `show` siempre
+asignado a variable (nunca suelto, que iría al scrollback), `-o none` en el
+`set` porque `secret set` devuelve el objeto **con su valor**, nada de ficheros
+temporales —que además **corromperían** la contraseña con BOM y salto de línea
+en PowerShell 5.1—, y nada de canalizar a `--value @-` por lo mismo. Declara el
+**riesgo residual asumido** (el valor en la línea de comandos del proceso `az`
+durante la llamada) en vez de fingir que no existe. La verificación es por
+nombre y las copias de `kv-albaranes-rs9k2` no se borran hasta que el job
+complete una ejecución: la vuelta atrás se conserva. Correcto.
+
+Cierra también mi observación 2: `test_f003_el_usuario_de_postgres_cuadra_con_
+el_modo_de_autenticacion` impide que vuelva la incoherencia `pgUser` ↔
+`pgAuthMode` en cualquiera de los dos sentidos.
+
+---
+
+## (c) (d) (e) Puertas del rigor `critico`, revalidadas
+
+| Puerta | Comando del reviewer | Resultado |
+|---|---|---|
+| Arnés | `bash harness/init.sh` | **ENTORNO LISTO**, exit 0 |
+| Suite | `python -m pytest -q` | **258 passed**, 0 failed, 1,96 s (251 → 254 → 258; **+7** en las dos rondas) |
+| Cobertura | `init.sh` | `[OK] PUERTA COBERTURA: N/A (F-003: las líneas cambiadas no contienen sentencias ejecutables)` — N/A con motivo impreso, sin cambios |
+| **Mutación, recalculada** | `harness.alcance.alcance_de_feature('F-003')` + `harness.mutacion.generar_mutantes` | Alcance **idéntico**: `{'config/settings.py': {40}}`; **0 mutantes**. La línea sigue siendo el docstring `build (ver infra/70_build_image.ps1)…`. Las dos rondas **no añaden Python de producción**, así que el 0/0 y su justificación siguen siendo válidos. Ninguna campaña relanzada por el reviewer |
+| **R5 sobre bytes** | lectura binaria de los 13 `.ps1` | **13/13** con BOM UTF-8, CRLF sin un solo LF suelto y cabecera de ruta correcta. Los ficheros tocados (`00_vars`, `80_create_job`, `05_check_prereqs`, `dev.json`) **no han perdido la codificación** al parchearse |
+| Fase RED | `impl_F-003.md` §10.3 y §11.5 | Presente en las dos rondas, con salida real. §10.3 documenta **tres pasos** —incluido el rojo con la clave ya puesta pero *sin* el `throw`, que es el que demuestra que el test caza la ausencia de la puerta y no solo la de la clave—. §11.5 declara además el `1 skipped` y cuál era, y qué test **nació en verde** y por qué eso era lo esperado |
+| Evidencias | §10.4 y §11.7 | Los cuatro números en cada ronda |
+
+---
+
+## Checkpoints (revalidados)
+
+- **C1** [x] `init.sh` exit 0; ficheros obligatorios presentes.
+- **C2** [x] Una sola feature `in_progress` (F-003); rama correcta;
+  `current.md` al día con las dos rondas; `history.md` con las `done`.
+- **C3** [x] Sin Python de producción nuevo; cabeceras de ruta en los tests;
+  sin secretos, sin `print()` de debug, sin dependencias nuevas.
+- **C3 bis** — **N/A justificado**: ninguna de las dos rondas toca
+  `docs/referencia/`. El barrido de datos sensibles se ha ejecutado igualmente
+  por R4, con sus patrones y resultado arriba.
+- **C4** [x] Todo requisito [AUTO] con test trazable en verde, incluidos los de
+  la enmienda; los [MANUAL] con su comando en `current.md`, `infra/README.md` y
+  la spec —ahora con **T22 bis** y **R27** añadidos—. Los tests siguen sin
+  tocar red ni BBDD (mismo barrido de imports; `azure-identity` ni siquiera
+  está instalada).
+- **C4 bis** [x] Rigor `critico` declarado; fase RED con traza real en ambas
+  rondas; cobertura N/A con motivo; mutación 0/0 **reverificada de forma
+  independiente**; cero supervivientes; «Evidencias» completa; ningún N/A sin
+  justificar.
+- **C5** [x] T1–T17 `[x]` con commit por tarea; las dos rondas con commits
+  propios (`F-003 fix-review: …`, `F-003 da4: …`) — desviación menor del
+  formato `F-003 Tn:` **aceptada**: son correcciones de review y una enmienda,
+  no tareas numeradas. `git status` limpio. `features.json` refleja el estado
+  real: F-003 `in_progress`, F-019 `pending`.
+
+---
+
+## Lo que queda pendiente (no bloquea esta aprobación)
+
+1. **F-019 sigue en `pending`** y es la única puerta que bloquea T23. La
+   aprobación de T1–T17 **no autoriza a poner `jobProgramable: true`**.
+2. **Bloque 5 completo sin ejecutar** (T18–T28, más T22 bis). F-003 no puede
+   pasar a `done` hasta que el humano lo ejecute y anote resultados en T27.
+3. **T22 bis antes de T23**: el job aborta si el secreto no está en el vault
+   propio, así que el orden está protegido por el script. Bien.
+4. **Las copias en `kv-albaranes-rs9k2` siguen ahí**, deliberadamente, hasta
+   que el job complete una ejecución correcta.
+5. **La deuda del ID de suscripción en el historial de git** sigue abierta y
+   sigue siendo decisión del humano.
+6. **DA-3** (nombre del action group de la landing zone) sigue abierta y hace
+   falta antes de T26.
+
+---
+
+## Automejora del protocolo · actualización
+
+La propuesta de la primera pasada **ya no es solo teórica: ha funcionado**. El
+implementer la ha materializado en un patrón que recomiendo elevar a
+`arnes-base`, porque vale para cualquier proyecto:
+
+> **Puerta bloqueante verificable.** Cuando una feature quede bloqueada por
+> otra, no se documenta el problema en prosa: se declara un valor booleano en
+> configuración, un `throw` que lo lee antes de actuar, y un **test que exige
+> que la feature bloqueante esté `done` en `harness/features.json` para
+> permitir abrirlo**. Así el bloqueo caduca solo cuando debe, y abrirlo antes
+> de tiempo pone la suite en rojo en vez de depender de que alguien lea un
+> README.
+
+Mantengo el segundo afinado (nombrar el `F-XXX` bloqueante, no describirlo),
+que aquí ya está aplicado y con test propio.
+
+Añado uno nuevo, que esta re-review ha usado y que no está en el protocolo:
+**cuando una feature entregue una salvaguarda, el reviewer debe intentar
+saltársela y dejar constancia del resultado**, igual que C4 bis obliga a
+recalcular la mutación en vez de creerse el informe. Comprobar que el test
+existe y pasa no es comprobar que la puerta frena; abrirla a mano, sí.
