@@ -259,3 +259,30 @@ def test_f004_r14_un_fallo_inesperado_de_la_fuente_se_atribuye_a_su_fichero() ->
     assert "RuntimeError" in mensaje
     assert "el SDK ha hecho algo raro" in mensaje
     assert list(resultado.metadata["files"]) == ["tipo_coste"]
+
+
+def test_f004_r11_el_libro_se_abre_en_solo_lectura_y_con_valores() -> None:
+    """
+    Los dos flags de openpyxl son decisiones, no adorno: `read_only` evita
+    cargar en memoria un libro entero dentro de un contenedor con memoria
+    contada, y `data_only` hace que el día que se lean celdas salga el VALOR
+    calculado y no el texto de la fórmula. Hoy no cambian la salida del step,
+    así que solo un test que mire la llamada los protege.
+    """
+    llamadas: list[dict] = []
+    real = modulo_step.load_workbook
+
+    def _registrando(fuente, **kwargs):
+        llamadas.append(kwargs)
+        return real(fuente, **kwargs)
+
+    settings = _settings(tipo_partida=f"{BLOB}/TipoPartida.xlsx")
+    fuente = _FuenteFalsa({"tipo_partida": _libro("Partidas")})
+    modulo_step.load_workbook = _registrando  # type: ignore[assignment]
+    try:
+        resultado = _step(settings, fuente).run()
+    finally:
+        modulo_step.load_workbook = real  # type: ignore[assignment]
+
+    assert resultado.status == StepStatus.SUCCESS
+    assert llamadas == [{"read_only": True, "data_only": True}]

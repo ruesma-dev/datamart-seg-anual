@@ -9,6 +9,7 @@ límite del adaptador. El SDK de Azure NO se importa en ningún test.
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 from pathlib import Path
 
@@ -625,3 +626,21 @@ def test_f004_r10_un_error_nuestro_no_se_vuelve_a_envolver() -> None:
         fuente.read_bytes(_ref_blob())
 
     assert exc.value is original
+
+
+def test_f004_r2_la_referencia_es_inmutable_y_sin_diccionario() -> None:
+    """
+    La referencia viaja del step al adaptador: nadie puede reescribirla por el
+    camino (frozen), y sin __dict__ un atributo mal escrito falla en el acto en
+    vez de crear silenciosamente un campo nuevo que nadie lee.
+    """
+    ref = parse_aux_file_ref(
+        "tipo_partida",
+        "AUX_EXCEL_TIPO_PARTIDA",
+        "https://cuenta.blob.core.windows.net/aux/TipoPartida.xlsx",
+    )
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        ref.container = "otro"  # type: ignore[misc]
+
+    assert not hasattr(ref, "__dict__")
