@@ -155,6 +155,24 @@ def test_f015_r10_exit_1_bajo_el_umbral(
     assert "80" in salida
 
 
+def test_f015_r10_justo_en_el_umbral_la_puerta_pasa(
+    entorno: dict, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    # 4 de 5 líneas = exactamente el 80 % del umbral: la frontera pasa.
+    entorno["cov"].write_text(
+        json.dumps(
+            {"files": {"modulo_x.py": {"executed_lines": [1, 2, 5, 7], "missing_lines": [9]}}}
+        ),
+        encoding="utf-8",
+    )
+    preparar(monkeypatch, lineas={"modulo_x.py": {1, 2, 5, 7, 9}})
+
+    codigo = cobertura.main(argumentos(entorno))
+
+    assert codigo == 0, "el umbral es un mínimo aceptable, no un listón a superar"
+    assert "80.0%" in capsys.readouterr().out
+
+
 def test_f015_r10_exit_0_sobre_el_umbral(
     entorno: dict, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:

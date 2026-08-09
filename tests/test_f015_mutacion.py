@@ -141,7 +141,30 @@ def test_f015_r6_aplicar_mutante_respeta_el_resto_del_fichero() -> None:
     mutada = aplicar_mutante(fuente, mutante)
 
     assert mutante.linea == 6
+    assert mutante.original == "return a > b"
     assert mutada == "# modulo_x.py\nimport os\n\n\ndef f(a, b):\n    return a >= b\n"
+
+
+def test_f015_r6_el_mutante_es_inmutable() -> None:
+    (mutante,) = mutantes_de("x = a > b\n")
+
+    with pytest.raises(Exception):  # noqa: B017  (FrozenInstanceError)
+        mutante.linea = 99
+
+
+def test_f015_r6_muta_la_ultima_linea_aunque_no_acabe_en_salto() -> None:
+    # El fichero sin salto final tiene una línea menos al partirlo: el
+    # recorrido no puede quedarse corto justo en la última.
+    assert mutados("x = a\ny = b > c", "comparacion") == ["y = b >= c"]
+
+
+def test_f015_r6_operador_al_principio_de_una_linea_de_continuacion() -> None:
+    fuente = "x = (\na\n==b\n)\n"
+
+    (mutante,) = [m for m in mutantes_de(fuente) if m.operador == "comparacion"]
+
+    assert (mutante.linea, mutante.col) == (3, 0)
+    assert mutante.mutado == "!=b"
 
 
 def test_f015_r6_operadores_con_acentos_en_la_misma_linea() -> None:
@@ -213,8 +236,11 @@ def preparar(
 def test_f015_r1_campania_cuenta_muertos_y_supervivientes(tmp_path: Path) -> None:
     _, alcance = preparar(tmp_path)
     ejecutor = EjecutorFalso([MUERTO, SUPERVIVIENTE, MUERTO])
+    progreso: list[str] = []
 
-    informe = ejecutar_campania(alcance, ejecutor, timeout_s=5, raiz=str(tmp_path))
+    informe = ejecutar_campania(
+        alcance, ejecutor, timeout_s=5, raiz=str(tmp_path), eco=progreso.append
+    )
 
     assert informe.generados == 3  # `a > b`, `True` y `False`
     assert informe.evaluados == 3
@@ -223,7 +249,12 @@ def test_f015_r1_campania_cuenta_muertos_y_supervivientes(tmp_path: Path) -> Non
     assert len(informe.supervivientes) == 1
     assert informe.supervivientes[0].mutado == "return False"
     assert informe.timeouts == []
-    assert informe.segundos >= 0
+    assert informe.muestreado is False
+    # El tiempo es la duración de la campaña, no una marca de reloj.
+    assert 0 <= informe.segundos < 60
+    # Y el avance se numera desde el primero.
+    assert progreso[0].startswith("[1/3]")
+    assert progreso[-1].startswith("[3/3]")
 
 
 def test_f015_r1_no_genera_mutantes_fuera_del_alcance(tmp_path: Path) -> None:
@@ -251,7 +282,7 @@ def test_f015_r1_exit_code_0_sin_supervivientes_y_1_con_ellos(
 
 
 def test_f015_r1_alcance_vacio_no_muta_nada(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
     alcance = Alcance("F-042", "rama", ("base", "rama"), {})
     monkeypatch.setattr(mutacion, "alcance_de_feature", lambda *a, **k: alcance)
@@ -266,6 +297,20 @@ def test_f015_r1_alcance_vacio_no_muta_nada(
     assert codigo == 0
     assert ejecutor.llamadas == 0
     assert salida.is_file()
+    assert "nada que mutar" in capsys.readouterr().out
+
+
+def test_f015_r1_sin_alcance_resoluble_el_codigo_es_de_error_de_uso(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def no_hay_alcance(*args: object, **kwargs: object) -> None:
+        raise SystemExit("ni rama ni merge")
+
+    monkeypatch.setattr(mutacion, "alcance_de_feature", no_hay_alcance)
+
+    codigo = mutacion.main(["--feature", "F-042", "--raiz", str(tmp_path)])
+
+    assert codigo == 2
 
 
 def test_f015_r11_el_timeout_por_mutante_sale_de_la_configuracion(
@@ -319,6 +364,27 @@ def test_f015_r1_muestreo_reproducible_con_semilla(tmp_path: Path) -> None:
     ]
 
 
+def test_f015_r1_un_tope_que_no_recorta_no_es_muestreo(tmp_path: Path) -> None:
+    _, alcance = preparar(tmp_path)
+
+    informe = ejecutar_campania(
+        alcance,
+        EjecutorFalso([MUERTO]),
+        timeout_s=5,
+        raiz=str(tmp_path),
+        max_mutantes=3,  # justo los que hay: no se descarta ninguno
+    )
+
+    assert informe.generados == 3
+    assert informe.evaluados == 3
+    assert informe.muestreado is False
+
+
+def test_f015_r1_sin_feature_el_uso_es_incorrecto() -> None:
+    with pytest.raises(SystemExit):
+        mutacion.main([])
+
+
 # --- R3: el informe ---------------------------------------------------------
 
 
@@ -349,12 +415,30 @@ def test_f015_r3_informe_contiene_totales_y_detalle_por_superviviente(
         "Tiempo total",
     ):
         assert etiqueta in texto, etiqueta
+    # Las dos referencias del diff, en su orden.
+    assert "`base` .. `feature/F-042-x`" in texto
     # Detalle del superviviente: fichero, línea, operador y original -> mutado.
     superviviente = informe.supervivientes[0]
+    assert "### 1. " in texto
     assert f"modulo_x.py:{superviviente.linea}" in texto
     assert superviviente.original in texto
     assert superviviente.mutado in texto
     assert superviviente.operador in texto
+
+
+def test_f015_r3_el_informe_se_escribe_aunque_falte_el_directorio(
+    tmp_path: Path,
+) -> None:
+    _, alcance = preparar(tmp_path)
+    informe = ejecutar_campania(
+        alcance, EjecutorFalso([MUERTO]), timeout_s=5, raiz=str(tmp_path)
+    )
+    destino = tmp_path / "sin" / "crear" / "mutacion_F-042.md"
+
+    escribir_informe(informe, destino)
+
+    assert destino.is_file()
+    assert "Ninguno" in destino.read_text(encoding="utf-8")
 
 
 def test_f015_r3_cada_superviviente_lleva_seccion_de_analisis(tmp_path: Path) -> None:
@@ -413,6 +497,11 @@ def test_f015_r7_timeout_no_cuelga_la_campania(tmp_path: Path) -> None:
     assert informe.muertos == 2
 
 
+class Proceso:
+    def __init__(self, codigo: int) -> None:
+        self.returncode = codigo
+
+
 def test_f015_r7_ejecutor_pytest_traduce_el_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -424,14 +513,35 @@ def test_f015_r7_ejecutor_pytest_traduce_el_timeout(
     monkeypatch.setattr(mutacion.subprocess, "run", revienta)
     assert ejecutor.ejecutar(1) == TIMEOUT
 
-    class Proceso:
-        def __init__(self, codigo: int) -> None:
-            self.returncode = codigo
-
     monkeypatch.setattr(mutacion.subprocess, "run", lambda *a, **k: Proceso(0))
     assert ejecutor.ejecutar(1) == SUPERVIVIENTE
     monkeypatch.setattr(mutacion.subprocess, "run", lambda *a, **k: Proceso(1))
     assert ejecutor.ejecutar(1) == MUERTO
+
+
+def test_f015_r7_el_ejecutor_no_deja_que_pytest_tumbe_la_campania(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registro: dict[str, object] = {}
+
+    def espia(orden: list[str], **kwargs: object) -> Proceso:
+        registro["orden"] = orden
+        registro.update(kwargs)
+        return Proceso(1)
+
+    monkeypatch.setattr(mutacion.subprocess, "run", espia)
+    EjecutorPytest(raiz="/una/raiz").ejecutar(7)
+
+    # Un mutante que hace fallar la suite NO puede lanzar excepción: es un
+    # muerto, que es el caso normal.
+    assert registro["check"] is False
+    # Ni escupir la salida de pytest por consola en cada uno de los cientos
+    # de mutantes.
+    assert registro["capture_output"] is True
+    # Y el timeout es el que se le pasa, no otro.
+    assert registro["timeout"] == 7
+    assert registro["cwd"] == "/una/raiz"
+    assert "pytest" in registro["orden"]
 
 
 def test_f015_r7_mutante_que_no_compila_cuenta_como_muerto(tmp_path: Path) -> None:

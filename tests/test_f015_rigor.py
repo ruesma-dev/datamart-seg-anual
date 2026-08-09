@@ -72,8 +72,12 @@ def test_f015_r11_configuracion_invalida_se_rechaza(tmp_path: Path) -> None:
 
 def test_f015_r11_timeout_de_mutacion_tambien_es_configuracion(rigor: dict) -> None:
     assert timeout_mutacion(rigor) > 0
+    # Un segundo es absurdo pero legítimo; cero o negativo, no.
+    assert timeout_mutacion({"mutacion": {"timeout_por_mutante_s": 1}}) == 1
     with pytest.raises(ValueError, match="timeout_por_mutante_s"):
         timeout_mutacion({"mutacion": {"timeout_por_mutante_s": 0}})
+    with pytest.raises(ValueError, match="timeout_por_mutante_s"):
+        timeout_mutacion({"mutacion": {"timeout_por_mutante_s": -5}})
 
 
 @pytest.mark.parametrize(
@@ -239,8 +243,12 @@ def test_f015_r15_cada_nivel_declara_lo_que_exige(rigor: dict) -> None:
     assert supervivientes_maximos("estandar", rigor) is None
 
 
-def test_f015_r15_puerta_desconocida_se_considera_exigida(rigor: dict) -> None:
+def test_f015_r15_lo_desconocido_se_considera_exigido(rigor: dict) -> None:
+    # Ni una puerta que no está en la tabla...
     assert exige("documental", "puerta_que_no_existe", rigor) is True
+    # ...ni un nivel inventado relajan nada.
+    assert exige("nivel_que_no_existe", "mutacion", rigor) is True
+    assert supervivientes_maximos("nivel_que_no_existe", rigor) is None
 
 
 def test_f015_r15_validacion_detecta_niveles_invalidos(rigor: dict) -> None:

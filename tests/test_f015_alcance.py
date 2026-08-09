@@ -142,6 +142,16 @@ def test_f015_r2_fichero_borrado_no_entra() -> None:
     assert filtrar_produccion(parsear_diff(DIFF_BORRADO)) == {}
 
 
+def test_f015_r2_lineas_fuera_de_un_hunk_no_cuentan() -> None:
+    # Sin cabecera `@@` no se sabe a qué línea corresponde lo añadido: se
+    # ignora, en vez de inventarse un número.
+    sin_hunk = "--- a/x.py\n+++ b/x.py\n+linea suelta\n"
+    hunk_ilegible = "--- a/x.py\n+++ b/x.py\n@@ esto no es una cabecera @@\n+linea\n"
+
+    assert parsear_diff(sin_hunk) == {}
+    assert parsear_diff(hunk_ilegible) == {}
+
+
 # --- R4 ---------------------------------------------------------------------
 
 
@@ -167,6 +177,12 @@ def test_f015_r4_resolucion_rama_luego_merge_luego_error() -> None:
     with pytest.raises(SystemExit) as exc:
         resolver_refs("F-042", "feature/F-042-x", "dev", git=git)
     assert "F-042" in str(exc.value)
+    assert "feature/F-042-x" in str(exc.value)
+
+    # 4) Y si ni siquiera había rama declarada, el mensaje lo dice.
+    with pytest.raises(SystemExit) as exc:
+        resolver_refs("F-042", None, "dev", git=GitFalso({}))
+    assert "(sin declarar)" in str(exc.value)
 
 
 def test_f015_r4_diff_de_merge_usa_primer_padre() -> None:
@@ -185,7 +201,10 @@ def test_f015_r4_diff_de_merge_usa_primer_padre() -> None:
 def test_f015_r4_ejecutar_git_de_verdad_devuelve_vacio_si_git_falla() -> None:
     # git es de solo lectura y local: aquí no hay red ni BBDD.
     assert ejecutar_git(["rev-parse", "--verify", "--quiet", "rama-que-no-existe"]) == ""
-    assert ejecutar_git(["rev-parse", "--abbrev-ref", "HEAD"]).strip() != ""
+    salida = ejecutar_git(["rev-parse", "--abbrev-ref", "HEAD"])
+    # Texto, no bytes: el parser del diff trabaja con str.
+    assert isinstance(salida, str)
+    assert salida.strip() != ""
     assert git_en(".")(["rev-parse", "--verify", "--quiet", "HEAD"]).strip() != ""
 
 
@@ -215,3 +234,7 @@ def test_f015_r4_total_de_lineas_del_alcance() -> None:
 
     assert alcance.total_lineas() == 3
     assert alcance.ficheros() == ["etl_x/util.py"]
+    # La descripción dice de dónde sale el alcance, y en qué orden.
+    descripcion = alcance.descripcion()
+    assert descripcion.startswith("F-042: 1 fichero(s), 3 línea(s)")
+    assert "merge777^1..merge777" in descripcion
