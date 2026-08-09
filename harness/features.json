@@ -223,7 +223,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-004-etl-sin-dependencias-locales/ (sdd=true)"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 5,

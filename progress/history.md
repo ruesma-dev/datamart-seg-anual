@@ -291,3 +291,35 @@ Commits: `7ad2e0f` (spec), `8dfa63f` (aprobación), `F-015 T1..T16` (14
 commits del implementer), cierre; `5006ee8` en `arnes-base`.
 
 ---
+
+# F-004 · Ejecutar el ETL en Azure sin dependencias locales (cerrada 2026-08-09)
+
+**APPROVED sin condiciones a la primera** (`progress/review_F-004.md`), rigor
+`estandar`, 11/11 tareas, primera feature del ETL bajo el régimen completo de
+F-015. Solo código: no aprovisiona nada en Azure.
+
+Qué hace ahora el ETL: el step `load_excel_aux` (antes un stub SKIPPED)
+resuelve los tres Excels auxiliares desde ruta local o URI de blob
+(`https://<cuenta>.blob.core.windows.net/...`), autentica con
+`DefaultAzureCredential` —sin claves ni SAS; las URIs con query string se
+rechazan sin filtrar el token—, lee en memoria sin temporales, valida con
+openpyxl y reporta origen/tamaño/hojas. No carga a `aux.*` (eso es F-013).
+Arquitectura hexagonal: puerto `AuxFileSource` + adaptadores local y blob en
+`infrastructure/excel/`; el step no importa el SDK de Azure. Auditoría R15/R16:
+nada en la imagen depende de rutas absolutas; SQL y YAML viajan en la imagen.
+
+Evidencias: 221 tests (55 nuevos) en ~2 s; cobertura de líneas cambiadas
+98,2 % (164/167); mutación 27 mutantes → 2 supervivientes (92,6 %), ambos
+equivalentes por construcción. El reviewer verificó los totales de forma
+INDEPENDIENTE (alcance 527 líneas y 27 mutantes recalculados, coincidencia
+exacta) y comprobó a mano que el rechazo de SAS no filtra el token — estreno
+del protocolo 1.2.1 del arnés.
+
+Queda vivo en current.md: 3 verificaciones MANUAL bloqueadas hasta F-003,
+dependencia AZURE_CLIENT_ID hacia F-003, hallazgo del barrido de secretos
+para F-016, y dos afinados de protocolo propuestos por el reviewer.
+
+Dependencia nueva en la imagen: `azure-storage-blob>=12.20.0`.
+Commits: `de8db29` (apertura), `F-004 T1..T11`, cierre del líder.
+
+---

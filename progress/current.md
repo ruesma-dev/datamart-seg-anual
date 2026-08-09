@@ -26,25 +26,20 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-004 · IMPLEMENTADA (2026-08-09) — pendiente de revisión
+# F-004 · CERRADA (2026-08-09)
 
-Las 11 tareas de `specs/F-004-etl-sin-dependencias-locales/tasks.md` hechas y
-marcadas, un commit por tarea, en `feature/F-004-etl-sin-dependencias-locales`.
-Informe completo: **`progress/impl_F-004.md`**. Campaña de mutación:
-`progress/mutacion_F-004.md`.
+**APPROVED sin condiciones** (`progress/review_F-004.md`), rigor `estandar`.
+Resumen en `progress/history.md`; detalle en `progress/impl_F-004.md` y
+`progress/mutacion_F-004.md`. Quedan vivas las secciones siguientes: las tres
+verificaciones MANUAL (bloqueadas hasta F-003), la decisión DA-1 (la carga a
+`aux.*` es de F-013), la dependencia `AZURE_CLIENT_ID` hacia F-003 y el
+hallazgo del barrido de secretos para F-016.
 
-`bash harness/init.sh` **en verde (exit 0)**: 221 tests, 2,85 s; cobertura de
-líneas cambiadas **98,2 %** (umbral 80); mutación **92,6 %** (27 mutantes, 2
-supervivientes, los dos equivalentes por construcción y razonados).
-
-El step `load_excel_aux` ya resuelve los tres Excels desde **ruta local o URI
-de blob** (`https://<cuenta>.blob.core.windows.net/...`), autentica con
-`DefaultAzureCredential` —sin claves, sin cadenas de conexión y **rechazando**
-las URIs con SAS sin filtrar el token en el mensaje—, lee **en memoria** y
-valida con openpyxl. **No carga nada a `aux.*`.** F-004 no ha aprovisionado
-nada en Azure ni ha ejecutado `python main.py` (la carga de F-005 estaba
-corriendo). `features.json` sigue en `in_progress`: lo mueve el líder tras el
-APROBADO del reviewer.
+**Pendiente del humano**: el reviewer propone dos afinados nuevos de
+protocolo (`review_F-004.md` § «Automejora»): (1) al muestrear supervivientes,
+contrastar también que las mutaciones PELIGROSAS vecinas de la misma línea
+murieron; (2) exigir en C4 que el reviewer deje constancia de CÓMO comprobó
+que la suite no toca red (barrido de imports, SDK ausente, o ambos).
 
 ## Verificaciones MANUAL (humano) de F-004 · BLOQUEADAS hasta F-003
 
@@ -89,11 +84,19 @@ barras.
 
 ---
 
-**F-005 · Fase 2 en ejecución contra Azure.** Pasos 3 a 7 y 11 hechos el
-2026-08-09. El 8 (carga inicial) está **corriendo ahora**: el primer intento
-murió el 2026-08-09 a las 11:46 por un corte de red local del puesto (el
-`COPY` de `obrparpre` colgado 9 min y luego `getaddrinfo failed`; el servidor
-estaba bien) y el humano la relanzó. Los pasos 9 y 10 dependen del 8.
+**F-005 · Fase 2 contra Azure, paso 8 a medias.** Pasos 3 a 7 y 11 hechos el
+2026-08-09. Del paso 8 (carga inicial) van **dos intentos fallidos**: el
+primero por corte de red local (11:46, `getaddrinfo failed`); el segundo llegó
+a **30 de 31 tablas** (19,7 M filas, 63 min) y solo falló **`dca`** (causa sin
+confirmar; el humano sospecha equipo desatendido/suspensión — si fue eso, el
+guardián anti-suspensión de F-014 no cumplió y hay que revisarlo). Como la
+ingesta es transaccional por tabla, lo cargado se conserva. **Recuperación
+preparada**: worktree limpio de `dev` en
+`C:\Users\pgris\PycharmProjects\datamart-carga` (para no importar código a
+medio editar del árbol de F-004); el humano copia `.env` y lanza
+`ingest --table dca --full` + `stage` + `build-mart` + `apply-grants`.
+Alternativa aceptada: esperar a F-003 y hacer la carga completa desde el job
+de Azure. Los pasos 9 y 10 dependen de que la base quede completa.
 
 ## Lo ejecutado contra Azure
 
@@ -104,7 +107,7 @@ estaba bien) y el humano la relanzó. Los pasos 9 y 10 dependen del 8.
 | 5 · Base y roles | Hecho: `sigrid_dm`, 3 roles, 9 esquemas, todos propiedad de `sigrid_dm_etl` |
 | 6 · Firewall | Añadida `datamart-puesto-pgris-2026-08-09`; las 3 reglas previas, intactas |
 | 7 · `.env` | Hecho y verificado por el humano el 2026-08-09 |
-| 8 · Carga inicial | **EN CURSO** (relanzada tras el corte de red del primer intento) |
+| 8 · Carga inicial | **A MEDIAS**: 30/31 tablas; falta `dca` y los pasos posteriores (ver arriba) |
 | 9 · Medición y veredicto del SKU | Pendiente del 8 |
 | 10 · Verificación de vistas | Pendiente del 8 |
 | 11 · Frontera de seguridad | Hecho, ver abajo |
@@ -184,11 +187,14 @@ pendientes que elevó, cerrados por el humano el 2026-08-09:
 
 # Rumbo confirmado por el humano (2026-08-09): el ETL debe correr en Azure
 
-Nuevo orden de prioridades de las features abiertas: **F-004** (ETL sin
-dependencias locales, spec_ready) → **F-003** (Container Apps Job nocturno
-`--full` + disparo manual, spec_ready) → **F-016** (refuerzo tests F-005) →
-**F-011** (incremental) → resto. La spec de F-003 exige F-004 y F-005
-cerradas antes de su T1. Siguiente paso: aprobar la spec de F-004.
+Nuevo orden de prioridades de las features abiertas: ~~F-004~~ (**cerrada el
+2026-08-09**) → **F-003** (Container Apps Job nocturno `--full` + disparo
+manual, spec_ready) → **F-016** (refuerzo tests F-005) → **F-011**
+(incremental) → resto. Los dos fallos consecutivos de la carga local refuerzan
+la urgencia de F-003. Siguiente paso: **aprobar la spec de F-003**, teniendo
+en cuenta dos recomendaciones del reviewer de F-004: enganchar las tres
+verificaciones MANUAL de F-004 como criterios de aceptación de F-003, y no
+olvidar `AZURE_CLIENT_ID` si la identidad del job es user-assigned.
 
 Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
 `opus`; leader y spec-author siguen en `inherit`.
