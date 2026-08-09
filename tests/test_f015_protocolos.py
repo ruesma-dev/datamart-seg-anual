@@ -12,6 +12,7 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 IMPLEMENTER = RAIZ / ".claude" / "agents" / "implementer.md"
+LINEA_BASE = RAIZ / "progress" / "mutacion_F-005.md"
 
 
 def texto_de(ruta: Path) -> str:
@@ -61,3 +62,38 @@ def test_f015_r9_implementer_exige_seccion_evidencias_con_numeros() -> None:
     assert "tiempo" in protocolo
     # Números reales, no impresiones.
     assert "debería funcionar" in protocolo or "numeros reales" in protocolo
+
+
+# --- R18: la línea base sobre código real del repositorio -------------------
+
+
+def test_f015_r18_existe_la_linea_base_de_f005_con_totales_reales() -> None:
+    assert LINEA_BASE.is_file(), "falta la línea base de mutación sobre F-005"
+    informe = LINEA_BASE.read_text(encoding="utf-8")
+
+    # Totales, con números de verdad (no plantillas a cero).
+    numeros = {}
+    for etiqueta in ("Mutantes generados", "Muertos", "Supervivientes", "Timeouts"):
+        fila = re.search(rf"\| {etiqueta} \| (\d+) \|", informe)
+        assert fila, etiqueta
+        numeros[etiqueta] = int(fila.group(1))
+
+    assert numeros["Mutantes generados"] > 0, "una campaña sin mutantes no mide nada"
+    assert numeros["Muertos"] + numeros["Supervivientes"] + numeros["Timeouts"] == (
+        numeros["Mutantes generados"]
+    )
+    # El alcance se reconstruyó desde el commit de merge (R4).
+    assert "**merge**" in informe
+    assert re.search(r"\| \*\*Total\*\* \| \*\*\d+\*\* \|", informe)
+
+
+def test_f015_r18_cada_superviviente_de_la_linea_base_esta_analizado() -> None:
+    informe = LINEA_BASE.read_text(encoding="utf-8")
+    supervivientes = int(re.search(r"\| Supervivientes \| (\d+) \|", informe).group(1))
+
+    # Una sección de análisis por superviviente...
+    assert informe.count("#### Análisis") == supervivientes
+    assert informe.count("**Por qué ningún test lo caza:**") == supervivientes
+    assert informe.count("**Veredicto:**") == supervivientes
+    # ...y ninguna sin completar.
+    assert "PENDIENTE" not in informe

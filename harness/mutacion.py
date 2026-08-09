@@ -456,7 +456,7 @@ def escribir_informe(informe: InformeMutacion, ruta: Path) -> None:
         lineas += [
             "Cada superviviente es una línea que ningún test comprueba de verdad, "
             "o una mutación equivalente. Distinguirlo es trabajo del implementer: "
-            "el análisis no puede quedarse en PENDIENTE al cerrar la feature.",
+            "ningún análisis puede quedarse sin completar al cerrar la feature.",
             "",
         ]
         for numero, mutante in enumerate(informe.supervivientes, start=1):
