@@ -81,6 +81,14 @@ agente escribe en Azure.
 
 ## Bloque 3 — Autenticación Entra contra PostgreSQL
 
+> ⚠ **ENMIENDA 2026-08-10 · DA-4 resuelta con la opción B.** Este bloque queda
+> **implementado, probado y dormido**: el job **no** se autentica con Entra
+> —el servidor la tiene deshabilitada y habilitarla afecta a `albaranes` y
+> `partes`—, sino con la contraseña del rol nativo pasada como referencia a Key
+> Vault. Las tareas T12–T14 **no se rehacen ni se revierten**: su verificación
+> sigue siendo válida y sus tests siguen en verde, porque son el camino de
+> vuelta si algún día se habilita Entra. Ver `requirements.md` §Enmiendas.
+
 > Si **DA-1** se resuelve como «ya está en F-005», T12–T15 se reducen a
 > verificar que los tests R12–R14 existen y pasan, y a anotarlo. No duplicar
 > código.
@@ -169,6 +177,20 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       proyecto `albaranes`).
       **Verificación**: MANUAL (humano): comando de **R23**, y después
       `az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table`.
+
+- [ ] **T22 bis**: Migrar las contraseñas de Postgres al Key Vault del proyecto
+      (**R27**, enmienda del 2026-08-10). Hoy viven en `kv-albaranes-rs9k2`, el
+      vault de otro proyecto, desde F-005. Se migran las dos:
+      `pg-sigrid-dm-app` (la que usa el job) y `pg-mcp-sigrid-dm-ro` (la del
+      MCP). Va **antes** de T23: `80_create_job.ps1` aborta si el secreto no
+      está en el vault del proyecto.
+      **Verificación**: MANUAL (humano): procedimiento del **paso 8 bis** de
+      `infra/README.md` —el valor no pasa por pantalla, ni por fichero, ni por
+      el historial del shell— y después
+      `az keyvault secret list --vault-name <keyVault> --query "[].name" -o tsv`,
+      que debe listar los dos nombres. **Nunca `az keyvault secret show` suelto.**
+      Las copias viejas en `kv-albaranes-rs9k2` **no se borran** hasta que el
+      job haya funcionado (después de T24).
 
 - [ ] **T23**: Crear el job. **BLOQUEADA POR `F-019`** (build de
       `stg.plan_mensual` por tramos): el job nocturno ejecuta la misma carga
