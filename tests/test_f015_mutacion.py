@@ -7,7 +7,24 @@ el ejecutor de tests se sustituye siempre por un doble.
 
 from __future__ import annotations
 
-from harness.mutacion import Mutante, aplicar_mutante, generar_mutantes
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from harness import mutacion
+from harness.alcance import Alcance
+from harness.mutacion import (
+    MUERTO,
+    SUPERVIVIENTE,
+    TIMEOUT,
+    EjecutorPytest,
+    Mutante,
+    aplicar_mutante,
+    ejecutar_campania,
+    escribir_informe,
+    generar_mutantes,
+)
 
 
 def mutantes_de(fuente: str, lineas: set[int] | None = None) -> list[Mutante]:
@@ -98,7 +115,7 @@ def test_f015_r6_aplicar_mutante_respeta_el_resto_del_fichero() -> None:
 
 
 def test_f015_r6_operadores_con_acentos_en_la_misma_linea() -> None:
-    # col_offset de ast son bytes UTF-8: una tilde antes del operador
+    # Los col_offset de ast son bytes UTF-8: una tilde antes del operador
     # desalinea el empalme textual si se trabaja con caracteres.
     fuente = 'año = "camión"\nx = año == 1\n'
 
@@ -106,3 +123,281 @@ def test_f015_r6_operadores_con_acentos_en_la_misma_linea() -> None:
 
     assert [m.mutado for m in generados] == ["x = año != 1"]
     assert aplicar_mutante(fuente, generados[0]) == 'año = "camión"\nx = año != 1\n'
+
+
+# --- Dobles del ejecutor de tests -------------------------------------------
+
+
+class EjecutorFalso:
+    """Doble del ejecutor de pytest: nunca lanza la suite ni abre nada.
+
+    Devuelve los veredictos que se le pasan, en orden (el último se repite), y
+    anota el contenido que tenía el fichero mutado en cada llamada.
+    """
+
+    def __init__(self, veredictos: list[str], vigilar: Path | None = None) -> None:
+        self.veredictos = list(veredictos)
+        self.vigilar = vigilar
+        self.llamadas = 0
+        self.vistos: list[str] = []
+
+    def ejecutar(self, timeout_s: int) -> str:
+        self.llamadas += 1
+        if self.vigilar is not None:
+            self.vistos.append(self.vigilar.read_text(encoding="utf-8"))
+        indice = min(self.llamadas - 1, len(self.veredictos) - 1)
+        return self.veredictos[indice]
+
+
+class EjecutorQueRevienta(EjecutorFalso):
+    def ejecutar(self, timeout_s: int) -> str:
+        self.llamadas += 1
+        if self.llamadas == 2:
+            raise RuntimeError("pytest se cayó de forma inesperada")
+        return MUERTO
+
+
+FUENTE = "def clasifica(a, b):\n    if a > b:\n        return True\n    return False\n"
+
+
+def preparar(
+    tmp_path: Path, fuente: str = FUENTE, lineas: set[int] | None = None
+) -> tuple[Path, Alcance]:
+    """Deja un módulo de mentira en disco y devuelve su ruta y su alcance."""
+    fichero = tmp_path / "modulo_x.py"
+    fichero.write_text(fuente, encoding="utf-8")
+    alcance = Alcance(
+        feature="F-042",
+        origen="rama",
+        ref_diff=("base", "feature/F-042-x"),
+        lineas={"modulo_x.py": lineas or set(range(1, len(fuente.split("\n")) + 1))},
+    )
+    return fichero, alcance
+
+
+# --- R1: la campaña cuenta muertos y supervivientes -------------------------
+
+
+def test_f015_r1_campania_cuenta_muertos_y_supervivientes(tmp_path: Path) -> None:
+    _, alcance = preparar(tmp_path)
+    ejecutor = EjecutorFalso([MUERTO, SUPERVIVIENTE, MUERTO])
+
+    informe = ejecutar_campania(alcance, ejecutor, timeout_s=5, raiz=str(tmp_path))
+
+    assert informe.generados == 3  # `a > b`, `True` y `False`
+    assert informe.evaluados == 3
+    assert ejecutor.llamadas == 3
+    assert informe.muertos == 2
+    assert len(informe.supervivientes) == 1
+    assert informe.supervivientes[0].mutado == "return False"
+    assert informe.timeouts == []
+    assert informe.segundos >= 0
+
+
+def test_f015_r1_no_genera_mutantes_fuera_del_alcance(tmp_path: Path) -> None:
+    _, alcance = preparar(tmp_path, lineas={2})
+    ejecutor = EjecutorFalso([MUERTO])
+
+    informe = ejecutar_campania(alcance, ejecutor, timeout_s=5, raiz=str(tmp_path))
+
+    assert informe.generados == 1
+    assert informe.mutantes_evaluados[0].linea == 2
+    assert informe.mutantes_evaluados[0].mutado == "if a >= b:"
+
+
+def test_f015_r1_exit_code_0_sin_supervivientes_y_1_con_ellos(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, alcance = preparar(tmp_path, lineas={2})
+    monkeypatch.setattr(mutacion, "alcance_de_feature", lambda *a, **k: alcance)
+    salida = tmp_path / "mutacion_F-042.md"
+    argumentos = ["--feature", "F-042", "--raiz", str(tmp_path), "--salida", str(salida)]
+
+    assert mutacion.main(argumentos, ejecutor=EjecutorFalso([MUERTO])) == 0
+    assert mutacion.main(argumentos, ejecutor=EjecutorFalso([SUPERVIVIENTE])) == 1
+    assert salida.is_file()
+
+
+def test_f015_r1_alcance_vacio_no_muta_nada(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    alcance = Alcance("F-042", "rama", ("base", "rama"), {})
+    monkeypatch.setattr(mutacion, "alcance_de_feature", lambda *a, **k: alcance)
+    salida = tmp_path / "informe.md"
+    ejecutor = EjecutorFalso([SUPERVIVIENTE])
+
+    codigo = mutacion.main(
+        ["--feature", "F-042", "--raiz", str(tmp_path), "--salida", str(salida)],
+        ejecutor=ejecutor,
+    )
+
+    assert codigo == 0
+    assert ejecutor.llamadas == 0
+    assert salida.is_file()
+
+
+def test_f015_r1_muestreo_reproducible_con_semilla(tmp_path: Path) -> None:
+    _, alcance = preparar(tmp_path)
+
+    uno = ejecutar_campania(
+        alcance,
+        EjecutorFalso([MUERTO]),
+        timeout_s=5,
+        raiz=str(tmp_path),
+        max_mutantes=2,
+        semilla=20260809,
+    )
+    otro = ejecutar_campania(
+        alcance,
+        EjecutorFalso([MUERTO]),
+        timeout_s=5,
+        raiz=str(tmp_path),
+        max_mutantes=2,
+        semilla=20260809,
+    )
+
+    assert uno.generados == 3
+    assert uno.evaluados == 2
+    assert uno.muestreado is True
+    assert [m.descripcion() for m in uno.mutantes_evaluados] == [
+        m.descripcion() for m in otro.mutantes_evaluados
+    ]
+
+
+# --- R3: el informe ---------------------------------------------------------
+
+
+def test_f015_r3_informe_contiene_totales_y_detalle_por_superviviente(
+    tmp_path: Path,
+) -> None:
+    _, alcance = preparar(tmp_path)
+    informe = ejecutar_campania(
+        alcance,
+        EjecutorFalso([SUPERVIVIENTE, MUERTO, TIMEOUT]),
+        timeout_s=5,
+        raiz=str(tmp_path),
+    )
+    destino = tmp_path / "mutacion_F-042.md"
+
+    escribir_informe(informe, destino)
+    texto = destino.read_text(encoding="utf-8")
+
+    # Alcance: ficheros y número de líneas.
+    assert "Alcance" in texto
+    assert "modulo_x.py" in texto
+    # Totales.
+    for etiqueta in (
+        "Mutantes generados",
+        "Muertos",
+        "Supervivientes",
+        "Timeouts",
+        "Tiempo total",
+    ):
+        assert etiqueta in texto, etiqueta
+    # Detalle del superviviente: fichero, línea, operador y original -> mutado.
+    superviviente = informe.supervivientes[0]
+    assert f"modulo_x.py:{superviviente.linea}" in texto
+    assert superviviente.original in texto
+    assert superviviente.mutado in texto
+    assert superviviente.operador in texto
+
+
+def test_f015_r3_cada_superviviente_lleva_seccion_de_analisis(tmp_path: Path) -> None:
+    _, alcance = preparar(tmp_path)
+    informe = ejecutar_campania(
+        alcance, EjecutorFalso([SUPERVIVIENTE]), timeout_s=5, raiz=str(tmp_path)
+    )
+    destino = tmp_path / "mutacion_F-042.md"
+
+    escribir_informe(informe, destino)
+    texto = destino.read_text(encoding="utf-8")
+
+    assert len(informe.supervivientes) == 3
+    assert texto.count("Análisis") == len(informe.supervivientes)
+    assert texto.count("PENDIENTE") >= len(informe.supervivientes)
+
+
+# --- R5: restauración garantizada -------------------------------------------
+
+
+def test_f015_r5_restaura_el_fichero_tras_cada_mutante(tmp_path: Path) -> None:
+    fichero, alcance = preparar(tmp_path)
+    ejecutor = EjecutorFalso([MUERTO], vigilar=fichero)
+
+    ejecutar_campania(alcance, ejecutor, timeout_s=5, raiz=str(tmp_path))
+
+    # Durante la campaña el fichero estuvo mutado de verdad...
+    assert ejecutor.vistos and all(visto != FUENTE for visto in ejecutor.vistos)
+    # ...y al terminar quedó exactamente como estaba.
+    assert fichero.read_text(encoding="utf-8") == FUENTE
+
+
+def test_f015_r5_restaura_aunque_el_ejecutor_lance_excepcion(tmp_path: Path) -> None:
+    fichero, alcance = preparar(tmp_path)
+
+    with pytest.raises(RuntimeError):
+        ejecutar_campania(
+            alcance, EjecutorQueRevienta([]), timeout_s=5, raiz=str(tmp_path)
+        )
+
+    assert fichero.read_text(encoding="utf-8") == FUENTE
+
+
+# --- R7: timeouts y mutantes que no compilan --------------------------------
+
+
+def test_f015_r7_timeout_no_cuelga_la_campania(tmp_path: Path) -> None:
+    _, alcance = preparar(tmp_path)
+    ejecutor = EjecutorFalso([TIMEOUT, MUERTO, MUERTO])
+
+    informe = ejecutar_campania(alcance, ejecutor, timeout_s=1, raiz=str(tmp_path))
+
+    assert ejecutor.llamadas == 3, "la campaña siguió con los mutantes restantes"
+    assert len(informe.timeouts) == 1
+    assert informe.supervivientes == [], "un timeout no es un superviviente"
+    assert informe.muertos == 2
+
+
+def test_f015_r7_ejecutor_pytest_traduce_el_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ejecutor = EjecutorPytest(raiz=".")
+
+    def revienta(*args: object, **kwargs: object) -> None:
+        raise subprocess.TimeoutExpired(cmd="pytest", timeout=1)
+
+    monkeypatch.setattr(mutacion.subprocess, "run", revienta)
+    assert ejecutor.ejecutar(1) == TIMEOUT
+
+    class Proceso:
+        def __init__(self, codigo: int) -> None:
+            self.returncode = codigo
+
+    monkeypatch.setattr(mutacion.subprocess, "run", lambda *a, **k: Proceso(0))
+    assert ejecutor.ejecutar(1) == SUPERVIVIENTE
+    monkeypatch.setattr(mutacion.subprocess, "run", lambda *a, **k: Proceso(1))
+    assert ejecutor.ejecutar(1) == MUERTO
+
+
+def test_f015_r7_mutante_que_no_compila_cuenta_como_muerto(tmp_path: Path) -> None:
+    fichero, alcance = preparar(tmp_path, fuente="x = 1 + 1\n")
+    roto = Mutante(
+        fichero="modulo_x.py",
+        linea=1,
+        col=4,
+        original="x = 1 + 1",
+        mutado="x = 1 +",
+        operador="sintaxis",
+        longitud=5,
+        sustituto="1 +",
+    )
+    ejecutor = EjecutorFalso([SUPERVIVIENTE])
+
+    informe = ejecutar_campania(
+        alcance, ejecutor, timeout_s=5, raiz=str(tmp_path), mutantes=[roto]
+    )
+
+    assert ejecutor.llamadas == 0, "un mutante que no compila ya está muerto"
+    assert informe.muertos == 1
+    assert informe.supervivientes == []
+    assert fichero.read_text(encoding="utf-8") == "x = 1 + 1\n"

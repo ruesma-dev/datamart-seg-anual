@@ -12,11 +12,28 @@ poder instalarse tal cual en cualquier repositorio, incluido Windows.
 
 from __future__ import annotations
 
+import argparse
 import ast
-from collections.abc import Iterator
-from dataclasses import dataclass
+import random
+import subprocess
+import sys
+import time
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+from harness.alcance import Alcance, alcance_de_feature
 
 Posicion = tuple[int, int]
+
+#: Veredictos posibles de la suite frente a un mutante.
+MUERTO = "muerto"
+SUPERVIVIENTE = "superviviente"
+TIMEOUT = "timeout"
+
+#: Segundos máximos por mutante si nadie configura otra cosa.
+TIMEOUT_POR_DEFECTO = 120
 
 #: (símbolo original, símbolo mutado) por tipo de nodo del árbol sintáctico.
 COMPARACIONES: dict[type, tuple[str, str]] = {
@@ -230,3 +247,301 @@ def aplicar_mutante(fuente: str, mutante: Mutante) -> str:
         + bruta[mutante.col + mutante.longitud :]
     ).decode("utf-8", "replace")
     return "\n".join(brutas)
+
+
+# --- Ejecución de la suite --------------------------------------------------
+
+
+def _leer(ruta: Path) -> str:
+    """Lee preservando los saltos de línea tal cual están en disco."""
+    with open(ruta, encoding="utf-8", newline="") as fichero:
+        return fichero.read()
+
+
+def _escribir(ruta: Path, texto: str) -> None:
+    """Escribe sin traducir saltos de línea: restaurar debe ser idéntico."""
+    with open(ruta, "w", encoding="utf-8", newline="") as fichero:
+        fichero.write(texto)
+
+
+class EjecutorPytest:
+    """Lanza la suite en un proceso aparte y traduce el resultado.
+
+    Que la suite falle significa que los tests CAZAN el mutante (muerto). Que
+    pase significa que el mutante sobrevive: nadie comprobaba esa línea.
+    """
+
+    def __init__(self, raiz: str = ".", argumentos: list[str] | None = None) -> None:
+        self.raiz = raiz
+        self.argumentos = argumentos or ["-x", "-q", "--tb=no", "-p", "no:cacheprovider"]
+
+    def ejecutar(self, timeout_s: int) -> str:
+        try:
+            proceso = subprocess.run(
+                [sys.executable, "-m", "pytest", *self.argumentos],
+                cwd=self.raiz,
+                capture_output=True,
+                timeout=timeout_s,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return TIMEOUT
+        return SUPERVIVIENTE if proceso.returncode == 0 else MUERTO
+
+
+# --- Campaña ----------------------------------------------------------------
+
+
+@dataclass
+class InformeMutacion:
+    """Resultado de una campaña de mutación."""
+
+    feature: str
+    alcance: Alcance
+    generados: int = 0
+    muertos: int = 0
+    supervivientes: list[Mutante] = field(default_factory=list)
+    timeouts: list[Mutante] = field(default_factory=list)
+    mutantes_evaluados: list[Mutante] = field(default_factory=list)
+    segundos: float = 0.0
+    muestreado: bool = False
+    max_mutantes: int | None = None
+    semilla: int | None = None
+
+    @property
+    def evaluados(self) -> int:
+        return len(self.mutantes_evaluados)
+
+
+def ejecutar_campania(
+    alcance: Alcance,
+    ejecutor: object,
+    timeout_s: int = TIMEOUT_POR_DEFECTO,
+    raiz: str = ".",
+    max_mutantes: int | None = None,
+    semilla: int | None = None,
+    mutantes: list[Mutante] | None = None,
+    eco: Callable[[str], None] | None = None,
+) -> InformeMutacion:
+    """Muta el alcance, mutante a mutante, y cuenta cuántos sobreviven.
+
+    Garantía dura: pase lo que pase (excepción, timeout, Ctrl-C), ningún
+    fichero queda mutado en el árbol de trabajo al salir de esta función.
+    """
+    inicio = time.monotonic()
+    base = Path(raiz)
+    fuentes: dict[str, str] = {}
+
+    for fichero in alcance.ficheros():
+        ruta = base / fichero
+        if ruta.is_file():
+            fuentes[fichero] = _leer(ruta)
+
+    if mutantes is None:
+        mutantes = []
+        for fichero, fuente in fuentes.items():
+            mutantes.extend(generar_mutantes(fuente, alcance.lineas[fichero], fichero))
+
+    informe = InformeMutacion(
+        feature=alcance.feature,
+        alcance=alcance,
+        generados=len(mutantes),
+        max_mutantes=max_mutantes,
+        semilla=semilla,
+    )
+
+    if max_mutantes is not None and len(mutantes) > max_mutantes:
+        sorteo = random.Random(semilla)
+        mutantes = sorted(
+            sorteo.sample(mutantes, max_mutantes),
+            key=lambda m: (m.fichero, m.linea, m.col, m.operador),
+        )
+        informe.muestreado = True
+
+    try:
+        for indice, mutante in enumerate(mutantes, start=1):
+            fuente = fuentes.get(mutante.fichero)
+            if fuente is None:
+                continue
+            informe.mutantes_evaluados.append(mutante)
+            mutada = aplicar_mutante(fuente, mutante)
+
+            try:
+                compile(mutada, mutante.fichero, "exec")
+            except (SyntaxError, ValueError):
+                informe.muertos += 1  # no compila: los tests lo cazarían siempre
+                continue
+
+            ruta = base / mutante.fichero
+            try:
+                _escribir(ruta, mutada)
+                veredicto = ejecutor.ejecutar(timeout_s)
+            finally:
+                _escribir(ruta, fuente)
+
+            if veredicto == SUPERVIVIENTE:
+                informe.supervivientes.append(mutante)
+            elif veredicto == TIMEOUT:
+                informe.timeouts.append(mutante)
+            else:
+                informe.muertos += 1
+
+            if eco is not None:
+                eco(
+                    f"[{indice}/{len(mutantes)}] {veredicto:13} "
+                    f"{mutante.descripcion()}"
+                )
+    finally:
+        # Red de seguridad: si algo se torció entre medias, el árbol vuelve a
+        # su estado original igualmente.
+        for fichero, fuente in fuentes.items():
+            ruta = base / fichero
+            if ruta.is_file() and _leer(ruta) != fuente:
+                _escribir(ruta, fuente)
+        informe.segundos = time.monotonic() - inicio
+
+    return informe
+
+
+# --- Informe ----------------------------------------------------------------
+
+
+def escribir_informe(informe: InformeMutacion, ruta: Path) -> None:
+    """Escribe el informe de la campaña en Markdown."""
+    alcance = informe.alcance
+    lineas: list[str] = [
+        f"<!-- {ruta.as_posix()} -->",
+        f"# {informe.feature} · Campaña de mutación",
+        "",
+        f"Generado por `python -m harness.mutacion --feature {informe.feature}` "
+        f"el {datetime.now().strftime('%Y-%m-%d %H:%M')}.",
+        "",
+        "## Alcance",
+        "",
+        f"Origen del diff: **{alcance.origen}** "
+        f"(`{alcance.ref_diff[0]}` .. `{alcance.ref_diff[1]}`).",
+        "",
+        "| Fichero | Líneas en alcance |",
+        "|---|---|",
+    ]
+    for fichero in alcance.ficheros():
+        lineas.append(f"| `{fichero}` | {len(alcance.lineas[fichero])} |")
+    lineas += [
+        f"| **Total** | **{alcance.total_lineas()}** |",
+        "",
+        "## Totales",
+        "",
+        "| Métrica | Valor |",
+        "|---|---|",
+        f"| Mutantes generados | {informe.generados} |",
+        f"| Mutantes evaluados | {informe.evaluados} |",
+        f"| Muertos | {informe.muertos} |",
+        f"| Supervivientes | {len(informe.supervivientes)} |",
+        f"| Timeouts | {len(informe.timeouts)} |",
+        f"| Tiempo total | {informe.segundos:.1f} s |",
+    ]
+    if informe.muestreado:
+        lineas.append(
+            f"| Muestreo | sí — {informe.evaluados} de {informe.generados} "
+            f"mutantes, semilla `{informe.semilla}` |"
+        )
+    else:
+        lineas.append("| Muestreo | no: campaña completa |")
+
+    lineas += ["", "## Supervivientes", ""]
+    if not informe.supervivientes:
+        lineas += ["Ninguno: cada mutación aplicada la cazó al menos un test.", ""]
+    else:
+        lineas += [
+            "Cada superviviente es una línea que ningún test comprueba de verdad, "
+            "o una mutación equivalente. Distinguirlo es trabajo del implementer: "
+            "el análisis no puede quedarse en PENDIENTE al cerrar la feature.",
+            "",
+        ]
+        for numero, mutante in enumerate(informe.supervivientes, start=1):
+            lineas += [
+                f"### {numero}. `{mutante.fichero}:{mutante.linea}` "
+                f"[{mutante.operador}]",
+                "",
+                f"- Original: `{mutante.original}`",
+                f"- Mutado:   `{mutante.mutado}`",
+                "",
+                "#### Análisis (PENDIENTE del implementer)",
+                "",
+                "> Por qué ningún test lo caza: PENDIENTE.",
+                "> Decisión: ¿test nuevo o mutante equivalente justificado?",
+                "",
+            ]
+
+    if informe.timeouts:
+        lineas += ["## Timeouts", ""]
+        for mutante in informe.timeouts:
+            lineas.append(f"- `{mutante.fichero}:{mutante.linea}` {mutante.descripcion()}")
+        lineas.append("")
+
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text("\n".join(lineas) + "\n", encoding="utf-8")
+
+
+# --- CLI --------------------------------------------------------------------
+
+
+def _analizar_argumentos(argv: list[str] | None) -> argparse.Namespace:
+    analizador = argparse.ArgumentParser(
+        prog="python -m harness.mutacion",
+        description=(
+            "Muta las líneas de producción que toca una feature y comprueba "
+            "cuántas mutaciones sobreviven a la suite de tests."
+        ),
+    )
+    analizador.add_argument("--feature", required=True, help="Identificador, p. ej. F-001")
+    analizador.add_argument("--base", default="dev", help="Rama de integración")
+    analizador.add_argument("--rama", default=None, help="Rama de la feature")
+    analizador.add_argument("--raiz", default=".", help="Raíz del repositorio a mutar")
+    analizador.add_argument("--timeout", type=int, default=None, help="Segundos por mutante")
+    analizador.add_argument("--max-mutantes", type=int, default=None)
+    analizador.add_argument("--semilla", type=int, default=None)
+    analizador.add_argument("--salida", default=None, help="Ruta del informe")
+    return analizador.parse_args(argv)
+
+
+def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
+    """Punto de entrada: 0 sin supervivientes, 1 con ellos, 2 error de uso."""
+    opciones = _analizar_argumentos(argv)
+    timeout_s = opciones.timeout or TIMEOUT_POR_DEFECTO
+
+    try:
+        alcance = alcance_de_feature(
+            opciones.feature, base=opciones.base, rama=opciones.rama, raiz=opciones.raiz
+        )
+    except SystemExit as parada:
+        print(str(parada), file=sys.stderr)
+        return 2
+
+    print(alcance.descripcion())
+    if not alcance.lineas:
+        print("Sin líneas de producción en el alcance: nada que mutar.")
+
+    informe = ejecutar_campania(
+        alcance,
+        ejecutor or EjecutorPytest(raiz=opciones.raiz),
+        timeout_s=timeout_s,
+        raiz=opciones.raiz,
+        max_mutantes=opciones.max_mutantes,
+        semilla=opciones.semilla,
+        eco=lambda linea: print(linea, flush=True),
+    )
+
+    destino = Path(opciones.salida or f"progress/mutacion_{opciones.feature}.md")
+    escribir_informe(informe, destino)
+    print(
+        f"{informe.evaluados} mutantes evaluados, {informe.muertos} muertos, "
+        f"{len(informe.supervivientes)} supervivientes, "
+        f"{len(informe.timeouts)} timeouts en {informe.segundos:.1f} s"
+    )
+    print(f"Informe: {destino.as_posix()}")
+    return 1 if informe.supervivientes else 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())
