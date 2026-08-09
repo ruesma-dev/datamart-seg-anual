@@ -125,6 +125,18 @@
       "branch": "feature/F-015-verificar-tests"
     },
     {
+      "id": "F-019",
+      "title": "Build de stg.plan_mensual por tramos: caber en el servidor compartido",
+      "description": "Creada el 2026-08-09: es la OPCION B elegida por el humano tras el incidente de esa noche (ver current.md): stg/08_plan_mensual.sql explota raw.obrparpre (13,76 M filas) con CROSS JOIN LATERAL unnest(...) y en el Standard_B1ms (2 GB RAM) derrama 16+ GB de temporales al disco compartido de 32 GB, que se llego a llenar al 93,4% y puso el servidor en solo-lectura 10 minutos afectando potencialmente a albaranes y partes. Objetivo: reescribir el build de plan_mensual por tramos (por obra, ejercicio u otro corte que la spec justifique con numeros) para acotar el pico de temporales y WAL, de forma que el build completo quepa con margen en el servidor actual. La spec debe empezar midiendo (tamano del resultado final, pico por tramo estimado) y fijar un limite de seguridad de disco. Incluye la verificacion en Azure (relanzar stage + build-mart + apply-grants, ejecucion del humano) que completa el paso 8 de F-005, y desbloquea armar la programacion del job de F-003. Descartadas por ahora: opcion A (crecer disco, irreversible y sobre servidor compartido) y opcion C (subir SKU).",
+      "acceptance": [
+        "Definida en detalle por specs/F-019-plan-mensual-por-tramos/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "priority": 9,
+      "branch": "feature/F-019-plan-mensual-por-tramos"
+    },
+    {
       "id": "F-016",
       "title": "Refuerzo de tests para los huecos de riesgo alto de F-005",
       "description": "Creada el 2026-08-09 por decision del humano tras la linea base de mutacion de F-015 (progress/mutacion_F-005.md): 101 mutantes sobre las lineas de F-005, 55 supervivientes (45,5%), de los que 6 son de riesgo ALTO. F-005 esta declarada rigor critico y hoy no pasaria su propio nivel. Esta feature cierra SOLO los 6 huecos de riesgo alto: (1) el valor por defecto de auto_create_db en config/settings.py y postgres_client.py, la puerta bloqueante contra el servidor compartido de produccion; (2) el autocommit de la conexion administrativa, sin el que CREATE DATABASE falla; (3) la igualdad de textos y la clasificacion de una diferencia como FALLO en fingerprint.py; (4) la deteccion de un paso fallido del pipeline en main.py, que invertida daria por buena una ejecucion fallida. Los 27 huecos de riesgo medio y los 14 de riesgo bajo quedan fuera como deuda anotada.",
@@ -138,7 +150,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-016-refuerzo-tests-f005"
     },
     {
@@ -150,7 +162,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-006-mcp-azure"
     },
     {
@@ -183,7 +195,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-011-carga-incremental"
     },
     {
@@ -195,7 +207,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -207,7 +219,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -219,7 +231,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -238,7 +250,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -263,7 +275,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -275,7 +287,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -287,7 +299,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-007-disparo-manual-web"
     }
   ]
