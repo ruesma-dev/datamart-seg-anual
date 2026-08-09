@@ -9,8 +9,11 @@
 #   1. INCIDENTE DEL 2026-08-09. La carga completa lleno el disco del servidor
 #      de Postgres y lo dejo en solo lectura diez minutos, afectando a otras
 #      dos aplicaciones en produccion. Este job ejecuta esa MISMA carga todas
-#      las noches. Hasta que el humano decida que hacer con el disco o con la
-#      consulta que lo llena, el job NO debe quedar programado.
+#      las noches. La decision de que hacer YA se tomo (opcion B): lo que
+#      falta es implementarla. Hasta que F-019 (build de stg.plan_mensual
+#      por tramos) este implementada Y verificada contra Azure, el job NO
+#      debe quedar programado. No es solo prosa: el fichero de entorno trae
+#      jobProgramable = false y este script aborta si lo lee.
 #   2. DECISION DA-4. El entorno declara autenticacion Entra contra Postgres
 #      porque el job no puede llevar contrasena (R10), pero el servidor tiene
 #      esa autenticacion deshabilitada y habilitarla afecta a las otras bases.
@@ -43,10 +46,22 @@ $ErrorActionPreference = "Stop"
 if (-not $Confirmar) {
     Write-Host ""
     Write-Host "Este script deja el job PROGRAMADO ($($CFG.cron), UTC)." -ForegroundColor Yellow
-    Write-Host "Lee la cabecera del fichero: hay dos decisiones abiertas (disco del" -ForegroundColor Yellow
-    Write-Host "servidor y DA-4) que deben cerrarse antes." -ForegroundColor Yellow
+    Write-Host "Lee la cabecera del fichero: hay dos puertas abiertas (F-019, por el" -ForegroundColor Yellow
+    Write-Host "disco del servidor, y DA-4) que deben cerrarse antes." -ForegroundColor Yellow
     Write-Host "Cuando lo tengas claro, repite con -Confirmar."
     exit 0
+}
+
+# Puerta del incidente del disco. Va primero y con throw a proposito:
+# -Confirmar solo demuestra que alguien quiso ejecutar el script, no que sepa
+# que la carga completa sigue sin caber en el servidor compartido. El estado
+# del bloqueo se puede contrastar: F-019 en harness/features.json.
+if (-not $CFG.jobProgramable) {
+    throw ("el entorno declara jobProgramable = false: programar este job sigue " +
+           "bloqueado por F-019 (build de stg.plan_mensual por tramos), que es la " +
+           "opcion elegida tras el incidente del disco del 2026-08-09 y todavia no " +
+           "esta implementada. Pon la clave a true solo cuando F-019 este cerrada y " +
+           "verificada contra Azure.")
 }
 
 if ($CFG.pgAuthMode -ne "entra") {
@@ -149,5 +164,5 @@ Confirmar-Exito "el job no responde despues de crearlo"
 Write-Host ""
 Write-Host "Job creado y PROGRAMADO." -ForegroundColor Green
 Write-Host "Prueba manual: az containerapp job start -g $($CFG.resourceGroup) -n $($CFG.job)"
-Write-Host "Si el disco del servidor sigue sin decidirse, considera dejar el job sin" -ForegroundColor Yellow
-Write-Host "programacion hasta entonces: el nocturno ejecuta la carga completa." -ForegroundColor Yellow
+Write-Host "Recuerda: el nocturno ejecuta la carga completa. Si F-019 no esta" -ForegroundColor Yellow
+Write-Host "verificada contra Azure, deja el job sin programacion." -ForegroundColor Yellow

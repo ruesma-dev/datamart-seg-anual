@@ -170,7 +170,14 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       **Verificación**: MANUAL (humano): comando de **R23**, y después
       `az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table`.
 
-- [ ] **T23**: Crear el job.
+- [ ] **T23**: Crear el job. **BLOQUEADA POR `F-019`** (build de
+      `stg.plan_mensual` por tramos): el job nocturno ejecuta la misma carga
+      completa que llenó el disco del servidor compartido el 2026-08-09. La
+      opción B ya está elegida —es `F-019`—, así que lo que falta no es
+      decidir: es que esté **implementada y verificada contra Azure**. Mientras
+      tanto `infra/env/dev.json` declara `jobProgramable: false` y
+      `80_create_job.ps1` aborta con `throw`; abrir la puerta es poner esa
+      clave a `true`, y hay un test que lo impide si `F-019` no está `done`.
       **Verificación**: MANUAL (humano): `pwsh -File infra/80_create_job.ps1` y
       comprobar con **R21**.
 

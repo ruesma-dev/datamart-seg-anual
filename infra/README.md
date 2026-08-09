@@ -15,19 +15,28 @@ del contexto de `az`.
 
 ---
 
-## ⚠ Antes de desplegar: dos decisiones abiertas
+## ⚠ Antes de desplegar: dos puertas cerradas
 
 Los scripts están completos y probados como texto, pero **no se han ejecutado
-contra Azure**. Hay dos cosas que el humano debe cerrar antes de llegar al job:
+contra Azure**. Hay dos cosas que deben cerrarse antes de llegar al job:
 
 1. **El disco del servidor de Postgres (incidente del 2026-08-09).** Una carga
    completa llenó el disco de 32 GB del servidor compartido y lo dejó en solo
    lectura diez minutos, afectando a otras dos aplicaciones en producción. El
-   job nocturno ejecuta **esa misma carga**. Hasta que se decida qué hacer
-   (crecer el disco, trocear la consulta que lo llena o subir el SKU), **el job
-   no debe quedar programado**: no llegues al paso 9 de la tabla. El
-   comprobador de prerrequisitos (paso 1) mide la ocupación del disco y falla
-   por encima del 60 %.
+   job nocturno ejecuta **esa misma carga**. Qué hacer ya está decidido —la
+   opción B, trocear el build—, así que lo que falta no es decidir: es
+   ejecutarlo. **Hasta que `F-019` (build de `stg.plan_mensual` por tramos)
+   esté implementada y verificada contra Azure, el job no debe quedar
+   programado**: no llegues al paso 9 de la tabla.
+
+   No queda en la prosa. `infra/env/<entorno>.json` declara
+   `jobProgramable: false` y **el script del paso 9 aborta con `throw`**
+   mientras siga así; ponerlo a `true` con `F-019` sin cerrar en
+   `harness/features.json` deja además la suite de tests en rojo. El
+   comprobador de prerrequisitos (paso 1) mide por su cuenta la ocupación del
+   disco y falla por encima del 60 %, pero eso no basta: tras revertirse la
+   transacción del incidente el disco volvió al 42 % y esa comprobación
+   pasaría.
 
 2. **DA-4 · autenticación contra Postgres.** El job no puede llevar contraseña
    (requisito R10), así que el fichero de entorno declara
@@ -58,7 +67,7 @@ repetirlos no rompe nada. Se ejecutan desde la raíz del repositorio.
 | 6 | `50_create_keyvault.ps1` | Key Vault con RBAC, **vacío**. | Sí |
 | 7 | `60_create_identity.ps1` | Identidad gestionada + sus **tres** permisos. | Sí |
 | 8 | `70_build_image.ps1` | Construye y publica la imagen con tag fechado. | Sí |
-| 9 | `80_create_job.ps1` | Crea el job **programado**. Exige `-Confirmar`. | Sí |
+| 9 | `80_create_job.ps1` | Crea el job **programado**. Exige `-Confirmar` y **está bloqueado por `F-019`** (arriba). | Sí |
 | — | `85_update_job.ps1` | Despliegue habitual: apunta el job a una imagen nueva. | Sí |
 | 10 | `90_create_alert.ps1` | Grupo de acción (reutiliza el que haya) y alerta de fallo. | Sí |
 

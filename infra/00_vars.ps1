@@ -54,7 +54,7 @@ $clavesObligatorias = @(
     "storageAccount", "auxContainer", "auxBlobs",
     "keyVault", "sigridSecretName", "jobSecretName", "managedIdentity",
     "acrName", "acrResourceGroup", "imageRepository",
-    "cron", "replicaTimeoutSeconds", "replicaRetryLimit",
+    "cron", "jobProgramable", "replicaTimeoutSeconds", "replicaRetryLimit",
     "parallelism", "replicaCompletionCount", "cpu", "memory",
     "sigridApiBaseUrl",
     "pgHost", "pgPort", "pgDatabase", "pgUser", "pgAuthMode",

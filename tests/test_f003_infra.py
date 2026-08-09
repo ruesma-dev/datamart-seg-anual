@@ -55,6 +55,9 @@ CLAVES_OBLIGATORIAS = (
     "acrResourceGroup",
     "imageRepository",
     "cron",
+    # Puerta del incidente del disco: obligatoria a propósito. Un fichero de
+    # entorno nuevo que la olvide no se queda «sin puerta», se queda en rojo.
+    "jobProgramable",
     "replicaTimeoutSeconds",
     "replicaRetryLimit",
     "parallelism",
@@ -647,3 +650,100 @@ def test_f003_r25_la_alerta_apunta_al_job_y_a_un_action_group() -> None:
     assert "$CFG.alertName" in texto
     # La alternativa acotada del diseño queda documentada, no improvisada.
     assert "scheduled-query" in texto
+
+
+# ---------------------------------------------------------------------------
+# La puerta del disco (incidente del 2026-08-09), detectable por máquina
+# ---------------------------------------------------------------------------
+#
+# El job nocturno ejecuta la MISMA carga completa que llenó el disco del
+# servidor compartido y lo dejó en solo lectura diez minutos. La salvaguarda
+# estuvo escrita solo en prosa y condicionada a «hasta que el humano decida»:
+# una condición que ya se cumple —la decisión fue la opción B, F-019— y que por
+# tanto leía como puerta abierta. Aquí se expresa contra algo comprobable: la
+# feature bloqueante, y una clave del fichero de entorno que el script mira.
+
+FEATURE_BLOQUEANTE = "F-019"
+
+
+def _features() -> dict[str, dict]:
+    """Las features del arnés indexadas por su identificador."""
+    datos = json.loads((REPO_ROOT / "harness" / "features.json").read_text(encoding="utf-8"))
+    return {f["id"]: f for f in datos["features"]}
+
+
+def test_f003_la_puerta_del_job_programado_es_detectable_por_maquina() -> None:
+    """
+    `jobProgramable` no es documentación: `80_create_job.ps1` la comprueba y
+    aborta con `throw` antes de crear nada.
+
+    `-Confirmar` exige un acto deliberado, pero no distingue entre un humano
+    que sabe que F-019 sigue abierta y otro que solo quiere terminar la tabla
+    del README. Esta puerta sí.
+    """
+    cfg = _config("dev")
+
+    assert isinstance(cfg["jobProgramable"], bool), (
+        "'jobProgramable' debe ser un booleano JSON: como cadena, 'false' sería "
+        "cierto en PowerShell y la puerta no frenaría nada"
+    )
+
+    texto = _script("80_create_job.ps1")
+
+    assert re.search(r"if\s*\(\s*-not\s+\$CFG\.jobProgramable\s*\)\s*\{[^}]*throw", texto), (
+        "80_create_job.ps1 no aborta cuando el entorno declara jobProgramable = false"
+    )
+    assert FEATURE_BLOQUEANTE in texto, (
+        f"el script no nombra la feature que mantiene cerrada la puerta "
+        f"({FEATURE_BLOQUEANTE}): sin el identificador nadie puede comprobar el "
+        f"estado del bloqueo contra harness/features.json"
+    )
+
+    puerta = texto.index("$CFG.jobProgramable")
+    creacion = texto.index("az containerapp job create")
+    assert puerta < creacion, "la puerta se comprueba después de crear el job"
+
+
+def test_f003_la_puerta_solo_se_abre_cuando_la_feature_bloqueante_esta_cerrada() -> None:
+    """
+    Poner `jobProgramable: true` con F-019 sin cerrar deja la suite en rojo.
+
+    Es el punto que la review echó en falta: una puerta escrita contra una
+    condición **todavía no cumplida y verificable**, no contra «que se decida».
+    Decidir ya se decidió (opción B); lo que protege del incidente es haberla
+    implementado.
+    """
+    features = _features()
+
+    assert FEATURE_BLOQUEANTE in features, (
+        f"la puerta del job apunta a {FEATURE_BLOQUEANTE} y esa feature ya no "
+        f"está en harness/features.json: el bloqueo se quedó sin referencia"
+    )
+
+    if _config("dev")["jobProgramable"]:
+        assert features[FEATURE_BLOQUEANTE]["status"] == "done", (
+            f"el entorno permite programar el job, pero {FEATURE_BLOQUEANTE} está en "
+            f"'{features[FEATURE_BLOQUEANTE]['status']}': el job nocturno volvería a "
+            f"lanzar la carga que llenó el disco del servidor compartido"
+        )
+
+
+def test_f003_la_puerta_nombra_la_feature_bloqueante_en_la_documentacion() -> None:
+    """
+    El README y `tasks.md` nombran `F-019`, no describen el problema.
+
+    Un identificador se puede contrastar con `harness/features.json`; una
+    condición en prosa («hasta que se decida qué hacer con el disco») envejece
+    sola y acaba dando por abierta una puerta que sigue cerrada.
+    """
+    readme = _texto(INFRA / "README.md")
+    tareas = _texto(SPEC_DIR / "tasks.md")
+
+    assert FEATURE_BLOQUEANTE in readme, (
+        f"infra/README.md no nombra {FEATURE_BLOQUEANTE} al explicar por qué el job "
+        f"no debe quedar programado"
+    )
+    assert FEATURE_BLOQUEANTE in tareas, (
+        f"specs/F-003-infra-caj/tasks.md no avisa de que T23 está bloqueada por "
+        f"{FEATURE_BLOQUEANTE}: quien trabaje desde las tareas no ve la puerta"
+    )

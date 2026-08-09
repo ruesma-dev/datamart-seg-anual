@@ -1,5 +1,6 @@
 {
   "$doc": "Datos del entorno. Es el UNICO sitio del despliegue donde se escribe el nombre de un recurso: los .ps1 leen todo de aqui ($CFG) y por eso crear otro entorno consiste en copiar este fichero, no en duplicar scripts. Prohibido meter aqui la suscripcion, el tenant, una clave, una contrasena o un correo (R4): la suscripcion sale del contexto de 'az' o de $env:AZ_SUBSCRIPTION_ID.",
+  "$aviso_jobProgramable": "PUERTA DEL INCIDENTE DEL DISCO (2026-08-09), CERRADA. Esta en 'false' a proposito y 80_create_job.ps1 aborta con throw mientras lo siga estando: el job nocturno ejecuta la MISMA carga completa que lleno el disco de 32 GB del servidor compartido y lo dejo en solo lectura diez minutos, afectando a albaranes y partes. La decision ya se tomo (opcion B), asi que lo que falta NO es decidir: es implementarla. Pasar esta clave a true SOLO cuando F-019 (build de stg.plan_mensual por tramos) este implementada Y verificada contra Azure; ponerla a true con F-019 sin cerrar en harness/features.json deja la suite de tests en rojo.",
   "$aviso_pgAuthMode": "DA-4, ABIERTA. Este fichero declara 'entra' porque lo exigen R10 y R12 de la spec aprobada, pero el servidor psql-albaranes-rs9k2 NO tiene habilitada la autenticacion Entra: el humano lo descarto el 2026-08-08 porque es una operacion de servidor que afecta a albaranes y partes. Mientras eso siga asi, el job se crearia bien y fallaria al conectar todas las noches. 05_check_prereqs.ps1 lo detecta y aborta. Ver infra/README.md y progress/current.md antes de ejecutar T23.",
 
   "environment": "dev",
@@ -29,6 +30,7 @@
   "imageRepository": "datamart-seg-anual",
 
   "cron": "0 2 * * *",
+  "jobProgramable": false,
   "replicaTimeoutSeconds": 7200,
   "replicaRetryLimit": 1,
   "parallelism": 1,

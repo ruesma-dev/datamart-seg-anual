@@ -29,20 +29,39 @@
 # F-003 · EN CURSO — bloques 1–4 hechos, bloque 5 es del humano
 
 Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** (13
-scripts de `infra/` reescritos o creados, `infra/env/dev.json`, 30 tests
+scripts de `infra/` reescritos o creados, `infra/env/dev.json`, 33 tests
 nuevos, `infra/README.md`). Informe completo: `progress/impl_F-003.md`.
 Campaña de mutación: `progress/mutacion_F-003.md`. `bash harness/init.sh` en
-verde, **251 tests** (eran 221).
+verde, **254 tests** (eran 221).
+
+**Review del 2026-08-10: `CHANGES_REQUESTED`, ya corregido**
+(`progress/review_F-003.md`, correcciones en `impl_F-003.md` §10). El defecto:
+la puerta que bloquea el cron nocturno estaba escrita como «hasta que se decida
+qué hacer con el disco», y esa decisión ya estaba tomada —es `F-019`—, con lo
+que se leía como puerta abierta. Ahora depende de que `F-019` esté
+**implementada y verificada**, y además es detectable por máquina:
+`jobProgramable: false` en `infra/env/dev.json`, `throw` en
+`80_create_job.ps1` y tres tests que se ponen en rojo si alguien la abre antes
+de tiempo. Falta el nuevo veredicto del reviewer.
 
 **No se ha ejecutado ni un comando `az` de escritura, ni `python main.py`.**
 
 ## ⚠ DOS PUERTAS QUE BLOQUEAN EL BLOQUE 5
 
 **1 · El disco (incidente del 2026-08-09, más abajo).** El job nocturno
-ejecuta la misma carga que llenó el disco del servidor compartido. **NO
-crear el job programado (T23) hasta que se decida entre A, B o C.**
-`infra/05_check_prereqs.ps1` falla si la ocupación supera el 60 %, y
-`80_create_job.ps1` no hace nada sin `-Confirmar`.
+ejecuta la misma carga que llenó el disco del servidor compartido. Entre A, B y
+C **ya se decidió: la B**, y es `F-019` en `harness/features.json`. Lo que
+falta, por tanto, no es decidir: es implementarla. **NO crear el job programado
+(T23) hasta que `F-019` (build de `stg.plan_mensual` por tramos) esté
+implementada y verificada contra Azure.**
+
+La puerta es detectable por máquina, no solo prosa: `infra/env/dev.json`
+declara `jobProgramable: false`, `80_create_job.ps1` aborta con `throw`
+mientras lo lea así, y `tests/test_f003_infra.py` deja la suite en rojo si
+alguien lo pone a `true` con `F-019` sin cerrar. Además
+`infra/05_check_prereqs.ps1` falla si la ocupación supera el 60 % y
+`80_create_job.ps1` no hace nada sin `-Confirmar`, pero ninguna de esas dos
+frena hoy: el disco volvió al 42,3 % al revertirse la transacción.
 
 **2 · DA-4, NUEVA · autenticación contra Postgres.** La spec aprobada prohíbe
 pasar contraseña al job (R10) y manda token de Entra (R12), pero
