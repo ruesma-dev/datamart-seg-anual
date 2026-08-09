@@ -7,6 +7,7 @@ Sin red y sin BBDD: se leen ficheros del repositorio y estructuras en memoria.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -147,6 +148,30 @@ def test_f015_r17_na_sin_justificacion_prohibido_tambien_en_puertas_nuevas() -> 
     assert "justificar" in minusculas or "justificaci" in minusculas
     # Y decir qué pasa con un N/A sin motivo.
     assert "checkbox vac" in minusculas
+
+
+# --- R16: el reviewer valida contra el nivel declarado ----------------------
+
+
+def test_f015_r16_reviewer_valida_contra_el_nivel_de_rigor(rigor: dict) -> None:
+    protocolo = re.sub(
+        r"\s+",
+        " ",
+        (RAIZ / ".claude" / "agents" / "reviewer.md").read_text(encoding="utf-8").lower(),
+    )
+
+    # Resuelve el nivel de la feature antes de juzgar nada.
+    assert "nivel de rigor" in protocolo
+    assert "features.json" in protocolo
+    assert rigor["nivel_por_defecto"] in protocolo
+    # Y exige las evidencias que ese nivel pida.
+    assert "progress/mutacion_f-xxx.md" in protocolo
+    assert "fase red" in protocolo
+    assert "evidencias" in protocolo
+    assert "c4 bis" in protocolo
+    # Ningún N/A sin justificación escrita.
+    assert "n/a" in protocolo
+    assert "justificaci" in protocolo
 
 
 # --- R15: resolución del nivel ----------------------------------------------
