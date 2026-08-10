@@ -360,7 +360,14 @@ Resumen en `progress/history.md`; detalle en `progress/impl_F-020.md` y
 (`harness/servicios.json` opcional); `arnes-base` en **1.3.0**. Este repo
 mono-proyecto no cambia de comportamiento (verificado por el reviewer).
 
-# F-019 · Fase B IMPLEMENTADA (2026-08-10) — falta la verificación del humano
+# F-019 · Fase B APROBADA por el reviewer (2026-08-10) — BLOQUEADA esperando las fases A y C del humano
+
+**APPROVED** (`progress/review_F-019.md`): 379 tests, 100 % de cobertura de
+las líneas cambiadas, mutación 41/41 muertos (rigor `critico` cumplido).
+La feature queda `blocked` hasta que el humano ejecute las fases A
+(mediciones locales R1/R2) y C (equivalencia R13 y verificación Azure
+R14–R16, que completa el paso 8 de F-005 y permite `jobProgramable: true`).
+El guion detallado está justo debajo, escrito por el implementer.
 
 Rama `feature/F-019-plan-mensual-por-tramos`, rigor `critico`. **T3–T10
 completas** (un commit por tarea); informe en `progress/impl_F-019.md` y
