@@ -138,6 +138,17 @@ def test_f019_r4_un_maximo_no_positivo_es_un_error_de_configuracion() -> None:
         planificar_tramos(PESOS, 0)
 
 
+def test_f019_r4_un_maximo_de_una_sola_fila_sigue_siendo_valido() -> None:
+    """Un máximo absurdamente pequeño es legítimo (trocea al extremo).
+
+    Lo prohibido es el cero o el negativo, que dejarían el build sin tope.
+    """
+    assert planificar_tramos({4: 5, 5: 3}, 1) == [
+        Tramo(indice=1, obras=(4,), peso=5),
+        Tramo(indice=2, obras=(5,), peso=3),
+    ]
+
+
 def test_f019_r4_maximo_configurable_desde_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -331,6 +342,7 @@ def test_f019_r8_el_porcentaje_de_ocupacion_va_en_gigabytes_binarios() -> None:
     assert porcentaje_ocupacion(17_179_869_184, 32) == 50.0   # 16 GiB de 32
     assert porcentaje_ocupacion(0, 32) == 0.0
     assert porcentaje_ocupacion(27_487_790_694, 32) == pytest.approx(80.0, abs=0.01)
+    assert porcentaje_ocupacion(536_870_912, 1) == 50.0       # un disco de 1 GB
 
 
 def test_f019_r8_un_disco_total_no_positivo_es_un_error_de_configuracion() -> None:
@@ -718,6 +730,16 @@ def test_f019_r5_plan_determinista() -> None:
     esperado = planificar_tramos(PESOS, MAXIMO)
     assert planificar_tramos(al_reves, MAXIMO) == esperado
     assert planificar_tramos(dict(sorted(PESOS.items())), MAXIMO) == esperado
+
+
+def test_f019_r5_un_tramo_es_un_valor_inmutable_y_cerrado() -> None:
+    """El plan se calcula una vez y no se retoca: nadie puede reescribir un
+    tramo a mitad del bucle ni colarle campos que el step no espera."""
+    tramo = planificar_tramos({1: 10}, 100)[0]
+
+    with pytest.raises(AttributeError):
+        tramo.peso = 999          # type: ignore[misc]
+    assert not hasattr(tramo, "__dict__")   # sin campos fuera de los declarados
 
 
 def test_f019_r5_las_obras_se_empaquetan_de_mayor_a_menor_peso() -> None:

@@ -92,14 +92,18 @@ GROUP BY pp.obra_id
 
 
 def porcentaje_ocupacion(bytes_usados: int, total_gb: int) -> float:
-    """Ocupación del disco en tanto por ciento, con el total en GB binarios."""
-    total_bytes = total_gb * BYTES_POR_GB
-    if total_bytes <= 0:
+    """Ocupación del disco en tanto por ciento, con el total en GB binarios.
+
+    La validación mira `total_gb` y no los bytes ya calculados: es el valor que
+    de verdad configura el humano (`PG_DISCO_TOTAL_GB`), y así el mensaje habla
+    de lo que hay que corregir.
+    """
+    if total_gb <= 0:
         raise ValueError(
             f"PG_DISCO_TOTAL_GB debe ser un entero positivo, y vale {total_gb}. "
             f"Sin tamaño de disco no hay puerta de seguridad que valga."
         )
-    return bytes_usados * 100.0 / total_bytes
+    return bytes_usados * 100.0 / (total_gb * BYTES_POR_GB)
 
 
 class PostgresClient:
