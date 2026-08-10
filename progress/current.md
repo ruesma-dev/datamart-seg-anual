@@ -26,25 +26,41 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-003 · EN CURSO — bloques 1–4 hechos, bloque 5 es del humano
+# F-003 · BLOQUEADA esperando a F-019 — código APROBADO y tanda 1 desplegada
 
-Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** (13
-scripts de `infra/` reescritos o creados, `infra/env/dev.json`, 33 tests
-nuevos, `infra/README.md`). Informe completo: `progress/impl_F-003.md`.
-Campaña de mutación: `progress/mutacion_F-003.md`. `bash harness/init.sh` en
-verde, **254 tests** (eran 221).
+Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** y
+**re-review del reviewer: APPROVED** el 2026-08-10 (`progress/review_F-003.md`,
+segunda pasada anexada; la primera fue CHANGES_REQUESTED por la puerta del
+disco mal condicionada, corregida y verificada). DA-4 cerrada por el humano:
+opción B, contraseña vía referencia de Key Vault; enmienda fechada en la spec.
 
-**Review del 2026-08-10: `CHANGES_REQUESTED`, ya corregido**
-(`progress/review_F-003.md`, correcciones en `impl_F-003.md` §10). El defecto:
-la puerta que bloquea el cron nocturno estaba escrita como «hasta que se decida
-qué hacer con el disco», y esa decisión ya estaba tomada —es `F-019`—, con lo
-que se leía como puerta abierta. Ahora depende de que `F-019` esté
-**implementada y verificada**, y además es detectable por máquina:
-`jobProgramable: false` en `infra/env/dev.json`, `throw` en
-`80_create_job.ps1` y tres tests que se ponen en rojo si alguien la abre antes
-de tiempo. Falta el nuevo veredicto del reviewer.
+## Tanda 1 del bloque 5 · EJECUTADA por el humano el 2026-08-10 (T18–T22)
 
-**No se ha ejecutado ni un comando `az` de escritura, ni `python main.py`.**
+| Qué | Resultado verificado (lecturas del líder) |
+|---|---|
+| Resource group | `rg-datamart-seg-dev` en spaincentral, 7 tags acens (R15) — `costcenter=pendiente` hasta que acens dé el centro de coste |
+| Log Analytics | `log-datamart-seg-dev`, PerGB2018, 30 días |
+| Entorno Container Apps | `cae-datamart-seg-dev`, sin VNet, logs a log-analytics (R16). **IP de salida: 68.221.221.85** |
+| Firewall Postgres | Regla `caj-datamart-seg-dev` → 68.221.221.85 creada en `psql-albaranes-rs9k2` con autorización expresa del humano (R23 parcial) |
+| Storage | `stdatamartsegdev`: sin acceso público, sin clave compartida, TLS1_2, contenedor `aux` (R17) |
+| Key Vault | `kv-datamart-seg-dev` con RBAC; secretos: `SIGRID-API-FUNCTION-KEY`, `pg-sigrid-dm-app`, `pg-mcp-sigrid-dm-ro` (R18 + paso 8 bis hecho, migración sin exponer valores) |
+| Identidad | `id-datamart-seg-dev` con exactamente 3 roles de ámbito recurso (R19) |
+| Imagen | `datamart-seg-anual:r20260810-1024` en el ACR, único tag, sin latest (R20) |
+
+**Pendiente (tanda 2, tras F-019): T23–T26** — crear el job, prueba segura
+(`version`/`check-pg`), logs (R24) y alerta con correo real (R25); más las 3
+verificaciones MANUAL de F-004 y retirar las copias viejas de los secretos en
+`kv-albaranes-rs9k2` cuando el job complete una ejecución correcta.
+
+**Defectos encontrados al desplegar (todos corregidos o anotados):** dos
+roturas de PowerShell 5.1 en los scripts (JMESPath con `?`/`!` contra az.cmd y
+comprobaciones de existencia que morían por stderr), corregidas por el
+implementer y verificadas ejecutando; el puesto NO tiene pwsh 7, el README ya
+usa `powershell -NoProfile -File`. Anotados sin corregir aún (para la vuelta
+de F-003): el comando de firewall del README usa `-n` para el servidor y la
+versión actual de az exige `--server-name`/`--name`; y la verificación de
+roles de `60_create_identity.ps1` consulta antes de que RBAC propague y lanza
+un `throw` falso (necesita reintento con espera).
 
 ## ⚠ LAS DOS PUERTAS DEL BLOQUE 5 (una sigue cerrada, la otra ya se resolvió)
 

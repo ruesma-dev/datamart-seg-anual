@@ -94,7 +94,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-003-infra-caj/ (sdd=true)"
       ],
-      "status": "in_progress",
+      "status": "blocked",
       "sdd": true,
       "rigor": "critico",
       "priority": 7,
