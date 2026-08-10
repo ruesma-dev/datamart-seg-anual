@@ -131,7 +131,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-020-arnes-multiservicio/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "priority": 8,
       "branch": "feature/F-020-arnes-multiservicio"
