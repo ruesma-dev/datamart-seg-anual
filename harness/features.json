@@ -144,7 +144,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-019-plan-mensual-por-tramos/ (sdd=true)"
       ],
-      "status": "spec_ready",
+      "status": "blocked",
       "sdd": true,
       "rigor": "critico",
       "priority": 9,
@@ -159,7 +159,9 @@
         "Relanzada la campana de mutacion sobre el alcance de F-005: los 6 mutantes de riesgo ALTO mueren. Como se reconstruye el alcance (arbol actual o worktree del merge c7500d4 con --raiz) lo decide el implementer y lo deja documentado en el informe",
         "El resultado va a un informe nuevo (progress/mutacion_F-005_tras_refuerzo.md); la linea base historica progress/mutacion_F-005.md NO se sobrescribe ni se retoca",
         "Los supervivientes de riesgo medio y bajo que sigan vivos quedan contabilizados en el informe nuevo como deuda, no se tapan en esta feature",
-        "bash harness/init.sh en verde"
+        "Afinado el barrido de secretos de test_f005_r21 para que las rutas largas no den falso positivo (hallazgo de F-004): exigir contexto de asignacion o excluir cadenas con varias barras",
+        "bash harness/init.sh en verde",
+        "PARADA 1 CUMPLIDA: plan de implementacion propuesto por el lider y aprobado por el humano el 2026-08-10; el implementer puede arrancar sin mas paradas en cuanto F-019 libere el turno"
       ],
       "status": "pending",
       "sdd": false,
