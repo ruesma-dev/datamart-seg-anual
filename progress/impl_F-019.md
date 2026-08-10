@@ -279,3 +279,25 @@ Un vaciado por tramo, una medición después del tramo, o un tramo ejecutado
 tras superar el límite cambian esa lista y ponen el test en rojo. Los abortos
 la dejan terminada en `"truncate"` y sin el `"sql"` del tramo que no llegó a
 ejecutarse.
+
+---
+
+# T8 · Documentación (en el mismo trabajo, no después)
+
+- **`docs/ARCHITECTURE.md`**, nueva sección «El build de `stg.plan_mensual` va
+  por tramos (F-019)» dentro de §El datamart en Azure: el incidente con su
+  fecha, por qué el corte por obra es estructuralmente equivalente, quién hace
+  qué (dominio / step / cliente), transacción por tramo, puerta de disco y los
+  tres settings con sus defaults.
+- **`azure-apps/datamart_seg_anual.md`** (repositorio `azure-apps`, commit
+  local `df5000e`): el aviso del incidente en §Dónde vive el dato y, en §Qué
+  rompe este proyecto a otros, qué significa la protección **para quien
+  mantiene `albaranes` o `partes`**: que la puerta mira el disco del SERVIDOR
+  entero (si lo llena otro proyecto, el que deja de escribir es el datamart),
+  que **si alguien hace crecer el disco hay que actualizar
+  `PG_DISCO_TOTAL_GB`**, y que quitarle al ETL el `CONNECT` que necesita para
+  medir no lo hace más seguro: lo deja ciego y lo para.
+
+Barrido de secretos de F-005 (`test_f005_r21_...`) ejecutado tras escribir la
+documentación: **17 passed**, sin falsos positivos de rutas largas (el defecto
+conocido que ya mordió en F-004).

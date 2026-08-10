@@ -94,6 +94,38 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   servidor entero y arrastraría `albaranes` y `partes` al pasado.
 - Procedimiento completo: `docs/runbook_postgres_azure.md`.
 
+### El build de `stg.plan_mensual` va por tramos (F-019)
+
+El 2026-08-09 ese build llenó el disco del servidor compartido: la explosión
+del `planif` con `CROSS JOIN LATERAL unnest(...)` sobre 13,76 M filas derramó
+16+ GB de temporales, la ocupación llegó al 93,4 % y Azure dejó el servidor en
+solo-lectura diez minutos, con `albaranes` y `partes` en producción. En local
+no pasaba porque sobra RAM.
+
+Desde F-019, el sub-paso `build_plan_mensual` **no se ejecuta de una pasada**:
+
+- **Corte por obra.** Ninguna ventana del SQL cruza obras (particionan por
+  `presupuesto_id` o por la terna obra-partida-ámbito), así que ejecutar el
+  mismo statement con un filtro de obras disjunto y completo da exactamente
+  las mismas filas. La equivalencia es estructural, no casual.
+- **Quién hace qué.** `domain/tramos.py` planifica (función pura: pesos por
+  obra + tope), `build_stg_step` orquesta y `postgres_client` mide y ejecuta.
+  El fichero SQL lleva un marcador que el step sustituye por las obras del
+  tramo, **en las dos ramas** (master amb 8/11 y reales amb 3/7); filtrar solo
+  una duplicaría la otra. El vaciado de la tabla lo hace el step una vez.
+- **Una transacción por tramo**, para que el pico de temporales de un tramo no
+  se apile con el del siguiente.
+- **Puerta de disco antes de CADA tramo**: se mide la ocupación del servidor
+  (suma de `pg_database_size` de todas las bases) y, si supera el límite, el
+  build **para**, deja la tabla **vacía** y marca FAILED. Si la medición
+  falla, también para: seguir a ciegas es lo que provocó el incidente.
+- **Tres settings**, todos con default y sin secretos: `PG_TRAMO_MAX_FILAS`
+  (1 000 000), `PG_DISCO_TOTAL_GB` (32) y `PG_DISCO_LIMITE_PCT` (80). Un
+  máximo enorme reproduce el comportamiento antiguo si alguna vez hiciera
+  falta diagnosticar, sin conservar una rama de código con el arma cargada.
+- Cada tramo deja su fila en `_meta.etl_runs`, así que `python main.py timings`
+  desglosa el coste real tramo a tramo.
+
 ## Infra
 
 - `Dockerfile` en raíz. `infra/` con scripts PowerShell 5.1 (UTF-8 BOM, CRLF)
