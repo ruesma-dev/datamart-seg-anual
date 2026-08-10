@@ -121,6 +121,68 @@ else
     fi
 fi
 
+# --- 7 bis. SERVICIOS DEL MONOREPO (solo si harness/servicios.json existe) --
+# Un repositorio con un único proyecto en la raíz no declara nada y esta
+# sección entera no se ejecuta: lo de arriba es todo lo que hay. Con
+# declaración, cada servicio se comprueba con SU intérprete desde SU directorio
+# y deja su propia línea [OK]/[AVISO]/[KO]; un KO en cualquiera hace KO el
+# veredicto global, porque `ko` es lo que suma a FALLOS.
+#
+# La declaración rota NO degrada a mono-proyecto: sería dejar servicios enteros
+# sin comprobar mientras el portero imprime que todo va bien.
+if [ -f "harness/servicios.json" ]; then
+    if ! $PY -m harness.servicios --validar; then
+        ko "harness/servicios.json inválido: el arnés no degrada a mono-proyecto en silencio"
+    else
+        ok "harness/servicios.json válido"
+        SERVICIOS=$($PY -m harness.servicios --shell)
+        if [ $? -ne 0 ]; then
+            ko "harness/servicios.json: no se pudo resolver el intérprete de algún servicio"
+            SERVICIOS=""
+        fi
+        # Sin tubería a propósito: en un subshell los `ko` no sumarían a FALLOS
+        # y un servicio en rojo acabaría dando el veredicto en verde.
+        while IFS='|' read -r NOMBRE RUTA LENGUAJE INTERPRETE COMANDO; do
+            [ -z "$NOMBRE" ] && continue
+            if [ "$LENGUAJE" = "python" ]; then
+                if [ ! -d "$RUTA/tests" ]; then
+                    warn "servicio $NOMBRE ($RUTA): sin directorio de tests — NADIE está comprobando los tests de $NOMBRE"
+                    continue
+                fi
+                if "$INTERPRETE" -c "import coverage" >/dev/null 2>&1; then
+                    ( cd "$RUTA" && rm -f coverage.json \
+                      && "$INTERPRETE" -m coverage run -m pytest -q --tb=short -x )
+                    RESULTADO=$?
+                    ( cd "$RUTA" && "$INTERPRETE" -m coverage json -q -o coverage.json ) \
+                        >/dev/null 2>&1 \
+                        || warn "servicio $NOMBRE ($RUTA): coverage no pudo escribir su coverage.json"
+                else
+                    ( cd "$RUTA" && "$INTERPRETE" -m pytest -q --tb=short -x )
+                    RESULTADO=$?
+                fi
+                if [ "$RESULTADO" -eq 0 ]; then
+                    ok "servicio $NOMBRE ($RUTA): pytest en verde"
+                else
+                    ko "servicio $NOMBRE ($RUTA): pytest en rojo"
+                fi
+            elif [ -n "$COMANDO" ]; then
+                warn "servicio $NOMBRE ($RUTA): lenguaje '$LENGUAJE', se saltan compilación, lint y pytest"
+                ( cd "$RUTA" && eval "$COMANDO" )
+                RESULTADO=$?
+                if [ "$RESULTADO" -eq 0 ]; then
+                    ok "servicio $NOMBRE ($RUTA): tests en verde ($COMANDO)"
+                else
+                    ko "servicio $NOMBRE ($RUTA): tests en rojo ($COMANDO)"
+                fi
+            else
+                warn "servicio $NOMBRE ($RUTA): lenguaje '$LENGUAJE' y sin comando_tests — NADIE está comprobando los tests de $NOMBRE"
+            fi
+        done <<EOF_SERVICIOS
+$SERVICIOS
+EOF_SERVICIOS
+    fi
+fi
+
 # --- 7b. Puerta de cobertura de las LÍNEAS CAMBIADAS por la feature ---------
 # La puerta decide sola si aplica (rama actual, diff frente a dev y nivel de
 # rigor de la feature) y explica el motivo cuando se declara N/A. El umbral
