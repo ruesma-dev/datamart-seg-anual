@@ -8,6 +8,7 @@ un fichero vacío en el sitio donde iría el intérprete.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -104,6 +105,14 @@ def test_f020_r1_campos_opcionales_ausentes_valen(tmp_path: Path) -> None:
     assert set(LENGUAJES) == {"python", "otro"}
 
 
+def test_f020_r1_un_servicio_es_inmutable() -> None:
+    """Nadie reescribe una declaración a mitad de ejecución."""
+    servicio = Servicio(nombre="api", ruta="services/api", lenguaje="python")
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        servicio.ruta = "otra"  # type: ignore[misc]
+
+
 def test_f020_r1_las_rutas_se_normalizan_a_barras(tmp_path: Path) -> None:
     monorepo(
         tmp_path,
@@ -173,6 +182,14 @@ def test_f020_r3_nombre_o_ruta_vacios(tmp_path: Path) -> None:
     monorepo(tmp_path, {"servicios": [{"nombre": "x", "ruta": "", "lenguaje": "otro"}]})
 
     with pytest.raises(ValueError, match="ruta"):
+        cargar_servicios(raiz=str(tmp_path))
+
+
+def test_f020_r3_ruta_ausente_error(tmp_path: Path) -> None:
+    """Falta la clave entera, no está vacía: el error sigue nombrando el campo."""
+    monorepo(tmp_path, {"servicios": [{"nombre": "api", "lenguaje": "otro"}]})
+
+    with pytest.raises(ValueError, match="el campo 'ruta'"):
         cargar_servicios(raiz=str(tmp_path))
 
 
@@ -277,6 +294,16 @@ def test_f020_r3_validar_por_cli_devuelve_0_con_declaracion_buena(
 
     assert codigo == 0
     assert "email" in capsys.readouterr().out
+
+
+def test_f020_r2_validar_sin_declaracion_es_exito_y_lo_dice(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No declarar servicios no es un error: es el caso mayoritario."""
+    codigo = main(["--validar", "--raiz", str(tmp_path)])
+
+    assert codigo == 0
+    assert "proyecto único en la raíz" in capsys.readouterr().out
 
 
 # --- R4: a qué servicio pertenece una ruta ----------------------------------

@@ -269,6 +269,46 @@ def test_f020_r2_main_sin_declaracion_no_construye_factoria(
     assert unico.llamadas == 1
 
 
+def test_f020_r15_main_con_servicios_respeta_el_ejecutor_inyectado(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Con declaración, un ejecutor inyectado sigue mandando sobre la factoría.
+
+    Es lo que evita que un test o una herramienta que pasa su propio doble
+    acabe lanzando suites de verdad, servicio por servicio.
+    """
+    (tmp_path / "harness").mkdir()
+    (tmp_path / "services" / "email").mkdir(parents=True)
+    (tmp_path / "harness" / "servicios.json").write_text(
+        '{"servicios": [{"nombre": "email", "ruta": "services/email",'
+        ' "lenguaje": "python"}]}',
+        encoding="utf-8",
+    )
+    fichero = tmp_path / "services" / "email" / "flujo.py"
+    fichero.write_text("def g(a, b):\n    return a > b\n", encoding="utf-8")
+    monkeypatch.setattr(
+        mutacion,
+        "alcance_de_feature",
+        lambda *a, **k: alcance_de({"services/email/flujo.py": {2}}),
+    )
+    unico = EjecutorDoble(MUERTO)
+
+    codigo = mutacion.main(
+        [
+            "--feature",
+            "F-042",
+            "--raiz",
+            str(tmp_path),
+            "--salida",
+            str(tmp_path / "informe.md"),
+        ],
+        ejecutor=unico,
+    )
+
+    assert codigo == 0
+    assert unico.llamadas == 1
+
+
 def test_f020_r3_main_con_declaracion_rota_no_muta_nada(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
