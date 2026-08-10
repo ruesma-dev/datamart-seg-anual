@@ -42,7 +42,7 @@ fixtures en `tmp_path`.
       real de ambos casos pegada en `progress/impl_F-020.md`.
       | Verificación: MANUAL (humano) — comandos exactos en R20 de
       `requirements.md`
-- [ ] T9: si `azure-apps/` documenta `arnes-base`, anotar allí la 1.3.0 y la
+- [x] T9: si `azure-apps/` documenta `arnes-base`, anotar allí la 1.3.0 y la
       capacidad multi-servicio (enlace, no duplicado). Si no existe el
       documento, dejar constancia en el informe y no crear nada.
       | Verificación: `grep -ri "1.3.0" C:/Users/pgris/PycharmProjects/azure-apps/ --include="*.md"` (o constancia escrita de N/A)
