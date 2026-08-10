@@ -170,3 +170,65 @@ son deliberadamente literales (`"TRUNCATE" not in sql.upper()`,
 `sql.count(MARCADOR) == 2`). Un test tonto y fuerte se prefirió a uno listo
 que hubiera que mantener; el precio es redactar los comentarios sin esas dos
 cadenas.
+
+## RED de T6 · composición segura del filtro y métodos nuevos del cliente (R7, R8, R10, R11)
+
+Con las firmas puestas y **sin lógica** (`componer_sql_tramo` devolvía el SQL
+tal cual; `BYTES_POR_GB = 0`; los tres métodos devolvían vacío):
+
+```
+$ python -m pytest tests/test_f019_tramos.py -q --tb=line
+............FFFFFFFFFF...                                                [100%]
+E   AssertionError: assert 'A /*F019_FIL...TRO_OBRAS*/ C' == 'A ARRAY[10, ...]::BIGINT[] C'
+      - A ARRAY[10, 20, 30]::BIGINT[] B ARRAY[10, 20, 30]::BIGINT[] C
+      + A /*F019_FILTRO_OBRAS*/ B /*F019_FILTRO_OBRAS*/ C
+tests\test_f019_tramos.py:223: AssertionError
+E   Failed: DID NOT RAISE ValueError
+tests\test_f019_tramos.py:239: Failed: DID NOT RAISE ValueError
+E   Failed: DID NOT RAISE ValueError
+tests\test_f019_tramos.py:249: Failed: DID NOT RAISE ValueError
+E   AssertionError: assert '/*F019_FILTRO_OBRAS*/' not in '-- etl_sigr...s_con_lag;\n'
+      '/*F019_FILTRO_OBRAS*/' is contained here:
+        id = ANY (/*F019_FILTRO_OBRAS*/)   -- tramo (F-019)
+tests\test_f019_tramos.py:255: AssertionError
+E   assert 0 == 1073741824
+tests\test_f019_tramos.py:326: assert 0 == 1073741824
+E   Failed: DID NOT RAISE ValueError
+tests\test_f019_tramos.py:333: Failed: DID NOT RAISE ValueError
+E   assert 0.0 == 50.0
+     +  where 0.0 = medir_ocupacion_disco_pct(32)
+tests\test_f019_tramos.py:342: assert 0.0 == 50.0
+E   assert {} == {101: 900000, 102: 420000}
+      Right contains 2 more items: {101: 900000, 102: 420000}
+tests\test_f019_tramos.py:363: assert {} == {101: 900000, 102: 420000}
+E   AssertionError: assert 0 == 4321
+     +  where 0 = execute_sql_text('INSERT INTO stg.plan_mensual ...')
+tests\test_f019_tramos.py:378: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_f019_tramos.py::test_f019_r7_solo_enteros_en_el_filtro
+FAILED tests/test_f019_tramos.py::test_f019_r7_sin_marcador_falla_antes_de_ejecutar
+FAILED tests/test_f019_tramos.py::test_f019_r7_un_tramo_sin_obras_no_compone_nada
+FAILED tests/test_f019_tramos.py::test_f019_r7_el_sql_real_compuesto_queda_sin_marcadores
+FAILED tests/test_f019_tramos.py::test_f019_r8_el_porcentaje_de_ocupacion_va_en_gigabytes_binarios
+FAILED tests/test_f019_tramos.py::test_f019_r8_un_disco_total_no_positivo_es_un_error_de_configuracion
+FAILED tests/test_f019_tramos.py::test_f019_r8_medir_ocupacion_suma_todas_las_bases_del_servidor
+FAILED tests/test_f019_tramos.py::test_f019_r10_una_medicion_vacia_o_nula_no_se_toma_por_cero
+FAILED tests/test_f019_tramos.py::test_f019_r3_los_pesos_por_obra_llegan_como_diccionario
+FAILED tests/test_f019_tramos.py::test_f019_r11_execute_sql_text_abre_una_conexion_por_llamada
+10 failed, 15 passed in 0.62s
+```
+
+**Verde tras implementar**: `25 passed in 0.53s`.
+
+**Decisiones de T6**:
+
+- La composición es **textual**, no `%(param)s`. El fichero está lleno de
+  porcentajes literales en los comentarios («llega al 93 %») y psycopg los
+  leería como marcadores de parámetro. Por eso el blindaje es tan estricto:
+  `type(obra) is not int` (y no `isinstance`, porque `bool` es subclase de
+  `int` y `ARRAY[True]` no es una lista de obras).
+- `medir_ocupacion_disco_pct` **propaga** la excepción; no devuelve 0 ni None.
+  Un cero «por si acaso» sería seguir a ciegas, que es lo que hacía el build
+  que llenó el disco.
+- `execute_sql_text` devuelve el `rowcount` del cursor, no un `COUNT(*)`: un
+  seq-scan por tramo sobre millones de filas en 1 vCPU sería castigo gratuito.

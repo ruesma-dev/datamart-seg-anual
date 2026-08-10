@@ -13,16 +13,25 @@ from __future__ import annotations
 
 import pytest
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from config.settings import PostgresSettings
 from etl_sigrid.application.steps.build_stg_step import (
     DIRECTORIO_SQL_STG,
     MARCADOR_FILTRO_OBRAS,
     RAMAS_CON_FILTRO,
+    componer_sql_tramo,
 )
 from etl_sigrid.domain.tramos import (
     Tramo,
     planificar_tramos,
     tramos_sobredimensionados,
+)
+from etl_sigrid.infrastructure.postgres.postgres_client import (
+    BYTES_POR_GB,
+    PostgresClient,
+    porcentaje_ocupacion,
 )
 
 # Variables de entorno de la feature. Se limpian en los tests de settings para
@@ -201,6 +210,180 @@ def test_f019_r6_la_logica_de_negocio_del_planif_sigue_intacta() -> None:
         "WHERE NOT (pct_acumulado = 0 AND pct_mes = 0)",
     ):
         assert marca in sql, f"desapareció del SQL: {marca}"
+
+
+# --- R7 · Composición segura del filtro --------------------------------------
+
+
+def test_f019_r7_solo_enteros_en_el_filtro() -> None:
+    """El filtro se compone con enteros validados; nada más entra en el SQL."""
+    plantilla = f"A {MARCADOR_FILTRO_OBRAS} B {MARCADOR_FILTRO_OBRAS} C"
+    compuesto = componer_sql_tramo(plantilla, (10, 20, 30))
+
+    assert compuesto == "A ARRAY[10, 20, 30]::BIGINT[] B ARRAY[10, 20, 30]::BIGINT[] C"
+    assert MARCADOR_FILTRO_OBRAS not in compuesto
+
+    for obras_invalidas in (
+        ("101",),                    # un identificador que llega como texto
+        (10, "20; DROP TABLE stg.plan_mensual"),
+        (10, 20.0),                  # un float no es un obra_id
+        (True,),                     # bool ES subclase de int: no cuela
+        (10, None),
+    ):
+        with pytest.raises(TypeError, match="obra"):
+            componer_sql_tramo(plantilla, obras_invalidas)
+
+
+def test_f019_r7_sin_marcador_falla_antes_de_ejecutar() -> None:
+    """Sin marcador NO se ejecuta el fichero: se ejecutaría sin filtro."""
+    with pytest.raises(ValueError, match="F019_FILTRO_OBRAS"):
+        componer_sql_tramo("SELECT 1", (10,))
+
+    # Y con el marcador en una sola rama tampoco: sería duplicar la otra.
+    with pytest.raises(ValueError, match="F019_FILTRO_OBRAS"):
+        componer_sql_tramo(f"A {MARCADOR_FILTRO_OBRAS} B", (10,))
+
+
+def test_f019_r7_un_tramo_sin_obras_no_compone_nada() -> None:
+    plantilla = f"{MARCADOR_FILTRO_OBRAS} {MARCADOR_FILTRO_OBRAS}"
+    with pytest.raises(ValueError, match="sin obras"):
+        componer_sql_tramo(plantilla, ())
+
+
+def test_f019_r7_el_sql_real_compuesto_queda_sin_marcadores() -> None:
+    compuesto = componer_sql_tramo(_sql_plan_mensual(), (1234, 5678))
+    assert MARCADOR_FILTRO_OBRAS not in compuesto
+    assert compuesto.count("= ANY (ARRAY[1234, 5678]::BIGINT[])") == RAMAS_CON_FILTRO
+
+
+# --- Dobles del cliente Postgres ---------------------------------------------
+#
+# Ningún test abre una conexión: se sustituye `PostgresClient.connection`, que
+# es el único punto por el que el cliente llega a la BBDD.
+
+
+class CursorFalso:
+    """Cursor de mentira: guarda lo ejecutado y devuelve filas preparadas."""
+
+    def __init__(self, filas: list[tuple] | None = None, rowcount: int | None = 0):
+        self.filas = filas if filas is not None else []
+        self.rowcount = rowcount
+        self.ejecutado: list[str] = []
+
+    def __enter__(self) -> CursorFalso:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+    def execute(self, sql: str, params: object = None) -> None:
+        self.ejecutado.append(sql)
+
+    def fetchone(self) -> tuple | None:
+        return self.filas[0] if self.filas else None
+
+    def fetchall(self) -> list[tuple]:
+        return list(self.filas)
+
+
+class ConexionFalsa:
+    def __init__(self, cursor: CursorFalso) -> None:
+        self._cursor = cursor
+
+    def cursor(self) -> CursorFalso:
+        return self._cursor
+
+
+class ConexionesFalsas:
+    """Reemplazo de `PostgresClient.connection` que cuenta aperturas."""
+
+    def __init__(self, cursor: CursorFalso) -> None:
+        self.cursor = cursor
+        self.aperturas = 0
+
+    @contextmanager
+    def __call__(self) -> Iterator[ConexionFalsa]:
+        self.aperturas += 1
+        yield ConexionFalsa(self.cursor)
+
+
+def cliente_con(cursor: CursorFalso) -> tuple[PostgresClient, ConexionesFalsas]:
+    """Un PostgresClient cuyo `connection()` no toca ningún servidor."""
+    cliente = PostgresClient(
+        "host=servidor-inexistente dbname=ninguna",
+        "host=servidor-inexistente dbname=ninguna",
+        "sigrid_dm",
+    )
+    conexiones = ConexionesFalsas(cursor)
+    cliente.connection = conexiones  # type: ignore[method-assign]
+    return cliente, conexiones
+
+
+# --- R8 · Medición de ocupación de disco -------------------------------------
+
+
+def test_f019_r8_el_porcentaje_de_ocupacion_va_en_gigabytes_binarios() -> None:
+    assert BYTES_POR_GB == 1_073_741_824
+    assert porcentaje_ocupacion(17_179_869_184, 32) == 50.0   # 16 GiB de 32
+    assert porcentaje_ocupacion(0, 32) == 0.0
+    assert porcentaje_ocupacion(27_487_790_694, 32) == pytest.approx(80.0, abs=0.01)
+
+
+def test_f019_r8_un_disco_total_no_positivo_es_un_error_de_configuracion() -> None:
+    with pytest.raises(ValueError, match="PG_DISCO_TOTAL_GB"):
+        porcentaje_ocupacion(1, 0)
+
+
+def test_f019_r8_medir_ocupacion_suma_todas_las_bases_del_servidor() -> None:
+    """Todas las bases: el disco es compartido con albaranes y partes."""
+    cursor = CursorFalso(filas=[(17_179_869_184,)])
+    cliente, conexiones = cliente_con(cursor)
+
+    assert cliente.medir_ocupacion_disco_pct(32) == 50.0
+    assert conexiones.aperturas == 1
+    assert "pg_database_size" in cursor.ejecutado[0]
+    assert "FROM pg_database" in cursor.ejecutado[0]
+
+
+def test_f019_r10_una_medicion_vacia_o_nula_no_se_toma_por_cero() -> None:
+    """Sin dato NO se sigue: se propaga el fallo y la puerta aborta (R10)."""
+    for filas in ([], [(None,)]):
+        cliente, _ = cliente_con(CursorFalso(filas=filas))
+        with pytest.raises(RuntimeError, match="ocupación"):
+            cliente.medir_ocupacion_disco_pct(32)
+
+
+# --- R4/R3 · Pesos por obra que alimentan al planificador --------------------
+
+
+def test_f019_r3_los_pesos_por_obra_llegan_como_diccionario() -> None:
+    cursor = CursorFalso(filas=[(101, 900_000), (102, 420_000)])
+    cliente, conexiones = cliente_con(cursor)
+
+    assert cliente.fetch_pesos_plan_mensual() == {101: 900_000, 102: 420_000}
+    assert conexiones.aperturas == 1
+    consulta = cursor.ejecutado[0]
+    assert "raw.obrparpre" in consulta
+    assert "stg.presupuesto" in consulta
+    assert "GROUP BY" in consulta
+
+
+# --- R11 · Una conexión (una transacción) por ejecución de tramo -------------
+
+
+def test_f019_r11_execute_sql_text_abre_una_conexion_por_llamada() -> None:
+    cursor = CursorFalso(rowcount=4321)
+    cliente, conexiones = cliente_con(cursor)
+
+    assert cliente.execute_sql_text("INSERT INTO stg.plan_mensual ...") == 4321
+    assert cliente.execute_sql_text("INSERT INTO stg.plan_mensual ...") == 4321
+    assert conexiones.aperturas == 2, "los tramos comparten transacción"
+
+
+def test_f019_r11_un_recuento_no_disponible_cuenta_como_cero_filas() -> None:
+    for rowcount in (None, -1, 0):
+        cliente, _ = cliente_con(CursorFalso(rowcount=rowcount))
+        assert cliente.execute_sql_text("INSERT ...") == 0
 
 
 # --- R5 · Plan determinista --------------------------------------------------

@@ -51,6 +51,57 @@ TIMINGS_SIN_ANCLA = 100
 ConnInfo = str | Callable[[], str]
 
 
+# --- Troceo y puerta de disco del build de plan_mensual (F-019) -------------
+
+# Gigabyte binario: es la unidad en la que Azure declara el disco del Flexible
+# Server (32 GB) y en la que se compara `PG_DISCO_TOTAL_GB`.
+BYTES_POR_GB = 1024 * 1024 * 1024
+
+# Ocupación del disco del SERVIDOR, no de nuestra base: el disco es compartido
+# con `albaranes` y `partes`, y lo que hay que vigilar es el total.
+# `pg_database_size` sobre otra base exige privilegio CONNECT; el rol del ETL
+# lo tiene (frontera medida en F-005). No cuenta WAL ni logs del servidor: ese
+# hueco lo absorbe el margen entre el límite (80 %) y la protección de Azure
+# (~95 %).
+SQL_OCUPACION_DISCO = "SELECT SUM(pg_database_size(datname)) FROM pg_database"
+
+# Peso de cada obra = filas de raw.obrparpre que le tocan, ponderando la rama
+# master por el número de posiciones de su `planif`, que es lo que de verdad
+# explota el CROSS JOIN LATERAL. Las filas de reales (amb 3/7) no se explotan:
+# pesan una. Es una agregación sin ventanas, así que no derrama como el build.
+SQL_PESOS_PLAN_MENSUAL = """
+SELECT
+    pp.obra_id,
+    SUM(
+        CASE
+            WHEN pp.ambito_id IN (8, 11)
+                THEN COALESCE(
+                    cardinality(
+                        string_to_array(NULLIF(TRIM(op.planif), ''), '|')
+                    ),
+                    0
+                )
+            ELSE 1
+        END
+    )::BIGINT AS peso
+FROM stg.presupuesto pp
+JOIN raw.obrparpre op ON op.ide = pp.presupuesto_id
+WHERE pp.ambito_id IN (3, 7, 8, 11)
+GROUP BY pp.obra_id
+"""
+
+
+def porcentaje_ocupacion(bytes_usados: int, total_gb: int) -> float:
+    """Ocupación del disco en tanto por ciento, con el total en GB binarios."""
+    total_bytes = total_gb * BYTES_POR_GB
+    if total_bytes <= 0:
+        raise ValueError(
+            f"PG_DISCO_TOTAL_GB debe ser un entero positivo, y vale {total_gb}. "
+            f"Sin tamaño de disco no hay puerta de seguridad que valga."
+        )
+    return bytes_usados * 100.0 / total_bytes
+
+
 class PostgresClient:
     """
     Cliente Postgres con auto-bootstrap perezoso.
@@ -541,7 +592,59 @@ class PostgresClient:
         )
 
     # ---------------------------------------------------------------------
+    # Build por tramos de stg.plan_mensual (F-019)
+    # ---------------------------------------------------------------------
+
+    def fetch_pesos_plan_mensual(self) -> dict[int, int]:
+        """Peso estimado de cada obra para planificar los tramos.
+
+        Devuelve {obra_id: filas estimadas}. Es la entrada de
+        `domain.tramos.planificar_tramos`, que no sabe de BBDD.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_PESOS_PLAN_MENSUAL)
+            return {int(fila[0]): int(fila[1]) for fila in cur.fetchall()}
+
+    def medir_ocupacion_disco_pct(self, total_gb: int) -> float:
+        """Ocupación del disco del servidor, en tanto por ciento.
+
+        **Propaga las excepciones a propósito**: quien llama tiene que abortar
+        si esto falla (R10). Devolver un 0 «por si acaso» sería seguir a
+        ciegas, que es exactamente lo que hacía el build que llenó el disco.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_OCUPACION_DISCO)
+            fila = cur.fetchone()
+
+        if not fila or fila[0] is None:
+            raise RuntimeError(
+                "No se pudo medir la ocupación del disco del servidor: la "
+                "consulta sobre pg_database no devolvió ningún valor. Sin esa "
+                "medición no se ejecuta ningún tramo."
+            )
+        return porcentaje_ocupacion(int(fila[0]), total_gb)
+
+    def execute_sql_text(self, sql_text: str) -> int:
+        """Ejecuta un SQL ya compuesto y devuelve las filas afectadas.
+
+        Una llamada = una conexión = **una transacción** (lo garantiza
+        `connection()`). Es lo que impide que el pico de temporales de un
+        tramo se apile con el del siguiente.
+
+        El recuento sale del `rowcount` del cursor, no de un `COUNT(*)` sobre
+        la tabla: un seq-scan por tramo sobre millones de filas en 1 vCPU
+        sería castigo gratuito.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(sql_text)
+            filas = cur.rowcount
+
+        # psycopg deja rowcount en -1 cuando la sentencia no trae recuento.
+        return max(int(filas), 0) if filas is not None else 0
+
+    # ---------------------------------------------------------------------
     # Carga masiva con COPY
+
     # ---------------------------------------------------------------------
 
     def copy_rows(

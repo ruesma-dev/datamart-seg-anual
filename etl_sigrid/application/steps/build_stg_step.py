@@ -19,6 +19,7 @@ Cada sub-step se registra en _meta.etl_runs con su tiempo y filas procesadas.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -49,6 +50,55 @@ MARCADOR_FILTRO_OBRAS = "/*F019_FILTRO_OBRAS*/"
 # Las DOS ramas del fichero (master amb 8/11 y reales amb 3/7) llevan filtro.
 # Filtrar solo una duplicaría las filas de la otra en cada tramo.
 RAMAS_CON_FILTRO = 2
+
+
+def componer_sql_tramo(sql_texto: str, obras: Sequence[int]) -> str:
+    """Sustituye el marcador de filtro por las obras del tramo.
+
+    Composición TEXTUAL y no `%(param)s` a propósito: los comentarios de
+    `08_plan_mensual.sql` están llenos de porcentajes literales («llega al
+    93 %») y psycopg los tomaría por marcadores de parámetro. El precedente
+    parametrizado del proyecto (`07_version_master_vigente.sql`) funciona
+    porque ese fichero no tiene ningún `%` suelto.
+
+    Que la composición sea textual obliga a blindar la entrada, y eso es lo
+    que hacen las tres comprobaciones de aquí (R7):
+
+    1. Tramo sin obras: no se ejecuta nada (un `ARRAY[]` vacío no filtraría
+       nada útil y delata un plan de tramos roto).
+    2. Cada obra tiene que ser un entero, y `bool` no cuenta aunque Python lo
+       considere subclase de `int`: `ARRAY[True]` no es una lista de obras.
+       Nada que venga de fuera puede llegar a concatenarse en el SQL.
+    3. El marcador tiene que aparecer una vez por rama. Si alguien lo borra al
+       editar el fichero, esto falla ANTES de enviar nada a la BBDD, en vez de
+       ejecutar el build entero sin filtro, que es justo el incidente.
+    """
+    if not obras:
+        raise ValueError(
+            "Tramo sin obras: no se compone ni se ejecuta nada. "
+            "El planificador de tramos no debería producir tramos vacíos."
+        )
+
+    for obra in obras:
+        if type(obra) is not int:  # noqa: E721 — `bool` es subclase de `int`
+            raise TypeError(
+                f"El filtro de tramo solo admite identificadores de obra "
+                f"enteros; llegó {obra!r} ({type(obra).__name__}). No se "
+                f"compone SQL con nada que no sea un entero validado."
+            )
+
+    apariciones = sql_texto.count(MARCADOR_FILTRO_OBRAS)
+    if apariciones != RAMAS_CON_FILTRO:
+        raise ValueError(
+            f"El SQL de plan_mensual debe contener el marcador "
+            f"{MARCADOR_FILTRO_OBRAS} exactamente {RAMAS_CON_FILTRO} veces "
+            f"(una por rama) y aparece {apariciones}. Sin las dos "
+            f"sustituciones el build se ejecutaría sin filtrar por tramo, o "
+            f"filtrando solo una rama y duplicando la otra: no se ejecuta."
+        )
+
+    lista = ", ".join(str(obra) for obra in obras)
+    return sql_texto.replace(MARCADOR_FILTRO_OBRAS, f"ARRAY[{lista}]::BIGINT[]")
 
 
 @dataclass(slots=True, frozen=True)
