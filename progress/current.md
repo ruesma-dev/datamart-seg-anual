@@ -348,42 +348,13 @@ Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
 
 ---
 
-# F-020 · IMPLEMENTADA (2026-08-10, implementer) — pendiente de review
+# F-020 · CERRADA (2026-08-10)
 
-Rama `feature/F-020-arnes-multiservicio`, rigor `estandar`, spec aprobada por
-el humano con **las seis DA aceptadas tal cual**. **T1–T11 completas**, un
-commit por tarea. Informe completo: **`progress/impl_F-020.md`**.
-
-Qué hace ahora el arnés: si un repositorio declara `harness/servicios.json`,
-`init.sh` valida **cada servicio con su intérprete desde su directorio** (una
-línea por servicio, un único veredicto, KO en cualquiera = KO global), la
-puerta de cobertura mide **un porcentaje agregado** fusionando el
-`coverage.json` de cada servicio, y la mutación juzga cada mutante con la suite
-de su servicio. **Sin ese fichero no cambia nada**, y este repositorio no lo
-declara: `bash harness/init.sh` sigue en verde sin ejecutar una sola línea de
-la sección nueva.
-
-- **Números**: 342 tests en verde (80 de F-020), cobertura de líneas cambiadas
-  99,4 % (167/168), campaña de mutación 46/46 mutantes **0 supervivientes**
-  (los 4 de la primera pasada eran huecos reales y tienen test), 122,9 s.
-- **Portado a `arnes-base` 1.3.0** en el mismo trabajo: commits locales
-  `cef7857` y `6035bdd`, sin push, con `servicios.ejemplo.json` en el payload y
-  la sección «Monorepo multi-servicio (desde 1.3.0)» en `GUIA_INSTALACION.md`.
-  `azure-apps/arnes_base.md` anotado (commit local `ac5fad6`).
-- **Corrección que afecta a TODOS los repositorios**, tengan servicios o no:
-  `pytest` devuelve 5 cuando no recoge ninguna prueba y la campaña de mutación
-  lo contaba como «mutante muerto». Desde ahora cuenta como superviviente. Si
-  un informe de mutación empeora al actualizar, es que antes mentía.
-- **Verificaciones MANUAL R18, R19 y R20 ejecutadas** con salida real pegada en
-  el informe (son locales: instalador de PowerShell 5.1 contra un monorepo
-  temporal en el scratchpad, Git Bash y git local; sin Azure y sin BBDD). El
-  humano solo tiene que revisarlas, o repetirlas con los mismos comandos.
-- **Defecto propio declarado**: el commit `9d58c09` (T8) se hizo con
-  `git add -A` y arrastró los ficheros de `specs/F-019-plan-mensual-por-tramos/`,
-  que son de otra feature. No se ha revertido (ya hay commits encima y los
-  ficheros están donde deben); queda anotado para quien lea el diff de la rama.
-
----
+**APPROVED del reviewer** (`progress/review_F-020.md`), rigor `estandar`.
+Resumen en `progress/history.md`; detalle en `progress/impl_F-020.md` y
+`progress/mutacion_F-020.md`. El arnés soporta monorepos multi-servicio
+(`harness/servicios.json` opcional); `arnes-base` en **1.3.0**. Este repo
+mono-proyecto no cambia de comportamiento (verificado por el reviewer).
 
 # F-019 · Spec escrita y APROBADA por el humano (2026-08-10)
 
@@ -393,36 +364,3 @@ aprobó el mismo día con DA-1..DA-4 como propuestas; la feature quedó
 apunte quedó pendiente para no colisionar con el trabajo de F-020.
 
 ---
-
-# F-020 · Spec escrita (2026-08-10, spec-author)
-
-Escrita `specs/F-020-arnes-multiservicio/` (requirements con R1–R20 en EARS,
-design con decisiones DA-1..DA-6, tasks T1–T11). La feature sigue `pending`
-hasta que el humano apruebe la spec (entonces el líder la pasa a
-`spec_ready`).
-
-Hallazgos técnicos que condicionan el diseño (verificados leyendo arnes-base
-1.2.1): (1) `es_produccion()` excluye `tests/` solo como prefijo, así que los
-tests de un servicio (`services/x/tests/`) entrarían hoy como código de
-producción a mutar y medir; (2) `EjecutorPytest` trata el exit 5 de pytest
-(«sin tests recogidos») como mutante MUERTO: en un servicio sin tests todos
-los mutantes «morirían» falsamente; (3) el coverage.json de un servicio
-numera rutas relativas al servicio y el alcance las numera desde la raíz:
-hace falta fusión con re-prefijado.
-
-## Decisiones abiertas que debe validar el humano (detalle en design.md)
-
-- **DA-1**: declaración explícita en `harness/servicios.json` (recomendada)
-  frente a autodescubrimiento o clave en rigor.json.
-- **DA-2**: implementar y testear en este repo y portar a arnes-base 1.3.0
-  (patrón F-015), matizando el «el trabajo vive en arnes-base» del encargo:
-  arnes-base no tiene infraestructura de tests propia.
-- **DA-3**: F-020 no declara `rigor` en features.json → hoy hereda
-  `critico`. Recomendado declarar `estandar` antes de pasarla a in_progress.
-- **DA-4**: código de raíz fuera de servicios sigue el camino mono-proyecto.
-- **DA-5**: servicio Python sin suite → sus mutantes sobreviven (no se
-  aborta la campaña).
-- **DA-6**: venv declarado pero inexistente → error explícito/KO, sin
-  fallback silencioso al intérprete global.
-
-Sin tocar: código, features.json, arnes-base (solo lectura). Sin commits.
