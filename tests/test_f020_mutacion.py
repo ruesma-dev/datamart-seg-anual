@@ -278,10 +278,21 @@ def test_f020_r3_main_con_declaracion_rota_no_muta_nada(
         mutacion, "alcance_de_feature", lambda *a, **k: alcance_de({"raiz.py": {2}})
     )
 
-    codigo = mutacion.main(["--feature", "F-042", "--raiz", str(tmp_path)])
+    # `--salida` dentro de tmp_path: ningún test escribe en progress/ del repo.
+    codigo = mutacion.main(
+        [
+            "--feature",
+            "F-042",
+            "--raiz",
+            str(tmp_path),
+            "--salida",
+            str(tmp_path / "informe.md"),
+        ]
+    )
 
     assert codigo == 2
     assert "no es JSON válido" in capsys.readouterr().err
+    assert not (tmp_path / "informe.md").exists(), "no se muta nada si la declaración está rota"
 
 
 def test_f020_r15_generar_mutantes_no_cambia_con_las_rutas_de_servicio() -> None:
