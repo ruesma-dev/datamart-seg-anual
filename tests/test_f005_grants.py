@@ -332,7 +332,8 @@ FICHEROS_VIGILADOS = (
 
 # Asignaciones con valor a la derecha. Lo que se busca NO es la palabra
 # 'password' —aparece por todas partes de forma legítima— sino que alguien haya
-# escrito un valor detrás.
+# escrito un valor detrás. Estos tres patrones traen su propio contexto de
+# asignación, así que no dan falsos positivos.
 PATRONES_SECRETO = (
     # PG_PASSWORD=algo (se admite vacío y se admiten referencias tipo $VAR)
     r"PG_PASSWORD\s*=\s*(?!\s*$)(?![#\$%<])\S+",
@@ -340,9 +341,44 @@ PATRONES_SECRETO = (
     r"\bpassword\s*=\s*(?![#\$%<'\"]|\*)\S+",
     # PASSWORD 'literal' en SQL (lo legítimo es PASSWORD :'variable')
     r"\bPASSWORD\s+'[^']+'",
-    # Cadenas con pinta de clave generada: 24+ caracteres de base64
-    r"[A-Za-z0-9+/]{24,}={0,2}(?![A-Za-z0-9+/=])",
 )
+
+# Cadenas con pinta de clave generada: 24+ caracteres del alfabeto base64.
+# Este patrón no tiene contexto de asignación, y es el que se equivoca: `/`
+# forma parte del alfabeto base64 y también de cualquier ruta del árbol.
+PATRON_CLAVE_GENERADA = r"[A-Za-z0-9+/]{24,}={0,2}(?![A-Za-z0-9+/=])"
+
+
+def _parece_ruta(candidato: str) -> bool:
+    """
+    ¿El candidato es una ruta del árbol y no una clave? (afinado de F-016)
+
+    Hallazgo de F-004: `etl_sigrid/infrastructure/excel/` en una frase de
+    `docs/ARCHITECTURE.md` casaba con el patrón de base64 y puso `init.sh` en
+    rojo. El criterio que los separa es doble y deliberadamente estrecho: dos
+    barras o más —una ruta con varios segmentos— **y** ni una mayúscula. Una
+    clave generada de 24 caracteres o más sin una sola mayúscula es un suceso
+    de probabilidad despreciable; una ruta del repositorio, la norma.
+    """
+    return candidato.count("/") >= 2 and candidato == candidato.lower()
+
+
+def buscar_secretos(texto: str) -> list[str]:
+    """
+    Fragmentos de `texto` que parecen un secreto. Es el barrido de R21 hecho
+    función, para poder comprobar que sigue cazando de verdad (F-016).
+    """
+    hallazgos = [
+        coincidencia.group(0)
+        for patron in PATRONES_SECRETO
+        for coincidencia in re.finditer(patron, texto)
+    ]
+    hallazgos += [
+        coincidencia.group(0)
+        for coincidencia in re.finditer(PATRON_CLAVE_GENERADA, texto)
+        if not _parece_ruta(coincidencia.group(0))
+    ]
+    return hallazgos
 
 
 def test_f005_r21_barrido_de_secretos_en_el_arbol() -> None:
@@ -357,12 +393,42 @@ def test_f005_r21_barrido_de_secretos_en_el_arbol() -> None:
         assert fichero.exists(), f"falta {relativo}"
         texto = fichero.read_text(encoding="utf-8-sig")
 
-        for patron in PATRONES_SECRETO:
-            encontrado = re.search(patron, texto)
-            assert encontrado is None, (
-                f"{relativo} parece contener un secreto: {encontrado.group(0)!r} "
-                f"(patrón {patron})"
-            )
+        hallazgos = buscar_secretos(texto)
+        assert hallazgos == [], (
+            f"{relativo} parece contener un secreto: {hallazgos!r}"
+        )
+
+
+def test_f016_el_barrido_afinado_caza_la_clave_y_no_la_ruta() -> None:
+    """
+    El test del test (F-016): afinar un barrido es fácil; afinarlo hasta que
+    deja de cazar, también. Este control fija las dos mitades.
+
+    Precedente: el implementer de F-005 inyectó una contraseña falsa en
+    `.env.example` para comprobar que el barrido saltaba. Aquí se hace lo mismo
+    sin tocar ningún fichero del repositorio.
+    """
+    # --- Sigue cazando lo que tiene que cazar (claves de mentira) ----------
+    assert buscar_secretos("PG_PASSWORD=Kj8sQ2mNp4TvR7wXz1Ab3Cd5")
+    assert buscar_secretos("host=x dbname=y password=Kj8sQ2mNp4TvR7wXz1Ab")
+    assert buscar_secretos("CREATE ROLE mcp LOGIN PASSWORD 'un-secreto-cualquiera'")
+    # Clave suelta, sin asignación delante: el patrón de base64 la caza igual.
+    assert buscar_secretos("clave rotada: Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA==")
+
+    # --- Y ya no se equivoca con las rutas largas (hallazgo de F-004) ------
+    frase = (
+        "El lector de Excel vive en etl_sigrid/infrastructure/excel/ y no "
+        "toca el disco local."
+    )
+    assert re.search(PATRON_CLAVE_GENERADA, frase), (
+        "el patrón crudo SÍ casa con la ruta: es justo el falso positivo que "
+        "puso init.sh en rojo en F-004"
+    )
+    assert buscar_secretos(frase) == [], "y el barrido afinado ya no se lo cree"
+
+    # Lo que se descarta es la ruta, no cualquier cosa con barras: una clave
+    # con barras pero con mayúsculas sigue saltando.
+    assert buscar_secretos("token AbCd/EfGh/IjKl/MnOpQrStUv") != []
 
 
 def test_f005_r40_ni_env_example_ni_infra_contienen_secretos() -> None:
