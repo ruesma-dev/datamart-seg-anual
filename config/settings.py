@@ -121,6 +121,27 @@ class PostgresSettings(BaseSettings):
         description="Esquemas, separados por comas, sobre los que el rol de solo "
                     "lectura recibe USAGE + SELECT.",
     )
+    # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
+    # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y
+    # dejó a albaranes y partes en solo-lectura diez minutos. Estos tres valores
+    # son los que acotan el pico y frenan el build antes de repetirlo.
+    tramo_max_filas: int = Field(
+        1_000_000,
+        description="Peso máximo de un tramo, medido en filas de raw.obrparpre "
+                    "atribuibles a sus obras. Una obra que sola lo supere va en "
+                    "un tramo unitario, con aviso.",
+    )
+    disco_total_gb: int = Field(
+        32,
+        description="Tamaño total del disco del servidor Postgres, en GB. No se "
+                    "cablea: el servidor puede crecer sin que cambie el código.",
+    )
+    disco_limite_pct: float = Field(
+        80.0,
+        description="Ocupación por encima de la cual el build de plan_mensual "
+                    "aborta ANTES de lanzar el siguiente tramo. La protección de "
+                    "Azure salta hacia el 95 %; el incidente tocó el 93,4 %.",
+    )
 
     @field_validator("auth_mode")
     @classmethod

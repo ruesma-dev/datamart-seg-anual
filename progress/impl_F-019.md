@@ -98,3 +98,21 @@ porque un «4 passed» sin explicar induce a error.
 
 **Verde tras implementar**: `10 passed in 0.06s`.
 
+
+## RED de T4 · settings `PG_TRAMO_MAX_FILAS` / `PG_DISCO_TOTAL_GB` / `PG_DISCO_LIMITE_PCT`
+
+```
+$ python -m pytest tests/test_f019_tramos.py -q -k "r4_maximo_configurable" --tb=short
+F                                                                        [100%]
+_______________ test_f019_r4_maximo_configurable_desde_settings _______________
+tests\test_f019_tramos.py:132: in test_f019_r4_maximo_configurable_desde_settings
+    assert por_defecto.tramo_max_filas == 1_000_000
+.venv\Lib\site-packages\pydantic\main.py:1042: in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E   AttributeError: 'PostgresSettings' object has no attribute 'tramo_max_filas'
+=========================== short test summary info ===========================
+FAILED tests/test_f019_tramos.py::test_f019_r4_maximo_configurable_desde_settings
+1 failed, 10 deselected in 0.56s
+```
+
+**Verde tras implementar**: `11 passed in 0.47s`.

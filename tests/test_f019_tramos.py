@@ -13,11 +13,16 @@ from __future__ import annotations
 
 import pytest
 
+from config.settings import PostgresSettings
 from etl_sigrid.domain.tramos import (
     Tramo,
     planificar_tramos,
     tramos_sobredimensionados,
 )
+
+# Variables de entorno de la feature. Se limpian en los tests de settings para
+# que el .env del puesto (que apunta a Azure) no decida el resultado.
+VARIABLES_F019 = ("PG_TRAMO_MAX_FILAS", "PG_DISCO_TOTAL_GB", "PG_DISCO_LIMITE_PCT")
 
 # Pesos de ejemplo: 10 obras con la asimetría típica (unas pocas pesan mucho).
 PESOS: dict[int, int] = {
@@ -109,6 +114,32 @@ def test_f019_r4_obra_gigante_va_en_tramo_unitario_con_warning() -> None:
 def test_f019_r4_un_maximo_no_positivo_es_un_error_de_configuracion() -> None:
     with pytest.raises(ValueError, match="PG_TRAMO_MAX_FILAS"):
         planificar_tramos(PESOS, 0)
+
+
+def test_f019_r4_maximo_configurable_desde_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Los tres parámetros de la feature son settings con default, no constantes.
+
+    Importa porque las mediciones de T1 (que ejecuta el humano contra su
+    PostgreSQL local) pueden obligar a mover los valores: deben moverse por
+    variable de entorno, sin tocar código ni tests.
+    """
+    for variable in VARIABLES_F019:
+        monkeypatch.delenv(variable, raising=False)
+
+    por_defecto = PostgresSettings(_env_file=None)
+    assert por_defecto.tramo_max_filas == 1_000_000
+    assert por_defecto.disco_total_gb == 32
+    assert por_defecto.disco_limite_pct == 80.0
+
+    monkeypatch.setenv("PG_TRAMO_MAX_FILAS", "250000")
+    monkeypatch.setenv("PG_DISCO_TOTAL_GB", "64")
+    monkeypatch.setenv("PG_DISCO_LIMITE_PCT", "65.5")
+    configurado = PostgresSettings(_env_file=None)
+    assert configurado.tramo_max_filas == 250_000
+    assert configurado.disco_total_gb == 64
+    assert configurado.disco_limite_pct == 65.5
 
 
 # --- R5 · Plan determinista --------------------------------------------------
