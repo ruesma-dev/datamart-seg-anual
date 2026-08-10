@@ -25,6 +25,7 @@ from pathlib import Path
 
 from harness.alcance import Alcance, alcance_de_feature
 from harness.rigor import RUTA_RIGOR, cargar_rigor, timeout_mutacion
+from harness.servicios import Servicio, cargar_servicios, interprete, servicio_de_ruta
 
 Posicion = tuple[int, int]
 
@@ -35,6 +36,11 @@ TIMEOUT = "timeout"
 
 #: Segundos máximos por mutante si nadie configura otra cosa.
 TIMEOUT_POR_DEFECTO = 120
+
+#: Código con el que pytest avisa de que no ha recogido NINGÚN test. No es un
+#: fallo de la suite: es que no hay suite. Contarlo como mutante muerto daría
+#: por cazado lo que nadie comprueba, justo lo que esta herramienta destapa.
+PYTEST_SIN_TESTS = 5
 
 #: (símbolo original, símbolo mutado) por tipo de nodo del árbol sintáctico.
 COMPARACIONES: dict[type, tuple[str, str]] = {
@@ -269,17 +275,27 @@ class EjecutorPytest:
     """Lanza la suite en un proceso aparte y traduce el resultado.
 
     Que la suite falle significa que los tests CAZAN el mutante (muerto). Que
-    pase significa que el mutante sobrevive: nadie comprobaba esa línea.
+    pase —o que no haya ningún test que recoger— significa que el mutante
+    sobrevive: nadie comprobaba esa línea.
+
+    `raiz` es el directorio desde el que se lanza la suite y `ejecutable`, el
+    intérprete con el que se lanza. En un monorepo, los de cada servicio.
     """
 
-    def __init__(self, raiz: str = ".", argumentos: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        raiz: str = ".",
+        argumentos: list[str] | None = None,
+        ejecutable: str | None = None,
+    ) -> None:
         self.raiz = raiz
         self.argumentos = argumentos or ["-x", "-q", "--tb=no", "-p", "no:cacheprovider"]
+        self.ejecutable = ejecutable or sys.executable
 
     def ejecutar(self, timeout_s: int) -> str:
         try:
             proceso = subprocess.run(
-                [sys.executable, "-m", "pytest", *self.argumentos],
+                [self.ejecutable, "-m", "pytest", *self.argumentos],
                 cwd=self.raiz,
                 capture_output=True,
                 timeout=timeout_s,
@@ -287,7 +303,28 @@ class EjecutorPytest:
             )
         except subprocess.TimeoutExpired:
             return TIMEOUT
-        return SUPERVIVIENTE if proceso.returncode == 0 else MUERTO
+        if proceso.returncode in (0, PYTEST_SIN_TESTS):
+            return SUPERVIVIENTE
+        return MUERTO
+
+
+def ejecutor_para(
+    fichero: str, servicios: list[Servicio], raiz: str = "."
+) -> EjecutorPytest:
+    """Ejecutor con el que se juzga un mutante, según a qué servicio pertenece.
+
+    Un fichero de un servicio Python se juzga con la suite de ESE servicio, en
+    su directorio y con su intérprete. Todo lo demás —código de la raíz, o un
+    `.py` suelto dentro de un servicio de otro lenguaje— con la suite de la
+    raíz, como en un repositorio de un solo proyecto.
+    """
+    servicio = servicio_de_ruta(fichero, servicios)
+    if servicio is None or servicio.lenguaje != "python":
+        return EjecutorPytest(raiz=raiz)
+    return EjecutorPytest(
+        raiz=str(Path(raiz) / servicio.ruta),
+        ejecutable=interprete(servicio, raiz),
+    )
 
 
 # --- Campaña ----------------------------------------------------------------
@@ -323,8 +360,13 @@ def ejecutar_campania(
     semilla: int | None = None,
     mutantes: list[Mutante] | None = None,
     eco: Callable[[str], None] | None = None,
+    ejecutor_de: Callable[[str], object] | None = None,
 ) -> InformeMutacion:
     """Muta el alcance, mutante a mutante, y cuenta cuántos sobreviven.
+
+    Con `ejecutor_de` se elige el ejecutor fichero a fichero (un monorepo juzga
+    cada mutante con la suite de su servicio); sin ella se usa `ejecutor` para
+    todo, que es el caso de un repositorio de un solo proyecto.
 
     Garantía dura: pase lo que pase (excepción, timeout, Ctrl-C), ningún
     fichero queda mutado en el árbol de trabajo al salir de esta función.
@@ -373,10 +415,12 @@ def ejecutar_campania(
                 informe.muertos += 1  # no compila: los tests lo cazarían siempre
                 continue
 
+            elegido = ejecutor if ejecutor_de is None else ejecutor_de(mutante.fichero)
+
             ruta = base / mutante.fichero
             try:
                 _escribir(ruta, mutada)
-                veredicto = ejecutor.ejecutar(timeout_s)
+                veredicto = elegido.ejecutar(timeout_s)
             finally:
                 _escribir(ruta, fuente)
 
@@ -528,6 +572,12 @@ def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
     timeout_s = opciones.timeout or _timeout_configurado()
 
     try:
+        servicios = cargar_servicios(raiz=opciones.raiz)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+
+    try:
         alcance = alcance_de_feature(
             opciones.feature, base=opciones.base, rama=opciones.rama, raiz=opciones.raiz
         )
@@ -539,6 +589,9 @@ def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
     if not alcance.lineas:
         print("Sin líneas de producción en el alcance: nada que mutar.")
 
+    def factoria(fichero: str) -> object:
+        return ejecutor_para(fichero, servicios, opciones.raiz)
+
     informe = ejecutar_campania(
         alcance,
         ejecutor or EjecutorPytest(raiz=opciones.raiz),
@@ -547,6 +600,7 @@ def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
         max_mutantes=opciones.max_mutantes,
         semilla=opciones.semilla,
         eco=lambda linea: print(linea, flush=True),
+        ejecutor_de=factoria if servicios and ejecutor is None else None,
     )
 
     destino = Path(opciones.salida or f"progress/mutacion_{opciones.feature}.md")

@@ -323,3 +323,30 @@ Dependencia nueva en la imagen: `azure-storage-blob>=12.20.0`.
 Commits: `de8db29` (apertura), `F-004 T1..T11`, cierre del líder.
 
 ---
+
+# F-020 · Arnés multi-servicio para monorepos (cerrada 2026-08-10)
+
+**APPROVED** (`progress/review_F-020.md`), rigor `estandar`, 11/11 tareas.
+El arnés funciona ahora en monorepos de varios servicios: declaración
+opcional en `harness/servicios.json` (sin fichero, comportamiento
+mono-proyecto idéntico — retrocompatibilidad verificada por el reviewer con
+la suite completa previa), `init.sh` valida cada servicio con su venv y su
+suite, la cobertura fusiona el coverage de cada servicio y la mutación juzga
+cada mutante con la suite de su servicio (DA-5: un servicio sin tests deja a
+sus mutantes sobrevivir, visible). Venv declarado inexistente = KO (DA-6).
+
+Probado de verdad contra un monorepo temporal de fixture (T8, salida real en
+el informe). Portado a **`arnes-base` 1.3.0** (commit local allí) con la
+sección «monorepo multi-servicio» en su guía; anotado en
+`azure-apps/arnes_base.md`. Es el prerrequisito de la migración de
+albaranes/partes/portal a monorepos por app.
+
+Evidencias: 342 tests (80 nuevos), cobertura de lo cambiado 99,4 %
+(167/168), mutación **46/46 muertos, 0 supervivientes** (4 en primera
+pasada, cerrados con tests). Totales verificados de forma independiente por
+el reviewer. Incidencias de higiene declaradas: un `git add -A` en T8
+arrastró la spec de F-019 (inofensivo, historia no reescrita) y un artefacto
+de test se retiró en commit propio. Tres reinicios del proceso anfitrión
+durante la feature; el trabajo se retomó de transcripción sin pérdidas.
+
+---

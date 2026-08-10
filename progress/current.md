@@ -348,35 +348,19 @@ Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
 
 ---
 
-# F-020 · Spec escrita (2026-08-10, spec-author)
+# F-020 · CERRADA (2026-08-10)
 
-Escrita `specs/F-020-arnes-multiservicio/` (requirements con R1–R20 en EARS,
-design con decisiones DA-1..DA-6, tasks T1–T11). La feature sigue `pending`
-hasta que el humano apruebe la spec (entonces el líder la pasa a
-`spec_ready`).
+**APPROVED del reviewer** (`progress/review_F-020.md`), rigor `estandar`.
+Resumen en `progress/history.md`; detalle en `progress/impl_F-020.md` y
+`progress/mutacion_F-020.md`. El arnés soporta monorepos multi-servicio
+(`harness/servicios.json` opcional); `arnes-base` en **1.3.0**. Este repo
+mono-proyecto no cambia de comportamiento (verificado por el reviewer).
 
-Hallazgos técnicos que condicionan el diseño (verificados leyendo arnes-base
-1.2.1): (1) `es_produccion()` excluye `tests/` solo como prefijo, así que los
-tests de un servicio (`services/x/tests/`) entrarían hoy como código de
-producción a mutar y medir; (2) `EjecutorPytest` trata el exit 5 de pytest
-(«sin tests recogidos») como mutante MUERTO: en un servicio sin tests todos
-los mutantes «morirían» falsamente; (3) el coverage.json de un servicio
-numera rutas relativas al servicio y el alcance las numera desde la raíz:
-hace falta fusión con re-prefijado.
+# F-019 · Spec escrita y APROBADA por el humano (2026-08-10)
 
-## Decisiones abiertas que debe validar el humano (detalle en design.md)
+Su `spec-author` escribió `specs/F-019-plan-mensual-por-tramos/` y el humano la
+aprobó el mismo día con DA-1..DA-4 como propuestas; la feature quedó
+`spec_ready` con rigor `critico` (commit `bf60eb0`). Se anota aquí porque el
+apunte quedó pendiente para no colisionar con el trabajo de F-020.
 
-- **DA-1**: declaración explícita en `harness/servicios.json` (recomendada)
-  frente a autodescubrimiento o clave en rigor.json.
-- **DA-2**: implementar y testear en este repo y portar a arnes-base 1.3.0
-  (patrón F-015), matizando el «el trabajo vive en arnes-base» del encargo:
-  arnes-base no tiene infraestructura de tests propia.
-- **DA-3**: F-020 no declara `rigor` en features.json → hoy hereda
-  `critico`. Recomendado declarar `estandar` antes de pasarla a in_progress.
-- **DA-4**: código de raíz fuera de servicios sigue el camino mono-proyecto.
-- **DA-5**: servicio Python sin suite → sus mutantes sobreviven (no se
-  aborta la campaña).
-- **DA-6**: venv declarado pero inexistente → error explícito/KO, sin
-  fallback silencioso al intérprete global.
-
-Sin tocar: código, features.json, arnes-base (solo lectura). Sin commits.
+---

@@ -19,8 +19,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-#: Directorios cuyo contenido nunca es código de producción mutable.
-DIRECTORIOS_EXCLUIDOS: tuple[str, ...] = ("tests/", "specs/", "progress/", "docs/")
+#: Directorios cuyo contenido nunca es código de producción mutable. Se
+#: comparan como SEGMENTO de ruta a cualquier profundidad, no como prefijo de
+#: la raíz: en un repositorio con servicios en subcarpetas, los tests de un
+#: servicio son tests igual que los de la raíz.
+DIRECTORIOS_EXCLUIDOS: tuple[str, ...] = ("tests", "specs", "progress", "docs")
 
 #: Ruta por defecto del inventario de features del arnés.
 RUTA_FEATURES = "harness/features.json"
@@ -109,12 +112,16 @@ def parsear_diff(texto: str) -> dict[str, set[int]]:
 def es_produccion(ruta: str) -> bool:
     """¿Es `ruta` código de producción susceptible de mutarse o medirse?
 
-    Solo Python, y fuera de los directorios de tests y documentación.
+    Solo Python, y con ningún directorio excluido en su camino: basta con que
+    `tests`, `specs`, `progress` o `docs` aparezca como un segmento completo,
+    esté en la raíz o dentro de un servicio del monorepo. El nombre del propio
+    fichero no cuenta: `app/docs.py` es código.
     """
     normalizada = ruta.replace("\\", "/")
     if not normalizada.endswith(".py"):
         return False
-    return not normalizada.startswith(DIRECTORIOS_EXCLUIDOS)
+    directorios = normalizada.split("/")[:-1]
+    return not any(nombre in DIRECTORIOS_EXCLUIDOS for nombre in directorios)
 
 
 def filtrar_produccion(lineas: dict[str, set[int]]) -> dict[str, set[int]]:
