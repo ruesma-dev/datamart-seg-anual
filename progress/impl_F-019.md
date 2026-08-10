@@ -116,3 +116,57 @@ FAILED tests/test_f019_tramos.py::test_f019_r4_maximo_configurable_desde_setting
 ```
 
 **Verde tras implementar**: `11 passed in 0.47s`.
+
+## RED de T5 · el SQL filtra por obra en las dos ramas (R6)
+
+Los tests estáticos existían antes de tocar el `.sql` (primero se añadieron
+las constantes `MARCADOR_FILTRO_OBRAS` y `RAMAS_CON_FILTRO` al step, para que
+el test lea el mismo contrato que usa el código):
+
+```
+$ python -m pytest tests/test_f019_tramos.py -q -k f019_r6 --tb=short
+________________ test_f019_r6_marcador_presente_en_ambas_ramas ________________
+tests\test_f019_tramos.py:175: in test_f019_r6_marcador_presente_en_ambas_ramas
+    assert MARCADOR_FILTRO_OBRAS in rama_master, "rama master sin filtro de tramo"
+E   AssertionError: rama master sin filtro de tramo
+E   assert '/*F019_FILTRO_OBRAS*/' in 'master_planif AS (\n    SELECT\n ...'
+_________________ test_f019_r6_el_sql_ya_no_contiene_truncate _________________
+tests\test_f019_tramos.py:186: in test_f019_r6_el_sql_ya_no_contiene_truncate
+    assert "TRUNCATE" not in _sql_plan_mensual().upper()
+E   AssertionError: assert 'TRUNCATE' not in '-- ETL_SIGR...S_CON_LAG;\n'
+E     'TRUNCATE' is contained here:
+E       TRUNCATE TABLE STG.PLAN_MENSUAL;
+=========================== short test summary info ===========================
+FAILED tests/test_f019_tramos.py::test_f019_r6_marcador_presente_en_ambas_ramas
+FAILED tests/test_f019_tramos.py::test_f019_r6_el_sql_ya_no_contiene_truncate
+2 failed, 1 passed, 11 deselected in 0.82s
+```
+
+**Verde tras cambiar el SQL**: `14 passed in 0.59s`.
+
+**Diff del `.sql`, verificado línea a línea** (`git diff --stat`: 20 inserciones,
+2 borrados; de las inserciones, 18 son comentario de cabecera):
+
+- `- TRUNCATE TABLE stg.plan_mensual;` (y su línea en blanco) — se va al step.
+- `+ AND pp.obra_id = ANY (/*F019_FILTRO_OBRAS*/)` en el `WHERE` de
+  `master_planif`.
+- `+ AND pp.obra_id = ANY (/*F019_FILTRO_OBRAS*/)` en el `WHERE` de
+  `reales_base`.
+
+**Cero líneas de lógica de negocio cambiadas**: ni una expresión, ni un
+`ROUND`, ni una ventana, ni un comentario de la interpretación del planif. Lo
+vigila además `test_f019_r6_la_logica_de_negocio_del_planif_sigue_intacta`.
+
+**Decisión menor tomada aquí** (el design la dejaba abierta): NO se añade el
+filtro sobre `fa.obride` en la subconsulta de `raw.obrfasamb`. El design lo
+permitía «si el implementer lo decide midiendo», y **medir exige BBDD**, que
+este agente tiene prohibida. Añadirlo a ciegas cambiaría el plan de ejecución
+de un SQL validado al céntimo sin ninguna evidencia a favor. Queda anotado
+como palanca disponible si T12 midiera un coste feo en el join.
+
+**Consecuencia de forma**: en el fichero ya no aparece la palabra TRUNCATE ni
+el marcador entre barras fuera de las dos ramas, porque los tests estáticos
+son deliberadamente literales (`"TRUNCATE" not in sql.upper()`,
+`sql.count(MARCADOR) == 2`). Un test tonto y fuerte se prefirió a uno listo
+que hubiera que mantener; el precio es redactar los comentarios sin esas dos
+cadenas.

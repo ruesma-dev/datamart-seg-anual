@@ -14,6 +14,11 @@ from __future__ import annotations
 import pytest
 
 from config.settings import PostgresSettings
+from etl_sigrid.application.steps.build_stg_step import (
+    DIRECTORIO_SQL_STG,
+    MARCADOR_FILTRO_OBRAS,
+    RAMAS_CON_FILTRO,
+)
 from etl_sigrid.domain.tramos import (
     Tramo,
     planificar_tramos,
@@ -23,6 +28,10 @@ from etl_sigrid.domain.tramos import (
 # Variables de entorno de la feature. Se limpian en los tests de settings para
 # que el .env del puesto (que apunta a Azure) no decida el resultado.
 VARIABLES_F019 = ("PG_TRAMO_MAX_FILAS", "PG_DISCO_TOTAL_GB", "PG_DISCO_LIMITE_PCT")
+
+# El mismo fichero que ejecuta el step, resuelto por la misma constante: si el
+# step cambiara de sitio el SQL, estos tests no seguirían mirando a otro lado.
+RUTA_PLAN_MENSUAL = DIRECTORIO_SQL_STG / "08_plan_mensual.sql"
 
 # Pesos de ejemplo: 10 obras con la asimetría típica (unas pocas pesan mucho).
 PESOS: dict[int, int] = {
@@ -140,6 +149,58 @@ def test_f019_r4_maximo_configurable_desde_settings(
     assert configurado.tramo_max_filas == 250_000
     assert configurado.disco_total_gb == 64
     assert configurado.disco_limite_pct == 65.5
+
+
+# --- R6 · El SQL filtra por obra en las DOS ramas ----------------------------
+#
+# Tests estáticos: leen el fichero .sql y no ejecutan SQL contra nada. No
+# validan sintaxis (eso solo lo hace la BBDD, en R13/R14), pero convierten la
+# regresión más probable —alguien edita el fichero y se lleva por delante un
+# filtro— en rojo inmediato de la suite. Un tramo que filtrara solo una rama
+# duplicaría las filas de la otra en CADA tramo.
+
+
+def _sql_plan_mensual() -> str:
+    return RUTA_PLAN_MENSUAL.read_text(encoding="utf-8")
+
+
+def test_f019_r6_marcador_presente_en_ambas_ramas() -> None:
+    sql = _sql_plan_mensual()
+    inicio_master = sql.index("master_planif AS (")
+    inicio_reales = sql.index("reales_base AS (")
+    assert inicio_master < inicio_reales, "el fichero ya no tiene las dos ramas"
+
+    rama_master = sql[inicio_master:inicio_reales]
+    rama_reales = sql[inicio_reales:]
+    assert MARCADOR_FILTRO_OBRAS in rama_master, "rama master sin filtro de tramo"
+    assert MARCADOR_FILTRO_OBRAS in rama_reales, "rama reales sin filtro de tramo"
+    assert sql.count(MARCADOR_FILTRO_OBRAS) == RAMAS_CON_FILTRO
+
+
+def test_f019_r6_el_sql_ya_no_contiene_truncate() -> None:
+    """El TRUNCATE lo ejecuta el step UNA vez, antes del primer tramo.
+
+    Si volviera al fichero, cada tramo borraría lo que insertó el anterior y
+    `stg.plan_mensual` acabaría con las obras del último tramo y nada más.
+    """
+    assert "TRUNCATE" not in _sql_plan_mensual().upper()
+
+
+def test_f019_r6_la_logica_de_negocio_del_planif_sigue_intacta() -> None:
+    """La interpretación del planif está validada al céntimo contra Sigrid.
+
+    F-019 solo añade un filtro y quita un TRUNCATE; estas marcas de la lógica
+    de negocio tienen que seguir ahí.
+    """
+    sql = _sql_plan_mensual()
+    for marca in (
+        "max_posterior",
+        "ultimo_positivo",
+        "grupo_positivo",
+        "stg.fn_master_fecha_efectiva",
+        "WHERE NOT (pct_acumulado = 0 AND pct_mes = 0)",
+    ):
+        assert marca in sql, f"desapareció del SQL: {marca}"
 
 
 # --- R5 · Plan determinista --------------------------------------------------

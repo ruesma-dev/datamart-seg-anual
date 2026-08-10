@@ -85,8 +85,25 @@
 -- ===========================================================================
 -- BRANCH B: REALES (amb=3 coste real, amb=7 venta real) — sin cambios
 -- ===========================================================================
-
-TRUNCATE TABLE stg.plan_mensual;
+--
+-- ===========================================================================
+-- EJECUCIÓN POR TRAMOS DE OBRAS (F-019, incidente del 2026-08-09)
+-- ===========================================================================
+-- Este fichero YA NO SE EJECUTA TAL CUAL: `build_stg_step` sustituye el
+-- marcador de filtro (el comentario F019_FILTRO_OBRAS que hay más abajo, en
+-- las dos ramas) por la lista de obras del tramo y lo lanza una vez por
+-- tramo, cada uno en su propia transacción. El VACIADO de la tabla lo ejecuta
+-- el step UNA sola vez, antes del primer tramo: si siguiera aquí, cada tramo
+-- borraría lo insertado por el anterior y solo sobreviviría el último.
+--
+-- El corte es por obra porque NINGUNA ventana de este fichero cruza obras:
+-- todas particionan por presupuesto_id (que pertenece a una única obra) o por
+-- (obra_id, partida_id, ambito_id). Por eso el resultado por tramos es, por
+-- construcción, idéntico al de una pasada única.
+--
+-- El filtro va en las DOS ramas. Filtrar solo una duplicaría las filas de la
+-- otra en cada tramo. Ni una línea de la lógica de negocio cambia.
+-- ===========================================================================
 
 -- ===========================================================================
 -- BRANCH A: MASTER (amb 8, 11)
@@ -153,6 +170,7 @@ WITH master_planif AS (
        AND fa.ambito_id      = pp.ambito_id
        AND fa.version_master = pp.fase_num
     WHERE pp.ambito_id IN (8, 11)
+      AND pp.obra_id = ANY (/*F019_FILTRO_OBRAS*/)   -- tramo (F-019)
       AND op.planif IS NOT NULL
       AND length(trim(op.planif)) >= 1
       AND fa.plafec_date IS NOT NULL
@@ -305,6 +323,7 @@ reales_base AS (
         ON f.obra_id     = pp.obra_id
        AND f.numero_fase = pp.fase_num
     WHERE pp.ambito_id IN (3, 7)
+      AND pp.obra_id = ANY (/*F019_FILTRO_OBRAS*/)   -- tramo (F-019)
       AND pp.fase_num >= 1
       AND f.anio IS NOT NULL
       AND f.mes  IS NOT NULL

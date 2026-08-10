@@ -32,6 +32,24 @@ from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
 
 logger = get_logger(__name__)
 
+# Directorio de los SQL de la capa stg. Constante de módulo para que los tests
+# estáticos de F-019 lean EXACTAMENTE el fichero que ejecuta el step.
+DIRECTORIO_SQL_STG = (
+    Path(__file__).resolve().parent.parent.parent
+    / "infrastructure" / "postgres" / "sql" / "stg"
+)
+
+# --- Troceo de stg.plan_mensual (F-019) ------------------------------------
+# El marcador se sustituye por la lista de obras del tramo (enteros validados)
+# justo antes de ejecutar. Va como comentario SQL a propósito: un fichero al
+# que le falte la sustitución no es SQL válido —`= ANY ()`— y por tanto no
+# puede colarse una ejecución sin filtro por descuido.
+MARCADOR_FILTRO_OBRAS = "/*F019_FILTRO_OBRAS*/"
+
+# Las DOS ramas del fichero (master amb 8/11 y reales amb 3/7) llevan filtro.
+# Filtrar solo una duplicaría las filas de la otra en cada tramo.
+RAMAS_CON_FILTRO = 2
+
 
 @dataclass(slots=True, frozen=True)
 class _SubStep:
@@ -80,10 +98,7 @@ class BuildStgStep(PipelineStep):
             logger.error("preflight_check_failed", error=str(e))
             return result
 
-        sql_dir = (
-            Path(__file__).resolve().parent.parent.parent
-            / "infrastructure" / "postgres" / "sql" / "stg"
-        )
+        sql_dir = DIRECTORIO_SQL_STG
 
         cod_version_master = self._settings.business_rules["sigrid"]["campos_extendidos"][
             "cod_version_master_vigente"
