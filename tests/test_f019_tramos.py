@@ -11,18 +11,22 @@ función pura del dominio y solo recibe un diccionario de pesos.
 
 from __future__ import annotations
 
-import pytest
-
 from collections.abc import Iterator
 from contextlib import contextmanager
+from types import SimpleNamespace
+
+import pytest
 
 from config.settings import PostgresSettings
 from etl_sigrid.application.steps.build_stg_step import (
     DIRECTORIO_SQL_STG,
     MARCADOR_FILTRO_OBRAS,
     RAMAS_CON_FILTRO,
+    BuildStgStep,
+    PlanMensualAbortado,
     componer_sql_tramo,
 )
+from etl_sigrid.domain.entities import StepStatus
 from etl_sigrid.domain.tramos import (
     Tramo,
     planificar_tramos,
@@ -384,6 +388,323 @@ def test_f019_r11_un_recuento_no_disponible_cuenta_como_cero_filas() -> None:
     for rowcount in (None, -1, 0):
         cliente, _ = cliente_con(CursorFalso(rowcount=rowcount))
         assert cliente.execute_sql_text("INSERT ...") == 0
+
+
+# --- Dobles para la orquestación del step -------------------------------------
+
+# Tres obras y un máximo de 1 000: el plan sale en DOS tramos —(1,) de peso 600
+# y (2, 3) de peso 900—, que es lo mínimo para poder observar «antes de cada
+# tramo», «se para en el segundo» y «no se ejecutan los siguientes».
+PESOS_CORTOS: dict[int, int] = {1: 600, 2: 500, 3: 400}
+MAXIMO_CORTO = 1_000
+
+
+class PgFalso:
+    """Doble de `PostgresClient` que deja traza de TODO lo que le piden.
+
+    No hereda de `PostgresClient` a propósito: si el step llamara a un método
+    que este doble no implementa, el test debe fallar, no acabar en una
+    conexión real.
+    """
+
+    def __init__(
+        self,
+        pesos: dict[int, int] | None = None,
+        ocupaciones: list[float] | None = None,
+        filas: list[int] | None = None,
+        error_medicion: Exception | None = None,
+        tramo_que_falla: int | None = None,
+    ) -> None:
+        self.pesos = dict(PESOS_CORTOS if pesos is None else pesos)
+        self._ocupaciones = list([10.0, 10.0] if ocupaciones is None else ocupaciones)
+        self._filas = list([700, 900] if filas is None else filas)
+        self._error_medicion = error_medicion
+        self._tramo_que_falla = tramo_que_falla
+
+        self.traza: list[str] = []
+        self.truncados: list[tuple[str, str]] = []
+        self.sql_ejecutado: list[str] = []
+        self.ficheros_ejecutados: list[str] = []
+        self.pasos_registrados: list[str] = []
+        self.cierres: list[tuple[int, str, int, str | None]] = []
+        self.total_gb_medidos: list[int] = []
+        self._ultimo_run = 0
+
+    # --- lo que usa el build por tramos ---
+    def fetch_pesos_plan_mensual(self) -> dict[int, int]:
+        self.traza.append("pesos")
+        return dict(self.pesos)
+
+    def truncate_table(self, schema: str, table: str) -> None:
+        self.traza.append("truncate")
+        self.truncados.append((schema, table))
+
+    def medir_ocupacion_disco_pct(self, total_gb: int) -> float:
+        self.traza.append("medicion")
+        self.total_gb_medidos.append(total_gb)
+        if self._error_medicion is not None:
+            raise self._error_medicion
+        return self._ocupaciones.pop(0)
+
+    def execute_sql_text(self, sql_text: str) -> int:
+        self.traza.append("sql")
+        self.sql_ejecutado.append(sql_text)
+        if len(self.sql_ejecutado) == self._tramo_que_falla:
+            raise RuntimeError("could not extend file: No space left on device")
+        return self._filas.pop(0)
+
+    # --- lo que usa el resto del step ---
+    def record_run_start(self, stage: str, step: str) -> int:
+        self.pasos_registrados.append(step)
+        self._ultimo_run += 1
+        return self._ultimo_run
+
+    def record_run_end(
+        self,
+        run_id: int,
+        status: str,
+        rows_processed: int = 0,
+        error_message: str | None = None,
+    ) -> None:
+        self.cierres.append((run_id, status, rows_processed, error_message))
+
+    def execute_sql_file(self, path: object, params: object = None) -> None:
+        self.traza.append("fichero")
+        self.ficheros_ejecutados.append(getattr(path, "name", str(path)))
+
+    def count_rows(self, schema: str, table: str) -> int:
+        return 0
+
+    def assert_columns_exist(self, schema: str, table: str, columnas: list[str]) -> None:
+        return None
+
+
+class LoggerFalso:
+    """Recoge los eventos estructurados sin escribir nada por consola."""
+
+    def __init__(self) -> None:
+        self.eventos: list[tuple[str, str, dict]] = []
+
+    def _anotar(self, nivel: str, evento: str, **kwargs: object) -> None:
+        self.eventos.append((nivel, evento, kwargs))
+
+    def debug(self, evento: str, **kwargs: object) -> None:
+        self._anotar("debug", evento, **kwargs)
+
+    def info(self, evento: str, **kwargs: object) -> None:
+        self._anotar("info", evento, **kwargs)
+
+    def warning(self, evento: str, **kwargs: object) -> None:
+        self._anotar("warning", evento, **kwargs)
+
+    def error(self, evento: str, **kwargs: object) -> None:
+        self._anotar("error", evento, **kwargs)
+
+    def exception(self, evento: str, **kwargs: object) -> None:
+        self._anotar("exception", evento, **kwargs)
+
+    def de(self, evento: str) -> list[dict]:
+        return [kwargs for _, nombre, kwargs in self.eventos if nombre == evento]
+
+
+def settings_falsos(
+    max_filas: int = MAXIMO_CORTO,
+    total_gb: int = 32,
+    limite_pct: float = 80.0,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        postgres=SimpleNamespace(
+            tramo_max_filas=max_filas,
+            disco_total_gb=total_gb,
+            disco_limite_pct=limite_pct,
+        ),
+        business_rules={
+            "sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15"}}
+        },
+    )
+
+
+def construir_por_tramos(pg: PgFalso, **kwargs: object) -> int:
+    paso = BuildStgStep(settings_falsos(**kwargs))  # type: ignore[arg-type]
+    return paso._build_plan_mensual_por_tramos(pg, RUTA_PLAN_MENSUAL)
+
+
+# --- R8 · Medición antes de CADA tramo ---------------------------------------
+
+
+def test_f019_r8_mide_ocupacion_antes_de_cada_tramo() -> None:
+    """Incluido el primero, y siempre ANTES de ejecutar el tramo."""
+    pg = PgFalso()
+    construir_por_tramos(pg)
+
+    assert pg.traza == [
+        "pesos",
+        "truncate",      # una sola vez, antes del primer tramo
+        "medicion", "sql",
+        "medicion", "sql",
+    ]
+    assert pg.total_gb_medidos == [32, 32]
+    assert pg.truncados == [("stg", "plan_mensual")]
+
+
+# --- R9 · Límite de seguridad: aborto limpio ---------------------------------
+
+
+def test_f019_r9_supera_limite_aborta_sin_ejecutar_el_tramo() -> None:
+    pg = PgFalso(ocupaciones=[10.0, 92.5])
+
+    with pytest.raises(PlanMensualAbortado) as fallo:
+        construir_por_tramos(pg)
+
+    mensaje = str(fallo.value)
+    assert "92.5" in mensaje          # ocupación medida
+    assert "80.0" in mensaje          # límite configurado
+    assert "2/2" in mensaje           # tramo en el que paró
+
+    # El segundo tramo NO se ejecutó y la tabla quedó vacía.
+    assert pg.traza == [
+        "pesos", "truncate", "medicion", "sql", "medicion", "truncate",
+    ]
+    assert len(pg.sql_ejecutado) == 1
+
+
+def test_f019_r9_una_ocupacion_justo_en_el_limite_no_aborta() -> None:
+    """El límite es superarlo, no alcanzarlo: 80,0 con límite 80 sigue."""
+    pg = PgFalso(ocupaciones=[80.0, 80.0])
+    construir_por_tramos(pg)
+    assert len(pg.sql_ejecutado) == 2
+
+
+def test_f019_r9_aborto_deja_la_tabla_vacia_y_failed_en_meta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El step entero: FAILED, tabla vacía y rastro en _meta.etl_runs."""
+    import etl_sigrid.application.steps.build_stg_step as modulo
+
+    pg = PgFalso(ocupaciones=[95.0])
+    monkeypatch.setattr(modulo, "build_postgres_client", lambda _s: pg)
+
+    resultado = BuildStgStep(settings_falsos()).run()  # type: ignore[arg-type]
+
+    assert resultado.status is StepStatus.FAILED
+    assert "build_plan_mensual" in (resultado.error_message or "")
+    assert pg.sql_ejecutado == []                       # ni un tramo
+    assert pg.truncados == [("stg", "plan_mensual")] * 2  # inicial + limpieza
+
+    fallidos = [c for c in pg.cierres if c[1] == "FAILED"]
+    assert [c[0] for c in fallidos]                     # hay FAILED en _meta
+    assert any("95.0" in (c[3] or "") for c in fallidos)
+    assert "build_stg.build_plan_mensual" in pg.pasos_registrados
+
+
+# --- R10 · Fail-safe de la medición ------------------------------------------
+
+
+def test_f019_r10_medicion_fallida_aborta_no_continua() -> None:
+    """Si no se puede medir, no se sigue a ciegas: se aborta como en R9."""
+    pg = PgFalso(error_medicion=RuntimeError("permission denied for pg_database"))
+
+    with pytest.raises(PlanMensualAbortado, match="permission denied"):
+        construir_por_tramos(pg)
+
+    assert pg.sql_ejecutado == []
+    assert pg.traza == ["pesos", "truncate", "medicion", "truncate"]
+
+
+# --- R11 · Transacción por tramo y fallo limpio ------------------------------
+
+
+def test_f019_r11_cada_tramo_en_su_transaccion() -> None:
+    """Una ejecución por tramo, cada una con SUS obras y solo con las suyas."""
+    pg = PgFalso()
+    construir_por_tramos(pg)
+
+    assert len(pg.sql_ejecutado) == 2
+    assert pg.sql_ejecutado[0].count("= ANY (ARRAY[1]::BIGINT[])") == RAMAS_CON_FILTRO
+    assert pg.sql_ejecutado[1].count("= ANY (ARRAY[2, 3]::BIGINT[])") == RAMAS_CON_FILTRO
+    for sql in pg.sql_ejecutado:
+        assert MARCADOR_FILTRO_OBRAS not in sql
+        assert "TRUNCATE" not in sql.upper()
+
+
+def test_f019_r11_fallo_de_tramo_limpia_y_para() -> None:
+    pg = PgFalso(tramo_que_falla=1)
+
+    with pytest.raises(PlanMensualAbortado, match="No space left on device"):
+        construir_por_tramos(pg)
+
+    assert len(pg.sql_ejecutado) == 1               # no hay tramos posteriores
+    assert pg.traza[-1] == "truncate"               # tabla vacía
+    assert ("stg", "plan_mensual") in pg.truncados
+    assert any(estado == "FAILED" for _, estado, _, _ in pg.cierres)
+
+
+# --- R12 · Observabilidad por tramo ------------------------------------------
+
+
+def test_f019_r12_log_por_tramo_con_campos_obligatorios(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import etl_sigrid.application.steps.build_stg_step as modulo
+
+    registro = LoggerFalso()
+    monkeypatch.setattr(modulo, "logger", registro)
+
+    pg = PgFalso(filas=[700, 900])
+    assert construir_por_tramos(pg) == 1_600        # suma de rowcounts reales
+
+    tramos = registro.de("plan_mensual_tramo")
+    assert len(tramos) == 2
+    assert set(tramos[0]) == {
+        "tramo", "obras", "peso", "filas", "duracion_s", "ocupacion_pct",
+    }
+    assert tramos[0]["tramo"] == "1/2"
+    assert tramos[0]["obras"] == 1
+    assert tramos[0]["peso"] == 600
+    assert tramos[0]["filas"] == 700
+    assert tramos[0]["ocupacion_pct"] == 10.0
+    assert tramos[0]["duracion_s"] >= 0.0
+    assert tramos[1]["tramo"] == "2/2"
+    assert tramos[1]["obras"] == 2
+    assert tramos[1]["peso"] == 900
+    assert tramos[1]["filas"] == 900
+
+    plan = registro.de("plan_mensual_plan_de_tramos")
+    assert plan == [{"tramos": 2, "obras": 3, "peso_total": 1_500, "max_filas": 1_000}]
+
+
+def test_f019_r12_registro_en_meta_por_tramo() -> None:
+    """`python main.py timings` tiene que poder desglosar el coste por tramo."""
+    pg = PgFalso()
+    construir_por_tramos(pg)
+
+    assert pg.pasos_registrados == [
+        "build_stg.build_plan_mensual.tramo_01",
+        "build_stg.build_plan_mensual.tramo_02",
+    ]
+    assert pg.cierres == [
+        (1, "SUCCESS", 700, None),
+        (2, "SUCCESS", 900, None),
+    ]
+
+
+def test_f019_r4_el_step_avisa_de_la_obra_sobredimensionada(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La obra que no cabe ni sola no aborta el build: se avisa con su peso."""
+    import etl_sigrid.application.steps.build_stg_step as modulo
+
+    registro = LoggerFalso()
+    monkeypatch.setattr(modulo, "logger", registro)
+
+    pg = PgFalso(pesos={7: 5_000}, ocupaciones=[10.0], filas=[42])
+    construir_por_tramos(pg)
+
+    avisos = registro.de("plan_mensual_tramo_sobredimensionado")
+    assert avisos == [
+        {"tramo": 1, "obras": [7], "peso": 5_000, "max_filas": MAXIMO_CORTO}
+    ]
+    assert len(pg.sql_ejecutado) == 1     # avisa, pero construye
 
 
 # --- R5 · Plan determinista --------------------------------------------------

@@ -232,3 +232,50 @@ FAILED tests/test_f019_tramos.py::test_f019_r11_execute_sql_text_abre_una_conexi
   que llenó el disco.
 - `execute_sql_text` devuelve el `rowcount` del cursor, no un `COUNT(*)`: un
   seq-scan por tramo sobre millones de filas en 1 vCPU sería castigo gratuito.
+
+## RED de T7 · orquestación por tramos en `build_stg_step` (R8, R9, R10, R11, R12)
+
+Con `_build_plan_mensual_por_tramos` devolviendo `0` sin hacer nada:
+
+```
+$ python -m pytest tests/test_f019_tramos.py -q --tb=line -p no:warnings
+.......................FFFFFFFFFF..                                      [100%]
+E   AssertionError: assert [] == ['pesos', 'tr...icion', 'sql']
+      Right contains 6 more items, first extra item: 'pesos'
+tests\test_f019_tramos.py:540: AssertionError
+E   Failed: DID NOT RAISE PlanMensualAbortado
+tests\test_f019_tramos.py:556: Failed: DID NOT RAISE PlanMensualAbortado
+E   assert 0 == 2
+     +  where 0 = len([])
+     +    where [] = <tests.test_f019_tramos.PgFalso object at ...>.sql_ejecutado
+tests\test_f019_tramos.py:575: assert 0 == 2
+E   AssertionError: assert <StepStatus.SUCCESS: 'SUCCESS'> is <StepStatus.FAILED: 'FAILED'>
+=========================== short test summary info ===========================
+FAILED tests/test_f019_tramos.py::test_f019_r8_mide_ocupacion_antes_de_cada_tramo
+FAILED tests/test_f019_tramos.py::test_f019_r9_supera_limite_aborta_sin_ejecutar_el_tramo
+FAILED tests/test_f019_tramos.py::test_f019_r9_una_ocupacion_justo_en_el_limite_no_aborta
+FAILED tests/test_f019_tramos.py::test_f019_r9_aborto_deja_la_tabla_vacia_y_failed_en_meta
+FAILED tests/test_f019_tramos.py::test_f019_r10_medicion_fallida_aborta_no_continua
+FAILED tests/test_f019_tramos.py::test_f019_r11_cada_tramo_en_su_transaccion
+FAILED tests/test_f019_tramos.py::test_f019_r11_fallo_de_tramo_limpia_y_para
+FAILED tests/test_f019_tramos.py::test_f019_r12_log_por_tramo_con_campos_obligatorios
+FAILED tests/test_f019_tramos.py::test_f019_r12_registro_en_meta_por_tramo
+FAILED tests/test_f019_tramos.py::test_f019_r4_el_step_avisa_de_la_obra_sobredimensionada
+10 failed, 25 passed, 20 warnings in 0.56s
+```
+
+**Verde tras implementar**: `35 passed` en el fichero y `377 passed` en la
+suite completa.
+
+**Cómo se comprueba el orden, que es lo que importa aquí**: el doble
+`PgFalso` deja una **traza cronológica** de todo lo que le piden, y el test de
+R8 la compara entera:
+
+```
+["pesos", "truncate", "medicion", "sql", "medicion", "sql"]
+```
+
+Un vaciado por tramo, una medición después del tramo, o un tramo ejecutado
+tras superar el límite cambian esa lista y ponen el test en rojo. Los abortos
+la dejan terminada en `"truncate"` y sin el `"sql"` del tramo que no llegó a
+ejecutarse.
