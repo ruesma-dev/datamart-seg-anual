@@ -348,6 +348,52 @@ Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
 
 ---
 
+# F-020 · IMPLEMENTADA (2026-08-10, implementer) — pendiente de review
+
+Rama `feature/F-020-arnes-multiservicio`, rigor `estandar`, spec aprobada por
+el humano con **las seis DA aceptadas tal cual**. **T1–T11 completas**, un
+commit por tarea. Informe completo: **`progress/impl_F-020.md`**.
+
+Qué hace ahora el arnés: si un repositorio declara `harness/servicios.json`,
+`init.sh` valida **cada servicio con su intérprete desde su directorio** (una
+línea por servicio, un único veredicto, KO en cualquiera = KO global), la
+puerta de cobertura mide **un porcentaje agregado** fusionando el
+`coverage.json` de cada servicio, y la mutación juzga cada mutante con la suite
+de su servicio. **Sin ese fichero no cambia nada**, y este repositorio no lo
+declara: `bash harness/init.sh` sigue en verde sin ejecutar una sola línea de
+la sección nueva.
+
+- **Números**: 342 tests en verde (80 de F-020), cobertura de líneas cambiadas
+  99,4 % (167/168), campaña de mutación 46/46 mutantes **0 supervivientes**
+  (los 4 de la primera pasada eran huecos reales y tienen test), 122,9 s.
+- **Portado a `arnes-base` 1.3.0** en el mismo trabajo: commits locales
+  `cef7857` y `6035bdd`, sin push, con `servicios.ejemplo.json` en el payload y
+  la sección «Monorepo multi-servicio (desde 1.3.0)» en `GUIA_INSTALACION.md`.
+  `azure-apps/arnes_base.md` anotado (commit local `ac5fad6`).
+- **Corrección que afecta a TODOS los repositorios**, tengan servicios o no:
+  `pytest` devuelve 5 cuando no recoge ninguna prueba y la campaña de mutación
+  lo contaba como «mutante muerto». Desde ahora cuenta como superviviente. Si
+  un informe de mutación empeora al actualizar, es que antes mentía.
+- **Verificaciones MANUAL R18, R19 y R20 ejecutadas** con salida real pegada en
+  el informe (son locales: instalador de PowerShell 5.1 contra un monorepo
+  temporal en el scratchpad, Git Bash y git local; sin Azure y sin BBDD). El
+  humano solo tiene que revisarlas, o repetirlas con los mismos comandos.
+- **Defecto propio declarado**: el commit `9d58c09` (T8) se hizo con
+  `git add -A` y arrastró los ficheros de `specs/F-019-plan-mensual-por-tramos/`,
+  que son de otra feature. No se ha revertido (ya hay commits encima y los
+  ficheros están donde deben); queda anotado para quien lea el diff de la rama.
+
+---
+
+# F-019 · Spec escrita y APROBADA por el humano (2026-08-10)
+
+Su `spec-author` escribió `specs/F-019-plan-mensual-por-tramos/` y el humano la
+aprobó el mismo día con DA-1..DA-4 como propuestas; la feature quedó
+`spec_ready` con rigor `critico` (commit `bf60eb0`). Se anota aquí porque el
+apunte quedó pendiente para no colisionar con el trabajo de F-020.
+
+---
+
 # F-020 · Spec escrita (2026-08-10, spec-author)
 
 Escrita `specs/F-020-arnes-multiservicio/` (requirements con R1–R20 en EARS,

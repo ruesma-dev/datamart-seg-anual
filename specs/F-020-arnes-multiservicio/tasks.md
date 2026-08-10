@@ -46,11 +46,11 @@ fixtures en `tmp_path`.
       capacidad multi-servicio (enlace, no duplicado). Si no existe el
       documento, dejar constancia en el informe y no crear nada.
       | Verificación: `grep -ri "1.3.0" C:/Users/pgris/PycharmProjects/azure-apps/ --include="*.md"` (o constancia escrita de N/A)
-- [ ] T10: campaña de mutación de la propia feature, análisis de cada
+- [x] T10: campaña de mutación de la propia feature, análisis de cada
       superviviente completado y sección «Evidencias» (tests, cobertura de
       líneas cambiadas, mutantes/supervivientes, tiempo) en
       `progress/impl_F-020.md`.
       | Verificación: `python -m harness.mutacion --feature F-020` e informe
       `progress/mutacion_F-020.md` sin análisis en PENDIENTE
-- [ ] T11: Ejecutar `bash harness/init.sh` en verde.
+- [x] T11: Ejecutar `bash harness/init.sh` en verde.
       | Verificación: `bash harness/init.sh` termina con exit code 0
