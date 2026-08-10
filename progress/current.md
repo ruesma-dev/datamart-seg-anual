@@ -461,42 +461,10 @@ toca** ese fichero.
 
 ---
 
-# F-016 · Implementación TERMINADA (2026-08-10) — pendiente de review
+# F-016 · CERRADA (2026-08-10)
 
-Rama `feature/F-016-refuerzo-tests-f005`, rigor `estandar`, `sdd=false` (los
-criterios son los `acceptance` de `harness/features.json`). PARADA 1 cumplida:
-plan aprobado por el humano el 2026-08-10. Tres commits, uno por frente.
-Detalle en **`progress/impl_F-016.md`**.
-
-**Qué se ha hecho.** Ocho tests nuevos (`tests/test_f016_huecos_alto_f005.py`)
-que fijan los seis huecos de riesgo ALTO de `progress/mutacion_F-005.md`, y el
-afinado del barrido de secretos de `test_f005_r21`. **Ni una línea de código de
-producción**: `bash harness/init.sh` lo confirma con `PUERTA COBERTURA: N/A
-(F-016 no cambia líneas Python de producción frente a dev)`.
-
-**Qué se ha verificado, con el número real.** La campaña de mutación de F-005
-relanzada sobre el mismo alcance y el mismo código, con la única variable de
-los tests nuevos (`progress/mutacion_F-005_tras_refuerzo.md`):
-
-| | Línea base (F-015) | Tras F-016 |
-|---|---|---|
-| Supervivientes de riesgo **ALTO** | 6 | **0** |
-| Supervivientes totales | 55 | 47 |
-| Puntuación de mutación | 45,5 % | **53,5 %** |
-
-`bash harness/init.sh` en verde, **388 tests** en 3,6 s.
-
-**Defectos de producción encontrados: ninguno.** Los seis huecos eran huecos de
-test, no de código: el código hacía lo correcto y nadie lo comprobaba. No ha
-hecho falta usar la vía de escape del plan (anotar aquí un defecto real sin
-arreglarlo).
-
-**Fuera de alcance, deuda que sigue viva y contabilizada** (no tapada, cada
-superviviente analizado uno a uno en el informe nuevo): 24 de riesgo MEDIO,
-15 de riesgo BAJO y 8 equivalentes en la práctica. F-005 está declarada
-`critico` y con 53,5 % **sigue sin pasar su propio nivel**; lo que ya no queda
-es ningún hueco de los que hacen que una carga mala se dé por buena. Si el
-humano quiere cerrar también la deuda MEDIA, es una feature nueva.
-
-**Verificaciones MANUAL pendientes: ninguna.** Nada de esta feature toca red,
-BBDD ni Azure.
+**APPROVED** (`progress/review_F-016.md`). Resumen en `progress/history.md`.
+Los 6 huecos de riesgo ALTO de F-005, fijados con tests: la mutación sobre
+F-005 pasa de 55 a **47 supervivientes, CERO de riesgo alto**. Barrido de
+secretos afinado (sin falsos positivos de rutas largas). Deuda restante:
+47 MEDIO/BAJO contabilizados en `progress/mutacion_F-005_tras_refuerzo.md`.
