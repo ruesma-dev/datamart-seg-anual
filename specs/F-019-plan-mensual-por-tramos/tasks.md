@@ -25,38 +25,38 @@ Azure» hasta T12, que es la primera ejecución autorizada del build nuevo.
 
 ## Fase B · Implementar (implementer; tests primero, fase RED con evidencia)
 
-- [ ] **T3**: `etl_sigrid/domain/tramos.py` con `planificar_tramos` +
+- [x] **T3**: `etl_sigrid/domain/tramos.py` con `planificar_tramos` +
       `Tramo`, y sus tests ANTES (RED documentada en el informe).
       | Verificación: `pytest tests/test_f019_tramos.py -k "r3 or r4 or r5"`
       en verde; salida RED previa en `progress/impl_F-019.md`.
-- [ ] **T4**: Settings nuevos en `config/settings.py` con defaults de T2.
+- [x] **T4**: Settings nuevos en `config/settings.py` con defaults de T2.
       | Verificación: `test_f019_r4_maximo_configurable_desde_settings`.
-- [ ] **T5**: Refactor de `08_plan_mensual.sql`: marcador
+- [x] **T5**: Refactor de `08_plan_mensual.sql`: marcador
       `/*F019_FILTRO_OBRAS*/` en las DOS ramas, TRUNCATE fuera, lógica de
       negocio intacta (diff solo añade el filtro y quita el TRUNCATE).
       | Verificación: `pytest -k "f019_r6"` (tests estáticos) y revisión
       del diff del fichero: cero líneas de lógica cambiadas.
-- [ ] **T6**: Composición segura del filtro (solo enteros; sin marcador ⇒
+- [x] **T6**: Composición segura del filtro (solo enteros; sin marcador ⇒
       fallo antes de tocar BBDD) y `execute_sql_text` +
       `fetch_pesos_plan_mensual` + `medir_ocupacion_disco_pct` en
       `postgres_client.py`. | Verificación: `pytest -k "f019_r7"`.
-- [ ] **T7**: Orquestación en `build_stg_step.py`:
+- [x] **T7**: Orquestación en `build_stg_step.py`:
       `_build_plan_mensual_por_tramos` con TRUNCATE inicial, puerta de
       disco antes de CADA tramo, transacción por tramo, aborto limpio
       (tabla vacía + FAILED en `_meta`), fail-safe de medición, logging y
       registro por tramo. Todo con dobles de `PostgresClient`.
       | Verificación: `pytest -k "f019_r8 or f019_r9 or f019_r10 or f019_r11 or f019_r12"`.
-- [ ] **T8**: Documentación: `docs/ARCHITECTURE.md` (build por tramos,
+- [x] **T8**: Documentación: `docs/ARCHITECTURE.md` (build por tramos,
       puerta de disco, settings) y `azure-apps/datamart_seg_anual.md`
       (protección del servidor compartido), en el mismo trabajo.
       | Verificación: ambos ficheros mencionan tramos, límite 80 % y el
       incidente 2026-08-09; `bash harness/init.sh` sin falsos positivos del
       barrido de secretos.
-- [ ] **T9**: Campaña de mutación sobre el alcance de la feature e informe
+- [x] **T9**: Campaña de mutación sobre el alcance de la feature e informe
       de evidencias (rigor `critico`: cero supervivientes sin justificación
       escrita). | Verificación: `progress/mutacion_F-019.md` con totales
       verificables; supervivientes 0 o justificados uno a uno.
-- [ ] **T10**: Ejecutar `bash harness/init.sh` en verde (pytest completo,
+- [x] **T10**: Ejecutar `bash harness/init.sh` en verde (pytest completo,
       cobertura del diff, sin red ni BBDD). | Verificación:
       `bash harness/init.sh` termina en verde.
 

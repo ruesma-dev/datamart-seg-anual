@@ -301,3 +301,154 @@ ejecutarse.
 Barrido de secretos de F-005 (`test_f005_r21_...`) ejecutado tras escribir la
 documentación: **17 passed**, sin falsos positivos de rutas largas (el defecto
 conocido que ya mordió en F-004).
+
+---
+
+# T9 · Campaña de mutación (rigor `critico`: cero supervivientes)
+
+**Primera pasada**: 41 mutantes, 37 muertos, **4 supervivientes**. Ninguno se
+justificó como equivalente sin pelearlo antes; los cuatro se cazaron con tests
+nuevos, y esto es lo que enseñaba cada uno:
+
+| Superviviente | Qué destapaba | Cómo se cazó |
+|---|---|---|
+| `tramos.py:29` `frozen=True` → `False` | Nadie comprobaba que un `Tramo` sea inmutable: el bucle del step podría reescribir uno a medias y nadie se enteraría | `test_f019_r5_un_tramo_es_un_valor_inmutable_y_cerrado` (asignar `peso` tiene que fallar) |
+| `tramos.py:29` `slots=True` → `False` | Ni que sea un valor cerrado: un campo mal escrito se habría creado en silencio | el mismo test: `not hasattr(tramo, "__dict__")` |
+| `tramos.py:77` `max_filas <= 0` → `<= 1` | Solo se probaba el 0. Un máximo de 1 fila es raro pero **legítimo** (trocear al extremo) y el mutante lo prohibía | `test_f019_r4_un_maximo_de_una_sola_fila_sigue_siendo_valido` |
+| `postgres_client.py:97` `total_bytes <= 0` → `<= 1` | **Este era equivalente de verdad**, y por una mala decisión mía: validar los bytes ya multiplicados hace inalcanzable el valor 1 (son múltiplos de 1 GiB). En vez de justificarlo, se corrigió el código para validar `total_gb`, que es el valor que configura el humano — y entonces el mutante SÍ es distinguible | validación movida a `total_gb <= 0` + caso `porcentaje_ocupacion(536_870_912, 1) == 50.0` |
+
+El cuarto caso merece subrayarse: un mutante equivalente suele ser la señal de
+que la comprobación está puesta sobre la variable equivocada. El mensaje de
+error también mejoró: ahora nombra `PG_DISCO_TOTAL_GB`, que es lo que hay que
+corregir, en vez de hablar de bytes.
+
+**Segunda pasada, con los tests nuevos**:
+
+```
+$ python -m harness.mutacion --feature F-019
+41 mutantes evaluados, 41 muertos, 0 supervivientes, 0 timeouts en 145.1 s
+Informe: progress/mutacion_F-019.md
+```
+
+`progress/mutacion_F-019.md` lo confirma: **41 generados, 41 evaluados, 41
+muertos, 0 supervivientes, 0 timeouts**, campaña completa (sin muestreo).
+Ninguna sección de análisis queda en `PENDIENTE`: no hay supervivientes que
+analizar.
+
+---
+
+# T10 · `bash harness/init.sh`
+
+```
+[OK] features.json válido
+[OK] harness/rigor.json y niveles declarados: válidos
+[AVISO] Hay features en estado blocked: revisa progress/current.md   (F-003, que espera a esta feature)
+[OK] compileall: sin errores de sintaxis
+[AVISO] ruff: 127 avisos (deuda previa, no bloquea)
+379 passed, 72 warnings in 4.88s
+[OK] pytest en verde (con medición de cobertura)
+[OK] PUERTA COBERTURA: 100.0% de 120 líneas cambiadas cubiertas (120/120, umbral 80%, nivel critico)
+[OK] Rama actual: feature/F-019-plan-mensual-por-tramos
+----------------------------------------
+ENTORNO LISTO. Puedes trabajar.
+```
+
+Los 127 avisos de `ruff` son **deuda previa del repositorio**: los cinco
+ficheros que toca F-019 pasan `ruff check` limpios (`All checks passed!`).
+
+---
+
+# Qué cambió, fichero a fichero
+
+| Fichero | Qué |
+|---|---|
+| `etl_sigrid/domain/tramos.py` (**nuevo**) | `Tramo` (valor inmutable) y `planificar_tramos` (empaquetado voraz determinista), más `tramos_sobredimensionados`. Cero imports de infraestructura y cero logging: el aviso lo emite quien llama |
+| `etl_sigrid/application/steps/build_stg_step.py` | `componer_sql_tramo` (composición blindada del filtro), `PlanMensualAbortado`, `_build_plan_mensual_por_tramos`, `_abortar_plan_mensual`, la marca `por_tramos` del sub-paso y la constante `DIRECTORIO_SQL_STG` |
+| `etl_sigrid/infrastructure/postgres/postgres_client.py` | `BYTES_POR_GB`, `porcentaje_ocupacion`, las consultas `SQL_OCUPACION_DISCO` y `SQL_PESOS_PLAN_MENSUAL`, y los métodos `fetch_pesos_plan_mensual`, `medir_ocupacion_disco_pct` y `execute_sql_text` |
+| `08_plan_mensual.sql` (capa stg) | El marcador de filtro en las dos ramas y el vaciado fuera. **Cero líneas de lógica de negocio** |
+| `config/settings.py` | Los tres settings nuevos, con default y descripción |
+| `tests/test_f019_tramos.py` (**nuevo**) | 37 tests, todos con nombre trazable `test_f019_rN_*` |
+| `docs/ARCHITECTURE.md` | Sección nueva del build por tramos |
+| `azure-apps/datamart_seg_anual.md` | Qué significa la protección para `albaranes` y `partes` (commit local `df5000e` en ese repositorio) |
+
+**Ni una dependencia nueva** en `requirements.txt`: todo con lo que ya había.
+
+## Decisiones de diseño (y por qué)
+
+1. **El corte es por obra y la equivalencia es estructural.** Ninguna ventana
+   del SQL cruza obras. No es «probablemente equivalente»: lo es por
+   construcción. Aun así, el humano lo comprueba al céntimo en R13.
+2. **La composición del filtro es textual, no `%(param)s`.** Los comentarios
+   del fichero están llenos de porcentajes literales y psycopg los leería como
+   marcadores de parámetro. De ahí que la entrada se blinde con
+   `type(obra) is not int`, que además rechaza `bool` (cosa que `isinstance`
+   no haría, porque `bool` es subclase de `int`).
+3. **El sub-paso se marca con un dato (`por_tramos=True`), no con un
+   `if sub.name == "build_plan_mensual"`.** Comparar por nombre reparte una
+   cadena mágica por el módulo; el flag lo declara la propia lista de
+   sub-pasos.
+4. **La duración y la ocupación se loguean SIN redondear.** Un `round(x, 2)`
+   habría metido una constante que ningún test puede distinguir de
+   `round(x, 3)`: un superviviente garantizado y sin ningún valor. Los números
+   crudos son además lo que quiere el formato JSON de producción.
+5. **El aborto usa una excepción propia** (`PlanMensualAbortado`): al leer el
+   fallo se distingue una parada deliberada del guardián de un error
+   inesperado. El `except` que ya existía en el bucle de sub-pasos la recoge y
+   la convierte en `StepStatus.FAILED`, así que `build_mart` no llega a
+   ejecutarse.
+6. **No se añadió el filtro sobre `fa.obride`** en la subconsulta de
+   `raw.obrfasamb`: el design lo permitía «midiendo», y medir exige BBDD.
+
+## Desviaciones respecto a la spec
+
+1. **T1 y T2 no están hechas** (son del humano y exigen BBDD). Justificado
+   arriba, en §Orden de tareas; la implementación no depende de sus números.
+2. **`_build_plan_mensual_por_tramos(pg, sql_path)`** recibe la ruta del SQL,
+   mientras que el design escribía `(pg)`. Se pasa desde el bucle de sub-pasos
+   para no repetir el nombre del fichero en dos sitios.
+3. **Todos los tests viven en `tests/test_f019_tramos.py`**, como decía el
+   design, incluidos los del step y los del cliente. El fichero es largo; se
+   respeta la spec en vez de partirlo por gusto.
+
+## Lo que queda FUERA de lo hecho aquí
+
+- Cualquier ejecución contra una BBDD: R1, R2, R13, R14, R15 y R16 son del
+  humano (T1, T2, T11, T12, T13, T14). Sin ellas, **la equivalencia funcional
+  está razonada y probada con dobles, pero no comprobada contra datos
+  reales**.
+- Tocar `infra/env/dev.json` o el `jobProgramable` de F-003 (lo prohíbe R16).
+- Optimizar el SQL de la explosión: fuera de alcance por la spec.
+
+---
+
+# Evidencias
+
+| Evidencia | Valor real | De dónde sale |
+|---|---|---|
+| **Tests ejecutados y resultado** | **379 passed**, 0 failed (37 de ellos `test_f019_*`) | `bash harness/init.sh` → pytest |
+| **Cobertura de las líneas cambiadas** | **100,0 %** (120 de 120 líneas; umbral 80 %, nivel `critico`) | línea `PUERTA COBERTURA` de `init.sh` |
+| **Mutantes generados y supervivientes** | **41 generados, 41 evaluados, 41 muertos, 0 supervivientes, 0 timeouts** (campaña completa, sin muestreo) | `python -m harness.mutacion --feature F-019` → `progress/mutacion_F-019.md` |
+| **Tiempo de ejecución de la suite** | **4,88 s** (la campaña de mutación entera: 145,1 s) | salida de pytest en `init.sh` |
+
+Ninguna de estas cuatro cifras es estimada: todas están copiadas de la salida
+de la herramienta que las produce.
+
+---
+
+# Verificaciones MANUAL pendientes (las ejecuta el humano)
+
+Con el comando exacto en `progress/current.md` §F-019 y en
+`specs/F-019-plan-mensual-por-tramos/requirements.md`. Resumen:
+
+| Tarea | Requisito | Qué hace el humano | Por qué importa |
+|---|---|---|---|
+| **T1** | R1 | Cuatro mediciones contra el PostgreSQL **local** | Confirmar o corregir `PG_TRAMO_MAX_FILAS`; detectar una obra que no quepa ni sola |
+| **T2** | — | Anotar los números en `design.md` §Mediciones | Que las constantes queden justificadas con datos, no con estimaciones |
+| **T11** | R13 | `stage` en local, checksum idéntico y `compare-fingerprints` | **Es la prueba de la equivalencia funcional.** Cualquier diferencia es FALLO |
+| **T12** | R14 | Pre-check de la medición con el rol real y, después, `stage` + `build-mart` + `apply-grants` contra Azure vigilando `storage_percent` | Cierra el paso 8 de F-005 y mide el paso 9 |
+| **T13** | R15 | Huella de vistas, local contra Azure | Cierra el paso 10 de F-005 |
+| **T14** | R16 | `jobProgramable: true` y tanda 2 de F-003 | Es lo que esta feature desbloquea |
+
+**Orden que no se puede invertir**: T1 y T2 antes de T12, y T11 antes de T12.
+Lanzar contra Azure sin haber comprobado la equivalencia en local sería
+estrenar el troceo directamente sobre el servidor compartido de producción.

@@ -217,7 +217,11 @@ sobra RAM. **Veredicto anticipado del paso 9: `Standard_B1ms` + 32 GB NO
 aguanta el build completo de stg tal como está escrito.**
 
 **PROHIBIDO relanzar `stage` contra Azure hasta decidir** (lo volvería a
-llenar). Decisión del humano pendiente entre: (A) crecer el disco 32→64 GB
+llenar). → **Al día 2026-08-10**: decidido (opción B) e **implementado**
+(F-019, sección al final de este fichero). La prohibición se levanta cuando el
+humano complete T1/T2 y T11 en local; el propio T12 es el primer `stage`
+autorizado contra Azure, y ya no es el mismo build: hay tramos acotados y una
+puerta de disco que aborta al 80 %. Decisión del humano pendiente entre: (A) crecer el disco 32→64 GB
 (operación online pero **irreversible** y sobre el servidor compartido; da
 más IOPS), (B) trocear/optimizar el build de `plan_mensual` para acotar el
 pico de temporales, (C) subir el SKU. La recomendación del líder es B
@@ -356,11 +360,90 @@ Resumen en `progress/history.md`; detalle en `progress/impl_F-020.md` y
 (`harness/servicios.json` opcional); `arnes-base` en **1.3.0**. Este repo
 mono-proyecto no cambia de comportamiento (verificado por el reviewer).
 
-# F-019 · Spec escrita y APROBADA por el humano (2026-08-10)
+# F-019 · Fase B IMPLEMENTADA (2026-08-10) — falta la verificación del humano
 
-Su `spec-author` escribió `specs/F-019-plan-mensual-por-tramos/` y el humano la
-aprobó el mismo día con DA-1..DA-4 como propuestas; la feature quedó
-`spec_ready` con rigor `critico` (commit `bf60eb0`). Se anota aquí porque el
-apunte quedó pendiente para no colisionar con el trabajo de F-020.
+Rama `feature/F-019-plan-mensual-por-tramos`, rigor `critico`. **T3–T10
+completas** (un commit por tarea); informe en `progress/impl_F-019.md` y
+campaña en `progress/mutacion_F-019.md`. Pendiente del **reviewer** y, después,
+de las verificaciones MANUAL de abajo.
+
+Números reales, no estimaciones: **379 tests en verde** (4,88 s), **cobertura
+100 % de las 120 líneas cambiadas** (umbral 80 %) y **mutación 41/41 muertos,
+cero supervivientes**. Ningún agente ha abierto conexión a BBDD ni a la API.
+
+## Qué hace ahora el build de `stg.plan_mensual`
+
+Pesos por obra → plan de tramos (`etl_sigrid/domain/tramos.py`, función pura)
+→ vaciado UNA vez → por cada tramo: **puerta de disco** → SQL filtrado por sus
+obras → **una transacción** → fila propia en `_meta.etl_runs`
+(`build_stg.build_plan_mensual.tramo_NN`) y log estructurado. Si la ocupación
+supera el límite, si la medición falla o si un tramo revienta: la tabla queda
+**vacía**, el paso queda **FAILED** y `build_mart` no llega a ejecutarse.
+
+Tres parámetros nuevos, todos con default y cambiables por variable de
+entorno: `PG_TRAMO_MAX_FILAS` (1 000 000), `PG_DISCO_TOTAL_GB` (32) y
+`PG_DISCO_LIMITE_PCT` (80).
+
+## GUION MANUAL DEL HUMANO (por orden; ninguno lo puede ejecutar un agente)
+
+Los comandos exactos están en
+`specs/F-019-plan-mensual-por-tramos/requirements.md`. Recordatorios de
+entorno: `PSQL` = `& "C:\Program Files\PostgreSQL\16\bin\psql.exe"`, **las
+opciones van ANTES** de la cadena de conexión, y `.env` apunta HOY a Azure (la
+copia local está en `.env.local.bak`).
+
+### 1 · T1 y T2 — medir en LOCAL (R1) y fijar las constantes
+
+Las cuatro consultas de **R1** (filas y tamaño de `stg.plan_mensual`,
+explosión de la rama master, top 15 de obras por peso, y el delta de
+`temp_files`/`temp_bytes` alrededor de un `stage`). Los resultados se anotan
+en `design.md` §Mediciones, columna «medido».
+
+**Qué hacer con esos números**: si la obra más pesada supera
+`PG_TRAMO_MAX_FILAS`, ir a `.env` y bajar el valor (no hace falta tocar
+código; hay un test que lo garantiza). Si el coeficiente de derrame por fila
+sale muy por encima de 1,2 KB, bajarlo también. **Va ANTES de T12.**
+
+### 2 · T11 — equivalencia funcional en LOCAL (R13), la prueba de fuego
+
+1. Con `.env` apuntando a LOCAL, y **antes** de nada, capturar la línea base
+   de **R2**: el checksum de contenido y `python main.py fingerprint-views`
+   con el árbol de `dev` (build antiguo).
+2. Con la rama de F-019: `python main.py stage`, repetir el checksum y
+   `python main.py compare-fingerprints`.
+
+Esperado: **checksum idéntico carácter a carácter** y cero diferencias.
+Cualquier diferencia es FALLO: se marca la feature `blocked`, no se
+racionaliza.
+
+### 3 · T12 — verificación contra AZURE (R14), en horario acordado
+
+Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
+el mismo build**. Antes de nada, el pre-check de que el rol real puede medir:
+
+```
+PSQL -h psql-albaranes-rs9k2.postgres.database.azure.com -p 5432 -U sigrid_dm_app -d sigrid_dm -X -c "SELECT pg_size_pretty(SUM(pg_database_size(datname))) FROM pg_database;"
+```
+
+Si eso falla, la puerta R10 abortaría el build nada más empezar (a propósito).
+Después: `stage` → `build-mart` → `apply-grants`, vigilando `storage_percent`
+por Portal o `az monitor metrics list`. Anotar **pico de disco**, duración y
+`python main.py timings` con el desglose por tramo.
+
+Esto **completa el paso 8 de F-005** y da el dato del paso 9 (veredicto sobre
+si el `Standard_B1ms` aguanta con el build troceado).
+
+### 4 · T13 — huella local contra Azure (R15)
+
+`fingerprint-views` contra Azure y `compare-fingerprints` con la huella local
+de T11. Sin diferencias. Cierra el **paso 10 de F-005**.
+
+### 5 · T14 — desbloquear F-003
+
+Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
+`infra/env/dev.json` y ejecutar la **tanda 2 de F-003 (T23–T26)** —crear el
+job, prueba segura, logs y alerta—. `tests/test_f003_infra.py` solo lo admite
+con F-019 cerrada, así que el propio test es la puerta. Esta feature **no
+toca** ese fichero.
 
 ---
