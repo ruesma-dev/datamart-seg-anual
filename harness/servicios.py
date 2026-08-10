@@ -1,5 +1,5 @@
 # harness/servicios.py
-"""Servicios de un monorepo: qué partes del repositorio se validan por separado.
+"""Servicios de un monorepo: qué zonas del repositorio se validan por separado.
 
 Un repositorio puede alojar varios servicios en subcarpetas, cada uno con su
 entorno virtual, sus tests y hasta otro lenguaje. Este módulo lee la
