@@ -187,14 +187,20 @@ Si el job **no** usa identidad *system-assigned*, F-003 debe inyectar
 solo, pero alguien tiene que ponerlo. Y la identidad necesita el rol
 `Storage Blob Data Reader` sobre la cuenta.
 
-## Hallazgo para F-016 (refuerzo de los tests de F-005)
+## Hallazgo para F-016 (refuerzo de los tests de F-005) · RESUELTO EN F-016
 
-`test_f005_r21_barrido_de_secretos_en_el_arbol` da **falso positivo con rutas
-largas**: su patrón de base64 (`[A-Za-z0-9+/]{24,}`) casó con
+`test_f005_r21_barrido_de_secretos_en_el_arbol` daba **falso positivo con
+rutas largas**: su patrón de base64 (`[A-Za-z0-9+/]{24,}`) casó con
 `sigrid/infrastructure/excel/` al añadir una línea a `docs/ARCHITECTURE.md` y
-puso `init.sh` en rojo. No se ha tocado el test de otra feature: se reformuló
-la frase. Conviene exigir contexto de asignación o excluir cadenas con varias
-barras.
+puso `init.sh` en rojo. F-004 no tocó el test de otra feature: reformuló la
+frase.
+
+**Cerrado el 2026-08-10 por F-016** (única excepción autorizada para tocar un
+test de F-005): el barrido es ahora la función `buscar_secretos()` y el patrón
+de clave descarta el candidato solo si **parece una ruta** —dos barras o más
+**y** ni una mayúscula—. Con control negativo
+(`test_f016_el_barrido_afinado_caza_la_clave_y_no_la_ruta`), que se pone rojo
+si alguien afina de más.
 
 ---
 
@@ -454,3 +460,11 @@ con F-019 cerrada, así que el propio test es la puerta. Esta feature **no
 toca** ese fichero.
 
 ---
+
+# F-016 · CERRADA (2026-08-10)
+
+**APPROVED** (`progress/review_F-016.md`). Resumen en `progress/history.md`.
+Los 6 huecos de riesgo ALTO de F-005, fijados con tests: la mutación sobre
+F-005 pasa de 55 a **47 supervivientes, CERO de riesgo alto**. Barrido de
+secretos afinado (sin falsos positivos de rutas largas). Deuda restante:
+47 MEDIO/BAJO contabilizados en `progress/mutacion_F-005_tras_refuerzo.md`.

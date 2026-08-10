@@ -350,3 +350,22 @@ de test se retiró en commit propio. Tres reinicios del proceso anfitrión
 durante la feature; el trabajo se retomó de transcripción sin pérdidas.
 
 ---
+
+# F-016 · Refuerzo de tests para los huecos de riesgo alto de F-005 (cerrada 2026-08-10)
+
+**APPROVED** (`progress/review_F-016.md`), rigor `estandar`, `sdd=false`.
+Tests nuevos `test_f016_*` que fijan los 6 huecos de riesgo ALTO de la línea
+base de mutación de F-005: default de `auto_create_db` (settings y cliente),
+autocommit de la conexión administrativa, igualdad/clasificación FALLO de
+`fingerprint.py` y detección de paso fallido en `main.py`. Además, afinado el
+barrido de secretos de `test_f005_r21` (adiós al falso positivo de rutas
+largas), conservando un test-del-test que demuestra que sigue cazando.
+
+La prueba que cierra el círculo de F-015: campaña de mutación relanzada
+sobre el alcance de F-005 → **de 55 supervivientes a 47, con CERO de riesgo
+ALTO** (los 6 muertos, más 2 MEDIO de propina). El reviewer cotejó los 6 uno
+a uno por cálculo puro. La línea base histórica quedó intacta; los 47
+restantes (MEDIO/BAJO), contabilizados como deuda consciente. Ni una línea
+de código de producción tocada.
+
+---
