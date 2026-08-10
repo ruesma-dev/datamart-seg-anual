@@ -144,8 +144,9 @@
       "acceptance": [
         "Definida en detalle por specs/F-019-plan-mensual-por-tramos/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
+      "rigor": "critico",
       "priority": 9,
       "branch": "feature/F-019-plan-mensual-por-tramos"
     },
