@@ -187,14 +187,20 @@ Si el job **no** usa identidad *system-assigned*, F-003 debe inyectar
 solo, pero alguien tiene que ponerlo. Y la identidad necesita el rol
 `Storage Blob Data Reader` sobre la cuenta.
 
-## Hallazgo para F-016 (refuerzo de los tests de F-005)
+## Hallazgo para F-016 (refuerzo de los tests de F-005) · RESUELTO EN F-016
 
-`test_f005_r21_barrido_de_secretos_en_el_arbol` da **falso positivo con rutas
-largas**: su patrón de base64 (`[A-Za-z0-9+/]{24,}`) casó con
+`test_f005_r21_barrido_de_secretos_en_el_arbol` daba **falso positivo con
+rutas largas**: su patrón de base64 (`[A-Za-z0-9+/]{24,}`) casó con
 `sigrid/infrastructure/excel/` al añadir una línea a `docs/ARCHITECTURE.md` y
-puso `init.sh` en rojo. No se ha tocado el test de otra feature: se reformuló
-la frase. Conviene exigir contexto de asignación o excluir cadenas con varias
-barras.
+puso `init.sh` en rojo. F-004 no tocó el test de otra feature: reformuló la
+frase.
+
+**Cerrado el 2026-08-10 por F-016** (única excepción autorizada para tocar un
+test de F-005): el barrido es ahora la función `buscar_secretos()` y el patrón
+de clave descarta el candidato solo si **parece una ruta** —dos barras o más
+**y** ni una mayúscula—. Con control negativo
+(`test_f016_el_barrido_afinado_caza_la_clave_y_no_la_ruta`), que se pone rojo
+si alguien afina de más.
 
 ---
 
@@ -454,3 +460,43 @@ con F-019 cerrada, así que el propio test es la puerta. Esta feature **no
 toca** ese fichero.
 
 ---
+
+# F-016 · Implementación TERMINADA (2026-08-10) — pendiente de review
+
+Rama `feature/F-016-refuerzo-tests-f005`, rigor `estandar`, `sdd=false` (los
+criterios son los `acceptance` de `harness/features.json`). PARADA 1 cumplida:
+plan aprobado por el humano el 2026-08-10. Tres commits, uno por frente.
+Detalle en **`progress/impl_F-016.md`**.
+
+**Qué se ha hecho.** Ocho tests nuevos (`tests/test_f016_huecos_alto_f005.py`)
+que fijan los seis huecos de riesgo ALTO de `progress/mutacion_F-005.md`, y el
+afinado del barrido de secretos de `test_f005_r21`. **Ni una línea de código de
+producción**: `bash harness/init.sh` lo confirma con `PUERTA COBERTURA: N/A
+(F-016 no cambia líneas Python de producción frente a dev)`.
+
+**Qué se ha verificado, con el número real.** La campaña de mutación de F-005
+relanzada sobre el mismo alcance y el mismo código, con la única variable de
+los tests nuevos (`progress/mutacion_F-005_tras_refuerzo.md`):
+
+| | Línea base (F-015) | Tras F-016 |
+|---|---|---|
+| Supervivientes de riesgo **ALTO** | 6 | **0** |
+| Supervivientes totales | 55 | 47 |
+| Puntuación de mutación | 45,5 % | **53,5 %** |
+
+`bash harness/init.sh` en verde, **388 tests** en 3,6 s.
+
+**Defectos de producción encontrados: ninguno.** Los seis huecos eran huecos de
+test, no de código: el código hacía lo correcto y nadie lo comprobaba. No ha
+hecho falta usar la vía de escape del plan (anotar aquí un defecto real sin
+arreglarlo).
+
+**Fuera de alcance, deuda que sigue viva y contabilizada** (no tapada, cada
+superviviente analizado uno a uno en el informe nuevo): 24 de riesgo MEDIO,
+15 de riesgo BAJO y 8 equivalentes en la práctica. F-005 está declarada
+`critico` y con 53,5 % **sigue sin pasar su propio nivel**; lo que ya no queda
+es ningún hueco de los que hacen que una carga mala se dé por buena. Si el
+humano quiere cerrar también la deuda MEDIA, es una feature nueva.
+
+**Verificaciones MANUAL pendientes: ninguna.** Nada de esta feature toca red,
+BBDD ni Azure.
