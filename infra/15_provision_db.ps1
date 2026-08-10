@@ -1,46 +1,48 @@
 ﻿# infra/15_provision_db.ps1
 #
-# Provisiona la base sigrid_dm y sus roles DENTRO del servidor compartido
-# psql-albaranes-rs9k2, que ya sirve a albaranes y partes.
+# Provisiona la base del datamart y sus roles DENTRO del servidor de Postgres
+# compartido que ya sirve a otras dos aplicaciones en produccion. Es de F-005;
+# F-003 solo lo reescribio para que lea sus nombres de $CFG como el resto.
 #
 # ESTE SCRIPT NO HACE NADA POR DEFECTO. Sin -Ejecutar solo imprime el plan y
-# lanza el diagnóstico de SOLO LECTURA. Es deliberado: el servidor tiene dos
-# bases en producción y un error de alcance afecta a dos aplicaciones vivas.
+# lanza el diagnostico de SOLO LECTURA. Es deliberado: el servidor tiene dos
+# bases en produccion y un error de alcance afecta a dos aplicaciones vivas.
 #
 # Uso:
-#   . .\00_vars.ps1
-#   .\15_provision_db.ps1                       # plan + diagnóstico, sin tocar nada
-#   $env:APP_PWD = "<generada>"                 # ver el runbook: se generan y se
-#   $env:MCP_PWD = "<generada>"                 #   guardan en Key Vault
-#   .\15_provision_db.ps1 -Ejecutar
+#   .\15_provision_db.ps1 -AdminUser <usuario>              # plan, sin tocar nada
+#   $env:APP_PWD = "<generada>"                             # ver el runbook: se
+#   $env:MCP_PWD = "<generada>"                             #   guardan en Key Vault
+#   .\15_provision_db.ps1 -AdminUser <usuario> -Ejecutar
 #
-# Lo que este script NO hace, a propósito:
-#   - no crea reglas de firewall (las crea el humano, ver el runbook §5);
-#   - no habilita autenticación Entra: es una operación de SERVIDOR y el humano
-#     la descartó el 2026-08-08 porque afectaría a albaranes y partes;
-#   - no cambia parámetros del servidor, su SKU ni su almacenamiento;
-#   - no toca albaranes ni partes.
+# Lo que este script NO hace, a proposito:
+#   - no crea reglas de firewall (las crea el humano, ver el runbook seccion 5);
+#   - no habilita autenticacion Entra: es una operacion de SERVIDOR y el humano
+#     la descarto el 2026-08-08 porque afectaria a las otras dos bases;
+#   - no cambia parametros del servidor, su SKU ni su almacenamiento;
+#   - no toca ninguna base que no sea la del datamart.
 #
-# Requisitos: Azure CLI con sesión iniciada y psql en el PATH.
+# Requisitos: Azure CLI con sesion iniciada y psql en el PATH.
 
 [CmdletBinding()]
 param(
     [switch]$Ejecutar,
-    [string]$AdminUser = $env:PG_ADMIN_USER
+    [string]$AdminUser = $env:PG_ADMIN_USER,
+    [string]$Entorno
 )
 
 $ErrorActionPreference = "Stop"
 
-. "$PSScriptRoot\00_vars.ps1"
+. "$PSScriptRoot\00_vars.ps1" -Entorno $Entorno
 
 $sqlDir = Join-Path $PSScriptRoot "sql"
 
 Write-Host ""
-Write-Host "=== Provision de $PG_DB en $PG_HOST ===" -ForegroundColor Cyan
-Write-Host "  Resource group  : $PG_RG (NO es el del datamart: es el de albaranes)"
-Write-Host "  Servidor        : $PG_SERVER"
-Write-Host "  Base a crear    : $PG_DB"
-Write-Host "  Roles           : $PG_OWNER_ROLE (grupo), $PG_APP_ROLE (ETL), $PG_RO_ROLE (MCP)"
+Write-Host "=== Provision de $($CFG.pgDatabase) en $($CFG.pgHost) ===" -ForegroundColor Cyan
+Write-Host ("  Resource group  : {0} (NO es el del datamart)" -f $CFG.pgResourceGroup)
+Write-Host ("  Servidor        : {0}" -f $PG_SERVER)
+Write-Host ("  Base a crear    : {0}" -f $CFG.pgDatabase)
+Write-Host ("  Roles           : {0} (grupo), {1} (ETL), {2} (solo lectura)" -f `
+    $CFG.pgSetRole, $CFG.pgUser, $CFG.pgReadonlyRole)
 Write-Host ""
 
 if (-not $AdminUser) {
@@ -51,7 +53,7 @@ if (-not $AdminUser) {
 
 # --- 1. Fotografia previa, solo lectura -------------------------------------
 Write-Host "--- Estado actual del servidor (solo lectura) ---" -ForegroundColor Cyan
-az postgres flexible-server show -g $PG_RG -n $PG_SERVER `
+Invoke-Az postgres flexible-server show -g $CFG.pgResourceGroup -n $PG_SERVER `
     --query "{sku:sku.name, version:version, almacenamientoGB:storage.storageSizeGb, ha:highAvailability.mode, retencionDias:backup.backupRetentionDays}" `
     -o table
 
@@ -59,11 +61,11 @@ Write-Host ""
 Write-Host "--- Reglas de firewall existentes ---" -ForegroundColor Cyan
 Write-Host "Guarda esta salida: tras cualquier cambio debe contener EXACTAMENTE" -ForegroundColor Yellow
 Write-Host "estas mismas reglas mas las nuevas." -ForegroundColor Yellow
-az postgres flexible-server firewall-rule list -g $PG_RG -n $PG_SERVER -o table
+Invoke-Az postgres flexible-server firewall-rule list -g $CFG.pgResourceGroup -n $PG_SERVER -o table
 
 Write-Host ""
 Write-Host "--- Diagnostico de la base (solo lectura) ---" -ForegroundColor Cyan
-$dsnAdmin = "host=$PG_HOST dbname=postgres user=$AdminUser sslmode=require"
+$dsnAdmin = "host=$($CFG.pgHost) dbname=postgres user=$AdminUser sslmode=require"
 psql "$dsnAdmin" -f (Join-Path $sqlDir "03_diagnostico.sql")
 
 if (-not $Ejecutar) {
@@ -90,12 +92,12 @@ psql "$dsnAdmin" -v ON_ERROR_STOP=1 -f (Join-Path $sqlDir "01_create_database.sq
 
 Write-Host ""
 Write-Host "--- 02_roles.sql (roles de login, esquemas y permisos) ---" -ForegroundColor Cyan
-$dsnDb = "host=$PG_HOST dbname=$PG_DB user=$AdminUser sslmode=require"
+$dsnDb = "host=$($CFG.pgHost) dbname=$($CFG.pgDatabase) user=$AdminUser sslmode=require"
 psql "$dsnDb" -v ON_ERROR_STOP=1 `
     -v app_pwd="$env:APP_PWD" -v mcp_pwd="$env:MCP_PWD" `
     -f (Join-Path $sqlDir "02_roles.sql")
 
 Write-Host ""
-Write-Host "Provision terminada. Siguiente paso del runbook: comprobar que" -ForegroundColor Green
-Write-Host "albaranes y partes siguen conectando, y que el listado de reglas de"
-Write-Host "firewall no ha cambiado."
+Write-Host "Provision terminada. Siguiente paso del runbook: comprobar que las" -ForegroundColor Green
+Write-Host "otras dos aplicaciones siguen conectando, y que el listado de reglas"
+Write-Host "de firewall no ha cambiado."

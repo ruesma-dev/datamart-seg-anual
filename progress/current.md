@@ -26,14 +26,121 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-004 · CERRADA (2026-08-09) — MERGE A `dev` PENDIENTE
+# F-003 · BLOQUEADA esperando a F-019 — código APROBADO y tanda 1 desplegada
 
-> ⚠ El merge de `feature/F-004-etl-sin-dependencias-locales` a `dev` está
-> **pendiente**: `dev` está ocupado por el worktree `datamart-carga`, donde el
-> humano ejecuta la recuperación de la carga (visto `main.py stage` en
-> ejecución). En cuanto termine: `git worktree remove ../datamart-carga`,
-> `git checkout dev`, merge `--no-ff` y `bash harness/init.sh`. Hasta
-> entonces, no crear la rama de F-003 (debe salir de `dev` ya mergeado).
+Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** y
+**re-review del reviewer: APPROVED** el 2026-08-10 (`progress/review_F-003.md`,
+segunda pasada anexada; la primera fue CHANGES_REQUESTED por la puerta del
+disco mal condicionada, corregida y verificada). DA-4 cerrada por el humano:
+opción B, contraseña vía referencia de Key Vault; enmienda fechada en la spec.
+
+## Tanda 1 del bloque 5 · EJECUTADA por el humano el 2026-08-10 (T18–T22)
+
+| Qué | Resultado verificado (lecturas del líder) |
+|---|---|
+| Resource group | `rg-datamart-seg-dev` en spaincentral, 7 tags acens (R15) — `costcenter=pendiente` hasta que acens dé el centro de coste |
+| Log Analytics | `log-datamart-seg-dev`, PerGB2018, 30 días |
+| Entorno Container Apps | `cae-datamart-seg-dev`, sin VNet, logs a log-analytics (R16). **IP de salida: 68.221.221.85** |
+| Firewall Postgres | Regla `caj-datamart-seg-dev` → 68.221.221.85 creada en `psql-albaranes-rs9k2` con autorización expresa del humano (R23 parcial) |
+| Storage | `stdatamartsegdev`: sin acceso público, sin clave compartida, TLS1_2, contenedor `aux` (R17) |
+| Key Vault | `kv-datamart-seg-dev` con RBAC; secretos: `SIGRID-API-FUNCTION-KEY`, `pg-sigrid-dm-app`, `pg-mcp-sigrid-dm-ro` (R18 + paso 8 bis hecho, migración sin exponer valores) |
+| Identidad | `id-datamart-seg-dev` con exactamente 3 roles de ámbito recurso (R19) |
+| Imagen | `datamart-seg-anual:r20260810-1024` en el ACR, único tag, sin latest (R20) |
+
+**Pendiente (tanda 2, tras F-019): T23–T26** — crear el job, prueba segura
+(`version`/`check-pg`), logs (R24) y alerta con correo real (R25); más las 3
+verificaciones MANUAL de F-004 y retirar las copias viejas de los secretos en
+`kv-albaranes-rs9k2` cuando el job complete una ejecución correcta.
+
+**Defectos encontrados al desplegar (todos corregidos o anotados):** dos
+roturas de PowerShell 5.1 en los scripts (JMESPath con `?`/`!` contra az.cmd y
+comprobaciones de existencia que morían por stderr), corregidas por el
+implementer y verificadas ejecutando; el puesto NO tiene pwsh 7, el README ya
+usa `powershell -NoProfile -File`. Anotados sin corregir aún (para la vuelta
+de F-003): el comando de firewall del README usa `-n` para el servidor y la
+versión actual de az exige `--server-name`/`--name`; y la verificación de
+roles de `60_create_identity.ps1` consulta antes de que RBAC propague y lanza
+un `throw` falso (necesita reintento con espera).
+
+## ⚠ LAS DOS PUERTAS DEL BLOQUE 5 (una sigue cerrada, la otra ya se resolvió)
+
+**1 · El disco (incidente del 2026-08-09, más abajo).** El job nocturno
+ejecuta la misma carga que llenó el disco del servidor compartido. Entre A, B y
+C **ya se decidió: la B**, y es `F-019` en `harness/features.json`. Lo que
+falta, por tanto, no es decidir: es implementarla. **NO crear el job programado
+(T23) hasta que `F-019` (build de `stg.plan_mensual` por tramos) esté
+implementada y verificada contra Azure.**
+
+La puerta es detectable por máquina, no solo prosa: `infra/env/dev.json`
+declara `jobProgramable: false`, `80_create_job.ps1` aborta con `throw`
+mientras lo lea así, y `tests/test_f003_infra.py` deja la suite en rojo si
+alguien lo pone a `true` con `F-019` sin cerrar. Además
+`infra/05_check_prereqs.ps1` falla si la ocupación supera el 60 % y
+`80_create_job.ps1` no hace nada sin `-Confirmar`, pero ninguna de esas dos
+frena hoy: el disco volvió al 42,3 % al revertirse la transacción.
+
+**2 · DA-4 · autenticación contra Postgres. CERRADA por ti el 2026-08-10:
+OPCIÓN B, ya aplicada.** La spec aprobada prohibía pasar contraseña al job (R10)
+y mandaba token de Entra (R12), pero `psql-albaranes-rs9k2` **tiene Entra
+deshabilitado** y habilitarlo es una operación de servidor que afecta a
+`albaranes` y `partes` — la descartaste el 2026-08-08, y F-005 se desplegó con
+contraseña en Key Vault. Tal cual, **el job se creaba perfecto y fallaba al
+conectar todas las noches**.
+
+Cómo queda: el job se autentica como `sigrid_dm_app` con su contraseña, que
+viaja como **referencia a Key Vault resuelta por la identidad gestionada**,
+igual que la clave de `sigrid-api`. **Ningún valor de secreto** en el
+repositorio, en un script ni en la línea de comandos. `pgAuthMode` pasa a
+`password`; el modo `entra` queda implementado, probado y **dormido**. La
+enmienda está escrita y fechada en `specs/F-003-infra-caj/requirements.md`
+§Enmiendas, sin borrar el texto original de R10 ni el bloque C.
+
+Esta puerta **ya no bloquea T23**; la única que queda es `F-019`. Lo que sí
+añade es un paso nuevo al bloque 5: **T22 bis, migrar las dos contraseñas** de
+`kv-albaranes-rs9k2` a `kv-datamart-seg-dev`, que también aprobaste. Va antes de
+crear el job, y el procedimiento seguro (el valor no pasa por pantalla, ni por
+fichero, ni por el historial) está en `infra/README.md` §«Paso 8 bis».
+
+## Guion del bloque 5 (T18–T28), listo para ejecutar
+
+Antes de nada: `pip install -r requirements.txt`. `azure-identity` y
+`azure-storage-blob` están declaradas pero **no instaladas** en el puesto, y la
+verificación 1 de F-004 fallaría con `ModuleNotFoundError`.
+
+Todo el detalle (comandos exactos, qué exige autorización, KQL de logs) está en
+**`infra/README.md`**. Resumen operativo:
+
+| Tarea | Comando | Comprobar |
+|---|---|---|
+| **T18** | `powershell -NoProfile -File infra/05_check_prereqs.ps1` → `10_create_rg.ps1` → `20_create_observability.ps1` → `30_create_env.ps1` | R15 y R16. **Anotar la IP de salida del entorno.** |
+| **T19** | `40_create_storage.ps1` → `50_create_keyvault.ps1` → `60_create_identity.ps1` | R17 y R19 (tres roles, ni uno más). **Anotar el `clientId`.** |
+| **T20** | `az keyvault secret set --vault-name kv-datamart-seg-dev -n SIGRID-API-FUNCTION-KEY --file <ruta>` | `secret list` devuelve el nombre. **Nunca `secret show`**; el valor no se escribe en ningún fichero. Necesitas `Key Vault Secrets Officer`. |
+| **T21** | `powershell -NoProfile -File infra/70_build_image.ps1` | R20. **Anotar el tag.** |
+| **T22** | Regla de firewall para la IP de T18 sobre `psql-albaranes-rs9k2` | ⚠ **Escritura sobre un recurso de `albaranes`**: autorización expresa, la ejecutas tú. Después, `firewall-rule list` debe traer las de antes **más** la nueva. |
+| **T22 bis** | Migrar `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro` de `kv-albaranes-rs9k2` a `kv-datamart-seg-dev` | **DA-4 opción B (R27).** Procedimiento exacto en `infra/README.md` §«Paso 8 bis»: `show` **siempre** asignado a variable, `set` con `-o none`, sin ficheros temporales. Comprobar con `secret list` (**nunca `show`**). Las copias viejas se borran **después** de T24. |
+| **T23** | `powershell -NoProfile -File infra/80_create_job.ps1 -Confirmar` | **BLOQUEADA por `F-019`** (DA-4 ya no bloquea). Exige que T22 bis esté hecha: el script aborta si falta el secreto. R21. |
+| **T24** | `az containerapp job start` + `job start --command python --args main.py,version` | `Succeeded` y el tag coincide con T21. |
+| **T25** | KQL de `infra/README.md` | Salen las líneas de T24. Si una columna no cuadra, `getschema` y **corregir el README**. |
+| **T26** | `az monitor metrics list-definitions --resource <id-job>` y luego `90_create_alert.ps1` | Correcto **solo si llega el correo**. Anotar hora del fallo y de recepción. |
+| **F-004** | Las tres verificaciones heredadas (blob desde el puesto, blob desde el job, prueba negativa de permisos) | Sección de F-004, más abajo. Van después de T19+T20. |
+
+Antes de T26 hace falta el nombre del grupo de acción de la landing zone
+(**DA-3**, sigue abierta): `az monitor action-group list --query "[].{n:name, rg:resourceGroup}" -o table`
+y pasarlo con `-ActionGroupName` / `-ActionGroupRg`. Si no existe ninguno
+reutilizable, `-AlertEmail`. **Ningún correo entra en el repositorio.**
+
+## Deuda que dejas decidir a ti
+
+El **ID de suscripción sigue en el historial de git** (estuvo en
+`infra/00_vars.ps1` hasta esta feature). Del árbol de trabajo ha desaparecido y
+hay un test que impide que vuelva; reescribir la historia es decisión tuya.
+
+---
+
+# F-004 · CERRADA (2026-08-09) — MERGEADA A `dev`
+
+> Merge hecho: `79c48e2 Merge branch 'feature/F-004-etl-sin-dependencias-locales'
+> into dev`. La rama de F-003 sale de ahí.
 
 **APPROVED sin condiciones** (`progress/review_F-004.md`), rigor `estandar`.
 Resumen en `progress/history.md`; detalle en `progress/impl_F-004.md` y
@@ -197,6 +304,11 @@ datamart (`kv-datamart-seg-dev`) **lo crea F-003 y todavía no existe**. Es una
 decisión de conveniencia, no de diseño: **F-003 debe moverlas** a su vault y
 actualizar la referencia. Anotado para que no se quede así por inercia.
 
+> **Al día 2026-08-10:** deja de ser una nota suelta. Con DA-4 cerrada (opción
+> B) la migración es **T22 bis** del bloque 5, con procedimiento escrito en
+> `infra/README.md` §«Paso 8 bis» y requisito propio (**R27**). Sigue
+> pendiente de ejecutar: el vault de destino aún no existe.
+
 ---
 
 # F-015 · CERRADA (2026-08-09) — pendientes resueltos el mismo día
@@ -221,14 +333,50 @@ pendientes que elevó, cerrados por el humano el 2026-08-09:
 # Rumbo confirmado por el humano (2026-08-09): el ETL debe correr en Azure
 
 Nuevo orden de prioridades de las features abiertas: ~~F-004~~ (**cerrada el
-2026-08-09**) → **F-003** (Container Apps Job nocturno `--full` + disparo
-manual, spec_ready) → **F-016** (refuerzo tests F-005) → **F-011**
-(incremental) → resto. Los dos fallos consecutivos de la carga local refuerzan
-la urgencia de F-003. Siguiente paso: **aprobar la spec de F-003**, teniendo
-en cuenta dos recomendaciones del reviewer de F-004: enganchar las tres
-verificaciones MANUAL de F-004 como criterios de aceptación de F-003, y no
-olvidar `AZURE_CLIENT_ID` si la identidad del job es user-assigned.
+2026-08-09**) → **F-003** (Container Apps Job nocturno `--full`; spec aprobada
+el 2026-08-09, **bloques 1–4 implementados el 2026-08-10**, ver arriba) →
+**F-016** (refuerzo tests F-005) → **F-011** (incremental) → resto.
+
+Las dos recomendaciones del reviewer de F-004 están **incorporadas**: las tres
+verificaciones MANUAL de F-004 viven ahora en el guion del bloque 5 y en
+`infra/README.md`, y `AZURE_CLIENT_ID` se inyecta en el job con su propio test
+(`test_f003_r7_el_job_inyecta_azure_client_id_de_la_identidad`).
 
 Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
 `opus`; leader y spec-author siguen en `inherit`.
 
+
+---
+
+# F-020 · Spec escrita (2026-08-10, spec-author)
+
+Escrita `specs/F-020-arnes-multiservicio/` (requirements con R1–R20 en EARS,
+design con decisiones DA-1..DA-6, tasks T1–T11). La feature sigue `pending`
+hasta que el humano apruebe la spec (entonces el líder la pasa a
+`spec_ready`).
+
+Hallazgos técnicos que condicionan el diseño (verificados leyendo arnes-base
+1.2.1): (1) `es_produccion()` excluye `tests/` solo como prefijo, así que los
+tests de un servicio (`services/x/tests/`) entrarían hoy como código de
+producción a mutar y medir; (2) `EjecutorPytest` trata el exit 5 de pytest
+(«sin tests recogidos») como mutante MUERTO: en un servicio sin tests todos
+los mutantes «morirían» falsamente; (3) el coverage.json de un servicio
+numera rutas relativas al servicio y el alcance las numera desde la raíz:
+hace falta fusión con re-prefijado.
+
+## Decisiones abiertas que debe validar el humano (detalle en design.md)
+
+- **DA-1**: declaración explícita en `harness/servicios.json` (recomendada)
+  frente a autodescubrimiento o clave en rigor.json.
+- **DA-2**: implementar y testear en este repo y portar a arnes-base 1.3.0
+  (patrón F-015), matizando el «el trabajo vive en arnes-base» del encargo:
+  arnes-base no tiene infraestructura de tests propia.
+- **DA-3**: F-020 no declara `rigor` en features.json → hoy hereda
+  `critico`. Recomendado declarar `estandar` antes de pasarla a in_progress.
+- **DA-4**: código de raíz fuera de servicios sigue el camino mono-proyecto.
+- **DA-5**: servicio Python sin suite → sus mutantes sobreviven (no se
+  aborta la campaña).
+- **DA-6**: venv declarado pero inexistente → error explícito/KO, sin
+  fallback silencioso al intérprete global.
+
+Sin tocar: código, features.json, arnes-base (solo lectura). Sin commits.

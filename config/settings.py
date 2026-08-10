@@ -37,7 +37,7 @@ def get_build_info() -> dict[str, str]:
     Metadatos de la build en curso, para diagnóstico.
 
     En Azure los inyecta el Dockerfile como variables de entorno en tiempo de
-    build (ver infra/20_build_image.ps1). Ejecutando desde el repositorio no
+    build (ver infra/70_build_image.ps1). Ejecutando desde el repositorio no
     existen, y entonces valen BUILD_UNKNOWN.
     """
     return {

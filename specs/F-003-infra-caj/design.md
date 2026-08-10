@@ -86,8 +86,15 @@ tags { acens-project, acens-environment, acens-customer,
        acens-support }
 ```
 
+> ⚠ **ENMIENDA 2026-08-10 (DA-4 opción B).** El fichero de entorno lleva además
+> `pgSecretName`, `pgJobSecretName` y `pgReadonlySecretName`: los **nombres**
+> (nunca los valores) de los secretos de Postgres en el Key Vault del proyecto.
+> Y `pgAuthMode` vale **`password`**, no `entra`. Ver
+> `requirements.md` §Enmiendas.
+
 Valores de `dev` a fijar en la implementación según la tabla de §2, con
-`cron = "0 2 * * *"`, `pgAuthMode = "entra"`, `acrName = "acralbaranesdev"`,
+`cron = "0 2 * * *"`, ~~`pgAuthMode = "entra"`~~ → **`pgAuthMode = "password"`
+(enmienda)**, `acrName = "acralbaranesdev"`,
 `acrResourceGroup = "rg-albaranes-dev"`, `acens-compliance = "gdpr"` (el
 datamart carga `prv`/`con`/`age`, con CIF y datos de terceros; se etiqueta como
 el resto de recursos que tocan datos de Sigrid).
@@ -187,6 +194,21 @@ az containerapp job create -g <rg> -n <job> --environment <cae> \
              "PG_HOST=…" "PG_PORT=…" "PG_DB=…" "PG_USER=…" "PG_AUTH_MODE=entra" \
              "LOG_LEVEL=INFO" "LOG_FORMAT=json"
 ```
+
+> ⚠ **ENMIENDA 2026-08-10 (DA-4 opción B).** La llamada real lleva **dos**
+> secretos y una variable más. El segundo secreto es la contraseña de Postgres,
+> con el mismo mecanismo que la clave de la API —referencia al vault resuelta
+> por la identidad—, y `PG_AUTH_MODE` vale `password`:
+>
+> ```
+>   --secrets "sigrid-api-key=keyvaultref:<uri-clave-api>,identityref:<uami-id>" \
+>             "pg-password=keyvaultref:<uri-contrasena>,identityref:<uami-id>" \
+>   --env-vars … "PG_AUTH_MODE=password" "PG_PASSWORD=secretref:pg-password" …
+> ```
+>
+> Sigue sin aparecer **ningún valor**: solo nombres y URIs de secreto. En modo
+> `entra` el segundo secreto y `PG_PASSWORD` no se generan; el script construye
+> las dos listas antes de llamar a `az`.
 
 Decisiones:
 
@@ -375,6 +397,6 @@ verdad, identidad gestionada y ausencia de contraseñas.
 | Identidad asignada por el sistema | Huevo y gallina con `AcrPull` en la creación del job, y se pierde al recrearlo (§4). |
 | ACR propio del datamart | D2 cerrada: `acralbaranesdev`. |
 | Entorno integrado en VNet | §2. Sin private endpoints ni DNS privada, no acerca nada y quita la IP estática de salida. |
-| Contraseña de Postgres en Key Vault | El diseño confirmado dice «sin contraseñas». Un secreto que no existe no se filtra ni se rota. |
+| ~~Contraseña de Postgres en Key Vault~~ | ~~El diseño confirmado dice «sin contraseñas». Un secreto que no existe no se filtra ni se rota.~~ **Descarte revertido el 2026-08-10 (DA-4 opción B): es lo que se implementa.** El razonamiento seguía siendo bueno, pero daba por hecho que Entra estaba disponible en el servidor, y no lo está; habilitarlo afecta a `albaranes` y `partes`. Al pasar la contraseña como referencia al vault, el valor sigue sin estar en el repositorio: lo que se pierde es la rotación automática, no la confidencialidad. |
 | Alerta por consulta de log como opción primaria | Depende del esquema de tablas `_CL` y tiene más latencia que una métrica. Queda como alternativa acotada (§6). |
 | `latest` como tag de imagen | Impide saber qué build corrió una noche concreta, que es justo lo que F-001 vino a resolver. |

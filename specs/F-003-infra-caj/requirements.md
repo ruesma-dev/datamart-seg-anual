@@ -30,6 +30,71 @@ Job en la suscripción (§6.3 del inventario).
 
 ---
 
+## Enmiendas
+
+### ENMIENDA 2026-08-10 · DA-4 resuelta con la **opción B**, aprobada por el humano
+
+**Qué cambia.** El job **sí lleva un segundo secreto**: la contraseña del rol
+nativo `sigrid_dm_app` con la que se conecta a PostgreSQL. Viaja **siempre**
+como **referencia a Key Vault resuelta por la identidad gestionada**, el mismo
+mecanismo que la clave de `sigrid-api`. `PG_AUTH_MODE` pasa a `password` en
+`infra/env/dev.json`.
+
+**Por qué.** R10 y el bloque C se escribieron sobre el diseño confirmado «sin
+contraseñas: autenticación Entra contra PostgreSQL». Al implementar se descubrió
+que `psql-albaranes-rs9k2` **tiene `activeDirectoryAuth` deshabilitado**, y
+habilitarlo es una operación **de servidor** que afecta a `albaranes` y `partes`
+—el humano la descartó el 2026-08-08, y F-005 se desplegó con contraseña en Key
+Vault—. Tal cual estaba, el job se creaba perfecto y **fallaba al conectar todas
+las noches**. Las dos salidas se elevaron como DA-4 y el humano eligió la B el
+2026-08-10.
+
+**Qué NO cambia, y es lo importante.** La prohibición real de R10 nunca fue la
+palabra `PG_PASSWORD`: era que **un valor de secreto no puede aparecer en el
+repositorio, en un script ni en la línea de comandos de `az`**. Eso sigue
+intacto. Sigue prohibido `--secrets "…=<valor literal>"`, sigue prohibido
+`--registry-password`, y `PG_PASSWORD` solo puede ir seguido de `secretref:`.
+
+**Requisitos afectados:**
+
+| Requisito | Antes | Después de la enmienda |
+|---|---|---|
+| **R10** | «no puede existir `PG_PASSWORD`… el **único** secreto del job es la clave de `sigrid-api`» | El job tiene **dos** secretos —clave de `sigrid-api` y contraseña de Postgres—, **ambos** por `keyvaultref` + `identityref`. `PG_PASSWORD` se admite **solo** como `secretref:<nombre>`; cualquier otro valor es un fallo |
+| **R12–R14** (bloque C, modo `entra`) | Camino de ejecución previsto para el job | **Implementados, probados y dormidos.** No se borran ni se dejan de verificar: F-005 los implementó y sus cuatro tests siguen en verde. Son el camino de vuelta si algún día se habilita Entra en el servidor |
+| **R7** (contrato de variables) | 15 variables con prefijo | 16: se añade `PG_PASSWORD`, que existe como campo `password` de `PostgresSettings` |
+
+**Trazabilidad de los tests.** `test_f003_r10_sin_pg_password_ni_secretos_literales_en_los_scripts`
+se sustituye por `test_f003_r10_ninguna_contrasena_literal_en_los_scripts` (mismo
+requisito, la invariante que sobrevive a la enmienda) y se añaden
+`test_f003_r10_la_contrasena_de_postgres_viaja_por_keyvaultref`,
+`test_f003_r10_el_job_solo_admite_los_dos_modos_de_autenticacion_previstos`,
+`test_f003_el_usuario_de_postgres_cuadra_con_el_modo_de_autenticacion` y
+`test_f003_los_prerrequisitos_comprueban_el_modo_de_autenticacion_declarado`.
+
+**Consecuencia operativa (bloque 5).** Las contraseñas viven todavía en
+`kv-albaranes-rs9k2`, el vault de otro proyecto. El humano aprobó **migrarlas al
+vault propio dentro de esta feature**: es el **paso 8 bis** del guion de
+`infra/README.md`, y va **antes** de crear el job. Se migran las dos
+(`pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro`, esta última para el MCP, que no la
+usa el job) y las copias viejas **no se borran hasta que el job funcione**.
+
+**Requisito nuevo que nace de la enmienda:**
+
+### R27 — [MANUAL] (enmienda 2026-08-10)
+El sistema debe alojar la contraseña del rol de aplicación en el **Key Vault del
+propio proyecto** (`keyVault` del fichero de entorno) antes de crear el job, y la
+migración desde el vault de `albaranes` debe hacerse **sin que el valor aparezca
+por pantalla, en un fichero ni en el historial del shell**.
+
+> Verificación: MANUAL (humano), paso 8 bis de `infra/README.md`. Correcto si
+> `az keyvault secret list --vault-name <keyVault> --query "[].name" -o tsv`
+> incluye los dos nombres y **en ningún momento se ejecutó `az keyvault secret
+> show` suelto** (sin asignar a variable). Comprobación automática asociada:
+> `test_f003_r10_la_contrasena_de_postgres_viaja_por_keyvaultref` verifica el
+> extremo del job, no la migración.
+
+---
+
 ## A. Parametrización de `infra/` por entorno (D3)
 
 ### R1 — [AUTO]
@@ -111,14 +176,28 @@ el fichero de entorno debe ser la única fuente de esa expresión.
 
 > Test: `test_f003_r9_cron_del_entorno_dev_es_0_2`.
 
-### R10 — [AUTO]
-El sistema no debe pasar ninguna contraseña al contenedor: no puede existir
-`PG_PASSWORD` ni ningún `--secrets "…=<valor literal>"` en los scripts. El único
-secreto del job es la clave de `sigrid-api`, y debe pasarse como **referencia a
-Key Vault resuelta con la identidad gestionada**.
+### R10 — [AUTO] · **ENMENDADO el 2026-08-10** (DA-4 opción B, ver §Enmiendas)
 
-> Test: `test_f003_r10_sin_pg_password_ni_secretos_literales_en_los_scripts`,
+> ⚠ **Texto original, que se conserva para que se vea qué cambió y por qué:**
+>
+> «El sistema no debe pasar ninguna contraseña al contenedor: no puede existir
+> `PG_PASSWORD` ni ningún `--secrets "…=<valor literal>"` en los scripts. El
+> único secreto del job es la clave de `sigrid-api`, y debe pasarse como
+> **referencia a Key Vault resuelta con la identidad gestionada**.»
+>
+> Tests originales: `test_f003_r10_sin_pg_password_ni_secretos_literales_en_los_scripts`,
 > `test_f003_r10_el_secreto_de_sigrid_se_pasa_por_keyvaultref`.
+
+**Texto vigente.** El sistema no debe pasar **ningún valor de secreto** al
+contenedor: no puede existir `--secrets "…=<valor literal>"` ni `PG_PASSWORD`
+seguido de nada que no sea `secretref:<nombre>`. El job tiene **dos** secretos
+—la clave de `sigrid-api` y la contraseña de PostgreSQL—, y **ambos** deben
+pasarse como **referencia a Key Vault resuelta con la identidad gestionada**.
+
+> Test: `test_f003_r10_ninguna_contrasena_literal_en_los_scripts`,
+> `test_f003_r10_el_secreto_de_sigrid_se_pasa_por_keyvaultref`,
+> `test_f003_r10_la_contrasena_de_postgres_viaja_por_keyvaultref`,
+> `test_f003_r10_el_job_solo_admite_los_dos_modos_de_autenticacion_previstos`.
 
 ### R11 — [AUTO]
 El sistema debe construir y publicar la imagen con un tag fechado
@@ -132,6 +211,17 @@ ejecución. El script no debe reescribir un tag existente (nada de `:latest`).
 ---
 
 ## C. Acceso a PostgreSQL sin contraseña (Entra)
+
+> ⚠ **ENMENDADO el 2026-08-10 (DA-4 opción B, ver §Enmiendas).** Este bloque
+> **no se elimina y no deja de verificarse**: R12–R14 quedan **implementados,
+> probados y dormidos**. El job **no** usa este camino, porque el servidor tiene
+> la autenticación Entra deshabilitada y habilitarla afecta a otras dos
+> aplicaciones; se autentica con contraseña por referencia a Key Vault (R10
+> enmendado). Reactivar este bloque es habilitar Entra en el servidor, poner
+> `pgAuthMode = "entra"` y cambiar `pgUser` al nombre de la identidad gestionada
+> —hay un test que exige esa coherencia—. Los cuatro tests de
+> `tests/test_f003_pg_entra_auth.py` siguen en verde: el camino de vuelta está
+> probado, no solo escrito.
 
 > **Dependencia crítica y decisión abierta.** El diseño confirmado dice «sin
 > contraseñas: autenticación Entra contra PostgreSQL», pero hoy
