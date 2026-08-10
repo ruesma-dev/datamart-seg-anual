@@ -163,7 +163,7 @@
         "bash harness/init.sh en verde",
         "PARADA 1 CUMPLIDA: plan de implementacion propuesto por el lider y aprobado por el humano el 2026-08-10; el implementer puede arrancar sin mas paradas en cuanto F-019 libere el turno"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": false,
       "rigor": "estandar",
       "priority": 10,
