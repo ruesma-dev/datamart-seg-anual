@@ -132,7 +132,7 @@ fi
 # sin comprobar mientras el portero imprime que todo va bien.
 if [ -f "harness/servicios.json" ]; then
     if ! $PY -m harness.servicios --validar; then
-        ko "harness/servicios.json inválido: el arnés no degrada a mono-proyecto en silencio"
+        ko "harness/servicios.json, o el venv de algún servicio, no son válidos: el arnés no degrada a mono-proyecto en silencio"
     else
         ok "harness/servicios.json válido"
         SERVICIOS=$($PY -m harness.servicios --shell)

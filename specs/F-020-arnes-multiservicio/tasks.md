@@ -34,7 +34,7 @@ fixtures en `tmp_path`.
       `GUIA_INSTALACION.md`, commit local en ese repositorio (sin push).
       | Verificación: MANUAL (humano) — comandos exactos en R18 y R19 de
       `requirements.md`
-- [ ] T8: prueba real: crear un monorepo temporal en el scratchpad (servicio
+- [x] T8: prueba real: crear un monorepo temporal en el scratchpad (servicio
       Python con venv y tests + servicio no Python), instalarle el arnés con
       `instalar_arnes.ps1` desde Windows PowerShell 5.1, configurar su
       `servicios.json` y ejecutar `bash harness/init.sh` en verde; repetir
