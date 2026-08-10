@@ -32,6 +32,7 @@ from harness.rigor import (
     nivel_de_feature,
     umbral_cobertura,
 )
+from harness.servicios import Servicio, cargar_servicios
 
 ETIQUETA = "PUERTA COBERTURA"
 MENSAJE_INSTALACION = (
@@ -74,6 +75,25 @@ def _indexar(cov: dict) -> dict[str, dict]:
     }
 
 
+def fusionar_coberturas(
+    cov_raiz: dict | None, coberturas_servicios: list[tuple[str, dict]]
+) -> dict:
+    """Une el informe de la raíz con el de cada servicio, re-prefijando rutas.
+
+    Función pura. Un servicio ejecuta su suite desde SU directorio, así que su
+    `coverage.json` numera las rutas respecto a él (`app/flujo.py`), mientras
+    que el alcance las numera respecto a la raíz del repositorio
+    (`services/email/app/flujo.py`). Sin re-prefijar, ningún fichero de
+    servicio casaría con el alcance y todos saldrían «no medidos».
+    """
+    fusionado: dict[str, dict] = dict(_indexar(cov_raiz or {}))
+    for ruta_servicio, cobertura_servicio in coberturas_servicios:
+        prefijo = ruta_servicio.replace("\\", "/").strip("/")
+        for ruta, datos in _indexar(cobertura_servicio).items():
+            fusionado[f"{prefijo}/{ruta}" if prefijo else ruta] = datos
+    return {"files": fusionado}
+
+
 def cobertura_lineas_cambiadas(
     cov: dict, lineas: dict[str, set[int]], raiz: str = "."
 ) -> tuple[int, int]:
@@ -99,6 +119,34 @@ def cobertura_lineas_cambiadas(
         cubiertas += len(relevantes & ejecutadas)
 
     return cubiertas, totales
+
+
+def _leer_cobertura(ruta: Path) -> dict | None:
+    """Lee un informe de coverage; `None` si no existe, error si no es JSON."""
+    if not ruta.is_file():
+        return None
+    try:
+        return json.loads(ruta.read_text(encoding="utf-8"))
+    except ValueError as error:
+        raise ValueError(f"{ruta.as_posix()} no es JSON válido: {error}") from error
+
+
+def coberturas_de_servicios(
+    servicios: list[Servicio], raiz: str, nombre_informe: str
+) -> list[tuple[str, dict]]:
+    """Informes de coverage de los servicios Python que tengan uno.
+
+    Un servicio sin informe no es un error aquí: sus ficheros cambiados caen en
+    el mecanismo de «no medido» y cuentan como no cubiertos (que es la verdad).
+    """
+    encontradas: list[tuple[str, dict]] = []
+    for servicio in servicios:
+        if servicio.lenguaje != "python":
+            continue
+        datos = _leer_cobertura(Path(raiz) / servicio.ruta / nombre_informe)
+        if datos is not None:
+            encontradas.append((servicio.ruta, datos))
+    return encontradas
 
 
 def _na(motivo: str) -> int:
@@ -157,14 +205,22 @@ def main(argv: list[str] | None = None) -> int:
             f"{opciones.base}"
         )
 
-    ruta_cov = Path(opciones.cov)
-    if not hay_coverage() or not ruta_cov.is_file():
+    if not hay_coverage():
         return _ko(MENSAJE_INSTALACION)
 
+    ruta_cov = Path(opciones.cov)
     try:
-        datos = json.loads(ruta_cov.read_text(encoding="utf-8"))
+        servicios = cargar_servicios(raiz=opciones.raiz)
+        cov_raiz = _leer_cobertura(ruta_cov)
+        por_servicio = coberturas_de_servicios(servicios, opciones.raiz, ruta_cov.name)
     except ValueError as error:
-        return _ko(f"{ruta_cov.as_posix()} no es JSON válido: {error}")
+        return _ko(str(error))
+
+    if cov_raiz is None and not por_servicio:
+        return _ko(MENSAJE_INSTALACION)
+    # Sin servicios declarados esto es exactamente el informe de la raíz: el
+    # repositorio de un solo proyecto sigue el camino de siempre.
+    datos = fusionar_coberturas(cov_raiz, por_servicio) if servicios else cov_raiz or {}
 
     cubiertas, totales = cobertura_lineas_cambiadas(datos, alcance.lineas, opciones.raiz)
     if totales == 0:
