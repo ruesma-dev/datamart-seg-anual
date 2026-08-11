@@ -71,7 +71,14 @@ la huella del resultado del build **actual** en local:
 
 ```powershell
 # checksum del contenido (excluye plan_id y _built_at, que cambian por diseño)
-PSQL -h localhost -U <usuario> -d sigrid_dm -X -A -t -c "SELECT count(*) || '|' || md5(string_agg(fila, '|' ORDER BY fila)) FROM (SELECT concat_ws('~', presupuesto_id, obra_id, partida_id, ambito_id, version, version_descripcion, version_tex, version_fec_creacion, version_fec_efectiva, anio_mes, posicion_mes, pct_acumulado, pct_mes, precio_unitario, can_mes, can_origen, importe_mes, importe_origen, importe_mes_raw, importe_origen_raw, total_incurrido, total_incurrido_mes) AS fila FROM stg.plan_mensual) t;"
+#
+# CORREGIDO en T1 (2026-08-11): la formulación original agregaba las 29,09 M
+# de filas en UNA cadena y Postgres la rechaza («memoria agotada»: una cadena
+# no puede superar 1 GB). Se hashea por cubos: cada fila va a uno de 4.096
+# cubos según su md5, se hashea cada cubo y se hashea la lista ordenada de
+# hashes. Misma semántica (mismo conjunto de filas ⇔ mismo checksum) y es la
+# fórmula que DEBE repetirse tal cual en R13.
+PSQL -h localhost -U <usuario> -d sigrid_dm -X -A -t -c "SELECT sum(n) || '|' || md5(string_agg(h, '|' ORDER BY b)) FROM (SELECT substr(md5(fila), 1, 3) AS b, count(*) AS n, md5(string_agg(fila, '|' ORDER BY fila)) AS h FROM (SELECT concat_ws('~', presupuesto_id, obra_id, partida_id, ambito_id, version, version_descripcion, version_tex, version_fec_creacion, version_fec_efectiva, anio_mes, posicion_mes, pct_acumulado, pct_mes, precio_unitario, can_mes, can_origen, importe_mes, importe_origen, importe_mes_raw, importe_origen_raw, total_incurrido, total_incurrido_mes) AS fila FROM stg.plan_mensual) t GROUP BY 1) buckets;"
 
 # huella de las vistas de consumo (herramienta de F-005)
 python main.py fingerprint-views --salida huella_local_antes_f019.csv

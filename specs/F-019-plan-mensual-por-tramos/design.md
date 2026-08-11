@@ -34,14 +34,21 @@ diferencia cambia alguna constante, lo anota aquí y en el informe.
 
 | Magnitud | Estimado | Medido (T1) |
 |---|---|---|
-| Filas `raw.obrparpre` | 13,76 M (dato duro) | |
-| Filas finales `stg.plan_mensual` | desconocido (medir) | |
-| Filas explosionadas rama master | desconocido (medir) | |
-| Tamaño físico `stg.plan_mensual` | desconocido (medir) | |
-| Derrame del build actual (temp_bytes, local) | ≥16 GB en Azure (cota inferior: no terminó) | |
-| Coeficiente derrame/fila | ≥ 16 GB / 13,76 M ≈ **1,2 KB/fila** | |
-| Peso de la obra más pesada | desconocido (medir) | |
-| Disco Azure: total / usado hoy | 32 GB / 13,5 GB (42,3 %); libres ≈ 18,5 GB | |
+| Filas `raw.obrparpre` | 13,76 M (dato duro) | 13,76 M |
+| Filas finales `stg.plan_mensual` | desconocido (medir) | **29.091.584** (master 25.680.675 · reales 3.410.909) |
+| Filas explosionadas rama master | desconocido (medir) | **69.052.610** posiciones de 3.750.281 presupuestos (×18,4) |
+| Tamaño físico `stg.plan_mensual` | desconocido (medir) | **7.532 MB** |
+| Derrame del build actual (temp_bytes, local) | ≥16 GB en Azure (cota inferior: no terminó) | pendiente (se mide en T11 alrededor del build por tramos: F-019 ya está mergeada en `dev` y el build antiguo ya no es ejecutable sin worktree) |
+| Coeficiente derrame/fila | ≥ 16 GB / 13,76 M ≈ **1,2 KB/fila** | pendiente (mismo motivo) |
+| Peso de la obra más pesada | desconocido (medir) | **298.053 filas** (obra 1948159; top 15 entre 121.994 y 298.053) |
+| Disco Azure: total / usado hoy | 32 GB / 13,5 GB (42,3 %); libres ≈ 18,5 GB | sin cambios |
+
+Medido el 2026-08-11 por el humano en el Postgres local (T1, comandos de
+R1). Consecuencia sobre las constantes: **no cambia ninguna**. La obra más
+pesada (298 k) queda muy por debajo de `PG_TRAMO_MAX_FILAS = 1 M`: ningún
+tramo unitario, empaquetado equilibrado (~3-4 obras grandes por tramo). La
+medición 4 de R1 (derrame) se toma en T11 junto a la equivalencia R13,
+porque el árbol de `dev` ya lleva el build nuevo.
 
 ### Derivación de las constantes propuestas (a confirmar con «medido»)
 
