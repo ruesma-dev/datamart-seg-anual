@@ -399,17 +399,26 @@ entorno: `PSQL` = `& "C:\Program Files\PostgreSQL\16\bin\psql.exe"`, **las
 opciones van ANTES** de la cadena de conexión, y `.env` apunta HOY a Azure (la
 copia local está en `.env.local.bak`).
 
-### 1 · T1 y T2 — medir en LOCAL (R1) y fijar las constantes
+### 1 · T1 y T2 — medir en LOCAL (R1) y fijar las constantes — HECHO 2026-08-11
 
-Las cuatro consultas de **R1** (filas y tamaño de `stg.plan_mensual`,
-explosión de la rama master, top 15 de obras por peso, y el delta de
-`temp_files`/`temp_bytes` alrededor de un `stage`). Los resultados se anotan
-en `design.md` §Mediciones, columna «medido».
+Mediciones del humano anotadas en `design.md` §2: 29.091.584 filas finales
+(7,5 GB), explosión master 69,05 M posiciones (×18,4), obra más pesada
+298.053 filas. **Ninguna constante cambia** (298 k ≪ 1 M del tramo). El
+derrame (medición 4 de R1) se toma en T11 alrededor del `stage` nuevo:
+F-019 ya estaba mergeada en `dev`, el build antiguo ya no es ejecutable.
 
-**Qué hacer con esos números**: si la obra más pesada supera
-`PG_TRAMO_MAX_FILAS`, ir a `.env` y bajar el valor (no hace falta tocar
-código; hay un test que lo garantiza). Si el coeficiente de derrame por fila
-sale muy por encima de 1,2 KB, bajarlo también. **Va ANTES de T12.**
+Incidencias del día, ya resueltas: (1) el checksum de R2/R13 se reformuló
+**por cubos** — la fórmula original superaba el límite de 1 GB por cadena de
+Postgres; la fórmula corregida está en `requirements.md` §R2 y es la que hay
+que repetir en R13. (2) El humano editó por error `.env.example` (versionado)
+con secretos reales; nunca llegó a commit, se restauró la plantilla y la
+configuración de Azure quedó en `.env.azure.bak` (ignorada). **Recomendado
+rotar** la contraseña de `sigrid_dm_app` (y el secreto `pg-sigrid-dm-app` de
+`kv-datamart-seg-dev`) antes de crear el job.
+
+**Línea base R2 capturada (build antiguo, local):**
+`29091584|0a4024a22cb5c4872061820f66c9024c`
+(+ `huella_local_antes_f019.csv` en el puesto del humano, sin versionar).
 
 ### 2 · T11 — equivalencia funcional en LOCAL (R13), la prueba de fuego
 
@@ -422,6 +431,23 @@ sale muy por encima de 1,2 KB, bajarlo también. **Va ANTES de T12.**
 Esperado: **checksum idéntico carácter a carácter** y cero diferencias.
 Cualquier diferencia es FALLO: se marca la feature `blocked`, no se
 racionaliza.
+
+**Incidente 2026-08-11/12 (T11 pendiente de reintento).** El primer `stage`
+del build nuevo (2026-08-11 23:53) FALLÓ a los 28 s: la puerta de disco R10
+saltó con «ocupación 169,26 % > 80 %» porque el `.env` local no define
+`PG_DISCO_TOTAL_GB` y aplicó el default de 32 GB (pensado para Azure),
+mientras el Postgres local suma ~54 GB de bases. El fail-safe se comportó
+como está diseñado: tabla vacía, paso FAILED, cero tramos ejecutados.
+Corrección para el reintento: añadir `PG_DISCO_TOTAL_GB=200` **solo al
+`.env` local** (disco real de 920 GB); `.env.azure.bak` no define la
+variable, así que en Azure seguirá aplicando el 32 correcto. Además, el
+2026-08-12 el `.env` quedó apuntando a Azure por error y se lanzaron dos
+`stage` contra el servidor compartido de producción: ambos murieron **antes
+de conectar** (timeout y fallo de DNS), no se escribió nada. Nueva línea
+base de derrame para el reintento (los contadores sobrevivieron al
+reinicio del puesto de las 04:35): `temp_files=16161`,
+`temp_bytes=578.037.755.664`. La línea base R2 del checksum sigue siendo
+válida: `raw` no se ha tocado.
 
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 

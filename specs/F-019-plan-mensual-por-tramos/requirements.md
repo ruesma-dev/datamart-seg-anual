@@ -81,7 +81,7 @@ la huella del resultado del build **actual** en local:
 PSQL -h localhost -U <usuario> -d sigrid_dm -X -A -t -c "SELECT sum(n) || '|' || md5(string_agg(h, '|' ORDER BY b)) FROM (SELECT substr(md5(fila), 1, 3) AS b, count(*) AS n, md5(string_agg(fila, '|' ORDER BY fila)) AS h FROM (SELECT concat_ws('~', presupuesto_id, obra_id, partida_id, ambito_id, version, version_descripcion, version_tex, version_fec_creacion, version_fec_efectiva, anio_mes, posicion_mes, pct_acumulado, pct_mes, precio_unitario, can_mes, can_origen, importe_mes, importe_origen, importe_mes_raw, importe_origen_raw, total_incurrido, total_incurrido_mes) AS fila FROM stg.plan_mensual) t GROUP BY 1) buckets;"
 
 # huella de las vistas de consumo (herramienta de F-005)
-python main.py fingerprint-views --salida huella_local_antes_f019.csv
+python main.py fingerprint-views --out huella_local_antes_f019.csv
 ```
 
 Verificación: MANUAL (humano). Ambos resultados guardados (el checksum,
@@ -225,7 +225,7 @@ Verificación: MANUAL (humano):
 ```powershell
 python main.py stage           # con .env apuntando a LOCAL
 # repetir el checksum de R2: debe coincidir carácter a carácter
-python main.py fingerprint-views --salida huella_local_despues_f019.csv
+python main.py fingerprint-views --out huella_local_despues_f019.csv
 python main.py compare-fingerprints huella_local_antes_f019.csv huella_local_despues_f019.csv
 ```
 
@@ -275,7 +275,7 @@ CUANDO R14 termina, el humano debe comparar la huella de las vistas de
 consumo de local contra Azure (paso 10 de F-005):
 
 ```powershell
-python main.py fingerprint-views --salida huella_azure_f019.csv   # .env Azure
+python main.py fingerprint-views --out huella_azure_f019.csv   # .env Azure
 python main.py compare-fingerprints huella_local_despues_f019.csv huella_azure_f019.csv
 ```
 
