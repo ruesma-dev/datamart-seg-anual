@@ -466,6 +466,23 @@ momento** para mantener el `raw` congelado. Verificado que el SQL de
 `temp_bytes` 578.037.755.664 → 591.769.096.726 alrededor del `stage`
 completo).
 
+**T11-bis, brazo 1 COMPLETADO (2026-08-13).** Build viejo (worktree
+`2cb6de7`) sobre el `raw` del 30-jul: **29.403.619 filas** — mismo recuento
+que el build nuevo. Duración del monolítico: **6 h 24 min** (22.532 s solo
+`plan_mensual`) frente a los 53 min del build por tramos. Derrame del
+monolítico: 13,86 GB ≈ 0,47 KB/fila (calcado al del nuevo; la mejora del
+troceo es tiempo y pico de ocupación, no derrame). Capturas de referencia:
+
+- **Checksum viejo (la referencia a clavar):**
+  `29403619|ec74147ef3e7175c66ed9d30d3e72f9f`
+- **Huella vieja:** `huella_build_viejo_f019.csv` (34 vistas, 694 métricas,
+  sin `--periodo-hasta`; la nueva debe capturarse igual), sin versionar.
+- Base de temporales antes del brazo 2: `temp_files=17802`,
+  `temp_bytes=620.626.993.530`.
+
+Falta el brazo 2: `stage` nuevo en el repo principal → checksum + huella
+nuevos → comparación exacta.
+
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
