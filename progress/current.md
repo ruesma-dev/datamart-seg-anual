@@ -446,8 +446,25 @@ variable, así que en Azure seguirá aplicando el 32 correcto. Además, el
 de conectar** (timeout y fallo de DNS), no se escribió nada. Nueva línea
 base de derrame para el reintento (los contadores sobrevivieron al
 reinicio del puesto de las 04:35): `temp_files=16161`,
-`temp_bytes=578.037.755.664`. La línea base R2 del checksum sigue siendo
-válida: `raw` no se ha tocado.
+`temp_bytes=578.037.755.664`.
+
+**T11-bis (aprobado por el humano el 2026-08-12).** El reintento del stage
+nuevo terminó en verde (60 tramos, 53 min, ocupación máx. ~31 %,
+29.403.619 filas), pero destapó que la línea base del 22-jul era
+**inválida**: el `raw` se reingirió el **30-jul**, después del último build
+viejo. Quedan ANULADOS el checksum `29091584|0a4024a2...` y
+`huella_local_antes_f019.csv` (comparaban datos del 22-jul contra datos
+del 30-jul). Plan aprobado: worktree del build viejo en
+`C:\Users\pgris\PycharmProjects\datamart-old-f019` (commit `2cb6de7`, el
+`dev` previo al merge de F-019) → build viejo sobre el `raw` del 30-jul →
+checksum y huella viejos → build nuevo en el repo principal → checksum y
+huella nuevos → comparación exacta. **`ingest` no se ejecuta en ningún
+momento** para mantener el `raw` congelado. Verificado que el SQL de
+`stg/` no usa `CURRENT_DATE`/`now()`: el build es determinista dado el
+`raw`. Medición 4 de R1 ya tomada con el stage nuevo de hoy: **derrame
+12,8 GB de temporales / 29,4 M filas ≈ 0,47 KB/fila** (delta de
+`temp_bytes` 578.037.755.664 → 591.769.096.726 alrededor del `stage`
+completo).
 
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 
