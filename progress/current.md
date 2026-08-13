@@ -522,6 +522,24 @@ Plan de diagnóstico propuesto al humano (pendiente de su OK):
    escala (equivalencia semántica probada, decidir sobre R13); no vacío →
    muestrear filas y columnas discrepantes y buscar la causa.
 
+**Resultados del plan (2026-08-13, humano dio OK y lo ejecuta el agente):**
+
+- Paso 1 HECHO: `public.tmp_f019_nuevo_a` creada con las 29.403.619 filas
+  del build nuevo (borrar al cerrar la investigación).
+- Paso 2 HECHO — **el build nuevo ES reproducible**: segunda ejecución
+  (2026-08-13 10:07→11:51) → checksum `29403619|c58b928de0c7bf297c9158b8f3faa370`,
+  idéntico carácter a carácter al de la primera. La diferencia con el
+  viejo es SISTEMÁTICA. Hipótesis (a) descartada para el build nuevo.
+- Descartado también que el parámetro de `07_version_master_vigente.sql`
+  sea una fecha: es `cod=15` (código de configuración), y ningún SQL de
+  `stg/` usa `CURRENT_DATE`/`now()`.
+- Paso 3 LANZADO (~14:15 local): build viejo en el worktree (~6,4 h).
+  Al terminar: `EXCEPT` numérico en ambas direcciones entre
+  `stg.plan_mensual` (contenido viejo) y `tmp_f019_nuevo_a` (nuevo), y
+  muestreo de discrepancias por columna. Suspensión del portátil con
+  corriente desactivada (`powercfg standby/hibernate-timeout-ac 0`) a
+  petición del humano para aguantar la tirada.
+
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
