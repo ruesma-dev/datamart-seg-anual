@@ -540,6 +540,52 @@ Plan de diagnóstico propuesto al humano (pendiente de su OK):
   corriente desactivada (`powercfg standby/hibernate-timeout-ac 0`) a
   petición del humano para aguantar la tirada.
 
+**CAUSA RAÍZ ENCONTRADA (2026-08-13 tarde).** Cadena de evidencia:
+
+1. El build viejo también es reproducible (2ª ejecución, 1 h 24 esta vez:
+   las 6 h 24 de ayer eran el portátil): `ec74147e...` clavado. Ambos
+   builds deterministas, contenido establemente distinto.
+2. `EXCEPT ALL` numérico: **10.259 filas difieren en cada dirección**
+   (0,035 %), solo **2 obras** (2403576, 2491656), 1.955 presupuestos,
+   solo rama master (ámbitos 8 y 11).
+3. Esas 2 obras son EXACTAMENTE las únicas de master con «filas gemelas»
+   (clave presupuesto+ámbito+mes+posición duplicada): 23.111 + 7.749 =
+   30.860, el total de master. Correlación perfecta.
+4. Por clave, los multiconjuntos de valores son IDÉNTICOS entre builds en
+   todas las columnas de negocio (pct, cantidades, importes, versión): los
+   valores solo se reparten al revés entre las gemelas. Residuo de 3
+   filas: mismo fenómeno vía `version_descripcion`.
+5. Origen de las gemelas: esas obras tienen **DOS versiones master con el
+   mismo número 13**, creadas el 22/07/2026 y el 23/07/2026. La selección
+   de vigente no desempata (empatan en número), así que cada posición sale
+   DUPLICADA. Ninguna pareja de gemelas es duplicado exacto (16.980
+   claves, todas con valores distintos entre gemelas).
+6. Mecanismo: las ventanas de 08 (`MAX ... ROWS UNBOUNDED PRECEDING`,
+   `LAG ... ORDER BY posicion_mes`) quedan SUBESPECIFICADAS cuando
+   `posicion_mes` empata (gemelas). Cada plan de ejecución (monolítico vs
+   por tramos) resuelve el empate distinto pero estable. **El troceo de
+   F-019 NO cambia ningún valor: el no determinismo es preexistente** (el
+   build viejo también cambiaría de bytes con otro plan/versión de PG).
+
+Conclusión técnica: **equivalencia semántica PROBADA** (mismos
+multiconjuntos de valores por clave en toda la tabla; los agregados a
+cualquier nivel son idénticos, por eso la huella coincidía). El checksum
+byte a byte de R13 es insatisfacible tal cual ante gemelas: mide el orden
+del empate, no el contenido.
+
+Hallazgo colateral (PREEXISTENTE, igual en ambos builds, fuera del alcance
+de F-019): la versión 13 duplicada hace que TODO el plan master de esas 2
+obras esté contado DOS VECES en `stg.plan_mensual`. Revisar con negocio si
+la vigente debería desempatar (p. ej. por fecha de creación más reciente).
+
+Decisión pendiente del humano (opciones presentadas por chat): A) enmendar
+R13 con criterio canónico insensible al empate y dar T11 por superado;
+B) arreglar el desempate en el SQL (cambio de código vía SDD, cambia el
+negocio de 2 obras); C) A ahora + el desempate como feature/bug aparte.
+Limpieza pendiente tras la decisión: tablas `tmp_f019_*`, worktree
+`datamart-old-f019` (con su `.env`), CSVs de huella obsoletos, y un
+`stage` nuevo final para dejar la tabla local en estado del build nuevo.
+
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
