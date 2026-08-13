@@ -578,13 +578,38 @@ de F-019): la versión 13 duplicada hace que TODO el plan master de esas 2
 obras esté contado DOS VECES en `stg.plan_mensual`. Revisar con negocio si
 la vigente debería desempatar (p. ej. por fecha de creación más reciente).
 
-Decisión pendiente del humano (opciones presentadas por chat): A) enmendar
-R13 con criterio canónico insensible al empate y dar T11 por superado;
-B) arreglar el desempate en el SQL (cambio de código vía SDD, cambia el
-negocio de 2 obras); C) A ahora + el desempate como feature/bug aparte.
-Limpieza pendiente tras la decisión: tablas `tmp_f019_*`, worktree
-`datamart-old-f019` (con su `.env`), CSVs de huella obsoletos, y un
-`stage` nuevo final para dejar la tabla local en estado del build nuevo.
+**DECISIÓN DEL HUMANO (2026-08-13): opción C** — enmendar R13 y dar T11
+por superado, más registrar el caso «muy bien, con código de obra y causa,
+para poder replicarlo a mano». Ejecutado:
+
+- `requirements.md` R13: enmienda fechada con el criterio canónico
+  (cardinalidad + `EXCEPT ALL` numérico con multiconjuntos por clave +
+  huella) y el veredicto **R13 SUPERADO**.
+- `docs/referencia/05_caso_obrfasamb_version_duplicada.md`: el caso
+  completo — obras 0694 (2403576, v26 duplicada, creada 20/07 y
+  23/07/2026) y 0697 (2491656, v13 duplicada, creada 22/07 y 23/07/2026),
+  ides 29916/29983, 29918/29985, 29949/29977, 29951/29979 (el segundo de
+  cada pareja siempre del 23/07, ides consecutivos: parece una misma
+  acción en Sigrid ese día), mecanismo del join por (obride, amb, fas) y
+  receta SQL de replicación. Indexado en el README de referencia.
+- `harness/features.json`: **F-022** creada (pending, sdd, prioridad 12):
+  desempate determinista, con la pregunta de negocio previa (¿corregir en
+  Sigrid o desempatar en ETL?). La F-021 sigue reservada para la
+  planificación consolidada.
+- Limpieza: DROP de `tmp_f019_nuevo_a`, `tmp_f019_diff_viejo` y
+  `tmp_f019_diff_nuevo`; worktree `datamart-old-f019` retirado (su copia
+  de `.env` eliminada con él); borrado `huella_local_antes_f019.csv`
+  (anulado). Se conservan `huella_build_viejo_f019.csv` y
+  `huella_build_nuevo_f019.csv` (evidencia del T11, sin versionar).
+  `stage` final lanzado para dejar la tabla local en estado del build
+  nuevo.
+
+**T11 CERRADO (SUPERADO).** Siguiente: T12 (R14, Azure) en horario
+acordado con el humano — recordar la rotación recomendada de la
+contraseña de `sigrid_dm_app` y del secreto `pg-sigrid-dm-app` antes de
+crear el job, y que el puesto del humano resolvía mal el host de Azure el
+2026-08-12 (timeout/DNS): comprobar red y regla de firewall antes de la
+ventana.
 
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 

@@ -25,6 +25,7 @@ está en el código sino en una norma de negocio.
 | `02_azure_landing_zone_acens.md` | Diseño de la Landing Zone de Azure entregado por acens. Contexto del despliegue (F-005, F-003, F-006). **Versión redactada**: sin rangos de red ni correos. |
 | `03_sigrid_api.md` | **Puntero, no documento.** La documentación de `sigrid-api` vive en `azure-apps/sigrid_api.md`; aquí solo queda lo imprescindible y el enlace. |
 | `04_azure_inventario_dev.md` | Inventario de la suscripción Azure «Ruesma» tomado con `az` (solo lectura) el 2026-08-08: resource groups, red, almacenamiento, secretos y bases de datos, contrastado con el diseño de acens. **Versión redactada**: sin IDs de suscripción/tenant, sin IPs ni rangos de red, sin valores de secretos. |
+| `05_caso_obrfasamb_version_duplicada.md` | Caso de datos del sistema origen: versiones master guardadas dos veces en `obrfasamb` (obras 0694 y 0697), que el ETL duplica en `stg.plan_mensual`. Con receta SQL para replicarlo. Motivó la enmienda de R13 en F-019 y la feature F-022. |
 
 ## Formato
 

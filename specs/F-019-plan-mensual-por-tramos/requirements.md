@@ -233,6 +233,32 @@ Resultado esperado: checksum idéntico y `compare-fingerprints` sin
 diferencias. **Cualquier diferencia es FALLO**, no se racionaliza: se
 investiga o se marca la feature `blocked`.
 
+> **ENMENDADO en T11 (2026-08-13), opción C autorizada por el humano.** El
+> checksum byte a byte resultó **insatisfacible por diseño** ante «filas
+> gemelas»: `raw.obrfasamb` contiene versiones master duplicadas (mismo
+> `(obride, amb, fas)`, ver
+> `docs/referencia/05_caso_obrfasamb_version_duplicada.md`), cada posición
+> de esas versiones sale dos veces, y las ventanas de `08_plan_mensual.sql`
+> (`ROWS UNBOUNDED PRECEDING`, `LAG ... ORDER BY posicion_mes`) quedan
+> subespecificadas en el empate: cada plan de ejecución reparte los pct
+> entre las gemelas de forma estable pero distinta. El checksum medía ese
+> orden, no el contenido. **Criterio enmendado**, verificado el 2026-08-13
+> contra el build viejo reconstruido en un worktree (`2cb6de7`) sobre el
+> MISMO `raw` congelado:
+>
+> 1. Misma cardinalidad (29.403.619 en ambos).
+> 2. Ambos builds reproducibles consigo mismos (checksum estable ×2 cada
+>    uno: viejo `ec74147e...`, nuevo `c58b928d...`).
+> 3. `EXCEPT ALL` numérico de las 22 columnas en ambas direcciones: las
+>    únicas filas discrepantes (10.259, un 0,035 %) son gemelas de las 2
+>    obras del caso, y **por clave los multiconjuntos de valores son
+>    idénticos** en todas las columnas de negocio: solo cambia el reparto
+>    entre gemelas.
+> 4. `compare-fingerprints` equivalente sin avisos.
+>
+> Con ese criterio, **R13 queda SUPERADO**: el troceo no cambia ningún
+> valor. El desempate determinista de las gemelas es la feature F-022.
+
 ---
 
 ## Bloque 5 · Verificación en Azure (cierra el paso 8 de F-005)
