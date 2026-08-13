@@ -480,8 +480,47 @@ troceo es tiempo y pico de ocupación, no derrame). Capturas de referencia:
 - Base de temporales antes del brazo 2: `temp_files=17802`,
   `temp_bytes=620.626.993.530`.
 
-Falta el brazo 2: `stage` nuevo en el repo principal → checksum + huella
-nuevos → comparación exacta.
+**T11-bis, brazo 2 y VEREDICTO: FALLO (2026-08-13, ~01:00).** El stage
+nuevo terminó en verde (49 min, mismo recuento 29.403.619) pero el checksum
+NO coincide:
+
+- viejo:  `29403619|ec74147ef3e7175c66ed9d30d3e72f9f`
+- nuevo:  `29403619|c58b928de0c7bf297c9158b8f3faa370`
+
+La feature sigue `blocked` (ya lo estaba) y NO se avanza a T12/T13/T14.
+Evidencia completa: mismo recuento; `compare-fingerprints` de
+`huella_build_viejo_f019.csv` vs `huella_build_nuevo_f019.csv` equivalente
+sin avisos (OJO al peso real de esa evidencia: las tablas fact de `mart`
+están congeladas desde el 22-jul porque `build-mart` no corrió, pero las
+vistas de `cierre/04_views_detalle.sql` y `mart/06_views_cp_tipologia.sql`
+SÍ leen `stg.plan_mensual` en vivo y sus sumas/recuentos coincidieron);
+`raw` congelado verificado (cero ejecuciones en `_meta.etl_runs` entre
+builds); diff del SQL viejo→nuevo limpio (solo comentarios, TRUNCATE al
+step y el filtro `F019_FILTRO_OBRAS` en ambas ramas; ni una expresión de
+negocio cambió); sin columnas float (todo `numeric`/fechas/ids/text); las
+ventanas de 08 son MAX/COUNT (insensibles a empates) y el LAG ordena por
+`posicion_mes`, único por `WITH ORDINALITY` dentro de cada presupuesto.
+
+Hipótesis abiertas: (a) no determinismo por empates en alguna parte aún no
+localizada (se manifestaría también entre dos ejecuciones del MISMO build),
+(b) diferencia de ESCALA en `numeric` (`1.50` vs `1.5`: igual como número,
+distinto como texto; invisible para vistas y tests, letal para el
+checksum), (c) diferencia real de contenido que los agregados no ven.
+
+Plan de diagnóstico propuesto al humano (pendiente de su OK):
+1. Congelar evidencia: `CREATE TABLE tmp_f019_nuevo_a AS SELECT * FROM
+   stg.plan_mensual` (~7,5 GB en local).
+2. Test de reproducibilidad (barato, decisivo): relanzar el stage NUEVO
+   (~50 min) y re-checksum. Si difiere de `c58b928d...` → el build no es
+   reproducible consigo mismo → el criterio de R13 es insatisfacible tal
+   cual y el arreglo es fijar desempates deterministas (cambio de código
+   vía SDD) o redefinir R13. Si coincide → diferencia sistemática
+   viejo↔nuevo.
+3. Solo si es sistemática: relanzar el build VIEJO en el worktree (~6,4 h)
+   y hacer diff por filas contra `tmp_f019_nuevo_a` con igualdad NUMÉRICA
+   (`EXCEPT` en ambas direcciones, insensible a escala): vacío → solo
+   escala (equivalencia semántica probada, decidir sobre R13); no vacío →
+   muestrear filas y columnas discrepantes y buscar la causa.
 
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 
