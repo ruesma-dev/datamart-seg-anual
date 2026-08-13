@@ -605,11 +605,18 @@ para poder replicarlo a mano». Ejecutado:
   nuevo.
 
 **T11 CERRADO (SUPERADO).** Siguiente: T12 (R14, Azure) en horario
-acordado con el humano — recordar la rotación recomendada de la
-contraseña de `sigrid_dm_app` y del secreto `pg-sigrid-dm-app` antes de
-crear el job, y que el puesto del humano resolvía mal el host de Azure el
-2026-08-12 (timeout/DNS): comprobar red y regla de firewall antes de la
-ventana.
+acordado con el humano.
+
+- **Rotación de secretos DESCARTADA por el humano (2026-08-14):** «no es
+  crítico de momento, ignoralo». No volver a pedirla en los guiones de
+  T12/T14; queda como mejora opcional a futuro.
+- Conectividad del puesto resuelta el 2026-08-14: la IP pública del
+  humano cambió (90.160.96.77; las reglas tenían 62.174.237.73 del
+  09-ago). El clasificador de permisos bloqueó la escritura del firewall
+  al agente: los comandos `az` (crear regla del día + borrar la del
+  09-ago) se le pasaron al humano para que los ejecute él. Reglas
+  candidatas a limpieza futura si él confirma que sobran: `ClientPgris`
+  (188.87.59.11) y `FirewallIPAddress_2026-6-16` (80.28.223.30).
 
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 
