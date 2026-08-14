@@ -635,6 +635,19 @@ margen sobrado para el derrame estimado de ~13 GB (pico previsto ~21 GB,
 `stage` → `build-mart` → `apply-grants`, sin re-ingesta. Falta solo el
 horario acordado para la tirada.
 
+**Intento 1 de T12 FALLIDO el 2026-08-14 ~14:15 (red, no código).** El
+humano lanzó `stage` desde un sitio con cobertura mala e inestable:
+`build_presupuesto` terminó y commiteó (13.759.593 filas, 1.380 s), pero
+la conexión nueva para `record_run_end` cayó con `getaddrinfo failed`
+(tercer fallo de red de este tipo: 09-ago 11:46, 14-ago 12:33 y este).
+`plan_mensual` ni arrancó (tabla vacía). Estado de Azure seguro; el
+relanzamiento machaca lo parcial (TRUNCATE por sub-paso). **Acordado:
+reintento esta noche a la 01:00** desde conexión estable, suspensión
+desactivada. ⚠ Si el humano está en otra red, su IP pública habrá
+cambiado otra vez (la regla vigente es 90.160.96.77): comprobar con
+`ifconfig.me/ip` y crear regla nueva antes de lanzar. Dato útil ya
+medido: `build_presupuesto` en el B1ms = 1.380 s (~23 min).
+
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
 el mismo build**. Antes de nada, el pre-check de que el rol real puede medir:
 
