@@ -620,6 +620,16 @@ acordado con el humano.
 
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
 
+**Pre-check SUPERADO el 2026-08-14 (~12:40).** Camino recorrido por el
+humano: re-login `az` con MFA reforzado (`--claims-challenge` +
+`--use-device-code`; la política de acceso condicional lo exigió al
+cambiar la IP), regla `datamart-puesto-pgris-2026-08-14` (90.160.96.77)
+creada y `datamart-puesto-pgris-2026-08-09` borrada en
+`rg-albaranes-dev`/`psql-albaranes-rs9k2`. La consulta de medición como
+`sigrid_dm_app` devolvió **7743 MB** ocupados en total (≈7,6 de 32 GB):
+margen sobrado para el derrame estimado de ~13 GB (pico previsto ~21 GB,
+~65 % < límite 80 %). Falta solo el horario acordado para la tirada.
+
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
 el mismo build**. Antes de nada, el pre-check de que el rol real puede medir:
 
