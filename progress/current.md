@@ -628,7 +628,12 @@ creada y `datamart-puesto-pgris-2026-08-09` borrada en
 `rg-albaranes-dev`/`psql-albaranes-rs9k2`. La consulta de medición como
 `sigrid_dm_app` devolvió **7743 MB** ocupados en total (≈7,6 de 32 GB):
 margen sobrado para el derrame estimado de ~13 GB (pico previsto ~21 GB,
-~65 % < límite 80 %). Falta solo el horario acordado para la tirada.
+~65 % < límite 80 %). Verificado además que `raw` quedó COMPLETA el
+09-ago: 31 tablas y `dca` con 306.737 filas; `sigrid_dm` ocupa 7.680 MB
+(los ~13,5 GB del incidente incluían WAL/sistema, que cuentan en
+`storage_percent` pero no en `pg_database_size`). T12 es directamente
+`stage` → `build-mart` → `apply-grants`, sin re-ingesta. Falta solo el
+horario acordado para la tirada.
 
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
 el mismo build**. Antes de nada, el pre-check de que el rol real puede medir:
