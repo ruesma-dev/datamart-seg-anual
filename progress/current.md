@@ -648,6 +648,31 @@ cambiado otra vez (la regla vigente es 90.160.96.77): comprobar con
 `ifconfig.me/ip` y crear regla nueva antes de lanzar. Dato útil ya
 medido: `build_presupuesto` en el B1ms = 1.380 s (~23 min).
 
+**T12 COMPLETADO en el intento 2 (14-ago 18:58Z → 15-ago 10:01Z, con
+pausa nocturna entre stage y build-mart).** El humano decidió relanzar
+desde la misma red inestable; blindaje aplicado: IP verificada
+(90.160.96.77 sin cambios) y `hosts` fijado a 68.221.140.205 desde
+consola de administrador (⚠ RETIRAR la línea al terminar T13). Resultados
+medidos en el `Standard_B1ms`:
+
+- `stage` **SUCCESS en 6.851,8 s (1 h 54)**: `build_plan_mensual`
+  troceado 5.993,9 s (~100 min), **60/60 tramos sin un solo aborto**,
+  29.398.375 filas. Ocupación de disco: 23,6 % inicial → **pico 46,55 %**
+  (~14,9 de 32 GB), muy lejos del límite 80 %; la puerta no intervino.
+- `build-mart` SUCCESS en 1.305,8 s (~22 min): `build_fact` 5.287.299
+  filas (1.168 s), `agg_categoria` 24.591.
+- `apply-grants` SUCCESS: 28 sentencias, rol `mcp_sigrid_dm_ro`.
+- `timings` capturado con el desglose de los 60 tramos (máx 293 s el
+  tramo 2; el 60 —564 obras pequeñas— 250 s).
+- Filas stg.plan_mensual: 29.398.375 vs 29.403.619 en local (−5.244) =
+  deriva esperada de raw (Azure 09-ago, local congelado 30-jul). Por eso
+  T13 compara solo meses cerrados con `--periodo-hasta`.
+
+**Veredicto del paso 9 de F-005: el B1ms AGUANTA el build troceado.**
+Factor de lentitud ~×2 respecto al portátil, pipeline completo
+stage+mart ≈ 2 h 16 — perfectamente viable como job nocturno. Pasos 8 y
+9 de F-005 COMPLETADOS.
+
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
 el mismo build**. Antes de nada, el pre-check de que el rol real puede medir:
 
