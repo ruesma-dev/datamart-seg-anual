@@ -754,6 +754,19 @@ pg_sleep 40 min + métricas del Portal). Backlog nuevo: keepalives TCP en
 la conexión del ETL (no salvan un enlace muerto, sí consultas largas
 tras NAT agresivo).
 
+**CASO CERRADO (2026-08-15 ~20:20Z): era la red.** Con el enlace «un
+poco más estable» (palabras del humano), el 4º intento de `build-cierre`
+pasó a la primera: SUCCESS en 2.701 s (`build_fact` 1.609 s, 16.856
+filas; `ddl_fact` tardó 1.086 s, probablemente el servidor digiriendo
+los abortos previos) y `apply-grants` volvió a sus 9,6 s. El servidor
+queda exonerado del todo: no hay OOM, no hace falta parche de memoria ni
+trocear cierre. Los keepalives TCP siguen siendo mejora recomendable de
+backlog. **Parte A de T13 COMPLETA: las 4 capas + grants desplegadas en
+Azure.** Los 22 fallos de vistas ausentes quedan resueltos; el bloque
+cerrado sigue pendiente de la parte B (re-ingesta sincronizada de ambos
+lados + huellas `--periodo-hasta 2026-05`), que exige red estable
+(~5-6 h, la ingesta pasa todo por el portátil dos veces).
+
 ### 5 · T14 — desbloquear F-003
 
 Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
