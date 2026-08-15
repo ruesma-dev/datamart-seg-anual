@@ -715,6 +715,27 @@ Diagnóstico en dos grupos, ninguno es un bug del build:
 Huellas del intento: `huella_azure_f019.csv` y
 `huella_local_cerrados_f019.csv` (raíz, sin versionar).
 
+**Parte A del arreglo (2026-08-15, tarde): 3 de 4 capas desplegadas en
+Azure.** `build-maestros` (23,6 s), `build-compras` (566,1 s, 2,46 M
+filas de fact) y `build-retenciones` (86,5 s) en verde + `apply-grants`
+(303 s, lento — el servidor venía de una muerte). **`build-cierre` FALLA
+de forma REPRODUCIBLE en `build_fact`**: dos intentos muertos con
+«server closed the connection unexpectedly» a duraciones muy distintas
+(982 s a las 11:46Z y 3.654 s a las 17:26Z) → presión de memoria
+dependiente de la carga del momento (B1ms, 2 GB compartidos), no un
+punto fijo. Mismo mal que F-019 curó en plan_mensual, ahora en cierre;
+destapado porque cierre NUNCA se había construido en Azure. Además, tras
+el segundo fallo `apply-grants` estuvo **71 min sin poder conectar**
+(timeout) — servidor grogui o red del humano caída; pendiente de
+confirmar salud del servidor (sirve albaranes y partes en producción).
+
+**DECISIÓN: no más reintentos de `build-cierre` contra Azure** hasta
+diagnosticar. Plan propuesto al humano (pendiente de su OK): evidencia
+en métricas del Portal (Memory/CPU percent en las dos ventanas), parche
+corto (`SET LOCAL work_mem/jit=off` en build_fact de cierre), feature de
+backlog para trocearlo con el planner de F-019, y builds de cierre solo
+en horario valle mientras tanto.
+
 ### 5 · T14 — desbloquear F-003
 
 Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
