@@ -693,6 +693,28 @@ si el `Standard_B1ms` aguanta con el build troceado).
 `fingerprint-views` contra Azure y `compare-fingerprints` con la huella local
 de T11. Sin diferencias. Cierra el **paso 10 de F-005**.
 
+**Intento 1 (2026-08-15, `--periodo-hasta 2026-05` a petición del humano;
+junio es el último cerrado pero prefirió margen): 41 FALLOS + 59 avisos.**
+Diagnóstico en dos grupos, ninguno es un bug del build:
+
+1. **22 vistas «presente vs ausente»**: en Azure nunca se construyeron
+   las capas `cierre`, `compras`, `maestro` y `retenciones` — sus builds
+   (`build-cierre`, `build-maestros`, `build-compras`,
+   `build-retenciones`) NO forman parte de `run-all` (docstring de
+   `run-all` en `main.py`) y el 09-ago solo llegó a correr `stage`.
+   Hueco de despliegue, se arregla ejecutándolos allí + `apply-grants`.
+2. **19 fallos del bloque cerrado del mart** (count +117 sobre 4,87 M =
+   0,0024 %; +319,54 € de incurrido): deriva REAL del raw entre 30-jul
+   (local) y 09-ago (Azure) — documentos de coste con fecha retroactiva
+   en meses cerrados y versiones nuevas que añaden filas a meses
+   pasados. Con raws de fechas distintas la igualdad exacta es
+   imposible por diseño; el docstring de `fingerprint-views` ya exige
+   capturar ambos lados con el mismo estado. Hace falta re-ingesta
+   sincronizada en los dos lados antes de repetir la huella.
+
+Huellas del intento: `huella_azure_f019.csv` y
+`huella_local_cerrados_f019.csv` (raíz, sin versionar).
+
 ### 5 · T14 — desbloquear F-003
 
 Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
