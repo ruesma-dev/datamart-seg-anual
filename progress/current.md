@@ -736,6 +736,24 @@ corto (`SET LOCAL work_mem/jit=off` en build_fact de cierre), feature de
 backlog para trocearlo con el planner de F-019, y builds de cierre solo
 en horario valle mientras tanto.
 
+**Giro del diagnóstico (2026-08-15 noche): el sospechoso principal pasa
+a ser LA RED DEL HUMANO, no el servidor.** Cadena de evidencia: (1) el
+humano confirmó estar en un sitio «con mala cobertura e inestable»; (2)
+las dos muertes de `build_fact` ocurren a duraciones aleatorias (16 y
+61 min) durante consultas largas = conexión TCP en silencio, perfil
+típico de NAT móvil que descarta conexiones calladas; (3) ayer una
+consulta de 19,5 min (mart build_fact) sobrevivió; (4) a las 18:43Z el
+servidor respondía al psql a la primera (bases 18 GB, sano) y a las
+19:05Z un tercer intento de build-cierre NI SIQUIERA CONECTÓ (timeout a
+los 130 s) — un servidor ocioso no rechaza conexiones nuevas, una red
+caída sí. El apagón de 71 min de apply-grants queda también explicado
+por la red. **AZURE EN PAUSA hasta que el humano esté en red estable.**
+Al volver: reintento `build-cierre` + `apply-grants`; solo si volviera a
+morir a mitad de consulta en red buena, investigar OOM (experimento
+pg_sleep 40 min + métricas del Portal). Backlog nuevo: keepalives TCP en
+la conexión del ETL (no salvan un enlace muerto, sí consultas largas
+tras NAT agresivo).
+
 ### 5 · T14 — desbloquear F-003
 
 Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
