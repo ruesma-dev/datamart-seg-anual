@@ -819,6 +819,18 @@ son tres defectos de otra índole que la huella ha destapado:
    que la huella excluya claves sustitutas (columnas con default
    nextval) o INSERT con ORDER BY determinista.
 
+**Arreglo de los defectos 2 y 3 (2026-08-16): HECHO en código.** Commits
+`42e128d` (locale: 8 apariciones de `TMMonth` → ARRAY de meses en
+castellano, dos más de las previstas en `cierre/04_views_detalle.sql`) y
+`65c52aa` (la huella deja de sumar `fact_id`/`fact_cat_id`). `init.sh`
+verde: 398 tests, cobertura 100 % de las líneas cambiadas, 1 mutante y 0
+supervivientes. Informe: `progress/impl_T13_fixes_f019.md`.
+Reprocesando las huellas T13 con el criterio nuevo los fallos bajan de 22
+a 20 y los dos que caen son los dos `sum_fact_id`. **Falta la parte del
+humano**: reconstruir mart+cierre en local y en Azure y repetir
+`compare-fingerprints`; y el defecto 1 (tipos de `compras.*`), que sigue
+abierto.
+
 Pendiente: PARADA 1 con el plan de arreglo (propuesto al humano).
 Reglas de firewall vigentes: `-2026-08-16` (90.160.92.59) y `-16b`
 (77.211.5.184) — la IP del humano rebota entre ambas; se limpiarán al
