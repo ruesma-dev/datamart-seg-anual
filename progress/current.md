@@ -788,6 +788,42 @@ relanzar la huella de Azure, SOLO tras restaurar `.env.azure.bak` al
 acabar la fase 2. Después: `compare-fingerprints huella_local_t13.csv
 huella_azure_t13.csv`.
 
+**Intento 2 de T13 (2026-08-16 noche): 22 FALLOS, los tres diagnosticados
+con causa raíz confirmada por consultas a ambos lados.** La GRAN noticia:
+los datos de negocio de los meses cerrados YA SON IDÉNTICOS (la deriva
+del intento 1 desapareció con las ingestas sincronizadas). Los 22 fallos
+son tres defectos de otra índole que la huella ha destapado:
+
+1. **10 × tipos en compras (bigint/text local vs integer/varchar
+   Azure).** Las tablas de compras heredan tipos de `raw.*` (`CREATE
+   TABLE AS`), y el raw LOCAL conserva el esquema del mapeo antiguo
+   (todo BIGINT/TEXT) porque la ingesta solo trunca, nunca recrea.
+   Azure (creado el 09-ago) refleja el mapeo vigente de
+   `entities.py::postgres_type` (int→INTEGER, nvarchar(n)→VARCHAR).
+   **El desviado es el LOCAL.** Fix: recrear el raw local (drop +
+   re-ingesta) y rebuild de compras.
+2. **9 × cierre.v_pbi_planif_vs_real (count 24.736 vs 36.657, +48 %).**
+   Bug REAL de portabilidad, confirmado: `nombre_mes` mezcla texto
+   libre de las fases de Sigrid con derivados
+   `to_char(anio_mes,'TMMonth YYYY')`, y `TM` depende de `lc_time` del
+   servidor — local `Spanish_Spain.1252` genera «Mayo 2026» (coincide
+   con el texto de fase y colapsa), Azure `en_US.utf8` genera
+   «May 2026» (convive con «Mayo 2026» y parte cada grupo en dos).
+   Verificado: mayo-2026 tiene 1 nombre en local y 2 en Azure; tabla
+   base y definición de la vista idénticas en ambos lados. Fix: derivar
+   el nombre del mes con constantes en español (sin TM) en los SQL de
+   mart/cierre y reconstruir ambos lados.
+3. **2 × sum_fact_id del mart.** `fact_id` es BIGSERIAL asignado por
+   orden de inserción sin ORDER BY → no determinista entre máquinas.
+   count y TODAS las sumas de negocio idénticas. Benigno. Fix candidato:
+   que la huella excluya claves sustitutas (columnas con default
+   nextval) o INSERT con ORDER BY determinista.
+
+Pendiente: PARADA 1 con el plan de arreglo (propuesto al humano).
+Reglas de firewall vigentes: `-2026-08-16` (90.160.92.59) y `-16b`
+(77.211.5.184) — la IP del humano rebota entre ambas; se limpiarán al
+acabar.
+
 ### 5 · T14 — desbloquear F-003
 
 Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
