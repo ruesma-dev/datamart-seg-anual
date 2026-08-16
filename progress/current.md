@@ -767,6 +767,27 @@ cerrado sigue pendiente de la parte B (re-ingesta sincronizada de ambos
 lados + huellas `--periodo-hasta 2026-05`), que exige red estable
 (~5-6 h, la ingesta pasa todo por el portátil dos veces).
 
+**Parte B en marcha (2026-08-16). FASE 1 (Azure) CERRADA a las ~14:22Z.**
+Odisea de red del sábado, toda resuelta sobre la marcha: (1) la ingesta
+moría con páginas de 500k (descargas >2,5 min cortadas); el humano bajó
+`SIGRID_API_PAGE_SIZE` a 50000 en `.env` y pasó; (2) los 3 Excels
+auxiliares apuntaban a la carpeta extinta `OneDrive - Construcciones
+Ruesma` — ruta buena: `OneDrive - Ruesma/Documentos/Sigrid/
+tablas_auxiliares/`; corregida en `.env` (⚠ en los `.bak` quedó un
+ESPACIO colado antes de la barra, el humano debía quitarlo); `load-aux`
+solo valida, no bloquea stage; (3) la IP del humano rotó DOS veces
+(90.160.96.77 → 90.160.92.59 → 77.211.5.184); la regla vigente es
+`datamart-puesto-pgris-2026-08-16b` (77.211.5.184) — esta vez el humano
+me autorizó expresamente y los `az` los ejecuté yo (create + delete de
+obsoletas). Resultado fase 1: `run-all --full` verde (raw fresco de la
+madrugada del 16), 4 capas + grants verdes (`build_fact` cierre 16.876
+filas), y `huella_azure_t13.csv` completa: 34 vistas, 794 métricas,
+bloques estructura/vivo/CERRADO (100). FASE 2 (local) lanzada en
+paralelo en otra consola con `.env` local; regla acordada: si hay que
+relanzar la huella de Azure, SOLO tras restaurar `.env.azure.bak` al
+acabar la fase 2. Después: `compare-fingerprints huella_local_t13.csv
+huella_azure_t13.csv`.
+
 ### 5 · T14 — desbloquear F-003
 
 Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
