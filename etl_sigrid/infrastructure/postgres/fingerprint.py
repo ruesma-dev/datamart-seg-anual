@@ -17,6 +17,10 @@ eso el criterio duro se aplica solo donde significa algo:
     `mart.v_pbi_dim_fecha`, que se genera con CURRENT_DATE y cuyas columnas
     `es_mes_actual` / `es_pasado_o_actual` dependen del día de la captura.
 
+Lo que NO entra en los agregados: las claves sustitutas (ver
+`COLUMNAS_SUSTITUTAS`). Las asigna una secuencia por orden de inserción, así
+que difieren entre máquinas con el mismo dato y solo producen fallos falsos.
+
 Los CSV siguen `docs/CONVENTIONS.md`: UTF-8 con BOM, separador `;` y coma
 decimal. `escribir_csv` y `leer_csv` son simétricos.
 """
@@ -46,6 +50,24 @@ TIPOS_NUMERICOS = frozenset(
         "double precision",
     }
 )
+
+# Claves sustitutas: columnas BIGSERIAL que llegan a las vistas de consumo.
+# NO se suman. Su valor lo asigna la secuencia por orden de inserción y los
+# builds no llevan ORDER BY, así que dos máquinas con el MISMO dato reparten
+# otros identificadores: la suma cambia sin que haya cambiado nada. Medido
+# comparando local con Azure en F-019 T13: `sum_fact_id` era la ÚNICA
+# diferencia de `mart.v_pbi_fact` y `mart.v_fact_periodificado`, con idéntico
+# `count` e idénticas sumas de importes. Un fallo falso.
+#
+# La lista es explícita y se amplía a mano a propósito: excluir por sufijo
+# `_id` se llevaría por delante `obra_id`, `partida_id`, `albaran_id`,
+# `proveedor_id`... que son claves NATURALES de Sigrid, estables entre
+# máquinas y de las mejores señales que tiene la huella.
+#
+# Al añadir una vista de consumo que exponga una columna nueva alimentada por
+# una secuencia (hoy quedan fuera porque no llegan a las vistas: `cierre_id`,
+# `plan_id`, `regla_id`), hay que añadirla aquí.
+COLUMNAS_SUSTITUTAS = frozenset({"fact_id", "fact_cat_id"})
 
 BLOQUE_ESTRUCTURA = "estructura"
 BLOQUE_CERRADO = "cerrado"
@@ -127,6 +149,21 @@ def build_estructura_query(schemas: Sequence[str]) -> str:
         """
     ).format(lista=lista)
     return consulta.as_string(None)
+
+
+def columnas_a_sumar(columnas: Sequence[tuple[str, str]]) -> list[str]:
+    """
+    De `(columna, tipo)` a la lista de columnas que se agregan con SUM.
+
+    Numéricas, menos las claves sustitutas (`COLUMNAS_SUSTITUTAS`): esas siguen
+    en el bloque `estructura` —si desaparecen o cambian de tipo es un FALLO—,
+    pero su suma no compara nada porque el valor lo pone una secuencia.
+    """
+    return [
+        c
+        for c, tipo in columnas
+        if tipo in TIPOS_NUMERICOS and c not in COLUMNAS_SUSTITUTAS
+    ]
 
 
 def build_agregado_query(
@@ -269,7 +306,7 @@ def construir_huella(
         columnas_por_vista.setdefault((esquema, vista), []).append((columna, tipo))
 
     for (esquema, vista), columnas in columnas_por_vista.items():
-        numericas = [c for c, tipo in columnas if tipo in TIPOS_NUMERICOS]
+        numericas = columnas_a_sumar(columnas)
         tiene_periodo = any(c == COLUMNA_PERIODO for c, _ in columnas)
         nombres = [METRICA_COUNT, *[f"sum_{c}" for c in numericas]]
 
