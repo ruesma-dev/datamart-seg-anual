@@ -30,7 +30,7 @@
   "imageRepository": "datamart-seg-anual",
 
   "cron": "0 2 * * *",
-  "jobProgramable": false,
+  "jobProgramable": true,
   "replicaTimeoutSeconds": 7200,
   "replicaRetryLimit": 1,
   "parallelism": 1,
