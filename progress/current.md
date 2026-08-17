@@ -26,7 +26,37 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-003 · DESBLOQUEADA (F-019 done el 2026-08-17) — falta la tanda 2 (T23–T26)
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-17 (léelo antes que nada)
+
+**El datamart ya corre solo.** Job `caj-datamart-seg-dev` programado a las
+02:00 UTC (04:00 local) con la imagen `r20260817-2025`; tanda 2 de F-003
+completa y alerta verificada de extremo a extremo (fallo 20:46:24 →
+correo Activated 20:51:58 → correo Deactivated 21:07:49). **Primera
+ejecución nocturna real: madrugada del 18-ago** — lo primero de la
+próxima sesión es mirar `python main.py timings` (con `.env` de Azure) y
+los logs KQL, y comprobar que NO llegó ningún correo Activated.
+
+**F-003 sigue `blocked` A PROPÓSITO** (no `done`): faltan las 3
+verificaciones heredadas de F-004 y las limpiezas, agrupadas en la
+feature nueva **F-023** (`pending`, prioridad 8, sdd=false, aceptación
+detallada en features.json). Marcar F-003 `done` hoy habría falseado su
+tasks.md. Orden natural: F-023 → reviewer de F-003 → F-003 `done`.
+
+**Los Excels auxiliares** (pregunta del humano): hoy el job los trata
+como «no configurados» porque `infra/env/dev.json` apunta a rutas de
+OneDrive; F-004 solo LEE y VALIDA. Subirlos al blob y verificar es F-023;
+volcarlos a tablas `aux.*` es **F-013** (aplazada por el humano el
+2026-08-08, decisión de modelo pendiente); que negocio los suba solo es
+**F-010**. F-023 es prerrequisito de F-013.
+
+**Cabos del puesto (en F-023)**: línea de `hosts`, reglas de firewall
+(`-2026-08-17-rango`, y `ClientPgris` / `FirewallIPAddress_2026-6-16` solo
+con confirmación de que nadie más las usa), `SIGRID_API_PAGE_SIZE=50000`.
+**Push pendiente del humano**: `git push origin feature/F-003-infra-caj`.
+
+---
+
+# F-003 · DESBLOQUEADA (F-019 done el 2026-08-17) — tanda 2 HECHA, cierre en F-023
 
 > F-019 cerrada con APROBADO del reviewer (dos pasadas,
 > `progress/review_F-019.md`) y resumen en `history.md`. El siguiente

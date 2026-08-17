@@ -330,6 +330,26 @@
       "rigor": "estandar",
       "priority": 12,
       "branch": "feature/F-022-desempate-obrfasamb"
+    },
+    {
+      "id": "F-023",
+      "title": "Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto",
+      "description": "Lo que quedo abierto al completar la tanda 2 de F-003 el 2026-08-17 (job nocturno creado, probado y con alerta verificada). Tres bloques: (1) las tres verificaciones MANUAL heredadas de F-004 (leer los Excels desde el blob 'aux' de stdatamartsegdev desde el puesto, desde el job con identidad gestionada, y la prueba negativa de permisos), que exigen ANTES subir los tres Excels al contenedor 'aux', asignar al humano el rol Storage Blob Data Reader sobre la cuenta y cambiar las AUX_EXCEL_* de infra/env/dev.json a URIs de blob (hoy apuntan a rutas locales de OneDrive: el job las trata como no configuradas); (2) retirar las copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro en kv-albaranes-rs9k2 (el job ya usa kv-datamart-seg-dev y tiene ejecucion correcta) — borrado en un recurso de albaranes, requiere OK explicito del humano; (3) limpieza del puesto: linea de hosts (68.221.140.205), reglas de firewall del puesto en psql-albaranes-rs9k2 (datamart-puesto-pgris-2026-08-17-rango, y ClientPgris / FirewallIPAddress_2026-6-16 SOLO si el humano confirma que nadie mas las usa) y decidir si SIGRID_API_PAGE_SIZE=50000 se queda en los .env. Con los tres bloques hechos, F-003 pasa por el reviewer y se marca done. NO incluye la carga de los Excels a tablas aux.* (eso es F-013).",
+      "acceptance": [
+        "Los tres Excels subidos al contenedor aux de stdatamartsegdev con nombres estables; el humano tiene Storage Blob Data Reader sobre la cuenta; AUX_EXCEL_* de infra/env/dev.json apuntan a las URIs de blob (sin claves ni SAS)",
+        "Verificacion 1 de F-004: python main.py load-aux desde el puesto con az login -> SUCCESS y origen=blob para los tres ficheros",
+        "Verificacion 2 de F-004: ejecucion del job con identidad gestionada muestra en Log Analytics el evento aux_file_read para los tres, sin ninguna ruta local",
+        "Verificacion 3 de F-004: sin el rol, load-aux falla con un mensaje que dice que rol falta y que hacer; el rol se vuelve a asignar despues",
+        "Copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro retiradas de kv-albaranes-rs9k2 con OK explicito del humano, sin exponer valores (nunca secret show); el job sigue ejecutando correctamente despues",
+        "Puesto limpio: linea de hosts retirada; reglas de firewall del puesto revisadas con el humano (las que se borren, con su confirmacion de que nadie mas las usa); decision anotada sobre SIGRID_API_PAGE_SIZE",
+        "El README de infra y azure-apps/datamart_seg_anual.md reflejan las URIs de blob y la ubicacion definitiva de los secretos",
+        "F-003: tasks.md con T23-T26 y las verificaciones marcadas, veredicto APROBADO del reviewer y status done; bash harness/init.sh en verde"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 8,
+      "branch": "feature/F-023-cierre-operativo-f003"
     }
   ]
 }
