@@ -49,6 +49,21 @@ volcarlos a tablas `aux.*` es **F-013** (aplazada por el humano el
 2026-08-08, decisión de modelo pendiente); que negocio los suba solo es
 **F-010**. F-023 es prerrequisito de F-013.
 
+**F-023 ARRANCADA el 2026-08-17 (noche), bloque 1 con OK del humano:**
+Excels subidos a `stdatamartsegdev/aux` (`TipoPartida.xlsx` 46.679 B,
+`TipoCoste.xlsx` 20.486 B, `mapeo_proporcionales.xlsx` 61.141 B, tamaños
+idénticos a los de OneDrive); rol `Storage Blob Data Reader` asignado al
+humano sobre la cuenta (un `Contributor` temporal para subir, retirado
+después: solo queda Reader); SDK de Azure instalado en el venv del puesto
+(faltaba, como avisaba este fichero). **Verificación 1 de F-004 SUPERADA**:
+`load-aux` desde el puesto con las URIs de blob por variables de entorno
+de proceso (sin tocar `.env`) → `SUCCESS`, `origen=blob` ×3. El primer
+intento sin SDK falló con el mensaje autoexplicativo de F-004, prueba de
+que el error guía. **A PROPÓSITO NO se ha tocado `dev.json` ni el job**:
+el cambio a URIs de blob en el job y las verificaciones 2-3 van DESPUÉS
+de leer la primera noche real. Pendiente en F-023: eso, los secretos
+duplicados (bloque 2, sin OK aún) y el puesto (bloque 3, sin OK aún).
+
 **Cabos del puesto (en F-023)**: línea de `hosts`, reglas de firewall
 (`-2026-08-17-rango`, y `ClientPgris` / `FirewallIPAddress_2026-6-16` solo
 con confirmación de que nadie más las usa), `SIGRID_API_PAGE_SIZE=50000`.
