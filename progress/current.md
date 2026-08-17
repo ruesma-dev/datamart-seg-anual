@@ -831,6 +831,30 @@ humano**: reconstruir mart+cierre en local y en Azure y repetir
 `compare-fingerprints`; y el defecto 1 (tipos de `compras.*`), que sigue
 abierto.
 
+**Intento 3 de T13 (2026-08-17): 5 FALLOS residuales, causa raíz cazada
+fila a fila — deriva REAL de datos, no build.** Cronología del día: el
+humano reconstruyó local anoche (run-all --full con los fixes, raw del
+sáb. noche) y por error capturó la huella local con nombre azure (el
+líder la renombró; regla nemotécnica dada: el .env decide el destino,
+--out solo el nombre). Fase Azure: build-mart 1.400 s + build-cierre
+1.634 s + grants en verde. La huella de Azure necesitó 4 intentos por la
+red (2 cortes en consulta larga + 1 rotación de IP): se resolvió con
+keepalives TCP vía `PGOPTIONS=-c tcp_keepalives_idle=30...` (sin tocar
+código) y con una REGLA DE RANGO en el firewall
+(`datamart-puesto-pgris-2026-08-17-rango`, 31.4.242.0-255; el operador
+del humano rota dentro de esa subred — limpiar al cerrar). Compare:
+**0 fallos de estructura, 0 de mart, 0 de compras, 0 de planif_vs_real**
+(los 3 defectos del intento 2, arreglados y verificados). Quedan 5
+fallos, todos en `cierre.v_pbi_cierre_resumen` bloque cerrado, y el
+COPY fila a fila los reduce a UNA edición en Sigrid: obra 2313811,
+DIRECTOS, +632,74 € en el «Previsto» (fase 0) entre las dos ingestas —
+632,74×3 meses = 1.898,22 exactos en los sumatorios. Esas filas tienen
+`final_version_master` vacío: son el FALLBACK de fase 0 del cierre, que
+usa el presupuesto VIVO por diseño (documentado en cierre/02_build_fact
+§E). Conclusión: el bloque «cerrado» de las vistas de cierre contiene
+un componente legítimamente vivo; la igualdad exacta ahí solo se cumple
+si NADIE toca ningún previsto entre las dos capturas.
+
 Pendiente: PARADA 1 con el plan de arreglo (propuesto al humano).
 Reglas de firewall vigentes: `-2026-08-16` (90.160.92.59) y `-16b`
 (77.211.5.184) — la IP del humano rebota entre ambas; se limpiarán al
