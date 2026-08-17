@@ -26,7 +26,13 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-003 · BLOQUEADA esperando a F-019 — código APROBADO y tanda 1 desplegada
+# F-003 · DESBLOQUEADA (F-019 done el 2026-08-17) — falta la tanda 2 (T23–T26)
+
+> F-019 cerrada con APROBADO del reviewer (dos pasadas,
+> `progress/review_F-019.md`) y resumen en `history.md`. El siguiente
+> movimiento es del humano: `jobProgramable: true` en `infra/env/dev.json`
+> (T14 de F-019 / R16) y la tanda 2 de abajo. La sección siguiente se
+> conserva como contexto de F-003.
 
 Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** y
 **re-review del reviewer: APPROVED** el 2026-08-10 (`progress/review_F-003.md`,
