@@ -83,8 +83,12 @@ expresa del humano («lanzas tu»):**
   resuelta: el grupo de acción de la landing zone está VACÍO, así que
   alerta propia con el correo del humano por parámetro (nunca en el
   repo). Fallo provocado con subcomando inexistente:
-  `Failed` a las 20:46:24 local. **Falta solo: confirmación del humano
-  de que el correo llegó y a qué hora.**
+  `Failed` a las 20:46:24 local. **T26 VERIFICADO**: correo «Azure:
+  Activated Severity: 1 alert-caj-datamart-seg-dev-failed» recibido a
+  las 20:51:58 (5 min 34 s después del fallo), confirmado por el humano
+  y contrastado por el líder en el buzón vía MCP. **TANDA 2 COMPLETA.**
+  Primera ejecución nocturna real: 2026-08-18 a las 02:00 UTC (04:00
+  local) — revisar por la mañana `timings` y los logs.
 
 **Queda tras el correo**: las 3 verificaciones MANUAL de F-004 y retirar
 las copias viejas de los secretos en `kv-albaranes-rs9k2` ahora que el
