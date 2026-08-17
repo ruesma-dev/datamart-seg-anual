@@ -103,7 +103,10 @@ if ($LASTEXITCODE -eq 0 -and $yaExiste) {
 } else {
     # Alerta de METRICA y no de consulta de log: no depende de que el esquema de
     # las tablas de logs cambie, y avisa en minutos en vez de en cuartos de hora.
-    $condicion = "total JobExecutionCount > 0 where Status includes Failed"
+    # Nombre y dimension REALES, verificados con list-definitions el 2026-08-17
+    # (la doc sugeria JobExecutionCount/Status, que no existen en esta region):
+    # metrica 'Executions', dimensiones state/jobName/executionName.
+    $condicion = "total Executions > 0 where state includes Failed"
 
     Write-Host "Creando la alerta '$($CFG.alertName)'..." -ForegroundColor Cyan
     Invoke-Az monitor metrics alert create `
