@@ -11,17 +11,14 @@ Azure» hasta T12, que es la primera ejecución autorizada del build nuevo.
 
 ## Fase A · Medir (humano, local)
 
-- [ ] **T1**: Mediciones previas en el Postgres local (R1) y captura de la
-      línea base de equivalencia (R2: checksum + `fingerprint-views` con el
-      build ACTUAL). | Verificación: MANUAL (humano) — comandos exactos en
-      R1/R2; resultados anotados en `design.md` §Mediciones (columna
-      «medido») y CSV/checksum guardados en el puesto.
-- [ ] **T2**: Confirmar o corregir las constantes (`PG_TRAMO_MAX_FILAS`,
-      `PG_DISCO_TOTAL_GB`, `PG_DISCO_LIMITE_PCT`) con los números de T1;
-      anotar la derivación final en `design.md` §2. Si T1 contradice el
-      corte elegido (p. ej. obra gigante dominante), PARAR y reproponer al
-      humano antes de seguir. | Verificación: `design.md` §Mediciones sin
-      celdas «medido» vacías y constantes justificadas con esos números.
+- [x] **T1 (hecha 2026-08-11)**: mediciones en `design.md` §2, columna
+      «medido» completa (29,09 M filas, 7.532 MB, explosión ×18,4, obra
+      más pesada 298.053 filas). Derrame medido después en T11:
+      ~0,47 KB/fila. La línea base de R2 del 22-jul quedó ANULADA por la
+      reingesta del 30-jul y se rehizo en T11 contra worktree `2cb6de7`.
+- [x] **T2 (hecha 2026-08-11)**: los números de T1 no contradicen ninguna
+      constante (obra más pesada 298.053 filas ≪ 1 M); derivación anotada
+      en `design.md` §2, defaults confirmados sin cambios.
 
 ## Fase B · Implementar (implementer; tests primero, fase RED con evidencia)
 
@@ -62,22 +59,28 @@ Azure» hasta T12, que es la primera ejecución autorizada del build nuevo.
 
 ## Fase C · Verificar contra BBDD real (humano; después del APPROVED del reviewer sobre Fase B)
 
-- [ ] **T11**: Equivalencia funcional en LOCAL (R13): `python main.py stage`
-      con `.env` local, checksum idéntico al de T1 y
-      `compare-fingerprints` sin diferencias. Cualquier diferencia ⇒
-      feature `blocked`, no se racionaliza. | Verificación: MANUAL (humano)
-      — comandos en R13; checksum y veredicto anotados en el informe.
-- [ ] **T12**: Verificación en AZURE (R14): pre-check de la medición de
-      ocupación con `sigrid_dm_app`, luego `stage` + `build-mart` +
-      `apply-grants` vigilando `storage_percent`, en horario acordado.
-      Anotar pico de disco, duración total y `timings` por tramo (cierra
-      paso 8 y alimenta el veredicto del paso 9 de F-005).
-      | Verificación: MANUAL (humano) — comandos en R14; SUCCESS en los
-      tres pasos y pico < `PG_DISCO_LIMITE_PCT`.
-- [ ] **T13**: Huella local vs Azure (R15): `fingerprint-views` en Azure y
-      `compare-fingerprints` contra la huella local de T11 (cierra paso 10
-      de F-005). | Verificación: MANUAL (humano) — sin diferencias.
-- [ ] **T14**: Con T12/T13 en verde y F-019 marcada `done` por el líder, el
+- [x] **T11 (hecha 2026-08-13, SUPERADA por enmienda de R13)**: el
+      checksum dio FALLO (`ec74147e` vs `c58b928d`), se declaró sin
+      racionalizar y la investigación aprobada por el humano probó la
+      equivalencia semántica (causa: versiones master duplicadas
+      preexistentes; ver enmienda de R13 y
+      `docs/referencia/05_caso_obrfasamb_version_duplicada.md`). Decisión
+      del humano: opción C. Commits `acee46b`…`181e01e`.
+- [x] **T12 (hecha 2026-08-14/15)**: `stage` SUCCESS 6.851,8 s, 60/60
+      tramos sin abortos, pico de disco 46,55 % (límite 80 %),
+      `build-mart` y `apply-grants` SUCCESS, `timings` por tramo anotado.
+      Cierra paso 8 de F-005 y da el veredicto del 9: el B1ms aguanta.
+      Commit `c74b65b`.
+- [x] **T13 (hecha 2026-08-15/17, SUPERADA por enmienda de R15)**: tres
+      iteraciones con capturas sincronizadas y `--periodo-hasta 2026-05`;
+      destaparon y corrigieron 3 defectos reales (raw local con esquema
+      legado; `TMMonth`/locale, commit `42e128d`; claves sustitutas en la
+      huella, `65c52aa`). Resultado final: 0 fallos en todo lo
+      determinista y 5 residuales probados fila a fila como una edición
+      real del Previsto (obra 2313811, +632,74 €). Decisión del humano:
+      opción A. Commits `8582485`, `2d95980`.
+- [ ] **T14** (queda `[ ]` A PROPÓSITO: es posterior al `done` y pertenece
+      operativamente a F-003): con T12/T13 en verde y F-019 marcada `done` por el líder, el
       humano pone `jobProgramable: true` en `infra/env/dev.json` y retoma
       la tanda 2 de F-003 (T23–T26). Esta tarea NO la ejecuta ningún agente
       de F-019. | Verificación: MANUAL (humano) —

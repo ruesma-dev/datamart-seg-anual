@@ -855,7 +855,20 @@ usa el presupuesto VIVO por diseño (documentado en cierre/02_build_fact
 un componente legítimamente vivo; la igualdad exacta ahí solo se cumple
 si NADIE toca ningún previsto entre las dos capturas.
 
-Pendiente: PARADA 1 con el plan de arreglo (propuesto al humano).
+**DESENLACE (2026-08-17): el humano eligió la OPCIÓN A.** R15 enmendada
+y SUPERADA en la spec (commit `2d95980`); tasks.md y design.md §6
+actualizados a petición del reviewer (`review_F-019.md`, 2ª pasada).
+**T13 CERRADO.** Quedan abiertas SOLO estas tareas operativas del puesto
+del humano (no son del repositorio):
+
+- Retirar la línea de `hosts` (68.221.140.205) cuando acabe el trabajo
+  contra Azure desde el portátil.
+- Limpiar reglas de firewall del puesto cuando el job de F-003 exista:
+  `datamart-puesto-pgris-2026-08-17-rango` (31.4.242.0-255) y las
+  antiguas `ClientPgris` / `FirewallIPAddress_2026-6-16` si el humano
+  confirma que sobran.
+- Decidir si `SIGRID_API_PAGE_SIZE=50000` se queda en los `.env` (fue un
+  apaño para la red inestable; en red buena 500000 es más rápido).
 Reglas de firewall vigentes: `-2026-08-16` (90.160.92.59) y `-16b`
 (77.211.5.184) — la IP del humano rebota entre ambas; se limpiarán al
 acabar.

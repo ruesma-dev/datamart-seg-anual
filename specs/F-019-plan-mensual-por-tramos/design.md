@@ -167,6 +167,33 @@ porque el árbol de `dev` ya lleva el build nuevo.
 - `.env`, `.env.local.bak`: solo el humano.
 - `harness/`, `CHECKPOINTS.md`.
 
+> **Enmienda (2026-08-17).** Durante T13 (R15) se tocaron, con
+> autorización expresa del humano y en dos commits con rigor `critico`
+> completo, dos de los grupos declarados intocables arriba:
+>
+> - **`fingerprint.py`** (`65c52aa`): la huella sumaba las claves
+>   sustitutas `fact_id`/`fact_cat_id`, que son BIGSERIAL asignados por
+>   orden de inserción sin `ORDER BY` — la misma carga en dos máquinas
+>   reparte ids distintos, así que el árbitro daba **falsos positivos**
+>   estructurales. La excepción no anula su independencia: la exclusión es
+>   de dos columnas nominadas en una constante documentada
+>   (`COLUMNAS_SUSTITUTAS`), ambas **siguen** en el bloque `estructura`,
+>   los tests de no-regresión fijan que las claves naturales (`obra_id`,
+>   `partida_id`, …) se siguen sumando, y el cambio se hizo **después** de
+>   que R13 estuviera verificado con el checksum por cubos — no para
+>   hacerlo pasar.
+> - **SQL de `mart/` y `cierre/`** (`42e128d`, 5 ficheros): la derivación
+>   de `nombre_mes` con `to_char(..., 'TMMonth ...')` dependía del
+>   `lc_time` del servidor (español en local, `en_US` en Azure), un bug
+>   real de portabilidad que partía los grupos de
+>   `cierre.v_pbi_planif_vs_real` (+48 % de filas en Azure). Las 8
+>   sustituciones cambian solo esa derivación por un `ARRAY` de meses en
+>   castellano; cero lógica de negocio tocada (verificado por el
+>   reviewer).
+>
+> El detalle completo, con fase RED, cobertura y mutación, está en
+> `progress/impl_T13_fixes_f019.md` y en la enmienda de R15.
+
 ## 7 · Riesgos y decisiones técnicas menores
 
 1. **Tabla visible a medias durante el build**. Entre el TRUNCATE inicial y
