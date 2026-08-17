@@ -350,3 +350,35 @@ de test se retiró en commit propio. Tres reinicios del proceso anfitrión
 durante la feature; el trabajo se retomó de transcripción sin pérdidas.
 
 ---
+
+## F-019 · Build de stg.plan_mensual por tramos (done 2026-08-17)
+
+**El problema**: el build monolítico de `stg.plan_mensual` (29,4 M filas)
+llenó el disco del servidor compartido `psql-albaranes-rs9k2` el
+2026-08-09 (93,4 %, solo-lectura ~10 min) y bloqueaba el job nocturno de
+F-003. **La solución**: planner puro de tramos por obra
+(`domain/tramos.py`, ≤1 M filas de peso por tramo, determinista), filtro
+`/*F019_FILTRO_OBRAS*/` en las dos ramas del SQL sin tocar una línea de
+negocio, transacción por tramo, y puerta de disco fail-safe antes de cada
+tramo (mide TODAS las bases; si falla la medición o supera el 80 %,
+aborta dejando la tabla VACÍA y FAILED en `_meta`).
+
+**Verificado de verdad**: 60/60 tramos contra Azure sin un aborto, pico
+46,55 % (frente al 93,4 % del incidente), stage 1 h 54 en el B1ms —
+veredicto del paso 9 de F-005: el SKU aguanta. La equivalencia funcional
+cayó dos veces del lado incómodo y las dos se investigó hasta la causa
+raíz antes de enmendar: R13 (checksum distinto → versiones master
+duplicadas preexistentes, empates en ventanas; equivalencia semántica
+probada con EXCEPT ALL; caso documentado en docs/referencia/05 y
+desempate diferido a F-022) y R15 (tres iteraciones de huella que
+destaparon 3 defectos reales — esquema legado del raw local, nombre_mes
+dependiente de lc_time vía TMMonth, claves sustitutas no deterministas en
+la huella — corregidos con rigor completo; los 5 fallos residuales,
+probados fila a fila como UNA edición real del Previsto en Sigrid).
+Enmiendas decididas por el humano por escrito (opciones C y A).
+
+Evidencias: 398 tests; núcleo 458 líneas / 41 mutantes / 0
+supervivientes + fixes 4 líneas / 1 mutante / 0 supervivientes, ambos
+verificados de forma independiente por el reviewer; dos pasadas de
+review (APPROVED Fase B 2026-08-10; APROBADO final 2026-08-17 tras 3
+arreglos documentales). Desbloquea la tanda 2 de F-003 (T23-T26).
