@@ -44,6 +44,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 00_vars.ps1 define $TAG (hora actual) y PowerShell no distingue mayúsculas:
+# el dot-source machacaría el parámetro -Tag. Se salva antes en otro nombre.
+$TagPedido = $Tag
+
 . "$PSScriptRoot\00_vars.ps1" -Entorno $Entorno
 
 # --- 1. Puertas -------------------------------------------------------------
@@ -128,12 +132,12 @@ if ($CFG.pgAuthMode -eq "password") {
 
 # --- 3. La imagen: la que se diga, o la ultima publicada --------------------
 
-if (-not $Tag) {
-    $Tag = Invoke-Az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
+if (-not $TagPedido) {
+    $TagPedido = Invoke-Az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
         --orderby time_desc --top 1 -o tsv
     Confirmar-Exito "no hay ninguna imagen publicada: ejecuta antes 70_build_image.ps1"
 }
-$imagen = "{0}.azurecr.io/{1}:{2}" -f $CFG.acrName, $CFG.imageRepository, $Tag
+$imagen = "{0}.azurecr.io/{1}:{2}" -f $CFG.acrName, $CFG.imageRepository, $TagPedido
 
 # --- 4. Variables de entorno del contenedor ---------------------------------
 #
