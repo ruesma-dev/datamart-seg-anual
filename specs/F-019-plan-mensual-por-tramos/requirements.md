@@ -308,6 +308,29 @@ python main.py compare-fingerprints huella_local_despues_f019.csv huella_azure_f
 Resultado esperado: sin diferencias (misma semántica que R13: una
 diferencia es FALLO).
 
+> **Enmienda (2026-08-17, decisión del humano — opción A).** R15 se ejecutó
+> con capturas sincronizadas de fin de semana, `--periodo-hasta 2026-05` y
+> tres iteraciones que destaparon y corrigieron tres defectos reales
+> (esquema legado del raw local; `nombre_mes` dependiente de `lc_time` vía
+> `TMMonth`, corregido en commit `42e128d`; claves sustitutas no
+> deterministas en la huella, corregido en `65c52aa`). Resultado final:
+> **estructura, mart, compras, maestro y retenciones idénticos (0 fallos)**
+> y 5 fallos residuales concentrados en `cierre.v_pbi_cierre_resumen`
+> (bloque cerrado), reducidos fila a fila (COPY en ambos lados) a UNA
+> edición real en Sigrid: obra 2313811, concepto DIRECTOS, +632,74 € en su
+> presupuesto «Previsto» entre la ingesta de Azure (sábado madrugada) y la
+> local (sábado noche); 632,74 × 3 meses = 1.898,22, exactamente la
+> diferencia de los sumatorios. Esas filas tienen `final_version_master`
+> vacío: provienen del **fallback de fase 0** del cierre
+> (`cierre/02_build_fact.sql` §E), que usa el presupuesto VIVO por diseño
+> también en meses cerrados. **Criterio enmendado**: la igualdad exacta se
+> exige a estructura y a todas las métricas deterministas; en las vistas de
+> cierre alimentadas por el fallback de fase 0, una discrepancia solo es
+> FALLO si no queda explicada fila a fila por ediciones del presupuesto
+> vivo entre capturas. Con ese criterio, **R15 queda SUPERADO** el
+> 2026-08-17. Evidencia: `huella_local_t13.csv`, `huella_azure_t13.csv`
+> (sin versionar) y el diagnóstico en `progress/current.md`.
+
 ### R16 · Desbloqueo de F-003 [MANUAL]
 
 CUANDO R14 y R15 estén en verde y F-019 esté marcada `done`, el humano puede
