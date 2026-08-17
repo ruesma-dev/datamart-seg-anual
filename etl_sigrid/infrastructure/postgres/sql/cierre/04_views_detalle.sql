@@ -417,7 +417,11 @@ SELECT
     cl.anio_mes,
     EXTRACT(YEAR  FROM cl.anio_mes)::INT                              AS anio,
     EXTRACT(MONTH FROM cl.anio_mes)::INT                              AS mes,
-    to_char(cl.anio_mes, 'TMMonth YYYY')                              AS nombre_mes,
+    -- Nombre del mes SIN locale: no puede depender de lc_time del servidor.
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM cl.anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM cl.anio_mes)::INT                 AS nombre_mes,
     -- CÓDIGOS y NOMBRES
     cl.grupo_cod,
     cl.subcategoria_cod,
@@ -568,7 +572,11 @@ SELECT
     cl.anio_mes,
     EXTRACT(YEAR FROM cl.anio_mes)::INT  AS anio,
     EXTRACT(MONTH FROM cl.anio_mes)::INT AS mes,
-    to_char(cl.anio_mes, 'TMMonth YYYY') AS nombre_mes,
+    -- Nombre del mes SIN locale: no puede depender de lc_time del servidor.
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM cl.anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM cl.anio_mes)::INT AS nombre_mes,
     cl.tipologia,
     CASE cl.tipologia
         WHEN 'LEVANTAMIENTO'  THEN 1 WHEN 'SEGUROS' THEN 2 WHEN 'AVALES' THEN 3

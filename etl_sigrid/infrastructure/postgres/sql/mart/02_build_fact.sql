@@ -268,7 +268,11 @@ SELECT
     mp.anio_mes,
     EXTRACT(YEAR  FROM mp.anio_mes)::INT,
     EXTRACT(MONTH FROM mp.anio_mes)::INT,
-    to_char(mp.anio_mes, 'TMMonth YYYY')   AS nombre_mes,
+    -- Nombre del mes SIN locale: no puede depender de lc_time del servidor.
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM mp.anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM mp.anio_mes)::INT AS nombre_mes,
     'Coste Planificado'::VARCHAR           AS escenario,
     'PLANIFICADO'::VARCHAR                 AS tipo_dato,
     'COSTE'::VARCHAR                       AS concepto,
@@ -294,7 +298,11 @@ SELECT
     mp.anio_mes,
     EXTRACT(YEAR  FROM mp.anio_mes)::INT,
     EXTRACT(MONTH FROM mp.anio_mes)::INT,
-    to_char(mp.anio_mes, 'TMMonth YYYY')   AS nombre_mes,
+    -- Nombre del mes SIN locale: no puede depender de lc_time del servidor.
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM mp.anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM mp.anio_mes)::INT AS nombre_mes,
     'Venta Planificada'::VARCHAR           AS escenario,
     'PLANIFICADO'::VARCHAR                 AS tipo_dato,
     'VENTA'::VARCHAR                       AS concepto,

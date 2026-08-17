@@ -108,9 +108,15 @@ SELECT
     EXTRACT(YEAR  FROM anio_mes)::INT      AS anio,
     EXTRACT(MONTH FROM anio_mes)::INT      AS mes,
     EXTRACT(QUARTER FROM anio_mes)::INT    AS trimestre,
-    -- Nombres en castellano (TM = locale traducido)
-    to_char(anio_mes, 'TMMonth')           AS nombre_mes_solo,
-    to_char(anio_mes, 'TMMonth YYYY')      AS nombre_mes_anio,
+    -- Nombres en castellano SIN locale: el dato no puede depender de lc_time
+    -- del servidor (en Azure, en_US.utf8, salía "May" / "May 2026").
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM anio_mes)::INT] AS nombre_mes_solo,
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM anio_mes)::INT AS nombre_mes_anio,
     to_char(anio_mes, 'YYYY-MM')           AS anio_mes_iso,
     'T' || EXTRACT(QUARTER FROM anio_mes)::INT
         || ' ' || EXTRACT(YEAR FROM anio_mes)::INT  AS trimestre_label,

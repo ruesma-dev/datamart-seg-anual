@@ -320,7 +320,12 @@ combinado AS (
         g.anio_mes,
         EXTRACT(YEAR  FROM g.anio_mes)::INT AS anio,
         EXTRACT(MONTH FROM g.anio_mes)::INT AS mes,
-        to_char(g.anio_mes, 'TMMonth YYYY') AS nombre_mes,
+        -- Nombre del mes SIN locale: el dato no puede depender de lc_time del
+        -- servidor (Azure va en en_US.utf8 y daría "May 2026" en vez de "Mayo 2026").
+        (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+              [EXTRACT(MONTH FROM g.anio_mes)::INT]
+            || ' ' || EXTRACT(YEAR FROM g.anio_mes)::INT AS nombre_mes,
         g.concepto, g.orden_concepto,
         COALESCE(e.ejecutado_origen, 0)::NUMERIC(18,2) AS ejecutado_origen,
         COALESCE(fm.final_importe, ff.final_importe, 0)::NUMERIC(18,2) AS final_importe,

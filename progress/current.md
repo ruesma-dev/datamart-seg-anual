@@ -26,7 +26,13 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-003 · BLOQUEADA esperando a F-019 — código APROBADO y tanda 1 desplegada
+# F-003 · DESBLOQUEADA (F-019 done el 2026-08-17) — falta la tanda 2 (T23–T26)
+
+> F-019 cerrada con APROBADO del reviewer (dos pasadas,
+> `progress/review_F-019.md`) y resumen en `history.md`. El siguiente
+> movimiento es del humano: `jobProgramable: true` en `infra/env/dev.json`
+> (T14 de F-019 / R16) y la tanda 2 de abajo. La sección siguiente se
+> conserva como contexto de F-003.
 
 Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** y
 **re-review del reviewer: APPROVED** el 2026-08-10 (`progress/review_F-003.md`,
@@ -405,17 +411,26 @@ entorno: `PSQL` = `& "C:\Program Files\PostgreSQL\16\bin\psql.exe"`, **las
 opciones van ANTES** de la cadena de conexión, y `.env` apunta HOY a Azure (la
 copia local está en `.env.local.bak`).
 
-### 1 · T1 y T2 — medir en LOCAL (R1) y fijar las constantes
+### 1 · T1 y T2 — medir en LOCAL (R1) y fijar las constantes — HECHO 2026-08-11
 
-Las cuatro consultas de **R1** (filas y tamaño de `stg.plan_mensual`,
-explosión de la rama master, top 15 de obras por peso, y el delta de
-`temp_files`/`temp_bytes` alrededor de un `stage`). Los resultados se anotan
-en `design.md` §Mediciones, columna «medido».
+Mediciones del humano anotadas en `design.md` §2: 29.091.584 filas finales
+(7,5 GB), explosión master 69,05 M posiciones (×18,4), obra más pesada
+298.053 filas. **Ninguna constante cambia** (298 k ≪ 1 M del tramo). El
+derrame (medición 4 de R1) se toma en T11 alrededor del `stage` nuevo:
+F-019 ya estaba mergeada en `dev`, el build antiguo ya no es ejecutable.
 
-**Qué hacer con esos números**: si la obra más pesada supera
-`PG_TRAMO_MAX_FILAS`, ir a `.env` y bajar el valor (no hace falta tocar
-código; hay un test que lo garantiza). Si el coeficiente de derrame por fila
-sale muy por encima de 1,2 KB, bajarlo también. **Va ANTES de T12.**
+Incidencias del día, ya resueltas: (1) el checksum de R2/R13 se reformuló
+**por cubos** — la fórmula original superaba el límite de 1 GB por cadena de
+Postgres; la fórmula corregida está en `requirements.md` §R2 y es la que hay
+que repetir en R13. (2) El humano editó por error `.env.example` (versionado)
+con secretos reales; nunca llegó a commit, se restauró la plantilla y la
+configuración de Azure quedó en `.env.azure.bak` (ignorada). **Recomendado
+rotar** la contraseña de `sigrid_dm_app` (y el secreto `pg-sigrid-dm-app` de
+`kv-datamart-seg-dev`) antes de crear el job.
+
+**Línea base R2 capturada (build antiguo, local):**
+`29091584|0a4024a22cb5c4872061820f66c9024c`
+(+ `huella_local_antes_f019.csv` en el puesto del humano, sin versionar).
 
 ### 2 · T11 — equivalencia funcional en LOCAL (R13), la prueba de fuego
 
@@ -429,7 +444,246 @@ Esperado: **checksum idéntico carácter a carácter** y cero diferencias.
 Cualquier diferencia es FALLO: se marca la feature `blocked`, no se
 racionaliza.
 
+**Incidente 2026-08-11/12 (T11 pendiente de reintento).** El primer `stage`
+del build nuevo (2026-08-11 23:53) FALLÓ a los 28 s: la puerta de disco R10
+saltó con «ocupación 169,26 % > 80 %» porque el `.env` local no define
+`PG_DISCO_TOTAL_GB` y aplicó el default de 32 GB (pensado para Azure),
+mientras el Postgres local suma ~54 GB de bases. El fail-safe se comportó
+como está diseñado: tabla vacía, paso FAILED, cero tramos ejecutados.
+Corrección para el reintento: añadir `PG_DISCO_TOTAL_GB=200` **solo al
+`.env` local** (disco real de 920 GB); `.env.azure.bak` no define la
+variable, así que en Azure seguirá aplicando el 32 correcto. Además, el
+2026-08-12 el `.env` quedó apuntando a Azure por error y se lanzaron dos
+`stage` contra el servidor compartido de producción: ambos murieron **antes
+de conectar** (timeout y fallo de DNS), no se escribió nada. Nueva línea
+base de derrame para el reintento (los contadores sobrevivieron al
+reinicio del puesto de las 04:35): `temp_files=16161`,
+`temp_bytes=578.037.755.664`.
+
+**T11-bis (aprobado por el humano el 2026-08-12).** El reintento del stage
+nuevo terminó en verde (60 tramos, 53 min, ocupación máx. ~31 %,
+29.403.619 filas), pero destapó que la línea base del 22-jul era
+**inválida**: el `raw` se reingirió el **30-jul**, después del último build
+viejo. Quedan ANULADOS el checksum `29091584|0a4024a2...` y
+`huella_local_antes_f019.csv` (comparaban datos del 22-jul contra datos
+del 30-jul). Plan aprobado: worktree del build viejo en
+`C:\Users\pgris\PycharmProjects\datamart-old-f019` (commit `2cb6de7`, el
+`dev` previo al merge de F-019) → build viejo sobre el `raw` del 30-jul →
+checksum y huella viejos → build nuevo en el repo principal → checksum y
+huella nuevos → comparación exacta. **`ingest` no se ejecuta en ningún
+momento** para mantener el `raw` congelado. Verificado que el SQL de
+`stg/` no usa `CURRENT_DATE`/`now()`: el build es determinista dado el
+`raw`. Medición 4 de R1 ya tomada con el stage nuevo de hoy: **derrame
+12,8 GB de temporales / 29,4 M filas ≈ 0,47 KB/fila** (delta de
+`temp_bytes` 578.037.755.664 → 591.769.096.726 alrededor del `stage`
+completo).
+
+**T11-bis, brazo 1 COMPLETADO (2026-08-13).** Build viejo (worktree
+`2cb6de7`) sobre el `raw` del 30-jul: **29.403.619 filas** — mismo recuento
+que el build nuevo. Duración del monolítico: **6 h 24 min** (22.532 s solo
+`plan_mensual`) frente a los 53 min del build por tramos. Derrame del
+monolítico: 13,86 GB ≈ 0,47 KB/fila (calcado al del nuevo; la mejora del
+troceo es tiempo y pico de ocupación, no derrame). Capturas de referencia:
+
+- **Checksum viejo (la referencia a clavar):**
+  `29403619|ec74147ef3e7175c66ed9d30d3e72f9f`
+- **Huella vieja:** `huella_build_viejo_f019.csv` (34 vistas, 694 métricas,
+  sin `--periodo-hasta`; la nueva debe capturarse igual), sin versionar.
+- Base de temporales antes del brazo 2: `temp_files=17802`,
+  `temp_bytes=620.626.993.530`.
+
+**T11-bis, brazo 2 y VEREDICTO: FALLO (2026-08-13, ~01:00).** El stage
+nuevo terminó en verde (49 min, mismo recuento 29.403.619) pero el checksum
+NO coincide:
+
+- viejo:  `29403619|ec74147ef3e7175c66ed9d30d3e72f9f`
+- nuevo:  `29403619|c58b928de0c7bf297c9158b8f3faa370`
+
+La feature sigue `blocked` (ya lo estaba) y NO se avanza a T12/T13/T14.
+Evidencia completa: mismo recuento; `compare-fingerprints` de
+`huella_build_viejo_f019.csv` vs `huella_build_nuevo_f019.csv` equivalente
+sin avisos (OJO al peso real de esa evidencia: las tablas fact de `mart`
+están congeladas desde el 22-jul porque `build-mart` no corrió, pero las
+vistas de `cierre/04_views_detalle.sql` y `mart/06_views_cp_tipologia.sql`
+SÍ leen `stg.plan_mensual` en vivo y sus sumas/recuentos coincidieron);
+`raw` congelado verificado (cero ejecuciones en `_meta.etl_runs` entre
+builds); diff del SQL viejo→nuevo limpio (solo comentarios, TRUNCATE al
+step y el filtro `F019_FILTRO_OBRAS` en ambas ramas; ni una expresión de
+negocio cambió); sin columnas float (todo `numeric`/fechas/ids/text); las
+ventanas de 08 son MAX/COUNT (insensibles a empates) y el LAG ordena por
+`posicion_mes`, único por `WITH ORDINALITY` dentro de cada presupuesto.
+
+Hipótesis abiertas: (a) no determinismo por empates en alguna parte aún no
+localizada (se manifestaría también entre dos ejecuciones del MISMO build),
+(b) diferencia de ESCALA en `numeric` (`1.50` vs `1.5`: igual como número,
+distinto como texto; invisible para vistas y tests, letal para el
+checksum), (c) diferencia real de contenido que los agregados no ven.
+
+Plan de diagnóstico propuesto al humano (pendiente de su OK):
+1. Congelar evidencia: `CREATE TABLE tmp_f019_nuevo_a AS SELECT * FROM
+   stg.plan_mensual` (~7,5 GB en local).
+2. Test de reproducibilidad (barato, decisivo): relanzar el stage NUEVO
+   (~50 min) y re-checksum. Si difiere de `c58b928d...` → el build no es
+   reproducible consigo mismo → el criterio de R13 es insatisfacible tal
+   cual y el arreglo es fijar desempates deterministas (cambio de código
+   vía SDD) o redefinir R13. Si coincide → diferencia sistemática
+   viejo↔nuevo.
+3. Solo si es sistemática: relanzar el build VIEJO en el worktree (~6,4 h)
+   y hacer diff por filas contra `tmp_f019_nuevo_a` con igualdad NUMÉRICA
+   (`EXCEPT` en ambas direcciones, insensible a escala): vacío → solo
+   escala (equivalencia semántica probada, decidir sobre R13); no vacío →
+   muestrear filas y columnas discrepantes y buscar la causa.
+
+**Resultados del plan (2026-08-13, humano dio OK y lo ejecuta el agente):**
+
+- Paso 1 HECHO: `public.tmp_f019_nuevo_a` creada con las 29.403.619 filas
+  del build nuevo (borrar al cerrar la investigación).
+- Paso 2 HECHO — **el build nuevo ES reproducible**: segunda ejecución
+  (2026-08-13 10:07→11:51) → checksum `29403619|c58b928de0c7bf297c9158b8f3faa370`,
+  idéntico carácter a carácter al de la primera. La diferencia con el
+  viejo es SISTEMÁTICA. Hipótesis (a) descartada para el build nuevo.
+- Descartado también que el parámetro de `07_version_master_vigente.sql`
+  sea una fecha: es `cod=15` (código de configuración), y ningún SQL de
+  `stg/` usa `CURRENT_DATE`/`now()`.
+- Paso 3 LANZADO (~14:15 local): build viejo en el worktree (~6,4 h).
+  Al terminar: `EXCEPT` numérico en ambas direcciones entre
+  `stg.plan_mensual` (contenido viejo) y `tmp_f019_nuevo_a` (nuevo), y
+  muestreo de discrepancias por columna. Suspensión del portátil con
+  corriente desactivada (`powercfg standby/hibernate-timeout-ac 0`) a
+  petición del humano para aguantar la tirada.
+
+**CAUSA RAÍZ ENCONTRADA (2026-08-13 tarde).** Cadena de evidencia:
+
+1. El build viejo también es reproducible (2ª ejecución, 1 h 24 esta vez:
+   las 6 h 24 de ayer eran el portátil): `ec74147e...` clavado. Ambos
+   builds deterministas, contenido establemente distinto.
+2. `EXCEPT ALL` numérico: **10.259 filas difieren en cada dirección**
+   (0,035 %), solo **2 obras** (2403576, 2491656), 1.955 presupuestos,
+   solo rama master (ámbitos 8 y 11).
+3. Esas 2 obras son EXACTAMENTE las únicas de master con «filas gemelas»
+   (clave presupuesto+ámbito+mes+posición duplicada): 23.111 + 7.749 =
+   30.860, el total de master. Correlación perfecta.
+4. Por clave, los multiconjuntos de valores son IDÉNTICOS entre builds en
+   todas las columnas de negocio (pct, cantidades, importes, versión): los
+   valores solo se reparten al revés entre las gemelas. Residuo de 3
+   filas: mismo fenómeno vía `version_descripcion`.
+5. Origen de las gemelas: esas obras tienen **DOS versiones master con el
+   mismo número 13**, creadas el 22/07/2026 y el 23/07/2026. La selección
+   de vigente no desempata (empatan en número), así que cada posición sale
+   DUPLICADA. Ninguna pareja de gemelas es duplicado exacto (16.980
+   claves, todas con valores distintos entre gemelas).
+6. Mecanismo: las ventanas de 08 (`MAX ... ROWS UNBOUNDED PRECEDING`,
+   `LAG ... ORDER BY posicion_mes`) quedan SUBESPECIFICADAS cuando
+   `posicion_mes` empata (gemelas). Cada plan de ejecución (monolítico vs
+   por tramos) resuelve el empate distinto pero estable. **El troceo de
+   F-019 NO cambia ningún valor: el no determinismo es preexistente** (el
+   build viejo también cambiaría de bytes con otro plan/versión de PG).
+
+Conclusión técnica: **equivalencia semántica PROBADA** (mismos
+multiconjuntos de valores por clave en toda la tabla; los agregados a
+cualquier nivel son idénticos, por eso la huella coincidía). El checksum
+byte a byte de R13 es insatisfacible tal cual ante gemelas: mide el orden
+del empate, no el contenido.
+
+Hallazgo colateral (PREEXISTENTE, igual en ambos builds, fuera del alcance
+de F-019): la versión 13 duplicada hace que TODO el plan master de esas 2
+obras esté contado DOS VECES en `stg.plan_mensual`. Revisar con negocio si
+la vigente debería desempatar (p. ej. por fecha de creación más reciente).
+
+**DECISIÓN DEL HUMANO (2026-08-13): opción C** — enmendar R13 y dar T11
+por superado, más registrar el caso «muy bien, con código de obra y causa,
+para poder replicarlo a mano». Ejecutado:
+
+- `requirements.md` R13: enmienda fechada con el criterio canónico
+  (cardinalidad + `EXCEPT ALL` numérico con multiconjuntos por clave +
+  huella) y el veredicto **R13 SUPERADO**.
+- `docs/referencia/05_caso_obrfasamb_version_duplicada.md`: el caso
+  completo — obras 0694 (2403576, v26 duplicada, creada 20/07 y
+  23/07/2026) y 0697 (2491656, v13 duplicada, creada 22/07 y 23/07/2026),
+  ides 29916/29983, 29918/29985, 29949/29977, 29951/29979 (el segundo de
+  cada pareja siempre del 23/07, ides consecutivos: parece una misma
+  acción en Sigrid ese día), mecanismo del join por (obride, amb, fas) y
+  receta SQL de replicación. Indexado en el README de referencia.
+- `harness/features.json`: **F-022** creada (pending, sdd, prioridad 12):
+  desempate determinista, con la pregunta de negocio previa (¿corregir en
+  Sigrid o desempatar en ETL?). La F-021 sigue reservada para la
+  planificación consolidada.
+- Limpieza: DROP de `tmp_f019_nuevo_a`, `tmp_f019_diff_viejo` y
+  `tmp_f019_diff_nuevo`; worktree `datamart-old-f019` retirado (su copia
+  de `.env` eliminada con él); borrado `huella_local_antes_f019.csv`
+  (anulado). Se conservan `huella_build_viejo_f019.csv` y
+  `huella_build_nuevo_f019.csv` (evidencia del T11, sin versionar).
+  `stage` final lanzado para dejar la tabla local en estado del build
+  nuevo.
+
+**T11 CERRADO (SUPERADO).** Siguiente: T12 (R14, Azure) en horario
+acordado con el humano.
+
+- **Rotación de secretos DESCARTADA por el humano (2026-08-14):** «no es
+  crítico de momento, ignoralo». No volver a pedirla en los guiones de
+  T12/T14; queda como mejora opcional a futuro.
+- Conectividad del puesto resuelta el 2026-08-14: la IP pública del
+  humano cambió (90.160.96.77; las reglas tenían 62.174.237.73 del
+  09-ago). El clasificador de permisos bloqueó la escritura del firewall
+  al agente: los comandos `az` (crear regla del día + borrar la del
+  09-ago) se le pasaron al humano para que los ejecute él. Reglas
+  candidatas a limpieza futura si él confirma que sobran: `ClientPgris`
+  (188.87.59.11) y `FirewallIPAddress_2026-6-16` (80.28.223.30).
+
 ### 3 · T12 — verificación contra AZURE (R14), en horario acordado
+
+**Pre-check SUPERADO el 2026-08-14 (~12:40).** Camino recorrido por el
+humano: re-login `az` con MFA reforzado (`--claims-challenge` +
+`--use-device-code`; la política de acceso condicional lo exigió al
+cambiar la IP), regla `datamart-puesto-pgris-2026-08-14` (90.160.96.77)
+creada y `datamart-puesto-pgris-2026-08-09` borrada en
+`rg-albaranes-dev`/`psql-albaranes-rs9k2`. La consulta de medición como
+`sigrid_dm_app` devolvió **7743 MB** ocupados en total (≈7,6 de 32 GB):
+margen sobrado para el derrame estimado de ~13 GB (pico previsto ~21 GB,
+~65 % < límite 80 %). Verificado además que `raw` quedó COMPLETA el
+09-ago: 31 tablas y `dca` con 306.737 filas; `sigrid_dm` ocupa 7.680 MB
+(los ~13,5 GB del incidente incluían WAL/sistema, que cuentan en
+`storage_percent` pero no en `pg_database_size`). T12 es directamente
+`stage` → `build-mart` → `apply-grants`, sin re-ingesta. Falta solo el
+horario acordado para la tirada.
+
+**Intento 1 de T12 FALLIDO el 2026-08-14 ~14:15 (red, no código).** El
+humano lanzó `stage` desde un sitio con cobertura mala e inestable:
+`build_presupuesto` terminó y commiteó (13.759.593 filas, 1.380 s), pero
+la conexión nueva para `record_run_end` cayó con `getaddrinfo failed`
+(tercer fallo de red de este tipo: 09-ago 11:46, 14-ago 12:33 y este).
+`plan_mensual` ni arrancó (tabla vacía). Estado de Azure seguro; el
+relanzamiento machaca lo parcial (TRUNCATE por sub-paso). **Acordado:
+reintento esta noche a la 01:00** desde conexión estable, suspensión
+desactivada. ⚠ Si el humano está en otra red, su IP pública habrá
+cambiado otra vez (la regla vigente es 90.160.96.77): comprobar con
+`ifconfig.me/ip` y crear regla nueva antes de lanzar. Dato útil ya
+medido: `build_presupuesto` en el B1ms = 1.380 s (~23 min).
+
+**T12 COMPLETADO en el intento 2 (14-ago 18:58Z → 15-ago 10:01Z, con
+pausa nocturna entre stage y build-mart).** El humano decidió relanzar
+desde la misma red inestable; blindaje aplicado: IP verificada
+(90.160.96.77 sin cambios) y `hosts` fijado a 68.221.140.205 desde
+consola de administrador (⚠ RETIRAR la línea al terminar T13). Resultados
+medidos en el `Standard_B1ms`:
+
+- `stage` **SUCCESS en 6.851,8 s (1 h 54)**: `build_plan_mensual`
+  troceado 5.993,9 s (~100 min), **60/60 tramos sin un solo aborto**,
+  29.398.375 filas. Ocupación de disco: 23,6 % inicial → **pico 46,55 %**
+  (~14,9 de 32 GB), muy lejos del límite 80 %; la puerta no intervino.
+- `build-mart` SUCCESS en 1.305,8 s (~22 min): `build_fact` 5.287.299
+  filas (1.168 s), `agg_categoria` 24.591.
+- `apply-grants` SUCCESS: 28 sentencias, rol `mcp_sigrid_dm_ro`.
+- `timings` capturado con el desglose de los 60 tramos (máx 293 s el
+  tramo 2; el 60 —564 obras pequeñas— 250 s).
+- Filas stg.plan_mensual: 29.398.375 vs 29.403.619 en local (−5.244) =
+  deriva esperada de raw (Azure 09-ago, local congelado 30-jul). Por eso
+  T13 compara solo meses cerrados con `--periodo-hasta`.
+
+**Veredicto del paso 9 de F-005: el B1ms AGUANTA el build troceado.**
+Factor de lentitud ~×2 respecto al portátil, pipeline completo
+stage+mart ≈ 2 h 16 — perfectamente viable como job nocturno. Pasos 8 y
+9 de F-005 COMPLETADOS.
 
 Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
 el mismo build**. Antes de nada, el pre-check de que el rol real puede medir:
@@ -450,6 +704,186 @@ si el `Standard_B1ms` aguanta con el build troceado).
 
 `fingerprint-views` contra Azure y `compare-fingerprints` con la huella local
 de T11. Sin diferencias. Cierra el **paso 10 de F-005**.
+
+**Intento 1 (2026-08-15, `--periodo-hasta 2026-05` a petición del humano;
+junio es el último cerrado pero prefirió margen): 41 FALLOS + 59 avisos.**
+Diagnóstico en dos grupos, ninguno es un bug del build:
+
+1. **22 vistas «presente vs ausente»**: en Azure nunca se construyeron
+   las capas `cierre`, `compras`, `maestro` y `retenciones` — sus builds
+   (`build-cierre`, `build-maestros`, `build-compras`,
+   `build-retenciones`) NO forman parte de `run-all` (docstring de
+   `run-all` en `main.py`) y el 09-ago solo llegó a correr `stage`.
+   Hueco de despliegue, se arregla ejecutándolos allí + `apply-grants`.
+2. **19 fallos del bloque cerrado del mart** (count +117 sobre 4,87 M =
+   0,0024 %; +319,54 € de incurrido): deriva REAL del raw entre 30-jul
+   (local) y 09-ago (Azure) — documentos de coste con fecha retroactiva
+   en meses cerrados y versiones nuevas que añaden filas a meses
+   pasados. Con raws de fechas distintas la igualdad exacta es
+   imposible por diseño; el docstring de `fingerprint-views` ya exige
+   capturar ambos lados con el mismo estado. Hace falta re-ingesta
+   sincronizada en los dos lados antes de repetir la huella.
+
+Huellas del intento: `huella_azure_f019.csv` y
+`huella_local_cerrados_f019.csv` (raíz, sin versionar).
+
+**Parte A del arreglo (2026-08-15, tarde): 3 de 4 capas desplegadas en
+Azure.** `build-maestros` (23,6 s), `build-compras` (566,1 s, 2,46 M
+filas de fact) y `build-retenciones` (86,5 s) en verde + `apply-grants`
+(303 s, lento — el servidor venía de una muerte). **`build-cierre` FALLA
+de forma REPRODUCIBLE en `build_fact`**: dos intentos muertos con
+«server closed the connection unexpectedly» a duraciones muy distintas
+(982 s a las 11:46Z y 3.654 s a las 17:26Z) → presión de memoria
+dependiente de la carga del momento (B1ms, 2 GB compartidos), no un
+punto fijo. Mismo mal que F-019 curó en plan_mensual, ahora en cierre;
+destapado porque cierre NUNCA se había construido en Azure. Además, tras
+el segundo fallo `apply-grants` estuvo **71 min sin poder conectar**
+(timeout) — servidor grogui o red del humano caída; pendiente de
+confirmar salud del servidor (sirve albaranes y partes en producción).
+
+**DECISIÓN: no más reintentos de `build-cierre` contra Azure** hasta
+diagnosticar. Plan propuesto al humano (pendiente de su OK): evidencia
+en métricas del Portal (Memory/CPU percent en las dos ventanas), parche
+corto (`SET LOCAL work_mem/jit=off` en build_fact de cierre), feature de
+backlog para trocearlo con el planner de F-019, y builds de cierre solo
+en horario valle mientras tanto.
+
+**Giro del diagnóstico (2026-08-15 noche): el sospechoso principal pasa
+a ser LA RED DEL HUMANO, no el servidor.** Cadena de evidencia: (1) el
+humano confirmó estar en un sitio «con mala cobertura e inestable»; (2)
+las dos muertes de `build_fact` ocurren a duraciones aleatorias (16 y
+61 min) durante consultas largas = conexión TCP en silencio, perfil
+típico de NAT móvil que descarta conexiones calladas; (3) ayer una
+consulta de 19,5 min (mart build_fact) sobrevivió; (4) a las 18:43Z el
+servidor respondía al psql a la primera (bases 18 GB, sano) y a las
+19:05Z un tercer intento de build-cierre NI SIQUIERA CONECTÓ (timeout a
+los 130 s) — un servidor ocioso no rechaza conexiones nuevas, una red
+caída sí. El apagón de 71 min de apply-grants queda también explicado
+por la red. **AZURE EN PAUSA hasta que el humano esté en red estable.**
+Al volver: reintento `build-cierre` + `apply-grants`; solo si volviera a
+morir a mitad de consulta en red buena, investigar OOM (experimento
+pg_sleep 40 min + métricas del Portal). Backlog nuevo: keepalives TCP en
+la conexión del ETL (no salvan un enlace muerto, sí consultas largas
+tras NAT agresivo).
+
+**CASO CERRADO (2026-08-15 ~20:20Z): era la red.** Con el enlace «un
+poco más estable» (palabras del humano), el 4º intento de `build-cierre`
+pasó a la primera: SUCCESS en 2.701 s (`build_fact` 1.609 s, 16.856
+filas; `ddl_fact` tardó 1.086 s, probablemente el servidor digiriendo
+los abortos previos) y `apply-grants` volvió a sus 9,6 s. El servidor
+queda exonerado del todo: no hay OOM, no hace falta parche de memoria ni
+trocear cierre. Los keepalives TCP siguen siendo mejora recomendable de
+backlog. **Parte A de T13 COMPLETA: las 4 capas + grants desplegadas en
+Azure.** Los 22 fallos de vistas ausentes quedan resueltos; el bloque
+cerrado sigue pendiente de la parte B (re-ingesta sincronizada de ambos
+lados + huellas `--periodo-hasta 2026-05`), que exige red estable
+(~5-6 h, la ingesta pasa todo por el portátil dos veces).
+
+**Parte B en marcha (2026-08-16). FASE 1 (Azure) CERRADA a las ~14:22Z.**
+Odisea de red del sábado, toda resuelta sobre la marcha: (1) la ingesta
+moría con páginas de 500k (descargas >2,5 min cortadas); el humano bajó
+`SIGRID_API_PAGE_SIZE` a 50000 en `.env` y pasó; (2) los 3 Excels
+auxiliares apuntaban a la carpeta extinta `OneDrive - Construcciones
+Ruesma` — ruta buena: `OneDrive - Ruesma/Documentos/Sigrid/
+tablas_auxiliares/`; corregida en `.env` (⚠ en los `.bak` quedó un
+ESPACIO colado antes de la barra, el humano debía quitarlo); `load-aux`
+solo valida, no bloquea stage; (3) la IP del humano rotó DOS veces
+(90.160.96.77 → 90.160.92.59 → 77.211.5.184); la regla vigente es
+`datamart-puesto-pgris-2026-08-16b` (77.211.5.184) — esta vez el humano
+me autorizó expresamente y los `az` los ejecuté yo (create + delete de
+obsoletas). Resultado fase 1: `run-all --full` verde (raw fresco de la
+madrugada del 16), 4 capas + grants verdes (`build_fact` cierre 16.876
+filas), y `huella_azure_t13.csv` completa: 34 vistas, 794 métricas,
+bloques estructura/vivo/CERRADO (100). FASE 2 (local) lanzada en
+paralelo en otra consola con `.env` local; regla acordada: si hay que
+relanzar la huella de Azure, SOLO tras restaurar `.env.azure.bak` al
+acabar la fase 2. Después: `compare-fingerprints huella_local_t13.csv
+huella_azure_t13.csv`.
+
+**Intento 2 de T13 (2026-08-16 noche): 22 FALLOS, los tres diagnosticados
+con causa raíz confirmada por consultas a ambos lados.** La GRAN noticia:
+los datos de negocio de los meses cerrados YA SON IDÉNTICOS (la deriva
+del intento 1 desapareció con las ingestas sincronizadas). Los 22 fallos
+son tres defectos de otra índole que la huella ha destapado:
+
+1. **10 × tipos en compras (bigint/text local vs integer/varchar
+   Azure).** Las tablas de compras heredan tipos de `raw.*` (`CREATE
+   TABLE AS`), y el raw LOCAL conserva el esquema del mapeo antiguo
+   (todo BIGINT/TEXT) porque la ingesta solo trunca, nunca recrea.
+   Azure (creado el 09-ago) refleja el mapeo vigente de
+   `entities.py::postgres_type` (int→INTEGER, nvarchar(n)→VARCHAR).
+   **El desviado es el LOCAL.** Fix: recrear el raw local (drop +
+   re-ingesta) y rebuild de compras.
+2. **9 × cierre.v_pbi_planif_vs_real (count 24.736 vs 36.657, +48 %).**
+   Bug REAL de portabilidad, confirmado: `nombre_mes` mezcla texto
+   libre de las fases de Sigrid con derivados
+   `to_char(anio_mes,'TMMonth YYYY')`, y `TM` depende de `lc_time` del
+   servidor — local `Spanish_Spain.1252` genera «Mayo 2026» (coincide
+   con el texto de fase y colapsa), Azure `en_US.utf8` genera
+   «May 2026» (convive con «Mayo 2026» y parte cada grupo en dos).
+   Verificado: mayo-2026 tiene 1 nombre en local y 2 en Azure; tabla
+   base y definición de la vista idénticas en ambos lados. Fix: derivar
+   el nombre del mes con constantes en español (sin TM) en los SQL de
+   mart/cierre y reconstruir ambos lados.
+3. **2 × sum_fact_id del mart.** `fact_id` es BIGSERIAL asignado por
+   orden de inserción sin ORDER BY → no determinista entre máquinas.
+   count y TODAS las sumas de negocio idénticas. Benigno. Fix candidato:
+   que la huella excluya claves sustitutas (columnas con default
+   nextval) o INSERT con ORDER BY determinista.
+
+**Arreglo de los defectos 2 y 3 (2026-08-16): HECHO en código.** Commits
+`42e128d` (locale: 8 apariciones de `TMMonth` → ARRAY de meses en
+castellano, dos más de las previstas en `cierre/04_views_detalle.sql`) y
+`65c52aa` (la huella deja de sumar `fact_id`/`fact_cat_id`). `init.sh`
+verde: 398 tests, cobertura 100 % de las líneas cambiadas, 1 mutante y 0
+supervivientes. Informe: `progress/impl_T13_fixes_f019.md`.
+Reprocesando las huellas T13 con el criterio nuevo los fallos bajan de 22
+a 20 y los dos que caen son los dos `sum_fact_id`. **Falta la parte del
+humano**: reconstruir mart+cierre en local y en Azure y repetir
+`compare-fingerprints`; y el defecto 1 (tipos de `compras.*`), que sigue
+abierto.
+
+**Intento 3 de T13 (2026-08-17): 5 FALLOS residuales, causa raíz cazada
+fila a fila — deriva REAL de datos, no build.** Cronología del día: el
+humano reconstruyó local anoche (run-all --full con los fixes, raw del
+sáb. noche) y por error capturó la huella local con nombre azure (el
+líder la renombró; regla nemotécnica dada: el .env decide el destino,
+--out solo el nombre). Fase Azure: build-mart 1.400 s + build-cierre
+1.634 s + grants en verde. La huella de Azure necesitó 4 intentos por la
+red (2 cortes en consulta larga + 1 rotación de IP): se resolvió con
+keepalives TCP vía `PGOPTIONS=-c tcp_keepalives_idle=30...` (sin tocar
+código) y con una REGLA DE RANGO en el firewall
+(`datamart-puesto-pgris-2026-08-17-rango`, 31.4.242.0-255; el operador
+del humano rota dentro de esa subred — limpiar al cerrar). Compare:
+**0 fallos de estructura, 0 de mart, 0 de compras, 0 de planif_vs_real**
+(los 3 defectos del intento 2, arreglados y verificados). Quedan 5
+fallos, todos en `cierre.v_pbi_cierre_resumen` bloque cerrado, y el
+COPY fila a fila los reduce a UNA edición en Sigrid: obra 2313811,
+DIRECTOS, +632,74 € en el «Previsto» (fase 0) entre las dos ingestas —
+632,74×3 meses = 1.898,22 exactos en los sumatorios. Esas filas tienen
+`final_version_master` vacío: son el FALLBACK de fase 0 del cierre, que
+usa el presupuesto VIVO por diseño (documentado en cierre/02_build_fact
+§E). Conclusión: el bloque «cerrado» de las vistas de cierre contiene
+un componente legítimamente vivo; la igualdad exacta ahí solo se cumple
+si NADIE toca ningún previsto entre las dos capturas.
+
+**DESENLACE (2026-08-17): el humano eligió la OPCIÓN A.** R15 enmendada
+y SUPERADA en la spec (commit `2d95980`); tasks.md y design.md §6
+actualizados a petición del reviewer (`review_F-019.md`, 2ª pasada).
+**T13 CERRADO.** Quedan abiertas SOLO estas tareas operativas del puesto
+del humano (no son del repositorio):
+
+- Retirar la línea de `hosts` (68.221.140.205) cuando acabe el trabajo
+  contra Azure desde el portátil.
+- Limpiar reglas de firewall del puesto cuando el job de F-003 exista:
+  `datamart-puesto-pgris-2026-08-17-rango` (31.4.242.0-255) y las
+  antiguas `ClientPgris` / `FirewallIPAddress_2026-6-16` si el humano
+  confirma que sobran.
+- Decidir si `SIGRID_API_PAGE_SIZE=50000` se queda en los `.env` (fue un
+  apaño para la red inestable; en red buena 500000 es más rápido).
+Reglas de firewall vigentes: `-2026-08-16` (90.160.92.59) y `-16b`
+(77.211.5.184) — la IP del humano rebota entre ambas; se limpiarán al
+acabar.
 
 ### 5 · T14 — desbloquear F-003
 

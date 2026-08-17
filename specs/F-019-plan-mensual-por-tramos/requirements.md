@@ -71,10 +71,17 @@ la huella del resultado del build **actual** en local:
 
 ```powershell
 # checksum del contenido (excluye plan_id y _built_at, que cambian por diseño)
-PSQL -h localhost -U <usuario> -d sigrid_dm -X -A -t -c "SELECT count(*) || '|' || md5(string_agg(fila, '|' ORDER BY fila)) FROM (SELECT concat_ws('~', presupuesto_id, obra_id, partida_id, ambito_id, version, version_descripcion, version_tex, version_fec_creacion, version_fec_efectiva, anio_mes, posicion_mes, pct_acumulado, pct_mes, precio_unitario, can_mes, can_origen, importe_mes, importe_origen, importe_mes_raw, importe_origen_raw, total_incurrido, total_incurrido_mes) AS fila FROM stg.plan_mensual) t;"
+#
+# CORREGIDO en T1 (2026-08-11): la formulación original agregaba las 29,09 M
+# de filas en UNA cadena y Postgres la rechaza («memoria agotada»: una cadena
+# no puede superar 1 GB). Se hashea por cubos: cada fila va a uno de 4.096
+# cubos según su md5, se hashea cada cubo y se hashea la lista ordenada de
+# hashes. Misma semántica (mismo conjunto de filas ⇔ mismo checksum) y es la
+# fórmula que DEBE repetirse tal cual en R13.
+PSQL -h localhost -U <usuario> -d sigrid_dm -X -A -t -c "SELECT sum(n) || '|' || md5(string_agg(h, '|' ORDER BY b)) FROM (SELECT substr(md5(fila), 1, 3) AS b, count(*) AS n, md5(string_agg(fila, '|' ORDER BY fila)) AS h FROM (SELECT concat_ws('~', presupuesto_id, obra_id, partida_id, ambito_id, version, version_descripcion, version_tex, version_fec_creacion, version_fec_efectiva, anio_mes, posicion_mes, pct_acumulado, pct_mes, precio_unitario, can_mes, can_origen, importe_mes, importe_origen, importe_mes_raw, importe_origen_raw, total_incurrido, total_incurrido_mes) AS fila FROM stg.plan_mensual) t GROUP BY 1) buckets;"
 
 # huella de las vistas de consumo (herramienta de F-005)
-python main.py fingerprint-views --salida huella_local_antes_f019.csv
+python main.py fingerprint-views --out huella_local_antes_f019.csv
 ```
 
 Verificación: MANUAL (humano). Ambos resultados guardados (el checksum,
@@ -218,13 +225,39 @@ Verificación: MANUAL (humano):
 ```powershell
 python main.py stage           # con .env apuntando a LOCAL
 # repetir el checksum de R2: debe coincidir carácter a carácter
-python main.py fingerprint-views --salida huella_local_despues_f019.csv
+python main.py fingerprint-views --out huella_local_despues_f019.csv
 python main.py compare-fingerprints huella_local_antes_f019.csv huella_local_despues_f019.csv
 ```
 
 Resultado esperado: checksum idéntico y `compare-fingerprints` sin
 diferencias. **Cualquier diferencia es FALLO**, no se racionaliza: se
 investiga o se marca la feature `blocked`.
+
+> **ENMENDADO en T11 (2026-08-13), opción C autorizada por el humano.** El
+> checksum byte a byte resultó **insatisfacible por diseño** ante «filas
+> gemelas»: `raw.obrfasamb` contiene versiones master duplicadas (mismo
+> `(obride, amb, fas)`, ver
+> `docs/referencia/05_caso_obrfasamb_version_duplicada.md`), cada posición
+> de esas versiones sale dos veces, y las ventanas de `08_plan_mensual.sql`
+> (`ROWS UNBOUNDED PRECEDING`, `LAG ... ORDER BY posicion_mes`) quedan
+> subespecificadas en el empate: cada plan de ejecución reparte los pct
+> entre las gemelas de forma estable pero distinta. El checksum medía ese
+> orden, no el contenido. **Criterio enmendado**, verificado el 2026-08-13
+> contra el build viejo reconstruido en un worktree (`2cb6de7`) sobre el
+> MISMO `raw` congelado:
+>
+> 1. Misma cardinalidad (29.403.619 en ambos).
+> 2. Ambos builds reproducibles consigo mismos (checksum estable ×2 cada
+>    uno: viejo `ec74147e...`, nuevo `c58b928d...`).
+> 3. `EXCEPT ALL` numérico de las 22 columnas en ambas direcciones: las
+>    únicas filas discrepantes (10.259, un 0,035 %) son gemelas de las 2
+>    obras del caso, y **por clave los multiconjuntos de valores son
+>    idénticos** en todas las columnas de negocio: solo cambia el reparto
+>    entre gemelas.
+> 4. `compare-fingerprints` equivalente sin avisos.
+>
+> Con ese criterio, **R13 queda SUPERADO**: el troceo no cambia ningún
+> valor. El desempate determinista de las gemelas es la feature F-022.
 
 ---
 
@@ -268,12 +301,35 @@ CUANDO R14 termina, el humano debe comparar la huella de las vistas de
 consumo de local contra Azure (paso 10 de F-005):
 
 ```powershell
-python main.py fingerprint-views --salida huella_azure_f019.csv   # .env Azure
+python main.py fingerprint-views --out huella_azure_f019.csv   # .env Azure
 python main.py compare-fingerprints huella_local_despues_f019.csv huella_azure_f019.csv
 ```
 
 Resultado esperado: sin diferencias (misma semántica que R13: una
 diferencia es FALLO).
+
+> **Enmienda (2026-08-17, decisión del humano — opción A).** R15 se ejecutó
+> con capturas sincronizadas de fin de semana, `--periodo-hasta 2026-05` y
+> tres iteraciones que destaparon y corrigieron tres defectos reales
+> (esquema legado del raw local; `nombre_mes` dependiente de `lc_time` vía
+> `TMMonth`, corregido en commit `42e128d`; claves sustitutas no
+> deterministas en la huella, corregido en `65c52aa`). Resultado final:
+> **estructura, mart, compras, maestro y retenciones idénticos (0 fallos)**
+> y 5 fallos residuales concentrados en `cierre.v_pbi_cierre_resumen`
+> (bloque cerrado), reducidos fila a fila (COPY en ambos lados) a UNA
+> edición real en Sigrid: obra 2313811, concepto DIRECTOS, +632,74 € en su
+> presupuesto «Previsto» entre la ingesta de Azure (sábado madrugada) y la
+> local (sábado noche); 632,74 × 3 meses = 1.898,22, exactamente la
+> diferencia de los sumatorios. Esas filas tienen `final_version_master`
+> vacío: provienen del **fallback de fase 0** del cierre
+> (`cierre/02_build_fact.sql` §E), que usa el presupuesto VIVO por diseño
+> también en meses cerrados. **Criterio enmendado**: la igualdad exacta se
+> exige a estructura y a todas las métricas deterministas; en las vistas de
+> cierre alimentadas por el fallback de fase 0, una discrepancia solo es
+> FALLO si no queda explicada fila a fila por ediciones del presupuesto
+> vivo entre capturas. Con ese criterio, **R15 queda SUPERADO** el
+> 2026-08-17. Evidencia: `huella_local_t13.csv`, `huella_azure_t13.csv`
+> (sin versionar) y el diagnóstico en `progress/current.md`.
 
 ### R16 · Desbloqueo de F-003 [MANUAL]
 

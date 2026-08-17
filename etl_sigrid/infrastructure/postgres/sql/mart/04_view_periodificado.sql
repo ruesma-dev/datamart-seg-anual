@@ -164,7 +164,11 @@ SELECT
     cre.anio_mes,
     EXTRACT(YEAR  FROM cre.anio_mes)::INT AS anio,
     EXTRACT(MONTH FROM cre.anio_mes)::INT AS mes,
-    to_char(cre.anio_mes, 'TMMonth YYYY') AS nombre_mes,
+    -- Nombre del mes SIN locale: no puede depender de lc_time del servidor.
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM cre.anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM cre.anio_mes)::INT AS nombre_mes,
     cre.escenario,
     MAX(modelo.tipo_dato)               AS tipo_dato,
     MAX(modelo.concepto)                AS concepto,
