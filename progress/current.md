@@ -53,10 +53,42 @@ opción B, contraseña vía referencia de Key Vault; enmienda fechada en la spec
 | Identidad | `id-datamart-seg-dev` con exactamente 3 roles de ámbito recurso (R19) |
 | Imagen | `datamart-seg-anual:r20260810-1024` en el ACR, único tag, sin latest (R20) |
 
-**Pendiente (tanda 2, tras F-019): T23–T26** — crear el job, prueba segura
-(`version`/`check-pg`), logs (R24) y alerta con correo real (R25); más las 3
-verificaciones MANUAL de F-004 y retirar las copias viejas de los secretos en
-`kv-albaranes-rs9k2` cuando el job complete una ejecución correcta.
+**Tanda 2 EJECUTADA el 2026-08-17 (noche), por el líder con autorización
+expresa del humano («lanzas tu»):**
+
+- **T14**: `jobProgramable: true` (commit `9d31475`),
+  `test_f003_infra.py` 38 passed.
+- **Imagen nueva** `r20260817-2025` construida con `70_build_image.ps1`
+  (la de T21 era del 10-ago, sin los fixes de T13).
+- **T23 HECHO** tras 4 intentos fallidos instructivos (corte DNS a mitad
+  del sondeo → cascarón `Failed` borrado; carrera con el borrado
+  pendiente; y un BUG real: `00_vars.ps1` define `$TAG` con la hora
+  actual y machacaba el parámetro `-Tag` por la insensibilidad a
+  mayúsculas de PowerShell → `MANIFEST_UNKNOWN`; corregido en `19f51a3`
+  salvando el parámetro en `$TagPedido`). Job `caj-datamart-seg-dev`
+  creado y PROGRAMADO (`0 2 * * *` UTC), identidad `id-datamart-seg-dev`,
+  secretos por referencia a Key Vault.
+- **T24 HECHO**: primera prueba Failed por args pegados
+  (`--args main.py,version` llega como un solo argumento; hay que pasar
+  `"main.py" "version"`); segunda `Succeeded`
+  (`caj-datamart-seg-dev-41p0exu`).
+- **T25 HECHO**: KQL contra `log-datamart-seg-dev` en verde; columnas
+  reales: `ContainerAppSystemLogs_CL.JobName_s/Reason_s/Log_s` y
+  `ContainerAppConsoleLogs_CL.Log_s`. Los logs muestran
+  `etl-sigrid-seguimiento 0.1.0 · image: datamart-seg-anual:r20260817-2025
+  · build: 2026-08-17T18:25:41Z` — el tag coincide.
+- **T26 CREADA, pendiente del correo**: la métrica real es
+  `Executions` con dimensión `state` (la doc decía
+  `JobExecutionCount/Status`, que no existen; script corregido). DA-3
+  resuelta: el grupo de acción de la landing zone está VACÍO, así que
+  alerta propia con el correo del humano por parámetro (nunca en el
+  repo). Fallo provocado con subcomando inexistente:
+  `Failed` a las 20:46:24 local. **Falta solo: confirmación del humano
+  de que el correo llegó y a qué hora.**
+
+**Queda tras el correo**: las 3 verificaciones MANUAL de F-004 y retirar
+las copias viejas de los secretos en `kv-albaranes-rs9k2` ahora que el
+job tiene una ejecución correcta.
 
 **Defectos encontrados al desplegar (todos corregidos o anotados):** dos
 roturas de PowerShell 5.1 en los scripts (JMESPath con `?`/`!` contra az.cmd y
