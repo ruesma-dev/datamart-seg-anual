@@ -84,69 +84,39 @@ Con la Fase C hecha y el reviewer en APROBADO → F-024 `done`, merge a
 
 ---
 
-# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-17 (léelo antes que nada)
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 (léelo antes que nada)
 
-**El datamart ya corre solo.** Job `caj-datamart-seg-dev` programado a las
-02:00 UTC (04:00 local) con la imagen `r20260817-2025`; tanda 2 de F-003
-completa y alerta verificada de extremo a extremo (fallo 20:46:24 →
-correo Activated 20:51:58 → correo Deactivated 21:07:49). **Primera
-ejecución nocturna real: madrugada del 18-ago** — lo primero de la
-próxima sesión es mirar `python main.py timings` (con `.env` de Azure) y
-los logs KQL, y comprobar que NO llegó ningún correo Activated.
+**El job nocturno YA HA HECHO UNA CARGA COMPLETA EN AZURE**: ejecución
+`caj-datamart-seg-dev-6a95hln`, lanzada a mano a las 12:22 local con la
+imagen `r20260818-1003`, `Succeeded` a las 15:08 (**2 h 45**): ingesta 33
+min (20,05 M filas), `build_stg` 1 h 51 (60/60 tramos, 29,59 M filas,
+pico de disco 57,2 %), `build_mart` 21 min (5,29 M filas), grants OK.
+Antes hubo dos muertes instructivas y corregidas el mismo día: la noche
+del 18 (02:00 UTC) por `timeout_seconds` 300 > 230 de sigrid-api (fix
+`193fc3c`, default 230 con tope), y a las 10:08 por `DeadlineExceeded` a
+las 2 h justas en el tramo 39/60 (fix `1a09f63`, `replicaTimeoutSeconds`
+7200 → 18000, aplicado al job en caliente). **La alerta funcionó en real
+las dos veces** (Activated a los ~6 min, Deactivated después). Próxima
+ejecución programada: madrugada del 19 a las 02:00 UTC — debería ser la
+primera nocturna limpia; lo primero de la próxima sesión es comprobarlo
+(`timings` con `.env` de Azure + buzón sin Activated).
 
-**F-003 sigue `blocked` A PROPÓSITO** (no `done`): faltan las 3
-verificaciones heredadas de F-004 y las limpiezas, agrupadas en la
-feature nueva **F-023** (`pending`, prioridad 8, sdd=false, aceptación
-detallada en features.json). Marcar F-003 `done` hoy habría falseado su
-tasks.md. Orden natural: F-023 → reviewer de F-003 → F-003 `done`.
+**Corrección de un supuesto repetido en este fichero**: la ingesta NO es
+transaccional por tabla; hace **commit por página** (DA-8 de F-024,
+confirmado en código). Donde abajo diga «transaccional por tabla», léase así.
 
-**Los Excels auxiliares** (pregunta del humano): hoy el job los trata
-como «no configurados» porque `infra/env/dev.json` apunta a rutas de
-OneDrive; F-004 solo LEE y VALIDA. Subirlos al blob y verificar es F-023;
-volcarlos a tablas `aux.*` es **F-013** (aplazada por el humano el
-2026-08-08, decisión de modelo pendiente); que negocio los suba solo es
-**F-010**. F-023 es prerrequisito de F-013.
+**Ramas y features**: F-024 con Fase B APROBADA por el reviewer (2 pasadas,
+`progress/review_F-024.md`) y Fase C pendiente (T17–T20, ver su sección);
+F-023 con el bloque 1 hecho; F-003 `blocked` a propósito hasta F-023. La
+rama de F-024 nace de la de F-003: se mergean juntas a `dev` cuando F-024
+cierre. **Pendiente del humano**: dar por buenos los 2 mutantes
+equivalentes de F-024 (`bold` de cabeceras), pushes de las dos ramas, y
+crear el remoto de `azure-apps` en GitHub (hoy solo existe en local).
 
-**F-023 ARRANCADA el 2026-08-17 (noche), bloque 1 con OK del humano:**
-Excels subidos a `stdatamartsegdev/aux` (`TipoPartida.xlsx` 46.679 B,
-`TipoCoste.xlsx` 20.486 B, `mapeo_proporcionales.xlsx` 61.141 B, tamaños
-idénticos a los de OneDrive); rol `Storage Blob Data Reader` asignado al
-humano sobre la cuenta (un `Contributor` temporal para subir, retirado
-después: solo queda Reader); SDK de Azure instalado en el venv del puesto
-(faltaba, como avisaba este fichero). **Verificación 1 de F-004 SUPERADA**:
-`load-aux` desde el puesto con las URIs de blob por variables de entorno
-de proceso (sin tocar `.env`) → `SUCCESS`, `origen=blob` ×3. El primer
-intento sin SDK falló con el mensaje autoexplicativo de F-004, prueba de
-que el error guía. **A PROPÓSITO NO se ha tocado `dev.json` ni el job**:
-el cambio a URIs de blob en el job y las verificaciones 2-3 van DESPUÉS
-de leer la primera noche real. Pendiente en F-023: eso, los secretos
-duplicados (bloque 2, sin OK aún) y el puesto (bloque 3, sin OK aún).
-
-**PRIMERA NOCHE REAL DEL JOB (18-ago 02:00 UTC): FAILED, causa cazada y
-corregida a la mañana siguiente.** Las 31 tablas de la ingesta murieron en
-el mismo segundo con `HTTP 400` de sigrid-api: `timeout_seconds ... <= 230,
-input 300`. El default de `SIGRID_API_TIMEOUT_S` en el código era 300 y el
-ajuste a 230 vivía SOLO en los `.env` del puesto, que el job no lleva
-(«funciona en mi máquina»). Sin daño: ingesta transaccional, nada
-escrito; stage/mart saltados; la alerta funcionó en real (Activated
-04:06:56, Deactivated 04:21:52 local). **Fix (commit `193fc3c`)**:
-default 230 con tope `le=230` en `config/settings.py` (un valor mayor por
-entorno se rechaza al arrancar) + `tests/test_f023_timeout_sigrid_api.py`
-(4 tests). Imagen `r20260818-1003` publicada y job actualizado a ella
-(`85_update_job.ps1` tenía el MISMO bug de `-Tag` que `80`; corregido en
-`be971ec`). Lección apuntada: las pruebas manuales del job van SIN
-`--command`/`--image` (el override borra las variables de entorno del
-job y `Settings()` falla por variables ausentes — así murió la prueba
-`check-api`, no por el fix). **Carga completa lanzada desde el job a las
-10:08:41 local (`caj-datamart-seg-dev-o03rx36`)** tal cual la lanzará el
-cron; a las 10:11 la ingesta ya llevaba `con` (2.172.547 filas), `conext`
-y `obr` — el fix confirmado en real. Revisar al terminar (~3-4 h):
-`timings`, resumen final y buzón sin Activated.
-
-**Cabos del puesto (en F-023)**: línea de `hosts`, reglas de firewall
-(`-2026-08-17-rango`, y `ClientPgris` / `FirewallIPAddress_2026-6-16` solo
-con confirmación de que nadie más las usa), `SIGRID_API_PAGE_SIZE=50000`.
-**Push pendiente del humano**: `git push origin feature/F-003-infra-caj`.
+**Documentación**: el diccionario de Sigrid se movió a
+`azure-apps/sigrid_tablas.md` (arnés 1.4.1 con la regla de «documentación
+compartida = una copia en el ecosistema + puntero»); este proyecto sigue
+sin `harness/VERSION` (actualización del arnés en el backlog).
 
 ---
 
@@ -406,7 +376,7 @@ primero por corte de red local (11:46, `getaddrinfo failed`); el segundo llegó
 a **30 de 31 tablas** (19,7 M filas, 63 min) y solo falló **`dca`** (causa sin
 confirmar; el humano sospecha equipo desatendido/suspensión — si fue eso, el
 guardián anti-suspensión de F-014 no cumplió y hay que revisarlo). Como la
-ingesta es transaccional por tabla, lo cargado se conserva. **Recuperación
+ingesta hace commit por página (corregido en F-024: no es transaccional por tabla), lo cargado por tabla completa se conserva. **Recuperación
 preparada**: worktree limpio de `dev` en
 `C:\Users\pgris\PycharmProjects\datamart-carga` (para no importar código a
 medio editar del árbol de F-004); el humano copia `.env` y lanza
