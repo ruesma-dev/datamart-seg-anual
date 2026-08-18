@@ -1,11 +1,11 @@
 <!-- progress/mutacion_F-024.md -->
 # F-024 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-024` el 2026-08-18 15:15.
+Generado por `python -m harness.mutacion --feature F-024` el 2026-08-18 16:24.
 
 ## Alcance
 
-Origen del diff: **rama** (`8de4d9edd363f2697a890d6dcf81168e2092f8e2` .. `feature/F-024-coherencia-cargas-truncadas`).
+Origen del diff: **rama** (`1f3d5df5a5519c84fc17b2a451cdce33526d5694` .. `feature/F-024-coherencia-cargas-truncadas`).
 
 | Fichero | Líneas en alcance |
 |---|---|
@@ -32,7 +32,7 @@ Origen del diff: **rama** (`8de4d9edd363f2697a890d6dcf81168e2092f8e2` .. `featur
 | Muertos | 106 |
 | Supervivientes | 2 |
 | Timeouts | 0 |
-| Tiempo total | 604.4 s |
+| Tiempo total | 464.4 s |
 | Muestreo | no: campaña completa |
 
 ## Supervivientes
@@ -71,3 +71,13 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > negrita sería un test de la librería `click`, no de esta feature. Mismo
 > criterio que aplicó F-019 con literales de presentación.
 
+## Nota de la remedición (2026-08-18, arnés v1.5.0)
+
+Campaña repetida tras actualizar el arnés a la v1.5.0 y fusionar `dev` en la
+rama: el motor nuevo puede correr en paralelo (aquí se lanzó con
+`--workers 1`, en serie, para medir en las mismas condiciones que la primera
+vez) y el `merge-base` del diff cambió al merge del arnés. **Resultado
+idéntico**: 108 mutantes, 106 muertos, los 2 mismos supervivientes de
+`main.py` ya aceptados como equivalentes. El análisis de arriba es el que
+aceptó el humano el 2026-08-18; la regeneración del informe lo había
+sustituido por la plantilla vacía y se ha repuesto.
