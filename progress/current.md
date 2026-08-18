@@ -26,6 +26,64 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# F-024 · IMPLEMENTADA (Fase B) — en review; Fase C (Azure) pendiente del humano
+
+Rama `feature/F-024-coherencia-cargas-truncadas` (nace de la de F-003, que
+lleva el fix del timeout de sigrid-api y el techo del job). Spec en
+`specs/F-024-coherencia-cargas-truncadas/`. **Las 8 decisiones están
+CERRADAS** (2026-08-18, «aprobado con las recomendadas»): DA-1 A, DA-2
+estricta con `--sin-puerta` solo en comandos sueltos, DA-3 A (KQL), DA-4
+30 h, DA-5 sí, DA-6 sí, DA-7 solo escritores. **DA-8 CONFIRMADA leyendo el
+código: la ingesta hace COMMIT POR PÁGINA, no por tabla** (`truncate_table`
+y cada `copy_rows` abren su propia conexión); una muerte a mitad de tabla la
+deja truncada y parcial. Donde este fichero diga «transaccional por tabla»
+(secciones históricas de F-005/F-003), léase con esta corrección.
+
+**Fase B hecha** (T5–T16, `progress/impl_F-024.md`): `batch_id` por
+ejecución; huérfanas `RUNNING` → `ABORTED` al arrancar comandos que
+escriben; puerta de coherencia de `raw` antes de `build_stg` y de `stg`
+antes de `build_mart` (fallo ruidoso, mensaje accionable, `--sin-puerta`
+registrado `SKIPPED`); vistas `_meta.v_raw_state` y `_meta.v_frescura`;
+comandos `check-coherencia` y `check-frescura`; `infra/95_create_alert_
+frescura.ps1` (KQL 30 h). Evidencias: 591 tests, cobertura 100 % de las
+líneas cambiadas, mutación 108/106/2 (los 2, `bold=True` de cabeceras de
+consola, justificados como equivalentes — **pendiente de que el humano lo
+dé por bueno**, lo pide el rigor `critico`). Reviewer 1ª pasada:
+CAMBIOS_REQUERIDOS por 4 puntos concretos (B1 test de que `run-all` lleva
+las dos puertas activas; B2 tests de R17; B3 este fichero; B4 comandos de
+R23 con `ContainerJobName_s` y ventanas `30h/1h/5m`), **los 4 corregidos
+el 2026-08-18** — pendiente la re-review.
+
+**Fase C · MANUAL (humano), con comando exacto en `requirements.md` R23–R26
+y en `infra/README.md`:**
+
+- **T17**: `powershell -NoProfile -File infra8_build_image.ps1` → anotar
+  tag → `powershell -NoProfile -File infra\85_update_job.ps1 -Tag <tag>`
+  → `python main.py apply-grants` (con `.env` de Azure) para que las vistas
+  nuevas de `_meta` sean legibles por el MCP. Antes: `python main.py
+  timings` para capturar el estado previo.
+- **T18 (R24)**: muerte externa controlada durante la ingesta:
+  `az containerapp job start ...` y a los ~3 min `az containerapp job stop
+  -g rg-datamart-seg-dev -n caj-datamart-seg-dev --job-execution-name
+  <ejec>`; después `python main.py timings` debe enseñar `ABORTED` con
+  motivo, `python main.py check-coherencia` debe fallar por raw
+  incoherente, y `python main.py stage` suelto sin `--sin-puerta` debe
+  negarse. Luego relanzar la carga completa.
+- **T19 (R23)**: `az extension add --name scheduled-query` (ya hecha en el
+  puesto), `powershell -NoProfile -File infra\95_create_alert_frescura.ps1`,
+  y la prueba de extremo a extremo con ventana corta (`update
+  --window-size 1h --evaluation-frequency 5m`), correo Activated,
+  restaurar a `30h`/`1h`. Hoy la KQL devuelve ≥1 desde las 15:08 (primer
+  `build_mart SUCCESS` del job).
+- **T20 (R26)**: en local, `check-coherencia` sobre el raw anterior a
+  F-024 debe decir `sin_batch`; `stage --sin-puerta` debe construir y
+  registrar `SKIPPED`.
+
+Con la Fase C hecha y el reviewer en APROBADO → F-024 `done`, merge a
+`dev` **junto con la rama de F-003** (F-024 la contiene).
+
+---
+
 # ESTADO AL CERRAR LA SESIÓN DEL 2026-08-17 (léelo antes que nada)
 
 **El datamart ya corre solo.** Job `caj-datamart-seg-dev` programado a las

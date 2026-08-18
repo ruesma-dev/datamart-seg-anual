@@ -1046,3 +1046,28 @@ def test_f024_r20_el_aviso_de_raw_vacio_solo_sale_si_raw_esta_vacio() -> None:
 
     assert "raw está vacío" not in texto
     assert "con" in texto and "obr" in texto
+
+
+# ---------------------------------------------------------------------------
+# R17 · Las vistas de _meta son legibles por el rol de solo lectura
+# (bloqueante B2 del reviewer: el requisito es AUTO y no tenía test trazable)
+# ---------------------------------------------------------------------------
+
+
+def test_f024_r17_meta_en_esquemas_de_consumo() -> None:
+    """Si alguien saca `_meta` de PG_CONSUMPTION_SCHEMAS, v_raw_state y
+    v_frescura se quedan sin permisos para el MCP y Power BI."""
+    from config.settings import DEFAULT_CONSUMPTION_SCHEMAS
+
+    assert "_meta" in [s.strip() for s in DEFAULT_CONSUMPTION_SCHEMAS.split(",")]
+
+
+def test_f024_r17_grants_cubren_vistas_de_meta() -> None:
+    from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
+
+    sentencias = build_readonly_grant_statements("mcp_sigrid_dm_ro", "sigrid_dm_etl", ["_meta"])
+    unido = "\n".join(sentencias)
+    # Las vistas son "tablas" a efectos de GRANT: la sentencia sobre el
+    # esquema las cubre, y el default privileges cubre las que se creen después.
+    assert 'GRANT SELECT ON ALL TABLES IN SCHEMA "_meta"' in unido
+    assert 'ALTER DEFAULT PRIVILEGES FOR ROLE "sigrid_dm_etl" IN SCHEMA "_meta"' in unido

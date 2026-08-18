@@ -557,15 +557,15 @@ az extension add --name scheduled-query
 
 # 1 · la consulta, a mano, con la ventana real (debe devolver >= 1 tras una noche buena)
 $ws = az monitor log-analytics workspace show -g <resourceGroup> -n <logAnalytics> --query customerId -o tsv
-az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerAppName_s == '<job>' | where Log_s has_all ('step_finished','build_mart','SUCCESS') | where TimeGenerated > ago(30h) | count" -o table
+az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '<job>' | where Log_s has_all ('step_finished','build_mart','SUCCESS') | where TimeGenerated > ago(30h) | count" -o table
 
 # 2 · crear la regla (idempotente)
 powershell -NoProfile -File infra\95_create_alert_frescura.ps1
 
 # 3 · provocar: ventana corta, esperar el correo, restaurar
-az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size PT1H --evaluation-frequency PT5M
+az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 1h --evaluation-frequency 5m
 #   ... correo Activated recibido a las HH:MM ...
-az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size P1DT6H --evaluation-frequency PT1H
+az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 30h --evaluation-frequency 1h
 ```
 
 Resultado esperado: correo Activated en la prueba, Deactivated tras

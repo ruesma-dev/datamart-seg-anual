@@ -251,7 +251,9 @@ az monitor scheduled-query create -g <rg> -n $CFG.frescuraAlertName `
     --description "El datamart lleva mas de $horas h sin un build_mart completo"
 ```
 
-- **Sintaxis a confirmar en Fase A** (T3): la forma exacta de `--condition`
+- **Sintaxis CONFIRMADA en Fase A (T3, 2026-08-18): `--window-size 30h`,
+  `--evaluation-frequency 1h` (formato `##h##m##s`, NO ISO 8601) y columna
+  `ContainerJobName_s`.** Texto original de la duda, conservado: la forma exacta de `--condition`
   / `--condition-query` y si `--window-size` admite `PT30H` o exige `P1DT6H`
   (`az monitor scheduled-query create --help` tras `az extension add`). El
   script no se ejecuta contra Azure sin haberlo confirmado; ese es el

@@ -749,3 +749,39 @@ def test_f024_r19_la_ayuda_ensena_el_umbral_y_el_paso_por_defecto() -> None:
     assert "build_mart" in salida
     # `show_default` de click las imprime así; sin él no aparece el bloque.
     assert salida.count("default:") >= 2
+
+
+# ---------------------------------------------------------------------------
+# R11 / DA-2 · run-all NO tiene vía de escape (bloqueante B1 del reviewer)
+# ---------------------------------------------------------------------------
+#
+# El test anterior de R11 comprobaba que click rechaza `--sin-puerta` en
+# `run-all`. Eso protege la superficie de la CLI, no la composición del
+# pipeline: si alguien construye BuildStgStep/BuildMartStep con
+# `omitir_puerta=True` dentro de `build_pipeline_steps`, la opción sigue
+# rechazándose y las dos puertas quedan desactivadas todas las noches. El
+# reviewer lo demostró aplicando ese mutante a mano: 587 tests en verde.
+# Este test mira los objetos, no la opción.
+
+
+def test_f024_r11_el_pipeline_nocturno_lleva_las_dos_puertas_activas() -> None:
+    from etl_sigrid.application.steps.build_mart_step import BuildMartStep
+    from etl_sigrid.application.steps.build_stg_step import BuildStgStep
+
+    pasos = main.build_pipeline_steps(settings_falsos(), False, "20260818T020000-prueba")
+
+    stg = [p for p in pasos if isinstance(p, BuildStgStep)]
+    mart = [p for p in pasos if isinstance(p, BuildMartStep)]
+    assert len(stg) == 1 and len(mart) == 1, "el pipeline lleva un stage y un mart"
+    assert stg[0]._omitir_puerta is False, "run-all no puede saltarse la puerta de raw"
+    assert mart[0]._omitir_puerta is False, "run-all no puede saltarse la puerta de stg"
+
+
+def test_f024_r11_las_puertas_del_pipeline_no_se_desactivan_ni_con_full_refresh() -> None:
+    from etl_sigrid.application.steps.build_mart_step import BuildMartStep
+    from etl_sigrid.application.steps.build_stg_step import BuildStgStep
+
+    pasos = main.build_pipeline_steps(settings_falsos(), True)
+    for p in pasos:
+        if isinstance(p, (BuildStgStep, BuildMartStep)):
+            assert p._omitir_puerta is False
