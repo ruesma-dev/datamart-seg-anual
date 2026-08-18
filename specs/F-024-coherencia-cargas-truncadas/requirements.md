@@ -519,9 +519,9 @@ DONDE DA-3 sea la opción A, debe existir
 `resourceGroup`, `alertActionGroupName`, `alertActionGroupRg`) sin ningún
 nombre de recurso ni correo literal, (2) sea idempotente (si la regla
 existe, no la recrea), (3) derive la ventana de evaluación de
-`frescuraUmbralHoras` (30 h → `P1DT6H`) y evalúe cada hora, (4) dispare con
+`frescuraUmbralHoras` (30 h → `30h`, formato `##h##m##s` de `az`, NO ISO 8601; confirmado en T3) y evalúe cada hora, (4) dispare con
 `count == 0` sobre la consulta de R21 acotada al job por
-`ContainerAppName_s`, severidad 2, auto-mitigación activa (que llegue el
+`ContainerJobName_s` (nombre real de la columna, confirmado en T3), severidad 2, auto-mitigación activa (que llegue el
 «Deactivated» cuando vuelva a haber carga), (5) sea UTF-8 con BOM, CRLF y
 cabecera con su ruta, y (6) esté en la tabla de `infra/README.md` en su
 orden. `infra/env/dev.json` gana `frescuraAlertName` y
