@@ -902,3 +902,68 @@ Los 6 huecos de riesgo ALTO de F-005, fijados con tests: la mutación sobre
 F-005 pasa de 55 a **47 supervivientes, CERO de riesgo alto**. Barrido de
 secretos afinado (sin falsos positivos de rutas largas). Deuda restante:
 47 MEDIO/BAJO contabilizados en `progress/mutacion_F-005_tras_refuerzo.md`.
+
+---
+
+# F-011 · SPEC ESCRITA (2026-08-18) — pendiente de aprobación del humano
+
+Carpeta `specs/F-011-carga-incremental/` (requirements.md, design.md,
+tasks.md). Rama prevista `feature/F-011-carga-incremental`. **No se ha
+tocado código, ni `harness/features.json`, ni la carpeta de F-023.** La
+feature no declara `rigor`, así que hereda `critico`.
+
+## Los dos hallazgos que cambian el rumbo de la feature
+
+1. **La sospecha de la ficha no se sostiene contra el dato que ya tenemos.**
+   La carga completa del 18-ago (165 min) se reparte: ingesta **33 min
+   (20 %)**, `build_stg` **111 min (67 %)**, `build_mart` **21 min (13 %)**.
+   Una ingesta instantánea deja la carga en 132 min. El cuello está en el
+   BUILD, no en la extracción. Por eso la spec va por bloques: A (medir,
+   siempre) → **PARADA con firma del humano** → B (ingesta incremental, solo
+   si los números lo justifican) → C (ventana de negocio: en F-011 solo se
+   mide; la implementación pide feature propia).
+
+2. **El hallazgo heredado de F-009 está mal contado y, sobre todo,
+   incompleto.** Verificado contra `azure-apps/sigrid_tablas.md`: `fecalt`
+   sale en **18** filas (decía 16), `fecmod` en **6** (decía 3), `sello` en
+   **2** (correcto) — y **`tiemod` («Tiempo modificación») en 232 filas, ~190
+   tablas**, que la ficha no menciona. `config/tables_sigrid.yaml` ya lo
+   declara en 17 de 31 tablas y la ingesta ya lo copia a `_source_tiemod` en
+   cada carga: **si `tiemod` sirve o no como watermark se puede responder con
+   SQL local, sin volver a leer Sigrid**. Los comandos exactos del recuento
+   están en `requirements.md` §0.2 para que el reviewer lo repita.
+
+## El choque con F-024, resuelto en el diseño (no al implementar)
+
+Una incremental deja tablas de `raw` de batches distintos y la puerta de
+F-024 las declararía incoherentes. Solución: **en modo incremental la ingesta
+escribe fila `ingest_raw.<tabla>` para TODAS las tablas declaradas, traigan o
+no filas nuevas** (R9). Así todas comparten `batch_id` y
+`domain/coherencia.py` **no se toca ni una línea** (R13, R14, con tests de no
+regresión). Efecto declarado: `rows_processed` deja de ser el tamaño de la
+tabla → se añade `filas_en_tabla` a `metadata` y dos columnas **al final** de
+`_meta.v_raw_state` (lo único que `CREATE OR REPLACE VIEW` admite sin
+`DROP CASCADE`, que se llevaría los GRANT del MCP).
+
+## Decisiones abiertas que necesita validar el humano (T9 de tasks.md)
+
+- **DA-1 · ¿Qué es una «obra abierta»?** Rec.: contrato sin `fecreafin` +
+  red de «movimiento en 12 meses», como predicado en `business_rules.yaml`.
+  **Decisión de Negocio.**
+- **DA-2 · Cadencia de la recarga completa.** Rec.: semanal
+  (`INGESTA_FULL_CADA_DIAS=7`); el día lo elige el humano porque la ventana se
+  comparte con `albaranes` y `partes`.
+- **DA-3 · ¿Se acepta perder las bajas de Sigrid entre recargas completas?**
+  Rec.: sí, con guardia de recuento por tabla que fuerza `full` al divergir.
+- **DA-4 · Si `tiemod` resulta no fiable, ¿qué se hace?** Rec.: atacar el
+  build y filtrar la extracción con el campo `where` que el YAML ya soporta;
+  descartado el watermark casero por sumas de control.
+- **DA-5 · ¿Feature propia para acotar el build (el 67 %)?** Rec.: sí, y con
+  prioridad por encima del bloque B de F-011.
+- **DA-6 · `azure-apps/sigrid_api.md` no cuadra con la instancia
+  desplegada**: documenta `MAX_ALLOWED_ROWS=1000` y
+  `MAX_QUERY_TIMEOUT_SECONDS=120`, pero este ETL trabaja con `page_size=10000`
+  y `timeout_s=230` y funciona. Rec.: medirlo con `bench-sigrid` y **avisar al
+  dueño de `sigrid-api`**; este proyecto no edita ese documento.
+- **DA-7 · Umbral que justifica el bloque B.** Rec.: solo si el ahorro
+  estimado es ≥ 20 min o la ingesta pasa a ser ≥ 40 % del total.
