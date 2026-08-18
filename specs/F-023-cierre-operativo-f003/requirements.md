@@ -1,25 +1,38 @@
 <!-- specs/F-023-cierre-operativo-f003/requirements.md -->
 # F-023 · Cierre operativo de F-003 — Requisitos (EARS)
 
-Rama: `feature/F-023-cierre-operativo-f003`. Rigor declarado hoy en
-`harness/features.json`: `estandar` — **la spec propone elevarlo a
-`critico`** (DA-1 en `design.md` §9): dos de los tres bloques escriben o
-borran sobre recursos de **otro proyecto en producción**
-(`kv-albaranes-rs9k2` y `psql-albaranes-rs9k2`). El cambio lo hace el
-líder, no esta spec.
+Rama: `feature/F-023-cierre-operativo-f003`. Rigor: **`critico`**, decidido
+por el humano el 2026-08-18 (DA-1, cerrada en `design.md` §9). Motivo: dos
+de los tres bloques escriben o borran sobre recursos de **otro proyecto en
+producción** (`kv-albaranes-rs9k2` y `psql-albaranes-rs9k2`). El cambio del
+campo `rigor` en `harness/features.json` lo hace el **líder**, no esta spec.
+
+Consecuencias de `critico` que este documento asume: fase RED de los cinco
+tests nuevos, cobertura y campaña de mutación ejecutadas y con su número
+real, cero supervivientes, **las dieciséis verificaciones MANUAL con su
+comando exacto y su resultado real**, y **acta con el OK del humano citado
+literalmente para cada borrado** (R14 y R18).
 
 ## Qué es esta feature, y qué no
 
-F-023 es **operación contra Azure**, no desarrollo. De los 21 requisitos
-de abajo, **6 son automatizables con test** (invariantes de configuración
-que impiden volver atrás) y **13 son `MANUAL (humano)`** con su comando
-exacto; 2 son de documentación y los valida el reviewer. Cerrarla es lo
-único que separa a F-003 de su `done`.
+F-023 es **operación contra Azure**, no desarrollo. De los 24 requisitos de
+abajo:
+
+- **R1–R4 son automatizables con test** (cuatro requisitos, **cinco tests**):
+  invariantes de configuración que impiden volver atrás.
+- **R5–R20 son `MANUAL (humano)`** (dieciséis): once traen su comando exacto
+  aquí; los cinco restantes (R11, R13, R17, R19, R20) son veredicto o
+  decisión escrita del humano sobre la salida de otro.
+- **R21–R24** los valida el reviewer (documentación, trazabilidad, backlog)
+  y el código de salida de `init.sh`.
+
+Cerrarla es lo único que separa a F-003 de su `done`.
 
 **NO entra la carga de los Excels a las tablas `aux.*`.** Eso es **F-013**
 y sigue `pending`: F-004 construyó la capacidad de **leer y validar** los
-libros, no de volcarlos, porque el modelo destino no está acordado (DA-1
-de F-004, en `progress/current.md`). Aquí se comprueba que la lectura
+libros, no de volcarlos, porque el modelo destino no está acordado (la DA-1
+**de F-004**, en `progress/current.md`, que no tiene nada que ver con las
+DA de esta spec). Aquí se comprueba que la lectura
 funciona de verdad contra el blob; ni una fila entra en ninguna tabla.
 
 ## Hechos verificados que la spec asume (leídos del árbol, no supuestos)
@@ -32,8 +45,12 @@ funciona de verdad contra el blob; ni una fila entra en ninguna tabla.
    `https://<storageAccount>.blob.core.windows.net/<auxContainer>/<blob>`
    para las tres variables. Las rutas de OneDrive están en el **`.env` del
    puesto** del humano (no versionado), que es lo que hay que cambiar para
-   la verificación 1. Consecuencia: el fichero de entorno **no se toca**
-   (salvo lo que descubra R4/R6, ver DA-6).
+   la verificación 1. Consecuencia: el fichero de entorno **no se toca**.
+   Si la fotografía inicial o R9 revelaran que el **job desplegado** no las
+   tiene como URIs de blob, se aplica el plan cerrado de DA-6:
+   `az containerapp job update --set-env-vars` a mano, documentado en el
+   README; el fichero de entorno sigue sin tocarse y el job **no** se
+   recrea.
 2. **El contenedor `aux` existe y la cuenta nace endurecida**:
    `40_create_storage.ps1` crea `stdatamartsegdev` con
    `--allow-shared-key-access false`. Todo acceso —también **subir** un
@@ -55,17 +72,20 @@ funciona de verdad contra el blob; ni una fila entra en ninguna tabla.
    retira. **El orden de los bloques no es estético: es funcional.**
 6. **F-024 Fase C (T17–T20) sigue pendiente y se ejecuta desde el puesto**
    (`apply-grants`, `timings`, `check-coherencia`, `stage --sin-puerta`).
-   El bloque 3 la dejaría sin acceso. De ahí R14.
+   El bloque 3 la dejaría sin acceso. De ahí **R17**, que con DA-7 cerrada
+   es una **puerta**: el bloque 3 no empieza hasta que la Fase C esté
+   completa.
 7. **El job no pasa `SIGRID_API_PAGE_SIZE`**: no está entre las variables
    de `80_create_job.ps1`, así que la carga nocturna usa el valor por
    defecto de `config/settings.py` (10000). Los 50000 son un apaño del
-   `.env` del puesto para una red mala. La decisión pendiente afecta al
-   puesto, no a Azure.
+   `.env` del puesto para una red mala. Con DA-4 cerrada, el asunto afecta
+   **solo al `.env` del puesto**, que no se versiona: se anota el valor y se
+   cierra, y `.env.example` no se toca.
 8. **Nadie más lee `pg-mcp-sigrid-dm-ro` de `kv-albaranes-rs9k2`** que se
    haya podido comprobar: el prototipo del MCP (`PycharmProjects/mcp-bbdd`)
    no usa Key Vault (solo aparece en dependencias de terceros), y ningún
-   documento de `azure-apps/` menciona ese vault. Aun así, R9 lo convierte
-   en pregunta explícita al humano antes de borrar.
+   documento de `azure-apps/` menciona ese vault. Aun así, **R12 (d)** lo
+   convierte en pregunta explícita al humano antes de borrar.
 
 ## Convenciones de este documento
 
@@ -74,6 +94,11 @@ funciona de verdad contra el blob; ni una fila entra en ninguna tabla.
 - **[MANUAL]**: solo se puede comprobar contra Azure o contra el puesto. Lo
   ejecuta **el humano**, con el comando exacto que se da aquí, y su
   resultado real (salida, hora) se anota en `progress/impl_F-023.md`.
+- **[ACTA]**: además de lo anterior, el requisito es una **escritura
+  destructiva** y el rigor `critico` exige que el informe cite
+  **literalmente**, con fecha y hora, el OK del humano para ese borrado
+  concreto. Sin acta no hay borrado, y un borrado sin acta se rechaza en la
+  revisión aunque esté bien hecho. Son dos: **R14** y **R18**.
 - Los nombres de recurso salen **siempre** de `infra/env/dev.json`. En los
   comandos van como `<clave>` cuando el valor es un nombre de recurso, y
   literal cuando es un nombre de otro proyecto que ya está escrito en el
@@ -185,8 +210,13 @@ az role assignment create --role "Storage Blob Data Reader" `
   --assignee "<su cuenta>" --scope $cuenta
 ```
 
-  La propagación de RBAC tarda un par de minutos: si el comando siguiente
-  falla por permisos, esperar y repetir antes de concluir nada.
+  La propagación de RBAC es de **consistencia eventual** y tarda un par de
+  minutos: si el comando siguiente falla con
+  `AuthorizationPermissionMismatch`, o si el `role assignment list` no
+  muestra todavía un rol recién creado, **esperar y repetir antes de
+  concluir nada**. Es la mitigación acordada en DA-5 (cerrada) para el mismo
+  defecto que hoy hace fallar en falso a `60_create_identity.ps1`; ese
+  arreglo va al backlog y **no se hace en esta feature**.
 
 ### Verificación 1 de F-004 · lectura desde el puesto
 
@@ -281,7 +311,8 @@ para su cuenta, y restaurarlos **exactamente** después.
 # 1. Retirar CADA rol de datos de blob que R6 listó para su cuenta:
 az role assignment delete --role "<rol tal cual salió en R6>" `
   --assignee "<su cuenta>" --scope $cuenta
-# 2. Esperar a la propagación (un par de minutos) y provocar el fallo:
+# 2. Esperar a la propagacion (un par de minutos; consistencia eventual,
+#    DA-5) y provocar el fallo:
 python main.py load-aux
 # 3. RESTAURAR, uno por uno, exactamente los mismos roles:
 az role assignment create --role "<el mismo rol>" --assignee "<su cuenta>" --scope $cuenta
@@ -358,7 +389,9 @@ citado literalmente, con fecha y hora, en `progress/impl_F-023.md`. Los
 demás secretos de ese vault (los de `albaranes`) **no se tocan ni se
 listan con detalle**.
 
-- [MANUAL]
+- [MANUAL] [ACTA] — con rigor `critico` (DA-1), el acta es condición de
+  aprobación: primero el OK citado, después el borrado, después la
+  evidencia. En ese orden.
 
 ```powershell
 az keyvault secret delete --vault-name kv-albaranes-rs9k2 -n <pgSecretName> -o none
@@ -421,68 +454,105 @@ python main.py check-pg
   `Resolve-DnsName` responde y `check-pg` sigue diciendo la versión del
   servidor. `check-pg` es de solo lectura y no abre ejecución en `_meta`.
 
-> **R17.** MIENTRAS queden verificaciones que se ejecutan **desde el
-> puesto** —las de esta misma feature y la **Fase C de F-024** (T17–T20)—
-> el sistema no debe retirar las reglas de firewall del puesto en
+> **R17.** MIENTRAS la **Fase C de F-024 (T17–T20)** no esté completa, el
+> sistema no debe retirar ninguna regla de firewall del puesto en
 > `psql-albaranes-rs9k2`.
 
 Retirarlas antes deja al humano sin `apply-grants`, sin `timings`, sin
 `check-coherencia` y sin huellas: exactamente lo que F-024 necesita para
-cerrar.
+cerrar. **DA-7 está cerrada y esto es una puerta, no una preferencia**: no
+existe la variante «retirar ahora y recrear la regla cuando haga falta para
+F-024».
 
-- [MANUAL] Comprobación de estado antes de tocar el firewall: F-024 con
-  Fase C completa (o el humano acepta por escrito recrear la regla cuando
-  la necesite, DA-2).
+- [MANUAL] Comprobación de estado **antes** de tocar el firewall: la Fase C
+  de F-024 consta completa (estado en `harness/features.json` y en
+  `progress/current.md`), y así se anota en el informe. Si no lo está, el
+  bloque 3 **no empieza**.
 
-> **R18.** CUANDO se retiren las reglas del puesto, deben desaparecer
-> **solo** las reglas creadas por este proyecto para el puesto (las
-> `datamart-puesto-*`), y deben permanecer intactas la regla del entorno
-> del job y la que autoriza a los servicios de Azure.
+> **R18.** CUANDO la puerta de R17 esté abierta y el humano dé su **OK
+> explícito y registrado**, el sistema debe retirar **todas** las reglas
+> `datamart-puesto-*` de `psql-albaranes-rs9k2`, sin dejar ninguna vigente,
+> y deben permanecer intactas la regla del entorno del job y la que
+> autoriza a los servicios de Azure.
 
-Borrar la regla del job apagaría la carga nocturna esa misma noche, con un
-error de conexión que no apunta al firewall.
+DA-2 (opción A, cerrada): **el puesto no conserva ningún acceso fijo**. Las
+direcciones de esas reglas están caducadas —la IP del humano rota— así que
+dejarlas sería una puerta abierta que además no sirve. Borrar la regla del
+job, en cambio, apagaría la carga nocturna esa misma noche con un error de
+conexión que no apunta al firewall: por eso R18 nombra qué debe permanecer.
 
-- [MANUAL]. ⚠ **Escritura sobre un recurso de `albaranes`**: exige
-  autorización expresa del humano y la ejecuta él. El flag del servidor lo
+- [MANUAL] [ACTA]. ⚠ **Escritura destructiva sobre un recurso de
+  `albaranes`**: exige autorización expresa del humano, citada literalmente
+  en el informe con fecha y hora, y la ejecuta él. El flag del servidor lo
   ha cambiado alguna versión de `az`: **comprobar primero con `--help`** y,
-  si difiere, corregir `infra/README.md` (defecto ya anotado en
-  `progress/current.md`).
+  si difiere de `infra/README.md`, corregir el README (defecto ya anotado
+  en `progress/current.md`).
 
 ```powershell
 az postgres flexible-server firewall-rule list --help    # confirmar el flag del servidor
 az postgres flexible-server firewall-rule list -g <pgResourceGroup> --name psql-albaranes-rs9k2 -o table
-# Por CADA regla `datamart-puesto-*` que salga:
+# Por CADA regla `datamart-puesto-*` que salga, sin excepcion:
 az postgres flexible-server firewall-rule delete -g <pgResourceGroup> --name psql-albaranes-rs9k2 `
   --rule-name <nombre de la regla> --yes
 az postgres flexible-server firewall-rule list -g <pgResourceGroup> --name psql-albaranes-rs9k2 -o table
 ```
 
-  **Correcto si** el listado final **no** contiene ninguna
+  **Correcto si** el listado final **no** contiene **ninguna**
   `datamart-puesto-*` y **sí** contiene la regla del job (`<job>`) y la de
-  servicios de Azure, más las que ya existían de `albaranes`.
+  servicios de Azure, más las que ya existían de `albaranes` (R19).
 
-> **R19.** DONDE el humano confirme por escrito que ninguna otra persona ni
-> proceso las usa, el sistema debe retirar también las dos reglas antiguas
-> ajenas al datamart (`ClientPgris` y `FirewallIPAddress_2026-6-16`); en
-> caso contrario debe dejarlas y anotar por qué.
+**Volver a autorizar el puesto cuando haga falta** (DA-2): este es el
+procedimiento que sustituye a la regla fija y que R21 obliga a dejar escrito
+en `infra/README.md`. La IP **no se escribe en el repositorio**: se usa en
+el comando y se olvida.
 
-Son de `albaranes`, anteriores a este proyecto. La opción por defecto es
-**no borrarlas**: el coste de dejarlas es cero y el de equivocarse es
-cortar el acceso de otro.
+```powershell
+az postgres flexible-server firewall-rule create --help   # confirmar el flag del servidor
+(Invoke-RestMethod "https://api.ipify.org?format=json").ip
 
-- [MANUAL] Respuesta del humano anotada literalmente, y listado posterior
-  como evidencia.
+az postgres flexible-server firewall-rule create -g <pgResourceGroup> --name psql-albaranes-rs9k2 `
+  --rule-name datamart-puesto-pgris-<AAAA-MM-DD> `
+  --start-ip-address <ip> --end-ip-address <ip>
 
-> **R20.** El sistema debe dejar **decidida y anotada** la política de
-> `SIGRID_API_PAGE_SIZE`: qué valor queda en el `.env` del puesto, por qué,
-> y la constatación de que el job **no** depende de esa variable.
+az postgres flexible-server firewall-rule list -g <pgResourceGroup> --name psql-albaranes-rs9k2 -o table
+
+# AL TERMINAR el trabajo, en el mismo trabajo:
+az postgres flexible-server firewall-rule delete -g <pgResourceGroup> --name psql-albaranes-rs9k2 `
+  --rule-name datamart-puesto-pgris-<AAAA-MM-DD> --yes
+```
+
+  Si durante el trabajo la IP rota dentro de una subred (pasó el
+  2026-08-17), se crea **una sola** regla de rango con el mismo nombre
+  datado y sufijo `-rango`, en vez de ir acumulando una regla por dirección.
+  Es igual de temporal y se borra igual.
+
+> **R19.** El sistema **no debe borrar** las dos reglas antiguas ajenas al
+> datamart (`ClientPgris` y `FirewallIPAddress_2026-6-16`), y debe dejar
+> escrito que se conservan **a propósito**.
+
+DA-3, cerrada: son de `albaranes` y **anteriores a este proyecto**. Este
+proyecto no sabe quién las usa y el coste de dejarlas es cero, mientras que
+el de equivocarse es cortarle el acceso a otro. Que sigan ahí después de
+F-023 **no es un olvido de la limpieza**: es la decisión, y por eso se
+anota. Si algún día alguien quiere retirarlas, es trabajo de `albaranes`.
+
+- [MANUAL] El listado final de R18 sirve de evidencia: las dos reglas
+  aparecen intactas, y el informe dice explícitamente que se conservan por
+  DA-3.
+
+> **R20.** El sistema debe dejar **anotada y cerrada** la política de
+> `SIGRID_API_PAGE_SIZE`: qué valor queda en el `.env` del puesto y por
+> qué, y la constatación de que el job **no** depende de esa variable.
+
+DA-4, cerrada: el asunto afecta **solo al `.env` del puesto**, que no se
+versiona. Por tanto **`.env.example` no se toca** —conserva el valor por
+defecto del código— y cambiar ese defecto sería otra feature. `.env` y
+`.env.*.bak` son del humano: **ningún agente los edita**. Una vez anotado,
+el asunto **no vuelve** como decisión pendiente a `progress/current.md`.
 
 - [TEST] la segunda mitad la fija R4.
-- [MANUAL] la primera: decisión del humano escrita en
-  `progress/impl_F-023.md` y en `progress/current.md`. `.env` y `.env.*.bak`
-  son del humano; **ningún agente los edita**. `.env.example` conserva el
-  valor por defecto del código (no se toca salvo que el humano decida
-  cambiar ese defecto, que sería otra feature).
+- [MANUAL] la primera: el valor y su motivo, escritos en
+  `progress/impl_F-023.md`.
 
 ---
 
@@ -491,8 +561,12 @@ cortar el acceso de otro.
 > **R21.** El sistema debe reflejar el estado final en la documentación, en
 > el mismo trabajo: `infra/README.md` (los Excels viven en el blob con sus
 > URIs; los secretos viven **solo** en el vault del proyecto y las copias
-> viejas ya no son la vuelta atrás; cómo volver a autorizar el puesto en el
-> firewall cuando haga falta; el flag correcto del comando de firewall) y
+> viejas ya no son la vuelta atrás; **cómo volver a autorizar el puesto en
+> el firewall cuando haga falta**, con el comando completo de R18, la
+> convención de nombre datado y la obligación de borrarla al terminar;
+> **cómo cambiar una variable de entorno de un job vivo**, con el comando de
+> DA-6 y la comprobación posterior de que las referencias a secretos siguen
+> en su sitio; el flag correcto del comando de firewall) y
 > `azure-apps/datamart_seg_anual.md` (qué consume y desde dónde, dónde
 > viven los secretos, y corrección de lo que ese documento sigue dando por
 > «no desplegado»).
@@ -512,7 +586,22 @@ desactualizado que parece vigente hace más daño que no tenerlo.
 - Verificación: revisión del reviewer (C4) contra los resultados anotados
   en `progress/impl_F-023.md`.
 
-> **R23.** El sistema debe terminar con `bash harness/init.sh` en verde.
+> **R23.** El sistema debe dejar en el informe la **ficha de los dos
+> defectos que van al backlog** —el de `60_create_identity.ps1` (DA-5) y la
+> carencia de los guiones de despliegue para cambiar variables de entorno de
+> un job vivo (DA-6)— con detalle suficiente para que el líder los dé de
+> alta en `harness/features.json` **sin volver a investigarlos**.
+
+Ninguno de los dos se arregla aquí. La ficha completa de ambos está en
+`design.md` §9 (DA-5 y DA-6): fichero, líneas, causa, arreglo propuesto,
+gravedad y cómo se verificaría. El informe la reproduce o la referencia sin
+ambigüedad. **Ningún agente edita `harness/features.json`**: el alta la hace
+el líder.
+
+- Verificación: revisión del reviewer — las dos fichas existen y son
+  accionables.
+
+> **R24.** El sistema debe terminar con `bash harness/init.sh` en verde.
 
 - Verificación: código de salida 0.
 
@@ -526,8 +615,9 @@ desactualizado que parece vigente hace más daño que no tenerlo.
 | Verificación 1 (`load-aux` desde el puesto) | R7, R8 |
 | Verificación 2 (job con identidad gestionada) | R9 |
 | Verificación 3 (prueba negativa de permisos) | R10, R11 |
-| Copias viejas retiradas con OK explícito, sin `secret show` | R12, R13, R14, R15 |
-| Puesto limpio (hosts, firewall, `SIGRID_API_PAGE_SIZE`) | R16, R17, R18, R19, R20, R4 |
+| Copias viejas retiradas con OK explícito, sin `secret show` | R12, R13, R14 (con acta), R15 |
+| Puesto limpio (hosts, firewall, `SIGRID_API_PAGE_SIZE`) | R16, R17 (puerta), R18 (con acta), R19 (no se borran), R20, R4 |
 | README de infra y `azure-apps/` actualizados | R21 |
-| F-003 con T23–T26 marcadas, reviewer e `init.sh` verde | R22, R23 |
+| F-003 con T23–T26 marcadas, reviewer e `init.sh` verde | R22, R24 |
 | (invariante añadido por la spec) rutas locales imposibles | R3 |
+| (añadido por las decisiones cerradas) los dos defectos al backlog | R23 |

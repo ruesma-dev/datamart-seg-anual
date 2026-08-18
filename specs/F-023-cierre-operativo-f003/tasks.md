@@ -1,37 +1,54 @@
 <!-- specs/F-023-cierre-operativo-f003/tasks.md -->
 # F-023 · Cierre operativo de F-003 — Tareas
 
-Rama: `feature/F-023-cierre-operativo-f003`. Un commit por tarea
-(`F-023 Tn: ...`) en las tareas que tocan ficheros; las MANUAL no generan
-commit propio salvo el del acta en `progress/impl_F-023.md`.
+Rama: `feature/F-023-cierre-operativo-f003`. Rigor **`critico`** (DA-1,
+cerrada el 2026-08-18). Un commit por tarea (`F-023 Tn: ...`) en las tareas
+que tocan ficheros; las MANUAL no generan commit propio salvo el del acta en
+`progress/impl_F-023.md`.
 
 **Regla de hierro**: ningún agente abre conexión a Azure, a Postgres ni a
 `sigrid-api`, ni edita `.env`. Todo lo marcado `MANUAL (humano)` lo ejecuta
 el humano con el comando exacto de `requirements.md`, y el implementer solo
 **transcribe** el resultado real (comando, salida relevante, hora).
 
+**Regla del acta (rigor `critico`)**: las dos tareas que borran algo —T11
+(secretos) y T15 (reglas de firewall)— no están hechas sin el **OK del
+humano citado literalmente**, con fecha y hora, **antes** de la evidencia
+del borrado.
+
+**Orden cerrado (DA-7)**: la Fase D no empieza hasta que la Fase C de F-024
+(T17–T20 de aquella feature) esté completa. T14 es la puerta y no se salta.
+
 ## Fase 0 · Decidir antes de tocar nada
 
-- [ ] **T1**: Cerrar las siete decisiones abiertas de `design.md` §9
-      (DA-1 rigor, DA-2 acceso del puesto, DA-3 reglas ajenas, DA-4
-      `SIGRID_API_PAGE_SIZE`, DA-5 defecto de `60_create_identity.ps1`,
-      DA-6 plan B de las variables del job, DA-7 orden respecto a F-024) y
-      anotar cada una con fecha en este `design.md`.
-      | **Verificación**: MANUAL (humano) — las siete DA tienen escrito
-      «CERRADA <fecha>: opción X».
+- [x] **T1** (2026-08-18): Cerradas las siete decisiones abiertas de
+      `design.md` §9 — el humano respondió «acepto la recomendación» en las
+      siete: **DA-1** rigor `critico`; **DA-2** opción A (se retiran todas
+      las `datamart-puesto-*` y se recrea bajo demanda con el comando del
+      README); **DA-3** no se borran `ClientPgris` ni
+      `FirewallIPAddress_2026-6-16`; **DA-4** `SIGRID_API_PAGE_SIZE` solo
+      afecta al `.env` del puesto y `.env.example` no se toca; **DA-5** el
+      defecto de `60_create_identity.ps1` va al backlog, con mitigación de
+      esperar y repetir; **DA-6** opción A (`az containerapp job update
+      --set-env-vars` a mano, documentado, y la carencia del guion al
+      backlog); **DA-7** se acepta el orden respecto a F-024.
+      | **Verificación**: `design.md` §9 se titula «Decisiones cerradas
+      (2026-08-18, por el humano)» y las siete llevan escrito
+      «CERRADA 2026-08-18» con su efecto. Hecho por el spec-author; el
+      líder aplica `rigor: critico` en `harness/features.json`.
 
 ## Fase A · Invariantes (implementer, sin red ni BBDD)
 
-- [ ] **T2**: Escribir `tests/test_f023_cierre_operativo.py` con los cuatro
-      tests de R1–R4, reutilizando los ayudantes de
+- [ ] **T2**: Escribir `tests/test_f023_cierre_operativo.py` con los
+      **cinco** tests de R1–R4, reutilizando los ayudantes de
       `tests/test_f003_infra.py` (`_script`, `_config`, `_env_vars_del_job`)
-      en vez de duplicarlos. Antes de darlos por buenos, **fase RED**:
-      provocar el fallo de cada uno con una entrada de prueba (un
-      `auxBlobs` con ruta, un texto de script con `AUX_EXCEL_*=D:\...`, una
-      lista de variables que incluya `SIGRID_API_PAGE_SIZE`) y pegar la
-      salida real del fallo en el informe.
+      en vez de duplicarlos. Antes de darlos por buenos, **fase RED**
+      (obligatoria en rigor `critico`): provocar el fallo de **cada uno** de
+      los cinco con la entrada de prueba que indica `design.md` §11 —en una
+      copia aislada, **nunca sobre el árbol real**— y pegar la salida real
+      del fallo en el informe.
       | **Verificación**: `python -m pytest tests/test_f023_cierre_operativo.py -v`
-      en verde, y las cuatro trazas RED en `progress/impl_F-023.md`.
+      en verde, y las **cinco** trazas RED en `progress/impl_F-023.md`.
 
 - [ ] **T3**: Fotografía del estado inicial, **solo lectura**, para que las
       tareas siguientes sean idempotentes y para poder restaurar: blobs del
@@ -43,7 +60,14 @@ el humano con el comando exacto de `requirements.md`, y el implementer solo
       `az containerapp job show -g <resourceGroup> -n <job> --query "properties.template.containers[0].env" -o json`
       (sin filtros JMESPath con `?`: rompen contra `az.cmd` en PowerShell
       5.1). Salidas pegadas en el informe. **Si las tres `AUX_EXCEL_*` del
-      job NO son URIs de blob → aplicar DA-6 y avisar antes de seguir.**
+      job NO fueran URIs de blob** → avisar y aplicar el plan cerrado de
+      **DA-6**: corregirlas con
+      `az containerapp job update --set-env-vars ...` (comando completo en
+      `design.md` §9), comprobar después con `job show` que siguen ahí las
+      demás variables y la referencia a secreto de `PG_PASSWORD`,
+      documentarlo en el README (T18) y dejar la ficha de la carencia para
+      el backlog (T22). **Ni se recrea el job ni se toca
+      `infra/env/dev.json`.**
 
 ## Fase B · Bloque 1 · Los Excels en el blob y las verificaciones de F-004
 
@@ -55,7 +79,9 @@ el humano con el comando exacto de `requirements.md`, y el implementer solo
 
 - [ ] **T5**: Comprobar (y si falta, asignar) el rol de lectura de blobs
       del humano sobre la cuenta, dejando anotada la **lista literal** de
-      roles: es la que hay que restaurar en T8.
+      roles: es la que hay que restaurar en T8. Si la lectura no refleja
+      todavía un rol recién creado, **esperar y repetir** (DA-5): es
+      propagación de RBAC, no un fallo.
       | **Verificación**: MANUAL (humano) — **R6**: `az role assignment list`
       sobre el ámbito de la cuenta.
 
@@ -77,7 +103,9 @@ el humano con el comando exacto de `requirements.md`, y el implementer solo
 - [ ] **T8**: Verificación 3 de F-004 — prueba negativa: retirar **todos**
       los roles de datos de blob del humano sobre la cuenta (no solo
       `Reader`: `Contributor` incluye lectura), ejecutar `load-aux`, leer el
-      mensaje y **restaurar exactamente** los roles de T5.
+      mensaje y **restaurar exactamente** los roles de T5. Entre retirar y
+      probar, y entre restaurar y comprobar, **esperar a la propagación de
+      RBAC** (DA-5).
       | **Verificación**: MANUAL (humano) — **R10** y **R11**: el error
       nombra `Storage Blob Data Reader`, `az login` y la identidad
       gestionada; y después la lista de roles coincide con la de T5 y
@@ -98,8 +126,9 @@ el humano con el comando exacto de `requirements.md`, y el implementer solo
 - [ ] **T10**: Recoger el **OK explícito** del humano para ese borrado
       concreto y citarlo literalmente, con fecha y hora, en
       `progress/impl_F-023.md`.
-      | **Verificación**: revisión del reviewer — el acta existe y es
-      inequívoca (nombra los dos secretos y el vault).
+      | **Verificación**: revisión del reviewer — **acta** exigida por el
+      rigor `critico`: existe, es inequívoca (nombra los dos secretos y el
+      vault) y es **anterior** al borrado de T11.
 
 - [ ] **T11**: Borrar las dos copias en `kv-albaranes-rs9k2`, sin leer
       ningún valor y sin `purge`.
@@ -115,6 +144,9 @@ el humano con el comando exacto de `requirements.md`, y el implementer solo
 
 ## Fase D · Bloque 3 · Limpieza del puesto
 
+> **Esta fase entera va después de la Fase C de F-024** (DA-7). T13 (el
+> `hosts`) puede hacerse antes porque no quita acceso; **el firewall, no**.
+
 - [ ] **T13**: Retirar la línea del fichero `hosts` que fija a mano la
       dirección del servidor de Postgres (consola de administrador) y
       comprobar que el nombre resuelve por DNS y el puesto sigue
@@ -123,43 +155,55 @@ el humano con el comando exacto de `requirements.md`, y el implementer solo
       resultados, `Resolve-DnsName` responde y `check-pg` devuelve la
       versión del servidor.
 
-- [ ] **T14**: **Puerta**: confirmar que la Fase C de F-024 (T17–T20) está
-      completa —o que el humano acepta recrear la regla cuando la
-      necesite—, antes de tocar el firewall.
+- [ ] **T14**: **Puerta (DA-7)**: confirmar que la Fase C de F-024
+      (T17–T20) está **completa** antes de tocar el firewall. No hay
+      alternativa: si no lo está, la Fase D se detiene aquí y se retoma
+      cuando lo esté.
       | **Verificación**: MANUAL (humano) — **R17**: estado de F-024
-      anotado en el informe, con la decisión DA-7 aplicada.
+      anotado en el informe (`harness/features.json` y `progress/current.md`
+      como fuente).
 
-- [ ] **T15**: Retirar las reglas `datamart-puesto-*` de
-      `psql-albaranes-rs9k2`, dejando intactas la regla del entorno del job
-      y la de servicios de Azure. Antes, confirmar con `--help` el flag del
-      servidor que admite la versión de `az` instalada.
+- [ ] **T15**: Retirar **todas** las reglas `datamart-puesto-*` de
+      `psql-albaranes-rs9k2` —el puesto no conserva ninguna vigente
+      (DA-2, opción A)—, dejando intactas la regla del entorno del job y la
+      de servicios de Azure. Antes, confirmar con `--help` el flag del
+      servidor que admite la versión de `az` instalada, y recoger el **OK
+      explícito** del humano para este borrado concreto.
       | **Verificación**: MANUAL (humano) — **R18**: el listado final no
-      contiene ninguna `datamart-puesto-*` y sí la del job. ⚠ Escritura en
-      un recurso de `albaranes`: autorización expresa, la ejecuta el humano.
+      contiene **ninguna** `datamart-puesto-*` y sí la del job. ⚠ Escritura
+      destructiva en un recurso de `albaranes`: **acta** con el OK citado
+      (rigor `critico`), autorización expresa y la ejecuta el humano.
 
-- [ ] **T16**: Decidir sobre las dos reglas antiguas ajenas (`ClientPgris`,
-      `FirewallIPAddress_2026-6-16`): borrarlas **solo** con confirmación
-      escrita de que nadie más las usa; si no, dejarlas y anotar por qué.
-      | **Verificación**: MANUAL (humano) — **R19**: respuesta literal del
-      humano y listado posterior.
+- [ ] **T16**: Dejar **sin tocar** las dos reglas antiguas ajenas
+      (`ClientPgris`, `FirewallIPAddress_2026-6-16`) y anotar en el informe
+      que se conservan **a propósito** (DA-3): son de `albaranes` y
+      anteriores a este proyecto. No se pregunta, no se borra.
+      | **Verificación**: MANUAL (humano) — **R19**: las dos aparecen
+      intactas en el listado final de T15, y el informe dice por qué.
 
 - [ ] **T17**: Anotar la decisión sobre `SIGRID_API_PAGE_SIZE` (qué valor
       se queda en el `.env` del puesto y por qué), dejando constancia de
-      que el job no depende de esa variable.
+      que el job no depende de esa variable y de que el asunto **queda
+      cerrado** (DA-4).
       | **Verificación**: **R20** — la mitad automática la fija el test de
       R4 (T2); la otra mitad, MANUAL (humano): decisión escrita en el
-      informe y en `progress/current.md`. Ningún agente edita `.env` ni los
-      `.bak`.
+      informe. **`.env.example` no se toca**; ningún agente edita `.env` ni
+      los `.bak`.
 
 ## Fase E · Documentación y cierre
 
 - [ ] **T18**: Actualizar `infra/README.md`: comandos y resultados de las
       tres verificaciones de F-004, el paso 8 bis corregido (las copias
       viejas ya no son la vuelta atrás; lo es el soft-delete del vault de
-      origen), el flag correcto del comando de firewall y la subsección
-      nueva «Volver a autorizar el puesto cuando haga falta».
+      origen), el flag correcto del comando de firewall, la subsección
+      nueva **«Volver a autorizar el puesto cuando haga falta»** (comando
+      completo de R18, nombre datado, borrado al terminar, variante de
+      rango) y la subsección nueva **«Cambiar una variable de entorno de un
+      job vivo»** (comando de DA-6 y comprobación posterior de que las
+      referencias a secretos siguen en su sitio).
       | **Verificación**: revisión del reviewer (C3) — **R21**: cada
-      afirmación contrastable contra lo anotado en el informe.
+      afirmación contrastable contra lo anotado en el informe, y los dos
+      comandos nuevos completos y ejecutables.
 
 - [ ] **T19**: Actualizar `azure-apps/datamart_seg_anual.md` **en el mismo
       trabajo**: origen real de los Excels (contenedor `aux`, identidad
@@ -177,12 +221,31 @@ el humano con el comando exacto de `requirements.md`, y el implementer solo
       resultado real.
       | **Verificación**: revisión del reviewer (C4) — **R22**.
 
-- [ ] **T21**: Escribir `progress/impl_F-023.md` completo (evidencias,
-      trazas RED, actas de las trece verificaciones MANUAL, alcance de
-      cobertura y salida real de la campaña de mutación aunque sea de cero
-      mutantes) y actualizar `progress/current.md` con el estado de F-023 y
-      de F-003 y las decisiones que queden abiertas.
-      | **Verificación**: revisión del reviewer contra `CHECKPOINTS.md`.
+- [ ] **T21**: Escribir `progress/impl_F-023.md` completo: evidencias con
+      los cuatro números, las **cinco** trazas RED, las **actas de las
+      dieciséis verificaciones MANUAL** (comando, salida real y hora), las
+      dos actas de borrado con el OK citado (T10 y T15), el alcance de
+      cobertura con su número real y la salida real de la campaña de
+      mutación. La campaña se ejecuta con `python -m harness.mutacion` y
+      genera `progress/mutacion_F-023.md`: dará **cero mutantes** porque el
+      diff no lleva código de producción, y **cero es un dato que se pega,
+      no un «no aplica»**. Actualizar `progress/current.md` con el estado de
+      F-023 y de F-003.
+      | **Verificación**: revisión del reviewer contra `CHECKPOINTS.md`
+      (C4 bis, nivel `critico`): fase RED, cobertura, mutación con totales
+      recalculados por el reviewer, cero supervivientes y las MANUAL con
+      resultado real.
 
-- [ ] **T22**: Ejecutar `bash harness/init.sh` en verde.
-      | **Verificación**: **R23** — código de salida 0.
+- [ ] **T22**: Dejar en el informe la **ficha de los dos defectos que van
+      al backlog**, copiada o referenciada sin ambigüedad desde
+      `design.md` §9: (1) `60_create_identity.ps1` verifica los roles antes
+      de que RBAC propague y lanza un `throw` falso (DA-5); (2) los guiones
+      de despliegue no saben cambiar una variable de entorno de un job vivo
+      —`80_create_job.ps1` se niega si el job existe y `85_update_job.ps1`
+      solo cambia la imagen— (DA-6). **Ningún agente edita
+      `harness/features.json`**: el alta la hace el líder.
+      | **Verificación**: revisión del reviewer — **R23**: las dos fichas
+      existen y son accionables sin volver a investigar el código.
+
+- [ ] **T23**: Ejecutar `bash harness/init.sh` en verde.
+      | **Verificación**: **R24** — código de salida 0.

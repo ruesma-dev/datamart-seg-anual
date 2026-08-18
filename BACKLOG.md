@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **21 features**, 11 abiertas, 10 terminadas.
+Resumen: **24 features**, 14 abiertas, 10 terminadas.
 
 Bloqueadas: **F-003**.
 
@@ -12,6 +12,7 @@ Bloqueadas: **F-003**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-003 | Infra: despliegue como Container Apps Job diario | 7 | bloqueada | critico | `feature/F-003-infra-caj` |
+| F-023 | Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto | 8 | spec lista | critico | `feature/F-023-cierre-operativo-f003` |
 | F-011 | Carga incremental del datamart | 11 | pendiente |  | `feature/F-011-carga-incremental` |
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
 | F-022 | Desempatar versiones master duplicadas de raw.obrfasamb | 12 | pendiente | estandar | `feature/F-022-desempate-obrfasamb` |
@@ -22,6 +23,8 @@ Bloqueadas: **F-003**.
 | F-013 | Cargar los Excels auxiliares a la capa aux | 17 | pendiente |  | `feature/F-013-carga-excels-aux` |
 | F-010 | Carga y mantenimiento de los Excels auxiliares en Azure | 18 | pendiente |  | `feature/F-010-carga-excels-auxiliares` |
 | F-007 | Disparo manual de la actualización desde web | 19 | pendiente |  | `feature/F-007-disparo-manual-web` |
+| F-026 | 60_create_identity.ps1 verifica los roles antes de que RBAC propague | 21 | pendiente | estandar | `feature/F-026-identity-espera-rbac` |
+| F-027 | No hay camino soportado para cambiar una variable de entorno del job ya desplegado | 22 | pendiente | estandar | `feature/F-027-job-update-env-vars` |
 
 ## Terminadas
 
@@ -45,6 +48,12 @@ Bloqueadas: **F-003**.
 estado **bloqueada** · prioridad 7 · rigor `critico` · SDD sí · rama `feature/F-003-infra-caj`
 
 Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev, escribiendo contra el Postgres de F-005. Dockerfile ya en raíz y scripts PowerShell esbozados en infra/ con varios TODO por cerrar (ACR, host de Postgres, secretos). Secretos en Key Vault, nunca en el repo. Incluye observabilidad: logs consultables y aviso ante fallo del job.
+
+### F-023 · Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto
+
+estado **spec lista** · prioridad 8 · rigor `critico` · SDD sí · rama `feature/F-023-cierre-operativo-f003`
+
+Lo que quedo abierto al completar la tanda 2 de F-003 el 2026-08-17 (job nocturno creado, probado y con alerta verificada). Tres bloques: (1) las tres verificaciones MANUAL heredadas de F-004 (leer los Excels desde el blob 'aux' de stdatamartsegdev desde el puesto, desde el job con identidad gestionada, y la prueba negativa de permisos), que exigen ANTES subir los tres Excels al contenedor 'aux', asignar al humano el rol Storage Blob Data Reader sobre la cuenta y cambiar las AUX_EXCEL_* de infra/env/dev.json a URIs de blob (hoy apuntan a rutas locales de OneDrive: el job las trata como no configuradas); (2) retirar las copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro en kv-albaranes-rs9k2 (el job ya usa kv-datamart-seg-dev y tiene ejecucion correcta) — borrado en un recurso de albaranes, requiere OK explicito del humano; (3) limpieza del puesto: linea de hosts (68.221.140.205), reglas de firewall del puesto en psql-albaranes-rs9k2 (datamart-puesto-pgris-2026-08-17-rango, y ClientPgris / FirewallIPAddress_2026-6-16 SOLO si el humano confirma que nadie mas las usa) y decidir si SIGRID_API_PAGE_SIZE=50000 se queda en los .env. Con los tres bloques hechos, F-003 pasa por el reviewer y se marca done. NO incluye la carga de los Excels a tablas aux.* (eso es F-013).
 
 ### F-011 · Carga incremental del datamart
 
@@ -105,6 +114,18 @@ Mecanismo para que una persona de negocio suba y actualice los Excels auxiliares
 estado **pendiente** · prioridad 19 · SDD sí · rama `feature/F-007-disparo-manual-web`
 
 Más adelante, no ahora. Botón en una app web (o sistema equivalente) para que usuarios autorizados lancen una actualización total o parcial del datamart bajo demanda, además de la nocturna programada. Requiere autenticación y autorización (Entra ID), disparo del Container Apps Job con parámetros de alcance, control de ejecuciones concurrentes y visibilidad del estado de la ejecución. Depende de que el ETL admita alcance parcial por CLI.
+
+### F-026 · 60_create_identity.ps1 verifica los roles antes de que RBAC propague
+
+estado **pendiente** · prioridad 21 · rigor `estandar` · SDD no · rama `feature/F-026-identity-espera-rbac`
+
+Defecto detectado al escribir la spec de F-023 (DA-5, decidido el 2026-08-18: va al backlog, no se arregla dentro de una feature de operacion). El script comprueba las asignaciones de rol inmediatamente despues de crearlas, cuando RBAC en Azure tarda en propagar, y lanza un throw que declara fallido un despliegue correcto. Mitigacion mientras tanto (la que usa F-023): esperar y repetir el comando antes de concluir nada. Arreglo esperado: reintentar con espera acotada y distinguir 'todavia no propagado' de 'no asignado'.
+
+### F-027 · No hay camino soportado para cambiar una variable de entorno del job ya desplegado
+
+estado **pendiente** · prioridad 22 · rigor `estandar` · SDD no · rama `feature/F-027-job-update-env-vars`
+
+Carencia del guion de despliegue, detectada al escribir la spec de F-023 (DA-6, decidido el 2026-08-18). 80_create_job.ps1 se niega a correr si el job existe y 85_update_job.ps1 solo cambia la imagen, asi que hoy cambiar una variable de entorno obliga a 'az containerapp job update --set-env-vars' a mano (opcion elegida y documentada en F-023) o a borrar y recrear el job, que pierde el historial de ejecuciones y hay que reprogramar. Falta un paso soportado e idempotente que actualice variables de entorno leyendo infra/env/dev.json, como hace 85_update_job.ps1 con la imagen.
 
 ### F-001 · Comando 'version' en el CLI
 
