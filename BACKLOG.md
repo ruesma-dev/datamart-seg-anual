@@ -3,7 +3,9 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **21 features**, 11 abiertas, 10 terminadas.
+Resumen: **23 features**, 13 abiertas, 10 terminadas.
+
+En curso: **F-024**.
 
 Bloqueadas: **F-003**.
 
@@ -12,6 +14,8 @@ Bloqueadas: **F-003**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-003 | Infra: despliegue como Container Apps Job diario | 7 | bloqueada | critico | `feature/F-003-infra-caj` |
+| F-023 | Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto | 8 | pendiente | estandar | `feature/F-023-cierre-operativo-f003` |
+| F-024 | Coherencia del datamart ante cargas truncadas: deteccion, puerta y frescura | 9 | en curso | critico | `feature/F-024-coherencia-cargas-truncadas` |
 | F-011 | Carga incremental del datamart | 11 | pendiente |  | `feature/F-011-carga-incremental` |
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
 | F-022 | Desempatar versiones master duplicadas de raw.obrfasamb | 12 | pendiente | estandar | `feature/F-022-desempate-obrfasamb` |
@@ -45,6 +49,18 @@ Bloqueadas: **F-003**.
 estado **bloqueada** · prioridad 7 · rigor `critico` · SDD sí · rama `feature/F-003-infra-caj`
 
 Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev, escribiendo contra el Postgres de F-005. Dockerfile ya en raíz y scripts PowerShell esbozados en infra/ con varios TODO por cerrar (ACR, host de Postgres, secretos). Secretos en Key Vault, nunca en el repo. Incluye observabilidad: logs consultables y aviso ante fallo del job.
+
+### F-023 · Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto
+
+estado **pendiente** · prioridad 8 · rigor `estandar` · SDD no · rama `feature/F-023-cierre-operativo-f003`
+
+Lo que quedo abierto al completar la tanda 2 de F-003 el 2026-08-17 (job nocturno creado, probado y con alerta verificada). Tres bloques: (1) las tres verificaciones MANUAL heredadas de F-004 (leer los Excels desde el blob 'aux' de stdatamartsegdev desde el puesto, desde el job con identidad gestionada, y la prueba negativa de permisos), que exigen ANTES subir los tres Excels al contenedor 'aux', asignar al humano el rol Storage Blob Data Reader sobre la cuenta y cambiar las AUX_EXCEL_* de infra/env/dev.json a URIs de blob (hoy apuntan a rutas locales de OneDrive: el job las trata como no configuradas); (2) retirar las copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro en kv-albaranes-rs9k2 (el job ya usa kv-datamart-seg-dev y tiene ejecucion correcta) — borrado en un recurso de albaranes, requiere OK explicito del humano; (3) limpieza del puesto: linea de hosts (68.221.140.205), reglas de firewall del puesto en psql-albaranes-rs9k2 (datamart-puesto-pgris-2026-08-17-rango, y ClientPgris / FirewallIPAddress_2026-6-16 SOLO si el humano confirma que nadie mas las usa) y decidir si SIGRID_API_PAGE_SIZE=50000 se queda en los .env. Con los tres bloques hechos, F-003 pasa por el reviewer y se marca done. NO incluye la carga de los Excels a tablas aux.* (eso es F-013).
+
+### F-024 · Coherencia del datamart ante cargas truncadas: deteccion, puerta y frescura
+
+estado **en curso** · prioridad 9 · rigor `critico` · SDD sí · rama `feature/F-024-coherencia-cargas-truncadas`
+
+Origen: la primera carga real desde el job (2026-08-18) murio por DeadlineExceeded a las 2 h justas, en el tramo 39/60 del stage. No hubo dano porque mart no se toco, pero destapo tres huecos: (1) una muerte EXTERNA del proceso (kill por deadline, OOM, reinicio del nodo) deja en _meta.etl_runs una fila RUNNING huerfana para siempre, y timings miente; (2) nada impide que stage/mart se construyan sobre un raw MEZCLADO (tablas de ejecuciones distintas, tras una ingesta parcial seguida de otro fallo), que es incoherencia silenciosa: cuadros que no cuadran y nadie que lo sepa; (3) el consumidor (Power BI, MCP) no tiene forma de saber si lo que ve es de esta noche o de hace tres dias. Se DESCARTA hacer atomico el pipeline entero: una transaccion de 3 h en el B1ms es justo lo que reventó el 09-ago y F-019 lo troceo a proposito. La coherencia se garantiza por verificacion y visibilidad: (a) al arrancar, run-all marca ABORTED las filas RUNNING de ejecuciones anteriores con motivo; (b) puerta antes de stage: FAILED explicito y ruidoso si la ultima ingesta de cada tabla no pertenece a la misma ejecucion (raw incoherente); (c) frescura visible: fecha del ultimo build_mart COMPLETO consultable desde las vistas de consumo, y alerta si supera un umbral. La alerta actual ya cubre los fallos internos (run-all sale 1 si un paso falla; verificado); la muerte externa la cubre (a)+(b).
 
 ### F-011 · Carga incremental del datamart
 
