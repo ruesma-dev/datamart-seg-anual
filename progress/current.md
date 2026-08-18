@@ -109,9 +109,11 @@ confirmado en código). Donde abajo diga «transaccional por tabla», léase as�
 `progress/review_F-024.md`) y Fase C pendiente (T17–T20, ver su sección);
 F-023 con el bloque 1 hecho; F-003 `blocked` a propósito hasta F-023. La
 rama de F-024 nace de la de F-003: se mergean juntas a `dev` cuando F-024
-cierre. **Pendiente del humano**: dar por buenos los 2 mutantes
-equivalentes de F-024 (`bold` de cabeceras), pushes de las dos ramas, y
-crear el remoto de `azure-apps` en GitHub (hoy solo existe en local).
+cierre. **Los 2 mutantes equivalentes de F-024 (`bold` de cabeceras) quedaron
+ACEPTADOS por el humano el 2026-08-18** (requisito del rigor `critico`).
+**Pendiente del humano**: pushes de las dos ramas. El remoto de
+`azure-apps` en GitHub (hoy solo existe en local) queda en **baja prioridad**
+por decisión del humano; mientras tanto, la única copia es la de su disco.
 
 **Documentación**: el diccionario de Sigrid se movió a
 `azure-apps/sigrid_tablas.md` (arnés 1.4.1 con la regla de «documentación

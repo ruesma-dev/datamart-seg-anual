@@ -44,7 +44,7 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 - Original: `click.secho("=== Estado de raw por tabla ===", fg="cyan", bold=True)`
 - Mutado:   `click.secho("=== Estado de raw por tabla ===", fg="cyan", bold=False)`
 
-#### Análisis (completado por el líder, 2026-08-18)
+#### Análisis (completado por el líder y ACEPTADO por el humano, 2026-08-18)
 
 > Por qué ningún test lo caza: `bold` solo cambia el atributo ANSI de una
 > cabecera decorativa de la consola de `check-coherencia`; no altera ningún
@@ -60,7 +60,7 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 - Original: `click.secho("=== Estado de stg ===", fg="cyan", bold=True)`
 - Mutado:   `click.secho("=== Estado de stg ===", fg="cyan", bold=False)`
 
-#### Análisis (completado por el líder, 2026-08-18)
+#### Análisis (completado por el líder y ACEPTADO por el humano, 2026-08-18)
 
 > Por qué ningún test lo caza: `bold` solo cambia el atributo ANSI de una
 > cabecera decorativa de la consola de `check-coherencia`; no altera ningún
