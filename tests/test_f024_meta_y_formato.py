@@ -21,11 +21,21 @@ Ninguno abre red ni BBDD.
 from __future__ import annotations
 
 import re
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
-from etl_sigrid.infrastructure.postgres.postgres_client import _split_sql_statements
+from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
+from etl_sigrid.domain.entities import StepResult, StepStatus
+from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
+from etl_sigrid.infrastructure.postgres.postgres_client import (
+    PostgresClient,
+    _split_sql_statements,
+)
+from etl_sigrid.infrastructure.postgres.step_run_recorder import PostgresStepRunRecorder
+from tests.test_f019_tramos import CursorFalso, cliente_con
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUTA_META = (
@@ -269,3 +279,299 @@ def _cuerpo_de_vista(nombre: str) -> str:
         if re.search(rf"CREATE\s+OR\s+REPLACE\s+VIEW\s+_meta\.{nombre}\b", stmt, re.I):
             return stmt
     pytest.fail(f"no hay ninguna sentencia que defina _meta.{nombre}")
+
+
+# ---------------------------------------------------------------------------
+# El cliente Postgres contra dobles de cursor (R2, R4, R13, R16)
+#
+# Desviación menor respecto a `design.md`, que repartía estos tests entre
+# `test_f024_steps.py` y `test_f024_cli.py`: todos los que sustituyen
+# `PostgresClient.connection` viven juntos aquí. Son la misma técnica y el
+# mismo contrato —el SQL que se envía y el mapeo de filas a objetos—, y
+# separarlos obligaba a duplicar los dobles en dos ficheros.
+#
+# NINGUNO abre una conexión: se sustituye `PostgresClient.connection`, que es
+# el único punto por el que el cliente llega a la BBDD. El doble se reutiliza
+# de F-019 en vez de copiarse.
+# ---------------------------------------------------------------------------
+
+
+class CursorEspia(CursorFalso):
+    """`CursorFalso` de F-019 que además guarda los PARÁMETROS.
+
+    F-019 solo necesitaba saber qué SQL se enviaba. Aquí hace falta el
+    contenido: el motivo del `ABORTED` lleva dentro el `batch_id` y la hora, y
+    eso es precisamente lo que hay que comprobar.
+    """
+
+    def __init__(self, filas: list[tuple] | None = None) -> None:
+        super().__init__(filas=filas)
+        self.parametros: list[object] = []
+
+    def execute(self, sql: str, params: object = None) -> None:
+        super().execute(sql, params)
+        self.parametros.append(params)
+
+
+def cliente_espia(filas: list[tuple] | None = None) -> tuple[PostgresClient, CursorEspia]:
+    cursor = CursorEspia(filas=filas)
+    cliente, _ = cliente_con(cursor)
+    return cliente, cursor
+
+
+# --- R2 · `batch_id` opcional en el registro de runs -------------------------
+
+
+def test_f024_r2_record_run_escribe_batch_id_si_lo_recibe() -> None:
+    """`record_run_start` y `record_run_completed` estampan la ejecución."""
+    batch = "20260818T020000Z-abc123"
+
+    cliente, cursor = cliente_espia(filas=[(77,)])
+    assert cliente.record_run_start("ingest", "ingest_raw.con", batch_id=batch) == 77
+
+    assert "batch_id" in cursor.ejecutado[0]
+    assert batch in cursor.parametros[0]
+
+    cliente, cursor = cliente_espia(filas=[(88,)])
+    ident = cliente.record_run_completed(
+        stage="build_mart",
+        step="build_mart",
+        started_at=datetime(2026, 8, 18, 5, 0, 0),
+        finished_at=datetime(2026, 8, 18, 5, 25, 0),
+        status="SUCCESS",
+        rows_processed=1_234,
+        batch_id=batch,
+    )
+
+    assert ident == 88
+    assert "batch_id" in cursor.ejecutado[0]
+    assert batch in cursor.parametros[0]
+
+
+def test_f024_r2_llamantes_sin_batch_siguen_funcionando() -> None:
+    """Los llamantes anteriores a F-024 no pasan batch y escriben NULL.
+
+    Importa porque `record_run_start` lo llaman los sub-pasos y los 60 tramos
+    de `build_stg`: si el parámetro fuera obligatorio, la firma rompería a
+    todos a la vez.
+    """
+    cliente, cursor = cliente_espia(filas=[(1,)])
+    assert cliente.record_run_start("stage", "build_stg.build_obras") == 1
+    assert None in cursor.parametros[0]
+
+    cliente, cursor = cliente_espia(filas=[(2,)])
+    assert (
+        cliente.record_run_completed(
+            stage="ingest",
+            step="ingest_raw",
+            started_at=datetime(2026, 8, 18, 2, 0, 0),
+            finished_at=datetime(2026, 8, 18, 2, 33, 0),
+            status="SUCCESS",
+        )
+        == 2
+    )
+    assert None in cursor.parametros[0]
+
+
+def test_f024_r2_el_grabador_de_pasos_propaga_su_batch() -> None:
+    """`PostgresStepRunRecorder` es quien estampa las filas de PASO, que son
+    las que después lee `v_frescura`."""
+    registradas: list[dict] = []
+
+    class ClienteEspia:
+        def record_run_completed(self, **kwargs: object) -> int:
+            registradas.append(kwargs)
+            return 1
+
+    resultado = StepResult(
+        step_name="build_mart",
+        status=StepStatus.SUCCESS,
+        started_at=datetime(2026, 8, 18, 5, 0, 0),
+        finished_at=datetime(2026, 8, 18, 5, 25, 0),
+        rows_processed=42,
+    )
+
+    PostgresStepRunRecorder(ClienteEspia(), "20260818T020000Z-abc123").record(
+        "build_mart", resultado
+    )
+    assert registradas[0]["batch_id"] == "20260818T020000Z-abc123"
+
+    # Sin batch (uso anterior a F-024) sigue grabando, con NULL.
+    registradas.clear()
+    PostgresStepRunRecorder(ClienteEspia()).record("build_mart", resultado)
+    assert registradas[0]["batch_id"] is None
+    assert registradas[0]["status"] == "SUCCESS"
+    assert registradas[0]["rows_processed"] == 42
+
+
+# --- R4 · La marca de huérfanas, en SQL --------------------------------------
+
+
+def test_f024_r4_la_marca_actualiza_solo_filas_running() -> None:
+    """Solo `RUNNING`, y el motivo lleva quién y cuándo.
+
+    Que el `WHERE` sea exactamente `status = 'RUNNING'` no es cosmético: sin
+    él, una ejecución nueva reescribiría como ABORTED el histórico entero de
+    `_meta.etl_runs`, incluidos los SUCCESS de las cargas buenas.
+    """
+    cliente, cursor = cliente_espia(
+        filas=[
+            (901, "build_stg.build_plan_mensual", datetime(2026, 8, 18, 3, 10, 0)),
+            (902, "build_stg.build_plan_mensual.tramo_39", datetime(2026, 8, 18, 3, 55, 0)),
+        ]
+    )
+
+    marcadas = cliente.abortar_runs_huerfanos(
+        "20260819T020000Z-def456", ahora=datetime(2026, 8, 19, 2, 0, 1)
+    )
+
+    consulta = cursor.ejecutado[0]
+    assert re.search(r"UPDATE\s+_meta\.etl_runs", consulta, re.IGNORECASE)
+    assert re.search(r"status\s*=\s*'ABORTED'", consulta, re.IGNORECASE)
+    assert re.search(r"WHERE\s+status\s*=\s*'RUNNING'", consulta, re.IGNORECASE)
+    assert re.search(r"RETURNING\s+id\s*,\s*step\s*,\s*started_at", consulta, re.IGNORECASE)
+
+    # El motivo, con la ejecución que las marcó y el instante.
+    parametros = cursor.parametros[0]
+    assert parametros["ahora"] == datetime(2026, 8, 19, 2, 0, 1)
+    assert "20260819T020000Z-def456" in parametros["motivo"]
+    assert "2026-08-19 02:00:01" in parametros["motivo"]
+    assert "huérfana" in parametros["motivo"]
+
+    # Y devuelve lo marcado, para poder emitir un WARNING por fila (R4).
+    assert marcadas == [
+        (901, "build_stg.build_plan_mensual", datetime(2026, 8, 18, 3, 10, 0)),
+        (902, "build_stg.build_plan_mensual.tramo_39", datetime(2026, 8, 18, 3, 55, 0)),
+    ]
+
+
+def test_f024_r4_sin_huerfanas_no_devuelve_nada() -> None:
+    """La noche normal: nadie dejó filas abiertas."""
+    cliente, _ = cliente_espia(filas=[])
+    assert cliente.abortar_runs_huerfanos("20260819T020000Z-def456") == []
+
+
+# --- R13 · Lectura del estado de `raw` ---------------------------------------
+
+
+def test_f024_r13_fetch_estado_raw_mapea_filas() -> None:
+    """Lee de la VISTA, no de `etl_runs`: la misma que ve el rol del MCP."""
+    cliente, cursor = cliente_espia(
+        filas=[
+            (
+                "con", "SUCCESS", "20260818T020000Z-aaaaaa",
+                datetime(2026, 8, 18, 2, 0, 0), datetime(2026, 8, 18, 2, 5, 0), 12_345,
+            ),
+            # Una tabla que murió a medias: sin fin, sin filas y sin batch.
+            ("obr", "ABORTED", None, datetime(2026, 8, 18, 2, 5, 0), None, None),
+        ]
+    )
+
+    estados = cliente.fetch_estado_raw()
+
+    assert "_meta.v_raw_state" in cursor.ejecutado[0]
+
+    assert estados[0] == EstadoTablaRaw(
+        tabla="con",
+        status="SUCCESS",
+        batch_id="20260818T020000Z-aaaaaa",
+        started_at=datetime(2026, 8, 18, 2, 0, 0),
+        finished_at=datetime(2026, 8, 18, 2, 5, 0),
+        filas=12_345,
+    )
+    assert estados[1] == EstadoTablaRaw(
+        tabla="obr",
+        status="ABORTED",
+        batch_id=None,
+        started_at=datetime(2026, 8, 18, 2, 5, 0),
+        finished_at=None,
+        filas=0,
+    )
+
+
+def test_f024_r13_fetch_ultimo_intento_stg_coge_la_fila_de_mayor_id() -> None:
+    """`ORDER BY id DESC LIMIT 1` sobre `step LIKE 'build_stg%'`.
+
+    Por `id` y no por fecha: la fila de PASO se inserta al terminar, y su
+    `started_at` es el del arranque del step, anterior al de sus sub-pasos.
+    Ordenar por fecha devolvería el último tramo aunque el paso ya hubiera
+    cerrado.
+    """
+    cliente, cursor = cliente_espia(
+        filas=[
+            (
+                1234, "build_stg", "SUCCESS", "20260818T020000Z-aaaaaa",
+                datetime(2026, 8, 18, 2, 40, 0), datetime(2026, 8, 18, 4, 30, 0),
+            )
+        ]
+    )
+
+    ultimo = cliente.fetch_ultimo_intento_stg()
+
+    consulta = cursor.ejecutado[0]
+    assert "build_stg%" in consulta
+    assert re.search(r"ORDER\s+BY\s+id\s+DESC", consulta, re.IGNORECASE)
+    assert re.search(r"LIMIT\s+1", consulta, re.IGNORECASE)
+
+    assert ultimo == EstadoPaso(
+        id=1234,
+        step="build_stg",
+        status="SUCCESS",
+        batch_id="20260818T020000Z-aaaaaa",
+        started_at=datetime(2026, 8, 18, 2, 40, 0),
+        finished_at=datetime(2026, 8, 18, 4, 30, 0),
+    )
+
+
+def test_f024_r13_sin_filas_de_stg_no_hay_ultimo_intento() -> None:
+    """`stg` nunca construido: la puerta de `mart` lo tiene que ver como KO,
+    no como «no sé»."""
+    cliente, _ = cliente_espia(filas=[])
+    assert cliente.fetch_ultimo_intento_stg() is None
+
+
+# --- R16 · Lectura de la frescura --------------------------------------------
+
+
+def test_f024_r16_fetch_frescura_mapea_las_ocho_columnas() -> None:
+    cliente, cursor = cliente_espia(
+        filas=[
+            (
+                "build_mart",
+                datetime(2026, 8, 18, 5, 25, 0),
+                "20260818T020000Z-aaaaaa",
+                987_654,
+                Decimal("3.5"),
+                datetime(2026, 8, 19, 2, 40, 0),
+                "FAILED",
+                "se acabo el disco",
+            ),
+            # Un paso que NUNCA terminó bien: todo el bloque de «último OK» a
+            # nulo, y aun así sale (por eso el JOIN de la vista es LEFT).
+            ("load_excel_aux", None, None, None, None,
+             datetime(2026, 8, 19, 2, 35, 0), "RUNNING", None),
+        ]
+    )
+
+    filas = cliente.fetch_frescura()
+
+    assert "_meta.v_frescura" in cursor.ejecutado[0]
+
+    assert filas[0] == FilaFrescura(
+        paso="build_mart",
+        ultimo_ok_finished_at=datetime(2026, 8, 18, 5, 25, 0),
+        ultimo_ok_batch_id="20260818T020000Z-aaaaaa",
+        ultimo_ok_filas=987_654,
+        horas_desde_ultimo_ok=3.5,
+        ultimo_intento_started_at=datetime(2026, 8, 19, 2, 40, 0),
+        ultimo_intento_status="FAILED",
+        ultimo_intento_error="se acabo el disco",
+    )
+    # Y las horas llegan como float, no como Decimal: `format_frescura` las
+    # compara con un umbral entero.
+    assert isinstance(filas[0].horas_desde_ultimo_ok, float)
+
+    assert filas[1].paso == "load_excel_aux"
+    assert filas[1].ultimo_ok_finished_at is None
+    assert filas[1].horas_desde_ultimo_ok is None
+    assert filas[1].ultimo_intento_status == "RUNNING"
