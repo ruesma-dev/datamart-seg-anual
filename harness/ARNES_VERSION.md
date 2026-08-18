@@ -5,10 +5,10 @@ Lo escribe `instalar_arnes.ps1`. **No lo edites a mano.**
 
 | Dato | Valor |
 |---|---|
-| Version del arnes | `1.5.0` |
+| Version del arnes | `1.5.1` |
 | Fecha de la version | 2026-08-18 |
 | Instalado/actualizado el | 2026-08-18 |
-| Modo | actualizar (fichero a fichero, ver nota) |
+| Modo | actualizar (fichero a fichero, ver notas) |
 | Origen | `arnes-base` |
 
 > **Nota de esta actualizacion (2026-08-18).** El repositorio venia de un
@@ -30,3 +30,9 @@ Para actualizar a una version posterior, desde el repositorio `arnes-base`:
 Antes de aceptar cambios, lee `GUIA_INSTALACION.md` en `arnes-base`: los
 ficheros con marcas de adaptacion llevan contenido propio de este proyecto y
 casi siempre hay que conservarlos, no sobrescribirlos.
+
+> **Nota de la 1.5.1 (2026-08-18).** Mejora nacida en este repositorio y
+> portada a `arnes-base` en el mismo trabajo (commit `11f24fb` alli): repetir
+> una campania de mutacion ya no borra el analisis de los supervivientes.
+> Ficheros que entran: `harness/mutacion.py`, `harness/VERSION` y
+> `tests/test_mutacion_informe.py`.

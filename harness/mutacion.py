@@ -16,6 +16,7 @@ import argparse
 import ast
 import os
 import random
+import re
 import subprocess
 import sys
 import time
@@ -466,9 +467,93 @@ def ejecutar_campania(
 # --- Informe ----------------------------------------------------------------
 
 
+#: Cabecera con la que se escribe un análisis que todavía nadie ha hecho.
+CABECERA_PENDIENTE = "#### Análisis (PENDIENTE del implementer)"
+
+#: Encabezado de la sección de un superviviente en el informe.
+PATRON_SUPERVIVIENTE = re.compile(
+    r"^### \d+\. `(?P<fichero>.+):(?P<linea>\d+)` \[(?P<operador>[^\]]+)\]$"
+)
+
+#: Aviso que acompaña a un análisis traído de la campaña anterior.
+AVISO_REPUESTO = (
+    "> _Análisis traído de la campaña anterior de esta feature: el mutante "
+    "volvió a sobrevivir con el mismo operador y el mismo texto. Reléelo si el "
+    "código de alrededor ha cambiado._"
+)
+
+
+def clave_de_mutante(fichero: str, operador: str, original: str, mutado: str) -> tuple:
+    """Identidad de un superviviente entre dos campañas, SIN el número de línea.
+
+    La línea se mueve en cuanto alguien añade un import más arriba, y aun así
+    sigue siendo el mismo mutante: mismo fichero, mismo operador y mismo cambio
+    de texto. Incluirla haría que el análisis se perdiera en cuanto el fichero
+    respirase, que es justo lo que este mecanismo evita.
+    """
+    return (fichero, operador, original, mutado)
+
+
+def analisis_escritos(texto: str) -> dict[tuple, str]:
+    """Análisis ya redactados en un informe anterior, indexados por mutante.
+
+    Devuelve solo los que alguien ha escrito de verdad: la plantilla vacía no
+    cuenta. Si dos supervivientes comparten clave con análisis distintos, la
+    clave se descarta entera —reponer el análisis equivocado sería peor que no
+    reponer ninguno—.
+    """
+    encontrados: dict[tuple, list[str]] = {}
+    lineas = texto.splitlines()
+    indice = 0
+    while indice < len(lineas):
+        cabecera = PATRON_SUPERVIVIENTE.match(lineas[indice].strip())
+        if cabecera is None:
+            indice += 1
+            continue
+        fichero = cabecera.group("fichero")
+        operador = cabecera.group("operador")
+        original = mutado = None
+        analisis: list[str] = []
+        indice += 1
+        while indice < len(lineas) and not lineas[indice].startswith("### "):
+            linea = lineas[indice]
+            if linea.startswith("- Original: `") and original is None:
+                original = linea[len("- Original: `") : -1]
+            elif linea.startswith("- Mutado:") and mutado is None:
+                mutado = linea.split("`", 1)[1][:-1] if "`" in linea else None
+            elif linea.startswith("#### Análisis"):
+                if linea.strip() != CABECERA_PENDIENTE:
+                    analisis = [linea]
+                    indice += 1
+                    while indice < len(lineas) and not lineas[indice].startswith(
+                        ("### ", "## ")
+                    ):
+                        analisis.append(lineas[indice])
+                        indice += 1
+                    break
+            indice += 1
+        if analisis and original is not None and mutado is not None:
+            clave = clave_de_mutante(fichero, operador, original, mutado)
+            texto_analisis = "\n".join(analisis).rstrip()
+            encontrados.setdefault(clave, []).append(texto_analisis)
+    return {
+        clave: textos[0]
+        for clave, textos in encontrados.items()
+        if len(set(textos)) == 1
+    }
+
+
 def escribir_informe(informe: InformeMutacion, ruta: Path) -> None:
-    """Escribe el informe de la campaña en Markdown."""
+    """Escribe el informe de la campaña en Markdown.
+
+    Si ya había un informe de esta feature, los análisis de supervivientes que
+    alguien hubiera escrito se conservan. Una campaña se repite muchas veces
+    —tras un merge, tras cambiar el arnés, tras tocar un test— y sobrescribir
+    ese trabajo con la plantilla vacía borra evidencia que el reviewer exige y
+    que a veces el humano ya ha dado por buena.
+    """
     alcance = informe.alcance
+    previos = analisis_escritos(ruta.read_text(encoding="utf-8")) if ruta.exists() else {}
     lineas: list[str] = [
         f"<!-- {ruta.as_posix()} -->",
         f"# {informe.feature} · Campaña de mutación",
@@ -526,12 +611,22 @@ def escribir_informe(informe: InformeMutacion, ruta: Path) -> None:
                 f"- Original: `{mutante.original}`",
                 f"- Mutado:   `{mutante.mutado}`",
                 "",
-                "#### Análisis (PENDIENTE del implementer)",
-                "",
-                "> Por qué ningún test lo caza: PENDIENTE.",
-                "> Decisión: ¿test nuevo o mutante equivalente justificado?",
-                "",
             ]
+            previo = previos.get(
+                clave_de_mutante(
+                    mutante.fichero, mutante.operador, mutante.original, mutante.mutado
+                )
+            )
+            if previo is None:
+                lineas += [
+                    CABECERA_PENDIENTE,
+                    "",
+                    "> Por qué ningún test lo caza: PENDIENTE.",
+                    "> Decisión: ¿test nuevo o mutante equivalente justificado?",
+                    "",
+                ]
+            else:
+                lineas += [previo, "", AVISO_REPUESTO, ""]
 
     if informe.timeouts:
         lineas += ["## Timeouts", ""]
