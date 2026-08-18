@@ -44,6 +44,11 @@ bash harness/init.sh                        # cobertura de las líneas cambiadas
 python -m harness.mutacion --feature F-XXX  # campaña de mutación
 ```
 
+Ambas herramientas son **solo para proyectos Python**. En un proyecto de otro
+lenguaje, `init.sh` declara la puerta N/A con su motivo y el nivel de rigor se
+sigue usando para exigir fase RED y evidencias: lo que se pierde es la
+medición automática, no la disciplina.
+
 ## C1 — El arnés está completo y en verde
 
 - [ ] `bash harness/init.sh` termina con exit code 0.
@@ -62,13 +67,23 @@ python -m harness.mutacion --feature F-XXX  # campaña de mutación
 
 ## C3 — El código respeta arquitectura y convenciones
 
-- [ ] Dominio sin imports de infraestructura; SQL en su capa correcta
-      (`stg`/`mart`/`cierre`/...) con numeración `NN_nombre.sql`.
-- [ ] Primera línea de cada fichero Python: comentario con su ruta relativa.
+- [ ] Arquitectura hexagonal respetada: dominio sin imports de
+      infraestructura; adaptadores solo en infrastructure; SQL en su capa
+      correcta (`stg`/`mart`/`cierre`/...) con numeración `NN_nombre.sql`.
+- [ ] Primera línea de cada fichero de código: comentario con su ruta
+      relativa.
 - [ ] Sin `print()` de debug, sin TODOs sin contexto, sin secretos
       hardcodeados, sin dependencias nuevas no previstas en la spec.
-- [ ] Semántica Sigrid respetada (amb/fas, importe_origen vs importe_mes,
-      `fasnum` vs `fas`) según `docs/ARCHITECTURE.md`.
+- [ ] Semántica Sigrid respetada según `docs/ARCHITECTURE.md`. Las trampas
+      del dominio que el reviewer vigila siempre:
+      - **ámbito y fase** (`amb`/`fas`, y `fasnum` no es `fas`): mezclar
+        ámbitos o fases distintas suma cosas que no son comparables;
+      - **`importe_origen` vs `importe_mes`**: uno es el importe del
+        documento origen y el otro el periodificado del mes; no se suman
+        entre sí ni se sustituyen;
+      - **versiones master duplicadas en `obrfasamb`** (caso documentado en
+        `docs/referencia/05_caso_obrfasamb_version_duplicada.md`): un plan
+        puede venir dos veces del origen y duplicar filas en `stg`.
 
 ## C3 bis — Los documentos que entran de fuera son seguros
 
@@ -89,8 +104,8 @@ Si no toca ninguno, es N/A.
 
 ## C4 — La verificación es real
 
-- [ ] Cada requisito EARS de la spec tiene >= 1 test trazable
-      (`test_fXXX_rN_*`) y todos pasan.
+- [ ] Cada requisito EARS de la spec (o cada criterio `acceptance`) tiene
+      >= 1 test trazable (`test_fXXX_rN_*`) y todos pasan.
 - [ ] Los unit tests no tocan red ni BBDD (mocks/fixtures).
 - [ ] Las verificaciones `MANUAL (humano)` están listadas en
       `progress/current.md` con su comando exacto, pendientes de que el
@@ -107,7 +122,11 @@ recorre estos puntos **contra ese nivel**.
 - [ ] **Fase RED** (niveles `estandar` y `critico`): el informe
       `progress/impl_F-XXX.md` contiene, para los requisitos centrales, la
       **salida real** del fallo del test antes de existir el código. No vale
-      «se hizo TDD»: vale la traza pegada.
+      «se hizo TDD»: vale la traza pegada. Si el entregable de la feature es
+      el propio test (no hay código de producción cuyo fallo previo enseñar),
+      la fase RED se demuestra rompiendo deliberadamente —en una copia
+      aislada, nunca en el árbol real— lo que el test vigila, y pegando la
+      traza de ese fallo.
 - [ ] **Cobertura** (niveles `estandar` y `critico`): la puerta de
       `bash harness/init.sh` sale en `[OK]` con el porcentaje de las líneas
       cambiadas, o en `N/A` **con el motivo impreso**.
@@ -123,6 +142,35 @@ recorre estos puntos **contra ese nivel**.
       cuatro números: tests ejecutados y resultado, cobertura de las líneas
       cambiadas, mutantes generados y supervivientes, y tiempo de la suite.
 - [ ] Ningún punto de este bloque marcado N/A sin justificación escrita.
+
+## C4 ter — Las verificaciones extra por rutas sensibles están hechas
+
+Hay ficheros cuyo cambio no lo cubre ningún test unitario por bien escrito que
+esté: un prompt de IA, un schema que un modelo rellena, el cliente de un
+proveedor externo, una migración, un fichero de infraestructura. Un repositorio
+puede declararlos en `harness/rutas_sensibles.json` junto con la verificación
+extra que exigen y el informe que la demuestra (esquema y ejemplo en
+`harness/rutas_sensibles.ejemplo.json`).
+
+**Sin esa declaración este bloque es N/A y no hay nada que justificar**: es la
+configuración del caso mayoritario. Con declaración presente, y **solo si la
+puerta de `bash harness/init.sh` señaló rutas tocadas** por el diff de la
+feature:
+
+- [ ] Existe el informe declarado para esta feature (el campo `informe` de la
+      verificación, con `{feature}` resuelto).
+- [ ] El informe cumple TODAS las líneas que la declaración exige en
+      `exige_lineas`. El reviewer las comprueba leyendo el fichero, no
+      fiándose del resumen del implementer.
+- [ ] El informe es **FRESCO**: su commit pertenece a la rama de la feature y
+      es POSTERIOR al último commit que tocó una ruta sensible. Un informe
+      verde de antes del cambio no demuestra nada. Esto no lo automatiza la
+      puerta —el informe vive en `progress/` y su commit mueve HEAD—: es
+      responsabilidad del reviewer, igual que la verificación independiente de
+      la mutación en C4 bis.
+- [ ] Si la exigencia declarada es `aviso` y la evidencia falta, el motivo
+      consta por escrito en el informe de review. `aviso` no significa
+      «ignorable»: significa «todavía no bloquea el arnés».
 
 ## C5 — La sesión se cerró bien
 

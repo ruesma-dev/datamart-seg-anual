@@ -118,6 +118,21 @@ def timeout_mutacion(rigor: dict) -> int:
     return valor
 
 
+def workers_mutacion(rigor: dict) -> int | None:
+    """Evaluadores concurrentes de la campaña de mutación, si se declaran.
+
+    Al revés que el timeout, esta clave es OPCIONAL y su ausencia no es un
+    error: `None` significa «decídelo tú», y quien llama aplica su valor por
+    núcleos de la máquina. Cablear aquí un número lo haría viajar de máquina en
+    máquina, que es justo lo que no queremos. Un valor absurdo (0, negativo, un
+    texto) se trata como ausencia: mejor el default que una campaña rara.
+    """
+    valor = rigor.get("mutacion", {}).get("workers")
+    if isinstance(valor, bool) or not isinstance(valor, int) or valor < 1:
+        return None
+    return valor
+
+
 # --- Inventario de features -------------------------------------------------
 
 

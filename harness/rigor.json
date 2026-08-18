@@ -5,6 +5,7 @@
     "umbral_lineas_cambiadas": 80
   },
   "mutacion": {
+    "$doc": "timeout_por_mutante_s: segundos que se le conceden a la suite por cada mutante. workers (OPCIONAL, no declarada aqui a proposito): evaluadores concurrentes de 'python -m harness.mutacion'; sin ella el default es min(max(1, nucleos - 2), 16), que se adapta a la maquina en vez de viajar cableado de una a otra. Precedencia: --workers > mutacion.workers > default.",
     "timeout_por_mutante_s": 120
   },
   "niveles": {

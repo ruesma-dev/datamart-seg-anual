@@ -15,8 +15,18 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[1]
 HARNESS = RAIZ / "harness"
 
-#: Herramientas que esta feature crea o modifica, y que viajan a `arnes-base`.
-HERRAMIENTAS = ("servicios.py", "alcance.py", "cobertura.py", "mutacion.py")
+#: Herramientas del arnés que viajan a `arnes-base` tal cual. Las tres últimas
+#: llegaron con la actualización a la v1.5.0 (mutación en paralelo, BACKLOG.md
+#: generado y puerta de rutas sensibles) y se vigilan igual que las demás.
+HERRAMIENTAS = (
+    "servicios.py",
+    "alcance.py",
+    "cobertura.py",
+    "mutacion.py",
+    "mutacion_paralela.py",
+    "backlog.py",
+    "rutas_sensibles.py",
+)
 
 #: Vocabulario que NO puede aparecer: sistemas de origen, capas de datos de
 #: este repositorio, proveedores de nube y nombres de las aplicaciones del
@@ -80,14 +90,21 @@ def test_f020_r17_las_herramientas_no_dependen_del_codigo_del_proyecto() -> None
                 "collections.abc",
                 "dataclasses",
                 "datetime",
+                "fnmatch",
                 "importlib.util",
+                "io",
                 "json",
+                "os",
                 "pathlib",
                 "random",
                 "re",
+                "shutil",
                 "subprocess",
                 "sys",
+                "tempfile",
+                "threading",
                 "time",
+                "types",
             }
         ]
         assert not externos, (nombre, externos)
