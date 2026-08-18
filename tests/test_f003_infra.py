@@ -84,6 +84,11 @@ CLAVES_OBLIGATORIAS = (
     "alertName",
     "alertActionGroupName",
     "alertActionGroupRg",
+    # F-024: la alerta de frescura y su umbral. Obligatorias a propósito: un
+    # entorno nuevo que las olvide no se queda «sin alerta de frescura», se
+    # queda en rojo.
+    "frescuraAlertName",
+    "frescuraUmbralHoras",
     "tags",
 )
 
@@ -124,6 +129,7 @@ CLAVES_NOMBRE_DE_RECURSO = (
     "alertName",
     "alertActionGroupName",
     "alertActionGroupRg",
+    "frescuraAlertName",
 )
 
 # `auxContainer` ("aux") queda fuera de la lista de arriba a propósito: son tres

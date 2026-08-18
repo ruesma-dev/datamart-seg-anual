@@ -106,6 +106,7 @@ repetirlos no rompe nada. Se ejecutan desde la raíz del repositorio.
 | 9 | `80_create_job.ps1` | Crea el job **programado**. Exige `-Confirmar` y **está bloqueado por `F-019`** (arriba). | Sí |
 | — | `85_update_job.ps1` | Despliegue habitual: apunta el job a una imagen nueva. | Sí |
 | 10 | `90_create_alert.ps1` | Grupo de acción (reutiliza el que haya) y alerta de fallo. | Sí |
+| 11 | `95_create_alert_frescura.ps1` | Alerta de **frescura** (F-024): avisa si pasan más de `frescuraUmbralHoras` sin que el job complete un `build_mart`. Exige `az extension add --name scheduled-query` una vez por puesto. | Sí |
 
 Entre medias hay **tres** pasos **que no son scripts** y que hace el humano:
 cargar la clave de la API en el vault (después del 6), autorizar la regla de
@@ -230,8 +231,13 @@ deliberado, y es lo que tendrá que resolver la feature de subida de Excels.
 
 ```powershell
 $ws = az monitor log-analytics workspace show -g <resourceGroup> -n <logAnalytics> --query customerId -o tsv
-az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerAppName_s == '<job>' | project TimeGenerated, Log_s | order by TimeGenerated desc | take 50" -o table
+az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '<job>' | project TimeGenerated, Log_s | order by TimeGenerated desc | take 50" -o table
 ```
+
+**Corregido el 2026-08-18 (F-024, T3).** Aquí ponía `ContainerAppName_s`, que
+**no existe** en `ContainerAppConsoleLogs_CL` para un job: la columna real es
+`ContainerJobName_s`, verificada con `| getschema`. La consulta anterior
+devolvía cero filas siempre, que es indistinguible de «el job no dejó logs».
 
 Si algún nombre de columna no coincide, comprueba el esquema real con
 `ContainerAppConsoleLogs_CL | getschema` y **corrige este README**; no
@@ -256,6 +262,70 @@ az containerapp job start -g <resourceGroup> -n <job> --command "python" --args 
 lanzado con el acceso a la base roto (por ejemplo, retirando temporalmente la
 regla de firewall) debe producir una ejecución `Failed` **y un correo
 recibido**. Anota la hora del fallo y la de recepción en `progress/current.md`.
+
+## Probar la alerta de frescura (F-024)
+
+`90_create_alert.ps1` avisa cuando una ejecución **termina en fallo**.
+`95_create_alert_frescura.ps1` cubre el otro agujero: que el job **no llegue a
+hacer** su trabajo sin que nadie lo declare fallo (no arrancó, se quedó
+colgado, alguien lo deshabilitó, la programación se perdió en un despliegue).
+Vigila desde **fuera** del ETL, así que «el job no lo hizo» dispara igual que
+«el job murió».
+
+Paso previo, **una sola vez por puesto** (es de la máquina, no del
+repositorio):
+
+```powershell
+az extension add --name scheduled-query
+```
+
+La consulta que vigila la regla, ejecutada a mano. Tras una noche buena tiene
+que devolver **≥ 1**; la alerta salta cuando devuelve **0**:
+
+```powershell
+$ws = az monitor log-analytics workspace show -g <resourceGroup> -n <logAnalytics> --query customerId -o tsv
+az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '<job>' | where Log_s has_all ('step_finished','build_mart','SUCCESS') | where TimeGenerated > ago(30h) | count" -o table
+```
+
+**`ContainerJobName_s`, no `ContainerAppName_s`**: la segunda no existe en
+`ContainerAppConsoleLogs_CL` para un job (verificado con `| getschema` el
+2026-08-18). Filtrar por ella devolvería siempre cero filas y la alerta
+dispararía todas las noches.
+
+Crear la regla (idempotente) y probarla de extremo a extremo. Una alerta que no
+se ha visto llegar no está verificada:
+
+```powershell
+powershell -NoProfile -File infra/95_create_alert_frescura.ps1
+
+# Provocar: ventana corta y evaluación frecuente, FUERA del horario de carga.
+# Debe llegar el correo «Activated» en menos de 15 min. Anota la hora.
+az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 1h --evaluation-frequency 5m
+
+# Restaurar. Tras la siguiente carga correcta debe llegar el «Deactivated».
+az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 30h --evaluation-frequency 1h
+```
+
+Las ventanas van en formato `##h##m##s` (`30h`), **no en ISO 8601**: un `PT30H`
+se rechaza.
+
+**Falso positivo asumido**: la regla mide **logs**, no la base de datos. Si
+reconstruyes `mart` desde el puesto, la regla no lo ve y avisa igual. Es
+coherente con lo que vigila: «el job hizo su trabajo».
+
+El umbral vive en `infra/env/dev.json` (`frescuraUmbralHoras`) y de ahí salen
+la ventana de la regla y el valor por defecto de `python main.py
+check-frescura`. Hay un test que cruza los dos para que no diverjan.
+
+## Diagnóstico desde el puesto cuando algo huele mal
+
+Los dos comandos son de **solo lectura** y no escriben nada en el datamart:
+
+```powershell
+python main.py check-coherencia   # ¿de qué carga viene cada tabla de raw?
+python main.py check-frescura     # ¿cuánto hace del último build_mart completo?
+python main.py timings --last 1   # avisa al pie de las filas RUNNING huérfanas
+```
 
 ## Verificaciones heredadas de F-004 (lectura de los Excels desde blob)
 

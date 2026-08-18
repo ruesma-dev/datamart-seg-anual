@@ -65,6 +65,7 @@
 
   "$aviso_frescura": "F-024, DA-4. 'frescuraUmbralHoras' es a la vez la ventana de la regla de consulta programada que crea 95_create_alert_frescura.ps1 y el umbral por defecto de 'python main.py check-frescura'. 30 h y no 24: el job arranca a las 02:00 UTC y tarda ~3 h 15, asi que un umbral de 24 h disparia cada manana durante la hora en que la carga nueva todavia no ha terminado. El contenedor NO lleva este fichero, asi que el codigo no puede leerlo en ejecucion: el valor esta duplicado en la constante UMBRAL_FRESCURA_HORAS de etl_sigrid/infrastructure/postgres/frescura.py y lo unico que impide que diverjan es el test test_f024_r19_umbral_por_defecto_coincide_con_dev_json. Si divergen, la alerta vigila una ventana y check-frescura juzga con otra, y nadie se entera hasta que falta un correo.",
   "frescuraUmbralHoras": 30,
+  "frescuraAlertName": "alert-caj-datamart-seg-dev-sin-build",
 
   "tags": {
     "acens-project": "datamart-seg-anual",
