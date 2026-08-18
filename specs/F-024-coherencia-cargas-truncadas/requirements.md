@@ -76,6 +76,32 @@ supervivientes sin justificación aceptada por el humano y toda verificación
 
 ## Decisiones que debe tomar el humano ANTES de implementar
 
+> **Enmienda (2026-08-18): TODAS CERRADAS por el humano — «aprobado con las
+> recomendadas».** DA-1 → A (`batch_id` en `_meta.etl_runs` + vistas
+> `v_raw_state`/`v_frescura`). DA-2 → A (puerta estricta; `--sin-puerta`
+> solo en comandos sueltos, registrado y con WARNING). DA-3 → A (regla KQL
+> programada sobre `log-datamart-seg-dev`). DA-4 → 30 h. DA-5 → sí (puerta
+> también antes de `build_mart`). DA-6 → sí (los comandos sueltos
+> registran). DA-7 → solo los comandos que escriben; `timings` avisa.
+> **DA-8 CONFIRMADA por el líder leyendo el código**: `truncate_table` y
+> cada `copy_rows` abren su propia `connection()` con commit → la ingesta
+> hace **commit por página, no por tabla**; una muerte a mitad de tabla la
+> deja truncada y parcial. La afirmación «transaccional por tabla» de
+> `progress/current.md` y de la cabecera de esta spec era incorrecta; se
+> corrige en `docs/ARCHITECTURE.md` en T14. No cambia el diseño: la puerta
+> se apoya en el `SUCCESS` de cada tabla, no en su atomicidad.
+> **T3 hecha (líder, 2026-08-18)**: extensión `scheduled-query` instalada en
+> el puesto; sintaxis confirmada con `--help`: `--condition "count
+> 'Frescura' < 1"` + `--condition-query Frescura="<kql>"` + `--window-size`
+> y `--evaluation-frequency` en formato `##h##m##s` (NO ISO 8601: `30h`,
+> no `PT30H`). **La columna del nombre del job en
+> `ContainerAppConsoleLogs_CL` es `ContainerJobName_s`, NO
+> `ContainerAppName_s`** (verificado con `getschema`; ese nombre no existe).
+> La KQL con `has_all('step_finished','build_mart','SUCCESS')` ejecuta sin
+> error; devuelve 0 filas a día de hoy porque ningún `build_mart` ha
+> terminado aún desde el job (18-ago: dos ejecuciones muertas antes de mart
+> y una tercera en curso), que es exactamente lo que la alerta detectaría.
+
 Cada una con opciones y la recomendación del spec-author. Las tareas de
 Fase A de `tasks.md` son cerrarlas y anotarlas aquí (enmienda fechada).
 

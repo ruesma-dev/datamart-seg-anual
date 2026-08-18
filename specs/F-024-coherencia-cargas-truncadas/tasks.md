@@ -10,24 +10,24 @@ que exija BBDD real o Azure es `MANUAL (humano)` con su comando exacto en
 
 ## Fase A · Medir y decidir (humano, antes de escribir código)
 
-- [ ] **T1**: Cerrar DA-1, DA-2, DA-5, DA-6, DA-7 (mecanismo, política de
+- [x] **T1** (cerrada 2026-08-18, «aprobado con las recomendadas»): Cerrar DA-1, DA-2, DA-5, DA-6, DA-7 (mecanismo, política de
       la puerta, puerta de `stg`, registro de comandos sueltos, quién marca)
       y anotar la decisión con fecha en `requirements.md` §Decisiones.
       | Verificación: MANUAL (humano) — las cinco DA tienen «CERRADA
       <fecha>: opción X» escrita.
-- [ ] **T2**: Cerrar DA-3 (mecanismo de la alerta) y DA-4 (umbral). Si es
+- [x] **T2** (cerrada 2026-08-18: DA-3 = A, DA-4 = 30 h): Cerrar DA-3 (mecanismo de la alerta) y DA-4 (umbral). Si es
       A, `az extension add --name scheduled-query` en el puesto y ejecutar a
       mano la KQL de R23 paso 1 (confirma columna del job, `has_all` y que
       devuelve ≥ 1 tras la última noche buena). Si es B, el spec-author
       enmienda R21/R22 antes de seguir. | Verificación: MANUAL (humano) —
       DA-3 y DA-4 cerradas; salida real de la KQL pegada en
       `progress/current.md`.
-- [ ] **T3**: (solo si DA-3 = A) Confirmar la sintaxis de `az monitor
+- [x] **T3** (hecha por el líder 2026-08-18: sintaxis ##h##m##s, columna ContainerJobName_s): (solo si DA-3 = A) Confirmar la sintaxis de `az monitor
       scheduled-query create` (`--condition`, `--condition-query`,
       formato de `--window-size`) con `--help`, sin crear nada, y anotar en
       `design.md` §8 la forma definitiva. | Verificación: MANUAL (humano) —
       §8 enmendado o confirmado con fecha.
-- [ ] **T4**: DA-8: confirmar si la ingesta hace commit por página
+- [x] **T4** (hecha por el líder 2026-08-18: commit POR PÁGINA, no por tabla; anotado en requirements): DA-8: confirmar si la ingesta hace commit por página
       (leyendo `copy_rows` o con el `SELECT count(*)` de R26 durante un
       `ingest --full` local) y anotar el resultado en `requirements.md`.
       | Verificación: MANUAL (humano).

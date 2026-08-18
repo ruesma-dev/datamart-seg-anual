@@ -238,14 +238,14 @@ Se registra como `build_mart.puerta_stg`.
 
 ```
 $horas   = [int]$CFG.frescuraUmbralHoras            # 30
-$ventana = "PT{0}H" -f $horas                        # ISO 8601 (30 h)
-$kql     = "ContainerAppConsoleLogs_CL | where ContainerAppName_s == '$($CFG.job)' | where Log_s has_all ('step_finished','build_mart','SUCCESS')"
+$ventana = "{0}h" -f $horas                          # formato ##h##m##s de az (30h), NO ISO 8601
+$kql     = "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '$($CFG.job)' | where Log_s has_all ('step_finished','build_mart','SUCCESS')"
 
 az monitor scheduled-query create -g <rg> -n $CFG.frescuraAlertName `
     --scopes <id del workspace $CFG.logAnalytics> `
     --condition "count 'Frescura' < 1" `
     --condition-query Frescura=$kql `
-    --window-size $ventana --evaluation-frequency PT1H `
+    --window-size $ventana --evaluation-frequency 1h `
     --severity 2 --auto-mitigate true `
     --action-groups <id del action group> `
     --description "El datamart lleva mas de $horas h sin un build_mart completo"
