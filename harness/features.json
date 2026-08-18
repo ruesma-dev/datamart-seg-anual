@@ -358,7 +358,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-024-coherencia-cargas-truncadas/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 9,
