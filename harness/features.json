@@ -350,6 +350,19 @@
       "rigor": "estandar",
       "priority": 8,
       "branch": "feature/F-023-cierre-operativo-f003"
+    },
+    {
+      "id": "F-024",
+      "title": "Coherencia del datamart ante cargas truncadas: deteccion, puerta y frescura",
+      "description": "Origen: la primera carga real desde el job (2026-08-18) murio por DeadlineExceeded a las 2 h justas, en el tramo 39/60 del stage. No hubo dano porque mart no se toco, pero destapo tres huecos: (1) una muerte EXTERNA del proceso (kill por deadline, OOM, reinicio del nodo) deja en _meta.etl_runs una fila RUNNING huerfana para siempre, y timings miente; (2) nada impide que stage/mart se construyan sobre un raw MEZCLADO (tablas de ejecuciones distintas, tras una ingesta parcial seguida de otro fallo), que es incoherencia silenciosa: cuadros que no cuadran y nadie que lo sepa; (3) el consumidor (Power BI, MCP) no tiene forma de saber si lo que ve es de esta noche o de hace tres dias. Se DESCARTA hacer atomico el pipeline entero: una transaccion de 3 h en el B1ms es justo lo que reventó el 09-ago y F-019 lo troceo a proposito. La coherencia se garantiza por verificacion y visibilidad: (a) al arrancar, run-all marca ABORTED las filas RUNNING de ejecuciones anteriores con motivo; (b) puerta antes de stage: FAILED explicito y ruidoso si la ultima ingesta de cada tabla no pertenece a la misma ejecucion (raw incoherente); (c) frescura visible: fecha del ultimo build_mart COMPLETO consultable desde las vistas de consumo, y alerta si supera un umbral. La alerta actual ya cubre los fallos internos (run-all sale 1 si un paso falla; verificado); la muerte externa la cubre (a)+(b).",
+      "acceptance": [
+        "Definida en detalle por specs/F-024-coherencia-cargas-truncadas/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 9,
+      "branch": "feature/F-024-coherencia-cargas-truncadas"
     }
   ]
 }
