@@ -31,11 +31,22 @@ from pathlib import Path
 
 from config.settings import Settings
 from etl_sigrid.application.steps.base import PipelineStep
+from etl_sigrid.domain.coherencia import (
+    VeredictoCoherencia,
+    evaluar_coherencia_stg,
+    formatear_veredicto_stg,
+)
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
+from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
 
 logger = get_logger(__name__)
+
+# --- Puerta de coherencia de stg (F-024, DA-5) ------------------------------
+# Se registra como sub-paso, igual que la de raw, para que su veredicto quede
+# consultable en `timings` y en `_meta.etl_runs`.
+PASO_PUERTA_STG = "build_mart.puerta_stg"
 
 
 @dataclass(slots=True, frozen=True)
@@ -51,8 +62,15 @@ class _SubStep:
 class BuildMartStep(PipelineStep):
     """Construye el esquema mart desde stg."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        batch_id: str | None = None,
+        omitir_puerta: bool = False,
+    ) -> None:
         self._settings = settings
+        self._batch_id = batch_id
+        self._omitir_puerta = omitir_puerta
 
     @property
     def name(self) -> str:
@@ -69,6 +87,18 @@ class BuildMartStep(PipelineStep):
     def run(self) -> StepResult:
         result = self._new_result()
         pg = build_postgres_client(self._settings)
+
+        # Puerta de coherencia de stg (F-024, DA-5). Antes del primer fichero,
+        # porque `01_ddl.sql` empieza con un DROP + CREATE de la tabla de
+        # hechos: evaluarla después ya se habría llevado por delante el `mart`
+        # bueno de la noche anterior, que es justo lo que salvó la situación
+        # el 2026-08-18.
+        veredicto = self._puerta_stg(pg)
+        if not veredicto.ok and not self._omitir_puerta:
+            result.status = StepStatus.FAILED
+            result.error_message = formatear_veredicto_stg(veredicto)
+            result.finished_at = datetime.utcnow()
+            return result
 
         sql_dir = Path(__file__).resolve().parents[2] / "infrastructure" / "postgres" / "sql" / "mart"
 
@@ -145,4 +175,47 @@ class BuildMartStep(PipelineStep):
         result.status = StepStatus.SUCCESS
         result.rows_processed = total_rows
         result.finished_at = datetime.utcnow()
+        result.metadata = {"stg_batch_id": veredicto.batch_id}
         return result
+
+    # ---------------------------------------------------------------------
+    # Puerta de coherencia de stg (F-024, R15)
+    # ---------------------------------------------------------------------
+
+    def _puerta_stg(self, pg: PostgresClient) -> VeredictoCoherencia:
+        """Comprueba que el último `build_stg` llegó a terminar.
+
+        Un `stage` muerto a medias deja `stg` MEZCLADO: los ficheros `03..07`
+        son atómicos cada uno, pero entre sí no, así que puede quedar
+        `stg.obras` de esta noche y `stg.presupuesto` de ayer. Construir `mart`
+        encima produce cuadros que no cuadran sin que nadie se entere, que es
+        exactamente lo que esta feature viene a impedir.
+
+        Mismo trato que la puerta de `raw`: se evalúa siempre y se registra
+        siempre, incluso cuando se omite.
+        """
+        run_id = pg.record_run_start("build_mart", PASO_PUERTA_STG, self._batch_id)
+
+        veredicto = evaluar_coherencia_stg(pg.fetch_ultimo_intento_stg())
+        mensaje = formatear_veredicto_stg(veredicto)
+
+        if self._omitir_puerta:
+            pg.record_run_end(
+                run_id,
+                StepStatus.SKIPPED.value,
+                error_message=f"puerta omitida por --sin-puerta; veredicto: {mensaje}",
+            )
+            logger.warning("puerta_omitida", veredicto_ok=veredicto.ok, motivo=mensaje)
+        elif veredicto.ok:
+            pg.record_run_end(run_id, StepStatus.SUCCESS.value)
+            logger.info("puerta_stg_ok", stg_batch_id=veredicto.batch_id)
+        else:
+            pg.record_run_end(run_id, StepStatus.FAILED.value, error_message=mensaje)
+            ultimo = veredicto.ultimo_paso
+            logger.error(
+                "puerta_stg_ko",
+                ultimo_step=ultimo.step if ultimo else None,
+                ultimo_status=ultimo.status if ultimo else None,
+            )
+
+        return veredicto

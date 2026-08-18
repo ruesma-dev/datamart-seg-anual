@@ -24,6 +24,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_stg_step import BuildStgStep
 from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
 from etl_sigrid.domain.entities import StepStatus
@@ -373,6 +374,125 @@ def test_f024_r3_sin_batch_el_step_sigue_funcionando(stg) -> None:
     """
     pg = PgFalso()
     resultado = stg(pg).run()
+
+    assert resultado.status is StepStatus.SUCCESS
+    assert all(batch is None for _s, _step, batch in pg.arranques)
+
+
+# ---------------------------------------------------------------------------
+# R15 · `build_mart` exige un stage completo (DA-5)
+# ---------------------------------------------------------------------------
+
+
+def paso_stg(step: str, status: str, ident: int = 500) -> EstadoPaso:
+    return EstadoPaso(
+        id=ident,
+        step=step,
+        status=status,
+        batch_id=BATCH,
+        started_at=datetime(2026, 8, 19, 2, 40, 0),
+        finished_at=datetime(2026, 8, 19, 4, 30, 0),
+    )
+
+
+@pytest.fixture
+def mart(monkeypatch: pytest.MonkeyPatch):
+    """Fábrica de `BuildMartStep` con el cliente sustituido por el doble."""
+    import etl_sigrid.application.steps.build_mart_step as modulo
+
+    def _construir(pg: PgFalso, **kwargs: object) -> BuildMartStep:
+        monkeypatch.setattr(modulo, "build_postgres_client", lambda _s: pg)
+        return BuildMartStep(settings_falsos(), **kwargs)  # type: ignore[arg-type]
+
+    return _construir
+
+
+@pytest.mark.parametrize(
+    ("caso", "ultimo"),
+    [
+        ("sin ninguna fila de stg", None),
+        ("sub-paso abortado", paso_stg("build_stg.build_presupuesto", "ABORTED")),
+        ("tramo en curso", paso_stg("build_stg.build_plan_mensual.tramo_39", "RUNNING")),
+        ("el paso fallo", paso_stg("build_stg", "FAILED")),
+        # El caso del 18-ago: el proceso murió y la última fila es un sub-paso
+        # que sí había terminado bien. `stg` quedó a medias igualmente.
+        ("sub-paso terminado, paso no", paso_stg("build_stg.build_obras", "SUCCESS")),
+    ],
+)
+def test_f024_r15_build_mart_ko_si_ultimo_stage_no_termino(
+    mart, caso: str, ultimo: EstadoPaso | None
+) -> None:
+    """Un `stg` mezclado no llega a `mart`. Y no se ejecuta ni un SQL.
+
+    `mart/01_ddl.sql` empieza con un DROP + CREATE de la tabla de hechos: si
+    la puerta se evaluara después, el primer fichero ya se habría llevado por
+    delante el `mart` bueno de la noche anterior.
+    """
+    pg = PgFalso(ultimo_stg=ultimo)
+
+    resultado = mart(pg, batch_id=BATCH).run()
+
+    assert resultado.status is StepStatus.FAILED, caso
+    assert pg.escrituras == [], caso
+
+    _, estado, _, motivo = pg.cierre_de("build_mart.puerta_stg")
+    assert estado == "FAILED", caso
+    assert "python main.py stage" in (motivo or ""), caso
+    assert "KO" in (resultado.error_message or ""), caso
+
+
+def test_f024_r15_build_mart_ok_si_stage_success(mart) -> None:
+    """La noche normal: el último `build_stg` terminó, así que se construye."""
+    pg = PgFalso(ultimo_stg=paso_stg("build_stg", "SUCCESS"))
+
+    resultado = mart(pg, batch_id=BATCH).run()
+
+    assert resultado.status is StepStatus.SUCCESS
+    assert pg.traza.count("fichero") >= 7, "no construyó mart"
+
+    assert ("build_mart", "build_mart.puerta_stg", BATCH) in pg.arranques
+    assert pg.cierre_de("build_mart.puerta_stg")[1] == "SUCCESS"
+
+
+def test_f024_r15_la_puerta_precede_al_primer_sql_de_mart(mart) -> None:
+    """El ORDEN: puerta cerrada antes de tocar el primer fichero."""
+    pg = PgFalso(ultimo_stg=paso_stg("build_stg", "SUCCESS"))
+    mart(pg, batch_id=BATCH).run()
+
+    assert pg.traza[:3] == [
+        "start:build_mart.puerta_stg",
+        "ultimo_stg",
+        "end:SUCCESS",
+    ]
+    assert pg.traza[3] == "fichero"
+
+
+def test_f024_r15_build_mart_sin_puerta_registra_y_continua(
+    mart, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Misma vía de escape que en `stage`, y con el mismo precio: queda escrito."""
+    import etl_sigrid.application.steps.build_mart_step as modulo
+
+    registro = LoggerFalso()
+    monkeypatch.setattr(modulo, "logger", registro)
+
+    pg = PgFalso(ultimo_stg=paso_stg("build_stg.build_plan_mensual", "ABORTED"))
+    resultado = mart(pg, batch_id=BATCH, omitir_puerta=True).run()
+
+    assert resultado.status is StepStatus.SUCCESS
+    assert pg.escrituras, "no construyó nada"
+
+    _, estado, _, motivo = pg.cierre_de("build_mart.puerta_stg")
+    assert estado == "SKIPPED"
+    assert "--sin-puerta" in (motivo or "")
+    assert "build_stg.build_plan_mensual" in (motivo or "")
+    assert registro.de("puerta_omitida")
+
+
+def test_f024_r15_build_mart_sin_batch_sigue_funcionando(mart) -> None:
+    """Compatibilidad con los llamantes anteriores a F-024."""
+    pg = PgFalso(ultimo_stg=paso_stg("build_stg", "SUCCESS"))
+    resultado = mart(pg).run()
 
     assert resultado.status is StepStatus.SUCCESS
     assert all(batch is None for _s, _step, batch in pg.arranques)
