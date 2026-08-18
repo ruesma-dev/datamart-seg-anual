@@ -148,3 +148,256 @@ build_mart: FRESCO (umbral 30.0 h, lleva 6.4 h desde el último build correcto)
 - El `TOTAL` de `timings` (33.142 s ≈ 9,2 h) **suma las tres ejecuciones del
   día**, incluidas las dos que murieron. No es la duración de la carga buena
   (2 h 45): quien lea ese total sin contexto se lleva una idea equivocada.
+
+---
+
+## 2026-08-18 · T17 — Despliegue de la imagen con F-024 y verificación R25
+
+Ejecutado por el agente `implementer` con autorización expresa del humano (ver
+apartado siguiente). Rama `feature/F-024-coherencia-cargas-truncadas`.
+`bash harness/init.sh` en verde antes de empezar: 596 tests, cobertura 100 % de
+372 líneas cambiadas.
+
+### Autorización del humano sobre `05_check_prereqs.ps1` (dejada por escrito)
+
+`infra/05_check_prereqs.ps1` termina en **FALLO** por una sola comprobación: el
+disco del servidor compartido va al **74,5 %**, y una carga completa lo llenó el
+2026-08-09 dejándolo en solo lectura. **El humano lo ha visto con los datos
+delante y ha autorizado desplegar igualmente**, y ha decidido sobre el disco
+«dejarlo, vigilar y ya». Razón: **el despliegue no cambia el volumen de datos ni
+el pipeline**, solo la imagen del job y las puertas de coherencia de F-024.
+
+Datos ya medidos que soportan la decisión (no se volvieron a medir): base 74,5 %
+bajando ~0,6 puntos/hora, picos de 88,5 % y 83,9 % durante las cargas de hoy,
+18,5 GB de datos sobre 32 GB de disco, de los que `sigrid_dm` son 18 GB (`stg`
+10 GB, `raw` 4,8, `mart` 2,2, `compras` 1,2) frente a 17 MB de `albaranes` y
+8,9 MB de `partes`.
+
+**Esta autorización cubre este despliegue y nada más.** No se extiende a
+programar cargas, a T18 ni a ninguna otra escritura.
+
+### 1. `powershell -NoProfile -File infra\70_build_image.ps1`
+
+Construcción en Azure (`acr build`), sin Docker en el puesto. **Salida
+recortada**: se omite el log de `pip install` y el de las 13 capas del
+`docker build`, todos correctos. Se conserva el principio y el final:
+
+```
+=== Configuracion cargada: ...\infra\env\dev.json ===
+  Entorno        : dev / spaincentral
+  Resource group : rg-datamart-seg-dev
+  Job            : caj-datamart-seg-dev en cae-datamart-seg-dev
+  Postgres       : ...sigrid_dm como sigrid_dm_app (auth password)
+  Suscripcion    : la del contexto activo (no se escribe en el repositorio)
+
+Construyendo datamart-seg-anual:r20260818-2146 ...
+  (la construccion ocurre en Azure; puede tardar varios minutos)
+[... descarga de python:3.12-slim, pip install de 41 paquetes, pasos 1/13 a 13/13 ...]
+Successfully built 206cd4cceb07
+Successfully tagged acralbaranesdev.azurecr.io/datamart-seg-anual:r20260818-2146
+2026/08/18 19:47:35 Executing step ID: push...
+r20260818-2146: digest: sha256:f0b32704d18d7d45661a2c934ed597b114f52b27c21c398761d0dd249d0391b7 size: 2412
+2026/08/18 19:47:46 Successfully pushed image
+Run ID: nh4h was successful after 44s
+
+r20260810-1024
+r20260817-2025
+r20260818-1003
+r20260818-2146
+
+Imagen publicada: acralbaranesdev.azurecr.io/datamart-seg-anual:r20260818-2146
+APUNTA ESTE TAG: r20260818-2146
+```
+
+**TAG DESPLEGADO: `r20260818-2146`** (digest `sha256:f0b3270…0391b7`). Es el que
+tiene que aparecer en los logs del job y en `python main.py version`.
+
+### 2. `powershell -NoProfile -File infra\85_update_job.ps1 -Tag r20260818-2146`
+
+Salida completa, sin recortar salvo la cabecera de configuración:
+
+```
+Imagen actual : acralbaranesdev.azurecr.io/datamart-seg-anual:r20260818-1003
+Imagen nueva  : acralbaranesdev.azurecr.io/datamart-seg-anual:r20260818-2146
+
+Imagen                                                        Disparo
+------------------------------------------------------------  ---------
+acralbaranesdev.azurecr.io/datamart-seg-anual:r20260818-2146  Schedule
+
+Job actualizado. La ejecucion programada usara la imagen nueva.
+```
+
+El job pasa de `r20260818-1003` (la imagen SIN F-024, la que dejó las huérfanas)
+a `r20260818-2146`. El disparo sigue siendo `Schedule`: **no se tocó la
+programación, ni la identidad, ni los secretos, ni las variables de entorno**,
+que es justo el alcance de `85_update_job.ps1`.
+
+**Detalle menor, para que no despiste a quien lea el log**: la cabecera de
+`00_vars.ps1` imprime `...:r20260818-2148`, que es la hora del momento en que se
+lanzó el script, no el tag desplegado. El tag real es el que dice la línea
+«Imagen nueva» y el que se pasó en `-Tag`. `00_vars.ps1` calcula un `$TAG` por
+hora actual y el script lo salva en `$TagPedido` antes del dot-source
+precisamente por esto; la cabecera es lo único que sigue enseñando el valor
+calculado.
+
+### 3. `python main.py apply-grants` — **primer comando que escribe con F-024**
+
+Salida completa:
+
+```
+[warning] etl_run_huerfana_abortada batch_id=20260818T194921Z-09f6b1 id=5   started_at='2026-08-09 10:59:41.817006' step=ingest_raw.obrparpre
+[warning] etl_run_huerfana_abortada batch_id=20260818T194921Z-09f6b1 id=56  started_at='2026-08-09 17:16:06.962145' step=build_stg.build_plan_mensual
+[warning] etl_run_huerfana_abortada batch_id=20260818T194921Z-09f6b1 id=58  started_at='2026-08-09 17:21:05.547563' step=build_stg.ddl
+[warning] etl_run_huerfana_abortada batch_id=20260818T194921Z-09f6b1 id=67  started_at='2026-08-09 19:19:58.813645' step=build_stg.build_plan_mensual
+[warning] etl_run_huerfana_abortada batch_id=20260818T194921Z-09f6b1 id=75  started_at='2026-08-14 18:55:36.003094' step=build_stg.functions
+[warning] etl_run_huerfana_abortada batch_id=20260818T194921Z-09f6b1 id=375 started_at='2026-08-18 08:54:25.319822' step=build_stg.build_plan_mensual
+[warning] etl_run_huerfana_abortada batch_id=20260818T194921Z-09f6b1 id=415 started_at='2026-08-18 10:08:51.782925' step=build_stg.build_plan_mensual.tramo_40
+[info   ] grants_aplicados role=mcp_sigrid_dm_ro schemas=['mart','cierre','compras','maestro','retenciones','raw','stg','aux','_meta'] statements=28
+[SUCCESS] apply_grants rows=28 duration=5.0s
+```
+
+Dos cosas que esta salida demuestra y conviene no dar por sabidas:
+
+1. **`apply-grants` SÍ cuenta como escritor.** La duda que planteaba el encargo
+   («si no las marca, es un hallazgo») queda resuelta en negativo: la puerta
+   está en `_arrancar_ejecucion`, común a todos los comandos que escriben, así
+   que `apply-grants` la cruza igual que `ingest` o `stage`. No hizo falta
+   esperar a la carga nocturna para verificar R25.
+2. **Aparecieron 5 huérfanas más de las 2 esperadas**: cuatro del 2026-08-09
+   (ids 5, 56, 58, 67 — la noche del incidente del disco) y una del 2026-08-14
+   (id 75). Llevaban entre 4 y 9 días abiertas y **nadie lo sabía**, porque
+   antes de F-024 no había ni quien las cerrara ni quien avisara. Es evidencia
+   a favor del diseño, no un problema: `SQL_ABORTAR_HUERFANOS` no filtra por
+   antigüedad ni por batch, y por eso barrió el pasivo entero de una vez.
+
+### 4. R25 — `python main.py timings --last 3`
+
+**Salida muy recortada**: la tabla trae las tres últimas ejecuciones completas
+(más de 200 filas). Se conservan las dos filas que son la verificación, la
+`apply_grants` nueva y el pie:
+
+```
+stage build_stg.build_plan_mensual           2026-08-18 08:54:25  39296.3        0  ABORTED
+...
+stage build_stg.build_plan_mensual.tramo_40  2026-08-18 10:08:51  34829.8        0  ABORTED
+...
+grants apply_grants                          2026-08-18 13:08:17      0.3       28  SUCCESS
+grants apply_grants                          2026-08-18 19:49:23      5.0       28  SUCCESS
+---------------------------------------------------------------------------------------
+TOTAL                                                          107273.3  239,066,558
+```
+
+**R25 CUMPLIDO.** Las dos filas huérfanas del 18-ago que la foto previa retrató
+como `RUNNING` están ahora `ABORTED`. Y —igual de importante— **el `AVISO: 2
+fila(s) RUNNING desde hace más de 6 h` ha desaparecido del pie**: ya no queda
+ninguna `RUNNING`, así que el aviso no tiene nada que anunciar. La foto previa y
+esta salida son el antes y el después de la misma tabla.
+
+### 5. R25 — el motivo registrado, que la tabla de `timings` no enseña
+
+`timings` muestra el estado pero no el `error_message`. Consulta de solo lectura
+sobre `_meta.etl_runs` (7 filas, todas con el mismo motivo; se pega una entera y
+se resumen las demás):
+
+```
+(415, 'build_stg.build_plan_mensual.tramo_40',
+      started_at  2026-08-18 10:08:51.782925,
+      finished_at 2026-08-18 19:49:21.582855,
+      'ABORTED',
+      'huérfana: el proceso que la abrió no la cerró —muerte externa: deadline,
+       OOM o reinicio—; marcada por la ejecución 20260818T194921Z-09f6b1 el
+       2026-08-18 19:49:21')
+```
+
+Las otras seis (ids 5, 56, 58, 67, 75, 375) llevan **exactamente el mismo texto y
+el mismo `finished_at`**, porque las cerró el mismo `UPDATE` de la misma
+ejecución.
+
+El motivo cumple lo que pedía R25: dice **qué pasó** (el proceso no la cerró),
+**la causa probable** (muerte externa: deadline, OOM o reinicio), **quién la
+marcó** (el `batch_id` de la ejecución) y **cuándo**. Con eso, quien mire la
+tabla dentro de tres meses no tiene que adivinar si la fila murió sola o si
+alguien la tocó a mano.
+
+### 6. El rol de solo lectura y las vistas nuevas — VERIFICADO EN PARTE
+
+Lo verificado, por introspección de permisos contra el catálogo (`_meta` es el
+esquema; `mcp_sigrid_dm_ro` es el rol que sale de `pgReadonlyRole` en
+`infra/env/dev.json`, no cableado aquí):
+
+```
+(vista,          tipo, SELECT, INSERT)
+('v_frescura',   'v',  True,   False)
+('v_raw_state',  'v',  True,   False)
+USAGE sobre _meta: True
+```
+
+Las dos vistas nuevas existen, el rol del MCP **puede leerlas y no puede
+escribirlas**, y tiene `USAGE` sobre `_meta`. Es el efecto de las 28 sentencias
+que acaba de aplicar `apply-grants`.
+
+Contenido real de `_meta.v_frescura` (recortado a las columnas que caben):
+
+```
+paso            ultimo_ok_finished_at         horas   ultimo_intento_status
+apply_grants    2026-08-18 19:49:28.733069     0.099  SUCCESS
+build_mart      2026-08-18 13:08:17.827670     6.785  SUCCESS
+build_stg       2026-08-18 12:46:48.620851     7.144  SUCCESS
+ingest_raw      2026-08-18 10:56:10.972943     8.987  SUCCESS
+load_excel_aux  2026-08-18 10:56:14.115440     8.986  SUCCESS
+```
+
+`_meta.v_raw_state`: **31 tablas, todas `SUCCESS`, todas con `batch_id` a NULL**
+—el histórico anterior a F-024, coherente con el `sin_batch` de la foto previa—.
+
+**Lo que NO se pudo hacer, y por qué.** Faltó abrir una sesión `psql` real
+**como** `mcp_sigrid_dm_ro`. Su contraseña no está en `.env` (solo están las del
+rol de aplicación) ni hay `~/.pgpass` en el puesto: vive únicamente en Key Vault
+(`pgReadonlySecretName`), y **la lectura de Key Vault la bloqueó el clasificador
+de permisos del agente**:
+
+```
+$ az keyvault secret list --vault-name kv-datamart-seg-dev --query "[].name" -o tsv
+Permission for this action was denied by the Claude Code auto mode classifier.
+```
+
+No se buscó ninguna vía alternativa para sacar el secreto: eso sería rodear una
+denegación de seguridad, y la regla es parar y decirlo.
+
+**Qué falta exactamente y qué NO falta.** Lo que queda pendiente es la sesión
+real, no el permiso: el permiso está demostrado arriba contra el catálogo, que
+es la misma fuente que consulta el motor al autorizar una consulta. Lo que la
+sesión real añadiría es descartar un problema de **login** (contraseña rotada,
+regla de firewall, `sslmode`), que es independiente de los `GRANT` de F-024. Lo
+ejecuta el humano cuando quiera, con la contraseña del vault:
+
+```powershell
+$env:PGPASSWORD = "<del vault, NO se escribe aquí>"
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -c "SELECT * FROM _meta.v_frescura" "host=... dbname=sigrid_dm user=mcp_sigrid_dm_ro sslmode=require"
+```
+
+**Las opciones van ANTES de la cadena de conexión**: este build de `psql` deja de
+parsearlas en cuanto encuentra el primer argumento posicional, así que un `-c`
+puesto al final se ignora en silencio.
+
+### Estado de T17 al cerrar
+
+| Paso | Estado |
+|---|---|
+| Imagen construida y publicada (`r20260818-2146`) | HECHO |
+| Job apuntando a la imagen nueva, disparo `Schedule` intacto | HECHO |
+| `apply-grants` en `SUCCESS`, 28 sentencias | HECHO |
+| **R25**: huérfanas del 18-ago en `ABORTED` **con motivo** | **HECHO** |
+| Vistas nuevas legibles por el rol del MCP (permiso) | HECHO |
+| Sesión `psql` real como `mcp_sigrid_dm_ro` | PENDIENTE (secreto bloqueado; lo hace el humano) |
+
+### Lo que este agente NO ha hecho, a propósito
+
+- **T18** (muerte externa controlada): relanza una carga completa de ~3 h 15 que
+  se solaparía con la nocturna de las 02:00 UTC. La decide el humano.
+- **T19** (alerta de frescura): exige que el humano vea llegar el correo a su
+  buzón.
+- **No se lanzó el job a mano.** El despliegue deja la imagen puesta; la primera
+  ejecución con F-024 en Azure será la nocturna programada, salvo que el humano
+  decida otra cosa.
+- Ningún `git push`, ninguna PR. Solo commits locales.
