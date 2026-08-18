@@ -64,6 +64,27 @@ el cambio a URIs de blob en el job y las verificaciones 2-3 van DESPUÉS
 de leer la primera noche real. Pendiente en F-023: eso, los secretos
 duplicados (bloque 2, sin OK aún) y el puesto (bloque 3, sin OK aún).
 
+**PRIMERA NOCHE REAL DEL JOB (18-ago 02:00 UTC): FAILED, causa cazada y
+corregida a la mañana siguiente.** Las 31 tablas de la ingesta murieron en
+el mismo segundo con `HTTP 400` de sigrid-api: `timeout_seconds ... <= 230,
+input 300`. El default de `SIGRID_API_TIMEOUT_S` en el código era 300 y el
+ajuste a 230 vivía SOLO en los `.env` del puesto, que el job no lleva
+(«funciona en mi máquina»). Sin daño: ingesta transaccional, nada
+escrito; stage/mart saltados; la alerta funcionó en real (Activated
+04:06:56, Deactivated 04:21:52 local). **Fix (commit `193fc3c`)**:
+default 230 con tope `le=230` en `config/settings.py` (un valor mayor por
+entorno se rechaza al arrancar) + `tests/test_f023_timeout_sigrid_api.py`
+(4 tests). Imagen `r20260818-1003` publicada y job actualizado a ella
+(`85_update_job.ps1` tenía el MISMO bug de `-Tag` que `80`; corregido en
+`be971ec`). Lección apuntada: las pruebas manuales del job van SIN
+`--command`/`--image` (el override borra las variables de entorno del
+job y `Settings()` falla por variables ausentes — así murió la prueba
+`check-api`, no por el fix). **Carga completa lanzada desde el job a las
+10:08:41 local (`caj-datamart-seg-dev-o03rx36`)** tal cual la lanzará el
+cron; a las 10:11 la ingesta ya llevaba `con` (2.172.547 filas), `conext`
+y `obr` — el fix confirmado en real. Revisar al terminar (~3-4 h):
+`timings`, resumen final y buzón sin Activated.
+
 **Cabos del puesto (en F-023)**: línea de `hosts`, reglas de firewall
 (`-2026-08-17-rango`, y `ClientPgris` / `FirewallIPAddress_2026-6-16` solo
 con confirmación de que nadie más las usa), `SIGRID_API_PAGE_SIZE=50000`.
