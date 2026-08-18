@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import os
 import random
 import subprocess
 import sys
@@ -24,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 from harness.alcance import Alcance, alcance_de_feature
-from harness.rigor import RUTA_RIGOR, cargar_rigor, timeout_mutacion
+from harness.rigor import RUTA_RIGOR, cargar_rigor, timeout_mutacion, workers_mutacion
 from harness.servicios import Servicio, cargar_servicios, interprete, servicio_de_ruta
 
 Posicion = tuple[int, int]
@@ -36,6 +37,11 @@ TIMEOUT = "timeout"
 
 #: Segundos máximos por mutante si nadie configura otra cosa.
 TIMEOUT_POR_DEFECTO = 120
+
+#: Tope del número de workers CALCULADO por defecto. Más allá, la máquina se
+#: pasa el rato cambiando de contexto y cada suite roza su timeout. No limita
+#: lo que se pida a mano con `--workers` ni lo declarado en `rigor.json`.
+TOPE_WORKERS = 16
 
 #: Código con el que pytest avisa de que no ha recogido NINGÚN test. No es un
 #: fallo de la suite: es que no hay suite. Contarlo como mutante muerto daría
@@ -309,7 +315,10 @@ class EjecutorPytest:
 
 
 def ejecutor_para(
-    fichero: str, servicios: list[Servicio], raiz: str = "."
+    fichero: str,
+    servicios: list[Servicio],
+    raiz: str = ".",
+    raiz_venvs: str | None = None,
 ) -> EjecutorPytest:
     """Ejecutor con el que se juzga un mutante, según a qué servicio pertenece.
 
@@ -317,13 +326,19 @@ def ejecutor_para(
     su directorio y con su intérprete. Todo lo demás —código de la raíz, o un
     `.py` suelto dentro de un servicio de otro lenguaje— con la suite de la
     raíz, como en un repositorio de un solo proyecto.
+
+    `raiz_venvs` separa DÓNDE se ejecuta la suite de DÓNDE vive el entorno
+    virtual: la campaña paralela lanza los tests dentro de un `git worktree`
+    —que no trae venvs, porque no están versionados— con el intérprete del
+    árbol principal. Sin él, ambas cosas son `raiz` y el comportamiento es
+    exactamente el de siempre.
     """
     servicio = servicio_de_ruta(fichero, servicios)
     if servicio is None or servicio.lenguaje != "python":
         return EjecutorPytest(raiz=raiz)
     return EjecutorPytest(
         raiz=str(Path(raiz) / servicio.ruta),
-        ejecutable=interprete(servicio, raiz),
+        ejecutable=interprete(servicio, raiz_venvs or raiz),
     )
 
 
@@ -549,7 +564,36 @@ def _analizar_argumentos(argv: list[str] | None) -> argparse.Namespace:
     analizador.add_argument("--max-mutantes", type=int, default=None)
     analizador.add_argument("--semilla", type=int, default=None)
     analizador.add_argument("--salida", default=None, help="Ruta del informe")
+    analizador.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help=(
+            "Evaluadores concurrentes, cada uno en su git worktree. 1 = campaña "
+            "en serie sobre el propio árbol (lo de siempre). Sin este flag, "
+            "'mutacion.workers' de harness/rigor.json o los núcleos menos dos."
+        ),
+    )
     return analizador.parse_args(argv)
+
+
+def workers_por_defecto() -> int:
+    """Workers cuando nadie dice nada: los núcleos menos dos, con tope.
+
+    Menos dos para dejar respirar a la máquina —el coordinador y quien la esté
+    usando— y con tope porque a partir de ahí las suites simultáneas se estorban
+    entre ellas y empiezan a rozar su propio timeout.
+    """
+    return min(max(1, (os.cpu_count() or 1) - 2), TOPE_WORKERS)
+
+
+def resolver_workers(pedidos: int | None, configurados: int | None) -> int:
+    """Número de workers, por precedencia: `--workers` > `rigor.json` > default."""
+    if pedidos is not None:
+        return pedidos
+    if configurados is not None:
+        return configurados
+    return workers_por_defecto()
 
 
 def _timeout_configurado() -> int:
@@ -564,6 +608,14 @@ def _timeout_configurado() -> int:
         return timeout_mutacion(cargar_rigor(RUTA_RIGOR))
     except ValueError:
         return TIMEOUT_POR_DEFECTO
+
+
+def _workers_configurados() -> int | None:
+    """Workers declarados en `harness/rigor.json`, o `None` si no hay clave."""
+    try:
+        return workers_mutacion(cargar_rigor(RUTA_RIGOR))
+    except ValueError:
+        return None
 
 
 def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
@@ -592,16 +644,39 @@ def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
     def factoria(fichero: str) -> object:
         return ejecutor_para(fichero, servicios, opciones.raiz)
 
-    informe = ejecutar_campania(
-        alcance,
-        ejecutor or EjecutorPytest(raiz=opciones.raiz),
-        timeout_s=timeout_s,
-        raiz=opciones.raiz,
-        max_mutantes=opciones.max_mutantes,
-        semilla=opciones.semilla,
-        eco=lambda linea: print(linea, flush=True),
-        ejecutor_de=factoria if servicios and ejecutor is None else None,
-    )
+    workers = resolver_workers(opciones.workers, _workers_configurados())
+
+    if workers >= 2 and ejecutor is None:
+        # Import perezoso: `harness.mutacion_paralela` se apoya en este módulo,
+        # y al revés solo aquí. Así no hay ciclo de importación que gestionar.
+        from harness.mutacion_paralela import ejecutar_campania_paralela
+
+        print(f"Campaña paralela: hasta {workers} workers, uno por worktree.")
+        try:
+            informe = ejecutar_campania_paralela(
+                alcance,
+                servicios,
+                timeout_s=timeout_s,
+                raiz=opciones.raiz,
+                workers=workers,
+                max_mutantes=opciones.max_mutantes,
+                semilla=opciones.semilla,
+                eco=lambda linea: print(linea, flush=True),
+            )
+        except ValueError as error:
+            print(str(error), file=sys.stderr)
+            return 2
+    else:
+        informe = ejecutar_campania(
+            alcance,
+            ejecutor or EjecutorPytest(raiz=opciones.raiz),
+            timeout_s=timeout_s,
+            raiz=opciones.raiz,
+            max_mutantes=opciones.max_mutantes,
+            semilla=opciones.semilla,
+            eco=lambda linea: print(linea, flush=True),
+            ejecutor_de=factoria if servicios and ejecutor is None else None,
+        )
 
     destino = Path(opciones.salida or f"progress/mutacion_{opciones.feature}.md")
     escribir_informe(informe, destino)

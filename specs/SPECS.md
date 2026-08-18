@@ -32,7 +32,7 @@ Secciones obligatorias:
 - **Ficheros que NO se tocan** (los colindantes que podrían tentarte).
 - **Clases/funciones**: firma y responsabilidad, capa hexagonal a la que
   pertenecen (domain / application / infrastructure).
-- **SQL** (si aplica): capa (`stg`/`mart`/`cierre`/...), numeración del
+- **SQL** (si aplica): capa/esquema al que pertenece, numeración del
   fichero siguiendo la convención `NN_nombre.sql`, tablas/vistas afectadas.
 - **Riesgos y decisiones**: alternativas descartadas y por qué.
 

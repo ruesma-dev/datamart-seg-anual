@@ -15,19 +15,22 @@ código.
 
 1. Ejecuta `bash harness/init.sh`. Si falla → CHANGES_REQUESTED directo.
 2. Lee `requirements.md` (o los `acceptance`) y verifica trazabilidad: cada
-   requisito debe tener al menos un test que lo cubra. Ejecuta
-   `python -m pytest -q` y comprueba que esos tests existen y pasan.
+   requisito debe tener al menos un test que lo cubra. Ejecuta la suite de
+   tests del proyecto y comprueba que esos tests existen y pasan.
 3. Lee el informe `progress/impl_F-XXX.md` y el diff de la rama
    (`git diff dev...HEAD`) y valida contra `design.md`: ¿solo los ficheros
    previstos? ¿Arquitectura hexagonal respetada (dominio sin infraestructura,
-   SQL en su capa correcta)?
-4. Valida `docs/CONVENTIONS.md`: primera línea con ruta, PEP8, type hints,
+   cada artefacto en su capa)?
+4. Valida `docs/CONVENTIONS.md`: primera línea con ruta, estilo del lenguaje,
    sin secretos hardcodeados, sin prints de debug.
 5. **Resuelve el nivel de rigor de la feature y valida contra él** (ver la
    sección siguiente).
-6. Recorre `CHECKPOINTS.md` completo (C1–C5, incluidos C3 bis y **C4 bis**)
-   marcando `[x]` / `[ ]` en tu informe. Un solo `[ ]` → CHANGES_REQUESTED.
+6. Recorre `CHECKPOINTS.md` completo (C1–C5, C3 bis y **C4 bis** incluidos)
+   marcando `[x]`, `[ ]` o `N/A` en tu informe. Un `[ ]`, o un `N/A` sin
+   justificar por escrito, → CHANGES_REQUESTED.
 7. Comprueba `tasks.md` con todas las tareas `[x]` y commits `F-XXX Tn: ...`.
+   En features `sdd=false` no hay `tasks.md`: aplica la nota de cabecera de
+   `CHECKPOINTS.md` y valida contra los `acceptance`.
 
 ## Validación contra el nivel de rigor (obligatoria)
 
@@ -57,12 +60,23 @@ nivel de rigor dice cuánta evidencia hay que exigir.
    además dos o tres supervivientes y confirma que existen como mutantes
    reales, con el mismo operador y el mismo texto original→mutado. Es la
    única defensa contra un informe de mutación escrito a mano.
+   **Si la campaña declara cero mutantes**, el recálculo no distingue entre
+   «no había nada que mutar» y «el generador está roto o el informe es
+   falso»: ambos dan 0. Haz la prueba de control: ejecuta
+   `generar_mutantes` sobre los ficheros del diff **ignorando la exclusión
+   de alcance**; si ahí sí salen mutantes, el cero es legítimo (exclusión
+   por diseño); si tampoco salen, el cero es sospechoso y hay que
+   investigarlo antes de aprobar.
 5. El informe del implementer debe traer la sección **«Evidencias»** con los
    cuatro números (tests, cobertura de lo cambiado, mutantes y
    supervivientes, tiempo de la suite).
 6. **Ningún checkpoint marcado N/A sin justificación escrita** en tu informe.
    Un N/A sin motivo se trata como checkbox vacío. No haber instalado una
    herramienta o no haber lanzado la campaña no es un motivo.
+
+En proyectos que no sean Python, las puertas de cobertura y mutación no están
+disponibles: eso es un N/A **justificado por el lenguaje**, y hay que
+escribirlo. La fase RED y la sección «Evidencias» siguen siendo exigibles.
 
 ## Informe (en disco, no en chat)
 
