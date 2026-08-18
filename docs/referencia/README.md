@@ -21,7 +21,7 @@ está en el código sino en una norma de negocio.
 
 | Fichero | Qué es |
 |---|---|
-| `01_sigrid_tablas.md` | Diccionario de la BBDD de Sigrid: tablas, campos, tipos e índices. Referencia del sistema origen y base para auditar `config/tables_sigrid.yaml`. |
+| `01_sigrid_tablas.md` | **Puntero, no documento.** El diccionario de la BBDD de Sigrid (tablas, campos, tipos e índices) es documentación del ecosistema y vive en `azure-apps/sigrid_tablas.md` desde el 2026-08-18; aquí solo queda lo imprescindible y el enlace. |
 | `02_azure_landing_zone_acens.md` | Diseño de la Landing Zone de Azure entregado por acens. Contexto del despliegue (F-005, F-003, F-006). **Versión redactada**: sin rangos de red ni correos. |
 | `03_sigrid_api.md` | **Puntero, no documento.** La documentación de `sigrid-api` vive en `azure-apps/sigrid_api.md`; aquí solo queda lo imprescindible y el enlace. |
 | `04_azure_inventario_dev.md` | Inventario de la suscripción Azure «Ruesma» tomado con `az` (solo lectura) el 2026-08-08: resource groups, red, almacenamiento, secretos y bases de datos, contrastado con el diseño de acens. **Versión redactada**: sin IDs de suscripción/tenant, sin IPs ni rangos de red, sin valores de secretos. |
