@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -410,6 +411,13 @@ def test_f019_r11_un_recuento_no_disponible_cuenta_como_cero_filas() -> None:
 PESOS_CORTOS: dict[int, int] = {1: 600, 2: 500, 3: 400}
 MAXIMO_CORTO = 1_000
 
+# Tablas que declara el YAML falso de estos tests. Las usan a la vez
+# `settings_falsos` (lo que la puerta de F-024 exige) y
+# `PgFalso.fetch_estado_raw` (lo que dice haber): si dejaran de coincidir, la
+# puerta de coherencia pararía el step antes de llegar a la de disco, que es lo
+# que estos tests miden.
+TABLAS_DEL_YAML_FALSO = ("con", "obr", "obrparpre")
+
 
 class PgFalso:
     """Doble de `PostgresClient` que deja traza de TODO lo que le piden.
@@ -466,10 +474,36 @@ class PgFalso:
         return self._filas.pop(0)
 
     # --- lo que usa el resto del step ---
-    def record_run_start(self, stage: str, step: str) -> int:
+    def record_run_start(
+        self, stage: str, step: str, batch_id: str | None = None
+    ) -> int:
+        # `batch_id` llegó con F-024: el doble sigue la firma real del cliente.
+        # Aquí no se comprueba (eso es de F-024), pero tiene que ADMITIRLO o el
+        # doble dejaría de parecerse a lo que sustituye.
         self.pasos_registrados.append(step)
         self._ultimo_run += 1
         return self._ultimo_run
+
+    def fetch_estado_raw(self) -> list:
+        """Un `raw` coherente: F-024 puso una puerta al principio de `run()`.
+
+        Estos tests son sobre la puerta de DISCO, así que la de coherencia
+        tiene que dejarlos pasar. Se declaran las mismas tablas que
+        `settings_falsos`, todas del mismo batch y en SUCCESS.
+        """
+        from etl_sigrid.domain.coherencia import EstadoTablaRaw
+
+        return [
+            EstadoTablaRaw(
+                tabla=tabla,
+                status="SUCCESS",
+                batch_id="20260819T020000Z-f019f0",
+                started_at=datetime(2026, 8, 19, 2, 0, 0),
+                finished_at=datetime(2026, 8, 19, 2, 30, 0),
+                filas=10,
+            )
+            for tabla in TABLAS_DEL_YAML_FALSO
+        ]
 
     def record_run_end(
         self,
@@ -532,6 +566,12 @@ def settings_falsos(
         ),
         business_rules={
             "sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15"}}
+        },
+        # F-024: de aquí saca la puerta de coherencia qué tablas exigir. Las
+        # mismas que devuelve `PgFalso.fetch_estado_raw`, para que la puerta
+        # pase y estos tests sigan midiendo lo suyo: la puerta de disco.
+        tables_sigrid={
+            "tables": [{"source_table": t} for t in TABLAS_DEL_YAML_FALSO]
         },
     )
 
