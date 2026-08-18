@@ -20,21 +20,37 @@ Ninguno abre red ni BBDD.
 
 from __future__ import annotations
 
+import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
-from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
+from etl_sigrid.domain.coherencia import (
+    EstadoPaso,
+    EstadoTablaRaw,
+    evaluar_coherencia_raw,
+)
 from etl_sigrid.domain.entities import StepResult, StepStatus
-from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
+from etl_sigrid.infrastructure.postgres.frescura import (
+    MARCA_INCOHERENTE,
+    UMBRAL_FRESCURA_HORAS,
+    FilaFrescura,
+    format_estado_raw,
+    format_frescura,
+)
 from etl_sigrid.infrastructure.postgres.postgres_client import (
     PostgresClient,
     _split_sql_statements,
 )
 from etl_sigrid.infrastructure.postgres.step_run_recorder import PostgresStepRunRecorder
+from etl_sigrid.infrastructure.postgres.timings import (
+    UMBRAL_HUERFANA_HORAS,
+    Timing,
+    format_timings,
+)
 from tests.test_f019_tramos import CursorFalso, cliente_con
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -575,3 +591,354 @@ def test_f024_r16_fetch_frescura_mapea_las_ocho_columnas() -> None:
     assert filas[1].ultimo_ok_finished_at is None
     assert filas[1].horas_desde_ultimo_ok is None
     assert filas[1].ultimo_intento_status == "RUNNING"
+
+
+# ---------------------------------------------------------------------------
+# R6 · `timings` enseña ABORTED y avisa de las RUNNING sospechosas
+# ---------------------------------------------------------------------------
+
+AHORA = datetime(2026, 8, 19, 9, 0, 0)
+
+
+def medicion(
+    step: str,
+    status: str = "SUCCESS",
+    inicio: datetime | None = None,
+    fin: datetime | None = None,
+) -> Timing:
+    return Timing(
+        stage="stage",
+        step=step,
+        started_at=inicio if inicio is not None else datetime(2026, 8, 19, 8, 0, 0),
+        finished_at=fin,
+        status=status,
+        rows_processed=10,
+    )
+
+
+def test_f024_r6_timings_muestra_aborted() -> None:
+    """`ABORTED` sale en la columna de estado como cualquier otro estado.
+
+    Es la mitad visible de la feature: hasta ahora, una fila que quedó abierta
+    seguía diciendo RUNNING para siempre y `timings` mentía.
+    """
+    salida = format_timings(
+        [
+            medicion("build_stg.build_plan_mensual", status="ABORTED",
+                     fin=datetime(2026, 8, 19, 8, 30, 0)),
+        ],
+        ahora=AHORA,
+    )
+
+    assert "ABORTED" in salida
+    assert "build_stg.build_plan_mensual" in salida
+
+
+def test_f024_r6_timings_avisa_de_running_antiguas() -> None:
+    """Más de 6 h en RUNNING: casi seguro huérfana de un proceso muerto."""
+    salida = format_timings(
+        [
+            medicion("build_stg.build_plan_mensual", status="RUNNING",
+                     inicio=datetime(2026, 8, 18, 3, 10, 0)),
+            medicion("build_stg.build_plan_mensual.tramo_39", status="RUNNING",
+                     inicio=datetime(2026, 8, 18, 3, 55, 0)),
+        ],
+        ahora=AHORA,
+    )
+
+    assert "2 fila" in salida, "el aviso no dice cuántas son"
+    assert "RUNNING" in salida
+    assert f"{UMBRAL_HUERFANA_HORAS} h" in salida
+    assert "ABORTED" in salida, "el aviso no dice qué va a pasar con ellas"
+    # Va al PIE, no en una columna nueva: no rompe a quien parsee la tabla.
+    assert salida.splitlines()[-1].strip() != ""
+    assert "AVISO" in salida.splitlines()[-1] or "AVISO" in salida.splitlines()[-2]
+
+
+def test_f024_r6_timings_no_avisa_de_running_recientes() -> None:
+    """Un paso que lleva media hora corriendo está, sencillamente, corriendo."""
+    salida = format_timings(
+        [
+            medicion("build_stg", status="RUNNING",
+                     inicio=datetime(2026, 8, 19, 8, 30, 0)),
+        ],
+        ahora=AHORA,
+    )
+
+    assert "AVISO" not in salida
+    assert "RUNNING" in salida
+
+
+def test_f024_r6_timings_no_avisa_de_pasos_antiguos_ya_cerrados() -> None:
+    """Solo `RUNNING`. Un SUCCESS de hace tres días no es ninguna huérfana."""
+    for estado_cerrado in ("SUCCESS", "FAILED", "ABORTED", "SKIPPED"):
+        salida = format_timings(
+            [
+                medicion("build_stg", status=estado_cerrado,
+                         inicio=datetime(2026, 8, 16, 2, 0, 0),
+                         fin=datetime(2026, 8, 16, 4, 0, 0)),
+            ],
+            ahora=AHORA,
+        )
+        assert "AVISO" not in salida, f"avisa por un paso {estado_cerrado}"
+
+
+def test_f024_r6_el_umbral_de_la_huerfana_son_seis_horas_exactas() -> None:
+    """El límite es SUPERARLO, no alcanzarlo.
+
+    Seis horas justas es una carga larga que sigue viva (el pipeline entero
+    tarda ~3 h 15, pero el timeout del job es de 5 h): no se acusa de huérfana
+    a algo que todavía puede estar trabajando.
+    """
+    assert UMBRAL_HUERFANA_HORAS == 6
+
+    justo = AHORA - timedelta(hours=UMBRAL_HUERFANA_HORAS)
+    un_poco_mas = justo - timedelta(minutes=30)
+
+    assert "AVISO" not in format_timings(
+        [medicion("build_stg", status="RUNNING", inicio=justo)], ahora=AHORA
+    )
+    assert "AVISO" in format_timings(
+        [medicion("build_stg", status="RUNNING", inicio=un_poco_mas)], ahora=AHORA
+    )
+
+
+def test_f024_r6_sin_ahora_se_usa_el_reloj() -> None:
+    """En producción nadie inyecta `ahora`: sale de `datetime.utcnow()`."""
+    hace_un_dia = datetime.utcnow() - timedelta(days=1)
+    salida = format_timings([medicion("build_stg", status="RUNNING", inicio=hace_un_dia)])
+    assert "AVISO" in salida
+
+
+def test_f024_r6_sin_mediciones_no_hay_aviso_que_dar() -> None:
+    """El mensaje de «sin mediciones» de F-005 sigue intacto."""
+    salida = format_timings([], ahora=AHORA)
+    assert "Sin mediciones" in salida
+    assert "AVISO" not in salida
+
+
+# ---------------------------------------------------------------------------
+# R19 · Formato y veredicto de frescura
+# ---------------------------------------------------------------------------
+
+
+def fila_frescura(
+    paso: str = "build_mart",
+    ultimo_ok: datetime | None = datetime(2026, 8, 19, 5, 25, 0),
+    estado_intento: str = "SUCCESS",
+) -> FilaFrescura:
+    return FilaFrescura(
+        paso=paso,
+        ultimo_ok_finished_at=ultimo_ok,
+        ultimo_ok_batch_id="20260819T020000Z-aaaaaa" if ultimo_ok else None,
+        ultimo_ok_filas=987_654 if ultimo_ok else None,
+        horas_desde_ultimo_ok=None,
+        ultimo_intento_started_at=datetime(2026, 8, 19, 2, 40, 0),
+        ultimo_intento_status=estado_intento,
+        ultimo_intento_error=None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("horas_desde_el_ok", "esperado"),
+    [
+        (0.5, "FRESCO"),
+        (29.9, "FRESCO"),
+        (30.0, "FRESCO"),     # el límite es superarlo, no alcanzarlo
+        (30.1, "CADUCADO"),
+        (72.0, "CADUCADO"),
+    ],
+)
+def test_f024_r19_format_frescura_veredictos(
+    horas_desde_el_ok: float, esperado: str
+) -> None:
+    ultimo_ok = AHORA - timedelta(hours=horas_desde_el_ok)
+    _, veredicto = format_frescura(
+        [fila_frescura(ultimo_ok=ultimo_ok)],
+        umbral_horas=UMBRAL_FRESCURA_HORAS,
+        paso="build_mart",
+        ahora=AHORA,
+    )
+    assert veredicto == esperado
+
+
+def test_f024_r19_sin_ningun_ok_el_veredicto_lo_dice() -> None:
+    """`SIN BUILD REGISTRADO` no es lo mismo que `CADUCADO`: uno significa
+    «lo que ves es viejo» y el otro «no hay nada que ver»."""
+    _, veredicto = format_frescura(
+        [fila_frescura(ultimo_ok=None, estado_intento="FAILED")],
+        umbral_horas=UMBRAL_FRESCURA_HORAS,
+        paso="build_mart",
+        ahora=AHORA,
+    )
+    assert veredicto == "SIN BUILD REGISTRADO"
+
+
+def test_f024_r19_un_paso_que_no_esta_en_la_vista_no_tiene_build() -> None:
+    """Preguntar por un paso que nunca corrió no es un error: es la respuesta."""
+    _, veredicto = format_frescura(
+        [fila_frescura(paso="build_stg")],
+        umbral_horas=UMBRAL_FRESCURA_HORAS,
+        paso="build_mart",
+        ahora=AHORA,
+    )
+    assert veredicto == "SIN BUILD REGISTRADO"
+
+
+def test_f024_r19_el_texto_ensena_todos_los_pasos() -> None:
+    """La tabla sale entera aunque el veredicto sea de un paso: el diagnóstico
+    de «mart está viejo» suele estar en la fila de `ingest_raw`."""
+    texto, veredicto = format_frescura(
+        [
+            fila_frescura(paso="build_mart", ultimo_ok=AHORA - timedelta(hours=50)),
+            fila_frescura(paso="ingest_raw", ultimo_ok=None, estado_intento="FAILED"),
+        ],
+        umbral_horas=UMBRAL_FRESCURA_HORAS,
+        paso="build_mart",
+        ahora=AHORA,
+    )
+
+    assert "build_mart" in texto
+    assert "ingest_raw" in texto
+    assert veredicto == "CADUCADO"
+    assert "CADUCADO" in texto, "el veredicto tiene que salir también en el texto"
+    assert str(UMBRAL_FRESCURA_HORAS) in texto, "no se dice contra qué umbral se juzga"
+    assert "50" in texto, "no se dice cuántas horas lleva sin build"
+
+
+def test_f024_r19_sin_ninguna_fila_lo_dice_en_vez_de_petar() -> None:
+    texto, veredicto = format_frescura(
+        [], umbral_horas=UMBRAL_FRESCURA_HORAS, paso="build_mart", ahora=AHORA
+    )
+    assert veredicto == "SIN BUILD REGISTRADO"
+    assert texto.strip()
+
+
+def test_f024_r19_umbral_por_defecto_coincide_con_dev_json() -> None:
+    """El umbral vive en UN sitio conceptual y aparece en dos.
+
+    El contenedor no lleva `infra/env/dev.json`, así que el código no puede
+    leerlo en tiempo de ejecución: la constante y el fichero se escriben por
+    separado y este test es lo único que impide que diverjan. Si divergen, la
+    alerta de Azure vigila una ventana y `check-frescura` juzga con otra, y
+    nadie se entera hasta que falta un correo.
+    """
+    dev = json.loads(
+        (REPO_ROOT / "infra" / "env" / "dev.json").read_text(encoding="utf-8-sig")
+    )
+    assert dev["frescuraUmbralHoras"] == UMBRAL_FRESCURA_HORAS
+
+
+# ---------------------------------------------------------------------------
+# R20 · Formato del estado por tabla
+# ---------------------------------------------------------------------------
+
+
+def test_f024_r20_format_estado_raw_marca_las_incoherentes() -> None:
+    """Una línea por tabla, y las que rompen la coherencia, señaladas.
+
+    Sin la marca visual hay que comparar 32 batch_id a ojo, que es justo lo que
+    nadie hace a las 8 de la mañana.
+    """
+    buena = EstadoTablaRaw(
+        tabla="con", status="SUCCESS", batch_id="20260819T020000Z-aaaaaa",
+        started_at=datetime(2026, 8, 19, 2, 0, 0),
+        finished_at=datetime(2026, 8, 19, 2, 5, 0), filas=12_345,
+    )
+    muerta = EstadoTablaRaw(
+        tabla="obr", status="ABORTED", batch_id=None,
+        started_at=datetime(2026, 8, 19, 2, 5, 0), finished_at=None, filas=0,
+    )
+    vieja = EstadoTablaRaw(
+        tabla="obrparpre", status="SUCCESS", batch_id="20260818T020000Z-bbbbbb",
+        started_at=datetime(2026, 8, 18, 2, 0, 0),
+        finished_at=datetime(2026, 8, 18, 2, 40, 0), filas=999,
+    )
+
+    veredicto = evaluar_coherencia_raw(
+        [buena, muerta, vieja], ("con", "obr", "obrparpre", "obrfas")
+    )
+    texto = format_estado_raw([buena, muerta, vieja], veredicto)
+
+    # Cada tabla, con su estado, su batch, su fin y sus filas.
+    assert "con" in texto and "12,345" in texto
+    assert "obr" in texto and "ABORTED" in texto
+    assert "obrparpre" in texto and "20260818T020000Z-bbbbbb" in texto
+    assert "2026-08-19 02:05" in texto
+
+    # Con los batches MEZCLADOS van marcadas TODAS las que participan del
+    # reparto, incluidas las del batch nuevo. Es deliberado: cuando hay dos
+    # ejecuciones repartidas por raw no hay forma de saber cuál es la buena, y
+    # marcar solo un lado sería fabricar una certeza que nadie tiene. El
+    # veredicto de debajo desglosa batch por batch.
+    assert _linea_de(texto, "con").startswith(MARCA_INCOHERENTE)
+    assert _linea_de(texto, "obr").startswith(MARCA_INCOHERENTE)
+    assert _linea_de(texto, "obrparpre").startswith(MARCA_INCOHERENTE)
+
+    # Y cierra con el veredicto y el mensaje accionable de R9.
+    assert "KO" in texto
+    assert "python main.py ingest --full" in texto
+    assert "obrfas" in texto, "la tabla que falta no aparece por ningún sitio"
+
+
+def test_f024_r20_la_marca_discrimina_cuando_hay_una_sola_culpable() -> None:
+    """Una tabla que murió a medias y el resto del mismo batch: solo ella.
+
+    Es el contraste del test anterior. Si la marca saliera siempre en todas
+    las líneas no señalaría nada, y esto lo impide.
+    """
+    sanas = [
+        EstadoTablaRaw(
+            tabla=t, status="SUCCESS", batch_id="20260819T020000Z-aaaaaa",
+            started_at=datetime(2026, 8, 19, 2, 0, 0),
+            finished_at=datetime(2026, 8, 19, 2, 5, 0), filas=10,
+        )
+        for t in ("con", "obrparpre")
+    ]
+    rota = EstadoTablaRaw(
+        tabla="obr", status="RUNNING", batch_id="20260819T020000Z-aaaaaa",
+        started_at=datetime(2026, 8, 19, 2, 5, 0), finished_at=None, filas=0,
+    )
+
+    estados = [sanas[0], rota, sanas[1]]
+    texto = format_estado_raw(
+        estados, evaluar_coherencia_raw(estados, ("con", "obr", "obrparpre"))
+    )
+
+    assert _linea_de(texto, "obr").startswith(MARCA_INCOHERENTE)
+    assert not _linea_de(texto, "con").startswith(MARCA_INCOHERENTE)
+    assert not _linea_de(texto, "obrparpre").startswith(MARCA_INCOHERENTE)
+
+
+def test_f024_r20_con_todo_coherente_no_marca_nada() -> None:
+    estados = [
+        EstadoTablaRaw(
+            tabla=t, status="SUCCESS", batch_id="20260819T020000Z-aaaaaa",
+            started_at=datetime(2026, 8, 19, 2, 0, 0),
+            finished_at=datetime(2026, 8, 19, 2, 5, 0), filas=10,
+        )
+        for t in ("con", "obr")
+    ]
+    veredicto = evaluar_coherencia_raw(estados, ("con", "obr"))
+    texto = format_estado_raw(estados, veredicto)
+
+    assert MARCA_INCOHERENTE not in texto
+    assert "OK" in texto
+    assert "--sin-puerta" not in texto
+
+
+def test_f024_r20_sin_estados_lo_dice() -> None:
+    """`raw` vacío: es el caso de un datamart recién creado."""
+    veredicto = evaluar_coherencia_raw([], ("con",))
+    texto = format_estado_raw([], veredicto)
+
+    assert texto.strip()
+    assert "KO" in texto
+
+
+def _linea_de(texto: str, tabla: str) -> str:
+    """La línea de la tabla pedida, sin el margen izquierdo."""
+    for linea in texto.splitlines():
+        if linea.strip().lstrip(MARCA_INCOHERENTE).strip().startswith(tabla.strip()):
+            return linea.strip()
+    pytest.fail(f"no hay línea para la tabla {tabla!r} en:\n{texto}")
