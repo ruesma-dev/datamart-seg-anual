@@ -380,6 +380,39 @@ $env:PGPASSWORD = "<del vault, NO se escribe aquí>"
 parsearlas en cuanto encuentra el primer argumento posicional, así que un `-c`
 puesto al final se ignora en silencio.
 
+
+### 7. El rol de solo lectura, cerrado sin tocar ningún secreto (líder, 2026-08-18)
+
+El agente dejó pendiente la sesión `psql` como `mcp_sigrid_dm_ro` porque leer
+su contraseña del Key Vault quedó bloqueado. **Hizo bien en no buscarle la
+vuelta**: `az keyvault secret show` sobre esos secretos está prohibido en todo
+F-023, y un secreto que se lee acaba en algún historial.
+
+Lo que R25 exige demostrar —que los `GRANT` de `apply-grants` alcanzan a las
+vistas nuevas— se comprueba sin credenciales, preguntándole al catálogo por el
+rol. Consultado desde la conexión de la aplicación, en solo lectura:
+
+```
+USAGE sobre el esquema _meta para 'mcp_sigrid_dm_ro': True
+SELECT sobre _meta.v_frescura       para 'mcp_sigrid_dm_ro': True
+SELECT sobre _meta.v_raw_state      para 'mcp_sigrid_dm_ro': True
+
+GRANT registrados en information_schema para el rol:
+  _meta.etl_runs               SELECT
+  _meta.v_frescura             SELECT
+  _meta.v_raw_state            SELECT
+```
+
+`has_schema_privilege` y `has_table_privilege` responden por el rol indicado,
+no por quien pregunta, así que esto **es** la verificación del permiso: si
+faltara el `GRANT`, saldría `False`.
+
+Lo único que NO cubre es que la cadena de conexión del MCP funcione de punta a
+punta (contraseña vigente, regla de firewall, `sslmode`), que es un asunto de
+conectividad ajeno a F-024. Si el humano quiere cerrarlo del todo, basta con
+que abra una sesión `psql` con la contraseña que ya tiene y lea las dos vistas;
+no hace falta sacar el secreto del vault para ello.
+
 ### Estado de T17 al cerrar
 
 | Paso | Estado |
@@ -389,7 +422,8 @@ puesto al final se ignora en silencio.
 | `apply-grants` en `SUCCESS`, 28 sentencias | HECHO |
 | **R25**: huérfanas del 18-ago en `ABORTED` **con motivo** | **HECHO** |
 | Vistas nuevas legibles por el rol del MCP (permiso) | HECHO |
-| Sesión `psql` real como `mcp_sigrid_dm_ro` | PENDIENTE (secreto bloqueado; lo hace el humano) |
+| `GRANT` sobre las vistas nuevas para `mcp_sigrid_dm_ro` | **HECHO** (verificado por catálogo, §7, sin tocar el secreto) |
+| Sesión `psql` real como `mcp_sigrid_dm_ro` | Opcional: solo probaría conectividad, no los `GRANT` de F-024 |
 
 ### Lo que este agente NO ha hecho, a propósito
 
