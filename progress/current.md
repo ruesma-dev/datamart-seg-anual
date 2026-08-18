@@ -26,7 +26,163 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-024 · IMPLEMENTADA (Fase B) — en review; Fase C (Azure) pendiente del humano
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 · NOCHE (léelo antes que nada)
+
+Esta sección **sustituye** a la que hay más abajo con la misma fecha: aquella
+se escribió a mediodía y varias cosas han cambiado desde entonces.
+
+## Lo primero de mañana, en este orden
+
+1. **Comprobar la nocturna del 19 (02:00 UTC)**, que es la **primera ejecución
+   con las puertas de coherencia de F-024** y con la imagen `r20260818-2146`:
+
+   ```powershell
+   python main.py timings --last 1     # ¿SUCCESS de punta a punta? ¿algún ABORTED?
+   python main.py check-coherencia     # debe dar OK: todas las tablas del MISMO batch
+   python main.py check-frescura       # build_mart FRESCO con la hora de esta noche
+   ```
+
+   `check-coherencia` **tiene que pasar de KO a OK**: hasta hoy fallaba porque
+   `raw` era histórico sin `batch_id`; la carga nocturna escribe `batch_id` en
+   todas las tablas y la puerta debe darla por buena. Si sigue en KO, **para y
+   míralo**: sería un fallo real de la puerta, no un resto del pasado.
+
+2. **El buzón**: no debe haber llegado ningún «Activated». Si llegó, la carga
+   falló y el aviso funcionó.
+
+3. Si la nocturna salió limpia, seguir con la **Fase C de F-024** (abajo).
+
+> **Ojo con el firewall**: la conexión desde el puesto va por la regla
+> `datamart-puesto-pgris-2026-08-18`, creada ayer con la IP pública de
+> entonces. **Las IP del puesto rotan**: si los comandos mueren con
+> `connection timeout expired`, no es la base, es la regla. El comando para
+> recrearla, con sus dos trampas de sintaxis, está en
+> `progress/manual_F-024_fase_c.md`. No borres esa regla hasta cerrar F-024
+> (el bloque 3 de F-023 va después, por su DA-7).
+
+## F-024 · Fase B aprobada + **T17 HECHO**; faltan T18, T19 y medio T20
+
+- **Desplegado**: imagen `r20260818-2146` construida y el job ya apunta a ella.
+  `apply-grants` ejecutado.
+- **R25 verificado**: al arrancar `apply-grants` —que cuenta como escritor— las
+  dos huérfanas `RUNNING` del 18-ago pasaron a **`ABORTED` con motivo**, y con
+  ellas **5 huérfanas antiguas** que nadie sabía que estaban ahí. El `AVISO` de
+  `timings` desapareció solo.
+- **`GRANT` del rol de solo lectura sobre `_meta.v_frescura` y
+  `_meta.v_raw_state`: verificados por catálogo** (`has_table_privilege`), sin
+  leer ningún secreto del vault. Lo único no probado es la conectividad de
+  punta a punta del MCP, que no es de F-024.
+- **T20 medio hecho**: la foto del `sin_batch` (31 tablas de `raw` sin
+  identidad de ejecución) **está capturada** en
+  `progress/manual_F-024_fase_c.md`, y ya no se puede repetir: la nocturna se
+  la lleva. Falta la otra mitad, `stage --sin-puerta` registrando `SKIPPED`.
+- **Falta T18** (muerte externa controlada) y **T19** (alerta de frescura de
+  extremo a extremo). Las dos exigen al humano: T18 relanza una carga completa
+  de ~3 h 15 —no la lances si se solapa con la nocturna— y T19 exige ver
+  llegar el correo. Comandos exactos en `manual_F-024_fase_c.md` y en
+  `requirements.md` R23–R26.
+- **Evidencias repuestas con el arnés nuevo**: 596 tests, cobertura 100 % de
+  372 líneas cambiadas, mutación **108/106/2** idéntica a la primera medición,
+  con los 2 supervivientes (`bold=True` de cabeceras) ya aceptados por el
+  humano como equivalentes.
+
+## Arnés: de sin versionar a 1.5.1, y `arnes-base` ya va por 1.5.2
+
+- `dev` lleva el arnés **v1.5.1**: portero ligero en el hook `Stop`
+  (`ARNES_SALTAR_SUITES=1`), mutación en paralelo por worktrees, `BACKLOG.md`
+  generado desde `features.json`, puerta de rutas sensibles (inactiva: no hay
+  `harness/rutas_sensibles.json`), y el sello en `harness/ARNES_VERSION.md`.
+- La 1.5.1 **nació aquí y se portó a `arnes-base`** el mismo día: repetir una
+  campaña de mutación ya no borra el análisis de los supervivientes. Pasó de
+  verdad al remedir F-024, con dos mutantes equivalentes ya aceptados que
+  volvieron a quedar en `PENDIENTE`.
+- **`arnes-base` está ya en 1.5.2**, subida desde fuera de esta sesión. **Hay
+  que mirar qué trae y propagarlo**; este repositorio se quedó en la 1.5.1.
+
+## Specs escritas y decisiones cerradas por el humano (2026-08-18)
+
+| Feature | Estado | Dónde |
+|---|---|---|
+| **F-011** carga incremental | `spec_ready`, `critico` | rama `feature/F-011-carga-incremental` |
+| **F-023** cierre operativo de F-003 | `spec_ready`, `critico`, `sdd=true` | rama `feature/F-023-cierre-operativo-f003` |
+| **F-025** ventana de negocio y build | `pending`, prioridad 10 | spec en la rama de F-011 |
+| **F-026** RBAC sin propagar en `60_create_identity.ps1` | `pending` | ficha en `features.json` |
+| **F-027** sin camino para cambiar env vars de un job vivo | `pending` | ficha en `features.json` |
+
+Lo que hay que saber de esas decisiones, sin releer las specs:
+
+- **F-011 ya no lleva ventana de negocio.** El humano dejó **sin decidir** qué
+  es una «obra abierta» (es de Negocio), así que el bloque C salió entero a
+  **F-025**. F-011 se queda con medir (siempre) y la ingesta incremental (solo
+  si el ahorro estimado es ≥ 20 min o la ingesta llega al ≥ 40 % del total).
+- **La sospecha que abría F-011 era falsa**: la carga del 18-ago se reparte en
+  ingesta 33 min (20 %), `build_stg` 111 (**67 %**) y `build_mart` 21 (13 %).
+  El cuello está en el build. Por eso **F-025 va por delante** del bloque B de
+  F-011.
+- **El hallazgo de F-009 estaba mal contado**: `fecalt` 18 (no 16), `fecmod` 6
+  (no 3), `sello` 2, y sobre todo **`tiemod` en ~190 tablas**, que nadie
+  mencionaba y que la ingesta **ya copia** a `_source_tiemod`. Si sirve como
+  watermark se responde con SQL local, sin volver a leer Sigrid.
+- **Recarga completa: los domingos.**
+- **F-023 sube a `critico`**: cada borrado exige acta con el OK citado. Se
+  retiran todas las reglas `datamart-puesto-*`; **no** se tocan `ClientPgris`
+  ni `FirewallIPAddress_2026-6-16` (son de `albaranes`). El bloque del
+  firewall va **después** de la Fase C de F-024.
+
+## Disco del Postgres: decisión tomada, con umbral de caducidad
+
+`05_check_prereqs.ps1` da **FALLO** por el disco al 74,5 % y el humano
+**autorizó desplegar igualmente** y **no ampliar**, con los datos delante:
+18,5 GB de 32 usados (de los que `sigrid_dm` son 18: `stg` 10, `raw` 4,8,
+`mart` 2,2), picos de **88,5 %** durante la carga, ~4 GB de margen.
+
+**Ese FALLO concreto es conocido y aceptado; cualquier otro fallo del script
+sigue siendo bloqueante.** La decisión caduca —y pasa a «ampliar», hablándolo
+con los dueños de `albaranes` y `partes`— si el pico supera el **90 %**, si la
+base en reposo pasa de **~78 %**, o si vuelve a haber un episodio de solo
+lectura como el del 2026-08-09. Está escrito también en la memoria persistente
+del proyecto (`disco-postgres-compartido-no-ampliar`).
+
+## Ramas vivas y el orden de integración (importa)
+
+| Rama | Qué lleva |
+|---|---|
+| `dev` | arnés 1.5.1, 418 tests. Sin F-023 ni F-024 |
+| `feature/F-024-coherencia-cargas-truncadas` | la feature + T17 + los cuadernos. **Es la rama de trabajo de hoy** |
+| `feature/F-023-cierre-operativo-f003` | spec cerrada |
+| `feature/F-011-carga-incremental` | spec cerrada + spec de F-025 |
+| `chore/arnes-1.5.0`, `chore/arnes-1.5.1` | ya fusionadas a `dev` |
+
+`harness/features.json` **diverge en cuatro ramas a la vez** porque `dev` aún
+no conoce F-023 ni F-024. Al integrar dará conflicto en ese fichero: **es
+esperado**. Orden que menos duele: **F-024 → F-023 → F-011**, y en cada
+conflicto se conserva la entrada más nueva (la que trae las decisiones
+cerradas). Nada de esto se ha subido: **no hay push ni PR**, todo son commits
+locales.
+
+## Fuera de este repositorio
+
+- **`azure-apps/sigrid_api.md` corregido** (commit local): la tabla daba los
+  defectos del código como si fueran los valores vigentes. La instancia `dev`
+  corre **`MAX_ALLOWED_ROWS` 500.000** (no 1.000),
+  **`MAX_QUERY_TIMEOUT_SECONDS` 230** (no 120) y `MAX_STATEMENTS_PER_BATCH`
+  50 (no 20). Nueva sección 4.1 con el comando para reproducirlo. Por eso
+  nuestro `page_size = 10000` con `timeout 230` funciona.
+
+## Cabos sueltos menores, para no redescubrirlos
+
+- `check-coherencia` imprime «(ejecucion **None**)» cuando el histórico no
+  tiene `batch_id`: enseña un `None` de Python donde debería decir «sin
+  identidad de ejecución». Cosmético.
+- El `TOTAL` de `timings` suma **todas** las ejecuciones del día, incluidas las
+  que murieron; no es la duración de la carga buena. Confunde a quien lo lea
+  sin contexto.
+- En la CLI de `az` del puesto: en `firewall-rule create` el servidor va en
+  `--server-name` y la regla en `--name`; **`--rule-name` no existe**.
+
+---
+
+# F-024 · Fase B — histórico de la sesión de mediodía (T17 ya está hecho: ver arriba)
 
 Rama `feature/F-024-coherencia-cargas-truncadas` (nace de la de F-003, que
 lleva el fix del timeout de sigrid-api y el techo del job). Spec en
@@ -84,7 +240,7 @@ Con la Fase C hecha y el reviewer en APROBADO → F-024 `done`, merge a
 
 ---
 
-# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 (léelo antes que nada)
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 · MEDIODÍA (histórico: lo vigente está arriba)
 
 **El job nocturno YA HA HECHO UNA CARGA COMPLETA EN AZURE**: ejecución
 `caj-datamart-seg-dev-6a95hln`, lanzada a mano a las 12:22 local con la
