@@ -26,6 +26,82 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-19 · MADRUGADA (00:00–00:30)
+
+Sesión corta y sin tocar código. Tres cosas que cambian lo que dice la
+sección siguiente (la del 18 por la noche), que por lo demás sigue vigente.
+
+## 1 · La nocturna del 19 TODAVÍA NO HA CORRIDO
+
+A las **00:03 del 19 (22:03 UTC del 18)**, `python main.py timings --last 1`
+seguía enseñando la carga del 18 (`ingest_raw` 10:23 UTC → `build_mart`
+12:46 UTC, todo `SUCCESS`) y los dos `apply_grants` (13:08 y 19:49, el
+segundo el de T17). La nocturna entra a las **02:00 UTC = 04:00 local**.
+
+Es decir: **la comprobación nº 1 del plan de anoche sigue siendo lo primero
+de la mañana**, sin cambios, con sus tres comandos (`timings --last 1`,
+`check-coherencia`, `check-frescura`) y la misma expectativa: `check-coherencia`
+tiene que pasar de KO a OK.
+
+## 2 · La re-review de la Fase B ya está APROBADA — no la vuelvas a lanzar
+
+`progress/review_F-024.md:521` («Re-review · 2026-08-18, 2ª pasada, sobre el
+commit `89a8707`») cierra con **APROBADO**, con los cuatro bloqueantes B1–B4
+verificados uno a uno. La frase «pendiente la re-review» solo sobrevive en la
+sección histórica de mediodía de este fichero; está obsoleta.
+
+**Consecuencia: de F-024 no queda más que la Fase C** — T18, T19 y la segunda
+mitad de T20. Todo lo demás (código, tests, cobertura, mutación, review) está
+cerrado.
+
+## 3 · Por qué esta madrugada no se tocó la Fase C
+
+- **T18** son ~3 h 15 entre la muerte controlada y la recarga completa, y la
+  nocturna entra a las 04:00: se pisarían. Hay que lanzarlo con la mañana por
+  delante, o desactivando antes la programación.
+- **T19** (~15 min: alerta, ventana corta 1h/5m, correo `Activated`, restaurar
+  a 30h/1h) **sí es factible a cualquier hora** y no interfiere con la
+  nocturna. Es el candidato natural para retomar. Exige que el humano vea
+  llegar el correo.
+- **T20, segunda mitad** (`stage --sin-puerta` registrando `SKIPPED`) **no se
+  puede lanzar con el `.env` apuntando a Azure**: serían 1 h 51 de escritura
+  sobre `stg` justo antes de la nocturna. O se hace en local con
+  `.env.local.bak`, o se espera a un hueco sin carga programada.
+
+## 4 · Cabos cerrados en esta sesión
+
+- **La errata que dejó anotada el reviewer**: la línea de T17 de este fichero
+  mandaba ejecutar `infra8_build_image.ps1`, que no existe. Ya dice
+  `infra\70_build_image.ps1`.
+- **Los seis `huella_*.csv` de la raíz** llevaban desde el 13 de agosto
+  sueltos y sin versionar. Ahora `huella_*.csv` está en el `.gitignore`, con
+  el motivo escrito: son la salida de `fingerprint` para **una** ejecución,
+  caducan con cada rebuild de `mart`/`cierre` y pueden llevar agregados de
+  negocio. **Los ficheros siguen en disco**: los de T13 son la referencia
+  hasta que se rehagan `build-mart` y `build-cierre` (defecto 2 de
+  `progress/impl_T13_fixes_f019.md`).
+
+## 5 · Qué trae el arnés 1.5.2 (mirado, no propagado)
+
+`arnes-base` va por **1.5.2** y solo cambia `.claude/agents/reviewer.md` y
+`CHECKPOINTS.md`: **el reviewer reejecuta la campaña de mutación cuando es
+barata** (si el «Tiempo total» del informe baja de 5 minutos), con `--salida`
+fuera de `progress/` para no pisar el informe del implementer. Sin herramienta
+detrás. La 1.5.2 nace de separar esa mejora de la 1.5.1, que era el cambio de
+`harness/mutacion.py`.
+
+Este repositorio va por **1.5.0 en la rama de F-024** y por **1.5.1 en `dev`**.
+La propagación sigue pendiente y **no debe hacerse dentro de F-024**: rama
+`chore/arnes-1.5.2` desde `dev`, con el instalador en `-SoloDiff` primero.
+
+## 6 · Orden para la mañana
+
+1. Comprobar la nocturna (sección siguiente, punto 1) y el buzón.
+2. Si salió limpia: **T19** es lo más corto; **T18** exige reservar la mañana.
+3. Con F-024 en `done`: arnés 1.5.2 → merge F-024 + F-003 a `dev` → F-023.
+
+---
+
 # ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 · NOCHE (léelo antes que nada)
 
 Esta sección **sustituye** a la que hay más abajo con la misma fecha: aquella
@@ -213,7 +289,7 @@ el 2026-08-18** — pendiente la re-review.
 **Fase C · MANUAL (humano), con comando exacto en `requirements.md` R23–R26
 y en `infra/README.md`:**
 
-- **T17**: `powershell -NoProfile -File infra8_build_image.ps1` → anotar
+- **T17**: `powershell -NoProfile -File infra\70_build_image.ps1` → anotar
   tag → `powershell -NoProfile -File infra\85_update_job.ps1 -Tag <tag>`
   → `python main.py apply-grants` (con `.env` de Azure) para que las vistas
   nuevas de `_meta` sean legibles por el MCP. Antes: `python main.py
