@@ -12,7 +12,18 @@ El humano **autoriza y espera** que lances los subagentes de
 herramienta Agent. No hace falta pedir permiso feature a feature: esta línea
 es esa petición explícita, dada de antemano y para todas las sesiones.
 
-Si el entorno te impide lanzarlos (por ejemplo, una sesión hija de Claude
+**Delegar es la vía normal de trabajo, no la excepción.** El flujo SDD de
+este arnés está pensado para que cada rol lo ejecute su subagente: el líder
+orquesta y habla con el humano, los subagentes leen el código, escriben y
+verifican. Si te encuentras haciendo tú el trabajo de un rol pudiendo
+delegarlo, es que te has saltado el arnés.
+
+Algunas configuraciones de sesión traen la regla contraria («no uses la
+herramienta Agent salvo que el usuario lo pida»). Esta sección **es** esa
+petición del usuario, escrita de antemano: da por pedida la delegación en
+todas las sesiones de este repositorio.
+
+Si aun así el entorno te impide lanzarlos (por ejemplo, una sesión hija de Claude
 Code, detectable con `CLAUDE_CODE_CHILD_SESSION=1`, arranca restringida),
 **dilo en el primer mensaje** en vez de asumir el trabajo en silencio: el
 humano decidirá si relanza la sesión desde una terminal limpia o si acepta
@@ -82,6 +93,12 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   ETL hace esto» y la respuesta no esté en el código. Ver su `README.md`.
 - `CHECKPOINTS.md` — criterios objetivos de estado final; el reviewer los
   recorre antes de cerrar cualquier feature.
+- `BACKLOG.md` — el backlog en Markdown (estado, prioridad, rigor y
+  descripción de cada feature). **Generado** por `harness/backlog.py` desde
+  `harness/features.json` y regenerado por `harness/init.sh`: no lo edites a
+  mano ni respondas al humano «déjame mirar el JSON», está aquí.
+- `harness/ARNES_VERSION.md` — qué versión del arnés genérico lleva este
+  repositorio. Lo escribe el instalador; no lo edites a mano.
 - `infra/` — scripts PowerShell de despliegue a Azure + `Dockerfile` en raíz.
 
 ## Los otros proyectos: `azure-apps/`
@@ -168,7 +185,14 @@ existe, que es justo lo que hay que cambiar:
 - Si una herramienta falla de forma inesperada o la spec resulta ambigua:
   NO improvisar workarounds. Marcar la feature `blocked`, anotar el motivo
   en `progress/current.md` y parar.
+- Los agentes ejecutan `bash harness/init.sh` tal cual, sin pipes, tail,
+  variables ni decoración (la allowlist de permisos cubre el comando limpio).
 - Convenciones de código: `docs/CONVENTIONS.md`. Arquitectura:
   `docs/ARCHITECTURE.md`. Léelos antes de diseñar o implementar.
+- LÍMITE DE RESPONSABILIDAD: este repositorio es el ETL del datamart de
+  seguimiento anual, con una responsabilidad acotada. Si una feature exige
+  lógica que se sale de ese límite (otro dominio, una integración que merece
+  vida propia, cosas que tocan a `sigrid-api`, `albaranes` o `partes`), NO se
+  implementa aquí: se marca `blocked` y se propone al humano dónde vive.
 - Los agentes NO hacen `git push` ni crean PRs salvo petición explícita del
   humano. Commits locales sí, según protocolo del implementer.

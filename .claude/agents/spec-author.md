@@ -22,18 +22,20 @@ Produces: la carpeta `specs/F-XXX-slug/` con TRES ficheros. NO tocas código.
 - `specs/F-XXX-slug/requirements.md` — requisitos en notación EARS. Cada
   requisito debe ser traducible a (al menos) un test.
 - `specs/F-XXX-slug/design.md` — diseño técnico: ficheros a crear/modificar
-  (ruta exacta), clases/funciones, SQL nuevo y en qué capa (`stg`/`mart`/
-  `cierre`...), qué NO se toca, y encaje en la arquitectura hexagonal +
-  pipeline existente.
+  (ruta exacta), clases/funciones, SQL nuevo y en qué capa o esquema del
+  proyecto, qué NO se toca, y encaje en la arquitectura descrita en
+  `docs/ARCHITECTURE.md`.
 - `specs/F-XXX-slug/tasks.md` — lista ordenada de tareas atómicas (T1, T2...),
   cada una con su criterio de verificación (qué test o comando la valida).
 
 ## Reglas
 
-- Si la feature implica SQL sobre el datamart, respeta la semántica de fases y
-  ámbitos descrita en `docs/ARCHITECTURE.md` (amb/fas, importe_origen vs
-  importe_mes). Ante cualquier duda de esquema, consúltalo ahí; no inventes
-  columnas.
+- Si la feature toca datos o esquemas, respeta la semántica de dominio
+  descrita en `docs/ARCHITECTURE.md`. Ante cualquier duda de esquema,
+  consúltalo ahí; no inventes columnas ni campos.
+- Evalúa el LÍMITE DE MICROSERVICIO: si la feature exige responsabilidades
+  que no pertenecen a este servicio, dilo en design.md y propón extraerlo
+  a otro microservicio en vez de diseñarlo aquí.
 - Los tests que propongas deben poder ejecutarse SIN red ni BBDD siempre que
   sea posible (fixtures/mocks). Si una parte exige BBDD, sepárala y márcala
   como verificación manual del humano.

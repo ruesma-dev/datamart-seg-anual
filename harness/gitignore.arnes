@@ -1,25 +1,3 @@
-# .gitignore
-.venv/
-__pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-.coverage
-coverage.json
-.mypy_cache/
-.ruff_cache/
-*.egg-info/
-dist/
-build/
-.idea/
-.vscode/
-logs/
-*.log
-*.zip
-
-# backups de configuracion
-*.bak
-
 # >>> ARNES-BASE: bloque gestionado por el arnes. No quitar esta marca. >>>
 # El instalador anade este bloque al .gitignore del proyecto si no esta ya.
 .env

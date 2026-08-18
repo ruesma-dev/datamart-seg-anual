@@ -69,15 +69,19 @@ Al final de `progress/impl_F-XXX.md`, una sección **«Evidencias»** con
 
 | Evidencia | Cómo se obtiene |
 |---|---|
-| Nº de **tests ejecutados** y resultado | salida de `python -m pytest -q` |
+| Nº de **tests ejecutados** y resultado | salida de la suite del proyecto |
 | **Cobertura de las líneas cambiadas** (%) | línea `PUERTA COBERTURA` de `bash harness/init.sh` |
 | **Mutantes generados y supervivientes** | `python -m harness.mutacion --feature F-XXX` → `progress/mutacion_F-XXX.md` |
-| **Tiempo de ejecución de la suite** | el que imprime pytest |
+| **Tiempo de ejecución de la suite** | el que imprime la propia suite |
 
 Si el nivel de la feature exige mutación, lanza la campaña **al terminar** (no
 corre dentro de `init.sh`: es cara) y **completa el análisis de cada
 superviviente** en su informe: por qué ningún test lo caza, y si es un hueco
 real o un mutante equivalente. Ninguna sección puede quedarse en `PENDIENTE`.
+
+> En proyectos que no sean Python, la mutación y la cobertura de líneas
+> cambiadas no están disponibles: dilo así en la sección «Evidencias», con el
+> motivo, en vez de omitirla.
 
 ## Comunicación con el líder (obligatoria)
 
@@ -95,9 +99,10 @@ Nunca devuelvas el diff ni el informe por chat. El líder lo lee de disco.
 
 ## Reglas
 
-- Primera línea de cada fichero Python: comentario con su ruta relativa.
-  PEP8. Type hints.
-- No añadas dependencias a `requirements.txt` sin que la spec lo indique.
+- Primera línea de cada fichero de código: comentario con su ruta relativa.
+  El resto de convenciones de estilo, en `docs/CONVENTIONS.md`.
+- No añadas dependencias al manifiesto del proyecto (`requirements.txt`,
+  `package.json`, `*.csproj`...) sin que la spec lo indique.
 - Toda escritura de código va acompañada de su test antes de pasar al
   siguiente cambio.
 - Si la spec resulta ambigua, una herramienta falla de forma inesperada o
