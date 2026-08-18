@@ -74,3 +74,77 @@ declarando por escrito que el `sin_batch` no se llegó a fotografiar.
 **Nota para quien lo retome**: la limpieza de las reglas del firewall es el
 bloque 3 de F-023 y, por su DA-7, va **después** de esta Fase C. No borres la
 regla que acabas de crear hasta que F-024 esté cerrada.
+
+---
+
+## 2026-08-18 · Foto previa al despliegue: CAPTURADA
+
+El humano creó la regla de firewall y las tres lecturas pasaron. Salidas
+reales, recortadas solo donde se indica. **Ninguna escribe nada.**
+
+### `python main.py timings --last 3`
+
+Las dos filas huérfanas del 18-ago siguen ahí, y el aviso al pie funciona:
+
+```
+stage  build_stg.build_plan_mensual           2026-08-18 08:54:25   0.0   0  RUNNING
+stage  build_stg.build_plan_mensual.tramo_40  2026-08-18 10:08:51   0.0   0  RUNNING
+------------------------------------------------------------------------------------
+TOTAL                                                        33142.2  239,066,530
+
+AVISO: 2 fila(s) RUNNING desde hace más de 6 h: probablemente huérfanas de un
+proceso muerto; la próxima ejecución que escriba las marcará ABORTED.
+```
+
+Es el **estado de partida de R25**: tras el primer arranque con la imagen de
+F-024, estas dos deben quedar `ABORTED` con motivo.
+
+### `python main.py check-coherencia` → **KO, `sin_batch`** (evidencia de T20/R26)
+
+```
+Coherencia de raw: KO. El esquema raw no acredita una carga completa y
+coherente, asi que no se construye stg encima:
+  · ingeridas sin identidad de ejecucion (historico anterior a F-024):
+    auxmun, auxobramb, auxobrcla, auxobrtca, auxobrtip, auxpro, cen, cob, com,
+    comlin, comprv, con, condir, conext, ctr, ctrpro, dca, dcapro, dcf,
+    dcfpro, dcfprodes, obr, obrctr, obrfas, obrfasamb, obrparpar, obrparpre,
+    obrprv, pag, prv, rec
+
+Solo hay dos salidas:
+  1. Relanzar la ingesta completa: python main.py ingest --full
+  2. Si la carga parcial fue deliberada: python main.py stage --sin-puerta
+     (el veredicto queda registrado como SKIPPED en _meta.etl_runs)
+
+=== Estado de stg ===
+Coherencia de stg: OK. El ultimo build_stg termino correctamente (ejecucion None).
+```
+
+**Esto es exactamente lo que R26 exige demostrar**: las 31 tablas de `raw`
+vienen de una imagen anterior a F-024, no llevan `batch_id`, y la puerta lo
+dice con nombre y apellidos en vez de dejar construir `stg` encima. El
+mensaje distingue el caso «histórico» del caso «batches mezclados», que es lo
+que se verá en T18.
+
+### `python main.py check-frescura` → **FRESCO**
+
+```
+paso            ultimo OK             horas        filas  ultimo intento      estado
+------------------------------------------------------------------------------------
+apply_grants    2026-08-18 13:08:18     6.4           28  2026-08-18 13:08:17 SUCCESS
+build_mart      2026-08-18 13:08:17     6.4    5,319,560  2026-08-18 12:46:48 SUCCESS
+build_stg       2026-08-18 12:46:48     6.8   43,793,846  2026-08-18 10:56:14 SUCCESS
+ingest_raw      2026-08-18 10:56:10     8.7   20,047,942  2026-08-18 10:23:07 SUCCESS
+load_excel_aux  2026-08-18 10:56:14     8.6            3  2026-08-18 10:56:11 SUCCESS
+
+build_mart: FRESCO (umbral 30.0 h, lleva 6.4 h desde el último build correcto)
+```
+
+### Observaciones menores, para no perderlas
+
+- El mensaje de `stg` termina en «(ejecucion **None**)» porque el histórico no
+  tiene `batch_id`. No es un fallo —el veredicto es correcto—, pero enseña un
+  `None` de Python al usuario donde debería decir algo como «sin identidad de
+  ejecución». Merece un retoque cosmético; no bloquea nada.
+- El `TOTAL` de `timings` (33.142 s ≈ 9,2 h) **suma las tres ejecuciones del
+  día**, incluidas las dos que murieron. No es la duración de la carga buena
+  (2 h 45): quien lea ese total sin contexto se lleva una idea equivocada.
