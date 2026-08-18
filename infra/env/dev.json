@@ -31,7 +31,8 @@
 
   "cron": "0 2 * * *",
   "jobProgramable": true,
-  "replicaTimeoutSeconds": 7200,
+  "$aviso_replicaTimeoutSeconds": "Techo de duracion de UNA ejecucion; si se supera, Azure MATA el contenedor (DeadlineExceeded) a mitad de lo que este haciendo. El 2026-08-18 la primera carga real murio a las 2 h justas por el tramo 39/60 del stage: el pipeline completo tarda ~3 h 15 en el B1ms (ingesta 33 min, presupuesto 12, stage troceado ~110, mart ~25). 18000 s = 5 h: holgura x1,5 sobre lo medido y dentro de la ventana nocturna (02:00-07:00 UTC). Si el pipeline crece, subir esto ANTES de que muerda.",
+  "replicaTimeoutSeconds": 18000,
   "replicaRetryLimit": 1,
   "parallelism": 1,
   "replicaCompletionCount": 1,
