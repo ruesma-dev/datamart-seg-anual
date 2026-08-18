@@ -957,3 +957,92 @@ def test_f024_r20_un_raw_completamente_vacio_lo_dice() -> None:
     assert "_meta.v_raw_state" in texto
     assert "vacío" in texto
     assert MARCA_INCOHERENTE not in texto
+
+
+# ---------------------------------------------------------------------------
+# Huecos cerrados tras la campaña de mutación (R19, R20)
+# ---------------------------------------------------------------------------
+
+
+def test_f024_r16_la_fila_de_frescura_es_inmutable_y_sin_dict() -> None:
+    """Mismo criterio que los objetos de valor del dominio: la cruza el MCP y
+    Power BI, y una errata no puede crear un campo fantasma."""
+    from dataclasses import FrozenInstanceError
+
+    fila = fila_frescura()
+
+    with pytest.raises(FrozenInstanceError):
+        fila.paso = "otro"  # type: ignore[misc]
+    assert not hasattr(fila, "__dict__")
+
+
+def test_f024_r19_el_estado_del_ultimo_intento_sale_tal_cual() -> None:
+    """Y solo se sustituye por el guion cuando de verdad no hay estado.
+
+    Con un `and` en vez del `or`, TODA fila mostraría el guion y la tabla
+    dejaría de decir que el último intento falló, que es la mitad de la
+    información que R16 separa a propósito.
+    """
+    texto, _ = format_frescura(
+        [
+            fila_frescura(paso="build_mart", estado_intento="FAILED"),
+            fila_frescura(paso="ingest_raw", estado_intento="SUCCESS"),
+        ],
+        umbral_horas=UMBRAL_FRESCURA_HORAS,
+        paso="build_mart",
+        ahora=AHORA,
+    )
+
+    assert "FAILED" in texto
+    assert "SUCCESS" in texto
+
+    sin_estado = FilaFrescura(
+        paso="load_excel_aux",
+        ultimo_ok_finished_at=None,
+        ultimo_ok_batch_id=None,
+        ultimo_ok_filas=None,
+        horas_desde_ultimo_ok=None,
+        ultimo_intento_started_at=None,
+        ultimo_intento_status=None,
+        ultimo_intento_error=None,
+    )
+    texto_sin, _ = format_frescura(
+        [sin_estado], umbral_horas=UMBRAL_FRESCURA_HORAS, paso="build_mart",
+        ahora=AHORA,
+    )
+    assert texto_sin.splitlines()[2].rstrip().endswith("-")
+
+
+def test_f024_r19_el_aviso_de_vista_vacia_solo_sale_si_esta_vacia() -> None:
+    """Con filas, el texto NO puede decir que no hay registro de ningún paso."""
+    con_filas, _ = format_frescura(
+        [fila_frescura()], umbral_horas=UMBRAL_FRESCURA_HORAS, paso="build_mart",
+        ahora=AHORA,
+    )
+    sin_filas, _ = format_frescura(
+        [], umbral_horas=UMBRAL_FRESCURA_HORAS, paso="build_mart", ahora=AHORA,
+    )
+
+    assert "sin filas en _meta.v_frescura" not in con_filas
+    assert "sin filas en _meta.v_frescura" in sin_filas
+
+
+def test_f024_r20_el_aviso_de_raw_vacio_solo_sale_si_raw_esta_vacio() -> None:
+    """Con tablas listadas, decir «raw está vacío» sería sencillamente falso.
+
+    El caso que lo destapa: hay estados PERO no hay faltantes (la carga normal).
+    """
+    estados = [
+        EstadoTablaRaw(
+            tabla=t, status="SUCCESS", batch_id="20260819T020000Z-aaaaaa",
+            started_at=datetime(2026, 8, 19, 2, 0, 0),
+            finished_at=datetime(2026, 8, 19, 2, 5, 0), filas=10,
+        )
+        for t in ("con", "obr")
+    ]
+    texto = format_estado_raw(
+        estados, evaluar_coherencia_raw(estados, ("con", "obr"))
+    )
+
+    assert "raw está vacío" not in texto
+    assert "con" in texto and "obr" in texto

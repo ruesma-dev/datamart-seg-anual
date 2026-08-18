@@ -24,7 +24,10 @@ from click.testing import CliRunner
 import main
 from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
 from etl_sigrid.domain.entities import StepResult, StepStatus
-from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
+from etl_sigrid.infrastructure.postgres.frescura import (
+    UMBRAL_FRESCURA_HORAS,
+    FilaFrescura,
+)
 
 BATCH_ANTERIOR = "20260818T020000Z-bbbbbb"
 
@@ -679,3 +682,70 @@ def test_f024_la_docstring_de_main_nombra_los_comandos_nuevos() -> None:
     ahí no existe para quien abre el fichero."""
     assert "check-coherencia" in (main.__doc__ or "")
     assert "check-frescura" in (main.__doc__ or "")
+
+
+# ---------------------------------------------------------------------------
+# Huecos cerrados tras la campaña de mutación
+# ---------------------------------------------------------------------------
+
+
+def test_f024_r3_el_pipeline_es_incremental_salvo_que_se_pida_lo_contrario(
+    cli,
+) -> None:
+    """El default de `build_pipeline_steps` es `full_refresh=False`.
+
+    Importa aunque `run-all --full` sea lo que corre cada noche: el default es
+    lo que se aplica a cualquier llamante que no opine, y una ingesta completa
+    por descuido son ~33 min y un TRUNCATE de todas las tablas de `raw` contra
+    el servidor compartido.
+    """
+    construcciones: list[dict] = []
+    pg = PgFalso()
+    corredor = cli(pg, construcciones=construcciones)
+
+    main.build_pipeline_steps(settings_falsos())
+    assert construcciones[0]["full_refresh"] is False
+
+    construcciones.clear()
+    main.build_pipeline_steps(settings_falsos(), True)
+    assert construcciones[0]["full_refresh"] is True
+
+    del corredor  # el runner solo estaba para instalar los dobles
+
+
+@pytest.mark.parametrize(
+    ("comando", "fragmento"),
+    [
+        ("check-coherencia", "estado de _meta"),
+        ("check-frescura", "_meta.v_frescura"),
+    ],
+)
+def test_f024_r14_r19_el_error_de_lectura_va_a_stderr(
+    cli, comando: str, fragmento: str
+) -> None:
+    """Los dos comandos son de diagnóstico y se pipean.
+
+    Si el «no se pudo leer» saliera por stdout se mezclaría con la tabla que
+    alguien esté redirigiendo a un fichero, y el código 2 llegaría acompañado
+    de un informe corrupto.
+    """
+    pg = PgFalso(error_al_leer=RuntimeError("connection refused"))
+    resultado = cli(pg).invoke(main.cli, [comando])
+
+    assert resultado.exit_code == 2
+    assert fragmento in resultado.stderr
+    assert fragmento not in resultado.stdout
+
+
+def test_f024_r19_la_ayuda_ensena_el_umbral_y_el_paso_por_defecto() -> None:
+    """`--help` tiene que decir contra qué se está juzgando.
+
+    Un `check-frescura` que dice CADUCADO sin decir el umbral obliga a abrir el
+    código para saber si son 24 h o 30.
+    """
+    salida = CliRunner().invoke(main.cli, ["check-frescura", "--help"]).output
+
+    assert str(UMBRAL_FRESCURA_HORAS) in salida
+    assert "build_mart" in salida
+    # `show_default` de click las imprime así; sin él no aparece el bloque.
+    assert salida.count("default:") >= 2

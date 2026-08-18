@@ -21,6 +21,7 @@ import pytest
 from etl_sigrid.domain.coherencia import (
     EstadoPaso,
     EstadoTablaRaw,
+    VeredictoCoherencia,
     evaluar_coherencia_raw,
     evaluar_coherencia_stg,
     formatear_veredicto_raw,
@@ -469,3 +470,86 @@ def test_f024_r15_mensaje_de_stg_ok() -> None:
 
     assert "OK" in texto
     assert "--sin-puerta" not in texto
+
+
+# ---------------------------------------------------------------------------
+# Los objetos de valor del dominio son inmutables y sin `__dict__`
+#
+# Nacen de la campaña de mutación: `frozen=True` y `slots=True` sobrevivían a
+# la suite entera, o sea que eran decoraciones sin nadie que las sostuviera.
+# No son decoración:
+#
+#   - `frozen` es lo que impide que un veredicto o un estado se «corrija» a
+#     mitad de camino entre que la puerta lo emite y el step lo obedece. Un
+#     `VeredictoCoherencia` mutable invita exactamente a eso.
+#   - `slots` es lo que convierte una errata (`estado.tabl`) en AttributeError
+#     en vez de en un atributo fantasma que nadie vuelve a leer.
+# ---------------------------------------------------------------------------
+
+OBJETOS_DE_VALOR = (
+    (
+        EstadoTablaRaw,
+        {"tabla": "con", "status": "SUCCESS", "batch_id": "b", "started_at": None,
+         "finished_at": None, "filas": 1},
+        "tabla",
+    ),
+    (
+        EstadoPaso,
+        {"id": 1, "step": "build_stg", "status": "SUCCESS", "batch_id": "b",
+         "started_at": None, "finished_at": None},
+        "step",
+    ),
+    (VeredictoCoherencia, {"ok": True}, "ok"),
+    (
+        Ejecucion,
+        {"batch_id": "20260819T020000Z-aaaaaa", "iniciada_en": datetime(2026, 8, 19)},
+        "batch_id",
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    ("clase", "argumentos", "campo"),
+    OBJETOS_DE_VALOR,
+    ids=lambda v: v.__name__ if isinstance(v, type) else "",
+)
+def test_f024_los_objetos_de_valor_son_inmutables(
+    clase: type, argumentos: dict, campo: str
+) -> None:
+    objeto = clase(**argumentos)
+
+    with pytest.raises(FrozenInstanceError):
+        setattr(objeto, campo, "otra cosa")
+
+
+@pytest.mark.parametrize(
+    ("clase", "argumentos", "campo"),
+    OBJETOS_DE_VALOR,
+    ids=lambda v: v.__name__ if isinstance(v, type) else "",
+)
+def test_f024_los_objetos_de_valor_no_admiten_campos_inventados(
+    clase: type, argumentos: dict, campo: str
+) -> None:
+    """`slots=True`: una errata no crea un atributo fantasma en silencio."""
+    objeto = clase(**argumentos)
+
+    assert not hasattr(objeto, "__dict__"), (
+        f"{clase.__name__} tiene __dict__: perdió slots=True y una errata como "
+        f"'{campo[:3]}' pasaría a crear un atributo nuevo sin avisar"
+    )
+
+
+def test_f024_r8_una_tabla_sin_filas_conocidas_cuenta_cero() -> None:
+    """El default de `filas` es 0, no 1.
+
+    Lo lee `check-coherencia` y acaba impreso al lado del nombre de la tabla:
+    un 1 por defecto diría que se ingirió una fila donde no se ingirió ninguna.
+    """
+    sin_filas = EstadoTablaRaw(
+        tabla="con",
+        status="ABORTED",
+        batch_id=None,
+        started_at=None,
+        finished_at=None,
+    )
+    assert sin_filas.filas == 0
