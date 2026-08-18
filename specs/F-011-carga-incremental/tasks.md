@@ -9,6 +9,15 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
 > firma del humano sobre `progress/medicion_F-011.md`. Es el «medir antes de
 > optimizar» de la feature, convertido en puerta ejecutable.
 
+> **Cambio del 2026-08-18.** El humano cerró seis decisiones y dejó DA-1 sin
+> decidir; con ella salió de F-011 el bloque C entero, que ahora es
+> `specs/F-025-ventana-negocio-build/`. Efecto sobre esta lista:
+> **T20 desaparece** (hueco deliberado: no se renumera nada, para que los
+> mensajes de commit `F-011 Tn` sigan apuntando a lo mismo), **T21 se queda**
+> reducida a su test de alcance, y **entra T8-bis** (avisar al dueño de
+> `sigrid-api` del dato de DA-6). Ver `requirements.md` § «Decisiones
+> cerradas».
+
 ---
 
 ## Bloque A · Medición (se hace siempre)
@@ -57,7 +66,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       ```bash
       python main.py perfil-carga                     # desglose de la carga del 18-ago
       python main.py diagnostico-tiemod --out huella_tiemod_1.csv
-      python main.py bench-sigrid --tabla obrparpre --paginas 200,1000,5000,10000 --out bench_sigrid.csv
+      python main.py bench-sigrid --tabla obrparpre --paginas 1000,5000,10000,20000 --out bench_sigrid.csv
       ```
 
       Y, tras la siguiente carga nocturna completa:
@@ -67,23 +76,46 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       python main.py diagnostico-tiemod --comparar-con huella_tiemod_1.csv
       ```
 
+      El barrido llega a **20.000**, que es el cap real de `sigrid-api`
+      (DA-6); hoy el ETL trabaja a 10.000, por debajo del límite. Lo que aquí
+      se busca ya no es descubrir el cap —lo dio el humano— sino si subir el
+      `page_size` compra tiempo y **cuál es el corte real del balanceador**
+      (R5-bis: documentado 120 s, en uso 230 s, sin acreditar).
+
       **Verificación**: `MANUAL (humano)`. Los CSV **no se versionan** (van al
       puesto, como las huellas de F-019). El `bench-sigrid` va contra el SQL
       Server de producción: lo lanza el humano en el momento que elija.
 
 - [ ] **T8**: Escribir `progress/medicion_F-011.md` con los números reales de
-      T7, el `batch_id` de cada carga medida, el cap real de `max_rows`
-      medido frente al documentado (DA-6) y una **recomendación firmada de SÍ
-      o NO** implementar el bloque B, contrastada contra el umbral de DA-7.
-      **Verificación**: el fichero existe y cada número tiene su origen
-      citado (`_meta.etl_runs` / salida del bench). Inspección del reviewer.
+      T7, el `batch_id` de cada carga medida, el cap y el timeout reales
+      medidos frente a los documentados (DA-6, R5-bis) y una **recomendación
+      firmada de SÍ o NO** implementar el bloque B.
+      **Verificación**: el fichero existe, cada número tiene su origen citado
+      (`_meta.etl_runs` / salida del bench) y **los dos números del umbral de
+      DA-7 están escritos al lado de sus dos límites**: ahorro estimado frente
+      a 20 min, y peso de la ingesta frente al 40 % del total. Inspección del
+      reviewer.
 
-- [ ] **T9 · PARADA · MANUAL (humano)**: el humano lee T8 y decide. Cierra
-      además DA-1, DA-2, DA-3, DA-4, DA-6 y DA-7 en
-      `progress/current.md`.
+- [ ] **T8-bis · MANUAL (humano)**: avisar al **dueño de `sigrid-api`** de que
+      `azure-apps/sigrid_api.md` documenta `MAX_ALLOWED_ROWS = 1000` cuando el
+      cap real son **20.000** (dato del humano, 2026-08-18), y pasarle de paso
+      lo que mida R5-bis sobre el timeout (documentado 120 s, en uso 230 s).
+      **Este proyecto NO edita ese documento**: su dueño es `sigrid-api`
+      (`CLAUDE.md` § ecosistema; ya pasó con las dos copias divergentes de
+      `sigrid_api.md`).
+      **Verificación**: `MANUAL (humano)`. Queda anotado en
+      `progress/medicion_F-011.md` a quién se avisó y cuándo; el reviewer
+      comprueba que **no hay ningún cambio en `azure-apps/`** en la rama
+      (`git -C ../azure-apps status --porcelain` limpio).
+
+- [ ] **T9 · PARADA · MANUAL (humano)**: el humano lee T8 y decide SÍ o NO
+      sobre el bloque B, contra el umbral de DA-7.
+      Las decisiones DA-2 a DA-7 **ya están cerradas** (2026-08-18,
+      `requirements.md` § «Decisiones cerradas»), y DA-1 salió a F-025: en esta
+      parada no queda nada más que decidir que el SÍ o el NO.
       **Verificación**: `MANUAL (humano)`. Si la decisión es NO, la feature
-      salta a T22 y se cierra con el bloque A entregado y el bloque C
-      convertido en feature nueva (DA-5).
+      salta a T21 y se cierra entregando solo el bloque A; el trabajo de
+      rendimiento continúa en **F-025**, que ataca el 67 % del tiempo.
 
 ---
 
@@ -92,9 +124,14 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
 - [ ] **T10**: Crear `etl_sigrid/domain/carga_incremental.py` con
       `ModoCarga`, `decidir_modo_de_carga` y `decidir_modo_de_tabla`. Tests
       exhaustivos primero (es la pieza que la campaña de mutación va a morder).
-      **Verificación**: `pytest tests/test_f011_watermark.py -q` (R12, R15,
-      R17) + `python -m harness.mutacion --feature F-011` sin supervivientes
-      en este módulo.
+      `decidir_modo_de_carga` recibe **`dia_semana_full`** además de
+      `cada_dias`: la regla exacta —el domingo manda, los días son la red— está
+      en R12-bis y se implementa literalmente, sin variantes.
+      **Verificación**: `pytest tests/test_f011_watermark.py -q` (R12, R12-bis,
+      R15, R17), con los cinco casos de R12-bis (domingo con full de ayer,
+      domingo con full de hoy, martes a los 6 días, martes a los 7, sin full
+      previa) + `python -m harness.mutacion --feature F-011` sin
+      supervivientes en este módulo.
 
 - [ ] **T11**: Crear `etl_sigrid/infrastructure/postgres/sql/ddl/01_watermark.sql`
       (tabla `_meta.ingesta_watermark` idempotente + ampliación **aditiva** de
@@ -111,8 +148,10 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       (R10), con conexión mockeada.
 
 - [ ] **T13**: Añadir `IngestaSettings` (prefijo `INGESTA_`) a
-      `config/settings.py` con los tres valores por defecto que reproducen el
-      comportamiento actual.
+      `config/settings.py` con los **cuatro** valores por defecto que
+      reproducen el comportamiento actual: `modo="full"`, `full_cada_dias=7`,
+      **`full_dia_semana=6` (domingo, DA-2)** y `deriva_max_filas=0`. El día de
+      la semana se valida en el rango 0–6.
       **Verificación**: `pytest tests/test_f011_cli.py -k apagado -q` (R18):
       sin variables de entorno, la composición del pipeline y el modo de
       ingesta son idénticos a los de hoy.
@@ -163,27 +202,35 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       marca la feature `blocked` y no se racionaliza (precedente de F-019 T11).
       **Verificación**: `MANUAL (humano)`.
 
-- [ ] **T19**: Actualizar `docs/ARCHITECTURE.md` (modelo de carga resultante y
-      corrección de la frase «la ingesta nocturna SIEMPRE `--full`») y
-      `azure-apps/datamart_seg_anual.md` (lo que este servicio consume de
-      `sigrid-api` y sus variables de entorno nuevas).
+- [ ] **T19**: Actualizar `docs/ARCHITECTURE.md` (modelo de carga resultante,
+      **la recarga completa de los domingos** y corrección de la frase «la
+      ingesta nocturna SIEMPRE `--full`») y `azure-apps/datamart_seg_anual.md`
+      (lo que este servicio consume de `sigrid-api` —frecuencia y volumen de
+      peticiones— y sus variables de entorno nuevas, `INGESTA_MODO`,
+      `INGESTA_FULL_CADA_DIAS`, `INGESTA_FULL_DIA_SEMANA`,
+      `INGESTA_DERIVA_MAX_FILAS`). Sigue sin tocarse `azure-apps/sigrid_api.md`
+      (T8-bis).
       **Verificación**: inspección del reviewer + `pytest tests/test_f011_alcance.py -q`
       (R24: barrido de secretos sobre lo nuevo).
 
 ---
 
-## Bloque C · Ventana de negocio (solo se mide)
+## ~~Bloque C · Ventana de negocio~~ — EXTRAÍDO A F-025 (2026-08-18)
 
-- [ ] **T20**: Añadir el bloque `ventana:` a `config/business_rules.yaml` con
-      el predicado a `null` y el comentario que apunta a DA-1, y el comando
-      `perfil-ventana` (+ `fetch_peso_ventana` en `postgres_client.py`).
-      **Verificación**: `pytest tests/test_f011_ventana.py -q` (R20, R21).
+- ~~**T20**~~: **HUECO DELIBERADO.** La tarea que añadía el bloque `ventana:` a
+  `config/business_rules.yaml`, el comando `perfil-ventana` y
+  `fetch_peso_ventana` **ya no pertenece a F-011**: es
+  `specs/F-025-ventana-negocio-build/`, porque depende de DA-1 y DA-1 sigue sin
+  decidir. No se renumera: T21, T22 y T23 conservan su número.
 
-- [ ] **T21**: Test de alcance que fija que el SQL de `stg` y `mart` no ha
-      cambiado en esta rama (R22), y anotar en `progress/current.md` la
-      propuesta de feature nueva para acotar el build (DA-5) con los números
-      de T8 como justificación.
-      **Verificación**: `pytest tests/test_f011_alcance.py -q`.
+- [ ] **T21**: Test de alcance que fija que esta rama **no** ha tocado el SQL de
+      `stg` ni de `mart` y que **no** existen ni el bloque `ventana:` de
+      `config/business_rules.yaml`, ni el comando `perfil-ventana`, ni
+      `fetch_peso_ventana` (R22). Y enlazar F-011 con F-025 en la cabecera de
+      la spec, ya escrita.
+      **Verificación**: `pytest tests/test_f011_alcance.py -q` (R22, R24).
+      El reviewer comprueba además que `specs/F-025-ventana-negocio-build/`
+      existe con sus tres ficheros y que su DA-1 sigue **abierta**.
 
 ---
 

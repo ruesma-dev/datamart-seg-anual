@@ -1,9 +1,17 @@
 <!-- specs/F-011-carga-incremental/design.md -->
 # F-011 · Carga incremental del datamart — Diseño técnico
 
-> Se lee **después** de `requirements.md`. El orden de los bloques A / B / C
-> es normativo: el bloque B no se escribe hasta que el humano firme la puerta
-> de R8.
+> Se lee **después** de `requirements.md`. El orden de los bloques A / B es
+> normativo: el bloque B no se escribe hasta que el humano firme la puerta de
+> R8.
+
+> **Cambio del 2026-08-18.** El humano cerró seis de las siete decisiones
+> abiertas y dejó **DA-1 sin decidir**. Con ella sale de esta feature el
+> **bloque C entero** (ventana de negocio y acotado del build), que pasa a
+> `specs/F-025-ventana-negocio-build/`. Este diseño ya no contiene
+> `perfil-ventana`, ni el bloque `ventana:` de `config/business_rules.yaml`,
+> ni `fetch_peso_ventana`. Ver `requirements.md` §0.0 y su sección
+> «Decisiones cerradas».
 
 ## 1 · El diagnóstico, antes del diseño
 
@@ -18,13 +26,21 @@ extracción, porque sigrid-api sirve 1.000 filas por petición y el balanceador
 corta a los 230 s»— que este dato **no confirma**. Dos matices que hay que
 medir antes de darla por refutada del todo:
 
-1. **El límite de filas no es el documentado.** `azure-apps/sigrid_api.md`
-   (línea 245) documenta `DEFAULT_MAX_ROWS / MAX_ALLOWED_ROWS = 200 / 1000`,
-   pero `config/settings.py` usa `page_size = 10000` por defecto y
-   `docs/ARCHITECTURE.md` afirma «tope duro 10.000 filas/petición». Los 20,05 M
-   de filas en 33 min encajan con páginas de 10.000 (≈2.005 peticiones, ~1 s
-   cada una), no con páginas de 1.000. La instancia desplegada **no es la que
-   describe su documentación** → DA-6, y la medición de R4/R5 lo zanja.
+1. **El límite de filas no es el documentado — y ya está zanjado (DA-6).**
+   `azure-apps/sigrid_api.md` (línea 245) documenta `DEFAULT_MAX_ROWS /
+   MAX_ALLOWED_ROWS = 200 / 1000`, pero **el cap real son 20.000 filas por
+   petición**, confirmado por el humano el 2026-08-18. Este ETL usa
+   `page_size = 10000`: **trabaja por debajo del límite real y le sobra
+   margen**. Los 20,05 M de filas en 33 min encajan con páginas de 10.000
+   (≈2.005 peticiones, ~1 s cada una), como tenía que ser.
+   **Consecuencia para el diseño:** la premisa «sigrid-api limita a 1.000
+   filas» que abre la feature queda **refutada**; el `bench-sigrid` ya no
+   sirve para descubrir el cap, sino para responder dos preguntas distintas:
+   ¿subir de 10.000 a 20.000 compra tiempo, o el coste está en el SQL Server
+   y no en el transporte? (R4) y ¿cuál es el corte real del balanceador,
+   documentado en 120 s y en uso a 230 s? (R5-bis, lo único que sigue sin
+   acreditar). **El documento equivocado lo corrige su dueño, no este
+   proyecto** (T8-bis).
 2. **El agregado esconde el reparto.** 33 min entre 31 tablas puede ser
    uniforme o puede ser `obrparpre` (13,76 M filas) llevándose la mitad. R3
    existe para eso, y la respuesta ya está guardada: cada tabla tiene su fila
@@ -107,17 +123,22 @@ Evaluado según manda el protocolo del `spec-author`:
 - **Todo el bloque A y el B pertenecen a este servicio.** Son la extracción y
   la contabilidad de la extracción: su casa es `etl_sigrid`.
 - **Lo que NO pertenece aquí: los límites de sigrid-api.** Si la medición
-  demuestra que la extracción es el cuello (páginas de 1.000, cortes a 230 s),
+  demuestra que la extracción es el cuello (cortes a 230 s, tamaño de página),
   el arreglo —subir `MAX_ALLOWED_ROWS`, añadir un endpoint de exportación
   masiva, revisar el timeout del balanceador— es trabajo **del proyecto
   `sigrid-api`**, y se le pide a su dueño con los números de `bench-sigrid` en
   la mano. Este ETL no implementa aquí ni un atajo ni una conexión directa al
   SQL Server: `sigrid-api` es el único acceso (`CLAUDE.md` § ecosistema).
-  Tampoco edita `azure-apps/sigrid_api.md`, que es de ese proyecto (DA-6).
-- **El bloque C roza otra frontera distinta**, la del dominio: acotar el build
-  a «obras abiertas» cambia qué ve Power BI. No es un microservicio nuevo, es
-  una **feature nueva con decisión de Negocio** (DA-1, DA-5). Por eso F-011 lo
-  mide y no lo implementa.
+  **Tampoco edita `azure-apps/sigrid_api.md`, que es de ese proyecto** — y eso
+  incluye el dato de DA-6: sabemos que el documento está mal (dice 1.000, el
+  cap real son 20.000) y lo que hacemos es **avisar al dueño** (T8-bis), no
+  corregirlo nosotros.
+- **El bloque C rozaba otra frontera distinta**, la del dominio: acotar el
+  build a «obras abiertas» cambia qué ve Power BI. No es un microservicio
+  nuevo, es una **feature nueva con decisión de Negocio**, y desde el
+  2026-08-18 ya no está aquí: es **F-025**
+  (`specs/F-025-ventana-negocio-build/`). F-011 ni la mide ni la implementa;
+  R22 es la barrera que lo fija con un test.
 
 ---
 
@@ -148,15 +169,15 @@ Evaluado según manda el protocolo del `spec-author`:
 
 | Ruta | Qué cambia |
 |---|---|
-| `main.py` | Tres comandos nuevos de **solo lectura**: `perfil-carga`, `bench-sigrid`, `diagnostico-tiemod`, y en el bloque C `perfil-ventana`. Ninguno llama a `_arrancar_ejecucion()` (R25), igual que `check-coherencia`, `check-frescura` y `timings`. |
-| `etl_sigrid/infrastructure/postgres/postgres_client.py` | Tres métodos de lectura nuevos, siguiendo el patrón de `fetch_timings` / `fetch_estado_raw`: `fetch_perfil_carga(batch_id: str \| None) -> list[FilaPerfil]` (una fila por paso y por tabla del batch), `fetch_diagnostico_tiemod() -> list[EstadoTiemod]` (recorre las tablas de `raw` con `_source_tiemod`), `fetch_peso_ventana(predicado_sql: str) -> PesoVentana` (bloque C). Sin escrituras. |
-| `config/business_rules.yaml` | Bloque nuevo `ventana:` con el predicado de «obra abierta» y el ejercicio en curso. **Se deja con el valor a `null` y un comentario que apunta a DA-1**: `perfil-ventana` falla a propósito si no está (R21). |
+| `main.py` | **Tres** comandos nuevos de **solo lectura**: `perfil-carga`, `bench-sigrid`, `diagnostico-tiemod`. Ninguno llama a `_arrancar_ejecucion()` (R25), igual que `timings`, `fingerprint-views` o `status`. **`perfil-ventana` ya no está aquí: es F-025.** |
+| `etl_sigrid/infrastructure/postgres/postgres_client.py` | **Dos** métodos de lectura nuevos, siguiendo el patrón de `fetch_timings` / `fetch_pesos_plan_mensual`: `fetch_perfil_carga(batch_id: str \| None) -> list[FilaPerfil]` (una fila por paso y por tabla del batch) y `fetch_diagnostico_tiemod() -> list[EstadoTiemod]` (recorre las tablas de `raw` con `_source_tiemod`). Sin escrituras. **`fetch_peso_ventana` ya no está aquí: es F-025.** |
+| ~~`config/business_rules.yaml`~~ | **NO SE TOCA.** El bloque `ventana:` salió a F-025 con DA-1 (R22). |
 
 ### Bloque B
 
 | Ruta | Qué cambia |
 |---|---|
-| `config/settings.py` | Clase nueva `IngestaSettings` (prefijo `INGESTA_`): `modo: str = "full"`, `full_cada_dias: int = 7`, `deriva_max_filas: int = 0`. Todo con default y **sin secretos**; con los defaults el comportamiento es idéntico al de hoy (R18). Pydantic v2, `default=` solo en la firma (`docs/CONVENTIONS.md`). |
+| `config/settings.py` | Clase nueva `IngestaSettings` (prefijo `INGESTA_`): `modo: str = "full"`, `full_cada_dias: int = 7`, **`full_dia_semana: int = 6`** (0 = lunes … 6 = **domingo**, convenio `datetime.weekday()`; DA-2) y `deriva_max_filas: int = 0`. Todo con default y **sin secretos**; con los defaults el comportamiento es idéntico al de hoy (R18). Pydantic v2, `default=` solo en la firma (`docs/CONVENTIONS.md`). El rango de `full_dia_semana` se valida (0–6) y un valor fuera de rango es error de arranque, no un domingo silencioso. |
 | `etl_sigrid/application/steps/ingest_raw_step.py` | (a) decide el modo global consultando `_meta.ingesta_watermark` y `decidir_modo_de_carga`; (b) recorre **todas** las tablas declaradas siempre (R9); (c) por tabla, elige cursor `full` / `tiemod` / `solo-altas` con `decidir_modo_de_tabla`; (d) rellena el `metadata` de R10; (e) actualiza `_meta.ingesta_watermark`. La orquestación queda en el step; las decisiones, en el dominio. |
 | `etl_sigrid/infrastructure/sigrid/sigrid_api_client.py` | `stream_table` acepta `desde_tiemod: float \| None`. Cuando viene, el `WHERE` añade `AND [tiemod] > ?` manteniendo el keyset por `ide` como orden y cursor de paginación (la paginación **no** cambia: sigue siendo `ide > ?`, que es lo que garantiza no saltarse filas). Método nuevo `count_rows(source_table, where)` para la guardia de deriva de R17. |
 | `etl_sigrid/infrastructure/postgres/postgres_client.py` | `record_run_end(...)` gana un parámetro opcional `metadata: dict \| None = None` (hoy no lo tiene; `record_run_completed` sí). Métodos `leer_watermark()` / `actualizar_watermark(...)`. `_bootstrap_schemas_and_meta` pasa a ejecutar **todos** los `sql/ddl/*.sql` en orden en vez del `00_meta.sql` fijo que ejecuta hoy — sin esto, `01_watermark.sql` no se crearía nunca. |
@@ -172,11 +193,14 @@ Evaluado según manda el protocolo del `spec-author`:
   que su comportamiento sea idéntico. Si el implementer se ve editando este
   fichero, el diseño se torció: vuelva a §1.3.
 - **`etl_sigrid/infrastructure/postgres/sql/stg/*.sql` y `sql/mart/*.sql`** —
-  ni una línea. Acotar el build es el bloque C, que en F-011 solo se mide
-  (R22, con test de que los ficheros no cambian).
-- **`etl_sigrid/domain/tramos.py` y el troceo de F-019** — el build por tramos
-  se queda exactamente como está. Es lo que impide repetir el incidente del
-  disco del 2026-08-09.
+  ni una línea. Acotar el build es **F-025** (R22, con test de que los
+  ficheros no cambian en esta rama).
+- **`config/business_rules.yaml`** — sin bloque `ventana:`, sin predicado de
+  «obra abierta». Es de F-025 y depende de DA-1, que sigue sin decidir.
+- **`etl_sigrid/domain/tramos.py`, `build_stg_step.py` y el troceo de F-019** —
+  el build por tramos se queda exactamente como está. Es lo que impide repetir
+  el incidente del disco del 2026-08-09, y es también la pieza sobre la que
+  F-025 se apoyará: F-011 no la mueve ni un milímetro.
 - **`_meta.v_frescura`** — la vista de frescura de F-024 no cambia. La
   ampliación aditiva es solo de `v_raw_state` (§1.3).
 - **`harness/features.json`** — lo actualiza el líder, no esta spec.
@@ -216,9 +240,16 @@ class ModoCarga(StrEnum):
 
 def decidir_modo_de_carga(
     ultima_full: datetime | None, hoy: datetime,
-    cada_dias: int, modo_configurado: str, forzar_full: bool,
-) -> tuple[ModoCarga, str]:           # (modo, motivo legible)  · R12, R18
+    cada_dias: int, dia_semana_full: int,      # 0=lunes … 6=domingo (DA-2)
+    modo_configurado: str, forzar_full: bool,
+) -> tuple[ModoCarga, str]:           # (modo, motivo legible)  · R12, R12-bis, R18
     ...
+    # FULL si: forzar_full | modo_configurado == "full" | ultima_full is None
+    #        | (hoy.weekday() == dia_semana_full and ultima_full.date() < hoy.date())
+    #        | (hoy - ultima_full).days >= cada_dias
+    # El día de la semana es la REGLA (domingo); los días son la RED de
+    # seguridad si el domingo el job no corrió. Comparación por date(), para
+    # que dos ejecuciones el mismo domingo hagan UNA sola recarga completa.
 
 def decidir_modo_de_tabla(
     tabla: str, modo_global: ModoCarga, columna_cursor: str | None,
@@ -262,10 +293,10 @@ Ninguna capa de negocio (`stg`, `mart`, `cierre`, `compras`, `maestro`,
 
 ```
 main.py (click)
- ├─ perfil-carga        ─┐
- ├─ diagnostico-tiemod   ├─ SOLO LECTURA. Sin batch_id, sin filas en _meta (R25)
- ├─ perfil-ventana      ─┤   dominio puro + fetch_* del PostgresClient
- └─ bench-sigrid        ─┘   dominio puro + SigridApiClient (lectura de Sigrid)
+ ├─ perfil-carga        ─┐  SOLO LECTURA. Sin batch_id, sin filas en _meta (R25)
+ ├─ diagnostico-tiemod   ├─ dominio puro + fetch_* del PostgresClient
+ └─ bench-sigrid        ─┘  dominio puro + SigridApiClient (lectura de Sigrid)
+      (perfil-ventana ya NO está aquí: es F-025)
 
 run-all  →  Orchestrator([
       IngestRawStep,      ← ÚNICO step que cambia (bloque B)
@@ -309,4 +340,18 @@ step tocado es la ingesta, y solo en el bloque B.
   cuesta lo mismo que traérselas.
 - **Materializar `stg`/`mart` de forma incremental por obra.** Es donde está
   el 67 % del tiempo y es tentador, pero cambia qué ve Power BI y necesita
-  decisión de Negocio y prueba de equivalencia. Feature propia (DA-5, R22).
+  decisión de Negocio (DA-1) y prueba de equivalencia. **Feature propia, ya
+  escrita: `specs/F-025-ventana-negocio-build/`** (DA-5 cerrada el
+  2026-08-18). R22 impide que se cuele en esta rama.
+
+### Lo que cambia en este diseño tras las decisiones del 2026-08-18
+
+| Decisión | Qué cambia en el diseño |
+|---|---|
+| DA-1 sin decidir | Desaparecen del diseño `perfil-ventana`, `fetch_peso_ventana` y el bloque `ventana:` de `config/business_rules.yaml`. Van a F-025. |
+| DA-2 domingos | `IngestaSettings` gana `full_dia_semana: int = 6` y `decidir_modo_de_carga` un parámetro más; la regla exacta está en R12-bis. |
+| DA-3 aceptada | R17 y `deriva_max_filas = 0` se quedan como están; no se diseña comparación de conjuntos de `ide`. |
+| DA-4 aceptada | La opción (c) (watermark propio por sumas de control) sale del diseño; si R7 dice `NO SIRVE`, el bloque B no se escribe. |
+| DA-5 aceptada | F-025 existe y va **por delante** del bloque B si R8 lo confirma (el build es el 67 %). |
+| DA-6 (cap 20.000) | §1.1 corregida; `bench-sigrid` mide hasta 20.000 y añade R5-bis (latencia máxima vs `timeout_s`); tarea T8-bis para avisar al dueño de `sigrid-api`. |
+| DA-7 aceptada | El umbral (≥ 20 min o ≥ 40 %) está escrito en R8 y en la verificación de T8/T9. |

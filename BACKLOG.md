@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **21 features**, 11 abiertas, 10 terminadas.
+Resumen: **22 features**, 12 abiertas, 10 terminadas.
 
 Bloqueadas: **F-003**.
 
@@ -12,7 +12,8 @@ Bloqueadas: **F-003**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-003 | Infra: despliegue como Container Apps Job diario | 7 | bloqueada | critico | `feature/F-003-infra-caj` |
-| F-011 | Carga incremental del datamart | 11 | pendiente |  | `feature/F-011-carga-incremental` |
+| F-025 | Ventana de negocio: acotar el build de stg y mart a lo que se mueve | 10 | pendiente | critico | `feature/F-025-ventana-negocio-build` |
+| F-011 | Carga incremental del datamart | 11 | spec lista | critico | `feature/F-011-carga-incremental` |
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
 | F-022 | Desempatar versiones master duplicadas de raw.obrfasamb | 12 | pendiente | estandar | `feature/F-022-desempate-obrfasamb` |
 | F-018 | Validar los numeros de cierre.fact_cierre_mensual | 13 | pendiente |  | `feature/F-018-validacion-cierre-mensual` |
@@ -46,9 +47,15 @@ estado **bloqueada** · prioridad 7 · rigor `critico` · SDD sí · rama `featu
 
 Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev, escribiendo contra el Postgres de F-005. Dockerfile ya en raíz y scripts PowerShell esbozados en infra/ con varios TODO por cerrar (ACR, host de Postgres, secretos). Secretos en Key Vault, nunca en el repo. Incluye observabilidad: logs consultables y aviso ante fallo del job.
 
+### F-025 · Ventana de negocio: acotar el build de stg y mart a lo que se mueve
+
+estado **pendiente** · prioridad 10 · rigor `critico` · SDD sí · rama `feature/F-025-ventana-negocio-build`
+
+Extraida de F-011 el 2026-08-18 por decision del humano: la definicion de 'obra abierta' (DA-1 de F-011) queda SIN DECIDIR y es de Negocio, asi que el bloque C de F-011 sale de aquella feature y se hace mas adelante en esta. Motivo de peso para priorizarla: la medicion de la carga del 18-ago demuestra que build_stg se lleva 111 de los 165 min (67 %) y build_mart 21 (13 %), mientras la ingesta son 33 (20 %); acotar el build rinde mas que la ingesta incremental. Cambia QUE VE Power BI, no solo cuanto tarda, asi que exige prueba de equivalencia como la que hizo F-019 con el troceado. No se toca el build por tramos de F-019 sin esa prueba. Por DA-5 de F-011 va con prioridad por encima del bloque B de F-011 si la medicion lo confirma.
+
 ### F-011 · Carga incremental del datamart
 
-estado **pendiente** · prioridad 11 · SDD sí · rama `feature/F-011-carga-incremental`
+estado **spec lista** · prioridad 11 · rigor `critico` · SDD sí · rama `feature/F-011-carga-incremental`
 
 Hoy el job nocturno ejecuta siempre --full. Conseguir que las cargas que no sean la inicial sean rapidas. HALLAZGO QUE CONDICIONA EL DISENO (F-009): Sigrid NO tiene una marca de ultima modificacion fiable — en el diccionario 'fecalt' aparece en 16 tablas, 'fecmod' en 3 y 'sello' en 2 — asi que no hay watermark directo y hay que construirlo. Palancas: ventana de negocio (ejercicio en curso y obras abiertas, con recarga completa semanal), altas nuevas por el 'ide' autoincremental, y un watermark propio mantenido por el ETL en _meta. Sospecha a verificar antes de disenar nada: el cuello de botella puede no estar en la base sino en la extraccion, porque sigrid-api limita a 1000 filas por peticion y el balanceador corta a los 230 s; encaja con que el intento de abril muriera en la ingesta. La spec debe empezar por medir, no por optimizar.
 

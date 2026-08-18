@@ -9,19 +9,41 @@
 ## 0 · Qué persigue esta feature y en qué orden
 
 La descripción de la feature ordena una cosa antes que ninguna otra: **medir,
-no optimizar**. Estos requisitos están agrupados en tres bloques y **el orden
+no optimizar**. Estos requisitos están agrupados en dos bloques y **el orden
 es normativo**:
 
 | Bloque | Requisitos | Naturaleza |
 |---|---|---|
 | **A · Medición** | R1–R8 | Se implementa **siempre**. Herramientas de solo lectura + informe. |
-| **B · Ingesta incremental** | R9–R19 | Se implementa **solo si la puerta de decisión de R8 lo justifica** y con las decisiones abiertas cerradas. |
-| **C · Ventana de negocio y build** | R20–R22 | En F-011 **solo se mide y se acota el alcance**. La implementación va a feature propia (ver DA-5). |
+| **B · Ingesta incremental** | R9–R19 | Se implementa **solo si la puerta de decisión de R8 lo justifica**, contrastada contra el umbral de DA-7 (ahorro estimado ≥ 20 min **o** ingesta ≥ 40 % del tiempo total). |
 
-**Ningún requisito del bloque B o C puede implementarse antes de que el humano
+**Ningún requisito del bloque B puede implementarse antes de que el humano
 firme la puerta de R8.** Es literalmente lo que pide la feature, y hay una
 razón dura además de la formal: los números que ya existen (§0.1) apuntan a
 que el cuello de botella **no** está donde la sospecha decía.
+
+### 0.0 · Lo que esta feature YA NO contiene (bloque C, extraído el 2026-08-18)
+
+La versión original de esta spec tenía un tercer bloque —**C · Ventana de
+negocio y build** (R20, R21, R22)— que dependía de una definición de «obra
+abierta» que Negocio **no ha decidido** (DA-1). El humano, el 2026-08-18,
+dejó DA-1 sin decidir y ordenó **sacar el bloque C de F-011**.
+
+Todo el bloque C vive ahora en **`specs/F-025-ventana-negocio-build/`**:
+el comando `perfil-ventana`, el bloque `ventana:` de
+`config/business_rules.yaml`, `fetch_peso_ventana` y el acotado del build.
+
+**Huecos de numeración deliberados: R20 y R21 ya no existen en F-011.** No se
+renumera nada: R1–R19 y R22–R25 conservan su identificador para que la
+trazabilidad requisito→test, las tareas y los mensajes de commit sigan
+apuntando a lo mismo. La tabla de trazabilidad deja constancia explícita del
+hueco.
+
+| Requisito retirado de F-011 | Dónde vive ahora |
+|---|---|
+| R20 (`perfil-ventana` informa el peso de la ventana) | F-025 · R1, R2, R4 |
+| R21 (sin predicado declarado, `perfil-ventana` falla y lo dice) | F-025 · R3 |
+| R22 (F-011 **no** acota el build) | **Se queda en F-011** como requisito de alcance (ver «Requisitos transversales»); su contrapartida positiva —acotar el build de verdad— es F-025 · R6–R18 |
 
 ### 0.1 · Lo que ya se sabe antes de escribir una línea de código
 
@@ -115,15 +137,31 @@ tablas por duración descendente y marcar cuántas tablas acumulan el 80 % del
 tiempo de ingesta. (Si son dos, atacar las 31 es trabajo tirado.)
 
 **R4.** CUANDO el usuario ejecuta `python main.py bench-sigrid --tabla <t>
---paginas 1000,5000,10000`, el sistema debe medir contra sigrid-api, **en solo
-lectura y sin escribir nada en Postgres**, el tiempo de respuesta y las filas
-por segundo de cada tamaño de página, y emitir el resumen por consola y a un
-CSV opcional (`--out`).
+--paginas 1000,5000,10000,20000`, el sistema debe medir contra sigrid-api, **en
+solo lectura y sin escribir nada en Postgres**, el tiempo de respuesta y las
+filas por segundo de cada tamaño de página, y emitir el resumen por consola y a
+un CSV opcional (`--out`).
+
+> El 20.000 no es decorativo: el cap real de `sigrid-api` son **20.000 filas
+> por petición** (DA-6, confirmado por el humano el 2026-08-18), y este ETL
+> trabaja hoy a 10.000. Medir el doble es lo único que dice si subir el
+> `page_size` compra algo o si el coste está en el SQL Server y no en el
+> transporte.
 
 **R5.** SI sigrid-api rechaza un tamaño de página por exceder su
 `MAX_ALLOWED_ROWS`, ENTONCES `bench-sigrid` debe registrar el cap real que la
 API devuelve en el cuerpo del 400, continuar con los tamaños admitidos y
 **no** abortar la medición.
+
+**R5-bis.** CUANDO `bench-sigrid` mide, el sistema debe registrar además el
+**tiempo de respuesta máximo observado** por tamaño de página y compararlo con
+el `timeout_s` configurado, para acreditar cuál es el corte real del
+balanceador (documentado 120 s, en uso 230 s: la divergencia sigue **sin
+acreditar** tras DA-6 y es lo que queda por medir aquí).
+
+> Identificador con sufijo, no un `R26` al final: este requisito nace de una
+> decisión cerrada sobre R5 y tiene que leerse pegado a él. No hay
+> renumeración en esta spec (§0.0).
 
 **R6.** El sistema debe ofrecer `python main.py diagnostico-tiemod`, de solo
 lectura sobre el datamart, que para cada tabla de `raw` con columna
@@ -140,9 +178,13 @@ o `SIN EVIDENCIA` (no hay dos cargas comparables).
 
 **R8.** El sistema debe dejar el resultado de R1–R7 escrito en
 `progress/medicion_F-011.md` con la fecha, el `batch_id` de las cargas
-medidas y **una recomendación firmada de SÍ o NO implementar el bloque B**.
-MIENTRAS ese informe no exista y el humano no lo apruebe, ningún requisito del
-bloque B puede darse por iniciado.
+medidas y **una recomendación firmada de SÍ o NO implementar el bloque B**,
+contrastada **explícitamente contra el umbral cerrado en DA-7**: el bloque B
+se implementa solo si el ahorro estimado es **≥ 20 minutos** o si la ingesta
+pasa a ser **≥ 40 % del tiempo total** de la carga. El informe debe escribir
+los dos números medidos al lado de los dos umbrales, no una valoración
+cualitativa. MIENTRAS ese informe no exista y el humano no lo apruebe, ningún
+requisito del bloque B puede darse por iniciado.
 
 > Verificación de R8: es una **puerta de proceso**, no de código. El reviewer
 > comprueba que el fichero existe, que sus números salen de `_meta.etl_runs` y
@@ -177,14 +219,40 @@ fila por tabla declarada y, como mínimo: `tabla`, `modo_ultimo`,
 `batch_id_ultimo`, `filas_en_tabla`, `actualizado_en`. Su creación debe ser
 idempotente y ejecutarse en el bootstrap, como la de `_meta.etl_runs`.
 
-**R12.** SI han pasado más de `INGESTA_FULL_CADA_DIAS` días desde la última
-recarga completa, ENTONCES `run-all` debe hacer recarga completa **de todas
-las tablas** esa noche, no solo de la que va atrasada.
+**R12.** SI hoy es el día de la semana configurado en
+`INGESTA_FULL_DIA_SEMANA` (**domingo** por defecto, DA-2) y todavía no se ha
+hecho una recarga completa hoy, **O** han pasado `INGESTA_FULL_CADA_DIAS` días
+o más desde la última recarga completa, ENTONCES `run-all` debe hacer recarga
+completa **de todas las tablas** esa noche, no solo de la que va atrasada.
 
-> Recargar solo la atrasada dejaría `raw` con una tabla de hoy y treinta de
-> antes de ayer: coherente para la puerta (mismo batch, porque R9 escribe
-> fila para todas) pero **incoherente en el dato**. La recarga completa es
-> todo o nada.
+> Las dos condiciones van en **OR** y no significan lo mismo. El día de la
+> semana es la **regla**: la recarga completa se hace los domingos, que es lo
+> que el humano decidió el 2026-08-18 y lo que permite coordinar la ventana
+> con `albaranes` y `partes` en el mismo servidor. Los días transcurridos son
+> la **red de seguridad**: si el domingo el job no corrió o murió, al séptimo
+> día se recarga completa aunque sea martes, en vez de esperar otra semana.
+> Con solo la segunda condición la recarga completa iría derivando de día
+> (domingo, lunes, martes…) hasta caer en horario de trabajo.
+
+**R12-bis.** CUANDO el sistema decide el modo de carga, debe hacerlo con esta
+regla exacta, sin ninguna otra fuente de verdad:
+
+```
+FULL  si  forzar_full (--full explícito)
+      o   modo_configurado == "full"            (apagado por defecto, R18)
+      o   no hay ninguna recarga completa previa registrada
+      o   (hoy.weekday() == INGESTA_FULL_DIA_SEMANA  Y  fecha(ultima_full) < fecha(hoy))
+      o   (hoy - ultima_full).days >= INGESTA_FULL_CADA_DIAS
+INCREMENTAL  en cualquier otro caso
+```
+
+`weekday()` es el de la librería estándar (0 = lunes … **6 = domingo**), y la
+comparación del día ya hecho es **por fecha, no por marca de tiempo**: dos
+ejecuciones el mismo domingo hacen **una** recarga completa, no dos. La marca
+de tiempo es la misma que el ETL ya usa para `started_at` (UTC); a las 02:00
+de la ventana nocturna la fecha UTC y la peninsular coinciden, tanto en
+horario de invierno como de verano, así que no se introduce ninguna
+conversión de zona horaria.
 
 **R13.** MIENTRAS exista una carga incremental, la puerta de coherencia de
 `raw` debe seguir exigiendo exactamente lo mismo que hoy: todas las tablas
@@ -232,28 +300,24 @@ faltan por validar y con qué comando se validan.
 
 ---
 
-## Bloque C · Ventana de negocio y build (solo medición en F-011)
+## ~~Bloque C · Ventana de negocio y build~~ — EXTRAÍDO A F-025 (2026-08-18)
 
-**R20.** CUANDO el usuario ejecuta `python main.py perfil-ventana`, el sistema
-debe informar, en solo lectura sobre el datamart, qué porcentaje de las filas
-de `stg.plan_mensual` y de `mart.fact_seguimiento_mensual` pertenecen a obras
-que cumplen el predicado de «obra abierta» declarado en
-`config/business_rules.yaml`, y qué porcentaje pertenecen al ejercicio en
-curso.
-
-**R21.** SI `config/business_rules.yaml` no declara el predicado de «obra
-abierta», ENTONCES `perfil-ventana` debe fallar con un mensaje que diga que es
-una **decisión de Negocio pendiente** (DA-1) y no inventar un criterio por
-defecto.
-
-**R22.** El sistema **no** debe acotar el build de `stg` ni el de `mart` a la
-ventana de negocio dentro de F-011. La decisión y la implementación van a
-feature propia (DA-5), porque cambian **qué datos ve Power BI**, no solo
-cuánto tarda en calcularlos.
+R20 y R21 ya no forman parte de esta feature: viven en
+`specs/F-025-ventana-negocio-build/`. Ver §0.0 para el mapeo completo y el
+motivo (DA-1 sigue sin decidir). **R22 se queda aquí**, reformulado como
+requisito de alcance en la sección siguiente: es la barrera que impide que
+F-011 se meta en el terreno de F-025.
 
 ---
 
 ## Requisitos transversales (aplican a todo lo anterior)
+
+**R22.** El sistema **no** debe acotar el build de `stg` ni el de `mart` a
+ninguna ventana de negocio dentro de F-011, ni añadir el bloque `ventana:` a
+`config/business_rules.yaml`, ni el comando `perfil-ventana`, ni
+`fetch_peso_ventana`. Todo eso es **F-025**, que cambia **qué datos ve Power
+BI** y por tanto necesita su propia decisión de Negocio (DA-1) y su propia
+prueba de equivalencia, igual que hizo F-019.
 
 **R23.** El sistema **no** debe ejecutar contra Sigrid ninguna sentencia que
 no sea de lectura. Todo SQL que los comandos nuevos envíen a `/api/sql/read`
@@ -265,7 +329,7 @@ debe obtenerlas de `config/settings.py` como el resto: ni un secreto en la
 spec, ni en el código, ni en los tests, ni en `progress/`.
 
 **R25.** Los comandos nuevos de solo lectura (`perfil-carga`,
-`diagnostico-tiemod`, `perfil-ventana`, `bench-sigrid`) **no** deben generar
+`diagnostico-tiemod`, `bench-sigrid`) **no** deben generar
 `batch_id` ni escribir filas en `_meta.etl_runs`, igual que hoy hacen
 `check-coherencia`, `check-frescura` y `timings`.
 
@@ -285,6 +349,7 @@ comando exacto está en `tasks.md`.
 | R3 | `test_f011_perfil.py::test_f011_r3_tablas_que_acumulan_el_80_pct` | sí |
 | R4 | `test_f011_bench.py::test_f011_r4_bench_no_escribe_en_postgres` | sí (cliente HTTP mockeado) |
 | R5 | `test_f011_bench.py::test_f011_r5_cap_rechazado_no_aborta_el_bench` | sí |
+| R5-bis | `test_f011_bench.py::test_f011_r5bis_registra_latencia_maxima_por_pagina` | sí |
 | R6 | `test_f011_tiemod.py::test_f011_r6_diagnostico_por_tabla` | sí |
 | R7 | `test_f011_tiemod.py::test_f011_r7_veredicto_sirve_no_sirve_sin_evidencia` | sí |
 | R8 | **MANUAL (humano)** · el reviewer comprueba `progress/medicion_F-011.md` | n/a |
@@ -292,6 +357,7 @@ comando exacto está en `tasks.md`.
 | R10 | `test_f011_ingesta.py::test_f011_r10_metadata_de_la_fila_de_tabla` | sí |
 | R11 | `test_f011_watermark.py::test_f011_r11_ddl_idempotente_y_en_bootstrap` | sí (lee el .sql) |
 | R12 | `test_f011_watermark.py::test_f011_r12_full_semanal_es_de_todas_las_tablas` | sí (función pura) |
+| R12-bis | `test_f011_watermark.py::test_f011_r12bis_el_domingo_manda_y_los_dias_son_la_red` | sí (función pura; casos: domingo con full de ayer → FULL, domingo con full de hoy → INCREMENTAL, martes con full de hace 6 días → INCREMENTAL, martes con full de hace 7 → FULL, sin full previa → FULL) |
 | R13 | `test_f011_coherencia.py::test_f011_r13_la_puerta_de_raw_no_cambia` | sí |
 | R14 | `test_f011_coherencia.py::test_f011_r14_tabla_no_exitosa_sigue_frenando_stg` | sí |
 | R15 | `test_f011_ingesta.py::test_f011_r15_tabla_sin_cursor_va_completa` | sí |
@@ -299,9 +365,9 @@ comando exacto está en `tasks.md`.
 | R17 | `test_f011_ingesta.py::test_f011_r17_deriva_de_recuento_fuerza_full` | sí |
 | R18 | `test_f011_cli.py::test_f011_r18_apagado_por_defecto_no_cambia_nada` | sí |
 | R19 | `test_f011_cli.py::test_f011_r19_modo_tiemod_sin_validacion_aborta` | sí |
-| R20 | `test_f011_ventana.py::test_f011_r20_porcentajes_de_la_ventana` | sí |
-| R21 | `test_f011_ventana.py::test_f011_r21_sin_predicado_falla_y_lo_dice` | sí |
-| R22 | `test_f011_alcance.py::test_f011_r22_el_sql_de_stg_y_mart_no_se_toca` | sí (diff de ficheros) |
+| ~~R20~~ | **HUECO DELIBERADO** · extraído a F-025 (§0.0). No existe `tests/test_f011_ventana.py` | n/a |
+| ~~R21~~ | **HUECO DELIBERADO** · extraído a F-025 (§0.0) | n/a |
+| R22 | `test_f011_alcance.py::test_f011_r22_el_sql_de_stg_y_mart_no_se_toca` + `::test_f011_r22_sin_bloque_ventana_ni_perfil_ventana` | sí (diff de ficheros + barrido del árbol) |
 | R23 | `test_f011_bench.py::test_f011_r23_solo_select_contra_sigrid` | sí |
 | R24 | `test_f011_alcance.py::test_f011_r24_sin_secretos_en_lo_nuevo` | sí |
 | R25 | `test_f011_cli.py::test_f011_r25_comandos_de_lectura_no_escriben_en_meta` | sí |
@@ -314,56 +380,127 @@ real en Azure contrastada con una `--full` inmediatamente posterior.
 
 ---
 
-## Decisiones abiertas (NO las cierra el spec-author)
+## Decisiones cerradas (2026-08-18, por el humano)
 
-**DA-1 · ¿Qué es una «obra abierta»?**
-Opciones: (a) obra cuyo contrato en `raw.obrctr` no tiene `fecreafin`
-informada; (b) obra con movimiento (albarán, factura o parte) en los últimos
-N meses; (c) una marca explícita de Sigrid que Negocio identifique.
-**Recomendación**: (a) como definición primaria y (b) con N=12 como red, ambas
-declaradas como predicado SQL en `config/business_rules.yaml` para poder
-cambiarlas sin tocar código. **Requiere confirmación de Negocio**: de esta
-definición depende qué obras dejarían de refrescarse a diario.
+Esta sección sustituye a la de «Decisiones abiertas» de la primera versión de
+la spec. El humano respondió a las siete el 2026-08-18: **seis quedan
+cerradas** y su efecto en el diseño está escrito aquí; **DA-1 no se cierra y
+sale de la feature**.
 
-**DA-2 · Cadencia de la recarga completa.**
-Opciones: (a) semanal, en el hueco de menor uso; (b) cada 3 días; (c) diaria
-(es decir, no hacer incremental). **Recomendación**: (a) semanal, sábado o
-domingo por la noche, con `INGESTA_FULL_CADA_DIAS=7`, **solo si** la puerta de
-R8 aprueba el bloque B. El día concreto lo elige el humano: la ventana la
-comparte con `albaranes` y `partes` en el mismo servidor.
+### DA-1 · ¿Qué es una «obra abierta»? — **SIN DECIDIR · SALE DE F-011**
 
-**DA-3 · ¿Se acepta perder las bajas de Sigrid entre recargas completas?**
-Un `DELETE` en Sigrid no lo ve ningún cursor. **Recomendación**: aceptarlo con
-la guardia de recuento de R17, que fuerza la recarga completa de la tabla en
-cuanto los recuentos divergen. Alternativa cara: comparar el conjunto completo
-de `ide` por tabla en cada carga (31 tablas × millones de ids a 10.000 filas
-por petición: no compensa).
+El humano **no** decide todavía qué es una obra abierta. En consecuencia, todo
+lo que dependía de esa definición **se extrae de F-011** y pasa a
+`specs/F-025-ventana-negocio-build/`, donde DA-1 es la **primera decisión
+abierta** y sigue sin cerrar.
 
-**DA-4 · Si `tiemod` resulta NO fiable (veredicto de R7), ¿qué se hace?**
-Opciones: (a) renunciar a la ingesta incremental y llevar el esfuerzo al build
-(bloque C); (b) filtrar la extracción por ventana de negocio usando el campo
-`where` que `config/tables_sigrid.yaml` **ya soporta** por tabla; (c) construir
-un watermark propio en `_meta` a base de recuentos y sumas de control por
-tabla y obra. **Recomendación**: (a) + (b). La (c) es un sistema de detección
-de cambios casero sobre 20 M de filas: mucho código nuevo para ahorrar 33 min.
+**Efecto concreto en esta spec:**
 
-**DA-5 · ¿Se abre una feature propia para acotar el build (el 67 % del
-tiempo)?** **Recomendación**: sí, y con prioridad **por encima** del bloque B
-de esta feature si R8 confirma los números de §0.1. Cambia qué ve Power BI, así
-que necesita su propia spec, su decisión de Negocio (DA-1) y su verificación
-de equivalencia, igual que hizo F-019.
+- R20 y R21 desaparecen (§0.0). Se dejan como **huecos de numeración**; no se
+  renumera nada.
+- **No** se añade el bloque `ventana:` a `config/business_rules.yaml`.
+- **No** se implementa el comando `perfil-ventana`.
+- **No** se implementa `fetch_peso_ventana` en `postgres_client.py`.
+- R22 se queda, convertido en requisito de alcance: F-011 **no** toca el SQL
+  de `stg` ni de `mart` ni crea nada de la ventana, y hay test que lo fija.
+- La tarea T20 del bloque C desaparece de `tasks.md` (hueco deliberado).
 
-**DA-6 · La documentación de `sigrid-api` no cuadra con la instancia
-desplegada.** `azure-apps/sigrid_api.md` documenta `MAX_ALLOWED_ROWS = 1000` y
-`MAX_QUERY_TIMEOUT_SECONDS = 120`; este ETL trabaja con `page_size = 10000` y
-`timeout_s = 230` y funciona. **Recomendación**: medir el cap real con
-`bench-sigrid` (R5) y **avisar al dueño de `sigrid-api` para que actualice su
-documento**; el dueño de ese documento es ese proyecto, no este
-(`CLAUDE.md` § ecosistema). **Este proyecto no edita `azure-apps/sigrid_api.md`.**
+### DA-2 · Cadencia de la recarga completa — **SEMANAL, LOS DOMINGOS**
 
-**DA-7 · ¿Qué mejora mínima justifica implementar el bloque B?**
-**Recomendación**: implementarlo solo si `perfil-carga` demuestra un ahorro
-estimado **≥ 20 minutos** o si la ingesta pasa a ser **≥ 40 %** del tiempo
-total. Por debajo de eso, el bloque B añade una máquina de estados nueva
-(watermark, deriva, modos) a un ETL que hoy es reproducible y aburrido, a
-cambio de calderilla.
+**Efecto concreto en el diseño**, y aquí está la parte que no puede quedar
+ambigua: **`INGESTA_FULL_CADA_DIAS=7` por sí solo NO implementa «los
+domingos»**. Contar días desde la última recarga completa hace que el día vaya
+derivando —si un domingo el job falla y la siguiente completa cae el lunes, la
+próxima cae el lunes, y así hasta meterse en horario de trabajo—. La decisión
+de modo, por tanto, **mira el día de la semana**, y los días transcurridos
+quedan como red de seguridad:
+
+- Ajuste nuevo **`INGESTA_FULL_DIA_SEMANA: int = 6`** (0 = lunes … 6 = domingo,
+  el convenio de `datetime.weekday()`). Es la **regla**.
+- Ajuste **`INGESTA_FULL_CADA_DIAS: int = 7`**. Es la **red de seguridad**: si
+  el domingo no hubo carga (job caído, ventana perdida), al séptimo día se
+  recarga completa aunque sea martes.
+- Las dos condiciones se combinan en **OR**, con la regla exacta escrita en
+  **R12-bis**, y viven en `decidir_modo_de_carga(...)`, dominio puro, con un
+  test por caso.
+- La comparación «¿ya se hizo la completa hoy?» es **por fecha**, no por marca
+  de tiempo: dos ejecuciones el mismo domingo hacen **una** recarga completa.
+- La marca de tiempo es la que el ETL ya usa (UTC). A las 02:00 de la ventana
+  nocturna la fecha UTC coincide con la peninsular en invierno y en verano, así
+  que **no se introduce ninguna conversión de zona horaria** (y se documenta
+  que si la ventana se moviera a antes de la medianoche, esto habría que
+  revisarlo).
+
+### DA-3 · Perder las bajas de Sigrid entre recargas completas — **ACEPTADO**
+
+Se acepta la recomendación: se asume que un `DELETE` en Sigrid no lo ve ningún
+cursor entre recargas completas, con dos redes.
+
+**Efecto concreto:** R17 (guardia de deriva por recuento de filas) se mantiene
+tal cual y es **obligatoria** en el bloque B, no opcional;
+`INGESTA_DERIVA_MAX_FILAS` entra con default `0` (cualquier divergencia fuerza
+la recarga completa de esa tabla). La recarga completa semanal de DA-2 es la
+segunda red. Queda **descartada** la comparación del conjunto completo de `ide`
+por tabla.
+
+### DA-4 · Si `tiemod` resulta NO fiable — **ACEPTADO (a) + (b)**
+
+Se acepta la recomendación: si el veredicto de R7 es `NO SIRVE`, (a) se
+renuncia a la ingesta incremental por watermark y el esfuerzo se lleva al
+build —que ahora es **F-025**— y (b) se puede acotar la extracción con el campo
+`where` que `config/tables_sigrid.yaml` **ya soporta** por tabla.
+
+**Efecto concreto:** la opción (c) —watermark propio a base de sumas de control
+sobre 20 M de filas— queda **descartada y no se diseña**; R19 sigue vigente
+(sin veredicto registrado, el modo `tiemod` aborta antes de leer una fila); y
+si R7 dice `NO SIRVE`, el bloque B se cierra sin implementar y F-011 entrega
+solo el bloque A.
+
+### DA-5 · Feature propia para acotar el build — **ACEPTADO: es F-025**
+
+Se acepta la recomendación. **Efecto concreto:**
+`specs/F-025-ventana-negocio-build/` existe y recoge todo el bloque C. Y con la
+prioridad que el humano ya fijó: **F-025 va por encima del bloque B de F-011**
+si los números de la medición (R8) lo confirman, porque el build es el **67 %**
+del tiempo y la ingesta el 20 %. F-025 cambia qué ve Power BI, así que exige
+prueba de equivalencia como hizo F-019.
+
+### DA-6 · El cap real de `sigrid-api` son 20.000 filas, no 1.000 — **DATO DEL HUMANO**
+
+**Confirmado por el humano el 2026-08-18: el cap real de `sigrid-api` es de
+20.000 filas por petición.** `azure-apps/sigrid_api.md` documenta 1.000
+(`MAX_ALLOWED_ROWS`): **el documento está mal**. Este ETL usa `page_size =
+10000`, o sea que **trabaja por debajo del límite real** y le sobra margen.
+
+**Efecto concreto en el diseño:**
+
+1. **Cae la premisa de la feature.** «sigrid-api limita a 1.000 filas por
+   petición» era una de las dos patas de la sospecha original; queda refutada.
+   La otra pata —el corte del balanceador— **sigue sin acreditar**: documentado
+   120 s, en uso 230 s. Eso es lo que mide **R5-bis**.
+2. `bench-sigrid` incluye el tamaño **20.000** en su barrido (R4) para saber si
+   subir el `page_size` compra algo o si el coste está en el SQL Server.
+3. **Este proyecto NO edita `azure-apps/sigrid_api.md`.** El dueño de ese
+   documento es el proyecto `sigrid-api` (`CLAUDE.md` § ecosistema). El dato se
+   registra aquí y **se avisa a su dueño**: tarea **T8-bis** de `tasks.md`,
+   MANUAL del humano.
+
+### DA-7 · Umbral que justifica implementar el bloque B — **ACEPTADO**
+
+Se acepta la recomendación. **Efecto concreto:** el bloque B se implementa
+**solo si** `perfil-carga` demuestra un ahorro estimado **≥ 20 minutos** **o**
+la ingesta pasa a ser **≥ 40 % del tiempo total**. El umbral está escrito en
+R8, en la tabla de bloques de §0 y en la verificación de T8/T9: el informe de
+medición tiene que poner los dos números medidos al lado de los dos umbrales.
+Por debajo de eso, el bloque B añade una máquina de estados nueva a un ETL hoy
+reproducible y aburrido a cambio de calderilla, y F-011 se cierra entregando
+solo el bloque A.
+
+---
+
+## Decisiones que siguen abiertas en F-011
+
+**Ninguna.** DA-1 salió a F-025, donde sigue abierta. Lo que queda por resolver
+en F-011 no son decisiones sino **mediciones**: el veredicto de `tiemod` (R7),
+el reparto del tiempo de ingesta por tabla (R3) y el corte real del balanceador
+(R5-bis). Las tres tienen su tarea MANUAL en `tasks.md` y su puerta en R8.

@@ -209,10 +209,11 @@
       "acceptance": [
         "Definida en detalle por specs/F-011-carga-incremental/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "priority": 11,
-      "branch": "feature/F-011-carga-incremental"
+      "branch": "feature/F-011-carga-incremental",
+      "rigor": "critico"
     },
     {
       "id": "F-017",
@@ -330,6 +331,19 @@
       "rigor": "estandar",
       "priority": 12,
       "branch": "feature/F-022-desempate-obrfasamb"
+    },
+    {
+      "id": "F-025",
+      "title": "Ventana de negocio: acotar el build de stg y mart a lo que se mueve",
+      "description": "Extraida de F-011 el 2026-08-18 por decision del humano: la definicion de 'obra abierta' (DA-1 de F-011) queda SIN DECIDIR y es de Negocio, asi que el bloque C de F-011 sale de aquella feature y se hace mas adelante en esta. Motivo de peso para priorizarla: la medicion de la carga del 18-ago demuestra que build_stg se lleva 111 de los 165 min (67 %) y build_mart 21 (13 %), mientras la ingesta son 33 (20 %); acotar el build rinde mas que la ingesta incremental. Cambia QUE VE Power BI, no solo cuanto tarda, asi que exige prueba de equivalencia como la que hizo F-019 con el troceado. No se toca el build por tramos de F-019 sin esa prueba. Por DA-5 de F-011 va con prioridad por encima del bloque B de F-011 si la medicion lo confirma.",
+      "acceptance": [
+        "Definida en detalle por specs/F-025-ventana-negocio-build/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 10,
+      "branch": "feature/F-025-ventana-negocio-build"
     }
   ]
 }
