@@ -18,6 +18,14 @@ from datetime import datetime
 
 import pytest
 
+from etl_sigrid.domain.coherencia import (
+    EstadoPaso,
+    EstadoTablaRaw,
+    evaluar_coherencia_raw,
+    evaluar_coherencia_stg,
+    formatear_veredicto_raw,
+    formatear_veredicto_stg,
+)
 from etl_sigrid.domain.ejecucion import (
     BYTES_DEL_SUFIJO,
     FORMATO_INSTANTE,
@@ -154,3 +162,310 @@ def test_f024_r4_aborted_es_parte_del_vocabulario_de_estados() -> None:
     assert {s.value for s in StepStatus} == {
         "PENDING", "RUNNING", "SUCCESS", "FAILED", "SKIPPED", "ABORTED",
     }
+
+
+# ---------------------------------------------------------------------------
+# R8 · Veredicto de coherencia de `raw` (dominio puro)
+# ---------------------------------------------------------------------------
+
+# Tres tablas declaradas: lo mínimo para poder observar «una falla y las otras
+# no», «una viene de otro batch» y «una no está».
+REQUERIDAS = ("con", "obr", "obrparpre")
+
+BATCH_BUENO = "20260818T020000Z-aaaaaa"
+BATCH_VIEJO = "20260817T020000Z-bbbbbb"
+
+
+def estado(
+    tabla: str,
+    status: str = "SUCCESS",
+    batch_id: str | None = BATCH_BUENO,
+    fin: datetime | None = None,
+    filas: int = 1_000,
+) -> EstadoTablaRaw:
+    """Una fila de `_meta.v_raw_state` como la ve el dominio."""
+    return EstadoTablaRaw(
+        tabla=tabla,
+        status=status,
+        batch_id=batch_id,
+        started_at=datetime(2026, 8, 18, 2, 0, 0),
+        finished_at=fin if fin is not None else datetime(2026, 8, 18, 2, 30, 0),
+        filas=filas,
+    )
+
+
+def todas_bien() -> list[EstadoTablaRaw]:
+    return [estado(t) for t in REQUERIDAS]
+
+
+def test_f024_r8_ok_cuando_todas_del_mismo_batch_success() -> None:
+    """La noche normal: ingesta completa, todo SUCCESS, un solo batch."""
+    veredicto = evaluar_coherencia_raw(todas_bien(), REQUERIDAS)
+
+    assert veredicto.ok is True
+    assert veredicto.batch_id == BATCH_BUENO
+    assert veredicto.faltantes == ()
+    assert veredicto.no_exitosas == ()
+    assert veredicto.sin_batch == ()
+    assert veredicto.batches_distintos == ()
+
+
+def test_f024_r8_ko_si_falta_una_tabla() -> None:
+    """Una tabla declarada que nunca se ingirió (típico: se añadió al YAML)."""
+    veredicto = evaluar_coherencia_raw([estado("con"), estado("obr")], REQUERIDAS)
+
+    assert veredicto.ok is False
+    assert veredicto.batch_id is None
+    assert veredicto.faltantes == ("obrparpre",)
+    # Las que sí están y están bien no se acusan de nada.
+    assert veredicto.no_exitosas == ()
+    assert veredicto.sin_batch == ()
+
+
+@pytest.mark.parametrize("estado_malo", ["FAILED", "ABORTED", "RUNNING"])
+def test_f024_r8_ko_si_la_ultima_ingesta_no_es_success(estado_malo: str) -> None:
+    """El ÚLTIMO intento manda: un FAILED posterior a un SUCCESS significa que
+    se intentó recargar y nadie sabe qué quedó en la tabla."""
+    estados = [estado("con"), estado("obr", status=estado_malo), estado("obrparpre")]
+
+    veredicto = evaluar_coherencia_raw(estados, REQUERIDAS)
+
+    assert veredicto.ok is False
+    assert [e.tabla for e in veredicto.no_exitosas] == ["obr"]
+    # El estado real viaja con el motivo: no es lo mismo FAILED que RUNNING.
+    assert veredicto.no_exitosas[0].status == estado_malo
+    # Una tabla que no terminó bien no cuenta además como «de otro batch».
+    assert veredicto.batches_distintos == ()
+
+
+def test_f024_r8_ko_si_batch_nulo() -> None:
+    """El raw anterior a F-024: SUCCESS, pero sin acreditar de qué carga viene.
+
+    Las otras dos comparten batch a propósito: así el único motivo del KO es
+    el batch nulo.
+    """
+    estados = [estado("con"), estado("obr"), estado("obrparpre", batch_id=None)]
+
+    veredicto = evaluar_coherencia_raw(estados, REQUERIDAS)
+
+    assert veredicto.ok is False
+    assert [e.tabla for e in veredicto.sin_batch] == ["obrparpre"]
+    assert veredicto.batch_id is None
+
+
+def test_f024_r8_ko_si_todo_el_historico_es_sin_batch() -> None:
+    """Primera vez tras desplegar: NINGUNA tabla tiene batch."""
+    estados = [estado(t, batch_id=None) for t in REQUERIDAS]
+
+    veredicto = evaluar_coherencia_raw(estados, REQUERIDAS)
+
+    assert veredicto.ok is False
+    assert [e.tabla for e in veredicto.sin_batch] == list(REQUERIDAS)
+    assert veredicto.batches_distintos == ()
+
+
+def test_f024_r8_ko_si_batches_distintos() -> None:
+    """La muerte externa a mitad de ingesta: unas tablas nuevas, otras viejas."""
+    estados = [
+        estado("con"),
+        estado("obr"),
+        estado("obrparpre", batch_id=BATCH_VIEJO, fin=datetime(2026, 8, 17, 2, 30, 0)),
+    ]
+
+    veredicto = evaluar_coherencia_raw(estados, REQUERIDAS)
+
+    assert veredicto.ok is False
+    assert veredicto.batch_id is None
+
+    # Mapa batch -> tablas, ordenado por batch (y por tanto cronológicamente).
+    mapa = {b: [e.tabla for e in tablas] for b, tablas in veredicto.batches_distintos}
+    assert mapa == {BATCH_BUENO: ["con", "obr"], BATCH_VIEJO: ["obrparpre"]}
+    assert [b for b, _ in veredicto.batches_distintos] == [BATCH_VIEJO, BATCH_BUENO]
+
+
+def test_f024_r8_ignora_tablas_no_declaradas() -> None:
+    """`raw` puede tener restos de tablas que ya no se ingieren (compras,
+    retenciones cargadas a mano): no son asunto de la puerta."""
+    estados = [
+        *todas_bien(),
+        estado("tabla_vieja", status="FAILED", batch_id=None),
+        estado("otra_de_otro_batch", batch_id=BATCH_VIEJO),
+    ]
+
+    veredicto = evaluar_coherencia_raw(estados, REQUERIDAS)
+
+    assert veredicto.ok is True
+    assert veredicto.batch_id == BATCH_BUENO
+
+
+def test_f024_r8_el_veredicto_es_determinista_y_ordenado() -> None:
+    """Mismo conjunto, distinto orden de entrada => mismo veredicto.
+
+    El mensaje de R9 se lee a las 8 de la mañana: que las tablas salgan hoy en
+    un orden y mañana en otro convierte dos incidentes iguales en dos textos
+    distintos.
+    """
+    estados = [
+        estado("obrparpre", status="FAILED"),
+        estado("con", batch_id=None),
+        estado("obr"),
+    ]
+    veredicto = evaluar_coherencia_raw(estados, REQUERIDAS)
+    al_reves = evaluar_coherencia_raw(
+        list(reversed(estados)), tuple(reversed(REQUERIDAS))
+    )
+
+    assert veredicto == al_reves
+    assert [e.tabla for e in veredicto.no_exitosas] == ["obrparpre"]
+    assert [e.tabla for e in veredicto.sin_batch] == ["con"]
+
+
+def test_f024_r8_sin_tablas_requeridas_no_hay_nada_que_acreditar() -> None:
+    """Caso degenerado: un YAML sin tablas. No hay batch único, así que KO.
+
+    Es lo conservador: un `tables_sigrid.yaml` vacío es un error de
+    configuración, no una carga coherente.
+    """
+    veredicto = evaluar_coherencia_raw(todas_bien(), ())
+
+    assert veredicto.ok is False
+    assert veredicto.faltantes == ()
+
+
+# ---------------------------------------------------------------------------
+# R9 · Mensaje accionable
+# ---------------------------------------------------------------------------
+
+
+def test_f024_r9_mensaje_lista_tablas_y_batches() -> None:
+    """Cada motivo con sus tablas; cada batch con su fecha de fin."""
+    estados = [
+        estado("con"),
+        estado("obr", status="ABORTED"),
+        estado("obrparpre", batch_id=BATCH_VIEJO, fin=datetime(2026, 8, 17, 2, 30, 0)),
+    ]
+    veredicto = evaluar_coherencia_raw(estados, (*REQUERIDAS, "obrfas"))
+    texto = formatear_veredicto_raw(veredicto)
+
+    assert "KO" in texto
+    # Faltante, no exitosa con su estado, y los dos batches con sus tablas.
+    assert "obrfas" in texto
+    assert "obr" in texto and "ABORTED" in texto
+    assert BATCH_BUENO in texto and BATCH_VIEJO in texto
+    assert "2026-08-17" in texto, "el batch viejo no dice cuándo terminó"
+    assert "2026-08-18" in texto, "el batch nuevo no dice cuándo terminó"
+
+
+def test_f024_r9_mensaje_nombra_el_historico_sin_batch() -> None:
+    veredicto = evaluar_coherencia_raw(
+        [estado(t, batch_id=None) for t in REQUERIDAS], REQUERIDAS
+    )
+    texto = formatear_veredicto_raw(veredicto)
+
+    assert "F-024" in texto, "no se explica que el raw es anterior a la feature"
+    for tabla in REQUERIDAS:
+        assert tabla in texto
+
+
+def test_f024_r9_mensaje_termina_con_las_dos_acciones() -> None:
+    """Las dos, en este orden, y NINGUNA otra sugerencia (R9 es explícito)."""
+    veredicto = evaluar_coherencia_raw([estado("con")], REQUERIDAS)
+    texto = formatear_veredicto_raw(veredicto)
+
+    assert "python main.py ingest --full" in texto
+    assert "python main.py stage --sin-puerta" in texto
+    assert texto.index("ingest --full") < texto.index("stage --sin-puerta")
+    assert "registrado" in texto or "SKIPPED" in texto, (
+        "no se advierte de que --sin-puerta queda registrado"
+    )
+
+    # Ni un tercer comando: el mensaje no invita a improvisar.
+    comandos = set(re.findall(r"python main\.py ([a-z-]+)", texto))
+    assert comandos == {"ingest", "stage"}, f"sugerencias de más: {comandos}"
+
+
+def test_f024_r9_mensaje_ok_dice_de_que_batch_viene_el_raw() -> None:
+    texto = formatear_veredicto_raw(evaluar_coherencia_raw(todas_bien(), REQUERIDAS))
+
+    assert "OK" in texto
+    assert BATCH_BUENO in texto
+    # Un veredicto OK no propone acciones correctivas.
+    assert "--sin-puerta" not in texto
+
+
+# ---------------------------------------------------------------------------
+# R15 · Veredicto de coherencia de `stg` (misma mecánica, otra pregunta)
+# ---------------------------------------------------------------------------
+
+
+def paso(step: str, status: str = "SUCCESS", ident: int = 42) -> EstadoPaso:
+    return EstadoPaso(
+        id=ident,
+        step=step,
+        status=status,
+        batch_id=BATCH_BUENO,
+        started_at=datetime(2026, 8, 18, 2, 40, 0),
+        finished_at=datetime(2026, 8, 18, 4, 30, 0),
+    )
+
+
+def test_f024_r15_stg_ok_si_la_ultima_fila_es_el_paso_completo() -> None:
+    veredicto = evaluar_coherencia_stg(paso("build_stg"))
+
+    assert veredicto.ok is True
+    assert veredicto.batch_id == BATCH_BUENO
+
+
+@pytest.mark.parametrize(
+    "ultimo",
+    [
+        None,                                                    # ninguna fila
+        paso("build_stg", status="FAILED"),                      # el paso falló
+        paso("build_stg", status="ABORTED"),                     # murió el proceso
+        paso("build_stg.build_plan_mensual", status="RUNNING"),  # sub-paso vivo
+        paso("build_stg.build_plan_mensual.tramo_39", status="ABORTED"),
+        # El caso sutil: un sub-paso que SÍ terminó bien, pero que no es el
+        # paso. Es lo que queda si el proceso muere entre dos sub-pasos.
+        paso("build_stg.build_obras", status="SUCCESS"),
+    ],
+    ids=[
+        "sin_filas", "failed", "aborted", "subpaso_running", "tramo_aborted",
+        "subpaso_success",
+    ],
+)
+def test_f024_r15_stg_ko_si_el_ultimo_stage_no_termino(
+    ultimo: EstadoPaso | None,
+) -> None:
+    veredicto = evaluar_coherencia_stg(ultimo)
+
+    assert veredicto.ok is False
+    assert veredicto.batch_id is None
+
+
+def test_f024_r15_mensaje_de_stg_es_accionable() -> None:
+    texto = formatear_veredicto_stg(
+        evaluar_coherencia_stg(paso("build_stg.build_plan_mensual.tramo_39", "ABORTED"))
+    )
+
+    assert "KO" in texto
+    assert "build_stg.build_plan_mensual.tramo_39" in texto
+    assert "ABORTED" in texto
+    assert "python main.py stage" in texto
+    assert "--sin-puerta" in texto
+
+    comandos = set(re.findall(r"python main\.py ([a-z-]+)", texto))
+    assert comandos == {"stage", "build-mart"}, f"sugerencias de más: {comandos}"
+
+
+def test_f024_r15_mensaje_de_stg_sin_ninguna_fila_lo_dice() -> None:
+    texto = formatear_veredicto_stg(evaluar_coherencia_stg(None))
+
+    assert "KO" in texto
+    assert "python main.py stage" in texto
+
+
+def test_f024_r15_mensaje_de_stg_ok() -> None:
+    texto = formatear_veredicto_stg(evaluar_coherencia_stg(paso("build_stg")))
+
+    assert "OK" in texto
+    assert "--sin-puerta" not in texto
