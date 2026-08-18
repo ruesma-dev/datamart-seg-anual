@@ -160,6 +160,9 @@ def settings_falsos(tablas: tuple[str, ...] = TABLAS) -> SimpleNamespace:
                 {"source_table": t, "target_table": t} for t in tablas
             ]
         },
+        # Solo se usa para el tamaño de página del log de la ingesta: ningún
+        # test de este fichero abre una conexión HTTP.
+        sigrid_api=SimpleNamespace(page_size=10_000),
     )
 
 
@@ -500,3 +503,78 @@ def test_f024_r15_build_mart_sin_batch_sigue_funcionando(mart) -> None:
 
 def _ultimo_indice(traza: list[str], valor: str) -> int:
     return len(traza) - 1 - traza[::-1].index(valor)
+
+
+# ---------------------------------------------------------------------------
+# R3 · La ingesta estampa el batch en la fila de CADA tabla
+# ---------------------------------------------------------------------------
+
+
+def test_f024_r3_la_ingesta_estampa_el_batch_por_tabla() -> None:
+    """Es la fila que después lee `_meta.v_raw_state`, y con ella la puerta.
+
+    Sin batch aquí, toda la feature se cae: `v_raw_state` no podría decir de
+    qué carga viene cada tabla y la puerta rechazaría siempre por `sin_batch`.
+    """
+    from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
+    from etl_sigrid.domain.entities import ColumnSpec, TableSpec
+
+    class _ApiFalsa:
+        def fetch_table_schema(self, tabla: str) -> list[ColumnSpec]:
+            return [
+                ColumnSpec(
+                    name="ide",
+                    sql_server_type="int",
+                    char_max_length=None,
+                    numeric_precision=None,
+                    numeric_scale=None,
+                    is_nullable=False,
+                )
+            ]
+
+        def stream_table(self, *args: object, **kwargs: object):
+            yield [{"ide": 1}, {"ide": 2}]
+
+    class _PgFalso(PgFalso):
+        def ensure_raw_table(self, *args: object, **kwargs: object) -> None:
+            self.traza.append("ensure")
+
+        def get_max_id(self, schema: str, table: str, id_column: str = "ide") -> int:
+            return 0
+
+        def copy_rows(self, **kwargs: object) -> int:
+            self.traza.append("copy")
+            return 2
+
+    pg = _PgFalso()
+    paso = IngestRawStep(settings_falsos(), batch_id=BATCH)  # type: ignore[arg-type]
+
+    filas = paso._ingest_one_table(
+        TableSpec(source_table="con", target_table="con"), _ApiFalsa(), pg
+    )
+
+    assert filas == 2
+    assert pg.arranques == [("ingest", "ingest_raw.con", BATCH)]
+    assert pg.cierres[0][1] == "SUCCESS"
+
+
+def test_f024_r3_una_tabla_que_falla_tambien_deja_su_batch() -> None:
+    """La fila FAILED lleva batch igual: es la que delata de qué carga viene el
+    intento que rompió la coherencia."""
+    from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
+    from etl_sigrid.domain.entities import TableSpec
+
+    class _ApiQueFalla:
+        def fetch_table_schema(self, tabla: str) -> list:
+            raise RuntimeError("sigrid-api no responde")
+
+    pg = PgFalso()
+    paso = IngestRawStep(settings_falsos(), batch_id=BATCH)  # type: ignore[arg-type]
+
+    with pytest.raises(RuntimeError, match="sigrid-api"):
+        paso._ingest_one_table(
+            TableSpec(source_table="con", target_table="con"), _ApiQueFalla(), pg
+        )
+
+    assert pg.arranques == [("ingest", "ingest_raw.con", BATCH)]
+    assert pg.cierres[0][1] == "FAILED"

@@ -942,3 +942,18 @@ def _linea_de(texto: str, tabla: str) -> str:
         if linea.strip().lstrip(MARCA_INCOHERENTE).strip().startswith(tabla.strip()):
             return linea.strip()
     pytest.fail(f"no hay línea para la tabla {tabla!r} en:\n{texto}")
+
+
+def test_f024_r20_un_raw_completamente_vacio_lo_dice() -> None:
+    """Datamart recién creado: ni tablas ingeridas ni tablas exigidas.
+
+    Distinto del test anterior, donde `raw` está vacío pero el YAML sí declara
+    tablas (y entonces salen como faltantes). Aquí no hay NADA que listar, y la
+    tabla no puede quedarse en blanco sin explicar por qué.
+    """
+    veredicto = evaluar_coherencia_raw([], ())
+    texto = format_estado_raw([], veredicto)
+
+    assert "_meta.v_raw_state" in texto
+    assert "vacío" in texto
+    assert MARCA_INCOHERENTE not in texto
