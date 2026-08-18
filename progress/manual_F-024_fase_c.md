@@ -43,11 +43,17 @@ lanza):
 
 ```powershell
 $IP = (Invoke-RestMethod https://api.ipify.org)     # o la que dé tu router
-az postgres flexible-server firewall-rule create `
-  --resource-group rg-albaranes-dev --name psql-albaranes-rs9k2 `
-  --rule-name "datamart-puesto-pgris-$(Get-Date -Format yyyy-MM-dd)" `
-  --start-ip-address $IP --end-ip-address $IP
+az postgres flexible-server firewall-rule create --resource-group rg-albaranes-dev --server-name psql-albaranes-rs9k2 --rule-name "datamart-puesto-pgris-$(Get-Date -Format yyyy-MM-dd)" --start-ip-address $IP --end-ip-address $IP
 ```
+
+**Ojo con los nombres de los parámetros**, que muerden: en
+`firewall-rule create`, `--name`/`-n` es el nombre de la **regla** y el
+servidor va en `--server-name`/`-s`. En `firewall-rule list`, en cambio,
+`--server-name` es el servidor y no hay regla que nombrar. Pasar el servidor
+en `--name` falla con «the following arguments are required:
+--server-name/-s», que no dice lo que uno espera. Escrito en una sola línea a
+propósito: un backtick de continuación con un espacio detrás rompe el comando
+en PowerShell sin decir por qué.
 
 Con la regla puesta, las tres lecturas de la foto (ninguna escribe nada):
 
