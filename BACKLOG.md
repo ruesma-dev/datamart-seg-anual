@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **29 features**, 18 abiertas, 11 terminadas.
+Resumen: **30 features**, 19 abiertas, 11 terminadas.
 
 En curso: **F-023**.
 
@@ -25,6 +25,7 @@ Bloqueadas: **F-003**.
 | F-018 | Validar los numeros de cierre.fact_cierre_mensual | 13 | pendiente |  | `feature/F-018-validacion-cierre-mensual` |
 | F-028 | La puerta de stg distingue un stage que no llegó a construir de uno que dejó stg a medias | 13 | pendiente | estandar | `feature/F-028-puerta-stg-distingue-fallo` |
 | F-033 | El documento de este proyecto en azure-apps miente sobre lo que hay desplegado | 13 | pendiente | documental | `feature/F-033-azure-apps-al-dia` |
+| F-026 | 60_create_identity.ps1 da por hecho un RBAC que aun no ha propagado | 14 | pendiente | estandar | `feature/F-026-rbac-propagacion` |
 | F-002 | PLAN_VIGENTE: serie de planificación consolidada | 15 | pendiente |  | `feature/F-002-plan-vigente` |
 | F-012 | Auditoria y limpieza de Azure para reducir costes | 16 | pendiente |  | `feature/F-012-auditoria-costes-azure` |
 | F-013 | Cargar los Excels auxiliares a la capa aux | 17 | pendiente |  | `feature/F-013-carga-excels-aux` |
@@ -121,6 +122,12 @@ Descubierto el 2026-08-19 ejecutando T18 de F-024 (muerte externa controlada) y 
 estado **pendiente** · prioridad 13 · rigor `documental` · SDD no · rama `feature/F-033-azure-apps-al-dia`
 
 Descubierto el 2026-08-19 al actualizar la parte de los Excels auxiliares (ver progress/impl_F-023_documentacion.md). azure-apps/datamart_seg_anual.md decia que NO EXISTE NINGUN Container Apps Job y que la lectura de los Excels era un stub pendiente. El job lleva dias ejecutandose cada noche a las 02:00 UTC, con alerta de fallo, alerta de frescura, identidad gestionada y secretos en su propio Key Vault; y los Excels se leen del blob desde F-004/F-023. Se corrigio la cabecera con una nota fechada y la parte que entraba en ese encargo, pero EL RESTO DEL DOCUMENTO SIGUE SIN REVISAR. Por que importa mas de lo que parece: CLAUDE.md dice que este documento es la fuente que los OTROS proyectos consultan antes de tocar algo que cruce la frontera -el Postgres compartido, el ACR comun, sigrid-api- y que un documento desactualizado que parece vigente hace mas daño que no tenerlo. Alguien de albaranes o partes puede tomar una decision leyendo que aqui no hay nada desplegado. El dueño del documento es este proyecto, asi que la puesta al dia es trabajo de aqui, no de azure-apps.
+
+### F-026 · 60_create_identity.ps1 da por hecho un RBAC que aun no ha propagado
+
+estado **pendiente** · prioridad 14 · rigor `estandar` · SDD no · rama `feature/F-026-rbac-propagacion`
+
+Defecto de F-003 anotado desde el 2026-08-17 y que hasta hoy NO ESTABA REGISTRADO EN NINGUN SITIO EJECUTABLE: la ficha de F-023, progress/manual_F-023.md y progress/current.md lo apuntaban 'a F-026', pero F-026 no existia en harness/features.json de esta rama. Lo detecto el reviewer al cerrar F-003 (progress/review_F-023_F-003_cierre.md, cambio requerido 3): un puntero a una ficha inexistente en la evidencia de cierre de una feature critico. EL DEFECTO: infra/60_create_identity.ps1 asigna roles y acto seguido los da por efectivos, pero una asignacion de RBAC en Azure tarda en propagar; el script lanza un throw que parece un fallo real cuando en realidad solo hace falta esperar y reintentar. Quien lo ejecuta se encuentra un error que no dice 'espera', y la reaccion natural es tocar permisos a mano. CONSECUENCIA COLATERAL VISTA EL 2026-08-19: el puesto no tiene User Access Administrator sobre la cuenta de almacenamiento, asi que la prueba negativa de F-004 no se podia hacer quitando y devolviendo el rol; se resolvio por otra via, pero el reparto de permisos sigue siendo el que es.
 
 ### F-002 · PLAN_VIGENTE: serie de planificación consolidada
 

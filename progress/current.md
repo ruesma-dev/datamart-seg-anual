@@ -26,6 +26,32 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# F-023 · las tres verificaciones de F-004, CUMPLIDAS (2026-08-19)
+
+Lo pide **T27 de F-003**: el resultado de cada verificación MANUAL, aquí. El
+detalle con comandos y salidas pegadas está en `progress/manual_F-023.md`.
+
+| Verificación | Cuándo | Resultado real |
+|---|---|---|
+| **V1** · `load-aux` desde el puesto lee del blob | 14:42:08 UTC | **`SUCCESS`, salida 0, `origen=blob`** para los tres ficheros. Autenticado con el `az login` del puesto contra `Storage Blob Data Reader`, sin claves ni SAS |
+| **V2** · el job lee del blob con identidad gestionada | 10:55:57 UTC | **`origen=blob`** para los tres, con `ubicacion` de blob y **ni una sola ruta local**. No hubo que provocarlo: ya había pasado en la carga del día y nadie lo había anotado |
+| **V3** · sin el rol, falla diciendo qué falta | 14:51 UTC | **Salida 1**. Azure devolvió 403 `AuthorizationPermissionMismatch` y el ETL lo tradujo nombrando **el rol exacto, la cuenta, la variable de entorno** y qué hacer en Azure y en local |
+
+**Dos cosas que conviene no perder de esta tanda:**
+
+1. **El primer intento de V1 dio `SUCCESS` y no valía.** Leyó `origen=local`,
+   desde OneDrive, porque el `.env` del puesto sigue apuntando a rutas locales
+   —el **job** sí tiene las URIs de blob—. Un `load-aux` en verde **no prueba
+   nada** sobre el blob: hay que mirar el campo `origen`. Segunda pista: leer del
+   blob tardó 9,9 s y leer de disco, 0,0 s.
+2. **V3 se hizo sin tocar RBAC**, apuntando a una cuenta sobre la que el puesto
+   no tiene el rol, en vez de quitar el rol de la propia. El reviewer lo dio por
+   **mejor que el requisito original**: no exige `User Access Administrator`, no
+   deja ninguna asignación que devolver —el original se queda sin acceso a los
+   Excels si el reasignado falla— y no toca permisos de un recurso compartido.
+
+---
+
 # F-024 CERRADA · 2026-08-19 (léelo primero; lo de abajo es el camino hasta aquí)
 
 **Fase C completa y reviewer en APROBADO** (`progress/review_F-024_cierre.md`).
@@ -608,7 +634,11 @@ Todo el detalle (comandos exactos, qué exige autorización, KQL de logs) está 
 | **F-004** | Las tres verificaciones heredadas (blob desde el puesto, blob desde el job, prueba negativa de permisos) | Sección de F-004, más abajo. Van después de T19+T20. |
 
 Antes de T26 hace falta el nombre del grupo de acción de la landing zone
-(**DA-3**, sigue abierta): `az monitor action-group list --query "[].{n:name, rg:resourceGroup}" -o table`
+(**DA-3 · RESUELTA el 2026-08-17**, ver la tanda 2 más abajo: el grupo de la
+landing zone está **vacío**, así que se creó alerta propia con el correo del
+humano por parámetro. Esta línea decía «sigue abierta» y contradecía a la
+tanda 2; corregido el 2026-08-19 al cerrar F-003):
+`az monitor action-group list --query "[].{n:name, rg:resourceGroup}" -o table`
 y pasarlo con `-ActionGroupName` / `-ActionGroupRg`. Si no existe ninguno
 reutilizable, `-AlertEmail`. **Ningún correo entra en el repositorio.**
 

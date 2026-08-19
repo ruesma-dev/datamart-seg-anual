@@ -473,6 +473,23 @@
       "rigor": "documental",
       "priority": 13,
       "branch": "feature/F-033-azure-apps-al-dia"
+    },
+    {
+      "id": "F-026",
+      "title": "60_create_identity.ps1 da por hecho un RBAC que aun no ha propagado",
+      "description": "Defecto de F-003 anotado desde el 2026-08-17 y que hasta hoy NO ESTABA REGISTRADO EN NINGUN SITIO EJECUTABLE: la ficha de F-023, progress/manual_F-023.md y progress/current.md lo apuntaban 'a F-026', pero F-026 no existia en harness/features.json de esta rama. Lo detecto el reviewer al cerrar F-003 (progress/review_F-023_F-003_cierre.md, cambio requerido 3): un puntero a una ficha inexistente en la evidencia de cierre de una feature critico. EL DEFECTO: infra/60_create_identity.ps1 asigna roles y acto seguido los da por efectivos, pero una asignacion de RBAC en Azure tarda en propagar; el script lanza un throw que parece un fallo real cuando en realidad solo hace falta esperar y reintentar. Quien lo ejecuta se encuentra un error que no dice 'espera', y la reaccion natural es tocar permisos a mano. CONSECUENCIA COLATERAL VISTA EL 2026-08-19: el puesto no tiene User Access Administrator sobre la cuenta de almacenamiento, asi que la prueba negativa de F-004 no se podia hacer quitando y devolviendo el rol; se resolvio por otra via, pero el reparto de permisos sigue siendo el que es.",
+      "acceptance": [
+        "60_create_identity.ps1 reintenta con espera en vez de fallar cuando la asignacion aun no ha propagado, con un tope y un mensaje que distingue 'todavia no propago' de 'no tienes permiso para asignar'",
+        "Si el script no puede asignar por falta de permisos, lo dice nombrando el rol que necesita quien lo ejecuta y sobre que recurso, en vez de un throw generico",
+        "Documentado en infra/README.md que el puesto puede no tener permisos de asignacion de roles, y quien los tiene",
+        "Verificado ejecutandolo de verdad sobre un recurso donde la asignacion sea nueva, con el resultado anotado",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 14,
+      "branch": "feature/F-026-rbac-propagacion"
     }
   ]
 }
