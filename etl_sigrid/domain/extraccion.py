@@ -69,8 +69,14 @@ class MedicionPagina:
 
     @property
     def filas_por_segundo(self) -> float:
-        """Ritmo de extracción. 0 si no se midió tiempo o no llegaron filas."""
-        if self.segundos <= 0 or self.filas <= 0:
+        """Ritmo de extracción. 0 si no se llegó a medir tiempo.
+
+        La guardia mira solo el tiempo: con `filas = 0` la división ya da 0,0
+        por sí sola. Comprobarlo además sería una condición que ningún test
+        puede distinguir —lo dijo la campaña de mutación— y una condición que
+        no se puede distinguir es una condición que sobra.
+        """
+        if self.segundos <= 0:
             return 0.0
         return self.filas / self.segundos
 

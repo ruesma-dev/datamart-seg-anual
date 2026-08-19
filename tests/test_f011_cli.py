@@ -148,7 +148,11 @@ class ApiFalsaCli:
     ) -> dict:
         self.sql_enviado.append(sql)
         self.max_rows.append(max_rows)
-        filas = [[i + 1, "x"] for i in range(min(max_rows or 0, 10))]
+        # Páginas COMPLETAS: si devolviera menos filas que el tamaño pedido,
+        # `medir_pagina` cortaría a la primera y las repeticiones no se
+        # ejercitarían nunca.
+        desde = int(parameters[0]) if parameters else 0
+        filas = [[desde + i + 1, "x"] for i in range(max_rows or 0)]
         return {"columns": ["ide", "res"], "rows": filas, "row_count": len(filas)}
 
 
@@ -738,8 +742,13 @@ def test_f011_r7_comparar_con_exige_un_fichero_que_exista(cli, tmp_path) -> None
         main.cli, ["diagnostico-tiemod", "--comparar-con", str(tmp_path)]
     )
 
+    # Los dos salen 2, pero tiene que rechazarlos CLICK al validar la opción,
+    # no el `open` de más adelante: el mensaje de uso dice qué opción está mal
+    # y el del `open` solo dice que un fichero no se pudo abrir.
     assert inexistente.exit_code == 2
+    assert "Invalid value for '--comparar-con'" in inexistente.stderr
     assert directorio.exit_code == 2
+    assert "Invalid value for '--comparar-con'" in directorio.stderr
 
 
 def test_f011_r7_una_tabla_nueva_no_rompe_la_comparacion(cli, tmp_path) -> None:
@@ -782,8 +791,12 @@ def test_f011_r4_bench_sigrid_ensena_sus_valores_por_defecto(cli) -> None:
     resultado = cli(PgQueNoEscribe()).invoke(main.cli, ["bench-sigrid", "--help"])
 
     assert resultado.exit_code == 0
-    assert "1000,5000,10000,20000" in resultado.output
-    assert "default" in resultado.output.lower()
+    ayuda = " ".join(resultado.output.split())
+    assert "1000,5000,10000,20000" in ayuda
+    # Cada opción con valor por defecto tiene que enseñarlo, `--repeticiones`
+    # incluida: es la que multiplica el número de peticiones contra producción.
+    assert "[default: 1000,5000,10000,20000]" in ayuda
+    assert "[default: 1]" in ayuda
 
 
 def test_f011_r4_bench_sigrid_mide_una_pagina_por_tamano_si_no_se_pide_mas(cli) -> None:

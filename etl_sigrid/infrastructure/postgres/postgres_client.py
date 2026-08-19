@@ -227,6 +227,17 @@ RETURNING id
 """
 
 
+def _float_o_none(valor: Any) -> float | None:
+    """Convierte a `float` respetando el nulo de SQL.
+
+    Existe para que cada columna se lea con su propio valor y no con el índice
+    de la de al lado: `MIN` y `MAX` de la misma columna son nulos a la vez, así
+    que confundirlos no lo detecta ningún dato posible. Con el helper, la
+    confusión ni se puede escribir.
+    """
+    return None if valor is None else float(valor)
+
+
 def porcentaje_ocupacion(bytes_usados: int, total_gb: int) -> float:
     """Ocupación del disco en tanto por ciento, con el total en GB binarios.
 
@@ -1076,8 +1087,8 @@ class PostgresClient:
                         tabla=tabla,
                         filas=int(fila[0] or 0),
                         nulos=int(fila[1] or 0),
-                        minimo=None if fila[2] is None else float(fila[2]),
-                        maximo=None if fila[3] is None else float(fila[3]),
+                        minimo=_float_o_none(fila[2]),
+                        maximo=_float_o_none(fila[3]),
                         distintos=int(fila[4] or 0),
                     )
                 )

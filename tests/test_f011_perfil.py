@@ -441,13 +441,14 @@ def test_f011_format_perfil_acumula_hasta_el_cien_por_cien() -> None:
     )
 
     lineas = format_perfil(perfil).splitlines()
-    obrparpre = next(x for x in lineas if x.startswith("obrparpre"))
-    con = next(x for x in lineas if x.startswith("con "))
+    obrparpre = next(x for x in lineas if x.startswith("obrparpre")).split()
+    con = next(x for x in lineas if x.startswith("con ")).split()
 
-    # 75 % y 25 % de la ingesta; acumulado 75 % y 100 %.
-    assert obrparpre.split()[-2:] == ["75.0", "75.0"] or "75.0" in obrparpre
-    assert "100.0" in con, f"la última fila no cierra en 100 %: {con}"
-    assert "25.0" in con
+    # Las dos últimas columnas antes del estado son %_ingesta y %_acum.
+    # Se comparan por posición y no con un `in`: "100.0" también está dentro de
+    # "-100.0", y un acumulado que restara pasaría inadvertido.
+    assert obrparpre[-3:-1] == ["75.0", "75.0"], obrparpre
+    assert con[-3:-1] == ["25.0", "100.0"], con
 
 
 def test_f011_format_perfil_con_ingesta_de_un_segundo_reparte_de_verdad() -> None:
@@ -456,9 +457,12 @@ def test_f011_format_perfil_con_ingesta_de_un_segundo_reparte_de_verdad() -> Non
         [fila("ingest_raw", 1.0), fila("ingest_raw.con", 1.0)]
     )
 
-    con = next(x for x in format_perfil(perfil).splitlines() if x.startswith("con "))
+    con = next(
+        x for x in format_perfil(perfil).splitlines() if x.startswith("con ")
+    ).split()
 
-    assert "100.0" in con
+    # Una ingesta de 1 s reparte el 100 %, no el 0 %: la guardia compara con 0.
+    assert con[-3:-1] == ["100.0", "100.0"], con
 
 
 def test_f011_format_perfil_con_tablas_a_cero_no_divide_por_cero() -> None:
@@ -471,3 +475,50 @@ def test_f011_format_perfil_con_tablas_a_cero_no_divide_por_cero() -> None:
 
     assert "con" in texto
     assert "R3: 0 tablas" in texto
+
+
+def test_f011_las_medidas_de_la_feature_usan_slots() -> None:
+    """Las mediciones son inmutables Y sin `__dict__`, como el resto del dominio.
+
+    `frozen=True, slots=True` es la forma que usan `coherencia.py`, `tramos.py`
+    y `timings.py`. `slots` no es decoración: impide crear atributos nuevos por
+    error —un `perfil.total_segudos` mal escrito sería un atributo nuevo en vez
+    de un fallo— y es lo único que distingue esta declaración de la de al lado.
+    """
+    from etl_sigrid.domain.extraccion import Divergencia, MedicionPagina, ResumenBench
+    from etl_sigrid.domain.tiemod import ComparacionTiemod, EstadoTiemod
+
+    perfil = perfil_de_carga(CARGA_REAL, batch_id=BATCH)
+    estado = EstadoTiemod(
+        tabla="con", filas=1, nulos=0, minimo=1.0, maximo=2.0, distintos=1
+    )
+    instancias = (
+        CARGA_REAL[0],
+        perfil,
+        techo_de_mejora(perfil)[0],
+        MedicionPagina(
+            page_size=1, peticiones=1, filas=1, segundos=1.0, latencia_max_s=1.0
+        ),
+        ResumenBench(
+            mediciones=(),
+            mejor_page_size=None,
+            mejor_filas_por_segundo=0.0,
+            latencia_max_s=0.0,
+            caps_rechazados=(),
+        ),
+        Divergencia(medido=1, documentado=2, mensaje="x"),
+        estado,
+        ComparacionTiemod(
+            tabla="con",
+            antes=None,
+            ahora=estado,
+            filas_avanzadas=None,
+            veredicto=None,  # type: ignore[arg-type]
+            motivo="x",
+        ),
+    )
+
+    for instancia in instancias:
+        assert not hasattr(instancia, "__dict__"), (
+            f"{type(instancia).__name__} no declara slots=True"
+        )
