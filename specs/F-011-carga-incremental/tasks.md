@@ -22,26 +22,26 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
 
 ## Bloque A · Medición (se hace siempre)
 
-- [ ] **T1**: Crear `etl_sigrid/domain/perfil_carga.py` con `FilaPerfil`,
+- [x] **T1**: Crear `etl_sigrid/domain/perfil_carga.py` con `FilaPerfil`,
       `PerfilCarga`, `perfil_de_carga`, `techo_de_mejora`,
       `tablas_que_acumulan` y `format_perfil` (funciones puras, sin imports de
       infraestructura). Tests primero.
       **Verificación**: `pytest tests/test_f011_perfil.py -q` en verde (R1, R2,
       R3), incluida la fase RED documentada.
 
-- [ ] **T2**: Añadir `fetch_perfil_carga(batch_id=None)` a
+- [x] **T2**: Añadir `fetch_perfil_carga(batch_id=None)` a
       `postgres_client.py` (solo `SELECT` sobre `_meta.etl_runs`) y el comando
       `perfil-carga` a `main.py`, sin `_arrancar_ejecucion()`.
       **Verificación**: `pytest tests/test_f011_cli.py -k perfil_carga -q`
       (cliente Postgres mockeado; comprueba también R25: cero escrituras en
       `_meta`).
 
-- [ ] **T3**: Crear `etl_sigrid/domain/extraccion.py` (`MedicionPagina`,
+- [x] **T3**: Crear `etl_sigrid/domain/extraccion.py` (`MedicionPagina`,
       `resumen_bench`, `es_sentencia_de_lectura`, `comparar_cap`).
       **Verificación**: `pytest tests/test_f011_bench.py -k "resumen or lectura
       or cap" -q` (R5, R23).
 
-- [ ] **T4**: Crear `etl_sigrid/infrastructure/sigrid/bench_extraccion.py` y
+- [x] **T4**: Crear `etl_sigrid/infrastructure/sigrid/bench_extraccion.py` y
       el comando `bench-sigrid --tabla --paginas [--out]`. El adaptador **no
       importa `PostgresClient`**; captura `SigridApiPageSizeTooLargeError` y
       sigue con los tamaños admitidos.
@@ -49,18 +49,26 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       cliente HTTP va mockeado; un test comprueba por barrido de imports que
       el módulo no toca Postgres.
 
-- [ ] **T5**: Crear `etl_sigrid/domain/tiemod.py` (`EstadoTiemod`,
+- [x] **T5**: Crear `etl_sigrid/domain/tiemod.py` (`EstadoTiemod`,
       `veredicto_tiemod` con `SIRVE` / `NO SIRVE` / `SIN EVIDENCIA`,
       `format_diagnostico`).
       **Verificación**: `pytest tests/test_f011_tiemod.py -q` (R6, R7), con un
       caso por veredicto y los bordes (columna toda nula, tabla vacía, dos
       fotografías idénticas).
 
-- [ ] **T6**: Añadir `fetch_diagnostico_tiemod()` a `postgres_client.py` y el
+- [x] **T6**: Añadir `fetch_diagnostico_tiemod()` a `postgres_client.py` y el
       comando `diagnostico-tiemod [--out] [--comparar-con]` a `main.py`.
       **Verificación**: `pytest tests/test_f011_cli.py -k tiemod -q`.
 
-- [ ] **T7 · MANUAL (humano)**: ejecutar las mediciones reales. Con `.env`
+- [ ] **T7 · MANUAL (humano)** · PARCIAL: ejecutar las mediciones reales.
+      **Hecho lo que se podía sin escribir en Azure** (2026-08-20): el
+      desglose por paso y por tabla de TRES cargas completas, leído de los
+      logs del job, y el veredicto de `tiemod` contra el catálogo de
+      Sigrid. **Sin hacer**: `perfil-carga`/`diagnostico-tiemod` contra el
+      datamart —la IP del puesto ha rotado y abrir el firewall es una
+      escritura sobre un recurso compartido— y `bench-sigrid`, que va
+      contra producción de Sigrid y lo lanza el humano. Números en
+      `progress/medicion_F-011.md`. Con `.env`
       apuntando a Azure (ver el aviso de `progress/current.md`):
 
       ```bash
@@ -86,7 +94,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       puesto, como las huellas de F-019). El `bench-sigrid` va contra el SQL
       Server de producción: lo lanza el humano en el momento que elija.
 
-- [ ] **T8**: Escribir `progress/medicion_F-011.md` con los números reales de
+- [x] **T8**: Escribir `progress/medicion_F-011.md` con los números reales de
       T7, el `batch_id` de cada carga medida, el cap y el timeout reales
       medidos frente a los documentados (DA-6, R5-bis) y una **recomendación
       firmada de SÍ o NO** implementar el bloque B.
@@ -223,7 +231,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
   `specs/F-025-ventana-negocio-build/`, porque depende de DA-1 y DA-1 sigue sin
   decidir. No se renumera: T21, T22 y T23 conservan su número.
 
-- [ ] **T21**: Test de alcance que fija que esta rama **no** ha tocado el SQL de
+- [x] **T21**: Test de alcance que fija que esta rama **no** ha tocado el SQL de
       `stg` ni de `mart` y que **no** existen ni el bloque `ventana:` de
       `config/business_rules.yaml`, ni el comando `perfil-ventana`, ni
       `fetch_peso_ventana` (R22). Y enlazar F-011 con F-025 en la cabecera de
@@ -236,12 +244,12 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
 
 ## Cierre
 
-- [ ] **T22**: Campaña de mutación del rigor `critico` y análisis de
+- [x] **T22**: Campaña de mutación del rigor `critico` y análisis de
       supervivientes.
       **Verificación**: `python -m harness.mutacion --feature F-011` con cero
       supervivientes, o cada superviviente justificado por escrito en
       `progress/mutacion_F-011.md` y **aceptado por el humano**.
 
-- [ ] **T23**: Ejecutar `bash harness/init.sh` en verde (incluye pytest y la
+- [x] **T23**: Ejecutar `bash harness/init.sh` en verde (incluye pytest y la
       puerta de cobertura de las líneas cambiadas).
       **Verificación**: `bash harness/init.sh` termina con exit code 0.
