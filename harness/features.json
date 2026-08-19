@@ -423,6 +423,24 @@
       "rigor": "documental",
       "priority": 12,
       "branch": "feature/F-030-reglas-negocio-compartidas"
+    },
+    {
+      "id": "F-031",
+      "title": "La alerta de frescura se queda encendida para siempre y deja de avisar",
+      "description": "Hallazgo confirmado el 2026-08-19 al cerrar D9 (detalle en progress/decisiones_abiertas.md). La regla `alert-caj-datamart-seg-dev-sin-build`, creada por infra/95_create_alert_frescura.ps1 con --auto-mitigate true, disparo a las 10:11:18 UTC durante la prueba de R23 -el correo llego en 6 min 42 s, eso funciona- y **no se resolvio sola**. A las 14:30 UTC, cuatro horas y cuatro evaluaciones horarias despues, seguia en Fired con lastModifiedDateTime IDENTICO al del disparo: no es que evaluara y decidiera mantenerla, es que no se toco. Y la condicion ya no se cumplia: la KQL exacta de la regla devuelve 3 eventos de build_mart SUCCESS, el mas reciente de las 13:08:39 UTC, asi que 'count < 1' es falso desde las 10:27. POR QUE IMPORTA MAS DE LO QUE PARECE: una alerta atascada en Fired NO VUELVE A NOTIFICAR. Es decir, el mecanismo que vigila 'el job no llego a hacer su trabajo' -el agujero que F-024 vino a tapar- se desarma solo despues del primer aviso, y encima en silencio: quien la mire vera una alerta encendida y pensara que el sistema esta vigilando. Es peor que no tenerla, porque da confianza falsa. Mitigacion aplicada ese dia: cerrar la instancia a mano (changestate newState=Closed) para recuperar la capacidad de avisar. Eso es un parche manual, no un arreglo.",
+      "acceptance": [
+        "Entendida y escrita la CAUSA: por que una regla de consulta programada con --auto-mitigate true no pasa a Resolved cuando su condicion deja de cumplirse (configuracion, tipo de senal, o comportamiento real del servicio frente a lo que la spec de F-024 asumia)",
+        "La alerta pasa a Resolved sola en un plazo acotado y CONOCIDO cuando la condicion deja de cumplirse, o si el servicio no lo garantiza, se adopta y documenta una alternativa que garantice que la alerta vuelve a poder notificar",
+        "Verificado de extremo a extremo con horas reales: provocar, ver el Activated y ver el Deactivated. No se da por buena la teoria: R23 ya se creyo una vez que esto funcionaba",
+        "infra/95_create_alert_frescura.ps1 refleja lo aprendido, y la enmienda queda en la spec de F-024 para que nadie vuelva a asumir lo que asumimos",
+        "Comprobado si la alerta de fallo (90_create_alert.ps1) tiene el mismo problema: si lo tiene, se arregla en el mismo trabajo, porque es la otra mitad de la vigilancia",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 11,
+      "branch": "feature/F-031-alerta-no-se-resuelve"
     }
   ]
 }

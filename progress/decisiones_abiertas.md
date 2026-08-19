@@ -277,7 +277,7 @@ que lo hace repartible a cualquiera.
 
 ---
 
-## D9 · OBSERVACION PENDIENTE · la alerta de frescura no se ha visto resolver — afecta a F-024 (R23)
+## D9 · CERRADA (2026-08-19, mismo dia) · HALLAZGO CONFIRMADO: la alerta de frescura no se resuelve sola — afecta a F-024 (R23), abre F-031
 
 **Abierta el 2026-08-19.** No es una decision de diseño: es una **medicion a
 medias** que hay que terminar, y es la condicion con la que el reviewer aprobo
@@ -324,6 +324,54 @@ $j.value | Where-Object { $_.name -like "*sin-build*" } | ForEach-Object { $_.pr
   es justo el agujero que F-024 vino a tapar.
 
 **Dueño:** el humano.
+
+---
+
+### CIERRE DE D9 · 2026-08-19 14:30 UTC · confirmado antes de la fecha prevista
+
+No hizo falta esperar a la nocturna del 20: apareció **evidencia que el criterio
+no contemplaba** y que es más fuerte que «ha pasado tiempo».
+
+**1. La condición dejó de cumplirse hace horas, y se puede demostrar.** La KQL
+**exacta de la regla** (ventana 48 h, criterio `ago(30h)`) devuelve **3
+eventos**:
+
+```
+2026-08-19T13:08:39Z   <- build_mart de la recarga de recuperacion
+2026-08-19T04:48:05Z   <- build_mart de la nocturna del 19
+2026-08-18T13:08:19Z   <- build_mart de la carga del 18
+```
+
+`count < 1` es falso desde las 10:27 UTC. La alerta no tenía ningún motivo para
+seguir encendida.
+
+**2. La instancia no se ha reevaluado.** A las 14:30 UTC, cuatro horas y cuatro
+evaluaciones horarias después, `lastModifiedDateTime` seguía siendo **idéntico**
+a `startDateTime` (10:11:18.9124869Z). No es que evaluara y decidiera mantenerla:
+es que no se tocó.
+
+**Por qué se actuó ya en vez de esperar.** Una alerta en `Fired` **no vuelve a
+notificar**. Con la nocturna del 20 a las 02:00 UTC, esperar significaba pasar la
+noche sin la única vigilancia que cubre «el job no llegó a hacer su trabajo» —el
+agujero que F-024 vino a tapar—. La alerta de fallo (`90_create_alert.ps1`) sigue
+cubriendo «la ejecución terminó en error», que es un caso distinto.
+
+**Acción tomada** (autorizada por el humano): cerrar la instancia
+`42ce9207-57d4-805b-29e1-d46b7c3d0038` con `changestate ... newState=Closed`.
+Resultado leído de vuelta: `alertState: Closed`, `monitorCondition: Fired`,
+`lastModified 14:32:59Z`. Con la instancia cerrada, si la condición vuelve a
+cumplirse Azure genera una alerta **nueva** y notifica.
+
+**Se pierde a cambio** la observación de si se habría resuelto sola. Asumido: la
+evidencia de los puntos 1 y 2 ya era suficiente, y la cobertura de esta noche
+valía más que terminar el experimento.
+
+**Consecuencia**: se abre **F-031**. R23 queda cumplido en sus puntos (1) y (2),
+y su punto (3) documentado como lo que resultó ser: la restauración de la ventana
+sí se verificó; el `Deactivated` automático **no ocurre**, y eso es un defecto del
+mecanismo, no de la prueba.
+
+
 
 ---
 

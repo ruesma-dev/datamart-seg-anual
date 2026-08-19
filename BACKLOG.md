@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **26 features**, 15 abiertas, 11 terminadas.
+Resumen: **27 features**, 16 abiertas, 11 terminadas.
 
 Bloqueadas: **F-003**.
 
@@ -15,6 +15,7 @@ Bloqueadas: **F-003**.
 | F-023 | Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto | 8 | pendiente | estandar | `feature/F-023-cierre-operativo-f003` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
 | F-011 | Carga incremental del datamart | 11 | pendiente |  | `feature/F-011-carga-incremental` |
+| F-031 | La alerta de frescura se queda encendida para siempre y deja de avisar | 11 | pendiente | estandar | `feature/F-031-alerta-no-se-resuelve` |
 | F-006 | MCP de bases de datos como servicio en cloud | 12 | pendiente |  | `feature/F-006-mcp-azure` |
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
 | F-022 | Desempatar versiones master duplicadas de raw.obrfasamb | 12 | pendiente | estandar | `feature/F-022-desempate-obrfasamb` |
@@ -68,6 +69,12 @@ Dos defectos de harness/mutacion.py descubiertos el 2026-08-19 durante T19 de F-
 estado **pendiente** · prioridad 11 · SDD sí · rama `feature/F-011-carga-incremental`
 
 Hoy el job nocturno ejecuta siempre --full. Conseguir que las cargas que no sean la inicial sean rapidas. HALLAZGO QUE CONDICIONA EL DISENO (F-009): Sigrid NO tiene una marca de ultima modificacion fiable — en el diccionario 'fecalt' aparece en 16 tablas, 'fecmod' en 3 y 'sello' en 2 — asi que no hay watermark directo y hay que construirlo. Palancas: ventana de negocio (ejercicio en curso y obras abiertas, con recarga completa semanal), altas nuevas por el 'ide' autoincremental, y un watermark propio mantenido por el ETL en _meta. Sospecha a verificar antes de disenar nada: el cuello de botella puede no estar en la base sino en la extraccion, porque sigrid-api limita a 1000 filas por peticion y el balanceador corta a los 230 s; encaja con que el intento de abril muriera en la ingesta. La spec debe empezar por medir, no por optimizar.
+
+### F-031 · La alerta de frescura se queda encendida para siempre y deja de avisar
+
+estado **pendiente** · prioridad 11 · rigor `estandar` · SDD no · rama `feature/F-031-alerta-no-se-resuelve`
+
+Hallazgo confirmado el 2026-08-19 al cerrar D9 (detalle en progress/decisiones_abiertas.md). La regla `alert-caj-datamart-seg-dev-sin-build`, creada por infra/95_create_alert_frescura.ps1 con --auto-mitigate true, disparo a las 10:11:18 UTC durante la prueba de R23 -el correo llego en 6 min 42 s, eso funciona- y **no se resolvio sola**. A las 14:30 UTC, cuatro horas y cuatro evaluaciones horarias despues, seguia en Fired con lastModifiedDateTime IDENTICO al del disparo: no es que evaluara y decidiera mantenerla, es que no se toco. Y la condicion ya no se cumplia: la KQL exacta de la regla devuelve 3 eventos de build_mart SUCCESS, el mas reciente de las 13:08:39 UTC, asi que 'count < 1' es falso desde las 10:27. POR QUE IMPORTA MAS DE LO QUE PARECE: una alerta atascada en Fired NO VUELVE A NOTIFICAR. Es decir, el mecanismo que vigila 'el job no llego a hacer su trabajo' -el agujero que F-024 vino a tapar- se desarma solo despues del primer aviso, y encima en silencio: quien la mire vera una alerta encendida y pensara que el sistema esta vigilando. Es peor que no tenerla, porque da confianza falsa. Mitigacion aplicada ese dia: cerrar la instancia a mano (changestate newState=Closed) para recuperar la capacidad de avisar. Eso es un parche manual, no un arreglo.
 
 ### F-006 · MCP de bases de datos como servicio en cloud
 
