@@ -59,7 +59,8 @@ class SigridApiSentenciaNoDeLecturaError(SigridApiError):
         self.sql = sql
         super().__init__(
             "Esta sentencia no es de lectura y no se enviará a Sigrid: solo se "
-            f"admiten consultas que empiecen por SELECT. Recibido: {sql[:200]!r}"
+            f"admiten consultas que empiecen por SELECT. Recibido: "
+            f"{sql[:LONGITUD_SQL_EN_ERROR]!r}"
         )
 
 
@@ -85,6 +86,11 @@ class SigridApiPageSizeTooLargeError(SigridApiHttpError):
             f"     la Function App (el cap se fija en cold-start)."
         )
 
+
+#: Cuánto SQL se copia dentro del mensaje de error. La consulta rechazada puede
+#: ser de miles de caracteres —una generada— y el mensaje acaba en un log que
+#: alguien tiene que leer: se enseña el principio, que es donde está el verbo.
+LONGITUD_SQL_EN_ERROR = 200
 
 # Errores que merecen reintento automático
 _RETRYABLE = (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError)

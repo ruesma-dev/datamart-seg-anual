@@ -663,3 +663,52 @@ def test_f011_r4_el_csv_del_bench_crea_los_directorios_que_falten(tmp_path) -> N
     escribir_csv_bench([medicion(1_000, 1.0, 1_000)], salida)
 
     assert salida.is_file()
+
+
+def test_f011_r4_el_log_del_banco_no_vuelca_nueve_decimales() -> None:
+    """La latencia se registra con milisegundos, no con la basura del reloj.
+
+    `perf_counter` da del orden de 1e-7 s de resolución; volcarla entera al log
+    llena la línea de dígitos que no significan nada y hace ilegible la salida
+    del job, que es donde después se lee la medición. Tres decimales = un
+    milisegundo, que es de sobra para medir peticiones HTTP.
+    """
+    from structlog.testing import capture_logs
+
+    from etl_sigrid.infrastructure.sigrid.bench_extraccion import medir_pagina
+
+    api = ApiFalsa()
+    tiempos = iter([0.0, 0.123456789])
+
+    with capture_logs() as capturado:
+        medir_pagina(
+            api,
+            "con",
+            columnas=["ide"],
+            page_size=1_000,
+            reloj=lambda: next(tiempos),
+        )
+
+    paginas = [linea for linea in capturado if linea.get("event") == "bench_pagina"]
+
+    assert len(paginas) == 1
+    assert paginas[0]["segundos"] == 0.123
+
+
+def test_f011_r23_el_error_no_vuelca_la_consulta_entera() -> None:
+    """Una sentencia larga se trunca en el mensaje: el log no es un volcado.
+
+    El SQL rechazado puede ser de miles de caracteres —una consulta generada—,
+    y el mensaje va a un log que alguien tiene que leer.
+    """
+    from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
+        LONGITUD_SQL_EN_ERROR,
+        SigridApiSentenciaNoDeLecturaError,
+    )
+
+    largo = "DROP TABLE dbo." + "x" * 1_000
+    mensaje = str(SigridApiSentenciaNoDeLecturaError(largo))
+
+    assert LONGITUD_SQL_EN_ERROR == 200
+    assert largo[:LONGITUD_SQL_EN_ERROR] in mensaje
+    assert largo[: LONGITUD_SQL_EN_ERROR + 1] not in mensaje
