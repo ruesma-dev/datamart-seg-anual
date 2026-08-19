@@ -510,3 +510,46 @@ y el ARM contestó, lo que refuerza que el token vale.
 Ninguna escritura efectiva en Azure: la regla no se creó, nada se modificó. El
 `update` de la prueba iba contra un nombre inexistente a propósito. Cuando se
 retome, el paso 1 no hay que repetirlo salvo que pasen 30 h sin carga.
+
+## Resuelto el falso misterio, y aparece el defecto de verdad (11:20)
+
+**El `AADSTS50076` era un claims challenge de Acceso Condicional**, no un MFA
+ausente. Lo que lo desbloqueó, ejecutado por el humano en su terminal:
+
+```powershell
+az logout
+az login --tenant <tenant-de-ruesma> `
+         --scope "https://management.core.windows.net//.default" `
+         --claims-challenge "<claims en base64 con acrs=p1>" `
+         --use-device-code
+```
+
+Encaja con todas las pruebas anteriores: el token viejo **tenía** MFA
+(`amr = pwd + rsa`) pero **no** el claim `acrs: p1` que la política exige para
+*crear* recursos; leer y actualizar no lo pedían. Por eso las lecturas y el
+`update` pasaban y solo el `create` fallaba, y por eso el mensaje hablaba de
+MFA cuando el problema era otro.
+
+**Con la autenticación resuelta, el ARM devuelve el error real:**
+
+```
+(InvalidRequestContent) The request content was invalid and could not be
+deserialized: 'WindowSize of 1800 minutes is not supported. Supported
+granularities are: 5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720,
+1440, 2880'
+```
+
+**1800 minutos son las 30 h de DA-4.** Azure no admite esa ventana: de 720
+(12 h) salta a 1440 (24 h) y de ahí a 2880 (48 h). Consecuencias:
+
+1. **`infra/95_create_alert_frescura.ps1` no puede funcionar como está.** No es
+   un problema del puesto ni de la sesión: la ventana que deriva del umbral
+   (`$ventana = "{0}h" -f $horas` con `frescuraUmbralHoras = 30`) es inválida
+   para el servicio. La alerta **nunca se ha podido crear**.
+2. **La suite no lo cazó.** `tests/test_f024_infra_alerta.py` fija los términos
+   de la KQL en los dos extremos —buena idea, y sigue valiendo— pero nadie
+   comprobó que la ventana fuera una de las granularidades admitidas. El
+   comentario del script dice que la sintaxis se verificó «con `--help`», y ahí
+   está el hueco: `--help` valida la forma `##h##m##s`, no el valor.
+3. La decisión DA-4 (30 h) **no es implementable como `windowSize`** y hay que
+   resolverla de otra forma. Está pendiente de que la decida el humano.
