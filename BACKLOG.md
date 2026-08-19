@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **23 features**, 13 abiertas, 10 terminadas.
+Resumen: **24 features**, 14 abiertas, 10 terminadas.
 
 En curso: **F-024**.
 
@@ -20,6 +20,7 @@ Bloqueadas: **F-003**.
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
 | F-022 | Desempatar versiones master duplicadas de raw.obrfasamb | 12 | pendiente | estandar | `feature/F-022-desempate-obrfasamb` |
 | F-018 | Validar los numeros de cierre.fact_cierre_mensual | 13 | pendiente |  | `feature/F-018-validacion-cierre-mensual` |
+| F-028 | La puerta de stg distingue un stage que no llegó a construir de uno que dejó stg a medias | 13 | pendiente | estandar | `feature/F-028-puerta-stg-distingue-fallo` |
 | F-006 | MCP de bases de datos como servicio en cloud | 14 | pendiente |  | `feature/F-006-mcp-azure` |
 | F-002 | PLAN_VIGENTE: serie de planificación consolidada | 15 | pendiente |  | `feature/F-002-plan-vigente` |
 | F-012 | Auditoria y limpieza de Azure para reducir costes | 16 | pendiente |  | `feature/F-012-auditoria-costes-azure` |
@@ -85,6 +86,12 @@ Creada el 2026-08-13 al cerrar el T11 de F-019 (opción C del humano). En raw.ob
 estado **pendiente** · prioridad 13 · SDD sí · rama `feature/F-018-validacion-cierre-mensual`
 
 Anadida el 2026-08-09 a peticion del humano ('revisar cierre mensual, tabla principal'; alcance confirmado: validar sus numeros). Contrastar los importes que produce cierre.fact_cierre_mensual (ejecutado origen/anterior/mes, final con su trazabilidad master/fase_0, pendiente, variacion) contra Sigrid y los criterios de cierre del negocio, sobre meses cerrados de obras representativas elegidas por el humano. Documentar cada desviacion con su causa (dato origen, regla de negocio o defecto del SQL) y corregir las que procedan. La spec debe fijar con el humano que obras y meses son el patron de contraste y cual es la tolerancia aceptable.
+
+### F-028 · La puerta de stg distingue un stage que no llegó a construir de uno que dejó stg a medias
+
+estado **pendiente** · prioridad 13 · rigor `estandar` · SDD no · rama `feature/F-028-puerta-stg-distingue-fallo`
+
+Descubierto el 2026-08-19 ejecutando T18 de F-024 (muerte externa controlada) y anotado en progress/manual_F-024_fase_c.md. Cuando `python main.py stage` se niega a construir porque la puerta de raw da KO, falla en 5,2 s con rows=0 y NO toca stg: no hay TRUNCATE ni build. Pero deja en _meta.etl_runs una fila build_stg en FAILED, y con eso la puerta de stg que protege a build_mart declara stg incoherente: 'el ultimo stage no llego a terminar y stg puede estar mezclado'. El veredicto es conservador y protege lo que debe, pero confunde dos situaciones muy distintas: (a) el stage ni empezó, y stg sigue siendo exactamente el del ultimo build completo, que puede ser perfectamente bueno; y (b) el stage murió a mitad de un build y stg si esta mezclado. Consecuencia practica del empate: tras cualquier muerte en la puerta hay que rehacer stage entero -1 h 51 en Azure segun la carga del 19-ago- aunque stg estuviera intacto. La informacion para distinguirlos YA ESTA en la tabla: en el caso (a) el sub-paso que fallo es build_stg.puerta_raw, una puerta y no un build, y ningun sub-paso de construccion llego a iniciarse. NO es un fallo de F-024 ni la debilita: es una mejora de precision del diagnostico que ahorra trabajo real.
 
 ### F-006 · MCP de bases de datos como servicio en cloud
 

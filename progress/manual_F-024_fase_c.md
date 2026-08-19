@@ -553,3 +553,170 @@ granularities are: 5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720,
    está el hueco: `--help` valida la forma `##h##m##s`, no el valor.
 3. La decisión DA-4 (30 h) **no es implementable como `windowSize`** y hay que
    resolverla de otra forma. Está pendiente de que la decida el humano.
+
+---
+
+# T19 · R23 CUMPLIDO en sus tres puntos (2026-08-19)
+
+## Punto (1): con `mart` fresco, la regla no dispara
+
+La KQL con la ventana real (30 h) devolvió **`Count = 2`** (los `build_mart
+SUCCESS` de la nocturna del 19 y de la carga del 18). Condición `count < 1` no
+se cumple: la regla no dispara. Verificado antes de crear nada.
+
+## La regla, creada con el script del repositorio
+
+`powershell -NoProfile -File infra\95_create_alert_frescura.ps1`, ya con el
+arreglo de la ventana. Como quedó en el servicio, leído de vuelta:
+
+```
+activa: true          automitiga: true       severidad: 2
+ventana: 2 days, 0:00:00                     frecuencia: '1:00:00'
+operador: LessThan    umbral: 1.0
+consulta: ContainerAppConsoleLogs_CL | where ContainerJobName_s == 'caj-datamart-seg-dev'
+          | where Log_s has_all ('step_finished','build_mart','SUCCESS')
+          | where TimeGenerated > ago(30h)
+```
+
+La ventana de 48 h y el criterio de 30 h dentro de la consulta, tal como se
+decidió esta mañana. **La creó el script**, no un comando a mano: era la
+condición para dar por probado el script y no solo el recurso.
+
+## Punto (2): ventana corta → correo, en 6 min 42 s
+
+| Hito | UTC | Local | Desde el cambio |
+|---|---|---|---|
+| `update --window-size 1h --evaluation-frequency 5m` | 10:04:53 | 12:04:53 | — |
+| Alerta **Fired** (`monitorCondition`) | 10:11:18 | 12:11:18 | 6 min 25 s |
+| **Correo recibido** en el buzón | 10:11:35 | 12:11:35 | **6 min 42 s** |
+
+Asunto: `Alert 'alert-caj-datamart-seg-dev-sin-build' was fired`. Muy por
+debajo de los 15 minutos que pide R23.
+
+**Con esto cae el riesgo residual que el implementer dejó abierto** en su §7:
+el `ago(30h)` explícito dentro de una ventana de 1 h **no** hace que Azure
+recorte la consulta de forma incompatible. La regla contó lo que tenía que
+contar: cero eventos en la hora, y disparó.
+
+Cómo se leyó el estado sin abrir el portal, que no es evidente:
+
+```powershell
+$u = "https://management.azure.com/subscriptions/<sub>/providers/Microsoft.AlertsManagement/alerts?api-version=2019-05-05-preview"
+az rest --method get --uri $u -o json | ConvertFrom-Json
+```
+
+Dos trampas juntas: en PowerShell, `cmd.exe` parte la URL en el `&` de
+`&timeRange=`, y `--query` con corchetes se rompe por lo mismo. Se pide sin
+`--query` y se filtra con `ConvertFrom-Json`.
+
+Aviso para futuras comprobaciones: **el buscador del buzón indexa con
+retraso**. A las 12:12 no encontraba un correo recibido a las 12:11:35. Si se
+busca justo después del disparo, puede parecer que no ha llegado.
+
+## Punto (3): restauración
+
+`update --window-size 48h --evaluation-frequency 1h` a las **10:27:05 UTC
+(12:27:05 local)**. Leído de vuelta: `2 days, 0:00:00` y `1:00:00`.
+**Pendiente el `Deactivated`**, que con `auto-mitigate true` debe llegar en la
+siguiente evaluación (antes de las 13:27 local): el `build_mart` de la
+nocturna, a las 04:26 UTC, sigue dentro del criterio de 30 h.
+
+---
+
+# T18 · R24 — muerte externa controlada (2026-08-19). Los cuatro primeros pasos, CUMPLIDOS
+
+## Paso 1 y 2: la muerte, en el peor momento posible
+
+| Hito | UTC | Local |
+|---|---|---|
+| `az containerapp job start` → ejecución `caj-datamart-seg-dev-cay0s53` | 10:10:19 | 12:10:19 |
+| Confirmado en Log Analytics que la ingesta iba por `raw` | 10:20:13 | 12:20:13 |
+| `az containerapp job stop --job-execution-name ...` | 10:20:32 | 12:20:32 |
+
+Se mató **a los 10 minutos**, como pide R24, y no a los 3 que decía una nota
+vieja de `current.md`. El momento no fue casual: los logs enseñaban
+`{"table": "obrparpre", "page": 842, "rows": 5000, "total_so_far": 4210000}`,
+es decir, la tabla más grande (13,8 M filas) a mitad de carga. Estado de la
+ejecución tras el `stop`: **`Stopped`**.
+
+## La prueba de DA-8, que solo se podía capturar aquí
+
+`python main.py status` inmediatamente después:
+
+```
+raw.obrparpre                     4,865,000    5,234,469
+```
+
+**4.865.000 filas de 13.809.350.** La tabla quedó **truncada y parcial**: la
+ingesta commitea **por página**, no por tabla. DA-8 estaba confirmada leyendo
+el código; ahora está confirmada con el dato. Esta evidencia se pierde en
+cuanto se relanza la ingesta, por eso se capturó antes de tocar nada.
+
+## Paso 3: lo que ve quien mira, antes de que nadie escriba
+
+`python main.py timings --last 1`:
+
+```
+ingest  ingest_raw.obrparpar  2026-08-19 10:13:35    43.8   390,214  SUCCESS
+ingest  ingest_raw.obrparpre  2026-08-19 10:14:19     0.0         0  RUNNING
+```
+
+La huérfana, viva. Sin aviso de «RUNNING desde hace más de 6 h» al pie, que es
+lo correcto: llevaba seis minutos, no seis horas.
+
+`python main.py check-coherencia` → **KO, salida 1**, con las dos causas
+separadas y nombradas:
+
+```
+· su ultimo intento de ingesta no termino en SUCCESS: obrparpre (RUNNING)
+· provienen de ejecuciones DISTINTAS:
+    20260819T020016Z-327ef0 (fin 02:35:54): auxmun, ... rec        [26 tablas]
+    20260819T101050Z-eef62b (fin 10:14:19): con, conext, obr, obrparpar
+```
+
+## Paso 4: el primer comando que escribe
+
+`python main.py stage` (suelto, sin `--sin-puerta`), a las 10:24:04 UTC:
+
+```
+[warning] etl_run_huerfana_abortada batch_id=20260819T102401Z-765278 id=633
+          started_at='2026-08-19 10:14:19.584741' step=ingest_raw.obrparpre
+[error  ] puerta_raw_ko batches=[...] no_exitosas=['obrparpre'] sin_batch=[]
+[FAILED ] build_stg  rows=0  duration=5.2s
+CODIGO DE SALIDA = 1
+```
+
+Las tres garantías de F-024, las tres en una sola ejecución y en el orden
+correcto:
+
+1. **La huérfana se cierra sola** al arrancar un comando que escribe, con el
+   `batch_id` de quien la cerró. En `timings` pasa a `ABORTED` con duración
+   582,2 s.
+2. **La puerta se niega**: `build_stg` y `build_stg.puerta_raw` en `FAILED`.
+3. **No tocó `stg`**: `rows=0` y **5,2 s** de duración. No hubo `TRUNCATE`, no
+   hubo build. Es la diferencia entre negarse y romper.
+
+`python main.py check-frescura` → `build_mart: FRESCO`, **salida 0**. Correcto:
+el `mart` que consumen Power BI y el MCP **no se ha tocado** y sigue siendo el
+de la nocturna. La carga murió sin dañar el dato publicado, que es la tesis
+entera de la feature.
+
+## Observación que no pide R24, y conviene tener escrita
+
+Tras el `stage` fallido, `check-coherencia` declara **`stg` en KO**: «la fila
+mas reciente de build_stg es 'build_stg' en estado FAILED ... el ultimo stage
+no llego a terminar y stg puede estar mezclado».
+
+`stg` **no se había tocado** —el `stage` murió en la puerta, en 5,2 s— así que
+el veredicto es conservador: ante la duda, se niega. No es un fallo y protege
+lo que tiene que proteger, pero conviene saber la consecuencia práctica: **una
+muerte en la puerta obliga a rehacer `stage` entero** aunque `stg` estuviera
+perfecto. Si algún día molesta, la información para distinguirlo ya está en la
+tabla (el sub-paso que falló fue `puerta_raw`, no un build).
+
+## Paso 5: recuperación, en curso
+
+`az containerapp job start` a las **10:25:12 UTC (12:25:12 local)**, ejecución
+`caj-datamart-seg-dev-lf64bpa`. Fin estimado hacia las 15:15 local. Al
+terminar hay que comprobar: `check-coherencia` OK, `check-frescura` con hora
+nueva y ningún `Activated` en el buzón.

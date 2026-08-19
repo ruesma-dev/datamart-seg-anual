@@ -363,6 +363,25 @@
       "rigor": "critico",
       "priority": 9,
       "branch": "feature/F-024-coherencia-cargas-truncadas"
+    },
+    {
+      "id": "F-028",
+      "title": "La puerta de stg distingue un stage que no llegó a construir de uno que dejó stg a medias",
+      "description": "Descubierto el 2026-08-19 ejecutando T18 de F-024 (muerte externa controlada) y anotado en progress/manual_F-024_fase_c.md. Cuando `python main.py stage` se niega a construir porque la puerta de raw da KO, falla en 5,2 s con rows=0 y NO toca stg: no hay TRUNCATE ni build. Pero deja en _meta.etl_runs una fila build_stg en FAILED, y con eso la puerta de stg que protege a build_mart declara stg incoherente: 'el ultimo stage no llego a terminar y stg puede estar mezclado'. El veredicto es conservador y protege lo que debe, pero confunde dos situaciones muy distintas: (a) el stage ni empezó, y stg sigue siendo exactamente el del ultimo build completo, que puede ser perfectamente bueno; y (b) el stage murió a mitad de un build y stg si esta mezclado. Consecuencia practica del empate: tras cualquier muerte en la puerta hay que rehacer stage entero -1 h 51 en Azure segun la carga del 19-ago- aunque stg estuviera intacto. La informacion para distinguirlos YA ESTA en la tabla: en el caso (a) el sub-paso que fallo es build_stg.puerta_raw, una puerta y no un build, y ningun sub-paso de construccion llego a iniciarse. NO es un fallo de F-024 ni la debilita: es una mejora de precision del diagnostico que ahorra trabajo real.",
+      "acceptance": [
+        "check-coherencia distingue los dos casos y lo dice con palabras distintas: 'el stage no llego a construir (fallo la puerta): stg conserva el ultimo build completo' frente a 'el stage murio a mitad: stg puede estar mezclado'",
+        "En el caso (a), el veredicto de stg se juzga contra el ultimo build_stg COMPLETO anterior; si ese es coherente, build_mart puede construir sin --sin-puerta",
+        "En el caso (b) el comportamiento no cambia: KO y build_mart se niega, igual que hoy",
+        "Ante cualquier duda -un sub-paso de construccion iniciado y no terminado, o datos que no permitan decidir- el veredicto sigue siendo KO: la mejora no puede abrir un camino nuevo a construir sobre stg mezclado",
+        "Tests que fijen los dos casos y el limite entre ellos (puerta OK pero el primer build iniciado y muerto), y que un mutante que confunda ambos casos muera",
+        "El mensaje sigue diciendo que hacer en cada caso, como el resto de mensajes de F-024",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 13,
+      "branch": "feature/F-028-puerta-stg-distingue-fallo"
     }
   ]
 }
