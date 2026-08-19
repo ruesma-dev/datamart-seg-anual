@@ -375,6 +375,33 @@ mecanismo, no de la prueba.
 
 ---
 
+## D10 · Cómo llega Power BI al datamart de Azure — afecta a F-034, F-032
+
+**Abierta el 2026-08-20.** Power BI leía del Postgres **local** y hay que moverlo
+al de Azure. Conectar es fácil; lo que hay que decidir es **por dónde entra**,
+porque el servidor es **compartido** con `albaranes` y `partes`.
+
+**Opción A · Solo Power BI Desktop, desde el puesto.** Funciona hoy: la IP del
+puesto ya está en el firewall. Coste cero, riesgo cero. Limitación: los informes
+solo se refrescan cuando alguien abre Power BI en ese puesto, así que no hay
+informes publicados que se actualicen solos.
+
+**Opción B · Power BI Service (informes publicados con refresco automático).**
+Exige que el servicio atraviese el firewall del servidor, y ahí solo hay dos
+caminos: un **gateway de datos local** —una máquina encendida que haga de puente,
+que es justo lo que quisimos evitar con el MCP— o **abrir rangos de IP de Power
+BI** en el Postgres compartido. Lo segundo **no es decisión de este proyecto en
+solitario**: afecta a `albaranes` y `partes`, y sus dueños tienen que decir que
+sí.
+
+**Lo que hay que decidir**: A, B, o A ahora y B cuando haga falta.
+
+**Y un cabo atado a esto**: la regla de firewall que da acceso al puesto **la
+retira F-032** en su limpieza. Si se elige A, esa regla deja de ser temporal y
+hay que decir explícitamente que se queda.
+
+---
+
 ## Decisiones ya cerradas
 
 - **2026-08-08 · Backlog priorizado.** Aprobado el orden F-001, F-004, F-005,

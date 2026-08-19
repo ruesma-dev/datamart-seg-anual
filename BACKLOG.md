@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **31 features**, 18 abiertas, 13 terminadas.
+Resumen: **32 features**, 19 abiertas, 13 terminadas.
 
 En curso: **F-011**.
 
@@ -19,6 +19,7 @@ En curso: **F-011**.
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
 | F-022 | Desempatar versiones master duplicadas de raw.obrfasamb | 12 | pendiente | estandar | `feature/F-022-desempate-obrfasamb` |
 | F-030 | Reglas de negocio compartidas: fuente unica que la IA aplica, con circuito de vuelta | 12 | pendiente | documental | `feature/F-030-reglas-negocio-compartidas` |
+| F-034 | Power BI deja de leer de local y pasa a leer el datamart de Azure | 12 | pendiente | critico | `feature/F-034-powerbi-azure` |
 | F-018 | Validar los numeros de cierre.fact_cierre_mensual | 13 | pendiente |  | `feature/F-018-validacion-cierre-mensual` |
 | F-028 | La puerta de stg distingue un stage que no llegó a construir de uno que dejó stg a medias | 13 | pendiente | estandar | `feature/F-028-puerta-stg-distingue-fallo` |
 | F-033 | El documento de este proyecto en azure-apps miente sobre lo que hay desplegado | 13 | pendiente | documental | `feature/F-033-azure-apps-al-dia` |
@@ -97,6 +98,12 @@ Creada el 2026-08-13 al cerrar el T11 de F-019 (opción C del humano). En raw.ob
 estado **pendiente** · prioridad 12 · rigor `documental` · SDD no · rama `feature/F-030-reglas-negocio-compartidas`
 
 Pedido por el humano el 2026-08-19 al hablar del MCP (F-006). Quiere poder decirle a la IA 'haz una planificacion' y que la haga con los datos de esta base y con las reglas de la empresa, iguales para todos los usuarios. La tarea NO es determinista y no se codifica: asignar partidas a la temporalidad exige juicio, lo decide la IA y el usuario la corrige interactivamente. Por eso las reglas son GUIA, no calculo, y su vehiculo natural es un procedimiento en lenguaje natural que el MCP publica como prompt, no un YAML de parametros. DONDE VIVE: en su PROPIO repositorio, con dueño en Negocio, mismo patron que azure-apps -fuente unica, sin copias-. NO se implementa en este proyecto: aqui solo se anota para no perderlo, y lo que si es de aqui es el diccionario semantico del datamart (ver F-006). LO QUE HACE FALLAR ESTO SI SE OLVIDA: el circuito de vuelta. Cuando un usuario corrige a la IA, la correccion es una preferencia suya -que no toca nada- o una regla de empresa que no estaba escrita; si esa segunda no vuelve a la fuente unica, se pierde y el siguiente usuario repite la misma correccion. Sin ese circuito el sistema no mejora: cada sesion vuelve a empezar. Con el, las reglas se escriben solas a partir del uso real.
+
+### F-034 · Power BI deja de leer de local y pasa a leer el datamart de Azure
+
+estado **pendiente** · prioridad 12 · rigor `critico` · SDD no · rama `feature/F-034-powerbi-azure`
+
+Pedido por el humano el 2026-08-19: Power BI estaba conectado al Postgres LOCAL y hay que moverlo al de Azure, que es donde el job nocturno deja el dato completo cada madrugada. Los datos de conexion ya existen -servidor psql-albaranes-rs9k2, base sigrid_dm, SSL obligatorio, vistas v_pbi_* de mart, cierre y compras-, asi que la feature no es 'conectar': es decidir COMO se conecta sin abrir agujeros en un servidor compartido. TRES DECISIONES ANTES DE EMPEZAR, la primera condiciona el resto. (1) DESKTOP O SERVICE: Power BI Desktop desde el puesto funciona hoy porque la IP del puesto esta en el firewall; Power BI Service NO puede conectar, y para que pueda hace falta o un gateway de datos o abrir rangos de IP de Power BI en un Postgres COMPARTIDO con albaranes y partes, que no es decision de este proyecto en solitario. (2) ROL PROPIO: hoy el unico rol de lectura es mcp_sigrid_dm_ro, creado para el MCP y con permiso sobre TODOS los esquemas, incluidos raw y stg. Compartirlo tiene dos problemas: la auditoria no distingue quien consulta y no se puede revocar a uno sin cortar al otro. Lo razonable es pbi_sigrid_dm_ro limitado a los esquemas de consumo. (3) IMPORT, NO DIRECTQUERY: el servidor es un B1ms compartido y DirectQuery le manda una consulta por cada interaccion del usuario; con Import y refresco programado despues de las 05:00 UTC -la carga termina a las 04:48- se tiene el dato del dia sin castigar al servidor. DEPENDENCIA QUE HAY QUE MIRAR: la regla de firewall que da acceso al puesto hoy la retira F-032; si Power BI Desktop depende de ella, hay que decidir que esa regla se queda de forma estable en vez de borrarse en la limpieza.
 
 ### F-018 · Validar los numeros de cierre.fact_cierre_mensual
 

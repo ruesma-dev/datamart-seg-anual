@@ -504,6 +504,26 @@
       "rigor": "critico",
       "priority": 10,
       "branch": "feature/F-025-ventana-negocio-build"
+    },
+    {
+      "id": "F-034",
+      "title": "Power BI deja de leer de local y pasa a leer el datamart de Azure",
+      "description": "Pedido por el humano el 2026-08-19: Power BI estaba conectado al Postgres LOCAL y hay que moverlo al de Azure, que es donde el job nocturno deja el dato completo cada madrugada. Los datos de conexion ya existen -servidor psql-albaranes-rs9k2, base sigrid_dm, SSL obligatorio, vistas v_pbi_* de mart, cierre y compras-, asi que la feature no es 'conectar': es decidir COMO se conecta sin abrir agujeros en un servidor compartido. TRES DECISIONES ANTES DE EMPEZAR, la primera condiciona el resto. (1) DESKTOP O SERVICE: Power BI Desktop desde el puesto funciona hoy porque la IP del puesto esta en el firewall; Power BI Service NO puede conectar, y para que pueda hace falta o un gateway de datos o abrir rangos de IP de Power BI en un Postgres COMPARTIDO con albaranes y partes, que no es decision de este proyecto en solitario. (2) ROL PROPIO: hoy el unico rol de lectura es mcp_sigrid_dm_ro, creado para el MCP y con permiso sobre TODOS los esquemas, incluidos raw y stg. Compartirlo tiene dos problemas: la auditoria no distingue quien consulta y no se puede revocar a uno sin cortar al otro. Lo razonable es pbi_sigrid_dm_ro limitado a los esquemas de consumo. (3) IMPORT, NO DIRECTQUERY: el servidor es un B1ms compartido y DirectQuery le manda una consulta por cada interaccion del usuario; con Import y refresco programado despues de las 05:00 UTC -la carga termina a las 04:48- se tiene el dato del dia sin castigar al servidor. DEPENDENCIA QUE HAY QUE MIRAR: la regla de firewall que da acceso al puesto hoy la retira F-032; si Power BI Desktop depende de ella, hay que decidir que esa regla se queda de forma estable en vez de borrarse en la limpieza.",
+      "acceptance": [
+        "Decidido y anotado si el consumo es Desktop, Service o los dos, con la consecuencia de red asumida por escrito; si es Service, con el OK de los dueños de albaranes y partes por tocar el firewall compartido",
+        "Rol de lectura propio de Power BI creado por script en infra/sql, con permiso SOLO sobre los esquemas de consumo y no sobre raw ni stg, y aplicado por apply-grants como el resto",
+        "La contraseña del rol vive en Key Vault y no aparece en ningun fichero, ni en el repositorio ni en un informe de progress",
+        "Verificado de verdad: un informe de Power BI abre las vistas v_pbi_* con ese rol y devuelve datos, con captura del resultado anotada",
+        "Comprobado que ese rol NO puede leer raw ni stg ni escribir nada: prueba negativa, no solo el permiso en el catalogo",
+        "Documentado en docs/ y en azure-apps/datamart_seg_anual.md como se conecta y con que rol, para que el siguiente no tenga que reconstruirlo",
+        "Decidido que pasa con la regla de firewall del puesto que hoy da el acceso, en coordinacion con F-032",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "critico",
+      "priority": 12,
+      "branch": "feature/F-034-powerbi-azure"
     }
   ]
 }
