@@ -96,18 +96,18 @@ que exija BBDD real o Azure es `MANUAL (humano)` con su comando exacto en
 
 ## Fase C · Verificar en Azure y en local (humano; tras el APPROVED del reviewer sobre Fase B)
 
-- [ ] **T17**: Construir la imagen (`70_build_image.ps1`), actualizar el
+- [x] **T17** (2026-08-18, HECHO): Construir la imagen (`70_build_image.ps1`), actualizar el
       job (`85_update_job.ps1`) y ejecutar R25: primera ejecución con
       F-024, huérfanas del 18-ago en `ABORTED`, `apply-grants`, y las dos
       vistas legibles con `mcp_sigrid_dm_ro`. | Verificación: MANUAL
       (humano) — comandos de R25; salida anotada en `progress/current.md`.
-- [ ] **T18**: R24: muerte externa controlada durante la ingesta
+- [x] **T18** (2026-08-19, CUMPLIDO): R24: muerte externa controlada durante la ingesta
       (`az containerapp job stop`), `timings` → `check-coherencia` KO →
       `stage` FAILED en la puerta sin tocar `stg` → `ABORTED` visibles →
       `check-frescura` FRESCO → recuperación con la carga completa y buzón
       sin Activated. | Verificación: MANUAL (humano) — comandos de R24 con
       horas y salidas reales.
-- [ ] **T19**: (DA-3 = A) R23: crear la regla con el script 95, ventana
+- [x] **T19** (2026-08-19, CUMPLIDO con una observacion abierta): (DA-3 = A) R23: crear la regla con el script 95, ventana
       corta (`1h`) para provocar el correo Activated, restaurar a `48h`
       —la ventana real de la regla, ver la enmienda de DA-4 del
       2026-08-19—, Deactivated tras la siguiente noche buena.
@@ -126,10 +126,30 @@ que exija BBDD real o Azure es `MANUAL (humano)` con su comando exacto en
             tests/test_f024_infra_alerta.py` (33 passed; seis de ellos
             ejecutan funciones del `.ps1` con `powershell`) y cuatro pruebas
             de control en rojo, en `progress/impl_F-024_T19_ventana.md` §11.
-- [ ] **T20**: R26 en local: `check-coherencia` KO por `sin_batch` sobre
+- [x] **T20** (2026-08-19, CUMPLIDO con desviacion justificada): R26: `check-coherencia` KO por `sin_batch` sobre
       el raw anterior, `stage` se niega, `ingest --full` (o
       `stage --sin-puerta` registrado) y construye. | Verificación: MANUAL
       (humano).
+
+### Cierre de la Fase C (2026-08-19)
+
+La evidencia completa, con comandos y salidas reales, esta en
+`progress/manual_F-024_fase_c.md`. Resumen de donde mirar cada una:
+
+| Tarea | Evidencia | Resultado |
+|---|---|---|
+| **T17** | secciones de T17 del cuaderno | imagen `r20260818-2146` desplegada; 7 huerfanas cerradas con motivo (2 esperadas + 5 antiguas que nadie sabia que estaban); vistas legibles por `mcp_sigrid_dm_ro`, verificado por catalogo |
+| **T18** | seccion «T18 · R24» | muerte a los 10 min con la ingesta en plena `obrparpre`; **4.865.000 filas de 13.809.350** (DA-8 medida, no deducida); huerfana `ABORTED` con motivo; puerta `FAILED` en 5,2 s con `rows=0`; `check-frescura` FRESCO porque `mart` no se toco; recarga a `Succeeded` y `check-coherencia` OK |
+| **T19** | seccion «T19 · R23 CUMPLIDO» | KQL con ventana real `Count = 2` (no dispara); ventana corta 10:04:53 UTC → `Fired` 10:11:18 → **correo 10:11:35** (6 min 42 s); restaurada a `48h`/`1h` a las 10:27:05, leida de vuelta del servicio. **Abierto**: el `Deactivated` no se habia observado a las 14:00 UTC (ver D9 en `progress/decisiones_abiertas.md`) |
+| **T20** | seccion «T20 · R26 segunda mitad» | `build_mart.puerta_stg` en **`SKIPPED`** en `_meta.etl_runs`, con la fila `SUCCESS` de la carga del job 50 min antes al lado |
+
+**Desviacion justificada de T20.** R26 esta escrito como `MANUAL-local` con
+`stage --sin-puerta`. Se ejecuto **contra Azure y con `build-mart
+--sin-puerta`** (21 min en vez de 1 h 51), por decision del humano. Demuestra
+lo mismo —lo que R26 exige es que omitir la puerta quede registrado como
+`SKIPPED`, y quedo— y ademas la primera mitad de R26, el `sin_batch` del
+historico, ya estaba capturada el 2026-08-18 antes de que la nocturna se la
+llevara.
 
 ## Notas de orden
 

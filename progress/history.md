@@ -401,3 +401,46 @@ supervivientes + fixes 4 líneas / 1 mutante / 0 supervivientes, ambos
 verificados de forma independiente por el reviewer; dos pasadas de
 review (APPROVED Fase B 2026-08-10; APROBADO final 2026-08-17 tras 3
 arreglos documentales). Desbloquea la tanda 2 de F-003 (T23-T26).
+
+
+## F-024 · Coherencia del datamart ante cargas truncadas — `done` (2026-08-19)
+
+Nació de una muerte real: la primera carga desde el job (2026-08-18) murió por
+`DeadlineExceeded` a las 2 h justas, en el tramo 39/60. No hubo daño, pero
+destapó tres huecos: una muerte externa dejaba filas `RUNNING` huérfanas para
+siempre y `timings` mentía; nada impedía construir `stg`/`mart` sobre un `raw`
+mezclado de dos ejecuciones; y el consumidor no tenía forma de saber si lo que
+veía era de esta noche o de hace tres días.
+
+**Lo que entrega**: `batch_id` por ejecución; huérfanas `RUNNING` → `ABORTED`
+con motivo al arrancar cualquier comando que escriba; puerta de coherencia
+antes de `build_stg` y antes de `build_mart`, con `--sin-puerta` registrado
+como `SKIPPED`; vistas `_meta.v_raw_state` y `_meta.v_frescura`; comandos
+`check-coherencia` y `check-frescura`; y una alerta de frescura en Azure.
+
+**Lo que la valida, y no lo podía dar ningún test**: se mató el job a propósito
+a mitad de la ingesta. La tabla `obrparpre` quedó con **4.865.000 filas de
+13.809.350** —DA-8 medida, no deducida: la ingesta commitea por página—, la
+huérfana se cerró sola con el `batch_id` de quien la cerró, la puerta se negó
+en 5,2 s **sin tocar `stg`** y `check-frescura` siguió en FRESCO porque `mart`
+no se tocó. La carga murió sin dañar el dato publicado, que era la tesis
+entera.
+
+**Dos defectos encontrados durante la propia verificación**, los dos ajenos al
+código de la feature y los dos arreglados o fichados:
+
+- La alerta **no se podía crear**: Azure no admite ventana de 30 h. DA-4 se
+  mantiene (el criterio sigue siendo 30 h) pero se expresa con ventana de 48 h
+  —la menor granularidad admitida que la contiene— y el criterio dentro de la
+  KQL. Lo que lo dejó pasar fue un comentario que decía «confirmado con
+  `--help`»: `--help` valida la forma, no el valor.
+- La **campaña de mutación mentía**: 108/108/0 en paralelo frente a 108/106/2
+  en serie. Ficha F-029, encargo en `arnes-base`.
+
+**Evidencias**: 617 tests, cobertura 100 % de 372 líneas cambiadas, mutación
+108/106/2 con los dos supervivientes (`bold` de cabeceras) aceptados como
+equivalentes, y las cuatro verificaciones manuales con sus salidas reales en
+`progress/manual_F-024_fase_c.md`. Tres reviews: Fase B, arreglo de la ventana
+y cierre.
+
+**Queda abierto**: D9, el `Deactivated` de la alerta, con fecha y criterio.

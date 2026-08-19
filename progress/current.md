@@ -26,6 +26,54 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# F-024 CERRADA · 2026-08-19 (léelo primero; lo de abajo es el camino hasta aquí)
+
+**Fase C completa y reviewer en APROBADO** (`progress/review_F-024_cierre.md`).
+Sustituye a todo lo que este fichero diga más abajo sobre «faltan T18, T19 y
+medio T20»: ya no falta ninguna.
+
+| Tarea | Resultado |
+|---|---|
+| **T17** (R25) | imagen `r20260818-2146`; 7 huérfanas cerradas con motivo (2 esperadas + 5 antiguas); vistas legibles por el rol del MCP |
+| **T18** (R24) | muerte a los 10 min; **4.865.000 de 13.809.350 filas** en `obrparpre` (DA-8 medida); huérfana `ABORTED`; puerta `FAILED` en 5,2 s con `rows=0`; `mart` intacto; recarga a OK |
+| **T19** (R23) | correo «Activated» en **6 min 42 s**; regla creada por el script del repositorio. **Abierto**: el `Deactivated` (ver D9) |
+| **T20** (R26) | `build_mart.puerta_stg` en **`SKIPPED`**, con el `SUCCESS` del job al lado |
+
+## Horas de R23, que el requisito pide anotar AQUÍ
+
+| Hito | UTC | Local |
+|---|---|---|
+| `update` a ventana corta (`1h`/`5m`) | 10:04:53 | 12:04:53 |
+| Alerta **`Fired`** | 10:11:18 | 12:11:18 |
+| **Correo recibido** | 10:11:35 | 12:11:35 |
+| Restauración a `48h`/`1h` | 10:27:05 | 12:27:05 |
+| Última lectura: seguía en `Fired` | 14:00 | 16:00 |
+
+## Lo único abierto de F-024: D9
+
+El `Deactivated` no se llegó a observar. **No bloqueó el cierre** —tres
+evaluaciones horarias están en el borde de la latencia de resolución, y no
+había nada que cambiar para acelerarlo— pero está clavado en
+`progress/decisiones_abiertas.md` como **D9**, con fecha (tras la nocturna del
+**2026-08-20**), comando de solo lectura y criterio: si sigue en `Fired`, es
+hallazgo confirmado, se abre feature y **hay que resolver la instancia a mano**,
+porque una alerta atascada en `Fired` no vuelve a notificar.
+
+## Lo siguiente, por orden
+
+1. **D9**, tras la nocturna del 20. Es una lectura de un minuto.
+2. **F-023** (prioridad 8), que desbloquea F-003. Bloque 1 primero —y si los
+   Excels están en el blob antes de la nocturna, la verificación 2 sale gratis—;
+   el **bloque 3 va el último**: retira las reglas de firewall del puesto, que
+   son las que dan acceso para trabajar. Hoy hay tres: `-17-rango`, `-18` y
+   `-19` (esta última acabó en rango `77.211.5.0/24` porque la IP del puesto
+   rota cada pocos minutos).
+3. **F-029** (prioridad 10): la campaña de mutación no es de fiar. El encargo
+   completo está en `arnes-base/ENCARGO_1.5.3_mutacion_fiable.md` y lo está
+   implementando la sesión de `albaranes`.
+
+---
+
 # LA NOCTURNA DEL 19 FUNCIONÓ · verificado a las 10:20 del 19 (léelo primero)
 
 **Primera nocturna con las puertas de coherencia de F-024 y con la imagen

@@ -277,6 +277,56 @@ que lo hace repartible a cualquiera.
 
 ---
 
+## D9 · OBSERVACION PENDIENTE · la alerta de frescura no se ha visto resolver — afecta a F-024 (R23)
+
+**Abierta el 2026-08-19.** No es una decision de diseño: es una **medicion a
+medias** que hay que terminar, y es la condicion con la que el reviewer aprobo
+el cierre de F-024. Tiene fecha y criterio para que no se degrade en
+«olvidado».
+
+**Lo observado.** La alerta `alert-caj-datamart-seg-dev-sin-build` paso a
+`Fired` el 2026-08-19 a las **10:11:18 UTC** durante la prueba de R23 (correo
+recibido a las 10:11:35, 6 min 42 s: eso **cumplio**). La ventana se restauro a
+`48h`/`1h` a las **10:27:05 UTC**, y desde ese mismo instante la condicion ya
+**no** se cumplia, porque el `build_mart` de la nocturna entraba en el criterio
+de 30 h. Ademas, a las **13:08 UTC** termino una carga correcta, que es el
+escenario que R23 describe para el `Deactivated`. Pese a todo, a las **14:00
+UTC** la alerta **seguia en `Fired`**, tras unas tres evaluaciones horarias.
+
+**Por que no bloqueo el cierre.** Tres evaluaciones estan *en el borde* de la
+latencia de resolucion de una alerta de busqueda de registros con estado, no
+mas alla: lo observado no es «no se cumple», es «todavia no se ha medido lo
+suficiente». Y no habia nada que cambiar —ni codigo, ni test, ni spec, ni
+script— para que el `Deactivated` llegara; la unica accion posible es volver a
+mirar. El argumento completo esta en `progress/review_F-024_cierre.md` §6.
+
+**Cuando se vuelve a mirar:** despues de la nocturna del **2026-08-20**, es
+decir con >= 12 evaluaciones horarias y una carga correcta de por medio.
+
+**Como se mira** (solo lectura, sin escribir nada en Azure):
+
+```powershell
+$sub = az account show --query id -o tsv
+$u = "https://management.azure.com/subscriptions/$sub/providers/Microsoft.AlertsManagement/alerts?api-version=2019-05-05-preview"
+$j = az rest --method get --uri $u -o json | ConvertFrom-Json
+$j.value | Where-Object { $_.name -like "*sin-build*" } | ForEach-Object { $_.properties.essentials.monitorCondition }
+```
+
+**Criterio de decision:**
+
+- Si dice **`Resolved`**: se anota la hora en `progress/manual_F-024_fase_c.md`
+  y **R23 queda cerrado del todo**. Fin de D9.
+- Si sigue en **`Fired`**: es un **hallazgo confirmado** —`--auto-mitigate
+  true` no hace lo que la spec asume— y entonces: (1) se abre feature contra
+  `infra/95_create_alert_frescura.ps1` por el mecanismo de resolucion, y (2) se
+  resuelve la instancia a mano, porque **una alerta atascada en `Fired` no
+  vuelve a notificar**: una falta de frescura genuina pasaria en silencio, que
+  es justo el agujero que F-024 vino a tapar.
+
+**Dueño:** el humano.
+
+---
+
 ## Decisiones ya cerradas
 
 - **2026-08-08 · Backlog priorizado.** Aprobado el orden F-001, F-004, F-005,
