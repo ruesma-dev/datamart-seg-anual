@@ -14,7 +14,7 @@ Fecha: 2026-08-19.
 > | Los tres Excels dentro | `TipoCoste.xlsx` 20.486 B, `TipoPartida.xlsx` 46.679 B, `mapeo_proporcionales.xlsx` 61.141 B |
 > | `AUX_EXCEL_*` en el **job desplegado** | las tres, como URIs de blob |
 > | Identidad del job | `UserAssigned` |
-> | Rol de `pgris@ruesma.es` sobre la cuenta | **`Storage Blob Data Reader`** ya concedido |
+> | Rol del **usuario del puesto** sobre la cuenta | **`Storage Blob Data Reader`** ya concedido |
 >
 > Lo que la ficha decía de las rutas de OneDrive es cierto **solo del `.env` del
 > puesto**, no del job. Esa distinción es la que hizo fallar el primer intento de
@@ -89,7 +89,7 @@ había anotado. Consultado en Log Analytics sobre el job `caj-datamart-seg-dev`:
 **Cumple lo que pedía el acceptance**: los tres ficheros, `origen=blob`, y **ni
 una sola ruta local** en la ejecución del job. El acceso fue con la identidad
 gestionada `UserAssigned`, que tiene su propio `Storage Blob Data Reader` sobre
-la cuenta (principal `2cbea046-…`).
+la cuenta, con su propio identificador de principal.
 
 Consulta usada, por si hay que repetirla:
 
@@ -110,13 +110,14 @@ hacer**; después se reasigna.
 
 **El obstáculo, comprobado**: quitar y devolver una asignación de rol exige
 `User Access Administrator` u `Owner` sobre la cuenta. Sobre
-`stdatamartsegdev` los tiene **`n3ms@ruesma.es`**; `pgris@ruesma.es` solo tiene
+`stdatamartsegdev` los tiene **el propietario de la suscripción**; el **usuario del puesto** solo tiene
 `Storage Blob Data Reader`, que no permite modificar asignaciones. Es la misma
 raíz que **F-026** («RBAC sin propagar en `60_create_identity.ps1`»).
 
 Salidas posibles, a decidir con el humano:
 
-1. Que `n3ms` ejecute el quitar/poner, o conceda UAA temporalmente.
+1. Que el propietario de la suscripción ejecute el quitar/poner, o conceda
+   `User Access Administrator` temporalmente.
 2. Probar el mensaje de error por otra vía que no exija tocar RBAC, y dejar
    escrito que se probó el **mensaje** pero no el **escenario real**.
 3. Desviación justificada por escrito, que acepta o rechaza el reviewer.

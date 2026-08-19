@@ -356,8 +356,8 @@ noche sin la única vigilancia que cubre «el job no llegó a hacer su trabajo»
 agujero que F-024 vino a tapar—. La alerta de fallo (`90_create_alert.ps1`) sigue
 cubriendo «la ejecución terminó en error», que es un caso distinto.
 
-**Acción tomada** (autorizada por el humano): cerrar la instancia
-`42ce9207-57d4-805b-29e1-d46b7c3d0038` con `changestate ... newState=Closed`.
+**Acción tomada** (autorizada por el humano): cerrar la instancia de alerta (su id se obtiene en la misma consulta de
+lectura) con `changestate ... newState=Closed`.
 Resultado leído de vuelta: `alertState: Closed`, `monitorCondition: Fired`,
 `lastModified 14:32:59Z`. Con la instancia cerrada, si la condición vuelve a
 cumplirse Azure genera una alerta **nueva** y notifica.
