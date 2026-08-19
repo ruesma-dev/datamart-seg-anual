@@ -466,7 +466,7 @@ con cuatro intentos y **cuatro Trace ID distintos** (08:32:28, 08:45:07,
 
 ```
 invalid_grant AADSTS50076: ... you must use multi-factor authentication to
-access '797f4846-ba00-4fd7-ba43-dac1f8f63013'   (Service Management API)
+access '<app id de la Service Management API>'
 ```
 
 **Ese mensaje es engañoso y hay que desconfiar de él.** Lo descartado, con la
