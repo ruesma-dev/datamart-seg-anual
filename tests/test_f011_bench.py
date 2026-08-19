@@ -562,14 +562,20 @@ def test_f011_r23_la_puerta_del_cliente_rechaza_lo_que_no_es_lectura() -> None:
         database="sigrid",
     )
 
-    def _no_debe_llamarse(**kwargs: object) -> dict:
-        raise AssertionError("no puede llegar a enviarse nada")
-
-    cliente._post_sql = _no_debe_llamarse  # type: ignore[method-assign]
+    enviado: list[dict] = []
+    cliente._post_sql = lambda **kwargs: enviado.append(kwargs) or {"ok": True}  # type: ignore[method-assign]
 
     with pytest.raises(SigridApiSentenciaNoDeLecturaError) as excinfo:
         cliente.leer_sql("DROP TABLE dbo.con")
 
     assert "SELECT" in str(excinfo.value)
     assert excinfo.value.sql == "DROP TABLE dbo.con"
+    assert enviado == [], "la sentencia rechazada llegó a enviarse"
+
+    # Control negativo: una lectura legítima SÍ pasa. Sin esto, un validador
+    # que dijera «no» a todo pasaría el test de arriba tan ricamente.
+    cliente.leer_sql("SELECT TOP 1 [ide] FROM [dbo].[con]", parameters=[0], max_rows=1)
+
+    assert len(enviado) == 1
+    assert enviado[0]["max_rows"] == 1
     cliente.close()
