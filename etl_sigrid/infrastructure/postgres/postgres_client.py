@@ -31,6 +31,7 @@ from psycopg.types.json import Json
 from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
 from etl_sigrid.domain.ejecucion import MOTIVO_HUERFANA
 from etl_sigrid.domain.entities import ColumnSpec
+from etl_sigrid.domain.perfil_carga import FilaPerfil
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
@@ -147,6 +148,33 @@ SELECT paso,
        ultimo_intento_error
 FROM _meta.v_frescura
 ORDER BY paso
+"""
+
+# --- Perfil de carga (F-011, R1-R3) -----------------------------------------
+#
+# SOLO LECTURA y sobre `_meta.etl_runs` y nada más: es el «medir antes de
+# optimizar» de F-011, y no hace falta ejecutar ninguna carga nueva para
+# responderlo, porque cada tabla ya deja su fila `ingest_raw.<tabla>` desde
+# F-024.
+#
+# El ancla es la ÚLTIMA carga con `batch_id`, elegida por `ORDER BY batch_id
+# DESC`: el identificador de F-024 es UTC compacto, así que ordena
+# cronológicamente sin parsear nada (fue una decisión explícita de esa
+# feature). Y se ancla a `step = 'ingest_raw'` porque es el primer paso de
+# `run-all`: así el perfil sale de una carga de verdad y no de un
+# `apply-grants` suelto que se ejecutó después.
+SQL_PERFIL_CARGA = """
+SELECT stage, step, started_at, finished_at, status, rows_processed, batch_id
+FROM _meta.etl_runs
+WHERE batch_id = COALESCE(
+        %(batch)s,
+        (SELECT batch_id
+         FROM _meta.etl_runs
+         WHERE step = 'ingest_raw' AND batch_id IS NOT NULL
+         ORDER BY batch_id DESC
+         LIMIT 1)
+      )
+ORDER BY started_at, id
 """
 
 SQL_RUN_START = """
@@ -943,6 +971,45 @@ class PostgresClient:
                 )
                 for fila in filas
             ]
+
+    def fetch_perfil_carga(
+        self, batch_id: str | None = None
+    ) -> tuple[str | None, list[FilaPerfil]]:
+        """
+        Desglose de una carga: una fila por paso y una por tabla de la ingesta.
+
+        Devuelve el par `(batch medido, filas)`. El `batch_id` viaja de vuelta
+        —y no solo las filas, como apuntaba el diseño— porque R8 exige que el
+        informe de medición diga de QUÉ carga salen los números: sin él, quien
+        lee el perfil no puede saber si midió la nocturna buena o la noche que
+        murió a los diez minutos.
+
+        Sin argumento mide la última carga registrada. Solo `SELECT`: no marca
+        huérfanas ni registra paso (R25).
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_PERFIL_CARGA, {"batch": batch_id})
+            filas = cur.fetchall()
+
+        medido = batch_id
+        perfil: list[FilaPerfil] = []
+        for stage, step, started_at, finished_at, status, rows, batch in filas:
+            if medido is None:
+                medido = batch
+            perfil.append(
+                FilaPerfil(
+                    stage=stage,
+                    step=step,
+                    segundos=(
+                        0.0
+                        if started_at is None or finished_at is None
+                        else (finished_at - started_at).total_seconds()
+                    ),
+                    filas=int(rows or 0),
+                    status=status,
+                )
+            )
+        return medido, perfil
 
     def record_run_completed(
         self,

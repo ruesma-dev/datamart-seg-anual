@@ -64,6 +64,10 @@ from etl_sigrid.domain.coherencia import (  # noqa: E402
 )
 from etl_sigrid.domain.ejecucion import Ejecucion, nueva_ejecucion  # noqa: E402
 from etl_sigrid.domain.entities import StepResult, StepStatus  # noqa: E402
+from etl_sigrid.domain.perfil_carga import (  # noqa: E402
+    format_perfil,
+    perfil_de_carga,
+)
 from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger  # noqa: E402
 from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
     make_admin_conninfo_provider,
@@ -614,6 +618,40 @@ def check_frescura(umbral_horas: float, paso: str) -> None:
 
     if veredicto != VEREDICTO_FRESCO:
         sys.exit(1)
+
+
+@cli.command("perfil-carga")
+@click.option(
+    "--batch",
+    "batch_id",
+    type=str,
+    default=None,
+    help="Identidad de ejecución a medir (batch_id). Por defecto, la última "
+         "carga registrada en _meta.etl_runs.",
+)
+def perfil_carga(batch_id: str | None) -> None:
+    """
+    ¿Dónde se va el tiempo de la carga? SOLO LECTURA (F-011, R1–R3).
+
+    Desglosa una carga completa en pasos de pipeline y en tablas de la ingesta,
+    con duración, filas, filas/s y porcentaje del total; imprime el techo de
+    mejora por paso (cuánto duraría la carga si ese paso costase cero) y cuántas
+    tablas acumulan el 80 % del tiempo de extracción.
+
+    Es el comando que decide si merece la pena una ingesta incremental, y lo
+    hace con lo que ya está guardado: no ejecuta ninguna carga nueva ni escribe
+    una fila en `_meta` (R25). Sale 2 si no puede leer, igual que
+    `check-coherencia`.
+    """
+    pg = _get_pg()
+
+    try:
+        batch_medido, filas = pg.fetch_perfil_carga(batch_id)
+    except Exception as e:  # el código 2 es «no se pudo leer»
+        click.secho(f"✗ No se pudo leer _meta.etl_runs: {e}", fg="red", err=True)
+        sys.exit(2)
+
+    click.echo(format_perfil(perfil_de_carga(filas, batch_id=batch_medido)))
 
 
 @cli.command("status")
