@@ -177,10 +177,17 @@ está.
 ```bash
 az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
 # Solo si hace falta: una IP por regla (start == end), con el nombre fechado
-az postgres flexible-server firewall-rule create -g rg-albaranes-dev -n psql-albaranes-rs9k2 \
-  --rule-name <uso>-<origen>-<AAAA-MM-DD> --start-ip-address <IP> --end-ip-address <IP>
+az postgres flexible-server firewall-rule create -g rg-albaranes-dev --server-name psql-albaranes-rs9k2 \
+  --name <uso>-<origen>-<AAAA-MM-DD> --start-ip-address <IP> --end-ip-address <IP>
 az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
 ```
+
+> **Ojo a la asimetria entre subcomandos, que muerde y ya costo media hora el
+> 2026-08-19.** En `create`, `update` y `delete` el servidor va en
+> `--server-name`/`-s` y la regla en `--name`/`-n`; **`--rule-name` no existe**
+> en esta CLI y devuelve «unrecognized arguments». En `list`, en cambio, el
+> `-n` **si** es el servidor y esta bien: no lo corrijas. Estos comandos
+> estaban escritos con `--rule-name` hasta el 2026-08-19 y **no ejecutaban**.
 
 El listado posterior debe contener **exactamente** las reglas anteriores más la
 nueva. Ninguna preexistente puede quedar modificada ni eliminada.
@@ -198,7 +205,7 @@ permisos. Procedimiento de retirada, que hay que aplicar sin esperar a que
 moleste:
 
 - cuando un puesto o servicio deje de necesitar acceso, **borra su regla** con
-  `az postgres flexible-server firewall-rule delete --rule-name <nombre>`;
+  `az postgres flexible-server firewall-rule delete -g <grupo> --server-name <servidor> --name <nombre>`;
 - revisa el listado cada vez que pases por este runbook y borra las que no
   reconozcas: el nombre lleva fecha justamente para eso.
 
