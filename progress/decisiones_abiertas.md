@@ -245,6 +245,38 @@ Preguntas para el humano:
    había un motivo para elegirlo? El esquema no da ninguna pista de que lo
    hubiera: no se usó ninguna capacidad específica de SQL Server.
 
+## D8 · Dónde se persiste una planificación hecha por la IA — afecta a F-006, F-030
+
+**Abierta el 2026-08-19.** El humano quiere pedirle a la IA una planificación
+temporal, que la IA la resuelva con juicio (no hay regla determinista para
+asignar partidas a meses) y luego corregirla de forma interactiva. Eso deja una
+pregunta sin responder: **el resultado corregido, ¿dónde se guarda?**
+
+Por qué no es un detalle:
+
+- `mcp-bbdd` es **solo lectura por diseño**, y esa restricción es justo lo que
+  permite dárselo a cualquier usuario sin miedo. Persistir una planificación es
+  un camino de **escritura**.
+- Sin persistencia no hay **traza** —qué repartió la IA, con qué criterio, qué
+  corrigió el usuario— ni forma de **reanudar** mañana donde se dejó hoy. Una
+  planificación que nadie puede auditar seis meses después es un número
+  huérfano.
+
+Las salidas que se ven, sin recomendar ninguna todavía:
+
+1. **No se persiste**: el usuario se lleva el resultado como fichero. Lo más
+   simple y lo más seguro; se pierde la traza y la continuidad.
+2. **Tabla propia en el datamart**: encaja con que el dato viva donde vive el
+   resto, pero obliga a decidir quién escribe y con qué rol, y este proyecto
+   pasaría a tener una capa de escritura de usuario que hoy no tiene.
+3. **Otro servicio con su propio permiso**: no relaja el MCP y aísla la
+   escritura, a costa de una pieza más que mantener.
+
+**Lo que no se hará**: relajar el MCP para que escriba. Perdería la garantía
+que lo hace repartible a cualquiera.
+
+---
+
 ## Decisiones ya cerradas
 
 - **2026-08-08 · Backlog priorizado.** Aprobado el orden F-001, F-004, F-005,
