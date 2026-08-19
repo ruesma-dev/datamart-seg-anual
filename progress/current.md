@@ -26,6 +26,61 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# LA NOCTURNA DEL 19 FUNCIONÓ · verificado a las 10:20 del 19 (léelo primero)
+
+**Primera nocturna con las puertas de coherencia de F-024 y con la imagen
+`r20260818-2146`: limpia de punta a punta.** Sustituye al punto 1 de la
+sección siguiente, que queda cumplido.
+
+| Qué | Resultado real |
+|---|---|
+| Ventana | **02:00:16 → 04:48:05 UTC = 2 h 48 min** (el 18 fueron 2 h 45) |
+| Estado de todos los pasos | `SUCCESS`. **Ni un `ABORTED`, ni una `RUNNING` huérfana, ni un `AVISO`** al pie de `timings` |
+| Identidad de ejecución | **una sola**: `20260819T020016Z-327ef0`, en las 25 tablas de `raw` |
+| `check-coherencia` | **OK en `raw` y en `stg`**, salida 0. **Ha pasado de KO a OK**, que era justo lo que había que confirmar |
+| `check-frescura` | `build_mart` **FRESCO** (3,5 h de 30 h de umbral), salida 0 |
+| Volumen | `raw` 20,05 M · `stg` 43,79 M · `mart` 5,32 M filas |
+| Buzón | **ningún «Activated»**. La alerta no disparó, que es lo correcto |
+
+**Las dos puertas corrieron en el job real y quedaron registradas**, que es la
+evidencia que faltaba de R10/R15 en Azure y no la daba ningún test:
+
+```
+stage        build_stg.puerta_raw   2026-08-19 02:35:58   0.1 s   SUCCESS
+build_mart   build_mart.puerta_stg  2026-08-19 04:26:32   0.2 s   SUCCESS
+```
+
+Es decir: la puerta se ejecuta **antes** de escribir, en producción, y **no
+estorba a una carga buena**. Que es la mitad de la garantía; la otra mitad —que
+sí frena a una carga mala— es lo que prueba T18.
+
+## Dos cosas que aparecieron al revisar, ninguna es un problema
+
+- **Mantenimiento programado de Azure Database for PostgreSQL** (región Spain
+  Central, tracking `SJFH-KHZ`): correo a las 05:27 UTC con **`STATUS:
+  Complete`**, o sea **después** de que la carga terminara a las 04:48. No la
+  tocó. Conviene recordar que ese servidor es el compartido y que estos
+  mantenimientos pueden caer dentro de la ventana de carga otro día.
+- **Disco**: pico de **88,69 %** a las 02:45 UTC (ingesta) y 84,13 % a las
+  04:30 (build_mart). Es el cuarto pico consecutivo en torno al 88,5 % **sin
+  tendencia al alza**, y **por debajo del 90 %** que invalidaría la decisión de
+  no ampliar. Cuidado al mirarlo por la mañana: a las 08:00 marcaba 76 % y
+  **seguía bajando** 0,6 puntos/hora hacia el reposo real de 72,46 %; ese 77 %
+  de después de la carga **no** es el «reposo por encima del 78 %» del umbral 2.
+
+## Lo que queda de F-024, con esto ya descontado
+
+Solo Fase C: **T18** (muerte externa controlada + recarga), **T19** (alerta de
+frescura de extremo a extremo) y la **segunda mitad de T20** (`--sin-puerta`
+registrando `SKIPPED`). Nada más: código, tests, cobertura, mutación y review
+están cerrados y aprobados.
+
+Hueco disponible hoy: la siguiente nocturna entra a las **02:00 UTC del 20**
+(04:00 local), así que T18 con su recarga de ~2 h 50 cabe de sobra si se
+arranca por la mañana.
+
+---
+
 # ESTADO AL CERRAR LA SESIÓN DEL 2026-08-19 · MADRUGADA (00:00–00:30)
 
 Sesión corta y sin tocar código. Tres cosas que cambian lo que dice la
