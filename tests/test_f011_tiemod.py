@@ -198,6 +198,26 @@ def test_f011_r7_comparar_empareja_por_tabla_y_no_por_posicion() -> None:
     assert set(comparaciones) == {"con", "obr", "dca"}
 
 
+def test_f011_r7_una_tabla_nueva_no_tiene_delta_de_filas() -> None:
+    """Sin fotografía anterior, la variación es 0 y no una resta contra nada."""
+    (comparacion,) = comparar_tiemod([], [estado(tabla="dca", filas=7, maximo=HOY)])
+
+    assert comparacion.antes is None
+    assert comparacion.delta_filas == 0
+    assert comparacion.veredicto is Veredicto.SIN_EVIDENCIA
+
+
+def test_f011_r7_el_delta_de_filas_cuenta_altas_y_bajas() -> None:
+    """El signo importa: una tabla que encoge es una baja en Sigrid."""
+    antes = [estado(tabla="con", filas=100, maximo=AYER)]
+
+    (crecio,) = comparar_tiemod(antes, [estado(tabla="con", filas=118, maximo=HOY)])
+    (encogio,) = comparar_tiemod(antes, [estado(tabla="con", filas=95, maximo=HOY)])
+
+    assert crecio.delta_filas == 18
+    assert encogio.delta_filas == -5
+
+
 def test_f011_r7_el_informe_de_comparacion_trae_el_veredicto_por_tabla() -> None:
     """Y el resumen global, que es lo que decide si R19 deja activar el modo."""
     antes = [estado(tabla="obr", filas=10, maximo=AYER)]

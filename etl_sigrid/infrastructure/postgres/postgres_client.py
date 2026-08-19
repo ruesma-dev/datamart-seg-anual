@@ -1067,9 +1067,10 @@ class PostgresClient:
                         col=columna, tabla=sql.Identifier(tabla)
                     )
                 )
+                # Una agregación sin GROUP BY siempre devuelve exactamente una
+                # fila: no hay rama defensiva que probar aquí, y añadirla solo
+                # dejaría código muerto que ningún test puede recorrer.
                 fila = cur.fetchone()
-                if fila is None:  # defensivo: una agregación siempre devuelve fila
-                    continue
                 estados.append(
                     EstadoTiemod(
                         tabla=tabla,
