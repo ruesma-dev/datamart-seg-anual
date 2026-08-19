@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **24 features**, 14 abiertas, 10 terminadas.
+Resumen: **25 features**, 15 abiertas, 10 terminadas.
 
 En curso: **F-024**.
 
@@ -16,6 +16,7 @@ Bloqueadas: **F-003**.
 | F-003 | Infra: despliegue como Container Apps Job diario | 7 | bloqueada | critico | `feature/F-003-infra-caj` |
 | F-023 | Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto | 8 | pendiente | estandar | `feature/F-023-cierre-operativo-f003` |
 | F-024 | Coherencia del datamart ante cargas truncadas: deteccion, puerta y frescura | 9 | en curso | critico | `feature/F-024-coherencia-cargas-truncadas` |
+| F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
 | F-011 | Carga incremental del datamart | 11 | pendiente |  | `feature/F-011-carga-incremental` |
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
 | F-022 | Desempatar versiones master duplicadas de raw.obrfasamb | 12 | pendiente | estandar | `feature/F-022-desempate-obrfasamb` |
@@ -62,6 +63,12 @@ Lo que quedo abierto al completar la tanda 2 de F-003 el 2026-08-17 (job nocturn
 estado **en curso** · prioridad 9 · rigor `critico` · SDD sí · rama `feature/F-024-coherencia-cargas-truncadas`
 
 Origen: la primera carga real desde el job (2026-08-18) murio por DeadlineExceeded a las 2 h justas, en el tramo 39/60 del stage. No hubo dano porque mart no se toco, pero destapo tres huecos: (1) una muerte EXTERNA del proceso (kill por deadline, OOM, reinicio del nodo) deja en _meta.etl_runs una fila RUNNING huerfana para siempre, y timings miente; (2) nada impide que stage/mart se construyan sobre un raw MEZCLADO (tablas de ejecuciones distintas, tras una ingesta parcial seguida de otro fallo), que es incoherencia silenciosa: cuadros que no cuadran y nadie que lo sepa; (3) el consumidor (Power BI, MCP) no tiene forma de saber si lo que ve es de esta noche o de hace tres dias. Se DESCARTA hacer atomico el pipeline entero: una transaccion de 3 h en el B1ms es justo lo que reventó el 09-ago y F-019 lo troceo a proposito. La coherencia se garantiza por verificacion y visibilidad: (a) al arrancar, run-all marca ABORTED las filas RUNNING de ejecuciones anteriores con motivo; (b) puerta antes de stage: FAILED explicito y ruidoso si la ultima ingesta de cada tabla no pertenece a la misma ejecucion (raw incoherente); (c) frescura visible: fecha del ultimo build_mart COMPLETO consultable desde las vistas de consumo, y alerta si supera un umbral. La alerta actual ya cubre los fallos internos (run-all sale 1 si un paso falla; verificado); la muerte externa la cubre (a)+(b).
+
+### F-029 · La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado
+
+estado **pendiente** · prioridad 10 · rigor `critico` · SDD sí · rama `feature/F-029-mutacion-fiable`
+
+Dos defectos de harness/mutacion.py descubiertos el 2026-08-19 durante T19 de F-024, los dos con el mismo efecto: la campaña de mutacion es la evidencia que el arnes exige en nivel critico, y hoy no es de fiar. (1) LA VIA PARALELA DECLARA MUERTOS MUTANTES QUE ESTAN VIVOS: la misma feature, el mismo arbol y el mismo dia dio '108 generados, 108 muertos, 0 supervivientes' en 270,9 s con hasta 16 worktrees, y '108 generados, 106 muertos, 2 supervivientes' en 1047,1 s con --workers 1. Los dos supervivientes son bold=True -> bold=False en dos click.secho de main.py (564 y 567); NINGUN test de la suite menciona 'bold' (grep -rn sin resultados) y aplicando la mutacion a mano la suite pasa entera, asi que esos mutantes no pueden morir: el cero era falso y el 106/2 es el bueno. Un '0 supervivientes' es exactamente el numero que nadie vuelve a mirar, y el arnes lo exige para cerrar una feature critica. (2) UNA INTERRUPCION DEJA EL ARBOL MUTADO: con --workers 1 la campaña muta el arbol de trabajo real, y si el proceso muere -o lo matan- el mutante en curso se queda aplicado. Observado dos veces el mismo dia: '==' por '!=' en etl_sigrid/domain/coherencia.py (la puerta que protege build_mart) y 'not veredicto.faltantes' por 'veredicto.faltantes' en frescura.py. El riesgo no es perder la campaña: es COMMITEAR UN MUTANTE creyendo que es codigo, que es lo que habria pasado con un 'git add .' en ese minuto. Agravante observado: un agente que se cae por un error de API deja la campaña huerfana y corriendo, y quien intente sanear el arbol restaura el mutante que se estaba evaluando y contamina el recuento sin saberlo. Es una mejora del ARNES, no del ETL: por la regla de propagacion de CLAUDE.md va tambien a arnes-base en el mismo trabajo, porque afecta a todos los proyectos que lo lleven. (3) MIENTRAS LA CAMPAÑA CORRE, CUALQUIER OTRA VERIFICACION SOBRE EL ARBOL MIENTE: con el arbol mutado, un bash harness/init.sh lanzado en paralelo sale EN ROJO con un test fallando que no tiene nada que ver con lo que se esta verificando. Observado el mismo 2026-08-19, minutos despues de los otros dos: el lider ejecuto init.sh para validar un cambio del backlog y se lo encontro rojo por el mutante en curso del reviewer. Con dos agentes trabajando a la vez -que es el modo normal de este arnes- eso significa que la puerta que decide si una feature puede cerrarse da falsos negativos, y que la reaccion natural (restaurar el fichero) contamina la campaña del otro.
 
 ### F-011 · Carga incremental del datamart
 
