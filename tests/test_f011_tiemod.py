@@ -276,3 +276,128 @@ def test_f011_r7_un_csv_vacio_no_trae_estados(tmp_path) -> None:
     vacio.write_text("", encoding="utf-8-sig")
 
     assert leer_csv_tiemod(vacio) == []
+
+
+# ---------------------------------------------------------------------------
+# Bordes que la campaña de mutación dejó al descubierto
+# ---------------------------------------------------------------------------
+
+
+def test_f011_r6_una_tabla_de_una_fila_se_juzga_como_las_demas() -> None:
+    """Una fila no es «vacía»: las guardias comparan con 0, no con 1.
+
+    `dcfprodes` tiene 271 filas y hay catálogos con menos de diez. Tratar una
+    tabla pequeña como si no existiera sería perder justo las que se pueden
+    revisar a mano.
+    """
+    una = estado(tabla="rara", filas=1, nulos=1, minimo=None, maximo=None, distintos=0)
+
+    assert una.esta_vacia is False
+    assert una.pct_nulos == 100.0
+    assert una.toda_nula is True
+
+    con_marca = estado(tabla="rara", filas=1, nulos=0, maximo=HOY, distintos=1)
+    assert con_marca.toda_nula is False
+    assert con_marca.pct_nulos == 0.0
+
+
+def test_f011_r7_la_comparacion_es_inmutable() -> None:
+    """El veredicto de una tabla no se reescribe después de emitirse."""
+    (comparacion,) = comparar_tiemod([], [estado(tabla="con", filas=1, maximo=HOY)])
+
+    with pytest.raises(FrozenInstanceError):
+        comparacion.veredicto = Veredicto.SIRVE  # type: ignore[misc]
+
+
+def test_f011_r7_el_motivo_del_no_sirve_dice_cuanto_cambio_la_tabla() -> None:
+    """«cambió de contenido (+18 filas)»: el número es el argumento.
+
+    Sin él, el veredicto es una opinión; con él, quien lo lee puede
+    comprobarlo. Y la resta tiene que ser resta: sumar las dos fotos daría un
+    número enorme y sin sentido.
+    """
+    antes = [estado(tabla="con", filas=100, maximo=AYER)]
+    ahora = [estado(tabla="con", filas=118, maximo=AYER)]
+
+    (comparacion,) = comparar_tiemod(antes, ahora, filas_avanzadas={"con": 0})
+
+    assert comparacion.veredicto is Veredicto.NO_SIRVE
+    assert "+18 filas" in comparacion.motivo
+
+
+def test_f011_r6_el_total_del_informe_reparte_los_nulos() -> None:
+    """El pie del diagnóstico calcula el porcentaje global, y sabe dividir."""
+    texto = format_diagnostico(
+        [
+            estado(tabla="a", filas=3, nulos=3, minimo=None, maximo=None, distintos=0),
+            estado(tabla="b", filas=1, nulos=0, maximo=HOY, distintos=1),
+        ]
+    )
+
+    total = next(x for x in texto.splitlines() if x.startswith("TOTAL"))
+
+    assert "75.0" in total, f"3 nulos de 4 filas son el 75 %: {total}"
+
+
+def test_f011_r6_el_total_con_todas_las_tablas_vacias_no_divide_por_cero() -> None:
+    """Base recién creada: todas las tablas a 0 filas. 0 %, no una excepción."""
+    texto = format_diagnostico(
+        [estado(tabla="a", filas=0, nulos=0, minimo=None, maximo=None, distintos=0)]
+    )
+
+    total = next(x for x in texto.splitlines() if x.startswith("TOTAL"))
+
+    assert "0.0" in total
+
+
+def test_f011_r6_una_sola_fila_nula_da_el_cien_por_cien_en_el_total() -> None:
+    """Total de 1 fila: el porcentaje sigue siendo 100 %, no 0 %."""
+    texto = format_diagnostico(
+        [estado(tabla="a", filas=1, nulos=1, minimo=None, maximo=None, distintos=0)]
+    )
+
+    total = next(x for x in texto.splitlines() if x.startswith("TOTAL"))
+
+    assert "100.0" in total
+
+
+def test_f011_r7_el_csv_crea_los_directorios_que_falten(tmp_path) -> None:
+    """`--out informes/2026/huella.csv` no puede fallar por una carpeta ausente."""
+    salida = tmp_path / "informes" / "2026" / "huella.csv"
+
+    escribir_csv_tiemod([estado(tabla="con", filas=1, maximo=HOY)], salida)
+
+    assert salida.is_file()
+
+
+def test_f011_r7_el_error_del_csv_ensena_la_cabecera_encontrada(tmp_path) -> None:
+    """El mensaje trae la cabecera REAL del fichero, no la de otra fila.
+
+    Es lo que convierte «este CSV no vale» en «has pasado el fichero del bench
+    en vez de la huella».
+    """
+    otro = tmp_path / "cualquiera.csv"
+    otro.write_text("page_size;peticiones;filas\n1000;1;1000\n", encoding="utf-8-sig")
+
+    with pytest.raises(ValueError) as excinfo:
+        leer_csv_tiemod(otro)
+
+    assert "page_size;peticiones;filas" in str(excinfo.value)
+
+
+def test_f011_r7_cada_columna_del_csv_va_a_su_campo(tmp_path) -> None:
+    """Mínimo y máximo se leen por separado: uno puede faltar y el otro no.
+
+    Un fichero editado a mano —o truncado— puede traer justo eso, y confundir
+    las dos columnas daría un veredicto con el umbral equivocado.
+    """
+    huella = tmp_path / "huella.csv"
+    huella.write_text(
+        "tabla;filas;nulos;minimo;maximo;distintos\ncon;10;0;;46264.75;3\n",
+        encoding="utf-8-sig",
+    )
+
+    (leido,) = leer_csv_tiemod(huella)
+
+    assert leido.minimo is None
+    assert leido.maximo == pytest.approx(46_264.75)

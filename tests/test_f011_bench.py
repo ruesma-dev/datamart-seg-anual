@@ -579,3 +579,87 @@ def test_f011_r23_la_puerta_del_cliente_rechaza_lo_que_no_es_lectura() -> None:
     assert len(enviado) == 1
     assert enviado[0]["max_rows"] == 1
     cliente.close()
+
+
+# ---------------------------------------------------------------------------
+# Bordes que la campaña de mutación dejó al descubierto
+# ---------------------------------------------------------------------------
+
+
+def test_f011_r4_las_mediciones_son_inmutables() -> None:
+    """Las tres piezas del banco son datos cerrados: nadie las retoca."""
+    from dataclasses import FrozenInstanceError
+
+    with pytest.raises(FrozenInstanceError):
+        medicion(1_000, 1.0, 1_000).filas = 2  # type: ignore[misc]
+
+    with pytest.raises(FrozenInstanceError):
+        resumen_bench([]).mejor_page_size = 1  # type: ignore[misc]
+
+    divergencia = comparar_cap(medido=20_000, documentado=1_000)
+    assert divergencia is not None
+    with pytest.raises(FrozenInstanceError):
+        divergencia.medido = 1  # type: ignore[misc]
+
+
+def test_f011_r4_una_peticion_de_un_segundo_exacto_si_tiene_ritmo() -> None:
+    """1 s y 1 fila no son «sin medir»: las guardias comparan con 0, no con 1."""
+    assert medicion(1_000, 1.0, 1_000).filas_por_segundo == pytest.approx(1_000.0)
+    assert medicion(1_000, 2.0, 1).filas_por_segundo == pytest.approx(0.5)
+
+
+def test_f011_r4_una_sola_peticion_tiene_latencia_media() -> None:
+    """Con una petición, la media es el tiempo de esa petición."""
+    assert medicion(1_000, 6.0, 3_000, peticiones=1).latencia_media_s == pytest.approx(6.0)
+
+
+def test_f011_r5_solo_los_rechazos_aportan_cap() -> None:
+    """Un tamaño admitido no aporta cap aunque traiga el campo relleno.
+
+    Es lo que separa «la API me dijo su límite» de «alguien dejó un número
+    ahí»: solo el 400 acredita el cap.
+    """
+    resumen = resumen_bench(
+        [medicion(10_000, 5.0, 10_000, rechazada=False, cap_devuelto=20_000)]
+    )
+
+    assert resumen.caps_rechazados == ()
+    assert resumen.cap_medido is None
+
+
+def test_f011_r5bis_el_aviso_salta_justo_en_el_umbral() -> None:
+    """Al 80 % exacto del timeout ya hay aviso: el corte es `>=`, no `>`."""
+    justo = resumen_bench([medicion(20_000, 184.0, 20_000, latencia_max_s=184.0)])
+    debajo = resumen_bench([medicion(20_000, 183.9, 20_000, latencia_max_s=183.9)])
+
+    assert "AVISO" in format_bench(justo, timeout_s=230.0)
+    assert "AVISO" not in format_bench(debajo, timeout_s=230.0)
+
+
+def test_f011_r5bis_el_aviso_dice_qué_porcentaje_del_timeout_se_consumio() -> None:
+    """210 s de 230 son el 91 %, y el número tiene que salir escrito."""
+    resumen = resumen_bench([medicion(20_000, 210.0, 20_000, latencia_max_s=210.0)])
+
+    assert "91 % del timeout" in format_bench(resumen, timeout_s=230.0)
+
+
+def test_f011_r4_medir_pagina_pide_una_sola_pagina_por_defecto() -> None:
+    """El valor por defecto es UNA petición: medir es barato salvo que se pida más."""
+    from etl_sigrid.infrastructure.sigrid.bench_extraccion import medir_pagina
+
+    api = ApiFalsa(segundos_por_peticion=1.0)
+    m = medir_pagina(
+        api, "con", columnas=["ide"], page_size=1_000, reloj=lambda: api.reloj
+    )
+
+    assert m.peticiones == 1
+    assert len(api.sql_enviado) == 1
+
+
+def test_f011_r4_el_csv_del_bench_crea_los_directorios_que_falten(tmp_path) -> None:
+    """`--out informes/2026/bench.csv` no puede fallar por una carpeta ausente."""
+    salida = tmp_path / "informes" / "2026" / "bench.csv"
+
+    escribir_csv_bench([medicion(1_000, 1.0, 1_000)], salida)
+
+    assert salida.is_file()

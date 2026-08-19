@@ -724,9 +724,18 @@ def diagnostico_tiemod(salida: Path | None, anterior: Path | None) -> None:
     """
     pg = _get_pg()
 
+    # La fotografía anterior se lee UNA vez y antes de tocar la BBDD: un CSV
+    # que no es una huella no puede confundirse con «no pude leer raw», que es
+    # un problema completamente distinto.
+    try:
+        previos = [] if anterior is None else leer_csv_tiemod(anterior)
+    except (OSError, ValueError) as e:
+        click.secho(f"✗ No se pudo leer {anterior}: {e}", fg="red", err=True)
+        sys.exit(2)
+
     try:
         estados = pg.fetch_diagnostico_tiemod()
-        avanzadas = _filas_avanzadas(pg, estados, anterior)
+        avanzadas = _filas_avanzadas(pg, estados, previos)
     except Exception as e:  # el código 2 es «no se pudo leer»
         click.secho(f"✗ No se pudo leer el estado de raw: {e}", fg="red", err=True)
         sys.exit(2)
@@ -734,11 +743,7 @@ def diagnostico_tiemod(salida: Path | None, anterior: Path | None) -> None:
     if anterior is None:
         click.echo(format_diagnostico(estados))
     else:
-        click.echo(
-            format_comparacion(
-                comparar_tiemod(leer_csv_tiemod(anterior), estados, avanzadas)
-            )
-        )
+        click.echo(format_comparacion(comparar_tiemod(previos, estados, avanzadas)))
 
     if salida is not None:
         escribir_csv_tiemod(estados, salida)
@@ -746,22 +751,20 @@ def diagnostico_tiemod(salida: Path | None, anterior: Path | None) -> None:
 
 
 def _filas_avanzadas(
-    pg: PostgresClient, estados: list, anterior: Path | None
+    pg: PostgresClient, estados: list, previos: list
 ) -> dict[str, int]:
     """Filas por tabla cuya marca supera el máximo de la fotografía anterior.
 
     Es una consulta más por tabla, y solo se lanza cuando hay con qué comparar:
     sin fotografía anterior no hay umbral, y contar «desde el principio» sería
-    contar la tabla entera para nada.
+    contar la tabla entera para nada. Una tabla que no estaba en la foto
+    anterior —añadida al YAML entre dos cargas— tampoco tiene umbral.
     """
-    if anterior is None:
-        return {}
-
-    previos = {e.tabla: e for e in leer_csv_tiemod(anterior)}
+    anteriores = {e.tabla: e for e in previos}
     return {
-        e.tabla: pg.fetch_filas_desde_tiemod(e.tabla, previos[e.tabla].maximo)
+        e.tabla: pg.fetch_filas_desde_tiemod(e.tabla, anteriores[e.tabla].maximo)
         for e in estados
-        if e.tabla in previos and previos[e.tabla].maximo is not None
+        if e.tabla in anteriores and anteriores[e.tabla].maximo is not None
     }
 
 

@@ -627,3 +627,197 @@ def test_f011_r7_fetch_filas_desde_tiemod_devuelve_el_recuento() -> None:
     cliente, _ = cliente_con(CursorFalso(filas=[(18,)]))
 
     assert cliente.fetch_filas_desde_tiemod("con", 46_263.5) == 18
+
+
+# ---------------------------------------------------------------------------
+# Bordes que la campaña de mutación dejó al descubierto
+# ---------------------------------------------------------------------------
+
+
+def test_f011_r6_fetch_diagnostico_tiemod_no_inventa_filas_en_una_tabla_vacia() -> None:
+    """Una tabla vacía trae ceros y nulos, y así tienen que llegar.
+
+    Es el caso que descalifica una columna (`toda_nula`) y el que peor sienta
+    que llegue redondeado: un 1 donde hay un 0 convierte «no hay nada» en «hay
+    algo».
+    """
+    from etl_sigrid.domain.tiemod import EstadoTiemod
+    from tests.test_f019_tramos import CursorFalso, cliente_con
+
+    class CursorPorConsulta(CursorFalso):
+        def __init__(self) -> None:
+            super().__init__(filas=[])
+            self.respuestas = [[("vacia",)], [(0, 0, None, None, 0)]]
+
+        def execute(self, sql: str, params: object = None) -> None:
+            super().execute(str(sql), params)
+            self.filas = self.respuestas.pop(0) if self.respuestas else []
+
+    cliente, _ = cliente_con(CursorPorConsulta())
+
+    assert cliente.fetch_diagnostico_tiemod() == [
+        EstadoTiemod(
+            tabla="vacia", filas=0, nulos=0, minimo=None, maximo=None, distintos=0
+        )
+    ]
+
+
+def test_f011_r7_fetch_filas_desde_tiemod_sin_respuesta_es_cero() -> None:
+    """Si el cursor no devuelve fila, el recuento es 0, no 1.
+
+    Un 1 inventado aquí convertiría un `NO SIRVE` en un `SIRVE`: el veredicto
+    de R7 se apoya justo en este número.
+    """
+    from tests.test_f019_tramos import CursorFalso, cliente_con
+
+    cliente, _ = cliente_con(CursorFalso(filas=[]))
+
+    assert cliente.fetch_filas_desde_tiemod("con", 46_263.5) == 0
+
+
+def test_f011_r25_el_cap_documentado_es_el_del_documento_del_ecosistema() -> None:
+    """1.000 es lo que dice `azure-apps/sigrid_api.md`, y por eso diverge (DA-6)."""
+    assert main.CAP_DOCUMENTADO_SIGRID_API == 1_000
+
+
+@pytest.mark.parametrize(
+    "argumentos",
+    [
+        ["perfil-carga"],
+        ["diagnostico-tiemod"],
+        ["bench-sigrid", "--tabla", "con", "--paginas", " , "],
+    ],
+)
+def test_f011_los_errores_van_a_stderr(cli, argumentos: list[str]) -> None:
+    """Los mensajes de error salen por stderr, no mezclados con el informe.
+
+    Importa de verdad: estos comandos se redirigen a un fichero para adjuntar
+    la medición, y un error escrito en stdout acabaría dentro del informe como
+    si fuera un resultado.
+    """
+    pg = PgQueNoEscribe(error_al_leer=RuntimeError("sin conexión"))
+    resultado = cli(pg).invoke(main.cli, argumentos)
+
+    assert resultado.exit_code == 2
+    assert "✗" in resultado.stderr
+    assert "✗" not in resultado.stdout
+
+
+def test_f011_r6_diagnostico_tiemod_rechaza_un_directorio_como_salida(cli, tmp_path) -> None:
+    """`--out` es un fichero. Un directorio es un error de uso, no un aviso."""
+    pg = PgConTiemod([estado_tiemod("con", 100, 46_263.5)])
+
+    resultado = cli(pg).invoke(
+        main.cli, ["diagnostico-tiemod", "--out", str(tmp_path)]
+    )
+
+    assert resultado.exit_code == 2
+
+
+def test_f011_r4_bench_sigrid_rechaza_un_directorio_como_salida(cli, tmp_path) -> None:
+    resultado = cli(PgQueNoEscribe()).invoke(
+        main.cli,
+        ["bench-sigrid", "--tabla", "con", "--paginas", "1000", "--out", str(tmp_path)],
+    )
+
+    assert resultado.exit_code == 2
+
+
+def test_f011_r7_comparar_con_exige_un_fichero_que_exista(cli, tmp_path) -> None:
+    """La huella anterior tiene que existir: si no, no hay nada que comparar.
+
+    Sin esta guardia, un nombre mal escrito daría una comparación vacía con
+    aspecto de resultado.
+    """
+    pg = PgConTiemod([estado_tiemod("con", 100, 46_263.5)])
+
+    inexistente = cli(pg).invoke(
+        main.cli, ["diagnostico-tiemod", "--comparar-con", str(tmp_path / "no_existe.csv")]
+    )
+    directorio = cli(pg).invoke(
+        main.cli, ["diagnostico-tiemod", "--comparar-con", str(tmp_path)]
+    )
+
+    assert inexistente.exit_code == 2
+    assert directorio.exit_code == 2
+
+
+def test_f011_r7_una_tabla_nueva_no_rompe_la_comparacion(cli, tmp_path) -> None:
+    """La foto anterior no tiene `dca` y la de ahora sí: no se consulta su umbral.
+
+    Es el caso de una tabla añadida al YAML entre dos cargas. Preguntar por su
+    máximo anterior reventaría con un KeyError.
+    """
+    from etl_sigrid.domain.tiemod import escribir_csv_tiemod
+
+    huella = tmp_path / "huella.csv"
+    escribir_csv_tiemod([estado_tiemod("con", 100, 46_263.5)], huella)
+
+    pg = PgConTiemod(
+        [estado_tiemod("con", 100, 46_263.5), estado_tiemod("dca", 7, 46_264.75)],
+        avanzadas={"con": 0},
+    )
+    resultado = cli(pg).invoke(
+        main.cli, ["diagnostico-tiemod", "--comparar-con", str(huella)]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert [t for t, _ in pg.umbrales_pedidos] == ["con"]
+    assert "dca" in resultado.output
+
+
+def test_f011_r4_bench_sigrid_exige_tabla(cli) -> None:
+    """Sin `--tabla` no hay nada que medir: error de uso, no un barrido vacío."""
+    resultado = cli(PgQueNoEscribe()).invoke(main.cli, ["bench-sigrid"])
+
+    assert resultado.exit_code == 2
+
+
+def test_f011_r4_bench_sigrid_ensena_sus_valores_por_defecto(cli) -> None:
+    """`--help` tiene que decir qué barre si no le dices nada.
+
+    El 20.000 del barrido por defecto es el cap real de DA-6: si no sale en la
+    ayuda, nadie sabe que se está midiendo justo en el límite de la API.
+    """
+    resultado = cli(PgQueNoEscribe()).invoke(main.cli, ["bench-sigrid", "--help"])
+
+    assert resultado.exit_code == 0
+    assert "1000,5000,10000,20000" in resultado.output
+    assert "default" in resultado.output.lower()
+
+
+def test_f011_r4_bench_sigrid_mide_una_pagina_por_tamano_si_no_se_pide_mas(cli) -> None:
+    """El `--repeticiones` por defecto es 1: medir no puede costar el doble."""
+    resultado = cli(PgQueNoEscribe()).invoke(
+        main.cli, ["bench-sigrid", "--tabla", "con", "--paginas", "1000,5000"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    api = ApiFalsaCli.ultima
+    assert api is not None
+    assert len(api.sql_enviado) == 2, "una petición por tamaño, ni una más"
+
+
+def test_f011_r7_un_csv_que_no_es_una_huella_se_distingue_de_un_fallo_de_bbdd(
+    cli, tmp_path
+) -> None:
+    """Pasar el CSV del bench a `--comparar-con` tiene su propio mensaje.
+
+    Los dos salen 2, pero «este fichero no es una huella» y «no pude leer el
+    datamart» mandan a mirar sitios distintos. Y la fotografía anterior se lee
+    ANTES de tocar la BBDD: no tiene sentido recorrer 20 M de filas para
+    después descubrir que el fichero de comparación no valía.
+    """
+    otro = tmp_path / "bench.csv"
+    otro.write_text("page_size;peticiones;filas\n1000;1;1000\n", encoding="utf-8-sig")
+
+    class PgQueNoDeberiaLeer(PgConTiemod):
+        def fetch_diagnostico_tiemod(self):  # type: ignore[override]
+            raise AssertionError("no se puede leer raw antes de validar la huella")
+
+    resultado = cli(PgQueNoDeberiaLeer([])).invoke(
+        main.cli, ["diagnostico-tiemod", "--comparar-con", str(otro)]
+    )
+
+    assert resultado.exit_code == 2
+    assert "no parece una huella" in resultado.stderr

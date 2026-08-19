@@ -295,3 +295,179 @@ def test_f011_el_perfil_es_inmutable_y_con_tuplas() -> None:
     assert isinstance(perfil.tablas, tuple)
     with pytest.raises(FrozenInstanceError):
         perfil.total_segundos = 1.0  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Bordes que la campaña de mutación dejó al descubierto
+#
+# Los tests de arriba fijaban el comportamiento; estos fijan los LÍMITES. Cada
+# uno nació de un mutante que sobrevivió a la primera campaña: el valor 1 donde
+# el código compara con 0, el `and` donde hay un `or`, el signo de una suma
+# acumulada. No son casos rebuscados: son justo los que separan «funciona» de
+# «funciona por casualidad».
+# ---------------------------------------------------------------------------
+
+
+def test_f011_r1_un_paso_de_un_segundo_exacto_si_tiene_ritmo() -> None:
+    """1 s no es «sin medir»: la guardia es `<= 0`, no `<= 1`."""
+    assert fila("ingest_raw", 1.0, 500).filas_por_segundo == pytest.approx(500.0)
+
+
+def test_f011_r1_una_carga_de_un_segundo_tiene_porcentajes() -> None:
+    """Igual con el total: una carga de 1 s reparte el 100 %, no el 0 %."""
+    perfil = perfil_de_carga([fila("ingest_raw", 1.0, 10)])
+
+    assert perfil.pct_del_total(perfil.pasos[0]) == pytest.approx(100.0)
+
+
+def test_f011_r2_el_techo_de_una_carga_de_un_segundo_no_es_cero() -> None:
+    perfil = perfil_de_carga([fila("ingest_raw", 1.0, 10)])
+
+    assert techo_de_mejora(perfil)[0].ahorro_pct == pytest.approx(100.0)
+
+
+def test_f011_r2_el_techo_es_inmutable() -> None:
+    """`TechoPaso` también es una medición cerrada."""
+    techo = techo_de_mejora(perfil_de_carga(CARGA_REAL))[0]
+
+    with pytest.raises(FrozenInstanceError):
+        techo.ahorro_min = 0.0  # type: ignore[misc]
+
+
+def test_f011_r3_un_uno_por_ciento_es_un_porcentaje_valido() -> None:
+    """El rango válido empieza justo por encima de 0, no de 1."""
+    perfil = perfil_de_carga(
+        [fila("ingest_raw.obrparpre", 60), fila("ingest_raw.con", 40)]
+    )
+
+    assert tablas_que_acumulan(perfil, 1.0) == ("obrparpre",)
+
+
+def test_f011_r3_una_ingesta_de_un_segundo_sigue_teniendo_cabeza() -> None:
+    """Objetivo por debajo de 1 s: sigue habiendo tablas que acumulan."""
+    perfil = perfil_de_carga(
+        [fila("ingest_raw.obrparpre", 0.6), fila("ingest_raw.con", 0.4)]
+    )
+
+    # 80 % de 1,0 s = 0,8 s: con 0,6 no basta, hacen falta las dos.
+    assert tablas_que_acumulan(perfil, 80.0) == ("obrparpre", "con")
+
+
+def test_f011_format_perfil_con_tablas_pero_sin_pasos_no_dice_sin_mediciones() -> None:
+    """`perfil-carga` sobre una carga a medias: hay tablas y no hay pasos.
+
+    Pasa de verdad —una ingesta que murió antes de cerrar su fila de paso— y el
+    desglose por tabla sigue siendo justo lo que se ha ido a mirar.
+    """
+    perfil = perfil_de_carga([fila("ingest_raw.obrparpre", 900, 13_760_000)])
+
+    texto = format_perfil(perfil)
+
+    assert "Sin mediciones" not in texto
+    assert "obrparpre" in texto
+
+
+def test_f011_format_perfil_escribe_el_nombre_pelado_de_la_tabla() -> None:
+    """En el bloque de tablas va `obrparpre`, no `ingest_raw.obrparpre`.
+
+    La columna es «tabla»: repetir el prefijo del paso en las 31 filas sobra, y
+    además rompería el ancho de la columna.
+    """
+    perfil = perfil_de_carga(
+        [fila("ingest_raw", 100), fila("ingest_raw.obrparpre", 100, 13_760_000)]
+    )
+
+    lineas = [linea for linea in format_perfil(perfil).splitlines()]
+    fila_tabla = [linea for linea in lineas if linea.startswith("obrparpre")]
+
+    assert fila_tabla, f"ninguna línea empieza por el nombre pelado: {lineas}"
+    assert not any(linea.startswith("ingest_raw.obrparpre") for linea in lineas)
+
+
+def test_f011_r3_el_pie_nombra_las_tablas_de_la_cabeza() -> None:
+    """La línea de R3 dice CUÁLES son, no solo cuántas."""
+    perfil = perfil_de_carga(
+        [
+            fila("ingest_raw", 100),
+            fila("ingest_raw.obrparpre", 50),
+            fila("ingest_raw.dcapro", 30),
+            fila("ingest_raw.con", 20),
+        ]
+    )
+
+    pie = [
+        linea for linea in format_perfil(perfil).splitlines() if linea.startswith("R3:")
+    ]
+
+    assert len(pie) == 1
+    assert "obrparpre, dcapro" in pie[0]
+    assert pie[0].startswith("R3: 2 tablas de 3 acumulan el 80 %")
+
+
+def test_f011_r3_el_singular_solo_se_usa_con_una_tabla() -> None:
+    """«1 tabla» y «2 tablas»: el plural se comprueba en los dos sentidos."""
+    una = perfil_de_carga(
+        [
+            fila("ingest_raw", 100),
+            fila("ingest_raw.obrparpre", 90),
+            fila("ingest_raw.con", 10),
+        ]
+    )
+    dos = perfil_de_carga(
+        [
+            fila("ingest_raw", 100),
+            fila("ingest_raw.obrparpre", 50),
+            fila("ingest_raw.dcapro", 30),
+            fila("ingest_raw.con", 20),
+        ]
+    )
+
+    assert "R3: 1 tabla de 2 acumulan" in format_perfil(una)
+    assert "R3: 2 tablas de 3 acumulan" in format_perfil(dos)
+
+
+def test_f011_format_perfil_acumula_hasta_el_cien_por_cien() -> None:
+    """La columna `%_acum` suma hacia arriba y cierra en 100,0.
+
+    Si acumulara restando —o si el porcentaje se calculara con división
+    entera— la última fila no daría 100,0 y la tabla mentiría en silencio.
+    """
+    perfil = perfil_de_carga(
+        [
+            fila("ingest_raw", 100),
+            fila("ingest_raw.obrparpre", 75),
+            fila("ingest_raw.con", 25),
+        ]
+    )
+
+    lineas = format_perfil(perfil).splitlines()
+    obrparpre = next(x for x in lineas if x.startswith("obrparpre"))
+    con = next(x for x in lineas if x.startswith("con "))
+
+    # 75 % y 25 % de la ingesta; acumulado 75 % y 100 %.
+    assert obrparpre.split()[-2:] == ["75.0", "75.0"] or "75.0" in obrparpre
+    assert "100.0" in con, f"la última fila no cierra en 100 %: {con}"
+    assert "25.0" in con
+
+
+def test_f011_format_perfil_con_ingesta_de_un_segundo_reparte_de_verdad() -> None:
+    """Ingesta total de 1 s: los porcentajes siguen siendo 100 %, no 0 %."""
+    perfil = perfil_de_carga(
+        [fila("ingest_raw", 1.0), fila("ingest_raw.con", 1.0)]
+    )
+
+    con = next(x for x in format_perfil(perfil).splitlines() if x.startswith("con "))
+
+    assert "100.0" in con
+
+
+def test_f011_format_perfil_con_tablas_a_cero_no_divide_por_cero() -> None:
+    """Ingesta que no llegó a medir: 0 % en vez de una excepción."""
+    perfil = perfil_de_carga(
+        [fila("ingest_raw", 10), fila("ingest_raw.con", 0.0)]
+    )
+
+    texto = format_perfil(perfil)
+
+    assert "con" in texto
+    assert "R3: 0 tablas" in texto
