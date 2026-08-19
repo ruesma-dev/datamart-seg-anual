@@ -34,6 +34,20 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
                                         Sale 0 si sí, 1 si no, 2 si no puede leer
     python main.py check-frescura     - ¿Cuánto hace que no hay un build_mart
                                         completo? Sale 0 solo si está FRESCO
+
+Medición del coste de la carga (F-011). Los tres son de SOLO LECTURA y ninguno
+escribe en _meta; el «medir antes de optimizar» de esa feature vive aquí:
+
+    python main.py perfil-carga       - ¿Dónde se va el tiempo? Desglose por
+                                        paso y por tabla, techo de mejora y las
+                                        tablas que acumulan el 80 % de la ingesta
+    python main.py diagnostico-tiemod - ¿Sirve `tiemod` como watermark? Estado
+                                        de _source_tiemod por tabla; con
+                                        --comparar-con, veredicto SIRVE /
+                                        NO SIRVE / SIN EVIDENCIA entre dos cargas
+    python main.py bench-sigrid       - ¿Cuánto rinde cada tamaño de página
+                                        contra sigrid-api? Lee de producción:
+                                        se lanza a mano y en el momento elegido
 """
 
 from __future__ import annotations
@@ -72,6 +86,13 @@ from etl_sigrid.domain.extraccion import (  # noqa: E402
 from etl_sigrid.domain.perfil_carga import (  # noqa: E402
     format_perfil,
     perfil_de_carga,
+)
+from etl_sigrid.domain.tiemod import (  # noqa: E402
+    comparar_tiemod,
+    escribir_csv_tiemod,
+    format_comparacion,
+    format_diagnostico,
+    leer_csv_tiemod,
 )
 from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger  # noqa: E402
 from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
@@ -666,6 +687,82 @@ def perfil_carga(batch_id: str | None) -> None:
         sys.exit(2)
 
     click.echo(format_perfil(perfil_de_carga(filas, batch_id=batch_medido)))
+
+
+@cli.command("diagnostico-tiemod")
+@click.option(
+    "--out",
+    "salida",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Fichero CSV donde escribir la fotografía. Es lo que después se pasa "
+         "a --comparar-con tras la siguiente carga.",
+)
+@click.option(
+    "--comparar-con",
+    "anterior",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Fotografía de una carga anterior. Activa el veredicto por tabla.",
+)
+def diagnostico_tiemod(salida: Path | None, anterior: Path | None) -> None:
+    """
+    ¿Sirve `tiemod` como watermark? SOLO LECTURA sobre el datamart (R6, R7).
+
+    Sin argumentos, fotografía `_source_tiemod` en cada tabla de `raw`: filas,
+    nulos, mínimo, máximo, valores distintos y porcentaje de nulos. Con
+    `--comparar-con`, contrasta esa fotografía con la de una carga anterior y
+    emite el veredicto de R7 por tabla: `SIRVE`, `NO SIRVE` o `SIN EVIDENCIA`.
+
+    No hace falta volver a leer Sigrid: los valores de su marca de modificación
+    ya están dentro del datamart desde la primera carga. Lo que sí hace falta
+    son DOS cargas, y por eso el veredicto sin `--comparar-con` no existe.
+
+    Ojo con el coste: recorre cada tabla de `raw` entera (hay 20 M de filas).
+    Es un comando de diagnóstico que se lanza a mano, nunca un paso del
+    pipeline, y no escribe una sola fila en `_meta` (R25).
+    """
+    pg = _get_pg()
+
+    try:
+        estados = pg.fetch_diagnostico_tiemod()
+        avanzadas = _filas_avanzadas(pg, estados, anterior)
+    except Exception as e:  # el código 2 es «no se pudo leer»
+        click.secho(f"✗ No se pudo leer el estado de raw: {e}", fg="red", err=True)
+        sys.exit(2)
+
+    if anterior is None:
+        click.echo(format_diagnostico(estados))
+    else:
+        click.echo(
+            format_comparacion(
+                comparar_tiemod(leer_csv_tiemod(anterior), estados, avanzadas)
+            )
+        )
+
+    if salida is not None:
+        escribir_csv_tiemod(estados, salida)
+        click.secho(f"✓ Fotografía escrita en {salida}", fg="green")
+
+
+def _filas_avanzadas(
+    pg: PostgresClient, estados: list, anterior: Path | None
+) -> dict[str, int]:
+    """Filas por tabla cuya marca supera el máximo de la fotografía anterior.
+
+    Es una consulta más por tabla, y solo se lanza cuando hay con qué comparar:
+    sin fotografía anterior no hay umbral, y contar «desde el principio» sería
+    contar la tabla entera para nada.
+    """
+    if anterior is None:
+        return {}
+
+    previos = {e.tabla: e for e in leer_csv_tiemod(anterior)}
+    return {
+        e.tabla: pg.fetch_filas_desde_tiemod(e.tabla, previos[e.tabla].maximo)
+        for e in estados
+        if e.tabla in previos and previos[e.tabla].maximo is not None
+    }
 
 
 @cli.command("bench-sigrid")

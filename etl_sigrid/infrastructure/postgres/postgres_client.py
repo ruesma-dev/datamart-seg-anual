@@ -32,6 +32,7 @@ from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
 from etl_sigrid.domain.ejecucion import MOTIVO_HUERFANA
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.domain.perfil_carga import FilaPerfil
+from etl_sigrid.domain.tiemod import COLUMNA_TIEMOD, EstadoTiemod
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
@@ -176,6 +177,40 @@ WHERE batch_id = COALESCE(
       )
 ORDER BY started_at, id
 """
+
+# --- Diagnóstico de `tiemod` (F-011, R6-R7) ---------------------------------
+#
+# SOLO LECTURA sobre `raw`. Responde si la marca de modificación de Sigrid
+# sirve como watermark **sin volver a leer Sigrid**: sus valores ya están
+# guardados en `_source_tiemod`, carga tras carga, desde que existe
+# `copy_rows(tiemod_column=...)`.
+#
+# El COUNT(DISTINCT) no es gratis —obliga a recorrer la tabla entera— y por eso
+# esto es un comando que se lanza a mano, no un paso del pipeline.
+SQL_TABLAS_CON_TIEMOD = """
+SELECT table_name
+FROM information_schema.columns
+WHERE table_schema = 'raw' AND column_name = %(columna)s
+ORDER BY table_name
+"""
+
+#: Plantilla: la tabla y la columna se interpolan con `psycopg.sql.Identifier`,
+#: nunca por concatenación. Va como constante para que un test pueda leer
+#: exactamente el SQL que se envía, igual que hace F-024.
+SQL_DIAGNOSTICO_TIEMOD = """
+SELECT COUNT(*)                                  AS filas,
+       COUNT(*) FILTER (WHERE {col} IS NULL)     AS nulos,
+       MIN({col})                                AS minimo,
+       MAX({col})                                AS maximo,
+       COUNT(DISTINCT {col})                     AS distintos
+FROM raw.{tabla}
+"""
+
+#: Filas cuya marca supera la de la fotografía anterior. Es la traducción
+#: operativa de «cuántas filas cambiaron» de R7: si `tiemod` es una marca de
+#: modificación, toda fila tocada desde la foto anterior está por encima de su
+#: máximo. Si no lo es, este recuento sale 0, que es justo la señal de NO SIRVE.
+SQL_FILAS_DESDE_TIEMOD = "SELECT COUNT(*) FROM raw.{tabla} WHERE {col} > %(umbral)s"
 
 SQL_RUN_START = """
 INSERT INTO _meta.etl_runs (stage, step, started_at, status, batch_id)
@@ -1010,6 +1045,55 @@ class PostgresClient:
                 )
             )
         return medido, perfil
+
+    def fetch_diagnostico_tiemod(self) -> list[EstadoTiemod]:
+        """
+        Estado de `_source_tiemod` en cada tabla de `raw` que la tenga (R6).
+
+        Una consulta de agregación por tabla, en una sola conexión. Es cara
+        —recorre cada tabla entera— y por eso solo la lanza el comando
+        `diagnostico-tiemod`, nunca el pipeline.
+        """
+        columna = sql.Identifier(COLUMNA_TIEMOD)
+        estados: list[EstadoTiemod] = []
+
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_TABLAS_CON_TIEMOD, {"columna": COLUMNA_TIEMOD})
+            tablas = [fila[0] for fila in cur.fetchall()]
+
+            for tabla in tablas:
+                cur.execute(
+                    sql.SQL(SQL_DIAGNOSTICO_TIEMOD).format(
+                        col=columna, tabla=sql.Identifier(tabla)
+                    )
+                )
+                fila = cur.fetchone()
+                if fila is None:  # defensivo: una agregación siempre devuelve fila
+                    continue
+                estados.append(
+                    EstadoTiemod(
+                        tabla=tabla,
+                        filas=int(fila[0] or 0),
+                        nulos=int(fila[1] or 0),
+                        minimo=None if fila[2] is None else float(fila[2]),
+                        maximo=None if fila[3] is None else float(fila[3]),
+                        distintos=int(fila[4] or 0),
+                    )
+                )
+        return estados
+
+    def fetch_filas_desde_tiemod(self, tabla: str, umbral: float) -> int:
+        """Cuántas filas de `raw.<tabla>` tienen la marca por encima de `umbral` (R7)."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                sql.SQL(SQL_FILAS_DESDE_TIEMOD).format(
+                    tabla=sql.Identifier(tabla),
+                    col=sql.Identifier(COLUMNA_TIEMOD),
+                ),
+                {"umbral": umbral},
+            )
+            fila = cur.fetchone()
+            return int(fila[0]) if fila else 0
 
     def record_run_completed(
         self,

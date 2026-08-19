@@ -31,6 +31,7 @@ BATCH = "20260819T020016Z-327ef0"
 COMANDOS_NUEVOS_DE_LECTURA = (
     ("perfil-carga", []),
     ("bench-sigrid", ["--tabla", "con", "--paginas", "1000"]),
+    ("diagnostico-tiemod", []),
 )
 
 
@@ -59,6 +60,14 @@ class PgQueNoEscribe:
         if self._error_al_leer is not None:
             raise self._error_al_leer
         return self._perfil
+
+    def fetch_diagnostico_tiemod(self) -> list:
+        if self._error_al_leer is not None:
+            raise self._error_al_leer
+        return []
+
+    def fetch_filas_desde_tiemod(self, tabla: str, umbral: float) -> int:
+        return 0
 
     # --- escrituras prohibidas -----------------------------------------
     def abortar_runs_huerfanos(self, *args: object, **kwargs: object) -> list:
@@ -431,3 +440,190 @@ def test_f011_r24_ni_un_secreto_en_la_salida_del_bench(cli) -> None:
     )
 
     assert "clave-de-mentira" not in resultado.output
+
+
+# ---------------------------------------------------------------------------
+# R6, R7 · `diagnostico-tiemod` fotografía y compara, sin escribir en _meta
+# ---------------------------------------------------------------------------
+
+
+def estado_tiemod(tabla: str, filas: int, maximo: float | None, nulos: int = 0):
+    from etl_sigrid.domain.tiemod import EstadoTiemod
+
+    return EstadoTiemod(
+        tabla=tabla,
+        filas=filas,
+        nulos=nulos,
+        minimo=None if maximo is None else 40_000.0,
+        maximo=maximo,
+        distintos=0 if maximo is None else 10,
+    )
+
+
+class PgConTiemod(PgQueNoEscribe):
+    """Doble que además responde al diagnóstico de `tiemod`."""
+
+    def __init__(self, estados: list, avanzadas: dict[str, int] | None = None) -> None:
+        super().__init__()
+        self._estados = estados
+        self._avanzadas = avanzadas or {}
+        self.umbrales_pedidos: list[tuple[str, float]] = []
+
+    def fetch_diagnostico_tiemod(self) -> list:
+        return list(self._estados)
+
+    def fetch_filas_desde_tiemod(self, tabla: str, umbral: float) -> int:
+        self.umbrales_pedidos.append((tabla, umbral))
+        return self._avanzadas.get(tabla, 0)
+
+
+def test_f011_r6_diagnostico_tiemod_fotografia_las_tablas(cli) -> None:
+    """Sin `--comparar-con` imprime el estado por tabla y nada más."""
+    pg = PgConTiemod([estado_tiemod("con", 2_172_969, 46_263.5)])
+    resultado = cli(pg).invoke(main.cli, ["diagnostico-tiemod"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "con" in resultado.output
+    assert "2,172,969" in resultado.output
+    # Sin fotografía anterior no se lanza ni una consulta de recuento.
+    assert pg.umbrales_pedidos == []
+
+
+def test_f011_r6_diagnostico_tiemod_escribe_la_huella(cli, tmp_path) -> None:
+    """`--out` deja el CSV que después alimenta la comparación de R7."""
+    salida = tmp_path / "huella_tiemod_1.csv"
+    pg = PgConTiemod([estado_tiemod("con", 100, 46_263.5)])
+
+    resultado = cli(pg).invoke(main.cli, ["diagnostico-tiemod", "--out", str(salida)])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert salida.exists()
+    assert salida.read_text(encoding="utf-8-sig").splitlines()[0].startswith("tabla;")
+
+
+def test_f011_r7_diagnostico_tiemod_compara_dos_cargas(cli, tmp_path) -> None:
+    """Con dos fotografías sale el veredicto por tabla, y el recuento real.
+
+    El umbral de la consulta de recuento es el máximo de la foto ANTERIOR: es
+    lo que convierte «cuántas filas cambiaron» en un número medible.
+    """
+    from etl_sigrid.domain.tiemod import escribir_csv_tiemod
+
+    huella = tmp_path / "huella_tiemod_1.csv"
+    escribir_csv_tiemod([estado_tiemod("con", 100, 46_263.5)], huella)
+
+    pg = PgConTiemod([estado_tiemod("con", 118, 46_264.75)], avanzadas={"con": 18})
+    resultado = cli(pg).invoke(
+        main.cli, ["diagnostico-tiemod", "--comparar-con", str(huella)]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "SIRVE" in resultado.output
+    assert pg.umbrales_pedidos == [("con", 46_263.5)]
+
+
+def test_f011_r7_diagnostico_tiemod_sin_evidencia_si_nada_cambio(cli, tmp_path) -> None:
+    """Dos fotos iguales: `SIN EVIDENCIA`, que no es lo mismo que `NO SIRVE`."""
+    from etl_sigrid.domain.tiemod import escribir_csv_tiemod
+
+    huella = tmp_path / "huella.csv"
+    escribir_csv_tiemod([estado_tiemod("con", 100, 46_263.5)], huella)
+
+    pg = PgConTiemod([estado_tiemod("con", 100, 46_263.5)])
+    resultado = cli(pg).invoke(
+        main.cli, ["diagnostico-tiemod", "--comparar-con", str(huella)]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "SIN EVIDENCIA" in resultado.output
+
+
+def test_f011_r6_diagnostico_tiemod_sale_2_si_no_puede_leer(cli) -> None:
+    class PgRoto(PgConTiemod):
+        def fetch_diagnostico_tiemod(self):  # type: ignore[override]
+            raise RuntimeError("sin conexión")
+
+    resultado = cli(PgRoto([])).invoke(main.cli, ["diagnostico-tiemod"])
+
+    assert resultado.exit_code == 2
+    assert "sin conexión" in resultado.output
+
+
+def test_f011_r25_diagnostico_tiemod_no_escribe_en_meta(cli) -> None:
+    """Mismo doble que revienta ante cualquier escritura (R25)."""
+    pg = PgConTiemod([estado_tiemod("con", 100, 46_263.5)])
+    resultado = cli(pg).invoke(main.cli, ["diagnostico-tiemod"])
+
+    assert resultado.exit_code == 0, resultado.output
+
+
+def test_f011_r23_el_sql_del_diagnostico_es_de_lectura() -> None:
+    """Las tres consultas de tiemod, leídas como texto: ni una escritura."""
+    from etl_sigrid.infrastructure.postgres.postgres_client import (
+        SQL_DIAGNOSTICO_TIEMOD,
+        SQL_FILAS_DESDE_TIEMOD,
+        SQL_TABLAS_CON_TIEMOD,
+    )
+
+    for consulta in (
+        SQL_TABLAS_CON_TIEMOD,
+        SQL_DIAGNOSTICO_TIEMOD,
+        SQL_FILAS_DESDE_TIEMOD,
+    ):
+        normalizada = " ".join(consulta.split()).upper()
+        assert normalizada.startswith("SELECT")
+        for prohibida in ("INSERT", "UPDATE", "DELETE", "TRUNCATE", "DROP", "ALTER"):
+            assert prohibida not in normalizada
+
+
+def test_f011_r6_el_diagnostico_interpola_la_tabla_como_identificador() -> None:
+    """La tabla viaja por `sql.Identifier`, nunca concatenada.
+
+    Los nombres vienen del catálogo de la propia base, así que el riesgo real
+    es bajo; pero una plantilla con `%s` para un nombre de tabla es el error
+    que después nadie revisa.
+    """
+    from etl_sigrid.infrastructure.postgres.postgres_client import (
+        SQL_DIAGNOSTICO_TIEMOD,
+        SQL_FILAS_DESDE_TIEMOD,
+    )
+
+    assert "{tabla}" in SQL_DIAGNOSTICO_TIEMOD and "{col}" in SQL_DIAGNOSTICO_TIEMOD
+    assert "{tabla}" in SQL_FILAS_DESDE_TIEMOD
+    assert "%(umbral)s" in SQL_FILAS_DESDE_TIEMOD
+
+
+def test_f011_r6_fetch_diagnostico_tiemod_traduce_las_filas() -> None:
+    """El mapeo desde el cursor, sin BBDD: catálogo y luego una agregación."""
+    from etl_sigrid.domain.tiemod import EstadoTiemod
+    from tests.test_f019_tramos import CursorFalso, cliente_con
+
+    class CursorPorConsulta(CursorFalso):
+        """Devuelve el catálogo la primera vez y la agregación después."""
+
+        def __init__(self) -> None:
+            super().__init__(filas=[])
+            self.respuestas = [
+                [("con",)],
+                [(100, 4, 1.5, 46_264.0, 37)],
+            ]
+
+        def execute(self, sql: str, params: object = None) -> None:
+            super().execute(str(sql), params)
+            self.filas = self.respuestas.pop(0) if self.respuestas else []
+
+    cliente, _ = cliente_con(CursorPorConsulta())
+
+    assert cliente.fetch_diagnostico_tiemod() == [
+        EstadoTiemod(
+            tabla="con", filas=100, nulos=4, minimo=1.5, maximo=46_264.0, distintos=37
+        )
+    ]
+
+
+def test_f011_r7_fetch_filas_desde_tiemod_devuelve_el_recuento() -> None:
+    from tests.test_f019_tramos import CursorFalso, cliente_con
+
+    cliente, _ = cliente_con(CursorFalso(filas=[(18,)]))
+
+    assert cliente.fetch_filas_desde_tiemod("con", 46_263.5) == 18
