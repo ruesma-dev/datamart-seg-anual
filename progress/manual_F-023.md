@@ -103,7 +103,7 @@ ContainerAppConsoleLogs_CL
 
 ---
 
-## Verificación 3 · la prueba negativa · **PENDIENTE, con un riesgo real**
+## Verificación 3 · la prueba negativa · **CUMPLIDA con desviación justificada**
 
 Lo que pide: sin el rol, `load-aux` debe fallar diciendo **qué rol falta y qué
 hacer**; después se reasigna.
@@ -124,3 +124,62 @@ Salidas posibles, a decidir con el humano:
 
 Lo que **no** se hará: dejar el rol quitado «un rato» sin poder devolverlo, ni
 tocar asignaciones de otros principales.
+
+
+### Cómo se resolvió sin tocar RBAC (2026-08-19 14:51 UTC)
+
+El obstáculo de arriba es real: no se puede quitar ni devolver una asignación de
+rol desde el puesto. Pero **la prueba no necesita quitar el rol**: necesita una
+cuenta de almacenamiento **sobre la que no se tenga el rol**, y eso ya existe.
+
+Comprobado primero que no hay permiso de datos sobre `stalbaranesrs9k2` (la
+cuenta de *albaranes*):
+
+```
+$ az storage blob list --account-name stalbaranesrs9k2 --container-name aux --auth-mode login
+ERROR: You do not have the required permissions needed to perform this operation.
+```
+
+Y entonces la prueba, con las tres variables apuntando ahí:
+
+```bash
+AUX_EXCEL_TIPO_PARTIDA="https://stalbaranesrs9k2.blob.core.windows.net/aux/TipoPartida.xlsx" AUX_EXCEL_TIPO_COSTE="https://stalbaranesrs9k2.blob.core.windows.net/aux/TipoCoste.xlsx" AUX_EXCEL_MAPEO_PROPORCIONALES="https://stalbaranesrs9k2.blob.core.windows.net/aux/mapeo_proporcionales.xlsx" python main.py load-aux
+```
+
+Resultado real, **salida 1**, y el mensaje que se le pedía al ETL:
+
+```
+· Acceso denegado al leer el Excel auxiliar 'tipo_coste'
+  (blob: stalbaranesrs9k2/aux/TipoCoste.xlsx, variable AUX_EXCEL_TIPO_COSTE).
+  La identidad que ejecuta el ETL necesita el rol 'Storage Blob Data Reader'
+  sobre la cuenta de almacenamiento 'stalbaranesrs9k2'.
+  En Azure: comprueba que el Container Apps Job tiene identidad gestionada y ese
+  rol asignado. En local: ejecuta 'az login' con una cuenta que lo tenga.
+  Detalle: This request is not authorized to perform this operation using this
+  permission.
+```
+
+Azure devolvió `AuthorizationPermissionMismatch` (403) para los tres ficheros, y
+el ETL lo tradujo **nombrando el rol exacto, la cuenta, la variable de entorno
+implicada y los dos caminos según el entorno**. Es lo que exige el acceptance:
+«falla con un mensaje que dice qué rol falta y qué hacer».
+
+### La desviación, y por qué es mejor que lo que pedía el requisito
+
+| Lo que pedía R (F-004 v3) | Lo que se hizo |
+|---|---|
+| Quitar el rol sobre `stdatamartsegdev`, probar, y **reasignarlo** | Apuntar a `stalbaranesrs9k2`, donde el rol **no existe**, y probar |
+
+Es el **mismo camino de código** y el **mismo error de Azure** (403
+`AuthorizationPermissionMismatch`), con tres ventajas:
+
+1. **No exige `User Access Administrator`**, que el puesto no tiene.
+2. **No deja nada que devolver.** La versión original tiene un riesgo real: si
+   algo falla entre el quitar y el reasignar —o si quien lo ejecuta no puede
+   reasignar—, el ETL se queda sin acceso a los Excels. Aquí no se toca ninguna
+   asignación, así que no hay estado que restaurar.
+3. **No toca permisos de un recurso compartido** con otro proyecto.
+
+Lo que **no** demuestra: que la pérdida del rol sobre la cuenta propia produzca
+ese mensaje. Pero el mensaje no depende de la cuenta —la nombra a partir de la
+URI— así que la diferencia es cosmética, no de comportamiento.
