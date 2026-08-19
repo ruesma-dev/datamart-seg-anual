@@ -192,7 +192,7 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       Las copias viejas en `kv-albaranes-rs9k2` **no se borran** hasta que el
       job haya funcionado (después de T24).
 
-- [ ] **T23**: Crear el job. **BLOQUEADA POR `F-019`** (build de
+- [x] **T23**: Crear el job. **BLOQUEADA POR `F-019`** (build de
       `stg.plan_mensual` por tramos): el job nocturno ejecuta la misma carga
       completa que llenó el disco del servidor compartido el 2026-08-09. La
       opción B ya está elegida —es `F-019`—, así que lo que falta no es
@@ -202,24 +202,68 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       clave a `true`, y hay un test que lo impide si `F-019` no está `done`.
       **Verificación**: MANUAL (humano): `powershell -NoProfile -File infra/80_create_job.ps1` y
       comprobar con **R21**.
+      **HECHA el 2026-08-17**, con `F-019` ya cerrada (2026-08-17) y
+      `jobProgramable: true`: job `caj-datamart-seg-dev` creado y **programado**
+      (`0 2 * * *` UTC), con identidad gestionada y los secretos por referencia
+      a Key Vault. Costó cuatro intentos y sacó un bug real de
+      `00_vars.ps1` (`$TAG` machacaba el parámetro `-Tag`), corregido.
+      Evidencia: `progress/current.md` §«Tanda 2 EJECUTADA el 2026-08-17».
 
-- [ ] **T24**: Ejecución de prueba y verificación de la build.
+- [x] **T24**: Ejecución de prueba y verificación de la build.
       **Verificación**: MANUAL (humano): los dos comandos de **R22**
       (`job start` normal y `job start --command python --args main.py,version`).
       Correcto si la ejecución completa termina `Succeeded` y la salida de
       `version` coincide con el tag de T21.
+      **HECHA el 2026-08-17**: ejecución `Succeeded` y `version` coincidiendo
+      con el tag desplegado. Hallazgo anotado: `--args main.py,version` llega
+      como **un solo argumento**; hay que pasarlos separados. Evidencia:
+      `progress/current.md` §«Tanda 2».
 
-- [ ] **T25**: Verificar los logs en Log Analytics.
+- [x] **T25**: Verificar los logs en Log Analytics.
       **Verificación**: MANUAL (humano): consulta de **R24**. Si el nombre de
       columna no coincide, comprobar `ContainerAppConsoleLogs_CL | getschema` y
       corregir el KQL de `infra/README.md`.
+      **HECHA el 2026-08-17** y **reconfirmada el 2026-08-19**: la consulta del
+      README devuelve las líneas reales del job. El nombre de columna **no**
+      coincidía con el que decía el README (`ContainerAppName_s` no existe para
+      un job; la real es `ContainerJobName_s`): corregido en el README por
+      F-024 (T3). Evidencias: `progress/current.md` §«Tanda 2» y
+      `progress/manual_F-023.md` §«Verificación 2».
 
-- [ ] **T26**: Crear la alerta y **probar que el correo llega**.
+- [x] **T26**: Crear la alerta y **probar que el correo llega**.
       **Verificación**: MANUAL (humano): `powershell -NoProfile -File infra/90_create_alert.ps1`
       (antes, la comprobación de métricas de §6:
       `az monitor metrics list-definitions --resource <job-id> -o table`), y
       después la prueba de fallo forzado de **R25**. Correcto **solo si se
       recibe el correo**; anotar hora del fallo y hora de recepción.
+      **HECHA el 2026-08-17**: fallo provocado a las 20:46:24 local, correo
+      «Activated» recibido a las 20:51:58 (**5 min 34 s**, dentro de los 15 min
+      de R25), confirmado por el humano. Dos hallazgos: la métrica real es
+      `Executions` con dimensión `state` (la documentada no existe, script
+      corregido) y **DA-3 resuelta**: el grupo de acción de la landing zone
+      está vacío, así que la alerta lleva su propio destinatario por parámetro,
+      nunca en el repositorio. Horas anotadas en `progress/current.md`
+      §«Tanda 2».
+
+## Las tres verificaciones heredadas de F-004 · CUMPLIDAS el 2026-08-19
+
+No son tareas de esta spec —F-004 las dejó pendientes porque necesitaban esta
+infraestructura, y se ejecutaron en **F-023**—, pero se anotan aquí porque son
+lo último que faltaba del despliegue y el bloque 5 no está completo sin ellas.
+**Evidencias, con comando y salida real, en `progress/manual_F-023.md`.**
+
+- [x] **V1**: `load-aux` desde el puesto con `az login` → `SUCCESS` con
+      `origen=blob` para los tres ficheros (2026-08-19 14:42 UTC).
+- [x] **V2**: una ejecución del job con identidad gestionada deja en Log
+      Analytics el evento `aux_file_read` de los tres con `origen=blob` y
+      **ninguna ruta local** (2026-08-19 10:55 UTC).
+- [x] **V3**: sin el rol, `load-aux` falla (salida 1) con un mensaje que nombra
+      el rol, la cuenta, la variable implicada y qué hacer en cada entorno
+      (2026-08-19 14:51 UTC). **Desviación justificada**: en vez de retirar el
+      rol sobre la cuenta propia —que exige `User Access Administrator`, que el
+      puesto no tiene, y deja una asignación que devolver— se apuntó a otra
+      cuenta sobre la que no hay rol. Mismo camino de código y mismo 403
+      `AuthorizationPermissionMismatch`, sin tocar ninguna asignación.
 
 ## Cierre
 

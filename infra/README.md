@@ -220,10 +220,17 @@ verificación). Hasta entonces son la vuelta atrás.
 ### 4. Rol de plano de datos sobre la cuenta de almacenamiento
 
 La cuenta se crea **sin clave compartida**, así que ni las herramientas
-gráficas entran con la clave: todo el acceso es por identidad. Para crear el
-contenedor o subir un Excel hace falta un rol de datos (`Storage Blob Data
-Contributor`) sobre la cuenta; ser Owner de la suscripción **no** basta. Es
-deliberado, y es lo que tendrá que resolver la feature de subida de Excels.
+gráficas entran con la clave: todo el acceso es por identidad. Ser Owner de la
+suscripción **no** basta; hacen falta roles de datos, y son dos distintos:
+
+- **`Storage Blob Data Contributor`** para **crear el contenedor o subir un
+  Excel**. Es un permiso de escritura y solo se necesita al preparar o
+  reemplazar los ficheros.
+- **`Storage Blob Data Reader`** para **leerlos**, que es lo único que hace el
+  ETL. Lo tienen la identidad gestionada del job y la persona que lo ejecuta
+  desde el puesto (ver «Los Excels auxiliares se leen del blob», abajo).
+
+Los tres Excels **ya están subidos** al contenedor `aux` del entorno `dev`.
 
 ---
 
@@ -347,24 +354,86 @@ python main.py check-frescura     # ¿cuánto hace del último build_mart comple
 python main.py timings --last 1   # avisa al pie de las filas RUNNING huérfanas
 ```
 
-## Verificaciones heredadas de F-004 (lectura de los Excels desde blob)
+## Los Excels auxiliares se leen del blob, no del disco
 
-F-004 dejó tres comprobaciones bloqueadas porque necesitaban esta
-infraestructura. Se hacen después del paso 7:
+Los tres libros que consume el paso `load_aux` —`TipoPartida.xlsx`,
+`TipoCoste.xlsx` y `mapeo_proporcionales.xlsx`— **no viven en el puesto de
+nadie**: viven en el contenedor `aux` de la cuenta de almacenamiento del
+proyecto (`storageAccount` en `infra/env/<entorno>.json`; en `dev`,
+`stdatamartsegdev`), que crea el paso 5 (`40_create_storage.ps1`).
 
-1. Desde el puesto, con `az login` y el rol de lectura de blobs, apuntar
-   `AUX_EXCEL_*` a los blobs reales y ejecutar `python main.py load-aux`:
-   debe dar `SUCCESS` con `origen=blob`.
-2. Desde el job, con su identidad gestionada: lanzar una ejecución y buscar en
-   los logs el evento `aux_file_read` con los tres ficheros y **ninguna ruta
-   local**.
-3. Prueba negativa: retirar el rol, repetir `load-aux` y comprobar que el error
-   dice qué rol falta y qué hacer. **Volver a asignarlo después.**
+| Pieza | Dónde está |
+|---|---|
+| Los ficheros | contenedor `aux` de la cuenta de almacenamiento del entorno |
+| Qué los apunta | `AUX_EXCEL_TIPO_PARTIDA`, `AUX_EXCEL_TIPO_COSTE`, `AUX_EXCEL_MAPEO_PROPORCIONALES` |
+| Con qué valor | la URI del blob: `https://<cuenta>.blob.core.windows.net/aux/<fichero>.xlsx` |
+| Qué rol hace falta | **`Storage Blob Data Reader`** sobre la cuenta, para la identidad que ejecute el ETL |
+
+El código admite las dos formas —ruta local o URI de blob— y decide por el
+valor de la variable (F-004); lo que se despliega en Azure es la segunda. **No
+se admiten SAS ni claves de cuenta**: la cuenta se crea sin clave compartida y
+todo el acceso es por identidad.
+
+Cómo se autentica cada entorno:
+
+- **En el job**: con su **identidad gestionada** (`id-...`, paso 7), que tiene
+  el `Storage Blob Data Reader` entre sus tres roles. Nada que teclear.
+- **En el puesto**: con el `az login` de la persona, que necesita ese mismo rol
+  sobre la cuenta. Sin él, el ETL falla con un mensaje que nombra el rol, la
+  cuenta y la variable implicada.
+
+### ⚠ Un `SUCCESS` de `load-aux` en el puesto no prueba que leyera del blob
+
+El `.env` del puesto **puede seguir apuntando a rutas locales** (una carpeta de
+OneDrive, por ejemplo). En ese caso `python main.py load-aux` termina en
+`SUCCESS`, con los tres ficheros leídos, y **no ha tocado Azure**: costó un
+intento fallido de verificación el 2026-08-19.
+
+Lo que hay que mirar es el campo **`origen`** del evento `aux_file_read`:
+
+```
+origen=local  ubicacion='ruta local: C:/.../TipoPartida.xlsx'   <- NO vale
+origen=blob   ubicacion='blob: <cuenta>/aux/TipoPartida.xlsx'   <- esto sí
+```
+
+Segunda pista, barata: leer del blob tarda **segundos**; un `load-aux`
+instantáneo está leyendo de disco.
+
+Para comprobarlo sin tocar `.env` —que es intocable por regla del proyecto—, se
+pasan las tres variables **en la propia invocación**:
+
+```bash
+AUX_EXCEL_TIPO_PARTIDA="https://<cuenta>.blob.core.windows.net/aux/TipoPartida.xlsx" \
+AUX_EXCEL_TIPO_COSTE="https://<cuenta>.blob.core.windows.net/aux/TipoCoste.xlsx" \
+AUX_EXCEL_MAPEO_PROPORCIONALES="https://<cuenta>.blob.core.windows.net/aux/mapeo_proporcionales.xlsx" \
+python main.py load-aux
+```
 
 Aviso: `azure-identity` y `azure-storage-blob` están declaradas en
-`requirements.txt` pero pueden no estar **instaladas** en el puesto. La
-comprobación 1 falla con `ModuleNotFoundError` hasta que se ejecute
+`requirements.txt` pero pueden no estar **instaladas** en el puesto. La lectura
+de blob falla con `ModuleNotFoundError` hasta que se ejecute
 `pip install -r requirements.txt`.
+
+### Las tres verificaciones heredadas de F-004 · CUMPLIDAS el 2026-08-19
+
+F-004 dejó tres comprobaciones bloqueadas porque necesitaban esta
+infraestructura. Se hicieron en F-023, después del paso 7. **Evidencias con
+comando y salida real en `progress/manual_F-023.md`**; aquí solo el resultado:
+
+| # | Qué se pedía | Resultado |
+|---|---|---|
+| 1 | `load-aux` desde el puesto con `az login` → `SUCCESS` y `origen=blob` | **CUMPLIDA** (14:42 UTC): `leidos=3`, sin omitidos, `origen=blob` |
+| 2 | Una ejecución del job con identidad gestionada → `aux_file_read` de los tres, **ninguna ruta local** | **CUMPLIDA** (10:55 UTC): los tres con `origen=blob` en Log Analytics |
+| 3 | Sin el rol, `load-aux` debe fallar diciendo **qué rol falta y qué hacer** | **CUMPLIDA con desviación justificada** (14:51 UTC): salida 1 y el mensaje nombra rol, cuenta, variable y los dos caminos |
+
+La desviación de la 3, por si hay que repetirla: en vez de **retirar** el rol
+sobre la cuenta propia —que exige `User Access Administrator` u `Owner`, que el
+puesto no tiene, y deja una asignación que devolver—, se apuntaron las
+`AUX_EXCEL_*` a **otra cuenta de almacenamiento sobre la que no hay rol**.
+Mismo camino de código y mismo error de Azure (403
+`AuthorizationPermissionMismatch`), sin tocar ninguna asignación. Es la vía
+recomendada: la versión original tiene el riesgo de quedarse sin acceso si el
+reasignado falla.
 
 ---
 
