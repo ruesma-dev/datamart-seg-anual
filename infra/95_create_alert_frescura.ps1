@@ -81,7 +81,12 @@ $ErrorActionPreference = "Stop"
 
 . "$PSScriptRoot\00_vars.ps1" -Entorno $Entorno
 
-# --- 0. Del umbral a una ventana que el servicio acepte ---------------------
+# --- 0. Lo que se deriva del umbral: la ventana y la consulta ---------------
+#
+# Las dos van en funciones y no sueltas en el cuerpo del script para que los
+# tests puedan EJECUTARLAS y mirar el valor que producen. Leerlas como texto es
+# lo que dejo pasar los dos defectos de esta feature: una ventana bien formada
+# e invalida, y un filtro temporal bien definido que no llegaba a la consulta.
 
 function Resolver-VentanaAdmitida {
     <#

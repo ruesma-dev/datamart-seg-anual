@@ -579,6 +579,18 @@ verdad la función del `.ps1` con `powershell`,
 `test_f024_r23_un_umbral_imposible_falla_antes_de_llamar_a_azure`. Leer el
 script como texto no bastaba: `30h` estaba bien formado y era inválido.
 
+> **Segunda enmienda (2026-08-19, review):** lo mismo valía para el criterio.
+> La consulta se compone en `Componer-ConsultaFrescura`, que los tests
+> **ejecutan** para afirmar sobre la cadena que se envía:
+> `test_f024_r22_la_kql_acota_el_criterio_con_el_umbral` (el `ago(...)` lleva
+> las horas del umbral y no las de la ventana),
+> `test_f024_r22_la_consulta_compuesta_lleva_el_evento_y_el_job`,
+> `test_f024_r22_el_nombre_de_la_consulta_es_el_que_cuenta_la_condicion` y
+> `test_f024_r22_la_consulta_compuesta_es_la_que_viaja_en_condition_query`.
+> Motivo: con el test anterior —que leía el texto— desconectar el filtro
+> temporal de la consulta dejaba la suite entera en verde con la regla
+> juzgando a 48 h.
+
 > Si el humano elige DA-3 = B, R21/R22 se sustituyen por: parametrizar
 > `80_create_job.ps1`/`85_update_job.ps1`/`90_create_alert.ps1` para un
 > segundo job y su alerta, con los tests de F-003 extendidos. El

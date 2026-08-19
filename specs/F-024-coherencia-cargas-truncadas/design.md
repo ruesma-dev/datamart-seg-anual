@@ -237,15 +237,17 @@ Se registra como `build_mart.puerta_stg`.
 `Get-EtiquetasCli`, idempotencia por `show`):
 
 ```
-$horas   = [int]$CFG.frescuraUmbralHoras            # 30
-$ventana = Resolver-VentanaAdmitida -UmbralHoras $horas   # 30 h -> "48h" (ver abajo)
-$filtro  = "| where TimeGenerated > ago({0}h)" -f $horas   # el criterio exacto: 30 h
-$kql     = "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '$($CFG.job)' | where Log_s has_all ('step_finished','build_mart','SUCCESS') $filtro"
+$horas    = [int]$CFG.frescuraUmbralHoras            # 30
+$ventana  = Resolver-VentanaAdmitida -UmbralHoras $horas   # 30 h -> "48h" (ver abajo)
+# La consulta se compone en una funcion, no suelta: asi un test la EJECUTA y
+# comprueba la cadena que se envia. Devuelve "Frescura=<kql>", con el filtro
+# temporal del criterio exacto (ago(30h)) ya dentro.
+$consulta = Componer-ConsultaFrescura -Job $CFG.job -UmbralHoras $horas
 
 az monitor scheduled-query create -g <rg> -n $CFG.frescuraAlertName `
     --scopes <id del workspace $CFG.logAnalytics> `
     --condition "count 'Frescura' < 1" `
-    --condition-query Frescura=$kql `
+    --condition-query $consulta `
     --window-size $ventana --evaluation-frequency 1h `
     --severity 2 --auto-mitigate true `
     --action-groups <id del action group> `

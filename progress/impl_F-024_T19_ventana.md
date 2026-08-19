@@ -122,9 +122,11 @@ Tras el arreglo, el mismo comando: **`30 passed in 1.30s`**.
    Restaurado.
 5. **Campaña de mutación** (`python -m harness.mutacion --feature F-024`):
    **108 mutantes, 108 muertos, 0 supervivientes, 0 timeouts en 270,9 s** →
-   `progress/mutacion_F-024_T19.md`. La campaña del 18-ago tenía 2
-   supervivientes; los tests añadidos después los matan. **Ningún
-   superviviente que analizar.**
+   `progress/mutacion_F-024_T19.md`.
+   **[Corrección del 2026-08-19, §17: este resultado era falso.** Los dos
+   supervivientes del 18-ago siguen vivos; la campaña paralela los contó como
+   muertos por error y yo interpreté el cero como una mejora. La cifra buena
+   es 108 / 106 / 2.**]**
 6. **Contra Azure, nada.** Ni un `create`, ni un `update`, ni una lectura.
    Verificado también por lo que no hay en el diff: el script no se ha
    ejecutado.
@@ -173,7 +175,7 @@ un commit de una línea.
 |---|---|
 | Tests ejecutados y resultado | **614 pasan, 0 fallan** (`bash harness/init.sh`). De ellos, **30** en `tests/test_f024_infra_alerta.py`, **6 nuevos** y 1 reescrito |
 | Cobertura de las líneas cambiadas | **100,0 %** (372/372; umbral 80 %, nivel `critico`) — línea `PUERTA COBERTURA` de `init.sh` |
-| Mutantes generados / supervivientes | **108 / 0** (0 timeouts) — `progress/mutacion_F-024_T19.md`. Sin supervivientes que analizar |
+| Mutantes generados / supervivientes | ~~**108 / 0**~~ **CORREGIDO en §17: son 108 / 2**, los dos equivalentes y ya justificados. El `0` salió de una campaña paralela cuyo resultado no es reproducible; `progress/mutacion_F-024_T19b.md` |
 | Tiempo de ejecución de la suite | **12,48 s** en la primera medición y **45,05 s** en la última, con el mismo resultado: la máquina estaba a la vez con la campaña de mutación y con otras cargas, así que el número no es comparable entre corridas. Lo que sí se midió aislado: el fichero de esta feature pasa de 6,23 s (14 invocaciones de `powershell`) a **1,30 s** (una sola, en caché) |
 | Tiempo de la campaña de mutación | **270,9 s** |
 | Fase RED | traza pegada en §4: 19 fallos antes del arreglo, 30 en verde después |
@@ -193,3 +195,244 @@ tres de los tests nuevos ejecutan la función en vez de leerla.
 | `dbd84d0` | los tests de la ventana arrancan `powershell` una sola vez |
 
 Sin `git push` y sin PR, como manda el protocolo.
+
+---
+
+# Segunda vuelta · 2026-08-19 (CAMBIOS_REQUERIDOS del reviewer)
+
+`progress/review_F-024_T19_ventana.md` devolvió el trabajo con un bloqueante y
+dos menores. Tenía razón en los tres, y el bloqueante era **el mismo defecto de
+clase que este trabajo venía a cerrar**, un paso más allá: cerré la ventana
+comprobando el valor, pero dejé el criterio de 30 h comprobado por su **forma**.
+
+## 8 · El bloqueante
+
+`test_f024_r22_la_kql_acota_el_criterio_con_el_umbral` buscaba
+`TimeGenerated > ago(...)` en el **texto del fichero** y exigía que esa línea
+llevara `$horas`. Eso demuestra que `$filtroTemporal` **se define**, no que
+**llegue a la consulta**. El reviewer quitó la variable de la concatenación de
+`$kql` —una variable definida y no usada, lo que deja un merge mal resuelto— y
+la suite entera pasó en verde con la regla juzgando a 48 h en vez de a 30.
+
+## 9 · Lo implementado en esta vuelta
+
+**La composición de la consulta pasa a una función del `.ps1`,
+`Componer-ConsultaFrescura -Job <j> -UmbralHoras <h> [-Nombre <n>]`**, que
+devuelve el argumento completo de `--condition-query` (`<nombre>=<kql>`). Los
+tests la **ejecutan** con `powershell` —mismo mecanismo que
+`Resolver-VentanaAdmitida`, misma pasada en caché, un solo arranque— y afirman
+sobre la cadena devuelta:
+
+| Test | Qué afirma sobre el VALOR |
+|---|---|
+| `test_f024_r22_la_kql_acota_el_criterio_con_el_umbral` (reescrito) | la consulta enviada trae `ago(30h)`; las horas del `ago` son las del umbral de `dev.json`; y **no** coinciden con las de la ventana (si coincidieran, el filtro no estaría acotando nada) |
+| `test_f024_r22_la_consulta_compuesta_lleva_el_evento_y_el_job` (nuevo) | los tres términos de `TERMINOS_DEL_EVENTO` van dentro del `has_all` **de la cadena enviada**, la consulta arranca en `ContainerAppConsoleLogs_CL` y acota por `ContainerJobName_s` con el job real |
+| `test_f024_r22_el_nombre_de_la_consulta_es_el_que_cuenta_la_condicion` (nuevo) | el nombre del resultado que devuelve la función es el mismo que cuenta `--condition "count 'X' < 1"`. Si divergen, la regla cuenta algo que no existe y **se queda muda sin que Azure proteste** |
+| `test_f024_r22_la_consulta_compuesta_es_la_que_viaja_en_condition_query` (nuevo) | punto 2 del reviewer: `$consulta` sale de la función, con `$CFG.job` y `$horas`, y esa misma variable es la que va en `--condition-query` |
+| `test_f024_r22_el_script_declara_las_granularidades_que_admite_azure` (corregido) | punto 3: se mira **solo el literal `$granularidades = @(...)`** y se exige igualdad exacta con la lista del ARM. Antes barría todos los números de la función y el `2880` del mensaje de `throw` la ponía en verde con la lista mutilada |
+
+Sobre el punto 2, con honestidad: ejecutar la composición demuestra **qué
+cadena produce** el script, no que sea la que se envía. Ese salto son dos
+líneas de pegamento (`$consulta = Componer-...` y `--condition-query
+$consulta`) y es lo único que sigue comprobándose por texto. Se podría cerrar
+del todo extrayendo **todos** los argumentos de `az` a una función que el test
+ejecutara, pero eso cambia la forma de invocar `az.cmd` en un script que **no
+puedo probar contra Azure** (y cuya regla está ahora mismo en mitad de la
+verificación manual). Lo dejo escrito como decisión, no como olvido: he
+preferido un eslabón de dos líneas explícito y con test a un refactor de la
+invocación que no puedo verificar.
+
+## 10 · Fase RED de esta vuelta
+
+Tests escritos antes de tocar el `.ps1`:
+
+```
+$ python -m pytest tests/test_f024_infra_alerta.py -q
+E       AssertionError: el script no define la función Componer-ConsultaFrescura
+tests\test_f024_infra_alerta.py:123: AssertionError
+E       AssertionError: $consulta no sale de Componer-ConsultaFrescura: lo que se
+        ejecuta en los tests y lo que se envía a Azure podrían ser cosas distintas
+tests\test_f024_infra_alerta.py:533: AssertionError
+
+19 failed, 14 passed in 4.16s
+```
+
+Después del arreglo: **`33 passed in 2.40s`**.
+
+## 11 · Las cuatro pruebas de control (romper lo que el test vigila y pegar la traza)
+
+El criterio de aceptación que puso el reviewer es la primera. Todas se
+aplicaron sobre el árbol real y se restauraron desde una copia previa;
+`git diff --quiet` limpio al terminar cada una.
+
+**Control 1 — el criterio no llega a la consulta** (quitar `$filtroTemporal` de
+la concatenación dejando intacta la línea que lo define): era exactamente el
+camino que antes pasaba en verde.
+
+```
+E  AssertionError: la consulta que se envía no acota por TimeGenerated, así que
+   la regla contaría los eventos de toda la ventana en vez de los del umbral:
+   Frescura=ContainerAppConsoleLogs_CL | where ContainerJobName_s == '...'
+   | where Log_s has_all ('step_finished','build_mart','SUCCESS')
+1 failed, 32 passed          # y en la suite completa: 1 failed, 616 passed
+```
+
+**Control 2 — la consulta compuesta no viaja en `--condition-query`** (se
+sustituye por una cadena literal):
+
+```
+E  AssertionError: el argumento --condition-query no lleva la consulta compuesta
+1 failed, 32 passed
+```
+
+**Control 3 — lista de granularidades mutilada** (`2880` fuera): el test del
+punto 3 **ahora sí** cae, además de los que ejecutan la función.
+
+```
+E  AssertionError: la lista del script no es la que declara el ARM.
+E  AssertionError: el umbral de frescura configurado (30 h = 1800 min) no cabe en
+   ninguna ventana que admita Azure: la mayor es 2880 min (48 h). ...
+```
+
+**Control 4 — el nombre del resultado deja de ser el que cuenta la condición**
+(`Frescura` → `Frescuras`):
+
+```
+E  AssertionError: la condición cuenta 'Frescura' y la consulta se llama
+   'Frescuras': la regla contaría un resultado inexistente
+1 failed, 32 passed
+```
+
+## 12 · Un incidente propio, para que conste
+
+Ejecutando el control 1 la primera vez, el `git checkout --` con el que
+restauraba el script **descartó los cambios del `.ps1` que aún no había
+commiteado** (la función nueva y la llamada). No se perdió nada —los rehíce y
+el resultado es idéntico—, pero la lección es real y la anoto: **primero se
+commitea y solo después se rompe el árbol a propósito**. Los tres controles
+siguientes se hicieron con copia previa y `cp` de vuelta, nunca con
+`git checkout`.
+
+## 13 · Verificaciones de esta vuelta, con el resultado real
+
+1. `bash harness/init.sh` → `ENTORNO LISTO. Puedes trabajar.`,
+   **`617 passed`**, `PUERTA COBERTURA: 100.0% de 372 líneas cambiadas
+   cubiertas (372/372, umbral 80%, nivel critico)`.
+2. Las cuatro pruebas de control de §11, cada una en rojo y restaurada.
+3. **Contra Azure, nada.** Ni un `create`, ni un `update`, ni un `show`, ni una
+   lectura. Sabiendo además que la regla está creada y en mitad de la prueba de
+   ventana corta, y que hay una ejecución del job en curso para T18, no se ha
+   ejecutado el script ni ningún comando de `az`.
+4. No se han tocado `progress/manual_F-024_fase_c.md` ni `progress/current.md`,
+   como pidió el líder por estar trabajando en ellos en paralelo. Lo que había
+   que anotar está aquí. **Consecuencia a tener en cuenta:** el aviso del `48h`
+   que dejé en `current.md` en la primera vuelta sigue siendo correcto, y esta
+   vuelta no añade nada que el humano tenga que hacer distinto.
+
+## 14 · Evidencias de la segunda vuelta
+
+| Evidencia | Valor real |
+|---|---|
+| Tests ejecutados y resultado | **617 pasan, 0 fallan**. El fichero de la alerta pasa de 30 a **33 tests** (3 nuevos, 2 reescritos) |
+| Cobertura de las líneas cambiadas | **100,0 %** (372/372, umbral 80 %) — igual que antes: no se toca Python de producción |
+| Mutantes / supervivientes | **108 / 106 muertos / 2 supervivientes**, los dos equivalentes y con análisis cerrado (`progress/mutacion_F-024_T19b.md`). Ver §17: el `0` de la primera vuelta era falso |
+| Pruebas de control | **4 de 4** en rojo al romper lo que vigilan, con la traza pegada en §11 |
+| Fase RED | traza pegada en §10: 19 fallos antes, 33 en verde después |
+| Tiempo de la suite del fichero | **2,4 s** para 33 tests, con una sola invocación de `powershell` que evalúa las dos funciones |
+
+## 15 · Sigue fuera del alcance (sin cambios respecto a la primera vuelta)
+
+- Crear la alerta y ver el `Activated`/`Deactivated`: es de T19 y lo hace el
+  humano. **La alerta no está verificada hasta que llegue un correo.**
+- El riesgo residual del servicio (que Azure Monitor recorte la consulta al
+  rango de la ventana de forma incompatible con un `ago()` explícito) sigue
+  identificado y sin cerrar. La sugerencia del reviewer es buena y la suscribo:
+  al mirar el `Activated`, fijarse en el **número de filas evaluadas** de la
+  notificación, que es donde se vería si el `ago(30h)` se está aplicando.
+- `--evaluation-frequency`: nadie ha comprobado si sus valores están tan
+  restringidos como los de `windowSize`.
+- Las dos propuestas de automejora del arnés (declarar `infra/**.ps1` como ruta
+  sensible; exigir en C4 bis la prueba de control de los tests que cubren
+  código no mutable) las decide el humano. Si las acepta, van también a
+  `arnes-base` por la regla de propagación. **No las he aplicado**: cambiar
+  `CHECKPOINTS.md` a mitad de una review es cambiar el examen mientras se
+  corrige. Añado un dato a favor de la segunda: las cuatro pruebas de control
+  de §11 las he escrito porque el reviewer las pidió, y han encontrado el
+  arreglo del punto 3 antes de que él lo volviera a mirar.
+
+## 17 · Corrección de un número mío: la mutación NO daba cero supervivientes
+
+Al relanzar la campaña en esta vuelta salió una discrepancia que hay que
+contar, porque afecta a un número que yo mismo llevé al informe anterior.
+
+| Campaña | Cómo | Resultado |
+|---|---|---|
+| 2026-08-18 15:15 (Fase B) | — | 108 mutantes, **106 muertos, 2 supervivientes** |
+| 2026-08-19 11:52 (primera vuelta de T19) | paralela, hasta 16 worktrees | 108 mutantes, **108 muertos, 0 supervivientes** en 270,9 s |
+| 2026-08-19 12:26 (esta vuelta) | `--workers 1` | 108 mutantes, **106 muertos, 2 supervivientes** en 1047,1 s |
+
+Los dos supervivientes son los mismos de siempre: `bold=True → bold=False` en
+dos `click.secho` de cabeceras decorativas de `check-coherencia`
+(`main.py:564` y `567`).
+
+**El resultado bueno es el de 106/2, y el cero era falso.** No es opinión:
+*ningún* test de la suite menciona `bold` —comprobado con `grep -rn "bold"
+tests/`, cero resultados—, así que no hay forma de que esa mutación muera. Lo
+he verificado aplicándola a mano en el árbol real:
+
+```
+$ python -m pytest tests/ -q     # con bold=False en main.py:564
+617 passed, 871 warnings in 6.82s
+```
+
+Es decir: **la campaña paralela declaró muertos dos mutantes que están vivos.**
+No he investigado la causa dentro de `harness/mutacion.py` —está fuera de mi
+encargo y toca el arnés— pero el efecto sí lo dejo escrito, porque un cero de
+supervivientes es exactamente el número que nadie vuelve a mirar.
+
+Consecuencias, asumidas:
+
+1. **Mi informe de la primera vuelta decía «108 / 0, sin supervivientes que
+   analizar». Era incorrecto** y lo he marcado en su tabla de Evidencias y en
+   su §5.5, en vez de reescribirlo. La cifra real, entonces y ahora, es
+   **108 / 106 / 2**.
+2. El reviewer verificó de forma independiente el **alcance y la generación**
+   (1268 líneas, 12 ficheros, 108 mutantes) y todo eso cuadra; lo que no se
+   verificó de forma independiente fue **el recuento de muertos**, que es justo
+   donde estaba el error. Anotado por si sirve para el arnés: el mismo
+   argumento que el reviewer usa para recalcular los totales vale para exigir
+   que un `0 supervivientes` se reproduzca antes de creérselo.
+3. Los dos supervivientes **no son deuda nueva ni tocan lo mío**: son
+   presentación pura, ya se analizaron y se aceptaron como **equivalentes** en
+   la Fase B (`progress/impl_F-024.md` §6.1, aprobado en
+   `progress/review_F-024.md`). He rellenado su análisis en
+   `progress/mutacion_F-024_T19b.md` con esa justificación y con la prueba de
+   arriba, así que no queda ninguna sección en `PENDIENTE`.
+4. Cambio de método por mi parte: en adelante, **campañas de mutación con
+   `--workers 1`** cuando el número vaya a un informe. Tarda 1047 s en vez de
+   271, y es lo que hay: un número más rápido que no es reproducible no vale
+   nada.
+
+**Sugerencia para el humano** (no aplicada, no es mi encargo): merece la pena
+mirar por qué la campaña paralela mata mutantes vivos, porque afecta a
+cualquier feature de nivel `critico` que la use —el arnés exige cero
+supervivientes y la vía paralela puede regalarlos—. Si se toca
+`harness/mutacion.py`, la regla de propagación manda llevarlo también a
+`arnes-base`.
+
+## 18 · Números finales de esta vuelta
+
+| Evidencia | Valor real |
+|---|---|
+| `bash harness/init.sh` | verde: `617 passed`, `PUERTA COBERTURA: 100.0% (372/372, umbral 80%, nivel critico)` |
+| Tests del fichero de la alerta | **33** (30 antes), 2,4 s |
+| Mutación (secuencial, reproducible) | **108 generados, 106 muertos, 2 supervivientes**, 0 timeouts, 1047,1 s — los dos equivalentes, con análisis cerrado en `progress/mutacion_F-024_T19b.md` |
+| Pruebas de control | 4 de 4 en rojo al romper lo que vigilan (§11) |
+| Contra Azure | **nada**: ni `create`, ni `update`, ni `show`, ni `az login` |
+
+## 19 · Commits de la segunda vuelta
+
+| Commit | Qué |
+|---|---|
+| `0c40e61` | el criterio de 30 h se comprueba sobre la consulta que se envía, no sobre el texto (los tres puntos del reviewer) |
+| `<este>` | la consulta se compone en una función también en `design.md`/`requirements.md`/`tasks.md`, el análisis de los 2 supervivientes y la corrección del número de mutación |

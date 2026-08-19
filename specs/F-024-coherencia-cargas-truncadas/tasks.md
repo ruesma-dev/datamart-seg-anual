@@ -118,9 +118,14 @@ que exija BBDD real o Azure es `MANUAL (humano)` con su comando exacto en
             Arreglado en `infra/95_create_alert_frescura.ps1`: la ventana la
             deriva `Resolver-VentanaAdmitida` de la lista de granularidades
             admitidas y el criterio de 30 h viaja en la KQL como
-            `ago(30h)`. | Verificación: `python -m pytest
-            tests/test_f024_infra_alerta.py` (30 passed; tres de ellos
-            ejecutan la función del `.ps1` con `powershell`).
+            `ago(30h)`. Tras la review (CAMBIOS_REQUERIDOS), la consulta se
+            compone también en una función, `Componer-ConsultaFrescura`, que
+            los tests ejecutan: el test anterior miraba el texto y dejaba
+            pasar un filtro desconectado de la consulta.
+            | Verificación: `python -m pytest
+            tests/test_f024_infra_alerta.py` (33 passed; seis de ellos
+            ejecutan funciones del `.ps1` con `powershell`) y cuatro pruebas
+            de control en rojo, en `progress/impl_F-024_T19_ventana.md` §11.
 - [ ] **T20**: R26 en local: `check-coherencia` KO por `sin_batch` sobre
       el raw anterior, `stage` se niega, `ingest --full` (o
       `stage --sin-puerta` registrado) y construye. | Verificación: MANUAL
