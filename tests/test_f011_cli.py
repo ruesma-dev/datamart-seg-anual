@@ -202,6 +202,66 @@ def test_f011_r25_perfil_carga_no_arranca_ejecucion(cli, monkeypatch) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_f011_r1_fetch_perfil_carga_traduce_las_filas_a_mediciones() -> None:
+    """El mapeo fila→`FilaPerfil`, con la duración calculada aquí y no en SQL.
+
+    Se sustituye `PostgresClient.connection`, que es el único punto por el que
+    el cliente llega a la BBDD: el test no abre ninguna conexión. Lo que se
+    comprueba es lo que rompería en silencio —el orden de las columnas y la
+    resta de instantes— y que una fila sin cerrar cuenta 0 s en vez de reventar.
+    """
+    from datetime import datetime
+
+    from tests.test_f019_tramos import CursorFalso, cliente_con
+
+    cursor = CursorFalso(
+        filas=[
+            (
+                "ingest",
+                "ingest_raw",
+                datetime(2026, 8, 19, 2, 0, 22),
+                datetime(2026, 8, 19, 2, 35, 54),
+                "SUCCESS",
+                20_048_847,
+                BATCH,
+            ),
+            (
+                "ingest",
+                "ingest_raw.obrparpre",
+                datetime(2026, 8, 19, 2, 0, 30),
+                None,  # sin cerrar: 0 s, no una excepción
+                "RUNNING",
+                None,
+                BATCH,
+            ),
+        ]
+    )
+    cliente, _ = cliente_con(cursor)
+
+    medido, filas = cliente.fetch_perfil_carga()
+
+    assert medido == BATCH
+    assert len(filas) == 2
+    assert filas[0].segundos == pytest.approx(2_132.0)
+    assert filas[0].filas == 20_048_847
+    assert filas[0].status == "SUCCESS"
+    assert filas[1].segundos == 0.0
+    assert filas[1].filas == 0
+    assert filas[1].tabla == "obrparpre"
+
+
+def test_f011_r1_fetch_perfil_carga_respeta_el_batch_pedido() -> None:
+    """Con `--batch`, el batch devuelto es el pedido aunque no haya filas."""
+    from tests.test_f019_tramos import CursorFalso, cliente_con
+
+    cliente, _ = cliente_con(CursorFalso(filas=[]))
+
+    medido, filas = cliente.fetch_perfil_carga("20260818T102311Z-aaaaaa")
+
+    assert medido == "20260818T102311Z-aaaaaa"
+    assert filas == []
+
+
 def test_f011_r23_el_sql_del_perfil_es_un_select() -> None:
     """La consulta va en una constante de módulo para poder leerla en un test.
 
