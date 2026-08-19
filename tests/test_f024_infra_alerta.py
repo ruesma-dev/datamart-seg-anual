@@ -21,9 +21,11 @@ Ninguno toca Azure: se lee el `.ps1` como texto.
 
 from __future__ import annotations
 
+import functools
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -124,22 +126,71 @@ def _funcion_ps(nombre: str) -> str:
     raise AssertionError(f"la función {nombre} no se cierra con '}}' en la columna cero")
 
 
-def _resolver_ventana(umbral: int, destino: Path) -> subprocess.CompletedProcess[str]:
-    """Ejecuta `Resolver-VentanaAdmitida -UmbralHoras <umbral>` del script real."""
-    guion = destino / "resolver_ventana.ps1"
-    guion.write_text(
-        _funcion_ps(FUNCION_VENTANA)
-        + f"\n$ErrorActionPreference = 'Stop'\n{FUNCION_VENTANA} -UmbralHoras {umbral}\n",
-        encoding="utf-8",
+#: Umbrales con los que se ejercita la función: los dos lados de cada frontera
+#: de la lista de granularidades, el que está configurado (30), el mayor que
+#: cabe (48) y los que no tienen ventana posible o no tienen sentido.
+UMBRALES_A_PROBAR = (-1, 0, 1, 2, 6, 11, 12, 24, 25, 30, 47, 48, 49, 72)
+
+_PLANTILLA_PRUEBA = """
+$ErrorActionPreference = 'Stop'
+foreach ($u in @(UMBRALES)) {
+    try {
+        "$u;OK;$(FUNCION -UmbralHoras $u)"
+    } catch {
+        $mensaje = $_.Exception.Message -replace "\\s+", " "
+        "$u;ERROR;$mensaje"
+    }
+}
+"""
+
+
+@functools.lru_cache(maxsize=1)
+def _resolver_ventanas() -> dict[int, tuple[bool, str]]:
+    """Ejecuta la función del `.ps1` con todos los umbrales, de una sola vez.
+
+    Arrancar `powershell` cuesta cerca de un segundo, y la campaña de mutación
+    lanza la suite entera una vez por mutante: catorce invocaciones sueltas
+    saldrían mucho más caras que el valor que aportan. Una sola pasada, con el
+    resultado en caché, y cada test lee de ella.
+
+    Devuelve `{umbral: (fue_bien, ventana_o_mensaje_de_error)}`.
+    """
+    assert POWERSHELL is not None
+
+    guion = _PLANTILLA_PRUEBA.replace(
+        "UMBRALES", ", ".join(str(u) for u in UMBRALES_A_PROBAR)
+    ).replace("FUNCION", FUNCION_VENTANA)
+
+    with tempfile.TemporaryDirectory() as carpeta:
+        fichero = Path(carpeta) / "resolver_ventana.ps1"
+        fichero.write_text(_funcion_ps(FUNCION_VENTANA) + guion, encoding="utf-8")
+
+        # La ruta del intérprete la resuelve `shutil.which`, no viene de fuera,
+        # y el guión lo escribe este mismo test: no hay entrada de usuario.
+        proceso = subprocess.run(
+            [POWERSHELL, "-NoProfile", "-NonInteractive", "-File", str(fichero)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
+        )
+
+    assert proceso.returncode == 0, (
+        f"el guión de prueba no llegó a ejecutarse: {proceso.stderr}"
     )
 
-    assert POWERSHELL is not None
-    return subprocess.run(  # noqa: S603 - ruta resuelta con shutil.which
-        [POWERSHELL, "-NoProfile", "-NonInteractive", "-File", str(guion)],
-        capture_output=True,
-        text=True,
-        timeout=120,
+    resultados: dict[int, tuple[bool, str]] = {}
+    for linea in proceso.stdout.splitlines():
+        if ";" not in linea:
+            continue
+        umbral, estado, valor = linea.strip().split(";", 2)
+        resultados[int(umbral)] = (estado == "OK", valor)
+
+    assert set(resultados) == set(UMBRALES_A_PROBAR), (
+        f"faltan umbrales en la salida: {sorted(set(UMBRALES_A_PROBAR) - set(resultados))}"
     )
+    return resultados
 
 
 # ---------------------------------------------------------------------------
@@ -365,9 +416,7 @@ def test_f024_r22_la_kql_acota_el_criterio_con_el_umbral() -> None:
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
-def test_f024_r23_la_ventana_del_umbral_configurado_es_una_granularidad_admitida(
-    tmp_path: Path,
-) -> None:
+def test_f024_r23_la_ventana_del_umbral_configurado_es_una_granularidad_admitida() -> None:
     """El caso real: con `frescuraUmbralHoras` de `dev.json`, ¿qué envía?
 
     Este es el test que faltaba el 2026-08-18. Ejecuta la función del script
@@ -376,11 +425,14 @@ def test_f024_r23_la_ventana_del_umbral_configurado_es_una_granularidad_admitida
     script anterior habría salido `30h` = 1800 min, que no está en la lista.
     """
     umbral = _config("dev")["frescuraUmbralHoras"]
+    assert umbral in UMBRALES_A_PROBAR, (
+        "el umbral configurado ya no está entre los que se ejercitan: el test "
+        "estaría comprobando otro caso que el real"
+    )
 
-    resultado = _resolver_ventana(umbral, tmp_path)
-    assert resultado.returncode == 0, resultado.stderr
+    fue_bien, ventana = _resolver_ventanas()[umbral]
+    assert fue_bien, ventana
 
-    ventana = resultado.stdout.strip()
     minutos = _minutos_de_ventana(ventana)
     assert minutos is not None, f"la ventana '{ventana}' no está en formato ##h##m##s"
     assert minutos in GRANULARIDADES_ADMITIDAS_MINUTOS, (
@@ -396,9 +448,9 @@ def test_f024_r23_la_ventana_del_umbral_configurado_es_una_granularidad_admitida
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
-@pytest.mark.parametrize("umbral", [1, 2, 6, 11, 12, 24, 25, 30, 47, 48])
+@pytest.mark.parametrize("umbral", [u for u in UMBRALES_A_PROBAR if 1 <= u <= 48])
 def test_f024_r23_la_ventana_es_la_menor_granularidad_que_contiene_el_umbral(
-    umbral: int, tmp_path: Path
+    umbral: int,
 ) -> None:
     """Regla completa, no solo el caso de 30 h.
 
@@ -409,38 +461,35 @@ def test_f024_r23_la_ventana_es_la_menor_granularidad_que_contiene_el_umbral(
     """
     esperado = min(g for g in GRANULARIDADES_ADMITIDAS_MINUTOS if g >= umbral * 60)
 
-    resultado = _resolver_ventana(umbral, tmp_path)
-    assert resultado.returncode == 0, resultado.stderr
+    fue_bien, ventana = _resolver_ventanas()[umbral]
+    assert fue_bien, ventana
 
-    minutos = _minutos_de_ventana(resultado.stdout.strip())
+    minutos = _minutos_de_ventana(ventana)
     assert minutos == esperado, (
-        f"umbral {umbral} h -> ventana {resultado.stdout.strip()} ({minutos} min); "
+        f"umbral {umbral} h -> ventana {ventana} ({minutos} min); "
         f"la menor admitida que lo contiene es {esperado} min"
     )
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
-@pytest.mark.parametrize("umbral", [49, 72, 0, -1])
-def test_f024_r23_un_umbral_imposible_falla_antes_de_llamar_a_azure(
-    umbral: int, tmp_path: Path
-) -> None:
+@pytest.mark.parametrize("umbral", [u for u in UMBRALES_A_PROBAR if u < 1 or u > 48])
+def test_f024_r23_un_umbral_imposible_falla_antes_de_llamar_a_azure(umbral: int) -> None:
     """Por encima de 2880 min no hay ventana: se para aquí, no en el ARM.
 
     Enviar una petición que sabemos que se va a rechazar cuesta un viaje a
     Azure y devuelve un `InvalidRequestContent` que no dice qué hacer. El
     mensaje del script sí: nombra la clave del fichero de entorno y el tope.
     """
-    resultado = _resolver_ventana(umbral, tmp_path)
+    fue_bien, mensaje = _resolver_ventanas()[umbral]
 
-    assert resultado.returncode != 0, (
+    assert not fue_bien, (
         f"con un umbral de {umbral} h el script no falla: enviaría a Azure una "
-        f"ventana inválida"
+        f"ventana inválida ({mensaje})"
     )
-    error = resultado.stderr.lower()
-    assert "frescuraumbralhoras" in error, (
-        f"el mensaje no dice qué clave hay que cambiar: {resultado.stderr}"
+    assert "frescuraumbralhoras" in mensaje.lower(), (
+        f"el mensaje no dice qué clave hay que cambiar: {mensaje}"
     )
-    assert "48" in error, f"el mensaje no dice cuál es el tope: {resultado.stderr}"
+    assert "48" in mensaje, f"el mensaje no dice cuál es el tope: {mensaje}"
 
 
 def test_f024_r23_la_documentacion_no_manda_restaurar_una_ventana_invalida() -> None:
