@@ -21,6 +21,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 00_vars.ps1 define $TAG (hora actual) y PowerShell no distingue mayusculas:
+# el dot-source machacaria el parametro -Tag. Se salva antes en otro nombre
+# (mismo bug que 80_create_job.ps1, cazado el 2026-08-17).
+$TagPedido = $Tag
+
 . "$PSScriptRoot\00_vars.ps1" -Entorno $Entorno
 
 $existente = Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job --query id -o tsv
@@ -28,12 +33,12 @@ if ($LASTEXITCODE -ne 0 -or -not $existente) {
     throw "el job '$($CFG.job)' no existe todavia. Crealo con 80_create_job.ps1."
 }
 
-if (-not $Tag) {
-    $Tag = Invoke-Az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
+if (-not $TagPedido) {
+    $TagPedido = Invoke-Az acr repository show-tags -n $CFG.acrName --repository $CFG.imageRepository `
         --orderby time_desc --top 1 -o tsv
     Confirmar-Exito "no hay ninguna imagen publicada: ejecuta antes 70_build_image.ps1"
 }
-$imagen = "{0}.azurecr.io/{1}:{2}" -f $CFG.acrName, $CFG.imageRepository, $Tag
+$imagen = "{0}.azurecr.io/{1}:{2}" -f $CFG.acrName, $CFG.imageRepository, $TagPedido
 
 $anterior = Invoke-Az containerapp job show -g $CFG.resourceGroup -n $CFG.job `
     --query "properties.template.containers[0].image" -o tsv

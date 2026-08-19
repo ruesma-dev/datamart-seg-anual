@@ -126,6 +126,72 @@ Desde F-019, el sub-paso `build_plan_mensual` **no se ejecuta de una pasada**:
 - Cada tramo deja su fila en `_meta.etl_runs`, así que `python main.py timings`
   desglosa el coste real tramo a tramo.
 
+### Coherencia ante cargas truncadas (F-024)
+
+El 2026-08-18 la primera carga real lanzada desde el job murió por
+`DeadlineExceeded` a las dos horas justas, en el tramo 39/60 del stage. `mart`
+no llegó a tocarse, así que las vistas siguieron enseñando el build anterior
+completo; pero `_meta.etl_runs` se quedó con dos filas `RUNNING` huérfanas para
+siempre y `stg.plan_mensual` a medias. Destapó tres huecos: una muerte externa
+del proceso no deja rastro honesto, nada impide construir sobre un `raw`
+MEZCLADO, y el consumidor no tiene forma de saber si lo que ve es de anoche o
+de hace tres días.
+
+**No se hace nada atómico.** Una transacción de tres horas en el `B1ms` es
+exactamente lo que reventó el 09-ago, y F-019 la troceó a propósito. La
+coherencia se garantiza por **verificación** y **visibilidad**:
+
+- **Identidad de ejecución.** Todo comando que ESCRIBE genera un `batch_id`
+  (`YYYYMMDDTHHMMSSZ-xxxxxx`, dominio puro en `domain/ejecucion.py`) y lo
+  estampa en cada fila que deja en `_meta.etl_runs`. El formato se ordena
+  cronológicamente **como texto**, así que un `ORDER BY batch_id` sale ordenado
+  sin parsear nada. El histórico anterior queda con `batch_id` a `NULL`: la
+  columna se **añade**, la tabla no se recrea.
+- **Filas huérfanas → `ABORTED`.** Al arrancar, antes de ejecutar ningún paso,
+  todo comando que escribe cierra las filas que siguen en `RUNNING` con el
+  motivo, la ejecución que las marcó y la hora. Toda `RUNNING` que exista al
+  arrancar es de otro proceso por definición. Si la marca falla, se avisa y se
+  **continúa**: es contabilidad, y el paso siguiente fallará por sí mismo si la
+  BBDD no está.
+- **Dos puertas, ambas ANTES de escribir nada.** `build_stg` exige que TODAS
+  las tablas declaradas en `tables_sigrid.yaml` provengan del **mismo** batch
+  terminado en `SUCCESS`; `build_mart` exige que la fila más reciente de
+  `build_stg%` sea el **paso** completo, no un sub-paso ni un tramo. El
+  veredicto es dominio puro (`domain/coherencia.py`) y queda registrado en
+  `_meta.etl_runs` (`build_stg.puerta_raw`, `build_mart.puerta_stg`) pase lo
+  que pase. Que vayan primero no es un detalle de orden: `stg` empieza con
+  `TRUNCATE` y `mart/01_ddl.sql` con un `DROP`, y eso no se deshace porque el
+  step devuelva `FAILED` después.
+- **`--sin-puerta`, solo en los comandos sueltos.** `stage` y `build-mart` la
+  admiten; `run-all` **no**, porque a las 02:00 no hay nadie delante para
+  valorar si saltársela es razonable. Con la opción, la puerta se evalúa
+  igualmente y su fila queda `SKIPPED` con el veredicto dentro: lo que esa fila
+  cuenta es que el build se hizo **sin** puerta, no lo que la puerta habría
+  dictaminado.
+- **Dos vistas en `_meta`**, derivadas de la tabla que ya escriben todos los
+  pasos, sin tablas nuevas que mantener: `v_raw_state` (de qué carga viene cada
+  tabla de `raw`) y `v_frescura` (último OK y último intento por paso, **por
+  separado**: un `build_mart` que falló esta noche deja `mart` con lo de ayer y
+  el consumidor necesita las dos noticias). Las leen por igual la puerta, el
+  MCP y Power BI. Ninguna toca `raw`, `stg` ni `mart`: cero coste sobre el
+  servidor compartido.
+- **Diagnóstico y alerta.** `check-coherencia` y `check-frescura` son de solo
+  lectura (`timings` también: ve las huérfanas y **avisa**, no las marca). Y
+  `infra/95_create_alert_frescura.ps1` crea una regla de consulta programada
+  que dispara si en `frescuraUmbralHoras` (30) no hay ninguna línea de log del
+  job diciendo que `build_mart` terminó en `SUCCESS`. Vigila desde **fuera**
+  del ETL, así que «el job no lo hizo» dispara igual que «el job murió».
+
+**La ingesta hace commit por PÁGINA, no por tabla** (DA-8, confirmado leyendo
+`copy_rows` el 2026-08-18). `truncate_table` y cada página de 10.000 filas
+abren su propia conexión, y por tanto su propia transacción. Consecuencia para
+cualquier post mortem futuro: una muerte a mitad de tabla la deja **truncada y
+parcial**, no intacta. Donde se dijo «la ingesta es transaccional por tabla, lo
+cargado se conserva» se dijo mal. La puerta de F-024 no depende de ello: la
+marca de «tabla ingerida» solo se escribe cuando la tabla termina en `SUCCESS`,
+así que una tabla parcial queda con su última fila en `RUNNING` → `ABORTED` y
+la puerta la rechaza igual.
+
 ## Infra
 
 - `Dockerfile` en raíz. `infra/` con scripts PowerShell 5.1 (UTF-8 BOM, CRLF)

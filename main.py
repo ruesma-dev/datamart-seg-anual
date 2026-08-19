@@ -26,12 +26,21 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
     python main.py fingerprint-views  - Huella de las vistas de consumo a CSV
     python main.py compare-fingerprints LOCAL AZURE
                                       - Compara dos huellas; sale != 0 si hay fallo
+
+Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
+
+    python main.py check-coherencia   - ¿De qué carga viene cada tabla de raw?
+                                        ¿Se puede construir stg y mart encima?
+                                        Sale 0 si sí, 1 si no, 2 si no puede leer
+    python main.py check-frescura     - ¿Cuánto hace que no hay un build_mart
+                                        completo? Sale 0 solo si está FRESCO
 """
 
 from __future__ import annotations
 
 import platform
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Permite ejecutar `python main.py` desde la raíz del proyecto sin instalar el paquete
@@ -48,7 +57,13 @@ from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: 
 from etl_sigrid.application.steps.build_stg_step import BuildStgStep  # noqa: E402
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: E402
 from etl_sigrid.application.steps.load_excel_aux_step import LoadExcelAuxStep  # noqa: E402
-from etl_sigrid.domain.entities import StepStatus  # noqa: E402
+from etl_sigrid.domain.coherencia import (  # noqa: E402
+    evaluar_coherencia_raw,
+    evaluar_coherencia_stg,
+    formatear_veredicto_stg,
+)
+from etl_sigrid.domain.ejecucion import Ejecucion, nueva_ejecucion  # noqa: E402
+from etl_sigrid.domain.entities import StepResult, StepStatus  # noqa: E402
 from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger  # noqa: E402
 from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
     make_admin_conninfo_provider,
@@ -61,6 +76,12 @@ from etl_sigrid.infrastructure.postgres.fingerprint import (  # noqa: E402
     leer_csv,
     mes_a_fecha,
     veredicto,
+)
+from etl_sigrid.infrastructure.postgres.frescura import (  # noqa: E402
+    UMBRAL_FRESCURA_HORAS,
+    VEREDICTO_FRESCO,
+    format_estado_raw,
+    format_frescura,
 )
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  # noqa: E402
 from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
@@ -98,6 +119,73 @@ def _get_pg() -> PostgresClient:
         auto_create_db=pg.auto_create_db,
         set_role=pg.set_role,
     )
+
+
+# ---------------------------------------------------------------------------
+# Coherencia ante cargas truncadas (F-024)
+#
+# `_arrancar_ejecucion` y `_ejecutar_paso` son la ÚNICA puerta de entrada de
+# los comandos que escriben. Que estén aquí, y no repetidos en cada comando,
+# es lo que hace comprobable la lista de «quién escribe y quién no»: el test
+# parametrizado de R4/R5 la recorre entera.
+# ---------------------------------------------------------------------------
+
+
+def _arrancar_ejecucion(pg: PostgresClient) -> Ejecucion:
+    """Abre una ejecución y cierra las filas que dejó abiertas un proceso muerto.
+
+    Se llama UNA vez por proceso, antes de construir ningún step. Toda fila
+    `RUNNING` que exista al arrancar es de otro proceso por definición: las
+    nuestras todavía no existen.
+
+    Un fallo marcando NO tumba la carga (R7): esto es contabilidad, y el paso
+    que venga detrás fallará por sí mismo si la BBDD no está. Abortar aquí
+    convertiría un problema de permisos sobre `_meta` en una noche sin datos.
+    """
+    ejecucion = nueva_ejecucion()
+    logger = get_logger("ejecucion")
+
+    try:
+        huerfanas = pg.abortar_runs_huerfanos(ejecucion.batch_id)
+    except Exception as e:  # contabilidad: no puede parar la carga
+        logger.warning(
+            "huerfanas_no_marcadas", batch_id=ejecucion.batch_id, error=str(e)
+        )
+        return ejecucion
+
+    for run_id, step, started_at in huerfanas:
+        logger.warning(
+            "etl_run_huerfana_abortada",
+            id=run_id,
+            step=step,
+            started_at=str(started_at),
+            batch_id=ejecucion.batch_id,
+        )
+
+    return ejecucion
+
+
+def _ejecutar_paso(step, pg: PostgresClient, ejecucion: Ejecucion) -> StepResult:
+    """Ejecuta un step suelto, lo registra en `_meta.etl_runs` y sale 1 si falló.
+
+    El registro va DESPUÉS de ejecutar y ANTES de salir (R18): un paso que
+    falla es justo cuando más falta hace que quede escrito. Y un fallo del
+    propio registro no cambia el código de salida, mismo criterio que el
+    grabador del orquestador.
+    """
+    resultado = step.run()
+
+    try:
+        PostgresStepRunRecorder(pg, ejecucion.batch_id).record(step.stage, resultado)
+    except Exception as e:  # medir nunca rompe el pipeline
+        get_logger("ejecucion").warning(
+            "step_run_no_registrado", step=resultado.step_name, error=str(e)
+        )
+
+    _print_result(resultado)
+    if resultado.status == StepStatus.FAILED:
+        sys.exit(1)
+    return resultado
 
 
 @cli.command("version")
@@ -186,38 +274,70 @@ def bootstrap() -> None:
 def ingest(table: str | None, full_refresh: bool, stop_on_error: bool) -> None:
     """Ingesta Sigrid → raw.* (incremental por defecto)."""
     settings = get_settings()
-    step = IngestRawStep(
-        settings,
-        only_table=table,
-        full_refresh=full_refresh,
-        stop_on_error=stop_on_error,
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(
+        IngestRawStep(
+            settings,
+            only_table=table,
+            full_refresh=full_refresh,
+            stop_on_error=stop_on_error,
+            batch_id=ejecucion.batch_id,
+        ),
+        pg,
+        ejecucion,
     )
-    result = step.run()
-    _print_result(result)
-    if result.status == StepStatus.FAILED:
-        sys.exit(1)
 
 
 @cli.command("load-aux")
 def load_aux() -> None:
     """Carga Excels auxiliares → aux.* (pendiente)."""
     settings = get_settings()
-    result = LoadExcelAuxStep(settings).run()
-    _print_result(result)
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(LoadExcelAuxStep(settings), pg, ejecucion)
 
 
 @cli.command("stage")
-def stage() -> None:
-    """Materializa stg.* desde raw.* (tipado, derivaciones, sin lógica de negocio)."""
+@click.option(
+    "--sin-puerta",
+    "sin_puerta",
+    is_flag=True,
+    default=False,
+    help="Construye aunque la puerta de coherencia de raw diga KO. El "
+         "veredicto se evalúa y se registra igual, como SKIPPED. NO existe "
+         "en run-all.",
+)
+def stage(sin_puerta: bool) -> None:
+    """Materializa stg.* desde raw.* (tipado, derivaciones, sin lógica de negocio).
+
+    Antes de tocar nada comprueba que TODAS las tablas de raw declaradas en
+    tables_sigrid.yaml provienen de la misma ejecución terminada en SUCCESS.
+    Si no, se niega y dice por qué (`python main.py check-coherencia` da el
+    detalle). Con --sin-puerta construye igualmente, y queda escrito.
+    """
     settings = get_settings()
-    result = BuildStgStep(settings).run()
-    _print_result(result)
-    if result.status == StepStatus.FAILED:
-        sys.exit(1)
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(
+        BuildStgStep(
+            settings, batch_id=ejecucion.batch_id, omitir_puerta=sin_puerta
+        ),
+        pg,
+        ejecucion,
+    )
 
 
 @cli.command("build-mart")
-def build_mart() -> None:
+@click.option(
+    "--sin-puerta",
+    "sin_puerta",
+    is_flag=True,
+    default=False,
+    help="Construye aunque el último stage no llegara a terminar. El "
+         "veredicto se evalúa y se registra igual, como SKIPPED.",
+)
+def build_mart(sin_puerta: bool) -> None:
     """
     Materializa mart.fact_seguimiento_mensual desde stg.plan_mensual.
 
@@ -226,15 +346,26 @@ def build_mart() -> None:
 
     Para los escenarios planificados, escoge automáticamente la versión del
     master vigente en cada mes (la más reciente con fec_creacion ≤ mes).
+
+    Exige que el último `build_stg` terminara: un stage muerto a medias deja
+    stg mezclado (unas tablas de esta noche y otras de ayer) y construir mart
+    encima da cuadros que no cuadran sin que nadie se entere.
     """
     settings = get_settings()
-    result = BuildMartStep(settings).run()
-    _print_result(result)
-    if result.status == StepStatus.FAILED:
-        sys.exit(1)
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(
+        BuildMartStep(
+            settings, batch_id=ejecucion.batch_id, omitir_puerta=sin_puerta
+        ),
+        pg,
+        ejecucion,
+    )
 
 
-def build_pipeline_steps(settings, full_refresh: bool = False) -> list:
+def build_pipeline_steps(
+    settings, full_refresh: bool = False, batch_id: str | None = None
+) -> list:
     """
     Composición del pipeline de `run-all`.
 
@@ -242,12 +373,18 @@ def build_pipeline_steps(settings, full_refresh: bool = False) -> list:
     forma parte del pipeline y va después de `build_mart`: si algún día alguien
     lo quita, el MCP se queda sin permisos la noche siguiente y nadie se entera
     hasta que alguien pregunta algo.
+
+    `batch_id` (F-024) viaja a los pasos que escriben filas propias en
+    `_meta.etl_runs` —la ingesta, por tabla; el stage, por sub-paso y tramo—
+    para que TODAS las filas de la noche compartan identidad. Ninguno de los
+    dos steps del pipeline recibe `omitir_puerta`: `run-all` no tiene vía de
+    escape a propósito.
     """
     return [
-        IngestRawStep(settings, full_refresh=full_refresh),
+        IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
         LoadExcelAuxStep(settings),
-        BuildStgStep(settings),
-        BuildMartStep(settings),
+        BuildStgStep(settings, batch_id=batch_id),
+        BuildMartStep(settings, batch_id=batch_id),
         ApplyGrantsStep(settings),
     ]
 
@@ -264,10 +401,15 @@ def run_all(full_refresh: bool) -> None:
     ejecutarlos hay que lanzar `python main.py apply-grants`.
     """
     settings = get_settings()
-    steps = build_pipeline_steps(settings, full_refresh)
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    steps = build_pipeline_steps(settings, full_refresh, batch_id=ejecucion.batch_id)
     # El grabador deja una fila por paso en _meta.etl_runs: es lo que después
-    # lee `python main.py timings`. Si falla, el orquestador solo lo loguea.
-    orchestrator = Orchestrator(steps, recorder=PostgresStepRunRecorder(_get_pg()))
+    # leen `python main.py timings` y la vista _meta.v_frescura. Si falla, el
+    # orquestador solo lo loguea.
+    orchestrator = Orchestrator(
+        steps, recorder=PostgresStepRunRecorder(pg, ejecucion.batch_id)
+    )
     results = orchestrator.run_all()
 
     click.echo("")
@@ -368,9 +510,13 @@ def timings(last: int) -> None:
 
     Es la entrada del veredicto sobre el SKU del servidor: si build_mart o
     build_cierre se disparan, el dato está aquí y no en una impresión.
+
+    Es de SOLO LECTURA (F-024, DA-7): si ve filas RUNNING demasiado antiguas
+    avisa al pie, pero no las marca. Contra Azure, un comando de diagnóstico
+    no escribe en la tabla que está diagnosticando.
     """
     pg = _get_pg()
-    click.echo(format_timings(pg.fetch_timings(last=last)))
+    click.echo(format_timings(pg.fetch_timings(last=last), ahora=datetime.utcnow()))
 
 
 @cli.command("apply-grants")
@@ -383,9 +529,90 @@ def apply_grants() -> None:
     DROP se lleva los GRANT concedidos.
     """
     settings = get_settings()
-    result = ApplyGrantsStep(settings).run()
-    _print_result(result)
-    if result.status == StepStatus.FAILED:
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(ApplyGrantsStep(settings), pg, ejecucion)
+
+
+@cli.command("check-coherencia")
+def check_coherencia() -> None:
+    """
+    ¿De qué carga viene cada tabla de raw, y se puede construir encima?
+
+    SOLO LECTURA: no marca huérfanas ni registra nada. Es el comando que
+    responde «¿por qué se negó a construir?» sin abrir una consola de psql.
+
+    Códigos de salida: 0 si raw y stg son coherentes, 1 si alguno no lo es,
+    2 si no se puede ni leer. El 2 se distingue del 1 a propósito: «el
+    datamart es incoherente» y «no he podido comprobarlo» exigen cosas
+    distintas de quien lo lea.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+
+    try:
+        estados = pg.fetch_estado_raw()
+        ultimo_stg = pg.fetch_ultimo_intento_stg()
+    except Exception as e:  # el código 2 es «no se pudo leer»
+        click.secho(f"✗ No se pudo leer el estado de _meta: {e}", fg="red", err=True)
+        sys.exit(2)
+
+    requeridas = [t["source_table"] for t in settings.tables_sigrid.get("tables", [])]
+    veredicto_raw = evaluar_coherencia_raw(estados, requeridas)
+    veredicto_stg = evaluar_coherencia_stg(ultimo_stg)
+
+    click.secho("=== Estado de raw por tabla ===", fg="cyan", bold=True)
+    click.echo(format_estado_raw(estados, veredicto_raw))
+    click.echo("")
+    click.secho("=== Estado de stg ===", fg="cyan", bold=True)
+    click.echo(formatear_veredicto_stg(veredicto_stg))
+
+    if not veredicto_raw.ok or not veredicto_stg.ok:
+        sys.exit(1)
+
+
+@cli.command("check-frescura")
+@click.option(
+    "--umbral-horas",
+    "umbral_horas",
+    type=float,
+    default=UMBRAL_FRESCURA_HORAS,
+    show_default=True,
+    help="Horas sin build correcto a partir de las cuales se considera "
+         "caducado. El valor por defecto es el mismo que vigila la alerta de "
+         "Azure (infra/env/dev.json: frescuraUmbralHoras).",
+)
+@click.option(
+    "--paso",
+    "paso",
+    type=str,
+    default="build_mart",
+    show_default=True,
+    help="Paso del pipeline sobre el que se emite el veredicto.",
+)
+def check_frescura(umbral_horas: float, paso: str) -> None:
+    """
+    ¿Cuánto hace que no hay un build completo? SOLO LECTURA.
+
+    Imprime `_meta.v_frescura` entera —el diagnóstico de «mart está viejo»
+    suele estar en la fila de `ingest_raw`— y emite el veredicto del paso
+    pedido. Sale 0 solo si está FRESCO; 1 si CADUCADO o SIN BUILD REGISTRADO;
+    2 si no puede leer.
+    """
+    pg = _get_pg()
+
+    try:
+        filas = pg.fetch_frescura()
+    except Exception as e:  # el código 2 es «no se pudo leer»
+        click.secho(f"✗ No se pudo leer _meta.v_frescura: {e}", fg="red", err=True)
+        sys.exit(2)
+
+    texto, veredicto = format_frescura(
+        filas, umbral_horas=umbral_horas, paso=paso, ahora=datetime.utcnow()
+    )
+    click.echo(texto)
+
+    if veredicto != VEREDICTO_FRESCO:
         sys.exit(1)
 
 
@@ -1765,10 +1992,9 @@ def build_cierre() -> None:
     INDEPENDIENTE del mart principal. Solo lee de stg.*.
     """
     settings = get_settings()
-    result = BuildCierreStep(settings).run()
-    _print_result(result)
-    if result.status == StepStatus.FAILED:
-        sys.exit(1)
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildCierreStep(settings), pg, ejecucion)
 
 
 @cli.command("build-maestros")
@@ -1781,10 +2007,9 @@ def build_maestros() -> None:
     ingesta (raw) esté hecha; no necesita stage ni mart.
     """
     settings = get_settings()
-    result = BuildMaestrosStep(settings).run()
-    _print_result(result)
-    if result.status == StepStatus.FAILED:
-        sys.exit(1)
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildMaestrosStep(settings), pg, ejecucion)
 
 
 @cli.command("reset-cierre")
@@ -2710,6 +2935,10 @@ def build_compras() -> None:
     import time as _time
 
     pg = _get_pg()
+    # Escribe, así que cierra las huérfanas de procesos muertos (F-024, R4).
+    # No registra paso: ejecuta SQL en línea sin step, y por eso queda fuera
+    # de `v_frescura` (DA-6). Convertirlo en step es otra feature.
+    _arrancar_ejecucion(pg)
     sql_dir = (
         Path(__file__).resolve().parent
         / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "compras"
@@ -3009,6 +3238,9 @@ def build_retenciones() -> None:
     import time as _time
 
     pg = _get_pg()
+    # Igual que `build-compras`: escribe, así que marca huérfanas; no registra
+    # paso porque no hay step al que atribuírselo (DA-6).
+    _arrancar_ejecucion(pg)
     sql_dir = (
         Path(__file__).resolve().parent
         / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "retenciones"

@@ -300,6 +300,11 @@ def _invocar_apply_grants(
         def __init__(self, _settings: Any) -> None:
             pass
 
+        @property
+        def stage(self) -> str:
+            # F-024: `_ejecutar_paso` lo necesita para registrar la fila.
+            return "apply_grants"
+
         def run(self) -> StepResult:
             inicio = datetime(2026, 8, 10, 3, 0, 0)
             return StepResult(
@@ -309,6 +314,20 @@ def _invocar_apply_grants(
                 finished_at=inicio,
             )
 
+    class _PgFalso:
+        """F-024: `apply-grants` pasa por el cliente para marcar y registrar.
+
+        Este test mide el CÓDIGO DE SALIDA del comando, no el registro, así que
+        el doble se limita a no estorbar.
+        """
+
+        def abortar_runs_huerfanos(self, batch_id: str, ahora: Any = None) -> list:
+            return []
+
+        def record_run_completed(self, **_kwargs: Any) -> int:
+            return 1
+
+    monkeypatch.setattr(main, "_get_pg", _PgFalso)
     monkeypatch.setattr(main, "ApplyGrantsStep", _PasoFalso)
     return CliRunner().invoke(main.cli, ["apply-grants"])
 

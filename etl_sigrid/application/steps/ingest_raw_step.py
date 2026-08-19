@@ -48,11 +48,16 @@ class IngestRawStep(PipelineStep):
         only_table: str | None = None,
         full_refresh: bool = False,
         stop_on_error: bool = False,
+        batch_id: str | None = None,
     ) -> None:
         self._settings = settings
         self._only_table = only_table
         self._full_refresh = full_refresh
         self._stop_on_error = stop_on_error
+        # F-024: estampa la ejecución en la fila de cada tabla. Es lo que
+        # después permite responder «¿de qué carga viene raw.obrparpre?», que
+        # es la pregunta que nadie podía contestar el 2026-08-18.
+        self._batch_id = batch_id
 
     @property
     def name(self) -> str:
@@ -167,7 +172,9 @@ class IngestRawStep(PipelineStep):
         pg: PostgresClient,
     ) -> int:
         """Ingesta una tabla. Devuelve el número de filas insertadas."""
-        run_id = pg.record_run_start("ingest", f"ingest_raw.{spec.source_table}")
+        run_id = pg.record_run_start(
+            "ingest", f"ingest_raw.{spec.source_table}", self._batch_id
+        )
 
         try:
             # 1. Schema desde Sigrid
