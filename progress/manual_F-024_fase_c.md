@@ -435,3 +435,78 @@ no hace falta sacar el secreto del vault para ello.
   ejecución con F-024 en Azure será la nocturna programada, salvo que el humano
   decida otra cosa.
 - Ningún `git push`, ninguna PR. Solo commits locales.
+
+---
+
+# T19 · alerta de frescura (R23) — intento del 2026-08-19, 10:30–10:55
+
+**Estado: PARADO en el paso 2 de 3.** La regla **no existe** todavía. Lo que
+sigue es el rastro completo, para no repetir media hora de diagnóstico.
+
+## Lo verificado (pasos 0 y 1 de R23, los dos CUMPLIDOS)
+
+| Paso | Comando | Resultado real |
+|---|---|---|
+| 0 · extensión del puesto | `az extension show --name scheduled-query` | presente, **1.0.0b2** (az 2.87.0) |
+| 1 · la consulta a mano, ventana real | la KQL de R23 con `ago(30h)` | **`Count = 2`** |
+
+Los dos eventos que cuenta son los `build_mart SUCCESS` de la nocturna del 19 y
+de la carga del 18, las dos dentro de la ventana de 30 h. Con `mart` fresco la
+condición `count < 1` **no se cumple**, o sea que la regla no dispararía: es
+exactamente lo que pedía el punto (1) de R23.
+
+Confirmado también, por catálogo, que la regla no existía antes de empezar:
+`az monitor scheduled-query list -g rg-datamart-seg-dev` devuelve **vacío**.
+
+## Lo que falla (paso 2) y lo que NO es
+
+`powershell -NoProfile -File infra\95_create_alert_frescura.ps1` falla siempre,
+con cuatro intentos y **cuatro Trace ID distintos** (08:32:28, 08:45:07,
+08:47:48, 08:50:26 UTC), en el mismo punto: el `create`. El mensaje es
+
+```
+invalid_grant AADSTS50076: ... you must use multi-factor authentication to
+access '797f4846-ba00-4fd7-ba43-dac1f8f63013'   (Service Management API)
+```
+
+**Ese mensaje es engañoso y hay que desconfiar de él.** Lo descartado, con la
+prueba que lo descarta:
+
+| Hipótesis | Prueba | Veredicto |
+|---|---|---|
+| La sesión de `az` caducó | `az login` del humano (08:44) y `az account show` | **NO**: sesión viva, tenant y suscripción correctos |
+| Falta MFA en el token | claim `amr` del token de `management.core.windows.net`: **`['pwd','rsa']`** | **NO**: el token **ya tiene MFA** (contraseña + RSA), `aud` correcto, cliente = Azure CLI |
+| Falta el token de ese audience | `az account get-access-token` para `management.azure.com` **y** `management.core.windows.net` | **NO**: los dos se obtienen, válidos hasta 11:25/11:55 |
+| Las escrituras de ARM están bloqueadas | `az monitor scheduled-query update` sobre una regla inexistente → **`ResourceNotFound`** | **NO**: una escritura de la MISMA extensión llega al ARM y este responde |
+| El `<` de `--condition "count 'Frescura' < 1"` lo reparsea `cmd.exe` | el mismo `update` **con** `--condition` → `ResourceNotFound` | **NO**: el argumento viaja entero |
+| Es cosa de PowerShell frente a Git Bash | mismo `az.cmd` 2.87.0, mismo `~/.azure`, `AZURE_CONFIG_DIR` vacío en los dos | **NO**: comparten binario y caché |
+
+Queda en pie una sola hipótesis, sin confirmar: **el `create` de la extensión
+beta resuelve `--scopes` / `--action-groups` pidiendo token para el tenant
+equivocado**. El puesto tiene un segundo tenant invitado —el de una consultora
+externa— que **sí exige MFA y falla**: aparece como `WARNING` en la salida de
+`az login` con este mismísimo error. Si la extensión lo intenta ahí, el fallo
+que vemos es el de ese tenant, no el nuestro. Se comprobaría pasando
+`--subscription` explícita al `create`, y eso **crea el recurso**, así que lo
+decide el humano.
+
+## Trampa de Git Bash, otra vez (cuesta un intento entero)
+
+El `create` lanzado a mano **desde Git Bash** llegó al ARM y este lo rechazó:
+
+```
+(LinkedInvalidPropertyId) Property id 'C:/Program Files/Git/subscriptions/...'
+at path 'properties.scopes[0]' is invalid
+```
+
+Git Bash convirtió `/subscriptions/...` en una ruta de Windows. Es la trampa ya
+anotada en `current.md`, y aquí muerde también en `--scopes` y en
+`--action-groups`. **Los comandos con ID de recurso van por PowerShell.** Ese
+intento, además, dejó un dato útil: **con IDs mal, la petición sí se autenticó**
+y el ARM contestó, lo que refuerza que el token vale.
+
+## Lo que NO se ha tocado
+
+Ninguna escritura efectiva en Azure: la regla no se creó, nada se modificó. El
+`update` de la prueba iba contra un nombre inexistente a propósito. Cuando se
+retome, el paso 1 no hay que repetirlo salvo que pasen 30 h sin carga.
