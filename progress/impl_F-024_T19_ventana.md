@@ -435,4 +435,4 @@ supervivientes y la vía paralela puede regalarlos—. Si se toca
 | Commit | Qué |
 |---|---|
 | `0c40e61` | el criterio de 30 h se comprueba sobre la consulta que se envía, no sobre el texto (los tres puntos del reviewer) |
-| `<este>` | la consulta se compone en una función también en `design.md`/`requirements.md`/`tasks.md`, el análisis de los 2 supervivientes y la corrección del número de mutación |
+| `1816d07` | la consulta se compone en una función también en `design.md`/`requirements.md`/`tasks.md`, el análisis de los 2 supervivientes y la corrección del número de mutación |
