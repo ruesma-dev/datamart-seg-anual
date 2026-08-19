@@ -209,7 +209,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-011-carga-incremental/ (sdd=true)"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "priority": 11,
       "branch": "feature/F-011-carga-incremental",

@@ -5,13 +5,15 @@
 
 Resumen: **31 features**, 18 abiertas, 13 terminadas.
 
+En curso: **F-011**.
+
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-025 | Ventana de negocio: acotar el build de stg y mart a lo que se mueve | 10 | pendiente | critico | `feature/F-025-ventana-negocio-build` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
-| F-011 | Carga incremental del datamart | 11 | spec lista | critico | `feature/F-011-carga-incremental` |
+| F-011 | Carga incremental del datamart | 11 | en curso | critico | `feature/F-011-carga-incremental` |
 | F-031 | La alerta de frescura se queda encendida para siempre y deja de avisar | 11 | pendiente | estandar | `feature/F-031-alerta-no-se-resuelve` |
 | F-006 | MCP de bases de datos como servicio en cloud | 12 | pendiente |  | `feature/F-006-mcp-azure` |
 | F-017 | Cierre mensual: incorporar los costes indirectos (CI) | 12 | pendiente |  | `feature/F-017-cierre-costes-indirectos` |
@@ -62,7 +64,7 @@ Dos defectos de harness/mutacion.py descubiertos el 2026-08-19 durante T19 de F-
 
 ### F-011 · Carga incremental del datamart
 
-estado **spec lista** · prioridad 11 · rigor `critico` · SDD sí · rama `feature/F-011-carga-incremental`
+estado **en curso** · prioridad 11 · rigor `critico` · SDD sí · rama `feature/F-011-carga-incremental`
 
 Hoy el job nocturno ejecuta siempre --full. Conseguir que las cargas que no sean la inicial sean rapidas. HALLAZGO QUE CONDICIONA EL DISENO (F-009): Sigrid NO tiene una marca de ultima modificacion fiable — en el diccionario 'fecalt' aparece en 16 tablas, 'fecmod' en 3 y 'sello' en 2 — asi que no hay watermark directo y hay que construirlo. Palancas: ventana de negocio (ejercicio en curso y obras abiertas, con recarga completa semanal), altas nuevas por el 'ide' autoincremental, y un watermark propio mantenido por el ETL en _meta. Sospecha a verificar antes de disenar nada: el cuello de botella puede no estar en la base sino en la extraccion, porque sigrid-api limita a 1000 filas por peticion y el balanceador corta a los 230 s; encaja con que el intento de abril muriera en la ingesta. La spec debe empezar por medir, no por optimizar.
 
