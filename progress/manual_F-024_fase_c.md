@@ -720,3 +720,37 @@ tabla (el sub-paso que falló fue `puerta_raw`, no un build).
 `caj-datamart-seg-dev-lf64bpa`. Fin estimado hacia las 15:15 local. Al
 terminar hay que comprobar: `check-coherencia` OK, `check-frescura` con hora
 nueva y ningún `Activated` en el buzón.
+
+
+## Paso 5 de T18: la recuperacion, CUMPLIDA
+
+La recarga `caj-datamart-seg-dev-lf64bpa` termino en **`Succeeded`** a las
+**15:10:49 local (13:10:49 UTC)**: 2 h 45 min, en linea con las cargas
+anteriores. Verificado desde el puesto justo despues:
+
+```
+check-coherencia -> Coherencia de raw: OK. Las tablas declaradas provienen
+                    todas de la ejecucion 20260819T102544Z-5c4257.
+                    Coherencia de stg: OK.                         salida 0
+
+check-frescura   -> build_mart  2026-08-19 13:08:38   0.5 h   5,319,602 filas
+                    build_mart: FRESCO (umbral 30.0 h)             salida 0
+```
+
+**R24 queda cumplido de punta a punta**: la muerte externa se detecto, la
+huerfana se cerro con motivo, la puerta freno el build, el `mart` publicado no
+se daño en ningun momento, y la recarga devolvio el datamart a un estado
+coherente con una sola identidad de ejecucion en las 25 tablas.
+
+### Un tropiezo de entorno que conviene tener escrito
+
+Entre el paso 4 y el paso 5 se perdio el acceso desde el puesto:
+`connection timeout expired`. **No era la base: era el firewall.** La IP publica
+del puesto rota, y rapido — en menos de una hora paso de `90.160.92.88` (regla
+de ayer) a `77.211.5.90` y de ahi a `77.211.5.107`. Perseguirla IP a IP no
+funciona: la regla `datamart-puesto-pgris-2026-08-19` acabo ampliada al rango
+`77.211.5.0-255`, igual que se hizo el 17-ago con `31.4.242.0/24`.
+
+Las tres reglas del puesto (`-17-rango`, `-18` y `-19`) las retira el bloque 3
+de F-023, que por esto mismo va **al final**: quita el acceso que hace falta
+para trabajar.
