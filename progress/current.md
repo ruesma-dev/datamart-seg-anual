@@ -115,9 +115,9 @@ cerrado.
   nocturna entra a las 04:00: se pisarían. Hay que lanzarlo con la mañana por
   delante, o desactivando antes la programación.
 - **T19** (~15 min: alerta, ventana corta 1h/5m, correo `Activated`, restaurar
-  a 30h/1h) **sí es factible a cualquier hora** y no interfiere con la
-  nocturna. Es el candidato natural para retomar. Exige que el humano vea
-  llegar el correo.
+  a **48h**/1h — ojo, ya no 30h: ver el aviso de abajo) **sí es factible a
+  cualquier hora** y no interfiere con la nocturna. Es el candidato natural
+  para retomar. Exige que el humano vea llegar el correo.
 - **T20, segunda mitad** (`stage --sin-puerta` registrando `SKIPPED`) **no se
   puede lanzar con el `.env` apuntando a Azure**: serían 1 h 51 de escritura
   sobre `stg` justo antes de la nocturna. O se hace en local con
@@ -360,8 +360,18 @@ y en `infra/README.md`:**
   puesto), `powershell -NoProfile -File infra\95_create_alert_frescura.ps1`,
   y la prueba de extremo a extremo con ventana corta (`update
   --window-size 1h --evaluation-frequency 5m`), correo Activated,
-  restaurar a `30h`/`1h`. Hoy la KQL devuelve ≥1 desde las 15:08 (primer
+  restaurar a **`48h`**/`1h`. Hoy la KQL devuelve ≥1 desde las 15:08 (primer
   `build_mart SUCCESS` del job).
+  **Aviso del 2026-08-19 (arreglado en el repositorio, pendiente de ejecutar):**
+  el primer `create` lo rechazó el ARM —`WindowSize of 1800 minutes is not
+  supported`— porque `windowSize` solo admite unas granularidades fijas y las
+  30 h de DA-4 no están entre ellas. DA-4 no cambia; cambia cómo se expresa:
+  la **ventana** es ahora la menor granularidad admitida que la contiene
+  (**48 h**, la calcula el propio script) y el **criterio de 30 h** viaja
+  dentro de la KQL como `| where TimeGenerated > ago(30h)`. Por eso al
+  restaurar hay que poner `48h`: con `30h` el `update` se rechaza y la regla
+  se queda con la ventana corta de la prueba, disparando cada hora. Detalle y
+  evidencias en `progress/impl_F-024_T19_ventana.md`.
 - **T20 (R26)**: en local, `check-coherencia` sobre el raw anterior a
   F-024 debe decir `sin_batch`; `stage --sin-puerta` debe construir y
   registrar `SKIPPED`.
