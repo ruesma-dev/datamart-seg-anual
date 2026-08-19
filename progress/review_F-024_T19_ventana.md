@@ -417,3 +417,288 @@ Todas las mutaciones de control de este informe se aplicaron en el árbol real
 y se revirtieron con `git checkout --`. Estado final comprobado:
 `git status --porcelain` sin salida y `git diff --quiet` en verde. El
 repositorio queda exactamente como estaba en `69d8b79`.
+
+---
+---
+
+# Re-review · 2026-08-19 (segunda pasada)
+
+Reviewer, 2026-08-19, tarde. Alcance: commits `0c40e61` y `1816d07` (más
+`2c64dae`, de una línea del informe). La primera pasada de arriba **no se
+reescribe**: queda tal cual, y este bloque cuenta qué ha cambiado.
+
+`bash harness/init.sh` en verde al abrir y al cerrar esta pasada:
+**`617 passed`** (614 antes) y `PUERTA COBERTURA: 100.0% de 372 líneas
+cambiadas cubiertas (372/372, umbral 80%, nivel critico)`.
+
+**Contra Azure, nada**: ni `create`, ni `update`, ni `show`, ni `az login`.
+Sabiendo que la alerta está restaurada a `48h`/`1h` esperando el
+`Deactivated`, no se ha ejecutado ningún comando de `az` ni el script.
+
+## Veredicto de la segunda pasada
+
+**APPROVED**
+
+Los tres puntos están corregidos, y el bloqueante está cerrado de verdad, no
+movido de sitio: lo he comprobado repitiendo mi propio experimento contra el
+árbol de ahora. Además, la corrección del número de mutación que trae el
+implementer es **cierta**, y la he verificado de forma independiente
+ejecutando la campaña completa yo mismo.
+
+Queda **pendiente, no imputable**: la evidencia manual de R23 (correo
+`Activated` / `Deactivated`), que lleva el líder con el humano y que el nivel
+`critico` exige para cerrar F-024. Mi veredicto cubre código, tests y
+documentación, y no depende de ella.
+
+## Punto 1 · El bloqueante está cerrado, no desplazado
+
+La composición de la consulta pasa a `Componer-ConsultaFrescura`
+(`infra/95_create_alert_frescura.ps1:142-186`), que los tests **ejecutan** con
+`powershell` y sobre cuyo valor devuelto afirman. El mecanismo se amplía sin
+encarecerse: `_ejecutar_funciones_del_script()` evalúa en **una sola pasada**
+las ventanas de los 14 umbrales *y* la consulta real, y la cachea.
+
+Cinco experimentos sobre el árbol de ahora, todos aplicados al árbol real y
+restaurados desde copia previa (nunca con `git checkout`, por la lección de
+§12 del implementer):
+
+| # | Manipulación | Resultado | Lectura |
+|---|---|---|---|
+| **E1** | quitar `$filtroTemporal` de la concatenación de `$kql`, dejando su definición intacta — **mi experimento de la primera pasada, literal** | **ROJO**: `1 failed, 616 passed` (`test_f024_r22_la_kql_acota_el_criterio_con_el_umbral`) | **el bloqueante está cerrado**: antes daba `614 passed` |
+| **E2** | lista de granularidades mutilada (`2880` → `1800`) | **ROJO**: `7 failed, 26 passed` | punto 3 cerrado (antes eran 5 fallos y el test de la lista **no** estaba entre ellos; ahora sí) |
+| **E3** | `-UmbralHoras ($horas + 18)` en la llamada | **VERDE**: `617 passed` | **agujero residual**, ver abajo |
+| **E4** | `-UmbralHoras 48` literal | **ROJO**: `1 failed` (`...es_la_que_viaja_en_condition_query`) | el eslabón textual sujeta el caso realista |
+| **E5** | `--condition-query $consultaVieja` | **ROJO**: `1 failed` (mismo test) | punto 2 cubierto |
+
+**El agujero equivalente un paso más allá existe, pero es residual y está
+declarado.** E3 pasa porque el test que ejecuta la función la llama con el
+umbral de `dev.json`, mientras que lo que el *script* le pasa se comprueba por
+texto (que la llamada lleve `$CFG.job` y `$horas`). Una aritmética deliberada
+—`($horas + 18)`— satisface el texto y cambia el valor. No lo considero
+bloqueante por tres razones: no es un accidente plausible (no es lo que deja
+un merge mal resuelto, que es E1 y cae); los dos caminos realistas (E4, E5)
+caen; y el implementer **declara el límite por escrito** en su §9, con el
+motivo —cerrarlo del todo exigiría extraer la invocación de `az` a una función,
+en un script que no puede probar contra Azure y cuya regla está ahora mismo en
+mitad de la verificación manual—. Es una decisión razonada, no un olvido. Lo
+dejo anotado para cuando la alerta esté verificada y el script se pueda tocar
+con red.
+
+Mención aparte para dos tests que van más allá de lo que pedí y que son los
+que más valor añaden:
+
+- `test_f024_r22_la_kql_acota_el_criterio_con_el_umbral` no solo comprueba que
+  el `ago(...)` lleva las horas del umbral: comprueba que **no coinciden con
+  las de la ventana**. Es la afirmación que impide que criterio y ventana
+  converjan por accidente, que era el fondo del problema.
+- `test_f024_r22_el_nombre_de_la_consulta_es_el_que_cuenta_la_condicion` cruza
+  `--condition "count 'X' < 1"` con el nombre que devuelve la función. Ese
+  fallo —la regla contando un resultado inexistente y quedándose muda sin que
+  Azure proteste— no lo había pedido nadie y es de los que no se descubren
+  hasta que falta un correo.
+
+## Punto 2 · La corrección de la campaña de mutación: **confirmada**
+
+### Lo que verifiqué, y cómo
+
+**a) Ningún test puede matar esos mutantes.** `grep -rn "bold" tests/` →
+**cero coincidencias**.
+
+**b) Los dos mutantes están vivos.** Aplicados a mano en el árbol real
+(`main.py:564` y `:567`, `bold=True` → `bold=False`), la suite entera pasa:
+**`617 passed`**. Restaurado desde copia previa.
+
+**c) La campaña completa, ejecutada por mí.**
+`python -m harness.mutacion --feature F-024 --workers 1`:
+
+```
+108 mutantes evaluados, 106 muertos, 2 supervivientes, 0 timeouts en 970.8 s
+```
+
+Y los dos supervivientes de mi campaña son **exactamente** `main.py:564` y
+`main.py:567`, los dos `bold=True → bold=False`. Los totales de mi informe y
+los del implementer (`progress/mutacion_F-024_T19b.md`) son **idénticos**,
+comprobado con `diff` sobre las líneas de totales.
+
+> Mi campaña sobrescribe `progress/mutacion_F-024.md` (el informe de la Fase
+> B). Lo he restaurado con `git checkout --` tras guardar mi resultado fuera
+> del repositorio. El fichero queda como estaba.
+
+**Conclusión: el `108 / 108 / 0` de la primera vuelta era falso y el número
+bueno es `108 / 106 / 2`.** El implementer tiene razón, lo ha corregido por su
+cuenta antes de que nadie se lo pidiera, y ha marcado el error en su informe
+anterior en vez de reescribirlo. Eso es exactamente lo que hay que hacer con
+un número publicado que resulta ser falso.
+
+Los dos supervivientes son presentación pura (`bold` de dos cabeceras
+decorativas), ya analizados y aceptados como **equivalentes** en la Fase B, y
+su análisis está completo en `mutacion_F-024_T19b.md`: **ninguna sección en
+`PENDIENTE`**. El nivel `critico` queda satisfecho con esa justificación
+escrita, que es la que ya aceptó la review de la Fase B.
+
+### Causa raíz del fallo del arnés, localizada y reproducida
+
+No me quedé en confirmar el número, porque el coordinador señalaba que afecta
+a cualquier feature `critico` que use la vía paralela. **La causa está
+identificada, es determinista y no es una condición de carrera.**
+
+Son dos defectos que se suman:
+
+**1. En un worktree, la suite de este repositorio está rota de base.**
+Creé un worktree igual que los que crea el modo paralelo
+(`git worktree add --detach <ruta> HEAD`) y ejecuté la suite **sin mutar nada**:
+
+```
+3 failed, 614 passed          # exit code 1
+FAILED tests/test_f015_cobertura.py::test_f015_r12_la_rama_actual_se_lee_de_git
+FAILED tests/test_f024_cli.py::test_f024_r19_la_ayuda_ensena_el_umbral_y_el_paso_por_defecto
+FAILED tests/test_f024_dominio.py::test_f024_r1_batch_id_tiene_forma_y_es_unico
+```
+
+Dos motivos, los dos consecuencia directa del diseño del modo paralelo: el
+worktree está en **detached HEAD** (`rama_actual()` devuelve `""`, de ahí el
+fallo de F-015) y **no tiene los ficheros no versionados**, empezando por
+`.env` (comprobado: el árbol principal sí lo tiene, el worktree no).
+
+**2. `harness/mutacion.py:312-314` cuenta cualquier suite roja como mutante
+muerto.**
+
+```python
+if proceso.returncode in (0, PYTEST_SIN_TESTS):
+    return SUPERVIVIENTE
+return MUERTO
+```
+
+No distingue «la suite falló **por el mutante**» de «la suite estaba fallando
+**de todas formas**». Con la suite base en rojo dentro del worker, **todo
+mutante sale muerto**. De ahí el `108/108/0` exacto: no es que matara dos
+mutantes de más, es que el modo paralelo **no puede dar otro resultado** en
+este repositorio.
+
+Lo más incómodo: la docstring de `harness/mutacion_paralela.py` **ya predice
+este fallo** entre sus «limitaciones conocidas» («un proyecto que las viole
+verá la suite roja en el worker y contará mutantes “muertos” de más»). Está
+escrito y no se comprueba. Un aviso en un docstring no es una salvaguarda.
+
+### Alcance del daño: acotado, y esta es la buena noticia
+
+El modo paralelo entró en este repositorio el **2026-08-18** con la v1.5.0 del
+arnés (`15676f7`). Todos los informes de mutación anteriores —F-003, F-004,
+F-005, F-015, F-016, F-019, F-020— son de campañas **en serie** y **no están
+afectados**. En particular `mutacion_F-020.md` (46/46/0), que a primera vista
+tiene la misma huella sospechosa de «cero supervivientes», es del 2026-08-10 y
+por tanto anterior al modo paralelo: **su cero es legítimo**.
+
+El único informe afectado de todo el repositorio es
+`progress/mutacion_F-024_T19.md`, que es justo el que el implementer ya ha
+marcado como falso. **No hace falta revisión retroactiva de ninguna feature
+cerrada.** Para otros repositorios con la v1.5.0 instalada, la conclusión no
+se traslada sin comprobarlo.
+
+## Checkpoints de la segunda pasada
+
+Solo lo que cambia respecto a la primera pasada; el resto se mantiene.
+
+- **C1** `[x]` — `init.sh` en verde, `617 passed`, cobertura 100 % (372/372).
+- **C2** `[x]` — sin cambios: una feature `in_progress`, rama correcta.
+- **C3** `[x]` — sigue sin tocarse Python de producción; el `.ps1` mantiene
+  BOM, CRLF, cabecera con ruta y español sin tildes. **Barrido de secretos
+  repetido por mí** sobre las líneas añadidas de `0c40e61` y `1816d07`, con
+  los mismos patrones de la primera pasada: **0 hallazgos**.
+- **C3 bis** — N/A justificado: no se toca `docs/referencia/`.
+- **C4** `[x]` — trazabilidad completa; la fila que en la primera pasada
+  marqué como «hay test pero no cubre el requisito» (R22.3b) queda cubierta
+  por los cuatro tests nuevos. Ningún test toca red ni BBDD.
+- **C4 bis** `[x]` — **el punto que más cambia**:
+  - **Fase RED**: traza real pegada (§10), `19 failed, 14 passed` antes y
+    `33 passed` después.
+  - **Cobertura**: `[OK]`, 100 % de 372 líneas.
+  - **Mutación**: totales **verificados de forma independiente por mí, esta
+    vez incluyendo el recuento de muertos**, no solo el alcance y la
+    generación. `108 / 106 / 2`, coincidentes con los del implementer.
+  - **Supervivientes**: dos, equivalentes, con análisis completo. Ninguno en
+    `PENDIENTE`.
+  - **Evidencias**: sección presente con los cuatro números y, además, con la
+    corrección del número anterior marcada en vez de borrada.
+  - **Pruebas de control**: 4 declaradas por el implementer, y 5 ejecutadas
+    por mí, de las cuales 4 en rojo.
+- **C4 ter** — N/A por configuración: no existe `harness/rutas_sensibles.json`.
+- **C5** `[x]` — `tasks.md` con `T19 bis` actualizado y T19 correctamente
+  `[ ]` (la verificación manual sigue en curso). Árbol de trabajo limpio.
+  `features.json` refleja `in_progress`.
+
+## Lo que hice mal en la primera pasada
+
+Lo dejo escrito porque es la parte útil de este episodio para el siguiente
+reviewer. En la primera pasada verifiqué el alcance y la generación de la
+campaña (1268 líneas, 12 ficheros, 108 mutantes) y los di por buenos, que es
+literalmente lo que pide `CHECKPOINTS.md` en C4 bis. **Pero el error no estaba
+en la generación: estaba en el recuento de muertos, que el protocolo no manda
+verificar.** Recalcular los mutantes con `harness.alcance` y
+`harness.mutacion.generar_mutantes` es un cálculo puro y barato, y por eso el
+protocolo lo pide; comprobar los muertos exige volver a correr la campaña, que
+son 16 minutos. Se me escapó por seguir el protocolo al pie de la letra en vez
+de preguntarme qué número era el que sostenía el veredicto. Un
+`0 supervivientes` en nivel `critico` es exactamente el número que hay que
+desconfiar, porque es el que nadie vuelve a mirar.
+
+## Automejora (propuestas, NO aplicadas)
+
+Las dos de la primera pasada siguen en pie (declarar `infra/**.ps1` como ruta
+sensible; exigir en C4 bis la prueba de control de los tests que cubren código
+no mutable). Esta pasada añade tres más, todas sobre el mismo hueco: **un
+número de mutación no vale nada si no es reproducible.**
+
+**3 · Medir la línea base antes de repartir (`harness/mutacion_paralela.py`).**
+Antes de crear worktrees y evaluar nada, correr la suite **sin mutar** en un
+worker y exigir `returncode == 0`. Si sale roja, **abortar la campaña** con el
+motivo, en vez de producir un informe de ceros. Es la comprobación que
+convierte la «limitación conocida» ya escrita en el docstring en una
+salvaguarda real. Coste: una ejecución de suite.
+
+**4 · Distinguir «suite rota» de «mutante muerto» (`harness/mutacion.py`).**
+Hoy cualquier `returncode` distinto de 0 y 5 es `MUERTO`. Los códigos de
+pytest no son equivalentes: `1` es «tests fallaron» (mutante muerto de
+verdad), pero `2` (interrumpido), `3` (error interno) y `4` (error de uso)
+significan que la suite **no llegó a juzgar nada**. Tratarlos como un
+resultado propio —`INVALIDO`— y hacer que la campaña se detenga si aparecen,
+en vez de contarlos como éxitos.
+
+**5 · Que una campaña interrumpida no deje el árbol mutado.** Lo aportó el
+coordinador y lo he vivido en esta misma review: mi campaña quedó huérfana
+tras una caída, siguió mutando ficheros de producción, y al matarla dejó un
+mutante aplicado en `etl_sigrid/infrastructure/postgres/frescura.py`. El
+riesgo real es **commitear un mutante creyendo que es código**. Dos medidas,
+ninguna cara:
+   - dejar una **marca en disco** mientras la campaña está viva (por ejemplo
+     `progress/.mutacion_en_curso`, con el PID y el fichero que está mutado en
+     ese momento), que `harness/init.sh` mire y convierta en `[ERROR]` con
+     instrucciones de restaurar;
+   - que la campaña, al arrancar, **compruebe esa marca** y se niegue a
+     empezar si una anterior no cerró limpiamente.
+
+   Un corolario para `CHECKPOINTS.md` o para el protocolo del reviewer:
+   **mientras una campaña de mutación esté corriendo, nadie toca el árbol** —
+   ni para restaurar lo que parece un resto abandonado, porque puede ser el
+   mutante en vuelo, y entonces el recuento entero deja de valer. Es lo que
+   invalidó mi primera campaña. Por eso, en esta pasada, no escribí ni este
+   informe mientras la campaña estaba en marcha.
+
+Si el humano acepta cualquiera de las cinco, la regla de propagación de
+`CLAUDE.md` manda llevarlas también a `arnes-base`.
+
+## Nota de método de la segunda pasada
+
+Los cinco experimentos del punto 1 y la mutación manual de los dos `bold` se
+aplicaron sobre el árbol real y se restauraron **desde copia previa**, no con
+`git checkout`. Mi campaña de mutación sobrescribió
+`progress/mutacion_F-024.md`, restaurado después con `git checkout --` tras
+copiar la evidencia fuera del repositorio. Estado final comprobado:
+`git status --porcelain` sin ficheros de producción modificados,
+`bash harness/init.sh` en verde con **`617 passed`**.
+
+Incidente propio, para que conste igual que el implementer anotó el suyo: una
+caída a mitad de esta pasada dejó mi primera campaña huérfana y corriendo, y
+el intento de sanear el árbol le quitó el mutante que estaba evaluando. Ese
+recuento se descartó entero y la campaña se relanzó desde cero. El número que
+sostiene este veredicto es el de la segunda, completa y sin interrupciones.
