@@ -3,18 +3,12 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **30 features**, 19 abiertas, 11 terminadas.
-
-En curso: **F-023**.
-
-Bloqueadas: **F-003**.
+Resumen: **30 features**, 17 abiertas, 13 terminadas.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-003 | Infra: despliegue como Container Apps Job diario | 7 | bloqueada | critico | `feature/F-003-infra-caj` |
-| F-023 | Cierre operativo de F-003: las tres verificaciones de F-004 en Azure | 8 | en curso | estandar | `feature/F-023-cierre-operativo-f003` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
 | F-011 | Carga incremental del datamart | 11 | pendiente |  | `feature/F-011-carga-incremental` |
 | F-031 | La alerta de frescura se queda encendida para siempre y deja de avisar | 11 | pendiente | estandar | `feature/F-031-alerta-no-se-resuelve` |
@@ -43,25 +37,15 @@ Bloqueadas: **F-003**.
 | F-014 | Arnes generico versionado, reutilizable en cualquier proyecto | 4 | estandar |
 | F-004 | Ejecutar el ETL en Azure sin dependencias locales | 5 | estandar |
 | F-015 | Verificar que los tests son de verdad: mutacion, fase RED, cobertura y niveles de rigor | 6 | estandar |
+| F-003 | Infra: despliegue como Container Apps Job diario | 7 | critico |
 | F-020 | Arnes multi-servicio: preparar arnes-base para monorepos de varias apps/servicios | 8 | estandar |
+| F-023 | Cierre operativo de F-003: las tres verificaciones de F-004 en Azure | 8 | critico |
 | F-019 | Build de stg.plan_mensual por tramos: caber en el servidor compartido | 9 | critico |
 | F-024 | Coherencia del datamart ante cargas truncadas: deteccion, puerta y frescura | 9 | critico |
 | F-016 | Refuerzo de tests para los huecos de riesgo alto de F-005 | 10 | estandar |
 | F-008 | Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api | 20 | documental |
 
 ## Detalle
-
-### F-003 · Infra: despliegue como Container Apps Job diario
-
-estado **bloqueada** · prioridad 7 · rigor `critico` · SDD sí · rama `feature/F-003-infra-caj`
-
-Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev, escribiendo contra el Postgres de F-005. Dockerfile ya en raíz y scripts PowerShell esbozados en infra/ con varios TODO por cerrar (ACR, host de Postgres, secretos). Secretos en Key Vault, nunca en el repo. Incluye observabilidad: logs consultables y aviso ante fallo del job.
-
-### F-023 · Cierre operativo de F-003: las tres verificaciones de F-004 en Azure
-
-estado **en curso** · prioridad 8 · rigor `estandar` · SDD no · rama `feature/F-023-cierre-operativo-f003`
-
-REDUCIDA 2026-08-19 por decision del humano: los bloques 2 (retirada de secretos duplicados en kv-albaranes-rs9k2) y 3 (limpieza del puesto) SALEN de aqui y pasan a F-032 con prioridad baja, porque eran limpieza operativa y estaban bloqueando el cierre de F-003, que es lo que interesa liberar para empezar F-011 y luego el MCP. Lo que queda: las tres verificaciones MANUAL heredadas de F-004 sobre los Excels auxiliares en Azure. ESTADO COMPROBADO CONTRA AZURE EL 2026-08-19, que corrige lo que decia la ficha anterior: la preparacion YA ESTA HECHA -los tres Excels estan en el contenedor aux de stdatamartsegdev, el job desplegado tiene las AUX_EXCEL_* como URIs de blob y el humano ya tiene el rol Storage Blob Data Reader sobre la cuenta-. Lo que la ficha decia de las rutas de OneDrive es cierto solo del .env DEL PUESTO, no del job. Verificacion 1 CUMPLIDA (2026-08-19 14:42 UTC): load-aux desde el puesto con las AUX_EXCEL_* apuntando al blob da SUCCESS con origen=blob para los tres; se paso por entorno en la invocacion, sin tocar .env, que es intocable. Verificacion 2 CUMPLIDA (2026-08-19 10:55:57 UTC): la carga del job leyo los tres desde el blob con identidad gestionada y el log lo acredita con origen=blob y ubicacion blob: stdatamartsegdev/aux/..., sin una sola ruta local. Queda la verificacion 3 (prueba negativa: sin el rol, load-aux debe fallar diciendo QUE rol falta y QUE hacer, y despues se reasigna). RIESGO CONOCIDO de la verificacion 3: quitar y devolver una asignacion de rol exige User Access Administrator u Owner sobre la cuenta, y sobre stdatamartsegdev los tiene el propietario de la suscripcion, no el usuario del puesto; misma raiz que F-026. Si no se puede ejecutar, se justifica la desviacion por escrito y la acepta o la rechaza el reviewer. Evidencias en progress/manual_F-023.md. VERIFICACION 3 CUMPLIDA el 2026-08-19 14:51 UTC sin necesidad de tocar RBAC: se apunto load-aux a una cuenta de almacenamiento sobre la que el puesto NO tiene Storage Blob Data Reader, en vez de quitar el rol de la propia. Azure devolvio 403 AuthorizationPermissionMismatch para los tres ficheros y el ETL lo tradujo nombrando el rol exacto, la cuenta, la variable de entorno implicada y los dos caminos segun entorno; salida 1. La desviacion es mejor que el requisito original en tres cosas: no exige permisos que el puesto no tiene, no deja ninguna asignacion que devolver -el riesgo del original era quedarse sin acceso si el reasignado falla- y no toca permisos de un recurso compartido. Las tres verificaciones quedan cumplidas; falta solo la documentacion de cierre y el veredicto del reviewer.
 
 ### F-029 · La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado
 
@@ -201,11 +185,23 @@ estado **terminada** · prioridad 6 · rigor `estandar` · SDD sí · rama `feat
 
 Hoy el arnes comprueba que los tests PASAN, pero nada comprueba que sean tests de verdad. Un test que pasa siempre es peor que no tener test: da falsa tranquilidad y ademas cuesta mantenerlo. Adoptado del arnes de Uncle Bob (github.com/betta-tech/harness-sdd, rama uncle-bob-harness) y de la skill old-coder (github.com/AmazingAng/old-coder), cuya tesis es que el humano no revisa codigo sino evidencias: un plan de pruebas antes y un informe con numeros reales despues. Precedente propio: el implementer de F-005 inyecto una contrasena falsa en .env.example para comprobar que el barrido de secretos saltaba. Eso ya es mutation testing sobre un test; esta feature lo generaliza. NO se adopta Gherkin: ya tenemos requisitos EARS con test trazable (test_fXXX_rN_*), que da la misma trazabilidad sin un tercer artefacto que mantener. NO se adopta que el reviewer pueda podar features: las features salen de decisiones de negocio del humano. Es una mejora GENERICA: se porta a arnes-base en el mismo trabajo.
 
+### F-003 · Infra: despliegue como Container Apps Job diario
+
+estado **terminada** · prioridad 7 · rigor `critico` · SDD sí · rama `feature/F-003-infra-caj`
+
+Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev, escribiendo contra el Postgres de F-005. Dockerfile ya en raíz y scripts PowerShell esbozados en infra/ con varios TODO por cerrar (ACR, host de Postgres, secretos). Secretos en Key Vault, nunca en el repo. Incluye observabilidad: logs consultables y aviso ante fallo del job.
+
 ### F-020 · Arnes multi-servicio: preparar arnes-base para monorepos de varias apps/servicios
 
 estado **terminada** · prioridad 8 · rigor `estandar` · SDD sí · rama `feature/F-020-arnes-multiservicio`
 
 Creada el 2026-08-10 a peticion del humano, con prioridad maxima tras F-003. Motivo: las apps del ecosistema (albaranes, partes, portal) estan hoy repartidas en varios repos por servicio (albaranes son 6: infra, ingesta email, api, persistencia...) y van a unificarse en UN monorepo por app via git subtree, con UN arnes en la raiz que cubra features que cruzan servicios. El arnes actual asume un unico proyecto Python en la raiz: harness/init.sh hace un solo compileall/pytest, y hay que adaptarlo para descubrir y validar varios servicios (cada uno con su venv, sus tests y posiblemente lenguajes distintos), degradando con elegancia en los que no sean Python. Alcance: (1) init.sh multi-servicio en arnes-base, configurable (p. ej. clave services en un fichero del arnes o autodescubrimiento por subcarpetas con marcador), (2) verificar que harness/alcance-cobertura-mutacion funcionan con rutas de subcarpetas de servicios (trabajan sobre git diff contra dev con rutas relativas a la raiz, en principio si), (3) instalador y GUIA_INSTALACION.md actualizados con el camino monorepo multi-servicio, (4) subida de version del arnes (1.3.0) y prueba real contra una estructura de varios servicios (fixture o el piloto de albaranes), (5) este repositorio datamart NO cambia de estructura: solo recibe la mejora de init.sh si le aplica. La migracion de cada app a monorepo (subtrees, pipelines, azure-apps) NO es de esta feature: es trabajo en los repos de cada app, con esta feature como prerrequisito.
+
+### F-023 · Cierre operativo de F-003: las tres verificaciones de F-004 en Azure
+
+estado **terminada** · prioridad 8 · rigor `critico` · SDD no · rama `feature/F-023-cierre-operativo-f003`
+
+REDUCIDA 2026-08-19 por decision del humano: los bloques 2 (retirada de secretos duplicados en kv-albaranes-rs9k2) y 3 (limpieza del puesto) SALEN de aqui y pasan a F-032 con prioridad baja, porque eran limpieza operativa y estaban bloqueando el cierre de F-003, que es lo que interesa liberar para empezar F-011 y luego el MCP. Lo que queda: las tres verificaciones MANUAL heredadas de F-004 sobre los Excels auxiliares en Azure. ESTADO COMPROBADO CONTRA AZURE EL 2026-08-19, que corrige lo que decia la ficha anterior: la preparacion YA ESTA HECHA -los tres Excels estan en el contenedor aux de stdatamartsegdev, el job desplegado tiene las AUX_EXCEL_* como URIs de blob y el humano ya tiene el rol Storage Blob Data Reader sobre la cuenta-. Lo que la ficha decia de las rutas de OneDrive es cierto solo del .env DEL PUESTO, no del job. Verificacion 1 CUMPLIDA (2026-08-19 14:42 UTC): load-aux desde el puesto con las AUX_EXCEL_* apuntando al blob da SUCCESS con origen=blob para los tres; se paso por entorno en la invocacion, sin tocar .env, que es intocable. Verificacion 2 CUMPLIDA (2026-08-19 10:55:57 UTC): la carga del job leyo los tres desde el blob con identidad gestionada y el log lo acredita con origen=blob y ubicacion blob: stdatamartsegdev/aux/..., sin una sola ruta local. Queda la verificacion 3 (prueba negativa: sin el rol, load-aux debe fallar diciendo QUE rol falta y QUE hacer, y despues se reasigna). RIESGO CONOCIDO de la verificacion 3: quitar y devolver una asignacion de rol exige User Access Administrator u Owner sobre la cuenta, y sobre stdatamartsegdev los tiene el propietario de la suscripcion, no el usuario del puesto; misma raiz que F-026. Si no se puede ejecutar, se justifica la desviacion por escrito y la acepta o la rechaza el reviewer. Evidencias en progress/manual_F-023.md. VERIFICACION 3 CUMPLIDA el 2026-08-19 14:51 UTC sin necesidad de tocar RBAC: se apunto load-aux a una cuenta de almacenamiento sobre la que el puesto NO tiene Storage Blob Data Reader, en vez de quitar el rol de la propia. Azure devolvio 403 AuthorizationPermissionMismatch para los tres ficheros y el ETL lo tradujo nombrando el rol exacto, la cuenta, la variable de entorno implicada y los dos caminos segun entorno; salida 1. La desviacion es mejor que el requisito original en tres cosas: no exige permisos que el puesto no tiene, no deja ninguna asignacion que devolver -el riesgo del original era quedarse sin acceso si el reasignado falla- y no toca permisos de un recurso compartido. Las tres verificaciones quedan cumplidas; falta solo la documentacion de cierre y el veredicto del reviewer.
 
 ### F-019 · Build de stg.plan_mensual por tramos: caber en el servidor compartido
 

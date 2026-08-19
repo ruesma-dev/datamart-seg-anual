@@ -312,7 +312,7 @@ lo último que faltaba del despliegue y el bloque 5 no está completo sin ellas.
 
 ## Cierre
 
-- [ ] **T27**: Anotar en `progress/current.md` el resultado de cada verificación
+- [x] **T27** (2026-08-19): Anotar en `progress/current.md` el resultado de cada verificación
       MANUAL, las decisiones abiertas que queden (DA-1/DA-2/DA-3 con su
       resolución) y el ID de suscripción todavía presente en el historial de git
       (riesgo §9), para que el humano decida.

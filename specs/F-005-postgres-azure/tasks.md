@@ -163,13 +163,15 @@ Ninguna la ejecuta un agente. Todos los comandos van con
       ```
       az postgres flexible-server firewall-rule create -g rg-albaranes-dev -n psql-albaranes-rs9k2 \
         --rule-name mcp-<puesto>-<AAAA-MM-DD> --start-ip-address <IP> --end-ip-address <IP>
+      az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
+      ```
+
       > NOTA 2026-08-19 (al cerrar F-003): este comando, tal cual, NO EJECUTA.
       > En `create` el servidor va en `--server-name`/`-s` y la regla en
       > `--name`/`-n`; `--rule-name` no existe en esta CLI. No se reescribe la
       > tarea porque F-005 esta `done` y su historia no se toca; la version
       > correcta esta en `docs/runbook_postgres_azure.md`.
-      az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
-      ```
+
       El listado posterior debe contener **exactamente** las reglas de T12 más
       la nueva.
 

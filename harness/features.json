@@ -94,7 +94,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-003-infra-caj/ (sdd=true)"
       ],
-      "status": "blocked",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 7,
@@ -343,9 +343,9 @@
         "El README de infra y azure-apps/datamart_seg_anual.md reflejan que los Excels se leen del blob",
         "F-003: tasks.md con T23-T26 y las verificaciones marcadas, veredicto APROBADO del reviewer y status done; bash harness/init.sh en verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
-      "rigor": "estandar",
+      "rigor": "critico",
       "priority": 8,
       "branch": "feature/F-023-cierre-operativo-f003"
     },

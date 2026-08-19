@@ -471,3 +471,151 @@ discusión de desviación sobre un requisito que en realidad se cumplía tal cua
 **Propuesta**: cuando una ficha o una spec reformule un requisito de otra
 feature, que **cite el original o lo enlace**. Una línea de coste; aquí habría
 ahorrado el análisis entero.
+
+---
+
+# Segunda pasada · 2026-08-19 (tarde)
+
+Revisados los commits `09c2a44`, `5bee7e4` y `1883289` sobre el HEAD `4a10bfa`.
+Alcance de esta pasada, el que anuncié: el diff de `tasks.md`, los dos ficheros
+del comando y `current.md`, más los dos ficheros del trabajo extra.
+
+**`bash harness/init.sh` tal cual: exit 0, 617 passed, `PUERTA COBERTURA [OK]
+100,0 % de 372 líneas cambiadas (372/372, umbral 80 %, nivel critico)`.** Los
+dos `[AVISO]` son los de siempre. Árbol limpio y un solo worktree, comprobados
+al retomar tras la caída.
+
+## Veredicto
+
+| Feature | Veredicto | Puede pasar a `done` |
+|---|---|---|
+| **F-003** | **APPROVED** | Sí, tras los dos apuntes de cierre de abajo |
+| **F-023** | **APPROVED** (sin cambios respecto a la primera pasada) | Sí, después de F-003 |
+
+Los cinco cambios están hechos, y tres de ellos mejor de lo que pedí.
+
+## Los cinco cambios, uno a uno
+
+1. **T18–T22 y T22 bis marcadas** `[x]` — Verificado contra
+   `progress/current.md` §«Tanda 1». No es un marcado a ciegas: la nota de
+   cabecera dice que se marcan apuntando esa evidencia y que **no se ha vuelto a
+   ejecutar nada contra Azure**, que es exactamente la distinción que importa.
+   Y cada tarea anota lo que marcarla a secas habría tapado: que la `staticIp`
+   de T18 no se versiona y por eso no está ahí, que la imagen de T21
+   (`r20260810-1024`) quedó obsoleta antes de T24, y que las copias viejas de
+   T22 bis **siguen vivas** con la condición de R27 ya cumplida. La prueba
+   independiente que apunté para T22 bis —`80_create_job.ps1` aborta sin el
+   secreto en el vault propio, luego T22 y T22 bis funcionaron— quedó recogida.
+   El aviso de T22 sobre que la regla existe «porque quien la creó usó los
+   parámetros correctos, no los que decía la spec» es la frase honesta.
+2. **Comando de firewall corregido** en `infra/README.md` y en R23 — Correcto en
+   los dos sitios: `--resource-group` / `--server-name` / `--name`. La línea del
+   `firewall-rule list` **intacta** con su `-n`, y la asimetría explicada con el
+   aviso de no generalizar el arreglo, que era el riesgo real de esta
+   corrección. Añadido además el detalle del backtick de continuación, que no
+   pedí y evita el siguiente tropiezo.
+3. **F-026 registrada** — Ficha con el defecto descrito y cinco criterios
+   `acceptance` accionables (reintento con espera, mensaje que distingue «aún no
+   propagó» de «no tienes permiso», documentación de quién tiene los permisos,
+   verificación real y arnés en verde), `estandar`, prioridad 14. `init.sh`
+   valida el JSON y `BACKLOG.md` la recoge en la línea 28. Ya no hay punteros a
+   una ficha inexistente.
+4. **T27** — Las tres verificaciones están en `current.md` con hora y resultado,
+   y con las dos cosas que pedían no perderse: que el primer intento de V1 dio
+   `SUCCESS` con `origen=local` y **no valía**, y que V3 se hizo sin tocar RBAC.
+   DA-3 ya no se contradice: la línea que la daba por abierta remite a la tanda 2
+   y explica por qué se corrigió. La deuda del ID de suscripción seguía en su
+   sitio.
+5. **T28 marcada** con el `init.sh` de hoy.
+
+## Las dos cosas de más: la primera, bien; la segunda, bien pensada y mal puesta
+
+**El runbook: acertaste, y era más grave de lo que parecía.**
+`docs/runbook_postgres_azure.md` es documento operativo vivo y sus dos comandos
+no ejecutaban; al `delete` le faltaban además grupo y servidor, así que estaba
+roto por partida doble. Dejarlo «para no ensuciar el diff» habría sido cumplir
+la letra de mi encargo a costa de su motivo: el cambio 2 existía justamente
+porque un comando copiable que falla cuesta media hora. La nota que explica la
+asimetría entre subcomandos —y que en `list` el `-n` **sí** es el servidor y no
+hay que tocarlo— es lo que impide que el próximo «arregle» lo que funciona.
+Barrido el repositorio entero: **no queda ningún comando de firewall ejecutable
+roto**; lo que menciona `--rule-name` es prosa que explica el error.
+
+**F-005: el criterio es correcto, la colocación no.** Anotar en vez de
+reescribir es lo que corresponde en una feature `done` —la spec de una feature
+cerrada es el registro de lo que se hizo, y reescribir sus comandos haría que
+ese registro dejara de coincidir con lo que realmente se ejecutó—. Es el mismo
+criterio que apliqué a la cola de F-004, así que **no lo reviertas: la nota se
+queda**.
+
+Pero está **dentro del bloque de código**, entre el `create` y el `list`
+(`specs/F-005-postgres-azure/tasks.md:166-170`), y ahí hace daño en vez de
+avisar:
+
+- No se renderiza como cita: los `>` salen como texto literal dentro del
+  bloque, así que no parece un aviso sino parte del script.
+- Quien copie el bloque —que es la forma normal de usar una tarea MANUAL— se
+  lleva cinco líneas de prosa en medio de dos comandos. Pegadas en una consola,
+  el `>` inicial es un operador de redirección: en bash el paréntesis de
+  «(al cerrar F-003)» hace saltar un error de sintaxis, y en PowerShell falla
+  igual. Ruido, no aviso.
+- Y el `create` roto que la nota denuncia **sigue siendo la primera línea del
+  bloque**, con el aviso debajo: quien copie solo el primer comando se lleva los
+  flags malos sin haber visto nada.
+
+Se arregla moviendo las cinco líneas **fuera del cierre del bloque**, detrás de
+los ``` de la línea 172. La nota, idéntica; solo cambia de sitio. Va como
+apunte de cierre y no como cambio requerido porque es un movimiento de cinco
+líneas, está en la spec de una feature cerrada y el documento operativo vivo
+—el runbook— ya está correcto.
+
+## Los checkpoints que estaban vacíos en la primera pasada
+
+- **C4 de F-003** `[x]` — El comando exacto de la verificación MANUAL de T22 ya
+  ejecuta, en los dos sitios. El resultado de cada verificación MANUAL está en
+  `current.md`.
+- **C5 de F-003** `[x]` con una salvedad mecánica — De las ocho tareas abiertas
+  quedan **cero por trabajo** y **una por marcar**: T27 sigue en `[ ]`, y no
+  podía ser de otra manera, porque su verificación declarada es «revisión del
+  reviewer contra `CHECKPOINTS.md` C4» y esa revisión es este documento. Doy su
+  contenido por verificado; marcarla es la consecuencia de este veredicto, no
+  trabajo pendiente. Va como apunte de cierre 1.
+
+## Apuntes de cierre
+
+### F-003 (antes de marcarla `done`)
+
+1. **Marcar T27** `[x]` en `specs/F-003-infra-caj/tasks.md`, con este informe
+   como evidencia (segunda pasada, 2026-08-19: contenido en `current.md`
+   verificado, DA-1/DA-2/DA-3 resueltas y fechadas, deuda del ID de suscripción
+   anotada para tu decisión).
+2. **Mover la nota de `specs/F-005-postgres-azure/tasks.md` T16 fuera del
+   bloque de código**, detrás del cierre del bloque. Sin cambiar su texto.
+3. `harness/features.json`: F-003 `blocked` → `done`.
+4. `progress/history.md`: resumen de F-003.
+
+### F-023 · **mantengo los cinco apuntes tal como los escribí**
+
+Nada de lo hecho hoy los altera. Los repito para no obligar a subir:
+
+1. `harness/features.json`, ficha de F-023: `"rigor": "estandar"` →
+   `"critico"`.
+2. F-023 `in_progress` → `done`, **después** de F-003.
+3. `progress/history.md`: resumen de F-023.
+4. Opcional: cerrar las tres verificaciones en la cola de
+   `specs/F-004-.../tasks.md`. Si lo haces, **mismo criterio que acaba de
+   aplicarse a F-005**: nota fechada al lado, no reescritura. Y fuera del
+   bloque de código.
+5. Decisión pendiente, no apunte: qué haces con el bloque 1 de F-032 (las dos
+   copias de contraseñas en el vault de *albaranes*), ahora que la condición de
+   R27 ya se cumple. Hoy ha ganado un recordatorio más en T22 bis.
+
+## Las cuatro propuestas de automejora siguen vivas
+
+Ninguna se ha aplicado, que es lo correcto: son para que decidas tú. Recuerdo la
+que más caro sale si se olvida: **la campaña de mutación es ciega a un techo
+numérico en un `Field(...)`** —cero mutantes en las 12 líneas del cambio de
+F-023, verde por silencio—, y la propuesta es que la campaña imprima «líneas en
+alcance sin ningún mutante generado». El episodio de hoy le da una segunda
+razón: el defecto del RBAC llevaba **nueve días** apuntando a una ficha que no
+existía, y ninguna puerta lo dijo.
