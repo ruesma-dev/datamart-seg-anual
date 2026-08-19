@@ -22,10 +22,16 @@ Ninguno toca Azure: se lee el `.ps1` como texto.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
 
 from tests.test_f003_infra import (
     INFRA,
     PATRONES_PROHIBIDOS,
+    REPO_ROOT,
     _config,
     _lineas_de_codigo,
     _ps1,
@@ -39,6 +45,30 @@ SCRIPT = "95_create_alert_frescura.ps1"
 #: Son los que emite el orquestador al terminar `build_mart` correctamente.
 TERMINOS_DEL_EVENTO = ("step_finished", "build_mart", "SUCCESS")
 
+#: Granularidades de ventana que ADMITE `az monitor scheduled-query`, en
+#: minutos. No es una elección nuestra ni una lista defensiva: es la que
+#: devolvió el ARM el 2026-08-19 al rechazar la primera creación de la regla,
+#: copiada literal del error:
+#:
+#:     (InvalidRequestContent) The request content was invalid and could not be
+#:     deserialized: 'WindowSize of 1800 minutes is not supported. Supported
+#:     granularities are: 5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720,
+#:     1440, 2880'
+#:
+#: 1800 minutos eran las 30 h de DA-4. Entre 1440 (24 h) y 2880 (48 h) no hay
+#: nada, así que el umbral acordado NO cabe como ventana. Esta constante vive
+#: aquí, en el test, a propósito: es la verdad del servicio contra la que se
+#: mide el script, no algo que el script pueda redefinir para ponerse en verde.
+GRANULARIDADES_ADMITIDAS_MINUTOS = (
+    5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720, 1440, 2880,
+)
+
+#: La función del `.ps1` que traduce el umbral a una ventana admisible.
+FUNCION_VENTANA = "Resolver-VentanaAdmitida"
+
+#: El puesto del humano no tiene `pwsh`; los scripts corren con `powershell`.
+POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+
 #: Todo lo que el script tiene que leer del fichero de entorno (R22.1).
 CLAVES_QUE_LEE = (
     "frescuraAlertName",
@@ -49,6 +79,67 @@ CLAVES_QUE_LEE = (
     "alertActionGroupName",
     "alertActionGroupRg",
 )
+
+
+# --- utilidades -------------------------------------------------------------
+
+
+def _minutos_de_ventana(ventana: str) -> int | None:
+    """Traduce una ventana `##h##m##s` a minutos; `None` si no lo es.
+
+    `az` acepta ese formato y NO ISO 8601 (`PT30H` se rechaza), así que los
+    valores escritos en la documentación viajan así y hay que interpretarlos
+    para poder compararlos con las granularidades del servicio.
+    """
+    casa = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?", ventana)
+    if casa is None or not any(casa.groups()):
+        return None
+    horas, minutos, segundos = (int(g or 0) for g in casa.groups())
+    return horas * 60 + minutos + segundos // 60
+
+
+def _funcion_ps(nombre: str) -> str:
+    """El texto de una función del `.ps1`, para poder EJECUTARLA de verdad.
+
+    Leer el script como cadena comprueba que dice lo que tiene que decir, pero
+    no lo que hace: el defecto del 2026-08-19 fue justo eso —una ventana bien
+    formada (`30h`) y a la vez inválida para el servicio—. Extraer la función
+    y ejecutarla es lo único que caza el valor equivocado.
+
+    Delimitación: desde `function <nombre>` hasta la primera `}` en la columna
+    cero, que es como está escrito el fichero (el cuerpo va indentado).
+    """
+    lineas = _script(SCRIPT).splitlines()
+
+    inicio = next(
+        (i for i, linea in enumerate(lineas) if linea.startswith(f"function {nombre}")),
+        None,
+    )
+    assert inicio is not None, f"el script no define la función {nombre}"
+
+    for fin in range(inicio + 1, len(lineas)):
+        if lineas[fin] == "}":
+            return "\n".join(lineas[inicio : fin + 1])
+
+    raise AssertionError(f"la función {nombre} no se cierra con '}}' en la columna cero")
+
+
+def _resolver_ventana(umbral: int, destino: Path) -> subprocess.CompletedProcess[str]:
+    """Ejecuta `Resolver-VentanaAdmitida -UmbralHoras <umbral>` del script real."""
+    guion = destino / "resolver_ventana.ps1"
+    guion.write_text(
+        _funcion_ps(FUNCION_VENTANA)
+        + f"\n$ErrorActionPreference = 'Stop'\n{FUNCION_VENTANA} -UmbralHoras {umbral}\n",
+        encoding="utf-8",
+    )
+
+    assert POWERSHELL is not None
+    return subprocess.run(  # noqa: S603 - ruta resuelta con shutil.which
+        [POWERSHELL, "-NoProfile", "-NonInteractive", "-File", str(guion)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -184,13 +275,16 @@ def test_f024_r22_la_alerta_es_idempotente() -> None:
 
 
 def test_f024_r22_la_ventana_sale_del_umbral_y_no_es_iso_8601() -> None:
-    """La ventana se deriva de `frescuraUmbralHoras`, en formato `##h##m##s`.
+    """La ventana se deriva de `frescuraUmbralHoras` y no se escribe a mano.
 
-    Confirmado con `--help` en T3: `az monitor scheduled-query` NO admite
-    ISO 8601 aquí. Un `PT30H` se rechaza al crear la regla, y el script no se
-    ejecuta contra Azure sin haberlo confirmado.
+    Dos cosas distintas que el script tiene que cumplir a la vez:
+    el formato es `##h##m##s` (`az` rechaza un `PT30H`), y el valor sale de
+    `Resolver-VentanaAdmitida`, no de pegarle una «h» al umbral. Lo segundo es
+    el defecto del 2026-08-19: `$ventana = "{0}h" -f $horas` daba `30h`, bien
+    formado y rechazado por el ARM.
     """
     texto = _script(SCRIPT)
+    codigo = "\n".join(linea for _n, linea in _lineas_de_codigo(INFRA / SCRIPT))
 
     assert "$CFG.frescuraUmbralHoras" in texto
     assert "--window-size" in texto
@@ -201,14 +295,186 @@ def test_f024_r22_la_ventana_sale_del_umbral_y_no_es_iso_8601() -> None:
         "la ventana está en ISO 8601 y az la rechaza; el formato es ##h##m##s"
     )
 
-    # Se compone a partir del umbral, no se escribe un 30 a mano.
-    assert re.search(r'"\{0\}h"\s+-f|"\$\(\$?horas\)h"|"\$\{?horas\}?h"', texto), (
-        "la ventana no se deriva del umbral: escribir el número a mano es "
-        "exactamente lo que hace que la alerta y check-frescura diverjan"
+    # El umbral, que es un criterio en horas, NO vale como ventana tal cual.
+    assert not re.search(r"\$ventana\s*=\s*\"\{0\}h\"\s*-f\s*\$horas", codigo), (
+        "la ventana se compone pegando una 'h' al umbral: eso produjo 30h "
+        "(1800 min), que Azure no admite, y la alerta no se pudo crear nunca"
+    )
+    assert re.search(rf"\$ventana\s*=\s*{FUNCION_VENTANA}\b", codigo), (
+        f"la ventana no sale de {FUNCION_VENTANA}, que es lo que garantiza que "
+        f"sea una granularidad admitida derivada del umbral"
     )
 
     assert re.search(r"--evaluation-frequency\s+1h", texto), (
         "la regla debe evaluarse cada hora"
+    )
+
+
+def test_f024_r22_el_script_declara_las_granularidades_que_admite_azure() -> None:
+    """La lista del error del ARM está en el script, entera y sin retocar.
+
+    Si alguien la «simplifica» —quita la de 2880, añade una inventada— la
+    ventana derivada dejará de ser admisible y el `create` volverá a fallar
+    con `InvalidRequestContent`. Aquí manda la constante del test, que es la
+    que devolvió el servicio.
+    """
+    funcion = _funcion_ps(FUNCION_VENTANA)
+
+    numeros = tuple(int(n) for n in re.findall(r"\d+", funcion))
+    faltan = [g for g in GRANULARIDADES_ADMITIDAS_MINUTOS if g not in numeros]
+    assert not faltan, (
+        f"{FUNCION_VENTANA} no contempla las granularidades {faltan} que el ARM "
+        f"declara admitidas"
+    )
+
+    # Y las contempla como una lista de la que elegir, no a base de ifs sueltos.
+    assert re.search(r"@\(\s*5\s*,", funcion), (
+        "las granularidades no están en una lista literal: escribirlas sueltas "
+        "hace imposible ver de un vistazo si falta alguna"
+    )
+
+
+def test_f024_r22_la_kql_acota_el_criterio_con_el_umbral() -> None:
+    """El criterio de DA-4 (30 h) viaja DENTRO de la consulta, no en la ventana.
+
+    La ventana es más ancha que el criterio porque Azure solo admite unas
+    granularidades fijas (48 h es la primera que contiene 30 h). Sin el filtro
+    temporal en la KQL, la regla juzgaría con 48 h y `check-frescura` con 30:
+    dos verdades distintas sobre el mismo datamart.
+    """
+    codigo = "\n".join(linea for _n, linea in _lineas_de_codigo(INFRA / SCRIPT))
+
+    filtro = re.search(r"TimeGenerated\s*>\s*ago\([^)]*\)", codigo)
+    assert filtro is not None, (
+        "la KQL no acota por TimeGenerated: la regla contaría los eventos de "
+        "toda la ventana (48 h) en vez de los del umbral (30 h)"
+    )
+
+    assert not re.search(r"ago\(\s*\d+\s*h\s*\)", codigo), (
+        "el filtro temporal lleva el número de horas escrito a mano: tiene que "
+        "salir del MISMO umbral que la ventana"
+    )
+
+    linea_del_filtro = next(
+        linea for _n, linea in _lineas_de_codigo(INFRA / SCRIPT)
+        if "TimeGenerated" in linea
+    )
+    assert "$horas" in linea_del_filtro, (
+        f"el filtro temporal no se deriva del umbral: {linea_del_filtro.strip()}"
+    )
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
+def test_f024_r23_la_ventana_del_umbral_configurado_es_una_granularidad_admitida(
+    tmp_path: Path,
+) -> None:
+    """El caso real: con `frescuraUmbralHoras` de `dev.json`, ¿qué envía?
+
+    Este es el test que faltaba el 2026-08-18. Ejecuta la función del script
+    con el umbral que está configurado de verdad y comprueba que el valor que
+    acabaría en `--window-size` es una granularidad que el ARM acepta. Con el
+    script anterior habría salido `30h` = 1800 min, que no está en la lista.
+    """
+    umbral = _config("dev")["frescuraUmbralHoras"]
+
+    resultado = _resolver_ventana(umbral, tmp_path)
+    assert resultado.returncode == 0, resultado.stderr
+
+    ventana = resultado.stdout.strip()
+    minutos = _minutos_de_ventana(ventana)
+    assert minutos is not None, f"la ventana '{ventana}' no está en formato ##h##m##s"
+    assert minutos in GRANULARIDADES_ADMITIDAS_MINUTOS, (
+        f"con un umbral de {umbral} h el script enviaría --window-size {ventana} "
+        f"({minutos} min), que Azure rechaza con InvalidRequestContent"
+    )
+    assert minutos >= umbral * 60, (
+        f"la ventana ({minutos} min) no contiene el umbral ({umbral * 60} min): "
+        f"la regla juzgaría con menos historia de la que dice DA-4"
+    )
+    # Con el umbral acordado en DA-4, esto son 48 h y no otra cosa.
+    assert ventana == "48h", ventana
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
+@pytest.mark.parametrize("umbral", [1, 2, 6, 11, 12, 24, 25, 30, 47, 48])
+def test_f024_r23_la_ventana_es_la_menor_granularidad_que_contiene_el_umbral(
+    umbral: int, tmp_path: Path
+) -> None:
+    """Regla completa, no solo el caso de 30 h.
+
+    «La menor granularidad admitida que contenga el umbral»: ni una que se
+    quede corta (la regla vigilaría menos de lo acordado) ni la mayor de la
+    lista por comodidad (mirar 48 h de logs cuando bastan 12 es más caro y
+    hace la alerta más lenta en reaccionar).
+    """
+    esperado = min(g for g in GRANULARIDADES_ADMITIDAS_MINUTOS if g >= umbral * 60)
+
+    resultado = _resolver_ventana(umbral, tmp_path)
+    assert resultado.returncode == 0, resultado.stderr
+
+    minutos = _minutos_de_ventana(resultado.stdout.strip())
+    assert minutos == esperado, (
+        f"umbral {umbral} h -> ventana {resultado.stdout.strip()} ({minutos} min); "
+        f"la menor admitida que lo contiene es {esperado} min"
+    )
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
+@pytest.mark.parametrize("umbral", [49, 72, 0, -1])
+def test_f024_r23_un_umbral_imposible_falla_antes_de_llamar_a_azure(
+    umbral: int, tmp_path: Path
+) -> None:
+    """Por encima de 2880 min no hay ventana: se para aquí, no en el ARM.
+
+    Enviar una petición que sabemos que se va a rechazar cuesta un viaje a
+    Azure y devuelve un `InvalidRequestContent` que no dice qué hacer. El
+    mensaje del script sí: nombra la clave del fichero de entorno y el tope.
+    """
+    resultado = _resolver_ventana(umbral, tmp_path)
+
+    assert resultado.returncode != 0, (
+        f"con un umbral de {umbral} h el script no falla: enviaría a Azure una "
+        f"ventana inválida"
+    )
+    error = resultado.stderr.lower()
+    assert "frescuraumbralhoras" in error, (
+        f"el mensaje no dice qué clave hay que cambiar: {resultado.stderr}"
+    )
+    assert "48" in error, f"el mensaje no dice cuál es el tope: {resultado.stderr}"
+
+
+def test_f024_r23_la_documentacion_no_manda_restaurar_una_ventana_invalida() -> None:
+    """Las ventanas escritas en la prosa también tienen que ser admisibles.
+
+    La prueba de extremo a extremo de R23 acorta la ventana y luego la
+    restaura. Si el comando de restaurar lleva un valor que Azure no admite,
+    la regla se queda con la ventana corta de la prueba y dispara cada hora
+    hasta que alguien se harte de los correos.
+    """
+    documentos = (
+        INFRA / "README.md",
+        REPO_ROOT / "specs" / "F-024-coherencia-cargas-truncadas" / "requirements.md",
+        REPO_ROOT / "specs" / "F-024-coherencia-cargas-truncadas" / "design.md",
+    )
+
+    # Solo los bloques de código, que es lo que alguien copia y pega. La prosa
+    # puede -y debe- citar el `30h` que resultó inválido: contar la historia es
+    # justo lo que evita que alguien lo reintroduzca, igual que con
+    # `ContainerAppName_s` en la cabecera del script.
+    encontradas = 0
+    for documento in documentos:
+        for bloque in re.findall(r"^```.*?^```", _texto(documento), re.S | re.M):
+            for ventana in re.findall(r"--window-size\s+([0-9]\S*)", bloque):
+                encontradas += 1
+                minutos = _minutos_de_ventana(ventana)
+                assert minutos in GRANULARIDADES_ADMITIDAS_MINUTOS, (
+                    f"{documento.name} manda ejecutar --window-size {ventana} "
+                    f"({minutos} min), que Azure rechaza"
+                )
+
+    assert encontradas >= 2, (
+        "no se ha encontrado ni la ventana de la prueba ni la de restaurar: el "
+        "test no está mirando donde cree"
     )
 
 

@@ -12,10 +12,23 @@
 #
 # COMO FUNCIONA. Regla de consulta programada (KQL) sobre el workspace de Log
 # Analytics: cuenta las lineas de consola del job que digan a la vez
-# 'step_finished', 'build_mart' y 'SUCCESS' dentro de la ventana, y dispara si
+# 'step_finished', 'build_mart' y 'SUCCESS' dentro del umbral, y dispara si
 # hay CERO. Se vigila la AUSENCIA porque es la senal: una regla que buscara "el
 # ultimo evento" no disparia nunca cuando no hay ningun evento, que es
 # exactamente el caso a detectar.
+#
+# LA VENTANA NO ES EL UMBRAL, Y NO ES UN CAPRICHO (defecto del 2026-08-19). El
+# criterio de DA-4 sigue siendo 30 h, pero Azure NO admite una ventana de 30 h:
+# solo acepta unas granularidades fijas y entre 24 h y 48 h no hay ninguna. Asi
+# que el umbral se expresa en DOS sitios, los dos derivados del MISMO
+# 'frescuraUmbralHoras' y ninguno escrito a mano:
+#   - la VENTANA de la regla es la menor granularidad admitida que CONTIENE al
+#     umbral (30 h -> 48 h), y la resuelve Resolver-VentanaAdmitida;
+#   - el CRITERIO son las 30 h exactas, y viaja DENTRO de la consulta como
+#     '| where TimeGenerated > ago(30h)'.
+# Mirar 48 h de logs y contar solo los de las ultimas 30 no cambia lo que se
+# vigila; lo que si lo cambiaria es quitar el filtro de la KQL y dejar que la
+# regla juzgue con 48 h mientras 'check-frescura' juzga con 30.
 #
 # Los tres terminos son los que emite el orquestador al cerrar cada paso. Hay un
 # test (tests/test_f024_infra_alerta.py) que fija los DOS extremos a la vez: si
@@ -30,12 +43,25 @@
 # LO QUE ESTA CONFIRMADO Y NO SE IMPROVISA (T3 de F-024, 2026-08-18):
 #   - la sintaxis es --condition "count 'Nombre' < 1" mas --condition-query
 #     Nombre="<kql>", comprobada con --help;
-#   - las ventanas van en formato ##h##m##s ("30h"), NO en ISO 8601: un PT30H
+#   - las ventanas van en formato ##h##m##s ("48h"), NO en ISO 8601: un PT48H
 #     se rechaza;
 #   - la columna del nombre del job en ContainerAppConsoleLogs_CL es
 #     ContainerJobName_s, verificada con | getschema. ContainerAppName_s -la que
 #     decia el README- NO existe para un job: filtrar por ella devolveria
 #     siempre cero filas y la alerta disparia todas las noches.
+#
+# LA TRAMPA DE --help, que es lo que dejo pasar el defecto: --help valida la
+# FORMA del argumento (##h##m##s), no el VALOR. Un "30h" pasa --help, pasa el
+# cliente de az entero y lo rechaza el servicio al final del viaje:
+#
+#     (InvalidRequestContent) The request content was invalid and could not be
+#     deserialized: 'WindowSize of 1800 minutes is not supported. Supported
+#     granularities are: 5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720,
+#     1440, 2880'
+#
+# Por eso la lista de granularidades esta en el codigo y hay tests que la fijan:
+# lo unico que confirma un valor es haberlo enviado o tener quien lo compruebe
+# en la suite. "Lo dice --help" no es una confirmacion.
 #
 # FALSO POSITIVO ASUMIDO: la regla mide LOGS, no la base de datos. Si el humano
 # reconstruye mart desde su puesto, la regla no lo ve y avisa igual. Es
@@ -54,6 +80,59 @@ param(
 $ErrorActionPreference = "Stop"
 
 . "$PSScriptRoot\00_vars.ps1" -Entorno $Entorno
+
+# --- 0. Del umbral a una ventana que el servicio acepte ---------------------
+
+function Resolver-VentanaAdmitida {
+    <#
+    .SYNOPSIS
+        Traduce el umbral de frescura (horas) a la ventana de la regla.
+
+    .DESCRIPTION
+        Azure solo admite unas granularidades fijas como windowSize, asi que la
+        ventana NO puede ser el umbral: es la menor granularidad admitida que lo
+        CONTIENE. La menor y no la mayor de la lista, porque una ventana mas
+        ancha de lo necesario es mas caro de consultar y no aporta nada: el
+        criterio exacto lo pone el filtro TimeGenerated de la KQL.
+
+        Si el umbral no cabe en ninguna, se para AQUI: enviar una peticion que
+        sabemos rechazada cuesta un viaje al ARM y devuelve un
+        InvalidRequestContent que no dice que hacer.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$UmbralHoras
+    )
+
+    # La lista NO es una eleccion nuestra ni una defensa preventiva: es la que
+    # devolvio el ARM el 2026-08-19 al rechazar la primera creacion de esta
+    # regla ("Supported granularities are: ..."), copiada literal. Entre 1440
+    # (24 h) y 2880 (48 h) no hay nada, y ahi es donde caen las 30 h de DA-4.
+    $granularidades = @(5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720, 1440, 2880)
+
+    if ($UmbralHoras -lt 1) {
+        throw ("el umbral de frescura configurado ($UmbralHoras h) no tiene " +
+               "sentido: 'frescuraUmbralHoras' en infra/env/<entorno>.json debe " +
+               "ser un numero de horas de 1 a 48")
+    }
+
+    $minutos = $UmbralHoras * 60
+    $elegida = $granularidades | Where-Object { $_ -ge $minutos } | Select-Object -First 1
+
+    if (-not $elegida) {
+        throw ("el umbral de frescura configurado ($UmbralHoras h = $minutos min) " +
+               "no cabe en ninguna ventana que admita Azure: la mayor es 2880 min " +
+               "(48 h). Baja 'frescuraUmbralHoras' en infra/env/<entorno>.json a " +
+               "48 o menos, o vigila esa frescura con otro mecanismo")
+    }
+
+    # Formato ##h##m##s, no ISO 8601. En horas cuando toca exacto, que es
+    # siempre para umbrales de 1 h o mas, y en minutos por si algun dia no.
+    if ($elegida % 60 -eq 0) {
+        return ("{0}h" -f ($elegida / 60))
+    }
+    return ("{0}m" -f $elegida)
+}
 
 # --- 1. La extension de az, sin la cual no existe el comando ----------------
 
@@ -87,18 +166,22 @@ if ($LASTEXITCODE -ne 0 -or -not $idAg) {
 
 $horas = [int]$CFG.frescuraUmbralHoras
 
-# Formato ##h##m##s, no ISO 8601. Y derivado del umbral, nunca escrito a mano:
-# el mismo numero decide la ventana de esta alerta y el default de
+# Las dos mitades del criterio, las dos derivadas del MISMO umbral y ninguna
+# escrita a mano: ese numero decide tambien el default de
 # `python main.py check-frescura`, y si divergen la alerta vigila una cosa y el
-# comando juzga otra.
-$ventana = "{0}h" -f $horas
+# comando juzga otra. La ventana sale mas ancha que el umbral porque el servicio
+# solo admite ciertas granularidades (ver la cabecera); el criterio exacto lo
+# pone el filtro temporal dentro de la consulta.
+$ventana = Resolver-VentanaAdmitida -UmbralHoras $horas
+$filtroTemporal = "| where TimeGenerated > ago({0}h)" -f $horas
 
 # La consulta viaja en una variable: al llevar espacios, PowerShell la
 # entrecomilla al invocar az.cmd, y asi los parentesis y las barras verticales
 # del KQL no los vuelve a interpretar cmd.exe.
 $kql = ("ContainerAppConsoleLogs_CL " +
         "| where ContainerJobName_s == '$($CFG.job)' " +
-        "| where Log_s has_all ('step_finished','build_mart','SUCCESS')")
+        "| where Log_s has_all ('step_finished','build_mart','SUCCESS') " +
+        $filtroTemporal)
 $consulta = "Frescura=$kql"
 
 $yaExiste = Invoke-Az monitor scheduled-query show `
@@ -108,7 +191,8 @@ if ($LASTEXITCODE -eq 0 -and $yaExiste) {
     Write-Host "La alerta '$($CFG.frescuraAlertName)' ya existe; no se recrea." -ForegroundColor Yellow
 } else {
     Write-Host "Creando la alerta de frescura '$($CFG.frescuraAlertName)'..." -ForegroundColor Cyan
-    Write-Host ("  Ventana: {0} (umbral de {1} h), evaluada cada hora." -f $ventana, $horas)
+    Write-Host ("  Ventana: {0} -la menor que admite Azure y contiene el umbral-," -f $ventana)
+    Write-Host ("  criterio de {0} h dentro de la consulta, evaluada cada hora." -f $horas)
 
     # --auto-mitigate true: sin el no llega el 'Deactivated' cuando vuelve a
     # haber carga, y la alerta se queda encendida para siempre.
@@ -138,3 +222,5 @@ Write-Host "NO esta verificada hasta que llegue un correo de verdad." -Foregroun
 Write-Host "La prueba de extremo a extremo esta en infra/README.md (R23 de F-024):"
 Write-Host "acortar la ventana fuera del horario de carga, esperar el Activated,"
 Write-Host "restaurarla y comprobar el Deactivated tras la siguiente noche buena."
+Write-Host ("Al restaurar, la ventana es {0}: cualquier otro valor que no sea una" -f $ventana)
+Write-Host "granularidad admitida deja la regla con la ventana corta de la prueba."

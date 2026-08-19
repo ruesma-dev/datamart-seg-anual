@@ -94,7 +94,8 @@ supervivientes sin justificación aceptada por el humano y toda verificación
 > el puesto; sintaxis confirmada con `--help`: `--condition "count
 > 'Frescura' < 1"` + `--condition-query Frescura="<kql>"` + `--window-size`
 > y `--evaluation-frequency` en formato `##h##m##s` (NO ISO 8601: `30h`,
-> no `PT30H`). **La columna del nombre del job en
+> no `PT30H`). **Ojo: esto confirmó la FORMA, no el VALOR — `30h` resultó
+> inválido y lo cuenta la enmienda de DA-4 del 2026-08-19.** **La columna del nombre del job en
 > `ContainerAppConsoleLogs_CL` es `ContainerJobName_s`, NO
 > `ContainerAppName_s`** (verificado con `getschema`; ese nombre no existe).
 > La KQL con `has_all('step_finished','build_mart','SUCCESS')` ejecuta sin
@@ -184,6 +185,38 @@ ninguna escribe correos en el repositorio.
   (`infra/env/dev.json: frescuraUmbralHoras`) y de ahí sale la ventana de
   la alerta y el default del comando `check-frescura` (R19 lo cruza con
   test).
+
+> **Enmienda (2026-08-19): el criterio sigue siendo 30 h; cambia cómo se
+> expresa en la regla.** Al crear la alerta por primera vez, el ARM la
+> rechazó:
+>
+> ```
+> (InvalidRequestContent) The request content was invalid and could not be
+> deserialized: 'WindowSize of 1800 minutes is not supported. Supported
+> granularities are: 5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720,
+> 1440, 2880'
+> ```
+>
+> 1800 min son las 30 h. **`windowSize` no es un valor libre**: solo admite
+> esas granularidades, y entre 1440 (24 h) y 2880 (48 h) no hay ninguna, así
+> que 30 h **no es expresable como ventana**. Decisión del humano, cerrada:
+>
+> 1. la **ventana** de la regla es *la menor granularidad admitida que
+>    contenga el umbral* → con 30 h, **2880 min (48 h)**;
+> 2. el **criterio** de 30 h se aplica **dentro de la consulta**, con un
+>    `| where TimeGenerated > ago(30h)` derivado del mismo
+>    `frescuraUmbralHoras`.
+>
+> La ventana es más ancha que el criterio a propósito y no lo relaja: la
+> regla lee 48 h de logs y **cuenta solo** los de las últimas 30. El umbral
+> sigue viviendo en un solo sitio y la ventana es un valor derivado, nunca
+> escrito a mano. Un umbral por encima de 48 h no sería implementable así:
+> el script falla antes de llamar a Azure y dice qué clave bajar.
+>
+> Por qué no lo cazó nadie antes: T3 dio la sintaxis por confirmada «con
+> `--help`», y `--help` valida la **forma** (`##h##m##s`), no el **valor**.
+> Un `30h` pasa el cliente entero y lo rechaza el servicio al final del
+> viaje. R22 gana tests que ejecutan la derivación de verdad.
 
 ### DA-5 · Puerta también antes de `build_mart` (coherencia de `stg`)
 
@@ -518,8 +551,14 @@ DONDE DA-3 sea la opción A, debe existir
 (`frescuraAlertName`, `frescuraUmbralHoras`, `logAnalytics`, `job`,
 `resourceGroup`, `alertActionGroupName`, `alertActionGroupRg`) sin ningún
 nombre de recurso ni correo literal, (2) sea idempotente (si la regla
-existe, no la recrea), (3) derive la ventana de evaluación de
-`frescuraUmbralHoras` (30 h → `30h`, formato `##h##m##s` de `az`, NO ISO 8601; confirmado en T3) y evalúe cada hora, (4) dispare con
+existe, no la recrea), (3) derive de `frescuraUmbralHoras` **las dos
+mitades del criterio, ninguna escrita a mano** (enmienda de DA-4,
+2026-08-19): la **ventana**, que es la menor granularidad que admite Azure
+y contiene el umbral (30 h → `48h`, formato `##h##m##s`, NO ISO 8601), y el
+**filtro temporal de la consulta**, que es el umbral exacto
+(`| where TimeGenerated > ago(30h)`); si el umbral no cabe en ninguna
+granularidad (> 48 h) el script debe fallar con un mensaje accionable
+**antes** de llamar a Azure, y evalúe cada hora, (4) dispare con
 `count == 0` sobre la consulta de R21 acotada al job por
 `ContainerJobName_s` (nombre real de la columna, confirmado en T3), severidad 2, auto-mitigación activa (que llegue el
 «Deactivated» cuando vuelva a haber carga), (5) sea UTF-8 con BOM, CRLF y
@@ -530,7 +569,15 @@ orden. `infra/env/dev.json` gana `frescuraAlertName` y
 Tests: `test_f024_r22_script_alerta_frescura_lee_de_cfg_y_sin_nombres`,
 `test_f024_r22_script_alerta_frescura_bom_crlf_cabecera`,
 `test_f024_r22_readme_documenta_el_script_en_orden`,
-`test_f024_r22_dev_json_declara_umbral_y_nombre`.
+`test_f024_r22_dev_json_declara_umbral_y_nombre`,
+`test_f024_r22_la_ventana_sale_del_umbral_y_no_es_iso_8601`,
+`test_f024_r22_el_script_declara_las_granularidades_que_admite_azure`,
+`test_f024_r22_la_kql_acota_el_criterio_con_el_umbral` y, ejecutando de
+verdad la función del `.ps1` con `powershell`,
+`test_f024_r23_la_ventana_del_umbral_configurado_es_una_granularidad_admitida`,
+`test_f024_r23_la_ventana_es_la_menor_granularidad_que_contiene_el_umbral` y
+`test_f024_r23_un_umbral_imposible_falla_antes_de_llamar_a_azure`. Leer el
+script como texto no bastaba: `30h` estaba bien formado y era inválido.
 
 > Si el humano elige DA-3 = B, R21/R22 se sustituyen por: parametrizar
 > `80_create_job.ps1`/`85_update_job.ps1`/`90_create_alert.ps1` para un
@@ -544,9 +591,11 @@ CUANDO la regla exista, el humano debe verificarla de extremo a extremo:
 (1) con `mart` fresco, la consulta manual devuelve ≥ 1 y la regla no
 dispara; (2) se acorta temporalmente la ventana a 1 h y la frecuencia a
 5 min (`az monitor scheduled-query update`) fuera del horario de carga →
-debe llegar el correo «Activated» en < 15 min; (3) se restauran ventana y
-frecuencia y llega el «Deactivated» tras la siguiente carga correcta.
-Anotar horas en `progress/current.md`.
+debe llegar el correo «Activated» en < 15 min; (3) se restauran ventana
+(**`48h`**, la real de la regla tras la enmienda de DA-4 — con `30h` el
+`update` se rechaza y la regla se queda con la ventana corta de la prueba,
+disparando cada hora) y frecuencia, y llega el «Deactivated» tras la
+siguiente carga correcta. Anotar horas en `progress/current.md`.
 
 Verificación: MANUAL (humano). Comandos (todos leen los nombres de
 `infra/env/dev.json`; ninguno va escrito aquí con valores):
@@ -565,7 +614,9 @@ powershell -NoProfile -File infra\95_create_alert_frescura.ps1
 # 3 · provocar: ventana corta, esperar el correo, restaurar
 az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 1h --evaluation-frequency 5m
 #   ... correo Activated recibido a las HH:MM ...
-az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 30h --evaluation-frequency 1h
+#   Restaurar con 48h: es la ventana que crea el script (umbral 30 h envuelto
+#   en la menor granularidad admitida). Un 30h aqui se rechaza.
+az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 48h --evaluation-frequency 1h
 ```
 
 Resultado esperado: correo Activated en la prueba, Deactivated tras

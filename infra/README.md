@@ -303,19 +303,39 @@ powershell -NoProfile -File infra/95_create_alert_frescura.ps1
 az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 1h --evaluation-frequency 5m
 
 # Restaurar. Tras la siguiente carga correcta debe llegar el «Deactivated».
-az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 30h --evaluation-frequency 1h
+# La ventana real es 48h, NO 30h: ver el aviso de abajo.
+az monitor scheduled-query update -g <resourceGroup> -n <frescuraAlertName> --window-size 48h --evaluation-frequency 1h
 ```
 
-Las ventanas van en formato `##h##m##s` (`30h`), **no en ISO 8601**: un `PT30H`
+Las ventanas van en formato `##h##m##s` (`48h`), **no en ISO 8601**: un `PT48H`
 se rechaza.
+
+**Y el valor tampoco es libre.** Azure solo admite estas granularidades de
+ventana, en minutos: `5, 10, 15, 30, 45, 60, 120, 180, 240, 300, 360, 720,
+1440, 2880`. El primer intento de crear la regla (2026-08-19) se rechazó con
+`(InvalidRequestContent) WindowSize of 1800 minutes is not supported` porque
+1800 min son las 30 h del umbral y entre 1440 (24 h) y 2880 (48 h) no hay nada.
+Ojo con `--help`: valida la **forma** `##h##m##s`, no el **valor**.
+
+Por eso el criterio de 30 h y la ventana son dos cosas distintas, las dos
+derivadas del mismo `frescuraUmbralHoras`:
+
+- la **ventana** es la menor granularidad admitida que lo contiene, **48 h**, y
+  la calcula el propio script (`Resolver-VentanaAdmitida`);
+- el **criterio** son las 30 h exactas y viaja dentro de la consulta, en el
+  `| where TimeGenerated > ago(30h)` de la KQL de arriba.
+
+Si al restaurar pones una ventana que Azure no admite, el `update` falla y la
+regla se queda con la ventana corta de la prueba, disparando cada hora.
 
 **Falso positivo asumido**: la regla mide **logs**, no la base de datos. Si
 reconstruyes `mart` desde el puesto, la regla no lo ve y avisa igual. Es
 coherente con lo que vigila: «el job hizo su trabajo».
 
 El umbral vive en `infra/env/dev.json` (`frescuraUmbralHoras`) y de ahí salen
-la ventana de la regla y el valor por defecto de `python main.py
-check-frescura`. Hay un test que cruza los dos para que no diverjan.
+la ventana de la regla, el filtro temporal de su consulta y el valor por
+defecto de `python main.py check-frescura`. Hay tests que cruzan los tres para
+que no diverjan.
 
 ## Diagnóstico desde el puesto cuando algo huele mal
 

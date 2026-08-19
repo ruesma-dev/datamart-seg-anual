@@ -238,8 +238,9 @@ Se registra como `build_mart.puerta_stg`.
 
 ```
 $horas   = [int]$CFG.frescuraUmbralHoras            # 30
-$ventana = "{0}h" -f $horas                          # formato ##h##m##s de az (30h), NO ISO 8601
-$kql     = "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '$($CFG.job)' | where Log_s has_all ('step_finished','build_mart','SUCCESS')"
+$ventana = Resolver-VentanaAdmitida -UmbralHoras $horas   # 30 h -> "48h" (ver abajo)
+$filtro  = "| where TimeGenerated > ago({0}h)" -f $horas   # el criterio exacto: 30 h
+$kql     = "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '$($CFG.job)' | where Log_s has_all ('step_finished','build_mart','SUCCESS') $filtro"
 
 az monitor scheduled-query create -g <rg> -n $CFG.frescuraAlertName `
     --scopes <id del workspace $CFG.logAnalytics> `
@@ -251,9 +252,20 @@ az monitor scheduled-query create -g <rg> -n $CFG.frescuraAlertName `
     --description "El datamart lleva mas de $horas h sin un build_mart completo"
 ```
 
+- **Enmienda (2026-08-19): la ventana es `48h`, no `30h`.** `windowSize` solo
+  admite unas granularidades fijas (5, 10, 15, 30, 45, 60, 120, 180, 240,
+  300, 360, 720, 1440, 2880 min) y 1800 min no está entre ellas: el ARM
+  rechazó la creación con `InvalidRequestContent`. La ventana pasa a ser la
+  menor granularidad que contiene el umbral (`Resolver-VentanaAdmitida`, en
+  el propio script) y el criterio de 30 h se aplica en la KQL con
+  `ago(30h)`; los dos derivan del mismo `frescuraUmbralHoras`. Umbral > 48 h
+  → el script falla con mensaje accionable antes de llamar a Azure. Detalle
+  en la enmienda de DA-4 de `requirements.md`.
 - **Sintaxis CONFIRMADA en Fase A (T3, 2026-08-18): `--window-size 30h`,
   `--evaluation-frequency 1h` (formato `##h##m##s`, NO ISO 8601) y columna
-  `ContainerJobName_s`.** Texto original de la duda, conservado: la forma exacta de `--condition`
+  `ContainerJobName_s`.** El `--window-size 30h` de esta línea resultó
+  FALSO: `--help` valida la forma, no el valor (ver la enmienda de arriba).
+  Texto original de la duda, conservado: la forma exacta de `--condition`
   / `--condition-query` y si `--window-size` admite `PT30H` o exige `P1DT6H`
   (`az monitor scheduled-query create --help` tras `az extension add`). El
   script no se ejecuta contra Azure sin haberlo confirmado; ese es el

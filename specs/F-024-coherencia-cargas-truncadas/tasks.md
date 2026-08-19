@@ -108,9 +108,19 @@ que exija BBDD real o Azure es `MANUAL (humano)` con su comando exacto en
       sin Activated. | Verificación: MANUAL (humano) — comandos de R24 con
       horas y salidas reales.
 - [ ] **T19**: (DA-3 = A) R23: crear la regla con el script 95, ventana
-      corta para provocar el correo Activated, restaurar, Deactivated tras
-      la siguiente noche buena. | Verificación: MANUAL (humano) — horas de
-      Activated/Deactivated en `progress/current.md`.
+      corta (`1h`) para provocar el correo Activated, restaurar a `48h`
+      —la ventana real de la regla, ver la enmienda de DA-4 del
+      2026-08-19—, Deactivated tras la siguiente noche buena.
+      | Verificación: MANUAL (humano) — horas de Activated/Deactivated en
+      `progress/current.md`.
+      - [x] **T19 bis** (2026-08-19, AUTO): el primer intento de creación lo
+            rechazó el ARM (`WindowSize of 1800 minutes is not supported`).
+            Arreglado en `infra/95_create_alert_frescura.ps1`: la ventana la
+            deriva `Resolver-VentanaAdmitida` de la lista de granularidades
+            admitidas y el criterio de 30 h viaja en la KQL como
+            `ago(30h)`. | Verificación: `python -m pytest
+            tests/test_f024_infra_alerta.py` (30 passed; tres de ellos
+            ejecutan la función del `.ps1` con `powershell`).
 - [ ] **T20**: R26 en local: `check-coherencia` KO por `sin_batch` sobre
       el raw anterior, `stage` se niega, `ingest --full` (o
       `stage --sin-puerta` registrado) y construye. | Verificación: MANUAL
