@@ -146,10 +146,28 @@ del humano, recurso a recurso, y la ejecuta él.
 
 ```powershell
 az containerapp env show -g <resourceGroup> -n <containerAppsEnv> --query properties.staticIp -o tsv
-az postgres flexible-server firewall-rule create -g <pgResourceGroup> -n <servidor> `
-  --rule-name <job> --start-ip-address <ip> --end-ip-address <ip>
+az postgres flexible-server firewall-rule create --resource-group <pgResourceGroup> --server-name <servidor> --name <job> --start-ip-address <ip> --end-ip-address <ip>
 az postgres flexible-server firewall-rule list -g <pgResourceGroup> -n <servidor> -o table
 ```
+
+**Ojo con los nombres de los parámetros del `create`, que no son los que uno
+espera** (corregido el 2026-08-19; la versión anterior de este README **no
+ejecutaba**, y tropezar con ella costó media hora y una regla de firewall de
+más):
+
+- El **servidor** va en `--server-name`/`-s`. Pasarlo en `--name` falla con
+  «the following arguments are required: --server-name/-s», que no dice lo que
+  uno cree que dice.
+- La **regla** se nombra con `--name`/`-n`. **`--rule-name` no existe** en la
+  CLI del puesto: devuelve «unrecognized arguments».
+- Y **la asimetría que hay que respetar**: en el `firewall-rule list` de la
+  tercera línea, `-n` **sí** es el servidor —`list` no recibe nombre de regla—,
+  así que esa línea está bien tal cual. No la «arregles» a `-s`: se rompería.
+  Los dos subcomandos usan `-n` para cosas distintas, y es de la CLI, no un
+  descuido de este README.
+
+El `create` va **en una sola línea a propósito**: un backtick de continuación
+con un espacio detrás rompe el comando en PowerShell sin decir por qué.
 
 El servidor tiene además una regla que autoriza a cualquier recurso de Azure.
 **No se debe depender de ella**: autoriza también a suscripciones ajenas.

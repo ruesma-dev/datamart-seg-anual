@@ -186,3 +186,111 @@ ENTORNO LISTO. Puedes trabajar.
 
 Los dos `[AVISO]` son previos a este trabajo: `F-003` está `blocked` a propósito
 hasta cerrar F-023, y los avisos de `ruff` son deuda declarada que no bloquea.
+
+---
+
+# Segunda pasada · 2026-08-19, tras el review de cierre
+
+`progress/review_F-023_F-003_cierre.md`: **F-023 APPROVED**, **F-003
+CHANGES_REQUESTED** con cinco cambios. Tres eran míos (1, 2 y 5); los otros dos
+—la ficha de F-026 y `progress/current.md`— los hace el líder, y no he tocado
+`harness/features.json`, `BACKLOG.md` ni `progress/current.md`.
+
+El reviewer confirma además el punto que dejé abierto en la primera pasada:
+**ninguna de T23–T26 estaba marcada por inercia y no hay nada que desmarcar**.
+El problema era el inverso, y es el cambio 1.
+
+## Cambio 1 · Seis tareas con evidencia y sin marcar, más T28
+
+Marcadas en `specs/F-003-infra-caj/tasks.md`, cada una con **qué se verificó**,
+no solo un `[x]`. La evidencia es la tanda 1 del bloque 5
+(`progress/current.md`, 2026-08-10). **No se ha ejecutado nada contra Azure**
+para marcarlas: son apuntes de lo ya verificado.
+
+| Tarea | Qué acredita la evidencia |
+|---|---|
+| T18 | `rg-datamart-seg-dev` con los 7 tags `acens-*` (`costcenter=pendiente`), Log Analytics PerGB2018 a 30 días, entorno **sin VNet** con logs a Log Analytics, `staticIp` anotada |
+| T19 | Storage con los **tres** flags de R17 y contenedor `aux`; vault con RBAC y vacío; identidad con **exactamente 3 roles** de ámbito recurso |
+| T20 | `SIGRID-API-FUNCTION-KEY` en el vault, comprobado **por nombre** (nunca `secret show`) |
+| T21 | Imagen con **tag único y sin `latest`**, publicada sin credenciales de registro |
+| T22 | Regla de firewall creada por el humano con autorización expresa; R23 pide «correcto si tras ello R22 pasa», y R22 pasó en T24 |
+| T22 bis | Los dos secretos `pg-*` listados en el vault del proyecto, migrados sin exponer valores (lo único que R27 exige) |
+| T28 | `bash harness/init.sh` hoy: **exit 0**, 617 passed, cobertura 100,0 % de 372 líneas |
+
+Tres cosas que he dejado escritas en las tareas, porque marcarlas a secas habría
+tapado información que ya costó dinero una vez:
+
+- **T18 no lleva la `staticIp` escrita en la spec**, aunque la tarea pide
+  «anotar la `staticIp`»: el repositorio no versiona direcciones IP. La tarea
+  remite a `progress/current.md`, donde está, y dice por qué no está aquí.
+- **T21 quedó obsoleta sola.** Su imagen (`r20260810-1024`) no es la que
+  verificó T24: la tanda 2 reconstruyó (`r20260817-2025`) para incluir los fixes
+  de T13. Está dicho en la tarea, en vez de dejar dos tags que no cuadran.
+- **T22 bis anota que las copias viejas siguen vivas** en el vault de otro
+  proyecto y que la condición de R27 —«que el job funcione»— ya se cumple, así
+  que su borrado (bloque 1 de F-032) **toca decidirlo**. Es el aviso del
+  reviewer, puesto donde se leerá al reabrir la tarea.
+
+**Ninguna tarea se ha quedado abierta por falta de evidencia.** Las que siguen
+en `[ ]` son T27 (exige contenido nuevo en `progress/current.md`, que es del
+líder) y nada más.
+
+## Cambio 2 · El comando de firewall que no ejecutaba
+
+Corregido en los dos sitios copiables que pedía el reviewer:
+
+- `infra/README.md`, paso 2 de «Pasos que exigen autorización expresa»
+- `specs/F-003-infra-caj/requirements.md`, bloque de **R23**
+
+De `create -g <grupo> -n <servidor> --rule-name <regla>` a
+`create --resource-group <grupo> --server-name <servidor> --name <regla>`.
+Fuente: `progress/manual_F-024_fase_c.md` (commit `7cc4fa1`), donde está
+verificado que el servidor va en `--server-name`/`-s`, la regla en `--name`/`-n`
+y que **`--rule-name` no existe** en la CLI del puesto.
+
+Además de corregirlo, en los dos ficheros queda escrito **por qué**, porque un
+comando arreglado sin explicación se vuelve a romper:
+
+1. Los dos mensajes de error reales y lo que confunden: pasar el servidor en
+   `--name` responde «the following arguments are required: --server-name/-s», y
+   `--rule-name` responde «unrecognized arguments».
+2. **La asimetría entre subcomandos, que es la trampa de verdad**: la línea del
+   `firewall-rule list`, dos más abajo en el README, **está bien con
+   `-n <servidor>`** porque `list` no recibe nombre de regla, así que ahí `-n`
+   *sí* es el servidor. **No la he tocado**, y las dos correcciones dicen
+   explícitamente que no se generalice el arreglo a `list`: quien «arregle» esa
+   línea a `-s` la romperá. Es comportamiento de la CLI, no un descuido.
+3. El `create` va **en una sola línea a propósito**: un backtick de continuación
+   con un espacio detrás rompe el comando en PowerShell sin decir por qué.
+
+### Dos sitios más con el mismo defecto, que NO he tocado
+
+El barrido de `--rule-name` en el repositorio devuelve **dos apariciones más**,
+las dos copiables, y ninguna estaba en el encargo:
+
+- `docs/runbook_postgres_azure.md`, línea **181** (el `create` del runbook, con
+  el mismo `-n <servidor> --rule-name`) y línea **201** (un
+  `firewall-rule delete --rule-name <nombre>`, roto por el mismo motivo).
+- `specs/F-005-postgres-azure/tasks.md`, **T16**, mismo `create`.
+
+**Por qué no las he corregido, aunque el arreglo sea idéntico**: el reviewer
+cierra diciendo que revisará «solo el diff de `tasks.md`, los dos ficheros del
+comando y `current.md`». Un tercer y cuarto fichero entrarían sin que nadie los
+mire, y uno de ellos es la spec de una feature ya cerrada. **Lo dejo señalado
+con línea exacta**: el runbook es documento operativo vivo y su `create` y su
+`delete` fallan igual que fallaba este; el de F-005 es histórico y molesta
+menos. Decisión del líder, no mía.
+
+## Verificación de esta pasada
+
+`bash harness/init.sh` tal cual, **antes** de commitear: **exit 0**, **617
+passed** en 5,95 s, `PUERTA COBERTURA [OK] 100.0% de 372 líneas cambiadas
+(372/372, umbral 80%, nivel critico)`. Los dos `[AVISO]` siguen siendo los
+preexistentes (`ruff` 152, deuda; y F-003 `blocked` a propósito). Ni una línea
+de Python tocada en esta pasada tampoco: mutación no procede, cobertura sin
+diferencias propias que medir.
+
+Barrido propio antes de commitear: **ni una IP, ni un GUID, ni un correo, ni un
+ID de suscripción o tenant** en los tres ficheros tocados. La `staticIp` del
+entorno se menciona por su nombre de propiedad, nunca por su valor —ver T18—, y
+la puerta `test_f003_r4_...` pasa en verde.

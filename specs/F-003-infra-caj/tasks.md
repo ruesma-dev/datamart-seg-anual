@@ -147,18 +147,37 @@ agente escribe en Azure.
 
 Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
 
-- [ ] **T18**: Prerrequisitos y creación de la base de infraestructura.
+> **Las seis tareas siguientes (T18–T22 y T22 bis) se ejecutaron el
+> 2026-08-10** —«tanda 1 del bloque 5»— y su resultado verificado está en
+> `progress/current.md` §«Tanda 1 del bloque 5 · EJECUTADA por el humano el
+> 2026-08-10». Se marcan el 2026-08-19 **apuntando esa evidencia**: no se ha
+> vuelto a ejecutar nada contra Azure para marcarlas.
+
+- [x] **T18**: Prerrequisitos y creación de la base de infraestructura.
       **Verificación**: MANUAL (humano):
       `powershell -NoProfile -File infra/05_check_prereqs.ps1`, luego `10_create_rg.ps1`,
       `20_create_observability.ps1`, `30_create_env.ps1`; comprobar con los
       comandos de **R15** y **R16**. Anotar la `staticIp` del entorno.
+      **HECHA el 2026-08-10**: `rg-datamart-seg-dev` en spaincentral con los 7
+      tags `acens-*` (R15; `costcenter=pendiente` hasta que acens dé el centro
+      de coste), `log-datamart-seg-dev` PerGB2018 con retención de 30 días y
+      `cae-datamart-seg-dev` **sin VNet** enviando logs a Log Analytics (R16).
+      La `staticIp` del entorno quedó anotada en `progress/current.md` —no aquí,
+      porque el repositorio no versiona direcciones IP— y es la que usó T22.
 
-- [ ] **T19**: Storage, Key Vault e identidad.
+- [x] **T19**: Storage, Key Vault e identidad.
       **Verificación**: MANUAL (humano): `40_create_storage.ps1`,
       `50_create_keyvault.ps1`, `60_create_identity.ps1`; comprobar con **R17**
       y **R19**.
+      **HECHA el 2026-08-10**: `stdatamartsegdev` con los tres flags de R17
+      —sin acceso público, **sin clave compartida**, TLS 1.2— y el contenedor
+      `aux`; `kv-datamart-seg-dev` con RBAC y vacío; `id-datamart-seg-dev` con
+      **exactamente 3 roles de ámbito recurso** (R19). Ese tercer rol,
+      `Storage Blob Data Reader`, es el que hace funcionar la lectura de los
+      Excels desde el blob (verificada el 2026-08-19,
+      `progress/manual_F-023.md`).
 
-- [ ] **T20**: Cargar el secreto de `sigrid-api` en el vault. Requiere que el
+- [x] **T20**: Cargar el secreto de `sigrid-api` en el vault. Requiere que el
       humano tenga `Key Vault Secrets Officer` sobre el vault (crearlo no lo
       concede).
       **Verificación**: MANUAL (humano):
@@ -167,18 +186,35 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       **Nunca `secret show`; el valor no se escribe en ningún fichero del
       repositorio ni en `progress/`.** Preferir `--file` a `--value` para no
       dejar el secreto en el historial del shell.
+      **HECHA el 2026-08-10**: `SIGRID-API-FUNCTION-KEY` presente en
+      `kv-datamart-seg-dev`, comprobado **por nombre** con `secret list` (nunca
+      `secret show`). El valor no está en ningún fichero del repositorio.
 
-- [ ] **T21**: Construir y publicar la imagen.
+- [x] **T21**: Construir y publicar la imagen.
       **Verificación**: MANUAL (humano): `powershell -NoProfile -File infra/70_build_image.ps1`
       y comprobar con **R20**. Anotar el tag publicado.
+      **HECHA el 2026-08-10**: `datamart-seg-anual:r20260810-1024` en
+      `acralbaranesdev`, **tag único y sin `latest`** (R20), publicada sin
+      credenciales de registro. Ese tag quedó obsoleto antes de crear el job:
+      la tanda 2 reconstruyó la imagen (`r20260817-2025`) para incluir los fixes
+      de T13, y es la que verificó T24.
 
-- [ ] **T22**: Autorizar y crear la regla de firewall del Postgres para la IP
+- [x] **T22**: Autorizar y crear la regla de firewall del Postgres para la IP
       estática de salida del entorno (**DA-2**: escritura sobre un recurso del
       proyecto `albaranes`).
       **Verificación**: MANUAL (humano): comando de **R23**, y después
       `az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table`.
+      **HECHA el 2026-08-10** por el humano, con autorización expresa recurso a
+      recurso: regla `caj-datamart-seg-dev` creada en `psql-albaranes-rs9k2`
+      para la IP estática de salida del entorno. R23 pide «correcto si tras ello
+      R22 pasa», y **R22 pasó** (T24, ejecución `Succeeded` contra la base).
+      **Aviso**: el comando que R23 traía escrito **no ejecutaba** —pasaba el
+      servidor en `-n` y la regla en `--rule-name`, que no existe en esta CLI—;
+      corregido el 2026-08-19 en `requirements.md` (R23) y en `infra/README.md`.
+      La regla existe porque quien la creó usó los parámetros correctos, no los
+      que decía la spec.
 
-- [ ] **T22 bis**: Migrar las contraseñas de Postgres al Key Vault del proyecto
+- [x] **T22 bis**: Migrar las contraseñas de Postgres al Key Vault del proyecto
       (**R27**, enmienda del 2026-08-10). Hoy viven en `kv-albaranes-rs9k2`, el
       vault de otro proyecto, desde F-005. Se migran las dos:
       `pg-sigrid-dm-app` (la que usa el job) y `pg-mcp-sigrid-dm-ro` (la del
@@ -191,6 +227,15 @@ Cada tarea de este bloque se anota con su salida real en `progress/current.md`.
       que debe listar los dos nombres. **Nunca `az keyvault secret show` suelto.**
       Las copias viejas en `kv-albaranes-rs9k2` **no se borran** hasta que el
       job haya funcionado (después de T24).
+      **HECHA el 2026-08-10**: `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro`
+      listados por nombre en `kv-datamart-seg-dev`, migrados sin exponer ningún
+      valor, que es lo único que R27 exige verificar. **Prueba independiente de
+      que funcionó**: `80_create_job.ps1` aborta si el secreto no está en el
+      vault del proyecto, y el job se creó (T23) y ha ejecutado correctamente
+      contra Postgres (T24) — imposible si esta tarea o T22 hubieran fallado.
+      Las copias viejas de `kv-albaranes-rs9k2` **siguen ahí**: su borrado es el
+      bloque 1 de **F-032**, y la condición de R27 («que el job funcione») ya se
+      cumple, así que toca decidirlo, no olvidarlo.
 
 - [x] **T23**: Crear el job. **BLOQUEADA POR `F-019`** (build de
       `stg.plan_mensual` por tramos): el job nocturno ejecuta la misma carga
@@ -273,5 +318,9 @@ lo último que faltaba del despliegue y el bloque 5 no está completo sin ellas.
       (riesgo §9), para que el humano decida.
       **Verificación**: revisión del reviewer contra `CHECKPOINTS.md` C4.
 
-- [ ] **T28**: Ejecutar `bash harness/init.sh` en verde.
+- [x] **T28**: Ejecutar `bash harness/init.sh` en verde.
       **Verificación**: exit code 0.
+      **HECHA el 2026-08-19**: `bash harness/init.sh` tal cual, **exit 0**,
+      **617 passed** y `PUERTA COBERTURA [OK] 100,0 % de 372 líneas cambiadas`.
+      Los dos `[AVISO]` son deuda previa declarada (`ruff` 152 y «hay features
+      en estado blocked», que es F-003 a propósito).
