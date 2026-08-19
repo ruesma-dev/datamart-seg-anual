@@ -134,6 +134,52 @@ function Resolver-VentanaAdmitida {
     return ("{0}m" -f $elegida)
 }
 
+function Componer-ConsultaFrescura {
+    <#
+    .SYNOPSIS
+        Compone el argumento de --condition-query: "<nombre>=<kql>".
+
+    .DESCRIPTION
+        La consulta se compone AQUI, entera y en un solo sitio, para que un test
+        pueda EJECUTAR esta funcion y mirar la cadena que se envia de verdad.
+
+        No es una manera de ordenar el codigo: es la leccion del 2026-08-19. La
+        consulta vivia suelta en el cuerpo del script y solo se podia comprobar
+        leyendo el fichero, asi que un test veia la linea que define el filtro
+        temporal y la daba por buena. Quitando esa variable de la concatenacion
+        -lo que deja un merge mal resuelto o un refactor con prisa- la suite
+        entera seguia en verde con la regla juzgando a 48 h en vez de a 30. Lo
+        encontro el reviewer buscando exactamente eso.
+
+        El nombre por defecto, 'Frescura', es el mismo que cuenta el argumento
+        --condition ("count 'Frescura' < 1"). Son dos argumentos distintos que
+        se refieren al mismo resultado, y hay un test que los cruza: si divergen,
+        la regla cuenta algo que no existe y se queda muda sin que Azure proteste.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Job,
+
+        [Parameter(Mandatory = $true)]
+        [int]$UmbralHoras,
+
+        [string]$Nombre = "Frescura"
+    )
+
+    # El criterio exacto de DA-4 va DENTRO de la consulta porque la ventana de
+    # la regla es mas ancha que el umbral (ver la cabecera). Sin este filtro, la
+    # alerta contaria los eventos de las ultimas 48 h y no los de las 30 que
+    # dice vigilar.
+    $filtroTemporal = "| where TimeGenerated > ago({0}h)" -f $UmbralHoras
+
+    $kql = ("ContainerAppConsoleLogs_CL " +
+            "| where ContainerJobName_s == '$Job' " +
+            "| where Log_s has_all ('step_finished','build_mart','SUCCESS') " +
+            $filtroTemporal)
+
+    return "$Nombre=$kql"
+}
+
 # --- 1. La extension de az, sin la cual no existe el comando ----------------
 
 Invoke-Az extension show --name scheduled-query --query name -o tsv | Out-Null
@@ -173,16 +219,11 @@ $horas = [int]$CFG.frescuraUmbralHoras
 # solo admite ciertas granularidades (ver la cabecera); el criterio exacto lo
 # pone el filtro temporal dentro de la consulta.
 $ventana = Resolver-VentanaAdmitida -UmbralHoras $horas
-$filtroTemporal = "| where TimeGenerated > ago({0}h)" -f $horas
 
 # La consulta viaja en una variable: al llevar espacios, PowerShell la
 # entrecomilla al invocar az.cmd, y asi los parentesis y las barras verticales
 # del KQL no los vuelve a interpretar cmd.exe.
-$kql = ("ContainerAppConsoleLogs_CL " +
-        "| where ContainerJobName_s == '$($CFG.job)' " +
-        "| where Log_s has_all ('step_finished','build_mart','SUCCESS') " +
-        $filtroTemporal)
-$consulta = "Frescura=$kql"
+$consulta = Componer-ConsultaFrescura -Job $CFG.job -UmbralHoras $horas
 
 $yaExiste = Invoke-Az monitor scheduled-query show `
     -g $CFG.resourceGroup -n $CFG.frescuraAlertName --query id -o tsv

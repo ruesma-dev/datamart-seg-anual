@@ -68,6 +68,9 @@ GRANULARIDADES_ADMITIDAS_MINUTOS = (
 #: La función del `.ps1` que traduce el umbral a una ventana admisible.
 FUNCION_VENTANA = "Resolver-VentanaAdmitida"
 
+#: La función del `.ps1` que compone el argumento de `--condition-query`.
+FUNCION_CONSULTA = "Componer-ConsultaFrescura"
+
 #: El puesto del humano no tiene `pwsh`; los scripts corren con `powershell`.
 POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
 
@@ -131,39 +134,62 @@ def _funcion_ps(nombre: str) -> str:
 #: cabe (48) y los que no tienen ventana posible o no tienen sentido.
 UMBRALES_A_PROBAR = (-1, 0, 1, 2, 6, 11, 12, 24, 25, 30, 47, 48, 49, 72)
 
+#: Guion que se ejecuta con `powershell` sobre las funciones extraídas del
+#: `.ps1`. Emite una línea por resultado, con el tipo delante, para poder
+#: llevarse en una sola pasada la ventana de cada umbral Y la consulta que se
+#: enviaría de verdad. Cada línea: `TIPO;CLAVE;OK|ERROR;VALOR`.
 _PLANTILLA_PRUEBA = """
 $ErrorActionPreference = 'Stop'
 foreach ($u in @(UMBRALES)) {
     try {
-        "$u;OK;$(FUNCION -UmbralHoras $u)"
+        "VENTANA;$u;OK;$(FUNCION_VENTANA -UmbralHoras $u)"
     } catch {
         $mensaje = $_.Exception.Message -replace "\\s+", " "
-        "$u;ERROR;$mensaje"
+        "VENTANA;$u;ERROR;$mensaje"
     }
+}
+try {
+    "CONSULTA;real;OK;$(FUNCION_CONSULTA -Job 'JOB_REAL' -UmbralHoras UMBRAL_REAL)"
+} catch {
+    $mensaje = $_.Exception.Message -replace "\\s+", " "
+    "CONSULTA;real;ERROR;$mensaje"
 }
 """
 
 
 @functools.lru_cache(maxsize=1)
-def _resolver_ventanas() -> dict[int, tuple[bool, str]]:
-    """Ejecuta la función del `.ps1` con todos los umbrales, de una sola vez.
+def _ejecutar_funciones_del_script() -> dict[tuple[str, str], tuple[bool, str]]:
+    """Ejecuta las funciones del `.ps1` y devuelve LOS VALORES que producen.
 
-    Arrancar `powershell` cuesta cerca de un segundo, y la campaña de mutación
-    lanza la suite entera una vez por mutante: catorce invocaciones sueltas
-    saldrían mucho más caras que el valor que aportan. Una sola pasada, con el
-    resultado en caché, y cada test lee de ella.
+    Es el corazón de este fichero, y la lección del defecto del 2026-08-19:
+    leer el script como texto comprueba la **forma** del código, no el
+    **valor** que se envía. Un `30h` bien formado era inválido; un
+    `$filtroTemporal` bien definido puede no llegar a la consulta. Lo único que
+    caza las dos cosas es ejecutar el código real y mirar lo que devuelve.
 
-    Devuelve `{umbral: (fue_bien, ventana_o_mensaje_de_error)}`.
+    Se hace en UNA sola pasada -`powershell` tarda casi un segundo en arrancar
+    y la campaña de mutación lanza la suite una vez por mutante- y el resultado
+    queda en caché.
+
+    Devuelve `{(tipo, clave): (fue_bien, valor_o_mensaje_de_error)}` con
+    `tipo` en `VENTANA` (una por umbral) o `CONSULTA` (la real, con el job y el
+    umbral de `dev.json`).
     """
     assert POWERSHELL is not None
 
-    guion = _PLANTILLA_PRUEBA.replace(
-        "UMBRALES", ", ".join(str(u) for u in UMBRALES_A_PROBAR)
-    ).replace("FUNCION", FUNCION_VENTANA)
+    cfg = _config("dev")
+    guion = (
+        _PLANTILLA_PRUEBA.replace("UMBRALES", ", ".join(str(u) for u in UMBRALES_A_PROBAR))
+        .replace("FUNCION_VENTANA", FUNCION_VENTANA)
+        .replace("FUNCION_CONSULTA", FUNCION_CONSULTA)
+        .replace("JOB_REAL", str(cfg["job"]))
+        .replace("UMBRAL_REAL", str(cfg["frescuraUmbralHoras"]))
+    )
+    funciones = f"{_funcion_ps(FUNCION_VENTANA)}\n{_funcion_ps(FUNCION_CONSULTA)}\n"
 
     with tempfile.TemporaryDirectory() as carpeta:
-        fichero = Path(carpeta) / "resolver_ventana.ps1"
-        fichero.write_text(_funcion_ps(FUNCION_VENTANA) + guion, encoding="utf-8")
+        fichero = Path(carpeta) / "funciones_de_la_alerta.ps1"
+        fichero.write_text(funciones + guion, encoding="utf-8")
 
         # La ruta del intérprete la resuelve `shutil.which`, no viene de fuera,
         # y el guión lo escribe este mismo test: no hay entrada de usuario.
@@ -180,17 +206,34 @@ def _resolver_ventanas() -> dict[int, tuple[bool, str]]:
         f"el guión de prueba no llegó a ejecutarse: {proceso.stderr}"
     )
 
-    resultados: dict[int, tuple[bool, str]] = {}
+    resultados: dict[tuple[str, str], tuple[bool, str]] = {}
     for linea in proceso.stdout.splitlines():
-        if ";" not in linea:
+        if linea.count(";") < 3:
             continue
-        umbral, estado, valor = linea.strip().split(";", 2)
-        resultados[int(umbral)] = (estado == "OK", valor)
+        tipo, clave, estado, valor = linea.strip().split(";", 3)
+        resultados[(tipo, clave)] = (estado == "OK", valor)
 
-    assert set(resultados) == set(UMBRALES_A_PROBAR), (
-        f"faltan umbrales en la salida: {sorted(set(UMBRALES_A_PROBAR) - set(resultados))}"
+    esperadas = {("VENTANA", str(u)) for u in UMBRALES_A_PROBAR} | {("CONSULTA", "real")}
+    assert set(resultados) == esperadas, (
+        f"faltan resultados en la salida: {sorted(esperadas - set(resultados))}"
     )
     return resultados
+
+
+def _resolver_ventanas() -> dict[int, tuple[bool, str]]:
+    """`{umbral: (fue_bien, ventana_o_mensaje_de_error)}`."""
+    return {
+        int(clave): resultado
+        for (tipo, clave), resultado in _ejecutar_funciones_del_script().items()
+        if tipo == "VENTANA"
+    }
+
+
+def _consulta_compuesta() -> str:
+    """El argumento de `--condition-query` tal y como lo compone el script."""
+    fue_bien, valor = _ejecutar_funciones_del_script()[("CONSULTA", "real")]
+    assert fue_bien, f"componer la consulta falló: {valor}"
+    return valor
 
 
 # ---------------------------------------------------------------------------
@@ -371,47 +414,142 @@ def test_f024_r22_el_script_declara_las_granularidades_que_admite_azure() -> Non
     """
     funcion = _funcion_ps(FUNCION_VENTANA)
 
-    numeros = tuple(int(n) for n in re.findall(r"\d+", funcion))
-    faltan = [g for g in GRANULARIDADES_ADMITIDAS_MINUTOS if g not in numeros]
-    assert not faltan, (
-        f"{FUNCION_VENTANA} no contempla las granularidades {faltan} que el ARM "
-        f"declara admitidas"
+    # Solo la lista, no el texto de la función: `2880` aparece también en el
+    # mensaje del `throw` («la mayor es 2880 min»), así que barrer todos los
+    # números de la función daba verde con la lista efectiva mutilada. Lo
+    # comprobó el reviewer quitando el 2880 del `@(...)`.
+    literal = re.search(r"\$granularidades\s*=\s*@\(([^)]*)\)", funcion)
+    assert literal is not None, (
+        "las granularidades no están en una lista literal `@(...)`: escritas "
+        "sueltas es imposible ver de un vistazo si falta alguna"
     )
 
-    # Y las contempla como una lista de la que elegir, no a base de ifs sueltos.
-    assert re.search(r"@\(\s*5\s*,", funcion), (
-        "las granularidades no están en una lista literal: escribirlas sueltas "
-        "hace imposible ver de un vistazo si falta alguna"
+    declaradas = tuple(int(n) for n in re.findall(r"\d+", literal.group(1)))
+    assert declaradas == GRANULARIDADES_ADMITIDAS_MINUTOS, (
+        f"la lista del script no es la que declara el ARM.\n"
+        f"  script: {declaradas}\n"
+        f"  ARM:    {GRANULARIDADES_ADMITIDAS_MINUTOS}"
     )
 
 
+@pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
 def test_f024_r22_la_kql_acota_el_criterio_con_el_umbral() -> None:
-    """El criterio de DA-4 (30 h) viaja DENTRO de la consulta, no en la ventana.
+    """El criterio de DA-4 (30 h) viaja DENTRO de la consulta que se envía.
 
     La ventana es más ancha que el criterio porque Azure solo admite unas
     granularidades fijas (48 h es la primera que contiene 30 h). Sin el filtro
-    temporal en la KQL, la regla juzgaría con 48 h y `check-frescura` con 30:
-    dos verdades distintas sobre el mismo datamart.
+    temporal EN LA CONSULTA, la regla juzgaría con 48 h y `check-frescura` con
+    30: dos verdades distintas sobre el mismo datamart.
+
+    Este test mira **la cadena que se compone**, no el texto del script. La
+    versión anterior comprobaba que la línea que define `$filtroTemporal`
+    existía y llevaba `$horas`; con eso, desconectar esa variable de la
+    concatenación —lo que deja un merge mal resuelto— pasaba la suite entera
+    en verde con la regla juzgando a 48 h. Lo encontró el reviewer.
+    """
+    umbral = _config("dev")["frescuraUmbralHoras"]
+    consulta = _consulta_compuesta()
+
+    filtro = re.search(r"TimeGenerated\s*>\s*ago\((\d+)h\)", consulta)
+    assert filtro is not None, (
+        f"la consulta que se envía no acota por TimeGenerated, así que la regla "
+        f"contaría los eventos de toda la ventana en vez de los del umbral: "
+        f"{consulta}"
+    )
+
+    horas_del_filtro = int(filtro.group(1))
+    assert horas_del_filtro == umbral, (
+        f"el criterio de la consulta ({horas_del_filtro} h) no es el umbral "
+        f"configurado ({umbral} h)"
+    )
+
+    # Y no es la ventana disfrazada: si los dos números coincidieran, el filtro
+    # no estaría acotando nada y volveríamos al defecto original sin notarlo.
+    fue_bien, ventana = _resolver_ventanas()[umbral]
+    assert fue_bien, ventana
+    assert horas_del_filtro * 60 != _minutos_de_ventana(ventana), (
+        f"criterio y ventana valen lo mismo ({ventana}): o el umbral cabía "
+        f"justo en una granularidad -y entonces este test hay que repensarlo- o "
+        f"el filtro se está derivando de la ventana en vez de del umbral"
+    )
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
+def test_f024_r22_la_consulta_compuesta_lleva_el_evento_y_el_job() -> None:
+    """La misma cadena, entera: los tres términos, el `has_all` y el job.
+
+    Los tests que fijan estos términos leyendo el `.ps1` siguen valiendo —dicen
+    que el script los NOMBRA— pero no dicen que lleguen a la consulta. Aquí se
+    comprueba sobre el valor devuelto.
+    """
+    consulta = _consulta_compuesta()
+
+    nombre, _, kql = consulta.partition("=")
+    assert nombre and kql, f"la consulta no tiene la forma <nombre>=<kql>: {consulta}"
+
+    assert kql.startswith("ContainerAppConsoleLogs_CL"), kql
+    assert f"ContainerJobName_s == '{_config('dev')['job']}'" in kql, (
+        "la consulta no acota al job: contaría los logs de cualquier otro "
+        "contenedor del entorno"
+    )
+
+    has_all = re.search(r"has_all\s*\(([^)]*)\)", kql)
+    assert has_all is not None, f"los tres términos no se exigen juntos: {kql}"
+    for termino in TERMINOS_DEL_EVENTO:
+        assert termino in has_all.group(1), (
+            f"'{termino}' no está dentro del has_all de la consulta enviada"
+        )
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="no hay powershell en este puesto")
+def test_f024_r22_el_nombre_de_la_consulta_es_el_que_cuenta_la_condicion() -> None:
+    """`--condition "count 'X' < 1"` y `--condition-query X=...`: el mismo X.
+
+    Son dos argumentos distintos que se refieren al mismo resultado por su
+    nombre. Si divergen, la regla cuenta algo que no existe: Azure no la
+    rechaza necesariamente y la alerta se queda muda.
+    """
+    # Solo el CÓDIGO: la cabecera del script explica la sintaxis con un
+    # `--condition "count 'Nombre' < 1"` de ejemplo, y buscar en el texto entero
+    # se quedaba con ese ejemplo en vez de con el argumento real.
+    codigo = "\n".join(linea for _n, linea in _lineas_de_codigo(INFRA / SCRIPT))
+
+    condicion = re.search(r'--condition\s+"count\s+\'([^\']+)\'', codigo)
+    assert condicion is not None, "no se encuentra el nombre en --condition"
+
+    nombre = _consulta_compuesta().split("=", 1)[0]
+    assert nombre == condicion.group(1), (
+        f"la condición cuenta '{condicion.group(1)}' y la consulta se llama "
+        f"'{nombre}': la regla contaría un resultado inexistente"
+    )
+
+
+def test_f024_r22_la_consulta_compuesta_es_la_que_viaja_en_condition_query() -> None:
+    """El último eslabón, el único que no se puede ejecutar: el argumento.
+
+    Ejecutar la composición demuestra qué cadena produce el script, no que esa
+    cadena sea la que se envía. Ese salto son dos líneas de pegamento y aquí se
+    fijan las dos: la consulta sale de la función y esa misma variable es la
+    que va en `--condition-query`.
     """
     codigo = "\n".join(linea for _n, linea in _lineas_de_codigo(INFRA / SCRIPT))
 
-    filtro = re.search(r"TimeGenerated\s*>\s*ago\([^)]*\)", codigo)
-    assert filtro is not None, (
-        "la KQL no acota por TimeGenerated: la regla contaría los eventos de "
-        "toda la ventana (48 h) en vez de los del umbral (30 h)"
+    asignacion = re.search(rf"\$consulta\s*=\s*{FUNCION_CONSULTA}\b([^\r\n]*)", codigo)
+    assert asignacion is not None, (
+        f"$consulta no sale de {FUNCION_CONSULTA}: lo que se ejecuta en los "
+        f"tests y lo que se envía a Azure podrían ser cosas distintas"
+    )
+    for parametro in ("-Job", "-UmbralHoras"):
+        assert parametro in asignacion.group(1), (
+            f"la llamada no pasa {parametro}: {asignacion.group(0)}"
+        )
+    assert "$CFG.job" in asignacion.group(1) and "$horas" in asignacion.group(1), (
+        f"la consulta no se compone con el job y el umbral reales: "
+        f"{asignacion.group(0)}"
     )
 
-    assert not re.search(r"ago\(\s*\d+\s*h\s*\)", codigo), (
-        "el filtro temporal lleva el número de horas escrito a mano: tiene que "
-        "salir del MISMO umbral que la ventana"
-    )
-
-    linea_del_filtro = next(
-        linea for _n, linea in _lineas_de_codigo(INFRA / SCRIPT)
-        if "TimeGenerated" in linea
-    )
-    assert "$horas" in linea_del_filtro, (
-        f"el filtro temporal no se deriva del umbral: {linea_del_filtro.strip()}"
+    assert re.search(r"--condition-query\s+\$consulta\b", codigo), (
+        "el argumento --condition-query no lleva la consulta compuesta"
     )
 
 
