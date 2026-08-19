@@ -531,3 +531,45 @@ def test_f011_r4_el_csv_del_bench_sigue_la_convencion_de_ruesma(tmp_path) -> Non
     assert texto.splitlines()[0].startswith("page_size;")
     assert ";1000;" in texto.replace("\r", "") or "1000;" in texto
     assert "10000" in texto
+
+
+def test_f011_r4_un_barrido_sin_columnas_es_un_error_de_programa() -> None:
+    """Sin columnas no hay consulta que medir: falla antes de tocar la red."""
+    api = ApiFalsa()
+
+    with pytest.raises(ValueError, match="columnas"):
+        barrer_paginas(api, "con", columnas=[], tamanos=[1_000], reloj=lambda: api.reloj)
+
+    assert api.sql_enviado == []
+
+
+def test_f011_r23_la_puerta_del_cliente_rechaza_lo_que_no_es_lectura() -> None:
+    """`SigridApiClient.leer_sql` valida ANTES de enviar (R23).
+
+    Se comprueba sobre el cliente de verdad, no sobre un doble: es la única
+    puerta pública por la que sale SQL que el propio cliente no ha construido,
+    y si no validara, el validador del dominio sería decorativo. No se abre
+    ninguna conexión: la excepción salta antes de llegar al `_post_sql`.
+    """
+    from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
+        SigridApiClient,
+        SigridApiSentenciaNoDeLecturaError,
+    )
+
+    cliente = SigridApiClient(
+        base_url="https://sigrid-api.example",
+        function_key="clave-de-mentira",  # nunca una credencial real en un test
+        database="sigrid",
+    )
+
+    def _no_debe_llamarse(**kwargs: object) -> dict:
+        raise AssertionError("no puede llegar a enviarse nada")
+
+    cliente._post_sql = _no_debe_llamarse  # type: ignore[method-assign]
+
+    with pytest.raises(SigridApiSentenciaNoDeLecturaError) as excinfo:
+        cliente.leer_sql("DROP TABLE dbo.con")
+
+    assert "SELECT" in str(excinfo.value)
+    assert excinfo.value.sql == "DROP TABLE dbo.con"
+    cliente.close()
