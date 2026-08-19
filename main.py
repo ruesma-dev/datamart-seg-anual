@@ -64,6 +64,11 @@ from etl_sigrid.domain.coherencia import (  # noqa: E402
 )
 from etl_sigrid.domain.ejecucion import Ejecucion, nueva_ejecucion  # noqa: E402
 from etl_sigrid.domain.entities import StepResult, StepStatus  # noqa: E402
+from etl_sigrid.domain.extraccion import (  # noqa: E402
+    comparar_cap,
+    format_bench,
+    resumen_bench,
+)
 from etl_sigrid.domain.perfil_carga import (  # noqa: E402
     format_perfil,
     perfil_de_carga,
@@ -92,7 +97,16 @@ from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
     PostgresStepRunRecorder,
 )
 from etl_sigrid.infrastructure.postgres.timings import format_timings  # noqa: E402
+from etl_sigrid.infrastructure.sigrid.bench_extraccion import (  # noqa: E402
+    barrer_paginas,
+    escribir_csv_bench,
+)
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  # noqa: E402
+
+#: Cap de filas por petición que documenta `azure-apps/sigrid_api.md`. El real
+#: son 20.000 (DA-6, dato del humano el 2026-08-18): la divergencia se avisa,
+#: pero **este proyecto no edita aquel documento**, que es de `sigrid-api`.
+CAP_DOCUMENTADO_SIGRID_API = 1_000
 
 
 @click.group()
@@ -652,6 +666,104 @@ def perfil_carga(batch_id: str | None) -> None:
         sys.exit(2)
 
     click.echo(format_perfil(perfil_de_carga(filas, batch_id=batch_medido)))
+
+
+@cli.command("bench-sigrid")
+@click.option(
+    "--tabla",
+    "tabla",
+    type=str,
+    required=True,
+    help="Tabla de Sigrid a medir (nombre en el origen, p. ej. obrparpre).",
+)
+@click.option(
+    "--paginas",
+    "paginas",
+    type=str,
+    default="1000,5000,10000,20000",
+    show_default=True,
+    help="Tamaños de página a barrer, separados por comas. El 20.000 es el cap "
+         "real de sigrid-api (DA-6); hoy el ETL trabaja a 10.000.",
+)
+@click.option(
+    "--repeticiones",
+    "repeticiones",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Páginas consecutivas por tamaño. Avanzan por keyset, no repiten la "
+         "misma página: repetirla mediría la caché del SQL Server.",
+)
+@click.option(
+    "--out",
+    "salida",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Fichero CSV donde escribir las mediciones.",
+)
+def bench_sigrid(
+    tabla: str, paginas: str, repeticiones: int, salida: Path | None
+) -> None:
+    """
+    ¿Cuánto rinde cada tamaño de página contra sigrid-api? SOLO LECTURA (R4, R5).
+
+    Mide la MISMA consulta que usa la ingesta (keyset por `ide`) con varios
+    tamaños de página y responde dos preguntas que no están acreditadas: si
+    subir de 10.000 a 20.000 compra tiempo o el coste está en el SQL Server
+    (R4), y cuál es el corte real del balanceador —documentado 120 s, en uso
+    230— comparando la latencia máxima observada con el timeout configurado
+    (R5-bis).
+
+    Si la API rechaza un tamaño, se anota su cap y el barrido continúa (R5).
+    No abre conexión con Postgres ni escribe una fila en `_meta` (R25).
+    """
+    settings = get_settings()
+    tamanos = [int(p) for p in paginas.split(",") if p.strip()]
+    if not tamanos:
+        click.secho("✗ --paginas no trae ningún tamaño.", fg="red", err=True)
+        sys.exit(2)
+
+    declarada = next(
+        (
+            t
+            for t in settings.tables_sigrid.get("tables", [])
+            if t["source_table"] == tabla
+        ),
+        None,
+    )
+    excluidas = set((declarada or {}).get("exclude_columns") or [])
+
+    with SigridApiClient(
+        base_url=settings.sigrid_api.base_url,
+        function_key=settings.sigrid_api.function_key.get_secret_value(),
+        database=settings.sigrid_api.database,
+        page_size=settings.sigrid_api.page_size,
+        timeout_s=settings.sigrid_api.timeout_s,
+        max_retries=settings.sigrid_api.max_retries,
+    ) as api:
+        # Las mismas columnas que se lleva la ingesta: medir con todas incluiría
+        # los blobs que el ETL nunca pide, y el número no serviría para nada.
+        columnas = [
+            c.name for c in api.fetch_table_schema(tabla) if c.name not in excluidas
+        ]
+        mediciones = barrer_paginas(
+            api,
+            tabla,
+            columnas=columnas,
+            tamanos=tamanos,
+            repeticiones=repeticiones,
+        )
+
+    resumen = resumen_bench(mediciones)
+    click.echo(format_bench(resumen, timeout_s=settings.sigrid_api.timeout_s))
+
+    divergencia = comparar_cap(resumen.cap_medido, CAP_DOCUMENTADO_SIGRID_API)
+    if divergencia is not None:
+        click.secho(f"AVISO: {divergencia.mensaje}", fg="yellow")
+
+    if salida is not None:
+        escribir_csv_bench(mediciones, salida)
+        click.secho(f"✓ Mediciones escritas en {salida}", fg="green")
 
 
 @cli.command("status")

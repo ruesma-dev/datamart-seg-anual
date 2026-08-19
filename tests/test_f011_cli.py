@@ -25,8 +25,13 @@ from etl_sigrid.domain.perfil_carga import FilaPerfil
 
 BATCH = "20260819T020016Z-327ef0"
 
-#: Los comandos que esta feature añade, todos de solo lectura (R25).
-COMANDOS_NUEVOS_DE_LECTURA = ("perfil-carga",)
+#: Los comandos que esta feature añade, todos de solo lectura (R25). La lista
+#: ES el requisito: añadir aquí el comando nuevo es lo que impide que se le
+#: cuele un `_arrancar_ejecucion()` dentro de seis meses.
+COMANDOS_NUEVOS_DE_LECTURA = (
+    ("perfil-carga", []),
+    ("bench-sigrid", ["--tabla", "con", "--paginas", "1000"]),
+)
 
 
 class PgQueNoEscribe:
@@ -78,8 +83,64 @@ class PgQueNoEscribe:
 def settings_falsos() -> SimpleNamespace:
     return SimpleNamespace(
         logging=SimpleNamespace(log_level="INFO", log_format="console"),
-        tables_sigrid={"tables": [{"source_table": "con", "target_table": "con"}]},
+        tables_sigrid={
+            "tables": [
+                {
+                    "source_table": "con",
+                    "target_table": "con",
+                    "exclude_columns": ["ima", "tex"],
+                }
+            ]
+        },
+        sigrid_api=SimpleNamespace(
+            base_url="https://sigrid-api.example",
+            # Nunca una credencial de verdad en un test, ni de desarrollo.
+            function_key=SimpleNamespace(get_secret_value=lambda: "clave-de-mentira"),
+            database="sigrid",
+            page_size=10_000,
+            timeout_s=230.0,
+            max_retries=3,
+        ),
     )
+
+
+class ApiFalsaCli:
+    """Doble de `SigridApiClient` para los tests del comando `bench-sigrid`."""
+
+    #: Lo que la CLI le pidió, para poder afirmar sobre ello desde fuera.
+    ultima: ApiFalsaCli | None = None
+
+    def __init__(self, **kwargs: object) -> None:
+        self.kwargs = kwargs
+        self.columnas_pedidas: list[str] = []
+        self.sql_enviado: list[str] = []
+        self.max_rows: list[int | None] = []
+        ApiFalsaCli.ultima = self
+
+    def __enter__(self) -> ApiFalsaCli:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+    def fetch_table_schema(self, source_table: str) -> list[SimpleNamespace]:
+        self.columnas_pedidas.append(source_table)
+        return [
+            SimpleNamespace(name="ide"),
+            SimpleNamespace(name="res"),
+            SimpleNamespace(name="ima"),  # excluida en tables_sigrid.yaml
+        ]
+
+    def leer_sql(
+        self,
+        sql: str,
+        parameters: list | None = None,
+        max_rows: int | None = None,
+    ) -> dict:
+        self.sql_enviado.append(sql)
+        self.max_rows.append(max_rows)
+        filas = [[i + 1, "x"] for i in range(min(max_rows or 0, 10))]
+        return {"columns": ["ide", "res"], "rows": filas, "row_count": len(filas)}
 
 
 @pytest.fixture
@@ -90,6 +151,7 @@ def cli(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(main, "get_settings", settings_falsos)
         monkeypatch.setattr(main, "configure_logging", lambda **kwargs: None)
         monkeypatch.setattr(main, "_get_pg", lambda: pg)
+        monkeypatch.setattr(main, "SigridApiClient", ApiFalsaCli)
         return CliRunner()
 
     return _preparar
@@ -163,16 +225,13 @@ def test_f011_r1_perfil_carga_sale_2_si_no_puede_leer(cli) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("comando", COMANDOS_NUEVOS_DE_LECTURA)
-def test_f011_r25_comandos_de_lectura_no_escriben_en_meta(cli, comando: str) -> None:
-    """El doble revienta ante cualquier escritura; basta con que el comando pase.
-
-    Va parametrizado sobre la lista y no comando a comando porque la lista ES
-    el requisito: el día que esta feature añada un cuarto comando de lectura,
-    añadirlo aquí es lo que impide que se le cuele un `_arrancar_ejecucion()`.
-    """
+@pytest.mark.parametrize("comando,argumentos", COMANDOS_NUEVOS_DE_LECTURA)
+def test_f011_r25_comandos_de_lectura_no_escriben_en_meta(
+    cli, comando: str, argumentos: list[str]
+) -> None:
+    """El doble revienta ante cualquier escritura; basta con que el comando pase."""
     pg = PgQueNoEscribe(perfil=(BATCH, CARGA))
-    resultado = cli(pg).invoke(main.cli, [comando])
+    resultado = cli(pg).invoke(main.cli, [comando, *argumentos])
 
     assert resultado.exit_code == 0, resultado.output
 
@@ -274,3 +333,101 @@ def test_f011_r23_el_sql_del_perfil_es_un_select() -> None:
     assert normalizado.startswith("SELECT")
     for prohibida in ("INSERT", "UPDATE", "DELETE", "TRUNCATE", "DROP", "ALTER"):
         assert prohibida not in normalizado, f"{prohibida} en SQL_PERFIL_CARGA"
+
+
+# ---------------------------------------------------------------------------
+# R4, R5, R5-bis · `bench-sigrid` mide contra Sigrid sin tocar el datamart
+# ---------------------------------------------------------------------------
+
+
+def test_f011_r4_bench_sigrid_barre_los_tamanos_pedidos(cli) -> None:
+    """Un `SELECT TOP n` por tamaño, con las columnas que usa la ingesta."""
+    resultado = cli(PgQueNoEscribe()).invoke(
+        main.cli, ["bench-sigrid", "--tabla", "con", "--paginas", "1000,5000"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    api = ApiFalsaCli.ultima
+    assert api is not None
+    assert api.columnas_pedidas == ["con"]
+    assert api.max_rows == [1_000, 5_000]
+    # `ima` está en exclude_columns del YAML: la ingesta no la pide y el banco
+    # tampoco, o estaría midiendo un blob que nunca viaja.
+    assert all("[ima]" not in sql for sql in api.sql_enviado)
+    assert all(sql.startswith("SELECT TOP ") for sql in api.sql_enviado)
+    # R5-bis: el veredicto compara con el timeout configurado.
+    assert "230" in resultado.output
+
+
+def test_f011_r4_bench_sigrid_escribe_el_csv_pedido(cli, tmp_path) -> None:
+    """`--out` deja las mediciones en disco; el CSV no se versiona (T7)."""
+    salida = tmp_path / "bench.csv"
+    resultado = cli(PgQueNoEscribe()).invoke(
+        main.cli,
+        ["bench-sigrid", "--tabla", "con", "--paginas", "1000", "--out", str(salida)],
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert salida.exists()
+    assert salida.read_text(encoding="utf-8-sig").splitlines()[0].startswith("page_size;")
+
+
+def test_f011_r4_bench_sigrid_sin_tamanos_es_un_error_de_uso(cli) -> None:
+    """`--paginas ,,` no mide nada: sale 2 en vez de fingir un barrido vacío."""
+    resultado = cli(PgQueNoEscribe()).invoke(
+        main.cli, ["bench-sigrid", "--tabla", "con", "--paginas", " , "]
+    )
+
+    assert resultado.exit_code == 2
+
+
+def test_f011_r4_bench_sigrid_no_abre_conexion_con_postgres(cli, monkeypatch) -> None:
+    """No es que no escriba: es que ni siquiera pide el cliente del datamart."""
+    def _no(_pg=None):
+        raise AssertionError("bench-sigrid no puede pedir el cliente de Postgres")
+
+    monkeypatch.setattr(main, "_get_pg", _no)
+
+    resultado = cli(PgQueNoEscribe()).invoke(
+        main.cli, ["bench-sigrid", "--tabla", "con", "--paginas", "1000"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+
+
+def test_f011_r5_bench_sigrid_avisa_de_la_divergencia_del_cap(cli, monkeypatch) -> None:
+    """Si la API acredita un cap distinto del documentado, se dice (DA-6).
+
+    Y se dice nombrando al dueño del documento: `azure-apps/sigrid_api.md` es
+    de `sigrid-api` y este proyecto no lo edita (T8-bis).
+    """
+    from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
+        SigridApiPageSizeTooLargeError,
+    )
+
+    class ApiQueRechaza(ApiFalsaCli):
+        def leer_sql(self, sql, parameters=None, max_rows=None):  # type: ignore[override]
+            raise SigridApiPageSizeTooLargeError(requested=max_rows or 0, cap=20_000)
+
+    # El orden importa: la fixture `cli` también sustituye `SigridApiClient`,
+    # así que este doble tiene que ponerse DESPUÉS de prepararla.
+    runner = cli(PgQueNoEscribe())
+    monkeypatch.setattr(main, "SigridApiClient", ApiQueRechaza)
+
+    resultado = runner.invoke(
+        main.cli, ["bench-sigrid", "--tabla", "con", "--paginas", "50000"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "RECHAZADA" in resultado.output
+    assert "20,000" in resultado.output
+    assert "sigrid-api" in resultado.output
+
+
+def test_f011_r24_ni_un_secreto_en_la_salida_del_bench(cli) -> None:
+    """La clave de función no puede acabar impresa por consola (R24)."""
+    resultado = cli(PgQueNoEscribe()).invoke(
+        main.cli, ["bench-sigrid", "--tabla", "con", "--paginas", "1000"]
+    )
+
+    assert "clave-de-mentira" not in resultado.output

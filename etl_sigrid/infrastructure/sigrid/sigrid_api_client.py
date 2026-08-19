@@ -28,6 +28,7 @@ from tenacity import (
 )
 
 from etl_sigrid.domain.entities import ColumnSpec
+from etl_sigrid.domain.extraccion import es_sentencia_de_lectura
 from etl_sigrid.infrastructure.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -43,6 +44,23 @@ class SigridApiHttpError(SigridApiError):
 
 class SigridApiBusinessError(SigridApiError):
     """La API responde 200 pero ok=False (consulta rechazada por validación)."""
+
+
+class SigridApiSentenciaNoDeLecturaError(SigridApiError):
+    """Se ha intentado mandar a Sigrid algo que no es un `SELECT` (F-011, R23).
+
+    Sigrid es el sistema de producción de un tercero y `sigrid-api` es su única
+    puerta. Que este error exista, y que sea la propia puerta la que lo lance,
+    es lo que convierte «contra Sigrid solo lecturas» en algo comprobable en
+    vez de una norma escrita en un documento.
+    """
+
+    def __init__(self, sql: str) -> None:
+        self.sql = sql
+        super().__init__(
+            "Esta sentencia no es de lectura y no se enviará a Sigrid: solo se "
+            f"admiten consultas que empiecen por SELECT. Recibido: {sql[:200]!r}"
+        )
 
 
 class SigridApiPageSizeTooLargeError(SigridApiHttpError):
@@ -253,6 +271,25 @@ class SigridApiClient:
                     total_rows=total_yielded,
                 )
                 return
+
+    def leer_sql(
+        self,
+        sql: str,
+        parameters: list | None = None,
+        max_rows: int | None = None,
+    ) -> dict[str, Any]:
+        """
+        Ejecuta una consulta de LECTURA contra Sigrid y devuelve la respuesta.
+
+        Es la puerta pública para el SQL que no construye el propio cliente —hoy
+        el banco de extracción de F-011—, y valida antes de enviar: si la
+        sentencia no es de lectura, no sale (R23). Sin este método, quien
+        necesitara mandar una consulta tendría que llamar al `_post_sql`
+        privado y el validador sería decorativo.
+        """
+        if not es_sentencia_de_lectura(sql):
+            raise SigridApiSentenciaNoDeLecturaError(sql)
+        return self._post_sql(sql=sql, parameters=parameters, max_rows=max_rows)
 
     def close(self) -> None:
         """Cierra la conexión HTTP. Llamar al terminar el pipeline."""

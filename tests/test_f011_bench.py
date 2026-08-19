@@ -13,6 +13,8 @@ de provocar a mano— sin tocar el SQL Server de producción.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from etl_sigrid.domain.extraccion import (
@@ -21,6 +23,13 @@ from etl_sigrid.domain.extraccion import (
     es_sentencia_de_lectura,
     format_bench,
     resumen_bench,
+)
+from etl_sigrid.infrastructure.sigrid.bench_extraccion import (
+    barrer_paginas,
+    escribir_csv_bench,
+)
+from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
+    SigridApiPageSizeTooLargeError,
 )
 
 
@@ -298,3 +307,227 @@ def test_f011_r23_un_nombre_de_columna_no_es_una_palabra_prohibida() -> None:
     assert es_sentencia_de_lectura(
         "SELECT updated_at, deleted, insertado FROM dbo.con"
     ) is True
+
+
+# ---------------------------------------------------------------------------
+# R4 · El adaptador: barre tamaños de página contra sigrid-api, sin Postgres
+#
+# El doble de API no habla HTTP: recibe el SQL ya construido y devuelve filas.
+# Es lo que permite comprobar el caso que de verdad importa —un 400 con el cap
+# a mitad del barrido— sin lanzar una sola petición al SQL Server de producción.
+# ---------------------------------------------------------------------------
+
+
+class ApiFalsa:
+    """Doble de `SigridApiClient` para el banco: cuenta peticiones y consume
+    tiempo de un reloj de mentira."""
+
+    def __init__(
+        self,
+        cap: int | None = None,
+        segundos_por_peticion: float = 1.0,
+        filas_disponibles: int = 1_000_000,
+    ) -> None:
+        self.cap = cap
+        self.segundos_por_peticion = segundos_por_peticion
+        self.filas_disponibles = filas_disponibles
+        self.sql_enviado: list[str] = []
+        self.max_rows_pedidos: list[int | None] = []
+        self.reloj = 0.0
+
+    def leer_sql(
+        self,
+        sql: str,
+        parameters: list | None = None,
+        max_rows: int | None = None,
+    ) -> dict:
+        self.sql_enviado.append(sql)
+        self.max_rows_pedidos.append(max_rows)
+        if self.cap is not None and max_rows is not None and max_rows > self.cap:
+            raise SigridApiPageSizeTooLargeError(requested=max_rows, cap=self.cap)
+
+        self.reloj += self.segundos_por_peticion
+        desde = int(parameters[0]) if parameters else 0
+        cuantas = max(0, min(max_rows or 0, self.filas_disponibles - desde))
+        filas = [[desde + i + 1, 46_200.5] for i in range(cuantas)]
+        return {"columns": ["ide", "tiemod"], "rows": filas, "row_count": cuantas}
+
+
+def test_f011_r4_bench_mide_cada_tamano_de_pagina(monkeypatch) -> None:
+    """Una petición por tamaño, con su tiempo y sus filas."""
+    api = ApiFalsa(segundos_por_peticion=2.0)
+
+    mediciones = barrer_paginas(
+        api,
+        "obrparpre",
+        columnas=["ide", "tiemod"],
+        tamanos=[1_000, 10_000],
+        reloj=lambda: api.reloj,
+    )
+
+    assert [m.page_size for m in mediciones] == [1_000, 10_000]
+    assert [m.filas for m in mediciones] == [1_000, 10_000]
+    assert [m.peticiones for m in mediciones] == [1, 1]
+    assert all(m.segundos == pytest.approx(2.0) for m in mediciones)
+    assert all(m.latencia_max_s == pytest.approx(2.0) for m in mediciones)
+    assert not any(m.rechazada for m in mediciones)
+
+
+def test_f011_r4_el_sql_del_bench_es_el_mismo_que_usa_la_ingesta() -> None:
+    """`SELECT TOP n ... WHERE [ide] > ? ORDER BY [ide] ASC`, keyset como el ETL.
+
+    Medir con otra forma de consulta mediría otra cosa: el objeto del barrido
+    es saber qué haría la ingesta real con páginas más grandes.
+    """
+    api = ApiFalsa()
+
+    barrer_paginas(
+        api, "obrparpre", columnas=["ide", "tiemod"], tamanos=[5_000],
+        reloj=lambda: api.reloj,
+    )
+
+    sql = api.sql_enviado[0]
+    assert sql.startswith("SELECT TOP 5000 ")
+    assert "[ide], [tiemod]" in sql
+    assert "FROM [dbo].[obrparpre]" in sql
+    assert "WHERE [ide] > ?" in sql
+    assert "ORDER BY [ide] ASC" in sql
+    assert api.max_rows_pedidos == [5_000]
+
+
+def test_f011_r4_varias_repeticiones_avanzan_el_cursor() -> None:
+    """Repetir no es pedir la misma página: avanza por keyset, como la ingesta.
+
+    Si repitiera la misma página, la segunda mediría la caché del SQL Server y
+    el número saldría bonito y falso.
+    """
+    api = ApiFalsa(segundos_por_peticion=1.5)
+
+    (medicion,) = barrer_paginas(
+        api, "con", columnas=["ide"], tamanos=[1_000], repeticiones=3,
+        reloj=lambda: api.reloj,
+    )
+
+    assert medicion.peticiones == 3
+    assert medicion.filas == 3_000
+    assert medicion.segundos == pytest.approx(4.5)
+    assert medicion.latencia_media_s == pytest.approx(1.5)
+
+
+def test_f011_r4_una_tabla_que_se_acaba_corta_las_repeticiones() -> None:
+    """Página corta = no queda más tabla: deja de pedir en vez de girar en vacío."""
+    api = ApiFalsa(filas_disponibles=1_500)
+
+    (medicion,) = barrer_paginas(
+        api, "cen", columnas=["ide"], tamanos=[1_000], repeticiones=5,
+        reloj=lambda: api.reloj,
+    )
+
+    assert medicion.peticiones == 2
+    assert medicion.filas == 1_500
+
+
+def test_f011_r5_cap_rechazado_no_aborta_el_bench() -> None:
+    """El 400 de la API se anota con su cap y el barrido continúa (R5).
+
+    Es el requisito con más valor operativo del bloque A: sin él, medir hasta
+    20.000 contra una API capada a 10.000 no devolvería ningún dato, solo una
+    excepción.
+    """
+    api = ApiFalsa(cap=10_000)
+
+    mediciones = barrer_paginas(
+        api,
+        "obrparpre",
+        columnas=["ide"],
+        tamanos=[1_000, 10_000, 20_000],
+        reloj=lambda: api.reloj,
+    )
+
+    assert len(mediciones) == 3
+    assert [m.rechazada for m in mediciones] == [False, False, True]
+    assert mediciones[2].cap_devuelto == 10_000
+    assert mediciones[2].peticiones == 0
+    assert resumen_bench(mediciones).cap_medido == 10_000
+
+
+def test_f011_r23_el_bench_no_manda_a_sigrid_nada_que_no_sea_select() -> None:
+    """El SQL del bench pasa por el validador antes de salir.
+
+    Se comprueba desde fuera: si alguien cambiara el constructor de la
+    consulta por algo que no empiece por SELECT, `barrer_paginas` tiene que
+    negarse en vez de enviarlo.
+    """
+    api = ApiFalsa()
+
+    with pytest.raises(ValueError, match="lectura"):
+        barrer_paginas(
+            api,
+            "obrparpre; DROP TABLE dbo.con --",
+            columnas=["ide"],
+            tamanos=[1_000],
+            reloj=lambda: api.reloj,
+        )
+
+    assert api.sql_enviado == []
+
+
+def test_f011_r4_bench_no_escribe_en_postgres() -> None:
+    """Barrido de imports: el adaptador del bench no conoce Postgres.
+
+    No es un detalle de estilo. `bench-sigrid` se lanza contra el SQL Server de
+    producción para medir; si de paso pudiera escribir en el datamart, dejaría
+    de ser un comando de diagnóstico.
+    """
+    import ast
+
+    ruta = (
+        Path(__file__).resolve().parents[1]
+        / "etl_sigrid" / "infrastructure" / "sigrid" / "bench_extraccion.py"
+    )
+    arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+
+    # Se miran los IMPORTS y los identificadores, no el texto entero: el propio
+    # docstring del módulo explica que no toca Postgres y un `in fuente` daría
+    # un falso positivo con su propia explicación.
+    modulos: list[str] = []
+    for nodo in ast.walk(arbol):
+        if isinstance(nodo, ast.Import):
+            modulos.extend(alias.name for alias in nodo.names)
+        elif isinstance(nodo, ast.ImportFrom):
+            modulos.append(nodo.module or "")
+            modulos.extend(alias.name for alias in nodo.names)
+
+    assert modulos, "el módulo no importa nada: ¿se ha vaciado el fichero?"
+    for modulo in modulos:
+        assert "postgres" not in modulo.lower(), (
+            f"bench_extraccion.py importa '{modulo}': el banco de extracción "
+            f"no toca el datamart"
+        )
+        assert "psycopg" not in modulo.lower(), (
+            f"bench_extraccion.py importa '{modulo}': el banco de extracción "
+            f"no toca el datamart"
+        )
+
+    identificadores = {
+        nodo.id for nodo in ast.walk(arbol) if isinstance(nodo, ast.Name)
+    }
+    assert "PostgresClient" not in identificadores
+
+
+def test_f011_r4_el_csv_del_bench_sigue_la_convencion_de_ruesma(tmp_path) -> None:
+    """UTF-8 con BOM y `;` como separador, como el resto de CSV del proyecto."""
+    salida = tmp_path / "bench.csv"
+    escribir_csv_bench(
+        [medicion(1_000, 1.0, 1_000), medicion(20_000, 0.0, 0, peticiones=0,
+                                                rechazada=True, cap_devuelto=10_000)],
+        salida,
+    )
+
+    crudo = salida.read_bytes()
+    assert crudo.startswith(b"\xef\xbb\xbf")
+
+    texto = salida.read_text(encoding="utf-8-sig")
+    assert texto.splitlines()[0].startswith("page_size;")
+    assert ";1000;" in texto.replace("\r", "") or "1000;" in texto
+    assert "10000" in texto
