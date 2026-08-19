@@ -11,7 +11,16 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+
+#: Horas que puede llevar una fila en `RUNNING` antes de resultar sospechosa
+#: (F-024, R6). Seis, y no tres: el pipeline completo tarda ~3 h 15 en el B1ms
+#: y el timeout del job son 5 h. Por debajo de eso se estaría acusando de
+#: huérfana a una carga que todavía puede estar trabajando.
+UMBRAL_HUERFANA_HORAS = 6
+
+#: El estado que dejan las filas que nadie cerró.
+ESTADO_ABIERTO = "RUNNING"
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,12 +48,18 @@ _CABECERA = (
 )
 
 
-def format_timings(timings: Sequence[Timing]) -> str:
+def format_timings(
+    timings: Sequence[Timing], ahora: datetime | None = None
+) -> str:
     """
     Tabla legible, en orden cronológico y con el total al pie.
 
     Función pura: recibe la lista y devuelve texto. Así se puede comprobar el
-    formato sin BBDD.
+    formato sin BBDD. `ahora` se inyecta por la misma razón: el aviso de
+    huérfanas de R6 depende del reloj, y un test no puede esperar seis horas.
+
+    El aviso va al PIE y no en una columna nueva (F-024): así no rompe a quien
+    parsee la tabla ni a los tests de formato de F-005.
     """
     if not timings:
         return (
@@ -74,4 +89,39 @@ def format_timings(timings: Sequence[Timing]) -> str:
     lineas.append(
         f"{'TOTAL':<12} {'':<20} {'':<19} {total_s:>12.1f} {total_filas:>12,}"
     )
+
+    aviso = _aviso_de_huerfanas(ordenados, ahora)
+    if aviso:
+        lineas.append("")
+        lineas.append(aviso)
+
     return "\n".join(lineas)
+
+
+def _aviso_de_huerfanas(
+    timings: Sequence[Timing], ahora: datetime | None
+) -> str:
+    """Aviso al pie por las filas `RUNNING` demasiado antiguas (R6).
+
+    `timings` es de SOLO LECTURA y contra Azure no escribe nada (DA-7): aquí
+    solo se avisa. Quien las marca `ABORTED` es la siguiente ejecución que
+    escriba, y el texto lo dice para que nadie salga a arreglarlo a mano.
+    """
+    instante = datetime.utcnow() if ahora is None else ahora
+    limite = instante - timedelta(hours=UMBRAL_HUERFANA_HORAS)
+
+    sospechosas = [
+        t
+        for t in timings
+        if t.status == ESTADO_ABIERTO
+        and t.started_at is not None
+        and t.started_at < limite
+    ]
+    if not sospechosas:
+        return ""
+
+    return (
+        f"AVISO: {len(sospechosas)} fila(s) {ESTADO_ABIERTO} desde hace más de "
+        f"{UMBRAL_HUERFANA_HORAS} h: probablemente huérfanas de un proceso "
+        f"muerto; la próxima ejecución que escriba las marcará ABORTED."
+    )

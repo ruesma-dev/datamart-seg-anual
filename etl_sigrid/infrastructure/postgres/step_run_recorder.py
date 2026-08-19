@@ -20,8 +20,9 @@ if TYPE_CHECKING:  # pragma: no cover - solo para anotaciones
 class PostgresStepRunRecorder:
     """Graba en `_meta.etl_runs` una fila por paso terminado."""
 
-    def __init__(self, client: PostgresClient) -> None:
+    def __init__(self, client: PostgresClient, batch_id: str | None = None) -> None:
         self._client = client
+        self._batch_id = batch_id
 
     def record(self, stage: str, result: StepResult) -> None:
         """Inserta la fila. Quien llama envuelve esto en try/except (R29)."""
@@ -34,4 +35,5 @@ class PostgresStepRunRecorder:
             rows_processed=result.rows_processed,
             error_message=result.error_message,
             metadata=result.metadata or None,
+            batch_id=self._batch_id,
         )

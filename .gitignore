@@ -20,6 +20,12 @@ logs/
 # backups de configuracion
 *.bak
 
+# Huellas de estructura y metricas de vistas: son la salida del comando
+# `fingerprint`, que se compara con `compare-fingerprints`. Son evidencia de
+# UNA ejecucion concreta, caducan con cada rebuild de mart/cierre y pueden
+# llevar agregados de negocio. No se versionan (ver progress/impl_T13_fixes_f019.md).
+huella_*.csv
+
 # >>> ARNES-BASE: bloque gestionado por el arnes. No quitar esta marca. >>>
 # El instalador anade este bloque al .gitignore del proyecto si no esta ya.
 .env

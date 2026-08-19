@@ -401,3 +401,106 @@ supervivientes + fixes 4 líneas / 1 mutante / 0 supervivientes, ambos
 verificados de forma independiente por el reviewer; dos pasadas de
 review (APPROVED Fase B 2026-08-10; APROBADO final 2026-08-17 tras 3
 arreglos documentales). Desbloquea la tanda 2 de F-003 (T23-T26).
+
+
+## F-024 · Coherencia del datamart ante cargas truncadas — `done` (2026-08-19)
+
+Nació de una muerte real: la primera carga desde el job (2026-08-18) murió por
+`DeadlineExceeded` a las 2 h justas, en el tramo 39/60. No hubo daño, pero
+destapó tres huecos: una muerte externa dejaba filas `RUNNING` huérfanas para
+siempre y `timings` mentía; nada impedía construir `stg`/`mart` sobre un `raw`
+mezclado de dos ejecuciones; y el consumidor no tenía forma de saber si lo que
+veía era de esta noche o de hace tres días.
+
+**Lo que entrega**: `batch_id` por ejecución; huérfanas `RUNNING` → `ABORTED`
+con motivo al arrancar cualquier comando que escriba; puerta de coherencia
+antes de `build_stg` y antes de `build_mart`, con `--sin-puerta` registrado
+como `SKIPPED`; vistas `_meta.v_raw_state` y `_meta.v_frescura`; comandos
+`check-coherencia` y `check-frescura`; y una alerta de frescura en Azure.
+
+**Lo que la valida, y no lo podía dar ningún test**: se mató el job a propósito
+a mitad de la ingesta. La tabla `obrparpre` quedó con **4.865.000 filas de
+13.809.350** —DA-8 medida, no deducida: la ingesta commitea por página—, la
+huérfana se cerró sola con el `batch_id` de quien la cerró, la puerta se negó
+en 5,2 s **sin tocar `stg`** y `check-frescura` siguió en FRESCO porque `mart`
+no se tocó. La carga murió sin dañar el dato publicado, que era la tesis
+entera.
+
+**Dos defectos encontrados durante la propia verificación**, los dos ajenos al
+código de la feature y los dos arreglados o fichados:
+
+- La alerta **no se podía crear**: Azure no admite ventana de 30 h. DA-4 se
+  mantiene (el criterio sigue siendo 30 h) pero se expresa con ventana de 48 h
+  —la menor granularidad admitida que la contiene— y el criterio dentro de la
+  KQL. Lo que lo dejó pasar fue un comentario que decía «confirmado con
+  `--help`»: `--help` valida la forma, no el valor.
+- La **campaña de mutación mentía**: 108/108/0 en paralelo frente a 108/106/2
+  en serie. Ficha F-029, encargo en `arnes-base`.
+
+**Evidencias**: 617 tests, cobertura 100 % de 372 líneas cambiadas, mutación
+108/106/2 con los dos supervivientes (`bold` de cabeceras) aceptados como
+equivalentes, y las cuatro verificaciones manuales con sus salidas reales en
+`progress/manual_F-024_fase_c.md`. Tres reviews: Fase B, arreglo de la ventana
+y cierre.
+
+**Queda abierto**: D9, el `Deactivated` de la alerta, con fecha y criterio.
+
+
+## F-003 · Infra: despliegue como Container Apps Job diario — `done` (2026-08-19)
+
+Empezó como «completar `infra/`» y acabó siendo el despliegue entero: Container
+Apps Job programado a las 02:00 UTC, imagen en el ACR compartido, identidad
+gestionada, secretos en su propio Key Vault, Log Analytics y alerta de fallo.
+Estuvo `blocked` desde el 2026-08-17 esperando su cierre operativo, que era
+F-023.
+
+**Lo que costó de verdad no fue crear el job, fue hacerlo cargar.** Tres muertes
+seguidas, cada una con su arreglo: la noche del 18 por un `timeout_seconds` de
+300 contra el techo de 230 s de `sigrid-api` (fix `193fc3c`, y de ahí sale el
+`SIGRID_API_TIMEOUT_MAX_S` que valida al arrancar); a las 10:08 del 18 por
+`DeadlineExceeded` a las dos horas justas en el tramo 39/60 (fix `1a09f63`,
+`replicaTimeoutSeconds` de 7200 a 18000); y el episodio del 9 de agosto en que
+una carga llenó el disco y dejó el servidor compartido en solo lectura diez
+minutos, que fue lo que motivó F-019.
+
+**Al cerrar aparecieron dos cosas que llevaban días escritas y no funcionaban**,
+las dos en comandos copiables que alguien iba a ejecutar: el comando de regla de
+firewall pasaba el servidor en `-n` y la regla en `--rule-name`, que **no existe**
+en esta CLI —estaba mal en el README, en R23, en el runbook de Postgres y en la
+spec de F-005—, y la ficha F-026, a la que apuntaba el defecto del RBAC sin
+propagar, **no existía en `features.json`**. Un puntero a una ficha inexistente
+dentro de la evidencia de cierre de una feature `critico`.
+
+El reviewer produjo además, en un worktree aislado, la **fase RED que faltaba**
+del commit `193fc3c`, que nunca tuvo informe: tres tests en rojo contra el código
+anterior al fix, incluido un `DID NOT RAISE ValidationError` que demuestra que el
+test discrimina de verdad el techo.
+
+## F-023 · Cierre operativo de F-003: las verificaciones de F-004 — `done` (2026-08-19)
+
+Nació con tres bloques y cerró con uno. Los otros dos —las copias de contraseñas
+en el vault de *albaranes* y el rastro en el puesto— salieron a **F-032** por
+decisión del humano: era limpieza operativa que estaba reteniendo el cierre de
+F-003 y, con él, el arranque de la carga incremental y del MCP.
+
+**Lo que quedó y se cumplió**: las tres verificaciones de F-004 sobre los Excels
+auxiliares. Y la sorpresa fue que casi todo estaba hecho sin que nadie lo hubiera
+anotado: los tres Excels llevaban tiempo en el contenedor `aux`, el job tenía las
+URIs de blob y el rol ya estaba concedido. La verificación 2 **ya había ocurrido**
+en la carga del día, esperando en los logs a que alguien mirara.
+
+Tres cosas que merece la pena recordar de esta feature:
+
+- **Un `SUCCESS` puede no probar nada.** El primer intento de la verificación 1
+  salió en verde leyendo `origen=local`, desde OneDrive: el `.env` del puesto
+  conserva rutas locales aunque el job no. Lo que había que mirar era el campo
+  `origen`, no el estado.
+- **La prueba negativa se hizo sin tocar RBAC**, apuntando a una cuenta sobre la
+  que no hay rol en vez de quitando el rol de la propia. El reviewer lo dio por
+  mejor que el requisito original: no exige permisos que el puesto no tiene y no
+  deja ninguna asignación que devolver, que era un riesgo real de quedarse sin
+  acceso a los Excels.
+- **El rigor declarado estaba equivocado.** El fichero decía `estandar` cuando el
+  humano la había subido a `critico`, y nadie lo había recogido. Se juzgó como
+  `critico` y se corrigió el fichero. Un nivel escrito por debajo del real baja
+  la vara en silencio para quien lo lea dentro de tres meses.

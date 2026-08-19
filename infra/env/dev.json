@@ -30,8 +30,9 @@
   "imageRepository": "datamart-seg-anual",
 
   "cron": "0 2 * * *",
-  "jobProgramable": false,
-  "replicaTimeoutSeconds": 7200,
+  "jobProgramable": true,
+  "$aviso_replicaTimeoutSeconds": "Techo de duracion de UNA ejecucion; si se supera, Azure MATA el contenedor (DeadlineExceeded) a mitad de lo que este haciendo. El 2026-08-18 la primera carga real murio a las 2 h justas por el tramo 39/60 del stage: el pipeline completo tarda ~3 h 15 en el B1ms (ingesta 33 min, presupuesto 12, stage troceado ~110, mart ~25). 18000 s = 5 h: holgura x1,5 sobre lo medido y dentro de la ventana nocturna (02:00-07:00 UTC). Si el pipeline crece, subir esto ANTES de que muerda.",
+  "replicaTimeoutSeconds": 18000,
   "replicaRetryLimit": 1,
   "parallelism": 1,
   "replicaCompletionCount": 1,
@@ -61,6 +62,10 @@
   "alertName": "alert-caj-datamart-seg-dev-failed",
   "alertActionGroupName": "ag-datamart-seg-dev",
   "alertActionGroupRg": "rg-datamart-seg-dev",
+
+  "$aviso_frescura": "F-024, DA-4. 'frescuraUmbralHoras' es el CRITERIO de frescura y de el salen tres cosas, ninguna escrita a mano: el filtro temporal de la consulta de la alerta que crea 95_create_alert_frescura.ps1 ('| where TimeGenerated > ago(30h)'), la VENTANA de esa regla -que NO es el umbral: Azure solo admite ciertas granularidades y 1800 min no esta entre ellas, asi que es la menor que lo contiene, 48 h; enmienda de DA-4 del 2026-08-19 tras el rechazo del ARM- y el umbral por defecto de 'python main.py check-frescura'. Por encima de 48 h el script falla a proposito antes de llamar a Azure. 30 h y no 24: el job arranca a las 02:00 UTC y tarda ~3 h 15, asi que un umbral de 24 h disparia cada manana durante la hora en que la carga nueva todavia no ha terminado. El contenedor NO lleva este fichero, asi que el codigo no puede leerlo en ejecucion: el valor esta duplicado en la constante UMBRAL_FRESCURA_HORAS de etl_sigrid/infrastructure/postgres/frescura.py y lo unico que impide que diverjan es el test test_f024_r19_umbral_por_defecto_coincide_con_dev_json. Si divergen, la alerta vigila una ventana y check-frescura juzga con otra, y nadie se entera hasta que falta un correo.",
+  "frescuraUmbralHoras": 30,
+  "frescuraAlertName": "alert-caj-datamart-seg-dev-sin-build",
 
   "tags": {
     "acens-project": "datamart-seg-anual",

@@ -28,10 +28,13 @@ import psycopg
 from psycopg import sql
 from psycopg.types.json import Json
 
+from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
+from etl_sigrid.domain.ejecucion import MOTIVO_HUERFANA
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
+from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
 from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
 from etl_sigrid.infrastructure.postgres.timings import Timing
 
@@ -88,6 +91,76 @@ FROM stg.presupuesto pp
 JOIN raw.obrparpre op ON op.ide = pp.presupuesto_id
 WHERE pp.ambito_id IN (3, 7, 8, 11)
 GROUP BY pp.obra_id
+"""
+
+
+# --- Coherencia ante cargas truncadas (F-024) -------------------------------
+#
+# Las consultas van como constantes de módulo, igual que `SQL_OCUPACION_DISCO`,
+# para que los tests estáticos lean EXACTAMENTE el SQL que se envía. Ninguna se
+# ejecuta con parámetros salvo la primera: `LIKE 'build_stg%'` lleva un `%` que
+# psycopg tomaría por marcador si hubiera parámetros que sustituir.
+
+# Cierra de una vez todas las filas que dejó abiertas un proceso muerto. NO
+# filtra por antigüedad (toda `RUNNING` que exista al arrancar es de otro
+# proceso, por definición) ni por batch (las nuestras aún no existen). El
+# `WHERE status = 'RUNNING'` es lo único que separa esto de reescribir el
+# histórico entero, incluidos los SUCCESS de las cargas buenas.
+SQL_ABORTAR_HUERFANOS = """
+UPDATE _meta.etl_runs
+SET status        = 'ABORTED',
+    finished_at   = %(ahora)s,
+    error_message = %(motivo)s
+WHERE status = 'RUNNING'
+RETURNING id, step, started_at
+"""
+
+# De qué carga viene cada tabla de raw. Se lee de la VISTA y no de `etl_runs`
+# para que la puerta, `check-coherencia`, el MCP y Power BI vean exactamente lo
+# mismo: una sola definición de «última ingesta», en el DDL.
+SQL_ESTADO_RAW = """
+SELECT tabla, status, batch_id, started_at, finished_at, filas
+FROM _meta.v_raw_state
+ORDER BY tabla
+"""
+
+# El último intento de construir stg. Por `id` DESC y no por fecha: la fila de
+# PASO se inserta al TERMINAR el step, y su `started_at` es el del arranque,
+# anterior al de todos sus sub-pasos. Ordenando por fecha, un stage terminado
+# devolvería su último tramo y la puerta de mart lo tomaría por incompleto.
+SQL_ULTIMO_INTENTO_STG = """
+SELECT id, step, status, batch_id, started_at, finished_at
+FROM _meta.etl_runs
+WHERE step LIKE 'build_stg%'
+ORDER BY id DESC
+LIMIT 1
+"""
+
+SQL_FRESCURA = """
+SELECT paso,
+       ultimo_ok_finished_at,
+       ultimo_ok_batch_id,
+       ultimo_ok_filas,
+       horas_desde_ultimo_ok,
+       ultimo_intento_started_at,
+       ultimo_intento_status,
+       ultimo_intento_error
+FROM _meta.v_frescura
+ORDER BY paso
+"""
+
+SQL_RUN_START = """
+INSERT INTO _meta.etl_runs (stage, step, started_at, status, batch_id)
+VALUES (%s, %s, %s, 'RUNNING', %s)
+RETURNING id
+"""
+
+SQL_RUN_COMPLETED = """
+INSERT INTO _meta.etl_runs
+    (stage, step, started_at, finished_at, status,
+     rows_processed, error_message, metadata, batch_id)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+RETURNING id
 """
 
 
@@ -704,19 +777,106 @@ class PostgresClient:
     # Tracking de runs (_meta.etl_runs)
     # ---------------------------------------------------------------------
 
-    def record_run_start(self, stage: str, step: str) -> int:
-        """Inserta una fila en _meta.etl_runs con status=RUNNING. Devuelve el run_id."""
+    def record_run_start(
+        self, stage: str, step: str, batch_id: str | None = None
+    ) -> int:
+        """Inserta una fila en _meta.etl_runs con status=RUNNING. Devuelve el run_id.
+
+        `batch_id` es opcional a propósito (F-024): este método lo llaman los
+        sub-pasos de `build_stg` y sus ~60 tramos, y hacerlo obligatorio
+        rompería todos los llamantes a la vez. Sin él se escribe NULL, que es
+        exactamente lo que tiene el histórico anterior a la feature.
+        """
         with self.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO _meta.etl_runs (stage, step, started_at, status)
-                VALUES (%s, %s, %s, 'RUNNING')
-                RETURNING id
-                """,
-                (stage, step, datetime.utcnow()),
-            )
+            cur.execute(SQL_RUN_START, (stage, step, datetime.utcnow(), batch_id))
             row = cur.fetchone()
             return int(row[0])
+
+    # ---------------------------------------------------------------------
+    # Coherencia ante cargas truncadas (F-024)
+    # ---------------------------------------------------------------------
+
+    def abortar_runs_huerfanos(
+        self, batch_id: str, ahora: datetime | None = None
+    ) -> list[tuple[int, str, datetime]]:
+        """Cierra como ABORTED las filas que dejó abiertas un proceso muerto.
+
+        Devuelve `(id, step, started_at)` de cada fila marcada, para que quien
+        llama emita un WARNING por fila: enterarse de que anoche murió algo es
+        justo lo que no pasaba antes de F-024.
+
+        **Propaga las excepciones**: quien llama decide. Y decide continuar
+        (R7), porque esto es contabilidad y el paso que venga detrás fallará
+        por sí mismo si la BBDD no está.
+        """
+        instante = datetime.utcnow() if ahora is None else ahora
+        motivo = MOTIVO_HUERFANA.format(
+            batch_id=batch_id,
+            ahora=instante.isoformat(sep=" ", timespec="seconds"),
+        )
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ABORTAR_HUERFANOS, {"ahora": instante, "motivo": motivo})
+            return [
+                (int(fila[0]), str(fila[1]), fila[2]) for fila in cur.fetchall()
+            ]
+
+    def fetch_estado_raw(self) -> list[EstadoTablaRaw]:
+        """Última ingesta conocida de cada tabla de `raw`, desde la vista."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ESTADO_RAW)
+            return [
+                EstadoTablaRaw(
+                    tabla=fila[0],
+                    status=fila[1],
+                    batch_id=fila[2],
+                    started_at=fila[3],
+                    finished_at=fila[4],
+                    filas=int(fila[5] or 0),
+                )
+                for fila in cur.fetchall()
+            ]
+
+    def fetch_ultimo_intento_stg(self) -> EstadoPaso | None:
+        """La fila más reciente de `build_stg%`, o `None` si no hay ninguna."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ULTIMO_INTENTO_STG)
+            fila = cur.fetchone()
+
+        if fila is None:
+            return None
+        return EstadoPaso(
+            id=int(fila[0]),
+            step=fila[1],
+            status=fila[2],
+            batch_id=fila[3],
+            started_at=fila[4],
+            finished_at=fila[5],
+        )
+
+    def fetch_frescura(self) -> list[FilaFrescura]:
+        """`_meta.v_frescura` tal cual, con las horas ya en `float`.
+
+        La vista las devuelve como `numeric` (psycopg las trae en `Decimal`) y
+        `format_frescura` las compara con un umbral entero: la conversión se
+        hace aquí, una vez, y no en cada llamante.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_FRESCURA)
+            return [
+                FilaFrescura(
+                    paso=fila[0],
+                    ultimo_ok_finished_at=fila[1],
+                    ultimo_ok_batch_id=fila[2],
+                    ultimo_ok_filas=fila[3],
+                    horas_desde_ultimo_ok=(
+                        None if fila[4] is None else float(fila[4])
+                    ),
+                    ultimo_intento_started_at=fila[5],
+                    ultimo_intento_status=fila[6],
+                    ultimo_intento_error=fila[7],
+                )
+                for fila in cur.fetchall()
+            ]
 
     def fetch_timings(self, last: int = 1) -> list[Timing]:
         """
@@ -794,6 +954,7 @@ class PostgresClient:
         rows_processed: int = 0,
         error_message: str | None = None,
         metadata: dict[str, Any] | None = None,
+        batch_id: str | None = None,
     ) -> int:
         """
         Inserta de una vez la fila de un paso YA terminado, y devuelve su id.
@@ -802,16 +963,13 @@ class PostgresClient:
         los steps que se instrumentan a sí mismos. Este lo usa el orquestador
         para dejar rastro de TODOS los pasos, incluidos los que no se
         instrumentan por dentro (build_mart, build_cierre), que son los pesados.
+
+        Estas son las filas de PASO que después lee `_meta.v_frescura`, y por
+        eso son las que más importa que lleven `batch_id` (F-024).
         """
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute(
-                """
-                INSERT INTO _meta.etl_runs
-                    (stage, step, started_at, finished_at, status,
-                     rows_processed, error_message, metadata)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-                """,
+                SQL_RUN_COMPLETED,
                 (
                     stage,
                     step,
@@ -821,6 +979,7 @@ class PostgresClient:
                     rows_processed,
                     error_message,
                     Json(metadata) if metadata else None,
+                    batch_id,
                 ),
             )
             row = cur.fetchone()

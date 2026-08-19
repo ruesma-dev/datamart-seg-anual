@@ -118,6 +118,13 @@ exponemos o consumimos**, en el mismo trabajo y no después; y **no se
 duplican aquí** los documentos de otros proyectos, se enlazan. Ya pasó con
 `sigrid_api.md`: dos copias, una de 515 líneas y otra de 890.
 
+Además de un documento por proyecto, `azure-apps/` guarda la **documentación
+del sistema origen común**: `sigrid_api.md` (la pasarela) y
+`sigrid_tablas.md` (el diccionario completo de la BBDD de Sigrid: tablas,
+campos, tipos e índices, movido allí el 2026-08-18). Cuando necesites saber
+qué es una tabla o un campo de Sigrid, ve ahí; en `docs/referencia/` de este
+proyecto solo queda el puntero `01_sigrid_tablas.md`.
+
 ## Documentos que llegan de fuera (PDF y ofimática)
 
 Cuando el humano pase un PDF —o un `.docx`, `.xlsx`, `.pptx`— conviértelo a

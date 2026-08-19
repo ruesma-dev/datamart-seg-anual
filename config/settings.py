@@ -47,6 +47,10 @@ def get_build_info() -> dict[str, str]:
     }
 
 
+# Máximo que acepta sigrid-api para timeout_seconds (ver azure-apps/sigrid_api.md).
+SIGRID_API_TIMEOUT_MAX_S = 230.0
+
+
 class SigridApiSettings(BaseSettings):
     """Conexión a la Function App sigrid-api."""
 
@@ -55,7 +59,14 @@ class SigridApiSettings(BaseSettings):
     base_url: str = Field(..., description="URL completa de la Function App")
     function_key: SecretStr = Field(..., description="Cabecera x-functions-key")
     database: str = Field("ruesma", description="Nombre BBDD on-prem (debe estar en ALLOWED_DATABASES)")
-    timeout_s: float = Field(300.0, description="Timeout HTTP por petición SQL")
+    # TECHO DE SIGRID-API: su balanceador corta a los 230 s y la API valida
+    # `timeout_seconds <= 230` (HTTP 400 si se supera). Este default vale para
+    # el job de Azure, que no lleva .env: la noche del 2026-08-18 el valor 300
+    # heredado hizo fallar las 31 tablas de la ingesta antes de leer una fila.
+    timeout_s: float = Field(
+        SIGRID_API_TIMEOUT_MAX_S, le=SIGRID_API_TIMEOUT_MAX_S,
+        description="Timeout HTTP por petición SQL (máximo 230, techo de sigrid-api)",
+    )
     page_size: int = Field(10000, description="Filas por petición (<= MAX_ALLOWED_ROWS de la API)")
     max_retries: int = Field(3, description="Reintentos automáticos en errores transitorios")
 

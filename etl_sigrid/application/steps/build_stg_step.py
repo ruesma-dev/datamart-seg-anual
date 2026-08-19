@@ -26,6 +26,11 @@ from pathlib import Path
 
 from config.settings import Settings
 from etl_sigrid.application.steps.base import PipelineStep
+from etl_sigrid.domain.coherencia import (
+    VeredictoCoherencia,
+    evaluar_coherencia_raw,
+    formatear_veredicto_raw,
+)
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.domain.tramos import planificar_tramos, tramos_sobredimensionados
 from etl_sigrid.infrastructure.logging_config import get_logger
@@ -51,6 +56,12 @@ MARCADOR_FILTRO_OBRAS = "/*F019_FILTRO_OBRAS*/"
 # Las DOS ramas del fichero (master amb 8/11 y reales amb 3/7) llevan filtro.
 # Filtrar solo una duplicaría las filas de la otra en cada tramo.
 RAMAS_CON_FILTRO = 2
+
+# --- Puerta de coherencia de raw (F-024) ------------------------------------
+# La puerta se registra como sub-paso para que aparezca en `timings` con su
+# duración (que debe ser de milisegundos: dos SELECT sobre `_meta`) y para que
+# quede constancia escrita de su veredicto, incluso cuando se omite.
+PASO_PUERTA_RAW = "build_stg.puerta_raw"
 
 
 class PlanMensualAbortado(RuntimeError):  # noqa: N818 — nombres en español
@@ -130,8 +141,15 @@ class _SubStep:
 class BuildStgStep(PipelineStep):
     """Construye el esquema stg desde raw."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        batch_id: str | None = None,
+        omitir_puerta: bool = False,
+    ) -> None:
         self._settings = settings
+        self._batch_id = batch_id
+        self._omitir_puerta = omitir_puerta
 
     @property
     def name(self) -> str:
@@ -150,6 +168,18 @@ class BuildStgStep(PipelineStep):
         pg = build_postgres_client(self._settings)
         # El auto-bootstrap (CREATE DATABASE/schemas/_meta) se ejecutará lazy en
         # la primera conexión. No hace falta llamada explícita.
+
+        # Puerta de coherencia de raw (F-024, R10). Va LA PRIMERA, antes
+        # incluso del pre-flight: si el raw no acredita una carga completa, no
+        # se ejecuta ni una consulta más contra el servidor compartido, y
+        # desde luego ni un TRUNCATE. Un `TRUNCATE stg.obras` ya ejecutado no
+        # se deshace porque el step devuelva FAILED después.
+        veredicto = self._puerta_raw(pg)
+        if not veredicto.ok and not self._omitir_puerta:
+            result.status = StepStatus.FAILED
+            result.error_message = formatear_veredicto_raw(veredicto)
+            result.finished_at = datetime.utcnow()
+            return result
 
         # Pre-flight check: verifica que raw tiene todas las columnas que los
         # SQL de stg van a usar. Si falta alguna, falla con un mensaje claro
@@ -198,7 +228,9 @@ class BuildStgStep(PipelineStep):
 
         for sub in sub_steps:
             sql_path = sql_dir / sub.sql_file
-            run_id = pg.record_run_start("stage", f"build_stg.{sub.name}")
+            run_id = pg.record_run_start(
+                "stage", f"build_stg.{sub.name}", self._batch_id
+            )
 
             t0 = datetime.utcnow()
             try:
@@ -240,8 +272,74 @@ class BuildStgStep(PipelineStep):
         result.status = StepStatus.SUCCESS
         result.rows_processed = total_rows
         result.finished_at = datetime.utcnow()
-        result.metadata = {"table_stats": table_stats}
+        result.metadata = {
+            "table_stats": table_stats,
+            # De qué carga de raw salió este stg. Es lo que permite, tres días
+            # después, saber si el cuadro que no cuadra viene de aquí.
+            "raw_batch_id": veredicto.batch_id,
+        }
         return result
+
+    # ---------------------------------------------------------------------
+    # Puerta de coherencia de raw (F-024, R10-R12)
+    # ---------------------------------------------------------------------
+
+    def _puerta_raw(self, pg: PostgresClient) -> VeredictoCoherencia:
+        """Evalúa si `raw` acredita una carga completa y deja constancia.
+
+        Se evalúa SIEMPRE, también con `--sin-puerta`: la vía de escape sirve
+        para construir de todas formas, no para dejar de mirar. El veredicto
+        acaba escrito en `_meta.etl_runs` pase lo que pase, que es lo que
+        convierte «alguien construyó sobre un raw raro» en un hecho
+        consultable en vez de en una sospecha.
+
+        Devolver el veredicto en vez de lanzar es deliberado: quien decide qué
+        hacer con un KO es `run()`, según haya `--sin-puerta` o no.
+        """
+        run_id = pg.record_run_start("stage", PASO_PUERTA_RAW, self._batch_id)
+
+        requeridas = [
+            tabla["source_table"]
+            for tabla in self._settings.tables_sigrid.get("tables", [])
+        ]
+        veredicto = evaluar_coherencia_raw(pg.fetch_estado_raw(), requeridas)
+        mensaje = formatear_veredicto_raw(veredicto)
+
+        if self._omitir_puerta:
+            # SKIPPED aunque el veredicto sea OK: lo que esta fila cuenta es
+            # que el build se hizo SIN puerta, no lo que la puerta habría
+            # dictaminado. Quien audite `_meta.etl_runs` tiene que poder
+            # distinguir un build verificado de uno que no lo fue.
+            pg.record_run_end(
+                run_id,
+                StepStatus.SKIPPED.value,
+                error_message=f"puerta omitida por --sin-puerta; veredicto: {mensaje}",
+            )
+            logger.warning(
+                "puerta_omitida",
+                veredicto_ok=veredicto.ok,
+                motivo=mensaje,
+            )
+        elif veredicto.ok:
+            pg.record_run_end(run_id, StepStatus.SUCCESS.value)
+            logger.info(
+                "puerta_raw_ok",
+                raw_batch_id=veredicto.batch_id,
+                tablas=len(requeridas),
+            )
+        else:
+            pg.record_run_end(
+                run_id, StepStatus.FAILED.value, error_message=mensaje
+            )
+            logger.error(
+                "puerta_raw_ko",
+                faltantes=list(veredicto.faltantes),
+                no_exitosas=[e.tabla for e in veredicto.no_exitosas],
+                sin_batch=[e.tabla for e in veredicto.sin_batch],
+                batches=[b for b, _ in veredicto.batches_distintos],
+            )
+
+        return veredicto
 
     # ---------------------------------------------------------------------
     # Build de stg.plan_mensual por tramos (F-019)
@@ -299,7 +397,9 @@ class BuildStgStep(PipelineStep):
         for tramo in tramos:
             etiqueta = f"{tramo.indice}/{total}"
             run_id = pg.record_run_start(
-                "stage", f"build_stg.build_plan_mensual.tramo_{tramo.indice:02d}"
+                "stage",
+                f"build_stg.build_plan_mensual.tramo_{tramo.indice:02d}",
+                self._batch_id,
             )
             t0 = datetime.utcnow()
 

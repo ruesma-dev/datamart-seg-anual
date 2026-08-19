@@ -20,6 +20,13 @@ class StepStatus(str, Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     SKIPPED = "SKIPPED"
+    # F-024. Vocabulario, no un estado que devuelva ningún `StepResult` vivo:
+    # lo escribe la marca de huérfanas sobre filas que quedaron en RUNNING
+    # porque el proceso que las abrió murió DESDE FUERA (deadline de Azure,
+    # OOM, reinicio de nodo) y no llegó a cerrarlas. Distinguirlo de FAILED
+    # importa: FAILED es «el paso se ejecutó y salió mal»; ABORTED es «nadie
+    # sabe qué pasó con este paso».
+    ABORTED = "ABORTED"
 
 
 @dataclass(slots=True)

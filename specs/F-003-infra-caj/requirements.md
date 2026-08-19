@@ -371,9 +371,21 @@ por regla de firewall en el servidor (D1, opción A).
 
 ```
 az containerapp env show -g <rg> -n <cae> --query properties.staticIp -o tsv
-az postgres flexible-server firewall-rule create -g rg-albaranes-dev -n psql-albaranes-rs9k2 \
-  --rule-name caj-datamart-seg-<entorno> --start-ip-address <ip> --end-ip-address <ip>
+az postgres flexible-server firewall-rule create --resource-group rg-albaranes-dev --server-name psql-albaranes-rs9k2 --name caj-datamart-seg-<entorno> --start-ip-address <ip> --end-ip-address <ip>
 ```
+
+> **Corregido el 2026-08-19.** El comando anterior **no ejecutaba**: pasaba el
+> servidor en `-n` y nombraba la regla con `--rule-name`. En esta CLI el
+> servidor va en `--server-name`/`-s` y la regla en `--name`/`-n`, y
+> `--rule-name` **no existe** (devuelve «unrecognized arguments»). Verificado y
+> escrito en `progress/manual_F-024_fase_c.md`; tropezar con la versión mala
+> costó media hora y una regla de firewall de más.
+>
+> No vale generalizar el arreglo al resto de subcomandos: en
+> `firewall-rule list` el `-n` **sí** es el servidor, porque `list` no recibe
+> nombre de regla. La asimetría es de la CLI. En una sola línea a propósito: un
+> backtick de continuación con un espacio detrás rompe el comando en PowerShell.
+
 Correcto si tras ello R22 pasa. Nota: el servidor ya tiene una regla
 `AllowAzureServices` (`0.0.0.0`) que podría hacer funcionar el job sin esta
 regla; **no se debe depender de ella** (autoriza a cualquier recurso de Azure,

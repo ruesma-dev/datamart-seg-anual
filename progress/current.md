@@ -26,7 +26,474 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
-# F-003 · DESBLOQUEADA (F-019 done el 2026-08-17) — falta la tanda 2 (T23–T26)
+# F-023 · las tres verificaciones de F-004, CUMPLIDAS (2026-08-19)
+
+Lo pide **T27 de F-003**: el resultado de cada verificación MANUAL, aquí. El
+detalle con comandos y salidas pegadas está en `progress/manual_F-023.md`.
+
+| Verificación | Cuándo | Resultado real |
+|---|---|---|
+| **V1** · `load-aux` desde el puesto lee del blob | 14:42:08 UTC | **`SUCCESS`, salida 0, `origen=blob`** para los tres ficheros. Autenticado con el `az login` del puesto contra `Storage Blob Data Reader`, sin claves ni SAS |
+| **V2** · el job lee del blob con identidad gestionada | 10:55:57 UTC | **`origen=blob`** para los tres, con `ubicacion` de blob y **ni una sola ruta local**. No hubo que provocarlo: ya había pasado en la carga del día y nadie lo había anotado |
+| **V3** · sin el rol, falla diciendo qué falta | 14:51 UTC | **Salida 1**. Azure devolvió 403 `AuthorizationPermissionMismatch` y el ETL lo tradujo nombrando **el rol exacto, la cuenta, la variable de entorno** y qué hacer en Azure y en local |
+
+**Dos cosas que conviene no perder de esta tanda:**
+
+1. **El primer intento de V1 dio `SUCCESS` y no valía.** Leyó `origen=local`,
+   desde OneDrive, porque el `.env` del puesto sigue apuntando a rutas locales
+   —el **job** sí tiene las URIs de blob—. Un `load-aux` en verde **no prueba
+   nada** sobre el blob: hay que mirar el campo `origen`. Segunda pista: leer del
+   blob tardó 9,9 s y leer de disco, 0,0 s.
+2. **V3 se hizo sin tocar RBAC**, apuntando a una cuenta sobre la que el puesto
+   no tiene el rol, en vez de quitar el rol de la propia. El reviewer lo dio por
+   **mejor que el requisito original**: no exige `User Access Administrator`, no
+   deja ninguna asignación que devolver —el original se queda sin acceso a los
+   Excels si el reasignado falla— y no toca permisos de un recurso compartido.
+
+---
+
+# F-024 CERRADA · 2026-08-19 (léelo primero; lo de abajo es el camino hasta aquí)
+
+**Fase C completa y reviewer en APROBADO** (`progress/review_F-024_cierre.md`).
+Sustituye a todo lo que este fichero diga más abajo sobre «faltan T18, T19 y
+medio T20»: ya no falta ninguna.
+
+| Tarea | Resultado |
+|---|---|
+| **T17** (R25) | imagen `r20260818-2146`; 7 huérfanas cerradas con motivo (2 esperadas + 5 antiguas); vistas legibles por el rol del MCP |
+| **T18** (R24) | muerte a los 10 min; **4.865.000 de 13.809.350 filas** en `obrparpre` (DA-8 medida); huérfana `ABORTED`; puerta `FAILED` en 5,2 s con `rows=0`; `mart` intacto; recarga a OK |
+| **T19** (R23) | correo «Activated» en **6 min 42 s**; regla creada por el script del repositorio. **Abierto**: el `Deactivated` (ver D9) |
+| **T20** (R26) | `build_mart.puerta_stg` en **`SKIPPED`**, con el `SUCCESS` del job al lado |
+
+## Horas de R23, que el requisito pide anotar AQUÍ
+
+| Hito | UTC | Local |
+|---|---|---|
+| `update` a ventana corta (`1h`/`5m`) | 10:04:53 | 12:04:53 |
+| Alerta **`Fired`** | 10:11:18 | 12:11:18 |
+| **Correo recibido** | 10:11:35 | 12:11:35 |
+| Restauración a `48h`/`1h` | 10:27:05 | 12:27:05 |
+| Última lectura: seguía en `Fired` | 14:00 | 16:00 |
+
+## Lo único abierto de F-024: D9
+
+El `Deactivated` no se llegó a observar. **No bloqueó el cierre** —tres
+evaluaciones horarias están en el borde de la latencia de resolución, y no
+había nada que cambiar para acelerarlo— pero está clavado en
+`progress/decisiones_abiertas.md` como **D9**, con fecha (tras la nocturna del
+**2026-08-20**), comando de solo lectura y criterio: si sigue en `Fired`, es
+hallazgo confirmado, se abre feature y **hay que resolver la instancia a mano**,
+porque una alerta atascada en `Fired` no vuelve a notificar.
+
+## Lo siguiente, por orden
+
+1. **D9**, tras la nocturna del 20. Es una lectura de un minuto.
+2. **F-023** (prioridad 8), que desbloquea F-003. Bloque 1 primero —y si los
+   Excels están en el blob antes de la nocturna, la verificación 2 sale gratis—;
+   el **bloque 3 va el último**: retira las reglas de firewall del puesto, que
+   son las que dan acceso para trabajar. Hoy hay tres: `-17-rango`, `-18` y
+   `-19` (esta última acabó en rango `77.211.5.0/24` porque la IP del puesto
+   rota cada pocos minutos).
+3. **F-029** (prioridad 10): la campaña de mutación no es de fiar. El encargo
+   completo está en `arnes-base/ENCARGO_1.5.3_mutacion_fiable.md` y lo está
+   implementando la sesión de `albaranes`.
+
+---
+
+# LA NOCTURNA DEL 19 FUNCIONÓ · verificado a las 10:20 del 19 (léelo primero)
+
+**Primera nocturna con las puertas de coherencia de F-024 y con la imagen
+`r20260818-2146`: limpia de punta a punta.** Sustituye al punto 1 de la
+sección siguiente, que queda cumplido.
+
+| Qué | Resultado real |
+|---|---|
+| Ventana | **02:00:16 → 04:48:05 UTC = 2 h 48 min** (el 18 fueron 2 h 45) |
+| Estado de todos los pasos | `SUCCESS`. **Ni un `ABORTED`, ni una `RUNNING` huérfana, ni un `AVISO`** al pie de `timings` |
+| Identidad de ejecución | **una sola**: `20260819T020016Z-327ef0`, en las 25 tablas de `raw` |
+| `check-coherencia` | **OK en `raw` y en `stg`**, salida 0. **Ha pasado de KO a OK**, que era justo lo que había que confirmar |
+| `check-frescura` | `build_mart` **FRESCO** (3,5 h de 30 h de umbral), salida 0 |
+| Volumen | `raw` 20,05 M · `stg` 43,79 M · `mart` 5,32 M filas |
+| Buzón | **ningún «Activated»**. La alerta no disparó, que es lo correcto |
+
+**Las dos puertas corrieron en el job real y quedaron registradas**, que es la
+evidencia que faltaba de R10/R15 en Azure y no la daba ningún test:
+
+```
+stage        build_stg.puerta_raw   2026-08-19 02:35:58   0.1 s   SUCCESS
+build_mart   build_mart.puerta_stg  2026-08-19 04:26:32   0.2 s   SUCCESS
+```
+
+Es decir: la puerta se ejecuta **antes** de escribir, en producción, y **no
+estorba a una carga buena**. Que es la mitad de la garantía; la otra mitad —que
+sí frena a una carga mala— es lo que prueba T18.
+
+## Dos cosas que aparecieron al revisar, ninguna es un problema
+
+- **Mantenimiento programado de Azure Database for PostgreSQL** (región Spain
+  Central, tracking `SJFH-KHZ`): correo a las 05:27 UTC con **`STATUS:
+  Complete`**, o sea **después** de que la carga terminara a las 04:48. No la
+  tocó. Conviene recordar que ese servidor es el compartido y que estos
+  mantenimientos pueden caer dentro de la ventana de carga otro día.
+- **Disco**: pico de **88,69 %** a las 02:45 UTC (ingesta) y 84,13 % a las
+  04:30 (build_mart). Es el cuarto pico consecutivo en torno al 88,5 % **sin
+  tendencia al alza**, y **por debajo del 90 %** que invalidaría la decisión de
+  no ampliar. Cuidado al mirarlo por la mañana: a las 08:00 marcaba 76 % y
+  **seguía bajando** 0,6 puntos/hora hacia el reposo real de 72,46 %; ese 77 %
+  de después de la carga **no** es el «reposo por encima del 78 %» del umbral 2.
+
+## Lo que queda de F-024, con esto ya descontado
+
+Solo Fase C: **T18** (muerte externa controlada + recarga), **T19** (alerta de
+frescura de extremo a extremo) y la **segunda mitad de T20** (`--sin-puerta`
+registrando `SKIPPED`). Nada más: código, tests, cobertura, mutación y review
+están cerrados y aprobados.
+
+Hueco disponible hoy: la siguiente nocturna entra a las **02:00 UTC del 20**
+(04:00 local), así que T18 con su recarga de ~2 h 50 cabe de sobra si se
+arranca por la mañana.
+
+---
+
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-19 · MADRUGADA (00:00–00:30)
+
+Sesión corta y sin tocar código. Tres cosas que cambian lo que dice la
+sección siguiente (la del 18 por la noche), que por lo demás sigue vigente.
+
+## 1 · La nocturna del 19 TODAVÍA NO HA CORRIDO
+
+A las **00:03 del 19 (22:03 UTC del 18)**, `python main.py timings --last 1`
+seguía enseñando la carga del 18 (`ingest_raw` 10:23 UTC → `build_mart`
+12:46 UTC, todo `SUCCESS`) y los dos `apply_grants` (13:08 y 19:49, el
+segundo el de T17). La nocturna entra a las **02:00 UTC = 04:00 local**.
+
+Es decir: **la comprobación nº 1 del plan de anoche sigue siendo lo primero
+de la mañana**, sin cambios, con sus tres comandos (`timings --last 1`,
+`check-coherencia`, `check-frescura`) y la misma expectativa: `check-coherencia`
+tiene que pasar de KO a OK.
+
+## 2 · La re-review de la Fase B ya está APROBADA — no la vuelvas a lanzar
+
+`progress/review_F-024.md:521` («Re-review · 2026-08-18, 2ª pasada, sobre el
+commit `89a8707`») cierra con **APROBADO**, con los cuatro bloqueantes B1–B4
+verificados uno a uno. La frase «pendiente la re-review» solo sobrevive en la
+sección histórica de mediodía de este fichero; está obsoleta.
+
+**Consecuencia: de F-024 no queda más que la Fase C** — T18, T19 y la segunda
+mitad de T20. Todo lo demás (código, tests, cobertura, mutación, review) está
+cerrado.
+
+## 3 · Por qué esta madrugada no se tocó la Fase C
+
+- **T18** son ~3 h 15 entre la muerte controlada y la recarga completa, y la
+  nocturna entra a las 04:00: se pisarían. Hay que lanzarlo con la mañana por
+  delante, o desactivando antes la programación.
+- **T19** (~15 min: alerta, ventana corta 1h/5m, correo `Activated`, restaurar
+  a **48h**/1h — ojo, ya no 30h: ver el aviso de abajo) **sí es factible a
+  cualquier hora** y no interfiere con la nocturna. Es el candidato natural
+  para retomar. Exige que el humano vea llegar el correo.
+- **T20, segunda mitad** (`stage --sin-puerta` registrando `SKIPPED`) **no se
+  puede lanzar con el `.env` apuntando a Azure**: serían 1 h 51 de escritura
+  sobre `stg` justo antes de la nocturna. O se hace en local con
+  `.env.local.bak`, o se espera a un hueco sin carga programada.
+
+## 4 · Cabos cerrados en esta sesión
+
+- **La errata que dejó anotada el reviewer**: la línea de T17 de este fichero
+  mandaba ejecutar `infra8_build_image.ps1`, que no existe. Ya dice
+  `infra\70_build_image.ps1`.
+- **Los seis `huella_*.csv` de la raíz** llevaban desde el 13 de agosto
+  sueltos y sin versionar. Ahora `huella_*.csv` está en el `.gitignore`, con
+  el motivo escrito: son la salida de `fingerprint` para **una** ejecución,
+  caducan con cada rebuild de `mart`/`cierre` y pueden llevar agregados de
+  negocio. **Los ficheros siguen en disco**: los de T13 son la referencia
+  hasta que se rehagan `build-mart` y `build-cierre` (defecto 2 de
+  `progress/impl_T13_fixes_f019.md`).
+
+## 5 · Qué trae el arnés 1.5.2 (mirado, no propagado)
+
+`arnes-base` va por **1.5.2** y solo cambia `.claude/agents/reviewer.md` y
+`CHECKPOINTS.md`: **el reviewer reejecuta la campaña de mutación cuando es
+barata** (si el «Tiempo total» del informe baja de 5 minutos), con `--salida`
+fuera de `progress/` para no pisar el informe del implementer. Sin herramienta
+detrás. La 1.5.2 nace de separar esa mejora de la 1.5.1, que era el cambio de
+`harness/mutacion.py`.
+
+Este repositorio va por **1.5.0 en la rama de F-024** y por **1.5.1 en `dev`**.
+La propagación sigue pendiente y **no debe hacerse dentro de F-024**: rama
+`chore/arnes-1.5.2` desde `dev`, con el instalador en `-SoloDiff` primero.
+
+## 6 · Orden para la mañana
+
+1. Comprobar la nocturna (sección siguiente, punto 1) y el buzón.
+2. Si salió limpia: **T19** es lo más corto; **T18** exige reservar la mañana.
+3. Con F-024 en `done`: arnés 1.5.2 → merge F-024 + F-003 a `dev` → F-023.
+
+---
+
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 · NOCHE (léelo antes que nada)
+
+Esta sección **sustituye** a la que hay más abajo con la misma fecha: aquella
+se escribió a mediodía y varias cosas han cambiado desde entonces.
+
+## Lo primero de mañana, en este orden
+
+1. **Comprobar la nocturna del 19 (02:00 UTC)**, que es la **primera ejecución
+   con las puertas de coherencia de F-024** y con la imagen `r20260818-2146`:
+
+   ```powershell
+   python main.py timings --last 1     # ¿SUCCESS de punta a punta? ¿algún ABORTED?
+   python main.py check-coherencia     # debe dar OK: todas las tablas del MISMO batch
+   python main.py check-frescura       # build_mart FRESCO con la hora de esta noche
+   ```
+
+   `check-coherencia` **tiene que pasar de KO a OK**: hasta hoy fallaba porque
+   `raw` era histórico sin `batch_id`; la carga nocturna escribe `batch_id` en
+   todas las tablas y la puerta debe darla por buena. Si sigue en KO, **para y
+   míralo**: sería un fallo real de la puerta, no un resto del pasado.
+
+2. **El buzón**: no debe haber llegado ningún «Activated». Si llegó, la carga
+   falló y el aviso funcionó.
+
+3. Si la nocturna salió limpia, seguir con la **Fase C de F-024** (abajo).
+
+> **Ojo con el firewall**: la conexión desde el puesto va por la regla
+> `datamart-puesto-pgris-2026-08-18`, creada ayer con la IP pública de
+> entonces. **Las IP del puesto rotan**: si los comandos mueren con
+> `connection timeout expired`, no es la base, es la regla. El comando para
+> recrearla, con sus dos trampas de sintaxis, está en
+> `progress/manual_F-024_fase_c.md`. No borres esa regla hasta cerrar F-024
+> (el bloque 3 de F-023 va después, por su DA-7).
+
+## F-024 · Fase B aprobada + **T17 HECHO**; faltan T18, T19 y medio T20
+
+- **Desplegado**: imagen `r20260818-2146` construida y el job ya apunta a ella.
+  `apply-grants` ejecutado.
+- **R25 verificado**: al arrancar `apply-grants` —que cuenta como escritor— las
+  dos huérfanas `RUNNING` del 18-ago pasaron a **`ABORTED` con motivo**, y con
+  ellas **5 huérfanas antiguas** que nadie sabía que estaban ahí. El `AVISO` de
+  `timings` desapareció solo.
+- **`GRANT` del rol de solo lectura sobre `_meta.v_frescura` y
+  `_meta.v_raw_state`: verificados por catálogo** (`has_table_privilege`), sin
+  leer ningún secreto del vault. Lo único no probado es la conectividad de
+  punta a punta del MCP, que no es de F-024.
+- **T20 medio hecho**: la foto del `sin_batch` (31 tablas de `raw` sin
+  identidad de ejecución) **está capturada** en
+  `progress/manual_F-024_fase_c.md`, y ya no se puede repetir: la nocturna se
+  la lleva. Falta la otra mitad, `stage --sin-puerta` registrando `SKIPPED`.
+- **Falta T18** (muerte externa controlada) y **T19** (alerta de frescura de
+  extremo a extremo). Las dos exigen al humano: T18 relanza una carga completa
+  de ~3 h 15 —no la lances si se solapa con la nocturna— y T19 exige ver
+  llegar el correo. Comandos exactos en `manual_F-024_fase_c.md` y en
+  `requirements.md` R23–R26.
+- **Evidencias repuestas con el arnés nuevo**: 596 tests, cobertura 100 % de
+  372 líneas cambiadas, mutación **108/106/2** idéntica a la primera medición,
+  con los 2 supervivientes (`bold=True` de cabeceras) ya aceptados por el
+  humano como equivalentes.
+
+## Arnés: de sin versionar a 1.5.1, y `arnes-base` ya va por 1.5.2
+
+- `dev` lleva el arnés **v1.5.1**: portero ligero en el hook `Stop`
+  (`ARNES_SALTAR_SUITES=1`), mutación en paralelo por worktrees, `BACKLOG.md`
+  generado desde `features.json`, puerta de rutas sensibles (inactiva: no hay
+  `harness/rutas_sensibles.json`), y el sello en `harness/ARNES_VERSION.md`.
+- La 1.5.1 **nació aquí y se portó a `arnes-base`** el mismo día: repetir una
+  campaña de mutación ya no borra el análisis de los supervivientes. Pasó de
+  verdad al remedir F-024, con dos mutantes equivalentes ya aceptados que
+  volvieron a quedar en `PENDIENTE`.
+- **`arnes-base` está ya en 1.5.2**, subida desde fuera de esta sesión. **Hay
+  que mirar qué trae y propagarlo**; este repositorio se quedó en la 1.5.1.
+
+## Specs escritas y decisiones cerradas por el humano (2026-08-18)
+
+| Feature | Estado | Dónde |
+|---|---|---|
+| **F-011** carga incremental | `spec_ready`, `critico` | rama `feature/F-011-carga-incremental` |
+| **F-023** cierre operativo de F-003 | `spec_ready`, `critico`, `sdd=true` | rama `feature/F-023-cierre-operativo-f003` |
+| **F-025** ventana de negocio y build | `pending`, prioridad 10 | spec en la rama de F-011 |
+| **F-026** RBAC sin propagar en `60_create_identity.ps1` | `pending` | ficha en `features.json` |
+| **F-027** sin camino para cambiar env vars de un job vivo | `pending` | ficha en `features.json` |
+
+Lo que hay que saber de esas decisiones, sin releer las specs:
+
+- **F-011 ya no lleva ventana de negocio.** El humano dejó **sin decidir** qué
+  es una «obra abierta» (es de Negocio), así que el bloque C salió entero a
+  **F-025**. F-011 se queda con medir (siempre) y la ingesta incremental (solo
+  si el ahorro estimado es ≥ 20 min o la ingesta llega al ≥ 40 % del total).
+- **La sospecha que abría F-011 era falsa**: la carga del 18-ago se reparte en
+  ingesta 33 min (20 %), `build_stg` 111 (**67 %**) y `build_mart` 21 (13 %).
+  El cuello está en el build. Por eso **F-025 va por delante** del bloque B de
+  F-011.
+- **El hallazgo de F-009 estaba mal contado**: `fecalt` 18 (no 16), `fecmod` 6
+  (no 3), `sello` 2, y sobre todo **`tiemod` en ~190 tablas**, que nadie
+  mencionaba y que la ingesta **ya copia** a `_source_tiemod`. Si sirve como
+  watermark se responde con SQL local, sin volver a leer Sigrid.
+- **Recarga completa: los domingos.**
+- **F-023 sube a `critico`**: cada borrado exige acta con el OK citado. Se
+  retiran todas las reglas `datamart-puesto-*`; **no** se tocan `ClientPgris`
+  ni `FirewallIPAddress_2026-6-16` (son de `albaranes`). El bloque del
+  firewall va **después** de la Fase C de F-024.
+
+## Disco del Postgres: decisión tomada, con umbral de caducidad
+
+`05_check_prereqs.ps1` da **FALLO** por el disco al 74,5 % y el humano
+**autorizó desplegar igualmente** y **no ampliar**, con los datos delante:
+18,5 GB de 32 usados (de los que `sigrid_dm` son 18: `stg` 10, `raw` 4,8,
+`mart` 2,2), picos de **88,5 %** durante la carga, ~4 GB de margen.
+
+**Ese FALLO concreto es conocido y aceptado; cualquier otro fallo del script
+sigue siendo bloqueante.** La decisión caduca —y pasa a «ampliar», hablándolo
+con los dueños de `albaranes` y `partes`— si el pico supera el **90 %**, si la
+base en reposo pasa de **~78 %**, o si vuelve a haber un episodio de solo
+lectura como el del 2026-08-09. Está escrito también en la memoria persistente
+del proyecto (`disco-postgres-compartido-no-ampliar`).
+
+## Ramas vivas y el orden de integración (importa)
+
+| Rama | Qué lleva |
+|---|---|
+| `dev` | arnés 1.5.1, 418 tests. Sin F-023 ni F-024 |
+| `feature/F-024-coherencia-cargas-truncadas` | la feature + T17 + los cuadernos. **Es la rama de trabajo de hoy** |
+| `feature/F-023-cierre-operativo-f003` | spec cerrada |
+| `feature/F-011-carga-incremental` | spec cerrada + spec de F-025 |
+| `chore/arnes-1.5.0`, `chore/arnes-1.5.1` | ya fusionadas a `dev` |
+
+`harness/features.json` **diverge en cuatro ramas a la vez** porque `dev` aún
+no conoce F-023 ni F-024. Al integrar dará conflicto en ese fichero: **es
+esperado**. Orden que menos duele: **F-024 → F-023 → F-011**, y en cada
+conflicto se conserva la entrada más nueva (la que trae las decisiones
+cerradas). Nada de esto se ha subido: **no hay push ni PR**, todo son commits
+locales.
+
+## Fuera de este repositorio
+
+- **`azure-apps/sigrid_api.md` corregido** (commit local): la tabla daba los
+  defectos del código como si fueran los valores vigentes. La instancia `dev`
+  corre **`MAX_ALLOWED_ROWS` 500.000** (no 1.000),
+  **`MAX_QUERY_TIMEOUT_SECONDS` 230** (no 120) y `MAX_STATEMENTS_PER_BATCH`
+  50 (no 20). Nueva sección 4.1 con el comando para reproducirlo. Por eso
+  nuestro `page_size = 10000` con `timeout 230` funciona.
+
+## Cabos sueltos menores, para no redescubrirlos
+
+- `check-coherencia` imprime «(ejecucion **None**)» cuando el histórico no
+  tiene `batch_id`: enseña un `None` de Python donde debería decir «sin
+  identidad de ejecución». Cosmético.
+- El `TOTAL` de `timings` suma **todas** las ejecuciones del día, incluidas las
+  que murieron; no es la duración de la carga buena. Confunde a quien lo lea
+  sin contexto.
+- En la CLI de `az` del puesto: en `firewall-rule create` el servidor va en
+  `--server-name` y la regla en `--name`; **`--rule-name` no existe**.
+
+---
+
+# F-024 · Fase B — histórico de la sesión de mediodía (T17 ya está hecho: ver arriba)
+
+Rama `feature/F-024-coherencia-cargas-truncadas` (nace de la de F-003, que
+lleva el fix del timeout de sigrid-api y el techo del job). Spec en
+`specs/F-024-coherencia-cargas-truncadas/`. **Las 8 decisiones están
+CERRADAS** (2026-08-18, «aprobado con las recomendadas»): DA-1 A, DA-2
+estricta con `--sin-puerta` solo en comandos sueltos, DA-3 A (KQL), DA-4
+30 h, DA-5 sí, DA-6 sí, DA-7 solo escritores. **DA-8 CONFIRMADA leyendo el
+código: la ingesta hace COMMIT POR PÁGINA, no por tabla** (`truncate_table`
+y cada `copy_rows` abren su propia conexión); una muerte a mitad de tabla la
+deja truncada y parcial. Donde este fichero diga «transaccional por tabla»
+(secciones históricas de F-005/F-003), léase con esta corrección.
+
+**Fase B hecha** (T5–T16, `progress/impl_F-024.md`): `batch_id` por
+ejecución; huérfanas `RUNNING` → `ABORTED` al arrancar comandos que
+escriben; puerta de coherencia de `raw` antes de `build_stg` y de `stg`
+antes de `build_mart` (fallo ruidoso, mensaje accionable, `--sin-puerta`
+registrado `SKIPPED`); vistas `_meta.v_raw_state` y `_meta.v_frescura`;
+comandos `check-coherencia` y `check-frescura`; `infra/95_create_alert_
+frescura.ps1` (KQL 30 h). Evidencias: 591 tests, cobertura 100 % de las
+líneas cambiadas, mutación 108/106/2 (los 2, `bold=True` de cabeceras de
+consola, justificados como equivalentes — **pendiente de que el humano lo
+dé por bueno**, lo pide el rigor `critico`). Reviewer 1ª pasada:
+CAMBIOS_REQUERIDOS por 4 puntos concretos (B1 test de que `run-all` lleva
+las dos puertas activas; B2 tests de R17; B3 este fichero; B4 comandos de
+R23 con `ContainerJobName_s` y ventanas `30h/1h/5m`), **los 4 corregidos
+el 2026-08-18** — pendiente la re-review.
+
+**Fase C · MANUAL (humano), con comando exacto en `requirements.md` R23–R26
+y en `infra/README.md`:**
+
+- **T17**: `powershell -NoProfile -File infra\70_build_image.ps1` → anotar
+  tag → `powershell -NoProfile -File infra\85_update_job.ps1 -Tag <tag>`
+  → `python main.py apply-grants` (con `.env` de Azure) para que las vistas
+  nuevas de `_meta` sean legibles por el MCP. Antes: `python main.py
+  timings` para capturar el estado previo.
+- **T18 (R24)**: muerte externa controlada durante la ingesta:
+  `az containerapp job start ...` y a los ~3 min `az containerapp job stop
+  -g rg-datamart-seg-dev -n caj-datamart-seg-dev --job-execution-name
+  <ejec>`; después `python main.py timings` debe enseñar `ABORTED` con
+  motivo, `python main.py check-coherencia` debe fallar por raw
+  incoherente, y `python main.py stage` suelto sin `--sin-puerta` debe
+  negarse. Luego relanzar la carga completa.
+- **T19 (R23)**: `az extension add --name scheduled-query` (ya hecha en el
+  puesto), `powershell -NoProfile -File infra\95_create_alert_frescura.ps1`,
+  y la prueba de extremo a extremo con ventana corta (`update
+  --window-size 1h --evaluation-frequency 5m`), correo Activated,
+  restaurar a **`48h`**/`1h`. Hoy la KQL devuelve ≥1 desde las 15:08 (primer
+  `build_mart SUCCESS` del job).
+  **Aviso del 2026-08-19 (arreglado en el repositorio, pendiente de ejecutar):**
+  el primer `create` lo rechazó el ARM —`WindowSize of 1800 minutes is not
+  supported`— porque `windowSize` solo admite unas granularidades fijas y las
+  30 h de DA-4 no están entre ellas. DA-4 no cambia; cambia cómo se expresa:
+  la **ventana** es ahora la menor granularidad admitida que la contiene
+  (**48 h**, la calcula el propio script) y el **criterio de 30 h** viaja
+  dentro de la KQL como `| where TimeGenerated > ago(30h)`. Por eso al
+  restaurar hay que poner `48h`: con `30h` el `update` se rechaza y la regla
+  se queda con la ventana corta de la prueba, disparando cada hora. Detalle y
+  evidencias en `progress/impl_F-024_T19_ventana.md`.
+- **T20 (R26)**: en local, `check-coherencia` sobre el raw anterior a
+  F-024 debe decir `sin_batch`; `stage --sin-puerta` debe construir y
+  registrar `SKIPPED`.
+
+Con la Fase C hecha y el reviewer en APROBADO → F-024 `done`, merge a
+`dev` **junto con la rama de F-003** (F-024 la contiene).
+
+---
+
+# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 · MEDIODÍA (histórico: lo vigente está arriba)
+
+**El job nocturno YA HA HECHO UNA CARGA COMPLETA EN AZURE**: ejecución
+`caj-datamart-seg-dev-6a95hln`, lanzada a mano a las 12:22 local con la
+imagen `r20260818-1003`, `Succeeded` a las 15:08 (**2 h 45**): ingesta 33
+min (20,05 M filas), `build_stg` 1 h 51 (60/60 tramos, 29,59 M filas,
+pico de disco 57,2 %), `build_mart` 21 min (5,29 M filas), grants OK.
+Antes hubo dos muertes instructivas y corregidas el mismo día: la noche
+del 18 (02:00 UTC) por `timeout_seconds` 300 > 230 de sigrid-api (fix
+`193fc3c`, default 230 con tope), y a las 10:08 por `DeadlineExceeded` a
+las 2 h justas en el tramo 39/60 (fix `1a09f63`, `replicaTimeoutSeconds`
+7200 → 18000, aplicado al job en caliente). **La alerta funcionó en real
+las dos veces** (Activated a los ~6 min, Deactivated después). Próxima
+ejecución programada: madrugada del 19 a las 02:00 UTC — debería ser la
+primera nocturna limpia; lo primero de la próxima sesión es comprobarlo
+(`timings` con `.env` de Azure + buzón sin Activated).
+
+**Corrección de un supuesto repetido en este fichero**: la ingesta NO es
+transaccional por tabla; hace **commit por página** (DA-8 de F-024,
+confirmado en código). Donde abajo diga «transaccional por tabla», léase así.
+
+**Ramas y features**: F-024 con Fase B APROBADA por el reviewer (2 pasadas,
+`progress/review_F-024.md`) y Fase C pendiente (T17–T20, ver su sección);
+F-023 con el bloque 1 hecho; F-003 `blocked` a propósito hasta F-023. La
+rama de F-024 nace de la de F-003: se mergean juntas a `dev` cuando F-024
+cierre. **Los 2 mutantes equivalentes de F-024 (`bold` de cabeceras) quedaron
+ACEPTADOS por el humano el 2026-08-18** (requisito del rigor `critico`).
+**Pendiente del humano**: pushes de las dos ramas. El remoto de
+`azure-apps` en GitHub (hoy solo existe en local) queda en **baja prioridad**
+por decisión del humano; mientras tanto, la única copia es la de su disco.
+
+**Documentación**: el diccionario de Sigrid se movió a
+`azure-apps/sigrid_tablas.md` (arnés 1.4.1 con la regla de «documentación
+compartida = una copia en el ecosistema + puntero»); este proyecto sigue
+sin `harness/VERSION` (actualización del arnés en el backlog).
+
+---
+
+# F-003 · DESBLOQUEADA (F-019 done el 2026-08-17) — tanda 2 HECHA, cierre en F-023
 
 > F-019 cerrada con APROBADO del reviewer (dos pasadas,
 > `progress/review_F-019.md`) y resumen en `history.md`. El siguiente
@@ -53,10 +520,46 @@ opción B, contraseña vía referencia de Key Vault; enmienda fechada en la spec
 | Identidad | `id-datamart-seg-dev` con exactamente 3 roles de ámbito recurso (R19) |
 | Imagen | `datamart-seg-anual:r20260810-1024` en el ACR, único tag, sin latest (R20) |
 
-**Pendiente (tanda 2, tras F-019): T23–T26** — crear el job, prueba segura
-(`version`/`check-pg`), logs (R24) y alerta con correo real (R25); más las 3
-verificaciones MANUAL de F-004 y retirar las copias viejas de los secretos en
-`kv-albaranes-rs9k2` cuando el job complete una ejecución correcta.
+**Tanda 2 EJECUTADA el 2026-08-17 (noche), por el líder con autorización
+expresa del humano («lanzas tu»):**
+
+- **T14**: `jobProgramable: true` (commit `9d31475`),
+  `test_f003_infra.py` 38 passed.
+- **Imagen nueva** `r20260817-2025` construida con `70_build_image.ps1`
+  (la de T21 era del 10-ago, sin los fixes de T13).
+- **T23 HECHO** tras 4 intentos fallidos instructivos (corte DNS a mitad
+  del sondeo → cascarón `Failed` borrado; carrera con el borrado
+  pendiente; y un BUG real: `00_vars.ps1` define `$TAG` con la hora
+  actual y machacaba el parámetro `-Tag` por la insensibilidad a
+  mayúsculas de PowerShell → `MANIFEST_UNKNOWN`; corregido en `19f51a3`
+  salvando el parámetro en `$TagPedido`). Job `caj-datamart-seg-dev`
+  creado y PROGRAMADO (`0 2 * * *` UTC), identidad `id-datamart-seg-dev`,
+  secretos por referencia a Key Vault.
+- **T24 HECHO**: primera prueba Failed por args pegados
+  (`--args main.py,version` llega como un solo argumento; hay que pasar
+  `"main.py" "version"`); segunda `Succeeded`
+  (`caj-datamart-seg-dev-41p0exu`).
+- **T25 HECHO**: KQL contra `log-datamart-seg-dev` en verde; columnas
+  reales: `ContainerAppSystemLogs_CL.JobName_s/Reason_s/Log_s` y
+  `ContainerAppConsoleLogs_CL.Log_s`. Los logs muestran
+  `etl-sigrid-seguimiento 0.1.0 · image: datamart-seg-anual:r20260817-2025
+  · build: 2026-08-17T18:25:41Z` — el tag coincide.
+- **T26 CREADA, pendiente del correo**: la métrica real es
+  `Executions` con dimensión `state` (la doc decía
+  `JobExecutionCount/Status`, que no existen; script corregido). DA-3
+  resuelta: el grupo de acción de la landing zone está VACÍO, así que
+  alerta propia con el correo del humano por parámetro (nunca en el
+  repo). Fallo provocado con subcomando inexistente:
+  `Failed` a las 20:46:24 local. **T26 VERIFICADO**: correo «Azure:
+  Activated Severity: 1 alert-caj-datamart-seg-dev-failed» recibido a
+  las 20:51:58 (5 min 34 s después del fallo), confirmado por el humano
+  y contrastado por el líder en el buzón vía MCP. **TANDA 2 COMPLETA.**
+  Primera ejecución nocturna real: 2026-08-18 a las 02:00 UTC (04:00
+  local) — revisar por la mañana `timings` y los logs.
+
+**Queda tras el correo**: las 3 verificaciones MANUAL de F-004 y retirar
+las copias viejas de los secretos en `kv-albaranes-rs9k2` ahora que el
+job tiene una ejecución correcta.
 
 **Defectos encontrados al desplegar (todos corregidos o anotados):** dos
 roturas de PowerShell 5.1 en los scripts (JMESPath con `?`/`!` contra az.cmd y
@@ -131,7 +634,11 @@ Todo el detalle (comandos exactos, qué exige autorización, KQL de logs) está 
 | **F-004** | Las tres verificaciones heredadas (blob desde el puesto, blob desde el job, prueba negativa de permisos) | Sección de F-004, más abajo. Van después de T19+T20. |
 
 Antes de T26 hace falta el nombre del grupo de acción de la landing zone
-(**DA-3**, sigue abierta): `az monitor action-group list --query "[].{n:name, rg:resourceGroup}" -o table`
+(**DA-3 · RESUELTA el 2026-08-17**, ver la tanda 2 más abajo: el grupo de la
+landing zone está **vacío**, así que se creó alerta propia con el correo del
+humano por parámetro. Esta línea decía «sigue abierta» y contradecía a la
+tanda 2; corregido el 2026-08-19 al cerrar F-003):
+`az monitor action-group list --query "[].{n:name, rg:resourceGroup}" -o table`
 y pasarlo con `-ActionGroupName` / `-ActionGroupRg`. Si no existe ninguno
 reutilizable, `-AlertEmail`. **Ningún correo entra en el repositorio.**
 
@@ -246,7 +753,7 @@ primero por corte de red local (11:46, `getaddrinfo failed`); el segundo llegó
 a **30 de 31 tablas** (19,7 M filas, 63 min) y solo falló **`dca`** (causa sin
 confirmar; el humano sospecha equipo desatendido/suspensión — si fue eso, el
 guardián anti-suspensión de F-014 no cumplió y hay que revisarlo). Como la
-ingesta es transaccional por tabla, lo cargado se conserva. **Recuperación
+ingesta hace commit por página (corregido en F-024: no es transaccional por tabla), lo cargado por tabla completa se conserva. **Recuperación
 preparada**: worktree limpio de `dev` en
 `C:\Users\pgris\PycharmProjects\datamart-carga` (para no importar código a
 medio editar del árbol de F-004); el humano copia `.env` y lanza

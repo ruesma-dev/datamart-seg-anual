@@ -94,7 +94,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-003-infra-caj/ (sdd=true)"
       ],
-      "status": "blocked",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 7,
@@ -172,13 +172,13 @@
     {
       "id": "F-006",
       "title": "MCP de bases de datos como servicio en cloud",
-      "description": "REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno).",
+      "description": "REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno). AMPLIADA 2026-08-19 por el humano. EL USUARIO OBJETIVO ES DE NEGOCIO, no tecnico: cualquier persona con permiso debe poder preguntar a la base en lenguaje natural y obtener respuestas de negocio, sin saber que es un esquema ni escribir SQL. Eso cambia el criterio de exito: no basta con que el servidor MCP funcione y este desplegado; tiene que poder usarlo alguien que no sepa nada del modelo de datos. QUE SE CONSERVA DEL PROTOTIPO, porque ha funcionado bien en local: el pipeline de validacion de solo lectura y, sobre todo, LA CAPA SEMANTICA (config/diccionario_datos.yaml de mcp-bbdd), que explica el significado de cada tabla y cada columna. Esa es la pieza que convierte una pregunta de negocio en el SQL correcto; sin ella el MCP contesta cualquier cosa con aplomo. DEPENDENCIA QUE SI ES DE ESTE REPOSITORIO: el diccionario semantico del datamart -que significa mart.fact_periodificado, cierre.v_pbi_cierre_cabecera, que es una obra abierta- lo sabe este proyecto, no el del MCP. El MCP sabe de conexiones, permisos, validacion y auditoria; el significado del dato es del dueño del dato. Hay que producirlo aqui y publicarlo al MCP, y si merece rigor propio se saca a feature. Prioridad subida de 14 a 12 el 2026-08-19: va justo detras de F-011 (carga incremental). AMPLIACION 2026-08-19 (2): el MCP debe exponer PROMPTS Y RECURSOS, no solo herramientas. Es la pieza que hace que las reglas de negocio sean LAS MISMAS PARA TODOS los usuarios sin que nadie copie nada en su proyecto: el servidor publica el procedimiento -por ejemplo, como se aborda una planificacion temporal- y cada sesion recibe la version vigente. El caso de uso que lo motiva no es determinista y no se puede codificar: asignar partidas a la temporalidad exige juicio, lo decide la IA pensando y el usuario la corrige de forma interactiva. De ahi dos exigencias que van con esto: que quede TRAZA de que decidio la IA, con que criterio y que corrigio el usuario -una planificacion que nadie puede auditar seis meses despues es un numero huerfano-, y que las correcciones puedan volver al repositorio de reglas cuando revelen una regla de empresa no escrita. Ver F-030 y la decision D8.",
       "acceptance": [
         "Definida en detalle por specs/F-006-mcp-azure/ (sdd=true)"
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 14,
+      "priority": 12,
       "branch": "feature/F-006-mcp-azure"
     },
     {
@@ -331,6 +331,166 @@
       "rigor": "estandar",
       "priority": 12,
       "branch": "feature/F-022-desempate-obrfasamb"
+    },
+    {
+      "id": "F-023",
+      "title": "Cierre operativo de F-003: las tres verificaciones de F-004 en Azure",
+      "description": "REDUCIDA 2026-08-19 por decision del humano: los bloques 2 (retirada de secretos duplicados en kv-albaranes-rs9k2) y 3 (limpieza del puesto) SALEN de aqui y pasan a F-032 con prioridad baja, porque eran limpieza operativa y estaban bloqueando el cierre de F-003, que es lo que interesa liberar para empezar F-011 y luego el MCP. Lo que queda: las tres verificaciones MANUAL heredadas de F-004 sobre los Excels auxiliares en Azure. ESTADO COMPROBADO CONTRA AZURE EL 2026-08-19, que corrige lo que decia la ficha anterior: la preparacion YA ESTA HECHA -los tres Excels estan en el contenedor aux de stdatamartsegdev, el job desplegado tiene las AUX_EXCEL_* como URIs de blob y el humano ya tiene el rol Storage Blob Data Reader sobre la cuenta-. Lo que la ficha decia de las rutas de OneDrive es cierto solo del .env DEL PUESTO, no del job. Verificacion 1 CUMPLIDA (2026-08-19 14:42 UTC): load-aux desde el puesto con las AUX_EXCEL_* apuntando al blob da SUCCESS con origen=blob para los tres; se paso por entorno en la invocacion, sin tocar .env, que es intocable. Verificacion 2 CUMPLIDA (2026-08-19 10:55:57 UTC): la carga del job leyo los tres desde el blob con identidad gestionada y el log lo acredita con origen=blob y ubicacion blob: stdatamartsegdev/aux/..., sin una sola ruta local. Queda la verificacion 3 (prueba negativa: sin el rol, load-aux debe fallar diciendo QUE rol falta y QUE hacer, y despues se reasigna). RIESGO CONOCIDO de la verificacion 3: quitar y devolver una asignacion de rol exige User Access Administrator u Owner sobre la cuenta, y sobre stdatamartsegdev los tiene el propietario de la suscripcion, no el usuario del puesto; misma raiz que F-026. Si no se puede ejecutar, se justifica la desviacion por escrito y la acepta o la rechaza el reviewer. Evidencias en progress/manual_F-023.md. VERIFICACION 3 CUMPLIDA el 2026-08-19 14:51 UTC sin necesidad de tocar RBAC: se apunto load-aux a una cuenta de almacenamiento sobre la que el puesto NO tiene Storage Blob Data Reader, en vez de quitar el rol de la propia. Azure devolvio 403 AuthorizationPermissionMismatch para los tres ficheros y el ETL lo tradujo nombrando el rol exacto, la cuenta, la variable de entorno implicada y los dos caminos segun entorno; salida 1. La desviacion es mejor que el requisito original en tres cosas: no exige permisos que el puesto no tiene, no deja ninguna asignacion que devolver -el riesgo del original era quedarse sin acceso si el reasignado falla- y no toca permisos de un recurso compartido. Las tres verificaciones quedan cumplidas; falta solo la documentacion de cierre y el veredicto del reviewer.",
+      "acceptance": [
+        "Verificacion 1 de F-004: load-aux desde el puesto con az login -> SUCCESS y origen=blob para los tres ficheros (CUMPLIDA 2026-08-19)",
+        "Verificacion 2 de F-004: una ejecucion del job con identidad gestionada muestra en Log Analytics el evento aux_file_read para los tres, sin ninguna ruta local (CUMPLIDA 2026-08-19)",
+        "Verificacion 3 de F-004: sin el rol, load-aux falla con un mensaje que dice que rol falta y que hacer (CUMPLIDA 2026-08-19 con desviacion justificada: en vez de quitar el rol sobre la cuenta propia -que exige User Access Administrator y deja algo que devolver-, se apunto a una cuenta sobre la que no hay rol. Mismo camino de codigo y mismo 403 AuthorizationPermissionMismatch, sin tocar ninguna asignacion)",
+        "Las evidencias de las tres, con comando y salida real, en progress/manual_F-023.md",
+        "El README de infra y azure-apps/datamart_seg_anual.md reflejan que los Excels se leen del blob",
+        "F-003: tasks.md con T23-T26 y las verificaciones marcadas, veredicto APROBADO del reviewer y status done; bash harness/init.sh en verde"
+      ],
+      "status": "done",
+      "sdd": false,
+      "rigor": "critico",
+      "priority": 8,
+      "branch": "feature/F-023-cierre-operativo-f003"
+    },
+    {
+      "id": "F-024",
+      "title": "Coherencia del datamart ante cargas truncadas: deteccion, puerta y frescura",
+      "description": "Origen: la primera carga real desde el job (2026-08-18) murio por DeadlineExceeded a las 2 h justas, en el tramo 39/60 del stage. No hubo dano porque mart no se toco, pero destapo tres huecos: (1) una muerte EXTERNA del proceso (kill por deadline, OOM, reinicio del nodo) deja en _meta.etl_runs una fila RUNNING huerfana para siempre, y timings miente; (2) nada impide que stage/mart se construyan sobre un raw MEZCLADO (tablas de ejecuciones distintas, tras una ingesta parcial seguida de otro fallo), que es incoherencia silenciosa: cuadros que no cuadran y nadie que lo sepa; (3) el consumidor (Power BI, MCP) no tiene forma de saber si lo que ve es de esta noche o de hace tres dias. Se DESCARTA hacer atomico el pipeline entero: una transaccion de 3 h en el B1ms es justo lo que reventó el 09-ago y F-019 lo troceo a proposito. La coherencia se garantiza por verificacion y visibilidad: (a) al arrancar, run-all marca ABORTED las filas RUNNING de ejecuciones anteriores con motivo; (b) puerta antes de stage: FAILED explicito y ruidoso si la ultima ingesta de cada tabla no pertenece a la misma ejecucion (raw incoherente); (c) frescura visible: fecha del ultimo build_mart COMPLETO consultable desde las vistas de consumo, y alerta si supera un umbral. La alerta actual ya cubre los fallos internos (run-all sale 1 si un paso falla; verificado); la muerte externa la cubre (a)+(b).",
+      "acceptance": [
+        "Definida en detalle por specs/F-024-coherencia-cargas-truncadas/ (sdd=true)"
+      ],
+      "status": "done",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 9,
+      "branch": "feature/F-024-coherencia-cargas-truncadas"
+    },
+    {
+      "id": "F-028",
+      "title": "La puerta de stg distingue un stage que no llegó a construir de uno que dejó stg a medias",
+      "description": "Descubierto el 2026-08-19 ejecutando T18 de F-024 (muerte externa controlada) y anotado en progress/manual_F-024_fase_c.md. Cuando `python main.py stage` se niega a construir porque la puerta de raw da KO, falla en 5,2 s con rows=0 y NO toca stg: no hay TRUNCATE ni build. Pero deja en _meta.etl_runs una fila build_stg en FAILED, y con eso la puerta de stg que protege a build_mart declara stg incoherente: 'el ultimo stage no llego a terminar y stg puede estar mezclado'. El veredicto es conservador y protege lo que debe, pero confunde dos situaciones muy distintas: (a) el stage ni empezó, y stg sigue siendo exactamente el del ultimo build completo, que puede ser perfectamente bueno; y (b) el stage murió a mitad de un build y stg si esta mezclado. Consecuencia practica del empate: tras cualquier muerte en la puerta hay que rehacer stage entero -1 h 51 en Azure segun la carga del 19-ago- aunque stg estuviera intacto. La informacion para distinguirlos YA ESTA en la tabla: en el caso (a) el sub-paso que fallo es build_stg.puerta_raw, una puerta y no un build, y ningun sub-paso de construccion llego a iniciarse. NO es un fallo de F-024 ni la debilita: es una mejora de precision del diagnostico que ahorra trabajo real.",
+      "acceptance": [
+        "check-coherencia distingue los dos casos y lo dice con palabras distintas: 'el stage no llego a construir (fallo la puerta): stg conserva el ultimo build completo' frente a 'el stage murio a mitad: stg puede estar mezclado'",
+        "En el caso (a), el veredicto de stg se juzga contra el ultimo build_stg COMPLETO anterior; si ese es coherente, build_mart puede construir sin --sin-puerta",
+        "En el caso (b) el comportamiento no cambia: KO y build_mart se niega, igual que hoy",
+        "Ante cualquier duda -un sub-paso de construccion iniciado y no terminado, o datos que no permitan decidir- el veredicto sigue siendo KO: la mejora no puede abrir un camino nuevo a construir sobre stg mezclado",
+        "Tests que fijen los dos casos y el limite entre ellos (puerta OK pero el primer build iniciado y muerto), y que un mutante que confunda ambos casos muera",
+        "El mensaje sigue diciendo que hacer en cada caso, como el resto de mensajes de F-024",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 13,
+      "branch": "feature/F-028-puerta-stg-distingue-fallo"
+    },
+    {
+      "id": "F-029",
+      "title": "La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado",
+      "description": "Dos defectos de harness/mutacion.py descubiertos el 2026-08-19 durante T19 de F-024, los dos con el mismo efecto: la campaña de mutacion es la evidencia que el arnes exige en nivel critico, y hoy no es de fiar. (1) LA VIA PARALELA DECLARA MUERTOS MUTANTES QUE ESTAN VIVOS: la misma feature, el mismo arbol y el mismo dia dio '108 generados, 108 muertos, 0 supervivientes' en 270,9 s con hasta 16 worktrees, y '108 generados, 106 muertos, 2 supervivientes' en 1047,1 s con --workers 1. Los dos supervivientes son bold=True -> bold=False en dos click.secho de main.py (564 y 567); NINGUN test de la suite menciona 'bold' (grep -rn sin resultados) y aplicando la mutacion a mano la suite pasa entera, asi que esos mutantes no pueden morir: el cero era falso y el 106/2 es el bueno. Un '0 supervivientes' es exactamente el numero que nadie vuelve a mirar, y el arnes lo exige para cerrar una feature critica. (2) UNA INTERRUPCION DEJA EL ARBOL MUTADO: con --workers 1 la campaña muta el arbol de trabajo real, y si el proceso muere -o lo matan- el mutante en curso se queda aplicado. Observado dos veces el mismo dia: '==' por '!=' en etl_sigrid/domain/coherencia.py (la puerta que protege build_mart) y 'not veredicto.faltantes' por 'veredicto.faltantes' en frescura.py. El riesgo no es perder la campaña: es COMMITEAR UN MUTANTE creyendo que es codigo, que es lo que habria pasado con un 'git add .' en ese minuto. Agravante observado: un agente que se cae por un error de API deja la campaña huerfana y corriendo, y quien intente sanear el arbol restaura el mutante que se estaba evaluando y contamina el recuento sin saberlo. Es una mejora del ARNES, no del ETL: por la regla de propagacion de CLAUDE.md va tambien a arnes-base en el mismo trabajo, porque afecta a todos los proyectos que lo lleven. (3) MIENTRAS LA CAMPAÑA CORRE, CUALQUIER OTRA VERIFICACION SOBRE EL ARBOL MIENTE: con el arbol mutado, un bash harness/init.sh lanzado en paralelo sale EN ROJO con un test fallando que no tiene nada que ver con lo que se esta verificando. Observado el mismo 2026-08-19, minutos despues de los otros dos: el lider ejecuto init.sh para validar un cambio del backlog y se lo encontro rojo por el mutante en curso del reviewer. Con dos agentes trabajando a la vez -que es el modo normal de este arnes- eso significa que la puerta que decide si una feature puede cerrarse da falsos negativos, y que la reaccion natural (restaurar el fichero) contamina la campaña del otro. CAUSA YA IDENTIFICADA por el reviewer el 2026-08-19 (detalle y trazas en progress/review_F-024_T19_ventana.md, segunda pasada): no hay que investigarla, hay que arreglarla. Son dos defectos que se suman. Primero, en un worktree la suite de este repositorio esta ROTA DE BASE: creado un worktree igual que los del modo paralelo (git worktree add --detach) y ejecutada la suite SIN mutar nada, fallan 3 tests, porque el worktree esta en detached HEAD -rama_actual() devuelve cadena vacia- y no tiene los ficheros no versionados, empezando por .env. Segundo, harness/mutacion.py:312-314 cuenta cualquier suite roja como mutante muerto: 'if returncode in (0, PYTEST_SIN_TESTS): SUPERVIVIENTE; return MUERTO'. No distingue 'la suite fallo POR el mutante' de 'la suite ya fallaba'. Con la base en rojo dentro del worker TODO mutante sale muerto, y por eso el 108/108/0 era exacto: el modo paralelo no puede dar otro resultado en este repositorio. Y el remate: la docstring de harness/mutacion_paralela.py YA PREDICE este fallo entre sus limitaciones conocidas ('un proyecto que las viole vera la suite roja en el worker y contara mutantes muertos de mas'). Estaba escrito y no se comprobaba; un aviso en un docstring no es una salvaguarda. ALCANCE DEL DAÑO, acotado: el modo paralelo entro el 2026-08-18 con la v1.5.0 del arnes (15676f7), asi que las campañas anteriores -F-003, F-004, F-005, F-015, F-016, F-019, F-020- son en serie y NO estan afectadas; en particular el 46/46/0 de mutacion_F-020.md es del 2026-08-10 y su cero es legitimo. AMPLIACION 2026-08-19 (llega de la sesion de albaranes, que esta implementando el encargo): el daño es MAYOR de lo que se creia y el modo serie tampoco se salva. Dos casos mas. (4) En modo SERIE, un fichero que no pertenece a ningun servicio de harness/servicios.json -los del propio harness/, por ejemplo- lo juzga ejecutor_para con 'python -m pytest' SIN ruta; si la raiz no tiene configuracion de pytest, esa invocacion recoge lo que no debe y revienta en la recoleccion en menos de un segundo haga lo que haga el mutante, con exit 2, que el mutador contaba como MUERTO. Asi salieron muertos los 19 mutantes de F-034 y los 61 de mutacion_F-012.md en albaranes, sin que un solo test los juzgara. La pista es el TIEMPO: una campaña de decenas de mutantes que termina en segundos no ha ejecutado ninguna suite. (5) CPython reutiliza el .pyc del mutante ANTERIOR cuando el fuente conserva tamaño y mtime en segundos enteros, cosa que pasa a menudo entre dos mutantes seguidos del mismo fichero: la misma campaña daba 3 supervivientes o 2 segun el segundo en que cayera, y el que desaparecia se contaba muerto. CONCLUSION QUE SUSTITUYE AL ALCANCE DE ARRIBA: hay que repetir TODA campaña cuyo informe diga cero supervivientes, sea del modo que sea, no solo las paralelas desde el 2026-08-18.",
+      "acceptance": [
+        "Reproducido el falso muerto en un caso minimo, con test de regresion que falle si vuelve a aparecer",
+        "Prueba de equivalencia: sobre el mismo arbol y la misma feature, la via paralela y --workers 1 dan el MISMO recuento de generados, muertos y supervivientes",
+        "Un mutante que ningun test cubre (el bold=True de main.py sirve de caso real) sale SUPERVIVIENTE en las dos vias, no solo en la secuencial",
+        "Ante interrupcion -Ctrl-C, kill del proceso, excepcion no capturada- el arbol queda restaurado; si no se puede restaurar, la campaña lo dice de forma ruidosa nombrando el fichero que quedo tocado",
+        "Una campaña en curso es visible para el resto del arnes -init.sh incluido- de forma que un resultado obtenido sobre un arbol mutado se reconozca como no valido en vez de leerse como un fallo real",
+        "La campaña mide la LINEA BASE antes de repartir: corre la suite sin mutar en el mismo entorno donde evaluara, y si esa base no esta verde se niega a empezar en vez de contar muertos falsos",
+        "El worker distingue 'la suite fallo por el mutante' de 'la suite ya fallaba': un mutante evaluado sobre una base roja no cuenta como muerto",
+        "La campaña se niega a arrancar si el arbol tiene cambios de produccion sin commitear, para que nadie confunda un mutante con trabajo real ni pierda su trabajo al restaurar",
+        "Investigada y escrita la CAUSA del falso muerto (no solo el sintoma): sin eso no se puede saber que otras campañas quedan invalidadas",
+        "Las campañas ya usadas como evidencia de features critico cerradas quedan revisadas o marcadas como no reproducibles, con la lista en progress/",
+        "Portado a arnes-base en el mismo trabajo, con su version y su entrada en GUIA_INSTALACION.md",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 10,
+      "branch": "feature/F-029-mutacion-fiable"
+    },
+    {
+      "id": "F-030",
+      "title": "Reglas de negocio compartidas: fuente unica que la IA aplica, con circuito de vuelta",
+      "description": "Pedido por el humano el 2026-08-19 al hablar del MCP (F-006). Quiere poder decirle a la IA 'haz una planificacion' y que la haga con los datos de esta base y con las reglas de la empresa, iguales para todos los usuarios. La tarea NO es determinista y no se codifica: asignar partidas a la temporalidad exige juicio, lo decide la IA y el usuario la corrige interactivamente. Por eso las reglas son GUIA, no calculo, y su vehiculo natural es un procedimiento en lenguaje natural que el MCP publica como prompt, no un YAML de parametros. DONDE VIVE: en su PROPIO repositorio, con dueño en Negocio, mismo patron que azure-apps -fuente unica, sin copias-. NO se implementa en este proyecto: aqui solo se anota para no perderlo, y lo que si es de aqui es el diccionario semantico del datamart (ver F-006). LO QUE HACE FALLAR ESTO SI SE OLVIDA: el circuito de vuelta. Cuando un usuario corrige a la IA, la correccion es una preferencia suya -que no toca nada- o una regla de empresa que no estaba escrita; si esa segunda no vuelve a la fuente unica, se pierde y el siguiente usuario repite la misma correccion. Sin ese circuito el sistema no mejora: cada sesion vuelve a empezar. Con el, las reglas se escriben solas a partir del uso real.",
+      "acceptance": [
+        "Existe un repositorio de reglas de negocio con dueño declarado en Negocio, versionado y sin copias en otros proyectos: los demas enlazan, no duplican",
+        "El procedimiento de planificacion temporal esta escrito en lenguaje natural, con lo que hay que mirar, lo que hay que preguntar antes de asumir y lo que no se debe hacer nunca",
+        "El MCP lo publica como prompt, de forma que dos usuarios distintos reciben la MISMA version vigente sin copiar nada",
+        "Hay un camino para que una correccion de usuario que revele una regla no escrita llegue al repositorio y la apruebe su dueño, en vez de morir en la conversacion",
+        "Queda claro que es regla de guia y que es regla ya implementada en codigo (config/business_rules.yaml y el SQL del datamart), para que nadie escriba dos veces la misma cosa en dos sitios distintos"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "documental",
+      "priority": 12,
+      "branch": "feature/F-030-reglas-negocio-compartidas"
+    },
+    {
+      "id": "F-031",
+      "title": "La alerta de frescura se queda encendida para siempre y deja de avisar",
+      "description": "Hallazgo confirmado el 2026-08-19 al cerrar D9 (detalle en progress/decisiones_abiertas.md). La regla `alert-caj-datamart-seg-dev-sin-build`, creada por infra/95_create_alert_frescura.ps1 con --auto-mitigate true, disparo a las 10:11:18 UTC durante la prueba de R23 -el correo llego en 6 min 42 s, eso funciona- y **no se resolvio sola**. A las 14:30 UTC, cuatro horas y cuatro evaluaciones horarias despues, seguia en Fired con lastModifiedDateTime IDENTICO al del disparo: no es que evaluara y decidiera mantenerla, es que no se toco. Y la condicion ya no se cumplia: la KQL exacta de la regla devuelve 3 eventos de build_mart SUCCESS, el mas reciente de las 13:08:39 UTC, asi que 'count < 1' es falso desde las 10:27. POR QUE IMPORTA MAS DE LO QUE PARECE: una alerta atascada en Fired NO VUELVE A NOTIFICAR. Es decir, el mecanismo que vigila 'el job no llego a hacer su trabajo' -el agujero que F-024 vino a tapar- se desarma solo despues del primer aviso, y encima en silencio: quien la mire vera una alerta encendida y pensara que el sistema esta vigilando. Es peor que no tenerla, porque da confianza falsa. Mitigacion aplicada ese dia: cerrar la instancia a mano (changestate newState=Closed) para recuperar la capacidad de avisar. Eso es un parche manual, no un arreglo.",
+      "acceptance": [
+        "Entendida y escrita la CAUSA: por que una regla de consulta programada con --auto-mitigate true no pasa a Resolved cuando su condicion deja de cumplirse (configuracion, tipo de senal, o comportamiento real del servicio frente a lo que la spec de F-024 asumia)",
+        "La alerta pasa a Resolved sola en un plazo acotado y CONOCIDO cuando la condicion deja de cumplirse, o si el servicio no lo garantiza, se adopta y documenta una alternativa que garantice que la alerta vuelve a poder notificar",
+        "Verificado de extremo a extremo con horas reales: provocar, ver el Activated y ver el Deactivated. No se da por buena la teoria: R23 ya se creyo una vez que esto funcionaba",
+        "infra/95_create_alert_frescura.ps1 refleja lo aprendido, y la enmienda queda en la spec de F-024 para que nadie vuelva a asumir lo que asumimos",
+        "Comprobado si la alerta de fallo (90_create_alert.ps1) tiene el mismo problema: si lo tiene, se arregla en el mismo trabajo, porque es la otra mitad de la vigilancia",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 11,
+      "branch": "feature/F-031-alerta-no-se-resuelve"
+    },
+    {
+      "id": "F-032",
+      "title": "Limpieza pendiente de F-003: secretos duplicados en el vault de albaranes y rastro en el puesto",
+      "description": "Extraido de F-023 el 2026-08-19 por decision del humano: era limpieza operativa que no aporta funcion y estaba bloqueando el cierre de F-003. Nada de esto impide que el ETL funcione ni que el datamart sea correcto; son cabos que conviene atar para no dejar rastro innecesario. DOS BLOQUES. (1) SECRETOS DUPLICADOS: retirar las copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro en kv-albaranes-rs9k2. El job ya usa kv-datamart-seg-dev y tiene ejecuciones correctas, asi que esas copias son residuo. Es un borrado en un recurso de ALBARANES: exige OK explicito del humano por cada secreto, sin exponer valores -nunca 'secret show'- y comprobando despues que el job sigue ejecutando bien. (2) RASTRO EN EL PUESTO: la linea de hosts; las reglas de firewall del puesto en psql-albaranes-rs9k2, que el 2026-08-19 ya son TRES (datamart-puesto-pgris-2026-08-17-rango, -18 y -19, esta ultima ampliada al rango 77.211.5.0/24 porque la IP publica del puesto rota cada pocos minutos); y decidir si SIGRID_API_PAGE_SIZE=50000 se queda en los .env. NO se tocan ClientPgris ni FirewallIPAddress_2026-6-16: son de albaranes, y solo se retiran si el humano confirma que nadie mas las usa. ORDEN QUE IMPORTA (heredado de la DA-7 de F-023): las reglas de firewall del puesto son las que dan acceso al Postgres desde aqui, asi que se retiran AL FINAL de todo, cuando ya no haya trabajo que las necesite. El 2026-08-19 se vio en vivo lo que cuesta no tenerlas: media hora perdida y una regla nueva.",
+      "acceptance": [
+        "Copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro retiradas de kv-albaranes-rs9k2 con OK explicito del humano citado por cada una, sin exponer valores, y con una ejecucion correcta del job posterior que lo demuestre",
+        "Linea de hosts retirada del puesto",
+        "Reglas de firewall del puesto revisadas una por una con el humano; las que se borren, con su confirmacion de que nadie mas las usa. ClientPgris y FirewallIPAddress_2026-6-16 solo si lo confirma",
+        "Decision anotada sobre SIGRID_API_PAGE_SIZE=50000 en los .env",
+        "Hecho DESPUES de que no quede trabajo que necesite acceso al Postgres desde el puesto"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 20,
+      "branch": "feature/F-032-limpieza-secretos-y-puesto"
+    },
+    {
+      "id": "F-033",
+      "title": "El documento de este proyecto en azure-apps miente sobre lo que hay desplegado",
+      "description": "Descubierto el 2026-08-19 al actualizar la parte de los Excels auxiliares (ver progress/impl_F-023_documentacion.md). azure-apps/datamart_seg_anual.md decia que NO EXISTE NINGUN Container Apps Job y que la lectura de los Excels era un stub pendiente. El job lleva dias ejecutandose cada noche a las 02:00 UTC, con alerta de fallo, alerta de frescura, identidad gestionada y secretos en su propio Key Vault; y los Excels se leen del blob desde F-004/F-023. Se corrigio la cabecera con una nota fechada y la parte que entraba en ese encargo, pero EL RESTO DEL DOCUMENTO SIGUE SIN REVISAR. Por que importa mas de lo que parece: CLAUDE.md dice que este documento es la fuente que los OTROS proyectos consultan antes de tocar algo que cruce la frontera -el Postgres compartido, el ACR comun, sigrid-api- y que un documento desactualizado que parece vigente hace mas daño que no tenerlo. Alguien de albaranes o partes puede tomar una decision leyendo que aqui no hay nada desplegado. El dueño del documento es este proyecto, asi que la puesta al dia es trabajo de aqui, no de azure-apps.",
+      "acceptance": [
+        "Documento repasado ENTERO contra la realidad desplegada, no solo las secciones que alguien recuerde: job y su programacion, imagen y registro, identidad, Key Vault, base de datos y esquemas, blob de los Excels, alertas y Log Analytics",
+        "Cada afirmacion del documento o se verifica contra Azure o se marca como no verificada; nada se reescribe de memoria",
+        "Lo que este proyecto EXPONE y CONSUME queda al dia, que es la parte que leen los demas proyectos antes de cruzar la frontera",
+        "Sin secretos: ni IDs de suscripcion o tenant, ni IPs, ni cadenas de conexion, ni correos",
+        "Commit local en azure-apps, sin push, y un puntero desde progress/ para saber cuando se repaso"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "documental",
+      "priority": 13,
+      "branch": "feature/F-033-azure-apps-al-dia"
+    },
+    {
+      "id": "F-026",
+      "title": "60_create_identity.ps1 da por hecho un RBAC que aun no ha propagado",
+      "description": "Defecto de F-003 anotado desde el 2026-08-17 y que hasta hoy NO ESTABA REGISTRADO EN NINGUN SITIO EJECUTABLE: la ficha de F-023, progress/manual_F-023.md y progress/current.md lo apuntaban 'a F-026', pero F-026 no existia en harness/features.json de esta rama. Lo detecto el reviewer al cerrar F-003 (progress/review_F-023_F-003_cierre.md, cambio requerido 3): un puntero a una ficha inexistente en la evidencia de cierre de una feature critico. EL DEFECTO: infra/60_create_identity.ps1 asigna roles y acto seguido los da por efectivos, pero una asignacion de RBAC en Azure tarda en propagar; el script lanza un throw que parece un fallo real cuando en realidad solo hace falta esperar y reintentar. Quien lo ejecuta se encuentra un error que no dice 'espera', y la reaccion natural es tocar permisos a mano. CONSECUENCIA COLATERAL VISTA EL 2026-08-19: el puesto no tiene User Access Administrator sobre la cuenta de almacenamiento, asi que la prueba negativa de F-004 no se podia hacer quitando y devolviendo el rol; se resolvio por otra via, pero el reparto de permisos sigue siendo el que es.",
+      "acceptance": [
+        "60_create_identity.ps1 reintenta con espera en vez de fallar cuando la asignacion aun no ha propagado, con un tope y un mensaje que distingue 'todavia no propago' de 'no tienes permiso para asignar'",
+        "Si el script no puede asignar por falta de permisos, lo dice nombrando el rol que necesita quien lo ejecuta y sobre que recurso, en vez de un throw generico",
+        "Documentado en infra/README.md que el puesto puede no tener permisos de asignacion de roles, y quien los tiene",
+        "Verificado ejecutandolo de verdad sobre un recurso donde la asignacion sea nueva, con el resultado anotado",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 14,
+      "branch": "feature/F-026-rbac-propagacion"
     },
     {
       "id": "F-025",
