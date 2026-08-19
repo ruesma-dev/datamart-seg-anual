@@ -3,7 +3,9 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **27 features**, 16 abiertas, 11 terminadas.
+Resumen: **28 features**, 17 abiertas, 11 terminadas.
+
+En curso: **F-023**.
 
 Bloqueadas: **F-003**.
 
@@ -12,7 +14,7 @@ Bloqueadas: **F-003**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-003 | Infra: despliegue como Container Apps Job diario | 7 | bloqueada | critico | `feature/F-003-infra-caj` |
-| F-023 | Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto | 8 | pendiente | estandar | `feature/F-023-cierre-operativo-f003` |
+| F-023 | Cierre operativo de F-003: las tres verificaciones de F-004 en Azure | 8 | en curso | estandar | `feature/F-023-cierre-operativo-f003` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
 | F-011 | Carga incremental del datamart | 11 | pendiente |  | `feature/F-011-carga-incremental` |
 | F-031 | La alerta de frescura se queda encendida para siempre y deja de avisar | 11 | pendiente | estandar | `feature/F-031-alerta-no-se-resuelve` |
@@ -27,6 +29,7 @@ Bloqueadas: **F-003**.
 | F-013 | Cargar los Excels auxiliares a la capa aux | 17 | pendiente |  | `feature/F-013-carga-excels-aux` |
 | F-010 | Carga y mantenimiento de los Excels auxiliares en Azure | 18 | pendiente |  | `feature/F-010-carga-excels-auxiliares` |
 | F-007 | Disparo manual de la actualización desde web | 19 | pendiente |  | `feature/F-007-disparo-manual-web` |
+| F-032 | Limpieza pendiente de F-003: secretos duplicados en el vault de albaranes y rastro en el puesto | 20 | pendiente | estandar | `feature/F-032-limpieza-secretos-y-puesto` |
 
 ## Terminadas
 
@@ -52,11 +55,11 @@ estado **bloqueada** · prioridad 7 · rigor `critico` · SDD sí · rama `featu
 
 Completar infra/ para desplegar el ETL como Azure Container Apps Job programado (nocturno, siempre --full) en rg-seguimiento-dev, escribiendo contra el Postgres de F-005. Dockerfile ya en raíz y scripts PowerShell esbozados en infra/ con varios TODO por cerrar (ACR, host de Postgres, secretos). Secretos en Key Vault, nunca en el repo. Incluye observabilidad: logs consultables y aviso ante fallo del job.
 
-### F-023 · Cierre operativo de F-003: verificaciones de F-004 en Azure, retirada de secretos duplicados y limpieza del puesto
+### F-023 · Cierre operativo de F-003: las tres verificaciones de F-004 en Azure
 
-estado **pendiente** · prioridad 8 · rigor `estandar` · SDD no · rama `feature/F-023-cierre-operativo-f003`
+estado **en curso** · prioridad 8 · rigor `estandar` · SDD no · rama `feature/F-023-cierre-operativo-f003`
 
-Lo que quedo abierto al completar la tanda 2 de F-003 el 2026-08-17 (job nocturno creado, probado y con alerta verificada). Tres bloques: (1) las tres verificaciones MANUAL heredadas de F-004 (leer los Excels desde el blob 'aux' de stdatamartsegdev desde el puesto, desde el job con identidad gestionada, y la prueba negativa de permisos), que exigen ANTES subir los tres Excels al contenedor 'aux', asignar al humano el rol Storage Blob Data Reader sobre la cuenta y cambiar las AUX_EXCEL_* de infra/env/dev.json a URIs de blob (hoy apuntan a rutas locales de OneDrive: el job las trata como no configuradas); (2) retirar las copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro en kv-albaranes-rs9k2 (el job ya usa kv-datamart-seg-dev y tiene ejecucion correcta) — borrado en un recurso de albaranes, requiere OK explicito del humano; (3) limpieza del puesto: linea de hosts (68.221.140.205), reglas de firewall del puesto en psql-albaranes-rs9k2 (datamart-puesto-pgris-2026-08-17-rango, y ClientPgris / FirewallIPAddress_2026-6-16 SOLO si el humano confirma que nadie mas las usa) y decidir si SIGRID_API_PAGE_SIZE=50000 se queda en los .env. Con los tres bloques hechos, F-003 pasa por el reviewer y se marca done. NO incluye la carga de los Excels a tablas aux.* (eso es F-013).
+REDUCIDA 2026-08-19 por decision del humano: los bloques 2 (retirada de secretos duplicados en kv-albaranes-rs9k2) y 3 (limpieza del puesto) SALEN de aqui y pasan a F-032 con prioridad baja, porque eran limpieza operativa y estaban bloqueando el cierre de F-003, que es lo que interesa liberar para empezar F-011 y luego el MCP. Lo que queda: las tres verificaciones MANUAL heredadas de F-004 sobre los Excels auxiliares en Azure. ESTADO COMPROBADO CONTRA AZURE EL 2026-08-19, que corrige lo que decia la ficha anterior: la preparacion YA ESTA HECHA -los tres Excels estan en el contenedor aux de stdatamartsegdev, el job desplegado tiene las AUX_EXCEL_* como URIs de blob y el humano ya tiene el rol Storage Blob Data Reader sobre la cuenta-. Lo que la ficha decia de las rutas de OneDrive es cierto solo del .env DEL PUESTO, no del job. Verificacion 1 CUMPLIDA (2026-08-19 14:42 UTC): load-aux desde el puesto con las AUX_EXCEL_* apuntando al blob da SUCCESS con origen=blob para los tres; se paso por entorno en la invocacion, sin tocar .env, que es intocable. Verificacion 2 CUMPLIDA (2026-08-19 10:55:57 UTC): la carga del job leyo los tres desde el blob con identidad gestionada y el log lo acredita con origen=blob y ubicacion blob: stdatamartsegdev/aux/..., sin una sola ruta local. Queda la verificacion 3 (prueba negativa: sin el rol, load-aux debe fallar diciendo QUE rol falta y QUE hacer, y despues se reasigna). RIESGO CONOCIDO de la verificacion 3: quitar y devolver una asignacion de rol exige User Access Administrator u Owner sobre la cuenta, y sobre stdatamartsegdev los tiene n3ms@ruesma.es, no pgris; misma raiz que F-026. Si no se puede ejecutar, se justifica la desviacion por escrito y la acepta o la rechaza el reviewer. Evidencias en progress/manual_F-023.md.
 
 ### F-029 · La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado
 
@@ -141,6 +144,12 @@ Mecanismo para que una persona de negocio suba y actualice los Excels auxiliares
 estado **pendiente** · prioridad 19 · SDD sí · rama `feature/F-007-disparo-manual-web`
 
 Más adelante, no ahora. Botón en una app web (o sistema equivalente) para que usuarios autorizados lancen una actualización total o parcial del datamart bajo demanda, además de la nocturna programada. Requiere autenticación y autorización (Entra ID), disparo del Container Apps Job con parámetros de alcance, control de ejecuciones concurrentes y visibilidad del estado de la ejecución. Depende de que el ETL admita alcance parcial por CLI.
+
+### F-032 · Limpieza pendiente de F-003: secretos duplicados en el vault de albaranes y rastro en el puesto
+
+estado **pendiente** · prioridad 20 · rigor `estandar` · SDD no · rama `feature/F-032-limpieza-secretos-y-puesto`
+
+Extraido de F-023 el 2026-08-19 por decision del humano: era limpieza operativa que no aporta funcion y estaba bloqueando el cierre de F-003. Nada de esto impide que el ETL funcione ni que el datamart sea correcto; son cabos que conviene atar para no dejar rastro innecesario. DOS BLOQUES. (1) SECRETOS DUPLICADOS: retirar las copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro en kv-albaranes-rs9k2. El job ya usa kv-datamart-seg-dev y tiene ejecuciones correctas, asi que esas copias son residuo. Es un borrado en un recurso de ALBARANES: exige OK explicito del humano por cada secreto, sin exponer valores -nunca 'secret show'- y comprobando despues que el job sigue ejecutando bien. (2) RASTRO EN EL PUESTO: la linea de hosts; las reglas de firewall del puesto en psql-albaranes-rs9k2, que el 2026-08-19 ya son TRES (datamart-puesto-pgris-2026-08-17-rango, -18 y -19, esta ultima ampliada al rango 77.211.5.0/24 porque la IP publica del puesto rota cada pocos minutos); y decidir si SIGRID_API_PAGE_SIZE=50000 se queda en los .env. NO se tocan ClientPgris ni FirewallIPAddress_2026-6-16: son de albaranes, y solo se retiran si el humano confirma que nadie mas las usa. ORDEN QUE IMPORTA (heredado de la DA-7 de F-023): las reglas de firewall del puesto son las que dan acceso al Postgres desde aqui, asi que se retiran AL FINAL de todo, cuando ya no haya trabajo que las necesite. El 2026-08-19 se vio en vivo lo que cuesta no tenerlas: media hora perdida y una regla nueva.
 
 ### F-001 · Comando 'version' en el CLI
 
