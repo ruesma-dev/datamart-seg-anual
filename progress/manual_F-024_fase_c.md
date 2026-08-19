@@ -754,3 +754,56 @@ funciona: la regla `datamart-puesto-pgris-2026-08-19` acabo ampliada al rango
 Las tres reglas del puesto (`-17-rango`, `-18` y `-19`) las retira el bloque 3
 de F-023, que por esto mismo va **al final**: quita el acceso que hace falta
 para trabajar.
+
+
+---
+
+# T20 · R26 segunda mitad — el `SKIPPED` queda registrado. CUMPLIDO
+
+Ejecutado contra Azure (decision del humano: `build-mart --sin-puerta`, 21 min,
+en vez de `stage --sin-puerta`, 1 h 51; demuestra lo mismo porque lo que se
+prueba es que omitir la puerta deja rastro).
+
+`python main.py build-mart --sin-puerta`, 15:38:39 -> 16:00:20 local:
+
+```
+[warning] puerta_omitida  veredicto_ok=True
+          motivo='Coherencia de stg: OK. El ultimo build_stg termino
+                  correctamente (ejecucion 20260819T102544Z-5c4257).'
+[SUCCESS] build_mart  rows=5,319,602  duration=1297.0s     salida 0
+```
+
+**La evidencia, en la propia tabla y con el contraste al lado.** Dos
+ejecuciones consecutivas de `build_mart` en `_meta.etl_runs`:
+
+```
+build_mart   build_mart.puerta_stg   2026-08-19 12:47:00   SUCCESS   <- el job, con puerta
+build_mart   build_mart.puerta_stg   2026-08-19 13:38:43   SKIPPED   <- la mia, --sin-puerta
+```
+
+Es lo que pide R26: saltarse la puerta **es posible** —hace falta para el caso
+en que la carga parcial sea deliberada— pero **no es gratis ni silencioso**,
+queda escrito quien la omitio y cuando.
+
+Detalle que merece la pena: el registro guarda tambien `veredicto_ok=True`, o
+sea **que habria dicho la puerta si se hubiera respetado**. Aqui daba OK, asi
+que la omision no ocultaba nada; el dia que alguien omita una puerta que decia
+KO, la tabla lo dira.
+
+## Estado de la Fase C al cerrar T20
+
+| Tarea | Estado |
+|---|---|
+| T17 · desplegar imagen y permisos | HECHO (2026-08-18) |
+| T18 · muerte externa controlada (R24) | **CUMPLIDO** entero, pasos 1 a 5 |
+| T19 · alerta de frescura (R23) | puntos (1) y (2) **CUMPLIDOS**; el `Deactivated` **pendiente de observacion** |
+| T20 · `--sin-puerta` registra `SKIPPED` (R26) | **CUMPLIDO** |
+
+**Lo unico abierto: el `Deactivated`.** La alerta lleva en `Fired` desde las
+10:11:18 UTC y a las 14:00 UTC sigue sin resolverse, pese a que la condicion
+dejo de cumplirse a las 10:27 (al restaurar la ventana a 48 h, el `build_mart`
+de la nocturna ya entraba en el criterio de 30 h) y pese a que a las 13:08 UTC
+termino una carga correcta, que es el escenario que R23 describe. Han pasado
+tres evaluaciones horarias. Si no se resuelve, es un hallazgo: `auto-mitigate
+true` no estaria haciendo lo que la spec asume, y una alerta encendida para
+siempre es tan inutil como una que no salta.
