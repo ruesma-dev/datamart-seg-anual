@@ -26,6 +26,62 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# F-011 · BLOQUE A ENTREGADO Y PARADA EN T9 (2026-08-20) — léelo primero
+
+**La feature está en su parada: hace falta una firma del humano.** Todo el
+detalle en `progress/medicion_F-011.md` (la puerta de R8) y en
+`progress/impl_F-011.md` (qué se hizo y con qué evidencias).
+
+## Lo que hay que decidir
+
+| Criterio de DA-7 | Umbral | Medido | ¿Se cumple? |
+|---|---|---|---|
+| Ahorro estimado de la ingesta incremental | ≥ 20 min | **2,25 min** | **NO** |
+| Peso de la ingesta en el total | ≥ 40 % | **19,9 %** | **NO** |
+
+**Recomendación firmada del implementer: NO implementar el bloque B.** Y el
+motivo de fondo no es el margen:
+
+> **`tiemod` no existe en 24 de las 31 tablas que ingerimos.** Comprobado en el
+> catálogo de Sigrid. Entre las que NO la tienen están las cuatro que se llevan
+> el 86 % del tiempo de ingesta; `obrparpre` (13,8 M filas, 61 % del tiempo)
+> tiene 22 columnas y ninguna es una marca de modificación. El diccionario
+> describía entidades lógicas, no la base real. DA-4 ya previó este desenlace:
+> si el veredicto es `NO SIRVE`, se renuncia al watermark y el esfuerzo se
+> lleva al build, que es **F-025**.
+
+## Números de la carga, medidos en TRES cargas completas
+
+ingesta **32,9 min** · `build_stg` **110,7** · `build_mart` **21,6** · total
+**165,2**. `build_stg` es el **67 %** y varía menos de 30 s entre cargas de
+días distintos: es una línea base excelente para medir lo que haga F-025.
+
+Y un dato que estaba gratis en los logs: **el datamart crece 1.688 filas al
+día sobre 20 M** (0,0084 %). Cada noche se traen 20 millones de filas para
+incorporar mil setecientas.
+
+## Qué queda pendiente, y de quién
+
+1. **T9, la firma** (humano). Si es NO, F-011 cierra con el bloque A.
+2. **`perfil-carga` y `diagnostico-tiemod` contra Azure**: la IP del puesto ha
+   rotado otra vez y **ninguna regla de firewall la cubre**. Crear una es
+   escritura sobre el servidor compartido y no se ha hecho.
+3. **`bench-sigrid`**: implementado y sin ejecutar; va contra producción de
+   Sigrid y lo lanza el humano cuando quiera (R4 y R5-bis siguen sin acreditar).
+4. **T8-bis**: avisar al dueño de `sigrid-api`. `azure-apps/` no se ha tocado.
+
+## Dos cabos que conviene no perder
+
+- **`config/tables_sigrid.yaml` miente en 17 entradas**: declara
+  `incremental_column: tiemod` en tablas que no la tienen. Es inerte hoy —el
+  step comprueba el esquema real— pero es la documentación equivocada que hizo
+  verosímil la premisa de F-009 durante meses. Propuesto y **no hecho**.
+- **F-029 confirmada en vivo**: un `init.sh` lanzado justo al terminar una
+  campaña de mutación salió **en rojo con 1 test fallando**; con el árbol
+  quieto, 798 en verde. Es el defecto (3) de su ficha, observado.
+
+---
+
 # F-023 · las tres verificaciones de F-004, CUMPLIDAS (2026-08-19)
 
 Lo pide **T27 de F-003**: el resultado de cada verificación MANUAL, aquí. El
