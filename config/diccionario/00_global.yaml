@@ -258,22 +258,35 @@ reglas:
 # cazar el error de retenciones en el prototipo.
 
 ordenes_de_magnitud:
-  - concepto: Retenido a proveedores, total de la empresa
+  - concepto: Retenido VIVO a proveedores, pendiente de devolver, en toda la empresa
     valor_aproximado: 34700000
     unidad: EUR
+    criterio: saldo_vivo
     fuente: >-
-      Nota global del prototipo mcp-bbdd, medida sobre retenciones.movimientos
-      con sentido PROVEEDOR.
-  - concepto: Retenido de clientes, total de la empresa
+      LEEME_RETENCIONES_R1.md, tabla del modelo: efectos de `pag` con
+      `retide <> 0` y `fecrea = 0`. NO es el total practicado historicamente:
+      lo ya liquidado no cuenta aqui.
+  - concepto: Retenido VIVO por clientes, pendiente de cobrar, en toda la empresa
     valor_aproximado: 21900000
     unidad: EUR
+    criterio: saldo_vivo
     fuente: >-
-      Nota global del prototipo mcp-bbdd, sentido CLIENTE.
-  - concepto: Efectos de retencion registrados
-    valor_aproximado: 27300
+      LEEME_RETENCIONES_R1.md, misma tabla: efectos de `cob` con `retide <> 0`
+      y `fecrea = 0`.
+  - concepto: Efectos de retencion practicados a proveedores, vivos y liquidados
+    valor_aproximado: 25124
     unidad: filas
+    criterio: total
     fuente: >-
-      Nota global del prototipo mcp-bbdd, filas de retenciones.movimientos.
+      LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `pag` con
+      `retide <> 0`, sin filtrar por estado.
+  - concepto: Efectos de retencion practicados por clientes, vivos y liquidados
+    valor_aproximado: 2219
+    unidad: filas
+    criterio: total
+    fuente: >-
+      LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `cob` con
+      `retide <> 0`, sin filtrar por estado.
 
 # ===========================================================================
 # CONVENCIONES (R4)

@@ -534,3 +534,67 @@ def test_f006_r39_bateria_cada_trampa_nombra_la_regla_que_la_evita() -> None:
         reglas = por_id[identificador].get("reglas_implicadas") or []
         assert reglas, identificador
         assert set(reglas) <= codigos, f"{identificador}: {reglas}"
+
+
+# ===========================================================================
+# R10 · Los ordenes de magnitud (defecto 4 de la review)
+#
+# Su unica funcion es que el agente detecte una cifra absurda ANTES de darla
+# por buena. Mezclar dos criterios sin decirlo la invierte: llamar «total de la
+# empresa» a un saldo VIVO hace que un agente que sume todos los movimientos
+# concluya que su numero esta mal cuando esta bien.
+# ===========================================================================
+
+CRITERIOS_MAGNITUD = ("saldo_vivo", "total")
+
+
+def test_f006_r10_cada_orden_de_magnitud_declara_su_criterio() -> None:
+    for orden in _diccionario_real().global_raw["ordenes_de_magnitud"]:
+        assert orden.get("criterio") in CRITERIOS_MAGNITUD, orden["concepto"]
+
+
+def test_f006_r10_las_cifras_de_retencion_son_de_saldo_vivo_y_lo_dicen() -> None:
+    """34,7 M€ y 21,9 M€ son saldo VIVO, no el total practicado nunca."""
+    por_concepto = {
+        o["concepto"]: o for o in _diccionario_real().global_raw["ordenes_de_magnitud"]
+    }
+
+    vivos = [o for o in por_concepto.values() if o["valor_aproximado"] in (34700000, 21900000)]
+
+    assert len(vivos) == 2
+    for orden in vivos:
+        assert orden["criterio"] == "saldo_vivo"
+        assert "vivo" in orden["concepto"].lower(), (
+            f"{orden['concepto']}: el concepto tiene que decir que es saldo vivo, "
+            f"no solo el campo `criterio`"
+        )
+
+
+def test_f006_r10_la_fuente_es_un_documento_que_existe_en_el_repositorio() -> None:
+    """Una medición sin fuente comprobable envejece sin que nadie lo note."""
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[1]
+
+    for orden in _diccionario_real().global_raw["ordenes_de_magnitud"]:
+        fuente = orden.get("fuente", "")
+        candidatos = (t.strip("`,.;:()") for t in fuente.split())
+        ficheros = [c for c in candidatos if c.endswith(".md")]
+        assert ficheros, f"{orden['concepto']}: la fuente no cita ningún documento"
+        for fichero in ficheros:
+            assert (raiz / fichero).exists(), (
+                f"{orden['concepto']}: `{fichero}` no existe en el repositorio"
+            )
+
+
+def test_f006_r10_los_recuentos_de_efectos_van_por_sentido() -> None:
+    """Con un solo total y dos importes por sentido, los criterios no casan y
+    no se puede contrastar ninguna cifra contra su recuento."""
+    conceptos = [
+        o["concepto"].lower()
+        for o in _diccionario_real().global_raw["ordenes_de_magnitud"]
+        if o["unidad"] == "filas"
+    ]
+
+    assert any("proveedor" in c for c in conceptos)
+    assert any("cliente" in c for c in conceptos)

@@ -631,3 +631,39 @@ Se corrigen **tres fichas y una relacion**, no solo la que senalaba el informe:
 - `v_pbi_dim_concepto.orden` declara `1..6` y dice que es el unico orden fiable.
 - La relacion con el dim pasa de «aporta el orden» a «el orden del dim es el
   bueno, no el `orden_concepto` de esta vista».
+
+## Defecto 4 · Los ordenes de magnitud mezclaban dos criterios
+
+```
+$ python -m pytest tests/test_f006_reglas.py -q -k "magnitud or retencion_son or fuente_es or recuentos"
+tests\test_f006_reglas.py:598: AssertionError
+FAILED tests/test_f006_reglas.py::test_f006_r10_cada_orden_de_magnitud_declara_su_criterio
+FAILED tests/test_f006_reglas.py::test_f006_r10_las_cifras_de_retencion_son_de_saldo_vivo_y_lo_dicen
+FAILED tests/test_f006_reglas.py::test_f006_r10_la_fuente_es_un_documento_que_existe_en_el_repositorio
+FAILED tests/test_f006_reglas.py::test_f006_r10_los_recuentos_de_efectos_van_por_sentido
+4 failed, 1 passed, 51 deselected in 0.78s
+```
+
+Comprobado en la fuente primaria del repositorio, `LEEME_RETENCIONES_R1.md`:
+son **«34,7 M€ vivos»** (25.124 efectos) y **«21,9 M€ vivos»** (2.219 efectos).
+El bloque decia «total de la empresa» de las dos.
+
+Se corrige mas de lo pedido, porque el problema de fondo era la mezcla de
+criterios:
+
+- Cada entrada declara ahora **`criterio: saldo_vivo | total`**, y el propio
+  `concepto` dice «VIVO» donde lo es: un campo que solo esta en el YAML no lo
+  lee el agente, el texto si.
+- La **`fuente` cita el documento del repositorio** que trae la medicion, con la
+  condicion exacta (`retide <> 0` y `fecrea = 0`), no la nota de segunda mano
+  del prototipo. **Hay un test que comprueba que ese fichero existe**: una
+  medicion sin fuente comprobable envejece sin que nadie lo note.
+- Los ~27.300 efectos, que eran el unico dato agregado de los dos sentidos, se
+  parten en **25.124 de proveedor y 2.219 de cliente**, para que cada importe
+  tenga su recuento del mismo lado y se puedan contrastar entre si.
+- La cabecera del bloque explica la diferencia entre los dos criterios y por que
+  compararlos lleva a dar por malo un numero correcto.
+
+Un fallo del test, no del contenido, se corrigio al implementar: la extraccion
+del nombre del fichero miraba `endswith('.md')` **antes** de quitar la coma
+final, asi que no encontraba `LEEME_RETENCIONES_R1.md,`.
