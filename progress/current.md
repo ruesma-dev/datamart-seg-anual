@@ -7,7 +7,7 @@ Rama `feature/F-006-mcp-azure`. **Bloques A, B, C y D entregados y corregidos
 tras el RECHAZADO del reviewer** (`progress/review_F-006.md`): los diez defectos
 están cerrados, cada uno con su fase RED.
 
-`bash harness/init.sh` en verde: **1310 tests**, cobertura de las líneas
+`bash harness/init.sh` en verde: **1359 tests**, cobertura de las líneas
 cambiadas **98,9 %** y campaña de mutación con **0 supervivientes de 161
 mutantes**.
 
@@ -67,7 +67,15 @@ pide y para que no se pierdan:
 
 ### Límite conocido de la puerta (escrito, no descubierto luego)
 
-Tras la tercera review, la puerta **sí** contrasta contra el SQL `agregacion`
+Tras la cuarta review, la puerta comprueba además la **coherencia interna entre
+campos de la misma ficha**: el `grano` tiene que nombrar todas las columnas de su
+`clave_negocio`. Nació de un patrón, no de un caso —tres veces se corrigió una
+afirmación en un campo y sobrevivió en el de al lado—, y al implementarla
+fallaron **28 de 41 fichas**. En la misma línea, el aviso de «congelado en el
+build» se propaga por derivación: `CURRENT_DATE` en un `CREATE TABLE AS` congela
+y en una vista no, y quien referencia una columna congelada lo hereda.
+
+La puerta **sí** contrasta contra el SQL `agregacion`
 (la función que envuelve cada columna) y `clave_negocio` (contenida en el
 `GROUP BY`, o igual a la PK del DDL). Lo que sigue **sin** ser derivable, y por
 eso no se comprueba, es la dirección contraria de la clave: **«la clave es

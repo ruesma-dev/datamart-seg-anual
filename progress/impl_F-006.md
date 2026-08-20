@@ -1825,3 +1825,39 @@ porque vive en una vista y se recalcula en cada consulta.
 
 Es el mismo patron de esta pasada: donde el reviewer senala un caso, se busca la
 clase; y donde la clase es derivable, se deriva en vez de revisarla a ojo.
+
+## Evidencias tras la cuarta review
+
+| Evidencia | Antes | Ahora |
+|---|---|---|
+| **Tests que pasan** | 1310 | **1359** (561 de F-006), 40 saltados con motivo |
+| **Tests que fallan** | 0 | **0** |
+| **Cobertura de las lineas cambiadas** | 98,9 % (710/718) | **98,9 % (710/718)**, umbral 80 %, nivel `critico` |
+| **Mutantes / supervivientes** | 161 / 0 | **161 / 0**, 0 timeouts, 399,5 s |
+| **Objetos documentados** | 49 de 102 | 49 de 102 |
+| **Granos reescritos** | — | **28**, para que nombren su clave |
+
+### Comprobaciones derivables que tiene ya la puerta
+
+| Contra el SQL | Entre campos de la misma ficha |
+|---|---|
+| columnas exactas de tablas y vistas | `clave_negocio` ⊆ columnas documentadas |
+| `agregacion` vs la funcion que envuelve la columna | **`grano` nombra toda la `clave_negocio`** |
+| `clave_negocio` ⊆ `GROUP BY` de vista o de `INSERT … SELECT` | cardinalidad vs unicidad de la clave declarada |
+| `clave_negocio` = PK del DDL (aparte **o inline**) | clave de JOIN citada en `porque` vs columnas propias |
+| `nulo_significa` en `*_ide` vs `NULLIF` | avisos derivados del ambito de las reglas |
+| **congelado en el build, y su propagacion** | minimos de contenido |
+
+Lo que sigue **sin** ser derivable y por que, dicho una vez mas para que no se
+de por cubierto: **si la clave es demasiado corta**. Exige dependencias
+funcionales que el texto no da. Se traslada a T26 como consulta de unicidad
+contra la base real, ya escrita en `tasks.md` con su SQL exacto.
+
+### Lo que encontro cada cosa, en esta pasada
+
+| Quien | Que |
+|---|---|
+| El reviewer | 4 defectos de campo vecino y 4 menores |
+| **La comprobacion grano↔clave** | **28 fichas**, no las dos senaladas |
+| **El barrido de copias** | la regla falsa de la NOTA **en la bateria** y **8 columnas** mas sin el aviso de congelado |
+| **La deteccion de PK inline** | 3 tablas cuyo motivo de salto era falso |
