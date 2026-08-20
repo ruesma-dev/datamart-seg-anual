@@ -134,24 +134,24 @@ Entregable: el esquema que responde más preguntas de la batería.
 
 Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
 
-- [ ] **T15**: `etl_sigrid/infrastructure/postgres/sql/ddl/01_diccionario.sql`
+- [x] **T15**: `etl_sigrid/infrastructure/postgres/sql/ddl/01_diccionario.sql`
       con el DDL exacto de `design.md` §4 (tres tablas + `_meta.v_diccionario`),
       idempotente, con el comentario de cabecera sobre `DROP VIEW` y
       `apply-grants` (R23).
       | Verificación: `pytest tests/test_f006_publicacion.py -k ddl` — el
       fichero existe, no contiene ningún `DROP TABLE` ni `DROP VIEW`, y los dos
       JOIN de la vista son `LEFT`.
-- [ ] **T16**: `etl_sigrid/infrastructure/postgres/diccionario_sql.py`
+- [x] **T16**: `etl_sigrid/infrastructure/postgres/diccionario_sql.py`
       (constructores puros) y los métodos `publicar_diccionario` y
       `list_objetos_catalogo` de `PostgresClient` (R17, R18, R22).
       | Verificación: `pytest tests/test_f006_publicacion.py` con doble de
       cliente — el reemplazo va en **una sola transacción** y no hay `DROP`.
-- [ ] **T17**: `PublicarDiccionarioStep` (R19, R21) y su inserción en
+- [x] **T17**: `PublicarDiccionarioStep` (R19, R21) y su inserción en
       `build_pipeline_steps` **entre `BuildMartStep` y `ApplyGrantsStep`** (R20).
       | Verificación: `pytest tests/test_f006_publicacion.py -k pipeline` — el
       orden es el exigido y un diccionario inválido devuelve `FAILED` **sin
       llamar a ningún método de escritura** del cliente.
-- [ ] **T18**: Comando `python main.py publicar-diccionario`, por los helpers
+- [x] **T18**: Comando `python main.py publicar-diccionario`, por los helpers
       `_arrancar_ejecucion` / `_ejecutar_paso` de F-024.
       | Verificación: `pytest tests/test_f006_publicacion.py -k cli` con
       `CliRunner` y dobles de `main.get_settings` y `main._get_pg`.
@@ -167,13 +167,13 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
 
 ## Bloque F · Fichas del resto de esquemas de consumo
 
-- [ ] **T20**: `config/diccionario/compras.yaml` — 7 tablas, 4 vistas, 3
+- [x] **T20**: `config/diccionario/compras.yaml` — 7 tablas, 4 vistas, 3
       funciones. Reglas obligadas en el ámbito: `R-ABONO-NEGATIVO`,
       `R-LINEA-ID-NO-UNICA`, `R-COMPRAS-SIN-IVA`, `R-COMPRAS-TIPO-DOC`.
       `PENDIENTES_MAX` baja.
       | Verificación: `pytest tests/test_f006_cobertura.py` en verde; P1, P5,
       P12, P14 y P16 con sus objetos documentados.
-- [ ] **T21**: `config/diccionario/retenciones.yaml` — 2 tablas y 7 vistas, con
+- [x] **T21**: `config/diccionario/retenciones.yaml` — 2 tablas y 7 vistas, con
       `R-RETENCION-NO-JOIN-LINEAS` en el ámbito y la nota de que
       `v_src_lineas_venta` está **siempre vacía** por diseño (`dvfpro` no se
       ingiere). `PENDIENTES_MAX` baja.
