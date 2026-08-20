@@ -1,9 +1,275 @@
 <!-- progress/review_F-006.md -->
 # F-006 · Review — bloques A a F
 
-> Este fichero tiene **cuatro pasadas**, de la más reciente a la más antigua.
+> Este fichero tiene **cinco pasadas**, de la más reciente a la más antigua.
 > Se conservan íntegras: son lo que se pidió corregir cada vez y el patrón
 > contra el que se contrasta la siguiente.
+
+---
+
+# QUINTA PASADA · 2026-08-20 — el grano, derivado
+
+> Commits revisados: `d07a67a`..`bbf9045` (cuatro). Alcance: T15–T18, T20 y T21.
+
+## Veredicto de la quinta pasada
+
+**RECHAZADO**, por dos defectos de gravedad media que aparecieron al terminar el
+contraste de los 28 granos.
+
+**Rectifico un veredicto que ya había emitido.** Di APROBADO apoyándome en mis
+propias comprobaciones —el recuento, los mecanismos, cinco granos muestreados— y
+dejando dicho que dos auditorías paralelas seguían corriendo. Al llegar,
+confirmaron los 28 granos uno a uno y **encontraron dos cosas que yo no había
+mirado**. Las he verificado contra el SQL y son ciertas, así que el veredicto
+cambia. Es la segunda vez en esta feature que me pasa lo mismo, y la lección es
+la de siempre: el contraste caso a caso encuentra lo que el muestreo no.
+
+Lo que se pidió está hecho y bien hecho —los cuatro defectos de campo vecino, los
+tres menores, la vía (a) implementada y la (b) diferida con criterio—, y los 28
+granos reescritos son ciertos: **ninguno se escribió para el test**. Lo que falla
+es otra cosa: **el barrido de copias no fue exhaustivo**, y quedan dos fichas que
+siguen diciendo algo que el SQL desmiente. El commit se titula «los cuatro
+defectos de campo vecino»; este es el quinto y el sexto.
+
+Lo importante de esta tanda no es que se hayan corregido cuatro fichas: es que
+**el defecto que llevábamos tres pasadas persiguiendo caso a caso era
+sistemático**, y solo se vio al derivarlo. Eso confirma lo que veníamos diciendo
+desde la segunda pasada, y esta vez el número lo dice sin ambigüedad.
+
+---
+
+## Lo que hay que corregir
+
+### 1 · `retenciones.v_pbi_retencion_obra`: la clave no cubre su `GROUP BY` (MEDIA)
+
+Es **el mismo defecto que motivó el rechazo de la tercera pasada**, en la ficha
+hermana de la que sí se corrigió.
+
+- Ficha (`retenciones.yaml:363`): `grano` «Una fila por `obra_id`» y
+  `clave_negocio: [obra_id]`.
+- SQL (`retenciones/02_views.sql:89`): `GROUP BY obra_id, codigo_obra, nombre_obra`.
+- Y las tres columnas **no se derivan unas de otras**: en `movimientos`,
+  `obra_id = COALESCE(NULLIF(p.cenide,0), CASE WHEN od.num_obras = 1 THEN
+  od.obra_unica END)` mientras `codigo_obra = COALESCE(cen_con.cod, obr_con.cod)`
+  y `nombre_obra = COALESCE(cen_con.res, obr_con.res)`
+  (`01_movimientos.sql:61-64`): son cascadas distintas, resueltas por joins
+  distintos. Con `cenide <> 0` sin fila en `raw.con` y `num_obras = 1`, la misma
+  `obra_id` puede salir con dos `codigo_obra` → **dos filas para la clave
+  declarada**, y quien una por `obra_id` duplica.
+
+En `compras.v_pbi_partida_coste` este mismo caso se corrigió bien, y su ficha lo
+explica con esas palabras: «`codigo_obra` se resuelve con una cascada distinta de
+la de `obra_id`» (`compras.yaml:919-920`). Faltó cruzarlo con `retenciones`.
+
+**Por qué no lo cazó el test nuevo**: el contraste es `clave ⊆ GROUP BY`, de
+subconjunto y no de igualdad. Es la limitación que ya señalé en la cuarta pasada,
+y este es el caso donde muerde. La comprobación de unicidad de T26 lo resolvería,
+pero hasta entonces la ficha miente.
+
+### 2 · `cierre.v_pbi_cierre_indirectos_detalle`: «traen valor siempre» es falso (MEDIA)
+
+El `grano` (`cierre.yaml:499-500`) afirma: «Sus dos entradas, `importe_fase0` y
+`plazo_total_meses`, **traen valor siempre**». No es cierto, y **la propia ficha
+se contradice cincuenta líneas más abajo**: `importe_fase0.nulo_significa: La
+subcategoria no tiene presupuesto vivo` (`:550`) y
+`plazo_total_meses.nulo_significa: La obra no tiene plazo calculable` (`:559`).
+El SQL confirma que ambas pueden ser NULL —`04_views_detalle.sql:340-341` guarda
+explícitamente `WHEN po.plazo_total_meses IS NULL THEN NULL` y `WHEN
+f0s.importe_fase0_subcat IS NULL THEN NULL`, y las dos llegan por `LEFT JOIN`—.
+
+La intención se adivina —«traen valor **sea el grupo INFRA o no**», que es lo que
+dicen bien los `significado` de las dos columnas— pero, tal y como está escrito,
+quien lea el grano concluye que nunca son nulas y no comprobará el NULL. Es de
+una línea: «traen valor tanto si el grupo se periodifica como si no; pueden ser
+nulas por su propia causa (ver `nulo_significa`)».
+
+### 3 · Una premisa falsa sostiene el límite del test — y la escribí yo (MEDIA-BAJA)
+
+`tests/test_f006_fichas.py:1156` justifica por qué «la clave es demasiado corta»
+no es derivable diciendo: «`codigo_obra` **sí** depende de `obra_id` y
+`proveedor_cif` NO depende de `proveedor_id`». La segunda mitad es cierta; **la
+primera es falsa**, y lo desmiente el propio commit en `compras.yaml:919-920`
+—con el SQL a favor de la ficha—.
+
+El origen de la frase es mi informe de la cuarta pasada: la escribí yo, el
+implementer la tomó como fundamento y su propia corrección la contradice. Hay que
+arreglarla en los dos sitios, porque el límite del test sigue siendo real —lo es
+por `proveedor_cif`— pero el ejemplo que lo ilustra es justamente un caso en el
+que la dependencia **no** existe.
+
+### Menores
+
+4. `retenciones.yaml:428-431` etiqueta `N:1` la relación `obra_id →
+   maestro.obras.obra_id` mientras el grano de esa misma ficha dice una fila por
+   `obra_id`; los dos casos análogos de `compras` usan `1:1` (`:694`, `:887`).
+   Una de las dos afirmaciones sobra. (Se resuelve sola al corregir el defecto 1.)
+5. `compras.yaml:667-669`: la analogía nueva («`importe_facturado` tampoco
+   filtra») compara cosas distintas —ahí no filtrar da el neto correcto, sobre
+   `factura_lineas`; en el pendiente arrastra NOTA y OTRO, sobre
+   `albaran_lineas`—. La corrección era necesaria, pero suaviza un aviso que no
+   conviene suavizar.
+6. `v_pbi_retencion_entidad.primera_devolucion_prevista` y
+   `ultima_devolucion_prevista` son `MIN`/`MAX` sobre **todos** los efectos,
+   liquidados incluidos (`02_views.sql:45-46`), y la ficha no lo dice en una
+   vista cuyo titular es `saldo_vivo`. Preexistente, no de esta tanda.
+7. La justificación del SQL de unicidad de T26 dice que agrupar los NULOS es
+   «como se comportan en un JOIN»: **falso**, en un `JOIN … ON a.x = b.x` los
+   NULL no casan. Agruparlos juntos es **más estricto** que un JOIN, que es lo
+   que conviene para comprobar una clave, pero el motivo escrito no es el
+   verdadero. El SQL en sí es correcto.
+
+## El 28 de 41, verificado
+
+No me fié del recuento. Lo reproduje: en un worktree aislado dejé los tests de
+HEAD y **revertí los cinco YAML al commit anterior** (`c20c933`), que es
+exactamente «activar la comprobación sobre el diccionario de ayer». Resultado:
+
+```
+28 failed, 14 passed, 268 deselected
+```
+
+**28 de 42 fichas con clave declarada**, ni una más ni una menos. Es decir: dos
+tercios del diccionario tenían un `grano` que no nombraba todas las columnas de
+su propia clave, incluidas fichas de `mart` y `cierre` que tres revisiones
+—las mías entre ellas— habían dado por veraces. Lo eran en columnas, en claves y
+en cardinalidades; en granos, no.
+
+Vale la pena decirlo claro porque es la lección de las cinco pasadas: **la
+revisión humana caso a caso encontró dos; la comprobación derivada encontró 28**.
+
+## Las 28 correcciones — la parte que había que mirar de verdad
+
+El riesgo de reescribir 28 granos de golpe contra un criterio automático es que
+alguno se escriba para el test y no para el lector. Lo verifiqué por dos vías: un
+barrido propio en busca de coletillas —del tipo «… la clave incluye X, Y, Z»
+pegado al final, que satisface el `\b` del test sin explicar nada— y el contraste
+uno a uno contra el SQL.
+
+Contrasté contra el SQL, uno a uno, **cinco de los 28** —los dos que motivaron
+el rechazo (`v_pbi_proveedor_obra`, `v_pbi_albaranes_sin_facturar`) y otros tres
+elegidos por ser los más fáciles de estropear: `fact_seguimiento_categoria`,
+`v_pbi_cierre_resumen` y `retenciones.movimientos`—. Los cinco son ciertos, y uno
+trae una corrección no trivial que nadie había pedido: `movimientos` pasa a
+declarar la clave `(sentido, movimiento_id)` porque el identificador sale de
+`p.ide` y de `c.ide` —dos secuencias distintas, `pag` y `cob`
+(`retenciones/01_movimientos.sql:47-48, 97-98`)—, así que **solo es único dentro
+de su sentido**. El barrido no encuentra coletillas, y el caso que motivó el
+rechazo quedó así:
+
+> «Una fila por (`obra_id`, `codigo_obra`, `proveedor_id`, `proveedor_nombre`,
+> `proveedor_cif`, `anio`), que es su clave de negocio y son SEIS columnas, no
+> tres. No basta con (obra, proveedor, ano): `proveedor_cif` sale del CIF que
+> traía cada documento y NO depende de `proveedor_id`, así que dos facturas del
+> mismo proveedor con CIF distinto dan DOS filas. Unir por tres columnas
+> duplica.»
+
+Eso no es satisfacer un test: es explicar la trampa que la review tardó tres
+pasadas en aislar, y dejarla escrita donde el agente la va a leer.
+
+**Los 28 se verificaron enteros**, uno a uno contra el SQL —19 de `mart` y
+`cierre`, 9 de `compras` y `retenciones`— y **los 28 son ciertos**. El patrón de
+la reescritura es homogéneo y honesto: traducir la palabra de negocio al nombre
+de columna (`obra` → `obra_id`, `mes` → `anio_mes`, «renglón del cuadro» →
+`concepto_cuadro`), sin inventar dimensiones, sin meter columnas redundantes para
+pasar el test y sin prometer unicidad que el SQL no dé. Se comprobó además, con
+las dos versiones del YAML parseadas y comparadas objeto a objeto, que **el único
+campo que cambió es `grano`**: `columnas`, `clave_negocio`, `relaciones`,
+`cardinalidad`, `descripcion`, `paso_etl` y `refresco` están intactos en los
+cuatro ficheros. **Cero regresiones.**
+
+Los dos defectos de arriba no son granos reescritos mal: son fichas que el
+barrido de copias no visitó.
+
+## El detector elegido — es el correcto, no el cómodo
+
+Descartó dos variantes y las razones son buenas:
+
+- **Casar la enumeración del grano con la clave** exige emparejar conceptos de
+  negocio («obra», «mes») con nombres de columna (`obra_id`, `anio_mes`): un
+  emparejamiento difuso que **marcaría de más**.
+- **Contar dimensiones** no delata nada: las seis columnas de
+  `v_pbi_proveedor_obra` son tres conceptos.
+- **Exigir que los nombres aparezcan** es exacto, no admite interpretación y
+  tiene un efecto colateral bueno: el grano pasa a decir por qué columnas hay que
+  unir.
+
+Su límite, dicho para que conste: es una comprobación **textual**, así que se
+puede satisfacer mencionando la columna sin arreglar la contradicción. Por eso
+las 28 correcciones necesitaban revisión humana, y por eso la hice.
+
+## La derivación del congelado — correcta, y con control en los dos sentidos
+
+Es la afirmación más fuerte de la tanda y es cierta en semántica PostgreSQL:
+`CURRENT_DATE` dentro de un `CREATE TABLE … AS SELECT` se evalúa **una vez**, al
+construir, y el valor queda materializado; dentro de una vista se reevalúa en
+cada consulta. El detector solo marca columnas de **tablas**
+(`test_f006_fichas.py:1843-1868`) y su control lo ancla en los dos sentidos:
+exige que `retenciones` dé exactamente `{vencida_sin_liquidar,
+dias_desde_vencimiento}` y que `compras.dias_desde_albaran` —que es de una
+vista— **no** aparezca.
+
+La herencia también es correcta: `v_pbi_retenciones_vencidas.antiguedad` se
+calcula con un `CASE` sobre `dias_desde_vencimiento`
+(`retenciones/02_views.sql:139-145`), que viene congelada de la tabla; y un
+`SUM(importe) FILTER (WHERE vencida_sin_liquidar)` es tan de la fecha del build
+como la marca, porque el conjunto de filas se decidió entonces.
+
+Lo probé: quité la palabra «build» del significado de `antiguedad` y
+`test_f006_r2_toda_columna_congelada_lo_advierte` se puso en rojo.
+
+Y el aviso **llega completo y no se sobrepropaga**: se recorrieron las columnas
+que dependen de `vencida_sin_liquidar` o `dias_desde_vencimiento` en el SQL
+—`movimientos`, las dos de `vivas`, las cuatro de `vencidas` incluida
+`antiguedad`, `entidad.importe_vencido`/`num_vencidas`,
+`obra.vencido_proveedores`/`vencido_cliente` y
+`resumen.importe_vencido`/`num_vencidas`— y **todas lo declaran**; mientras que
+`compras.dias_desde_albaran`, que vive en un `CREATE VIEW` y por tanto se
+recalcula, **no** lo dice, que es lo correcto.
+
+**Dónde puede quedarse corto** (deuda, no defecto): el conjunto de columnas
+congeladas se agrupa **por esquema**, no por objeto, y la herencia es de
+profundidad uno —una vista que referenciara una columna heredada de otra vista no
+se marcaría—. Hoy no existe ninguna cadena así, y agrupar por esquema peca de
+conservador, que es el lado bueno del error.
+
+## Lo demás que declaraba
+
+| Punto | Verificado |
+|---|---|
+| **P12 de la batería** | Corregido, y bien: «no generaliza la regla: en `compras.v_pbi_contrato_consumo` el pendiente se suma sin filtrar, así que allí las NOTA también cuentan» |
+| **Vía (a), tablas agregadas** | **Probado por mí**: puse `num_partidas` en `suma` y falla `test_f006_r7_la_agregacion_de_las_tablas_agregadas_casa_con_el_sql`. Antes no lo cubría nada |
+| **PK inline** | Corregido: `pk_declarada` devuelve ahora `['fact_id']` y `['cierre_id']` donde antes daba `None`, y sigue dando `None` para el CTAS sin PK. Los tres motivos de skip falsos, resueltos |
+| **El aserto que impedía crecer** | Sustituido por el invariante de prefijo (`proyectadas[:18] == COLUMNAS_V_DICCIONARIO[:18]`), que es el correcto: permite añadir al final, que es lo único que el contrato declara compatible |
+| **Los dos docstrings** | Corregidos. El del `rollback` distingue ahora que el `commit` sí se ejecutaba y solo el `rollback` no |
+| **Vía (b), diferida a T26** | El SQL hace lo que dice (ver abajo) y el reparto es sensato: T26 construye el comando, T27 lo ejecuta contra la base como verificación MANUAL (humano), coherente con la regla de que ningún agente abre conexión |
+
+---
+
+## Rigor y comprobaciones de siempre
+
+- **1359 tests + 40 saltados**, ejecutados por mí; cobertura **98,9 % de 718
+  líneas**. Los 40 saltados siguen siendo los mismos cinco grupos ya auditados en
+  la cuarta pasada, ahora con los tres motivos falsos de PK corregidos.
+- **Mutación verificada de forma independiente**: alcance **2324 líneas** y
+  **161 mutantes** recalculados; coinciden con `progress/mutacion_F-006.md`; cero
+  supervivientes. (No varía respecto a la tanda anterior porque estos cuatro
+  commits tocan YAML, tests y specs, no código de producción.)
+- **Nada prohibido**: el diff no toca `main.py`, `settings.py`, `grants.py`,
+  `postgres_client.py`, `infra/**` ni ningún SQL de negocio; ni un `GRANT`,
+  `REVOKE`, firewall o Azure; ninguna conexión a la base. **Sin `push`**: no
+  existe rama remota de la feature.
+- Trinquete coherente: 49 fichas + 53 pendientes = 102 objetos, `PENDIENTES_MAX`
+  = 53.
+- Árbol limpio; mis experimentos se hicieron en worktrees aislados ya eliminados.
+
+### Checkpoints (quinta pasada)
+
+**C1** `[x]` · **C2** `[x]` · **C3** `[x]` · **C3 bis** N/A · **C4** `[ ]` —dos
+fichas siguen declarando algo que el SQL desmiente (defectos 1 y 2): una clave
+que no identifica una fila y una nulidad imposible. Todo lo demás de C4 está
+cumplido, y el resto del diccionario —49 fichas, 593 columnas— sí cuadra— ·
+**C4 bis** `[x]` · **C4 ter** N/A · **C5** N/A parcial (20 de 42 tareas, el
+alcance encargado).
 
 ---
 

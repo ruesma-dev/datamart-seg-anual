@@ -497,7 +497,10 @@ objetos:
       es su clave de negocio. Las columnas CALCULADAS de periodificacion
       (ratios, acumulados y parciales) solo tienen valor en los grupos cuyo
       nombre contiene "INFRA"; en el resto van a nulo. Sus dos entradas,
-      `importe_fase0` y `plazo_total_meses`, traen valor siempre.
+      `importe_fase0` y `plazo_total_meses`, traen valor tanto si el grupo se
+      periodifica como si no, pero **pueden ser nulas por su propia causa**: no
+      haber presupuesto vivo o no haber plazo calculable. Ver su
+      `nulo_significa`.
     clave_negocio: [obra_id, anio_mes, grupo_cod, subcategoria_cod]
     paso_etl: build_cierre
     refresco: manual

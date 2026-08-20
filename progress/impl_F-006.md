@@ -1861,3 +1861,91 @@ contra la base real, ya escrita en `tasks.md` con su SQL exacto.
 | **La comprobacion grano↔clave** | **28 fichas**, no las dos senaladas |
 | **El barrido de copias** | la regla falsa de la NOTA **en la bateria** y **8 columnas** mas sin el aviso de congelado |
 | **La deteccion de PK inline** | 3 tablas cuyo motivo de salto era falso |
+
+---
+
+# Correcciones de la quinta review
+
+## El barrido, esta vez exhaustivo y ANTES de tocar nada
+
+La leccion de la pasada anterior era buscar las copias. Esta vez el barrido fue
+lo primero, y automatizado: se listaron **todas** las vistas y tablas agregadas
+cuya clave esta estrictamente contenida en su `GROUP BY`. Salieron **tres**
+candidatos, no el que senalaba el informe:
+
+```
+REVISAR mart.fact_seguimiento_categoria    | GROUP BY de mas=['ambito_id','anio','concepto','mes','tipo_dato']
+REVISAR retenciones.v_pbi_retencion_entidad| GROUP BY de mas=['entidad_cif','entidad_nombre']
+REVISAR retenciones.v_pbi_retencion_obra   | GROUP BY de mas=['codigo_obra','nombre_obra']
+```
+
+De los tres, **solo uno miente**, y el criterio que los separa se verifico
+contra el SQL:
+
+| Ficha | Columnas omitidas | Veredicto |
+|---|---|---|
+| `fact_seguimiento_categoria` | `anio`, `mes` salen de `anio_mes`; `tipo_dato`, `concepto`, `ambito_id` salen de `escenario` | **clave correcta**, son derivadas |
+| `v_pbi_retencion_entidad` | `ent.res` y `prv.cif`, los dos por `LEFT JOIN … ON ide = entide` | **clave correcta**, un solo lookup por la propia clave |
+| `v_pbi_retencion_obra` | `COALESCE(cen_con.cod, obr_con.cod)` sobre **dos JOIN distintos** | **MIENTE** |
+
+## Defecto 1 · `v_pbi_retencion_obra`, y el estrechamiento que lo caza
+
+La clave pasa a las tres columnas y el grano explica el porque: en
+`retenciones.movimientos`, `obra_id` sale del centro de coste del efecto y
+`codigo_obra`/`nombre_obra` de un `COALESCE` sobre dos JOIN distintos, asi que
+**un `obra_id` cuyo centro de coste no exista en el maestro puede aparecer con
+dos codigos**. La relacion hacia `maestro.obras` explica ahora por que es `N:1`
+y no `1:1` (menor 4, que se resolvia solo).
+
+**Y se estrecha el subconjunto, que era lo que se pedia valorar.** Hay un
+criterio barato y exacto que separa los tres casos de arriba sin marcar de mas:
+**una columna agrupada puede omitirse de la clave si se resuelve por UNA sola
+fuente, y no puede si sale de un `COALESCE` de dos fuentes distintas**. Cuando
+la vista la proyecta desnuda, se resuelve aguas arriba, en la tabla de la que
+selecciona. Fase RED:
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "multifuente or no_es_derivable"
+tests\test_f006_fichas.py:2011: AssertionError
+FAILED tests/test_f006_fichas.py::test_f006_r2_la_clave_cubre_lo_del_group_by_que_no_es_derivable
+1 failed, 1 passed, 310 deselected in 0.52s
+```
+
+Marca `codigo_obra` y `nombre_obra`, y **no marca** ni las cinco derivadas de
+`fact_seguimiento_categoria` ni las dos de `v_pbi_retencion_entidad`. Su control
+prueba las dos direcciones del detector.
+
+Lo que sigue fuera: la clave corta cuya dependencia falla por otro motivo. Eso
+es la consulta de unicidad de T26, ya escrita.
+
+## Defecto 2 · el grano que se contradecia consigo mismo
+
+`v_pbi_cierre_indirectos_detalle` decia que `importe_fase0` y
+`plazo_total_meses` «traen valor siempre» y cincuenta lineas mas abajo declaraba
+el nulo de las dos. **Manda el SQL**, que las deja nulas por `LEFT JOIN` y con
+guardas explicitas. El grano dice ahora lo que se queria decir —traen valor se
+periodifique el grupo o no— y remite a su `nulo_significa` para lo demas.
+
+## Defecto 3 · la premisa falsa que sostenia el limite
+
+El comentario que justifica por que «la clave demasiado corta» no es derivable
+usaba como ejemplo que «`codigo_obra` si depende de `obra_id`». **Es falso**, y
+lo desmiente el propio SQL de `retenciones` y la ficha de
+`compras.v_pbi_partida_coste`. Corregido: el limite sigue siendo real —lo
+sostiene `proveedor_cif`— pero el ejemplo que lo ilustraba era justo un caso en
+el que la dependencia NO existe, y **un ejemplo equivocado dentro de la
+justificacion de un limite hace creer que la linea esta en otro sitio**.
+
+**Para el reviewer**: la frase salio de su informe de la cuarta pasada y sigue
+ahi. Conviene corregirla tambien en `progress/review_F-006.md`, porque el
+proximo que lea el limite partira de ese texto.
+
+## Deuda anotada, no tocada (menores 5, 6 y 7)
+
+Por decision del lider viajan con los bloques que faltan:
+
+| # | Que |
+|---|---|
+| 5 | `compras.yaml`: la analogia «`importe_facturado` tampoco filtra» compara cosas distintas —alli no filtrar da el neto correcto sobre `factura_lineas`; en el pendiente arrastra NOTA y OTRO sobre `albaran_lineas`— y suaviza un aviso que no conviene suavizar |
+| 6 | `v_pbi_retencion_entidad.primera_devolucion_prevista` y `.ultima_devolucion_prevista` son `MIN`/`MAX` sobre TODOS los efectos, liquidados incluidos, en una vista cuyo titular es `saldo_vivo`. Preexistente |
+| 7 | La justificacion del SQL de unicidad de T26 dice que agrupar los NULOS es «como se comportan en un JOIN»: es al reves, en un JOIN los NULL no casan. Agruparlos es MAS estricto, que es lo que conviene; el SQL es correcto y el motivo escrito no |

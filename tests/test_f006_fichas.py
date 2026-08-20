@@ -1151,15 +1151,27 @@ def test_f006_r13_el_aviso_de_frescura_llega_a_compras_y_retenciones() -> None:
 #
 #   * «la clave nombra algo que no identifica» SÍ lo es: basta con exigir que
 #     esté contenida en el `GROUP BY`, o que case con la PK del DDL;
-#   * «la clave es demasiado corta» NO lo es. Decidir si una columna del
-#     `GROUP BY` puede omitirse exige saber si depende funcionalmente de otra, y
-#     eso no se lee del texto: `codigo_obra` sí depende de `obra_id` y
-#     `proveedor_cif` NO depende de `proveedor_id` —sale del CIF del documento—
-#     y las dos se escriben igual. Exigir la igualdad con el `GROUP BY` marcaría
-#     como falsas fichas correctas: `mart.fact_seguimiento_categoria` agrupa por
-#     nueve columnas de las que cinco se derivan de otras dos.
-#     Esa mitad se queda en revisión humana, y queda dicho aquí en vez de
-#     dejarlo creer cubierto.
+#   * «la clave es demasiado corta» solo lo es EN PARTE. Decidir si una columna
+#     del `GROUP BY` puede omitirse exige saber si depende funcionalmente de
+#     otra, y eso no siempre se lee del texto: `proveedor_cif` NO depende de
+#     `proveedor_id` —sale del CIF que traía cada documento— y aun así se
+#     escribe igual que una columna que sí dependiera. Exigir la igualdad con el
+#     `GROUP BY` marcaría como falsas fichas correctas:
+#     `mart.fact_seguimiento_categoria` agrupa por nueve columnas de las que
+#     cinco se derivan de otras dos.
+#
+#     OJO con el ejemplo contrario, que en las primeras versiones de este
+#     comentario estaba MAL: `codigo_obra` **no** depende de `obra_id` en
+#     general. En `retenciones.movimientos` los dos salen de cascadas distintas,
+#     y en `compras.v_pbi_partida_coste` la ficha lo dice con esas palabras. Un
+#     ejemplo equivocado dentro de la justificación de un límite hace más daño
+#     que no justificarlo: hace creer que la línea está en otro sitio.
+#
+#     La parte que SÍ es derivable se comprueba más abajo, en
+#     `test_f006_r2_la_clave_cubre_lo_del_group_by_que_no_es_derivable`: una
+#     columna agrupada que sale de un `COALESCE` de dos fuentes no se puede dar
+#     por dependiente. Lo que queda fuera se cierra con la consulta de unicidad
+#     de T26.
 # ===========================================================================
 
 
@@ -1915,4 +1927,101 @@ def test_f006_r2_toda_columna_congelada_lo_advierte() -> None:
 
     assert not problemas, (
         f"{problemas} dependen de un calculo congelado en el build y no lo dicen"
+    )
+
+
+# ===========================================================================
+# ESTRECHAR EL SUBCONJUNTO · la clave corta que SI es derivable
+#
+# El contraste `clave ⊆ GROUP BY` deja pasar la clave demasiado corta, y ahi
+# mordio: `v_pbi_retencion_obra` agrupaba por tres columnas y declaraba una.
+# Exigir la IGUALDAD marcaria de mas —`fact_seguimiento_categoria` agrupa por
+# nueve columnas de las que cinco se derivan de otras dos, y su clave corta es
+# correcta—, asi que hace falta un criterio que separe los dos casos.
+#
+# Y lo hay, barato y exacto: **una columna del `GROUP BY` puede omitirse de la
+# clave si se resuelve por una sola fuente** —`ent.res`, un lookup por la propia
+# clave— **y NO puede si se resuelve con un `COALESCE` de dos fuentes
+# distintas**, porque entonces nada garantiza que acompane siempre al mismo
+# valor de la clave. Es justo lo que separa `entidad_nombre` (una fuente, ok) de
+# `codigo_obra` (`COALESCE(cen_con.cod, obr_con.cod)`, dos joins distintos).
+#
+# Sigue sin cubrir la clave corta cuya dependencia falla por otro motivo: eso
+# es la consulta de unicidad de T26. Pero cubre esta familia, que es la que ha
+# fallado dos veces.
+# ===========================================================================
+
+
+def tabla_origen(cuerpo: str) -> str | None:
+    """El objeto del que selecciona el `SELECT` final, si es uno solo."""
+    coincidencia = re.search(
+        r"^FROM\s+([a-z_]+)\.([a-z_0-9]+)",
+        re.sub(r"--[^\n]*", " ", cuerpo),
+        re.MULTILINE | re.IGNORECASE,
+    )
+    return f"{coincidencia.group(1)}.{coincidencia.group(2)}" if coincidencia else None
+
+
+def resuelta_por_varias_fuentes(expresion: str) -> bool:
+    """¿La columna sale de un `COALESCE` sobre dos o mas tablas distintas?"""
+    if not expresion or "COALESCE" not in expresion.upper():
+        return False
+    dentro = expresion[expresion.upper().index("COALESCE") :]
+    alias = set(re.findall(r"\b([a-z_][a-z_0-9]*)\.[a-z_]", dentro, re.IGNORECASE))
+    return len(alias) >= 2
+
+
+def _proyecciones_del_diccionario() -> dict[str, dict[str, str]]:
+    proyecciones: dict[str, dict[str, str]] = {}
+    for ficha in _diccionario().fichas:
+        origen = _origen_por_objeto().get(ficha.nombre)
+        if not origen or origen == "config/tables_sigrid.yaml":
+            continue
+        sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+        cuerpo = cuerpo_de_vista(sql, ficha.esquema, ficha.objeto) or cuerpo_del_insert(
+            sql, ficha.esquema, ficha.objeto
+        )
+        if cuerpo:
+            proyecciones[ficha.nombre] = proyeccion_por_alias(cuerpo) or {}
+    return proyecciones
+
+
+def test_f006_r2_control_el_detector_de_multifuente_separa_los_dos_casos() -> None:
+    """Si marcase las dos, o ninguna, el test de abajo no valdria nada."""
+    assert resuelta_por_varias_fuentes("COALESCE(cen_con.cod, obr_con.cod)") is True
+    assert resuelta_por_varias_fuentes("ent.res") is False
+    assert resuelta_por_varias_fuentes("COALESCE(od.num_obras, 0)") is False
+
+
+def test_f006_r2_la_clave_cubre_lo_del_group_by_que_no_es_derivable() -> None:
+    """Una columna agrupada que sale de dos fuentes tiene que estar en la clave."""
+    proyecciones = _proyecciones_del_diccionario()
+    problemas = []
+
+    for ficha in _diccionario().fichas:
+        if ficha.nombre not in proyecciones:
+            continue
+        origen = _origen_por_objeto()[ficha.nombre]
+        sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+        cuerpo = cuerpo_de_vista(sql, ficha.esquema, ficha.objeto) or cuerpo_del_insert(
+            sql, ficha.esquema, ficha.objeto
+        )
+        proyeccion = proyecciones[ficha.nombre]
+        agrupadas = columnas_del_group_by(cuerpo, proyeccion)
+        if not agrupadas:
+            continue
+
+        arriba = proyecciones.get(tabla_origen(cuerpo) or "", {})
+        for columna in sorted(agrupadas - set(ficha.clave_negocio)):
+            expresion = (proyeccion.get(columna) or "").strip()
+            # Una referencia desnuda no dice nada: se resuelve aguas arriba.
+            if re.fullmatch(r"[a-z_][a-z_0-9]*", expresion, re.IGNORECASE):
+                expresion = arriba.get(columna, "")
+            if resuelta_por_varias_fuentes(expresion):
+                problemas.append(f"{ficha.nombre}.{columna}")
+
+    assert not problemas, (
+        f"{problemas} se agrupan y salen de un COALESCE de varias fuentes, asi "
+        f"que no se pueden dar por dependientes de la clave: o entran en ella, "
+        f"o la ficha promete una unicidad que no existe"
     )

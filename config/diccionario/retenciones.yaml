@@ -360,12 +360,19 @@ objetos:
       posicion neta: cuanto retenemos a proveedores frente a cuanto nos retiene
       el cliente. Es la vista para "como esta la obra X en garantias".
     grano: >-
-      Una fila por `obra_id`. Los efectos sin obra atribuida quedan FUERA, asi
-      que la suma de esta vista es menor que el total de la empresa: lo que
-      falta esta en `sin_obra_asignada` de
+      Una fila por (`obra_id`, `codigo_obra`, `nombre_obra`), que es su clave de
+      negocio y son TRES columnas, no una. No basta con `obra_id`: en
+      `retenciones.movimientos` las tres se resuelven con cascadas DISTINTAS
+      —`obra_id` sale del centro de coste del efecto o, en su defecto, de la
+      obra unica del documento; `codigo_obra` y `nombre_obra` salen de
+      `COALESCE` sobre dos JOIN distintos—, asi que un `obra_id` cuyo centro de
+      coste no exista en el maestro puede aparecer con dos codigos y dar DOS
+      filas. Unir solo por `obra_id` duplica. Ademas, los efectos sin obra
+      atribuida quedan FUERA, asi que la suma de esta vista es menor que el
+      total de la empresa: lo que falta esta en `sin_obra_asignada` de
       `retenciones.v_pbi_retencion_resumen`, que es un RECUENTO y no un
       importe.
-    clave_negocio: [obra_id]
+    clave_negocio: [obra_id, codigo_obra, nombre_obra]
     paso_etl: build_retenciones
     refresco: manual
     columnas:
@@ -429,7 +436,9 @@ objetos:
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
-        porque: Para el nombre, el cliente y el estado de la obra.
+        porque: >-
+          Para el cliente y el estado de la obra. Es N:1 y no 1:1 porque esta
+          vista puede traer mas de una fila por `obra_id`: ver el grano.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
         cardinalidad: "N:1"
