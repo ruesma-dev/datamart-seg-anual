@@ -717,6 +717,16 @@ Dos niveles, con propósitos distintos y honestidad sobre lo que vale cada uno.
 | Cuándo corre | En cada `init.sh`, siempre | `MANUAL (humano)`, y al desplegar |
 | Qué hace al fallar | `init.sh` en rojo | Sale con código 1 y lista las discrepancias |
 
+> **Enmienda del 2026-08-20 (cuarta review).** La puerta offline contrasta
+> además contra el SQL, y esto no estaba en el diseño original: `agregacion`
+> frente a la función que envuelve cada columna, `clave_negocio` frente al
+> `GROUP BY` de la vista o del `INSERT … SELECT`, frente a la PK del DDL, y el
+> `grano` frente a su propia `clave_negocio`. Lo que **no** es derivable
+> —decidir si una columna del `GROUP BY` puede omitirse de la clave, porque
+> depende de dependencias funcionales que el texto no da— se traslada a T26
+> como una consulta de unicidad por objeto contra la base real, donde sí se
+> resuelve entero.
+
 La offline es un **trinquete barato**: no demuestra que el diccionario esté
 completo, demuestra que nadie ha añadido una vista al repositorio sin
 documentarla. La online es la que dice la verdad. Están las dos porque la barata

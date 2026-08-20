@@ -213,6 +213,30 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
       código 1 si hay discrepancias.
       | Verificación: `pytest tests/test_f006_cobertura.py -k check_cli` con
       doble de cliente.
+      |
+      | **AMPLIACIÓN decidida el 2026-08-20 (cuarta review): la comprobación de
+      UNICIDAD de la clave de negocio va aquí.** La puerta offline solo puede
+      comprobar la mitad derivable —que la clave no nombre columnas fuera del
+      `GROUP BY`—; la otra mitad, «la clave es demasiado corta», exige saber si
+      una columna depende funcionalmente de otra y eso no está en el texto.
+      Contra la base real se resuelve entero y barato, con una consulta por
+      objeto que tenga `clave_negocio` no vacía:
+      |
+      | ```sql
+      | SELECT count(*) FROM (
+      |     SELECT <clave_negocio> FROM <esquema>.<objeto>
+      |     GROUP BY <clave_negocio> HAVING count(*) > 1
+      | ) AS duplicadas;
+      | ```
+      |
+      | Si devuelve algo distinto de 0, la clave declarada **no identifica una
+      | fila** y la ficha miente. Se prefiere esta forma a
+      | `count(*) - count(DISTINCT (...))` porque agrupa los NULOS como un valor
+      | más, que es como se comportan en un JOIN, y porque devuelve CUÁNTAS
+      | claves están duplicadas, que es lo accionable. Es una agregación por
+      | objeto sobre tablas ya construidas: unas decenas de consultas baratas.
+      | Ojo con `raw` y con las fichas de clave vacía: se saltan, no tienen clave
+      | que comprobar.
 - [ ] **T27**: Ejecutar el chequeo contra la base real y cerrar las
       discrepancias que aparezcan (la puerta offline es heurística: R29).
       | Verificación: MANUAL (humano) — `python main.py check-diccionario`

@@ -1405,23 +1405,69 @@ def test_f006_r2_la_clave_de_negocio_cabe_en_el_group_by(nombre: str) -> None:
 
 
 def pk_declarada(sql: str, esquema: str, objeto: str) -> list[str] | None:
-    """Las columnas de la PK que el DDL declara con `ALTER TABLE`, si la hay."""
-    coincidencia = re.search(
+    """Las columnas de la PK que declara el DDL, en cualquiera de sus dos formas.
+
+    PostgreSQL admite declararla APARTE (`ALTER TABLE … ADD PRIMARY KEY (col)`)
+    o INLINE, en la propia definición de la columna (`col BIGSERIAL PRIMARY
+    KEY`). Ver solo la primera hacía que el test dijera «el DDL no declara clave
+    primaria» de tres tablas que sí la declaran, que es un motivo de salto
+    FALSO: hoy no cambiaba ningún veredicto —esas tres saltaban igual por la
+    rama de la clave sustituta— pero el día que alguien declarase una PK de
+    negocio inline, el test la habría saltado en silencio.
+    """
+    limpio = re.sub(r"--[^\n]*", " ", sql)
+
+    aparte = re.search(
         rf"ALTER\s+TABLE\s+{re.escape(esquema)}\.{re.escape(objeto)}\s+"
         rf"ADD\s+PRIMARY\s+KEY\s*\(([^)]*)\)",
-        re.sub(r"--[^\n]*", " ", sql),
+        limpio,
         re.IGNORECASE,
     )
-    if coincidencia is None:
+    if aparte is not None:
+        return [c.strip() for c in aparte.group(1).split(",") if c.strip()]
+
+    creacion = re.search(
+        rf"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+        rf"{re.escape(esquema)}\.{re.escape(objeto)}\s*\(",
+        limpio,
+        re.IGNORECASE,
+    )
+    if creacion is None:
         return None
-    return [c.strip() for c in coincidencia.group(1).split(",") if c.strip()]
+    cuerpo = limpio[creacion.end() :]
+    corte = re.search(r"^\s*\)\s*;", cuerpo, re.MULTILINE)
+    if corte is not None:
+        cuerpo = cuerpo[: corte.start()]
+
+    inline = []
+    for linea in cuerpo.split("\n"):
+        if not re.search(r"\bPRIMARY\s+KEY\b", linea, re.IGNORECASE):
+            continue
+        palabras = linea.split()
+        if not palabras or palabras[0].upper() in ("CONSTRAINT", "PRIMARY"):
+            continue
+        inline.append(palabras[0].strip('"'))
+    return inline or None
 
 
-def test_f006_r2_control_hay_tablas_con_pk_declarada() -> None:
+def test_f006_r2_control_el_detector_de_pk_ve_las_dos_formas() -> None:
+    """`ALTER TABLE … ADD PRIMARY KEY` y la forma INLINE `col TIPO PRIMARY KEY`.
+
+    El detector solo veia la primera, y por eso decia «el DDL no declara clave
+    primaria» de tres tablas que SI la declaran en la propia columna. Hoy no
+    cambiaba ningun veredicto —esas tres habrian saltado igual por la rama de la
+    clave sustituta— pero el dia que alguien declarase una PK de negocio inline,
+    el test la habria saltado en silencio.
+    """
     sql = (DIR_SQL / "compras/01_documentos.sql").read_text(encoding="utf-8")
-
     assert pk_declarada(sql, "compras", "contratos") == ["contrato_id"]
     assert pk_declarada(sql, "compras", "albaran_lineas") == ["linea_id"]
+
+    inline = (DIR_SQL / "mart/01_ddl.sql").read_text(encoding="utf-8")
+    assert pk_declarada(inline, "mart", "fact_seguimiento_mensual") == ["fact_id"]
+
+    inline_cierre = (DIR_SQL / "cierre/01_ddl_fact.sql").read_text(encoding="utf-8")
+    assert pk_declarada(inline_cierre, "cierre", "fact_cierre_mensual") == ["cierre_id"]
 
     sin_pk = (DIR_SQL / "compras/02_fact_linea.sql").read_text(encoding="utf-8")
     assert pk_declarada(sin_pk, "compras", "fact_compras_linea") is None
@@ -1445,7 +1491,7 @@ def test_f006_r2_la_clave_de_negocio_casa_con_la_pk_declarada(nombre: str) -> No
     sql = (DIR_SQL / origen).read_text(encoding="utf-8")
     pk = pk_declarada(sql, ficha.esquema, ficha.objeto)
     if pk is None:
-        pytest.skip("el DDL no declara clave primaria para este objeto")
+        pytest.skip("el DDL no declara clave primaria, ni aparte ni inline")
 
     sustitutas = {
         c.nombre for c in ficha.columnas if c.agregacion == "clave_sustituta"
@@ -1683,3 +1729,93 @@ def test_f006_r2_el_proveedor_de_la_tabla_de_hechos_declara_su_nulo() -> None:
     """Sale de un `NULLIF(entide, 0)` y la ficha vecina manda aqui justamente
     «para no perder las lineas sin proveedor»."""
     assert _columna("compras.fact_compras_linea", "proveedor_id").nulo_significa
+
+
+# ---------------------------------------------------------------------------
+# Via (a) del reviewer · las tablas agregadas tambien tienen su GROUP BY
+#
+# `mart.fact_seguimiento_categoria` se llena con `INSERT ... SELECT ... GROUP
+# BY`, y hasta ahora no la miraba nadie: el contraste de `GROUP BY` solo veia
+# vistas y el de PK la saltaba por clave sustituta. Es el mismo parser sobre
+# otra sentencia, y de paso hace que el contraste de `agregacion` alcance a sus
+# columnas —`num_partidas` es un `COUNT(DISTINCT)`—.
+# ---------------------------------------------------------------------------
+
+
+def cuerpo_del_insert(sql: str, esquema: str, objeto: str) -> str | None:
+    """El `SELECT` con el que se rellena una tabla, si se rellena asi."""
+    coincidencia = re.search(
+        rf"INSERT\s+INTO\s+{re.escape(esquema)}\.{re.escape(objeto)}\s*\(",
+        re.sub(r"--[^\n]*", " ", sql),
+        re.IGNORECASE,
+    )
+    if coincidencia is None:
+        return None
+    resto = re.sub(r"--[^\n]*", " ", sql)[coincidencia.end() :]
+    # Saltar la lista de columnas destino hasta su parentesis de cierre.
+    profundidad = 1
+    for indice, caracter in enumerate(resto):
+        profundidad += (caracter == "(") - (caracter == ")")
+        if profundidad == 0:
+            return resto[indice + 1 :].split(";")[0]
+    return None
+
+
+def _tablas_rellenadas_con_insert():
+    for ficha in _diccionario().fichas:
+        if ficha.nombre not in TABLAS_CON_DDL_EXPLICITO:
+            continue
+        origen = _origen_por_objeto()[ficha.nombre]
+        carpeta = (DIR_SQL / origen).parent
+        for ruta in sorted(carpeta.glob("*.sql")):
+            cuerpo = cuerpo_del_insert(
+                ruta.read_text(encoding="utf-8"), ficha.esquema, ficha.objeto
+            )
+            if cuerpo is not None:
+                yield ficha, cuerpo
+                break
+
+
+def test_f006_r2_control_las_tablas_agregadas_se_encuentran() -> None:
+    """Si no encontrara ninguna, los dos tests de abajo pasarian en falso."""
+    nombres = {f.nombre for f, _ in _tablas_rellenadas_con_insert()}
+
+    assert "mart.fact_seguimiento_categoria" in nombres
+    assert "mart.fact_seguimiento_mensual" in nombres
+
+
+def test_f006_r2_la_clave_de_las_tablas_agregadas_cabe_en_su_group_by() -> None:
+    problemas = []
+    for ficha, cuerpo in _tablas_rellenadas_con_insert():
+        proyeccion = proyeccion_por_alias(cuerpo)
+        if proyeccion is None:
+            continue
+        agrupadas = columnas_del_group_by(cuerpo, proyeccion)
+        if agrupadas is None:
+            continue
+        sobran = sorted(set(ficha.clave_negocio) - agrupadas)
+        if sobran:
+            problemas.append(f"{ficha.nombre}: {sobran} no estan en el GROUP BY")
+
+    assert not problemas, "; ".join(problemas)
+
+
+def test_f006_r7_la_agregacion_de_las_tablas_agregadas_case_con_el_sql() -> None:
+    """`num_partidas` es un `COUNT(DISTINCT)` y hoy esta bien; nada lo fijaba."""
+    problemas = []
+    for ficha, cuerpo in _tablas_rellenadas_con_insert():
+        proyeccion = proyeccion_por_alias(cuerpo)
+        if proyeccion is None:
+            continue
+        for columna in ficha.columnas:
+            expresion = proyeccion.get(columna.nombre)
+            if expresion is None or columna.agregacion is None:
+                continue
+            funcion = funcion_envolvente(expresion)
+            if columna.agregacion in AGREGACION_PROHIBIDA.get(funcion, set()):
+                problemas.append(
+                    f"{ficha.nombre}.{columna.nombre}: el SQL es {funcion} y la "
+                    f"ficha dice `{columna.agregacion}`"
+                )
+
+    assert not problemas, "; ".join(problemas)

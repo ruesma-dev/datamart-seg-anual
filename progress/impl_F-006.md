@@ -1727,3 +1727,66 @@ no las dos que se senalaron.
 - `fact_compras_linea.proveedor_id` sale de un `NULLIF(entide, 0)` y no
   declaraba su nulo, siendo la tabla a la que la ficha vecina manda «para no
   perder las lineas sin proveedor». Ahora lo dice y explica esa conexion.
+
+## Los menores 4, 5 y 6
+
+- **El detector de PK tenia un punto ciego y su mensaje mentia.** Solo veia
+  `ALTER TABLE … ADD PRIMARY KEY`, no la forma **inline** `col TIPO PRIMARY
+  KEY`, asi que decia «el DDL no declara clave primaria» de tres tablas que si
+  la declaran. Hoy no cambiaba ningun veredicto —esas tres saltaban igual por la
+  rama de la clave sustituta— pero el dia que alguien declarase una PK de
+  negocio inline la habria saltado en silencio. Corregido, y el control prueba
+  ahora **las dos formas** y el caso negativo.
+- **Un aserto rompia el crecimiento que el propio contrato declara compatible.**
+  Fijaba que la ultima columna de `_meta.v_diccionario` fuese
+  `motivo_no_consumo`, asi que anadir otra AL FINAL —lo unico que la cabecera
+  del DDL permite sin romper a nadie— lo ponia en rojo aunque se actualizasen
+  SQL, `design.md` y la lista. El invariante correcto es **el prefijo de 18**,
+  que ya estaba en la linea siguiente.
+- **Dos docstrings afirmaban de mas**, que es la misma sobreventa corregida ya
+  dos veces. El del `rollback` decia que ni el `commit` ni el `rollback` se
+  ejecutaban en ningun test: **el `commit` si** —`test_f005_conexion.py` usa el
+  `connection()` real—; lo que no se ejercitaba era la rama del `rollback`, que
+  necesita que algo falle dentro del `with`. Y el de `apply_grants` se declara
+  ahora **estructural**: comprueba `depends_on`, protege del escenario que
+  nombra y no de un cambio en la logica de salto del orquestador.
+
+## Las dos vias del reviewer, valoradas
+
+### (a) El `GROUP BY` de las tablas agregadas · **implementada**
+
+`mart.fact_seguimiento_categoria` se llena con `INSERT … SELECT … GROUP BY` y no
+la miraba nadie: el contraste de `GROUP BY` solo veia vistas y el de PK la
+saltaba por clave sustituta. Es el mismo parser sobre otra sentencia. Ahora se
+le aplican **las dos** comprobaciones, la de clave y la de agregacion, con su
+test de control.
+
+Comprobado que no pasa en vacio: poniendo `agregacion: suma` en
+`num_partidas` —que es un `COUNT(DISTINCT)`— el test se pone en rojo:
+
+```
+E  AssertionError: mart.fact_seguimiento_categoria.num_partidas: el SQL es COUNT DISTINCT y la ficha dice `suma`
+```
+
+### (b) La consulta de unicidad en T27 · **viable, y declarada**
+
+**Es viable y liquida el problema entero**, incluidas las dependencias
+funcionales que ninguna lectura del texto puede resolver. Queda escrita en
+`tasks.md` T26 como parte del comando, con la consulta exacta:
+
+```sql
+SELECT count(*) FROM (
+    SELECT <clave_negocio> FROM <esquema>.<objeto>
+    GROUP BY <clave_negocio> HAVING count(*) > 1
+) AS duplicadas;
+```
+
+Se prefiere esta forma a `count(*) - count(DISTINCT (...))` por dos motivos:
+**agrupa los NULOS como un valor mas**, que es como se comportan en un JOIN, y
+devuelve **cuantas** claves estan duplicadas, que es lo accionable. Es una
+agregacion por objeto sobre tablas ya construidas: unas decenas de consultas
+baratas. `design.md` §10 queda enmendado con el reparto entre lo que la puerta
+offline puede y lo que se traslada a T26.
+
+**No se implementa ahora** porque exige conexion a la base y este encargo no la
+tiene: T26 y T27 son del bloque H.

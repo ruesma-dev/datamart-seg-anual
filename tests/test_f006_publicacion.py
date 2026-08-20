@@ -818,8 +818,9 @@ class _PgDeCli:
 
 
 def _cli_runner(monkeypatch, pg):
-    import main
     from click.testing import CliRunner
+
+    import main
 
     monkeypatch.setattr(main, "_get_pg", lambda: pg)
     monkeypatch.setattr(main, "get_settings", _settings_falso)
@@ -983,10 +984,15 @@ def test_f006_r15_las_dieciocho_del_diseno_conservan_su_posicion() -> None:
     assert del_diseno == proyectadas, (
         "el diseno y la vista real tienen que proyectar lo mismo, en el mismo orden"
     )
-    assert proyectadas[-1] == "motivo_no_consumo", (
-        "lo anadido va al final; las 18 originales conservan su posicion"
+    # El invariante es el PREFIJO, no cual es la ultima columna: fijar la ultima
+    # rompia justo el crecimiento que la cabecera del DDL declara compatible
+    # —anadir al final— aunque se actualizasen el SQL, el diseno y la lista.
+    assert proyectadas[:18] == COLUMNAS_V_DICCIONARIO[:18], (
+        "las 18 columnas del contrato original conservan su posicion"
     )
-    assert proyectadas[:18] == COLUMNAS_V_DICCIONARIO[:18]
+    assert "motivo_no_consumo" in proyectadas[18:], (
+        "lo anadido despues va detras de las 18, en cualquier orden entre si"
+    )
 
 
 def test_f006_r23_el_diseno_documenta_la_columna_anadida() -> None:
@@ -1007,12 +1013,12 @@ def test_f006_r23_el_diseno_documenta_la_columna_anadida() -> None:
 def test_f006_r20_apply_grants_no_depende_de_la_publicacion() -> None:
     """Si el diccionario no valida, los GRANT tienen que aplicarse igual.
 
-    Hoy es cierto porque `ApplyGrantsStep.depends_on` solo lleva `build_mart` y
-    el orquestador unicamente salta un paso si fallo una dependencia DECLARADA.
-    Nada lo fijaba: el dia que alguien anada `publicar_diccionario` a esa lista
-    «para que quede ordenado», una noche con el diccionario invalido dejaria al
-    MCP sin permisos de lectura, que es exactamente el fallo que R20 existe para
-    evitar.
+    Es un test ESTRUCTURAL, no conductual: comprueba `depends_on`, que es la
+    entrada de la que el orquestador decide si salta un paso. Protege del
+    escenario que nombra —que alguien anada `publicar_diccionario` a esa lista
+    «para que quede ordenado» y una noche con el diccionario invalido deje al
+    MCP sin permisos, que es el fallo que R20 existe para evitar— y **no** de un
+    cambio en la logica de salto del propio orquestador, que tiene sus tests.
     """
     import main
 
@@ -1026,10 +1032,12 @@ def test_f006_r20_apply_grants_no_depende_de_la_publicacion() -> None:
 def test_f006_r18_una_excepcion_a_mitad_de_la_publicacion_hace_rollback() -> None:
     """Atomicidad comprobada por CONDUCTA, no solo por estructura.
 
-    Los demas tests sustituyen `connection()` entera, asi que el `commit` y el
-    `rollback` reales del cliente no se ejecutaban en ningun test del
-    repositorio: la garantia que sostiene todo el contrato estaba probada de
-    lejos. Aqui se usa el `connection()` de verdad con una conexion falsa.
+    La rama del `rollback` **no la ejecutaba ningun test del repositorio**: el
+    `commit` si —`test_f005_conexion.py` usa el `connection()` real—, pero para
+    llegar al `rollback` hace falta que algo falle dentro del `with`, y eso no
+    lo provocaba nadie. Era la mitad de la garantia que sostiene el contrato, sin
+    ejercitar. Aqui se usa el `connection()` de verdad y solo se sustituye la
+    apertura del socket.
     """
     from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
 
