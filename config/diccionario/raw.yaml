@@ -77,14 +77,30 @@ objetos:
       `maestro.proveedores` y para documentos de compra `compras.contratos`,
       `compras.albaranes` y `compras.facturas`.
     descripcion: >-
-      **Conceptos.** El corazon del modelo de Sigrid y la tabla de la que cuelga
-      casi todo lo demas. Aqui viven `cod` (codigo), `res` (el nombre legible;
-      **no existe `nom`**), `fec` (fecha de alta como entero `YYYYMMDD`), `est`
-      (estado), `fecbaj` (fecha de baja) y `obr`. Las tablas "Propiedades de
-      `con`" —`obr`, `prv`, `ctr`, `dcf` y las demas— comparten su `ide` con una
-      fila de aqui, y por eso casi toda consulta contra Sigrid empieza uniendo
-      con esta tabla. Carga incremental por `tiemod`. **No se traen** `ima` ni
-      `tex`.
+      **Conceptos.** El corazon del modelo de Sigrid y la tabla de la que
+      cuelga casi todo lo demas. Aqui viven `cod` (codigo), `res` (el nombre
+      legible; **no existe `nom`**), `fec` (fecha de alta como entero
+      `YYYYMMDD`), `est` (estado), `fecbaj` (fecha de baja) y `obr`. Las
+      tablas "Propiedades de `con`" —`obr`, `prv`, `ctr`, `dcf` y las demas—
+      comparten su `ide` con una fila de aqui, y por eso casi toda consulta
+      contra Sigrid empieza uniendo con esta tabla.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `con`. Se busca con `grep
+      -n "^| con " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -100,9 +116,22 @@ objetos:
       empresa. Lo que el datamart saca de aqui ya esta interpretado en
       `stg.obras` y en la eleccion de version master.
     descripcion: >-
-      **Campos extendidos de concepto.** Atributos adicionales que Sigrid deja
-      definir por encima de los fijos de `con`. El ETL los lee en `stg/03_obras`
-      y en `stg/07_version_master_vigente`. Se recarga entera cada noche.
+      **Campos extendidos de concepto.** Atributos adicionales que Sigrid
+      deja definir por encima de los fijos de `con`. El ETL los lee en
+      `stg/03_obras` y en `stg/07_version_master_vigente`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `conext`. Se busca con
+      `grep -n "^| conext " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por extension de concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -114,13 +143,33 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Es solo la mitad de una obra: el codigo, el nombre y las fechas estan en
-      `con`. Consultarla sola da una obra sin nombre. Lo unido y traducido esta
-      en `maestro.obras` y en `stg.obras`.
+      El codigo y las fechas de la obra estan en `con`, no aqui, asi que
+      consultarla sola da una obra sin codigo. Lo unido y traducido esta en
+      `maestro.obras` y en `stg.obras`, que ademas toman el nombre de `con.res`
+      —no del `obr.res` propio, que es otro campo—.
     descripcion: >-
-      **Obras.** "Propiedades de `con`" en 1:1: la parte especifica de obra de
-      un concepto. Alimenta `stg.obras`, `maestro.obras`, las cabeceras de
-      `cierre` y el presupuesto. Carga incremental por `tiemod`.
+      **Obras.** "Propiedades de `con`" en 1:1: la parte especifica de obra
+      de un concepto. Alimenta `stg.obras`, `maestro.obras`, las cabeceras
+      de `cierre` y el presupuesto.
+
+      **Tiene campos propios que se llaman igual que los de `con`**:
+      `obr.res` es "Nombre completo", distinto del `con.res` que el datamart
+      publica como `nombre_obra`. Es una de las excepciones que
+      `R-SIGRID-CON` nombra: no asumas que el nombre esta solo en `con`, ni
+      que el de aqui es el mismo.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `obr`. Se busca con `grep
+      -n "^| obr " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: >-
       Una fila por obra, identificada por `ide`, que es el mismo `ide` de su
       fila en `raw.con`.
@@ -137,10 +186,26 @@ objetos:
       Sin la jerarquia resuelta ni la categoria deducida. `stg.partidas` ya trae
       las dos cosas, y `compras.v_*` ya cruza partida con compra.
     descripcion: >-
-      **Obras: Partidas.** El arbol de capitulos y partidas de cada obra. Es de
-      donde sale `stg.partidas`, incluida la heuristica de categoria sobre el
-      codigo del capitulo raiz. Carga incremental por `tiemod`. **No se traen**
-      `tex`, `med` ni `des`.
+      **Obras: Partidas.** El arbol de capitulos y partidas de cada obra. Es
+      de donde sale `stg.partidas`, incluida la heuristica de categoria
+      sobre el codigo del capitulo raiz.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 3 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrparpar`. Se busca con
+      `grep -n "^| obrparpar " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por partida o capitulo de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -158,9 +223,27 @@ objetos:
       Consultarla directamente es donde se producen los importes multiplicados.
     descripcion: >-
       **Obras: Presupuestos y mediciones.** La tabla mas voluminosa que se
-      ingiere y el origen de todo el seguimiento economico: importes por obra,
-      partida, ambito y fase. Se pagina de 5.000 en 5.000. Carga incremental por
-      `tiemod`. **No se traen** `tex`, `med` ni `des`.
+      ingiere y el origen de todo el seguimiento economico: importes por
+      obra, partida, ambito y fase.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 3 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      Se pide paginada de 5000 en 5000.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrparpre`. Se busca con
+      `grep -n "^| obrparpre " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por linea de presupuesto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -176,10 +259,22 @@ objetos:
       `stg.fases` ya lo trae con su descripcion y sus fechas, y
       `mart.v_master_versiones_tipadas` ademas deduce el tipo de master.
     descripcion: >-
-      **Obras: Fases.** Las fases de cada obra, que segun el ambito son MESES o
-      VERSIONES del master. El campo se llama aqui `fasnum`, y `fase_num` /
-      `version` aguas abajo. Alimenta `stg.fases`. Carga incremental por
-      `tiemod`.
+      **Obras: Fases.** Las fases de cada obra, que segun el ambito son
+      MESES o VERSIONES del master. El campo se llama aqui `fasnum`, y
+      `fase_num` / `version` aguas abajo. Alimenta `stg.fases`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrfas`. Se busca con
+      `grep -n "^| obrfas " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por fase de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -195,9 +290,22 @@ objetos:
       eleccion de version. Lo que se pregunta esta en `mart`.
     descripcion: >-
       **Obras: Fases y Ambitos.** Que ambitos tiene cada fase, y es lo que
-      permite distinguir los cuatro que usa el seguimiento: 3 (coste real), 7
-      (venta real), 8 (coste master) y 11 (venta master). La lee
-      `stg/08_plan_mensual`. Carga incremental por `tiemod`.
+      permite distinguir los cuatro que usa el seguimiento: 3 (coste real),
+      7 (venta real), 8 (coste master) y 11 (venta master). La lee
+      `stg/08_plan_mensual`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrfasamb`. Se busca con
+      `grep -n "^| obrfasamb " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por combinacion de fase y ambito, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -212,10 +320,26 @@ objetos:
       Contratos sin unir a `con`, sin proveedor resuelto y sin las retenciones
       calculadas. Estan en las cabeceras de `cierre` y en `retenciones`.
     descripcion: >-
-      **Obras: Contratos de obra.** El contrato del cliente con la obra, no las
-      compras. Lo usan las vistas de cabecera de `cierre` y el arranque de
-      `retenciones`. Carga incremental por `tiemod`. **No se traen** `tex` ni
-      `obs`.
+      **Obras: Contratos de obra.** El contrato del cliente con la obra, no
+      las compras. Lo usan las vistas de cabecera de `cierre` y el arranque
+      de `retenciones`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrctr`. Se busca con
+      `grep -n "^| obrctr " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por contrato de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -227,12 +351,29 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Como toda "Propiedad de `con`", sin unir a `con` no tiene ni codigo ni
-      nombre. Ya viene resuelto en las cabeceras de `cierre`.
+      Sin unir a `con` no tiene codigo. Y **tiene un `res` propio**, que es
+      "Reparto nombre" y **no** el nombre del centro: el que publica `cierre`
+      sale de `con.res`. Ya viene resuelto en las cabeceras de `cierre`.
     descripcion: >-
       **Centros de Coste.** "Propiedades de `con`" en 1:1. Lo consume
-      `cierre/05_views_cabecera`. Se recarga entera cada noche —no tiene
-      `tiemod`— y **no se trae** `tex`.
+      `cierre/05_views_cabecera`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 1 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `cen`. Se busca con `grep
+      -n "^| cen " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por centro de coste, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -247,7 +388,20 @@ objetos:
       Tabla de codigos. El tipo ya viene resuelto en las cabeceras de `cierre`.
     descripcion: >-
       **Obras: Tipos de obras.** Catalogo de tipos. Lo consume
-      `cierre/05_views_cabecera`. Se recarga entera cada noche.
+      `cierre/05_views_cabecera`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrtip`. Se busca con
+      `grep -n "^| auxobrtip " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por tipo de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -262,8 +416,21 @@ objetos:
       Tabla de codigos. El subtipo ya viene resuelto en las cabeceras de
       `cierre`.
     descripcion: >-
-      **Obras: Subtipos de obras.** Catalogo de subtipos, dependiente del tipo.
-      Lo consume `cierre/05_views_cabecera`. Se recarga entero cada noche.
+      **Obras: Subtipos de obras.** Catalogo de subtipos, dependiente del
+      tipo. Lo consume `cierre/05_views_cabecera`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrcla`. Se busca con
+      `grep -n "^| auxobrcla " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por subtipo de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -280,10 +447,23 @@ objetos:
       el 11, cuando `mart` ya construye tambien el 3 y el 7. La lista fiable de
       los cuatro esta en la ficha de `stg.ambitos` y en `mart`.
     descripcion: >-
-      **Obras: Ambitos en presupuestos.** El catalogo de ambitos de Sigrid, de
-      donde salen los cuatro que usa el seguimiento: 3 (coste real), 7 (venta
-      real), 8 (coste master) y 11 (venta master). Lo consume `stg/02_ambitos`.
-      Se recarga entero cada noche.
+      **Obras: Ambitos en presupuestos.** El catalogo de ambitos de Sigrid,
+      de donde salen los cuatro que usa el seguimiento: 3 (coste real), 7
+      (venta real), 8 (coste master) y 11 (venta master). Lo consume
+      `stg/02_ambitos`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobramb`. Se busca con
+      `grep -n "^| auxobramb " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por ambito, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -298,23 +478,35 @@ objetos:
       **Ningun SQL del datamart la lee.** No hay nada aguas abajo construido
       sobre ella.
     descripcion: >-
-      **Obras: Tipos de capitulos.** El catalogo OFICIAL de tipos de capitulo de
-      Sigrid, y **el datamart no lo usa**: `stg.partidas.categoria` clasifica las
-      partidas con una HEURISTICA sobre el codigo del capitulo raiz en vez de con
-      esta tabla. Que el catalogo bueno este ingerido y sin usar es lo que hace
-      creer que la clasificacion viene de Sigrid cuando la deduce el ETL; una
-      obra que no siga la convencion de codigos se clasifica mal y nada lo
-      delata.
+      **Obras: Tipos de capitulos.** El catalogo OFICIAL de tipos de
+      capitulo de Sigrid, y **el datamart no lo usa**:
+      `stg.partidas.categoria` clasifica las partidas con una HEURISTICA
+      sobre el codigo del capitulo raiz en vez de con esta tabla. Que el
+      catalogo bueno este ingerido y sin usar es lo que hace creer que la
+      clasificacion viene de Sigrid cuando la deduce el ETL; una obra que no
+      siga la convencion de codigos se clasifica mal y nada lo delata.
 
-      La relacion **existe en el dato y nadie la recorre**: `raw.obrparpar` trae
-      la columna `tcaide`, que apunta aqui, y ningun SQL la menciona.
+      La relacion **existe en el dato y nadie la recorre**: `raw.obrparpar`
+      trae la columna `tcaide`, que apunta aqui, y ningun SQL la menciona.
 
-      **Ojo antes de darla por sobrante**: aunque no se consulte, `build_stg`
-      comprueba al arrancar que esta tabla tenga `ide`, `cod` y `res`, y aborta
-      si faltan. Dejar de ingerirla romperia el paso.
+      **Ojo antes de darla por sobrante**: aunque no se consulte,
+      `build_stg` comprueba al arrancar que esta tabla tenga `ide`, `cod` y
+      `res`, y aborta si faltan. Dejar de ingerirla romperia el paso.
 
-      Es deuda conocida, no un descuido de esta ficha. Se recarga entera cada
-      noche.
+      Es deuda conocida, no un descuido de esta ficha.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrtca`. Se busca con
+      `grep -n "^| auxobrtca " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por tipo de capitulo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -329,10 +521,26 @@ objetos:
       Direcciones sin provincia ni municipio resueltos: hacen falta `auxpro` y
       `auxmun`. `maestro.proveedores` ya las trae unidas.
     descripcion: >-
-      **Direcciones de conceptos.** La direccion de un concepto —tipicamente un
-      proveedor—. La consumen `maestro/02_proveedores` y
-      `maestro/03_proveedores_obra`. Se recarga entera cada noche. **No se
-      traen** `dirtex` ni `eiotex`.
+      **Direcciones de conceptos.** La direccion de un concepto —tipicamente
+      un proveedor—. La consumen `maestro/02_proveedores` y
+      `maestro/03_proveedores_obra`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `condir`. Se busca con
+      `grep -n "^| condir " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por direccion, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -348,18 +556,31 @@ objetos:
       facilmente como "esta obra no tiene proveedores" cuando lo cierto es que
       esta relacion no se alimenta aqui.
     descripcion: >-
-      **Obras: Proveedores.** Seria la relacion directa entre obra y proveedor,
-      pero **en Ruesma no se usa y la tabla esta vacia**. Por eso
+      **Obras: Proveedores.** Seria la relacion directa entre obra y
+      proveedor, pero **en Ruesma no se usa y la tabla esta vacia**. Por eso
       `maestro.proveedores_obra` no sale de aqui sino de `raw.ctr`, los
       contratos de compra: el proveedor de una obra se deduce de haberle
-      contratado algo.
+      contratado algo. Esa es tambien la razon de que el
+      `importe_contratado` de aquella vista sea `SUM(ctr.totdoc)`, **el
+      total del documento CON IVA**, y no una suma de lineas sin IVA como en
+      `compras`. Se ingiere igualmente y **no la lee ningun SQL**.
 
-      Esa es tambien la razon de que el `importe_contratado` de aquella vista
-      sea `SUM(ctr.totdoc)`, **el total del documento CON IVA**, y no una suma
-      de lineas sin IVA como en `compras`.
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
 
-      Se ingiere igualmente y **no la lee ningun SQL**. Se recarga entera cada
-      noche y **no se trae** `tex`.
+      **No se traen** 1 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrprv`. Se busca con
+      `grep -n "^| obrprv " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por relacion obra-proveedor, identificada por `ide`. Hoy, ninguna.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -371,16 +592,37 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Es media entidad: el CIF, el nombre y el codigo del proveedor estan en
-      `con`. `maestro.proveedores` ya lo trae todo unido.
+      Esta media entidad, y el reparto no es el que parece: el codigo y el
+      nombre estan en `con`, pero **el CIF y la razon social son campos propios
+      de aqui** (`prv.cif`, `prv.raz`). `maestro.proveedores` ya lo trae todo
+      unido y es donde hay que preguntar.
     descripcion: >-
       **Proveedores.** "Propiedades de `con`" en 1:1. Alimenta
       `maestro.proveedores`, `maestro.proveedores_obra` y los movimientos de
-      `retenciones`. Se recarga entera cada noche.
+      `retenciones`.
+
+      **Tiene campos propios**, y son justo los que mas se buscan: `prv.cif`
+      ("CIF/NIF") y `prv.raz` ("Razon social") **no estan en `con`**. Lo
+      confirma nuestro propio SQL: `maestro/02_proveedores.sql` toma `p.cif`
+      y `p.raz` de aqui, y de `raw.con` solo `cod` y `res`. Buscar `con.cif`
+      falla con "columna inexistente".
 
       Su campo `ofcide` (oficio) **se ingiere y no se expone**:
-      `maestro.proveedores` no publica ni oficio ni naturaleza. Es F-036 en el
-      backlog, no un olvido de esta ficha.
+      `maestro.proveedores` no publica ni oficio ni naturaleza. Es F-036 en
+      el backlog, no un olvido de esta ficha.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `prv`. Se busca con `grep
+      -n "^| prv " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por proveedor, identificada por `ide`, el mismo de su fila en `raw.con`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -394,7 +636,20 @@ objetos:
     motivo_no_consumo: Tabla de codigos. La provincia ya viene resuelta en `maestro.proveedores`.
     descripcion: >-
       **Direcciones: Provincias.** Catalogo de provincias, que resuelve el
-      codigo que guarda `condir`. Se recarga entero cada noche.
+      codigo que guarda `condir`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxpro`. Se busca con
+      `grep -n "^| auxpro " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por provincia, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -408,7 +663,20 @@ objetos:
     motivo_no_consumo: Tabla de codigos. El municipio ya viene resuelto en `maestro.proveedores`.
     descripcion: >-
       **Direcciones: Municipios.** Catalogo de municipios, que resuelve el
-      codigo que guarda `condir`. Se recarga entero cada noche.
+      codigo que guarda `condir`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxmun`. Se busca con
+      `grep -n "^| auxmun " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por municipio, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -425,10 +693,26 @@ objetos:
       da el detalle sin IVA. Mezclar el total de aqui con las sumas de linea de
       `compras` compara dos magnitudes distintas.
     descripcion: >-
-      **Contratos de compra.** "Propiedades de `con`" en 1:1: la cabecera del
-      contrato con un proveedor. Alimenta `compras.contratos` y, por la
-      ausencia de `raw.obrprv`, tambien `maestro.proveedores_obra`. Carga
-      incremental por `tiemod`. **No se traen** `tex` ni `obs`.
+      **Contratos de compra.** "Propiedades de `con`" en 1:1: la cabecera
+      del contrato con un proveedor. Alimenta `compras.contratos` y, por la
+      ausencia de `raw.obrprv`, tambien `maestro.proveedores_obra`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `ctr`. Se busca con `grep
+      -n "^| ctr " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por contrato de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -443,11 +727,28 @@ objetos:
       **No la lee ningun SQL del datamart.** No hay nada aguas abajo que
       responda sobre comparativos de oferta.
     descripcion: >-
-      **Documento comparativo de ofertas.** "Propiedades de `con`" en 1:1: la
-      cabecera de un comparativo entre proveedores, previo a la adjudicacion.
-      Se ingiere junto con `comlin` y `comprv` y **ninguna de las tres se usa**:
-      el datamart no cubre hoy el proceso de compra anterior al contrato. Carga
-      incremental por `tiemod`, con una lista larga de textos excluidos.
+      **Documento comparativo de ofertas.** "Propiedades de `con`" en 1:1:
+      la cabecera de un comparativo entre proveedores, previo a la
+      adjudicacion. Se ingiere junto con `comlin` y `comprv` y **ninguna de
+      las tres se usa**: el datamart no cubre hoy el proceso de compra
+      anterior al contrato.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 13 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `com`. Se busca con `grep
+      -n "^| com " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por comparativo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -462,7 +763,24 @@ objetos:
       **No la lee ningun SQL del datamart**, igual que `raw.com` y `raw.comprv`.
     descripcion: >-
       **Detalle del comparativo de ofertas.** Las lineas que se comparan. Se
-      ingiere y no se usa. Carga incremental por `tiemod`.
+      ingiere y no se usa.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 13 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `comlin`. Se busca con
+      `grep -n "^| comlin " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por linea del comparativo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -477,8 +795,24 @@ objetos:
       **No la lee ningun SQL del datamart**, igual que `raw.com` y `raw.comlin`.
     descripcion: >-
       **Proveedores del comparativo.** Que proveedores entraron en cada
-      comparativo y con que oferta. Se ingiere y no se usa. Carga incremental
-      por `tiemod`.
+      comparativo y con que oferta. Se ingiere y no se usa.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 13 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `comprv`. Se busca con
+      `grep -n "^| comprv " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por proveedor dentro de un comparativo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -494,9 +828,25 @@ objetos:
       normalizado. `compras.fact_compras_linea` ya las trae unificadas con las de
       albaran y factura, **todas sin IVA**.
     descripcion: >-
-      **Productos en Contratos de compra.** El detalle de linea de un contrato.
-      Es una de las tres fuentes de `compras.fact_compras_linea`. Carga incremental por
-      `tiemod`.
+      **Productos en Contratos de compra.** El detalle de linea de un
+      contrato. Es una de las tres fuentes de `compras.fact_compras_linea`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 13 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `ctrpro`. Se busca con
+      `grep -n "^| ctrpro " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por linea de contrato de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -512,8 +862,24 @@ objetos:
       en `compras.albaranes`, junto a `compras.contratos` y `compras.facturas`.
     descripcion: >-
       **Albaran de compra.** "Propiedades de `con`" en 1:1. Alimenta
-      `compras.albaranes`. Carga incremental por `tiemod`, con una lista larga
-      de textos y campos de direccion excluidos.
+      `compras.albaranes`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 23 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `dca`. Se busca con `grep
+      -n "^| dca " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por albaran de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -528,9 +894,27 @@ objetos:
       Lineas crudas. `compras.fact_compras_linea` las trae unificadas con las de
       contrato y factura, sin IVA y con la partida resuelta.
     descripcion: >-
-      **Productos en Albaranes de compra.** El detalle de linea de un albaran, y
-      otra de las tres fuentes de `compras.fact_compras_linea`. Se pagina de 5.000 en
-      5.000. Carga incremental por `tiemod`.
+      **Productos en Albaranes de compra.** El detalle de linea de un
+      albaran, y otra de las tres fuentes de `compras.fact_compras_linea`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 13 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      Se pide paginada de 5000 en 5000.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcapro`. Se busca con
+      `grep -n "^| dcapro " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por linea de albaran, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -546,8 +930,24 @@ objetos:
       es ademas donde esta resuelto el signo de los ABONOS.
     descripcion: >-
       **Factura de compra.** "Propiedades de `con`" en 1:1. Alimenta
-      `compras.facturas` y el arranque de `retenciones`. Carga incremental por
-      `tiemod`, con una lista larga de textos y campos de direccion excluidos.
+      `compras.facturas` y el arranque de `retenciones`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 23 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcf`. Se busca con `grep
+      -n "^| dcf " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por factura de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -562,10 +962,28 @@ objetos:
       Lineas crudas. `compras.fact_compras_linea` las trae unificadas y sin IVA, y
       `retenciones` ya calcula lo suyo sin que haga falta bajar aqui.
     descripcion: >-
-      **Productos en Facturas de compra.** El detalle de linea de una factura,
-      la tercera fuente de `compras.fact_compras_linea`, y tambien entrada de
-      `retenciones`. Se pagina de 5.000 en 5.000. Carga incremental por
-      `tiemod`.
+      **Productos en Facturas de compra.** El detalle de linea de una
+      factura, la tercera fuente de `compras.fact_compras_linea`, y tambien
+      entrada de `retenciones`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 13 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      Se pide paginada de 5000 en 5000.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcfpro`. Se busca con
+      `grep -n "^| dcfpro " azure-apps/sigrid_tablas.md`. No se copia aqui
+      porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por linea de factura, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -581,9 +999,25 @@ objetos:
       varios destinos no esta modelado aguas abajo.
     descripcion: >-
       **Destinos en Facturas de compra.** El reparto de una linea de factura
-      entre varios destinos —obras o partidas—. Se ingiere y **no se usa**: la
-      imputacion que el datamart maneja es la de la propia linea. Se recarga
-      entera cada noche.
+      entre varios destinos —obras o partidas—. Se ingiere y **no se usa**:
+      la imputacion que el datamart maneja es la de la propia linea.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 13 columnas de esta tabla: textos largos,
+      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
+      devuelve "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcfprodes`. Se busca con
+      `grep -n "^| dcfprodes " azure-apps/sigrid_tablas.md`. No se copia
+      aqui porque seria una segunda version que acabaria divergiendo.
     grano: Una fila por destino de una linea de factura, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -599,7 +1033,19 @@ objetos:
       `retenciones`, que ya cruza cobros, pagos y recargos.
     descripcion: >-
       **Cobros.** "Propiedades de `con`" en 1:1. Entrada de `retenciones`.
-      Carga incremental por `tiemod`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `cob`. Se busca con `grep
+      -n "^| cob " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por cobro, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -614,8 +1060,25 @@ objetos:
       Pagos sin unir a `con` ni al proveedor. `retenciones.movimientos` ya los
       trae cruzados y con el signo resuelto.
     descripcion: >-
-      **Pagos.** "Propiedades de `con`" en 1:1. Entrada de `retenciones`. Carga
-      incremental por `tiemod`. **No se trae** `blores`.
+      **Pagos.** "Propiedades de `con`" en 1:1. Entrada de `retenciones`.
+      **No se trae** `blores`.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **No se traen** 1 columnas de esta tabla: textos largos, observaciones
+      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `pag`. Se busca con `grep
+      -n "^| pag " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por pago, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -632,9 +1095,22 @@ objetos:
       que interesa. Consultarla creyendo que son solo retenciones suma cosas que
       no lo son.
     descripcion: >-
-      **Recargos, descuentos o retenciones.** "Propiedades de `con`" en 1:1, y
-      **las tres cosas viven aqui juntas**. Es de donde `retenciones` extrae las
-      retenciones de garantia. Se recarga entera cada noche.
+      **Recargos, descuentos o retenciones.** "Propiedades de `con`" en 1:1,
+      y **las tres cosas viven aqui juntas**. Es de donde `retenciones`
+      extrae las retenciones de garantia.
+
+      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
+      solo las filas con `ide` mayor que el maximo ya guardado. La
+      consecuencia practica es que **una fila modificada en Sigrid no se
+      refresca** aqui, y una borrada alli se queda. La recarga completa
+      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
+      pasa**: hay que lanzarla a mano.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2), y
+      el diccionario completo de campos, tipos e indices esta en
+      `azure-apps/sigrid_tablas.md`, en el bloque `rec`. Se busca con `grep
+      -n "^| rec " azure-apps/sigrid_tablas.md`. No se copia aqui porque
+      seria una segunda version que acabaria divergiendo.
     grano: Una fila por recargo, descuento o retencion, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw

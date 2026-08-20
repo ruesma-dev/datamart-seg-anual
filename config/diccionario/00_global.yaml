@@ -159,27 +159,53 @@ reglas:
     ambito:
       - raw
     regla: >-
-      Antes de escribir cualquier consulta contra `raw`, cinco cosas. **`ide` es
-      la clave de las 31 tablas**, se llama igual en todas y es el indice
-      primario; un campo que acaba en `ide` —`conide`, `entide`, `obride`— es una
-      referencia a el. **Muchas tablas son "Propiedades de `con`" en 1:1**: `obr`,
-      `prv`, `cen`, `ctr`, `com`, `dca`, `dcf`, `cob`, `pag` y `rec` no son
-      entidades completas, son la extension especifica de un concepto y comparten
-      su `ide` con una fila de `con`. **`cod`, `res` y `fec` viven en `con`**, no
-      en la tabla especifica: el codigo, la descripcion y la fecha de alta de una
-      obra, un proveedor o una factura estan todos alli, y por eso casi toda
-      consulta empieza uniendo con `con` por `ide`. **`con.nom` NO EXISTE**: el
-      nombre legible es `con.res`. Y **las fechas son enteros `YYYYMMDD`**, donde
-      el valor `0` no es una fecha sino el NULL, porque Sigrid no guarda nulos en
-      los enteros.
+      Antes de escribir cualquier consulta contra `raw`, cinco cosas.
+
+      **1. `ide` es la clave de las 31 tablas.** Se llama igual en todas, es el
+      indice primario y es unico. Un campo que acaba en `ide` —`conide`,
+      `entide`, `obride`— es una referencia a el.
+
+      **2. Muchas tablas son "Propiedades de `con`" en 1:1.** `obr`, `prv`,
+      `cen`, `ctr`, `com`, `dca`, `dcf`, `cob`, `pag` y `rec` no son entidades
+      completas: son la extension especifica de un concepto y comparten su `ide`
+      con una fila de `con`. Unirlas por `ide` nunca multiplica.
+
+      **3. `con` SIEMPRE trae `cod`, `res` y `fec`** —codigo, nombre legible y
+      fecha de alta— **y es de donde el datamart los toma**. Pero eso es el
+      patron, no una ley: **la tabla especifica puede tener ademas campos
+      propios con el mismo nombre y OTRO significado**. Comprueba antes de
+      asumir cualquiera de los dos lados. Las que los tienen son `obr`, `prv`,
+      `cen`, `ctr`, `com`, `dca` y `dcf`; dos ejemplos de lo distinto que
+      significan: `obr.res` es "Nombre completo" mientras `con.res` es el
+      Resumen que el datamart publica como `nombre_obra`, y `cen.res` es
+      "Reparto nombre".
+
+      **4. Lo que NO esta en `con`.** `con.nom` **no existe**: el nombre legible
+      es `con.res`. Y el CIF y la razon social de un proveedor son **`prv.cif` y
+      `prv.raz`**, de la tabla especifica: buscarlos en `con` falla con "columna
+      inexistente".
+
+      **5. Las fechas son enteros `YYYYMMDD`**, y el valor `0` no es una fecha
+      sino el NULL, porque Sigrid no guarda nulos en los enteros. Lo mismo vale
+      para las referencias: un `entide` a 0 significa "sin asignar".
     motivo: >-
-      Es la estructura del sistema origen, verificada en la entidad `con` de
-      `azure-apps/sigrid_tablas.md` (pagina 94), que es donde estan `ide`, `cod`,
-      `res`, `fec`, `est` y `fecbaj`, y donde **no hay ningun `nom`**. Ninguno de
-      los cinco puntos falla con un dato raro que invite a mirar: `con.nom` falla
-      con "columna inexistente", consultar `obr` sin unir a `con` devuelve una
-      obra sin nombre y sin codigo, y un `MIN(fecha)` que no excluya el cero
-      devuelve cero, que parece un dato y no lo es.
+      Es la estructura del sistema origen. Los puntos 1, 2 y 5 y la inexistencia
+      de `con.nom` estan verificados en la entidad `con` de
+      `azure-apps/sigrid_tablas.md` (pagina 94), donde estan `ide`, `cod`, `res`,
+      `fec`, `est` y `fecbaj` y **no hay ningun `nom`**.
+
+      El punto 3 se formulo primero en absoluto —"viven en `con`, no en la tabla
+      especifica"— y era **falso**: `obr.res` existe, esta ingerido y vale
+      "Nombre completo". Una regla bloqueante que niega un campo real es peor
+      que no tenerla. El punto 4 tiene doble verificacion: `sigrid_tablas.md` da
+      `prv.cif` = "CIF/NIF" y `prv.raz` = "Razon social", y
+      `maestro/02_proveedores.sql` los toma **de `raw.prv`**, tomando de
+      `raw.con` solo `cod` y `res`.
+
+      Ninguno de los cinco puntos falla con un dato raro que invite a mirar:
+      `con.nom` y `con.cif` fallan con "columna inexistente", consultar `obr`
+      sin unir a `con` devuelve una obra sin codigo, y un `MIN(fecha)` que no
+      excluya el cero devuelve cero, que parece un dato y no lo es.
     orden: 13
 
   - codigo: R-CLAVE-SUSTITUTA
