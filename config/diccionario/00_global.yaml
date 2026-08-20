@@ -726,8 +726,6 @@ pendientes:
   - maestro.obras
   - maestro.proveedores
   - maestro.proveedores_obra
-  - mart.fact_seguimiento_categoria
-  - mart.fact_seguimiento_mensual
   - mart.v_fact_periodificado
   - mart.v_master_versiones_tipadas
   - mart.v_master_vigente_anual

@@ -317,3 +317,51 @@ Tres tests que no pedía la spec y que se añadieron porque protegen algo real:
 
 Los `bloqueada_por` se comprueban contra `harness/features.json`: F-036 a F-040
 existen.
+
+---
+
+## Bloque C · Fichas de `mart`
+
+### T12 · Las dos tablas de hecho
+
+```
+$ python -m pytest tests/test_f006_cobertura.py tests/test_f006_fichas.py -q
+FAILED tests/test_f006_cobertura.py::test_f006_r25_puerta_todo_objeto_publicado_tiene_ficha_o_esta_pendiente
+FAILED tests/test_f006_cobertura.py::test_f006_r27_puerta_el_trinquete_solo_baja
+FAILED tests/test_f006_cobertura.py::test_f006_r27_puerta_el_trinquete_no_esta_holgado
+FAILED tests/test_f006_fichas.py::test_f006_r26_mart_las_tablas_documentan_exactamente_sus_columnas[fact_seguimiento_categoria-mart/03_agg_categoria.sql]
+FAILED tests/test_f006_fichas.py::test_f006_r26_mart_las_tablas_documentan_exactamente_sus_columnas[fact_seguimiento_mensual-mart/01_ddl.sql]
+FAILED tests/test_f006_fichas.py::test_f006_r2_mart_la_clave_de_negocio_es_el_grano_declarado[fact_seguimiento_categoria-mart/03_agg_categoria.sql]
+FAILED tests/test_f006_fichas.py::test_f006_r2_mart_la_clave_de_negocio_es_el_grano_declarado[fact_seguimiento_mensual-mart/01_ddl.sql]
+FAILED tests/test_f006_fichas.py::test_f006_r7_mart_importe_origen_no_se_declara_sumable
+FAILED tests/test_f006_fichas.py::test_f006_r7_mart_las_claves_sustitutas_estan_marcadas
+FAILED tests/test_f006_fichas.py::test_f006_r12_mart_las_tablas_de_hecho_heredan_sus_avisos
+FAILED tests/test_f006_fichas.py::test_f006_r7_mart_el_escenario_declara_sus_cuatro_valores
+12 failed, 35 passed in 0.46s
+```
+
+Verde tras escribir `config/diccionario/mart.yaml`: `185 passed` en F-006.
+`PENDIENTES_MAX` baja de **98 a 96**.
+
+**Fichero nuevo: `tests/test_f006_fichas.py`.** No lo pedía la spec y es la
+pieza que más protege del encargo. La puerta de cobertura comprueba que cada
+objeto TIENE ficha; esto comprueba que la ficha **dice la verdad**: parsea el
+`CREATE TABLE` real y exige que las columnas documentadas sean exactamente las
+que existen, ni una de menos ni una de más. Para las tablas la comprobación es
+exacta; para las vistas se hará más débil (que el nombre aparezca en el SQL que
+las crea) y el docstring lo declara.
+
+El parser de DDL se prueba a sí mismo antes de que nadie se fíe de él
+(`test_f006_r26_el_parser_de_ddl_no_se_corta_dentro_de_un_numeric`), y aun así
+falló en el primer intento con un caso real: `unidad_medida VARCHAR(16), -- m3,
+m2, ud, kg... (de obrparpar.unimed)`. La coma **dentro del comentario** partía
+la definición en dos. Se corrigió quitando comentarios antes de contar comas y
+paréntesis, y queda anotado en el propio código.
+
+**Correcciones a `design.md` §3.3 obligadas por el SQL** (manda el SQL):
+
+| `design.md` decía | El SQL dice |
+|---|---|
+| `obra_codigo`, `partida_codigo`, `mes` | `codigo_obra`, `codigo_partida`, `anio_mes` |
+| `escenario: [COSTE_REAL, COSTE_PLAN, VENTA_REAL, VENTA_PLAN]` | `Coste Real`, `Coste Planificado`, `Venta Real`, `Venta Planificada` |
+| `clave_negocio: [obra_codigo, partida_codigo, mes, escenario]` | se usa `[obra_id, partida_id, anio_mes, escenario]`: `obra_id` es `con.ide`, estable entre builds, y `codigo_partida` es anulable |

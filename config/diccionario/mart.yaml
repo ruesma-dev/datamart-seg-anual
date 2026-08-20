@@ -1,0 +1,327 @@
+# config/diccionario/mart.yaml
+#
+# Fichas del esquema `mart`: el seguimiento mensual listo para consumo.
+#
+# Es la superficie principal del datamart. Lo que lo hace consultable
+# directamente, y no `stg`, es que aqui la VERSION MASTER VIGENTE ya esta
+# resuelta mes a mes: en `stg.plan_mensual` conviven todas las versiones y
+# consultarla sin filtrar multiplica los importes.
+#
+# Todos los nombres y granos de este fichero estan verificados contra el DDL
+# real de `etl_sigrid/infrastructure/postgres/sql/mart/`.
+
+version: 1
+esquema: mart
+
+objetos:
+
+  fact_seguimiento_mensual:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El hecho central del seguimiento: cuanto se ha producido y cuanto se habia
+      planificado, mes a mes, para cada partida de cada obra, en las cuatro
+      combinaciones de coste/venta y real/planificado. Es la tabla a la que hay
+      que ir para cualquier pregunta de planificacion o de produccion mensual.
+    grano: >-
+      Una fila por (obra, partida, mes, escenario). "Escenario" es el cruce de
+      magnitud (COSTE o VENTA) y naturaleza (REAL o PLANIFICADO): hasta cuatro
+      filas por celda. Los meses futuros solo tienen los dos escenarios
+      planificados; los meses pasados de una obra que arranco sin master, solo
+      los dos reales.
+    clave_negocio: [obra_id, partida_id, anio_mes, escenario]
+    paso_etl: build_mart
+    refresco: nocturno
+
+    columnas:
+      fact_id:
+        significado: >-
+          Clave tecnica de la fila. BIGSERIAL: se reasigna en cada build, asi
+          que no identifica nada de forma estable.
+        agregacion: clave_sustituta
+      obra_id:
+        significado: >-
+          Identificador de la obra en Sigrid (`con.ide`). Es estable entre
+          builds, al contrario que `fact_id`, y es la clave de union con el
+          resto de esquemas.
+        agregacion: no_sumable
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid: cuatro digitos, con
+        posible sufijo alfabetico ('0675', '0675B').
+      nombre_obra: >-
+        Nombre legible de la obra. Viene de `con.res`; en Sigrid no existe
+        ninguna columna `nom`.
+      partida_id:
+        significado: >-
+          Identificador de la partida o capitulo en Sigrid (`obrparpar.ide`).
+          Es el unico eje que une el mundo del seguimiento con el mundo
+          documental de compras.
+        agregacion: no_sumable
+      codigo_partida: >-
+        Codigo jerarquico de la partida dentro de su obra ('01.02'). Unico por
+        obra, no entre obras.
+      descripcion_partida: Descripcion corta de la partida, tal y como la escribio el jefe de obra.
+      unidad_medida: >-
+        Unidad de medicion de la partida (m3, m2, ud, kg...), de
+        `obrparpar.unimed`.
+      categoria:
+        significado: >-
+          Clasificacion del coste. Se DERIVA por heuristica del codigo del
+          capitulo raiz, no de un catalogo: no es una taxonomia oficial.
+        valores: [CD, CI, CP, OTRO]
+      capitulo_raiz_cod: Codigo del capitulo raiz del que cuelga la partida. Informativo.
+      ruta_capitulos: >-
+        Camino completo de capitulos hasta la partida, separado por ' > ' ("CD >
+        01 > 01.02"). Es lo que permite reconstruir el arbol sin recursion.
+      anio_mes:
+        significado: >-
+          Mes al que se imputa la fila, como fecha del dia 1. Es la columna
+          temporal por la que se filtra y se agrupa.
+        agregacion: no_sumable
+      anio:
+        significado: Ano de `anio_mes`, desnormalizado para filtrar barato.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes (1-12) de `anio_mes`.
+        agregacion: no_sumable
+      nombre_mes: >-
+        Etiqueta del mes en castellano con su ano ("Octubre 2025"). Se genera
+        sin depender del locale del servidor.
+      escenario:
+        significado: >-
+          El cruce de magnitud y naturaleza, y la columna por la que de verdad
+          se filtra. Estos cuatro literales son exactos.
+        valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
+      tipo_dato:
+        significado: Naturaleza del dato, la mitad "real o previsto" del escenario.
+        valores: [REAL, PLANIFICADO]
+      concepto:
+        significado: Magnitud, la mitad "coste o venta" del escenario.
+        valores: [COSTE, VENTA]
+      ambito_id:
+        significado: >-
+          Ambito de Sigrid del que sale la fila, para trazabilidad: 3 coste
+          real, 7 venta real, 8 coste master, 11 venta master.
+        agregacion: no_sumable
+      importe_mes:
+        significado: >-
+          Importe imputado A ESE MES concreto, ya desacumulado. Es el que se usa
+          para cualquier serie temporal.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: >-
+          Importe ACUMULADO desde el inicio de la obra hasta ese mes, tal y como
+          viene de Sigrid. Sumarlo a lo largo del tiempo multiplica el resultado
+          por unas nueve veces: para un total de un periodo se toma el valor del
+          ultimo mes, no la suma.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_mes_raw:
+        significado: >-
+          El mismo importe del mes calculado con el precio SIN redondear a dos
+          decimales. Es una referencia para cuadrar contra Sigrid, no la cifra
+          que se da al usuario.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen_raw:
+        significado: Version sin redondear de `importe_origen`. Misma advertencia de acumulado.
+        unidad: EUR
+        agregacion: ultimo_valor
+      can_mes:
+        significado: >-
+          Cantidad medida imputada al mes, en la unidad de la partida. En las
+          partidas de tipo porcentaje (los CP) puede ser un coeficiente con seis
+          decimales, no una cantidad fisica.
+        agregacion: suma_solo_dentro_del_mes
+      can_origen:
+        significado: Cantidad acumulada a origen. Misma advertencia que `importe_origen`.
+        agregacion: ultimo_valor
+      precio_unitario:
+        significado: >-
+          Precio unitario de la partida con hasta seis decimales. Redondearlo
+          antes de multiplicar cambia el importe.
+        unidad: EUR
+        agregacion: no_sumable
+      version_master:
+        significado: Numero de la version master vigente de la que sale el planificado.
+        nulo_significa: La fila es REAL; los reales no tienen version.
+        agregacion: no_sumable
+      version_descripcion: >-
+        Etiqueta legible de la version en las filas planificadas ("Version 11
+        (04/02/2026)"); en las filas reales, la etiqueta del mes.
+      version_tex:
+        significado: >-
+          Texto libre que escribio el jefe de obra al crear la version master
+          ("ABC", "PLANIFICACION CUATRIMESTRAL FEB-26"). Es de donde se deriva
+          `tipo_master`.
+        nulo_significa: La fila es REAL.
+      version_fec_creacion:
+        significado: Fecha en que se creo la version master.
+        nulo_significa: La fila es REAL.
+        agregacion: no_sumable
+      tipo_master:
+        significado: >-
+          Clasificacion de la version derivada de `version_tex`. Solo 'Planif
+          Inicial', 'ABC' y 'Cuatrimestral' cuentan como master vigente: las de
+          'Cierre mensual' NO reemplazan al plan.
+        valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]
+        nulo_significa: La fila es REAL.
+      total_incurrido:
+        significado: >-
+          Calculo paralelo de Sigrid del incurrido a origen (columna "Imp.
+          Incurrido"). Normalmente coincide con cantidad por precio, pero a veces
+          difiere en centimos. Solo tiene valor en el coste real (ambito 3).
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La fila no es de coste real.
+      total_incurrido_mes:
+        significado: >-
+          El incurrido de Sigrid del mes ("Imp. Incurrido Parcial"). Solo en
+          coste real.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+        nulo_significa: La fila no es de coste real.
+      _built_at:
+        significado: >-
+          Instante en que se construyo la fila. Instrumentacion del ETL, no
+          negocio: para la frescura del esquema se consulta `_meta.v_frescura`.
+        agregacion: no_sumable
+
+    relaciones:
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: N:1
+        porque: >-
+          Universo del SEGUIMIENTO, que excluye obras administrativas y codigos
+          de cinco o mas digitos. Es el universo que ya esta aplicado aqui.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: N:1
+        porque: >-
+          Para poner cliente, estado y fechas de alta y baja a la obra. OJO:
+          `maestro.obras` NO filtra nada y es superconjunto de `stg.obras`.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: N:1
+        porque: Para el arbol completo de capitulos y el nivel de la partida.
+      - de: partida_id
+        a: compras.v_pbi_partida_coste.partida_id
+        cardinalidad: N:1
+        porque: >-
+          Es el unico eje que une el coste PLANIFICADO de una partida con su
+          coste INCURRIDO documental. Hoy no lo explota ninguna vista: la vista
+          puente es F-039. Ojo, `compras` no filtra por `stg.obras`.
+      - de: obra_id
+        a: cierre.fact_cierre_mensual.obra_id
+        cardinalidad: N:1
+        porque: >-
+          Para contrastar el seguimiento mensual contra el cierre economico de
+          la obra. Ojo con la frescura: `cierre` no se refresca de noche.
+
+    ejemplos_preguntas:
+      - Cual es la planificacion mensual de la obra 0704 en 2025
+      - Dame la evolucion mensual del coste directo de la obra X en el ano A
+      - Que obras estan mal configuradas, sin planificado en algun mes
+      - Cuanto llevamos produciendo este ano frente a lo planificado
+
+  fact_seguimiento_categoria:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El mismo hecho que `fact_seguimiento_mensual` pero preagregado por
+      categoria de coste (CD, CI, CP, OTRO), sin bajar a partida. Existe para no
+      tener que agregar millones de filas en cada consulta de KPI; NO sustituye a
+      la tabla de detalle, la complementa.
+    grano: >-
+      Una fila por (obra, mes, categoria, escenario). Es la suma de todas las
+      partidas de esa obra y mes que comparten categoria.
+    clave_negocio: [obra_id, anio_mes, categoria, escenario]
+    paso_etl: build_mart
+    refresco: nocturno
+
+    columnas:
+      fact_cat_id:
+        significado: >-
+          Clave tecnica de la fila. BIGSERIAL: se reasigna en cada build y no
+          identifica nada de forma estable.
+        agregacion: clave_sustituta
+      obra_id:
+        significado: Identificador de la obra en Sigrid (`con.ide`). Estable entre builds.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      anio_mes:
+        significado: Mes al que se imputa la fila, como fecha del dia 1.
+        agregacion: no_sumable
+      anio:
+        significado: Ano de `anio_mes`.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes (1-12) de `anio_mes`.
+        agregacion: no_sumable
+      nombre_mes: Etiqueta del mes en castellano con su ano ("Octubre 2025").
+      categoria:
+        significado: >-
+          Clasificacion del coste, derivada por heuristica del codigo del
+          capitulo raiz. CD son costes directos, CI indirectos, CP
+          proporcionales.
+        valores: [CD, CI, CP, OTRO]
+      escenario:
+        significado: El cruce de magnitud y naturaleza. Literales exactos.
+        valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
+      tipo_dato:
+        significado: Naturaleza del dato.
+        valores: [REAL, PLANIFICADO]
+      concepto:
+        significado: Magnitud del dato.
+        valores: [COSTE, VENTA]
+      ambito_id:
+        significado: Ambito de Sigrid de origen (3, 7, 8 u 11), para trazabilidad.
+        agregacion: no_sumable
+      importe_mes:
+        significado: >-
+          Suma del importe del mes de todas las partidas de esa categoria. No se
+          suma entre meses distintos.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: >-
+          Suma del acumulado a origen de esas partidas. Ya es acumulado: sumarlo
+          en el tiempo multiplica.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_mes_raw:
+        significado: Version sin redondear de `importe_mes`, para cuadrar contra Sigrid.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen_raw:
+        significado: Version sin redondear de `importe_origen`.
+        unidad: EUR
+        agregacion: ultimo_valor
+      num_partidas:
+        significado: >-
+          Cuantas partidas distintas se han sumado en esa fila. Sirve para
+          detectar celdas construidas sobre una sola partida.
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+
+    relaciones:
+      - de: obra_id
+        a: mart.fact_seguimiento_mensual.obra_id
+        cardinalidad: 1:N
+        porque: >-
+          Para bajar de la categoria al detalle por partida. La categoria se
+          llama igual en las dos tablas a proposito.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: N:1
+        porque: Para poner cliente y estado a la obra.
+
+    ejemplos_preguntas:
+      - Que obras se desvian mas de su master vigente en coste directo
+      - Cual es el reparto entre coste directo, indirecto y proporcional de la obra X

@@ -411,8 +411,9 @@ YAML_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 #: ninguna tarea lo sube; al cerrar F-006 vale 0 y `pendientes` está vacía.
 #:
 #: Historia, para que se vea que baja de verdad:
-#:   98  T8 · andamiaje, con el inventario entero declarado pendiente
-PENDIENTES_MAX = 98
+#:   98  T8  · andamiaje, con el inventario entero declarado pendiente
+#:   96  T12 · las dos tablas de hecho de `mart`
+PENDIENTES_MAX = 96
 
 
 def _inventario_del_repositorio():
