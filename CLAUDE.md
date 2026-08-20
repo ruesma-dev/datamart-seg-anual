@@ -78,8 +78,9 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 - `config/diccionario/` — el **diccionario semántico** del datamart (F-006):
   un YAML por esquema más `00_global.yaml` con las reglas duras. Lo publica en
   `_meta` el paso `publicar_diccionario`, y de ahí lo lee el MCP por SQL. Quien
-  añade o cambia un objeto publicado actualiza su ficha en el mismo trabajo: hay
-  una puerta en `init.sh` que lo exige.
+  añade o cambia un objeto publicado actualiza su ficha en el mismo trabajo. La
+  puerta de `init.sh` exige **ficha o pendiente declarado**: se puede aplazar la
+  ficha, pero no ignorarla, y la lista de pendientes solo baja.
 - `etl_sigrid/domain/` — entidades puras (sin dependencias externas).
 - `etl_sigrid/application/` — `orchestrator.py` + `steps/` (patrón pipeline;
   cada step hereda de `steps/base.py`).

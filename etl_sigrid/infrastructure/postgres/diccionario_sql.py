@@ -35,9 +35,12 @@ from etl_sigrid.domain.inventario import InformeCobertura
 # Van como constantes de módulo, igual que `SQL_OCUPACION_DISCO` en
 # `postgres_client.py`, para que un test pueda leerlas sin ejecutarlas.
 
-#: Vaciado previo. Es `DELETE` y no `TRUNCATE` a propósito: `TRUNCATE` no es
-#: transaccional de la misma forma en todos los escenarios y aquí son unos
-#: cientos de filas, así que no hay nada que ganar y sí una garantía que perder.
+#: Vaciado previo. Es `DELETE` y no `TRUNCATE` a propósito, y el motivo no es la
+#: transaccionalidad —en PostgreSQL `TRUNCATE` **sí** es transaccional—: es que
+#: `TRUNCATE` toma un `ACCESS EXCLUSIVE` sobre la tabla, que **bloquea a los
+#: lectores** hasta el commit. Un MCP consultando durante la publicación se
+#: quedaría esperando, que es justo lo que este diseño evita. Con unos cientos
+#: de filas, `DELETE` no cuesta nada y no bloquea a nadie.
 SQL_BORRAR_DICCIONARIO = "DELETE FROM _meta.diccionario"
 SQL_BORRAR_REGLAS = "DELETE FROM _meta.diccionario_reglas"
 SQL_BORRAR_PUBLICACION = "DELETE FROM _meta.diccionario_publicacion"

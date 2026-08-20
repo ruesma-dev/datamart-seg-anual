@@ -1347,8 +1347,10 @@ SELECT objeto, ultimo_ok_finished_at FROM _meta.v_diccionario WHERE esquema = 'c
 
 Lo que hay que comprobar en esa salida, mas alla de que no reviente:
 
-1. **37 filas en `_meta.diccionario`** (25 fichas hoy) y **12 en
-   `_meta.diccionario_reglas`**;
+1. **una fila por ficha en `_meta.diccionario`** —hoy **49**— y **12 en
+   `_meta.diccionario_reglas`**. El paso imprime los recuentos, y son los que
+   hay que comparar: cualquier cifra escrita aquí envejece a la siguiente tanda
+   de fichas;
 2. `hash_fuente` **coincide** con el que imprime el paso, o el diccionario
    publicado no es el del repositorio;
 3. las filas de `cierre` traen `ultimo_ok_finished_at` **de `build_cierre`**, y
@@ -1596,3 +1598,29 @@ consumo**: si un objeto se recomienda para consultar, quien lo consulte necesita
 saber que identifica una fila, y R3 ya obliga a escribir por que no se
 recomienda. El hueco declarado es mejor que la clave inventada; el hueco
 silencioso, no.
+
+## Los menores que quedaban, y dos tests que no arreglan nada
+
+| # | Corregido |
+|---|---|
+| **15** | `v_pbi_albaranes_sin_facturar`: `contrato_id` sale de la cabecera y `codigo_contrato` de una cascada mas amplia, asi que **pueden salir juntos nulo e informado**. No es una incoherencia y ahora lo dicen las dos fichas |
+| **21** | El comentario de `diccionario_sql.py` justificaba `DELETE` frente a `TRUNCATE` diciendo que este «no es transaccional». **Es falso**: en PostgreSQL lo es. El motivo bueno, y es mejor, es que `TRUNCATE` toma un `ACCESS EXCLUSIVE` que **bloquea a los lectores** hasta el commit, que es justo lo que este diseno evita. La decision era correcta; el motivo escrito, no |
+| **22** | `CLAUDE.md` decia que la puerta exige actualizar la ficha «en el mismo trabajo». Lo que exige es **ficha O pendiente declarado**. Rebajada la frase a lo que de verdad hace, anadiendo que la lista solo baja |
+| **24** | `n_columnas` (todas las fichas) y `cobertura_cols` (solo la superficie de consumo) **no comparten denominador**, asi que multiplicarlos no da columnas descritas. Dicho con `COMMENT ON COLUMN` en el propio contrato, que es donde lo va a leer quien consulte |
+| **26** | `version` es manual y `hash_fuente` es la identidad. Documentado tambien con `COMMENT ON COLUMN`: **para invalidar una cache hay que mirar el hash**, no el numero |
+| **27** | La verificacion manual de T19 daba cifras que ya estaban viejas. Ahora remite a los recuentos que imprime el propio paso, en vez de fijar un numero que envejece cada tanda |
+
+**Dos tests nuevos que no corrigen nada, y por eso no tienen fase RED**: pasaron
+en verde desde el primer momento. Estan porque lo que fijan no estaba fijado por
+nada:
+
+- **`apply_grants` no depende de `publicar_diccionario`.** Hoy es cierto, pero
+  el dia que alguien anada esa dependencia «para que quede ordenado», una noche
+  con el diccionario invalido dejaria al MCP sin permisos de lectura: el fallo
+  exacto que R20 existe para evitar.
+- **El `rollback` real del cliente.** Los demas tests sustituyen `connection()`
+  entera, asi que el `commit`/`rollback` de `postgres_client.py` **no se
+  ejecutaba en ningun test del repositorio**: la garantia que sostiene todo el
+  contrato estaba probada de lejos. Ahora se usa el `connection()` de verdad
+  con una conexion falsa, y hay un control que comprueba que sin excepcion si
+  hace `commit` —si nunca lo hiciera, el otro pasaria en falso—.

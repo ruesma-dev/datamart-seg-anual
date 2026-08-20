@@ -997,3 +997,91 @@ def test_f006_r23_el_diseno_documenta_la_columna_anadida() -> None:
     seccion = diseno[diseno.index("### 4.2"):diseno.index("### 4.3")]
 
     assert "motivo_no_consumo" in seccion
+
+
+# ---------------------------------------------------------------------------
+# Lo que faltaba fijar por un test, aunque hoy sea cierto
+# ---------------------------------------------------------------------------
+
+
+def test_f006_r20_apply_grants_no_depende_de_la_publicacion() -> None:
+    """Si el diccionario no valida, los GRANT tienen que aplicarse igual.
+
+    Hoy es cierto porque `ApplyGrantsStep.depends_on` solo lleva `build_mart` y
+    el orquestador unicamente salta un paso si fallo una dependencia DECLARADA.
+    Nada lo fijaba: el dia que alguien anada `publicar_diccionario` a esa lista
+    «para que quede ordenado», una noche con el diccionario invalido dejaria al
+    MCP sin permisos de lectura, que es exactamente el fallo que R20 existe para
+    evitar.
+    """
+    import main
+
+    pasos = main.build_pipeline_steps(_settings_falso())
+    grants = next(p for p in pasos if p.name == "apply_grants")
+
+    assert grants.depends_on == ["build_mart"]
+    assert "publicar_diccionario" not in grants.depends_on
+
+
+def test_f006_r18_una_excepcion_a_mitad_de_la_publicacion_hace_rollback() -> None:
+    """Atomicidad comprobada por CONDUCTA, no solo por estructura.
+
+    Los demas tests sustituyen `connection()` entera, asi que el `commit` y el
+    `rollback` reales del cliente no se ejecutaban en ningun test del
+    repositorio: la garantia que sostiene todo el contrato estaba probada de
+    lejos. Aqui se usa el `connection()` de verdad con una conexion falsa.
+    """
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    diario: list[str] = []
+
+    class _ConexionQueRegistra:
+        def cursor(self):
+            raise RuntimeError("se cayó la red a mitad del INSERT")
+
+        def commit(self):
+            diario.append("commit")
+
+        def rollback(self):
+            diario.append("rollback")
+
+        def close(self):
+            diario.append("close")
+
+    cliente = object.__new__(PostgresClient)
+    cliente._bootstrap_done = True
+    cliente._conninfo = "dsn-de-mentira"
+    cliente._connect = lambda _dsn: _ConexionQueRegistra()
+
+    with pytest.raises(RuntimeError, match="se cayó la red"), cliente.connection() as c:
+        c.cursor()
+
+    assert diario == ["rollback", "close"], diario
+    assert "commit" not in diario
+
+
+def test_f006_r18_sin_excepcion_hace_commit() -> None:
+    """Control del test de arriba: si nunca hiciera commit, pasaria en falso."""
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    diario: list[str] = []
+
+    class _ConexionQueRegistra:
+        def commit(self):
+            diario.append("commit")
+
+        def rollback(self):  # pragma: no cover - no deberia llamarse
+            diario.append("rollback")
+
+        def close(self):
+            diario.append("close")
+
+    cliente = object.__new__(PostgresClient)
+    cliente._bootstrap_done = True
+    cliente._conninfo = "dsn-de-mentira"
+    cliente._connect = lambda _dsn: _ConexionQueRegistra()
+
+    with cliente.connection():
+        pass
+
+    assert diario == ["commit", "close"], diario

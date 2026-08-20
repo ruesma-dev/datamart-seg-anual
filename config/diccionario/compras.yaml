@@ -828,10 +828,18 @@ objetos:
         significado: CIF del proveedor segun el documento.
         nulo_significa: El documento no llevaba CIF informado.
       contrato_id:
-        significado: Contrato contra el que se entrego.
-        nulo_significa: La entrega no cuelga de ningun contrato.
+        significado: >-
+          Contrato contra el que se entrego, tomado de la CABECERA del albaran.
+          Puede ser nulo teniendo `codigo_contrato` informado: ese sale de una
+          cascada mas amplia, que mira tambien el contrato de la propia linea.
+        nulo_significa: La cabecera del albaran no cuelga de ningun contrato.
         agregacion: no_sumable
-      codigo_contrato: Codigo del contrato, para leerlo sin otro JOIN.
+      codigo_contrato:
+        significado: >-
+          Codigo del contrato, resuelto por cabecera O por la linea. Por eso
+          puede venir informado con `contrato_id` a nulo: no es una
+          incoherencia, son dos cascadas distintas.
+        nulo_significa: Ni la cabecera ni la linea cuelgan de un contrato.
       obra_id:
         significado: Obra a la que se imputa la entrega pendiente.
         nulo_significa: La linea no se imputa a ninguna obra.

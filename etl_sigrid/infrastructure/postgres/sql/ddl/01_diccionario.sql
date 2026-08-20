@@ -140,6 +140,22 @@ FROM _meta.diccionario AS d
 LEFT JOIN _meta.v_frescura AS f ON f.paso = d.paso_etl
 LEFT JOIN _meta.diccionario_publicacion AS p ON TRUE;
 
+COMMENT ON COLUMN _meta.diccionario_publicacion.version IS
+'Numero de version manual del diccionario. Lo sube una persona al cambiar el '
+'contenido y sirve para COMUNICAR el cambio. NO es la identidad: la identidad '
+'es hash_fuente, que cambia solo con cualquier edicion. Para invalidar una '
+'cache hay que mirar hash_fuente, no esto.';
+
+COMMENT ON COLUMN _meta.diccionario_publicacion.n_columnas IS
+'Total de columnas documentadas, en TODAS las fichas.';
+
+COMMENT ON COLUMN _meta.diccionario_publicacion.cobertura_cols IS
+'Porcentaje de columnas con significado dentro de la superficie de consumo '
+'(consumo_recomendado = true) y SOLO de ella. OJO: NO comparte denominador con '
+'n_columnas, asi que n_columnas * cobertura_cols / 100 no es el numero de '
+'columnas descritas. Son dos medidas de cosas distintas: una es volumen y la '
+'otra es completitud de lo que se recomienda consultar.';
+
 COMMENT ON VIEW _meta.v_diccionario IS
 'Punto de entrada del MCP: significado, grano, trampas y fecha de build de cada '
 'objeto en una sola consulta. Los dos JOIN son LEFT a proposito. Anadir columnas '
