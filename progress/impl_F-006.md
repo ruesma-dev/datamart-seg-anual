@@ -1191,3 +1191,61 @@ devolviera un conjunto vacio no lo haga pasar en falso.
 
 Las fichas de esos cuatro objetos van en T24, con el resto de `_meta`.
 `design.md` §5.1 queda actualizado: `_meta.yaml` pasa de 6 a **7 objetos**.
+
+## T16 · Los constructores puros y los dos metodos del cliente
+
+```
+$ python -m pytest tests/test_f006_publicacion.py -q
+FAILED tests/test_f006_publicacion.py::test_f006_r22_filas_la_ficha_jsonb_es_determinista_y_completa
+FAILED tests/test_f006_publicacion.py::test_f006_r22_filas_el_jsonb_no_arrastra_claves_vacias
+FAILED tests/test_f006_publicacion.py::test_f006_r9_filas_de_reglas_van_las_doce_en_su_orden
+FAILED tests/test_f006_publicacion.py::test_f006_r22_fila_de_publicacion_lleva_los_recuentos_reales
+FAILED tests/test_f006_publicacion.py::test_f006_r22_la_cobertura_publicada_baja_si_falta_un_significado
+9 failed, 15 passed in 0.62s
+...
+$ (tras los constructores, la tanda del cliente)
+FAILED tests/test_f006_publicacion.py::test_f006_r17_publicar_escribe_las_tres_tablas
+FAILED tests/test_f006_publicacion.py::test_f006_r18_publicar_va_en_UNA_sola_transaccion
+FAILED tests/test_f006_publicacion.py::test_f006_r18_publicar_no_hace_drop_ni_truncate
+FAILED tests/test_f006_publicacion.py::test_f006_r18_publicar_borra_antes_de_insertar
+FAILED tests/test_f006_publicacion.py::test_f006_r17_publicar_manda_las_filas_reales_no_un_ejemplo
+FAILED tests/test_f006_publicacion.py::test_f006_r22_publicar_registra_la_version_y_el_hash
+FAILED tests/test_f006_publicacion.py::test_f006_r28_list_objetos_catalogo_pregunta_por_los_esquemas_pedidos
+7 failed, 24 passed in 3.25s
+```
+
+`diccionario_sql.py` sigue el patron de `grants.py`: **no toca ninguna
+conexion**, solo produce texto SQL y tuplas. Y
+`PostgresClient.publicar_diccionario` mete los tres `DELETE`, los dos
+`executemany` y el `INSERT` de publicacion **dentro de un solo `with
+self.connection()`**, que es una sola transaccion.
+
+**Todo se prueba con las 25 fichas reales, no con un ejemplo de juguete**, como
+pedia el encargo. Salida real del doble:
+
+```
+[info] diccionario_publicado  filas=38 hash_fuente=a1656adbc71d objetos=25 reglas=12 version=1
+```
+
+38 filas = 25 fichas + 12 reglas + 1 publicacion. Los recuentos que se publican
+son **25 objetos, 12 reglas, 332 columnas, cobertura 100,00 %**.
+
+Cuatro decisiones que merecen quedar escritas:
+
+- **El JSONB omite las claves sin valor.** Publicar `"unidad": null` en cada una
+  de las 332 columnas es ruido que el consumidor tendria que filtrar. Hay un
+  test que lo exige.
+- **`sort_keys=True` pero las listas conservan su orden.** El orden de las
+  columnas del YAML es editorial —primero las claves, luego los importes— y el
+  MCP lo sirve tal cual; lo que se ordena son las claves de cada objeto, para
+  que dos publicaciones del mismo YAML den el mismo texto y un `diff` sobre la
+  tabla sea legible.
+- **Las filas salen ordenadas** por `esquema.objeto` y las reglas por su
+  `orden`: sin eso, dos publicaciones del mismo diccionario escribirian lo mismo
+  en distinto orden y comparar entornos seria ruido.
+- **`list_objetos_catalogo` incluye las FUNCIONES**, no solo tablas y vistas: el
+  diccionario documenta doce funciones y `check-diccionario` tiene que verlas.
+
+**Ningun test abre conexion**: el doble registra un diario de llamadas y sobre
+el se comprueba que hay UNA transaccion, que el `DELETE` precede al `INSERT` y
+que no aparece ni un `DROP` ni un `TRUNCATE`.

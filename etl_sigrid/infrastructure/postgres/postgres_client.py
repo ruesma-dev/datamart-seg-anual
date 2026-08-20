@@ -18,7 +18,7 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -692,6 +692,87 @@ class PostgresClient:
             statements=len(sentencias),
         )
         return sentencias
+
+    # ---------------------------------------------------------------------
+    # Diccionario semántico (F-006)
+    # ---------------------------------------------------------------------
+
+    def publicar_diccionario(
+        self,
+        dicc,
+        *,
+        hash_fuente: str,
+        informe,
+        batch_id: str | None = None,
+        ahora: datetime | None = None,
+    ) -> int:
+        """Reemplaza el diccionario publicado y devuelve las filas escritas.
+
+        TODO ocurre dentro de UNA transacción, y esa es la garantía que el
+        contrato con `mcp-bbdd` le debe a quien consulte mientras se publica:
+        verá el diccionario anterior completo o el nuevo completo, nunca uno a
+        medias y nunca vacío. Una tabla vacía dejaría al MCP inventándose los
+        significados, que es justo lo que esta feature existe para impedir.
+
+        El vaciado es `DELETE` y jamás `DROP`: un `DROP` se lleva por delante
+        los `GRANT` del rol de lectura y dejaría al MCP ciego hasta el
+        `apply-grants` siguiente.
+        """
+        from etl_sigrid.infrastructure.postgres.diccionario_sql import (
+            SQL_BORRAR_DICCIONARIO,
+            SQL_BORRAR_PUBLICACION,
+            SQL_BORRAR_REGLAS,
+            SQL_INSERT_DICCIONARIO,
+            SQL_INSERT_PUBLICACION,
+            SQL_INSERT_REGLA,
+            fila_publicacion,
+            filas_diccionario,
+            filas_reglas,
+        )
+
+        instante = ahora if ahora is not None else datetime.utcnow()
+        fichas = filas_diccionario(dicc)
+        reglas = filas_reglas(dicc)
+        publicacion = fila_publicacion(dicc, hash_fuente, instante, batch_id, informe)
+
+        with self.connection() as conn, conn.cursor() as cur:
+            # Borrar antes de insertar: al revés chocaría con la clave primaria.
+            cur.execute(SQL_BORRAR_DICCIONARIO)
+            cur.execute(SQL_BORRAR_REGLAS)
+            cur.execute(SQL_BORRAR_PUBLICACION)
+            if fichas:
+                cur.executemany(SQL_INSERT_DICCIONARIO, fichas)
+            if reglas:
+                cur.executemany(SQL_INSERT_REGLA, reglas)
+            cur.execute(SQL_INSERT_PUBLICACION, publicacion)
+
+        escritas = len(fichas) + len(reglas) + 1
+        logger.info(
+            "diccionario_publicado",
+            version=publicacion[1],
+            hash_fuente=hash_fuente[:12],
+            objetos=len(fichas),
+            reglas=len(reglas),
+            filas=escritas,
+        )
+        return escritas
+
+    def list_objetos_catalogo(self, schemas: Sequence[str]) -> list[tuple]:
+        """Los objetos que la base tiene DE VERDAD, para `check-diccionario`.
+
+        Es la única fuente no heurística: la puerta offline lee el SQL del
+        repositorio con expresiones regulares y no puede ver un objeto creado
+        por otra vía. Incluye funciones además de tablas y vistas, porque el
+        diccionario también las documenta.
+        """
+        from etl_sigrid.infrastructure.postgres.diccionario_sql import (
+            SQL_OBJETOS_CATALOGO,
+        )
+
+        pedidos = list(schemas)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_OBJETOS_CATALOGO, (pedidos, pedidos))
+            return list(cur.fetchall())
 
     # ---------------------------------------------------------------------
     # Ejecución de archivos SQL (DDL, transformaciones stg/mart)
