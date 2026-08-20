@@ -162,35 +162,34 @@ reglas:
     ambito:
       - raw
     regla: >-
-      Antes de escribir cualquier consulta contra `raw`, cinco cosas.
+      Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
       **1. `ide` es la clave de las 31 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 
-      **2. Muchas tablas son "Propiedades de `con`" en 1:1.** `obr`, `prv`,
-      `cen`, `ctr`, `com`, `dca`, `dcf`, `cob`, `pag` y `rec` no son entidades
+      **2. Diez tablas son "Propiedades de `con`" en 1:1**: `obr`, `prv`, `cen`,
+      `ctr`, `com`, `dca`, `dcf`, `cob`, `pag` y `rec`. No son entidades
       completas: son la extension especifica de un concepto y comparten su `ide`
       con una fila de `con`. Unirlas por `ide` nunca multiplica.
 
-      **3. `con` SIEMPRE trae `cod`, `res` y `fec`** —codigo, nombre legible y
-      fecha de alta— **y es de donde el datamart los toma**. Pero eso es el
-      patron, no una ley: **la tabla especifica puede tener ademas campos
-      propios con el mismo nombre y OTRO significado**. Comprueba antes de
-      asumir cualquiera de los dos lados. Las que los tienen son `obr`, `prv`,
-      `cen`, `ctr`, `com`, `dca` y `dcf`; dos ejemplos de lo distinto que
-      significan: `obr.res` es "Nombre completo" mientras `con.res` es el
-      Resumen que el datamart publica como `nombre_obra`, y `cen.res` es
-      "Reparto nombre".
+      **3. `con` trae `cod`, `res` y `fec`** —codigo, nombre legible y fecha de
+      alta— **y es de donde el datamart los toma para esas diez**. Pero **no
+      asumas que un campo esta en `con` solo porque exista alli**: hay tablas
+      cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
+      el campo exacto: `auxmun` (`auxmun.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpro` (`auxpro.res`); `conext` (`conext.cod`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`). Ahi el valor bueno es el de la tabla, no el de
+      `con`.
 
-      **4. Lo que NO esta en `con`.** `con.nom` **no existe**: el nombre legible
-      es `con.res`. Y el CIF y la razon social de un proveedor son **`prv.cif` y
-      `prv.raz`**, de la tabla especifica: buscarlos en `con` falla con "columna
-      inexistente".
+      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxobramb`, `obrfas`, `obrfasamb`, `obrparpre`
+      no se unen a `raw.con` en ningun SQL de este repositorio, asi que para
+      ellas el JOIN de los puntos 2 y 3 **no existe**; su nombre esta en su
+      propio `res` o no esta.
 
       **5. Las fechas son enteros `YYYYMMDD`**, y el valor `0` no es una fecha
       sino el NULL, porque Sigrid no guarda nulos en los enteros. Lo mismo vale
-      para las referencias: un `entide` a 0 significa "sin asignar".
+      para las referencias: un `entide` a 0 significa "sin asignar". Por eso el
+      ETL las envuelve en `NULLIF(..., 0)` y las convierte con
+      `stg.fn_sigrid_date_to_date`.
 
       **6. Hay referencias POLIMORFICAS, y no se pueden unir a ciegas.** En las
       lineas de documento de compra, `docoriide` apunta al documento de origen
@@ -199,24 +198,31 @@ reglas:
       de otro tipo que casualmente comparten `ide`. Es lo que hace
       `compras/01_documentos.sql`:
       `CASE WHEN l.docoritip = 44 THEN NULLIF(l.docoriide, 0) END`.
+
+      El nombre legible que usa todo el datamart es **`con.res`**: no hay una
+      sola referencia a `con.nom` en el repositorio.
     motivo: >-
-      Es la estructura del sistema origen. Los puntos 1, 2 y 5 y la inexistencia
-      de `con.nom` estan verificados en la entidad `con` de
-      `azure-apps/sigrid_tablas.md` (pagina 94), donde estan `ide`, `cod`, `res`,
-      `fec`, `est` y `fecbaj` y **no hay ningun `nom`**.
+      Todo lo que afirma esta regla se **deriva de este repositorio**, que es la
+      unica fuente de primera mano que tenemos sobre el origen: nuestro SQL no
+      correria contra una columna inexistente, asi que cada `alias.campo` que
+      aparece ahi es una columna real. La lista del punto 3 y la del punto 4 las
+      genera un test (`tests/test_f006_fuente_que_gobierna.py`) barriendo
+      `sql/**`, y la regla queda en rojo si dejan de coincidir.
 
-      El punto 3 se formulo primero en absoluto —"viven en `con`, no en la tabla
-      especifica"— y era **falso**: `obr.res` existe, esta ingerido y vale
-      "Nombre completo". Una regla bloqueante que niega un campo real es peor
-      que no tenerla. El punto 4 tiene doble verificacion: `sigrid_tablas.md` da
-      `prv.cif` = "CIF/NIF" y `prv.raz` = "Razon social", y
-      `maestro/02_proveedores.sql` los toma **de `raw.prv`**, tomando de
-      `raw.con` solo `cod` y `res`.
+      **Lo que esta regla NO dice, y es deliberado**: que campos existen en
+      Sigrid y el datamart no lee. Esa pregunta solo la responde
+      `azure-apps/sigrid_tablas.md`, que es la conversion literal de un PDF de
+      380 paginas y **no se deja segmentar de forma fiable**. Intentarlo produjo
+      dos afirmaciones falsas en dos revisiones seguidas —un campo `res`
+      atribuido a `cen` que en realidad es de `cenrep`, tabla que ni se ingiere,
+      y una lista de excepciones con una sola acertada
+      de siete—. Para preguntar por una columna concreta, ese documento; para
+      fiarse de una afirmacion, este repositorio.
 
-      Ninguno de los cinco puntos falla con un dato raro que invite a mirar:
-      `con.nom` y `con.cif` fallan con "columna inexistente", consultar `obr`
-      sin unir a `con` devuelve una obra sin codigo, y un `MIN(fecha)` que no
-      excluya el cero devuelve cero, que parece un dato y no lo es.
+      Ninguno de los seis puntos falla con un dato raro que invite a mirar:
+      `con.nom` falla con "columna inexistente", consultar `obr` sin unir a `con`
+      devuelve una obra sin codigo, y un `MIN(fecha)` que no excluya el cero
+      devuelve cero, que parece un dato y no lo es.
     orden: 13
 
   - codigo: R-CLAVE-SUSTITUTA

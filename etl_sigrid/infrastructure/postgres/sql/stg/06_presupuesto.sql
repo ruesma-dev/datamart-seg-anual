@@ -22,7 +22,12 @@
 -- decimales ANTES de multiplicar, y el resultado a deci. Replicamos esa
 -- mecánica para que el importe cuadre al céntimo con la pantalla de Sigrid:
 --
---   importe = ROUND( ROUND(can, decc) * ROUND(pre, decp), deci )
+--   importe = ROUND( can * ROUND(pre, decp), deci )
+--
+-- OJO: `decc` NO interviene. La cantidad NO se redondea, por el motivo que
+-- explica la NOTA de mas abajo (las partidas tipo porcentaje se inflarian).
+-- Este comentario decia `ROUND(can, decc)` y era falso; indujo una ficha
+-- equivocada en F-006, que lo copio en vez de leer el codigo.
 --
 -- Defaults si la obra no los tiene informados: decc=3, decp=2, deci=2.
 -- (En Ruesma típicamente decc=3, decp=3, deci=2 — ver pantalla obra 0710.)
@@ -30,7 +35,7 @@
 -- ===========================================================================
 -- COLUMNAS DE IMPORTE
 -- ===========================================================================
---   - importe         = ROUND(ROUND(can,decc)*ROUND(pre,decp), deci).
+--   - importe         = ROUND(can * ROUND(pre,decp), deci). Sin `decc`.
 --                       Decimales propios de la obra. Lo usan mart/plan_mensual
 --                       y el cierre (costes).
 --   - importe_oficial = COALESCE(NULLIF(impcoe,0), importe). Lo usa el cierre
@@ -65,7 +70,7 @@ SELECT DISTINCT ON (pp.obride, pp.paride, pp.amb, COALESCE(pp.fas, 0))
     pp.can::NUMERIC(20,6)                             AS cantidad,
     pp.pre::NUMERIC(20,6)                             AS precio,
     -- importe con decimales propios de la obra:
-    --   redondea can a decc y pre a decp ANTES de multiplicar; resultado a deci
+    --   redondea SOLO pre a decp antes de multiplicar; resultado a deci
     -- NOTA: la cantidad NO se redondea. Las partidas tipo porcentaje (CP
     -- avales/seguros) tienen cantidades como 0.0015 (=0.15%) que, redondeadas
     -- a decc=3, se convertirían en 0.002 e inflarían el importe. Sigrid solo

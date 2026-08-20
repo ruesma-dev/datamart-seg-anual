@@ -1,35 +1,33 @@
 # tests/test_f006_raw_ingesta.py
 """
-Lo que las fichas de `raw` dicen de la INGESTA se contrasta con la ingesta (7ª pasada).
+Lo que las fichas de `raw` dicen de sus COLUMNAS EXCLUIDAS (7ª y 8ª pasada).
 
-La primera versión de este fichero contrastaba contra `config/tables_sigrid.yaml`,
-y ese es **justo el documento que miente**: declara `incremental_column: tiemod`
-en tablas que no tienen esa columna, y ninguna de las 31 se carga como decía la
-ficha. Contrastar contra él dio 31 fichas en verde afirmando algo falso.
+Este fichero nació contrastando también **cómo se carga** cada tabla, y esa
+parte se equivocó dos veces seguidas:
 
-Lo que hace de verdad `IngestRawStep` (`ingest_raw_step.py`, paso 3 y 4):
+* la 7ª pasada la derivó de `config/tables_sigrid.yaml` —«incremental por
+  `tiemod`»—, un fichero de configuración que declara una columna de corte que
+  la ingesta no usa para cargar;
+* la 8ª la derivó de `ingest_raw_step.py` —«append por `MAX(ide)`, lo modificado
+  no se refresca nunca»—, que describe cómo funciona el comando pero **no qué se
+  ejecuta de noche**: el `Dockerfile` arranca `run-all --full`, o sea recarga
+  entera.
 
-    if self._full_refresh:
-        pg.truncate_table("raw", spec.target_table)
-        last_id_already = 0
-    else:
-        last_id_already = pg.get_max_id("raw", spec.target_table, spec.id_column)
-    ...
-    tiemod_col = spec.incremental_column if spec.incremental_column in col_names else None
+Esa mitad **se ha retirado de aquí** y vive en
+`tests/test_f006_fuente_que_gobierna.py`, contrastada contra el `Dockerfile`,
+que es la fuente que gobierna el hecho. Dejarla aquí «arreglada» habría sido el
+tercer intento de acertar por reconstrucción.
 
-Es decir, para las 31 y siempre igual:
+Lo que sí se queda es lo que este fichero siempre pudo derivar bien, porque su
+fuente sí gobierna el hecho: **qué columnas no se ingieren**, que lo decide
+`exclude_columns` de `config/tables_sigrid.yaml`, y la biyección entre fichas y
+tablas ingeridas.
 
-* **Append por `MAX(ide)`**: se piden a Sigrid solo las filas con `ide` mayor que
-  el máximo ya guardado. Una fila **modificada** en Sigrid no se refresca nunca,
-  y una **borrada** en Sigrid se queda aquí para siempre.
-* `incremental_column` **no gobierna la carga**. Se usa solo para volcar
-  `_source_tiemod`, y solo si la columna existe entre las que se piden.
-* El `TRUNCATE` únicamente ocurre con `full_refresh=True`, que `run-all` **no
-  pasa**: hay que lanzarlo a mano.
-
-La lección, que es la misma que ya nos costó dos rechazos: **derivar de la
-fuente equivocada es tan malo como no derivar**. La fuente de «cómo se carga» es
-el código que carga.
+Y una comprobación que en su día pasaba en vacío: la primera versión solo exigía
+`citadas <= excluidas`, que se cumple sola cuando la ficha no cita ninguna. De
+31 fichas, 11 tenían exclusiones y no decían nada —`dca` y `dcf` con 23 columnas
+cada una—. Ahora la ficha tiene que decir **cuántas** son: un número no se puede
+escribir en vacío.
 """
 
 from __future__ import annotations
@@ -45,12 +43,6 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 FICHERO_RAW = RAIZ / "config" / "diccionario" / "raw.yaml"
 FICHERO_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 PASO_INGESTA = RAIZ / "etl_sigrid" / "application" / "steps" / "ingest_raw_step.py"
-
-#: Cómo tiene que decirlo la ficha. Frase fija para poder comprobarla.
-FRASE_APPEND = "append por `MAX(ide)`"
-
-#: Y lo que ya no puede decir: las dos formulaciones falsas de la tanda anterior.
-FRASES_PROHIBIDAS = ("incremental por `tiemod`", "recarga entera", "recarga entero")
 
 
 @lru_cache(maxsize=1)
@@ -68,48 +60,8 @@ def _nombres() -> list[str]:
     return sorted(_fichas())
 
 
-# ---------------------------------------------------------------------------
-# Primero: que el código siga haciendo lo que las fichas dicen que hace
-# ---------------------------------------------------------------------------
 
 
-def test_f006_r13_la_ingesta_sigue_siendo_append_por_max_ide() -> None:
-    """El ancla. Si el paso cambia de estrategia, las 31 fichas quedan obsoletas.
-
-    Sin este test, las fichas podrían seguir describiendo un `append` mucho
-    después de que la ingesta pasara a refrescar por `tiemod`, y nadie se
-    enteraría: es la misma trampa que tener 31 fichas contrastadas contra un
-    YAML de configuración que no gobierna la carga.
-    """
-    codigo = PASO_INGESTA.read_text(encoding="utf-8")
-
-    assert re.search(
-        r"last_id_already\s*=\s*pg\.get_max_id\(\s*[\"']raw[\"']", codigo
-    ), "la ingesta ya no arranca el cursor en el MAX(ide) guardado"
-    assert re.search(r"start_id\s*=\s*last_id_already", codigo), (
-        "el cursor ya no se pasa como `start_id`"
-    )
-    assert re.search(r"if\s+self\._full_refresh:", codigo), (
-        "ya no hay rama de `full_refresh`"
-    )
-    # `incremental_column` NO decide la carga: solo alimenta `_source_tiemod`.
-    assert re.search(r"tiemod_col\s*=\s*spec\.incremental_column", codigo)
-    assert re.search(r"tiemod_column\s*=\s*tiemod_col", codigo)
-
-
-def test_f006_r13_run_all_no_pide_recarga_completa() -> None:
-    """El `TRUNCATE` no ocurre de noche, y por eso las fichas no pueden decir
-    que la tabla se recarga entera."""
-    codigo = PASO_INGESTA.read_text(encoding="utf-8")
-    assert re.search(r"full_refresh:\s*bool\s*=\s*False", codigo), (
-        "si el valor por defecto pasara a True, `run-all` truncaría cada noche "
-        "y las fichas dirían lo contrario de lo que ocurre"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Y después: que las fichas lo cuenten, y lo cuenten igual
-# ---------------------------------------------------------------------------
 
 
 def test_f006_r26_hay_una_ficha_por_tabla_ingerida() -> None:
@@ -117,37 +69,8 @@ def test_f006_r26_hay_una_ficha_por_tabla_ingerida() -> None:
     assert set(_fichas()) == set(_ingesta())
 
 
-@pytest.mark.parametrize("nombre", _nombres())
-def test_f006_r13_la_ficha_dice_como_se_carga_la_tabla(nombre: str) -> None:
-    """Las 31 se cargan igual, así que las 31 lo dicen igual."""
-    texto = _fichas()[nombre]["descripcion"]
-
-    assert FRASE_APPEND in texto, (
-        f"la ficha de raw.{nombre} tiene que decir que la carga es «{FRASE_APPEND}»: "
-        f"es como se cargan las 31, y significa que una fila modificada en Sigrid "
-        f"no se refresca nunca"
-    )
-    dichas = [f for f in FRASES_PROHIBIDAS if f in texto]
-    assert dichas == [], (
-        f"la ficha de raw.{nombre} dice {dichas}, y eso no ocurre: lo dedujimos de "
-        f"`config/tables_sigrid.yaml`, que declara una columna de corte que la "
-        f"ingesta no usa para cargar (y que en muchas tablas ni existe)"
-    )
 
 
-@pytest.mark.parametrize("nombre", _nombres())
-def test_f006_r13_la_ficha_avisa_de_que_lo_modificado_no_vuelve(nombre: str) -> None:
-    """La consecuencia importa más que el mecanismo.
-
-    «Append por MAX(ide)» es exacto y no le dice nada a quien no lo interprete.
-    Lo que hay que saber al usar el dato es que **lo modificado en Sigrid no se
-    refresca**, así que la ficha lo dice con todas las letras.
-    """
-    texto = _fichas()[nombre]["descripcion"].lower()
-    assert "no se refresca" in texto or "no vuelve a leerse" in texto, (
-        f"la ficha de raw.{nombre} explica el mecanismo pero no su consecuencia: "
-        f"una fila cambiada en Sigrid se queda con el valor de cuando entró"
-    )
 
 
 # ---------------------------------------------------------------------------

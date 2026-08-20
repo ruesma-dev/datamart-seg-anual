@@ -2203,3 +2203,55 @@ def test_f006_r2_la_clave_cubre_lo_del_group_by_que_no_es_derivable() -> None:
         f"que no se pueden dar por dependientes de la clave: o entran en ella, "
         f"o la ficha promete una unicidad que no existe"
     )
+
+
+def test_f006_r2_control_el_guardian_de_nulos_sigue_detectando() -> None:
+    """El único detector de este fichero que no tenía control. Y está en cero.
+
+    Medido en la octava pasada: el guardián evalúa 15 fichas y **30 columnas
+    candidatas, de las que ninguna llega al `assert`** —se filtran todas en la
+    guarda de proyección desnuda—. Eso no lo hace inútil: sigue siendo la alarma
+    que se dispara el día que alguien publique un `nulo_significa` sobre una
+    columna que trae 0. Pero un detector en cero **sin control** es
+    indistinguible de un detector roto, y ya nos pasó con la comprobación de
+    columnas excluidas, que pasaba en vacío en once fichas.
+
+    Este test no comprueba las fichas: comprueba **el detector**, sobre un caso
+    fabricado en el que sí tiene que morder, y sobre los dos recortes que lo
+    acotan.
+    """
+    sql_malo = """
+    CREATE OR REPLACE VIEW maestro.ejemplo AS
+    SELECT
+        o.entide                       AS cliente_id
+    FROM raw.obr o;
+    """
+    bloque = _bloque_del_objeto(sql_malo, "maestro.ejemplo")
+    alias = _alias_directos_de_raw(sql_malo)
+    proyeccion = _proyeccion_de(bloque, "cliente_id")
+
+    assert alias == {"o"}, "el lector de alias tiene que ver `FROM raw.obr o`"
+    assert proyeccion is not None, "y la proyección tiene que encontrarse"
+    directa = re.match(r"\s*(\w+)\.(\w+)\s+AS\b", proyeccion, re.IGNORECASE)
+    assert directa and directa.group(1) in alias, (
+        "la proyección desnuda `o.entide AS cliente_id` tiene que pasar la "
+        "guarda: si no, el guardián no muerde nunca y está roto, no en cero"
+    )
+    assert "NULLIF" not in proyeccion.upper(), "y este caso tiene que fallar el assert"
+
+    # Y los dos recortes, que son lo que baja la cuenta a cero hoy:
+    sql_left = """
+    CREATE OR REPLACE VIEW maestro.ejemplo AS
+    SELECT
+        c.ide                          AS cliente_id
+    FROM raw.obr o
+    LEFT JOIN raw.con c ON c.ide = o.entide;
+    """
+    assert "c" not in _alias_directos_de_raw(sql_left), (
+        "un alias de `LEFT JOIN` no puede contar: su NULL lo produce el join"
+    )
+
+    sql_compuesto = "        COALESCE(a.x, b.y)             AS cliente_id,"
+    assert re.match(r"\s*(\w+)\.(\w+)\s+AS\b", sql_compuesto) is None, (
+        "una expresión compuesta no es una proyección desnuda y no se analiza"
+    )

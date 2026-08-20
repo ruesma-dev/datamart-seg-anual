@@ -123,7 +123,7 @@ objetos:
           Sigrid en su cadena de planificacion. Un cero intermedio es un estorno
           literal; un cero final arrastra el ultimo valor positivo.
         unidad: "%"
-        agregacion: ultimo_valor
+        agregacion: suma_solo_dentro_del_mes
         nulo_significa: La fila no procede de una cadena de planificacion porcentual.
       pct_mes:
         significado: >-
@@ -146,7 +146,7 @@ objetos:
         agregacion: suma_solo_dentro_del_mes
       can_origen:
         significado: Cantidad acumulada desde el inicio hasta ese mes.
-        agregacion: ultimo_valor
+        agregacion: suma_solo_dentro_del_mes
       importe_mes:
         significado: Importe imputado A ESE MES concreto, ya desacumulado.
         unidad: EUR
@@ -156,7 +156,7 @@ objetos:
           Importe ACUMULADO desde el inicio hasta ese mes. Sumarlo a lo largo del
           tiempo multiplica el resultado.
         unidad: EUR
-        agregacion: ultimo_valor
+        agregacion: suma_solo_dentro_del_mes
       importe_mes_raw:
         significado: El importe del mes calculado con el precio SIN redondear a dos decimales.
         unidad: EUR
@@ -165,7 +165,7 @@ objetos:
       importe_origen_raw:
         significado: Version sin redondear del acumulado a origen.
         unidad: EUR
-        agregacion: ultimo_valor
+        agregacion: suma_solo_dentro_del_mes
         nulo_significa: No se calculo la version sin redondear para esa fila.
       total_incurrido:
         significado: >-
@@ -173,7 +173,7 @@ objetos:
           Normalmente coincide con cantidad por precio, pero a veces difiere en
           centimos.
         unidad: EUR
-        agregacion: ultimo_valor
+        agregacion: suma_solo_dentro_del_mes
         nulo_significa: >-
           La fila no es de un ambito REAL. Llega en los **dos** reales —3
           (coste) y 7 (venta)—, no solo en coste, porque el bloque que lo trae
@@ -248,6 +248,11 @@ objetos:
       cuatro es el grano conceptual. `fase_num` es el mismo campo `fas` de Sigrid
       y arrastra su ambiguedad: mes en los ambitos reales, numero de version en
       los master.
+
+      **`fase_num = 0` no es un mes: es el "Previsto" vivo**, la estimacion
+      vigente de la obra. De ahi sale el fallback del cierre para el mes en curso
+      sin master (`cierre/02_build_fact.sql`, bloque E), asi que filtrar
+      `fase_num >= 1` lo deja fuera y filtrar `= 0` da justo esa foto.
     clave_negocio: [presupuesto_id]
     paso_etl: build_stg
     refresco: nocturno
@@ -281,8 +286,16 @@ objetos:
           proposito**: en las partidas de tipo porcentaje la cantidad es un
           coeficiente diminuto, y redondearlo infla el importe de forma visible.
 
-          **En los ambitos REALES (3 y 7) este valor viene ACUMULADO A ORIGEN**: la fila de la fase 5 trae lo llevado hasta el mes 5, no lo del mes 5. Sumarlo a traves de `fase_num` cuenta el mismo importe una vez por cada mes transcurrido. Para el total de la obra hay que quedarse con la fase MAYOR, y para el valor del mes hay que restar la fase anterior, que es lo que hace `stg.plan_mensual`.
-        agregacion: ultimo_valor
+          **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
+          Sumar por obra o por partida con la fase fija es correcto, y es lo
+          que hace `cierre/02_build_fact.sql` con `WHERE fase_num = 0`. Lo
+          que no vale es cruzar fases: en los ambitos REALES (3 y 7) el
+          valor viene **acumulado a origen** —la fila de la fase 5 trae lo
+          llevado hasta el mes 5, no lo del mes 5—, asi que sumarlas cuenta
+          el mismo importe una vez por cada mes transcurrido. Para el total
+          hay que quedarse con la fase MAYOR; para el valor de un mes,
+          restar la anterior, que es lo que hace `stg.plan_mensual`.
+        agregacion: suma_solo_dentro_del_mes
       precio:
         significado: Precio unitario, con seis decimales para no perder precision de Sigrid.
         unidad: EUR
@@ -292,9 +305,17 @@ objetos:
           Importe total de la partida, redondeado con los decimales que la obra
           tenga configurados. **Es la columna de COSTE** (ambitos 3 y 8).
 
-          **En los ambitos REALES (3 y 7) este valor viene ACUMULADO A ORIGEN**: la fila de la fase 5 trae lo llevado hasta el mes 5, no lo del mes 5. Sumarlo a traves de `fase_num` cuenta el mismo importe una vez por cada mes transcurrido. Para el total de la obra hay que quedarse con la fase MAYOR, y para el valor del mes hay que restar la fase anterior, que es lo que hace `stg.plan_mensual`.
+          **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
+          Sumar por obra o por partida con la fase fija es correcto, y es lo
+          que hace `cierre/02_build_fact.sql` con `WHERE fase_num = 0`. Lo
+          que no vale es cruzar fases: en los ambitos REALES (3 y 7) el
+          valor viene **acumulado a origen** —la fila de la fase 5 trae lo
+          llevado hasta el mes 5, no lo del mes 5—, asi que sumarlas cuenta
+          el mismo importe una vez por cada mes transcurrido. Para el total
+          hay que quedarse con la fase MAYOR; para el valor de un mes,
+          restar la anterior, que es lo que hace `stg.plan_mensual`.
         unidad: EUR
-        agregacion: ultimo_valor
+        agregacion: suma_solo_dentro_del_mes
       importe_oficial:
         significado: >-
           El importe con los coeficientes que Sigrid aplica SOLO EN VENTA. **Es
@@ -302,17 +323,30 @@ objetos:
           lo mismo que `importe`, y por eso confundirlas pasa desapercibido en
           coste y falsea la venta.
 
-          **En los ambitos REALES (3 y 7) este valor viene ACUMULADO A ORIGEN**: la fila de la fase 5 trae lo llevado hasta el mes 5, no lo del mes 5. Sumarlo a traves de `fase_num` cuenta el mismo importe una vez por cada mes transcurrido. Para el total de la obra hay que quedarse con la fase MAYOR, y para el valor del mes hay que restar la fase anterior, que es lo que hace `stg.plan_mensual`.
+          **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
+          Sumar por obra o por partida con la fase fija es correcto, y es lo
+          que hace `cierre/02_build_fact.sql` con `WHERE fase_num = 0`. Lo
+          que no vale es cruzar fases: en los ambitos REALES (3 y 7) el
+          valor viene **acumulado a origen** —la fila de la fase 5 trae lo
+          llevado hasta el mes 5, no lo del mes 5—, asi que sumarlas cuenta
+          el mismo importe una vez por cada mes transcurrido. Para el total
+          hay que quedarse con la fase MAYOR; para el valor de un mes,
+          restar la anterior, que es lo que hace `stg.plan_mensual`.
         unidad: EUR
-        agregacion: ultimo_valor
+        agregacion: suma_solo_dentro_del_mes
       dec_cantidades:
         significado: >-
-          Decimales de cantidad configurados en la obra (`obr.decc`; por defecto
-          3). **No redondea la columna `cantidad` de esta misma tabla**, que se
-          guarda con seis decimales a proposito: gobierna el redondeo que se
-          aplica DENTRO del calculo del importe,
-          `ROUND(ROUND(can, decc) * ROUND(pre, decp), deci)`, y se expone aqui
-          para que `stg.plan_mensual` reaplique el mismo al explotar el plan.
+          Decimales de cantidad configurados en la obra (`obr.decc`; por
+          defecto 3). **Se expone y NO interviene en ningun calculo de esta
+          tabla.** El importe se computa `ROUND(can * ROUND(pre, decp), deci)`:
+          la cantidad **no se redondea**, y el propio SQL explica por que —las
+          partidas tipo porcentaje tienen cantidades como 0.0015 que,
+          redondeadas a tres decimales, se irian a 0.002 e inflarian el
+          importe—.
+
+          Se conserva para que `stg.plan_mensual` tenga a mano los decimales de
+          la obra. **Ojo con los comentarios del SQL**: alguno repite una formula
+          con `decc` dentro que el codigo no ejecuta. Manda el codigo.
         agregacion: no_sumable
       dec_precios:
         significado: Decimales de precio configurados en la obra.
@@ -322,8 +356,14 @@ objetos:
         agregacion: no_sumable
       _source_tiemod:
         significado: >-
-          Marca de modificacion de la fila en Sigrid, que usa la ingesta
-          incremental. Instrumentacion, no negocio.
+          El `tiemod` que la fila de Sigrid tenia **cuando entro en `raw`**.
+          Instrumentacion, no negocio.
+
+          **No es una marca de modificacion vigente.** Nadie la actualiza
+          despues: en la recarga nocturna (`run-all --full`) se reescribe con el
+          valor del momento de la carga, y en un `ingest` sin `--full` la fila ni
+          siquiera vuelve a leerse. Sirve para saber con que version del origen
+          entro un dato, no para detectar cambios.
         agregacion: no_sumable
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
@@ -370,8 +410,11 @@ objetos:
           de su obra.
         agregacion: no_sumable
       codigo_partida:
-        significado: Codigo jerarquico de la partida dentro de su obra.
-        nulo_significa: La partida no tiene codigo en Sigrid.
+        significado: >-
+          Codigo jerarquico de la partida dentro de su obra. **Nunca es NULL**:
+          la rama raiz del recorrido filtra `p.cod IS NOT NULL AND p.cod <> ''`,
+          y las descendientes cuelgan de un padre que ya paso ese filtro. Una
+          partida sin codigo en Sigrid **no llega a esta tabla**.
       capitulo_padre_id:
         significado: Capitulo del que cuelga directamente.
         agregacion: no_sumable
@@ -397,10 +440,7 @@ objetos:
         significado: >-
           Codigo del capitulo raiz. Es la ENTRADA de la heuristica que decide la
           categoria.
-        nulo_significa: >-
-          El capitulo raiz no tiene codigo en Sigrid. **No** significa que la
-          fila sea la raiz: en la raiz este campo trae su propio codigo, igual
-          que `capitulo_raiz_id` trae su propio `ide`.
+        nulo_significa: null
       categoria:
         significado: >-
           Clasificacion del coste. **Es una HEURISTICA sobre el codigo del
@@ -413,12 +453,15 @@ objetos:
         significado: >-
           Camino completo de capitulos hasta la partida, separado por " > ". Es
           lo que permite reconstruir el arbol sin recursion, y de donde salen los
-          niveles de `mart.v_pbi_dim_partida_niveles`.
-        nulo_significa: No se pudo reconstruir la ruta.
+          niveles de `mart.v_pbi_dim_partida_niveles`. **Nunca es NULL**: se
+          concatena a partir de codigos que el filtro de entrada ya garantiza no
+          nulos.
       nivel:
-        significado: Profundidad en el arbol de capitulos, empezando en 0 para el raiz.
+        significado: >-
+          Profundidad en el arbol de capitulos, empezando en 0 para el raiz.
+          **Nunca es NULL**: la raiz entra con un `0` literal y cada
+          descendiente suma uno al de su padre.
         agregacion: no_sumable
-        nulo_significa: No se pudo calcular la profundidad.
       activa: >-
         Marca de partida vigente, tomada del origen. Ojo, no confundir con la
         `activa` de `stg.obras`, que esta cableada a TRUE.

@@ -4,11 +4,246 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **siete pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **ocho pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# OCTAVA PASADA · 2026-08-21 — la regla de oro y la carga de `raw`
+
+> Commits revisados: `f1d449f`..`a7cccdd`.
+
+## Veredicto de la octava pasada
+
+**RECHAZADO.** Las dos correcciones centrales de la tanda —la regla de oro y la
+carga de `raw`— **sustituyeron una afirmación falsa por otra**, y en los dos
+casos la nueva es falsa en dirección contraria. No es un matiz: la regla es
+`bloqueante` y se adjunta a las 31 fichas del origen, y la carga es lo que le
+dice al agente cuán viejo es el dato que está leyendo.
+
+Lo demás de la tanda está bien, y una parte muy bien: el fallo de
+`_proyeccion_de` **no tuvo efecto retroactivo** —medido por dos vías
+independientes—, las seis fichas de `compras` revalidadas no tienen ni una
+columna ajena, la biyección 102↔102 es exacta y la mutación cuadra con el
+bytecode limpio.
+
+**Rectifico además una frase de mi propio borrador**: escribí que el guardián de
+nulos «pasa de cubrir 1 ficha a 15». Eso describe el bucle, no la comprobación:
+lo medí y **cero columnas llegan hoy al `assert`** (defecto 12).
+
+---
+
+## Los defectos
+
+### A · La regla de oro: 1 de 7 excepciones es correcta
+
+1. **`cen.res` no existe: la regla vuelve a inventar un campo (GRAVE).** Es el
+   defecto por el que se rechazó la séptima pasada, movido de tabla. La regla
+   dice que `cen.res` es «Reparto nombre» y la ficha lo repite
+   (`raw.yaml:354-356`). Conté las coincidencias en el bloque de `cen` de
+   `azure-apps/sigrid_tablas.md` (L4651-4715): **cero**. El `res | Reparto
+   nombre` está en **`cenrep`** (L4723), tabla distinta que **ni se ingiere**.
+   Lo corrobora nuestro SQL: `cierre/05_views_cabecera.sql:175` toma el nombre
+   del centro de `cenc.res`, donde `cenc` es **`raw.con`**, y el `LEFT JOIN
+   raw.cen` de la línea anterior no aporta ninguna columna.
+2. **Cuatro falsos positivos más (MEDIA-GRAVE).** La regla exige «campos propios
+   **con el mismo nombre**». `ctr`, `dca` y `dcf` llevan `entcod`, `entres`,
+   `entcif` y `fecdoc` —nombres distintos—; `com` no tiene ninguno de los tres.
+   Y `prv` no tiene `cod`/`res`/`fec`: tiene `cif` y `raz`, que es lo que dice
+   bien el punto 4, así que el punto 3 la contradice y contradice a su propia
+   ficha, que acierta.
+3. **Y dieciséis falsos negativos (GRAVE).** «Las que los tienen son …» se lee
+   como enumeración cerrada sobre las 31 tablas. Faltan `conext`, `obrparpar`,
+   `obrfas`, `obrfasamb`, `obrctr`, `condir`, `obrprv`, los cinco catálogos
+   `aux*`, `ctrpro`, `dcapro` y `dcfpro`. Mi barrido derivable sobre nuestro SQL
+   —para cada alias de `raw`, usos de `.cod`/`.res`/`.fec`/`.raz`/`.cif`—
+   confirma que **ocho de ellas se leen a diario sin unir a `con`**: entre otras
+   **`obrparpar`** (`stg/04_partidas.sql:46-47`: `p.cod AS codigo_partida`,
+   `p.res AS descripcion_corta` — el código y la descripción de la partida),
+   `obrfas.res` (el nombre del mes) y los catálogos `auxobramb`, `auxobrtip`,
+   `auxobrcla`, `auxpro`, `auxmun`, que **no tienen ninguna relación con `con`**:
+   el JOIN que la regla sugiere no existe.
+4. **La copia divergente sigue publicada (MEDIA).** La cabecera de `raw.yaml`,
+   que encabeza las 31 fichas, conserva intacta la frase rechazada —«`cod`,
+   `res` y `fec` viven en `con`, **no en la tabla especifica**»— y ocho líneas
+   después declara: «Esta regla se publica ademas como `R-SIGRID-CON` en el
+   bloque global», presentando como la misma dos versiones que divergen. Es el
+   **quinto caso** del patrón: la corrección se aplica donde se señaló y la copia
+   sobrevive.
+5. **El mecanismo no podía cazarlo (MEDIA).** `CON_CAMPOS_PROPIOS`
+   (`tests/test_f006_regla_de_oro.py:48`) es una lista escrita a mano, y el test
+   que exige que las fichas repitan la excepción (`:143`) se parametriza solo con
+   `["obr", "prv"]`: **con `cen` dentro habría fallado**. El comentario que
+   justifica no derivarla del PDF es honesto —el segmentador daba resultados
+   inestables, y de ahí salió justamente el error de `cen`/`cenrep`—, pero la
+   conclusión es la equivocada: **había una fuente derivable sin usar, nuestro
+   propio SQL**.
+
+**Cómo cerrarlo**: que la regla enuncie el patrón sin lista cerrada, nombre las
+excepciones verificadas una a una —`obr.res` es la única confirmada entre las
+diez extensiones 1:1, y `prv` aporta `cif`/`raz` con otro nombre— y que un test
+derive del SQL las tablas cuyos campos propios usa el ETL y exija que la regla no
+las contradiga.
+
+### B · La carga de `raw`: la nueva redacción es falsa contra la ejecución real
+
+6. **La imagen desplegada hace recarga completa (GRAVE).** Las 31 fichas dicen
+   ahora que la carga es append por `MAX(ide)` y que **«lo modificado en Sigrid
+   no se refresca nunca»**. El `Dockerfile:26-27` dice lo contrario, y es lo que
+   se despliega:
+
+   ```dockerfile
+   # El job nocturno SIEMPRE full (el incremental pierde UPDATEs).
+   ENTRYPOINT ["python", "main.py"]
+   CMD ["run-all", "--full"]
+   ```
+
+   Y lo corroboran `docs/ARCHITECTURE.md` («la ingesta nocturna SIEMPRE
+   `--full`»), `infra/80_create_job.ps1` («el alcance de la carga nocturna está
+   escrito en el Dockerfile y en ningún sitio más»), el runbook y
+   `azure-apps/datamart_seg_anual.md`. La corrección se derivó de
+   `ingest_raw_step.py` —la fuente correcta para *cómo* carga el comando— y no de
+   la que gobierna *qué se ejecuta de noche*. Es el error que el docstring de ese
+   mismo fichero de tests denuncia: «derivar de la fuente equivocada es tan malo
+   como no derivar».
+7. **La bandera citada 31 veces no existe (GRAVE).** Las fichas dicen «la recarga
+   completa existe —`--full-refresh`, que hace `TRUNCATE`—». La opción real es
+   **`--full`** (`python main.py ingest --help`); `--full-refresh` falla con «no
+   such option». Un comando inejecutable, publicado 31 veces.
+8. **«`run-all` no la pasa» es falso (MEDIA).** `run-all` tiene `--full`
+   (`main.py:457`) y lo propaga hasta `IngestRawStep`. Lo cierto es que el
+   *valor por defecto* es incremental; combinado con el defecto 6, la frase manda
+   al lector justo al revés de lo que ocurre en producción.
+
+### C · Copias supervivientes del mismo defecto
+
+9. **`stg.yaml:323-326`** conserva la frase que esta misma tanda erradicó de las
+   31 fichas de `raw`: `_source_tiemod` «Marca de modificacion de la fila en
+   Sigrid, **que usa la ingesta incremental**». El barrido de frases prohibidas
+   del test nuevo solo mira `raw.yaml`. Y falta la consecuencia que sí importa y
+   nadie dice: bajo append, `_source_tiemod` guarda el `tiemod` que la fila tenía
+   **al entrar**, así que es una marca de inserción, no de modificación.
+10. **Cuatro `nulo_significa` imposibles en `stg.partidas`**, uno de ellos el que
+    se acaba de «corregir»: `capitulo_raiz_cod` dice ahora «El capitulo raiz no
+    tiene codigo en Sigrid», imposible porque la rama raíz filtra `p.cod IS NOT
+    NULL AND p.cod <> ''` (`04_partidas.sql:57-58`). Igual en `codigo_partida`,
+    `ruta_capitulos` y `nivel`, que se construyen sin poder ser nulos.
+
+### D · Otras fichas
+
+11. **`dec_cantidades` afirma gobernar una fórmula en la que no aparece
+    (GRAVE).** La ficha (`stg.yaml:307-314`) dice que gobierna el redondeo
+    `ROUND(ROUND(can, decc) * ROUND(pre, decp), deci)`. El SQL real es
+    `ROUND(pp.can::NUMERIC * ROUND(pp.pre::NUMERIC, decp), deci)`
+    (`06_presupuesto.sql:73-76`): **`decc` no interviene**, y la NOTA de cuatro
+    líneas antes lo dice expresamente —«la cantidad NO se redondea… Sigrid solo
+    redondea el PRECIO»—. El origen del error es reconocible: los comentarios de
+    `08_plan_mensual.sql:309,401-402` sí repiten la fórmula con `decc`, y la
+    ficha copió el comentario en vez del código. Es la deuda «comentarios del SQL
+    que mienten» mordiendo por primera vez.
+12. **El guardián de nulos no comprueba nada hoy (MEDIA, mecanismo).** Lo medí:
+    15 fichas evaluadas, **30 columnas candidatas y cero llegan al `assert`** —se
+    filtran todas en la guarda de proyección desnuda—. No es inútil: queda como
+    alarma para el futuro. Pero, a diferencia de los otros seis detectores del
+    fichero, **no tiene un `test_..._control_...`** que fije que sigue detectando
+    algo, que es justo lo que impide que un detector se degrade a cero en
+    silencio. Y ya está en cero.
+13. **La plantilla de exclusiones es falsa en 19 fichas (MEDIA).** «No se traen N
+    columnas: textos largos, observaciones e imagenes» se aplicó igual a todas:
+    en `pag` la única excluida es `blores`; en `dca`/`dcf` seis de las 23 son
+    direcciones; en `cen` y `obrprv` solo hay `tex`. En `dca`/`dcf` el texto
+    anterior —«una lista larga de textos y campos de direccion»— era **exacto**,
+    así que el diff cambió una frase cierta por una falsa. El test comprueba el
+    número y las columnas citadas, no la caracterización.
+
+### Menores
+
+- «Antes de escribir cualquier consulta contra `raw`, **cinco cosas**» y numera
+  **seis**; el `motivo` repite el error. El punto 6 —polimorfismo `docoritip`,
+  nuevo, correcto y con cita literal verificada— queda anunciado como si no
+  existiera.
+- El punto 4 acierta con `prv.cif` pero omite que `ctr.entcif`, `dca.entcif` y
+  `dcf.entcif` traen el CIF desnormalizado en la cabecera del documento.
+- `stg.presupuesto` baja sus tres medidas a `ultimo_valor`, lo que contradice su
+  propio `ejemplos_preguntas` («cuánto suma el presupuesto de venta…») y el uso
+  real de `cierre/02_build_fact.sql:259-286`, que hace `SUM(importe_oficial)`
+  sobre una fase fija. Lo no sumable es la dimensión `fase_num`, no la columna.
+- `fase_num = 0` en los ámbitos reales es el «Previsto» vivo, no un mes, y el
+  `grano` reescrito no lo recoge pese a que `cierre/02_build_fact.sql:252-286`
+  depende de ello.
+- La receta `grep -n "^| <tabla> "` que las 31 fichas dan para localizar la tabla
+  en `sigrid_tablas.md` no aísla el bloque de `con`.
+- `config/tables_sigrid.yaml` sigue diciendo «catálogo estable, refresco
+  completo» en 13 tablas, y poner `incremental_column: null` no provoca ninguna
+  recarga. Las fichas aciertan y el fichero de configuración miente.
+
+---
+
+## Lo que sí está verificado y correcto
+
+### El fallo de `_proyeccion_de` no tuvo efecto retroactivo
+
+Era lo que más preocupaba y se midió por dos vías independientes que coinciden:
+
+- **Un solo llamante en toda su vida**: el guardián de nulos. `git log -S` da
+  tres commits —nacimiento, corrección, informe— y ninguna otra llamada. Los
+  demás contrastes van por `columnas_del_create_table`, `cuerpo_de_vista`,
+  `cuerpo_del_insert`, `pk_declarada` y `proyeccion_por_alias`, todos
+  cualificados por `esquema.objeto`.
+- **Alcanzaba a una sola ficha**: `cierre.v_pbi_cierre_cabecera`, cuyo fichero
+  crea **un solo objeto**. No había vecino del que heredar proyección.
+- **Revalidación a mano de las seis fichas de `compras/01_documentos.sql`**: 78
+  columnas documentadas contra 78 proyectadas, **ninguna ajena y ninguna
+  omitida**, y los **30 `nulo_significa` respaldados por el `NULLIF`/`CASE` de su
+  propio bloque**. Los dos casos donde el vecino sí habría mentido
+  —`albaranes.contrato_id` y `factura_lineas.albaran_id`— son correctos.
+- Mismo contraste sobre los otros once ficheros multiobjeto: **0 problemas**.
+
+El acotado fue en la práctica un anti-falsos-positivos: eliminó tres acusaciones
+falsas contra `compras` que aparecieron al ampliar el guardián. Correcto y
+necesario, pero no reparó nada retroactivo.
+
+### Lo demás
+
+- **`pendientes` en 0 significa lo que dice**: biyección exacta, 102 fichas ↔ 102
+  objetos, sin huérfanas ni fantasmas, con los recuentos por esquema cuadrando
+  uno a uno. Salvedad ya conocida: «los que el repositorio publica» son los que
+  ve la heurística; la verdad es R28, que sigue sin existir.
+- **El punto 2 de la regla es exacto**: las diez «Propiedades de `con`» son
+  exactamente esas diez. El punto 6 (polimorfismo) es correcto con cita literal.
+  `con.nom` no existe, `obr.res` sí, y `prv.cif`/`prv.raz` tienen la doble
+  verificación que declaran.
+- **Mutación**: recalculada con el `__pycache__` borrado —2358 líneas, 166
+  mutantes—, idéntica a lo declarado, 0 supervivientes y 0 timeouts.
+  `harness/mutacion.py` **intacto**, como debe ser: su arreglo es F-041.
+- **Nada prohibido**: el diff toca YAML, dominio, tests y `progress/`. Ni un
+  `GRANT`, `REVOKE`, firewall, Azure ni conexión a la base. **Sin `push`**.
+- El resto de correcciones de la tanda que verifiqué y son ciertas:
+  `R-FRESCURA-MANUAL` con los seis pasos reales, `stg.fases.anio`/`.mes`,
+  `maestro.obras.cliente_id`, `capitulo_raiz_id`, `version_master_vigente` a
+  `1:N`, `total_incurrido` en los dos ámbitos reales y la guarda del mes oficial.
+
+---
+
+## Qué falta para poder pasar la batería de aceptación
+
+Cuando se cierren estos trece, lo que queda ya no es contenido:
+
+1. **T19**: publicar contra la base real y comprobar el contrato de `_meta`.
+2. **T26/T27**: `check-diccionario` contra el catálogo real, con la consulta de
+   unicidad de clave. Es además lo único que convierte «102 objetos» en una
+   verdad y no en lo que ve una expresión regular.
+3. **T39**: las 18 preguntas contra el diccionario publicado —13 respondibles, 3
+   parciales y 2 que deben contestarse con un «no puedo, y este es el motivo»—.
+4. Los bloques 🔏 de permisos y firewall, que necesitan firma del humano.
+
+Y la deuda declarada que viaja: el falso positivo del detector de multifuente,
+los menores 5-7 de la sexta pasada, F-041 para que «cero supervivientes»
+signifique lo que dice, y ahora los comentarios del SQL que mienten —que con el
+defecto 11 han dejado de ser deuda teórica—.
 
 ---
 

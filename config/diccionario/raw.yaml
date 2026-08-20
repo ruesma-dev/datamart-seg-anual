@@ -1,65 +1,51 @@
 # config/diccionario/raw.yaml
 #
-# Fichas del esquema `raw`: la copia literal de Sigrid, tabla a tabla.
+# Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
 # **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 31 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
-# referencias— ya existe y esta mantenido en `azure-apps/sigrid_tablas.md`.
-# Copiarlo aqui crearia una segunda version que divergiria; cada ficha apunta
-# alli. Lo que SI se documenta es lo que ese documento no dice: que tabla
-# alimenta que parte del datamart, cual esta vacia, y cual se ingiere sin que
-# nadie la use.
+# referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
+# el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
+# dice: que tabla alimenta que parte del datamart, cual esta vacia, cual se
+# ingiere sin que nadie la use, y como se carga.
 #
-# **NINGUNA de estas tablas es superficie de consulta.** No es una preferencia
-# de estilo: aqui no hay semantica de negocio, y quien pregunte sobre negocio
-# tiene la respuesta ya traducida aguas abajo. Cada ficha dice donde.
-#
-# ---------------------------------------------------------------------------
-# LA REGLA DE ORO DE SIGRID
-# ---------------------------------------------------------------------------
-# Sin esto, `raw` es ilegible; con esto, casi todo encaja. Verificado en la
-# entidad `con` de `sigrid_tablas.md` (pagina 94) y en las cabeceras de las
-# demas tablas.
-#
-# 1. **`ide` es la clave de TODAS las tablas.** Se llama igual en las 31, es el
-#    INDICE PRIMARIO y es unico. Un campo que acabe en `ide` en otra tabla
-#    —`conide`, `entide`, `obride`— es una referencia a ese `ide`.
-# 2. **Muchas tablas son "Propiedades de `con`" en 1:1.** Es literalmente lo que
-#    pone su cabecera en Sigrid. `obr`, `prv`, `cen`, `ctr`, `com`, `dca`,
-#    `dcf`, `cob`, `pag` y `rec` NO son entidades completas: son la extension
-#    especifica de un CONCEPTO, y comparten su `ide` con la fila de `con`.
-# 3. **`cod`, `res` y `fec` viven en `con`, no en la tabla especifica.** El
-#    codigo, la descripcion y la fecha de alta de una obra, de un proveedor o de
-#    una factura estan todos en `con`. Por eso casi todas las consultas del ETL
-#    empiezan uniendo la tabla con `con` por `ide`.
-# 4. **`con.nom` NO EXISTE.** El nombre legible es `con.res` ("Resumen"). Es el
-#    error mas facil de cometer al escribir una consulta contra Sigrid, y no
-#    falla con un dato raro: falla con "columna inexistente".
-# 5. **Las fechas son ENTEROS `YYYYMMDD`**, tipo "Entero tipo fecha" en Sigrid.
-#    Y **`0` no es una fecha, es el NULL**: Sigrid no guarda nulos en los
-#    enteros. Un `MIN(fecha)` sin excluir el cero devuelve cero.
-#
-# Esta regla se publica ademas como `R-SIGRID-CON` en el bloque global, para que
-# el agente la reciba entera antes de escribir ninguna consulta.
+# **NINGUNA de estas tablas es superficie de consulta.** Aqui no hay semantica de
+# negocio, y quien pregunte sobre negocio tiene la respuesta ya traducida aguas
+# abajo. Cada ficha dice donde.
 #
 # ---------------------------------------------------------------------------
-# Lo que dice cada ficha
+# LA REGLA DE ORO NO SE COPIA AQUI. Esta en `R-SIGRID-CON` (00_global.yaml).
 # ---------------------------------------------------------------------------
-# - Que es la tabla en Sigrid, con la descripcion literal del autodocumentador.
-# - **Que parte del datamart la usa**, o que NO la usa nadie. Seis de las 31 se
-#   ingieren y no las lee ningun SQL: se dice en su ficha, porque una tabla que
-#   se carga cada noche sin consumidor cuesta tiempo de ventana y hace creer que
-#   hay una funcionalidad que no existe. Una de esas seis, `auxobrtca`, tampoco
-#   se consulta pero SI se comprueba: `build_stg` aborta si le faltan columnas.
-#   Que ningun SQL lea una tabla no significa que se pueda dejar de ingerir.
-# - Si la carga es INCREMENTAL por `tiemod` o completa cada noche.
-# - Que columnas NO se traen (`exclude_columns` de `config/tables_sigrid.yaml`):
-#   son textos largos, observaciones e imagenes. Preguntar por ellas en `raw`
-#   no devuelve nulo, devuelve "columna inexistente".
+# Esta cabecera tuvo una version resumida de la regla, y **divergio**: la
+# septima pasada de review corrigio la regla publicada y la copia de aqui
+# sobrevivio intacta, afirmando lo contrario y declarandose «la misma regla».
+# Fue el quinto rechazo por el patron de la copia, y por eso ahora hay un
+# barrido automatico (`tests/test_f006_copias.py`) que mira **el texto crudo,
+# comentarios incluidos**.
 #
-# Contrastado con `config/tables_sigrid.yaml` (las 31 entradas, sus
-# `incremental_column` y sus `exclude_columns`) y con los SQL de
-# `etl_sigrid/infrastructure/postgres/sql/` para saber quien consume cada una.
+# Regla de mantenimiento: lo que el agente tiene que saber va en la regla o en
+# la ficha, que son lo que se publica. Un comentario que repite una afirmacion
+# publicada es una copia esperando a divergir.
+#
+# ---------------------------------------------------------------------------
+# De donde sale lo que estas fichas afirman
+# ---------------------------------------------------------------------------
+# Cada afirmacion se deriva de la fuente que GOBIERNA el hecho, y no de la que
+# habla de algo parecido. Costo dos revisiones aprenderlo:
+#
+#   que corre de noche          -> `Dockerfile` (`CMD ["run-all", "--full"]`)
+#   como carga segun la bandera -> `ingest_raw_step.py`
+#   como se llama la bandera    -> los `click.option` de `main.py`
+#   que campos propios existen  -> nuestro SQL, que no correria contra una
+#                                  columna inexistente
+#
+# `sigrid_tablas.md` **no esta en esa lista**: es la conversion literal de un PDF
+# de 380 paginas, no se deja segmentar, y los dos intentos de derivar de el
+# produjeron una afirmacion falsa. Sirve para consultar una columna concreta a
+# mano; no para respaldar una ficha.
+#
+# Contrastado con `config/tables_sigrid.yaml` (las 31 entradas y sus
+# `exclude_columns`) y con `etl_sigrid/infrastructure/postgres/sql/`.
 
 version: 1
 esquema: raw
@@ -85,22 +71,29 @@ objetos:
       comparten su `ide` con una fila de aqui, y por eso casi toda consulta
       contra Sigrid empieza uniendo con esta tabla.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `con`. Se busca con `grep
-      -n "^| con " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `con`. Se localiza con
+      `grep -n "^| con " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `con`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 2 columnas: solo `ima`, `tex`. Preguntar por ellas
+      aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -120,18 +113,26 @@ objetos:
       deja definir por encima de los fijos de `con`. El ETL los lee en
       `stg/03_obras` y en `stg/07_version_master_vigente`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `conext`. Se busca con
-      `grep -n "^| conext " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `conext`. Se localiza con
+      `grep -n "^| conext " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `conext`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por extension de concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -158,18 +159,26 @@ objetos:
       `R-SIGRID-CON` nombra: no asumas que el nombre esta solo en `con`, ni
       que el de aqui es el mismo.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `obr`. Se busca con `grep
-      -n "^| obr " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `obr`. Se localiza con
+      `grep -n "^| obr " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `obr`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: >-
       Una fila por obra, identificada por `ide`, que es el mismo `ide` de su
       fila en `raw.con`.
@@ -190,22 +199,29 @@ objetos:
       de donde sale `stg.partidas`, incluida la heuristica de categoria
       sobre el codigo del capitulo raiz.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 3 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `obrparpar`. Se busca con
-      `grep -n "^| obrparpar " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrparpar`. Se localiza
+      con `grep -n "^| obrparpar " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `obrparpar`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 3 columnas: solo `des`, `med`, `tex`. Preguntar por
+      ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por partida o capitulo de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -226,24 +242,31 @@ objetos:
       ingiere y el origen de todo el seguimiento economico: importes por
       obra, partida, ambito y fase.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 3 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
-      Se pide paginada de 5000 en 5000.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `obrparpre`. Se busca con
-      `grep -n "^| obrparpre " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrparpre`. Se localiza
+      con `grep -n "^| obrparpre " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `obrparpre`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 3 columnas: solo `des`, `med`, `tex`. Preguntar por
+      ellas aqui no devuelve nulo, devuelve "columna inexistente".
+
+      Se pide paginada de 5000 en 5000.
     grano: Una fila por linea de presupuesto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -263,18 +286,26 @@ objetos:
       MESES o VERSIONES del master. El campo se llama aqui `fasnum`, y
       `fase_num` / `version` aguas abajo. Alimenta `stg.fases`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `obrfas`. Se busca con
-      `grep -n "^| obrfas " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrfas`. Se localiza con
+      `grep -n "^| obrfas " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `obrfas`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por fase de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -294,18 +325,26 @@ objetos:
       7 (venta real), 8 (coste master) y 11 (venta master). La lee
       `stg/08_plan_mensual`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `obrfasamb`. Se busca con
-      `grep -n "^| obrfasamb " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrfasamb`. Se localiza
+      con `grep -n "^| obrfasamb " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `obrfasamb`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por combinacion de fase y ambito, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -324,22 +363,29 @@ objetos:
       las compras. Lo usan las vistas de cabecera de `cierre` y el arranque
       de `retenciones`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `obrctr`. Se busca con
-      `grep -n "^| obrctr " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrctr`. Se localiza con
+      `grep -n "^| obrctr " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `obrctr`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 2 columnas: solo `obs`, `tex`. Preguntar por ellas
+      aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por contrato de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -358,22 +404,29 @@ objetos:
       **Centros de Coste.** "Propiedades de `con`" en 1:1. Lo consume
       `cierre/05_views_cabecera`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 1 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `cen`. Se busca con `grep
-      -n "^| cen " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `cen`. Se localiza con
+      `grep -n "^| cen " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `cen`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 1 columna: solo `tex`. Preguntar por ellas aqui no
+      devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por centro de coste, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -390,18 +443,26 @@ objetos:
       **Obras: Tipos de obras.** Catalogo de tipos. Lo consume
       `cierre/05_views_cabecera`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrtip`. Se busca con
-      `grep -n "^| auxobrtip " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrtip`. Se localiza
+      con `grep -n "^| auxobrtip " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `auxobrtip`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por tipo de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -419,18 +480,26 @@ objetos:
       **Obras: Subtipos de obras.** Catalogo de subtipos, dependiente del
       tipo. Lo consume `cierre/05_views_cabecera`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrcla`. Se busca con
-      `grep -n "^| auxobrcla " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrcla`. Se localiza
+      con `grep -n "^| auxobrcla " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `auxobrcla`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por subtipo de obra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -452,18 +521,26 @@ objetos:
       (venta real), 8 (coste master) y 11 (venta master). Lo consume
       `stg/02_ambitos`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `auxobramb`. Se busca con
-      `grep -n "^| auxobramb " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobramb`. Se localiza
+      con `grep -n "^| auxobramb " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `auxobramb`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por ambito, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -495,18 +572,26 @@ objetos:
 
       Es deuda conocida, no un descuido de esta ficha.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrtca`. Se busca con
-      `grep -n "^| auxobrtca " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxobrtca`. Se localiza
+      con `grep -n "^| auxobrtca " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `auxobrtca`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por tipo de capitulo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -525,22 +610,29 @@ objetos:
       un proveedor—. La consumen `maestro/02_proveedores` y
       `maestro/03_proveedores_obra`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `condir`. Se busca con
-      `grep -n "^| condir " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `condir`. Se localiza con
+      `grep -n "^| condir " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `condir`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 2 columnas: solo `dirtex`, `eiotex`. Preguntar por
+      ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por direccion, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -565,22 +657,29 @@ objetos:
       total del documento CON IVA**, y no una suma de lineas sin IVA como en
       `compras`. Se ingiere igualmente y **no la lee ningun SQL**.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 1 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `obrprv`. Se busca con
-      `grep -n "^| obrprv " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `obrprv`. Se localiza con
+      `grep -n "^| obrprv " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `obrprv`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 1 columna: solo `tex`. Preguntar por ellas aqui no
+      devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por relacion obra-proveedor, identificada por `ide`. Hoy, ninguna.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -611,18 +710,26 @@ objetos:
       `maestro.proveedores` no publica ni oficio ni naturaleza. Es F-036 en
       el backlog, no un olvido de esta ficha.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `prv`. Se busca con `grep
-      -n "^| prv " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `prv`. Se localiza con
+      `grep -n "^| prv " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `prv`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por proveedor, identificada por `ide`, el mismo de su fila en `raw.con`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -638,18 +745,26 @@ objetos:
       **Direcciones: Provincias.** Catalogo de provincias, que resuelve el
       codigo que guarda `condir`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `auxpro`. Se busca con
-      `grep -n "^| auxpro " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxpro`. Se localiza con
+      `grep -n "^| auxpro " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `auxpro`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por provincia, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -665,18 +780,26 @@ objetos:
       **Direcciones: Municipios.** Catalogo de municipios, que resuelve el
       codigo que guarda `condir`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `auxmun`. Se busca con
-      `grep -n "^| auxmun " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `auxmun`. Se localiza con
+      `grep -n "^| auxmun " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `auxmun`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por municipio, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -697,22 +820,29 @@ objetos:
       del contrato con un proveedor. Alimenta `compras.contratos` y, por la
       ausencia de `raw.obrprv`, tambien `maestro.proveedores_obra`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 2 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `ctr`. Se busca con `grep
-      -n "^| ctr " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `ctr`. Se localiza con
+      `grep -n "^| ctr " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `ctr`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 2 columnas: solo `obs`, `tex`. Preguntar por ellas
+      aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por contrato de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -733,22 +863,31 @@ objetos:
       las tres se usa**: el datamart no cubre hoy el proceso de compra
       anterior al contrato.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 13 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `com`. Se busca con `grep
-      -n "^| com " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `com`. Se localiza con
+      `grep -n "^| com " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `com`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      observaciones, 2 de textos de direccion, 7 sueltas entre textos y
+      campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
     grano: Una fila por comparativo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -765,22 +904,31 @@ objetos:
       **Detalle del comparativo de ofertas.** Las lineas que se comparan. Se
       ingiere y no se usa.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 13 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `comlin`. Se busca con
-      `grep -n "^| comlin " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `comlin`. Se localiza con
+      `grep -n "^| comlin " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `comlin`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      observaciones, 2 de textos de direccion, 7 sueltas entre textos y
+      campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
     grano: Una fila por linea del comparativo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -797,22 +945,31 @@ objetos:
       **Proveedores del comparativo.** Que proveedores entraron en cada
       comparativo y con que oferta. Se ingiere y no se usa.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 13 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `comprv`. Se busca con
-      `grep -n "^| comprv " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `comprv`. Se localiza con
+      `grep -n "^| comprv " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `comprv`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      observaciones, 2 de textos de direccion, 7 sueltas entre textos y
+      campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
     grano: Una fila por proveedor dentro de un comparativo, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -831,22 +988,31 @@ objetos:
       **Productos en Contratos de compra.** El detalle de linea de un
       contrato. Es una de las tres fuentes de `compras.fact_compras_linea`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 13 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `ctrpro`. Se busca con
-      `grep -n "^| ctrpro " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `ctrpro`. Se localiza con
+      `grep -n "^| ctrpro " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `ctrpro`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      observaciones, 2 de textos de direccion, 7 sueltas entre textos y
+      campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
     grano: Una fila por linea de contrato de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -864,22 +1030,31 @@ objetos:
       **Albaran de compra.** "Propiedades de `con`" en 1:1. Alimenta
       `compras.albaranes`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 23 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `dca`. Se busca con `grep
-      -n "^| dca " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `dca`. Se localiza con
+      `grep -n "^| dca " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `dca`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 23 columnas: 6 de direcciones, 2 de descripciones
+      largas, 2 de observaciones, 11 sueltas entre textos y campos
+      auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
     grano: Una fila por albaran de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -897,24 +1072,33 @@ objetos:
       **Productos en Albaranes de compra.** El detalle de linea de un
       albaran, y otra de las tres fuentes de `compras.fact_compras_linea`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 13 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
-      Se pide paginada de 5000 en 5000.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `dcapro`. Se busca con
-      `grep -n "^| dcapro " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcapro`. Se localiza con
+      `grep -n "^| dcapro " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `dcapro`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      observaciones, 2 de textos de direccion, 7 sueltas entre textos y
+      campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      Se pide paginada de 5000 en 5000.
     grano: Una fila por linea de albaran, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -932,22 +1116,31 @@ objetos:
       **Factura de compra.** "Propiedades de `con`" en 1:1. Alimenta
       `compras.facturas` y el arranque de `retenciones`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 23 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `dcf`. Se busca con `grep
-      -n "^| dcf " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcf`. Se localiza con
+      `grep -n "^| dcf " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `dcf`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 23 columnas: 6 de direcciones, 2 de descripciones
+      largas, 2 de observaciones, 11 sueltas entre textos y campos
+      auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
     grano: Una fila por factura de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -966,24 +1159,33 @@ objetos:
       factura, la tercera fuente de `compras.fact_compras_linea`, y tambien
       entrada de `retenciones`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 13 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
-      Se pide paginada de 5000 en 5000.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `dcfpro`. Se busca con
-      `grep -n "^| dcfpro " azure-apps/sigrid_tablas.md`. No se copia aqui
-      porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcfpro`. Se localiza con
+      `grep -n "^| dcfpro " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `dcfpro`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      observaciones, 2 de textos de direccion, 7 sueltas entre textos y
+      campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
+
+      Se pide paginada de 5000 en 5000.
     grano: Una fila por linea de factura, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1002,22 +1204,31 @@ objetos:
       entre varios destinos —obras o partidas—. Se ingiere y **no se usa**:
       la imputacion que el datamart maneja es la de la propia linea.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 13 columnas de esta tabla: textos largos,
-      observaciones e imagenes. Preguntar por ellas aqui no devuelve nulo,
-      devuelve "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `dcfprodes`. Se busca con
-      `grep -n "^| dcfprodes " azure-apps/sigrid_tablas.md`. No se copia
-      aqui porque seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `dcfprodes`. Se localiza
+      con `grep -n "^| dcfprodes " azure-apps/sigrid_tablas.md`, que
+      devuelve el arranque del bloque **y tambien las filas de otras tablas
+      con un campo llamado `dcfprodes`**: la de entidad es la que lleva la
+      descripcion en la segunda columna. No se copia aqui porque seria una
+      segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 13 columnas: 2 de descripciones largas, 2 de
+      observaciones, 2 de textos de direccion, 7 sueltas entre textos y
+      campos auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
+      "columna inexistente".
     grano: Una fila por destino de una linea de factura, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1034,18 +1245,26 @@ objetos:
     descripcion: >-
       **Cobros.** "Propiedades de `con`" en 1:1. Entrada de `retenciones`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `cob`. Se busca con `grep
-      -n "^| cob " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `cob`. Se localiza con
+      `grep -n "^| cob " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `cob`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por cobro, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1063,22 +1282,29 @@ objetos:
       **Pagos.** "Propiedades de `con`" en 1:1. Entrada de `retenciones`.
       **No se trae** `blores`.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
-      **No se traen** 1 columnas de esta tabla: textos largos, observaciones
-      e imagenes. Preguntar por ellas aqui no devuelve nulo, devuelve
-      "columna inexistente".
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `pag`. Se busca con `grep
-      -n "^| pag " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `pag`. Se localiza con
+      `grep -n "^| pag " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `pag`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
+
+      **No se traen** 1 columna: solo `blores`. Preguntar por ellas aqui no
+      devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por pago, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1099,18 +1325,26 @@ objetos:
       y **las tres cosas viven aqui juntas**. Es de donde `retenciones`
       extrae las retenciones de garantia.
 
-      Se carga por **append por `MAX(ide)`**: cada noche se piden a Sigrid
-      solo las filas con `ide` mayor que el maximo ya guardado. La
-      consecuencia practica es que **una fila modificada en Sigrid no se
-      refresca** aqui, y una borrada alli se queda. La recarga completa
-      existe —`--full-refresh`, que hace `TRUNCATE`— pero **`run-all` no la
-      pasa**: hay que lanzarla a mano.
-
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
-      `azure-apps/sigrid_tablas.md`, en el bloque `rec`. Se busca con `grep
-      -n "^| rec " azure-apps/sigrid_tablas.md`. No se copia aqui porque
-      seria una segunda version que acabaria divergiendo.
+      `azure-apps/sigrid_tablas.md`, en el bloque `rec`. Se localiza con
+      `grep -n "^| rec " azure-apps/sigrid_tablas.md`, que devuelve el
+      arranque del bloque **y tambien las filas de otras tablas con un campo
+      llamado `rec`**: la de entidad es la que lleva la descripcion en la
+      segunda columna. No se copia aqui porque seria una segunda version que
+      acabaria divergiendo.
+
+      **Como se carga.** El job nocturno desplegado arranca `run-all --full`
+      —lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa
+      de que el alcance esta escrito ahi y en ningun sitio mas—, asi que
+      cada noche la tabla **se recarga entera**: `TRUNCATE` y todo de nuevo
+      desde Sigrid. Un cambio hecho ayer en Sigrid esta aqui esta manana.
+
+      Sin `--full` —el valor por defecto, tipico al lanzar `ingest` a mano
+      en local— la carga es un **append por `MAX(ide)`**: solo entran las
+      filas con `ide` mayor que el maximo guardado, y entonces una fila
+      modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
+      corre de noche es el primero.
     grano: Una fila por recargo, descuento o retencion, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
