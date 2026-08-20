@@ -746,3 +746,57 @@ def test_f006_r2_los_catalogos_estaticos_no_se_contradicen_con_su_refresco() -> 
 
         assert ficha.refresco == "manual"
         assert "build-cierre" in ficha.descripcion, objeto
+
+
+# ---------------------------------------------------------------------------
+# `final_pct` no se autoincluye en su propia excepcion (arrastre 3)
+#
+# El texto decia que «en la fila VENTA los cinco porcentajes usan un divisor
+# propio, la venta final», y `final_pct` es justo el que NO usa la venta final:
+# usa `presupuesto_aprobado_venta`. Contarse a si mismo dentro del grupo del
+# que se excluye deja al lector sin saber cual es su divisor.
+#
+# Los numeros reales, contra `sql/cierre/03_views.sql`: de las seis columnas de
+# porcentaje, en la fila VENTA cuatro cambian su divisor a la venta final,
+# `final_pct` lo cambia al presupuesto aprobado, y `variacion_pct` no tiene
+# ninguna excepcion.
+# ---------------------------------------------------------------------------
+
+
+def test_f006_r2_final_pct_dice_cuantos_porcentajes_cambian_y_cuales() -> None:
+    columnas = {
+        c.nombre: c for c in _fichas_de("cierre")["v_pbi_cierre_resumen"].columnas
+    }
+
+    significado = columnas["final_pct"].significado
+
+    assert "cinco porcentajes" not in significado
+    assert "cuatro" in significado.lower(), (
+        "hay que decir cuántos cambian de divisor de verdad"
+    )
+    assert "variacion_pct" in significado, (
+        "y decir cuál no tiene ninguna excepción, que es la otra mitad del mapa"
+    )
+
+
+def test_f006_r2_variacion_pct_no_declara_una_excepcion_que_no_tiene() -> None:
+    """Su divisor es `final_anterior` siempre, sin mirar el concepto."""
+    columnas = {
+        c.nombre: c for c in _fichas_de("cierre")["v_pbi_cierre_resumen"].columnas
+    }
+
+    assert "VENTA" not in columnas["variacion_pct"].significado
+
+
+def test_f006_r2_el_sql_confirma_el_reparto_de_divisores() -> None:
+    """Control: si el SQL cambiara, la ficha se quedaría mintiendo en silencio."""
+    sql = (DIR_SQL / "cierre/03_views.sql").read_text(encoding="utf-8")
+    cuerpo = cuerpo_de_vista(sql, "cierre", "v_pbi_cierre_resumen")
+
+    con_excepcion_de_venta = cuerpo.count("WHEN t.concepto = 'VENTA' THEN")
+
+    assert con_excepcion_de_venta == 5, (
+        "cuatro porcentajes van a venta_final y uno al aprobado; variacion_pct "
+        "no tiene excepción"
+    )
+    assert "a.aprobado_venta" in cuerpo

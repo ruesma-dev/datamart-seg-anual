@@ -296,10 +296,13 @@ objetos:
       final_pct:
         significado: >-
           El importe final del concepto sobre la venta final. En la fila VENTA
-          el divisor cambia y es `presupuesto_aprobado_venta` de la cabecera.
-          Matiz: en la fila VENTA los cinco porcentajes usan un divisor propio
-          —la venta final en vez de la venta de su columna—; lo particular de
-          este es que ademas ese divisor sale de otra vista.
+          el divisor cambia y es `presupuesto_aprobado_venta`, que ademas sale de
+          otra vista, la cabecera. El mapa completo de la fila VENTA, para no
+          confundirse: **cuatro** porcentajes (`ejecutado_origen_pct`,
+          `ejecutado_anterior_pct`, `ejecutado_mes_pct` y `pendiente_pct`)
+          cambian su divisor a la venta final; **este** lo cambia al presupuesto
+          aprobado; y `variacion_pct` **no cambia nada**, porque su divisor
+          siempre es la prevision anterior.
         unidad: "%"
         agregacion: promedio
         nulo_significa: El divisor es cero o no existe.

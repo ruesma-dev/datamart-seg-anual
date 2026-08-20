@@ -1031,3 +1031,25 @@ JOIN dentro de un `porque` sea una columna documentada de la propia ficha. El
 `porque` es lo que un agente copia para escribir el JOIN, asi que sus nombres
 son tan verificables como los de `de` y `a`. Si hace falta nombrar la clave del
 otro extremo, se escribe cualificada y el patron no la reclama.
+
+## Arrastre 3 · `final_pct` se contaba dentro de la excepcion de la que se excluye
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "final_pct or variacion_pct or reparto_de_divisores"
+tests\test_f006_fichas.py:773: AssertionError
+FAILED tests/test_f006_fichas.py::test_f006_r2_final_pct_dice_cuantos_porcentajes_cambian_y_cuales
+1 failed, 2 passed, 94 deselected in 0.95s
+```
+
+El texto decia «en la fila VENTA los cinco porcentajes usan un divisor propio,
+la venta final», y `final_pct` es precisamente el que NO usa la venta final.
+Contado contra `sql/cierre/03_views.sql`, el reparto real de la fila VENTA es:
+**cuatro** porcentajes cambian su divisor a la venta final, **`final_pct`** lo
+cambia al presupuesto aprobado —que ademas sale de otra vista— y
+**`variacion_pct` no cambia nada**, porque su divisor es siempre la prevision
+anterior, sin mirar el concepto.
+
+La ficha da ahora el mapa entero. Y hay un **test de control contra el SQL**:
+cuenta los cinco `WHEN t.concepto = 'VENTA' THEN` de la vista, asi que si manana
+alguien anade o quita una excepcion, la ficha se pone en rojo en vez de quedarse
+mintiendo en silencio.
