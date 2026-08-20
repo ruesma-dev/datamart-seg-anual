@@ -1,9 +1,143 @@
 <!-- progress/review_F-006.md -->
 # F-006 · Review — bloques A a F
 
-> Este fichero tiene **cinco pasadas**, de la más reciente a la más antigua.
-> Se conservan íntegras: son lo que se pidió corregir cada vez y el patrón
-> contra el que se contrasta la siguiente.
+> **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada.
+>
+> Este fichero tiene **seis pasadas**, de la más reciente a la más antigua. Se
+> conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
+> que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
+> parecía correcto resultó tener un defecto sistemático en dos tercios de sus
+> fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# SEXTA PASADA · 2026-08-20 — cierre
+
+> Commits revisados: `6fb7f13`..`c81457f`.
+
+## Veredicto de la sexta pasada
+
+**APROBADO, sin matices.**
+
+Los tres defectos de la quinta pasada están cerrados y verificados contra el SQL,
+y el trabajo entregado queda aprobado con este alcance:
+
+| Bloque | Estado |
+|---|---|
+| **A · Formato** (T3–T8) | aprobado |
+| **B · Reglas duras** (T9–T11) | aprobado |
+| **C · Fichas de `mart`** (T12, T13) | aprobado |
+| **D · Fichas de `cierre`** (T14) | aprobado |
+| **E · Publicación en `_meta`** (T15–T18) | aprobado — T19 queda como verificación MANUAL (humano), con sus comandos escritos |
+| **F · parcial** (T20 `compras`, T21 `retenciones`) | aprobado |
+
+**49 fichas, 593 columnas, 12 reglas duras y el contrato con `mcp-bbdd`**, con las
+claves, los granos, las cardinalidades, las nulidades y las agregaciones
+contrastadas contra el SQL que crea cada objeto. Quedan 53 objetos por documentar
+—`stg`, `maestro`, `aux`, `_meta`, `raw`— y su trinquete en 53.
+
+## Los tres defectos
+
+1. **`v_pbi_retencion_obra`** declara ahora la clave de tres columnas y su grano
+   explica por qué: «en `retenciones.movimientos` las tres se resuelven con
+   cascadas DISTINTAS […] un `obra_id` cuyo centro de coste no exista en el
+   maestro puede aparecer con dos códigos y dar DOS filas». Cerrado.
+2. **`v_pbi_cierre_indirectos_detalle`**: «traen valor tanto si el grupo se
+   periodifica como si no, **pero pueden ser nulas por su propia causa**: no
+   haber presupuesto vivo o no haber plazo calculable». Cerrado, y con el SQL por
+   delante.
+3. **La premisa falsa del comentario del test**, cerrada y con el porqué escrito.
+   **Y corregida también en este informe**, que era donde nació: ver la nota de
+   enmienda en la cuarta pasada, §«La acotación de lo no derivable».
+
+## El barrido, y los dos «legítimos»
+
+El barrido automatizado —hecho **antes** de tocar nada, que era la lección
+pendiente— dio tres candidatos. Los reproduje ejecutando el detector sobre los 49
+objetos y **salen exactamente los mismos tres**. De los dos declarados legítimos,
+verifiqué la dependencia contra el SQL:
+
+- **`mart.fact_seguimiento_categoria`** omite `anio`, `mes`, `tipo_dato`,
+  `concepto` y `ambito_id`. Las dos primeras se derivan de `anio_mes` y las tres
+  siguientes de `escenario`, cuya correspondencia es 1:1 y está fijada en
+  `mart.v_pbi_dim_escenario`. **Legítimo.**
+- **`retenciones.v_pbi_retencion_entidad`** omite `entidad_nombre` y
+  `entidad_cif`. Aguas arriba, en `movimientos`, las dos ramas resuelven
+  `entidad_nombre` con `ent.res` —una sola fuente, lookup por `entidad_id`— y
+  `entidad_cif` con `prv.cif` en la rama PROVEEDOR y `NULL` constante en la de
+  CLIENTE (`01_movimientos.sql:57-59, 105-107`). **Legítimo.**
+
+Ninguno de los dos miente.
+
+## El ataque a la comprobación nueva
+
+Es la que va a gobernar los 53 objetos que faltan, así que fui a romperla.
+
+**Lo que hace bien**: ejecutada sobre el diccionario entero **no marca ni una
+sola columna**, y las siete omisiones legítimas de arriba pasan limpias. Su test
+de control separa los dos casos (`COALESCE(cen_con.cod, obr_con.cod)` sí,
+`ent.res` no, `COALESCE(od.num_obras, 0)` no). Cero falsos positivos hoy.
+
+**Dónde se rompe** (encontrado, reproducido, y **no bloquea**): la regla mira si
+dentro del `COALESCE` hay dos alias distintos, no si esos alias resuelven al
+**mismo objeto**. Construí una vista con dos ramas de la misma tabla unidas por
+la propia clave:
+
+```sql
+SELECT COALESCE(a.obra_id, b.obra_id)         AS obra_id,
+       COALESCE(a.nombre_obra, b.nombre_obra) AS nombre_obra,
+       SUM(a.importe_mes)                     AS total
+FROM mart.fact_seguimiento_mensual a
+FULL JOIN mart.fact_seguimiento_mensual b ON a.obra_id = b.obra_id
+GROUP BY obra_id, nombre_obra;
+```
+
+Aquí `nombre_obra` **sí** depende de `obra_id` —las dos ramas son la misma
+tabla—, y el test la marca:
+
+```
+['mart.v_prueba_fulljoin.nombre_obra'] se agrupan y salen de un COALESCE de
+varias fuentes, asi que no se pueden dar por dependientes de la clave: o entran
+en ella, o la ficha promete una unicidad que no existe
+```
+
+Es decir: obligaría a meter `nombre_obra` en la clave, **a mentir en la ficha
+para pasar la puerta**, que es justo lo que había que evitar. Dos matices que lo
+dejan en deuda y no en defecto: hoy **ningún objeto del repositorio** tiene ese
+patrón en un `GROUP BY` analizable, y la variante con `GROUP BY` por expresiones
+—`GROUP BY COALESCE(...), COALESCE(...)`— ni siquiera se analiza, así que tampoco
+salta. El patrón existe ya en el repositorio dentro de una CTE
+(`06_views_cp_tipologia.sql`, `detalle_partida`: `COALESCE(r.codigo_partida,
+p.codigo_partida)` sobre las dos ramas de un `FULL JOIN`), así que aparecerá.
+
+**Arreglo cuando muerda**: comparar si los dos alias del `COALESCE` resuelven al
+mismo objeto en el `FROM`/`JOIN`; si lo hacen y el join es por la clave, la
+dependencia se mantiene. Alternativa barata: permitir declarar la omisión
+justificada en la ficha, como ya se hace con `motivo_no_consumo`.
+
+## Deuda declarada que viaja con los bloques que faltan
+
+Por decisión del líder, y con mi acuerdo: los menores 5 (la analogía suavizada de
+`compras.yaml`), 6 (`MIN`/`MAX` sobre todos los efectos en una vista de saldo
+vivo, preexistente) y 7 (la justificación del SQL de T26 que dice que agrupar los
+NULOS es «como se comportan en un JOIN», cuando es al revés: es **más** estricto
+que un JOIN). A esos tres se suma el falso positivo de arriba. Ninguno bloquea, y
+los cuatro están escritos con su caso reproducible.
+
+## Rigor
+
+- **1361 tests + 40 saltados**, ejecutados por mí; cobertura **98,9 %**.
+- **Mutación verificada de forma independiente**: 2324 líneas, **161 mutantes**,
+  cero supervivientes; coincide con `progress/mutacion_F-006.md`.
+- **Nada prohibido**: el diff toca dos YAML, un fichero de tests y `progress/`.
+  Ni un `GRANT`, `REVOKE`, firewall, Azure ni conexión a la base. **Sin `push`**.
+- Trinquete coherente: 49 fichas + 53 pendientes = 102 objetos.
+
+### Checkpoints
+
+**C1** `[x]` · **C2** `[x]` · **C3** `[x]` · **C3 bis** N/A · **C4** `[x]` ·
+**C4 bis** `[x]` · **C4 ter** N/A · **C5** N/A parcial (20 de 42 tareas: el
+alcance encargado; C5 se exigirá entero cuando F-006 pase a `done`).
 
 ---
 
@@ -475,11 +609,23 @@ pendientes solo baja». Es exactamente lo que la puerta hace.
 
 ### La acotación de lo no derivable — honesta, y dos vías que aporto
 
-Que la clave sea *demasiado corta* exige dependencias funcionales que no están en
-el texto: `codigo_obra` depende de `obra_id` y omitirla es correcto;
-`proveedor_cif` no depende de `proveedor_id` y omitirla es un error, y en el SQL
-las dos se ven igual. Forzarlo marcaría fichas correctas: **la acotación es
-honesta**. Dos vías que no aparecen en su informe:
+Que la clave sea *demasiado corta* exige dependencias funcionales que no siempre
+están en el texto: `proveedor_cif` no depende de `proveedor_id` —sale del CIF que
+traía cada documento— y aun así se escribe igual que una columna que sí
+dependiera. Forzar la igualdad con el `GROUP BY` marcaría fichas correctas
+—`mart.fact_seguimiento_categoria` agrupa por nueve columnas de las que cinco se
+derivan de otras dos—: **la acotación es honesta**. Dos vías que no aparecen en
+su informe:
+
+> **Corrección del 2026-08-20 (sexta pasada).** Este párrafo decía «`codigo_obra`
+> depende de `obra_id` y omitirla es correcto». **Era falso**, y el error es mío:
+> en `retenciones.movimientos` las dos salen de cascadas distintas
+> (`01_movimientos.sql:61-64`) y en `compras.v_pbi_partida_coste` la ficha lo
+> dice con esas palabras. El implementer tomó la frase de aquí como fundamento
+> del límite del test y su propia corrección la desmintió. El límite sigue siendo
+> real —lo es por `proveedor_cif`—, pero el ejemplo que lo ilustraba era
+> justamente un caso en el que la dependencia **no** existe. Queda corregido
+> arriba y en `tests/test_f006_fichas.py`.
 
 - **Derivable hoy y gratis**: las tablas agregadas que se llenan con
   `INSERT … SELECT … GROUP BY` —`mart.fact_seguimiento_categoria`,
