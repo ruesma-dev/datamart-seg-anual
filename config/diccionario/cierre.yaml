@@ -688,12 +688,20 @@ objetos:
       codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
       nombre_obra: Nombre legible de la obra.
       cliente_ide:
-        significado: Identificador del cliente en Sigrid.
+        significado: >-
+          Identificador del cliente en Sigrid. OJO: es el UNICO `*_ide` de esta
+          vista que se proyecta sin `NULLIF(..., 0)`, asi que una obra sin
+          cliente trae **0 y no NULL**. `WHERE cliente_ide IS NULL` no devuelve
+          nada nunca: para las obras sin cliente hay que filtrar
+          `cliente_ide = 0` (o `cliente_nombre IS NULL`, que ese si lo es).
         agregacion: no_sumable
-        nulo_significa: La obra no tiene cliente asignado.
-      cliente_nombre: >-
-        Nombre del cliente, de `con.res`. Es lo UNICO que el datamart sabe del
-        cliente: la tabla de clientes de Sigrid no se ingiere.
+      cliente_nombre:
+        significado: >-
+          Nombre del cliente, de `con.res`. Es lo UNICO que el datamart sabe del
+          cliente: la tabla de clientes de Sigrid no se ingiere.
+        nulo_significa: >-
+          La obra no tiene cliente asignado (`cliente_ide = 0`), o el que tiene
+          no existe en `raw.con`. Es la forma fiable de detectarlo.
       tecnico_ide:
         significado: Identificador del tecnico responsable en Sigrid.
         agregacion: no_sumable

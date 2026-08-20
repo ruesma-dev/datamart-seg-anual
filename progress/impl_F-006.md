@@ -667,3 +667,27 @@ criterios:
 Un fallo del test, no del contenido, se corrigio al implementar: la extraccion
 del nombre del fichero miraba `endswith('.md')` **antes** de quitar la coma
 final, asi que no encontraba `LEEME_RETENCIONES_R1.md,`.
+
+## Defecto 5 · `cliente_ide` declaraba un nulo que no existe
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "nulo or cliente_ide"
+E       AssertionError: assert 'La obra no tiene cliente asignado.' is None
+FAILED tests/test_f006_fichas.py::test_f006_r2_un_nulo_declarado_en_un_ide_tiene_que_ser_posible[cierre.v_pbi_cierre_cabecera]
+FAILED tests/test_f006_fichas.py::test_f006_r2_cliente_ide_avisa_de_que_el_cero_es_el_sin_cliente
+2 failed, 18 passed, 61 deselected in 3.31s
+```
+
+`sql/cierre/05_views_cabecera.sql:71` proyecta `obr.entide AS cliente_ide` **sin
+`NULLIF(..., 0)`**, y es el unico `*_ide` de la vista que no lo lleva. Una obra
+sin cliente trae 0, y `WHERE cliente_ide IS NULL` no devuelve nada nunca.
+
+Corregido, y **con la salida buena escrita**: la ficha dice que se filtra
+`cliente_ide = 0`, o `cliente_nombre IS NULL`, que ese si es nulo de verdad
+—porque el `LEFT JOIN` no encuentra el concepto—. Se le anadio a
+`cliente_nombre` su `nulo_significa`, que faltaba.
+
+**Endurecimiento**: hay un test parametrizado sobre todas las vistas que, para
+cada columna `*_ide` que declare `nulo_significa`, exige que su proyeccion en el
+SQL lleve `NULLIF`. Declarar un nulo imposible manda al agente a escribir un
+filtro que siempre sale vacio, y ahora eso no pasa de la puerta.

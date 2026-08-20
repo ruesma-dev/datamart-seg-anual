@@ -392,3 +392,55 @@ def test_f006_r7_cierre_el_dim_de_concepto_si_ordena_de_uno_a_seis() -> None:
     columnas = {c.nombre: c for c in _fichas_de("cierre")["v_pbi_dim_concepto"].columnas}
 
     assert list(columnas["orden"].valores) == ["1", "2", "3", "4", "5", "6"]
+
+
+# ---------------------------------------------------------------------------
+# `nulo_significa` en columnas `*_ide` (defecto 5)
+#
+# `cliente_ide` decia «la obra no tiene cliente asignado» y NUNCA es NULL: es el
+# unico `*_ide` de la vista que se proyecta sin `NULLIF(..., 0)`, asi que las
+# obras sin cliente traen **0** y un `WHERE cliente_ide IS NULL` no devuelve
+# nada. Es comprobable, y por eso se comprueba: declarar un nulo que no existe
+# manda al agente a escribir un filtro que siempre sale vacio.
+# ---------------------------------------------------------------------------
+
+
+def _proyeccion_de(sql: str, columna: str) -> str | None:
+    """La línea del `SELECT` que crea ese alias, sin comentarios."""
+    for linea in re.sub(r"--[^\n]*", " ", sql).split("\n"):
+        if re.search(rf"\bAS\s+{re.escape(columna)}\s*,?\s*$", linea, re.IGNORECASE):
+            return linea
+    return None
+
+
+@pytest.mark.parametrize(
+    "nombre", sorted(f.nombre for f in _fichas_con_columnas() if f.tipo == "vista")
+)
+def test_f006_r2_un_nulo_declarado_en_un_ide_tiene_que_ser_posible(nombre: str) -> None:
+    ficha = _diccionario().por_nombre[nombre]
+    origen = _origen_por_objeto()[nombre]
+    sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+
+    for columna in ficha.columnas:
+        if not columna.nombre.endswith("_ide") or not columna.nulo_significa:
+            continue
+        proyeccion = _proyeccion_de(sql, columna.nombre)
+        if proyeccion is None:
+            continue
+        assert "NULLIF" in proyeccion.upper(), (
+            f"{nombre}.{columna.nombre} declara `nulo_significa` pero se proyecta "
+            f"sin NULLIF, así que trae 0 y nunca es NULL: {proyeccion.strip()}"
+        )
+
+
+def test_f006_r2_cliente_ide_avisa_de_que_el_cero_es_el_sin_cliente() -> None:
+    """No basta con quitar el `nulo_significa` falso: hay que decir qué hacer."""
+    columnas = {
+        c.nombre: c for c in _fichas_de("cierre")["v_pbi_cierre_cabecera"].columnas
+    }
+
+    cliente = columnas["cliente_ide"]
+
+    assert cliente.nulo_significa is None
+    assert "0" in cliente.significado
+    assert "NULL" in cliente.significado.upper()
