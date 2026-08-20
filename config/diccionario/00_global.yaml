@@ -453,6 +453,244 @@ ocultar:
   - _source_tiemod
   - _built_at
 
+# ===========================================================================
+# BATERIA DE ACEPTACION (R39, R41)
+# ===========================================================================
+#
+# El criterio de exito de F-006, escrito aqui para que el agente tambien pueda
+# leerlo. Recuento honesto: de 18 preguntas, **13 se responden hoy, 3 a medias
+# y 2 no se pueden responder**. Un "no puedo responderlo con esta base, y este
+# es el motivo" es una respuesta CORRECTA; inventarse una cifra, no.
+#
+# Cuatro son preguntas TRAMPA deliberadas (P9, P10, P11, P16): si el agente cae
+# en una, no ha fallado el agente, ha fallado la ficha del objeto, y hay que
+# corregirla antes de cerrar la feature.
+
+preguntas_aceptacion:
+
+  - id: P1
+    pregunta: Que proveedores nos han facturado mas
+    objetos_esperados:
+      - compras.v_pbi_proveedor_obra
+      - compras.fact_compras_linea
+    respuesta_correcta: >-
+      Importes SIN IVA. Los abonos ya restan porque entran en negativo, asi que
+      no se vuelven a restar. No se pierden las filas con obra_id nulo, que son
+      estructura y gastos generales. Si baja al grano de linea, agrupa por
+      (tipo_doc, linea_id) y no por linea_id a secas.
+    reglas_implicadas: [R-ABONO-NEGATIVO, R-COMPRAS-SIN-IVA, R-LINEA-ID-NO-UNICA]
+    estado: respondible
+
+  - id: P2
+    pregunta: Que retenciones tengo de los proveedores de la obra X
+    objetos_esperados:
+      - retenciones.movimientos
+      - retenciones.v_pbi_retenciones_vivas
+    respuesta_correcta: >-
+      Filtra sentido = 'PROVEEDOR'. Da `saldo_vivo` por defecto y menciona que
+      existe la otra lectura, `neto_practicado`, y que pueden divergir. NO une
+      el efecto a las lineas de su factura. Senala las filas con obra_id nulo y
+      num_obras_documento > 1, que son facturas repartidas entre varias obras.
+      Cita la fecha de build porque `retenciones` no se refresca de noche.
+    reglas_implicadas: [R-RETENCION-NO-JOIN-LINEAS, R-FRESCURA-MANUAL]
+    estado: respondible
+    nota: >-
+      La vista cruzada obra x proveedor no existe: las dos agregadas cortan por
+      un eje cada una. Llega con F-039.
+
+  - id: P3
+    pregunta: Quien fue el proveedor de fontaneria de la obra X
+    objetos_esperados:
+      - compras.contratos
+    respuesta_correcta: >-
+      Declara explicitamente que es una HEURISTICA sobre texto libre (un LIKE
+      sobre `contratos.descripcion`) y que el datamart no tiene taxonomia de
+      oficio. Nunca presenta el resultado como una clasificacion.
+    estado: parcial
+    bloqueada_por: F-036
+
+  - id: P4
+    pregunta: Cual es el flujo de caja de la obra X
+    objetos_esperados: []
+    respuesta_correcta: >-
+      "El datamart no tiene tesoreria." No hay ni un objeto de cobros o pagos en
+      los nueve esquemas. Cualquier numero es incorrecto, incluida la tentacion
+      de dar el facturado como si fuera caja.
+    estado: bloqueada
+    bloqueada_por: F-037
+
+  - id: P5
+    pregunta: De la obra X, lo facturado por contrato, lo que hay en albaran sin facturar y los comparativos
+    objetos_esperados:
+      - compras.v_pbi_contrato_consumo
+      - compras.v_pbi_albaranes_sin_facturar
+    respuesta_correcta: >-
+      Contrato y albaran se responden. Solo ALBARAN y PROFORMA cuentan como
+      pendientes de facturar, y la sobrefacturacion conserva signo negativo.
+      **El comparativo no existe como objeto** y hay que decirlo: `raw.com`,
+      `raw.comlin` y `raw.comprv` estan ingeridos pero ningun SQL los lee.
+    estado: parcial
+    bloqueada_por: F-038
+
+  - id: P6
+    pregunta: Cual es la planificacion mensual de la obra X
+    objetos_esperados:
+      - mart.fact_seguimiento_mensual
+      - mart.v_master_versiones_tipadas
+    respuesta_correcta: >-
+      Va a `mart`, NO a `stg.plan_mensual`, donde conviven todas las versiones.
+      Usa `importe_mes` y no suma `importe_origen` a lo largo del tiempo.
+      Menciona que las versiones de tipo 'Cierre mensual' no reemplazan al plan.
+    reglas_implicadas: [R-VERSION-MASTER, R-IMPORTE-MES]
+    estado: respondible
+
+  - id: P7
+    pregunta: Cuanto llevamos ejecutado en la obra X a cierre del mes M, en venta y en coste
+    objetos_esperados:
+      - cierre.v_pbi_cierre_resumen
+      - cierre.v_pbi_cierre_cabecera
+    respuesta_correcta: >-
+      CITA LA FECHA DE BUILD, porque `cierre` es de refresco manual. Los
+      porcentajes van contra la VENTA de esa misma columna y ese mismo mes, no
+      contra el presupuesto global.
+    reglas_implicadas: [R-FRESCURA-MANUAL]
+    estado: respondible
+
+  - id: P8
+    pregunta: Que obras se desvian mas de su master vigente en coste directo
+    objetos_esperados:
+      - mart.fact_seguimiento_categoria
+      - mart.v_master_vigente_anual
+    respuesta_correcta: >-
+      Separa magnitud (COSTE/VENTA) y naturaleza (REAL/PLANIFICADO) y no mezcla
+      ambitos. Filtra categoria = 'CD' para coste directo. Compara sobre la
+      misma ventana temporal en los dos escenarios.
+    reglas_implicadas: [R-VERSION-MASTER]
+    estado: respondible
+
+  - id: P9
+    pregunta: Cuantas obras activas tenemos
+    objetos_esperados:
+      - maestro.obras
+      - stg.obras
+    respuesta_correcta: >-
+      DECLARA QUE UNIVERSO USA: `maestro.obras` no filtra nada y `stg.obras`
+      excluye administrativas y códigos de cinco o mas digitos. Y usa
+      `maestro.obras.es_activa`, NO `stg.obras.activa`, que esta cableada a TRUE
+      y vale TRUE para todas.
+    reglas_implicadas: [R-UNIVERSO-OBRA, R-OBRA-ACTIVA]
+    estado: respondible
+    es_trampa: true
+
+  - id: P10
+    pregunta: Cual es el presupuesto de la obra X
+    objetos_esperados:
+      - stg.presupuesto
+    respuesta_correcta: >-
+      Usa el importe TOTAL sin distribucion mensual, no la suma de
+      `plan_mensual`. Para coste (ambitos 3 y 8) `importe`; para venta (ambitos
+      7 y 11) `importe_oficial`, que lleva los coeficientes que Sigrid aplica
+      solo en venta. Filtra la fase correcta.
+    reglas_implicadas: [R-FAS-AMBIGUO, R-VERSION-MASTER]
+    estado: respondible
+    es_trampa: true
+
+  - id: P11
+    pregunta: Dame la evolucion mensual del coste directo de la obra X en el ano A
+    objetos_esperados:
+      - mart.fact_seguimiento_mensual
+    respuesta_correcta: >-
+      Usa `importe_mes`. Si suma `importe_origen` a lo largo de los meses, la
+      respuesta es INCORRECTA aunque el numero parezca razonable: multiplica por
+      unas nueve veces.
+    reglas_implicadas: [R-IMPORTE-MES]
+    estado: respondible
+    es_trampa: true
+
+  - id: P12
+    pregunta: Que tenemos en albaranes sin facturar
+    objetos_esperados:
+      - compras.v_pbi_albaranes_sin_facturar
+    respuesta_correcta: >-
+      Solo ALBARAN y PROFORMA cuentan como pendientes; las NOTA suman en el
+      consumido pero no en el pendiente. Cita la fecha de build de `compras`.
+    reglas_implicadas: [R-COMPRAS-TIPO-DOC, R-FRESCURA-MANUAL]
+    estado: respondible
+
+  - id: P13
+    pregunta: Que retenciones vencen este trimestre y siguen vivas
+    objetos_esperados:
+      - retenciones.v_pbi_retenciones_vencidas
+      - retenciones.v_pbi_retenciones_vivas
+    respuesta_correcta: >-
+      Usa las vistas de vivas y vencidas en lugar de recalcular el estado, y
+      cita la fecha de build porque `retenciones` es de refresco manual.
+    reglas_implicadas: [R-FRESCURA-MANUAL]
+    estado: respondible
+
+  - id: P14
+    pregunta: Cuales son las diez partidas con mas coste incurrido de la obra X
+    objetos_esperados:
+      - compras.v_pbi_partida_coste
+    respuesta_correcta: >-
+      Advierte de que `compras` no filtra por `stg.obras` y puede traer obras
+      administrativas que el seguimiento excluye. Y dice que el puente entre el
+      coste planificado de la partida y el incurrido documental **no existe
+      todavia** como objeto, aunque `partida_id` los une.
+    reglas_implicadas: [R-UNIVERSO-OBRA]
+    estado: parcial
+    bloqueada_por: F-039
+
+  - id: P15
+    pregunta: De cuando es el dato que me estas dando
+    objetos_esperados:
+      - _meta.v_frescura
+    respuesta_correcta: >-
+      Devuelve el ultimo OK y el ultimo intento POR SEPARADO —que un paso haya
+      fallado esta noche no borra el dato bueno de ayer— y la version del
+      diccionario publicado. Distingue los esquemas nocturnos de los manuales.
+    reglas_implicadas: [R-FRESCURA-MANUAL]
+    estado: respondible
+    nota: >-
+      Es la prueba de aceptacion de R15 y R16. Cuando exista `_meta.v_diccionario`
+      (bloque E), la respuesta sale de UNA sola consulta.
+
+  - id: P16
+    pregunta: Cuanto le hemos comprado al proveedor P en toda la empresa este ano
+    objetos_esperados:
+      - compras.fact_compras_linea
+    respuesta_correcta: >-
+      FILTRA `tipo_doc`: sumar sin filtrar cuenta contratado, albaranado y
+      facturado como si fueran tres costes distintos. No trata `linea_id` como
+      unico. Y no compara el resultado con
+      `maestro.proveedores_obra.importe_contratado`, que lleva IVA.
+    reglas_implicadas: [R-COMPRAS-TIPO-DOC, R-LINEA-ID-NO-UNICA, R-COMPRAS-SIN-IVA]
+    estado: respondible
+    es_trampa: true
+
+  - id: P17
+    pregunta: Quienes son nuestros diez mayores clientes
+    objetos_esperados: []
+    respuesta_correcta: >-
+      "No lo tenemos": la tabla `cli` de Sigrid no se ingiere y las ventas
+      (`dvf`/`dvfpro`) tampoco. Del cliente solo conocemos el nombre, via
+      `raw.con.res` a traves de `obr.entide`. No hay importe facturado a cliente
+      en el datamart.
+    estado: bloqueada
+    bloqueada_por: F-040
+
+  - id: P18
+    pregunta: Que obras estan mal configuradas, sin planificado en algun mes
+    objetos_esperados:
+      - mart.v_master_versiones_tipadas
+      - mart.fact_seguimiento_mensual
+    respuesta_correcta: >-
+      Reconoce el sintoma: obras que solo tienen versiones de tipo 'Cierre
+      mensual', que no reemplazan al plan. Y que un mes sin fila de la version
+      vigente da importes 0 sin dejar por ello de ser la vigente.
+    reglas_implicadas: [R-VERSION-MASTER]
+    estado: respondible
+
 pendientes:
   - _meta.etl_runs
   - _meta.v_frescura

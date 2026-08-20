@@ -417,3 +417,123 @@ def test_f006_r11_un_ambito_declarado_pendiente_se_tolera() -> None:
 
     assert validar(sin_declarar, PASOS_NOCTURNOS)
     assert validar(declarado, PASOS_NOCTURNOS) == []
+
+
+# ===========================================================================
+# La batería de aceptación (T11 · R39, R41)
+#
+# Es el criterio de éxito de F-006, escrito dentro del propio diccionario para
+# que el agente pueda leerlo: **13 preguntas bien respondidas y 5 bien
+# rechazadas**. Un «no puedo responderlo con esta base, y este es el motivo» es
+# una respuesta correcta; inventarse una cifra, no.
+# ===========================================================================
+
+ESTADOS_BATERIA = ("respondible", "parcial", "bloqueada")
+
+#: El recuento honesto de `requirements.md` §9: de 18 preguntas, 13 se
+#: responden hoy, 3 se responden a medias y 2 no se pueden responder.
+PARCIALES = {"P3", "P5", "P14"}
+BLOQUEADAS = {"P4", "P17"}
+
+
+def _bateria():
+    return _diccionario_real().global_raw["preguntas_aceptacion"]
+
+
+def test_f006_r39_bateria_estan_las_dieciocho_preguntas() -> None:
+    ids = [p["id"] for p in _bateria()]
+
+    assert ids == [f"P{n}" for n in range(1, 19)], ids
+
+
+def test_f006_r39_bateria_cada_pregunta_dice_que_seria_correcto() -> None:
+    """Sin `respuesta_correcta` la batería no es un criterio, es una lista de
+    temas: dos personas la darían por superada con respuestas distintas."""
+    for pregunta in _bateria():
+        assert len(pregunta["pregunta"].strip()) >= 20, pregunta["id"]
+        assert len(pregunta["respuesta_correcta"].strip()) >= 60, pregunta["id"]
+        assert pregunta["estado"] in ESTADOS_BATERIA, pregunta["id"]
+
+
+def test_f006_r41_bateria_el_recuento_honesto_es_trece_tres_y_dos() -> None:
+    """Si el criterio de cierre se lee como «responde los seis casos del
+    humano», F-006 no puede cerrar. Se cierra con este recuento."""
+    por_estado: dict[str, set[str]] = {}
+    for pregunta in _bateria():
+        por_estado.setdefault(pregunta["estado"], set()).add(pregunta["id"])
+
+    assert por_estado["parcial"] == PARCIALES
+    assert por_estado["bloqueada"] == BLOQUEADAS
+    assert len(por_estado["respondible"]) == 13
+
+
+def test_f006_r41_bateria_lo_no_respondible_dice_que_feature_lo_desbloquea() -> None:
+    """Un «no se puede» sin dueño se convierte en un «no se puede» para siempre."""
+    for pregunta in _bateria():
+        if pregunta["estado"] == "respondible":
+            assert "bloqueada_por" not in pregunta, pregunta["id"]
+        else:
+            assert pregunta.get("bloqueada_por"), pregunta["id"]
+
+
+def test_f006_r41_bateria_las_features_que_bloquean_existen_de_verdad() -> None:
+    """Apuntar a una feature inventada es peor que no apuntar a ninguna."""
+    import json
+    from pathlib import Path
+
+    features = json.loads(
+        (Path(__file__).resolve().parents[1] / "harness" / "features.json").read_text(
+            encoding="utf-8"
+        )
+    )["features"]
+    existentes = {f["id"] for f in features}
+
+    for pregunta in _bateria():
+        bloqueante = pregunta.get("bloqueada_por")
+        if bloqueante:
+            assert bloqueante in existentes, f"{pregunta['id']} -> {bloqueante}"
+
+
+def test_f006_r39_bateria_los_objetos_esperados_existen_en_el_repositorio() -> None:
+    """Enrutar a un objeto que no existe manda al agente a inventarse el SQL."""
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    publicados = {o.nombre for o in _inventario_del_repositorio()}
+
+    for pregunta in _bateria():
+        for objeto in pregunta.get("objetos_esperados") or []:
+            assert objeto in publicados, f"{pregunta['id']}: {objeto} no existe"
+
+
+def test_f006_r41_bateria_las_imposibles_no_esperan_ningun_objeto() -> None:
+    """P4 (tesorería) y P17 (clientes) se responden con un «no lo tenemos».
+
+    Si la ficha les diera objetos, el agente buscaría ahí y acabaría dando una
+    cifra parecida a la pedida pero de otra cosa.
+    """
+    por_id = {p["id"]: p for p in _bateria()}
+
+    for identificador in BLOQUEADAS:
+        assert not (por_id[identificador].get("objetos_esperados") or []), identificador
+        assert "no" in por_id[identificador]["respuesta_correcta"].lower()
+
+
+def test_f006_r39_bateria_las_cuatro_trampas_estan_marcadas() -> None:
+    """P9, P10, P11 y P16 son preguntas trampa deliberadas: si el agente cae en
+    alguna, la ficha correspondiente está mal escrita."""
+    por_id = {p["id"]: p for p in _bateria()}
+
+    for identificador in ("P9", "P10", "P11", "P16"):
+        assert por_id[identificador].get("es_trampa") is True, identificador
+
+
+def test_f006_r39_bateria_cada_trampa_nombra_la_regla_que_la_evita() -> None:
+    """La trampa y su antídoto van juntos: es lo que permite comprobar, al
+    ejecutar la batería, si el fallo fue del agente o de la ficha."""
+    codigos = {r.codigo for r in _diccionario_real().reglas}
+    por_id = {p["id"]: p for p in _bateria()}
+
+    for identificador in ("P9", "P10", "P11", "P16"):
+        reglas = por_id[identificador].get("reglas_implicadas") or []
+        assert reglas, identificador
+        assert set(reglas) <= codigos, f"{identificador}: {reglas}"

@@ -282,3 +282,38 @@ Decisiones de contenido que conviene dejar por escrito:
 - Se añadió un test que cruza `esquemas[*].pasos_etl` contra el pipeline real:
   un esquema que se declare `nocturno` citando un paso que no corre de noche
   deja `init.sh` en rojo.
+
+### T11 · Las 18 preguntas de la batería de aceptación
+
+```
+$ python -m pytest tests/test_f006_reglas.py -q -k bateria
+tests\test_f006_reglas.py:440: KeyError
+=========================== short test summary info ===========================
+FAILED tests/test_f006_reglas.py::test_f006_r39_bateria_estan_las_dieciocho_preguntas
+FAILED tests/test_f006_reglas.py::test_f006_r39_bateria_cada_pregunta_dice_que_seria_correcto
+FAILED tests/test_f006_reglas.py::test_f006_r41_bateria_el_recuento_honesto_es_trece_tres_y_dos
+FAILED tests/test_f006_reglas.py::test_f006_r41_bateria_lo_no_respondible_dice_que_feature_lo_desbloquea
+FAILED tests/test_f006_reglas.py::test_f006_r41_bateria_las_features_que_bloquean_existen_de_verdad
+FAILED tests/test_f006_reglas.py::test_f006_r39_bateria_los_objetos_esperados_existen_en_el_repositorio
+FAILED tests/test_f006_reglas.py::test_f006_r41_bateria_las_imposibles_no_esperan_ningun_objeto
+FAILED tests/test_f006_reglas.py::test_f006_r39_bateria_las_cuatro_trampas_estan_marcadas
+FAILED tests/test_f006_reglas.py::test_f006_r39_bateria_cada_trampa_nombra_la_regla_que_la_evita
+9 failed, 43 deselected in 0.44s
+```
+
+Verde tras escribir la batería: `9 passed`.
+
+Tres tests que no pedía la spec y que se añadieron porque protegen algo real:
+
+- **`objetos_esperados` se contrasta contra el inventario del repositorio.**
+  Enrutar la pregunta a un objeto que no existe manda al agente a inventarse el
+  SQL, que es justo lo que la feature evita.
+- **Las dos imposibles (P4, P17) no pueden declarar ningún objeto.** Si la
+  batería les diera objetos, el agente buscaría ahí y acabaría dando una cifra
+  parecida a la pedida pero de otra cosa.
+- **Cada pregunta trampa nombra la regla que la evita** (`reglas_implicadas`).
+  Es lo que permitirá, al ejecutar la batería en T39, distinguir si falló el
+  agente o si la ficha estaba mal escrita.
+
+Los `bloqueada_por` se comprueban contra `harness/features.json`: F-036 a F-040
+existen.
