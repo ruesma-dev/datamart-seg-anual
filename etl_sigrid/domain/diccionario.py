@@ -28,7 +28,7 @@ vueltas.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 # ---------------------------------------------------------------------------
 # Vocabularios cerrados
@@ -76,6 +76,27 @@ AGREGACIONES = (
 
 #: Severidad de una regla dura del diccionario.
 SEVERIDADES = ("bloqueante", "aviso")
+
+#: Las DOCE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
+#:
+#: No es una lista de buenas prácticas: cada una nace de una trampa concreta del
+#: modelo y varias de un número falso real. Se escriben aquí, en el dominio, para
+#: que quitar una del YAML deje `bash harness/init.sh` en rojo en vez de dejar al
+#: agente sin esa defensa en silencio.
+CODIGOS_REGLAS_OBLIGATORIAS = (
+    "R-ABONO-NEGATIVO",
+    "R-CLAVE-SUSTITUTA",
+    "R-COMPRAS-SIN-IVA",
+    "R-COMPRAS-TIPO-DOC",
+    "R-FAS-AMBIGUO",
+    "R-FRESCURA-MANUAL",
+    "R-IMPORTE-MES",
+    "R-LINEA-ID-NO-UNICA",
+    "R-OBRA-ACTIVA",
+    "R-RETENCION-NO-JOIN-LINEAS",
+    "R-UNIVERSO-OBRA",
+    "R-VERSION-MASTER",
+)
 
 #: Claves obligatorias de cada entrada de `esquemas` en `00_global.yaml` (R4).
 CLAVES_ESQUEMA = ("titulo", "para_que_sirve", "consumo_recomendado", "refresco")
@@ -439,6 +460,14 @@ def _validar_ficha(
             "pregunta al objeto",
         )
 
+    # --- R12: los avisos se derivan, no se escriben -------------------------
+    if ficha.avisos:
+        error(
+            "R12",
+            "`avisos` no se escribe a mano: lo deriva el validador desde el "
+            "`ambito` de las reglas de 00_global.yaml. Borra la clave de la ficha",
+        )
+
     errores.extend(_validar_columnas(ficha))
     errores.extend(_validar_clave_negocio(ficha))
     errores.extend(_validar_relaciones(ficha, indice))
@@ -588,9 +617,38 @@ def _validar_frescura(
 def _validar_reglas(
     dicc: Diccionario, indice: Mapping[str, Ficha]
 ) -> list[ErrorValidacion]:
-    """Formato de las reglas duras. El contenido exigible (las doce) es R9."""
+    """R9 (las doce, completas y bien formadas) y R11 (ámbitos resolubles)."""
     errores: list[ErrorValidacion] = []
     fichero = "00_global.yaml"
+
+    declaradas = [r.codigo for r in dicc.reglas]
+    for codigo in CODIGOS_REGLAS_OBLIGATORIAS:
+        if codigo not in declaradas:
+            errores.append(
+                ErrorValidacion(
+                    fichero=fichero,
+                    objeto=codigo,
+                    regla="R9",
+                    detalle=(
+                        f"falta la regla obligatoria `{codigo}` en el bloque "
+                        f"`reglas`. Sin ella el agente pierde esa defensa y nadie "
+                        f"se entera"
+                    ),
+                )
+            )
+
+    vistos: set[str] = set()
+    for regla in dicc.reglas:
+        if regla.codigo in vistos:
+            errores.append(
+                ErrorValidacion(
+                    fichero=fichero,
+                    objeto=regla.codigo,
+                    regla="R9",
+                    detalle=f"regla duplicada: `{regla.codigo}` aparece más de una vez",
+                )
+            )
+        vistos.add(regla.codigo)
 
     for regla in dicc.reglas:
         def error(codigo_ears: str, detalle: str) -> None:
@@ -618,7 +676,63 @@ def _validar_reglas(
                 f"la regla `{regla.codigo}` no declara `ambito`: una regla que no "
                 f"se adjunta a ningún objeto no protege nada",
             )
+
+        for destino in regla.ambito:
+            if "." in destino:
+                if destino not in indice:
+                    error(
+                        "R11",
+                        f"la regla `{regla.codigo}` declara en su `ambito` el objeto "
+                        f"`{destino}`, que no tiene ficha en el diccionario. Una "
+                        f"regla que apunta a la nada no protege nada",
+                    )
+            elif destino not in ESQUEMAS_DEL_DATAMART:
+                error(
+                    "R11",
+                    f"la regla `{regla.codigo}` declara en su `ambito` el esquema "
+                    f"`{destino}`, que no existe en el datamart: "
+                    f"{_lista(ESQUEMAS_DEL_DATAMART)}",
+                )
     return errores
+
+
+# ---------------------------------------------------------------------------
+# R12 · Derivación de avisos
+# ---------------------------------------------------------------------------
+
+
+def alcanza(regla: Regla, ficha: Ficha) -> bool:
+    """¿El ámbito de la regla incluye a esta ficha?
+
+    Un ámbito sin punto es un esquema entero; con punto, un objeto concreto.
+    """
+    return ficha.esquema in regla.ambito or ficha.nombre in regla.ambito
+
+
+def derivar_avisos(dicc: Diccionario) -> Diccionario:
+    """Adjunta a cada ficha los códigos de las reglas cuyo ámbito la incluye (R12).
+
+    Existe para que un agente que solo consulte la ficha de un objeto vea sus
+    trampas **sin haber leído el bloque global**, que es lo que va a pasar en la
+    práctica: el MCP sirve `describir_tabla` mucho más a menudo que el contexto
+    entero.
+
+    La derivación es automática a propósito: el autor de la ficha no tiene que
+    acordarse de nada, y por eso `validar` rechaza un `avisos` escrito a mano.
+    Devuelve un diccionario NUEVO —las entidades son inmutables— y es idempotente:
+    aplicarla dos veces da exactamente lo mismo, porque reemplaza la lista en vez
+    de acumularla.
+    """
+    fichas = tuple(
+        replace(
+            ficha,
+            avisos=tuple(
+                sorted({r.codigo for r in dicc.reglas if alcanza(r, ficha)})
+            ),
+        )
+        for ficha in dicc.fichas
+    )
+    return replace(dicc, fichas=fichas)
 
 
 # ---------------------------------------------------------------------------

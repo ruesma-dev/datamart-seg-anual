@@ -20,6 +20,7 @@ import pytest
 from etl_sigrid.domain.diccionario import (
     AGREGACIONES,
     CAPAS,
+    CODIGOS_REGLAS_OBLIGATORIAS,
     ESQUEMAS_DEL_DATAMART,
     REFRESCOS,
     TIPOS,
@@ -78,12 +79,31 @@ def _esquemas(*nombres: str) -> dict:
     }
 
 
-def _dicc(fichas=None, reglas=(), esquemas=None, **kwargs) -> Diccionario:
+def _regla(codigo: str, **kwargs) -> Regla:
+    """Regla dura válida de referencia, con ámbito resoluble."""
+    datos: dict = {
+        "codigo": codigo,
+        "titulo": f"Título de {codigo}",
+        "severidad": "bloqueante",
+        "ambito": ("mart",),
+        "regla": "Qué hacer y qué no hacer.",
+        "motivo": "Por qué, con el incidente real.",
+    }
+    datos.update(kwargs)
+    return Regla(**datos)
+
+
+def _reglas_minimas() -> list[Regla]:
+    """Las doce que R9 exige, en su forma mínima válida."""
+    return [_regla(codigo) for codigo in CODIGOS_REGLAS_OBLIGATORIAS]
+
+
+def _dicc(fichas=None, reglas=None, esquemas=None, **kwargs) -> Diccionario:
     datos: dict = {
         "version": "1",
         "base": "sigrid_dm",
         "fichas": tuple(_ficha() for _ in range(1)) if fichas is None else tuple(fichas),
-        "reglas": tuple(reglas),
+        "reglas": tuple(_reglas_minimas() if reglas is None else reglas),
         "esquemas": _esquemas() if esquemas is None else esquemas,
         "pendientes": (),
         "global_raw": {},

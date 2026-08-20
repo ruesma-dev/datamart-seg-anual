@@ -56,3 +56,27 @@ ERROR tests/test_f006_formato.py
 ## Evidencias
 
 *(se completa al terminar los cuatro bloques)*
+
+### T4 · `derivar_avisos()` y las validaciones R9 / R11 / R12
+
+```
+$ python -m pytest tests/test_f006_reglas.py tests/test_f006_formato.py -q
+=================================== ERRORS ====================================
+_________________ ERROR collecting tests/test_f006_reglas.py __________________
+ImportError while importing test module 'C:\Users\pgris\PycharmProjects\datamart-seg-anual\tests\test_f006_reglas.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_f006_reglas.py:19: in <module>
+    from etl_sigrid.domain.diccionario import (
+E   ImportError: cannot import name 'CODIGOS_REGLAS_OBLIGATORIAS' from 'etl_sigrid.domain.diccionario'
+=========================== short test summary info ===========================
+ERROR tests/test_f006_reglas.py
+ERROR tests/test_f006_formato.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!
+2 errors in 0.18s
+```
+
+Verde tras el código: `78 passed in 0.12s`.
