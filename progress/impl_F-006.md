@@ -2907,8 +2907,14 @@ respalde cualquier campo propio que una ficha se atribuya.
   origen del error es reconocible y lo arreglo tambien: los **comentarios de
   `06_presupuesto.sql`** repetian la formula con `decc` y la NOTA de cuatro
   lineas despues los desmentia. Copie el comentario en vez de leer el codigo.
-  Los comentarios quedan corregidos, con la nota de que indujeron una ficha
-  falsa; es la deuda «comentarios del SQL que mienten» mordiendo por primera vez.
+  Es la deuda «comentarios del SQL que mienten» mordiendo por primera vez.
+
+  **Intente corregir esos comentarios y no debo**: el guardian de F-011 salto
+  —«F-006 ha tocado SQL de negocio»— y tiene razon, porque acotar ese fichero es
+  F-025 y exige su prueba de equivalencia antes de cambiar lo que ve Power BI.
+  Revertido. **No se debilita un guardian para dejar pasar un cambio propio**;
+  queda propuesto al lider. La ficha si avisa de que algun comentario del SQL
+  repite una formula que el codigo no ejecuta, y de que manda el codigo.
 - **Cuatro `nulo_significa` imposibles en `stg.partidas`**, incluido el que se
   acababa de «corregir»: la rama raiz filtra `p.cod IS NOT NULL AND p.cod <> ''`,
   asi que ni `codigo_partida` ni `capitulo_raiz_cod` ni `ruta_capitulos` ni
