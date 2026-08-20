@@ -7,7 +7,7 @@ Rama `feature/F-006-mcp-azure`. **Bloques A, B, C y D entregados y corregidos
 tras el RECHAZADO del reviewer** (`progress/review_F-006.md`): los diez defectos
 están cerrados, cada uno con su fase RED.
 
-`bash harness/init.sh` en verde: **1359 tests**, cobertura de las líneas
+`bash harness/init.sh` en verde: **1361 tests**, cobertura de las líneas
 cambiadas **98,9 %** y campaña de mutación con **0 supervivientes de 161
 mutantes**.
 
@@ -74,6 +74,13 @@ afirmación en un campo y sobrevivió en el de al lado—, y al implementarla
 fallaron **28 de 41 fichas**. En la misma línea, el aviso de «congelado en el
 build» se propaga por derivación: `CURRENT_DATE` en un `CREATE TABLE AS` congela
 y en una vista no, y quien referencia una columna congelada lo hereda.
+
+Tras la quinta review, el contraste de clave se estrechó: una columna del
+`GROUP BY` **puede** omitirse de la clave si se resuelve por una sola fuente, y
+**no puede** si sale de un `COALESCE` de dos, porque entonces nada garantiza que
+acompañe siempre al mismo valor de clave. Lo que sigue fuera —la clave corta
+cuya dependencia falla por otro motivo— lo cierra la consulta de unicidad de T26,
+ya escrita en `tasks.md`.
 
 La puerta **sí** contrasta contra el SQL `agregacion`
 (la función que envuelve cada columna) y `clave_negocio` (contenida en el

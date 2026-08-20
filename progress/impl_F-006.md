@@ -1949,3 +1949,17 @@ Por decision del lider viajan con los bloques que faltan:
 | 5 | `compras.yaml`: la analogia «`importe_facturado` tampoco filtra» compara cosas distintas —alli no filtrar da el neto correcto sobre `factura_lineas`; en el pendiente arrastra NOTA y OTRO sobre `albaran_lineas`— y suaviza un aviso que no conviene suavizar |
 | 6 | `v_pbi_retencion_entidad.primera_devolucion_prevista` y `.ultima_devolucion_prevista` son `MIN`/`MAX` sobre TODOS los efectos, liquidados incluidos, en una vista cuyo titular es `saldo_vivo`. Preexistente |
 | 7 | La justificacion del SQL de unicidad de T26 dice que agrupar los NULOS es «como se comportan en un JOIN»: es al reves, en un JOIN los NULL no casan. Agruparlos es MAS estricto, que es lo que conviene; el SQL es correcto y el motivo escrito no |
+
+## Evidencias tras la quinta review
+
+| Evidencia | Antes | Ahora |
+|---|---|---|
+| **Tests que pasan** | 1359 | **1361** (563 de F-006), 40 saltados con motivo |
+| **Tests que fallan** | 0 | **0** |
+| **Cobertura de las lineas cambiadas** | 98,9 % (710/718) | **98,9 % (710/718)**, umbral 80 %, nivel `critico` |
+| **Mutantes / supervivientes** | 161 / 0 | **161 / 0**, 0 timeouts, 404,7 s |
+
+**El limite del contraste de clave, actualizado.** Ya no es «la clave corta no
+es derivable»: la familia en la que se resuelve por varias fuentes **si lo es** y
+se comprueba. Lo que queda fuera es la clave corta cuya dependencia falla por un
+motivo que el texto no expone, y eso lo cierra la consulta de unicidad de T26.
