@@ -1963,3 +1963,44 @@ Por decision del lider viajan con los bloques que faltan:
 es derivable»: la familia en la que se resuelve por varias fuentes **si lo es** y
 se comprueba. Lo que queda fuera es la clave corta cuya dependencia falla por un
 motivo que el texto no expone, y eso lo cierra la consulta de unicidad de T26.
+
+---
+
+# Bloque F (resto) y bloque G · los 53 objetos que faltaban
+
+## T22 · `maestro` (4 objetos)
+
+Fase RED, la puerta con los cuatro fuera de `pendientes`:
+
+```
+$ python -m pytest tests/test_f006_cobertura.py -q -k puerta
+tests\test_f006_cobertura.py:501: AssertionError
+FAILED tests/test_f006_cobertura.py::test_f006_r25_puerta_todo_objeto_publicado_tiene_ficha_o_esta_pendiente
+1 failed, 10 passed, 34 deselected in 1.13s
+```
+
+Las cuatro trampas del encargo, escritas y contrastadas contra el SQL:
+
+- **`maestro.obras` no filtra nada** y su grano lo dice: es superconjunto de
+  `stg.obras`, y contar en una o en otra da distinto **a proposito**. La
+  relacion hacia `stg.obras` explica que unir por ahi equivale a filtrar.
+- **`es_activa` es la columna buena** para saber si una obra vive, y la ficha
+  lo contrasta con la `activa` de `stg.obras`, cableada a TRUE.
+- **`proveedores` no expone oficio ni naturaleza** aunque `raw.prv` los traiga
+  cargados. Dicho con su motivo: es F-036, y es la razon de que la pregunta del
+  fontanero solo se pueda responder hoy por texto libre.
+- **`importe_contratado` lleva IVA** y no es comparable con el de `compras`. La
+  ficha dice ademas **como** compararlos: sumando aparte la `cuota_iva` de
+  `compras.contrato_lineas`.
+- **`raw.obrprv` esta vacia en Ruesma**, y por eso el vinculo obra-proveedor se
+  reconstruye desde los contratos. Esta en la descripcion, que es donde el
+  agente se pregunta de donde sale la vista.
+
+### Un arreglo de mantenimiento, hecho aqui porque tocaba
+
+Cinco tests de publicacion fijaban los recuentos **como literales** —49 objetos,
+593 columnas, 62 filas—, asi que cada esquema documentado los rompia. No es un
+fallo de contenido, es una trampa de mantenimiento que iba a repetirse cinco
+veces mas en esta misma tanda. Pasan a **derivarse del propio diccionario**, con
+un suelo (`>= 49`, `>= 593`) para que no puedan quedarse en vacio si alguien
+vacia una ficha.
