@@ -2949,3 +2949,57 @@ Tiene ya su `test_..._control_...`, como los otros seis del fichero: ejercita el
 caso en el que debe morder (`o.entide AS cliente_id` desde `FROM raw.obr o`) y
 los dos recortes que hoy lo dejan en cero —el alias de `LEFT JOIN` y la
 expresion compuesta—.
+
+## Evidencias tras la octava review
+
+Numeros medidos, no estimados.
+
+| Evidencia | Valor | Como se obtiene |
+|---|---|---|
+| **Tests ejecutados** | **1809 pasan, 0 fallan**, 127 saltados (1011 de ellos son de F-006) | `bash harness/init.sh` |
+| **Tiempo de la suite** | **~45 s** el subconjunto de F-006; **~155 s** la suite entera bajo `coverage` | salida de pytest |
+| **Cobertura de las lineas cambiadas** | **99,0 %** (715 de 722; umbral 80 %, nivel `critico`) | linea `PUERTA COBERTURA` |
+| **Mutantes / supervivientes** | **166 generados, 166 muertos, 0 supervivientes, 0 timeouts** en 741,5 s | `python -m harness.mutacion --feature F-006 --timeout 300` |
+| **Objetos documentados** | **102 de 102** | `config/diccionario/` |
+| **Trinquete `pendientes`** | **0** | `PENDIENTES_MAX` |
+| **Reglas duras publicadas** | **13 de 13** | `00_global.yaml` |
+
+Campana lanzada **borrando `__pycache__` a mano antes**, como en la tanda
+anterior: `harness/mutacion.py` sigue intacto —su arreglo es **F-041**— y sin esa
+limpieza previa el numero se mide con un mutante potencialmente vivo en el
+bytecode.
+
+### Comprobaciones derivables anadidas en esta pasada
+
+Todas contra **la fuente que gobierna el hecho**, que es la leccion de la tanda:
+
+| Comprobacion | Fuente que gobierna | Que caza |
+|---|---|---|
+| el job nocturno recarga entera | `Dockerfile` (`CMD`) | describir una carga que no es la que corre de noche |
+| `--full` trunca y recarga | `ingest_raw_step.py` | que cambie el significado de la bandera |
+| las banderas citadas existen | `click.option` de `main.py` | publicar un comando inejecutable (pasaba 31 veces) |
+| la regla declara los campos derivados | barrido de `sql/**` | una lista de excepciones escrita a mano (acerto 1 de 7) |
+| las tablas que no cuelgan de `con` | idem | sugerir un JOIN que no existe |
+| ninguna ficha se atribuye un campo no derivado | idem | la misma afirmacion dicha con otras palabras |
+| frases rechazadas, **texto crudo** | las propias revisiones | la copia escondida en una cabecera |
+| control del guardian de nulos | — | un detector en cero indistinguible de uno roto |
+
+Cinco de las ocho llevan su **test de control**, y el guardian de nulos ya tiene
+el suyo: era el unico detector del fichero sin el, y ademas estaba en cero.
+
+### Limites declarados, no descubiertos luego
+
+- **`azure-apps/sigrid_tablas.md` no es una fuente de la que derivar.** Lo que
+  solo dice ese documento **no se afirma en ninguna ficha ni en la regla**. La
+  regla lo declara como hueco y remite alli para consultar a mano.
+- El guardian de nulos **no analiza expresiones compuestas** ni sale de los
+  alias directos de `raw`, y **hoy no llega ninguna columna a su `assert`**: es
+  una alarma para el futuro, no una comprobacion activa. Dicho en su test.
+- La caracterizacion de las columnas excluidas agrupa por familias deducidas del
+  **nombre** de la columna; lo que no encaja se cuenta como «sueltas entre
+  textos y campos auxiliares» en vez de inventarle categoria.
+- Sigue **sin ejecutarse la bateria de 18 preguntas** (T39) ni
+  `check-diccionario` (T26). Que una ficha sea correcta no demuestra todavia que
+  sea suficiente.
+- **Los comentarios de `06_presupuesto.sql` siguen mintiendo**: corregirlos es de
+  F-025 y el guardian de F-011 lo impide con razon. Propuesto al lider.

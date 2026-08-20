@@ -3,11 +3,40 @@
 
 ## F-006 · El diccionario semántico del datamart — `in_progress`
 
-Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**, y **corregidos los
-trece defectos de la séptima pasada** de review.
+Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**, y corregidos los
+defectos de la séptima y la **octava** pasada de review.
 
 `bash harness/init.sh` en verde: **1758 tests**, 127 saltados, cobertura de las
 líneas cambiadas **99,0 %** (715 de 722).
+
+### El criterio nuevo, que es lo que hay que recordar de aquí
+
+La octava pasada rechazó porque **las dos correcciones centrales de la séptima
+sustituyeron una afirmación falsa por otra**. No fue descuido: yo sí derivaba, y
+aun así acerté dos veces mal, porque derivaba de una fuente que gobierna **otra
+cosa**.
+
+> **Si una afirmación no es derivable de la fuente que GOBIERNA el hecho, no se
+> escribe.** Ni reformulada ni matizada. Se omite, y si el hueco importa se
+> declara como hueco.
+
+| Hecho | Fuente que lo gobierna |
+|---|---|
+| Qué corre en el job nocturno | `Dockerfile` (`CMD ["run-all", "--full"]`) |
+| Cómo carga el comando según la bandera | `ingest_raw_step.py` |
+| Cómo se llama una bandera | los `click.option` de `main.py` |
+| Qué campos propios de `raw` existen | nuestro SQL, que no correría contra columnas inexistentes |
+
+**`azure-apps/sigrid_tablas.md` no está en esa tabla y es deliberado.** Es la
+conversión de un PDF de 380 páginas, no se deja segmentar —mi segmentador da a
+`obr` un bloque de 1252 líneas y mete `cenrep` dentro de `cen`—, y los dos
+intentos de derivar de él produjeron una afirmación falsa. Sirve para consultar
+una columna a mano; **no para respaldar una ficha**.
+
+**Se recortó contenido publicado, y está dicho**: `cen.res` (inventado),
+`obr.res` (solo lo dice el PDF), cuatro excepciones falsas de la regla de oro, y
+los `entcif` que la review sugería añadir —misma fuente, mismo riesgo—. El
+diccionario es más pequeño y no miente, que es el propósito de la feature.
 
 ### Qué falló en la séptima pasada, en una línea
 
@@ -131,6 +160,21 @@ y qué NO».
 
 ### Avisos que no hay que perder
 
+- **Los comentarios de `sql/stg/06_presupuesto.sql` mienten** y ya mordieron:
+  dicen `importe = ROUND(ROUND(can, decc) * ...)` cuando el código hace
+  `ROUND(can * ROUND(pre, decp), deci)` —`decc` no interviene—, y la NOTA de
+  cuatro líneas después los desmiente. De ahí salió una ficha falsa en la 8ª
+  pasada, por copiar el comentario en vez de leer el código. **Intenté
+  corregirlos y no debía**: el guardián de F-011 saltó («F-006 ha tocado SQL de
+  negocio») y tiene razón, porque ese fichero es de F-025 y exige su prueba de
+  equivalencia. Revertido; **no se debilita un guardián para dejar pasar un
+  cambio propio**. Queda propuesto: es un arreglo de dos comentarios que elimina
+  una trampa viva.
+- **`config/tables_sigrid.yaml` sigue diciendo «catálogo estable, refresco
+  completo»** en 13 tablas, y poner `incremental_column: null` no provoca
+  ninguna recarga: la recarga la decide `--full` en el `Dockerfile`. Las fichas
+  ya aciertan; el fichero de configuración es el que engaña, y fue la fuente que
+  me indujo el error de la 7ª pasada.
 - **`AUX` es un nombre de dispositivo reservado de Windows.**
   `config/diccionario/aux.yaml` pasó los 618 tests y **git no podía indexarlo**
   (`open(...): No such file or directory` sobre un fichero que `ls` enseña). El
