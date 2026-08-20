@@ -1,13 +1,340 @@
 <!-- progress/review_F-006.md -->
-# F-006 · Review — bloques A a F
+# F-006 · Review — el diccionario semántico
 
-> **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada.
+> **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
+> pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **seis pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **siete pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# SÉPTIMA PASADA · 2026-08-20 — el diccionario completo
+
+> Commits revisados: `c5c0bd6`..`df4b199`. Alcance nuevo: los **53 objetos** que
+> faltaban —`maestro` (4), `stg` (10), `aux` (1), `_meta` (7) y `raw` (31)—.
+> Total del diccionario: **102 objetos, 793 columnas, 13 reglas, `pendientes` en 0**.
+
+## Veredicto de la séptima pasada
+
+**RECHAZADO.** El andamiaje de esta tanda es excelente —los recuentos cuadran, el
+trinquete llega a 0 de verdad, la mutación se recalcula sola, el barrido de
+comentarios está automatizado y los tres hallazgos de «derivar antes de
+corregir» son ciertos— pero **el contenido de los dos esquemas más grandes tiene
+defectos graves**, y son de la clase que esta feature existe para impedir: fichas
+que producen números falsos y una regla **bloqueante** que le dice al agente que
+un campo cargado en la base no existe.
+
+Los diez que bloquean están abajo. Ninguno es de forma: los verifiqué uno a uno
+contra el SQL y contra `azure-apps/sigrid_tablas.md`.
+
+---
+
+## Lo que hay que corregir
+
+### En `raw` y en la regla de oro
+
+1. **`R-SIGRID-CON` está sobregeneralizada, y es `bloqueante` sobre las 31
+   fichas.** Dice que `cod`, `res` y `fec` viven en `con` «**no en la tabla
+   específica**». Falso para la tabla más consultada del datamart:
+   `sigrid_tablas.md:16542` da `obr.res = "Nombre completo", Texto ilimitado`, y
+   `raw.obr` se ingiere con `exclude_columns: []`, así que **la columna está
+   cargada en Postgres**. El `motivo` repite el error —«consultar `obr` sin unir
+   a `con` devuelve una obra sin nombre y sin código»: sin código sí, sin nombre
+   no— y la ficha `raw.obr` (`raw.yaml:115-118`) lo dice otra vez. Una regla
+   bloqueante que niega un campo real es peor que no tenerla.
+2. **La ficha `raw.prv` ubica el CIF donde no está** (`raw.yaml:373-374`: «el
+   CIF, el nombre y el código del proveedor están en `con`»). El CIF es
+   `prv.cif`, y lo confirma el propio repositorio:
+   `maestro/02_proveedores.sql:28-29` toma `p.cif` y `p.raz` **de `raw.prv`**, y
+   solo `cod`/`res` de `raw.con`. El agente que siga la ficha buscará `con.cif` y
+   se estrellará: exactamente el fallo que la regla de oro existe para evitar.
+3. **Las 31 fichas describen mal cómo se carga la tabla.** 18 dicen «carga
+   incremental por `tiemod`» y 13 «se recarga entera cada noche», y **ninguna de
+   las dos cosas ocurre**: `ingest_raw_step.py:205-211` toma
+   `last_id_already = pg.get_max_id("raw", tabla, "ide")` —append de los `ide`
+   por encima del máximo ya guardado— y usa `incremental_column` **solo** para
+   volcar `_source_tiemod`. Una fila modificada en Sigrid no se refresca nunca, y
+   el `TRUNCATE` solo ocurre con `full_refresh=True`, que `run-all` no pasa. Es
+   información operativa falsa sobre la frescura del origen.
+4. **`tiemod` no existe en 15 de las 18 tablas** a las que `tables_sigrid.yaml`
+   —y por herencia la ficha— le asigna esa columna de corte. Solo `con` y
+   `comprv` la tienen.
+5. **Trece punteros a objetos que no existen**: `compras.documentos` (×7) y
+   `compras.fact_linea` (×6), en las fichas de `con`, `ctr`, `ctrpro`, `dca`,
+   `dcapro`, `dcf` y `dcfpro`. Lo verifiqué: 13 menciones en `raw.yaml` y **cero
+   apariciones en todo el SQL**; los reales son `compras.contratos`,
+   `compras.albaranes`, `compras.facturas` y `compras.fact_compras_linea`. Como
+   todo el argumento de DA-2 es «no consultes `raw`, ve aguas abajo y la ficha te
+   dice dónde», el puntero roto vacía el `motivo_no_consumo` de siete tablas.
+6. **Ninguna de las 31 fichas remite a `azure-apps/sigrid_tablas.md`**, que es la
+   contrapartida que DA-2 prometía a cambio de no documentar columnas. Las dos
+   menciones viven en el comentario de cabecera, que `yaml.safe_load` descarta.
+   **Rectifico aquí mi propio barrido**: lo hice contra el publicable *global*, y
+   ahí el puntero aparece —en la entrada `esquemas.raw` de `00_global.yaml`—, así
+   que lo di por bueno. El matiz que se me escapó es que un agente que pida
+   `describir_tabla('raw.dcapro')` recibe la ficha, no el bloque de esquema: el
+   puntero tiene que estar **en la ficha**.
+
+### En `stg`
+
+7. **`stg.presupuesto` no dice que en los ámbitos reales es ACUMULADO A ORIGEN, y
+   encima marca `agregacion: suma`.** Las tres medidas —`cantidad`, `importe`,
+   `importe_oficial`— llevan `suma`, y el desacumulado se hace aguas abajo por
+   diferencia con la fase anterior (`08_plan_mensual.sql:346-352`:
+   `cantidad - LAG(cantidad)`). Sumar a través de `fase_num` multiplica. Es la
+   trampa de `R-IMPORTE-MES` otra vez, en la ficha que se autoproclama «la fuente
+   buena para cuál es el presupuesto de la obra» y que propone como ejemplo
+   «Cuál es el presupuesto de la obra X».
+8. **La trampa de las versiones master no está escrita en `stg.presupuesto`**,
+   donde aplica igual que en `plan_mensual`: en los ámbitos 8 y 11 hay una fila
+   por versión. La ficha invita a la pregunta y solo dice «filtrar la fase
+   correcta», sin advertir de qué pasa si no se filtra.
+9. **`stg.fases.anio` y `.mes` declaran un origen falso**: «derivado de su fecha
+   de inicio», con `nulo_significa: La fase no tiene fecha de inicio`.
+   `05_fases.sql:26-27` los copia de `f.ano` y `f.mes` de `raw.obrfas`, que son
+   independientes de `fecini`. No es cosmético: `08_plan_mensual.sql:328-329`
+   exige `anio`/`mes` no nulos para construir los ámbitos reales.
+10. **Cuatro `nulo_significa` imposibles en `stg.partidas`, uno de ellos
+    invertido**: `capitulo_raiz_id.nulo_significa: «La propia fila es el capítulo
+    raíz»` cuando `04_partidas.sql:51` hace exactamente lo contrario —«En la
+    raíz, ella misma es el raíz», `p.ide AS capitulo_raiz_id`—. Buscar las raíces
+    con `WHERE capitulo_raiz_id IS NULL` devuelve cero filas.
+
+### En `maestro`, y en el mecanismo que debía impedirlo
+
+11. **`maestro.obras.cliente_id` declara un nulo que nunca ocurre**, y es la
+    **reincidencia exacta** del defecto que ya corregimos en la tercera pasada.
+    `maestro/01_obras.sql:26` proyecta `o.entide AS cliente_id` **sin
+    `NULLIF(…, 0)`** —el propio fichero avisa en su cabecera de que en Sigrid
+    esas referencias «vienen a 0»— y la ficha (`maestro.yaml:75`) dice
+    `nulo_significa: La obra no tiene cliente asignado`. Un `WHERE cliente_id IS
+    NULL` devuelve cero filas siempre.
+    Lo importante es **por qué se coló**: el guardián que se escribió para esto,
+    `test_f006_r2_un_nulo_declarado_en_un_ide_tiene_que_ser_posible`, filtra por
+    `columna.nombre.endswith("_ide")` (`tests/test_f006_fichas.py:514`), y
+    `maestro` nombra sus columnas `_id`. El mecanismo estaba y no cubrió el caso
+    por un sufijo. Arreglo doble: la ficha, y ampliar el guardián a `_id`.
+12. **El `motivo` de `R-FRESCURA-MANUAL` cita una composición del pipeline que ya
+    no es la real** (`00_global.yaml:49-51`): «IngestRaw, LoadExcelAux, BuildStg,
+    BuildMart y ApplyGrants». Falta **`PublicarDiccionarioStep`**, que el bloque E
+    insertó entre `BuildMart` y `ApplyGrants`. La conclusión de la regla no
+    cambia, pero es una regla `bloqueante` cuya evidencia citada está desfasada
+    desde hace dos tandas.
+13. **`tests/test_f006_raw_ingesta.py:78-97` pasa en vacío en 11 de las 31
+    fichas.** La aserción es `citadas <= excluidas`, que se cumple trivialmente
+    cuando `citadas` está vacío, y las columnas citadas se extraen con una regex
+    que exige un formato de prosa concreto (`**No se traen** …`). Hoy solo 7
+    fichas citan alguna, mientras 11 tienen exclusiones y no citan ninguna
+    —`dca` y `dcf` con 23 columnas excluidas cada una—. Sin un control de
+    no-vacuidad, el día que alguien escriba el aviso con otro formato el test
+    seguirá verde mientras la ficha calla.
+
+### Deuda de la misma tanda, que puede viajar
+
+`stg.fn_master_fecha_efectiva` omite la guarda `IF v_mes_creac IN (2,6,10)`, que
+es media regla; `stg.version_master_vigente` declara `N:N` una relación que es
+`1:N`; `stg.plan_mensual.total_incurrido` dice «no es de coste real» cuando
+también llega en el ámbito 7; `presupuesto.dec_cantidades` dice gobernar un
+redondeo que el SQL declara explícitamente que no aplica; `R-SIGRID-CON` no
+advierte de las referencias polimórficas (`linoriide` + `docoritip`); y
+`domain/diccionario.py:99` sigue diciendo «las DOCE reglas duras» cuando la tupla
+tiene trece.
+
+---
+
+## Los números, recontados
+
+No me fío de los recuentos y esta vez hay una discrepancia con lo que llegó por
+el chat, sin consecuencias pero conviene fijarla:
+
+| | Declarado | Medido por mí |
+|---|---|---|
+| Tests | 1496 | **1557** |
+| Saltados | 40 | **82** |
+| Cobertura | 99,0 % de 722 | 99,0 % de 722 ✔ |
+| Objetos / columnas / pendientes | 102 / 793 / 0 | **102 / 793 / 0** ✔ |
+
+La diferencia de tests es de medición: el líder contó antes de los cuatro
+últimos commits. El **inventario cuadra exactamente**: 102 fichas para 102
+objetos publicados, `pendientes` vacía y `PENDIENTES_MAX = 0`. El trinquete en 0
+significa lo que dice.
+
+Reparto verificado: `_meta` 7 objetos (los tres de instrumentación más las tres
+tablas del diccionario y su vista), `aux` 1, `cierre` 12, `compras` 14,
+`maestro` 4, `mart` 13, `raw` 31 **con 0 columnas** —como manda DA-2—,
+`retenciones` 10 y `stg` 10.
+
+## Los 82 saltados, explicados
+
+Subieron de 40 a 82 y el informe no lo menciona, así que lo desgloso:
+
+| Nº | Motivo | Veredicto |
+|---|---|---|
+| 31 | «las tablas de `raw` no tienen DDL en el repositorio (DA-2)» | **legítimo y esperado**: son las 31 fichas nuevas de `raw` |
+| 35 | «el `GROUP BY` de este objeto no es derivable» | legítimo (eran 28; suben porque hay más objetos) |
+| 6 | «la PK es una clave sustituta; la de negocio es otra cosa» | **legítimo, y es la prueba de que la corrección de la PK inline funciona** |
+| 3+3 | «la proyección no se deja leer» | legítimo: los catálogos `VALUES` |
+| 2 | «el DDL no declara clave primaria, ni aparte ni inline» | legítimo: las CTAS sin PK |
+| 2 | «se crea con SQL dinámico; tiene su propio test» | legítimo, ya validado |
+
+**Ninguno esquiva una comprobación que antes se ejecutara.** Y el mensaje falso
+que denuncié en la cuarta pasada está corregido: ahora dice «ni aparte ni
+inline» y solo aplica a las dos tablas que de verdad no tienen PK; las tres
+tablas de hecho caen en la rama correcta —clave sustituta—, que antes no se
+alcanzaba.
+
+## La mutación, mirada con lupa
+
+- **Recalculada de forma independiente**: alcance **2358 líneas**, **166
+  mutantes**. Coincide con `progress/mutacion_F-006.md`, que declara 166
+  evaluados, 166 muertos, **0 supervivientes y 0 timeouts**.
+- **Los cuatro «timeouts» eran cuatro supervivientes**, y está contado sin
+  adornos en `tests/test_f006_supervivientes.py`, que además explica por qué
+  sobrevivían: dos `frozen=True → False` en `Columna` y `Relacion` —que nadie
+  cazaba, mientras la hermana `Ficha` sí tenía quien la cazara— y dos mínimos de
+  longitud subidos en uno, que sobrevivían porque **ningún caso ejercitaba el
+  borde**. La lección que deja escrita es la correcta: **un timeout no es un
+  mutante muerto, es un mutante sin evaluar.**
+- **El mutante vivo en el bytecode: confirmado, y lo reproduje.** Monté un
+  módulo de laboratorio fuera del repositorio, generé su `__pycache__`, apliqué
+  una mutación **del mismo tamaño** conservando el `mtime`, y después restauré el
+  fuente original conservándolo otra vez. Python siguió ejecutando el bytecode
+  **mutado**:
+
+  ```
+  resultado: True      <- fuente original
+  resultado: False     <- fuente mutado
+  resultado: False     <- fuente RESTAURADO, pero corre el .pyc mutado
+  ```
+
+  Es real y es serio: con el fuente restaurado la suite corre contra código
+  mutado. En este caso dio un falso rojo; **en el caso simétrico daría un falso
+  verde**, es decir, un mutante contado como muerto sin estarlo.
+
+  **Salvedad que el líder debe conocer**: `harness/mutacion.py` **no se ha
+  tocado** —lo comprobé: el diff de `harness/` en esta tanda es solo
+  `features.json`—, así que el defecto sigue vivo en la herramienta y la campaña
+  de 166/166 se midió con él presente. Está dado de alta como **F-041**, junto
+  con el recuento de timeouts y los worktrees huérfanos, y es del arnés genérico,
+  así que viaja a `arnes-base` por la regla de propagación. No bloquea F-006: la
+  evidencia disponible es la que la herramienta puede dar hoy, y los cuatro
+  supervivientes reales se reevaluaron uno a uno.
+
+## La regla de oro, verificada en la fuente
+
+`R-SIGRID-CON` es la decimotercera regla y gobierna cómo un agente entiende todo
+`raw`. **Fui a la fuente** (`azure-apps/sigrid_tablas.md`, entidad `con`) y sus
+puntos centrales se confirman al pie de la letra:
+
+| Afirmación | Verificación |
+|---|---|
+| «`ide` es la clave … y es el índice primario» | `ide Identificador \| Entero \| INDICE PRIMARIO \| Unico` |
+| «`cod`, `res` y `fec` viven en `con`» | los tres están en la entidad: `cod Código`, `res Resumen`, `fec Fecha alta` |
+| «`con.nom` NO EXISTE; el nombre legible es `con.res`» | **no hay ningún campo `nom`** en la entidad |
+| El `motivo` cita `ide`, `cod`, `res`, `fec`, `est` y `fecbaj` | los seis están, con esos nombres |
+| «un campo que acaba en `ide` es una referencia» | la lista de referencias de `con` es exactamente eso: `pag.conide`, `ctr.entide`, `obrfasamb.ofeentide`… |
+
+Y el hallazgo que la motiva es cierto y no menor: **la regla estaba solo en un
+comentario del YAML**, y los comentarios no se publican. El MCP no la habría
+visto nunca.
+
+## El parser que no veía las columnas migradas
+
+Verificado por mí, y es un hallazgo genuino de «derivar antes de corregir»:
+`_meta.etl_runs.batch_id` **no está en el `CREATE TABLE`**, se añade después con
+`ALTER TABLE _meta.etl_runs ADD COLUMN IF NOT EXISTS batch_id TEXT NULL`
+(`sql/ddl/00_meta.sql:34`). El contraste exacto de columnas no leía los `ALTER`,
+así que acusaba a la ficha de documentar una columna inexistente **cuando la
+columna existe**, solo que migrada. Ejecuté el parser corregido sobre el fichero
+y devuelve las diez columnas, `batch_id` incluida. Si se hubiera «corregido» la
+ficha en vez del parser, se habría borrado de la ficha una columna real.
+
+## El barrido de comentarios, hecho a máquina
+
+Es la segunda vez que aparece el mismo fallo —ya pasó con el aviso de frescura en
+la cabecera—, así que no me fié del barrido manual: parseé los diez YAML con
+`safe_load` —que descarta los comentarios— y comparé el conjunto de
+identificadores citados en comentarios contra **todo** el texto publicable del
+diccionario.
+
+**No queda ninguna afirmación importante fuera de lo publicable.** Los únicos
+identificadores que viven solo en comentarios son `describir_tabla` —el nombre
+de una herramienta del MCP— y `exclude_columns` / `incremental_column`, que son
+claves de `config/tables_sigrid.yaml` citadas al explicar **cómo se verificó** la
+ficha; lo que esas claves significan está contado en prosa publicable en 19
+sitios de `raw.yaml`. Ninguno de los tres es semántica de negocio.
+
+## El nombre de fichero que git no podía indexar
+
+`aux.yaml` pasaba los tests y `git add` lo rechazaba: `AUX` es nombre de
+dispositivo reservado en Windows. La solución —`aux_.yaml`, con el sufijo de la
+convención de Python— es correcta y está bien acotada:
+
+- **el contenido sigue declarando `esquema: aux`**, que es lo que consultará el
+  MCP: el nombre del fichero no se publica;
+- el cargador resuelve **la familia entera** de reservados —`con`, `prn`, `aux`,
+  `nul`, `com1`–`com9`, `lpt1`–`lpt9`— en una sola función usada por el cargador
+  y por quien cree un esquema nuevo;
+- y el comentario señala el caso que habría dolido de verdad: **`con` es el
+  nombre de la tabla central de Sigrid**.
+
+## Rigor y comprobaciones de siempre
+
+- **1557 tests + 82 saltados**, ejecutados por mí; cobertura **99,0 % de 722
+  líneas**.
+- **Nada prohibido**: el diff no toca `main.py`, `settings.py`, `grants.py`,
+  `postgres_client.py`, `infra/**` ni ningún SQL de negocio; ni un `GRANT`,
+  `REVOKE`, firewall, Azure ni conexión a la base. **Sin `push`**: no hay rama
+  remota. **Sin worktrees huérfanos.**
+- El dominio sigue puro: `diccionario.py` importa solo `re`, `collections.abc` y
+  `dataclasses`; el manejo de nombres de fichero vive en el cargador, que es
+  infraestructura.
+- Deuda menor nueva: un aviso `I001` de `ruff` en
+  `tests/test_f006_supervivientes.py` (orden de imports). Es la segunda vez que
+  un test nuevo entra con ese aviso.
+- **Matiz de proceso**: el commit `df4b199` es de **F-041** y va en la rama de
+  F-006. Es solo el alta en `features.json` y `BACKLOG.md` de una feature nacida
+  de este trabajo, no una implementación, así que es defendible; conviene que el
+  líder lo sepa porque la regla es una rama por feature.
+
+---
+
+## Lo que esta bien y no hay que rehacer
+
+El rechazo es de contenido y el andamiaje es solido; conviene decirlo para que la
+correccion no se lleve por delante lo que funciona:
+
+- **Ni una columna inventada ni omitida** en las 75 de `stg`, contrastadas una a
+  una; ni una ficha de `raw` de mas o de menos: las 31 `target_table` de
+  `config/tables_sigrid.yaml` casan con las 31 del YAML, en el mismo orden.
+- Los **31 titulos de `raw`** coinciden literalmente con la fila de entidad del
+  autodocumentador de Sigrid, y las 31 tablas tienen `ide` como indice primario
+  unico, como afirma la regla.
+- **Nueve de las doce afirmaciones de `R-SIGRID-CON` son ciertas**, incluidas las
+  dos que mas pesan: `con.nom` no existe y el `0` es el NULL de las fechas.
+- Las **seis trampas de `stg`** que se pidio comprobar estan escritas en campos
+  **publicables** y son ciertas: ninguna vive solo en un comentario.
+- **`_meta` y `aux_` estan limpios**: los siete objetos de `_meta` casan columna a
+  columna con su DDL —y `v_diccionario` conserva el orden del contrato, con
+  `motivo_no_consumo` la ultima—, y las dos afirmaciones de `aux_` (se crea vacia
+  por diseno, la vista no periodifica nada) se verificaron contra el SQL.
+- Las tres trampas de `maestro` estan escritas y son ciertas.
+- Las seis tablas de `raw` que las fichas declaran sin consumidor son exactamente
+  las seis que ningun SQL lee.
+
+Con esas bases, lo que falta es corregir trece afirmaciones y dos mecanismos, no
+rehacer el trabajo.
+
+## Checkpoints (septima pasada)
+
+**C1** `[x]` · **C2** `[x]` · **C3** `[x]` · **C3 bis** N/A · **C4** `[ ]` —trece
+afirmaciones publicadas que el SQL o el origen desmienten, una de ellas en una
+regla bloqueante— · **C4 bis** `[x]`, con la salvedad del bytecode · **C4 ter**
+N/A · **C5** N/A parcial (los bloques A a G del alcance encargado).
 
 ---
 

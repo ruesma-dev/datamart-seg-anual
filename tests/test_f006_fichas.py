@@ -494,6 +494,33 @@ def test_f006_r7_cierre_el_dim_de_concepto_si_ordena_de_uno_a_seis() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _bloque_del_objeto(sql: str, nombre_cualificado: str) -> str:
+    """El trozo del fichero que construye ESE objeto, no el fichero entero.
+
+    `compras/01_documentos.sql` construye seis objetos seguidos, y buscar en todo
+    el fichero devuelve la proyección del vecino. Pasó de verdad: el guardián de
+    nulos acusó a `compras.albaranes.contrato_id` de proyectarse sin `NULLIF`
+    leyendo el `c.ide AS contrato_id` de `compras.contratos`, cuando la línea de
+    `albaranes` es `NULLIF(a.ctride, 0) AS contrato_id` y está bien.
+
+    Dos falsos positivos de tres: sin este recorte, la comprobación acusaba a más
+    fichas de las que fallan, que es la otra forma de hacer daño.
+    """
+    inicio = re.search(
+        rf"CREATE\s+(?:OR\s+REPLACE\s+)?(?:VIEW|TABLE)"
+        rf"(?:\s+IF\s+NOT\s+EXISTS)?\s+{re.escape(nombre_cualificado)}\b",
+        sql,
+        re.IGNORECASE,
+    )
+    if not inicio:
+        return sql
+    resto = sql[inicio.end():]
+    siguiente = re.search(
+        r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:VIEW|TABLE)\b", resto, re.IGNORECASE
+    )
+    return resto[: siguiente.start()] if siguiente else resto
+
+
 def _proyeccion_de(sql: str, columna: str) -> str | None:
     """La línea del `SELECT` que crea ese alias, sin comentarios."""
     for linea in re.sub(r"--[^\n]*", " ", sql).split("\n"):
@@ -502,19 +529,102 @@ def _proyeccion_de(sql: str, columna: str) -> str | None:
     return None
 
 
+def test_f006_r2_la_proyeccion_se_busca_en_el_bloque_del_objeto() -> None:
+    """Si no se acotase, un objeto heredaría la proyección de su vecino."""
+    sql = """
+    CREATE TABLE compras.contratos AS
+    SELECT
+        c.ide                   AS contrato_id
+    FROM raw.ctr c;
+    CREATE TABLE compras.albaranes AS
+    SELECT
+        NULLIF(a.ctride, 0)     AS contrato_id
+    FROM raw.dca a;
+    """
+    contratos = _proyeccion_de(_bloque_del_objeto(sql, "compras.contratos"), "contrato_id")
+    albaranes = _proyeccion_de(_bloque_del_objeto(sql, "compras.albaranes"), "contrato_id")
+    assert "NULLIF" not in contratos.upper()
+    assert "NULLIF" in albaranes.upper()
+
+
+def _alias_directos_de_raw(sql: str) -> set[str]:
+    """Alias ligados a una tabla de `raw` por un camino que NO produce NULL.
+
+    Es decir: `FROM raw.obr o` y `JOIN raw.con c`, pero **no** `LEFT JOIN raw.con
+    prv_con`, donde el NULL lo pone el join y no hace falta ningún `NULLIF`.
+    """
+    alias: set[str] = set()
+    for linea in re.sub(r"--[^\n]*", " ", sql).split("\n"):
+        m = re.search(
+            r"\b(LEFT\s+(?:OUTER\s+)?JOIN|RIGHT\s+(?:OUTER\s+)?JOIN|FULL\s+"
+            r"(?:OUTER\s+)?JOIN|INNER\s+JOIN|JOIN|FROM)\s+raw\.(\w+)\s+(\w+)",
+            linea,
+            re.IGNORECASE,
+        )
+        if m and not re.match(r"(LEFT|RIGHT|FULL)", m.group(1), re.IGNORECASE):
+            alias.add(m.group(3))
+    return alias
+
+
+#: Sufijos con los que este proyecto nombra una referencia a otra entidad.
+#:
+#: Empezó siendo solo `_ide`, el nombre que usa `cierre`, y por eso este
+#: guardián **no vio** `maestro.obras.cliente_id`, que es el mismo defecto que
+#: se corrigió en la tercera pasada: `o.entide AS cliente_id` sin `NULLIF`, con
+#: un `nulo_significa` que nunca ocurre. `maestro`, `stg` y `mart` nombran esas
+#: columnas `_id`.
+#:
+#: La lección no es que faltase un sufijo: es que **un filtro por sufijo deja
+#: pasar a la hermana**. Se comprueban los dos, y el test de abajo fija que la
+#: lista los contenga para que añadir una convención nueva sea deliberado.
+SUFIJOS_DE_REFERENCIA = ("_ide", "_id")
+
+
+def test_f006_r2_el_guardian_de_nulos_cubre_las_dos_convenciones() -> None:
+    """`cierre` los llama `_ide` y `maestro` los llama `_id`. Los dos cuentan."""
+    assert set(SUFIJOS_DE_REFERENCIA) == {"_ide", "_id"}
+
+
 @pytest.mark.parametrize(
-    "nombre", sorted(f.nombre for f in _fichas_con_columnas() if f.tipo == "vista")
+    "nombre", sorted(f.nombre for f in _fichas_con_columnas())
 )
 def test_f006_r2_un_nulo_declarado_en_un_ide_tiene_que_ser_posible(nombre: str) -> None:
     ficha = _diccionario().por_nombre[nombre]
-    origen = _origen_por_objeto()[nombre]
+    origen = _origen_por_objeto().get(nombre)
+    if origen is None:
+        pytest.skip(f"{nombre} no tiene un SQL de origen legible")
     sql = (DIR_SQL / origen).read_text(encoding="utf-8")
 
+    # El «0 en vez de NULL» es una convención de SIGRID, no nuestra: sus enteros
+    # no guardan nulos. Así que esto solo aplica cuando el valor sale DIRECTO de
+    # una tabla de `raw` por un camino que no puede producir NULL por sí mismo.
+    #
+    # Las dos exclusiones no son comodidad, son correctitud, y sin ellas el
+    # guardián marcaba seis casos de los que solo dos son ciertos:
+    #
+    #  · Si el alias llega por `LEFT JOIN`, la columna **sí** puede ser NULL sin
+    #    ningún `NULLIF`: lo produce el propio join cuando no casa.
+    #  · Si el alias no es una tabla de `raw` —una vista de `compras`, otra de
+    #    `retenciones`— el 0 ya lo neutralizó quien la construyó, y volver a
+    #    exigirlo aquí acusaría a la ficha de mentir cuando dice la verdad.
+    #    `_meta.etl_runs.batch_id` es el caso extremo: acaba en `_id`, no lleva
+    #    `NULLIF` y **es NULL de verdad** en las filas anteriores a F-024.
+    #
+    # LÍMITE ACEPTADO, escrito y no descubierto luego: una expresión compuesta
+    # —un `COALESCE`, un `CASE`— no se analiza. Puede producir NULL por muchas
+    # vías y decidirlo desde el texto marcaría de más.
+    alias_de_raw = _alias_directos_de_raw(sql)
+    if not alias_de_raw:
+        pytest.skip(f"{nombre} no lee directamente de `raw`: el 0-como-NULL es de Sigrid")
+
     for columna in ficha.columnas:
-        if not columna.nombre.endswith("_ide") or not columna.nulo_significa:
+        if not columna.nombre.endswith(SUFIJOS_DE_REFERENCIA) or not columna.nulo_significa:
             continue
-        proyeccion = _proyeccion_de(sql, columna.nombre)
+        proyeccion = _proyeccion_de(_bloque_del_objeto(sql, nombre), columna.nombre)
         if proyeccion is None:
+            continue
+        directa = re.search(r"^\s*(\w+)\.(\w+)\s+AS\b", proyeccion, re.IGNORECASE)
+        if not directa or directa.group(1) not in alias_de_raw:
             continue
         assert "NULLIF" in proyeccion.upper(), (
             f"{nombre}.{columna.nombre} declara `nulo_significa` pero se proyecta "

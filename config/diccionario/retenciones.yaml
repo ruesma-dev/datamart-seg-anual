@@ -738,8 +738,9 @@ objetos:
       pregunta.
     descripcion: >-
       El equivalente de `retenciones.v_src_lineas_compra` para las facturas de
-      VENTA. **Esta siempre vacia por diseno**: se construye sobre `raw.dvfpro`,
-      que no se ingiere, asi que el SQL crea la variante sin filas. La
+      VENTA. **Esta siempre vacia por diseno**: se construye sobre `dvfpro`, una
+      tabla de Sigrid que **no se ingiere** —por eso no tiene ficha en `raw`—,
+      asi que el SQL crea la variante sin filas. La
       consecuencia practica es que una retencion de CLIENTE solo se puede
       atribuir a obra por su centro de coste, sin el respaldo de las lineas.
     grano: >-

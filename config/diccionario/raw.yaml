@@ -74,7 +74,8 @@ objetos:
       Es la tabla central de Sigrid, no una tabla de negocio: mezcla obras,
       proveedores, facturas, albaranes y todo lo demas en las mismas filas,
       distinguidos por `tip`. Para obras esta `maestro.obras`, para proveedores
-      `maestro.proveedores` y para documentos de compra `compras.documentos`.
+      `maestro.proveedores` y para documentos de compra `compras.contratos`,
+      `compras.albaranes` y `compras.facturas`.
     descripcion: >-
       **Conceptos.** El corazon del modelo de Sigrid y la tabla de la que cuelga
       casi todo lo demas. Aqui viven `cod` (codigo), `res` (el nombre legible;
@@ -420,12 +421,12 @@ objetos:
     consumo_recomendado: false
     motivo_no_consumo: >-
       Cabecera cruda: sin proveedor resuelto, sin obra y con los importes CON
-      IVA. `compras.documentos` la trae unida y tipada, y `compras.fact_linea`
+      IVA. `compras.contratos` la trae unida y tipada, y `compras.fact_compras_linea`
       da el detalle sin IVA. Mezclar el total de aqui con las sumas de linea de
       `compras` compara dos magnitudes distintas.
     descripcion: >-
       **Contratos de compra.** "Propiedades de `con`" en 1:1: la cabecera del
-      contrato con un proveedor. Alimenta `compras.documentos` y, por la
+      contrato con un proveedor. Alimenta `compras.contratos` y, por la
       ausencia de `raw.obrprv`, tambien `maestro.proveedores_obra`. Carga
       incremental por `tiemod`. **No se traen** `tex` ni `obs`.
     grano: Una fila por contrato de compra, identificada por `ide`.
@@ -490,11 +491,11 @@ objetos:
     consumo_recomendado: false
     motivo_no_consumo: >-
       Lineas crudas, sin partida ni obra resueltas y sin el tipo de documento
-      normalizado. `compras.fact_linea` ya las trae unificadas con las de
+      normalizado. `compras.fact_compras_linea` ya las trae unificadas con las de
       albaran y factura, **todas sin IVA**.
     descripcion: >-
       **Productos en Contratos de compra.** El detalle de linea de un contrato.
-      Es una de las tres fuentes de `compras.fact_linea`. Carga incremental por
+      Es una de las tres fuentes de `compras.fact_compras_linea`. Carga incremental por
       `tiemod`.
     grano: Una fila por linea de contrato de compra, identificada por `ide`.
     clave_negocio: [ide]
@@ -508,10 +509,10 @@ objetos:
     consumo_recomendado: false
     motivo_no_consumo: >-
       Cabecera cruda de albaran, sin proveedor ni obra resueltos. Esta unificada
-      con los otros dos tipos de documento en `compras.documentos`.
+      en `compras.albaranes`, junto a `compras.contratos` y `compras.facturas`.
     descripcion: >-
       **Albaran de compra.** "Propiedades de `con`" en 1:1. Alimenta
-      `compras.documentos`. Carga incremental por `tiemod`, con una lista larga
+      `compras.albaranes`. Carga incremental por `tiemod`, con una lista larga
       de textos y campos de direccion excluidos.
     grano: Una fila por albaran de compra, identificada por `ide`.
     clave_negocio: [ide]
@@ -524,11 +525,11 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Lineas crudas. `compras.fact_linea` las trae unificadas con las de
+      Lineas crudas. `compras.fact_compras_linea` las trae unificadas con las de
       contrato y factura, sin IVA y con la partida resuelta.
     descripcion: >-
       **Productos en Albaranes de compra.** El detalle de linea de un albaran, y
-      otra de las tres fuentes de `compras.fact_linea`. Se pagina de 5.000 en
+      otra de las tres fuentes de `compras.fact_compras_linea`. Se pagina de 5.000 en
       5.000. Carga incremental por `tiemod`.
     grano: Una fila por linea de albaran, identificada por `ide`.
     clave_negocio: [ide]
@@ -541,11 +542,11 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Cabecera cruda de factura. `compras.documentos` la trae unida y tipada, y
+      Cabecera cruda de factura. `compras.facturas` la trae unida y tipada, y
       es ademas donde esta resuelto el signo de los ABONOS.
     descripcion: >-
       **Factura de compra.** "Propiedades de `con`" en 1:1. Alimenta
-      `compras.documentos` y el arranque de `retenciones`. Carga incremental por
+      `compras.facturas` y el arranque de `retenciones`. Carga incremental por
       `tiemod`, con una lista larga de textos y campos de direccion excluidos.
     grano: Una fila por factura de compra, identificada por `ide`.
     clave_negocio: [ide]
@@ -558,11 +559,11 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Lineas crudas. `compras.fact_linea` las trae unificadas y sin IVA, y
+      Lineas crudas. `compras.fact_compras_linea` las trae unificadas y sin IVA, y
       `retenciones` ya calcula lo suyo sin que haga falta bajar aqui.
     descripcion: >-
       **Productos en Facturas de compra.** El detalle de linea de una factura,
-      la tercera fuente de `compras.fact_linea`, y tambien entrada de
+      la tercera fuente de `compras.fact_compras_linea`, y tambien entrada de
       `retenciones`. Se pagina de 5.000 en 5.000. Carga incremental por
       `tiemod`.
     grano: Una fila por linea de factura, identificada por `ide`.

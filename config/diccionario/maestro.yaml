@@ -70,18 +70,28 @@ objetos:
         es la columna buena para saber si una obra vive**: la `activa` de
         `stg.obras` esta cableada a TRUE y no significa nada.
       cliente_id:
-        significado: Identificador del cliente en Sigrid, de `obr.entide`.
+        significado: >-
+          Identificador del cliente en Sigrid, copiado de `obr.entide` **tal
+          cual, sin `NULLIF`**. Por eso **la obra sin cliente trae 0, no NULL**:
+          Sigrid no guarda nulos en sus enteros. Un
+          `WHERE cliente_id IS NULL` devuelve cero filas siempre; lo que hay que
+          escribir es `WHERE cliente_id = 0`. Para saber si el cliente ademas
+          existe, mirar `nombre_cliente`, que si es NULL cuando no resuelve.
         agregacion: no_sumable
-        nulo_significa: La obra no tiene cliente asignado.
       codigo_cliente:
         significado: Codigo del cliente, de `con.cod`.
-        nulo_significa: La obra no tiene cliente, o el que tiene no existe en `raw.con`.
+        nulo_significa: >-
+          La obra no tiene cliente —`cliente_id` = 0— o el que tiene no existe en
+          `raw.con`. Aqui el NULL si es real: lo produce el `LEFT JOIN`.
       nombre_cliente:
         significado: >-
           Nombre del cliente, de `con.res`. Es lo UNICO que el datamart sabe del
           cliente: la tabla de clientes de Sigrid no se ingiere, asi que no hay
           CIF, ni direccion, ni facturacion de cliente. Es F-040.
-        nulo_significa: La obra no tiene cliente, o el que tiene no existe en `raw.con`.
+        nulo_significa: >-
+          La obra no tiene cliente —`cliente_id` = 0— o el que tiene no existe en
+          `raw.con`. Este NULL si es real, lo produce el `LEFT JOIN`, asi que es
+          la forma fiable de preguntar por las obras sin cliente resuelto.
     relaciones:
       - de: obra_id
         a: stg.obras.obra_id
