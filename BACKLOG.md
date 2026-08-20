@@ -3,13 +3,20 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **33 features**, 19 abiertas, 14 terminadas.
+Resumen: **38 features**, 24 abiertas, 14 terminadas.
+
+En curso: **F-006**.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-006 | MCP de bases de datos como servicio en cloud | 1 | pendiente |  | `feature/F-006-mcp-azure` |
+| F-006 | MCP de bases de datos como servicio en cloud | 1 | en curso |  | `feature/F-006-mcp-azure` |
+| F-036 | Clasificacion por oficio y categoria oficial de partida | 2 | pendiente | estandar | `feature/F-036-oficios` |
+| F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 3 | pendiente | critico | `feature/F-037-tesoreria` |
+| F-038 | Modelar los comparativos de ofertas en compras | 4 | pendiente | estandar | `feature/F-038-comparativos` |
+| F-039 | Vistas puente que faltan para las preguntas de negocio | 5 | pendiente | estandar | `feature/F-039-vistas-puente` |
+| F-040 | El lado de ingresos: ventas, certificaciones y clientes | 6 | pendiente | critico | `feature/F-040-ingresos` |
 | F-035 | Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna | 9 | pendiente | critico | `feature/F-035-estudio-tiempo-carga` |
 | F-025 | Ventana de negocio: acotar el build de stg y mart a lo que se mueve | 10 | pendiente | critico | `feature/F-025-ventana-negocio-build` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
@@ -52,9 +59,39 @@ Resumen: **33 features**, 19 abiertas, 14 terminadas.
 
 ### F-006 · MCP de bases de datos como servicio en cloud
 
-estado **pendiente** · prioridad 1 · SDD sí · rama `feature/F-006-mcp-azure`
+estado **en curso** · prioridad 1 · SDD sí · rama `feature/F-006-mcp-azure`
 
 REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno). AMPLIADA 2026-08-19 por el humano. EL USUARIO OBJETIVO ES DE NEGOCIO, no tecnico: cualquier persona con permiso debe poder preguntar a la base en lenguaje natural y obtener respuestas de negocio, sin saber que es un esquema ni escribir SQL. Eso cambia el criterio de exito: no basta con que el servidor MCP funcione y este desplegado; tiene que poder usarlo alguien que no sepa nada del modelo de datos. QUE SE CONSERVA DEL PROTOTIPO, porque ha funcionado bien en local: el pipeline de validacion de solo lectura y, sobre todo, LA CAPA SEMANTICA (config/diccionario_datos.yaml de mcp-bbdd), que explica el significado de cada tabla y cada columna. Esa es la pieza que convierte una pregunta de negocio en el SQL correcto; sin ella el MCP contesta cualquier cosa con aplomo. DEPENDENCIA QUE SI ES DE ESTE REPOSITORIO: el diccionario semantico del datamart -que significa mart.fact_periodificado, cierre.v_pbi_cierre_cabecera, que es una obra abierta- lo sabe este proyecto, no el del MCP. El MCP sabe de conexiones, permisos, validacion y auditoria; el significado del dato es del dueño del dato. Hay que producirlo aqui y publicarlo al MCP, y si merece rigor propio se saca a feature. Prioridad subida de 14 a 12 el 2026-08-19: va justo detras de F-011 (carga incremental). AMPLIACION 2026-08-19 (2): el MCP debe exponer PROMPTS Y RECURSOS, no solo herramientas. Es la pieza que hace que las reglas de negocio sean LAS MISMAS PARA TODOS los usuarios sin que nadie copie nada en su proyecto: el servidor publica el procedimiento -por ejemplo, como se aborda una planificacion temporal- y cada sesion recibe la version vigente. El caso de uso que lo motiva no es determinista y no se puede codificar: asignar partidas a la temporalidad exige juicio, lo decide la IA pensando y el usuario la corrige de forma interactiva. De ahi dos exigencias que van con esto: que quede TRAZA de que decidio la IA, con que criterio y que corrigio el usuario -una planificacion que nadie puede auditar seis meses despues es un numero huerfano-, y que las correcciones puedan volver al repositorio de reglas cuando revelen una regla de empresa no escrita. Ver F-030 y la decision D8. PRIORIDAD SUBIDA A 1 el 2026-08-20 por el humano: pasa a ser lo primero, por delante del estudio del tiempo de carga y de la ventana de negocio. Recordatorio de alcance que esa prioridad no cambia: el grueso de esta feature se ejecuta en el arnes de SU PROPIO repositorio; aqui solo queda lo que toca a sigrid_dm -el rol de solo lectura y la regla de firewall- y el diccionario semantico del datamart, que es del dueño del dato.
+
+### F-036 · Clasificacion por oficio y categoria oficial de partida
+
+estado **pendiente** · prioridad 2 · rigor `estandar` · SDD no · rama `feature/F-036-oficios`
+
+Nacida el 2026-08-20 del analisis de dominio de F-006 (progress/explore_F-006_dominio_completo.md). Hoy el datamart NO sabe responder quien fue el proveedor de fontaneria de la obra XXX: la unica via es un LIKE sobre texto libre de la descripcion del contrato. El dato SI existe en Sigrid y esta casi todo dentro. (1) Ingerir obrofc -Obras: Oficios- que relaciona obride + ofcide + prvide, es decir literalmente que proveedor hace que oficio en que obra, y su catalogo auxofc. Son dos tablas pequenas. (2) Exponer prv.ofcide -oficio del proveedor- y prv.natide -naturaleza-, que YA estan cargados en raw.prv y no los usa nadie, ingiriendo auxpronat para el nombre. (3) Sustituir la heuristica de categoria CD/CI/CP/OTRO de stg/04_partidas.sql:84-100 -que clasifica con LIKE sobre el codigo del capitulo raiz- por el catalogo oficial obrparpar.tcaide -> auxobrtca, AMBOS YA INGERIDOS: auxobrtca se trae desde el principio y ningun SQL lo mira, pese a que el propio tables_sigrid.yaml lo justifica diciendo que sirve para clasificar sin depender de heuristicas. Cambiar la categoria toca el cierre y el mart, asi que exige prueba de equivalencia antes y despues.
+
+### F-037 · Esquema tesoreria: el flujo de caja que hoy se tira
+
+estado **pendiente** · prioridad 3 · rigor `critico` · SDD sí · rama `feature/F-037-tesoreria`
+
+Nacida el 2026-08-20 del analisis de dominio de F-006. Hacer el flujo de caja de una obra es un caso de uso que el datamart no puede responder hoy: cero objetos de tesoreria en los ocho esquemas. Y el dato esta entero dentro: raw.pag -252.189 filas- y raw.cob -21.643- contienen TODOS los efectos, con tot -importe-, fecven -vencimiento previsto-, fecrea -fecha real, 0 = pendiente-, conide -documento origen-, entide -proveedor o cliente-, cenide -obra-, efeide -medio de pago-, natide -naturaleza- y prpide -prevision origen-. El modulo retenciones los filtra con WHERE retide <> 0 y DESCARTA el resto, que es exactamente el flujo de caja. Alcance: un esquema tesoreria con movimientos sin ese filtro, sentido COBRO/PAGO y estado PREVISTO/REALIZADO, siguiendo el mismo patron que retenciones/01_movimientos.sql, incluida su cascada de atribucion a obra por cenide con respaldo por lineas solo si todas apuntan a la misma obra. Aviso conceptual que la spec debe recoger: stg.plan_mensual es DEVENGO, no caja; convertir la planificacion en prevision de tesoreria exigiria plazos de pago y retenciones que hoy no estan en el repositorio, y eso queda fuera. Limitacion conocida: sin ingerir las ventas -F-040- el lado de cobros solo tiene el efecto, no el documento.
+
+### F-038 · Modelar los comparativos de ofertas en compras
+
+estado **pendiente** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-038-comparativos`
+
+Nacida el 2026-08-20 del analisis de dominio de F-006. El humano pidio poder ver, junto a lo facturado por contrato de una obra, lo que hay en albaranes y EN COMPARATIVOS de ese proveedor en esa obra. Los albaranes estan resueltos; el comparativo no existe como concepto en el datamart. Y sin embargo raw.com -unas 20.000 filas-, raw.comlin y raw.comprv SE INGIEREN desde la tanda C1/C2 y ningun SQL del esquema compras los lee: lo unico que sobrevive es compras.contratos.comparativo_id -de ctr.comide- y compras.albaranes.comparativo_id, ambos huerfanos apuntando a una tabla que no existe. Alcance: modelar comparativo, sus lineas y sus ofertantes en el esquema compras -com.obride -> obra, comprv.prvide -> proveedor, comlin -> lineas- y cerrar el triangulo comparativo-contrato-albaran, de modo que se pueda responder que se pidio a cuantos, quien oferto que y con quien se acabo contratando. Nota: comlinpar -desglose por partidas del comparativo, que seria el enlace comparativo-partida- NO se ingiere hoy; la spec decide si entra.
+
+### F-039 · Vistas puente que faltan para las preguntas de negocio
+
+estado **pendiente** · prioridad 5 · rigor `estandar` · SDD no · rama `feature/F-039-vistas-puente`
+
+Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el datamart puede responder pero obligan a escribir SQL de agregacion no evidente, justo lo que hace fallar a un agente. (1) Que retenciones tengo de los proveedores de una obra: las dos vistas agregadas existentes cortan por un solo eje cada una -v_pbi_retencion_obra pierde el proveedor, v_pbi_retencion_entidad pierde la obra-; falta retenciones.v_pbi_retencion_obra_entidad. (2) Que proveedores han facturado mas: v_pbi_proveedor_obra esta agrupada por obra y ano, asi que el ranking global exige agregar sin perder las filas con obra_id NULL -facturas de estructura y generales-; falta una vista proveedor x periodo con grano mensual. (3) EL EJE MAS VALIOSO Y HOY INEXPLOTADO: partida_id une el mundo del seguimiento -stg.partidas, plan_mensual, mart.fact_seguimiento_mensual- con el mundo documental -compras.v_pbi_partida_coste-, y permite comparar coste PLANIFICADO de una partida con coste INCURRIDO documental de esa partida. Ninguna vista lo hace. Aviso para la implementacion: compras y retenciones no filtran por stg.obras, asi que pueden traer obras administrativas que el seguimiento excluye; las vistas nuevas deben decidir y documentar que universo de obra usan.
+
+### F-040 · El lado de ingresos: ventas, certificaciones y clientes
+
+estado **pendiente** · prioridad 6 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
+
+Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse.
 
 ### F-035 · Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna
 

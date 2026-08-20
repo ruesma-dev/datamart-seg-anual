@@ -26,6 +26,135 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# F-006 EN CURSO · SESIÓN DEL 2026-08-20 (tarde) — LÉEME PRIMERO
+
+Rama `feature/F-006-mcp-azure`. F-006 pasó a `in_progress`.
+
+## El humano reformuló el objetivo, y eso manda sobre la ficha
+
+Los seis casos de uso que dictó (planificación temporal iterativa, ranking de
+proveedores, retenciones de una obra, el proveedor de fontanería, flujo de caja,
+facturado por contrato con albaranes y comparativos) son **pruebas de
+aceptación, no la especificación**. Sus palabras: «habrá infinidad de ellos; el
+contexto del MCP debe explicar la estructura y significado de la BBDD para que
+el agente que conectemos pueda hacer sus propios casos de uso». Y el encuadre de
+fondo: **este datamart tendrá todo el conocimiento de negocio de la obra de la
+empresa**, extraído de Sigrid y posiblemente de otras fuentes; lo que falte se
+va añadiendo.
+
+## Cuatro decisiones tomadas por el humano esta sesión
+
+1. **El diccionario semántico vive aquí como YAML versionado y el ETL lo publica
+   en `_meta` de la propia base.** El MCP lo lee por SQL, sin conocer repos ni
+   ficheros. El multi-base sale gratis y permite una puerta de cobertura.
+2. **El prototipo `mcp-bbdd` se migra, no se reescribe**: `git init` + arnés +
+   transporte HTTP. Eso ocurre en su repositorio.
+3. **Se empieza por el diccionario**, no por el despliegue en cloud.
+4. **Los huecos de dominio se dan de alta como fichas nuevas**: F-036 a F-040.
+
+## Lo que se exploró (cuatro informes, léelos antes de tocar nada)
+
+| Informe | Qué contiene |
+|---|---|
+| `explore_F-006_dominio_completo.md` | **el principal**: inventario anotado, las 7 advertencias transversales y el mapa de cobertura del dominio |
+| `explore_F-006_datamart_casos_uso.md` | veredicto de los seis casos de uso |
+| `explore_F-006_mcp_bbdd.md` | el prototipo: qué conserva, qué le falta, dónde está el agujero |
+| `explore_F-006_contexto.md` | decisiones abiertas, roles, firewall, patrón de despliegue |
+
+## Los hallazgos que cambian el plan
+
+- **El oficio SÍ existe en Sigrid.** `obrofc` («Obras: Oficios») relaciona
+  `obride` + `ofcide` + `prvide`: literalmente qué proveedor hace qué oficio en
+  qué obra. No se ingiere. Con su catálogo `auxofc` son dos tablas pequeñas.
+  Además `prv.ofcide` **ya está cargado en `raw`** y nadie lo expone. -> F-036.
+- **El flujo de caja está dentro y se tira.** `raw.pag` (252 k) y `raw.cob`
+  (21 k) traen todos los efectos con vencimiento previsto y fecha real; el
+  módulo `retenciones` filtra `retide <> 0` y descarta el resto, que es
+  exactamente la tesorería. -> F-037.
+- **Los comparativos están ingeridos y sin modelar**: `raw.com`, `comlin` y
+  `comprv` no los lee ningún SQL; solo sobrevive un `comparativo_id` huérfano.
+  -> F-038.
+- **`auxobrtca` se ingiere desde el principio y ningún SQL lo mira**, mientras
+  la categoría CD/CI/CP se decide con un `LIKE` sobre el código del capítulo.
+- **El prototipo conecta como `postgres` superusuario** con la contraseña en
+  claro en `.env` y en `claude_desktop_config.json`. El rol de solo lectura que
+  su propio README llama «la defensa efectiva» está sin usar y escrito para otra
+  base.
+- **`mcp_sigrid_dm_ro` ve los ocho esquemas**, `raw` y `stg` incluidos, y es el
+  único rol de lectura que hay.
+- **Cuatro de los ocho esquemas no se refrescan de noche** (`cierre`, `compras`,
+  `maestro`, `retenciones`): un agente puede dar cifras de hace semanas con
+  aplomo si el diccionario no lo dice.
+
+## Fichas nuevas dadas de alta (prioridades provisionales, pendientes de que el humano las ajuste)
+
+| Ficha | Prioridad | Qué |
+|---|---|---|
+| F-036 | 2 | oficios (`obrofc`+`auxofc`), `prv.ofcide`, y categoría oficial por `auxobrtca` |
+| F-037 | 3 | esquema `tesoreria` sobre `raw.pag`/`cob` sin el filtro de retenciones |
+| F-038 | 4 | modelar los comparativos en `compras` |
+| F-039 | 5 | vistas puente: retención obra×proveedor, proveedor×periodo, partida plan vs incurrido |
+| F-040 | 6 | ingresos: ventas (`dvf`/`dvfpro`), certificaciones (`cer`/`obrcer`), clientes (`cli`) |
+
+Las prioridades 2 a 6 las puso el líder por coherencia con el objetivo de
+fondo; **desplazan a F-035 (9) y F-025 (10) y el humano no las ha confirmado**.
+
+## Spec de F-006 escrita (spec-author, 2026-08-20)
+
+`specs/F-006-mcp-azure/` con los tres ficheros: `requirements.md` (509 líneas,
+R1–R41 en EARS + la batería de 18 preguntas), `design.md` (721 líneas, con los
+dos contratos) y `tasks.md` (T1–T42 en once bloques entregables).
+
+**Alcance acotado a este repositorio**: el diccionario semántico, su
+publicación en `_meta`, la puerta de cobertura, el rol de lectura y la
+conectividad. **Fuera**: el servidor MCP entero (transporte, Entra,
+multi-base, auditoría, despliegue) que va en `mcp-bbdd`; F-030 y D8, que se
+declaran como dependencias vecinas y no se resuelven; y la ingesta nueva
+(F-036 a F-040).
+
+### Decisiones de diseño que tomó el spec-author
+
+1. **Un YAML por esquema** en `config/diccionario/` más `00_global.yaml`, no un
+   monolito: el del prototipo ya son 1.083 líneas para 34 fichas y aquí hay más
+   de 80 objetos. Formato fijado como contrato en `design.md` §3, con ficha de
+   ejemplo completa.
+2. **Publicación en tres tablas de `_meta` + una vista** (`diccionario`,
+   `diccionario_reglas`, `diccionario_publicacion`, `v_diccionario`), con la
+   ficha en `JSONB` y `descripcion`/`grano` como columnas de verdad. DDL exacto
+   en `design.md` §4: es la mitad del contrato con `mcp-bbdd`.
+3. **El paso va entre `build_mart` y `apply_grants`**, y el reemplazo es
+   `DELETE`+`INSERT` en una transacción. **Nunca `DROP`**: se llevaría los
+   GRANT del MCP, que es justo lo que obliga a reaplicarlos cada noche.
+4. **Puerta de cobertura doble**: la offline (pytest, en cada `init.sh`) es un
+   trinquete heurístico sobre el SQL del repo; `check-diccionario` contra
+   `information_schema` es la verdad. Umbral **100 % de objetos y 100 % de
+   columnas dentro de `consumo_recomendado: true`**, bloqueante; fuera, aviso.
+   Un porcentaje se descartó porque deja que la columna que falte sea la
+   importante.
+5. **Hallazgo que cambia el diseño del rol**: `apply_readonly_grants` **solo
+   concede, nunca revoca**. Estrechar `PG_CONSUMPTION_SCHEMAS` no le quita nada
+   al rol. Hay que construir los `REVOKE`, y van **apagados por defecto**
+   (`PG_REVOKE_FUERA_DE_CONSUMO=false`) porque Power BI usa hoy ese mismo rol.
+6. **Corrección de un dato de los informes**: son **nueve** esquemas, no ocho.
+7. **Cierre honesto**: de las 18 preguntas, 13 respondibles, 3 parciales y 2
+   imposibles. F-006 cierra con «13 bien respondidas y 5 bien rechazadas», no
+   con los seis casos de uso resueltos.
+
+### Lo que necesita respuesta del humano
+
+- **DA-1 a DA-6** (`requirements.md` §10), con recomendación cada una. La que
+  más pesa es **DA-3: cuándo se activa el `REVOKE`** — en esta feature tras
+  verificar Power BI (recomendada), o se deja construido y lo activa F-034.
+- **Firma para T32, T33, T34 y T38** (marcadas 🔏 en `tasks.md`): tocan
+  permisos en el servidor compartido y una regla de firewall en
+  `rg-albaranes-dev`.
+- **`"rigor": "critico"` en la ficha de F-006** de `harness/features.json`: hoy
+  se aplica por omisión y eso es frágil (T2).
+- **Confirmar las prioridades 2 a 6 de F-036 a F-040**, que siguen sin
+  confirmar y son las que acotan qué puede cerrar F-006.
+
+---
+
 # F-011 · BLOQUE A ENTREGADO Y PARADA EN T9 (2026-08-20) — léelo primero
 
 **La feature está en su parada: hace falta una firma del humano.** Todo el

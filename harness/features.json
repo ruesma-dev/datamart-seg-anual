@@ -176,7 +176,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-006-mcp-azure/ (sdd=true)"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "priority": 1,
       "branch": "feature/F-006-mcp-azure"
@@ -543,6 +543,77 @@
       "rigor": "critico",
       "priority": 9,
       "branch": "feature/F-035-estudio-tiempo-carga"
+    },
+    {
+      "id": "F-036",
+      "title": "Clasificacion por oficio y categoria oficial de partida",
+      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006 (progress/explore_F-006_dominio_completo.md). Hoy el datamart NO sabe responder quien fue el proveedor de fontaneria de la obra XXX: la unica via es un LIKE sobre texto libre de la descripcion del contrato. El dato SI existe en Sigrid y esta casi todo dentro. (1) Ingerir obrofc -Obras: Oficios- que relaciona obride + ofcide + prvide, es decir literalmente que proveedor hace que oficio en que obra, y su catalogo auxofc. Son dos tablas pequenas. (2) Exponer prv.ofcide -oficio del proveedor- y prv.natide -naturaleza-, que YA estan cargados en raw.prv y no los usa nadie, ingiriendo auxpronat para el nombre. (3) Sustituir la heuristica de categoria CD/CI/CP/OTRO de stg/04_partidas.sql:84-100 -que clasifica con LIKE sobre el codigo del capitulo raiz- por el catalogo oficial obrparpar.tcaide -> auxobrtca, AMBOS YA INGERIDOS: auxobrtca se trae desde el principio y ningun SQL lo mira, pese a que el propio tables_sigrid.yaml lo justifica diciendo que sirve para clasificar sin depender de heuristicas. Cambiar la categoria toca el cierre y el mart, asi que exige prueba de equivalencia antes y despues.",
+      "acceptance": [
+        "raw.obrofc y raw.auxofc ingeridas y declaradas en config/tables_sigrid.yaml",
+        "maestro.proveedores expone oficio y naturaleza con su nombre legible",
+        "Existe una vista que responde obra + oficio -> proveedor sin usar LIKE sobre texto libre",
+        "stg.partidas.categoria sale de auxobrtca, con prueba de equivalencia contra la heuristica anterior y las diferencias explicadas una a una"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 2,
+      "branch": "feature/F-036-oficios"
+    },
+    {
+      "id": "F-037",
+      "title": "Esquema tesoreria: el flujo de caja que hoy se tira",
+      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. Hacer el flujo de caja de una obra es un caso de uso que el datamart no puede responder hoy: cero objetos de tesoreria en los ocho esquemas. Y el dato esta entero dentro: raw.pag -252.189 filas- y raw.cob -21.643- contienen TODOS los efectos, con tot -importe-, fecven -vencimiento previsto-, fecrea -fecha real, 0 = pendiente-, conide -documento origen-, entide -proveedor o cliente-, cenide -obra-, efeide -medio de pago-, natide -naturaleza- y prpide -prevision origen-. El modulo retenciones los filtra con WHERE retide <> 0 y DESCARTA el resto, que es exactamente el flujo de caja. Alcance: un esquema tesoreria con movimientos sin ese filtro, sentido COBRO/PAGO y estado PREVISTO/REALIZADO, siguiendo el mismo patron que retenciones/01_movimientos.sql, incluida su cascada de atribucion a obra por cenide con respaldo por lineas solo si todas apuntan a la misma obra. Aviso conceptual que la spec debe recoger: stg.plan_mensual es DEVENGO, no caja; convertir la planificacion en prevision de tesoreria exigiria plazos de pago y retenciones que hoy no estan en el repositorio, y eso queda fuera. Limitacion conocida: sin ingerir las ventas -F-040- el lado de cobros solo tiene el efecto, no el documento.",
+      "acceptance": [
+        "Definida en detalle por specs/F-037-tesoreria/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 3,
+      "branch": "feature/F-037-tesoreria"
+    },
+    {
+      "id": "F-038",
+      "title": "Modelar los comparativos de ofertas en compras",
+      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. El humano pidio poder ver, junto a lo facturado por contrato de una obra, lo que hay en albaranes y EN COMPARATIVOS de ese proveedor en esa obra. Los albaranes estan resueltos; el comparativo no existe como concepto en el datamart. Y sin embargo raw.com -unas 20.000 filas-, raw.comlin y raw.comprv SE INGIEREN desde la tanda C1/C2 y ningun SQL del esquema compras los lee: lo unico que sobrevive es compras.contratos.comparativo_id -de ctr.comide- y compras.albaranes.comparativo_id, ambos huerfanos apuntando a una tabla que no existe. Alcance: modelar comparativo, sus lineas y sus ofertantes en el esquema compras -com.obride -> obra, comprv.prvide -> proveedor, comlin -> lineas- y cerrar el triangulo comparativo-contrato-albaran, de modo que se pueda responder que se pidio a cuantos, quien oferto que y con quien se acabo contratando. Nota: comlinpar -desglose por partidas del comparativo, que seria el enlace comparativo-partida- NO se ingiere hoy; la spec decide si entra.",
+      "acceptance": [
+        "Definida en detalle por specs/F-038-comparativos/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 4,
+      "branch": "feature/F-038-comparativos"
+    },
+    {
+      "id": "F-039",
+      "title": "Vistas puente que faltan para las preguntas de negocio",
+      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el datamart puede responder pero obligan a escribir SQL de agregacion no evidente, justo lo que hace fallar a un agente. (1) Que retenciones tengo de los proveedores de una obra: las dos vistas agregadas existentes cortan por un solo eje cada una -v_pbi_retencion_obra pierde el proveedor, v_pbi_retencion_entidad pierde la obra-; falta retenciones.v_pbi_retencion_obra_entidad. (2) Que proveedores han facturado mas: v_pbi_proveedor_obra esta agrupada por obra y ano, asi que el ranking global exige agregar sin perder las filas con obra_id NULL -facturas de estructura y generales-; falta una vista proveedor x periodo con grano mensual. (3) EL EJE MAS VALIOSO Y HOY INEXPLOTADO: partida_id une el mundo del seguimiento -stg.partidas, plan_mensual, mart.fact_seguimiento_mensual- con el mundo documental -compras.v_pbi_partida_coste-, y permite comparar coste PLANIFICADO de una partida con coste INCURRIDO documental de esa partida. Ninguna vista lo hace. Aviso para la implementacion: compras y retenciones no filtran por stg.obras, asi que pueden traer obras administrativas que el seguimiento excluye; las vistas nuevas deben decidir y documentar que universo de obra usan.",
+      "acceptance": [
+        "Existe retenciones.v_pbi_retencion_obra_entidad con los dos ejes",
+        "Existe una vista de facturacion por proveedor y periodo mensual que no pierde las filas sin obra",
+        "Existe una vista puente por partida que enfrenta planificado e incurrido documental, con el universo de obra elegido y justificado",
+        "Cada vista nueva queda documentada en el diccionario semantico de F-006"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 5,
+      "branch": "feature/F-039-vistas-puente"
+    },
+    {
+      "id": "F-040",
+      "title": "El lado de ingresos: ventas, certificaciones y clientes",
+      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse.",
+      "acceptance": [
+        "Definida en detalle por specs/F-040-ingresos/ (sdd=true)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 6,
+      "branch": "feature/F-040-ingresos"
     }
   ]
 }
