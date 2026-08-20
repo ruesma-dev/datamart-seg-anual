@@ -2283,6 +2283,33 @@ raiz teniendo el catalogo bueno enlazado al lado.
 Se anota ademas en `raw.prv` que **`ofcide` se ingiere y no se expone**:
 `maestro.proveedores` no publica oficio ni naturaleza. Es F-036, no un olvido.
 
+### Y la ingesta tambien se contrasta, no se escribe a mano
+
+Cada ficha de `raw` afirma dos cosas que no estan en el SQL sino en
+`config/tables_sigrid.yaml`: si la carga es **incremental por `tiemod`** o
+completa, y **que columnas no se traen**. Escribiendo 31 fichas a mano se me
+quedaron dos sin decir —`raw.con` es incremental y `raw.conext` se recarga
+entera— y ninguna comprobacion existente lo habria notado.
+
+`tests/test_f006_raw_ingesta.py` deriva las dos afirmaciones (63 tests). Fase
+RED:
+
+```
+$ python -m pytest tests/test_f006_raw_ingesta.py -q
+E  AssertionError: la ficha de raw.con tiene que decir UNA de las dos cosas: que
+   la carga es «incremental por `tiemod`» o que se «recarga entera» cada noche
+E  AssertionError: la ficha de raw.conext tiene que decir UNA de las dos cosas...
+2 failed, 61 passed
+```
+
+Comprueba tres cosas: que haya **exactamente** una ficha por tabla ingerida —ni
+de mas ni de menos—, que cada una diga **una** de las dos formas de carga y que
+sea la cierta, y que **toda columna que una ficha cite como no traida lo este de
+verdad**. Esto ultimo importa mas de lo que parece: preguntar en `raw` por una
+columna excluida no devuelve nulo, devuelve "columna inexistente". No se exige
+listarlas todas —hay tablas con veinticinco exclusiones—, solo que lo citado sea
+cierto.
+
 ### Y otro recuento cableado
 
 Anadir la regla numero trece rompio tres asertos con el `12` escrito a mano. Es

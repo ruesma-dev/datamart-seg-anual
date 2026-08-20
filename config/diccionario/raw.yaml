@@ -82,7 +82,8 @@ objetos:
       (estado), `fecbaj` (fecha de baja) y `obr`. Las tablas "Propiedades de
       `con`" —`obr`, `prv`, `ctr`, `dcf` y las demas— comparten su `ide` con una
       fila de aqui, y por eso casi toda consulta contra Sigrid empieza uniendo
-      con esta tabla.
+      con esta tabla. Carga incremental por `tiemod`. **No se traen** `ima` ni
+      `tex`.
     grano: Una fila por concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -100,7 +101,7 @@ objetos:
     descripcion: >-
       **Campos extendidos de concepto.** Atributos adicionales que Sigrid deja
       definir por encima de los fijos de `con`. El ETL los lee en `stg/03_obras`
-      y en `stg/07_version_master_vigente`.
+      y en `stg/07_version_master_vigente`. Se recarga entera cada noche.
     grano: Una fila por extension de concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
