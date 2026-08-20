@@ -162,12 +162,62 @@ def columnas_del_create_table(texto: str, nombre_cualificado: str) -> list[str]:
         if primera.lower() in restricciones:
             continue
         columnas.append(primera)
+
+    # Y las que llegaron por migración. Una columna añadida con `ALTER TABLE`
+    # existe igual que las del `CREATE`, y hay motivos para añadirlas así: el
+    # `batch_id` de `_meta.etl_runs` no se metió en el CREATE porque recrear esa
+    # tabla borraría el histórico de qué pasó cada noche. Van al final porque
+    # ese es su orden real en el catálogo de Postgres.
+    columnas.extend(
+        m.group(1).strip('"')
+        for m in re.finditer(
+            rf"ALTER\s+TABLE\s+(?:ONLY\s+)?{re.escape(nombre_cualificado)}\s+"
+            rf"ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w\"]+)",
+            texto,
+            re.IGNORECASE,
+        )
+    )
     return columnas
 
 
 # ---------------------------------------------------------------------------
 # El parser, probado sobre un caso conocido antes de fiarse de él
 # ---------------------------------------------------------------------------
+
+
+def test_f006_r26_el_parser_de_ddl_ve_las_columnas_anadidas_por_alter_table() -> None:
+    """Una columna que llegó por migración es tan real como las del CREATE.
+
+    `_meta.etl_runs.batch_id` la añadió F-024 con un `ALTER TABLE ... ADD COLUMN
+    IF NOT EXISTS`, y NO se metió dentro del `CREATE TABLE` a propósito: el
+    histórico de esa tabla es el único sitio donde consta qué pasó las noches
+    que falló, y recrearla lo perdería.
+
+    Sin este caso, el parser habría acusado de sobrar a una columna que existe,
+    y la salida obvia —borrarla de la ficha— habría dejado el diccionario
+    mintiendo justo sobre el campo que responde «¿de qué carga viene esta
+    tabla?».
+    """
+    ddl = """
+    CREATE TABLE IF NOT EXISTS _meta.ejemplo (
+        id     BIGSERIAL PRIMARY KEY,
+        step   VARCHAR(100) NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_x ON _meta.ejemplo (step);
+    ALTER TABLE _meta.ejemplo ADD COLUMN IF NOT EXISTS batch_id TEXT NULL;
+    """
+    assert columnas_del_create_table(ddl, "_meta.ejemplo") == ["id", "step", "batch_id"]
+
+
+def test_f006_r26_el_alter_table_de_otra_tabla_no_contamina() -> None:
+    """El `ADD COLUMN` se atribuye a SU tabla, no a la que se está leyendo."""
+    ddl = """
+    CREATE TABLE _meta.a (id BIGINT);
+    CREATE TABLE _meta.b (id BIGINT);
+    ALTER TABLE _meta.b ADD COLUMN IF NOT EXISTS solo_de_b TEXT;
+    """
+    assert columnas_del_create_table(ddl, "_meta.a") == ["id"]
+    assert columnas_del_create_table(ddl, "_meta.b") == ["id", "solo_de_b"]
 
 
 def test_f006_r26_el_parser_de_ddl_no_se_corta_dentro_de_un_numeric() -> None:

@@ -721,13 +721,6 @@ preguntas_aceptacion:
     estado: respondible
 
 pendientes:
-  - _meta.diccionario
-  - _meta.diccionario_publicacion
-  - _meta.diccionario_reglas
-  - _meta.v_diccionario
-  - _meta.etl_runs
-  - _meta.v_frescura
-  - _meta.v_raw_state
   - raw.auxmun
   - raw.auxobramb
   - raw.auxobrcla

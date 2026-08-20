@@ -2132,3 +2132,75 @@ definicion de la convencion, el fichero pasa a `aux_.yaml` con el `_` final que
 Python usa para las palabras reservadas, y el tercer test comprueba que el
 escape **no vale para los esquemas normales**: sin eso, `mart.yaml` y
 `mart_.yaml` podrian coexistir cargando fichas del mismo esquema en silencio.
+
+## T25 · `_meta` (7 objetos), donde la precision importa el doble
+
+Es el esquema que se cita cuando hay que decir DE CUANDO ES un dato. Una ficha
+imprecisa aqui hace que un agente cite mal la fecha, o que no la cite, con
+aplomo: el fallo que F-024 vino a eliminar. Las tres cosas del encargo van en la
+cabecera del fichero y repetidas en la columna que toca:
+
+- **`batch_id` se ordena como TEXTO.** El formato `YYYYMMDDTHHMMSSZ-xxxxxx` se
+  eligio para eso, y la ficha lo dice donde se lee: en `etl_runs.batch_id` y en
+  `v_raw_state.batch_id`, esta ultima con el uso que le da valor —comprobar si
+  dos tablas de `raw` vienen de la misma noche—.
+- **UTC sin zona.** Dicho en cada marca de tiempo, y con el numero:
+  `horas_desde_ultimo_ok` explica que se calcula contra
+  `now() AT TIME ZONE 'UTC'` porque restarle un `now()` local daria el desfase
+  horario de Espana, **dos horas en verano**, como antiguedad.
+- **`v_frescura` filtra tramos y hace `LEFT JOIN` a proposito.** El grano dice
+  el filtro exacto (`position('.' IN step) = 0`) y lo que pasaria sin el; el
+  `nulo_significa` de `ultimo_ok_finished_at` dice que un paso que no termino
+  bien nunca **sigue saliendo**, y que un `INNER JOIN` seria el silencio que
+  F-024 elimino.
+
+Se documenta ademas la separacion ULTIMO OK / ULTIMO INTENTO, que es lo que
+permite citar bien un `build_mart` que fallo anoche: el dato es de ayer y ademas
+hay que decir que lo ultimo fallo. Citar solo una de las dos miente en los dos
+sentidos.
+
+En las tres tablas del diccionario queda escrito lo que no se puede deducir
+mirando: que `hash_fuente` es la identidad y `version` solo comunicacion, que el
+`CHECK (id = 1)` hace singleton la publicacion, que `cobertura_cols` **no
+comparte denominador** con `n_columnas`, y por que `motivo_no_consumo` va la
+ultima en `v_diccionario` en vez de donde se leeria mejor.
+
+### El parser de DDL no veia las columnas de las migraciones
+
+Al escribir la ficha de `etl_runs` salto la comprobacion de exactitud:
+
+```
+E  AssertionError: faltan: []; sobran: ['batch_id']
+```
+
+Y `batch_id` existe. Lo anadio F-024 con `ALTER TABLE ... ADD COLUMN IF NOT
+EXISTS`, **fuera del `CREATE TABLE` a proposito**: el historico de `etl_runs` es
+el unico sitio donde consta que paso las noches que fallaron, y recrear la tabla
+lo perderia.
+
+La salida obvia —borrar `batch_id` de la ficha— habria dejado el diccionario
+mintiendo justo sobre el campo que responde «de que carga viene esta tabla».
+Fase RED, dos tests nuevos:
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k alter_table
+E  AssertionError: assert ['id', 'step'] == ['id', 'step', 'batch_id']
+E  AssertionError: assert ['id'] == ['id', 'solo_de_b']
+2 failed
+```
+
+El segundo esta para que el `ADD COLUMN` se atribuya a SU tabla y no a la que se
+esta leyendo. El parser pasa a recogerlas, al final, que es su orden real en el
+catalogo.
+
+### Y dos cosas mas que cazaron los mecanismos
+
+- **R40** reclamo `ejemplos_preguntas` en los cuatro objetos de consumo. Es la
+  regla que enruta de la pregunta al objeto, y sin ella `v_frescura` habria
+  quedado documentada pero inalcanzable desde «de cuando es este dato».
+- **R5**: declare `v_frescura -> etl_runs.step` como `N:1` y es `N:N`.
+  `etl_runs` tiene una fila por VEZ que el paso corrio. El `porque` corregido
+  explica que unir por `step` sin agregar devuelve el historico entero, que es
+  exactamente la razon por la que la vista existe.
+
+Trinquete: 38 -> **31**, que son las 31 tablas de `raw`.
