@@ -1059,3 +1059,262 @@ def test_f006_r2_el_diccionario_global_real_valida_entero() -> None:
     errores = validar(_global_real(), pasos_del_pipeline_nocturno())
 
     assert errores == [], "\n" + formatear_errores(errores)
+
+
+# ===========================================================================
+# Ramas defensivas del validador y del cargador
+#
+# Todas nacen de la misma idea: **un YAML mal escrito tiene que dar un mensaje
+# accionable, no una excepción de Python ni un silencio**. Sin estos tests la
+# rama existe pero nadie ha comprobado nunca que el mensaje salga, que es la
+# forma más común de que un manejo de errores esté roto el día que hace falta.
+# ===========================================================================
+
+
+def test_f006_r4_un_esquema_de_mas_en_el_global_falla() -> None:
+    """Declarar `tesoreria` en `esquemas` sería anunciar algo que no existe."""
+    esquemas = _esquemas()
+    esquemas["tesoreria"] = {
+        "titulo": "Tesorería",
+        "para_que_sirve": "Cobros y pagos.",
+        "consumo_recomendado": True,
+        "refresco": "manual",
+    }
+
+    errores = validar(_dicc(esquemas=esquemas), PASOS_NOCTURNOS)
+
+    assert any("tesoreria" in e.detalle for e in errores)
+
+
+def test_f006_r4_un_refresco_inventado_en_la_entrada_de_esquema_falla() -> None:
+    esquemas = _esquemas()
+    esquemas["mart"] = dict(esquemas["mart"], refresco="cuando_apetezca")
+
+    errores = validar(_dicc(esquemas=esquemas), PASOS_NOCTURNOS)
+
+    assert any("cuando_apetezca" in e.detalle for e in errores)
+
+
+def test_f006_r4_consumo_recomendado_no_booleano_en_el_esquema_falla() -> None:
+    """`consumo_recomendado: "si"` es un texto y en Python es siempre cierto."""
+    esquemas = _esquemas()
+    esquemas["mart"] = dict(esquemas["mart"], consumo_recomendado="si")
+
+    errores = validar(_dicc(esquemas=esquemas), PASOS_NOCTURNOS)
+
+    assert any("booleano" in e.detalle for e in errores)
+
+
+def test_f006_r4_una_ficha_de_un_esquema_real_sin_entrada_en_el_global_falla() -> None:
+    """El esquema existe, pero nadie ha escrito para qué sirve."""
+    esquemas = _esquemas(*[e for e in ESQUEMAS_DEL_DATAMART if e != "mart"])
+
+    errores = validar(_dicc(esquemas=esquemas), PASOS_NOCTURNOS)
+
+    assert any(
+        e.objeto == "mart.fact_seguimiento_mensual" and "esquemas" in e.detalle
+        for e in errores
+    )
+
+
+def test_f006_r2_consumo_recomendado_no_booleano_en_la_ficha_falla() -> None:
+    errores = validar(
+        _dicc(fichas=[_ficha(consumo_recomendado="si")]), PASOS_NOCTURNOS
+    )
+
+    assert any("booleano" in e.detalle for e in errores)
+
+
+def test_f006_r6_una_columna_sin_nombre_falla() -> None:
+    """Pasa con un `- :` suelto en el YAML y dejaría una columna anónima."""
+    errores = validar(
+        _dicc(fichas=[_ficha(columnas=(Columna(nombre="  ", significado="Algo."),))]),
+        PASOS_NOCTURNOS,
+    )
+
+    assert any("sin nombre" in e.detalle for e in errores)
+
+
+# --- Cargador: formas del YAML que no se pueden convertir en entidades -----
+
+
+def test_f006_r1_cargador_un_escalar_suelto_vale_como_lista_de_uno(tmp_path) -> None:
+    """`clave_negocio: obra_id` sin corchetes es un error humano frecuente y
+    tiene una interpretación obvia. Se acepta en vez de reventar."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    texto = MART_MINIMO.replace(
+        "    clave_negocio: [obra_codigo, importe_mes]", "    clave_negocio: obra_codigo"
+    )
+    directorio = _directorio(tmp_path, **{"mart.yaml": texto})
+
+    dicc, _ = cargar_diccionario(directorio)
+
+    assert dicc.por_nombre["mart.fact_seguimiento_mensual"].clave_negocio == (
+        "obra_codigo",
+    )
+
+
+def test_f006_r1_cargador_un_fichero_de_esquema_vacio_falla(tmp_path) -> None:
+    """Un `aux.yaml` en blanco es un fichero a medio escribir, no un esquema sin
+    objetos: se rechaza nombrandolo, en vez de aportar cero fichas en silencio."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    directorio = _directorio(tmp_path)
+    (directorio / "aux.yaml").write_text("", encoding="utf-8")
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any(e.fichero == "aux.yaml" for e in excinfo.value.errores)
+
+
+def test_f006_r1_cargador_un_fichero_que_no_es_un_mapa_falla(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    directorio = _directorio(tmp_path, **{"mart.yaml": "- uno\n- dos\n"})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("mapa" in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r1_cargador_esquemas_que_no_es_un_mapa_falla(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = GLOBAL_MINIMO.replace(
+        "esquemas:\n  mart:", "esquemas: [mart]\notro_bloque:\n  mart:"
+    )
+    directorio = _directorio(tmp_path, **{"00_global.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible):
+        cargar_diccionario(directorio)
+
+
+@pytest.mark.parametrize(
+    ("bloque", "roto", "esperado"),
+    [
+        ("reglas", "reglas: no soy una lista", "lista"),
+        ("objetos", None, "mapa"),
+    ],
+)
+def test_f006_r1_cargador_bloques_con_la_forma_equivocada(
+    tmp_path, bloque: str, roto: str | None, esperado: str
+) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    if bloque == "reglas":
+        texto = GLOBAL_MINIMO.split("reglas:")[0] + roto + "\npendientes: []\n"
+        directorio = _directorio(tmp_path, **{"00_global.yaml": texto})
+    else:
+        directorio = _directorio(
+            tmp_path, **{"mart.yaml": "esquema: mart\nobjetos: no soy un mapa\n"}
+        )
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any(esperado in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r1_cargador_una_regla_que_no_es_un_mapa_falla(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    texto = GLOBAL_MINIMO.split("reglas:")[0] + "reglas:\n  - solo texto\npendientes: []\n"
+    directorio = _directorio(tmp_path, **{"00_global.yaml": texto})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("posición" in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r6_cargador_columnas_que_no_es_un_mapa_falla(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = MART_MINIMO.replace(
+        "    columnas:\n      obra_codigo:", "    columnas: [obra_codigo]\n    _sobra:"
+    )
+    directorio = _directorio(tmp_path, **{"mart.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible):
+        cargar_diccionario(directorio)
+
+
+def test_f006_r6_cargador_una_columna_que_es_una_lista_falla(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = MART_MINIMO.replace(
+        "      obra_codigo: Codigo de obra tal y como se teclea en Sigrid.",
+        "      obra_codigo: [uno, dos]",
+    )
+    directorio = _directorio(tmp_path, **{"mart.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("ni un texto ni un mapa" in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r5_cargador_relaciones_que_no_es_una_lista_falla(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = MART_MINIMO.replace("    relaciones: []", "    relaciones: no soy una lista")
+    directorio = _directorio(tmp_path, **{"mart.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("lista" in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r5_cargador_una_relacion_que_no_es_un_mapa_falla(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = MART_MINIMO.replace("    relaciones: []", "    relaciones:\n      - texto suelto")
+    directorio = _directorio(tmp_path, **{"mart.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("relación no es un mapa" in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r8_cargador_un_error_de_yaml_sin_posicion_tambien_es_legible() -> None:
+    """No todos los errores de `yaml` traen marca de línea. El mensaje sigue
+    teniendo que explicar qué pasa."""
+    import yaml as yaml_lib
+
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import _detalle_yaml
+
+    detalle = _detalle_yaml(yaml_lib.YAMLError("algo raro"))
+
+    assert "no parsea" in detalle

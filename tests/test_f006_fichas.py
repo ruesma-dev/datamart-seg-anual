@@ -281,3 +281,62 @@ def test_f006_r26_las_columnas_tecnicas_no_se_declaran_de_negocio(nombre: str) -
     for columna in ficha.columnas:
         if columna.nombre in TECNICAS:
             assert columna.agregacion == "no_sumable", f"{nombre}.{columna.nombre}"
+
+
+# ---------------------------------------------------------------------------
+# `cierre` · el esquema que NO se refresca de noche (T14)
+# ---------------------------------------------------------------------------
+
+
+def test_f006_r14_cierre_entero_se_declara_de_refresco_manual() -> None:
+    """`cierre` no está en `build_pipeline_steps`: se construye a mano.
+
+    Que una sola ficha de este esquema se declarase `nocturno` bastaría para que
+    el agente diera un dato de hace semanas sin advertirlo.
+    """
+    fichas = _fichas_de("cierre")
+
+    assert fichas, "no hay fichas de `cierre`"
+    for nombre, ficha in fichas.items():
+        assert ficha.refresco == "manual", nombre
+        assert ficha.paso_etl == "build_cierre", nombre
+
+
+def test_f006_r12_cierre_hereda_el_aviso_de_frescura() -> None:
+    """Quien mire una ficha de `cierre` tiene que ver que hay que citar la fecha."""
+    from etl_sigrid.domain.diccionario import derivar_avisos
+
+    derivado = derivar_avisos(_diccionario())
+
+    for nombre in _fichas_de("cierre"):
+        avisos = derivado.por_nombre[f"cierre.{nombre}"].avisos
+        assert "R-FRESCURA-MANUAL" in avisos, nombre
+
+
+def test_f006_r26_cierre_la_tabla_de_hecho_documenta_sus_columnas() -> None:
+    ficha = _fichas_de("cierre")["fact_cierre_mensual"]
+    reales = columnas_del_create_table(
+        _texto_sql("cierre/01_ddl_fact.sql"), "cierre.fact_cierre_mensual"
+    )
+
+    assert {c.nombre for c in ficha.columnas} == set(reales), (
+        f"faltan: {sorted(set(reales) - {c.nombre for c in ficha.columnas})}; "
+        f"sobran: {sorted({c.nombre for c in ficha.columnas} - set(reales))}"
+    )
+
+
+def test_f006_r2_cierre_las_tres_funciones_estan_documentadas() -> None:
+    """Son las que deciden a qué mes pertenece un cierre, y la regla es
+    contraintuitiva: si el texto y la fecha discrepan, manda el TEXTO."""
+    funciones = {
+        n: f for n, f in _fichas_de("cierre").items() if f.tipo == "funcion"
+    }
+
+    assert set(funciones) == {
+        "fn_parse_mes_fase",
+        "fn_mes_de_fase",
+        "fn_mes_de_version_master",
+    }
+    for nombre, ficha in funciones.items():
+        assert ficha.grano is None or ficha.grano == "", nombre
+        assert ficha.motivo_no_consumo, nombre

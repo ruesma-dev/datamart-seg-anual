@@ -413,7 +413,8 @@ YAML_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 #:   98  T8  · andamiaje, con el inventario entero declarado pendiente
 #:   96  T12 · las dos tablas de hecho de `mart`
 #:   85  T13 · las once vistas de `mart`
-PENDIENTES_MAX = 85
+#:   73  T14 · los doce objetos de `cierre`
+PENDIENTES_MAX = 73
 
 
 def _inventario_del_repositorio():
@@ -483,3 +484,76 @@ def test_f006_r27_puerta_el_trinquete_no_esta_holgado() -> None:
         f"PENDIENTES_MAX vale {PENDIENTES_MAX} y hay {len(dicc.pendientes)} "
         f"pendientes declarados: ajusta la constante en esta misma tarea"
     )
+
+
+# ---------------------------------------------------------------------------
+# El informe que se lee cuando la puerta se pone en rojo
+#
+# Es la única salida que va a ver quien rompa la puerta a las 8 de la mañana.
+# Si no nombra el objeto, el fichero y qué hacer con él, la puerta cuesta más
+# de lo que vale.
+# ---------------------------------------------------------------------------
+
+
+def _informe_con_todo() -> InformeCobertura:
+    """Un informe con las cinco clases de hueco a la vez."""
+    ficha_muda = _ficha(columnas=(_columna("mes", significado="  "),))
+    fuera_de_consumo = _ficha(
+        esquema="raw",
+        objeto="obrparpre",
+        capa="origen",
+        consumo_recomendado=False,
+        motivo_no_consumo="Copia literal de Sigrid.",
+        columnas=(),
+        ejemplos_preguntas=(),
+        paso_etl="ingest_raw",
+    )
+
+    return evaluar_cobertura(
+        _dicc(fichas=[ficha_muda, fuera_de_consumo]),
+        _inventario("mart.fact_seguimiento_mensual", "cierre.v_pbi_cierre_resumen"),
+        ("mart.fact_seguimiento_mensual", "mart.objeto_borrado"),
+    )
+
+
+def test_f006_r25_dominio_el_informe_nombra_las_cinco_clases_de_hueco() -> None:
+    informe = _informe_con_todo()
+
+    texto = formatear_cobertura(informe)
+
+    assert "KO" in texto
+    # publicado y sin ficha
+    assert "cierre.v_pbi_cierre_resumen" in texto
+    # con ficha y sin objeto publicado
+    assert "raw.obrparpre" in texto
+    # columna sin describir dentro de la superficie de consumo
+    assert "mart.fact_seguimiento_mensual.mes" in texto
+    # pendiente ya documentado y pendiente fantasma
+    assert "mart.objeto_borrado" in texto
+    assert "trinquete" in texto
+    # aviso, que no bloquea
+    assert "No bloquea" in texto
+
+
+def test_f006_r25_dominio_el_informe_dice_que_hacer_con_lo_que_falta() -> None:
+    """No basta con listar: hay que decir dónde se escribe la ficha."""
+    informe = _informe_con_todo()
+
+    texto = formatear_cobertura(informe)
+
+    assert "config/diccionario/" in texto
+    assert "pendientes" in texto
+
+
+def test_f006_r27_dominio_un_informe_solo_con_pendientes_no_es_un_fallo() -> None:
+    """Entregar por bloques tiene que poder verse verde, pero con la cuenta a la vista."""
+    informe = evaluar_cobertura(
+        _dicc(), _inventario("mart.fact_seguimiento_mensual", "mart.v_pbi_fact"),
+        ("mart.v_pbi_fact",),
+    )
+
+    texto = formatear_cobertura(informe)
+
+    assert informe.ok
+    assert "OK con pendientes declarados" in texto
+    assert "pendientes declarados: 1" in texto

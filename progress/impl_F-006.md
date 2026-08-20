@@ -396,3 +396,70 @@ por el camino largo. La ficha dice qué cambiaría el día que se carguen reglas
 Ruff quedó en cero avisos nuevos: los 9 que introdujo el bloque se cerraron
 (orden de imports, `B023` en un cierre sobre variable de bucle y un `noqa`
 razonado en `DiccionarioIlegible`, que en español no admite el sufijo `Error`).
+
+---
+
+## Bloque D · Fichas de `cierre`
+
+### T14 · La tabla de hecho, las ocho vistas y las tres funciones
+
+```
+$ python -m pytest tests/test_f006_cobertura.py tests/test_f006_fichas.py -q
+tests\test_f006_fichas.py:335: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_f006_cobertura.py::test_f006_r25_puerta_todo_objeto_publicado_tiene_ficha_o_esta_pendiente
+FAILED tests/test_f006_fichas.py::test_f006_r14_cierre_entero_se_declara_de_refresco_manual
+FAILED tests/test_f006_fichas.py::test_f006_r26_cierre_la_tabla_de_hecho_documenta_sus_columnas
+FAILED tests/test_f006_fichas.py::test_f006_r2_cierre_las_tres_funciones_estan_documentadas
+4 failed, 73 passed in 4.16s
+```
+
+Verde tras escribir `config/diccionario/cierre.yaml`. `PENDIENTES_MAX` baja de
+**85 a 73**.
+
+**`tasks.md` T14 dice «`fact_cierre_mensual`, las 6 vistas y las 3 funciones».
+Son OCHO vistas**, no seis: además de `v_pbi_cierre_resumen`,
+`v_pbi_dim_concepto`, `v_pbi_cierre_cabecera`, `v_pbi_cierre_indirectos_detalle`,
+`v_pbi_cierre_generales_detalle` y `v_pbi_planif_vs_real`, están
+`v_pbi_dim_subcategoria_ci` y `v_pbi_dim_tipologia_cp`. Las doce fichas están
+escritas.
+
+Tres tests propios de este bloque, que son los que impiden la mentira concreta
+de `cierre`:
+
+- **todas sus fichas declaran `refresco: manual` y `paso_etl: build_cierre`**.
+  Una sola que dijera `nocturno` bastaría para que el agente diera un dato de
+  hace semanas sin advertirlo;
+- **todas heredan el aviso `R-FRESCURA-MANUAL`** por derivación, no a mano;
+- la tabla de hecho documenta **exactamente** las columnas de su `CREATE TABLE`.
+
+Contenido que costó verificar y que no estaba en ningún informe:
+
+- **`presupuesto_aprobado_venta` es hoy una COPIA literal del inicial**
+  (`sql/cierre/05_views_cabecera.sql`: `vi.presupuesto_inicial_venta AS
+  presupuesto_aprobado_venta`). La ficha lo dice, porque es el divisor del
+  `final_pct` de la VENTA y alguien podría creer que es un dato propio.
+- **El `final_pct` de la fila VENTA es la única excepción del cuadro**: va
+  contra `presupuesto_aprobado_venta`, no contra la venta final. El resto de
+  porcentajes van contra la VENTA de su misma columna y su mismo mes.
+- **`ejecutado_mes_periodif` no resta el periodificado del mes anterior, resta
+  el INCURRIDO**. Está en el comentario del SQL y es contraintuitivo; la ficha
+  lo advierte.
+- **`ratio_lineal` no tiene tope en el 100 %**: una obra que se alarga da más
+  de 1. También queda dicho.
+- `v_pbi_dim_subcategoria_ci` resuelve los nombres **por obra y no globalmente**,
+  a propósito: el mismo código de subcapítulo se llama distinto en cada obra.
+
+### Cobertura de las líneas cambiadas
+
+Tras T14 la puerta daba `92.6 %`. Se añadieron tests para las ramas defensivas
+que quedaban sin ejercitar —vocabularios mal escritos en el bloque global,
+formas de YAML que no se pueden convertir en entidades, y el **informe que se
+lee cuando la puerta se pone en rojo**— y quedó en:
+
+```
+[OK] PUERTA COBERTURA: 98.8% de 499 líneas cambiadas cubiertas (493/499, umbral 80%, nivel critico)
+```
+
+No es cosmética: esas ramas son manejo de errores, y un manejo de errores que
+nadie ha ejecutado nunca es el que falla el día que hace falta.
