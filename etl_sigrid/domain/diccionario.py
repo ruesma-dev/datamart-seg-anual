@@ -95,7 +95,7 @@ CARDINALIDADES = ("1:1", "1:N", "N:1", "N:N")
 #: Severidad de una regla dura del diccionario.
 SEVERIDADES = ("bloqueante", "aviso")
 
-#: Las DOCE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
+#: Las TRECE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
 #:
 #: No es una lista de buenas prácticas: cada una nace de una trampa concreta del
 #: modelo y varias de un número falso real. Se escriben aquí, en el dominio, para

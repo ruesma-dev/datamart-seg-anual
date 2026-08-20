@@ -169,11 +169,15 @@ objetos:
         nulo_significa: No se calculo la version sin redondear para esa fila.
       total_incurrido:
         significado: >-
-          Calculo paralelo de Sigrid del incurrido a origen. Normalmente coincide
-          con cantidad por precio, pero a veces difiere en centimos.
+          Calculo paralelo de Sigrid del incurrido a origen (`obrparpre.totinc`).
+          Normalmente coincide con cantidad por precio, pero a veces difiere en
+          centimos.
         unidad: EUR
         agregacion: ultimo_valor
-        nulo_significa: La fila no es de coste real.
+        nulo_significa: >-
+          La fila no es de un ambito REAL. Llega en los **dos** reales —3
+          (coste) y 7 (venta)—, no solo en coste, porque el bloque que lo trae
+          filtra `ambito_id IN (3, 7)`. En los master (8 y 11) es nulo.
       total_incurrido_mes:
         significado: El incurrido de Sigrid imputado a ese mes.
         unidad: EUR
@@ -217,12 +221,29 @@ objetos:
       presupuesto de la obra"**, que no se responde sumando `stg.plan_mensual`.
     descripcion: >-
       El presupuesto por partida y ambito, con su cantidad, su precio y su
-      importe TOTAL sin distribucion mensual. Es lo que hay que usar para el
-      presupuesto de una obra; la explosion mensual vive en `stg.plan_mensual`.
+      importe, sin distribucion mensual propia. La explosion a meses vive en
+      `stg.plan_mensual`.
+
+      **Dos trampas antes de escribir nada, y las dos multiplican importes.**
+
+      **1. En los ambitos REALES (3 = coste, 7 = venta) el valor esta ACUMULADO
+      A ORIGEN.** La fila de la fase 5 trae lo llevado hasta el mes 5, no lo del
+      mes 5. Por eso `stg.plan_mensual` desacumula por diferencia con la fase
+      anterior (`cantidad - LAG(cantidad)`). Un `SUM` a traves de `fase_num`
+      cuenta el mismo importe una vez por cada mes transcurrido: para el total
+      de la obra hay que quedarse con la fase MAYOR.
+
+      **2. En los ambitos MASTER (8 = coste, 11 = venta) conviven TODAS las
+      versiones**, igual que en `stg.plan_mensual`: alli `fase_num` no es un mes
+      sino el numero de version, y hay una fila por cada una. Sin filtrar la
+      version vigente —`stg.version_master_vigente`— se suman todas las
+      revisiones del presupuesto como si fueran partidas distintas.
     grano: >-
       Una fila por (`obra_id`, `partida_id`, `ambito_id`, `fase_num`), y cada una
       identificada por `presupuesto_id`, que es la clave primaria y viene de
-      Sigrid. Se declara esa como clave de negocio porque es la que usan los JOIN
+      Sigrid. **`fase_num` NO es una dimension sumable**: en los ambitos reales
+      (3 y 7) es el mes y el valor viene ACUMULADO A ORIGEN, y en los master (8
+      y 11) es el numero de version y estan todas. Se declara esa como clave de negocio porque es la que usan los JOIN
       —`stg.plan_mensual` referencia justo esa columna— y la combinacion de
       cuatro es el grano conceptual. `fase_num` es el mismo campo `fas` de Sigrid
       y arrastra su ambiguedad: mes en los ambitos reales, numero de version en
@@ -259,7 +280,9 @@ objetos:
           Cantidad presupuestada, con SEIS decimales y **sin redondear a
           proposito**: en las partidas de tipo porcentaje la cantidad es un
           coeficiente diminuto, y redondearlo infla el importe de forma visible.
-        agregacion: suma
+
+          **En los ambitos REALES (3 y 7) este valor viene ACUMULADO A ORIGEN**: la fila de la fase 5 trae lo llevado hasta el mes 5, no lo del mes 5. Sumarlo a traves de `fase_num` cuenta el mismo importe una vez por cada mes transcurrido. Para el total de la obra hay que quedarse con la fase MAYOR, y para el valor del mes hay que restar la fase anterior, que es lo que hace `stg.plan_mensual`.
+        agregacion: ultimo_valor
       precio:
         significado: Precio unitario, con seis decimales para no perder precision de Sigrid.
         unidad: EUR
@@ -268,18 +291,28 @@ objetos:
         significado: >-
           Importe total de la partida, redondeado con los decimales que la obra
           tenga configurados. **Es la columna de COSTE** (ambitos 3 y 8).
+
+          **En los ambitos REALES (3 y 7) este valor viene ACUMULADO A ORIGEN**: la fila de la fase 5 trae lo llevado hasta el mes 5, no lo del mes 5. Sumarlo a traves de `fase_num` cuenta el mismo importe una vez por cada mes transcurrido. Para el total de la obra hay que quedarse con la fase MAYOR, y para el valor del mes hay que restar la fase anterior, que es lo que hace `stg.plan_mensual`.
         unidad: EUR
-        agregacion: suma
+        agregacion: ultimo_valor
       importe_oficial:
         significado: >-
           El importe con los coeficientes que Sigrid aplica SOLO EN VENTA. **Es
           la columna de VENTA** (ambitos 7 y 11). Cuando no hay coeficiente vale
           lo mismo que `importe`, y por eso confundirlas pasa desapercibido en
           coste y falsea la venta.
+
+          **En los ambitos REALES (3 y 7) este valor viene ACUMULADO A ORIGEN**: la fila de la fase 5 trae lo llevado hasta el mes 5, no lo del mes 5. Sumarlo a traves de `fase_num` cuenta el mismo importe una vez por cada mes transcurrido. Para el total de la obra hay que quedarse con la fase MAYOR, y para el valor del mes hay que restar la fase anterior, que es lo que hace `stg.plan_mensual`.
         unidad: EUR
-        agregacion: suma
+        agregacion: ultimo_valor
       dec_cantidades:
-        significado: Decimales de cantidad configurados en la obra, de los que depende el redondeo.
+        significado: >-
+          Decimales de cantidad configurados en la obra (`obr.decc`; por defecto
+          3). **No redondea la columna `cantidad` de esta misma tabla**, que se
+          guarda con seis decimales a proposito: gobierna el redondeo que se
+          aplica DENTRO del calculo del importe,
+          `ROUND(ROUND(can, decc) * ROUND(pre, decp), deci)`, y se expone aqui
+          para que `stg.plan_mensual` reaplique el mismo al explotar el plan.
         agregacion: no_sumable
       dec_precios:
         significado: Decimales de precio configurados en la obra.
@@ -352,14 +385,22 @@ objetos:
         significado: Unidad de medicion (m3, m2, ud, kg...).
         nulo_significa: La partida no tiene unidad, tipico de los capitulos.
       capitulo_raiz_id:
-        significado: Identificador del capitulo raiz del que desciende.
+        significado: >-
+          Identificador del capitulo raiz del que desciende. **Nunca es NULL**:
+          en la raiz la fila se apunta a si misma, asi que
+          `capitulo_raiz_id = partida_id`. Buscar las raices con
+          `WHERE capitulo_raiz_id IS NULL` devuelve cero filas siempre; lo que
+          hay que escribir es `WHERE capitulo_raiz_id = partida_id`, o bien
+          `WHERE capitulo_padre_id IS NULL`, que ese si es nulo en la raiz.
         agregacion: no_sumable
-        nulo_significa: La propia fila es el capitulo raiz.
       capitulo_raiz_cod:
         significado: >-
           Codigo del capitulo raiz. Es la ENTRADA de la heuristica que decide la
           categoria.
-        nulo_significa: La propia fila es el capitulo raiz, o no tiene codigo.
+        nulo_significa: >-
+          El capitulo raiz no tiene codigo en Sigrid. **No** significa que la
+          fila sea la raiz: en la raiz este campo trae su propio codigo, igual
+          que `capitulo_raiz_id` trae su propio `ide`.
       categoria:
         significado: >-
           Clasificacion del coste. **Es una HEURISTICA sobre el codigo del
@@ -497,13 +538,23 @@ objetos:
         agregacion: no_sumable
         nulo_significa: Falta alguna de las dos fechas con las que calcularlo.
       anio:
-        significado: Ano de la fase, derivado de su fecha de inicio.
+        significado: >-
+          Ano de la fase, copiado tal cual de `obrfas.ano` en `raw.obrfas`. **No
+          se deriva de `fecha_inicio`**: son campos independientes en Sigrid y
+          pueden no coincidir.
         agregacion: no_sumable
-        nulo_significa: La fase no tiene fecha de inicio.
+        nulo_significa: >-
+          Sigrid no lo tiene informado. **No es cosmetico**: `stg.plan_mensual`
+          exige `anio` y `mes` no nulos para construir los ambitos reales, asi
+          que una fase sin ellos **no aparece** en el seguimiento mensual.
       mes:
-        significado: Mes de la fase, derivado de su fecha de inicio.
+        significado: >-
+          Mes de la fase, copiado tal cual de `obrfas.mes` en `raw.obrfas`. **No
+          se deriva de `fecha_inicio`**, igual que `anio`.
         agregacion: no_sumable
-        nulo_significa: La fase no tiene fecha de inicio.
+        nulo_significa: >-
+          Sigrid no lo tiene informado, y entonces `stg.plan_mensual` descarta la
+          fase al construir los ambitos reales.
       nombre_mes:
         significado: >-
           Nombre del mes escrito en la fase. **Manda sobre la fecha** cuando las
@@ -561,11 +612,13 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.v_master_vigente_anual.obra_id
-        cardinalidad: "N:N"
+        cardinalidad: "1:N"
         porque: >-
-          Es la misma pregunta resuelta de otra forma: alli por ano y ambito, y
-          con el criterio del seguimiento. Las dos respuestas pueden no coincidir,
-          y la buena para el seguimiento es la de `mart`.
+          Es la misma pregunta resuelta de otra forma: aqui **una fila por obra**,
+          alli una por (`obra_id`, `anio`, `ambito_id`) y con el criterio del
+          seguimiento. De ahi el `1:N`: unir por `obra_id` multiplica esta fila
+          por cada ano y ambito que tenga alli. Las dos respuestas pueden no
+          coincidir, y la buena para el seguimiento es la de `mart`.
     ejemplos_preguntas:
       - Que version master marca Sigrid como vigente en la obra X
 
@@ -656,6 +709,16 @@ objetos:
       representa. Sin ese ajuste, una cuatrimestral de febrero entregada en marzo
       no regiria febrero y ese mes se quedaria con el plan anterior. No toca las
       versiones ABC ni las de cierre mensual, que no son cuatrimestrales.
+
+      **Solo corrige con DOBLE evidencia, y la segunda mitad de la regla es tan
+      importante como la primera**: ademas de que el texto parsee un mes
+      distinto al de creacion, hace falta que el mes de creacion **no sea uno de
+      los oficiales** —febrero, junio u octubre, los tres meses cuatrimestrales
+      (`IF v_mes_creac IN (2, 6, 10) THEN RETURN p_fec_creacion`)—. Una version
+      creada en un mes oficial se respeta aunque su texto diga otra cosa, porque
+      entonces lo mas probable es que el texto este mal, no la fecha. Contar solo
+      la primera mitad hace creer que cualquier discrepancia de texto mueve la
+      fecha, y no es asi.
     grano: null
     clave_negocio: []
     paso_etl: build_stg

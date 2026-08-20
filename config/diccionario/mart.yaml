@@ -870,7 +870,12 @@ objetos:
         significado: Orden de presentacion de la tipologia. Es presentacion, no un dato.
         agregacion: no_sumable
       cp_real:
-        significado: Coste proporcional real acumulado en la ventana del ano.
+        significado: >-
+          Coste proporcional real, **sumado** sobre la ventana del ano
+          [enero .. mes de corte]. "Acumulado" aqui es el total de esos meses,
+          no un acumulado a origen como el de `stg.presupuesto`: cada mes entra
+          una sola vez, asi que sumar dos anos suma meses distintos y es
+          correcto.
         unidad: EUR
         agregacion: suma
       cp_planificado:

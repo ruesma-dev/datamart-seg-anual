@@ -46,8 +46,11 @@ reglas:
       build no es consultable por SQL: de esos dos esquemas hay que advertir que
       la antiguedad se desconoce, en vez de callarlo.
     motivo: >-
-      La composicion real esta en `main.build_pipeline_steps`: IngestRaw,
-      LoadExcelAux, BuildStg, BuildMart y ApplyGrants. Dar un dato de `cierre`
+      La composicion real esta en `main.build_pipeline_steps`, y sus pasos se
+      llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
+      donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
+      `build_stg`, `build_mart`, `publicar_diccionario` y `apply_grants`. Dar
+      un dato de `cierre`
       sin fecha es dar una respuesta de hace semanas con aplomo.
 
   - codigo: R-IMPORTE-MES
@@ -188,6 +191,14 @@ reglas:
       **5. Las fechas son enteros `YYYYMMDD`**, y el valor `0` no es una fecha
       sino el NULL, porque Sigrid no guarda nulos en los enteros. Lo mismo vale
       para las referencias: un `entide` a 0 significa "sin asignar".
+
+      **6. Hay referencias POLIMORFICAS, y no se pueden unir a ciegas.** En las
+      lineas de documento de compra, `docoriide` apunta al documento de origen
+      **y `docoritip` dice a que tabla**: 44 es contrato y 14 albaran. Unir
+      `docoriide` sin filtrar antes por `docoritip` cruza lineas con documentos
+      de otro tipo que casualmente comparten `ide`. Es lo que hace
+      `compras/01_documentos.sql`:
+      `CASE WHEN l.docoritip = 44 THEN NULLIF(l.docoriide, 0) END`.
     motivo: >-
       Es la estructura del sistema origen. Los puntos 1, 2 y 5 y la inexistencia
       de `con.nom` estan verificados en la entidad `con` de

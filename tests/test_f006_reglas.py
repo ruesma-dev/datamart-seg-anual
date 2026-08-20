@@ -829,3 +829,35 @@ def test_f006_r9_la_regla_de_oro_de_sigrid_se_publica() -> None:
         ("0", "que el cero es el NULL de Sigrid"),
     ):
         assert fragmento in texto, f"la regla no dice nada de {porque}"
+
+
+# ---------------------------------------------------------------------------
+# La evidencia que cita `R-FRESCURA-MANUAL` tiene que seguir siendo cierta
+# ---------------------------------------------------------------------------
+#
+# Su `motivo` enumeraba los pasos de `run-all` —«IngestRaw, LoadExcelAux,
+# BuildStg, BuildMart y ApplyGrants»— y llevaba dos tandas sin `PublicarDiccionario`,
+# que el bloque E metió entre `BuildMart` y `ApplyGrants`. La conclusión de la
+# regla no cambiaba, pero es una regla **bloqueante** citando una composición
+# que ya no existe, y una evidencia desfasada envejece mal: la próxima vez que
+# alguien la lea para decidir algo, decidirá con la lista de antes.
+#
+# En vez de arreglar la lista, se ancla: los pasos que la regla nombre tienen
+# que ser los que `main.build_pipeline_steps` devuelve de verdad.
+
+
+def test_f006_r9_la_regla_de_frescura_cita_el_pipeline_real() -> None:
+    import main
+    from config.settings import get_settings
+
+    pasos = [p.name for p in main.build_pipeline_steps(get_settings())]
+
+    regla = next(r for r in _diccionario_real().reglas if r.codigo == "R-FRESCURA-MANUAL")
+    texto = f"{regla.regla} {regla.motivo}"
+
+    faltan = [p for p in pasos if p not in texto]
+    assert faltan == [], (
+        f"`R-FRESCURA-MANUAL` enumera el pipeline nocturno y se ha dejado {faltan}. "
+        f"Los pasos reales son {pasos}: la lista de la regla se escribió a mano y "
+        f"se quedó atrás cuando el bloque E insertó un paso nuevo"
+    )
