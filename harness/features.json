@@ -615,6 +615,22 @@
       "rigor": "critico",
       "priority": 6,
       "branch": "feature/F-040-ingresos"
+    },
+    {
+      "id": "F-041",
+      "title": "La campana de mutacion miente: timeouts, bytecode y worktrees",
+      "description": "Descubierta el 2026-08-20 durante F-006. Tres defectos de la campana de mutacion del arnes, no de ninguna feature. (1) EL GRAVE: el informe cuenta los TIMEOUTS aparte de los supervivientes, asi que una campana puede declararse limpia teniendo mutantes vivos. Ocurrio de verdad: los cuatro timeouts de la campana de F-006 eran CUATRO SUPERVIVIENTES, y solo se supo porque el implementer los reevaluo uno a uno en vez de fiarse del recuento. Un timeout es un mutante cuyo destino se desconoce y debe tratarse como superviviente hasta que se demuestre lo contrario, o el criterio de cero supervivientes -que es una regla dura del nivel critico- no significa nada. (2) La campana deja mutantes vivos en el __pycache__ del arbol, de modo que una ejecucion posterior puede importar bytecode mutado. En F-006 dio un FALSO ROJO, que es la direccion inofensiva; en la contraria seria un falso verde y no lo veria nadie. (3) Deja worktrees huerfanos: se acumularon dieciseis. Los tres son del arnes generico y valen para cualquier proyecto, asi que por la regla de propagacion obligatoria se portan a arnes-base en el mismo trabajo. Nota relacionada: F-029 ya describe que las campanas de mutacion no son de fiar hasta que se arregle su interferencia con init.sh; esta ficha es el segundo frente del mismo problema y conviene mirarlas juntas. El implementer de F-006 dejo una propuesta escrita en progress/impl_F-006.md.",
+      "acceptance": [
+        "Un timeout cuenta como superviviente mientras no se demuestre lo contrario, y el informe lo dice con esas palabras",
+        "La campana no deja bytecode mutado en el arbol tras terminar, ni en exito ni en fallo",
+        "La campana no deja worktrees huerfanos, y los dieciseis acumulados quedan retirados",
+        "Las tres correcciones portadas a arnes-base con el modo actualizar del instalador, y F-029 revisada a la luz de estas"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 7,
+      "branch": "feature/F-041-mutacion-fiable"
     }
   ]
 }

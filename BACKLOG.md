@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **38 features**, 24 abiertas, 14 terminadas.
+Resumen: **39 features**, 25 abiertas, 14 terminadas.
 
 En curso: **F-006**.
 
@@ -17,6 +17,7 @@ En curso: **F-006**.
 | F-038 | Modelar los comparativos de ofertas en compras | 4 | pendiente | estandar | `feature/F-038-comparativos` |
 | F-039 | Vistas puente que faltan para las preguntas de negocio | 5 | pendiente | estandar | `feature/F-039-vistas-puente` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 6 | pendiente | critico | `feature/F-040-ingresos` |
+| F-041 | La campana de mutacion miente: timeouts, bytecode y worktrees | 7 | pendiente | estandar | `feature/F-041-mutacion-fiable` |
 | F-035 | Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna | 9 | pendiente | critico | `feature/F-035-estudio-tiempo-carga` |
 | F-025 | Ventana de negocio: acotar el build de stg y mart a lo que se mueve | 10 | pendiente | critico | `feature/F-025-ventana-negocio-build` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
@@ -92,6 +93,12 @@ Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el dat
 estado **pendiente** · prioridad 6 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
 
 Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse.
+
+### F-041 · La campana de mutacion miente: timeouts, bytecode y worktrees
+
+estado **pendiente** · prioridad 7 · rigor `estandar` · SDD no · rama `feature/F-041-mutacion-fiable`
+
+Descubierta el 2026-08-20 durante F-006. Tres defectos de la campana de mutacion del arnes, no de ninguna feature. (1) EL GRAVE: el informe cuenta los TIMEOUTS aparte de los supervivientes, asi que una campana puede declararse limpia teniendo mutantes vivos. Ocurrio de verdad: los cuatro timeouts de la campana de F-006 eran CUATRO SUPERVIVIENTES, y solo se supo porque el implementer los reevaluo uno a uno en vez de fiarse del recuento. Un timeout es un mutante cuyo destino se desconoce y debe tratarse como superviviente hasta que se demuestre lo contrario, o el criterio de cero supervivientes -que es una regla dura del nivel critico- no significa nada. (2) La campana deja mutantes vivos en el __pycache__ del arbol, de modo que una ejecucion posterior puede importar bytecode mutado. En F-006 dio un FALSO ROJO, que es la direccion inofensiva; en la contraria seria un falso verde y no lo veria nadie. (3) Deja worktrees huerfanos: se acumularon dieciseis. Los tres son del arnes generico y valen para cualquier proyecto, asi que por la regla de propagacion obligatoria se portan a arnes-base en el mismo trabajo. Nota relacionada: F-029 ya describe que las campanas de mutacion no son de fiar hasta que se arregle su interferencia con init.sh; esta ficha es el segundo frente del mismo problema y conviene mirarlas juntas. El implementer de F-006 dejo una propuesta escrita en progress/impl_F-006.md.
 
 ### F-035 · Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna
 
