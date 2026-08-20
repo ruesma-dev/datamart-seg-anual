@@ -2056,3 +2056,79 @@ llegar `stg` con sus seis tablas se habria quedado corto **en silencio**: las
 nuevas habrian caido en el grupo de «proyeccion» y el control las habria dado
 por ilegibles. Pasa a derivarse del SQL, y los dos tests exactos de tablas se
 parametrizan sobre el resultado en vez de sobre una lista de `mart`.
+
+## T24 · `aux` (1 objeto), y el estado real dicho sin rodeos
+
+`aux.periodificacion_partida` guarda las reglas con las que Negocio reparte un
+coste puntual a lo largo de varios meses. **Hoy esta vacia**, y la ficha lo dice
+en mayusculas junto con la consecuencia comprobable: sin filas aqui,
+**`mart.v_fact_periodificado` es un paso a traves** y devuelve exactamente lo
+mismo que `mart.fact_seguimiento_mensual`. Quien la eligio esperando numeros
+distintos no los vera.
+
+Se documentan tambien los dos tipos de regla —especifica por obra+partida, o
+generica por patron `LIKE`— que un CHECK impide mezclar, y que la especifica
+gana cuando ambas casan.
+
+### Dos cosas que el validador corrigio, y tenia razon en las dos
+
+Escribi la ficha con `capa: auxiliar` y `paso_etl: build_mart` /
+`refresco: manual`. Saltaron R2 y R14:
+
+- `auxiliar` no esta en el vocabulario cerrado. La capa honesta es
+  `preparacion`: es material que alimenta la capa de consumo sin ser consumido.
+- **R14 caza una mentira de verdad**: `build_mart` SI corre cada noche, asi que
+  declarar `manual` con ese paso no cuadra. Pero es que el paso tampoco era
+  cierto: `build_mart` **crea** la tabla con `IF NOT EXISTS` y no la toca. No
+  hay ningun paso del ETL que escriba aqui. Queda `refresco: estatico`, que es
+  el unico valor que no promete un build detras, y la ficha explica por que.
+
+### Un test que habia dejado de comprobar nada
+
+`test_f006_r22_la_cobertura_publicada_baja_si_falta_un_significado` inyectaba
+una columna sin significado en `fichas[0]` y esperaba ver bajar la cobertura.
+Funciono mientras la primera ficha por orden de fichero fue de `mart`; al entrar
+`aux.yaml` —alfabeticamente antes, y **fuera** del consumo recomendado, que es
+lo unico que `cobertura_columnas` mide— la columna muda dejo de contar.
+
+Tuvo la suerte de romper en vez de pasar en verde comprobando nada. La victima
+pasa a **derivarse** (primera ficha con `consumo_recomendado: true` y columnas)
+y un aserto explicito impide que vuelva a caer en una que no se mide.
+
+### `aux.yaml` no se podia versionar, y los tests no se enteraron
+
+Al hacer el `git add` de la ficha:
+
+```
+$ git add -A
+error: open("config/diccionario/aux.yaml"): No such file or directory
+error: unable to index file 'config/diccionario/aux.yaml'
+fatal: adding files failed
+```
+
+Sobre un fichero que `ls -la` enseña con sus 6.308 bytes y que Python abre sin
+pestanear. **`AUX` es un nombre de dispositivo reservado de MS-DOS** que Windows
+sigue honrando, y git no puede indexarlo.
+
+Lo grave es lo que no paso: **los 618 tests estaban en verde con la ficha
+dentro**. El fichero funcionaba en este puesto y no habria llegado a ningun
+otro; el fallo lo dio el control de versiones, no la suite.
+
+Fase RED (`tests/test_f006_nombres_fichero.py`, 3 tests, 2 en rojo):
+
+```
+$ python -m pytest tests/test_f006_nombres_fichero.py -q
+E  AssertionError: ['aux.yaml'] usa un nombre de dispositivo reservado de
+   Windows: git no puede indexar el fichero aunque Python lo lea...
+E  DiccionarioIlegible: aux_.yaml: el fichero `aux_.yaml` declara `esquema: aux`.
+   El nombre del fichero manda: tiene que ser `aux_`
+2 failed, 1 passed
+```
+
+El arreglo no lista `aux`: barre **la familia entera** —`con`, `prn`, `nul`,
+`com1`..`lpt9`—, porque `con` es ademas el nombre de la tabla central de Sigrid
+y habria mordido igual. `nombre_de_fichero(esquema)` en el cargador es la unica
+definicion de la convencion, el fichero pasa a `aux_.yaml` con el `_` final que
+Python usa para las palabras reservadas, y el tercer test comprueba que el
+escape **no vale para los esquemas normales**: sin eso, `mart.yaml` y
+`mart_.yaml` podrian coexistir cargando fichas del mismo esquema en silencio.

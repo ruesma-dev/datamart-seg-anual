@@ -1,0 +1,136 @@
+# config/diccionario/aux_.yaml
+#
+# Ficha del esquema `aux`: los parametros que pone Negocio a mano, no el ETL.
+#
+# Hoy tiene un solo objeto y **esta vacio a proposito**. Esto no es un hueco de
+# documentacion: es el estado real del sistema, y hay que decirlo sin rodeos
+# porque de el depende que `mart.v_fact_periodificado` sea, a dia de hoy, una
+# vista que no cambia nada.
+#
+# Estructura verificada contra
+# `etl_sigrid/infrastructure/postgres/sql/mart/04_view_periodificado.sql`, que
+# es donde la tabla se crea de verdad; el fichero
+# `sql/auxiliar/01_periodificacion.sql` es una copia de referencia que el
+# pipeline NO ejecuta.
+
+version: 1
+esquema: aux
+
+objetos:
+
+  periodificacion_partida:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      No es un objeto de consulta sino de configuracion, y ademas **hoy esta
+      vacia**. Un agente no debe consultarla para responder nada; debe saber que
+      existe para entender por que `mart.v_fact_periodificado` devuelve
+      exactamente lo mismo que `mart.fact_seguimiento_mensual`.
+    descripcion: >-
+      Las reglas con las que Negocio decide que costes puntuales se reparten a
+      lo largo de varios meses. El caso tipico es la infraestructura de obra
+      —montaje de grua, instalacion, licencias— que se factura de golpe pero
+      aporta valor durante meses; sin repartirla, la comparativa real contra
+      planificado sale con un pico donde no lo hay.
+
+      **HOY ESTA VACIA.** La crea `mart/04_view_periodificado.sql` con
+      `CREATE TABLE IF NOT EXISTS` y nadie inserta nada: no hay ningun paso del
+      ETL que la rellene, ni fichero Excel que la alimente, ni regla acordada
+      con Negocio. La consecuencia directa y comprobable es que
+      **`mart.v_fact_periodificado` es hoy un paso a traves**: sin filas aqui,
+      ninguna partida se periodifica y la vista devuelve los mismos importes que
+      `mart.fact_seguimiento_mensual`. Si alguien la eligio pensando que veria
+      numeros distintos, no los vera. Se activa insertando reglas a mano y
+      relanzando `build-mart`.
+
+      Va `refresco: estatico` y sin `paso_etl` a proposito: **ningun paso del
+      ETL escribe aqui**. `build_mart` la crea si falta, pero no la toca; su
+      contenido solo cambia cuando una persona inserta o borra una regla. Decir
+      `paso_etl: build_mart` habria prometido que un build nocturno la
+      actualiza, que es justo lo contrario de lo que pasa.
+    grano: >-
+      Una fila por regla, identificada por `regla_id`. Una regla es de uno de
+      dos tipos, y un CHECK impide mezclarlos: **especifica** de una partida de
+      una obra (`obra_id` y `partida_id` informados, `patron_codigo` nulo) o
+      **generica** por patron de codigo (`patron_codigo` informado, los otros
+      dos nulos). Cuando las dos casan, manda la especifica.
+    clave_negocio: [regla_id]
+    refresco: estatico
+    columnas:
+      regla_id:
+        significado: >-
+          Clave tecnica de la regla. BIGSERIAL, asignada por Postgres al
+          insertar.
+        agregacion: clave_sustituta
+      obra_id:
+        significado: Obra a la que se limita la regla, en las reglas especificas.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Es una regla generica por patron, y entonces aplica a todas las obras.
+      partida_id:
+        significado: Partida concreta a la que aplica la regla, en las especificas.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Es una regla generica por patron, y entonces aplica a toda partida
+          cuyo codigo case.
+      patron_codigo:
+        significado: >-
+          Patron LIKE sobre el codigo de la partida en las reglas genericas.
+          `CI.2.%` alcanza a `CI.2.1`, `CI.2.2` y demas.
+        nulo_significa: Es una regla especifica de una obra y una partida.
+      activa:
+        significado: >-
+          Si la regla se aplica. Poner en falso desactiva la regla sin borrarla,
+          que es como se prueba un cambio sin perder el historico.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+      metodo:
+        significado: >-
+          Como se reparte el importe. `LINEAL` lo divide entre `plazo_meses` y
+          repite la misma cuota; `AL_FINAL` lo deja entero en el ultimo mes, que
+          equivale a no periodificar y sirve para anular una regia generica en
+          un caso concreto.
+        valores: [LINEAL, AL_FINAL]
+        agregacion: no_sumable
+      plazo_meses:
+        significado: >-
+          Numero de meses entre los que se reparte. Un CHECK exige que sea
+          positivo cuando el metodo es `LINEAL`.
+        agregacion: no_sumable
+        nulo_significa: El metodo es `AL_FINAL` y no necesita plazo.
+      fecha_inicio:
+        significado: Mes en el que empieza el reparto, si se quiere forzar uno concreto.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El reparto arranca en el mes en el que aparece el importe, que es lo
+          habitual.
+      descripcion:
+        significado: >-
+          Por que se periodifica esta partida, escrito por quien creo la regla.
+          Es el unico sitio donde queda la razon de negocio.
+        nulo_significa: Nadie la escribio.
+      creado_por:
+        significado: >-
+          Usuario de Postgres que inserto la fila. Lo pone el propio motor con
+          `current_user`.
+        agregacion: no_sumable
+      _built_at:
+        significado: >-
+          Cuando se inserto la regla. A diferencia de los `_built_at` del resto
+          del datamart, este NO se reescribe en cada build: la tabla sobrevive
+          a los builds porque se crea con `IF NOT EXISTS` y nadie la vacia.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          La obra a la que se limita la regla especifica. Muchas reglas pueden
+          apuntar a la misma obra.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: >-
+          La partida a la que aplica la regla especifica. Una partida podria
+          tener regla en varias obras.

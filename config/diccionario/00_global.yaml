@@ -728,7 +728,6 @@ pendientes:
   - _meta.etl_runs
   - _meta.v_frescura
   - _meta.v_raw_state
-  - aux.periodificacion_partida
   - raw.auxmun
   - raw.auxobramb
   - raw.auxobrcla

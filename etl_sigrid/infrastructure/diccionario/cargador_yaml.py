@@ -40,6 +40,29 @@ from etl_sigrid.domain.diccionario import (
 #: que encabece el listado y que entre el primero en el hash.
 FICHERO_GLOBAL = "00_global.yaml"
 
+#: Nombres de dispositivo que MS-DOS reservó y Windows nunca soltó. Un fichero
+#: llamado así —con cualquier extensión— existe para Python y es INABRIBLE para
+#: git, que lo rechaza con «No such file or directory» sobre un fichero que `ls`
+#: enseña. Nos costó un `git add` fallido con `aux.yaml`, y `con` habría sido
+#: peor: es el nombre de la tabla central de Sigrid.
+DISPOSITIVOS_RESERVADOS = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{i}" for i in range(1, 10)}
+    | {f"lpt{i}" for i in range(1, 10)}
+)
+
+
+def nombre_de_fichero(esquema: str) -> str:
+    """Cómo se llama el fichero del esquema `esquema`.
+
+    `<esquema>.yaml`, salvo que el nombre sea un dispositivo reservado: entonces
+    lleva un `_` al final, la misma convención que usa Python para `class_` o
+    `id_`. Es una función y no una regla escrita en dos sitios porque la usan el
+    cargador y quien crea un esquema nuevo.
+    """
+    sufijo = "_" if esquema.lower() in DISPOSITIVOS_RESERVADOS else ""
+    return f"{esquema}{sufijo}.yaml"
+
 CLAVES_GLOBAL = frozenset(
     {
         "version",
@@ -272,12 +295,22 @@ def _cargar_fichero_esquema(
 
     esquema = _texto(datos.get("esquema"))
     esperado = fichero[: -len(".yaml")]
-    if esquema != esperado:
+    # El `_` final solo se admite cuando el sistema operativo lo obliga: si se
+    # aceptase siempre, `mart.yaml` y `mart_.yaml` podrían coexistir cargando
+    # fichas del mismo esquema sin que nada lo dijera.
+    if fichero != nombre_de_fichero(esquema):
         errores.append(
             _error(
                 fichero,
                 f"el fichero `{fichero}` declara `esquema: {esquema}`. El nombre del "
-                f"fichero manda: tiene que ser `{esperado}`",
+                f"fichero manda: tiene que ser `{esperado}`"
+                + (
+                    f", y como `{esquema}` es un nombre de dispositivo reservado "
+                    f"de Windows —que git no puede indexar— el fichero se llama "
+                    f"`{nombre_de_fichero(esquema)}`"
+                    if esquema.lower() in DISPOSITIVOS_RESERVADOS
+                    else ""
+                ),
             )
         )
         return []

@@ -383,7 +383,16 @@ def test_f006_r22_fila_de_publicacion_lleva_los_recuentos_reales() -> None:
 
 
 def test_f006_r22_la_cobertura_publicada_baja_si_falta_un_significado() -> None:
-    """El número que se publica tiene que moverse con la realidad."""
+    """El número que se publica tiene que moverse con la realidad.
+
+    La víctima se **deriva**: tiene que ser una ficha de la superficie de
+    consumo, porque `cobertura_columnas` solo mide ahí. Este test elegía
+    `fichas[0]` a ciegas y funcionó mientras la primera ficha por orden
+    alfabético de fichero fue de `mart`; al entrar `aux.yaml` —fuera del consumo
+    recomendado— la columna muda dejó de contar y el test habría pasado a
+    comprobar nada si no llega a romper. El aserto de abajo impide que vuelva a
+    elegir una ficha que no se mide.
+    """
     from dataclasses import replace
     from datetime import datetime
 
@@ -392,8 +401,12 @@ def test_f006_r22_la_cobertura_publicada_baja_si_falta_un_significado() -> None:
 
     dicc, hash_fuente = _diccionario_real()
     fichas = list(dicc.fichas)
-    victima = fichas[0]
-    fichas[0] = replace(
+    indice = next(
+        i for i, f in enumerate(fichas) if f.consumo_recomendado and f.columnas
+    )
+    victima = fichas[indice]
+    assert victima.consumo_recomendado and victima.columnas
+    fichas[indice] = replace(
         victima,
         columnas=(Columna(nombre="muda", significado=""), *victima.columnas),
     )
