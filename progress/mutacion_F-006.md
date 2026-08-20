@@ -1,7 +1,7 @@
 <!-- progress/mutacion_F-006.md -->
 # F-006 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-006` el 2026-08-20 15:07.
+Generado por `python -m harness.mutacion --feature F-006` el 2026-08-20 15:44.
 
 ## Alcance
 
@@ -9,22 +9,22 @@ Origen del diff: **rama** (`4b1d3029c4ea47fb560ee59d70d04d2f2173c0a8` .. `featur
 
 | Fichero | Líneas en alcance |
 |---|---|
-| `etl_sigrid/domain/diccionario.py` | 968 |
+| `etl_sigrid/domain/diccionario.py` | 1016 |
 | `etl_sigrid/domain/inventario.py` | 288 |
 | `etl_sigrid/infrastructure/diccionario/__init__.py` | 2 |
 | `etl_sigrid/infrastructure/diccionario/cargador_yaml.py` | 435 |
-| **Total** | **1693** |
+| **Total** | **1741** |
 
 ## Totales
 
 | Métrica | Valor |
 |---|---|
-| Mutantes generados | 128 |
-| Mutantes evaluados | 128 |
-| Muertos | 128 |
+| Mutantes generados | 132 |
+| Mutantes evaluados | 132 |
+| Muertos | 132 |
 | Supervivientes | 0 |
 | Timeouts | 0 |
-| Tiempo total | 359.0 s |
+| Tiempo total | 352.3 s |
 | Muestreo | no: campaña completa |
 
 ## Supervivientes

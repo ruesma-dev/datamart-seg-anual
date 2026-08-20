@@ -946,17 +946,17 @@ Numeros medidos de nuevo, no arrastrados de la entrega anterior.
 
 | Evidencia | Antes de la review | Ahora |
 |---|---|---|
-| **Tests que pasan** | 1052 | **1125** (332 de F-006) |
+| **Tests que pasan** | 1052 | **1133** (340 de F-006) |
 | **Tests que fallan** | 0 | **0** |
 | **Tiempo de la suite** | 16,9 s | **25,6 s** sin cobertura; ~76 s dentro de `init.sh` |
-| **Cobertura de las lineas cambiadas** | 98,8 % (493/499) | **98,7 % (537/544)**, umbral 80 %, nivel `critico` |
-| **Mutantes / supervivientes** | 112 / 0 | **128 / 0**, 0 timeouts, 359,0 s |
+| **Cobertura de las lineas cambiadas** | 98,8 % (493/499) | **98,7 % (550/557)**, umbral 80 %, nivel `critico` |
+| **Mutantes / supervivientes** | 112 / 0 | **132 / 0**, 0 timeouts, 352,3 s (recontada tras los arrastres) |
 | **Objetos documentados** | 25 de 98 | 25 de 98 |
 | **Columnas descritas** | 332 | 332, ahora **exactas contra la proyeccion de cada vista** |
 | **Relaciones publicadas** | 42, con 8 rotas y 10 mintiendo | **42, las 42 validadas**: vocabulario cerrado y unicidad derivada de la clave |
 | **Trinquete `pendientes`** | 73, editable | 73, **anclado al inventario y al historial de git** |
 
-**Analisis de supervivientes: no hay ninguno.** 128 mutantes sobre los tres
+**Analisis de supervivientes: no hay ninguno.** 132 mutantes sobre los tres
 modulos nuevos, todos muertos. Detalle en `progress/mutacion_F-006.md`.
 
 ### Los diez defectos, y lo que se encontro de mas al arreglarlos
