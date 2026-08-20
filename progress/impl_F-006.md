@@ -53,9 +53,7 @@ ERROR tests/test_f006_formato.py
 
 ---
 
-## Evidencias
-
-*(se completa al terminar los cuatro bloques)*
+## Bloque A · Andamiaje
 
 ### T4 · `derivar_avisos()` y las validaciones R9 / R11 / R12
 
@@ -463,3 +461,65 @@ lee cuando la puerta se pone en rojo**— y quedó en:
 
 No es cosmética: esas ramas son manejo de errores, y un manejo de errores que
 nadie ha ejecutado nunca es el que falla el día que hace falta.
+
+---
+
+## Lo que se dejó anotado y NO se arregló
+
+Regla de hierro 3 de `tasks.md`: escribir las fichas obliga a leer las vistas y
+va a destapar cosas. Se anotan, no se tocan.
+
+| Hallazgo | Dónde | Qué feature lo recoge |
+|---|---|---|
+| **`build-compras` y `build-retenciones` no registran paso en `_meta.etl_runs`.** Ejecutan SQL en línea, sin step, así que **no aparecen en `_meta.v_frescura` y su fecha de build no se puede consultar por SQL**. `cierre` y `maestro` sí registran. | `main.py`, comandos `build-compras` y `build-retenciones` | Afecta a T20 y T21 (bloque F) y al valor real de `_meta.v_diccionario` (bloque E): el `LEFT JOIN` por `paso_etl` dará frescura nula para esos dos esquemas. Queda dicho dentro de `R-FRESCURA-MANUAL` para que el agente no prometa una fecha que no puede obtener. Convertirlos en step es feature propia |
+| `cierre.v_pbi_cierre_cabecera.presupuesto_aprobado_venta` **es una copia literal del inicial**; no hay dato propio de aprobación | `sql/cierre/05_views_cabecera.sql` | Anotado en la ficha. Si negocio quiere un aprobado real, es feature de modelo |
+| `mart.v_fact_periodificado` **no periodifica nada** hoy y devuelve lo mismo que la tabla de hecho | `aux.periodificacion_partida` se crea vacía | Anotado en la ficha, con `consumo_recomendado: false` y motivo |
+| El inventario real son **98 objetos**, no los «más de 80» que estimaba la spec; `cierre` tiene **8 vistas**, no 6 | `sql/**` + `config/tables_sigrid.yaml` | Corregido aquí; conviene enmendarlo en `design.md` §5.1 |
+| El ejemplo de ficha de `design.md` §3.3 usa **nombres de columna y literales de escenario que no existen** | `design.md` §3.3 | Corregido en las fichas. La enmienda del documento es del spec-author |
+
+---
+
+## Qué queda fuera de este encargo
+
+Los bloques **E a K** de `tasks.md` (T15 a T42): la publicación en `_meta`, las
+fichas de `compras`, `retenciones`, `maestro`, `stg`, `aux`, `_meta` y `raw`, el
+comando `check-diccionario`, la documentación, **los permisos y los `REVOKE`**,
+la conectividad y la batería de aceptación contra la base real.
+
+**No se ha tocado nada de permisos, `REVOKE`, firewall ni Azure, y no se ha
+abierto ninguna conexión a la base.** Tampoco se ha modificado `main.py`,
+`config/settings.py`, `grants.py`, `postgres_client.py` ni ningún SQL de
+negocio: este encargo solo **añade** ficheros y no cambia el comportamiento de
+ningún comando existente.
+
+Verificaciones `MANUAL (humano)` pendientes, todas de bloques posteriores: T19
+(publicar contra la BBDD real), T27 (`check-diccionario`), T32 a T34 (los 🔏 de
+permisos), T37 (`azure-apps`), T38 (firewall) y T39 (la batería).
+
+---
+
+## Evidencias
+
+Números medidos, no estimados.
+
+| Evidencia | Valor | Cómo se obtiene |
+|---|---|---|
+| **Tests ejecutados** | **1052 pasan, 0 fallan** (254 de ellos son de F-006) | `bash harness/init.sh` |
+| **Tiempo de la suite** | **16,9 s** sin medición de cobertura; **≈46 s** dentro de `init.sh`, que la ejecuta bajo `coverage` | salida de pytest |
+| **Cobertura de las líneas cambiadas** | **98,8 %** (493 de 499; umbral 80 %, nivel `critico`) | línea `PUERTA COBERTURA` de `bash harness/init.sh` |
+| **Mutantes generados / supervivientes** | **112 generados, 112 muertos, 0 supervivientes, 0 timeouts** en 202,6 s | `python -m harness.mutacion --feature F-006` → `progress/mutacion_F-006.md` |
+| **Objetos documentados** | **25 de 98** (`mart` 13, `cierre` 12) | `config/diccionario/` |
+| **Columnas descritas** | **332**, todas con significado de negocio | ídem |
+| **Trinquete `pendientes`** | **73**, bajando desde 98 | `PENDIENTES_MAX` en `tests/test_f006_cobertura.py` |
+| **Reglas duras publicadas** | **12 de 12**, todas con ámbito resoluble y motivo | `00_global.yaml` |
+| **Batería de aceptación** | **18 preguntas**: 13 respondibles, 3 parciales, 2 imposibles | ídem |
+
+**Análisis de supervivientes: no hay ninguno.** La campaña cubrió los tres
+módulos nuevos (`domain/diccionario.py`, `domain/inventario.py` y
+`infrastructure/diccionario/cargador_yaml.py`, 1.523 líneas en alcance) y cada
+mutación aplicada la cazó al menos un test. Detalle en
+`progress/mutacion_F-006.md`.
+
+Las seis líneas cambiadas sin cubrir son ramas de guarda redundantes con otras
+ya ejercitadas (comprobaciones de tipo encadenadas dentro del cargador); ninguna
+sobrevivió a la mutación, que es la comprobación que de verdad importa.
