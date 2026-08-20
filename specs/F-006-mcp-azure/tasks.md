@@ -37,12 +37,12 @@ revisar por separado.
 
 ## Fase 0 · Decisiones del humano (antes de escribir nada)
 
-- [ ] **T1**: Cerrar DA-1 a DA-6 de `requirements.md` §10 y anotar cada una con
+- [x] **T1**: Cerrar DA-1 a DA-6 de `requirements.md` §10 y anotar cada una con
       «CERRADA <fecha>: opción X» en ese mismo apartado. Si alguna se cierra
       distinto de la recomendación, el spec-author enmienda `design.md` **antes**
       de que empiece el bloque A.
       | Verificación: MANUAL (humano) — las seis DA tienen su línea de cierre.
-- [ ] **T2**: Añadir `"rigor": "critico"` a la ficha de F-006 en
+- [x] **T2**: Añadir `"rigor": "critico"` a la ficha de F-006 en
       `harness/features.json` (hoy funciona por omisión).
       | Verificación: `bash harness/init.sh` en verde y `BACKLOG.md` regenerado
       mostrando el rigor.
@@ -54,26 +54,26 @@ revisar por separado.
 Entregable: se puede validar un diccionario y medir su cobertura, aunque el
 diccionario esté casi vacío. **Aquí se fija el contrato del YAML.**
 
-- [ ] **T3**: `etl_sigrid/domain/diccionario.py` — entidades (`Columna`,
+- [x] **T3**: `etl_sigrid/domain/diccionario.py` — entidades (`Columna`,
       `Relacion`, `Ficha`, `Regla`, `Diccionario`, `ErrorValidacion`) y
       `validar()` cubriendo R2–R7. Tests ANTES, con fase RED documentada.
       | Verificación: `pytest tests/test_f006_formato.py` en verde.
-- [ ] **T4**: `derivar_avisos()` (R12) y las validaciones de reglas R9 y R11 en
+- [x] **T4**: `derivar_avisos()` (R12) y las validaciones de reglas R9 y R11 en
       el mismo módulo de dominio.
       | Verificación: `pytest tests/test_f006_reglas.py` en verde.
-- [ ] **T5**: Validaciones de frescura R13 y R14, con `pasos_nocturnos`
+- [x] **T5**: Validaciones de frescura R13 y R14, con `pasos_nocturnos`
       inyectado. El test debe leer `main.build_pipeline_steps` **real**, no una
       lista copiada: si mañana `build-cierre` entra en el pipeline nocturno, el
       test tiene que cambiar de veredicto solo.
       | Verificación: `pytest tests/test_f006_frescura.py` en verde.
-- [ ] **T6**: `etl_sigrid/domain/inventario.py` — `objetos_de_sql`,
+- [x] **T6**: `etl_sigrid/domain/inventario.py` — `objetos_de_sql`,
       `objetos_de_raw`, `evaluar_cobertura`, `formatear_cobertura` (R24–R27,
       R29). El docstring declara la heurística.
       | Verificación: `pytest tests/test_f006_cobertura.py -k dominio` en verde.
-- [ ] **T7**: `etl_sigrid/infrastructure/diccionario/cargador_yaml.py`
+- [x] **T7**: `etl_sigrid/infrastructure/diccionario/cargador_yaml.py`
       (R1, R6, R8, y el `hash_fuente` de R22).
       | Verificación: `pytest tests/test_f006_formato.py -k cargador` en verde.
-- [ ] **T8**: `tests/test_f006_cobertura.py` como **puerta real** sobre el
+- [x] **T8**: `tests/test_f006_cobertura.py` como **puerta real** sobre el
       repositorio: inventaría `sql/**` + `config/tables_sigrid.yaml`, carga el
       diccionario real y falla si algún objeto no está documentado ni declarado
       en `pendientes`. Se crea `config/diccionario/00_global.yaml` mínimo con
@@ -89,16 +89,16 @@ Entregable: `00_global.yaml` completo. **Es la pieza de más valor por línea de
 toda la feature**: son las doce reglas que impiden que un agente devuelva un
 número plausible y falso.
 
-- [ ] **T9**: Las doce reglas de R9 en `00_global.yaml`, cada una con `codigo`,
+- [x] **T9**: Las doce reglas de R9 en `00_global.yaml`, cada una con `codigo`,
       `titulo`, `severidad`, `ambito`, `regla` y `motivo` (con el incidente real
       cuando lo hay). Materia prima:
       `progress/explore_F-006_dominio_completo.md` Parte 0 y Parte 1.
       | Verificación: `pytest tests/test_f006_reglas.py` en verde (las doce
       presentes, ámbitos resolubles, severidades del vocabulario).
-- [ ] **T10**: Convenciones, ejes, órdenes de magnitud (R10), `ocultar` y las
+- [x] **T10**: Convenciones, ejes, órdenes de magnitud (R10), `ocultar` y las
       nueve entradas de `esquemas` (R4).
       | Verificación: `pytest tests/test_f006_formato.py -k global` en verde.
-- [ ] **T11**: Las 18 preguntas de la batería (R39) en `preguntas_aceptacion`,
+- [x] **T11**: Las 18 preguntas de la batería (R39) en `preguntas_aceptacion`,
       con `estado` y `bloqueada_por` donde corresponda.
       | Verificación: `pytest tests/test_f006_reglas.py -k bateria` — las 18
       ids de `requirements.md` §9 presentes y los `bloqueada_por` apuntando a
@@ -110,20 +110,20 @@ número plausible y falso.
 
 Entregable: el esquema que responde más preguntas de la batería.
 
-- [ ] **T12**: `config/diccionario/mart.yaml` — las 2 tablas de hecho
+- [x] **T12**: `config/diccionario/mart.yaml` — las 2 tablas de hecho
       (`fact_seguimiento_mensual`, `fact_seguimiento_categoria`) con todas sus
       columnas. Bajar `PENDIENTES_MAX`.
       | Verificación: `pytest tests/test_f006_cobertura.py` en verde con el
       nuevo tope.
-- [ ] **T13**: Las 9 vistas de `mart` (`v_pbi_*`, `v_master_*`,
+- [x] **T13**: Las 11 vistas de `mart` (no 9: el inventario real las cuenta) (`v_pbi_*`, `v_master_*`,
       `v_fact_periodificado`, `v_pbi_cp_tipologia`). `PENDIENTES_MAX` baja.
       | Verificación: ídem. Las preguntas P6, P8, P11 y P18 tienen ya sus
       `objetos_esperados` documentados.
 
 ## Bloque D · Fichas de `cierre`
 
-- [ ] **T14**: `config/diccionario/cierre.yaml` — `fact_cierre_mensual`, las 6
-      vistas y las 3 funciones. **Todas con `refresco: manual`** (R14): `cierre`
+- [x] **T14**: `config/diccionario/cierre.yaml` — `fact_cierre_mensual`, las 8
+      vistas (no 6: el inventario real las cuenta) y las 3 funciones. **Todas con `refresco: manual`** (R14): `cierre`
       no está en el pipeline nocturno. `PENDIENTES_MAX` baja.
       | Verificación: `pytest tests/test_f006_frescura.py` +
       `test_f006_cobertura.py` en verde.
