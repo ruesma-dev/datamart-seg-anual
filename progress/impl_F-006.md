@@ -2057,7 +2057,7 @@ nuevas habrian caido en el grupo de «proyeccion» y el control las habria dado
 por ilegibles. Pasa a derivarse del SQL, y los dos tests exactos de tablas se
 parametrizan sobre el resultado en vez de sobre una lista de `mart`.
 
-## T24 · `aux` (1 objeto), y el estado real dicho sin rodeos
+## T24 (1 de 2) · `aux` (1 objeto), y el estado real dicho sin rodeos
 
 `aux.periodificacion_partida` guarda las reglas con las que Negocio reparte un
 coste puntual a lo largo de varios meses. **Hoy esta vacia**, y la ficha lo dice
@@ -2133,7 +2133,7 @@ Python usa para las palabras reservadas, y el tercer test comprueba que el
 escape **no vale para los esquemas normales**: sin eso, `mart.yaml` y
 `mart_.yaml` podrian coexistir cargando fichas del mismo esquema en silencio.
 
-## T25 · `_meta` (7 objetos), donde la precision importa el doble
+## T24 (2 de 2) · `_meta` (7 objetos), donde la precision importa el doble
 
 Es el esquema que se cita cuando hay que decir DE CUANDO ES un dato. Una ficha
 imprecisa aqui hace que un agente cite mal la fecha, o que no la cite, con
@@ -2205,7 +2205,7 @@ catalogo.
 
 Trinquete: 38 -> **31**, que son las 31 tablas de `raw`.
 
-## T26 · `raw` (31 tablas) y la regla de oro publicada
+## T25 · `raw` (31 tablas) y la regla de oro publicada
 
 DA-2: **nivel de objeto, no de columna**. Son 31 tablas con cientos de campos de
 cuatro letras cuyo diccionario completo —tipos, indices y referencias— ya existe
@@ -2280,3 +2280,66 @@ tablas con DDL explicito y ahora las reglas—, asi que los tres se derivan de
 proposito: es la que hace que anadir una regla se vea en el diff.
 
 **Trinquete: 31 -> 0.** No queda ningun objeto del datamart sin ficha.
+
+## Barrido de copias antes de cerrar la tanda
+
+Tres rechazos vinieron de una afirmacion corregida en un sitio y viva en el
+campo vecino, asi que el barrido se hace **derivando**, no releyendo. La consulta
+busca toda relacion `N:1` o `1:1` que apunte a una columna que **no es** la clave
+declarada del objeto destino, que es el patron de los dos defectos de esta
+tanda:
+
+```
+mart.v_pbi_fact          -> mart.fact_seguimiento_mensual.fact_id      1:1
+mart.v_pbi_fact_categoria-> mart.fact_seguimiento_categoria.fact_cat_id 1:1
+mart.v_fact_periodificado-> mart.fact_seguimiento_mensual.fact_id      1:1
+```
+
+**Las tres son ciertas** y conviene dejar dicho por que, porque parecen el mismo
+caso que `stg.presupuesto` y no lo son:
+
+- En `mart`, `fact_id` y `fact_cat_id` son BIGSERIAL que **cambian en cada
+  build** (es lo que dice `R-CLAVE-SUSTITUTA`). Son unicos, asi que el `1:1` de
+  una vista pasarela es cierto; pero no pueden ser la clave de negocio, que es
+  la combinacion estable.
+- En `stg`, `presupuesto_id` y `fase_id` **vienen de Sigrid** y son estables
+  entre builds, ademas de ser la columna por la que unen los JOIN. Ahi la clave
+  de negocio SI es la PK, y el grano conserva la combinacion conceptual.
+
+La distincion no es de estilo: de un lado hay un numero que sobrevive a la noche
+y del otro uno que no.
+
+## Estado del diccionario al cerrar esta tanda
+
+| | |
+|---|---|
+| Objetos con ficha | **102** (`raw` 31, `compras` 14, `mart` 13, `cierre` 12, `stg` 10, `retenciones` 10, `_meta` 7, `maestro` 4, `aux` 1) |
+| Pendientes declarados | **0** |
+| Reglas duras publicadas | **13** |
+| Columnas documentadas | **793** |
+| Objetos en superficie de consumo | 47 de 102 |
+| Cobertura de significados en esa superficie | **100 %** |
+
+El trinquete (`PENDIENTES_MAX`) recorrio 98 -> 96 -> 85 -> 73 -> 77 -> 53 -> 49
+-> 39 -> 38 -> 31 -> **0**. No queda ningun objeto del datamart sin ficha, asi
+que **no hay nada que declarar como excepcion**.
+
+## Lo que NO entra en esta tanda
+
+Para que el resumen al humano no prometa de mas:
+
+- **T26 (`check-diccionario`) no esta hecho.** La cobertura que se comprueba hoy
+  sigue siendo la heuristica **offline** sobre `sql/**` y
+  `config/tables_sigrid.yaml`. El contraste contra `information_schema` de la
+  base real es esa tarea, y hace falta conexion.
+- **La consulta de unicidad por objeto sigue planteada, no ejecutada.** Es lo
+  unico que cierra el hueco conocido de "la clave declarada es demasiado corta"
+  cuando la dependencia funcional no se ve en el texto. Esta escrita en T27 y es
+  `MANUAL (humano)`: ningun agente abre la base.
+- Las fichas de `raw` **no verifican que los nombres de tabla existan en el
+  origen**: se contrastan contra `config/tables_sigrid.yaml`, que es lo que el
+  ETL ingiere. Si Sigrid renombrase una tabla, la ingesta fallaria antes que el
+  diccionario.
+- **Las 18 preguntas de `requirements.md` §9 (T39) no se han pasado.** Hasta
+  entonces, que una ficha sea correcta no demuestra todavia que sea *suficiente*
+  para responder la pregunta a la que apunta.

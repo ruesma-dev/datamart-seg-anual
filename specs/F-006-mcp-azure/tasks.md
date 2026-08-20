@@ -178,7 +178,7 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
       `v_src_lineas_venta` está **siempre vacía** por diseño (`dvfpro` no se
       ingiere). `PENDIENTES_MAX` baja.
       | Verificación: ídem; P2 y P13 documentadas.
-- [ ] **T22**: `config/diccionario/maestro.yaml` — 3 vistas y 1 función.
+- [x] **T22**: `config/diccionario/maestro.yaml` — 3 vistas y 1 función.
       **Terreno virgen: el prototipo no lo cubre en absoluto.** Con la trampa de
       `importe_contratado` (con IVA) y la de `raw.obrprv`, vacía en Ruesma.
       `PENDIENTES_MAX` baja.
@@ -186,17 +186,17 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
 
 ## Bloque G · Fichas de las capas internas y de origen
 
-- [ ] **T23**: `config/diccionario/stg.yaml` — 7 tablas, 1 vista, 3 funciones.
+- [x] **T23**: `config/diccionario/stg.yaml` — 7 tablas, 1 vista, 3 funciones.
       `consumo_recomendado: false` con `motivo_no_consumo` (R3) apuntando a
       `R-VERSION-MASTER`: consultar `stg.plan_mensual` sin filtrar versión
       multiplica los importes. `PENDIENTES_MAX` baja.
       | Verificación: `pytest tests/test_f006_cobertura.py` en verde; P10
       documentada.
-- [ ] **T24**: `config/diccionario/aux.yaml` (1 objeto, hoy vacío por diseño) y
+- [x] **T24**: `config/diccionario/aux.yaml` (1 objeto, hoy vacío por diseño) y
       `config/diccionario/_meta.yaml` (6 objetos, `refresco: operacion`/
       `estatico` donde corresponda). `PENDIENTES_MAX` baja.
       | Verificación: ídem; **P15 documentada**, que es la prueba de R15 y R16.
-- [ ] **T25**: `config/diccionario/raw.yaml` — 31 fichas **a nivel de objeto**
+- [x] **T25**: `config/diccionario/raw.yaml` — 31 fichas **a nivel de objeto**
       (DA-2), todas `consumo_recomendado: false` con `motivo_no_consumo`
       apuntando a `azure-apps/sigrid_tablas.md`. Incluye la regla de oro de
       Sigrid (`ide` universal, `cod`/`res`/`fec` viven en `con`, `con.nom` no

@@ -3,13 +3,16 @@
 
 ## F-006 · El diccionario semántico del datamart — `in_progress`
 
-Rama `feature/F-006-mcp-azure`. **Bloques A, B, C y D entregados y corregidos
-tras el RECHAZADO del reviewer** (`progress/review_F-006.md`): los diez defectos
-están cerrados, cada uno con su fase RED.
+Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**: tras seis pasadas de
+review y un APROBADO sin matices, la última tanda documentó los 53 objetos que
+faltaban (`maestro`, `stg`, `aux`, `_meta` y `raw`).
 
-`bash harness/init.sh` en verde: **1361 tests**, cobertura de las líneas
-cambiadas **98,9 %** y campaña de mutación con **0 supervivientes de 161
-mutantes**.
+`bash harness/init.sh` en verde: **1487 tests**, cobertura de las líneas
+cambiadas **99,0 %** (714 de 721).
+
+**El diccionario está completo: 102 objetos, 793 columnas, 13 reglas duras y
+`pendientes` VACÍA.** El trinquete llegó a **0**, así que no hay ningún objeto
+que declarar como excepción.
 
 - Informe de implementación: `progress/impl_F-006.md`
 - Campaña de mutación: `progress/mutacion_F-006.md`
@@ -24,8 +27,11 @@ de `diccionario_sql.py`, `PublicarDiccionarioStep` **entre `build_mart` y
 `apply_grants`**, y el comando `python main.py publicar-diccionario`. El
 reemplazo va en UNA transacción con `DELETE`+`INSERT` y sin un solo `DROP`.
 
-**Bloque F a medias** (T20, T21): `compras` (14 objetos) y `retenciones` (10).
-Quedan `maestro`, `stg`, `aux`, `_meta` y `raw`.
+**Bloques F y G completos** (T20–T25): `compras` (14), `retenciones` (10),
+`maestro` (4), `stg` (10), `aux` (1), `_meta` (7) y `raw` (31, a nivel de objeto
+según DA-2). La regla de oro de Sigrid se publica como `R-SIGRID-CON`, la
+decimotercera regla: estaba escrita en una cabecera YAML, que es un comentario y
+**no llega al MCP**.
 
 
 - **Andamiaje** (bloque A): `etl_sigrid/domain/diccionario.py` (entidades y
@@ -34,20 +40,25 @@ Quedan `maestro`, `stg`, `aux`, `_meta` y `raw`.
   cobertura, que corre en cada `init.sh`.
 - **Bloque global** (bloque B): las doce reglas duras, los órdenes de magnitud,
   las convenciones, los nueve esquemas y las 18 preguntas de la batería.
-- **Fichas**: `mart` (13), `cierre` (12), `compras` (14) y `retenciones` (10):
-  **49 objetos y 593 columnas**, todas contrastadas contra el SQL.
+- **Fichas**: los **102 objetos** del datamart con **793 columnas**, todas
+  contrastadas contra el SQL. La superficie de consumo son 47 de esos 102, con
+  el **100 %** de sus columnas con significado; los otros 55 llevan
+  `motivo_no_consumo` diciendo a dónde ir en su lugar.
 
-El trinquete `pendientes` está en **53** de 102 objetos —el DDL del contrato
-añadió cuatro objetos nuevos a `_meta`—, anclado al inventario y al historial de
-git: un objeto documentado ya no puede volver, aunque el repositorio sí puede
-publicar cosas nuevas.
+El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49 → 39 → 38 →
+31 → **0**, anclado al inventario y al historial de git: un objeto documentado
+ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
 ### Lo siguiente
 
-El resto del bloque F (`maestro`) y el bloque G (`stg`, `aux`, `_meta`, `raw`):
-son los 53 objetos que faltan. Después el bloque H (`check-diccionario`, R28), y
-solo entonces los bloques 🔏 de permisos y firewall, que necesitan firma del
-humano.
+El **bloque H**: `check-diccionario` (R28, T26), que es lo que sustituye la
+heurística offline de hoy por un contraste contra `information_schema` de la
+base real; y T27, el chequeo contra esa base, que es `MANUAL (humano)`. Solo
+después los bloques 🔏 de permisos y firewall, que necesitan firma.
+
+Sigue sin pasarse la **batería de 18 preguntas** (T39): que una ficha sea
+correcta todavía no demuestra que sea *suficiente* para responder la pregunta a
+la que apunta.
 
 ### Verificaciones `MANUAL (humano)` pendientes
 
@@ -87,9 +98,10 @@ La puerta **sí** contrasta contra el SQL `agregacion`
 `GROUP BY`, o igual a la PK del DDL). Lo que sigue **sin** ser derivable, y por
 eso no se comprueba, es la dirección contraria de la clave: **«la clave es
 demasiado corta»** exige saber si una columna del `GROUP BY` depende
-funcionalmente de otra, y eso no se lee del texto —`codigo_obra` sí depende de
-`obra_id` y `proveedor_cif` no depende de `proveedor_id`, y las dos se escriben
-igual—. Esa mitad, y la veracidad del `grano` y de cada `significado`, siguen en
+funcionalmente de otra, y eso no se lee del texto: dos pares de columnas se
+escriben igual y solo uno tiene dependencia funcional. (El ejemplo que circuló
+en `progress/review_F-006.md` era erróneo en su primera mitad y está corregido
+en los tests; queda anotado aquí para que no se vuelva a copiar.) Esa mitad, y la veracidad del `grano` y de cada `significado`, siguen en
 revisión humana.
 
 
@@ -105,6 +117,25 @@ y qué NO».
 
 ### Avisos que no hay que perder
 
+- **`AUX` es un nombre de dispositivo reservado de Windows.**
+  `config/diccionario/aux.yaml` pasó los 618 tests y **git no podía indexarlo**
+  (`open(...): No such file or directory` sobre un fichero que `ls` enseña). El
+  esquema se llama `aux_.yaml`, y el cargador conoce ya la familia entera
+  (`con`, `prn`, `nul`, `com1`..`lpt9`) — `con` habría mordido igual, que es el
+  nombre de la tabla central de Sigrid. Lección que vale para cualquier
+  repositorio del ecosistema: **la suite en verde no demuestra que el fichero
+  sea versionable**. Candidata a `arnes-base`; no la he portado porque el código
+  que la aplica es el cargador de este proyecto. Decide el líder.
+- **Seis tablas de `raw` se ingieren cada noche y no las lee ningún SQL**:
+  `auxobrtca`, `obrprv`, `com`, `comlin`, `comprv` y `dcfprodes`. Cuesta ventana
+  nocturna y hace creer que hay funcionalidad que no existe. `auxobrtca` es
+  además el catálogo oficial de tipos de capítulo que `stg.partidas.categoria`
+  **no usa** (usa una heurística). Candidatas a una feature de limpieza o a
+  aprovecharlas.
+- **`raw.obrprv` está vacía en Ruesma**, y de ahí sale la asimetría de
+  `maestro.proveedores_obra`: su `importe_contratado` es `SUM(ctr.totdoc)`, con
+  IVA, frente a las sumas de línea sin IVA de `compras`. Documentado en las dos
+  fichas.
 - **`build-compras` y `build-retenciones` no registran paso en
   `_meta.etl_runs`**: su fecha de build no es consultable por SQL. Afecta a T20,
   T21 y al valor real de `_meta.v_diccionario`. Ya está dicho dentro de
