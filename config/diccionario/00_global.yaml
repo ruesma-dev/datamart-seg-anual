@@ -275,6 +275,184 @@ ordenes_de_magnitud:
     fuente: >-
       Nota global del prototipo mcp-bbdd, filas de retenciones.movimientos.
 
+# ===========================================================================
+# CONVENCIONES (R4)
+# ===========================================================================
+#
+# Las tres cosas que se equivocan solas: el IVA, las fechas de Sigrid y la zona
+# horaria de los timestamps.
+
+convenciones:
+  moneda: EUR
+  importes_iva: >-
+    Los importes del esquema `compras` son SIN IVA (base imponible de linea).
+    El unico importe CON IVA del datamart es
+    `maestro.proveedores_obra.importe_contratado`, que es SUM(ctr.totdoc), el
+    total del documento. No son comparables entre si.
+  fechas: >-
+    En `raw` las fechas son enteros con formato YYYYMMDD y el valor 0 significa
+    NULL, no el ano 0. A partir de `stg` ya vienen tipadas como DATE. Hay cuatro
+    funciones de conversion, una por esquema (`stg.fn_sigrid_date_to_date`,
+    `compras.fn_sigrid_date`, `retenciones.fn_sigrid_date`, `maestro.fn_fecha`).
+  timestamps: >-
+    Los timestamps de `_meta` son UTC SIN zona horaria (TIMESTAMP, escritos con
+    datetime.utcnow()). Compararlos contra un now() local da el desfase de
+    Espana como antiguedad, que en verano son dos horas.
+  identidad_sigrid: >-
+    En Sigrid `ide` es la clave universal y muchas tablas son "propiedades de
+    `con` 1:1": `obr.ide = con.ide`, y lo mismo `prv`, `dca`, `dcf`, `ctr`,
+    `rec`, `pag` y `cob`. El codigo (`cod`), el nombre (`res`) y la fecha
+    (`fec`) viven en `con`, no en la extension. `con.nom` NO existe.
+
+# ===========================================================================
+# EJES DEL MODELO (R4)
+# ===========================================================================
+#
+# El seguimiento cruza dos ejes y produce cuatro escenarios. Los literales de
+# `escenario` son EXACTAMENTE estos: el agente los va a poner en un WHERE, y
+# estan fijados en mart.v_pbi_dim_escenario.
+
+ejes:
+  - eje: magnitud
+    valores: [COSTE, VENTA]
+    significa: Que se mide, el coste de ejecutar o la venta al cliente.
+  - eje: naturaleza
+    valores: [REAL, PLANIFICADO]
+    significa: Lo que ha pasado frente a lo que estaba previsto que pasara.
+  - eje: escenario
+    valores:
+      - Coste Real
+      - Coste Planificado
+      - Venta Real
+      - Venta Planificada
+    significa: >-
+      El cruce de los dos anteriores, y la columna por la que se filtra de
+      verdad. Cada escenario viene de un ambito de Sigrid: Coste Real del 3,
+      Venta Real del 7, Coste Planificado del 8 y Venta Planificada del 11.
+
+# ===========================================================================
+# ESQUEMAS (R4)
+# ===========================================================================
+#
+# Son NUEVE. Los informes de exploracion dicen ocho y se equivocan.
+# Ojo a la trampa de nombres: el esquema se llama `aux` y su carpeta de SQL es
+# `sql/auxiliar/`.
+
+esquemas:
+
+  mart:
+    titulo: Seguimiento mensual listo para consumo
+    para_que_sirve: >-
+      Es la superficie principal para preguntas de planificacion y produccion:
+      cuanto se ha producido y cuanto se habia planificado, mes a mes, por obra
+      y partida. Aqui la version master vigente YA esta resuelta, que es lo que
+      lo hace consultable directamente.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_mart]
+
+  cierre:
+    titulo: Cierre economico mensual de obra
+    para_que_sirve: >-
+      Ejecutado y previsto por obra y mes, con gastos y beneficio derivados, mas
+      la cabecera de la obra (cliente, tecnico, presupuestos y modificados). Es
+      lo que responde "cuanto llevamos ejecutado a cierre del mes M".
+    consumo_recomendado: true
+    refresco: manual
+    pasos_etl: [build_cierre]
+
+  compras:
+    titulo: Mundo documental de la compra a proveedores
+    para_que_sirve: >-
+      Contratos, albaranes, proformas, notas, facturas y abonos de proveedor, a
+      nivel de linea y sin IVA. Responde a quien se ha comprado, cuanto se ha
+      contratado, que hay albaranado sin facturar y que coste lleva cada
+      partida.
+    consumo_recomendado: true
+    refresco: manual
+    pasos_etl: []
+    nota_frescura: >-
+      `build-compras` NO registra paso en `_meta.etl_runs`: ejecuta el SQL en
+      linea sin step, asi que no aparece en `_meta.v_frescura` y su fecha de
+      build no es consultable por SQL hoy.
+
+  retenciones:
+    titulo: Retenciones de garantia practicadas y sufridas
+    para_que_sirve: >-
+      Un registro por efecto de retencion, en los dos sentidos: lo retenido a
+      proveedores y lo que los clientes nos retienen. Con saldo vivo, fechas
+      prevista y real de liquidacion, y marca de vencida sin liquidar.
+    consumo_recomendado: true
+    refresco: manual
+    pasos_etl: []
+    nota_frescura: >-
+      `build-retenciones` tampoco registra paso propio: misma limitacion que
+      `compras`.
+
+  maestro:
+    titulo: Maestros de consulta directa
+    para_que_sirve: >-
+      Obras, proveedores y la relacion proveedor-obra derivada de los contratos,
+      pensados para consultarse tal cual. `maestro.obras` es el universo SIN
+      filtrar, superconjunto de `stg.obras`.
+    consumo_recomendado: true
+    refresco: manual
+    pasos_etl: [build_maestros]
+
+  _meta:
+    titulo: Instrumentacion del propio ETL
+    para_que_sirve: >-
+      Responde "de cuando es el dato que me estas dando". Guarda una fila por
+      ejecucion de paso, el estado de cada tabla de `raw` y, desde F-006, el
+      diccionario semantico publicado. Es lo que hay que citar cuando la
+      respuesta sale de un esquema de refresco manual.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [ingest_raw, build_stg, build_mart]
+
+  aux:
+    titulo: Parametrizacion auxiliar del mart
+    para_que_sirve: >-
+      Reglas de periodificacion de coste que la vista `mart.v_fact_periodificado`
+      aplica. Hoy la tabla se crea VACIA por diseno: no se periodifica nada y la
+      vista es un passthrough.
+    consumo_recomendado: false
+    refresco: estatico
+    pasos_etl: []
+
+  stg:
+    titulo: Capa intermedia de preparacion
+    para_que_sirve: >-
+      Normaliza Sigrid y explota la planificacion a nivel mensual. NO es
+      superficie de consulta: en `stg.plan_mensual` conviven todas las versiones
+      master y consultarla sin filtrar version multiplica los importes. Lo que
+      se pregunta esta aguas abajo, en `mart` y en `cierre`.
+    consumo_recomendado: false
+    refresco: nocturno
+    pasos_etl: [build_stg]
+
+  raw:
+    titulo: Copia literal de Sigrid
+    para_que_sirve: >-
+      Reflejo tabla a tabla del SQL Server de Sigrid, sin transformar y sin
+      semantica de negocio: nombres de cuatro letras, fechas como enteros y el
+      valor 0 en lugar de NULL. Su diccionario real es `azure-apps/sigrid_tablas.md`.
+      No se consulta para responder preguntas de negocio.
+    consumo_recomendado: false
+    refresco: nocturno
+    pasos_etl: [ingest_raw]
+
+# ===========================================================================
+# COLUMNAS TECNICAS QUE NO SON NEGOCIO
+# ===========================================================================
+#
+# Instrumentacion del ETL. Ensucian el catalogo y no responden nada.
+
+ocultar:
+  - _ingested_at
+  - _source_tiemod
+  - _built_at
+
 pendientes:
   - _meta.etl_runs
   - _meta.v_frescura

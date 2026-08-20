@@ -244,3 +244,41 @@ línea sin step (`main.py`, comentario «no registra paso ... queda fuera de
 `maestro` sí registran (`build_cierre`, `build_maestros`). Queda dicho dentro de
 la propia regla `R-FRESCURA-MANUAL` para que el agente no prometa una fecha que
 no puede obtener. Convertirlos en step es otra feature.
+
+### T10 · Convenciones, ejes, `ocultar` y las nueve entradas de `esquemas`
+
+```
+$ python -m pytest tests/test_f006_formato.py -q -k global
+E       assert [ErrorValidac... | stg'), ...] == []
+E         Left contains 9 more items, first extra item: ErrorValidacion(fichero='00_global.yaml', objeto=None, regla='R4', detalle='el esquema `_meta` no tiene entrada en `esquemas`. El diccionario debe cubrir los nueve: _meta | aux | cierre | compras | maestro | mart | raw | retenciones | stg')
+tests\test_f006_formato.py:1061: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_f006_formato.py::test_f006_r4_el_global_real_declara_los_nueve_esquemas
+FAILED tests/test_f006_formato.py::test_f006_r4_los_cuatro_esquemas_manuales_lo_declaran_en_el_global
+FAILED tests/test_f006_formato.py::test_f006_r4_el_global_real_trae_las_convenciones_que_mas_confunden
+FAILED tests/test_f006_formato.py::test_f006_r4_el_global_real_declara_los_ejes_del_modelo
+FAILED tests/test_f006_formato.py::test_f006_r4_el_global_real_oculta_las_columnas_tecnicas
+FAILED tests/test_f006_formato.py::test_f006_r2_el_diccionario_global_real_valida_entero
+6 failed, 3 passed, 62 deselected in 1.17s
+```
+
+Verde tras escribir el bloque: `9 passed` en `-k global`, `167 passed` en F-006.
+
+Decisiones de contenido que conviene dejar por escrito:
+
+- **Los cuatro literales de `escenario`** se declaran como eje propio y hay un
+  test que los contrasta **contra el SQL de `mart.v_pbi_dim_escenario`**: son
+  `Coste Real`, `Coste Planificado`, `Venta Real`, `Venta Planificada`. El
+  ejemplo de `design.md` §3.3 usa `COSTE_REAL`, `VENTA_PLAN`… y **está mal**;
+  manda el SQL.
+- **`aux` se declara `refresco: estatico`.** Se comprobó que `LoadExcelAuxStep`
+  **no escribe en `aux`** (su propio docstring: «aquí se LEE y se VALIDA, no se
+  carga nada a `aux.*`»), así que la tabla se crea vacía y nada la rellena.
+- **`_meta` entra en la superficie de consumo** (`consumo_recomendado: true`):
+  es lo que responde P15, «¿de cuándo es el dato que me estás dando?».
+- **`raw` y `stg` quedan fuera** (`false`), coherente con lo que R30 hará con
+  `PG_CONSUMPTION_SCHEMAS` en el bloque I. Aquí es solo una recomendación
+  editorial: **no se ha tocado ningún permiso**.
+- Se añadió un test que cruza `esquemas[*].pasos_etl` contra el pipeline real:
+  un esquema que se declare `nocturno` citando un paso que no corre de noche
+  deja `init.sh` en rojo.

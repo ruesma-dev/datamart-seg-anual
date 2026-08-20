@@ -178,3 +178,52 @@ def test_f006_r14_refresco_estatico_no_se_cruza_con_el_pipeline() -> None:
     estatica = _ficha(refresco="estatico", paso_etl=None)
 
     assert validar(_dicc(fichas=[estatica]), PASOS_NOCTURNOS) == []
+
+
+# ---------------------------------------------------------------------------
+# R16 · El diccionario dice CÓMO se obtiene la fecha de build
+# ---------------------------------------------------------------------------
+
+
+def test_f006_r16_el_global_real_dice_como_citar_la_fecha_de_build() -> None:
+    """No basta con decir «cita la fecha»: hay que decir de dónde se saca.
+
+    Una instrucción que el agente no puede ejecutar es una instrucción que no se
+    cumple, y el resultado es el mismo que no haberla escrito: un dato de hace
+    semanas dado sin advertencia.
+    """
+    from pathlib import Path
+
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    dicc, _ = cargar_diccionario(
+        Path(__file__).resolve().parents[1] / "config" / "diccionario"
+    )
+    regla = next(r for r in dicc.reglas if r.codigo == "R-FRESCURA-MANUAL")
+
+    assert "_meta.v_frescura" in regla.regla
+    assert "SELECT" in regla.regla.upper()
+    assert regla.severidad == "bloqueante"
+
+
+def test_f006_r16_los_esquemas_manuales_del_global_coinciden_con_el_pipeline() -> None:
+    """Lo que el bloque global promete tiene que ser lo que el pipeline hace."""
+    from pathlib import Path
+
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    dicc, _ = cargar_diccionario(
+        Path(__file__).resolve().parents[1] / "config" / "diccionario"
+    )
+
+    for nombre, entrada in dicc.esquemas.items():
+        pasos = entrada.get("pasos_etl") or []
+        if entrada["refresco"] == "nocturno":
+            assert pasos, f"{nombre}: se declara nocturno y no cita ningún paso"
+            assert all(p in PASOS_NOCTURNOS for p in pasos), (
+                f"{nombre}: cita pasos que no corren de noche: {pasos}"
+            )
+        elif entrada["refresco"] == "manual":
+            assert all(p not in PASOS_NOCTURNOS for p in pasos), (
+                f"{nombre}: se declara manual pero sus pasos corren de noche"
+            )

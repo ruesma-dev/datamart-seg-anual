@@ -925,3 +925,137 @@ def test_f006_r1_cargador_una_ficha_sin_cuerpo_es_un_error(tmp_path) -> None:
         cargar_diccionario(directorio)
 
     assert any("fact_vacio" in e.detalle for e in excinfo.value.errores)
+
+
+# ===========================================================================
+# El bloque global REAL (T10 · R4, R10)
+#
+# Estos tests leen `config/diccionario/00_global.yaml`, no fixtures: son la
+# diferencia entre «el validador sabe exigir nueve esquemas» y «los nueve
+# esquemas están escritos».
+# ===========================================================================
+
+
+def _global_real():
+    from pathlib import Path
+
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        cargar_diccionario,
+    )
+
+    dicc, _ = cargar_diccionario(
+        Path(__file__).resolve().parents[1] / "config" / "diccionario"
+    )
+    return dicc
+
+
+def test_f006_r4_el_global_real_declara_los_nueve_esquemas() -> None:
+    dicc = _global_real()
+
+    assert set(dicc.esquemas) == set(ESQUEMAS_DEL_DATAMART)
+
+
+def test_f006_r4_cada_esquema_global_dice_para_que_sirve() -> None:
+    """Es lo primero que lee el agente para decidir dónde buscar."""
+    dicc = _global_real()
+
+    for nombre, entrada in dicc.esquemas.items():
+        assert entrada.get("titulo"), f"{nombre}: sin `titulo`"
+        assert len(str(entrada.get("para_que_sirve", "")).strip()) >= 40, (
+            f"{nombre}: `para_que_sirve` demasiado corto para ser útil"
+        )
+        assert isinstance(entrada.get("consumo_recomendado"), bool), (
+            f"{nombre}: `consumo_recomendado` tiene que ser booleano"
+        )
+        assert entrada.get("refresco") in REFRESCOS, f"{nombre}: refresco inválido"
+
+
+def test_f006_r4_raw_y_stg_quedan_fuera_de_la_superficie_de_consumo() -> None:
+    """`raw` es una copia literal de Sigrid sin semántica, y `stg.plan_mensual`
+    multiplica los importes si se consulta sin filtrar versión. Ofrecérselos al
+    agente es ofrecerle el camino que produce números falsos."""
+    dicc = _global_real()
+
+    assert dicc.esquemas["raw"]["consumo_recomendado"] is False
+    assert dicc.esquemas["stg"]["consumo_recomendado"] is False
+    for consumo in ("mart", "cierre", "compras", "maestro", "retenciones", "_meta"):
+        assert dicc.esquemas[consumo]["consumo_recomendado"] is True
+
+
+def test_f006_r4_los_cuatro_esquemas_manuales_lo_declaran_en_el_global() -> None:
+    """El régimen de refresco tiene que verse ya al listar los esquemas, sin
+    tener que abrir una ficha."""
+    dicc = _global_real()
+
+    for manual in ("cierre", "compras", "maestro", "retenciones"):
+        assert dicc.esquemas[manual]["refresco"] == "manual", manual
+    for nocturno in ("raw", "stg", "mart", "_meta"):
+        assert dicc.esquemas[nocturno]["refresco"] == "nocturno", nocturno
+
+
+def test_f006_r4_el_global_real_trae_las_convenciones_que_mas_confunden() -> None:
+    """IVA, fechas de Sigrid y zona horaria: las tres que se equivocan solas."""
+    dicc = _global_real()
+
+    convenciones = dicc.global_raw["convenciones"]
+
+    assert convenciones["moneda"] == "EUR"
+    assert "IVA" in convenciones["importes_iva"]
+    assert "maestro.proveedores_obra.importe_contratado" in convenciones["importes_iva"]
+    assert "YYYYMMDD" in convenciones["fechas"]
+    assert "0" in convenciones["fechas"]
+    assert "UTC" in convenciones["timestamps"]
+
+
+def test_f006_r4_el_global_real_declara_los_ejes_del_modelo() -> None:
+    """Los cuatro escenarios son el esqueleto del seguimiento."""
+    dicc = _global_real()
+
+    ejes = {e["eje"]: e["valores"] for e in dicc.global_raw["ejes"]}
+
+    assert ejes["magnitud"] == ["COSTE", "VENTA"]
+    assert ejes["naturaleza"] == ["REAL", "PLANIFICADO"]
+    assert set(ejes["escenario"]) == {
+        "Coste Real",
+        "Coste Planificado",
+        "Venta Real",
+        "Venta Planificada",
+    }
+
+
+def test_f006_r4_los_escenarios_declarados_son_los_del_sql() -> None:
+    """Los literales tienen que ser EXACTOS: el agente los va a poner en un
+    `WHERE escenario = '...'`. Se contrastan contra `mart.v_pbi_dim_escenario`,
+    que es donde el modelo los fija."""
+    from pathlib import Path
+
+    sql = (
+        Path(__file__).resolve().parents[1]
+        / "etl_sigrid/infrastructure/postgres/sql/mart/05_views_powerbi.sql"
+    ).read_text(encoding="utf-8")
+
+    ejes = {e["eje"]: e["valores"] for e in _global_real().global_raw["ejes"]}
+
+    for escenario in ejes["escenario"]:
+        assert f"'{escenario}'" in sql, f"{escenario!r} no aparece en el SQL"
+
+
+def test_f006_r4_el_global_real_oculta_las_columnas_tecnicas() -> None:
+    """Las columnas de instrumentación no son negocio y ensucian el catálogo."""
+    dicc = _global_real()
+
+    ocultar = dicc.global_raw["ocultar"]
+
+    assert "_ingested_at" in ocultar
+    assert "_source_tiemod" in ocultar
+    assert "_built_at" in ocultar
+
+
+def test_f006_r2_el_diccionario_global_real_valida_entero() -> None:
+    """LA COMPROBACIÓN QUE IMPORTA: lo que se va a publicar en `_meta` pasa el
+    validador completo, con los pasos nocturnos leídos del pipeline real."""
+    from tests.test_f006_frescura import pasos_del_pipeline_nocturno
+
+    errores = validar(_global_real(), pasos_del_pipeline_nocturno())
+
+    assert errores == [], "\n" + formatear_errores(errores)
