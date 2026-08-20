@@ -104,3 +104,22 @@ FAILED tests/test_f006_frescura.py::test_f006_r14_el_veredicto_sigue_al_pipeline
 ```
 
 Verde tras el código: `91 passed in 0.87s` (los tres ficheros de F-006).
+
+### T6 · `etl_sigrid/domain/inventario.py` — inventario y cobertura
+
+```
+$ python -m pytest tests/test_f006_cobertura.py -q -k dominio
+=================================== ERRORS ====================================
+________________ ERROR collecting tests/test_f006_cobertura.py ________________
+ImportError while importing test module '...\tests\test_f006_cobertura.py'.
+Traceback:
+tests\test_f006_cobertura.py:25: in <module>
+    from etl_sigrid.domain.inventario import (
+E   ModuleNotFoundError: No module named 'etl_sigrid.domain.inventario'
+=========================== short test summary info ===========================
+ERROR tests/test_f006_cobertura.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.15s
+```
+
+Verde tras el código: `33 passed in 0.07s`.
