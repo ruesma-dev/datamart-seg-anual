@@ -982,10 +982,8 @@ vuelva a pasar en las 73 fichas que faltan.
   `check-diccionario` (R28, bloque H), que **no existe todavia**, y los cuatro
   docstrings que antes lo daban por cubierto ahora dicen exactamente eso.
 - Que el TEXTO de una ficha sea cierto. Los minimos garantizan que alguien lo
-  escribio; que diga la verdad lo garantiza la revision humana y la bateria de
-  aceptacion (T39). Lo que si esta cubierto ahora, y no lo estaba: nombres de
-  columna, granos declarados, claves de negocio, cardinalidades, nulos
-  imposibles en `*_ide` y objetos citados en la prosa de las reglas.
+  escribio; que diga la verdad la garantizan la revision humana y la bateria de
+  aceptacion (T39). **Ver la seccion siguiente, que lo desglosa sin adornos.**
 
 ---
 
@@ -1071,3 +1069,62 @@ quien reste un mes de calendario para reproducir la cifra no la reproduce.
 Queda **una sola** mencion a «mes anterior» en el fichero, y es correcta: la de
 `ejecutado_mes_periodif`, que describe contra que resta el SQL el incurrido. El
 test la excluye por nombre y explica por que.
+
+---
+
+## Que comprueba la puerta y que NO, sin sobrevender
+
+La version anterior de este informe decia que quedaban cubiertos «nombres de
+columna, granos declarados, claves de negocio, cardinalidades...». **Es falso de
+tres de esos cinco** y el reviewer tenia razon en senalarlo: un informe que
+promete de mas es el mismo problema que una ficha que miente, solo que apuntando
+hacia dentro. Lo que hay, exactamente:
+
+### Se comprueba (falla la puerta)
+
+| Qué | Cómo |
+|---|---|
+| Que todo objeto publicado tenga ficha, o este declarado en `pendientes` | inventario de `sql/**` + `tables_sigrid.yaml` |
+| Que `pendientes` no crezca ni recupere un objeto ya documentado | anclado al inventario y al historial de git, arbol de trabajo incluido |
+| Que las columnas documentadas de una **tabla** sean EXACTAMENTE las de su `CREATE TABLE` | parseo del DDL |
+| Que las de una **vista** sean EXACTAMENTE las de su proyeccion final | lectura del `SELECT` de esa vista, sin comentarios |
+| Que `tipo`, `capa`, `refresco`, `agregacion`, `cardinalidad` y `severidad` esten en su vocabulario cerrado | R2, R7, R5, R9 |
+| Que las dos puntas de cada relacion existan, objeto y columna | R5, en cuanto el destino tiene ficha |
+| Que la cardinalidad no prometa una unicidad que la clave declarada no da | derivado de `clave_negocio` |
+| Que la clave de JOIN citada en un `porque` nombre columnas de la ficha | R5 |
+| Que las columnas de `clave_negocio` **existan** en la ficha | R2 |
+| Que `refresco` no mienta sobre el pipeline real | R14, leyendo `build_pipeline_steps` |
+| Que un `nulo_significa` en un `*_ide` tenga su `NULLIF` en el SQL | contraste con la proyeccion |
+| Que las doce reglas esten, con ambito resoluble, y que su prosa no cite objetos inexistentes | R9, R11 |
+| Que ningun texto este de relleno | `MINIMOS_TEXTO` |
+
+### NO se comprueba (pasa en verde)
+
+Comprobado por mi, no supuesto. Reduje `clave_negocio` de
+`mart.fact_seguimiento_mensual` a `[obra_id]` y cambie su `grano` a «una fila
+por obra y mes, con el importe total de la obra en ese mes»:
+
+```
+$ python -m pytest tests/ -q -k f006
+335 passed, 798 deselected in 21.42s
+```
+
+- **Que el `grano` sea cierto.** Es texto libre y nada lo contrasta.
+- **Que `clave_negocio` sea la clave de verdad.** Solo se exige que sus columnas
+  existan. Y hay un efecto de segundo orden que conviene ver: **la comprobacion
+  de fan-out DERIVA la unicidad de la clave declarada**, asi que una clave
+  reducida no solo pasa desapercibida, sino que **desarma esa comprobacion** y
+  deja valida una cardinalidad `N:1` que antes se cazaba. Es la limitacion que
+  mas vigilancia pide en las 73 fichas restantes.
+- **Que el `significado` de una columna sea cierto.** El caso limite sigue
+  siendo el de la review: `importe_mes` descrito como «importe ACUMULADO desde
+  el inicio», que es la trampa numero uno del datamart escrita al reves. La
+  `agregacion` sigue siendo `suma_solo_dentro_del_mes` y nadie cruza las dos
+  cosas.
+- **Un objeto que exista en la base y no en el repositorio.** Es
+  `check-diccionario` (R28, bloque H), que no existe todavia.
+
+Las tres primeras solo las cazan hoy **la revision humana y la bateria de
+aceptacion** (T39), y por eso cuatro de sus dieciocho preguntas son trampas
+deliberadas sobre exactamente estos puntos. Queda escrito aqui, y no descubierto
+dentro de 73 fichas.

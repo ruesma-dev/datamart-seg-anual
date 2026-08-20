@@ -50,6 +50,18 @@ pide y para que no se pierdan:
 | **T38** 🔏 | Regla de firewall para la IP del entorno del MCP |
 | **T39** | Ejecutar las 18 preguntas de la batería contra el diccionario publicado |
 
+### Límite conocido de la puerta (escrito, no descubierto luego)
+
+La puerta comprueba que las columnas de cada ficha sean exactamente las del SQL,
+que las relaciones resuelvan y que las cardinalidades no prometan unicidad
+falsa. **No comprueba que el `grano`, la `clave_negocio` ni el `significado` de
+una columna sean CIERTOS**: un grano falso y una clave reducida pasan en verde,
+verificado. Y hay un efecto de segundo orden: la detección de fan-out deriva la
+unicidad de la clave declarada, así que **una clave reducida desarma esa
+detección**. Hoy eso solo lo cazan la revisión humana y la batería de aceptación
+(T39). Desglose completo en `progress/impl_F-006.md`, §«Qué comprueba la puerta
+y qué NO».
+
 ### Avisos que no hay que perder
 
 - **`build-compras` y `build-retenciones` no registran paso en
