@@ -1249,3 +1249,50 @@ Cuatro decisiones que merecen quedar escritas:
 **Ningun test abre conexion**: el doble registra un diario de llamadas y sobre
 el se comprueba que hay UNA transaccion, que el `DELETE` precede al `INSERT` y
 que no aparece ni un `DROP` ni un `TRUNCATE`.
+
+## T17 · El paso y su sitio en el pipeline
+
+```
+$ python -m pytest tests/test_f006_publicacion.py -q
+FAILED tests/test_f006_publicacion.py::test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants
+FAILED tests/test_f006_publicacion.py::test_f006_r14_pipeline_los_pasos_nocturnos_se_inyectan_desde_la_composicion
+FAILED tests/test_f006_publicacion.py::test_f006_r17_paso_publica_el_diccionario_real_y_lo_cuenta
+FAILED tests/test_f006_publicacion.py::test_f006_r19_paso_con_diccionario_invalido_no_escribe_nada
+FAILED tests/test_f006_publicacion.py::test_f006_r19_paso_con_yaml_ilegible_da_failed_legible
+FAILED tests/test_f006_publicacion.py::test_f006_r21_paso_si_la_base_falla_no_deshace_el_build
+FAILED tests/test_f006_publicacion.py::test_f006_r25_paso_con_cobertura_rota_no_publica
+7 failed, 31 passed in 5.78s
+```
+
+El pipeline queda: `ingest_raw -> load_excel_aux -> build_stg -> build_mart ->
+**publicar_diccionario** -> apply_grants`. El orden esta comprobado dos veces:
+por la lista y por el orden topologico que resuelve el orquestador.
+
+**R19 tiene un espia por cliente**, no una comprobacion de buena fe: el doble
+lanza `AssertionError` si alguien le pide una conexion, y los tests de
+diccionario invalido, YAML ilegible y cobertura rota exigen que **la lista de
+llamadas quede vacia**. Publicar un diccionario a medias dejaria al MCP
+inventandose significados; que se quede el de ayer es mucho mejor.
+
+### `pasos_nocturnos` sin lista copiada, y sin default peligroso
+
+El paso EXIGE `pasos_nocturnos` en el constructor, sin valor por defecto, y
+`build_pipeline_steps` **lo inyecta despues de componer la lista**: es la unica
+forma de que salga de la propia composicion, porque cuando el paso se construye
+todavia se esta construyendo el pipeline que lo contiene. Un default vacio
+habria hecho que R14 diera por mentirosa cualquier ficha `nocturno`; uno con la
+lista escrita a mano se habria desincronizado a la primera.
+
+### Tres efectos colaterales que hubo que atender
+
+1. **`run-all` reusa su cliente.** `build_pipeline_steps` acepta ahora el `pg`
+   ya abierto y se lo pasa al paso, en vez de que este abra una segunda
+   conexion contra un servidor que es compartido.
+2. **El doble `PgFalso` de F-024** no sabia responder a `execute_sql_file` ni a
+   `publicar_diccionario`. Se le anaden como no-op, con el comentario de por
+   que: alli se prueba la propagacion del `batch_id`, no la publicacion.
+3. **Dos tests ajenos afirmaban «cinco pasos»** y ahora son seis. Se actualizan
+   con el motivo escrito en el propio mensaje del assert, para que quien lo lea
+   dentro de un ano sepa que cambio y por que.
+
+`bash harness/init.sh`: **1171 tests**, cobertura de lineas cambiadas **98,9 %**.

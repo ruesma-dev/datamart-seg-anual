@@ -615,7 +615,6 @@ def test_f006_r27_dominio_un_informe_solo_con_pendientes_no_es_un_fallo() -> Non
 # ---------------------------------------------------------------------------
 
 import subprocess  # noqa: E402
-from itertools import pairwise  # noqa: E402
 
 
 def test_f006_r27_pendientes_es_exactamente_lo_que_falta_por_documentar() -> None:

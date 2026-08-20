@@ -569,3 +569,207 @@ def test_f006_r28_list_objetos_catalogo_pregunta_por_los_esquemas_pedidos() -> N
     assert "information_schema.tables" in sentencia
     assert "pg_proc" in sentencia, "las funciones también son objetos publicados"
     assert params == (["mart", "cierre"], ["mart", "cierre"])
+
+
+# ---------------------------------------------------------------------------
+# pipeline · el paso y su sitio (T17 · R19, R20, R21)
+# ---------------------------------------------------------------------------
+
+
+def _settings_falso():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        postgres=SimpleNamespace(
+            readonly_role="mcp_sigrid_dm_ro",
+            set_role="sigrid_dm_etl",
+            consumption_schema_list=["mart"],
+        )
+    )
+
+
+def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None:
+    """EL ORDEN NO ES COSMÉTICO.
+
+    `apply_grants` concede `SELECT ON ALL TABLES IN SCHEMA _meta`, que es una
+    foto del instante en que corre. Publicar después dejaría las tres tablas
+    nuevas dependiendo solo del `ALTER DEFAULT PRIVILEGES`: funcionaría hoy y
+    dejaría de funcionar el día que alguien toque esa regla.
+    """
+    import main
+    from etl_sigrid.application.orchestrator import Orchestrator
+    from etl_sigrid.application.steps.publicar_diccionario_step import (
+        PublicarDiccionarioStep,
+    )
+
+    pasos = main.build_pipeline_steps(_settings_falso())
+
+    nombres = [p.name for p in pasos]
+    assert nombres == [
+        "ingest_raw",
+        "load_excel_aux",
+        "build_stg",
+        "build_mart",
+        "publicar_diccionario",
+        "apply_grants",
+    ]
+
+    paso = next(p for p in pasos if p.name == "publicar_diccionario")
+    assert isinstance(paso, PublicarDiccionarioStep)
+    assert paso.depends_on == ["build_mart"]
+    assert paso.stage == "diccionario"
+
+    orden = [p.name for p in Orchestrator(pasos)._topological_sort()]
+    assert orden.index("publicar_diccionario") > orden.index("build_mart")
+    assert orden.index("publicar_diccionario") < orden.index("apply_grants")
+
+
+def test_f006_r14_pipeline_los_pasos_nocturnos_se_inyectan_desde_la_composicion() -> None:
+    """Ni el paso ni el validador tienen una lista de pasos escrita a mano.
+
+    Se inyecta DESPUÉS de componer el pipeline, que es lo único que evita la
+    copia: el día que `build-cierre` entre en `run-all`, el veredicto de R14
+    cambia solo.
+    """
+    import main
+
+    pasos = main.build_pipeline_steps(_settings_falso())
+    publicar = next(p for p in pasos if p.name == "publicar_diccionario")
+
+    assert tuple(publicar.pasos_nocturnos) == tuple(p.name for p in pasos)
+    assert "build_cierre" not in publicar.pasos_nocturnos
+
+
+class _ClienteEspia:
+    """Cliente que grita si alguien intenta escribir."""
+
+    def __init__(self) -> None:
+        self.llamadas: list[str] = []
+
+    def execute_sql_file(self, path, **_):
+        self.llamadas.append(f"execute_sql_file:{path.name}")
+
+    def publicar_diccionario(self, *_a, **_k):
+        self.llamadas.append("publicar_diccionario")
+        return 38
+
+    def connection(self):  # pragma: no cover - no debería llamarse
+        raise AssertionError("el paso no debe abrir conexión por su cuenta")
+
+
+def _paso(pasos_nocturnos=("build_mart",), cliente=None, directorio=None):
+    from etl_sigrid.application.steps.publicar_diccionario_step import (
+        PublicarDiccionarioStep,
+    )
+
+    return PublicarDiccionarioStep(
+        _settings_falso(),
+        pasos_nocturnos=pasos_nocturnos,
+        client=cliente or _ClienteEspia(),
+        batch_id="20260820T021500Z-abcdef",
+        directorio=directorio,
+    )
+
+
+def test_f006_r17_paso_publica_el_diccionario_real_y_lo_cuenta() -> None:
+    from etl_sigrid.domain.entities import StepStatus
+    from tests.test_f006_frescura import pasos_del_pipeline_nocturno
+
+    espia = _ClienteEspia()
+    resultado = _paso(pasos_del_pipeline_nocturno(), espia).run()
+
+    assert resultado.status is StepStatus.SUCCESS
+    assert resultado.rows_processed == 38
+    assert espia.llamadas == [
+        "execute_sql_file:01_diccionario.sql",
+        "publicar_diccionario",
+    ], "el DDL idempotente va ANTES de escribir"
+    assert resultado.metadata["n_objetos"] == 25
+    assert resultado.metadata["n_reglas"] == 12
+    assert resultado.metadata["n_columnas"] == 332
+    assert resultado.metadata["cobertura_cols"] == 100.0
+    assert len(resultado.metadata["hash_fuente"]) == 64
+
+
+def test_f006_r19_paso_con_diccionario_invalido_no_escribe_nada(tmp_path) -> None:
+    """R19: si no valida, FAILED **antes** de abrir la transacción de escritura.
+
+    El diccionario anterior se queda publicado intacto, que es infinitamente
+    mejor que publicar uno a medias: el MCP sigue respondiendo con la semántica
+    de ayer en vez de inventársela.
+    """
+    from etl_sigrid.domain.entities import StepStatus
+
+    (tmp_path / "00_global.yaml").write_text(
+        "version: 1\nbase: sigrid_dm\npendientes: []\n", encoding="utf-8"
+    )
+
+    espia = _ClienteEspia()
+    resultado = _paso(("build_mart",), espia, directorio=tmp_path).run()
+
+    assert resultado.status is StepStatus.FAILED
+    assert espia.llamadas == [], "no se toca la base con un diccionario inválido"
+    assert "R9" in resultado.error_message or "R4" in resultado.error_message
+
+
+def test_f006_r19_paso_con_yaml_ilegible_da_failed_legible(tmp_path) -> None:
+    from etl_sigrid.domain.entities import StepStatus
+
+    (tmp_path / "00_global.yaml").write_text("version: [1,\n", encoding="utf-8")
+
+    espia = _ClienteEspia()
+    resultado = _paso(("build_mart",), espia, directorio=tmp_path).run()
+
+    assert resultado.status is StepStatus.FAILED
+    assert espia.llamadas == []
+    assert "00_global.yaml" in resultado.error_message
+    assert "linea" in resultado.error_message.lower()
+
+
+def test_f006_r21_paso_si_la_base_falla_no_deshace_el_build() -> None:
+    """Un fallo de publicación es una noticia, no una catástrofe.
+
+    `mart` queda construido y el diccionario anterior sigue publicado; el paso
+    termina en FAILED para que `run-all` salga con código 1 y alguien lo mire.
+    """
+    from etl_sigrid.domain.entities import StepStatus
+    from tests.test_f006_frescura import pasos_del_pipeline_nocturno
+
+    class _ClienteQueFalla(_ClienteEspia):
+        def publicar_diccionario(self, *_a, **_k):
+            self.llamadas.append("publicar_diccionario")
+            raise RuntimeError("connection reset by peer")
+
+    espia = _ClienteQueFalla()
+    resultado = _paso(pasos_del_pipeline_nocturno(), espia).run()
+
+    assert resultado.status is StepStatus.FAILED
+    assert "connection reset" in resultado.error_message
+    assert "publicar_diccionario" in espia.llamadas
+
+
+def test_f006_r25_paso_con_cobertura_rota_no_publica(tmp_path) -> None:
+    """La puerta de cobertura también corre en la publicación, no solo en los
+    tests: publicar un diccionario incompleto es publicar huecos."""
+    import shutil
+
+    from etl_sigrid.domain.entities import StepStatus
+
+    for fichero in DIR_DICCIONARIO.glob("*.yaml"):
+        shutil.copy(fichero, tmp_path / fichero.name)
+    global_yaml = tmp_path / "00_global.yaml"
+    # Se borra POR LÍNEA y no por substring: `      - stg.plan_mensual` es un
+    # ámbito de regla y contiene la misma cadena. Un `replace` se lleva las dos
+    # y entonces lo que rompe es el YAML, no la cobertura.
+    lineas = global_yaml.read_text(encoding="utf-8").split("\n")
+    global_yaml.write_text(
+        "\n".join(ln for ln in lineas if ln != "  - stg.plan_mensual"),
+        encoding="utf-8",
+    )
+
+    espia = _ClienteEspia()
+    resultado = _paso(("build_mart",), espia, directorio=tmp_path).run()
+
+    assert resultado.status is StepStatus.FAILED
+    assert espia.llamadas == []
+    assert "stg.plan_mensual" in resultado.error_message

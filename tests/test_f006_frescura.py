@@ -67,6 +67,7 @@ def test_f006_r14_el_pipeline_nocturno_es_este_y_no_incluye_los_manuales() -> No
         "load_excel_aux",
         "build_stg",
         "build_mart",
+        "publicar_diccionario",
         "apply_grants",
     )
     for paso in ("build_cierre", "build_maestros", "build_compras", "build_retenciones"):

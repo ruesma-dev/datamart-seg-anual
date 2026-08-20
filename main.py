@@ -64,7 +64,10 @@ import click  # noqa: E402
 
 from config.settings import get_build_info, get_settings  # noqa: E402
 from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
-from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep  # noqa: E402
+from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
+from etl_sigrid.application.steps.publicar_diccionario_step import (
+    PublicarDiccionarioStep,
+)  # noqa: E402
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
@@ -403,7 +406,10 @@ def build_mart(sin_puerta: bool) -> None:
 
 
 def build_pipeline_steps(
-    settings, full_refresh: bool = False, batch_id: str | None = None
+    settings,
+    full_refresh: bool = False,
+    batch_id: str | None = None,
+    pg: PostgresClient | None = None,
 ) -> list:
     """
     Composición del pipeline de `run-all`.
@@ -419,13 +425,32 @@ def build_pipeline_steps(
     dos steps del pipeline recibe `omitir_puerta`: `run-all` no tiene vía de
     escape a propósito.
     """
-    return [
+    pasos = [
         IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
         LoadExcelAuxStep(settings),
         BuildStgStep(settings, batch_id=batch_id),
         BuildMartStep(settings, batch_id=batch_id),
+        # F-006: entre build_mart y apply_grants, y el orden NO es cosmético.
+        # `apply_grants` concede SELECT ON ALL TABLES IN SCHEMA _meta, que es
+        # una foto del instante en que corre: publicar después dejaría las tres
+        # tablas del diccionario dependiendo solo del ALTER DEFAULT PRIVILEGES.
+        # `pg` se pasa cuando el llamante ya tiene cliente abierto: publicar
+        # reusa esa conexión en vez de abrir una segunda contra el mismo
+        # servidor, que es compartido.
+        PublicarDiccionarioStep(
+            settings, pasos_nocturnos=(), batch_id=batch_id, client=pg
+        ),
         ApplyGrantsStep(settings),
     ]
+
+    # La lista de pasos nocturnos se inyecta DESPUÉS de componer, y no antes,
+    # porque es la composición la que la define. Es lo que evita que el
+    # validador de frescura (R14) dependa de una copia escrita a mano: el día
+    # que `build-cierre` entre en `run-all`, su veredicto cambia solo.
+    for paso in pasos:
+        if isinstance(paso, PublicarDiccionarioStep):
+            paso.pasos_nocturnos = [p.name for p in pasos]
+    return pasos
 
 
 @cli.command("run-all")
@@ -442,7 +467,9 @@ def run_all(full_refresh: bool) -> None:
     settings = get_settings()
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
-    steps = build_pipeline_steps(settings, full_refresh, batch_id=ejecucion.batch_id)
+    steps = build_pipeline_steps(
+        settings, full_refresh, batch_id=ejecucion.batch_id, pg=pg
+    )
     # El grabador deja una fila por paso en _meta.etl_runs: es lo que después
     # leen `python main.py timings` y la vista _meta.v_frescura. Si falla, el
     # orquestador solo lo loguea.
