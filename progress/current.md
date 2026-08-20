@@ -3,12 +3,26 @@
 
 ## F-006 · El diccionario semántico del datamart — `in_progress`
 
-Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**: tras seis pasadas de
-review y un APROBADO sin matices, la última tanda documentó los 53 objetos que
-faltaban (`maestro`, `stg`, `aux`, `_meta` y `raw`).
+Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**, y **corregidos los
+trece defectos de la séptima pasada** de review.
 
-`bash harness/init.sh` en verde: **1487 tests**, cobertura de las líneas
-cambiadas **99,0 %** (714 de 721).
+`bash harness/init.sh` en verde: **1758 tests**, 127 saltados, cobertura de las
+líneas cambiadas **99,0 %** (715 de 722).
+
+### Qué falló en la séptima pasada, en una línea
+
+Trece afirmaciones publicadas que el SQL o el origen desmienten. La mitad eran
+**declaradas a mano donde había una fuente comprobable**, así que se cerraron
+derivando: un detector de punteros rotos (encontró **24**, once más que la
+review), el guardián de nulos ampliado a las dos convenciones de sufijo, el
+pipeline citado anclado a `main.build_pipeline_steps`, y el contraste de la
+carga de `raw` movido a `ingest_raw_step.py`.
+
+**La peor fue mía y merece quedar escrita**: las 31 fichas de `raw` describían
+una carga que no ocurre porque las contrasté contra `config/tables_sigrid.yaml`,
+que es **justo el documento que miente**. Sí derivé, pero de la fuente
+equivocada, y eso deja 31 fichas en verde afirmando algo falso. Detalle en
+`progress/impl_F-006.md`, sección «Séptima pasada».
 
 **El diccionario está completo: 102 objetos, 793 columnas, 13 reglas duras y
 `pendientes` VACÍA.** El trinquete llegó a **0**, así que no hay ningún objeto
@@ -165,8 +179,14 @@ de propagación obliga a llevarlo a `arnes-base` en el mismo trabajo.
 Salieron además **dos defectos más de la campaña**, tampoco tocados: al terminar
 **no borra `__pycache__`**, así que la ejecución siguiente puede correr sobre un
 mutante compilado —nos dio un falso rojo en `init.sh`, y al revés daría un falso
-verde—, y **deja los worktrees huérfanos** (dieciséis, en `Temp`). Ambos en la
-misma propuesta.
+verde—, y **deja los worktrees huérfanos** (dieciséis, en `Temp`).
+
+El reviewer **reprodujo el del bytecode** en un módulo de laboratorio y los tres
+están dados de alta como **F-041**, que se arregla fuera de esta feature y viaja
+a `arnes-base`. Consecuencia que hay que tener presente: `harness/mutacion.py`
+sigue sin tocarse, así que las campañas de F-006 **se han medido con el defecto
+presente**; las de esta última tanda se lanzaron borrando `__pycache__` a mano
+antes.
 
 ### Decisión pendiente del humano
 

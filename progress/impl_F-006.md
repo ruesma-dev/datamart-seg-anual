@@ -2726,3 +2726,64 @@ Las tres relaciones `1:1` hacia una clave sustituta que el barrido senala siguen
 siendo **ciertas**, por el motivo ya escrito en la tanda anterior: en `mart` esas
 claves son BIGSERIAL que cambian en cada build, la vista es una pasarela fila a
 fila, y el `1:1` es cierto aunque la clave de negocio sea la combinacion estable.
+
+## Evidencias tras la septima review
+
+Numeros medidos, no estimados.
+
+| Evidencia | Valor | Como se obtiene |
+|---|---|---|
+| **Tests ejecutados** | **1758 pasan, 0 fallan**, 127 saltados (960 de ellos son de F-006) | `bash harness/init.sh` |
+| **Tiempo de la suite** | **~48 s** el subconjunto de F-006; **~150 s** la suite entera dentro de `init.sh`, que corre bajo `coverage` | salida de pytest |
+| **Cobertura de las lineas cambiadas** | **99,0 %** (715 de 722; umbral 80 %, nivel `critico`) | linea `PUERTA COBERTURA` de `bash harness/init.sh` |
+| **Mutantes generados / supervivientes** | **166 generados, 166 muertos, 0 supervivientes, 0 timeouts** en 711,3 s | `python -m harness.mutacion --feature F-006 --timeout 300` |
+| **Objetos documentados** | **102 de 102** | `config/diccionario/` |
+| **Columnas descritas** | **793** | idem |
+| **Trinquete `pendientes`** | **0** | `PENDIENTES_MAX` en `tests/test_f006_cobertura.py` |
+| **Reglas duras publicadas** | **13 de 13** | `00_global.yaml` |
+
+**Analisis de supervivientes: ninguno.** La campana se lanzo **borrando
+`__pycache__` a mano antes**, como pidio el lider: `harness/mutacion.py` no se ha
+tocado —el defecto es **F-041** y se arregla fuera de esta feature—, asi que sin
+esa limpieza previa el numero se mide con un mutante potencialmente vivo en el
+bytecode. Es una salvedad de la herramienta, no del resultado, y queda dicha.
+
+Los siete tests nuevos de la tanda anterior (`test_f006_supervivientes.py`) matan
+los cuatro mutantes que en su dia se contaron como «timeout»; esta campana los
+evalua y los mata, ya sin margen de duda.
+
+Las siete lineas cambiadas sin cubrir son ramas de guarda redundantes dentro del
+cargador; ninguna sobrevivio a la mutacion.
+
+### Comprobaciones derivables anadidas en esta pasada
+
+Cinco, y las cinco existen porque el defecto que cerraban estaba **declarado a
+mano donde habia una fuente comprobable**:
+
+| Comprobacion | Contra que deriva | Que caza |
+|---|---|---|
+| `test_f006_punteros.py` | el propio diccionario | citar un `esquema.objeto` que no existe (**24** encontrados) |
+| `test_f006_raw_ingesta.py` | `ingest_raw_step.py` | describir una carga que el paso no hace, y callar las columnas excluidas |
+| `test_f006_regla_de_oro.py` | `maestro/02_proveedores.sql` | que la regla afirme en absoluto un patron, y que no ubique el CIF |
+| `test_f006_stg_trampas.py` | `sql/stg/*.sql` | acumulado a origen, origen de `anio`/`mes`, nulos invertidos |
+| guardian de nulos ampliado | los alias de `raw` del SQL | un `nulo_significa` imposible, en **las dos** convenciones de sufijo |
+
+Y la del pipeline citado, dentro de `test_f006_reglas.py`, que ancla la evidencia
+de `R-FRESCURA-MANUAL` a `main.build_pipeline_steps` en vez de a una lista
+escrita a mano.
+
+### Limites declarados, no descubiertos luego
+
+- **`sigrid_tablas.md` no es parseable de forma fiable**, asi que la lista de
+  tablas con campos propios y la pregunta «que tablas tienen `tiemod`» no se
+  derivan: la primera queda como constante revisable con su motivo, y la segunda
+  **no se documenta en ninguna ficha**.
+- El guardian de nulos **no analiza expresiones compuestas** (`COALESCE`,
+  `CASE`): pueden producir NULL por muchas vias y decidirlo desde el texto
+  marcaria de mas.
+- El guardian **no se aplica fuera de los alias directos de `raw`**, asi que un
+  objeto que reexporte una columna de Sigrid a traves de `stg` no se comprueba
+  ahi. `stg` aplica el `NULLIF` en el punto de entrada, que es donde toca.
+- Sigue **sin ejecutarse la bateria de 18 preguntas** (T39) ni
+  `check-diccionario` (T26): que una ficha sea correcta no demuestra todavia que
+  sea suficiente.
