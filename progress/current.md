@@ -162,6 +162,12 @@ diga «SIN EVALUAR (timeout)». No aplicada: toca `harness/mutacion.py`, es del
 arnés y cambiaría el veredicto de features ya cerradas. Si se acepta, la regla
 de propagación obliga a llevarlo a `arnes-base` en el mismo trabajo.
 
+Salieron además **dos defectos más de la campaña**, tampoco tocados: al terminar
+**no borra `__pycache__`**, así que la ejecución siguiente puede correr sobre un
+mutante compilado —nos dio un falso rojo en `init.sh`, y al revés daría un falso
+verde—, y **deja los worktrees huérfanos** (dieciséis, en `Temp`). Ambos en la
+misma propuesta.
+
 ### Decisión pendiente del humano
 
 El reviewer propone una mejora de `CHECKPOINTS.md`, **no aplicada**: que cuando

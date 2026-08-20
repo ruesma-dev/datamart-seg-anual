@@ -2453,6 +2453,39 @@ el umbral obliga a tocar las dos y se ve en el diff. Con eso, los cuatro mueren:
 137: "grano": 20 -> 21                    =>  MUERTO
 ```
 
+### Segundo hallazgo del arnes: la campana deja mutantes vivos en el bytecode
+
+Tras la campana, `bash harness/init.sh` salio **en rojo** con un test que
+acababa de pasar:
+
+```
+E  AssertionError: `MINIMOS_TEXTO['grano']` vale 21 y este fichero fija 20
+```
+
+El fuente decia 20. El commit no habia tocado ese fichero. Y aun asi:
+
+```
+$ python -c "from etl_sigrid.domain.diccionario import MINIMOS_TEXTO; print(MINIMOS_TEXTO['grano'])"
+21
+desde: ...\etl_sigrid\domain\diccionario.py
+```
+
+Era el **`.pyc`**. La campana restaura el fuente pero no invalida el bytecode, y
+la comprobacion de Python (tamano y fecha) no vio el cambio, asi que siguio
+ejecutando el mutante. Borrar `__pycache__` lo arreglo al instante.
+
+**Esta vez dio un falso ROJO y por eso se investigo. Al reves da un falso
+VERDE**, que es el caso que no se investiga: una suite que pasa ejecutando
+codigo que no es el del repositorio. Es el mismo problema de fondo que el
+`aux.yaml` inversionable —lo que se prueba no es lo que se guarda—, y ninguno de
+los dos lo delata la propia suite.
+
+La campana dejo ademas **16 worktrees huerfanos** en `Temp`, que se supone que
+se limpian solos.
+
+Los dos son del arnes, no de esta feature, asi que **no los he tocado**: van con
+la propuesta de abajo.
+
 ### Propuesta para el lider: el informe de mutacion invita al error
 
 **No la he aplicado**: toca `harness/mutacion.py`, que es del arnes y no de esta
@@ -2470,11 +2503,15 @@ algo de ruido». Pero un timeout **no se ha evaluado**: puede ser un mutante que
 la suite no caza y que ademas la cuelga. Contarlo aparte del recuento que decide
 el veredicto convierte el numero que se mira en optimista.
 
-Dos cambios, los dos baratos:
+Cuatro cambios, los cuatro baratos:
 
 1. Que el veredicto sea **`muertos == total`**, no `supervivientes == 0`. Un
    timeout deja la campana en rojo hasta que alguien lo explique.
 2. Que la linea diga **«4 SIN EVALUAR (timeout)»** en vez de «4 timeouts».
+3. Que al restaurar el fuente **se borre `__pycache__`**, para que la siguiente
+   ejecucion no corra sobre un mutante compilado.
+4. Que los worktrees se limpien tambien cuando la campana termina bien; hoy
+   quedaron dieciseis.
 
 Si vale para cualquier proyecto —y vale—, la regla de propagacion obliga a
 portarlo a `arnes-base` en el mismo trabajo.
@@ -2485,9 +2522,9 @@ Numeros medidos, no estimados.
 
 | Evidencia | Valor | Como se obtiene |
 |---|---|---|
-| **Tests ejecutados** | **1487 pasan, 0 fallan**, 82 saltados (752 de ellos son de F-006) | `bash harness/init.sh` |
+| **Tests ejecutados** | **1496 pasan, 0 fallan**, 82 saltados (759 de ellos son de F-006) | `bash harness/init.sh` |
 | **Tiempo de la suite** | **~45 s** el subconjunto de F-006; **144,5 s** la suite entera dentro de `init.sh`, que corre bajo `coverage` | salida de pytest |
-| **Cobertura de las lineas cambiadas** | **99,0 %** (714 de 721; umbral 80 %, nivel `critico`) | linea `PUERTA COBERTURA` de `bash harness/init.sh` |
+| **Cobertura de las lineas cambiadas** | **99,0 %** (715 de 722; umbral 80 %, nivel `critico`) | linea `PUERTA COBERTURA` de `bash harness/init.sh` |
 | **Mutantes generados / supervivientes** | **166 generados, 166 muertos, 0 supervivientes, 0 timeouts** en 658,6 s | `python -m harness.mutacion --feature F-006 --timeout 300` -> `progress/mutacion_F-006.md` |
 | **Objetos documentados** | **102 de 102** | `config/diccionario/` |
 | **Columnas descritas** | **793** | idem |
