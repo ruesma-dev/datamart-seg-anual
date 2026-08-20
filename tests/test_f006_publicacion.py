@@ -347,7 +347,7 @@ def test_f006_r9_filas_de_reglas_van_las_doce_en_su_orden() -> None:
 
     filas = filas_reglas(dicc)
 
-    assert len(filas) == 12
+    assert len(filas) == len(dicc.reglas)
     assert [f[6] for f in filas] == sorted(f[6] for f in filas), "ordenadas por `orden`"
     codigos = [f[0] for f in filas]
     assert "R-IMPORTE-MES" in codigos
@@ -558,7 +558,7 @@ def test_f006_r17_publicar_manda_las_filas_reales_no_un_ejemplo() -> None:
 
     dicc, _ = _diccionario_real()
     assert len(fichas) == len(dicc.fichas) >= 49
-    assert len(reglas) == 12
+    assert len(reglas) == len(dicc.reglas)
     assert all(len(f) == 14 for f in fichas)
     assert all(len(r) == 7 for r in reglas)
 
@@ -717,7 +717,7 @@ def test_f006_r17_paso_publica_el_diccionario_real_y_lo_cuenta() -> None:
         "publicar_diccionario",
     ], "el DDL idempotente va ANTES de escribir"
     assert resultado.metadata["n_objetos"] == len(dicc.fichas)
-    assert resultado.metadata["n_reglas"] == 12
+    assert resultado.metadata["n_reglas"] == len(dicc.reglas)
     assert resultado.metadata["n_columnas"] == sum(len(f.columnas) for f in dicc.fichas)
     assert resultado.metadata["cobertura_cols"] == 100.0
     assert len(resultado.metadata["hash_fuente"]) == 64

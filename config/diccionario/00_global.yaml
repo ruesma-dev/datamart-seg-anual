@@ -153,6 +153,35 @@ reglas:
       de `sql/stg/01_ddl.sql`. Tratar una version como si fuera un mes produce
       series temporales inventadas.
 
+  - codigo: R-SIGRID-CON
+    titulo: La regla de oro de Sigrid, sin la cual `raw` es ilegible
+    severidad: bloqueante
+    ambito:
+      - raw
+    regla: >-
+      Antes de escribir cualquier consulta contra `raw`, cinco cosas. **`ide` es
+      la clave de las 31 tablas**, se llama igual en todas y es el indice
+      primario; un campo que acaba en `ide` —`conide`, `entide`, `obride`— es una
+      referencia a el. **Muchas tablas son "Propiedades de `con`" en 1:1**: `obr`,
+      `prv`, `cen`, `ctr`, `com`, `dca`, `dcf`, `cob`, `pag` y `rec` no son
+      entidades completas, son la extension especifica de un concepto y comparten
+      su `ide` con una fila de `con`. **`cod`, `res` y `fec` viven en `con`**, no
+      en la tabla especifica: el codigo, la descripcion y la fecha de alta de una
+      obra, un proveedor o una factura estan todos alli, y por eso casi toda
+      consulta empieza uniendo con `con` por `ide`. **`con.nom` NO EXISTE**: el
+      nombre legible es `con.res`. Y **las fechas son enteros `YYYYMMDD`**, donde
+      el valor `0` no es una fecha sino el NULL, porque Sigrid no guarda nulos en
+      los enteros.
+    motivo: >-
+      Es la estructura del sistema origen, verificada en la entidad `con` de
+      `azure-apps/sigrid_tablas.md` (pagina 94), que es donde estan `ide`, `cod`,
+      `res`, `fec`, `est` y `fecbaj`, y donde **no hay ningun `nom`**. Ninguno de
+      los cinco puntos falla con un dato raro que invite a mirar: `con.nom` falla
+      con "columna inexistente", consultar `obr` sin unir a `con` devuelve una
+      obra sin nombre y sin codigo, y un `MIN(fecha)` que no excluya el cero
+      devuelve cero, que parece un dato y no lo es.
+    orden: 13
+
   - codigo: R-CLAVE-SUSTITUTA
     titulo: Las claves BIGSERIAL cambian en cada build
     severidad: bloqueante
@@ -720,35 +749,4 @@ preguntas_aceptacion:
     reglas_implicadas: [R-VERSION-MASTER]
     estado: respondible
 
-pendientes:
-  - raw.auxmun
-  - raw.auxobramb
-  - raw.auxobrcla
-  - raw.auxobrtca
-  - raw.auxobrtip
-  - raw.auxpro
-  - raw.cen
-  - raw.cob
-  - raw.com
-  - raw.comlin
-  - raw.comprv
-  - raw.con
-  - raw.condir
-  - raw.conext
-  - raw.ctr
-  - raw.ctrpro
-  - raw.dca
-  - raw.dcapro
-  - raw.dcf
-  - raw.dcfpro
-  - raw.dcfprodes
-  - raw.obr
-  - raw.obrctr
-  - raw.obrfas
-  - raw.obrfasamb
-  - raw.obrparpar
-  - raw.obrparpre
-  - raw.obrprv
-  - raw.pag
-  - raw.prv
-  - raw.rec
+pendientes: []

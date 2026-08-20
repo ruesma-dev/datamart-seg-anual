@@ -103,6 +103,7 @@ SEVERIDADES = ("bloqueante", "aviso")
 #: agente sin esa defensa en silencio.
 CODIGOS_REGLAS_OBLIGATORIAS = (
     "R-ABONO-NEGATIVO",
+    "R-SIGRID-CON",
     "R-CLAVE-SUSTITUTA",
     "R-COMPRAS-SIN-IVA",
     "R-COMPRAS-TIPO-DOC",

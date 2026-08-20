@@ -2204,3 +2204,79 @@ catalogo.
   exactamente la razon por la que la vista existe.
 
 Trinquete: 38 -> **31**, que son las 31 tablas de `raw`.
+
+## T26 · `raw` (31 tablas) y la regla de oro publicada
+
+DA-2: **nivel de objeto, no de columna**. Son 31 tablas con cientos de campos de
+cuatro letras cuyo diccionario completo —tipos, indices y referencias— ya existe
+y esta mantenido en `azure-apps/sigrid_tablas.md`. Copiarlo aqui crearia una
+segunda version que divergiria, que es exactamente lo que ya paso con
+`sigrid_api.md`. Cada ficha apunta alli.
+
+Lo que si documentan las fichas es **lo que ese documento no puede decir**:
+quien consume cada tabla dentro del datamart, cual esta vacia y cual se ingiere
+sin que la lea nadie.
+
+### La regla de oro, y por que no basta con contarla
+
+Los cinco puntos —`ide` como clave universal; las tablas "Propiedades de `con`"
+en 1:1; `cod`, `res` y `fec` viviendo en `con`; **`con.nom` no existe**; y las
+fechas como enteros `YYYYMMDD` con el `0` haciendo de NULL— estan verificados
+**en la fuente**, no de memoria: la entidad `con` de `sigrid_tablas.md`, pagina
+94, donde aparecen `ide`, `cod`, `res`, `fec`, `est` y `fecbaj` y no hay ningun
+`nom`; y las cabeceras que dicen literalmente «Propiedades de con» en `obr`,
+`prv`, `cen`, `ctr`, `com`, `dca`, `dcf`, `cob`, `pag` y `rec`.
+
+Los escribi primero en la cabecera de `raw.yaml`. **Y una cabecera YAML es un
+comentario: no la lee el cargador, no entra en `_meta.diccionario_reglas` y el
+MCP no la ve nunca.** El agente habria seguido escribiendo `con.nom`.
+
+Fase RED:
+
+```
+$ python -m pytest tests/test_f006_reglas.py -q -k regla_de_oro
+E  AssertionError: la regla de oro de Sigrid está explicada en la cabecera de
+   raw.yaml, que es un comentario y no se publica en _meta.diccionario_reglas
+1 failed
+```
+
+El test no comprueba que exista una regla: comprueba **los cinco puntos, uno a
+uno**, sobre el texto publicado. `R-SIGRID-CON` pasa a ser la decimotercera
+regla obligatoria del dominio, con alcance `raw` y severidad bloqueante. Ninguno
+de los cinco falla con un dato raro que invite a mirar: `con.nom` falla con
+"columna inexistente", `obr` sin unir devuelve una obra sin nombre y un
+`MIN(fecha)` sin excluir el cero devuelve cero, que parece un dato.
+
+### Seis tablas que se cargan cada noche y no lee nadie
+
+Sale del cruce entre `config/tables_sigrid.yaml` y quien las referencia en
+`sql/`. Cada una lo dice en su ficha, porque una tabla ingerida sin consumidor
+gasta ventana nocturna y **hace creer que existe una funcionalidad que no
+existe**:
+
+- **`auxobrtca`** (tipos de capitulo) es el catalogo OFICIAL que
+  `stg.partidas.categoria` NO usa: aquello es una heuristica sobre el codigo del
+  capitulo raiz. Que el catalogo bueno este ingerido y sin usar es lo que hace
+  creer que la clasificacion viene de Sigrid.
+- **`obrprv`** esta **VACIA en Ruesma**. Por eso `maestro.proveedores_obra` sale
+  de `raw.ctr` —el proveedor de una obra se deduce de haberle contratado algo— y
+  por eso su `importe_contratado` es `SUM(ctr.totdoc)`, **total del documento
+  CON IVA**, y no una suma de lineas sin IVA como en `compras`. Las dos cosas
+  quedan escritas en su ficha.
+- **`com`, `comlin` y `comprv`**: el comparativo de ofertas. El datamart no
+  cubre hoy el proceso de compra anterior al contrato.
+- **`dcfprodes`**: el reparto de una linea de factura entre varios destinos, que
+  no esta modelado aguas abajo.
+
+Se anota ademas en `raw.prv` que **`ofcide` se ingiere y no se expone**:
+`maestro.proveedores` no publica oficio ni naturaleza. Es F-036, no un olvido.
+
+### Y otro recuento cableado
+
+Anadir la regla numero trece rompio tres asertos con el `12` escrito a mano. Es
+la tercera vez que aparece el mismo patron en esta feature —los objetos, las
+tablas con DDL explicito y ahora las reglas—, asi que los tres se derivan de
+`len(dicc.reglas)`. La lista de codigos obligatorios sigue siendo explicita a
+proposito: es la que hace que anadir una regla se vea en el diff.
+
+**Trinquete: 31 -> 0.** No queda ningun objeto del datamart sin ficha.

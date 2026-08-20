@@ -37,14 +37,20 @@ def _codigos(errores) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# R9 · Las doce reglas duras
+# R9 · Las trece reglas duras
 # ---------------------------------------------------------------------------
 
 
-def test_f006_r9_son_doce_reglas_y_estas() -> None:
-    """La lista es cerrada y explícita: si mañana se añade una, se ve en el diff."""
-    assert len(CODIGOS_REGLAS_OBLIGATORIAS) == 12
+def test_f006_r9_son_trece_reglas_y_estas() -> None:
+    """La lista es cerrada y explícita: si mañana se añade una, se ve en el diff.
+
+    Empezó siendo doce. La decimotercera, `R-SIGRID-CON`, entró con las fichas
+    de `raw`: es la regla de oro de Sigrid, y estaba contada en un comentario
+    del YAML, que no se publica y por tanto el MCP no ve.
+    """
+    assert len(CODIGOS_REGLAS_OBLIGATORIAS) == 13
     assert set(CODIGOS_REGLAS_OBLIGATORIAS) == {
+        "R-SIGRID-CON",
         "R-FRESCURA-MANUAL",
         "R-IMPORTE-MES",
         "R-UNIVERSO-OBRA",
@@ -783,3 +789,43 @@ def test_f006_r9_importe_mes_nombra_las_columnas_del_cierre() -> None:
 
     assert "ejecutado_origen" in regla.regla
     assert "ejecutado_mes" in regla.regla
+
+
+# ---------------------------------------------------------------------------
+# La regla de oro de Sigrid tiene que estar PUBLICADA, no comentada (T26)
+# ---------------------------------------------------------------------------
+#
+# `config/diccionario/raw.yaml` explica la regla de oro en su cabecera, y esa
+# cabecera es un comentario YAML: no la lee el cargador, no entra en
+# `_meta.diccionario_reglas` y el MCP no la ve nunca. Lo que sirve al agente es
+# lo que se publica.
+#
+# Los cinco puntos se comprueban uno a uno y contra la fuente
+# (`azure-apps/sigrid_tablas.md`, entidad `con`, pagina 94), porque son
+# justamente los que se olvidan al escribir una consulta contra Sigrid y ninguno
+# falla con un dato raro: fallan con «columna inexistente» o con un cero que
+# parece una fecha.
+
+
+def test_f006_r9_la_regla_de_oro_de_sigrid_se_publica() -> None:
+    """No basta con contarla en un comentario del YAML: tiene que ser una regla."""
+    dicc = _diccionario_real()
+    porcodigo = {r.codigo: r for r in dicc.reglas}
+    assert "R-SIGRID-CON" in porcodigo, (
+        "la regla de oro de Sigrid está explicada en la cabecera de raw.yaml, "
+        "que es un comentario y no se publica en _meta.diccionario_reglas"
+    )
+    regla = porcodigo["R-SIGRID-CON"]
+    assert regla.severidad == "bloqueante"
+    assert "raw" in regla.ambito, "tiene que alcanzar al esquema entero"
+
+    texto = f"{regla.regla} {regla.motivo}".lower()
+    for fragmento, porque in (
+        ("ide", "la clave universal"),
+        ("propiedades de `con`", "el 1:1 con la tabla central"),
+        ("res", "el nombre legible, que no es `nom`"),
+        ("nom", "que `con.nom` NO existe"),
+        ("yyyymmdd", "las fechas como enteros"),
+        ("0", "que el cero es el NULL de Sigrid"),
+    ):
+        assert fragmento in texto, f"la regla no dice nada de {porque}"

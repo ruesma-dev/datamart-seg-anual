@@ -1,0 +1,629 @@
+# config/diccionario/raw.yaml
+#
+# Fichas del esquema `raw`: la copia literal de Sigrid, tabla a tabla.
+#
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 31 tablas con
+# cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
+# referencias— ya existe y esta mantenido en `azure-apps/sigrid_tablas.md`.
+# Copiarlo aqui crearia una segunda version que divergiria; cada ficha apunta
+# alli. Lo que SI se documenta es lo que ese documento no dice: que tabla
+# alimenta que parte del datamart, cual esta vacia, y cual se ingiere sin que
+# nadie la use.
+#
+# **NINGUNA de estas tablas es superficie de consulta.** No es una preferencia
+# de estilo: aqui no hay semantica de negocio, y quien pregunte sobre negocio
+# tiene la respuesta ya traducida aguas abajo. Cada ficha dice donde.
+#
+# ---------------------------------------------------------------------------
+# LA REGLA DE ORO DE SIGRID
+# ---------------------------------------------------------------------------
+# Sin esto, `raw` es ilegible; con esto, casi todo encaja. Verificado en la
+# entidad `con` de `sigrid_tablas.md` (pagina 94) y en las cabeceras de las
+# demas tablas.
+#
+# 1. **`ide` es la clave de TODAS las tablas.** Se llama igual en las 31, es el
+#    INDICE PRIMARIO y es unico. Un campo que acabe en `ide` en otra tabla
+#    —`conide`, `entide`, `obride`— es una referencia a ese `ide`.
+# 2. **Muchas tablas son "Propiedades de `con`" en 1:1.** Es literalmente lo que
+#    pone su cabecera en Sigrid. `obr`, `prv`, `cen`, `ctr`, `com`, `dca`,
+#    `dcf`, `cob`, `pag` y `rec` NO son entidades completas: son la extension
+#    especifica de un CONCEPTO, y comparten su `ide` con la fila de `con`.
+# 3. **`cod`, `res` y `fec` viven en `con`, no en la tabla especifica.** El
+#    codigo, la descripcion y la fecha de alta de una obra, de un proveedor o de
+#    una factura estan todos en `con`. Por eso casi todas las consultas del ETL
+#    empiezan uniendo la tabla con `con` por `ide`.
+# 4. **`con.nom` NO EXISTE.** El nombre legible es `con.res` ("Resumen"). Es el
+#    error mas facil de cometer al escribir una consulta contra Sigrid, y no
+#    falla con un dato raro: falla con "columna inexistente".
+# 5. **Las fechas son ENTEROS `YYYYMMDD`**, tipo "Entero tipo fecha" en Sigrid.
+#    Y **`0` no es una fecha, es el NULL**: Sigrid no guarda nulos en los
+#    enteros. Un `MIN(fecha)` sin excluir el cero devuelve cero.
+#
+# Esta regla se publica ademas como `R-SIGRID-CON` en el bloque global, para que
+# el agente la reciba entera antes de escribir ninguna consulta.
+#
+# ---------------------------------------------------------------------------
+# Lo que dice cada ficha
+# ---------------------------------------------------------------------------
+# - Que es la tabla en Sigrid, con la descripcion literal del autodocumentador.
+# - **Que parte del datamart la usa**, o que NO la usa nadie. Seis de las 31 se
+#   ingieren y no las lee ningun SQL: se dice en su ficha, porque una tabla que
+#   se carga cada noche sin consumidor cuesta tiempo de ventana y hace creer que
+#   hay una funcionalidad que no existe.
+# - Si la carga es INCREMENTAL por `tiemod` o completa cada noche.
+# - Que columnas NO se traen (`exclude_columns` de `config/tables_sigrid.yaml`):
+#   son textos largos, observaciones e imagenes. Preguntar por ellas en `raw`
+#   no devuelve nulo, devuelve "columna inexistente".
+#
+# Contrastado con `config/tables_sigrid.yaml` (las 31 entradas, sus
+# `incremental_column` y sus `exclude_columns`) y con los SQL de
+# `etl_sigrid/infrastructure/postgres/sql/` para saber quien consume cada una.
+
+version: 1
+esquema: raw
+
+objetos:
+
+  con:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la tabla central de Sigrid, no una tabla de negocio: mezcla obras,
+      proveedores, facturas, albaranes y todo lo demas en las mismas filas,
+      distinguidos por `tip`. Para obras esta `maestro.obras`, para proveedores
+      `maestro.proveedores` y para documentos de compra `compras.documentos`.
+    descripcion: >-
+      **Conceptos.** El corazon del modelo de Sigrid y la tabla de la que cuelga
+      casi todo lo demas. Aqui viven `cod` (codigo), `res` (el nombre legible;
+      **no existe `nom`**), `fec` (fecha de alta como entero `YYYYMMDD`), `est`
+      (estado), `fecbaj` (fecha de baja) y `obr`. Las tablas "Propiedades de
+      `con`" —`obr`, `prv`, `ctr`, `dcf` y las demas— comparten su `ide` con una
+      fila de aqui, y por eso casi toda consulta contra Sigrid empieza uniendo
+      con esta tabla.
+    grano: Una fila por concepto, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  conext:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Campos configurables cuyo significado depende de como los use cada
+      empresa. Lo que el datamart saca de aqui ya esta interpretado en
+      `stg.obras` y en la eleccion de version master.
+    descripcion: >-
+      **Campos extendidos de concepto.** Atributos adicionales que Sigrid deja
+      definir por encima de los fijos de `con`. El ETL los lee en `stg/03_obras`
+      y en `stg/07_version_master_vigente`.
+    grano: Una fila por extension de concepto, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obr:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es solo la mitad de una obra: el codigo, el nombre y las fechas estan en
+      `con`. Consultarla sola da una obra sin nombre. Lo unido y traducido esta
+      en `maestro.obras` y en `stg.obras`.
+    descripcion: >-
+      **Obras.** "Propiedades de `con`" en 1:1: la parte especifica de obra de
+      un concepto. Alimenta `stg.obras`, `maestro.obras`, las cabeceras de
+      `cierre` y el presupuesto. Carga incremental por `tiemod`.
+    grano: >-
+      Una fila por obra, identificada por `ide`, que es el mismo `ide` de su
+      fila en `raw.con`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obrparpar:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Sin la jerarquia resuelta ni la categoria deducida. `stg.partidas` ya trae
+      las dos cosas, y `compras.v_*` ya cruza partida con compra.
+    descripcion: >-
+      **Obras: Partidas.** El arbol de capitulos y partidas de cada obra. Es de
+      donde sale `stg.partidas`, incluida la heuristica de categoria sobre el
+      codigo del capitulo raiz. Carga incremental por `tiemod`. **No se traen**
+      `tex`, `med` ni `des`.
+    grano: Una fila por partida o capitulo de obra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obrparpre:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el presupuesto SIN explotar a meses y con la ambiguedad de `fas` sin
+      resolver. `stg.presupuesto` lo normaliza, `stg.plan_mensual` lo explota y
+      `mart.fact_seguimiento_mensual` elige ademas la version vigente.
+      Consultarla directamente es donde se producen los importes multiplicados.
+    descripcion: >-
+      **Obras: Presupuestos y mediciones.** La tabla mas voluminosa que se
+      ingiere y el origen de todo el seguimiento economico: importes por obra,
+      partida, ambito y fase. Se pagina de 5.000 en 5.000. Carga incremental por
+      `tiemod`. **No se traen** `tex`, `med` ni `des`.
+    grano: Una fila por linea de presupuesto, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obrfas:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Su campo `fasnum` es el `fas` ambiguo de Sigrid sin interpretar.
+      `stg.fases` ya lo trae con su descripcion y sus fechas, y
+      `mart.v_master_versiones_tipadas` ademas deduce el tipo de master.
+    descripcion: >-
+      **Obras: Fases.** Las fases de cada obra, que segun el ambito son MESES o
+      VERSIONES del master. El campo se llama aqui `fasnum`, y `fase_num` /
+      `version` aguas abajo. Alimenta `stg.fases`. Carga incremental por
+      `tiemod`.
+    grano: Una fila por fase de obra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obrfasamb:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el cruce crudo de fase con ambito, sin la explosion mensual ni la
+      eleccion de version. Lo que se pregunta esta en `mart`.
+    descripcion: >-
+      **Obras: Fases y Ambitos.** Que ambitos tiene cada fase, y es lo que
+      permite distinguir los cuatro que usa el seguimiento: 3 (coste real), 7
+      (venta real), 8 (coste master) y 11 (venta master). La lee
+      `stg/08_plan_mensual`. Carga incremental por `tiemod`.
+    grano: Una fila por combinacion de fase y ambito, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obrctr:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Contratos sin unir a `con`, sin proveedor resuelto y sin las retenciones
+      calculadas. Estan en las cabeceras de `cierre` y en `retenciones`.
+    descripcion: >-
+      **Obras: Contratos de obra.** El contrato del cliente con la obra, no las
+      compras. Lo usan las vistas de cabecera de `cierre` y el arranque de
+      `retenciones`. Carga incremental por `tiemod`. **No se traen** `tex` ni
+      `obs`.
+    grano: Una fila por contrato de obra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cen:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Como toda "Propiedad de `con`", sin unir a `con` no tiene ni codigo ni
+      nombre. Ya viene resuelto en las cabeceras de `cierre`.
+    descripcion: >-
+      **Centros de Coste.** "Propiedades de `con`" en 1:1. Lo consume
+      `cierre/05_views_cabecera`. Se recarga entera cada noche —no tiene
+      `tiemod`— y **no se trae** `tex`.
+    grano: Una fila por centro de coste, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxobrtip:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Tabla de codigos. El tipo ya viene resuelto en las cabeceras de `cierre`.
+    descripcion: >-
+      **Obras: Tipos de obras.** Catalogo de tipos. Lo consume
+      `cierre/05_views_cabecera`. Se recarga entera cada noche.
+    grano: Una fila por tipo de obra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxobrcla:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Tabla de codigos. El subtipo ya viene resuelto en las cabeceras de
+      `cierre`.
+    descripcion: >-
+      **Obras: Subtipos de obras.** Catalogo de subtipos, dependiente del tipo.
+      Lo consume `cierre/05_views_cabecera`. Se recarga entero cada noche.
+    grano: Una fila por subtipo de obra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxobramb:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      `stg.ambitos` ya trae los mismos ambitos con su nombre. **Ojo con la
+      columna `uso_seguimiento` de aquella**: esta DESFASADA y marca solo el 8 y
+      el 11, cuando `mart` ya construye tambien el 3 y el 7. La lista fiable de
+      los cuatro esta en la ficha de `stg.ambitos` y en `mart`.
+    descripcion: >-
+      **Obras: Ambitos en presupuestos.** El catalogo de ambitos de Sigrid, de
+      donde salen los cuatro que usa el seguimiento: 3 (coste real), 7 (venta
+      real), 8 (coste master) y 11 (venta master). Lo consume `stg/02_ambitos`.
+      Se recarga entero cada noche.
+    grano: Una fila por ambito, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxobrtca:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **No la lee ningun SQL del datamart.** Se ingiere y se queda ahi.
+    descripcion: >-
+      **Obras: Tipos de capitulos.** El catalogo OFICIAL de tipos de capitulo de
+      Sigrid, y **no lo usa nadie**: `stg.partidas.categoria` clasifica las
+      partidas con una HEURISTICA sobre el codigo del capitulo raiz en vez de
+      con esta tabla. Que exista ingerida y sin usar es justo lo que hace creer
+      que la clasificacion viene de Sigrid cuando la deduce el ETL; una obra que
+      no siga la convencion de codigos se clasifica mal y nada lo delata.
+
+      Es deuda conocida, no un descuido de esta ficha. Se recarga entera cada
+      noche.
+    grano: Una fila por tipo de capitulo, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  condir:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Direcciones sin provincia ni municipio resueltos: hacen falta `auxpro` y
+      `auxmun`. `maestro.proveedores` ya las trae unidas.
+    descripcion: >-
+      **Direcciones de conceptos.** La direccion de un concepto —tipicamente un
+      proveedor—. La consumen `maestro/02_proveedores` y
+      `maestro/03_proveedores_obra`. Se recarga entera cada noche. **No se
+      traen** `dirtex` ni `eiotex`.
+    grano: Una fila por direccion, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  obrprv:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **Esta VACIA en Ruesma.** Consultarla devuelve cero filas, y eso se lee
+      facilmente como "esta obra no tiene proveedores" cuando lo cierto es que
+      esta relacion no se alimenta aqui.
+    descripcion: >-
+      **Obras: Proveedores.** Seria la relacion directa entre obra y proveedor,
+      pero **en Ruesma no se usa y la tabla esta vacia**. Por eso
+      `maestro.proveedores_obra` no sale de aqui sino de `raw.ctr`, los
+      contratos de compra: el proveedor de una obra se deduce de haberle
+      contratado algo.
+
+      Esa es tambien la razon de que el `importe_contratado` de aquella vista
+      sea `SUM(ctr.totdoc)`, **el total del documento CON IVA**, y no una suma
+      de lineas sin IVA como en `compras`.
+
+      Se ingiere igualmente y **no la lee ningun SQL**. Se recarga entera cada
+      noche y **no se trae** `tex`.
+    grano: Una fila por relacion obra-proveedor, identificada por `ide`. Hoy, ninguna.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  prv:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es media entidad: el CIF, el nombre y el codigo del proveedor estan en
+      `con`. `maestro.proveedores` ya lo trae todo unido.
+    descripcion: >-
+      **Proveedores.** "Propiedades de `con`" en 1:1. Alimenta
+      `maestro.proveedores`, `maestro.proveedores_obra` y los movimientos de
+      `retenciones`. Se recarga entera cada noche.
+
+      Su campo `ofcide` (oficio) **se ingiere y no se expone**:
+      `maestro.proveedores` no publica ni oficio ni naturaleza. Es F-036 en el
+      backlog, no un olvido de esta ficha.
+    grano: Una fila por proveedor, identificada por `ide`, el mismo de su fila en `raw.con`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxpro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: Tabla de codigos. La provincia ya viene resuelta en `maestro.proveedores`.
+    descripcion: >-
+      **Direcciones: Provincias.** Catalogo de provincias, que resuelve el
+      codigo que guarda `condir`. Se recarga entero cada noche.
+    grano: Una fila por provincia, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxmun:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: Tabla de codigos. El municipio ya viene resuelto en `maestro.proveedores`.
+    descripcion: >-
+      **Direcciones: Municipios.** Catalogo de municipios, que resuelve el
+      codigo que guarda `condir`. Se recarga entero cada noche.
+    grano: Una fila por municipio, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  ctr:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Cabecera cruda: sin proveedor resuelto, sin obra y con los importes CON
+      IVA. `compras.documentos` la trae unida y tipada, y `compras.fact_linea`
+      da el detalle sin IVA. Mezclar el total de aqui con las sumas de linea de
+      `compras` compara dos magnitudes distintas.
+    descripcion: >-
+      **Contratos de compra.** "Propiedades de `con`" en 1:1: la cabecera del
+      contrato con un proveedor. Alimenta `compras.documentos` y, por la
+      ausencia de `raw.obrprv`, tambien `maestro.proveedores_obra`. Carga
+      incremental por `tiemod`. **No se traen** `tex` ni `obs`.
+    grano: Una fila por contrato de compra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  com:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **No la lee ningun SQL del datamart.** No hay nada aguas abajo que
+      responda sobre comparativos de oferta.
+    descripcion: >-
+      **Documento comparativo de ofertas.** "Propiedades de `con`" en 1:1: la
+      cabecera de un comparativo entre proveedores, previo a la adjudicacion.
+      Se ingiere junto con `comlin` y `comprv` y **ninguna de las tres se usa**:
+      el datamart no cubre hoy el proceso de compra anterior al contrato. Carga
+      incremental por `tiemod`, con una lista larga de textos excluidos.
+    grano: Una fila por comparativo, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  comlin:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **No la lee ningun SQL del datamart**, igual que `raw.com` y `raw.comprv`.
+    descripcion: >-
+      **Detalle del comparativo de ofertas.** Las lineas que se comparan. Se
+      ingiere y no se usa. Carga incremental por `tiemod`.
+    grano: Una fila por linea del comparativo, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  comprv:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **No la lee ningun SQL del datamart**, igual que `raw.com` y `raw.comlin`.
+    descripcion: >-
+      **Proveedores del comparativo.** Que proveedores entraron en cada
+      comparativo y con que oferta. Se ingiere y no se usa. Carga incremental
+      por `tiemod`.
+    grano: Una fila por proveedor dentro de un comparativo, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  ctrpro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Lineas crudas, sin partida ni obra resueltas y sin el tipo de documento
+      normalizado. `compras.fact_linea` ya las trae unificadas con las de
+      albaran y factura, **todas sin IVA**.
+    descripcion: >-
+      **Productos en Contratos de compra.** El detalle de linea de un contrato.
+      Es una de las tres fuentes de `compras.fact_linea`. Carga incremental por
+      `tiemod`.
+    grano: Una fila por linea de contrato de compra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dca:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Cabecera cruda de albaran, sin proveedor ni obra resueltos. Esta unificada
+      con los otros dos tipos de documento en `compras.documentos`.
+    descripcion: >-
+      **Albaran de compra.** "Propiedades de `con`" en 1:1. Alimenta
+      `compras.documentos`. Carga incremental por `tiemod`, con una lista larga
+      de textos y campos de direccion excluidos.
+    grano: Una fila por albaran de compra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcapro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Lineas crudas. `compras.fact_linea` las trae unificadas con las de
+      contrato y factura, sin IVA y con la partida resuelta.
+    descripcion: >-
+      **Productos en Albaranes de compra.** El detalle de linea de un albaran, y
+      otra de las tres fuentes de `compras.fact_linea`. Se pagina de 5.000 en
+      5.000. Carga incremental por `tiemod`.
+    grano: Una fila por linea de albaran, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcf:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Cabecera cruda de factura. `compras.documentos` la trae unida y tipada, y
+      es ademas donde esta resuelto el signo de los ABONOS.
+    descripcion: >-
+      **Factura de compra.** "Propiedades de `con`" en 1:1. Alimenta
+      `compras.documentos` y el arranque de `retenciones`. Carga incremental por
+      `tiemod`, con una lista larga de textos y campos de direccion excluidos.
+    grano: Una fila por factura de compra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcfpro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Lineas crudas. `compras.fact_linea` las trae unificadas y sin IVA, y
+      `retenciones` ya calcula lo suyo sin que haga falta bajar aqui.
+    descripcion: >-
+      **Productos en Facturas de compra.** El detalle de linea de una factura,
+      la tercera fuente de `compras.fact_linea`, y tambien entrada de
+      `retenciones`. Se pagina de 5.000 en 5.000. Carga incremental por
+      `tiemod`.
+    grano: Una fila por linea de factura, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcfprodes:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **No la lee ningun SQL del datamart.** El reparto de una linea entre
+      varios destinos no esta modelado aguas abajo.
+    descripcion: >-
+      **Destinos en Facturas de compra.** El reparto de una linea de factura
+      entre varios destinos —obras o partidas—. Se ingiere y **no se usa**: la
+      imputacion que el datamart maneja es la de la propia linea. Se recarga
+      entera cada noche.
+    grano: Una fila por destino de una linea de factura, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cob:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Cobros sin unir a `con` ni a la obra. Lo que se pregunta esta en
+      `retenciones`, que ya cruza cobros, pagos y recargos.
+    descripcion: >-
+      **Cobros.** "Propiedades de `con`" en 1:1. Entrada de `retenciones`.
+      Carga incremental por `tiemod`.
+    grano: Una fila por cobro, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  pag:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Pagos sin unir a `con` ni al proveedor. `retenciones.movimientos` ya los
+      trae cruzados y con el signo resuelto.
+    descripcion: >-
+      **Pagos.** "Propiedades de `con`" en 1:1. Entrada de `retenciones`. Carga
+      incremental por `tiemod`. **No se trae** `blores`.
+    grano: Una fila por pago, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  rec:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Mezcla recargos, descuentos y retenciones en la misma tabla, sin
+      distinguir cual es cual salvo por sus codigos. `retenciones` ya aisla lo
+      que interesa. Consultarla creyendo que son solo retenciones suma cosas que
+      no lo son.
+    descripcion: >-
+      **Recargos, descuentos o retenciones.** "Propiedades de `con`" en 1:1, y
+      **las tres cosas viven aqui juntas**. Es de donde `retenciones` extrae las
+      retenciones de garantia. Se recarga entera cada noche.
+    grano: Una fila por recargo, descuento o retencion, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
