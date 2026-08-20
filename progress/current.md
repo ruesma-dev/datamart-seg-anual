@@ -82,6 +82,69 @@ incorporar mil setecientas.
 
 ---
 
+# CIERRE DE SESIÓN · 2026-08-20 · LÉEME PRIMERO
+
+Todo integrado en `dev` y **subido a GitHub**. Ninguna feature en curso, ninguna
+bloqueada, `init.sh` en verde: **798 tests**, 33 fichas, 14 cerradas.
+
+## Lo primero de la próxima sesión: F-006, el MCP
+
+El humano subió su prioridad a **1** el 2026-08-20: va por delante del estudio
+del tiempo de carga (F-035) y de la ventana de negocio (F-025).
+
+**Cuidado con el alcance, que la prioridad no cambia**: el grueso de F-006 se
+ejecuta en el arnés de **su propio repositorio**. Aquí solo queda lo que toca a
+`sigrid_dm` —el rol de solo lectura y la regla de firewall— y **el diccionario
+semántico del datamart**, que es del dueño del dato y sin el cual el MCP
+contesta cualquier cosa con aplomo.
+
+Antes de arrancarlo conviene leer, en este orden: la ficha de F-006 (tiene dos
+ampliaciones del 19 y del 20), **F-030** (las reglas de negocio compartidas, con
+el circuito de vuelta de las correcciones) y **D8** (dónde se persiste una
+planificación, sin decidir).
+
+## Lo que se cerró hoy
+
+| Feature | Qué deja |
+|---|---|
+| **F-024** | el datamart ya no se construye sobre cargas truncadas; verificado matando el job a mitad de la ingesta |
+| **F-023** | los Excels auxiliares se leen del blob, con las tres verificaciones de F-004 hechas |
+| **F-003** | el job nocturno, cerrado por fin tras dos días bloqueado |
+| **F-011** | la medición que evitó optimizar el sitio equivocado |
+
+## Estado real de la carga, comprobado el 20
+
+La nocturna del 20 fue **perfecta**: 02:00:21 → 04:46:36 UTC, **2 h 46**, con
+las dos puertas de F-024 en verde y el mismo `batch_id`. Reparto del tiempo:
+`build_stg` **110 min (67 %)**, ingesta 34,6 (20 %), `build_mart` 21,5 (13 %).
+
+## Decisiones que esperan al humano
+
+| Dónde | Qué |
+|---|---|
+| **F-032** | las dos copias de contraseñas en el vault de *albaranes*: subir su prioridad o aceptar por escrito que se quedan. La condición que las mantenía —«que el job funcione»— se cumplió hace días |
+| **D10** | por dónde entra Power BI: Desktop o Service. Condicionada por D11 |
+| **D11** | el acceso desde el puesto es un **apaño**, no una solución: IP fija, VPN o Private Link |
+| **D8** | dónde se persiste una planificación hecha por la IA |
+
+## Trampas de entorno que te ahorrarán tiempo
+
+1. **Para leer la base desde el puesto**: la IP pública rota cada pocos minutos
+   y cambia de bloque. Hay **una regla única sin fecha**, `datamart-puesto-pgris`,
+   que hay que **actualizar con la IP del momento** justo antes de cada tanda de
+   comandos, en la misma ventana de segundos. Perseguirla con reglas nuevas no
+   funciona: hay cuatro fechadas acumuladas que lo demuestran, y las retira
+   F-032 (la sin fecha **se queda**).
+2. **Para saber si la carga fue bien no hace falta la base**: los eventos
+   `step_finished` en Log Analytics lo dicen, y no pasan por el firewall.
+3. **Las campañas de mutación no son de fiar** hasta que se arregle F-029: usa
+   `--workers 1`, no las dejes huérfanas, y si algo se cae, lo primero es
+   `git status` y `git worktree list`.
+4. **`init.sh` ANTES de commitear, no después.** La puerta de secretos rechaza
+   GUID, IPs y correos, y hoy paró tres commits.
+
+---
+
 # F-011 CERRADA · 2026-08-20 · midió, y la medición dijo que no
 
 **Reviewer en APROBADO** (`progress/review_F-011_cierre.md`). Si este fichero
