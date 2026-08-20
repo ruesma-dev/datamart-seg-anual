@@ -2557,3 +2557,172 @@ este puesto apunta a `psql-albaranes-rs9k2`, el servidor compartido con
 | **T32**–**T34**, **T38** | Los bloques de permisos y firewall, que necesitan firma |
 | **T37** | Actualizar `azure-apps/datamart_seg_anual.md` |
 | **T39** | Pasar las 18 preguntas de la bateria contra el diccionario publicado |
+
+---
+
+# Septima pasada · los trece defectos
+
+RECHAZADO por **trece afirmaciones publicadas que el SQL o el origen
+desmienten**. Corregidas las trece, y con ellas cinco cosas mas que salieron al
+derivar.
+
+## 1. `R-SIGRID-CON` negaba un campo que existe
+
+La regla decia que `cod`, `res` y `fec` viven en `con` «**no en la tabla
+especifica**». Eso es un **patron dominante, no una ley**, y la regla es
+`bloqueante` y va adjunta a las 31 fichas de `raw`.
+
+Verificado en la fuente, no de memoria:
+
+- `sigrid_tablas.md:16542` da **`obr.res = "Nombre completo"`**, y `raw.obr` se
+  ingiere con `exclude_columns: []`: la columna esta cargada en Postgres.
+- **`prv.cif` = "CIF/NIF"** y `prv.raz` = "Razon social", con **doble
+  verificacion**: el PDF y nuestro propio SQL, que en
+  `maestro/02_proveedores.sql:28` toma `p.cif` y `p.raz` **de `raw.prv`** y de
+  `raw.con` solo `cod` y `res`.
+- **`cen.res` = "Reparto nombre"**, que ademas **no** es el nombre del centro:
+  el que publica `cierre` sale de `con.res` por un alias distinto.
+
+Barri las filas de entidad de `sigrid_tablas.md` y las tablas «Propiedades de
+`con`» con campos propios son **siete**: `obr`, `prv`, `cen`, `ctr`, `com`,
+`dca` y `dcf`. La regla las nombra ahora una a una, y las fichas de `obr`, `prv`
+y `cen` lo repiten, **porque quien lee solo la ficha tambien se estrella**.
+
+**Lo que NO se pudo derivar, y se dice en vez de fingirlo.** Intente extraer esa
+lista en tiempo de test y `sigrid_tablas.md` **no se deja parsear de forma
+fiable**: es la conversion literal de un PDF de 380 paginas, y el segmentador
+daba resultados distintos segun como se detectara la fila de entidad —llegaba a
+mezclar campos de entidades vecinas, que es como aparecieron unos `res`/`fec`
+atribuidos a `prv` que en realidad son de `prvblo` y `prvces`—. La lista queda
+escrita en `tests/test_f006_regla_de_oro.py` con el motivo al lado. Una
+derivacion que no se sostiene es peor que una constante revisable.
+
+## 2. Las 31 fichas describian una carga que no ocurre
+
+18 decian «incremental por `tiemod`» y 13 «se recarga entera». **Ninguna de las
+dos pasa.** `ingest_raw_step.py`:
+
+```python
+if self._full_refresh:
+    pg.truncate_table("raw", spec.target_table)
+    last_id_already = 0
+else:
+    last_id_already = pg.get_max_id("raw", spec.target_table, spec.id_column)
+...
+tiemod_col = spec.incremental_column if spec.incremental_column in col_names else None
+```
+
+Es **append por `MAX(ide)`** para las 31, y `incremental_column` **no gobierna la
+carga**: solo vuelca `_source_tiemod`, y solo si la columna existe. La
+consecuencia, que es lo que hay que saber al usar el dato: **una fila modificada
+en Sigrid no se refresca nunca**, y una borrada alli se queda aqui. El `TRUNCATE`
+solo con `--full-refresh`, que `run-all` no pasa.
+
+**La causa de fondo es mia y es la peor de la tanda**: yo *si* derive esto, pero
+**de la fuente equivocada**. Contraste contra `config/tables_sigrid.yaml`, que es
+justamente el documento que miente —declara `incremental_column: tiemod` en
+tablas que ni la tienen—, y me lleve 31 fichas en verde afirmando algo falso. La
+leccion: **derivar de la fuente equivocada es tan malo como no derivar**. La
+fuente de «como se carga» es el codigo que carga, y ahi se contrasta ahora, con
+un test que se pone en rojo si el paso cambia de estrategia.
+
+No documento **que tablas tienen `tiemod`**, y tampoco lo finjo: esa pregunta
+solo la responde el catalogo de Sigrid, que no es parseable, o la base, que no
+se toca.
+
+## 3. Veinticuatro punteros a objetos que no existen
+
+`compras.documentos` y `compras.fact_linea` no aparecen en ningun SQL. Los
+reales son `compras.contratos`, `compras.albaranes`, `compras.facturas` y
+`compras.fact_compras_linea`. Como **todo el argumento de DA-2** es «no
+consultes `raw`, ve aguas abajo y la ficha te dice donde», el puntero roto vacia
+de contenido el `motivo_no_consumo`.
+
+Se **deriva**: ningun texto publicable puede citar un `esquema.objeto` que el
+diccionario no fiche. El detector encontro **24, once mas que la review**, porque
+tambien mira `descripcion`; y uno que la review no vio, en `retenciones`, de una
+tanda ya aprobada. Dos falsos positivos suyos —una ruta de fichero y un comodin
+`compras.v_*`— se acotaron con su test.
+
+## 4 a 7. Las trampas de `stg`
+
+- **`stg.presupuesto` es ACUMULADO A ORIGEN en los ambitos reales**, y marcaba
+  sus tres medidas `agregacion: suma`. Confirmado en `08_plan_mensual.sql`, que
+  desacumula por diferencia con la fase anterior
+  (`cantidad - COALESCE(LAG(cantidad), 0)` bajo `ambito_id IN (3, 7)`). Pasan a
+  `ultimo_valor`, con el aviso en cada medida, en la descripcion y **en el
+  grano**, que es donde se mira antes de escribir un `SUM`.
+- **Las versiones master no estaban** en esa ficha, aplicando igual que en
+  `plan_mensual`: en los ambitos 8 y 11 hay una fila por version.
+- **`stg.fases.anio`/`.mes`** decian derivarse de la fecha de inicio y
+  `05_fases.sql` los copia de `f.ano`/`f.mes`, campos **independientes**. Y no
+  es cosmetico: `08_plan_mensual.sql` exige que no sean nulos, asi que una fase
+  sin ellos **no aparece** en el seguimiento. La ficha lo dice ahora.
+- **`stg.partidas.capitulo_raiz_id`** tenia el nulo invertido: en la raiz
+  `p.ide AS capitulo_raiz_id`, asi que nunca es NULL y
+  `WHERE capitulo_raiz_id IS NULL` devuelve cero filas. Se dice como preguntarlo
+  bien.
+
+## 8. La reincidencia, y el filtro que la dejo pasar
+
+`maestro.obras.cliente_id` declaraba un nulo imposible —`o.entide AS cliente_id`
+sin `NULLIF`—, **el mismo defecto de la tercera pasada**. El guardian escrito
+entonces filtraba por `endswith("_ide")` y `maestro` usa `_id`.
+
+**Se arregla el filtro, no el caso.** Al ampliarlo a los dos sufijos y a todas
+las fichas —no solo vistas— marcaba **seis**, y solo **dos** eran ciertos. Las
+dos derivaciones que lo acotan:
+
+- Un alias que llega por **`LEFT JOIN`** puede ser NULL sin `NULLIF`: lo produce
+  el join. Se leen los alias y se distingue.
+- **`_proyeccion_de` buscaba en todo el fichero**, y `compras/01_documentos.sql`
+  construye **seis objetos seguidos**: acusaba a `compras.albaranes.contrato_id`
+  leyendo el `c.ide AS contrato_id` de `compras.contratos`, cuando la linea de
+  `albaranes` es `NULLIF(a.ctride, 0)` y esta bien. Ese fallo estaba debilitando
+  otras comprobaciones que comparten el ayudante.
+
+Queda `retenciones.movimientos.documento_id`, que **no** se marca: sale de una
+vista, no de un alias de `raw`. El limite esta escrito junto al codigo.
+
+## 9. El puntero de DA-2, donde el MCP lo lee
+
+La contrapartida de documentar `raw` solo a nivel de objeto era remitir al
+diccionario de campos. El puntero estaba en la entrada de **esquema**, y
+`describir_tabla('raw.dca')` devuelve **la ficha**. Va en las 31, con el `grep`
+exacto del bloque.
+
+**Es la tercera vez en esta feature que algo cierto esta escrito donde no
+llega**: dos veces en comentarios YAML y ahora en el bloque equivocado. El test
+lo comprueba en la ficha.
+
+## 10 a 13. Pipeline, no-vacuidad y deuda
+
+- **`R-FRESCURA-MANUAL`** citaba un pipeline sin `publicar_diccionario`. En vez
+  de arreglar la lista, **se ancla** a `main.build_pipeline_steps`, y de paso
+  pasa a nombrar los pasos como se llaman en `_meta.v_frescura.paso`.
+- **La comprobacion de columnas excluidas pasaba en vacio en 11 fichas**
+  (`citadas <= excluidas` se cumple sola con `citadas` vacio). Ahora cada ficha
+  dice **el numero exacto**, que no se puede escribir en vacio.
+- La deuda «que puede viajar», las seis: la guarda de los meses oficiales en
+  `fn_master_fecha_efectiva` —que es media regla: solo corrige con **doble
+  evidencia**—, la cardinalidad `1:N` de `version_master_vigente`,
+  `total_incurrido` llegando **tambien en el ambito 7**, `dec_cantidades`
+  gobernando el redondeo **del importe** y no de `cantidad`, las **referencias
+  polimorficas** (`docoriide` + `docoritip`) como sexto punto de la regla de oro,
+  y el comentario que seguia diciendo «las DOCE reglas».
+
+## El barrido, que ya no se hace leyendo
+
+Tres rechazos han venido de una afirmacion corregida en un campo y viva en el de
+al lado, asi que el barrido se hizo **a maquina** sobre las 102 fichas. Cazo
+**la hermana exacta del defecto 7**: `stg.partidas.capitulo_raiz_cod` repetia la
+mitad falsa («La propia fila es el capitulo raiz»). Tiene ya su test.
+
+Cazo tambien una ambiguedad en `mart.v_pbi_cp_tipologia.cp_real`, que decia
+«acumulado» queriendo decir «sumado sobre la ventana»: no es el acumulado a
+origen de `stg.presupuesto`, y ahora lo distingue explicitamente.
+
+Las tres relaciones `1:1` hacia una clave sustituta que el barrido senala siguen
+siendo **ciertas**, por el motivo ya escrito en la tanda anterior: en `mart` esas
+claves son BIGSERIAL que cambian en cada build, la vista es una pasarela fila a
+fila, y el `1:1` es cierto aunque la clave de negocio sea la combinacion estable.
