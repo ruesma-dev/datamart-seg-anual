@@ -83,7 +83,7 @@ CLAVES_REGLA = frozenset(
 )
 
 
-class DiccionarioIlegible(Exception):
+class DiccionarioIlegible(Exception):  # noqa: N818 - el codigo de este repositorio esta en espanol y `DiccionarioIlegibleError` no se lee
     """El YAML no se puede convertir en entidades. Trae el porqué, no una traza.
 
     Un `yaml.scanner.ScannerError` crudo en la salida del ETL a las 2 de la
@@ -165,7 +165,7 @@ def cargar_diccionario(directorio: Path) -> tuple[Diccionario, str]:
         trozos.append(texto.encode("utf-8"))
         try:
             datos = yaml.safe_load(texto)
-        except yaml.YAMLError as exc:  # noqa: PERF203 - un error por fichero
+        except yaml.YAMLError as exc:
             errores.append(_error(ruta.name, _detalle_yaml(exc)))
             continue
         if datos is None:

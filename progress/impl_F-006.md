@@ -365,3 +365,34 @@ paréntesis, y queda anotado en el propio código.
 | `obra_codigo`, `partida_codigo`, `mes` | `codigo_obra`, `codigo_partida`, `anio_mes` |
 | `escenario: [COSTE_REAL, COSTE_PLAN, VENTA_REAL, VENTA_PLAN]` | `Coste Real`, `Coste Planificado`, `Venta Real`, `Venta Planificada` |
 | `clave_negocio: [obra_codigo, partida_codigo, mes, escenario]` | se usa `[obra_id, partida_id, anio_mes, escenario]`: `obra_id` es `con.ide`, estable entre builds, y `codigo_partida` es anulable |
+
+### T13 · Las once vistas de `mart`
+
+```
+$ python -m pytest tests/test_f006_cobertura.py -q -k puerta
+tests\test_f006_cobertura.py:461: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_f006_cobertura.py::test_f006_r25_puerta_todo_objeto_publicado_tiene_ficha_o_esta_pendiente
+1 failed, 10 passed, 27 deselected in 0.38s
+```
+
+Verde tras escribir las once vistas: `211 passed` en F-006, `1009 passed` en
+`bash harness/init.sh`. `PENDIENTES_MAX` baja de **96 a 85**.
+
+El test genérico nuevo —«ninguna columna documentada está inventada»— falló en
+su primera versión **por un fallo del propio test**: el `\b` del regex se
+escribió como carácter de retroceso en vez de como frontera de palabra, y
+marcaba TODAS las columnas como inventadas. Se corrigió; el test ahora distingue
+`mes` de `anio_mes`, que era el motivo de usar frontera de palabra.
+
+Decisión editorial que conviene revisar: **`mart.v_fact_periodificado` se declara
+`consumo_recomendado: false`**, con su `motivo_no_consumo` escrito. No es para
+esquivar la puerta —sus columnas están documentadas igual— sino porque **hoy no
+periodifica nada**: `aux.periodificacion_partida` se crea vacía por diseño, así
+que la vista devuelve lo mismo que la tabla de hecho más dos columnas, y todas
+sus filas salen marcadas `NO_PERIODIFICADO`. Recomendarla sería mandar al agente
+por el camino largo. La ficha dice qué cambiaría el día que se carguen reglas.
+
+Ruff quedó en cero avisos nuevos: los 9 que introdujo el bloque se cerraron
+(orden de imports, `B023` en un cierre sobre variable de bucle y un `noqa`
+razonado en `DiccionarioIlegible`, que en español no admite el sufijo `Error`).

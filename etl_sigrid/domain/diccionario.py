@@ -692,11 +692,14 @@ def _validar_reglas(
         vistos.add(regla.codigo)
 
     for regla in dicc.reglas:
-        def error(codigo_ears: str, detalle: str) -> None:
+        # `codigo` se liga en la firma a propósito: una función anidada que
+        # capturase `regla` del bucle es un fallo clásico en cuanto alguien
+        # difiera la llamada, y ruff lo marca (B023).
+        def error(codigo_ears: str, detalle: str, codigo: str = regla.codigo) -> None:
             errores.append(
                 ErrorValidacion(
                     fichero=fichero,
-                    objeto=regla.codigo,
+                    objeto=codigo,
                     regla=codigo_ears,
                     detalle=detalle,
                 )

@@ -25,7 +25,6 @@ import pytest
 
 import main
 from etl_sigrid.domain.diccionario import validar
-
 from tests.test_f006_formato import _dicc, _ficha
 
 
@@ -129,7 +128,7 @@ def test_f006_r14_los_cuatro_esquemas_manuales_no_pueden_ser_nocturnos(
     errores = validar(_dicc(fichas=[mentirosa]), PASOS_NOCTURNOS)
 
     assert errores, f"{esquema} declarándose nocturno tenía que fallar"
-    assert any("R14" == e.regla for e in errores)
+    assert any(e.regla == "R14" for e in errores)
     assert any(f"build_{esquema}" in e.detalle for e in errores)
 
 

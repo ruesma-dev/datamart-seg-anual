@@ -30,7 +30,6 @@ from etl_sigrid.domain.inventario import (
     objetos_de_raw,
     objetos_de_sql,
 )
-
 from tests.test_f006_formato import _columna, _dicc, _ficha
 
 # ===========================================================================
@@ -413,7 +412,8 @@ YAML_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 #: Historia, para que se vea que baja de verdad:
 #:   98  T8  · andamiaje, con el inventario entero declarado pendiente
 #:   96  T12 · las dos tablas de hecho de `mart`
-PENDIENTES_MAX = 96
+#:   85  T13 · las once vistas de `mart`
+PENDIENTES_MAX = 85
 
 
 def _inventario_del_repositorio():

@@ -19,11 +19,9 @@ import pytest
 from etl_sigrid.domain.diccionario import (
     CODIGOS_REGLAS_OBLIGATORIAS,
     SEVERIDADES,
-    Regla,
     derivar_avisos,
     validar,
 )
-
 from tests.test_f006_formato import (  # reutiliza las fábricas de fixtures
     PASOS_NOCTURNOS,
     _dicc,
@@ -338,7 +336,6 @@ def test_f006_r11_los_ambitos_reales_apuntan_a_algo_que_existe() -> None:
     publica de verdad. Se comprueba contra el inventario, no contra las fichas:
     mientras un bloque no esté escrito, su objeto está en `pendientes`."""
     from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
-
     from tests.test_f006_cobertura import _inventario_del_repositorio
 
     dicc = _diccionario_real()

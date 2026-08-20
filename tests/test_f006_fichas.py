@@ -225,3 +225,59 @@ def test_f006_r7_mart_el_escenario_declara_sus_cuatro_valores() -> None:
             "Venta Real",
             "Venta Planificada",
         }, objeto
+
+
+# ---------------------------------------------------------------------------
+# Todas las fichas · ninguna columna inventada
+#
+# Comprobación más débil que la de las tablas, y el docstring del módulo lo
+# dice: para una vista haría falta un parser de SQL. Se limita a exigir que
+# cada nombre de columna documentado aparezca como palabra en el fichero que
+# crea el objeto. Caza los nombres inventados y las erratas —el 90 % de los
+# casos— y no caza un alias mal atribuido. Para eso está `check-diccionario`.
+# ---------------------------------------------------------------------------
+
+
+def _origen_por_objeto() -> dict[str, str]:
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    return {o.nombre: o.origen for o in _inventario_del_repositorio()}
+
+
+def _fichas_con_columnas() -> list:
+    return [f for f in _diccionario().fichas if f.columnas]
+
+
+@pytest.mark.parametrize(
+    "nombre", sorted(f.nombre for f in _fichas_con_columnas())
+)
+def test_f006_r26_ninguna_columna_documentada_esta_inventada(nombre: str) -> None:
+    """Una columna que no existe es un `SELECT` que revienta, y eso con suerte:
+    lo malo es la columna que existe y significa otra cosa."""
+    ficha = _diccionario().por_nombre[nombre]
+    origen = _origen_por_objeto()[nombre]
+    if origen == "config/tables_sigrid.yaml":
+        pytest.skip("las tablas de `raw` no tienen SQL que leer (DA-2)")
+
+    sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+
+    inventadas = [
+        c.nombre
+        for c in ficha.columnas
+        if not re.search(rf"\b{re.escape(c.nombre)}\b", sql)
+    ]
+
+    assert not inventadas, f"{nombre}: {inventadas} no aparecen en {origen}"
+
+
+@pytest.mark.parametrize(
+    "nombre", sorted(f.nombre for f in _fichas_con_columnas())
+)
+def test_f006_r26_las_columnas_tecnicas_no_se_declaran_de_negocio(nombre: str) -> None:
+    """Si se documentan (y se documentan, para que la ficha esté completa), al
+    menos que no se ofrezcan como cifra sumable."""
+    ficha = _diccionario().por_nombre[nombre]
+
+    for columna in ficha.columnas:
+        if columna.nombre in TECNICAS:
+            assert columna.agregacion == "no_sumable", f"{nombre}.{columna.nombre}"

@@ -325,3 +325,693 @@ objetos:
     ejemplos_preguntas:
       - Que obras se desvian mas de su master vigente en coste directo
       - Cual es el reparto entre coste directo, indirecto y proporcional de la obra X
+
+  v_pbi_fact:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      La tabla de hecho aligerada: los mismos hechos que
+      `mart.fact_seguimiento_mensual` pero solo con identificadores e importes,
+      sin los textos que se repiten millones de veces. Pensada para modelos en
+      estrella, donde los nombres los ponen las dimensiones.
+    grano: >-
+      El mismo que la tabla de la que sale: una fila por (obra, partida, mes,
+      escenario).
+    clave_negocio: [obra_id, partida_id, anio_mes, escenario]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      fact_id:
+        significado: Clave tecnica heredada del hecho. Cambia en cada build.
+        agregacion: clave_sustituta
+      obra_id:
+        significado: Identificador de la obra en Sigrid. Se une a la dimension de obra.
+        agregacion: no_sumable
+      partida_id:
+        significado: Identificador de la partida en Sigrid. Se une a la dimension de partida.
+        agregacion: no_sumable
+      anio_mes:
+        significado: Mes de imputacion, como fecha del dia 1. Se une a la dimension de fecha.
+        agregacion: no_sumable
+      escenario:
+        significado: Cruce de magnitud y naturaleza. Se une a la dimension de escenario.
+        valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
+      importe_mes:
+        significado: Importe imputado a ese mes concreto, ya desacumulado.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: Importe acumulado desde el inicio hasta ese mes. No se suma en el tiempo.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_mes_raw:
+        significado: El importe del mes con el precio sin redondear. Referencia de cuadre.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen_raw:
+        significado: Version sin redondear del acumulado a origen.
+        unidad: EUR
+        agregacion: ultimo_valor
+      can_mes:
+        significado: Cantidad medida imputada al mes, en la unidad de la partida.
+        agregacion: suma_solo_dentro_del_mes
+      can_origen:
+        significado: Cantidad acumulada a origen.
+        agregacion: ultimo_valor
+      precio_unitario:
+        significado: Precio unitario de la partida, con hasta seis decimales.
+        unidad: EUR
+        agregacion: no_sumable
+      version_master:
+        significado: Numero de la version master vigente del planificado.
+        nulo_significa: La fila es REAL.
+        agregacion: no_sumable
+      version_descripcion: Etiqueta legible de la version, o del mes en las filas reales.
+      tipo_master:
+        significado: >-
+          Clasificacion de la version master. Solo 'Planif Inicial', 'ABC' y
+          'Cuatrimestral' son master vigente.
+        valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]
+        nulo_significa: La fila es REAL.
+      total_incurrido:
+        significado: Incurrido a origen calculado por Sigrid. Solo en coste real.
+        unidad: EUR
+        agregacion: ultimo_valor
+      total_incurrido_mes:
+        significado: Incurrido del mes calculado por Sigrid. Solo en coste real.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+    relaciones:
+      - de: fact_id
+        a: mart.fact_seguimiento_mensual.fact_id
+        cardinalidad: 1:1
+        porque: >-
+          Es literalmente la misma fila. Para los textos (nombre de obra,
+          descripcion de partida) se va a la tabla o a las dimensiones.
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: N:1
+        porque: Dimension de obra del modelo en estrella.
+      - de: partida_id
+        a: mart.v_pbi_dim_partida.partida_id
+        cardinalidad: N:1
+        porque: Dimension de partida del modelo en estrella.
+      - de: anio_mes
+        a: mart.v_pbi_dim_fecha.anio_mes
+        cardinalidad: N:1
+        porque: Calendario mensual del modelo.
+      - de: escenario
+        a: mart.v_pbi_dim_escenario.escenario
+        cardinalidad: N:1
+        porque: Dimension de escenario, que ademas aporta el orden de presentacion.
+    ejemplos_preguntas:
+      - Dame los importes mensuales de la obra X sin los textos repetidos
+      - Cuanto suma el coste real de la obra X en el mes M
+
+  v_pbi_fact_categoria:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Version aligerada del preagregado por categoria: identificadores, importes
+      y cuantas partidas se han sumado. Para tarjetas de KPI y matrices por
+      capitulo sin bajar a partida.
+    grano: Una fila por (obra, mes, categoria, escenario).
+    clave_negocio: [obra_id, anio_mes, categoria, escenario]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      fact_cat_id:
+        significado: Clave tecnica heredada del preagregado. Cambia en cada build.
+        agregacion: clave_sustituta
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      anio_mes:
+        significado: Mes de imputacion, como fecha del dia 1.
+        agregacion: no_sumable
+      categoria:
+        significado: Clasificacion del coste, derivada por heuristica del capitulo raiz.
+        valores: [CD, CI, CP, OTRO]
+      escenario:
+        significado: Cruce de magnitud y naturaleza.
+        valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
+      importe_mes:
+        significado: Importe del mes sumado sobre todas las partidas de la categoria.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: Acumulado a origen de esas partidas. No se suma en el tiempo.
+        unidad: EUR
+        agregacion: ultimo_valor
+      num_partidas:
+        significado: Cuantas partidas distintas se han sumado en la fila.
+        agregacion: no_sumable
+    relaciones:
+      - de: fact_cat_id
+        a: mart.fact_seguimiento_categoria.fact_cat_id
+        cardinalidad: 1:1
+        porque: Es la misma fila, sin los textos de obra ni de mes.
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: N:1
+        porque: Dimension de obra.
+    ejemplos_preguntas:
+      - Cual es el reparto CD/CI/CP del coste real de la obra X este ano
+
+  v_pbi_dim_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Dimension de obra del modelo en estrella. Sale de `stg.obras`, es decir del
+      universo del SEGUIMIENTO: no estan las obras administrativas ni los codigos
+      con cinco o mas digitos. Para el universo completo, con cliente y estado,
+      se va a `maestro.obras`.
+    grano: Una fila por obra del universo de seguimiento.
+    clave_negocio: [obra_id]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid (`con.ide`). Clave de la dimension.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      obra_label: >-
+        Codigo y nombre juntos, para segmentadores ("0704 · REFORMA..."). Es
+        presentacion, no un dato.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: 1:1
+        porque: >-
+          Para el cliente, el estado y las fechas de alta y baja. OJO: el
+          maestro tiene MAS obras, porque no filtra las administrativas.
+    ejemplos_preguntas:
+      - Que obras hay en el seguimiento
+      - Como se llama la obra 0704
+
+  v_pbi_dim_partida:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Dimension de partida del modelo en estrella, con los atributos para bajar
+      por la jerarquia: categoria, capitulo raiz y ruta completa de capitulos.
+      Incluye tanto las partidas como los capitulos, porque en Sigrid un capitulo
+      es tambien una fila de partidas.
+    grano: Una fila por partida o capitulo de una obra.
+    clave_negocio: [partida_id]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      partida_id:
+        significado: Identificador de la partida en Sigrid (`obrparpar.ide`). Clave.
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que pertenece. Una partida pertenece siempre a una sola
+          obra: los codigos de partida solo son unicos dentro de su obra.
+        agregacion: no_sumable
+      codigo_partida: Codigo jerarquico de la partida dentro de su obra ('01.02').
+      descripcion_partida: Descripcion corta que escribio el jefe de obra.
+      unidad_medida: Unidad de medicion (m3, m2, ud, kg...).
+      categoria:
+        significado: >-
+          Clasificacion del coste, DERIVADA por heuristica del codigo del
+          capitulo raiz. No es una taxonomia oficial de Sigrid.
+        valores: [CD, CI, CP, OTRO]
+      capitulo_raiz_cod: Codigo del capitulo raiz del que cuelga la partida.
+      ruta_capitulos: Camino de capitulos hasta la partida, separado por ' > '.
+      nivel:
+        significado: Profundidad en el arbol de capitulos. 0 es el raiz.
+        agregacion: no_sumable
+      activa: >-
+        Marca de partida vigente. Ojo: la columna equivalente de `stg.obras`
+        esta cableada a TRUE; esta viene del origen.
+      partida_label: Codigo y descripcion juntos, para segmentadores. Es presentacion.
+      es_hoja: >-
+        Marca las partidas de detalle frente a los capitulos, para no sumar dos
+        veces al agregar por la jerarquia.
+    relaciones:
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: N:1
+        porque: Una partida cuelga de una obra.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: 1:1
+        porque: Es la fila de origen; la vista solo renombra y anade etiquetas.
+    ejemplos_preguntas:
+      - Que partidas tiene la obra X y de que capitulo cuelgan
+      - Cuantas partidas de coste directo tiene la obra X
+
+  v_pbi_dim_partida_niveles:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Lo mismo que `mart.v_pbi_dim_partida` mas seis columnas `nivel_1` a
+      `nivel_6` con "codigo · nombre" de cada escalon de la ruta de capitulos.
+      Existe para pintar el arbol del presupuesto sin recursion. Misma clave, asi
+      que se puede sustituir una por otra.
+    grano: Una fila por partida o capitulo de una obra, igual que la dimension base.
+    clave_negocio: [partida_id]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      partida_id:
+        significado: Identificador de la partida en Sigrid. Clave.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra a la que pertenece la partida.
+        agregacion: no_sumable
+      codigo_partida: Codigo jerarquico de la partida dentro de su obra.
+      descripcion_partida: Descripcion corta de la partida.
+      unidad_medida: Unidad de medicion de la partida.
+      categoria:
+        significado: Clasificacion del coste, derivada por heuristica del capitulo raiz.
+        valores: [CD, CI, CP, OTRO]
+      capitulo_raiz_cod: Codigo del capitulo raiz.
+      ruta_capitulos: Camino de capitulos separado por ' > '. Es la fuente de los niveles.
+      nivel:
+        significado: Profundidad en el arbol de capitulos.
+        agregacion: no_sumable
+      activa: Marca de partida vigente en el origen.
+      partida_label: Codigo y descripcion juntos. Presentacion.
+      es_hoja: Distingue las partidas de detalle de los capitulos.
+      nivel_1: Primer escalon de la ruta ("CD · COSTES DIRECTOS"), como codigo y nombre.
+      nivel_2: Segundo escalon de la ruta.
+      nivel_3:
+        significado: Tercer escalon de la ruta.
+        nulo_significa: La rama no llega a esa profundidad.
+      nivel_4:
+        significado: Cuarto escalon de la ruta.
+        nulo_significa: La rama no llega a esa profundidad.
+      nivel_5:
+        significado: Quinto escalon de la ruta.
+        nulo_significa: La rama no llega a esa profundidad.
+      nivel_6:
+        significado: Sexto escalon de la ruta.
+        nulo_significa: La rama no llega a esa profundidad.
+    relaciones:
+      - de: partida_id
+        a: mart.v_pbi_dim_partida.partida_id
+        cardinalidad: 1:1
+        porque: Es un superconjunto de columnas de la misma fila.
+    ejemplos_preguntas:
+      - Dame el arbol de presupuesto de la obra X por niveles
+
+  v_pbi_dim_escenario:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Catalogo ESTATICO de los cuatro escenarios del seguimiento, con el ambito
+      de Sigrid del que sale cada uno y su orden de presentacion. No lee ninguna
+      tabla: son cuatro filas escritas en la propia vista.
+    grano: Una fila por escenario. Siempre cuatro.
+    clave_negocio: [escenario]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      escenario:
+        significado: >-
+          Literal exacto del escenario. Es la clave y lo que se pone en un
+          `WHERE` sobre las tablas de hecho.
+        valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
+      tipo_dato:
+        significado: Naturaleza, la mitad "real o previsto".
+        valores: [REAL, PLANIFICADO]
+      concepto:
+        significado: Magnitud, la mitad "coste o venta".
+        valores: [COSTE, VENTA]
+      ambito_id:
+        significado: Ambito de Sigrid del que sale el escenario (3, 8, 7 u 11).
+        agregacion: no_sumable
+      orden:
+        significado: Orden de presentacion (1 a 4). Es presentacion, no un dato.
+        agregacion: no_sumable
+    relaciones: []
+    ejemplos_preguntas:
+      - Que escenarios existen en el seguimiento y de que ambito sale cada uno
+
+  v_pbi_dim_fecha:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Calendario MENSUAL, no diario: una fila por mes desde el primero con datos
+      en el seguimiento hasta doce meses despues del ultimo. Los nombres de mes
+      se generan en castellano sin depender del idioma del servidor.
+    grano: Una fila por mes.
+    clave_negocio: [anio_mes]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      anio_mes:
+        significado: Primer dia del mes. Clave de la dimension.
+        agregacion: no_sumable
+      anio:
+        significado: Ano del mes.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes, de 1 a 12.
+        agregacion: no_sumable
+      trimestre:
+        significado: Numero de trimestre, de 1 a 4.
+        agregacion: no_sumable
+      nombre_mes_solo: Nombre del mes en castellano, sin ano ("Octubre").
+      nombre_mes_anio: Nombre del mes con su ano ("Octubre 2025").
+      anio_mes_iso: El mes en formato ordenable como texto ("2025-10").
+      trimestre_label: Etiqueta del trimestre con su ano ("T4 2025").
+      es_pasado_o_actual: >-
+        Marca los meses hasta el actual incluido. Sirve para no mezclar el
+        futuro planificado con lo ya ocurrido.
+      es_mes_actual: Marca el mes en curso. Se recalcula en cada consulta.
+    relaciones: []
+    ejemplos_preguntas:
+      - Que meses cubre el seguimiento
+      - Dame los meses cerrados de 2025
+
+  v_master_versiones_tipadas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Catalogo de las versiones master de planificacion de cada obra, con su tipo
+      DEDUCIDO del texto libre que escribio el jefe de obra. Es la vista que
+      explica por que una obra tiene o no tiene plan vigente en un mes.
+    grano: >-
+      Una fila por (obra, ambito master, version). Solo ambitos 8 (coste) y 11
+      (venta), y solo versiones con fecha efectiva resuelta.
+    clave_negocio: [obra_id, ambito_id, version]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: Ambito master del que sale la version, 8 en coste y 11 en venta.
+        agregacion: no_sumable
+      version:
+        significado: >-
+          Numero de version master. OJO: en los ambitos master el campo `fas` de
+          Sigrid es este numero de version, no un mes.
+        agregacion: no_sumable
+      version_fec_creacion:
+        significado: Fecha en que se creo la version en Sigrid.
+        agregacion: no_sumable
+      version_fec_efectiva:
+        significado: >-
+          Fecha desde la que la version rige de verdad. Coincide con la de
+          creacion salvo en las cuatrimestrales entregadas tarde, donde se
+          adelanta al periodo que representan.
+        agregacion: no_sumable
+      version_descripcion: Etiqueta legible de la version ("Version 11 (04/02/2026)").
+      version_tex: >-
+        Texto libre que escribio el jefe de obra al crear la version ("ABC",
+        "PLANIFICACION CUATRIMESTRAL FEB-26"). Es la fuente de `tipo_master`.
+      tipo_master:
+        significado: >-
+          Tipo deducido del texto, con prioridad estricta. Solo 'Planif Inicial',
+          'ABC' y 'Cuatrimestral' cuentan como master vigente: las de 'Cierre
+          mensual' NO reemplazan al plan, y una obra que solo tenga cierres en un
+          mes se queda sin planificado ese mes.
+        valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]
+    relaciones:
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: N:1
+        porque: Para poner codigo y nombre a la obra.
+      - de: obra_id
+        a: stg.plan_mensual.obra_id
+        cardinalidad: N:1
+        porque: >-
+          Es la tabla de la que sale, filtrando los ambitos master. Consultar
+          `stg.plan_mensual` directamente sin elegir version multiplica importes.
+    ejemplos_preguntas:
+      - Que versiones de planificacion tiene la obra X y de que tipo son
+      - Que obras solo tienen versiones de cierre mensual
+
+  v_master_vigente_anual:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Para cada obra y ano, cual es la version master que rige: la ultima de tipo
+      'Planif Inicial', 'ABC' o 'Cuatrimestral' con fecha efectiva anterior al
+      corte. El corte es el 31 de diciembre si el ano ya paso, y hoy si es el ano
+      en curso.
+    grano: Una fila por (obra, ano, ambito master).
+    clave_negocio: [obra_id, anio, ambito_id]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      anio:
+        significado: Ano para el que se resuelve la version vigente.
+        agregacion: no_sumable
+      ambito_id:
+        significado: Ambito master, 8 en coste y 11 en venta.
+        agregacion: no_sumable
+      version:
+        significado: Numero de la version master que rige ese ano.
+        agregacion: no_sumable
+      version_fec_efectiva:
+        significado: Fecha desde la que rige la version elegida.
+        agregacion: no_sumable
+      version_descripcion: Etiqueta legible de la version elegida.
+      version_tex: Texto libre original de la version elegida.
+      tipo_master:
+        significado: >-
+          Tipo de la version elegida. Aqui solo pueden aparecer los tres tipos
+          que cuentan como master vigente.
+        valores: [ABC, Planif Inicial, Cuatrimestral]
+    relaciones:
+      - de: obra_id
+        a: mart.v_master_versiones_tipadas.obra_id
+        cardinalidad: N:1
+        porque: Es el catalogo del que se elige, filtrando por fecha efectiva.
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: N:1
+        porque: Para poner codigo y nombre a la obra.
+    ejemplos_preguntas:
+      - Que version de plan rige en la obra X para 2025
+      - Que obras no tienen ninguna version master vigente
+
+  v_pbi_cp_tipologia:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Desglose ANUAL de los Costes Proporcionales por tipologia de negocio
+      (seguros, avales, levantamiento, contratacion, medio ambiente y aporte a
+      gastos generales), comparando real y planificado sobre la MISMA ventana de
+      meses. Solo salen las filas con algun importe distinto de cero.
+    grano: >-
+      Una fila por (obra, ano, tipologia). El plan y el real se suman sobre la
+      misma ventana [enero .. mes de corte]: 12 si el ano ya paso, y el ultimo
+      mes con cierre real si es el ano en curso. Cortar el plan en el mes de
+      calendario lo dejaria siempre por delante del real.
+    clave_negocio: [obra_id, anio, tipologia]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      anio:
+        significado: Ano al que se refiere la agregacion.
+        agregacion: no_sumable
+      tipologia:
+        significado: >-
+          Agrupacion de negocio de los CP. Se deduce del subcapitulo cuando este
+          es definitorio (CP.1 a CP.4, CP.6, CP.9, CP.12) y, si no, por el texto
+          de la descripcion. Lo que no encaja en ninguna regla va a APORTE GG.
+        valores:
+          - LEVANTAMIENTO
+          - SEGUROS
+          - AVALES
+          - CONTRATACION
+          - MEDIO AMBIENTE
+          - APORTE GG
+      orden_tipologia:
+        significado: Orden de presentacion de la tipologia. Es presentacion, no un dato.
+        agregacion: no_sumable
+      cp_real:
+        significado: Coste proporcional real acumulado en la ventana del ano.
+        unidad: EUR
+        agregacion: suma
+      cp_planificado:
+        significado: Coste proporcional planificado en la MISMA ventana, segun la version vigente.
+        unidad: EUR
+        agregacion: suma
+      cp_desviacion:
+        significado: >-
+          Real menos planificado. Positivo significa gastado de mas frente al
+          plan.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: N:1
+        porque: Para poner codigo y nombre a la obra.
+      - de: obra_id
+        a: mart.v_master_vigente_anual.obra_id
+        cardinalidad: N:1
+        porque: Es la version de plan que se usa para la columna planificada.
+    ejemplos_preguntas:
+      - Cuanto llevamos de seguros y avales en la obra X este ano
+      - Que obras se desvian mas en costes proporcionales
+
+  v_fact_periodificado:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      HOY NO PERIODIFICA NADA. `aux.periodificacion_partida` se crea vacia por
+      diseno, asi que la vista devuelve exactamente lo mismo que
+      `mart.fact_seguimiento_mensual` mas dos columnas de trazabilidad, y todas
+      sus filas salen marcadas 'NO_PERIODIFICADO'. Usar la tabla de hecho es mas
+      barato y menos confuso. Cuando se carguen reglas, esta ficha cambia.
+    descripcion: >-
+      El hecho del seguimiento con las reglas de periodificacion aplicadas: coge
+      un coste imputado de golpe —un seguro, un aval— y lo reparte a lo largo de
+      su plazo. Solo periodifica COSTE; la venta pasa siempre directa.
+    grano: >-
+      Una fila por (obra, partida, mes, escenario), igual que la tabla de hecho,
+      salvo en las filas periodificadas, donde una imputacion de un mes se
+      convierte en tantas filas como meses tenga su plazo.
+    clave_negocio: [obra_id, partida_id, anio_mes, escenario]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      fact_id:
+        significado: Clave tecnica de la fila original.
+        nulo_significa: La fila es derivada, no existe en la tabla de hecho.
+        agregacion: clave_sustituta
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra.
+      partida_id:
+        significado: Identificador de la partida en Sigrid.
+        agregacion: no_sumable
+      codigo_partida: Codigo jerarquico de la partida dentro de su obra.
+      descripcion_partida: Descripcion corta de la partida.
+      unidad_medida: Unidad de medicion de la partida.
+      categoria:
+        significado: Clasificacion del coste, derivada del capitulo raiz.
+        valores: [CD, CI, CP, OTRO]
+      capitulo_raiz_cod: Codigo del capitulo raiz.
+      ruta_capitulos: Camino de capitulos separado por ' > '.
+      anio_mes:
+        significado: Mes al que queda imputada la fila DESPUES de periodificar.
+        agregacion: no_sumable
+      anio:
+        significado: Ano de `anio_mes`.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes de `anio_mes`.
+        agregacion: no_sumable
+      nombre_mes: Etiqueta del mes en castellano con su ano.
+      escenario:
+        significado: Cruce de magnitud y naturaleza.
+        valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
+      tipo_dato:
+        significado: Naturaleza del dato.
+        valores: [REAL, PLANIFICADO]
+      concepto:
+        significado: Magnitud del dato. Solo se periodifica COSTE.
+        valores: [COSTE, VENTA]
+      ambito_id:
+        significado: Ambito de Sigrid de origen.
+        agregacion: no_sumable
+      importe_mes:
+        significado: >-
+          Importe imputado al mes YA periodificado. En las filas repartidas es el
+          total dividido entre el plazo.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: >-
+          Acumulado a origen. OJO: en las filas periodificadas NO es un
+          acumulado, se repite el importe del mes; el acumulado se calcula en
+          consumo.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_mes_raw:
+        significado: Version sin redondear del importe del mes periodificado.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen_raw:
+        significado: Version sin redondear del acumulado, con la misma advertencia.
+        unidad: EUR
+        agregacion: ultimo_valor
+      can_mes:
+        significado: Cantidad imputada al mes.
+        nulo_significa: La fila es periodificada; el reparto no conserva cantidades.
+        agregacion: suma_solo_dentro_del_mes
+      can_origen:
+        significado: Cantidad acumulada a origen.
+        nulo_significa: La fila es periodificada.
+        agregacion: ultimo_valor
+      precio_unitario:
+        significado: Precio unitario de la partida.
+        unidad: EUR
+        agregacion: no_sumable
+      version_master:
+        significado: Numero de la version master del planificado.
+        nulo_significa: La fila es REAL.
+        agregacion: no_sumable
+      version_descripcion: Etiqueta legible de la version, o del mes en las filas reales.
+      version_tex:
+        significado: Texto libre de la version master.
+        nulo_significa: La fila es REAL.
+      version_fec_creacion:
+        significado: Fecha de creacion de la version master.
+        nulo_significa: La fila es REAL.
+        agregacion: no_sumable
+      tipo_master:
+        significado: Tipo de la version master, deducido del texto.
+        valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]
+        nulo_significa: La fila es REAL.
+      total_incurrido:
+        significado: Incurrido a origen de Sigrid. Solo en coste real y sin periodificar.
+        unidad: EUR
+        agregacion: ultimo_valor
+      total_incurrido_mes:
+        significado: Incurrido del mes de Sigrid. Solo en coste real y sin periodificar.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      regla_id_aplicada:
+        significado: Regla de `aux.periodificacion_partida` que se aplico a la fila.
+        nulo_significa: No se aplico ninguna regla; la fila pasa tal cual.
+        agregacion: no_sumable
+      marca:
+        significado: >-
+          Si la fila viene tal cual de la tabla de hecho o es resultado de un
+          reparto. Hoy todas son 'NO_PERIODIFICADO'.
+        valores: [NO_PERIODIFICADO, PERIODIFICADO]
+    relaciones:
+      - de: fact_id
+        a: mart.fact_seguimiento_mensual.fact_id
+        cardinalidad: 1:1
+        porque: >-
+          Las filas no periodificadas son las mismas. Las periodificadas no
+          tienen equivalente y traen `fact_id` nulo.
+      - de: regla_id_aplicada
+        a: aux.periodificacion_partida.regla_id
+        cardinalidad: N:1
+        porque: Para saber que regla reparte el importe y con que plazo.
+    ejemplos_preguntas:
+      - Como quedaria el coste de la obra X si se periodificaran los seguros
