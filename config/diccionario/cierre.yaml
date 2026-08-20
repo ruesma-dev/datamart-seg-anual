@@ -82,7 +82,10 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_anterior:
-        significado: El mismo acumulado, pero al cierre del mes anterior.
+        significado: >-
+          El mismo acumulado, pero en la FILA ANTERIOR de esa obra y ese
+          concepto. Ojo: es la fila anterior, no el mes de calendario anterior;
+          si un mes no tiene cierre, no hay fila y se salta.
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_mes:
@@ -98,10 +101,16 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
       final_anterior:
-        significado: La misma prevision, tal y como estaba al cierre del mes anterior.
+        significado: >-
+          La misma prevision en la FILA ANTERIOR de esa obra y ese concepto. Si
+          entonces no habia prevision vale **0, no nulo**: el importe del que se
+          copia ya viene con los nulos convertidos a cero. Filtrar por `IS NULL`
+          para buscar «sin prevision anterior» pierde todas esas filas.
         unidad: EUR
         agregacion: ultimo_valor
-        nulo_significa: No habia prevision el mes anterior; es el primer cierre de la obra.
+        nulo_significa: >-
+          Es la PRIMERA fila de esa obra y ese concepto: no hay ninguna anterior
+          de la que copiar.
       pendiente_importe:
         significado: >-
           Lo que queda por ejecutar: la prevision final menos lo ejecutado a
@@ -229,7 +238,10 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_anterior:
-        significado: El mismo acumulado al cierre del mes anterior.
+        significado: >-
+          El mismo acumulado en la fila anterior de esa serie. Es la fila
+          anterior, no el mes de calendario anterior: los meses sin cierre no
+          tienen fila y se saltan.
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_mes:
@@ -241,10 +253,14 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
       final_anterior:
-        significado: La misma prevision al cierre del mes anterior.
+        significado: >-
+          La misma prevision en la fila anterior de esa serie. Si entonces no
+          habia prevision vale 0, no nulo.
         unidad: EUR
         agregacion: ultimo_valor
-        nulo_significa: No hay mes anterior con prevision.
+        nulo_significa: >-
+          Es la primera fila de esa obra y ese concepto: no hay ninguna anterior
+          de la que copiar.
       pendiente_importe:
         significado: Lo que queda por ejecutar hasta la prevision final.
         unidad: EUR
@@ -279,9 +295,11 @@ objetos:
         nulo_significa: La venta usada como divisor es cero o no existe.
       final_pct:
         significado: >-
-          El importe final del concepto sobre la venta final. UNICA EXCEPCION del
-          cuadro: en la fila VENTA el divisor es
-          `presupuesto_aprobado_venta` de la cabecera, no la venta final.
+          El importe final del concepto sobre la venta final. En la fila VENTA
+          el divisor cambia y es `presupuesto_aprobado_venta` de la cabecera.
+          Matiz: en la fila VENTA los cinco porcentajes usan un divisor propio
+          —la venta final en vez de la venta de su columna—; lo particular de
+          este es que ademas ese divisor sale de otra vista.
         unidad: "%"
         agregacion: promedio
         nulo_significa: El divisor es cero o no existe.
@@ -342,9 +360,11 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      Catalogo ESTATICO de los seis conceptos del cuadro de cierre, con su
+      Catalogo FIJO de los seis conceptos del cuadro de cierre, con su
       descripcion legible y su orden. No lee ninguna tabla: son seis filas
-      escritas en la propia vista.
+      escritas en la propia vista, asi que su contenido no cambia nunca. Declara
+      `refresco: manual` porque la VISTA se recrea con `build-cierre`, que es
+      otra cosa que el contenido.
     grano: Una fila por concepto. Siempre seis.
     clave_negocio: [concepto]
     paso_etl: build_cierre
@@ -372,8 +392,10 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      Catalogo ESTATICO de las seis tipologias de coste proporcional, con su
-      descripcion y su orden. Mismas seis que usa `mart.v_pbi_cp_tipologia`.
+      Catalogo FIJO de las seis tipologias de coste proporcional, con su
+      descripcion y su orden. Mismas seis que usa `mart.v_pbi_cp_tipologia`. Su
+      contenido no cambia nunca; declara `refresco: manual` porque la VISTA se
+      recrea con `build-cierre`.
     grano: Una fila por tipologia. Siempre seis.
     clave_negocio: [tipologia]
     paso_etl: build_cierre
@@ -453,9 +475,10 @@ objetos:
       paralelo para los grupos de infraestructura. Las cuatro conviven a
       proposito: no hay una elegida, se comparan.
     grano: >-
-      Una fila por (obra, mes, grupo, subcategoria). Las columnas de
-      periodificacion solo tienen valor en los grupos cuyo nombre contiene
-      "INFRA"; en el resto van a nulo.
+      Una fila por (obra, mes, grupo, subcategoria). Las columnas CALCULADAS de
+      periodificacion (ratios, acumulados y parciales) solo tienen valor en los
+      grupos cuyo nombre contiene "INFRA"; en el resto van a nulo. Sus dos
+      entradas, `importe_fase0` y `plazo_total_meses`, traen valor siempre.
     clave_negocio: [obra_id, anio_mes, grupo_cod, subcategoria_cod]
     paso_etl: build_cierre
     refresco: manual
@@ -484,7 +507,10 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_anterior:
-        significado: El mismo acumulado al cierre del mes anterior.
+        significado: >-
+          El mismo acumulado en la fila anterior de esa serie. Es la fila
+          anterior, no el mes de calendario anterior: los meses sin cierre no
+          tienen fila y se saltan.
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_mes:
@@ -493,17 +519,23 @@ objetos:
         agregacion: suma_solo_dentro_del_mes
       es_infraestructura: >-
         Marca los grupos cuyo nombre contiene "INFRA", que son los unicos que se
-        periodifican. En el resto, todas las columnas de periodificacion son
-        nulas.
+        periodifican. En el resto quedan nulas las columnas CALCULADAS (ratios,
+        acumulados y parciales), pero no sus dos entradas.
       importe_fase0:
         significado: >-
           Importe previsto de la subcategoria en el presupuesto vivo (fase 0). Es
-          la base sobre la que se calculan las periodificaciones.
+          la base sobre la que se calculan las periodificaciones, y trae valor
+          este el grupo periodificado o no.
         unidad: EUR
         agregacion: ultimo_valor
         nulo_significa: La subcategoria no tiene presupuesto vivo.
       plazo_total_meses:
-        significado: Meses de plazo de la obra, usados por la periodificacion lineal.
+        significado: >-
+          Meses de plazo de la obra usados por la periodificacion lineal. Trae
+          valor este el grupo periodificado o no. OJO: **no coincide con
+          `plazo_meses` de `cierre.v_pbi_cierre_cabecera`**, que se calcula con
+          otra pareja de fechas: la misma obra da dos numeros distintos y no son
+          intercambiables.
         agregacion: no_sumable
         nulo_significa: La obra no tiene plazo calculable.
       ratio_periodif:
@@ -642,7 +674,10 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_anterior:
-        significado: El mismo acumulado al cierre del mes anterior.
+        significado: >-
+          El mismo acumulado en la fila anterior de esa serie. Es la fila
+          anterior, no el mes de calendario anterior: los meses sin cierre no
+          tienen fila y se saltan.
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_mes:
@@ -759,7 +794,9 @@ objetos:
         significado: >-
           Duracion en meses entre la mejor pareja de fechas disponible: real con
           real si la obra acabo, real con previsto si sigue viva, y previsto con
-          previsto si no hay fechas reales.
+          previsto si no hay fechas reales. OJO: **no coincide con
+          `plazo_total_meses` de `cierre.v_pbi_cierre_indirectos_detalle`**, que
+          se calcula de otra forma; la misma obra da dos numeros distintos.
         agregacion: no_sumable
         nulo_significa: No hay una pareja de fechas con la que calcularlo.
       coeficiente_indirectos:

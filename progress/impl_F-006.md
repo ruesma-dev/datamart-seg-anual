@@ -907,3 +907,33 @@ El test que rozaba la circularidad —comprobaba que la cadena
 promesa— se sustituye por uno que comprueba **un hecho sobre `main.py`**: que el
 comando no exista mientras los docstrings lo den por futuro. El dia que alguien
 implemente R28, ese test se pone en rojo y obliga a corregir los textos.
+
+## Hallazgos menores de la review (1 a 6), tambien corregidos
+
+No bloqueaban, pero son texto que un agente lee para decidir y estaba
+equivocado. Fase RED:
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "fila_anterior or final_anterior_es_cero or periodificacion_no_anula or dos_plazos or catalogos_estaticos"
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_anterior_es_la_fila_anterior_no_el_mes_anterior
+FAILED tests/test_f006_fichas.py::test_f006_r2_final_anterior_es_cero_y_no_nulo_cuando_no_hubo_prevision
+FAILED tests/test_f006_fichas.py::test_f006_r2_la_periodificacion_no_anula_todas_sus_columnas
+FAILED tests/test_f006_fichas.py::test_f006_r2_los_dos_plazos_se_advierten_entre_si
+FAILED tests/test_f006_fichas.py::test_f006_r2_los_catalogos_estaticos_no_se_contradicen_con_su_refresco
+5 failed, 89 deselected in 1.27s
+```
+
+| # | Corregido |
+|---|---|
+| 1 | Fuera de INFRA no son nulas «todas las columnas de periodificacion»: **`importe_fase0` y `plazo_total_meses` traen valor siempre**, porque son las ENTRADAS del calculo, no su resultado. Corregido en el `grano`, en `es_infraestructura` y en las dos columnas |
+| 2 | `final_anterior` vale **0, no nulo**, cuando no hubo prevision: el importe del que se copia es un `COALESCE(..., 0)`. Solo es nulo en la PRIMERA fila de la particion. Buscar «sin prevision anterior» con `IS NULL` perdia todas esas filas |
+| 3 | «al cierre del mes anterior» significa **la fila anterior**, no el mes de calendario anterior: el `LAG` salta los meses sin fase. Corregido en las **cuatro** fichas que usaban la frase |
+| 4 | `v_pbi_cierre_cabecera.plazo_meses` y `v_pbi_cierre_indirectos_detalle.plazo_total_meses` **dan numeros distintos para la misma obra**. Ahora cada una advierte de la otra por su nombre |
+| 5 | `final_pct` no era «la unica excepcion del cuadro»: en la fila VENTA los cinco porcentajes cambian de divisor. Lo propio de `final_pct` es que su divisor sale **de otra vista** |
+| 6 | «catalogo ESTATICO» junto a `refresco: manual` se leia como un error. Las dos cosas son ciertas —el contenido esta escrito en la vista y la vista se recrea con `build-cierre`— y ahora la ficha lo dice, en vez de dejar al lector resolviendo la aparente contradiccion |
+
+El hallazgo 7 —tres comentarios del SQL que mienten: el tope del `ratio_lineal`,
+un fallback inexistente y un JOIN muerto con `raw.cen`— **se anota y no se
+toca**: es deuda del SQL de negocio, y la regla de hierro 3 de `tasks.md` dice
+que no se arregla aqui. Candidato a una feature de limpieza, y conviene, porque
+engañaran a quien lea el SQL creyendo que el YAML es el que se equivoca.

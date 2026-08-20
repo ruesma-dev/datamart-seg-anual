@@ -660,3 +660,89 @@ def test_f006_r26_el_extractor_ignora_los_comentarios() -> None:
 
     assert "segmentadores" not in proyectadas
     assert "estrella" not in proyectadas
+
+
+# ---------------------------------------------------------------------------
+# Hallazgos menores de la review · matices que el SQL contradice
+#
+# No bloqueaban, pero son texto que un agente lee para decidir, y estaban
+# equivocados. Cada uno se comprobó contra el SQL antes de escribirlo.
+# ---------------------------------------------------------------------------
+
+
+def test_f006_r2_el_anterior_es_la_fila_anterior_no_el_mes_anterior() -> None:
+    """`LAG` sobre (obra, concepto) ordenado por mes: salta los meses sin fila.
+
+    «El mes anterior» invita a restar un mes de calendario, que es otra cosa.
+    """
+    fichas = _fichas_de("cierre")
+
+    for objeto in ("fact_cierre_mensual", "v_pbi_cierre_resumen",
+                   "v_pbi_cierre_indirectos_detalle",
+                   "v_pbi_cierre_generales_detalle"):
+        columnas = {c.nombre: c for c in fichas[objeto].columnas}
+        for columna in ("ejecutado_anterior", "final_anterior"):
+            if columna not in columnas:
+                continue
+            assert "fila anterior" in columnas[columna].significado.lower(), (
+                f"{objeto}.{columna}"
+            )
+
+
+def test_f006_r2_final_anterior_es_cero_y_no_nulo_cuando_no_hubo_prevision() -> None:
+    """`final_importe` es un `COALESCE(..., 0)`, así que su `LAG` es 0.
+
+    Solo es NULL en la primera fila de la partición, que es la primera de esa
+    obra y ese concepto. Decir «no había previsión el mes anterior» mandaba a
+    filtrar por `IS NULL` y perder todas las filas con 0.
+    """
+    columnas = {
+        c.nombre: c for c in _fichas_de("cierre")["fact_cierre_mensual"].columnas
+    }
+
+    nulo = columnas["final_anterior"].nulo_significa or ""
+
+    assert "primera" in nulo.lower()
+    assert "0" in columnas["final_anterior"].significado
+
+
+def test_f006_r2_la_periodificacion_no_anula_todas_sus_columnas() -> None:
+    """`importe_fase0` y `plazo_total_meses` traen valor también fuera de INFRA."""
+    ficha = _fichas_de("cierre")["v_pbi_cierre_indirectos_detalle"]
+    columnas = {c.nombre: c for c in ficha.columnas}
+
+    assert columnas["importe_fase0"].nulo_significa
+    assert "periodifica" not in (columnas["importe_fase0"].nulo_significa or "")
+    assert "todas las columnas de periodificacion son nulas" not in ficha.grano
+    assert "todas las columnas de periodificacion son nulas" not in (
+        columnas["es_infraestructura"].significado
+    )
+
+
+def test_f006_r2_los_dos_plazos_se_advierten_entre_si() -> None:
+    """`plazo_meses` de la cabecera y `plazo_total_meses` del detalle se
+    calculan distinto y dan números distintos para la misma obra."""
+    cabecera = {
+        c.nombre: c for c in _fichas_de("cierre")["v_pbi_cierre_cabecera"].columnas
+    }
+    detalle = {
+        c.nombre: c
+        for c in _fichas_de("cierre")["v_pbi_cierre_indirectos_detalle"].columnas
+    }
+
+    assert "plazo_total_meses" in cabecera["plazo_meses"].significado
+    assert "plazo_meses" in detalle["plazo_total_meses"].significado
+
+
+def test_f006_r2_los_catalogos_estaticos_no_se_contradicen_con_su_refresco() -> None:
+    """Se describían como «catálogo ESTATICO» declarando `refresco: manual`.
+
+    Las dos cosas son ciertas y no se contradicen —el contenido está escrito en
+    la vista, y la vista se recrea con `build-cierre`—, pero había que decirlo,
+    porque leídas juntas parecen un error.
+    """
+    for objeto in ("v_pbi_dim_concepto", "v_pbi_dim_tipologia_cp"):
+        ficha = _fichas_de("cierre")[objeto]
+
+        assert ficha.refresco == "manual"
+        assert "build-cierre" in ficha.descripcion, objeto
