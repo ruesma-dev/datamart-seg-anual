@@ -3,41 +3,78 @@
 
 ## F-006 · El diccionario semántico del datamart — `in_progress`
 
-Rama `feature/F-006-mcp-azure`. **Bloques A, B, C y D terminados** (T3 a T14),
-con `bash harness/init.sh` en verde: 1052 tests, cobertura de líneas cambiadas
-98,8 % y campaña de mutación con **0 supervivientes de 112 mutantes**.
+Rama `feature/F-006-mcp-azure`. **Bloques A, B, C y D entregados y corregidos
+tras el RECHAZADO del reviewer** (`progress/review_F-006.md`): los diez defectos
+están cerrados, cada uno con su fase RED.
 
-Informe completo: `progress/impl_F-006.md`.
-Campaña de mutación: `progress/mutacion_F-006.md`.
+`bash harness/init.sh` en verde: **1125 tests**, cobertura de las líneas
+cambiadas **98,7 %** y campaña de mutación con **0 supervivientes de 128
+mutantes**.
+
+- Informe de implementación: `progress/impl_F-006.md`
+- Campaña de mutación: `progress/mutacion_F-006.md`
+- Review que provocó las correcciones: `progress/review_F-006.md`
 
 ### Qué hay ya
 
 - **Andamiaje** (bloque A): `etl_sigrid/domain/diccionario.py` (entidades y
   validador), `etl_sigrid/domain/inventario.py` (inventario y cobertura),
   `etl_sigrid/infrastructure/diccionario/cargador_yaml.py`, y la puerta de
-  cobertura en `tests/test_f006_cobertura.py`, que corre en cada `init.sh`.
-- **Bloque global** (bloque B): `config/diccionario/00_global.yaml` con las doce
-  reglas duras, los órdenes de magnitud, las convenciones, los nueve esquemas y
-  las 18 preguntas de la batería de aceptación.
-- **Fichas**: `mart.yaml` (13 objetos) y `cierre.yaml` (12 objetos).
+  cobertura, que corre en cada `init.sh`.
+- **Bloque global** (bloque B): las doce reglas duras, los órdenes de magnitud,
+  las convenciones, los nueve esquemas y las 18 preguntas de la batería.
+- **Fichas**: `mart.yaml` (13 objetos) y `cierre.yaml` (12), 332 columnas.
 
-El trinquete `PENDIENTES_MAX` está en **73** de 98 objetos y solo baja.
+El trinquete `pendientes` está en **73** de 98 objetos, ahora anclado al
+inventario y al historial de git: un objeto documentado ya no puede volver.
 
 ### Lo siguiente
 
 Bloque E (`tasks.md` T15–T19): la publicación en `_meta`, que es el contrato con
-el repositorio `mcp-bbdd`. Después F y G (el resto de fichas), y solo entonces
-los bloques 🔏 de permisos y firewall, que necesitan firma del humano.
+`mcp-bbdd`. Después F y G (el resto de fichas), y solo entonces los bloques 🔏
+de permisos y firewall, que necesitan firma del humano.
+
+### Verificaciones `MANUAL (humano)` pendientes
+
+Ninguna corresponde a los bloques A–D; se listan aquí porque el checkpoint C4 lo
+pide y para que no se pierdan:
+
+| Tarea | Qué hay que hacer |
+|---|---|
+| **T19** | `python main.py publicar-diccionario` contra la BBDD real y comprobar el contrato de `_meta` |
+| **T27** | `python main.py check-diccionario` contra el catálogo real, con código de salida 0 |
+| **T32** 🔏 | Verificar que Power BI no lee de `stg` ni de `raw` |
+| **T33** 🔏 | Activar `PG_REVOKE_FUERA_DE_CONSUMO` y ejecutar `apply-grants` |
+| **T34** 🔏 | Comprobar que Power BI sigue refrescando |
+| **T37** | Actualizar `azure-apps/datamart_seg_anual.md` |
+| **T38** 🔏 | Regla de firewall para la IP del entorno del MCP |
+| **T39** | Ejecutar las 18 preguntas de la batería contra el diccionario publicado |
 
 ### Avisos que no hay que perder
 
-- **`build-compras` y `build-retenciones` no registran paso en `_meta.etl_runs`**:
-  su fecha de build no es consultable por SQL. Afecta a T20, T21 y al valor real
-  de `_meta.v_diccionario`.
-- El inventario real son **98 objetos**, no «más de 80», y `cierre` tiene **8
-  vistas**, no 6: conviene enmendar `design.md` §5.1 y `tasks.md` T14.
-- El ejemplo de ficha de `design.md` §3.3 usa nombres de columna y literales de
-  escenario **que no existen** en el SQL. Las fichas usan los reales.
+- **`build-compras` y `build-retenciones` no registran paso en
+  `_meta.etl_runs`**: su fecha de build no es consultable por SQL. Afecta a T20,
+  T21 y al valor real de `_meta.v_diccionario`. Ya está dicho dentro de
+  `R-FRESCURA-MANUAL`.
+- **`check-diccionario` (R28) no existe todavía.** Los docstrings ya no lo dan
+  por cubierto, y hay un test que se pone en rojo el día que se implemente para
+  obligar a corregirlos.
+- **Dependencia dura del bloque E**: si T15 crea `_meta.v_diccionario`, hay que
+  añadirla al texto de `R-FRESCURA-MANUAL`, de donde se retiró por no existir.
+- **Deuda del SQL de negocio, anotada y no tocada**: tres comentarios que
+  mienten —el tope del `ratio_lineal` (`04_views_detalle.sql:295`), un fallback
+  inexistente (`03_views.sql:129`) y un JOIN muerto con `raw.cen`
+  (`05_views_cabecera.sql:174`)—. Engañarán a quien lea el SQL creyendo que el
+  YAML se equivoca. Candidatos a una feature de limpieza.
+
+### Decisión pendiente del humano
+
+El reviewer propone una mejora de `CHECKPOINTS.md`, **no aplicada**: que cuando
+una feature entregue contenido declarativo que otro sistema consumirá, C4 exija
+que los valores del contrato pasen por un vocabulario cerrado validado, no solo
+que el campo exista. Es lo que habría cazado el `cardinalidad: 61`, que ni la
+cobertura ni la mutación podían ver porque el valor venía del dato y no del
+código.
 
 ### Nada de esto se ha tocado
 
