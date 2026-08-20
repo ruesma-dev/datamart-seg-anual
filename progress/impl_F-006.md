@@ -2389,3 +2389,66 @@ Para que el resumen al humano no prometa de mas:
 - **Las 18 preguntas de `requirements.md` §9 (T39) no se han pasado.** Hasta
   entonces, que una ficha sea correcta no demuestra todavia que sea *suficiente*
   para responder la pregunta a la que apunta.
+
+## Los cuatro «timeouts» de la mutacion eran cuatro supervivientes
+
+La campana cerro asi:
+
+```
+166 mutantes evaluados, 162 muertos, 0 supervivientes, 4 timeouts en 633.2 s
+```
+
+Leido deprisa es una campana limpia. **No lo era.** Los cuatro timeouts fueron
+consecutivos (17 a 20) y coincidieron con otra suite corriendo en la misma
+maquina, asi que en vez de darlos por ruido los reevalue **de uno en uno**,
+aplicando la mutacion a mano y lanzando la suite:
+
+```
+--- linea 173: frozen=True -> frozen=False              =>  SUPERVIVIENTE
+--- linea 140: "ejemplo_pregunta": 20 -> 21             =>  SUPERVIVIENTE
+--- linea 189: frozen=True -> frozen=False              =>  SUPERVIVIENTE
+--- linea 137: "grano": 20 -> 21                        =>  SUPERVIVIENTE
+    (752 passed, 82 skipped en cada uno)
+```
+
+**Los cuatro.** La leccion vale mas que los cuatro tests: un timeout **no es un
+mutante muerto, es un mutante sin evaluar**, y un informe que los cuenta en una
+fila aparte de «supervivientes: 0» invita a leerlos como ruido de maquina.
+
+### Que eran, y por que ninguno es equivalente
+
+- **`frozen=True` -> `frozen=False` en `Columna` y `Relacion`.** Nada rompia al
+  volverlas mutables. La inmutabilidad no es decoracion: estas entidades se
+  comparten entre el validador, el cargador y los constructores de SQL, y se
+  publican tal cual; si una `Columna` puede cambiarse entre que se valida y que
+  se publica, **lo publicado no es lo validado**. La hermana `Ficha` (linea 277)
+  si tenia quien la cazara; estas dos no.
+- **Los minimos de longitud subidos en uno** (`grano` y `ejemplo_pregunta`, de
+  20 a 21). Sobrevivian porque **ningun caso ejercita el borde**: si ninguna
+  ficha ni ningun test tiene un texto de exactamente 20 caracteres, mover el
+  umbral no cambia ningun veredicto.
+
+### El primer arreglo tampoco valia, y es el error interesante
+
+Escribi los tests de borde leyendo el minimo de la propia constante
+(`MINIMOS_TEXTO[campo]`). Resultado: al subir la constante, el texto de prueba
+subia con ella y el borde seguia pasando. **Los dos mutantes sobrevivieron al
+test escrito para matarlos**:
+
+```
+173: frozen -> MUERTO
+140: "ejemplo_pregunta": 20 -> 21  =>  SUPERVIVIENTE
+189: frozen -> MUERTO
+137: "grano": 20 -> 21             =>  SUPERVIVIENTE
+```
+
+**Un test que se mueve con lo que vigila no vigila.** Los numeros pasan a estar
+escritos en `MINIMOS_FIJADOS`, con un test que los une a `MINIMOS_TEXTO`: mover
+el umbral obliga a tocar las dos y se ve en el diff. Con eso, los cuatro mueren:
+
+```
+173: frozen=True -> frozen=False          =>  MUERTO
+140: "ejemplo_pregunta": 20 -> 21         =>  MUERTO
+189: frozen=True -> frozen=False          =>  MUERTO
+137: "grano": 20 -> 21                    =>  MUERTO
+```
