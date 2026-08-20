@@ -773,3 +773,38 @@ nombres concretos, y diga que en `cierre` se llaman `ejecutado_mes` y
 `ejecutado_origen`: el agente busca por nombre de columna, y `importe_mes` no le
 dice nada cuando esta mirando el cierre. El `motivo` explica ahora por que la
 regla se redacto mirando a `mart` cuando el bug ocurrio en `cierre`.
+
+## Defecto 9 · `design.md` senalado y no corregido
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "contrato or recuento_real"
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_ejemplo_del_contrato_no_usa_nombres_que_no_existen[obra_codigo]
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_ejemplo_del_contrato_no_usa_nombres_que_no_existen[partida_codigo]
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_ejemplo_del_contrato_no_usa_nombres_que_no_existen[COSTE_REAL]
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_ejemplo_del_contrato_no_usa_nombres_que_no_existen[VENTA_PLAN]
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_ejemplo_del_contrato_no_usa_nombres_que_no_existen[COSTE_PLAN]
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_ejemplo_del_contrato_usa_los_nombres_reales
+FAILED tests/test_f006_fichas.py::test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos
+7 failed, 81 deselected in 0.55s
+```
+
+Corregido en `specs/F-006-mcp-azure/design.md`, con una **nota de enmienda
+fechada** al principio de §3 que dice que se cambio y por que —el ejemplo es lo
+que copia quien escriba las 73 fichas que faltan—:
+
+- §3.3: `obra_codigo` -> `codigo_obra`, `partida_codigo` -> `codigo_partida`,
+  `mes` -> `anio_mes`, los cuatro literales de escenario a
+  `Coste Real / Coste Planificado / Venta Real / Venta Planificada`, y la
+  relacion a `maestro.obras.obra_id`, que es la columna que esa vista expone.
+- El ejemplo **documenta ahora las columnas de su propia clave de negocio**
+  (`obra_id`, `partida_id`, `anio_mes`): antes la clave nombraba columnas que la
+  ficha de ejemplo no traia, asi que el propio ejemplo no habria pasado el
+  validador que el documento especifica.
+- §5.1: `mart` **13 objetos (2 + 11 vistas)** y `cierre` **12 (1 + 8 vistas + 3
+  funciones)**; §14.1 pasa de «mas de 80 objetos» a **98**.
+
+**Endurecimiento**: tres tests vigilan el documento. Dos se acotan a los bloques
+YAML —la prosa puede y debe citar los nombres equivocados para explicar la
+enmienda— y el tercero compara el recuento del documento contra el inventario
+real, asi que si manana se publica un objeto nuevo, el documento se queda en
+rojo hasta que alguien lo actualice.

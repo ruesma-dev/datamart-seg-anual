@@ -444,3 +444,58 @@ def test_f006_r2_cliente_ide_avisa_de_que_el_cero_es_el_sin_cliente() -> None:
     assert cliente.nulo_significa is None
     assert "0" in cliente.significado
     assert "NULL" in cliente.significado.upper()
+
+
+# ---------------------------------------------------------------------------
+# El ejemplo de `design.md` §3.3 es el contrato (defecto 9)
+#
+# Es lo que copiara quien escriba `compras.yaml`, `retenciones.yaml` y las 73
+# fichas que faltan. Que las fichas de este bloque esten bien no evita que el
+# error se propague desde el documento.
+# ---------------------------------------------------------------------------
+
+DESIGN = RAIZ / "specs" / "F-006-mcp-azure" / "design.md"
+
+
+def _yaml_del_contrato() -> str:
+    """Solo los bloques YAML de `design.md`, no la prosa.
+
+    La comprobación se acota al ejemplo porque es lo que se copia; la prosa
+    puede (y debe) citar los nombres equivocados para explicar la enmienda.
+    """
+    texto = DESIGN.read_text(encoding="utf-8")
+    bloques = texto.split("```")
+    return chr(10).join(b for i, b in enumerate(bloques) if i % 2 == 1)
+
+
+@pytest.mark.parametrize(
+    "inventado",
+    ["obra_codigo", "partida_codigo", "COSTE_REAL", "VENTA_PLAN", "COSTE_PLAN"],
+)
+def test_f006_r2_el_ejemplo_del_contrato_no_usa_nombres_que_no_existen(
+    inventado: str,
+) -> None:
+    texto = _yaml_del_contrato()
+
+    assert inventado not in texto, (
+        f"`{inventado}` no existe en el SQL y el ejemplo del contrato lo usa"
+    )
+
+
+def test_f006_r2_el_ejemplo_del_contrato_usa_los_nombres_reales() -> None:
+    texto = _yaml_del_contrato()
+
+    for real in ("codigo_obra", "codigo_partida", "anio_mes", "Coste Real"):
+        assert real in texto, f"el ejemplo del contrato no usa `{real}`"
+
+
+def test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos() -> None:
+    """`design.md` estimaba «más de 80»; son 98, y el reparto por esquema
+    tampoco coincidía."""
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    texto = DESIGN.read_text(encoding="utf-8")
+    total = len(_inventario_del_repositorio())
+
+    assert str(total) in texto
+    assert "más de 80 objetos" not in texto

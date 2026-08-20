@@ -37,6 +37,15 @@ infraestructura.
 
 ## 3 · CONTRATO 1 · Formato exacto del YAML
 
+> **Enmienda del 2026-08-20 (review de los bloques A–D).** El ejemplo de §3.3
+> usaba nombres de columna y literales de escenario **que no existen en el SQL**
+> (`obra_codigo`, `partida_codigo`, `mes`, `COSTE_REAL`…). Corregido a los
+> reales, verificados contra `sql/mart/01_ddl.sql` y
+> `sql/mart/05_views_powerbi.sql`. Importa porque este ejemplo es lo que copia
+> quien escribe las fichas siguientes. En la misma enmienda se corrigen los
+> recuentos de §5.1: el inventario real son **98 objetos**, `mart` tiene **11
+> vistas** y `cierre` **8**.
+
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
 `grano`, `columnas`, `relaciones`, `ejemplos_preguntas`, más un bloque de notas
@@ -182,14 +191,28 @@ objetos:
     grano: >-
       Una fila por (obra, partida, mes, escenario). "Escenario" es la
       combinación de magnitud (COSTE o VENTA) y naturaleza (REAL o
-      PLANIFICADO): cuatro escenarios posibles por celda.
-    clave_negocio: [obra_codigo, partida_codigo, mes, escenario]
+      PLANIFICADO): cuatro escenarios posibles por celda. Los literales
+      exactos son los de la columna `escenario`, más abajo.
+    clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart            # coincide con _meta.v_frescura.paso
     refresco: nocturno              # nocturno | manual | estatico
 
     columnas:
       # forma abreviada (R6): equivale a {significado: "..."}
-      obra_codigo: Código de obra tal y como se teclea en Sigrid.
+      codigo_obra: Código de obra tal y como se teclea en Sigrid.
+      codigo_partida: Código jerárquico de la partida dentro de su obra.
+
+      # las columnas de la clave de negocio también se documentan
+      obra_id:
+        significado: Identificador de la obra en Sigrid (`con.ide`), estable
+          entre builds.
+        agregacion: no_sumable
+      partida_id:
+        significado: Identificador de la partida en Sigrid (`obrparpar.ide`).
+        agregacion: no_sumable
+      anio_mes:
+        significado: Mes de imputación, como fecha del día 1.
+        agregacion: no_sumable
 
       # forma completa
       importe_mes:
@@ -205,7 +228,7 @@ objetos:
         agregacion: ultimo_valor
       escenario:
         significado: Combinación de magnitud y naturaleza.
-        valores: [COSTE_REAL, COSTE_PLAN, VENTA_REAL, VENTA_PLAN]
+        valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
       version_tex:
         significado: >-
           Texto de la versión master de la que sale el planificado.
@@ -216,8 +239,8 @@ objetos:
         agregacion: clave_sustituta
 
     relaciones:
-      - de: obra_codigo
-        a: maestro.obras.obra_codigo
+      - de: obra_id
+        a: maestro.obras.obra_id
         cardinalidad: "N:1"
         porque: >-
           Para poner nombre, cliente o estado a la obra. OJO: maestro.obras
@@ -390,8 +413,8 @@ como comentario de cabecera en el propio fichero SQL.
 | Fichero | Contenido |
 |---|---|
 | `config/diccionario/00_global.yaml` | Notas, convenciones, los nueve esquemas, las doce reglas duras (R9), órdenes de magnitud (R10), `ocultar`, `pendientes` (R27) y la batería (R39) |
-| `config/diccionario/mart.yaml` | ~11 objetos: 2 tablas de hecho + 9 vistas |
-| `config/diccionario/cierre.yaml` | ~10 objetos: 1 tabla, 6 vistas, 3 funciones |
+| `config/diccionario/mart.yaml` | **13 objetos**: 2 tablas de hecho + 11 vistas |
+| `config/diccionario/cierre.yaml` | **12 objetos**: 1 tabla, 8 vistas, 3 funciones |
 | `config/diccionario/compras.yaml` | ~14 objetos: 7 tablas, 4 vistas, 3 funciones |
 | `config/diccionario/retenciones.yaml` | ~9 objetos: 2 tablas, 7 vistas |
 | `config/diccionario/maestro.yaml` | ~4 objetos: 3 vistas, 1 función |
@@ -820,7 +843,7 @@ una planificación, eso es F-030 y no entra en el YAML.
 | **Dejar el diccionario en `mcp-bbdd`** (como hoy) | Lo mantendría quien no conoce el modelo, se desincronizaría a la primera, y no habría forma de poner una puerta de cobertura: el repositorio del MCP no sabe qué objetos publica el datamart. Decisión ya tomada por el humano |
 | **Publicarlo por HTTP o por fichero compartido** | Obligaría al MCP a conocer una segunda fuente además de la conexión SQL que ya tiene, y rompería el multi-base: cada base publica su semántica en su propio `_meta` y el MCP no necesita saber de dónde salió |
 | **Generar el diccionario automáticamente desde `pg_catalog`** | Daría nombres y tipos, que es justo lo que el MCP ya obtiene solo. Lo que falta es el significado y las trampas, y eso no está en ningún catálogo |
-| **Un único YAML monolítico** | 34 fichas ya son 1.083 líneas en el prototipo; aquí hay más de 80 objetos. Un fichero por esquema hace el diff revisable y permite entregar por bloques |
+| **Un único YAML monolítico** | 34 fichas ya son 1.083 líneas en el prototipo; aquí hay 98 objetos. Un fichero por esquema hace el diff revisable y permite entregar por bloques |
 | **Modelo normalizado con tabla de columnas** | Un JOIN más y dos esquemas que mantener, para no ganar ninguna consulta que alguien vaya a escribir (§4.1) |
 | **Umbral de cobertura porcentual (95 %)** | Permite que la columna que falte sea la importante. Ver §10 |
 | **Atomicidad por `DROP TABLE` + `CREATE`** | Se lleva los `GRANT` y deja al MCP ciego hasta el `apply-grants` siguiente (§9.3) |
