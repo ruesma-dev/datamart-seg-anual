@@ -498,7 +498,7 @@ permisos), T37 (`azure-apps`), T38 (firewall) y T39 (la batería).
 
 ---
 
-## Evidencias
+## Evidencias (primera entrega, antes de la review)
 
 Números medidos, no estimados.
 
@@ -937,3 +937,52 @@ un fallback inexistente y un JOIN muerto con `raw.cen`— **se anota y no se
 toca**: es deuda del SQL de negocio, y la regla de hierro 3 de `tasks.md` dice
 que no se arregla aqui. Candidato a una feature de limpieza, y conviene, porque
 engañaran a quien lea el SQL creyendo que el YAML es el que se equivoca.
+
+---
+
+## Evidencias tras la review
+
+Numeros medidos de nuevo, no arrastrados de la entrega anterior.
+
+| Evidencia | Antes de la review | Ahora |
+|---|---|---|
+| **Tests que pasan** | 1052 | **1125** (332 de F-006) |
+| **Tests que fallan** | 0 | **0** |
+| **Tiempo de la suite** | 16,9 s | **25,6 s** sin cobertura; ~76 s dentro de `init.sh` |
+| **Cobertura de las lineas cambiadas** | 98,8 % (493/499) | **98,7 % (537/544)**, umbral 80 %, nivel `critico` |
+| **Mutantes / supervivientes** | 112 / 0 | **128 / 0**, 0 timeouts, 359,0 s |
+| **Objetos documentados** | 25 de 98 | 25 de 98 |
+| **Columnas descritas** | 332 | 332, ahora **exactas contra la proyeccion de cada vista** |
+| **Relaciones publicadas** | 42, con 8 rotas y 10 mintiendo | **42, las 42 validadas**: vocabulario cerrado y unicidad derivada de la clave |
+| **Trinquete `pendientes`** | 73, editable | 73, **anclado al inventario y al historial de git** |
+
+**Analisis de supervivientes: no hay ninguno.** 128 mutantes sobre los tres
+modulos nuevos, todos muertos. Detalle en `progress/mutacion_F-006.md`.
+
+### Los diez defectos, y lo que se encontro de mas al arreglarlos
+
+En cinco de los diez, corregir el caso concreto habria dejado el mecanismo
+intacto. Se corrigio el mecanismo, y el mecanismo encontro mas casos:
+
+| Defecto | Pedido | Encontrado y corregido |
+|---|---|---|
+| 1 · `cardinalidad: 61` | 8 comillas | 8 comillas **+ vocabulario cerrado validado**, con el mensaje que explica el caso del 61 |
+| 2 · fan-out | 6 relaciones | **10**, por comprobacion derivada de la clave de negocio |
+| 3 · `orden_concepto` | 1 ficha | **3 fichas y una relacion** |
+| 4 · ordenes de magnitud | anadir «vivos» | `criterio` explicito, fuente **comprobada por un test** y recuentos por sentido |
+| 8 · `R-IMPORTE-MES` | 2 objetos al ambito | **4**, por el mismo criterio derivado |
+
+Los cinco restantes (5, 6, 7, 9, 10) se corrigieron como pedia el informe, cada
+uno con su test y, donde era derivable, con la comprobacion que impide que
+vuelva a pasar en las 73 fichas que faltan.
+
+### Que sigue sin cubrir la puerta, dicho sin adornos
+
+- Un objeto que exista en la base y **no** en el repositorio. Lo dira
+  `check-diccionario` (R28, bloque H), que **no existe todavia**, y los cuatro
+  docstrings que antes lo daban por cubierto ahora dicen exactamente eso.
+- Que el TEXTO de una ficha sea cierto. Los minimos garantizan que alguien lo
+  escribio; que diga la verdad lo garantiza la revision humana y la bateria de
+  aceptacion (T39). Lo que si esta cubierto ahora, y no lo estaba: nombres de
+  columna, granos declarados, claves de negocio, cardinalidades, nulos
+  imposibles en `*_ide` y objetos citados en la prosa de las reglas.
