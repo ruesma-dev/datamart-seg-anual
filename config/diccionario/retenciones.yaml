@@ -575,11 +575,16 @@ objetos:
           PROVEEDOR y 2.200 en CLIENTE.
         agregacion: suma
       num_entidades:
-        significado: Cuantos proveedores o clientes distintos hay detras.
-        agregacion: suma
+        significado: >-
+          Cuantos proveedores o clientes distintos hay detras. NO SE SUMA entre
+          las dos filas: es un `COUNT(DISTINCT)` y un proveedor que sea a la vez
+          cliente se contaria dos veces.
+        agregacion: no_sumable
       num_obras:
-        significado: Cuantas obras distintas tienen efectos de ese sentido.
-        agregacion: suma
+        significado: >-
+          Cuantas obras distintas tienen efectos de ese sentido. Misma
+          advertencia: es un recuento de distintos y no se suma entre filas.
+        agregacion: no_sumable
       saldo_vivo:
         significado: >-
           Lo que sigue retenido en toda la empresa. Del orden de 34,7 M€ en

@@ -1132,3 +1132,327 @@ def test_f006_r13_el_aviso_de_frescura_llega_a_compras_y_retenciones() -> None:
         assert fichas, esquema
         for ficha in fichas:
             assert "R-FRESCURA-MANUAL" in ficha.avisos, ficha.nombre
+
+
+# ===========================================================================
+# EL MECANISMO · contrastar contra el SQL lo que hasta ahora no se contrastaba
+#
+# Dos huecos que el reviewer señaló dos veces y que costaron dos rechazos: la
+# puerta comprobaba los NOMBRES de las columnas pero no `agregacion` ni
+# `clave_negocio`. En `mart` y `cierre` no dolió porque sus claves son simples;
+# en `compras` y `retenciones` son compuestas, y ahí es donde se cayó.
+#
+# Quedan 53 objetos por documentar, así que esto no es perfeccionismo: es la
+# diferencia entre que los mismos errores se repitan cincuenta veces o no puedan
+# volver a colarse.
+#
+# LÍMITE DECLARADO, para no marcar de más. De las dos direcciones de un error de
+# clave, solo una es derivable:
+#
+#   * «la clave nombra algo que no identifica» SÍ lo es: basta con exigir que
+#     esté contenida en el `GROUP BY`, o que case con la PK del DDL;
+#   * «la clave es demasiado corta» NO lo es. Decidir si una columna del
+#     `GROUP BY` puede omitirse exige saber si depende funcionalmente de otra, y
+#     eso no se lee del texto: `codigo_obra` sí depende de `obra_id` y
+#     `proveedor_cif` NO depende de `proveedor_id` —sale del CIF del documento—
+#     y las dos se escriben igual. Exigir la igualdad con el `GROUP BY` marcaría
+#     como falsas fichas correctas: `mart.fact_seguimiento_categoria` agrupa por
+#     nueve columnas de las que cinco se derivan de otras dos.
+#     Esa mitad se queda en revisión humana, y queda dicho aquí en vez de
+#     dejarlo creer cubierto.
+# ===========================================================================
+
+
+def proyeccion_por_alias(cuerpo: str) -> dict[str, str] | None:
+    """Alias -> expresión que lo produce, en el `SELECT` final del objeto.
+
+    Es el mismo recorrido que `columnas_proyectadas`, guardando además el texto
+    de cada elemento: es lo que permite preguntarle a una columna qué función la
+    envuelve de verdad.
+    """
+    cuerpo = re.sub(r"--[^\n]*", " ", cuerpo)
+    lineas = cuerpo.split("\n")
+    selects = [i for i, linea in enumerate(lineas) if re.match(r"^SELECT\b", linea)]
+    if not selects:
+        return None
+    inicio = selects[-1]
+    fin = next(
+        (i for i in range(inicio + 1, len(lineas)) if re.match(r"^(FROM|;)\b", lineas[i])),
+        None,
+    )
+    if fin is None:
+        return None
+
+    proyeccion = re.sub(
+        r"^SELECT\s+(?:DISTINCT\s+(?:ON\s*\([^)]*\)\s*)?)?",
+        "",
+        "\n".join(lineas[inicio:fin]),
+        flags=re.IGNORECASE,
+    )
+
+    items, actual, profundidad = [], [], 0
+    for caracter in proyeccion:
+        if caracter in "([":
+            profundidad += 1
+        elif caracter in ")]":
+            profundidad -= 1
+        if caracter == "," and profundidad == 0:
+            items.append("".join(actual))
+            actual = []
+        else:
+            actual.append(caracter)
+    items.append("".join(actual))
+
+    por_alias: dict[str, str] = {}
+    for item in items:
+        item = " ".join(item.split())
+        if not item:
+            continue
+        alias = re.search(r"\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\s*$", item, re.IGNORECASE)
+        if alias:
+            expresion = item[: alias.start()].strip()
+            por_alias[alias.group(1)] = expresion
+            continue
+        desnuda = re.match(
+            r"^(?:[A-Za-z_][A-Za-z0-9_]*\.)?([A-Za-z_][A-Za-z0-9_]*)$", item
+        )
+        if desnuda:
+            por_alias[desnuda.group(1)] = item
+            continue
+        return None
+    return por_alias or None
+
+
+def funcion_envolvente(expresion: str) -> str | None:
+    """La función agregada más externa de una expresión, si la hay.
+
+    Devuelve `COUNT DISTINCT`, `COUNT`, `SUM`, `MIN`, `MAX` o `None`. Se ignora
+    lo que venga después (`FILTER (...)`, un cast, `::NUMERIC`), porque no
+    cambia lo que la medida es.
+    """
+    limpia = expresion.strip()
+    coincidencia = re.match(r"^([A-Za-z_]+)\s*\(", limpia)
+    if coincidencia is None:
+        return None
+    funcion = coincidencia.group(1).upper()
+    if funcion not in ("COUNT", "SUM", "MIN", "MAX", "AVG"):
+        return None
+    if funcion == "COUNT" and re.match(r"^COUNT\s*\(\s*DISTINCT\b", limpia, re.I):
+        return "COUNT DISTINCT"
+    return funcion
+
+
+#: Lo que cada función admite como `agregacion`. Solo se listan las funciones
+#: cuyo veredicto es inequívoco: `SUM` y `COUNT` sin DISTINCT sí se pueden
+#: seguir sumando entre grupos disjuntos, y por eso no se restringen.
+AGREGACION_PROHIBIDA = {
+    # Un recuento de distintos NO se suma: la misma factura repartida entre tres
+    # obras aparece en tres filas con valor 1, y sumarlas da tres facturas donde
+    # hay una.
+    "COUNT DISTINCT": {"suma", "suma_solo_dentro_del_mes"},
+    # Un mínimo o un máximo tampoco: sumarlos no significa nada.
+    "MIN": {"suma", "suma_solo_dentro_del_mes"},
+    "MAX": {"suma", "suma_solo_dentro_del_mes"},
+    "AVG": {"suma", "suma_solo_dentro_del_mes"},
+}
+
+
+def _objetos_con_proyeccion():
+    """Fichas con columnas que se leen de una proyección, y su SQL."""
+    for ficha in _diccionario().fichas:
+        if not ficha.columnas or ficha.nombre in TABLAS_CON_DDL_EXPLICITO:
+            continue
+        if ficha.nombre in CREADAS_CON_SQL_DINAMICO:
+            continue
+        sql = (DIR_SQL / _origen_por_objeto()[ficha.nombre]).read_text(encoding="utf-8")
+        cuerpo = cuerpo_de_vista(sql, ficha.esquema, ficha.objeto)
+        if cuerpo is None:
+            continue
+        yield ficha, cuerpo
+
+
+def test_f006_r7_control_el_detector_de_funciones_distingue_lo_que_importa() -> None:
+    """Si esto fallara, el test de abajo pasaría en falso sobre todo."""
+    assert funcion_envolvente("COUNT(DISTINCT documento_id)") == "COUNT DISTINCT"
+    assert funcion_envolvente("COUNT(*) FILTER (WHERE estado = 'VIVA')") == "COUNT"
+    assert funcion_envolvente("SUM(importe) FILTER (WHERE importe > 0)") == "SUM"
+    assert funcion_envolvente("MIN(fecha_prevista_devolucion)") == "MIN"
+    assert funcion_envolvente("l.importe") is None
+    assert funcion_envolvente("ROUND(a * 100.0 / b, 2)") is None
+
+
+@pytest.mark.parametrize(
+    "nombre", sorted(f.nombre for f, _ in _objetos_con_proyeccion())
+)
+def test_f006_r7_la_agregacion_declarada_case_con_la_funcion_del_sql(
+    nombre: str,
+) -> None:
+    """`COUNT(DISTINCT …)` no puede ser `suma`, y `MIN`/`MAX` tampoco.
+
+    `agregacion` es el campo que el MCP traduce a «esta columna se suma»: si
+    miente, el agente suma lo que no se suma y el número sale plausible.
+    """
+    ficha, cuerpo = next(
+        (f, c) for f, c in _objetos_con_proyeccion() if f.nombre == nombre
+    )
+    proyeccion = proyeccion_por_alias(cuerpo)
+    if proyeccion is None:
+        pytest.skip("la proyección de este objeto no se deja leer")
+
+    problemas = []
+    for columna in ficha.columnas:
+        expresion = proyeccion.get(columna.nombre)
+        if expresion is None or columna.agregacion is None:
+            continue
+        funcion = funcion_envolvente(expresion)
+        if columna.agregacion in AGREGACION_PROHIBIDA.get(funcion, set()):
+            problemas.append(
+                f"{columna.nombre}: el SQL es {funcion} y la ficha dice "
+                f"`agregacion: {columna.agregacion}`"
+            )
+
+    assert not problemas, "; ".join(problemas)
+
+
+def columnas_del_group_by(cuerpo: str, proyeccion: dict[str, str]) -> set[str] | None:
+    """Los ALIAS por los que agrupa el `SELECT` final, o `None` si no se sabe.
+
+    Devolver `None` en vez de una lista a medias es deliberado, y hay tres
+    casos en los que se hace:
+
+    * la vista tiene `UNION`: el `GROUP BY` que se encuentra pertenece a una
+      rama, no al grano de la vista;
+    * el `GROUP BY` es POSICIONAL (`GROUP BY 1, 2`), que es legítimo y frecuente
+      dentro de las CTE;
+    * alguna expresión agrupada no casa con ningún alias proyectado.
+
+    En los tres, una respuesta a medias convertiría la comprobación en un
+    colador o en una fuente de falsos positivos.
+    """
+    limpio = re.sub(r"--[^\n]*", " ", cuerpo)
+    if re.search(r"^\s*UNION\b", limpio, re.MULTILINE | re.IGNORECASE):
+        return None
+
+    # Se busca el `GROUP BY` de nivel 0 y se lee HASTA EL `;`, no hasta el
+    # final de su linea: los `GROUP BY` largos se parten en varias, y cortar por
+    # linea dejaba fuera la ultima columna. Se detecto con
+    # `compras.v_pbi_proveedor_obra`, cuyo `anio` quedaba invisible.
+    coincidencia = re.search(r"^GROUP\s+BY\s+", limpio, re.MULTILINE | re.IGNORECASE)
+    if coincidencia is None:
+        return None
+
+    crudo = limpio[coincidencia.end():].split(";")[0]
+    crudo = re.split(r"^(HAVING|ORDER)\b", crudo, flags=re.MULTILINE | re.IGNORECASE)[0]
+    expresiones = [e.strip() for e in crudo.split(",") if e.strip()]
+    if not expresiones or any(e.isdigit() for e in expresiones):
+        return None
+
+    por_expresion = {" ".join(v.split()): k for k, v in proyeccion.items()}
+    alias: set[str] = set()
+    for expresion in expresiones:
+        normalizada = " ".join(expresion.split())
+        if normalizada in proyeccion:          # agrupa por el propio alias
+            alias.add(normalizada)
+        elif normalizada in por_expresion:     # agrupa por la expresión fuente
+            alias.add(por_expresion[normalizada])
+        else:
+            return None
+    return alias
+
+
+def test_f006_r2_control_el_group_by_se_lee_donde_se_puede_leer() -> None:
+    """Control del alcance: si no leyera ninguno, el test de abajo no probaría
+    nada; si los leyera todos, es que no está descartando los casos dudosos."""
+    leidos = {
+        f.nombre
+        for f, c in _objetos_con_proyeccion()
+        if (p := proyeccion_por_alias(c)) and columnas_del_group_by(c, p) is not None
+    }
+
+    assert "compras.v_pbi_proveedor_obra" in leidos
+    assert "compras.v_pbi_partida_coste" in leidos
+    assert "retenciones.v_pbi_retencion_entidad" in leidos
+    # Y este NO, porque tiene UNION y su `GROUP BY` es de una rama.
+    assert "mart.v_fact_periodificado" not in leidos
+
+
+@pytest.mark.parametrize(
+    "nombre", sorted(f.nombre for f, _ in _objetos_con_proyeccion())
+)
+def test_f006_r2_la_clave_de_negocio_cabe_en_el_group_by(nombre: str) -> None:
+    """Una columna de la clave que no está en el `GROUP BY` puede repetirse.
+
+    Es la mitad derivable del problema: si la clave nombra algo por lo que la
+    vista no agrupa, hay varias filas con el mismo valor de clave y el JOIN por
+    ella multiplica.
+    """
+    ficha, cuerpo = next(
+        (f, c) for f, c in _objetos_con_proyeccion() if f.nombre == nombre
+    )
+    proyeccion = proyeccion_por_alias(cuerpo)
+    if proyeccion is None:
+        pytest.skip("la proyección de este objeto no se deja leer")
+    agrupadas = columnas_del_group_by(cuerpo, proyeccion)
+    if agrupadas is None:
+        pytest.skip("el `GROUP BY` de este objeto no es derivable; ver docstring")
+
+    sobran = sorted(set(ficha.clave_negocio) - agrupadas)
+
+    assert not sobran, (
+        f"{sobran} están en `clave_negocio` y no en el `GROUP BY`: la vista "
+        f"puede tener varias filas con el mismo valor"
+    )
+
+
+def pk_declarada(sql: str, esquema: str, objeto: str) -> list[str] | None:
+    """Las columnas de la PK que el DDL declara con `ALTER TABLE`, si la hay."""
+    coincidencia = re.search(
+        rf"ALTER\s+TABLE\s+{re.escape(esquema)}\.{re.escape(objeto)}\s+"
+        rf"ADD\s+PRIMARY\s+KEY\s*\(([^)]*)\)",
+        re.sub(r"--[^\n]*", " ", sql),
+        re.IGNORECASE,
+    )
+    if coincidencia is None:
+        return None
+    return [c.strip() for c in coincidencia.group(1).split(",") if c.strip()]
+
+
+def test_f006_r2_control_hay_tablas_con_pk_declarada() -> None:
+    sql = (DIR_SQL / "compras/01_documentos.sql").read_text(encoding="utf-8")
+
+    assert pk_declarada(sql, "compras", "contratos") == ["contrato_id"]
+    assert pk_declarada(sql, "compras", "albaran_lineas") == ["linea_id"]
+
+    sin_pk = (DIR_SQL / "compras/02_fact_linea.sql").read_text(encoding="utf-8")
+    assert pk_declarada(sin_pk, "compras", "fact_compras_linea") is None
+
+
+@pytest.mark.parametrize(
+    "nombre", sorted(f.nombre for f in _diccionario().fichas if f.tipo == "tabla")
+)
+def test_f006_r2_la_clave_de_negocio_casa_con_la_pk_declarada(nombre: str) -> None:
+    """Si el DDL declara una PK, la clave de negocio tiene que ser esa.
+
+    Salvo que la PK sea una clave sustituta —un `BIGSERIAL` que cambia en cada
+    build—, que es el caso de las tablas de hecho y se deja fuera a propósito:
+    ahí la clave de negocio es OTRA cosa y así se documenta.
+    """
+    ficha = _diccionario().por_nombre[nombre]
+    origen = _origen_por_objeto()[nombre]
+    if origen == "config/tables_sigrid.yaml":
+        pytest.skip("las tablas de `raw` no tienen DDL en el repositorio (DA-2)")
+
+    sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+    pk = pk_declarada(sql, ficha.esquema, ficha.objeto)
+    if pk is None:
+        pytest.skip("el DDL no declara clave primaria para este objeto")
+
+    sustitutas = {
+        c.nombre for c in ficha.columnas if c.agregacion == "clave_sustituta"
+    }
+    if set(pk) <= sustitutas:
+        pytest.skip("la PK es una clave sustituta; la de negocio es otra cosa")
+
+    assert set(ficha.clave_negocio) == set(pk), (
+        f"la PK del DDL es {pk} y la ficha declara {list(ficha.clave_negocio)}"
+    )

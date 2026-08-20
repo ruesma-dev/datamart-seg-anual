@@ -737,14 +737,23 @@ objetos:
         unidad: EUR
         agregacion: suma
       num_facturas:
-        significado: Cuantos documentos de factura o abono distintos hay detras.
-        agregacion: suma
+        significado: >-
+          Cuantos documentos de factura o abono distintos hay detras. NO SE
+          SUMA entre filas: es un `COUNT(DISTINCT)`, y una factura repartida
+          entre tres obras aparece en las tres con valor 1. Sumarlas daria tres
+          facturas donde hay una. Para el total de la empresa hay que volver a
+          contar distintos sobre `compras.fact_compras_linea`.
+        agregacion: no_sumable
       num_albaranes:
-        significado: Cuantos albaranes distintos hay detras.
-        agregacion: suma
+        significado: >-
+          Cuantos albaranes o proformas distintos hay detras. Misma advertencia
+          que `num_facturas`: es un recuento de distintos y no se suma.
+        agregacion: no_sumable
       num_contratos:
-        significado: Cuantos contratos distintos hay detras.
-        agregacion: suma
+        significado: >-
+          Cuantos contratos distintos hay detras. Misma advertencia: es un
+          recuento de distintos y no se suma.
+        agregacion: no_sumable
     relaciones:
       - de: proveedor_id
         a: maestro.proveedores.proveedor_id

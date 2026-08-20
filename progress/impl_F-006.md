@@ -1504,3 +1504,56 @@ se comprobaba por subcadena que 15 de sus nombres aparecieran, y omitia justo
 `tipo`, `capa`, `consumo_recomendado` y `motivo_no_consumo`—. Ahora hay tres:
 la lista completa **en orden**, que el diseno y la vista real proyecten lo mismo,
 y que `design.md` documente la columna anadida.
+
+## El mecanismo · contrastar `agregacion` y `clave_negocio` contra el SQL
+
+Es la causa de fondo que el reviewer llevaba senalando desde la segunda pasada y
+que ya habia costado dos rechazos. Fase RED, con el mecanismo recien escrito
+sobre las fichas tal y como estaban:
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "agregacion_declarada or clave_de_negocio_cabe or ..."
+E       AssertionError: ['anio'] están en `clave_negocio` y no en el `GROUP BY`
+FAILED tests/test_f006_fichas.py::test_f006_r7_la_agregacion_declarada_case_con_la_funcion_del_sql[compras.v_pbi_proveedor_obra]
+FAILED tests/test_f006_fichas.py::test_f006_r7_la_agregacion_declarada_case_con_la_funcion_del_sql[retenciones.v_pbi_retencion_resumen]
+FAILED tests/test_f006_fichas.py::test_f006_r2_la_clave_de_negocio_cabe_en_el_group_by[compras.v_pbi_proveedor_obra]
+3 failed, 48 passed, 38 skipped, 164 deselected in 0.96s
+```
+
+**El defecto 2 eran TRES columnas y son CINCO.** La comprobacion encontro dos
+mas que la auditoria manual no vio: `num_entidades` y `num_obras` de
+`retenciones.v_pbi_retencion_resumen`, tambien `COUNT(DISTINCT)` marcados
+`suma`. Las cinco pasan a `no_sumable` **y su texto explica por que**, que es lo
+que el agente lee: una factura repartida entre tres obras aparece en las tres
+con valor 1.
+
+El tercer fallo era **del propio detector, y lo delato el control**: el lector
+del `GROUP BY` cortaba al final de la primera linea, asi que en un `GROUP BY` de
+seis columnas partido en dos lineas se perdia la ultima. Corregido a leer hasta
+el `;`.
+
+### Que comprueba, y que NO, dicho antes de que se de por cubierto
+
+**Derivable y sonido, implementado:**
+
+| Comprobacion | Que caza |
+|---|---|
+| `agregacion` contra la funcion que envuelve la columna | `COUNT(DISTINCT)`, `MIN`, `MAX` y `AVG` no pueden ser `suma`. `SUM` y `COUNT` sin DISTINCT **si** se pueden seguir sumando entre grupos disjuntos, y por eso no se restringen |
+| `clave_negocio` contenida en el `GROUP BY` | Una columna de la clave por la que la vista no agrupa puede repetirse, y el JOIN por ella multiplica |
+| `clave_negocio` frente a la PK del DDL | Si el `ALTER TABLE ... ADD PRIMARY KEY` declara una clave, la de negocio tiene que ser esa. Se exceptuan las PK marcadas `clave_sustituta`, donde la de negocio es otra cosa a proposito |
+
+**NO derivable, y por eso NO se implementa:** la direccion contraria, «la clave
+es demasiado corta». Decidir si una columna del `GROUP BY` puede omitirse exige
+saber si depende funcionalmente de otra, y eso no se lee del texto:
+`codigo_obra` SI depende de `obra_id` y `proveedor_cif` NO depende de
+`proveedor_id` —sale del CIF del documento— y las dos se escriben igual. Exigir
+la igualdad con el `GROUP BY` marcaria como falsas fichas correctas:
+`mart.fact_seguimiento_categoria` agrupa por nueve columnas de las que cinco se
+derivan de otras dos. **Esa mitad se queda en revision humana**, esta escrito en
+el docstring del modulo y es exactamente el defecto 5, que se corrige a mano.
+
+Cada comprobacion lleva **su test de control**: que el detector de funciones
+distinga los cinco casos, que el `GROUP BY` se lea donde se puede y **no** donde
+no —`mart.v_fact_periodificado` tiene `UNION` y su `GROUP BY` es de una rama—, y
+que existan tablas con PK declarada. Sin ellos, un detector que devolviera
+siempre vacio haria pasar todo en falso.
