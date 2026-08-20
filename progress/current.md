@@ -7,8 +7,8 @@ Rama `feature/F-006-mcp-azure`. **Bloques A, B, C y D entregados y corregidos
 tras el RECHAZADO del reviewer** (`progress/review_F-006.md`): los diez defectos
 están cerrados, cada uno con su fase RED.
 
-`bash harness/init.sh` en verde: **1242 tests**, cobertura de las líneas
-cambiadas **98,9 %** y campaña de mutación con **0 supervivientes de 160
+`bash harness/init.sh` en verde: **1310 tests**, cobertura de las líneas
+cambiadas **98,9 %** y campaña de mutación con **0 supervivientes de 161
 mutantes**.
 
 - Informe de implementación: `progress/impl_F-006.md`
@@ -66,6 +66,17 @@ pide y para que no se pierdan:
 | **T39** | Ejecutar las 18 preguntas de la batería contra el diccionario publicado |
 
 ### Límite conocido de la puerta (escrito, no descubierto luego)
+
+Tras la tercera review, la puerta **sí** contrasta contra el SQL `agregacion`
+(la función que envuelve cada columna) y `clave_negocio` (contenida en el
+`GROUP BY`, o igual a la PK del DDL). Lo que sigue **sin** ser derivable, y por
+eso no se comprueba, es la dirección contraria de la clave: **«la clave es
+demasiado corta»** exige saber si una columna del `GROUP BY` depende
+funcionalmente de otra, y eso no se lee del texto —`codigo_obra` sí depende de
+`obra_id` y `proveedor_cif` no depende de `proveedor_id`, y las dos se escriben
+igual—. Esa mitad, y la veracidad del `grano` y de cada `significado`, siguen en
+revisión humana.
+
 
 La puerta comprueba que las columnas de cada ficha sean exactamente las del SQL,
 que las relaciones resuelvan y que las cardinalidades no prometan unicidad

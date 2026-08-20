@@ -1624,3 +1624,34 @@ nada:
   contrato estaba probada de lejos. Ahora se usa el `connection()` de verdad
   con una conexion falsa, y hay un control que comprueba que sin excepcion si
   hace `commit` —si nunca lo hiciera, el otro pasaria en falso—.
+
+## Evidencias tras la tercera review
+
+| Evidencia | Antes | Ahora |
+|---|---|---|
+| **Tests que pasan** | 1242 | **1310** (521 de F-006), 40 saltados con motivo |
+| **Tests que fallan** | 0 | **0** |
+| **Tiempo de la suite** | 31,8 s | **27,2 s** sin cobertura |
+| **Cobertura de las lineas cambiadas** | 98,9 % (710/718) | **98,9 % (710/718)**, umbral 80 %, nivel `critico` |
+| **Mutantes / supervivientes** | 160 / 0 | **161 / 0**, 0 timeouts, 377,8 s |
+| **Objetos documentados** | 49 de 102 | 49 de 102 |
+| **Columnas descritas** | 593 | 593 |
+
+**Analisis de supervivientes: no hay ninguno.**
+
+Los 40 tests saltados no son un descuido: son el alcance declarado del
+mecanismo. Cada `skip` lleva su motivo —«el `GROUP BY` de este objeto no es
+derivable», «el DDL no declara clave primaria», «se crea con SQL dinamico»— y
+hay tests de control que exigen que el salto **no sea universal**: si el lector
+del `GROUP BY` dejara de leer ninguno, o los leyera todos, saltarian.
+
+### Recuento honesto de lo que encontro cada cosa
+
+| Quien lo encontro | Defectos |
+|---|---|
+| El reviewer, a mano | 6 graves, 4 medios, 11 menores |
+| **El mecanismo nuevo, al escribirlo** | **2 `COUNT(DISTINCT)` mas** que la auditoria manual no vio, y **un fallo del propio detector** (el `GROUP BY` multilinea) que delato su test de control |
+
+Es el argumento a favor de la comprobacion derivable en una linea: la auditoria
+manual encontro tres de cinco; el test encuentra los cinco y seguira
+encontrandolos en los 53 objetos que faltan.
