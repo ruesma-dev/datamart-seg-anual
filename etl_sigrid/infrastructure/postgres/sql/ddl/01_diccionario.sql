@@ -115,7 +115,6 @@ SELECT d.esquema,
        d.tipo,
        d.capa,
        d.consumo_recomendado,
-       d.motivo_no_consumo,
        d.descripcion,
        d.grano,
        d.clave_negocio,
@@ -128,7 +127,15 @@ SELECT d.esquema,
        f.horas_desde_ultimo_ok,
        f.ultimo_intento_status,
        p.version        AS diccionario_version,
-       p.publicado_en   AS diccionario_publicado_en
+       p.publicado_en   AS diccionario_publicado_en,
+       -- AL FINAL, y no junto a `consumo_recomendado`, que es donde tendria
+       -- sentido leerla: las 18 columnas anteriores son el contrato publicado
+       -- en design.md §4.2 y meter una por el medio corre de posicion a todas
+       -- las que van detras. Quien desempaquete por indice se encontraria los
+       -- campos cambiados sin que nada fallase. Anadir al final es la unica
+       -- forma compatible de crecer, y es la regla que este mismo fichero
+       -- declara en su cabecera.
+       d.motivo_no_consumo
 FROM _meta.diccionario AS d
 LEFT JOIN _meta.v_frescura AS f ON f.paso = d.paso_etl
 LEFT JOIN _meta.diccionario_publicacion AS p ON TRUE;

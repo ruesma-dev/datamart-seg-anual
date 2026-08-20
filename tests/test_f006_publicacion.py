@@ -913,3 +913,87 @@ def test_f006_r17_el_comando_esta_documentado_en_claude_md() -> None:
     texto = (RAIZ / "CLAUDE.md").read_text(encoding="utf-8")
 
     assert "publicar-diccionario" in texto
+
+
+# ---------------------------------------------------------------------------
+# ddl · la vista, con sus columnas fijadas EN ORDEN (defecto 6 y 7)
+#
+# Era la unica de las cuatro estructuras del contrato sin contraste exacto: solo
+# se comprobaba, por subcadena, que 15 de sus nombres aparecieran. Rigor
+# asimetrico justo en la pieza mas expuesta, porque es la que `mcp-bbdd` va a
+# consultar de verdad.
+#
+# El orden importa tanto como los nombres: quien desempaquete por posicion se
+# encuentra los campos corridos si alguien inserta una columna por el medio, y
+# la cabecera del propio fichero SQL prohibe reordenar precisamente por eso.
+# ---------------------------------------------------------------------------
+
+#: Las 18 columnas de `design.md` §4.2, EN SU ORDEN, mas lo que se ha anadido
+#: despues AL FINAL, que es la unica forma compatible de crecer.
+COLUMNAS_V_DICCIONARIO = [
+    # --- las 18 del contrato original, posiciones 1 a 18 -------------------
+    "esquema",
+    "objeto",
+    "tipo",
+    "capa",
+    "consumo_recomendado",
+    "descripcion",
+    "grano",
+    "clave_negocio",
+    "refresco",
+    "avisos",
+    "n_columnas",
+    "ficha",
+    "paso_etl",
+    "ultimo_ok_finished_at",
+    "horas_desde_ultimo_ok",
+    "ultimo_intento_status",
+    "diccionario_version",
+    "diccionario_publicado_en",
+    # --- anadidas despues, siempre al final --------------------------------
+    "motivo_no_consumo",
+]
+
+
+def test_f006_r15_ddl_la_vista_proyecta_estas_columnas_y_en_este_orden() -> None:
+    from tests.test_f006_fichas import columnas_proyectadas
+
+    proyectadas = columnas_proyectadas(_cuerpo_de_la_vista() + "\n;")
+
+    assert proyectadas == COLUMNAS_V_DICCIONARIO
+
+
+def test_f006_r15_las_dieciocho_del_diseno_conservan_su_posicion() -> None:
+    """El contrato de `design.md` §4.2 sigue intacto posicion a posicion.
+
+    Anadir al final es compatible; insertar por el medio corre todo lo que va
+    detras y rompe a quien desempaquete por indice. La columna 19 se anadio
+    despues, y por eso esta la 19 y no la 6.
+    """
+    from tests.test_f006_fichas import columnas_proyectadas
+
+    diseno = (RAIZ / "specs" / "F-006-mcp-azure" / "design.md").read_text(
+        encoding="utf-8"
+    )
+    inicio = diseno.index("CREATE OR REPLACE VIEW _meta.v_diccionario AS")
+    del_diseno = columnas_proyectadas(diseno[inicio:].split("```")[0])
+
+    proyectadas = columnas_proyectadas(_cuerpo_de_la_vista() + "\n;")
+
+    assert del_diseno == proyectadas, (
+        "el diseno y la vista real tienen que proyectar lo mismo, en el mismo orden"
+    )
+    assert proyectadas[-1] == "motivo_no_consumo", (
+        "lo anadido va al final; las 18 originales conservan su posicion"
+    )
+    assert proyectadas[:18] == COLUMNAS_V_DICCIONARIO[:18]
+
+
+def test_f006_r23_el_diseno_documenta_la_columna_anadida() -> None:
+    """Enmendar el documento es parte de anadir la columna, no un extra."""
+    diseno = (RAIZ / "specs" / "F-006-mcp-azure" / "design.md").read_text(
+        encoding="utf-8"
+    )
+    seccion = diseno[diseno.index("### 4.2"):diseno.index("### 4.3")]
+
+    assert "motivo_no_consumo" in seccion

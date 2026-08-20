@@ -1,10 +1,361 @@
 <!-- progress/review_F-006.md -->
-# F-006 · Review de los bloques A, B, C y D
+# F-006 · Review — bloques A a F
 
-> Este fichero tiene **dos pasadas**. Arriba, la segunda (la vigente). Abajo,
-> íntegra, la primera, que rechazó el trabajo: se conserva para que se pueda
-> auditar qué se pidió exactamente y contrastarlo con lo que se hizo.
+> Este fichero tiene **tres pasadas**, de la más reciente a la más antigua.
+> Se conservan íntegras: son lo que se pidió corregir cada vez y el patrón
+> contra el que se contrasta la siguiente.
 
+---
+
+# TERCERA PASADA · 2026-08-20 — bloque E y bloque F parcial
+
+> Commits revisados: `5b5e8ff`..`206eae3` (doce: cinco de arrastres de la
+> segunda pasada y siete del trabajo nuevo). Alcance: **T15–T18** (publicación
+> en `_meta`) y **T20, T21** (fichas de `compras` y `retenciones`).
+
+## Veredicto de la tercera pasada
+
+**RECHAZADO.**
+
+El **bloque E está casi bien hecho** —el contrato cumple sus tres invariantes y
+sus tres tablas son idénticas a `design.md` §4.1, aunque **la vista se desvía**
+(defecto 6)—, el trinquete
+reformulado **aguanta las cinco vías de burla** que le probé, y los cinco
+arrastres de la segunda pasada están cerrados. Nada de eso salva la entrega:
+**las fichas nuevas de `compras` y `retenciones` mienten en cinco puntos que
+producen números falsos**, y el criterio de esta feature es explícito —una ficha
+que miente es motivo de rechazo aunque todo lo demás esté bien—.
+
+Lo que más pesa: la ficha de `compras.albaranes` enuncia como regla general una
+de las trampas que esta feature existe para contar bien —«la NOTA suma en el
+consumido pero no en el pendiente»— y **es falsa en una de las dos vistas donde
+se aplica**. Tres contadores `COUNT(DISTINCT …)` van marcados `agregacion:
+suma`, que es justo el campo que el MCP traduce a «esta columna se suma». Y dos
+fichas de `retenciones` declaran una clave de negocio que **contradice su propio
+grano** y que es exactamente el par que produce el fan-out que el fichero
+declara como la regla que más dinero ha costado.
+
+No es un problema de volumen ni de descuido puntual: **la puerta no contrasta
+con el SQL ni las claves de negocio ni el campo `agregacion`**, y son los dos
+huecos que ya señalé en la segunda pasada (experimentos E6 y E11). Entonces no
+habían hecho daño porque `mart` y `cierre` tienen claves simples; `compras` y
+`retenciones` las tienen compuestas, y ahí es donde se ha caído.
+
+---
+
+## Lo que hay que corregir
+
+### Graves · afirmaciones que producen números falsos
+
+1. **`compras.yaml:326-328` — la regla de la NOTA es falsa en `v_pbi_contrato_consumo`.**
+   La ficha de `albaranes.tipo_documento` dice, sin acotar: «Solo ALBARAN y
+   PROFORMA cuentan como pendiente de facturar; la NOTA suma en el consumido
+   pero no en el pendiente». Es cierto en `v_pbi_albaranes_sin_facturar`
+   (`03_views.sql:172`) y **falso** en `v_pbi_contrato_consumo`: en la CTE
+   `alb_pivot`, las tres primeras medidas llevan `FILTER` por tipo y
+   `SUM(pendiente_facturar)` **no lo lleva** (`03_views.sql:39-42`), así que
+   `importe_albaranado_sin_facturar` incluye NOTA y OTRO. Ni esa ficha ni la de
+   la columna (`compras.yaml:652-657`) lo dicen.
+2. **`compras.yaml:741,744,747` — tres `COUNT(DISTINCT …)` declarados sumables.**
+   `num_facturas`, `num_albaranes` y `num_contratos` llevan `agregacion: suma` y
+   son `COUNT(DISTINCT documento_id)` / `COUNT(DISTINCT contrato_id)`
+   (`03_views.sql:126-130`). Una factura repartida entre tres obras aparece en
+   tres filas con valor 1: sumarlas da tres facturas donde hay una. El
+   vocabulario cerrado ya tiene `no_sumable` para esto.
+3. **`retenciones.yaml:639` y `:667` — clave de negocio que contradice su propio
+   grano.** `v_src_lineas_compra` es `SELECT docide, obride FROM raw.dcfpro`
+   (`retenciones/00_setup.sql:101-103`): **una fila por línea**, como dice su
+   propio `grano`. La `clave_negocio: [docide, obride]` declarada se repite
+   tantas veces como líneas tenga la factura contra esa obra. Es el par que
+   produce el fan-out de `R-RETENCION-NO-JOIN-LINEAS`, ofrecido como clave. Lo
+   mismo en `v_src_lineas_venta`, hoy inocuo porque la vista está vacía, pero la
+   ficha describe la forma que tendrá cuando se ingiera `dvfpro`.
+4. **`compras.yaml:827-831` — anuncia negativos que la vista no puede devolver.**
+   `v_pbi_albaranes_sin_facturar.importe_pendiente_facturar` dice que «NEGATIVO
+   significa que se facturó de más, y el signo se conserva a propósito». La
+   vista filtra `WHERE l.importe_pendiente_facturar > 0` (`03_views.sql:171`):
+   ahí no hay negativos. El texto es correcto en `albaran_lineas`
+   (`compras.yaml:436-441`), de donde parece copiado. Quien pregunte por
+   sobrefacturación mirará aquí y concluirá que no existe.
+5. **`compras.yaml:699` — clave de negocio reducida en `v_pbi_proveedor_obra`.**
+   Declara `[obra_id, proveedor_id, anio]`; el `GROUP BY` real tiene seis
+   columnas (`03_views.sql:133-134`), y `proveedor_cif` **no** depende de
+   `proveedor_id`: sale del CIF del documento, como la propia ficha admite en
+   `:716`. Dos facturas del mismo proveedor con `entcif` distinto dan dos filas
+   para la clave declarada.
+
+6. **`sql/ddl/01_diccionario.sql:118` — la vista del contrato se desvía de la
+   spec, y de la forma que el propio fichero prohíbe.** `_meta.v_diccionario`
+   proyecta **19 columnas**; `design.md` §4.2 especifica **18**. La añadida es
+   `motivo_no_consumo`, y no está al final: va **en posición 6**, entre
+   `consumo_recomendado` y `descripcion`. La cabecera del mismo fichero, cuatro
+   líneas más arriba (`:10-16`), dice: «QUE SE PUEDE CAMBIAR SIN ROMPER A NADIE:
+   añadir columnas **AL FINAL**… QUE NO: quitar o **reordenar** columnas de la
+   vista». La columna es una buena idea —el MCP necesita el porqué de un objeto
+   no recomendado—, pero esta es **la mitad del contrato que `mcp-bbdd` va a
+   consultar de verdad**, y quien implemente contra la spec y desempaquete por
+   posición se encontrará los campos corridos a partir del sexto. `design.md`
+   §4.2 **no se enmendó**, y en esta misma tanda sí se enmendaron sus recuentos,
+   así que la ocasión estaba. **Decidir ahora**: mover la columna al final o
+   enmendar §4.2. Dejarlo como está, no.
+7. **La vista es la única de las cuatro estructuras sin test que fije sus
+   columnas.** Las tres tablas tienen contraste exacto y parametrizado
+   (`tests/test_f006_publicacion.py:157`); la vista solo tiene una comprobación
+   de presencia por subcadena de 15 de sus 19 nombres (`:190`), que además omite
+   justo `tipo`, `capa`, `consumo_recomendado` y `motivo_no_consumo`. Rigor
+   asimétrico en la pieza más expuesta: falta el test con la lista completa **y
+   ordenada**.
+
+### Medias
+
+8. **`compras.yaml:712` — `nulo_significa` imposible y, peor, un filtro no
+   documentado.** La vista lleva `WHERE proveedor_id IS NOT NULL`
+   (`03_views.sql:132`): la fila que la ficha describe no existe, y **las líneas
+   sin proveedor desaparecen de la vista** sin que ninguna ficha lo advierta. La
+   pérdida silenciosa de `obra_id IS NULL` sí está protegida (`:705-708`); esta
+   es la misma familia, contada a medias.
+9. **`retenciones.yaml:72` — `tipo_id.nulo_significa` imposible.** Las dos ramas
+   filtran `WHERE COALESCE(retide, 0) <> 0` (`01_movimientos.sql:89,131`): un
+   efecto sin tipo no entra en la tabla. Quien busque `WHERE tipo_id IS NULL`
+   obtendrá cero filas y concluirá que no hay efectos sin tipo.
+10. **Ocho medidas que devuelven NULL y no lo declaran.** Los cuatro importes de
+   `v_pbi_proveedor_obra` (`compras.yaml:721-738`) y los cuatro de
+   `v_pbi_partida_coste` (`:885-901`) son `SUM(…) FILTER (…)` **sin
+   `COALESCE`** (`03_views.sql:118-125`, `:188-195`). El contraste lo delata:
+   `v_pbi_contrato_consumo` sí envuelve en `COALESCE(...,0)` (`:77-82`) y por eso
+   allí no hace falta declararlo. `WHERE facturado > 0` pierde filas en silencio.
+11. **`retenciones.yaml:145-154` (y sus copias en `:466-471`, `:530-532`) —
+   `vencida_sin_liquidar` y `dias_desde_vencimiento` están congelados.**
+   `movimientos` es un `CREATE TABLE AS` (`01_movimientos.sql:21`) y ambas se
+   calculan con `CURRENT_DATE` **en el build** (`:77-79`, `:120-122`). El texto
+   («días transcurridos desde la fecha prevista», «la fecha prevista ya pasó»)
+   se lee como *hoy*. En un esquema de refresco manual **cuya frescura ni
+   siquiera es consultable por SQL**, la lista de vencidas puede llevar semanas
+   parada y nadie puede saber cuánto. Hay que decir que para vencimiento a fecha
+   de hoy se recalcula sobre `fecha_prevista_devolucion`.
+
+### Menores (arreglar al pasar, no bloquean por sí solos)
+
+12. `compras.yaml:45` — `(tipo_doc, linea_id)` es correcta para los seis tipos
+    nombrados, pero `OTRO` es alcanzable desde dos ramas del UNION
+    (`00_setup.sql:40` y `:43`, `tip=14` y `tip=15` con serie desconocida), así
+    que ahí vuelve a colisionar. Basta con decirlo en la ficha.
+13. `compras.yaml:863` — `v_pbi_partida_coste` declara `[obra_id, partida_id]` y
+    el `GROUP BY` incluye `codigo_obra`, que se resuelve con una cadena
+    `COALESCE` distinta de `obra_id` (`02_fact_linea.sql:52-53` y `:83-84`).
+14. `compras.yaml:77-81` — la cascada de `obra_id` omite el respaldo por
+    contrato: el SQL es `COALESCE(l.obra_id, ctr.obra_id)` (`02_fact_linea.sql:52`).
+15. `compras.yaml:799-803` — `contrato_id` sale solo de la cabecera y
+    `codigo_contrato` de `COALESCE(a.contrato_id, l.contrato_id_linea)`
+    (`03_views.sql:169-170`): pueden salir juntos nulo e informado.
+16. `retenciones.yaml:344-347` — invita a cuadrar euros contra
+    `sin_obra_asignada`, que es un `COUNT`, no un importe (`02_views.sql:170`).
+17. `retenciones.yaml:117-122` — `num_obras_documento` es **siempre 0** en
+    sentido CLIENTE, porque se alimenta de la vista vacía; se describe como «lo
+    que explica que la obra esté vacía», y para CLIENTE nunca explica nada.
+18. `retenciones.yaml:168-175` — la relación a `compras.facturas` solo casa en
+    sentido PROVEEDOR; la ficha gemela de `v_pbi_retencion_entidad` (`:326-331`)
+    sí lo acota, esta no.
+19. `retenciones.yaml:607-610` dice que las dos lecturas del saldo «no hay que
+    compararlas entre sí» cuando el SQL dice lo contrario (`02_views.sql:19-20`):
+    la divergencia **es** el diagnóstico.
+20. `compras.yaml:640-644` y `:951-954`, `:971-975`: `importe_facturado` suma sin
+    filtrar tipo; `fn_serie` devuelve cadena vacía, no NULL, y su ejemplo no es
+    el formato real de Sigrid (`00_setup.sql:24-25`).
+21. `diccionario_sql.py:38-40` justifica `DELETE` frente a `TRUNCATE` diciendo
+    que «`TRUNCATE` no es transaccional de la misma forma en todos los
+    escenarios». En PostgreSQL `TRUNCATE` **sí** es transaccional; la razón
+    buena es que toma un `ACCESS EXCLUSIVE` que bloquea a los lectores, que es
+    justo lo que aquí se quiere evitar. La decisión es correcta; el motivo
+    escrito, no.
+22. **`CLAUDE.md` promete más de lo que la puerta hace.** Dice que «quien añade o
+    cambia un objeto publicado actualiza su ficha en el mismo trabajo: hay una
+    puerta en `init.sh` que lo exige». Lo comprobé (**experimento E14**): publicar
+    una vista nueva sin ficha, declararla en `pendientes` y subir el tope **pasa
+    la puerta de cobertura**; lo único que salta es, de rebote, el test que
+    cuenta objetos contra `design.md`. Lo que la puerta exige es «ficha **o**
+    pendiente declarado». Rebajar la frase o cerrar el hueco.
+
+23. **Falta el test de que `apply_grants` siga corriendo cuando
+    `publicar_diccionario` falla.** Hoy es cierto porque
+    `ApplyGrantsStep.depends_on == ["build_mart"]` y el orquestador solo salta
+    un paso si falló una dependencia **declarada**. Pero nada lo fija: el día
+    que alguien añada `"publicar_diccionario"` a esas dependencias «para que
+    quede ordenado», una noche con el diccionario inválido dejaría al MCP sin
+    `GRANT` — que es exactamente el fallo que R20 existe para evitar. Es un test
+    de una línea.
+24. **`cobertura_cols` y `n_columnas` no comparten denominador.** `n_columnas`
+    publica **593** (todas las fichas) y `cobertura_columnas` se mide solo sobre
+    `consumo_recomendado: true` (**554**). Hoy ambos dan 100 % y no se nota,
+    pero `n_columnas * cobertura_cols / 100` no es el número de columnas
+    documentadas. Sin `COMMENT ON COLUMN` que lo aclare ni mención en la spec, un
+    consumidor razonable los combinará.
+25. **La atomicidad está probada estructuralmente, no conductualmente.** El
+    doble sustituye `connection()` entera, así que el `commit`/`rollback` real
+    de `postgres_client.py:332-334` no se ejecuta en ningún test del
+    repositorio. Falta uno que compruebe que una excepción a mitad del `with`
+    provoca `rollback()`.
+26. **`version` es un `1` estático que nadie incrementa** (`00_global.yaml`). Si
+    `mcp-bbdd` lo usa para invalidar caché, no invalidará nunca: la identidad
+    real es `hash_fuente`, y eso solo está dicho en un comentario del SQL. DA-5
+    decidió «número manual **más** hash»; el número está, pero conviene
+    documentar en el DDL cuál de los dos manda.
+27. **`progress/impl_F-006.md` da por buena una comprobación con cifras
+    viejas**: la verificación manual de T19 habla de «37 filas en
+    `_meta.diccionario` (25 fichas hoy)» cuando ya son **49** y **62**. Quien
+    ejecute T19 verá un desajuste que no es un fallo.
+
+### Y el mecanismo, que es lo que evita la próxima vez
+
+Los cinco defectos graves los habría cazado la puerta si comprobara dos cosas
+que hoy no comprueba, y que ya salieron en la segunda pasada (E6, E11):
+
+- **Contrastar `clave_negocio` contra el SQL**: para las vistas, comparar con
+  las columnas del `GROUP BY`; para las tablas, con la PK del DDL. Ambas son
+  derivables con el parser que ya existe. Habría cazado los defectos 3, 5 y 11.
+- **Contrastar `agregacion` con la función del alias**: `COUNT(DISTINCT …)` no
+  puede ser `suma`. Habría cazado el defecto 2.
+
+Mientras eso no exista, cada esquema con claves compuestas exige revisión
+humana columna a columna, y eso no escala a los 45 objetos que quedan.
+
+---
+
+## Lo que sí está bien, verificado
+
+### El contrato con `mcp-bbdd` (bloque E)
+
+- **Las tres tablas, columna por columna iguales a `design.md` §4.1.** Extraje
+  los nombres del DDL real y del diseño: **coinciden exactamente**, en el mismo
+  orden, incluido el `CHECK (id = 1)` del singleton. Tienen además test de
+  contraste exacto y parametrizado. **La vista es la excepción, y es el defecto
+  6**: rectifico aquí mi propia comprobación inicial, que se quedó en §4.1.
+- **Invariante del orden**: `build_pipeline_steps` compone `IngestRaw →
+  LoadExcelAux → BuildStg → BuildMart → **PublicarDiccionario** → ApplyGrants`
+  (`main.py`), con el motivo escrito en el propio código: `apply_grants` es una
+  foto del instante, y publicar después dejaría las tres tablas nuevas sin
+  `GRANT` para el rol del MCP.
+- **Invariante del reemplazo**: `DELETE` + `INSERT`
+  (`diccionario_sql.py:41-43`), y **ni un `DROP` ni un `TRUNCATE` ejecutable** en
+  el DDL, en los constructores ni en el paso: las únicas apariciones de esas
+  palabras son comentarios que explican por qué no se usan.
+- **Reusa la conexión abierta** en vez de abrir una segunda contra el servidor
+  compartido, y el comando suelto valida con los pasos nocturnos de la
+  composición real, no con una lista escrita a mano.
+- **R19 y R21 se cumplen y están bien probados**: si el diccionario no valida,
+  el cliente ni siquiera se instancia, y los tests lo demuestran con un espía
+  cuyo `connection()` **lanza excepción si alguien lo llama**, comprobando
+  después que la lista de llamadas está vacía. El fallo termina en `FAILED` y
+  `run-all` sale con código 1 sin tocar el build de datos.
+- **El `hash_fuente` es reproducible de verdad**: ordena los ficheros, incluye
+  el nombre de cada uno y **normaliza `\r\n` a `\n`** —el detalle que casi
+  siempre se olvida y que haría que el mismo diccionario diera dos hashes según
+  el puesto—, con tests para las cuatro propiedades.
+- **El test de las 49 fichas prueba lo que dice**: carga el diccionario real de
+  `config/diccionario/`, no una maqueta; el cliente es el de producción con solo
+  `connection` sustituida; y las 62 filas están **derivadas** (49 objetos + 12
+  reglas + 1 publicación), no cableadas. El doble registra el orden real de las
+  sentencias, y con él se comprueba que los `DELETE` preceden a los `INSERT` y
+  que todo cae dentro de una única transacción.
+
+### El trinquete reformulado
+
+Cambió de «cada revisión cabe en la anterior» a «ningún objeto que tuvo ficha
+vuelve a `pendientes`», y el motivo es legítimo: el DDL del contrato añadió
+cuatro objetos nuevos a `_meta` y la comparación cruda los daba por regresión.
+**Le probé cinco vías y ninguna pasa**: desdocumentar una ficha vieja y subir el
+tope (**E1**); hacerlo con una ficha estrenada en este mismo commit (**E12**,
+nuevo); **commitear** el retroceso para que el árbol coincida con HEAD (**E9**);
+renombrar el fichero de esquema y borrar la ficha en el mismo commit (**E13**,
+nuevo); y la ficha esquelética de `x` (**E2**). Además siguen cazados el resto de
+experimentos de las pasadas anteriores (**E3**, columna de otra vista del mismo
+fichero SQL). El falso positivo se arregló **sin** abrir un falso negativo en lo
+que importa. El único hueco que queda es el consciente y acotado del defecto 20.
+
+### Los arrastres de la segunda pasada
+
+Los cinco, cerrados y verificados: el `porque` de `v_pbi_planif_vs_real` ahora
+explica que la vista colapsó `categoria` dentro de `concepto_cuadro` y que no
+hay clave directa; el de `v_pbi_cp_tipologia` pasa a `(obra_id, anio)` diciendo
+que el ámbito lo fija el SQL; `final_pct` da el mapa real de divisores; queda
+**un** «mes anterior» en todo `cierre.yaml`, y es el legítimo; y el informe
+rebajó su afirmación sobre granos y claves. Hay además un test que exige que las
+columnas citadas en un `porque` existan.
+
+### Los tres hallazgos que el implementer se apunta
+
+- **Las tablas `CREATE TABLE AS SELECT` no las comprobaba nadie**: cierto, y
+  ahora el test de proyección exacta las cubre explícitamente
+  (`test_f006_fichas.py:544`). Es lo que hace que las 162 columnas de `compras` y
+  las 99 de `retenciones` estén verificadas nombre a nombre — y, en efecto,
+  **no hay ni una inventada ni una omitida** en los 24 objetos nuevos.
+- **El aviso de frescura estaba en la cabecera del YAML, que no se publica**:
+  cierto y bien resuelto. `R-FRESCURA-MANUAL` lleva ahora dentro que
+  `build-compras` y `build-retenciones` no registran paso y que de esos dos
+  esquemas hay que **advertir que la antigüedad se desconoce, en vez de
+  callarlo**.
+- **Los dos `1:1` de retenciones que eran `N:N`**: corregidos; repasadas las
+  nueve relaciones del fichero, todos los lados `1` prometen unicidad real.
+
+### Rigor
+
+- **1242 tests + 2 skipped**, ejecutados por mí. Los 2 skips son legítimos y
+  están cubiertos: las dos vistas de `retenciones` creadas con SQL dinámico
+  dentro de un `DO $$` tienen su propio test a mano
+  (`test_f006_r26_las_vistas_dinamicas_de_retenciones`).
+- **Cobertura 98,9 % de 718 líneas cambiadas.**
+- **Mutación verificada de forma independiente**: recalculé alcance (**2313
+  líneas**, ocho ficheros) y mutantes (**160**), y coinciden con
+  `progress/mutacion_F-006.md`; cero supervivientes.
+- **T19 bien diferida**: `MANUAL (humano)` con los comandos exactos y las tres
+  consultas de comprobación, listada en `current.md`. Esto cierra la reserva que
+  dejé en la primera pasada sobre C4.
+- **Nada prohibido**: ni un `GRANT`, `REVOKE`, firewall ni Azure en el diff; las
+  únicas apariciones de esas palabras son comentarios que explican el orden del
+  pipeline. `grants.py` y `apply_grants_step.py`, intactos. Y la ausencia de
+  conexiones no se dio por buena leyendo: se comprobó **relanzando la suite
+  entera con los sockets parcheados para lanzar excepción** — 1242 passed, ni un
+  socket abierto.
+- **Riesgo residual honesto**: nada del bloque E se ha ejecutado nunca contra un
+  PostgreSQL. La adaptación de tipos de psycopg (el `JSONB` como texto, los
+  `list[str]` a `TEXT[]`), el `CHECK (id = 1)` y la propia sintaxis del DDL están
+  sin probar. Está declarado y planificado como T19, no oculto.
+- **`azure-apps/datamart_seg_anual.md` no menciona todavía las tres tablas ni la
+  vista.** Está planificado como T37 (bloque J), así que es un aplazamiento
+  deliberado; pero la regla de `CLAUDE.md` dice «en el mismo trabajo, no
+  después», y el contrato con otro equipo es justo el caso que esa regla cubre.
+  Conviene decidirlo explícitamente en vez de que se arrastre.
+- Deuda menor nueva: **+2 avisos de `ruff`** (un `I001` en
+  `tests/test_f006_publicacion.py` y el bloque de imports de `main.py`), cuando
+  las tandas anteriores dejaban `ruff` limpio en lo propio.
+
+### Checkpoints (tercera pasada)
+
+- **C1** `[x]` — `init.sh` exit 0, 1242 tests + 2 skipped, ejecutado por mí.
+- **C2** `[x]` — una `in_progress`, rama correcta, `current.md` al día.
+- **C3** `[x]` — dominio sin infraestructura; el paso nuevo en `application/steps/`,
+  los constructores SQL en `infrastructure/postgres/`, el DDL en `sql/ddl/` con
+  su numeración. Cabeceras de ruta presentes. Deuda menor: +2 avisos de `ruff`.
+- **C3 bis** — **N/A**: no se toca `docs/referencia/`.
+- **C4** `[ ]` — **el checkbox que falta**: R2 exige que la ficha diga qué es una
+  fila y qué la identifica, y cinco fichas nuevas declaran claves o reglas que el
+  SQL desmiente (defectos 1-5). Los tests pasan; lo que no se cumple es el
+  requisito. Las verificaciones `MANUAL (humano)` sí están listadas con su
+  comando exacto.
+- **C4 bis** `[x]` — fase RED por tarea; cobertura 98,9 % de 718 líneas;
+  mutación **verificada de forma independiente** (2313 líneas, 160 mutantes,
+  coinciden), cero supervivientes; sección «Evidencias» presente.
+- **C4 ter** — **N/A**: no existe `harness/rutas_sensibles.json`.
+- **C5** — **N/A parcial**: 20 de 42 tareas, que son el alcance encargado.
+
+### Observación de coherencia
+
+Las cuatro tablas y vistas nuevas de `_meta` entran en `pendientes` sin ficha:
+es decir, **el diccionario se publica a sí mismo sin describirse**. Es coherente
+con el trinquete y T24 lo recoge, pero conviene que no se cierre el bloque F sin
+ello, porque el MCP verá esos cuatro objetos en el catálogo antes que su ficha.
+
+---
 ---
 
 # SEGUNDA PASADA · 2026-08-20

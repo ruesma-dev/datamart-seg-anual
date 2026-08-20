@@ -374,11 +374,25 @@ SELECT d.esquema,
        f.horas_desde_ultimo_ok,
        f.ultimo_intento_status,
        p.version        AS diccionario_version,
-       p.publicado_en   AS diccionario_publicado_en
+       p.publicado_en   AS diccionario_publicado_en,
+       d.motivo_no_consumo          -- añadida el 2026-08-20, ver nota abajo
 FROM _meta.diccionario AS d
 LEFT JOIN _meta.v_frescura AS f ON f.paso = d.paso_etl
 LEFT JOIN _meta.diccionario_publicacion AS p ON TRUE;
 ```
+
+> **Enmienda del 2026-08-20 (tercera review).** La vista proyecta **19**
+> columnas, no 18: se añadió `motivo_no_consumo`, porque un MCP que ve un objeto
+> con `consumo_recomendado: false` necesita poder decir POR QUÉ no lo recomienda
+> sin abrir el JSONB ni hacer un segundo viaje.
+>
+> Va **la última**, y eso no es descuido. Las 18 anteriores son el contrato ya
+> publicado: insertarla en su sitio natural —junto a `consumo_recomendado`—
+> correría de posición a las trece que van detrás, y quien desempaquete por
+> índice se encontraría los campos cambiados sin que nada fallase. Añadir al
+> final es la única forma compatible de crecer, que es justo lo que dice §4.3.
+> El orden completo lo fija `tests/test_f006_publicacion.py`, y hay un test que
+> exige que las 18 de aquí sigan siendo un PREFIJO de las reales.
 
 Los dos `LEFT JOIN` son deliberados (R15). El de `v_frescura`, porque un objeto
 cuyo paso nunca terminó bien tiene que seguir saliendo, con la frescura a nulo:

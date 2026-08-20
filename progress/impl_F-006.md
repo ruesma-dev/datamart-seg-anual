@@ -1470,3 +1470,37 @@ inventario —son de solo lectura y las entidades son inmutables— y volvio a
   ecosistema. Necesitan firma del humano y **no se ha tocado nada de eso**.
 - **T19, T27, T39 y T40**: verificaciones `MANUAL (humano)`, con sus comandos en
   este informe.
+
+---
+
+# Correcciones de la tercera review
+
+## Defecto 6 y 7 · La vista del contrato se desviaba, y sin test que la fijara
+
+```
+$ python -m pytest tests/test_f006_publicacion.py -q -k "orden or dieciocho or columna_anadida"
+FAILED tests/test_f006_publicacion.py::test_f006_r15_ddl_la_vista_proyecta_estas_columnas_y_en_este_orden
+FAILED tests/test_f006_publicacion.py::test_f006_r15_las_dieciocho_del_diseno_conservan_su_posicion
+FAILED tests/test_f006_publicacion.py::test_f006_r23_el_diseno_documenta_la_columna_anadida
+3 failed, 4 passed, 41 deselected in 1.10s
+```
+
+**Decision, con su motivo: manda la implementacion en el QUE y el diseno en el
+DONDE.** La columna `motivo_no_consumo` es una buena idea y se queda —un MCP que
+ve un objeto con `consumo_recomendado: false` necesita poder decir por que sin
+abrir el JSONB ni hacer un segundo viaje—, pero **estaba en la posicion 6**, que
+es exactamente lo que la cabecera del propio fichero prohibe cuatro lineas mas
+arriba: correr de posicion a las trece columnas que van detras. Quien
+desempaquete por indice se habria encontrado los campos cambiados **sin que nada
+fallase**.
+
+Se mueve **al final**, que es la unica forma compatible de crecer, y se enmienda
+`design.md` §4.2 con una nota fechada que explica por que no esta en su sitio
+natural. Las 18 del contrato original conservan su posicion exacta.
+
+Y se le pone **el test que le faltaba**, que es lo que permitio que esto pasara:
+era la unica de las cuatro estructuras del contrato sin contraste exacto —solo
+se comprobaba por subcadena que 15 de sus nombres aparecieran, y omitia justo
+`tipo`, `capa`, `consumo_recomendado` y `motivo_no_consumo`—. Ahora hay tres:
+la lista completa **en orden**, que el diseno y la vista real proyecten lo mismo,
+y que `design.md` documente la columna anadida.
