@@ -153,18 +153,18 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.fact_seguimiento_mensual.obra_id
-        cardinalidad: 1:N
+        cardinalidad: "1:N"
         porque: >-
           Para bajar del cierre agregado al detalle por partida y mes. Ojo: el
           seguimiento se refresca de noche y el cierre no, asi que pueden estar
           contando momentos distintos.
       - de: obra_id
         a: maestro.obras.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para poner cliente, estado y fechas de alta y baja a la obra.
       - de: obra_id
         a: stg.obras.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Es el universo del que sale: el cierre solo cubre las obras del
           seguimiento, no las administrativas.
@@ -301,17 +301,17 @@ objetos:
     relaciones:
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Es la tabla base; aqui solo se anaden dos conceptos y los porcentajes.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           De ahi sale el `presupuesto_aprobado_venta` que se usa como divisor del
           porcentaje final de la VENTA.
       - de: concepto
         a: cierre.v_pbi_dim_concepto.concepto
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para la descripcion legible y el orden de presentacion del concepto.
 
     ejemplos_preguntas:
@@ -416,7 +416,7 @@ objetos:
     relaciones:
       - de: obra_id
         a: stg.obras.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: El catalogo se construye a partir de las partidas de esa obra.
     ejemplos_preguntas:
       - Que subcategorias de coste indirecto tiene la obra X
@@ -555,11 +555,11 @@ objetos:
     relaciones:
       - de: obra_id
         a: cierre.v_pbi_dim_subcategoria_ci.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para los nombres de grupo y subcategoria propios de esa obra.
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Es el desglose del concepto INDIRECTOS del cuadro de cierre: la suma
           del detalle debe cuadrar con esa fila.
@@ -625,11 +625,11 @@ objetos:
     relaciones:
       - de: tipologia
         a: cierre.v_pbi_dim_tipologia_cp.tipologia
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para la descripcion legible de la tipologia.
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Es el desglose del concepto GENERALES del cuadro de cierre: la suma del
           detalle debe cuadrar con esa fila.
@@ -769,17 +769,17 @@ objetos:
     relaciones:
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: 1:N
+        cardinalidad: "1:N"
         porque: Es la cabecera del cuadro de cierre de esa obra.
       - de: obra_id
         a: maestro.obras.obra_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: >-
           El maestro trae el estado y las fechas de alta y baja desde otra via
           (`con.fecbaj`), util para contrastar si la obra vive.
       - de: obra_id
         a: stg.obras.obra_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: Es el universo del que sale la vista.
     ejemplos_preguntas:
       - De que va la obra X, quien es el cliente y en que fechas se hace
@@ -854,13 +854,13 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.fact_seguimiento_categoria.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Es la tabla de la que sale, pivotando planificado y real. Ojo: esa
           tabla se refresca de noche y esta vista solo con `build-cierre`.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para el contexto administrativo de la obra.
     ejemplos_preguntas:
       - Como va la obra X frente a lo planificado este mes

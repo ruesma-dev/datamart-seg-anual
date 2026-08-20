@@ -192,30 +192,30 @@ objetos:
     relaciones:
       - de: obra_id
         a: stg.obras.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Universo del SEGUIMIENTO, que excluye obras administrativas y codigos
           de cinco o mas digitos. Es el universo que ya esta aplicado aqui.
       - de: obra_id
         a: maestro.obras.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Para poner cliente, estado y fechas de alta y baja a la obra. OJO:
           `maestro.obras` NO filtra nada y es superconjunto de `stg.obras`.
       - de: partida_id
         a: stg.partidas.partida_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para el arbol completo de capitulos y el nivel de la partida.
       - de: partida_id
         a: compras.v_pbi_partida_coste.partida_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Es el unico eje que une el coste PLANIFICADO de una partida con su
           coste INCURRIDO documental. Hoy no lo explota ninguna vista: la vista
           puente es F-039. Ojo, `compras` no filtra por `stg.obras`.
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Para contrastar el seguimiento mensual contra el cierre economico de
           la obra. Ojo con la frescura: `cierre` no se refresca de noche.
@@ -313,13 +313,13 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.fact_seguimiento_mensual.obra_id
-        cardinalidad: 1:N
+        cardinalidad: "1:N"
         porque: >-
           Para bajar de la categoria al detalle por partida. La categoria se
           llama igual en las dos tablas a proposito.
       - de: obra_id
         a: maestro.obras.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para poner cliente y estado a la obra.
 
     ejemplos_preguntas:
@@ -405,25 +405,25 @@ objetos:
     relaciones:
       - de: fact_id
         a: mart.fact_seguimiento_mensual.fact_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: >-
           Es literalmente la misma fila. Para los textos (nombre de obra,
           descripcion de partida) se va a la tabla o a las dimensiones.
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Dimension de obra del modelo en estrella.
       - de: partida_id
         a: mart.v_pbi_dim_partida.partida_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Dimension de partida del modelo en estrella.
       - de: anio_mes
         a: mart.v_pbi_dim_fecha.anio_mes
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Calendario mensual del modelo.
       - de: escenario
         a: mart.v_pbi_dim_escenario.escenario
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Dimension de escenario, que ademas aporta el orden de presentacion.
     ejemplos_preguntas:
       - Dame los importes mensuales de la obra X sin los textos repetidos
@@ -471,11 +471,11 @@ objetos:
     relaciones:
       - de: fact_cat_id
         a: mart.fact_seguimiento_categoria.fact_cat_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: Es la misma fila, sin los textos de obra ni de mes.
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Dimension de obra.
     ejemplos_preguntas:
       - Cual es el reparto CD/CI/CP del coste real de la obra X este ano
@@ -505,7 +505,7 @@ objetos:
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: >-
           Para el cliente, el estado y las fechas de alta y baja. OJO: el
           maestro tiene MAS obras, porque no filtra las administrativas.
@@ -558,11 +558,11 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Una partida cuelga de una obra.
       - de: partida_id
         a: stg.partidas.partida_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: Es la fila de origen; la vista solo renombra y anade etiquetas.
     ejemplos_preguntas:
       - Que partidas tiene la obra X y de que capitulo cuelgan
@@ -619,7 +619,7 @@ objetos:
     relaciones:
       - de: partida_id
         a: mart.v_pbi_dim_partida.partida_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: Es un superconjunto de columnas de la misma fila.
     ejemplos_preguntas:
       - Dame el arbol de presupuesto de la obra X por niveles
@@ -745,11 +745,11 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para poner codigo y nombre a la obra.
       - de: obra_id
         a: stg.plan_mensual.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: >-
           Es la tabla de la que sale, filtrando los ambitos master. Consultar
           `stg.plan_mensual` directamente sin elegir version multiplica importes.
@@ -796,11 +796,11 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.v_master_versiones_tipadas.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Es el catalogo del que se elige, filtrando por fecha efectiva.
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para poner codigo y nombre a la obra.
     ejemplos_preguntas:
       - Que version de plan rige en la obra X para 2025
@@ -862,11 +862,11 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para poner codigo y nombre a la obra.
       - de: obra_id
         a: mart.v_master_vigente_anual.obra_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Es la version de plan que se usa para la columna planificada.
     ejemplos_preguntas:
       - Cuanto llevamos de seguros y avales en la obra X este ano
@@ -1005,13 +1005,13 @@ objetos:
     relaciones:
       - de: fact_id
         a: mart.fact_seguimiento_mensual.fact_id
-        cardinalidad: 1:1
+        cardinalidad: "1:1"
         porque: >-
           Las filas no periodificadas son las mismas. Las periodificadas no
           tienen equivalente y traen `fact_id` nulo.
       - de: regla_id_aplicada
         a: aux.periodificacion_partida.regla_id
-        cardinalidad: N:1
+        cardinalidad: "N:1"
         porque: Para saber que regla reparte el importe y con que plazo.
     ejemplos_preguntas:
       - Como quedaria el coste de la obra X si se periodificaran los seguros

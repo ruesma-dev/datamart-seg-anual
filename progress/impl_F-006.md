@@ -523,3 +523,40 @@ mutación aplicada la cazó al menos un test. Detalle en
 Las seis líneas cambiadas sin cubrir son ramas de guarda redundantes con otras
 ya ejercitadas (comprobaciones de tipo encadenadas dentro del cargador); ninguna
 sobrevivió a la mutación, que es la comprobación que de verdad importa.
+
+---
+
+# Correcciones tras la review (RECHAZADO, `progress/review_F-006.md`)
+
+Diez defectos, en el orden de gravedad del informe. Cada uno con su fase RED.
+
+## Defecto 1 · `cardinalidad: 1:1` publicada como el entero `61`
+
+Confirmado antes de tocar nada, ejecutando el cargador real:
+
+```
+$ python -c "... cargar_diccionario('config/diccionario') ..."
+Counter({'N:1': 31, '61': 8, '1:N': 3})
+```
+
+Ocho relaciones publicaban `61`. YAML lee `1:1` sin comillas como sexagesimal
+(1x60+1). Fase RED:
+
+```
+$ python -m pytest tests/test_f006_formato.py -q -k "cardinalidad or 61 or valida_entero"
+E       ImportError: cannot import name 'CARDINALIDADES' from 'etl_sigrid.domain.diccionario'
+FAILED tests/test_f006_formato.py::test_f006_r5_el_vocabulario_de_cardinalidad_es_exactamente_este
+FAILED tests/test_f006_formato.py::test_f006_r5_el_61_de_yaml_se_caza_como_cardinalidad_invalida
+FAILED tests/test_f006_formato.py::test_f006_r5_una_cardinalidad_vacia_falla
+FAILED tests/test_f006_formato.py::test_f006_r5_ninguna_relacion_real_publica_una_cardinalidad_de_yaml
+4 failed, 5 passed, 88 deselected in 1.22s
+```
+
+**Se corrigen las dos cosas, como pedia el reviewer**: las ocho comillas y el
+hueco que las permitio. `CARDINALIDADES = ("1:1", "1:N", "N:1", "N:N")` es ahora
+vocabulario cerrado validado en R5, igual que `agregacion` en R7, y **el mensaje
+de error dice como se arregla**: «si querias `1:1`, escribelo ENTRE COMILLAS:
+YAML lee `1:1` sin comillas como el numero 61». Sin eso el mismo fallo entraria
+otra vez en las 73 fichas que faltan.
+
+Verde: `Counter({'N:1': 31, '1:1': 8, '1:N': 3})`.

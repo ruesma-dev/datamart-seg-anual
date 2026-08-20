@@ -74,6 +74,14 @@ AGREGACIONES = (
     "clave_sustituta",
 )
 
+#: Vocabulario CERRADO de la cardinalidad de una relacion (R5).
+#:
+#: Cerrado por un incidente concreto: `cardinalidad: 1:1` escrito SIN COMILLAS
+#: lo interpreta YAML como un numero sexagesimal y vale **61**. Ocho relaciones
+#: se publicaron asi y no lo vio nadie, porque el campo era `str` y no se
+#: contrastaba con nada. Es el mismo remedio que ya tenia `agregacion`.
+CARDINALIDADES = ("1:1", "1:N", "N:1", "N:N")
+
 #: Severidad de una regla dura del diccionario.
 SEVERIDADES = ("bloqueante", "aviso")
 
@@ -555,6 +563,14 @@ def _validar_relaciones(
                     regla="R5",
                     detalle=detalle,
                 )
+            )
+
+        if relacion.cardinalidad not in CARDINALIDADES:
+            error(
+                f"la relación hacia `{relacion.a}` declara `cardinalidad` = "
+                f"'{relacion.cardinalidad}', fuera del vocabulario: "
+                f"{_lista(CARDINALIDADES)}. Si querías `1:1`, escríbelo ENTRE "
+                f"COMILLAS: YAML lee `1:1` sin comillas como el número 61"
             )
 
         if propias and relacion.de not in propias:

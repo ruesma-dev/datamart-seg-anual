@@ -1318,3 +1318,91 @@ def test_f006_r8_cargador_un_error_de_yaml_sin_posicion_tambien_es_legible() -> 
     detalle = _detalle_yaml(yaml_lib.YAMLError("algo raro"))
 
     assert "no parsea" in detalle
+
+
+# ===========================================================================
+# R5 · Vocabulario cerrado de `cardinalidad` (defecto 1 de la review)
+#
+# `cardinalidad: 1:1` SIN COMILLAS lo interpreta YAML como sexagesimal y vale
+# 61. Ocho relaciones de `mart.yaml` y `cierre.yaml` se publicaron asi, y no lo
+# vio nadie porque el campo se declaraba `str` y no se validaba contra nada.
+# El vocabulario cerrado es la misma defensa que ya tenia `agregacion` (R7).
+# ===========================================================================
+
+
+def test_f006_r5_el_vocabulario_de_cardinalidad_es_exactamente_este() -> None:
+    from etl_sigrid.domain.diccionario import CARDINALIDADES
+
+    assert set(CARDINALIDADES) == {"1:1", "1:N", "N:1", "N:N"}
+
+
+@pytest.mark.parametrize("cardinalidad", ["1:1", "1:N", "N:1", "N:N"])
+def test_f006_r5_las_cardinalidades_del_vocabulario_validan(cardinalidad: str) -> None:
+    from etl_sigrid.domain.diccionario import Relacion
+
+    ficha = _ficha(
+        relaciones=(
+            Relacion(
+                de="obra_codigo",
+                a="mart.fact_seguimiento_mensual.obra_codigo",
+                cardinalidad=cardinalidad,
+                porque="Consigo misma, para la prueba.",
+            ),
+        )
+    )
+
+    assert validar(_dicc(fichas=[ficha]), PASOS_NOCTURNOS) == []
+
+
+def test_f006_r5_el_61_de_yaml_se_caza_como_cardinalidad_invalida() -> None:
+    """El caso exacto que se coló: `1:1` sin comillas parseado como 61."""
+    from etl_sigrid.domain.diccionario import Relacion
+
+    ficha = _ficha(
+        relaciones=(
+            Relacion(
+                de="obra_codigo",
+                a="mart.fact_seguimiento_mensual.obra_codigo",
+                cardinalidad="61",
+                porque="Lo que YAML entiende por `1:1` sin comillas.",
+            ),
+        )
+    )
+
+    errores = validar(_dicc(fichas=[ficha]), PASOS_NOCTURNOS)
+
+    assert errores
+    assert any("61" in e.detalle for e in errores)
+    assert any("comillas" in e.detalle for e in errores), (
+        "el mensaje tiene que decir COMO se arregla, no solo que esta mal"
+    )
+
+
+def test_f006_r5_una_cardinalidad_vacia_falla() -> None:
+    from etl_sigrid.domain.diccionario import Relacion
+
+    ficha = _ficha(
+        relaciones=(
+            Relacion(
+                de="obra_codigo",
+                a="mart.fact_seguimiento_mensual.obra_codigo",
+                cardinalidad="",
+                porque="Sin cardinalidad no se sabe si el JOIN multiplica.",
+            ),
+        )
+    )
+
+    assert any(e.regla == "R5" for e in validar(_dicc(fichas=[ficha]), PASOS_NOCTURNOS))
+
+
+def test_f006_r5_ninguna_relacion_real_publica_una_cardinalidad_de_yaml() -> None:
+    """Sobre el diccionario REAL: ni un `61`, ni un numero, ni nada fuera del
+    vocabulario. Es lo que llegaria al JSONB que consume el MCP."""
+    from etl_sigrid.domain.diccionario import CARDINALIDADES
+
+    for ficha in _global_real().fichas:
+        for relacion in ficha.relaciones:
+            assert relacion.cardinalidad in CARDINALIDADES, (
+                f"{ficha.nombre} -> {relacion.a}: cardinalidad "
+                f"{relacion.cardinalidad!r}"
+            )
