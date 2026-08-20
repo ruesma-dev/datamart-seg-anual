@@ -313,6 +313,26 @@ Los tres motivos, por orden de peso:
 
 ---
 
+## 6.2 · FIRMA DEL HUMANO · 2026-08-20
+
+> ## NO al bloque B. Firmado por el humano.
+
+Aceptada la recomendación del §6 con los números del §5 delante: ahorro máximo
+**2,25 min** frente al umbral de 20, e ingesta al **19,9 %** frente al umbral
+del 40. Ninguna de las dos condiciones de DA-7 se cumple, y van en O.
+
+El motivo de fondo pesa más que los números: **la marca de modificación no
+existe en las 24 tablas que se llevan el 93 % de la ingesta**, así que no hay
+nada que preguntarle a Sigrid. DA-4 ya había previsto por escrito este
+desenlace y qué hacer entonces: llevar el esfuerzo al build.
+
+**Consecuencia**: F-011 se cierra con el **bloque A entregado** —la medición,
+que es el resultado— y el **bloque B descartado**. El trabajo se traslada a
+**F-025**, donde está el tiempo de verdad: `build_stg`, 110,7 min, el 67,0 % de
+la carga.
+
+---
+
 ## 7 · Verificaciones MANUAL que quedan pendientes (todas del humano)
 
 Ninguna cambia la recomendación; están aquí porque la spec las pide y porque

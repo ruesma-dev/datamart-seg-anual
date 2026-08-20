@@ -402,6 +402,46 @@ hay que decir explícitamente que se queda.
 
 ---
 
+## D11 · El acceso al Postgres desde el puesto por regla de IP ya no funciona — afecta a F-032, F-034, D10
+
+**Abierta el 2026-08-20.** Medido hoy: la IP pública del puesto **rota cada
+pocos minutos y cambia de bloque entero**. En una hora se vieron tres:
+`77.211.5.x` (ayer, con su rango `/24` ya autorizado), `176.80.159.179` y
+`88.26.46.154`. Es estable entre consultas seguidas, así que no es un error de
+medición: es un CGNAT que reasigna.
+
+**Por qué importa y no es una molestia menor:**
+
+- **Perseguirla con reglas es inútil.** Hoy se creó la regla con la IP correcta
+  y para cuando se probó la conexión, ya era otra. Ayer costó media hora y dos
+  reglas, y la de rango `/24` tampoco sirve si el salto es de bloque.
+- **Ya hay cuatro reglas del puesto acumuladas** (`-17-rango`, `-18`, `-19` y
+  `-20`), todas inútiles a los pocos minutos de crearse, en el firewall de un
+  servidor **compartido** con `albaranes` y `partes`. F-032 las tiene que
+  retirar, y ahora se sabe que no hay que sustituirlas por otra igual.
+- **Tumba la opción A de D10.** Power BI Desktop desde el puesto obligaría a
+  recrear la regla varias veces al día. Como método de trabajo, no se sostiene.
+
+**Caminos posibles, ninguno evaluado todavía:**
+
+1. **Trabajar desde dentro de Azure** para lo que necesite base: la regla
+   `AllowAzureServices` ya existe, así que un Cloud Shell entra sin tocar el
+   firewall. Es lo más barato y no toca infraestructura compartida.
+2. **IP fija del ISP** en el puesto. Resuelve todo de golpe y es decisión
+   administrativa, no técnica.
+3. **VPN punto a sitio o Private Link/VNet** contra el servidor. Es lo más
+   sólido y lo más caro, y toca un recurso compartido: no es decisión de este
+   proyecto en solitario.
+4. **Rango amplio del ISP** en el firewall. Barato y **malo**: abrir un bloque
+   grande de un operador doméstico en un Postgres de producción compartido.
+
+**Lo que bloquea mientras no se decida**: cualquier verificación desde el puesto
+que necesite la base —`check-coherencia`, `check-frescura`, `timings`— y el
+consumo de Power BI Desktop. **No bloquea** al job nocturno, que corre dentro de
+Azure con su propia regla y sigue cargando cada noche.
+
+---
+
 ## Decisiones ya cerradas
 
 - **2026-08-08 · Backlog priorizado.** Aprobado el orden F-001, F-004, F-005,
