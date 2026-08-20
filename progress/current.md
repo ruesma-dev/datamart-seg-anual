@@ -26,6 +26,106 @@
 > - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
 >   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
 
+# F-011 · BLOQUE A ENTREGADO Y PARADA EN T9 (2026-08-20) — léelo primero
+
+**La feature está en su parada: hace falta una firma del humano.** Todo el
+detalle en `progress/medicion_F-011.md` (la puerta de R8) y en
+`progress/impl_F-011.md` (qué se hizo y con qué evidencias).
+
+## Lo que hay que decidir
+
+| Criterio de DA-7 | Umbral | Medido | ¿Se cumple? |
+|---|---|---|---|
+| Ahorro estimado de la ingesta incremental | ≥ 20 min | **2,25 min** | **NO** |
+| Peso de la ingesta en el total | ≥ 40 % | **19,9 %** | **NO** |
+
+**Recomendación firmada del implementer: NO implementar el bloque B.** Y el
+motivo de fondo no es el margen:
+
+> **`tiemod` no existe en 24 de las 31 tablas que ingerimos.** Comprobado en el
+> catálogo de Sigrid. Entre las que NO la tienen están las cuatro que se llevan
+> el 86 % del tiempo de ingesta; `obrparpre` (13,8 M filas, 61 % del tiempo)
+> tiene 22 columnas y ninguna es una marca de modificación. El diccionario
+> describía entidades lógicas, no la base real. DA-4 ya previó este desenlace:
+> si el veredicto es `NO SIRVE`, se renuncia al watermark y el esfuerzo se
+> lleva al build, que es **F-025**.
+
+## Números de la carga, medidos en TRES cargas completas
+
+ingesta **32,9 min** · `build_stg` **110,7** · `build_mart` **21,6** · total
+**165,2**. `build_stg` es el **67 %** y varía menos de 30 s entre cargas de
+días distintos: es una línea base excelente para medir lo que haga F-025.
+
+Y un dato que estaba gratis en los logs: **el datamart crece 1.688 filas al
+día sobre 20 M** (0,0084 %). Cada noche se traen 20 millones de filas para
+incorporar mil setecientas.
+
+## Qué queda pendiente, y de quién
+
+1. **T9, la firma** (humano). Si es NO, F-011 cierra con el bloque A.
+2. **`perfil-carga` y `diagnostico-tiemod` contra Azure**: la IP del puesto ha
+   rotado otra vez y **ninguna regla de firewall la cubre**. Crear una es
+   escritura sobre el servidor compartido y no se ha hecho.
+3. **`bench-sigrid`**: implementado y sin ejecutar; va contra producción de
+   Sigrid y lo lanza el humano cuando quiera (R4 y R5-bis siguen sin acreditar).
+4. **T8-bis**: avisar al dueño de `sigrid-api`. `azure-apps/` no se ha tocado.
+
+## Dos cabos que conviene no perder
+
+- **`config/tables_sigrid.yaml` miente en 17 entradas**: declara
+  `incremental_column: tiemod` en tablas que no la tienen. Es inerte hoy —el
+  step comprueba el esquema real— pero es la documentación equivocada que hizo
+  verosímil la premisa de F-009 durante meses. Propuesto y **no hecho**.
+- **F-029 confirmada en vivo**: un `init.sh` lanzado justo al terminar una
+  campaña de mutación salió **en rojo con 1 test fallando**; con el árbol
+  quieto, 798 en verde. Es el defecto (3) de su ficha, observado.
+
+---
+
+# F-011 CERRADA · 2026-08-20 · midió, y la medición dijo que no
+
+**Reviewer en APROBADO** (`progress/review_F-011_cierre.md`). Si este fichero
+dice más abajo que «falta la firma del humano», está caducado: la firma se dio
+hoy y está en `progress/medicion_F-011.md` §6.2.
+
+**Cierra con el bloque A entregado y el bloque B descartado por su propia
+puerta.** No es un abandono: la spec definía dos destinos y R8/DA-4/DA-7
+escribieron la rama del NO **antes** de medir.
+
+| Criterio de DA-7 | Umbral | Medido |
+|---|---|---|
+| Ahorro de la ingesta incremental | ≥ 20 min | **2,25 min** |
+| Peso de la ingesta en la carga | ≥ 40 % | **19,9 %** |
+
+**El motivo de fondo, que pesa más que los números**: la marca de modificación
+**no existe** en las 24 tablas que se llevan el 93 % de la ingesta. El reviewer
+lo corroboró contra el diccionario de Sigrid: la ficha de `obrparpre` lista sus
+22 columnas y ninguna es de modificación.
+
+**Dónde está el tiempo de verdad**: `build_stg`, **110,7 min, el 67,0 %**. Eso
+es **F-025**, que pasa a ser lo siguiente.
+
+**No reabrir «solo altas» sin leer D12.** Sí llegaría al umbral y serviría un
+plan viejo en silencio, porque `obrparpre.planif` se edita sin crear filas.
+
+## Lo que queda de F-011, todo MANUAL y nada bloqueante
+
+| Tarea | Qué es | Comando |
+|---|---|---|
+| **T7** | mediciones complementarias | las de `specs/F-011-carga-incremental/tasks.md` T7; el grueso ya está en `medicion_F-011.md` |
+| **T8-bis** | avisar al dueño de `sigrid-api` de lo medido sobre paginación y tiempos | conversación, no comando |
+
+## Y una advertencia de entorno para la próxima sesión
+
+**Desde el puesto no se puede leer la base** (ver **D11**): la IP pública rota
+cada pocos minutos y cambia de bloque entero — tres distintas en una hora el
+2026-08-20. Las reglas de firewall no aguantan; ya hay cuatro acumuladas e
+inútiles. Para comprobar la nocturna hace falta otra vía, y la más barata es
+Cloud Shell, que entra por la regla `AllowAzureServices` sin tocar el firewall
+compartido. **El job nocturno no está afectado**: corre dentro de Azure.
+
+---
+
 # F-023 · las tres verificaciones de F-004, CUMPLIDAS (2026-08-19)
 
 Lo pide **T27 de F-003**: el resultado de cada verificación MANUAL, aquí. El
@@ -1409,3 +1509,68 @@ Los 6 huecos de riesgo ALTO de F-005, fijados con tests: la mutación sobre
 F-005 pasa de 55 a **47 supervivientes, CERO de riesgo alto**. Barrido de
 secretos afinado (sin falsos positivos de rutas largas). Deuda restante:
 47 MEDIO/BAJO contabilizados en `progress/mutacion_F-005_tras_refuerzo.md`.
+
+---
+
+# F-011 · SPEC ESCRITA (2026-08-18) — pendiente de aprobación del humano
+
+Carpeta `specs/F-011-carga-incremental/` (requirements.md, design.md,
+tasks.md). Rama prevista `feature/F-011-carga-incremental`. **No se ha
+tocado código, ni `harness/features.json`, ni la carpeta de F-023.** La
+feature no declara `rigor`, así que hereda `critico`.
+
+## Los dos hallazgos que cambian el rumbo de la feature
+
+1. **La sospecha de la ficha no se sostiene contra el dato que ya tenemos.**
+   La carga completa del 18-ago (165 min) se reparte: ingesta **33 min
+   (20 %)**, `build_stg` **111 min (67 %)**, `build_mart` **21 min (13 %)**.
+   Una ingesta instantánea deja la carga en 132 min. El cuello está en el
+   BUILD, no en la extracción. Por eso la spec va por bloques: A (medir,
+   siempre) → **PARADA con firma del humano** → B (ingesta incremental, solo
+   si los números lo justifican) → C (ventana de negocio: en F-011 solo se
+   mide; la implementación pide feature propia).
+
+2. **El hallazgo heredado de F-009 está mal contado y, sobre todo,
+   incompleto.** Verificado contra `azure-apps/sigrid_tablas.md`: `fecalt`
+   sale en **18** filas (decía 16), `fecmod` en **6** (decía 3), `sello` en
+   **2** (correcto) — y **`tiemod` («Tiempo modificación») en 232 filas, ~190
+   tablas**, que la ficha no menciona. `config/tables_sigrid.yaml` ya lo
+   declara en 17 de 31 tablas y la ingesta ya lo copia a `_source_tiemod` en
+   cada carga: **si `tiemod` sirve o no como watermark se puede responder con
+   SQL local, sin volver a leer Sigrid**. Los comandos exactos del recuento
+   están en `requirements.md` §0.2 para que el reviewer lo repita.
+
+## El choque con F-024, resuelto en el diseño (no al implementar)
+
+Una incremental deja tablas de `raw` de batches distintos y la puerta de
+F-024 las declararía incoherentes. Solución: **en modo incremental la ingesta
+escribe fila `ingest_raw.<tabla>` para TODAS las tablas declaradas, traigan o
+no filas nuevas** (R9). Así todas comparten `batch_id` y
+`domain/coherencia.py` **no se toca ni una línea** (R13, R14, con tests de no
+regresión). Efecto declarado: `rows_processed` deja de ser el tamaño de la
+tabla → se añade `filas_en_tabla` a `metadata` y dos columnas **al final** de
+`_meta.v_raw_state` (lo único que `CREATE OR REPLACE VIEW` admite sin
+`DROP CASCADE`, que se llevaría los GRANT del MCP).
+
+## Decisiones abiertas que necesita validar el humano (T9 de tasks.md)
+
+- **DA-1 · ¿Qué es una «obra abierta»?** Rec.: contrato sin `fecreafin` +
+  red de «movimiento en 12 meses», como predicado en `business_rules.yaml`.
+  **Decisión de Negocio.**
+- **DA-2 · Cadencia de la recarga completa.** Rec.: semanal
+  (`INGESTA_FULL_CADA_DIAS=7`); el día lo elige el humano porque la ventana se
+  comparte con `albaranes` y `partes`.
+- **DA-3 · ¿Se acepta perder las bajas de Sigrid entre recargas completas?**
+  Rec.: sí, con guardia de recuento por tabla que fuerza `full` al divergir.
+- **DA-4 · Si `tiemod` resulta no fiable, ¿qué se hace?** Rec.: atacar el
+  build y filtrar la extracción con el campo `where` que el YAML ya soporta;
+  descartado el watermark casero por sumas de control.
+- **DA-5 · ¿Feature propia para acotar el build (el 67 %)?** Rec.: sí, y con
+  prioridad por encima del bloque B de F-011.
+- **DA-6 · `azure-apps/sigrid_api.md` no cuadra con la instancia
+  desplegada**: documenta `MAX_ALLOWED_ROWS=1000` y
+  `MAX_QUERY_TIMEOUT_SECONDS=120`, pero este ETL trabaja con `page_size=10000`
+  y `timeout_s=230` y funciona. Rec.: medirlo con `bench-sigrid` y **avisar al
+  dueño de `sigrid-api`**; este proyecto no edita ese documento.
+- **DA-7 · Umbral que justifica el bloque B.** Rec.: solo si el ahorro
+  estimado es ≥ 20 min o la ingesta pasa a ser ≥ 40 % del total.

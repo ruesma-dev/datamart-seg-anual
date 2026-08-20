@@ -504,3 +504,34 @@ Tres cosas que merece la pena recordar de esta feature:
   humano la había subido a `critico`, y nadie lo había recogido. Se juzgó como
   `critico` y se corrigió el fichero. Un nivel escrito por debajo del real baja
   la vara en silencio para quien lo lea dentro de tres meses.
+
+
+## F-011 · Carga incremental del datamart — `done` (2026-08-20)
+
+**Cierra sin implementar lo que su título promete, y está bien así.** La spec
+definía dos destinos posibles y escribió la rama del NO **antes** de medir:
+DA-7 condicionó la ingesta incremental a que el ahorro fuera ≥ 20 min o la
+ingesta pesara ≥ 40 % del total, y DA-4 dejó dicho qué hacer si el watermark no
+servía.
+
+**Lo medido**: ahorro máximo **2,25 min** y peso de la ingesta **19,9 %**.
+Ninguna condición se cumple, y no por poco. El motivo de fondo es que **la marca
+de modificación no existe en las 24 tablas que se llevan el 93 % de la
+ingesta**: solo 7 de 31 la tienen. Aunque esas 7 costaran cero, la carga bajaría
+de 165,2 a 163,0 minutos.
+
+**La sospecha que abrió la feature era falsa.** Se creía que el cuello de
+botella era la ingesta; está en `build_stg`, 110,7 min, el 67,0 % de la carga.
+Ese es el sitio, y tiene feature propia: F-025.
+
+**Lo que se entrega**: la medición, que es un resultado y no un consuelo — de
+dónde se va el tiempo, qué tablas lo consumen, qué marcas existen realmente en
+el origen y cuánto se podría ahorrar como techo. Más las herramientas y tests
+que la sostienen: 798 tests en la suite, cobertura 100 % de 469 líneas
+cambiadas, mutación 189/189/0 reejecutada de forma independiente por el
+reviewer con `--workers 1`.
+
+**Lo que hay que recordar**: el atajo de «solo altas» sí llegaría al umbral y
+**serviría un plan viejo en silencio**, porque `obrparpre.planif` se edita sin
+crear filas. Está clavado en `progress/decisiones_abiertas.md` como **D12**,
+fuera de esta feature, porque una feature cerrada deja de leerse.

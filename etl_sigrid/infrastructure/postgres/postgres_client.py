@@ -31,6 +31,8 @@ from psycopg.types.json import Json
 from etl_sigrid.domain.coherencia import EstadoPaso, EstadoTablaRaw
 from etl_sigrid.domain.ejecucion import MOTIVO_HUERFANA
 from etl_sigrid.domain.entities import ColumnSpec
+from etl_sigrid.domain.perfil_carga import FilaPerfil
+from etl_sigrid.domain.tiemod import COLUMNA_TIEMOD, EstadoTiemod
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
@@ -149,6 +151,67 @@ FROM _meta.v_frescura
 ORDER BY paso
 """
 
+# --- Perfil de carga (F-011, R1-R3) -----------------------------------------
+#
+# SOLO LECTURA y sobre `_meta.etl_runs` y nada más: es el «medir antes de
+# optimizar» de F-011, y no hace falta ejecutar ninguna carga nueva para
+# responderlo, porque cada tabla ya deja su fila `ingest_raw.<tabla>` desde
+# F-024.
+#
+# El ancla es la ÚLTIMA carga con `batch_id`, elegida por `ORDER BY batch_id
+# DESC`: el identificador de F-024 es UTC compacto, así que ordena
+# cronológicamente sin parsear nada (fue una decisión explícita de esa
+# feature). Y se ancla a `step = 'ingest_raw'` porque es el primer paso de
+# `run-all`: así el perfil sale de una carga de verdad y no de un
+# `apply-grants` suelto que se ejecutó después.
+SQL_PERFIL_CARGA = """
+SELECT stage, step, started_at, finished_at, status, rows_processed, batch_id
+FROM _meta.etl_runs
+WHERE batch_id = COALESCE(
+        %(batch)s,
+        (SELECT batch_id
+         FROM _meta.etl_runs
+         WHERE step = 'ingest_raw' AND batch_id IS NOT NULL
+         ORDER BY batch_id DESC
+         LIMIT 1)
+      )
+ORDER BY started_at, id
+"""
+
+# --- Diagnóstico de `tiemod` (F-011, R6-R7) ---------------------------------
+#
+# SOLO LECTURA sobre `raw`. Responde si la marca de modificación de Sigrid
+# sirve como watermark **sin volver a leer Sigrid**: sus valores ya están
+# guardados en `_source_tiemod`, carga tras carga, desde que existe
+# `copy_rows(tiemod_column=...)`.
+#
+# El COUNT(DISTINCT) no es gratis —obliga a recorrer la tabla entera— y por eso
+# esto es un comando que se lanza a mano, no un paso del pipeline.
+SQL_TABLAS_CON_TIEMOD = """
+SELECT table_name
+FROM information_schema.columns
+WHERE table_schema = 'raw' AND column_name = %(columna)s
+ORDER BY table_name
+"""
+
+#: Plantilla: la tabla y la columna se interpolan con `psycopg.sql.Identifier`,
+#: nunca por concatenación. Va como constante para que un test pueda leer
+#: exactamente el SQL que se envía, igual que hace F-024.
+SQL_DIAGNOSTICO_TIEMOD = """
+SELECT COUNT(*)                                  AS filas,
+       COUNT(*) FILTER (WHERE {col} IS NULL)     AS nulos,
+       MIN({col})                                AS minimo,
+       MAX({col})                                AS maximo,
+       COUNT(DISTINCT {col})                     AS distintos
+FROM raw.{tabla}
+"""
+
+#: Filas cuya marca supera la de la fotografía anterior. Es la traducción
+#: operativa de «cuántas filas cambiaron» de R7: si `tiemod` es una marca de
+#: modificación, toda fila tocada desde la foto anterior está por encima de su
+#: máximo. Si no lo es, este recuento sale 0, que es justo la señal de NO SIRVE.
+SQL_FILAS_DESDE_TIEMOD = "SELECT COUNT(*) FROM raw.{tabla} WHERE {col} > %(umbral)s"
+
 SQL_RUN_START = """
 INSERT INTO _meta.etl_runs (stage, step, started_at, status, batch_id)
 VALUES (%s, %s, %s, 'RUNNING', %s)
@@ -162,6 +225,17 @@ INSERT INTO _meta.etl_runs
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id
 """
+
+
+def _float_o_none(valor: Any) -> float | None:
+    """Convierte a `float` respetando el nulo de SQL.
+
+    Existe para que cada columna se lea con su propio valor y no con el índice
+    de la de al lado: `MIN` y `MAX` de la misma columna son nulos a la vez, así
+    que confundirlos no lo detecta ningún dato posible. Con el helper, la
+    confusión ni se puede escribir.
+    """
+    return None if valor is None else float(valor)
 
 
 def porcentaje_ocupacion(bytes_usados: int, total_gb: int) -> float:
@@ -943,6 +1017,95 @@ class PostgresClient:
                 )
                 for fila in filas
             ]
+
+    def fetch_perfil_carga(
+        self, batch_id: str | None = None
+    ) -> tuple[str | None, list[FilaPerfil]]:
+        """
+        Desglose de una carga: una fila por paso y una por tabla de la ingesta.
+
+        Devuelve el par `(batch medido, filas)`. El `batch_id` viaja de vuelta
+        —y no solo las filas, como apuntaba el diseño— porque R8 exige que el
+        informe de medición diga de QUÉ carga salen los números: sin él, quien
+        lee el perfil no puede saber si midió la nocturna buena o la noche que
+        murió a los diez minutos.
+
+        Sin argumento mide la última carga registrada. Solo `SELECT`: no marca
+        huérfanas ni registra paso (R25).
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_PERFIL_CARGA, {"batch": batch_id})
+            filas = cur.fetchall()
+
+        medido = batch_id
+        perfil: list[FilaPerfil] = []
+        for stage, step, started_at, finished_at, status, rows, batch in filas:
+            if medido is None:
+                medido = batch
+            perfil.append(
+                FilaPerfil(
+                    stage=stage,
+                    step=step,
+                    segundos=(
+                        0.0
+                        if started_at is None or finished_at is None
+                        else (finished_at - started_at).total_seconds()
+                    ),
+                    filas=int(rows or 0),
+                    status=status,
+                )
+            )
+        return medido, perfil
+
+    def fetch_diagnostico_tiemod(self) -> list[EstadoTiemod]:
+        """
+        Estado de `_source_tiemod` en cada tabla de `raw` que la tenga (R6).
+
+        Una consulta de agregación por tabla, en una sola conexión. Es cara
+        —recorre cada tabla entera— y por eso solo la lanza el comando
+        `diagnostico-tiemod`, nunca el pipeline.
+        """
+        columna = sql.Identifier(COLUMNA_TIEMOD)
+        estados: list[EstadoTiemod] = []
+
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_TABLAS_CON_TIEMOD, {"columna": COLUMNA_TIEMOD})
+            tablas = [fila[0] for fila in cur.fetchall()]
+
+            for tabla in tablas:
+                cur.execute(
+                    sql.SQL(SQL_DIAGNOSTICO_TIEMOD).format(
+                        col=columna, tabla=sql.Identifier(tabla)
+                    )
+                )
+                # Una agregación sin GROUP BY siempre devuelve exactamente una
+                # fila: no hay rama defensiva que probar aquí, y añadirla solo
+                # dejaría código muerto que ningún test puede recorrer.
+                fila = cur.fetchone()
+                estados.append(
+                    EstadoTiemod(
+                        tabla=tabla,
+                        filas=int(fila[0] or 0),
+                        nulos=int(fila[1] or 0),
+                        minimo=_float_o_none(fila[2]),
+                        maximo=_float_o_none(fila[3]),
+                        distintos=int(fila[4] or 0),
+                    )
+                )
+        return estados
+
+    def fetch_filas_desde_tiemod(self, tabla: str, umbral: float) -> int:
+        """Cuántas filas de `raw.<tabla>` tienen la marca por encima de `umbral` (R7)."""
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                sql.SQL(SQL_FILAS_DESDE_TIEMOD).format(
+                    tabla=sql.Identifier(tabla),
+                    col=sql.Identifier(COLUMNA_TIEMOD),
+                ),
+                {"umbral": umbral},
+            )
+            fila = cur.fetchone()
+            return int(fila[0]) if fila else 0
 
     def record_run_completed(
         self,

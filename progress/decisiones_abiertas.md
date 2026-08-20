@@ -375,6 +375,124 @@ mecanismo, no de la prueba.
 
 ---
 
+## D10 · Cómo llega Power BI al datamart de Azure — afecta a F-034, F-032
+
+**Abierta el 2026-08-20.** Power BI leía del Postgres **local** y hay que moverlo
+al de Azure. Conectar es fácil; lo que hay que decidir es **por dónde entra**,
+porque el servidor es **compartido** con `albaranes` y `partes`.
+
+**Opción A · Solo Power BI Desktop, desde el puesto.** Funciona hoy: la IP del
+puesto ya está en el firewall. Coste cero, riesgo cero. Limitación: los informes
+solo se refrescan cuando alguien abre Power BI en ese puesto, así que no hay
+informes publicados que se actualicen solos.
+
+**Opción B · Power BI Service (informes publicados con refresco automático).**
+Exige que el servicio atraviese el firewall del servidor, y ahí solo hay dos
+caminos: un **gateway de datos local** —una máquina encendida que haga de puente,
+que es justo lo que quisimos evitar con el MCP— o **abrir rangos de IP de Power
+BI** en el Postgres compartido. Lo segundo **no es decisión de este proyecto en
+solitario**: afecta a `albaranes` y `partes`, y sus dueños tienen que decir que
+sí.
+
+**Lo que hay que decidir**: A, B, o A ahora y B cuando haga falta.
+
+**Y un cabo atado a esto**: la regla de firewall que da acceso al puesto **la
+retira F-032** en su limpieza. Si se elige A, esa regla deja de ser temporal y
+hay que decir explícitamente que se queda.
+
+---
+
+## D11 · RESUELTA EN PARTE (2026-08-20) · El acceso al Postgres desde el puesto por regla de IP ya no funciona — afecta a F-032, F-034, D10
+
+**Abierta el 2026-08-20.** Medido hoy: la IP pública del puesto **rota cada
+pocos minutos y cambia de bloque entero**. En una hora se vieron tres:
+`77.211.5.x` (ayer, con su rango `/24` ya autorizado), `176.80.159.179` y
+`88.26.46.154`. Es estable entre consultas seguidas, así que no es un error de
+medición: es un CGNAT que reasigna.
+
+**Por qué importa y no es una molestia menor:**
+
+- **Perseguirla con reglas es inútil.** Hoy se creó la regla con la IP correcta
+  y para cuando se probó la conexión, ya era otra. Ayer costó media hora y dos
+  reglas, y la de rango `/24` tampoco sirve si el salto es de bloque.
+- **Ya hay cuatro reglas del puesto acumuladas** (`-17-rango`, `-18`, `-19` y
+  `-20`), todas inútiles a los pocos minutos de crearse, en el firewall de un
+  servidor **compartido** con `albaranes` y `partes`. F-032 las tiene que
+  retirar, y ahora se sabe que no hay que sustituirlas por otra igual.
+- **Tumba la opción A de D10.** Power BI Desktop desde el puesto obligaría a
+  recrear la regla varias veces al día. Como método de trabajo, no se sostiene.
+
+**Caminos posibles, ninguno evaluado todavía:**
+
+1. **Trabajar desde dentro de Azure** para lo que necesite base: la regla
+   `AllowAzureServices` ya existe, así que un Cloud Shell entra sin tocar el
+   firewall. Es lo más barato y no toca infraestructura compartida.
+2. **IP fija del ISP** en el puesto. Resuelve todo de golpe y es decisión
+   administrativa, no técnica.
+3. **VPN punto a sitio o Private Link/VNet** contra el servidor. Es lo más
+   sólido y lo más caro, y toca un recurso compartido: no es decisión de este
+   proyecto en solitario.
+4. **Rango amplio del ISP** en el firewall. Barato y **malo**: abrir un bloque
+   grande de un operador doméstico en un Postgres de producción compartido.
+
+**SOLUCIÓN ADOPTADA el 2026-08-20 (autorizada por el humano)**: una **regla
+única sin fecha**, `datamart-puesto-pgris`, que se **actualiza con la IP del
+momento** justo antes de cada tanda de comandos. Creada y probada el mismo
+minuto: `check-frescura` y `check-coherencia` respondieron con salida 0 y la
+nocturna del 20 quedó verificada por las dos vías.
+
+Por qué funciona donde fallaba lo anterior: no persigue la IP con reglas nuevas,
+**reescribe la misma**. Y deja **una** regla en el firewall compartido en lugar
+de una por día.
+
+Lo que sigue abierto: **las cuatro reglas fechadas** (`-17-rango`, `-18`, `-19`,
+`-20`) siguen ahí y son inútiles; las retira F-032, que debe saber que **la
+regla sin fecha se queda**. Y la decisión de fondo —IP fija, VPN o Private
+Link— sigue sin tomar: esto es un apaño que funciona, no una solución.
+
+**Lo que bloquea mientras no se decida**: cualquier verificación desde el puesto
+que necesite la base —`check-coherencia`, `check-frescura`, `timings`— y el
+consumo de Power BI Desktop. **No bloquea** al job nocturno, que corre dentro de
+Azure con su propia regla y sigue cargando cada noche.
+
+---
+
+## D12 · CERRADA (2026-08-20) · La ingesta incremental por watermark se descarta — de F-011, afecta a F-025
+
+Se clava **aquí** y no solo en los documentos de F-011 porque una feature
+cerrada deja de leerse, y esta decisión hay que recordarla cuando alguien
+proponga otra vez «cargar solo lo que cambió».
+
+**Qué se descartó**: la ingesta incremental por marca de modificación (bloque B
+de F-011, tareas T10–T19). Firmado por el humano el 2026-08-20.
+
+**Por qué, en un dato**: la marca de modificación **no existe** en las 24 tablas
+que se llevan el **93 % del tiempo de ingesta**. Solo 7 de 31 la tienen, y esas
+7 suman **2,25 min** de una carga de 165. El umbral de DA-7 eran 20 min, o que
+la ingesta pesara el 40 % del total: pesa el **19,9 %**. Verificado además
+contra el diccionario de Sigrid en `azure-apps/sigrid_tablas.md`, donde la ficha
+de `obrparpre` lista sus 22 columnas y **ninguna es de modificación**.
+
+**Lo que hay que recordar si alguien lo propone de nuevo**, que es la trampa de
+verdad:
+
+> El cursor por «solo altas» **sí** llegaría al umbral: traería 1.688 filas en
+> vez de 20 M. Y **serviría un plan viejo en silencio**. `obrparpre` guarda la
+> cadena `planif` de cada partida, que se **edita** constantemente sin crear
+> filas nuevas; `build_stg` la lee y hay un parser que alimenta
+> `stg.plan_mensual` con ella. Una noche de solo altas dejaría el seguimiento
+> con la planificación de ayer y **nadie se enteraría**: no hay error, no hay
+> aviso, solo un número que ya no es verdad.
+
+Solo se reabre si Negocio acepta **por escrito** esa pérdida, o si Sigrid añade
+marca de modificación a las tablas que cuestan.
+
+**Dónde va el esfuerzo en su lugar**: `build_stg`, **110,7 min, el 67,0 %** de
+la carga. Eso es **F-025**, y DA-5 ya le había dado prioridad sobre el bloque B
+«si los números lo confirman». Lo confirman.
+
+---
+
 ## Decisiones ya cerradas
 
 - **2026-08-08 · Backlog priorizado.** Aprobado el orden F-001, F-004, F-005,

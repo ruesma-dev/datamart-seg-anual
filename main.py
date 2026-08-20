@@ -34,6 +34,20 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
                                         Sale 0 si sí, 1 si no, 2 si no puede leer
     python main.py check-frescura     - ¿Cuánto hace que no hay un build_mart
                                         completo? Sale 0 solo si está FRESCO
+
+Medición del coste de la carga (F-011). Los tres son de SOLO LECTURA y ninguno
+escribe en _meta; el «medir antes de optimizar» de esa feature vive aquí:
+
+    python main.py perfil-carga       - ¿Dónde se va el tiempo? Desglose por
+                                        paso y por tabla, techo de mejora y las
+                                        tablas que acumulan el 80 % de la ingesta
+    python main.py diagnostico-tiemod - ¿Sirve `tiemod` como watermark? Estado
+                                        de _source_tiemod por tabla; con
+                                        --comparar-con, veredicto SIRVE /
+                                        NO SIRVE / SIN EVIDENCIA entre dos cargas
+    python main.py bench-sigrid       - ¿Cuánto rinde cada tamaño de página
+                                        contra sigrid-api? Lee de producción:
+                                        se lanza a mano y en el momento elegido
 """
 
 from __future__ import annotations
@@ -64,6 +78,22 @@ from etl_sigrid.domain.coherencia import (  # noqa: E402
 )
 from etl_sigrid.domain.ejecucion import Ejecucion, nueva_ejecucion  # noqa: E402
 from etl_sigrid.domain.entities import StepResult, StepStatus  # noqa: E402
+from etl_sigrid.domain.extraccion import (  # noqa: E402
+    comparar_cap,
+    format_bench,
+    resumen_bench,
+)
+from etl_sigrid.domain.perfil_carga import (  # noqa: E402
+    format_perfil,
+    perfil_de_carga,
+)
+from etl_sigrid.domain.tiemod import (  # noqa: E402
+    comparar_tiemod,
+    escribir_csv_tiemod,
+    format_comparacion,
+    format_diagnostico,
+    leer_csv_tiemod,
+)
 from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger  # noqa: E402
 from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
     make_admin_conninfo_provider,
@@ -88,7 +118,16 @@ from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
     PostgresStepRunRecorder,
 )
 from etl_sigrid.infrastructure.postgres.timings import format_timings  # noqa: E402
+from etl_sigrid.infrastructure.sigrid.bench_extraccion import (  # noqa: E402
+    barrer_paginas,
+    escribir_csv_bench,
+)
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  # noqa: E402
+
+#: Cap de filas por petición que documenta `azure-apps/sigrid_api.md`. El real
+#: son 20.000 (DA-6, dato del humano el 2026-08-18): la divergencia se avisa,
+#: pero **este proyecto no edita aquel documento**, que es de `sigrid-api`.
+CAP_DOCUMENTADO_SIGRID_API = 1_000
 
 
 @click.group()
@@ -614,6 +653,217 @@ def check_frescura(umbral_horas: float, paso: str) -> None:
 
     if veredicto != VEREDICTO_FRESCO:
         sys.exit(1)
+
+
+@cli.command("perfil-carga")
+@click.option(
+    "--batch",
+    "batch_id",
+    type=str,
+    default=None,
+    help="Identidad de ejecución a medir (batch_id). Por defecto, la última "
+         "carga registrada en _meta.etl_runs.",
+)
+def perfil_carga(batch_id: str | None) -> None:
+    """
+    ¿Dónde se va el tiempo de la carga? SOLO LECTURA (F-011, R1–R3).
+
+    Desglosa una carga completa en pasos de pipeline y en tablas de la ingesta,
+    con duración, filas, filas/s y porcentaje del total; imprime el techo de
+    mejora por paso (cuánto duraría la carga si ese paso costase cero) y cuántas
+    tablas acumulan el 80 % del tiempo de extracción.
+
+    Es el comando que decide si merece la pena una ingesta incremental, y lo
+    hace con lo que ya está guardado: no ejecuta ninguna carga nueva ni escribe
+    una fila en `_meta` (R25). Sale 2 si no puede leer, igual que
+    `check-coherencia`.
+    """
+    pg = _get_pg()
+
+    try:
+        batch_medido, filas = pg.fetch_perfil_carga(batch_id)
+    except Exception as e:  # el código 2 es «no se pudo leer»
+        click.secho(f"✗ No se pudo leer _meta.etl_runs: {e}", fg="red", err=True)
+        sys.exit(2)
+
+    click.echo(format_perfil(perfil_de_carga(filas, batch_id=batch_medido)))
+
+
+@cli.command("diagnostico-tiemod")
+@click.option(
+    "--out",
+    "salida",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Fichero CSV donde escribir la fotografía. Es lo que después se pasa "
+         "a --comparar-con tras la siguiente carga.",
+)
+@click.option(
+    "--comparar-con",
+    "anterior",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Fotografía de una carga anterior. Activa el veredicto por tabla.",
+)
+def diagnostico_tiemod(salida: Path | None, anterior: Path | None) -> None:
+    """
+    ¿Sirve `tiemod` como watermark? SOLO LECTURA sobre el datamart (R6, R7).
+
+    Sin argumentos, fotografía `_source_tiemod` en cada tabla de `raw`: filas,
+    nulos, mínimo, máximo, valores distintos y porcentaje de nulos. Con
+    `--comparar-con`, contrasta esa fotografía con la de una carga anterior y
+    emite el veredicto de R7 por tabla: `SIRVE`, `NO SIRVE` o `SIN EVIDENCIA`.
+
+    No hace falta volver a leer Sigrid: los valores de su marca de modificación
+    ya están dentro del datamart desde la primera carga. Lo que sí hace falta
+    son DOS cargas, y por eso el veredicto sin `--comparar-con` no existe.
+
+    Ojo con el coste: recorre cada tabla de `raw` entera (hay 20 M de filas).
+    Es un comando de diagnóstico que se lanza a mano, nunca un paso del
+    pipeline, y no escribe una sola fila en `_meta` (R25).
+    """
+    pg = _get_pg()
+
+    # La fotografía anterior se lee UNA vez y antes de tocar la BBDD: un CSV
+    # que no es una huella no puede confundirse con «no pude leer raw», que es
+    # un problema completamente distinto.
+    try:
+        previos = [] if anterior is None else leer_csv_tiemod(anterior)
+    except (OSError, ValueError) as e:
+        click.secho(f"✗ No se pudo leer {anterior}: {e}", fg="red", err=True)
+        sys.exit(2)
+
+    try:
+        estados = pg.fetch_diagnostico_tiemod()
+        avanzadas = _filas_avanzadas(pg, estados, previos)
+    except Exception as e:  # el código 2 es «no se pudo leer»
+        click.secho(f"✗ No se pudo leer el estado de raw: {e}", fg="red", err=True)
+        sys.exit(2)
+
+    if anterior is None:
+        click.echo(format_diagnostico(estados))
+    else:
+        click.echo(format_comparacion(comparar_tiemod(previos, estados, avanzadas)))
+
+    if salida is not None:
+        escribir_csv_tiemod(estados, salida)
+        click.secho(f"✓ Fotografía escrita en {salida}", fg="green")
+
+
+def _filas_avanzadas(
+    pg: PostgresClient, estados: list, previos: list
+) -> dict[str, int]:
+    """Filas por tabla cuya marca supera el máximo de la fotografía anterior.
+
+    Es una consulta más por tabla, y solo se lanza cuando hay con qué comparar:
+    sin fotografía anterior no hay umbral, y contar «desde el principio» sería
+    contar la tabla entera para nada. Una tabla que no estaba en la foto
+    anterior —añadida al YAML entre dos cargas— tampoco tiene umbral.
+    """
+    anteriores = {e.tabla: e for e in previos}
+    return {
+        e.tabla: pg.fetch_filas_desde_tiemod(e.tabla, anteriores[e.tabla].maximo)
+        for e in estados
+        if e.tabla in anteriores and anteriores[e.tabla].maximo is not None
+    }
+
+
+@cli.command("bench-sigrid")
+@click.option(
+    "--tabla",
+    "tabla",
+    type=str,
+    required=True,
+    help="Tabla de Sigrid a medir (nombre en el origen, p. ej. obrparpre).",
+)
+@click.option(
+    "--paginas",
+    "paginas",
+    type=str,
+    default="1000,5000,10000,20000",
+    show_default=True,
+    help="Tamaños de página a barrer, separados por comas. El 20.000 es el cap "
+         "real de sigrid-api (DA-6); hoy el ETL trabaja a 10.000.",
+)
+@click.option(
+    "--repeticiones",
+    "repeticiones",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Páginas consecutivas por tamaño. Avanzan por keyset, no repiten la "
+         "misma página: repetirla mediría la caché del SQL Server.",
+)
+@click.option(
+    "--out",
+    "salida",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Fichero CSV donde escribir las mediciones.",
+)
+def bench_sigrid(
+    tabla: str, paginas: str, repeticiones: int, salida: Path | None
+) -> None:
+    """
+    ¿Cuánto rinde cada tamaño de página contra sigrid-api? SOLO LECTURA (R4, R5).
+
+    Mide la MISMA consulta que usa la ingesta (keyset por `ide`) con varios
+    tamaños de página y responde dos preguntas que no están acreditadas: si
+    subir de 10.000 a 20.000 compra tiempo o el coste está en el SQL Server
+    (R4), y cuál es el corte real del balanceador —documentado 120 s, en uso
+    230— comparando la latencia máxima observada con el timeout configurado
+    (R5-bis).
+
+    Si la API rechaza un tamaño, se anota su cap y el barrido continúa (R5).
+    No abre conexión con Postgres ni escribe una fila en `_meta` (R25).
+    """
+    settings = get_settings()
+    tamanos = [int(p) for p in paginas.split(",") if p.strip()]
+    if not tamanos:
+        click.secho("✗ --paginas no trae ningún tamaño.", fg="red", err=True)
+        sys.exit(2)
+
+    declarada = next(
+        (
+            t
+            for t in settings.tables_sigrid.get("tables", [])
+            if t["source_table"] == tabla
+        ),
+        None,
+    )
+    excluidas = set((declarada or {}).get("exclude_columns") or [])
+
+    with SigridApiClient(
+        base_url=settings.sigrid_api.base_url,
+        function_key=settings.sigrid_api.function_key.get_secret_value(),
+        database=settings.sigrid_api.database,
+        page_size=settings.sigrid_api.page_size,
+        timeout_s=settings.sigrid_api.timeout_s,
+        max_retries=settings.sigrid_api.max_retries,
+    ) as api:
+        # Las mismas columnas que se lleva la ingesta: medir con todas incluiría
+        # los blobs que el ETL nunca pide, y el número no serviría para nada.
+        columnas = [
+            c.name for c in api.fetch_table_schema(tabla) if c.name not in excluidas
+        ]
+        mediciones = barrer_paginas(
+            api,
+            tabla,
+            columnas=columnas,
+            tamanos=tamanos,
+            repeticiones=repeticiones,
+        )
+
+    resumen = resumen_bench(mediciones)
+    click.echo(format_bench(resumen, timeout_s=settings.sigrid_api.timeout_s))
+
+    divergencia = comparar_cap(resumen.cap_medido, CAP_DOCUMENTADO_SIGRID_API)
+    if divergencia is not None:
+        click.secho(f"AVISO: {divergencia.mensaje}", fg="yellow")
+
+    if salida is not None:
+        escribir_csv_bench(mediciones, salida)
+        click.secho(f"✓ Mediciones escritas en {salida}", fg="green")
 
 
 @cli.command("status")
