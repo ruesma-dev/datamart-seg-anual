@@ -7,8 +7,8 @@ Rama `feature/F-006-mcp-azure`. **Bloques A, B, C y D entregados y corregidos
 tras el RECHAZADO del reviewer** (`progress/review_F-006.md`): los diez defectos
 están cerrados, cada uno con su fase RED.
 
-`bash harness/init.sh` en verde: **1125 tests**, cobertura de las líneas
-cambiadas **98,7 %** y campaña de mutación con **0 supervivientes de 128
+`bash harness/init.sh` en verde: **1242 tests**, cobertura de las líneas
+cambiadas **98,9 %** y campaña de mutación con **0 supervivientes de 160
 mutantes**.
 
 - Informe de implementación: `progress/impl_F-006.md`
@@ -17,22 +17,37 @@ mutantes**.
 
 ### Qué hay ya
 
+**Bloque E entregado** (T15–T18): el contrato con `mcp-bbdd` está construido y
+probado con las fichas reales, sin tocar la base. Tres tablas y
+`_meta.v_diccionario` en `sql/ddl/01_diccionario.sql`, los constructores puros
+de `diccionario_sql.py`, `PublicarDiccionarioStep` **entre `build_mart` y
+`apply_grants`**, y el comando `python main.py publicar-diccionario`. El
+reemplazo va en UNA transacción con `DELETE`+`INSERT` y sin un solo `DROP`.
+
+**Bloque F a medias** (T20, T21): `compras` (14 objetos) y `retenciones` (10).
+Quedan `maestro`, `stg`, `aux`, `_meta` y `raw`.
+
+
 - **Andamiaje** (bloque A): `etl_sigrid/domain/diccionario.py` (entidades y
   validador), `etl_sigrid/domain/inventario.py` (inventario y cobertura),
   `etl_sigrid/infrastructure/diccionario/cargador_yaml.py`, y la puerta de
   cobertura, que corre en cada `init.sh`.
 - **Bloque global** (bloque B): las doce reglas duras, los órdenes de magnitud,
   las convenciones, los nueve esquemas y las 18 preguntas de la batería.
-- **Fichas**: `mart.yaml` (13 objetos) y `cierre.yaml` (12), 332 columnas.
+- **Fichas**: `mart` (13), `cierre` (12), `compras` (14) y `retenciones` (10):
+  **49 objetos y 593 columnas**, todas contrastadas contra el SQL.
 
-El trinquete `pendientes` está en **73** de 98 objetos, ahora anclado al
-inventario y al historial de git: un objeto documentado ya no puede volver.
+El trinquete `pendientes` está en **53** de 102 objetos —el DDL del contrato
+añadió cuatro objetos nuevos a `_meta`—, anclado al inventario y al historial de
+git: un objeto documentado ya no puede volver, aunque el repositorio sí puede
+publicar cosas nuevas.
 
 ### Lo siguiente
 
-Bloque E (`tasks.md` T15–T19): la publicación en `_meta`, que es el contrato con
-`mcp-bbdd`. Después F y G (el resto de fichas), y solo entonces los bloques 🔏
-de permisos y firewall, que necesitan firma del humano.
+El resto del bloque F (`maestro`) y el bloque G (`stg`, `aux`, `_meta`, `raw`):
+son los 53 objetos que faltan. Después el bloque H (`check-diccionario`, R28), y
+solo entonces los bloques 🔏 de permisos y firewall, que necesitan firma del
+humano.
 
 ### Verificaciones `MANUAL (humano)` pendientes
 

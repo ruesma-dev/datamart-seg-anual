@@ -1433,3 +1433,40 @@ vacia— sigan estando en el SQL.
 Un detalle de formato que costo un rato y conviene recordar: **un escalar YAML
 sin comillas no puede contener `": "`**. Cinco textos de `compras.yaml` lo
 tenian y el fichero no parseaba; se pasaron a bloque `>-`.
+
+---
+
+## Evidencias tras el bloque E y el bloque F parcial
+
+| Evidencia | Bloques A-D | Ahora |
+|---|---|---|
+| **Tests que pasan** | 1133 | **1242** (444 de F-006), 2 saltados con motivo |
+| **Tests que fallan** | 0 | **0** |
+| **Tiempo de la suite** | 25,6 s | **31,8 s** sin cobertura |
+| **Cobertura de las lineas cambiadas** | 98,7 % (550/557) | **98,9 % (710/718)**, umbral 80 %, nivel `critico` |
+| **Mutantes / supervivientes** | 132 / 0 | **160 / 0**, 0 timeouts, 386,3 s |
+| **Objetos documentados** | 25 de 98 | **49 de 102** |
+| **Columnas descritas** | 332 | **593**, todas contrastadas contra el SQL |
+| **Trinquete `pendientes`** | 73 | **53** |
+
+**Analisis de supervivientes: no hay ninguno.** La campana cubre ahora tambien
+`diccionario_sql.py`, `publicar_diccionario_step.py` y las lineas nuevas de
+`postgres_client.py` y `main.py`.
+
+Un apunte sobre el tiempo: al entrar las 24 fichas nuevas la suite se fue a
+**seis minutos**, porque `tests/test_f006_fichas.py` recargaba los 49 YAML en
+cada uno de sus ~160 tests. Se cachearon la carga del diccionario y el
+inventario —son de solo lectura y las entidades son inmutables— y volvio a
+**32 s**. Estaba en la evidencia y por eso se miro.
+
+## Lo que queda para la tanda siguiente
+
+- **Bloque F, el resto**: `maestro` (4 objetos), y despues el bloque G con
+  `stg` (10), `aux` (1), `_meta` (7, incluidos los cuatro que anadio el DDL del
+  contrato) y `raw` (31 a nivel de objeto). Son los 53 que faltan.
+- **Bloque H**: `check-diccionario` (R28), que hoy **no existe** y que los
+  docstrings no dan por existente.
+- **Bloques I y J**: permisos, `REVOKE`, firewall y documentacion del
+  ecosistema. Necesitan firma del humano y **no se ha tocado nada de eso**.
+- **T19, T27, T39 y T40**: verificaciones `MANUAL (humano)`, con sus comandos en
+  este informe.
