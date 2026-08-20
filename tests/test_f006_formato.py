@@ -1426,7 +1426,7 @@ def test_f006_r5_ninguna_relacion_real_publica_una_cardinalidad_de_yaml() -> Non
 # ===========================================================================
 
 
-def _con_clave(objeto: str, clave, columnas) -> "Ficha":
+def _con_clave(objeto: str, clave, columnas) -> Ficha:
     return _ficha(
         objeto=objeto,
         clave_negocio=tuple(clave),
@@ -1576,6 +1576,78 @@ def test_f006_r5_ninguna_relacion_real_promete_una_unicidad_falsa() -> None:
         e
         for e in validar(_global_real(), pasos_del_pipeline_nocturno())
         if "fan-out" in e.detalle
+    ]
+
+    assert errores == [], "\n" + formatear_errores(errores)
+
+
+# ===========================================================================
+# Defensa (a) de la puerta · minimos de contenido (defecto 10)
+#
+# El reviewer escribio un `maestro.yaml` con `descripcion: x`, `grano: x`,
+# `motivo_no_consumo: x` y una columna `obra_id: x`, saco el objeto de
+# `pendientes` y **todo quedo en verde**. Escalado a las 31 fichas de `raw`, el
+# trinquete cae de 73 a 42 sin una linea de conocimiento.
+#
+# El validador exigia que los campos EXISTIERAN, no que dijeran algo. En el
+# bloque global si se exigian minimos desde el principio (`para_que_sirve >= 40`,
+# `regla >= 40`, `motivo >= 30`); esto extiende el mismo criterio a las fichas.
+# ===========================================================================
+
+
+@pytest.mark.parametrize(
+    ("campo", "valor"),
+    [
+        ("descripcion", "x"),
+        ("grano", "x"),
+    ],
+)
+def test_f006_r2_una_ficha_esqueletica_no_pasa(campo: str, valor: str) -> None:
+    errores = validar(_dicc(fichas=[_ficha(**{campo: valor})]), PASOS_NOCTURNOS)
+
+    assert errores, f"`{campo}: {valor}` tenía que fallar"
+    assert any(campo in e.detalle and "caracteres" in e.detalle for e in errores)
+
+
+def test_f006_r3_un_motivo_no_consumo_de_relleno_no_pasa() -> None:
+    """Era la puerta trasera de R3: el motivo existía, pero no decía nada."""
+    fuera = _ficha(
+        consumo_recomendado=False,
+        motivo_no_consumo="x",
+        columnas=(),
+        ejemplos_preguntas=(),
+    )
+
+    errores = validar(_dicc(fichas=[fuera]), PASOS_NOCTURNOS)
+
+    assert any("motivo_no_consumo" in e.detalle and "caracteres" in e.detalle
+               for e in errores)
+
+
+def test_f006_r6_un_significado_de_relleno_no_pasa() -> None:
+    ficha = _ficha(columnas=(_columna("obra_id", significado="x"),),
+                   clave_negocio=("obra_id",))
+
+    errores = validar(_dicc(fichas=[ficha]), PASOS_NOCTURNOS)
+
+    assert any("obra_id" in e.detalle and "caracteres" in e.detalle for e in errores)
+
+
+def test_f006_r40_un_ejemplo_de_pregunta_de_relleno_no_pasa() -> None:
+    errores = validar(
+        _dicc(fichas=[_ficha(ejemplos_preguntas=("x",))]), PASOS_NOCTURNOS
+    )
+
+    assert any("ejemplos_preguntas" in e.detalle for e in errores)
+
+
+def test_f006_r2_el_diccionario_real_supera_los_minimos() -> None:
+    """Las 25 fichas entregadas pasan los mínimos sin retocar nada."""
+    from tests.test_f006_frescura import pasos_del_pipeline_nocturno
+
+    errores = [
+        e for e in validar(_global_real(), pasos_del_pipeline_nocturno())
+        if "caracteres" in e.detalle
     ]
 
     assert errores == [], "\n" + formatear_errores(errores)

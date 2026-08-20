@@ -109,6 +109,45 @@ CODIGOS_REGLAS_OBLIGATORIAS = (
 #: Claves obligatorias de cada entrada de `esquemas` en `00_global.yaml` (R4).
 CLAVES_ESQUEMA = ("titulo", "para_que_sirve", "consumo_recomendado", "refresco")
 
+#: Longitud mínima de cada texto de una ficha, en caracteres.
+#:
+#: No es burocracia: sin esto, `descripcion: x` y `motivo_no_consumo: x` pasan
+#: la puerta. Se comprobó en la review que con fichas así el trinquete de
+#: `pendientes` baja de 73 a 42 en verde, sin una línea de conocimiento, y que
+#: `motivo_no_consumo: x` abre la puerta trasera que R3 existe para cerrar.
+#:
+#: Los números salen de lo que ya se exigía en el bloque global desde el
+#: principio (`para_que_sirve >= 40`, `regla >= 40`, `motivo >= 30`): esto
+#: extiende el mismo criterio a las fichas, que es donde está el volumen.
+#: Medir caracteres no garantiza que el texto sea bueno; garantiza que alguien
+#: se ha parado a escribirlo, que es todo lo que un test puede comprobar.
+MINIMOS_TEXTO = {
+    "descripcion": 40,
+    "grano": 20,
+    "motivo_no_consumo": 30,
+    "significado": 15,
+    "ejemplo_pregunta": 20,
+}
+
+
+def _corto(campo: str, valor: str | None, para_que: str) -> str | None:
+    """Mensaje de error si el texto falta o no llega al mínimo (R2, R3, R6).
+
+    Distingue los dos casos —falta, o está de relleno— porque se arreglan
+    distinto y porque decirle a alguien «faltan 7 caracteres» sin más es la
+    forma de que rellene con puntos suspensivos.
+    """
+    texto = (valor or "").strip()
+    minimo = MINIMOS_TEXTO[campo]
+    if not texto:
+        return f"falta `{campo}`: {para_que}"
+    if len(texto) < minimo:
+        return (
+            f"`{campo}` tiene {len(texto)} caracteres y el mínimo son {minimo}: "
+            f"{texto!r} no explica {para_que}"
+        )
+    return None
+
 
 def _lista(valores: Sequence[str]) -> str:
     """Vocabulario en el mensaje de error, siempre en el mismo orden."""
@@ -433,23 +472,31 @@ def _validar_ficha(
         error("R2", "`consumo_recomendado` tiene que ser un booleano")
 
     # --- R2: texto de negocio obligatorio -----------------------------------
-    if not (ficha.descripcion or "").strip():
-        error("R2", "falta `descripcion`: qué es el objeto, en lenguaje de negocio")
+    error_texto = _corto(
+        "descripcion", ficha.descripcion, "qué es el objeto, en lenguaje de negocio"
+    )
+    if error_texto:
+        error("R2", error_texto)
 
     es_relacion = ficha.tipo in ("tabla", "vista")
-    if es_relacion and not (ficha.grano or "").strip():
-        error("R2", "falta `grano`: qué es UNA fila de este objeto")
+    if es_relacion:
+        error_texto = _corto("grano", ficha.grano, "qué es UNA fila de este objeto")
+        if error_texto:
+            error("R2", error_texto)
     if es_relacion and not ficha.clave_negocio:
         error("R2", "falta `clave_negocio`: qué columnas identifican una fila")
 
     # --- R3: la puerta trasera cerrada --------------------------------------
-    if not ficha.consumo_recomendado and not (ficha.motivo_no_consumo or "").strip():
-        error(
-            "R3",
-            "`consumo_recomendado: false` exige `motivo_no_consumo` escrito. Sin "
-            "esa exigencia, bajar el booleano sería la forma silenciosa de "
-            "esquivar la puerta de cobertura de columnas",
+    if not ficha.consumo_recomendado:
+        error_texto = _corto(
+            "motivo_no_consumo",
+            ficha.motivo_no_consumo,
+            "por qué este objeto NO se recomienda para consulta. Sin esta "
+            "exigencia, bajar el booleano sería la forma silenciosa de esquivar "
+            "la puerta de cobertura de columnas",
         )
+        if error_texto:
+            error("R3", error_texto)
 
     # --- R6, R26: la superficie de consumo se describe entera ---------------
     # Las funciones quedan exentas de `columnas` aunque estén recomendadas:
@@ -460,6 +507,15 @@ def _validar_ficha(
             "un objeto con `consumo_recomendado: true` tiene que documentar sus "
             "`columnas`: es la superficie que el agente va a consultar",
         )
+    for ejemplo in ficha.ejemplos_preguntas:
+        if len(ejemplo.strip()) < MINIMOS_TEXTO["ejemplo_pregunta"]:
+            error(
+                "R40",
+                f"la entrada de `ejemplos_preguntas` {ejemplo!r} no llega a "
+                f"{MINIMOS_TEXTO['ejemplo_pregunta']} caracteres: no es una "
+                f"pregunta de negocio, es un hueco relleno",
+            )
+
     if ficha.consumo_recomendado and not ficha.ejemplos_preguntas:
         error(
             "R40",
@@ -506,12 +562,13 @@ def _validar_columnas(ficha: Ficha) -> list[ErrorValidacion]:
             error("R6", f"columna duplicada: `{columna.nombre}`")
         vistas.add(columna.nombre)
 
-        if not (columna.significado or "").strip():
-            error(
-                "R6",
-                f"la columna `{columna.nombre}` no tiene `significado` en lenguaje "
-                f"de negocio",
-            )
+        error_texto = _corto(
+            "significado",
+            columna.significado,
+            f"qué es la columna `{columna.nombre}`, en lenguaje de negocio",
+        )
+        if error_texto:
+            error("R6", f"columna `{columna.nombre}`: {error_texto}")
 
         if columna.agregacion is not None and columna.agregacion not in AGREGACIONES:
             error(

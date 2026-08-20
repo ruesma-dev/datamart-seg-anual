@@ -14,8 +14,9 @@ Dos mitades, con propósitos distintos:
 
 La puerta es **un trinquete barato, no una demostración**: no prueba que el
 diccionario esté completo, prueba que nadie ha añadido una vista al repositorio
-sin documentarla. La verdad la dice `python main.py check-diccionario` contra el
-catálogo real de la base (R28), que es otra tarea.
+sin documentarla. La comprobación contra el catálogo real de la base es
+`python main.py check-diccionario` (R28), que **todavía no existe**: es del
+bloque H. Mientras tanto, lo que esta puerta no ve no lo ve nadie.
 """
 
 from __future__ import annotations
@@ -165,8 +166,40 @@ def test_f006_r29_dominio_el_docstring_declara_la_heuristica() -> None:
     doc = objetos_de_sql.__doc__ or ""
 
     assert "heurístic" in doc.lower()
-    assert "check-diccionario" in doc
     assert "tables_sigrid.yaml" in doc
+
+
+def test_f006_r28_lo_que_se_dice_de_check_diccionario_es_cierto_hoy() -> None:
+    """El docstring dice que `check-diccionario` no existe. Que siga siendo verdad.
+
+    La review señaló que este test rozaba la circularidad: comprobaba que la
+    cadena `check-diccionario` estuviera ESCRITA, es decir, verificaba la
+    promesa y no el comando. Ahora comprueba un hecho sobre `main.py`, y el día
+    que alguien implemente R28 este test se pone en rojo y obliga a corregir los
+    docstrings que hoy lo dan por futuro. Que es exactamente lo que se quiere:
+    que las dos cosas no se separen.
+    """
+    from etl_sigrid.domain.inventario import objetos_de_sql as _objetos
+
+    main_py = (RAIZ / "main.py").read_text(encoding="utf-8")
+    existe = 'cli.command("check-diccionario")' in main_py
+
+    textos = [
+        _objetos.__doc__ or "",
+        (RAIZ / "etl_sigrid/domain/inventario.py").read_text(encoding="utf-8"),
+        (RAIZ / "tests/test_f006_fichas.py").read_text(encoding="utf-8"),
+        __doc__ or "",
+    ]
+    lo_dan_por_futuro = any(
+        "sin implementar" in t or "todavía no existe" in t or "TODAVÍA NO EXISTE" in t
+        for t in textos
+    )
+
+    assert existe is not lo_dan_por_futuro, (
+        "el comando `check-diccionario` "
+        + ("YA existe" if existe else "NO existe")
+        + " y los docstrings dicen lo contrario"
+    )
 
 
 # ===========================================================================
@@ -557,3 +590,114 @@ def test_f006_r27_dominio_un_informe_solo_con_pendientes_no_es_un_fallo() -> Non
     assert informe.ok
     assert "OK con pendientes declarados" in texto
     assert "pendientes declarados: 1" in texto
+
+
+# ---------------------------------------------------------------------------
+# Defensa (d) de la puerta · el trinquete tiene que ser un trinquete
+#
+# `PENDIENTES_MAX` es una constante escrita a mano al lado de la lista que
+# vigila: subir las dos a la vez pasaba en verde. Demostrado en la review
+# desdocumentando `mart.v_pbi_dim_escenario`, devolviendolo a `pendientes` y
+# subiendo el tope a 74. La regla de hierro 4 de `tasks.md` dice que eso no
+# puede pasar, y hasta ahora era un comentario, no un test.
+#
+# Se ancla a dos cosas que NO estan en la linea que se edita:
+#
+#   * el **inventario**: `pendientes` tiene que ser exactamente lo que falta
+#     por documentar, ni un objeto mas;
+#   * el **historial de git** del propio fichero: la lista solo puede encoger.
+#     Un objeto que ya tuvo ficha no puede volver a `pendientes`.
+# ---------------------------------------------------------------------------
+
+import subprocess  # noqa: E402
+from itertools import pairwise  # noqa: E402
+
+
+def test_f006_r27_pendientes_es_exactamente_lo_que_falta_por_documentar() -> None:
+    """Ni un objeto de más: `pendientes` no es una lista libre.
+
+    Con esto, inflar el trinquete exige borrar una ficha, y borrar una ficha se
+    ve en el diff y lo caza el trinquete de git de abajo.
+    """
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+    inventario = _inventario_del_repositorio()
+
+    esperados = {o.nombre for o in inventario} - set(dicc.por_nombre)
+
+    assert set(dicc.pendientes) == esperados
+    assert len(dicc.pendientes) == len(inventario) - len(dicc.fichas)
+
+
+def _pendientes_en(revision: str) -> set[str] | None:
+    """La lista de `pendientes` tal y como estaba en esa revisión de git."""
+    import yaml as yaml_lib
+
+    hecho = subprocess.run(
+        ["git", "show", f"{revision}:config/diccionario/00_global.yaml"],
+        cwd=RAIZ,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if hecho.returncode != 0:
+        return None
+    return set(yaml_lib.safe_load(hecho.stdout).get("pendientes") or [])
+
+
+def test_f006_r27_el_trinquete_solo_baja_a_lo_largo_del_historial() -> None:
+    """LA COMPROBACIÓN QUE FALTABA: ningún objeto vuelve a `pendientes`.
+
+    Se recorre el historial del propio fichero y se exige que cada revisión sea
+    un subconjunto de la anterior. No hay forma de saltárselo editando una
+    constante, porque la referencia es lo que ya está escrito en git.
+    """
+    revisiones = subprocess.run(
+        ["git", "log", "--format=%H", "-40", "--", "config/diccionario/00_global.yaml"],
+        cwd=RAIZ,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if revisiones.returncode != 0:
+        pytest.skip("sin git no hay historial contra el que comparar")
+
+    historial = revisiones.stdout.split()
+    assert historial, "el fichero del diccionario no tiene historial en git"
+
+    # De la más nueva a la más vieja: cada una tiene que caber en la siguiente.
+    # EL ÁRBOL DE TRABAJO VA EL PRIMERO: sin él, el test compara commits ya
+    # hechos entre sí y deja pasar exactamente lo que viene a impedir. Se
+    # comprobó: sin esta línea, el experimento de la review pasaba en verde.
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+    listas = [("árbol de trabajo", set(dicc.pendientes))]
+    listas += [(rev, _pendientes_en(rev)) for rev in historial]
+    listas = [(rev, lista) for rev, lista in listas if lista is not None]
+
+    for (rev_nueva, nueva), (rev_vieja, vieja) in pairwise(listas):
+        vueltos = sorted(nueva - vieja)
+        assert not vueltos, (
+            f"{vueltos} volvieron a `pendientes` en {rev_nueva[:8]} "
+            f"(no estaban en {rev_vieja[:8]}): el trinquete solo baja"
+        )
+
+
+def test_f006_r27_el_trinquete_de_hoy_cabe_en_el_de_la_primera_revision() -> None:
+    """Control del test de arriba: si el historial no se leyera, pasaría solo."""
+    primera = subprocess.run(
+        ["git", "log", "--format=%H", "--reverse", "--",
+         "config/diccionario/00_global.yaml"],
+        cwd=RAIZ,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if primera.returncode != 0 or not primera.stdout.split():
+        pytest.skip("sin git no hay historial contra el que comparar")
+
+    inicial = _pendientes_en(primera.stdout.split()[0])
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+
+    assert inicial, "no se pudo leer la primera revisión del diccionario"
+    assert set(dicc.pendientes) < inicial, (
+        "la lista de hoy tiene que ser un subconjunto ESTRICTO de la inicial"
+    )

@@ -808,3 +808,102 @@ YAML —la prosa puede y debe citar los nombres equivocados para explicar la
 enmienda— y el tercero compara el recuento del documento contra el inventario
 real, asi que si manana se publica un objeto nuevo, el documento se queda en
 rojo hasta que alguien lo actualice.
+
+## Defecto 10 · Las defensas de la puerta
+
+Decision del lider: entra en esta entrega. Las cuatro defensas, con la evidencia
+de que cada una caza el experimento que el reviewer hizo pasar en verde.
+
+### (a) Minimos de contenido
+
+Fase RED:
+
+```
+$ python -m pytest tests/test_f006_formato.py -q -k "esqueletica or relleno or minimos"
+FAILED tests/test_f006_formato.py::test_f006_r2_una_ficha_esqueletica_no_pasa[descripcion-x]
+FAILED tests/test_f006_formato.py::test_f006_r2_una_ficha_esqueletica_no_pasa[grano-x]
+FAILED tests/test_f006_formato.py::test_f006_r3_un_motivo_no_consumo_de_relleno_no_pasa
+FAILED tests/test_f006_formato.py::test_f006_r6_un_significado_de_relleno_no_pasa
+FAILED tests/test_f006_formato.py::test_f006_r40_un_ejemplo_de_pregunta_de_relleno_no_pasa
+5 failed, 1 passed, 103 deselected in 1.06s
+```
+
+`MINIMOS_TEXTO` en el dominio: `descripcion >= 40`, `grano >= 20`,
+`motivo_no_consumo >= 30`, `significado >= 15`, cada `ejemplos_preguntas >= 20`.
+Los numeros no son arbitrarios: son los que **ya se exigian en el bloque global
+desde el principio**, extendidos a las fichas, que es donde esta el volumen.
+Medir caracteres no garantiza que el texto sea bueno; garantiza que alguien se
+ha parado a escribirlo, que es todo lo que un test puede comprobar. El mensaje
+de error distingue «falta» de «esta de relleno», porque se arreglan distinto.
+
+De las 25 fichas entregadas, **cuatro textos** no llegaban: `grano` de
+`v_pbi_dim_fecha` y tres `significado` de `anio`/`mes`. Se reescribieron; no se
+bajo ningun umbral.
+
+### (b) y (c) Las vistas, tan exactas como las tablas
+
+Los dos huecos eran de vistas, y se cerraron leyendo **la proyeccion del
+`SELECT` final de cada vista concreta**, sin comentarios (mas un caso propio
+para los catalogos `SELECT * FROM (VALUES ...) AS t(a, b, c)`). Las **19 vistas
+documentadas se parsean**, y hay un test de control que lo exige: si algun dia
+una deja de parsearse, se pone en rojo en vez de dejar de comprobar en silencio.
+
+Evidencia, reproduciendo los dos experimentos de la review a la vez —borrar
+`can_mes` de `mart.v_pbi_fact` y colarle `obra_label`, que es de otra vista del
+mismo fichero—:
+
+```
+=== EL TEST VIEJO (busca en el fichero entero) ===
+22 passed in 3.52s
+=== EL TEST NUEVO (proyeccion de la vista) ===
+E       AssertionError: faltan: ['can_mes']; sobran: ['obra_label']
+FAILED tests/test_f006_fichas.py::test_f006_r26_las_vistas_documentan_exactamente_su_proyeccion[mart.v_pbi_fact]
+1 failed, 18 passed in 3.09s
+```
+
+**El contraste generico viejo se retira**, no se deja al lado: quedaba subsumido
+por las dos comprobaciones exactas y un test debil que da falsa confianza es
+peor que ninguno. En su lugar queda un meta-test que exige que **toda ficha con
+columnas este cubierta por una comprobacion exacta**, para que el hueco no
+vuelva por la puerta de atras.
+
+### (d) El trinquete, anclado a algo que no es la linea que se edita
+
+Dos anclajes:
+
+- **Al inventario**: `pendientes` tiene que ser EXACTAMENTE lo que falta por
+  documentar. Inflar el trinquete exige ahora borrar una ficha.
+- **Al historial de git** del propio fichero: cada revision tiene que caber en
+  la anterior, **empezando por el arbol de trabajo**. Un objeto que ya tuvo
+  ficha no puede volver a `pendientes`.
+
+Reproduciendo el experimento del reviewer —desdocumentar
+`mart.v_pbi_dim_escenario`, devolverlo a `pendientes` y subir el tope a 74—:
+
+```
+=== LOS DOS TESTS QUE YA HABIA ===
+3 passed, 41 deselected in 0.84s          <- pasaba en verde
+=== LA DEFENSA NUEVA ===
+E           assert not ['mart.v_pbi_dim_escenario']
+FAILED tests/test_f006_cobertura.py::test_f006_r27_el_trinquete_solo_baja_a_lo_largo_del_historial
+```
+
+**Un fallo propio, encontrado por el experimento y no por el test**: la primera
+version comparaba solo commits ya hechos entre si y **dejaba pasar el arbol de
+trabajo**, es decir, exactamente lo que venia a impedir. Se corrigio metiendo el
+arbol de trabajo como primer eslabon de la cadena, y queda escrito en el propio
+codigo para que nadie lo quite creyendo que sobra.
+
+### (e) Retirada la promesa de `check-diccionario`
+
+Se cita en cuatro sitios como la defensa que cubre lo que la puerta offline no
+ve, y **no existe**. Los cuatro textos dicen ahora que es R28, que llega en el
+bloque H y que **mientras tanto no hay red de seguridad detras**; y dicen
+tambien lo que la puerta SI garantiza hoy, que despues de (b) y (c) es bastante
+mas que antes.
+
+El test que rozaba la circularidad —comprobaba que la cadena
+`check-diccionario` estuviera escrita en el docstring, o sea, verificaba la
+promesa— se sustituye por uno que comprueba **un hecho sobre `main.py`**: que el
+comando no exista mientras los docstrings lo den por futuro. El dia que alguien
+implemente R28, ese test se pone en rojo y obliga a corregir los textos.

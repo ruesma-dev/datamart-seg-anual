@@ -16,11 +16,14 @@ Alcance y honestidad sobre él:
 
 * Para las **tablas** con `CREATE TABLE (...)` explícito la comprobación es
   exacta en los dos sentidos: ni una columna de menos ni una de más.
-* Para las **vistas** es más débil —haría falta un parser de SQL— y se limita a
-  exigir que cada columna documentada aparezca literalmente en el fichero que
-  crea la vista. Caza los nombres inventados y las erratas, que es el 90 % de
-  los casos, y no caza un alias mal atribuido. Para eso está
-  `python main.py check-diccionario` contra el catálogo real (R28).
+* Para las **vistas** también, desde la review de los bloques A-D: se lee la
+  proyección del `SELECT` final de esa vista concreta, sin comentarios. Antes se
+  buscaba el nombre en el fichero entero, y eso dejaba pasar una columna de otra
+  vista del mismo fichero y no se enteraba de una columna omitida.
+* Lo que sigue sin cubrirse: un objeto que exista en la base y no en el
+  repositorio. Eso lo dirá `python main.py check-diccionario` contra
+  `information_schema` (R28), que **está sin implementar** y llega en el bloque
+  H. No se da por cubierto lo que no lo está.
 
 Ningún test de este fichero abre red ni BBDD.
 """
@@ -248,26 +251,24 @@ def _fichas_con_columnas() -> list:
     return [f for f in _diccionario().fichas if f.columnas]
 
 
-@pytest.mark.parametrize(
-    "nombre", sorted(f.nombre for f in _fichas_con_columnas())
-)
-def test_f006_r26_ninguna_columna_documentada_esta_inventada(nombre: str) -> None:
-    """Una columna que no existe es un `SELECT` que revienta, y eso con suerte:
-    lo malo es la columna que existe y significa otra cosa."""
-    ficha = _diccionario().por_nombre[nombre]
-    origen = _origen_por_objeto()[nombre]
-    if origen == "config/tables_sigrid.yaml":
-        pytest.skip("las tablas de `raw` no tienen SQL que leer (DA-2)")
+def test_f006_r26_toda_ficha_con_columnas_la_cubre_una_comprobacion_exacta() -> None:
+    """Meta-test: ninguna ficha con columnas se queda sin contrastar.
 
-    sql = (DIR_SQL / origen).read_text(encoding="utf-8")
-
-    inventadas = [
-        c.nombre
-        for c in ficha.columnas
-        if not re.search(rf"\b{re.escape(c.nombre)}\b", sql)
+    Hasta la review existía aquí un contraste genérico y débil —que el nombre
+    apareciera en algún sitio del fichero SQL— que daba falsa confianza: dejaba
+    pasar columnas ajenas y columnas omitidas. Se retiró al hacer exacta la
+    comprobación de las vistas. Este test es lo que impide que el hueco vuelva
+    por la puerta de atrás: si mañana aparece una ficha con columnas que no sea
+    ni tabla ni vista, aquí se ve.
+    """
+    sin_cubrir = [
+        f.nombre
+        for f in _fichas_con_columnas()
+        if f.tipo not in ("tabla", "vista")
     ]
 
-    assert not inventadas, f"{nombre}: {inventadas} no aparecen en {origen}"
+    assert not sin_cubrir, f"{sin_cubrir} tienen columnas y nadie las contrasta"
+    assert len(_fichas_con_columnas()) >= 22
 
 
 @pytest.mark.parametrize(
@@ -499,3 +500,163 @@ def test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos() -> None:
 
     assert str(total) in texto
     assert "más de 80 objetos" not in texto
+
+
+# ---------------------------------------------------------------------------
+# Defensas (b) y (c) de la puerta · las VISTAS, tan exactas como las tablas
+#
+# Dos huecos demostrados en la review, los dos sobre vistas:
+#
+#   * **Columna ajena que cuela.** El contraste buscaba `\b<nombre>\b` en el
+#     TEXTO CRUDO DEL FICHERO ENTERO, comentarios incluidos. Documentar
+#     `obra_label` —columna de `v_pbi_dim_obra`— dentro de la ficha de
+#     `v_pbi_fact` pasaba en verde, porque las dos vistas viven en el mismo
+#     fichero. Colaban hasta palabras que solo salen en un comentario.
+#   * **Columna OMITIDA que no se nota.** Borrar `can_mes` de la ficha de
+#     `v_pbi_fact` dejaba la suite en verde: para las vistas solo se exigía que
+#     lo documentado apareciera, no que apareciera todo.
+#
+# Se cierran los dos leyendo la proyección final de CADA vista: su propio
+# `CREATE VIEW`, sin comentarios, desde su último `SELECT` de nivel 0 hasta su
+# `FROM`. Con eso la comprobación de las vistas es exacta en los dos sentidos,
+# igual que la de las tablas, y ya no hace falta apelar a `check-diccionario`
+# para esto.
+# ---------------------------------------------------------------------------
+
+
+def cuerpo_de_vista(sql: str, esquema: str, objeto: str) -> str | None:
+    """El texto del `CREATE VIEW` de ESA vista y solo de esa."""
+    patron = re.compile(
+        rf"CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\s+"
+        rf"{re.escape(esquema)}\.{re.escape(objeto)}\s+AS",
+        re.IGNORECASE,
+    )
+    coincidencia = patron.search(sql)
+    if coincidencia is None:
+        return None
+    resto = sql[coincidencia.end() :]
+    corte = re.search(r"^(CREATE|COMMENT|DROP)\b", resto, re.MULTILINE)
+    return resto[: corte.start()] if corte else resto
+
+
+def columnas_proyectadas(cuerpo: str) -> list[str] | None:
+    """Alias del `SELECT` final de una vista, o `None` si no se puede saber.
+
+    Devolver `None` en vez de una lista a medias es deliberado: una lista
+    incompleta convertiría la comprobación en un colador silencioso, que es
+    justo el fallo que esto viene a arreglar. Si algún día una vista deja de
+    parsearse, `test_..._todas_las_vistas_se_dejan_leer` se pone en rojo y
+    obliga a mirar, en vez de dejar de comprobar sin avisar.
+    """
+    cuerpo = re.sub(r"--[^\n]*", " ", cuerpo)
+
+    # Caso `SELECT * FROM (VALUES ...) AS t(a, b, c)`: los catálogos estáticos
+    # declaran sus nombres al final y no en la proyección.
+    alias_tupla = re.search(r"\)\s*AS\s+\w+\s*\(([^)]*)\)\s*;", cuerpo, re.IGNORECASE)
+    if alias_tupla:
+        return [c.strip() for c in alias_tupla.group(1).split(",") if c.strip()]
+
+    lineas = cuerpo.split("\n")
+    selects = [i for i, linea in enumerate(lineas) if re.match(r"^SELECT\b", linea)]
+    if not selects:
+        return None
+    inicio = selects[-1]
+    fin = next(
+        (i for i in range(inicio + 1, len(lineas)) if re.match(r"^(FROM|;)\b", lineas[i])),
+        None,
+    )
+    if fin is None:
+        return None
+
+    proyeccion = re.sub(
+        r"^SELECT\s+(?:DISTINCT\s+(?:ON\s*\([^)]*\)\s*)?)?",
+        "",
+        "\n".join(lineas[inicio:fin]),
+        flags=re.IGNORECASE,
+    )
+
+    items, actual, profundidad = [], [], 0
+    for caracter in proyeccion:
+        if caracter in "([":
+            profundidad += 1
+        elif caracter in ")]":
+            profundidad -= 1
+        if caracter == "," and profundidad == 0:
+            items.append("".join(actual))
+            actual = []
+        else:
+            actual.append(caracter)
+    items.append("".join(actual))
+
+    nombres: list[str] = []
+    for item in items:
+        item = " ".join(item.split())
+        if not item:
+            continue
+        alias = re.search(r"\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\s*$", item, re.IGNORECASE)
+        if alias:
+            nombres.append(alias.group(1))
+            continue
+        desnuda = re.match(
+            r"^(?:[A-Za-z_][A-Za-z0-9_]*\.)?([A-Za-z_][A-Za-z0-9_]*)$", item
+        )
+        if desnuda:
+            nombres.append(desnuda.group(1))
+            continue
+        return None
+    return nombres or None
+
+
+def _vistas_del_diccionario() -> list:
+    return [f for f in _diccionario().fichas if f.tipo == "vista"]
+
+
+def test_f006_r26_todas_las_vistas_se_dejan_leer() -> None:
+    """Control: si la extracción dejara de funcionar, el test de abajo pasaría
+    en falso sobre cero vistas."""
+    ilegibles = []
+    for ficha in _vistas_del_diccionario():
+        sql = (DIR_SQL / _origen_por_objeto()[ficha.nombre]).read_text(encoding="utf-8")
+        cuerpo = cuerpo_de_vista(sql, ficha.esquema, ficha.objeto)
+        if cuerpo is None or columnas_proyectadas(cuerpo) is None:
+            ilegibles.append(ficha.nombre)
+
+    assert not ilegibles, f"no se pudo leer la proyección de {ilegibles}"
+    assert len(_vistas_del_diccionario()) >= 19
+
+
+@pytest.mark.parametrize("nombre", sorted(f.nombre for f in _vistas_del_diccionario()))
+def test_f006_r26_las_vistas_documentan_exactamente_su_proyeccion(nombre: str) -> None:
+    """Ni una columna de menos (hueco) ni una de más (humo o columna ajena)."""
+    ficha = _diccionario().por_nombre[nombre]
+    sql = (DIR_SQL / _origen_por_objeto()[nombre]).read_text(encoding="utf-8")
+
+    proyectadas = columnas_proyectadas(cuerpo_de_vista(sql, ficha.esquema, ficha.objeto))
+    documentadas = [c.nombre for c in ficha.columnas]
+
+    assert set(documentadas) == set(proyectadas), (
+        f"faltan: {sorted(set(proyectadas) - set(documentadas))}; "
+        f"sobran: {sorted(set(documentadas) - set(proyectadas))}"
+    )
+
+
+def test_f006_r26_el_extractor_no_confunde_dos_vistas_del_mismo_fichero() -> None:
+    """El hueco exacto: `obra_label` es de `v_pbi_dim_obra`, no de `v_pbi_fact`,
+    y las dos viven en `05_views_powerbi.sql`."""
+    sql = (DIR_SQL / "mart/05_views_powerbi.sql").read_text(encoding="utf-8")
+
+    de_fact = columnas_proyectadas(cuerpo_de_vista(sql, "mart", "v_pbi_fact"))
+    de_obra = columnas_proyectadas(cuerpo_de_vista(sql, "mart", "v_pbi_dim_obra"))
+
+    assert "obra_label" in de_obra
+    assert "obra_label" not in de_fact
+
+
+def test_f006_r26_el_extractor_ignora_los_comentarios() -> None:
+    """Colaban palabras que solo aparecían en un comentario del fichero."""
+    sql = (DIR_SQL / "mart/05_views_powerbi.sql").read_text(encoding="utf-8")
+
+    proyectadas = columnas_proyectadas(cuerpo_de_vista(sql, "mart", "v_pbi_dim_obra"))
+
+    assert "segmentadores" not in proyectadas
+    assert "estrella" not in proyectadas

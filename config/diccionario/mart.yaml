@@ -671,7 +671,8 @@ objetos:
       Calendario MENSUAL, no diario: una fila por mes desde el primero con datos
       en el seguimiento hasta doce meses despues del ultimo. Los nombres de mes
       se generan en castellano sin depender del idioma del servidor.
-    grano: Una fila por mes.
+    grano: >-
+      Una fila por mes, no por dia: el grano de todo el seguimiento es mensual.
     clave_negocio: [anio_mes]
     paso_etl: build_mart
     refresco: nocturno
@@ -680,7 +681,7 @@ objetos:
         significado: Primer dia del mes. Clave de la dimension.
         agregacion: no_sumable
       anio:
-        significado: Ano del mes.
+        significado: Ano al que pertenece el mes de la fila.
         agregacion: no_sumable
       mes:
         significado: Numero de mes, de 1 a 12.

@@ -11,9 +11,17 @@ sobre lo que vale cada una:
   diccionario esté completo: demuestra que **nadie ha añadido un objeto al
   repositorio sin documentarlo**. Es un trinquete, y es heurístico (R29).
 * **`python main.py check-diccionario`**, contra `information_schema` de la base
-  real. Esa es la verdad, y cuesta una conexión.
+  real. Esa sería la verdad, y cuesta una conexión. **TODAVÍA NO EXISTE**: es
+  R28 y llega en el bloque H. Mientras tanto **no hay red de seguridad detrás de
+  esta puerta**, y por eso conviene decirlo aquí en vez de dar por cubierto lo
+  que no lo está.
 
-Están las dos porque la barata corre siempre y la cara no.
+Lo que esta puerta SÍ garantiza hoy, y no es poco: que todo objeto publicado
+tiene ficha o está declarado pendiente, y que las columnas documentadas de una
+tabla o de una vista son **exactamente** las que el SQL crea (lo comprueba
+`tests/test_f006_fichas.py`, leyendo el `CREATE TABLE` o la proyección del
+`CREATE VIEW`). Lo que NO puede ver es un objeto creado por una vía que la
+expresión regular no contemple.
 
 Dominio puro: `objetos_de_sql` recibe un mapa `ruta -> texto` ya leído, no rutas.
 Quien abre ficheros es la CLI o el test, nunca este módulo.
@@ -91,8 +99,10 @@ def objetos_de_sql(textos: Mapping[str, str]) -> list[ObjetoPublicado]:
     `ensure_raw_table` desde Python y no hay SQL que leer. Se inventarían con
     `objetos_de_raw` desde `config/tables_sigrid.yaml`.
 
-    Y por eso existe `python main.py check-diccionario`, que compara contra
-    `information_schema` y es la única fuente que dice la verdad.
+    La comprobación contra `information_schema`, que sería la única fuente que
+    dice la verdad, es `python main.py check-diccionario` (R28) y **está sin
+    implementar**: llega en el bloque H. Hasta entonces esta heurística es lo
+    único que hay.
 
     Recibe `ruta -> texto` para que quien lea ficheros sea infraestructura. El
     resultado sale ordenado y deduplicado por `esquema.objeto`: el mismo
