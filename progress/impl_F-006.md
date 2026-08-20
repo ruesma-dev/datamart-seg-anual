@@ -150,3 +150,39 @@ del fichero manda sobre el campo `esquema`», que el propio cargador impone. Se
 sustituyó por `..._el_hash_cubre_el_conjunto_de_ficheros`, que comprueba la
 propiedad que de verdad importa: **añadir un fichero cambia el hash aunque
 ninguno de los viejos cambie**.
+
+### T8 · La puerta real sobre el repositorio
+
+```
+$ python -m pytest tests/test_f006_cobertura.py -q -k puerta
+E           etl_sigrid.infrastructure.diccionario.cargador_yaml.DiccionarioIlegible: 00_global.yaml: no existe 00_global.yaml en ...\config\diccionario: sin bloque global no hay reglas, ni esquemas, ni pendientes
+
+etl_sigrid\infrastructure\diccionario\cargador_yaml.py:149: DiccionarioIlegible
+=========================== short test summary info ===========================
+FAILED tests/test_f006_cobertura.py::test_f006_r1_puerta_el_diccionario_real_se_carga
+FAILED tests/test_f006_cobertura.py::test_f006_r25_puerta_todo_objeto_publicado_tiene_ficha_o_esta_pendiente
+FAILED tests/test_f006_cobertura.py::test_f006_r27_puerta_el_trinquete_solo_baja
+FAILED tests/test_f006_cobertura.py::test_f006_r27_puerta_el_trinquete_no_esta_holgado
+4 failed, 7 passed, 27 deselected in 0.21s
+```
+
+Verde tras crear `config/diccionario/00_global.yaml`: `11 passed`, y
+`bash harness/init.sh` en verde con **944 tests** y
+`PUERTA COBERTURA: 92.8% de 498 lineas cambiadas cubiertas (462/498, umbral 80%, nivel critico)`.
+
+**El inventario real del repositorio son 98 objetos publicados**, no los ~80 que
+estimaba la spec:
+
+| esquema | objetos |
+|---|---|
+| `raw` | 31 (de `config/tables_sigrid.yaml`) |
+| `compras` | 14 |
+| `mart` | 13 |
+| `cierre` | 12 |
+| `retenciones` | 10 |
+| `stg` | 10 |
+| `maestro` | 4 |
+| `_meta` | 3 |
+| `aux` | 1 |
+
+`PENDIENTES_MAX` arranca en **98** y solo baja.
