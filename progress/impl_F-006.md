@@ -1053,3 +1053,21 @@ La ficha da ahora el mapa entero. Y hay un **test de control contra el SQL**:
 cuenta los cinco `WHEN t.concepto = 'VENTA' THEN` de la vista, asi que si manana
 alguien anade o quita una excepcion, la ficha se pone en rojo en vez de quedarse
 mintiendo en silencio.
+
+## Arrastre 4 · Seis residuos de «mes anterior»
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "residuo"
+tests\test_f006_fichas.py:824: AssertionError
+1 failed, 97 deselected in 0.51s
+```
+
+Los seis estaban en `variacion_importe` (dos fichas, significado y nulo),
+`ejecutado_anterior_pct` y `variacion_pct`. Todos pasan a **«la fila anterior de
+esa obra y ese concepto»**, que es lo que hace el `LAG`. La diferencia no es de
+estilo: en una obra que no cerro marzo, «el mes anterior» de abril es febrero, y
+quien reste un mes de calendario para reproducir la cifra no la reproduce.
+
+Queda **una sola** mencion a «mes anterior» en el fichero, y es correcta: la de
+`ejecutado_mes_periodif`, que describe contra que resta el SQL el incurrido. El
+test la excluye por nombre y explica por que.

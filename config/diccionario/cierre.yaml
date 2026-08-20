@@ -119,11 +119,14 @@ objetos:
         agregacion: ultimo_valor
       variacion_importe:
         significado: >-
-          Cuanto ha cambiado la prevision final respecto al mes anterior.
-          Positivo significa que la obra se ha encarecido o que ha crecido.
+          Cuanto ha cambiado la prevision final respecto a la FILA ANTERIOR de
+          esa obra y ese concepto. Positivo significa que la obra se ha
+          encarecido o que ha crecido.
         unidad: EUR
         agregacion: ultimo_valor
-        nulo_significa: No hay mes anterior con el que comparar.
+        nulo_significa: >-
+          Es la primera fila de esa obra y ese concepto: no hay ninguna
+          anterior con la que comparar.
       final_fuente:
         significado: >-
           De donde sale la prevision final, y es importante para saber cuanto
@@ -266,10 +269,14 @@ objetos:
         unidad: EUR
         agregacion: ultimo_valor
       variacion_importe:
-        significado: Cambio de la prevision final respecto al mes anterior.
+        significado: >-
+          Cambio de la prevision final respecto a la fila anterior de esa obra
+          y ese concepto.
         unidad: EUR
         agregacion: ultimo_valor
-        nulo_significa: No hay mes anterior con el que comparar.
+        nulo_significa: >-
+          Es la primera fila de esa obra y ese concepto: no hay ninguna
+          anterior con la que comparar.
       ejecutado_origen_pct:
         significado: >-
           El ejecutado a origen del concepto sobre LA VENTA DE ESA MISMA COLUMNA
@@ -279,7 +286,8 @@ objetos:
         agregacion: promedio
         nulo_significa: La venta usada como divisor es cero o no existe.
       ejecutado_anterior_pct:
-        significado: Lo mismo, referido al acumulado del mes anterior.
+        significado: >-
+          Lo mismo, referido al acumulado de la fila anterior de esa serie.
         unidad: "%"
         agregacion: promedio
         nulo_significa: La venta usada como divisor es cero o no existe.
@@ -307,7 +315,10 @@ objetos:
         agregacion: promedio
         nulo_significa: El divisor es cero o no existe.
       variacion_pct:
-        significado: La variacion de la prevision sobre la prevision del mes anterior.
+        significado: >-
+          La variacion de la prevision sobre la prevision de la fila anterior.
+          Este porcentaje NO cambia de divisor en la fila VENTA: es el unico
+          de los seis sin excepcion.
         unidad: "%"
         agregacion: promedio
         nulo_significa: No hay prevision anterior, o era cero.

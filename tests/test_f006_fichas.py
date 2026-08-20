@@ -780,12 +780,23 @@ def test_f006_r2_final_pct_dice_cuantos_porcentajes_cambian_y_cuales() -> None:
 
 
 def test_f006_r2_variacion_pct_no_declara_una_excepcion_que_no_tiene() -> None:
-    """Su divisor es `final_anterior` siempre, sin mirar el concepto."""
+    """Su divisor es `final_anterior` siempre, sin mirar el concepto.
+
+    Mencionar la fila VENTA vale —y ayuda— mientras sea para decir que ahí NO
+    pasa nada: es la duda que le queda a quien acaba de leer las otras cinco.
+    """
     columnas = {
         c.nombre: c for c in _fichas_de("cierre")["v_pbi_cierre_resumen"].columnas
     }
 
-    assert "VENTA" not in columnas["variacion_pct"].significado
+    significado = columnas["variacion_pct"].significado
+
+    if "VENTA" in significado:
+        assert "NO cambia" in significado, (
+            "si se nombra la fila VENTA, tiene que ser para decir que este "
+            "porcentaje no tiene excepción"
+        )
+    assert "fila anterior" in significado.lower()
 
 
 def test_f006_r2_el_sql_confirma_el_reparto_de_divisores() -> None:
@@ -800,3 +811,26 @@ def test_f006_r2_el_sql_confirma_el_reparto_de_divisores() -> None:
         "no tiene excepción"
     )
     assert "a.aprobado_venta" in cuerpo
+
+
+def test_f006_r2_no_queda_ningun_residuo_de_mes_anterior() -> None:
+    """Arrastre 4: la comparación es contra la FILA anterior, siempre.
+
+    Quedaban seis en `variacion_importe`, `ejecutado_anterior_pct` y
+    `variacion_pct`. La frase «el mes anterior» invita a restar un mes de
+    calendario, y el `LAG` que hay detrás salta los meses sin fase: en una obra
+    que no cerró marzo, «el mes anterior» de abril es febrero.
+    """
+    import yaml as yaml_lib
+
+    crudo = (DIR_DICCIONARIO / "cierre.yaml").read_text(encoding="utf-8")
+    # La única mención legítima describe un comentario del SQL sobre el
+    # incurrido, no una comparación entre filas de la propia vista.
+    residuos = [
+        linea.strip()
+        for linea in crudo.split("\n")
+        if "mes anterior" in linea and "INCURRIDO" not in linea
+    ]
+
+    assert not residuos, residuos
+    assert yaml_lib.safe_load(crudo), "y el fichero sigue parseando"
