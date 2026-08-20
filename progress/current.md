@@ -151,6 +151,17 @@ y qué NO».
   (`05_views_cabecera.sql:174`)—. Engañarán a quien lea el SQL creyendo que el
   YAML se equivoca. Candidatos a una feature de limpieza.
 
+### Decisión pendiente del líder
+
+**El informe de mutación cuenta los timeouts aparte de los supervivientes**, y
+eso invita al error: «162 muertos, 0 supervivientes, 4 timeouts» se lee como
+campaña limpia. En F-006 los cuatro timeouts **eran cuatro supervivientes**,
+comprobado reevaluándolos uno a uno. Propuesta escrita en
+`progress/impl_F-006.md`: que el veredicto sea `muertos == total` y que la línea
+diga «SIN EVALUAR (timeout)». No aplicada: toca `harness/mutacion.py`, es del
+arnés y cambiaría el veredicto de features ya cerradas. Si se acepta, la regla
+de propagación obliga a llevarlo a `arnes-base` en el mismo trabajo.
+
 ### Decisión pendiente del humano
 
 El reviewer propone una mejora de `CHECKPOINTS.md`, **no aplicada**: que cuando

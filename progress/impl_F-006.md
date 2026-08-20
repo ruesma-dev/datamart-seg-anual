@@ -2452,3 +2452,71 @@ el umbral obliga a tocar las dos y se ve en el diff. Con eso, los cuatro mueren:
 189: frozen=True -> frozen=False          =>  MUERTO
 137: "grano": 20 -> 21                    =>  MUERTO
 ```
+
+### Propuesta para el lider: el informe de mutacion invita al error
+
+**No la he aplicado**: toca `harness/mutacion.py`, que es del arnes y no de esta
+feature, y cambiar como cuenta afectaria al veredicto de features ya cerradas.
+La dejo escrita porque acaba de costarnos cuatro supervivientes.
+
+La linea de cierre es:
+
+```
+166 mutantes evaluados, 162 muertos, 0 supervivientes, 4 timeouts
+```
+
+«0 supervivientes» y «4 timeouts» en la misma frase se leen como «limpio, con
+algo de ruido». Pero un timeout **no se ha evaluado**: puede ser un mutante que
+la suite no caza y que ademas la cuelga. Contarlo aparte del recuento que decide
+el veredicto convierte el numero que se mira en optimista.
+
+Dos cambios, los dos baratos:
+
+1. Que el veredicto sea **`muertos == total`**, no `supervivientes == 0`. Un
+   timeout deja la campana en rojo hasta que alguien lo explique.
+2. Que la linea diga **«4 SIN EVALUAR (timeout)»** en vez de «4 timeouts».
+
+Si vale para cualquier proyecto —y vale—, la regla de propagacion obliga a
+portarlo a `arnes-base` en el mismo trabajo.
+
+## Evidencias tras la sexta review (bloques F y G completos)
+
+Numeros medidos, no estimados.
+
+| Evidencia | Valor | Como se obtiene |
+|---|---|---|
+| **Tests ejecutados** | **1487 pasan, 0 fallan**, 82 saltados (752 de ellos son de F-006) | `bash harness/init.sh` |
+| **Tiempo de la suite** | **~45 s** el subconjunto de F-006; **144,5 s** la suite entera dentro de `init.sh`, que corre bajo `coverage` | salida de pytest |
+| **Cobertura de las lineas cambiadas** | **99,0 %** (714 de 721; umbral 80 %, nivel `critico`) | linea `PUERTA COBERTURA` de `bash harness/init.sh` |
+| **Mutantes generados / supervivientes** | **166 generados, 166 muertos, 0 supervivientes, 0 timeouts** en 658,6 s | `python -m harness.mutacion --feature F-006 --timeout 300` -> `progress/mutacion_F-006.md` |
+| **Objetos documentados** | **102 de 102** | `config/diccionario/` |
+| **Columnas descritas** | **793** | idem |
+| **Trinquete `pendientes`** | **0**, desde 98 | `PENDIENTES_MAX` en `tests/test_f006_cobertura.py` |
+| **Reglas duras publicadas** | **13 de 13** | `00_global.yaml` |
+| **Superficie de consumo** | 47 de 102 objetos, con el **100 %** de sus columnas con significado | `cobertura_columnas` |
+
+**Analisis de supervivientes: no queda ninguno, y esta vez el numero significa
+lo que dice.** La primera tirada cerro con «162 muertos, 0 supervivientes, 4
+timeouts» y **los cuatro timeouts eran supervivientes**: reevaluados de uno en
+uno sobrevivieron los cuatro, estan analizados en la seccion anterior y se
+cerraron con `tests/test_f006_supervivientes.py`. La segunda tirada, con
+`--timeout 300` y sin nada mas corriendo en la maquina, evalua los 166 y los
+mata todos.
+
+Las siete lineas cambiadas sin cubrir son ramas de guarda redundantes con otras
+ya ejercitadas dentro del cargador; ninguna sobrevivio a la mutacion.
+
+### Verificaciones `MANUAL (humano)` pendientes
+
+Ninguna de esta tanda se puede hacer desde aqui, y ninguna se ha intentado:
+**ningun agente ha abierto conexion a la base ni a Azure**, porque el `.env` de
+este puesto apunta a `psql-albaranes-rs9k2`, el servidor compartido con
+`albaranes` y `partes` en produccion.
+
+| Tarea | Que hay que hacer |
+|---|---|
+| **T19** | `python main.py publicar-diccionario` contra la BBDD real y comprobar el contrato de `_meta` |
+| **T27** | `check-diccionario` contra el catalogo real, y la consulta de unicidad por objeto |
+| **T32**–**T34**, **T38** | Los bloques de permisos y firewall, que necesitan firma |
+| **T37** | Actualizar `azure-apps/datamart_seg_anual.md` |
+| **T39** | Pasar las 18 preguntas de la bateria contra el diccionario publicado |
