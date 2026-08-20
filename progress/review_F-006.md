@@ -1,9 +1,156 @@
 <!-- progress/review_F-006.md -->
 # F-006 · Review de los bloques A, B, C y D
 
-> Rama `feature/F-006-mcp-azure`, commits `ba8ff93`..`5e901f8`.
-> Alcance revisado: **solo T3–T14** (bloques A a D). Los bloques E a K no
-> entran en el veredicto; sí se dice al final cómo quedan preparados.
+> Este fichero tiene **dos pasadas**. Arriba, la segunda (la vigente). Abajo,
+> íntegra, la primera, que rechazó el trabajo: se conserva para que se pueda
+> auditar qué se pidió exactamente y contrastarlo con lo que se hizo.
+
+---
+
+# SEGUNDA PASADA · 2026-08-20
+
+> Commits revisados: `5783cbc`..`7d9845b` (trece). Mismo alcance: **T3–T14**,
+> bloques A a D.
+
+## Veredicto de la segunda pasada
+
+**APROBADO**, con cuatro correcciones de arrastre que deben entrar **antes de
+que el bloque E publique el diccionario en `_meta`** (§«Lo que arrastra»).
+
+Los **diez defectos están corregidos**, verificados uno a uno y no de palabra:
+cada arreglo lo comprobé contra el SQL o reproduciendo el experimento que antes
+pasaba en verde. En cinco casos se arregló **el mecanismo y no el caso**, y las
+ampliaciones que eso destapó son **ciertas, no ruido**: las 4 relaciones de
+fan-out nuevas y los 2 objetos extra de `R-IMPORTE-MES` los verifiqué contra el
+SQL uno a uno. Las fichas **siguen siendo veraces tras 277 líneas de edición**:
+332 columnas, 22 granos y 22 claves de negocio revalidados, sin una sola
+regresión.
+
+Apruebo aun quedando cuatro imprecisiones (una de ellas introducida al
+corregir) porque son de **otra categoría** que las que motivaron el rechazo.
+Aquellas publicaban un valor sin sentido (`cardinalidad: 61`), inducían un
+fan-out silencioso que multiplica importes y etiquetaban mal las cifras de
+control: producían números falsos sin avisar. Las que quedan son prosa del
+campo `porque` que, si un agente la sigue, produce **un error de SQL ruidoso**
+(une por una columna que no existe) o una matización imperfecta. Bloquear otra
+ronda completa por eso no protegería nada que no proteja ya el hecho de que el
+diccionario **todavía no se publica**: hasta el bloque E no llega a ningún
+agente, y ahí es donde deben entrar.
+
+---
+
+## Los diez defectos, uno a uno
+
+Estado verificado por mí. «Experimento» significa que reproduje en un worktree
+aislado la mutación que antes pasaba en verde.
+
+| # | Defecto | Estado | Cómo lo comprobé |
+|---|---|---|---|
+| 1 | `cardinalidad: 1:1` publicada como `61` | **corregido, con mecanismo** | Vocabulario cerrado `CARDINALIDADES` (`domain/diccionario.py:83`) aplicado en `:625`. **Experimento E7**: quitar las comillas a un `1:1` → falla `test_f006_r5_ninguna_relacion_real_publica_una_cardinalidad...` con un mensaje que dice «escríbelo ENTRE COMILLAS». Las 8 relaciones afectadas, entrecomilladas; `yaml.safe_load` confirma que **las 42 cardinalidades son ahora `str`** |
+| 2 | Seis cardinalidades `N:1` que eran `N:N` | **corregido, con mecanismo; 10 instancias** | La unicidad se **deriva** de la clave de negocio (`_es_unica_por`, `diccionario.py:675`; `_validar_cardinalidad`, `:699`). Las 4 nuevas salen de `mart.yaml`, que la primera pasada no auditó, y **las cuatro son ciertas** contra el SQL. Ninguna relación legítima quedó degradada: las `N:1` hacia dimensiones de clave simple siguen intactas. **Experimento E8**: degradar un `N:N` a `N:1` → detectado |
+| 3 | `orden_concepto` «1 a 6» falso | **corregido, ampliado a 3 fichas + 1 relación** | Contrastado: `02_build_fact.sql:299-304` da 1/2/3/4 y `03_views.sql:56,87` añaden GASTOS=2 y BENEFICIO=6. La ficha declara ahora los valores reales `{1,2,2,3,4,6}`, dice que el 2 está duplicado y que no hay 5, y **manda ordenar por `v_pbi_dim_concepto`**, que sí va 1→6 |
+| 4 | Órdenes de magnitud: «total» siendo saldo vivo | **corregido** | Las cifras cuadran **al dígito** con `LEEME_RETENCIONES_R1.md:21-22` («34,7 M€ vivos», «21,9 M€ vivos»), ahora con `criterio: saldo_vivo`/`total`, fuente comprobable y sentido (quién retiene a quién, contra `sql/retenciones/01_movimientos.sql:6-8`). La cifra de «~27.300 efectos», que **no estaba en ninguna fuente**, se sustituyó por los dos recuentos reales desglosados |
+| 5 | `cliente_ide.nulo_significa` falso | **corregido, con mecanismo** | La ficha dice ahora que llega **0** y cómo filtrarlo. La afirmación fuerte («es el único `*_ide` sin `NULLIF`») es cierta: los otros seis lo llevan. **Experimento E10**: reintroducir el nulo imposible → detectado por dos tests |
+| 6 | `R-FRESCURA-MANUAL` citaba `_meta.v_diccionario`, inexistente | **corregido, con mecanismo** | Ahora cita solo `_meta.v_frescura`, que sí existe (`sql/ddl/00_meta.sql:70`), y añade que la antigüedad de `compras`/`retenciones` **se desconoce**. Hay barrido con regex de los nueve esquemas sobre `regla`, `motivo` y `respuesta_correcta`, contrastado contra el inventario derivado del SQL. Queda una cita en `nota` de P15, en condicional y correcta |
+| 7 | `R-CLAVE-SUSTITUTA` marcaba estable→inestable | **corregido; mecanismo a medias** | `aux.periodificacion_partida` fuera del ámbito, y las cuatro claves que sí son inestables (`fact_id`, `fact_cat_id`, `plan_id`, `cierre_id`) siguen dentro. El matiz: el test nuevo cubre los falsos positivos y no los falsos negativos, y por eso `mart.v_fact_periodificado.fact_id` —marcada `clave_sustituta`— no la alcanza la regla. Hueco preexistente, no regresión |
+| 8 | `R-IMPORTE-MES` no cubría `cierre` | **corregido, ampliado a 4; cero ruido** | Los dos extra (`v_pbi_cierre_indirectos_detalle`, `v_pbi_cierre_generales_detalle`) **tienen la trampa de verdad**: CTE `agregado` con `SUM(importe_origen)` + `LAG` + `ejecutado_mes`. El detector es **simétrico** (busca todo objeto que documente a la vez una columna EUR `suma_solo_dentro_del_mes` y otra `ultimo_valor`) y lleva test de control anti-detector-vacío: devuelve 9 objetos y los 9 están en el ámbito |
+| 9 | `design.md` señalado y no corregido | **corregido** | Nota de enmienda fechada (`design.md:40-48`), ejemplo §3.3 con los nombres reales, relación a `maestro.obras.obra_id`, §5.1 a 13 y 12 objetos, y «más de 80» → 98. **Experimentos D1 y D2**: reintroducir el literal `COSTE_REAL` o la columna `obra_codigo` en el ejemplo → detectado. (D3, falsear el recuento de la tabla §5.1, no está vigilado: menor) |
+| 10 | Las defensas de la puerta | **corregido: 3 de mis 4 experimentos ahora se cazan; el 4º, declarado** | Ver el apartado siguiente |
+
+## Los experimentos, reejecutados por mí
+
+Worktree aislado (`git worktree --detach`), árbol real intacto. Línea base: 327
+tests de F-006 en verde.
+
+| Experimento | Antes | Ahora |
+|---|---|---|
+| **E1** · desdocumentar `v_pbi_dim_escenario`, devolverla a `pendientes` y **subir** el tope a 74 | pasaba (252 passed) | **detectado**: `test_f006_r27_el_trinquete_solo_baja_a_lo_largo_del_historial` |
+| **E2** · ficha esquelética (`descripcion: x`, `grano: x`, `motivo_no_consumo: x`) que saca un objeto de `pendientes` | pasaba | **detectado**: 3 fallos (mínimos de contenido + proyección exacta + validación) |
+| **E3** · colar `obra_label`, columna de otra vista del **mismo fichero SQL**, en `v_pbi_fact` | pasaba (254 passed) | **detectado**: `..._las_vistas_documentan_exactamente_su_proyeccion[mart.v_pbi_fact]` |
+| **E4** · invertir el `significado` de `importe_mes` a «Importe ACUMULADO» | pasaba | **sigue pasando** — y está **declarado sin adornos** en el informe: «que el TEXTO de una ficha sea cierto […] lo garantiza la revisión humana y la batería T39» |
+| **E9** (nuevo) · el mismo retroceso de E1 pero **commiteado**, para que el árbol coincida con HEAD | — | **detectado**: el anclaje recorre el historial del fichero por pares, no solo el árbol |
+| **E5** (nuevo) · grano falso en `fact_seguimiento_mensual` («una fila por obra y mes») | — | **pasa en verde** |
+| **E6** (nuevo) · `clave_negocio: [obra_id]` en esa misma tabla | — | **pasa en verde** |
+| **E11** (nuevo) · clave de negocio falsa **y** degradar a `N:1` el fan-out que esa clave sostiene | — | **pasa en verde** |
+
+Sobre E4: no es un incumplimiento. Ninguna de las cuatro defensas que pedí
+podía cazar un texto invertido, y el implementer lo dice en vez de taparlo,
+que es exactamente la conducta que la primera pasada echó en falta.
+
+Sobre E5, E6 y E11 sí hay algo que corregir, aunque no en el código: el informe
+afirma que ahora están cubiertos «nombres de columna, **granos declarados**,
+**claves de negocio**, cardinalidades…». Lo que de verdad está cubierto es que
+las columnas de la clave **existan** y que la cardinalidad no prometa una
+unicidad que la clave declarada no sostiene. Que el grano o la clave sean
+**ciertos** no lo comprueba nada, y E11 enseña la consecuencia: como la
+detección de fan-out se **deriva** de la clave de negocio, quien declare una
+clave falsa desactiva de paso la defensa que esa clave sostiene. Es la misma
+clase de sobreventa —una línea que promete más de lo que el test hace— que
+motivó parte del rechazo anterior, y por eso conviene arreglar la frase.
+
+## Lo que arrastra (obligatorio antes de que el bloque E publique)
+
+1. **`cierre.yaml:933` manda un JOIN por una columna que no existe.** El
+   `porque` de la relación `v_pbi_planif_vs_real → mart.fact_seguimiento_categoria`
+   dice «El JOIN va por `(obra_id, anio_mes, categoria)`», pero la vista **no
+   proyecta `categoria`**: sus 13 columnas llevan `concepto_cuadro`
+   (`sql/cierre/06_views_planif_vs_real.sql:113-123`). Y no es solo el nombre:
+   `PRODUCCIÓN`, `TOTAL COSTES` y `BENEFICIO` son agregados que no corresponden
+   a ninguna categoría (`06:52-62`, `:84-106`). **Lo introdujo la corrección del
+   defecto 2**, y la corrección hermana de `cierre.yaml:339-341` sí eligió una
+   columna que existe en los dos lados (`concepto`), lo que confirma que es un
+   despiste.
+2. **`mart.yaml:881`**: la relación `v_pbi_cp_tipologia → v_master_vigente_anual`
+   manda unir por `(obra_id, anio, ambito_id)`, y `ambito_id` no es columna de
+   la vista origen (sus 7 columnas están verificadas); en el SQL es un filtro
+   constante `va.ambito_id = 8` (`06_views_cp_tipologia.sql:216`).
+3. **`cierre.yaml:298-302`**: al explicar la excepción, `final_pct` se
+   autoincluye en ella. En la fila VENTA usa `aprobado_venta`
+   (`03_views.sql:190-196`), no `venta_final` como los otros cuatro. Aun así es
+   mejor que el texto anterior.
+4. **Seis residuos de «mes anterior»** (`cierre.yaml:122,126,269,272,282,307`)
+   en columnas vecinas de las siete que sí se corrigieron a «FILA anterior». Es
+   la misma trampa —el `LAG` salta los meses sin cierre— en la misma ficha.
+5. **La frase del informe** sobre granos y claves de negocio: rebajarla a lo que
+   los tests hacen de verdad (ver arriba). Y, si se quiere cerrar E6/E11 de
+   verdad, contrastar la clave de negocio contra la PK o el índice único del
+   DDL en las tablas, que es donde sí es derivable.
+
+## Rigor y checkpoints (segunda pasada)
+
+- **C1** `[x]` — `bash harness/init.sh` exit 0, **1125 tests**, ejecutado por mí.
+- **C2** `[x]` — una sola feature `in_progress`, rama correcta, `current.md` al día.
+- **C3** `[x]` — dominio sin infraestructura, cabeceras de ruta, `ruff` limpio.
+- **C3 bis** — **N/A**: el diff no toca `docs/referencia/`.
+- **C4** `[x]` — la reserva de la primera pasada (R27 se cumplía «al pie de la
+  letra» pero no conseguía lo que prometía) **queda resuelta**: el anclaje al
+  historial de git es la comprobación que faltaba, y E9 confirma que ni
+  commiteando se esquiva.
+- **C4 bis** `[x]` — fase RED con trazas por defecto corregido; cobertura
+  **98,7 % de 544 líneas**; **mutación verificada de forma independiente**:
+  recalculé alcance (**1693 líneas**) y mutantes (**128** = 81 + 24 + 0 + 23),
+  y coinciden con `progress/mutacion_F-006.md`; cero supervivientes; sección
+  «Evidencias» presente.
+- **C4 ter** — **N/A**: no existe `harness/rutas_sensibles.json`.
+- **C5** — **N/A parcial**, como en la primera pasada: 14 de 42 tareas, que son
+  el alcance encargado. Se exigirá entero al pasar F-006 a `done`.
+
+## Nada prohibido, otra vez
+
+`git diff 5e901f8..HEAD --name-status`: solo los tres YAML del diccionario, el
+dominio, los tests, `design.md` y ficheros de `progress/`. **Cero cambios** en
+`main.py`, `config/settings.py`, `grants.py`, `postgres_client.py`, `infra/**` y
+cualquier `.sql`. Ningún GRANT, REVOKE, firewall ni Azure; ninguna conexión a la
+base. Árbol limpio; mis experimentos se hicieron en worktrees aislados que ya
+he eliminado.
+
+---
+---
+
+# PRIMERA PASADA · 2026-08-20 (RECHAZADO)
+
+> Commits revisados: `ba8ff93`..`5e901f8`. Se conserva íntegra: es lo que se
+> pidió corregir y el patrón de contraste de la segunda pasada.
 
 ## Veredicto
 

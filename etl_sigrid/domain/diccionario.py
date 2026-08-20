@@ -27,6 +27,7 @@ vueltas.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
@@ -73,6 +74,15 @@ AGREGACIONES = (
     "ultimo_valor",
     "clave_sustituta",
 )
+
+#: Una clave de JOIN citada dentro de un `porque`, escrita `` `(a, b, c)` ``.
+#:
+#: El texto de `porque` es lo que un agente copia para escribir el JOIN, asi que
+#: las columnas que nombra son tan verificables como las de `de` y `a`. Se coló
+#: dos veces al corregir el fan-out: `categoria` en una vista que ya la habia
+#: colapsado en otra columna, y `ambito_id` en otra donde ni siquiera es una
+#: dimension, sino un filtro constante del SQL.
+_CLAVE_JOIN = re.compile(r"`\(([^)]*)\)`")
 
 #: Vocabulario CERRADO de la cardinalidad de una relacion (R5).
 #:
@@ -622,6 +632,8 @@ def _validar_relaciones(
                 )
             )
 
+        errores.extend(_validar_clave_de_join(ficha, relacion, propias))
+
         if relacion.cardinalidad not in CARDINALIDADES:
             error(
                 f"la relación hacia `{relacion.a}` declara `cardinalidad` = "
@@ -694,6 +706,42 @@ def _es_unica_por(ficha: Ficha, columna: str) -> bool | None:
         if candidata.nombre == columna and candidata.agregacion == "clave_sustituta":
             return True
     return False
+
+
+def _validar_clave_de_join(
+    ficha: Ficha, relacion: Relacion, propias: set[str]
+) -> list[ErrorValidacion]:
+    """Las columnas que el `porque` cita como clave de JOIN tienen que existir.
+
+    Solo se juzgan las fichas que documentan columnas: las de `raw` van a nivel
+    de objeto (DA-2) y ahi no hay nada contra lo que contrastar.
+
+    Si hace falta nombrar la clave del OTRO extremo, se escribe cualificada
+    (`otra_vista.columna`) y este patron no la reclama: lo que no vale es citar
+    a secas una columna que quien lee la ficha no va a encontrar en ella.
+    """
+    if not propias:
+        return []
+
+    errores: list[ErrorValidacion] = []
+    for coincidencia in _CLAVE_JOIN.finditer(relacion.porque or ""):
+        citadas = [c.strip() for c in coincidencia.group(1).split(",") if c.strip()]
+        ajenas = [c for c in citadas if "." not in c and c not in propias]
+        if ajenas:
+            errores.append(
+                ErrorValidacion(
+                    fichero=ficha.fichero,
+                    objeto=ficha.nombre,
+                    regla="R5",
+                    detalle=(
+                        f"la relación hacia `{relacion.a}` cita como clave de JOIN "
+                        f"{ajenas}, que no son columnas de `{ficha.nombre}`. Quien "
+                        f"copie esa clave escribirá un JOIN por una columna que "
+                        f"esta ficha no tiene"
+                    ),
+                )
+            )
+    return errores
 
 
 def _validar_cardinalidad(

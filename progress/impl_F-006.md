@@ -986,3 +986,48 @@ vuelva a pasar en las 73 fichas que faltan.
   aceptacion (T39). Lo que si esta cubierto ahora, y no lo estaba: nombres de
   columna, granos declarados, claves de negocio, cardinalidades, nulos
   imposibles en `*_ide` y objetos citados en la prosa de las reglas.
+
+---
+
+# Correcciones tras el APROBADO (arrastres del propio informe)
+
+Cuatro cosas que el informe anterior dejaba «para antes de que el bloque E
+publique». Se cierran ahora: son mentiras en fichas, y el bloque E las
+publicaria a `_meta` tal cual.
+
+## Arrastre 1 y 2 · Dos claves de JOIN citadas y no existentes
+
+Las dos las introdujo **mi propia correccion del fan-out**, al anadir a cada
+`porque` la clave por la que hay que agregar antes de unir. Antes de tocar nada
+se busco el patron en **las 42 relaciones**, no solo en la senalada:
+
+```
+$ python - <<'EOF'   (barrido de todas las tuplas `(a, b, c)` de los `porque`)
+cierre.v_pbi_planif_vs_real -> mart.fact_seguimiento_categoria.obra_id: ['categoria'] NO son columnas de cierre.v_pbi_planif_vs_real
+mart.v_pbi_cp_tipologia   -> mart.v_master_vigente_anual.obra_id:      ['ambito_id'] NO son columnas de mart.v_pbi_cp_tipologia
+```
+
+**Son exactamente dos**, las dos que senalo el reviewer. Fase RED:
+
+```
+$ python -m pytest tests/test_f006_formato.py -q -k "clave_de_join or sin_columnas_no_se_juzga"
+FAILED tests/test_f006_formato.py::test_f006_r5_una_clave_de_join_inventada_en_el_porque_falla
+FAILED tests/test_f006_formato.py::test_f006_r5_una_ficha_sin_columnas_no_se_juzga
+2 failed, 2 passed, 109 deselected in 1.17s
+```
+
+- **`cierre.v_pbi_planif_vs_real`**: la vista **ya colapso** la `categoria` del
+  origen dentro de `concepto_cuadro`, y ademas **tres de sus seis renglones no
+  corresponden a ninguna categoria** (PRODUCCION es la venta entera; TOTAL
+  COSTES y BENEFICIO son sumas). La ficha lo dice asi ahora, en vez de dar una
+  clave que no se puede escribir.
+- **`mart.v_pbi_cp_tipologia`**: `ambito_id` no es dimension de esa union.
+  `sql/mart/06_views_cp_tipologia.sql:231` fija `va.ambito_id = 8` como **filtro
+  constante** sobre el destino, y la vista ni siquiera proyecta la columna. El
+  JOIN va por `(obra_id, anio)`, y la ficha explica el filtro.
+
+**Endurecimiento**: R5 comprueba ahora que toda columna citada como clave de
+JOIN dentro de un `porque` sea una columna documentada de la propia ficha. El
+`porque` es lo que un agente copia para escribir el JOIN, asi que sus nombres
+son tan verificables como los de `de` y `a`. Si hace falta nombrar la clave del
+otro extremo, se escribe cualificada y el patron no la reclama.

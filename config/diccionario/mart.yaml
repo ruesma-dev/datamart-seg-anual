@@ -878,8 +878,10 @@ objetos:
         cardinalidad: "N:N"
         porque: >-
           Es la version de plan que se usa para la columna planificada. El JOIN
-          va por `(obra_id, anio, ambito_id)`: por `obra_id` solo trae la version
-          de todos los anos.
+          va por `(obra_id, anio)`: por `obra_id` solo trae la version de todos
+          los anos. El ambito no es una dimension de esta union: el SQL fija
+          `ambito_id = 8` (coste) como filtro constante sobre el destino, y esta
+          vista ni siquiera proyecta esa columna.
     ejemplos_preguntas:
       - Cuanto llevamos de seguros y avales en la obra X este ano
       - Que obras se desvian mas en costes proporcionales

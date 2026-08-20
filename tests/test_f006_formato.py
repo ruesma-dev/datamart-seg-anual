@@ -1651,3 +1651,102 @@ def test_f006_r2_el_diccionario_real_supera_los_minimos() -> None:
     ]
 
     assert errores == [], "\n" + formatear_errores(errores)
+
+
+# ===========================================================================
+# R5 · La clave de JOIN que cita el `porque` tiene que existir en la ficha
+#
+# La correccion del fan-out anadio a cada `porque` la clave por la que hay que
+# agregar antes de unir. En dos de las diez se colo una columna que la vista NO
+# proyecta: `categoria` en `cierre.v_pbi_planif_vs_real` —ya colapsada en
+# `concepto_cuadro`— y `ambito_id` en `mart.v_pbi_cp_tipologia`, donde ademas no
+# es dimension sino un filtro constante.
+#
+# Es la misma clase de mentira que la relacion rota que R5 ya impedia, y ahora
+# se comprueba igual: un agente que copie esa clave escribe un JOIN por una
+# columna que no existe.
+# ===========================================================================
+
+
+def test_f006_r5_una_clave_de_join_inventada_en_el_porque_falla() -> None:
+    from etl_sigrid.domain.diccionario import Relacion
+
+    ficha = _ficha(
+        relaciones=(
+            Relacion(
+                de="obra_codigo",
+                a="mart.fact_seguimiento_mensual.obra_codigo",
+                cardinalidad="N:N",
+                porque=(
+                    "Hay que agregar antes de unir, por `(obra_codigo, categoria)`, "
+                    "y `categoria` no es columna de esta ficha."
+                ),
+            ),
+        )
+    )
+
+    errores = validar(_dicc(fichas=[ficha]), PASOS_NOCTURNOS)
+
+    assert errores
+    assert any("categoria" in e.detalle for e in errores)
+    assert any(e.regla == "R5" for e in errores)
+
+
+def test_f006_r5_una_clave_de_join_con_columnas_propias_valida() -> None:
+    from etl_sigrid.domain.diccionario import Relacion
+
+    ficha = _ficha(
+        columnas=(_columna("obra_codigo"), _columna("mes")),
+        clave_negocio=("obra_codigo",),
+        relaciones=(
+            Relacion(
+                de="obra_codigo",
+                a="mart.fact_seguimiento_mensual.obra_codigo",
+                cardinalidad="N:N",
+                porque="Se agrega por `(obra_codigo, mes)` en los dos lados.",
+            ),
+        ),
+    )
+
+    assert validar(_dicc(fichas=[ficha]), PASOS_NOCTURNOS) == []
+
+
+def test_f006_r5_una_ficha_sin_columnas_no_se_juzga() -> None:
+    """`raw` va a nivel de objeto (DA-2): no hay columnas contra las que mirar."""
+    from etl_sigrid.domain.diccionario import Relacion
+
+    ficha = _ficha(
+        esquema="raw",
+        objeto="obrparpre",
+        capa="origen",
+        consumo_recomendado=False,
+        motivo_no_consumo="Copia literal de Sigrid; su diccionario es sigrid_tablas.md",
+        columnas=(),
+        ejemplos_preguntas=(),
+        paso_etl="ingest_raw",
+        relaciones=(
+            Relacion(
+                de="ide",
+                a="stg.obras.obra_id",
+                cardinalidad="N:N",
+                porque="Se une por `(ide, conide)`, que aqui no se documentan.",
+            ),
+        ),
+    )
+
+    assert validar(
+        _dicc(fichas=[ficha], pendientes=("stg.obras",)), PASOS_NOCTURNOS
+    ) == []
+
+
+def test_f006_r5_ninguna_clave_de_join_real_esta_inventada() -> None:
+    """Sobre el diccionario REAL: es el test que habría cazado los dos casos."""
+    from tests.test_f006_frescura import pasos_del_pipeline_nocturno
+
+    errores = [
+        e
+        for e in validar(_global_real(), pasos_del_pipeline_nocturno())
+        if "clave de JOIN" in e.detalle
+    ]
+
+    assert errores == [], "\n" + formatear_errores(errores)

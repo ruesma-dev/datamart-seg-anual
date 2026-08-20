@@ -929,10 +929,14 @@ objetos:
         a: mart.fact_seguimiento_categoria.obra_id
         cardinalidad: "N:N"
         porque: >-
-          Es la tabla de la que sale, pivotando planificado y real. El JOIN va
-          por `(obra_id, anio_mes, categoria)`: por `obra_id` solo multiplica.
-          Ojo: esa tabla se refresca de noche y esta vista solo con
-          `build-cierre`.
+          Es la tabla de la que sale, pivotando planificado y real. NO se puede
+          volver a ella por una clave directa: esta vista ya colapso la
+          `categoria` del origen dentro de `concepto_cuadro`, y tres de sus seis
+          renglones no corresponden a ninguna categoria concreta (PRODUCCION es
+          la venta entera, y TOTAL COSTES y BENEFICIO son sumas). Para cuadrar
+          contra el origen hay que agregarlo por `obra_id` y `anio_mes` y
+          traducir la categoria al renglon. Ojo ademas: esa tabla se refresca de
+          noche y esta vista solo con `build-cierre`.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
         cardinalidad: "N:1"
