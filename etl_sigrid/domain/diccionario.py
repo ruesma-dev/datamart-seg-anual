@@ -591,27 +591,60 @@ def _validar_relaciones(
 def _validar_frescura(
     ficha: Ficha, pasos_nocturnos: Sequence[str]
 ) -> list[ErrorValidacion]:
-    """R13: `refresco` y `paso_etl` declarados.
+    """R13 (`refresco` y `paso_etl` declarados) y R14 (y que no mientan).
 
-    El cruce contra la composición REAL del pipeline (R14) se añade en T5;
-    `pasos_nocturnos` llega hasta aquí desde `validar` para eso.
+    R14 es la defensa contra la respuesta de hace semanas dada con aplomo:
+    `cierre`, `compras`, `maestro` y `retenciones` no están en el pipeline
+    nocturno y se construyen a mano. Aquí no hay ninguna lista de esos cuatro
+    esquemas escrita a mano: se comprueba contra `pasos_nocturnos`, que sale de
+    `main.build_pipeline_steps`. El día que uno de ellos entre en `run-all`, el
+    veredicto cambia solo.
+
+    La comprobación es **en los dos sentidos**. Declararse `nocturno` sin correr
+    de noche promete una frescura que no existe; declararse `manual` corriendo de
+    noche hace que el agente cite una fecha de build que no hacía falta citar y
+    desconfíe de un dato bueno. Las dos son mentiras sobre lo mismo.
     """
-    if ficha.refresco == "estatico":
-        return []
-    if (ficha.paso_etl or "").strip():
-        return []
-    return [
-        ErrorValidacion(
-            fichero=ficha.fichero,
-            objeto=ficha.nombre,
-            regla="R13",
-            detalle=(
-                "falta `paso_etl`: el nombre del paso tal y como aparece en la "
-                "columna `paso` de `_meta.v_frescura`. Solo `refresco: estatico` "
-                "está exento"
-            ),
+    errores: list[ErrorValidacion] = []
+
+    def error(regla: str, detalle: str) -> None:
+        errores.append(
+            ErrorValidacion(
+                fichero=ficha.fichero,
+                objeto=ficha.nombre,
+                regla=regla,
+                detalle=detalle,
+            )
         )
-    ]
+
+    if ficha.refresco == "estatico":
+        return errores
+
+    paso = (ficha.paso_etl or "").strip()
+    if not paso:
+        error(
+            "R13",
+            "falta `paso_etl`: el nombre del paso tal y como aparece en la "
+            "columna `paso` de `_meta.v_frescura`. Solo `refresco: estatico` "
+            "está exento",
+        )
+        return errores
+
+    corre_de_noche = paso in pasos_nocturnos
+    if ficha.refresco == "nocturno" and not corre_de_noche:
+        error(
+            "R14",
+            f"declara `refresco: nocturno` pero su paso `{paso}` no forma parte "
+            f"del pipeline de `run-all` ({_lista(tuple(pasos_nocturnos))}): se "
+            f"construye a mano y puede estar arbitrariamente desfasado",
+        )
+    elif ficha.refresco == "manual" and corre_de_noche:
+        error(
+            "R14",
+            f"declara `refresco: manual` pero su paso `{paso}` SÍ forma parte del "
+            f"pipeline de `run-all`: el dato se refresca cada noche",
+        )
+    return errores
 
 
 def _validar_reglas(

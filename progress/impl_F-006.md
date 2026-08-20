@@ -80,3 +80,27 @@ ERROR tests/test_f006_formato.py
 ```
 
 Verde tras el código: `78 passed in 0.12s`.
+
+### T5 · Frescura: R13 y R14 contra la composición REAL del pipeline
+
+```
+$ python -m pytest tests/test_f006_frescura.py -q
+>       assert errores
+E       assert []
+
+tests\test_f006_frescura.py:143: AssertionError
+____ test_f006_r14_el_veredicto_sigue_al_pipeline_y_no_a_una_lista_copiada ____
+>       assert validar(dicc, PASOS_NOCTURNOS), "hoy build_cierre no corre de noche"
+E       AssertionError: hoy build_cierre no corre de noche
+E       assert []
+=========================== short test summary info ===========================
+FAILED tests/test_f006_frescura.py::test_f006_r14_los_cuatro_esquemas_manuales_no_pueden_ser_nocturnos[cierre]
+FAILED tests/test_f006_frescura.py::test_f006_r14_los_cuatro_esquemas_manuales_no_pueden_ser_nocturnos[compras]
+FAILED tests/test_f006_frescura.py::test_f006_r14_los_cuatro_esquemas_manuales_no_pueden_ser_nocturnos[maestro]
+FAILED tests/test_f006_frescura.py::test_f006_r14_los_cuatro_esquemas_manuales_no_pueden_ser_nocturnos[retenciones]
+FAILED tests/test_f006_frescura.py::test_f006_r14_declararse_manual_con_un_paso_nocturno_tambien_falla
+FAILED tests/test_f006_frescura.py::test_f006_r14_el_veredicto_sigue_al_pipeline_y_no_a_una_lista_copiada
+6 failed, 7 passed in 0.96s
+```
+
+Verde tras el código: `91 passed in 0.87s` (los tres ficheros de F-006).
