@@ -1557,3 +1557,42 @@ distinga los cinco casos, que el `GROUP BY` se lea donde se puede y **no** donde
 no —`mart.v_fact_periodificado` tiene `UNION` y su `GROUP BY` es de una rama—, y
 que existan tablas con PK declarada. Sin ellos, un detector que devolviera
 siempre vacio haria pasar todo en falso.
+
+## Defectos 1, 3, 4, 5 y los medios · las mentiras que ninguna comprobacion caza
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "nota_se_acota or no_anuncia_negativos or clave_falsa or ..."
+FAILED tests/test_f006_fichas.py::test_f006_r2_la_regla_de_la_nota_se_acota_a_donde_es_cierta
+FAILED tests/test_f006_fichas.py::test_f006_r2_la_vista_de_sin_facturar_no_anuncia_negativos
+FAILED tests/test_f006_fichas.py::test_f006_r2_las_dos_vistas_fuente_de_retenciones_no_declaran_clave_falsa
+FAILED tests/test_f006_fichas.py::test_f006_r2_la_clave_de_proveedor_obra_es_la_del_group_by
+FAILED tests/test_f006_fichas.py::test_f006_r2_los_filtros_que_pierden_filas_se_declaran
+FAILED tests/test_f006_fichas.py::test_f006_r2_las_medidas_sin_coalesce_declaran_su_nulo[compras.v_pbi_proveedor_obra-columnas0]
+FAILED tests/test_f006_fichas.py::test_f006_r2_las_medidas_sin_coalesce_declaran_su_nulo[compras.v_pbi_partida_coste-columnas1]
+FAILED tests/test_f006_fichas.py::test_f006_r2_lo_vencido_se_congela_en_el_build_y_se_dice
+8 failed, 253 deselected in 0.67s
+```
+
+| Defecto | Corregido |
+|---|---|
+| **1** · la regla de la NOTA | Estaba enunciada como general y es **falsa en `v_pbi_contrato_consumo`**, donde `SUM(pendiente_facturar)` es el unico agregado sin `FILTER`. Ahora la ficha de `tipo_documento` dice **donde vale y donde no**, y la columna del pendiente advierte de que incluye NOTA y OTRO y de que las dos cifras pueden no coincidir. Con un test que exige que el SQL siga sin `FILTER`: el dia que se lo pongan, estas dos fichas hay que reescribirlas |
+| **3** · clave que contradice el grano | Las dos vistas fuente de `retenciones` declaraban `[docide, obride]`, que es **el par del fan-out** ofrecido como clave. Ahora declaran que **no tienen clave** y su `grano` dice que son una fila por LINEA |
+| **4** · negativos imposibles | `v_pbi_albaranes_sin_facturar` filtra `> 0`: ahi no hay sobrefacturacion. El texto —copiado de `albaran_lineas`, donde SI es cierto— dice ahora que las sobrefacturadas **no aparecen** y donde ir a verlas |
+| **5** · clave demasiado corta | `v_pbi_proveedor_obra` pasa a las **seis** columnas de su `GROUP BY`. `proveedor_cif` no depende de `proveedor_id`: sale del CIF del documento, como la propia ficha admitia |
+| **8, 9** · nulos imposibles | Dos `nulo_significa` que un filtro de la vista impide. Y, mas importante, **el filtro que los impide se declara**: `WHERE proveedor_id IS NOT NULL` saca filas de la vista, y eso no lo decia nadie |
+| **10** · ocho medidas sin `COALESCE` | Devuelven NULL y no cero. Lo delata el contraste: `v_pbi_contrato_consumo` si envuelve. Un `WHERE facturado > 0` perdia filas en silencio |
+| **11** · lo vencido, congelado | `vencida_sin_liquidar` y `dias_desde_vencimiento` se calculan con `CURRENT_DATE` **en el build** de un `CREATE TABLE AS`. En un esquema manual cuya frescura ni siquiera es consultable, esa lista puede llevar semanas parada. Las fichas lo dicen y mandan recalcular sobre `fecha_prevista_devolucion` |
+
+Y los menores 12, 13, 14, 16, 17, 18, 19 y 20, cada uno contra su linea de SQL.
+
+### Un cambio de contrato que hizo falta, con su motivo
+
+Al quitar la clave falsa de las dos vistas fuente, R2 las rechazo: exigia
+`clave_negocio` a toda tabla o vista. **Exigir una clave siempre obliga a
+inventarsela**, que es exactamente lo que produjo el defecto 3.
+
+R2 admite ahora declararla **vacia**, pero solo **fuera de la superficie de
+consumo**: si un objeto se recomienda para consultar, quien lo consulte necesita
+saber que identifica una fila, y R3 ya obliga a escribir por que no se
+recomienda. El hueco declarado es mejor que la clave inventada; el hueco
+silencioso, no.

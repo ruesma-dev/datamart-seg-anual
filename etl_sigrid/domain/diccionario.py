@@ -493,8 +493,16 @@ def _validar_ficha(
         error_texto = _corto("grano", ficha.grano, "qué es UNA fila de este objeto")
         if error_texto:
             error("R2", error_texto)
-    if es_relacion and not ficha.clave_negocio:
-        error("R2", "falta `clave_negocio`: qué columnas identifican una fila")
+    if es_relacion and not ficha.clave_negocio and ficha.consumo_recomendado:
+        error(
+            "R2",
+            "falta `clave_negocio`: qué columnas identifican una fila. Se admite "
+            "declararla VACÍA cuando el objeto no tiene clave de verdad —una "
+            "vista que no deduplica, por ejemplo— pero solo fuera de la "
+            "superficie de consumo: inventarse una clave es peor que no tenerla, "
+            "y quien consulta un objeto recomendado necesita saber qué "
+            "identifica una fila",
+        )
 
     # --- R3: la puerta trasera cerrada --------------------------------------
     if not ficha.consumo_recomendado:

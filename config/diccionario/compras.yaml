@@ -41,7 +41,10 @@ objetos:
       Una fila por linea de documento. La clave real es el par
       `(tipo_doc, linea_id)` y NO `linea_id` a secas: los identificadores vienen
       de tres tablas distintas de Sigrid (`ctrpro`, `dcapro` y `dcfpro`) que
-      colisionan entre si, y la tabla no tiene clave primaria declarada.
+      colisionan entre si, y la tabla no tiene clave primaria declarada. Con una
+      salvedad: el valor `OTRO` de `tipo_doc` lo pueden producir DOS ramas
+      distintas —una serie desconocida de albaran y otra de factura—, asi que
+      dentro de `OTRO` el par puede volver a repetirse.
     clave_negocio: [tipo_doc, linea_id]
     paso_etl: build_compras
     refresco: manual
@@ -76,9 +79,9 @@ objetos:
       obra_id:
         significado: >-
           Obra a la que se imputa la linea, resuelta en cascada: en el contrato
-          viene de la cabecera; en el albaran, de la propia linea; y en la
-          factura, de la linea, con respaldo en la linea de albaran de origen y
-          luego en el contrato.
+          viene de la cabecera; en el albaran, de la propia linea con respaldo en
+          la obra del contrato; y en la factura, de la linea, con respaldo en la
+          linea de albaran de origen y luego en el contrato.
         nulo_significa: >-
           La linea no se imputa a ninguna obra: es estructura, gastos generales
           o compra de central. **No se pueden perder al agregar**: filtrarlas
@@ -323,9 +326,12 @@ objetos:
       serie: Prefijo alfabetico del codigo (AC, PROF, NTC), de donde sale el tipo.
       tipo_documento:
         significado: >-
-          Que clase de entrega es. Solo ALBARAN y PROFORMA cuentan como
-          pendiente de facturar; la NOTA suma en el consumido pero no en el
-          pendiente.
+          Que clase de entrega es. **La regla de "solo ALBARAN y PROFORMA
+          cuentan como pendiente de facturar" vale en
+          `compras.v_pbi_albaranes_sin_facturar`, que filtra por tipo, y NO vale
+          en `compras.v_pbi_contrato_consumo`**, donde el pendiente se suma sin
+          filtrar y por tanto incluye tambien NOTA y OTRO. En el consumido del
+          contrato la NOTA suma siempre.
         valores: [ALBARAN, PROFORMA, NOTA, OTRO]
       descripcion: Texto libre del documento.
       fecha:
@@ -639,8 +645,9 @@ objetos:
         agregacion: suma
       importe_facturado:
         significado: >-
-          Facturado NETO contra el contrato: las facturas menos los abonos, que
-          ya vienen en negativo.
+          Facturado imputable al contrato. Suma TODAS las lineas de factura que
+          le llegan, sin filtrar tipo, asi que los abonos entran con su signo
+          negativo y el resultado ya es neto.
         unidad: EUR
         agregacion: suma
       importe_facturado_directo:
@@ -651,8 +658,12 @@ objetos:
         agregacion: suma
       importe_albaranado_sin_facturar:
         significado: >-
-          Lo entregado y todavia no facturado. Es la cifra de "que nos van a
-          facturar y aun no ha llegado".
+          Lo entregado y todavia no facturado. OJO, y es la excepcion de este
+          esquema: **aqui el pendiente incluye NOTA y OTRO**, porque es el unico
+          agregado de la vista que se suma SIN filtrar por tipo de documento. Si
+          se quiere el pendiente solo de ALBARAN y PROFORMA hay que ir a
+          `compras.v_pbi_albaranes_sin_facturar`, que si filtra, y las dos
+          cifras pueden no coincidir.
         unidad: EUR
         agregacion: suma
       importe_consumido:
@@ -696,7 +707,7 @@ objetos:
     grano: >-
       Una fila por (obra, proveedor, ano). OJO: el periodo es ANUAL. Para grano
       mensual hay que ir a `compras.fact_compras_linea` y agrupar por la fecha.
-    clave_negocio: [obra_id, proveedor_id, anio]
+    clave_negocio: [obra_id, codigo_obra, proveedor_id, proveedor_nombre, proveedor_cif, anio]
     paso_etl: build_compras
     refresco: manual
     columnas:
@@ -708,8 +719,12 @@ objetos:
         agregacion: no_sumable
       codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
       proveedor_id:
-        significado: Identificador del proveedor.
-        nulo_significa: El documento no tenia proveedor informado.
+        significado: >-
+          Identificador del proveedor. Nunca es nulo aqui, y no porque siempre
+          exista: **la vista filtra `proveedor_id IS NOT NULL`, asi que las
+          lineas sin proveedor no aparecen** y su importe falta en cualquier
+          total que se saque de aqui. Para no perderlas hay que ir a
+          `compras.fact_compras_linea`.
         agregacion: no_sumable
       proveedor_nombre: Nombre del proveedor, de `con.res`.
       proveedor_cif:
@@ -724,18 +739,25 @@ objetos:
           del "quien nos ha facturado mas".
         unidad: EUR
         agregacion: suma
+        nulo_significa: >-
+          NO hubo facturas de ese proveedor en esa obra y ese ano. Es NULO y no
+          cero, porque la suma no lleva `COALESCE`: un `WHERE facturado > 0`
+          descarta estas filas en silencio.
       albaranado:
         significado: Entregado con albaran en el ano, sin IVA.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hubo albaranes en esa combinacion. Nulo, no cero.
       certificado_proforma:
         significado: Certificado por proforma en el ano, sin IVA.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hubo proformas en esa combinacion. Nulo, no cero.
       contratado:
         significado: Contratado en el ano, sin IVA.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hubo contratos en esa combinacion. Nulo, no cero.
       num_facturas:
         significado: >-
           Cuantos documentos de factura o abono distintos hay detras. NO SE
@@ -835,8 +857,10 @@ objetos:
         agregacion: suma
       importe_pendiente_facturar:
         significado: >-
-          Lo que queda por facturar de la linea. NEGATIVO significa que se
-          facturo de mas, y el signo se conserva a proposito.
+          Lo que queda por facturar de la linea. Aqui SIEMPRE es positivo: la
+          vista filtra `> 0`, asi que las lineas sobrefacturadas **no aparecen**.
+          Para verlas hay que ir a `compras.albaran_lineas`, donde el pendiente
+          conserva su signo negativo.
         unidad: EUR
         agregacion: suma
       dias_desde_albaran:
@@ -869,7 +893,7 @@ objetos:
       Una fila por (obra, partida). Solo entran las lineas que tienen partida
       informada: lo que no se imputa a partida no aparece aqui, asi que el total
       de esta vista es MENOR que el de `compras.fact_compras_linea`.
-    clave_negocio: [obra_id, partida_id]
+    clave_negocio: [obra_id, codigo_obra, partida_id, codigo_partida, descripcion_partida]
     paso_etl: build_compras
     refresco: manual
     columnas:
@@ -895,19 +919,24 @@ objetos:
         significado: Entregado con albaran en esa partida, sin IVA.
         unidad: EUR
         agregacion: suma
+        nulo_significa: >-
+          No hubo albaranes en esa partida. Es NULO y no cero, porque la suma no
+          lleva `COALESCE`: un `WHERE albaranado > 0` descarta estas filas.
       certificado_proforma:
         significado: Certificado por proforma en esa partida, sin IVA.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hubo proformas en esa partida. Nulo, no cero.
       facturado:
-        significado: >-
-          Facturado NETO en esa partida: facturas menos abonos, sin IVA.
+        significado: Facturado NETO en esa partida, facturas menos abonos, sin IVA.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hubo facturas en esa partida. Nulo, no cero.
       contratado:
         significado: Contratado en esa partida, sin IVA.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hubo contratos en esa partida. Nulo, no cero.
       num_lineas_albaran:
         significado: Cuantas lineas de entrega hay detras de la cifra.
         agregacion: suma
@@ -959,9 +988,11 @@ objetos:
       Funcion auxiliar del build de compras, usada solo dentro del SQL que
       construye el esquema.
     descripcion: >-
-      Extrae el prefijo alfabetico del codigo de un documento de Sigrid y lo
-      pasa a mayusculas: de "AC-2025-0123" saca "AC". Es lo que permite
-      distinguir un albaran de una proforma sin mirar nada mas.
+      Extrae el prefijo alfabetico inicial del codigo de un documento de Sigrid
+      y lo pasa a mayusculas: de un codigo que empieza por "AC" saca "AC". Si el
+      codigo no empieza por letras devuelve **cadena vacia, no nulo**, que es lo
+      que hace que `compras.fn_tipo_documento` acabe clasificandolo como OTRO en
+      vez de dejarlo sin tipo.
     grano: null
     clave_negocio: []
     paso_etl: build_compras

@@ -1456,3 +1456,140 @@ def test_f006_r2_la_clave_de_negocio_casa_con_la_pk_declarada(nombre: str) -> No
     assert set(ficha.clave_negocio) == set(pk), (
         f"la PK del DDL es {pk} y la ficha declara {list(ficha.clave_negocio)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Las mentiras de contenido que ninguna comprobacion derivable caza
+#
+# Cada una se verifico contra el SQL antes de escribirla. Son las que quedan en
+# revision humana, y por eso llevan test: para que no vuelvan.
+# ---------------------------------------------------------------------------
+
+
+def _columna(nombre_objeto: str, columna: str):
+    return {c.nombre: c for c in _diccionario().por_nombre[nombre_objeto].columnas}[
+        columna
+    ]
+
+
+def test_f006_r2_la_regla_de_la_nota_se_acota_a_donde_es_cierta() -> None:
+    """Era una regla general y es FALSA en una de las dos vistas.
+
+    En `v_pbi_albaranes_sin_facturar` el filtro por tipo existe; en
+    `v_pbi_contrato_consumo`, `SUM(pendiente_facturar)` es el unico agregado de
+    su CTE **sin `FILTER`**, asi que ahi el pendiente SI incluye NOTA y OTRO.
+    Una regla falsa es peor que ninguna: el agente la aplica con confianza.
+    """
+    sql = (DIR_SQL / "compras/03_views.sql").read_text(encoding="utf-8")
+    assert "SUM(pendiente_facturar)                                 AS pendiente_facturar" in sql, (
+        "si algun dia le ponen FILTER, estas dos fichas hay que reescribirlas"
+    )
+
+    tipo = _columna("compras.albaranes", "tipo_documento").significado
+    assert "v_pbi_albaranes_sin_facturar" in tipo, "hay que decir DONDE es cierta"
+
+    pendiente = _columna(
+        "compras.v_pbi_contrato_consumo", "importe_albaranado_sin_facturar"
+    ).significado
+    assert "NOTA" in pendiente, "y decir donde NO lo es"
+
+
+def test_f006_r2_la_vista_de_sin_facturar_no_anuncia_negativos() -> None:
+    """Filtra `> 0`: ahi no hay sobrefacturacion que ver."""
+    sql = (DIR_SQL / "compras/03_views.sql").read_text(encoding="utf-8")
+    assert "WHERE l.importe_pendiente_facturar > 0" in sql
+
+    texto = _columna(
+        "compras.v_pbi_albaranes_sin_facturar", "importe_pendiente_facturar"
+    ).significado
+    assert "NEGATIVO significa" not in texto
+    assert "albaran_lineas" in texto, "hay que decir donde SI se ven los negativos"
+
+    # Y en la tabla de origen sigue siendo cierto, que es de donde se copio mal.
+    origen = _columna("compras.albaran_lineas", "importe_pendiente_facturar")
+    assert "NEGATIVO" in origen.significado
+
+
+def test_f006_r2_las_dos_vistas_fuente_de_retenciones_no_declaran_clave_falsa() -> None:
+    """Su grano es «una fila por linea»: el par (docide, obride) se repite.
+
+    Y es justo el par que produce el fan-out de `R-RETENCION-NO-JOIN-LINEAS`,
+    ofrecido como clave de negocio.
+    """
+    for objeto in ("v_src_lineas_compra", "v_src_lineas_venta"):
+        ficha = _diccionario().por_nombre[f"retenciones.{objeto}"]
+        assert list(ficha.clave_negocio) != ["docide", "obride"], objeto
+        assert "linea" in ficha.grano.lower(), objeto
+
+
+def test_f006_r2_la_clave_de_proveedor_obra_es_la_del_group_by() -> None:
+    """`proveedor_cif` NO depende de `proveedor_id`: sale del CIF del documento.
+
+    Dos facturas del mismo proveedor con CIF distinto dan dos filas para la
+    clave corta, y quien una por ella duplica.
+    """
+    ficha = _diccionario().por_nombre["compras.v_pbi_proveedor_obra"]
+
+    assert set(ficha.clave_negocio) == {
+        "obra_id", "codigo_obra", "proveedor_id", "proveedor_nombre",
+        "proveedor_cif", "anio",
+    }
+
+
+def test_f006_r2_los_filtros_que_pierden_filas_se_declaran() -> None:
+    """`WHERE proveedor_id IS NOT NULL` y `WHERE retide <> 0` sacan filas.
+
+    Un `nulo_significa` sobre una columna que el propio filtro impide es peor
+    que no decir nada: manda a escribir un `IS NULL` que siempre sale vacio, y
+    ademas esconde que hay filas que no estan.
+    """
+    proveedor = _columna("compras.v_pbi_proveedor_obra", "proveedor_id")
+    assert proveedor.nulo_significa is None
+    assert "no aparecen" in proveedor.significado or "quedan fuera" in (
+        proveedor.significado
+    )
+
+    tipo = _columna("retenciones.movimientos", "tipo_id")
+    assert tipo.nulo_significa is None
+    assert "retide" in tipo.significado or "sin tipo" in tipo.significado
+
+
+@pytest.mark.parametrize(
+    ("objeto", "columnas"),
+    [
+        ("compras.v_pbi_proveedor_obra",
+         ["facturado", "albaranado", "certificado_proforma", "contratado"]),
+        ("compras.v_pbi_partida_coste",
+         ["albaranado", "certificado_proforma", "facturado", "contratado"]),
+    ],
+)
+def test_f006_r2_las_medidas_sin_coalesce_declaran_su_nulo(
+    objeto: str, columnas: list[str]
+) -> None:
+    """`SUM(...) FILTER (...)` sin `COALESCE` devuelve NULL, no 0.
+
+    El contraste lo delata: `v_pbi_contrato_consumo` SI envuelve en
+    `COALESCE(...,0)` y por eso alli no hace falta. Un `WHERE facturado > 0`
+    sobre estas dos pierde filas en silencio.
+    """
+    for columna in columnas:
+        assert _columna(objeto, columna).nulo_significa, f"{objeto}.{columna}"
+
+
+def test_f006_r2_lo_vencido_se_congela_en_el_build_y_se_dice() -> None:
+    """`CURRENT_DATE` se evalua al construir la tabla, no al consultarla.
+
+    `movimientos` es un `CREATE TABLE AS`: en un esquema de refresco manual cuya
+    frescura ni siquiera es consultable por SQL, la lista de vencidas puede
+    llevar semanas parada y nadie puede saber cuanto.
+    """
+    sql = (DIR_SQL / "retenciones/01_movimientos.sql").read_text(encoding="utf-8")
+    assert "CURRENT_DATE" in sql and "CREATE TABLE retenciones.movimientos AS" in sql
+
+    for objeto, columna in (
+        ("retenciones.movimientos", "vencida_sin_liquidar"),
+        ("retenciones.movimientos", "dias_desde_vencimiento"),
+    ):
+        texto = _columna(objeto, columna).significado
+        assert "build" in texto.lower(), f"{objeto}.{columna}"
+        assert "fecha_prevista_devolucion" in texto, f"{objeto}.{columna}"

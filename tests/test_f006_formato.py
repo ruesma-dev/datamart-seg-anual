@@ -1750,3 +1750,45 @@ def test_f006_r5_ninguna_clave_de_join_real_esta_inventada() -> None:
     ]
 
     assert errores == [], "\n" + formatear_errores(errores)
+
+
+# ===========================================================================
+# R2 · Un objeto puede NO tener clave de negocio, y decirlo
+#
+# `retenciones.v_src_lineas_compra` es `SELECT docide, obride FROM raw.dcfpro`:
+# una fila por linea, sin deduplicar. NO tiene clave de negocio, y la que traia
+# —el par entero— era precisamente el que produce el fan-out que el fichero
+# declara como la regla que mas dinero ha costado.
+#
+# Exigir una clave siempre obliga a inventarsela, que es peor que no tenerla. Se
+# admite declararla vacia, pero **solo fuera de la superficie de consumo**: si
+# un objeto se recomienda para consultar, quien lo consulte necesita saber que
+# identifica una fila, y R3 ya obliga a escribir el motivo de no recomendarlo.
+# ===========================================================================
+
+
+def test_f006_r2_fuera_del_consumo_se_admite_no_tener_clave() -> None:
+    sin_clave = _ficha(
+        consumo_recomendado=False,
+        motivo_no_consumo="Vista interna del build; no deduplica y no tiene clave.",
+        clave_negocio=(),
+        ejemplos_preguntas=(),
+    )
+
+    assert validar(_dicc(fichas=[sin_clave]), PASOS_NOCTURNOS) == []
+
+
+def test_f006_r2_dentro_del_consumo_la_clave_sigue_siendo_obligatoria() -> None:
+    errores = validar(_dicc(fichas=[_ficha(clave_negocio=())]), PASOS_NOCTURNOS)
+
+    assert errores
+    assert any("clave_negocio" in e.detalle for e in errores)
+
+
+def test_f006_r2_las_dos_vistas_fuente_declaran_que_no_tienen_clave() -> None:
+    """Sobre el diccionario REAL: preferir el hueco a la clave inventada."""
+    for objeto in ("v_src_lineas_compra", "v_src_lineas_venta"):
+        ficha = _global_real().por_nombre[f"retenciones.{objeto}"]
+
+        assert ficha.clave_negocio == ()
+        assert ficha.consumo_recomendado is False

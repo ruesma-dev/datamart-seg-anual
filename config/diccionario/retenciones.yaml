@@ -68,8 +68,10 @@ objetos:
       tipo_id:
         significado: >-
           Tipo de retencion aplicado. En Ruesma el 97 % de los efectos son de un
-          solo tipo, la retencion de garantia estandar.
-        nulo_significa: El efecto no tiene tipo informado.
+          solo tipo, la retencion de garantia estandar. Nunca es nulo: **la tabla
+          se construye filtrando `retide <> 0`**, asi que un efecto sin tipo no
+          es una retencion y no entra. Buscar `WHERE tipo_id IS NULL` devuelve
+          cero filas siempre.
         agregacion: no_sumable
       tipo_descripcion:
         significado: Nombre del tipo de retencion, ya resuelto para no tener que unir.
@@ -118,7 +120,10 @@ objetos:
         significado: >-
           Entre cuantas obras reparte el documento origen. Mayor que 1 con
           `obra_id` nulo es la marca de "esta factura toca varias obras y la
-          retencion no se ha repartido".
+          retencion no se ha repartido". OJO: en sentido CLIENTE vale **siempre
+          0**, porque se alimenta de `retenciones.v_src_lineas_venta`, que esta
+          vacia; ahi no explica nada y una obra vacia solo significa que el
+          efecto no tenia centro de coste.
         agregacion: no_sumable
       importe:
         significado: >-
@@ -144,13 +149,17 @@ objetos:
         valores: [VIVA, LIQUIDADA]
       vencida_sin_liquidar:
         significado: >-
-          Marca los efectos que siguen vivos y cuya fecha prevista ya paso. En
-          sentido CLIENTE es dinero que hay que reclamar; en PROVEEDOR, dinero
-          que habria que haber liberado.
+          Marca los efectos que seguian vivos y cuya fecha prevista ya habia
+          pasado **EN EL MOMENTO DEL BUILD**, no hoy: la tabla se materializa y
+          la comparacion contra la fecha actual se congela ahi. En un esquema de
+          refresco manual cuya fecha de build ni siquiera es consultable por SQL,
+          esta lista puede llevar semanas parada. Para el vencimiento a dia de
+          hoy hay que recalcularlo sobre `fecha_prevista_devolucion`.
       dias_desde_vencimiento:
         significado: >-
-          Dias transcurridos desde la fecha prevista. Negativo significa que
-          todavia no ha vencido.
+          Dias transcurridos desde la fecha prevista **hasta el dia del build**,
+          no hasta hoy. Negativo significa que aun no habia vencido entonces.
+          Para los dias reales se recalcula sobre `fecha_prevista_devolucion`.
         agregacion: no_sumable
         nulo_significa: El efecto no tiene fecha de vencimiento con la que contar.
 
@@ -169,10 +178,12 @@ objetos:
         a: compras.facturas.factura_id
         cardinalidad: "N:1"
         porque: >-
-          Para llegar a la factura de compra de la que nace la retencion. NUNCA
-          se sigue hasta `compras.factura_lineas` sin agregar antes por
-          `documento_id`: hacerlo multiplica el importe retenido por el numero
-          de lineas de la factura, y es el error que dio 38,9 M€ en una obra.
+          Para llegar a la factura de compra de la que nace la retencion. Solo
+          casa en sentido PROVEEDOR: las de CLIENTE nacen de facturas de venta,
+          que no se ingieren. Y NUNCA se sigue hasta `compras.factura_lineas` sin
+          agregar antes por `documento_id`: hacerlo multiplica el importe
+          retenido por el numero de lineas de la factura, y es el error que dio
+          38,9 M€ en una obra.
 
     ejemplos_preguntas:
       - Que retenciones tengo de los proveedores de la obra X
@@ -612,15 +623,18 @@ objetos:
       neto_practicado:
         significado: >-
           Suma de todos los efectos con su signo, vivos y liquidados. NO es el
-          saldo vivo y no hay que compararlos entre si.
+          saldo vivo, y compararlos SI tiene sentido: que diverjan es el
+          diagnostico de que hay ajustes o devoluciones registradas como efectos
+          negativos. Lo que no vale es usar una por la otra.
         unidad: EUR
         agregacion: suma
       sin_obra_asignada:
         significado: >-
-          Cuantos efectos no se pudieron atribuir a ninguna obra. Es la
-          diferencia entre este resumen y la suma de
-          `retenciones.v_pbi_retencion_obra`, y por eso conviene citarlo cuando
-          se den totales por obra.
+          CUANTOS efectos no se pudieron atribuir a ninguna obra. Es un
+          recuento, no un importe: sirve para saber que falta gente en el reparto
+          por obra, pero NO cuadra euros contra
+          `retenciones.v_pbi_retencion_obra`. Conviene citarlo cuando se den
+          totales por obra, precisamente para decir que no suman el total.
         agregacion: suma
     relaciones: []
     ejemplos_preguntas:
@@ -640,8 +654,13 @@ objetos:
       usan como respaldo para atribuir a obra una retencion de proveedor. Se
       crea de dos formas segun exista o no `raw.dcfpro`; en Ruesma esa tabla SI
       se ingiere, asi que el respaldo esta activo.
-    grano: Una fila por linea de factura de compra, con solo dos columnas.
-    clave_negocio: [docide, obride]
+    grano: >-
+      Una fila por LINEA de factura de compra, no por factura: el par
+      (documento, obra) se repite tantas veces como lineas tenga esa factura
+      contra esa obra. Es exactamente el par que produce el fan-out de
+      `R-RETENCION-NO-JOIN-LINEAS`, y por eso esta vista se agrega SIEMPRE por
+      documento antes de usarse.
+    clave_negocio: []
     paso_etl: build_retenciones
     refresco: manual
     columnas:
@@ -668,8 +687,11 @@ objetos:
       que no se ingiere, asi que el SQL crea la variante sin filas. La
       consecuencia practica es que una retencion de CLIENTE solo se puede
       atribuir a obra por su centro de coste, sin el respaldo de las lineas.
-    grano: Ninguna fila, hoy. Tendria una por linea de factura de venta.
-    clave_negocio: [docide, obride]
+    grano: >-
+      Ninguna fila, hoy. Tendria una por LINEA de factura de venta, no por
+      factura: el par (documento, obra) se repetiria por cada linea, igual que en
+      su gemela de compras.
+    clave_negocio: []
     paso_etl: build_retenciones
     refresco: manual
     columnas:
