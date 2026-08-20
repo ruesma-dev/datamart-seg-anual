@@ -720,3 +720,27 @@ respuestas de la bateria buscando cualquier `esquema.objeto` de los nueve
 esquemas y exigen que exista en el inventario. Es la misma clase de defensa que
 R11 aplicaba al `ambito`, extendida a la prosa, que es la parte que el agente
 lee de verdad.
+
+## Defecto 7 · `R-CLAVE-SUSTITUTA` marcaba como inestable una clave estable
+
+```
+$ python -m pytest tests/test_f006_reglas.py -q -k "reconstruye or control_del_detector"
+E       AssertionError: ['aux.periodificacion_partida'] no se reconstruyen en ningún build: su clave es estable y la regla miente al meterlos en su ámbito
+tests\test_f006_reglas.py:706: AssertionError
+1 failed, 1 passed, 59 deselected in 0.46s
+```
+
+`sql/mart/04_view_periodificado.sql:14` crea esa tabla con `CREATE TABLE IF NOT
+EXISTS` y ningun build la reconstruye: `regla_id` es estable.
+
+Corregido en los dos sitios: sale del ambito de la regla, y **la regla declara
+la excepcion explicitamente** en vez de callarla, para que quien lea el listado
+de claves BIGSERIAL no la aplique de mas. La ficha de
+`mart.v_fact_periodificado.regla_id_aplicada` tambien lo dice.
+
+**Endurecimiento**: un test comprueba que **todo objeto del ambito de esa regla
+se reconstruye de verdad**, buscando su `DROP`, su `TRUNCATE` o su
+`truncate_table(...)` en el SQL y en los steps. Y lleva su propio test de
+control —`mart.fact_seguimiento_mensual` True, `stg.plan_mensual` True (se
+trunca desde Python, no desde SQL), `aux.periodificacion_partida` False—, porque
+un detector que devolviera siempre `True` haria pasar el test en falso.

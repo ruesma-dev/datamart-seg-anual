@@ -154,16 +154,19 @@ reglas:
       - mart.v_pbi_fact_categoria
       - stg.plan_mensual
       - cierre.fact_cierre_mensual
-      - aux.periodificacion_partida
     regla: >-
-      `fact_id`, `fact_cat_id`, `plan_id`, `cierre_id` y `regla_id` son
-      BIGSERIAL: se reasignan enteros en cada reconstruccion. No sirven como
-      identificador estable, no se guardan fuera del datamart y no se le
-      enseñan al usuario. Para identificar algo se usa su clave de negocio.
+      `fact_id`, `fact_cat_id`, `plan_id` y `cierre_id` son BIGSERIAL sobre
+      tablas que se reconstruyen enteras en cada build: se reasignan. No sirven
+      como identificador estable, no se guardan fuera del datamart y no se le
+      ensenan al usuario. Para identificar algo se usa su clave de negocio.
+      EXCEPCION: `aux.periodificacion_partida.regla_id` tambien es BIGSERIAL
+      pero su tabla se crea con `CREATE TABLE IF NOT EXISTS` y nadie la
+      reconstruye, asi que ese si es estable.
     motivo: >-
-      Las tablas se recrean con DROP + CREATE en cada build (`sql/mart/01_ddl.sql`,
-      `sql/cierre/01_ddl_fact.sql`). Un `fact_id` citado en un informe de ayer
-      apunta hoy a otra fila.
+      Las tablas afectadas se recrean con DROP + CREATE o se truncan en cada
+      build (`sql/mart/01_ddl.sql`, `sql/cierre/01_ddl_fact.sql`, y
+      `stg.plan_mensual` desde el propio paso). Un `fact_id` citado en un
+      informe de ayer apunta hoy a otra fila.
 
   - codigo: R-ABONO-NEGATIVO
     titulo: En compras los abonos ya entran con signo negativo

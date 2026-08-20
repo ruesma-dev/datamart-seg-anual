@@ -652,3 +652,65 @@ def test_f006_r16_frescura_manual_cita_la_vista_que_si_existe_hoy() -> None:
         "esa vista la crea el bloque E; hasta entonces la regla mandaría ejecutar "
         "una consulta que revienta"
     )
+
+
+# ===========================================================================
+# R-CLAVE-SUSTITUTA solo vale para lo que se reconstruye (defecto 7)
+#
+# La regla metia `aux.periodificacion_partida` en su ambito y declaraba
+# `regla_id` entre las claves que «se reasignan enteras en cada build», con el
+# motivo «las tablas se recrean con DROP + CREATE». Esa tabla se crea con
+# `CREATE TABLE IF NOT EXISTS` y ningun build la reconstruye: `regla_id` es
+# ESTABLE. El error es conservador —no produce numeros falsos— pero es un dato
+# falso dentro de una regla dura, y las reglas duras se respetan por ser
+# exactas.
+#
+# Comprobable: un objeto cuya clave se reasigna tiene que aparecer en algun
+# `DROP`, `TRUNCATE` o `truncate_table(...)` del repositorio.
+# ===========================================================================
+
+
+def _se_reconstruye(nombre: str) -> bool:
+    from pathlib import Path
+
+    esquema, objeto = nombre.split(".", 1)
+    raiz = Path(__file__).resolve().parents[1]
+    fuentes = [
+        *(raiz / "etl_sigrid" / "infrastructure" / "postgres" / "sql").rglob("*.sql"),
+        *(raiz / "etl_sigrid" / "application" / "steps").rglob("*.py"),
+    ]
+    patrones = (
+        re.compile(rf"DROP\s+(TABLE|VIEW|MATERIALIZED\s+VIEW)[^\n;]*\b{esquema}\.{objeto}\b",
+                   re.IGNORECASE),
+        re.compile(rf"TRUNCATE[^\n;]*\b{esquema}\.{objeto}\b", re.IGNORECASE),
+        re.compile(rf"truncate_table\(\s*[\"']{esquema}[\"']\s*,\s*[\"']{objeto}[\"']"),
+    )
+    for fuente in fuentes:
+        texto = fuente.read_text(encoding="utf-8")
+        if any(p.search(texto) for p in patrones):
+            return True
+    return False
+
+
+def test_f006_r9_el_ambito_de_clave_sustituta_solo_lleva_lo_que_se_reconstruye() -> None:
+    regla = next(
+        r for r in _diccionario_real().reglas if r.codigo == "R-CLAVE-SUSTITUTA"
+    )
+
+    estables = [
+        destino
+        for destino in regla.ambito
+        if "." in destino and not _se_reconstruye(destino)
+    ]
+
+    assert not estables, (
+        f"{estables} no se reconstruyen en ningún build: su clave es estable y la "
+        f"regla miente al meterlos en su ámbito"
+    )
+
+
+def test_f006_r9_el_control_del_detector_de_reconstruccion() -> None:
+    """Si el detector diera siempre True, el test de arriba pasaría en falso."""
+    assert _se_reconstruye("mart.fact_seguimiento_mensual") is True
+    assert _se_reconstruye("stg.plan_mensual") is True, "se trunca desde Python"
+    assert _se_reconstruye("aux.periodificacion_partida") is False

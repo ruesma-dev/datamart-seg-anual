@@ -1005,7 +1005,11 @@ objetos:
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
       regla_id_aplicada:
-        significado: Regla de `aux.periodificacion_partida` que se aplico a la fila.
+        significado: >-
+          Regla de `aux.periodificacion_partida` que se aplico a la fila. Al
+          contrario que el resto de claves BIGSERIAL del datamart, esta SI es
+          estable: su tabla se crea con `CREATE TABLE IF NOT EXISTS` y ningun
+          build la reconstruye.
         nulo_significa: No se aplico ninguna regla; la fila pasa tal cual.
         agregacion: no_sumable
       marca:
