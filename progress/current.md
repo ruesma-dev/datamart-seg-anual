@@ -82,6 +82,50 @@ incorporar mil setecientas.
 
 ---
 
+# F-011 CERRADA · 2026-08-20 · midió, y la medición dijo que no
+
+**Reviewer en APROBADO** (`progress/review_F-011_cierre.md`). Si este fichero
+dice más abajo que «falta la firma del humano», está caducado: la firma se dio
+hoy y está en `progress/medicion_F-011.md` §6.2.
+
+**Cierra con el bloque A entregado y el bloque B descartado por su propia
+puerta.** No es un abandono: la spec definía dos destinos y R8/DA-4/DA-7
+escribieron la rama del NO **antes** de medir.
+
+| Criterio de DA-7 | Umbral | Medido |
+|---|---|---|
+| Ahorro de la ingesta incremental | ≥ 20 min | **2,25 min** |
+| Peso de la ingesta en la carga | ≥ 40 % | **19,9 %** |
+
+**El motivo de fondo, que pesa más que los números**: la marca de modificación
+**no existe** en las 24 tablas que se llevan el 93 % de la ingesta. El reviewer
+lo corroboró contra el diccionario de Sigrid: la ficha de `obrparpre` lista sus
+22 columnas y ninguna es de modificación.
+
+**Dónde está el tiempo de verdad**: `build_stg`, **110,7 min, el 67,0 %**. Eso
+es **F-025**, que pasa a ser lo siguiente.
+
+**No reabrir «solo altas» sin leer D12.** Sí llegaría al umbral y serviría un
+plan viejo en silencio, porque `obrparpre.planif` se edita sin crear filas.
+
+## Lo que queda de F-011, todo MANUAL y nada bloqueante
+
+| Tarea | Qué es | Comando |
+|---|---|---|
+| **T7** | mediciones complementarias | las de `specs/F-011-carga-incremental/tasks.md` T7; el grueso ya está en `medicion_F-011.md` |
+| **T8-bis** | avisar al dueño de `sigrid-api` de lo medido sobre paginación y tiempos | conversación, no comando |
+
+## Y una advertencia de entorno para la próxima sesión
+
+**Desde el puesto no se puede leer la base** (ver **D11**): la IP pública rota
+cada pocos minutos y cambia de bloque entero — tres distintas en una hora el
+2026-08-20. Las reglas de firewall no aguantan; ya hay cuatro acumuladas e
+inútiles. Para comprobar la nocturna hace falta otra vía, y la más barata es
+Cloud Shell, que entra por la regla `AllowAzureServices` sin tocar el firewall
+compartido. **El job nocturno no está afectado**: corre dentro de Azure.
+
+---
+
 # F-023 · las tres verificaciones de F-004, CUMPLIDAS (2026-08-19)
 
 Lo pide **T27 de F-003**: el resultado de cada verificación MANUAL, aquí. El

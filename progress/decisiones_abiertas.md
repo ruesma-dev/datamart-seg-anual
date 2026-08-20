@@ -442,6 +442,42 @@ Azure con su propia regla y sigue cargando cada noche.
 
 ---
 
+## D12 · CERRADA (2026-08-20) · La ingesta incremental por watermark se descarta — de F-011, afecta a F-025
+
+Se clava **aquí** y no solo en los documentos de F-011 porque una feature
+cerrada deja de leerse, y esta decisión hay que recordarla cuando alguien
+proponga otra vez «cargar solo lo que cambió».
+
+**Qué se descartó**: la ingesta incremental por marca de modificación (bloque B
+de F-011, tareas T10–T19). Firmado por el humano el 2026-08-20.
+
+**Por qué, en un dato**: la marca de modificación **no existe** en las 24 tablas
+que se llevan el **93 % del tiempo de ingesta**. Solo 7 de 31 la tienen, y esas
+7 suman **2,25 min** de una carga de 165. El umbral de DA-7 eran 20 min, o que
+la ingesta pesara el 40 % del total: pesa el **19,9 %**. Verificado además
+contra el diccionario de Sigrid en `azure-apps/sigrid_tablas.md`, donde la ficha
+de `obrparpre` lista sus 22 columnas y **ninguna es de modificación**.
+
+**Lo que hay que recordar si alguien lo propone de nuevo**, que es la trampa de
+verdad:
+
+> El cursor por «solo altas» **sí** llegaría al umbral: traería 1.688 filas en
+> vez de 20 M. Y **serviría un plan viejo en silencio**. `obrparpre` guarda la
+> cadena `planif` de cada partida, que se **edita** constantemente sin crear
+> filas nuevas; `build_stg` la lee y hay un parser que alimenta
+> `stg.plan_mensual` con ella. Una noche de solo altas dejaría el seguimiento
+> con la planificación de ayer y **nadie se enteraría**: no hay error, no hay
+> aviso, solo un número que ya no es verdad.
+
+Solo se reabre si Negocio acepta **por escrito** esa pérdida, o si Sigrid añade
+marca de modificación a las tablas que cuestan.
+
+**Dónde va el esfuerzo en su lugar**: `build_stg`, **110,7 min, el 67,0 %** de
+la carga. Eso es **F-025**, y DA-5 ya le había dado prioridad sobre el bloque B
+«si los números lo confirman». Lo confirman.
+
+---
+
 ## Decisiones ya cerradas
 
 - **2026-08-08 · Backlog priorizado.** Aprobado el orden F-001, F-004, F-005,

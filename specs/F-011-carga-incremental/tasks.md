@@ -60,7 +60,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       comando `diagnostico-tiemod [--out] [--comparar-con]` a `main.py`.
       **Verificación**: `pytest tests/test_f011_cli.py -k tiemod -q`.
 
-- [ ] **T7 · MANUAL (humano)** · PARCIAL: ejecutar las mediciones reales.
+- [ ] **T7 · MANUAL (humano) · SIGUE PENDIENTE** · PARCIAL: ejecutar las mediciones reales.
       **Hecho lo que se podía sin escribir en Azure** (2026-08-20): el
       desglose por paso y por tabla de TRES cargas completas, leído de los
       logs del job, y el veredicto de `tiemod` contra el catálogo de
@@ -104,7 +104,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       a 20 min, y peso de la ingesta frente al 40 % del total. Inspección del
       reviewer.
 
-- [ ] **T8-bis · MANUAL (humano)**: avisar al **dueño de `sigrid-api`** de que
+- [ ] **T8-bis · MANUAL (humano) · SIGUE PENDIENTE**: avisar al **dueño de `sigrid-api`** de que
       `azure-apps/sigrid_api.md` documenta `MAX_ALLOWED_ROWS = 1000` cuando el
       cap real son **20.000** (dato del humano, 2026-08-18), y pasarle de paso
       lo que mida R5-bis sobre el timeout (documentado 120 s, en uso 230 s).
@@ -116,7 +116,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       comprueba que **no hay ningún cambio en `azure-apps/`** en la rama
       (`git -C ../azure-apps status --porcelain` limpio).
 
-- [ ] **T9 · PARADA · MANUAL (humano)**: el humano lee T8 y decide SÍ o NO
+- [x] **T9 (2026-08-20, FIRMADA: NO al bloque B) · PARADA · MANUAL (humano)**: el humano lee T8 y decide SÍ o NO
       sobre el bloque B, contra el umbral de DA-7.
       Las decisiones DA-2 a DA-7 **ya están cerradas** (2026-08-18,
       `requirements.md` § «Decisiones cerradas»), y DA-1 salió a F-025: en esta
@@ -129,7 +129,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
 
 ## Bloque B · Ingesta incremental (solo si T9 dice que sí)
 
-- [ ] **T10**: Crear `etl_sigrid/domain/carga_incremental.py` con
+- [~] **T10 · DESCARTADA (puerta de R8, 2026-08-20)**: Crear `etl_sigrid/domain/carga_incremental.py` con
       `ModoCarga`, `decidir_modo_de_carga` y `decidir_modo_de_tabla`. Tests
       exhaustivos primero (es la pieza que la campaña de mutación va a morder).
       `decidir_modo_de_carga` recibe **`dia_semana_full`** además de
@@ -141,7 +141,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       previa) + `python -m harness.mutacion --feature F-011` sin
       supervivientes en este módulo.
 
-- [ ] **T11**: Crear `etl_sigrid/infrastructure/postgres/sql/ddl/01_watermark.sql`
+- [~] **T11 · DESCARTADA (puerta de R8, 2026-08-20)**: Crear `etl_sigrid/infrastructure/postgres/sql/ddl/01_watermark.sql`
       (tabla `_meta.ingesta_watermark` idempotente + ampliación **aditiva** de
       `_meta.v_raw_state`) y hacer que `_bootstrap_schemas_and_meta` ejecute
       todos los `sql/ddl/*.sql` en orden en lugar del `00_meta.sql` fijo.
@@ -149,13 +149,13 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       el test lee el `.sql`, comprueba `IF NOT EXISTS`, que la vista conserva
       sus columnas actuales en el mismo orden y que no hay bloques `$$`.
 
-- [ ] **T12**: Añadir a `postgres_client.py` `leer_watermark()`,
+- [~] **T12 · DESCARTADA (puerta de R8, 2026-08-20)**: Añadir a `postgres_client.py` `leer_watermark()`,
       `actualizar_watermark(...)` y el parámetro opcional `metadata` de
       `record_run_end(...)`.
       **Verificación**: `pytest tests/test_f011_ingesta.py -k metadata -q`
       (R10), con conexión mockeada.
 
-- [ ] **T13**: Añadir `IngestaSettings` (prefijo `INGESTA_`) a
+- [~] **T13 · DESCARTADA (puerta de R8, 2026-08-20)**: Añadir `IngestaSettings` (prefijo `INGESTA_`) a
       `config/settings.py` con los **cuatro** valores por defecto que
       reproducen el comportamiento actual: `modo="full"`, `full_cada_dias=7`,
       **`full_dia_semana=6` (domingo, DA-2)** y `deriva_max_filas=0`. El día de
@@ -164,33 +164,33 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       sin variables de entorno, la composición del pipeline y el modo de
       ingesta son idénticos a los de hoy.
 
-- [ ] **T14**: Añadir `desde_tiemod` a `SigridApiClient.stream_table` y el
+- [~] **T14 · DESCARTADA (puerta de R8, 2026-08-20)**: Añadir `desde_tiemod` a `SigridApiClient.stream_table` y el
       método `count_rows(source_table, where=None)`. La paginación keyset por
       `ide` **no cambia**: `tiemod` solo entra en el `WHERE`.
       **Verificación**: `pytest tests/test_f011_bench.py -k sql_generado -q` —
       comprueba el SQL emitido carácter a carácter y que sigue siendo un
       `SELECT` (R23).
 
-- [ ] **T15**: Reescribir el bucle de `ingest_raw_step.py`: modo global desde
+- [~] **T15 · DESCARTADA (puerta de R8, 2026-08-20)**: Reescribir el bucle de `ingest_raw_step.py`: modo global desde
       el watermark, fila en `_meta.etl_runs` para **todas** las tablas
       declaradas (R9), modo por tabla desde el dominio, `metadata` de R10,
       actualización del watermark.
       **Verificación**: `pytest tests/test_f011_ingesta.py -q` (R9, R10, R15,
       R17) con `SigridApiClient` y `PostgresClient` mockeados.
 
-- [ ] **T16**: Añadir `--solo-altas` a `ingest` y la negativa de R16 y R19 en
+- [~] **T16 · DESCARTADA (puerta de R8, 2026-08-20)**: Añadir `--solo-altas` a `ingest` y la negativa de R16 y R19 en
       `main.py`. `run-all` **no** recibe vía de escape nueva.
       **Verificación**: `pytest tests/test_f011_cli.py -q` (R16, R19) —
       incluye un test de que `run-all` no expone ninguna opción para saltarse
       el modo, en la línea del test equivalente de F-024.
 
-- [ ] **T17**: Tests de no regresión de la puerta de F-024 con escenarios de
+- [~] **T17 · DESCARTADA (puerta de R8, 2026-08-20)**: Tests de no regresión de la puerta de F-024 con escenarios de
       carga incremental.
       **Verificación**: `pytest tests/test_f011_coherencia.py tests/test_f024_dominio.py -q`
       (R13, R14) — los de F-024 pasan **sin modificarse**; si alguno hay que
       tocarlo, el diseño se torció y hay que parar.
 
-- [ ] **T18 · MANUAL (humano)**: primera carga incremental real contra Azure,
+- [~] **T18 · DESCARTADA (puerta de R8, 2026-08-20)** · MANUAL (humano)**: primera carga incremental real contra Azure,
       contrastada con una completa inmediatamente posterior:
 
       ```bash
@@ -210,7 +210,7 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
       marca la feature `blocked` y no se racionaliza (precedente de F-019 T11).
       **Verificación**: `MANUAL (humano)`.
 
-- [ ] **T19**: Actualizar `docs/ARCHITECTURE.md` (modelo de carga resultante,
+- [~] **T19 · DESCARTADA (puerta de R8, 2026-08-20)**: Actualizar `docs/ARCHITECTURE.md` (modelo de carga resultante,
       **la recarga completa de los domingos** y corrección de la frase «la
       ingesta nocturna SIEMPRE `--full`») y `azure-apps/datamart_seg_anual.md`
       (lo que este servicio consume de `sigrid-api` —frecuencia y volumen de
@@ -253,3 +253,22 @@ tests van antes o junto a la implementación (fase RED, exigida por el rigor
 - [x] **T23**: Ejecutar `bash harness/init.sh` en verde (incluye pytest y la
       puerta de cobertura de las líneas cambiadas).
       **Verificación**: `bash harness/init.sh` termina con exit code 0.
+
+## Cierre de F-011 (2026-08-20)
+
+**T1-T8 y T21-T23 hechas**: el bloque A -medir- se entrego entero, y es el
+resultado de la feature. **T9 es la puerta y esta FIRMADA con un NO** por el
+humano (`progress/medicion_F-011.md` §6.2, commit `6125be3`).
+
+**T10-T19 quedan DESCARTADAS**, no pendientes: la puerta de **R8** las
+condicionaba a que el ahorro fuera >= 20 min o la ingesta >= 40 % del total, y
+lo medido fue **2,25 min** y **19,9 %**. Ninguna de las dos, y van en O. **DA-4**
+ya habia escrito que hacer si el watermark no servia -llevar el esfuerzo al
+build- y **DA-7** fijo los umbrales antes de medir. La feature ha ejecutado su
+propia spec: la rama del NO estaba escrita de antemano.
+
+**Siguen pendientes del humano** T7 (mediciones manuales complementarias) y
+T8-bis (avisar al dueño de `sigrid-api`), las dos MANUAL y ninguna bloqueante.
+
+El tiempo esta en `build_stg`: **110,7 min, el 67,0 %** de la carga. Eso es
+**F-025**.
