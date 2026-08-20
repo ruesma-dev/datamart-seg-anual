@@ -60,15 +60,24 @@ reglas:
       - mart.v_pbi_fact_categoria
       - mart.v_fact_periodificado
       - stg.plan_mensual
+      - cierre.fact_cierre_mensual
+      - cierre.v_pbi_cierre_resumen
+      - cierre.v_pbi_cierre_indirectos_detalle
+      - cierre.v_pbi_cierre_generales_detalle
     regla: >-
-      Para una serie temporal se suma `importe_mes`, que es el importe imputado
-      A ESE MES concreto. `importe_origen` YA es el acumulado desde el inicio
-      hasta ese mes: sumarlo a lo largo del tiempo multiplica el resultado.
-      `importe_origen` solo admite `ultimo_valor` (el del ultimo mes del rango).
+      Todo importe del datamart viene en pareja: uno del MES y otro ACUMULADO A
+      ORIGEN. Para una serie temporal se suma el del mes; el acumulado ya lleva
+      dentro todos los meses anteriores, asi que sumarlo a lo largo del tiempo
+      multiplica el resultado, y de un total de un periodo se toma su valor del
+      ULTIMO mes, no la suma. La pareja cambia de nombre segun el esquema: en
+      `mart` y en `stg` son `importe_mes` e `importe_origen`; **en `cierre` son
+      `ejecutado_mes` y `ejecutado_origen`**, y la trampa es identica.
     motivo: >-
       Fue el bug de la Tanda 1.4 del cierre: multiplicaba por unas nueve veces
-      (`sql/cierre/02_build_fact.sql`). El numero salia grande pero creible, que
-      es exactamente lo peligroso.
+      (`sql/cierre/02_build_fact.sql`). Esta escrito con los nombres de los dos
+      esquemas precisamente porque el bug ocurrio en `cierre` y la regla se
+      redacto mirando a `mart`. El numero salia grande pero creible, que es
+      exactamente lo peligroso.
 
   - codigo: R-UNIVERSO-OBRA
     titulo: Hay dos universos de obra y no cuentan lo mismo

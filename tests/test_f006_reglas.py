@@ -714,3 +714,72 @@ def test_f006_r9_el_control_del_detector_de_reconstruccion() -> None:
     assert _se_reconstruye("mart.fact_seguimiento_mensual") is True
     assert _se_reconstruye("stg.plan_mensual") is True, "se trunca desde Python"
     assert _se_reconstruye("aux.periodificacion_partida") is False
+
+
+# ===========================================================================
+# R-IMPORTE-MES tiene que alcanzar a TODO lo que tiene la trampa (defecto 8)
+#
+# El ambito listaba objetos de `mart` y `stg`, pero el motivo cita el bug de la
+# Tanda 1.4 **del cierre**, el que multiplicaba por unas nueve veces. `cierre`
+# tiene la misma trampa con otros nombres: `ejecutado_origen` es el acumulado y
+# `ejecutado_mes` el parcial. Un agente que lea la regla y no la ficha repite el
+# error original.
+#
+# Comprobable sin auditar nada: un objeto que documente A LA VEZ una columna en
+# euros `suma_solo_dentro_del_mes` y otra en euros `ultimo_valor` tiene por
+# definicion el par parcial/acumulado, y la regla debe alcanzarlo.
+# ===========================================================================
+
+
+def _objetos_con_par_parcial_acumulado() -> list[str]:
+    encontrados = []
+    for ficha in _diccionario_real().fichas:
+        parciales = {
+            c.nombre
+            for c in ficha.columnas
+            if c.agregacion == "suma_solo_dentro_del_mes" and c.unidad == "EUR"
+        }
+        acumuladas = {
+            c.nombre
+            for c in ficha.columnas
+            if c.agregacion == "ultimo_valor" and c.unidad == "EUR"
+        }
+        if parciales and acumuladas:
+            encontrados.append(ficha.nombre)
+    return sorted(encontrados)
+
+
+def test_f006_r9_importe_mes_alcanza_a_todo_lo_que_tiene_la_trampa() -> None:
+    from etl_sigrid.domain.diccionario import alcanza
+
+    regla = next(r for r in _diccionario_real().reglas if r.codigo == "R-IMPORTE-MES")
+    por_nombre = _diccionario_real().por_nombre
+
+    fuera = [
+        nombre
+        for nombre in _objetos_con_par_parcial_acumulado()
+        if not alcanza(regla, por_nombre[nombre])
+    ]
+
+    assert not fuera, (
+        f"{fuera} tienen el par parcial/acumulado en euros y R-IMPORTE-MES no "
+        f"los alcanza: el agente que lea la regla y no la ficha repite el ≈9x"
+    )
+
+
+def test_f006_r9_el_control_del_detector_del_par() -> None:
+    """Si el detector no encontrara nada, el test de arriba pasaría en falso."""
+    detectados = _objetos_con_par_parcial_acumulado()
+
+    assert "mart.fact_seguimiento_mensual" in detectados
+    assert "cierre.fact_cierre_mensual" in detectados
+    assert len(detectados) >= 8
+
+
+def test_f006_r9_importe_mes_nombra_las_columnas_del_cierre() -> None:
+    """El agente busca por nombre de columna: `importe_mes` no le dice nada
+    cuando está mirando `cierre`."""
+    regla = next(r for r in _diccionario_real().reglas if r.codigo == "R-IMPORTE-MES")
+
+    assert "ejecutado_origen" in regla.regla
+    assert "ejecutado_mes" in regla.regla

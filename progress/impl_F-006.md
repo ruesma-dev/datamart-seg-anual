@@ -744,3 +744,32 @@ se reconstruye de verdad**, buscando su `DROP`, su `TRUNCATE` o su
 control —`mart.fact_seguimiento_mensual` True, `stg.plan_mensual` True (se
 trunca desde Python, no desde SQL), `aux.periodificacion_partida` False—, porque
 un detector que devolviera siempre `True` haria pasar el test en falso.
+
+## Defecto 8 · `R-IMPORTE-MES` no cubria `cierre`, que es donde ocurrio el bug
+
+```
+$ python -m pytest tests/test_f006_reglas.py -q -k "trampa or detector_del_par or columnas_del_cierre"
+E       AssertionError: assert 'ejecutado_origen' in 'Para una serie temporal se suma `importe_mes`...'
+FAILED tests/test_f006_reglas.py::test_f006_r9_importe_mes_alcanza_a_todo_lo_que_tiene_la_trampa
+FAILED tests/test_f006_reglas.py::test_f006_r9_importe_mes_nombra_las_columnas_del_cierre
+2 failed, 3 passed, 59 deselected in 1.30s
+```
+
+El encargo pedia anadir dos objetos. **Se anaden cuatro**, porque la
+comprobacion derivada encontro dos mas con exactamente la misma trampa:
+`cierre.v_pbi_cierre_indirectos_detalle` y
+`cierre.v_pbi_cierre_generales_detalle` tambien tienen su `ejecutado_mes` y su
+`ejecutado_origen`.
+
+El criterio, que no exige auditar nada: **un objeto que documente a la vez una
+columna en euros `suma_solo_dentro_del_mes` y otra en euros `ultimo_valor` tiene
+por definicion el par parcial/acumulado**, y la regla debe alcanzarlo. El test
+lleva su control (que el detector encuentre al menos ocho objetos y en concreto
+los dos cabeza de serie), porque un detector que no encontrase nada haria pasar
+el test en falso.
+
+El texto de la regla se reescribio para que hable de **la pareja**, no de dos
+nombres concretos, y diga que en `cierre` se llaman `ejecutado_mes` y
+`ejecutado_origen`: el agente busca por nombre de columna, y `importe_mes` no le
+dice nada cuando esta mirando el cierre. El `motivo` explica ahora por que la
+regla se redacto mirando a `mart` cuando el bug ocurrio en `cierre`.
