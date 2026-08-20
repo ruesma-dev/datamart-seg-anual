@@ -498,7 +498,9 @@ def test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos() -> None:
     texto = DESIGN.read_text(encoding="utf-8")
     total = len(_inventario_del_repositorio())
 
-    assert str(total) in texto
+    assert str(total) in texto, (
+        f"el inventario real son {total} objetos y `design.md` no lo dice"
+    )
     assert "más de 80 objetos" not in texto
 
 

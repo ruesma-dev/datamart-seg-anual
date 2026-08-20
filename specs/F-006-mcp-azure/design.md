@@ -44,7 +44,8 @@ infraestructura.
 > `sql/mart/05_views_powerbi.sql`. Importa porque este ejemplo es lo que copia
 > quien escribe las fichas siguientes. En la misma enmienda se corrigen los
 > recuentos de §5.1: el inventario real son **98 objetos**, `mart` tiene **11
-> vistas** y `cierre` **8**.
+> vistas** y `cierre` **8**. El DDL del bloque E anade cuatro objetos mas a
+> `_meta`, que pasan a ser **102**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
@@ -420,7 +421,7 @@ como comentario de cabecera en el propio fichero SQL.
 | `config/diccionario/maestro.yaml` | ~4 objetos: 3 vistas, 1 función |
 | `config/diccionario/stg.yaml` | ~11 objetos: 7 tablas, 1 vista, 3 funciones |
 | `config/diccionario/aux.yaml` | 1 objeto (`periodificacion_partida`, hoy vacía por diseño) |
-| `config/diccionario/_meta.yaml` | 6 objetos: `etl_runs`, `v_raw_state`, `v_frescura` y los tres nuevos |
+| `config/diccionario/_meta.yaml` | **7 objetos**: `etl_runs`, `v_raw_state`, `v_frescura`, las tres tablas del diccionario y `v_diccionario` |
 | `config/diccionario/raw.yaml` | 31 fichas a nivel de objeto (DA-2), todas `consumo_recomendado: false` |
 
 ### 5.2 · Código
@@ -843,7 +844,7 @@ una planificación, eso es F-030 y no entra en el YAML.
 | **Dejar el diccionario en `mcp-bbdd`** (como hoy) | Lo mantendría quien no conoce el modelo, se desincronizaría a la primera, y no habría forma de poner una puerta de cobertura: el repositorio del MCP no sabe qué objetos publica el datamart. Decisión ya tomada por el humano |
 | **Publicarlo por HTTP o por fichero compartido** | Obligaría al MCP a conocer una segunda fuente además de la conexión SQL que ya tiene, y rompería el multi-base: cada base publica su semántica en su propio `_meta` y el MCP no necesita saber de dónde salió |
 | **Generar el diccionario automáticamente desde `pg_catalog`** | Daría nombres y tipos, que es justo lo que el MCP ya obtiene solo. Lo que falta es el significado y las trampas, y eso no está en ningún catálogo |
-| **Un único YAML monolítico** | 34 fichas ya son 1.083 líneas en el prototipo; aquí hay 98 objetos. Un fichero por esquema hace el diff revisable y permite entregar por bloques |
+| **Un único YAML monolítico** | 34 fichas ya son 1.083 líneas en el prototipo; aquí hay 98 objetos (102 tras el DDL del bloque E). Un fichero por esquema hace el diff revisable y permite entregar por bloques |
 | **Modelo normalizado con tabla de columnas** | Un JOIN más y dos esquemas que mantener, para no ganar ninguna consulta que alguien vaya a escribir (§4.1) |
 | **Umbral de cobertura porcentual (95 %)** | Permite que la columna que falte sea la importante. Ver §10 |
 | **Atomicidad por `DROP TABLE` + `CREATE`** | Se lleva los `GRANT` y deja al MCP ciego hasta el `apply-grants` siguiente (§9.3) |

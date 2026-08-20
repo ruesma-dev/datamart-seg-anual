@@ -1128,3 +1128,66 @@ Las tres primeras solo las cazan hoy **la revision humana y la bateria de
 aceptacion** (T39), y por eso cuatro de sus dieciocho preguntas son trampas
 deliberadas sobre exactamente estos puntos. Queda escrito aqui, y no descubierto
 dentro de 73 fichas.
+
+---
+
+# Bloque E · La publicacion en `_meta` (el contrato con `mcp-bbdd`)
+
+## T15 · El DDL del contrato
+
+```
+$ python -m pytest tests/test_f006_publicacion.py -q
+FAILED tests/test_f006_publicacion.py::test_f006_r22_ddl_el_contrato_de_columnas_es_exacto[_meta.diccionario-columnas0]
+FAILED tests/test_f006_publicacion.py::test_f006_r22_ddl_el_contrato_de_columnas_es_exacto[_meta.diccionario_reglas-columnas1]
+FAILED tests/test_f006_publicacion.py::test_f006_r22_ddl_el_contrato_de_columnas_es_exacto[_meta.diccionario_publicacion-columnas2]
+FAILED tests/test_f006_publicacion.py::test_f006_r22_ddl_los_tipos_del_contrato_no_se_improvisan
+FAILED tests/test_f006_publicacion.py::test_f006_r22_ddl_publicado_en_es_timestamp_sin_zona
+FAILED tests/test_f006_publicacion.py::test_f006_r15_ddl_la_vista_expone_significado_y_frescura_de_una_vez
+FAILED tests/test_f006_publicacion.py::test_f006_r23_ddl_advierte_de_lo_que_cuesta_cambiar_la_vista
+15 failed in 1.09s
+```
+
+`sql/ddl/01_diccionario.sql`: las tres tablas y `_meta.v_diccionario`, con el
+contrato de `design.md` §4.1 **columna a columna**, comprobado con el mismo
+parser de DDL que valida las fichas. Los tests son deliberadamente literales:
+`mcp-bbdd` va a programar contra esto sin poder preguntar.
+
+Lo que queda blindado por un test, no por buena voluntad:
+
+- **Ni un `DROP` ni un `TRUNCATE` en todo el fichero.** Un `DROP` se lleva los
+  `GRANT` y dejaria al MCP ciego hasta el `apply-grants` siguiente. El test mira
+  el VERBO de cada sentencia, no el texto, porque la cabecera menciona
+  `DROP VIEW` a proposito para advertir de lo que cuesta.
+- **Los dos JOIN de la vista son LEFT**, y cada uno por su motivo, escrito en el
+  fichero: el de `v_frescura` para que un objeto cuyo paso nunca termino bien
+  siga saliendo, y el de `diccionario_publicacion` porque un `CROSS JOIN` con la
+  tabla vacia devolveria cero filas y la vista mentiria diciendo que no hay
+  diccionario.
+- **`publicado_en` es `TIMESTAMP` sin zona** y no hay ni un `TIMESTAMPTZ`:
+  mezclarlos haria incomparables la fecha del diccionario y la de `v_frescura`,
+  que es justo lo que la vista cruza.
+- **El singleton**: `id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1)`.
+
+### El trinquete SUBE de 73 a 77, y por que eso esta bien
+
+El DDL anade cuatro objetos NUEVOS al repositorio, asi que el inventario pasa de
+98 a **102** y `pendientes` de 73 a 77. La comparacion cruda de listas entre
+commits lo daba por regresion:
+
+```
+$ python -m pytest tests/test_f006_cobertura.py -q
+FAILED tests/test_f006_cobertura.py::test_f006_r27_el_trinquete_solo_baja_a_lo_largo_del_historial
+FAILED tests/test_f006_cobertura.py::test_f006_r27_el_trinquete_de_hoy_cabe_en_el_de_la_primera_revision
+2 failed, 43 passed in 1.76s
+```
+
+**Era el test el que estaba mal planteado, no el cambio.** Lo que hay que
+prohibir no es que la lista crezca —el repositorio publica cosas nuevas— sino
+que **un objeto que YA tuvo ficha vuelva a la lista de deberes**. El trinquete
+se reescribe asi: se barre el historial de git de los ficheros de esquema, se
+reune todo lo que alguna vez tuvo ficha, y se exige que la interseccion con
+`pendientes` sea vacia. Con su test de control, para que un barrido que
+devolviera un conjunto vacio no lo haga pasar en falso.
+
+Las fichas de esos cuatro objetos van en T24, con el resto de `_meta`.
+`design.md` §5.1 queda actualizado: `_meta.yaml` pasa de 6 a **7 objetos**.

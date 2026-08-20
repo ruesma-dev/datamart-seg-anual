@@ -447,7 +447,12 @@ YAML_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 #:   96  T12 · las dos tablas de hecho de `mart`
 #:   85  T13 · las once vistas de `mart`
 #:   73  T14 · los doce objetos de `cierre`
-PENDIENTES_MAX = 73
+#:   77  T15 · SUBE 4, y es legitimo: el DDL del contrato anade cuatro
+#:            objetos NUEVOS a `_meta`. El trinquete prohibe que un objeto
+#:            YA DOCUMENTADO vuelva a `pendientes`, no que el repositorio
+#:            publique cosas nuevas. Sus fichas van en T24, con el resto
+#:            de `_meta`.
+PENDIENTES_MAX = 77
 
 
 def _inventario_del_repositorio():
@@ -628,6 +633,81 @@ def test_f006_r27_pendientes_es_exactamente_lo_que_falta_por_documentar() -> Non
     assert len(dicc.pendientes) == len(inventario) - len(dicc.fichas)
 
 
+def _documentados_alguna_vez() -> set[str] | None:
+    """Todo objeto que tuvo ficha en algún momento del historial de git.
+
+    Se recorre la historia de los ficheros de esquema —que son pocos y cambian
+    poco—, no la del repositorio entero: una decena de `git show` y la respuesta
+    es exacta.
+    """
+    import yaml as yaml_lib
+
+    ficheros = subprocess.run(
+        ["git", "ls-files", "config/diccionario/*.yaml"],
+        cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
+    )
+    if ficheros.returncode != 0:
+        return None
+
+    documentados: set[str] = set()
+    for ruta in ficheros.stdout.split():
+        if ruta.endswith("00_global.yaml"):
+            continue
+        revisiones = subprocess.run(
+            ["git", "log", "--format=%H", "--", ruta],
+            cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
+        )
+        for revision in revisiones.stdout.split():
+            volcado = subprocess.run(
+                ["git", "show", f"{revision}:{ruta}"],
+                cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
+            )
+            if volcado.returncode != 0:
+                continue
+            datos = yaml_lib.safe_load(volcado.stdout) or {}
+            esquema = datos.get("esquema", "")
+            documentados |= {
+                f"{esquema}.{objeto}" for objeto in (datos.get("objetos") or {})
+            }
+    # Lo de hoy cuenta: una ficha recién escrita tampoco puede deshacerse.
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+    return documentados | set(dicc.por_nombre)
+
+
+def test_f006_r27_ningun_objeto_documentado_vuelve_a_pendientes() -> None:
+    """EL TRINQUETE DE VERDAD: lo escrito no se desescribe.
+
+    Comparar la lista de `pendientes` de dos commits seguidos no vale, y se
+    comprobó: un objeto NUEVO del repositorio —el DDL del contrato añadió cuatro
+    a `_meta`— entra legítimamente en `pendientes` y la comparación cruda lo
+    daba por regresión. Lo que hay que prohibir es otra cosa: que un objeto que
+    YA tuvo ficha vuelva a la lista de deberes.
+    """
+    documentados = _documentados_alguna_vez()
+    if documentados is None:
+        pytest.skip("sin git no hay historial contra el que comparar")
+
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+
+    regresiones = sorted(set(dicc.pendientes) & documentados)
+    assert not regresiones, (
+        f"{regresiones} tuvieron ficha y han vuelto a `pendientes`: el trinquete "
+        f"solo baja"
+    )
+
+
+def test_f006_r27_control_el_historial_se_lee_de_verdad() -> None:
+    """Si el barrido devolviera un conjunto vacío, el test de arriba pasaría solo."""
+    documentados = _documentados_alguna_vez()
+    if documentados is None:
+        pytest.skip("sin git no hay historial contra el que comparar")
+
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+
+    assert set(dicc.por_nombre) <= documentados
+    assert len(documentados) >= len(dicc.por_nombre) >= 25
+
+
 def _pendientes_en(revision: str) -> set[str] | None:
     """La lista de `pendientes` tal y como estaba en esa revisión de git."""
     import yaml as yaml_lib
@@ -642,62 +722,3 @@ def _pendientes_en(revision: str) -> set[str] | None:
     if hecho.returncode != 0:
         return None
     return set(yaml_lib.safe_load(hecho.stdout).get("pendientes") or [])
-
-
-def test_f006_r27_el_trinquete_solo_baja_a_lo_largo_del_historial() -> None:
-    """LA COMPROBACIÓN QUE FALTABA: ningún objeto vuelve a `pendientes`.
-
-    Se recorre el historial del propio fichero y se exige que cada revisión sea
-    un subconjunto de la anterior. No hay forma de saltárselo editando una
-    constante, porque la referencia es lo que ya está escrito en git.
-    """
-    revisiones = subprocess.run(
-        ["git", "log", "--format=%H", "-40", "--", "config/diccionario/00_global.yaml"],
-        cwd=RAIZ,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    if revisiones.returncode != 0:
-        pytest.skip("sin git no hay historial contra el que comparar")
-
-    historial = revisiones.stdout.split()
-    assert historial, "el fichero del diccionario no tiene historial en git"
-
-    # De la más nueva a la más vieja: cada una tiene que caber en la siguiente.
-    # EL ÁRBOL DE TRABAJO VA EL PRIMERO: sin él, el test compara commits ya
-    # hechos entre sí y deja pasar exactamente lo que viene a impedir. Se
-    # comprobó: sin esta línea, el experimento de la review pasaba en verde.
-    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
-    listas = [("árbol de trabajo", set(dicc.pendientes))]
-    listas += [(rev, _pendientes_en(rev)) for rev in historial]
-    listas = [(rev, lista) for rev, lista in listas if lista is not None]
-
-    for (rev_nueva, nueva), (rev_vieja, vieja) in pairwise(listas):
-        vueltos = sorted(nueva - vieja)
-        assert not vueltos, (
-            f"{vueltos} volvieron a `pendientes` en {rev_nueva[:8]} "
-            f"(no estaban en {rev_vieja[:8]}): el trinquete solo baja"
-        )
-
-
-def test_f006_r27_el_trinquete_de_hoy_cabe_en_el_de_la_primera_revision() -> None:
-    """Control del test de arriba: si el historial no se leyera, pasaría solo."""
-    primera = subprocess.run(
-        ["git", "log", "--format=%H", "--reverse", "--",
-         "config/diccionario/00_global.yaml"],
-        cwd=RAIZ,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    if primera.returncode != 0 or not primera.stdout.split():
-        pytest.skip("sin git no hay historial contra el que comparar")
-
-    inicial = _pendientes_en(primera.stdout.split()[0])
-    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
-
-    assert inicial, "no se pudo leer la primera revisión del diccionario"
-    assert set(dicc.pendientes) < inicial, (
-        "la lista de hoy tiene que ser un subconjunto ESTRICTO de la inicial"
-    )
