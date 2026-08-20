@@ -262,3 +262,158 @@ def test_f006_r12_derivar_es_idempotente() -> None:
     dos = derivar_avisos(una)
 
     assert una.fichas == dos.fichas
+
+
+# ===========================================================================
+# El bloque global REAL de `config/diccionario/00_global.yaml`
+#
+# Estos tests no usan fixtures: leen lo que de verdad se va a publicar en la
+# base. Son la diferencia entre «el validador sabe exigir doce reglas» y «las
+# doce reglas están escritas».
+# ===========================================================================
+
+from pathlib import Path  # noqa: E402
+
+from etl_sigrid.infrastructure.diccionario.cargador_yaml import (  # noqa: E402
+    cargar_diccionario,
+)
+
+DIR_DICCIONARIO = Path(__file__).resolve().parents[1] / "config" / "diccionario"
+
+
+def _diccionario_real():
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+    return dicc
+
+
+def test_f006_r9_el_global_real_declara_las_doce_reglas() -> None:
+    dicc = _diccionario_real()
+
+    declaradas = {r.codigo for r in dicc.reglas}
+    faltan = set(CODIGOS_REGLAS_OBLIGATORIAS) - declaradas
+    assert not faltan, f"faltan reglas en 00_global.yaml: {sorted(faltan)}"
+
+
+def test_f006_r9_cada_regla_real_dice_que_hacer_y_por_que() -> None:
+    """Una regla sin motivo se desobedece a la primera. Y sin ámbito no llega
+    a ninguna ficha, que es la vía por la que el agente la va a leer."""
+    dicc = _diccionario_real()
+
+    for regla in dicc.reglas:
+        assert len(regla.regla.strip()) >= 40, f"{regla.codigo}: `regla` demasiado corta"
+        assert len(regla.motivo.strip()) >= 30, f"{regla.codigo}: `motivo` demasiado corto"
+        assert regla.ambito, f"{regla.codigo}: sin `ambito`"
+        assert regla.severidad in SEVERIDADES, f"{regla.codigo}: severidad inválida"
+
+
+def test_f006_r9_las_reglas_reales_son_bloqueantes_salvo_las_que_avisan() -> None:
+    """La mayoría son bloqueantes: no son consejos, son la diferencia entre un
+    número correcto y uno plausible y falso."""
+    dicc = _diccionario_real()
+
+    bloqueantes = [r.codigo for r in dicc.reglas if r.severidad == "bloqueante"]
+
+    assert len(bloqueantes) >= 10, f"solo {len(bloqueantes)} reglas bloqueantes"
+
+
+def test_f006_r10_el_global_real_trae_ordenes_de_magnitud() -> None:
+    """Para que el agente detecte una cifra absurda antes de darla por buena.
+
+    Es lo que hizo el prototipo y funcionó: el error real de retenciones daba
+    38,9 M€ en UNA obra siendo esa la cifra de toda la empresa.
+    """
+    dicc = _diccionario_real()
+
+    ordenes = dicc.global_raw.get("ordenes_de_magnitud") or []
+
+    assert len(ordenes) >= 3
+    for orden in ordenes:
+        assert orden.get("concepto")
+        assert isinstance(orden.get("valor_aproximado"), (int, float))
+        assert orden.get("unidad")
+
+
+def test_f006_r11_los_ambitos_reales_apuntan_a_algo_que_existe() -> None:
+    """Cada `ambito` es un esquema del datamart o un objeto que el repositorio
+    publica de verdad. Se comprueba contra el inventario, no contra las fichas:
+    mientras un bloque no esté escrito, su objeto está en `pendientes`."""
+    from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    dicc = _diccionario_real()
+    publicados = {o.nombre for o in _inventario_del_repositorio()}
+
+    for regla in dicc.reglas:
+        for destino in regla.ambito:
+            existe = (
+                destino in publicados
+                if "." in destino
+                else destino in ESQUEMAS_DEL_DATAMART
+            )
+            assert existe, f"{regla.codigo}: el ámbito `{destino}` no existe"
+
+
+def test_f006_r9_el_diccionario_real_no_tiene_reglas_de_mas_sin_codigo() -> None:
+    dicc = _diccionario_real()
+
+    for regla in dicc.reglas:
+        assert regla.codigo.startswith("R-"), f"código raro: {regla.codigo!r}"
+
+
+# --- Reglas concretas que no pueden faltar por su contenido ---------------
+#
+# No basta con que el código esté: lo que protege es el TEXTO. Estos tests
+# fijan el contenido mínimo de las tres reglas que nacieron de un número falso
+# real, para que un refactor bienintencionado no las diluya.
+
+
+def test_f006_r9_importe_mes_dice_lo_que_no_se_puede_hacer() -> None:
+    dicc = _diccionario_real()
+    regla = next(r for r in dicc.reglas if r.codigo == "R-IMPORTE-MES")
+
+    texto = (regla.regla + " " + regla.motivo).lower()
+
+    assert "importe_origen" in texto
+    assert "importe_mes" in texto
+    assert "mart.fact_seguimiento_mensual" in regla.ambito
+
+
+def test_f006_r9_retencion_no_join_lineas_cita_el_incidente() -> None:
+    dicc = _diccionario_real()
+    regla = next(r for r in dicc.reglas if r.codigo == "R-RETENCION-NO-JOIN-LINEAS")
+
+    assert "38,9" in regla.motivo or "38.9" in regla.motivo
+    assert "retenciones.movimientos" in regla.ambito
+
+
+def test_f006_r9_frescura_manual_nombra_los_cuatro_esquemas() -> None:
+    dicc = _diccionario_real()
+    regla = next(r for r in dicc.reglas if r.codigo == "R-FRESCURA-MANUAL")
+
+    assert set(regla.ambito) >= {"cierre", "compras", "maestro", "retenciones"}
+    assert "_meta.v_frescura" in regla.regla
+
+
+# ===========================================================================
+# El trinquete de `pendientes` también vale para los ámbitos y las relaciones
+# ===========================================================================
+
+
+def test_f006_r11_un_ambito_declarado_pendiente_se_tolera() -> None:
+    """Mientras el bloque no esté escrito, la regla ya puede apuntar a su objeto.
+
+    Es lo que permite escribir las doce reglas ANTES que las ochenta fichas, que
+    es el orden correcto: las reglas son la pieza de más valor por línea.
+    Cuando `pendientes` quede vacía, la comprobación vuelve a ser estricta.
+    """
+    reglas = [_regla(c) for c in CODIGOS_REGLAS_OBLIGATORIAS]
+    reglas[0] = _regla(
+        CODIGOS_REGLAS_OBLIGATORIAS[0], ambito=("compras.fact_compras_linea",)
+    )
+
+    sin_declarar = _dicc(reglas=reglas)
+    declarado = _dicc(reglas=reglas, pendientes=("compras.fact_compras_linea",))
+
+    assert validar(sin_declarar, PASOS_NOCTURNOS)
+    assert validar(declarado, PASOS_NOCTURNOS) == []

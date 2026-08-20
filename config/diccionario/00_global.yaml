@@ -2,19 +2,278 @@
 #
 # El bloque global del diccionario semantico del datamart (F-006).
 #
-# Este fichero se sirve casi entero al agente en su primera llamada: es lo que
-# lee ANTES de escribir una linea de SQL. Aqui van las convenciones, los nueve
-# esquemas, las reglas duras que impiden respuestas plausibles y falsas, los
-# ordenes de magnitud contra los que detectar un disparate, y la lista de lo
-# que todavia no esta documentado.
+# Esto es lo que el agente lee ANTES de escribir una linea de SQL. Aqui van las
+# convenciones, los nueve esquemas, las reglas duras que impiden respuestas
+# plausibles y falsas, los ordenes de magnitud contra los que detectar un
+# disparate, la bateria de aceptacion y la lista de lo que todavia no esta
+# documentado.
 #
 # `pendientes` es un TRINQUETE (R27): solo baja. La constante PENDIENTES_MAX de
-# tests/test_f006_cobertura.py tiene que valer exactamente lo que hay aqui, y
-# al cerrar F-006 esta lista queda vacia.
+# tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
+# F-006 esta lista queda vacia.
 
 version: 1
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
+
+# ===========================================================================
+# REGLAS DURAS (R9)
+# ===========================================================================
+#
+# No son consejos: son la diferencia entre un numero correcto y uno plausible
+# y falso. Cada una nace de una trampa concreta del modelo, y varias de un
+# error real que se dio y costo tiempo. Por eso todas llevan `motivo`: una
+# regla sin porque se desobedece a la primera.
+#
+# El `ambito` es lo que hace que la regla llegue al agente: el validador
+# adjunta su codigo a la ficha de cada objeto alcanzado (R12), asi que quien
+# solo consulte `describir_tabla` ve sus trampas sin haber leido esto.
+
+reglas:
+
+  - codigo: R-FRESCURA-MANUAL
+    titulo: Cuatro esquemas no se refrescan de noche
+    severidad: bloqueante
+    ambito: [cierre, compras, maestro, retenciones]
+    regla: >-
+      El pipeline nocturno (`run-all`) construye SOLO raw, stg y mart. Los
+      esquemas `cierre`, `compras`, `maestro` y `retenciones` se construyen con
+      comandos propios y pueden estar desfasados semanas respecto a Sigrid.
+      Toda respuesta que salga de ellos DEBE citar su fecha de build, que se
+      obtiene con `SELECT * FROM _meta.v_frescura` (o de una sola vez, junto
+      con la semantica, en `_meta.v_diccionario`). Ojo: `build-compras` y
+      `build-retenciones` no registran paso propio, asi que no aparecen en esa
+      vista y su frescura hoy no es consultable por SQL.
+    motivo: >-
+      La composicion real esta en `main.build_pipeline_steps`: IngestRaw,
+      LoadExcelAux, BuildStg, BuildMart y ApplyGrants. Dar un dato de `cierre`
+      sin fecha es dar una respuesta de hace semanas con aplomo.
+
+  - codigo: R-IMPORTE-MES
+    titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
+    severidad: bloqueante
+    ambito:
+      - mart.fact_seguimiento_mensual
+      - mart.fact_seguimiento_categoria
+      - mart.v_pbi_fact
+      - mart.v_pbi_fact_categoria
+      - mart.v_fact_periodificado
+      - stg.plan_mensual
+    regla: >-
+      Para una serie temporal se suma `importe_mes`, que es el importe imputado
+      A ESE MES concreto. `importe_origen` YA es el acumulado desde el inicio
+      hasta ese mes: sumarlo a lo largo del tiempo multiplica el resultado.
+      `importe_origen` solo admite `ultimo_valor` (el del ultimo mes del rango).
+    motivo: >-
+      Fue el bug de la Tanda 1.4 del cierre: multiplicaba por unas nueve veces
+      (`sql/cierre/02_build_fact.sql`). El numero salia grande pero creible, que
+      es exactamente lo peligroso.
+
+  - codigo: R-UNIVERSO-OBRA
+    titulo: Hay dos universos de obra y no cuentan lo mismo
+    severidad: bloqueante
+    ambito:
+      - stg.obras
+      - maestro.obras
+      - mart.v_pbi_dim_obra
+    regla: >-
+      `stg.obras` es el universo del SEGUIMIENTO: excluye codigos
+      administrativos (0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT),
+      excluye codigos con cinco o mas digitos seguidos y deduplica por el
+      mecanismo de Sigrid `conext.cod = '15'`. `maestro.obras` NO filtra nada:
+      es superconjunto. Toda respuesta que cuente obras debe decir cual usa.
+      `compras` y `retenciones` tampoco filtran por `stg.obras` y pueden traer
+      obras administrativas que el seguimiento excluye.
+    motivo: >-
+      Los filtros estan en `sql/stg/03_obras.sql`; `sql/maestro/01_obras.sql` no
+      tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
+      dar la del maestro como "obras de la empresa" infla el numero.
+
+  - codigo: R-OBRA-ACTIVA
+    titulo: stg.obras.activa esta cableada a TRUE y no significa nada
+    severidad: bloqueante
+    ambito:
+      - stg.obras
+      - maestro.obras
+    regla: >-
+      No uses `stg.obras.activa` para saber si una obra vive: la construye un
+      literal `TRUE AS activa` y vale TRUE para todas. Para el estado real usa
+      `maestro.obras.es_activa`, que se deriva de `con.fecbaj`, o las fechas de
+      `cierre.v_pbi_cierre_cabecera`.
+    motivo: >-
+      `sql/stg/03_obras.sql` la escribe como constante. Una columna que se llama
+      `activa` y siempre dice TRUE es una trampa perfecta: nadie la comprueba.
+
+  - codigo: R-VERSION-MASTER
+    titulo: En stg.plan_mensual conviven TODAS las versiones master
+    severidad: bloqueante
+    ambito:
+      - stg.plan_mensual
+      - mart.v_master_versiones_tipadas
+      - mart.v_master_vigente_anual
+    regla: >-
+      Consultar `stg.plan_mensual` filtrando solo por obra y ambito multiplica
+      los importes por el numero de versiones master de esa obra. La version
+      vigente solo esta resuelta AGUAS ABAJO: para planificado se va a
+      `mart.fact_seguimiento_mensual`, nunca a `stg`. Ademas, solo son master
+      vigente las de tipo 'Planif Inicial', 'ABC' y 'Cuatrimestral'; las de
+      'Cierre mensual' NO reemplazan al plan.
+    motivo: >-
+      Los ambitos master (8 y 11) guardan una fila por version y mes. `mart`
+      elige la vigente por mes con la regla de `sql/mart/02_build_fact.sql`; el
+      que va a `stg` directamente se salta esa eleccion y suma todas.
+
+  - codigo: R-FAS-AMBIGUO
+    titulo: fas significa dos cosas y cambia de nombre en cada capa
+    severidad: bloqueante
+    ambito:
+      - stg.presupuesto
+      - stg.plan_mensual
+      - stg.fases
+      - raw.obrfas
+      - raw.obrfasamb
+    regla: >-
+      En los ambitos REALES (3 = coste, 7 = venta) `fas` es el MES, y `fas = 0`
+      es el "Previsto" vivo. En los ambitos MASTER (8 = coste, 11 = venta) `fas`
+      es el NUMERO DE VERSION. Ademas cambia de nombre segun donde mires: se
+      llama `fase_num` en `stg.presupuesto`, `version` en `stg.plan_mensual` y
+      `fasnum` en `raw.obrfas`. Nunca cruces las dos lecturas.
+    motivo: >-
+      Es la ambiguedad estructural del modelo de Sigrid, verificada en los DDL
+      de `sql/stg/01_ddl.sql`. Tratar una version como si fuera un mes produce
+      series temporales inventadas.
+
+  - codigo: R-CLAVE-SUSTITUTA
+    titulo: Las claves BIGSERIAL cambian en cada build
+    severidad: bloqueante
+    ambito:
+      - mart.fact_seguimiento_mensual
+      - mart.fact_seguimiento_categoria
+      - mart.v_pbi_fact
+      - mart.v_pbi_fact_categoria
+      - stg.plan_mensual
+      - cierre.fact_cierre_mensual
+      - aux.periodificacion_partida
+    regla: >-
+      `fact_id`, `fact_cat_id`, `plan_id`, `cierre_id` y `regla_id` son
+      BIGSERIAL: se reasignan enteros en cada reconstruccion. No sirven como
+      identificador estable, no se guardan fuera del datamart y no se le
+      enseñan al usuario. Para identificar algo se usa su clave de negocio.
+    motivo: >-
+      Las tablas se recrean con DROP + CREATE en cada build (`sql/mart/01_ddl.sql`,
+      `sql/cierre/01_ddl_fact.sql`). Un `fact_id` citado en un informe de ayer
+      apunta hoy a otra fila.
+
+  - codigo: R-ABONO-NEGATIVO
+    titulo: En compras los abonos ya entran con signo negativo
+    severidad: bloqueante
+    ambito:
+      - compras.fact_compras_linea
+      - compras.facturas
+      - compras.factura_lineas
+      - compras.v_pbi_proveedor_obra
+      - compras.v_pbi_contrato_consumo
+      - compras.v_pbi_partida_coste
+    regla: >-
+      Los documentos de tipo ABONO llegan con su signo natural, es decir en
+      negativo. Un `SUM(importe)` sobre FACTURA y ABONO ya da el facturado neto:
+      restarlos otra vez, o filtrarlos fuera y restarlos aparte, produce un
+      resultado equivocado en el doble de la cifra abonada.
+    motivo: >-
+      Esta escrito en el propio SQL: `sql/compras/03_views.sql` dice "los ABONOS
+      restan (signo natural)" y las vistas los agregan junto a las facturas.
+
+  - codigo: R-LINEA-ID-NO-UNICA
+    titulo: linea_id NO es unico en compras.fact_compras_linea
+    severidad: bloqueante
+    ambito:
+      - compras.fact_compras_linea
+    regla: >-
+      La tabla no tiene clave primaria declarada y `linea_id` NO identifica una
+      fila: viene de tres tablas distintas de Sigrid (`ctrpro`, `dcapro` y
+      `dcfpro`) cuyos identificadores colisionan. La clave real es el par
+      `(tipo_doc, linea_id)`. Un COUNT DISTINCT sobre `linea_id` pierde filas y
+      un JOIN por `linea_id` a secas las duplica.
+    motivo: >-
+      La tabla se crea con `CREATE TABLE ... AS` uniendo los tres origenes
+      (`sql/compras/02_fact_linea.sql`), sin PK y sin renumerar.
+
+  - codigo: R-RETENCION-NO-JOIN-LINEAS
+    titulo: Nunca unir un efecto de retencion a las lineas de su factura
+    severidad: bloqueante
+    ambito:
+      - retenciones.movimientos
+      - retenciones.v_src_lineas_compra
+      - retenciones.v_src_lineas_venta
+      - compras.factura_lineas
+    regla: >-
+      `retenciones.movimientos` tiene UN registro por efecto, con el importe
+      total retenido. Unirlo a las lineas del documento origen multiplica ese
+      importe por el numero de lineas de la factura. Si hace falta el detalle,
+      se agrega primero por documento y se une despues por documento, nunca por
+      linea.
+    motivo: >-
+      Es el error real que dio 38,9 M€ de retencion en UNA sola obra, siendo esa
+      la cifra de toda la empresa. De ahi salio la nota global del prototipo
+      `mcp-bbdd`, y de ahi sale esta regla.
+
+  - codigo: R-COMPRAS-SIN-IVA
+    titulo: Los importes de compras son sin IVA; importe_contratado lleva IVA
+    severidad: bloqueante
+    ambito:
+      - compras
+      - maestro.proveedores_obra
+    regla: >-
+      Todos los importes del esquema `compras` son SIN IVA (base imponible de
+      linea). En cambio `maestro.proveedores_obra.importe_contratado` es
+      `SUM(ctr.totdoc)`, el TOTAL DEL DOCUMENTO CON IVA. No son comparables: la
+      diferencia entre ambas cifras no es sobrecoste ni ahorro, es el impuesto.
+    motivo: >-
+      `sql/compras/02_fact_linea.sql` dice "todos los importes SIN IVA" y
+      `sql/maestro/03_proveedores_obra.sql` suma `t.totdoc` de `raw.ctr`.
+      Compararlos da desviaciones falsas del orden del 21 %.
+
+  - codigo: R-COMPRAS-TIPO-DOC
+    titulo: Seis tipos de documento conviven en la misma tabla
+    severidad: bloqueante
+    ambito:
+      - compras.fact_compras_linea
+    regla: >-
+      `compras.fact_compras_linea` mezcla CONTRATO, ALBARAN, PROFORMA, NOTA,
+      FACTURA y ABONO (mas OTRO) en la misma tabla. Sumar `importe` sin filtrar
+      `tipo_doc` suma el mismo gasto hasta tres veces: contratado, albaranado y
+      facturado son tres momentos del MISMO coste, no tres costes. Se filtra
+      siempre por el `tipo_doc` que responde la pregunta.
+    motivo: >-
+      Los tipos los asigna `compras.fn_tipo_documento` sobre `(con.tip, serie)`.
+      Es la nota global del prototipo `mcp-bbdd`: "no filtrar tipo_doc triplica".
+
+# ===========================================================================
+# ORDENES DE MAGNITUD (R10)
+# ===========================================================================
+#
+# Para que el agente detecte una cifra absurda ANTES de darla por buena. No son
+# recuentos por objeto —esos envejecen mal y nadie los actualiza (DA-6)—, sino
+# los cuatro totales de empresa que se mueven poco y que ya sirvieron para
+# cazar el error de retenciones en el prototipo.
+
+ordenes_de_magnitud:
+  - concepto: Retenido a proveedores, total de la empresa
+    valor_aproximado: 34700000
+    unidad: EUR
+    fuente: >-
+      Nota global del prototipo mcp-bbdd, medida sobre retenciones.movimientos
+      con sentido PROVEEDOR.
+  - concepto: Retenido de clientes, total de la empresa
+    valor_aproximado: 21900000
+    unidad: EUR
+    fuente: >-
+      Nota global del prototipo mcp-bbdd, sentido CLIENTE.
+  - concepto: Efectos de retencion registrados
+    valor_aproximado: 27300
+    unidad: filas
+    fuente: >-
+      Nota global del prototipo mcp-bbdd, filas de retenciones.movimientos.
 
 pendientes:
   - _meta.etl_runs

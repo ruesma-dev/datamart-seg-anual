@@ -470,7 +470,7 @@ def _validar_ficha(
 
     errores.extend(_validar_columnas(ficha))
     errores.extend(_validar_clave_negocio(ficha))
-    errores.extend(_validar_relaciones(ficha, indice))
+    errores.extend(_validar_relaciones(ficha, indice, dicc.pendientes))
     errores.extend(_validar_frescura(ficha, pasos_nocturnos))
 
     return errores
@@ -540,7 +540,7 @@ def _validar_clave_negocio(ficha: Ficha) -> list[ErrorValidacion]:
 
 
 def _validar_relaciones(
-    ficha: Ficha, indice: Mapping[str, Ficha]
+    ficha: Ficha, indice: Mapping[str, Ficha], pendientes: Sequence[str]
 ) -> list[ErrorValidacion]:
     """R5: toda relación resuelve contra el diccionario, en los dos extremos."""
     errores: list[ErrorValidacion] = []
@@ -574,10 +574,18 @@ def _validar_relaciones(
         esquema, objeto, columna = partes
         destino = indice.get(f"{esquema}.{objeto}")
         if destino is None:
-            error(
-                f"el destino `{relacion.a}` apunta a `{esquema}.{objeto}`, que no "
-                f"tiene ficha en el diccionario"
-            )
+            # Mientras su bloque no esté escrito, el objeto está declarado en
+            # `pendientes` y la relación se tolera: es lo que permite escribir
+            # ya el camino de JOIN más valioso del datamart sin esperar a que
+            # estén las ochenta fichas. La comprobación no se salta, se aplaza:
+            # en cuanto el destino tenga ficha, la columna se verifica, y al
+            # cerrar F-006 `pendientes` está vacía y esto vuelve a ser estricto.
+            if f"{esquema}.{objeto}" not in pendientes:
+                error(
+                    f"el destino `{relacion.a}` apunta a `{esquema}.{objeto}`, que "
+                    f"no tiene ficha en el diccionario ni está declarado en "
+                    f"`pendientes`"
+                )
             continue
 
         if destino.columnas and columna not in {c.nombre for c in destino.columnas}:
@@ -712,12 +720,13 @@ def _validar_reglas(
 
         for destino in regla.ambito:
             if "." in destino:
-                if destino not in indice:
+                if destino not in indice and destino not in dicc.pendientes:
                     error(
                         "R11",
                         f"la regla `{regla.codigo}` declara en su `ambito` el objeto "
-                        f"`{destino}`, que no tiene ficha en el diccionario. Una "
-                        f"regla que apunta a la nada no protege nada",
+                        f"`{destino}`, que no tiene ficha en el diccionario ni está "
+                        f"declarado en `pendientes`. Una regla que apunta a la nada "
+                        f"no protege nada",
                     )
             elif destino not in ESQUEMAS_DEL_DATAMART:
                 error(

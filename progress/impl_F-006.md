@@ -186,3 +186,61 @@ estimaba la spec:
 | `aux` | 1 |
 
 `PENDIENTES_MAX` arranca en **98** y solo baja.
+
+---
+
+## Bloque B · Reglas duras y bloque global
+
+### T9 · Las doce reglas de R9 en `00_global.yaml`
+
+```
+$ python -m pytest tests/test_f006_reglas.py -q
+E         Left contains one more item: ErrorValidacion(fichero='00_global.yaml', objeto='R-ABONO-NEGATIVO', regla='R11', detalle='la regla `R-ABONO-NEGATIVO`...to `compras.fact_compras_linea`, que no tiene ficha en el diccionario. Una regla que apunta a la nada no protege nada')
+tests\test_f006_reglas.py:419: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_f006_reglas.py::test_f006_r9_el_global_real_declara_las_doce_reglas
+FAILED tests/test_f006_reglas.py::test_f006_r9_las_reglas_reales_son_bloqueantes_salvo_las_que_avisan
+FAILED tests/test_f006_reglas.py::test_f006_r10_el_global_real_trae_ordenes_de_magnitud
+FAILED tests/test_f006_reglas.py::test_f006_r9_importe_mes_dice_lo_que_no_se_puede_hacer
+FAILED tests/test_f006_reglas.py::test_f006_r9_retencion_no_join_lineas_cita_el_incidente
+FAILED tests/test_f006_reglas.py::test_f006_r9_frescura_manual_nombra_los_cuatro_esquemas
+FAILED tests/test_f006_reglas.py::test_f006_r11_un_ambito_declarado_pendiente_se_tolera
+7 failed, 36 passed in 0.25s
+```
+
+Verde tras escribir las reglas: `43 passed`, y `156 passed` en todo F-006.
+
+**Las doce reglas, verificadas una a una contra el SQL** (no contra los
+informes). Lo que se comprobó de cada una:
+
+| Regla | Comprobado en |
+|---|---|
+| `R-FRESCURA-MANUAL` | `main.build_pipeline_steps` construido de verdad: `ingest_raw, load_excel_aux, build_stg, build_mart, apply_grants` |
+| `R-IMPORTE-MES` | `sql/mart/01_ddl.sql` (columnas `importe_mes` / `importe_origen`) |
+| `R-UNIVERSO-OBRA` | `sql/stg/03_obras.sql` (filtros y dedup por `conext.cod='15'`) vs `sql/maestro/01_obras.sql` (sin filtro) |
+| `R-OBRA-ACTIVA` | `sql/stg/03_obras.sql:123` → `TRUE AS activa`, literal |
+| `R-VERSION-MASTER` | `sql/mart/06_views_cp_tipologia.sql` (tipado de versión y elección de vigente) |
+| `R-FAS-AMBIGUO` | `sql/stg/01_ddl.sql`: `fase_num` en `presupuesto`, `version` en `plan_mensual` |
+| `R-CLAVE-SUSTITUTA` | los siete `BIGSERIAL` del árbol SQL, con sus `DROP TABLE` |
+| `R-ABONO-NEGATIVO` | `sql/compras/03_views.sql:10` «los ABONOS restan (signo natural)» |
+| `R-LINEA-ID-NO-UNICA` | `sql/compras/02_fact_linea.sql`: `CREATE TABLE ... AS` de tres orígenes, sin PK |
+| `R-RETENCION-NO-JOIN-LINEAS` | `sql/retenciones/01_movimientos.sql` (un registro por efecto) |
+| `R-COMPRAS-SIN-IVA` | `sql/compras/02_fact_linea.sql` (sin IVA) vs `sql/maestro/03_proveedores_obra.sql` (`SUM(t.totdoc)`) |
+| `R-COMPRAS-TIPO-DOC` | `compras.fn_tipo_documento`: CONTRATO, ALBARAN, PROFORMA, NOTA, FACTURA, ABONO, OTRO |
+
+**Cambio de diseño hecho aquí, con su motivo.** `validar` tolera ahora que el
+`ambito` de una regla —y el destino de una `relacion`— apunte a un objeto
+declarado en `pendientes`. Sin eso, las doce reglas no se podían escribir hasta
+tener las noventa y ocho fichas, que es el orden equivocado: las reglas son la
+pieza de más valor por línea. **La comprobación no se salta, se aplaza**: en
+cuanto el objeto tiene ficha, se verifica (y en el caso de las relaciones,
+también su columna), y al cerrar F-006 `pendientes` está vacía y vuelve a ser
+estricta.
+
+**Hallazgo, para T20/T21 (bloque F, fuera de este encargo):** `build-compras` y
+`build-retenciones` **no registran paso en `_meta.etl_runs`** —ejecutan SQL en
+línea sin step (`main.py`, comentario «no registra paso ... queda fuera de
+`v_frescura`»)—, así que **su frescura no es consultable por SQL**. `cierre` y
+`maestro` sí registran (`build_cierre`, `build_maestros`). Queda dicho dentro de
+la propia regla `R-FRESCURA-MANUAL` para que el agente no prometa una fecha que
+no puede obtener. Convertirlos en step es otra feature.
