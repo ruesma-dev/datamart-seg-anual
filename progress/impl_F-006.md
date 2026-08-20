@@ -1790,3 +1790,38 @@ offline puede y lo que se traslada a T26.
 
 **No se implementa ahora** porque exige conexion a la base y este encargo no la
 tiene: T26 y T27 son del bloque H.
+
+## El barrido de copias, convertido en mecanismo
+
+La leccion que el propio reviewer extrae —«cuando se corrige una afirmacion hay
+que buscar sus copias en el mismo fichero»— se aplico al terminar, y **encontro
+dos supervivientes mas** que nadie habia senalado:
+
+1. **La regla falsa de la NOTA seguia viva en la bateria de aceptacion**, en la
+   respuesta correcta de P12 (`00_global.yaml`). Corregida igual que en las
+   fichas: dice que vale en la vista que filtra y no en la que no.
+2. **El aviso de congelado faltaba en SEIS medidas agregadas mas**
+   —`v_pbi_retencion_entidad.importe_vencido` y `.num_vencidas`,
+   `v_pbi_retencion_obra.vencido_proveedores` y `.vencido_cliente`,
+   `v_pbi_retencion_resumen.importe_vencido` y `.num_vencidas`— mas
+   `v_pbi_retenciones_vencidas.antiguedad` e `.importe`. Todas se calculan
+   **filtrando por `vencida_sin_liquidar`**, asi que el conjunto de filas que
+   suman se decidio en el build.
+
+En vez de corregir la tercera tanda a mano, se derivo: **`CURRENT_DATE` dentro
+de un `CREATE TABLE AS` congela; dentro de una vista, no** —la distincion es
+exacta y se lee del SQL—, **y una columna cuya expresion referencia una columna
+congelada hereda el congelado y tiene que advertirlo**. Fase RED:
+
+```
+E  assert not ['retenciones.v_pbi_retencion_entidad.importe_vencido',
+    'retenciones.v_pbi_retencion_entidad.num_vencidas',
+    'retenciones.v_pbi_retencion_obra.vencido_proveedores', ...]
+```
+
+Con su control, que exige que se detecten exactamente las dos columnas
+congeladas de `retenciones` **y que `compras.dias_desde_albaran` NO cuente**,
+porque vive en una vista y se recalcula en cada consulta.
+
+Es el mismo patron de esta pasada: donde el reviewer senala un caso, se busca la
+clase; y donde la clase es derivable, se deriva en vez de revisarla a ojo.

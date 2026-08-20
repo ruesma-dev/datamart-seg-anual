@@ -1819,3 +1819,100 @@ def test_f006_r7_la_agregacion_de_las_tablas_agregadas_case_con_el_sql() -> None
                 )
 
     assert not problemas, "; ".join(problemas)
+
+
+# ===========================================================================
+# CONGELADO EN EL BUILD · y su propagacion, que es donde sobrevivia
+#
+# `CURRENT_DATE` dentro de un `CREATE TABLE AS` se evalua UNA vez, al construir,
+# y se queda congelado hasta la siguiente reconstruccion. En una vista no: ahi
+# se evalua en cada consulta. La distincion es exacta y derivable del SQL.
+#
+# El aviso se corrigio primero en las dos columnas senaladas, luego en las dos
+# vistas de detalle... y seguia faltando en las SEIS medidas agregadas que se
+# calculan filtrando por ellas. Es la misma clase de error otra vez, asi que en
+# vez de corregir la tercera tanda a mano se deriva: **una columna cuya
+# expresion referencia una columna congelada hereda el congelado y tiene que
+# advertirlo**.
+# ===========================================================================
+
+#: Lo que delata un calculo dependiente del reloj.
+_RELOJ = re.compile(r"\b(CURRENT_DATE|CURRENT_TIMESTAMP|now\s*\()", re.IGNORECASE)
+
+
+def columnas_congeladas() -> dict[str, set[str]]:
+    """Por esquema, las columnas de TABLAS que se calculan con el reloj.
+
+    Solo las tablas congelan: una vista con `CURRENT_DATE` se recalcula en cada
+    consulta y no tiene este problema.
+    """
+    congeladas: dict[str, set[str]] = {}
+    for ficha in _diccionario().fichas:
+        if ficha.tipo != "tabla" or not ficha.columnas:
+            continue
+        origen = _origen_por_objeto()[ficha.nombre]
+        if origen == "config/tables_sigrid.yaml":
+            continue
+        sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+        cuerpo = cuerpo_de_vista(sql, ficha.esquema, ficha.objeto) or cuerpo_del_insert(
+            sql, ficha.esquema, ficha.objeto
+        )
+        if cuerpo is None:
+            continue
+        proyeccion = proyeccion_por_alias(cuerpo)
+        if proyeccion is None:
+            continue
+        for alias, expresion in proyeccion.items():
+            if _RELOJ.search(expresion):
+                congeladas.setdefault(ficha.esquema, set()).add(alias)
+    return congeladas
+
+
+def test_f006_r2_control_se_detectan_las_columnas_congeladas() -> None:
+    """Si no detectara ninguna, el test de abajo pasaria en falso."""
+    congeladas = columnas_congeladas()
+
+    assert congeladas.get("retenciones") == {
+        "vencida_sin_liquidar",
+        "dias_desde_vencimiento",
+    }
+    # Y una VISTA con CURRENT_DATE no cuenta: se recalcula en cada consulta.
+    assert "dias_desde_albaran" not in congeladas.get("compras", set())
+
+
+def test_f006_r2_toda_columna_congelada_lo_advierte() -> None:
+    """Incluidas las que solo heredan el congelado por referenciarla.
+
+    `SUM(importe) FILTER (WHERE vencida_sin_liquidar)` es tan de la fecha del
+    build como la propia marca: el conjunto de filas que suma se decidio
+    entonces.
+    """
+    congeladas = columnas_congeladas()
+    problemas = []
+
+    for ficha in _diccionario().fichas:
+        heredables = congeladas.get(ficha.esquema, set())
+        if not heredables or not ficha.columnas:
+            continue
+        origen = _origen_por_objeto()[ficha.nombre]
+        if origen == "config/tables_sigrid.yaml":
+            continue
+        sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+        cuerpo = cuerpo_de_vista(sql, ficha.esquema, ficha.objeto) or cuerpo_del_insert(
+            sql, ficha.esquema, ficha.objeto
+        )
+        proyeccion = proyeccion_por_alias(cuerpo) if cuerpo else None
+        if proyeccion is None:
+            continue
+
+        for columna in ficha.columnas:
+            expresion = proyeccion.get(columna.nombre, "")
+            toca = columna.nombre in heredables or any(
+                re.search(rf"\b{re.escape(c)}\b", expresion) for c in heredables
+            )
+            if toca and "build" not in (columna.significado or "").lower():
+                problemas.append(f"{ficha.nombre}.{columna.nombre}")
+
+    assert not problemas, (
+        f"{problemas} dependen de un calculo congelado en el build y no lo dicen"
+    )

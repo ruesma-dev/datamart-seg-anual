@@ -638,8 +638,11 @@ preguntas_aceptacion:
     objetos_esperados:
       - compras.v_pbi_albaranes_sin_facturar
     respuesta_correcta: >-
-      Solo ALBARAN y PROFORMA cuentan como pendientes; las NOTA suman en el
-      consumido pero no en el pendiente. Cita la fecha de build de `compras`.
+      Usa `compras.v_pbi_albaranes_sin_facturar`, que SI filtra por tipo: solo
+      ALBARAN y PROFORMA. Y no generaliza la regla: en
+      `compras.v_pbi_contrato_consumo` el pendiente se suma sin filtrar, asi que
+      alli las NOTA tambien cuentan. Cita la fecha de build de `compras`, o
+      advierte de que no es consultable.
     reglas_implicadas: [R-COMPRAS-TIPO-DOC, R-FRESCURA-MANUAL]
     estado: respondible
 

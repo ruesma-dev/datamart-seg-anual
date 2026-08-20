@@ -319,12 +319,18 @@ objetos:
         unidad: EUR
         agregacion: suma
       importe_vencido:
-        significado: Suma de los efectos vivos cuya fecha prevista ya paso.
+        significado: >-
+          Suma de los efectos vivos cuya fecha prevista ya habia pasado EN EL
+          BUILD. Hereda el congelado de `vencida_sin_liquidar`: quien quiera lo
+          vencido a dia de hoy tiene que recalcularlo sobre
+          `fecha_prevista_devolucion`.
         unidad: EUR
         agregacion: suma
         nulo_significa: La entidad no tiene ningun efecto vencido.
       num_vencidas:
-        significado: Cuantos efectos estan vencidos y sin liquidar.
+        significado: >-
+          Cuantos efectos estaban vencidos y sin liquidar EN EL BUILD. Mismo
+          congelado que `importe_vencido`.
         agregacion: suma
       primera_devolucion_prevista:
         significado: La fecha de devolucion mas proxima de esa entidad.
@@ -406,12 +412,16 @@ objetos:
         unidad: EUR
         agregacion: suma
       vencido_proveedores:
-        significado: Retencion a proveedor vencida y sin liberar en esa obra.
+        significado: >-
+          Retencion a proveedor que estaba vencida y sin liberar EN EL BUILD.
+          Hereda el congelado de `vencida_sin_liquidar`.
         unidad: EUR
         agregacion: suma
         nulo_significa: No hay nada vencido en ese sentido.
       vencido_cliente:
-        significado: Retencion de cliente vencida y sin cobrar en esa obra.
+        significado: >-
+          Retencion de cliente que estaba vencida y sin cobrar EN EL BUILD.
+          Mismo congelado.
         unidad: EUR
         agregacion: suma
         nulo_significa: No hay nada vencido en ese sentido.
@@ -549,7 +559,10 @@ objetos:
         significado: Nombre de la obra atribuida.
         nulo_significa: El efecto no se pudo atribuir a una obra.
       importe:
-        significado: Importe retenido y vencido, con signo.
+        significado: >-
+          Importe retenido, con signo, de un efecto que estaba vencido EN EL
+          BUILD: la vista filtra por `vencida_sin_liquidar` y hereda su
+          congelado.
         unidad: EUR
         agregacion: suma
       fecha_prevista_devolucion:
@@ -567,7 +580,8 @@ objetos:
       antiguedad:
         significado: >-
           Tramo de antiguedad del vencimiento, para priorizar sin tener que
-          calcular. Es presentacion derivada de los dias, no un dato nuevo.
+          calcular. Es presentacion derivada de `dias_desde_vencimiento`, asi
+          que hereda su congelado: los tramos son los del dia del build.
         valores:
           - Menos de 3 meses
           - 3-6 meses
@@ -641,12 +655,16 @@ objetos:
         significado: Cuantos efectos ya se liquidaron.
         agregacion: suma
       importe_vencido:
-        significado: Lo vencido y sin liquidar, en toda la empresa.
+        significado: >-
+          Lo que estaba vencido y sin liquidar EN EL BUILD, en toda la empresa.
+          Hereda el congelado de `vencida_sin_liquidar`.
         unidad: EUR
         agregacion: suma
         nulo_significa: No hay nada vencido en ese sentido. Nulo, no cero.
       num_vencidas:
-        significado: Cuantos efectos estan vencidos y sin liquidar.
+        significado: >-
+          Cuantos efectos estaban vencidos y sin liquidar EN EL BUILD. Mismo
+          congelado.
         agregacion: suma
       neto_practicado:
         significado: >-
