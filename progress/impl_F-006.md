@@ -2004,3 +2004,55 @@ fallo de contenido, es una trampa de mantenimiento que iba a repetirse cinco
 veces mas en esta misma tanda. Pasan a **derivarse del propio diccionario**, con
 un suelo (`>= 49`, `>= 593`) para que no puedan quedarse en vacio si alguien
 vacia una ficha.
+
+## T23 · `stg` (10 objetos), el esquema con las peores trampas
+
+Todas las fichas van `consumo_recomendado: false` con su motivo: **lo que se
+pregunta esta en `mart` y en `cierre`**, y estas existen para que un agente
+entienda de donde sale aquello y por que no debe consultar esto.
+
+Las seis trampas del encargo, escritas y contrastadas contra el SQL:
+
+- **`plan_mensual`**: su clave son CINCO columnas e incluye `version`. El grano
+  dice literalmente que omitirla «es exactamente lo que multiplica los
+  importes», y el `motivo_no_consumo` manda a `mart`.
+- **`presupuesto`**: es el importe TOTAL sin distribucion mensual, con la regla
+  de `importe` para coste (ambitos 3 y 8) e `importe_oficial` para venta (7 y
+  11). La ficha explica **por que confundirlas pasa desapercibido**: sin
+  coeficiente las dos valen lo mismo, asi que el error solo se ve en venta. Y la
+  cantidad se guarda **sin redondear** porque en las partidas de tipo porcentaje
+  el redondeo infla el importe.
+- **`obras.activa`**: «NO SIGNIFICA NADA», con la alternativa buena al lado.
+- **`partidas.categoria`**: heuristica sobre el codigo del capitulo raiz, y la
+  ficha dice ademas que el catalogo oficial esta ingerido y sin usar, y que una
+  obra que no siga la convencion **se clasifica mal y nada lo delata**.
+- **`fases.numero_fase`** y la ambiguedad de `fas`, con sus tres nombres segun
+  la capa.
+- **`ambitos.uso_seguimiento` DESFASADO**: la ficha dice que marca solo 8 y 11,
+  que `mart` ya construye tambien 3 y 7, y que **quien filtre por esa columna se
+  dejara fuera la mitad**. Su `nulo_significa` lo repite, porque es el valor que
+  se lee.
+
+### Lo que cazaron los mecanismos, sin revisarlo a ojo
+
+Al escribir el esquema saltaron tres cosas, y las tres eran reales:
+
+1. **`stg.presupuesto` y `stg.fases` declaraban una clave distinta de su PK.**
+   La PK viene de Sigrid y no es sustituta, asi que identifica la fila igual de
+   bien y ademas **es la que usan los JOIN** —`plan_mensual` referencia
+   `presupuesto_id`—. Se declara esa como clave y el grano conserva la
+   combinacion conceptual de cuatro columnas.
+2. **`mart.v_master_versiones_tipadas -> stg.plan_mensual` prometia `N:1`.** Es
+   la comprobacion aplazada disparandose otra vez: en cuanto `plan_mensual` tuvo
+   ficha, el validador vio que hay muchas filas por obra. Es `N:N`, y su
+   `porque` dice por que trio hay que unir.
+3. Los recuentos de los tests de publicacion **ya no rompieron**, porque se
+   derivaron en T22.
+
+### Un refactor de mantenimiento, por la misma razon
+
+`TABLAS_CON_DDL_EXPLICITO` era un conjunto de tres nombres escrito a mano. Al
+llegar `stg` con sus seis tablas se habria quedado corto **en silencio**: las
+nuevas habrian caido en el grupo de «proyeccion» y el control las habria dado
+por ilegibles. Pasa a derivarse del SQL, y los dos tests exactos de tablas se
+parametrizan sobre el resultado en vez de sobre una lista de `mart`.

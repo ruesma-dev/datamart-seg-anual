@@ -69,6 +69,43 @@ def _texto_sql(*rutas: str) -> str:
     return "\n".join((DIR_SQL / ruta).read_text(encoding="utf-8") for ruta in rutas)
 
 
+@lru_cache(maxsize=1)
+def _origen_por_objeto() -> dict[str, str]:
+    """Qué fichero crea cada objeto. Cacheado porque recorre el árbol SQL
+    entero y lo piden decenas de tests parametrizados."""
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    return {o.nombre: o.origen for o in _inventario_del_repositorio()}
+
+
+@lru_cache(maxsize=1)
+def tablas_con_ddl_explicito() -> frozenset[str]:
+    """Objetos cuyo SQL declara la LISTA de columnas, no una proyección.
+
+    Se DERIVA en vez de escribirse a mano. Empezó siendo un conjunto de tres
+    nombres y, al llegar `stg` con sus seis tablas, se habría quedado corto en
+    silencio: las nuevas habrían caído en el grupo de «proyección» y el control
+    las habría dado por ilegibles. Es la misma trampa de mantenimiento que los
+    recuentos literales de los tests de publicación.
+    """
+    explicitas = set()
+    for ficha in _diccionario().fichas:
+        if ficha.tipo != "tabla" or not ficha.columnas:
+            continue
+        origen = _origen_por_objeto().get(ficha.nombre)
+        if not origen or origen == "config/tables_sigrid.yaml":
+            continue
+        sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+        if re.search(
+            rf"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+            rf"{re.escape(ficha.esquema)}\.{re.escape(ficha.objeto)}\s*\(",
+            sql,
+            re.IGNORECASE,
+        ):
+            explicitas.add(ficha.nombre)
+    return frozenset(explicitas)
+
+
 def columnas_del_create_table(texto: str, nombre_cualificado: str) -> list[str]:
     """Nombres de columna de un `CREATE TABLE <esq>.<obj> ( ... );` explícito.
 
@@ -161,13 +198,12 @@ TABLAS_MART = {
 }
 
 
-@pytest.mark.parametrize(("objeto", "fichero"), sorted(TABLAS_MART.items()))
-def test_f006_r26_mart_las_tablas_documentan_exactamente_sus_columnas(
-    objeto: str, fichero: str
-) -> None:
+@pytest.mark.parametrize("nombre", sorted(tablas_con_ddl_explicito()))
+def test_f006_r26_las_tablas_documentan_exactamente_sus_columnas(nombre: str) -> None:
     """Ni una columna de menos (habría un hueco) ni una de más (sería humo)."""
-    ficha = _fichas_de("mart")[objeto]
-    reales = columnas_del_create_table(_texto_sql(fichero), f"mart.{objeto}")
+    ficha = _diccionario().por_nombre[nombre]
+    sql = (DIR_SQL / _origen_por_objeto()[nombre]).read_text(encoding="utf-8")
+    reales = columnas_del_create_table(sql, nombre)
 
     documentadas = [c.nombre for c in ficha.columnas]
 
@@ -177,15 +213,14 @@ def test_f006_r26_mart_las_tablas_documentan_exactamente_sus_columnas(
     )
 
 
-@pytest.mark.parametrize(("objeto", "fichero"), sorted(TABLAS_MART.items()))
-def test_f006_r2_mart_la_clave_de_negocio_es_el_grano_declarado(
-    objeto: str, fichero: str
-) -> None:
+@pytest.mark.parametrize("nombre", sorted(tablas_con_ddl_explicito()))
+def test_f006_r2_la_clave_de_negocio_existe_en_la_tabla(nombre: str) -> None:
     """La clave de negocio tiene que existir de verdad en la tabla."""
-    ficha = _fichas_de("mart")[objeto]
-    reales = set(columnas_del_create_table(_texto_sql(fichero), f"mart.{objeto}"))
+    ficha = _diccionario().por_nombre[nombre]
+    sql = (DIR_SQL / _origen_por_objeto()[nombre]).read_text(encoding="utf-8")
+    reales = set(columnas_del_create_table(sql, nombre))
 
-    assert ficha.clave_negocio
+    assert ficha.clave_negocio or not ficha.consumo_recomendado
     assert set(ficha.clave_negocio) <= reales
 
 
@@ -248,15 +283,6 @@ def test_f006_r7_mart_el_escenario_declara_sus_cuatro_valores() -> None:
 # crea el objeto. Caza los nombres inventados y las erratas —el 90 % de los
 # casos— y no caza un alias mal atribuido. Para eso está `check-diccionario`.
 # ---------------------------------------------------------------------------
-
-
-@lru_cache(maxsize=1)
-def _origen_por_objeto() -> dict[str, str]:
-    """Qué fichero crea cada objeto. Cacheado por el mismo motivo: recorre el
-    árbol SQL entero y lo piden decenas de tests parametrizados."""
-    from tests.test_f006_cobertura import _inventario_del_repositorio
-
-    return {o.nombre: o.origen for o in _inventario_del_repositorio()}
 
 
 def _fichas_con_columnas() -> list:
@@ -632,17 +658,9 @@ def _vistas_del_diccionario() -> list:
     return [
         f
         for f in _diccionario().fichas
-        if f.columnas and f.nombre not in TABLAS_CON_DDL_EXPLICITO
+        if f.columnas and f.nombre not in tablas_con_ddl_explicito()
     ]
 
-
-#: Objetos cuyo SQL declara la lista de columnas y se leen con el parser de DDL.
-#: El resto se crea con `AS SELECT` y se lee de su proyección.
-TABLAS_CON_DDL_EXPLICITO = {
-    "mart.fact_seguimiento_mensual",
-    "mart.fact_seguimiento_categoria",
-    "cierre.fact_cierre_mensual",
-}
 
 #: La única excepción, y hay que decirla: `retenciones.v_src_lineas_compra` y
 #: `v_src_lineas_venta` se crean con SQL DINÁMICO dentro de un `DO $$` —según
@@ -1272,7 +1290,7 @@ AGREGACION_PROHIBIDA = {
 def _objetos_con_proyeccion():
     """Fichas con columnas que se leen de una proyección, y su SQL."""
     for ficha in _diccionario().fichas:
-        if not ficha.columnas or ficha.nombre in TABLAS_CON_DDL_EXPLICITO:
+        if not ficha.columnas or ficha.nombre in tablas_con_ddl_explicito():
             continue
         if ficha.nombre in CREADAS_CON_SQL_DINAMICO:
             continue
@@ -1775,7 +1793,7 @@ def cuerpo_del_insert(sql: str, esquema: str, objeto: str) -> str | None:
 
 def _tablas_rellenadas_con_insert():
     for ficha in _diccionario().fichas:
-        if ficha.nombre not in TABLAS_CON_DDL_EXPLICITO:
+        if ficha.nombre not in tablas_con_ddl_explicito():
             continue
         origen = _origen_por_objeto()[ficha.nombre]
         carpeta = (DIR_SQL / origen).parent

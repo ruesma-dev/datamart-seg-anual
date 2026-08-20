@@ -765,10 +765,12 @@ objetos:
         porque: Para poner codigo y nombre a la obra.
       - de: obra_id
         a: stg.plan_mensual.obra_id
-        cardinalidad: "N:1"
+        cardinalidad: "N:N"
         porque: >-
-          Es la tabla de la que sale, filtrando los ambitos master. Consultar
-          `stg.plan_mensual` directamente sin elegir version multiplica importes.
+          Es la tabla de la que sale, filtrando los ambitos master. Hay muchas
+          filas por obra en las dos puntas: el JOIN va por
+          `(obra_id, ambito_id, version)`, y aun asi consultar `stg.plan_mensual`
+          sin elegir version multiplica los importes.
     ejemplos_preguntas:
       - Que versiones de planificacion tiene la obra X y de que tipo son
       - Que obras solo tienen versiones de cierre mensual

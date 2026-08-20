@@ -454,7 +454,8 @@ YAML_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 #:            de `_meta`.
 #:   53  T20/T21 · los 14 objetos de `compras` y los 10 de `retenciones`
 #:   49  T22 · las cuatro fichas de `maestro`
-PENDIENTES_MAX = 49
+#:   39  T23 · los diez objetos de `stg`
+PENDIENTES_MAX = 39
 
 
 def _inventario_del_repositorio():
