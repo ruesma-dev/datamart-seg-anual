@@ -507,3 +507,30 @@ completo cuando las 13 se responden bien y las 5 restantes se contestan con un
    planificación hecha por la IA) siguen abiertas. El diccionario describe **lo
    que el dato es**; F-030 describe **cómo se decide con él**. Son cosas
    distintas y esta spec no resuelve la segunda.
+
+
+---
+
+## 12 · Decisiones resueltas (humano, 2026-08-20)
+
+Las seis decisiones de la seccion 10 estan cerradas. Todas se resolvieron con
+la recomendacion de la spec.
+
+| id | Resolucion |
+|---|---|
+| **DA-1** | **A.** El diccionario se publica en `run-all` y por comando suelto. No se republica al final de cada build manual: no depende de los datos. |
+| **DA-2** | **A.** `raw` se documenta a nivel de objeto, no de columna. La ficha de cada tabla de `raw` remite a `azure-apps/sigrid_tablas.md`, que es su diccionario real. |
+| **DA-3** | **A.** Los `REVOKE` se construyen Y se activan dentro de F-006, **pero solo despues de verificar (R34) que Power BI no depende de los esquemas que se retiran**. Si esa verificacion sale sucia, se cae a la opcion B: quedan construidos y apagados, y se entregan a F-034 como dependencia explicita. |
+| **DA-4** | **A.** La bateria de aceptacion se ejecuta contra el **prototipo local apuntado a la base de Azure**, leyendo el diccionario nuevo. Motivo: no dejar el criterio de exito de esta feature como rehen del repositorio `mcp-bbdd`. Implica abrir la regla de firewall del puesto en cada tanda (D11, CGNAT). |
+| **DA-5** | **A.** Version manual (`version: N`) mas hash. El hash detecta el cambio; el numero lo comunica. |
+| **DA-6** | **A.** Nada de recuentos de filas por objeto: envejecen mal y nadie los actualiza. Los ordenes de magnitud van solo en las reglas globales (R10). |
+
+Ademas, en la misma sesion:
+
+- Se anadio **`"rigor": "critico"`** explicito a la ficha de F-006, como pedia
+  la cabecera de este documento. Ya no depende de la omision.
+- Se confirmaron las prioridades **2 a 6 para F-036..F-040**, por delante de
+  F-035 y F-025. Motivo dado por el humano: el conocimiento de negocio va
+  primero. Esto acota que puede cerrar F-006 y que queda para esas fichas.
+- Orden de trabajo aprobado: **empezar por los bloques A-D** (andamiaje, reglas
+  duras, fichas de `mart` y de `cierre`).
