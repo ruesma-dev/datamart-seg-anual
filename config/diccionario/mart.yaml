@@ -25,11 +25,11 @@ objetos:
       combinaciones de coste/venta y real/planificado. Es la tabla a la que hay
       que ir para cualquier pregunta de planificacion o de produccion mensual.
     grano: >-
-      Una fila por (obra, partida, mes, escenario). "Escenario" es el cruce de
-      magnitud (COSTE o VENTA) y naturaleza (REAL o PLANIFICADO): hasta cuatro
-      filas por celda. Los meses futuros solo tienen los dos escenarios
-      planificados; los meses pasados de una obra que arranco sin master, solo
-      los dos reales.
+      Una fila por (`obra_id`, `partida_id`, `anio_mes`, `escenario`), que es
+      exactamente su clave de negocio. "Escenario" es el cruce de magnitud
+      (COSTE o VENTA) y naturaleza (REAL o PLANIFICADO): hasta cuatro filas por
+      celda. Los meses futuros solo tienen los dos escenarios planificados; los
+      meses pasados de una obra que arranco sin master, solo los dos reales.
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -242,8 +242,9 @@ objetos:
       tener que agregar millones de filas en cada consulta de KPI; NO sustituye a
       la tabla de detalle, la complementa.
     grano: >-
-      Una fila por (obra, mes, categoria, escenario). Es la suma de todas las
-      partidas de esa obra y mes que comparten categoria.
+      Una fila por (`obra_id`, `anio_mes`, `categoria`, `escenario`), que es su
+      clave de negocio. Es la suma de todas las partidas de esa obra y mes que
+      comparten categoria.
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -344,8 +345,8 @@ objetos:
       sin los textos que se repiten millones de veces. Pensada para modelos en
       estrella, donde los nombres los ponen las dimensiones.
     grano: >-
-      El mismo que la tabla de la que sale: una fila por (obra, partida, mes,
-      escenario).
+      El mismo que la tabla de la que sale: una fila por (`obra_id`,
+      `partida_id`, `anio_mes`, `escenario`).
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -445,7 +446,8 @@ objetos:
       Version aligerada del preagregado por categoria: identificadores, importes
       y cuantas partidas se han sumado. Para tarjetas de KPI y matrices por
       capitulo sin bajar a partida.
-    grano: Una fila por (obra, mes, categoria, escenario).
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `categoria`, `escenario`).
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -497,7 +499,8 @@ objetos:
       universo del SEGUIMIENTO: no estan las obras administrativas ni los codigos
       con cinco o mas digitos. Para el universo completo, con cliente y estado,
       se va a `maestro.obras`.
-    grano: Una fila por obra del universo de seguimiento.
+    grano: >-
+      Una fila por `obra_id`, del universo de seguimiento.
     clave_negocio: [obra_id]
     paso_etl: build_mart
     refresco: nocturno
@@ -530,7 +533,8 @@ objetos:
       por la jerarquia: categoria, capitulo raiz y ruta completa de capitulos.
       Incluye tanto las partidas como los capitulos, porque en Sigrid un capitulo
       es tambien una fila de partidas.
-    grano: Una fila por partida o capitulo de una obra.
+    grano: >-
+      Una fila por `partida_id`: una partida o un capitulo de una obra.
     clave_negocio: [partida_id]
     paso_etl: build_mart
     refresco: nocturno
@@ -585,7 +589,8 @@ objetos:
       `nivel_6` con "codigo · nombre" de cada escalon de la ruta de capitulos.
       Existe para pintar el arbol del presupuesto sin recursion. Misma clave, asi
       que se puede sustituir una por otra.
-    grano: Una fila por partida o capitulo de una obra, igual que la dimension base.
+    grano: >-
+      Una fila por `partida_id`, igual que la dimension base.
     clave_negocio: [partida_id]
     paso_etl: build_mart
     refresco: nocturno
@@ -675,7 +680,8 @@ objetos:
       en el seguimiento hasta doce meses despues del ultimo. Los nombres de mes
       se generan en castellano sin depender del idioma del servidor.
     grano: >-
-      Una fila por mes, no por dia: el grano de todo el seguimiento es mensual.
+      Una fila por `anio_mes`, es decir por mes y no por dia: el grano de todo
+      el seguimiento es mensual.
     clave_negocio: [anio_mes]
     paso_etl: build_mart
     refresco: nocturno
@@ -714,8 +720,9 @@ objetos:
       DEDUCIDO del texto libre que escribio el jefe de obra. Es la vista que
       explica por que una obra tiene o no tiene plan vigente en un mes.
     grano: >-
-      Una fila por (obra, ambito master, version). Solo ambitos 8 (coste) y 11
-      (venta), y solo versiones con fecha efectiva resuelta.
+      Una fila por (`obra_id`, `ambito_id`, `version`), que es su clave de
+      negocio. Solo ambitos 8 (coste) y 11 (venta), y solo versiones con fecha
+      efectiva resuelta.
     clave_negocio: [obra_id, ambito_id, version]
     paso_etl: build_mart
     refresco: nocturno
@@ -775,7 +782,9 @@ objetos:
       'Planif Inicial', 'ABC' o 'Cuatrimestral' con fecha efectiva anterior al
       corte. El corte es el 31 de diciembre si el ano ya paso, y hoy si es el ano
       en curso.
-    grano: Una fila por (obra, ano, ambito master).
+    grano: >-
+      Una fila por (`obra_id`, `anio`, `ambito_id`), que es su clave de
+      negocio.
     clave_negocio: [obra_id, anio, ambito_id]
     paso_etl: build_mart
     refresco: nocturno
@@ -828,10 +837,11 @@ objetos:
       gastos generales), comparando real y planificado sobre la MISMA ventana de
       meses. Solo salen las filas con algun importe distinto de cero.
     grano: >-
-      Una fila por (obra, ano, tipologia). El plan y el real se suman sobre la
-      misma ventana [enero .. mes de corte]: 12 si el ano ya paso, y el ultimo
-      mes con cierre real si es el ano en curso. Cortar el plan en el mes de
-      calendario lo dejaria siempre por delante del real.
+      Una fila por (`obra_id`, `anio`, `tipologia`), que es su clave de
+      negocio. El plan y el real se suman sobre la MISMA ventana
+      [enero .. mes de corte]: 12 si el ano ya paso, y el ultimo mes con cierre
+      real si es el ano en curso. Cortar el plan en el mes de calendario lo
+      dejaria siempre por delante del real.
     clave_negocio: [obra_id, anio, tipologia]
     paso_etl: build_mart
     refresco: nocturno
@@ -904,9 +914,9 @@ objetos:
       un coste imputado de golpe —un seguro, un aval— y lo reparte a lo largo de
       su plazo. Solo periodifica COSTE; la venta pasa siempre directa.
     grano: >-
-      Una fila por (obra, partida, mes, escenario), igual que la tabla de hecho,
-      salvo en las filas periodificadas, donde una imputacion de un mes se
-      convierte en tantas filas como meses tenga su plazo.
+      Una fila por (`obra_id`, `partida_id`, `anio_mes`, `escenario`), igual que
+      la tabla de hecho, salvo en las filas periodificadas, donde una imputacion
+      de un mes se convierte en tantas filas como meses tenga su plazo.
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno

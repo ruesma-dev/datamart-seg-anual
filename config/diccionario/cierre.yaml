@@ -33,9 +33,10 @@ objetos:
       beneficio y los porcentajes ya calculados se va a
       `cierre.v_pbi_cierre_resumen`.
     grano: >-
-      Una fila por (obra, mes, concepto), con cuatro conceptos base: VENTA,
-      INDIRECTOS, DIRECTOS y GENERALES. Los conceptos GASTOS y BENEFICIO NO
-      estan aqui: se derivan en la vista de resumen.
+      Una fila por (`obra_id`, `anio_mes`, `concepto`), que es su clave de
+      negocio, con cuatro conceptos base: VENTA, INDIRECTOS, DIRECTOS y
+      GENERALES. Los conceptos GASTOS y BENEFICIO NO estan aqui: se derivan en
+      la vista de resumen.
     clave_negocio: [obra_id, anio_mes, concepto]
     paso_etl: build_cierre
     refresco: manual
@@ -200,8 +201,10 @@ objetos:
       BENEFICIO (venta menos gastos), con los porcentajes ya calculados. Es la
       vista a la que hay que ir para "cuanto llevamos ejecutado".
     grano: >-
-      Seis filas por (obra, mes): VENTA, GASTOS, INDIRECTOS, DIRECTOS, GENERALES
-      y BENEFICIO. Las dos ultimas no existen en la tabla base, se derivan aqui.
+      Seis filas por (`obra_id`, `anio_mes`), una por `concepto`: VENTA, GASTOS,
+      INDIRECTOS, DIRECTOS, GENERALES y BENEFICIO. La clave es la terna
+      (`obra_id`, `anio_mes`, `concepto`). Las dos ultimas no existen en la
+      tabla base, se derivan aqui.
     clave_negocio: [obra_id, anio_mes, concepto]
     paso_etl: build_cierre
     refresco: manual
@@ -442,8 +445,9 @@ objetos:
       cada obra, porque lo escribe el jefe de obra, y heredar el nombre de otra
       obra seria mentir.
     grano: >-
-      Una fila por (obra, grupo de indirectos, subcategoria). El grupo sale del
-      segundo escalon de la ruta de capitulos y la subcategoria del tercero.
+      Una fila por (`obra_id`, `grupo_cod`, `subcategoria_cod`), que es su clave
+      de negocio. El grupo sale del segundo escalon de la ruta de capitulos y la
+      subcategoria del tercero.
     clave_negocio: [obra_id, grupo_cod, subcategoria_cod]
     paso_etl: build_cierre
     refresco: manual
@@ -489,10 +493,11 @@ objetos:
       paralelo para los grupos de infraestructura. Las cuatro conviven a
       proposito: no hay una elegida, se comparan.
     grano: >-
-      Una fila por (obra, mes, grupo, subcategoria). Las columnas CALCULADAS de
-      periodificacion (ratios, acumulados y parciales) solo tienen valor en los
-      grupos cuyo nombre contiene "INFRA"; en el resto van a nulo. Sus dos
-      entradas, `importe_fase0` y `plazo_total_meses`, traen valor siempre.
+      Una fila por (`obra_id`, `anio_mes`, `grupo_cod`, `subcategoria_cod`), que
+      es su clave de negocio. Las columnas CALCULADAS de periodificacion
+      (ratios, acumulados y parciales) solo tienen valor en los grupos cuyo
+      nombre contiene "INFRA"; en el resto van a nulo. Sus dos entradas,
+      `importe_fase0` y `plazo_total_meses`, traen valor siempre.
     clave_negocio: [obra_id, anio_mes, grupo_cod, subcategoria_cod]
     paso_etl: build_cierre
     refresco: manual
@@ -648,7 +653,9 @@ objetos:
       Detalle de los costes GENERALES (los proporcionales) de cada obra, abierto
       por tipologia de negocio: seguros, avales, levantamiento, contratacion,
       medio ambiente y aporte a gastos generales.
-    grano: Una fila por (obra, mes, tipologia).
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `tipologia`), que es su clave de
+      negocio.
     clave_negocio: [obra_id, anio_mes, tipologia]
     paso_etl: build_cierre
     refresco: manual
@@ -724,9 +731,9 @@ objetos:
       presupuestos inicial, vigente y aprobado con los modificados. Es la vista
       que contesta "de que va esta obra y en que estado esta".
     grano: >-
-      Una fila por obra del universo de seguimiento. Cuando una obra tiene varios
-      contratos, las fechas se agregan: la mas antigua para los inicios y la mas
-      reciente para los finales.
+      Una fila por `obra_id`, del universo de seguimiento. Cuando una obra tiene
+      varios contratos, las fechas se agregan: la mas antigua para los inicios y
+      la mas reciente para los finales.
     clave_negocio: [obra_id]
     paso_etl: build_cierre
     refresco: manual
@@ -882,9 +889,9 @@ objetos:
       produccion, los tres tipos de coste, el total de costes y el beneficio. Los
       importes son DEL MES, no acumulados a origen.
     grano: >-
-      Una fila por (obra, mes, renglon del cuadro). Sale de
-      `mart.fact_seguimiento_categoria`, que si se refresca de noche, aunque la
-      vista se recree con `build-cierre`.
+      Una fila por (`obra_id`, `anio_mes`, `concepto_cuadro`), que es su clave de
+      negocio. Sale de `mart.fact_seguimiento_categoria`, que si se refresca de
+      noche, aunque la vista se recree con `build-cierre`.
     clave_negocio: [obra_id, anio_mes, concepto_cuadro]
     paso_etl: build_cierre
     refresco: manual

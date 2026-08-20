@@ -89,8 +89,15 @@ objetos:
         agregacion: no_sumable
       codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
       proveedor_id:
-        significado: Identificador del proveedor en Sigrid (`con.ide`).
+        significado: >-
+          Identificador del proveedor en Sigrid (`con.ide`). Sale de un
+          `NULLIF(entide, 0)`, asi que un documento sin proveedor lo trae a
+          NULO y no a cero.
         agregacion: no_sumable
+        nulo_significa: >-
+          El documento no tenia proveedor informado. Estas lineas SI estan aqui,
+          y son justamente las que `compras.v_pbi_proveedor_obra` deja fuera con
+          su filtro: es la razon de que esa ficha mande volver a esta tabla.
       proveedor_nombre: Nombre del proveedor, de `con.res`.
       proveedor_cif:
         significado: >-
@@ -599,7 +606,8 @@ objetos:
       El estado de cada contrato de un vistazo: cuanto se comprometio, cuanto se
       ha entregado, cuanto se ha facturado, cuanto queda disponible y que
       porcentaje se lleva consumido. Es la vista para "como va el contrato C".
-    grano: Una fila por contrato.
+    grano: >-
+      Una fila por `contrato_id`.
     clave_negocio: [contrato_id]
     paso_etl: build_compras
     refresco: manual
@@ -658,10 +666,10 @@ objetos:
         agregacion: suma
       importe_albaranado_sin_facturar:
         significado: >-
-          Lo entregado y todavia no facturado. OJO, y es la excepcion de este
-          esquema: **aqui el pendiente incluye NOTA y OTRO**, porque es el unico
-          agregado de la vista que se suma SIN filtrar por tipo de documento. Si
-          se quiere el pendiente solo de ALBARAN y PROFORMA hay que ir a
+          Lo entregado y todavia no facturado. OJO: **aqui el pendiente incluye
+          NOTA y OTRO**, porque se suma SIN filtrar por tipo de documento —igual
+          que `importe_facturado`, que tampoco filtra—. Si se quiere el
+          pendiente solo de ALBARAN y PROFORMA hay que ir a
           `compras.v_pbi_albaranes_sin_facturar`, que si filtra, y las dos
           cifras pueden no coincidir.
         unidad: EUR
@@ -705,8 +713,14 @@ objetos:
       por los cuatro momentos del gasto: contratado, entregado, certificado y
       facturado. Es la vista del ranking de proveedores.
     grano: >-
-      Una fila por (obra, proveedor, ano). OJO: el periodo es ANUAL. Para grano
-      mensual hay que ir a `compras.fact_compras_linea` y agrupar por la fecha.
+      Una fila por (`obra_id`, `codigo_obra`, `proveedor_id`,
+      `proveedor_nombre`, `proveedor_cif`, `anio`), que es su clave de negocio y
+      son SEIS columnas, no tres. No basta con (obra, proveedor, ano):
+      `proveedor_cif` sale del CIF que traia cada documento y NO depende de
+      `proveedor_id`, asi que dos facturas del mismo proveedor con CIF distinto
+      dan DOS filas. Unir por tres columnas duplica. OJO ademas: el periodo es
+      ANUAL; para grano mensual hay que ir a `compras.fact_compras_linea` y
+      agrupar por la fecha.
     clave_negocio: [obra_id, codigo_obra, proveedor_id, proveedor_nombre, proveedor_cif, anio]
     paso_etl: build_compras
     refresco: manual
@@ -801,9 +815,11 @@ objetos:
       con la antiguedad de cada entrega para poder priorizar. Responde a "que
       nos van a facturar y aun no ha llegado".
     grano: >-
-      Una fila por linea de albaran o proforma con pendiente. **Solo ALBARAN y
-      PROFORMA**: las notas de cargo suman en el consumido del contrato pero no
-      cuentan como pendiente de facturar.
+      Una fila por `linea_id` de albaran o proforma con pendiente. **Esta vista
+      SI filtra por tipo**: solo ALBARAN y PROFORMA, asi que las notas de cargo
+      no aparecen. Cuidado con generalizar la regla: en
+      `compras.v_pbi_contrato_consumo` el pendiente se suma SIN filtrar tipo y
+      alli las notas SI cuentan.
     clave_negocio: [linea_id]
     paso_etl: build_compras
     refresco: manual
@@ -898,9 +914,13 @@ objetos:
       cuanto se ha entregado, certificado, facturado y contratado en ella. Es la
       cara "real documental" que se compara con el coste del seguimiento.
     grano: >-
-      Una fila por (obra, partida). Solo entran las lineas que tienen partida
-      informada: lo que no se imputa a partida no aparece aqui, asi que el total
-      de esta vista es MENOR que el de `compras.fact_compras_linea`.
+      Una fila por (`obra_id`, `codigo_obra`, `partida_id`, `codigo_partida`,
+      `descripcion_partida`), que es su clave de negocio y son CINCO columnas,
+      no dos: el `GROUP BY` incluye tambien los textos, y `codigo_obra` se
+      resuelve con una cascada distinta de la de `obra_id`. Solo entran las
+      lineas que tienen partida informada: lo que no se imputa a partida no
+      aparece aqui, asi que el total de esta vista es MENOR que el de
+      `compras.fact_compras_linea`.
     clave_negocio: [obra_id, codigo_obra, partida_id, codigo_partida, descripcion_partida]
     paso_etl: build_compras
     refresco: manual

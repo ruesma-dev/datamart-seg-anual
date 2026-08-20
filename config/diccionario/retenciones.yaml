@@ -44,10 +44,11 @@ objetos:
       pagado al subcontratista; con sentido CLIENTE es dinero nuestro que el
       cliente todavia no nos ha pagado. Es la tabla base de todo el esquema.
     grano: >-
-      UNA FILA POR EFECTO, no por linea de factura. Unirla a las lineas del
-      documento origen multiplica el importe por el numero de lineas: es el
-      error que dio 38,9 M€ en una sola obra. Para cruzar con el detalle hay que
-      agregar antes por documento.
+      UNA FILA POR EFECTO, no por linea de factura, y su clave es el par
+      (`sentido`, `movimiento_id`): el identificador solo es unico dentro de su
+      sentido. Unirla a las lineas del documento origen multiplica el importe
+      por el numero de lineas: es el error que dio 38,9 M€ en una sola obra.
+      Para cruzar con el detalle hay que agregar antes por documento.
     clave_negocio: [sentido, movimiento_id]
     paso_etl: build_retenciones
     refresco: manual
@@ -258,9 +259,9 @@ objetos:
       LECTURAS del saldo a la vista para que no haya que elegir a ciegas: la de
       estado (`saldo_vivo`) y la de signo (`neto_practicado`).
     grano: >-
-      Una fila por (sentido, entidad). Los efectos sin entidad informada quedan
-      FUERA de esta vista, asi que su total puede ser menor que el de
-      `retenciones.movimientos`.
+      Una fila por (`sentido`, `entidad_id`), que es su clave de negocio. Los
+      efectos sin entidad informada quedan FUERA de esta vista, asi que su total
+      puede ser menor que el de `retenciones.movimientos`.
     clave_negocio: [sentido, entidad_id]
     paso_etl: build_retenciones
     refresco: manual
@@ -353,9 +354,11 @@ objetos:
       posicion neta: cuanto retenemos a proveedores frente a cuanto nos retiene
       el cliente. Es la vista para "como esta la obra X en garantias".
     grano: >-
-      Una fila por obra. Los efectos sin obra atribuida quedan FUERA, asi que la
-      suma de esta vista es menor que el total de la empresa: lo que falta esta
-      en `sin_obra_asignada` de `retenciones.v_pbi_retencion_resumen`.
+      Una fila por `obra_id`. Los efectos sin obra atribuida quedan FUERA, asi
+      que la suma de esta vista es menor que el total de la empresa: lo que
+      falta esta en `sin_obra_asignada` de
+      `retenciones.v_pbi_retencion_resumen`, que es un RECUENTO y no un
+      importe.
     clave_negocio: [obra_id]
     paso_etl: build_retenciones
     refresco: manual
@@ -435,7 +438,10 @@ objetos:
       El detalle, efecto a efecto, de todo lo que sigue retenido. Es la lista de
       trabajo: cada fila es una retencion concreta que habra que liberar o
       reclamar.
-    grano: Una fila por efecto vivo, en los dos sentidos.
+    grano: >-
+      Una fila por efecto vivo, en los dos sentidos; su clave es el par
+      (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
+      de su sentido.
     clave_negocio: [sentido, movimiento_id]
     paso_etl: build_retenciones
     refresco: manual
@@ -475,9 +481,16 @@ objetos:
         agregacion: no_sumable
         nulo_significa: El efecto no tiene fecha de vencimiento informada.
       vencida_sin_liquidar:
-        significado: Si la fecha prevista ya paso y el efecto sigue vivo.
+        significado: >-
+          Si la fecha prevista ya habia pasado **EN EL MOMENTO DEL BUILD**, no
+          hoy: se hereda de `retenciones.movimientos`, que es una tabla
+          materializada. Para el vencimiento a dia de hoy hay que recalcularlo
+          sobre `fecha_prevista_devolucion`.
       dias_desde_vencimiento:
-        significado: Dias desde el vencimiento. Negativo significa que aun no ha vencido.
+        significado: >-
+          Dias desde el vencimiento **hasta el dia del build**, no hasta hoy.
+          Negativo significa que aun no habia vencido entonces. Para los dias
+          reales se recalcula sobre `fecha_prevista_devolucion`.
         agregacion: no_sumable
         nulo_significa: El efecto no tiene fecha de vencimiento con la que contar.
       num_obras_documento:
@@ -505,7 +518,11 @@ objetos:
       Las retenciones cuya fecha prevista ya paso y que siguen vivas, con un
       tramo de antiguedad para priorizar. En sentido CLIENTE es dinero que hay
       que reclamar; en PROVEEDOR, dinero que habria que haber liberado.
-    grano: Una fila por efecto vencido y sin liquidar.
+    grano: >-
+      Una fila por efecto vencido y sin liquidar; su clave es el par
+      (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
+      de su sentido. **Vencido A FECHA DEL BUILD**, no de hoy: ver
+      `vencida_sin_liquidar`.
     clave_negocio: [sentido, movimiento_id]
     paso_etl: build_retenciones
     refresco: manual
@@ -539,7 +556,13 @@ objetos:
         significado: La fecha en la que debio liberarse o cobrarse.
         agregacion: no_sumable
       dias_desde_vencimiento:
-        significado: Cuantos dias lleva vencido. Aqui siempre es positivo.
+        significado: >-
+          Cuantos dias llevaba vencido **EL DIA DEL BUILD**, no hoy: la columna
+          se materializa en `retenciones.movimientos` y se congela ahi. Aqui
+          siempre es positivo, porque la vista filtra por vencidas. Para los
+          dias reales se recalcula sobre `fecha_prevista_devolucion`, y en un
+          esquema de refresco manual cuya fecha de build no es consultable, la
+          diferencia pueden ser semanas.
         agregacion: no_sumable
       antiguedad:
         significado: >-
@@ -603,6 +626,9 @@ objetos:
           magnitud es una senal de que la consulta esta mal.
         unidad: EUR
         agregacion: suma
+        nulo_significa: >-
+          No hay ningun efecto vivo en ese sentido. Es NULO y no cero, porque la
+          suma no lleva `COALESCE`.
       num_vivas:
         significado: Cuantos efectos siguen retenidos.
         agregacion: suma
@@ -610,6 +636,7 @@ objetos:
         significado: Lo que ya se libero o se cobro, en toda la empresa.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hay ningun efecto liquidado en ese sentido. Nulo, no cero.
       num_liquidadas:
         significado: Cuantos efectos ya se liquidaron.
         agregacion: suma
@@ -617,6 +644,7 @@ objetos:
         significado: Lo vencido y sin liquidar, en toda la empresa.
         unidad: EUR
         agregacion: suma
+        nulo_significa: No hay nada vencido en ese sentido. Nulo, no cero.
       num_vencidas:
         significado: Cuantos efectos estan vencidos y sin liquidar.
         agregacion: suma

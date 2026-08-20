@@ -1586,10 +1586,100 @@ def test_f006_r2_lo_vencido_se_congela_en_el_build_y_se_dice() -> None:
     sql = (DIR_SQL / "retenciones/01_movimientos.sql").read_text(encoding="utf-8")
     assert "CURRENT_DATE" in sql and "CREATE TABLE retenciones.movimientos AS" in sql
 
+    # Las dos VISTAS derivadas cuentan tanto como la tabla base, o mas: son las
+    # que responden P13 de la bateria, y quien pregunta «que vence este
+    # trimestre» aterriza ahi y no en `movimientos`.
     for objeto, columna in (
         ("retenciones.movimientos", "vencida_sin_liquidar"),
         ("retenciones.movimientos", "dias_desde_vencimiento"),
+        ("retenciones.v_pbi_retenciones_vivas", "vencida_sin_liquidar"),
+        ("retenciones.v_pbi_retenciones_vivas", "dias_desde_vencimiento"),
+        ("retenciones.v_pbi_retenciones_vencidas", "dias_desde_vencimiento"),
     ):
         texto = _columna(objeto, columna).significado
         assert "build" in texto.lower(), f"{objeto}.{columna}"
         assert "fecha_prevista_devolucion" in texto, f"{objeto}.{columna}"
+
+
+# ===========================================================================
+# COHERENCIA INTERNA · que dos campos de la misma ficha no se contradigan
+#
+# Esta comprobacion nace de un patron, no de un caso: **tres veces** se ha
+# corregido una afirmacion en un campo y ha sobrevivido en el de al lado. Paso
+# con el ejemplo de `design.md`, con los residuos de «mes anterior» y con los
+# granos. La ultima vez, `v_pbi_proveedor_obra` amplio su `clave_negocio` a seis
+# columnas y su `grano` siguio diciendo «una fila por (obra, proveedor, ano)`:
+# **la clave quedo bien y el grano seguia induciendo el fan-out**, que es lo que
+# de verdad lee el agente antes de escribir un JOIN.
+#
+# La regla es simple y no admite interpretacion: **el `grano` tiene que nombrar
+# todas las columnas de la `clave_negocio`**. Da igual como lo redacte —una
+# enumeracion entre parentesis o prosa— mientras las nombre; asi el grano no
+# puede prometer menos dimensiones de las que la clave declara.
+#
+# Es una sola direccion a proposito: el grano SI puede mencionar columnas que no
+# estan en la clave, porque explicar el contexto es justo lo que se le pide.
+# ===========================================================================
+
+
+def test_f006_r2_control_hay_claves_compuestas_que_vigilar() -> None:
+    """Si no hubiera ninguna, el test de abajo no probaria nada."""
+    compuestas = [
+        f for f in _diccionario().fichas
+        if f.tipo != "funcion" and len(f.clave_negocio) >= 2
+    ]
+
+    assert len(compuestas) >= 20
+
+
+@pytest.mark.parametrize(
+    "nombre",
+    sorted(
+        f.nombre for f in _diccionario().fichas
+        if f.tipo != "funcion" and f.clave_negocio
+    ),
+)
+def test_f006_r2_el_grano_nombra_todas_las_columnas_de_la_clave(nombre: str) -> None:
+    """Un grano que enumera menos dimensiones que la clave manda a duplicar."""
+    ficha = _diccionario().por_nombre[nombre]
+
+    faltan = [
+        columna
+        for columna in ficha.clave_negocio
+        if not re.search(rf"\b{re.escape(columna)}\b", ficha.grano or "")
+    ]
+
+    assert not faltan, (
+        f"la `clave_negocio` es {list(ficha.clave_negocio)} y el `grano` no "
+        f"nombra {faltan}: quien lea el grano unira por menos columnas y "
+        f"duplicara"
+    )
+
+
+def test_f006_r2_las_tres_medidas_que_faltaban_declaran_su_nulo() -> None:
+    """La misma clase del defecto 10, en la ficha vecina.
+
+    `v_pbi_retencion_resumen` tiene tres `SUM(...) FILTER` sin `COALESCE` cuyas
+    hermanas del mismo fichero SI lo declaran. Se busco la clase entera, no el
+    caso senalado.
+    """
+    for columna in ("saldo_vivo", "importe_liquidado", "importe_vencido"):
+        assert _columna("retenciones.v_pbi_retencion_resumen", columna).nulo_significa, (
+            columna
+        )
+
+
+def test_f006_r2_el_pendiente_no_se_declara_el_unico_sin_filtrar() -> None:
+    """`importe_facturado` tampoco filtra por tipo, y la propia ficha lo admite."""
+    texto = _columna(
+        "compras.v_pbi_contrato_consumo", "importe_albaranado_sin_facturar"
+    ).significado
+
+    assert "unico agregado" not in texto.lower()
+    assert "NOTA" in texto
+
+
+def test_f006_r2_el_proveedor_de_la_tabla_de_hechos_declara_su_nulo() -> None:
+    """Sale de un `NULLIF(entide, 0)` y la ficha vecina manda aqui justamente
+    «para no perder las lineas sin proveedor»."""
+    assert _columna("compras.fact_compras_linea", "proveedor_id").nulo_significa

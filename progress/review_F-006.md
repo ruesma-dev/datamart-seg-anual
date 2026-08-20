@@ -1,9 +1,252 @@
 <!-- progress/review_F-006.md -->
 # F-006 · Review — bloques A a F
 
-> Este fichero tiene **tres pasadas**, de la más reciente a la más antigua.
+> Este fichero tiene **cuatro pasadas**, de la más reciente a la más antigua.
 > Se conservan íntegras: son lo que se pidió corregir cada vez y el patrón
 > contra el que se contrasta la siguiente.
+
+---
+
+# CUARTA PASADA · 2026-08-20 — cierre de los defectos del bloque E y F
+
+> Commits revisados: `efbef48`..`c20c933` (cinco). Mismo alcance: T15–T18,
+> T20 y T21.
+
+## Veredicto de la cuarta pasada
+
+**RECHAZADO**, por poco y por una sola razón: **tres de los defectos dados por
+cerrados lo están en el campo que la review señaló y siguen abiertos en el campo
+vecino de la misma ficha**, y dos de ellos son afirmaciones falsas en el `grano`,
+que es lo primero que un agente lee.
+
+Todo lo demás está bien, y es mucho: el contrato con `mcp-bbdd` quedó resuelto
+como debía, el mecanismo derivable funciona y no marca de más, y los 40 tests
+saltados —el punto por el que había que empezar— tienen explicación buena.
+
+**Rectifico además mi propia verificación**: di por cerrados los defectos (a),
+(e) y el del congelado tras comprobar `clave_negocio` y la ficha de la columna.
+No miré el `grano` ni las dos vistas derivadas, y ahí seguían. La lección es del
+proceso, no de una persona: **cuando se corrige una afirmación hay que buscar sus
+copias en el mismo fichero**, porque esta es la tercera vez que el defecto
+sobrevive en el campo de al lado —pasó con el ejemplo de `design.md`, con los
+residuos de «mes anterior» y ahora con los granos—.
+
+---
+
+## Lo que hay que corregir
+
+1. **El `grano` contradice a su propia `clave_negocio`, y el grano es el que
+   induce el fan-out.** En `v_pbi_proveedor_obra` la clave pasó a las seis
+   columnas del `GROUP BY` (`compras.yaml:710`) pero el `grano` sigue diciendo
+   «Una fila por (obra, proveedor, ano)» (`:707-709`). Son incompatibles: si
+   `proveedor_cif` no depende funcionalmente de `proveedor_id` —y no depende,
+   sale de `entcif` del documento— entonces hay más de una fila por (obra,
+   proveedor, año), que es justo el motivo por el que se amplió la clave. Quien
+   lea el grano unirá por tres columnas y duplicará. Idéntico en
+   `v_pbi_partida_coste`: clave de cinco (`:904`), grano «Una fila por (obra,
+   partida)» (`:900-901`).
+2. **La regla falsa de la NOTA sobrevive en el `grano` de la vista vecina.** La
+   corrección quedó bien en la ficha de `tipo_documento` (`:329-333`) y en la de
+   `importe_albaranado_sin_facturar` (`:659-666`), pero el `grano` de
+   `v_pbi_albaranes_sin_facturar` (`:803-806`) mantiene la formulación general:
+   «las notas de cargo suman en el consumido del contrato pero no cuentan como
+   pendiente de facturar». La segunda mitad es **exactamente lo que es falso** en
+   `v_pbi_contrato_consumo`, cuyo `SUM(pendiente_facturar)` no filtra por tipo
+   (`compras/03_views.sql:42`). El test que fija la corrección no mira ese campo.
+3. **El aviso de congelado no llega a las dos vistas donde aterriza la
+   pregunta.** En la tabla base quedó muy bien explicado, pero
+   `v_pbi_retenciones_vivas` (`retenciones.yaml:477-482`) sigue diciendo «Si la
+   fecha prevista ya paso» y «Dias desde el vencimiento», y
+   `v_pbi_retenciones_vencidas` (`:541-543`) «Cuantos dias lleva vencido», las
+   dos sin advertir de que ambas columnas se calcularon con `CURRENT_DATE` **en
+   el build** (`retenciones/01_movimientos.sql:21, 77-79, 120-122`) y llevan
+   parados los días que lleve sin reconstruirse el esquema. Son las vistas que
+   responden P13 de la batería, y mi informe anterior las citó por número de
+   línea.
+
+### Menores (arreglar al pasar)
+
+4. **El detector de PK tiene un punto ciego y su mensaje de skip miente.**
+   `pk_declarada` reconoce `ALTER TABLE … ADD PRIMARY KEY (col)` —por eso cubre
+   de verdad 8 de las 12 tablas— pero **no la forma inline** `col TIPO PRIMARY
+   KEY`. Llamé a la función: devuelve `None` para `mart.fact_seguimiento_mensual`,
+   `mart.fact_seguimiento_categoria` y `cierre.fact_cierre_mensual`, cuyos DDL la
+   declaran en la propia columna. El test las salta diciendo «el DDL no declara
+   clave primaria para este objeto», **que es falso**. Hoy no cuesta nada —esas
+   tres habrían saltado igual por la rama «la PK es una clave sustituta»—, pero
+   el día que alguien declare una PK de negocio inline, el test la saltará en
+   silencio. Su control prueba positivo y negativo, pero solo de la forma `ALTER
+   TABLE`, así que no ve el hueco.
+5. **Un aserto rompe el crecimiento que el propio contrato declara compatible.**
+   `test_f006_publicacion.py:989` fija `proyectadas[-1] == "motivo_no_consumo"`.
+   Añadir una columna **al final** —lo único que la cabecera del DDL permite sin
+   romper a nadie— pone ese aserto en rojo aunque se actualicen SQL, `design.md`
+   y la lista. El invariante correcto es el prefijo de 18, que ya está en la
+   línea siguiente.
+6. **Dos docstrings afirman de más.** El del `rollback` dice que «el `commit` y
+   el `rollback` reales no se ejecutaban en ningún test»: lo del `rollback` es
+   cierto y está demostrado, pero el `commit` **sí** se ejecutaba
+   (`test_f005_conexion.py` usa el `connection()` real). Y el de `apply_grants`
+   es un test **estructural** —comprueba `depends_on`—, no conductual: protege
+   del escenario que nombra, no de un cambio en la lógica de salto del
+   orquestador. Es la misma clase de sobreventa que ya se corrigió dos veces.
+7. Tres medidas más de la clase «`SUM(…) FILTER` sin `COALESCE`, NULL no
+   declarado» quedan sin `nulo_significa` —`v_pbi_retencion_resumen.saldo_vivo`,
+   `.importe_liquidado`, `.importe_vencido`— mientras sus hermanas del mismo
+   fichero sí lo declaran; `compras.yaml:662-664` dice «es el único agregado de
+   la vista que se suma SIN filtrar por tipo», y no lo es (`importe_facturado`
+   tampoco filtra, y la propia ficha lo admite en `:646-652`); y
+   `fact_compras_linea.proveedor_id` (`:91-93`) no declara `nulo_significa`
+   pese a salir de un `NULLIF(entide, 0)`, siendo la tabla a la que la ficha
+   vecina te manda «para no perder las líneas sin proveedor».
+
+### El mecanismo: dos puntos ciegos que explican por qué pasan estos tres
+
+- **El contraste `clave_negocio` ⊆ `GROUP BY` es de subconjunto, no de
+  igualdad** (`test_f006_fichas.py:1399`). Por eso una clave corta lo pasaba
+  antes y por eso hoy nada impide que el `grano` diga menos que la clave.
+- **Nada contrasta el `grano` con la `clave_negocio`**, y buena parte de eso
+  **sí es derivable**: cuando el `grano` enumera columnas entre paréntesis
+  —«Una fila por (obra, proveedor, ano)»—, esa enumeración debería casar con la
+  clave declarada, o declararse explícitamente como resumen. Es un test corto y
+  habría cazado los defectos 1 y 2 de esta lista.
+- Además, el contraste de agregación excluye `TABLAS_CON_DDL_EXPLICITO`
+  (`:1263`), así que `mart.fact_seguimiento_categoria.num_partidas` —un
+  `COUNT(DISTINCT)`— hoy está bien pero nada lo fija.
+
+---
+
+## Lo que sí está cerrado, verificado
+
+### Los 40 saltados — explicados, y ninguno esquiva nada que antes corriera
+
+| Nº | Motivo impreso | Veredicto |
+|---|---|---|
+| 2 | «se crea con SQL dinámico; tiene su propio test» | **legítimo**, ya validado |
+| 3 | «la proyección no se deja leer» (agregación) | **legítimo** |
+| 3 | ídem (`GROUP BY`) | **legítimo** |
+| 28 | «el `GROUP BY` no es derivable» | **legítimo** |
+| 4 | «el DDL no declara clave primaria» | **motivo falso en 3 de los 4** (defecto 4) |
+
+Los tres tests son **nuevos de esta tanda**, parametrizados sobre las 49 fichas,
+y saltan donde no aplican; lo que ya existía sigue ejecutándose entero. Los 3+3
+de «proyección ilegible» son los tres catálogos `SELECT * FROM (VALUES …)`, y
+**comprobé que los tres siguen cubiertos** por el test de proyección exacta, que
+pasa para los tres. Los 28 del `GROUP BY` son legítimos: el test corre sobre las
+**seis** vistas con `GROUP BY` directo y salta donde la agregación vive en CTEs
+bajo un `UNION`; su test de control ancla el alcance en los dos sentidos —exige
+que tres objetos SÍ se lean y que uno con `UNION` NO—, que es lo que impide que
+se degrade en silencio.
+
+### El contrato (defecto 6) — cerrado y bien resuelto
+
+`motivo_no_consumo` se queda —el MCP necesita el porqué— pero **al final**: las
+18 columnas del contrato conservan su posición. Extraje el orden de las dos
+fuentes y **coinciden posición por posición**. `design.md` §4.2 se enmendó con
+nota fechada, y también su bloque SQL, no solo la nota.
+
+Y los tests **fijan posiciones, no presencia**, probado en worktree aislado:
+
+| Experimento | Resultado |
+|---|---|
+| Intercambiar `d.tipo` y `d.capa` | **detectado**: `At index 2 diff` |
+| Mover `motivo_no_consumo` al medio | **detectado**: `At index 5 diff` |
+
+Los cuatro menores del contrato también: los denominadores de `cobertura_cols` y
+`n_columnas` quedan explicados en dos `COMMENT ON COLUMN` —en la base, que es
+donde el MCP los lee—; el DDL dice ahora que la identidad es `hash_fuente` y no
+`version`; y las cifras viejas de T19 están corregidas a 49 y 12.
+
+### El mecanismo — funciona y no marca de más
+
+- **`agregacion` contra la función del SQL**: corre en **34 de 37** casos, y su
+  criterio es más fino que el que yo habría escrito: distingue
+  `COUNT(DISTINCT …)` de `COUNT(*)` sobre particiones disjuntas, que sí es
+  aditivo. Lo comprobé por la vía contraria: un detector tosco («todo COUNT es
+  no sumable») **habría marcado nueve columnas de más**; el suyo no marca
+  ninguna.
+- **Los cinco `COUNT(DISTINCT)` son ciertos**: los tres que encontré a mano más
+  `num_entidades` y `num_obras` de `v_pbi_retencion_resumen`
+  (`retenciones/02_views.sql:161-162`), que **no vi**. Es el argumento a favor de
+  derivar en vez de revisar a ojo.
+
+### Las fichas — cinco de los seis graves, cerrados
+
+Cerrados y verificados contra el SQL: los tres contadores a `no_sumable`; los
+negativos imposibles de `v_pbi_albaranes_sin_facturar` («la vista filtra `> 0`,
+así que las líneas sobrefacturadas **no aparecen**»); las claves de las dos
+vistas fuente de `retenciones`, resueltas **mejor de lo pedido** —`clave_negocio:
+[]` con el `grano` advirtiendo que el par es «exactamente el que produce el
+fan-out de `R-RETENCION-NO-JOIN-LINEAS`, y por eso esta vista se agrega SIEMPRE
+por documento antes de usarse»—; los cuatro medios; y los once menores 12-20.
+
+**Sobre la clave vacía declarada**: es mejor que una clave inventada y **no abre
+puerta trasera**. El validador la admite **solo fuera de la superficie de
+consumo** (`domain/diccionario.py:499-505`), y salir de ella cuesta escribir un
+`motivo_no_consumo` con mínimo de longitud, visible en el diff. Una clave
+inventada manda al agente a un JOIN que multiplica; un hueco declarado le dice
+que esa vista no deduplica.
+
+**Sin regresión en `mart` ni `cierre`**: el diff de esta tanda toca solo
+`compras.yaml` y `retenciones.yaml`; los otros tres YAML son idénticos byte a
+byte, y sus granos, claves y cardinalidades se revalidaron igualmente.
+
+### Los dos tests sin fase RED — justificados, y el hueco existía
+
+El del `rollback` cubre una ruta que **ningún test del repositorio ejecutaba**:
+confirmado empíricamente instrumentando `connection()` en una copia del commit
+anterior y corriendo su suite entera —la marca de `commit` se crea, la de
+`rollback` no—. El test nuevo pisa la ruta real: solo sustituye la apertura del
+socket. Y `apply_grants` sigue corriendo con la publicación fallida, verificado
+montando el pipeline (`build_mart SUCCESS / publicar_diccionario FAILED /
+apply_grants SUCCESS`).
+
+### `CLAUDE.md` — corregido con precisión
+
+Pasa de «hay una puerta que lo exige» a «la puerta exige **ficha o pendiente
+declarado**: se puede aplazar la ficha, pero no ignorarla, y la lista de
+pendientes solo baja». Es exactamente lo que la puerta hace.
+
+### La acotación de lo no derivable — honesta, y dos vías que aporto
+
+Que la clave sea *demasiado corta* exige dependencias funcionales que no están en
+el texto: `codigo_obra` depende de `obra_id` y omitirla es correcto;
+`proveedor_cif` no depende de `proveedor_id` y omitirla es un error, y en el SQL
+las dos se ven igual. Forzarlo marcaría fichas correctas: **la acotación es
+honesta**. Dos vías que no aparecen en su informe:
+
+- **Derivable hoy y gratis**: las tablas agregadas que se llenan con
+  `INSERT … SELECT … GROUP BY` —`mart.fact_seguimiento_categoria`,
+  `sql/mart/03_agg_categoria.sql`— tienen su `GROUP BY` en el repositorio, y
+  ningún mecanismo comprueba su clave: el de `GROUP BY` solo mira vistas y el de
+  PK las salta por clave sustituta. Es el mismo parser sobre otra sentencia.
+- **La definitiva**: que `check-diccionario` (R28, T27) incluya una consulta de
+  unicidad por objeto —`SELECT count(*) - count(DISTINCT (clave)) FROM …`—.
+  Liquida el problema entero, dependencias funcionales incluidas, con una
+  consulta barata por objeto. Conviene declararlo como parte de T27 antes de que
+  se escriba.
+
+---
+
+## Rigor y comprobaciones de siempre
+
+- **1310 tests + 40 saltados**, ejecutados por mí; cobertura **98,9 %**.
+- **Mutación verificada de forma independiente**: recalculé alcance (**2324
+  líneas**) y mutantes (**161**); coinciden con `progress/mutacion_F-006.md`;
+  cero supervivientes.
+- **Nada prohibido**: el diff no toca `main.py`, `settings.py`, `grants.py`,
+  `infra/**` ni ningún SQL de negocio; ni un `GRANT`, `REVOKE`, firewall o Azure;
+  ninguna conexión a la base. **Sin `push`**: no existe rama remota de la feature.
+- `ruff` se queda en 161 avisos, los mismos que antes: no añade deuda.
+- Trinquete coherente: 49 fichas + 53 pendientes = 102 objetos, y
+  `PENDIENTES_MAX` vale 53.
+
+### Checkpoints (cuarta pasada)
+
+**C1** `[x]` · **C2** `[x]` · **C3** `[x]` · **C3 bis** N/A · **C4** `[ ]` —tres
+fichas siguen declarando en su `grano` algo que el SQL desmiente (defectos 1-3);
+todo lo demás de C4 está cumplido— · **C4 bis** `[x]` · **C4 ter** N/A · **C5**
+N/A parcial (20 de 42 tareas, el alcance encargado).
 
 ---
 

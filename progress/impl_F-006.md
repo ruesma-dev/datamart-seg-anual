@@ -1655,3 +1655,75 @@ del `GROUP BY` dejara de leer ninguno, o los leyera todos, saltarian.
 Es el argumento a favor de la comprobacion derivable en una linea: la auditoria
 manual encontro tres de cinco; el test encuentra los cinco y seguira
 encontrandolos en los 53 objetos que faltan.
+
+---
+
+# Correcciones de la cuarta review
+
+## La clase, cerrada · coherencia interna entre campos de la misma ficha
+
+El reviewer no rechaza por cuatro casos, rechaza por **un patron**: una
+afirmacion corregida en un campo y viva en el de al lado. Ya habia pasado tres
+veces —con el ejemplo de `design.md`, con «mes anterior» y ahora con los
+granos—. Fase RED de la comprobacion que lo cierra:
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "grano_nombra or claves_compuestas"
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_grano_nombra_todas_las_columnas_de_la_clave[retenciones.v_pbi_retencion_obra]
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_grano_nombra_todas_las_columnas_de_la_clave[retenciones.v_pbi_retenciones_vencidas]
+FAILED tests/test_f006_fichas.py::test_f006_r2_el_grano_nombra_todas_las_columnas_de_la_clave[retenciones.v_pbi_retenciones_vivas]
+28 failed, 13 passed, 261 deselected in 1.04s
+```
+
+**28 de 41 fichas fallaban**, no las dos senaladas. La regla es de una linea y
+no admite interpretacion: **el `grano` tiene que nombrar todas las columnas de
+su `clave_negocio`**. Da igual como lo redacte —enumeracion entre parentesis o
+prosa— mientras las nombre, asi que el grano no puede prometer menos
+dimensiones de las que la clave declara.
+
+Se descartaron dos alternativas antes de elegirla. **Comparar la enumeracion del
+grano con la clave** no funciona: los granos escriben conceptos de negocio
+(«obra», «mes») y las claves, columnas (`obra_id`, `anio_mes`); casarlos exige
+un emparejamiento difuso que marcaria de mas. **Contar dimensiones** tampoco:
+las seis columnas de `v_pbi_proveedor_obra` son tres conceptos, asi que el
+recuento no delata nada. Exigir que los NOMBRES aparezcan es exacto, no admite
+interpretacion y ademas mejora la ficha: el grano pasa a decir literalmente por
+que columnas hay que unir.
+
+Los 28 granos reescritos, con el resultado a la vista en los dos casos que
+motivaron el rechazo:
+
+- `v_pbi_proveedor_obra`: «Una fila por (`obra_id`, `codigo_obra`,
+  `proveedor_id`, `proveedor_nombre`, `proveedor_cif`, `anio`), que es su clave
+  de negocio y son **SEIS columnas, no tres**. No basta con (obra, proveedor,
+  ano): `proveedor_cif` sale del CIF que traia cada documento y NO depende de
+  `proveedor_id`, asi que dos facturas del mismo proveedor con CIF distinto dan
+  DOS filas. Unir por tres columnas duplica.»
+- `v_pbi_partida_coste`: la clave son **cinco** columnas y el grano lo dice, con
+  el motivo —el `GROUP BY` incluye los textos y `codigo_obra` se resuelve por
+  otra cascada—.
+
+## Defecto 3 · la regla de la NOTA, tambien en el grano
+
+Sobrevivia en el `grano` de `v_pbi_albaranes_sin_facturar` con la formulacion
+general. Ahora dice **lo que esa vista hace** —«esta vista SI filtra por tipo»—
+y advierte de no generalizar, nombrando la vista donde es falso.
+
+## Defecto 4 · el congelado, en las dos vistas donde aterriza la pregunta
+
+El aviso estaba solo en la tabla base. `v_pbi_retenciones_vivas` y `_vencidas`
+son **las que responden P13 de la bateria**: quien pregunta «que vence este
+trimestre» aterriza ahi. Las tres columnas afectadas dicen ahora que el calculo
+se congelo **el dia del build** y que para el vencimiento de hoy hay que
+recalcular sobre `fecha_prevista_devolucion`. El test cubre las cinco columnas,
+no las dos que se senalaron.
+
+## Menor 7 · la misma clase, buscada entera
+
+- Las **tres** medidas de `v_pbi_retencion_resumen` sin `COALESCE` que faltaban
+  por declarar su nulo, mientras sus hermanas del mismo fichero si lo hacian.
+- El pendiente **no era «el unico agregado sin filtrar»**: `importe_facturado`
+  tampoco filtra, y la propia ficha lo admitia dos columnas mas arriba.
+- `fact_compras_linea.proveedor_id` sale de un `NULLIF(entide, 0)` y no
+  declaraba su nulo, siendo la tabla a la que la ficha vecina manda «para no
+  perder las lineas sin proveedor». Ahora lo dice y explica esa conexion.
