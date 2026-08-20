@@ -14,6 +14,8 @@ Ningún test de este fichero abre red ni BBDD.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from etl_sigrid.domain.diccionario import (
@@ -598,3 +600,55 @@ def test_f006_r10_los_recuentos_de_efectos_van_por_sentido() -> None:
 
     assert any("proveedor" in c for c in conceptos)
     assert any("cliente" in c for c in conceptos)
+
+
+# ===========================================================================
+# Las reglas no pueden mandar consultar lo que no existe (defecto 6)
+#
+# `R-FRESCURA-MANUAL` mandaba usar `_meta.v_diccionario`, que la crea el bloque
+# E y hoy no existe. Una instruccion que el agente no puede ejecutar es una
+# instruccion que no se cumple, y el resultado es el mismo que no haberla
+# escrito: un dato de hace semanas dado sin advertencia.
+# ===========================================================================
+
+_OBJETO_CITADO = re.compile(
+    r"\b(_meta|mart|cierre|compras|maestro|retenciones|stg|aux|raw)\.([a-z_][a-z0-9_]*)"
+)
+
+
+def _objetos_citados(texto: str) -> set[str]:
+    return {f"{e}.{o}" for e, o in _OBJETO_CITADO.findall(texto or "")}
+
+
+def test_f006_r9_las_reglas_no_citan_objetos_que_no_existen() -> None:
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    publicados = {o.nombre for o in _inventario_del_repositorio()}
+
+    for regla in _diccionario_real().reglas:
+        citados = _objetos_citados(regla.regla) | _objetos_citados(regla.motivo)
+        fantasmas = sorted(citados - publicados)
+        assert not fantasmas, f"{regla.codigo} cita {fantasmas}, que no existen"
+
+
+def test_f006_r39_la_bateria_tampoco_cita_objetos_que_no_existen() -> None:
+    from tests.test_f006_cobertura import _inventario_del_repositorio
+
+    publicados = {o.nombre for o in _inventario_del_repositorio()}
+
+    for pregunta in _diccionario_real().global_raw["preguntas_aceptacion"]:
+        citados = _objetos_citados(pregunta["respuesta_correcta"])
+        fantasmas = sorted(citados - publicados)
+        assert not fantasmas, f"{pregunta['id']} cita {fantasmas}, que no existen"
+
+
+def test_f006_r16_frescura_manual_cita_la_vista_que_si_existe_hoy() -> None:
+    regla = next(
+        r for r in _diccionario_real().reglas if r.codigo == "R-FRESCURA-MANUAL"
+    )
+
+    assert "_meta.v_frescura" in regla.regla
+    assert "_meta.v_diccionario" not in regla.regla, (
+        "esa vista la crea el bloque E; hasta entonces la regla mandaría ejecutar "
+        "una consulta que revienta"
+    )

@@ -40,10 +40,11 @@ reglas:
       esquemas `cierre`, `compras`, `maestro` y `retenciones` se construyen con
       comandos propios y pueden estar desfasados semanas respecto a Sigrid.
       Toda respuesta que salga de ellos DEBE citar su fecha de build, que se
-      obtiene con `SELECT * FROM _meta.v_frescura` (o de una sola vez, junto
-      con la semantica, en `_meta.v_diccionario`). Ojo: `build-compras` y
-      `build-retenciones` no registran paso propio, asi que no aparecen en esa
-      vista y su frescura hoy no es consultable por SQL.
+      obtiene con `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'`
+      (o el paso que toque). Ojo: `build-compras` y `build-retenciones` no
+      registran paso propio, asi que NO aparecen en esa vista y su fecha de
+      build no es consultable por SQL: de esos dos esquemas hay que advertir que
+      la antiguedad se desconoce, en vez de callarlo.
     motivo: >-
       La composicion real esta en `main.build_pipeline_steps`: IngestRaw,
       LoadExcelAux, BuildStg, BuildMart y ApplyGrants. Dar un dato de `cierre`

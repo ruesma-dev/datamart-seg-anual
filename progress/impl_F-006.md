@@ -691,3 +691,32 @@ Corregido, y **con la salida buena escrita**: la ficha dice que se filtra
 cada columna `*_ide` que declare `nulo_significa`, exige que su proyeccion en el
 SQL lleve `NULLIF`. Declarar un nulo imposible manda al agente a escribir un
 filtro que siempre sale vacio, y ahora eso no pasa de la puerta.
+
+## Defecto 6 · Una regla mandaba consultar una vista que no existe
+
+```
+$ python -m pytest tests/test_f006_reglas.py -q -k "no_citan or tampoco_cita or si_existe_hoy"
+E           tica, en `_meta.v_diccionario`). Ojo: `build-compras` y `build-retenciones` no registran paso propio...
+tests\test_f006_reglas.py:651: AssertionError
+FAILED tests/test_f006_reglas.py::test_f006_r9_las_reglas_no_citan_objetos_que_no_existen
+FAILED tests/test_f006_reglas.py::test_f006_r16_frescura_manual_cita_la_vista_que_si_existe_hoy
+2 failed, 1 passed, 56 deselected in 0.55s
+```
+
+`_meta.v_diccionario` la crea T15, en el bloque E. La regla la citaba en
+presente. **Se opta por condicionar el texto**, no por atar el bloque E: la
+regla cita ahora solo `_meta.v_frescura`, con el `WHERE paso = ...` incluido
+para que la consulta sea ejecutable tal cual. Cuando el bloque E cree la vista,
+anadirla a la regla es una linea. La mencion condicionada («cuando exista
+`_meta.v_diccionario`») sigue donde correspondia desde el principio: en la nota
+de la pregunta P15.
+
+De paso, la regla dice ahora que de `compras` y `retenciones` **hay que advertir
+que la antiguedad se desconoce**, en vez de solo constatar que no se puede
+consultar.
+
+**Endurecimiento**: dos tests barren el texto de las doce reglas y de las 18
+respuestas de la bateria buscando cualquier `esquema.objeto` de los nueve
+esquemas y exigen que exista en el inventario. Es la misma clase de defensa que
+R11 aplicaba al `ambito`, extendida a la prosa, que es la parte que el agente
+lee de verdad.
