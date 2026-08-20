@@ -452,7 +452,8 @@ YAML_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 #:            YA DOCUMENTADO vuelva a `pendientes`, no que el repositorio
 #:            publique cosas nuevas. Sus fichas van en T24, con el resto
 #:            de `_meta`.
-PENDIENTES_MAX = 77
+#:   53  T20/T21 · los 14 objetos de `compras` y los 10 de `retenciones`
+PENDIENTES_MAX = 53
 
 
 def _inventario_del_repositorio():

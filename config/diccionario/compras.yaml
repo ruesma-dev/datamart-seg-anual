@@ -1,0 +1,982 @@
+# config/diccionario/compras.yaml
+#
+# Fichas del esquema `compras`: el mundo DOCUMENTAL de la compra a proveedores.
+#
+# CUATRO COSAS QUE HAY QUE SABER ANTES DE CONSULTAR NADA DE AQUI:
+#
+# 1. **Todos los importes son SIN IVA.** El unico importe con IVA del datamart
+#    es `maestro.proveedores_obra.importe_contratado`, que es la suma del total
+#    del documento. No son comparables: la diferencia no es sobrecoste, es el
+#    impuesto.
+# 2. **Los ABONOS ya entran en negativo.** Un SUM sobre FACTURA y ABONO da el
+#    facturado neto; restarlos otra vez se equivoca en el doble de lo abonado.
+# 3. **`compras` NO filtra por `stg.obras`.** Puede traer obras administrativas
+#    (gastos generales, centros de personal) que el seguimiento excluye a
+#    proposito, y filas con `obra_id` nulo que son estructura y no se pueden
+#    perder al agregar.
+# 4. **NO SE REFRESCA DE NOCHE, y su fecha de build no es consultable.**
+#    `build-compras` ejecuta el SQL en linea sin registrar paso en
+#    `_meta.etl_runs`, asi que no aparece en `_meta.v_frescura` y la frescura de
+#    estos objetos sale a NULO. De un dato de aqui hay que advertir que la
+#    antiguedad se desconoce, en vez de callarlo.
+#
+# Nombres y granos verificados contra el SQL de
+# `etl_sigrid/infrastructure/postgres/sql/compras/`.
+
+version: 1
+esquema: compras
+
+objetos:
+
+  fact_compras_linea:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      La tabla a la que hay que ir para cualquier pregunta de compras: todas las
+      lineas de todos los documentos de compra —contratos, albaranes, proformas,
+      notas, facturas y abonos— unificadas con las mismas columnas, con la obra
+      y la partida ya resueltas y los importes sin IVA.
+    grano: >-
+      Una fila por linea de documento. La clave real es el par
+      `(tipo_doc, linea_id)` y NO `linea_id` a secas: los identificadores vienen
+      de tres tablas distintas de Sigrid (`ctrpro`, `dcapro` y `dcfpro`) que
+      colisionan entre si, y la tabla no tiene clave primaria declarada.
+    clave_negocio: [tipo_doc, linea_id]
+    paso_etl: build_compras
+    refresco: manual
+
+    columnas:
+      tipo_doc:
+        significado: >-
+          Que clase de documento es la linea. FILTRAR SIEMPRE POR ESTA COLUMNA:
+          contratado, albaranado y facturado son tres momentos del MISMO coste,
+          no tres costes, y sumarlos juntos lo cuenta hasta tres veces.
+        valores: [CONTRATO, ALBARAN, PROFORMA, NOTA, FACTURA, ABONO, OTRO]
+      serie:
+        significado: >-
+          Prefijo alfabetico del codigo del documento en Sigrid (AC, PROF, NTC,
+          FR, AB...). Es de donde se deduce `tipo_doc`.
+      linea_id:
+        significado: >-
+          Identificador de la linea en Sigrid. NO ES UNICO en esta tabla: hay
+          que combinarlo con `tipo_doc`. Un COUNT DISTINCT sobre el pierde
+          filas y un JOIN por el a secas las duplica.
+        agregacion: no_sumable
+      documento_id:
+        significado: Identificador del documento al que pertenece la linea.
+        agregacion: no_sumable
+      codigo_documento: Codigo del documento tal y como se ve en Sigrid.
+      fecha:
+        significado: Fecha del documento, ya tipada. En `raw` es un entero YYYYMMDD.
+        agregacion: no_sumable
+      anio:
+        significado: Ano de la fecha del documento, desnormalizado para agrupar barato.
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que se imputa la linea, resuelta en cascada: en el contrato
+          viene de la cabecera; en el albaran, de la propia linea; y en la
+          factura, de la linea, con respaldo en la linea de albaran de origen y
+          luego en el contrato.
+        nulo_significa: >-
+          La linea no se imputa a ninguna obra: es estructura, gastos generales
+          o compra de central. **No se pueden perder al agregar**: filtrarlas
+          fuera sin decirlo deja el total de compras por debajo del real.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      proveedor_id:
+        significado: Identificador del proveedor en Sigrid (`con.ide`).
+        agregacion: no_sumable
+      proveedor_nombre: Nombre del proveedor, de `con.res`.
+      proveedor_cif:
+        significado: >-
+          CIF del proveedor tal y como lo tiene la ficha del documento. Sirve
+          para agrupar cuando el mismo proveedor aparece con nombres distintos.
+        nulo_significa: El documento no llevaba CIF informado.
+      partida_id:
+        significado: >-
+          Partida de obra a la que se imputa la linea. Es el unico eje que une
+          este mundo documental con el del seguimiento (`mart`).
+        nulo_significa: La linea no se imputa a ninguna partida concreta.
+        agregacion: no_sumable
+      producto_id:
+        significado: >-
+          Identificador del producto en Sigrid. Solo el identificador: el
+          maestro de productos no se ingiere, asi que no hay nombre ni familia.
+        nulo_significa: La linea no referencia un producto del maestro.
+        agregacion: no_sumable
+      descripcion: >-
+        Texto libre de la linea. Es lo unico que hoy permite adivinar el oficio
+        (fontaneria, electricidad...) y es una heuristica, no una clasificacion.
+      cantidad:
+        significado: Cantidad de la linea, en su unidad de medida.
+        agregacion: suma
+      precio:
+        significado: Precio unitario de la linea, con hasta seis decimales.
+        unidad: EUR
+        agregacion: no_sumable
+      importe:
+        significado: >-
+          Importe de la linea SIN IVA. En las lineas de ABONO viene en negativo
+          con su signo natural, asi que un SUM sobre FACTURA y ABONO ya da el
+          facturado neto.
+        unidad: EUR
+        agregacion: suma
+      importe_pendiente_facturar:
+        significado: >-
+          Lo que queda por facturar de esa linea de albaran. Si se ha facturado
+          de mas conserva **signo negativo**, y eso es informacion, no un error.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La linea no es de albaran; el concepto no aplica.
+      contrato_id:
+        significado: >-
+          Contrato al que se vincula la linea, heredado del albaran o del
+          documento origen cuando la factura no lo informa.
+        nulo_significa: La linea no cuelga de ningun contrato.
+        agregacion: no_sumable
+      codigo_contrato: Codigo del contrato vinculado, para leerlo sin otro JOIN.
+
+    relaciones:
+      - de: partida_id
+        a: mart.fact_seguimiento_mensual.partida_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es el puente entre el coste INCURRIDO documental y el coste
+          PLANIFICADO del seguimiento, y la relacion mas valiosa del datamart.
+          Las dos tienen muchas filas por partida: hay que agregar cada lado
+          por `(obra_id, partida_id)` antes de unir. OJO: esta tabla no filtra
+          por `stg.obras` y el seguimiento si, asi que sobran obras. La vista
+          puente todavia no existe: es F-039.
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la cabecera del contrato: descripcion, fecha y comparativo.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para poner nombre y cliente a la obra. Se usa el maestro y no
+          `stg.obras` porque este esquema no filtra: hay obras aqui que el
+          universo del seguimiento excluye.
+
+    ejemplos_preguntas:
+      - Que proveedores nos han facturado mas este ano
+      - Cuanto le hemos comprado al proveedor P en toda la empresa
+      - En que partidas se ha ido el coste incurrido de la obra X
+
+  contratos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Cabecera de cada contrato con un proveedor: a quien, para que obra, por
+      cuanto y de que comparativo salio. Es el documento que fija el compromiso;
+      lo que luego se consume llega por albaranes y facturas.
+    grano: Una fila por contrato de compra. `contrato_id` es clave primaria.
+    clave_negocio: [contrato_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      contrato_id:
+        significado: Identificador del contrato en Sigrid (`con.ide`). Estable.
+        agregacion: no_sumable
+      codigo_contrato: Codigo del contrato tal y como se ve en Sigrid.
+      serie: Prefijo alfabetico del codigo, que identifica el tipo de documento.
+      descripcion: >-
+        Texto libre del contrato. En Ruesma suele nombrar el oficio
+        ("FONTANERIA Y SANEAMIENTO"), y es la unica via —heuristica— de
+        responder quien hizo que en una obra.
+      fecha:
+        significado: Fecha del contrato, ya tipada.
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra del contrato, tomada de la CABECERA. En albaranes y facturas la
+          obra viene en la linea, no aqui.
+        nulo_significa: El contrato no se imputa a una obra concreta.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      proveedor_id:
+        significado: Identificador del proveedor contratado.
+        nulo_significa: El contrato no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre: Nombre del proveedor, de `con.res`.
+      proveedor_cif:
+        significado: CIF del proveedor segun el propio contrato.
+        nulo_significa: El contrato no llevaba CIF informado.
+      comparativo_id:
+        significado: >-
+          Comparativo de ofertas del que salio el contrato. Solo queda el
+          identificador: el comparativo NO esta modelado en el datamart, aunque
+          sus tablas de origen si estan ingeridas. Es F-038.
+        nulo_significa: El contrato no viene de un comparativo.
+        agregacion: no_sumable
+    relaciones:
+      - de: contrato_id
+        a: compras.contrato_lineas.contrato_id
+        cardinalidad: "1:N"
+        porque: Para el detalle de partidas y precios comprometidos.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el cliente de la obra.
+    ejemplos_preguntas:
+      - Quien fue el proveedor de fontaneria de la obra X
+      - Que contratos tiene abiertos la obra X y con quien
+
+  contrato_lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El detalle de lo comprometido en cada contrato: que partida, que producto,
+      cuanta cantidad y a que precio. Incluye cuanta cantidad se ha servido ya.
+    grano: Una fila por linea de contrato. `linea_id` es clave primaria aqui.
+    clave_negocio: [linea_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      linea_id:
+        significado: >-
+          Identificador de la linea en Sigrid. Aqui SI es unico, porque la tabla
+          viene de un solo origen; en `compras.fact_compras_linea` no lo es.
+        agregacion: no_sumable
+      contrato_id:
+        significado: Contrato al que pertenece la linea.
+        agregacion: no_sumable
+      producto_id:
+        significado: Identificador del producto. El maestro de productos no se ingiere.
+        nulo_significa: La linea no referencia un producto del maestro.
+        agregacion: no_sumable
+      descripcion: Texto libre de la linea, tal y como se escribio en el contrato.
+      unidad_medida: Unidad en la que se mide la cantidad (m3, m2, ud, kg...).
+      partida_id:
+        significado: Partida de obra a la que se imputa lo contratado.
+        nulo_significa: La linea no se imputa a una partida concreta.
+        agregacion: no_sumable
+      centro_coste_id:
+        significado: >-
+          Centro de coste de la linea. En Ruesma cada obra suele ser su propio
+          centro, y esa equivalencia es la que usa el modulo de retenciones.
+        nulo_significa: La linea no tiene centro de coste informado.
+        agregacion: no_sumable
+      cantidad:
+        significado: Cantidad contratada, en la unidad de medida de la linea.
+        agregacion: suma
+      precio:
+        significado: Precio unitario contratado, con hasta seis decimales.
+        unidad: EUR
+        agregacion: no_sumable
+      importe:
+        significado: Importe contratado de la linea, SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      cuota_iva:
+        significado: >-
+          IVA de la linea, aparte del importe. Sumarlo al importe es lo unico
+          que hace comparable esta cifra con
+          `maestro.proveedores_obra.importe_contratado`.
+        unidad: EUR
+        agregacion: suma
+      cantidad_servida:
+        significado: >-
+          Cuanta de la cantidad contratada se ha entregado ya. Es el avance del
+          contrato en unidades fisicas, no en dinero.
+        agregacion: suma
+    relaciones:
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la cabecera: proveedor, obra y fecha.
+      - de: partida_id
+        a: compras.v_pbi_partida_coste.partida_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para comparar lo comprometido en la partida con lo ya incurrido. Se
+          agrega por `(partida_id)` antes de unir: las dos tienen varias filas.
+    ejemplos_preguntas:
+      - Que se contrato exactamente en el contrato C y a que precio
+
+  albaranes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Cabecera de los documentos de entrega del proveedor. Bajo el mismo
+      concepto de Sigrid conviven tres cosas distintas que se distinguen por
+      `tipo_documento`: el albaran de material, la certificacion de
+      subcontratista (PROFORMA) y la nota de cargo (NOTA).
+    grano: Una fila por documento de entrega. `albaran_id` es clave primaria.
+    clave_negocio: [albaran_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      albaran_id:
+        significado: Identificador del documento en Sigrid (`con.ide`).
+        agregacion: no_sumable
+      codigo_albaran: Codigo del documento tal y como se ve en Sigrid.
+      serie: Prefijo alfabetico del codigo (AC, PROF, NTC), de donde sale el tipo.
+      tipo_documento:
+        significado: >-
+          Que clase de entrega es. Solo ALBARAN y PROFORMA cuentan como
+          pendiente de facturar; la NOTA suma en el consumido pero no en el
+          pendiente.
+        valores: [ALBARAN, PROFORMA, NOTA, OTRO]
+      descripcion: Texto libre del documento.
+      fecha:
+        significado: Fecha del documento, ya tipada.
+        agregacion: no_sumable
+      contrato_id:
+        significado: Contrato del que cuelga la entrega, si viene informado en la cabecera.
+        nulo_significa: La entrega no se vincula a un contrato desde la cabecera.
+        agregacion: no_sumable
+      comparativo_id:
+        significado: Comparativo de ofertas de origen. No esta modelado (F-038).
+        nulo_significa: El documento no viene de un comparativo.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: Identificador del proveedor que entrega.
+        nulo_significa: El documento no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre: Nombre del proveedor, de `con.res`.
+      proveedor_cif:
+        significado: CIF del proveedor segun el documento.
+        nulo_significa: El documento no llevaba CIF informado.
+      referencia_proveedor:
+        significado: El numero que el proveedor le da a su propio albaran.
+        nulo_significa: El proveedor no dio referencia, o no se tecleo.
+    relaciones:
+      - de: albaran_id
+        a: compras.albaran_lineas.albaran_id
+        cardinalidad: "1:N"
+        porque: Para el detalle de lo entregado y lo pendiente de facturar.
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: Para saber contra que compromiso se esta entregando.
+    ejemplos_preguntas:
+      - Que albaranes ha traido el proveedor P este mes
+
+  albaran_lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El detalle de lo entregado, y la fuente de la pregunta "que tenemos
+      recibido y sin facturar". Cada linea sabe cuanta cantidad suya se ha
+      facturado ya y cuanto importe queda pendiente.
+    grano: Una fila por linea de albaran, proforma o nota. `linea_id` es clave.
+    clave_negocio: [linea_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      linea_id:
+        significado: Identificador de la linea en Sigrid. Unico dentro de esta tabla.
+        agregacion: no_sumable
+      albaran_id:
+        significado: Documento de entrega al que pertenece la linea.
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que se imputa lo entregado. A diferencia del contrato, aqui
+          la obra viene EN LA LINEA: un mismo albaran puede repartirse entre
+          varias obras.
+        nulo_significa: La linea no se imputa a ninguna obra (estructura o generales).
+        agregacion: no_sumable
+      partida_id:
+        significado: Partida de obra a la que se imputa lo entregado.
+        nulo_significa: La linea no se imputa a una partida concreta.
+        agregacion: no_sumable
+      producto_id:
+        significado: Identificador del producto. El maestro de productos no se ingiere.
+        nulo_significa: La linea no referencia un producto del maestro.
+        agregacion: no_sumable
+      descripcion: Texto libre de la linea entregada.
+      unidad_medida: Unidad en la que se mide la cantidad.
+      centro_coste_id:
+        significado: Centro de coste de la linea; en Ruesma suele coincidir con la obra.
+        nulo_significa: La linea no tiene centro de coste informado.
+        agregacion: no_sumable
+      cantidad:
+        significado: >-
+          Cantidad entregada. Puede ser 0 en lineas replicadas que no se
+          recibieron, que es un patron normal de Sigrid y no un error.
+        agregacion: suma
+      precio:
+        significado: Precio unitario de la entrega.
+        unidad: EUR
+        agregacion: no_sumable
+      importe:
+        significado: Importe entregado en la linea, SIN IVA.
+        unidad: EUR
+        agregacion: suma
+      cuota_iva:
+        significado: IVA de la linea, aparte del importe.
+        unidad: EUR
+        agregacion: suma
+      cantidad_facturada:
+        significado: >-
+          Cuanta de la cantidad entregada se ha facturado ya. Es de donde sale
+          el pendiente, y por eso el pendiente no es un cruce contra facturas
+          sino un dato de la propia linea.
+        agregacion: suma
+      contrato_linea_id:
+        significado: Linea de contrato de la que procede la entrega.
+        nulo_significa: La entrega no procede de una linea de contrato.
+        agregacion: no_sumable
+      contrato_id_linea:
+        significado: Contrato del que procede la entrega, tomado de la propia linea.
+        nulo_significa: La entrega no procede de un contrato.
+        agregacion: no_sumable
+      importe_pendiente_facturar:
+        significado: >-
+          Importe entregado y aun no facturado, SIN IVA. Si se facturo de mas
+          queda NEGATIVO y ese signo se conserva a proposito: es una
+          sobrefacturacion, no un cero.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: albaran_id
+        a: compras.albaranes.albaran_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la cabecera: proveedor, tipo de documento y fecha.
+      - de: contrato_linea_id
+        a: compras.contrato_lineas.linea_id
+        cardinalidad: "N:1"
+        porque: Para comparar lo entregado contra lo comprometido en esa linea.
+    ejemplos_preguntas:
+      - Que tenemos entregado y sin facturar en la obra X
+
+  facturas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Cabecera de las facturas recibidas de proveedor. Incluye los ABONOS, que
+      son el mismo concepto de Sigrid con otra serie y **entran en negativo**.
+    grano: Una fila por factura o abono recibido. `factura_id` es clave primaria.
+    clave_negocio: [factura_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      factura_id:
+        significado: Identificador del documento en Sigrid (`con.ide`).
+        agregacion: no_sumable
+      codigo_factura: Codigo del documento tal y como se ve en Sigrid.
+      serie: Prefijo alfabetico del codigo (FR, FRGG, AB, ABGG).
+      tipo_documento:
+        significado: >-
+          Si es una factura o un abono. Los abonos llevan los importes en
+          negativo, asi que sumar los dos tipos juntos ya da el neto.
+        valores: [FACTURA, ABONO, OTRO]
+      descripcion: Texto libre del documento.
+      fecha:
+        significado: Fecha de la factura, ya tipada.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: Identificador del proveedor que factura.
+        nulo_significa: El documento no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre: Nombre del proveedor, de `con.res`.
+      proveedor_cif:
+        significado: CIF del proveedor segun la propia factura.
+        nulo_significa: El documento no llevaba CIF informado.
+      referencia_proveedor:
+        significado: El numero que el proveedor le da a su propia factura.
+        nulo_significa: El proveedor no dio referencia, o no se tecleo.
+    relaciones:
+      - de: factura_id
+        a: compras.factura_lineas.factura_id
+        cardinalidad: "1:N"
+        porque: Para el detalle por obra y partida, que en la cabecera no esta.
+    ejemplos_preguntas:
+      - Que facturas nos ha pasado el proveedor P este ano
+
+  factura_lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El detalle de cada factura recibida, con la trazabilidad de donde viene
+      cada linea: del albaran que la origino, o directamente del contrato.
+    grano: Una fila por linea de factura o abono. `linea_id` es clave primaria.
+    clave_negocio: [linea_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      linea_id:
+        significado: Identificador de la linea en Sigrid. Unico dentro de esta tabla.
+        agregacion: no_sumable
+      factura_id:
+        significado: Factura o abono al que pertenece la linea.
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que se imputa la linea. Puede venir vacia y resolverse
+          despues por el albaran de origen: esa cascada esta ya aplicada en
+          `compras.fact_compras_linea`, aqui no.
+        nulo_significa: La factura no informo la obra en la linea.
+        agregacion: no_sumable
+      partida_id:
+        significado: Partida de obra de la linea, con la misma salvedad que la obra.
+        nulo_significa: La factura no informo la partida en la linea.
+        agregacion: no_sumable
+      producto_id:
+        significado: Identificador del producto. El maestro de productos no se ingiere.
+        nulo_significa: La linea no referencia un producto del maestro.
+        agregacion: no_sumable
+      descripcion: Texto libre de la linea facturada.
+      unidad_medida: Unidad en la que se mide la cantidad.
+      centro_coste_id:
+        significado: Centro de coste de la linea; en Ruesma suele coincidir con la obra.
+        nulo_significa: La linea no tiene centro de coste informado.
+        agregacion: no_sumable
+      cantidad:
+        significado: Cantidad facturada en la linea.
+        agregacion: suma
+      precio:
+        significado: Precio unitario facturado.
+        unidad: EUR
+        agregacion: no_sumable
+      importe:
+        significado: >-
+          Importe de la linea SIN IVA. En las lineas de ABONO es negativo, con
+          su signo natural.
+        unidad: EUR
+        agregacion: suma
+      cuota_iva:
+        significado: IVA de la linea, aparte del importe.
+        unidad: EUR
+        agregacion: suma
+      albaran_linea_id:
+        significado: Linea de albaran que se esta facturando.
+        nulo_significa: La linea no procede de un albaran.
+        agregacion: no_sumable
+      albaran_id:
+        significado: Albaran del que procede la linea facturada.
+        nulo_significa: La linea no procede de un albaran.
+        agregacion: no_sumable
+      contrato_linea_id:
+        significado: Linea de contrato que se factura directamente, sin pasar por albaran.
+        nulo_significa: La linea no se factura directamente contra un contrato.
+        agregacion: no_sumable
+      contrato_id_directo:
+        significado: Contrato que se factura directamente, sin albaran de por medio.
+        nulo_significa: La linea no se factura directamente contra un contrato.
+        agregacion: no_sumable
+    relaciones:
+      - de: factura_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la cabecera: proveedor, tipo de documento y fecha.
+      - de: albaran_linea_id
+        a: compras.albaran_lineas.linea_id
+        cardinalidad: "N:1"
+        porque: >-
+          Es la trazabilidad entrega -> factura, y de donde la factura hereda la
+          obra y la partida cuando no las informa.
+    ejemplos_preguntas:
+      - De que albaranes sale la factura F
+
+  v_pbi_contrato_consumo:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El estado de cada contrato de un vistazo: cuanto se comprometio, cuanto se
+      ha entregado, cuanto se ha facturado, cuanto queda disponible y que
+      porcentaje se lleva consumido. Es la vista para "como va el contrato C".
+    grano: Una fila por contrato.
+    clave_negocio: [contrato_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      contrato_id:
+        significado: Identificador del contrato en Sigrid.
+        agregacion: no_sumable
+      codigo_contrato: Codigo del contrato tal y como se ve en Sigrid.
+      serie: Prefijo alfabetico del codigo del contrato.
+      fecha:
+        significado: Fecha del contrato.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra del contrato, tomada de su cabecera.
+        nulo_significa: El contrato no se imputa a una obra concreta.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra.
+      proveedor_id:
+        significado: Identificador del proveedor contratado.
+        nulo_significa: El contrato no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre: Nombre del proveedor contratado.
+      proveedor_cif:
+        significado: CIF del proveedor contratado.
+        nulo_significa: El contrato no llevaba CIF informado.
+      importe_contratado:
+        significado: >-
+          Suma de las lineas del contrato, SIN IVA. No confundir con
+          `maestro.proveedores_obra.importe_contratado`, que es el total del
+          documento CON IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_albaranado:
+        significado: Suma de lo entregado con albaran contra este contrato, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_certificado_proforma:
+        significado: >-
+          Suma de lo certificado por el subcontratista mediante proforma. Es
+          entrega igual que el albaran, pero de obra ejecutada y no de material.
+        unidad: EUR
+        agregacion: suma
+      importe_facturado:
+        significado: >-
+          Facturado NETO contra el contrato: las facturas menos los abonos, que
+          ya vienen en negativo.
+        unidad: EUR
+        agregacion: suma
+      importe_facturado_directo:
+        significado: >-
+          La parte del facturado que fue directamente contra el contrato, sin
+          pasar por un albaran previo.
+        unidad: EUR
+        agregacion: suma
+      importe_albaranado_sin_facturar:
+        significado: >-
+          Lo entregado y todavia no facturado. Es la cifra de "que nos van a
+          facturar y aun no ha llegado".
+        unidad: EUR
+        agregacion: suma
+      importe_consumido:
+        significado: >-
+          Lo que el contrato lleva gastado de verdad, combinando entregas y
+          facturas sin contarlas dos veces.
+        unidad: EUR
+        agregacion: suma
+      importe_disponible:
+        significado: >-
+          Lo que queda del contrato. Negativo significa que se ha consumido mas
+          de lo contratado, y eso es informacion, no un error de calculo.
+        unidad: EUR
+        agregacion: suma
+      pct_consumido:
+        significado: El consumido sobre el contratado, en tanto por ciento.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: El contrato no tiene importe contratado con el que dividir.
+    relaciones:
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "1:1"
+        porque: Es el mismo contrato, con los consumos ya calculados.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el cliente y el estado de la obra.
+    ejemplos_preguntas:
+      - Como va de consumido el contrato C
+      - Que contratos de la obra X estan a punto de agotarse
+
+  v_pbi_proveedor_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Cuanto se ha movido con cada proveedor en cada obra y cada ano, abierto
+      por los cuatro momentos del gasto: contratado, entregado, certificado y
+      facturado. Es la vista del ranking de proveedores.
+    grano: >-
+      Una fila por (obra, proveedor, ano). OJO: el periodo es ANUAL. Para grano
+      mensual hay que ir a `compras.fact_compras_linea` y agrupar por la fecha.
+    clave_negocio: [obra_id, proveedor_id, anio]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: Obra del gasto.
+        nulo_significa: >-
+          El gasto no se imputa a ninguna obra: estructura o generales. Estas
+          filas **no se pueden perder** al hacer un ranking de proveedores.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      proveedor_id:
+        significado: Identificador del proveedor.
+        nulo_significa: El documento no tenia proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre: Nombre del proveedor, de `con.res`.
+      proveedor_cif:
+        significado: CIF del proveedor. Util para agrupar el mismo proveedor con nombres distintos.
+        nulo_significa: Los documentos no llevaban CIF informado.
+      anio:
+        significado: Ano de la fecha de los documentos. El corte es anual, no mensual.
+        agregacion: no_sumable
+      facturado:
+        significado: >-
+          Facturado NETO en el ano: facturas menos abonos, sin IVA. Es la cifra
+          del "quien nos ha facturado mas".
+        unidad: EUR
+        agregacion: suma
+      albaranado:
+        significado: Entregado con albaran en el ano, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      certificado_proforma:
+        significado: Certificado por proforma en el ano, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      contratado:
+        significado: Contratado en el ano, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      num_facturas:
+        significado: Cuantos documentos de factura o abono distintos hay detras.
+        agregacion: suma
+      num_albaranes:
+        significado: Cuantos albaranes distintos hay detras.
+        agregacion: suma
+      num_contratos:
+        significado: Cuantos contratos distintos hay detras.
+        agregacion: suma
+    relaciones:
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el CIF y la direccion del proveedor. OJO al comparar con
+          `maestro.proveedores_obra.importe_contratado`: aquello lleva IVA y
+          esto no.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el cliente de la obra.
+    ejemplos_preguntas:
+      - Que proveedores nos han facturado mas
+      - Con que proveedores trabajamos en la obra X y por cuanto
+
+  v_pbi_albaranes_sin_facturar:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El detalle, linea a linea, de lo que esta entregado y todavia no facturado,
+      con la antiguedad de cada entrega para poder priorizar. Responde a "que
+      nos van a facturar y aun no ha llegado".
+    grano: >-
+      Una fila por linea de albaran o proforma con pendiente. **Solo ALBARAN y
+      PROFORMA**: las notas de cargo suman en el consumido del contrato pero no
+      cuentan como pendiente de facturar.
+    clave_negocio: [linea_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      albaran_id:
+        significado: Documento de entrega al que pertenece la linea.
+        agregacion: no_sumable
+      codigo_albaran: Codigo del documento tal y como se ve en Sigrid.
+      serie: Prefijo alfabetico del codigo del documento.
+      tipo_documento:
+        significado: Solo aparecen los dos tipos que cuentan como pendiente.
+        valores: [ALBARAN, PROFORMA]
+      fecha:
+        significado: Fecha del documento de entrega.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: Identificador del proveedor que entrego.
+        nulo_significa: El documento no tenia proveedor informado.
+        agregacion: no_sumable
+      proveedor_nombre: Nombre del proveedor.
+      proveedor_cif:
+        significado: CIF del proveedor segun el documento.
+        nulo_significa: El documento no llevaba CIF informado.
+      contrato_id:
+        significado: Contrato contra el que se entrego.
+        nulo_significa: La entrega no cuelga de ningun contrato.
+        agregacion: no_sumable
+      codigo_contrato: Codigo del contrato, para leerlo sin otro JOIN.
+      obra_id:
+        significado: Obra a la que se imputa la entrega pendiente.
+        nulo_significa: La linea no se imputa a ninguna obra.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      partida_id:
+        significado: Partida de obra de la entrega pendiente.
+        nulo_significa: La linea no se imputa a una partida concreta.
+        agregacion: no_sumable
+      linea_id:
+        significado: Identificador de la linea de albaran. Unico en esta vista.
+        agregacion: no_sumable
+      descripcion: Texto libre de lo entregado.
+      cantidad:
+        significado: Cantidad entregada en la linea.
+        agregacion: suma
+      cantidad_facturada:
+        significado: Cuanta de esa cantidad se ha facturado ya.
+        agregacion: suma
+      importe:
+        significado: Importe entregado en la linea, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      importe_pendiente_facturar:
+        significado: >-
+          Lo que queda por facturar de la linea. NEGATIVO significa que se
+          facturo de mas, y el signo se conserva a proposito.
+        unidad: EUR
+        agregacion: suma
+      dias_desde_albaran:
+        significado: >-
+          Cuantos dias lleva la entrega sin facturarse. Sirve para priorizar lo
+          mas antiguo, que es donde se acumulan los problemas.
+        agregacion: no_sumable
+    relaciones:
+      - de: linea_id
+        a: compras.albaran_lineas.linea_id
+        cardinalidad: "1:1"
+        porque: Es la misma linea, filtrada a las que tienen pendiente.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el cliente de la obra.
+    ejemplos_preguntas:
+      - Que tenemos en albaranes sin facturar
+      - Que entregas de la obra X llevan mas tiempo sin factura
+
+  v_pbi_partida_coste:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El coste incurrido de cada partida de obra desde el lado documental:
+      cuanto se ha entregado, certificado, facturado y contratado en ella. Es la
+      cara "real documental" que se compara con el coste del seguimiento.
+    grano: >-
+      Una fila por (obra, partida). Solo entran las lineas que tienen partida
+      informada: lo que no se imputa a partida no aparece aqui, asi que el total
+      de esta vista es MENOR que el de `compras.fact_compras_linea`.
+    clave_negocio: [obra_id, partida_id]
+    paso_etl: build_compras
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: >-
+          Obra de la partida. OJO: este esquema no filtra por `stg.obras`, asi
+          que pueden aparecer obras administrativas que el seguimiento excluye.
+        nulo_significa: Las lineas no tenian obra informada.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      partida_id:
+        significado: >-
+          Identificador de la partida en Sigrid. Es el eje que permite comparar
+          este coste incurrido con el planificado de `mart`.
+        agregacion: no_sumable
+      codigo_partida:
+        significado: Codigo jerarquico de la partida dentro de su obra.
+        nulo_significa: La partida no existe ya en el maestro de Sigrid.
+      descripcion_partida:
+        significado: Descripcion de la partida, tomada del maestro de Sigrid.
+        nulo_significa: La partida no existe ya en el maestro de Sigrid.
+      albaranado:
+        significado: Entregado con albaran en esa partida, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      certificado_proforma:
+        significado: Certificado por proforma en esa partida, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      facturado:
+        significado: >-
+          Facturado NETO en esa partida: facturas menos abonos, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      contratado:
+        significado: Contratado en esa partida, sin IVA.
+        unidad: EUR
+        agregacion: suma
+      num_lineas_albaran:
+        significado: Cuantas lineas de entrega hay detras de la cifra.
+        agregacion: suma
+      num_lineas_factura:
+        significado: Cuantas lineas de factura o abono hay detras de la cifra.
+        agregacion: suma
+    relaciones:
+      - de: partida_id
+        a: mart.fact_seguimiento_mensual.partida_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es el puente entre coste incurrido y coste planificado de la misma
+          partida. Hay que agregar el seguimiento por `(obra_id, partida_id)` y
+          filtrar su escenario antes de unir. La vista puente no existe: F-039.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre y el cliente de la obra.
+    ejemplos_preguntas:
+      - Cuales son las diez partidas con mas coste incurrido de la obra X
+
+  fn_tipo_documento:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. Se documenta porque explica de
+      donde sale `tipo_doc`, que es la columna por la que hay que filtrar
+      siempre en este esquema.
+    descripcion: >-
+      Traduce el par (tipo de documento de Sigrid, serie del codigo) al tipo de
+      negocio. El tipo 14 con serie AC es ALBARAN, con PROF es PROFORMA y con
+      NTC es NOTA; el tipo 15 con FR o FRGG es FACTURA y con AB o ABGG es ABONO;
+      el tipo 44 es CONTRATO. Lo que no encaja sale como OTRO, que no es un
+      error sino un aviso de que hay una serie sin clasificar.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_serie:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Extrae el prefijo alfabetico del codigo de un documento de Sigrid y lo
+      pasa a mayusculas: de "AC-2025-0123" saca "AC". Es lo que permite
+      distinguir un albaran de una proforma sin mirar nada mas.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_sigrid_date:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. Cada esquema tiene la suya, a
+      proposito, para no depender del orden de construccion.
+    descripcion: >-
+      Convierte una fecha de Sigrid —un entero con formato YYYYMMDD— en una
+      fecha de verdad, tratando el 0 como ausencia de fecha y no como el ano 0.
+      Es la conversion que hace que a partir de `compras` las fechas ya sean
+      comparables.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

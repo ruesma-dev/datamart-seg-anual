@@ -208,11 +208,14 @@ objetos:
         porque: Para el arbol completo de capitulos y el nivel de la partida.
       - de: partida_id
         a: compras.v_pbi_partida_coste.partida_id
-        cardinalidad: "N:1"
+        cardinalidad: "N:N"
         porque: >-
           Es el unico eje que une el coste PLANIFICADO de una partida con su
-          coste INCURRIDO documental. Hoy no lo explota ninguna vista: la vista
-          puente es F-039. Ojo, `compras` no filtra por `stg.obras`.
+          coste INCURRIDO documental, y la relacion mas valiosa del datamart.
+          Las dos puntas tienen varias filas por partida: hay que agregar este
+          lado por `(obra_id, partida_id)` —eligiendo antes el escenario— y unir
+          por ese par. Hoy no lo explota ninguna vista: la vista puente es
+          F-039. Ojo, `compras` no filtra por `stg.obras`.
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
         cardinalidad: "N:N"

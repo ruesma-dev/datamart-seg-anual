@@ -224,7 +224,7 @@ DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
 def _diccionario_real():
     """El diccionario REAL, con sus avisos ya derivados.
 
-    Los tests de publicación se hacen contra las 25 fichas de verdad y no contra
+    Los tests de publicación se hacen contra las fichas de verdad y no contra
     un ejemplo de juguete: si el mecanismo no traga el contenido real, es ahora
     cuando hay que enterarse y no la noche que se publique.
     """
@@ -248,7 +248,7 @@ def test_f006_r17_filas_hay_una_por_ficha_y_en_orden_estable() -> None:
 
     filas = filas_diccionario(dicc)
 
-    assert len(filas) == len(dicc.fichas) == 25
+    assert len(filas) == len(dicc.fichas) == 49
     claves = [(f[0], f[1]) for f in filas]
     assert claves == sorted(claves), "el orden tiene que ser estable entre publicaciones"
 
@@ -373,7 +373,7 @@ def test_f006_r22_fila_de_publicacion_lleva_los_recuentos_reales() -> None:
     assert hash_pub == hash_fuente and len(hash_pub) == 64
     assert publicado == ahora
     assert batch == "20260820T021500Z-abcdef"
-    assert (n_objetos, n_reglas, n_columnas) == (25, 12, 332)
+    assert (n_objetos, n_reglas, n_columnas) == (49, 12, 593)
     assert cobertura == 100.0
 
 
@@ -488,7 +488,7 @@ def test_f006_r17_publicar_escribe_las_tres_tablas() -> None:
     assert any("INSERT INTO _meta.diccionario (" in s for s in sentencias)
     assert any("INSERT INTO _meta.diccionario_reglas (" in s for s in sentencias)
     assert any("INSERT INTO _meta.diccionario_publicacion (" in s for s in sentencias)
-    assert filas == 25 + 12 + 1
+    assert filas == 49 + 12 + 1
 
 
 def test_f006_r18_publicar_va_en_una_sola_transaccion() -> None:
@@ -529,7 +529,7 @@ def test_f006_r18_publicar_borra_antes_de_insertar() -> None:
 
 
 def test_f006_r17_publicar_manda_las_filas_reales_no_un_ejemplo() -> None:
-    """Se prueba con las 25 fichas de verdad: si el mecanismo no traga el
+    """Se prueba con las fichas de verdad, todas: si el mecanismo no traga el
     contenido real, es ahora cuando hay que enterarse."""
     _, diario, _ = _publicar_y_diario()
 
@@ -537,7 +537,7 @@ def test_f006_r17_publicar_manda_las_filas_reales_no_un_ejemplo() -> None:
     fichas = next(v for k, v in lotes.items() if "INSERT INTO _meta.diccionario (" in k)
     reglas = next(v for k, v in lotes.items() if "diccionario_reglas" in k)
 
-    assert len(fichas) == 25
+    assert len(fichas) == 49
     assert len(reglas) == 12
     assert all(len(f) == 14 for f in fichas)
     assert all(len(r) == 7 for r in reglas)
@@ -554,7 +554,7 @@ def test_f006_r22_publicar_registra_la_version_y_el_hash() -> None:
     assert publicacion[0] == 1
     assert len(publicacion[2]) == 64
     assert publicacion[4] == "20260820T021500Z-abcdef"
-    assert publicacion[5:] == (25, 12, 332, 100.0)
+    assert publicacion[5:] == (49, 12, 593, 100.0)
 
 
 def test_f006_r28_list_objetos_catalogo_pregunta_por_los_esquemas_pedidos() -> None:
@@ -653,7 +653,7 @@ class _ClienteEspia:
 
     def publicar_diccionario(self, *_a, **_k):
         self.llamadas.append("publicar_diccionario")
-        return 38
+        return 62
 
     def connection(self):  # pragma: no cover - no debería llamarse
         raise AssertionError("el paso no debe abrir conexión por su cuenta")
@@ -681,14 +681,14 @@ def test_f006_r17_paso_publica_el_diccionario_real_y_lo_cuenta() -> None:
     resultado = _paso(pasos_del_pipeline_nocturno(), espia).run()
 
     assert resultado.status is StepStatus.SUCCESS
-    assert resultado.rows_processed == 38
+    assert resultado.rows_processed == 62
     assert espia.llamadas == [
         "execute_sql_file:01_diccionario.sql",
         "publicar_diccionario",
     ], "el DDL idempotente va ANTES de escribir"
-    assert resultado.metadata["n_objetos"] == 25
+    assert resultado.metadata["n_objetos"] == 49
     assert resultado.metadata["n_reglas"] == 12
-    assert resultado.metadata["n_columnas"] == 332
+    assert resultado.metadata["n_columnas"] == 593
     assert resultado.metadata["cobertura_cols"] == 100.0
     assert len(resultado.metadata["hash_fuente"]) == 64
 
@@ -814,7 +814,7 @@ class _PgDeCli:
         self.llamadas.append("publicar_diccionario")
         if self._al_publicar is not None:
             raise self._al_publicar
-        return 38
+        return 62
 
 
 def _cli_runner(monkeypatch, pg):

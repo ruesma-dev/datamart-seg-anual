@@ -31,6 +31,7 @@ Ningún test de este fichero abre red ni BBDD.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -45,7 +46,15 @@ DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
 TECNICAS = ("_built_at", "_ingested_at", "_source_tiemod")
 
 
+@lru_cache(maxsize=1)
 def _diccionario():
+    """El diccionario real, cacheado.
+
+    Se cachea porque este fichero lo pide en cada uno de sus ~160 tests y
+    releerlo 160 veces son 49 ficheros YAML por vuelta: la suite pasó de 50 s a
+    seis minutos al entrar `compras` y `retenciones`. Es de solo lectura y las
+    entidades son inmutables, así que compartir la instancia no acopla nada.
+    """
     dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
     return dicc
 
@@ -241,7 +250,10 @@ def test_f006_r7_mart_el_escenario_declara_sus_cuatro_valores() -> None:
 # ---------------------------------------------------------------------------
 
 
+@lru_cache(maxsize=1)
 def _origen_por_objeto() -> dict[str, str]:
+    """Qué fichero crea cada objeto. Cacheado por el mismo motivo: recorre el
+    árbol SQL entero y lo piden decenas de tests parametrizados."""
     from tests.test_f006_cobertura import _inventario_del_repositorio
 
     return {o.nombre: o.origen for o in _inventario_del_repositorio()}
@@ -527,9 +539,15 @@ def test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos() -> None:
 
 
 def cuerpo_de_vista(sql: str, esquema: str, objeto: str) -> str | None:
-    """El texto del `CREATE VIEW` de ESA vista y solo de esa."""
+    """El texto del `CREATE ... AS` de ESE objeto y solo de ese.
+
+    Cubre las vistas y también las tablas creadas con `CREATE TABLE x AS
+    SELECT`, que es como se construyen las siete de `compras` y las dos de
+    `retenciones`: no tienen lista de columnas que parsear, tienen una
+    proyección, exactamente igual que una vista.
+    """
     patron = re.compile(
-        rf"CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\s+"
+        rf"CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?(?:VIEW|TABLE)\s+"
         rf"{re.escape(esquema)}\.{re.escape(objeto)}\s+AS",
         re.IGNORECASE,
     )
@@ -537,7 +555,7 @@ def cuerpo_de_vista(sql: str, esquema: str, objeto: str) -> str | None:
     if coincidencia is None:
         return None
     resto = sql[coincidencia.end() :]
-    corte = re.search(r"^(CREATE|COMMENT|DROP)\b", resto, re.MULTILINE)
+    corte = re.search(r"^(CREATE|COMMENT|DROP|ALTER)\b", resto, re.MULTILINE)
     return resto[: corte.start()] if corte else resto
 
 
@@ -610,14 +628,40 @@ def columnas_proyectadas(cuerpo: str) -> list[str] | None:
 
 
 def _vistas_del_diccionario() -> list:
-    return [f for f in _diccionario().fichas if f.tipo == "vista"]
+    """Todo objeto que se crea con una PROYECCIÓN, sea vista o `TABLE AS`."""
+    return [
+        f
+        for f in _diccionario().fichas
+        if f.columnas and f.nombre not in TABLAS_CON_DDL_EXPLICITO
+    ]
 
 
-def test_f006_r26_todas_las_vistas_se_dejan_leer() -> None:
+#: Objetos cuyo SQL declara la lista de columnas y se leen con el parser de DDL.
+#: El resto se crea con `AS SELECT` y se lee de su proyección.
+TABLAS_CON_DDL_EXPLICITO = {
+    "mart.fact_seguimiento_mensual",
+    "mart.fact_seguimiento_categoria",
+    "cierre.fact_cierre_mensual",
+}
+
+#: La única excepción, y hay que decirla: `retenciones.v_src_lineas_compra` y
+#: `v_src_lineas_venta` se crean con SQL DINÁMICO dentro de un `DO $$` —según
+#: exista o no la tabla de origen en `raw`— así que su `SELECT` va dentro de una
+#: cadena y ningún parser razonable lo alcanza. Sus dos columnas las comprueba
+#: `test_f006_r26_las_vistas_dinamicas_de_retenciones`, escrito a mano.
+CREADAS_CON_SQL_DINAMICO = {
+    "retenciones.v_src_lineas_compra",
+    "retenciones.v_src_lineas_venta",
+}
+
+
+def test_f006_r26_todos_los_objetos_con_proyeccion_se_dejan_leer() -> None:
     """Control: si la extracción dejara de funcionar, el test de abajo pasaría
-    en falso sobre cero vistas."""
+    en falso sobre cero objetos."""
     ilegibles = []
     for ficha in _vistas_del_diccionario():
+        if ficha.nombre in CREADAS_CON_SQL_DINAMICO:
+            continue
         sql = (DIR_SQL / _origen_por_objeto()[ficha.nombre]).read_text(encoding="utf-8")
         cuerpo = cuerpo_de_vista(sql, ficha.esquema, ficha.objeto)
         if cuerpo is None or columnas_proyectadas(cuerpo) is None:
@@ -630,6 +674,9 @@ def test_f006_r26_todas_las_vistas_se_dejan_leer() -> None:
 @pytest.mark.parametrize("nombre", sorted(f.nombre for f in _vistas_del_diccionario()))
 def test_f006_r26_las_vistas_documentan_exactamente_su_proyeccion(nombre: str) -> None:
     """Ni una columna de menos (hueco) ni una de más (humo o columna ajena)."""
+    if nombre in CREADAS_CON_SQL_DINAMICO:
+        pytest.skip("se crea con SQL dinámico; tiene su propio test")
+
     ficha = _diccionario().por_nombre[nombre]
     sql = (DIR_SQL / _origen_por_objeto()[nombre]).read_text(encoding="utf-8")
 
@@ -640,6 +687,27 @@ def test_f006_r26_las_vistas_documentan_exactamente_su_proyeccion(nombre: str) -
         f"faltan: {sorted(set(proyectadas) - set(documentadas))}; "
         f"sobran: {sorted(set(documentadas) - set(proyectadas))}"
     )
+
+
+def test_f006_r26_las_vistas_dinamicas_de_retenciones() -> None:
+    """Las dos que se crean dentro de un `EXECUTE`, comprobadas a mano.
+
+    Las dos variantes que el SQL puede crear —la real y la vacía— proyectan las
+    mismas dos columnas, y eso es justamente lo que hace que el resto del módulo
+    funcione exista o no la tabla de origen.
+    """
+    fichas = _fichas_de("retenciones")
+    if not fichas:
+        pytest.skip("las fichas de `retenciones` llegan en el bloque F")
+
+    sql = (DIR_SQL / "retenciones/00_setup.sql").read_text(encoding="utf-8")
+
+    for objeto in ("v_src_lineas_compra", "v_src_lineas_venta"):
+        documentadas = {c.nombre for c in fichas[objeto].columnas}
+        assert documentadas == {"docide", "obride"}, objeto
+        assert sql.count(f"CREATE VIEW retenciones.{objeto} AS") == 2, (
+            "las dos variantes (con y sin tabla de origen) tienen que seguir ahí"
+        )
 
 
 def test_f006_r26_el_extractor_no_confunde_dos_vistas_del_mismo_fichero() -> None:
@@ -836,3 +904,231 @@ def test_f006_r2_no_queda_ningun_residuo_de_mes_anterior() -> None:
 
     assert not residuos, residuos
     assert yaml_lib.safe_load(crudo), "y el fichero sigue parseando"
+
+
+# ---------------------------------------------------------------------------
+# `compras` y `retenciones` · las trampas que el encargo exigía por escrito
+#
+# Estos dos esquemas sirven cuatro de los seis casos de uso del humano y son los
+# que más trampas tienen. Cada una de ellas está aquí, contrastada contra el SQL
+# que la origina, para que una reescritura bienintencionada no la diluya.
+# ---------------------------------------------------------------------------
+
+
+def _texto_de(nombre: str) -> str:
+    """Todo lo que la ficha le dice al agente, en una sola cadena."""
+    ficha = _diccionario().por_nombre[nombre]
+    partes = [ficha.descripcion, ficha.grano or "", ficha.motivo_no_consumo or ""]
+    partes += [c.significado for c in ficha.columnas]
+    partes += [c.nulo_significa or "" for c in ficha.columnas]
+    partes += [r.porque for r in ficha.relaciones]
+    return " ".join(partes)
+
+
+def test_f006_r2_compras_linea_id_no_se_declara_unico() -> None:
+    """`linea_id` viene de `ctrpro`, `dcapro` y `dcfpro`, que colisionan.
+
+    La clave real es `(tipo_doc, linea_id)` y la tabla no tiene PK declarada:
+    tratarlo como único pierde filas al contar y las duplica al unir.
+    """
+    ficha = _diccionario().por_nombre["compras.fact_compras_linea"]
+
+    assert list(ficha.clave_negocio) == ["tipo_doc", "linea_id"]
+    columnas = {c.nombre: c for c in ficha.columnas}
+    assert "NO ES UNICO" in columnas["linea_id"].significado
+    assert "tipo_doc" in columnas["linea_id"].significado
+
+    sql = (DIR_SQL / "compras/02_fact_linea.sql").read_text(encoding="utf-8")
+    assert "ADD PRIMARY KEY" not in sql, (
+        "si algún día se le pone PK a esta tabla, esta ficha hay que reescribirla"
+    )
+
+
+def test_f006_r2_compras_los_abonos_ya_vienen_en_negativo() -> None:
+    texto = _texto_de("compras.fact_compras_linea")
+
+    assert "ABONO" in texto
+    assert "negativo" in texto
+
+    sql = (DIR_SQL / "compras/03_views.sql").read_text(encoding="utf-8")
+    assert "signo natural" in sql, "es de donde sale la afirmación"
+
+
+def test_f006_r2_compras_los_importes_son_sin_iva_y_se_dice() -> None:
+    """Y se dice también contra qué NO se pueden comparar."""
+    for objeto in ("fact_compras_linea", "v_pbi_contrato_consumo",
+                   "v_pbi_proveedor_obra", "v_pbi_partida_coste"):
+        assert "SIN IVA" in _texto_de(f"compras.{objeto}").upper(), objeto
+
+    assert "importe_contratado" in _texto_de("compras.v_pbi_proveedor_obra")
+
+
+def test_f006_r2_compras_no_filtra_por_el_universo_del_seguimiento() -> None:
+    """Puede traer obras administrativas que `stg.obras` excluye."""
+    texto = _texto_de("compras.v_pbi_partida_coste")
+
+    assert "stg.obras" in texto
+    assert "administrativas" in texto
+
+
+def test_f006_r2_compras_las_filas_sin_obra_no_se_pueden_perder() -> None:
+    """Estructura y generales: filtrarlas fuera baja el total sin avisar."""
+    columnas = {
+        c.nombre: c
+        for c in _diccionario().por_nombre["compras.fact_compras_linea"].columnas
+    }
+
+    nulo = columnas["obra_id"].nulo_significa or ""
+    assert "estructura" in nulo.lower()
+    assert "no se pueden perder" in nulo.lower()
+
+
+def test_f006_r2_retenciones_prohibe_el_join_a_las_lineas() -> None:
+    """La regla que más dinero ha costado: 38,9 M€ en una sola obra."""
+    ficha = _diccionario().por_nombre["retenciones.movimientos"]
+
+    assert "38,9" in ficha.grano
+    assert "UNA FILA POR EFECTO" in ficha.grano
+
+    hacia_factura = next(
+        r for r in ficha.relaciones if r.a.startswith("compras.facturas")
+    )
+    assert "NUNCA" in hacia_factura.porque
+    assert "factura_lineas" in hacia_factura.porque
+
+
+def test_f006_r12_retenciones_hereda_la_regla_del_join() -> None:
+    """No basta con contarlo en la ficha: la regla dura tiene que alcanzarla."""
+    from etl_sigrid.domain.diccionario import derivar_avisos
+
+    derivado = derivar_avisos(_diccionario())
+
+    avisos = derivado.por_nombre["retenciones.movimientos"].avisos
+    assert "R-RETENCION-NO-JOIN-LINEAS" in avisos
+
+
+def test_f006_r2_retenciones_explica_la_cascada_de_atribucion_a_obra() -> None:
+    columnas = {
+        c.nombre: c
+        for c in _diccionario().por_nombre["retenciones.movimientos"].columnas
+    }
+
+    obra = columnas["obra_id"]
+    assert "CENTRO DE COSTE" in obra.significado
+    assert "98" in obra.significado, "la cascada acierta en torno al 98 % por cenide"
+    assert "num_obras_documento" in (obra.nulo_significa or "")
+
+
+def test_f006_r2_retenciones_declara_las_dos_lecturas_del_saldo() -> None:
+    """`saldo_vivo` es la de por defecto; `neto_practicado` es la otra, y no dan
+    lo mismo. Dar una sin decir cuál es no es una respuesta completa."""
+    for objeto in ("v_pbi_retencion_entidad", "v_pbi_retencion_resumen"):
+        columnas = {
+            c.nombre: c
+            for c in _diccionario().por_nombre[f"retenciones.{objeto}"].columnas
+        }
+        assert "saldo_vivo" in columnas
+        assert "neto_practicado" in columnas
+        assert "NO es" in columnas["neto_practicado"].significado, objeto
+
+    entidad = {
+        c.nombre: c
+        for c in _diccionario().por_nombre[
+            "retenciones.v_pbi_retencion_entidad"
+        ].columnas
+    }
+    assert "DEFECTO" in entidad["saldo_vivo"].significado.upper()
+
+
+def test_f006_r2_retenciones_dice_que_la_vista_de_venta_esta_vacia() -> None:
+    """`dvfpro` no se ingiere: consultarla no devuelve nada nunca."""
+    ficha = _diccionario().por_nombre["retenciones.v_src_lineas_venta"]
+
+    assert "VACIA" in ficha.descripcion.upper()
+    assert "dvfpro" in ficha.descripcion
+    assert ficha.consumo_recomendado is False
+
+
+def test_f006_r14_los_dos_esquemas_manuales_lo_declaran_en_todas_sus_fichas() -> None:
+    for esquema, paso in (("compras", "build_compras"),
+                          ("retenciones", "build_retenciones")):
+        fichas = _fichas_de(esquema)
+        assert fichas, esquema
+        for nombre, ficha in fichas.items():
+            assert ficha.refresco == "manual", f"{esquema}.{nombre}"
+            assert ficha.paso_etl == paso, f"{esquema}.{nombre}"
+
+
+def _pasos_registrables() -> set[str]:
+    """Los pasos que existen de verdad como step y por tanto dejan fila.
+
+    Se derivan del propio código: un paso solo aparece en `_meta.v_frescura` si
+    hay una clase `PipelineStep` cuyo `name` lo devuelve.
+    """
+    nombres: set[str] = set()
+    for ruta in (RAIZ / "etl_sigrid" / "application" / "steps").rglob("*.py"):
+        texto = ruta.read_text(encoding="utf-8")
+        nombres |= set(re.findall(r'return "([a-z_]+)"', texto))
+    return nombres
+
+
+def test_f006_r13_control_hay_pasos_registrables_de_verdad() -> None:
+    """Si la derivación devolviera vacío, el test de abajo no probaría nada."""
+    registrables = _pasos_registrables()
+
+    assert {"build_mart", "build_stg", "build_cierre", "publicar_diccionario"} <= (
+        registrables
+    )
+    assert "build_compras" not in registrables
+    assert "build_retenciones" not in registrables
+
+
+def test_f006_r13_una_ficha_cuyo_paso_no_deja_rastro_lo_advierte() -> None:
+    """`build-compras` y `build-retenciones` ejecutan SQL en línea, sin step.
+
+    Su fecha de build NO es consultable por SQL, así que `_meta.v_diccionario`
+    dará frescura a nulo para estos objetos. La ficha tiene que decirlo en vez
+    de mandar al agente a una vista que no le va a responder.
+    """
+    from etl_sigrid.domain.diccionario import derivar_avisos
+
+    registrables = _pasos_registrables()
+    derivado = derivar_avisos(_diccionario())
+    reglas = {r.codigo: r for r in derivado.reglas}
+
+    afectadas = [
+        f for f in derivado.fichas
+        if f.paso_etl and f.paso_etl not in registrables
+    ]
+    assert afectadas, "el control de arriba dice que hay pasos no registrables"
+
+    for ficha in afectadas:
+        # El aviso puede llegar por el texto de la propia ficha o —lo normal—
+        # por una regla dura que la alcance. Lo segundo es el mecanismo pensado
+        # para esto: repetir la advertencia en las 24 fichas la diluiría, y una
+        # nota en la cabecera del YAML no la ve el agente, porque los
+        # comentarios del fichero no se publican.
+        propio = _texto_de(ficha.nombre)
+        heredado = " ".join(
+            reglas[c].regla + " " + reglas[c].motivo
+            for c in ficha.avisos
+            if c in reglas
+        )
+        texto = propio + " " + heredado
+        assert "no registran paso" in texto or "no es consultable" in texto, (
+            f"{ficha.nombre} declara `paso_etl: {ficha.paso_etl}`, que no deja "
+            f"fila en `_meta.etl_runs`, y ni la ficha ni sus avisos lo advierten"
+        )
+
+
+def test_f006_r13_el_aviso_de_frescura_llega_a_compras_y_retenciones() -> None:
+    """Y llega por el mecanismo, no por copiar la advertencia 24 veces."""
+    from etl_sigrid.domain.diccionario import derivar_avisos
+
+    derivado = derivar_avisos(_diccionario())
+
+    for esquema in ("compras", "retenciones"):
+        fichas = [f for f in derivado.fichas if f.esquema == esquema]
+        assert fichas, esquema
+        for ficha in fichas:
+            assert "R-FRESCURA-MANUAL" in ficha.avisos, ficha.nombre

@@ -1361,3 +1361,75 @@ Lo que hay que comprobar en esa salida, mas alla de que no reviente:
 Lo unico que este puesto puede garantizar es que el mecanismo traga **el
 contenido real**: los tests publican las 25 fichas de verdad contra un doble y
 cuentan 38 filas, 332 columnas y cobertura 100 %.
+
+---
+
+# Bloque F parcial · Fichas de `compras` y `retenciones`
+
+Fase RED, la puerta con los 24 objetos fuera de `pendientes`:
+
+```
+$ python -m pytest tests/test_f006_cobertura.py -q -k puerta
+tests\test_f006_cobertura.py:500: AssertionError
+FAILED tests/test_f006_cobertura.py::test_f006_r25_puerta_todo_objeto_publicado_tiene_ficha_o_esta_pendiente
+1 failed, 10 passed, 34 deselected in 0.81s
+```
+
+**14 fichas de `compras` y 10 de `retenciones`**, con sus 261 columnas nuevas.
+El diccionario pasa de 25 a **49 objetos y 593 columnas**, y el trinquete de 77
+a **53**.
+
+## Lo que hubo que ampliar en la puerta antes de escribir nada
+
+Las siete tablas de `compras` y las dos de `retenciones` **no tienen lista de
+columnas en su DDL**: se crean con `CREATE TABLE ... AS SELECT`. El parser de
+DDL no las ve y el contraste de vistas tampoco las miraba, asi que habrian
+entrado 155 columnas sin comprobar ni una.
+
+La solucion resulto obvia una vez vista: **una tabla creada con `AS SELECT`
+tiene una proyeccion, exactamente igual que una vista**, asi que se lee con el
+mismo mecanismo. Las 46 fichas con columnas se contrastan ahora una a una,
+tabla o vista, y el meta-test exige que ninguna quede sin cubrir.
+
+**La unica excepcion, y se declara**: `retenciones.v_src_lineas_compra` y
+`v_src_lineas_venta` se crean con SQL DINAMICO dentro de un `DO $$`, segun
+exista o no la tabla de origen en `raw`. Su `SELECT` va dentro de una cadena y
+ningun parser razonable lo alcanza. Sus dos columnas las comprueba un test
+escrito a mano, que ademas exige que las **dos variantes** —la real y la
+vacia— sigan estando en el SQL.
+
+## Las trampas, cada una con su test contra el SQL
+
+| Trampa | Como queda cerrada |
+|---|---|
+| **`linea_id` NO es unico** en `fact_compras_linea` | `clave_negocio: [tipo_doc, linea_id]`, la columna lo dice, y un test comprueba que la tabla **sigue sin PK declarada**: el dia que se la pongan, la ficha hay que reescribirla |
+| **Los abonos ya vienen en negativo** | Dicho en la ficha y contrastado contra el «signo natural» del propio SQL |
+| **Importes SIN IVA** | Exigido en las cuatro fichas de consumo, y ademas que digan **contra que NO se comparan**: `maestro.proveedores_obra.importe_contratado` lleva IVA |
+| **NUNCA unir un efecto a las lineas de su factura** | En el `grano` de `movimientos`, con los 38,9 M€, y en el `porque` de la relacion hacia `compras.facturas`, que dice explicitamente que no se siga hasta `factura_lineas` |
+| **La cascada de atribucion a obra** | `cenide` primero (~98 % en Ruesma), luego las lineas del documento **solo si todas apuntan a la misma obra**; y `num_obras_documento > 1` con obra nula explicado en el `nulo_significa` |
+| **Las dos lecturas del saldo** | `saldo_vivo` marcada como LA DE POR DEFECTO y `neto_practicado` diciendo que **NO es lo mismo**; exigido en las dos vistas que las exponen |
+| **No filtran por `stg.obras`** | Dicho en las fichas, con la palabra «administrativas» |
+| **`v_src_lineas_venta` esta SIEMPRE vacia** | En su descripcion, con el motivo (`dvfpro` no se ingiere) y `consumo_recomendado: false` |
+
+## Tres correcciones que aparecieron al escribir
+
+1. **El aviso de frescura no llegaba al agente.** La advertencia de que
+   `build-compras` y `build-retenciones` no registran paso estaba en la
+   **cabecera del YAML**, y los comentarios del fichero **no se publican**: el
+   MCP nunca los ve. Se resolvio por el mecanismo que existe para esto —la
+   regla `R-FRESCURA-MANUAL` alcanza a los dos esquemas y su texto lo dice— y
+   hay un test que lo exige **derivando del codigo** que pasos dejan fila en
+   `_meta.etl_runs` y cuales no. Repetir la advertencia en las 24 fichas la
+   habria diluido.
+2. **La comprobacion aplazada de fan-out se disparo, como estaba disenada.**
+   `mart.fact_seguimiento_mensual -> compras.v_pbi_partida_coste.partida_id`
+   declaraba `N:1`; en cuanto el destino tuvo ficha, el validador vio que su
+   clave es `(obra_id, partida_id)` y lo marco. Es `N:N`, y su `porque` dice
+   ahora por que par hay que agregar.
+3. **Dos relaciones `1:1` de retenciones eran `N:N`.** `movimiento_id` solo es
+   unico DENTRO de su sentido: unir por el a secas **cruza retenciones de
+   proveedor con retenciones de cliente**. Las fichas lo dicen ahora.
+
+Un detalle de formato que costo un rato y conviene recordar: **un escalar YAML
+sin comillas no puede contener `": "`**. Cinco textos de `compras.yaml` lo
+tenian y el fichero no parseaba; se pasaron a bloque `>-`.
