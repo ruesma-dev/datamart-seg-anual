@@ -178,6 +178,7 @@
       ],
       "status": "in_progress",
       "sdd": true,
+      "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-006-mcp-azure"
     },
