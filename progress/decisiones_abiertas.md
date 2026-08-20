@@ -402,7 +402,7 @@ hay que decir explícitamente que se queda.
 
 ---
 
-## D11 · El acceso al Postgres desde el puesto por regla de IP ya no funciona — afecta a F-032, F-034, D10
+## D11 · RESUELTA EN PARTE (2026-08-20) · El acceso al Postgres desde el puesto por regla de IP ya no funciona — afecta a F-032, F-034, D10
 
 **Abierta el 2026-08-20.** Medido hoy: la IP pública del puesto **rota cada
 pocos minutos y cambia de bloque entero**. En una hora se vieron tres:
@@ -434,6 +434,21 @@ medición: es un CGNAT que reasigna.
    proyecto en solitario.
 4. **Rango amplio del ISP** en el firewall. Barato y **malo**: abrir un bloque
    grande de un operador doméstico en un Postgres de producción compartido.
+
+**SOLUCIÓN ADOPTADA el 2026-08-20 (autorizada por el humano)**: una **regla
+única sin fecha**, `datamart-puesto-pgris`, que se **actualiza con la IP del
+momento** justo antes de cada tanda de comandos. Creada y probada el mismo
+minuto: `check-frescura` y `check-coherencia` respondieron con salida 0 y la
+nocturna del 20 quedó verificada por las dos vías.
+
+Por qué funciona donde fallaba lo anterior: no persigue la IP con reglas nuevas,
+**reescribe la misma**. Y deja **una** regla en el firewall compartido en lugar
+de una por día.
+
+Lo que sigue abierto: **las cuatro reglas fechadas** (`-17-rango`, `-18`, `-19`,
+`-20`) siguen ahí y son inútiles; las retira F-032, que debe saber que **la
+regla sin fecha se queda**. Y la decisión de fondo —IP fija, VPN o Private
+Link— sigue sin tomar: esto es un apaño que funciona, no una solución.
 
 **Lo que bloquea mientras no se decida**: cualquier verificación desde el puesto
 que necesite la base —`check-coherencia`, `check-frescura`, `timings`— y el

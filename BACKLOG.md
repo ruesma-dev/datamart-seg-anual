@@ -3,12 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **32 features**, 18 abiertas, 14 terminadas.
+Resumen: **33 features**, 19 abiertas, 14 terminadas.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
+| F-035 | Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna | 9 | pendiente | critico | `feature/F-035-estudio-tiempo-carga` |
 | F-025 | Ventana de negocio: acotar el build de stg y mart a lo que se mueve | 10 | pendiente | critico | `feature/F-025-ventana-negocio-build` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
 | F-031 | La alerta de frescura se queda encendida para siempre y deja de avisar | 11 | pendiente | estandar | `feature/F-031-alerta-no-se-resuelve` |
@@ -48,6 +49,12 @@ Resumen: **32 features**, 18 abiertas, 14 terminadas.
 | F-008 | Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api | 20 | documental |
 
 ## Detalle
+
+### F-035 · Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna
+
+estado **pendiente** · prioridad 9 · rigor `critico` · SDD sí · rama `feature/F-035-estudio-tiempo-carga`
+
+Pedido por el humano el 2026-08-20 al cerrar F-011: 'hay que estudiar como reducir el tiempo de carga'. Se hace con el patron que ya funciono en el bloque A de F-011 -medir, fijar umbrales ANTES, y firmar una recomendacion-, porque ese patron evito implementar una maquina de estados entera a cambio de 2,25 min. DE DONDE SE PARTE, medido sobre tres cargas completas: build_stg 110,7 min (67,0 %), ingest_raw 32,9 (19,9 %), build_mart 21,6 (13,1 %), total 165,2 min. Aunque la ingesta fuera instantanea la carga duraria 2 h 12, asi que el trabajo esta en el build. Y un dato nuevo del 2026-08-20: durante build_stg la CPU del servidor esta al 80 % de media y 92 % de pico durante 1 h 50, con UNA SOLA vCPU (Standard_B1ms). Los creditos de rafaga NO se agotan -bajan de 128,5 a 57,4-, asi que no hay estrangulamiento: simplemente no hay mas CPU. LAS CUATRO PALANCAS A MEDIR. (1) MAS vCPU Y TRAMOS EN PARALELO: los 60 tramos de plan_mensual que troceo F-019 se ejecutan en SERIE; con mas vCPU podrian solaparse. Escalar el SKU solo durante la ventana nocturna y devolverlo despues es lo mas barato de probar y no toca una linea de SQL, pero el servidor es COMPARTIDO con albaranes y partes: el cambio implica reinicio y hay que avisarles. (2) VENTANA DE NEGOCIO: es F-025, que ya existe con prioridad 10; reconstruir solo lo que se mueve. Depende de una decision de Negocio sin tomar -que es una obra abierta-. (3) BUILD INCREMENTAL POR DIFF LOCAL: la via que F-011 no exploro porque su spec la ataba al watermark del ORIGEN. Seguir trayendo raw completo -34 min, funciona y es fiable- y comparar contra una firma del dia anterior EN NUESTRA BASE, con un hash por fila y clave, para saber que obras cambiaron y reconstruir en stg solo lo afectado. No depende de que Sigrid tenga marca de modificacion. A medir: cuanto ocupan las firmas -el disco esta al 72 % en reposo y 88 % en pico, es el limite conocido-, cuanto cuesta calcular el diff, y que porcentaje de obras cambia de verdad de un dia para otro, que es el numero que decide si esta via sirve. (4) SQL E INDICES: el plan de ejecucion del build, por si hay algo caro y evitable. RESTRICCION QUE VALE PARA LAS CUATRO: cualquiera que cambie que se construye altera LO QUE VE POWER BI, no solo cuanto tarda, asi que exige prueba de equivalencia como la que hizo F-019 con el troceado.
 
 ### F-025 · Ventana de negocio: acotar el build de stg y mart a lo que se mueve
 
