@@ -1,0 +1,117 @@
+# config/diccionario/00_global.yaml
+#
+# El bloque global del diccionario semantico del datamart (F-006).
+#
+# Este fichero se sirve casi entero al agente en su primera llamada: es lo que
+# lee ANTES de escribir una linea de SQL. Aqui van las convenciones, los nueve
+# esquemas, las reglas duras que impiden respuestas plausibles y falsas, los
+# ordenes de magnitud contra los que detectar un disparate, y la lista de lo
+# que todavia no esta documentado.
+#
+# `pendientes` es un TRINQUETE (R27): solo baja. La constante PENDIENTES_MAX de
+# tests/test_f006_cobertura.py tiene que valer exactamente lo que hay aqui, y
+# al cerrar F-006 esta lista queda vacia.
+
+version: 1
+base: sigrid_dm
+titulo: Datamart de seguimiento anual de obra
+
+pendientes:
+  - _meta.etl_runs
+  - _meta.v_frescura
+  - _meta.v_raw_state
+  - aux.periodificacion_partida
+  - cierre.fact_cierre_mensual
+  - cierre.fn_mes_de_fase
+  - cierre.fn_mes_de_version_master
+  - cierre.fn_parse_mes_fase
+  - cierre.v_pbi_cierre_cabecera
+  - cierre.v_pbi_cierre_generales_detalle
+  - cierre.v_pbi_cierre_indirectos_detalle
+  - cierre.v_pbi_cierre_resumen
+  - cierre.v_pbi_dim_concepto
+  - cierre.v_pbi_dim_subcategoria_ci
+  - cierre.v_pbi_dim_tipologia_cp
+  - cierre.v_pbi_planif_vs_real
+  - compras.albaran_lineas
+  - compras.albaranes
+  - compras.contrato_lineas
+  - compras.contratos
+  - compras.fact_compras_linea
+  - compras.factura_lineas
+  - compras.facturas
+  - compras.fn_serie
+  - compras.fn_sigrid_date
+  - compras.fn_tipo_documento
+  - compras.v_pbi_albaranes_sin_facturar
+  - compras.v_pbi_contrato_consumo
+  - compras.v_pbi_partida_coste
+  - compras.v_pbi_proveedor_obra
+  - maestro.fn_fecha
+  - maestro.obras
+  - maestro.proveedores
+  - maestro.proveedores_obra
+  - mart.fact_seguimiento_categoria
+  - mart.fact_seguimiento_mensual
+  - mart.v_fact_periodificado
+  - mart.v_master_versiones_tipadas
+  - mart.v_master_vigente_anual
+  - mart.v_pbi_cp_tipologia
+  - mart.v_pbi_dim_escenario
+  - mart.v_pbi_dim_fecha
+  - mart.v_pbi_dim_obra
+  - mart.v_pbi_dim_partida
+  - mart.v_pbi_dim_partida_niveles
+  - mart.v_pbi_fact
+  - mart.v_pbi_fact_categoria
+  - raw.auxmun
+  - raw.auxobramb
+  - raw.auxobrcla
+  - raw.auxobrtca
+  - raw.auxobrtip
+  - raw.auxpro
+  - raw.cen
+  - raw.cob
+  - raw.com
+  - raw.comlin
+  - raw.comprv
+  - raw.con
+  - raw.condir
+  - raw.conext
+  - raw.ctr
+  - raw.ctrpro
+  - raw.dca
+  - raw.dcapro
+  - raw.dcf
+  - raw.dcfpro
+  - raw.dcfprodes
+  - raw.obr
+  - raw.obrctr
+  - raw.obrfas
+  - raw.obrfasamb
+  - raw.obrparpar
+  - raw.obrparpre
+  - raw.obrprv
+  - raw.pag
+  - raw.prv
+  - raw.rec
+  - retenciones.fn_sigrid_date
+  - retenciones.movimientos
+  - retenciones.tipos
+  - retenciones.v_pbi_retencion_entidad
+  - retenciones.v_pbi_retencion_obra
+  - retenciones.v_pbi_retencion_resumen
+  - retenciones.v_pbi_retenciones_vencidas
+  - retenciones.v_pbi_retenciones_vivas
+  - retenciones.v_src_lineas_compra
+  - retenciones.v_src_lineas_venta
+  - stg.ambitos
+  - stg.fases
+  - stg.fn_master_fecha_efectiva
+  - stg.fn_master_mes_representado
+  - stg.fn_sigrid_date_to_date
+  - stg.obras
+  - stg.partidas
+  - stg.plan_mensual
+  - stg.presupuesto
+  - stg.version_master_vigente

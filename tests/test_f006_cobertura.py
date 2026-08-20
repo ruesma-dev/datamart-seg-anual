@@ -383,3 +383,102 @@ def test_f006_r25_dominio_el_informe_es_inmutable() -> None:
     assert isinstance(informe, InformeCobertura)
     with pytest.raises(FrozenInstanceError):
         informe.sin_ficha = ()  # type: ignore[misc]
+
+
+# ===========================================================================
+# puerta · la puerta REAL sobre este repositorio (R24-R27)
+#
+# Esto es lo que corre en cada `bash harness/init.sh`. No prueba que el
+# diccionario esté completo: prueba que **nadie ha añadido un objeto al
+# repositorio sin documentarlo ni declararlo pendiente**.
+# ===========================================================================
+
+from pathlib import Path  # noqa: E402 - la puerta sí toca ficheros
+
+import yaml  # noqa: E402
+
+from etl_sigrid.infrastructure.diccionario.cargador_yaml import (  # noqa: E402
+    cargar_diccionario,
+)
+
+RAIZ = Path(__file__).resolve().parents[1]
+DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
+DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
+YAML_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
+
+#: EL TRINQUETE (R27). Es el número de objetos que el diccionario todavía se
+#: permite no haber escrito. **Solo baja.** Cada bloque de fichas lo reduce y
+#: ninguna tarea lo sube; al cerrar F-006 vale 0 y `pendientes` está vacía.
+#:
+#: Historia, para que se vea que baja de verdad:
+#:   98  T8 · andamiaje, con el inventario entero declarado pendiente
+PENDIENTES_MAX = 98
+
+
+def _inventario_del_repositorio():
+    """Los objetos que este repositorio publica, leídos de sus propios ficheros."""
+    textos = {
+        str(ruta.relative_to(DIR_SQL)).replace("\\", "/"): ruta.read_text(
+            encoding="utf-8"
+        )
+        for ruta in DIR_SQL.rglob("*.sql")
+    }
+    tablas = yaml.safe_load(YAML_TABLAS.read_text(encoding="utf-8"))["tables"]
+    return objetos_de_sql(textos) + objetos_de_raw(tablas)
+
+
+def test_f006_r24_puerta_el_inventario_no_esta_vacio() -> None:
+    """Un inventario vacío haría pasar la puerta sin comprobar nada.
+
+    Es el modo de fallo silencioso de este tipo de puertas: si mañana cambia la
+    ruta del SQL, el `rglob` no encuentra nada y todo queda verde.
+    """
+    inventario = _inventario_del_repositorio()
+
+    assert len(inventario) >= 90, f"solo se inventariaron {len(inventario)} objetos"
+    esquemas = {o.esquema for o in inventario}
+    assert {"mart", "cierre", "compras", "retenciones", "maestro", "stg", "raw",
+            "aux", "_meta"} <= esquemas
+
+
+def test_f006_r1_puerta_el_diccionario_real_se_carga() -> None:
+    """`config/diccionario/` parsea y produce entidades."""
+    dicc, hash_fuente = cargar_diccionario(DIR_DICCIONARIO)
+
+    assert dicc.base == "sigrid_dm"
+    assert len(hash_fuente) == 64
+
+
+def test_f006_r25_puerta_todo_objeto_publicado_tiene_ficha_o_esta_pendiente() -> None:
+    """LA PUERTA. Un objeto publicado sin ficha es el caso peligroso: el agente
+    lo ve en el catálogo del servidor MCP e **inventa** su significado."""
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+
+    informe = evaluar_cobertura(dicc, _inventario_del_repositorio(), dicc.pendientes)
+
+    assert informe.ok, "\n" + formatear_cobertura(informe)
+
+
+def test_f006_r27_puerta_el_trinquete_solo_baja() -> None:
+    """`pendientes` no puede crecer. Al cerrar F-006 tiene que estar vacía."""
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+
+    assert len(dicc.pendientes) <= PENDIENTES_MAX, (
+        f"el diccionario declara {len(dicc.pendientes)} pendientes y el trinquete "
+        f"está en {PENDIENTES_MAX}. El trinquete SOLO BAJA: documenta el objeto en "
+        f"vez de subirlo"
+    )
+
+
+def test_f006_r27_puerta_el_trinquete_no_esta_holgado() -> None:
+    """Un trinquete muy por encima de la realidad deja hueco para colar objetos.
+
+    Se exige que la constante sea exactamente lo que hay declarado: bajarla es
+    parte de la tarea que documenta, no un apaño posterior.
+    """
+    dicc, _ = cargar_diccionario(DIR_DICCIONARIO)
+
+    assert len(dicc.pendientes) == PENDIENTES_MAX, (
+        f"PENDIENTES_MAX vale {PENDIENTES_MAX} y hay {len(dicc.pendientes)} "
+        f"pendientes declarados: ajusta la constante en esta misma tarea"
+    )
