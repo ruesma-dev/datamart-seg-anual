@@ -215,10 +215,13 @@ objetos:
           puente es F-039. Ojo, `compras` no filtra por `stg.obras`.
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: "N:1"
+        cardinalidad: "N:N"
         porque: >-
           Para contrastar el seguimiento mensual contra el cierre economico de
-          la obra. Ojo con la frescura: `cierre` no se refresca de noche.
+          la obra. NO se unen por `obra_id` a secas: las dos tienen muchas filas
+          por obra y el JOIN duplicaria importes. Hay que agregar cada lado y
+          unir por `(obra_id, anio_mes)`. Ojo tambien con la frescura: `cierre`
+          no se refresca de noche y el seguimiento si.
 
     ejemplos_preguntas:
       - Cual es la planificacion mensual de la obra 0704 en 2025
@@ -313,10 +316,12 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.fact_seguimiento_mensual.obra_id
-        cardinalidad: "1:N"
+        cardinalidad: "N:N"
         porque: >-
           Para bajar de la categoria al detalle por partida. La categoria se
-          llama igual en las dos tablas a proposito.
+          llama igual en las dos tablas a proposito, pero el JOIN va por
+          `(obra_id, anio_mes, categoria, escenario)`: por `obra_id` solo
+          multiplicaria las filas.
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
@@ -796,8 +801,11 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.v_master_versiones_tipadas.obra_id
-        cardinalidad: "N:1"
-        porque: Es el catalogo del que se elige, filtrando por fecha efectiva.
+        cardinalidad: "N:N"
+        porque: >-
+          Es el catalogo del que se elige, filtrando por fecha efectiva. Una
+          version concreta se identifica con `(obra_id, ambito_id, version)`:
+          unir por `obra_id` trae todas las versiones de la obra.
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
         cardinalidad: "N:1"
@@ -866,8 +874,11 @@ objetos:
         porque: Para poner codigo y nombre a la obra.
       - de: obra_id
         a: mart.v_master_vigente_anual.obra_id
-        cardinalidad: "N:1"
-        porque: Es la version de plan que se usa para la columna planificada.
+        cardinalidad: "N:N"
+        porque: >-
+          Es la version de plan que se usa para la columna planificada. El JOIN
+          va por `(obra_id, anio, ambito_id)`: por `obra_id` solo trae la version
+          de todos los anos.
     ejemplos_preguntas:
       - Cuanto llevamos de seguros y avales en la obra X este ano
       - Que obras se desvian mas en costes proporcionales

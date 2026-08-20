@@ -609,7 +609,94 @@ def _validar_relaciones(
                 f"el destino `{relacion.a}` apunta a la columna `{columna}`, que no "
                 f"está documentada en `{destino.nombre}`"
             )
+            continue
+
+        errores.extend(_validar_cardinalidad(ficha, relacion, destino, columna))
     return errores
+
+
+def _es_unica_por(ficha: Ficha, columna: str) -> bool | None:
+    """¿Una fila de `ficha` queda identificada por esa columna sola?
+
+    Devuelve `None` cuando no se puede saber —la ficha no declara clave de
+    negocio ni columnas, como las de `raw`—, para poder aplazar el juicio en vez
+    de inventárselo.
+
+    Dos formas de ser única: ser ELLA SOLA la clave de negocio, o estar marcada
+    `agregacion: clave_sustituta`. Lo segundo hace falta porque las claves
+    sustitutas se dejan fuera de `clave_negocio` a propósito (cambian en cada
+    build) y aun así identifican la fila dentro de un mismo build: es lo que
+    hace legítima la relación `1:1` entre una tabla de hecho y su vista
+    aligerada.
+    """
+    if not ficha.clave_negocio and not ficha.columnas:
+        return None
+    if tuple(ficha.clave_negocio) == (columna,):
+        return True
+    for candidata in ficha.columnas:
+        if candidata.nombre == columna and candidata.agregacion == "clave_sustituta":
+            return True
+    return False
+
+
+def _validar_cardinalidad(
+    ficha: Ficha, relacion: Relacion, destino: Ficha, columna: str
+) -> list[ErrorValidacion]:
+    """Un lado `1` de la cardinalidad promete unicidad. Aquí se comprueba.
+
+    Por qué esto merece un test y no una revisión a mano: seis relaciones se
+    publicaron diciendo `N:1` sobre `obra_id` cuando el destino tiene muchas
+    filas por obra. Un agente que se fía escribe el JOIN sin agregar antes y
+    **duplica importes en silencio** — el mismo error que
+    `R-RETENCION-NO-JOIN-LINEAS` existe para castigar, cometido dentro del
+    propio diccionario.
+
+    No hace falta auditar nada: el diccionario ya declara la clave de negocio de
+    cada objeto, así que la unicidad es DERIVABLE. Cuando el extremo todavía no
+    tiene ficha —está en `pendientes`— el juicio se aplaza, igual que el resto de
+    comprobaciones de relación.
+    """
+    if relacion.cardinalidad not in CARDINALIDADES:
+        return []
+
+    izquierda, derecha = relacion.cardinalidad.split(":")
+    problemas: list[tuple[str, str]] = []
+
+    if izquierda == "1" and _es_unica_por(ficha, relacion.de) is False:
+        problemas.append(
+            (
+                f"`{ficha.nombre}` tiene varias filas por `{relacion.de}` "
+                f"(su clave es {list(ficha.clave_negocio)})",
+                "izquierdo",
+            )
+        )
+    if derecha == "1" and _es_unica_por(destino, columna) is False:
+        problemas.append(
+            (
+                f"`{destino.nombre}` tiene varias filas por `{columna}` "
+                f"(su clave es {list(destino.clave_negocio)})",
+                "derecho",
+            )
+        )
+
+    if not problemas:
+        return []
+
+    detalle = "; ".join(p for p, _ in problemas)
+    return [
+        ErrorValidacion(
+            fichero=ficha.fichero,
+            objeto=ficha.nombre,
+            regla="R5",
+            detalle=(
+                f"la relación hacia `{relacion.a}` declara "
+                f"`{relacion.cardinalidad}` y eso promete una unicidad que no "
+                f"existe: {detalle}. El JOIN produciría fan-out y duplicaría "
+                f"importes. La cardinalidad cierta es `N:N`, y conviene decir en "
+                f"`porque` por qué clave hay que agregar antes de unir"
+            ),
+        )
+    ]
 
 
 def _validar_frescura(

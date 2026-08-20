@@ -153,11 +153,12 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.fact_seguimiento_mensual.obra_id
-        cardinalidad: "1:N"
+        cardinalidad: "N:N"
         porque: >-
-          Para bajar del cierre agregado al detalle por partida y mes. Ojo: el
-          seguimiento se refresca de noche y el cierre no, asi que pueden estar
-          contando momentos distintos.
+          Para bajar del cierre agregado al detalle por partida y mes. Las dos
+          tienen muchas filas por obra: hay que agregar antes y unir por
+          `(obra_id, anio_mes)`. Ojo ademas a que el seguimiento se refresca de
+          noche y el cierre no, asi que pueden estar contando momentos distintos.
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
@@ -301,8 +302,11 @@ objetos:
     relaciones:
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: "N:1"
-        porque: Es la tabla base; aqui solo se anaden dos conceptos y los porcentajes.
+        cardinalidad: "N:N"
+        porque: >-
+          Es la tabla base; aqui solo se anaden dos conceptos y los porcentajes.
+          La fila equivalente se localiza con `(obra_id, anio_mes, concepto)`,
+          no con `obra_id`.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
         cardinalidad: "N:1"
@@ -555,14 +559,19 @@ objetos:
     relaciones:
       - de: obra_id
         a: cierre.v_pbi_dim_subcategoria_ci.obra_id
-        cardinalidad: "N:1"
-        porque: Para los nombres de grupo y subcategoria propios de esa obra.
+        cardinalidad: "N:N"
+        porque: >-
+          Para los nombres de grupo y subcategoria propios de esa obra. El JOIN
+          va por `(obra_id, grupo_cod, subcategoria_cod)`: por `obra_id` solo
+          trae el catalogo entero de la obra y multiplica.
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: "N:1"
+        cardinalidad: "N:N"
         porque: >-
           Es el desglose del concepto INDIRECTOS del cuadro de cierre: la suma
-          del detalle debe cuadrar con esa fila.
+          del detalle debe cuadrar con esa fila. Para comprobarlo se agrega el
+          detalle por `(obra_id, anio_mes)` y se compara contra la fila de
+          concepto INDIRECTOS de ese mes; unirlos en crudo multiplica.
     ejemplos_preguntas:
       - En que se van los costes indirectos de la obra X
       - Cuanto cambiaria el indirecto de la obra X con cada variante de periodificacion
@@ -629,10 +638,11 @@ objetos:
         porque: Para la descripcion legible de la tipologia.
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
-        cardinalidad: "N:1"
+        cardinalidad: "N:N"
         porque: >-
-          Es el desglose del concepto GENERALES del cuadro de cierre: la suma del
-          detalle debe cuadrar con esa fila.
+          Es el desglose del concepto GENERALES del cuadro de cierre: la suma
+          del detalle debe cuadrar con esa fila. Se agrega por
+          `(obra_id, anio_mes)` antes de comparar; unirlos en crudo multiplica.
     ejemplos_preguntas:
       - Cuanto llevamos de seguros y avales en la obra X
       - Que parte de los generales de la obra X es aporte a gastos generales
@@ -854,10 +864,12 @@ objetos:
     relaciones:
       - de: obra_id
         a: mart.fact_seguimiento_categoria.obra_id
-        cardinalidad: "N:1"
+        cardinalidad: "N:N"
         porque: >-
-          Es la tabla de la que sale, pivotando planificado y real. Ojo: esa
-          tabla se refresca de noche y esta vista solo con `build-cierre`.
+          Es la tabla de la que sale, pivotando planificado y real. El JOIN va
+          por `(obra_id, anio_mes, categoria)`: por `obra_id` solo multiplica.
+          Ojo: esa tabla se refresca de noche y esta vista solo con
+          `build-cierre`.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
         cardinalidad: "N:1"

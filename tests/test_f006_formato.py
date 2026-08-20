@@ -1406,3 +1406,176 @@ def test_f006_r5_ninguna_relacion_real_publica_una_cardinalidad_de_yaml() -> Non
                 f"{ficha.nombre} -> {relacion.a}: cardinalidad "
                 f"{relacion.cardinalidad!r}"
             )
+
+
+# ===========================================================================
+# R5 · La cardinalidad no puede prometer unicidad que la clave no da
+#      (defecto 2 de la review)
+#
+# Seis relaciones declaraban `N:1` o `1:N` sobre `obra_id` teniendo el destino
+# muchas filas por obra. Un agente que se fie escribe un JOIN con FAN-OUT
+# SILENCIOSO y duplica importes: es exactamente el error que
+# `R-RETENCION-NO-JOIN-LINEAS` existe para castigar, cometido dentro del propio
+# diccionario.
+#
+# El remedio no es revisar a mano: el diccionario YA declara la clave de
+# negocio de cada objeto, asi que la unicidad es DERIVABLE. Un lado `1` exige
+# que su columna sea, ella sola, la clave de negocio de esa ficha (o una clave
+# sustituta, que es unica por definicion). Esto protege tambien a las 73 fichas
+# que faltan.
+# ===========================================================================
+
+
+def _con_clave(objeto: str, clave, columnas) -> "Ficha":
+    return _ficha(
+        objeto=objeto,
+        clave_negocio=tuple(clave),
+        columnas=tuple(_columna(c) for c in columnas),
+    )
+
+
+def test_f006_r5_un_lado_uno_sobre_una_clave_parcial_es_fan_out() -> None:
+    """El caso real: `obra_id` hacia una tabla cuya clave es (obra, mes, concepto)."""
+    from etl_sigrid.domain.diccionario import Relacion
+
+    destino = _con_clave(
+        "fact_cierre", ["obra_id", "anio_mes"], ["obra_id", "anio_mes"]
+    )
+    origen = _ficha(
+        columnas=(_columna("obra_id"),),
+        clave_negocio=("obra_id",),
+        relaciones=(
+            Relacion(
+                de="obra_id",
+                a="mart.fact_cierre.obra_id",
+                cardinalidad="N:1",
+                porque="Miente: el destino tiene muchas filas por obra.",
+            ),
+        ),
+    )
+
+    errores = validar(_dicc(fichas=[origen, destino]), PASOS_NOCTURNOS)
+
+    assert errores
+    assert any("fan-out" in e.detalle for e in errores)
+    assert any("N:N" in e.detalle for e in errores), (
+        "el mensaje tiene que decir que cardinalidad SI es cierta"
+    )
+
+
+def test_f006_r5_declarada_n_a_n_la_misma_relacion_vale() -> None:
+    from etl_sigrid.domain.diccionario import Relacion
+
+    destino = _con_clave(
+        "fact_cierre", ["obra_id", "anio_mes"], ["obra_id", "anio_mes"]
+    )
+    origen = _ficha(
+        columnas=(_columna("obra_id"),),
+        clave_negocio=("obra_id",),
+        relaciones=(
+            Relacion(
+                de="obra_id",
+                a="mart.fact_cierre.obra_id",
+                cardinalidad="N:N",
+                porque="Dice la verdad: hay que agregar antes de unir.",
+            ),
+        ),
+    )
+
+    assert validar(_dicc(fichas=[origen, destino]), PASOS_NOCTURNOS) == []
+
+
+def test_f006_r5_el_lado_izquierdo_tambien_se_comprueba() -> None:
+    """`1:N` promete que el ORIGEN es unico por esa columna."""
+    from etl_sigrid.domain.diccionario import Relacion
+
+    destino = _con_clave("dim_obra", ["obra_id"], ["obra_id"])
+    origen = _ficha(
+        columnas=(_columna("obra_id"), _columna("anio_mes")),
+        clave_negocio=("obra_id", "anio_mes"),
+        relaciones=(
+            Relacion(
+                de="obra_id",
+                a="mart.dim_obra.obra_id",
+                cardinalidad="1:N",
+                porque="Miente por el lado del origen.",
+            ),
+        ),
+    )
+
+    errores = validar(_dicc(fichas=[origen, destino]), PASOS_NOCTURNOS)
+
+    assert any("fan-out" in e.detalle for e in errores)
+
+
+def test_f006_r5_una_clave_sustituta_si_da_unicidad() -> None:
+    """`fact_id` no esta en la clave de negocio a proposito, pero es unica.
+
+    Sin esta excepcion, las relaciones legitimas `1:1` entre una tabla de hecho
+    y su vista aligerada saldrian marcadas como falsas.
+    """
+    from etl_sigrid.domain.diccionario import Relacion
+
+    destino = _ficha(
+        objeto="fact_base",
+        clave_negocio=("obra_id", "anio_mes"),
+        columnas=(
+            _columna("fact_id", agregacion="clave_sustituta"),
+            _columna("obra_id"),
+            _columna("anio_mes"),
+        ),
+    )
+    origen = _ficha(
+        objeto="v_fact",
+        clave_negocio=("obra_id", "anio_mes"),
+        columnas=(
+            _columna("fact_id", agregacion="clave_sustituta"),
+            _columna("obra_id"),
+            _columna("anio_mes"),
+        ),
+        relaciones=(
+            Relacion(
+                de="fact_id",
+                a="mart.fact_base.fact_id",
+                cardinalidad="1:1",
+                porque="Es literalmente la misma fila.",
+            ),
+        ),
+    )
+
+    assert validar(_dicc(fichas=[origen, destino]), PASOS_NOCTURNOS) == []
+
+
+def test_f006_r5_un_destino_todavia_pendiente_no_se_comprueba() -> None:
+    """Sin ficha del destino no hay clave que mirar: se aplaza, no se inventa."""
+    from etl_sigrid.domain.diccionario import Relacion
+
+    origen = _ficha(
+        columnas=(_columna("obra_id"),),
+        clave_negocio=("obra_id",),
+        relaciones=(
+            Relacion(
+                de="obra_id",
+                a="stg.obras.obra_id",
+                cardinalidad="N:1",
+                porque="El destino aun no tiene ficha.",
+            ),
+        ),
+    )
+
+    assert validar(
+        _dicc(fichas=[origen], pendientes=("stg.obras",)), PASOS_NOCTURNOS
+    ) == []
+
+
+def test_f006_r5_ninguna_relacion_real_promete_una_unicidad_falsa() -> None:
+    """Sobre el diccionario REAL. Es el test que habria cazado el defecto 2."""
+    from tests.test_f006_frescura import pasos_del_pipeline_nocturno
+
+    errores = [
+        e
+        for e in validar(_global_real(), pasos_del_pipeline_nocturno())
+        if "fan-out" in e.detalle
+    ]
+
+    assert errores == [], "\n" + formatear_errores(errores)

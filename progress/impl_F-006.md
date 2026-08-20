@@ -560,3 +560,47 @@ YAML lee `1:1` sin comillas como el numero 61». Sin eso el mismo fallo entraria
 otra vez en las 73 fichas que faltan.
 
 Verde: `Counter({'N:1': 31, '1:1': 8, '1:N': 3})`.
+
+## Defecto 2 · Cardinalidades que prometen una unicidad que no existe
+
+El reviewer encontro **seis** a mano. En vez de corregir esas seis, se hizo la
+comprobacion **derivable**, porque el diccionario ya declara la clave de negocio
+de cada objeto: **un lado `1` de la cardinalidad promete que esa columna
+identifica una fila**, y eso se puede comprobar solo. Un lado es unico si la
+columna es ella sola la `clave_negocio`, o si esta marcada
+`agregacion: clave_sustituta` (que se deja fuera de la clave a proposito y aun
+asi identifica la fila dentro de un build; sin esa excepcion las relaciones
+`1:1` legitimas entre una tabla de hecho y su vista aligerada saldrian marcadas
+como falsas).
+
+Fase RED, primero sobre fixtures:
+
+```
+$ python -m pytest tests/test_f006_formato.py -q -k "fan_out or unicidad or sustituta or ..."
+FAILED tests/test_f006_formato.py::test_f006_r5_un_lado_uno_sobre_una_clave_parcial_es_fan_out
+FAILED tests/test_f006_formato.py::test_f006_r5_el_lado_izquierdo_tambien_se_comprueba
+2 failed, 5 passed, 96 deselected in 1.01s
+```
+
+y despues, con la comprobacion ya implementada, sobre el diccionario real:
+
+```
+E         Left contains 10 more items, first extra item: ErrorValidacion(fichero='cierre.yaml', objeto='cierre.fact_cierre_mensual', regla='R5', ...)
+```
+
+**Son DIEZ, no seis.** La comprobacion derivada encontro cuatro que la auditoria
+manual no vio:
+
+| Relacion | Decia |
+|---|---|
+| `mart.fact_seguimiento_categoria` -> `mart.fact_seguimiento_mensual.obra_id` | `1:N` |
+| `mart.fact_seguimiento_mensual` -> `cierre.fact_cierre_mensual.obra_id` | `N:1` |
+| `mart.v_master_vigente_anual` -> `mart.v_master_versiones_tipadas.obra_id` | `N:1` |
+| `mart.v_pbi_cp_tipologia` -> `mart.v_master_vigente_anual.obra_id` | `N:1` |
+
+Las diez pasan a `N:N` **y su `porque` dice ahora por que clave hay que agregar
+antes de unir**, que es la informacion que de verdad evita el fan-out:
+`(obra_id, anio_mes)`, `(obra_id, anio_mes, concepto)`,
+`(obra_id, grupo_cod, subcategoria_cod)`, `(obra_id, ambito_id, version)`...
+
+Reparto final: `N:1` 21, `N:N` 10, `1:1` 8, `1:N` 3.
