@@ -49,7 +49,9 @@
 # - **Que parte del datamart la usa**, o que NO la usa nadie. Seis de las 31 se
 #   ingieren y no las lee ningun SQL: se dice en su ficha, porque una tabla que
 #   se carga cada noche sin consumidor cuesta tiempo de ventana y hace creer que
-#   hay una funcionalidad que no existe.
+#   hay una funcionalidad que no existe. Una de esas seis, `auxobrtca`, tampoco
+#   se consulta pero SI se comprueba: `build_stg` aborta si le faltan columnas.
+#   Que ningun SQL lea una tabla no significa que se pueda dejar de ingerir.
 # - Si la carga es INCREMENTAL por `tiemod` o completa cada noche.
 # - Que columnas NO se traen (`exclude_columns` de `config/tables_sigrid.yaml`):
 #   son textos largos, observaciones e imagenes. Preguntar por ellas en `raw`
@@ -291,14 +293,23 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      **No la lee ningun SQL del datamart.** Se ingiere y se queda ahi.
+      **Ningun SQL del datamart la lee.** No hay nada aguas abajo construido
+      sobre ella.
     descripcion: >-
       **Obras: Tipos de capitulos.** El catalogo OFICIAL de tipos de capitulo de
-      Sigrid, y **no lo usa nadie**: `stg.partidas.categoria` clasifica las
-      partidas con una HEURISTICA sobre el codigo del capitulo raiz en vez de
-      con esta tabla. Que exista ingerida y sin usar es justo lo que hace creer
-      que la clasificacion viene de Sigrid cuando la deduce el ETL; una obra que
-      no siga la convencion de codigos se clasifica mal y nada lo delata.
+      Sigrid, y **el datamart no lo usa**: `stg.partidas.categoria` clasifica las
+      partidas con una HEURISTICA sobre el codigo del capitulo raiz en vez de con
+      esta tabla. Que el catalogo bueno este ingerido y sin usar es lo que hace
+      creer que la clasificacion viene de Sigrid cuando la deduce el ETL; una
+      obra que no siga la convencion de codigos se clasifica mal y nada lo
+      delata.
+
+      La relacion **existe en el dato y nadie la recorre**: `raw.obrparpar` trae
+      la columna `tcaide`, que apunta aqui, y ningun SQL la menciona.
+
+      **Ojo antes de darla por sobrante**: aunque no se consulte, `build_stg`
+      comprueba al arrancar que esta tabla tenga `ide`, `cod` y `res`, y aborta
+      si faltan. Dejar de ingerirla romperia el paso.
 
       Es deuda conocida, no un descuido de esta ficha. Se recarga entera cada
       noche.

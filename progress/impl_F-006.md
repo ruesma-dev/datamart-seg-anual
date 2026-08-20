@@ -2268,6 +2268,18 @@ existe**:
 - **`dcfprodes`**: el reparto de una linea de factura entre varios destinos, que
   no esta modelado aguas abajo.
 
+El barrido de esa afirmacion **encontro un matiz que la habria dejado falsa**.
+`auxobrtca` no la lee ningun SQL, cierto, pero `build_stg_step.py` la incluye en
+su comprobacion de precondiciones: **aborta el paso si a la tabla le faltan
+`ide`, `cod` o `res`**. Dejar de ingerirla no es gratis. La ficha lo dice, y la
+cabecera del fichero tambien, porque "no la lee nadie" invita justo a la accion
+equivocada.
+
+Y sale de ahi un dato mejor sobre la heuristica de categorias: `raw.obrparpar`
+trae la columna `tcaide`, que **apunta a `auxobrtca`**. La relacion existe en el
+dato y ningun SQL la recorre; la clasificacion se deduce del codigo del capitulo
+raiz teniendo el catalogo bueno enlazado al lado.
+
 Se anota ademas en `raw.prv` que **`ofcide` se ingiere y no se expone**:
 `maestro.proveedores` no publica oficio ni naturaleza. Es F-036, no un olvido.
 
@@ -2280,6 +2292,13 @@ tablas con DDL explicito y ahora las reglas—, asi que los tres se derivan de
 proposito: es la que hace que anadir una regla se vea en el diff.
 
 **Trinquete: 31 -> 0.** No queda ningun objeto del datamart sin ficha.
+
+## Nota de numeración (para leer el historial sin tropezar)
+
+Los mensajes de commit de esta tanda numeran `_meta` como T25 y `raw` como T26.
+`tasks.md` los agrupa distinto: **T24 son `aux` y `_meta` juntos, y `raw` es
+T25**. Las secciones de este informe siguen la numeración de `tasks.md`, que es
+la que manda; los mensajes de commit ya están en el historial y no se reescriben.
 
 ## Barrido de copias antes de cerrar la tanda
 
