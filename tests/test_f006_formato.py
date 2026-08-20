@@ -587,3 +587,341 @@ def test_f006_r9_una_regla_con_severidad_inventada_falla() -> None:
     errores = validar(_dicc(reglas=[regla]), PASOS_NOCTURNOS)
 
     assert any("catastrofica" in e.detalle for e in errores)
+
+
+# ===========================================================================
+# Cargador de YAML (T7 · R1, R6, R8, R22)
+#
+# El cargador es INFRAESTRUCTURA: toca el sistema de ficheros. Estos tests
+# escriben YAML en `tmp_path`, nunca leen el diccionario real del repositorio
+# (de eso se ocupa la puerta de `tests/test_f006_cobertura.py`).
+# ===========================================================================
+
+
+GLOBAL_MINIMO = """
+version: 1
+base: sigrid_dm
+titulo: Datamart de prueba
+convenciones:
+  moneda: EUR
+esquemas:
+  mart:
+    titulo: Seguimiento mensual
+    para_que_sirve: Superficie principal de consumo.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_mart]
+reglas:
+  - codigo: R-IMPORTE-MES
+    titulo: importe_mes no se suma entre meses
+    severidad: bloqueante
+    ambito: [mart]
+    regla: No sumes importe_origen en el tiempo.
+    motivo: Bug de la Tanda 1.4; multiplicaba por nueve.
+pendientes: []
+"""
+
+MART_MINIMO = """
+version: 1
+esquema: mart
+objetos:
+  fact_seguimiento_mensual:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: El hecho central del seguimiento.
+    grano: Una fila por (obra, partida, mes, escenario).
+    clave_negocio: [obra_codigo, importe_mes]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_codigo: Codigo de obra tal y como se teclea en Sigrid.
+      importe_mes:
+        significado: Importe imputado a ese mes concreto.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+    relaciones: []
+    ejemplos_preguntas:
+      - Cual es la planificacion mensual de la obra X
+"""
+
+
+def _directorio(tmp_path, **ficheros):
+    """Escribe un diccionario de prueba y devuelve su directorio."""
+    destino = tmp_path / "diccionario"
+    destino.mkdir()
+    contenido = {"00_global.yaml": GLOBAL_MINIMO, "mart.yaml": MART_MINIMO}
+    contenido.update(ficheros)
+    for nombre, texto in contenido.items():
+        if texto is None:
+            continue
+        (destino / nombre).write_text(texto, encoding="utf-8")
+    return destino
+
+
+def test_f006_r1_cargador_lee_un_fichero_por_esquema(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    dicc, _hash = cargar_diccionario(_directorio(tmp_path))
+
+    assert dicc.version == "1"
+    assert dicc.base == "sigrid_dm"
+    assert [f.nombre for f in dicc.fichas] == ["mart.fact_seguimiento_mensual"]
+    assert [r.codigo for r in dicc.reglas] == ["R-IMPORTE-MES"]
+    assert dicc.esquemas["mart"]["refresco"] == "nocturno"
+
+
+def test_f006_r1_cargador_deja_el_resto_del_global_a_mano(tmp_path) -> None:
+    """`convenciones`, `ejes`, `ocultar` y la batería se sirven tal cual."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    dicc, _ = cargar_diccionario(_directorio(tmp_path))
+
+    assert dicc.global_raw["convenciones"] == {"moneda": "EUR"}
+    assert dicc.global_raw["titulo"] == "Datamart de prueba"
+
+
+def test_f006_r6_cargador_admite_la_forma_abreviada_de_columna(tmp_path) -> None:
+    """`columna: "<significado>"` equivale a `columna: {significado: ...}`.
+
+    Sin esto, las 800+ columnas del datamart costarían tres líneas cada una y
+    nadie las escribiría.
+    """
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    dicc, _ = cargar_diccionario(_directorio(tmp_path))
+
+    ficha = dicc.por_nombre["mart.fact_seguimiento_mensual"]
+    abreviada = next(c for c in ficha.columnas if c.nombre == "obra_codigo")
+    completa = next(c for c in ficha.columnas if c.nombre == "importe_mes")
+
+    assert abreviada.significado.startswith("Codigo de obra")
+    assert abreviada.unidad is None and abreviada.agregacion is None
+    assert completa.unidad == "EUR"
+    assert completa.agregacion == "suma_solo_dentro_del_mes"
+
+
+def test_f006_r6_cargador_conserva_el_orden_de_las_columnas(tmp_path) -> None:
+    """El orden del YAML es editorial: primero las claves, luego los importes."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    dicc, _ = cargar_diccionario(_directorio(tmp_path))
+
+    ficha = dicc.por_nombre["mart.fact_seguimiento_mensual"]
+    assert [c.nombre for c in ficha.columnas] == ["obra_codigo", "importe_mes"]
+
+
+def test_f006_r22_cargador_el_hash_es_estable_entre_cargas(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    directorio = _directorio(tmp_path)
+
+    _, uno = cargar_diccionario(directorio)
+    _, dos = cargar_diccionario(directorio)
+
+    assert uno == dos
+    assert len(uno) == 64  # SHA-256 en hexadecimal
+
+
+def test_f006_r22_cargador_el_hash_cambia_si_cambia_una_letra(tmp_path) -> None:
+    """Es lo que permite responder «¿esto es lo que hay en el repositorio?»."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    directorio = _directorio(tmp_path)
+    _, antes = cargar_diccionario(directorio)
+
+    (directorio / "mart.yaml").write_text(
+        MART_MINIMO.replace("El hecho central", "El hecho centrico"), encoding="utf-8"
+    )
+    _, despues = cargar_diccionario(directorio)
+
+    assert antes != despues
+
+
+def test_f006_r22_cargador_el_hash_no_depende_del_fin_de_linea(tmp_path) -> None:
+    """CRLF en Windows y LF en el contenedor tienen que dar el mismo hash."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    directorio = _directorio(tmp_path)
+    _, con_lf = cargar_diccionario(directorio)
+
+    for nombre in ("00_global.yaml", "mart.yaml"):
+        ruta = directorio / nombre
+        texto = ruta.read_text(encoding="utf-8").replace("\n", "\r\n")
+        ruta.write_bytes(texto.encode("utf-8"))
+    _, con_crlf = cargar_diccionario(directorio)
+
+    assert con_lf == con_crlf
+
+
+def test_f006_r22_cargador_el_hash_cubre_el_conjunto_de_ficheros(tmp_path) -> None:
+    """Añadir un fichero cambia el hash aunque no cambie ninguno de los viejos.
+
+    El nombre de cada fichero entra en el resumen, no solo su contenido: si no,
+    un esquema nuevo vacío pasaría por «el mismo diccionario de siempre».
+    """
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    directorio = _directorio(tmp_path)
+    _, antes = cargar_diccionario(directorio)
+
+    (directorio / "cierre.yaml").write_text(
+        "version: 1\nesquema: cierre\nobjetos: {}\n", encoding="utf-8"
+    )
+    _, despues = cargar_diccionario(directorio)
+
+    assert antes != despues
+
+
+def test_f006_r8_cargador_un_yaml_roto_no_devuelve_una_traza_de_yaml(tmp_path) -> None:
+    """Quien lo lea tiene que ver el fichero y la línea, no un `ScannerError`."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    directorio = _directorio(tmp_path, **{"mart.yaml": "objetos:\n  a: [1,\n"})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    errores = excinfo.value.errores
+    assert any(e.fichero == "mart.yaml" for e in errores)
+    assert any(
+        "linea" in e.detalle.lower() or "línea" in e.detalle.lower() for e in errores
+    )
+
+
+def test_f006_r6_cargador_rechaza_una_clave_desconocida_en_una_columna(tmp_path) -> None:
+    """Un `significao:` mal escrito dejaría la columna sin significado y muda."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = MART_MINIMO.replace("        unidad: EUR", "        unidadd: EUR")
+    directorio = _directorio(tmp_path, **{"mart.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("unidadd" in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r2_cargador_rechaza_una_clave_desconocida_en_una_ficha(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = MART_MINIMO.replace("    grano:", "    granoo:")
+    directorio = _directorio(tmp_path, **{"mart.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("granoo" in e.detalle for e in excinfo.value.errores)
+
+
+def test_f006_r1_cargador_exige_que_el_nombre_del_fichero_sea_el_esquema(
+    tmp_path,
+) -> None:
+    """`mart.yaml` con `esquema: cierre` dentro es una bomba de relojería."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    roto = MART_MINIMO.replace("esquema: mart", "esquema: cierre")
+    directorio = _directorio(tmp_path, **{"mart.yaml": roto})
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any(
+        "cierre" in e.detalle and "mart" in e.detalle for e in excinfo.value.errores
+    )
+
+
+def test_f006_r1_cargador_ignora_lo_que_no_sea_yaml(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    directorio = _directorio(tmp_path)
+    (directorio / "README.md").write_text("no soy una ficha", encoding="utf-8")
+
+    dicc, _ = cargar_diccionario(directorio)
+
+    assert [f.nombre for f in dicc.fichas] == ["mart.fact_seguimiento_mensual"]
+
+
+def test_f006_r1_cargador_sin_global_no_hay_diccionario(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    directorio = _directorio(tmp_path)
+    (directorio / "00_global.yaml").unlink()
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("00_global.yaml" in e.fichero for e in excinfo.value.errores)
+
+
+def test_f006_r12_cargador_pasa_los_avisos_escritos_a_mano_al_validador(
+    tmp_path,
+) -> None:
+    """El cargador no los borra en silencio: `validar` tiene que poder acusarlos."""
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    con_avisos = MART_MINIMO.replace(
+        "    relaciones: []", "    avisos: [R-IMPORTE-MES]\n    relaciones: []"
+    )
+    directorio = _directorio(tmp_path, **{"mart.yaml": con_avisos})
+
+    dicc, _ = cargar_diccionario(directorio)
+
+    assert dicc.por_nombre["mart.fact_seguimiento_mensual"].avisos == ("R-IMPORTE-MES",)
+
+
+def test_f006_r1_cargador_lee_las_relaciones(tmp_path) -> None:
+    from etl_sigrid.domain.diccionario import Relacion
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+
+    con_relacion = MART_MINIMO.replace(
+        "    relaciones: []",
+        "    relaciones:\n"
+        "      - de: obra_codigo\n"
+        "        a: mart.fact_seguimiento_mensual.obra_codigo\n"
+        "        cardinalidad: 1 a 1\n"
+        "        porque: Consigo misma, para la prueba.\n",
+    )
+    directorio = _directorio(tmp_path, **{"mart.yaml": con_relacion})
+
+    dicc, _ = cargar_diccionario(directorio)
+
+    assert dicc.por_nombre["mart.fact_seguimiento_mensual"].relaciones == (
+        Relacion(
+            de="obra_codigo",
+            a="mart.fact_seguimiento_mensual.obra_codigo",
+            cardinalidad="1 a 1",
+            porque="Consigo misma, para la prueba.",
+        ),
+    )
+
+
+def test_f006_r1_cargador_una_ficha_sin_cuerpo_es_un_error(tmp_path) -> None:
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
+        DiccionarioIlegible,
+        cargar_diccionario,
+    )
+
+    directorio = _directorio(
+        tmp_path, **{"mart.yaml": "esquema: mart\nobjetos:\n  fact_vacio:\n"}
+    )
+
+    with pytest.raises(DiccionarioIlegible) as excinfo:
+        cargar_diccionario(directorio)
+
+    assert any("fact_vacio" in e.detalle for e in excinfo.value.errores)

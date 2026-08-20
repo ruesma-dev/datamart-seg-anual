@@ -123,3 +123,30 @@ ERROR tests/test_f006_cobertura.py
 ```
 
 Verde tras el código: `33 passed in 0.07s`.
+
+### T7 · `cargador_yaml.py` — lectura de los YAML y `hash_fuente`
+
+```
+$ python -m pytest tests/test_f006_formato.py -q -k cargador
+FAILED tests/test_f006_formato.py::test_f006_r22_cargador_el_hash_no_depende_del_fin_de_linea
+FAILED tests/test_f006_formato.py::test_f006_r22_cargador_el_hash_cambia_si_se_renombra_un_fichero
+FAILED tests/test_f006_formato.py::test_f006_r8_cargador_un_yaml_roto_no_devuelve_una_traza_de_yaml
+FAILED tests/test_f006_formato.py::test_f006_r6_cargador_rechaza_una_clave_desconocida_en_una_columna
+FAILED tests/test_f006_formato.py::test_f006_r2_cargador_rechaza_una_clave_desconocida_en_una_ficha
+FAILED tests/test_f006_formato.py::test_f006_r1_cargador_exige_que_el_nombre_del_fichero_sea_el_esquema
+FAILED tests/test_f006_formato.py::test_f006_r1_cargador_ignora_lo_que_no_sea_yaml
+FAILED tests/test_f006_formato.py::test_f006_r1_cargador_sin_global_no_hay_diccionario
+FAILED tests/test_f006_formato.py::test_f006_r12_cargador_pasa_los_avisos_escritos_a_mano_al_validador
+FAILED tests/test_f006_formato.py::test_f006_r1_cargador_lee_las_relaciones
+FAILED tests/test_f006_formato.py::test_f006_r1_cargador_una_ficha_sin_cuerpo_es_un_error
+17 failed, 45 deselected in 0.51s
+```
+
+Verde tras el código: `141 passed in 1.16s` (los cuatro ficheros de F-006).
+
+Un test de la tanda RED se reescribió al implementar: `..._el_hash_cambia_si_se_
+renombra_un_fichero` era imposible de satisfacer sin violar la regla «el nombre
+del fichero manda sobre el campo `esquema`», que el propio cargador impone. Se
+sustituyó por `..._el_hash_cubre_el_conjunto_de_ficheros`, que comprueba la
+propiedad que de verdad importa: **añadir un fichero cambia el hash aunque
+ninguno de los viejos cambie**.
