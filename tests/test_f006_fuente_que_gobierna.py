@@ -286,3 +286,53 @@ def test_f006_r9_la_regla_avisa_de_las_tablas_que_no_cuelgan_de_con() -> None:
         f"la regla no avisa de que {faltan} no se unen a `con` en ningún SQL: "
         f"el JOIN que sugiere no existe para ellas"
     )
+
+
+@pytest.mark.parametrize("nombre", _nombres())
+def test_f006_r26_ninguna_ficha_atribuye_a_su_tabla_un_campo_no_derivado(
+    nombre: str,
+) -> None:
+    """Una ficha tampoco puede afirmar lo que la regla ya no afirma.
+
+    El barrido de frases rechazadas buscaba la cadena literal `cen.res`, y las
+    fichas lo decían con otras palabras —«tiene un `res` propio, que es "Reparto
+    nombre"»—, así que sobrevivió a la corrección de la regla. Sexto asomo del
+    patrón de la copia, y esta vez cazado antes de publicarlo.
+
+    Aquí no se busca una frase: se comprueba la **afirmación**. Si una ficha dice
+    que su tabla tiene un `cod`/`res`/`fec`/`raz`/`cif` propio, el barrido del
+    SQL tiene que respaldarlo.
+    """
+    ficha = _fichas_raw()[nombre]
+    texto = f"{ficha['descripcion']} {ficha.get('motivo_no_consumo', '')}"
+    respaldados = set(campos_propios_usados().get(nombre, ()))
+
+    afirmados: set[str] = set()
+    # `tabla.campo` cualificado, y la forma en prosa «un `res` propio».
+    afirmados |= {
+        c for t, c in re.findall(r"`(\w+)\.(\w+)`", texto)
+        if t == nombre and c in CAMPOS_DEL_PATRON
+    }
+    afirmados |= {
+        c for c in re.findall(r"`(\w+)`\s+propi", texto) if c in CAMPOS_DEL_PATRON
+    }
+    afirmados |= {
+        c for c in re.findall(r"campos? propios?[^.]*?`(\w+)`", texto)
+        if c in CAMPOS_DEL_PATRON
+    }
+
+    sin_respaldo = afirmados - respaldados
+    assert sin_respaldo == set(), (
+        f"raw.{nombre} atribuye a su propia tabla {sorted(sin_respaldo)} y el "
+        f"barrido del SQL no lo respalda (lee {sorted(respaldados) or 'ninguno'}). "
+        f"Si solo lo dice `sigrid_tablas.md`, no se afirma: ese documento no es "
+        f"una fuente de la que derivar"
+    )
+
+
+def test_f006_r26_control_el_detector_de_atribuciones_muerde() -> None:
+    """Con la frase que sobrevivió, para que no vuelva a colarse en silencio."""
+    texto = 'tiene un `res` propio, que es "Reparto nombre"'
+    afirmados = {c for c in re.findall(r"`(\w+)`\s+propi", texto) if c in CAMPOS_DEL_PATRON}
+    assert afirmados == {"res"}
+    assert "cen" not in campos_propios_usados()

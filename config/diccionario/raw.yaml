@@ -144,20 +144,19 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      El codigo y las fechas de la obra estan en `con`, no aqui, asi que
-      consultarla sola da una obra sin codigo. Lo unido y traducido esta en
-      `maestro.obras` y en `stg.obras`, que ademas toman el nombre de `con.res`
-      —no del `obr.res` propio, que es otro campo—.
+      El codigo, el nombre y las fechas que el datamart publica salen de `con`:
+      `maestro/01_obras.sql` toma `c.cod`, `c.res` y `c.fec` de `raw.con` y de
+      aqui solo `entide`. Consultarla sola da una obra sin ninguno de los tres.
+      Lo unido y traducido esta en `maestro.obras` y en `stg.obras`.
     descripcion: >-
       **Obras.** "Propiedades de `con`" en 1:1: la parte especifica de obra
       de un concepto. Alimenta `stg.obras`, `maestro.obras`, las cabeceras
       de `cierre` y el presupuesto.
 
-      **Tiene campos propios que se llaman igual que los de `con`**:
-      `obr.res` es "Nombre completo", distinto del `con.res` que el datamart
-      publica como `nombre_obra`. Es una de las excepciones que
-      `R-SIGRID-CON` nombra: no asumas que el nombre esta solo en `con`, ni
-      que el de aqui es el mismo.
+      El ETL no lee de aqui ningun `cod`, `res` ni `fec`: los toma de `con`.
+      Que exista o no un campo con ese nombre en la tabla de Sigrid **no se
+      afirma en esta ficha**, porque la unica fuente que lo diria es el
+      catalogo en PDF y no es verificable; para eso, el puntero de abajo.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
@@ -397,9 +396,10 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Sin unir a `con` no tiene codigo. Y **tiene un `res` propio**, que es
-      "Reparto nombre" y **no** el nombre del centro: el que publica `cierre`
-      sale de `con.res`. Ya viene resuelto en las cabeceras de `cierre`.
+      El codigo y el nombre del centro salen de `con`, no de aqui: en
+      `cierre/05_views_cabecera.sql` el `LEFT JOIN raw.cen` **no aporta ninguna
+      columna** y el nombre viene de un alias sobre `raw.con`. Ya viene resuelto
+      en las cabeceras de `cierre`.
     descripcion: >-
       **Centros de Coste.** "Propiedades de `con`" en 1:1. Lo consume
       `cierre/05_views_cabecera`.

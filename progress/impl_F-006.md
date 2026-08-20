@@ -2787,3 +2787,159 @@ escrita a mano.
 - Sigue **sin ejecutarse la bateria de 18 preguntas** (T39) ni
   `check-diccionario` (T26): que una ficha sea correcta no demuestra todavia que
   sea suficiente.
+
+---
+
+# Octava pasada · el criterio nuevo, y lo que hubo que recortar
+
+RECHAZADO porque **las dos correcciones centrales de la tanda anterior
+sustituyeron una afirmacion falsa por otra**. No fue descuido: las dos estaban
+escritas **por reconstruccion** y contrastadas despues contra una fuente que
+habla de otra cosa. El lider fijo el criterio y este informe lo aplica.
+
+## El criterio, y lo que cambia
+
+> **Si una afirmacion no es derivable de la fuente que gobierna el hecho, no se
+> escribe.** Ni reformulada ni matizada. Se omite, y si el hueco importa se
+> declara como hueco.
+
+Lo importante es la segunda mitad —**la fuente que gobierna**—, porque yo si
+derivaba, y aun asi acerte dos veces mal:
+
+| Pasada | De donde derive | Que gobierna esa fuente | Resultado |
+|---|---|---|---|
+| 7ª | `config/tables_sigrid.yaml` | que columna se vuelca a `_source_tiemod` | «incremental por `tiemod`». **Falso** |
+| 8ª | `ingest_raw_step.py` | como carga el comando segun la bandera | «append; lo modificado no vuelve». **Falso** |
+| ahora | `Dockerfile` | **que se ejecuta de noche** | recarga entera |
+
+La tabla de fuentes queda escrita en `tests/test_f006_fuente_que_gobierna.py` y
+en la cabecera de `raw.yaml`, para que la proxima afirmacion empiece por elegir
+la fuente y no por escribir la frase.
+
+## A · La carga de `raw`
+
+El `Dockerfile` arranca `CMD ["run-all", "--full"]`, con el comentario «el job
+nocturno SIEMPRE full (el incremental pierde UPDATEs)». Y
+`infra/80_create_job.ps1` avisa de que **el alcance de la carga nocturna esta ahi
+y en ningun sitio mas**. Asi que:
+
+- **de noche la tabla se recarga entera** (`TRUNCATE` y todo de nuevo), y un
+  cambio hecho ayer en Sigrid esta aqui esta manana;
+- **sin `--full`** —el valor por defecto, tipico al lanzar `ingest` a mano— la
+  carga es append por `MAX(ide)` y lo modificado no vuelve a leerse.
+
+Las 31 fichas dicen las dos cosas y en ese orden. El test se ancla al `CMD`: si
+la imagen deja de pasar `--full`, se pone en rojo.
+
+**Y la bandera.** Las fichas citaban `--full-refresh` **31 veces** y esa opcion
+no existe: la real es `--full`. Ahora las banderas que cita una ficha se
+contrastan contra los `click.option` de `main.py`, con su test de control.
+
+## B · La regla de oro: de siete excepciones, una
+
+`cen.res` **no existe**. El «Reparto nombre» es de `cenrep`, tabla que ni se
+ingiere. Es el mismo defecto por el que se rechazo la septima pasada, movido de
+tabla, y lo cometi **con el mismo metodo**: segmentar el PDF.
+
+Lo medi, y el metodo es indefendible: mi segmentador da a `obr` un bloque de
+**1252 lineas** con once `cod` y veintiun `res` dentro, porque se traga las
+entidades intermedias; y mete `cenrep` dentro de `cen`. **`azure-apps/sigrid_tablas.md`
+no es una fuente de la que derivar.** Queda dicho en la regla, en la cabecera de
+`raw.yaml` y en el docstring del test.
+
+Habia una fuente derivable **sin usar: nuestro propio SQL**, que no correria
+contra una columna inexistente. El barrido da **once tablas** cuyos campos
+propios el ETL lee sin pasar por `con`:
+
+```
+auxmun(res)  auxobramb(cod,res)  auxobrcla(res)  auxobrtip(res)  auxpro(res)
+conext(cod)  dcfpro(res)  obrfas(res)  obrfasamb(fec,res)
+obrparpar(cod,res)  prv(cif,raz)
+```
+
+`obrparpar.cod` y `.res` son el codigo y la descripcion de la partida: se leian
+a diario y la regla decia que estaban en `con`. Y cuatro tablas
+—`auxobramb`, `obrfas`, `obrfasamb`, `obrparpre`— **no se unen a `raw.con` en
+ningun SQL**, asi que el JOIN que la regla sugeria no existe para ellas.
+
+La lista la **genera** un test comparando el punto 3 de la regla con el barrido:
+si divergen, rojo. Escrita a mano acerto 1 de 7 y se dejo 16.
+
+## Lo que se ha RECORTADO, y por que
+
+Aplicar el criterio obliga a borrar contenido publicado. Se recorta y se dice:
+
+| Recortado | Motivo |
+|---|---|
+| «`cen` tiene un `res` propio, Reparto nombre» | **inventado**: es de `cenrep` |
+| «`obr.res` es "Nombre completo"» | solo lo dice el PDF, y el PDF no es derivable |
+| `ctr`, `com`, `dca`, `dcf` como excepciones | falsos positivos del mismo metodo |
+| `ctr.entcif` / `dca.entcif` / `dcf.entcif` (que la review sugeria anadir) | **no se anade**: misma fuente, mismo riesgo |
+| «lo modificado en Sigrid no se refresca nunca» | cierto solo sin `--full`, y de noche va con `--full` |
+
+Las fichas de `obr` y `cen` dicen ahora **lo que el SQL demuestra** —de donde
+toma el datamart cada campo— y declaran el hueco: que exista o no un campo con
+ese nombre en Sigrid no se afirma aqui, y para eso esta el puntero al catalogo.
+El diccionario es mas pequeno y no miente.
+
+## C · El quinto y el sexto caso del patron de la copia
+
+**Quinto**: la cabecera de `raw.yaml` conservaba intacta la frase que la septima
+pasada rechazo, y ocho lineas despues declaraba ser «la misma regla» que
+`R-SIGRID-CON`. Los barridos anteriores no podian verla: miran el contenido
+publicable, y `yaml.safe_load` **descarta los comentarios**.
+`tests/test_f006_copias.py` mira el **texto crudo** de los diez ficheros, con la
+lista de frases rechazadas y la pasada que rechazo cada una.
+
+**Sexto, cazado por mi antes de publicarlo**: al recortar la regla, las fichas de
+`obr` y `cen` seguian diciendo lo mismo **con otras palabras** —«tiene un `res`
+propio»—, asi que el barrido de frases literales no las veia. El detector nuevo
+no busca una frase: comprueba **la afirmacion**, y exige que el barrido del SQL
+respalde cualquier campo propio que una ficha se atribuya.
+
+## D · Lo demas
+
+- **`_source_tiemod`** (`stg.yaml`) conservaba «que usa la ingesta incremental».
+  Ademas de retirarlo, se dice lo que importa y nadie decia: es el `tiemod` que
+  la fila tenia **al entrar**, no una marca de modificacion vigente.
+- **`dec_cantidades`** afirmaba gobernar `ROUND(ROUND(can, decc) * ...)`. El SQL
+  real es `ROUND(can * ROUND(pre, decp), deci)`: **`decc` no interviene**. El
+  origen del error es reconocible y lo arreglo tambien: los **comentarios de
+  `06_presupuesto.sql`** repetian la formula con `decc` y la NOTA de cuatro
+  lineas despues los desmentia. Copie el comentario en vez de leer el codigo.
+  Los comentarios quedan corregidos, con la nota de que indujeron una ficha
+  falsa; es la deuda «comentarios del SQL que mienten» mordiendo por primera vez.
+- **Cuatro `nulo_significa` imposibles en `stg.partidas`**, incluido el que se
+  acababa de «corregir»: la rama raiz filtra `p.cod IS NOT NULL AND p.cod <> ''`,
+  asi que ni `codigo_partida` ni `capitulo_raiz_cod` ni `ruta_capitulos` ni
+  `nivel` pueden ser nulos. Los cuatro pasan a decirlo.
+- **La plantilla de exclusiones era falsa en 19 fichas** —«textos largos,
+  observaciones e imagenes» aplicado a todas, cuando en `pag` la unica es
+  `blores`—, y en `dca`/`dcf` sustituyo un texto que **era exacto**. La
+  caracterizacion se **genera** ahora de las columnas concretas.
+- **`stg.presupuesto`: me pase corrigiendo.** Bajar las tres medidas a
+  `ultimo_valor` contradecia el uso real —`cierre/02_build_fact.sql` hace
+  `SUM(importe_oficial)` con la fase fija— y sus propios ejemplos. Lo no sumable
+  es **la dimension `fase_num`**, no la columna: quedan en
+  `suma_solo_dentro_del_mes`, que en los ambitos reales es literalmente el mes.
+  Se anade que **`fase_num = 0` es el "Previsto" vivo**, no un mes, de donde sale
+  el fallback del cierre.
+- **La receta `grep`** de las 31 fichas prometia aislar el bloque y no lo hace;
+  ahora dice que devuelve tambien filas de otras tablas y como reconocer la de
+  entidad.
+- **La regla decia «cinco cosas» y numeraba seis.** Hay un test que compara el
+  anuncio con los puntos numerados.
+
+## E · El guardian de nulos, el unico detector sin control
+
+Rectificacion del reviewer que hago mia: el guardian ampliado evalua 15 fichas y
+**30 columnas candidatas de las que ninguna llega al `assert`**. No es inutil
+—es la alarma para el dia que alguien publique un `nulo_significa` sobre una
+columna que trae 0— pero **un detector en cero sin control es indistinguible de
+uno roto**, y ya nos paso con la comprobacion de exclusiones, que pasaba en
+vacio en once fichas.
+
+Tiene ya su `test_..._control_...`, como los otros seis del fichero: ejercita el
+caso en el que debe morder (`o.entide AS cliente_id` desde `FROM raw.obr o`) y
+los dos recortes que hoy lo dejan en cero —el alias de `LEFT JOIN` y la
+expresion compuesta—.
