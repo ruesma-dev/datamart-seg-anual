@@ -72,9 +72,14 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 ## Mapa del repositorio (no leas todo el proyecto, ve a lo que necesites)
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
-  stage, build-mart, run-all, status.
+  stage, build-mart, publicar-diccionario, run-all, status.
 - `config/` — `settings.py` (pydantic-settings sobre `.env`),
   `tables_sigrid.yaml` (tablas a ingerir), `business_rules.yaml`.
+- `config/diccionario/` — el **diccionario semántico** del datamart (F-006):
+  un YAML por esquema más `00_global.yaml` con las reglas duras. Lo publica en
+  `_meta` el paso `publicar_diccionario`, y de ahí lo lee el MCP por SQL. Quien
+  añade o cambia un objeto publicado actualiza su ficha en el mismo trabajo: hay
+  una puerta en `init.sh` que lo exige.
 - `etl_sigrid/domain/` — entidades puras (sin dependencias externas).
 - `etl_sigrid/application/` — `orchestrator.py` + `steps/` (patrón pipeline;
   cada step hereda de `steps/base.py`).

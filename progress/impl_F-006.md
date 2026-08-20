@@ -1296,3 +1296,68 @@ lista escrita a mano se habria desincronizado a la primera.
    dentro de un ano sepa que cambio y por que.
 
 `bash harness/init.sh`: **1171 tests**, cobertura de lineas cambiadas **98,9 %**.
+
+## T18 · El comando `python main.py publicar-diccionario`
+
+```
+$ python -m pytest tests/test_f006_publicacion.py -q -k cli
+FAILED tests/test_f006_publicacion.py::test_f006_r17_cli_el_comando_publica_y_sale_con_cero
+FAILED tests/test_f006_publicacion.py::test_f006_r24_cli_marca_huerfanas_antes_de_escribir
+FAILED tests/test_f006_publicacion.py::test_f006_r17_cli_registra_el_paso_en_meta
+FAILED tests/test_f006_publicacion.py::test_f006_r21_cli_si_falla_sale_con_uno
+FAILED tests/test_f006_publicacion.py::test_f006_r14_cli_usa_los_pasos_nocturnos_del_pipeline_real
+5 failed, 40 deselected in 1.10s
+```
+
+Por los helpers de F-024, como el resto de comandos que escriben: marca las
+huerfanas antes de actuar, registra el paso en `_meta.etl_runs` y sale con 1 si
+falla. Probado con `CliRunner` y un doble; **ninguna conexion real**.
+
+Dos cosas que no eran obvias y quedan cerradas por un test:
+
+- **El comando suelto valida con el MISMO criterio que la noche**: los pasos
+  nocturnos salen de `build_pipeline_steps`, no de una lista escrita en el
+  comando. Si usara otra, un diccionario podria publicarse a mano y que
+  `run-all` lo rechazase despues, que es peor que rechazarlo ya.
+- **DA-1 comprobada por inspeccion del propio `main.py`**: los cuatro builds
+  manuales (`build-cierre`, `build-compras`, `build-maestros`,
+  `build-retenciones`) NO republican. El diccionario no depende de los datos.
+
+`CLAUDE.md` lista ahora el comando y documenta `config/diccionario/` en el mapa
+del repositorio, con la regla de que quien anade un objeto actualiza su ficha en
+el mismo trabajo.
+
+## T19 · PENDIENTE, verificacion `MANUAL (humano)`
+
+**No se ha ejecutado y no se puede ejecutar desde aqui**: exige conexion a
+`psql-albaranes-rs9k2`, el servidor compartido con `albaranes` y `partes` en
+produccion. Queda para el humano, con estos comandos exactos:
+
+```bash
+python main.py publicar-diccionario
+```
+
+y despues, con `psql`:
+
+```sql
+SELECT esquema, objeto, refresco, avisos FROM _meta.diccionario ORDER BY 1, 2;
+SELECT * FROM _meta.diccionario_publicacion;
+SELECT objeto, ultimo_ok_finished_at FROM _meta.v_diccionario WHERE esquema = 'cierre';
+```
+
+Lo que hay que comprobar en esa salida, mas alla de que no reviente:
+
+1. **37 filas en `_meta.diccionario`** (25 fichas hoy) y **12 en
+   `_meta.diccionario_reglas`**;
+2. `hash_fuente` **coincide** con el que imprime el paso, o el diccionario
+   publicado no es el del repositorio;
+3. las filas de `cierre` traen `ultimo_ok_finished_at` **de `build_cierre`**, y
+   las de `compras` y `retenciones` lo traeran **a NULO** cuando se documenten,
+   porque esos dos comandos no registran paso: es el limite conocido, no un
+   fallo de la vista;
+4. `avisos` NO esta vacio en `mart.fact_seguimiento_mensual`: si lo estuviera,
+   la derivacion de R12 no habria llegado a la base.
+
+Lo unico que este puesto puede garantizar es que el mecanismo traga **el
+contenido real**: los tests publican las 25 fichas de verdad contra un doble y
+cuentan 38 filas, 332 columnas y cobertura 100 %.

@@ -600,6 +600,42 @@ def apply_grants() -> None:
     _ejecutar_paso(ApplyGrantsStep(settings), pg, ejecucion)
 
 
+@cli.command("publicar-diccionario")
+def publicar_diccionario_cmd() -> None:
+    """
+    Publica el diccionario semántico en `_meta` para que el MCP lo lea por SQL.
+
+    Valida los YAML de `config/diccionario/`, comprueba que cubran todo lo que
+    el repositorio publica y reemplaza el contenido de `_meta.diccionario`,
+    `_meta.diccionario_reglas` y `_meta.diccionario_publicacion` en UNA
+    transacción. Si algo no valida, no escribe nada: el diccionario anterior se
+    queda publicado entero.
+
+    Este comando y `run-all` son las DOS únicas vías de publicación (DA-1). Los
+    builds manuales (`build-cierre`, `build-compras`, `build-maestros`,
+    `build-retenciones`) NO republican: el diccionario no depende de los datos,
+    y publicarlo cinco veces no añadiría nada salvo superficie de fallo.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    # Los pasos nocturnos salen de la composición REAL del pipeline, no de una
+    # lista escrita aquí: el comando suelto tiene que validar con el mismo
+    # criterio que la noche, o un diccionario podría publicarse a mano y que
+    # `run-all` lo rechazase después, que es peor que rechazarlo ya.
+    nocturnos = [p.name for p in build_pipeline_steps(settings)]
+    _ejecutar_paso(
+        PublicarDiccionarioStep(
+            settings,
+            pasos_nocturnos=nocturnos,
+            batch_id=ejecucion.batch_id,
+            client=pg,
+        ),
+        pg,
+        ejecucion,
+    )
+
+
 @cli.command("check-coherencia")
 def check_coherencia() -> None:
     """

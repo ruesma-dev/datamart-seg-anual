@@ -584,7 +584,9 @@ def _settings_falso():
             readonly_role="mcp_sigrid_dm_ro",
             set_role="sigrid_dm_etl",
             consumption_schema_list=["mart"],
-        )
+        ),
+        # Lo mira el callback del grupo de la CLI al configurar el log.
+        logging=SimpleNamespace(log_level="INFO", log_format="console"),
     )
 
 
@@ -773,3 +775,141 @@ def test_f006_r25_paso_con_cobertura_rota_no_publica(tmp_path) -> None:
     assert resultado.status is StepStatus.FAILED
     assert espia.llamadas == []
     assert "stg.plan_mensual" in resultado.error_message
+
+
+# ---------------------------------------------------------------------------
+# cli · `python main.py publicar-diccionario` (T18 · R17, DA-1)
+# ---------------------------------------------------------------------------
+
+
+class _PgDeCli:
+    """Doble del cliente para la CLI: registra lo que se le pide."""
+
+    def __init__(self, al_publicar=None) -> None:
+        self.llamadas: list[str] = []
+        self.pasos: list[tuple[str, str]] = []
+        self._al_publicar = al_publicar
+
+    # lo que usa `_arrancar_ejecucion` (F-024, R4)
+    def abortar_runs_huerfanos(self, *_a, **_k):
+        self.llamadas.append("abortar_runs_huerfanos")
+        return []
+
+    # lo que usa el grabador
+    def record_run_start(self, *_a, **_k):
+        return 1
+
+    def record_run_completed(self, **kwargs):
+        self.pasos.append((kwargs.get("step", "?"), kwargs.get("status", "?")))
+        return 1
+
+    def record_run(self, *_a, **_k):
+        return 1
+
+    # lo que usa el paso
+    def execute_sql_file(self, path, **_k):
+        self.llamadas.append(f"execute_sql_file:{path.name}")
+
+    def publicar_diccionario(self, *_a, **_k):
+        self.llamadas.append("publicar_diccionario")
+        if self._al_publicar is not None:
+            raise self._al_publicar
+        return 38
+
+
+def _cli_runner(monkeypatch, pg):
+    import main
+    from click.testing import CliRunner
+
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    monkeypatch.setattr(main, "get_settings", _settings_falso)
+    return CliRunner()
+
+
+def test_f006_r17_cli_el_comando_publica_y_sale_con_cero(monkeypatch) -> None:
+    import main
+
+    pg = _PgDeCli()
+    resultado = _cli_runner(monkeypatch, pg).invoke(main.cli, ["publicar-diccionario"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "execute_sql_file:01_diccionario.sql" in pg.llamadas
+    assert "publicar_diccionario" in pg.llamadas
+
+
+def test_f006_r24_cli_marca_huerfanas_antes_de_escribir(monkeypatch) -> None:
+    """Escribe, así que pasa por el mismo protocolo que el resto (F-024, R4)."""
+    import main
+
+    pg = _PgDeCli()
+    _cli_runner(monkeypatch, pg).invoke(main.cli, ["publicar-diccionario"])
+
+    assert pg.llamadas[0] == "abortar_runs_huerfanos"
+
+
+def test_f006_r17_cli_registra_el_paso_en_meta(monkeypatch) -> None:
+    import main
+
+    pg = _PgDeCli()
+    _cli_runner(monkeypatch, pg).invoke(main.cli, ["publicar-diccionario"])
+
+    assert ("publicar_diccionario", "SUCCESS") in pg.pasos
+
+
+def test_f006_r21_cli_si_falla_sale_con_uno(monkeypatch) -> None:
+    import main
+
+    pg = _PgDeCli(al_publicar=RuntimeError("se cayó la red"))
+    resultado = _cli_runner(monkeypatch, pg).invoke(main.cli, ["publicar-diccionario"])
+
+    assert resultado.exit_code == 1
+    assert ("publicar_diccionario", "FAILED") in pg.pasos
+
+
+def test_f006_r14_cli_usa_los_pasos_nocturnos_del_pipeline_real(monkeypatch) -> None:
+    """El comando suelto valida con el MISMO criterio que la noche.
+
+    Si usara otro, un diccionario podría publicarse a mano y ser rechazado por
+    `run-all`, o al revés, que es peor.
+    """
+    import main
+    from etl_sigrid.application.steps.publicar_diccionario_step import (
+        PublicarDiccionarioStep,
+    )
+
+    vistos: list[tuple[str, ...]] = []
+    original = PublicarDiccionarioStep.run
+
+    def espiar(self):
+        vistos.append(tuple(self.pasos_nocturnos))
+        return original(self)
+
+    monkeypatch.setattr(PublicarDiccionarioStep, "run", espiar)
+    _cli_runner(monkeypatch, _PgDeCli()).invoke(main.cli, ["publicar-diccionario"])
+
+    esperados = tuple(p.name for p in main.build_pipeline_steps(_settings_falso()))
+    assert vistos == [esperados]
+
+
+def test_f006_da1_los_builds_manuales_no_republican_el_diccionario() -> None:
+    """DA-1: solo `run-all` y el comando suelto.
+
+    El diccionario no depende de los datos, así que publicarlo al final de cada
+    build manual no añadiría nada y sí superficie de fallo.
+    """
+    import main
+
+    fuente = Path(main.__file__).read_text(encoding="utf-8")
+
+    for comando in ("build-cierre", "build-compras", "build-maestros",
+                    "build-retenciones"):
+        inicio = fuente.index(f'@cli.command("{comando}")')
+        fin = fuente.index("@cli.command(", inicio + 10)
+        assert "PublicarDiccionarioStep" not in fuente[inicio:fin], comando
+
+
+def test_f006_r17_el_comando_esta_documentado_en_claude_md() -> None:
+    """El mapa del repositorio lista los comandos: si no está, no existe."""
+    texto = (RAIZ / "CLAUDE.md").read_text(encoding="utf-8")
+
+    assert "publicar-diccionario" in texto
