@@ -603,4 +603,31 @@ antes de unir**, que es la informacion que de verdad evita el fan-out:
 `(obra_id, anio_mes)`, `(obra_id, anio_mes, concepto)`,
 `(obra_id, grupo_cod, subcategoria_cod)`, `(obra_id, ambito_id, version)`...
 
-Reparto final: `N:1` 21, `N:N` 10, `1:1` 8, `1:N` 3.
+Reparto final: `N:1` 23, `N:N` 10, `1:1` 8, `1:N` 1.
+
+## Defecto 3 · `orden_concepto` declaraba un rango falso
+
+```
+$ python -m pytest tests/test_f006_fichas.py -q -k "orden"
+tests\test_f006_fichas.py:394: AssertionError
+FAILED tests/test_f006_fichas.py::test_f006_r7_cierre_el_orden_del_resumen_declara_sus_valores_reales
+FAILED tests/test_f006_fichas.py::test_f006_r7_cierre_el_orden_del_resumen_avisa_del_empate
+FAILED tests/test_f006_fichas.py::test_f006_r7_cierre_el_orden_de_la_tabla_base_solo_llega_a_cuatro
+FAILED tests/test_f006_fichas.py::test_f006_r7_cierre_el_dim_de_concepto_si_ordena_de_uno_a_seis
+4 failed, 57 deselected in 1.17s
+```
+
+Verificado en el SQL: `02_build_fact.sql:290-297` da 1, 2, 3 y 4 a los cuatro
+conceptos base; `03_views.sql:56` le da **2** a GASTOS y `:85` le da **6** a
+BENEFICIO. Valores reales `{1, 2, 2, 3, 4, 6}`: **el 2 repetido y ningun 5**.
+
+Se corrigen **tres fichas y una relacion**, no solo la que senalaba el informe:
+
+- `v_pbi_cierre_resumen.orden_concepto` declara sus cinco valores distintos, dice
+  que el 2 lo comparten INDIRECTOS y GASTOS y **manda ordenar por
+  `cierre.v_pbi_dim_concepto.orden`**.
+- `fact_cierre_mensual.orden_concepto` declara `1..4`: esa tabla solo tiene los
+  cuatro conceptos base.
+- `v_pbi_dim_concepto.orden` declara `1..6` y dice que es el unico orden fiable.
+- La relacion con el dim pasa de «aporta el orden» a «el orden del dim es el
+  bueno, no el `orden_concepto` de esta vista».

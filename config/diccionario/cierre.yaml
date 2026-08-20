@@ -69,7 +69,11 @@ objetos:
           esta tabla; GASTOS y BENEFICIO se derivan en la vista de resumen.
         valores: [VENTA, INDIRECTOS, DIRECTOS, GENERALES]
       orden_concepto:
-        significado: Orden de presentacion del concepto en el cuadro. Presentacion.
+        significado: >-
+          Orden de presentacion del concepto en el cuadro. Aqui solo hay cuatro
+          valores porque esta tabla solo tiene los cuatro conceptos base; los dos
+          derivados llegan en `cierre.v_pbi_cierre_resumen`.
+        valores: ["1", "2", "3", "4"]
         agregacion: no_sumable
       ejecutado_origen:
         significado: >-
@@ -210,7 +214,15 @@ objetos:
         significado: Linea del cuadro de cierre, ya con los dos conceptos derivados.
         valores: [VENTA, GASTOS, INDIRECTOS, DIRECTOS, GENERALES, BENEFICIO]
       orden_concepto:
-        significado: Orden de presentacion del concepto (1 a 6). Presentacion.
+        significado: >-
+          Orden de presentacion heredado de la tabla base. NO SIRVE PARA ORDENAR
+          EL CUADRO: los valores reales son 1, 2, 2, 3, 4 y 6, con el **2
+          repetido** —lo tienen INDIRECTOS, que lo hereda del fact, y GASTOS, que
+          lo recibe al derivarse— y sin ningun 5. Un `ORDER BY orden_concepto`
+          deja esos dos empatados en orden indefinido. Para ordenar el cuadro se
+          usa `cierre.v_pbi_dim_concepto.orden`, que si va de 1 a 6 sin huecos ni
+          repeticiones.
+        valores: ["1", "2", "3", "4", "6"]
         agregacion: no_sumable
       ejecutado_origen:
         significado: Ejecutado acumulado desde el inicio de la obra hasta ese mes.
@@ -316,7 +328,9 @@ objetos:
       - de: concepto
         a: cierre.v_pbi_dim_concepto.concepto
         cardinalidad: "N:1"
-        porque: Para la descripcion legible y el orden de presentacion del concepto.
+        porque: >-
+          Para la descripcion legible y, sobre todo, para ORDENAR: el `orden`
+          del dim es el bueno, no el `orden_concepto` de esta vista.
 
     ejemplos_preguntas:
       - Cuanto llevamos ejecutado en la obra X a cierre del mes M, en venta y en coste
@@ -340,7 +354,11 @@ objetos:
         significado: Clave del concepto, tal y como aparece en el cuadro de cierre.
         valores: [VENTA, GASTOS, INDIRECTOS, DIRECTOS, GENERALES, BENEFICIO]
       orden:
-        significado: Orden de presentacion en el cuadro (1 a 6).
+        significado: >-
+          Orden de presentacion en el cuadro, de 1 a 6 sin huecos ni empates.
+          Es el unico orden fiable: el `orden_concepto` de
+          `cierre.v_pbi_cierre_resumen` repite el 2 y se salta el 5.
+        valores: ["1", "2", "3", "4", "5", "6"]
         agregacion: no_sumable
       descripcion: >-
         Nombre largo del concepto para mostrar al usuario ("Costes Generales

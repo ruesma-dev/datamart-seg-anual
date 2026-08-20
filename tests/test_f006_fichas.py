@@ -340,3 +340,55 @@ def test_f006_r2_cierre_las_tres_funciones_estan_documentadas() -> None:
     for nombre, ficha in funciones.items():
         assert ficha.grano is None or ficha.grano == "", nombre
         assert ficha.motivo_no_consumo, nombre
+
+
+# ---------------------------------------------------------------------------
+# `orden_concepto`: el rango declarado tiene que ser el real (defecto 3)
+#
+# La ficha decia «(1 a 6)». Los valores reales son {1, 2, 2, 3, 4, 6}: el 2 esta
+# DUPLICADO (INDIRECTOS lo hereda del fact y GASTOS lo recibe en la vista) y el
+# 5 no existe. Un `ORDER BY orden_concepto` deja dos conceptos empatados en
+# orden indefinido, que es la clase de fallo que nadie mira dos veces.
+# ---------------------------------------------------------------------------
+
+
+def _valores_orden(objeto: str, columna: str) -> list[str]:
+    return list(
+        {c.nombre: c for c in _fichas_de("cierre")[objeto].columnas}[columna].valores
+    )
+
+
+def test_f006_r7_cierre_el_orden_del_resumen_declara_sus_valores_reales() -> None:
+    assert _valores_orden("v_pbi_cierre_resumen", "orden_concepto") == [
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+    ]
+
+
+def test_f006_r7_cierre_el_orden_del_resumen_avisa_del_empate() -> None:
+    """No basta con listar los valores: hay que decir que el 2 se repite y por
+    dónde se ordena de verdad."""
+    columnas = {c.nombre: c for c in _fichas_de("cierre")["v_pbi_cierre_resumen"].columnas}
+
+    significado = columnas["orden_concepto"].significado
+
+    assert "2" in significado
+    assert "v_pbi_dim_concepto" in significado, (
+        "la ficha tiene que mandar ordenar por el dim, que sí es 1..6 sin huecos"
+    )
+
+
+def test_f006_r7_cierre_el_orden_de_la_tabla_base_solo_llega_a_cuatro() -> None:
+    """`fact_cierre_mensual` solo tiene los cuatro conceptos base."""
+    columnas = {c.nombre: c for c in _fichas_de("cierre")["fact_cierre_mensual"].columnas}
+
+    assert list(columnas["orden_concepto"].valores) == ["1", "2", "3", "4"]
+
+
+def test_f006_r7_cierre_el_dim_de_concepto_si_ordena_de_uno_a_seis() -> None:
+    columnas = {c.nombre: c for c in _fichas_de("cierre")["v_pbi_dim_concepto"].columnas}
+
+    assert list(columnas["orden"].valores) == ["1", "2", "3", "4", "5", "6"]
