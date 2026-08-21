@@ -207,3 +207,74 @@ def test_f006_r2_el_codigo_del_capitulo_raiz_tampoco_declara_un_nulo_falso() -> 
         f"fila se apunta a sí misma y este campo trae su propio código. "
         f"Declara: {texto!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Una regla BLOQUEANTE no puede convivir con fichas que la contradicen (9ª)
+# ---------------------------------------------------------------------------
+#
+# `R-IMPORTE-MES` dice, y es bloqueante: «de un total de un periodo se toma su
+# valor del ÚLTIMO mes, no la suma». Su ámbito incluye `stg.plan_mensual`.
+#
+# Y `stg.plan_mensual` marcaba **sumables** cuatro columnas acumuladas a origen
+# —`can_origen`, `importe_origen`, `importe_origen_raw`, `total_incurrido`—
+# mientras sus **doce gemelas de `mart`**, con el mismo nombre y el mismo
+# número, están en `ultimo_valor`. Que una regla bloqueante conviva con fichas
+# que la contradicen es lo peor que puede pasarle a este diccionario: el agente
+# recibe las dos cosas y no tiene forma de saber cuál vale.
+#
+# La comprobación no lista columnas: **deriva la coherencia**. La misma columna,
+# en dos objetos del ámbito de la regla, es el mismo número y tiene que
+# declararse igual. Así se caza la deriva en los dos sentidos, y sin lista que
+# mantener.
+
+
+def _objetos_del_ambito_de(codigo: str) -> list[str]:
+    return list(next(r for r in _dicc().reglas if r.codigo == codigo).ambito)
+
+
+def test_f006_r10_control_el_ambito_de_importe_mes_cubre_stg_y_mart() -> None:
+    """Si el ámbito se encogiera, la comprobación de abajo pasaría en vacío."""
+    ambito = _objetos_del_ambito_de("R-IMPORTE-MES")
+    assert "stg.plan_mensual" in ambito
+    assert "mart.fact_seguimiento_mensual" in ambito
+    assert len(ambito) >= 8
+
+
+def test_f006_r10_una_columna_repetida_se_declara_igual_en_todo_el_ambito() -> None:
+    """`importe_origen` es el mismo número en `stg` y en `mart`: o las dos o ninguna."""
+    ambito = _objetos_del_ambito_de("R-IMPORTE-MES")
+    indice = _dicc().por_nombre
+
+    por_columna: dict[str, dict[str, str]] = {}
+    for nombre in ambito:
+        ficha = indice.get(nombre)
+        if ficha is None:
+            continue
+        for c in ficha.columnas:
+            if c.agregacion:
+                por_columna.setdefault(c.nombre, {})[nombre] = c.agregacion
+
+    discrepantes = {
+        col: dict(sorted(objs.items()))
+        for col, objs in por_columna.items()
+        if len(set(objs.values())) > 1
+    }
+    assert discrepantes == {}, (
+        f"la misma columna se declara con `agregacion` distinta dentro del ámbito "
+        f"de `R-IMPORTE-MES`, que es bloqueante: {discrepantes}. Son el mismo "
+        f"número; si una es acumulada a origen lo es en los dos sitios"
+    )
+
+
+@pytest.mark.parametrize(
+    "columna", ["can_origen", "importe_origen", "importe_origen_raw", "total_incurrido"]
+)
+def test_f006_r10_las_acumuladas_a_origen_no_son_sumables(columna: str) -> None:
+    """Y el valor correcto es el que manda la regla: el del último mes."""
+    c = _columna("stg.plan_mensual", columna)
+    assert c.agregacion == "ultimo_valor", (
+        f"stg.plan_mensual.{columna} es un acumulado a origen y se declara "
+        f"`{c.agregacion}`. `R-IMPORTE-MES` dice que de un total de un periodo se "
+        f"toma el valor del ULTIMO mes, no la suma"
+    )

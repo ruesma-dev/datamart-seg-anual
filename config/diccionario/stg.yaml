@@ -146,7 +146,7 @@ objetos:
         agregacion: suma_solo_dentro_del_mes
       can_origen:
         significado: Cantidad acumulada desde el inicio hasta ese mes.
-        agregacion: suma_solo_dentro_del_mes
+        agregacion: ultimo_valor
       importe_mes:
         significado: Importe imputado A ESE MES concreto, ya desacumulado.
         unidad: EUR
@@ -156,7 +156,7 @@ objetos:
           Importe ACUMULADO desde el inicio hasta ese mes. Sumarlo a lo largo del
           tiempo multiplica el resultado.
         unidad: EUR
-        agregacion: suma_solo_dentro_del_mes
+        agregacion: ultimo_valor
       importe_mes_raw:
         significado: El importe del mes calculado con el precio SIN redondear a dos decimales.
         unidad: EUR
@@ -165,7 +165,7 @@ objetos:
       importe_origen_raw:
         significado: Version sin redondear del acumulado a origen.
         unidad: EUR
-        agregacion: suma_solo_dentro_del_mes
+        agregacion: ultimo_valor
         nulo_significa: No se calculo la version sin redondear para esa fila.
       total_incurrido:
         significado: >-
@@ -173,7 +173,7 @@ objetos:
           Normalmente coincide con cantidad por precio, pero a veces difiere en
           centimos.
         unidad: EUR
-        agregacion: suma_solo_dentro_del_mes
+        agregacion: ultimo_valor
         nulo_significa: >-
           La fila no es de un ambito REAL. Llega en los **dos** reales —3
           (coste) y 7 (venta)—, no solo en coste, porque el bloque que lo trae
