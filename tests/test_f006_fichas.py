@@ -506,19 +506,35 @@ def _bloque_del_objeto(sql: str, nombre_cualificado: str) -> str:
     Dos falsos positivos de tres: sin este recorte, la comprobación acusaba a más
     fichas de las que fallan, que es la otra forma de hacer daño.
     """
-    inicio = re.search(
-        rf"CREATE\s+(?:OR\s+REPLACE\s+)?(?:VIEW|TABLE)"
-        rf"(?:\s+IF\s+NOT\s+EXISTS)?\s+{re.escape(nombre_cualificado)}\b",
-        sql,
-        re.IGNORECASE,
+    # Un objeto puede tener VARIOS bloques: el `CREATE` que lo declara y el
+    # `INSERT ... SELECT` que lo puebla, a veces en ficheros distintos. Se
+    # devuelven todos concatenados, porque la proyección puede estar en
+    # cualquiera de ellos.
+    #
+    # Buscarla solo en el `CREATE` dejaba sin comprobar las tres tablas grandes
+    # de `stg`: su DDL declara tipos y no tiene ni una proyección, así que el
+    # guardián de nulos no encontraba nada y pasaba en vacío.
+    arranque = (
+        r"(?:CREATE\s+(?:OR\s+REPLACE\s+)?(?:VIEW|TABLE)(?:\s+IF\s+NOT\s+EXISTS)?"
+        r"|INSERT\s+INTO)"
     )
-    if not inicio:
-        return sql
-    resto = sql[inicio.end():]
-    siguiente = re.search(
-        r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:VIEW|TABLE)\b", resto, re.IGNORECASE
-    )
-    return resto[: siguiente.start()] if siguiente else resto
+    trozos: list[str] = []
+    for inicio in re.finditer(
+        rf"{arranque}\s+{re.escape(nombre_cualificado)}\b", sql, re.IGNORECASE
+    ):
+        # Desde el principio de la SENTENCIA, no desde la palabra `INSERT`: en
+        # `stg/04_partidas.sql` el `WITH RECURSIVE` que trae las proyecciones va
+        # **antes** del `INSERT INTO stg.partidas`, así que empezar en el INSERT
+        # dejaba fuera justo las columnas que hay que comprobar.
+        arranca_en = sql.rfind(";", 0, inicio.start()) + 1
+        resto = sql[arranca_en:]
+        siguiente = re.search(
+            rf"{arranque}\s+\w+\.\w+", sql[inicio.end():], re.IGNORECASE
+        )
+        if siguiente:
+            resto = sql[arranca_en : inicio.end() + siguiente.start()]
+        trozos.append(resto)
+    return "\n".join(trozos) if trozos else sql
 
 
 def _proyeccion_de(sql: str, columna: str) -> str | None:
@@ -545,6 +561,53 @@ def test_f006_r2_la_proyeccion_se_busca_en_el_bloque_del_objeto() -> None:
     albaranes = _proyeccion_de(_bloque_del_objeto(sql, "compras.albaranes"), "contrato_id")
     assert "NULLIF" not in contratos.upper()
     assert "NULLIF" in albaranes.upper()
+
+
+@lru_cache(maxsize=1)
+def _ficheros_que_pueblan() -> dict[str, tuple[str, ...]]:
+    """Dónde se PROYECTAN las columnas de cada objeto, que no siempre es donde
+    se declara.
+
+    `stg.partidas`, `stg.fases` y `stg.plan_mensual` se declaran en
+    `stg/01_ddl.sql` —solo tipos, ni un `raw.` a la vista— y se pueblan con un
+    `INSERT ... SELECT` en otro fichero. El guardián de nulos resolvía el origen
+    por el `CREATE`, leía el DDL, no encontraba ningún alias de `raw` y **se
+    saltaba las tres fichas** con el mensaje «no lee directamente de `raw`».
+
+    Tres de los objetos más grandes de `stg` quedaban sin comprobar, y el
+    guardián decía que era por una razón que no se cumplía. Es la misma clase de
+    punto ciego que ya apareció dos veces: un detector que cubre menos de lo que
+    su mensaje da a entender.
+    """
+    donde: dict[str, set[str]] = {}
+    for fichero in sorted(DIR_SQL.rglob("*.sql")):
+        texto = re.sub(r"--[^\n]*", " ", fichero.read_text(encoding="utf-8"))
+        rel = fichero.relative_to(DIR_SQL).as_posix()
+        for m in re.finditer(
+            r"\b(?:INSERT\s+INTO|CREATE\s+(?:OR\s+REPLACE\s+)?(?:VIEW|TABLE)"
+            r"(?:\s+IF\s+NOT\s+EXISTS)?)\s+(\w+\.\w+)",
+            texto,
+            re.IGNORECASE,
+        ):
+            donde.setdefault(m.group(1).lower(), set()).add(rel)
+    return {k: tuple(sorted(v)) for k, v in donde.items()}
+
+
+def test_f006_r2_control_se_localiza_donde_se_puebla_cada_tabla_de_stg() -> None:
+    """Las tres que el guardián se saltaba, y por qué se las saltaba."""
+    donde = _ficheros_que_pueblan()
+    for objeto, esperado in (
+        ("stg.partidas", "stg/04_partidas.sql"),
+        ("stg.fases", "stg/05_fases.sql"),
+        ("stg.plan_mensual", "stg/08_plan_mensual.sql"),
+    ):
+        assert esperado in donde.get(objeto, ()), (
+            f"{objeto} se puebla en {esperado} y el localizador no lo ve: "
+            f"{donde.get(objeto)}"
+        )
+        assert "stg/01_ddl.sql" in donde.get(objeto, ()), (
+            f"{objeto} se declara en el DDL, que es lo que el guardián leía antes"
+        )
 
 
 def _alias_directos_de_raw(sql: str) -> set[str]:
@@ -595,10 +658,12 @@ def _alias_directos_de_raw(sql: str) -> set[str]:
 )
 def test_f006_r2_un_nulo_declarado_tiene_que_ser_posible(nombre: str) -> None:
     ficha = _diccionario().por_nombre[nombre]
-    origen = _origen_por_objeto().get(nombre)
-    if origen is None:
+    ficheros = _ficheros_que_pueblan().get(nombre.lower(), ())
+    if not ficheros:
         pytest.skip(f"{nombre} no tiene un SQL de origen legible")
-    sql = (DIR_SQL / origen).read_text(encoding="utf-8")
+    # Se concatenan los ficheros donde el objeto se declara o se puebla: la
+    # proyección puede estar en cualquiera de ellos.
+    sql = "\n".join((DIR_SQL / f).read_text(encoding="utf-8") for f in ficheros)
 
     # El «0 en vez de NULL» es una convención de SIGRID, no nuestra: sus enteros
     # no guardan nulos. Así que esto solo aplica cuando el valor sale DIRECTO de

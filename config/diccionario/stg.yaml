@@ -423,7 +423,9 @@ objetos:
         significado: >-
           Descripcion de la partida tal y como la escribio el jefe de obra. Es
           texto libre, y hoy es la unica via —heuristica— de adivinar el oficio.
-        nulo_significa: La partida no tiene descripcion.
+          **Nunca es NULL**: se proyecta `p.res` en crudo desde `raw.obrparpar`,
+          asi que una partida sin descripcion llega como **cadena vacia**.
+        nulo_significa: null
       unidad_medida:
         significado: Unidad de medicion (m3, m2, ud, kg...).
         nulo_significa: La partida no tiene unidad, tipico de los capitulos.
@@ -512,11 +514,14 @@ objetos:
         significado: Identificador de la obra en Sigrid. Clave primaria de la tabla.
         agregacion: no_sumable
       codigo_obra:
-        significado: Codigo de obra tal y como se teclea en Sigrid.
-        nulo_significa: No puede serlo, el build excluye las obras sin codigo.
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid. **Nunca es NULL**: sale
+          de `con.cod` en crudo y ademas el build excluye las obras sin codigo.
+        nulo_significa: null
       nombre_obra:
-        significado: Nombre legible de la obra, de `con.res`.
-        nulo_significa: La obra no tiene resumen informado en Sigrid.
+        significado: >-
+          Nombre legible de la obra, de `con.res`. **Nunca es NULL**: se proyecta
+          en crudo, asi que una obra sin resumen llega como **cadena vacia**.
       activa: >-
         **NO SIGNIFICA NADA.** La construye un literal `TRUE` y vale TRUE para
         todas las obras, incluidas las cerradas hace anos. Para saber si una obra
@@ -585,19 +590,22 @@ objetos:
           Ano de la fase, copiado tal cual de `obrfas.ano` en `raw.obrfas`. **No
           se deriva de `fecha_inicio`**: son campos independientes en Sigrid y
           pueden no coincidir.
+
+          **Nunca es NULL**: se proyecta en crudo y Sigrid no guarda nulos en
+          los enteros, asi que "sin informar" llega como **0**. Consecuencia que
+          conviene conocer: el filtro `f.anio IS NOT NULL` de
+          `stg/08_plan_mensual.sql` **no descarta nada**; una fase con `anio = 0`
+          entra igual.
         agregacion: no_sumable
-        nulo_significa: >-
-          Sigrid no lo tiene informado. **No es cosmetico**: `stg.plan_mensual`
-          exige `anio` y `mes` no nulos para construir los ambitos reales, asi
-          que una fase sin ellos **no aparece** en el seguimiento mensual.
+        nulo_significa: null
       mes:
         significado: >-
           Mes de la fase, copiado tal cual de `obrfas.mes` en `raw.obrfas`. **No
-          se deriva de `fecha_inicio`**, igual que `anio`.
+          se deriva de `fecha_inicio`**, igual que `anio`. Y **nunca es NULL**
+          por el mismo motivo: es un entero de Sigrid proyectado en crudo, y
+          "sin informar" llega como **0**.
         agregacion: no_sumable
-        nulo_significa: >-
-          Sigrid no lo tiene informado, y entonces `stg.plan_mensual` descarta la
-          fase al construir los ambitos reales.
+        nulo_significa: null
       nombre_mes:
         significado: >-
           Nombre del mes escrito en la fase. **Manda sobre la fecha** cuando las

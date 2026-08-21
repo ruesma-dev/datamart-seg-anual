@@ -149,18 +149,40 @@ def test_f006_r26_anio_y_mes_de_las_fases_declaran_su_origen_real(
     )
 
 
-def test_f006_r26_anio_y_mes_avisan_de_que_el_plan_mensual_los_exige() -> None:
-    """No es cosmético: si son nulos, la fila no entra en los ámbitos reales."""
-    sql = _sql("stg/08_plan_mensual.sql")
-    assert re.search(r"f\.anio\s+IS\s+NOT\s+NULL", sql, re.IGNORECASE)
+def test_f006_r26_anio_y_mes_nunca_son_nulos_y_la_ficha_lo_dice() -> None:
+    """Escribí este test en la 7ª pasada con la premisa al revés.
 
-    for columna in ("anio", "mes"):
-        c = _columna("stg.fases", columna)
-        texto = f"{c.significado} {c.nulo_significa or ''}"
-        assert "plan_mensual" in texto, (
-            f"stg.fases.{columna} no avisa de que `stg.plan_mensual` exige que no "
-            f"sea nulo para construir los ámbitos reales"
+    Decía «si son nulos, la fila no entra en los ámbitos reales», y di por bueno
+    que la ficha lo repitiera. Pero `anio` y `mes` se proyectan **en crudo**
+    desde `raw.obrfas`, y Sigrid no guarda nulos en los enteros: nunca son NULL,
+    «sin informar» llega como **0**.
+
+    La consecuencia es la contraria de la que publiqué: el filtro
+    `f.anio IS NOT NULL` de `stg/08_plan_mensual.sql` **no descarta nada**, y una
+    fase con `anio = 0` entra igual. Lo destapó el guardián de nulos al cubrir el
+    punto ciego de las tablas que se pueblan con `INSERT ... SELECT`.
+    """
+    fases = _sql("stg/05_fases.sql")
+    for columna, origen in (("anio", "f.ano"), ("mes", "f.mes")):
+        assert re.search(rf"{re.escape(origen)}\s+AS\s+{columna}\b", fases), (
+            f"`{columna}` ya no se proyecta en crudo desde {origen}; revisar la ficha"
         )
+        c = _columna("stg.fases", columna)
+        assert c.nulo_significa is None, (
+            f"stg.fases.{columna} declara un NULL que no puede ocurrir: "
+            f"{c.nulo_significa!r}"
+        )
+        assert "0" in c.significado, (
+            f"stg.fases.{columna} tiene que decir que «sin informar» es 0"
+        )
+
+    # Y que el filtro inerte siga estando, porque es lo que la ficha explica.
+    plan = _sql("stg/08_plan_mensual.sql")
+    assert re.search(r"f\.anio\s+IS\s+NOT\s+NULL", plan, re.IGNORECASE)
+    assert "no descarta nada" in _columna("stg.fases", "anio").significado, (
+        "la ficha tiene que decir que ese filtro no filtra: quien lo lea en el SQL "
+        "va a suponer lo contrario"
+    )
 
 
 # ---------------------------------------------------------------------------
