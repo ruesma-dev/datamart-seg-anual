@@ -28,6 +28,8 @@ import re
 
 import pytest
 
+from tests._texto import contiene
+
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
 
@@ -88,7 +90,7 @@ def test_f006_r26_ninguna_frase_rechazada_sobrevive_en_el_fichero(
     vivas = [
         f"«{frase}» ({motivo})"
         for frase, motivo in FRASES_RECHAZADAS.items()
-        if frase in texto
+        if contiene(texto, frase)
     ]
     assert vivas == [], (
         f"{fichero.name} conserva {len(vivas)} frase(s) que una revisión ya "
@@ -160,7 +162,7 @@ def test_f006_r26_el_bloque_global_publicable_no_conserva_frases_rechazadas() ->
     vivas = [
         f"«{frase}» ({motivo})"
         for frase, motivo in FRASES_RECHAZADAS.items()
-        if frase in texto
+        if contiene(texto, frase)
     ]
     assert vivas == [], (
         f"el bloque global publica {len(vivas)} frase(s) ya rechazada(s): {vivas}. "
@@ -221,7 +223,50 @@ def test_f006_r26_control_el_barrido_ve_una_frase_plegada() -> None:
         f.write_text(plegado, encoding="utf-8")
         texto = _texto_barrible(f)
 
-    vivas = [frase for frase in FRASES_RECHAZADAS if frase in texto]
+    vivas = [f for f in FRASES_RECHAZADAS if contiene(texto, f)]
     assert vivas == ["no en la tabla especifica"], (
         f"el barrido no ve la frase plegada: {vivas}"
     )
+
+
+# ---------------------------------------------------------------------------
+# El plegado como CLASE, no como caso (13ª pasada)
+# ---------------------------------------------------------------------------
+
+
+def test_f006_r26_control_la_comparacion_ignora_el_ajuste_de_linea() -> None:
+    """El caso exacto de la 13ª pasada, con el texto real que estuvo mintiendo.
+
+    `inventario.py` afirmaba que `check-diccionario` «está sin implementar» del
+    comando que existía desde ese mismo commit, y el guardián de R28 estaba
+    **verde**: buscaba la subcadena literal y el ajuste de línea partía la
+    frase.
+    """
+    envuelto = (
+        "es `python main.py check-diccionario` (R28) y **está sin\n"
+        "    implementar**: llega en el bloque H."
+    )
+    assert "sin implementar" not in envuelto, "así estaba escrito, y así no se veía"
+    assert contiene(envuelto, "sin implementar"), "normalizando, sí"
+
+
+def test_f006_r26_ninguna_guarda_de_prosa_compara_subcadenas_crudas() -> None:
+    """Que el arreglo no se quede en los dos sitios de hoy.
+
+    Es la **tercera** aparición del mismo defecto y la primera fue en un barrido
+    que se arregló solo para sí mismo. Este test recorre los ficheros que
+    comparan prosa y exige que usen `contiene`, no `in` a pelo, sobre las listas
+    de frases vigiladas.
+    """
+    raiz = pathlib.Path(__file__).resolve().parents[1]
+    vigilados = {
+        "tests/test_f006_copias.py": "FRASES_RECHAZADAS",
+        "tests/test_f006_cobertura.py": "lo_dan_por_futuro",
+    }
+    for ruta, marca in vigilados.items():
+        texto = (raiz / ruta).read_text(encoding="utf-8")
+        assert marca in texto, f"{ruta} ya no contiene {marca}: revisar este test"
+        assert "from tests._texto import contiene" in texto, (
+            f"{ruta} compara prosa y no importa `contiene`: volvería a ser ciego "
+            f"a una frase partida por el ajuste de línea"
+        )

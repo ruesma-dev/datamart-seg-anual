@@ -189,9 +189,16 @@ def test_f006_r28_lo_que_se_dice_de_check_diccionario_es_cierto_hoy() -> None:
         (RAIZ / "tests/test_f006_fichas.py").read_text(encoding="utf-8"),
         __doc__ or "",
     ]
+    # NORMALIZANDO ESPACIOS: buscar la subcadena cruda comparaba contra un
+    # accidente de formato. Este mismo guardián estuvo verde sosteniendo una
+    # afirmación falsa porque `inventario.py` traía esa frase partida entre
+    # dos líneas, y el ajuste de línea la hacía invisible a la búsqueda.
+    from tests._texto import contiene
+
     lo_dan_por_futuro = any(
-        "sin implementar" in t or "todavía no existe" in t or "TODAVÍA NO EXISTE" in t
+        contiene(t, frase)
         for t in textos
+        for frase in ("sin implementar", "todavía no existe", "TODAVÍA NO EXISTE")
     )
 
     assert existe is not lo_dan_por_futuro, (

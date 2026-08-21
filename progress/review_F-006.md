@@ -18,95 +18,158 @@
 
 ## Veredicto de la decimotercera pasada
 
-**APROBADO.** Los tres graves de la duodécima están cerrados, y los dos que eran
-de **confianza en la evidencia** —no de contenido— se han cerrado del modo que
-había que cerrarlos: enseñando la salida que faltaba y reconociendo el recorte.
+**RECHAZADO**, y **rectifico el APROBADO que ya había emitido**. Es la sexta vez
+en esta feature, siempre por lo mismo: emito antes de que vuelva la auditoría que
+yo mismo encargo, y verifico lo que la tanda dice haber hecho en lugar de buscar
+lo que se le ha escapado. Los cuatro defectos los he confirmado uno a uno.
 
-Queda una deuda menor y una tarea que es tuya, no suya: la huérfana.
+**Lo que sí está cerrado, y bien**, sigue en pie: el `READ ONLY` aplicado de
+verdad y comprobado sobre lo que el cliente ejecuta, la republicación con
+`version: 2` y el mecanismo que detecta la desincronización, las evidencias
+completas —los hashes pegados casan con árboles reconstruidos, no son
+inventables— y los siete NO COMPROBADO con nombre.
 
-## Los tres graves
+Lo que falla son **dos reincidencias del patrón que esta misma tanda decía
+cerrar**, y dos huecos en la propagación del aviso.
 
-### 1 · El `READ ONLY` ahora se aplica de verdad
+---
 
-Y el diagnóstico técnico es correcto: `BEGIN READ ONLY` no servía porque la
-conexión llega ya en transacción —lo mismo que rompió el `autocommit` en la
-tanda anterior—, así que la vía es `SET LOCAL transaction_read_only = on`, que es
-válida precisamente **dentro** de una transacción abierta.
+## Los dos graves
 
-Lo importante es cómo se comprueba: el test ya no mira lo que un constructor
-devuelve, mira **lo que el cliente ejecuta**. Con un cursor espía que registra en
-`ejecutadas`, asserta `cursor.ejecutadas[:2] == list(previas)` y que la segunda es
-`SET LOCAL transaction_read_only = on` (`tests/test_f006_unicidad.py:209-220`).
-Esa es la diferencia entre fijar una intención y fijar un hecho.
+### 1 · El guardián de R28 está verde sosteniendo una afirmación falsa
 
-Y el barrido de constructores muertos existe y quedó como control permanente:
-`test_f006_t26_control_ningun_constructor_de_unicidad_esta_muerto` (`:223`).
-Encontró uno —el que yo denuncié— y ninguno más.
+`etl_sigrid/domain/inventario.py:102-105` sigue diciendo, hoy:
 
-### 2 · Republicado, con el mecanismo que detecta la desincronización
+> «La comprobación contra `information_schema` … es `python main.py
+> check-diccionario` (R28) y **está sin implementar**: llega en el bloque H.
+> Hasta entonces esta heurística es lo único que hay.»
 
-- `version: 2` en el árbol (`00_global.yaml:15`) y en la base: `publicado: ('2',
-  'a7584ee84391')`, con hash nuevo (antes `a6da19bac1e8`).
-- Y la comprobación que faltaba: `check-diccionario` compara el `hash_fuente` de
-  `_meta.diccionario_publicacion` con el del árbol. Ejecutado **antes** de
-  republicar dio `KO LO PUBLICADO NO ES LO DEL ARBOL`; después,
-  `OK lo publicado ES lo del arbol (version 2, hash a7584ee84391)`. El defecto que
-  denuncié —publicar y luego editar en el mismo commit— ya no puede pasar
-  inadvertido.
+Y `check-diccionario` **existe desde este commit**. El guardián escrito para
+impedir justo eso (`tests/test_f006_cobertura.py:172-201`) busca la subcadena
+literal `"sin implementar"` en ese fichero, y **el ajuste de línea la parte** en
+`"está sin\n    implementar"`. Lo medí:
 
-### 3 · La evidencia, completa y con el recorte reconocido
+```
+'sin implementar' in inventario.py            -> False
+'sin implementar' in " ".join(texto.split())  -> True
+```
 
-- El log de publicación va **entero, con `hash_fuente`**, y el informe dice por
-  qué faltaba: «lleva siempre `hash_fuente` y yo pegué la línea sin él. Va
-  entera». Reconocer el recorte vale más que corregirlo en silencio.
-- **Las cuatro comprobaciones traen su salida real**: los siete objetos de `_meta`
-  con su tipo, las 19 columnas **enumeradas en orden** con `motivo_no_consumo` la
-  última, y el singleton con su tupla.
-- **Los siete NO COMPROBADO, con nombre y con su clave.** Y entre ellos aparece
-  `mart.v_pbi_fact`, que era justo el objeto que la auditoría anterior señaló como
-  «clave demostrablemente rota y ninguna pasada lo ha reportado».
+Es **el mismo punto ciego del plegado que yo demostré en la décima pasada** con
+`test_f006_copias.py`, tercera aparición, y esta vez dentro del dispositivo
+escrito para evitarlo. Además no es un docstring cualquiera: `objetos_de_sql` es
+la heurística cuya única red de seguridad **es** R28, y su documentación sigue
+diciendo que esa red no existe.
 
-## El dato de la tanda: verificado, y es exacto
+*Arreglo*: normalizar espacios antes de buscar y ampliar el vocabulario («no
+existe», «llega en el bloque H», «pendiente»).
 
-`mart.fact_seguimiento_mensual` **sale NO COMPROBADO con 30 s y con 60 s, y solo
-a 180 s revela que su clave está rota en 8.778 casos**. Confirma la deducción que
-hice en la pasada anterior a partir de sus propios números, y es el mejor
-argumento que existe para **F-041**: si un timeout se hubiera contado como OK, el
-defecto más grave de toda la feature se habría enterrado con un verde. El arnés
-hace hoy exactamente eso con los mutantes.
+### 2 · Código muerto nuevo, con test verde, en la tanda que dice haberlo barrido
 
-## La deuda que queda
+`PostgresClient.list_objetos_catalogo` (`postgres_client.py:841-856`) hace lo
+mismo que el nuevo `fetch_catalogo_objetos` (`:692-705`) y ejecuta la **misma**
+constante SQL. Su **único consumidor en todo el repositorio** es un test
+(`test_f006_publicacion.py:589,594`). Producción no lo llama.
 
-**La cobertura del comando, por segunda vez.** `tests/test_f006_catalogo.py`
-**no usa `CliRunner` ni una sola vez**, igual que `test_f006_unicidad.py` en la
-tanda anterior: cubre bien las 166 líneas de lógica pura de `catalogo.py` y deja
-el comando de `main.py:603` sin tocar. El patrón para cubrirlo sin conexión sigue
-existiendo en el propio repositorio (`test_f006_publicacion.py`, con `CliRunner` y
-`monkeypatch.setattr(main, "_get_pg", …)`). No bloquea —90,9 % sobre un umbral de
-80 %— pero es la segunda vez que la misma explicación se apoya en algo que el
-repositorio ya sabe resolver.
+El barrido de constructores muertos —que celebro, y que encontró el que yo
+denuncié— **solo escanea los `def` de nivel de módulo de `unicidad_sql.py`**, así
+que no puede ver este. La afirmación «era el único» es cierta dentro de un
+alcance que no se declara, y el contraejemplo lo introduce el mismo commit.
 
-## La huérfana: no bloquea esta tanda
+---
 
-Se preguntaba si además de la batería impide aprobar. **No, y por tres razones**:
+## Los dos huecos de propagación
 
-1. **No lanzar `build_cierre` fue obedecer**: escribe en esquema de negocio y la
-   firma estaba acotada a `_meta`. Respetar el límite de una autorización no es un
-   defecto, es lo que hay que hacer.
-2. **Ya no es un estado silencioso**, que era mi objeción real en la pasada
-   anterior. `check-diccionario` la reporta explícitamente:
-   `!  cierre.v_pbi_planif_vs_real  FICHADO Y NO EXISTE`, con su recuento propio.
-3. **No es objeto esperado de ninguna de las 18 preguntas**, así que tampoco
-   falsearía la batería: dejaría `check-diccionario` en rojo, nada más.
+### 3 · El aviso alarma sobre la medida sana y calla la enferma
 
-Es una tarea del humano —autorizar `build_cierre`—, no del implementer.
+El aviso de `mart.fact_seguimiento_categoria` (`mart.yaml:270-277`) dice que
+«**el importe de esas obras y meses viene inflado**» y separa por **escenario**
+—`Coste Real` y `Venta Real` sí, master no— pero **no por medida**. Contra el SQL
+no son equivalentes:
 
-## ¿Listo para la batería? Sí, y esto es lo que falta
+- **`importe_origen`** es acumulado e **idéntico en las dos filas** —la propia
+  evidencia lo enseña: `27850.08 | 27850.08`—, así que el `SUM` del agregado
+  **lo duplica**. Inflado, cierto.
+- **`importe_mes`** se calcula con `LAG` particionado por
+  `(obra_id, partida_id, ambito_id)` —no por fase— en
+  `stg/08_plan_mensual.sql:331-360`: las dos filas llevan `origen(12)−origen(11)`
+  y `origen(13)−origen(12)`, y su suma **telescopea** al incremento correcto.
+  **No se infla.**
+
+O sea: el aviso pone bajo sospecha la medida que Power BI usa para toda serie
+temporal y no señala la única realmente rota. Y las fichas de esas dos columnas
+(`mart.yaml:321-332`) no dicen nada.
+
+### 4 · La propagación dejó fuera una quinta ficha, y es de consumo
+
+`mart.v_pbi_fact_categoria` (`mart.yaml:475-487`) es `consumo_recomendado: true`,
+proyecta `importe_origen` desde la agregada (`05_views_powerbi.sql:177-187`) y
+**no tiene ni una palabra del duplicado**. Es la vista que Power BI consume para
+las tarjetas de KPI. «Las cuatro avisan» es cierto; que fueran cuatro, no.
+
+*(`cierre.v_pbi_planif_vs_real` también lee la agregada, pero solo `importe_mes`,
+así que **no** está afectada — justo la distinción que el defecto 3 no hace.)*
+
+---
+
+## Y la cobertura, tercera vez, ahora con la prueba hecha
+
+Ya no es una opinión: se midió. De las 85 líneas sin cubrir, **64 están en
+`main.py`** —el cuerpo **entero** de `check-diccionario` (619-648) y el de
+`check-unicidad` (699-757)— y 12 en los dos métodos nuevos del cliente.
+`catalogo.py`, en cambio, está al **100 %**: el módulo está bien cubierto; lo que
+no lo está es el pegamento.
+
+Y se demostró que era cubrible con lo que ya hay: añadiendo un `CliRunner` con
+`main._get_pg` sustituido —el patrón de `test_f006_publicacion.py:856-863`— la
+cobertura pasa de **90,9 % a 93,4 %**, **+23 líneas con unas 40 de doble y sin
+abrir una conexión**. «El bloque nuevo añade líneas de CLI» describe dónde está
+el hueco, no por qué sigue ahí.
+
+Lo que agrava: esas líneas sin test son precisamente donde vive lo que la tanda
+presenta como su entrega —el desfase de hash, el `SystemExit(1)`, el aviso de
+`_meta` vacío—.
+
+---
+
+## Lo que sí está cerrado y verificado
+
+- **El `READ ONLY` se aplica de verdad.** `SET LOCAL transaction_read_only = on`,
+  y el diagnóstico es correcto: `BEGIN READ ONLY` no vale porque la conexión llega
+  ya en transacción. El test mira **lo que el cliente ejecuta**, con cursor espía.
+- **La republicación y su mecanismo.** `version: 2`, hash nuevo, y
+  `check-diccionario` comparando el `hash_fuente` publicado con el del árbol: KO
+  antes, OK después, y salta siempre que difieran.
+- **Las evidencias son sólidas y reproducibles**: el log completo con
+  `hash_fuente`, las cuatro comprobaciones con su salida, y los **siete NO
+  COMPROBADO con nombre y clave** —`mart.v_pbi_fact` entre ellos—. Los hashes
+  pegados casan exactamente con árboles históricos reconstruidos: no son
+  inventables.
+- **`check-diccionario` alcanza a los 102** —los nueve esquemas, no la superficie
+  de consumo—, comprueba **las tres direcciones** y **no pasa en vacío**:
+  probado, con `information_schema` a cero da 102 huérfanas y `exit=1`.
+- **El dato de los 180 s es exacto** y confirma mi deducción: el fact sale NO
+  COMPROBADO a 30 s y a 60 s, y solo a 180 s revela los 8.778. Es el mejor
+  argumento para **F-041**.
+- **La huérfana no bloquea**: no lanzar `build_cierre` fue obedecer la firma, ya
+  no es un estado silencioso y no es objeto esperado de ninguna pregunta.
+
+---
+
+## ¿Listo para la batería? El contenido sí; el diccionario, tras cerrar los cuatro
 
 De las cuatro condiciones que puse en la pasada anterior, **tres están hechas**:
-el aviso del duplicado propagado a las cuatro fichas, republicado con `version: 2`
-y hash nuevo, y el `READ ONLY` aplicado de verdad. La cuarta —`build_cierre`— no
-es del implementer.
+republicado con `version: 2` y hash nuevo, el `READ ONLY` aplicado de verdad, y el
+aviso propagado —aunque a cuatro fichas de **cinco**, que es el defecto 4—. La
+cuarta, `build_cierre`, no es del implementer.
+
+**Antes de la batería hay que cerrar los cuatro defectos de esta pasada.** Ninguno
+es estructural y dos son de una línea, pero dos tocan lo que el MCP sirve: el
+aviso que señala la medida equivocada (defecto 3) y la quinta ficha sin aviso
+(defecto 4). Si la batería corre antes, P8 y las preguntas de KPI se responderían
+sobre `importe_origen` inflado sin advertencia, y quien lea el aviso desconfiará
+de `importe_mes`, que está sano. Los dos graves no afectan a lo publicado, pero
+dejan al repositorio afirmando que R28 no existe y arrastrando código muerto
+recién creado.
 
 Lo que falta, exactamente:
 

@@ -99,10 +99,10 @@ def objetos_de_sql(textos: Mapping[str, str]) -> list[ObjetoPublicado]:
     `ensure_raw_table` desde Python y no hay SQL que leer. Se inventarían con
     `objetos_de_raw` desde `config/tables_sigrid.yaml`.
 
-    La comprobación contra `information_schema`, que sería la única fuente que
-    dice la verdad, es `python main.py check-diccionario` (R28) y **está sin
-    implementar**: llega en el bloque H. Hasta entonces esta heurística es lo
-    único que hay.
+    La comprobación contra `information_schema`, que es la única fuente que dice
+    la verdad, **ya existe**: `python main.py check-diccionario` (R28). Esta
+    heurística sigue siendo lo que corre en cada `init.sh`, porque no cuesta una
+    conexión; la otra es la que hay que creer cuando las dos discrepen.
 
     Recibe `ruta -> texto` para que quien lea ficheros sea infraestructura. El
     resultado sale ordenado y deduplicado por `esquema.objeto`: el mismo
