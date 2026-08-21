@@ -137,6 +137,26 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
+### El contrato creció (2026-08-22) · `_meta.diccionario_contexto`
+
+`_meta` publicaba los objetos y las reglas pero **no el resto del bloque
+global**, así que un MCP que leyera de la base habría respondido **peor que el
+prototipo local**, que servía `convenciones` y `ordenes_de_magnitud` enteros.
+Salió al implementarlo en `mcp-bbdd`, no de una revisión nuestra.
+
+- **Publicado en versión 4**: 103 objetos, 13 reglas y **21 filas de contexto**
+  (convenciones 5, órdenes de magnitud 4, ejes 3, esquemas 9).
+- **Una fila por entrada, nunca columnas nuevas**: el contrato crece añadiendo
+  filas. Enmienda fechada en `design.md` §4.4, que es lo que implementa el otro
+  repositorio.
+- **Las once claves del global están clasificadas** y un test exige que ninguna
+  quede sin decidir. `ocultar` se queda fuera **a propósito y fechado**:
+  `mcp-bbdd` lo resuelve con el `motivo_no_consumo` que sí viaja.
+
+**Aviso de historial**: este cambio empezó en `909cd79`, un commit del líder que
+se llevó por delante trabajo mío sin commitear. No se reescribió la historia;
+está dicho en `progress/impl_F-006.md`.
+
 ### Estado tras la 13ª pasada
 
 - **Publicado**: `_meta` sirve la **version 3** (`a105d8f1109c`), con el aviso del

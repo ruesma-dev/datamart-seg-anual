@@ -4028,3 +4028,116 @@ más caro que cerrarla y además la convierte en paisaje.
 compartido y la autorización está acotada a `_meta`. La huérfana
 `cierre.v_pbi_planif_vs_real` sigue apareciendo en `check-diccionario`, que es
 donde tiene que aparecer.
+
+---
+
+# El contrato crece · `_meta.diccionario_contexto` (2026-08-22)
+
+## Nota sobre el historial: dónde empezó de verdad este cambio
+
+**La ampliación del contrato empieza en `909cd79`**, un commit del líder titulado
+«F-044: script temporal para lanzar los cuatro build a mano, medidos». No es lo
+que parece: el líder hizo `git add -A` mientras yo tenía trabajo sin commitear y
+se llevó dentro seis ficheros míos —el DDL de la tabla nueva, la clasificación
+del dominio, `filas_contexto`, la escritura en el cliente, la ficha de `_meta` y
+dos tests—.
+
+No se reescribe el historial: hacerlo con dos agentes sobre el mismo árbol es
+peor remedio que la enfermedad. Queda escrito aquí porque **un historial que
+engaña sobre dónde empezó un cambio cuesta media hora dentro de tres meses**.
+
+## Por qué crece
+
+Al implementar en `mcp-bbdd` el proveedor que lee el diccionario de `_meta` en
+vez del YAML salió un hueco que **no vimos ninguno de los tres**: `_meta`
+publicaba los objetos y las reglas, pero **no el resto del bloque global**. El
+prototipo local servía `convenciones` y `ordenes_de_magnitud` enteros, así que
+con el origen en base **se perdían**, y el MCP en cloud habría respondido *peor*
+que el prototipo local.
+
+Los **órdenes de magnitud** son los que hacen que una cifra absurda se note
+—existen para que no se repita lo de los 38,9 M€ en una sola obra— y las
+**convenciones** hacen falta para interpretar cualquier importe. Sin ellos el
+contrato no cumple su propósito.
+
+## La forma: filas, nunca columnas
+
+```sql
+CREATE TABLE IF NOT EXISTS _meta.diccionario_contexto (
+    bloque  TEXT    NOT NULL,
+    clave   TEXT    NOT NULL,
+    orden   INTEGER NOT NULL DEFAULT 0,
+    texto   TEXT    NOT NULL,
+    datos   JSONB   NOT NULL,
+    PRIMARY KEY (bloque, clave)
+);
+```
+
+Mismo criterio que puso `motivo_no_consumo` al final de la vista: **crecer sin
+romper**. Un bloque nuevo mañana son filas, no un `ALTER TABLE` ni una vista
+recreada —y recrear una vista exige `DROP`, que se lleva los `GRANT`—.
+
+`texto` se genera **aquí** a propósito: si cada consumidor compusiera su propio
+renderizado acabarían divergiendo, que es justo lo que pasó con el resumen por
+esquema del prototipo. `datos` lleva la entrada entera para quien necesite el
+valor numérico sin parsear prosa.
+
+## El barrido del punto 3: nada se queda fuera sin decirlo
+
+Recorrí **las once claves** del bloque global y las clasifiqué. La decisión vive
+en `CONTEXTO_PUBLICADO` / `CONTEXTO_NO_PUBLICADO` y **un test exige que ninguna
+quede sin decidir**: si alguien añade una clave nueva y no decide, salta.
+
+| Viaja | Filas | Por qué |
+|---|---|---|
+| `convenciones` | 5 | sin moneda/IVA/fecha no se interpreta ningún importe |
+| `ordenes_de_magnitud` | 4 | hacen que una cifra absurda se note |
+| `ejes` | 3 | los literales EXACTOS de `escenario` |
+| `esquemas` | 9 | enruta una pregunta antes de mirar objeto por objeto |
+
+| No viaja | Por qué |
+|---|---|
+| `reglas`, `version` | ya viajan, en sus propias tablas |
+| `base`, `titulo` | el MCP ya está conectado; el título no ayuda a responder |
+| `preguntas_aceptacion`, `pendientes` | instrumentación nuestra, no contexto |
+| `ocultar` | ver abajo |
+
+**`ocultar` se queda fuera a propósito**, y está escrito y fechado para que nadie
+lo añada por su cuenta: `mcp-bbdd` lo resuelve anteponiendo `[NO RECOMENDADO
+PARA CONSULTA: …]` con el `motivo_no_consumo` que sí viaja. Resuelve el problema
+sin ampliar superficie que mantener sincronizada entre dos repositorios.
+
+Es la **tercera vez** que información importante no llega —la regla de oro en un
+comentario, el aviso de frescura en una cabecera, y ahora esto— y las tres
+salieron por casualidad. Por eso la decisión deja de ser implícita.
+
+## Publicado y verificado
+
+```
+[info] diccionario_publicado     contexto=21 filas=138 hash_fuente=44e091eb215c
+                                 objetos=103 reglas=13 version=4
+[SUCCESS] publicar_diccionario   rows=138 duration=0.7s
+```
+
+Contra la base:
+
+```
+=== contexto publicado ===
+   convenciones           5
+   ejes                   3
+   esquemas               9
+   ordenes_de_magnitud    4
+
+=== lo que vera el agente ===
+   Retenido VIVO a proveedores, pendiente de devolver, en toda la empresa:
+       del orden de 34.700.000 EUR (criterio: saldo_vivo)
+   Retenido VIVO por clientes, pendiente de cobrar, en toda la empresa:
+       del orden de 21.900.000 EUR (criterio: saldo_vivo)
+   moneda: EUR
+
+OK   lo publicado ES lo del arbol (version 4, hash 44e091eb215c)
+```
+
+Las cuatro tablas se vacían y se reescriben **en la misma transacción**, con su
+test. `design.md` lleva la enmienda fechada en §4.4, que es lo que implementa el
+otro repositorio.
