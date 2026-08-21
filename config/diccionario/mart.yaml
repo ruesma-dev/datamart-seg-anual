@@ -28,9 +28,21 @@ objetos:
       Una fila por (`obra_id`, `partida_id`, `anio_mes`, `escenario`) **salvo en
       un caso medido, en el que hay dos**.
 
-      **MEDIDO CONTRA LA BASE el 2026-08-21 (T26): esa combinacion NO identifica
-      una fila en 8.778 casos**, siempre exactamente dos filas, repartidos entre
-      `Coste Real` (4.754) y `Venta Real` (4.024). La causa esta localizada: el
+      **MEDIDO CONTRA LA BASE (T26): esa combinacion NO identifica una fila en
+      8.778 casos**, siempre exactamente dos filas, en **9 obras**, repartidos
+      entre `Coste Real` (4.754) y `Venta Real` (4.024). La consulta:
+
+      `SELECT count(*), count(DISTINCT obra_id) FROM (SELECT obra_id, partida_id,
+      anio_mes, escenario FROM mart.fact_seguimiento_mensual GROUP BY 1,2,3,4
+      HAVING count(*) > 1) d`
+
+      **Ojo con los tres numeros que aparecen en estas fichas, porque miden
+      cosas distintas y es facil cruzarlos:** **22 obras** tienen dos fases con
+      el mismo `ano` y `mes` en `stg.fases` —eso es la CAUSA—, pero solo **9**
+      llegan a producir filas duplicadas aqui (las demas no tienen presupuesto
+      en esos meses); y aguas abajo, en `mart.fact_seguimiento_categoria`, el
+      efecto se concentra en **37 celdas de 8 obras**, porque alli el grano es
+      la categoria y muchas partidas caen en la misma. La causa esta localizada: el
       fact se construye por FASE, y hay **22 obras con dos fases distintas que
       Sigrid tiene con el mismo `ano` y `mes`. Ejemplo real: la obra 584748
       tiene la fase 12 («Junio 2010») y la 13 («AGOSTO 2010»), y las dos llevan
@@ -283,19 +295,30 @@ objetos:
       clave de negocio. Es la suma de todas las partidas de esa obra y mes que
       comparten categoria.
 
-      **Hereda el duplicado de `mart.fact_seguimiento_mensual`**: alli hay 8.778
-      combinaciones con dos filas (22 obras con dos fases que Sigrid tiene con
-      el mismo `ano` y `mes`; medido el 2026-08-21). Como esta tabla **agrega**,
-      las dos filas se funden en una y **la clave no duplica** —comprobado, sin
-      contradiccion—.
+      **CUIDADO: el valor de `importe_origen` que hay guardado aqui esta
+      DOBLADO en 37 celdas de 8 obras (39,07 M EUR de mas, medido el
+      2026-08-22).** La clave no duplica —esta tabla agrega, asi que sale una
+      sola fila y no hay fan-out—, pero **el numero de dentro si esta mal**: el
+      build hace `SUM(importe_origen)` sobre las filas duplicadas de
+      `mart.fact_seguimiento_mensual`, donde el acumulado es identico en las
+      dos, y sumar dos veces el mismo acumulado da el doble.
 
-      **Que le pasa a cada medida, medido y no supuesto:** `importe_mes` **sale
-      bien**, porque las dos filas del origen telescopean y su suma es
-      exactamente el movimiento del mes (200 de 200 series). `importe_origen`
-      **sale sumado dos veces**, porque las dos filas repiten el mismo
-      acumulado. Por eso esa columna es `ultimo_valor` y no se suma nunca: aqui
-      ya viene agregada, asi que **no la uses para un total** —usa la serie de
-      `importe_mes`—. Afecta a `Coste Real` y `Venta Real`; los master no.
+      Que una fila sea unica no dice nada de si su importe es correcto, y aqui
+      son cosas distintas: **leer una fila y darla por buena devuelve el doble**
+      en esas celdas.
+
+      **Medida a medida:** `importe_mes` **esta bien** —las filas del origen
+      telescopean y su suma es exactamente el movimiento del mes, 200 de 200
+      series—; `importe_origen` e `importe_origen_raw` **estan doblados**. Para
+      un acumulado fiable hay que ir a `mart.fact_seguimiento_mensual`,
+      deduplicar por (`obra_id`, `partida_id`, `anio_mes`, `escenario`) y sumar
+      despues, o usar la serie de `importe_mes`. Afecta a `Coste Real` y `Venta
+      Real`; los master no. Es defecto del build, abierto, y no se arregla desde
+      F-006.
+
+      La consulta que da ese numero esta en el grano de
+      `mart.fact_seguimiento_mensual`, junto a la explicacion de por que 8.778,
+      37 y 22 son numeros distintos que miden cosas distintas.
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -542,12 +565,19 @@ objetos:
 
       **Sirve medidas afectadas por el duplicado del fact, y es la ficha donde
       mas importa**: alimenta las tarjetas de KPI. Debajo esta
-      `mart.fact_seguimiento_categoria`, que agrega las 8.778 combinaciones
-      duplicadas de `mart.fact_seguimiento_mensual` (22 obras con dos fases que
-      Sigrid tiene con el mismo `ano` y `mes`; medido el 2026-08-21).
-      `importe_mes` **sale bien**, porque las dos filas del origen telescopean
-      —comprobado, 200 de 200 series—; `importe_origen` viene **sumado dos
-      veces**, asi que no lo uses para un total: usa la serie de `importe_mes`.
+      `mart.fact_seguimiento_categoria`, y **hereda su valor doblado**:
+      `importe_origen` esta DOBLADO en 37 celdas de 8 obras —39,07 M EUR de
+      mas, medido el 2026-08-22— porque el build suma dos veces el mismo
+      acumulado de las filas duplicadas del fact. La fila es unica; el numero
+      de dentro no es correcto.
+
+      `importe_mes` **esta bien** —las filas del origen telescopean, 200 de 200
+      series— y es la via buena para un total. Para un acumulado fiable hay que
+      deduplicar en `mart.fact_seguimiento_mensual` antes de sumar.
+
+      La consulta que da ese numero esta en el grano de
+      `mart.fact_seguimiento_mensual`, junto a la explicacion de por que 8.778,
+      37 y 22 son numeros distintos que miden cosas distintas.
     grano: >-
       Una fila por (`obra_id`, `anio_mes`, `categoria`, `escenario`).
     clave_negocio: [obra_id, anio_mes, categoria, escenario]

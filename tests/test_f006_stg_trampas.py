@@ -544,14 +544,21 @@ def test_f006_r10_control_la_derivacion_encuentra_los_afectados() -> None:
     assert not [o for o in afectados if ".v_pbi_dim_" in o]
 
 
+#: Los números medidos del defecto, cada uno con lo que mide. Un objeto puede
+#: citar el suyo: exigir siempre «8.778» obligaba a `fact_seguimiento_categoria`
+#: a dar un número que **no es el suyo** —allí el grano es la categoría y son 37
+#: celdas—, y así el test empujaba a escribir una cifra menos precisa.
+NUMEROS_DEL_DEFECTO = ("8.778", "37 celdas", "39,07")
+
+
 @pytest.mark.parametrize("objeto", _objetos_que_sirven_medidas_del_fact())
 def test_f006_r10_todo_objeto_que_sirve_medidas_del_fact_avisa(objeto: str) -> None:
-    """Quien publica una medida del fact tiene que decir que hay duplicado."""
+    """Quien publica una medida del fact tiene que avisar, y con una cifra medida."""
     ficha = _dicc().por_nombre[objeto]
     texto = f"{ficha.descripcion} {ficha.grano or ''}"
-    assert "8.778" in texto, (
+    assert any(n in texto for n in NUMEROS_DEL_DEFECTO), (
         f"{objeto} sirve medidas de `mart.fact_seguimiento_mensual` y no avisa "
-        f"de sus 8.778 combinaciones duplicadas"
+        f"del duplicado con ninguna cifra medida ({list(NUMEROS_DEL_DEFECTO)})"
     )
 
 
@@ -670,3 +677,93 @@ def test_f006_r10_la_columna_sana_dice_que_lo_es(objeto: str) -> None:
         f"{objeto}.importe_mes es la vía buena y su ficha no lo dice: sin eso, el "
         f"aviso de al lado se lee como que todo el objeto está mal"
     )
+
+
+# ---------------------------------------------------------------------------
+# La cabecera no puede contradecir a las columnas (15ª pasada)
+# ---------------------------------------------------------------------------
+#
+# Patrón con nombre: **el guardián enseña a mirar donde él mira**. Van tres.
+#
+#   13ª · el derivador exigía el aviso en `descripcion`/`grano`, y el reviewer
+#         verificó ahí; el defecto vivía en las fichas de columna.
+#   14ª · el derivador pasó a exigirlo en la columna, y el reviewer verificó
+#         ahí; la cabecera se quedó afirmando lo contrario.
+#   15ª · lo destapó ir a mirar **cómo llega el diccionario al agente**:
+#         `listar_tablas` entrega descripción y grano **sin columnas**, así que
+#         el agente veía solo el texto tranquilizador; `describir_tabla` entrega
+#         las dos y las veía **contradiciéndose**.
+#
+# Mover la exigencia de sitio no cierra nada: la cierra exigir que **las dos
+# partes digan lo mismo**. Eso es lo que comprueba esto.
+
+#: Afirmaciones de cabecera que se leen como «aquí no hay problema». Si una
+#: columna del objeto lleva el aviso del doblado, ninguna de estas puede quedar
+#: sin matizar: el agente que solo vea la cabecera se irá tranquilo.
+_TRANQUILIZADORAS = (
+    "la clave no duplica",
+    "sin contradiccion",
+    "no hay duplicado",
+    "no esta afectada",
+)
+
+
+@pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
+def test_f006_r10_la_cabecera_no_contradice_a_sus_columnas(objeto: str) -> None:
+    """Si una columna avisa de que su valor está doblado, la cabecera también.
+
+    `listar_tablas` del MCP entrega **descripción y grano, sin columnas**. Un
+    aviso que solo vive en la columna no llega por esa vía, y una cabecera
+    tranquilizadora se lee como que el objeto está sano.
+    """
+    ficha = _dicc().por_nombre[objeto]
+    cabecera = f"{ficha.descripcion} {ficha.grano or ''}"
+
+    columnas_avisadas = [
+        c.nombre for c in ficha.columnas if "DOBLADO" in (c.significado or "")
+    ]
+    if not columnas_avisadas:
+        pytest.skip(f"{objeto} no tiene columnas con el aviso")
+
+    assert "DOBLADO" in cabecera, (
+        f"{objeto}: las columnas {columnas_avisadas} avisan de que su valor está "
+        f"doblado y la cabecera no lo dice. Quien use `listar_tablas` recibe solo "
+        f"la cabecera y se va tranquilo"
+    )
+
+
+@pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
+def test_f006_r10_la_cabecera_no_afirma_lo_contrario(objeto: str) -> None:
+    """Y no basta con que lo mencione: no puede afirmar a la vez lo contrario.
+
+    El caso real: el grano decía «la clave no duplica —comprobado—», que es
+    cierto y **suena a que todo está bien**, mientras la columna decía que el
+    importe está doblado. Las dos frases juntas se anulan.
+    """
+    ficha = _dicc().por_nombre[objeto]
+    cabecera = f"{ficha.descripcion} {ficha.grano or ''}".lower()
+    if "doblado" not in cabecera:
+        pytest.skip(f"{objeto} no avisa en cabecera")
+
+    sueltas = [
+        f
+        for f in _TRANQUILIZADORAS
+        if f in cabecera and "el numero de dentro" not in cabecera
+    ]
+    assert sueltas == [], (
+        f"{objeto}: la cabecera afirma {sueltas} sin aclarar que eso NO significa "
+        f"que el importe sea correcto. Que una fila sea única no dice nada de si "
+        f"su número está bien"
+    )
+
+
+def test_f006_r10_control_la_coherencia_se_comprueba_sobre_alguien() -> None:
+    """Si el derivador se vaciara, los dos de arriba pasarían sin mirar nada."""
+    objetos = _objetos_que_agregan_el_fact()
+    assert len(objetos) >= 2
+    con_aviso = [
+        o
+        for o in objetos
+        if any("DOBLADO" in (c.significado or "") for c in _dicc().por_nombre[o].columnas)
+    ]
+    assert len(con_aviso) >= 2, f"solo {con_aviso} llevan el aviso en columna"
