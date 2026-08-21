@@ -4,10 +4,30 @@
 ## F-006 · El diccionario semántico del datamart — `in_progress`
 
 Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**, y corregidos los
-defectos de la séptima y la **octava** pasada de review.
+defectos de la séptima, la octava y la **novena** pasada de review.
 
 `bash harness/init.sh` en verde: **1758 tests**, 127 saltados, cobertura de las
 líneas cambiadas **99,0 %** (715 de 722).
+
+### La lección de la novena, que va antes que ninguna otra
+
+**Dos derivaciones con el mismo error no son una comprobación.** El reviewer
+reprodujo mi lista «con su propio derivador» y coincidía **porque su script
+tenía mi mismo bug**: los dos mapeábamos alias→tabla con un `dict` por fichero,
+y en `compras/01_documentos.sql` tres tablas comparten el alias `l`.
+
+Lo grave no fue el bug, sino que **mis pruebas no podían verlo**: fijaban la
+coherencia regla↔derivador, no la corrección del derivador. Un derivador
+equivocado hace que la regla copie el error y el test salga verde por
+construcción. Ahora cada derivador lleva un control que **no lo usa a él**: SQL
+fabricado con la respuesta calculada a mano, y contraste del fichero real por
+otra vía.
+
+Segunda mitad de la misma lección: **un detector puede cubrir menos de lo que su
+mensaje da a entender**. El guardián de nulos saltaba las tres tablas grandes de
+`stg` diciendo «no lee directamente de `raw`», que era falso: resolvía el origen
+por el `CREATE` y esas tablas se pueblan con `INSERT ... SELECT` en otro
+fichero. Al cubrirlo aparecieron seis nulos imposibles más.
 
 ### El criterio nuevo, que es lo que hay que recordar de aquí
 
