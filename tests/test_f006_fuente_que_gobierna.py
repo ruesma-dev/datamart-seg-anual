@@ -176,21 +176,57 @@ def test_f006_r13_el_detector_de_banderas_reconoce_una_inventada() -> None:
 CAMPOS_DEL_PATRON = ("cod", "res", "fec", "raz", "cif")
 
 
+#: Palabras que nunca son un alias, aunque sigan a `raw.<tabla>`.
+_NO_SON_ALIAS = frozenset(
+    {"ON", "WHERE", "LEFT", "RIGHT", "FULL", "JOIN", "INNER", "OUTER", "CROSS",
+     "GROUP", "ORDER", "UNION", "SELECT", "AND", "OR", "USING", "LIMIT", "HAVING",
+     "WITH", "AS", "SET", "VALUES", "RETURNING"}
+)
+
+
+def sentencias(sql: str) -> list[str]:
+    """Trocea un fichero SQL en sentencias, que es el ámbito de un alias.
+
+    **Este trozo es el que estaba mal y produjo una lista incompleta.** El
+    derivador mapeaba alias→tabla con un `dict` **por fichero**, y en
+    `compras/01_documentos.sql` las tres tablas de línea comparten el alias `l`:
+
+        FROM raw.ctrpro l    (línea 61)
+        FROM raw.dcapro l    (línea 126)
+        FROM raw.dcfpro l    (línea 179)
+
+    Las tres proyectan `l.res AS descripcion`. El `dict` se quedaba con la
+    última, así que `ctrpro.res` y `dcapro.res` desaparecían de la derivación y
+    de la regla que la copia.
+
+    Es el mismo vicio que ya apareció en `_proyeccion_de`, que leía el fichero
+    entero cuando ese fichero construye **seis objetos**: aquí también hay que
+    tratarlo como seis ámbitos, no como uno.
+    """
+    limpio = re.sub(r"--[^\n]*", " ", sql)
+    return [s for s in limpio.split(";") if s.strip()]
+
+
+def alias_de_raw(sentencia: str) -> dict[str, str]:
+    """Alias → tabla de `raw` dentro de UNA sentencia."""
+    alias: dict[str, str] = {}
+    for m in re.finditer(r"\braw\.(\w+)\s+(?:AS\s+)?(\w+)\b", sentencia, re.IGNORECASE):
+        if m.group(2).upper() in _NO_SON_ALIAS:
+            continue
+        alias[m.group(2)] = m.group(1).lower()
+    return alias
+
+
 @lru_cache(maxsize=1)
 def campos_propios_usados() -> dict[str, tuple[str, ...]]:
     """Por tabla de `raw`, qué campos propios lee nuestro SQL directamente."""
     usos: dict[str, set[str]] = {}
     for fichero in sorted(DIR_SQL.rglob("*.sql")):
-        texto = re.sub(r"--[^\n]*", " ", fichero.read_text(encoding="utf-8"))
-        alias: dict[str, str] = {}
-        for m in re.finditer(r"\braw\.(\w+)\s+(?:AS\s+)?(\w+)\b", texto, re.IGNORECASE):
-            if m.group(2).upper() in ("ON", "WHERE", "LEFT", "JOIN", "INNER", "GROUP", "ORDER"):
-                continue
-            alias[m.group(2)] = m.group(1).lower()
-        for al, tabla in alias.items():
-            for campo in CAMPOS_DEL_PATRON:
-                if re.search(rf"\b{re.escape(al)}\.{campo}\b", texto):
-                    usos.setdefault(tabla, set()).add(campo)
+        for sentencia in sentencias(fichero.read_text(encoding="utf-8")):
+            for al, tabla in alias_de_raw(sentencia).items():
+                for campo in CAMPOS_DEL_PATRON:
+                    if re.search(rf"\b{re.escape(al)}\.{campo}\b", sentencia):
+                        usos.setdefault(tabla, set()).add(campo)
     usos.pop("con", None)
     return {t: tuple(sorted(c)) for t, c in sorted(usos.items())}
 
