@@ -22,7 +22,7 @@ Alcance y honestidad sobre él:
   vista del mismo fichero y no se enteraba de una columna omitida.
 * Lo que sigue sin cubrirse: un objeto que exista en la base y no en el
   repositorio. Eso lo dirá `python main.py check-diccionario` contra
-  `information_schema` (R28), que **está sin implementar** y llega en el bloque
+  `information_schema` (R28), que **ya existe** como `check-diccionario` y
   H. No se da por cubierto lo que no lo está.
 
 Ningún test de este fichero abre red ni BBDD.

@@ -266,6 +266,15 @@ objetos:
       Una fila por (`obra_id`, `anio_mes`, `categoria`, `escenario`), que es su
       clave de negocio. Es la suma de todas las partidas de esa obra y mes que
       comparten categoria.
+
+      **Hereda el duplicado de `mart.fact_seguimiento_mensual`, y aqui es PEOR
+      de detectar.** Alli hay 8.778 combinaciones con dos filas (22 obras con
+      dos fases que Sigrid tiene con el mismo `ano` y `mes`; medido el
+      2026-08-21). Como esta tabla **agrega**, las dos filas se suman en una:
+      la clave NO duplica —comprobado, sin contradiccion— pero **el importe de
+      esas obras y meses viene inflado**. Un duplicado que se ve se corrige; uno
+      que se suma no se nota. Afecta a `Coste Real` y `Venta Real`; los master
+      no.
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -367,7 +376,11 @@ objetos:
       estrella, donde los nombres los ponen las dimensiones.
     grano: >-
       El mismo que la tabla de la que sale: una fila por (`obra_id`,
-      `partida_id`, `anio_mes`, `escenario`).
+      `partida_id`, `anio_mes`, `escenario`) **y, con el, su defecto**. Es un
+      `SELECT ... FROM mart.fact_seguimiento_mensual` sin filtro ni agregacion,
+      asi que las 8.778 combinaciones duplicadas de la tabla (medido el
+      2026-08-21) **llegan intactas a Power BI**. Ver el grano de
+      `mart.fact_seguimiento_mensual` para la causa y el apano.
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -963,6 +976,13 @@ objetos:
       Una fila por (`obra_id`, `partida_id`, `anio_mes`, `escenario`), igual que
       la tabla de hecho, salvo en las filas periodificadas, donde una imputacion
       de un mes se convierte en tantas filas como meses tenga su plazo.
+
+      **"Igual que la tabla de hecho" incluye su defecto**: lee de
+      `mart.fact_seguimiento_mensual`, donde esa combinacion **no identifica una
+      fila** en 8.778 casos (medido el 2026-08-21). Como hoy la tabla de reglas
+      esta vacia y esta vista es un paso a traves, el duplicado llega **tal
+      cual**. Ver el grano de `mart.fact_seguimiento_mensual` para la causa y el
+      apano.
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno

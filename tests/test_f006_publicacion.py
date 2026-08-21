@@ -369,7 +369,10 @@ def test_f006_r22_fila_de_publicacion_lleva_los_recuentos_reales() -> None:
      n_objetos, n_reglas, n_columnas, cobertura) = fila
 
     assert ident == 1, "singleton: siempre la fila 1"
-    assert version == "1"
+    # La version la sube una persona al cambiar el contenido, asi que se
+    # DERIVA del bloque global en vez de escribirla: subio a 2 en la 12a
+    # pasada, al republicar con el aviso del duplicado del fact.
+    assert version == dicc.version
     assert hash_pub == hash_fuente and len(hash_pub) == 64
     assert publicado == ahora
     assert batch == "20260820T021500Z-abcdef"

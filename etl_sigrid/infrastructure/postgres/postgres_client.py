@@ -654,6 +654,10 @@ class PostgresClient:
         """
         import psycopg
 
+        from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+            sentencias_previas,
+        )
+
         # NO se toca `autocommit`: `self.connection()` devuelve una conexion que
         # ya viene EN TRANSACCION (`INTRANS`), y cambiarlo ahi revienta con
         # `can't change 'autocommit' now`. Paso de verdad al ejecutar T26 contra
@@ -663,7 +667,8 @@ class PostgresClient:
         with self.connection() as conn:
             try:
                 with conn.cursor() as cur:
-                    cur.execute(f"SET LOCAL statement_timeout = '{int(timeout_s)}s'")
+                    for previa in sentencias_previas(timeout_s):
+                        cur.execute(previa)
                     cur.execute(consulta.sql)
                     fila = cur.fetchone()
                 conn.commit()
@@ -683,6 +688,35 @@ class PostgresClient:
         if fila is None:
             return (0, 0)
         return (int(fila[0]), int(fila[1]))
+
+    def fetch_catalogo_objetos(self, esquemas: list[str]) -> list[tuple]:
+        """Los objetos que la base publica de verdad, para R28.
+
+        Tablas y vistas de `information_schema`, y funciones de `pg_proc`, que
+        es donde estan: `information_schema.routines` se queda corta con las
+        sobrecargas.
+        """
+        from etl_sigrid.infrastructure.postgres.diccionario_sql import (
+            SQL_OBJETOS_CATALOGO,
+        )
+
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_OBJETOS_CATALOGO, (esquemas, esquemas))
+            return [tuple(f) for f in cur.fetchall()]
+
+    def fetch_hash_publicado(self) -> tuple[str, str] | None:
+        """`(version, hash_fuente)` de lo que hay publicado, o `None` si no hay.
+
+        Es lo que permite detectar que **lo publicado ya no es lo del
+        repositorio**, que es como se quedo `_meta` sirviendo un grano que T26
+        habia demostrado falso: la ficha se corrigio y no se republico.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT version, hash_fuente FROM _meta.diccionario_publicacion"
+            )
+            fila = cur.fetchone()
+            return (str(fila[0]), str(fila[1])) if fila else None
 
     # ---------------------------------------------------------------------
     # Permisos del rol de solo lectura

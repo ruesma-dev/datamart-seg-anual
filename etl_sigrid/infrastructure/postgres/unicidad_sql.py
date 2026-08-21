@@ -193,21 +193,29 @@ def objetos_saltados(
     return saltados
 
 
-def sentencias_de_la_transaccion(
-    consulta: ConsultaUnicidad, timeout_s: int = TIMEOUT_POR_CONSULTA_S
-) -> Sequence[str]:
-    """Las sentencias que envuelven una comprobación: acota el tiempo, no escribe.
+def sentencias_previas(timeout_s: int = TIMEOUT_POR_CONSULTA_S) -> Sequence[str]:
+    """Lo que se emite ANTES de la consulta, y que el cliente emite de verdad.
 
-    `SET LOCAL` limita el efecto a la transacción en curso, así que no cambia la
-    configuración del servidor ni afecta a `albaranes` ni a `partes`.
-    `READ ONLY` hace que el motor rechace cualquier escritura, por si algún día
-    alguien amplía esto sin leer el docstring.
+    Las dos van con `SET LOCAL`, o sea acotadas a la transacción en curso: no
+    cambian la configuración del servidor ni afectan a `albaranes` ni a
+    `partes`, que lo comparten.
+
+    * `statement_timeout` corta una consulta que se alargue. Si salta, el objeto
+      se reporta **NO COMPROBADO**, nunca como correcto.
+    * `transaction_read_only` hace que el motor **rechace** cualquier escritura.
+      Es la misma garantía que `BEGIN READ ONLY` pero aplicable a una
+      transacción **ya abierta**, que es el caso: `PostgresClient.connection()`
+      devuelve la conexión en estado `INTRANS`.
+
+    **Esta función existía antes devolviendo `BEGIN READ ONLY … COMMIT` y no la
+    llamaba nadie**: el cliente emitía solo el `statement_timeout` mientras el
+    comando imprimía por pantalla «transaccion READ ONLY». Un constructor
+    muerto, con su test en verde, sosteniendo una garantía falsa que además iba
+    impresa. Ahora la emite el cliente, así que el test comprueba lo que ocurre.
     """
     return (
-        "BEGIN READ ONLY",
         f"SET LOCAL statement_timeout = '{int(timeout_s)}s'",
-        consulta.sql,
-        "COMMIT",
+        "SET LOCAL transaction_read_only = on",
     )
 
 

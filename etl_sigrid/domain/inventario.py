@@ -11,7 +11,7 @@ sobre lo que vale cada una:
   diccionario esté completo: demuestra que **nadie ha añadido un objeto al
   repositorio sin documentarlo**. Es un trinquete, y es heurístico (R29).
 * **`python main.py check-diccionario`**, contra `information_schema` de la base
-  real. Esa sería la verdad, y cuesta una conexión. **TODAVÍA NO EXISTE**: es
+  real. Esa sería la verdad, y cuesta una conexión. **YA EXISTE**, es
   R28 y llega en el bloque H. Mientras tanto **no hay red de seguridad detrás de
   esta puerta**, y por eso conviene decirlo aquí en vez de dar por cubierto lo
   que no lo está.

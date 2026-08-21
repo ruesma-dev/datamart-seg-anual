@@ -15,7 +15,7 @@ Dos mitades, con propósitos distintos:
 La puerta es **un trinquete barato, no una demostración**: no prueba que el
 diccionario esté completo, prueba que nadie ha añadido una vista al repositorio
 sin documentarla. La comprobación contra el catálogo real de la base es
-`python main.py check-diccionario` (R28), que **todavía no existe**: es del
+`python main.py check-diccionario` (R28), que **ya existe**: es del
 bloque H. Mientras tanto, lo que esta puerta no ve no lo ve nadie.
 """
 
@@ -170,14 +170,13 @@ def test_f006_r29_dominio_el_docstring_declara_la_heuristica() -> None:
 
 
 def test_f006_r28_lo_que_se_dice_de_check_diccionario_es_cierto_hoy() -> None:
-    """El docstring dice que `check-diccionario` no existe. Que siga siendo verdad.
+    """Lo que se dice de `check-diccionario` tiene que ser cierto HOY.
 
-    La review señaló que este test rozaba la circularidad: comprobaba que la
-    cadena `check-diccionario` estuviera ESCRITA, es decir, verificaba la
-    promesa y no el comando. Ahora comprueba un hecho sobre `main.py`, y el día
-    que alguien implemente R28 este test se pone en rojo y obliga a corregir los
-    docstrings que hoy lo dan por futuro. Que es exactamente lo que se quiere:
-    que las dos cosas no se separen.
+    Nació diciendo «no existe» y **hizo su trabajo**: el día que R28 se
+    implementó (12ª pasada) este test se puso en rojo y obligó a corregir los
+    tres docstrings que lo daban por futuro. Ahora comprueba la otra mitad de lo
+    mismo —que nadie lo siga dando por pendiente ahora que existe—, que es la
+    dirección en la que un texto envejece sin que nadie lo note.
     """
     from etl_sigrid.domain.inventario import objetos_de_sql as _objetos
 

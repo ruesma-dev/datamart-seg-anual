@@ -4,11 +4,258 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **once pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **doce pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# DUODÉCIMA PASADA · 2026-08-21 — la primera contra la base real
+
+> Commits revisados: hasta `726e009` (más `b2a2b06`, el alta de F-042 y F-043).
+> Esta tanda se ejecutó **contra la base de Azure**, con autorización del humano
+> acotada a crear el `_meta` del contrato y publicar el diccionario.
+
+## Veredicto de la duodécima pasada
+
+**RECHAZADO**, y **rectifico el mío propio**: emití «un solo defecto, de alcance»
+antes de tener las dos auditorías que había encargado. Al llegar, encontraron
+tres cosas graves que yo no vi, y las he confirmado una a una contra el código.
+Es la quinta vez en esta feature que me pasa, y el patrón vuelve a ser el mismo:
+verifiqué lo que la tanda dice haber hecho, no lo que la evidencia demuestra.
+
+Que conste primero lo que sigue siendo cierto, porque es lo importante de la
+pasada: **ejecutar contra la base real destapó en una tarde un defecto de datos
+que once pasadas de revisión estática no podían ver**, y la ficha que lo
+documenta es la mejor de la feature. La decisión estaba bien tomada.
+
+Pero hay tres defectos graves, y dos de ellos no son de contenido: son de
+**confianza en la evidencia**.
+
+---
+
+## Los tres graves
+
+### 1 · El `READ ONLY` que se le anunció al humano no existe
+
+`main.py:658` imprime por pantalla, antes de ejecutar contra el servidor
+compartido con producción:
+
+> `statement_timeout = 30s por consulta, transaccion READ ONLY`
+
+**No hay ninguna transacción de solo lectura.** Lo verifiqué: `comprobar_unicidad`
+(`postgres_client.py:665-685`) emite exactamente dos sentencias —`SET LOCAL
+statement_timeout` y la consulta— y **ningún `BEGIN READ ONLY`**. El constructor
+que sí lo emite, `sentencias_de_la_transaccion` (`unicidad_sql.py:196`), tiene un
+único consumidor en todo el repositorio: **el test** (`test_f006_unicidad.py:201`).
+Es código muerto en producción, y su test está verde afirmando
+`sentencias[0] == "BEGIN READ ONLY"`.
+
+El riesgo material es bajo —lo generado son `SELECT count(*)` con identificadores
+citados— pero la garantía que se le dio al operador por pantalla era falsa, y el
+test que la respalda fija la coherencia con un artefacto que producción no usa.
+Es literalmente el patrón que esta misma review denunció en su novena pasada.
+
+### 2 · Lo publicado ya no es lo del repositorio, y nadie lo dice
+
+El commit `726e009` es el que publica el diccionario en `_meta`… y **el mismo
+commit edita `config/diccionario/mart.yaml`** (+23 líneas: justo el aviso del
+duplicado). Se publicó, se cambió el contenido y **no se volvió a publicar**.
+
+Consecuencias que no son teóricas:
+
+- El `hash_fuente` que hay en `_meta.diccionario_publicacion` **ya no es el del
+  repositorio**, que es exactamente la garantía que `design.md` §4.3 vende y que
+  el `COMMENT ON COLUMN` manda mirar para invalidar caché.
+- `version` sigue en `1` pese a un cambio material.
+- Y lo que importa: **el MCP sigue leyendo hoy que
+  `(obra_id, partida_id, anio_mes, escenario)` identifica una fila** del fact. El
+  arreglo está en git; la base sirve la versión mentirosa.
+
+### 3 · La evidencia pegada de T19 está recortada justo donde dolería
+
+`resumen_publicacion` (`diccionario_sql.py:231`) emite **siempre** `hash_fuente`.
+El log pegado como prueba de la publicación (`impl_F-006.md:3498`) va **sin él**,
+con las demás claves en orden alfabético y el hueco exactamente donde iría. El
+mismo evento aparece **con** `hash_fuente` en otro punto del propio informe.
+
+Puede no haber intención —la cabecera dice «salidas reales, redactadas de
+identificadores», y alguien pudo tomar el hash por uno—, pero un SHA-256 de
+ficheros YAML públicos no es un identificador ni un secreto, y el efecto es que
+**falta el único campo que habría delatado el defecto 2**. Además, de las cuatro
+comprobaciones que la sección titula «sobre la salida real», **tres no traen
+ninguna salida**: la existencia de los 7 objetos, el orden de las 19 columnas y
+el singleton se afirman en prosa. La lista de columnas pegada es indistinguible
+de haber copiado el DDL.
+
+---
+
+## Y dos más, de gravedad media
+
+4. **El «Bloque H» no lo produjo ningún comando del repositorio**: `check-diccionario`
+   (R28) **no existe** —no hay tal `@cli.command` en `main.py`—, y lo que se
+   presenta como su resultado sale de la sonda de unicidad. Que la huérfana
+   `cierre.v_pbi_planif_vs_real` se detectara es un **efecto colateral** de un
+   `except psycopg.errors.UndefinedTable`, no una comprobación de existencia. Por
+   eso solo alcanza a los 47 objetos de consumo con clave: los otros 55 podrían
+   faltar en la base sin que nada lo diga.
+5. **Los siete NO COMPROBADO no se nombran, y uno de ellos era el defecto de la
+   feature.** El código los trata de forma ejemplar —nunca cuentan como OK,
+   restan del recuento y devuelven código 1—, pero el informe pegó solo la línea
+   de Resumen. Y se deduce de sus propios números: la pasada 1 dio «0 con la
+   clave rota» y la 2 dio KO en `mart.fact_seguimiento_mensual`, luego **ese
+   objeto era uno de los siete**. Los siete son, por construcción, los más
+   grandes: justo donde una clave corta colisiona antes.
+
+---
+
+## El alcance de la clave rota: no es una tabla, son cuatro objetos
+
+Este es el hallazgo de la pasada y lo verifiqué por mi cuenta, porque la pregunta
+que importa no es si el número es cierto —lo es— sino **hasta dónde llega**.
+
+Recorrí el diccionario buscando quién se apoya en esa clave:
+
+| Objeto | Qué declara | ¿Lo dice? |
+|---|---|---|
+| `mart.fact_seguimiento_mensual` | clave `(obra_id, partida_id, anio_mes, escenario)` | **Sí**, corregida: 8.778 casos, siempre dos filas, 22 obras con dos fases |
+| **`mart.v_pbi_fact`** | **la misma cuaterna** como clave | **No dice nada** |
+| **`mart.v_fact_periodificado`** | **la misma cuaterna** como clave | **No dice nada** |
+| **`mart.fact_seguimiento_categoria`** | agrega con `SUM(importe_mes)` sobre el fact (`03_agg_categoria.sql:67,72`) | **No dice nada** |
+
+Las dos vistas **heredan la fila** del fact, así que su clave es falsa por la
+misma causa y en la misma medida. Y el agregado es peor que una clave falsa: la
+causa que F-042 documenta —la fase 13 «AGOSTO 2010» guardada con `mes = 6`—
+significa que **dos fases de meses distintos acaban en el mismo `anio_mes`**, así
+que el `SUM` del agregado **imputa a un mes lo que pertenece a otro**. Eso no es
+una advertencia de clave: es un importe equivocado en un objeto de consumo.
+
+Las dos relaciones con lado `1` que apuntan a la tabla van por `fact_id`
+(`1:1`), que es la PK real y sí es única: esas no se ven afectadas. El daño está
+en las tres fichas de arriba.
+
+## La ficha corregida es excelente, y hay que decirlo
+
+La de `mart.fact_seguimiento_mensual` es el mejor ejemplo de esta feature de cómo
+se documenta un defecto que no se puede arreglar aquí. Trae:
+
+- **el número medido y desglosado**: 8.778 combinaciones, siempre exactamente dos
+  filas, 4.754 en `Coste Real` y 4.024 en `Venta Real`;
+- **la causa localizada con ejemplo real**: la obra 584748 tiene las fases 12
+  («Junio 2010») y 13 («AGOSTO 2010»), y las dos llevan `ano = 2010, mes = 6`;
+- **por qué no se puede arreglar en la ficha**: ninguna columna publicada las
+  distingue —solo cambian `nombre_mes`, `version_descripcion` y
+  `total_incurrido`—, así que no se puede alargar la clave con lo que hay;
+- **las consecuencias de número**: un `SUM(importe_origen)` por esa clave cuenta
+  dos veces el mismo importe (27.850,08 en el ejemplo) y un `JOIN` produce
+  fan-out;
+- **el acotado**: los ámbitos master (8 y 11) no están afectados;
+- y **el apaño mientras tanto**: agregar también por `nombre_mes`.
+
+Corregir la ficha y no el build es además la decisión correcta: `mart` es de otra
+feature y la autorización de esta tanda llegaba hasta `_meta`.
+
+El problema es de alcance: ese texto está en una de las cuatro fichas.
+
+## El efecto de segundo orden, verificado: no se materializa
+
+El informe advierte, con razón, de que «la detección de cardinalidades deriva la
+unicidad de esta clave, así que todas las relaciones que apuntan a este fact se
+validaron contra una premisa falsa». Lo comprobé una a una y **la consecuencia no
+llega**: las dos únicas relaciones con lado `1` hacia el fact —desde `v_pbi_fact`
+y desde `v_fact_periodificado`— van por **`fact_id`**, que es la PK `BIGSERIAL`
+real y sí es única. Ninguna cardinalidad del diccionario cambia de veredicto. Es
+un punto a favor que conviene dejar escrito, porque el temor era razonable.
+
+## Los dos incidentes de secretos
+
+Los reviso porque la regla del proyecto es dura y explícita, y porque uno de los
+dos es de esta tanda.
+
+- **El de esta tanda está bien resuelto.** Al pegar la salida real de `az` entraron
+  un GUID de tenant y un correo del puesto en `progress/`. La guarda de F-003 lo
+  cazó, se redactó y **se reescribió el commit con `--amend`** en vez de arreglarlo
+  en uno posterior, que es lo correcto: el historial no suelta lo que entra. Lo
+  verifiqué: **el diff completo de la rama (`dev...HEAD`) no introduce ni un GUID
+  ni un correo real**, y ningún fichero versionado del repositorio contiene un
+  GUID (los que aparecen en un barrido ingenuo son todos de `.venv`).
+- **El otro es preexistente, real y sigue expuesto.** `progress/review_F-005.md`
+  contiene el ID de suscripción de Azure; entró en el commit `5b486d4` —el cierre
+  de F-005— y, según su propia ficha, **ya está en GitHub**. Lo confirmé: tres
+  commits del historial lo contienen. En el árbol de hoy está truncado, pero el
+  historial no. **No nació en F-006 y F-006 no lo empeora: lo detectó**, y está
+  dado de alta como **F-043**. No bloquea esta feature, pero la limpieza del
+  historial y la valoración de rotar lo que toque son acción del humano y
+  conviene que no se quede en la cola.
+
+## La bajada de cobertura: la explicación no se sostiene
+
+Se atribuye la caída de 99,0 % a 93,7 % a que «el bucle del CLI no se puede
+cubrir sin conexión» y a que «llega con T27». Lo comprobé y no es así:
+
+- **El propio repositorio ya resolvió ese problema, en esta misma feature, dos
+  bloques antes.** `tests/test_f006_publicacion.py:854-860` cubre el comando
+  `publicar-diccionario` con `CliRunner` y `monkeypatch.setattr(main, "_get_pg",
+  …)` más un `get_settings` falso: sin conexión y sin base.
+- `tests/test_f006_unicidad.py` **no usa `CliRunner` ni una sola vez**. Cubre muy
+  bien la parte pura —que la consulta agrupe por la clave entera, que no use
+  `COUNT DISTINCT`, que no interpole identificadores, que la transacción no
+  escriba, que un resultado vacío no signifique que la clave es correcta— y deja
+  el comando sin tocar.
+
+O sea: lo que falta no es incubrible, es que no se hizo, y hay un patrón propio a
+mano. Se comprobó además ejecutando `--dry-run` con `CliRunner`: **retorna antes
+de abrir conexión** y cubre 18 de esas líneas sin doble alguno, y las 23 restantes
+se alcanzan con el `_ClienteFalso` que ya vive en ese mismo fichero de tests. De
+las 41 líneas del comando, **las 41 eran cubribles**. Y «llega con T27» tampoco cierra el hueco: T27 es una ejecución manual
+contra la base, y la puerta mide cobertura con la suite, no con lo que alguien
+ejecute a mano. Sigue por encima del umbral (80 %) y no bloquea, pero la
+explicación es más cómoda que la realidad.
+
+## Y la conexión con la batería, que es lo que decide
+
+Crucé los objetos afectados con los `objetos_esperados` de las 18 preguntas:
+
+| Pregunta | Objeto esperado | ¿Tiene el aviso? |
+|---|---|---|
+| P6, P11, P18 | `mart.fact_seguimiento_mensual` | **Sí** |
+| **P8** | **`mart.fact_seguimiento_categoria`** | **No** |
+
+`cierre.v_pbi_planif_vs_real` —la huérfana que existe en el repositorio y no en
+la base— **no es objeto esperado de ninguna pregunta**, así que su ausencia no
+falsearía la batería. Eso juega a favor.
+
+## ¿Está el diccionario listo para la batería?
+
+**Todavía no, y ahora las condiciones son cuatro.** En mi primera redacción dije
+«casi, con dos»; con los tres graves confirmados, la lista crece — y una de ellas
+es que lo que el MCP lee **hoy** no es lo que dice el repositorio.
+
+1. **Propagar el aviso del duplicado a las tres fichas que faltan.** Es media
+   hora y cierra el único defecto abierto. Sin ello, P8 se responde sobre
+   importes afectados sin advertencia, y la batería mediría mal por culpa nuestra.
+2. **Lanzar `build_cierre` antes de la batería.** El bloque H demuestra que **la
+   base va por detrás del repositorio**: hay una vista publicada en el SQL que no
+   existe en la base porque ese build no se ha vuelto a ejecutar. Si la batería
+   corre contra la base tal cual, alguna pregunta podría fallar por un objeto
+   ausente y no por el diccionario, y eso ensucia la medición.
+
+3. **Republicar, y con `version` subida.** Es la condición nueva y la más
+   importante: la base sirve ahora mismo un grano que la propia tanda ha
+   demostrado falso. Publicar y luego editar el diccionario en el mismo commit
+   deja el contrato caduco; si la batería corre contra lo publicado, medirá el
+   diccionario de ayer.
+4. **Aplicar de verdad el `READ ONLY`** —o dejar de anunciarlo— antes de volver a
+   ejecutar nada contra el servidor compartido.
+
+Con esas cuatro, mi respuesta es **sí**. El contenido está: 102 fichas, 793 columnas,
+13 reglas, `pendientes` en 0, el contrato publicado y comprobado contra el diseño.
+Y sostengo lo que dije en la pasada anterior, ahora con un argumento más fuerte:
+**la vía rentable ya no es leer el YAML contra el SQL, es preguntarle a la
+realidad**. T26 lo acaba de demostrar; la batería es el siguiente paso de esa
+misma línea y mide lo único que sigue sin medirse.
 
 ---
 

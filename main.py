@@ -600,6 +600,64 @@ def apply_grants() -> None:
     _ejecutar_paso(ApplyGrantsStep(settings), pg, ejecucion)
 
 
+@cli.command("check-diccionario")
+def check_diccionario_cmd() -> None:
+    """
+    Contrasta el diccionario contra el catalogo REAL de Postgres (R28).
+
+    La puerta que corre en cada `init.sh` es offline y heuristica: deduce lo que
+    el repositorio publica leyendo `sql/**`. No puede ver que la BASE vaya por
+    detras del repositorio, ni que tenga algo que el repositorio ya no crea.
+    Esto si.
+
+    Comprueba los 102 objetos fichados, en las tres direcciones: publicado sin
+    ficha, fichado que no existe, y tipo que no casa. Y avisa si lo PUBLICADO en
+    `_meta` ya no es lo del arbol.
+
+    Sale con codigo 1 si hay discrepancias.
+    """
+    import pathlib as _pathlib
+
+    from etl_sigrid.application.steps.publicar_diccionario_step import DIR_DICCIONARIO
+    from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+    from etl_sigrid.infrastructure.postgres.catalogo import comparar, formatear
+
+    dicc, hash_arbol = cargar_diccionario(DIR_DICCIONARIO)
+    pg = _get_pg()
+
+    catalogo = pg.fetch_catalogo_objetos(list(ESQUEMAS_DEL_DATAMART))
+    informe = comparar(dicc, catalogo)
+    click.echo(formatear(informe))
+    click.echo("")
+
+    publicado = pg.fetch_hash_publicado()
+    desfasado = False
+    if publicado is None:
+        click.echo("!    no hay nada publicado en `_meta.diccionario_publicacion`")
+        desfasado = True
+    else:
+        version, hash_pub = publicado
+        if hash_pub == hash_arbol:
+            click.echo(
+                f"OK   lo publicado ES lo del arbol (version {version}, "
+                f"hash {hash_pub[:12]})"
+            )
+        else:
+            desfasado = True
+            click.echo(
+                f"KO   LO PUBLICADO NO ES LO DEL ARBOL. `_meta` sirve el hash "
+                f"{hash_pub[:12]} (version {version}) y los YAML dan "
+                f"{hash_arbol[:12]}. Alguien edito una ficha y no republico, asi "
+                f"que el MCP esta leyendo una version anterior. Se arregla con "
+                f"`python main.py publicar-diccionario`, subiendo `version` si el "
+                f"cambio hay que comunicarlo."
+            )
+
+    if not informe.ok or desfasado:
+        raise SystemExit(1)
+
+
 @cli.command("check-unicidad")
 @click.option(
     "--todos",

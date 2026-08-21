@@ -32,7 +32,7 @@ from etl_sigrid.infrastructure.postgres.unicidad_sql import (
     consultas_de_unicidad,
     interpretar_resultado,
     objetos_saltados,
-    sentencias_de_la_transaccion,
+    sentencias_previas,
     veredicto_no_comprobado,
 )
 
@@ -196,14 +196,63 @@ def test_f006_t26_sobre_el_diccionario_real_alcanza_a_las_claves_compuestas() ->
 
 
 def test_f006_t26_la_transaccion_acota_el_tiempo_y_no_escribe() -> None:
-    """`SET LOCAL` no toca la configuración del servidor; `READ ONLY` lo blinda."""
-    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
-    sentencias = sentencias_de_la_transaccion(consulta, timeout_s=15)
+    """`SET LOCAL` no toca la configuración del servidor; el READ ONLY lo blinda.
 
-    assert sentencias[0] == "BEGIN READ ONLY"
-    assert sentencias[1] == "SET LOCAL statement_timeout = '15s'"
-    assert sentencias[-1] == "COMMIT"
+    Y se comprueba que el **cliente las emite**, no solo que el constructor las
+    fabrique. La versión anterior devolvía `BEGIN READ ONLY … COMMIT` que **no
+    llamaba nadie**, mientras el comando anunciaba «transaccion READ ONLY» por
+    pantalla contra un servidor compartido con producción: un test verde sobre
+    código muerto, sosteniendo una garantía falsa y además impresa.
+    """
+    previas = sentencias_previas(timeout_s=15)
+    assert previas[0] == "SET LOCAL statement_timeout = '15s'"
+    assert previas[1] == "SET LOCAL transaction_read_only = on"
     assert TIMEOUT_POR_CONSULTA_S > 0
+
+    # Lo que de verdad se ejecuta, en orden y antes de la consulta.
+    cursor = _CursorFalso(fila=(0, 0))
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+    _comprobar(_ClienteFalso(_ConexionFalsa(cursor)), consulta, timeout=15)
+
+    assert cursor.ejecutadas[:2] == list(previas), (
+        f"el cliente no emite las sentencias previas: {cursor.ejecutadas[:2]}"
+    )
+    assert "GROUP BY" in cursor.ejecutadas[2]
+
+
+def test_f006_t26_control_ningun_constructor_de_unicidad_esta_muerto() -> None:
+    """Un constructor que solo usa su propio test es una garantía sin respaldo.
+
+    Es la clase de falso verde que esta feature lleva doce pasadas persiguiendo,
+    y `sentencias_de_la_transaccion` fue el caso: fabricaba el `BEGIN READ ONLY`
+    y lo emitía únicamente el test.
+    """
+    raiz = pathlib.Path(__file__).resolve().parents[1]
+    ruta = raiz / "etl_sigrid" / "infrastructure" / "postgres" / "unicidad_sql.py"
+    modulo = ruta.read_text(encoding="utf-8")
+
+    publicos = [
+        f for f in re.findall(r"^def ([a-z][a-z_]*)\(", modulo, re.M)
+    ]
+    assert publicos, "el barrido no encuentra funciones; revisar antes de fiarse"
+
+    consumidores = "\n".join(
+        (raiz / f).read_text(encoding="utf-8")
+        for f in ("main.py", "etl_sigrid/infrastructure/postgres/postgres_client.py")
+    )
+    muertos = []
+    for f in publicos:
+        usado_fuera = f in consumidores
+        # o dentro del propio módulo, por otra función suya
+        resto = modulo.split(f"def {f}(", 1)[1]
+        usado_dentro = f"{f}(" in modulo.replace(f"def {f}(", "", 1)
+        if not usado_fuera and not usado_dentro:
+            muertos.append(f)
+
+    assert muertos == [], (
+        f"estos constructores no los usa nadie fuera de sus tests: {muertos}. "
+        f"Un test verde sobre código muerto no prueba nada del sistema"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +372,8 @@ def test_f006_t26_el_cliente_acota_el_tiempo_y_devuelve_las_dos_cifras() -> None
     assert _comprobar(_ClienteFalso(conexion), consulta, timeout=45) == (3, 9)
 
     assert cursor.ejecutadas[0] == "SET LOCAL statement_timeout = '45s'"
-    assert "GROUP BY obra_id, anio_mes" in cursor.ejecutadas[1]
+    assert cursor.ejecutadas[1] == "SET LOCAL transaction_read_only = on"
+    assert "GROUP BY obra_id, anio_mes" in cursor.ejecutadas[2]
     assert conexion.commits == 1 and conexion.rollbacks == 0
 
 
@@ -384,7 +434,9 @@ def test_f006_t26_control_el_doble_ejercita_el_camino_real() -> None:
 
     assert hasattr(PostgresClient, "comprobar_unicidad")
     cuerpo = _cuerpo_de_comprobar_unicidad()
-    assert "SET LOCAL statement_timeout" in cuerpo
+    # El texto de las sentencias previas vive en `unicidad_sql`; aqui se
+    # comprueba que el cliente las PIDA y las ejecute.
+    assert "sentencias_previas" in cuerpo
     assert "QueryCanceled" in cuerpo
     assert "UndefinedTable" in cuerpo
     assert "rollback" in cuerpo
