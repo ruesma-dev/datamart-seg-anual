@@ -3439,3 +3439,30 @@ también son IPs de puesto caducadas. Son **seis** entradas abiertas de más.
 **No las he tocado**: la firma autoriza *reescribir* la regla única, no borrar
 reglas de un servidor que comparten otros dos proyectos. Queda propuesto al
 humano; el runbook ya documenta el `firewall-rule delete`.
+
+### Dos cosas que salieron al cerrar, y conviene que consten
+
+**1. La guarda de secretos me cazó, y tenía razón.** Al pegar la salida real de
+`az` en `progress/` metí el **GUID de tenant**, el GUID de aplicacion de ARM del
+mensaje de error y el **correo del puesto**. `init.sh` se puso en rojo:
+
+```
+E   AssertionError: el repositorio contiene datos que no deben versionarse:
+E     progress/current.md: GUID (suscripcion o tenant) -> '…'
+E     progress/impl_F-006.md: direccion de correo -> '…'
+FAILED tests/test_f003_infra.py::test_f003_r4_sin_secretos_ni_identificadores_en_infra_y_spec
+```
+
+Es exactamente el riesgo de «pegar la salida real», que es lo que se pide hacer.
+Redactado, y **el commit reescrito con `--amend`** en vez de arreglarlo en uno
+nuevo: la regla dice que el historial de git no suelta lo que entra, así que lo
+que toca es que no entre. Nada estaba pusheado. Verificado: `git show HEAD` ya no
+contiene ningún GUID.
+
+**2. La cobertura de líneas cambiadas baja de 99,0 % a 94,2 %** (795 de 844), y
+el motivo es sano: T26 añade ~120 líneas de producción y **el camino de
+ejecución del comando no se puede cubrir sin conexión**. Lo cubierto es todo lo
+derivable —la generación de las consultas, el alcance, la interpretación del
+resultado y el método del cliente con dobles—; lo que falta es el bucle del CLI
+que llama a la base, y esa cobertura llega con T27. Sigue muy por encima del
+umbral del 80 %.
