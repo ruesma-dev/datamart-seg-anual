@@ -626,7 +626,7 @@ def check_diccionario_cmd() -> None:
     dicc, hash_arbol = cargar_diccionario(DIR_DICCIONARIO)
     pg = _get_pg()
 
-    catalogo = pg.fetch_catalogo_objetos(list(ESQUEMAS_DEL_DATAMART))
+    catalogo = pg.list_objetos_catalogo(list(ESQUEMAS_DEL_DATAMART))
     informe = comparar(dicc, catalogo)
     click.echo(formatear(informe))
     click.echo("")

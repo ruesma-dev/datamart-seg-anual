@@ -220,38 +220,100 @@ def test_f006_t26_la_transaccion_acota_el_tiempo_y_no_escribe() -> None:
     assert "GROUP BY" in cursor.ejecutadas[2]
 
 
-def test_f006_t26_control_ningun_constructor_de_unicidad_esta_muerto() -> None:
-    """Un constructor que solo usa su propio test es una garantía sin respaldo.
+#: Los módulos que este barrido cubre, y por tanto el ALCANCE sobre el que
+#: concluye. Está escrito porque la vez anterior dije «era el único» y era
+#: cierto **dentro de un alcance que no declaré**: solo miraba `unicidad_sql`, y
+#: al ampliarlo apareció `list_objetos_catalogo`, duplicado de un método mío con
+#: el mismo SQL y con un test como único consumidor.
+#:
+#: Una afirmación de completitud sin su alcance es de la misma familia que las
+#: que esta feature lleva trece pasadas corrigiendo.
+MODULOS_BARRIDOS = (
+    "etl_sigrid/infrastructure/postgres/unicidad_sql.py",
+    "etl_sigrid/infrastructure/postgres/catalogo.py",
+    "etl_sigrid/infrastructure/postgres/diccionario_sql.py",
+    "etl_sigrid/domain/inventario.py",
+    "etl_sigrid/infrastructure/diccionario/cargador_yaml.py",
+)
 
-    Es la clase de falso verde que esta feature lleva doce pasadas persiguiendo,
-    y `sentencias_de_la_transaccion` fue el caso: fabricaba el `BEGIN READ ONLY`
-    y lo emitía únicamente el test.
+#: Dónde puede vivir un consumidor legítimo. Si una función solo aparece en
+#: `tests/`, es código muerto con test verde.
+CONSUMIDORES = (
+    "main.py",
+    "etl_sigrid/infrastructure/postgres/postgres_client.py",
+    "etl_sigrid/application/steps/publicar_diccionario_step.py",
+)
+
+
+def _funciones_publicas(texto: str) -> list[str]:
+    return re.findall(r"^def ([a-z][a-z_0-9]*)\(", texto, re.M)
+
+
+def _metodos_publicos(texto: str) -> list[str]:
+    return re.findall(r"^    def ([a-z][a-z_0-9]*)\(", texto, re.M)
+
+
+def test_f006_control_el_barrido_de_codigo_muerto_declara_su_alcance() -> None:
+    """El alcance existe, es el que se dice, y no está vacío."""
+    raiz = pathlib.Path(__file__).resolve().parents[1]
+    for ruta in MODULOS_BARRIDOS + CONSUMIDORES:
+        assert (raiz / ruta).exists(), f"{ruta} ya no existe: revisar el alcance"
+    assert len(MODULOS_BARRIDOS) >= 5
+
+
+def test_f006_ningun_constructor_esta_muerto_en_el_alcance_declarado() -> None:
+    """Una función que solo usa su test es una garantía sin respaldo.
+
+    Fue el caso de `sentencias_de_la_transaccion`, que fabricaba un
+    `BEGIN READ ONLY` que **nadie emitía** mientras el comando lo anunciaba por
+    pantalla. Y de `list_objetos_catalogo`, duplicado con el mismo SQL.
     """
     raiz = pathlib.Path(__file__).resolve().parents[1]
-    ruta = raiz / "etl_sigrid" / "infrastructure" / "postgres" / "unicidad_sql.py"
-    modulo = ruta.read_text(encoding="utf-8")
-
-    publicos = [
-        f for f in re.findall(r"^def ([a-z][a-z_]*)\(", modulo, re.M)
-    ]
-    assert publicos, "el barrido no encuentra funciones; revisar antes de fiarse"
-
     consumidores = "\n".join(
-        (raiz / f).read_text(encoding="utf-8")
-        for f in ("main.py", "etl_sigrid/infrastructure/postgres/postgres_client.py")
+        (raiz / f).read_text(encoding="utf-8") for f in CONSUMIDORES
     )
-    muertos = []
-    for f in publicos:
-        usado_fuera = f in consumidores
-        # o dentro del propio módulo, por otra función suya
-        resto = modulo.split(f"def {f}(", 1)[1]
-        usado_dentro = f"{f}(" in modulo.replace(f"def {f}(", "", 1)
-        if not usado_fuera and not usado_dentro:
-            muertos.append(f)
+
+    muertos: list[str] = []
+    for ruta in MODULOS_BARRIDOS:
+        texto = (raiz / ruta).read_text(encoding="utf-8")
+        otros = "\n".join(
+            (raiz / m).read_text(encoding="utf-8")
+            for m in MODULOS_BARRIDOS
+            if m != ruta
+        )
+        for nombre in _funciones_publicas(texto):
+            propio = texto.replace(f"def {nombre}(", "", 1)
+            usado = (
+                f"{nombre}(" in consumidores
+                or f"{nombre}(" in propio
+                or f"{nombre}(" in otros
+                or f"import {nombre}" in consumidores
+            )
+            if not usado:
+                muertos.append(f"{ruta}::{nombre}")
 
     assert muertos == [], (
-        f"estos constructores no los usa nadie fuera de sus tests: {muertos}. "
-        f"Un test verde sobre código muerto no prueba nada del sistema"
+        f"código muerto con test verde: {muertos}. Alcance del barrido: "
+        f"{list(MODULOS_BARRIDOS)}"
+    )
+
+
+def test_f006_ningun_metodo_del_cliente_de_f006_esta_duplicado() -> None:
+    """Dos métodos con el mismo SQL es la otra cara del código muerto.
+
+    `list_objetos_catalogo` y `fetch_catalogo_objetos` ejecutaban la misma
+    consulta; el segundo lo escribí yo en la tanda que decía haber barrido el
+    código muerto.
+    """
+    raiz = pathlib.Path(__file__).resolve().parents[1]
+    cliente = (
+        raiz / "etl_sigrid/infrastructure/postgres/postgres_client.py"
+    ).read_text(encoding="utf-8")
+
+    usos = cliente.count("SQL_OBJETOS_CATALOGO")
+    assert usos <= 2, (
+        f"`SQL_OBJETOS_CATALOGO` aparece {usos} veces en el cliente: "
+        f"probablemente hay dos métodos haciendo lo mismo"
     )
 
 

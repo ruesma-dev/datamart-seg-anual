@@ -689,21 +689,6 @@ class PostgresClient:
             return (0, 0)
         return (int(fila[0]), int(fila[1]))
 
-    def fetch_catalogo_objetos(self, esquemas: list[str]) -> list[tuple]:
-        """Los objetos que la base publica de verdad, para R28.
-
-        Tablas y vistas de `information_schema`, y funciones de `pg_proc`, que
-        es donde estan: `information_schema.routines` se queda corta con las
-        sobrecargas.
-        """
-        from etl_sigrid.infrastructure.postgres.diccionario_sql import (
-            SQL_OBJETOS_CATALOGO,
-        )
-
-        with self.connection() as conn, conn.cursor() as cur:
-            cur.execute(SQL_OBJETOS_CATALOGO, (esquemas, esquemas))
-            return [tuple(f) for f in cur.fetchall()]
-
     def fetch_hash_publicado(self) -> tuple[str, str] | None:
         """`(version, hash_fuente)` de lo que hay publicado, o `None` si no hay.
 
