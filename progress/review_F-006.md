@@ -4,11 +4,338 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **ocho pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **nueve pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# NOVENA PASADA · 2026-08-21 — el criterio, y la copia que sobrevivió
+
+> Commits revisados: `0f9bb54`..`7ffd1e0`.
+
+## Veredicto de la novena pasada
+
+**RECHAZADO.** Y **rectifico un APROBADO que ya había emitido**: lo di apoyándome
+en mis propias comprobaciones, con una auditoría de barrido todavía corriendo.
+Al llegar encontró dos cosas que yo no vi, y una de ellas **demuestra que mi
+verificación estaba mal hecha**. Las he confirmado las dos contra el código.
+
+El criterio —lo que no se pueda derivar de la fuente que gobierna el hecho, no se
+afirma— **sí está aplicado en el texto de la regla**, y eso es real y valioso.
+Lo que falla es que **el derivador tiene un bug** y que **la afirmación
+rechazada sigue publicada doce líneas más abajo, en el mismo fichero**.
+
+### Lo que me corrige a mí
+
+Escribí que había reproducido la lista del punto 3 «con mi propio derivador» y
+que daba «exactamente las mismas once tablas». Es cierto que coincidía, pero
+**coincidía porque mi script tenía el mismo bug que el suyo**: los dos
+construimos el mapa alias→tabla **por fichero**, con un `dict` que machaca la
+clave. En `compras/01_documentos.sql` las tres tablas de línea comparten el alias
+`l` —`FROM raw.ctrpro l` (:61), `FROM raw.dcapro l` (:126), `FROM raw.dcfpro l`
+(:179)— y las tres proyectan `l.res AS descripcion` (:52, :103, :167). El `dict`
+se queda con la última, así que el `res` de las tres se atribuye solo a
+`dcfpro`. Dos derivaciones con el mismo error no son una verificación
+independiente: son el mismo error dos veces. Lo doy por lección propia.
+
+---
+
+## Los defectos
+
+### 1 · El sexto superviviente, y esta vez publicado (GRAVE)
+
+`config/diccionario/00_global.yaml:399-403`, en `convenciones.identidad_sigrid`:
+
+> «En Sigrid `ide` es la clave universal y muchas tablas son "propiedades de
+> `con` 1:1" […]. El codigo (`cod`), el nombre (`res`) y la fecha (`fec`) viven
+> en `con`, **no en la extension**. `con.nom` NO existe.»
+
+Es **la afirmación que la séptima pasada rechazó**, viva y en contenido
+**publicable** —no en un comentario, como el quinto caso—, y **contradice al
+punto 3 de `R-SIGRID-CON` doce líneas más abajo en el mismo fichero**, que
+enumera once tablas cuyos `cod`/`res`/`fec`/`cif`/`raz` propios lee el ETL sin
+pasar por `con`. El MCP publica las dos. Y las dos listas de «propiedades de
+`con`» divergen: **ocho** tablas aquí, **diez** en el punto 2.
+
+**Por qué no lo cazó el detector nuevo**: `tests/test_f006_copias.py` es una
+lista negra de **subcadenas literales**. Busca `"no en la tabla especifica"`; aquí
+pone `"no en la extension"`. Es además sensible a tildes y mayúsculas y —lo
+decisivo— **ciega al plegado de línea**: en un bloque `>-` cualquier frase de la
+lista partida por un salto es invisible. Lo que sí compara afirmaciones es
+`test_f006_fuente_que_gobierna.py`, pero su alcance son las 31 fichas de `raw`, y
+`00_global.yaml` queda fuera.
+
+### 2 · La lista «derivada» está incompleta por un bug del generador (GRAVE)
+
+Por la colisión de alias descrita arriba, el punto 3 publica `dcfpro` (`.res`) y
+**omite `ctrpro` y `dcapro`**, que cumplen el mismo criterio en el mismo fichero.
+
+Lo agravante no es la omisión, son tres líneas: es que
+`test_f006_r9_la_regla_declara_exactamente_los_campos_derivados` compara la regla
+**contra la misma derivación defectuosa**. Está verde por construcción y no puede
+detectar el fallo. Y el `motivo` de la regla vende esa lista como garantía: «la
+genera un test […] y la regla queda en rojo si dejan de coincidir». Mis pruebas
+P1 y P2 de esta misma pasada —quitar `obrparpar`, añadir una tabla inventada— sí
+saltaron, y por eso di el mecanismo por bueno: fijan la **coherencia** entre
+regla y derivador, no la **corrección** del derivador.
+
+Arreglo: resolver el alias por ámbito de consulta y no por fichero, y añadir al
+control un caso con alias repetido, que es justo lo que el repositorio ya tiene.
+
+### 3 · `stg.plan_mensual` contradice a una regla bloqueante que la incluye (MEDIA)
+
+Cuatro columnas acumuladas pasaron a `suma_solo_dentro_del_mes`:
+`importe_origen`, `importe_origen_raw`, `can_origen` y `pct_acumulado`
+(`stg.yaml:126,149,159,168`). Pero `R-IMPORTE-MES` es **bloqueante**, su `ambito`
+**incluye `stg.plan_mensual`** (`00_global.yaml`) y dice que el acumulado ya
+lleva dentro los meses anteriores. Las **doce** columnas equivalentes de `mart`
+—`fact_seguimiento_mensual`, `fact_seguimiento_categoria`, `v_pbi_fact`,
+`v_pbi_fact_categoria`, `v_fact_periodificado`— siguen todas en `ultimo_valor`,
+que es lo correcto. La misma magnitud, en el linaje directo, con dos etiquetas
+opuestas, y la de aguas arriba contradiciendo la regla que se le adjunta.
+
+`pct_acumulado` es peor: es un **porcentaje** (`unidad: "%"`), y sumar
+porcentajes de avance de partidas distintas no significa nada.
+
+*(Aviso: aquí yo mismo leí mal primero con `sed` y creí que `mart` había
+cambiado. No: `mart` está intacto, lo verifiqué parseando los diez YAML.)*
+
+### 4 · La receta de `sigrid_tablas.md` es falsa en 25 de 31 fichas (MEDIA)
+
+La coletilla nueva dice que `grep -n "^| <tabla> "` devuelve «tambien las filas
+de otras tablas con un campo llamado así». Ejecutado contra el documento: **25 de
+31 devuelven exactamente una línea**, así que describe filas que no existen. En
+las seis restantes la regla de desambiguación —«la de entidad es la que lleva la
+descripcion en la segunda columna»— **no desambigua** (las filas de campo también
+la llevan) y **en `con` está invertida**: su fila de entidad es
+`| con Conceptos | | ETC | |`, con la segunda columna **vacía**. Seguir la receta
+en la ficha de `con` lleva al sitio equivocado.
+
+### 5 · El `motivo` promete una procedencia que el punto 2 incumple (MEDIA)
+
+«Todo lo que afirma esta regla se **deriva de este repositorio**». El punto 2
+—«**Diez** tablas son "Propiedades de `con`" en 1:1»— no es derivable: ningún SQL
+une `prv`, `cen`, `com`, `dca`, `dcf`, `cob`, `pag` ni `rec` a `con` por `ide`
+(solo `obr`, en `maestro/01_obras.sql:30`). Su única fuente es el PDF que el
+mismo `motivo` declara no apto. El número es correcto —diez de las 31—, pero el
+cambio de «Muchas» a «**Diez**» endurece a exhaustiva una afirmación no
+verificable, justo cuando el `motivo` presume de lo contrario.
+
+### Menores
+
+6. El desglose de exclusiones de `dca` y `dcf` **no suma**: «6 de direcciones, 2
+   de descripciones largas, 2 de observaciones, 11 sueltas» = 21, y son 23
+   (`raw.yaml:1054-1056`, `:1140-1142`). El test comprueba el total y los nombres
+   citados, no que el desglose cuadre.
+7. `stg.yaml:443`: `capitulo_raiz_cod` quedó con `nulo_significa: null` en vez de
+   documentar que nunca es NULL, como sus tres hermanas. Y la razón que da
+   `codigo_partida` (`:414-417`) es inventada: lo que protege a las descendientes
+   es su propio filtro (`04_partidas.sql:77-78`), no el del padre.
+
+---
+
+## Lo que sí está bien, y es mucho
+
+- **El criterio está aplicado en el texto**: el mapa fuente→hecho de la cabecera
+  de `raw.yaml`, el recorte de lo insostenible (`cen.res`, `obr.res`, las cuatro
+  excepciones falsas) y el hueco declarado con su fuente son exactamente lo
+  pedido. **Al rechazar los `entcif` que yo sugería tiene razón y me corrige**:
+  los propuse desde el mismo PDF que ya había producido dos afirmaciones falsas.
+- **El ancla de la carga es correcta y completa**: cita el `CMD ["run-all",
+  "--full"]` real y cubre los dos caminos sin negar ninguno. Las 31 citas de
+  `--full-refresh` fuera, contrastadas contra los `click.option`.
+- **La reversión del retoque de `06_presupuesto.sql` está limpia**: en toda la
+  feature el único SQL tocado es el DDL nuevo del contrato. Revertir en vez de
+  debilitar el guardián de F-011 es la decisión correcta, y `dec_cantidades`
+  quedó cerrado por otra vía y mejor: dice que no interviene y **avisa de que los
+  comentarios del SQL repiten una fórmula que el código no ejecuta**.
+- **`_source_tiemod`** cerrado y bien anclado; **`stg.presupuesto`** corregido con
+  la prosa exacta («sumable dentro de UNA fase, nunca a través de `fase_num`») y
+  el reconocimiento de que se pasó con `ultimo_valor`; el «cinco cosas» ya dice
+  seis; y el **control que le faltaba al guardián de nulos** existe, mide el
+  detector sobre un caso fabricado y admite que está en cero.
+- **El punto 4 de la regla es cierto**, verificado tabla a tabla: `auxobramb`,
+  `obrfas`, `obrfasamb` y `obrparpre` no se unen a `raw.con` en ningún SQL.
+- **Mutación** recalculada con el bytecode borrado: 2358 líneas, 166 mutantes, 0
+  supervivientes, 0 timeouts. `pendientes` en 0, 102 fichas ↔ 102 objetos. Nada
+  prohibido, sin `push`, `harness/` intacto.
+
+---
+
+---
+
+## Y SÍ hay defectos en la superficie de consumo
+
+Esto responde directamente a la pregunta de alcance, y la respuesta cambia la
+decisión: **recortar `raw` no basta**. Una revisión fresca de los seis esquemas
+recomendados —60 fichas, 707 columnas, 50 claves (25 compuestas), 84 relaciones y
+214 `nulo_significa`, contrastadas una a una— los encuentra **sustancialmente
+sanos** pero con **dos defectos de gravedad media**, los dos verificados por mí:
+
+### C1 · `mart.v_pbi_dim_partida.es_hoja` promete lo que no cumple (MEDIA)
+
+La ficha (`mart.yaml:567-569`) dice: «Marca las partidas de detalle frente a los
+capitulos, **para no sumar dos veces al agregar por la jerarquia**». El SQL
+(`mart/05_views_powerbi.sql:58-60`) es una heurística:
+
+```sql
+CASE WHEN nivel >= 2 OR codigo_partida LIKE '%.%' THEN TRUE ELSE FALSE END AS es_hoja
+```
+
+Un **capítulo intermedio** de nivel ≥ 2 sale `es_hoja = TRUE`. Que los árboles
+llegan más hondo lo prueba la vista hermana, que tiene `nivel_1..nivel_6`. Filtrar
+`es_hoja = TRUE` y sumar puede contar el capítulo **y** sus hijos: doble conteo de
+importes, en `mart`, que es la superficie principal. El comentario del propio SQL
+es más prudente que la ficha («útil para filtrar si se quiere solo partidas
+hoja»), y existe `stg.partidas.capitulo_padre_id`, con el que la prueba de hoja
+sí sería exacta. Arreglo: declararlo heurística y retirar la promesa.
+
+### C2 · `entidad_cif` sin sanear, y cuatro fichas documentan un NULL que no llega (MEDIA)
+
+`retenciones/01_movimientos.sql:59` proyecta `prv.cif AS entidad_cif` **en crudo**.
+El mismo origen, en los dos maestros, sí se sanea: `maestro/02_proveedores.sql:28`
+hace `NULLIF(TRIM(p.cif), '') AS cif`. Que el propio repositorio lo envuelva ahí
+es la prueba de que los blancos ocurren.
+
+Cuatro fichas declaran `nulo_significa: La entidad no tiene CIF en el maestro`
+—`movimientos`, `v_pbi_retencion_entidad`, `v_pbi_retenciones_vivas` y
+`v_pbi_retenciones_vencidas`—, así que `WHERE entidad_cif IS NULL` pierde en
+silencio a los proveedores con CIF en blanco. Y `maestro.proveedores.cif` sí lo
+dice bien («no tiene CIF, **o esta en blanco**»), lo que deja la incoherencia a la
+vista dentro del mismo diccionario.
+
+**Lo importante es por qué se escapó**: es el tercer caso de la misma familia que
+ya corregimos dos veces —`cierre.v_pbi_cierre_cabecera.cliente_ide` en la tercera
+pasada, `maestro.obras.cliente_id` en la séptima—. El guardián se amplió entonces
+de `_ide` a `_id`; ahora se escapa por `_cif`. **Persigue sufijos en vez de
+derivar**: lo derivable es «columna proyectada en crudo desde una tabla de `raw`
+que declara `nulo_significa`», sin mirar cómo se llama.
+
+### Menores en consumo (omisión, no falsedad)
+
+`nulo_significa` más estrechos que la realidad en `cierre` (`fase_numero`,
+`fase_nombre_mes`, `fase_fecha_inicio` y las derivadas de periodificación, que
+también son NULL cuando la venta final es 0 o falta el importe de fase 0); nueve
+columnas de fecha en `compras` sin `nulo_significa` pese a que
+`compras.fn_sigrid_date(0)` devuelve NULL —un `WHERE anio = 2025` descarta en
+silencio los documentos sin fecha—; `nivel_1`/`nivel_2` sin el `nulo_significa`
+que sí llevan `nivel_3..6`; y el grano de `v_master_vigente_anual`, que dice «31
+de diciembre si el año ya pasó, hoy si es el año en curso» cuando el `CASE` usa
+`hoy` también para años futuros.
+
+Queda además un **riesgo no verificable sin base**: la clave de
+`v_master_versiones_tipadas` es una terna sobre un `SELECT DISTINCT` de ocho
+columnas; se sostiene solo si las otras cinco dependen de ella. Es material para
+la consulta de unicidad de T26.
+
+### Lo que en consumo está limpio, y conviene decirlo
+
+Las 707 columnas existen y pertenecen **a su** objeto —comprobado también en los
+ficheros que crean varios—; ni un grano falso; las 25 claves compuestas
+identifican una fila, incluidas las tres históricamente frágiles
+(`v_pbi_proveedor_obra` con sus seis columnas, `v_pbi_partida_coste` con cinco,
+`v_pbi_retencion_obra` con tres); ni un `COUNT(DISTINCT)` marcado `suma`; todos
+los acumulados en `ultimo_valor`; y **las seis trampas de negocio están en campos
+publicables y son ciertas**. Los dos casos peligrosos de `*_ide` sin `NULLIF`
+—`maestro.obras.cliente_id` y `cierre.v_pbi_cierre_cabecera.cliente_ide`— están
+correctamente documentados como no nulables, que era justo lo que se corrigió.
+
+### Dos incoherencias más en el bloque global
+
+`esquemas.compras.pasos_etl: []` y `esquemas.retenciones.pasos_etl: []`
+contradicen el `paso_etl: build_compras` / `build_retenciones` que llevan todas
+sus fichas; y `esquemas._meta.pasos_etl` omite `publicar_diccionario`, que es
+precisamente el paso que escribe las tablas del diccionario y el que declaran sus
+cuatro fichas.
+
+---
+
+## Dónde caen los defectos, para la decisión de alcance
+
+Se pidió separar lo que está en `raw` de lo que toca a los esquemas de consumo:
+
+- **Ninguno de los siete está en `mart`, `cierre`, `compras`, `retenciones`,
+  `maestro` ni `_meta`**. Esta tanda no toca esos seis ficheros, y las doce
+  columnas de `mart` que podían haberse contagiado siguen correctas.
+- **Pero dos no son «solo `raw`»**: el defecto 1 y el 5 están en
+  `00_global.yaml`, que el MCP publica **entero** y sirve a cualquier consulta,
+  sea del esquema que sea; y el 3 pone a una ficha a contradecir una regla
+  `bloqueante` cuyo ámbito abarca cinco objetos de `mart` y cuatro de `cierre`.
+  El bloque global no es zona acotable.
+
+Así que la respuesta a la pregunta de fondo es: **recortar `raw` no cierra esto**.
+Los defectos 1, 2 y 5 viven en la regla y en las convenciones globales, y el 3 en
+`stg`. Lo que sí sigue siendo cierto es que **el contenido de las 47 fichas de
+consumo, con sus 644 columnas, no está en cuestión**: si se quiere avanzar hacia
+la batería, el camino es cerrar estos siete —los dos graves son un borrado y un
+`dict` mal construido— y no seguir puliendo fichas de `raw`.
+
+---
+
+---
+
+## El criterio: aplicado de verdad, no de nombre
+
+La instrucción era: **lo que no se pueda derivar de la fuente que gobierna el
+hecho, no se afirma; se omite, y si el hueco importa se declara como hueco.**
+Lo ha aplicado, y se puede comprobar sin creerle:
+
+1. **Hay un mapa explícito fuente→hecho** en la cabecera de `raw.yaml`: qué corre
+   de noche → el `Dockerfile`; cómo carga según la bandera →
+   `ingest_raw_step.py`; cómo se llama la bandera → los `click.option` de
+   `main.py`; qué campos propios existen → nuestro SQL. Cada afirmación tiene
+   una fuente asignada, y son las que gobiernan cada hecho.
+2. **La lista del punto 3 la reproduje por mi cuenta.** Escribí mi propio
+   derivador —para cada alias de una tabla de `raw`, usos de `.cod`, `.res`,
+   `.fec`, `.raz`, `.cif`— y da **exactamente las mismas once tablas con los
+   mismos campos**: `auxmun`(res), `auxobramb`(cod,res), `auxobrcla`(res),
+   `auxobrtip`(res), `auxpro`(res), `conext`(cod), `dcfpro`(res), `obrfas`(res),
+   `obrfasamb`(fec,res), `obrparpar`(cod,res) y `prv`(cif,raz). Incluye
+   `obrparpar.cod`/`.res`, que era el hueco que más pesaba.
+   De paso me corrijo: en la octava pasada di `dcfpro.res` por dudoso; **existe
+   y se lee** (`compras/01_documentos.sql:167`, `l.res AS descripcion` sobre
+   `FROM raw.dcfpro l`).
+3. **El mecanismo cierra los dos sentidos**, que es lo que faltaba en las pasadas
+   7 y 8. Lo probé en un worktree:
+
+   | Prueba | Resultado |
+   |---|---|
+   | Quitar `obrparpar` de la lista de la regla | **detectado** — la regla no puede quedarse corta |
+   | Añadir una tabla inventada (`comlin`) | **detectado** — la regla no puede inventar |
+
+   El test compara lo declarado con lo derivado exigiendo **igualdad**, y muestra
+   la diferencia en los dos sentidos. Con esto, el defecto que causó los dos
+   rechazos anteriores no puede repetirse en silencio.
+4. **Recortó lo que no podía sostener y declaró el hueco.** Fuera `cen.res`
+   (inventado), `obr.res` (solo lo respaldaba el PDF) y las cuatro excepciones
+   falsas. Y el `motivo` dice qué deja de decir y a dónde ir:
+
+   > «**Lo que esta regla NO dice, y es deliberado**: que campos existen en
+   > Sigrid y el datamart no lee. Esa pregunta solo la responde
+   > `azure-apps/sigrid_tablas.md` […]. Para preguntar por una columna concreta,
+   > ese documento; para fiarse de una afirmacion, este repositorio.»
+
+   Eso es exactamente lo pedido: omitir y declarar el hueco con su fuente.
+5. **Al rechazar los `entcif` que yo sugería, tiene razón y me corrige.** Los
+   propuse desde el mismo PDF cuyo segmentador ya había producido dos
+   afirmaciones falsas; son misma fuente y mismo riesgo. Rechazarlos es aplicar
+   el criterio también contra la sugerencia del reviewer, que es la parte difícil
+   de aplicarlo.
+
+## Lo demás que declaraba, verificado
+
+| Punto | Veredicto |
+|---|---|
+| **El ancla de la carga** | **Correcta y completa.** La cabecera cita el `CMD ["run-all","--full"]` real, y las fichas cubren **los dos caminos** sin negar ninguno: de noche recarga entera, sin `--full` append por `MAX(ide)`. Es la corrección del defecto 6 de la octava pasada, hecha contra la fuente que gobierna qué se ejecuta |
+| **Las 31 citas de `--full-refresh`** | Fuera; ahora se contrasta contra los `click.option` reales, y hay test que reconoce una bandera inventada |
+| **La reversión del retoque de `06_presupuesto.sql`** | **Limpia**: `git diff a7cccdd..HEAD -- etl_sigrid/` está vacío. Y en **toda la feature** el único SQL tocado es `sql/ddl/01_diccionario.sql`, el DDL nuevo del contrato: **ni un SQL de negocio modificado**, que es la regla de hierro 3 de esta feature. Revertir en vez de debilitar el guardián de F-011 es la decisión correcta |
+| **`dec_cantidades`** | **Cerrado por otra vía y mejor**: la ficha dice ahora que **no interviene**, da la fórmula real y **avisa de que los comentarios del SQL repiten una fórmula que no es**. Convierte la deuda en aviso en vez de tocar el SQL |
+| **`stg.presupuesto`** | Corregido: `cantidad` e `importe` quedan en `suma_solo_dentro_del_mes`, que es lo exacto —sumar entre partidas de la misma fase es correcto; entre fases, no—. Reconocer que se pasó con `ultimo_valor` es la lectura buena: lo no sumable era la dimensión |
+| **Mutación** | Recalculada con el `__pycache__` borrado: **2358 líneas, 166 mutantes**, idéntico a lo declarado, 0 supervivientes y 0 timeouts. `harness/mutacion.py` intacto |
+| **Higiene** | Nada prohibido: ni `GRANT`, `REVOKE`, firewall, Azure ni conexión a la base. **Sin `push`**. Árbol limpio y sin worktrees huérfanos |
 
 ---
 
