@@ -177,7 +177,7 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `auxmun` (`auxmun.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpro` (`auxpro.res`); `conext` (`conext.cod`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `auxmun` (`auxmun.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpro` (`auxpro.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
       **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxobramb`, `obrfas`, `obrfasamb`, `obrparpre`
@@ -213,9 +213,8 @@ reglas:
       Sigrid y el datamart no lee. Esa pregunta solo la responde
       `azure-apps/sigrid_tablas.md`, que es la conversion literal de un PDF de
       380 paginas y **no se deja segmentar de forma fiable**. Intentarlo produjo
-      dos afirmaciones falsas en dos revisiones seguidas —un campo `res`
-      atribuido a `cen` que en realidad es de `cenrep`, tabla que ni se ingiere,
-      y una lista de excepciones con una sola acertada
+      dos afirmaciones falsas en dos revisiones seguidas —un `cen.res` que en
+      realidad es de `cenrep`, y una lista de excepciones con una sola acertada
       de siete—. Para preguntar por una columna concreta, ese documento; para
       fiarse de una afirmacion, este repositorio.
 

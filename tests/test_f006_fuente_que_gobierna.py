@@ -372,3 +372,96 @@ def test_f006_r26_control_el_detector_de_atribuciones_muerde() -> None:
     afirmados = {c for c in re.findall(r"`(\w+)`\s+propi", texto) if c in CAMPOS_DEL_PATRON}
     assert afirmados == {"res"}
     assert "cen" not in campos_propios_usados()
+
+
+# ---------------------------------------------------------------------------
+# Control del DERIVADOR, independiente del derivador
+# ---------------------------------------------------------------------------
+#
+# La novena pasada señaló el vicio de fondo, y es más grave que el bug del
+# alias: mis pruebas fijaban la **coherencia regla↔derivador**, no la
+# **corrección del derivador**. Si el derivador se equivoca, la regla copia el
+# error y el test sale verde por construcción.
+#
+# Pasó también con la verificación del reviewer: dijo haber reproducido la lista
+# «con su propio derivador» y coincidía **porque su script tenía el mismo bug**.
+# Dos derivaciones con el mismo error no son una comprobación: son el mismo
+# error contado dos veces.
+#
+# Estos tres controles no llaman a `campos_propios_usados` sobre el repositorio:
+# uno usa un SQL fabricado con la respuesta calculada a mano, otro contrasta
+# contra el fichero real **por otra vía** (líneas concretas, no alias), y el
+# tercero fija la verdad conocida de un fichero completo.
+
+
+def test_f006_r9_control_el_derivador_no_pierde_un_alias_repetido() -> None:
+    """El caso exacto del bug, con la respuesta calculada a mano.
+
+    Dos tablas distintas con el mismo alias `l` en el mismo fichero. La
+    respuesta correcta es que aparezcan LAS DOS; el derivador por fichero
+    devolvía solo la última.
+    """
+    sql = """
+    CREATE TABLE compras.a AS
+    SELECT
+        l.res                       AS descripcion
+    FROM raw.ctrpro l;
+
+    CREATE TABLE compras.b AS
+    SELECT
+        l.res                       AS descripcion
+    FROM raw.dcapro l;
+    """
+    encontrados: dict[str, set[str]] = {}
+    for sentencia in sentencias(sql):
+        for al, tabla in alias_de_raw(sentencia).items():
+            for campo in CAMPOS_DEL_PATRON:
+                if re.search(rf"\b{re.escape(al)}\.{campo}\b", sentencia):
+                    encontrados.setdefault(tabla, set()).add(campo)
+
+    assert encontrados == {"ctrpro": {"res"}, "dcapro": {"res"}}, (
+        f"el derivador pierde una de las dos tablas que comparten alias: "
+        f"{encontrados}"
+    )
+
+
+def test_f006_r9_control_el_troceo_en_sentencias_separa_los_ambitos() -> None:
+    """Y que el troceo sea el que hace posible lo anterior."""
+    sql = "SELECT 1 FROM raw.a x; SELECT 2 FROM raw.b x;"
+    trozos = sentencias(sql)
+    assert len(trozos) == 2, f"esperaba dos sentencias, no {len(trozos)}: {trozos}"
+    assert alias_de_raw(trozos[0]) == {"x": "a"}
+    assert alias_de_raw(trozos[1]) == {"x": "b"}
+
+
+def test_f006_r9_control_las_tres_lineas_de_compras_existen_de_verdad() -> None:
+    """Contraste contra el fichero real POR OTRA VÍA: líneas, no alias.
+
+    Si el derivador vuelve a perder una tabla, este test no se entera de la
+    misma manera: lee las proyecciones y los `FROM` como texto, empareja por
+    posición y no usa `alias_de_raw` ni `sentencias`.
+    """
+    fichero = DIR_SQL / "compras" / "01_documentos.sql"
+    lineas = fichero.read_text(encoding="utf-8").split("\n")
+
+    # Cada `FROM raw.<tabla> l` y la proyección `l.res AS ...` que le precede.
+    tablas_con_l: list[str] = []
+    for n, linea in enumerate(lineas):
+        m = re.match(r"\s*FROM\s+raw\.(\w+)\s+l\s*$", linea)
+        if m:
+            tablas_con_l.append(m.group(1))
+
+    assert set(tablas_con_l) == {"ctrpro", "dcapro", "dcfpro"}, (
+        f"las tres tablas de línea de compras comparten el alias `l`; "
+        f"encontradas {tablas_con_l}"
+    )
+    assert sum(1 for l in lineas if re.match(r"\s*l\.res\s+AS\s+descripcion", l)) == 3, (
+        "las tres proyectan `l.res AS descripcion`: es lo que el bug ocultaba"
+    )
+
+    # Y ahora sí, que el derivador las vea las tres.
+    derivado = campos_propios_usados()
+    for tabla in ("ctrpro", "dcapro", "dcfpro"):
+        assert "res" in derivado.get(tabla, ()), (
+            f"el derivador no ve `{tabla}.res`, que existe en el fichero"
+        )
