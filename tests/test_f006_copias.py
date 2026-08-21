@@ -52,12 +52,39 @@ def _ficheros() -> list[pathlib.Path]:
     return sorted(DIR_DICCIONARIO.glob("*.yaml"))
 
 
+def _texto_barrible(fichero: pathlib.Path) -> str:
+    """El fichero crudo **y** el YAML ya cargado, los dos.
+
+    Hacen falta los dos y por motivos opuestos:
+
+    * el **crudo** conserva los comentarios, que `yaml.safe_load` descarta y que
+      es donde se escondió la copia del quinto caso (la cabecera de `raw.yaml`);
+    * el **cargado** conserva las frases **plegadas**. Un bloque `>-` reparte una
+      frase entre dos líneas, y en el fichero crudo la cadena
+      «no en la tabla especifica» puede no aparecer nunca aunque
+      `yaml.safe_load` la publique entera.
+
+    Lo demostró el reviewer en la 10ª pasada: plantó dos frases rechazadas
+    plegadas como las pliega el YAML y **el barrido pasó en verde**. Es decir, la
+    defensa contra el patrón que ha causado siete rechazos se saltaba por un
+    salto de línea.
+    """
+    import yaml
+
+    crudo = fichero.read_text(encoding="utf-8")
+    try:
+        cargado = str(yaml.safe_load(crudo))
+    except yaml.YAMLError:
+        cargado = ""
+    return crudo + "\n" + cargado
+
+
 @pytest.mark.parametrize("fichero", _ficheros(), ids=lambda p: p.name)
 def test_f006_r26_ninguna_frase_rechazada_sobrevive_en_el_fichero(
     fichero: pathlib.Path,
 ) -> None:
-    """Incluidos los comentarios, que es donde se escondió la quinta vez."""
-    texto = fichero.read_text(encoding="utf-8")
+    """Comentarios incluidos, y frases plegadas incluidas."""
+    texto = _texto_barrible(fichero)
     vivas = [
         f"«{frase}» ({motivo})"
         for frase, motivo in FRASES_RECHAZADAS.items()
@@ -162,4 +189,39 @@ def test_f006_r26_la_convencion_de_sigrid_no_duplica_la_regla() -> None:
     assert "viven en `con`" not in convencion, (
         "la convención vuelve a afirmar dónde vive cada campo; eso es del punto 3 "
         "de la regla, y tenerlo en dos sitios es lo que produjo la divergencia"
+    )
+
+
+def test_f006_r26_control_el_barrido_ve_una_frase_plegada() -> None:
+    """El experimento del reviewer, convertido en control permanente.
+
+    Una frase partida por el ajuste de línea de un bloque `>-` **no aparece** en
+    el texto crudo, y sí en lo que se publica. Si este control se rompe, el
+    barrido ha vuelto a mirar solo el fichero y la defensa está desarmada.
+    """
+    import tempfile
+
+    import yaml
+
+    plegado = (
+        "version: 1\n"
+        "esquema: prueba\n"
+        "convenciones:\n"
+        "  x: >-\n"
+        "    El codigo, el nombre y la fecha viven en `con`, no en la tabla\n"
+        "    especifica.\n"
+    )
+    # En crudo la frase NO está: el salto de línea la parte.
+    assert "no en la tabla especifica" not in plegado
+    # Cargada, sí: es lo que llega al agente.
+    assert "no en la tabla especifica" in str(yaml.safe_load(plegado))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        f = pathlib.Path(tmp) / "prueba.yaml"
+        f.write_text(plegado, encoding="utf-8")
+        texto = _texto_barrible(f)
+
+    vivas = [frase for frase in FRASES_RECHAZADAS if frase in texto]
+    assert vivas == ["no en la tabla especifica"], (
+        f"el barrido no ve la frase plegada: {vivas}"
     )
