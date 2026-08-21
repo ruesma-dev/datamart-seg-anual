@@ -47,6 +47,15 @@ infraestructura.
 > vistas** y `cierre` **8**. El DDL del bloque E anade cuatro objetos mas a
 > `_meta`, que pasan a ser **102**.
 
+> **ENMIENDA 2026-08-22 · El contrato crece: `_meta.diccionario_contexto`.**
+> Al implementar el proveedor de `mcp-bbdd` que lee el diccionario de `_meta` en
+> vez del YAML salió un hueco que no vimos ninguno de los tres: **`_meta`
+> publicaba los objetos y las reglas, pero no el resto del bloque global**. El
+> prototipo local servía `convenciones` y `ordenes_de_magnitud` enteros en su
+> `contexto_bbdd()`, así que con el origen en base **se perdían**, y el MCP en
+> cloud habría respondido *peor* que el prototipo. Se añade una tabla, con lo
+> que el inventario pasa a **103 objetos**. Detalle en §4.4.
+
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
 `grano`, `columnas`, `relaciones`, `ejemplos_preguntas`, más un bloque de notas
@@ -420,6 +429,70 @@ debe ejecutar `apply-grants` inmediatamente después. Está escrito en R23 y va
 como comentario de cabecera en el propio fichero SQL.
 
 ---
+
+### 4.4 · `_meta.diccionario_contexto` (enmienda del 2026-08-22)
+
+**Por qué crece el contrato.** Los **órdenes de magnitud** existen para que el
+modelo detecte una cifra absurda —son los que evitan que se repita lo de los
+38,9 M€ en una sola obra— y las **convenciones** (moneda, IVA, formato de fecha)
+hacen falta para interpretar cualquier importe que devuelva. Sin ellos, el MCP
+que lee de la base responde peor que el prototipo que lee del YAML, que sería un
+retroceso difícil de justificar.
+
+**Forma: una fila por entrada, y nunca columnas nuevas.** Es el mismo criterio
+que puso `motivo_no_consumo` al final de `v_diccionario` en vez de en medio: el
+contrato tiene que **crecer sin romper** a quien ya lee. Añadir un bloque nuevo
+mañana son filas nuevas, no un `ALTER TABLE` ni una vista recreada —y recrear
+una vista exige `DROP`, que se lleva los `GRANT`—.
+
+```sql
+CREATE TABLE IF NOT EXISTS _meta.diccionario_contexto (
+    bloque  TEXT    NOT NULL,   -- convenciones|ordenes_de_magnitud|ejes|esquemas
+    clave   TEXT    NOT NULL,
+    orden   INTEGER NOT NULL DEFAULT 0,
+    texto   TEXT    NOT NULL,   -- la entrada redactada, para inyectar tal cual
+    datos   JSONB   NOT NULL,   -- la entrada entera, por si hacen falta campos
+    PRIMARY KEY (bloque, clave)
+);
+```
+
+`texto` se genera **aquí** a propósito: si cada consumidor compusiera su propio
+renderizado acabarían divergiendo, que es exactamente lo que pasó con el resumen
+por esquema del prototipo. `datos` está para quien necesite el valor numérico de
+un orden de magnitud sin parsear prosa.
+
+**Qué viaja y qué no.** La decisión vive en `CONTEXTO_PUBLICADO` y
+`CONTEXTO_NO_PUBLICADO` (`domain/diccionario.py`), y **un test exige que toda
+clave del bloque global esté en una de las dos**. Es la tercera vez que
+información importante se queda sin viajar —la regla de oro en un comentario, el
+aviso de frescura en una cabecera, y ahora esto—, y las tres se descubrieron por
+casualidad; así que la decisión deja de ser implícita.
+
+| Viaja | Por qué |
+|---|---|
+| `convenciones` | sin moneda/IVA/fecha no se interpreta ningún importe |
+| `ordenes_de_magnitud` | son los que hacen que una cifra absurda se note |
+| `ejes` | los literales EXACTOS de `escenario`; inventarlos devuelve cero filas sin error |
+| `esquemas` | permite enrutar una pregunta antes de mirar objeto por objeto |
+
+| No viaja | Por qué |
+|---|---|
+| `reglas` | ya va, en `_meta.diccionario_reglas` |
+| `version` | ya va, en `_meta.diccionario_publicacion` |
+| `base`, `titulo` | el MCP ya está conectado a esa base; el título no ayuda a responder |
+| `preguntas_aceptacion`, `pendientes` | instrumentación de esta feature, no contexto de negocio |
+| **`ocultar`** | ver abajo |
+
+**`ocultar` NO entra en el contrato, y es deliberado.** `mcp-bbdd` lo resuelve
+anteponiendo `[NO RECOMENDADO PARA CONSULTA: …]` a la descripción, usando el
+`motivo_no_consumo` que **sí** viaja. Resuelve el problema sin ampliar la
+superficie que hay que mantener sincronizada entre dos repositorios. Acordado el
+2026-08-22: **no se añade al contrato sin revisar esta decisión.**
+
+**Cómo se lee.** Igual que el resto: pidiendo las columnas **por nombre** y
+nunca `SELECT *`, y tolerando que la tabla no exista —un consumidor antiguo
+sigue funcionando sin ella, que es la prueba de que el contrato creció sin
+romper—.
 
 ## 5 · Ficheros a crear
 

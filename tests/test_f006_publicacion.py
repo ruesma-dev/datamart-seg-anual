@@ -499,18 +499,35 @@ def _publicar_y_diario():
     return filas, diario, cliente
 
 
-def test_f006_r17_publicar_escribe_las_tres_tablas() -> None:
+def test_f006_r17_publicar_escribe_las_cuatro_tablas() -> None:
+    """Cuatro desde la enmienda del 2026-08-22: entra `diccionario_contexto`.
+
+    Y las cuatro se vacían y se reescriben **en la misma transacción**, que es
+    lo que le debe el contrato a quien consulte mientras se publica.
+    """
+    from etl_sigrid.infrastructure.postgres.diccionario_sql import filas_contexto
+
     filas, diario, _ = _publicar_y_diario()
 
     sentencias = [d[1] for d in diario if d[0] in ("execute", "executemany")]
-    assert any(s == "DELETE FROM _meta.diccionario" for s in sentencias)
-    assert any(s == "DELETE FROM _meta.diccionario_reglas" for s in sentencias)
-    assert any(s == "DELETE FROM _meta.diccionario_publicacion" for s in sentencias)
-    assert any("INSERT INTO _meta.diccionario (" in s for s in sentencias)
-    assert any("INSERT INTO _meta.diccionario_reglas (" in s for s in sentencias)
-    assert any("INSERT INTO _meta.diccionario_publicacion (" in s for s in sentencias)
+    for tabla in (
+        "diccionario",
+        "diccionario_reglas",
+        "diccionario_contexto",
+        "diccionario_publicacion",
+    ):
+        assert any(s == f"DELETE FROM _meta.{tabla}" for s in sentencias), (
+            f"no se vacía `_meta.{tabla}`"
+        )
+        assert any(f"INSERT INTO _meta.{tabla} (" in s for s in sentencias), (
+            f"no se reescribe `_meta.{tabla}`"
+        )
+
     dicc, _ = _diccionario_real()
-    assert filas == len(dicc.fichas) + len(dicc.reglas) + 1
+    esperadas = (
+        len(dicc.fichas) + len(dicc.reglas) + len(filas_contexto(dicc)) + 1
+    )
+    assert filas == esperadas
 
 
 def test_f006_r18_publicar_va_en_una_sola_transaccion() -> None:
