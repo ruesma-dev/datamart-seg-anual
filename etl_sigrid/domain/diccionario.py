@@ -95,6 +95,57 @@ CARDINALIDADES = ("1:1", "1:N", "N:1", "N:N")
 #: Severidad de una regla dura del diccionario.
 SEVERIDADES = ("bloqueante", "aviso")
 
+#: Qué claves del bloque global VIAJAN a `_meta` y cuáles no, con su motivo.
+#:
+#: Existe porque es la **tercera vez** que información importante se queda sin
+#: viajar: primero la regla de oro, escondida en un comentario YAML; luego el
+#: aviso de frescura, en una cabecera; y ahora `convenciones` y
+#: `ordenes_de_magnitud`, que el prototipo local servía y el MCP en cloud
+#: perdía. Las tres se descubrieron por casualidad.
+#:
+#: Así que la decisión deja de ser implícita: **toda clave del bloque global
+#: tiene que estar aquí**, publicada o excluida con su razón, y un test lo
+#: comprueba. Si alguien añade una clave nueva y no decide, salta.
+CONTEXTO_PUBLICADO = {
+    "convenciones": (
+        "Moneda, IVA y formato de fecha. Sin esto el agente no puede "
+        "interpretar ningun importe que devuelva."
+    ),
+    "ordenes_de_magnitud": (
+        "Las cifras de referencia de la empresa. Son las que permiten detectar "
+        "una respuesta absurda: existen para que no se repita el 38,9 M€ en una "
+        "sola obra."
+    ),
+    "ejes": (
+        "Los literales EXACTOS de `escenario`. El agente los va a poner en un "
+        "WHERE, asi que inventarselos devuelve cero filas sin error."
+    ),
+    "esquemas": (
+        "Que es cada esquema y para que sirve. Es lo que permite enrutar una "
+        "pregunta antes de mirar objeto por objeto."
+    ),
+}
+
+#: Lo que NO viaja, y por qué. Un hueco declarado no es un hueco olvidado.
+CONTEXTO_NO_PUBLICADO = {
+    "version": "va en `_meta.diccionario_publicacion.version`",
+    "base": "el MCP ya esta conectado a esa base: decirselo no le aporta nada",
+    "titulo": "rotulo del documento, sin uso para responder",
+    "ocultar": (
+        "columnas de instrumentacion que el MCP no debe ofrecer. Se resuelve "
+        "SIN contrato: `mcp-bbdd` antepone `[NO RECOMENDADO PARA CONSULTA: ...]` "
+        "a la descripcion usando el `motivo_no_consumo` que si viaja. Acordado "
+        "el 2026-08-22; no anadir al contrato sin revisar esa decision"
+    ),
+    "preguntas_aceptacion": (
+        "la bateria con la que se prueba esta feature. Es instrumentacion "
+        "nuestra, no contexto de negocio"
+    ),
+    "pendientes": "el trinquete de cobertura del propio diccionario, interno",
+    "reglas": "ya viaja, en `_meta.diccionario_reglas`",
+}
+
+
 #: Las TRECE reglas duras que `00_global.yaml` tiene que declarar sí o sí (R9).
 #:
 #: No es una lista de buenas prácticas: cada una nace de una trampa concreta del

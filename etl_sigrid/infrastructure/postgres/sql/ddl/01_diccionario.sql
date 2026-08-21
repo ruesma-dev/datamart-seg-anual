@@ -75,6 +75,37 @@ CREATE TABLE IF NOT EXISTS _meta.diccionario_reglas (
 );
 
 -- ---------------------------------------------------------------------------
+-- El CONTEXTO global: convenciones, ordenes de magnitud, ejes y esquemas.
+-- ---------------------------------------------------------------------------
+-- ENMIENDA DEL CONTRATO, 2026-08-22. Nace porque al implementar el proveedor de
+-- `mcp-bbdd` se vio que `_meta` publicaba los objetos y las reglas pero NO el
+-- resto del bloque global, asi que el MCP en cloud habria respondido PEOR que el
+-- prototipo local, que lo servia entero.
+--
+-- UNA FILA POR ENTRADA, igual que `diccionario_reglas`, y no columnas nuevas en
+-- `diccionario_publicacion`: asi el contrato crece anadiendo FILAS y nunca rompe
+-- a quien ya lee. Es el mismo criterio que puso `motivo_no_consumo` al final de
+-- la vista en vez de en medio.
+--
+-- `texto` va siempre y es lo que el agente inyecta tal cual. `datos` lleva la
+-- entrada entera en JSONB para quien necesite los campos sueltos —el valor
+-- numerico de un orden de magnitud, por ejemplo— sin parsear prosa.
+CREATE TABLE IF NOT EXISTS _meta.diccionario_contexto (
+    bloque  TEXT    NOT NULL,   -- convenciones|ordenes_de_magnitud|ejes|esquemas
+    clave   TEXT    NOT NULL,   -- moneda | <concepto> | magnitud | mart ...
+    orden   INTEGER NOT NULL DEFAULT 0,
+    texto   TEXT    NOT NULL,
+    datos   JSONB   NOT NULL,
+    PRIMARY KEY (bloque, clave)
+);
+
+COMMENT ON TABLE _meta.diccionario_contexto IS
+'Contexto global que el agente necesita ANTES de consultar: convenciones de '
+'moneda/IVA/fecha, ordenes de magnitud para detectar una cifra absurda, los '
+'literales exactos de escenario y para que sirve cada esquema. Crece anadiendo '
+'filas, nunca columnas.';
+
+-- ---------------------------------------------------------------------------
 -- Que version del diccionario esta publicada. UNA sola fila, siempre.
 -- ---------------------------------------------------------------------------
 -- El `CHECK (id = 1)` la convierte en un singleton: no hay forma de que queden

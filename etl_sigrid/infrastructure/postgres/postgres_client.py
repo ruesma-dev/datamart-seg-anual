@@ -785,40 +785,48 @@ class PostgresClient:
         `apply-grants` siguiente.
         """
         from etl_sigrid.infrastructure.postgres.diccionario_sql import (
+            SQL_BORRAR_CONTEXTO,
             SQL_BORRAR_DICCIONARIO,
             SQL_BORRAR_PUBLICACION,
             SQL_BORRAR_REGLAS,
+            SQL_INSERT_CONTEXTO,
             SQL_INSERT_DICCIONARIO,
             SQL_INSERT_PUBLICACION,
             SQL_INSERT_REGLA,
             fila_publicacion,
             filas_diccionario,
+            filas_contexto,
             filas_reglas,
         )
 
         instante = ahora if ahora is not None else datetime.utcnow()
         fichas = filas_diccionario(dicc)
         reglas = filas_reglas(dicc)
+        contexto = filas_contexto(dicc)
         publicacion = fila_publicacion(dicc, hash_fuente, instante, batch_id, informe)
 
         with self.connection() as conn, conn.cursor() as cur:
             # Borrar antes de insertar: al revés chocaría con la clave primaria.
             cur.execute(SQL_BORRAR_DICCIONARIO)
             cur.execute(SQL_BORRAR_REGLAS)
+            cur.execute(SQL_BORRAR_CONTEXTO)
             cur.execute(SQL_BORRAR_PUBLICACION)
             if fichas:
                 cur.executemany(SQL_INSERT_DICCIONARIO, fichas)
             if reglas:
                 cur.executemany(SQL_INSERT_REGLA, reglas)
+            if contexto:
+                cur.executemany(SQL_INSERT_CONTEXTO, contexto)
             cur.execute(SQL_INSERT_PUBLICACION, publicacion)
 
-        escritas = len(fichas) + len(reglas) + 1
+        escritas = len(fichas) + len(reglas) + len(contexto) + 1
         logger.info(
             "diccionario_publicado",
             version=publicacion[1],
             hash_fuente=hash_fuente[:12],
             objetos=len(fichas),
             reglas=len(reglas),
+            contexto=len(contexto),
             filas=escritas,
         )
         return escritas

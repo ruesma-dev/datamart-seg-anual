@@ -25,6 +25,9 @@ import json
 from collections.abc import Mapping
 from datetime import datetime
 
+from etl_sigrid.domain.diccionario import (
+    CONTEXTO_PUBLICADO,
+)
 from etl_sigrid.domain.diccionario import Diccionario, Ficha
 from etl_sigrid.domain.inventario import InformeCobertura
 
@@ -44,6 +47,7 @@ from etl_sigrid.domain.inventario import InformeCobertura
 SQL_BORRAR_DICCIONARIO = "DELETE FROM _meta.diccionario"
 SQL_BORRAR_REGLAS = "DELETE FROM _meta.diccionario_reglas"
 SQL_BORRAR_PUBLICACION = "DELETE FROM _meta.diccionario_publicacion"
+SQL_BORRAR_CONTEXTO = "DELETE FROM _meta.diccionario_contexto"
 
 SQL_INSERT_DICCIONARIO = """
 INSERT INTO _meta.diccionario (
@@ -57,6 +61,11 @@ SQL_INSERT_REGLA = """
 INSERT INTO _meta.diccionario_reglas (
     codigo, titulo, severidad, ambito, regla, motivo, orden
 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+"""
+
+SQL_INSERT_CONTEXTO = """
+INSERT INTO _meta.diccionario_contexto (bloque, clave, orden, texto, datos)
+VALUES (%s, %s, %s, %s, %s)
 """
 
 SQL_INSERT_PUBLICACION = """
@@ -234,3 +243,78 @@ def resumen_publicacion(fila: tuple) -> Mapping[str, object]:
         "n_columnas": fila[7],
         "cobertura_cols": float(fila[8]),
     }
+
+
+def filas_contexto(dicc: Diccionario) -> list[tuple]:
+    """Una fila por entrada del contexto global (enmienda del 2026-08-22).
+
+    Se DERIVA de `CONTEXTO_PUBLICADO`: no hay lista de bloques escrita aquí, así
+    que decidir qué viaja se hace en un solo sitio y un test comprueba que toda
+    clave del bloque global esté decidida.
+
+    `texto` es la versión legible —lo que el agente inyecta tal cual— y `datos`
+    la entrada entera en JSONB, para quien necesite el valor numérico de un
+    orden de magnitud sin tener que parsear la prosa.
+    """
+    filas: list[tuple] = []
+    for bloque in CONTEXTO_PUBLICADO:
+        contenido = dicc.global_raw.get(bloque)
+        if not contenido:
+            continue
+
+        if isinstance(contenido, dict):
+            entradas = list(contenido.items())
+        else:
+            entradas = [(_clave_de(e, n), e) for n, e in enumerate(contenido)]
+
+        for orden, (clave, valor) in enumerate(entradas):
+            filas.append(
+                (
+                    bloque,
+                    str(clave),
+                    orden,
+                    _texto_de(bloque, clave, valor),
+                    json.dumps(valor, ensure_ascii=False, default=str),
+                )
+            )
+    return filas
+
+
+def _clave_de(entrada: object, posicion: int) -> str:
+    """Cómo se llama una entrada de lista. Estable entre publicaciones."""
+    if isinstance(entrada, dict):
+        for campo in ("eje", "concepto", "codigo", "clave", "nombre"):
+            if entrada.get(campo):
+                return str(entrada[campo])
+    return str(posicion)
+
+
+def _texto_de(bloque: str, clave: str, valor: object) -> str:
+    """La entrada, en una frase que se pueda inyectar sin más.
+
+    No es decoración: es lo que evita que cada consumidor invente su propio
+    renderizado y acaben divergiendo, que es lo que ya pasó con el resumen por
+    esquema del prototipo.
+    """
+    if not isinstance(valor, dict):
+        return f"{clave}: {valor}"
+
+    if bloque == "ordenes_de_magnitud":
+        cifra = valor.get("valor_aproximado")
+        unidad = valor.get("unidad", "")
+        criterio = valor.get("criterio", "")
+        # El separador de miles se aplica AL NUMERO, no a la frase: un
+        # `.replace(",", ".")` sobre todo el texto se comia las comas del
+        # concepto y lo dejaba en «Retenido VIVO a proveedores. pendiente de...».
+        formateada = f"{cifra:,}".replace(",", ".") if isinstance(cifra, int) else cifra
+        return (
+            f"{valor.get('concepto', clave)}: del orden de {formateada} {unidad}"
+            f"{f' (criterio: {criterio})' if criterio else ''}"
+        )
+    if bloque == "ejes":
+        valores = ", ".join(str(v) for v in valor.get("valores", []))
+        return f"{clave}: {valores}. {valor.get('significa', '')}".strip()
+    if bloque == "esquemas":
+        return f"{clave} — {valor.get('titulo', '')}: {valor.get('para_que_sirve', '')}"
+
+    return "; ".join(f"{k}: {v}" for k, v in valor.items())

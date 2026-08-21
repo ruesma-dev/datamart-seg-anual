@@ -61,6 +61,18 @@ class _PgCatalogo:
         return self.publicado
 
 
+def _cuantas_consultas(solo_consumo=True) -> int:
+    """Cuántas consultas toca generar, derivado del diccionario.
+
+    Escribir 47 y 56 a mano se quedó atrás en cuanto el contrato creció con
+    `_meta.diccionario_contexto`. Es el mismo recuento cableado de siempre.
+    """
+    from etl_sigrid.infrastructure.postgres.unicidad_sql import consultas_de_unicidad
+
+    dicc, _ = _diccionario_real()
+    return len(consultas_de_unicidad(dicc, solo_consumo=solo_consumo))
+
+
 def _runner(monkeypatch, pg) -> CliRunner:
     import main
 
@@ -106,7 +118,9 @@ def test_f006_t26_cli_todo_limpio_sale_con_cero(monkeypatch) -> None:
     resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-unicidad"])
 
     assert resultado.exit_code == 0, resultado.output
-    assert len(pg.preguntados) == 47, f"alcance por defecto: {len(pg.preguntados)}"
+    assert len(pg.preguntados) == _cuantas_consultas(), (
+        f"alcance por defecto: {len(pg.preguntados)}"
+    )
     assert "0 con la clave rota" in resultado.output
     # El aviso que impide leer un verde como una garantia.
     assert "NO tiene la clave demostrada" in resultado.output
@@ -148,7 +162,9 @@ def test_f006_t26_cli_un_objeto_que_no_existe_no_tumba_el_recorrido(monkeypatch)
     assert resultado.exit_code == 1
     assert "FICHADO Y NO EXISTE" in resultado.output
     assert "1 fichados que no existen" in resultado.output
-    assert len(pg.preguntados) == 47, "el recorrido tiene que continuar"
+    assert len(pg.preguntados) == _cuantas_consultas(), (
+        "el recorrido tiene que continuar"
+    )
 
 
 def test_f006_t26_cli_todos_amplia_el_alcance(monkeypatch) -> None:
@@ -158,7 +174,9 @@ def test_f006_t26_cli_todos_amplia_el_alcance(monkeypatch) -> None:
     resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-unicidad", "--todos"])
 
     assert resultado.exit_code == 0
-    assert len(pg.preguntados) == 56, f"con --todos: {len(pg.preguntados)}"
+    assert len(pg.preguntados) == _cuantas_consultas(solo_consumo=False), (
+        f"con --todos: {len(pg.preguntados)}"
+    )
     assert "TODO objeto con clave" in resultado.output
     assert not [o for o in pg.preguntados if o.startswith("raw.")], (
         "`raw` nunca entra: su `ide` es PRIMARY KEY"

@@ -46,8 +46,10 @@ def _catalogo_completo():
 def test_f006_r28_la_biyeccion_perfecta_no_da_discrepancias() -> None:
     informe = comparar(_dicc(), _catalogo_completo())
     assert informe.ok
-    assert informe.comprobados == 102
-    assert informe.en_catalogo == 102
+    # Derivados: el recuento cableado se quedó atrás en cuanto el contrato
+    # creció con `_meta.diccionario_contexto`.
+    assert informe.comprobados == len(_dicc().fichas)
+    assert informe.en_catalogo == len(_dicc().fichas)
     assert "biyeccion exacta" in formatear(informe)
 
 
@@ -122,7 +124,7 @@ def test_f006_r28_normaliza_el_vocabulario_del_catalogo() -> None:
 def test_f006_r28_control_el_detector_no_pasa_en_vacio() -> None:
     """Si `comparar` dejara de comparar, los tests de arriba seguirian verdes."""
     informe = comparar(_dicc(), [])
-    assert len(informe.discrepancias) == 102, (
+    assert len(informe.discrepancias) == len(_dicc().fichas), (
         "con el catalogo vacio TODAS las fichas tienen que salir como huerfanas"
     )
     assert all(d.clase == "huerfana" for d in informe.discrepancias)

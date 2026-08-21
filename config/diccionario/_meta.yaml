@@ -472,6 +472,66 @@ objetos:
         unidad: "%"
         agregacion: no_sumable
 
+  diccionario_contexto:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      El contexto que el agente necesita **antes** de consultar nada: las
+      convenciones con las que interpretar un importe, los ordenes de magnitud
+      con los que detectar una cifra absurda, los literales exactos de
+      `escenario` y para que sirve cada esquema.
+
+      Nacio el 2026-08-22 como enmienda del contrato. Hasta entonces `_meta`
+      publicaba los objetos y las reglas pero **no el resto del bloque global**,
+      asi que un MCP que leyera de la base habria respondido PEOR que el
+      prototipo local, que lo servia entero de su YAML.
+
+      Los ordenes de magnitud son los que evitan que se repita el 38,9 M€ en una
+      sola obra: existen para que una respuesta absurda se note.
+    grano: >-
+      Una fila por entrada, identificada por (`bloque`, `clave`). **El contrato
+      crece anadiendo FILAS, nunca columnas**, que es lo que permite ampliarlo
+      sin romper a quien ya lee.
+    clave_negocio: [bloque, clave]
+    paso_etl: publicar_diccionario
+    refresco: nocturno
+    ejemplos_preguntas:
+      - En que moneda estan los importes y llevan IVA
+      - Esta cifra es razonable para esta empresa
+      - Que valores exactos puede tomar escenario
+      - Para que sirve cada esquema del datamart
+    columnas:
+      bloque:
+        significado: >-
+          De que familia es la entrada. Cada una responde una pregunta distinta,
+          y las cuatro se sirven juntas al arrancar.
+        valores: [convenciones, ordenes_de_magnitud, ejes, esquemas]
+        agregacion: no_sumable
+      clave:
+        significado: >-
+          Identificador de la entrada dentro de su bloque: `moneda`, el concepto
+          del orden de magnitud, el nombre del eje o el del esquema.
+        agregacion: no_sumable
+      orden:
+        significado: >-
+          En que orden se presentan las entradas de un bloque. Se conserva el
+          del YAML, que esta escrito de mas a menos importante.
+        agregacion: no_sumable
+      texto:
+        significado: >-
+          La entrada ya redactada, para inyectarla tal cual. Se genera aqui a
+          proposito: si cada consumidor la compusiera por su cuenta acabarian
+          divergiendo, que es lo que ya paso con el resumen por esquema del
+          prototipo.
+        agregacion: no_sumable
+      datos:
+        significado: >-
+          La entrada entera en JSONB, para quien necesite los campos sueltos
+          —el valor numerico de un orden de magnitud, la lista de valores de un
+          eje— sin parsear la prosa de `texto`.
+        agregacion: no_sumable
+
   v_diccionario:
     tipo: vista
     capa: operacion
