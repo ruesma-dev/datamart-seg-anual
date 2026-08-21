@@ -227,8 +227,14 @@ objetos:
           La entidad contratada no tiene ficha de proveedor, o la tiene sin CIF.
           Ver `es_proveedor`.
       razon_social:
-        significado: Razon social del proveedor, de su ficha.
-        nulo_significa: La entidad no tiene ficha de proveedor, o no tiene razon social.
+        significado: >-
+          Razon social del proveedor, de su ficha (`prv.raz`), **en crudo**: sin
+          el `NULLIF(TRIM(...))` que si lleva `cif` aqui al lado. Una razon
+          social vacia llega como **cadena vacia**, no como NULL.
+        nulo_significa: >-
+          La entidad contratada **no tiene ficha de proveedor**: el `LEFT JOIN`
+          con `raw.prv` no casa. Ver `es_proveedor`. **No** significa que la
+          ficha exista sin razon social; ese caso trae cadena vacia.
       es_proveedor: >-
         Si la entidad contratada tiene ficha de proveedor en Sigrid. FALSE
         significa que se contrato a alguien que no esta dado de alta como

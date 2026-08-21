@@ -102,15 +102,18 @@ objetos:
         agregacion: no_sumable
       entidad_nombre: Nombre del proveedor o del cliente, de `con.res`.
       entidad_cif:
-        significado: CIF de la entidad. Solo esta relleno para los proveedores.
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
         nulo_significa: >-
-          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
-          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
-          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
-          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
-          proveedor con el CIF en blanco trae **cadena vacia**. Para
-          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
-          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
       obra_id:
         significado: >-
           Obra a la que se atribuye la retencion, resuelta en cascada. Primero
@@ -281,15 +284,18 @@ objetos:
         agregacion: no_sumable
       entidad_nombre: Nombre de la entidad, de `con.res`.
       entidad_cif:
-        significado: CIF de la entidad. Solo esta relleno para los proveedores.
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
         nulo_significa: >-
-          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
-          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
-          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
-          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
-          proveedor con el CIF en blanco trae **cadena vacia**. Para
-          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
-          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
       num_movimientos:
         significado: Cuantos efectos hay detras de las cifras de la fila.
         agregacion: suma
@@ -492,15 +498,18 @@ objetos:
         nulo_significa: El documento origen no tenia fecha informada.
       entidad_nombre: Nombre del proveedor o del cliente.
       entidad_cif:
-        significado: CIF de la entidad. Solo relleno para proveedores.
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
         nulo_significa: >-
-          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
-          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
-          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
-          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
-          proveedor con el CIF en blanco trae **cadena vacia**. Para
-          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
-          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
       codigo_obra:
         significado: Codigo de la obra a la que se atribuyo el efecto.
         nulo_significa: >-
@@ -580,15 +589,18 @@ objetos:
         nulo_significa: El documento origen no tenia fecha informada.
       entidad_nombre: Nombre del proveedor o del cliente.
       entidad_cif:
-        significado: CIF de la entidad. Solo relleno para proveedores.
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
         nulo_significa: >-
-          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
-          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
-          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
-          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
-          proveedor con el CIF en blanco trae **cadena vacia**. Para
-          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
-          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
       codigo_obra:
         significado: Codigo de la obra a la que se atribuyo el efecto.
         nulo_significa: El efecto no se pudo atribuir a una obra.

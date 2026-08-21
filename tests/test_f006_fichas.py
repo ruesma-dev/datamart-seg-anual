@@ -2327,3 +2327,94 @@ def test_f006_r2_control_el_guardian_de_nulos_sigue_detectando() -> None:
     assert re.match(r"\s*(\w+)\.(\w+)\s+AS\b", sql_compuesto) is None, (
         "una expresión compuesta no es una proyección desnuda y no se analiza"
     )
+
+
+# ---------------------------------------------------------------------------
+# El NULL existe, pero no significa lo que la ficha dice (10ª pasada)
+# ---------------------------------------------------------------------------
+#
+# El guardián de arriba comprueba si el NULL **puede ocurrir**. Estos dos casos
+# pasaban por él porque el NULL sí ocurre —la columna llega por `LEFT JOIN`— y
+# aun así la ficha mentía sobre **qué significa**:
+#
+#   `maestro.proveedores_obra.razon_social` · «la entidad no tiene ficha de
+#       proveedor, **o no tiene razón social**». La segunda mitad es falsa:
+#       `pv.raz` se proyecta en crudo, así que una razón social vacía llega como
+#       **cadena vacía**. El NULL solo sale del join que no casa.
+#
+#   Su hermana `maestro.proveedores.razon_social` se corrigió en la tanda
+#   anterior y esta se quedó atrás. Octavo caso del patrón, y esta vez entre dos
+#   fichas tocadas **el mismo día**.
+#
+# Lo derivable es esto: **sin `NULLIF`, el valor vacío del origen no llega como
+# NULL**, así que una ficha no puede atribuir su NULL a que el dato esté en
+# blanco. Que el `LEFT JOIN` produzca NULL por otra razón no la salva: son dos
+# causas distintas y la ficha publica la que no es.
+
+#: Cómo se escribe «el dato venía vacío». Si aparece en un `nulo_significa` de
+#: una columna proyectada sin `NULLIF`, la ficha atribuye el NULL a un caso que
+#: produce cadena vacía o cero.
+_ATRIBUYE_A_VALOR_VACIO = (
+    "en blanco",
+    "sin informar",
+    "no informado",
+    "no informada",
+    "no llevaba",
+    "no tiene razon social",
+    "no tiene descripcion",
+    "no tiene codigo",
+    "no tiene nombre",
+    "no tiene cif",
+)
+
+
+@pytest.mark.parametrize("nombre", sorted(f.nombre for f in _fichas_con_columnas()))
+def test_f006_r2_un_nulo_sin_nullif_no_se_atribuye_a_un_valor_vacio(nombre: str) -> None:
+    ficha = _diccionario().por_nombre[nombre]
+    ficheros = _ficheros_que_pueblan().get(nombre.lower(), ())
+    if not ficheros:
+        pytest.skip(f"{nombre} no tiene un SQL de origen legible")
+    sql = "\n".join((DIR_SQL / f).read_text(encoding="utf-8") for f in ficheros)
+    bloque = _bloque_del_objeto(sql, nombre)
+    # Alias de `raw` de CUALQUIER tipo de join: aquí no importa si el join puede
+    # producir NULL —importa que el valor llegue del origen sin normalizar—.
+    alias_raw = set(
+        re.findall(r"\braw\.\w+\s+(?:AS\s+)?(\w+)\b", sql, re.IGNORECASE)
+    )
+
+    culpables: list[str] = []
+    for columna in ficha.columnas:
+        if not columna.nulo_significa:
+            continue
+        proyeccion = _proyeccion_de(bloque, columna.nombre)
+        if proyeccion is None:
+            continue
+        # Solo una proyección DESNUDA `alias.columna`: si hay `NULLIF`, `TRIM`,
+        # `COALESCE` o un `CASE`, el vacío sí puede haberse convertido en NULL.
+        directa = re.match(r"\s*(\w+)\.\w+\s+AS\b", proyeccion, re.IGNORECASE)
+        if not directa:
+            continue
+        # Y que venga de `raw`. Una columna que sale de otro objeto del datamart
+        # puede haberse normalizado aguas arriba: `compras.fact_compras_linea`
+        # toma `proveedor_cif` de `compras.contratos`, que ya aplica
+        # `NULLIF(TRIM(...))`, así que allí el NULL por «en blanco» sí es cierto.
+        if directa.group(1) not in alias_raw:
+            continue
+        texto = columna.nulo_significa.lower()
+        frases = [f for f in _ATRIBUYE_A_VALOR_VACIO if f in texto]
+        if frases:
+            culpables.append(f"{columna.nombre} -> {frases} | {proyeccion.strip()}")
+
+    assert culpables == [], (
+        f"{nombre} atribuye su NULL a un valor vacío del origen, y la columna se "
+        f"proyecta SIN `NULLIF`: un valor vacío llega como cadena vacía (o como 0 "
+        f"en los enteros), nunca como NULL. {culpables}"
+    )
+
+
+def test_f006_r2_control_el_detector_de_atribucion_muerde() -> None:
+    """Con el caso real, para que no se degrade a cero en silencio."""
+    proyeccion = "    pv.raz                      AS razon_social,"
+    assert re.match(r"\s*\w+\.\w+\s+AS\b", proyeccion, re.IGNORECASE)
+    texto = "la entidad no tiene ficha de proveedor, o no tiene razon social."
+    assert [f for f in _ATRIBUYE_A_VALOR_VACIO if f in texto] == ["no tiene razon social"]
