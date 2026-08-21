@@ -4,10 +4,24 @@
 ## F-006 · El diccionario semántico del datamart — `in_progress`
 
 Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**, y corregidos los
-defectos de la séptima, la octava y la **novena** pasada de review.
+defectos de la séptima a la **décima** pasada de review.
 
 `bash harness/init.sh` en verde: **1758 tests**, 127 saltados, cobertura de las
 líneas cambiadas **99,0 %** (715 de 722).
+
+### Lo que la décima añade
+
+Tres cosas que valen para cualquier feature de este arnés:
+
+- **Una comprobación cruzada es ciega para lo que solo aparece una vez.** La de
+  `agregacion` compara la misma columna entre objetos; medido, **32** columnas
+  del ámbito de `R-IMPORTE-MES` están solas y nadie las mira. Se cerró la parte
+  derivable y **el resto está declarado con su número**.
+- **Un barrido sobre el fichero crudo no ve lo que el YAML pliega.** Hay que
+  barrer el crudo (por los comentarios) **y** el cargado (por las frases
+  partidas por el ajuste de línea).
+- **Un recuento a mano en un docstring envejece.** Dos se desfasaron en una sola
+  tanda; ahora se miden en un test y el número vive en un sitio.
 
 ### La lección de la novena, que va antes que ninguna otra
 

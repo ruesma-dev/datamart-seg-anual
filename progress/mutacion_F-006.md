@@ -1,7 +1,7 @@
 <!-- progress/mutacion_F-006.md -->
 # F-006 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-006` el 2026-08-21 09:47.
+Generado por `python -m harness.mutacion --feature F-006` el 2026-08-21 10:42.
 
 ## Alcance
 
@@ -28,7 +28,7 @@ Origen del diff: **rama** (`4b1d3029c4ea47fb560ee59d70d04d2f2173c0a8` .. `featur
 | Muertos | 166 |
 | Supervivientes | 0 |
 | Timeouts | 0 |
-| Tiempo total | 812.1 s |
+| Tiempo total | 738.8 s |
 | Muestreo | no: campaña completa |
 
 ## Supervivientes

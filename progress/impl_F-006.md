@@ -3251,3 +3251,42 @@ filtro `IS NOT NULL` es inerte— **se sostiene**, pero el ejemplo no:
 Cambia el ejemplo, no la conclusión: se nombra la guarda que **sí** actúa y se
 dice lo accionable, que es comparar contra `0` y no contra NULL. Un ejemplo
 inejecutable es una afirmación falsa aunque la conclusión sea cierta.
+
+## Evidencias tras la décima review
+
+| Evidencia | Valor | Como se obtiene |
+|---|---|---|
+| **Tests ejecutados** | **1895 pasan, 0 fallan**, 122 saltados (1096 de F-006) | `bash harness/init.sh` |
+| **Cobertura de las lineas cambiadas** | **99,0 %** (715 de 722; umbral 80 %, nivel `critico`) | linea `PUERTA COBERTURA` |
+| **Mutantes / supervivientes** | **166 generados, 166 muertos, 0 supervivientes, 0 timeouts** en 738,8 s | `python -m harness.mutacion --feature F-006 --timeout 300` |
+| **Objetos documentados** | **102 de 102**, `pendientes` en 0 | `config/diccionario/` |
+
+Campana lanzada **borrando `__pycache__` a mano antes**: `harness/mutacion.py`
+sigue intacto —su arreglo es **F-041**—.
+
+### Comprobaciones anadidas, todas con control
+
+| Comprobacion | Que caza | Su control |
+|---|---|---|
+| NULL atribuido a un valor vacio sin `NULLIF` | los defectos 1 y 2, que el guardian anterior no veia porque ahi el NULL **si** ocurre | el caso real (`pv.raz`), fijado |
+| un porcentaje no se declara sumable | `pct_acumulado` y `pct_mes`, invisibles para la comprobacion cruzada | que haya al menos ocho porcentajes que mirar |
+| barrido sobre el YAML **cargado** | frases rechazadas **plegadas**, que el barrido crudo no ve | el experimento del reviewer, plantado y comprobado |
+| alcance del guardian de nulos | que un detector se degrade en silencio | mide y fija el numero |
+| tablas pobladas fuera del DDL | idem, y sustituye a una lista a mano que decia tres de cinco | las deriva |
+
+### Limites declarados, con su numero
+
+- **La comprobacion cruzada de `agregacion` es ciega para las columnas unicas.**
+  Medido: **32** de las columnas con `agregacion` del ambito de `R-IMPORTE-MES`
+  aparecen en un solo objeto. Se cierra la parte derivable (porcentajes) y el
+  resto queda **declarado en un test que salta si el hueco cambia de tamano**.
+- El detector de atribucion solo mira **proyecciones desnudas desde `raw`**: una
+  columna que sale de otro objeto del datamart puede haberse normalizado aguas
+  arriba, y exigirlo alli marcaria de mas.
+- `azure-apps/sigrid_tablas.md` sigue **fuera** de las fuentes de las que se
+  deriva.
+- Sigue sin ejecutarse la **bateria de 18 preguntas** (T39) ni
+  `check-diccionario` (T26): que una ficha sea correcta no demuestra que sea
+  suficiente.
+- Los **comentarios de `06_presupuesto.sql`** siguen mintiendo; corregirlos es de
+  F-025 y el guardian de F-011 lo impide con razon.
