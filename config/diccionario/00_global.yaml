@@ -213,8 +213,9 @@ reglas:
       Sigrid y el datamart no lee. Esa pregunta solo la responde
       `azure-apps/sigrid_tablas.md`, que es la conversion literal de un PDF de
       380 paginas y **no se deja segmentar de forma fiable**. Intentarlo produjo
-      dos afirmaciones falsas en dos revisiones seguidas —un `cen.res` que en
-      realidad es de `cenrep`, y una lista de excepciones con una sola acertada
+      dos afirmaciones falsas en dos revisiones seguidas —un campo `res`
+      atribuido a `cen` que en realidad es de `cenrep`, tabla que ni se
+      ingiere, y una lista de excepciones con una sola acertada
       de siete—. Para preguntar por una columna concreta, ese documento; para
       fiarse de una afirmacion, este repositorio.
 
@@ -396,10 +397,15 @@ convenciones:
     datetime.utcnow()). Compararlos contra un now() local da el desfase de
     Espana como antiguedad, que en verano son dos horas.
   identidad_sigrid: >-
-    En Sigrid `ide` es la clave universal y muchas tablas son "propiedades de
-    `con` 1:1": `obr.ide = con.ide`, y lo mismo `prv`, `dca`, `dcf`, `ctr`,
-    `rec`, `pag` y `cob`. El codigo (`cod`), el nombre (`res`) y la fecha
-    (`fec`) viven en `con`, no en la extension. `con.nom` NO existe.
+    En Sigrid `ide` es la clave universal, y hay tablas que son "propiedades de
+    `con` 1:1". **Lo que hay que saber antes de consultar `raw` esta en la regla
+    `R-SIGRID-CON`, que es la unica version**: cuales son esas tablas, de que
+    lado sale cada campo y que tablas no cuelgan de `con` en absoluto.
+
+    Esta entrada no lo repite a proposito. Cuando lo repetia, se quedo atras: la
+    regla corrigio donde vive cada campo y amplio la lista de tablas, y esta
+    convencion siguio publicando la version anterior, con dos tablas menos.
+    Eran dos versiones publicadas que se contradecian.
 
 # ===========================================================================
 # EJES DEL MODELO (R4)

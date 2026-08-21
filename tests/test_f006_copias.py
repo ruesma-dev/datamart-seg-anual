@@ -24,6 +24,7 @@ Este fichero mira el **texto crudo**: prosa, comentarios y todo.
 from __future__ import annotations
 
 import pathlib
+import re
 
 import pytest
 
@@ -95,3 +96,70 @@ def test_f006_r26_control_el_barrido_detecta_una_frase_plantada() -> None:
     inventado = "# esto usa la ingesta incremental\nversion: 1\n"
     vivas = [f for f in FRASES_RECHAZADAS if f in inventado]
     assert vivas == ["usa la ingesta incremental"]
+
+
+# ---------------------------------------------------------------------------
+# Toda la superficie PUBLICABLE, no solo las fichas (9ª pasada)
+# ---------------------------------------------------------------------------
+#
+# Séptimo caso del patrón de la copia, y el primero que llegó a publicarse
+# después de corregido: `00_global.yaml` → `convenciones.identidad_sigrid`
+# conservaba la frase rechazada en la 7ª pasada —«el código, el nombre y la
+# fecha viven en `con`, no en la extensión»— **doce líneas por encima del punto
+# 3 de la regla que la corrige**, y con una lista divergente: ocho tablas frente
+# a diez.
+#
+# Los barridos anteriores miraban las fichas y las reglas. `convenciones` no es
+# ninguna de las dos: entra en `global_raw`, que el dominio describe como «lo
+# que se sirve tal cual». Se publica igual que lo demás.
+#
+# La lección, otra vez la misma: **el barrido tiene que cubrir toda la superficie
+# publicable**, no la parte donde recordamos que hubo un defecto.
+
+BLOQUES_PUBLICABLES = ("convenciones", "esquemas", "ordenes_de_magnitud", "ejes")
+
+
+def _global_publicable() -> str:
+    """Todo el texto del bloque global que acaba en `_meta`, sin comentarios."""
+    import yaml
+
+    datos = yaml.safe_load((DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8"))
+    return str(datos)
+
+
+def test_f006_r26_el_bloque_global_publicable_no_conserva_frases_rechazadas() -> None:
+    """`convenciones` se publica, así que se barre como todo lo demás."""
+    texto = _global_publicable()
+    vivas = [
+        f"«{frase}» ({motivo})"
+        for frase, motivo in FRASES_RECHAZADAS.items()
+        if frase in texto
+    ]
+    assert vivas == [], (
+        f"el bloque global publica {len(vivas)} frase(s) ya rechazada(s): {vivas}. "
+        f"`global_raw` se sirve tal cual, así que un `convenciones` desfasado "
+        f"llega al agente igual que una ficha"
+    )
+
+
+def test_f006_r26_la_convencion_de_sigrid_no_duplica_la_regla() -> None:
+    """Una convención que repite una regla es una copia esperando a divergir.
+
+    Ya divergió: la convención decía ocho tablas «propiedades de `con`» y la
+    regla diez, y la convención afirmaba dónde vive cada campo cuando la regla
+    ya había dejado de afirmarlo.
+    """
+    import yaml
+
+    datos = yaml.safe_load((DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8"))
+    convencion = str(datos["convenciones"]["identidad_sigrid"])
+
+    assert "R-SIGRID-CON" in convencion, (
+        "la convención tiene que remitir a la regla, que es la única versión"
+    )
+    tablas = set(re.findall(r"`(\w+)`", convencion))
+    del tablas  # solo para dejar claro que no se comprueba una lista: no debe haberla
+    assert "viven en `con`" not in convencion, (
+        "la convención vuelve a afirmar dónde vive cada campo; eso es del punto 3 "
+        "de la regla, y tenerlo en dos sitios es lo que produjo la divergencia"
+    )
