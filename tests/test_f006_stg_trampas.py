@@ -471,3 +471,106 @@ def test_f006_r26_el_ejemplo_del_anio_cero_lo_soporta_el_sql() -> None:
         "tiene que decir cuál es la guarda que SÍ actúa, ya que la del `WHERE` "
         "no hace nada"
     )
+
+
+# ---------------------------------------------------------------------------
+# El aviso del duplicado se DERIVA, no se propaga a mano (13ª pasada)
+# ---------------------------------------------------------------------------
+#
+# Van **cuatro** veces que una propagación deja fuera a una hermana. La cuarta
+# fue `mart.v_pbi_fact_categoria`, que sirve `importe_origen` **a las tarjetas de
+# KPI de Power BI** y se quedó sin una palabra del problema.
+#
+# El patrón es siempre el mismo: corrijo donde me señalan y mantengo a mano una
+# lista de quién más está afectado. Así que la lista deja de mantenerse a mano:
+# se deriva de quién lee la familia del fact **y publica una medida**.
+
+#: Las columnas cuyo valor depende del duplicado. Una ficha que las publique y
+#: no avise manda a alguien a sumar mal.
+_MEDIDAS_DEL_FACT = (
+    "importe_mes",
+    "importe_origen",
+    "importe_mes_raw",
+    "importe_origen_raw",
+    "can_mes",
+    "can_origen",
+    "total_incurrido",
+    "total_incurrido_mes",
+)
+
+
+def _objetos_que_sirven_medidas_del_fact() -> list[str]:
+    """Fichas de `mart` que leen del fact y publican alguna de sus medidas.
+
+    Las dimensiones (`v_pbi_dim_*`) leen del fact para sacar el calendario o el
+    catálogo de obras, pero **no publican medidas**, así que el duplicado no las
+    afecta y no tienen que avisar de nada.
+    """
+    afectados: list[str] = []
+    for ficha in _dicc().fichas:
+        if ficha.esquema != "mart":
+            continue
+        origen = _ficheros_del_objeto(ficha.nombre)
+        if not origen:
+            continue
+        sql = "\n".join(origen)
+        if not re.search(r"FROM\s+mart\.fact_seguimiento_(mensual|categoria)", sql):
+            continue
+        if any(c.nombre in _MEDIDAS_DEL_FACT for c in ficha.columnas):
+            afectados.append(ficha.nombre)
+    return sorted(afectados)
+
+
+def _ficheros_del_objeto(nombre: str) -> list[str]:
+    from tests.test_f006_fichas import _ficheros_que_pueblan
+
+    raiz = pathlib.Path(__file__).resolve().parents[1]
+    base = raiz / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
+    return [
+        (base / f).read_text(encoding="utf-8")
+        for f in _ficheros_que_pueblan().get(nombre.lower(), ())
+    ]
+
+
+def test_f006_r10_control_la_derivacion_encuentra_los_afectados() -> None:
+    """Sin esto, un cambio de nombre dejaría la lista vacía y el test en verde."""
+    afectados = _objetos_que_sirven_medidas_del_fact()
+    assert len(afectados) >= 4, f"solo {afectados}: la derivación se ha quedado corta"
+    assert "mart.v_pbi_fact_categoria" in afectados, (
+        "es la que la propagación a mano dejó fuera, y sirve `importe_origen` a "
+        "las tarjetas de KPI"
+    )
+    # Y que NO arrastre las dimensiones, que no publican medidas.
+    assert not [o for o in afectados if ".v_pbi_dim_" in o]
+
+
+@pytest.mark.parametrize("objeto", _objetos_que_sirven_medidas_del_fact())
+def test_f006_r10_todo_objeto_que_sirve_medidas_del_fact_avisa(objeto: str) -> None:
+    """Quien publica una medida del fact tiene que decir que hay duplicado."""
+    ficha = _dicc().por_nombre[objeto]
+    texto = f"{ficha.descripcion} {ficha.grano or ''}"
+    assert "8.778" in texto, (
+        f"{objeto} sirve medidas de `mart.fact_seguimiento_mensual` y no avisa "
+        f"de sus 8.778 combinaciones duplicadas"
+    )
+
+
+@pytest.mark.parametrize("objeto", _objetos_que_sirven_medidas_del_fact())
+def test_f006_r10_el_aviso_no_alarma_sobre_la_medida_sana(objeto: str) -> None:
+    """El aviso estuvo INVERTIDO y es lo peor que le puede pasar a uno.
+
+    Decía «el importe viene inflado» en bloque. Medido contra la base sobre 200
+    series afectadas: `importe_mes` **telescopea** y su suma es correcta en
+    200/200, mientras `SUM(importe_origen)` solo coincide en 28/200. O sea que el
+    aviso alarmaba sobre la medida sana y callaba sobre la enferma: quien lo
+    leyera evitaría `importe_mes`, que está bien, y sumaría `importe_origen`, que
+    está mal.
+    """
+    ficha = _dicc().por_nombre[objeto]
+    texto = f"{ficha.descripcion} {ficha.grano or ''}"
+    if "importe_mes" not in [c.nombre for c in ficha.columnas]:
+        pytest.skip(f"{objeto} no publica `importe_mes`")
+    assert "telescopea" in texto or "telescopean" in texto, (
+        f"{objeto} avisa del duplicado sin decir que las medidas del MES se "
+        f"pueden sumar igualmente: sin eso, el aviso se lee como que todo está mal"
+    )

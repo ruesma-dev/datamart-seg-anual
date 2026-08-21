@@ -39,11 +39,27 @@ objetos:
       `version_descripcion` y `total_incurrido`—, asi que **no se puede alargar
       la clave con lo que hay publicado**.
 
-      **Consecuencias practicas, y son de numero:** un `SUM(importe_origen)`
-      agrupando por esa clave **cuenta dos veces** el mismo importe en esas
-      filas (en el ejemplo, 27.850,08 aparece en las dos), y un `JOIN` por la
-      clave declarada produce fan-out. Los ambitos master (8 y 11) no estan
-      afectados.
+      **Que se puede sumar y que no, MEDIDO contra la base sobre 200 series
+      afectadas (2026-08-21). No es lo mismo para todas las columnas:**
+
+      - **Las medidas del MES se pueden sumar con normalidad**: `importe_mes`,
+        `importe_mes_raw`, `can_mes` y `total_incurrido_mes` **telescopean**
+        —cada fila trae la diferencia con la anterior, y el `LAG` particionado
+        hace que las dos filas del mes duplicado sumen exactamente el movimiento
+        del mes—. Comprobado: `SUM(importe_mes)` iguala al ultimo
+        `importe_origen` en **200 de 200** series.
+      - **Las medidas ACUMULADAS A ORIGEN no**: `importe_origen`,
+        `importe_origen_raw`, `can_origen` y `total_incurrido` traen el llevado
+        hasta ese mes, asi que las dos filas **repiten el mismo acumulado** y
+        sumarlas cuenta dos veces. Comprobado: `SUM(importe_origen)` solo
+        coincide con el ultimo valor en **28 de 200**. De todos modos estas
+        columnas ya son `ultimo_valor`: no se suman **nunca**, ni con duplicado
+        ni sin el.
+
+      O sea: **el duplicado no rompe ninguna suma que ya estuviera bien
+      planteada**. Rompe el `count(*)`, rompe cualquier `JOIN` por la clave
+      declarada —fan-out— y rompe a quien sume una columna `_origen`, que ya
+      estaba mal antes. Los ambitos master (8 y 11) no estan afectados.
 
       Mientras no se corrija el build, para totales fiables hay que **agregar
       tambien por `nombre_mes`** o quedarse con una sola fase por mes. Esta
@@ -267,14 +283,19 @@ objetos:
       clave de negocio. Es la suma de todas las partidas de esa obra y mes que
       comparten categoria.
 
-      **Hereda el duplicado de `mart.fact_seguimiento_mensual`, y aqui es PEOR
-      de detectar.** Alli hay 8.778 combinaciones con dos filas (22 obras con
-      dos fases que Sigrid tiene con el mismo `ano` y `mes`; medido el
-      2026-08-21). Como esta tabla **agrega**, las dos filas se suman en una:
-      la clave NO duplica —comprobado, sin contradiccion— pero **el importe de
-      esas obras y meses viene inflado**. Un duplicado que se ve se corrige; uno
-      que se suma no se nota. Afecta a `Coste Real` y `Venta Real`; los master
-      no.
+      **Hereda el duplicado de `mart.fact_seguimiento_mensual`**: alli hay 8.778
+      combinaciones con dos filas (22 obras con dos fases que Sigrid tiene con
+      el mismo `ano` y `mes`; medido el 2026-08-21). Como esta tabla **agrega**,
+      las dos filas se funden en una y **la clave no duplica** —comprobado, sin
+      contradiccion—.
+
+      **Que le pasa a cada medida, medido y no supuesto:** `importe_mes` **sale
+      bien**, porque las dos filas del origen telescopean y su suma es
+      exactamente el movimiento del mes (200 de 200 series). `importe_origen`
+      **sale sumado dos veces**, porque las dos filas repiten el mismo
+      acumulado. Por eso esa columna es `ultimo_valor` y no se suma nunca: aqui
+      ya viene agregada, asi que **no la uses para un total** —usa la serie de
+      `importe_mes`—. Afecta a `Coste Real` y `Venta Real`; los master no.
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -379,8 +400,14 @@ objetos:
       `partida_id`, `anio_mes`, `escenario`) **y, con el, su defecto**. Es un
       `SELECT ... FROM mart.fact_seguimiento_mensual` sin filtro ni agregacion,
       asi que las 8.778 combinaciones duplicadas de la tabla (medido el
-      2026-08-21) **llegan intactas a Power BI**. Ver el grano de
-      `mart.fact_seguimiento_mensual` para la causa y el apano.
+      2026-08-21) **llegan intactas a Power BI**.
+
+      **Que se puede sumar**: las medidas del MES (`importe_mes` y sus
+      hermanas) **telescopean**, asi que sumarlas sigue siendo correcto
+      —comprobado, 200 de 200 series—. Las acumuladas a origen
+      (`importe_origen`…) repiten el mismo valor en las dos filas, y por eso
+      son `ultimo_valor`: no se suman nunca. Ver el grano de
+      `mart.fact_seguimiento_mensual` para la causa completa.
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -480,6 +507,15 @@ objetos:
       Version aligerada del preagregado por categoria: identificadores, importes
       y cuantas partidas se han sumado. Para tarjetas de KPI y matrices por
       capitulo sin bajar a partida.
+
+      **Sirve medidas afectadas por el duplicado del fact, y es la ficha donde
+      mas importa**: alimenta las tarjetas de KPI. Debajo esta
+      `mart.fact_seguimiento_categoria`, que agrega las 8.778 combinaciones
+      duplicadas de `mart.fact_seguimiento_mensual` (22 obras con dos fases que
+      Sigrid tiene con el mismo `ano` y `mes`; medido el 2026-08-21).
+      `importe_mes` **sale bien**, porque las dos filas del origen telescopean
+      —comprobado, 200 de 200 series—; `importe_origen` viene **sumado dos
+      veces**, asi que no lo uses para un total: usa la serie de `importe_mes`.
     grano: >-
       Una fila por (`obra_id`, `anio_mes`, `categoria`, `escenario`).
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
@@ -981,8 +1017,14 @@ objetos:
       `mart.fact_seguimiento_mensual`, donde esa combinacion **no identifica una
       fila** en 8.778 casos (medido el 2026-08-21). Como hoy la tabla de reglas
       esta vacia y esta vista es un paso a traves, el duplicado llega **tal
-      cual**. Ver el grano de `mart.fact_seguimiento_mensual` para la causa y el
-      apano.
+      cual**.
+
+      **Que se puede sumar**: las medidas del MES (`importe_mes` y sus
+      hermanas) **telescopean**, asi que sumarlas sigue siendo correcto
+      —comprobado, 200 de 200 series—. Las acumuladas a origen
+      (`importe_origen`…) repiten el mismo valor en las dos filas, y por eso
+      son `ultimo_valor`: no se suman nunca. Ver el grano de
+      `mart.fact_seguimiento_mensual` para la causa completa.
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno
