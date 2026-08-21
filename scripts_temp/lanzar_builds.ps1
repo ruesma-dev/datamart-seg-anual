@@ -36,8 +36,9 @@ print(round(pg.medir_ocupacion_disco_pct(total), 2))
 function Actualizar-Firewall {
     $ip = (Invoke-RestMethod -Uri "https://api.ipify.org?format=json").ip
     Write-Host "IP del puesto: $ip" -ForegroundColor Cyan
+    # OJO: en este comando -n/--name es la REGLA; el servidor va en --server-name.
     az postgres flexible-server firewall-rule update `
-        --resource-group $GRUPO --name $SERVIDOR -n $REGLA `
+        --resource-group $GRUPO --server-name $SERVIDOR -n $REGLA `
         --start-ip-address $ip --end-ip-address $ip --output none
     if ($LASTEXITCODE -ne 0) { throw "No se pudo actualizar la regla $REGLA" }
     Write-Host "Regla $REGLA apuntando a $ip" -ForegroundColor Green
