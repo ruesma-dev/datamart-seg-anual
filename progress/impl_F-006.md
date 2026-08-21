@@ -3290,3 +3290,152 @@ sigue intacto —su arreglo es **F-041**—.
   suficiente.
 - Los **comentarios de `06_presupuesto.sql`** siguen mintiendo; corregirlos es de
   F-025 y el guardian de F-011 lo impide con razon.
+
+---
+
+# T26 cerrado, y la tanda contra Azure BLOQUEADA en el primer paso
+
+## T26 · la comprobación de unicidad, generada y sin ejecutar
+
+Cierra la mitad del problema que la puerta offline no puede cubrir: sabe si la
+clave nombra columnas de más, **no si es demasiado corta**. Y esa mitad se
+propaga, porque la detección de fan-out **deriva** la unicidad de la clave
+declarada: una clave reducida además desarma la comprobación de cardinalidades.
+
+`etl_sigrid/infrastructure/postgres/unicidad_sql.py` + `main.py check-unicidad`.
+
+**Alcance, derivado del diccionario y no de una lista:**
+
+| | |
+|---|---|
+| Objetos de consumo (por defecto) | **47** |
+| Con `--todos` | **56** |
+| De ellos, con **clave compuesta** | **26** — ahí vive el riesgo |
+| Saltados | 55, cada uno con su motivo |
+
+**Qué se salta y por qué**: las funciones (no tienen filas), las fichas sin
+clave, las claves sustitutas (BIGSERIAL o PK: únicas por construcción) y **las
+31 de `raw`**, que se ingieren con `ensure_raw_table(..., primary_key=id_column)`
+y por tanto tienen `ide` como PRIMARY KEY. Comprobarlas sería pagar un escaneo
+completo por lo que el motor ya impide, y varias son de las tablas más grandes.
+
+**Decisión de coste, que es lo que pediste justificar.** Esto corre contra
+`psql-albaranes-rs9k2`, compartido con `albaranes` y `partes` **en producción**:
+
+- **Por defecto, solo la superficie de consumo.** Es donde una clave corta
+  produce un número falso en una respuesta; fuera de ahí el objeto no debería
+  consultarse y su propia ficha dice a dónde ir. `--todos` es la pasada
+  completa, para una ventana tranquila: `stg.plan_mensual` ronda los **29
+  millones de filas** y esto es una agregación sobre cinco columnas.
+- **`SET LOCAL statement_timeout` por consulta** (30 s por defecto) y
+  transacción **`READ ONLY`**. `SET LOCAL` no toca la configuración del
+  servidor, así que no afecta a los otros dos proyectos.
+- **Nada de muestreo, y es deliberado.** Una muestra limpia **no prueba**
+  unicidad, así que muestrear debilitaría la única comprobación que cierra este
+  hueco. En su lugar, si el tiempo salta, el objeto se reporta **NO
+  COMPROBADO** —nunca como correcto—: contar un timeout como OK convertiría el
+  límite que protege el servidor en una forma de aprobar sin mirar.
+
+**Cómo se lee un resultado vacío**, y está en el mensaje, no solo en el
+docstring:
+
+> `OK  <objeto>: los datos de hoy no contradicen la clave (…). No prueba que sea
+> correcta; prueba que aun no ha colisionado.`
+
+Una clave puede ser insuficiente y no haber colisionado todavía: basta con que
+ninguna obra haya repetido aún esa combinación.
+
+**Un duplicado dice objeto, clave, cuántas combinaciones se repiten, cuántas
+filas afectan, el efecto de segundo orden sobre el fan-out y la consulta para
+ver cuáles son.**
+
+**No se ha ejecutado ninguna**: `--dry-run` imprime y no conecta, y el cliente
+se prueba con dobles, como el bloque E. 15 tests.
+
+## El bloqueo: `az` exige MFA para escribir
+
+Con la firma del humano intenté el paso 2 (el firewall) y **paré**.
+
+**Lo que SÍ funciona** — lectura contra Azure con el token en caché:
+
+```
+$ az account show --query "{sub:name, user:user.name}" -o tsv
+Ruesma	<usuario>
+
+$ az postgres flexible-server firewall-rule list -g rg-albaranes-dev \
+    --server-name psql-albaranes-rs9k2 -o table
+EndIpAddress    Name                                    StartIpAddress
+--------------  --------------------------------------  ----------------
+0.0.0.0         AllowAzureServices                      0.0.0.0
+31.4.242.255    datamart-puesto-pgris-2026-08-17-rango  31.4.242.0
+80.28.223.30    FirewallIPAddress_2026-6-16_16-42-54    80.28.223.30
+68.221.221.85   caj-datamart-seg-dev                    68.221.221.85
+88.26.46.154    datamart-puesto-pgris                   88.26.46.154
+188.87.59.11    ClientPgris                             188.87.59.11
+90.160.92.88    datamart-puesto-pgris-2026-08-18        90.160.92.88
+77.211.5.255    datamart-puesto-pgris-2026-08-19        77.211.5.0
+176.80.159.179  datamart-puesto-pgris-2026-08-20        176.80.159.179
+```
+
+**Lo que NO** — la escritura, que es justo la que la firma autoriza:
+
+```
+$ IP=$(curl -s https://api.ipify.org)   # 88.26.22.183
+$ az postgres flexible-server firewall-rule update -g rg-albaranes-dev \
+    -s psql-albaranes-rs9k2 -n datamart-puesto-pgris \
+    --start-ip-address "$IP" --end-ip-address "$IP"
+
+ERROR: SubError: basic_action V2Error: invalid_grant AADSTS50076: Due to a
+configuration change made by your administrator, or because you moved to a new
+location, you must use multi-factor authentication to access
+'<GUID-REDACTADO>'.
+    az logout
+    az login --tenant "…" --scope "https://management.core.windows.net//.default"
+```
+
+**`az login` es interactivo y exige MFA**, así que no lo puede hacer un agente.
+No he improvisado ninguna vía alternativa: la regla dice parar, y además esto va
+contra un servidor compartido en producción.
+
+**Y el bloqueo alcanza a toda la tanda**, no solo al firewall. La regla sigue
+apuntando a `88.26.46.154` y la IP de este puesto es ahora `88.26.22.183`, que
+no está en ninguna regla. Comprobado:
+
+```
+$ python -c "socket … connect(('psql-albaranes-rs9k2.postgres.database.azure.com', 5432))"
+puerto cerrado: TimeoutError timed out
+```
+
+Así que **T19, el bloque H y la ejecución de T26 quedan detrás de ese `az
+login`**: sin abrir el firewall no hay conexión a la base.
+
+### Lo que hace falta para desbloquear
+
+Una sola acción del humano, en una terminal suya:
+
+```
+az login
+```
+
+Y después, o bien la ejecuta él, o me deja seguir a mí:
+
+```
+IP=$(curl -s https://api.ipify.org)
+az postgres flexible-server firewall-rule update -g rg-albaranes-dev \
+  -s psql-albaranes-rs9k2 -n datamart-puesto-pgris \
+  --start-ip-address "$IP" --end-ip-address "$IP"
+```
+
+**Ojo con el parámetro**: es `-n / --name`, no `--rule-name`; con `--rule-name`
+falla con «unrecognized arguments», que fue mi primer intento.
+
+### Hallazgo de paso: la deuda D11 sigue ahí, y ha crecido
+
+El listado confirma **cuatro reglas fechadas e inútiles** en un servidor
+compartido —`…-2026-08-17-rango`, `…-2026-08-18`, `…-2026-08-19`,
+`…-2026-08-20`— más `ClientPgris` y `FirewallIPAddress_2026-6-16_16-42-54`, que
+también son IPs de puesto caducadas. Son **seis** entradas abiertas de más.
+
+**No las he tocado**: la firma autoriza *reescribir* la regla única, no borrar
+reglas de un servidor que comparten otros dos proyectos. Queda propuesto al
+humano; el runbook ya documenta el `firewall-rule delete`.

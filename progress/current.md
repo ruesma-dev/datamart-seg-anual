@@ -137,6 +137,34 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
+### BLOQUEADO · `az` exige MFA para escribir (2026-08-21)
+
+**T26 está cerrado** (la comprobación de unicidad, generada y sin ejecutar). Lo
+que toca la base **no ha podido arrancar**, y no por falta de firma: el humano
+firmó, pero el token de `az` no sirve para escribir.
+
+- **Lecturas contra Azure: funcionan.** `az account show` y
+  `firewall-rule list` devuelven datos con el token en caché.
+- **Escrituras: no.** `firewall-rule update` responde `AADSTS50076 … you must
+  use multi-factor authentication` y pide `az login`, que es **interactivo**.
+- **Y bloquea toda la tanda**: la regla `datamart-puesto-pgris` sigue en
+  `88.26.46.154`, la IP del puesto es `88.26.22.183`, y el puerto 5432 da
+  **timeout** desde aquí. Sin abrir el firewall no hay conexión, así que **T19,
+  el bloque H y la ejecución de T26 quedan detrás**.
+
+**Desbloqueo — una sola acción del humano** en su terminal:
+
+```
+az login
+```
+
+Después, la regla se reescribe con `-n datamart-puesto-pgris` (**no**
+`--rule-name`, que falla). Comandos exactos en `progress/impl_F-006.md`.
+
+**Hallazgo**: el listado confirma que **D11 ha crecido a seis** entradas
+caducadas en un servidor compartido. No las he tocado: la firma autoriza
+reescribir la regla única, no borrar reglas ajenas.
+
 ### Lo siguiente · la batería de aceptación (bloque K)
 
 Es lo que queda por hacer, y **en este orden**, porque cada paso depende del
