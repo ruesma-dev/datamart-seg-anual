@@ -3635,3 +3635,277 @@ Los 39 «sin contradicción» **no tienen la clave demostrada**. Los datos de ho
 la contradicen, que es otra cosa: una clave puede ser insuficiente y no haber
 colisionado todavía. `mart.fact_seguimiento_mensual` llevaba meses sin
 colisionar y colisionaba desde 2010.
+
+---
+
+# Duodécima pasada · tres graves, y las evidencias que faltaban
+
+## GRAVE 1 · El `READ ONLY` era mentira, y la mentira iba impresa
+
+`main.py` imprimía «transaccion READ ONLY» antes de lanzar contra el servidor
+compartido con producción, y `comprobar_unicidad` emitía **solo** el
+`statement_timeout`. El constructor que sí fabricaba `BEGIN READ ONLY … COMMIT`
+**lo llamaba únicamente el test**.
+
+El riesgo material era bajo —son `SELECT count(*)`— pero **la garantía era falsa
+y estaba anunciada**, que es peor que no anunciarla: quien lea esa línea deja de
+preguntarse si el comando puede escribir.
+
+**Aplicado de verdad.** No con `BEGIN READ ONLY`, que no vale aquí:
+`PostgresClient.connection()` devuelve la conexión **ya en transacción**
+(`INTRANS`), que es lo mismo que ya rompió el `autocommit`. Se emite
+`SET LOCAL transaction_read_only = on` junto al `statement_timeout`: misma
+garantía, aplicable a una transacción abierta, y acotada a ella.
+
+Y el test ya no comprueba el constructor sino **lo que el cliente ejecuta**:
+
+```python
+assert cursor.ejecutadas[:2] == list(previas)
+assert "GROUP BY" in cursor.ejecutadas[2]
+```
+
+### El barrido de constructores muertos
+
+Pediste mirar si había más. Lo hice a máquina sobre `unicidad_sql` y
+`diccionario_sql`, contando usos fuera de tests y fuera del propio módulo:
+
+```
+unicidad_sql.consultas_de_unicidad          -> 2
+unicidad_sql.objetos_saltados               -> 2
+unicidad_sql.sentencias_de_la_transaccion   -> 0     <<<
+unicidad_sql.interpretar_resultado          -> 2
+unicidad_sql.veredicto_no_comprobado        -> 2
+unicidad_sql.veredicto_no_existe            -> 2
+diccionario_sql.filas_diccionario           -> 2
+diccionario_sql.filas_reglas                -> 2
+diccionario_sql.cobertura_columnas          -> 0     (la usa `fila_publicacion`)
+diccionario_sql.fila_publicacion            -> 4
+diccionario_sql.resumen_publicacion         -> 2
+```
+
+**Uno, y era ese.** `cobertura_columnas` sale a 0 porque la consume otra función
+de su mismo módulo, no porque esté muerta. Queda un control permanente que barre
+las funciones públicas de `unicidad_sql` y falla si alguna solo la usa su test.
+
+## GRAVE 2 · Lo publicado no era lo del repositorio, y mentía donde más dolía
+
+El commit `726e009` publicaba **y además** editaba `mart.yaml` con el aviso del
+duplicado. No republiqué. Resultado: durante unas horas `_meta` sirvió el grano
+que decía que la clave del fact identifica una fila —**justo lo que T26 acababa
+de demostrar falso**— con `hash_fuente` obsoleto y `version` en 1.
+
+**Corregido en tres pasos.**
+
+**1. El aviso, propagado a las tres fichas que lo heredan**, derivadas de quién
+lee el fact en `sql/mart/`:
+
+| Ficha | Cómo le llega |
+|---|---|
+| `mart.v_pbi_fact` | `SELECT … FROM mart.fact_seguimiento_mensual` sin filtro: **el duplicado llega intacto a Power BI** |
+| `mart.v_fact_periodificado` | pasarela mientras `aux.periodificacion_partida` esté vacía: llega tal cual |
+| `mart.fact_seguimiento_categoria` | **AGREGA**, así que la clave NO duplica —T26 la dio sin contradicción— pero **las dos filas se suman: el importe viene inflado** |
+
+El tercero es el importante y no estaba dicho en ningún sitio: **un duplicado
+que se ve se corrige; uno que se suma no se nota.**
+
+**2. `version` sube a 2 y se republica**:
+
+```
+[info] diccionario_publicado     filas=116 hash_fuente=a7584ee84391 objetos=102
+                                 reglas=13 version=2
+[info] diccionario_publicado_ok  cobertura_cols=100.0 filas=116
+                                 hash_fuente=a7584ee8439110237b9a625e98a32c714b3903b05fcf43a37f379700cc0b7399
+                                 n_columnas=793 n_objetos=102 n_reglas=13 version=2
+[SUCCESS] publicar_diccionario   rows=116 duration=0.7s
+```
+
+Verificado en la base que las cuatro fichas avisan ya:
+
+```
+mart.fact_seguimiento_categoria -> avisa del duplicado: True
+mart.fact_seguimiento_mensual   -> avisa del duplicado: True
+mart.v_fact_periodificado       -> avisa del duplicado: True
+mart.v_pbi_fact                 -> avisa del duplicado: True
+publicado: ('2', 'a7584ee84391')
+```
+
+**3. El mecanismo detecta ahora esta situación por sí solo**, que era la parte
+que pedías. `check-diccionario` compara el `hash_fuente` de `_meta` con el de los
+YAML del árbol. Ejecutado **antes** de republicar, con el desfase todavía vivo:
+
+```
+KO   LO PUBLICADO NO ES LO DEL ARBOL. `_meta` sirve el hash 3339c397f39f
+     (version 1) y los YAML dan 9f5d5f2f5df4. Alguien edito una ficha y no
+     republico, asi que el MCP esta leyendo una version anterior. Se arregla con
+     `python main.py publicar-diccionario`, subiendo `version` si el cambio hay
+     que comunicarlo.
+```
+
+Y después:
+
+```
+OK   lo publicado ES lo del arbol (version 2, hash a7584ee84391)
+```
+
+## GRAVE 3 · El «bloque H» no lo producía ningún comando
+
+Cierto: `check-diccionario` no existía. La huérfana salió **de rebote**, de un
+`except UndefinedTable` del chequeo de unicidad, que recorre la superficie de
+consumo —**47 de 102**— y solo puede ver una de las tres clases de discrepancia.
+
+Implementado de frente en `etl_sigrid/infrastructure/postgres/catalogo.py` +
+`main.py check-diccionario`: los **102**, en las **tres** direcciones —publicado
+sin ficha, fichado que no existe, tipo que no casa—. Salida real:
+
+```
+Diccionario contra el catalogo real de Postgres
+  fichas: 102   objetos en la base: 101
+
+FICHADO Y NO EXISTE (1):
+  - cierre.v_pbi_planif_vs_real: fichado como vista y NO existe en la base. O
+    falta lanzar el build de `cierre` —la base va por detras del repositorio— o
+    la ficha sobra
+
+1 discrepancia(s). La puerta offline no puede verlas: lee el SQL del
+repositorio, no el catalogo.
+```
+
+**Cero publicados sin ficha y cero tipos mal, ahora sí sobre los 102.** Con su
+control: comparar contra un catálogo vacío tiene que dar 102 huérfanas, o el
+comparador no está comparando.
+
+**Un guardián propio hizo su trabajo.** El test que escribí diciendo «R28 no
+existe» se puso en rojo al implementarlo y **obligó a corregir los tres
+docstrings** que lo daban por futuro. Ahora comprueba la dirección contraria:
+que nadie lo siga dando por pendiente.
+
+## Las evidencias que faltaban
+
+### La salida de T19, completa
+
+Tenías razón en que la recorté donde dolía. El evento `diccionario_publicado_ok`
+lleva siempre `hash_fuente` y yo pegué la línea sin él. Va entera:
+
+```
+[info] diccionario_publicado     filas=116 hash_fuente=a6da19bac1e8 objetos=102
+                                 reglas=13 version=1
+[info] diccionario_publicado_ok  cobertura_cols=100.0 filas=116
+                                 hash_fuente=a6da19bac1e87c2289be6c04b2fe52a98b710746514568b5aa6973898dc6a99a
+                                 n_columnas=793 n_objetos=102 n_reglas=13 version=1
+[SUCCESS] publicar_diccionario   rows=116 duration=0.8s
+```
+
+### Las cuatro comprobaciones, con su salida
+
+**1 · Los objetos del contrato existen** (`information_schema.tables`,
+esquema `_meta`):
+
+```
+   diccionario             | BASE TABLE
+   diccionario_publicacion | BASE TABLE
+   diccionario_reglas      | BASE TABLE
+   etl_runs                | BASE TABLE
+   v_diccionario           | VIEW
+   v_frescura              | VIEW
+   v_raw_state             | VIEW
+```
+
+**2 · `v_diccionario`: 19 columnas y en el orden del contrato**:
+
+```
+   total: 19
+   ['esquema', 'objeto', 'tipo', 'capa', 'consumo_recomendado', 'descripcion',
+    'grano', 'clave_negocio', 'refresco', 'avisos', 'n_columnas', 'ficha',
+    'paso_etl', 'ultimo_ok_finished_at', 'horas_desde_ultimo_ok',
+    'ultimo_intento_status', 'diccionario_version', 'diccionario_publicado_en',
+    'motivo_no_consumo']
+```
+
+Las 18 del contrato en orden y `motivo_no_consumo` **la última**, que es la
+única forma compatible de crecer.
+
+**3 · El singleton**:
+
+```
+   (1, '1', 'a6da19bac1e8', datetime.datetime(2026, 8, 21, 19, 2, 43, 383050),
+    102, 13, 793, Decimal('100.00'))
+   filas: 1
+```
+
+**4 · Los dos `LEFT JOIN`**:
+
+```
+   total en v_diccionario: 102
+   sin paso_etl         : 4
+   con frescura resuelta: 58
+   reglas publicadas    : 13
+```
+
+Los 4 sin paso son los `refresco: estatico` —`aux.periodificacion_partida` y los
+tres de instrumentación de `_meta`— y **siguen saliendo**, que es lo que el
+`LEFT JOIN` prometía.
+
+### La causa raíz del duplicado, con su salida
+
+```
+=== fases de la obra 584748 con anio=2010 mes=6 ===
+   (124, 12, 2010, 6, 'Junio 2010',  2010-06-01)
+   (150, 13, 2010, 6, 'AGOSTO 2010', 2010-06-16)
+
+=== cuantas obras tienen dos fases con el mismo (anio,mes) ===
+   22 obras
+
+=== escenarios afectados ===
+   ('Coste Real', 4754)
+   ('Venta Real', 4024)
+
+=== siempre 2 filas, o mas? ===
+   filas por clave: 2 -> claves: 8778
+```
+
+Y la comparación fila a fila de una clave duplicada, que es lo que demuestra que
+**ninguna columna publicada distingue las dos**:
+
+```
+      partida_id            31783                 31783
+      anio_mes              2010-06-01            2010-06-01
+      escenario             Coste Real            Coste Real
+      importe_origen        27850.08              27850.08
+  >>> nombre_mes            Junio 2010            AGOSTO 2010
+  >>> version_descripcion   Junio 2010            AGOSTO 2010
+  >>> total_incurrido       0.00                  27850.09
+  >>> total_incurrido_mes   0.00                  27850.09
+```
+
+`importe_origen` **idéntico en las dos**: por eso un `SUM` cuenta dos veces.
+
+### Los siete NO COMPROBADO, con nombre
+
+Los perdí en el informe anterior y tenías razón en que se deducía de mis propios
+números que uno era el fact. Pasada completa con `--timeout 60`:
+
+```
+?  cierre.v_pbi_cierre_indirectos_detalle  (obra_id, anio_mes, grupo_cod, subcategoria_cod)
+?  compras.v_pbi_partida_coste             (obra_id, codigo_obra, partida_id, codigo_partida, …)
+?  mart.fact_seguimiento_mensual           (obra_id, partida_id, anio_mes, escenario)
+?  mart.v_master_versiones_tipadas         (obra_id, ambito_id, version)
+?  mart.v_master_vigente_anual             (obra_id, anio, ambito_id)
+?  mart.v_pbi_cp_tipologia                 (obra_id, anio, tipologia)
+?  mart.v_pbi_fact                         (obra_id, partida_id, anio_mes, escenario)
+
+!  cierre.v_pbi_planif_vs_real             FICHADO Y NO EXISTE
+
+Resumen: 39 sin contradiccion, 0 con la clave rota, 7 sin comprobar,
+         1 fichados que no existen en la base.
+```
+
+**Y esto es la demostración de por qué un timeout no puede contarse como OK.**
+`mart.fact_seguimiento_mensual` sale NO COMPROBADO con 30 s y con 60 s. Solo con
+**180 s** reveló que su clave está rota en 8.778 casos. Si el diseño hubiera
+tratado el timeout como «sin problemas», el defecto más grave de la feature
+—en la tabla central— habría quedado enterrado bajo un verde, y encima con la
+excusa de proteger un servidor compartido.
+
+Nota sobre el séptimo: **`mart.v_pbi_fact` es la pasarela literal del fact**, así
+que está roto con toda seguridad —mismas 8.778 combinaciones— aunque **no se ha
+medido**. Se dice como lo que es: no verificado, no «probablemente bien».

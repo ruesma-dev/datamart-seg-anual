@@ -137,6 +137,26 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
+### Estado tras la 12ª pasada (2026-08-21)
+
+- **Publicado y casando**: `_meta` sirve la **version 2**, hash `a7584ee84391`,
+  y `check-diccionario` confirma «lo publicado ES lo del arbol». Las **cuatro**
+  fichas del fact avisan ya del duplicado, verificado en la base.
+- **`check-diccionario` existe** y contrasta los **102** objetos en las tres
+  direcciones. Detecta además que lo publicado se quede atrás comparando
+  `hash_fuente`, que es lo que dejó a `_meta` sirviendo un grano falso.
+- **El `READ ONLY` se aplica de verdad** (`SET LOCAL transaction_read_only`), y
+  hay un control que barre constructores muertos.
+- **Los siete NO COMPROBADO, con nombre**, en `progress/impl_F-006.md`. Entre
+  ellos **`mart.fact_seguimiento_mensual`**: salía como no comprobado con 30 s y
+  60 s, y solo con 180 s reveló la clave rota. **Es la demostración de por qué un
+  timeout no puede contarse como OK.**
+
+**Lo único que queda para la batería, y NO lo puede hacer un agente**: lanzar
+`build_cierre` para que exista `cierre.v_pbi_planif_vs_real`. Escribe en un
+esquema de negocio del servidor compartido y la autorización del humano está
+acotada a `_meta`. Pendiente de que el líder la pida.
+
 ### EJECUTADO contra la base (2026-08-21) · T19, bloque H y T26
 
 Desbloqueado con el `az login` del humano. Detalle y salidas reales en
