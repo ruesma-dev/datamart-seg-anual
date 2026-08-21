@@ -352,3 +352,97 @@ def test_f006_r26_es_hoja_no_promete_evitar_el_doble_conteo(objeto: str) -> None
     assert "capitulo" in texto, (
         "tiene que avisar de que un capitulo intermedio sale marcado como hoja"
     )
+
+
+# ---------------------------------------------------------------------------
+# El punto ciego de la comprobación cruzada, medido y acotado (10ª pasada)
+# ---------------------------------------------------------------------------
+#
+# `test_f006_r10_una_columna_repetida_se_declara_igual_en_todo_el_ambito` compara
+# la misma columna **entre objetos** del ámbito de una regla. Por construcción
+# **no ve las columnas que existen en un solo objeto**: para ellas no hay con
+# quién comparar y la comprobación pasa sin mirar.
+#
+# No es un caso raro. Medido sobre el ámbito de `R-IMPORTE-MES`: de las columnas
+# con `agregacion`, **32 aparecen en un único objeto**. Ahí se escondía
+# `stg.plan_mensual.pct_acumulado`, y marcarla `clave_sustituta` habría dejado la
+# batería entera en verde.
+#
+# Se cierra la parte derivable —los porcentajes— y **se declara el resto**, que
+# es lo que el líder pidió: un hueco escrito vale más que un hueco que parece
+# cubierto.
+
+PORCENTAJES_NO_SUMABLES = ("promedio", "no_sumable", "ultimo_valor", "clave_sustituta")
+
+
+def _columnas_de_porcentaje():
+    """Toda columna de porcentaje del diccionario, esté sola en su objeto o no.
+
+    Se reconocen por el nombre (`pct_*`, `*_pct`) o por declarar `unidad: %`.
+    Esta comprobación es **por columna**, no cruzada, así que alcanza también a
+    las que están solas: es el complemento del punto ciego de arriba.
+    """
+    for ficha in _dicc().fichas:
+        for c in ficha.columnas:
+            es_pct = (
+                c.nombre.startswith("pct_")
+                or c.nombre.endswith("_pct")
+                or (c.unidad or "") == "%"
+            )
+            if es_pct and c.agregacion:
+                yield ficha.nombre, c
+
+
+def test_f006_r10_control_hay_porcentajes_que_comprobar() -> None:
+    """Sin esto, un cambio de convención de nombres dejaría el test en vacío."""
+    encontrados = list(_columnas_de_porcentaje())
+    assert len(encontrados) >= 8, (
+        f"solo {len(encontrados)} columnas de porcentaje: o cambió la convención "
+        f"de nombres, o la comprobación dejó de alcanzar a nadie"
+    )
+
+
+def test_f006_r10_ningun_porcentaje_se_declara_sumable() -> None:
+    """Un porcentaje no se suma: ni entre partidas, ni entre meses.
+
+    `cierre` ya lo tenía bien en sus siete `*_pct`, todos `promedio`. Los dos de
+    `stg.plan_mensual` estaban en `suma_solo_dentro_del_mes` y nadie los veía,
+    porque son únicos en su objeto y la comprobación cruzada no alcanza.
+    """
+    malos = [
+        f"{objeto}.{c.nombre} -> {c.agregacion}"
+        for objeto, c in _columnas_de_porcentaje()
+        if c.agregacion not in PORCENTAJES_NO_SUMABLES
+    ]
+    assert malos == [], (
+        f"un porcentaje declarado sumable invita a un `SUM` que no significa "
+        f"nada: {malos}. Los de `cierre` son `promedio`"
+    )
+
+
+def test_f006_r10_el_punto_ciego_de_la_comprobacion_cruzada_esta_declarado() -> None:
+    """El hueco que NO se cierra, contado con su número.
+
+    Este test no comprueba una ficha: fija que el hueco siga siendo el que
+    creemos. Si el número de columnas únicas se dispara, la comprobación cruzada
+    está cubriendo mucho menos de lo que parece y hay que revisarla.
+    """
+    ambito = _objetos_del_ambito_de("R-IMPORTE-MES")
+    indice = _dicc().por_nombre
+    apariciones: dict[str, int] = {}
+    for nombre in ambito:
+        ficha = indice.get(nombre)
+        if ficha is None:
+            continue
+        for c in ficha.columnas:
+            if c.agregacion:
+                apariciones[c.nombre] = apariciones.get(c.nombre, 0) + 1
+
+    unicas = [c for c, n in apariciones.items() if n == 1]
+    assert 25 <= len(unicas) <= 40, (
+        f"el punto ciego de la comprobación cruzada ha cambiado de tamaño: "
+        f"{len(unicas)} columnas aparecen en un solo objeto del ámbito de "
+        f"`R-IMPORTE-MES` (se midieron 32). Para ellas no hay con quién comparar "
+        f"y solo las alcanzan las comprobaciones POR COLUMNA, como la de los "
+        f"porcentajes de aquí arriba"
+    )

@@ -123,14 +123,14 @@ objetos:
           Sigrid en su cadena de planificacion. Un cero intermedio es un estorno
           literal; un cero final arrastra el ultimo valor positivo.
         unidad: "%"
-        agregacion: suma_solo_dentro_del_mes
+        agregacion: promedio
         nulo_significa: La fila no procede de una cadena de planificacion porcentual.
       pct_mes:
         significado: >-
           El porcentaje que corresponde a ESE mes, ya desacumulado como la
           diferencia con el mes anterior.
         unidad: "%"
-        agregacion: suma_solo_dentro_del_mes
+        agregacion: promedio
         nulo_significa: La fila no procede de una cadena de planificacion porcentual.
       precio_unitario:
         significado: >-
