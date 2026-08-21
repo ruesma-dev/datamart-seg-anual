@@ -3112,3 +3112,44 @@ con `anio = 0` entra igual. La ficha lo dice, porque quien lea ese `WHERE` va a
 suponer lo contrario.
 
 Saltados: de **45 a 40**, y los que quedan por un motivo que ahora es cierto.
+
+## Evidencias tras la novena review
+
+| Evidencia | Valor | Como se obtiene |
+|---|---|---|
+| **Tests ejecutados** | **1828 pasan, 0 fallan**, 122 saltados (1030 de F-006) | `bash harness/init.sh` |
+| **Cobertura de las lineas cambiadas** | **99,0 %** (715 de 722; umbral 80 %, nivel `critico`) | linea `PUERTA COBERTURA` |
+| **Mutantes / supervivientes** | **166 generados, 166 muertos, 0 supervivientes, 0 timeouts** en 812,1 s | `python -m harness.mutacion --feature F-006 --timeout 300` |
+| **Saltados del guardian de nulos** | **de 45 a 40** | el punto ciego de `stg` cubierto |
+| **Objetos documentados** | **102 de 102**, `pendientes` en 0 | `config/diccionario/` |
+
+Campana lanzada **borrando `__pycache__` a mano antes**: `harness/mutacion.py`
+sigue intacto —su arreglo es **F-041**— y sin esa limpieza el numero se mide con
+un mutante potencialmente vivo en el bytecode.
+
+### Comprobaciones anadidas, y esta vez con control propio
+
+La leccion de la pasada es que **una comprobacion sin control independiente no
+comprueba nada**, asi que cada derivador nuevo lleva el suyo:
+
+| Comprobacion | Su control |
+|---|---|
+| derivador de campos propios de `raw` | SQL fabricado con alias repetido y respuesta calculada a mano; y contraste del fichero real **por otra via** (lineas y `FROM`, sin usar el derivador) |
+| troceo en sentencias | dos sentencias con el mismo alias apuntando a tablas distintas |
+| coherencia de `agregacion` en el ambito de una regla | que el ambito siga cubriendo `stg` y `mart`, para que no pase en vacio |
+| `es_hoja` es una heuristica | que el SQL siga calculandola asi, para poder devolver la promesa si cambia |
+| localizador del fichero que **puebla** cada tabla | las tres tablas de `stg` que el guardian se saltaba |
+| barrido de frases rechazadas | ahora sobre **toda la superficie publicable**, incluidas `convenciones` y los comentarios |
+
+### Limites declarados
+
+- **`azure-apps/sigrid_tablas.md` sigue fuera** de las fuentes de las que se
+  deriva. Lo que solo dice ese documento no se afirma en ninguna ficha.
+- El guardian de nulos **no analiza expresiones compuestas** (`COALESCE`,
+  `CASE`) ni columnas que llegan por `LEFT JOIN`, donde el NULL es real.
+- La coherencia de `agregacion` se comprueba **dentro del ambito de cada regla**;
+  dos objetos que no compartan regla pueden declarar distinto sin que salte.
+- Sigue sin ejecutarse la **bateria de 18 preguntas** (T39) ni
+  `check-diccionario` (T26).
+- Los **comentarios de `06_presupuesto.sql`** siguen mintiendo: corregirlos es de
+  F-025 y el guardian de F-011 lo impide con razon. Propuesto al lider.
