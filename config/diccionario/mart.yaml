@@ -343,12 +343,30 @@ objetos:
         significado: >-
           Suma del importe del mes de todas las partidas de esa categoria. No se
           suma entre meses distintos.
+
+          **Esta columna NO esta afectada por el duplicado del fact**: las filas
+          duplicadas telescopean —cada una trae la diferencia con la anterior— y
+          su suma es exactamente el movimiento del mes (comprobado, 200 de 200
+          series). Es la via buena para totales mientras el build no se corrija.
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
       importe_origen:
         significado: >-
           Suma del acumulado a origen de esas partidas. Ya es acumulado: sumarlo
           en el tiempo multiplica.
+
+          **OJO: EL VALOR ALMACENADO ESTA DOBLADO en 37 celdas de 8 obras.** El
+          build hace `SUM(importe_origen)` sobre `mart.fact_seguimiento_mensual`,
+          y alli 8.778 combinaciones tienen DOS filas con el **mismo acumulado**
+          (22 obras con dos fases que Sigrid tiene con el mismo `ano` y `mes`).
+          Sumar dos veces el mismo acumulado da el doble: medido el 2026-08-22,
+          **39,07 M EUR de mas**.
+
+          **Leer una fila y darla por buena devuelve el doble** en esas celdas.
+          Para un acumulado fiable hay que ir a `mart.fact_seguimiento_mensual`,
+          deduplicar por (`obra_id`, `partida_id`, `anio_mes`, `escenario`) y
+          sumar despues; o usar la serie de `importe_mes`, que **si es
+          correcta**. Es defecto del build, abierto, y no se arregla desde F-006.
         unidad: EUR
         agregacion: ultimo_valor
       importe_mes_raw:
@@ -356,7 +374,21 @@ objetos:
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
       importe_origen_raw:
-        significado: Version sin redondear de `importe_origen`.
+        significado: >-
+          Version sin redondear de `importe_origen`, y con **su mismo defecto**.
+
+          **OJO: EL VALOR ALMACENADO ESTA DOBLADO en 37 celdas de 8 obras.** El
+          build hace `SUM(importe_origen)` sobre `mart.fact_seguimiento_mensual`,
+          y alli 8.778 combinaciones tienen DOS filas con el **mismo acumulado**
+          (22 obras con dos fases que Sigrid tiene con el mismo `ano` y `mes`).
+          Sumar dos veces el mismo acumulado da el doble: medido el 2026-08-22,
+          **39,07 M EUR de mas**.
+
+          **Leer una fila y darla por buena devuelve el doble** en esas celdas.
+          Para un acumulado fiable hay que ir a `mart.fact_seguimiento_mensual`,
+          deduplicar por (`obra_id`, `partida_id`, `anio_mes`, `escenario`) y
+          sumar despues; o usar la serie de `importe_mes`, que **si es
+          correcta**. Es defecto del build, abierto, y no se arregla desde F-006.
         unidad: EUR
         agregacion: ultimo_valor
       num_partidas:
@@ -538,11 +570,32 @@ objetos:
         significado: Cruce de magnitud y naturaleza.
         valores: [Coste Real, Coste Planificado, Venta Real, Venta Planificada]
       importe_mes:
-        significado: Importe del mes sumado sobre todas las partidas de la categoria.
+        significado: >-
+          Importe del mes sumado sobre todas las partidas de la categoria.
+
+          **Esta columna NO esta afectada por el duplicado del fact**: las filas
+          duplicadas telescopean —cada una trae la diferencia con la anterior— y
+          su suma es exactamente el movimiento del mes (comprobado, 200 de 200
+          series). Es la via buena para totales mientras el build no se corrija.
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
       importe_origen:
-        significado: Acumulado a origen de esas partidas. No se suma en el tiempo.
+        significado: >-
+          Acumulado a origen de esas partidas. No se suma en el tiempo.
+
+          **OJO: EL VALOR ALMACENADO ESTA DOBLADO en 37 celdas de 8 obras.** El
+          build hace `SUM(importe_origen)` sobre las filas de
+          `mart.fact_seguimiento_mensual`, y alli 8.778 combinaciones tienen DOS
+          filas con el **mismo acumulado** (22 obras con dos fases que Sigrid
+          tiene con el mismo `ano` y `mes`). Sumar dos veces el mismo acumulado
+          da el doble: medido el 2026-08-22, **39,07 M EUR de mas**.
+
+          Asi que **leer una fila y darla por buena devuelve el doble** en esas
+          celdas. Para un acumulado fiable por categoria hay que ir a
+          `mart.fact_seguimiento_mensual` y deduplicar por
+          (`obra_id`, `partida_id`, `anio_mes`, `escenario`) antes de sumar, o
+          usar la serie de `importe_mes`, que **si es correcta**. Es defecto del
+          build, no de esta ficha: esta abierto y no se arregla desde F-006.
         unidad: EUR
         agregacion: ultimo_valor
       num_partidas:

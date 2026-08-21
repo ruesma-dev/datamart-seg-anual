@@ -574,3 +574,99 @@ def test_f006_r10_el_aviso_no_alarma_sobre_la_medida_sana(objeto: str) -> None:
         f"{objeto} avisa del duplicado sin decir que las medidas del MES se "
         f"pueden sumar igualmente: sin eso, el aviso se lee como que todo está mal"
     )
+
+
+# ---------------------------------------------------------------------------
+# El aviso baja a la COLUMNA, no se queda en la cabecera (14ª pasada)
+# ---------------------------------------------------------------------------
+#
+# El derivador anterior exigía el aviso en `descripcion` o `grano`, o sea **a
+# nivel de objeto**. Y por ahí se coló el peor defecto de la feature:
+# `mart.fact_seguimiento_categoria.importe_origen` **está doblado en el valor
+# almacenado** —el build hace `SUM(importe_origen)` sobre filas duplicadas cuyo
+# acumulado es idéntico— mientras su ficha de columna decía «ya es acumulado» con
+# `agregacion: ultimo_valor`, es decir: *tómalo tal cual*.
+#
+# Medido el 2026-08-22: **37 celdas de 8 obras, 39,07 M EUR de más**. Alguien
+# pregunta cuánto lleva a origen una obra, lee una fila y recibe el doble **con
+# el diccionario respaldándolo**, que es peor que no documentar nada.
+#
+# El reviewer dio el defecto por cerrado media hora antes porque verificó
+# `descripcion` y `grano` —donde el derivador exigía el aviso— y no abrió las
+# fichas de columna: **heredó el punto ciego del guardián que estaba
+# verificando**. Por eso la comprobación baja a la columna.
+
+#: Las columnas cuyo VALOR ALMACENADO está doblado por el `SUM` sobre las filas
+#: duplicadas. Se derivan: son las acumuladas a origen de los objetos que
+#: agregan el fact.
+_ACUMULADAS = ("importe_origen", "importe_origen_raw", "can_origen", "total_incurrido")
+
+
+def _objetos_que_agregan_el_fact() -> list[str]:
+    """Los que hacen `SUM(...)` sobre el fact y por tanto doblan el acumulado.
+
+    Se distingue de los que solo lo leen: una pasarela propaga el duplicado como
+    filas —visible— y una agregación lo funde en un número —invisible—.
+    """
+    from tests.test_f006_fichas import _bloque_del_objeto
+
+    agregan: list[str] = []
+    for ficha in _dicc().fichas:
+        if ficha.esquema != "mart":
+            continue
+        # SOLO su bloque: `05_views_powerbi.sql` construye seis vistas, y mirar
+        # el fichero entero metía a `mart.v_pbi_fact` —que es una pasarela y NO
+        # dobla nada— por el `FROM` de su vecina. Es el mismo punto ciego que ya
+        # apareció en `_proyeccion_de` y en el derivador de alias.
+        bloque = _bloque_del_objeto(
+            "\n".join(_ficheros_del_objeto(ficha.nombre)), ficha.nombre
+        )
+        dobla = re.search(r"SUM\s*\(\s*importe_origen", bloque, re.IGNORECASE)
+        hereda = re.search(
+            r"FROM\s+mart\.fact_seguimiento_categoria", bloque, re.IGNORECASE
+        ) and any(c.nombre in _ACUMULADAS for c in ficha.columnas)
+        if dobla or hereda:
+            agregan.append(ficha.nombre)
+    return sorted(agregan)
+
+
+def test_f006_r10_control_se_identifican_los_objetos_que_doblan() -> None:
+    """Si la derivación se quedara vacía, los tests de abajo pasarían solos."""
+    objetos = _objetos_que_agregan_el_fact()
+    assert "mart.fact_seguimiento_categoria" in objetos, (
+        "es el que hace `SUM(importe_origen)` sobre las filas duplicadas"
+    )
+    assert "mart.v_pbi_fact_categoria" in objetos, "y el que lo sirve a Power BI"
+
+
+@pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
+def test_f006_r10_el_aviso_del_doblado_esta_en_la_columna(objeto: str) -> None:
+    """En el `significado` de cada acumulada, no en la cabecera del objeto.
+
+    Quien consulta una columna concreta recibe su ficha de columna. Un aviso en
+    la descripción del objeto no le llega.
+    """
+    ficha = _dicc().por_nombre[objeto]
+    mudas = [
+        c.nombre
+        for c in ficha.columnas
+        if c.nombre in _ACUMULADAS and "DOBLADO" not in (c.significado or "")
+    ]
+    assert mudas == [], (
+        f"{objeto}: las columnas {mudas} tienen el valor almacenado DOBLADO y su "
+        f"`significado` no lo dice. Quien lea una fila recibe el doble con el "
+        f"diccionario respaldándolo"
+    )
+
+
+@pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
+def test_f006_r10_la_columna_sana_dice_que_lo_es(objeto: str) -> None:
+    """Para no repetir el error de alarmar en bloque sobre la medida buena."""
+    ficha = _dicc().por_nombre[objeto]
+    mes = next((c for c in ficha.columnas if c.nombre == "importe_mes"), None)
+    if mes is None:
+        pytest.skip(f"{objeto} no publica `importe_mes`")
+    assert "NO esta afectada" in mes.significado, (
+        f"{objeto}.importe_mes es la vía buena y su ficha no lo dice: sin eso, el "
+        f"aviso de al lado se lee como que todo el objeto está mal"
+    )
