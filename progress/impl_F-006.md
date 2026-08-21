@@ -3909,3 +3909,122 @@ excusa de proteger un servidor compartido.
 Nota sobre el séptimo: **`mart.v_pbi_fact` es la pasarela literal del fact**, así
 que está roto con toda seguridad —mismas 8.778 combinaciones— aunque **no se ha
 medido**. Se dice como lo que es: no verificado, no «probablemente bien».
+
+---
+
+# Decimotercera pasada · cuatro defectos, y dos son reincidencias mías
+
+## GRAVE 1 · El plegado, tercera vez, y dentro del dispositivo que lo vigilaba
+
+`inventario.py` afirmaba que `check-diccionario` «está sin implementar: llega en
+el bloque H» **del comando que existe desde ese mismo commit**. Y el guardián de
+R28 estaba **verde**, porque busca la subcadena literal y el ajuste de línea
+partía la frase:
+
+```
+"sin implementar" in envuelto   -> False
+contiene(envuelto, "sin implementar") -> True
+```
+
+Lo que lo hace grave no es la frase: es **dónde ocurrió**. Dentro del mecanismo
+escrito para impedir exactamente esto, y sobre la función cuya única red de
+seguridad *es* R28.
+
+**Y ya lo había arreglado una vez.** En la 10ª pasada, para el barrido de YAML, y
+**solo ahí**. Arreglar el caso y no la clase es lo que garantiza la tercera
+aparición.
+
+Ahora hay `tests/_texto.py` con `normalizado()` y `contiene()`, aplicado a las
+guardas de prosa, y **dos controles**: el caso exacto que estuvo mintiendo, y uno
+que exige que esas guardas usen `contiene` y no `in` a pelo. La frase de
+`inventario.py` dice ya lo que es cierto.
+
+## GRAVE 2 · Código muerto nuevo, en la tanda que decía haberlo barrido
+
+`list_objetos_catalogo` y mi `fetch_catalogo_objetos` ejecutaban **el mismo
+SQL**, y el consumidor del primero era un test. Eliminado **el mío**: el comando
+usa el que ya existía y ya tenía prueba.
+
+**Pero el defecto de fondo era otro, y lo señalaste exacto**: «era el único» era
+cierto **dentro de un alcance que no declaré**. Mi barrido miraba
+`unicidad_sql.py` y nada más, y presenté la conclusión como si fuera general.
+
+El barrido cubre ahora cinco módulos y **declara sobre cuáles concluye** en una
+constante comprobada, más un test que vigila que no vuelva a haber dos métodos
+con el mismo SQL:
+
+```
+MODULOS_BARRIDOS = (unicidad_sql, catalogo, diccionario_sql,
+                    inventario, cargador_yaml)
+```
+
+Una afirmación de completitud sin su alcance es de la misma familia que las que
+esta feature lleva trece pasadas corrigiendo.
+
+## DEFECTO 3 · El aviso estaba INVERTIDO, y es lo peor para el usuario
+
+Decía «el importe viene inflado» en bloque. **Medido contra la base**, sobre 200
+series afectadas:
+
+```
+importe_mes          telescopea en 200/200   -> SUMAR ES CORRECTO
+importe_mes_raw      telescopea en 200/200   -> SUMAR ES CORRECTO
+can_mes              telescopea en 200/200   -> SUMAR ES CORRECTO
+total_incurrido_mes  telescopea en 200/200   -> SUMAR ES CORRECTO
+
+SUM(importe_origen) == ultimo valor   solo en 28/200   -> SUMAR ESTA MAL
+```
+
+La prueba decisiva fue comprobar que `SUM(importe_mes)` iguala al último
+`importe_origen`: si telescopea, sumar todas las filas del mes es correcto **aun
+con el duplicado delante**, porque el `LAG` particionado hace que la segunda fila
+aporte la diferencia y no un valor repetido.
+
+**Así que el aviso alarmaba sobre la medida sana y callaba sobre la enferma.** Un
+agente que lo leyera evitaría `importe_mes`, que está bien, y sumaría
+`importe_origen`, que está mal. Es el reverso exacto de para lo que se escribió.
+
+Los cinco avisos lo dicen ya **columna a columna**, con una conclusión que antes
+no estaba: **el duplicado no rompe ninguna suma que ya estuviera bien
+planteada**. Rompe el `count(*)`, rompe cualquier `JOIN` por la clave declarada
+—fan-out— y rompe a quien sume una columna `_origen`, que ya estaba mal antes.
+
+**Nota de método que me llevo**: llegué a esa conclusión midiendo primero si los
+dos valores eran iguales, y esa medida **no zanjaba nada** —1.440 de 8.778 claves
+tienen `importe_mes` distinto en las dos filas, y aun así la suma es correcta—.
+La pregunta buena no era «¿se repite el valor?» sino «¿la suma da lo que debe?».
+
+## DEFECTO 4 · Cuarta hermana olvidada, y la lista deja de ser una lista
+
+`mart.v_pbi_fact_categoria` sirve `importe_origen` **a las tarjetas de KPI de
+Power BI** y se quedó sin una palabra del problema.
+
+Van **cuatro** propagaciones que dejan fuera a una hermana, siempre por el mismo
+motivo: corrijo donde me señalan y mantengo a mano la lista de quién más está
+afectado. Así que **la lista deja de mantenerse a mano**: se deriva de quién lee
+la familia del fact **y publica alguna de sus medidas**. Las dimensiones
+(`v_pbi_dim_*`) leen del fact para el calendario y el catálogo, no publican
+medidas, y por eso no entran —comprobado en el propio test—.
+
+## La cobertura, cerrada en vez de explicada
+
+Tenías razón en las tres cosas. **64 de las 85 líneas sin cubrir eran el cuerpo
+entero de los dos comandos**, y no hacía falta ninguna conexión: hacía falta el
+`CliRunner` que este repositorio ya usa en seis sitios.
+
+Doce tests que ejercitan los dos comandos completos —dry-run, clave rota,
+timeout, objeto inexistente, `--todos`, la bandera de timeout, la biyección, la
+huérfana, el hash desfasado, el «nada publicado» y el objeto sin ficha— con
+dobles **solo** del cliente de Postgres: el diccionario que cargan es el real y
+las consultas que generan son las reales.
+
+**90,9 % → 97,8 %** de 942 líneas, por encima del 93,4 % que estimaba la review, y
+sin abrir una sola conexión. Llevaba tres tandas explicando esa laguna, que es
+más caro que cerrarla y además la convierte en paisaje.
+
+## Lo que sigue fuera, por la firma
+
+`build_cierre` no se ha lanzado: escribe en un esquema de negocio del servidor
+compartido y la autorización está acotada a `_meta`. La huérfana
+`cierre.v_pbi_planif_vs_real` sigue apareciendo en `check-diccionario`, que es
+donde tiene que aparecer.

@@ -137,6 +137,18 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
+### Estado tras la 13ª pasada
+
+- **Publicado**: `_meta` sirve la **version 3** (`a105d8f1109c`), con el aviso del
+  duplicado **corregido y en las cinco fichas** que sirven medidas del fact.
+- **El aviso estaba INVERTIDO** y era lo más dañino: alarmaba sobre `importe_mes`,
+  que **telescopea y se puede sumar** (200/200 series), y callaba sobre
+  `importe_origen`, que **no** (28/200). Ahora va columna a columna.
+- **El plegado, tercera vez y dentro del guardián que lo vigilaba.** Tratado como
+  clase en `tests/_texto.py`, con dos controles.
+- **Cobertura 97,8 %** (era 90,9 %): el cuerpo de los dos comandos se cubre con
+  `CliRunner`, sin conexión. Llevaba tres tandas explicando esa laguna.
+
 ### Estado tras la 12ª pasada (2026-08-21)
 
 - **Publicado y casando**: `_meta` sirve la **version 2**, hash `a7584ee84391`,
