@@ -610,8 +610,10 @@ def check_diccionario_cmd() -> None:
     detras del repositorio, ni que tenga algo que el repositorio ya no crea.
     Esto si.
 
-    Comprueba los 102 objetos fichados, en las tres direcciones: publicado sin
-    ficha, fichado que no existe, y tipo que no casa. Y avisa si lo PUBLICADO en
+    Comprueba TODOS los objetos fichados, en las tres direcciones: publicado sin
+    ficha, fichado que no existe, y tipo que no casa. El recuento lo imprime el
+    propio comando, que lo cuenta; escribirlo aqui solo servia para que caducara
+    —decia 102 y ya eran 103—. Y avisa si lo PUBLICADO en
     `_meta` ya no es lo del arbol.
 
     Sale con codigo 1 si hay discrepancias.

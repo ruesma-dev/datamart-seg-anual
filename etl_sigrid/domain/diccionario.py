@@ -131,11 +131,19 @@ CONTEXTO_NO_PUBLICADO = {
     "version": "va en `_meta.diccionario_publicacion.version`",
     "base": "el MCP ya esta conectado a esa base: decirselo no le aporta nada",
     "titulo": "rotulo del documento, sin uso para responder",
+    # OJO: la razon anterior era FALSA y estuvo escrita un dia. Decia que
+    # `motivo_no_consumo` lo sustituia, y no puede: `motivo_no_consumo` es de
+    # OBJETO y esto son COLUMNAS. Verificado el 2026-08-22 en `mcp-bbdd`.
     "ocultar": (
-        "columnas de instrumentacion que el MCP no debe ofrecer. Se resuelve "
-        "SIN contrato: `mcp-bbdd` antepone `[NO RECOMENDADO PARA CONSULTA: ...]` "
-        "a la descripcion usando el `motivo_no_consumo` que si viaja. Acordado "
-        "el 2026-08-22; no anadir al contrato sin revisar esa decision"
+        "son tres COLUMNAS de instrumentacion (`_ingested_at`, `_source_tiemod`, "
+        "`_built_at`), y publicarlas hoy no serviria de nada: el unico gancho "
+        "del consumidor es `esta_oculta(tabla.nombre_completo)` "
+        "(`application/services/servicio_catalogo.py`), que recibe un nombre de "
+        "TABLA. Ninguna tabla se llama `_built_at`, asi que **nunca oculto nada, "
+        "ni con el YAML ni con la base**. El hueco es real —el agente ve esas "
+        "columnas en la `ficha` y puede ofrecerlas como si fueran de negocio— "
+        "pero se cierra en `mcp-bbdd` anadiendo un gancho de COLUMNA; publicar "
+        "la lista antes solo mueve el problema de sitio. Revisado el 2026-08-22"
     ),
     "preguntas_aceptacion": (
         "la bateria con la que se prueba esta feature. Es instrumentacion "

@@ -4,11 +4,619 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **trece pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **catorce pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# DECIMOCUARTA PASADA · una campaña caducada, un número doblado y una cifra que yo mismo copié mal
+
+**Veredicto: RECHAZADO**, ahora por tres motivos y no por uno. Escribí la primera
+versión de esta pasada con un solo grave; una auditoría independiente que había
+encargado volvió tarde, con hallazgos que yo no tenía, y **dos de ellos me
+obligan a rectificar cosas que ya había dado por buenas en este mismo informe**.
+Lo dejo escrito así, con la rectificación a la vista, porque el historial de esta
+review vale más que mi acierto.
+
+Los tres motivos:
+
+1. **La campaña de mutación acredita un código que ya no es el que hay.** 86
+   mutantes sin evaluar, dos ficheros enteros fuera.
+2. **`importe_origen` está doblado en el valor almacenado, y su ficha de columna
+   no lo dice.** Es la tercera vez en esta feature que el aviso llega a la
+   descripción del objeto y no a la columna que lleva el número malo — y yo di
+   ese defecto por «cerrado y bien cerrado» hace media hora.
+3. **La razón escrita para dejar `ocultar` fuera del contrato es falsa**, con un
+   test verde encima que solo comprueba que la cadena aparezca.
+
+Y una corrección que me toca a mí: **el diccionario tiene 103 objetos, 798
+columnas y 48 de consumo, no 102 / 793 / 47.** Escribí las cifras viejas en la
+primera versión de esta pasada, copiándolas de las anteriores en vez de
+recalcularlas. Es exactamente lo que llevo catorce pasadas reprochando. Las
+recalculé cargando el diccionario: la ficha 103 es `_meta.diccionario_contexto`,
+que añade esta misma tanda.
+
+Lo que **sí** está cerrado, verificado uno a uno: el plegado tratado como clase
+(cubre todos los sitios; las únicas comparaciones contra crudo son SQL literal,
+que no se pliega), el alcance real del barrido de código muerto, la quinta ficha
+del aviso llegada por derivación legítima, y el contrato versión 4 —las 21 filas
+cuadran recalculadas, las once claves del `00_global.yaml` están todas
+clasificadas sin solapamiento, y el mecanismo **no** admite una clave nueva en
+silencio: lo probé metiendo una, y por partida doble (la rechaza el whitelist del
+cargador y, si pasara, el guardián).
+
+**Nivel de rigor: `critico`** (declarado en `harness/features.json`). Exige fase
+RED con traza real, cobertura de lo cambiado, campaña de mutación **con cero
+supervivientes** y verificaciones MANUAL (humano) con comando y resultado real.
+
+**Entorno:** `bash harness/init.sh` en **verde** — 1968 pasados, 124 saltados,
+cobertura **98,2 %** de 976 líneas. Rama `feature/F-006-mcp-azure`, sin `push`.
+
+## GRAVE 1 · La campaña de mutación acredita un código que ya no es el que hay
+
+Esto no lo encontré revisando lo que la tanda dice haber hecho, sino haciendo lo
+que mi protocolo manda y llevo catorce pasadas repitiendo: **recalcular los
+totales en vez de creérmelos**. Esta vez no cuadran.
+
+`progress/mutacion_F-006.md` lleva fecha del **2026-08-21 a las 10:42** y declara
+**2358 líneas en 8 ficheros, 166 mutantes, 0 supervivientes**. Recalculado por mí
+sobre `HEAD`, con `harness.alcance` y `harness.mutacion.generar_mutantes`:
+
+| | Campaña (21-ago 10:42) | Hoy en `HEAD` | Diferencia |
+|---|---|---|---|
+| Ficheros en alcance | 8 | **10** | +2 |
+| Líneas en alcance | 2358 | **3164** | **+806** |
+| Mutantes | 166 | **252** | **+86** |
+
+**Un tercio de los mutantes del alcance no se ha evaluado nunca.** Y no son
+líneas cualesquiera: entre la campaña y hoy entraron **siete commits que tocan
+producción** —`ebd88a6`, `1444c77`, `726e009`, `39c83f7`, `70e7bb7`, `abdab22`,
+`909cd79`—, es decir, **todo lo que se escribió para cerrar los graves de las
+pasadas 12, 13 y 14**. Los dos ficheros que faltan enteros son:
+
+- **`etl_sigrid/infrastructure/postgres/unicidad_sql.py`** (274 líneas, 24
+  mutantes) — el módulo que emite el `SET LOCAL transaction_read_only = on`
+  contra el servidor **compartido con producción**. Es exactamente el código
+  nacido del GRAVE 1 de la duodécima pasada, donde el `READ ONLY` resultó ser
+  mentira impresa.
+- **`etl_sigrid/infrastructure/postgres/catalogo.py`** (166 líneas, 14 mutantes)
+  — el que sostiene `check-diccionario`, la única fuente que dice la verdad.
+
+Más los crecimientos sin cubrir de `main.py` (+157 líneas), `diccionario.py`
+(+51), `diccionario_sql.py` (+84) y `postgres_client.py` (+74), donde vive el
+`diccionario_contexto` que esta misma tanda añade.
+
+**No estoy diciendo que el informe mienta**: lleva su fecha honesta y su alcance
+honesto para el momento en que se generó. Estoy diciendo que **no se relanzó**, y
+que un informe correcto de ayer no acredita el código de hoy.
+
+Por qué bloquea, y no es formalismo: el nivel **crítico** exige cero
+supervivientes. **86 mutantes sin ejecutar no son cero supervivientes; son 86
+desconocidos**, y están concentrados justo en el código que se escribió a
+correr para tapar tres graves —el peor momento posible para dejar de mirar—. La
+mutación existe precisamente para decir si esos tests nuevos comprueban algo o
+solo acompañan. Aprobar aquí sería hacer lo que llevo catorce pasadas señalando:
+dar por buena una afirmación de completitud sin su evidencia.
+
+**Qué hace falta:** relanzar `python -m harness.mutacion --feature F-006` sobre
+`HEAD` y volver con los totales reales. La anterior tardó 738 s sobre 166
+mutantes; esta rondará los 19 minutos. Si sale en 252/252 muertos, cae este
+grave y no tengo nada más que oponer a la tanda. Y conviene borrar los
+`__pycache__` antes: F-041 documenta que Python ejecuta bytecode mutado obsoleto
+cuando el fuente restaurado conserva mtime y tamaño.
+
+## GRAVE 2 · `importe_origen` viene doblado en el valor almacenado, y la ficha de columna dice que está bien
+
+Este no lo vi yo en la primera vuelta. Lo trajo la auditoría, lo verifiqué, y es
+el más peligroso de los tres para lo que viene ahora.
+
+**El hecho, por dos vías independientes.** El propio informe del implementer
+(`progress/impl_F-006.md:3880`) mide y concluye: «`importe_origen` **idéntico en
+las dos** [filas duplicadas]: por eso un `SUM` cuenta dos veces». Y el build de la
+categoría hace exactamente ese `SUM` (`sql/mart/03_agg_categoria.sql:68`):
+
+```sql
+SUM(importe_mes)        AS importe_mes,
+SUM(importe_origen)     AS importe_origen,
+```
+
+Es decir: **el valor que queda escrito en
+`mart.fact_seguimiento_categoria.importe_origen` ya está inflado ×2** para las
+series afectadas. No es que se infle si alguien lo suma. Está inflado en la
+tabla, y `mart.v_pbi_fact_categoria` lo lee tal cual.
+
+**Y lo que la ficha de columna le dice al agente es que ese número es el bueno.**
+`config/diccionario/mart.yaml:348-353` y `543-546`:
+
+> `importe_origen` — «Suma del acumulado a origen de esas partidas. **Ya es
+> acumulado**: sumarlo en el tiempo multiplica.» · `agregacion: ultimo_valor`
+
+El aviso corregido en la descripción del objeto dice «no la uses para un total».
+Correcto y útil, pero **no cubre el camino de lectura que importa**: leer **una
+sola fila** para responder «¿cuánto llevamos acumulado a origen en la obra X,
+categoría CD, a fecha M?». Ahí no hay ningún total que evitar; hay un valor que
+la ficha marca como `ultimo_valor`, que es la instrucción de tomarlo tal cual, y
+que viene doblado.
+
+**Por qué me obliga a rectificarme.** En la primera versión de esta pasada
+escribí que el DEFECTO 3 estaba «cerrado, y bien cerrado». Lo verifiqué en
+`descripcion` y en `grano`, que es donde el implementer lo puso y donde el
+derivador lo exige, **y no abrí las fichas de columna**. El derivador de
+`tests/test_f006_stg_trampas.py` tiene el mismo punto ciego: asierta sobre
+`ficha.descripcion` y `ficha.grano`, nunca sobre `columna.significado`. Un
+guardián que solo mira donde ya se arregló.
+
+**Qué hace falta:** que el aviso baje a `significado` de `importe_origen` en los
+dos objetos, diciendo lo que pasa —el valor almacenado viene sumado dos veces
+para las series afectadas— y qué usar en su lugar; y que el derivador exija el
+aviso **en la columna**, no en la ficha.
+
+### Dos afirmaciones más del mismo aviso que no se sostienen
+
+- **`total_incurrido` está en el saco equivocado.** `mart.yaml:52-55` lo lista
+  entre las que «repiten el mismo acumulado en las dos filas». La comparación
+  fila a fila del propio informe (`impl_F-006.md:3892-3895`) muestra **0.00 vs
+  27850.09**: no repite, y sumarlas no dobla.
+- **El «28/200» no prueba lo que se le hace probar.** Se cita como evidencia del
+  doblado (`impl_F-006.md:3975`, `mart.yaml:53-56`), pero mide que
+  `SUM(importe_origen)` sobre **todos los meses** no da el último valor — algo que
+  es cierto con duplicado y sin él, porque sumar un acumulado a lo largo del
+  tiempo está mal de por sí. La medición que sí prueba el doblado es la de la
+  línea 3880. El hecho es correcto; la cifra que se publica como su prueba, no.
+  Y esto importa: un agente al que se le da un número como razón puede razonar a
+  partir de él.
+
+## GRAVE 3 · la razón por la que `ocultar` se queda fuera es falsa, y hay un test verde encima
+
+Yo había anotado esto como observación menor: la razón cita `motivo_no_consumo`,
+que es de objeto, para un `ocultar` que es de columna. La auditoría fue más
+lejos y tiene razón: **el mecanismo que se invoca no existe en ninguno de los dos
+lados**.
+
+- `ocultar` (`config/diccionario/00_global.yaml:554-557`) son tres nombres de
+  **columna**: `_ingested_at`, `_source_tiemod`, `_built_at`.
+- `motivo_no_consumo` vive en `Ficha`, no en `Columna` (`domain/diccionario.py:224-232`),
+  y la tabla `_meta.diccionario` no lo lleva a nivel de columna. **No puede
+  sustituir a `ocultar` ni en principio.**
+- En el consumidor el gancho es de **tabla**:
+  `mcp-bbdd/.../servicio_catalogo.py:49` llama `esta_oculta(tabla.nombre_completo)`,
+  con `fnmatch` sobre ese nombre.
+
+Conclusión, y es peor que la mía: `ocultar` lista **columnas** contra un gancho de
+**tabla**, así que **nunca ocultó nada**, tampoco en el proveedor YAML. La
+intención original (`design.md:159`, «patrones fnmatch de columnas técnicas»)
+jamás se implementó, y la exclusión del contrato la ha certificado como
+«resuelta por otra vía» sin que nadie lo notara.
+
+El resultado práctico de hoy es inocuo —esas tres columnas de instrumentación no
+estorban a nadie—. Lo que no es inocuo es el mecanismo: `tests/test_f006_contexto.py:82-85`
+comprueba que las cadenas `"motivo_no_consumo"` y `"2026-08-22"` **aparezcan** en
+el texto de la razón, no que la razón sea cierta. Es el patrón exacto que esta
+feature lleva catorce pasadas produciendo: **un guardián verde sosteniendo una
+afirmación falsa**. Y esta vez el guardián es nuevo, de esta tanda, y nació ya
+así.
+
+**Qué hace falta:** reescribir la razón para que diga la verdad —`ocultar` no se
+publica porque nunca llegó a funcionar y está pendiente de decidir si se
+implementa a nivel de columna o se retira— y abrir la deuda correspondiente. Un
+test no puede validar la veracidad de una prosa; por eso la prosa tiene que
+decir lo que se puede sostener.
+
+## DEFECTO 4 · la tanda cierra sin «Evidencias», y no es papeleo
+
+La sección de `progress/impl_F-006.md` que documenta esta tanda —«El contrato
+crece · `_meta.diccionario_contexto`»— termina en la verificación contra la base,
+que está muy bien hecha, pero **no trae la sección «Evidencias»** con los cuatro
+números que el nivel crítico exige (tests, cobertura de lo cambiado, mutantes y
+supervivientes, tiempo de la suite). Las pasadas anteriores sí la traían.
+
+Lo señalo porque **está causalmente unido al grave**. Si esta tanda hubiera
+tenido que escribir «mutantes: N, supervivientes: 0», alguien habría abierto
+`progress/mutacion_F-006.md` para copiar los números, habría visto la fecha del
+21 a las 10:42, y el grave se habría cazado solo. La sección Evidencias no está
+para que el reviewer tenga una tabla bonita: está para obligar a **volver a mirar
+la evidencia** en cada tanda, que es exactamente el paso que se saltó.
+
+Se arregla con el mismo trabajo que el grave: relanzar la campaña y cerrar la
+tanda con los cuatro números reales.
+
+Tampoco encuentro **traza RED** para los tests nuevos de `test_f006_contexto.py`.
+Es menos grave —el mecanismo de clasificación lo probé yo metiendo una clave
+inventada, y falla en rojo como debe, así que sé que los tests muerden—, pero el
+nivel crítico pide la traza escrita y esta vez no está.
+## Los cuatro defectos, atacados donde podían haberse escapado
+
+Mi patrón de error en esta feature ha sido verificar lo que la tanda dice haber
+hecho. Esta vez fui a buscar lo contrario: **lo que se le pudo escapar**.
+
+### GRAVE 1 · ¿está tratado como clase, o solo en los dos sitios conocidos?
+
+`tests/_texto.py` existe, con su `normalizado()` y su historia escrita —las tres
+apariciones—, y lo usan **dos** ficheros. La pregunta era si con dos basta.
+
+Barrí los diez ficheros de test de la feature buscando comparaciones de frase que
+**no** pasen por el helper: salen 37. Pero la clase no es «comparar texto», es
+**comparar prosa contra texto no parseado**, y ahí está la diferencia: lo que
+carga `yaml.safe_load` llega ya desplegado —el parser colapsa el plegado de un
+bloque `>-`—, así que las comparaciones contra `significado`, `grano` o `motivo`
+**no son vulnerables**. Las vulnerables son las que miran el crudo: ficheros
+`.py` (docstrings) y `.yaml` sin parsear.
+
+Filtré por eso y el resultado es limpio: **las únicas comparaciones de frase
+contra texto crudo son las tres de `test_f006_fichas.py:1807-1910`, y son
+fragmentos de SQL literal** —`WHERE l.importe_pendiente_facturar > 0`,
+`CREATE TABLE retenciones.movimientos AS`—, que no se pliegan. **No queda ninguna
+comparación de prosa cruda fuera del helper.** El tratamiento como clase se
+sostiene.
+
+### GRAVE 2 · ¿el alcance declarado es el real?
+
+El barrido declara cinco módulos barridos y tres consumidores, con el motivo
+escrito: «una afirmación de completitud sin su alcance es de la misma familia que
+las que esta feature lleva trece pasadas corrigiendo». Ocho de los diez módulos
+Python que toca la feature.
+
+Los dos que quedan fuera son el dominio (`diccionario.py`) y el `__init__`. Así
+que **busqué código muerto ahí por mi cuenta**: recorrí las funciones públicas de
+`domain/diccionario.py`, los métodos de `postgres_client.py` y los del step, y
+comprobé para cada uno si tiene consumidor fuera de `tests/`. Resultado:
+**ninguno sin consumidor**. El alcance declarado no esconde nada.
+
+### DEFECTO 3 · el aviso invertido, y la lectura que se me pedía
+
+> **Rectificado más abajo.** Lo que sigue es mi lectura de la primera vuelta y la
+> mantengo porque es correcta **en lo que mira**: el aviso ya no está invertido y
+> la instrucción es accionable. Pero mira solo `descripcion` y `grano`. El GRAVE 2
+> de esta misma pasada explica lo que se me escapó: en la ficha de **columna** el
+> número sigue doblado y sin avisar.
+
+
+Está corregido, y el texto ahora es **accionable**, que es lo que importa:
+
+> «**Qué le pasa a cada medida, medido y no supuesto:** `importe_mes` **sale
+> bien**, porque las dos filas del origen telescopean y su suma es exactamente el
+> movimiento del mes (200 de 200 series). `importe_origen` **sale sumado dos
+> veces**, porque las dos filas repiten el mismo acumulado. Por eso esa columna
+> es `ultimo_valor` y no se suma nunca: aquí ya viene agregada, así que **no la
+> uses para un total** —usa la serie de `importe_mes`—.»
+
+Tiene las cuatro cosas que un agente necesita: **qué medida está rota**, **cuál
+no**, **por qué** y **qué hacer en su lugar**. Y el acotado por escenario.
+
+Lo que más me interesa de esta corrección no es el texto, es el método: la
+primera medida fue comprobar si los dos valores eran iguales, y **eso no zanjaba
+nada**; la pregunta buena era si **la suma da lo que debe**. Cambiar la pregunta
+convirtió una intuición en 200/200 frente a 28/200. Es la diferencia entre medir
+y confirmar lo que uno ya cree.
+
+### DEFECTO 4 · la quinta ficha, y la lista derivada
+
+`mart.v_pbi_fact_categoria` ya avisa. Y la lista **se deriva de verdad**:
+`_objetos_que_sirven_medidas_del_fact()` recorre las fichas y mira qué SQL las
+puebla, con dos controles que cierran los dos sentidos:
+
+- `..._control_la_derivacion_encuentra_los_afectados` exige que no salga vacía,
+  que **`v_pbi_fact_categoria` esté** —nombrando que es «la que la propagación a
+  mano dejó fuera»— y que **no arrastre las dimensiones**, que no publican
+  medidas;
+- y dos tests parametrizados **sobre la derivación**: uno exige que cada objeto
+  afectado traiga el `8.778`, y otro que el aviso **no vuelva a alarmar sobre la
+  medida sana**.
+
+Es el mecanismo completo: deriva, se controla contra el vacío y contra el falso
+positivo, y fija la corrección del defecto 3 para que no se revierta.
+
+## El contrato, versión 4
+
+- **Las 21 filas cuadran**, recalculadas por mí desde el árbol: 5 convenciones +
+  4 órdenes de magnitud + 3 ejes + 9 esquemas.
+- **Las once claves del bloque global están clasificadas**: cuatro viajan y siete
+  se declaran fuera, sin solapamiento y con su razón. Las razones son ciertas y
+  concretas: `reglas` ya viaja en `_meta.diccionario_reglas`, `version`/`base`/
+  `titulo` van en `diccionario_publicacion`, `pendientes` es el trinquete interno
+  y `preguntas_aceptacion` es instrumentación de la propia feature.
+- **El mecanismo no deja añadir una clave en silencio.** Lo probé: añadí
+  `clave_inventada_por_el_reviewer` a una copia de `00_global.yaml` y la batería
+  se puso en rojo —13 fallos, entre ellos el de clasificación—. Y hay un tercer
+  test que exige que lo excluido lleve motivo de al menos 20 caracteres, que es
+  el antídoto contra el hueco declarado sin razón.
+
+**Un matiz sobre `ocultar`**, la exclusión que más me chirriaba: su razón dice que
+se resuelve «sin contrato» porque `mcp-bbdd` antepone un aviso usando el
+`motivo_no_consumo` que sí viaja. Eso es impreciso: `motivo_no_consumo` es de
+**objeto** y `ocultar` lista **columnas** de instrumentación (`_built_at`,
+`_ingested_at`, `_source_tiemod`), así que no cubre el mismo caso. La conclusión,
+sin embargo, es correcta: esas columnas **sí llegan documentadas**, cada una con
+su `significado` diciendo que son instrumentación y con `agregacion: no_sumable`.
+El consumidor no se queda sin la información; la razón escrita cita el mecanismo
+equivocado. Corrección de una línea, y la decisión queda fechada, que era lo
+importante.
+
+## La pregunta que se me hace: ¿está listo para las 18 preguntas?
+
+**Rectifico.** En la primera versión de esta pasada respondí «sí, está listo, sin
+matices». Con el segundo grave delante, la respuesta correcta es: **casi, y hay
+una cosa que arreglar antes, precisamente porque la batería no la va a
+destapar** — que es la condición exacta que se me pidió aplicar.
+
+**Lo que hay que arreglar antes: el aviso de `importe_origen` en la ficha de
+columna.** No por perfeccionismo. Porque es el único defecto conocido que puede
+hacer que una de las 18 preguntas **se responda con un número que es el doble del
+verdadero, con toda la seguridad del mundo y una ficha que lo respalda**. Y una
+pregunta como «¿cuánto llevamos acumulado a origen en tal obra y tal categoría?»
+es de las que van a caer seguro. Es media hora de trabajo en el `significado` de
+dos columnas.
+
+**Lo que la batería sí puede juzgar, y por eso hay que lanzarla igualmente**, es
+lo único que catorce pasadas de revisión no han podido responder: si el enrutado
+funciona. Si una pregunta en castellano llega al objeto correcto, si el MCP
+entrega las 13 reglas duras junto con las fichas, si las 21 filas de contexto
+sirven para lo que se pensaron. Eso no se revisa leyendo YAML; se mide
+preguntando. **Los 103 objetos, las 798 columnas y el contrato están donde tienen
+que estar y el consumidor los lee.**
+
+### Lo que la batería NO va a destapar, y conviene tener delante al leerla
+
+1. **El doblado de `importe_origen`** — arriba. Si se lanza antes de arreglarlo,
+   hay que leer con lupa cualquier respuesta que dé un acumulado a origen por
+   categoría.
+2. **Los 39 «sin contradicción» no tienen la clave demostrada, y 7 objetos
+   siguieron sin comprobar** —entre ellos `mart.fact_seguimiento_mensual` y
+   `mart.v_pbi_fact`, que son justo los del duplicado, y
+   `cierre.v_pbi_cierre_indirectos_detalle`—. Que un dato de hoy no contradiga
+   una clave no demuestra la clave. Si una pregunta cae ahí, el número puede
+   venir inflado y **la batería no lo notará**, porque juzga si la respuesta es
+   plausible, no si cuadra. El implementer lo declara con todas las letras, que
+   es lo correcto; lo repito aquí porque hay que tenerlo delante.
+3. **La base va a cambiar bajo los pies.** Tras los cuatro `build-*` que el
+   humano lanzará a mano desaparecerá la huérfana —que era el síntoma de que la
+   base iba por detrás del repositorio— y pueden aparecer objetos nuevos sin
+   ficha. **Recomiendo pasar `check-diccionario` después de los builds y antes de
+   la batería**: cuesta una conexión de lectura y es la única fuente que dice la
+   verdad.
+4. **`ocultar` y los recuentos caducados** no los verá ninguna pregunta. Se
+   arreglan porque el siguiente que los lea se los va a creer.
+
+## Recuentos caducados, todos verificados por mí
+
+El diccionario creció a **103 objetos / 798 columnas / 48 de consumo** y varios
+sitios se quedaron en la cifra anterior. Cargando el diccionario:
+
+```
+objetos : 103      columnas: 798      consumo : 48      reglas  : 13
+```
+
+| Dónde | Dice | Es |
+|---|---|---|
+| `main.py:613` — **ayuda visible al usuario** de `check-diccionario` | «los 102 objetos fichados» | 103 |
+| `sql/ddl/01_diccionario.sql:7` — **el contrato de API** | «Estas **tres** tablas y esta vista» | cuatro tablas |
+| `design.md:11`, `:511`, `:552`; `tasks.md:305-306` | «tres tablas más una vista»; `_meta.yaml` «7 objetos» | cuatro; 8 |
+| `progress/current.md:101`, `:131-132` | «102 objetos, 793 columnas», consumo 47 | 103 / 798 / 48 |
+
+El del DDL es el que más me molesta: es el fichero que **define las cuatro** y
+que se declara a sí mismo «lo único que este repositorio le garantiza al servidor
+MCP». El de `main.py` es el segundo, porque lo lee un humano en la terminal. El
+recuento sí se derivó donde tocaba —en el test (`tests/test_f006_catalogo.py:50`,
+con su comentario)— y se dejó cableado justo en los dos sitios que se leen.
+
+## El docstring de módulo de `inventario.py`, arreglado a medias
+
+Verifiqué en la primera vuelta que el docstring de `objetos_de_sql`
+(`inventario.py:102-105`) ya dice «**ya existe**», y lo di por corregido. El
+docstring de **módulo**, cuatro líneas más arriba (`inventario.py:14-17`), sigue
+diciendo:
+
+> «**YA EXISTE**, es R28 y **llega en el bloque H**. **Mientras tanto no hay red
+> de seguridad detrás de esta puerta**»
+
+Las tres afirmaciones se contradicen entre sí en la misma frase: se corrigió la
+parte que el guardián busca y sobrevivieron el futuro y el «mientras tanto». Es
+el patrón denunciado, a cuatro líneas del arreglo, y es también un aviso sobre el
+método: **buscar una cadena arregla la cadena, no el párrafo**.
+
+## R38 sin cumplir: `azure-apps` no sabe que existe el diccionario
+
+`design.md:552` manda actualizar `azure-apps/datamart_seg_anual.md` «en este
+mismo trabajo», y el `CLAUDE.md` global lo pone como regla de propiedad: el dueño
+del documento es el proyecto que describe, y se actualiza en el mismo trabajo, no
+después. Comprobado en el documento real: **no menciona `_meta.v_diccionario` ni
+ninguna tabla del contrato**. Su tabla de consumidores (línea 58) sigue diciendo
+que el MCP consume `_meta.v_frescura` y `_meta.v_raw_state`, y la línea 57 lo
+describe como «**MCP** (cliente de escritorio)». La única aparición de la palabra
+«diccionario» (línea 189) es el diccionario de tablas de Sigrid, que es otra cosa.
+
+`tasks.md:305` sigue en `[ ]`, así que la tarea está viva y no perdida — pero
+esta tanda publicó el contrato contra la base real, y el documento que lo tiene
+que contar sigue describiendo un mundo sin diccionario. Añado que su redacción ya
+nacería caducada: dice «las tres tablas».
+
+## Una copia a mano nueva, sin test que la ate
+
+`config/diccionario/_meta.yaml:479` publica
+`valores: [convenciones, ordenes_de_magnitud, ejes, esquemas]`, que replica a mano
+`CONTEXTO_PUBLICADO`; el mismo listado vuelve a aparecer en
+`01_diccionario.sql:94` y en `design.md:450`. Nada ata esas cuatro copias entre
+sí. El día que se publique un quinto bloque de contexto, el mecanismo de
+clasificación —que sí funciona— dejará pasar el cambio con su verde, y **el
+`valores` que ve el agente quedará mintiendo**. No bloquea hoy; es deuda con
+fecha de caducidad conocida, y barata de atar ahora.
+
+## Sobre el aviso de higiene del `git add -A`
+
+Comprobado y sin consecuencias: rehíce la lectura del contrato sobre el rango
+completo de la tanda en vez de sobre `9ab9be7`, y el diseño enmendado aparece
+repartido entre varios commits, como se me advirtió. El árbol queda limpio y la
+redacción del ID de suscripción (F-043) se sostiene en `HEAD`: ni una
+coincidencia en los ficheros versionados. El historial lo conserva, y eso está
+escrito como excepción aceptada, no como cierre limpio.
+
+## Checkpoints
+
+| | Estado | Razón |
+|---|---|---|
+| **C1** Entorno en verde | `[x]` | `init.sh` verde: 1968 pasados, 124 saltados, cobertura 98,2 % de 976 líneas. |
+| **C2** Trazabilidad requisito → test | **`[ ]`** | R28 y R29 sí. **R10 no**: el derivador exige el aviso en `descripcion`/`grano` y nunca en `columna.significado`, que es donde falta y donde está el número doblado. El guardián de la razón de `ocultar` comprueba que una cadena aparezca, no que sea cierta. |
+| **C3** Diff conforme al diseño | `[x]` | Solo los ficheros previstos; dominio sin infraestructura; el contexto en `domain/diccionario.py`, el SQL en `infrastructure/`. |
+| **C3 bis** Sin secretos ni prints | `[x]` | Ni GUID ni correo real en el árbol; el ID de suscripción queda redactado en `HEAD` (F-043), con su excepción escrita. |
+| **C4** Convenciones y veracidad | **`[ ]`** | Prosa falsa publicada: la razón de `ocultar`, el `total_incurrido` mal clasificado, el «28/200» como prueba de lo que no prueba, «tres tablas» en el DDL del contrato y «102 objetos» en la ayuda de `main.py`. |
+| **C4 bis** Campaña de mutación | **`[ ]`** | El informe es del 21-ago 10:42 y cubre 2358 líneas / 166 mutantes; hoy el alcance es **3164 / 252**. Faltan 86 mutantes y dos ficheros enteros. |
+| **C4 ter** Cero supervivientes | **`[ ]`** | Depende del anterior: cero supervivientes sobre un alcance que ya no es el vigente no acredita el actual. |
+| **C5** Tareas y commits | **`[ ]`** | Además de las MANUAL pendientes por diseño (T19, T27, T29-T34, que **no** son defecto de esta tanda), **T28/R38 sigue sin hacerse y era «en este mismo trabajo»**: `azure-apps/datamart_seg_anual.md` no menciona el contrato del diccionario. Falta también la sección «Evidencias» y la traza RED de los tests nuevos. |
+
+### Trazabilidad de lo nuevo
+
+| Requisito | Test que lo cubre | |
+|---|---|---|
+| R28 · toda clave del global, decidida | `test_f006_contexto.py::test_f006_r28_toda_clave_del_global_esta_decidida` | ✔ probado con clave inventada |
+| R28 · sin solapamiento entre listas | `..._ninguna_clave_esta_en_las_dos_listas` | ✔ |
+| R28 · lo excluido lleva motivo | `..._lo_excluido_lleva_su_motivo` | ⚠ exige ≥20 caracteres, no veracidad |
+| R10 · el aviso alcanza a todo objeto afectado | `test_f006_stg_trampas.py::..._todo_objeto_que_sirve_medidas_del_fact_avisa` | ⚠ solo mira ficha, no columna |
+| R10 · la derivación no está vacía ni infla | `..._control_la_derivacion_encuentra_los_afectados` | ✔ control legítimo |
+| R10 · el aviso no se invierte otra vez | `..._el_aviso_no_alarma_sobre_la_medida_sana` | ✔ |
+| Plegado YAML como clase | `tests/_texto.py`, usado por `test_f006_cobertura.py` y `test_f006_copias.py` | ✔ con dos controles |
+| R38 · documento de `azure-apps` | — | ✘ sin cubrir y sin hacer |
+
+## Automejora que propongo (no aplico): la campaña puede caducar y nadie se entera
+
+El grave de esta pasada **no es culpa del implementer, es un agujero del arnés**.
+`harness/init.sh` dice en sus líneas 428-430, y con razón, que la mutación no
+corre ahí porque es cara, y que «el reviewer la comprueba por
+`progress/mutacion_F-XXX.md`». El problema es que **nada comprueba que ese
+informe siga siendo válido**: se escribe con su fecha, el código sigue creciendo,
+y el fichero de ayer parece exactamente igual de verde que el de hoy.
+
+En una feature de tanda única eso casi nunca muerde. En una de **catorce
+pasadas**, con siete commits de producción después de la campaña, muerde seguro.
+Y lo he cazado a mano; si en esta pasada me hubiera limitado a comprobar que el
+informe existe, dice 0 supervivientes y sus totales cuadran **entre sí**, habría
+aprobado. Cuadran entre sí perfectamente: lo que no cuadra es con `HEAD`.
+
+**Propuesta concreta**, barata y que automatiza justo el fallo:
+
+1. Que `harness/mutacion.py` estampe en el informe el **SHA de `HEAD`** sobre el
+   que se generó la campaña, además de la fecha y el `ref_diff` que ya escribe.
+2. Que `harness/init.sh`, en la feature `in_progress`, compare ese SHA con el
+   `HEAD` actual y emita una línea **`PUERTA MUTACION: [CADUCADA]`** cuando entre
+   medias haya commits que toquen ficheros de producción. No hace falta ejecutar
+   la campaña —que es lo caro—: basta un `git log` para saber que hay que
+   relanzarla.
+3. Que `.claude/agents/reviewer.md` añada al punto 4 de la validación de rigor:
+   «comprueba que la campaña se generó sobre el `HEAD` que revisas; un informe
+   correcto de una versión anterior del código no acredita la actual».
+
+Los tres cambios valen para **cualquier** proyecto, así que, si se aprueban, van
+a `arnes-base` en el mismo trabajo, por la regla de propagación del `CLAUDE.md`.
+
+### Segunda propuesta: un guardián no puede validar una prosa
+
+Los dos graves nuevos de esta pasada tienen la misma forma, y no es casualidad:
+**un test verde comprobando que una cadena aparece, encima de una afirmación
+falsa**. `..._lo_excluido_lleva_su_motivo` exige veinte caracteres de razón y da
+por buena una razón que describe un mecanismo inexistente. El derivador de R10
+exige el aviso en `descripcion` y deja intacta la columna que lleva el número
+doblado. En ambos casos el guardián certifica **presencia**, y lo que hacía falta
+era **veracidad**.
+
+No propongo un test que valide prosa, porque no existe. Propongo dos cosas
+baratas para `CHECKPOINTS.md`:
+
+1. **Que un guardián de prosa declare explícitamente qué NO comprueba.** Una línea
+   en su docstring: «comprueba que la razón existe y tiene contenido; **no**
+   comprueba que sea cierta — eso es trabajo del reviewer». Convierte un verde
+   engañoso en un verde honesto, y le dice al reviewer dónde tiene que mirar a
+   mano.
+2. **Que cuando un aviso corrija un número, el checkpoint pida verificar la ficha
+   de la columna afectada, no solo la del objeto.** Es el punto ciego que hemos
+   repetido tres veces en esta feature, y el reviewer —yo— lo heredé del guardián
+   que estaba revisando.
+
+Y una tercera, para el rol reviewer: **cuando encargue una auditoría, esperarla o
+decir que no la encargué**. Dar por perdida la de esta pasada me costó dos graves
+y una cifra copiada mal, y la primera versión del informe ya llevaba escrito, con
+todas las letras, que no me apoyaba en nada que no hubiera verificado yo.
+
+Y una observación que va con esto: llevo catorce pasadas comprobando que los
+totales de mutación cuadran, y **hasta hoy los comparaba solo consigo mismos**.
+La verificación que mi propio protocolo pide —recalcular con `harness.alcance` y
+`generar_mutantes`— vale para cazar un informe escrito a mano, que era el miedo
+original, pero solo caza un informe caducado si uno recuerda que el alcance de
+hoy puede no ser el de la campaña. Merece decirlo explícitamente en el protocolo,
+porque es un modo de fallo distinto del que estaba previsto.
+
+## Nota de método, para que conste
+
+Encargué en paralelo una auditoría independiente y **escribí la primera versión
+de esta pasada dándola por perdida**, porque no había devuelto nada en mi
+ventana. Dejé escrito entonces: «no me apoyo en nada que no haya verificado yo».
+Volvió después, con **cinco hallazgos que yo no tenía**, dos de ellos graves. He
+reescrito la pasada entera.
+
+Lo dejo a la vista en vez de limpiarlo porque las dos lecciones son del mismo
+tipo que llevo catorce pasadas señalando, y esta vez me tocan a mí:
+
+- **Di por cerrado el DEFECTO 3 mirando donde se había arreglado.** Verifiqué el
+  aviso en `descripcion` y en `grano` —que es donde el derivador lo exige— y no
+  abrí las fichas de columna, que es donde vive el número doblado. Mi
+  verificación heredó el punto ciego del guardián que estaba verificando.
+- **Copié 102 objetos / 793 columnas de las pasadas anteriores** en lugar de
+  recalcularlos, en el mismo informe en el que reprocho exactamente eso. Son 103
+  y 798.
+
+Y una tercera, sobre el encargo: dar por perdida una auditoría por impaciencia
+sale igual de caro que no encargarla. La diferencia entre mi primera versión y
+esta —un grave contra tres— es lo que costaron esos minutos.
+
+Lo que sostiene esta pasada lo he comprobado personalmente, incluido todo lo que
+vino de la auditoría, que **no he dado por bueno sin repetirlo**: el recálculo del
+alcance y de los mutantes; el `SUM(importe_origen)` leído en el SQL del build y
+la medición fila a fila del informe; el recuento real cargando el diccionario; el
+gancho de tabla contra la lista de columnas de `ocultar`; las 21 filas de
+contexto; la clasificación de las once claves; el experimento de la clave
+inventada; el barrido de prosa cruda por los ficheros de test; la búsqueda de
+código muerto en los módulos fuera del alcance declarado; y el documento de
+`azure-apps` abierto y leído.
+
+## Qué hace falta para que esto pase a APROBADO
+
+Por orden de lo que más daño hace si se queda:
+
+1. **Bajar el aviso de `importe_origen` a la ficha de columna** en
+   `mart.fact_seguimiento_categoria` y `mart.v_pbi_fact_categoria`: decir que el
+   valor **almacenado** viene sumado dos veces para las series afectadas, y qué
+   usar en su lugar. Y que el derivador lo exija **en la columna**, no en la
+   ficha, o el punto ciego sigue ahí.
+2. **Relanzar `python -m harness.mutacion --feature F-006` sobre `HEAD`**, con los
+   `__pycache__` borrados antes (F-041), y volver con los totales reales: 252
+   mutantes, no 166.
+3. **Reescribir la razón de `ocultar`** para que diga la verdad —nunca funcionó,
+   lista columnas contra un gancho de tabla— y abrir la deuda de decidir si se
+   implementa a nivel de columna o se retira.
+4. **Corregir `total_incurrido`** de saco y **retirar el «28/200»** como prueba
+   del doblado, citando en su lugar la medición fila a fila que sí lo prueba.
+5. **Actualizar los recuentos**: `main.py:613` (102 → 103),
+   `sql/ddl/01_diccionario.sql:7` («tres tablas» → cuatro), `design.md:11/511/552`,
+   `tasks.md:305-306`, `progress/current.md:101/131-132`.
+6. **Cerrar T28/R38**: `azure-apps/datamart_seg_anual.md` con el contrato del
+   diccionario, ya con el recuento bueno.
+7. **Rematar el docstring de módulo** de `inventario.py:14-17`, del que solo se
+   corrigió la parte que buscaba el guardián.
+8. **Cerrar la tanda con «Evidencias»** y los cuatro números, y con la traza RED
+   de los tests nuevos.
+
+Los puntos 1 y 2 son los que bloquean de verdad. Del 3 al 8 son prosa falsa y
+deuda: ninguno rompe un número, y todos se los va a creer el siguiente que los
+lea.
+
+### Sobre lanzar la batería mientras tanto
+
+**Puede lanzarse**, corre contra lo ya publicado y mide lo único que la revisión
+no alcanza —el enrutado—. Pero **el punto 1 antes**, si es posible: son dos
+`significado` y evita que la primera pregunta sobre acumulado a origen devuelva
+el doble con una ficha respaldándolo. Los puntos 2 al 8 no tienen por qué
+esperarla, y la campaña son unos 19 minutos de máquina sin nadie delante.
 
 ---
 

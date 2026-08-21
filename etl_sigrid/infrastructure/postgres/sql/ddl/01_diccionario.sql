@@ -4,7 +4,7 @@
 -- EL CONTRATO CON `mcp-bbdd` (F-006). LEER ANTES DE TOCAR NADA.
 -- ===========================================================================
 --
--- Estas tres tablas y esta vista son lo unico que este repositorio le garantiza
+-- Estas CUATRO tablas y esta vista son lo unico que este repositorio le garantiza
 -- al servidor MCP: nombres, tipos y una publicacion atomica. El MCP programa
 -- contra esto sin poder preguntar, asi que un cambio aqui es un cambio de API.
 --
@@ -28,7 +28,7 @@
 -- Este fichero es idempotente y lo ejecuta `PublicarDiccionarioStep` en cada
 -- publicacion, justo antes de escribir. No va en `00_meta.sql` a proposito:
 -- aquel lo ejecuta el bootstrap en la PRIMERA conexion de cada proceso, y
--- meter ahi tres tablas mas encareceria el arranque de todos los comandos por
+-- meter ahi las tablas del contrato encareceria el arranque de todos los comandos por
 -- algo que solo necesita un paso.
 
 -- ---------------------------------------------------------------------------

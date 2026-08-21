@@ -71,18 +71,33 @@ def test_f006_r28_lo_excluido_lleva_su_motivo() -> None:
     assert mudos == [], f"{mudos} se excluyen sin explicar por qué"
 
 
-def test_f006_r28_ocultar_se_queda_fuera_a_proposito() -> None:
-    """Acordado el 2026-08-22, y escrito para que nadie lo añada sin revisarlo.
+def test_f006_r28_ocultar_se_queda_fuera_por_la_razon_cierta() -> None:
+    """La razón que hubo escrita aquí era FALSA, y este test la respaldaba.
 
-    `mcp-bbdd` lo resuelve anteponiendo `[NO RECOMENDADO PARA CONSULTA: …]` a la
-    descripción con el `motivo_no_consumo` que sí viaja, así que ampliar el
-    contrato solo añadiría superficie que mantener sincronizada entre dos
-    repositorios.
+    Decía que `motivo_no_consumo` lo sustituía. No puede:
+    `motivo_no_consumo` es de **objeto** y `ocultar` son **columnas**. Y el test
+    solo comprobaba que la cadena apareciese, así que dio por buena una
+    justificación inventada —exactamente lo que esta feature existe para
+    impedir, cometido dentro de ella—.
+
+    Lo verificado el 2026-08-22 en `mcp-bbdd`: el único gancho es
+    `esta_oculta(tabla.nombre_completo)`, que recibe un nombre de **tabla**, así
+    que la lista de columnas **nunca ocultó nada en ningún proveedor**.
     """
     assert "ocultar" in CONTEXTO_NO_PUBLICADO
     motivo = CONTEXTO_NO_PUBLICADO["ocultar"]
-    assert "motivo_no_consumo" in motivo
+
+    assert "esta_oculta" in motivo, "la razón tiene que citar el gancho real"
+    assert "TABLA" in motivo, "y decir que el gancho es de tabla, no de columna"
     assert "2026-08-22" in motivo, "la decisión va fechada para poder revisarla"
+    assert "hueco es real" in motivo, (
+        "un hueco declarado tiene que reconocerse como hueco: la necesidad "
+        "existe aunque el mecanismo no exista todavía"
+    )
+    assert "motivo_no_consumo" not in motivo, (
+        "vuelve la justificación falsa: `motivo_no_consumo` es de objeto y esto "
+        "son columnas, así que no puede sustituirla ni en principio"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -159,3 +174,36 @@ def test_f006_r28_control_el_generador_no_publica_en_vacio() -> None:
     assert len(CONTEXTO_PUBLICADO) >= 4
     filas = filas_contexto(_dicc())
     assert len({f[0] for f in filas}) == len(CONTEXTO_PUBLICADO)
+
+
+# ---------------------------------------------------------------------------
+# Los recuentos del estado, derivados (14ª pasada)
+# ---------------------------------------------------------------------------
+#
+# `progress/current.md` describe el ESTADO, así que sus cifras tienen que ser
+# las de hoy. Caducaron dos veces —decían 102/793/47 cuando ya eran 103/798/48—
+# y la segunda vez el propio reviewer copió las viejas **en el informe donde
+# reprochaba justo eso**. No es casualidad: a mano no funciona.
+#
+# No se puede derivar el texto de un documento en prosa, pero sí **comprobarlo**,
+# que es lo que impide que envejezca en silencio.
+
+
+def test_f006_los_recuentos_de_current_son_los_de_hoy() -> None:
+    texto = (RAIZ / "progress" / "current.md").read_text(encoding="utf-8")
+    dicc = _dicc()
+
+    objetos = len(dicc.fichas)
+    columnas = sum(len(f.columnas) for f in dicc.fichas)
+    consumo = sum(1 for f in dicc.fichas if f.consumo_recomendado)
+
+    # Solo la sección de estado: más abajo hay historia, y la historia se queda.
+    estado = texto.split("### El contrato creció")[0]
+
+    for valor, que in ((objetos, "objetos"), (columnas, "columnas"), (consumo, "de consumo")):
+        assert str(valor) in estado, (
+            f"`current.md` no dice el número real de {que} ({valor}). Los "
+            f"recuentos a mano caducan: ya lo hicieron dos veces"
+        )
+    for viejo in ("102 objetos", "793 columnas"):
+        assert viejo not in estado, f"«{viejo}» es un recuento caducado"

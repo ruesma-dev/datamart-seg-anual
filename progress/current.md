@@ -98,7 +98,7 @@ que es **justo el documento que miente**. Sí derivé, pero de la fuente
 equivocada, y eso deja 31 fichas en verde afirmando algo falso. Detalle en
 `progress/impl_F-006.md`, sección «Séptima pasada».
 
-**El diccionario está completo: 102 objetos, 793 columnas, 13 reglas duras y
+**El diccionario está completo: 103 objetos, 798 columnas, 13 reglas duras y
 `pendientes` VACÍA.** El trinquete llegó a **0**, así que no hay ningún objeto
 que declarar como excepción.
 
@@ -128,14 +128,31 @@ decimotercera regla: estaba escrita en una cabecera YAML, que es un comentario y
   cobertura, que corre en cada `init.sh`.
 - **Bloque global** (bloque B): las doce reglas duras, los órdenes de magnitud,
   las convenciones, los nueve esquemas y las 18 preguntas de la batería.
-- **Fichas**: los **102 objetos** del datamart con **793 columnas**, todas
-  contrastadas contra el SQL. La superficie de consumo son 47 de esos 102, con
+- **Fichas**: los **103 objetos** del datamart con **798 columnas**, todas
+  contrastadas contra el SQL. La superficie de consumo son 48 de esos 103, con
   el **100 %** de sus columnas con significado; los otros 55 llevan
   `motivo_no_consumo` diciendo a dónde ir en su lugar.
 
 El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49 → 39 → 38 →
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
+
+### Estado tras la 14ª pasada · el valor doblado
+
+- ** está DOBLADO** en el valor
+  almacenado: 37 celdas de 8 obras, **39,07 M€ de más**. El build hace
+  `SUM(importe_origen)` sobre las filas duplicadas del fact, cuyo acumulado es
+  idéntico. **El aviso baja ya al `significado` de cada columna**, no a la
+  cabecera del objeto, y el derivador lo exige ahí. **El build no se toca**: es
+  `mart`, de otra feature.
+- **`ocultar` sigue fuera, pero por otra razón**: la anterior era falsa y mi
+  propio test la respaldaba. El gancho de `mcp-bbdd` es de **tabla** y la lista
+  son **columnas**, así que nunca ocultó nada. El hueco es real y se cierra allí.
+- **Recuentos derivados o comprobados**: 103 objetos, 798 columnas, 48 de
+  consumo. Hay un test que los contrasta contra `current.md`.
+- **R38 hecho**: `azure-apps/datamart_seg_anual.md` documenta ya el contrato.
+
+Publicado en **versión 5**.
 
 ### El contrato creció (2026-08-22) · `_meta.diccionario_contexto`
 
@@ -194,7 +211,7 @@ acotada a `_meta`. Pendiente de que el líder la pida.
 Desbloqueado con el `az login` del humano. Detalle y salidas reales en
 `progress/impl_F-006.md`, sección «Contra Azure, de verdad».
 
-- **T19 hecho.** El contrato vive en `_meta`: 102 objetos, 13 reglas, 793
+- **T19 hecho.** El contrato vive en `_meta`: 103 objetos, 13 reglas, 798
   columnas, cobertura 100 %, singleton con una fila. `v_diccionario` con sus 19
   columnas en orden y `motivo_no_consumo` la última. Los dos `LEFT JOIN`
   comprobados: 4 objetos sin paso siguen saliendo.

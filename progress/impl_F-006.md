@@ -4141,3 +4141,103 @@ OK   lo publicado ES lo del arbol (version 4, hash 44e091eb215c)
 Las cuatro tablas se vacían y se reescriben **en la misma transacción**, con su
 test. `design.md` lleva la enmienda fechada en §4.4, que es lo que implementa el
 otro repositorio.
+
+---
+
+# Decimocuarta pasada · el valor doblado, y dos razones falsas
+
+## GRAVE 1 · Un valor doblado en la base, con el diccionario respaldándolo
+
+`mart.fact_seguimiento_categoria.importe_origen` **está doblado en el valor
+almacenado**. El build hace `SUM(importe_origen)` sobre las filas duplicadas del
+fact, y ahí el acumulado es **idéntico en las dos**, así que sumarlas da el
+doble. Medido contra la base el 2026-08-22:
+
+```
+   celdas de categoria afectadas: 37   obras: 8   sobran: 39.07 M EUR
+```
+
+**39,07 M€ de más.** Es el mismo orden de magnitud que el «38,9 M€ en una sola
+obra» que motivó los órdenes de magnitud — el error que esta feature nació para
+impedir, reproducido dentro de ella.
+
+Y la ficha de columna decía «ya es acumulado» con `agregacion: ultimo_valor`, o
+sea **tómalo tal cual**. Alguien pregunta cuánto lleva a origen una obra, lee una
+fila y **recibe el doble con el diccionario respaldándolo**, que es peor que no
+documentar nada.
+
+### Por qué se coló, que es lo que hay que arreglar
+
+El derivador exigía el aviso en `descripcion` o `grano`: **a nivel de objeto**. Y
+quien consulta una columna concreta recibe **su ficha de columna**, donde no
+había nada.
+
+El reviewer lo dio por cerrado media hora antes porque verificó `descripcion` y
+`grano` —justo donde el derivador exigía— y no abrió las fichas de columna:
+**heredó el punto ciego del guardián que estaba verificando**. Es la misma
+lección de siempre: una comprobación no solo deja pasar defectos, además **enseña
+a mirar donde ella mira**.
+
+Ahora el aviso baja a la columna y el derivador lo exige ahí. Con dos matices que
+no estaban:
+
+- las **acumuladas** (`importe_origen`, `importe_origen_raw`) dicen que el valor
+  está doblado, cuánto, por qué, y cómo obtener un acumulado fiable;
+- las **sanas** (`importe_mes`) dicen **que lo son**, para no repetir el error de
+  la pasada anterior de alarmar en bloque sobre la medida buena.
+
+Al derivar quién agrega volvió a aparecer **el punto ciego del bloque**: mirar el
+fichero entero metía a `mart.v_pbi_fact` —que es pasarela y no dobla nada— por el
+`FROM` de su vecina en `05_views_powerbi.sql`. Acotado a su bloque, como ya hubo
+que hacer con `_proyeccion_de` y con el derivador de alias. **Tercera vez.**
+
+El build no se toca: es `mart`, de otra feature, y la firma está acotada a
+`_meta`.
+
+## GRAVE 2 · La razón para excluir `ocultar` era falsa, y mi test la respaldaba
+
+Escribí que `motivo_no_consumo` lo sustituía. **No puede**: `motivo_no_consumo`
+es de **objeto** y `ocultar` son **columnas**.
+
+Verificado en `mcp-bbdd`: el único gancho es
+`esta_oculta(tabla.nombre_completo)` (`application/services/servicio_catalogo.py:49`),
+que recibe un nombre de **tabla**. Ninguna tabla se llama `_built_at`, así que
+esa lista **nunca ocultó nada, ni con el YAML ni con la base**.
+
+Lo peor no es la razón: es que **mi test la respaldaba**. Comprobaba que la
+cadena `motivo_no_consumo` apareciese en el motivo, así que dio por buena una
+justificación inventada. Un test que verifica que una explicación *existe* no
+verifica que sea *cierta* — exactamente el fallo que esta feature persigue,
+cometido dentro de ella.
+
+**Decidido de nuevo con el dato correcto delante**: sigue fuera, pero por otra
+razón. La necesidad **es real** —el agente ve esas columnas en la `ficha` y puede
+ofrecerlas como si fueran de negocio— y el hueco se cierra en `mcp-bbdd`
+añadiendo un gancho de **columna**; publicar la lista antes solo movería el
+problema de sitio. Queda escrito así, fechado, y el test comprueba ahora los
+hechos verificables: que cite el gancho real, que diga que es de tabla, que
+reconozca el hueco, y **que no vuelva la justificación falsa**.
+
+## GRAVE 3 · Recuentos caducados
+
+Son **103 objetos, 798 columnas y 48 de consumo**. Estaban mal en la ayuda de
+`main.py`, en el «tres tablas» del DDL que define cuatro, y en `current.md`.
+
+Aplicado el remedio de siempre donde se puede: la ayuda de `main.py` **ya no da
+la cifra** —la imprime el propio comando, que la cuenta—, y el DDL dice «cuatro».
+Lo que no se puede derivar, un documento en prosa, **se comprueba**: hay un test
+que contrasta los recuentos de `current.md` contra el diccionario y falla si
+caducan. Ya lo hicieron dos veces, y la segunda el propio reviewer copió las
+cifras viejas **en el informe donde reprochaba justo eso**.
+
+## R38 · El documento del ecosistema
+
+`azure-apps/datamart_seg_anual.md` describía el MCP como «cliente de escritorio»
+y no decía que este proyecto **publica su propia semántica en la base**. Añadido:
+qué se publica (las cuatro tablas y la vista), quién lo consume, dónde está el
+contrato completo, cómo se publica, y las **reglas de compatibilidad** que rompen
+si se ignoran —columnas solo al final de `v_diccionario`, el contexto crece por
+filas, nunca `DROP` ni `TRUNCATE`, y `hash_fuente` es la identidad, no
+`version`—.
+
+Publicado en **versión 5**.
