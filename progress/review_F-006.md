@@ -4,11 +4,129 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **doce pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **trece pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# DECIMOTERCERA PASADA · 2026-08-21 — los tres graves, cerrados
+
+> Commits revisados: `39c83f7` y `9ea8346`.
+
+## Veredicto de la decimotercera pasada
+
+**APROBADO.** Los tres graves de la duodécima están cerrados, y los dos que eran
+de **confianza en la evidencia** —no de contenido— se han cerrado del modo que
+había que cerrarlos: enseñando la salida que faltaba y reconociendo el recorte.
+
+Queda una deuda menor y una tarea que es tuya, no suya: la huérfana.
+
+## Los tres graves
+
+### 1 · El `READ ONLY` ahora se aplica de verdad
+
+Y el diagnóstico técnico es correcto: `BEGIN READ ONLY` no servía porque la
+conexión llega ya en transacción —lo mismo que rompió el `autocommit` en la
+tanda anterior—, así que la vía es `SET LOCAL transaction_read_only = on`, que es
+válida precisamente **dentro** de una transacción abierta.
+
+Lo importante es cómo se comprueba: el test ya no mira lo que un constructor
+devuelve, mira **lo que el cliente ejecuta**. Con un cursor espía que registra en
+`ejecutadas`, asserta `cursor.ejecutadas[:2] == list(previas)` y que la segunda es
+`SET LOCAL transaction_read_only = on` (`tests/test_f006_unicidad.py:209-220`).
+Esa es la diferencia entre fijar una intención y fijar un hecho.
+
+Y el barrido de constructores muertos existe y quedó como control permanente:
+`test_f006_t26_control_ningun_constructor_de_unicidad_esta_muerto` (`:223`).
+Encontró uno —el que yo denuncié— y ninguno más.
+
+### 2 · Republicado, con el mecanismo que detecta la desincronización
+
+- `version: 2` en el árbol (`00_global.yaml:15`) y en la base: `publicado: ('2',
+  'a7584ee84391')`, con hash nuevo (antes `a6da19bac1e8`).
+- Y la comprobación que faltaba: `check-diccionario` compara el `hash_fuente` de
+  `_meta.diccionario_publicacion` con el del árbol. Ejecutado **antes** de
+  republicar dio `KO LO PUBLICADO NO ES LO DEL ARBOL`; después,
+  `OK lo publicado ES lo del arbol (version 2, hash a7584ee84391)`. El defecto que
+  denuncié —publicar y luego editar en el mismo commit— ya no puede pasar
+  inadvertido.
+
+### 3 · La evidencia, completa y con el recorte reconocido
+
+- El log de publicación va **entero, con `hash_fuente`**, y el informe dice por
+  qué faltaba: «lleva siempre `hash_fuente` y yo pegué la línea sin él. Va
+  entera». Reconocer el recorte vale más que corregirlo en silencio.
+- **Las cuatro comprobaciones traen su salida real**: los siete objetos de `_meta`
+  con su tipo, las 19 columnas **enumeradas en orden** con `motivo_no_consumo` la
+  última, y el singleton con su tupla.
+- **Los siete NO COMPROBADO, con nombre y con su clave.** Y entre ellos aparece
+  `mart.v_pbi_fact`, que era justo el objeto que la auditoría anterior señaló como
+  «clave demostrablemente rota y ninguna pasada lo ha reportado».
+
+## El dato de la tanda: verificado, y es exacto
+
+`mart.fact_seguimiento_mensual` **sale NO COMPROBADO con 30 s y con 60 s, y solo
+a 180 s revela que su clave está rota en 8.778 casos**. Confirma la deducción que
+hice en la pasada anterior a partir de sus propios números, y es el mejor
+argumento que existe para **F-041**: si un timeout se hubiera contado como OK, el
+defecto más grave de toda la feature se habría enterrado con un verde. El arnés
+hace hoy exactamente eso con los mutantes.
+
+## La deuda que queda
+
+**La cobertura del comando, por segunda vez.** `tests/test_f006_catalogo.py`
+**no usa `CliRunner` ni una sola vez**, igual que `test_f006_unicidad.py` en la
+tanda anterior: cubre bien las 166 líneas de lógica pura de `catalogo.py` y deja
+el comando de `main.py:603` sin tocar. El patrón para cubrirlo sin conexión sigue
+existiendo en el propio repositorio (`test_f006_publicacion.py`, con `CliRunner` y
+`monkeypatch.setattr(main, "_get_pg", …)`). No bloquea —90,9 % sobre un umbral de
+80 %— pero es la segunda vez que la misma explicación se apoya en algo que el
+repositorio ya sabe resolver.
+
+## La huérfana: no bloquea esta tanda
+
+Se preguntaba si además de la batería impide aprobar. **No, y por tres razones**:
+
+1. **No lanzar `build_cierre` fue obedecer**: escribe en esquema de negocio y la
+   firma estaba acotada a `_meta`. Respetar el límite de una autorización no es un
+   defecto, es lo que hay que hacer.
+2. **Ya no es un estado silencioso**, que era mi objeción real en la pasada
+   anterior. `check-diccionario` la reporta explícitamente:
+   `!  cierre.v_pbi_planif_vs_real  FICHADO Y NO EXISTE`, con su recuento propio.
+3. **No es objeto esperado de ninguna de las 18 preguntas**, así que tampoco
+   falsearía la batería: dejaría `check-diccionario` en rojo, nada más.
+
+Es una tarea del humano —autorizar `build_cierre`—, no del implementer.
+
+## ¿Listo para la batería? Sí, y esto es lo que falta
+
+De las cuatro condiciones que puse en la pasada anterior, **tres están hechas**:
+el aviso del duplicado propagado a las cuatro fichas, republicado con `version: 2`
+y hash nuevo, y el `READ ONLY` aplicado de verdad. La cuarta —`build_cierre`— no
+es del implementer.
+
+Lo que falta, exactamente:
+
+1. **Autorizar y lanzar `build_cierre`** (humano). Deja `check-diccionario` en
+   verde y la base al día con el repositorio. **No condiciona las preguntas**: esa
+   vista no es objeto esperado de ninguna.
+2. **Decidir cómo se ejecuta T39.** DA-4 dijo que contra el prototipo local
+   apuntado a Azure, y eso implica abrir la regla de firewall del puesto en cada
+   tanda, con la salvedad de D11 (CGNAT rota la IP). Conviene fijarlo antes de
+   empezar, no a mitad.
+3. **Leer el resultado con el criterio ya escrito** (R41): el éxito son **13
+   respondibles bien contestadas y 5 bien rechazadas** —3 parciales y 2
+   imposibles—, no 18 de 18. Un «no puedo, y este es el motivo» correcto cuenta
+   como acierto.
+
+Y una advertencia para interpretar lo que salga: **los 39 objetos «sin
+contradicción» de T26 no tienen la clave demostrada**, solo no la contradicen con
+los datos de hoy; y siete siguen sin comprobar. Si una pregunta de la batería da
+un número raro sobre uno de ellos, el diccionario es el primer sitio donde mirar,
+no el último.
 
 ---
 
