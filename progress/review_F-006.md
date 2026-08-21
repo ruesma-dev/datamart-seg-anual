@@ -4,11 +4,317 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **nueve pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **diez pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# DÉCIMA PASADA · 2026-08-21 — el vicio de fondo, cerrado
+
+> Commits revisados: `ad88f9b`..`5bb6963`.
+
+## Veredicto de la décima pasada
+
+**RECHAZADO**, y **rectifico el APROBADO que ya había emitido**. Es la cuarta vez
+en esta feature que me pasa lo mismo, y el patrón de mi error es siempre el
+mismo, así que lo dejo escrito: **verifico el estado y doy por buena la defensa**.
+Comprobé que hoy no queda ninguna copia —con mi propio barrido normalizado, y es
+cierto— y de ahí di por bueno que el barrido *cubre* la superficie publicable. No
+la cubre, y basta un experimento adverso para verlo.
+
+Lo cerrado sigue cerrado y es mucho: los dos graves, el vicio de fondo de los
+derivadores, `es_hoja`. Pero quedan **dos defectos en la superficie de consumo**,
+uno en `stg`, un mecanismo que promete lo que no hace, dos recuentos declarados
+que no cuadran y un ejemplo publicado que el SQL no soporta.
+
+---
+
+## Bloquean · están en la superficie de consumo
+
+### 1 · `retenciones.entidad_cif`: el mecanismo publicado es falso, y va por cuadruplicado
+
+La corrección acertó en la conclusión y falló en el porqué, que es lo que un
+agente copia para escribir SQL. El texto nuevo dice:
+
+> «La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con `raw.prv` no
+> casa.»
+
+Vale para la rama PROVEEDOR. **No vale para la mitad CLIENTE de la tabla**: en
+`retenciones/01_movimientos.sql:107`, `entidad_cif` es el literal
+`NULL::VARCHAR(24)`. Ahí no hay ningún `LEFT JOIN raw.prv` que pueda casar o no:
+el NULL es una constante. Quien lea la ficha buscará una ficha de proveedor
+ausente donde lo que hay es una columna que no existe para ese sentido.
+
+Y el bloque de siete líneas está **duplicado literalmente en cuatro fichas**
+—`movimientos`, `v_pbi_retencion_entidad`, `v_pbi_retenciones_vivas`,
+`v_pbi_retenciones_vencidas`—: el arreglo de esta tanda ha creado, de un golpe,
+cuatro copias que la próxima corrección tendrá que acertar a la vez.
+
+### 2 · `maestro.proveedores_obra.razon_social`: el arreglo no llegó a la ficha hermana
+
+En la misma tanda se corrigió `maestro.proveedores.razon_social` para decir que
+una razón social sin informar llega como **cadena vacía** y nunca como NULL. Su
+hermana, en el mismo fichero (`maestro.yaml:229-231`), sigue diciendo
+`nulo_significa: La entidad no tiene ficha de proveedor, **o no tiene razon
+social**`. El SQL es el mismo patrón —`maestro/03_proveedores_obra.sql:45`,
+`pv.raz` en crudo con `LEFT JOIN raw.prv`—, así que la segunda mitad es falsa por
+el mismo motivo que se acaba de corregir arriba.
+
+---
+
+## No bloquea la batería, pero hay que corregirlo · `stg`
+
+### 3 · `pct_acumulado`, la cuarta hermana
+
+Ya lo tenía localizado por mi cuenta y la auditoría llega a la misma columna:
+`stg.plan_mensual.pct_acumulado` sigue en `suma_solo_dentro_del_mes` siendo un
+porcentaje **acumulado** —lo dice su propio `significado`—, con `pct_mes` al lado
+como la desacumulada y con `R-IMPORTE-MES` (bloqueante) incluyéndola en su
+ámbito. Las otras cuatro columnas del mismo grupo sí pasaron a `ultimo_valor`.
+
+Lo que lo explica está en el test: `tests/test_f006_stg_trampas.py:292` enumera
+**a mano** `["can_origen", "importe_origen", "importe_origen_raw",
+"total_incurrido"]`. El guardián se escribió a la medida del arreglo, así que no
+podía ver la quinta. Es la octava instancia del patrón, y esta vez vive en el
+test, no en la ficha.
+
+---
+
+## El mecanismo · el barrido de copias no cubre lo que dice cubrir
+
+Se declaró que el barrido pasa a cubrir «toda la superficie publicable, no solo
+las fichas». **No la cubre, y lo comprobé yo**: en un worktree aislado planté en
+`stg.obras.motivo_no_consumo` —campo publicable— dos afirmaciones que las pasadas
+séptima y octava rechazaron, plegadas como las pliega el propio YAML:
+
+```yaml
+      Se rehace cada noche con una ingesta incremental por
+      `tiemod`, asi que no se refresca
+      nunca.
+```
+
+Resultado: **`14 passed`**. Y lo que `yaml.safe_load` publica de ahí es
+exactamente «ingesta incremental por `tiemod`, asi que no se refresca nunca»: las
+dos frases rechazadas, servidas al MCP, con la batería en verde.
+
+La causa está a la vista en el fichero: el barrido parametrizado sobre los diez
+YAML mira **texto crudo**, y una frase partida por el salto de línea que `>-`
+introduce es invisible para él; el que sí normaliza el plegado **solo lee
+`00_global.yaml`**. La protección que funciona es justo la que no se extendió a
+los otros nueve ficheros. Y `BLOQUES_PUBLICABLES` es una **constante muerta**: no
+la usa ninguna función.
+
+El arreglo es de una línea: que el barrido normalizado recorra
+`str(yaml.safe_load(...))` de los **diez** ficheros. Y conviene, porque los
+defectos 1 y 2 de arriba son justamente lo que ese barrido debería haber cazado.
+
+---
+
+---
+
+## Dos recuentos declarados que no cuadran
+
+No cambian el veredicto, pero sí lo que uno cree que está protegido.
+
+**Las correcciones del guardián son nueve, no diez.** El desglose real es **4 + 5**:
+las cuatro que ningún sufijo cazaba (`maestro.proveedores.razon_social`,
+`stg.ambitos.codigo`, `.descripcion`, `.clase_sigrid`) y **cinco** del punto ciego
+del `INSERT … SELECT` (`stg.obras.codigo_obra`, `.nombre_obra`,
+`stg.partidas.descripcion_corta`, `stg.fases.anio`, `.mes`). El propio mensaje de
+commit que anuncia «seis» **enumera cinco**. `entidad_cif` no cuenta como décima:
+el guardián **no la marca** —llega por `LEFT JOIN`, donde el NULL sí es posible— y
+su arreglo fue de significado, no de posibilidad.
+
+**Y las tablas que dejaron de saltarse son cinco, no tres.** Lo medí: el guardián
+evalúa ahora **seis** objetos de `stg` —`ambitos`, `fases`, `obras`, `partidas`,
+`plan_mensual` y `presupuesto`—, y el docstring que documenta el arreglo
+(`tests/test_f006_fichas.py:571`) nombra solo `partidas`, `fases` y
+`plan_mensual`. Quedan sin mencionar **`stg.obras`** —que aportó **dos** de los
+cinco hallazgos— y **`stg.presupuesto`**. El control se escribió sobre la lista
+corta, así que fija menos de lo que el arreglo consiguió.
+
+## Por qué `pct_acumulado` era invisible: la derivación tiene un punto ciego estructural
+
+La comprobación nueva de coherencia dentro del ámbito de cada regla
+(`tests/test_f006_stg_trampas.py:266`) **funciona y no es un falso control**: su
+control comparte el accesor del ámbito, pero fija literales, así que al encoger
+el ámbito la comprobación pasa en vacío y **el control falla**. Correcto.
+
+Lo que no puede ver es otra cosa: compara **la misma columna declarada en varios
+objetos** del ámbito. Una columna que existe en **uno solo** —y `pct_acumulado`
+existe solo en `stg.plan_mensual`— no tiene con qué compararse y es invisible por
+construcción. Comprobado: marcarla `clave_sustituta` deja la batería entera en
+verde. Por eso el defecto no se detectó ni por la lista escrita a mano ni por la
+derivación: hacían falta las dos y ninguna la alcanza.
+
+## Un ejemplo publicado que el SQL no soporta
+
+`stg.yaml:594-598` explica —con razón— que el filtro `f.anio IS NOT NULL` de
+`08_plan_mensual.sql:328` no descarta nada, y lo ilustra diciendo que «una fase
+con `anio = 0` **entra igual**». No entra: dos líneas antes, la misma `SELECT`
+hace `make_date(f.anio, f.mes, 1)` (`:319`), y `make_date` **rechaza el año 0**
+—«year 0 is out of range»—. Una fase así no entraría: **abortaría el build**. El
+punto de fondo se sostiene; el ejemplo concreto, no.
+
+## Rectificación de un test mío
+
+La tarea C del encargo era juzgar si el implementer tenía razón al corregir un
+test que escribí yo en la séptima pasada. **La tiene, y yo estaba al revés.**
+Aquel test afirmaba que `stg.fases.anio`/`.mes` podían ser NULL y que
+`stg.plan_mensual` descartaba esas fases. Es falso: `stg/05_fases.sql:26-27`
+proyecta `f.ano` y `f.mes` **en crudo** desde `raw.obrfas`, sin `NULLIF` —y en la
+línea de al lado sí lo ponen donde lo querían: `NULLIF(TRIM(f.res), '')`—, así
+que con la convención de Sigrid el «sin informar» llega como 0 y el filtro es
+inerte. La premisa nueva es la correcta.
+
+## `es_hoja`: cerrado, con dos matices menores
+
+La corrección es cierta y está en las dos vistas, y el fenómeno que denuncia es
+estructural: `capitulo_padre_id` existe en `stg.partidas` y el árbol llega a seis
+niveles. Dos imprecisiones que no bloquean: la receta que propone —«bajar al
+último nivel de la jerarquía»— sugiere un `MAX(nivel)` cuando la profundidad es
+variable y el criterio exacto es «ninguna fila la apunta con `capitulo_padre_id`»,
+columna que **ninguna de las dos vistas proyecta**; y el ejemplo llama «nivel 2» a
+`CI.2`, que con `CI` como raíz es nivel 1.
+
+---
+
+## GRAVE 2 · el derivador, verificado con uno que no comparte linaje
+
+Es lo que se me pidió atacar, porque en la novena pasada mi verificación y la
+suya coincidieron **en el mismo error**. Así que esta vez escribí un derivador
+**desde cero**, con otro diseño: trocea cada fichero en **sentencias**
+—respetando los bloques `$$` de las funciones—, resuelve el mapa alias→tabla
+**dentro de cada sentencia** y solo entonces busca `alias.campo`. No reutiliza
+ni una línea del repositorio ni de mi script anterior.
+
+Resultado: **13 tablas**, y contrastado contra lo que la regla publica hoy,
+**coincidencia exacta, campo a campo**:
+
+`auxmun`(res) · `auxobramb`(cod,res) · `auxobrcla`(res) · `auxobrtip`(res) ·
+`auxpro`(res) · `conext`(cod) · **`ctrpro`(res)** · **`dcapro`(res)** ·
+`dcfpro`(res) · `obrfas`(res) · `obrfasamb`(fec,res) · `obrparpar`(cod,res) ·
+`prv`(cif,raz)
+
+Las dos que faltaban están dentro. El diagnóstico era el correcto: el alias es
+local a la sentencia, y `l` era `ctrpro`, `dcapro` y `dcfpro` en el mismo fichero.
+
+**Y el vicio de fondo está cerrado, que es lo que importaba más.** Los controles
+nuevos no comparten linaje con lo que controlan:
+
+| Control | Qué hace |
+|---|---|
+| `..._el_derivador_no_pierde_un_alias_repetido` | SQL **fabricado** con el caso exacto del bug y **la respuesta escrita a mano**: `{"ctrpro": {"res"}, "dcapro": {"res"}}`. Un derivador por fichero lo suspende |
+| `..._el_troceo_en_sentencias_separa_los_ambitos` | Fija que `SELECT … raw.a x; SELECT … raw.b x;` da `{x: a}` y `{x: b}`, no uno solo |
+| `..._las_tres_lineas_de_compras_existen_de_verdad` | Contraste del **fichero real por otra vía**: lee líneas con su propia regex y **no usa `alias_de_raw` ni `sentencias`**. Si el derivador vuelve a perder una tabla, este no se entera de la misma manera |
+
+Eso es exactamente lo que hacía falta: el control ya no puede confirmar el error
+del derivador con el mismo error. Se acaba una clase entera de falsos verdes.
+
+## GRAVE 1 · la copia borrada, y ninguna más en lo publicable
+
+`convenciones.identidad_sigrid` ya no repite la regla: **remite** a ella y dice
+por qué, dejando la lección escrita para el siguiente que pase:
+
+> «**Lo que hay que saber antes de consultar `raw` esta en la regla
+> `R-SIGRID-CON`, que es la unica version** […]. Esta entrada no lo repite a
+> proposito. Cuando lo repetia, se quedo atras […]. Eran dos versiones publicadas
+> que se contradecian.»
+
+Barrí **toda la superficie publicable** de los diez YAML —lo que sobrevive a
+`yaml.safe_load`, con el texto normalizado sin tildes y sin plegado de línea—
+buscando las ocho afirmaciones que revisiones anteriores rechazaron: «viven en
+`con`», «no en la extension», «no en la tabla especifica», `cen.res`, «Reparto
+nombre», `--full-refresh`, «incremental por `tiemod`» y «no se refresca nunca».
+**Cero coincidencias: el estado de hoy es limpio.**
+
+Lo que **no** puedo dar por bueno es la defensa: el barrido del repositorio no
+cubre esa superficie, y lo demuestro en §«El mecanismo». Estado limpio y defensa
+incompleta son dos cosas distintas, y confundirlas es lo que me llevó a aprobar
+antes de tiempo.
+
+## El guardián sin sufijos, medido
+
+Dejó de perseguir nombres y comprueba la afirmación real —«columna proyectada en
+crudo desde `raw` que declara `nulo_significa`»—. Lo medí antes y después:
+
+| | Novena pasada | Ahora |
+|---|---|---|
+| Fichas evaluadas | 15 | **20** |
+| Fichas de `stg` dentro | 1 (`ambitos`) | **6** (`ambitos`, `fases`, `obras`, `partidas`, `plan_mensual`, `presupuesto`) |
+| Columnas recorridas | 30 | **95** |
+| Saltos «no lee de `raw`» | 45 | **40** |
+
+El punto ciego está cerrado: las tablas de `stg` se pueblan con `INSERT … SELECT`
+en un fichero distinto del que las declara, y el guardián las saltaba con un
+motivo que era **falso** —decía que no leen de `raw` cuando sí lo hacen—. Ahora
+concatena los ficheros que **declaran o pueblan** el objeto.
+
+Cero columnas llegan hoy al `assert`, pero esta vez eso significa lo correcto:
+las que llegaban se corrigieron, y el detector tiene desde la octava pasada un
+control que distingue «cero por sano» de «cero por roto».
+
+## Rigor e higiene
+
+- **1828 tests**, 122 saltados, cobertura **99,0 %**, ejecutado por mí.
+- **Mutación recalculada con el `__pycache__` borrado**: 2358 líneas, **166
+  mutantes**, 0 supervivientes, 0 timeouts.
+- **Nada prohibido**: el diff toca cinco YAML, cuatro ficheros de tests y
+  `progress/`. Ni un `GRANT`, `REVOKE`, firewall, Azure ni conexión a la base.
+  **`harness/` intacto** y **sin `push`**.
+- Mi novena pasada quedó preservada en un commit propio, sin alterar su contenido.
+
+## La superficie de consumo: uno cerrado, dos abiertos
+
+**`es_hoja` sí está cerrado**, y bien, en **las dos** vistas
+(`mart.v_pbi_dim_partida` y `v_pbi_dim_partida_niveles`): retirada la promesa y
+sustituida por la verdad, con el ejemplo concreto —«un **capitulo** intermedio de
+nivel 2 con descendientes —`CI.2`, con `CI.2.1` debajo— sale marcado como hoja
+igual que ellas. Por eso **no evita el doble conteo**»—.
+
+**`entidad_cif` no**: la conclusión es correcta y el mecanismo publicado es falso
+para la mitad CLIENTE de la tabla (defecto 1). Y aparece un tercero que esta
+tanda dejó atrás, `maestro.proveedores_obra.razon_social` (defecto 2).
+
+Corrijo aquí lo que escribí antes de tener la auditoría: **la superficie de
+consumo no está limpia**. Lo que sí sigue siendo cierto es que sus 47 fichas y
+644 columnas no tienen ningún defecto de los grandes —columnas inventadas,
+granos falsos, claves que no identifican, acumulados marcados sumables—: los dos
+que quedan son afirmaciones sobre *por qué* una columna es nula.
+
+## Alcance y qué falta para la batería
+
+El diccionario está **estructuralmente completo**: bloques A a G, **102 fichas
+para 102 objetos publicados, 793 columnas, 13 reglas duras y `pendientes` en 0**,
+más el contrato de `_meta` con `mcp-bbdd` y el paso que lo publica. Lo que falta
+para aprobarlo son los cuatro puntos de arriba, ninguno estructural.
+
+Para poder pasar la batería de aceptación hace falta, por este orden:
+
+1. **Los cuatro defectos de esta pasada**, empezando por los dos de consumo.
+2. **T19**: `python main.py publicar-diccionario` contra la base real y las tres
+   consultas de comprobación del contrato. Es la primera vez que algo de esto se
+   ejecutará contra un PostgreSQL: la adaptación de tipos de psycopg, el `JSONB`,
+   los `TEXT[]` y el `CHECK (id = 1)` están sin probar, y está declarado.
+3. **T26/T27**: `check-diccionario` contra el catálogo real, **con la consulta de
+   unicidad de clave**. Es lo único que convierte «102 objetos» en una verdad
+   comprobada y no en lo que ve una expresión regular, y lo único que puede
+   cerrar las claves compuestas que el análisis estático no decide.
+4. **T39**: las 18 preguntas contra el diccionario publicado —13 respondibles, 3
+   parciales y 2 que deben contestarse con un «no puedo, y este es el motivo»—.
+   Ese es el criterio de éxito de F-006.
+5. Los bloques 🔏 de permisos y firewall, que necesitan firma del humano y no
+   condicionan la batería.
+
+**Deuda declarada que viaja** y que conviene no perder: el falso positivo del
+detector de multifuente (`COALESCE` de dos ramas del mismo objeto); los menores 5
+a 7 de la sexta pasada; **F-041**, para que «cero supervivientes» signifique lo
+que dice; los comentarios del SQL que mienten —ya mordieron una vez con
+`dec_cantidades`—; y la lista del punto 4 de `R-SIGRID-CON`, que es conservadora
+y cuyo enunciado se lee cerrado.
 
 ---
 

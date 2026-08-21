@@ -3153,3 +3153,101 @@ comprueba nada**, asi que cada derivador nuevo lleva el suyo:
   `check-diccionario` (T26).
 - Los **comentarios de `06_presupuesto.sql`** siguen mintiendo: corregirlos es de
   F-025 y el guardian de F-011 lo impide con razon. Propuesto al lider.
+
+---
+
+# Décima pasada · seis defectos, y por fin son finos
+
+## Los dos que bloqueaban
+
+### 1 · `entidad_cif` publicaba un mecanismo falso, y lo publicaba cuatro veces
+
+`retenciones.movimientos` tiene **dos mitades** y cada una calcula el CIF de una
+forma distinta:
+
+```sql
+-- PROVEEDOR (FROM raw.pag)
+prv.cif                   AS entidad_cif      -- crudo, LEFT JOIN raw.prv
+-- CLIENTE (FROM raw.cob)
+NULL::VARCHAR(24)         AS entidad_cif      -- literal, SIEMPRE nulo
+```
+
+Mi corrección de la 9ª explicaba **solo la mitad PROVEEDOR** —«el `LEFT JOIN` no
+casa»— y la aplicó a las cuatro fichas. En `CLIENTE` no hay join que no case:
+hay una constante. Así que corregí cuatro copias de una explicación equivocada,
+que es el patrón de la copia funcionando **a mi favor y en mi contra a la vez**:
+la escribí una vez y se publicó cuatro.
+
+Las cuatro dicen ya los dos mecanismos, y el `significado` avisa de que la
+columna **solo existe en la mitad PROVEEDOR**.
+
+### 2 · La hermana, octavo caso, entre dos fichas tocadas el mismo día
+
+`maestro.proveedores_obra.razon_social` decía «la entidad no tiene ficha de
+proveedor, **o no tiene razón social**». La segunda mitad es falsa: `pv.raz` va
+en crudo, así que una razón social vacía llega como **cadena vacía**.
+
+Y su hermana `maestro.proveedores.razon_social` **se corrigió en la tanda
+anterior**, con esa misma explicación. Las dos fichas se tocaron el mismo día y
+una se quedó atrás.
+
+### Lo que las une, y es lo que se deriva
+
+Las dos publican la misma clase de error, y no es «el NULL no puede ocurrir»
+—ahí el guardián ya llegaba— sino **el NULL ocurre por otra razón**:
+
+> sin `NULLIF`, un valor vacío del origen llega como **cadena vacía** (o como
+> **0** en los enteros), nunca como NULL. Así que una ficha no puede atribuir su
+> NULL a que el dato esté en blanco.
+
+Acotado a columnas que vienen de un alias de `raw`: una que sale de otro objeto
+del datamart puede haberse normalizado aguas arriba —`compras.fact_compras_linea`
+toma `proveedor_cif` de `compras.contratos`, que ya aplica `NULLIF(TRIM(...))`,
+y era un falso positivo—. Con su control.
+
+## 3 · Un punto ciego por construcción, cerrado en parte y declarado
+
+`pct_acumulado` no lo veía **nadie**: ni la lista a mano ni la derivación. La
+comprobación cruzada compara la misma columna **entre objetos** del ámbito, y
+`pct_acumulado` existe en uno solo. Sin pareja no hay comparación, y marcarla
+`clave_sustituta` habría dejado la batería entera en verde.
+
+**Medido: 32** de las columnas con `agregacion` del ámbito de `R-IMPORTE-MES`
+aparecen en un único objeto. No es un caso raro; es un tercio largo.
+
+Se cierra la parte derivable con una comprobación **por columna**, que alcanza a
+las solitarias: *un porcentaje no se suma, ni entre partidas ni entre meses*.
+Cazó `pct_acumulado` y su hermana `pct_mes`; los siete `*_pct` de `cierre` ya
+estaban en `promedio`. Y **el resto del hueco queda declarado** en un test que
+salta si cambia de tamaño: un hueco escrito vale más que uno que parece
+cubierto.
+
+## 4 · La defensa contra el patrón se saltaba por un salto de línea
+
+El reviewer plantó dos frases rechazadas **plegadas** como las pliega un bloque
+`>-` y el barrido pasó en verde, mientras `yaml.safe_load` las publica enteras.
+
+Ahora se barre el fichero **crudo y** el YAML **cargado**, y hacen falta los dos
+por motivos opuestos: el crudo conserva los comentarios —que `safe_load`
+descarta, y donde se escondió la copia del quinto caso— y el cargado conserva
+las frases plegadas. El experimento queda como control permanente.
+
+## 5 · Dos recuentos escritos a mano, ya desfasados
+
+«Seis casos» donde la enumeración lista dos, y «tres tablas» donde son **cinco**
+—omitiendo `stg.obras`, que aportó dos de los hallazgos, y `stg.presupuesto`—.
+
+No los he corregido: los he **sacado de la prosa**. El alcance del guardián y las
+tablas pobladas fuera del DDL se **miden** en dos controles, y el número vive en
+un solo sitio. Un recuento a mano en un docstring es otra afirmación que
+envejece, y estas dos ya lo habían hecho en una sola tanda.
+
+## 6 · Un ejemplo que el SQL no soporta
+
+La ficha decía que una fase con `anio = 0` «entra igual». La conclusión —el
+filtro `IS NOT NULL` es inerte— **se sostiene**, pero el ejemplo no:
+`make_date(f.anio, f.mes, 1)` **aborta el build** con año 0.
+
+Cambia el ejemplo, no la conclusión: se nombra la guarda que **sí** actúa y se
+dice lo accionable, que es comparar contra `0` y no contra NULL. Un ejemplo
+inejecutable es una afirmación falsa aunque la conclusión sea cierta.
