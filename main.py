@@ -645,6 +645,7 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
         interpretar_resultado,
         objetos_saltados,
         veredicto_no_comprobado,
+        veredicto_no_existe,
     )
 
     dicc, _hash = cargar_diccionario(DIR_DICCIONARIO)
@@ -668,8 +669,13 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     pg = _get_pg()
     fallos = 0
     sin_comprobar = 0
+    inexistentes = 0
     for c in consultas:
         resultado = pg.comprobar_unicidad(c, timeout)
+        if resultado == "NO_EXISTE":
+            inexistentes += 1
+            click.echo(veredicto_no_existe(c))
+            continue
         if resultado is None:
             sin_comprobar += 1
             click.echo(veredicto_no_comprobado(c, f"timeout de {timeout}s"))
@@ -681,14 +687,15 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
 
     click.echo("")
     click.echo(
-        f"Resumen: {len(consultas) - fallos - sin_comprobar} sin contradiccion, "
-        f"{fallos} con la clave rota, {sin_comprobar} sin comprobar."
+        f"Resumen: {len(consultas) - fallos - sin_comprobar - inexistentes} sin "
+        f"contradiccion, {fallos} con la clave rota, {sin_comprobar} sin "
+        f"comprobar, {inexistentes} fichados que no existen en la base."
     )
     click.echo(
         "Un objeto sin contradiccion NO tiene la clave demostrada: los datos de "
         "hoy no la contradicen, que es otra cosa."
     )
-    if fallos or sin_comprobar:
+    if fallos or sin_comprobar or inexistentes:
         raise SystemExit(1)
 
 

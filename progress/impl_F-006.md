@@ -3466,3 +3466,172 @@ derivable —la generación de las consultas, el alcance, la interpretación del
 resultado y el método del cliente con dobles—; lo que falta es el bucle del CLI
 que llama a la base, y esa cobertura llega con T27. Sigue muy por encima del
 umbral del 80 %.
+
+---
+
+# Contra Azure, de verdad · 2026-08-21
+
+Qué se ejecutó, qué devolvió y qué encontró. Salidas reales, redactadas de
+identificadores.
+
+## 0 · Firewall
+
+`az login` lo hizo el humano. La regla **única** `datamart-puesto-pgris` se
+reescribió midiendo la IP justo antes, y **cinco veces más** a lo largo de la
+tanda porque rota cada pocos minutos (pauta de D11). **No se creó ninguna regla
+nueva y no se tocó ninguna de las seis caducadas.**
+
+```
+$ az postgres flexible-server firewall-rule update -g rg-albaranes-dev \
+    -s psql-albaranes-rs9k2 -n datamart-puesto-pgris \
+    --start-ip-address "$IP" --end-ip-address "$IP"
+datamart-puesto-pgris   <IP-del-puesto>   <IP-del-puesto>
+
+$ python -m main check-pg
+✓ Postgres OK. PostgreSQL 16.14 on x86_64-pc-linux-gnu
+```
+
+## 1 · T19 · el contrato en `_meta`, publicado
+
+```
+$ python -m main publicar-diccionario
+[info] diccionario_publicado_ok  cobertura_cols=100.0 filas=116 n_columnas=793
+                                 n_objetos=102 n_reglas=13 version=1
+[SUCCESS] publicar_diccionario    rows=116 duration=0.8s
+```
+
+**Las cuatro comprobaciones, sobre la salida real:**
+
+1. **Los objetos del contrato existen**: `diccionario`, `diccionario_reglas` y
+   `diccionario_publicacion` como `BASE TABLE`, y `v_diccionario` como `VIEW`,
+   junto a `etl_runs`, `v_frescura` y `v_raw_state`, que ya estaban.
+2. **`v_diccionario` tiene 19 columnas y en el orden del contrato**, con
+   `motivo_no_consumo` **la última**, que es la única forma compatible de
+   crecer:
+   `esquema, objeto, tipo, capa, consumo_recomendado, descripcion, grano,
+   clave_negocio, refresco, avisos, n_columnas, ficha, paso_etl,
+   ultimo_ok_finished_at, horas_desde_ultimo_ok, ultimo_intento_status,
+   diccionario_version, diccionario_publicado_en, motivo_no_consumo`
+3. **El singleton es singleton**: `count(*) = 1`, `id = 1`, y los recuentos
+   cuadran con el repositorio (102 / 13 / 793 / 100.00).
+4. **Los dos `LEFT JOIN` hacen lo que prometían**: 102 filas en
+   `v_diccionario`, de las que **4 no tienen `paso_etl`** —los `estatico`— y
+   **siguen saliendo**; 58 traen frescura resuelta.
+
+## 2 · Bloque H · el diccionario contra `information_schema`
+
+```
+objetos en el catalogo real: 101
+objetos fichados           : 102
+
+SIN FICHA (0)
+HUERFANAS (1)   cierre.v_pbi_planif_vs_real | vista
+TIPO DISTINTO (0)
+```
+
+**Cero objetos publicados sin documentar y cero tipos mal.** La biyección que la
+puerta offline daba por buena se sostiene contra el catálogo real, con **una
+excepción que es el hallazgo**:
+
+**`cierre.v_pbi_planif_vs_real` está fichada y no existe en la base.** No es que
+la ficha sobre: `cierre/06_views_planif_vs_real.sql` la crea, y `cierre` tiene
+en la base 8 objetos de los 12 fichados. La causa está localizada: **`build_cierre`
+no aparece en `_meta.v_frescura`** —no registra paso, que es la deuda conocida de
+`R-FRESCURA-MANUAL`—, así que nunca se ha vuelto a lanzar desde que ese fichero
+entró. **La base va por detrás del repositorio**, y la puerta offline no podía
+verlo porque lee el SQL, no el catálogo. Es justo lo que R28 existe para
+descubrir.
+
+## 3 · T26 · la unicidad de la clave, ejecutada
+
+Primera pasada, alcance por defecto (superficie de consumo, `statement_timeout`
+30 s):
+
+```
+Resumen: 39 sin contradiccion, 0 con la clave rota, 7 sin comprobar,
+         1 fichados que no existen en la base.
+```
+
+Segunda pasada con `--timeout 180`, decidida **porque el servidor había
+aguantado la primera sin incidencias y era fuera de horario**. Ahí saltó lo
+importante:
+
+```
+KO   mart.fact_seguimiento_mensual: la clave declarada
+     (obra_id, partida_id, anio_mes, escenario) NO identifica una fila.
+     8778 combinacion(es) se repiten, afectando a 17556 filas.
+```
+
+### El hallazgo, caracterizado hasta la causa
+
+**La tabla central del datamart tiene la clave rota.** Es exactamente el hueco
+que T26 se escribió para cerrar, y ha aparecido en el objeto más consultado.
+
+- **Siempre exactamente dos filas** por clave duplicada: 8.778 claves, 17.556
+  filas. Ni una con tres.
+- **Reparto**: `Coste Real` 4.754 y `Venta Real` 4.024. Los ámbitos master (8 y
+  11) **no** están afectados, coherente con que allí se elige la versión vigente.
+- **Qué distingue a las dos filas**: solo `nombre_mes`, `version_descripcion` y
+  `total_incurrido`. Todo lo demás —incluido `importe_origen`— es idéntico.
+- **Causa raíz**: el fact se construye por FASE, y hay **22 obras con dos fases
+  que Sigrid tiene con el mismo `ano` y `mes`. Ejemplo verificado, obra 584748:
+
+  ```
+  fase_id  numero_fase  anio  mes  nombre_mes     fecha_inicio
+  124      12           2010  6    Junio 2010     2010-06-01
+  150      13           2010  6    AGOSTO 2010    2010-06-16
+  ```
+
+  La fase 13 se llama «AGOSTO» y lleva `mes = 6`. **Es la trampa que la ficha de
+  `stg.fases` ya documentaba** —`anio` y `mes` se copian en crudo de
+  `raw.obrfas`, independientes del nombre y de `fecha_inicio`— mordiendo aguas
+  abajo.
+
+**Consecuencias, y son de número**: `SUM(importe_origen)` agrupando por la clave
+declarada **cuenta dos veces** (27.850,08 en las dos filas del ejemplo), y un
+`JOIN` por esa clave produce fan-out. Y el efecto de segundo orden que ya estaba
+escrito: **la detección de cardinalidades deriva la unicidad de esta clave**, así
+que todas las relaciones que apuntan a este fact se validaron contra una premisa
+falsa.
+
+**Qué he hecho y qué no.** He corregido **la ficha**, que es F-006: dice el
+número medido, la causa, el ejemplo y qué hacer mientras tanto (agregar también
+por `nombre_mes`). **No he tocado el build**: `mart` es de otra feature y el
+límite de esta tanda era `_meta`. Y **no se puede alargar la clave con lo que hay
+publicado**, porque ninguna columna del fact identifica la fase: eso es un cambio
+de esquema o de agregación, y necesita su propia feature.
+
+### Dos defectos de mi propio código que solo la ejecución real destapó
+
+1. **`conn.autocommit = False` reventaba**: `self.connection()` devuelve una
+   conexión que **ya viene en transacción**.
+
+   ```
+   psycopg.ProgrammingError: can't change 'autocommit' now:
+   connection in transaction status INTRANS
+   ```
+
+   El doble no lo reprodujo —ahí `autocommit` es un atributo normal—. **Es
+   exactamente lo que un doble no puede garantizar**: prueba que llamas a lo que
+   crees, no que el otro extremo se comporte como crees. Tiene ya su test.
+
+2. **El comando moría con `UndefinedTable`** al llegar a la huérfana de H, y se
+   llevaba por delante las comprobaciones que faltaban. Ahora «fichado y no
+   existe» es **un veredicto más**, y de los valiosos: dice que la base va por
+   detrás del repositorio.
+
+### Los 7 sin comprobar
+
+Con 30 s saltaron 7; con 180 s la lista bajó y quedó al menos
+`cierre.v_pbi_cierre_indirectos_detalle`. **Van como NO COMPROBADO, nunca como
+OK**: contar un timeout como correcto convertiría el límite que protege un
+servidor compartido en una forma de aprobar sin mirar. La segunda pasada no
+terminó dentro de mi ventana de ejecución, así que el recuento final de esa
+pasada queda incompleto y **eso también se dice**.
+
+### Y lo que un verde NO significa
+
+Los 39 «sin contradicción» **no tienen la clave demostrada**. Los datos de hoy no
+la contradicen, que es otra cosa: una clave puede ser insuficiente y no haber
+colisionado todavía. `mart.fact_seguimiento_mensual` llevaba meses sin
+colisionar y colisionaba desde 2010.

@@ -249,3 +249,18 @@ def veredicto_no_comprobado(consulta: ConsultaUnicidad, motivo: str) -> str:
         f"?    {consulta.objeto}: NO COMPROBADO ({motivo}). No es un OK: la "
         f"clave ({', '.join(consulta.clave)}) sigue sin verificar"
     )
+
+
+def veredicto_no_existe(consulta: ConsultaUnicidad) -> str:
+    """El objeto esta fichado y no existe en la base.
+
+    No es un fallo del chequeo ni un OK: es el hallazgo. Significa que **la base
+    va por detras del repositorio** —alguien anadio el objeto al SQL y no se ha
+    vuelto a construir ese esquema— o que la ficha sobra. Lo primero es lo
+    normal en los cuatro esquemas de refresco manual.
+    """
+    return (
+        f"!    {consulta.objeto}: FICHADO Y NO EXISTE en la base. La ficha "
+        f"describe algo que el repositorio crea y la base no tiene: falta "
+        f"lanzar el build de su esquema, o la ficha sobra. No es un OK"
+    )

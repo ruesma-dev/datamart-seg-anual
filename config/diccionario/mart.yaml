@@ -25,8 +25,29 @@ objetos:
       combinaciones de coste/venta y real/planificado. Es la tabla a la que hay
       que ir para cualquier pregunta de planificacion o de produccion mensual.
     grano: >-
-      Una fila por (`obra_id`, `partida_id`, `anio_mes`, `escenario`), que es
-      exactamente su clave de negocio. "Escenario" es el cruce de magnitud
+      Una fila por (`obra_id`, `partida_id`, `anio_mes`, `escenario`) **salvo en
+      un caso medido, en el que hay dos**.
+
+      **MEDIDO CONTRA LA BASE el 2026-08-21 (T26): esa combinacion NO identifica
+      una fila en 8.778 casos**, siempre exactamente dos filas, repartidos entre
+      `Coste Real` (4.754) y `Venta Real` (4.024). La causa esta localizada: el
+      fact se construye por FASE, y hay **22 obras con dos fases distintas que
+      Sigrid tiene con el mismo `ano` y `mes`. Ejemplo real: la obra 584748
+      tiene la fase 12 («Junio 2010») y la 13 («AGOSTO 2010»), y las dos llevan
+      `ano = 2010, mes = 6`. Las dos caen en el mismo `anio_mes` y ninguna
+      columna del fact las distingue —solo cambian `nombre_mes`,
+      `version_descripcion` y `total_incurrido`—, asi que **no se puede alargar
+      la clave con lo que hay publicado**.
+
+      **Consecuencias practicas, y son de numero:** un `SUM(importe_origen)`
+      agrupando por esa clave **cuenta dos veces** el mismo importe en esas
+      filas (en el ejemplo, 27.850,08 aparece en las dos), y un `JOIN` por la
+      clave declarada produce fan-out. Los ambitos master (8 y 11) no estan
+      afectados.
+
+      Mientras no se corrija el build, para totales fiables hay que **agregar
+      tambien por `nombre_mes`** o quedarse con una sola fase por mes. Esta
+      abierto como defecto del build; la ficha lo dice en vez de callarlo. "Escenario" es el cruce de magnitud
       (COSTE o VENTA) y naturaleza (REAL o PLANIFICADO): hasta cuatro filas por
       celda. Los meses futuros solo tienen los dos escenarios planificados; los
       meses pasados de una obra que arranco sin master, solo los dos reales.

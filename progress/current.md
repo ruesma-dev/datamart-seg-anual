@@ -137,33 +137,36 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
-### BLOQUEADO · `az` exige MFA para escribir (2026-08-21)
+### EJECUTADO contra la base (2026-08-21) · T19, bloque H y T26
 
-**T26 está cerrado** (la comprobación de unicidad, generada y sin ejecutar). Lo
-que toca la base **no ha podido arrancar**, y no por falta de firma: el humano
-firmó, pero el token de `az` no sirve para escribir.
+Desbloqueado con el `az login` del humano. Detalle y salidas reales en
+`progress/impl_F-006.md`, sección «Contra Azure, de verdad».
 
-- **Lecturas contra Azure: funcionan.** `az account show` y
-  `firewall-rule list` devuelven datos con el token en caché.
-- **Escrituras: no.** `firewall-rule update` responde `AADSTS50076 … you must
-  use multi-factor authentication` y pide `az login`, que es **interactivo**.
-- **Y bloquea toda la tanda**: la regla `datamart-puesto-pgris` sigue en
-  `88.26.46.154`, la IP del puesto es `88.26.22.183`, y el puerto 5432 da
-  **timeout** desde aquí. Sin abrir el firewall no hay conexión, así que **T19,
-  el bloque H y la ejecución de T26 quedan detrás**.
+- **T19 hecho.** El contrato vive en `_meta`: 102 objetos, 13 reglas, 793
+  columnas, cobertura 100 %, singleton con una fila. `v_diccionario` con sus 19
+  columnas en orden y `motivo_no_consumo` la última. Los dos `LEFT JOIN`
+  comprobados: 4 objetos sin paso siguen saliendo.
+- **Bloque H hecho.** Cero objetos publicados sin ficha y cero tipos mal. **Una
+  huérfana: `cierre.v_pbi_planif_vs_real`**, que el repositorio crea y la base no
+  tiene porque `build_cierre` no registra paso y no se ha vuelto a lanzar. **La
+  base va por detrás del repositorio**, y es justo lo que la puerta offline no
+  podía ver.
+- **T26 ejecutado, y encontró lo gordo.**
 
-**Desbloqueo — una sola acción del humano** en su terminal:
+  > **`mart.fact_seguimiento_mensual` tiene la clave rota**: la declarada
+  > `(obra_id, partida_id, anio_mes, escenario)` **no identifica una fila** en
+  > **8.778** casos (17.556 filas), siempre exactamente dos. Causa: **22 obras
+  > con dos fases que Sigrid tiene con el mismo `ano` y `mes`**. Un
+  > `SUM(importe_origen)` por esa clave **cuenta dos veces**.
 
-```
-az login
-```
+  La **ficha ya lo dice** con el número, la causa y el apaño (agregar también por
+  `nombre_mes`). **El build no se ha tocado**: es `mart`, de otra feature, y
+  ninguna columna publicada identifica la fase, así que arreglarlo es un cambio
+  de esquema o de agregación y **necesita su propia feature**.
 
-Después, la regla se reescribe con `-n datamart-puesto-pgris` (**no**
-`--rule-name`, que falla). Comandos exactos en `progress/impl_F-006.md`.
-
-**Hallazgo**: el listado confirma que **D11 ha crecido a seis** entradas
-caducadas en un servidor compartido. No las he tocado: la firma autoriza
-reescribir la regla única, no borrar reglas ajenas.
+**Pendiente de esta tanda**: 7 objetos quedaron **NO COMPROBADO** por
+`statement_timeout` —nunca contados como OK— y la segunda pasada con 180 s no
+terminó dentro de la ventana. Repetirla es barato y no bloquea nada.
 
 ### Lo siguiente · la batería de aceptación (bloque K)
 

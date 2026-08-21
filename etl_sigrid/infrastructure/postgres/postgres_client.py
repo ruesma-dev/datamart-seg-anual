@@ -637,7 +637,9 @@ class PostgresClient:
             fila = cur.fetchone()
             return tuple(fila) if fila else ()
 
-    def comprobar_unicidad(self, consulta, timeout_s: int) -> tuple[int, int] | None:
+    def comprobar_unicidad(
+        self, consulta, timeout_s: int
+    ) -> tuple[int, int] | str | None:
         """Ejecuta UNA comprobación de unicidad (F-006, T26).
 
         Devuelve `(claves_duplicadas, filas_implicadas)`, o **`None` si la
@@ -652,8 +654,13 @@ class PostgresClient:
         """
         import psycopg
 
+        # NO se toca `autocommit`: `self.connection()` devuelve una conexion que
+        # ya viene EN TRANSACCION (`INTRANS`), y cambiarlo ahi revienta con
+        # `can't change 'autocommit' now`. Paso de verdad al ejecutar T26 contra
+        # la base: el doble no lo reprodujo porque en el `autocommit` era un
+        # atributo normal. Es justo lo que un doble no puede garantizar, y por
+        # eso hacia falta la ejecucion real.
         with self.connection() as conn:
-            conn.autocommit = False
             try:
                 with conn.cursor() as cur:
                     cur.execute(f"SET LOCAL statement_timeout = '{int(timeout_s)}s'")
@@ -663,6 +670,13 @@ class PostgresClient:
             except psycopg.errors.QueryCanceled:
                 conn.rollback()
                 return None
+            except psycopg.errors.UndefinedTable:
+                # El objeto esta fichado y NO existe en la base. No es un fallo
+                # del chequeo: es el hallazgo. Paso de verdad con
+                # `cierre.v_pbi_planif_vs_real`, que el repositorio crea y la
+                # base no tiene porque `build-cierre` no se ha vuelto a lanzar.
+                conn.rollback()
+                return "NO_EXISTE"
             except Exception:
                 conn.rollback()
                 raise

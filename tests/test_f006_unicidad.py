@@ -324,7 +324,6 @@ def test_f006_t26_el_cliente_acota_el_tiempo_y_devuelve_las_dos_cifras() -> None
 
     assert cursor.ejecutadas[0] == "SET LOCAL statement_timeout = '45s'"
     assert "GROUP BY obra_id, anio_mes" in cursor.ejecutadas[1]
-    assert conexion.autocommit is False, "sin transacción no hay `SET LOCAL` que valga"
     assert conexion.commits == 1 and conexion.rollbacks == 0
 
 
@@ -345,6 +344,36 @@ def test_f006_t26_un_timeout_del_motor_devuelve_none_y_no_deja_la_transaccion_ab
     assert conexion.rollbacks == 1 and conexion.commits == 0
 
 
+def _cuerpo_de_comprobar_unicidad() -> str:
+    """El metodo entero, hasta el siguiente `def` del mismo nivel.
+
+    Rebanar por numero de caracteres era fragil y ya cortaba el metodo por la
+    mitad: el test decia que faltaba `UndefinedTable` cuando estaba tres lineas
+    mas abajo.
+    """
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    fuente = pathlib.Path(
+        PostgresClient.__module__.replace(".", "/") + ".py"
+    ).read_text(encoding="utf-8")
+    desde = fuente.index("    def comprobar_unicidad")
+    resto = fuente[desde + 10 :]
+    hasta = re.search(chr(10) + r"    def \w+", resto)
+    return resto[: hasta.start()] if hasta else resto
+
+
+def _codigo_de_comprobar_unicidad() -> str:
+    """Solo el codigo, sin el docstring.
+
+    Se busca la ASIGNACION (`autocommit =`) y no la palabra: el codigo lleva un
+    comentario que explica por que no se toca, y buscar la palabra suelta hacia
+    que el propio aviso disparase el test.
+    """
+    cuerpo = _cuerpo_de_comprobar_unicidad()
+    trozos = cuerpo.split('"""')
+    return trozos[2] if len(trozos) > 2 else cuerpo
+
+
 def test_f006_t26_control_el_doble_ejercita_el_camino_real() -> None:
     """Si el método dejara de usar `connection()`, el doble no lo notaría.
 
@@ -354,11 +383,59 @@ def test_f006_t26_control_el_doble_ejercita_el_camino_real() -> None:
     from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
 
     assert hasattr(PostgresClient, "comprobar_unicidad")
-    fuente = pathlib.Path(
-        PostgresClient.__module__.replace(".", "/") + ".py"
-    ).read_text(encoding="utf-8")
-    cuerpo = fuente[fuente.index("def comprobar_unicidad") :][:1600]
+    cuerpo = _cuerpo_de_comprobar_unicidad()
     assert "SET LOCAL statement_timeout" in cuerpo
     assert "QueryCanceled" in cuerpo
+    assert "UndefinedTable" in cuerpo
     assert "rollback" in cuerpo
-    assert re.search(r"autocommit\s*=\s*False", cuerpo)
+    # Y que NO se toque `autocommit`, que es lo que reventó contra la base real.
+    assert "autocommit =" not in _codigo_de_comprobar_unicidad()
+
+
+def test_f006_t26_el_cliente_no_toca_autocommit() -> None:
+    """Lo aprendió la ejecución real, no el doble. Y es la lección de la tanda.
+
+    La primera versión hacía `conn.autocommit = False` antes de la consulta. El
+    doble no se quejó —ahí `autocommit` es un atributo normal— y contra la base
+    reventó a la primera:
+
+        psycopg.ProgrammingError: can't change 'autocommit' now:
+        connection in transaction status INTRANS
+
+    `self.connection()` devuelve una conexión que **ya viene en transacción**, así
+    que `SET LOCAL` funciona sin tocar nada. Es exactamente lo que un doble no
+    puede garantizar: el doble prueba que llamas a lo que crees, no que el otro
+    extremo se comporte como crees.
+    """
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    cuerpo = _cuerpo_de_comprobar_unicidad()
+    assert "autocommit =" not in _codigo_de_comprobar_unicidad(), (
+        "volver a tocar `autocommit` reventaría contra la base con INTRANS"
+    )
+
+
+def test_f006_t26_un_objeto_fichado_que_no_existe_no_tumba_el_chequeo() -> None:
+    """El otro hallazgo de la ejecución real: `cierre.v_pbi_planif_vs_real`.
+
+    Está fichado, el repositorio lo crea y la base no lo tiene porque
+    `build-cierre` no se ha vuelto a lanzar. La primera versión del comando
+    moría con `UndefinedTable` a mitad del recorrido y se llevaba por delante
+    las comprobaciones que faltaban. Ahora es un veredicto más —y uno valioso:
+    dice que la base va por detrás del repositorio—.
+    """
+    import psycopg
+
+    from etl_sigrid.infrastructure.postgres.unicidad_sql import veredicto_no_existe
+
+    cursor = _CursorFalso(
+        fila=None, revienta=psycopg.errors.UndefinedTable("no existe")
+    )
+    conexion = _ConexionFalsa(cursor)
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+
+    assert _comprobar(_ClienteFalso(conexion), consulta) == "NO_EXISTE"
+    assert conexion.rollbacks == 1
+
+    texto = veredicto_no_existe(consulta)
+    assert "NO EXISTE" in texto and "No es un OK" in texto
