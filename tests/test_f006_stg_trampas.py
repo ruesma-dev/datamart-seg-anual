@@ -278,3 +278,55 @@ def test_f006_r10_las_acumuladas_a_origen_no_son_sumables(columna: str) -> None:
         f"`{c.agregacion}`. `R-IMPORTE-MES` dice que de un total de un periodo se "
         f"toma el valor del ULTIMO mes, no la suma"
     )
+
+
+# ---------------------------------------------------------------------------
+# `es_hoja` promete lo que su heurística no cumple (9ª pasada)
+# ---------------------------------------------------------------------------
+#
+# `es_hoja` se calcula `nivel >= 2 OR codigo_partida LIKE '%.%'` en las dos
+# vistas que lo publican. Eso **no** es «no tiene hijos»: un capítulo de nivel 2
+# con descendientes —`CI.2`, que tiene `CI.2.1`— sale marcado como hoja. Y la
+# ficha prometía justo lo contrario: «para no sumar dos veces al agregar por la
+# jerarquía». Quien se fíe suma el capítulo y sus hijas: **doble conteo**, que es
+# el error que la columna decía evitar.
+#
+# O la ficha dice lo que la heurística hace de verdad, o no promete nada.
+
+VISTAS_CON_ES_HOJA = ("mart.v_pbi_dim_partida", "mart.v_pbi_dim_partida_niveles")
+
+
+def test_f006_r26_control_es_hoja_sigue_siendo_una_heuristica() -> None:
+    """Si algún día se calcula de verdad, este test avisa de revisar las fichas."""
+    for ruta in ("mart/05_views_powerbi.sql", "mart/05b_view_dim_partida_niveles.sql"):
+        sql = _sql(ruta)
+        assert re.search(
+            r"nivel\s*>=\s*2\s+OR\s+\S*codigo_partida\s+LIKE\s+'%\.%'", sql
+        ), (
+            f"{ruta}: `es_hoja` ya no se calcula con la heurística de nivel y "
+            f"código. Si ahora mira los hijos de verdad, las fichas pueden "
+            f"volver a prometer que evita el doble conteo"
+        )
+
+
+@pytest.mark.parametrize("objeto", VISTAS_CON_ES_HOJA)
+def test_f006_r26_es_hoja_no_promete_evitar_el_doble_conteo(objeto: str) -> None:
+    """La promesa era falsa en las dos vistas; se comprueban las dos."""
+    c = _columna(objeto, "es_hoja")
+    texto = c.significado.lower()
+
+    assert "para no sumar dos veces" not in texto, (
+        f"{objeto}.es_hoja repite la promesa que la heuristica no cumple: un "
+        f"capitulo de nivel 2 con hijas sale marcado como hoja, asi que fiarse "
+        f"de ella produce justo el doble conteo que dice evitar"
+    )
+    assert "heuristica" in texto, (
+        f"{objeto}.es_hoja tiene que decir que es una HEURISTICA sobre el nivel y "
+        f"la forma del codigo, no una comprobacion de si la partida tiene hijos"
+    )
+    assert "nivel" in texto and "codigo" in texto, (
+        "y decir cual es, para que se pueda juzgar cuando falla"
+    )
+    assert "capitulo" in texto, (
+        "tiene que avisar de que un capitulo intermedio sale marcado como hoja"
+    )

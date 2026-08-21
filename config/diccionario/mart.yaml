@@ -565,8 +565,16 @@ objetos:
         esta cableada a TRUE; esta viene del origen.
       partida_label: Codigo y descripcion juntos, para segmentadores. Es presentacion.
       es_hoja: >-
-        Marca las partidas de detalle frente a los capitulos, para no sumar dos
-        veces al agregar por la jerarquia.
+        **HEURISTICA, no una comprobacion de si la partida tiene hijos.** Vale
+        TRUE cuando `nivel >= 2` o el `codigo_partida` lleva un punto, y nada
+        mas. Un **capitulo** intermedio de nivel 2 con descendientes —`CI.2`,
+        con `CI.2.1` debajo— sale marcado como hoja igual que ellas.
+
+        Por eso **no evita el doble conteo**: filtrando por `es_hoja` se suman a
+        la vez el capitulo y sus hijas. Sirve como filtro de presentacion en
+        Power BI, para quitar de un visual los capitulos de primer nivel. Para
+        agregar sin duplicar hay que bajar al ultimo nivel de la jerarquia de
+        `stg.partidas`, no fiarse de esta columna.
     relaciones:
       - de: obra_id
         a: mart.v_pbi_dim_obra.obra_id
@@ -614,7 +622,17 @@ objetos:
         agregacion: no_sumable
       activa: Marca de partida vigente en el origen.
       partida_label: Codigo y descripcion juntos. Presentacion.
-      es_hoja: Distingue las partidas de detalle de los capitulos.
+      es_hoja: >-
+        **HEURISTICA, no una comprobacion de si la partida tiene hijos.** Vale
+        TRUE cuando `nivel >= 2` o el `codigo_partida` lleva un punto, y nada
+        mas. Un **capitulo** intermedio de nivel 2 con descendientes —`CI.2`,
+        con `CI.2.1` debajo— sale marcado como hoja igual que ellas.
+
+        Por eso **no evita el doble conteo**: filtrando por `es_hoja` se suman a
+        la vez el capitulo y sus hijas. Sirve como filtro de presentacion en
+        Power BI, para quitar de un visual los capitulos de primer nivel. Para
+        agregar sin duplicar hay que bajar al ultimo nivel de la jerarquia de
+        `stg.partidas`, no fiarse de esta columna.
       nivel_1: Primer escalon de la ruta ("CD · COSTES DIRECTOS"), como codigo y nombre.
       nivel_2: Segundo escalon de la ruta.
       nivel_3:
