@@ -446,3 +446,28 @@ def test_f006_r10_el_punto_ciego_de_la_comprobacion_cruzada_esta_declarado() -> 
         f"y solo las alcanzan las comprobaciones POR COLUMNA, como la de los "
         f"porcentajes de aquí arriba"
     )
+
+
+def test_f006_r26_el_ejemplo_del_anio_cero_lo_soporta_el_sql() -> None:
+    """El ejemplo publicado tiene que ser ejecutable, no solo verosímil.
+
+    La ficha decía que una fase con `anio = 0` «entra igual». El punto de fondo
+    —el filtro `IS NOT NULL` es inerte— se sostiene, pero el ejemplo no: unas
+    líneas más abajo `make_date(f.anio, f.mes, 1)` **aborta el build** con año 0.
+    Un ejemplo que el SQL no soporta es una afirmación falsa aunque la
+    conclusión sea cierta.
+    """
+    plan = _sql("stg/08_plan_mensual.sql")
+    assert re.search(r"make_date\(\s*f\.anio\s*,\s*f\.mes", plan), (
+        "`make_date` ya no construye el mes desde `f.anio`/`f.mes`: revisar la "
+        "ficha, porque su explicación se apoya en esa línea"
+    )
+    texto = _columna("stg.fases", "anio").significado
+    assert "entra igual" not in texto, (
+        "la ficha vuelve a decir que una fase con `anio = 0` entra: `make_date` "
+        "aborta el build"
+    )
+    assert "make_date" in texto, (
+        "tiene que decir cuál es la guarda que SÍ actúa, ya que la del `WHERE` "
+        "no hace nada"
+    )

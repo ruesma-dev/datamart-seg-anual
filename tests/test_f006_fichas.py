@@ -511,9 +511,13 @@ def _bloque_del_objeto(sql: str, nombre_cualificado: str) -> str:
     # devuelven todos concatenados, porque la proyección puede estar en
     # cualquiera de ellos.
     #
-    # Buscarla solo en el `CREATE` dejaba sin comprobar las tres tablas grandes
-    # de `stg`: su DDL declara tipos y no tiene ni una proyección, así que el
-    # guardián de nulos no encontraba nada y pasaba en vacío.
+    # Buscarla solo en el `CREATE` dejaba sin comprobar las tablas de `stg` que
+    # se declaran en `stg/01_ddl.sql` y se pueblan en otro fichero: su DDL trae
+    # tipos y ni una proyección, así que el guardián de nulos no encontraba nada
+    # y pasaba en vacío. Cuáles y cuántas son lo dice
+    # `test_f006_r2_control_se_localiza_donde_se_puebla_cada_tabla_de_stg`, que
+    # las deriva; la lista escrita a mano que hubo aquí se dejaba dos, y
+    # justamente las que más hallazgos aportaron.
     arranque = (
         r"(?:CREATE\s+(?:OR\s+REPLACE\s+)?(?:VIEW|TABLE)(?:\s+IF\s+NOT\s+EXISTS)?"
         r"|INSERT\s+INTO)"
@@ -596,17 +600,25 @@ def _ficheros_que_pueblan() -> dict[str, tuple[str, ...]]:
 def test_f006_r2_control_se_localiza_donde_se_puebla_cada_tabla_de_stg() -> None:
     """Las tres que el guardián se saltaba, y por qué se las saltaba."""
     donde = _ficheros_que_pueblan()
-    for objeto, esperado in (
-        ("stg.partidas", "stg/04_partidas.sql"),
-        ("stg.fases", "stg/05_fases.sql"),
-        ("stg.plan_mensual", "stg/08_plan_mensual.sql"),
-    ):
-        assert esperado in donde.get(objeto, ()), (
-            f"{objeto} se puebla en {esperado} y el localizador no lo ve: "
+
+    # Las que se DECLARAN en el DDL de `stg` y se pueblan en otro sitio: se
+    # derivan, no se listan. La lista a mano que hubo aquí decía tres y son
+    # cinco, y se dejaba fuera `stg.obras`, que aportó dos de los hallazgos.
+    partidas_en_dos_sitios = {
+        objeto: ficheros
+        for objeto, ficheros in donde.items()
+        if objeto.startswith("stg.")
+        and "stg/01_ddl.sql" in ficheros
+        and any(f != "stg/01_ddl.sql" for f in ficheros)
+    }
+    assert len(partidas_en_dos_sitios) >= 5, (
+        f"esperaba al menos cinco tablas de `stg` declaradas en el DDL y pobladas "
+        f"aparte; el localizador ve {sorted(partidas_en_dos_sitios)}"
+    )
+    for objeto in ("stg.partidas", "stg.fases", "stg.plan_mensual", "stg.obras"):
+        assert objeto in partidas_en_dos_sitios, (
+            f"{objeto} se puebla fuera del DDL y el localizador no lo ve: "
             f"{donde.get(objeto)}"
-        )
-        assert "stg/01_ddl.sql" in donde.get(objeto, ()), (
-            f"{objeto} se declara en el DDL, que es lo que el guardián leía antes"
         )
 
 
@@ -669,8 +681,11 @@ def test_f006_r2_un_nulo_declarado_tiene_que_ser_posible(nombre: str) -> None:
     # no guardan nulos. Así que esto solo aplica cuando el valor sale DIRECTO de
     # una tabla de `raw` por un camino que no puede producir NULL por sí mismo.
     #
-    # Las dos exclusiones no son comodidad, son correctitud, y sin ellas el
-    # guardián marcaba seis casos de los que solo dos son ciertos:
+    # Las dos exclusiones no son comodidad, son correctitud: sin ellas el
+    # guardián acusa a fichas que dicen la verdad. Cuántas, lo mide
+    # `test_f006_r2_control_cuantas_fichas_alcanza_el_guardian`; escribir el
+    # número aquí solo servía para que envejeciera —y ya no cuadraba con la
+    # enumeración de debajo—.
     #
     #  · Si el alias llega por `LEFT JOIN`, la columna **sí** puede ser NULL sin
     #    ningún `NULLIF`: lo produce el propio join cuando no casa.
@@ -2418,3 +2433,33 @@ def test_f006_r2_control_el_detector_de_atribucion_muerde() -> None:
     assert re.match(r"\s*\w+\.\w+\s+AS\b", proyeccion, re.IGNORECASE)
     texto = "la entidad no tiene ficha de proveedor, o no tiene razon social."
     assert [f for f in _ATRIBUYE_A_VALOR_VACIO if f in texto] == ["no tiene razon social"]
+
+
+def test_f006_r2_control_cuantas_fichas_alcanza_el_guardian() -> None:
+    """Cuántas fichas evalúa el guardián de nulos, medido y no escrito a mano.
+
+    Un detector que se degrada a cero es indistinguible de uno roto, y ya nos
+    pasó dos veces. Este control fija el **alcance**: si cae de golpe, alguien ha
+    estrechado una guarda sin darse cuenta.
+
+    El número vive aquí y en ningún otro sitio. Los que había escritos en los
+    comentarios de arriba envejecieron y dejaron de cuadrar —decían «seis casos»
+    donde la enumeración lista dos, y «tres tablas» donde son cinco—, que es
+    exactamente lo que pasa con un recuento a mano.
+    """
+    con_sql = 0
+    con_alias_de_raw = 0
+    for ficha in _fichas_con_columnas():
+        ficheros = _ficheros_que_pueblan().get(ficha.nombre.lower(), ())
+        if not ficheros:
+            continue
+        con_sql += 1
+        sql = "\n".join((DIR_SQL / f).read_text(encoding="utf-8") for f in ficheros)
+        if _alias_directos_de_raw(sql):
+            con_alias_de_raw += 1
+
+    assert con_sql >= 55, f"el guardián solo localiza SQL de {con_sql} fichas"
+    assert con_alias_de_raw >= 15, (
+        f"solo {con_alias_de_raw} fichas leen directamente de `raw` según el "
+        f"guardián; si baja de golpe, una guarda se ha estrechado de más"
+    )

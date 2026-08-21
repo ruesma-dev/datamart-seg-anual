@@ -592,10 +592,15 @@ objetos:
           pueden no coincidir.
 
           **Nunca es NULL**: se proyecta en crudo y Sigrid no guarda nulos en
-          los enteros, asi que "sin informar" llega como **0**. Consecuencia que
-          conviene conocer: el filtro `f.anio IS NOT NULL` de
-          `stg/08_plan_mensual.sql` **no descarta nada**; una fase con `anio = 0`
-          entra igual.
+          los enteros, asi que "sin informar" llega como **0**.
+
+          Consecuencia que conviene conocer: el filtro `f.anio IS NOT NULL` de
+          `stg/08_plan_mensual.sql` **no descarta nada**, porque no hay nulos
+          que descartar. La guarda que de verdad actua contra una fase mal
+          informada es `make_date(f.anio, f.mes, 1)` unas lineas mas abajo: con
+          `anio = 0` **aborta el build** en vez de colar una fila silenciosa. Al
+          escribir un `WHERE` sobre estas columnas, comprobar contra `0` y no
+          contra NULL.
         agregacion: no_sumable
         nulo_significa: null
       mes:
