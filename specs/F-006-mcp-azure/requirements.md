@@ -534,3 +534,24 @@ Ademas, en la misma sesion:
   primero. Esto acota que puede cerrar F-006 y que queda para esas fichas.
 - Orden de trabajo aprobado: **empezar por los bloques A-D** (andamiaje, reglas
   duras, fichas de `mart` y de `cierre`).
+
+
+---
+
+## 13 · Autorizaciones del humano (2026-08-21)
+
+Cuatro decisiones tomadas al abrir la fase que toca la base real.
+
+| Asunto | Resolucion |
+|---|---|
+| **Escritura en `sigrid_dm` (T19)** | **AUTORIZADA y acotada a esta accion**: crear las tres tablas y la vista del contrato en el esquema `_meta`, y publicar el diccionario. No alcanza a ningun otro esquema ni a ningun dato de negocio. |
+| **Firewall del puesto** | Lo actualiza el agente, **reescribiendo la regla unica `datamart-puesto-pgris`** con la IP del momento antes de cada tanda. No se crean reglas nuevas: D11 ya dejo cuatro fechadas e inutiles. |
+| **DA-3 · los `REVOKE`** | **Cae a la opcion B.** El mecanismo queda construido y probado, y **se entrega APAGADO a F-034**, que lo activara cuando Power BI tenga su propio rol. Motivo: hoy `mcp_sigrid_dm_ro` es el unico rol de lectura y lo comparten el MCP y Power BI; retirar un esquema sin saber cual consume romperia los informes. **Consecuencia de alcance: F-006 NO cierra el bloque I**; lo entrega. El MCP seguira viendo `raw` y `stg` hasta que F-034 lo separe. |
+| **DA-4 · la bateria** | Se ejecuta contra el prototipo local **haciendo que lea el diccionario de `_meta`**, no de su YAML. Implica un cambio minimo en `mcp-bbdd` -que no tiene git ni arnes todavia-, y a cambio prueba el contrato de verdad, que es lo que ese repositorio tendra que implementar igualmente. |
+
+### Lo que esto cambia en el cierre de F-006
+
+- El bloque I deja de ser condicion de cierre y pasa a ser **entrega documentada a F-034**.
+- Los bloques H, J, K y T19 siguen dentro, y ya tienen via libre.
+- La bateria mide lo unico que hoy vale cero: que un agente encuentre la ficha,
+  reciba las trece reglas y responda. Sin eso, F-006 no puede declararse hecha.
