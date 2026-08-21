@@ -631,6 +631,38 @@
       "rigor": "estandar",
       "priority": 7,
       "branch": "feature/F-041-mutacion-fiable"
+    },
+    {
+      "id": "F-042",
+      "title": "La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas",
+      "description": "Descubierto el 2026-08-21 por la comprobacion de unicidad T26 de F-006, la primera vez que se ejecuto contra la base real. La tabla central del seguimiento, mart.fact_seguimiento_mensual, NO cumple la clave que declara: (obra_id, partida_id, anio_mes, escenario) se repite en 8.778 combinaciones, 17.556 filas, siempre dos a dos. CAUSA LOCALIZADA: 22 obras tienen dos fases que Sigrid guarda con el mismo ano y el mismo mes; ejemplo real, la obra 584748 tiene una fase 13 llamada AGOSTO 2010 con mes = 6. Al proyectar ambas al mismo anio_mes salen dos filas indistinguibles. CONSECUENCIA: cualquier SUM por esa clave CUENTA DOS VECES, y ninguna columna publicada identifica la fase, asi que hoy el consumidor no puede ni detectarlo ni deshacerlo. Afecta por igual a Power BI y al MCP. Efecto de segundo orden ya observado en F-006: la deteccion de fan-out del diccionario derivaba de esa unicidad y por tanto se apoyaba en una premisa falsa. F-006 corrigio LA FICHA -dice el numero, la causa, el ejemplo y el apano-, no el dato: arreglarlo es cambio de esquema o de agregacion en mart, que es otra feature. Decisiones que la spec debe tomar: si las dos fases son informacion legitima que hay que conservar -y entonces la clave necesita una columna mas, publicada- o si una de las dos es un error de configuracion en Sigrid que hay que filtrar. La segunda no se decide aqui: es de Negocio. Ver tambien F-022, que documenta otro caso de filas gemelas con origen parecido en raw.obrfasamb.",
+      "acceptance": [
+        "Decidido con Negocio si las dos fases del mismo mes son legitimas o son error de configuracion",
+        "La clave declarada de mart.fact_seguimiento_mensual se cumple en la base, comprobado con la consulta de T26",
+        "Ninguna agregacion de Power BI ni del MCP cuenta dos veces, verificado contra un caso de las 22 obras",
+        "La ficha del diccionario actualizada, y revisada la deteccion de fan-out que dependia de esa unicidad"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 2,
+      "branch": "feature/F-042-clave-fact"
+    },
+    {
+      "id": "F-043",
+      "title": "Un ID de suscripcion de Azure esta versionado y subido a GitHub",
+      "description": "Detectado el 2026-08-21 al auditar el repositorio buscando secretos, durante F-006. progress/review_F-005.md:65 contiene el ID de suscripcion de Azure en claro, y entro en el commit 5b486d4 -el cierre de F-005-, asi que esta en el historial y ya subido a GitHub. El CLAUDE.md de PycharmProjects lo prohibe expresamente y con estas palabras: ni contrasenas, ni cadenas de conexion, ni claves, NI IDS DE SUSCRIPCION O TENANT, ni IPs internas; da igual que el repositorio sea privado, porque el historial de git no suelta lo que entra. Un ID de suscripcion no es una credencial y por si solo no da acceso, pero es superficie de reconocimiento y la regla del proyecto no admite matices. El propio texto de esa linea dice haberlo verificado con git show dev:infra/00_vars.ps1, asi que hay que comprobar si ese fichero lo trae tambien en alguna revision. DECISION DEL HUMANO, no del agente: (a) reescribir el historial -git filter-repo o similar- y forzar el push, que rompe los clones existentes y hay que avisar a quien tenga uno; (b) redactar solo en HEAD y aceptar por escrito que el historial lo conserva; o (c) aceptarlo entero por escrito, dejando constancia de que se valoro. Cualquiera de las tres vale, pero elegir por omision no. Hacer ademas una pasada de auditoria por si hay mas: la busqueda de hoy solo cubrio los tres identificadores conocidos.",
+      "acceptance": [
+        "Auditado el repositorio entero -y no solo los tres identificadores conocidos- en HEAD y en el historial",
+        "Decidida y ejecutada una de las tres vias, con la decision escrita en progress/decisiones_abiertas.md",
+        "Comprobado si infra/00_vars.ps1 trae el mismo dato en alguna revision",
+        "Si se reescribe el historial, avisados los que tengan clon antes del push forzado"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 3,
+      "branch": "feature/F-043-secreto-versionado"
     }
   ]
 }

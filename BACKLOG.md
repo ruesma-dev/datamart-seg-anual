@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **39 features**, 25 abiertas, 14 terminadas.
+Resumen: **41 features**, 27 abiertas, 14 terminadas.
 
 En curso: **F-006**.
 
@@ -13,7 +13,9 @@ En curso: **F-006**.
 |---|---|---|---|---|---|
 | F-006 | MCP de bases de datos como servicio en cloud | 1 | en curso | critico | `feature/F-006-mcp-azure` |
 | F-036 | Clasificacion por oficio y categoria oficial de partida | 2 | pendiente | estandar | `feature/F-036-oficios` |
+| F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | pendiente | critico | `feature/F-042-clave-fact` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 3 | pendiente | critico | `feature/F-037-tesoreria` |
+| F-043 | Un ID de suscripcion de Azure esta versionado y subido a GitHub | 3 | pendiente | estandar | `feature/F-043-secreto-versionado` |
 | F-038 | Modelar los comparativos de ofertas en compras | 4 | pendiente | estandar | `feature/F-038-comparativos` |
 | F-039 | Vistas puente que faltan para las preguntas de negocio | 5 | pendiente | estandar | `feature/F-039-vistas-puente` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 6 | pendiente | critico | `feature/F-040-ingresos` |
@@ -70,11 +72,23 @@ estado **pendiente** · prioridad 2 · rigor `estandar` · SDD no · rama `featu
 
 Nacida el 2026-08-20 del analisis de dominio de F-006 (progress/explore_F-006_dominio_completo.md). Hoy el datamart NO sabe responder quien fue el proveedor de fontaneria de la obra XXX: la unica via es un LIKE sobre texto libre de la descripcion del contrato. El dato SI existe en Sigrid y esta casi todo dentro. (1) Ingerir obrofc -Obras: Oficios- que relaciona obride + ofcide + prvide, es decir literalmente que proveedor hace que oficio en que obra, y su catalogo auxofc. Son dos tablas pequenas. (2) Exponer prv.ofcide -oficio del proveedor- y prv.natide -naturaleza-, que YA estan cargados en raw.prv y no los usa nadie, ingiriendo auxpronat para el nombre. (3) Sustituir la heuristica de categoria CD/CI/CP/OTRO de stg/04_partidas.sql:84-100 -que clasifica con LIKE sobre el codigo del capitulo raiz- por el catalogo oficial obrparpar.tcaide -> auxobrtca, AMBOS YA INGERIDOS: auxobrtca se trae desde el principio y ningun SQL lo mira, pese a que el propio tables_sigrid.yaml lo justifica diciendo que sirve para clasificar sin depender de heuristicas. Cambiar la categoria toca el cierre y el mart, asi que exige prueba de equivalencia antes y despues.
 
+### F-042 · La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas
+
+estado **pendiente** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-042-clave-fact`
+
+Descubierto el 2026-08-21 por la comprobacion de unicidad T26 de F-006, la primera vez que se ejecuto contra la base real. La tabla central del seguimiento, mart.fact_seguimiento_mensual, NO cumple la clave que declara: (obra_id, partida_id, anio_mes, escenario) se repite en 8.778 combinaciones, 17.556 filas, siempre dos a dos. CAUSA LOCALIZADA: 22 obras tienen dos fases que Sigrid guarda con el mismo ano y el mismo mes; ejemplo real, la obra 584748 tiene una fase 13 llamada AGOSTO 2010 con mes = 6. Al proyectar ambas al mismo anio_mes salen dos filas indistinguibles. CONSECUENCIA: cualquier SUM por esa clave CUENTA DOS VECES, y ninguna columna publicada identifica la fase, asi que hoy el consumidor no puede ni detectarlo ni deshacerlo. Afecta por igual a Power BI y al MCP. Efecto de segundo orden ya observado en F-006: la deteccion de fan-out del diccionario derivaba de esa unicidad y por tanto se apoyaba en una premisa falsa. F-006 corrigio LA FICHA -dice el numero, la causa, el ejemplo y el apano-, no el dato: arreglarlo es cambio de esquema o de agregacion en mart, que es otra feature. Decisiones que la spec debe tomar: si las dos fases son informacion legitima que hay que conservar -y entonces la clave necesita una columna mas, publicada- o si una de las dos es un error de configuracion en Sigrid que hay que filtrar. La segunda no se decide aqui: es de Negocio. Ver tambien F-022, que documenta otro caso de filas gemelas con origen parecido en raw.obrfasamb.
+
 ### F-037 · Esquema tesoreria: el flujo de caja que hoy se tira
 
 estado **pendiente** · prioridad 3 · rigor `critico` · SDD sí · rama `feature/F-037-tesoreria`
 
 Nacida el 2026-08-20 del analisis de dominio de F-006. Hacer el flujo de caja de una obra es un caso de uso que el datamart no puede responder hoy: cero objetos de tesoreria en los ocho esquemas. Y el dato esta entero dentro: raw.pag -252.189 filas- y raw.cob -21.643- contienen TODOS los efectos, con tot -importe-, fecven -vencimiento previsto-, fecrea -fecha real, 0 = pendiente-, conide -documento origen-, entide -proveedor o cliente-, cenide -obra-, efeide -medio de pago-, natide -naturaleza- y prpide -prevision origen-. El modulo retenciones los filtra con WHERE retide <> 0 y DESCARTA el resto, que es exactamente el flujo de caja. Alcance: un esquema tesoreria con movimientos sin ese filtro, sentido COBRO/PAGO y estado PREVISTO/REALIZADO, siguiendo el mismo patron que retenciones/01_movimientos.sql, incluida su cascada de atribucion a obra por cenide con respaldo por lineas solo si todas apuntan a la misma obra. Aviso conceptual que la spec debe recoger: stg.plan_mensual es DEVENGO, no caja; convertir la planificacion en prevision de tesoreria exigiria plazos de pago y retenciones que hoy no estan en el repositorio, y eso queda fuera. Limitacion conocida: sin ingerir las ventas -F-040- el lado de cobros solo tiene el efecto, no el documento.
+
+### F-043 · Un ID de suscripcion de Azure esta versionado y subido a GitHub
+
+estado **pendiente** · prioridad 3 · rigor `estandar` · SDD no · rama `feature/F-043-secreto-versionado`
+
+Detectado el 2026-08-21 al auditar el repositorio buscando secretos, durante F-006. progress/review_F-005.md:65 contiene el ID de suscripcion de Azure en claro, y entro en el commit 5b486d4 -el cierre de F-005-, asi que esta en el historial y ya subido a GitHub. El CLAUDE.md de PycharmProjects lo prohibe expresamente y con estas palabras: ni contrasenas, ni cadenas de conexion, ni claves, NI IDS DE SUSCRIPCION O TENANT, ni IPs internas; da igual que el repositorio sea privado, porque el historial de git no suelta lo que entra. Un ID de suscripcion no es una credencial y por si solo no da acceso, pero es superficie de reconocimiento y la regla del proyecto no admite matices. El propio texto de esa linea dice haberlo verificado con git show dev:infra/00_vars.ps1, asi que hay que comprobar si ese fichero lo trae tambien en alguna revision. DECISION DEL HUMANO, no del agente: (a) reescribir el historial -git filter-repo o similar- y forzar el push, que rompe los clones existentes y hay que avisar a quien tenga uno; (b) redactar solo en HEAD y aceptar por escrito que el historial lo conserva; o (c) aceptarlo entero por escrito, dejando constancia de que se valoro. Cualquiera de las tres vale, pero elegir por omision no. Hacer ademas una pasada de auditoria por si hay mas: la busqueda de hoy solo cubrio los tres identificadores conocidos.
 
 ### F-038 · Modelar los comparativos de ofertas en compras
 
