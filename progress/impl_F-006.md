@@ -3003,3 +3003,112 @@ el suyo: era el unico detector del fichero sin el, y ademas estaba en cero.
   sea suficiente.
 - **Los comentarios de `06_presupuesto.sql` siguen mintiendo**: corregirlos es de
   F-025 y el guardian de F-011 lo impide con razon. Propuesto al lider.
+
+---
+
+# Novena pasada · dos derivaciones con el mismo error no son una comprobación
+
+RECHAZADO. Y el aviso que abre la review nos afecta a los dos: la verificación
+«independiente» del reviewer **no lo era**. Reprodujo mi lista «con su propio
+derivador» y coincidía **porque su script tenía mi mismo bug**.
+
+## El bug, y el vicio que lo dejó pasar
+
+El derivador mapeaba alias→tabla con un `dict` **por fichero**. En
+`compras/01_documentos.sql` las tres tablas de línea comparten el alias `l`:
+
+```
+FROM raw.ctrpro l    (61)     l.res AS descripcion
+FROM raw.dcapro l    (126)    l.res AS descripcion
+FROM raw.dcfpro l    (179)    l.res AS descripcion
+```
+
+El `dict` se quedaba con la última, así que **`ctrpro.res` y `dcapro.res`
+desaparecían** de la derivación y de la regla que la copia. El alias es local a
+la **sentencia**, no al fichero. Mismo vicio que ya apareció en
+`_proyeccion_de`, que leía el fichero entero cuando ese fichero construye
+**seis** objetos.
+
+**Pero el bug no es lo grave. Lo grave es que mis pruebas no podían verlo.**
+Fijaban la coherencia **regla↔derivador**, no la **corrección del derivador**:
+si el derivador se equivoca, la regla copia el error y el test sale verde por
+construcción. Ahora hay tres controles que **no llaman al derivador sobre el
+repositorio**: uno con SQL fabricado y la respuesta calculada a mano, otro que
+contrasta el fichero real **por otra vía** —líneas y `FROM`, sin usar
+`alias_de_raw` ni `sentencias`— y otro sobre el troceo.
+
+## GRAVE 1 · La copia, séptima vez, y publicada
+
+`00_global.yaml` → `convenciones.identidad_sigrid` conservaba la frase rechazada
+en la 7ª pasada —«el código, el nombre y la fecha viven en `con`, no en la
+extensión»— **doce líneas por encima del punto 3 de la regla que la corrige**, y
+con lista divergente: ocho tablas frente a diez.
+
+No es un comentario: `convenciones` entra en `global_raw`, que el dominio
+describe como «lo que se sirve tal cual». **Se publica.** Mis barridos miraban
+fichas y reglas; `convenciones` no es ninguna de las dos.
+
+La convención pasa a **remitir a la regla en vez de repetirla**, y el barrido
+cubre ya **toda la superficie publicable**. La regla de mantenimiento que ya
+escribí en la cabecera de `raw.yaml` y no apliqué aquí: *un texto que repite una
+afirmación publicada es una copia esperando a divergir*.
+
+## La superficie de consumo
+
+- **`es_hoja`** se calcula `nivel >= 2 OR codigo_partida LIKE '%.%'` y la ficha
+  prometía «para no sumar dos veces al agregar por la jerarquía». Un capítulo de
+  nivel 2 con descendientes —`CI.2`, con `CI.2.1` debajo— sale marcado como
+  hoja, así que fiarse produce **justo el doble conteo que decía evitar**. Las
+  **dos** vistas que la publican dicen ya lo que la heurística hace, para qué
+  sirve de verdad y qué hacer para agregar sin duplicar.
+- **`entidad_cif`**, en cuatro fichas de `retenciones`: decían «la entidad no
+  tiene CIF», y `retenciones/01_movimientos.sql:59` proyecta `prv.cif` **en
+  crudo**, sin el `NULLIF(TRIM(...))` de los dos maestros. Un proveedor con el
+  CIF en blanco trae **cadena vacía**; el NULL solo aparece cuando el
+  `LEFT JOIN` no casa, o sea cuando la entidad no es proveedor. Las cuatro dicen
+  ya cómo distinguir los dos casos.
+- **`stg.plan_mensual`** marcaba sumables cuatro columnas acumuladas a origen
+  mientras sus doce gemelas de `mart` estaban en `ultimo_valor`, y
+  `R-IMPORTE-MES` es **bloqueante** y la incluye en su ámbito. Que una regla
+  bloqueante conviva con fichas que la contradicen es lo peor que puede pasarle
+  a este diccionario. No se corrigió por lista: **se deriva la coherencia** —la
+  misma columna, en dos objetos del ámbito de una regla, es el mismo número y se
+  declara igual—, con su control para que un ámbito encogido no deje la
+  comprobación en vacío.
+
+## El guardián deja de perseguir sufijos
+
+Tres casos de la misma familia, cada uno escapado por el nombre:
+`cliente_ide` (3ª), `cliente_id` (7ª), `entidad_cif` (9ª). Ampliar la lista de
+sufijos era perseguir el caso: **mientras el guardián mire nombres, habrá un
+cuarto**.
+
+Ahora comprueba la afirmación real, y ya no hay lista que mantener:
+
+> una columna proyectada **en crudo** desde `raw` que declara `nulo_significa`
+
+Al quitar el filtro aparecieron **cuatro** casos que ningún sufijo habría
+cazado: `maestro.proveedores.razon_social` y las tres de `stg.ambitos`
+(`codigo`, `descripcion`, `clase_sigrid`).
+
+## Y un punto ciego que el propio mensaje del guardián ocultaba
+
+El guardián resolvía el origen por el `CREATE`, y `stg.partidas`, `stg.fases` y
+`stg.plan_mensual` se declaran en `stg/01_ddl.sql` —tipos, ni un `raw.` a la
+vista— y se pueblan con `INSERT ... SELECT` en otro fichero. **Las saltaba con
+el mensaje «no lee directamente de `raw`», que era falso.** Tres de los objetos
+más grandes de `stg` sin comprobar, y el motivo publicado en el `-rs` era otro.
+
+Dos arreglos: se localiza también el fichero que **puebla** cada objeto, y el
+bloque arranca al principio de la **sentencia**, porque en `04_partidas.sql` el
+`WITH RECURSIVE` con las proyecciones va **antes** del `INSERT`.
+
+Aparecieron seis nulos imposibles más, y uno obliga a corregir un test **mío**
+de la 7ª pasada, escrito con la premisa al revés: `stg.fases.anio` y `.mes` son
+enteros de Sigrid proyectados en crudo, **nunca son NULL** y «sin informar»
+llega como **0**. La consecuencia es la contraria de la que publiqué: el filtro
+`f.anio IS NOT NULL` de `08_plan_mensual.sql` **no descarta nada**, y una fase
+con `anio = 0` entra igual. La ficha lo dice, porque quien lea ese `WHERE` va a
+suponer lo contrario.
+
+Saltados: de **45 a 40**, y los que quedan por un motivo que ahora es cierto.
