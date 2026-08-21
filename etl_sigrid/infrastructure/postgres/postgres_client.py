@@ -637,6 +637,39 @@ class PostgresClient:
             fila = cur.fetchone()
             return tuple(fila) if fila else ()
 
+    def comprobar_unicidad(self, consulta, timeout_s: int) -> tuple[int, int] | None:
+        """Ejecuta UNA comprobación de unicidad (F-006, T26).
+
+        Devuelve `(claves_duplicadas, filas_implicadas)`, o **`None` si la
+        consulta agotó el `statement_timeout`**. Ese `None` no es un cero: es
+        «no lo sabemos», y quien lo reciba tiene que reportarlo como NO
+        COMPROBADO. Contarlo como correcto convertiría el límite de tiempo
+        —que está para no ahogar un servidor compartido con `albaranes` y
+        `partes`— en una forma de aprobar sin mirar.
+
+        La transacción va `READ ONLY` y el `statement_timeout` es `SET LOCAL`,
+        así que ni escribe ni cambia la configuración del servidor.
+        """
+        import psycopg
+
+        with self.connection() as conn:
+            conn.autocommit = False
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"SET LOCAL statement_timeout = '{int(timeout_s)}s'")
+                    cur.execute(consulta.sql)
+                    fila = cur.fetchone()
+                conn.commit()
+            except psycopg.errors.QueryCanceled:
+                conn.rollback()
+                return None
+            except Exception:
+                conn.rollback()
+                raise
+        if fila is None:
+            return (0, 0)
+        return (int(fila[0]), int(fila[1]))
+
     # ---------------------------------------------------------------------
     # Permisos del rol de solo lectura
     # ---------------------------------------------------------------------

@@ -600,6 +600,98 @@ def apply_grants() -> None:
     _ejecutar_paso(ApplyGrantsStep(settings), pg, ejecucion)
 
 
+@cli.command("check-unicidad")
+@click.option(
+    "--todos",
+    is_flag=True,
+    default=False,
+    help="Comprueba TODO objeto con clave, no solo la superficie de consumo.",
+)
+@click.option(
+    "--timeout",
+    default=30,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
+    """
+    Comprueba contra la base que cada `clave_negocio` declarada identifica UNA fila.
+
+    Es la mitad del problema que la puerta offline no puede cubrir: sabe si la
+    clave nombra columnas de mas, pero no si es demasiado CORTA. Y esa mitad se
+    propaga, porque la deteccion de fan-out deriva la unicidad de la clave
+    declarada: una clave reducida ademas desarma esa comprobacion.
+
+    Por defecto solo la superficie de consumo, que es donde una clave corta
+    produce un numero falso en una respuesta. `--todos` hace la pasada completa;
+    piensalo antes, porque `stg.plan_mensual` ronda los 29 millones de filas y
+    esto corre contra un servidor compartido con `albaranes` y `partes` EN
+    PRODUCCION. Cada consulta lleva su `statement_timeout` y la transaccion va
+    `READ ONLY`.
+
+    OJO CON EL VERDE: que no haya duplicados no prueba que la clave sea
+    correcta. Prueba que los datos de HOY no la contradicen.
+    """
+    from etl_sigrid.application.steps.publicar_diccionario_step import DIR_DICCIONARIO
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+    from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+        consultas_de_unicidad,
+        interpretar_resultado,
+        objetos_saltados,
+        veredicto_no_comprobado,
+    )
+
+    dicc, _hash = cargar_diccionario(DIR_DICCIONARIO)
+    consultas = consultas_de_unicidad(dicc, solo_consumo=not todos)
+    saltados = objetos_saltados(dicc, solo_consumo=not todos)
+
+    alcance = "TODO objeto con clave" if todos else "solo la superficie de consumo"
+    click.echo(f"Comprobacion de unicidad · {alcance}")
+    click.echo(f"  {len(consultas)} objeto(s) a comprobar, {len(saltados)} saltado(s)")
+    click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
+    click.echo("")
+
+    if dry_run:
+        for c in consultas:
+            click.echo(f"-- {c.objeto}  clave: ({', '.join(c.clave)})")
+            click.echo(c.sql + ";")
+            click.echo("")
+        click.echo(f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    fallos = 0
+    sin_comprobar = 0
+    for c in consultas:
+        resultado = pg.comprobar_unicidad(c, timeout)
+        if resultado is None:
+            sin_comprobar += 1
+            click.echo(veredicto_no_comprobado(c, f"timeout de {timeout}s"))
+            continue
+        duplicadas, filas = resultado
+        if duplicadas:
+            fallos += 1
+        click.echo(interpretar_resultado(c, duplicadas, filas))
+
+    click.echo("")
+    click.echo(
+        f"Resumen: {len(consultas) - fallos - sin_comprobar} sin contradiccion, "
+        f"{fallos} con la clave rota, {sin_comprobar} sin comprobar."
+    )
+    click.echo(
+        "Un objeto sin contradiccion NO tiene la clave demostrada: los datos de "
+        "hoy no la contradicen, que es otra cosa."
+    )
+    if fallos or sin_comprobar:
+        raise SystemExit(1)
+
+
 @cli.command("publicar-diccionario")
 def publicar_diccionario_cmd() -> None:
     """

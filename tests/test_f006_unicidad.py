@@ -1,0 +1,364 @@
+# tests/test_f006_unicidad.py
+"""
+La comprobación de unicidad de la clave de negocio (F-006, T26).
+
+Cierra la mitad del problema que la puerta offline **no puede** cubrir. La
+puerta sabe si la clave nombra columnas de más —eso está en el `GROUP BY`— pero
+no si es demasiado **corta**: eso exige saber si una columna depende
+funcionalmente de otra, y eso no está en el SQL, está en los datos.
+
+Y es el hueco que más se propaga: la detección de fan-out deriva la unicidad de
+la clave declarada, así que una clave reducida no solo miente sobre el grano,
+además **desarma la comprobación de cardinalidades**.
+
+Aquí **no se abre ninguna conexión**. Se comprueba la CONSTRUCCIÓN de las
+consultas y el manejo del resultado, con dobles, como se hizo con el bloque E.
+Ejecutarlas contra la base es T27 y lo hace el humano.
+"""
+
+from __future__ import annotations
+
+import pathlib
+import re
+from functools import lru_cache
+
+import pytest
+
+from etl_sigrid.domain.diccionario import Columna, Diccionario, Ficha
+from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+    TIMEOUT_POR_CONSULTA_S,
+    ConsultaUnicidad,
+    consultas_de_unicidad,
+    interpretar_resultado,
+    objetos_saltados,
+    sentencias_de_la_transaccion,
+    veredicto_no_comprobado,
+)
+
+DIR_DICCIONARIO = pathlib.Path(__file__).resolve().parents[1] / "config" / "diccionario"
+
+
+@lru_cache(maxsize=1)
+def _dicc() -> Diccionario:
+    return cargar_diccionario(DIR_DICCIONARIO)[0]
+
+
+def _ficha(**kwargs) -> Ficha:
+    base = dict(
+        esquema="mart",
+        objeto="ejemplo",
+        tipo="tabla",
+        capa="consumo",
+        consumo_recomendado=True,
+        descripcion="D" * 60,
+        grano="Una fila por obra y mes, que es su clave.",
+        clave_negocio=("obra_id", "anio_mes"),
+        paso_etl="build_mart",
+        refresco="nocturno",
+        columnas=(Columna(nombre="obra_id", significado="S" * 40),),
+        relaciones=(),
+        ejemplos_preguntas=("Cuanto llevamos gastado en la obra X",),
+    )
+    base.update(kwargs)
+    return Ficha(**base)
+
+
+def _diccionario_con(*fichas: Ficha) -> Diccionario:
+    return Diccionario(
+        version="1",
+        base="sigrid_dm",
+        fichas=fichas,
+        reglas=(),
+        esquemas={},
+        pendientes=(),
+        global_raw={},
+    )
+
+
+# ---------------------------------------------------------------------------
+# La consulta que se genera
+# ---------------------------------------------------------------------------
+
+
+def test_f006_t26_la_consulta_agrupa_por_la_clave_entera() -> None:
+    """La forma exacta que se acordó, y el porqué está en el módulo."""
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+
+    assert consulta.objeto == "mart.ejemplo"
+    assert consulta.clave == ("obra_id", "anio_mes")
+    assert "GROUP BY obra_id, anio_mes" in consulta.sql
+    assert "HAVING count(*) > 1" in consulta.sql
+    assert "FROM mart.ejemplo" in consulta.sql
+    # Devuelve las dos cifras que hacen accionable el resultado.
+    assert "claves_duplicadas" in consulta.sql
+    assert "filas_implicadas" in consulta.sql
+
+
+def test_f006_t26_no_se_usa_count_distinct() -> None:
+    """`count(*) - count(DISTINCT …)` descartaría los NULOS y daría un número.
+
+    Se prefiere `GROUP BY … HAVING` porque agrupa los NULOS **como un valor
+    más**, que es como se comportan en un `JOIN` —y el JOIN es lo que le va a
+    salir mal al agente—, y porque dice CUÁNTAS claves duplican.
+    """
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+    assert "DISTINCT" not in consulta.sql.upper()
+
+
+def test_f006_t26_la_consulta_de_detalle_devuelve_las_claves_que_colisionan() -> None:
+    """«Hay 12 duplicados» no es accionable; «estos son» sí."""
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+    assert "SELECT obra_id, anio_mes, count(*)" in consulta.sql_detalle
+    assert "ORDER BY filas DESC" in consulta.sql_detalle
+    assert "LIMIT" in consulta.sql_detalle
+
+
+def test_f006_t26_un_identificador_raro_no_se_interpola() -> None:
+    """El diccionario es un YAML editable a mano y esto acaba en un `SELECT`."""
+    malicioso = _ficha(clave_negocio=("obra_id; DROP TABLE mart.x --",))
+    with pytest.raises(ValueError, match="no interpolable"):
+        consultas_de_unicidad(_diccionario_con(malicioso))
+
+
+# ---------------------------------------------------------------------------
+# A qué objetos alcanza, y por qué a los demás no
+# ---------------------------------------------------------------------------
+
+
+def test_f006_t26_se_salta_lo_que_el_motor_ya_garantiza() -> None:
+    """Pagar un escaneo por lo que impone una PRIMARY KEY no tiene sentido."""
+    sustituta = _ficha(
+        objeto="con_sustituta",
+        clave_negocio=("fact_id",),
+        columnas=(
+            Columna(nombre="fact_id", significado="S" * 40, agregacion="clave_sustituta"),
+        ),
+    )
+    de_raw = _ficha(esquema="raw", objeto="obr", clave_negocio=("ide",), columnas=())
+
+    consultas = consultas_de_unicidad(_diccionario_con(sustituta, de_raw))
+    assert consultas == []
+
+    motivos = dict(objetos_saltados(_diccionario_con(sustituta, de_raw)))
+    assert "sustituta" in motivos["mart.con_sustituta"]
+    assert "PRIMARY KEY" in motivos["raw.obr"]
+
+
+def test_f006_t26_se_saltan_las_funciones_y_las_fichas_sin_clave() -> None:
+    funcion = _ficha(objeto="fn_algo", tipo="funcion", grano=None, clave_negocio=())
+    sin_clave = _ficha(objeto="sin_clave", clave_negocio=(), consumo_recomendado=False)
+
+    assert consultas_de_unicidad(_diccionario_con(funcion, sin_clave)) == []
+    motivos = dict(objetos_saltados(_diccionario_con(funcion, sin_clave)))
+    assert "funcion" in motivos["mart.fn_algo"]
+    assert "no declara clave" in motivos["mart.sin_clave"]
+
+
+def test_f006_t26_el_alcance_por_defecto_es_la_superficie_de_consumo() -> None:
+    """Decisión de coste y de daño, documentada en el módulo."""
+    de_consumo = _ficha(objeto="de_consumo")
+    interna = _ficha(
+        objeto="interna",
+        consumo_recomendado=False,
+        motivo_no_consumo="M" * 40,
+    )
+    dicc = _diccionario_con(de_consumo, interna)
+
+    assert [c.objeto for c in consultas_de_unicidad(dicc)] == ["mart.de_consumo"]
+    assert [c.objeto for c in consultas_de_unicidad(dicc, solo_consumo=False)] == [
+        "mart.de_consumo",
+        "mart.interna",
+    ]
+
+
+def test_f006_t26_sobre_el_diccionario_real_alcanza_a_las_claves_compuestas() -> None:
+    """El control: donde está el riesgo es en las claves de varias columnas.
+
+    Si este número se desplomara, el generador habría dejado de ver los objetos
+    que importan y el chequeo pasaría en vacío.
+    """
+    todas = consultas_de_unicidad(_dicc(), solo_consumo=False)
+    compuestas = [c for c in todas if len(c.clave) > 1]
+
+    assert len(todas) >= 50, f"solo {len(todas)} objetos con clave que comprobar"
+    assert len(compuestas) >= 20, (
+        f"solo {len(compuestas)} claves compuestas; ahí es donde vive el riesgo "
+        f"de «la clave es demasiado corta»"
+    )
+    # Y ninguna de `raw`, que el motor ya garantiza.
+    assert not [c for c in todas if c.objeto.startswith("raw.")]
+
+
+# ---------------------------------------------------------------------------
+# El coste: contra un servidor compartido en producción
+# ---------------------------------------------------------------------------
+
+
+def test_f006_t26_la_transaccion_acota_el_tiempo_y_no_escribe() -> None:
+    """`SET LOCAL` no toca la configuración del servidor; `READ ONLY` lo blinda."""
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+    sentencias = sentencias_de_la_transaccion(consulta, timeout_s=15)
+
+    assert sentencias[0] == "BEGIN READ ONLY"
+    assert sentencias[1] == "SET LOCAL statement_timeout = '15s'"
+    assert sentencias[-1] == "COMMIT"
+    assert TIMEOUT_POR_CONSULTA_S > 0
+
+
+# ---------------------------------------------------------------------------
+# Cómo se lee el resultado
+# ---------------------------------------------------------------------------
+
+
+def test_f006_t26_un_resultado_vacio_no_dice_que_la_clave_sea_correcta() -> None:
+    """La frase importa: es la diferencia entre comprobar y garantizar.
+
+    Una clave puede ser insuficiente y no haber colisionado todavía; basta con
+    que ninguna obra haya repetido aún esa combinación.
+    """
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+    texto = interpretar_resultado(consulta, 0, 0)
+
+    assert texto.startswith("OK")
+    assert "no contradicen" in texto
+    assert "correcta" in texto and "No prueba que sea correcta" in texto
+
+
+def test_f006_t26_un_duplicado_dice_objeto_clave_y_cuantas_filas() -> None:
+    """Requisito: que la corrección sea evidente sin volver a investigar."""
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+    texto = interpretar_resultado(consulta, 12, 37)
+
+    assert texto.startswith("KO")
+    assert "mart.ejemplo" in texto
+    assert "obra_id, anio_mes" in texto
+    assert "12" in texto and "37" in texto
+    # Y la consulta para ver cuáles, pegada en el propio mensaje.
+    assert "ORDER BY filas DESC" in texto
+    # Y el efecto de segundo orden, que es lo que no se ve solo.
+    assert "fan-out" in texto
+
+
+def test_f006_t26_un_timeout_nunca_se_cuenta_como_correcto() -> None:
+    """Si no, el límite que protege el servidor sería una forma de aprobar."""
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+    texto = veredicto_no_comprobado(consulta, "timeout de 30s")
+
+    assert "NO COMPROBADO" in texto
+    assert "No es un OK" in texto
+    assert not texto.startswith("OK")
+
+
+# ---------------------------------------------------------------------------
+# El cliente, con un doble. NO se abre ninguna conexión.
+# ---------------------------------------------------------------------------
+
+
+class _CursorFalso:
+    def __init__(self, fila, revienta=None):
+        self.fila = fila
+        self.revienta = revienta
+        self.ejecutadas: list[str] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def execute(self, sql, *_args):
+        self.ejecutadas.append(sql)
+        if self.revienta is not None and "GROUP BY" in sql:
+            raise self.revienta
+
+    def fetchone(self):
+        return self.fila
+
+
+class _ConexionFalsa:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.autocommit = True
+        self.commits = 0
+        self.rollbacks = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def cursor(self):
+        return self._cursor
+
+    def commit(self):
+        self.commits += 1
+
+    def rollback(self):
+        self.rollbacks += 1
+
+
+class _ClienteFalso:
+    """Solo lo que `comprobar_unicidad` usa: `connection()`."""
+
+    def __init__(self, conexion):
+        self._conexion = conexion
+
+    def connection(self):
+        return self._conexion
+
+
+def _comprobar(cliente, consulta, timeout=30):
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    return PostgresClient.comprobar_unicidad(cliente, consulta, timeout)
+
+
+def test_f006_t26_el_cliente_acota_el_tiempo_y_devuelve_las_dos_cifras() -> None:
+    cursor = _CursorFalso(fila=(3, 9))
+    conexion = _ConexionFalsa(cursor)
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+
+    assert _comprobar(_ClienteFalso(conexion), consulta, timeout=45) == (3, 9)
+
+    assert cursor.ejecutadas[0] == "SET LOCAL statement_timeout = '45s'"
+    assert "GROUP BY obra_id, anio_mes" in cursor.ejecutadas[1]
+    assert conexion.autocommit is False, "sin transacción no hay `SET LOCAL` que valga"
+    assert conexion.commits == 1 and conexion.rollbacks == 0
+
+
+def test_f006_t26_un_timeout_del_motor_devuelve_none_y_no_deja_la_transaccion_abierta() -> None:
+    """`None` es «no lo sabemos», y el `rollback` es lo que no deja basura.
+
+    Sin ese `rollback`, una consulta cancelada dejaría la transacción en estado
+    fallido y la siguiente del bucle reventaría por un motivo que no es el suyo,
+    contra un servidor que además comparten otros dos proyectos.
+    """
+    import psycopg
+
+    cursor = _CursorFalso(fila=None, revienta=psycopg.errors.QueryCanceled("timeout"))
+    conexion = _ConexionFalsa(cursor)
+    (consulta,) = consultas_de_unicidad(_diccionario_con(_ficha()))
+
+    assert _comprobar(_ClienteFalso(conexion), consulta) is None
+    assert conexion.rollbacks == 1 and conexion.commits == 0
+
+
+def test_f006_t26_control_el_doble_ejercita_el_camino_real() -> None:
+    """Si el método dejara de usar `connection()`, el doble no lo notaría.
+
+    Es el control que impide que estos tests se conviertan en una comprobación
+    de sí mismos: se afirma que el método REAL es el que se está llamando.
+    """
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    assert hasattr(PostgresClient, "comprobar_unicidad")
+    fuente = pathlib.Path(
+        PostgresClient.__module__.replace(".", "/") + ".py"
+    ).read_text(encoding="utf-8")
+    cuerpo = fuente[fuente.index("def comprobar_unicidad") :][:1600]
+    assert "SET LOCAL statement_timeout" in cuerpo
+    assert "QueryCanceled" in cuerpo
+    assert "rollback" in cuerpo
+    assert re.search(r"autocommit\s*=\s*False", cuerpo)
