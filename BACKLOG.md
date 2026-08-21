@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **41 features**, 27 abiertas, 14 terminadas.
+Resumen: **42 features**, 28 abiertas, 14 terminadas.
 
 En curso: **F-006**.
 
@@ -14,6 +14,7 @@ En curso: **F-006**.
 | F-006 | MCP de bases de datos como servicio en cloud | 1 | en curso | critico | `feature/F-006-mcp-azure` |
 | F-036 | Clasificacion por oficio y categoria oficial de partida | 2 | pendiente | estandar | `feature/F-036-oficios` |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | pendiente | critico | `feature/F-042-clave-fact` |
+| F-044 | Cuatro esquemas del datamart no se refrescan de noche, y nadie se entera | 2 | pendiente | critico | `feature/F-044-esquemas-nocturnos` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 3 | pendiente | critico | `feature/F-037-tesoreria` |
 | F-043 | Un ID de suscripcion de Azure esta versionado y subido a GitHub | 3 | pendiente | estandar | `feature/F-043-secreto-versionado` |
 | F-038 | Modelar los comparativos de ofertas en compras | 4 | pendiente | estandar | `feature/F-038-comparativos` |
@@ -77,6 +78,12 @@ Nacida el 2026-08-20 del analisis de dominio de F-006 (progress/explore_F-006_do
 estado **pendiente** · prioridad 2 · rigor `critico` · SDD sí · rama `feature/F-042-clave-fact`
 
 Descubierto el 2026-08-21 por la comprobacion de unicidad T26 de F-006, la primera vez que se ejecuto contra la base real. La tabla central del seguimiento, mart.fact_seguimiento_mensual, NO cumple la clave que declara: (obra_id, partida_id, anio_mes, escenario) se repite en 8.778 combinaciones, 17.556 filas, siempre dos a dos. CAUSA LOCALIZADA: 22 obras tienen dos fases que Sigrid guarda con el mismo ano y el mismo mes; ejemplo real, la obra 584748 tiene una fase 13 llamada AGOSTO 2010 con mes = 6. Al proyectar ambas al mismo anio_mes salen dos filas indistinguibles. CONSECUENCIA: cualquier SUM por esa clave CUENTA DOS VECES, y ninguna columna publicada identifica la fase, asi que hoy el consumidor no puede ni detectarlo ni deshacerlo. Afecta por igual a Power BI y al MCP. Efecto de segundo orden ya observado en F-006: la deteccion de fan-out del diccionario derivaba de esa unicidad y por tanto se apoyaba en una premisa falsa. F-006 corrigio LA FICHA -dice el numero, la causa, el ejemplo y el apano-, no el dato: arreglarlo es cambio de esquema o de agregacion en mart, que es otra feature. Decisiones que la spec debe tomar: si las dos fases son informacion legitima que hay que conservar -y entonces la clave necesita una columna mas, publicada- o si una de las dos es un error de configuracion en Sigrid que hay que filtrar. La segunda no se decide aqui: es de Negocio. Ver tambien F-022, que documenta otro caso de filas gemelas con origen parecido en raw.obrfasamb.
+
+### F-044 · Cuatro esquemas del datamart no se refrescan de noche, y nadie se entera
+
+estado **pendiente** · prioridad 2 · rigor `critico` · SDD no · rama `feature/F-044-esquemas-nocturnos`
+
+Planteado el 2026-08-21 por el humano al preguntar si build_cierre se lanza cada noche. NO SE LANZA. run-all compone exactamente ingest_raw, load_excel_aux, build_stg, build_mart, publicar_diccionario y apply_grants (main.py:428-443). Los esquemas CIERRE, COMPRAS, MAESTRO y RETENCIONES se construyen con comandos manuales -build-cierre, build-compras, build-maestros, build-retenciones- y por tanto pueden estar arbitrariamente desfasados respecto a raw y stg, que si se rehacen cada noche. POR QUE IMPORTA AHORA: esos cuatro esquemas sirven cuatro de los seis casos de uso que el humano pidio al MCP -proveedores que mas facturan, retenciones de una obra, facturado por contrato, albaranes pendientes-. Un agente de negocio preguntara y recibira cifras viejas con total aplomo. Y el aviso de frescura no le salva: build-cierre y build-retenciones NI SIQUIERA REGISTRAN PASO en _meta.etl_runs, asi que su fecha de construccion no es consultable por SQL ni por el MCP ni por nadie. Lo unico que hay hoy es que el diccionario de F-006 lo declara por escrito, que es avisar del problema, no resolverlo. EVIDENCIA CONCRETA del 2026-08-21: la vista cierre.v_pbi_planif_vs_real existe en el SQL del repositorio y NO EXISTE en la base, porque nadie ha relanzado build-cierre desde que se anadio. Lo detecto el check-diccionario de F-006 al contrastar contra information_schema. LA DECISION ES DE PROYECTO, no tecnica: (a) los cuatro entran en run-all, con lo que la ventana nocturna crece y hay que medir cuanto -hoy la carga tarda 2 h 46 y F-035 esta midiendo las palancas-; (b) entran solo los que el negocio necesite frescos a diario; (c) se quedan manuales y entonces hace falta que registren paso y que algo avise cuando lleven demasiado tiempo sin correr. Lo que no vale es seguir como ahora: manuales, sin traza y sin alarma. El propio codigo lo tiene previsto -un comentario de build_pipeline_steps dice que el dia que build-cierre entre en run-all el veredicto de frescura cambia solo-, asi que la parte tecnica esta preparada.
 
 ### F-037 · Esquema tesoreria: el flujo de caja que hoy se tira
 

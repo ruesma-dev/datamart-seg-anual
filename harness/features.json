@@ -663,6 +663,22 @@
       "rigor": "estandar",
       "priority": 3,
       "branch": "feature/F-043-secreto-versionado"
+    },
+    {
+      "id": "F-044",
+      "title": "Cuatro esquemas del datamart no se refrescan de noche, y nadie se entera",
+      "description": "Planteado el 2026-08-21 por el humano al preguntar si build_cierre se lanza cada noche. NO SE LANZA. run-all compone exactamente ingest_raw, load_excel_aux, build_stg, build_mart, publicar_diccionario y apply_grants (main.py:428-443). Los esquemas CIERRE, COMPRAS, MAESTRO y RETENCIONES se construyen con comandos manuales -build-cierre, build-compras, build-maestros, build-retenciones- y por tanto pueden estar arbitrariamente desfasados respecto a raw y stg, que si se rehacen cada noche. POR QUE IMPORTA AHORA: esos cuatro esquemas sirven cuatro de los seis casos de uso que el humano pidio al MCP -proveedores que mas facturan, retenciones de una obra, facturado por contrato, albaranes pendientes-. Un agente de negocio preguntara y recibira cifras viejas con total aplomo. Y el aviso de frescura no le salva: build-cierre y build-retenciones NI SIQUIERA REGISTRAN PASO en _meta.etl_runs, asi que su fecha de construccion no es consultable por SQL ni por el MCP ni por nadie. Lo unico que hay hoy es que el diccionario de F-006 lo declara por escrito, que es avisar del problema, no resolverlo. EVIDENCIA CONCRETA del 2026-08-21: la vista cierre.v_pbi_planif_vs_real existe en el SQL del repositorio y NO EXISTE en la base, porque nadie ha relanzado build-cierre desde que se anadio. Lo detecto el check-diccionario de F-006 al contrastar contra information_schema. LA DECISION ES DE PROYECTO, no tecnica: (a) los cuatro entran en run-all, con lo que la ventana nocturna crece y hay que medir cuanto -hoy la carga tarda 2 h 46 y F-035 esta midiendo las palancas-; (b) entran solo los que el negocio necesite frescos a diario; (c) se quedan manuales y entonces hace falta que registren paso y que algo avise cuando lleven demasiado tiempo sin correr. Lo que no vale es seguir como ahora: manuales, sin traza y sin alarma. El propio codigo lo tiene previsto -un comentario de build_pipeline_steps dice que el dia que build-cierre entre en run-all el veredicto de frescura cambia solo-, asi que la parte tecnica esta preparada.",
+      "acceptance": [
+        "Decidido y escrito cual de las tres vias se toma, y por que",
+        "Si entran en run-all: medido el impacto en la ventana nocturna antes de dejarlo fijo",
+        "Si siguen manuales: los cuatro registran paso en _meta.etl_runs y hay alarma de frescura",
+        "cierre.v_pbi_planif_vs_real existe en la base, y el check-diccionario no reporta huerfanas"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "critico",
+      "priority": 2,
+      "branch": "feature/F-044-esquemas-nocturnos"
     }
   ]
 }
