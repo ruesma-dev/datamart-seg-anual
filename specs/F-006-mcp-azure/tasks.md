@@ -361,3 +361,100 @@ escribe libremente; la ejecución contra Azure necesita firma.
 Ninguna otra tarea escribe contra producción. T19, T27 y T40 escriben en
 `_meta` de `sigrid_dm` —tres tablas propias de esta feature, creadas por ella—
 y no tocan datos de negocio ni permisos.
+
+---
+
+## Deuda declarada al aprobar la undécima pasada (T43)
+
+Condición del APROBADO: la deuda va aquí **con dueño y con línea**, no como
+«pendiente» genérico. El argumento del reviewer para no seguir puliendo es el
+que la ordena: **cerrar seis defectos de matiz en la décima pasada generó tres
+nuevos de la misma clase**, así que otra ronda no acerca al objetivo, solo
+cambia qué frase está mal. Lo que no está medido es el riesgo grande: que un
+agente encuentre la ficha, reciba las trece reglas y responda.
+
+### D1 · Décimo caso de la copia, donde el barrido no llega
+
+**Dónde**: `tests/test_f006_stg_trampas.py:151-163`, docstring de
+`test_f006_r26_anio_y_mes_nunca_son_nulos_y_la_ficha_lo_dice`. Conserva el
+ejemplo «una fase con `anio = 0` entra igual», que es **el mismo que se corrigió
+en la ficha** (defecto 6 de la décima): `make_date` aborta el build.
+
+**Por qué se escapó**: el barrido de frases rechazadas
+(`tests/test_f006_copias.py`) mira **solo `config/diccionario/*.yaml`**, crudo y
+cargado. Un docstring de test no es superficie publicable, así que queda fuera
+por diseño.
+
+**¿Ampliarlo a los docstrings es viable?** Sí técnicamente —es abrir
+`tests/*.py` y aplicar el mismo `FRASES_RECHAZADAS`— pero **no conviene**, y por
+la misma razón por la que el `motivo` de una regla puede citar la formulación
+equivocada: un docstring que explica un error **tiene que nombrarlo**. Barrerlos
+produciría falsos positivos en todos los tests que documentan por qué existen,
+que son la mayoría de los que se han escrito en estas cuatro pasadas.
+
+**Dueño: revisión humana.** Es prosa explicativa que no llega al agente. Lo
+accionable es corregir ese docstring concreto, que sí describe mal el mecanismo.
+
+### D2 · Referencia posicional en una ficha
+
+**Dónde**: `config/diccionario/stg.yaml:598`. Dice que `make_date` está «unas
+líneas más abajo» y en `stg/08_plan_mensual.sql` está **nueve líneas arriba** de
+la referencia. **Dueño: implementer**, un cambio de dos palabras. Nota de
+método: las referencias posicionales a otro fichero envejecen solas; lo robusto
+es nombrar la construcción, no dónde está.
+
+### D3 · Un recuento nuevo a mano, y la solución ya se sabe
+
+**Dónde**: `tests/test_f006_fichas.py:615`, mensaje de
+`test_f006_r2_control_se_localiza_donde_se_puebla_cada_tabla_de_stg`: dice «al
+menos cinco tablas» y son **seis** (`fases`, `obras`, `partidas`,
+`plan_mensual`, `presupuesto`, `version_master_vigente`).
+
+**Dueño: implementer.** Y la lección ya está aprendida en esta misma tanda: **no
+se corrige el número, se deriva**. El aserto debe comparar contra el conjunto
+que el propio localizador calcula, no contra una constante escrita al lado.
+
+### D4 · Tres correcciones sin guarda de regresión
+
+Están bien hoy y **nada impide que vuelvan atrás en verde**:
+
+| Corrección | Por qué no la cubre ningún detector |
+|---|---|
+| La mitad **CLIENTE** de `entidad_cif` (literal `NULL::VARCHAR(24)`) en sus cuatro fichas | el detector de atribución busca frases de «valor vacío»; volver a la explicación de una sola mitad no las usa |
+| La **caracterización por familias** de las columnas excluidas en las 31 fichas de `raw` («6 de direcciones, 2 de observaciones…») | los tests comprueban el **número** y que lo citado esté excluido, no que la caracterización sea cierta |
+| `maestro.proveedores_obra.cif` | lleva `NULLIF(TRIM(...))`, así que **los dos** guardianes lo saltan: el de nulos porque el NULL es posible, y el de atribución porque la proyección no es desnuda |
+
+**Dueño: implementer**, si el humano decide otra ronda. No bloquean.
+
+### D5 · La zona que el reviewer declara NO FIABLE
+
+Con estas palabras, porque es lo que hay que leer antes de fiarse del
+diccionario:
+
+> **Las afirmaciones sobre el origen que NO se derivan de este repositorio no
+> son fiables.** Alcanza al **punto 2 de `R-SIGRID-CON`** —las diez tablas
+> «Propiedades de `con`»— y a todo lo que dependa de
+> `azure-apps/sigrid_tablas.md`. Esa fuente **ya produjo dos afirmaciones
+> falsas** (`cen.res`, que es de `cenrep`; y una lista de excepciones con una
+> acertada de siete), y no se deja segmentar de forma fiable.
+
+**Fuera de esa zona, el resto se considera fiable**: las **47 fichas de la
+superficie de consumo** están verificadas y con su mecanismo escrito.
+
+**Dueño: humano.** Decidir si el punto 2 se recorta, se marca como no verificado
+o se verifica contra la base real en T27, que es la única fuente que lo
+zanjaría.
+
+### D6 · Deuda anterior, que sigue viva
+
+| Qué | Dónde | Dueño |
+|---|---|---|
+| **Multifuente**: el detector de `COALESCE` cuenta **dos alias**, no si resuelven al mismo objeto | `tests/test_f006_fichas.py` | implementer |
+| **Menores 5, 6 y 7** de la quinta pasada | `progress/review_F-006.md` | implementer |
+| **F-041**: la campaña de mutación no borra `__pycache__` ni limpia worktrees, y cuenta los timeouts aparte de los supervivientes | `harness/mutacion.py`, y a `arnes-base` por la regla de propagación | fuera de F-006 |
+| **Comentarios del SQL que mienten**: `06_presupuesto.sql` dice `ROUND(can, decc)` y el código no lo hace | `sql/stg/06_presupuesto.sql` | **F-025**; el guardián de F-011 impide tocarlo desde aquí, con razón |
+| `config/tables_sigrid.yaml` dice «catálogo estable, refresco completo» en 13 tablas y no gobierna ninguna recarga | `config/tables_sigrid.yaml` | implementer |
+
+- [ ] **T43**: Registrar esta deuda —hecho— y **decidir con el humano** cuáles de
+      D1–D6 entran antes de la batería y cuáles se quedan declaradas.
+      | Verificación: esta sección existe con dueño y línea por entrada.

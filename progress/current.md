@@ -3,8 +3,19 @@
 
 ## F-006 · El diccionario semántico del datamart — `in_progress`
 
-Rama `feature/F-006-mcp-azure`. **Bloques A–G completos**, y corregidos los
-defectos de la séptima a la **décima** pasada de review.
+Rama `feature/F-006-mcp-azure`. **APROBADO** en la undécima pasada, tras
+corregir los defectos de la séptima a la décima.
+
+**El contenido del diccionario está cerrado y no hay que seguir puliéndolo.** El
+argumento del reviewer, que el líder asume: cerrar seis defectos de matiz en la
+décima pasada **generó tres nuevos de la misma clase**, así que otra ronda no
+acerca al objetivo, solo cambia qué frase está mal. Lo que sigue **sin medir** es
+el riesgo grande: que un agente encuentre la ficha, reciba las trece reglas y
+responda las preguntas.
+
+La deuda viva está en `specs/F-006-mcp-azure/tasks.md`, sección **«Deuda
+declarada»** (D1–D6), **con dueño y línea cada entrada**. Era la condición del
+aprobado.
 
 `bash harness/init.sh` en verde: **1758 tests**, 127 saltados, cobertura de las
 líneas cambiadas **99,0 %** (715 de 722).
@@ -126,7 +137,46 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
-### Lo siguiente
+### Lo siguiente · la batería de aceptación (bloque K)
+
+Es lo que queda por hacer, y **en este orden**, porque cada paso depende del
+anterior:
+
+| Paso | Qué es | Necesita |
+|---|---|---|
+| **T26** | Comando `check-diccionario` (R28): contrasta contra `information_schema` en vez de la heurística offline de hoy | nada; se puede escribir sin base |
+| **T19** 🔌 | `python main.py publicar-diccionario` contra la BBDD real y comprobar el contrato de `_meta` | conexión |
+| **T27** 🔌 | `check-diccionario` contra el catálogo real, y **la consulta de unicidad por objeto** (la que cierra «la clave es demasiado corta») | conexión |
+| **T39** 🔌 | Las **18 preguntas** de `requirements.md` §9 contra el diccionario publicado | T19 hecho |
+| **T40** | Corregir las fichas que la batería delate y republicar | T39 |
+| **T37** | Actualizar `azure-apps/datamart_seg_anual.md` | nada |
+
+**🔌 = abre conexión a la base.** Ningún agente lo hace: el `.env` de este puesto
+apunta a `psql-albaranes-rs9k2`, compartido con `albaranes` y `partes` **en
+producción**. Los tres son `MANUAL (humano)`.
+
+**Lo que hace falta para poder pasar la batería**, en una línea: **T26 escrito** y
+**T19 ejecutado por el humano**. Con eso, T39 ya se puede lanzar. Nada de la
+deuda D1–D6 bloquea la batería; son afirmaciones de prosa y guardas de
+regresión, y la decisión de si alguna entra antes es de T43.
+
+### Lo que necesita firma del humano
+
+Ninguno de estos lo toca un agente, y están detallados en el «Resumen de las
+tareas que necesitan firma 🔏» de `tasks.md`:
+
+| Tarea | Qué toca | Riesgo si sale mal |
+|---|---|---|
+| **T32** | Leer `pg_stat_activity` para ver si Power BI consulta `stg` o `raw` | ninguno: solo lectura; la firma es por el acceso |
+| **T33** | **`REVOKE`** sobre `mcp_sigrid_dm_ro` | **Power BI deja de refrescar en silencio**. Rollback: una variable de entorno y `apply-grants` |
+| **T34** | Comprobar que Power BI sigue refrescando | ninguno: verificación |
+| **T38** | **Regla de firewall** en `rg-albaranes-dev`, recurso de otro proyecto | superficie de red abierta de más |
+
+T19, T27 y T40 escriben en `_meta` de `sigrid_dm` —tres tablas propias de esta
+feature— y no tocan datos de negocio ni permisos, así que no llevan firma; solo
+los ejecuta el humano por la regla de no abrir conexión.
+
+### Lo siguiente (histórico)
 
 El **bloque H**: `check-diccionario` (R28, T26), que es lo que sustituye la
 heurística offline de hoy por un contraste contra `information_schema` de la

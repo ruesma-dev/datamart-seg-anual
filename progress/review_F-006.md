@@ -4,11 +4,212 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **diez pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **once pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# UNDÉCIMA PASADA · 2026-08-21 — los seis, y el punto de rendimientos decrecientes
+
+> Commits revisados: `c56daa6`..`6b84da6`.
+
+## Veredicto de la undécima pasada
+
+**APROBADO.** Los seis defectos de la décima están cerrados, verificados uno a
+uno contra el SQL, y los dos focos que se me pidieron atacar salen bien: **mi
+experimento del plegado ahora falla** —y ha quedado como control permanente— y
+**el punto ciego de las 32 columnas está honestamente acotado**, comprobado en
+los dos sentidos.
+
+No queda ningún defecto abierto. Lo que sigue es mi lectura del punto de
+rendimientos decrecientes, que es lo que se me pidió además del veredicto.
+
+---
+
+## Los dos focos que se me pidieron
+
+### 1 · Mi experimento del plegado: ahora falla, y ha quedado como control
+
+Reejecuté exactamente el mismo experimento de la décima pasada —plantar en
+`stg.obras.motivo_no_consumo` dos frases que las pasadas séptima y octava
+rechazaron, **plegadas como las pliega el propio YAML**—. Antes: `14 passed`.
+Ahora:
+
+```
+FAILED tests/test_f006_copias.py::..._ninguna_frase_rechazada_sobrevive_en_el_fichero[stg.yaml]
+AssertionError: stg.yaml conserva 2 frase(s) que una revisión ya rechazó
+```
+
+Y, mejor que el arreglo, **el experimento quedó como control permanente**
+(`test_f006_r26_control_el_barrido_ve_una_frase_plegada`): fija que la frase **no
+está** en el texto crudo y **sí** en lo que se publica, y que el barrido la ve. Si
+alguien revierte el barrido a mirar solo el fichero, ese control cae. Es la
+diferencia entre arreglar un caso y cerrar la clase.
+
+### 2 · El punto ciego de las 32 columnas: **el acotado es honesto**
+
+Lo comprobé en vez de creerlo, y en los dos sentidos:
+
+- **El número es correcto.** Recorrí el ámbito de `R-IMPORTE-MES` contando las
+  columnas con `agregacion` que aparecen en un solo objeto: **32**, exactamente
+  las que declara.
+- **La parte que cierra es la que cazaba el defecto real**: «ningún porcentaje se
+  declara sumable», y es una comprobación **por columna**, no cruzada, así que
+  alcanza a las que están solas —que es justo donde se escondía
+  `pct_acumulado`—. Tiene control anti-vacío (`>= 8` porcentajes).
+- **La parte que declara no es comodidad.** Busqué si en esas 32 quedaba algo
+  derivable por otro criterio evidente —columnas cuyo nombre dice `*_origen` o
+  `*acumulad*`, que fue como yo encontré `pct_acumulado`—: son **6**, y **las 6
+  están correctamente marcadas** (`promedio` o `ultimo_valor`). Es decir, lo
+  declarado «no derivable» **no esconde ningún defecto vivo**.
+- Y el hueco lleva un test que salta si cambia de tamaño (25–40), que es lo que
+  impide que la comprobación cruzada se degrade en silencio.
+
+**Mejora posible, no defecto**: añadir el criterio por nombre —`*_origen` /
+`*acumulad*` no puede ser sumable— cerraría 6 de esas 32 con la misma lógica que
+los porcentajes. Hoy no cambiaría ningún veredicto.
+
+## Los seis, verificados
+
+| # | Defecto de la décima | Estado |
+|---|---|---|
+| 1 | `entidad_cif`: mecanismo falso en la mitad CLIENTE | **cerrado**. Las cuatro fichas dicen ahora «**solo existe en la mitad PROVEEDOR**. En `sentido = 'CLIENTE'` la consulta escribe un NULL constante», que es exactamente lo que hace `01_movimientos.sql:107` |
+| 2 | `maestro.proveedores_obra.razon_social` | **cerrado**: «de su ficha (`prv.raz`), **en crudo**», alineada con su hermana |
+| 3 | El punto ciego de la comprobación cruzada | **cerrado en la parte derivable y declarado en el resto** (ver arriba) |
+| 4 | `pct_acumulado` sumable | **cerrado**: pasa a `promedio`, y con él `pct_mes` |
+| 5 | Los recuentos inventados en la prosa | **cerrado**: los números salen de la prosa y se miden en controles. Las cuatro menciones que quedan son hechos verificados o **la cita del propio error** —«y "tres tablas" donde son cinco»—, que es la forma correcta de no repetirlo |
+| 6 | El ejemplo del `anio = 0` | **cerrado y mejorado**: ahora dice que `make_date(f.anio, f.mes, 1)` «con `anio = 0` **aborta el build** en vez de colar una fila silenciosa», mantiene la conclusión de fondo y añade el consejo operativo: comprobar contra `0`, no contra NULL |
+
+## Rigor e higiene
+
+- **1895 tests**, 122 saltados, cobertura **99,0 %**, ejecutado por mí.
+- **Mutación**: 2358 líneas, 166 mutantes, 0 supervivientes, 0 timeouts.
+- **Nada prohibido**: el diff toca tres YAML, tres ficheros de tests y
+  `progress/`. **`harness/` y `etl_sigrid/` intactos**, ni un `GRANT`, `REVOKE`,
+  firewall, Azure ni conexión a la base. **Sin `push`**.
+
+---
+
+---
+
+## La deuda declarada, con nombre y línea
+
+Los seis están cerrados, pero la pasada deja cuatro cosas anotadas. **Ninguna
+produce un número falso** y ninguna bloquea; las escribo con su ubicación para
+que se puedan cerrar cuando se toque esa zona.
+
+1. **Décimo caso del patrón de la copia, y esta vez fuera del alcance del
+   barrido.** `tests/test_f006_stg_trampas.py:151-163`: el docstring del test
+   sigue publicando como conclusión vigente «el filtro `f.anio IS NOT NULL` […]
+   **no descarta nada**, y una fase con `anio = 0` **entra igual**» — la frase
+   exacta que el defecto 5 acaba de rechazar por falsa. El test que la corrige
+   está 290 líneas más abajo, en el mismo fichero. El barrido de copias **no
+   puede verlo**: solo mira `config/diccionario/*.yaml`. Es el hueco de alcance
+   que queda: la prosa de los tests no está barrida.
+2. **Una ubicación falsa en ficha publicada.** `stg.yaml:598-600` dice que
+   `make_date(f.anio, f.mes, 1)` está «unas lineas **mas abajo**» del filtro. Lo
+   comprobé: `make_date` está en `08_plan_mensual.sql:319` y el filtro en `:328`
+   — **nueve líneas por encima**. La afirmación de fondo es correcta; la
+   indicación para encontrarla, no.
+3. **Un recuento nuevo escrito a mano, y equivocado**, justo en la corrección que
+   consistía en dejar de escribir recuentos a mano:
+   `tests/test_f006_fichas.py:2447` dice «"tres tablas" donde son **cinco**», y la
+   derivación devuelve **seis** —falta `stg.version_master_vigente`, que es TABLE
+   en `stg/01_ddl.sql:181` y se puebla en `stg/07_version_master_vigente.sql:22`—.
+   Lo verifiqué ejecutando la propia derivación del repositorio.
+4. **Un disfraz que sigue abierto.** `PORCENTAJES_NO_SUMABLES` admite
+   `clave_sustituta`, así que marcar `pct_acumulado` con esa etiqueta deja la
+   batería en verde. Lo reconoce el propio comentario del bloque. Y hay tres
+   correcciones —`entidad_cif`, la regla derivada y el ejemplo del `anio = 0`—
+   que **no tienen guarda de regresión**: reescribirlas con otras palabras pasa
+   sin un solo fallo.
+
+**Lo que esto dice, y por qué lo pongo aquí y no en la lista de defectos**: en la
+misma pasada en la que se cerraron seis defectos de matiz **se han generado tres
+nuevos de la misma clase** —una copia en un docstring, una ubicación equivocada y
+un recuento a mano—. No es descuido de nadie: es lo que pasa cuando se corrige
+prosa técnica a mano, y es exactamente el dato que sostiene la recomendación de
+abajo. El proceso está cerrando matices a la misma velocidad a la que los crea.
+
+---
+
+## El juicio de fondo que se me pide
+
+Once pasadas mirando esto de cerca. Doy mi lectura sin suavizarla.
+
+### ¿Destaparía la batería lo que sigo encontrando? **No, casi nada.**
+
+Clasifiqué los defectos de las tres últimas pasadas por si una pregunta de negocio
+real los expondría:
+
+| Defecto | ¿Lo vería la batería? |
+|---|---|
+| La copia divergente de `identidad_sigrid` | **No.** Habla del origen; ninguna de las 18 preguntas consulta `raw` |
+| El bug del derivador de campos propios | **No.** Se ve leyendo el YAML contra el SQL, no preguntando |
+| `entidad_cif`: mecanismo falso en la mitad CLIENTE | **Casi seguro que no.** P2 pregunta por retenciones de proveedor; nadie filtra por `entidad_cif IS NULL` para eso |
+| `razon_social` de la ficha hermana | **No** |
+| `pct_acumulado` sumable | **No.** Vive en `stg.plan_mensual`, fuera del consumo recomendado, y ninguna pregunta va ahí |
+| Recuentos en la prosa, ejemplo del `anio = 0` | **No** |
+| `es_hoja` prometiendo lo que no cumple | **Quizá**, y solo a medias: P8 y P14 agregan por jerarquía, pero la batería es cualitativa —«usa estos objetos y cita estas advertencias»— y no trae cifras esperadas contra las que cuadrar |
+
+La conclusión es incómoda pero es la que hay: **lo que la revisión estática está
+encontrando ahora es de una clase que la batería no ve**. Son afirmaciones que
+solo se detectan leyendo la ficha contra el SQL que la genera.
+
+Y el reverso importa igual: **la batería destaparía cosas que once pasadas no han
+tocado**, porque nadie las ha probado nunca. Si el agente encuentra la ficha del
+objeto que necesita; si el `contexto_bbdd` que sirve el MCP incluye de verdad las
+trece reglas; si el enrutado pregunta→objeto funciona; si las trampas están donde
+el agente las lee y no solo donde nosotros las verificamos; y si las 13
+respondibles se responden. Ese riesgo —el del criterio de éxito de la feature— hoy
+**no está medido en absoluto**.
+
+### ¿Alguna zona que considere no fiable? **Una, y la nombro.**
+
+**Las afirmaciones sobre el sistema de origen que no se derivan de este
+repositorio.** En concreto el punto 2 de `R-SIGRID-CON` —«diez tablas son
+"Propiedades de `con`" en 1:1»— y cualquier cosa que dependa de
+`azure-apps/sigrid_tablas.md`. Su única fuente es un PDF de 380 páginas cuya
+segmentación el propio equipo ha declarado no fiable, y **ya produjo dos
+afirmaciones falsas en dos pasadas seguidas** (`cen.res`, que no existe, y una
+lista de siete excepciones con una sola acertada). El número «diez» está
+verificado y es correcto, pero su respaldo no es reproducible: si mañana cambia,
+nadie se entera.
+
+Fuera de eso, **no señalo ninguna otra zona como no fiable, y lo digo con la misma
+claridad**. Las 47 fichas de la superficie de consumo tienen columnas, granos,
+claves compuestas, cardinalidades, agregaciones y nulos verificados uno a uno
+contra el SQL, y ahora además con mecanismo derivado que impide la recaída.
+
+### ¿Qué recomiendo? **Pasar a la batería, con una lista corta de deuda declarada.**
+
+No es complacencia; es dónde está el riesgo ahora:
+
+1. **La revisión estática ha dejado de converger a cero: converge a matices.** Las
+   últimas tandas han encontrado menos y más pequeño cada vez, pero siguen
+   encontrando. Con 793 columnas y 13 reglas, una pasada doce encontraría algo
+   más, y una trece también. Eso no es señal de que el diccionario esté mal: es
+   la asíntota de este método.
+   Y hay un dato que lo cierra: **en esta misma pasada, cerrar seis defectos de
+   matiz ha generado tres nuevos de la misma clase** (§«La deuda declarada»).
+   Corregir prosa técnica a mano produce matices al mismo ritmo al que los quita;
+   por debajo de cierto umbral, otra pasada no acerca al objetivo, solo cambia
+   qué frase está mal.
+2. **Ninguno de los defectos vivos produce un número falso silencioso en la
+   superficie de consumo**, que es el daño que esta feature existe para evitar.
+   Los que lo producían —`importe_origen` sumable, las claves reducidas, los
+   `COUNT(DISTINCT)` marcados `suma`, el fan-out de las cardinalidades— están
+   cerrados y con guardián.
+3. **El riesgo no medido es el otro**, y es mayor: que esto no funcione con un
+   agente de verdad. Es lo que dice R41 y es lo que decide si la feature sirve.
+4. **La deuda tiene que quedar escrita y con dueño**, no «pendiente». Si se pasa a
+   la batería, que sea con la lista corta anotada en `tasks.md` y revisable
+   cuando esos bloques se toquen.
+
+Dicho esto: **si algo bloqueara, lo diría**. En esta pasada no bloquea nada.
 
 ---
 
