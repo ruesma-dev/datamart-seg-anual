@@ -566,29 +566,34 @@ def _alias_directos_de_raw(sql: str) -> set[str]:
     return alias
 
 
-#: Sufijos con los que este proyecto nombra una referencia a otra entidad.
-#:
-#: Empezó siendo solo `_ide`, el nombre que usa `cierre`, y por eso este
-#: guardián **no vio** `maestro.obras.cliente_id`, que es el mismo defecto que
-#: se corrigió en la tercera pasada: `o.entide AS cliente_id` sin `NULLIF`, con
-#: un `nulo_significa` que nunca ocurre. `maestro`, `stg` y `mart` nombran esas
-#: columnas `_id`.
-#:
-#: La lección no es que faltase un sufijo: es que **un filtro por sufijo deja
-#: pasar a la hermana**. Se comprueban los dos, y el test de abajo fija que la
-#: lista los contenga para que añadir una convención nueva sea deliberado.
-SUFIJOS_DE_REFERENCIA = ("_ide", "_id")
-
-
-def test_f006_r2_el_guardian_de_nulos_cubre_las_dos_convenciones() -> None:
-    """`cierre` los llama `_ide` y `maestro` los llama `_id`. Los dos cuentan."""
-    assert set(SUFIJOS_DE_REFERENCIA) == {"_ide", "_id"}
+# ---------------------------------------------------------------------------
+# El guardián de nulos, por PROCEDENCIA y no por nombre (9ª pasada)
+# ---------------------------------------------------------------------------
+#
+# Van **tres** casos de la misma familia y cada uno se escapó por el nombre:
+#
+#   3ª pasada · `cierre.v_pbi_cierre_cabecera.cliente_ide`
+#   7ª pasada · `maestro.obras.cliente_id`     — el filtro miraba `_ide`
+#   9ª pasada · `retenciones.movimientos.entidad_cif` — miraba `_ide` y `_id`
+#
+# Ampliar la lista de sufijos era perseguir el caso, no cerrar la clase: mientras
+# el guardián mire **nombres**, habrá un cuarto. Lo que hay que comprobar es la
+# **afirmación real**, que no tiene nada que ver con cómo se llame la columna:
+#
+#     una columna proyectada EN CRUDO desde `raw` que declara `nulo_significa`
+#
+# Si el valor sale tal cual de una tabla de Sigrid por un camino que no puede
+# producir NULL, entonces ese `nulo_significa` no ocurre nunca, se llame la
+# columna `cliente_ide`, `cliente_id`, `entidad_cif` o `pepe`.
+#
+# Ya no hay lista de sufijos que mantener, así que tampoco hay un sufijo nuevo
+# del que olvidarse.
 
 
 @pytest.mark.parametrize(
     "nombre", sorted(f.nombre for f in _fichas_con_columnas())
 )
-def test_f006_r2_un_nulo_declarado_en_un_ide_tiene_que_ser_posible(nombre: str) -> None:
+def test_f006_r2_un_nulo_declarado_tiene_que_ser_posible(nombre: str) -> None:
     ficha = _diccionario().por_nombre[nombre]
     origen = _origen_por_objeto().get(nombre)
     if origen is None:
@@ -618,7 +623,7 @@ def test_f006_r2_un_nulo_declarado_en_un_ide_tiene_que_ser_posible(nombre: str) 
         pytest.skip(f"{nombre} no lee directamente de `raw`: el 0-como-NULL es de Sigrid")
 
     for columna in ficha.columnas:
-        if not columna.nombre.endswith(SUFIJOS_DE_REFERENCIA) or not columna.nulo_significa:
+        if not columna.nulo_significa:
             continue
         proyeccion = _proyeccion_de(_bloque_del_objeto(sql, nombre), columna.nombre)
         if proyeccion is None:
@@ -627,8 +632,10 @@ def test_f006_r2_un_nulo_declarado_en_un_ide_tiene_que_ser_posible(nombre: str) 
         if not directa or directa.group(1) not in alias_de_raw:
             continue
         assert "NULLIF" in proyeccion.upper(), (
-            f"{nombre}.{columna.nombre} declara `nulo_significa` pero se proyecta "
-            f"sin NULLIF, así que trae 0 y nunca es NULL: {proyeccion.strip()}"
+            f"{nombre}.{columna.nombre} declara `nulo_significa` y se proyecta EN "
+            f"CRUDO desde una tabla de `raw` que no llega por LEFT JOIN, así que "
+            f"nunca es NULL: trae el valor tal cual —0 en los enteros de Sigrid, "
+            f"cadena vacía en los textos—. Línea: {proyeccion.strip()}"
         )
 
 

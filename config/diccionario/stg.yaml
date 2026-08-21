@@ -694,17 +694,22 @@ objetos:
       codigo:
         significado: >-
           Nemonico del ambito. NO sirve para clasificar: puede contradecir a la
-          descripcion.
-        nulo_significa: El ambito no tiene codigo.
+          descripcion. **Nunca es NULL**: se proyecta `a.cod` en crudo desde
+          `raw.auxobramb`, la tabla del `FROM`, asi que un ambito sin codigo
+          llega como **cadena vacia**.
       descripcion:
         significado: >-
-          Descripcion del ambito, y la fuente REAL de su significado. Es de donde
-          se deduce el tipo.
-        nulo_significa: El ambito no tiene descripcion.
+          Descripcion del ambito, y la fuente REAL de su significado: es de donde
+          se deduce el tipo. **Nunca es NULL**: se proyecta `a.res` en crudo
+          desde `raw.auxobramb`, la tabla del `FROM`, asi que un ambito sin
+          descripcion llega como **cadena vacia**.
       clase_sigrid:
-        significado: Clasificacion interna de Sigrid, expuesta sin traducir.
+        significado: >-
+          Clasificacion interna de Sigrid, expuesta sin traducir. **Nunca es
+          NULL**: se proyecta `a.ambcla` en crudo desde `raw.auxobramb`, la tabla
+          del `FROM`; Sigrid no guarda nulos en los enteros, asi que "sin clase"
+          llega como **0**.
         agregacion: no_sumable
-        nulo_significa: El ambito no tiene clase informada.
       tipo:
         significado: >-
           Categoria semantica del ambito, deducida de su descripcion. Es

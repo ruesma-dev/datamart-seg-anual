@@ -103,7 +103,14 @@ objetos:
       entidad_nombre: Nombre del proveedor o del cliente, de `con.res`.
       entidad_cif:
         significado: CIF de la entidad. Solo esta relleno para los proveedores.
-        nulo_significa: La entidad no tiene CIF en el maestro de proveedores.
+        nulo_significa: >-
+          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
+          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
+          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
+          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
+          proveedor con el CIF en blanco trae **cadena vacia**. Para
+          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
+          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
       obra_id:
         significado: >-
           Obra a la que se atribuye la retencion, resuelta en cascada. Primero
@@ -275,7 +282,14 @@ objetos:
       entidad_nombre: Nombre de la entidad, de `con.res`.
       entidad_cif:
         significado: CIF de la entidad. Solo esta relleno para los proveedores.
-        nulo_significa: La entidad no tiene CIF en el maestro de proveedores.
+        nulo_significa: >-
+          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
+          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
+          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
+          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
+          proveedor con el CIF en blanco trae **cadena vacia**. Para
+          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
+          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
       num_movimientos:
         significado: Cuantos efectos hay detras de las cifras de la fila.
         agregacion: suma
@@ -479,7 +493,14 @@ objetos:
       entidad_nombre: Nombre del proveedor o del cliente.
       entidad_cif:
         significado: CIF de la entidad. Solo relleno para proveedores.
-        nulo_significa: La entidad no tiene CIF en el maestro.
+        nulo_significa: >-
+          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
+          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
+          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
+          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
+          proveedor con el CIF en blanco trae **cadena vacia**. Para
+          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
+          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
       codigo_obra:
         significado: Codigo de la obra a la que se atribuyo el efecto.
         nulo_significa: >-
@@ -560,7 +581,14 @@ objetos:
       entidad_nombre: Nombre del proveedor o del cliente.
       entidad_cif:
         significado: CIF de la entidad. Solo relleno para proveedores.
-        nulo_significa: La entidad no tiene CIF en el maestro.
+        nulo_significa: >-
+          La entidad **no tiene ficha de proveedor**: el `LEFT JOIN` con
+          `raw.prv` no casa. **No** significa que el proveedor exista sin CIF:
+          aqui `prv.cif` se proyecta EN CRUDO, sin el `NULLIF(TRIM(...))` que si
+          aplican `maestro.proveedores` y `maestro.proveedores_obra`, asi que un
+          proveedor con el CIF en blanco trae **cadena vacia**. Para
+          distinguirlos: `entidad_cif IS NULL` es "no es proveedor" y
+          `TRIM(entidad_cif) = ''` es "proveedor sin CIF".
       codigo_obra:
         significado: Codigo de la obra a la que se atribuyo el efecto.
         nulo_significa: El efecto no se pudo atribuir a una obra.

@@ -145,8 +145,13 @@ objetos:
           puede diferir.
         nulo_significa: La ficha del proveedor no tiene CIF, o esta en blanco.
       razon_social:
-        significado: Razon social completa, que puede diferir del nombre comercial.
-        nulo_significa: La ficha no tiene razon social informada.
+        significado: >-
+          Razon social completa, que puede diferir del nombre comercial.
+          **Nunca es NULL**: se proyecta `p.raz` en crudo desde `raw.prv`, la
+          tabla del `FROM`, asi que una razon social sin informar llega como
+          **cadena vacia**. `razon_social IS NULL` devuelve cero filas; lo que
+          hay que escribir es `TRIM(razon_social) = ''`. Ojo: `cif`, aqui al
+          lado, **si** lleva `NULLIF(TRIM(...))` y por tanto si puede ser NULL.
       dir1:
         significado: Primera linea de la direccion.
         nulo_significa: >-
