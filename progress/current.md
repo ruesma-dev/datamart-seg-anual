@@ -137,6 +137,25 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
+### Estado tras la 16ª pasada · instrumentos rotos
+
+- **NO se declaran números de mutación hasta F-041.** La campaña corre en un
+  worktree con HEAD detached, donde `test_f015_r12` falla siempre; con `-x` la
+  suite para ahí y `harness/mutacion.py` cuenta cualquier `returncode != 0` como
+  mutante muerto. **Los «166/166» y «254/254» que declaré no son evidencia.** En
+  su lugar: «no verificable, ver F-041».
+- **Superviviente real muerto**: `and`→`or` en `diccionario_sql.py:297`, que las
+  dos campañas dieron por muerto. Difiere en la cadena vacía.
+- **El guardián de coherencia entró por tres vías** —otra redacción, frase
+  partida, y un salvoconducto que **apagaba la lista entera**—. Arreglado
+  **dejando de comparar frases**: ahora la cabecera tiene que **nombrar cada
+  columna afectada**, que es derivable y no depende del idioma. Sigue cortando el
+  caso real de la 15ª.
+- **La regresión de `ocultar` no estaba en el árbol** —verificado en árbol, HEAD
+  y base—, pero **el hueco del test sí**: reproducido revirtiendo el arreglo, los
+  19 tests pasaban igual. Ya está el test que lo caza.
+- **Versión 7 publicada**, biyección exacta 103/103.
+
 ### Estado tras la 15ª pasada
 
 - **Cabecera y columnas ya dicen lo mismo.** El reviewer fue a mirar **cómo

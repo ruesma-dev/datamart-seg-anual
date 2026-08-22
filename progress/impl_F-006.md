@@ -4367,3 +4367,103 @@ arreglar).
 **Cero supervivientes sobre los 254**, incluidos los ~88 mutantes nuevos que
 generan `catalogo.py`, `unicidad_sql.py` y el contexto — código escrito en las
 tres últimas tandas y que hasta ahora no se había mutado nunca.
+
+---
+
+# Decimosexta pasada · instrumentos rotos
+
+## La puerta de mutación no comprobaba nada, y mis números eran humo
+
+El reviewer lo demostró: la campaña corre en un `git worktree` con **HEAD
+detached**, y ahí `test_f015_r12_la_rama_actual_se_lee_de_git` **falla siempre**.
+Como la suite va con `-x`, para en ese test; y `harness/mutacion.py` cuenta
+**cualquier `returncode != 0` como mutante muerto**. La suite estaba roja antes
+de mutar nada, así que **todos los mutantes se declaraban muertos sin comprobar
+nada**. Su control: el mismo worktree **sin mutar** da el mismo fallo.
+
+Eso invalida las campañas que he ido declarando: los «166/166» y el «254/254» de
+la tanda anterior **no son evidencia de nada**. Y es peor que no tener número,
+porque parece evidencia y se lee como tal — lo dije de los recuentos a mano y me
+lo aplico aquí.
+
+**Decisión, y es una regla para mí, no un apaño**: hasta que F-041 esté hecho,
+**no vuelvo a declarar un número de mutación**. En su lugar, «no verificable, ver
+F-041». `harness/mutacion.py` es del arnés y no lo toco.
+
+### El superviviente real, muerto
+
+Encontró uno que las **dos** campañas —la mía y la suya, independientes— dieron
+por muerto: `and`→`or` en `diccionario_sql.py:297`.
+
+La diferencia está en la **cadena vacía**: con `and` devuelve la posición, con
+`or` cortocircuita y devuelve la cadena vacía. Ningún test lo tocaba. El control
+nuevo `_clave_de("", 2) == "2"` lo caza, verificado aplicando el mutante a mano:
+
+```
+MUTANTE and->or => MUERTO
+   FAILED test_f006_r28_control_toda_entrada_de_lista_de_texto_se_identifica_sola
+```
+
+## La regresión de `ocultar`: el estado no, el hueco sí
+
+**La regresión no está en el árbol.** Verificado en los tres sitios: árbol, `HEAD`
+y la base publican `_ingested_at` / `_source_tiemod` / `_built_at`, no `0/1/2`.
+
+**Pero el hueco del test es real y lo he reproducido.** Revirtiendo el arreglo a
+mano:
+
+```
+claves con el arreglo revertido: ['0', '1', '2']
+19 passed
+```
+
+El test viejo comprobaba `columna in str(f[3]) or columna in str(f[1])` —el
+nombre en la clave **o en el texto**— y el texto lo lleva siempre. Un falso verde
+sobre el contrato publicado. Ya está el test que sí lo caza, escrito en RED con
+el arreglo revertido.
+
+## El guardián de coherencia: las tres vías, y la lección
+
+Le pediste que lo atacara y entró por tres a la vez. Reproducidas las tres antes
+de tocar nada:
+
+```
+VIA 3 · el salvoconducto:  frases marcadas: []   <- lista INERTE
+VIA 1 · otra redaccion:    marcadas: []          <- 'sale unica' no estaba
+VIA 2 · frase partida:     marcadas: []          <- el salto la parte
+         normalizando:     ['la clave no duplica']
+```
+
+La tercera es la peor y es mía de cabo a rabo: `"el numero de dentro" not in
+cabecera` se evaluaba sobre **todo el texto**, y esa frase es la formulación
+nueva —está siempre—, así que **apagaba la lista entera**. Un guardián verde que
+no miraba nada, dentro del fichero que existe para cazar exactamente eso.
+
+**El arreglo no es ampliar la lista: es dejar de comparar frases.** Enumerar
+redacciones a mano no puede funcionar, porque el idioma tiene infinitas — y
+además es lo que invita al salvoconducto.
+
+Lo que sí es derivable, sin listas y sin juzgar prosa: **la cabecera tiene que
+NOMBRAR cada columna afectada**. Una cabecera que solo tranquiliza no pasa,
+porque no las nombra; y quien lea únicamente `listar_tablas` sabe de cuáles
+desconfiar. Comprobado que **sigue cortando el caso real** de la 15ª: la cabecera
+antigua cae por cuatro tests.
+
+**Límite declarado**: decidir si un texto «tranquiliza» no es derivable, así que
+no se intenta. Se comprueba lo objetivo —el marcador y los nombres— y lo demás
+queda en revisión humana. Es preferible a una comprobación que aparenta cubrirlo
+y no cubre.
+
+Las tres vías quedan como **control permanente**, incluida la de la constante,
+cuyo nombre se compone en tiempo de ejecución: escribirlo entero hacía que el
+control **se cazara a sí mismo**, que fue el primer intento.
+
+## El 22→9, en las fichas de columna
+
+Las cabeceras ya lo decían y las tres fichas de columna no. Corregido: la causa
+son **22 obras** con dos fases, de las que **9** llegan a duplicar filas en el
+fact. Las cabeceras remitían a «la consulta que da ese número» y esa consulta
+devuelve 9.
+
+Publicado en **versión 7**, biyección exacta 103/103 y lo publicado casa con el
+árbol.

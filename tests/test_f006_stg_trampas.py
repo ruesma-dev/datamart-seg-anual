@@ -29,6 +29,8 @@ from functools import lru_cache
 
 import pytest
 
+from tests._texto import contiene
+
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
@@ -721,24 +723,13 @@ def test_f006_r10_la_columna_sana_dice_que_lo_es(objeto: str) -> None:
 # Mover la exigencia de sitio no cierra nada: la cierra exigir que **las dos
 # partes digan lo mismo**. Eso es lo que comprueba esto.
 
-#: Afirmaciones de cabecera que se leen como «aquí no hay problema». Si una
-#: columna del objeto lleva el aviso del doblado, ninguna de estas puede quedar
-#: sin matizar: el agente que solo vea la cabecera se irá tranquilo.
-_TRANQUILIZADORAS = (
-    "la clave no duplica",
-    "sin contradiccion",
-    "no hay duplicado",
-    "no esta afectada",
-)
-
-
 @pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
 def test_f006_r10_la_cabecera_no_contradice_a_sus_columnas(objeto: str) -> None:
     """Si una columna avisa de que su valor está doblado, la cabecera también.
 
-    `listar_tablas` del MCP entrega **descripción y grano, sin columnas**. Un
-    aviso que solo vive en la columna no llega por esa vía, y una cabecera
-    tranquilizadora se lee como que el objeto está sano.
+    `listar_tablas` del MCP entrega **descripción y grano, sin columnas**
+    (`presentadores.py`). Un aviso que solo vive en la columna no llega por esa
+    vía, y una cabecera tranquilizadora se lee como que el objeto está sano.
     """
     ficha = _dicc().por_nombre[objeto]
     cabecera = f"{ficha.descripcion} {ficha.grano or ''}"
@@ -749,7 +740,7 @@ def test_f006_r10_la_cabecera_no_contradice_a_sus_columnas(objeto: str) -> None:
     if not columnas_avisadas:
         pytest.skip(f"{objeto} no tiene columnas con el aviso")
 
-    assert "DOBLADO" in cabecera, (
+    assert contiene(cabecera, "DOBLADO"), (
         f"{objeto}: las columnas {columnas_avisadas} avisan de que su valor está "
         f"doblado y la cabecera no lo dice. Quien use `listar_tablas` recibe solo "
         f"la cabecera y se va tranquilo"
@@ -757,27 +748,77 @@ def test_f006_r10_la_cabecera_no_contradice_a_sus_columnas(objeto: str) -> None:
 
 
 @pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
-def test_f006_r10_la_cabecera_no_afirma_lo_contrario(objeto: str) -> None:
-    """Y no basta con que lo mencione: no puede afirmar a la vez lo contrario.
+def test_f006_r10_la_cabecera_nombra_las_columnas_afectadas(objeto: str) -> None:
+    """La otra mitad, y esta vez SIN comparar frases.
 
-    El caso real: el grano decía «la clave no duplica —comprobado—», que es
-    cierto y **suena a que todo está bien**, mientras la columna decía que el
-    importe está doblado. Las dos frases juntas se anulan.
+    La versión anterior mantenía una lista de cuatro «frases tranquilizadoras» y
+    entró por tres sitios a la vez:
+
+    1. **Otra redacción.** «la clave sale única y no se repite ninguna fila» no
+       estaba en la lista. Enumerar redacciones a mano es la comprobación mal
+       planteada: el idioma tiene infinitas.
+    2. **Frase partida por línea en blanco**, sin normalizar. El plegado, cuarta
+       aparición.
+    3. **El salvoconducto**, y era el peor: `"el numero de dentro" not in
+       cabecera` se evaluaba sobre **todo el texto**, y esa frase es la
+       formulación nueva y está siempre, así que **dejaba la lista entera
+       inerte**. Un guardián verde que no miraba nada.
+
+    Lo que sí es derivable, sin listas y sin juzgar prosa: **la cabecera tiene
+    que NOMBRAR cada columna afectada**. Una cabecera que solo tranquiliza no
+    puede pasar, porque no las nombra; y quien lea únicamente `listar_tablas`
+    sabe cuáles no se puede creer.
+
+    **Límite declarado**: decidir si un texto «tranquiliza» no es derivable, así
+    que no se intenta. Se comprueba lo objetivo —el marcador y los nombres—, y
+    lo demás queda en la revisión humana.
     """
     ficha = _dicc().por_nombre[objeto]
-    cabecera = f"{ficha.descripcion} {ficha.grano or ''}".lower()
-    if "doblado" not in cabecera:
-        pytest.skip(f"{objeto} no avisa en cabecera")
+    cabecera = f"{ficha.descripcion} {ficha.grano or ''}"
 
-    sueltas = [
-        f
-        for f in _TRANQUILIZADORAS
-        if f in cabecera and "el numero de dentro" not in cabecera
-    ]
-    assert sueltas == [], (
-        f"{objeto}: la cabecera afirma {sueltas} sin aclarar que eso NO significa "
-        f"que el importe sea correcto. Que una fila sea única no dice nada de si "
-        f"su número está bien"
+    afectadas = [c.nombre for c in ficha.columnas if "DOBLADO" in (c.significado or "")]
+    if not afectadas:
+        pytest.skip(f"{objeto} no tiene columnas con el aviso")
+
+    sin_nombrar = [c for c in afectadas if not contiene(cabecera, c)]
+    assert sin_nombrar == [], (
+        f"{objeto}: la cabecera avisa del doblado pero no nombra {sin_nombrar}, "
+        f"que son las columnas afectadas. Quien lea solo `listar_tablas` no sabe "
+        f"de cuáles desconfiar"
+    )
+
+
+def test_f006_r10_control_el_guardian_de_coherencia_muerde() -> None:
+    """Las tres vías por las que entró, convertidas en control permanente.
+
+    Sin esto, cualquiera de los tres arreglos podría revertirse en verde.
+    """
+    afectadas = ["importe_origen", "importe_origen_raw"]
+
+    # Vía 1 · otra redacción: la cabecera tranquiliza sin nombrar nada.
+    otra = "esta DOBLADO, pero la clave sale unica y no se repite ninguna fila"
+    assert [c for c in afectadas if not contiene(otra, c)] == afectadas, (
+        "una cabecera que no nombra ninguna columna afectada tiene que fallar, "
+        "diga lo que diga"
+    )
+
+    # Vía 2 · frase partida por el ajuste de línea: se ve igual.
+    partida = "el valor de importe_origen\n\ny de importe_origen_raw esta DOBLADO"
+    assert [c for c in afectadas if not contiene(partida, c)] == [], (
+        "normalizando espacios, una cabecera envuelta cuenta igual"
+    )
+
+    # Vía 3 · ya no hay lista de frases, así que no hay salvoconducto que la
+    # apague. Se comprueba lo objetivo: que la constante no vuelva.
+    fuente = pathlib.Path(__file__).read_text(encoding="utf-8")
+    # El nombre se compone en tiempo de ejecución: escribirlo entero aquí haría
+    # que este control se cazara a sí mismo, que es el fallo que ya tuvo la
+    # primera versión de esta comprobación.
+    constante = "_TRANQUI" + "LIZADORAS"
+    assert f"{constante} = (" not in fuente, (
+        "vuelve la lista de frases escritas a mano. Enumerar redacciones no "
+        "funciona —el idioma tiene infinitas— y además invita al salvoconducto "
+        "global que dejó la comprobación inerte"
     )
 
 

@@ -4,11 +4,433 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **quince pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **dieciséis pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# DECIMOSEXTA PASADA · la mejor tanda, y la puerta que la acreditaba no mide nada
+
+**Veredicto: RECHAZADO.** Y quiero separar bien las dos cosas, porque el reparto
+importa más que nunca:
+
+**Esta es la mejor tanda de las dieciséis.** La formulación nueva es exacta, los
+tres números están medidos y son coherentes, el error de paso 22 → 9 estaba bien
+visto y bien corregido, `ocultar` viaja en una forma que sí resuelve lo que
+planteé, `_ACUMULADAS` se deriva de verdad, y **por primera vez una comprobación
+ataca la clase y no el caso** — y una de sus dos mitades funciona.
+
+**Y sin embargo bloquea, por algo que no es de esta tanda ni del implementer**:
+la puerta de mutación del arnés **declara «0 supervivientes» sin haber comprobado
+nada**. Lo he demostrado con su control. Eso invalida la evidencia que llevamos
+dieciséis pasadas citando, **incluida la campaña que yo mismo lancé hace un rato**
+y que también dio 254/254.
+
+Los tres motivos, por orden de gravedad:
+
+1. **La puerta de mutación falla en verde** (fallo del arnés, afecta a otras
+   features).
+2. **El guardián de coherencia tiene tres vías de evasión**, una de las cuales lo
+   deja inerte hoy mismo.
+3. **La corrección 22 → 9 llegó a la cabecera y no a las fichas de columna**, y
+   una frase publicada al agente le remite a una consulta que devuelve otro
+   número.
+
+**Nivel de rigor: `critico`.** **Entorno:** `init.sh` verde — **1982 pasados**,
+124 saltados, cobertura **98,1 %** de 979 líneas. Árbol limpio, sin `push`.
+
+## GRAVE · La puerta de mutación del arnés da «0 supervivientes» sin comprobar nada
+
+Esto no es un defecto de F-006 ni del implementer. **Es un fallo del arnés**, lo
+he demostrado de punta a punta, y afecta a todas las features que hayan pasado
+por esta puerta. Lo pongo el primero porque invalida una evidencia que llevamos
+dieciséis pasadas dando por buena, incluida la que yo mismo generé hace un rato.
+
+### El hecho
+
+El mutante `and` → `or` en `diccionario_sql.py:297` —línea en alcance, operador
+del catálogo del propio arnés— **sobrevive a la suite completa**:
+
+| | Resultado |
+|---|---|
+| Copia con `.env`, **con** el mutante | 1976 pasados, 2 fallos (de entorno git) |
+| Copia con `.env`, **sin** el mutante (control) | 1976 pasados, **los mismos 2 fallos** |
+
+Idénticos. El mutante no cambia nada: **ningún test lo caza**. Y sin embargo
+`progress/mutacion_F-006.md` declara 254/254 muertos, y **mi propia campaña
+independiente también** —la lancé con el bytecode borrado y dio 254 muertos, 0
+supervivientes, 688,3 s—. Las dos se equivocan igual.
+
+### Por qué, que es lo accionable
+
+Dos piezas de `harness/mutacion.py` que por separado son razonables:
+
+```python
+self.argumentos = argumentos or ["-x", "-q", "--tb=no", "-p", "no:cacheprovider"]
+...
+if proceso.returncode in (0, PYTEST_SIN_TESTS):
+    return SUPERVIVIENTE
+return MUERTO
+```
+
+**Cualquier** salida distinta de cero cuenta como mutante cazado. Y la campaña
+paralela corre cada evaluador **en un `git worktree` con HEAD detached**. Ahí:
+
+```
+FAILED tests/test_f015_cobertura.py::test_f015_r12_la_rama_actual_se_lee_de_git
+!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!
+1 failed, 1539 passed
+```
+
+En un worktree detached **no hay rama actual**, así que ese test falla. Y con
+`-x` la suite para en él, antes de llegar a los tests que sí comprobarían el
+mutante. Control obligado, y lo hice: **el mismo worktree sin ningún mutante da
+exactamente el mismo fallo**. La suite está en rojo **antes** de mutar nada.
+
+De ahí que todo salga «muerto»: no porque los tests cacen al mutante, sino porque
+la suite ya venía roja por un motivo ajeno. **El «0 supervivientes» es un
+artefacto de medición**, no evidencia.
+
+Y es la peor forma de fallar que puede tener una puerta de calidad: **falla en
+verde**. Un mutante que sobrevive se declara muerto; nadie se entera; y el número
+ocupa el sitio de la evidencia en el checkpoint, así que quien lo lee ya ha
+terminado de mirar. Es exactamente lo que el implementer describió de los
+recuentos —«parece evidencia»— llevado a su extremo.
+
+### Qué hay que arreglar, y dónde
+
+En `harness/mutacion.py`, y de ahí a **`arnes-base`** por la regla de propagación:
+
+1. **Exigir línea base verde antes de empezar.** Correr la suite sin mutar en el
+   entorno donde se va a evaluar y **abortar la campaña** si no da returncode 0.
+   Es la comprobación que convierte el resultado en interpretable.
+2. **Distinguir «falló por el mutante» de «falló por otra cosa».** Como mínimo,
+   comparar el conjunto de tests fallidos con el de la línea base; un mutante
+   está muerto si falla **algo que antes pasaba**.
+3. **Revisar `-x`**: parar al primer fallo hace que el orden de recolección
+   decida el veredicto.
+4. Y quitar del camino la causa concreta: `test_f015_r12` no debería fallar por
+   ejecutarse en un worktree detached, o debería saltarse ahí.
+
+### Alcance del daño
+
+**No sé cuántas campañas anteriores están afectadas y no lo voy a afirmar sin
+medirlo**, pero la lista de candidatas está a la vista en `progress/`:
+`mutacion_F-005.md`, `F-015`, `F-016`, `F-019`, `F-020`, `F-024`, `F-003`,
+`F-004`, `F-011`. Todas las que declaren 0 supervivientes y se hayan lanzado en
+modo paralelo merecen repetirse con la línea base arreglada. Es trabajo, y es
+inevitable: la alternativa es seguir citando como evidencia un número que hoy
+sabemos que no la da.
+
+**Para F-006 en concreto**: no digo que la suite sea mala —la cobertura real es
+del 98,1 % y los tests de esta feature son de los mejores que he revisado—. Digo
+que **la campaña no ha demostrado lo que dice demostrar**, y que al menos un
+mutante vivo lo prueba.
+
+## MOTIVO 3 · La corrección 22 → 9 llegó a un sitio y no a los otros
+
+El error de paso estaba bien visto: en el fact son **9 obras**, no 22; las 22
+tienen fases duplicadas y solo 9 llegan a producir filas duplicadas. La cadena
+**22 → 9 → 8** es coherente y decreciente, que es justo lo que tenía que salir.
+Mi objeción de la pasada anterior —«deberían ser 22 en los tres sitios»— **era
+mía y era el mismo cruce que ellos detectaron**.
+
+Pero la corrección no viajó entera. Medido sobre el YAML:
+
+| Ficha de columna | dice «22 obras» | dice «9 obras» |
+|---|---|---|
+| `fact_seguimiento_categoria.importe_origen` | **sí** | no |
+| `fact_seguimiento_categoria.importe_origen_raw` | **sí** | no |
+| `v_pbi_fact_categoria.importe_origen` | **sí** | no |
+
+**Las tres fichas de columna que llevan el aviso siguen con la cifra que el
+propio informe declara mal atribuida, y en ninguna aparece el 9.** La cabecera
+del fact sí explica el 22 → 9; las columnas de los objetos de categoría, no. Es
+la tercera variante del mismo patrón: la corrección llega a un nivel y no al
+otro, y el guardián de coherencia no lo caza porque comprueba que aparezca
+«DOBLADO», no que las cifras concuerden.
+
+### Y una afirmación falsa publicada al agente
+
+Las dos cabeceras dicen, literalmente:
+
+> «**La consulta que da ese numero esta en el grano de
+> `mart.fact_seguimiento_mensual`**, junto a la explicacion de por que 8.778, 37
+> y 22 son numeros distintos…»
+
+«Ese numero» es el del doblado —37 celdas, 39,07 M€—. **La consulta que hay allí
+devuelve 8.778 y 9 obras**, que es otra cosa. Un agente que la ejecute para
+comprobar el dato obtendrá algo que no cuadra con lo que acaba de leer, y lo
+razonable será que desconfíe del aviso entero, que es lo peor que puede pasar
+con el aviso que más importa.
+
+Además esa misma frase sigue enumerando «8.778, 37 y **22**», el trío antiguo.
+
+**Ninguno de estos dos tiene consulta publicada**: del «22 obras» y del «37
+celdas / 39,07 M€» solo hay líneas de salida en el informe
+(`impl_F-006.md:3855-3856` y `:4157`). El titular «Los tres números, cada uno con
+su consulta» promete tres y entrega una. La de las 8.778 es correcta y sí mide lo
+que se le atribuye.
+
+## El guardián de coherencia, atacado: corta el caso real y tiene tres puertas
+
+Me pediste que intentara escribir una ficha donde cabecera y columna se
+contradigan sin que salte. **Lo conseguí tres veces**, en copias de
+`git archive HEAD` que borré después; en las tres, `5 passed`.
+
+**Primero, lo que sí corta.** `..._la_cabecera_no_contradice_a_sus_columnas`
+**funciona**: le quité el «DOBLADO» de la cabecera dejándolo en las columnas —el
+caso exacto de la decimoquinta pasada— y saltó. Es la primera vez en dieciséis
+pasadas que una comprobación ataca la clase. No es poco y quiero que conste.
+
+**Vía 1 · otra redacción.** `_TRANQUILIZADORAS` es una lista a mano de cuatro
+frases. Inserté en el grano: «*Al agregar, el duplicado queda resuelto y el total
+es fiable.*» Falso, tranquilizador, en el texto que ve el agente. Pasa. Es el
+mismo problema que `_ACUMULADAS` tenía y que **esta misma tanda ha corregido**:
+el arreglo se aplicó a un guardián y no al que se escribió a la vez.
+
+**Vía 2 · partir la frase.** Los bloques usan plegado `>-`, que une líneas con un
+espacio; pero **una línea en blanco produce un salto real**. Partí «La clave no
+duplica»:
+
+```
+'la clave no duplica' literal presente? False
+presente si normalizo espacios?          True
+```
+
+El lector la lee entera, el guardián no la ve. Misma piedra de las pasadas 8, 10,
+13 y 15, y el repo **ya tiene** `tests/_texto.py::normalizado()`.
+
+**Vía 3 · el salvoconducto, y es la que lo deja inerte.**
+
+```python
+if f in cabecera and "el numero de dentro" not in cabecera
+```
+
+La exención se evalúa sobre **toda la cabecera**, así que esa frase —que es
+justamente la formulación nueva de esta tanda, siempre presente— habilita **todas**
+las tranquilizadoras a la vez. Inserté una de la propia lista, «*Esta tabla no
+esta afectada por el duplicado*»: pasa. Control: retiré el salvoconducto dejando
+la misma frase y **entonces sí saltó**.
+
+Conclusión: **`..._la_cabecera_no_afirma_lo_contrario` no puede fallar hoy por
+ninguna de sus cuatro frases.** Está en verde por construcción.
+
+**El arreglo es pequeño**: exigir la aclaración *junto a* cada frase y no en
+cualquier parte; normalizar antes de comparar; y cambiar la lista por un
+criterio, como ya se hizo con `_ACUMULADAS`.
+
+### Y el guardián hermano se relajó en esta misma tanda
+
+`..._todo_objeto_que_sirve_medidas_del_fact_avisa` pasó de exigir «8.778» a
+aceptar **cualquiera de tres cadenas** (`"8.778"`, `"37 celdas"`, `"39,07"`). Un
+objeto puede citar ahora el número de otro objeto —el de categoría en la ficha
+del mensual, o al revés— y pasar. Justo cuando acabamos de descubrir que cruzar
+esos números es el error fácil.
+
+## Lo que está bien, y es la mayor parte
+
+### La formulación nueva · exacta, y deja al agente mejor
+
+> «**CUIDADO: el valor de `importe_origen` que hay guardado aqui esta DOBLADO en
+> 37 celdas de 8 obras…** La clave no duplica —esta tabla agrega, asi que sale
+> una sola fila y no hay fan-out—, pero **el numero de dentro si esta mal**…»
+
+Es exacta en el punto difícil: **no niega que la clave sea única** —lo era, y
+negarlo habría sido cambiar una mentira por otra—, sino que separa las dos cosas
+que antes se confundían. Y el aviso va **antes** del matiz tranquilizador, no
+después.
+
+Deja al agente mejor por las dos vías: quien llama `listar_tablas` recibe el
+«CUIDADO … DOBLADO» en la primera línea, cuando antes recibía solo «la clave no
+duplica —comprobado—»; quien llama `describir_tabla` recibe cabecera y columna
+**diciendo lo mismo**. No queda ninguna frase tranquilizadora suelta en el texto
+actual.
+
+### `ocultar` · viaja usable, y resuelve lo que planteé
+
+Fui yo quien argumentó que debía viajar, así que juzgo si lo publicado sirve.
+**Sirve.** Ejecuté la generación:
+
+```
+('ocultar', '_ingested_at',   0, '_ingested_at')
+('ocultar', '_source_tiemod', 1, '_source_tiemod')
+('ocultar', '_built_at',      2, '_built_at')
+```
+
+**La clave es el nombre de la columna**, no la posición: `mcp-bbdd` puede leerla
+y comparar contra nombres de columna sin cablear nada, que era exactamente mi
+objeción —la segunda copia de nuestra semántica no llega a existir—. El docstring
+lo dice sin adornos: «con la posición, publicar la lista **no le habría servido
+de nada**». Y `design.md:486-495` avisa de la asimetría lista-de-columnas /
+gancho-de-tabla, que es lo que pediste comprobar.
+
+**Pero el arreglo no está protegido por ningún test, y lo demostré**: eliminé las
+dos líneas que lo hacen (`diccionario_sql.py:297-298`) y
+
+```
+ocultar publicado ahora: [('ocultar','0'), ('ocultar','1'), ('ocultar','2')]
+19 passed
+```
+
+Vuelve a publicar la posición —lo que el propio docstring dice que no serviría de
+nada— y **los 19 tests de contexto siguen verdes**. Es la misma función donde
+vive el mutante superviviente, y no es casualidad: nadie comprueba esa línea.
+
+**Un hueco de propagación**: `azure-apps/datamart_seg_anual.md` enumera lo que
+lleva `_meta.diccionario_contexto` y **no incluye `ocultar`**. El contrato creció
+en esta tanda y el documento del ecosistema se quedó en la versión anterior; la
+regla del `CLAUDE.md` pide actualizarlo en el mismo trabajo. Y `design.md:159`
+sigue describiendo `ocultar` como «patrones fnmatch de columnas técnicas» con dos
+entradas, contradiciendo a su propia §4.4.
+
+### `_ACUMULADAS`, derivada de verdad · con una pérdida silenciosa
+
+Ahora es `_acumuladas_de(objeto)` con criterio real y del diccionario:
+`agregacion == "ultimo_valor"` **y** que lleve unidad. No es circular —deriva de
+`agregacion`/`unidad` y verifica `significado`— y tiene control anti-vacío.
+
+**Pero ya produce un conjunto incompleto, en silencio.** Ejecutada:
+
+```
+mart.fact_seguimiento_mensual  -> ['importe_origen', 'importe_origen_raw', 'total_incurrido']
+```
+
+**Falta `can_origen`**, que era uno de los cuatro nombres de la lista a mano: no
+declara `unidad`, así que el criterio la deja fuera. El control solo ancla dos de
+los cuatro y solo sobre `fact_seguimiento_categoria`. **Basta borrar un `unidad:`
+de un YAML para que una columna doblada salga de la lista y deje de exigírsele el
+aviso**, sin que nada falle. Es la derivación correcta con el ancla demasiado
+corta.
+
+## La batería · SÍ, lanzadla, y lo que falta se corrige mientras corre
+
+**Respuesta directa: la batería puede lanzarse ya.** Nada de lo que bloquea el
+APROBADO bloquea la batería, y la distinción es limpia:
+
+- **El contenido publicado está bien.** La formulación es exacta, `ocultar` viaja
+  usable, y la biyección es 103/103 con lo publicado casando con el árbol.
+- **Lo que está roto son instrumentos**: una puerta de calidad que mide mal y
+  unos guardianes que se pueden esquivar. Protegen contra regresiones futuras, no
+  contra lo que hay escrito hoy — y el texto de hoy lo he leído entero.
+- **Ninguno de los arreglos toca las fichas**, salvo el del 22 → 9, que es
+  sustituir una cifra en tres `significado`. Ni siquiera obliga a replantear
+  nada: se republica y ya.
+
+Lo que conviene tener delante al leer los resultados, porque la batería no lo
+destapará —juzga plausibilidad, no números—:
+
+1. **El «22 obras» de las tres fichas de columna es la cifra mal atribuida.** Si
+   una respuesta la cita, no es del agente: es nuestra.
+2. **La remisión «la consulta que da ese numero está en…» apunta a otra
+   consulta.** Si alguien la sigue para verificar, no le va a cuadrar.
+3. **El doblado sigue vivo en la base**: el diccionario avisa bien, pero el
+   número seguirá mal hasta que se arregle el build. F-042 lo recoge como dato
+   erróneo, que es la clasificación correcta.
+4. **Los 39 «sin contradicción» no tienen la clave demostrada.**
+
+## Checkpoints
+
+| | Estado | Razón |
+|---|---|---|
+| **C1** Entorno en verde | `[x]` | 1982 pasados, 124 saltados, cobertura 98,1 % de 979 líneas. |
+| **C2** Trazabilidad requisito → test | **`[ ]`** | La coherencia cabecera↔columnas tiene una mitad que funciona y otra inerte; el arreglo de `ocultar` no lo protege ningún test (demostrado); `_acumuladas_de` pierde `can_origen` en silencio. |
+| **C3** Diff conforme al diseño | `[x]` | Solo los ficheros previstos. `design.md` §4.4 actualizado, aunque su §159 se contradice. |
+| **C3 bis** Sin secretos ni prints | `[x]` | Sin GUID ni correo en el árbol. |
+| **C4** Convenciones y veracidad | **`[ ]`** | «La consulta que da ese numero está en…» remite a una consulta que da otro número; las tres fichas de columna conservan el «22» mal atribuido; dos de los tres números siguen sin consulta. |
+| **C4 bis** Campaña de mutación | **`[ ]`** | **La puerta no mide**: en worktree detached la suite ya está roja antes de mutar, y `returncode != 0` se cuenta como mutante muerto. Demostrado con control. |
+| **C4 ter** Cero supervivientes | **`[ ]`** | Hay **al menos un superviviente real** (`diccionario_sql.py:297`, `and`→`or`), declarado muerto por las dos campañas. |
+| **C5** Tareas y commits | `[x]` **parcial** | Reserva: `azure-apps` no recoge `ocultar` en el contrato ampliado, y R38 pedía hacerlo en el mismo trabajo. Las MANUAL (T19, T27, T29-T34) siguen abiertas por diseño. |
+
+**Rectifico** los checkpoints que había puesto en `[x]` en el borrador de esta
+misma pasada: di C4 bis y C4 ter por buenos porque mi recálculo del **conteo**
+(254) coincidía exacto con el informe. El conteo coincide y sigue coincidiendo;
+lo que no vale es el **veredicto** de cada mutante. Contar bien los mutantes y
+creerse su resultado son dos cosas distintas, y yo verifiqué la primera y di por
+buena la segunda.
+
+## Sobre su observación de la mutación, que se ha quedado corta
+
+> «Un número de mutación sin recalcular envejece como un recuento a mano, con el
+> agravante de que **parece evidencia**.»
+
+**La suscribo y la extiendo, porque hoy resulta ser peor de lo que dice.** No es
+solo que un número de mutación **envejezca**: es que podía **no haber medido
+nunca nada**. El de esta tanda está recalculado, es de hoy, y aun así no vale.
+Un recuento a mano caducado al menos midió algo en su día.
+
+Y coincide con el diagnóstico de fondo de las dieciséis pasadas: **el problema
+nunca han sido los datos, han sido los instrumentos que decían que los datos
+estaban bien**. El aviso que estaba en el sitio equivocado, el guardián que
+comprobaba que una cadena aparece, la lista a mano bajo un comentario que decía
+«se derivan», y ahora la puerta que cuenta muertos sin mirar. Cada vez el
+contenido estaba mejor y el instrumento seguía igual.
+
+## Automejora que propongo (no aplico)
+
+Tres, y la primera es urgente y no es de este proyecto:
+
+1. **Línea base verde obligatoria en `harness/mutacion.py`.** Correr la suite sin
+   mutar en el entorno de evaluación y **abortar** si no da returncode 0; y
+   decidir «muerto» comparando contra los tests que fallaban en la base, no
+   contra un código de salida. Va a **`arnes-base`** por la regla de propagación,
+   y con ella la revisión de las campañas anteriores que declararon 0
+   supervivientes en modo paralelo.
+2. **Que un guardián nuevo venga con su intento de evasión**, no solo con su
+   control anti-vacío. El control responde «¿comprueba a alguien?»; falta
+   «**¿puedo escribir el defecto de forma que no salte?**». Las tres vías de hoy
+   se encuentran en diez minutos si alguien se sienta a intentarlo, y **ninguna
+   se encuentra leyendo el test**: leyéndolo parece correcto, con su lista, su
+   docstring y su control.
+3. **Que los tests que comparan prosa normalicen el marcado**, con
+   `tests/_texto.py::normalizado()`, que ya existe y ya resolvió esto tres veces.
+
+## Qué falta para APROBADO
+
+**Bloqueantes:**
+
+1. **Arreglar la puerta de mutación** (línea base verde + veredicto por
+   comparación) y **relanzar la campaña** para saber cuántos supervivientes hay
+   de verdad. Hoy sabemos de uno; no sabemos si son diez.
+2. **Cerrar el mutante conocido**: un test que compruebe `_clave_de` con
+   entradas de tipo cadena, que es lo que hace `ocultar` usable.
+3. **Quitar el salvoconducto** del guardián de coherencia, normalizar antes de
+   comparar y sustituir la lista de frases por un criterio.
+4. **Propagar el 22 → 9** a las tres fichas de columna, y corregir la remisión
+   «la consulta que da ese numero está en el grano de…», que apunta a otra.
+
+**De higiene, no bloqueantes:** publicar la consulta del «37 celdas / 39,07 M€» y
+la del «22 obras»; anclar `can_origen` y `v_pbi_fact_categoria` en el control de
+`_acumuladas_de`; deshacer la relajación del guardián hermano a tres cadenas;
+añadir `ocultar` a `azure-apps/datamart_seg_anual.md`; y arreglar `design.md:159`,
+que contradice a su §4.4.
+
+## Nota de método
+
+Esperé la auditoría independiente **y** relancé yo la campaña de mutación con el
+bytecode borrado. Las dos cosas importaron: mi campaña confirmó el conteo y **me
+llevó a la conclusión equivocada**, y fue la auditoría la que señaló un mutante
+concreto que yo no había mirado. Lo verifiqué entonces con su control —copia con
+`.env`, con y sin mutante, resultados idénticos— y de ahí salió el fallo del
+arnés.
+
+La lección, y va contra mi propio trabajo: **relanzar una medición no la valida
+si la medición está mal construida**. Yo hice exactamente lo que pedía el
+protocolo —no fiarme del informe, recalcular por mi cuenta— y obtuve el mismo
+resultado falso, con la confianza añadida de haberlo obtenido yo. La verificación
+independiente reproduce el método; solo atacar el resultado lo pone a prueba.
+
+Todo lo que sostiene esta pasada lo comprobé personalmente: el recálculo del
+alcance (3191 líneas) y de los mutantes (254, exacto); la campaña completa
+relanzada; el mutante vivo con su control; el worktree detached que rompe
+`test_f015_r12` **con y sin mutante**; los tres ataques al guardián, cada uno con
+su control; la eliminación del arreglo de `ocultar` con los 19 tests en verde; la
+derivación de `_acumuladas_de` ejecutada; y las cifras de las fichas de columna
+contadas sobre el YAML. Todos los worktrees y copias que creé están borrados y
+`git worktree list` vuelve a tener una sola entrada.
 
 ---
 

@@ -381,7 +381,8 @@ objetos:
           **OJO: EL VALOR ALMACENADO ESTA DOBLADO en 37 celdas de 8 obras.** El
           build hace `SUM(importe_origen)` sobre `mart.fact_seguimiento_mensual`,
           y alli 8.778 combinaciones tienen DOS filas con el **mismo acumulado**
-          (22 obras con dos fases que Sigrid tiene con el mismo `ano` y `mes`).
+          (la causa son 22 obras con dos fases que Sigrid tiene con el mismo
+          `ano` y `mes`, de las que **9** llegan a duplicar filas en el fact).
           Sumar dos veces el mismo acumulado da el doble: medido el 2026-08-22,
           **39,07 M EUR de mas**.
 
@@ -403,7 +404,8 @@ objetos:
           **OJO: EL VALOR ALMACENADO ESTA DOBLADO en 37 celdas de 8 obras.** El
           build hace `SUM(importe_origen)` sobre `mart.fact_seguimiento_mensual`,
           y alli 8.778 combinaciones tienen DOS filas con el **mismo acumulado**
-          (22 obras con dos fases que Sigrid tiene con el mismo `ano` y `mes`).
+          (la causa son 22 obras con dos fases que Sigrid tiene con el mismo
+          `ano` y `mes`, de las que **9** llegan a duplicar filas en el fact).
           Sumar dos veces el mismo acumulado da el doble: medido el 2026-08-22,
           **39,07 M EUR de mas**.
 
@@ -616,8 +618,9 @@ objetos:
           **OJO: EL VALOR ALMACENADO ESTA DOBLADO en 37 celdas de 8 obras.** El
           build hace `SUM(importe_origen)` sobre las filas de
           `mart.fact_seguimiento_mensual`, y alli 8.778 combinaciones tienen DOS
-          filas con el **mismo acumulado** (22 obras con dos fases que Sigrid
-          tiene con el mismo `ano` y `mes`). Sumar dos veces el mismo acumulado
+          filas con el **mismo acumulado** (la causa son 22 obras con dos fases
+          que Sigrid tiene con el mismo `ano` y `mes`, de las que **9** llegan a
+          duplicar filas en el fact). Sumar dos veces el mismo acumulado
           da el doble: medido el 2026-08-22, **39,07 M EUR de mas**.
 
           Asi que **leer una fila y darla por buena devuelve el doble** en esas

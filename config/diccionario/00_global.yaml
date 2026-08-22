@@ -12,7 +12,7 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 
-version: 6
+version: 7
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
