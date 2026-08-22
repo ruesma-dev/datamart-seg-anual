@@ -4241,3 +4241,109 @@ filas, nunca `DROP` ni `TRUNCATE`, y `hash_fuente` es la identidad, no
 `version`—.
 
 Publicado en **versión 5**.
+
+---
+
+# Decimoquinta pasada · la cabecera decía lo contrario que las columnas
+
+## Lo que lo destapó, y es el mérito de la pasada
+
+El reviewer fue a mirar **cómo llega el diccionario al agente**, que es lo que
+ninguno de los tres habíamos hecho en quince pasadas:
+
+- `listar_tablas` entrega **descripción y grano, sin columnas**.
+- `describir_tabla` entrega las dos cosas.
+
+Así que el aviso que en la 14ª bajé a las columnas **no llegaba** por la primera
+vía, y por la segunda llegaba **acompañado de su contrario**: el `grano` decía
+«como esta tabla agrega, las dos filas se funden y **la clave no duplica
+—comprobado—**», que es cierto y suena a que todo está bien, mientras la columna
+decía que el importe está doblado.
+
+Las dos frases juntas se anulan. Y por `listar_tablas`, el agente solo veía la
+tranquilizadora.
+
+## El patrón, ya con nombre: «el guardián enseña a mirar donde él mira»
+
+Van **tres**, y las tres son la misma:
+
+| Pasada | Dónde exigía el guardián | Dónde estaba el defecto |
+|---|---|---|
+| 13ª | `descripcion` / `grano` | en las fichas de columna |
+| 14ª | en la columna | en la cabecera |
+| 15ª | — | en **cómo se entrega**, que nadie miraba |
+
+Mover la exigencia de sitio no cierra nada: solo cambia dónde aparecerá la
+próxima. Lo que la cierra es **exigir que las dos partes digan lo mismo**, y eso
+es lo que se ha derivado:
+
+- si una columna lleva el aviso, la cabecera **tiene que llevarlo**;
+- y no puede **afirmar a la vez lo contrario** sin aclarar que una fila única no
+  dice nada de si su importe es correcto.
+
+Con su control, para que no pase en vacío si el derivador se queda sin objetos.
+
+## Los tres números, cada uno con su consulta
+
+Tenías razón en que «37 celdas / 8 obras» aparecía sin consulta y contradecía al
+«8.778 / 22» de la misma ficha. Medidos los tres, y **son legítimamente
+distintos porque miden cosas distintas**:
+
+| Número | Qué mide |
+|---|---|
+| **22 obras** | tienen dos fases con el mismo `ano` y `mes` en `stg.fases` — **la causa** |
+| **8.778 claves / 9 obras** | combinaciones duplicadas en `mart.fact_seguimiento_mensual`, grano partida |
+| **37 celdas / 8 obras** | celdas con importe doblado en `mart.fact_seguimiento_categoria`, grano categoría |
+
+```sql
+-- las 8.778
+SELECT count(*), count(DISTINCT obra_id) FROM (
+  SELECT obra_id, partida_id, anio_mes, escenario
+  FROM mart.fact_seguimiento_mensual GROUP BY 1,2,3,4 HAVING count(*) > 1) d;
+```
+
+**Y salió un error de paso: en el fact son 9 obras, no 22.** Las 22 son las que
+tienen fases duplicadas; solo 9 llegan a producir filas duplicadas, porque las
+demás no tienen presupuesto en esos meses. Estaba mal atribuido y ya no lo está.
+
+## `ocultar` entra al contrato, y el argumento es el bueno
+
+Tercera decisión sobre la misma clave. Las dos anteriores la dejaban fuera:
+
+1. Con una razón **falsa** —«`motivo_no_consumo` lo sustituye»—, imposible
+   porque uno es de objeto y la otra son columnas.
+2. Con una razón **cierta pero incompleta**: el gancho de `mcp-bbdd` recibe
+   tabla, así que publicarla no ocultaría nada todavía.
+
+Lo que faltaba en las dos: **si no viaja, `mcp-bbdd` tiene que cablear la
+lista**, y eso es una **segunda copia de la semántica de este repositorio** —
+justo lo que F-006 nació para terminar, y la misma regla que rige `azure-apps`:
+se enlaza, no se duplica. Que el consumidor no pueda usarla hoy no es motivo para
+no publicarla; es motivo para que la tenga cuando la use.
+
+Publica **una fila por columna, con la columna como `clave`**:
+
+```sql
+SELECT clave FROM _meta.diccionario_contexto WHERE bloque = 'ocultar';
+--  _ingested_at / _source_tiemod / _built_at
+```
+
+La primera versión las publicaba con la **posición** como clave (`0`, `1`, `2`),
+que no le habría servido de nada a quien tiene que comparar contra nombres de
+columna. Corregido.
+
+`design.md` §4.4 avisa de lo que hizo falsas a las dos razones anteriores —la
+lista es de **columnas** y el gancho recibe **tabla**— y dice que si el
+consumidor necesita otra forma **se cambia el contrato**, que para eso crece por
+filas, en vez de dejar que lo adivine.
+
+## `_ACUMULADAS`: la afirmación falsa más barata de toda la feature
+
+Era una tupla escrita a mano bajo un comentario que decía «**Se derivan**». Un
+texto describiendo un mecanismo que no existía, del mismo tipo que las que
+llevamos quince pasadas corrigiendo, y en el fichero que las corrige.
+
+Ahora se deriva del propio diccionario, con un criterio que ya estaba escrito:
+una columna es acumulada a origen si se declara `ultimo_valor` —que es
+literalmente lo que esa agregación significa— y tiene unidad, o sea es medida y
+no clave. Con su control, usando los nombres que traía la lista a mano.
