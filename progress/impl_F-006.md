@@ -498,6 +498,8 @@ permisos), T37 (`azure-apps`), T38 (firewall) y T39 (la batería).
 
 ---
 
+> **AVISO (16ª pasada): los números de mutación de este informe NO son evidencia.** La campaña corría en un worktree con HEAD detached, donde `test_f015_r12` falla siempre; con `-x` la suite paraba ahí y `harness/mutacion.py` contaba cualquier `returncode != 0` como mutante muerto. Se conservan como registro de lo que se declaró en cada tanda, no como prueba. Pendiente de **F-041**.
+
 ## Evidencias (primera entrega, antes de la review)
 
 Números medidos, no estimados.
