@@ -4347,3 +4347,23 @@ Ahora se deriva del propio diccionario, con un criterio que ya estaba escrito:
 una columna es acumulada a origen si se declara `ultimo_valor` —que es
 literalmente lo que esa agregación significa— y tiene unidad, o sea es medida y
 no clave. Con su control, usando los nombres que traía la lista a mano.
+
+## Evidencias tras la 15ª review
+
+| Evidencia | Valor | Cómo se obtiene |
+|---|---|---|
+| **Mutantes / supervivientes** | **254 generados, 254 muertos, 0 supervivientes, 0 timeouts** en 658,8 s | `python -m harness.mutacion --feature F-006 --timeout 300` |
+| **Objetos documentados** | **103**, biyección exacta 103/103 contra la base | `python main.py check-diccionario` |
+| **Columnas** | **798**, cobertura 100 % en la superficie de consumo (48 objetos) | `_meta.diccionario_publicacion` |
+| **Publicado** | **versión 6**, hash `52f107235bc6`, **141 filas** | idem |
+| **Filas de contexto** | **24** (convenciones 5, órdenes de magnitud 4, ejes 3, esquemas 9, **ocultar 3**) | `_meta.diccionario_contexto` |
+
+**La campaña llevaba tres tandas sin relanzarse**: declaraba 166 mutantes cuando
+el alcance ya eran **254**. Un número de mutación que no se recalcula envejece
+igual que un recuento escrito a mano, y con el agravante de que **parece
+evidencia**. Relanzada con el `__pycache__` borrado a mano (F-041 sigue sin
+arreglar).
+
+**Cero supervivientes sobre los 254**, incluidos los ~88 mutantes nuevos que
+generan `catalogo.py`, `unicidad_sql.py` y el contexto — código escrito en las
+tres últimas tandas y que hasta ahora no se había mutado nunca.
