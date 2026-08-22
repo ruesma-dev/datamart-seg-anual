@@ -1,0 +1,56 @@
+diff --git a/config/diccionario/retenciones.yaml b/config/diccionario/retenciones.yaml
+index 78361f3..46efa0b 100644
+--- a/config/diccionario/retenciones.yaml
++++ b/config/diccionario/retenciones.yaml
+@@ -179,12 +179,18 @@ objetos:
+         a: retenciones.tipos.tipo_id
+         cardinalidad: "N:1"
+         porque: Para el porcentaje y el plazo de devolucion del tipo aplicado.
+-      - de: obra_id
+-        a: maestro.obras.obra_id
+-        cardinalidad: "N:1"
++      - de: codigo_obra
++        a: maestro.obras.codigo_obra
++        cardinalidad: "N:N"
+         porque: >-
+-          Para el nombre y el cliente de la obra. Se usa el maestro y no
+-          `stg.obras` porque este esquema no filtra obras administrativas.
++          **La via buena para cruzar con el resto del datamart.** `obra_id` NO
++          sirve: es el `ide` del CENTRO DE COSTE, no el de la obra, y **0 de 500
++          valores casan** con `maestro.obras.obra_id` (medido el 2026-08-22). Un
++          `JOIN` por `obra_id` devuelve cero filas en silencio. **Y ni siquiera este JOIN es
++          limpio**: `maestro.obras` tiene 918 filas y solo 843 `codigo_obra`
++          distintos (medido el 2026-08-22), asi que unir por el puede
++          multiplicar filas. Hay que agregar por `codigo_obra` antes de unir, o
++          quedarse con una obra por codigo.
+       - de: documento_id
+         a: compras.facturas.factura_id
+         cardinalidad: "N:1"
+@@ -453,14 +459,20 @@ objetos:
+         agregacion: suma
+         nulo_significa: No hay nada vencido en ese sentido.
+     relaciones:
+-      - de: obra_id
+-        a: maestro.obras.obra_id
+-        cardinalidad: "N:1"
++      - de: codigo_obra
++        a: maestro.obras.codigo_obra
++        cardinalidad: "N:N"
+         porque: >-
+-          Para el cliente y el estado de la obra. Es N:1 y no 1:1 porque esta
+-          vista puede traer mas de una fila por `obra_id`: ver el grano.
+-      - de: obra_id
+-        a: cierre.v_pbi_cierre_cabecera.obra_id
++          **La via buena para cruzar con el resto del datamart.** `obra_id` NO
++          sirve: es el `ide` del CENTRO DE COSTE, no el de la obra, y **0 de 500
++          valores casan** con `maestro.obras.obra_id` (medido el 2026-08-22). Un
++          `JOIN` por `obra_id` devuelve cero filas en silencio. **Y ni siquiera este JOIN es
++          limpio**: `maestro.obras` tiene 918 filas y solo 843 `codigo_obra`
++          distintos (medido el 2026-08-22), asi que unir por el puede
++          multiplicar filas. Hay que agregar por `codigo_obra` antes de unir, o
++          quedarse con una obra por codigo.
++      - de: codigo_obra
++        a: cierre.v_pbi_cierre_cabecera.codigo_obra
+         cardinalidad: "N:1"
+         porque: >-
+           Para poner la garantia en contexto con el presupuesto y las fechas de
