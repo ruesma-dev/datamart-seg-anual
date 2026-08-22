@@ -281,11 +281,21 @@ def filas_contexto(dicc: Diccionario) -> list[tuple]:
 
 
 def _clave_de(entrada: object, posicion: int) -> str:
-    """Cómo se llama una entrada de lista. Estable entre publicaciones."""
+    """Cómo se llama una entrada de lista. Estable entre publicaciones.
+
+    Una entrada que ya **es** una cadena se identifica por sí misma: en
+    `ocultar` la clave tiene que ser el nombre de la columna
+    (`_built_at`), no su posición, porque el consumidor la va a usar para
+    comparar contra nombres de columna. Con la posición, publicar la lista no le
+    habría servido de nada.
+    """
     if isinstance(entrada, dict):
         for campo in ("eje", "concepto", "codigo", "clave", "nombre"):
             if entrada.get(campo):
                 return str(entrada[campo])
+        return str(posicion)
+    if isinstance(entrada, str) and entrada.strip():
+        return entrada
     return str(posicion)
 
 
@@ -297,7 +307,9 @@ def _texto_de(bloque: str, clave: str, valor: object) -> str:
     esquema del prototipo.
     """
     if not isinstance(valor, dict):
-        return f"{clave}: {valor}"
+        # Una entrada que es una cadena se publica tal cual: `ocultar` sirve
+        # nombres de columna, y un `clave: valor` con los dos iguales sería ruido.
+        return str(valor) if str(valor) == clave else f"{clave}: {valor}"
 
     if bloque == "ordenes_de_magnitud":
         cifra = valor.get("valor_aproximado")

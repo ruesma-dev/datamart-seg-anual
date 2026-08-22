@@ -481,13 +481,40 @@ casualidad; así que la decisión deja de ser implícita.
 | `version` | ya va, en `_meta.diccionario_publicacion` |
 | `base`, `titulo` | el MCP ya está conectado a esa base; el título no ayuda a responder |
 | `preguntas_aceptacion`, `pendientes` | instrumentación de esta feature, no contexto de negocio |
-| **`ocultar`** | ver abajo |
+| `ocultar` | columnas de instrumentación que no deben ofrecerse como si fueran de negocio |
 
-**`ocultar` NO entra en el contrato, y es deliberado.** `mcp-bbdd` lo resuelve
-anteponiendo `[NO RECOMENDADO PARA CONSULTA: …]` a la descripción, usando el
-`motivo_no_consumo` que **sí** viaja. Resuelve el problema sin ampliar la
-superficie que hay que mantener sincronizada entre dos repositorios. Acordado el
-2026-08-22: **no se añade al contrato sin revisar esta decisión.**
+#### `ocultar`: viaja, y **es una lista de COLUMNAS**
+
+Entró el 2026-08-22 tras tres decisiones sobre la misma clave, y la advertencia
+que sigue es la que hizo falsas a las dos primeras:
+
+> **`ocultar` lista NOMBRES DE COLUMNA** —`_ingested_at`, `_source_tiemod`,
+> `_built_at`—, no de tabla. El gancho que `mcp-bbdd` tiene hoy es
+> `esta_oculta(tabla.nombre_completo)`, que recibe **una tabla**, así que
+> comparar la lista contra él **no oculta nada**: ninguna tabla se llama
+> `_built_at`. Para que sirva hace falta un gancho **de columna**, aplicado al
+> filtrar las columnas de una ficha.
+
+Se publica **una fila por columna**, con la columna **como `clave`** para que se
+pueda comparar directamente:
+
+```sql
+SELECT clave FROM _meta.diccionario_contexto WHERE bloque = 'ocultar';
+--  _ingested_at
+--  _source_tiemod
+--  _built_at
+```
+
+**Por qué viaja aunque el consumidor no pueda usarla todavía**: si no viajara,
+`mcp-bbdd` tendría que **cablear la lista** en su propio código para escribir ese
+gancho, y eso sería una **segunda copia de la semántica de este repositorio** —
+exactamente lo que F-006 existe para terminar, y la misma regla que rige
+`azure-apps`: se enlaza, no se duplica. Que hoy no se use no es motivo para no
+publicarla; es motivo para que la tenga el día que la use.
+
+**Si el consumidor necesita otra forma** —la lista por objeto en vez de global,
+o un patrón en vez de nombres exactos— se dice aquí y se cambia el contrato, que
+para eso crece por filas. Lo que no vale es que lo adivine.
 
 **Cómo se lee.** Igual que el resto: pidiendo las columnas **por nombre** y
 nunca `SELECT *`, y tolerando que la tabla no exista —un consumidor antiguo

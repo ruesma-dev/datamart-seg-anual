@@ -4,11 +4,398 @@
 > **F-006, bloques A–D, E y F parcial: APROBADO** en la sexta pasada. La septima
 > pasada revisa el diccionario completo (los 53 objetos restantes) y lo RECHAZA.
 >
-> Este fichero tiene **catorce pasadas**, de la más reciente a la más antigua. Se
+> Este fichero tiene **quince pasadas**, de la más reciente a la más antigua. Se
 > conservan íntegras: son lo que se pidió corregir cada vez y el patrón contra el
 > que se contrasta la siguiente. Leídas al revés cuentan cómo un diccionario que
 > parecía correcto resultó tener un defecto sistemático en dos tercios de sus
 > fichas, y cómo se cerró: derivando la comprobación en vez de revisando a ojo.
+
+---
+
+# DECIMOQUINTA PASADA · el aviso bajó a la columna, pero la cabecera sigue tranquilizando
+
+**Veredicto: RECHAZADO**, por dos motivos.
+
+1. **La campaña de mutación sigue sin relanzarse.** Es el GRAVE 1 que escribí en
+   la pasada anterior, intacto: mismo fichero, misma fecha, 1111 bytes.
+2. **El aviso del doblado bajó a la columna pero no se corrigió en la cabecera**,
+   que conserva el encuadre suave que rechacé —y que dice, además, algo
+   tranquilizador y engañoso: «la clave no duplica —comprobado—».
+
+**Rectifico lo que escribí hace un rato en la primera versión de esta pasada.**
+Di el GRAVE 1 por «cerrado, y bien cerrado esta vez», y respondí que un agente ya
+no puede equivocarse. Una auditoría que encargué —y que esta vez sí esperé—
+volvió con la pieza que me faltaba: **cómo llega el diccionario al agente**. Con
+eso delante, la respuesta correcta es que **sí puede equivocarse**, y explico por
+dónde.
+
+Es la segunda pasada seguida en que doy este defecto por cerrado y no lo estaba.
+La causa es la misma que el implementer describió tan bien: verifiqué donde el
+guardián nuevo mira —la columna— igual que la vez anterior verifiqué donde miraba
+el guardián viejo —el objeto—. **El guardián enseña a mirar donde él mira**, y yo
+he caído dos veces seguidas.
+
+**Nivel de rigor: `critico`.** **Entorno:** `init.sh` verde — **1974 pasados**,
+124 saltados, cobertura **98,2 %** de 976 líneas. Árbol limpio, sin `push`,
+publicado en versión 5.
+
+## MOTIVO 1 · La campaña de mutación, sin relanzar
+
+Recalculado hoy sobre `HEAD` con `harness.alcance` y `generar_mutantes`:
+
+| | Campaña (21-ago 10:42) | Hoy | Diferencia |
+|---|---|---|---|
+| Ficheros | 8 | **10** | +2 |
+| Líneas | 2358 | **3174** | +816 |
+| Mutantes | 166 | **252** | **+86** |
+
+Siguen enteros fuera `unicidad_sql.py` (24 mutantes) —el módulo del `SET LOCAL
+transaction_read_only` que corre contra el servidor compartido con producción— y
+`catalogo.py` (14), que sostiene `check-diccionario`. En nivel `critico`, 86
+mutantes sin ejecutar no son cero supervivientes: son 86 desconocidos.
+
+## MOTIVO 2 · El aviso llega a la columna, pero la cabecera dice lo contrario
+
+### Lo que sí está bien hecho, y no es poco
+
+El aviso **bajó al `significado`** de las cuatro columnas afectadas y es
+completo: dice qué pasa, cuánto, que **leer una fila y darla por buena devuelve
+el doble**, y dos vías para el valor bueno. Las columnas sanas dicen que lo son
+(«**Esta columna NO esta afectada por el duplicado del fact**»), que corrige el
+error inverso de la pasada 13. El punto ciego del bloque está acotado: ejecuté la
+derivación y `v_pbi_fact` ya **no** se cuela. Todo eso es correcto y lo doy por
+verificado.
+
+### Lo que faltó, y por qué importa
+
+Fui a ver **cómo llega esto al agente**, que es lo que no había mirado. El MCP
+tiene dos presentadores (`mcp-bbdd/interface_adapters/mcp/presentadores.py`):
+
+- **`listar_tablas`** → `presentar_catalogo` (líneas 26-58): descripción y grano.
+  **Sin columnas.**
+- **`describir_tabla`** → `presentar_tabla` (líneas 61-85): descripción, grano
+  **y** la tabla de columnas, en la misma respuesta.
+
+Y la cabecera de los dos objetos sigue diciendo, literalmente:
+
+> `fact_seguimiento_categoria.grano`: «Como esta tabla **agrega**, las dos filas
+> se funden en una y **la clave no duplica** —comprobado, sin contradiccion—.»
+>
+> `v_pbi_fact_categoria.descripcion`: «`importe_origen` viene **sumado dos
+> veces**, asi que **no lo uses para un total**.»
+
+Las dos consecuencias:
+
+1. **Por `listar_tablas` el agente solo ve eso.** Y eso dice que la agregación
+   resolvió el duplicado y que el único riesgo es hacer totales. Quien lea una
+   fila para responder «¿cuánto llevamos a origen en esta obra?» concluye que es
+   seguro. **Es el encuadre exacto que rechacé en la pasada anterior**: «no es que
+   se infle si alguien lo suma; está inflado en la tabla».
+2. **Por `describir_tabla` el agente recibe las dos cosas a la vez, y se
+   contradicen.** La cabecera dice «la clave no duplica, comprobado»; la columna,
+   tres párrafos más abajo, dice «EL VALOR ALMACENADO ESTA DOBLADO». Ante dos
+   afirmaciones opuestas en la misma respuesta, el resultado no es predecible.
+
+**Que conste el matiz honesto**: el catálogo instruye «Usa `describir_tabla(...)`
+antes de escribir SQL», así que el flujo normal sí pasa por la respuesta que
+lleva el aviso bueno. El riesgo no es que el aviso no llegue nunca; es que llegue
+**acompañado de su contrario**. Arreglar la cabecera son dos párrafos.
+
+### Y un defecto de presentación que degrada justo ese aviso
+
+Los `significado` nuevos vienen de YAML plegado con línea en blanco, así que
+llevan **saltos de línea literales**: 1 en `importe_mes`, 2 en `importe_origen` y
+en `importe_origen_raw` (lo medí en los cinco). `presentar_tabla` los inserta en
+una **fila de tabla Markdown** escapando solo el `|` (`presentadores.py:82-85`).
+Un salto de línea dentro de una celda rompe la fila: el aviso «OJO: … DOBLADO»
+sale partido en líneas huérfanas fuera de la tabla. Es el aviso más importante
+del diccionario y es el que peor se va a ver.
+
+## El número: el hecho se sostiene, el alcance no
+
+En la primera versión de esta pasada escribí que «el número se sostiene».
+Rectifico a medias, porque hay que separar dos cosas.
+
+**El hecho está probado**: el build hace `SUM(importe_origen)`
+(`03_agg_categoria.sql:68`) y en el fact el acumulado es idéntico en las dos
+filas duplicadas (`impl_F-006.md:3880`). Eso no lo discute nadie.
+
+**El alcance publicado —«37 celdas de 8 obras, 39,07 M€»— no está respaldado.**
+Dos razones:
+
+1. **No hay consulta.** En todo el repositorio solo está el bloque de salida
+   (`impl_F-006.md:4157`). Sin el SQL no se sabe qué se midió ni sobre qué
+   recorte, y no se puede reproducir. En una feature donde la regla es «lo que no
+   se pueda derivar no se afirma», esto es una cifra sin derivación.
+2. **No cuadra con las otras cifras de la misma ficha.** El propio informe
+   establece **8.778 claves duplicadas repartidas en 22 obras**
+   (`impl_F-006.md:3570`, `:3576`). Si una obra tiene partidas duplicadas, su
+   celda de categoría queda afectada por construcción — así que deberían salir
+   **22 obras, no 8**. Puede haber una explicación buena (que la medición se
+   acotara a un mes o a un escenario), pero no está escrita, y el texto se
+   publica al agente como si fuera el alcance total.
+
+No sé cuál de las dos cifras es la correcta, y no lo afirmo: digo que **se
+contradicen en el mismo párrafo** y que la que viaja al agente es la que menos
+respaldo tiene. Si el alcance real fueran 22 obras, el aviso publicado
+**subestima** el daño.
+
+Va en la misma línea el «**200 de 200 series**» que ahora respalda a las columnas
+sanas: es una muestra sobre `fact_seguimiento_mensual` —no sobre los dos objetos
+de categoría donde se publica— y se lee como exhaustiva. Es el mismo tipo de
+error que el «28/200» que sí se retiró.
+
+## Riesgos latentes en la derivación, medidos
+
+Verifiqué el derivador buscando por dónde se le escapa algo. Tres huecos, ninguno
+con consecuencia hoy y los tres del mismo tipo: **la comprobación es más estrecha
+que el problema**.
+
+1. **`_ACUMULADAS` es una lista a mano con un comentario que dice lo contrario.**
+   `tests/test_f006_stg_trampas.py:599-602`: «Se derivan: son las acumuladas a
+   origen…» encima de `_ACUMULADAS = ("importe_origen", "importe_origen_raw",
+   "can_origen", "total_incurrido")`, que es una tupla escrita a mano. Es
+   exactamente la afirmación de derivación falsa que esta feature persigue,
+   dentro del test que la persigue. Además `total_incurrido` **no está doblado**
+   (0.00 vs 27850.09, `impl_F-006.md:3892-3895`) y `can_origen` no se ha medido
+   nunca: si un objeto publicara cualquiera de las dos, el test exigiría escribir
+   un «DOBLADO» **falso**, y alguien lo escribiría para poner el test en verde.
+2. **La regex no casa con alias.** `:624` busca `SUM\s*\(\s*importe_origen`, que
+   no ve `SUM(pm.importe_origen)`. Y esa es justo la forma que usa
+   `cierre/02_build_fact.sql:78,93,107,121`, que agrega sobre `stg.plan_mensual`
+   unido a `stg.fases` — **la misma fuente de fases duplicadas**. Si ese build
+   dobla o no, no lo dice nadie: no está verificado en ninguna parte.
+3. **El filtro `ficha.esquema != "mart"` excluye el resto del datamart sin
+   declararlo.** Comprobé el único consumidor del fact de categoría fuera de
+   `mart` —`cierre.v_pbi_planif_vs_real`, `06_views_planif_vs_real.sql:45`— y
+   **hoy es inocuo**: solo lee `f.importe_mes`, la columna sana. Pero el doblado
+   viaja con la columna, no con el esquema.
+
+## `ocultar` · la razón ya es cierta; la decisión, cambio de opinión
+
+**La razón nueva es verificable y la verifiqué.** El gancho del consumidor es
+`esta_oculta(nombre_completo)` recibiendo **tabla**
+(`mcp-bbdd/application/services/servicio_catalogo.py:49`, con `fnmatch` en
+`diccionario_yaml.py:87-89`), y la lista de `00_global.yaml:554-557` son tres
+nombres de **columna**. Ninguna tabla se llama `_built_at`, así que nunca ocultó
+nada. Cierto punto por punto, y con el hueco reconocido en vez de tapado. El
+proveedor Postgres, además, devuelve `False` cableado (`diccionario_postgres.py:303-305`).
+
+**Sobre si debe seguir fuera, cambio de opinión respecto a lo que escribí hace un
+rato.** Mi argumento era que el hueco ya está mitigado por otra vía, y **eso es
+cierto**: las 11 columnas de instrumentación fichadas dicen en su propio
+`significado` «Instrumentación del ETL, **no negocio**: para la frescura del
+esquema se consulta `_meta.v_frescura`». La defensa contra «el agente la ofrece
+como si fuera de negocio» ya viaja al consumidor.
+
+Pero eso resuelve el riesgo **funcional** y no el que decide la cuestión, que es
+**arquitectónico**. La propia razón escrita dice que el hueco «se cierra en
+`mcp-bbdd` añadiendo un gancho de COLUMNA». Para escribir ese gancho, `mcp-bbdd`
+necesita **la lista**; y si la lista no viaja por el contrato, la cablea en su
+repositorio. Eso es **una segunda copia de la semántica de este repo, divergiendo
+de él**: exactamente lo que F-006 nació para terminar —el diccionario vivía en un
+YAML del propio MCP— y el fallo que el `CLAUDE.md` documenta con `sigrid_api.md`
+y sus dos copias.
+
+Y publicarla es barato: `_meta.diccionario_contexto` crece **por filas**, y un
+bloque que el consumidor no conozca lo ignora. No hay coste de compatibilidad.
+
+Así que: **debería viajar**, y la razón para excluirla —«publicar la lista antes
+solo mueve el problema de sitio»— es el paso que no se sostiene. Publicar el dato
+no mueve el problema: evita la segunda copia y desbloquea el gancho en lugar de
+condicionarlo. **No lo pongo como bloqueante** —hoy no rompe nada y la decisión
+está escrita y fechada, que es lo que pedí—, pero sí como recomendación con
+argumento, para que se decida con esto delante y no con lo que yo dije antes.
+
+## Recuentos y R38
+
+**Bien resuelto donde se pudo derivar.** La ayuda de `main.py` **ya no da la
+cifra** —la imprime el comando, que la cuenta— y el DDL dice «Estas **CUATRO**
+tablas». Eliminar el dato en vez de actualizarlo es la única forma de que no
+vuelva a caducar. Recuentos reales, recalculados por mí: **103 objetos, 798
+columnas, 48 de consumo, 13 reglas**.
+
+**Cuatro huecos:**
+
+1. **`current.md:142` perdió el sujeto.** El titular del hallazgo principal de la
+   tanda quedó así: «`- ** está DOBLADO** en el valor almacenado: 37 celdas de 8
+   obras…`». Falta el nombre del objeto. El lector no sabe **qué** está doblado,
+   justo en el documento que es la memoria del proyecto.
+2. **«tres tablas» solo se arregló en el DDL.** Siguen caducados
+   `design.md:306` (el título de §4.1, «Las tres tablas y la vista»), `:548`,
+   `:552`, `:566`; `tasks.md:138`, `:306`, `:362`; y `current.md:275`. Y
+   `design.md:511` cuenta «**7 objetos**» en `_meta.yaml` cuando son **8**. Lo
+   pedí en la pasada anterior con las líneas puestas.
+3. **Eso contradice al documento del ecosistema.** `azure-apps/datamart_seg_anual.md`
+   manda al consumidor a `design.md` §4 «para el contrato completo», y allí §4.1
+   anuncia **tres** tablas mientras la tabla de `azure-apps` lista **cuatro** y la
+   vista. El documento correcto remite al caducado.
+4. **El guardián de los recuentos es el patrón que dice combatir.** Lo probé en
+   una copia de `git archive HEAD`: inyecté «El datamart tiene **102** objetos
+   fichados» dentro de la sección de estado y el test pasó (`1 passed`). Busca la
+   cadena literal `"102 objetos"` y la negrita la separa. Además `assert str(valor)
+   in estado` es una subcadena suelta: cualquier «48» del texto la satisface, sin
+   atarla a su sustantivo. Cuarta vez que esta feature tropieza con comparar
+   contra prosa sin normalizar —plegado YAML en las pasadas 8, 10 y 13—.
+
+### R38, revisado como dueño del documento
+
+**Bien hecho.** `azure-apps/datamart_seg_anual.md` (commit `2e9bee8`) documenta
+las cuatro tablas y la vista, quién las consume, cómo se publican, las reglas de
+compatibilidad y qué rompe a `mcp-bbdd`. Ya no llama al MCP «cliente de
+escritorio». Verifiqué lo que más caro sale en un documento de ecosistema:
+
+- **No duplica: enlaza** a `design.md` §4, que es la regla que se incumplió con
+  `sigrid_api.md` y sus dos copias divergentes.
+- **Los comandos que cita existen**: `publicar-diccionario` (`main.py:762`) y
+  `check-diccionario` (`main.py:603`).
+
+Dos huecos menores como dueño: no dice que `ocultar` se deja fuera a propósito
+—y `mcp-bbdd` va a ir a buscarla—, y no nombra el rol de solo lectura en esa
+sección, aunque sí aparece más abajo para F-024.
+
+## Más comprobaciones que exigen por objeto lo que es de columna, y al revés
+
+Me pediste buscar más casos del patrón. Los hay, y en el mismo fichero que lo
+cerró:
+
+- **`..._el_aviso_no_alarma_sobre_la_medida_sana`** (`test_f006_stg_trampas.py:559-586`)
+  condiciona por la existencia de la **columna** `importe_mes` y luego asierta
+  `"telescopea"` contra `ficha.descripcion + ficha.grano`, **a nivel de objeto**.
+  Es el gemelo exacto del defecto que esta tanda cierra, intacto.
+- **`..._todo_objeto_que_sirve_medidas_del_fact_avisa`** (`:548-556`) exige el
+  `"8.778"` solo en `descripcion`/`grano`. En la primera versión de esta pasada
+  escribí que los dos niveles «conviven, que es lo que hay que tener». Me
+  corrijo: **conviven mal**. Nada exige que el texto de objeto diga que el
+  **valor almacenado** está doblado, así que entre estos dos guardianes la
+  redacción vieja y suave de la cabecera queda fijada y en verde.
+- **Y al revés, que es lo que se me escapó**: el doblado del valor almacenado es
+  una propiedad **del objeto** —todas sus filas están mal, y `listar_tablas` no
+  lleva columnas—, y los tests nuevos (`:643-670`) lo exigen **solo en la
+  columna**. Ningún test cubre la cabecera. Hace falta en los dos sitios porque
+  hay dos caminos de lectura.
+
+Revisé los demás usos de `ficha.descripcion` y **son correctos**: los de
+`stg.presupuesto` están cubiertos en ambos niveles, y los de `raw.*`
+(`test_f006_raw_ingesta.py`, `..._fuente_que_gobierna.py`, `..._regla_de_oro.py`)
+solo pueden ir a nivel de objeto porque esas fichas tienen **0 columnas** por
+DA-2. No hay nada que corregir ahí.
+
+## ¿Puede lanzarse la batería de las 18 preguntas?
+
+**Sí, pero arreglando antes la cabecera de esos dos objetos.** Son dos párrafos y
+elimina una contradicción interna que la batería no va a destapar.
+
+El razonamiento, para que se pueda discutir: el catálogo instruye «Usa
+`describir_tabla(...)` antes de escribir SQL», así que el flujo normal sí entrega
+el aviso bueno de la columna. El problema no es que falte, es que **llega junto a
+su contrario** —«la clave no duplica, comprobado»— y que por `listar_tablas` solo
+llega el contrario. La batería es cualitativa: juzga si la respuesta parece
+razonable, no si el número cuadra, así que un acumulado al doble pasará por
+bueno.
+
+**Lo demás no bloquea la batería** y puede ir en paralelo: la campaña de
+mutación son 19 minutos de máquina sin nadie delante, y los recuentos y el
+formato son higiene.
+
+Lo que conviene tener delante al leer los resultados:
+
+1. **El alcance del doblado no está claro** (37 celdas / 8 obras contra 8.778
+   claves / 22 obras). Si una pregunta da un acumulado a origen, no basta con que
+   el aviso salga: hay que contrastar el número.
+2. **Los 39 «sin contradicción» no tienen la clave demostrada, y 7 objetos
+   quedaron sin comprobar**, entre ellos `mart.fact_seguimiento_mensual` y
+   `mart.v_pbi_fact`.
+3. **La base cambia bajo los pies** con los cuatro `build-*` que se lanzan ahora:
+   desaparecerá la huérfana de `cierre` y pueden aparecer objetos nuevos sin
+   ficha. **Pasar `check-diccionario` después de los builds y antes de la
+   batería.**
+4. **El doblado sigue vivo en la base.** F-042 lo recoge ya como dato erróneo,
+   que es la clasificación correcta: el diccionario avisa, el número sigue mal
+   hasta que se arregle el build.
+
+## Checkpoints
+
+| | Estado | Razón |
+|---|---|---|
+| **C1** Entorno en verde | `[x]` | 1974 pasados, 124 saltados, cobertura 98,2 % de 976 líneas. |
+| **C2** Trazabilidad requisito → test | **`[ ]`** | R10 cubierto en la columna pero **no en la cabecera**, que es el único texto que entrega `listar_tablas`; y dos guardianes fijan la redacción vieja del objeto. |
+| **C3** Diff conforme al diseño | `[x]` | Solo los ficheros previstos. El build de `mart` no se toca: correcto, es de otra feature y la firma está acotada a `_meta`. |
+| **C3 bis** Sin secretos ni prints | `[x]` | Sin GUID ni correo en el árbol; ID de suscripción redactado en `HEAD`. |
+| **C4** Convenciones y veracidad | **`[ ]`** | Cifra publicada al agente sin consulta que la respalde y en contradicción con las del mismo párrafo; comentario «Se derivan» sobre una lista a mano; «tres tablas» vivo en `design.md` y `tasks.md`; `current.md:142` sin sujeto. |
+| **C4 bis** Campaña de mutación | **`[ ]`** | Sin relanzar: 166 mutantes sobre 2358 líneas; hoy son **252 sobre 3174**. |
+| **C4 ter** Cero supervivientes | **`[ ]`** | Depende del anterior. |
+| **C5** Tareas y commits | `[x]` **parcial** | T37/R38 hecho y bien. Siguen abiertas por diseño las MANUAL (T19, T27, T29-T34), pendientes de autorización: no son defecto de esta tanda. |
+
+## Nota de método: esta vez esperé, y cambió el veredicto
+
+Encargué una auditoría independiente y **la esperé**, que es lo que me faltó en
+la pasada anterior. Volvió con la pieza decisiva: **cómo llega el diccionario al
+agente**. Yo había verificado que el aviso estaba en la ficha de columna y me
+detuve ahí; no fui a mirar qué entrega cada presentador del MCP. Con eso delante,
+el defecto que iba a dar por cerrado —por segunda vez— no lo está.
+
+La diferencia entre mi primera versión de esta pasada y esta: un RECHAZO solo por
+la mutación, con el GRAVE 1 aprobado y un «la batería puede lanzarse sin
+matices», contra un RECHAZO con motivo material y una condición previa a la
+batería. Esperar quince minutos valió eso.
+
+Dos rectificaciones mías que dejo a la vista:
+
+- **«Un agente que lea solo la ficha de columna ya no puede equivocarse»** era
+  responder a una pregunta que no describe el sistema: el agente **nunca** lee
+  solo la columna. O lee la cabecera sola (`listar_tablas`) o las dos juntas
+  (`describir_tabla`). La pregunta útil era «¿qué recibe el agente?», y esa no me
+  la hice.
+- **«Los dos niveles conviven, que es lo que hay que tener»**: conviven mal
+  mientras la cabecera diga lo contrario que la columna.
+
+Todo lo que sostiene esta pasada lo comprobé personalmente, incluido lo que trajo
+la auditoría, que **no di por bueno sin repetirlo**: el recálculo del alcance y
+los mutantes; los dos presentadores abiertos en `mcp-bbdd`; las cabeceras y las
+cinco fichas de columna leídas enteras; los saltos de línea contados; la
+ejecución del derivador; el `SUM(pm.importe_origen)` de `cierre/02_build_fact.sql`;
+la aritmética de 8.778/22 contra 37/8; el experimento de las negritas en una copia
+de `git archive HEAD` que borré después; el gancho `esta_oculta`; y los comandos
+de `azure-apps` localizados en `main.py`.
+
+## Automejora que propongo (no aplico)
+
+Mantengo las de las pasadas anteriores —**estampar el SHA en el informe de
+mutación y que `init.sh` avise `PUERTA MUTACION: [CADUCADA]`**, y **que un
+guardián de prosa declare qué NO comprueba**—. La primera habría evitado el
+motivo 1: nadie olvidó relanzar la campaña por descuido, sino porque **nada se lo
+recordó**, y en una feature de quince tandas eso pasa seguro.
+
+Añado dos, con el experimento hecho:
+
+1. **Que los tests que comparan contra prosa normalicen el marcado, no solo los
+   espacios.** `tests/_texto.py::normalizado()` colapsa espacios; le falta quitar
+   `*`, `` ` `` y `_`. Probado: `**102** objetos` esquiva un guardián que busca
+   `"102 objetos"`. Es la cuarta vez con la misma piedra.
+2. **Que `CHECKPOINTS.md` pida verificar el aviso en el camino de entrega, no en
+   el fichero.** La lección de esta pasada no es «mira también la columna» ni
+   «mira también el objeto»: es que **el sitio correcto depende de qué entrega el
+   consumidor**, y eso se averigua abriendo el consumidor. Un aviso que no llega
+   no existe, y dónde llega no se deduce del YAML.
+
+## Qué falta para APROBADO
+
+1. **Corregir la cabecera** de `mart.fact_seguimiento_categoria` y
+   `mart.v_pbi_fact_categoria`: que digan que el **valor almacenado** está
+   doblado, y retirar el «la clave no duplica —comprobado—», que tranquiliza
+   sobre lo que no debe. Y un test que lo exija **en los dos niveles**.
+2. **Relanzar `python -m harness.mutacion --feature F-006`** sobre `HEAD`, con los
+   `__pycache__` borrados (F-041), y cerrar con los totales reales: 252, no 166.
+   Más la sección **«Evidencias»**.
+3. **Respaldar o acotar el «37 celdas / 8 obras»**: publicar la consulta, o
+   escribir a qué recorte corresponde. Hoy contradice al 8.778/22 de la misma
+   ficha.
+
+Y de higiene, que no bloquea: los saltos de línea en los `significado`; el
+comentario «Se derivan» sobre `_ACUMULADAS` y sacar de ahí `total_incurrido`;
+«tres tablas» en `design.md` y `tasks.md`; el sujeto de `current.md:142`; y
+normalizar el marcado en el guardián de recuentos.
 
 ---
 

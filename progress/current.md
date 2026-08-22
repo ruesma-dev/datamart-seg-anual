@@ -137,9 +137,29 @@ El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado
 ya no puede volver, aunque el repositorio sí puede publicar cosas nuevas.
 
+### Estado tras la 15ª pasada
+
+- **Cabecera y columnas ya dicen lo mismo.** El reviewer fue a mirar **cómo
+  llega el diccionario al agente**: `listar_tablas` entrega descripción y grano
+  **sin columnas**, así que el aviso que vivía solo en la columna no llegaba, y
+  la cabecera tranquilizaba. Corregidos los dos párrafos y **derivada la
+  coherencia**: si una columna avisa, la cabecera también, y no puede afirmar a
+  la vez lo contrario.
+- **`ocultar` viaja** (versión 6). Tercera decisión sobre esa clave y la primera
+  con el argumento bueno: si no viaja, `mcp-bbdd` tiene que cablear la lista, y
+  eso es **una segunda copia de nuestra semántica**. Publica una fila por
+  columna, con la columna como `clave`. `design.md` avisa de que la lista es de
+  **columnas** y el gancho del consumidor recibe **tabla**.
+- **Los tres números llevan ya su consulta**: 22 obras con dos fases (la causa),
+  **9** que llegan a duplicar en el fact, y 37 celdas de 8 obras al agregar por
+  categoría. Hallazgo de paso: eran 9, no 22.
+- **`_ACUMULADAS` se deriva** de la ficha, en vez de ser una lista a mano bajo un
+  comentario que decía «se derivan».
+- **Biyección exacta 103/103** contra la base, y lo publicado casa con el árbol.
+
 ### Estado tras la 14ª pasada · el valor doblado
 
-- ** está DOBLADO** en el valor
+- **`mart.fact_seguimiento_categoria.importe_origen` está DOBLADO** en el valor
   almacenado: 37 celdas de 8 obras, **39,07 M€ de más**. El build hace
   `SUM(importe_origen)` sobre las filas duplicadas del fact, cuyo acumulado es
   idéntico. **El aviso baja ya al `significado` de cada columna**, no a la

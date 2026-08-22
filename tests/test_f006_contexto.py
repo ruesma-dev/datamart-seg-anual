@@ -71,33 +71,50 @@ def test_f006_r28_lo_excluido_lleva_su_motivo() -> None:
     assert mudos == [], f"{mudos} se excluyen sin explicar por qué"
 
 
-def test_f006_r28_ocultar_se_queda_fuera_por_la_razon_cierta() -> None:
-    """La razón que hubo escrita aquí era FALSA, y este test la respaldaba.
+def test_f006_r28_ocultar_viaja_para_no_duplicar_la_semantica() -> None:
+    """Tercera decisión sobre esta clave, y la primera con el argumento bueno.
 
-    Decía que `motivo_no_consumo` lo sustituía. No puede:
-    `motivo_no_consumo` es de **objeto** y `ocultar` son **columnas**. Y el test
-    solo comprobaba que la cadena apareciese, así que dio por buena una
-    justificación inventada —exactamente lo que esta feature existe para
-    impedir, cometido dentro de ella—.
+    Las dos anteriores la dejaban fuera:
 
-    Lo verificado el 2026-08-22 en `mcp-bbdd`: el único gancho es
-    `esta_oculta(tabla.nombre_completo)`, que recibe un nombre de **tabla**, así
-    que la lista de columnas **nunca ocultó nada en ningún proveedor**.
+    1. Con una razón **falsa** —«`motivo_no_consumo` lo sustituye»—, que no
+       puede ser: `motivo_no_consumo` es de **objeto** y esto son **columnas**.
+       Y este test la respaldaba comprobando que la cadena apareciese.
+    2. Con una razón cierta pero incompleta: el gancho de `mcp-bbdd` es
+       `esta_oculta(tabla.nombre_completo)`, recibe **tabla**, así que publicarla
+       no ocultaría nada todavía.
+
+    Lo que faltaba en las dos: **si no viaja, `mcp-bbdd` tiene que cablear la
+    lista** para escribir su gancho de columna, y eso es una segunda copia de la
+    semántica de este repositorio — lo que F-006 nació para terminar, y la misma
+    regla que rige `azure-apps`: se enlaza, no se duplica.
+
+    Que el consumidor no pueda usarla hoy no es motivo para no publicarla: es
+    motivo para que la tenga cuando la use.
     """
-    assert "ocultar" in CONTEXTO_NO_PUBLICADO
-    motivo = CONTEXTO_NO_PUBLICADO["ocultar"]
+    assert "ocultar" in CONTEXTO_PUBLICADO
+    assert "ocultar" not in CONTEXTO_NO_PUBLICADO
 
-    assert "esta_oculta" in motivo, "la razón tiene que citar el gancho real"
-    assert "TABLA" in motivo, "y decir que el gancho es de tabla, no de columna"
-    assert "2026-08-22" in motivo, "la decisión va fechada para poder revisarla"
-    assert "hueco es real" in motivo, (
-        "un hueco declarado tiene que reconocerse como hueco: la necesidad "
-        "existe aunque el mecanismo no exista todavía"
+    motivo = CONTEXTO_PUBLICADO["ocultar"]
+    assert "segunda" in motivo and "copia" in motivo, (
+        "la razón de publicarla es no duplicar la semántica; si se pierde, la "
+        "próxima revisión volverá a plantearse sacarla"
     )
     assert "motivo_no_consumo" not in motivo, (
-        "vuelve la justificación falsa: `motivo_no_consumo` es de objeto y esto "
-        "son columnas, así que no puede sustituirla ni en principio"
+        "vuelve la justificación falsa: es de objeto y esto son columnas"
     )
+
+
+def test_f006_r28_ocultar_publica_las_tres_columnas_de_instrumentacion() -> None:
+    """Y las publica como lista utilizable, no como prosa."""
+    filas = [f for f in filas_contexto(_dicc()) if f[0] == "ocultar"]
+    assert filas, "`ocultar` está en CONTEXTO_PUBLICADO y no publica filas"
+
+    claves = {f[1] for f in filas}
+    for columna in ("_ingested_at", "_source_tiemod", "_built_at"):
+        assert any(columna in str(f[3]) or columna in str(f[1]) for f in filas), (
+            f"`{columna}` no llega al contrato"
+        )
+    assert len(claves) == len(filas), "una fila por columna oculta"
 
 
 # ---------------------------------------------------------------------------

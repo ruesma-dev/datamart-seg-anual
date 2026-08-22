@@ -107,6 +107,24 @@ SEVERIDADES = ("bloqueante", "aviso")
 #: tiene que estar aquí**, publicada o excluida con su razón, y un test lo
 #: comprueba. Si alguien añade una clave nueva y no decide, salta.
 CONTEXTO_PUBLICADO = {
+    # Entro el 2026-08-22, en la tercera decision sobre esta clave. Las dos
+    # anteriores la dejaban fuera: la primera con una razon FALSA
+    # (`motivo_no_consumo` la sustituye — no puede, es de objeto y esto son
+    # columnas) y la segunda con una cierta pero incompleta (el gancho de
+    # `mcp-bbdd` recibe TABLA, asi que publicarla no ocultaria nada todavia).
+    #
+    # Lo que faltaba: si no viaja, `mcp-bbdd` tiene que **cablear la lista** para
+    # escribir su gancho de columna, y eso es una SEGUNDA COPIA de la semantica
+    # de este repositorio — justo lo que F-006 nacio para terminar, y la misma
+    # regla que rige `azure-apps`: se enlaza, no se duplica. Que el consumidor no
+    # pueda usarla hoy no es motivo para no publicarla: es motivo para que la
+    # tenga cuando la use.
+    "ocultar": (
+        "las columnas de instrumentacion que el MCP no debe ofrecer como si "
+        "fueran de negocio (`_ingested_at`, `_source_tiemod`, `_built_at`). Sin "
+        "esto, el consumidor tendria que cablear la lista y mantener una segunda "
+        "copia de nuestra semantica"
+    ),
     "convenciones": (
         "Moneda, IVA y formato de fecha. Sin esto el agente no puede "
         "interpretar ningun importe que devuelva."
@@ -131,20 +149,7 @@ CONTEXTO_NO_PUBLICADO = {
     "version": "va en `_meta.diccionario_publicacion.version`",
     "base": "el MCP ya esta conectado a esa base: decirselo no le aporta nada",
     "titulo": "rotulo del documento, sin uso para responder",
-    # OJO: la razon anterior era FALSA y estuvo escrita un dia. Decia que
-    # `motivo_no_consumo` lo sustituia, y no puede: `motivo_no_consumo` es de
-    # OBJETO y esto son COLUMNAS. Verificado el 2026-08-22 en `mcp-bbdd`.
-    "ocultar": (
-        "son tres COLUMNAS de instrumentacion (`_ingested_at`, `_source_tiemod`, "
-        "`_built_at`), y publicarlas hoy no serviria de nada: el unico gancho "
-        "del consumidor es `esta_oculta(tabla.nombre_completo)` "
-        "(`application/services/servicio_catalogo.py`), que recibe un nombre de "
-        "TABLA. Ninguna tabla se llama `_built_at`, asi que **nunca oculto nada, "
-        "ni con el YAML ni con la base**. El hueco es real —el agente ve esas "
-        "columnas en la `ficha` y puede ofrecerlas como si fueran de negocio— "
-        "pero se cierra en `mcp-bbdd` anadiendo un gancho de COLUMNA; publicar "
-        "la lista antes solo mueve el problema de sitio. Revisado el 2026-08-22"
-    ),
+
     "preguntas_aceptacion": (
         "la bateria con la que se prueba esta feature. Es instrumentacion "
         "nuestra, no contexto de negocio"

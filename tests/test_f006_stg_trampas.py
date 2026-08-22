@@ -603,10 +603,33 @@ def test_f006_r10_el_aviso_no_alarma_sobre_la_medida_sana(objeto: str) -> None:
 # fichas de columna: **heredó el punto ciego del guardián que estaba
 # verificando**. Por eso la comprobación baja a la columna.
 
-#: Las columnas cuyo VALOR ALMACENADO está doblado por el `SUM` sobre las filas
-#: duplicadas. Se derivan: son las acumuladas a origen de los objetos que
-#: agregan el fact.
-_ACUMULADAS = ("importe_origen", "importe_origen_raw", "can_origen", "total_incurrido")
+def _acumuladas_de(objeto: str) -> list[str]:
+    """Las columnas acumuladas a origen de un objeto, DERIVADAS de su ficha.
+
+    Antes esto era una tupla escrita a mano bajo un comentario que decía «se
+    derivan». La afirmación falsa más barata de arreglar de toda la feature, y
+    del mismo tipo que las que llevamos quince pasadas corrigiendo: un texto que
+    describe un mecanismo que no existe.
+
+    El criterio sí es derivable y sale del propio diccionario: una columna es
+    acumulada a origen si se declara `ultimo_valor` —que es justamente lo que
+    esa agregación significa: no se suma, se toma el último— y lleva una unidad,
+    o sea es una medida y no una clave.
+    """
+    ficha = _dicc().por_nombre[objeto]
+    return sorted(
+        c.nombre
+        for c in ficha.columnas
+        if c.agregacion == "ultimo_valor" and (c.unidad or "").strip()
+    )
+
+
+def test_f006_r10_control_las_acumuladas_se_derivan_de_la_ficha() -> None:
+    """Con los nombres que la lista a mano traía, para que la derivación valga."""
+    derivadas = _acumuladas_de("mart.fact_seguimiento_categoria")
+    assert "importe_origen" in derivadas and "importe_origen_raw" in derivadas
+    assert "importe_mes" not in derivadas, "el del mes no es acumulado"
+    assert derivadas, "la derivación no encuentra ninguna: revisar antes de fiarse"
 
 
 def _objetos_que_agregan_el_fact() -> list[str]:
@@ -631,7 +654,7 @@ def _objetos_que_agregan_el_fact() -> list[str]:
         dobla = re.search(r"SUM\s*\(\s*importe_origen", bloque, re.IGNORECASE)
         hereda = re.search(
             r"FROM\s+mart\.fact_seguimiento_categoria", bloque, re.IGNORECASE
-        ) and any(c.nombre in _ACUMULADAS for c in ficha.columnas)
+        ) and bool(_acumuladas_de(ficha.nombre))
         if dobla or hereda:
             agregan.append(ficha.nombre)
     return sorted(agregan)
@@ -657,7 +680,8 @@ def test_f006_r10_el_aviso_del_doblado_esta_en_la_columna(objeto: str) -> None:
     mudas = [
         c.nombre
         for c in ficha.columnas
-        if c.nombre in _ACUMULADAS and "DOBLADO" not in (c.significado or "")
+        if c.nombre in _acumuladas_de(objeto)
+        and "DOBLADO" not in (c.significado or "")
     ]
     assert mudas == [], (
         f"{objeto}: las columnas {mudas} tienen el valor almacenado DOBLADO y su "
