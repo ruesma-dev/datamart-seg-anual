@@ -224,3 +224,44 @@ def test_f006_los_recuentos_de_current_son_los_de_hoy() -> None:
         )
     for viejo in ("102 objetos", "793 columnas"):
         assert viejo not in estado, f"«{viejo}» es un recuento caducado"
+
+
+def test_f006_r28_la_clave_de_ocultar_es_el_nombre_de_la_columna() -> None:
+    """La `clave` tiene que ser utilizable, no la posición en la lista.
+
+    El consumidor compara `clave` contra nombres de columna. Con `0`, `1`, `2`
+    publicar la lista no le sirve de nada: tendría que leer `texto` y adivinar
+    que ahí va el nombre, que es justo la ambigüedad que un contrato evita.
+
+    **Este test existe porque el que había no lo cazaba.** Comprobaba
+    `columna in str(f[3]) or columna in str(f[1])`, o sea que el nombre
+    apareciese en la clave **o en el texto**, y el texto lo lleva siempre. Con el
+    arreglo revertido a mano, las claves salían `0/1/2` y los 19 tests pasaban
+    igual: un falso verde sobre el contrato publicado.
+    """
+    claves = [f[1] for f in filas_contexto(_dicc()) if f[0] == "ocultar"]
+    assert claves, "`ocultar` no publica filas"
+
+    posicionales = [c for c in claves if c.isdigit()]
+    assert posicionales == [], (
+        f"las claves {posicionales} son posiciones, no nombres de columna: "
+        f"publicadas así, el consumidor no puede compararlas contra nada"
+    )
+    assert set(claves) == {"_ingested_at", "_source_tiemod", "_built_at"}, (
+        f"las claves publicadas son {claves}"
+    )
+
+
+def test_f006_r28_control_toda_entrada_de_lista_de_texto_se_identifica_sola() -> None:
+    """Y la regla general, para que no dependa de que `ocultar` sea el único.
+
+    Cualquier bloque que publique una lista de cadenas —hoy solo `ocultar`, pero
+    mañana otro— tiene que identificarse por su valor, no por su índice.
+    """
+    from etl_sigrid.infrastructure.postgres.diccionario_sql import _clave_de
+
+    assert _clave_de("_built_at", 7) == "_built_at"
+    assert _clave_de({"eje": "magnitud"}, 3) == "magnitud"
+    # Y lo que no tiene nombre propio sí cae en la posición.
+    assert _clave_de({"sin": "nombre"}, 5) == "5"
+    assert _clave_de("", 2) == "2"
