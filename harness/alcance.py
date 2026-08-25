@@ -207,6 +207,71 @@ class Alcance:
         )
 
 
+#: Primera referencia del `ref_diff` de un alcance declarado a mano: no hay
+#: diff detrás, y decirlo es más honesto que inventar una base de comparación.
+SIN_DIFF = "(sin diff)"
+
+#: Valor de `Alcance.origen` cuando el alcance no sale de un diff sino de la
+#: orden. Lo mira el informe para no imprimir dos refs que no comparan nada.
+ORIGEN_FICHEROS = "ficheros"
+
+
+def alcance_de_ficheros(rutas: list[str], feature_id: str, raiz: str = ".") -> Alcance:
+    """Alcance declarado a mano: los ficheros indicados, ENTEROS.
+
+    Existe porque hay campañas cuyo sujeto no es «lo que cambió» sino un módulo
+    entero —medir si la maquinaria del arnés está protegida por sus tests, por
+    ejemplo—, y para eso no hay diff que sirva: el de la rama numeraría líneas
+    ajenas y el de la feature original apunta a un código que ya no existe.
+
+    `origen="ficheros"` y `ref_diff=(SIN_DIFF, <sha de HEAD>)`, para que el
+    informe pueda decir contra qué commit se midió. Aborta con `SystemExit` —sin
+    tocar nada— si una ruta no existe, si `es_produccion` la rechaza —mutar lo
+    que no es código de producción da supervivientes que no significan nada— o
+    si, ya filtradas las entradas en blanco, no queda ni un fichero que mutar.
+    """
+    base = Path(raiz)
+    lineas: dict[str, set[int]] = {}
+    for ruta in rutas:
+        normalizada = ruta.replace("\\", "/").strip()
+        if not normalizada:
+            continue
+        fichero = base / normalizada
+        if not fichero.is_file():
+            raise SystemExit(
+                f"--ficheros: {normalizada} no existe en {base.as_posix()}. "
+                "Abortado sin tocar nada."
+            )
+        if not es_produccion(normalizada):
+            raise SystemExit(
+                f"--ficheros: {normalizada} no es código de producción "
+                "(solo .py fuera de "
+                f"{', '.join(DIRECTORIOS_EXCLUIDOS)}). Abortado sin tocar nada."
+            )
+        total = len(fichero.read_text(encoding="utf-8").splitlines())
+        lineas[normalizada] = set(range(1, total + 1))
+
+    # DESPUÉS del filtrado, no antes: desde el CLI la lista nunca llega vacía
+    # —`split(",")` devuelve siempre al menos un elemento— y las entradas en
+    # blanco se descartan una a una, así que `--ficheros ","` se colaba hasta
+    # el final y escribía un informe de CERO mutantes. Una campaña vacía que
+    # sale con éxito es peor que un aborto: se lee como «nada que mutar, todo
+    # bien». Lo que importa no es cómo venga la lista, sino que quede algo.
+    if not lineas:
+        raise SystemExit(
+            "--ficheros no deja ninguna ruta que mutar "
+            f"({rutas!r}): no hay nada que medir. Abortado sin tocar nada."
+        )
+
+    sha = ejecutar_git(["rev-parse", "HEAD"], raiz=raiz).strip()
+    return Alcance(
+        feature=feature_id,
+        origen=ORIGEN_FICHEROS,
+        ref_diff=(SIN_DIFF, sha),
+        lineas=lineas,
+    )
+
+
 def alcance_de_feature(
     feature_id: str,
     base: str = "dev",

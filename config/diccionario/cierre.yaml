@@ -1,0 +1,1056 @@
+# config/diccionario/cierre.yaml
+#
+# Fichas del esquema `cierre`: el cierre economico mensual de obra.
+#
+# DOS COSAS QUE HAY QUE SABER ANTES DE CONSULTAR NADA DE AQUI:
+#
+# 1. `cierre` NO SE REFRESCA DE NOCHE. `run-all` construye raw, stg y mart; el
+#    cierre se construye a mano con `python main.py build-cierre`. Toda
+#    respuesta que salga de este esquema tiene que citar su fecha de build, que
+#    se obtiene con `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'`.
+#
+# 2. El mes al que pertenece un cierre lo decide el TEXTO de la fase o de la
+#    version, no su fecha. Si texto y fecha discrepan, manda el texto: es la
+#    regla que dictó el jefe de obra y esta implementada en
+#    `cierre.fn_mes_de_fase`.
+#
+# Nombres y granos verificados contra el SQL de
+# `etl_sigrid/infrastructure/postgres/sql/cierre/`.
+
+version: 1
+esquema: cierre
+
+objetos:
+
+  fact_cierre_mensual:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El cierre economico de cada obra mes a mes: lo ejecutado hasta la fecha y
+      la prevision de como acabara la obra, abierto en venta y en los tres tipos
+      de coste. Es la tabla base; para consultarla con los gastos totales, el
+      beneficio y los porcentajes ya calculados se va a
+      `cierre.v_pbi_cierre_resumen`.
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `concepto`), que es su clave de
+      negocio, con cuatro conceptos base: VENTA, INDIRECTOS, DIRECTOS y
+      GENERALES. Los conceptos GASTOS y BENEFICIO NO estan aqui: se derivan en
+      la vista de resumen.
+    clave_negocio: [obra_id, anio_mes, concepto]
+    paso_etl: build_cierre
+    refresco: manual
+
+    columnas:
+      cierre_id:
+        significado: >-
+          Clave tecnica de la fila. BIGSERIAL sobre una tabla que se recrea
+          entera en cada build: no identifica nada de forma estable.
+        agregacion: clave_sustituta
+      obra_id:
+        significado: Identificador de la obra en Sigrid (`con.ide`). Estable entre builds.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      anio_mes:
+        significado: >-
+          Mes de cierre, como fecha del dia 1. Es el mes CANONICO de la fase, y
+          si el texto de la fase discrepa de su fecha, manda el texto.
+        agregacion: no_sumable
+      anio:
+        significado: Ano del mes de cierre.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes (1-12) del cierre.
+        agregacion: no_sumable
+      nombre_mes: Etiqueta del mes de cierre en castellano con su ano.
+      concepto:
+        significado: >-
+          Linea del cuadro de cierre. Solo los cuatro conceptos base estan en
+          esta tabla; GASTOS y BENEFICIO se derivan en la vista de resumen.
+        valores: [VENTA, INDIRECTOS, DIRECTOS, GENERALES]
+      orden_concepto:
+        significado: >-
+          Orden de presentacion del concepto en el cuadro. Aqui solo hay cuatro
+          valores porque esta tabla solo tiene los cuatro conceptos base; los dos
+          derivados llegan en `cierre.v_pbi_cierre_resumen`.
+        valores: ["1", "2", "3", "4"]
+        agregacion: no_sumable
+      ejecutado_origen:
+        significado: >-
+          Lo ejecutado ACUMULADO desde el inicio de la obra hasta ese mes, en
+          ese concepto. Es un acumulado: no se suma entre meses.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_anterior:
+        significado: >-
+          El mismo acumulado, pero en la FILA ANTERIOR de esa obra y ese
+          concepto. Ojo: es la fila anterior, no el mes de calendario anterior;
+          si un mes no tiene cierre, no hay fila y se salta.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_mes:
+        significado: >-
+          Lo ejecutado EN ESE MES: la diferencia entre el acumulado de este mes y
+          el del anterior. Es el que se usa para una serie temporal.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      final_importe:
+        significado: >-
+          Prevision de como acabara la obra en ese concepto, segun la version
+          master de cierre de ese mes. Es una foto del momento, no un acumulado.
+        unidad: EUR
+        agregacion: ultimo_valor
+      final_anterior:
+        significado: >-
+          La misma prevision en la FILA ANTERIOR de esa obra y ese concepto. Si
+          entonces no habia prevision vale **0, no nulo**: el importe del que se
+          copia ya viene con los nulos convertidos a cero. Filtrar por `IS NULL`
+          para buscar «sin prevision anterior» pierde todas esas filas.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: >-
+          Es la PRIMERA fila de esa obra y ese concepto: no hay ninguna anterior
+          de la que copiar.
+      pendiente_importe:
+        significado: >-
+          Lo que queda por ejecutar: la prevision final menos lo ejecutado a
+          origen.
+        unidad: EUR
+        agregacion: ultimo_valor
+      variacion_importe:
+        significado: >-
+          Cuanto ha cambiado la prevision final respecto a la FILA ANTERIOR de
+          esa obra y ese concepto. Positivo significa que la obra se ha
+          encarecido o que ha crecido.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: >-
+          Es la primera fila de esa obra y ese concepto: no hay ninguna
+          anterior con la que comparar.
+      final_fuente:
+        significado: >-
+          De donde sale la prevision final, y es importante para saber cuanto
+          fiarse. 'master' es una version de cierre firmada; 'fase_0' es el
+          presupuesto vivo del mes en curso, que todavia se mueve; 'sin_dato'
+          significa que no hay ni una cosa ni la otra.
+        valores: [master, fase_0, sin_dato]
+      final_version_master:
+        significado: Numero de la version master de cierre usada para la prevision.
+        nulo_significa: La prevision no viene de una version master.
+        agregacion: no_sumable
+      final_version_tex:
+        significado: >-
+          Texto libre de esa version ("CIERRE MARZO-25"). Es lo que decide a que
+          mes pertenece el cierre cuando discrepa de la fecha.
+        nulo_significa: La prevision no viene de una version master.
+      fase_id:
+        significado: Identificador en Sigrid de la fase de la que sale el ejecutado.
+        nulo_significa: El ejecutado no procede de una fase cerrada.
+        agregacion: no_sumable
+      fase_numero:
+        significado: >-
+          Numero de la fase. OJO: en los ambitos reales de Sigrid el numero de
+          fase ES el mes, no una version.
+        nulo_significa: El ejecutado no procede de una fase cerrada.
+        agregacion: no_sumable
+      fase_fecha_inicio:
+        significado: Fecha de inicio de la fase, tal y como la registro Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La fase no tiene fecha registrada; el mes se resolvio por el texto.
+      fase_nombre_mes: >-
+        Nombre del mes escrito en la fase ("Septiembre 2023"). Manda sobre la
+        fecha cuando las dos existen y no coinciden.
+      _built_at:
+        significado: >-
+          Instante en que se construyo la fila. Instrumentacion del ETL; para la
+          frescura del esquema se consulta `_meta.v_frescura`.
+        agregacion: no_sumable
+
+    relaciones:
+      - de: obra_id
+        a: mart.fact_seguimiento_mensual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para bajar del cierre agregado al detalle por partida y mes. Las dos
+          tienen muchas filas por obra: hay que agregar antes y unir por
+          `(obra_id, anio_mes)`. Ojo ademas a que el seguimiento se refresca de
+          noche y el cierre no, asi que pueden estar contando momentos distintos.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para poner cliente, estado y fechas de alta y baja a la obra.
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Es el universo del que sale: el cierre solo cubre las obras del
+          seguimiento, no las administrativas.
+
+    ejemplos_preguntas:
+      - Cuanto llevamos ejecutado en la obra X a cierre del mes M
+      - Como ha evolucionado la prevision de cierre de la obra X
+
+  v_pbi_cierre_resumen:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El cuadro de cierre completo, tal y como se lee en control de gestion: los
+      cuatro conceptos de la tabla base mas GASTOS (la suma de los tres costes) y
+      BENEFICIO (venta menos gastos), con los porcentajes ya calculados. Es la
+      vista a la que hay que ir para "cuanto llevamos ejecutado".
+    grano: >-
+      Seis filas por (`obra_id`, `anio_mes`), una por `concepto`: VENTA, GASTOS,
+      INDIRECTOS, DIRECTOS, GENERALES y BENEFICIO. La clave es la terna
+      (`obra_id`, `anio_mes`, `concepto`). Las dos ultimas no existen en la
+      tabla base, se derivan aqui.
+    clave_negocio: [obra_id, anio_mes, concepto]
+    paso_etl: build_cierre
+    refresco: manual
+
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra.
+      anio_mes:
+        significado: Mes de cierre, como fecha del dia 1.
+        agregacion: no_sumable
+      anio:
+        significado: Ano del mes de cierre.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes del cierre.
+        agregacion: no_sumable
+      nombre_mes: Etiqueta del mes en castellano con su ano.
+      concepto:
+        significado: Linea del cuadro de cierre, ya con los dos conceptos derivados.
+        valores: [VENTA, GASTOS, INDIRECTOS, DIRECTOS, GENERALES, BENEFICIO]
+      orden_concepto:
+        significado: >-
+          Orden de presentacion heredado de la tabla base. NO SIRVE PARA ORDENAR
+          EL CUADRO: los valores reales son 1, 2, 2, 3, 4 y 6, con el **2
+          repetido** —lo tienen INDIRECTOS, que lo hereda del fact, y GASTOS, que
+          lo recibe al derivarse— y sin ningun 5. Un `ORDER BY orden_concepto`
+          deja esos dos empatados en orden indefinido. Para ordenar el cuadro se
+          usa `cierre.v_pbi_dim_concepto.orden`, que si va de 1 a 6 sin huecos ni
+          repeticiones.
+        valores: ["1", "2", "3", "4", "6"]
+        agregacion: no_sumable
+      ejecutado_origen:
+        significado: Ejecutado acumulado desde el inicio de la obra hasta ese mes.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_anterior:
+        significado: >-
+          El mismo acumulado en la fila anterior de esa serie. Es la fila
+          anterior, no el mes de calendario anterior: los meses sin cierre no
+          tienen fila y se saltan.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_mes:
+        significado: Lo ejecutado en ese mes concreto.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      final_importe:
+        significado: Prevision de cierre de la obra en ese concepto.
+        unidad: EUR
+        agregacion: ultimo_valor
+      final_anterior:
+        significado: >-
+          La misma prevision en la fila anterior de esa serie. Si entonces no
+          habia prevision vale 0, no nulo.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: >-
+          Es la primera fila de esa obra y ese concepto: no hay ninguna anterior
+          de la que copiar.
+      pendiente_importe:
+        significado: Lo que queda por ejecutar hasta la prevision final.
+        unidad: EUR
+        agregacion: ultimo_valor
+      variacion_importe:
+        significado: >-
+          Cambio de la prevision final respecto a la fila anterior de esa obra
+          y ese concepto.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: >-
+          Es la primera fila de esa obra y ese concepto: no hay ninguna
+          anterior con la que comparar.
+      ejecutado_origen_pct:
+        significado: >-
+          El ejecutado a origen del concepto sobre LA VENTA DE ESA MISMA COLUMNA
+          y ese mismo mes. Excepcion: en la fila VENTA el divisor es la venta
+          final.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La venta usada como divisor es cero o no existe.
+      ejecutado_anterior_pct:
+        significado: >-
+          Lo mismo, referido al acumulado de la fila anterior de esa serie.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La venta usada como divisor es cero o no existe.
+      ejecutado_mes_pct:
+        significado: Lo mismo, referido al ejecutado del mes.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La venta usada como divisor es cero o no existe.
+      pendiente_pct:
+        significado: Lo mismo, referido al pendiente.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La venta usada como divisor es cero o no existe.
+      final_pct:
+        significado: >-
+          El importe final del concepto sobre la venta final. En la fila VENTA
+          el divisor cambia y es `presupuesto_aprobado_venta`, que ademas sale de
+          otra vista, la cabecera. El mapa completo de la fila VENTA, para no
+          confundirse: **cuatro** porcentajes (`ejecutado_origen_pct`,
+          `ejecutado_anterior_pct`, `ejecutado_mes_pct` y `pendiente_pct`)
+          cambian su divisor a la venta final; **este** lo cambia al presupuesto
+          aprobado; y `variacion_pct` **no cambia nada**, porque su divisor
+          siempre es la prevision anterior.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: El divisor es cero o no existe.
+      variacion_pct:
+        significado: >-
+          La variacion de la prevision sobre la prevision de la fila anterior.
+          Este porcentaje NO cambia de divisor en la fila VENTA: es el unico
+          de los seis sin excepcion.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: No hay prevision anterior, o era cero.
+      final_fuente:
+        significado: >-
+          De donde sale la prevision. En las filas derivadas (GASTOS, BENEFICIO)
+          se queda con la peor de las que agrega: si alguna es 'sin_dato', el
+          conjunto es 'sin_dato'.
+        valores: [master, fase_0, sin_dato]
+      final_version_master:
+        significado: Numero de version master de la prevision.
+        nulo_significa: La fila es derivada (GASTOS o BENEFICIO) o no viene de master.
+        agregacion: no_sumable
+      final_version_tex:
+        significado: Texto libre de la version master de la prevision.
+        nulo_significa: La fila es derivada o no viene de master.
+      fase_numero:
+        significado: Numero de la fase del ejecutado, que en los reales es el mes.
+        nulo_significa: La fila es derivada.
+        agregacion: no_sumable
+      fase_nombre_mes:
+        significado: Nombre del mes escrito en la fase.
+        nulo_significa: La fila es derivada.
+
+    relaciones:
+      - de: obra_id
+        a: cierre.fact_cierre_mensual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la tabla base; aqui solo se anaden dos conceptos y los porcentajes.
+          La fila equivalente se localiza con `(obra_id, anio_mes, concepto)`,
+          no con `obra_id`.
+      - de: obra_id
+        a: cierre.v_pbi_cierre_cabecera.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          De ahi sale el `presupuesto_aprobado_venta` que se usa como divisor del
+          porcentaje final de la VENTA.
+      - de: concepto
+        a: cierre.v_pbi_dim_concepto.concepto
+        cardinalidad: "N:1"
+        porque: >-
+          Para la descripcion legible y, sobre todo, para ORDENAR: el `orden`
+          del dim es el bueno, no el `orden_concepto` de esta vista.
+
+    ejemplos_preguntas:
+      - Cuanto llevamos ejecutado en la obra X a cierre del mes M, en venta y en coste
+      - Que beneficio previsto tiene la obra X
+      - Que obras tienen el beneficio previsto por debajo del inicial
+
+  v_pbi_dim_concepto:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Catalogo FIJO de los seis conceptos del cuadro de cierre, con su
+      descripcion legible y su orden. No lee ninguna tabla: son seis filas
+      escritas en la propia vista, asi que su contenido no cambia nunca. Declara
+      `refresco: manual` porque la VISTA se recrea con `build-cierre`, que es
+      otra cosa que el contenido.
+    grano: Una fila por concepto. Siempre seis.
+    clave_negocio: [concepto]
+    paso_etl: build_cierre
+    refresco: manual
+    columnas:
+      concepto:
+        significado: Clave del concepto, tal y como aparece en el cuadro de cierre.
+        valores: [VENTA, GASTOS, INDIRECTOS, DIRECTOS, GENERALES, BENEFICIO]
+      orden:
+        significado: >-
+          Orden de presentacion en el cuadro, de 1 a 6 sin huecos ni empates.
+          Es el unico orden fiable: el `orden_concepto` de
+          `cierre.v_pbi_cierre_resumen` repite el 2 y se salta el 5.
+        valores: ["1", "2", "3", "4", "5", "6"]
+        agregacion: no_sumable
+      descripcion: >-
+        Nombre largo del concepto para mostrar al usuario ("Costes Generales
+        (Proporcionales)").
+    relaciones: []
+    ejemplos_preguntas:
+      - Que conceptos tiene el cuadro de cierre y en que orden van
+
+  v_pbi_dim_tipologia_cp:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Catalogo FIJO de las seis tipologias de coste proporcional, con su
+      descripcion y su orden. Mismas seis que usa `mart.v_pbi_cp_tipologia`. Su
+      contenido no cambia nunca; declara `refresco: manual` porque la VISTA se
+      recrea con `build-cierre`.
+    grano: Una fila por tipologia. Siempre seis.
+    clave_negocio: [tipologia]
+    paso_etl: build_cierre
+    refresco: manual
+    columnas:
+      tipologia:
+        significado: Clave de la tipologia de coste proporcional.
+        valores:
+          - LEVANTAMIENTO
+          - SEGUROS
+          - AVALES
+          - CONTRATACION
+          - MEDIO AMBIENTE
+          - APORTE GG
+      orden_tipologia:
+        significado: Orden de presentacion (1 a 6).
+        agregacion: no_sumable
+      descripcion: Nombre largo de la tipologia ("Avales y garantias").
+    relaciones: []
+    ejemplos_preguntas:
+      - Que tipologias de coste proporcional se distinguen
+
+  v_pbi_dim_subcategoria_ci:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Catalogo de las subcategorias de coste indirecto **por obra**, no global.
+      Es deliberado: el mismo codigo de subcapitulo puede llamarse distinto en
+      cada obra, porque lo escribe el jefe de obra, y heredar el nombre de otra
+      obra seria mentir.
+    grano: >-
+      Una fila por (`obra_id`, `grupo_cod`, `subcategoria_cod`), que es su clave
+      de negocio. El grupo sale del segundo escalon de la ruta de capitulos y la
+      subcategoria del tercero.
+    clave_negocio: [obra_id, grupo_cod, subcategoria_cod]
+    paso_etl: build_cierre
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: >-
+          Obra a la que pertenece el catalogo. La clave incluye la obra
+          precisamente porque los nombres NO son globales.
+        agregacion: no_sumable
+      grupo_cod: >-
+        Codigo del grupo de indirectos, del segundo escalon de la ruta de
+        capitulos. Vale 'CI' cuando la partida no baja de ahi.
+      grupo_nombre: >-
+        Nombre del grupo tal y como lo escribio el jefe de obra EN ESA OBRA. Si
+        no hay descripcion, se repite el codigo.
+      subcategoria_cod: >-
+        Codigo de la subcategoria, del tercer escalon de la ruta. Vale
+        '(sin detalle)' cuando la partida no llega a ese nivel.
+      subcategoria_nombre: Nombre de la subcategoria en esa obra concreta.
+      orden_grupo:
+        significado: Orden alfabetico del grupo dentro de la obra. Presentacion.
+        agregacion: no_sumable
+      orden_subcategoria:
+        significado: >-
+          Orden de la subcategoria dentro de su grupo, dejando '(sin detalle)' al
+          final. Presentacion.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "N:1"
+        porque: El catalogo se construye a partir de las partidas de esa obra.
+    ejemplos_preguntas:
+      - Que subcategorias de coste indirecto tiene la obra X
+
+  v_pbi_cierre_indirectos_detalle:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **NO SE PUEDE CONSULTAR HOY.** Agota los 40 s con `SELECT * ... LIMIT 5` y
+      los **60 s filtrada a una sola obra** (medido el 2026-08-25). Estaba
+      marcada como recomendada mientras no devolvia ni una fila dentro de la
+      ventana util. Para los indirectos por obra y mes que si responden, ir a
+      `cierre.fact_cierre_mensual` con `concepto = 'INDIRECTOS'`. Ver
+      R-COSTE-CONSULTA.
+    descripcion: >-
+      Detalle de los costes INDIRECTOS de cada obra abierto por grupo y
+      subcategoria, con CUATRO variantes de periodificacion calculadas en
+      paralelo para los grupos de infraestructura. Las cuatro conviven a
+      proposito: no hay una elegida, se comparan.
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `grupo_cod`, `subcategoria_cod`), que
+      es su clave de negocio. Las columnas CALCULADAS de periodificacion
+      (ratios, acumulados y parciales) solo tienen valor en los grupos cuyo
+      nombre contiene "INFRA"; en el resto van a nulo. Sus dos entradas,
+      `importe_fase0` y `plazo_total_meses`, traen valor tanto si el grupo se
+      periodifica como si no, pero **pueden ser nulas por su propia causa**: no
+      haber presupuesto vivo o no haber plazo calculable. Ver su
+      `nulo_significa`.
+    clave_negocio: [obra_id, anio_mes, grupo_cod, subcategoria_cod]
+    paso_etl: build_cierre
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra.
+      anio_mes:
+        significado: Mes de cierre, como fecha del dia 1.
+        agregacion: no_sumable
+      anio:
+        significado: Ano del mes de cierre.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes del cierre.
+        agregacion: no_sumable
+      nombre_mes: Etiqueta del mes en castellano con su ano.
+      grupo_cod: Codigo del grupo de indirectos, del segundo escalon de la ruta.
+      subcategoria_cod: Codigo de la subcategoria, del tercer escalon de la ruta.
+      grupo_nombre: Nombre del grupo en esa obra concreta.
+      subcategoria_nombre: Nombre de la subcategoria en esa obra concreta.
+      ejecutado_origen:
+        significado: Coste indirecto acumulado desde el inicio hasta ese mes.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_anterior:
+        significado: >-
+          El mismo acumulado en la fila anterior de esa serie. Es la fila
+          anterior, no el mes de calendario anterior: los meses sin cierre no
+          tienen fila y se saltan.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_mes:
+        significado: Coste indirecto imputado en ese mes.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      es_infraestructura: >-
+        Marca los grupos cuyo nombre contiene "INFRA", que son los unicos que se
+        periodifican. En el resto quedan nulas las columnas CALCULADAS (ratios,
+        acumulados y parciales), pero no sus dos entradas.
+      importe_fase0:
+        significado: >-
+          Importe previsto de la subcategoria en el presupuesto vivo (fase 0). Es
+          la base sobre la que se calculan las periodificaciones, y trae valor
+          este el grupo periodificado o no.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La subcategoria no tiene presupuesto vivo.
+      plazo_total_meses:
+        significado: >-
+          Meses de plazo de la obra usados por la periodificacion lineal. Trae
+          valor este el grupo periodificado o no. OJO: **no coincide con
+          `plazo_meses` de `cierre.v_pbi_cierre_cabecera`**, que se calcula con
+          otra pareja de fechas: la misma obra da dos numeros distintos y no son
+          intercambiables.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene plazo calculable.
+      ratio_periodif:
+        significado: >-
+          Variante 1, por PRODUCCION: que fraccion del previsto corresponde a
+          este mes segun la venta acumulada sobre la venta final.
+        agregacion: no_sumable
+        nulo_significa: La subcategoria no se periodifica o falta el dato de venta.
+      pct_periodificacion:
+        significado: La variante 1 expresada en tanto por ciento.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_origen_periodif:
+        significado: Acumulado periodificado por produccion (variante 1).
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_mes_periodif:
+        significado: >-
+          Parcial del mes de la variante 1: el acumulado periodificado de este
+          mes menos el INCURRIDO del mes anterior, no menos el periodificado.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_origen_periodif_inc:
+        significado: >-
+          Variante 2: igual que la 1, pero contando solo desde el primer mes con
+          coste incurrido de verdad.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_mes_periodif_inc:
+        significado: Parcial del mes de la variante 2.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+        nulo_significa: La subcategoria no se periodifica.
+      ratio_lineal:
+        significado: >-
+          Variante 3, LINEAL: la fraccion del plazo transcurrida. NO tiene tope
+          en el 100 %, asi que una obra que se alarga puede pasar de 1.
+        agregacion: no_sumable
+        nulo_significa: La subcategoria no se periodifica o la obra no tiene plazo.
+      pct_periodificacion_lineal:
+        significado: La variante 3 expresada en tanto por ciento. Puede pasar de 100.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_origen_periodif_lineal:
+        significado: Acumulado periodificado linealmente (variante 3).
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_mes_periodif_lineal:
+        significado: Parcial del mes de la variante 3.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_origen_periodif_lineal_inc:
+        significado: >-
+          Variante 4: lineal, pero contando solo desde el primer mes con coste
+          incurrido.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La subcategoria no se periodifica.
+      ejecutado_mes_periodif_lineal_inc:
+        significado: Parcial del mes de la variante 4.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+        nulo_significa: La subcategoria no se periodifica.
+    relaciones:
+      - de: obra_id
+        a: cierre.v_pbi_dim_subcategoria_ci.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para los nombres de grupo y subcategoria propios de esa obra. El JOIN
+          va por `(obra_id, grupo_cod, subcategoria_cod)`: por `obra_id` solo
+          trae el catalogo entero de la obra y multiplica.
+      - de: obra_id
+        a: cierre.fact_cierre_mensual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es el desglose del concepto INDIRECTOS del cuadro de cierre: la suma
+          del detalle debe cuadrar con esa fila. Para comprobarlo se agrega el
+          detalle por `(obra_id, anio_mes)` y se compara contra la fila de
+          concepto INDIRECTOS de ese mes; unirlos en crudo multiplica.
+    ejemplos_preguntas:
+      - En que se van los costes indirectos de la obra X
+      - Cuanto cambiaria el indirecto de la obra X con cada variante de periodificacion
+
+  v_pbi_cierre_generales_detalle:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Detalle de los costes GENERALES (los proporcionales) de cada obra, abierto
+      por tipologia de negocio: seguros, avales, levantamiento, contratacion,
+      medio ambiente y aporte a gastos generales.
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `tipologia`), que es su clave de
+      negocio.
+    clave_negocio: [obra_id, anio_mes, tipologia]
+    paso_etl: build_cierre
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra.
+      anio_mes:
+        significado: Mes de cierre, como fecha del dia 1.
+        agregacion: no_sumable
+      anio:
+        significado: Ano del mes de cierre.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes del cierre.
+        agregacion: no_sumable
+      nombre_mes: Etiqueta del mes en castellano con su ano.
+      tipologia:
+        significado: >-
+          Tipologia del coste proporcional. Se deduce igual que en
+          `mart.v_pbi_cp_tipologia`: manda el subcapitulo cuando es definitorio y,
+          si no, el texto de la descripcion.
+        valores:
+          - LEVANTAMIENTO
+          - SEGUROS
+          - AVALES
+          - CONTRATACION
+          - MEDIO AMBIENTE
+          - APORTE GG
+      orden_tipologia:
+        significado: Orden de presentacion de la tipologia. Presentacion.
+        agregacion: no_sumable
+      ejecutado_origen:
+        significado: Coste proporcional acumulado desde el inicio hasta ese mes.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_anterior:
+        significado: >-
+          El mismo acumulado en la fila anterior de esa serie. Es la fila
+          anterior, no el mes de calendario anterior: los meses sin cierre no
+          tienen fila y se saltan.
+        unidad: EUR
+        agregacion: ultimo_valor
+      ejecutado_mes:
+        significado: Coste proporcional imputado en ese mes.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+    relaciones:
+      - de: tipologia
+        a: cierre.v_pbi_dim_tipologia_cp.tipologia
+        cardinalidad: "N:1"
+        porque: Para la descripcion legible de la tipologia.
+      - de: obra_id
+        a: cierre.fact_cierre_mensual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es el desglose del concepto GENERALES del cuadro de cierre: la suma
+          del detalle debe cuadrar con esa fila. Se agrega por
+          `(obra_id, anio_mes)` antes de comparar; unirlos en crudo multiplica.
+    ejemplos_preguntas:
+      - Cuanto llevamos de seguros y avales en la obra X
+      - Que parte de los generales de la obra X es aporte a gastos generales
+
+  v_pbi_cierre_cabecera:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      La ficha administrativa de cada obra: cliente, tecnico responsable, centro
+      de coste, tipo y clase, todas las fechas del ciclo de vida, el plazo, y los
+      presupuestos inicial, vigente y aprobado con los modificados. Es la vista
+      que contesta "de que va esta obra y en que estado esta".
+    grano: >-
+      Una fila por `obra_id`, del universo de seguimiento. Cuando una obra tiene
+      varios contratos, las fechas se agregan: la mas antigua para los inicios y
+      la mas reciente para los finales.
+    clave_negocio: [obra_id]
+    paso_etl: build_cierre
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra.
+      cliente_ide:
+        significado: >-
+          Identificador del cliente en Sigrid. OJO: es el UNICO `*_ide` de esta
+          vista que se proyecta sin `NULLIF(..., 0)`, asi que una obra sin
+          cliente trae **0 y no NULL**. `WHERE cliente_ide IS NULL` no devuelve
+          nada nunca: para las obras sin cliente hay que filtrar
+          `cliente_ide = 0` (o `cliente_nombre IS NULL`, que ese si lo es).
+        agregacion: no_sumable
+      cliente_nombre:
+        significado: >-
+          Nombre del cliente, de `con.res`. Es lo UNICO que el datamart sabe del
+          cliente: la tabla de clientes de Sigrid no se ingiere.
+        nulo_significa: >-
+          La obra no tiene cliente asignado (`cliente_ide = 0`), o el que tiene
+          no existe en `raw.con`. Es la forma fiable de detectarlo.
+      tecnico_ide:
+        significado: Identificador del tecnico responsable en Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene tecnico asignado.
+      tecnico_responsable: Nombre del tecnico responsable de la obra.
+      centro_coste_ide:
+        significado: >-
+          Identificador del centro de coste, y **la unica pasarela publicada
+          entre `retenciones` y el resto del datamart**. El centro de coste
+          **NO es la obra**: es una entidad distinta, con su propio `ide` y
+          contiguo al de ella (la obra 0655 es `1990273` como obra y `1990274`
+          como centro de coste). Por eso el `obra_id` de `retenciones` —que es
+          este `ide`, no el de la obra— casa **0 de 261** contra
+          `maestro.obras.obra_id` y **249 de 261** contra esta columna (medido
+          el 2026-08-25). Decir que "cada obra es su propio centro" era lo que
+          inducia el JOIN equivocado. **No es unica**: dos valores se repiten
+          (4 filas), asi que unir por aqui es `N:N` y hay que agregar antes.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene centro de coste asignado.
+      centro_coste_nombre: Nombre del centro de coste.
+      tipo_obra_ide:
+        significado: Identificador del tipo de obra en el catalogo de Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene tipo asignado.
+      tipo_obra_nombre: Tipo de obra en texto (edificacion, obra civil...).
+      clase_obra_ide:
+        significado: Identificador de la clase de obra en el catalogo de Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene clase asignada.
+      clase_obra_nombre: Clase de obra en texto.
+      fecha_inicio_previsto:
+        significado: >-
+          Inicio previsto, en cascada: primero el contrato, luego la obra y, si
+          no hay ninguno, el primer mes con version master del cierre.
+        agregacion: no_sumable
+        nulo_significa: No hay ninguna fuente con fecha de inicio previsto.
+      fecha_fin_previsto:
+        significado: >-
+          Fin previsto, en la misma cascada, con el ultimo mes con version master
+          como ultimo recurso.
+        agregacion: no_sumable
+        nulo_significa: No hay ninguna fuente con fecha de fin previsto.
+      fecha_inicio_real:
+        significado: >-
+          Inicio real, priorizando el inicio FISICO de obra sobre la activacion
+          administrativa del contrato. Son cosas distintas y se confunden con
+          facilidad.
+        agregacion: no_sumable
+        nulo_significa: La obra no ha empezado, o no se registro la fecha.
+      fecha_fin_real:
+        significado: >-
+          Fin real de la obra, y **la mejor aproximacion que hay hoy a "obra en
+          curso"**, porque las dos columnas que lo aparentan —`stg.obras.activa`
+          y `maestro.obras.es_activa`— valen TRUE para todas sus filas. Con un
+          limite que hay que declarar al responder: esta vista solo cubre **583
+          de las 919 obras**, y de ellas 247 tienen fin real y **107 tienen
+          inicio real sin fin real** (medido el 2026-08-25).
+        agregacion: no_sumable
+        nulo_significa: >-
+          La obra no ha acabado **o no se registro la fecha**. No distingue una
+          cosa de la otra: para "en curso" hay que exigir ademas
+          `fecha_inicio_real IS NOT NULL`, que es lo que deja las 107.
+      fecha_adjudicacion:
+        significado: >-
+          Fecha de adjudicacion, con una cascada amplia: adjudicacion real, firma
+          real, adjudicacion prevista, firma prevista y, por ultimo, la fecha de
+          adjudicacion de la propia obra.
+        agregacion: no_sumable
+        nulo_significa: No hay ninguna fecha de adjudicacion ni de firma registrada.
+      plazo_meses:
+        significado: >-
+          Duracion en meses entre la mejor pareja de fechas disponible: real con
+          real si la obra acabo, real con previsto si sigue viva, y previsto con
+          previsto si no hay fechas reales. OJO: **no coincide con
+          `plazo_total_meses` de `cierre.v_pbi_cierre_indirectos_detalle`**, que
+          se calcula de otra forma; la misma obra da dos numeros distintos.
+        agregacion: no_sumable
+        nulo_significa: No hay una pareja de fechas con la que calcularlo.
+      coeficiente_indirectos:
+        significado: Coeficiente de costes indirectos que la obra tiene configurado en Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La obra no lo tiene configurado, o vale cero.
+      superficie_total:
+        significado: Superficie total de la obra segun Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La obra no la tiene informada, o vale cero.
+      director_obra_ide:
+        significado: Identificador del director de obra en Sigrid. Solo el identificador.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene director asignado.
+      presupuesto_inicial_venta:
+        significado: >-
+          Venta prevista en el PRIMER cierre con version master de la obra. Es la
+          referencia de partida.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La obra no tiene ningun cierre con version master.
+      version_inicial: Texto de la version master de la que sale el presupuesto inicial.
+      presupuesto_vigente_venta:
+        significado: Venta prevista en el ULTIMO cierre con version master de la obra.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La obra no tiene ningun cierre con version master.
+      version_vigente: Texto de la version master de la que sale el presupuesto vigente.
+      presupuesto_aprobado_venta:
+        significado: >-
+          Presupuesto aprobado. HOY ES UNA COPIA del inicial: no hay en el modelo
+          un dato distinto de aprobacion. Es el divisor del porcentaje final de la
+          VENTA en el cuadro de cierre.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La obra no tiene ningun cierre con version master.
+      modificados_aprobados:
+        significado: >-
+          Diferencia entre el presupuesto vigente y el inicial, es decir cuanto ha
+          crecido la obra por modificados.
+        unidad: EUR
+        agregacion: ultimo_valor
+    relaciones:
+      - de: obra_id
+        a: cierre.fact_cierre_mensual.obra_id
+        cardinalidad: "1:N"
+        porque: Es la cabecera del cuadro de cierre de esa obra.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          El maestro trae el estado y las fechas de alta y baja desde otra via
+          (`con.fecbaj`), util para contrastar si la obra vive.
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "1:1"
+        porque: Es el universo del que sale la vista.
+    ejemplos_preguntas:
+      - De que va la obra X, quien es el cliente y en que fechas se hace
+      - Que obras estan acabadas y cuales siguen vivas
+      - Cuanto han crecido las obras por modificados
+
+  v_pbi_planif_vs_real:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El cuadro de planificado frente a real por obra y mes, con seis renglones:
+      produccion, los tres tipos de coste, el total de costes y el beneficio. Los
+      importes son DEL MES, no acumulados a origen.
+    grano: >-
+      Una fila por (`obra_id`, `anio_mes`, `concepto_cuadro`), que es su clave de
+      negocio. Sale de `mart.fact_seguimiento_categoria`, que si se refresca de
+      noche, aunque la vista se recree con `build-cierre`.
+    clave_negocio: [obra_id, anio_mes, concepto_cuadro]
+    paso_etl: build_cierre
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra.
+      anio_mes:
+        significado: Mes al que corresponden los importes, como fecha del dia 1.
+        agregacion: no_sumable
+      anio:
+        significado: Ano de `anio_mes`, desnormalizado para filtrar barato.
+        agregacion: no_sumable
+      mes:
+        significado: Numero de mes de `anio_mes`, de 1 a 12.
+        agregacion: no_sumable
+      nombre_mes: Etiqueta del mes en castellano con su ano.
+      concepto_cuadro:
+        significado: >-
+          Renglon del cuadro. TOTAL COSTES es la suma de los tres tipos de coste
+          y BENEFICIO es produccion menos total de costes: sumar los seis
+          renglones no tiene sentido.
+        valores:
+          - PRODUCCIÓN
+          - COSTES DIRECTOS
+          - COSTES INDIRECTOS
+          - COSTES PROPORCIONALES
+          - TOTAL COSTES
+          - BENEFICIO
+      orden_concepto:
+        significado: Orden de presentacion del renglon (1 a 6). Presentacion.
+        agregacion: no_sumable
+      planificado:
+        significado: Importe planificado para ese mes segun la version master vigente.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      real:
+        significado: Importe realmente ejecutado en ese mes.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      diferencia:
+        significado: >-
+          Real menos planificado. En produccion, positivo es haber producido de
+          mas; en costes, positivo es haber gastado de mas.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      desviacion_pct:
+        significado: La diferencia sobre el planificado, en tanto por ciento.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: No habia planificado ese mes, o era cero.
+    relaciones:
+      - de: obra_id
+        a: mart.fact_seguimiento_categoria.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la tabla de la que sale, pivotando planificado y real. NO se puede
+          volver a ella por una clave directa: esta vista ya colapso la
+          `categoria` del origen dentro de `concepto_cuadro`, y tres de sus seis
+          renglones no corresponden a ninguna categoria concreta (PRODUCCION es
+          la venta entera, y TOTAL COSTES y BENEFICIO son sumas). Para cuadrar
+          contra el origen hay que agregarlo por `obra_id` y `anio_mes` y
+          traducir la categoria al renglon. Ojo ademas: esa tabla se refresca de
+          noche y esta vista solo con `build-cierre`.
+      - de: obra_id
+        a: cierre.v_pbi_cierre_cabecera.obra_id
+        cardinalidad: "N:1"
+        porque: Para el contexto administrativo de la obra.
+    ejemplos_preguntas:
+      - Como va la obra X frente a lo planificado este mes
+      - En que meses se desvio mas la obra X
+
+  fn_parse_mes_fase:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es una funcion auxiliar que usan las demas por dentro. Un agente que
+      responde preguntas de negocio no la llama; se documenta para que entienda
+      POR QUE el mes de un cierre puede no coincidir con su fecha.
+    descripcion: >-
+      Convierte en fecha el texto libre con el que se nombran las fases y las
+      versiones de Sigrid: "Septiembre 2023", "sep-23", "CIERRE MARZO-25",
+      "PLANIFICACION CUATRIMEST FEB-26". Acepta el mes largo o corto, el ano con
+      dos o cuatro digitos y las palabras en cualquier orden, y devuelve el
+      primer dia del mes. Si no encuentra mes Y ano, devuelve nulo.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_cierre
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_mes_de_fase:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de cierre. Se documenta porque explica una regla
+      de negocio que sorprende a cualquiera que mire los datos.
+    descripcion: >-
+      Decide a que mes pertenece una fase de obra. Si el nombre escrito en la
+      fase y su fecha de inicio apuntan al mismo mes, devuelve ese mes. **Si
+      discrepan, MANDA EL TEXTO**: es la regla que dicto el jefe de obra, porque
+      la fecha se teclea mal con mas frecuencia que el nombre. Si solo hay uno de
+      los dos, usa ese.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_cierre
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_mes_de_version_master:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de cierre. Se documenta por el mismo motivo que
+      las otras dos: explica de donde sale el mes de un cierre.
+    descripcion: >-
+      Decide que mes representa una version master de tipo cierre. Manda el texto
+      libre de la version ("CIERRE MARZO-25" es marzo de 2025); si ese texto no
+      se puede interpretar, se intenta con la descripcion de la version, y si
+      tampoco, devuelve nulo.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_cierre
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

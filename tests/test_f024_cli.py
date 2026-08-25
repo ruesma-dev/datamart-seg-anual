@@ -103,7 +103,19 @@ class ConexionFalsa:
 
 
 class PgFalso:
-    """Doble del cliente para la CLI. Anota si le piden marcar huérfanas."""
+    """Doble del cliente para la CLI. Anota si le piden marcar huérfanas.
+
+    F-006 añadió `publicar_diccionario` al pipeline de `run-all`, así que este
+    doble tiene que saber responder a lo que ese paso le pide. Se quedan como
+    no-op deliberados: lo que aquí se prueba es la propagación del `batch_id`,
+    no la publicación, que tiene su propio fichero de tests.
+    """
+
+    def execute_sql_file(self, path, **_kwargs) -> None:
+        return None
+
+    def publicar_diccionario(self, *_args, **_kwargs) -> int:
+        return 0
 
     def __init__(
         self,
@@ -457,7 +469,9 @@ def test_f024_r3_run_all_un_solo_batch_para_todas_las_filas(cli) -> None:
 
     # Y todas las filas de paso se escribieron con ese mismo batch.
     assert {b for _step, _estado, b in pg.pasos_registrados} == {batch}
-    assert len(pg.pasos_registrados) == 5, "no se registraron los cinco pasos"
+    assert len(pg.pasos_registrados) == 6, (
+        "no se registraron los seis pasos del pipeline (F-006 añadió publicar_diccionario entre build_mart y apply_grants)"
+    )
 
 
 def test_f024_r3_dos_ejecuciones_no_comparten_batch(cli) -> None:

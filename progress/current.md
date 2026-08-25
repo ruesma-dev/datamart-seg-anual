@@ -1,1639 +1,247 @@
 <!-- progress/current.md -->
-# Trabajo en curso
+# Estado actual · 2026-08-25
 
-> ## ⚠ LEE ESTO PRIMERO: `.env` APUNTA A AZURE
->
-> Desde el 2026-08-09, `.env` está configurado contra
-> **`psql-albaranes-rs9k2`**, el servidor compartido que sirve también a
-> `albaranes` y `partes` en producción. **NO** apunta al Postgres local.
->
-> Consecuencia inmediata: `check-pg`, `status`, `run-all` y cualquier cosa que
-> abra conexión **van contra Azure**. Antes de lanzar nada que escriba,
-> asegúrate de que es lo que quieres. Para volver a local, el humano guardó
-> copia en `.env.local.bak`.
->
-> Los tests de pytest **no** tocan red ni BBDD, así que `harness/init.sh`
-> sigue siendo seguro de ejecutar.
->
-> Datos útiles de entorno para no redescubrirlos:
-> - `psql.exe` está en `C:\Program Files\PostgreSQL\16\bin` (no está en el
->   `PATH` por defecto). No hace falta instalar nada.
-> - Las contraseñas del datamart están en **`kv-albaranes-rs9k2`**, secretos
->   `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro`. Nunca en ficheros del repo.
-> - Al conectar con `psql`, **las opciones van ANTES** de la cadena de
->   conexión: este build deja de parsearlas tras el primer argumento
->   posicional.
-> - Los ID de recurso de Azure se rompen en Git Bash por la conversión de
->   rutas: usa la forma `--resource NOMBRE --resource-group ... --resource-type ...`.
+**Feature en curso: F-006 · MCP sobre el datamart.** Rama
+`feature/F-006-mcp-azure`. `bash harness/init.sh` **en verde: 2025 tests,
+cobertura 98,0 %**. Árbol limpio.
 
-# F-011 · BLOQUE A ENTREGADO Y PARADA EN T9 (2026-08-20) — léelo primero
+**Trabajo aparte, sin integrar: el arnés pasó de 1.5.1 a 1.7.4** en la rama
+`chore/arnes-1.7.4`, con el portero **en verde: 2.278 tests (253 más, los del
+arnés), cobertura 98,0 %** y las tres puertas cumplidas. Lee la sección
+siguiente antes de retomar F-006: el papeleo de la feature cambió de sitio, y
+esa rama **todavía no está integrada** en `dev` ni en `feature/F-006-mcp-azure`,
+así que desde ellas no se ve nada de esto.
 
-**La feature está en su parada: hace falta una firma del humano.** Todo el
-detalle en `progress/medicion_F-011.md` (la puerta de R8) y en
-`progress/impl_F-011.md` (qué se hizo y con qué evidencias).
-
-## Lo que hay que decidir
-
-| Criterio de DA-7 | Umbral | Medido | ¿Se cumple? |
-|---|---|---|---|
-| Ahorro estimado de la ingesta incremental | ≥ 20 min | **2,25 min** | **NO** |
-| Peso de la ingesta en el total | ≥ 40 % | **19,9 %** | **NO** |
-
-**Recomendación firmada del implementer: NO implementar el bloque B.** Y el
-motivo de fondo no es el margen:
-
-> **`tiemod` no existe en 24 de las 31 tablas que ingerimos.** Comprobado en el
-> catálogo de Sigrid. Entre las que NO la tienen están las cuatro que se llevan
-> el 86 % del tiempo de ingesta; `obrparpre` (13,8 M filas, 61 % del tiempo)
-> tiene 22 columnas y ninguna es una marca de modificación. El diccionario
-> describía entidades lógicas, no la base real. DA-4 ya previó este desenlace:
-> si el veredicto es `NO SIRVE`, se renuncia al watermark y el esfuerzo se
-> lleva al build, que es **F-025**.
-
-## Números de la carga, medidos en TRES cargas completas
-
-ingesta **32,9 min** · `build_stg` **110,7** · `build_mart` **21,6** · total
-**165,2**. `build_stg` es el **67 %** y varía menos de 30 s entre cargas de
-días distintos: es una línea base excelente para medir lo que haga F-025.
-
-Y un dato que estaba gratis en los logs: **el datamart crece 1.688 filas al
-día sobre 20 M** (0,0084 %). Cada noche se traen 20 millones de filas para
-incorporar mil setecientas.
-
-## Qué queda pendiente, y de quién
-
-1. **T9, la firma** (humano). Si es NO, F-011 cierra con el bloque A.
-2. **`perfil-carga` y `diagnostico-tiemod` contra Azure**: la IP del puesto ha
-   rotado otra vez y **ninguna regla de firewall la cubre**. Crear una es
-   escritura sobre el servidor compartido y no se ha hecho.
-3. **`bench-sigrid`**: implementado y sin ejecutar; va contra producción de
-   Sigrid y lo lanza el humano cuando quiera (R4 y R5-bis siguen sin acreditar).
-4. **T8-bis**: avisar al dueño de `sigrid-api`. `azure-apps/` no se ha tocado.
-
-## Dos cabos que conviene no perder
-
-- **`config/tables_sigrid.yaml` miente en 17 entradas**: declara
-  `incremental_column: tiemod` en tablas que no la tienen. Es inerte hoy —el
-  step comprueba el esquema real— pero es la documentación equivocada que hizo
-  verosímil la premisa de F-009 durante meses. Propuesto y **no hecho**.
-- **F-029 confirmada en vivo**: un `init.sh` lanzado justo al terminar una
-  campaña de mutación salió **en rojo con 1 test fallando**; con el árbol
-  quieto, 798 en verde. Es el defecto (3) de su ficha, observado.
+Esta sesión retomó la parada del 2026-08-22
+(`progress/parada_2026-08-22_limite_gasto.md`, ya histórica: lo que describe
+está hecho).
 
 ---
 
-# CIERRE DE SESIÓN · 2026-08-20 · LÉEME PRIMERO
+## El arnés, de 1.5.1 a 1.7.4 (2026-08-25, rama `chore/arnes-1.7.4`)
 
-Todo integrado en `dev` y **subido a GitHub**. Ninguna feature en curso, ninguna
-bloqueada, `init.sh` en verde: **798 tests**, 33 fichas, 14 cerradas.
+Actualización con el instalador de `arnes-base` en modo actualizar. Lo genérico
+entró solo; `harness/init.sh` y `CHECKPOINTS.md` se **fusionaron a mano** para
+no perder lo propio del proyecto (la cabecera de configuración y la sección 9
+del primero; las trampas del dominio Sigrid y la regla del SQL por capas del
+segundo). `CLAUDE.md`, `docs/CONVENTIONS.md` y `docs/referencia/README.md` se
+conservaron: el payload solo traía la plantilla sin adaptar.
 
-## Lo primero de la próxima sesión: F-006, el MCP
+### Lo que cambia en el día a día
 
-El humano subió su prioridad a **1** el 2026-08-20: va por delante del estudio
-del tiempo de carga (F-035) y de la ventana de negocio (F-025).
-
-**Cuidado con el alcance, que la prioridad no cambia**: el grueso de F-006 se
-ejecuta en el arnés de **su propio repositorio**. Aquí solo queda lo que toca a
-`sigrid_dm` —el rol de solo lectura y la regla de firewall— y **el diccionario
-semántico del datamart**, que es del dueño del dato y sin el cual el MCP
-contesta cualquier cosa con aplomo.
-
-Antes de arrancarlo conviene leer, en este orden: la ficha de F-006 (tiene dos
-ampliaciones del 19 y del 20), **F-030** (las reglas de negocio compartidas, con
-el circuito de vuelta de las correcciones) y **D8** (dónde se persiste una
-planificación, sin decidir).
-
-## Lo que se cerró hoy
-
-| Feature | Qué deja |
+| Novedad | Qué significa |
 |---|---|
-| **F-024** | el datamart ya no se construye sobre cargas truncadas; verificado matando el job a mitad de la ingesta |
-| **F-023** | los Excels auxiliares se leen del blob, con las tres verificaciones de F-004 hechas |
-| **F-003** | el job nocturno, cerrado por fin tras dos días bloqueado |
-| **F-011** | la medición que evitó optimizar el sitio equivocado |
+| **Puerta de tamaño** (`python -m harness.tamano`) | El papeleo de la feature en curso tiene topes: requirements 150, design 250, impl 220, review 140 líneas. Pasarse pone el portero en **rojo**. Solo mide la feature abierta; lo `done` está amnistiado. |
+| **`nivel_por_defecto` = `estandar`** | Antes, una feature sin `rigor` heredaba `critico`. Ya no: `critico` **se declara**. |
+| **Campañas `estandar` muestreadas** | 20 mutantes con semilla fija `20260820`. **Sus números no son comparables** con los de campañas anteriores. `--max-mutantes 0` fuerza la campaña entera. |
+| **El venv del proyecto manda** | El portero antepone `.venv` al PATH: se acabaron los veredictos distintos según cómo se abriera la terminal. |
+| **Centinela de campaña** | Si queda un mutante aplicado en el árbol, el portero lo dice en vez de medir encima. |
 
-## Estado real de la carga, comprobado el 20
+### El papeleo de F-006 se partió en resumen + anexo
 
-La nocturna del 20 fue **perfecta**: 02:00:21 → 04:46:36 UTC, **2 h 46**, con
-las dos puertas de F-024 en verde y el mismo `batch_id`. Reparto del tiempo:
-`build_stg` **110 min (67 %)**, ingesta 34,6 (20 %), `build_mart` 21,5 (13 %).
+Lo exigía la puerta nueva (impl iba por 4.763 líneas contra un tope de 220). El
+detalle **está intacto**, solo cambió de nombre:
 
-## Decisiones que esperan al humano
-
-| Dónde | Qué |
+| Se lee primero (resumen, medido) | Detalle íntegro (anexo, no medido) |
 |---|---|
-| **F-032** | las dos copias de contraseñas en el vault de *albaranes*: subir su prioridad o aceptar por escrito que se quedan. La condición que las mantenía —«que el job funcione»— se cumplió hace días |
-| **D10** | por dónde entra Power BI: Desktop o Service. Condicionada por D11 |
-| **D11** | el acceso desde el puesto es un **apaño**, no una solución: IP fija, VPN o Private Link |
-| **D8** | dónde se persiste una planificación hecha por la IA |
+| `specs/F-006-mcp-azure/requirements.md` (132) | `requirements_detalle.md` (557) |
+| `specs/F-006-mcp-azure/design.md` (191) | `design_detalle.md` (1.004) |
+| `progress/impl_F-006.md` (197) | `impl_F-006_detalle.md` (4.763) |
+| `progress/review_F-006.md` (125) | `review_F-006_detalle.md` (4.918) |
 
-## Trampas de entorno que te ahorrarán tiempo
+**Efecto colateral que conviene recordar:** tres tests de F-006
+(`test_f006_fichas.py`, `test_f006_publicacion.py` ×2) leían `design.md` para
+verificar el contrato **letra a letra** —los bloques YAML, el DDL de
+`_meta.v_diccionario` y la §4.2—. Al resumir el diseño se pusieron rojos, y
+ahora apuntan a `design_detalle.md`. Si algún día se parte más papeleo, mira
+antes quién lo lee: `grep -rn "<fichero>" --include=*.py .`
 
-1. **Para leer la base desde el puesto**: la IP pública rota cada pocos minutos
-   y cambia de bloque. Hay **una regla única sin fecha**, `datamart-puesto-pgris`,
-   que hay que **actualizar con la IP del momento** justo antes de cada tanda de
-   comandos, en la misma ventana de segundos. Perseguirla con reglas nuevas no
-   funciona: hay cuatro fechadas acumuladas que lo demuestran, y las retira
-   F-032 (la sin fecha **se queda**).
-2. **Para saber si la carga fue bien no hace falta la base**: los eventos
-   `step_finished` en Log Analytics lo dicen, y no pasan por el firewall.
-3. **Las campañas de mutación no son de fiar** hasta que se arregle F-029: usa
-   `--workers 1`, no las dejes huérfanas, y si algo se cae, lo primero es
-   `git status` y `git worktree list`.
-4. **`init.sh` ANTES de commitear, no después.** La puerta de secretos rechaza
-   GUID, IPs y correos, y hoy paró tres commits.
+Los resúmenes son **índices navegables**, no versiones cortas: están los 41
+requisitos, las 43 tareas y el recorrido de checkpoints, cada uno con su enlace
+al anexo. El veredicto vigente del reviewer sigue siendo **RECHAZADO** (pasada
+decimosexta): la actualización del arnés no cambia nada de eso.
+
+### Trece tests del proyecto iban por detrás de la herramienta
+
+`tests/` no solo prueba el ETL: prueba también las herramientas del arnés, y
+trece tests codificaban el comportamiento de la 1.5.1. Se adaptaron **sin
+aflojar ninguna aserción** (`test_f015_mutacion.py` pasó de 92 a 97):
+
+| Fichero | Qué codificaba de la versión vieja |
+|---|---|
+| `test_f006_fichas`, `test_f006_publicacion` | Leían el contrato letra a letra de `design.md`; ahora leen `design_detalle.md` |
+| `test_f015_mutacion` (5) | La campaña sin línea base, sin código 3 y sin `stdout` en el proceso |
+| `test_f020_mutacion` (7) | Campaña por servicios y códigos de error |
+| `test_f015_rigor` (1) | «Sin rigor declarado se aplica el más exigente», la regla que derogó la 1.7.0 |
+| `test_f020_genericidad` (2) | R17, gemela de R19; y una lista blanca de módulos estándar escrita a mano |
+
+**R19 y R17 se afinaron, y esto conviene entenderlo antes de tocarlas.** R19
+(en `test_f015_rigor.py`) y R17 (en `test_f020_genericidad.py`) son la misma
+regla escrita dos veces en dos features distintas. Exigían que
+ninguna herramienta de `harness/` mencionara palabras del datamart, barriendo
+el texto entero. El arnés 1.7.4 trae 20 menciones que **no son dependencias**:
+notas de procedencia («esto nació en `albaranes` F-038»), `mutacion_paralela.py`
+citando este repositorio como su origen, y «cierre» en castellano llano («la
+línea base de cierre EXPIRÓ»). Decisión del humano el 2026-08-25: **R19 vigila
+el código ejecutable, no la prosa**. En concreto:
+
+- el barrido usa `ast` para quitar comentarios y docstrings, y **conserva los
+  literales**: un mensaje de error que nombre a Sigrid sigue atando igual;
+- `\bcierre\b` pasa a `cierre\.\w`, el uso cualificado con el que se cita un
+  esquema;
+- la lista blanca de módulos estándar de R17, escrita a mano, se sustituye por
+  `sys.stdlib_module_names`: envejecía en cada versión del arnés (la 1.7.x trajo
+  `math`, `signal` y `contextlib`) y cada envejecimiento se leía como una
+  violación que no lo era. Preguntar por la biblioteca estándar de verdad caza
+  además cualquier dependencia de terceros, incluida la que nadie prohibió;
+- `f-0\d\d` **se retira** —`tamano.py` lo usa de ejemplo en el `help` de
+  `--feature` y no ata a nadie— y en su lugar entra una comprobación más
+  fuerte: **ninguna herramienta importa `etl_sigrid`, `config`, `main`, `tests`
+  ni `infra`**, que es la atadura de verdad. Verificado metiendo el import a
+  propósito: el test se pone rojo.
+
+Queda **propuesto para `arnes-base`**: que las herramientas genéricas lleven su
+procedencia en el registro de versiones y no en el docstring del módulo.
+
+### Dos cosas que hay que mirar antes de seguir
+
+1. **F-041 puede haber encogido.** Denuncia que la campaña de mutación miente
+   por timeouts y bytecode. El bytecode **ya está arreglado** río arriba (1.6.3:
+   la campaña ejecuta con `PYTHONDONTWRITEBYTECODE=1`) y los timeouts ahora se
+   derivan de la línea base medida (1.7.2), no de una constante. Lo que **sigue
+   vivo** es que un mutante cuya suite no recoge ni un test sale
+   `SUPERVIVIENTE` en vez de «no juzgado», así que **una campaña de una sola
+   pasada aún no vale como evidencia**: contrasta con una segunda
+   (`--workers 1`). Revisa la ficha de F-041 antes de trabajarla.
+2. **Siete features siguen sin `rigor` declarado** (F-002, F-007, F-010, F-012,
+   F-013, F-017, F-018). Decisión del humano el 2026-08-25: **se quedan así** y
+   el nivel se decide al abrir cada una, cuando se conozca el alcance real. Que
+   nadie lo lea como un descuido.
 
 ---
 
-# F-011 CERRADA · 2026-08-20 · midió, y la medición dijo que no
+## Lo que hace F-006, en una línea
 
-**Reviewer en APROBADO** (`progress/review_F-011_cierre.md`). Si este fichero
-dice más abajo que «falta la firma del humano», está caducado: la firma se dio
-hoy y está en `progress/medicion_F-011.md` §6.2.
+Publicar en `_meta` la **capa semántica** del datamart —qué significa cada
+objeto y cada columna, y qué reglas hay que respetar para leerlo— para que
+**cualquier agente conectado por MCP construya sus propios casos de uso**, no
+solo los seis que el humano dio de ejemplo. Los seis casos son la **batería de
+aceptación**, no la especificación.
 
-**Cierra con el bloque A entregado y el bloque B descartado por su propia
-puerta.** No es un abandono: la spec definía dos destinos y R8/DA-4/DA-7
-escribieron la rama del NO **antes** de medir.
+## Dónde está
 
-| Criterio de DA-7 | Umbral | Medido |
+Diccionario en **versión 8**, publicado y verificado contra la base: **103
+objetos** documentados, **798 columnas**, **46 de consumo recomendado**. (Estas
+cifras las comprueba un test: si envejecen, la suite se pone roja. Ya caducaron
+dos veces.)
+
+Tres puertas que lo contrastan **contra el dato real**, no contra sí mismo:
+
+| Comando | Qué comprueba |
+|---|---|
+| `check-diccionario` | biyección ficha ↔ objeto que existe en la base |
+| `check-unicidad` | que la clave declarada sea de verdad única |
+| `check-relaciones` | que el JOIN de cada relación declarada **devuelva filas** |
+
+El lado consumidor (`C:\Users\pgris\PycharmProjects\mcp-bbdd`, repo aparte, ya
+en git) consume `_meta` y sirve **los cinco bloques** de contexto.
+
+---
+
+## Lo que falta para cerrar F-006
+
+### Nuestro
+- **Bloque J, documentación** (T35-T37): `docs/runbook_postgres_azure.md`,
+  sección de arquitectura, y actualizar `azure-apps/datamart_seg_anual.md`.
+  T37 es **obligatoria**: cambió lo que este proyecto expone.
+- **T28**: la regla en `docs/CONVENTIONS.md` (quien cambia un objeto publicado
+  actualiza su ficha en el mismo trabajo).
+- **T43**: decidir con el humano qué deuda declarada se paga y cuál viaja.
+- **Cierre**: T41 (mutación) y T42 (`init.sh`), más el veredicto del reviewer
+  contra `CHECKPOINTS.md`. Sin él, la feature **no se marca `done`**.
+
+### Del humano, y ningún agente puede hacerlo
+- **Probar el MCP dentro de Claude Escritorio.** Todo va por la misma fábrica y
+  los mismos servicios, pero **el protocolo MCP no se ha ejercitado nunca**.
+- **T32 🔏: verificar que Power BI no lee de `stg` ni de `raw`.** De eso depende
+  si los `REVOKE` (T29-T31) se encienden aquí o se entregan a F-034. Hoy el rol
+  `mcp_sigrid_dm_ro` **lo comparten el MCP y Power BI**, y por eso los REVOKE
+  están **construidos y apagados**.
+
+### El objetivo que todavía NO está cumplido
+El humano pidió **«un MCP que pueda usar cualquier usuario desde cualquier
+puesto»**. Hoy el MCP corre **en el puesto de pgris** apuntando a Azure. T38
+(desplegar el entorno) está **bloqueada hasta que ese entorno exista**. Lo
+construido es la capa semántica, que era el prerrequisito, no el despliegue.
+
+---
+
+## Lo que esta feature ha enseñado, y conviene no volver a aprender
+
+1. **El defecto sobrevive «en el campo de al lado».** Ocurrió más de cinco
+   veces: se corrige la cabecera y el aviso sigue mal en la columna; se arregla
+   una vista y la hermana queda igual. En T40, «el centro de coste coincide con
+   la obra» estaba en **cuatro fichas**, y `es_activa` mentía en **cinco
+   sitios**. Corregir donde te lo señalan no es corregir.
+2. **Un barrido de texto sobre el YAML crudo no ve las frases plegadas.**
+   Rompió cuatro comprobaciones de esta feature, una de ellas el propio
+   guardián escrito para evitarlo. Barre siempre sobre el diccionario
+   **cargado**.
+3. **Un test verde puede sostener una mentira.** Había un test exigiendo
+   literalmente `assert "98" in obra.significado` — es decir, obligaba a que la
+   ficha repitiera una afirmación falsa.
+4. **Una relación puede resolver perfectamente y no unir nada.** El validador
+   offline no puede verlo: los dos extremos existen y los tipos encajan. Lo que
+   falla está en los datos. De ahí `check-relaciones`.
+5. **Preguntarle al adaptador cuántos bloques hay es preguntarle al acusado.**
+   El verificador de `mcp-bbdd` lee de la base por el pool, no por el código que
+   se los estaba dejando.
+
+---
+
+## Deuda y decisiones abiertas
+
+### Del humano
+- **`CHECKPOINTS.md`**: el reviewer propone que C4 exija que los valores de un
+  contrato declarativo pasen por un **vocabulario cerrado validado**, no solo
+  que el campo exista. Es lo que habría cazado el `cardinalidad: 61` (YAML leyó
+  `1:1` como sexagesimal), que ni la cobertura ni la mutación podían ver porque
+  el valor venía del dato, no del código. **No aplicada.**
+- **`harness/mutacion.py`**: que el veredicto sea `muertos == total` y que un
+  timeout diga «SIN EVALUAR». En F-006 los cuatro timeouts **eran cuatro
+  supervivientes**. Toca el arnés y cambiaría el veredicto de features ya
+  cerradas; si se acepta, viaja a `arnes-base` en el mismo trabajo.
+
+### Backlog nacido de esta feature
+| Feature | Prio | Qué |
 |---|---|---|
-| Ahorro de la ingesta incremental | ≥ 20 min | **2,25 min** |
-| Peso de la ingesta en la carga | ≥ 40 % | **19,9 %** |
+| **F-041** | 2 | **La puerta de mutación no comprueba nada.** Mientras no se arregle, **ningún número de mutación de este repositorio es evidencia**. Superviviente real conocido: `and`→`or` en `diccionario_sql.py:297`. |
+| **F-042** | 2 | Clave rota del fact y **agregado doblado**: 39,07 M€ de más en 8 obras, alimentando tarjetas KPI de Power BI. |
+| **F-045** | 2 | **Las retenciones no se pueden atribuir a una obra** (nace de T40). |
+| **F-044** | 1 (tras el MCP) | Los cuatro `build-*` a la nocturna. Medido: **37,5 min**, el disco no se mueve. |
+| F-036..F-040 | 2-6 | Huecos de dominio: oficios, tesorería, comparativos, vistas puente, ingresos. |
 
-**El motivo de fondo, que pesa más que los números**: la marca de modificación
-**no existe** en las 24 tablas que se llevan el 93 % de la ingesta. El reviewer
-lo corroboró contra el diccionario de Sigrid: la ficha de `obrparpre` lista sus
-22 columnas y ninguna es de modificación.
-
-**Dónde está el tiempo de verdad**: `build_stg`, **110,7 min, el 67,0 %**. Eso
-es **F-025**, que pasa a ser lo siguiente.
-
-**No reabrir «solo altas» sin leer D12.** Sí llegaría al umbral y serviría un
-plan viejo en silencio, porque `obrparpre.planif` se edita sin crear filas.
-
-## Lo que queda de F-011, todo MANUAL y nada bloqueante
-
-| Tarea | Qué es | Comando |
-|---|---|---|
-| **T7** | mediciones complementarias | las de `specs/F-011-carga-incremental/tasks.md` T7; el grueso ya está en `medicion_F-011.md` |
-| **T8-bis** | avisar al dueño de `sigrid-api` de lo medido sobre paginación y tiempos | conversación, no comando |
-
-## Y una advertencia de entorno para la próxima sesión
-
-**Desde el puesto no se puede leer la base** (ver **D11**): la IP pública rota
-cada pocos minutos y cambia de bloque entero — tres distintas en una hora el
-2026-08-20. Las reglas de firewall no aguantan; ya hay cuatro acumuladas e
-inútiles. Para comprobar la nocturna hace falta otra vía, y la más barata es
-Cloud Shell, que entra por la regla `AllowAzureServices` sin tocar el firewall
-compartido. **El job nocturno no está afectado**: corre dentro de Azure.
+### Huecos de negocio declarados, sin resolver
+- **El mayor proveedor de la empresa es la propia empresa** (intragrupo). Tumba
+  silenciosamente cualquier ranking de «quién ha facturado más», que era uno de
+  los seis casos de uso.
+- **Los órdenes de magnitud** ya llegan al agente, pero cubrían solo
+  `retenciones`; T40 los amplió a donde están los importes.
 
 ---
 
-# F-023 · las tres verificaciones de F-004, CUMPLIDAS (2026-08-19)
-
-Lo pide **T27 de F-003**: el resultado de cada verificación MANUAL, aquí. El
-detalle con comandos y salidas pegadas está en `progress/manual_F-023.md`.
-
-| Verificación | Cuándo | Resultado real |
-|---|---|---|
-| **V1** · `load-aux` desde el puesto lee del blob | 14:42:08 UTC | **`SUCCESS`, salida 0, `origen=blob`** para los tres ficheros. Autenticado con el `az login` del puesto contra `Storage Blob Data Reader`, sin claves ni SAS |
-| **V2** · el job lee del blob con identidad gestionada | 10:55:57 UTC | **`origen=blob`** para los tres, con `ubicacion` de blob y **ni una sola ruta local**. No hubo que provocarlo: ya había pasado en la carga del día y nadie lo había anotado |
-| **V3** · sin el rol, falla diciendo qué falta | 14:51 UTC | **Salida 1**. Azure devolvió 403 `AuthorizationPermissionMismatch` y el ETL lo tradujo nombrando **el rol exacto, la cuenta, la variable de entorno** y qué hacer en Azure y en local |
-
-**Dos cosas que conviene no perder de esta tanda:**
-
-1. **El primer intento de V1 dio `SUCCESS` y no valía.** Leyó `origen=local`,
-   desde OneDrive, porque el `.env` del puesto sigue apuntando a rutas locales
-   —el **job** sí tiene las URIs de blob—. Un `load-aux` en verde **no prueba
-   nada** sobre el blob: hay que mirar el campo `origen`. Segunda pista: leer del
-   blob tardó 9,9 s y leer de disco, 0,0 s.
-2. **V3 se hizo sin tocar RBAC**, apuntando a una cuenta sobre la que el puesto
-   no tiene el rol, en vez de quitar el rol de la propia. El reviewer lo dio por
-   **mejor que el requisito original**: no exige `User Access Administrator`, no
-   deja ninguna asignación que devolver —el original se queda sin acceso a los
-   Excels si el reasignado falla— y no toca permisos de un recurso compartido.
-
----
-
-# F-024 CERRADA · 2026-08-19 (léelo primero; lo de abajo es el camino hasta aquí)
-
-**Fase C completa y reviewer en APROBADO** (`progress/review_F-024_cierre.md`).
-Sustituye a todo lo que este fichero diga más abajo sobre «faltan T18, T19 y
-medio T20»: ya no falta ninguna.
-
-| Tarea | Resultado |
-|---|---|
-| **T17** (R25) | imagen `r20260818-2146`; 7 huérfanas cerradas con motivo (2 esperadas + 5 antiguas); vistas legibles por el rol del MCP |
-| **T18** (R24) | muerte a los 10 min; **4.865.000 de 13.809.350 filas** en `obrparpre` (DA-8 medida); huérfana `ABORTED`; puerta `FAILED` en 5,2 s con `rows=0`; `mart` intacto; recarga a OK |
-| **T19** (R23) | correo «Activated» en **6 min 42 s**; regla creada por el script del repositorio. **Abierto**: el `Deactivated` (ver D9) |
-| **T20** (R26) | `build_mart.puerta_stg` en **`SKIPPED`**, con el `SUCCESS` del job al lado |
-
-## Horas de R23, que el requisito pide anotar AQUÍ
-
-| Hito | UTC | Local |
-|---|---|---|
-| `update` a ventana corta (`1h`/`5m`) | 10:04:53 | 12:04:53 |
-| Alerta **`Fired`** | 10:11:18 | 12:11:18 |
-| **Correo recibido** | 10:11:35 | 12:11:35 |
-| Restauración a `48h`/`1h` | 10:27:05 | 12:27:05 |
-| Última lectura: seguía en `Fired` | 14:00 | 16:00 |
-
-## Lo único abierto de F-024: D9
-
-El `Deactivated` no se llegó a observar. **No bloqueó el cierre** —tres
-evaluaciones horarias están en el borde de la latencia de resolución, y no
-había nada que cambiar para acelerarlo— pero está clavado en
-`progress/decisiones_abiertas.md` como **D9**, con fecha (tras la nocturna del
-**2026-08-20**), comando de solo lectura y criterio: si sigue en `Fired`, es
-hallazgo confirmado, se abre feature y **hay que resolver la instancia a mano**,
-porque una alerta atascada en `Fired` no vuelve a notificar.
-
-## Lo siguiente, por orden
-
-1. **D9**, tras la nocturna del 20. Es una lectura de un minuto.
-2. **F-023** (prioridad 8), que desbloquea F-003. Bloque 1 primero —y si los
-   Excels están en el blob antes de la nocturna, la verificación 2 sale gratis—;
-   el **bloque 3 va el último**: retira las reglas de firewall del puesto, que
-   son las que dan acceso para trabajar. Hoy hay tres: `-17-rango`, `-18` y
-   `-19` (esta última acabó en rango `77.211.5.0/24` porque la IP del puesto
-   rota cada pocos minutos).
-3. **F-029** (prioridad 10): la campaña de mutación no es de fiar. El encargo
-   completo está en `arnes-base/ENCARGO_1.5.3_mutacion_fiable.md` y lo está
-   implementando la sesión de `albaranes`.
-
----
-
-# LA NOCTURNA DEL 19 FUNCIONÓ · verificado a las 10:20 del 19 (léelo primero)
-
-**Primera nocturna con las puertas de coherencia de F-024 y con la imagen
-`r20260818-2146`: limpia de punta a punta.** Sustituye al punto 1 de la
-sección siguiente, que queda cumplido.
-
-| Qué | Resultado real |
-|---|---|
-| Ventana | **02:00:16 → 04:48:05 UTC = 2 h 48 min** (el 18 fueron 2 h 45) |
-| Estado de todos los pasos | `SUCCESS`. **Ni un `ABORTED`, ni una `RUNNING` huérfana, ni un `AVISO`** al pie de `timings` |
-| Identidad de ejecución | **una sola**: `20260819T020016Z-327ef0`, en las 25 tablas de `raw` |
-| `check-coherencia` | **OK en `raw` y en `stg`**, salida 0. **Ha pasado de KO a OK**, que era justo lo que había que confirmar |
-| `check-frescura` | `build_mart` **FRESCO** (3,5 h de 30 h de umbral), salida 0 |
-| Volumen | `raw` 20,05 M · `stg` 43,79 M · `mart` 5,32 M filas |
-| Buzón | **ningún «Activated»**. La alerta no disparó, que es lo correcto |
-
-**Las dos puertas corrieron en el job real y quedaron registradas**, que es la
-evidencia que faltaba de R10/R15 en Azure y no la daba ningún test:
-
-```
-stage        build_stg.puerta_raw   2026-08-19 02:35:58   0.1 s   SUCCESS
-build_mart   build_mart.puerta_stg  2026-08-19 04:26:32   0.2 s   SUCCESS
-```
-
-Es decir: la puerta se ejecuta **antes** de escribir, en producción, y **no
-estorba a una carga buena**. Que es la mitad de la garantía; la otra mitad —que
-sí frena a una carga mala— es lo que prueba T18.
-
-## Dos cosas que aparecieron al revisar, ninguna es un problema
-
-- **Mantenimiento programado de Azure Database for PostgreSQL** (región Spain
-  Central, tracking `SJFH-KHZ`): correo a las 05:27 UTC con **`STATUS:
-  Complete`**, o sea **después** de que la carga terminara a las 04:48. No la
-  tocó. Conviene recordar que ese servidor es el compartido y que estos
-  mantenimientos pueden caer dentro de la ventana de carga otro día.
-- **Disco**: pico de **88,69 %** a las 02:45 UTC (ingesta) y 84,13 % a las
-  04:30 (build_mart). Es el cuarto pico consecutivo en torno al 88,5 % **sin
-  tendencia al alza**, y **por debajo del 90 %** que invalidaría la decisión de
-  no ampliar. Cuidado al mirarlo por la mañana: a las 08:00 marcaba 76 % y
-  **seguía bajando** 0,6 puntos/hora hacia el reposo real de 72,46 %; ese 77 %
-  de después de la carga **no** es el «reposo por encima del 78 %» del umbral 2.
-
-## Lo que queda de F-024, con esto ya descontado
-
-Solo Fase C: **T18** (muerte externa controlada + recarga), **T19** (alerta de
-frescura de extremo a extremo) y la **segunda mitad de T20** (`--sin-puerta`
-registrando `SKIPPED`). Nada más: código, tests, cobertura, mutación y review
-están cerrados y aprobados.
-
-Hueco disponible hoy: la siguiente nocturna entra a las **02:00 UTC del 20**
-(04:00 local), así que T18 con su recarga de ~2 h 50 cabe de sobra si se
-arranca por la mañana.
-
----
-
-# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-19 · MADRUGADA (00:00–00:30)
-
-Sesión corta y sin tocar código. Tres cosas que cambian lo que dice la
-sección siguiente (la del 18 por la noche), que por lo demás sigue vigente.
-
-## 1 · La nocturna del 19 TODAVÍA NO HA CORRIDO
-
-A las **00:03 del 19 (22:03 UTC del 18)**, `python main.py timings --last 1`
-seguía enseñando la carga del 18 (`ingest_raw` 10:23 UTC → `build_mart`
-12:46 UTC, todo `SUCCESS`) y los dos `apply_grants` (13:08 y 19:49, el
-segundo el de T17). La nocturna entra a las **02:00 UTC = 04:00 local**.
-
-Es decir: **la comprobación nº 1 del plan de anoche sigue siendo lo primero
-de la mañana**, sin cambios, con sus tres comandos (`timings --last 1`,
-`check-coherencia`, `check-frescura`) y la misma expectativa: `check-coherencia`
-tiene que pasar de KO a OK.
-
-## 2 · La re-review de la Fase B ya está APROBADA — no la vuelvas a lanzar
-
-`progress/review_F-024.md:521` («Re-review · 2026-08-18, 2ª pasada, sobre el
-commit `89a8707`») cierra con **APROBADO**, con los cuatro bloqueantes B1–B4
-verificados uno a uno. La frase «pendiente la re-review» solo sobrevive en la
-sección histórica de mediodía de este fichero; está obsoleta.
-
-**Consecuencia: de F-024 no queda más que la Fase C** — T18, T19 y la segunda
-mitad de T20. Todo lo demás (código, tests, cobertura, mutación, review) está
-cerrado.
-
-## 3 · Por qué esta madrugada no se tocó la Fase C
-
-- **T18** son ~3 h 15 entre la muerte controlada y la recarga completa, y la
-  nocturna entra a las 04:00: se pisarían. Hay que lanzarlo con la mañana por
-  delante, o desactivando antes la programación.
-- **T19** (~15 min: alerta, ventana corta 1h/5m, correo `Activated`, restaurar
-  a **48h**/1h — ojo, ya no 30h: ver el aviso de abajo) **sí es factible a
-  cualquier hora** y no interfiere con la nocturna. Es el candidato natural
-  para retomar. Exige que el humano vea llegar el correo.
-- **T20, segunda mitad** (`stage --sin-puerta` registrando `SKIPPED`) **no se
-  puede lanzar con el `.env` apuntando a Azure**: serían 1 h 51 de escritura
-  sobre `stg` justo antes de la nocturna. O se hace en local con
-  `.env.local.bak`, o se espera a un hueco sin carga programada.
-
-## 4 · Cabos cerrados en esta sesión
-
-- **La errata que dejó anotada el reviewer**: la línea de T17 de este fichero
-  mandaba ejecutar `infra8_build_image.ps1`, que no existe. Ya dice
-  `infra\70_build_image.ps1`.
-- **Los seis `huella_*.csv` de la raíz** llevaban desde el 13 de agosto
-  sueltos y sin versionar. Ahora `huella_*.csv` está en el `.gitignore`, con
-  el motivo escrito: son la salida de `fingerprint` para **una** ejecución,
-  caducan con cada rebuild de `mart`/`cierre` y pueden llevar agregados de
-  negocio. **Los ficheros siguen en disco**: los de T13 son la referencia
-  hasta que se rehagan `build-mart` y `build-cierre` (defecto 2 de
-  `progress/impl_T13_fixes_f019.md`).
-
-## 5 · Qué trae el arnés 1.5.2 (mirado, no propagado)
-
-`arnes-base` va por **1.5.2** y solo cambia `.claude/agents/reviewer.md` y
-`CHECKPOINTS.md`: **el reviewer reejecuta la campaña de mutación cuando es
-barata** (si el «Tiempo total» del informe baja de 5 minutos), con `--salida`
-fuera de `progress/` para no pisar el informe del implementer. Sin herramienta
-detrás. La 1.5.2 nace de separar esa mejora de la 1.5.1, que era el cambio de
-`harness/mutacion.py`.
-
-Este repositorio va por **1.5.0 en la rama de F-024** y por **1.5.1 en `dev`**.
-La propagación sigue pendiente y **no debe hacerse dentro de F-024**: rama
-`chore/arnes-1.5.2` desde `dev`, con el instalador en `-SoloDiff` primero.
-
-## 6 · Orden para la mañana
-
-1. Comprobar la nocturna (sección siguiente, punto 1) y el buzón.
-2. Si salió limpia: **T19** es lo más corto; **T18** exige reservar la mañana.
-3. Con F-024 en `done`: arnés 1.5.2 → merge F-024 + F-003 a `dev` → F-023.
-
----
-
-# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 · NOCHE (léelo antes que nada)
-
-Esta sección **sustituye** a la que hay más abajo con la misma fecha: aquella
-se escribió a mediodía y varias cosas han cambiado desde entonces.
-
-## Lo primero de mañana, en este orden
-
-1. **Comprobar la nocturna del 19 (02:00 UTC)**, que es la **primera ejecución
-   con las puertas de coherencia de F-024** y con la imagen `r20260818-2146`:
-
-   ```powershell
-   python main.py timings --last 1     # ¿SUCCESS de punta a punta? ¿algún ABORTED?
-   python main.py check-coherencia     # debe dar OK: todas las tablas del MISMO batch
-   python main.py check-frescura       # build_mart FRESCO con la hora de esta noche
-   ```
-
-   `check-coherencia` **tiene que pasar de KO a OK**: hasta hoy fallaba porque
-   `raw` era histórico sin `batch_id`; la carga nocturna escribe `batch_id` en
-   todas las tablas y la puerta debe darla por buena. Si sigue en KO, **para y
-   míralo**: sería un fallo real de la puerta, no un resto del pasado.
-
-2. **El buzón**: no debe haber llegado ningún «Activated». Si llegó, la carga
-   falló y el aviso funcionó.
-
-3. Si la nocturna salió limpia, seguir con la **Fase C de F-024** (abajo).
-
-> **Ojo con el firewall**: la conexión desde el puesto va por la regla
-> `datamart-puesto-pgris-2026-08-18`, creada ayer con la IP pública de
-> entonces. **Las IP del puesto rotan**: si los comandos mueren con
-> `connection timeout expired`, no es la base, es la regla. El comando para
-> recrearla, con sus dos trampas de sintaxis, está en
-> `progress/manual_F-024_fase_c.md`. No borres esa regla hasta cerrar F-024
-> (el bloque 3 de F-023 va después, por su DA-7).
-
-## F-024 · Fase B aprobada + **T17 HECHO**; faltan T18, T19 y medio T20
-
-- **Desplegado**: imagen `r20260818-2146` construida y el job ya apunta a ella.
-  `apply-grants` ejecutado.
-- **R25 verificado**: al arrancar `apply-grants` —que cuenta como escritor— las
-  dos huérfanas `RUNNING` del 18-ago pasaron a **`ABORTED` con motivo**, y con
-  ellas **5 huérfanas antiguas** que nadie sabía que estaban ahí. El `AVISO` de
-  `timings` desapareció solo.
-- **`GRANT` del rol de solo lectura sobre `_meta.v_frescura` y
-  `_meta.v_raw_state`: verificados por catálogo** (`has_table_privilege`), sin
-  leer ningún secreto del vault. Lo único no probado es la conectividad de
-  punta a punta del MCP, que no es de F-024.
-- **T20 medio hecho**: la foto del `sin_batch` (31 tablas de `raw` sin
-  identidad de ejecución) **está capturada** en
-  `progress/manual_F-024_fase_c.md`, y ya no se puede repetir: la nocturna se
-  la lleva. Falta la otra mitad, `stage --sin-puerta` registrando `SKIPPED`.
-- **Falta T18** (muerte externa controlada) y **T19** (alerta de frescura de
-  extremo a extremo). Las dos exigen al humano: T18 relanza una carga completa
-  de ~3 h 15 —no la lances si se solapa con la nocturna— y T19 exige ver
-  llegar el correo. Comandos exactos en `manual_F-024_fase_c.md` y en
-  `requirements.md` R23–R26.
-- **Evidencias repuestas con el arnés nuevo**: 596 tests, cobertura 100 % de
-  372 líneas cambiadas, mutación **108/106/2** idéntica a la primera medición,
-  con los 2 supervivientes (`bold=True` de cabeceras) ya aceptados por el
-  humano como equivalentes.
-
-## Arnés: de sin versionar a 1.5.1, y `arnes-base` ya va por 1.5.2
-
-- `dev` lleva el arnés **v1.5.1**: portero ligero en el hook `Stop`
-  (`ARNES_SALTAR_SUITES=1`), mutación en paralelo por worktrees, `BACKLOG.md`
-  generado desde `features.json`, puerta de rutas sensibles (inactiva: no hay
-  `harness/rutas_sensibles.json`), y el sello en `harness/ARNES_VERSION.md`.
-- La 1.5.1 **nació aquí y se portó a `arnes-base`** el mismo día: repetir una
-  campaña de mutación ya no borra el análisis de los supervivientes. Pasó de
-  verdad al remedir F-024, con dos mutantes equivalentes ya aceptados que
-  volvieron a quedar en `PENDIENTE`.
-- **`arnes-base` está ya en 1.5.2**, subida desde fuera de esta sesión. **Hay
-  que mirar qué trae y propagarlo**; este repositorio se quedó en la 1.5.1.
-
-## Specs escritas y decisiones cerradas por el humano (2026-08-18)
-
-| Feature | Estado | Dónde |
-|---|---|---|
-| **F-011** carga incremental | `spec_ready`, `critico` | rama `feature/F-011-carga-incremental` |
-| **F-023** cierre operativo de F-003 | `spec_ready`, `critico`, `sdd=true` | rama `feature/F-023-cierre-operativo-f003` |
-| **F-025** ventana de negocio y build | `pending`, prioridad 10 | spec en la rama de F-011 |
-| **F-026** RBAC sin propagar en `60_create_identity.ps1` | `pending` | ficha en `features.json` |
-| **F-027** sin camino para cambiar env vars de un job vivo | `pending` | ficha en `features.json` |
-
-Lo que hay que saber de esas decisiones, sin releer las specs:
-
-- **F-011 ya no lleva ventana de negocio.** El humano dejó **sin decidir** qué
-  es una «obra abierta» (es de Negocio), así que el bloque C salió entero a
-  **F-025**. F-011 se queda con medir (siempre) y la ingesta incremental (solo
-  si el ahorro estimado es ≥ 20 min o la ingesta llega al ≥ 40 % del total).
-- **La sospecha que abría F-011 era falsa**: la carga del 18-ago se reparte en
-  ingesta 33 min (20 %), `build_stg` 111 (**67 %**) y `build_mart` 21 (13 %).
-  El cuello está en el build. Por eso **F-025 va por delante** del bloque B de
-  F-011.
-- **El hallazgo de F-009 estaba mal contado**: `fecalt` 18 (no 16), `fecmod` 6
-  (no 3), `sello` 2, y sobre todo **`tiemod` en ~190 tablas**, que nadie
-  mencionaba y que la ingesta **ya copia** a `_source_tiemod`. Si sirve como
-  watermark se responde con SQL local, sin volver a leer Sigrid.
-- **Recarga completa: los domingos.**
-- **F-023 sube a `critico`**: cada borrado exige acta con el OK citado. Se
-  retiran todas las reglas `datamart-puesto-*`; **no** se tocan `ClientPgris`
-  ni `FirewallIPAddress_2026-6-16` (son de `albaranes`). El bloque del
-  firewall va **después** de la Fase C de F-024.
-
-## Disco del Postgres: decisión tomada, con umbral de caducidad
-
-`05_check_prereqs.ps1` da **FALLO** por el disco al 74,5 % y el humano
-**autorizó desplegar igualmente** y **no ampliar**, con los datos delante:
-18,5 GB de 32 usados (de los que `sigrid_dm` son 18: `stg` 10, `raw` 4,8,
-`mart` 2,2), picos de **88,5 %** durante la carga, ~4 GB de margen.
-
-**Ese FALLO concreto es conocido y aceptado; cualquier otro fallo del script
-sigue siendo bloqueante.** La decisión caduca —y pasa a «ampliar», hablándolo
-con los dueños de `albaranes` y `partes`— si el pico supera el **90 %**, si la
-base en reposo pasa de **~78 %**, o si vuelve a haber un episodio de solo
-lectura como el del 2026-08-09. Está escrito también en la memoria persistente
-del proyecto (`disco-postgres-compartido-no-ampliar`).
-
-## Ramas vivas y el orden de integración (importa)
-
-| Rama | Qué lleva |
-|---|---|
-| `dev` | arnés 1.5.1, 418 tests. Sin F-023 ni F-024 |
-| `feature/F-024-coherencia-cargas-truncadas` | la feature + T17 + los cuadernos. **Es la rama de trabajo de hoy** |
-| `feature/F-023-cierre-operativo-f003` | spec cerrada |
-| `feature/F-011-carga-incremental` | spec cerrada + spec de F-025 |
-| `chore/arnes-1.5.0`, `chore/arnes-1.5.1` | ya fusionadas a `dev` |
-
-`harness/features.json` **diverge en cuatro ramas a la vez** porque `dev` aún
-no conoce F-023 ni F-024. Al integrar dará conflicto en ese fichero: **es
-esperado**. Orden que menos duele: **F-024 → F-023 → F-011**, y en cada
-conflicto se conserva la entrada más nueva (la que trae las decisiones
-cerradas). Nada de esto se ha subido: **no hay push ni PR**, todo son commits
-locales.
-
-## Fuera de este repositorio
-
-- **`azure-apps/sigrid_api.md` corregido** (commit local): la tabla daba los
-  defectos del código como si fueran los valores vigentes. La instancia `dev`
-  corre **`MAX_ALLOWED_ROWS` 500.000** (no 1.000),
-  **`MAX_QUERY_TIMEOUT_SECONDS` 230** (no 120) y `MAX_STATEMENTS_PER_BATCH`
-  50 (no 20). Nueva sección 4.1 con el comando para reproducirlo. Por eso
-  nuestro `page_size = 10000` con `timeout 230` funciona.
-
-## Cabos sueltos menores, para no redescubrirlos
-
-- `check-coherencia` imprime «(ejecucion **None**)» cuando el histórico no
-  tiene `batch_id`: enseña un `None` de Python donde debería decir «sin
-  identidad de ejecución». Cosmético.
-- El `TOTAL` de `timings` suma **todas** las ejecuciones del día, incluidas las
-  que murieron; no es la duración de la carga buena. Confunde a quien lo lea
-  sin contexto.
-- En la CLI de `az` del puesto: en `firewall-rule create` el servidor va en
-  `--server-name` y la regla en `--name`; **`--rule-name` no existe**.
-
----
-
-# F-024 · Fase B — histórico de la sesión de mediodía (T17 ya está hecho: ver arriba)
-
-Rama `feature/F-024-coherencia-cargas-truncadas` (nace de la de F-003, que
-lleva el fix del timeout de sigrid-api y el techo del job). Spec en
-`specs/F-024-coherencia-cargas-truncadas/`. **Las 8 decisiones están
-CERRADAS** (2026-08-18, «aprobado con las recomendadas»): DA-1 A, DA-2
-estricta con `--sin-puerta` solo en comandos sueltos, DA-3 A (KQL), DA-4
-30 h, DA-5 sí, DA-6 sí, DA-7 solo escritores. **DA-8 CONFIRMADA leyendo el
-código: la ingesta hace COMMIT POR PÁGINA, no por tabla** (`truncate_table`
-y cada `copy_rows` abren su propia conexión); una muerte a mitad de tabla la
-deja truncada y parcial. Donde este fichero diga «transaccional por tabla»
-(secciones históricas de F-005/F-003), léase con esta corrección.
-
-**Fase B hecha** (T5–T16, `progress/impl_F-024.md`): `batch_id` por
-ejecución; huérfanas `RUNNING` → `ABORTED` al arrancar comandos que
-escriben; puerta de coherencia de `raw` antes de `build_stg` y de `stg`
-antes de `build_mart` (fallo ruidoso, mensaje accionable, `--sin-puerta`
-registrado `SKIPPED`); vistas `_meta.v_raw_state` y `_meta.v_frescura`;
-comandos `check-coherencia` y `check-frescura`; `infra/95_create_alert_
-frescura.ps1` (KQL 30 h). Evidencias: 591 tests, cobertura 100 % de las
-líneas cambiadas, mutación 108/106/2 (los 2, `bold=True` de cabeceras de
-consola, justificados como equivalentes — **pendiente de que el humano lo
-dé por bueno**, lo pide el rigor `critico`). Reviewer 1ª pasada:
-CAMBIOS_REQUERIDOS por 4 puntos concretos (B1 test de que `run-all` lleva
-las dos puertas activas; B2 tests de R17; B3 este fichero; B4 comandos de
-R23 con `ContainerJobName_s` y ventanas `30h/1h/5m`), **los 4 corregidos
-el 2026-08-18** — pendiente la re-review.
-
-**Fase C · MANUAL (humano), con comando exacto en `requirements.md` R23–R26
-y en `infra/README.md`:**
-
-- **T17**: `powershell -NoProfile -File infra\70_build_image.ps1` → anotar
-  tag → `powershell -NoProfile -File infra\85_update_job.ps1 -Tag <tag>`
-  → `python main.py apply-grants` (con `.env` de Azure) para que las vistas
-  nuevas de `_meta` sean legibles por el MCP. Antes: `python main.py
-  timings` para capturar el estado previo.
-- **T18 (R24)**: muerte externa controlada durante la ingesta:
-  `az containerapp job start ...` y a los ~3 min `az containerapp job stop
-  -g rg-datamart-seg-dev -n caj-datamart-seg-dev --job-execution-name
-  <ejec>`; después `python main.py timings` debe enseñar `ABORTED` con
-  motivo, `python main.py check-coherencia` debe fallar por raw
-  incoherente, y `python main.py stage` suelto sin `--sin-puerta` debe
-  negarse. Luego relanzar la carga completa.
-- **T19 (R23)**: `az extension add --name scheduled-query` (ya hecha en el
-  puesto), `powershell -NoProfile -File infra\95_create_alert_frescura.ps1`,
-  y la prueba de extremo a extremo con ventana corta (`update
-  --window-size 1h --evaluation-frequency 5m`), correo Activated,
-  restaurar a **`48h`**/`1h`. Hoy la KQL devuelve ≥1 desde las 15:08 (primer
-  `build_mart SUCCESS` del job).
-  **Aviso del 2026-08-19 (arreglado en el repositorio, pendiente de ejecutar):**
-  el primer `create` lo rechazó el ARM —`WindowSize of 1800 minutes is not
-  supported`— porque `windowSize` solo admite unas granularidades fijas y las
-  30 h de DA-4 no están entre ellas. DA-4 no cambia; cambia cómo se expresa:
-  la **ventana** es ahora la menor granularidad admitida que la contiene
-  (**48 h**, la calcula el propio script) y el **criterio de 30 h** viaja
-  dentro de la KQL como `| where TimeGenerated > ago(30h)`. Por eso al
-  restaurar hay que poner `48h`: con `30h` el `update` se rechaza y la regla
-  se queda con la ventana corta de la prueba, disparando cada hora. Detalle y
-  evidencias en `progress/impl_F-024_T19_ventana.md`.
-- **T20 (R26)**: en local, `check-coherencia` sobre el raw anterior a
-  F-024 debe decir `sin_batch`; `stage --sin-puerta` debe construir y
-  registrar `SKIPPED`.
-
-Con la Fase C hecha y el reviewer en APROBADO → F-024 `done`, merge a
-`dev` **junto con la rama de F-003** (F-024 la contiene).
-
----
-
-# ESTADO AL CERRAR LA SESIÓN DEL 2026-08-18 · MEDIODÍA (histórico: lo vigente está arriba)
-
-**El job nocturno YA HA HECHO UNA CARGA COMPLETA EN AZURE**: ejecución
-`caj-datamart-seg-dev-6a95hln`, lanzada a mano a las 12:22 local con la
-imagen `r20260818-1003`, `Succeeded` a las 15:08 (**2 h 45**): ingesta 33
-min (20,05 M filas), `build_stg` 1 h 51 (60/60 tramos, 29,59 M filas,
-pico de disco 57,2 %), `build_mart` 21 min (5,29 M filas), grants OK.
-Antes hubo dos muertes instructivas y corregidas el mismo día: la noche
-del 18 (02:00 UTC) por `timeout_seconds` 300 > 230 de sigrid-api (fix
-`193fc3c`, default 230 con tope), y a las 10:08 por `DeadlineExceeded` a
-las 2 h justas en el tramo 39/60 (fix `1a09f63`, `replicaTimeoutSeconds`
-7200 → 18000, aplicado al job en caliente). **La alerta funcionó en real
-las dos veces** (Activated a los ~6 min, Deactivated después). Próxima
-ejecución programada: madrugada del 19 a las 02:00 UTC — debería ser la
-primera nocturna limpia; lo primero de la próxima sesión es comprobarlo
-(`timings` con `.env` de Azure + buzón sin Activated).
-
-**Corrección de un supuesto repetido en este fichero**: la ingesta NO es
-transaccional por tabla; hace **commit por página** (DA-8 de F-024,
-confirmado en código). Donde abajo diga «transaccional por tabla», léase así.
-
-**Ramas y features**: F-024 con Fase B APROBADA por el reviewer (2 pasadas,
-`progress/review_F-024.md`) y Fase C pendiente (T17–T20, ver su sección);
-F-023 con el bloque 1 hecho; F-003 `blocked` a propósito hasta F-023. La
-rama de F-024 nace de la de F-003: se mergean juntas a `dev` cuando F-024
-cierre. **Los 2 mutantes equivalentes de F-024 (`bold` de cabeceras) quedaron
-ACEPTADOS por el humano el 2026-08-18** (requisito del rigor `critico`).
-**Pendiente del humano**: pushes de las dos ramas. El remoto de
-`azure-apps` en GitHub (hoy solo existe en local) queda en **baja prioridad**
-por decisión del humano; mientras tanto, la única copia es la de su disco.
-
-**Documentación**: el diccionario de Sigrid se movió a
-`azure-apps/sigrid_tablas.md` (arnés 1.4.1 con la regla de «documentación
-compartida = una copia en el ecosistema + puntero»); este proyecto sigue
-sin `harness/VERSION` (actualización del arnés en el backlog).
-
----
-
-# F-003 · DESBLOQUEADA (F-019 done el 2026-08-17) — tanda 2 HECHA, cierre en F-023
-
-> F-019 cerrada con APROBADO del reviewer (dos pasadas,
-> `progress/review_F-019.md`) y resumen en `history.md`. El siguiente
-> movimiento es del humano: `jobProgramable: true` en `infra/env/dev.json`
-> (T14 de F-019 / R16) y la tanda 2 de abajo. La sección siguiente se
-> conserva como contexto de F-003.
-
-Rama `feature/F-003-infra-caj`, rigor `critico`. **T1–T17 completas** y
-**re-review del reviewer: APPROVED** el 2026-08-10 (`progress/review_F-003.md`,
-segunda pasada anexada; la primera fue CHANGES_REQUESTED por la puerta del
-disco mal condicionada, corregida y verificada). DA-4 cerrada por el humano:
-opción B, contraseña vía referencia de Key Vault; enmienda fechada en la spec.
-
-## Tanda 1 del bloque 5 · EJECUTADA por el humano el 2026-08-10 (T18–T22)
-
-| Qué | Resultado verificado (lecturas del líder) |
-|---|---|
-| Resource group | `rg-datamart-seg-dev` en spaincentral, 7 tags acens (R15) — `costcenter=pendiente` hasta que acens dé el centro de coste |
-| Log Analytics | `log-datamart-seg-dev`, PerGB2018, 30 días |
-| Entorno Container Apps | `cae-datamart-seg-dev`, sin VNet, logs a log-analytics (R16). **IP de salida: 68.221.221.85** |
-| Firewall Postgres | Regla `caj-datamart-seg-dev` → 68.221.221.85 creada en `psql-albaranes-rs9k2` con autorización expresa del humano (R23 parcial) |
-| Storage | `stdatamartsegdev`: sin acceso público, sin clave compartida, TLS1_2, contenedor `aux` (R17) |
-| Key Vault | `kv-datamart-seg-dev` con RBAC; secretos: `SIGRID-API-FUNCTION-KEY`, `pg-sigrid-dm-app`, `pg-mcp-sigrid-dm-ro` (R18 + paso 8 bis hecho, migración sin exponer valores) |
-| Identidad | `id-datamart-seg-dev` con exactamente 3 roles de ámbito recurso (R19) |
-| Imagen | `datamart-seg-anual:r20260810-1024` en el ACR, único tag, sin latest (R20) |
-
-**Tanda 2 EJECUTADA el 2026-08-17 (noche), por el líder con autorización
-expresa del humano («lanzas tu»):**
-
-- **T14**: `jobProgramable: true` (commit `9d31475`),
-  `test_f003_infra.py` 38 passed.
-- **Imagen nueva** `r20260817-2025` construida con `70_build_image.ps1`
-  (la de T21 era del 10-ago, sin los fixes de T13).
-- **T23 HECHO** tras 4 intentos fallidos instructivos (corte DNS a mitad
-  del sondeo → cascarón `Failed` borrado; carrera con el borrado
-  pendiente; y un BUG real: `00_vars.ps1` define `$TAG` con la hora
-  actual y machacaba el parámetro `-Tag` por la insensibilidad a
-  mayúsculas de PowerShell → `MANIFEST_UNKNOWN`; corregido en `19f51a3`
-  salvando el parámetro en `$TagPedido`). Job `caj-datamart-seg-dev`
-  creado y PROGRAMADO (`0 2 * * *` UTC), identidad `id-datamart-seg-dev`,
-  secretos por referencia a Key Vault.
-- **T24 HECHO**: primera prueba Failed por args pegados
-  (`--args main.py,version` llega como un solo argumento; hay que pasar
-  `"main.py" "version"`); segunda `Succeeded`
-  (`caj-datamart-seg-dev-41p0exu`).
-- **T25 HECHO**: KQL contra `log-datamart-seg-dev` en verde; columnas
-  reales: `ContainerAppSystemLogs_CL.JobName_s/Reason_s/Log_s` y
-  `ContainerAppConsoleLogs_CL.Log_s`. Los logs muestran
-  `etl-sigrid-seguimiento 0.1.0 · image: datamart-seg-anual:r20260817-2025
-  · build: 2026-08-17T18:25:41Z` — el tag coincide.
-- **T26 CREADA, pendiente del correo**: la métrica real es
-  `Executions` con dimensión `state` (la doc decía
-  `JobExecutionCount/Status`, que no existen; script corregido). DA-3
-  resuelta: el grupo de acción de la landing zone está VACÍO, así que
-  alerta propia con el correo del humano por parámetro (nunca en el
-  repo). Fallo provocado con subcomando inexistente:
-  `Failed` a las 20:46:24 local. **T26 VERIFICADO**: correo «Azure:
-  Activated Severity: 1 alert-caj-datamart-seg-dev-failed» recibido a
-  las 20:51:58 (5 min 34 s después del fallo), confirmado por el humano
-  y contrastado por el líder en el buzón vía MCP. **TANDA 2 COMPLETA.**
-  Primera ejecución nocturna real: 2026-08-18 a las 02:00 UTC (04:00
-  local) — revisar por la mañana `timings` y los logs.
-
-**Queda tras el correo**: las 3 verificaciones MANUAL de F-004 y retirar
-las copias viejas de los secretos en `kv-albaranes-rs9k2` ahora que el
-job tiene una ejecución correcta.
-
-**Defectos encontrados al desplegar (todos corregidos o anotados):** dos
-roturas de PowerShell 5.1 en los scripts (JMESPath con `?`/`!` contra az.cmd y
-comprobaciones de existencia que morían por stderr), corregidas por el
-implementer y verificadas ejecutando; el puesto NO tiene pwsh 7, el README ya
-usa `powershell -NoProfile -File`. Anotados sin corregir aún (para la vuelta
-de F-003): el comando de firewall del README usa `-n` para el servidor y la
-versión actual de az exige `--server-name`/`--name`; y la verificación de
-roles de `60_create_identity.ps1` consulta antes de que RBAC propague y lanza
-un `throw` falso (necesita reintento con espera).
-
-## ⚠ LAS DOS PUERTAS DEL BLOQUE 5 (una sigue cerrada, la otra ya se resolvió)
-
-**1 · El disco (incidente del 2026-08-09, más abajo).** El job nocturno
-ejecuta la misma carga que llenó el disco del servidor compartido. Entre A, B y
-C **ya se decidió: la B**, y es `F-019` en `harness/features.json`. Lo que
-falta, por tanto, no es decidir: es implementarla. **NO crear el job programado
-(T23) hasta que `F-019` (build de `stg.plan_mensual` por tramos) esté
-implementada y verificada contra Azure.**
-
-La puerta es detectable por máquina, no solo prosa: `infra/env/dev.json`
-declara `jobProgramable: false`, `80_create_job.ps1` aborta con `throw`
-mientras lo lea así, y `tests/test_f003_infra.py` deja la suite en rojo si
-alguien lo pone a `true` con `F-019` sin cerrar. Además
-`infra/05_check_prereqs.ps1` falla si la ocupación supera el 60 % y
-`80_create_job.ps1` no hace nada sin `-Confirmar`, pero ninguna de esas dos
-frena hoy: el disco volvió al 42,3 % al revertirse la transacción.
-
-**2 · DA-4 · autenticación contra Postgres. CERRADA por ti el 2026-08-10:
-OPCIÓN B, ya aplicada.** La spec aprobada prohibía pasar contraseña al job (R10)
-y mandaba token de Entra (R12), pero `psql-albaranes-rs9k2` **tiene Entra
-deshabilitado** y habilitarlo es una operación de servidor que afecta a
-`albaranes` y `partes` — la descartaste el 2026-08-08, y F-005 se desplegó con
-contraseña en Key Vault. Tal cual, **el job se creaba perfecto y fallaba al
-conectar todas las noches**.
-
-Cómo queda: el job se autentica como `sigrid_dm_app` con su contraseña, que
-viaja como **referencia a Key Vault resuelta por la identidad gestionada**,
-igual que la clave de `sigrid-api`. **Ningún valor de secreto** en el
-repositorio, en un script ni en la línea de comandos. `pgAuthMode` pasa a
-`password`; el modo `entra` queda implementado, probado y **dormido**. La
-enmienda está escrita y fechada en `specs/F-003-infra-caj/requirements.md`
-§Enmiendas, sin borrar el texto original de R10 ni el bloque C.
-
-Esta puerta **ya no bloquea T23**; la única que queda es `F-019`. Lo que sí
-añade es un paso nuevo al bloque 5: **T22 bis, migrar las dos contraseñas** de
-`kv-albaranes-rs9k2` a `kv-datamart-seg-dev`, que también aprobaste. Va antes de
-crear el job, y el procedimiento seguro (el valor no pasa por pantalla, ni por
-fichero, ni por el historial) está en `infra/README.md` §«Paso 8 bis».
-
-## Guion del bloque 5 (T18–T28), listo para ejecutar
-
-Antes de nada: `pip install -r requirements.txt`. `azure-identity` y
-`azure-storage-blob` están declaradas pero **no instaladas** en el puesto, y la
-verificación 1 de F-004 fallaría con `ModuleNotFoundError`.
-
-Todo el detalle (comandos exactos, qué exige autorización, KQL de logs) está en
-**`infra/README.md`**. Resumen operativo:
-
-| Tarea | Comando | Comprobar |
-|---|---|---|
-| **T18** | `powershell -NoProfile -File infra/05_check_prereqs.ps1` → `10_create_rg.ps1` → `20_create_observability.ps1` → `30_create_env.ps1` | R15 y R16. **Anotar la IP de salida del entorno.** |
-| **T19** | `40_create_storage.ps1` → `50_create_keyvault.ps1` → `60_create_identity.ps1` | R17 y R19 (tres roles, ni uno más). **Anotar el `clientId`.** |
-| **T20** | `az keyvault secret set --vault-name kv-datamart-seg-dev -n SIGRID-API-FUNCTION-KEY --file <ruta>` | `secret list` devuelve el nombre. **Nunca `secret show`**; el valor no se escribe en ningún fichero. Necesitas `Key Vault Secrets Officer`. |
-| **T21** | `powershell -NoProfile -File infra/70_build_image.ps1` | R20. **Anotar el tag.** |
-| **T22** | Regla de firewall para la IP de T18 sobre `psql-albaranes-rs9k2` | ⚠ **Escritura sobre un recurso de `albaranes`**: autorización expresa, la ejecutas tú. Después, `firewall-rule list` debe traer las de antes **más** la nueva. |
-| **T22 bis** | Migrar `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro` de `kv-albaranes-rs9k2` a `kv-datamart-seg-dev` | **DA-4 opción B (R27).** Procedimiento exacto en `infra/README.md` §«Paso 8 bis»: `show` **siempre** asignado a variable, `set` con `-o none`, sin ficheros temporales. Comprobar con `secret list` (**nunca `show`**). Las copias viejas se borran **después** de T24. |
-| **T23** | `powershell -NoProfile -File infra/80_create_job.ps1 -Confirmar` | **BLOQUEADA por `F-019`** (DA-4 ya no bloquea). Exige que T22 bis esté hecha: el script aborta si falta el secreto. R21. |
-| **T24** | `az containerapp job start` + `job start --command python --args main.py,version` | `Succeeded` y el tag coincide con T21. |
-| **T25** | KQL de `infra/README.md` | Salen las líneas de T24. Si una columna no cuadra, `getschema` y **corregir el README**. |
-| **T26** | `az monitor metrics list-definitions --resource <id-job>` y luego `90_create_alert.ps1` | Correcto **solo si llega el correo**. Anotar hora del fallo y de recepción. |
-| **F-004** | Las tres verificaciones heredadas (blob desde el puesto, blob desde el job, prueba negativa de permisos) | Sección de F-004, más abajo. Van después de T19+T20. |
-
-Antes de T26 hace falta el nombre del grupo de acción de la landing zone
-(**DA-3 · RESUELTA el 2026-08-17**, ver la tanda 2 más abajo: el grupo de la
-landing zone está **vacío**, así que se creó alerta propia con el correo del
-humano por parámetro. Esta línea decía «sigue abierta» y contradecía a la
-tanda 2; corregido el 2026-08-19 al cerrar F-003):
-`az monitor action-group list --query "[].{n:name, rg:resourceGroup}" -o table`
-y pasarlo con `-ActionGroupName` / `-ActionGroupRg`. Si no existe ninguno
-reutilizable, `-AlertEmail`. **Ningún correo entra en el repositorio.**
-
-## Deuda que dejas decidir a ti
-
-El **ID de suscripción sigue en el historial de git** (estuvo en
-`infra/00_vars.ps1` hasta esta feature). Del árbol de trabajo ha desaparecido y
-hay un test que impide que vuelva; reescribir la historia es decisión tuya.
-
----
-
-# F-004 · CERRADA (2026-08-09) — MERGEADA A `dev`
-
-> Merge hecho: `79c48e2 Merge branch 'feature/F-004-etl-sin-dependencias-locales'
-> into dev`. La rama de F-003 sale de ahí.
-
-**APPROVED sin condiciones** (`progress/review_F-004.md`), rigor `estandar`.
-Resumen en `progress/history.md`; detalle en `progress/impl_F-004.md` y
-`progress/mutacion_F-004.md`. Quedan vivas las secciones siguientes: las tres
-verificaciones MANUAL (bloqueadas hasta F-003), la decisión DA-1 (la carga a
-`aux.*` es de F-013), la dependencia `AZURE_CLIENT_ID` hacia F-003 y el
-hallazgo del barrido de secretos para F-016.
-
-**Pendiente del humano**: el reviewer propone dos afinados nuevos de
-protocolo (`review_F-004.md` § «Automejora»): (1) al muestrear supervivientes,
-contrastar también que las mutaciones PELIGROSAS vecinas de la misma línea
-murieron; (2) exigir en C4 que el reviewer deje constancia de CÓMO comprobó
-que la suite no toca red (barrido de imports, SDK ausente, o ambos).
-
-## Verificaciones MANUAL (humano) de F-004 · BLOQUEADAS hasta F-003
-
-Las tres necesitan la storage account y el contenedor `aux`, que **crea
-F-003**. No bloquean el cierre de F-004; sí deben ejecutarse antes de dar por
-buena la lectura de blobs en Azure.
-
-1. Con `az login` activo y el rol `Storage Blob Data Reader` sobre la cuenta,
-   apuntar la variable al blob real y ejecutar:
-   `python main.py load-aux`
-   Esperado: `SUCCESS` y, en el detalle, `origen=blob` con las hojas del libro.
-2. Desde el Container Apps Job, con identidad gestionada:
-   `az containerapp job start -n <job> -g <rg>` y buscar en los logs el evento
-   `aux_file_read`. Esperado: los tres ficheros leídos y **ninguna ruta local**.
-3. Prueba negativa del mensaje de permisos: retirar temporalmente el rol,
-   ejecutar `python main.py load-aux` y comprobar que el error dice qué rol
-   falta y qué hacer. **Volver a asignarlo después.**
-
-## Decisión abierta DA-1 · ¿quién carga los Excels a `aux.*`?
-
-F-004 deja los tres libros **leídos y validados**, no volcados. Motivo: las
-tablas destino no existen (`aux` solo tiene `periodificacion_partida`, vacía) y
-**el esquema de los tres Excel no está en el repositorio** —columnas, hojas,
-claves— ni las reglas que los mapean a `mart`. Inventarlo sería inventar el
-modelo de datos de Negocio. Necesita decisión del humano y feature propia.
-
-## Dependencia de F-004 hacia F-003
-
-Si el job **no** usa identidad *system-assigned*, F-003 debe inyectar
-`AZURE_CLIENT_ID` en el entorno del contenedor: `DefaultAzureCredential` lo lee
-solo, pero alguien tiene que ponerlo. Y la identidad necesita el rol
-`Storage Blob Data Reader` sobre la cuenta.
-
-## Hallazgo para F-016 (refuerzo de los tests de F-005) · RESUELTO EN F-016
-
-`test_f005_r21_barrido_de_secretos_en_el_arbol` daba **falso positivo con
-rutas largas**: su patrón de base64 (`[A-Za-z0-9+/]{24,}`) casó con
-`sigrid/infrastructure/excel/` al añadir una línea a `docs/ARCHITECTURE.md` y
-puso `init.sh` en rojo. F-004 no tocó el test de otra feature: reformuló la
-frase.
-
-**Cerrado el 2026-08-10 por F-016** (única excepción autorizada para tocar un
-test de F-005): el barrido es ahora la función `buscar_secretos()` y el patrón
-de clave descarta el candidato solo si **parece una ruta** —dos barras o más
-**y** ni una mayúscula—. Con control negativo
-(`test_f016_el_barrido_afinado_caza_la_clave_y_no_la_ruta`), que se pone rojo
-si alguien afina de más.
-
----
-
-## ⚠ INCIDENTE 2026-08-09 ~21:00 · disco del servidor compartido casi lleno
-
-Tercer intento del paso 8: `raw` completa (incl. `dca`), pero
-`stage`/`build_plan_mensual` **llenó el disco de 32 GB** del servidor
-compartido: storage_percent subió a **93,4 %** a las 20:55 y Azure activó la
-protección → servidor **en solo-lectura ~10 min** (20:55–21:05) y conexión
-matada (`AdminShutdown`). La transacción se revirtió y el disco volvió a
-**42,3 %** (≈13,5 GB usados: base previa 4,1 + `raw` del datamart ≈9,4).
-`albaranes` y `partes` pudieron fallar escrituras en esa ventana (sábado
-noche; revisar sus logs).
-
-**Causa raíz**: `stg/08_plan_mensual.sql` explota `raw.obrparpre` (13,76 M
-filas) con `CROSS JOIN LATERAL unnest(string_to_array(planif,'|'))`; en el
-B1ms (2 GB RAM) los sorts derraman a ficheros temporales sobre el mismo disco
-→ 16+ GB de temporales/WAL y 103 min sin terminar. En local no pasa porque
-sobra RAM. **Veredicto anticipado del paso 9: `Standard_B1ms` + 32 GB NO
-aguanta el build completo de stg tal como está escrito.**
-
-**PROHIBIDO relanzar `stage` contra Azure hasta decidir** (lo volvería a
-llenar). → **Al día 2026-08-10**: decidido (opción B) e **implementado**
-(F-019, sección al final de este fichero). La prohibición se levanta cuando el
-humano complete T1/T2 y T11 en local; el propio T12 es el primer `stage`
-autorizado contra Azure, y ya no es el mismo build: hay tramos acotados y una
-puerta de disco que aborta al 80 %. Decisión del humano pendiente entre: (A) crecer el disco 32→64 GB
-(operación online pero **irreversible** y sobre el servidor compartido; da
-más IOPS), (B) trocear/optimizar el build de `plan_mensual` para acotar el
-pico de temporales, (C) subir el SKU. La recomendación del líder es B
-primero: A y C tocan el servidor de producción compartido y no arreglan que
-1 vCPU se arrastre.
-
-**F-005 · Fase 2 contra Azure, paso 8 a medias.** Pasos 3 a 7 y 11 hechos el
-2026-08-09. Del paso 8 (carga inicial) van **dos intentos fallidos**: el
-primero por corte de red local (11:46, `getaddrinfo failed`); el segundo llegó
-a **30 de 31 tablas** (19,7 M filas, 63 min) y solo falló **`dca`** (causa sin
-confirmar; el humano sospecha equipo desatendido/suspensión — si fue eso, el
-guardián anti-suspensión de F-014 no cumplió y hay que revisarlo). Como la
-ingesta hace commit por página (corregido en F-024: no es transaccional por tabla), lo cargado por tabla completa se conserva. **Recuperación
-preparada**: worktree limpio de `dev` en
-`C:\Users\pgris\PycharmProjects\datamart-carga` (para no importar código a
-medio editar del árbol de F-004); el humano copia `.env` y lanza
-`ingest --table dca --full` + `stage` + `build-mart` + `apply-grants`.
-Alternativa aceptada: esperar a F-003 y hacer la carga completa desde el job
-de Azure. Los pasos 9 y 10 dependen de que la base quede completa.
-
-## Lo ejecutado contra Azure
-
-| Paso | Estado |
-|---|---|
-| 3 · Puerta de espacio | **PASA**: 4,14 GiB usados de 32; **27,86 GiB libres** (exige ≥14) |
-| 4 · Contraseñas en Key Vault | Hecho: `pg-sigrid-dm-app` y `pg-mcp-sigrid-dm-ro` en `kv-albaranes-rs9k2` |
-| 5 · Base y roles | Hecho: `sigrid_dm`, 3 roles, 9 esquemas, todos propiedad de `sigrid_dm_etl` |
-| 6 · Firewall | Añadida `datamart-puesto-pgris-2026-08-09`; las 3 reglas previas, intactas |
-| 7 · `.env` | Hecho y verificado por el humano el 2026-08-09 |
-| 8 · Carga inicial | **A MEDIAS**: 30/31 tablas; falta `dca` y los pasos posteriores (ver arriba) |
-| 9 · Medición y veredicto del SKU | Pendiente del 8 |
-| 10 · Verificación de vistas | Pendiente del 8 |
-| 11 · Frontera de seguridad | Hecho, ver abajo |
-
-**Fotografía previa** (antes de tocar nada): `Standard_B1ms`, PG 16.14, 32 GB,
-auto-grow **deshabilitado**, sin HA, backup 7 días, `log_statement=none`.
-Reglas de firewall previas: `AllowAzureServices`, `FirewallIPAddress_2026-6-16`,
-`ClientPgris`. Bases previas: `albaranes`, `partes`.
-
-## Frontera de seguridad, medida
-
-- `sigrid_dm_app` conecta y `SET ROLE sigrid_dm_etl` funciona
-  (`current_user=sigrid_dm_etl`, `session_user=sigrid_dm_app`). Crea y borra.
-- `mcp_sigrid_dm_ro` **no puede escribir**: `permission denied`.
-- `mcp_sigrid_dm_ro` **sí puede conectarse a `albaranes`** —riesgo aceptado el
-  2026-08-08 al descartar `REVOKE CONNECT`— y **no puede leer sus datos**
-  (`permission denied for table`). Lo que sí ve, cuantificado: **14 nombres de
-  tabla y 450 de columna** vía `pg_catalog`, que no filtra por privilegios.
-  `information_schema` sí filtra y le devuelve 0.
-
-## Defecto encontrado y corregido
-
-`infra/sql/02_roles.sql` hacía `ALTER ROLE ... WITH NOSUPERUSER ...` y **falla
-contra Azure**: el administrador de un Flexible Server no es superusuario, y
-PostgreSQL exige el atributo SUPERUSER para cambiarlo aunque sea para ponerlo
-a NO. Contra un PostgreSQL local no fallaba porque allí el admin sí lo es:
-este fichero **solo podía romperse contra Azure**, y solo al ejecutarlo.
-
-Corregido quitando `NOSUPERUSER`, que era redundante: `CREATE ROLE` ya crea
-sin superusuario, y así se verificó (`rolsuper = f` en los tres roles).
-
-## Lo que falta
-
-1. **`.env` · HECHO y verificado** el 2026-08-09. Los once valores correctos:
-   host de Azure, `sigrid_dm`, `sigrid_dm_app`, contraseña de 32 caracteres
-   que coincide con Key Vault, `sslmode=require`, **`PG_AUTO_CREATE_DB=False`**,
-   `SET ROLE` y rol de solo lectura. `check-pg` responde PostgreSQL **16.14**
-   (Azure; el local es 16.4). La contraseña está tipada como `SecretStr`, así
-   que no puede colarse en un log.
-2. **Carga inicial · PENDIENTE, la lanza el humano**:
-   `python main.py run-all --full`. El `apply-grants` final no es opcional.
-   Puede tardar: ~4 GB a través de una API que sirve 1.000 filas por petición,
-   contra un servidor de 1 vCPU. Es repetible: si hay que abortarla porque
-   `albaranes` o `partes` se resienten, se relanza sin más.
-3. **Pasos 9 y 10, del líder, en cuanto termine la carga**: medición con
-   `python main.py timings` y **veredicto explícito sobre si `Standard_B1ms`
-   aguanta** —es la entrada de F-011—, y comparación de la huella de vistas
-   local contra Azure con el mes cerrado que fije el humano.
-
-## Nota sobre dónde viven las contraseñas
-
-Se han guardado en **`kv-albaranes-rs9k2`** porque el vault propio del
-datamart (`kv-datamart-seg-dev`) **lo crea F-003 y todavía no existe**. Es una
-decisión de conveniencia, no de diseño: **F-003 debe moverlas** a su vault y
-actualizar la referencia. Anotado para que no se quede así por inercia.
-
-> **Al día 2026-08-10:** deja de ser una nota suelta. Con DA-4 cerrada (opción
-> B) la migración es **T22 bis** del bloque 5, con procedimiento escrito en
-> `infra/README.md` §«Paso 8 bis» y requisito propio (**R27**). Sigue
-> pendiente de ejecutar: el vault de destino aún no existe.
-
----
-
-# F-015 · CERRADA (2026-08-09) — pendientes resueltos el mismo día
-
-Implementada y **APROBADA** por el reviewer a la primera
-(`progress/review_F-015.md`). Resumen en `progress/history.md`. Los cuatro
-pendientes que elevó, cerrados por el humano el 2026-08-09:
-
-1. **MANUAL de R20 · VERIFICADO por el humano**: los cuatro comandos
-   devolvieron lo esperado (commit `5006ee8`, `ARNES_VERSION=1.2.0`,
-   herramientas presentes, guía con la sección de mutación en su línea 287).
-2. **Refuerzo de F-005 · SÍ**: creada **F-016** (`sdd=false`, rigor
-   `estandar`, prioridad 9) para los 6 huecos de riesgo ALTO. Los de riesgo
-   medio y bajo quedan como deuda anotada en `progress/mutacion_F-005.md`.
-3. **Rigor de las 9 features sin abrir**: se decidirá al abrir cada una;
-   mientras tanto heredan `critico`, que es el comportamiento buscado.
-4. **Automejora del reviewer · APROBADA y aplicada**: `reviewer.md` (paso 4
-   de la validación de rigor) y `CHECKPOINTS.md` (C4 bis) exigen ahora
-   verificar los totales de mutación de forma independiente. Portada a
-   `arnes-base` **1.2.1**.
-
-# Rumbo confirmado por el humano (2026-08-09): el ETL debe correr en Azure
-
-Nuevo orden de prioridades de las features abiertas: ~~F-004~~ (**cerrada el
-2026-08-09**) → **F-003** (Container Apps Job nocturno `--full`; spec aprobada
-el 2026-08-09, **bloques 1–4 implementados el 2026-08-10**, ver arriba) →
-**F-016** (refuerzo tests F-005) → **F-011** (incremental) → resto.
-
-Las dos recomendaciones del reviewer de F-004 están **incorporadas**: las tres
-verificaciones MANUAL de F-004 viven ahora en el guion del bloque 5 y en
-`infra/README.md`, y `AZURE_CLIENT_ID` se inyecta en el job con su propio test
-(`test_f003_r7_el_job_inyecta_azure_client_id_de_la_identidad`).
-
-Modelos de agentes: el humano decidió dejar implementer y reviewer fijados a
-`opus`; leader y spec-author siguen en `inherit`.
-
-
----
-
-# F-020 · CERRADA (2026-08-10)
-
-**APPROVED del reviewer** (`progress/review_F-020.md`), rigor `estandar`.
-Resumen en `progress/history.md`; detalle en `progress/impl_F-020.md` y
-`progress/mutacion_F-020.md`. El arnés soporta monorepos multi-servicio
-(`harness/servicios.json` opcional); `arnes-base` en **1.3.0**. Este repo
-mono-proyecto no cambia de comportamiento (verificado por el reviewer).
-
-# F-019 · Fase B APROBADA por el reviewer (2026-08-10) — BLOQUEADA esperando las fases A y C del humano
-
-**APPROVED** (`progress/review_F-019.md`): 379 tests, 100 % de cobertura de
-las líneas cambiadas, mutación 41/41 muertos (rigor `critico` cumplido).
-La feature queda `blocked` hasta que el humano ejecute las fases A
-(mediciones locales R1/R2) y C (equivalencia R13 y verificación Azure
-R14–R16, que completa el paso 8 de F-005 y permite `jobProgramable: true`).
-El guion detallado está justo debajo, escrito por el implementer.
-
-Rama `feature/F-019-plan-mensual-por-tramos`, rigor `critico`. **T3–T10
-completas** (un commit por tarea); informe en `progress/impl_F-019.md` y
-campaña en `progress/mutacion_F-019.md`. Pendiente del **reviewer** y, después,
-de las verificaciones MANUAL de abajo.
-
-Números reales, no estimaciones: **379 tests en verde** (4,88 s), **cobertura
-100 % de las 120 líneas cambiadas** (umbral 80 %) y **mutación 41/41 muertos,
-cero supervivientes**. Ningún agente ha abierto conexión a BBDD ni a la API.
-
-## Qué hace ahora el build de `stg.plan_mensual`
-
-Pesos por obra → plan de tramos (`etl_sigrid/domain/tramos.py`, función pura)
-→ vaciado UNA vez → por cada tramo: **puerta de disco** → SQL filtrado por sus
-obras → **una transacción** → fila propia en `_meta.etl_runs`
-(`build_stg.build_plan_mensual.tramo_NN`) y log estructurado. Si la ocupación
-supera el límite, si la medición falla o si un tramo revienta: la tabla queda
-**vacía**, el paso queda **FAILED** y `build_mart` no llega a ejecutarse.
-
-Tres parámetros nuevos, todos con default y cambiables por variable de
-entorno: `PG_TRAMO_MAX_FILAS` (1 000 000), `PG_DISCO_TOTAL_GB` (32) y
-`PG_DISCO_LIMITE_PCT` (80).
-
-## GUION MANUAL DEL HUMANO (por orden; ninguno lo puede ejecutar un agente)
-
-Los comandos exactos están en
-`specs/F-019-plan-mensual-por-tramos/requirements.md`. Recordatorios de
-entorno: `PSQL` = `& "C:\Program Files\PostgreSQL\16\bin\psql.exe"`, **las
-opciones van ANTES** de la cadena de conexión, y `.env` apunta HOY a Azure (la
-copia local está en `.env.local.bak`).
-
-### 1 · T1 y T2 — medir en LOCAL (R1) y fijar las constantes — HECHO 2026-08-11
-
-Mediciones del humano anotadas en `design.md` §2: 29.091.584 filas finales
-(7,5 GB), explosión master 69,05 M posiciones (×18,4), obra más pesada
-298.053 filas. **Ninguna constante cambia** (298 k ≪ 1 M del tramo). El
-derrame (medición 4 de R1) se toma en T11 alrededor del `stage` nuevo:
-F-019 ya estaba mergeada en `dev`, el build antiguo ya no es ejecutable.
-
-Incidencias del día, ya resueltas: (1) el checksum de R2/R13 se reformuló
-**por cubos** — la fórmula original superaba el límite de 1 GB por cadena de
-Postgres; la fórmula corregida está en `requirements.md` §R2 y es la que hay
-que repetir en R13. (2) El humano editó por error `.env.example` (versionado)
-con secretos reales; nunca llegó a commit, se restauró la plantilla y la
-configuración de Azure quedó en `.env.azure.bak` (ignorada). **Recomendado
-rotar** la contraseña de `sigrid_dm_app` (y el secreto `pg-sigrid-dm-app` de
-`kv-datamart-seg-dev`) antes de crear el job.
-
-**Línea base R2 capturada (build antiguo, local):**
-`29091584|0a4024a22cb5c4872061820f66c9024c`
-(+ `huella_local_antes_f019.csv` en el puesto del humano, sin versionar).
-
-### 2 · T11 — equivalencia funcional en LOCAL (R13), la prueba de fuego
-
-1. Con `.env` apuntando a LOCAL, y **antes** de nada, capturar la línea base
-   de **R2**: el checksum de contenido y `python main.py fingerprint-views`
-   con el árbol de `dev` (build antiguo).
-2. Con la rama de F-019: `python main.py stage`, repetir el checksum y
-   `python main.py compare-fingerprints`.
-
-Esperado: **checksum idéntico carácter a carácter** y cero diferencias.
-Cualquier diferencia es FALLO: se marca la feature `blocked`, no se
-racionaliza.
-
-**Incidente 2026-08-11/12 (T11 pendiente de reintento).** El primer `stage`
-del build nuevo (2026-08-11 23:53) FALLÓ a los 28 s: la puerta de disco R10
-saltó con «ocupación 169,26 % > 80 %» porque el `.env` local no define
-`PG_DISCO_TOTAL_GB` y aplicó el default de 32 GB (pensado para Azure),
-mientras el Postgres local suma ~54 GB de bases. El fail-safe se comportó
-como está diseñado: tabla vacía, paso FAILED, cero tramos ejecutados.
-Corrección para el reintento: añadir `PG_DISCO_TOTAL_GB=200` **solo al
-`.env` local** (disco real de 920 GB); `.env.azure.bak` no define la
-variable, así que en Azure seguirá aplicando el 32 correcto. Además, el
-2026-08-12 el `.env` quedó apuntando a Azure por error y se lanzaron dos
-`stage` contra el servidor compartido de producción: ambos murieron **antes
-de conectar** (timeout y fallo de DNS), no se escribió nada. Nueva línea
-base de derrame para el reintento (los contadores sobrevivieron al
-reinicio del puesto de las 04:35): `temp_files=16161`,
-`temp_bytes=578.037.755.664`.
-
-**T11-bis (aprobado por el humano el 2026-08-12).** El reintento del stage
-nuevo terminó en verde (60 tramos, 53 min, ocupación máx. ~31 %,
-29.403.619 filas), pero destapó que la línea base del 22-jul era
-**inválida**: el `raw` se reingirió el **30-jul**, después del último build
-viejo. Quedan ANULADOS el checksum `29091584|0a4024a2...` y
-`huella_local_antes_f019.csv` (comparaban datos del 22-jul contra datos
-del 30-jul). Plan aprobado: worktree del build viejo en
-`C:\Users\pgris\PycharmProjects\datamart-old-f019` (commit `2cb6de7`, el
-`dev` previo al merge de F-019) → build viejo sobre el `raw` del 30-jul →
-checksum y huella viejos → build nuevo en el repo principal → checksum y
-huella nuevos → comparación exacta. **`ingest` no se ejecuta en ningún
-momento** para mantener el `raw` congelado. Verificado que el SQL de
-`stg/` no usa `CURRENT_DATE`/`now()`: el build es determinista dado el
-`raw`. Medición 4 de R1 ya tomada con el stage nuevo de hoy: **derrame
-12,8 GB de temporales / 29,4 M filas ≈ 0,47 KB/fila** (delta de
-`temp_bytes` 578.037.755.664 → 591.769.096.726 alrededor del `stage`
-completo).
-
-**T11-bis, brazo 1 COMPLETADO (2026-08-13).** Build viejo (worktree
-`2cb6de7`) sobre el `raw` del 30-jul: **29.403.619 filas** — mismo recuento
-que el build nuevo. Duración del monolítico: **6 h 24 min** (22.532 s solo
-`plan_mensual`) frente a los 53 min del build por tramos. Derrame del
-monolítico: 13,86 GB ≈ 0,47 KB/fila (calcado al del nuevo; la mejora del
-troceo es tiempo y pico de ocupación, no derrame). Capturas de referencia:
-
-- **Checksum viejo (la referencia a clavar):**
-  `29403619|ec74147ef3e7175c66ed9d30d3e72f9f`
-- **Huella vieja:** `huella_build_viejo_f019.csv` (34 vistas, 694 métricas,
-  sin `--periodo-hasta`; la nueva debe capturarse igual), sin versionar.
-- Base de temporales antes del brazo 2: `temp_files=17802`,
-  `temp_bytes=620.626.993.530`.
-
-**T11-bis, brazo 2 y VEREDICTO: FALLO (2026-08-13, ~01:00).** El stage
-nuevo terminó en verde (49 min, mismo recuento 29.403.619) pero el checksum
-NO coincide:
-
-- viejo:  `29403619|ec74147ef3e7175c66ed9d30d3e72f9f`
-- nuevo:  `29403619|c58b928de0c7bf297c9158b8f3faa370`
-
-La feature sigue `blocked` (ya lo estaba) y NO se avanza a T12/T13/T14.
-Evidencia completa: mismo recuento; `compare-fingerprints` de
-`huella_build_viejo_f019.csv` vs `huella_build_nuevo_f019.csv` equivalente
-sin avisos (OJO al peso real de esa evidencia: las tablas fact de `mart`
-están congeladas desde el 22-jul porque `build-mart` no corrió, pero las
-vistas de `cierre/04_views_detalle.sql` y `mart/06_views_cp_tipologia.sql`
-SÍ leen `stg.plan_mensual` en vivo y sus sumas/recuentos coincidieron);
-`raw` congelado verificado (cero ejecuciones en `_meta.etl_runs` entre
-builds); diff del SQL viejo→nuevo limpio (solo comentarios, TRUNCATE al
-step y el filtro `F019_FILTRO_OBRAS` en ambas ramas; ni una expresión de
-negocio cambió); sin columnas float (todo `numeric`/fechas/ids/text); las
-ventanas de 08 son MAX/COUNT (insensibles a empates) y el LAG ordena por
-`posicion_mes`, único por `WITH ORDINALITY` dentro de cada presupuesto.
-
-Hipótesis abiertas: (a) no determinismo por empates en alguna parte aún no
-localizada (se manifestaría también entre dos ejecuciones del MISMO build),
-(b) diferencia de ESCALA en `numeric` (`1.50` vs `1.5`: igual como número,
-distinto como texto; invisible para vistas y tests, letal para el
-checksum), (c) diferencia real de contenido que los agregados no ven.
-
-Plan de diagnóstico propuesto al humano (pendiente de su OK):
-1. Congelar evidencia: `CREATE TABLE tmp_f019_nuevo_a AS SELECT * FROM
-   stg.plan_mensual` (~7,5 GB en local).
-2. Test de reproducibilidad (barato, decisivo): relanzar el stage NUEVO
-   (~50 min) y re-checksum. Si difiere de `c58b928d...` → el build no es
-   reproducible consigo mismo → el criterio de R13 es insatisfacible tal
-   cual y el arreglo es fijar desempates deterministas (cambio de código
-   vía SDD) o redefinir R13. Si coincide → diferencia sistemática
-   viejo↔nuevo.
-3. Solo si es sistemática: relanzar el build VIEJO en el worktree (~6,4 h)
-   y hacer diff por filas contra `tmp_f019_nuevo_a` con igualdad NUMÉRICA
-   (`EXCEPT` en ambas direcciones, insensible a escala): vacío → solo
-   escala (equivalencia semántica probada, decidir sobre R13); no vacío →
-   muestrear filas y columnas discrepantes y buscar la causa.
-
-**Resultados del plan (2026-08-13, humano dio OK y lo ejecuta el agente):**
-
-- Paso 1 HECHO: `public.tmp_f019_nuevo_a` creada con las 29.403.619 filas
-  del build nuevo (borrar al cerrar la investigación).
-- Paso 2 HECHO — **el build nuevo ES reproducible**: segunda ejecución
-  (2026-08-13 10:07→11:51) → checksum `29403619|c58b928de0c7bf297c9158b8f3faa370`,
-  idéntico carácter a carácter al de la primera. La diferencia con el
-  viejo es SISTEMÁTICA. Hipótesis (a) descartada para el build nuevo.
-- Descartado también que el parámetro de `07_version_master_vigente.sql`
-  sea una fecha: es `cod=15` (código de configuración), y ningún SQL de
-  `stg/` usa `CURRENT_DATE`/`now()`.
-- Paso 3 LANZADO (~14:15 local): build viejo en el worktree (~6,4 h).
-  Al terminar: `EXCEPT` numérico en ambas direcciones entre
-  `stg.plan_mensual` (contenido viejo) y `tmp_f019_nuevo_a` (nuevo), y
-  muestreo de discrepancias por columna. Suspensión del portátil con
-  corriente desactivada (`powercfg standby/hibernate-timeout-ac 0`) a
-  petición del humano para aguantar la tirada.
-
-**CAUSA RAÍZ ENCONTRADA (2026-08-13 tarde).** Cadena de evidencia:
-
-1. El build viejo también es reproducible (2ª ejecución, 1 h 24 esta vez:
-   las 6 h 24 de ayer eran el portátil): `ec74147e...` clavado. Ambos
-   builds deterministas, contenido establemente distinto.
-2. `EXCEPT ALL` numérico: **10.259 filas difieren en cada dirección**
-   (0,035 %), solo **2 obras** (2403576, 2491656), 1.955 presupuestos,
-   solo rama master (ámbitos 8 y 11).
-3. Esas 2 obras son EXACTAMENTE las únicas de master con «filas gemelas»
-   (clave presupuesto+ámbito+mes+posición duplicada): 23.111 + 7.749 =
-   30.860, el total de master. Correlación perfecta.
-4. Por clave, los multiconjuntos de valores son IDÉNTICOS entre builds en
-   todas las columnas de negocio (pct, cantidades, importes, versión): los
-   valores solo se reparten al revés entre las gemelas. Residuo de 3
-   filas: mismo fenómeno vía `version_descripcion`.
-5. Origen de las gemelas: esas obras tienen **DOS versiones master con el
-   mismo número 13**, creadas el 22/07/2026 y el 23/07/2026. La selección
-   de vigente no desempata (empatan en número), así que cada posición sale
-   DUPLICADA. Ninguna pareja de gemelas es duplicado exacto (16.980
-   claves, todas con valores distintos entre gemelas).
-6. Mecanismo: las ventanas de 08 (`MAX ... ROWS UNBOUNDED PRECEDING`,
-   `LAG ... ORDER BY posicion_mes`) quedan SUBESPECIFICADAS cuando
-   `posicion_mes` empata (gemelas). Cada plan de ejecución (monolítico vs
-   por tramos) resuelve el empate distinto pero estable. **El troceo de
-   F-019 NO cambia ningún valor: el no determinismo es preexistente** (el
-   build viejo también cambiaría de bytes con otro plan/versión de PG).
-
-Conclusión técnica: **equivalencia semántica PROBADA** (mismos
-multiconjuntos de valores por clave en toda la tabla; los agregados a
-cualquier nivel son idénticos, por eso la huella coincidía). El checksum
-byte a byte de R13 es insatisfacible tal cual ante gemelas: mide el orden
-del empate, no el contenido.
-
-Hallazgo colateral (PREEXISTENTE, igual en ambos builds, fuera del alcance
-de F-019): la versión 13 duplicada hace que TODO el plan master de esas 2
-obras esté contado DOS VECES en `stg.plan_mensual`. Revisar con negocio si
-la vigente debería desempatar (p. ej. por fecha de creación más reciente).
-
-**DECISIÓN DEL HUMANO (2026-08-13): opción C** — enmendar R13 y dar T11
-por superado, más registrar el caso «muy bien, con código de obra y causa,
-para poder replicarlo a mano». Ejecutado:
-
-- `requirements.md` R13: enmienda fechada con el criterio canónico
-  (cardinalidad + `EXCEPT ALL` numérico con multiconjuntos por clave +
-  huella) y el veredicto **R13 SUPERADO**.
-- `docs/referencia/05_caso_obrfasamb_version_duplicada.md`: el caso
-  completo — obras 0694 (2403576, v26 duplicada, creada 20/07 y
-  23/07/2026) y 0697 (2491656, v13 duplicada, creada 22/07 y 23/07/2026),
-  ides 29916/29983, 29918/29985, 29949/29977, 29951/29979 (el segundo de
-  cada pareja siempre del 23/07, ides consecutivos: parece una misma
-  acción en Sigrid ese día), mecanismo del join por (obride, amb, fas) y
-  receta SQL de replicación. Indexado en el README de referencia.
-- `harness/features.json`: **F-022** creada (pending, sdd, prioridad 12):
-  desempate determinista, con la pregunta de negocio previa (¿corregir en
-  Sigrid o desempatar en ETL?). La F-021 sigue reservada para la
-  planificación consolidada.
-- Limpieza: DROP de `tmp_f019_nuevo_a`, `tmp_f019_diff_viejo` y
-  `tmp_f019_diff_nuevo`; worktree `datamart-old-f019` retirado (su copia
-  de `.env` eliminada con él); borrado `huella_local_antes_f019.csv`
-  (anulado). Se conservan `huella_build_viejo_f019.csv` y
-  `huella_build_nuevo_f019.csv` (evidencia del T11, sin versionar).
-  `stage` final lanzado para dejar la tabla local en estado del build
-  nuevo.
-
-**T11 CERRADO (SUPERADO).** Siguiente: T12 (R14, Azure) en horario
-acordado con el humano.
-
-- **Rotación de secretos DESCARTADA por el humano (2026-08-14):** «no es
-  crítico de momento, ignoralo». No volver a pedirla en los guiones de
-  T12/T14; queda como mejora opcional a futuro.
-- Conectividad del puesto resuelta el 2026-08-14: la IP pública del
-  humano cambió (90.160.96.77; las reglas tenían 62.174.237.73 del
-  09-ago). El clasificador de permisos bloqueó la escritura del firewall
-  al agente: los comandos `az` (crear regla del día + borrar la del
-  09-ago) se le pasaron al humano para que los ejecute él. Reglas
-  candidatas a limpieza futura si él confirma que sobran: `ClientPgris`
-  (188.87.59.11) y `FirewallIPAddress_2026-6-16` (80.28.223.30).
-
-### 3 · T12 — verificación contra AZURE (R14), en horario acordado
-
-**Pre-check SUPERADO el 2026-08-14 (~12:40).** Camino recorrido por el
-humano: re-login `az` con MFA reforzado (`--claims-challenge` +
-`--use-device-code`; la política de acceso condicional lo exigió al
-cambiar la IP), regla `datamart-puesto-pgris-2026-08-14` (90.160.96.77)
-creada y `datamart-puesto-pgris-2026-08-09` borrada en
-`rg-albaranes-dev`/`psql-albaranes-rs9k2`. La consulta de medición como
-`sigrid_dm_app` devolvió **7743 MB** ocupados en total (≈7,6 de 32 GB):
-margen sobrado para el derrame estimado de ~13 GB (pico previsto ~21 GB,
-~65 % < límite 80 %). Verificado además que `raw` quedó COMPLETA el
-09-ago: 31 tablas y `dca` con 306.737 filas; `sigrid_dm` ocupa 7.680 MB
-(los ~13,5 GB del incidente incluían WAL/sistema, que cuentan en
-`storage_percent` pero no en `pg_database_size`). T12 es directamente
-`stage` → `build-mart` → `apply-grants`, sin re-ingesta. Falta solo el
-horario acordado para la tirada.
-
-**Intento 1 de T12 FALLIDO el 2026-08-14 ~14:15 (red, no código).** El
-humano lanzó `stage` desde un sitio con cobertura mala e inestable:
-`build_presupuesto` terminó y commiteó (13.759.593 filas, 1.380 s), pero
-la conexión nueva para `record_run_end` cayó con `getaddrinfo failed`
-(tercer fallo de red de este tipo: 09-ago 11:46, 14-ago 12:33 y este).
-`plan_mensual` ni arrancó (tabla vacía). Estado de Azure seguro; el
-relanzamiento machaca lo parcial (TRUNCATE por sub-paso). **Acordado:
-reintento esta noche a la 01:00** desde conexión estable, suspensión
-desactivada. ⚠ Si el humano está en otra red, su IP pública habrá
-cambiado otra vez (la regla vigente es 90.160.96.77): comprobar con
-`ifconfig.me/ip` y crear regla nueva antes de lanzar. Dato útil ya
-medido: `build_presupuesto` en el B1ms = 1.380 s (~23 min).
-
-**T12 COMPLETADO en el intento 2 (14-ago 18:58Z → 15-ago 10:01Z, con
-pausa nocturna entre stage y build-mart).** El humano decidió relanzar
-desde la misma red inestable; blindaje aplicado: IP verificada
-(90.160.96.77 sin cambios) y `hosts` fijado a 68.221.140.205 desde
-consola de administrador (⚠ RETIRAR la línea al terminar T13). Resultados
-medidos en el `Standard_B1ms`:
-
-- `stage` **SUCCESS en 6.851,8 s (1 h 54)**: `build_plan_mensual`
-  troceado 5.993,9 s (~100 min), **60/60 tramos sin un solo aborto**,
-  29.398.375 filas. Ocupación de disco: 23,6 % inicial → **pico 46,55 %**
-  (~14,9 de 32 GB), muy lejos del límite 80 %; la puerta no intervino.
-- `build-mart` SUCCESS en 1.305,8 s (~22 min): `build_fact` 5.287.299
-  filas (1.168 s), `agg_categoria` 24.591.
-- `apply-grants` SUCCESS: 28 sentencias, rol `mcp_sigrid_dm_ro`.
-- `timings` capturado con el desglose de los 60 tramos (máx 293 s el
-  tramo 2; el 60 —564 obras pequeñas— 250 s).
-- Filas stg.plan_mensual: 29.398.375 vs 29.403.619 en local (−5.244) =
-  deriva esperada de raw (Azure 09-ago, local congelado 30-jul). Por eso
-  T13 compara solo meses cerrados con `--periodo-hasta`.
-
-**Veredicto del paso 9 de F-005: el B1ms AGUANTA el build troceado.**
-Factor de lentitud ~×2 respecto al portátil, pipeline completo
-stage+mart ≈ 2 h 16 — perfectamente viable como job nocturno. Pasos 8 y
-9 de F-005 COMPLETADOS.
-
-Levanta la prohibición de «no relanzar `stage` contra Azure» **porque ya no es
-el mismo build**. Antes de nada, el pre-check de que el rol real puede medir:
-
-```
-PSQL -h psql-albaranes-rs9k2.postgres.database.azure.com -p 5432 -U sigrid_dm_app -d sigrid_dm -X -c "SELECT pg_size_pretty(SUM(pg_database_size(datname))) FROM pg_database;"
-```
-
-Si eso falla, la puerta R10 abortaría el build nada más empezar (a propósito).
-Después: `stage` → `build-mart` → `apply-grants`, vigilando `storage_percent`
-por Portal o `az monitor metrics list`. Anotar **pico de disco**, duración y
-`python main.py timings` con el desglose por tramo.
-
-Esto **completa el paso 8 de F-005** y da el dato del paso 9 (veredicto sobre
-si el `Standard_B1ms` aguanta con el build troceado).
-
-### 4 · T13 — huella local contra Azure (R15)
-
-`fingerprint-views` contra Azure y `compare-fingerprints` con la huella local
-de T11. Sin diferencias. Cierra el **paso 10 de F-005**.
-
-**Intento 1 (2026-08-15, `--periodo-hasta 2026-05` a petición del humano;
-junio es el último cerrado pero prefirió margen): 41 FALLOS + 59 avisos.**
-Diagnóstico en dos grupos, ninguno es un bug del build:
-
-1. **22 vistas «presente vs ausente»**: en Azure nunca se construyeron
-   las capas `cierre`, `compras`, `maestro` y `retenciones` — sus builds
-   (`build-cierre`, `build-maestros`, `build-compras`,
-   `build-retenciones`) NO forman parte de `run-all` (docstring de
-   `run-all` en `main.py`) y el 09-ago solo llegó a correr `stage`.
-   Hueco de despliegue, se arregla ejecutándolos allí + `apply-grants`.
-2. **19 fallos del bloque cerrado del mart** (count +117 sobre 4,87 M =
-   0,0024 %; +319,54 € de incurrido): deriva REAL del raw entre 30-jul
-   (local) y 09-ago (Azure) — documentos de coste con fecha retroactiva
-   en meses cerrados y versiones nuevas que añaden filas a meses
-   pasados. Con raws de fechas distintas la igualdad exacta es
-   imposible por diseño; el docstring de `fingerprint-views` ya exige
-   capturar ambos lados con el mismo estado. Hace falta re-ingesta
-   sincronizada en los dos lados antes de repetir la huella.
-
-Huellas del intento: `huella_azure_f019.csv` y
-`huella_local_cerrados_f019.csv` (raíz, sin versionar).
-
-**Parte A del arreglo (2026-08-15, tarde): 3 de 4 capas desplegadas en
-Azure.** `build-maestros` (23,6 s), `build-compras` (566,1 s, 2,46 M
-filas de fact) y `build-retenciones` (86,5 s) en verde + `apply-grants`
-(303 s, lento — el servidor venía de una muerte). **`build-cierre` FALLA
-de forma REPRODUCIBLE en `build_fact`**: dos intentos muertos con
-«server closed the connection unexpectedly» a duraciones muy distintas
-(982 s a las 11:46Z y 3.654 s a las 17:26Z) → presión de memoria
-dependiente de la carga del momento (B1ms, 2 GB compartidos), no un
-punto fijo. Mismo mal que F-019 curó en plan_mensual, ahora en cierre;
-destapado porque cierre NUNCA se había construido en Azure. Además, tras
-el segundo fallo `apply-grants` estuvo **71 min sin poder conectar**
-(timeout) — servidor grogui o red del humano caída; pendiente de
-confirmar salud del servidor (sirve albaranes y partes en producción).
-
-**DECISIÓN: no más reintentos de `build-cierre` contra Azure** hasta
-diagnosticar. Plan propuesto al humano (pendiente de su OK): evidencia
-en métricas del Portal (Memory/CPU percent en las dos ventanas), parche
-corto (`SET LOCAL work_mem/jit=off` en build_fact de cierre), feature de
-backlog para trocearlo con el planner de F-019, y builds de cierre solo
-en horario valle mientras tanto.
-
-**Giro del diagnóstico (2026-08-15 noche): el sospechoso principal pasa
-a ser LA RED DEL HUMANO, no el servidor.** Cadena de evidencia: (1) el
-humano confirmó estar en un sitio «con mala cobertura e inestable»; (2)
-las dos muertes de `build_fact` ocurren a duraciones aleatorias (16 y
-61 min) durante consultas largas = conexión TCP en silencio, perfil
-típico de NAT móvil que descarta conexiones calladas; (3) ayer una
-consulta de 19,5 min (mart build_fact) sobrevivió; (4) a las 18:43Z el
-servidor respondía al psql a la primera (bases 18 GB, sano) y a las
-19:05Z un tercer intento de build-cierre NI SIQUIERA CONECTÓ (timeout a
-los 130 s) — un servidor ocioso no rechaza conexiones nuevas, una red
-caída sí. El apagón de 71 min de apply-grants queda también explicado
-por la red. **AZURE EN PAUSA hasta que el humano esté en red estable.**
-Al volver: reintento `build-cierre` + `apply-grants`; solo si volviera a
-morir a mitad de consulta en red buena, investigar OOM (experimento
-pg_sleep 40 min + métricas del Portal). Backlog nuevo: keepalives TCP en
-la conexión del ETL (no salvan un enlace muerto, sí consultas largas
-tras NAT agresivo).
-
-**CASO CERRADO (2026-08-15 ~20:20Z): era la red.** Con el enlace «un
-poco más estable» (palabras del humano), el 4º intento de `build-cierre`
-pasó a la primera: SUCCESS en 2.701 s (`build_fact` 1.609 s, 16.856
-filas; `ddl_fact` tardó 1.086 s, probablemente el servidor digiriendo
-los abortos previos) y `apply-grants` volvió a sus 9,6 s. El servidor
-queda exonerado del todo: no hay OOM, no hace falta parche de memoria ni
-trocear cierre. Los keepalives TCP siguen siendo mejora recomendable de
-backlog. **Parte A de T13 COMPLETA: las 4 capas + grants desplegadas en
-Azure.** Los 22 fallos de vistas ausentes quedan resueltos; el bloque
-cerrado sigue pendiente de la parte B (re-ingesta sincronizada de ambos
-lados + huellas `--periodo-hasta 2026-05`), que exige red estable
-(~5-6 h, la ingesta pasa todo por el portátil dos veces).
-
-**Parte B en marcha (2026-08-16). FASE 1 (Azure) CERRADA a las ~14:22Z.**
-Odisea de red del sábado, toda resuelta sobre la marcha: (1) la ingesta
-moría con páginas de 500k (descargas >2,5 min cortadas); el humano bajó
-`SIGRID_API_PAGE_SIZE` a 50000 en `.env` y pasó; (2) los 3 Excels
-auxiliares apuntaban a la carpeta extinta `OneDrive - Construcciones
-Ruesma` — ruta buena: `OneDrive - Ruesma/Documentos/Sigrid/
-tablas_auxiliares/`; corregida en `.env` (⚠ en los `.bak` quedó un
-ESPACIO colado antes de la barra, el humano debía quitarlo); `load-aux`
-solo valida, no bloquea stage; (3) la IP del humano rotó DOS veces
-(90.160.96.77 → 90.160.92.59 → 77.211.5.184); la regla vigente es
-`datamart-puesto-pgris-2026-08-16b` (77.211.5.184) — esta vez el humano
-me autorizó expresamente y los `az` los ejecuté yo (create + delete de
-obsoletas). Resultado fase 1: `run-all --full` verde (raw fresco de la
-madrugada del 16), 4 capas + grants verdes (`build_fact` cierre 16.876
-filas), y `huella_azure_t13.csv` completa: 34 vistas, 794 métricas,
-bloques estructura/vivo/CERRADO (100). FASE 2 (local) lanzada en
-paralelo en otra consola con `.env` local; regla acordada: si hay que
-relanzar la huella de Azure, SOLO tras restaurar `.env.azure.bak` al
-acabar la fase 2. Después: `compare-fingerprints huella_local_t13.csv
-huella_azure_t13.csv`.
-
-**Intento 2 de T13 (2026-08-16 noche): 22 FALLOS, los tres diagnosticados
-con causa raíz confirmada por consultas a ambos lados.** La GRAN noticia:
-los datos de negocio de los meses cerrados YA SON IDÉNTICOS (la deriva
-del intento 1 desapareció con las ingestas sincronizadas). Los 22 fallos
-son tres defectos de otra índole que la huella ha destapado:
-
-1. **10 × tipos en compras (bigint/text local vs integer/varchar
-   Azure).** Las tablas de compras heredan tipos de `raw.*` (`CREATE
-   TABLE AS`), y el raw LOCAL conserva el esquema del mapeo antiguo
-   (todo BIGINT/TEXT) porque la ingesta solo trunca, nunca recrea.
-   Azure (creado el 09-ago) refleja el mapeo vigente de
-   `entities.py::postgres_type` (int→INTEGER, nvarchar(n)→VARCHAR).
-   **El desviado es el LOCAL.** Fix: recrear el raw local (drop +
-   re-ingesta) y rebuild de compras.
-2. **9 × cierre.v_pbi_planif_vs_real (count 24.736 vs 36.657, +48 %).**
-   Bug REAL de portabilidad, confirmado: `nombre_mes` mezcla texto
-   libre de las fases de Sigrid con derivados
-   `to_char(anio_mes,'TMMonth YYYY')`, y `TM` depende de `lc_time` del
-   servidor — local `Spanish_Spain.1252` genera «Mayo 2026» (coincide
-   con el texto de fase y colapsa), Azure `en_US.utf8` genera
-   «May 2026» (convive con «Mayo 2026» y parte cada grupo en dos).
-   Verificado: mayo-2026 tiene 1 nombre en local y 2 en Azure; tabla
-   base y definición de la vista idénticas en ambos lados. Fix: derivar
-   el nombre del mes con constantes en español (sin TM) en los SQL de
-   mart/cierre y reconstruir ambos lados.
-3. **2 × sum_fact_id del mart.** `fact_id` es BIGSERIAL asignado por
-   orden de inserción sin ORDER BY → no determinista entre máquinas.
-   count y TODAS las sumas de negocio idénticas. Benigno. Fix candidato:
-   que la huella excluya claves sustitutas (columnas con default
-   nextval) o INSERT con ORDER BY determinista.
-
-**Arreglo de los defectos 2 y 3 (2026-08-16): HECHO en código.** Commits
-`42e128d` (locale: 8 apariciones de `TMMonth` → ARRAY de meses en
-castellano, dos más de las previstas en `cierre/04_views_detalle.sql`) y
-`65c52aa` (la huella deja de sumar `fact_id`/`fact_cat_id`). `init.sh`
-verde: 398 tests, cobertura 100 % de las líneas cambiadas, 1 mutante y 0
-supervivientes. Informe: `progress/impl_T13_fixes_f019.md`.
-Reprocesando las huellas T13 con el criterio nuevo los fallos bajan de 22
-a 20 y los dos que caen son los dos `sum_fact_id`. **Falta la parte del
-humano**: reconstruir mart+cierre en local y en Azure y repetir
-`compare-fingerprints`; y el defecto 1 (tipos de `compras.*`), que sigue
-abierto.
-
-**Intento 3 de T13 (2026-08-17): 5 FALLOS residuales, causa raíz cazada
-fila a fila — deriva REAL de datos, no build.** Cronología del día: el
-humano reconstruyó local anoche (run-all --full con los fixes, raw del
-sáb. noche) y por error capturó la huella local con nombre azure (el
-líder la renombró; regla nemotécnica dada: el .env decide el destino,
---out solo el nombre). Fase Azure: build-mart 1.400 s + build-cierre
-1.634 s + grants en verde. La huella de Azure necesitó 4 intentos por la
-red (2 cortes en consulta larga + 1 rotación de IP): se resolvió con
-keepalives TCP vía `PGOPTIONS=-c tcp_keepalives_idle=30...` (sin tocar
-código) y con una REGLA DE RANGO en el firewall
-(`datamart-puesto-pgris-2026-08-17-rango`, 31.4.242.0-255; el operador
-del humano rota dentro de esa subred — limpiar al cerrar). Compare:
-**0 fallos de estructura, 0 de mart, 0 de compras, 0 de planif_vs_real**
-(los 3 defectos del intento 2, arreglados y verificados). Quedan 5
-fallos, todos en `cierre.v_pbi_cierre_resumen` bloque cerrado, y el
-COPY fila a fila los reduce a UNA edición en Sigrid: obra 2313811,
-DIRECTOS, +632,74 € en el «Previsto» (fase 0) entre las dos ingestas —
-632,74×3 meses = 1.898,22 exactos en los sumatorios. Esas filas tienen
-`final_version_master` vacío: son el FALLBACK de fase 0 del cierre, que
-usa el presupuesto VIVO por diseño (documentado en cierre/02_build_fact
-§E). Conclusión: el bloque «cerrado» de las vistas de cierre contiene
-un componente legítimamente vivo; la igualdad exacta ahí solo se cumple
-si NADIE toca ningún previsto entre las dos capturas.
-
-**DESENLACE (2026-08-17): el humano eligió la OPCIÓN A.** R15 enmendada
-y SUPERADA en la spec (commit `2d95980`); tasks.md y design.md §6
-actualizados a petición del reviewer (`review_F-019.md`, 2ª pasada).
-**T13 CERRADO.** Quedan abiertas SOLO estas tareas operativas del puesto
-del humano (no son del repositorio):
-
-- Retirar la línea de `hosts` (68.221.140.205) cuando acabe el trabajo
-  contra Azure desde el portátil.
-- Limpiar reglas de firewall del puesto cuando el job de F-003 exista:
-  `datamart-puesto-pgris-2026-08-17-rango` (31.4.242.0-255) y las
-  antiguas `ClientPgris` / `FirewallIPAddress_2026-6-16` si el humano
-  confirma que sobran.
-- Decidir si `SIGRID_API_PAGE_SIZE=50000` se queda en los `.env` (fue un
-  apaño para la red inestable; en red buena 500000 es más rápido).
-Reglas de firewall vigentes: `-2026-08-16` (90.160.92.59) y `-16b`
-(77.211.5.184) — la IP del humano rebota entre ambas; se limpiarán al
-acabar.
-
-### 5 · T14 — desbloquear F-003
-
-Con T12 y T13 en verde y F-019 marcada `done`: poner `jobProgramable: true` en
-`infra/env/dev.json` y ejecutar la **tanda 2 de F-003 (T23–T26)** —crear el
-job, prueba segura, logs y alerta—. `tests/test_f003_infra.py` solo lo admite
-con F-019 cerrada, así que el propio test es la puerta. Esta feature **no
-toca** ese fichero.
-
----
-
-# F-016 · CERRADA (2026-08-10)
-
-**APPROVED** (`progress/review_F-016.md`). Resumen en `progress/history.md`.
-Los 6 huecos de riesgo ALTO de F-005, fijados con tests: la mutación sobre
-F-005 pasa de 55 a **47 supervivientes, CERO de riesgo alto**. Barrido de
-secretos afinado (sin falsos positivos de rutas largas). Deuda restante:
-47 MEDIO/BAJO contabilizados en `progress/mutacion_F-005_tras_refuerzo.md`.
-
----
-
-# F-011 · SPEC ESCRITA (2026-08-18) — pendiente de aprobación del humano
-
-Carpeta `specs/F-011-carga-incremental/` (requirements.md, design.md,
-tasks.md). Rama prevista `feature/F-011-carga-incremental`. **No se ha
-tocado código, ni `harness/features.json`, ni la carpeta de F-023.** La
-feature no declara `rigor`, así que hereda `critico`.
-
-## Los dos hallazgos que cambian el rumbo de la feature
-
-1. **La sospecha de la ficha no se sostiene contra el dato que ya tenemos.**
-   La carga completa del 18-ago (165 min) se reparte: ingesta **33 min
-   (20 %)**, `build_stg` **111 min (67 %)**, `build_mart` **21 min (13 %)**.
-   Una ingesta instantánea deja la carga en 132 min. El cuello está en el
-   BUILD, no en la extracción. Por eso la spec va por bloques: A (medir,
-   siempre) → **PARADA con firma del humano** → B (ingesta incremental, solo
-   si los números lo justifican) → C (ventana de negocio: en F-011 solo se
-   mide; la implementación pide feature propia).
-
-2. **El hallazgo heredado de F-009 está mal contado y, sobre todo,
-   incompleto.** Verificado contra `azure-apps/sigrid_tablas.md`: `fecalt`
-   sale en **18** filas (decía 16), `fecmod` en **6** (decía 3), `sello` en
-   **2** (correcto) — y **`tiemod` («Tiempo modificación») en 232 filas, ~190
-   tablas**, que la ficha no menciona. `config/tables_sigrid.yaml` ya lo
-   declara en 17 de 31 tablas y la ingesta ya lo copia a `_source_tiemod` en
-   cada carga: **si `tiemod` sirve o no como watermark se puede responder con
-   SQL local, sin volver a leer Sigrid**. Los comandos exactos del recuento
-   están en `requirements.md` §0.2 para que el reviewer lo repita.
-
-## El choque con F-024, resuelto en el diseño (no al implementar)
-
-Una incremental deja tablas de `raw` de batches distintos y la puerta de
-F-024 las declararía incoherentes. Solución: **en modo incremental la ingesta
-escribe fila `ingest_raw.<tabla>` para TODAS las tablas declaradas, traigan o
-no filas nuevas** (R9). Así todas comparten `batch_id` y
-`domain/coherencia.py` **no se toca ni una línea** (R13, R14, con tests de no
-regresión). Efecto declarado: `rows_processed` deja de ser el tamaño de la
-tabla → se añade `filas_en_tabla` a `metadata` y dos columnas **al final** de
-`_meta.v_raw_state` (lo único que `CREATE OR REPLACE VIEW` admite sin
-`DROP CASCADE`, que se llevaría los GRANT del MCP).
-
-## Decisiones abiertas que necesita validar el humano (T9 de tasks.md)
-
-- **DA-1 · ¿Qué es una «obra abierta»?** Rec.: contrato sin `fecreafin` +
-  red de «movimiento en 12 meses», como predicado en `business_rules.yaml`.
-  **Decisión de Negocio.**
-- **DA-2 · Cadencia de la recarga completa.** Rec.: semanal
-  (`INGESTA_FULL_CADA_DIAS=7`); el día lo elige el humano porque la ventana se
-  comparte con `albaranes` y `partes`.
-- **DA-3 · ¿Se acepta perder las bajas de Sigrid entre recargas completas?**
-  Rec.: sí, con guardia de recuento por tabla que fuerza `full` al divergir.
-- **DA-4 · Si `tiemod` resulta no fiable, ¿qué se hace?** Rec.: atacar el
-  build y filtrar la extracción con el campo `where` que el YAML ya soporta;
-  descartado el watermark casero por sumas de control.
-- **DA-5 · ¿Feature propia para acotar el build (el 67 %)?** Rec.: sí, y con
-  prioridad por encima del bloque B de F-011.
-- **DA-6 · `azure-apps/sigrid_api.md` no cuadra con la instancia
-  desplegada**: documenta `MAX_ALLOWED_ROWS=1000` y
-  `MAX_QUERY_TIMEOUT_SECONDS=120`, pero este ETL trabaja con `page_size=10000`
-  y `timeout_s=230` y funciona. Rec.: medirlo con `bench-sigrid` y **avisar al
-  dueño de `sigrid-api`**; este proyecto no edita ese documento.
-- **DA-7 · Umbral que justifica el bloque B.** Rec.: solo si el ahorro
-  estimado es ≥ 20 min o la ingesta pasa a ser ≥ 40 % del total.
+## Reglas vigentes que no se negocian
+
+- Escritura autorizada **solo en el esquema `_meta`** de `sigrid_dm`. Todo lo
+  demás, lecturas. `psql-albaranes-rs9k2` lo comparten `albaranes` y `partes`
+  **en producción**: las puertas corren en transacción `READ ONLY` y con
+  timeout.
+- **Firewall**: regla **única y sin fecha** `datamart-puesto-pgris`, se reescribe
+  con la IP del momento. No se crean reglas nuevas ni se tocan las ajenas.
+  (`-n` es la REGLA; el servidor va en `--server-name`.)
+- **No ampliar** los 32 GB del servidor; umbral de parada al **80 %** de disco
+  (hoy 57,93 %).
+- Nunca secretos en el repositorio. `.env` no se toca ni se sube.
+- Sin `git push` ni PRs sin petición explícita.
+- Commits **con rutas explícitas** (`git add <ruta>`, nunca `-A`): más de un
+  agente sobre el mismo árbol, y ya se mezcló trabajo ajeno en un commit.

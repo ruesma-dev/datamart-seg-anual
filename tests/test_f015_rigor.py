@@ -6,6 +6,7 @@ Sin red y sin BBDD: se leen ficheros del repositorio y estructuras en memoria.
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 from pathlib import Path
@@ -180,8 +181,21 @@ def test_f015_r16_reviewer_valida_contra_el_nivel_de_rigor(rigor: dict) -> None:
 
 # --- R19: las herramientas del arnés son genéricas --------------------------
 
-#: Nada de esto puede aparecer en las herramientas: se portan tal cual a
-#: cualquier repositorio, y una mención al proyecto de origen las ata a él.
+#: Nada de esto puede aparecer en el CÓDIGO EJECUTABLE de las herramientas: se
+#: portan tal cual a cualquier repositorio, y una dependencia del proyecto de
+#: origen las ata a él.
+#:
+#: El barrido mira el código, no la prosa (decisión del humano el 2026-08-25, al
+#: actualizar el arnés a 1.7.4). Lo que R19 existe para cazar es una herramienta
+#: que DEPENDA del datamart —un identificador, una ruta, un literal usado en la
+#: lógica—, no una que cuente de dónde salió: el arnés genérico documenta la
+#: procedencia de cada mejora («esto nació en `albaranes` F-038») y usa palabras
+#: castellanas que aquí son además nombres de esquema, como «cierre». Barriendo
+#: el texto entero, R19 se ponía roja en cada actualización sin que ninguna
+#: herramienta hubiera dejado de ser genérica.
+#:
+#: Pendiente de proponer a `arnes-base`: que las herramientas genéricas lleven
+#: su procedencia en el registro de versiones y no en el docstring del módulo.
 PALABRAS_DEL_PROYECTO = (
     r"sigrid",
     r"datamart",
@@ -193,40 +207,114 @@ PALABRAS_DEL_PROYECTO = (
     r"\betl\b",
     r"\bstg\b",
     r"\bmart\b",
-    r"\bcierre\b",
+    # `cierre` cualificado, no la palabra suelta: el arnés la usa en castellano
+    # llano («la línea base de cierre EXPIRÓ») y el esquema se cita `cierre.algo`.
+    r"cierre\.\w",
     r"\bobra\b",
     r"\bobras\b",
     r"\bamb\b",
     r"\bfas\b",
-    r"f-0\d\d",
 )
+
+#: Paquetes de ESTE proyecto: una herramienta que importe cualquiera de ellos
+#: deja de ser portable, y eso sí es una atadura (no como citar «F-038» de
+#: ejemplo en el texto de ayuda de `--feature`, que es lo que hace `tamano.py`
+#: y no ata a nadie: todos los repositorios con arnés tienen features F-0NN).
+PAQUETES_DEL_PROYECTO = ("etl_sigrid", "config", "main", "tests", "infra")
+
+
+def codigo_ejecutable(fuente: str) -> str:
+    """La fuente sin comentarios ni docstrings: solo lo que se ejecuta.
+
+    `ast.unparse` de un árbol ya podado tira los comentarios por construcción y
+    conserva los literales de cadena, que SÍ son código: un mensaje de error que
+    nombre a Sigrid ata la herramienta igual que un `import`.
+    """
+    arbol = ast.parse(fuente)
+    contenedores = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+    for nodo in ast.walk(arbol):
+        if not isinstance(nodo, contenedores):
+            continue
+        cuerpo = nodo.body
+        primero = cuerpo[0] if cuerpo else None
+        es_docstring = (
+            isinstance(primero, ast.Expr)
+            and isinstance(primero.value, ast.Constant)
+            and isinstance(primero.value.value, str)
+        )
+        if es_docstring:
+            nodo.body = cuerpo[1:] or [ast.Pass()]
+    return ast.unparse(arbol)
+
+
+def sin_documentacion(dato: object) -> object:
+    """El JSON sin sus claves `$...`, que son la documentación del fichero."""
+    if isinstance(dato, dict):
+        return {k: sin_documentacion(v) for k, v in dato.items() if not k.startswith("$")}
+    if isinstance(dato, list):
+        return [sin_documentacion(v) for v in dato]
+    return dato
 
 
 def test_f015_r19_herramientas_del_arnes_sin_menciones_especificas() -> None:
-    ficheros = [*sorted((RAIZ / "harness").glob("*.py")), RUTA_RIGOR]
+    ficheros = sorted((RAIZ / "harness").glob("*.py"))
 
     assert len(ficheros) >= 5, "faltan herramientas que revisar"
+    revisables = {
+        fichero.name: codigo_ejecutable(fichero.read_text(encoding="utf-8")).lower()
+        for fichero in ficheros
+    }
+    revisables[RUTA_RIGOR.name] = json.dumps(
+        sin_documentacion(json.loads(RUTA_RIGOR.read_text(encoding="utf-8"))),
+        ensure_ascii=False,
+    ).lower()
+
     for fichero in ficheros:
-        texto = fichero.read_text(encoding="utf-8").lower()
+        arbol = ast.parse(fichero.read_text(encoding="utf-8"))
+        for nodo in ast.walk(arbol):
+            if isinstance(nodo, ast.Import):
+                origenes = [alias.name for alias in nodo.names]
+            elif isinstance(nodo, ast.ImportFrom):
+                origenes = [nodo.module or ""]
+            else:
+                continue
+            for origen in origenes:
+                raiz_del_import = origen.split(".")[0]
+                assert raiz_del_import not in PAQUETES_DEL_PROYECTO, (
+                    f"{fichero.name} importa `{origen}`, del proyecto: deja de ser portable"
+                )
+
+    for nombre, texto in revisables.items():
         for patron in PALABRAS_DEL_PROYECTO:
-            assert not re.search(patron, texto), f"{fichero.name} menciona {patron}"
+            hallazgo = re.search(patron, texto)
+            assert not hallazgo, (
+                f"{nombre} menciona {patron} en código ejecutable: "
+                f"{texto[max(0, hallazgo.start() - 60):hallazgo.end() + 60]!r}"
+            )
 
 
 # --- R15: resolución del nivel ----------------------------------------------
 
 
-def test_f015_r15_sin_rigor_declarado_se_aplica_el_mas_exigente(rigor: dict) -> None:
+def test_f015_r15_sin_rigor_declarado_se_aplica_el_nivel_por_defecto(rigor: dict) -> None:
+    # El arnés 1.7.0 baja `nivel_por_defecto` de `critico` a `estandar` (su
+    # AVISO 1): omitir el nivel deja de arrastrar el modo más caro, pero no
+    # libra de ninguna puerta. `critico` pasa a declararse, no a heredarse.
     por_defecto = rigor["nivel_por_defecto"]
 
-    # No declarar nivel NO es la vía fácil: cae en el más exigente.
+    # No declarar nivel no elige nivel: cae en el por defecto, sea cual sea.
     assert nivel_de_feature({"id": "F-042"}, rigor) == por_defecto
     assert nivel_de_feature({"id": "F-042", "rigor": None}, rigor) == por_defecto
     # Un valor inválido tampoco relaja nada.
     assert nivel_de_feature({"id": "F-042", "rigor": "flojito"}, rigor) == por_defecto
-    # Y el más exigente exige las tres puertas.
+    # Y omitirlo sigue sin ser la vía fácil: las tres puertas se exigen enteras.
     for puerta in PUERTAS:
         assert exige(por_defecto, puerta, rigor) is True
-    assert supervivientes_maximos(por_defecto, rigor) == 0
+    # Lo único que ya no se hereda son los cero supervivientes de `critico`.
+    assert por_defecto != "critico", "`critico` se declara, no se hereda"
+    assert supervivientes_maximos(por_defecto, rigor) is None
+    # Quien sí lo declara los sigue pagando: el nivel no se ha ablandado.
+    assert supervivientes_maximos("critico", rigor) == 0
 
 
 def test_f015_r15_cada_nivel_declara_lo_que_exige(rigor: dict) -> None:

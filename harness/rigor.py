@@ -7,8 +7,12 @@ compartida en producción debe exigir más que la media. El nivel se declara en
 el campo `rigor` de cada entrada de `harness/features.json` y lo que exige
 cada nivel vive en `harness/rigor.json`.
 
-Regla dura: si una feature no declara nivel, se le aplica el más exigente.
-Omitirlo no puede ser la vía fácil para saltarse las puertas.
+Regla dura: si una feature no declara nivel, se le aplica el
+`nivel_por_defecto` de `harness/rigor.json`. Ese nivel exige evidencia real
+(fase RED, cobertura y mutación), así que omitir el campo no es la vía fácil
+para saltarse las puertas; lo que no hace es arrastrar el modo más caro —cero
+supervivientes tolerados— a features que no lo necesitan. `critico` se
+declara: no se hereda por descuido.
 """
 
 from __future__ import annotations
@@ -72,7 +76,7 @@ def niveles_validos(rigor: dict) -> list[str]:
 
 
 def nivel_de_feature(feature: dict, rigor: dict) -> str:
-    """Nivel declarado por la feature; si falta o no vale, el más exigente."""
+    """Nivel declarado por la feature; si falta o no vale, el nivel por defecto."""
     declarado = feature.get("rigor")
     if isinstance(declarado, str) and declarado in rigor["niveles"]:
         return declarado
@@ -109,11 +113,28 @@ def umbral_cobertura(rigor: dict) -> int:
 
 
 def timeout_mutacion(rigor: dict) -> int:
-    """Segundos máximos que se le conceden a la suite por cada mutante."""
-    valor = rigor.get("mutacion", {}).get("timeout_por_mutante_s")
-    if not isinstance(valor, int) or valor <= 0:
+    """SUELO de segundos que se le conceden a la suite por cada mutante.
+
+    Suelo y no techo: `harness.mutacion` deriva el timeout efectivo de la línea
+    base que mide antes de juzgar a nadie, y nunca concede menos que este valor.
+
+    «Falta la clave» y «el valor no vale» son dos averías distintas y llevan
+    mensajes distintos: cuando las dos decían «falta», quien leía el aviso se
+    ponía a buscar una clave que tenía delante. Y un booleano NO es un timeout,
+    aunque `isinstance(True, int)` diga que sí: con `true` la campaña concedía
+    **1 segundo** por mutante y salía entera en «timeout».
+    """
+    bloque = rigor.get("mutacion", {})
+    valor = bloque.get("timeout_por_mutante_s") if isinstance(bloque, dict) else None
+    if valor is None:
         raise ValueError(
             "Falta 'mutacion.timeout_por_mutante_s' en la configuración de rigor."
+        )
+    if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
+        raise ValueError(
+            f"'mutacion.timeout_por_mutante_s' no vale: {valor!r}. Tiene que ser "
+            "un entero estrictamente positivo (un booleano NO cuenta como "
+            "entero aquí: 'true' daría 1 segundo por mutante)."
         )
     return valor
 
@@ -133,6 +154,57 @@ def workers_mutacion(rigor: dict) -> int | None:
     return valor
 
 
+def max_mutantes_nivel(nivel: str, rigor: dict) -> int | None:
+    """Mutantes que se evalúan como mucho en ese nivel; `None` = sin tope.
+
+    Clave OPCIONAL, como `workers_mutacion`: ausencia, `null`, un booleano o un
+    entero absurdo (cero o negativo) se tratan como «sin tope». Un `rigor.json`
+    anterior a F-038 sigue funcionando y mide la campaña entera, que es lo que
+    hacía.
+    """
+    valor = rigor.get("niveles", {}).get(nivel, {}).get("max_mutantes")
+    if isinstance(valor, bool) or not isinstance(valor, int) or valor < 1:
+        return None
+    return valor
+
+
+def semilla_nivel(nivel: str, rigor: dict) -> int | None:
+    """Semilla del muestreo de ese nivel; `None` = la que decida quien llama.
+
+    Fijarla en el fichero es lo que hace REPRODUCIBLE una campaña muestreada:
+    dos reviewers que remidan la misma feature obtienen los mismos mutantes. A
+    diferencia del tope, aquí el `0` es una semilla legítima.
+    """
+    valor = rigor.get("niveles", {}).get(nivel, {}).get("semilla")
+    if isinstance(valor, bool) or not isinstance(valor, int):
+        return None
+    return valor
+
+
+#: Ficheros de papeleo que tienen tope de líneas, con su clave en `rigor.json`.
+CLAVES_TAMANO: tuple[str, ...] = ("requirements", "design", "impl", "review")
+
+
+def topes_tamano(rigor: dict) -> dict[str, int]:
+    """Topes de líneas del papeleo de una feature, o `{}` si no se declaran.
+
+    Bloque OPCIONAL: sin él, la puerta de tamaño se declara N/A con su motivo
+    en vez de romper el arnés de un proyecto con configuración anterior. Los
+    valores que no son un entero positivo se descartan uno a uno —incluido el
+    `$doc` del propio bloque—: un tope de cero prohibiría escribir.
+    """
+    bloque = rigor.get("tamano")
+    if not isinstance(bloque, dict):
+        return {}
+    topes: dict[str, int] = {}
+    for clave in CLAVES_TAMANO:
+        valor = bloque.get(clave)
+        if isinstance(valor, bool) or not isinstance(valor, int) or valor < 1:
+            continue
+        topes[clave] = valor
+    return topes
+
+
 # --- Inventario de features -------------------------------------------------
 
 
@@ -148,8 +220,8 @@ def cargar_features(ruta: Path | str = RUTA_FEATURES) -> list[dict]:
 def validar_features(features: list[dict], rigor: dict) -> list[str]:
     """Devuelve los errores de los niveles declarados (lista vacía = todo bien).
 
-    No declarar nivel NO es un error: se aplica el más exigente. Declarar uno
-    inexistente sí lo es: sería un rigor imaginario.
+    No declarar nivel NO es un error: se aplica el nivel por defecto. Declarar
+    uno inexistente sí lo es: sería un rigor imaginario.
     """
     errores: list[str] = []
     for feature in features:

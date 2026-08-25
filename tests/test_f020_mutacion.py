@@ -16,6 +16,7 @@ import pytest
 from harness import mutacion
 from harness.alcance import Alcance
 from harness.mutacion import (
+    INDETERMINADO,
     MUERTO,
     PYTEST_SIN_TESTS,
     SUPERVIVIENTE,
@@ -57,6 +58,29 @@ def falso_venv(raiz: Path, ruta: str) -> Path:
     return destino
 
 
+def repositorio(raiz: Path) -> Path:
+    """Deja `raiz` como repositorio git con todo lo que hay ya commiteado.
+
+    El arnés 1.6.0 añadió `guardia_arbol_limpio`: la campaña se niega a arrancar
+    si git no puede declarar limpios los ficheros que va a mutar, así que un
+    `tmp_path` suelto ya no vale como árbol de trabajo.
+    """
+
+    def git(*args: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(raiz), *args], check=True, capture_output=True
+        )
+
+    subprocess.run(
+        ["git", "init", "-q", "-b", "dev", str(raiz)], check=True, capture_output=True
+    )
+    git("config", "user.email", "arnes@example.invalid")
+    git("config", "user.name", "Arnes")
+    git("add", "-A")
+    git("commit", "-q", "-m", "inicial")
+    return raiz
+
+
 # --- R16: una suite que no recoge tests no caza nada ------------------------
 
 
@@ -83,12 +107,21 @@ def test_f020_r16_exit_0_sigue_siendo_superviviente(
     assert EjecutorPytest().ejecutar(10) == SUPERVIVIENTE
 
 
-def test_f020_r16_otros_codigos_de_error_siguen_siendo_muerto(
+def test_f020_r16_otros_codigos_de_error_no_juzgan_nada_y_son_indeterminado(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # El arnés 1.6.0 rompe el veredicto binario: el 2 (recolección
+    # interrumpida), el 3 (error interno) y el 4 (mal uso) dicen que la suite ni
+    # llegó a juzgar, así que ya no son MUERTO sino INDETERMINADO, y quien lo
+    # resuelve es la campaña corriendo la línea base ahí mismo.
     for codigo in (2, 3, 4, 6):
         monkeypatch.setattr(subprocess, "run", RunFalso(codigo))
-        assert EjecutorPytest().ejecutar(10) == MUERTO, codigo
+        veredicto = EjecutorPytest().ejecutar(10)
+
+        assert veredicto == INDETERMINADO, codigo
+        # Y sigue sin ser ninguna de las tres respuestas que cierran una
+        # feature: dar por cazado lo que nadie comprobó era el defecto.
+        assert veredicto not in (MUERTO, SUPERVIVIENTE, TIMEOUT), codigo
 
 
 def test_f020_r16_el_timeout_sigue_siendo_timeout(
@@ -174,6 +207,9 @@ def test_f020_r15_la_campania_pide_un_ejecutor_por_fichero(tmp_path: Path) -> No
         "def f(a, b):\n    return a == b\n", encoding="utf-8"
     )
     (tmp_path / "raiz.py").write_text("def g(a, b):\n    return a > b\n", encoding="utf-8")
+    # El arnés 1.6.0 exige un árbol que git pueda declarar limpio antes de mutar
+    # nada: sin repositorio, la campaña aborta con `ArbolSucio` y no reparte.
+    repositorio(tmp_path)
     del_servicio = EjecutorDoble(MUERTO)
     de_la_raiz = EjecutorDoble(SUPERVIVIENTE)
     pedidos: list[str] = []
@@ -206,8 +242,11 @@ def test_f020_r15_la_restauracion_aguanta_aunque_la_factoria_falle(
 ) -> None:
     fuente = "def g(a, b):\n    return a > b\n"
     (tmp_path / "raiz.py").write_text(fuente, encoding="utf-8")
+    repositorio(tmp_path)
+    pedidos: list[str] = []
 
     def factoria(fichero: str) -> EjecutorDoble:
+        pedidos.append(fichero)
         raise ValueError("venv declarado inexistente")
 
     with pytest.raises(ValueError):
@@ -218,6 +257,8 @@ def test_f020_r15_la_restauracion_aguanta_aunque_la_factoria_falle(
             ejecutor_de=factoria,
         )
 
+    # La avería es la de la factoría y no otra: se la pidió y reventó ella.
+    assert pedidos == ["raiz.py"]
     assert (tmp_path / "raiz.py").read_text(encoding="utf-8") == fuente
 
 
@@ -233,6 +274,7 @@ def test_f020_r2_mutacion_sin_servicios_camino_actual(tmp_path: Path) -> None:
 
 def test_f020_r2_la_campania_sin_factoria_usa_el_ejecutor_unico(tmp_path: Path) -> None:
     (tmp_path / "raiz.py").write_text("def g(a, b):\n    return a > b\n", encoding="utf-8")
+    repositorio(tmp_path)
     unico = EjecutorDoble(MUERTO)
 
     informe = ejecutar_campania(
@@ -248,6 +290,7 @@ def test_f020_r2_main_sin_declaracion_no_construye_factoria(
 ) -> None:
     """El `main` mono-proyecto sigue pasando un solo ejecutor a la campaña."""
     (tmp_path / "raiz.py").write_text("def g(a, b):\n    return a > b\n", encoding="utf-8")
+    repositorio(tmp_path)
     monkeypatch.setattr(
         mutacion, "alcance_de_feature", lambda *a, **k: alcance_de({"raiz.py": {2}})
     )
@@ -286,6 +329,7 @@ def test_f020_r15_main_con_servicios_respeta_el_ejecutor_inyectado(
     )
     fichero = tmp_path / "services" / "email" / "flujo.py"
     fichero.write_text("def g(a, b):\n    return a > b\n", encoding="utf-8")
+    repositorio(tmp_path)
     monkeypatch.setattr(
         mutacion,
         "alcance_de_feature",

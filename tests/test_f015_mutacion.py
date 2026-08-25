@@ -15,7 +15,9 @@ import pytest
 from harness import mutacion
 from harness.alcance import Alcance
 from harness.mutacion import (
+    MARCA_LINEA_BASE,
     MUERTO,
+    NADA_JUZGADO,
     SUPERVIVIENTE,
     TIMEOUT,
     EjecutorPytest,
@@ -218,9 +220,28 @@ FUENTE = "def clasifica(a, b):\n    if a > b:\n        return True\n    return F
 def preparar(
     tmp_path: Path, fuente: str = FUENTE, lineas: set[int] | None = None
 ) -> tuple[Path, Alcance]:
-    """Deja un módulo de mentira en disco y devuelve su ruta y su alcance."""
+    """Deja un módulo de mentira en un repositorio limpio y devuelve su ruta
+    y su alcance.
+
+    El repositorio no es decorado: desde el arnés 1.6.x la campaña se niega a
+    mutar un árbol cuyo estado no puede consultar (`ArbolSucio`), porque
+    sobrescribe ficheros de producción para mutarlos. Antes bastaba con el
+    fichero suelto en un temporal.
+    """
+    subprocess.run(["git", "init", "-q", "-b", "dev", str(tmp_path)], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.email", "arnes@ruesma.es"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.name", "Arnes"], check=True
+    )
     fichero = tmp_path / "modulo_x.py"
     fichero.write_text(fuente, encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "commit", "-q", "-m", "inicial"], check=True
+    )
     alcance = Alcance(
         feature="F-042",
         origen="rama",
@@ -252,9 +273,14 @@ def test_f015_r1_campania_cuenta_muertos_y_supervivientes(tmp_path: Path) -> Non
     assert informe.muestreado is False
     # El tiempo es la duración de la campaña, no una marca de reloj.
     assert 0 <= informe.segundos < 60
-    # Y el avance se numera desde el primero.
-    assert progreso[0].startswith("[1/3]")
-    assert progreso[-1].startswith("[3/3]")
+    # El arnés 1.6.0 corre la línea base ANTES de tocar un solo fichero y la
+    # anuncia con `[base] `: el `[1/n]` ya no es el primer eco de la campaña.
+    assert progreso[0].startswith(MARCA_LINEA_BASE)
+    # Y el avance, ya sin las líneas de base, se numera desde el primero.
+    avance = [linea for linea in progreso if not linea.startswith(MARCA_LINEA_BASE)]
+    assert len(avance) == 3
+    assert avance[0].startswith("[1/3]")
+    assert avance[-1].startswith("[3/3]")
 
 
 def test_f015_r1_no_genera_mutantes_fuera_del_alcance(tmp_path: Path) -> None:
@@ -294,10 +320,15 @@ def test_f015_r1_alcance_vacio_no_muta_nada(
         ejecutor=ejecutor,
     )
 
-    assert codigo == 0
+    # El arnés 1.7.2 aborta con código 3 y SIN informe cuando el alcance no
+    # trae ni una línea: un «0 generados, 0 supervivientes» escrito en verde se
+    # lee como campaña impecable y el reviewer lo da por bueno.
+    assert codigo == NADA_JUZGADO == 3
     assert ejecutor.llamadas == 0
-    assert salida.is_file()
-    assert "nada que mutar" in capsys.readouterr().out
+    assert not salida.exists()
+    error = capsys.readouterr().err
+    assert "ALCANCE VACÍO" in error
+    assert "No se ha juzgado NADA" in error
 
 
 def test_f015_r1_sin_alcance_resoluble_el_codigo_es_de_error_de_uso(
@@ -380,9 +411,14 @@ def test_f015_r1_un_tope_que_no_recorta_no_es_muestreo(tmp_path: Path) -> None:
     assert informe.muestreado is False
 
 
-def test_f015_r1_sin_feature_el_uso_es_incorrecto() -> None:
-    with pytest.raises(SystemExit):
-        mutacion.main([])
+def test_f015_r1_sin_feature_el_uso_es_incorrecto(
+    capsys: pytest.CaptureFixture,
+) -> None:
+    # El arnés 1.6.0 añadió `--estado` y `--restaurar`, que no llevan feature:
+    # `--feature` deja de ser obligatorio en argparse y su falta se reporta con
+    # el código 2 de error de uso, no con un SystemExit.
+    assert mutacion.main([]) == 2
+    assert "--feature" in capsys.readouterr().err
 
 
 # --- R3: el informe ---------------------------------------------------------
@@ -498,8 +534,15 @@ def test_f015_r7_timeout_no_cuelga_la_campania(tmp_path: Path) -> None:
 
 
 class Proceso:
-    def __init__(self, codigo: int) -> None:
+    """Doble de `subprocess.CompletedProcess` para el ejecutor de pytest."""
+
+    # El arnés 1.6.0 lee la salida del proceso para poder NOMBRAR los tests
+    # caídos cuando la línea base está rota: un doble con solo `returncode` ya
+    # no cumple el contrato de `subprocess.run`.
+    def __init__(self, codigo: int, salida: bytes = b"", error: bytes = b"") -> None:
         self.returncode = codigo
+        self.stdout = salida
+        self.stderr = error
 
 
 def test_f015_r7_ejecutor_pytest_traduce_el_timeout(

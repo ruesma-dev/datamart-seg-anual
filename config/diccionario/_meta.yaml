@@ -1,0 +1,669 @@
+# config/diccionario/_meta.yaml
+#
+# Fichas del esquema `_meta`: la instrumentacion del propio ETL.
+#
+# Aqui la precision importa el doble. Estos objetos son los que se citan cuando
+# hay que decir DE CUANDO ES el dato que se esta dando, y una ficha imprecisa
+# sobre la frescura hace que un agente cite mal la fecha —o que no la cite— con
+# aplomo. Es exactamente el fallo que F-024 vino a eliminar.
+#
+# Tres cosas que hay que saber antes de leer nada de aqui:
+#
+# 1. **`batch_id` se ordena como TEXTO.** El formato es `YYYYMMDDTHHMMSSZ-xxxxxx`
+#    justo para eso: `ORDER BY batch_id` sale cronologico sin parsear nada, en
+#    Postgres y en Power BI. El sufijo hexadecimal desempata dos procesos que
+#    arranquen en el mismo segundo.
+# 2. **Todas las marcas de tiempo son UTC SIN ZONA.** Se escriben con
+#    `datetime.utcnow()` y se guardan como `TIMESTAMP`, no `TIMESTAMPTZ`.
+#    Restarles un `now()` local da como antiguedad el desfase horario de Espana,
+#    que en verano son DOS HORAS de error.
+# 3. **`_meta.v_frescura` deja fuera los tramos a proposito** y hace `LEFT JOIN`
+#    a proposito. Las dos decisiones estan explicadas en su ficha y las dos
+#    cambian lo que la vista devuelve.
+#
+# Verificado contra `sql/ddl/00_meta.sql` y `sql/ddl/01_diccionario.sql`.
+
+version: 1
+esquema: _meta
+
+objetos:
+
+  etl_runs:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el log crudo, con una fila por paso Y por tramo: solo
+      `build_plan_mensual` deja del orden de sesenta filas por noche. Para saber
+      de cuando es un dato hay que ir a `_meta.v_frescura`, y para el estado de
+      `raw` a `_meta.v_raw_state`; las dos resuelven ya el "cual es la ultima" y
+      su desempate. Esta tabla se consulta para investigar una noche concreta,
+      no para responder una pregunta de negocio.
+    descripcion: >-
+      El historico de ejecuciones del pipeline: una fila por cada paso que
+      arranca, con cuando empezo, cuando acabo, como acabo y cuantas filas
+      proceso. Es la unica fuente de la frescura de todo el datamart, y sobre
+      ella se construyen las otras dos vistas de este esquema.
+    grano: >-
+      Una fila por ejecucion de un paso, identificada por `id`. **No hay una
+      fila por paso, sino una por VEZ que ese paso corrio**: consultar sin
+      quedarse con la ultima devuelve el historico entero. Ademas conviven dos
+      niveles: los pasos de pipeline (`step` sin punto, como `build_mart`) y sus
+      tramos (`step` con punto, como `ingest_raw.obrfas` o los lotes de
+      `build_plan_mensual`).
+    clave_negocio: [id]
+    refresco: estatico
+    columnas:
+      id:
+        significado: >-
+          Clave tecnica de la fila, BIGSERIAL. Ademas de identificar, **es el
+          desempate**: dos ejecuciones del mismo paso en el mismo segundo tienen
+          el mismo `started_at`, y sin `id DESC` el "cual fue la ultima"
+          bailaria entre consultas.
+        agregacion: clave_sustituta
+      stage:
+        significado: >-
+          Etapa del pipeline a la que pertenece el paso (`raw`, `stg`, `mart`,
+          `diccionario`...). Agrupa pasos, no los identifica.
+        agregacion: no_sumable
+      step:
+        significado: >-
+          Nombre del paso. **Si lleva un punto es un TRAMO** —`ingest_raw.obrfas`,
+          un lote de `build_plan_mensual`— y si no, un paso de pipeline. Esa
+          distincion es la que usa `v_frescura` para filtrar, y mezclarlos
+          multiplica las filas.
+        agregacion: no_sumable
+      started_at:
+        significado: >-
+          Cuando arranco el paso. **UTC sin zona**, escrito con
+          `datetime.utcnow()`: compararlo con un `now()` local da el desfase
+          horario como antiguedad.
+        agregacion: no_sumable
+      finished_at:
+        significado: Cuando termino el paso, en UTC sin zona igual que `started_at`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El paso no termino: o sigue corriendo, o el proceso murio y la fila
+          quedo huerfana. Es lo que distingue "esta tardando" de "fallo".
+      status:
+        significado: >-
+          Como acabo. `RUNNING` es el valor por defecto al insertar, asi que una
+          fila `RUNNING` antigua no es un paso vivo sino uno cuyo proceso murio
+          sin cerrarla; el arranque siguiente las cierra como huerfanas.
+        valores: [RUNNING, SUCCESS, FAILED]
+        agregacion: no_sumable
+      rows_processed:
+        significado: >-
+          Filas que proceso el paso. Sumarlo a lo largo del historico cuenta
+          varias veces las mismas filas: cada noche se vuelve a procesar lo
+          mismo.
+        agregacion: no_sumable
+      error_message:
+        significado: >-
+          El error con el que fallo, o el motivo por el que una fila `RUNNING`
+          se cerro como huerfana.
+        nulo_significa: El paso no fallo, o fallo sin dejar mensaje.
+      metadata:
+        significado: JSONB con lo que el paso quiso dejar anotado de su ejecucion.
+        nulo_significa: El paso no anoto nada.
+      batch_id:
+        significado: >-
+          La ejecucion completa a la que pertenece esta fila: todas las que deja
+          un mismo proceso lo comparten, y es lo que permite responder de que
+          carga viene cada tabla de `raw`. El formato `YYYYMMDDTHHMMSSZ-xxxxxx`
+          **se ordena cronologicamente como texto**, sin parsear.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La fila es anterior a F-024, cuando la columna no existia. No es un
+          fallo de la carga.
+
+  v_raw_state:
+    tipo: vista
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      El estado de la ultima ingesta de cada tabla de `raw`: de que carga viene,
+      como acabo y cuantas filas trajo. Es la fuente unica para la pregunta "de
+      que carga viene esta tabla", y la leen la puerta de `stage`,
+      `check-coherencia`, el servidor MCP y Power BI.
+    grano: >-
+      Una fila por `tabla` de `raw`, y solo la mas reciente: el `DISTINCT ON` ya
+      se ha quedado con ella. El desempate va por `started_at DESC, id DESC`, y
+      el `id` no es decorativo: dos ingestas de la misma tabla en el mismo
+      segundo —un reintento inmediato— tienen el mismo `started_at`.
+    clave_negocio: [tabla]
+    refresco: estatico
+    ejemplos_preguntas:
+      - De que carga viene la tabla X de raw
+      - Que tablas de raw fallaron en la ultima ingesta
+      - Vienen todas las tablas de raw de la misma noche
+    columnas:
+      tabla:
+        significado: >-
+          Nombre de la tabla de `raw`, ya sin el prefijo `ingest_raw.` del paso.
+        agregacion: no_sumable
+      status:
+        significado: Como acabo esa ultima ingesta.
+        valores: [RUNNING, SUCCESS, FAILED]
+        agregacion: no_sumable
+      batch_id:
+        significado: >-
+          La ejecucion de la que viene el contenido actual de la tabla. Es lo
+          que permite comprobar si dos tablas de `raw` vienen de la misma carga:
+          si no coinciden, cruzarlas puede mezclar dos noches.
+        agregacion: no_sumable
+        nulo_significa: La ingesta es anterior a F-024.
+      started_at:
+        significado: Cuando arranco esa ingesta, en UTC sin zona.
+        agregacion: no_sumable
+      finished_at:
+        significado: Cuando termino, en UTC sin zona.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La ingesta no termino. Si ademas el `status` es `RUNNING`, la tabla
+          puede estar a medias.
+      filas:
+        significado: Filas que trajo esa ingesta.
+        agregacion: no_sumable
+      run_id:
+        significado: >-
+          El `id` de la fila de `_meta.etl_runs` de la que sale esta, por si hay
+          que ir al log crudo.
+        agregacion: no_sumable
+    relaciones:
+      - de: run_id
+        a: _meta.etl_runs.id
+        cardinalidad: "N:1"
+        porque: >-
+          Cada fila de la vista es una fila concreta de `_meta.etl_runs`, la que
+          el `DISTINCT ON` eligio para esa tabla.
+
+  v_frescura:
+    tipo: vista
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      De cuando es el dato de cada paso del pipeline, y como fue el ultimo
+      intento. **Es el objeto que hay que citar al dar cualquier cifra**, y con
+      mas motivo si sale de un esquema de refresco manual.
+
+      Separa dos noticias que no son la misma: el ULTIMO OK y el ULTIMO INTENTO.
+      Un `build_mart` que fallo esta noche deja `mart` con lo de ayer, y quien
+      consulta necesita las dos cosas a la vez: de cuando es lo que esta viendo,
+      y que lo ultimo que se intento salio mal. Citar solo el ultimo OK oculta
+      el fallo; citar solo el ultimo intento envejece un dato que esta bien.
+    grano: >-
+      Una fila por `paso` de pipeline. **Deja fuera los tramos a proposito**: el
+      filtro es `position('.' IN step) = 0`, asi que `ingest_raw.obrfas` y los
+      lotes de `build_plan_mensual` no salen. Sin ese filtro habria del orden de
+      sesenta filas mas y la vista dejaria de ser legible.
+    clave_negocio: [paso]
+    refresco: estatico
+    ejemplos_preguntas:
+      - De cuando es el dato que me estas dando
+      - Cuando se construyo el mart por ultima vez
+      - Que pasos fallaron anoche
+      - Cuantas horas lleva sin actualizarse el cierre
+    columnas:
+      paso:
+        significado: >-
+          Nombre del paso de pipeline. Es la columna por la que se une con
+          `paso_etl` del diccionario.
+        agregacion: no_sumable
+      ultimo_ok_finished_at:
+        significado: >-
+          Cuando termino bien la ULTIMA vez, en UTC sin zona. Es la fecha que
+          hay que citar como "de cuando es este dato".
+        agregacion: no_sumable
+        nulo_significa: >-
+          Ese paso **no ha terminado bien nunca**. Sale igualmente porque el JOIN
+          es `LEFT`: esconderlo seria justo el silencio que F-024 elimino.
+      ultimo_ok_batch_id:
+        significado: La ejecucion en la que ese paso termino bien por ultima vez.
+        agregacion: no_sumable
+        nulo_significa: El paso nunca termino bien, o fue antes de F-024.
+      ultimo_ok_filas:
+        significado: Filas que proceso en esa ultima ejecucion buena.
+        agregacion: no_sumable
+        nulo_significa: El paso nunca termino bien.
+      horas_desde_ultimo_ok:
+        significado: >-
+          Antiguedad del dato, en horas. Se calcula contra
+          `now() AT TIME ZONE 'UTC'` **porque `finished_at` es UTC sin zona**:
+          restarle un `now()` local daria como antiguedad el desfase horario de
+          Espana, dos horas en verano. Es la unica linea que habria que cambiar
+          si algun dia se migra a `timestamptz`.
+        unidad: horas
+        agregacion: no_sumable
+        nulo_significa: El paso nunca termino bien, asi que no hay antiguedad que medir.
+      ultimo_intento_started_at:
+        significado: >-
+          Cuando arranco el ultimo intento, haya ido bien o mal, en UTC sin zona.
+        agregacion: no_sumable
+      ultimo_intento_status:
+        significado: >-
+          Como acabo el ultimo intento. Si es `FAILED` y
+          `ultimo_ok_finished_at` tiene fecha, el dato que se esta viendo es el
+          de esa fecha y no el de hoy.
+        valores: [RUNNING, SUCCESS, FAILED]
+        agregacion: no_sumable
+      ultimo_intento_error:
+        significado: El mensaje con el que fallo el ultimo intento.
+        nulo_significa: El ultimo intento no fallo.
+    relaciones:
+      - de: paso
+        a: _meta.etl_runs.step
+        cardinalidad: "N:N"
+        porque: >-
+          Sale de `_meta.etl_runs`, que tiene **una fila por cada VEZ que ese
+          paso corrio**: unir por `step` sin agregar antes devuelve el historico
+          entero. La vista existe justo para eso —se queda con la ultima fila
+          buena y la ultima intentada por `step`, desempatando por `id DESC`— y
+          por eso hay que consultarla a ella y no el log.
+
+  diccionario:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la tabla base. `_meta.v_diccionario` da lo mismo mas la frescura del
+      objeto y la version publicada, en una sola consulta y sin JOIN a mano.
+      Consultar esta directamente obliga a repetir los dos `LEFT JOIN` y se
+      pierde justo el dato que evita citar una fecha equivocada.
+    descripcion: >-
+      Una fila por objeto documentado del datamart: que es, con que grano, con
+      que clave, si se recomienda consultarlo y por que no, mas la ficha entera
+      —columnas, relaciones, ejemplos— en un JSONB.
+    grano: >-
+      Una fila por objeto, identificada por (`esquema`, `objeto`), que es su
+      clave primaria.
+    clave_negocio: [esquema, objeto]
+    paso_etl: publicar_diccionario
+    refresco: nocturno
+    columnas:
+      esquema:
+        significado: Esquema del datamart al que pertenece el objeto.
+        agregacion: no_sumable
+      objeto:
+        significado: Nombre del objeto, sin el esquema delante.
+        agregacion: no_sumable
+      tipo:
+        significado: Que clase de objeto es.
+        valores: [tabla, vista, funcion]
+        agregacion: no_sumable
+      capa:
+        significado: >-
+          Donde cae en el recorrido del dato: `origen` es la copia cruda de
+          Sigrid, `preparacion` lo que la normaliza, `consumo` lo que se
+          pregunta y `operacion` la instrumentacion del propio ETL.
+        valores: [origen, preparacion, consumo, operacion]
+        agregacion: no_sumable
+      consumo_recomendado:
+        significado: >-
+          Si el objeto es superficie de consulta. **En falso no significa
+          "prohibido" sino "hay otro sitio mejor"**, y ese sitio esta dicho en
+          `motivo_no_consumo`.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+      motivo_no_consumo:
+        significado: >-
+          Por que no conviene consultarlo y a donde ir en su lugar. Es
+          obligatorio siempre que `consumo_recomendado` sea falso.
+        nulo_significa: El objeto SI es superficie de consulta.
+      descripcion:
+        significado: Que es el objeto y para que sirve, en prosa.
+        agregacion: no_sumable
+      grano:
+        significado: >-
+          Que representa UNA fila. Es el campo que evita el error de contar dos
+          veces, y nombra siempre las columnas de la clave.
+        nulo_significa: El objeto es una funcion y no tiene filas.
+      clave_negocio:
+        significado: >-
+          Las columnas que identifican una fila. Vacio fuera de la superficie de
+          consumo significa que no se ha establecido; dentro de ella no puede
+          estarlo.
+        agregacion: no_sumable
+      paso_etl:
+        significado: >-
+          El paso que construye el objeto, con el mismo nombre que tiene en
+          `_meta.v_frescura.paso`. Es la columna del JOIN que da la frescura.
+        nulo_significa: >-
+          El objeto no lo reconstruye ningun paso, y entonces su `refresco` es
+          `estatico`.
+      refresco:
+        significado: >-
+          `nocturno` si lo reconstruye `run-all` cada noche, `manual` si alguien
+          lo lanza a mano —y entonces puede estar arbitrariamente desfasado— y
+          `estatico` si no se reconstruye.
+        valores: [nocturno, manual, estatico]
+        agregacion: no_sumable
+      avisos:
+        significado: >-
+          Codigos de las reglas duras que alcanzan a este objeto, ya resueltos
+          por ambito para no obligar al MCP a interpretarlos.
+        agregacion: no_sumable
+      n_columnas:
+        significado: >-
+          Cuantas columnas documenta la ficha. Sale a columna para que medir la
+          cobertura no obligue a abrir el JSONB.
+        agregacion: no_sumable
+      ficha:
+        significado: >-
+          La ficha completa en JSONB: columnas con su significado, unidad,
+          agregacion y que significa el nulo; relaciones con su cardinalidad; y
+          ejemplos. Es lo que se sirve entero al describir un objeto.
+        agregacion: no_sumable
+
+  diccionario_reglas:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      Las reglas duras del datamart: las trampas del modelo escritas como orden
+      y con su motivo. Se sirven ENTERAS al agente en su primera llamada, antes
+      de que escriba ninguna consulta, porque una regla que se lee despues del
+      error no ha servido de nada.
+    grano: Una fila por regla, identificada por su `codigo`, que es la clave primaria.
+    clave_negocio: [codigo]
+    paso_etl: publicar_diccionario
+    refresco: nocturno
+    ejemplos_preguntas:
+      - Que reglas tengo que respetar antes de consultar el datamart
+      - Por que no puedo sumar el importe acumulado
+      - Que trampas tiene este modelo
+    columnas:
+      codigo:
+        significado: Identificador corto y estable de la regla, para poder citarla.
+        agregacion: no_sumable
+      titulo:
+        significado: La regla en una linea, para listarlas sin leerlas enteras.
+        agregacion: no_sumable
+      severidad:
+        significado: >-
+          `bloqueante` significa que incumplirla produce un numero FALSO, no
+          feo: no es una preferencia de estilo. `aviso` es lo demas.
+        valores: [bloqueante, aviso]
+        agregacion: no_sumable
+      ambito:
+        significado: >-
+          Esquemas y objetos a los que alcanza la regla. Es lo que se resuelve
+          para rellenar `avisos` en cada ficha.
+        agregacion: no_sumable
+      regla:
+        significado: Que hay que hacer o no hacer, en imperativo.
+        agregacion: no_sumable
+      motivo:
+        significado: >-
+          Por que. Va aparte de la regla a proposito: una orden sin motivo se
+          incumple en cuanto estorba.
+        agregacion: no_sumable
+      orden:
+        significado: En que orden se presentan las reglas al agente.
+        agregacion: no_sumable
+
+  diccionario_publicacion:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      Que version del diccionario esta publicada en esta base, con su huella y
+      sus recuentos. Responde sin salir de SQL a "el diccionario que estoy
+      leyendo, es el del repositorio?".
+    grano: >-
+      **UNA sola fila, siempre**, con `id` = 1. Un `CHECK (id = 1)` lo garantiza
+      a nivel de motor: no hay forma de que queden dos versiones publicadas a la
+      vez.
+    clave_negocio: [id]
+    paso_etl: publicar_diccionario
+    refresco: nocturno
+    ejemplos_preguntas:
+      - Que version del diccionario esta publicada
+      - El diccionario que estoy leyendo es el del repositorio
+      - Cuando se publico el diccionario
+    columnas:
+      id:
+        significado: >-
+          Siempre 1. No identifica nada: es el mecanismo que convierte la tabla
+          en un singleton.
+        agregacion: no_sumable
+      version:
+        significado: >-
+          Numero de version manual, que sube una persona al cambiar el
+          contenido. Sirve para COMUNICAR el cambio. **No es la identidad**:
+          para invalidar una cache hay que mirar `hash_fuente`, porque la
+          version puede quedarse quieta mientras el contenido cambia.
+        agregacion: no_sumable
+      hash_fuente:
+        significado: >-
+          SHA-256 de los ficheros YAML del diccionario, en orden y con los
+          saltos de linea normalizados. **Esta es la identidad**: cambia con
+          cualquier edicion, y compararlo con el que calcula el cargador dice si
+          lo publicado es lo del repositorio.
+        agregacion: no_sumable
+      publicado_en:
+        significado: >-
+          Cuando se publico, en UTC sin zona como todo `_meta`. Es `TIMESTAMP` y
+          no `TIMESTAMPTZ` para que sea comparable con las fechas de
+          `v_frescura`, que es justo lo que `v_diccionario` hace.
+        agregacion: no_sumable
+      batch_id:
+        significado: La ejecucion que lo publico.
+        agregacion: no_sumable
+        nulo_significa: Se publico fuera de una ejecucion con identidad de lote.
+      n_objetos:
+        significado: Objetos documentados, en total.
+        agregacion: no_sumable
+      n_reglas:
+        significado: Reglas duras publicadas.
+        agregacion: no_sumable
+      n_columnas:
+        significado: >-
+          Columnas documentadas en TODAS las fichas, dentro y fuera de la
+          superficie de consumo.
+        agregacion: no_sumable
+      cobertura_cols:
+        significado: >-
+          Porcentaje de columnas con significado dentro de la superficie de
+          consumo, **y solo de ella**. OJO: no comparte denominador con
+          `n_columnas`, asi que `n_columnas * cobertura_cols / 100` NO es el
+          numero de columnas descritas. Una mide volumen y la otra completitud
+          de lo que se recomienda consultar.
+        unidad: "%"
+        agregacion: no_sumable
+
+  diccionario_contexto:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      El contexto que el agente necesita **antes** de consultar nada: las
+      convenciones con las que interpretar un importe, los ordenes de magnitud
+      con los que detectar una cifra absurda, los literales exactos de
+      `escenario` y para que sirve cada esquema.
+
+      Nacio el 2026-08-22 como enmienda del contrato. Hasta entonces `_meta`
+      publicaba los objetos y las reglas pero **no el resto del bloque global**,
+      asi que un MCP que leyera de la base habria respondido PEOR que el
+      prototipo local, que lo servia entero de su YAML.
+
+      Los ordenes de magnitud son los que evitan que se repita el 38,9 M€ en una
+      sola obra: existen para que una respuesta absurda se note.
+    grano: >-
+      Una fila por entrada, identificada por (`bloque`, `clave`). **El contrato
+      crece anadiendo FILAS, nunca columnas**, que es lo que permite ampliarlo
+      sin romper a quien ya lee.
+    clave_negocio: [bloque, clave]
+    paso_etl: publicar_diccionario
+    refresco: nocturno
+    ejemplos_preguntas:
+      - En que moneda estan los importes y llevan IVA
+      - Esta cifra es razonable para esta empresa
+      - Que valores exactos puede tomar escenario
+      - Para que sirve cada esquema del datamart
+    columnas:
+      bloque:
+        significado: >-
+          De que familia es la entrada. Cada una responde una pregunta distinta,
+          y las CINCO se sirven juntas al arrancar. **`ocultar` faltaba en esta
+          lista** aunque la tabla lleva publicandolo desde el principio: el
+          consumidor que se fiara de los valores posibles no sabria que existe.
+          Hoy son 29 filas (5 convenciones, 9 ordenes de magnitud, 3 ejes,
+          9 esquemas y 3 de `ocultar`), y el recuento no se escribe aqui porque
+          caduca: se cuenta con
+          `SELECT bloque, count(*) FROM _meta.diccionario_contexto GROUP BY 1`.
+        valores: [convenciones, ordenes_de_magnitud, ejes, esquemas, ocultar]
+        agregacion: no_sumable
+      clave:
+        significado: >-
+          Identificador de la entrada dentro de su bloque: `moneda`, el concepto
+          del orden de magnitud, el nombre del eje o el del esquema.
+        agregacion: no_sumable
+      orden:
+        significado: >-
+          En que orden se presentan las entradas de un bloque. Se conserva el
+          del YAML, que esta escrito de mas a menos importante.
+        agregacion: no_sumable
+      texto:
+        significado: >-
+          La entrada ya redactada, para inyectarla tal cual. Se genera aqui a
+          proposito: si cada consumidor la compusiera por su cuenta acabarian
+          divergiendo, que es lo que ya paso con el resumen por esquema del
+          prototipo.
+        agregacion: no_sumable
+      datos:
+        significado: >-
+          La entrada entera en JSONB, para quien necesite los campos sueltos
+          —el valor numerico de un orden de magnitud, la lista de valores de un
+          eje— sin parsear la prosa de `texto`.
+        agregacion: no_sumable
+
+  v_diccionario:
+    tipo: vista
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      **El punto de entrada unico del servidor MCP**: significado, grano,
+      trampas y fecha de build de cada objeto en una sola consulta. Es lo que
+      permite que una respuesta traiga el dato y de cuando es sin dos viajes.
+
+      Sus columnas son un CONTRATO con `mcp-bbdd`. Se pueden anadir columnas al
+      final; quitarlas o reordenarlas exige `DROP VIEW`, y **un DROP se lleva
+      por delante los GRANT del rol del MCP**, que hay que reaplicar acto
+      seguido con `python main.py apply-grants` o el MCP se queda ciego.
+    grano: >-
+      Una fila por objeto documentado, identificada por (`esquema`, `objeto`).
+      El JOIN con la publicacion es `LEFT JOIN ... ON TRUE` contra una tabla de
+      una sola fila, asi que no multiplica; y es `LEFT` y no `CROSS` porque con
+      la tabla vacia un `CROSS JOIN` devolveria CERO filas y la vista mentiria
+      diciendo que no hay diccionario cuando lo que falta es el registro de
+      publicacion.
+    clave_negocio: [esquema, objeto]
+    paso_etl: publicar_diccionario
+    refresco: nocturno
+    ejemplos_preguntas:
+      - Que objetos tiene el datamart y cual debo consultar
+      - Que significa la columna X de la tabla Y
+      - Cual es el grano de esta tabla
+      - Puedo sumar esta columna
+      - De cuando es el dato de este objeto
+    columnas:
+      esquema:
+        significado: Esquema del datamart al que pertenece el objeto.
+        agregacion: no_sumable
+      objeto:
+        significado: Nombre del objeto, sin el esquema delante.
+        agregacion: no_sumable
+      tipo:
+        significado: Que clase de objeto es.
+        valores: [tabla, vista, funcion]
+        agregacion: no_sumable
+      capa:
+        significado: Donde cae en el recorrido del dato.
+        valores: [origen, preparacion, consumo, operacion]
+        agregacion: no_sumable
+      consumo_recomendado:
+        significado: >-
+          Si es superficie de consulta. En falso, `motivo_no_consumo` dice a
+          donde ir en su lugar.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+      descripcion:
+        significado: Que es el objeto y para que sirve.
+        agregacion: no_sumable
+      grano:
+        significado: Que representa UNA fila.
+        nulo_significa: El objeto es una funcion y no tiene filas.
+      clave_negocio:
+        significado: Las columnas que identifican una fila.
+        agregacion: no_sumable
+      refresco:
+        significado: Si se reconstruye cada noche, a mano, o no se reconstruye.
+        valores: [nocturno, manual, estatico]
+        agregacion: no_sumable
+      avisos:
+        significado: Codigos de las reglas duras que alcanzan a este objeto.
+        agregacion: no_sumable
+      n_columnas:
+        significado: Cuantas columnas documenta la ficha.
+        agregacion: no_sumable
+      ficha:
+        significado: La ficha completa en JSONB.
+        agregacion: no_sumable
+      paso_etl:
+        significado: >-
+          El paso que construye el objeto. Es la columna del JOIN con la
+          frescura.
+        nulo_significa: No lo reconstruye ningun paso; su `refresco` es `estatico`.
+      ultimo_ok_finished_at:
+        significado: >-
+          Cuando termino bien por ultima vez el paso que construye este objeto,
+          en UTC sin zona. **Es la fecha que hay que citar** al dar un dato de
+          este objeto.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El objeto no tiene paso, o su paso no ha terminado bien nunca. El JOIN
+          es `LEFT` para que el objeto siga saliendo en vez de desaparecer.
+      horas_desde_ultimo_ok:
+        significado: Antiguedad del dato de este objeto, en horas.
+        unidad: horas
+        agregacion: no_sumable
+        nulo_significa: No hay ultimo OK que medir.
+      ultimo_intento_status:
+        significado: >-
+          Como acabo el ultimo intento de construirlo. `FAILED` con
+          `ultimo_ok_finished_at` informado significa que lo que se esta viendo
+          es de esa fecha anterior.
+        valores: [RUNNING, SUCCESS, FAILED]
+        agregacion: no_sumable
+        nulo_significa: El objeto no tiene paso asociado.
+      diccionario_version:
+        significado: Version del diccionario publicada en esta base.
+        agregacion: no_sumable
+        nulo_significa: No hay registro de publicacion todavia.
+      diccionario_publicado_en:
+        significado: Cuando se publico el diccionario, en UTC sin zona.
+        agregacion: no_sumable
+        nulo_significa: No hay registro de publicacion todavia.
+      motivo_no_consumo:
+        significado: >-
+          Por que no conviene consultar el objeto y a donde ir. Va **la ultima**
+          y no junto a `consumo_recomendado`, que es donde se leeria mejor,
+          porque las dieciocho columnas anteriores son el contrato publicado y
+          meter una por el medio correria de posicion a todas las de detras:
+          quien desempaquetase por indice se encontraria los campos cambiados
+          sin que nada fallase.
+        nulo_significa: El objeto SI es superficie de consulta.
+    relaciones:
+      - de: paso_etl
+        a: _meta.v_frescura.paso
+        cardinalidad: "N:1"
+        porque: >-
+          De ahi sale la frescura. Muchos objetos comparten paso —todo `mart`
+          viene de `build_mart`— y `v_frescura` tiene una sola fila por paso.
+      - de: esquema
+        a: _meta.diccionario.esquema
+        cardinalidad: "N:N"
+        porque: >-
+          Es la tabla de la que sale. El JOIN real va por (`esquema`, `objeto`)
+          y es uno a uno; por `esquema` solo hay muchas filas en las dos puntas.

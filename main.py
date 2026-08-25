@@ -64,7 +64,10 @@ import click  # noqa: E402
 
 from config.settings import get_build_info, get_settings  # noqa: E402
 from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
-from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep  # noqa: E402
+from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
+from etl_sigrid.application.steps.publicar_diccionario_step import (
+    PublicarDiccionarioStep,
+)  # noqa: E402
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
@@ -403,7 +406,10 @@ def build_mart(sin_puerta: bool) -> None:
 
 
 def build_pipeline_steps(
-    settings, full_refresh: bool = False, batch_id: str | None = None
+    settings,
+    full_refresh: bool = False,
+    batch_id: str | None = None,
+    pg: PostgresClient | None = None,
 ) -> list:
     """
     Composición del pipeline de `run-all`.
@@ -419,13 +425,32 @@ def build_pipeline_steps(
     dos steps del pipeline recibe `omitir_puerta`: `run-all` no tiene vía de
     escape a propósito.
     """
-    return [
+    pasos = [
         IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
         LoadExcelAuxStep(settings),
         BuildStgStep(settings, batch_id=batch_id),
         BuildMartStep(settings, batch_id=batch_id),
+        # F-006: entre build_mart y apply_grants, y el orden NO es cosmético.
+        # `apply_grants` concede SELECT ON ALL TABLES IN SCHEMA _meta, que es
+        # una foto del instante en que corre: publicar después dejaría las tres
+        # tablas del diccionario dependiendo solo del ALTER DEFAULT PRIVILEGES.
+        # `pg` se pasa cuando el llamante ya tiene cliente abierto: publicar
+        # reusa esa conexión en vez de abrir una segunda contra el mismo
+        # servidor, que es compartido.
+        PublicarDiccionarioStep(
+            settings, pasos_nocturnos=(), batch_id=batch_id, client=pg
+        ),
         ApplyGrantsStep(settings),
     ]
+
+    # La lista de pasos nocturnos se inyecta DESPUÉS de componer, y no antes,
+    # porque es la composición la que la define. Es lo que evita que el
+    # validador de frescura (R14) dependa de una copia escrita a mano: el día
+    # que `build-cierre` entre en `run-all`, su veredicto cambia solo.
+    for paso in pasos:
+        if isinstance(paso, PublicarDiccionarioStep):
+            paso.pasos_nocturnos = [p.name for p in pasos]
+    return pasos
 
 
 @cli.command("run-all")
@@ -442,7 +467,9 @@ def run_all(full_refresh: bool) -> None:
     settings = get_settings()
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
-    steps = build_pipeline_steps(settings, full_refresh, batch_id=ejecucion.batch_id)
+    steps = build_pipeline_steps(
+        settings, full_refresh, batch_id=ejecucion.batch_id, pg=pg
+    )
     # El grabador deja una fila por paso en _meta.etl_runs: es lo que después
     # leen `python main.py timings` y la vista _meta.v_frescura. Si falla, el
     # orquestador solo lo loguea.
@@ -571,6 +598,315 @@ def apply_grants() -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(ApplyGrantsStep(settings), pg, ejecucion)
+
+
+@cli.command("check-diccionario")
+def check_diccionario_cmd() -> None:
+    """
+    Contrasta el diccionario contra el catalogo REAL de Postgres (R28).
+
+    La puerta que corre en cada `init.sh` es offline y heuristica: deduce lo que
+    el repositorio publica leyendo `sql/**`. No puede ver que la BASE vaya por
+    detras del repositorio, ni que tenga algo que el repositorio ya no crea.
+    Esto si.
+
+    Comprueba TODOS los objetos fichados, en las tres direcciones: publicado sin
+    ficha, fichado que no existe, y tipo que no casa. El recuento lo imprime el
+    propio comando, que lo cuenta; escribirlo aqui solo servia para que caducara
+    —decia 102 y ya eran 103—. Y avisa si lo PUBLICADO en
+    `_meta` ya no es lo del arbol.
+
+    Sale con codigo 1 si hay discrepancias.
+    """
+    import pathlib as _pathlib
+
+    from etl_sigrid.application.steps.publicar_diccionario_step import DIR_DICCIONARIO
+    from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+    from etl_sigrid.infrastructure.postgres.catalogo import comparar, formatear
+
+    dicc, hash_arbol = cargar_diccionario(DIR_DICCIONARIO)
+    pg = _get_pg()
+
+    catalogo = pg.list_objetos_catalogo(list(ESQUEMAS_DEL_DATAMART))
+    informe = comparar(dicc, catalogo)
+    click.echo(formatear(informe))
+    click.echo("")
+
+    publicado = pg.fetch_hash_publicado()
+    desfasado = False
+    if publicado is None:
+        click.echo("!    no hay nada publicado en `_meta.diccionario_publicacion`")
+        desfasado = True
+    else:
+        version, hash_pub = publicado
+        if hash_pub == hash_arbol:
+            click.echo(
+                f"OK   lo publicado ES lo del arbol (version {version}, "
+                f"hash {hash_pub[:12]})"
+            )
+        else:
+            desfasado = True
+            click.echo(
+                f"KO   LO PUBLICADO NO ES LO DEL ARBOL. `_meta` sirve el hash "
+                f"{hash_pub[:12]} (version {version}) y los YAML dan "
+                f"{hash_arbol[:12]}. Alguien edito una ficha y no republico, asi "
+                f"que el MCP esta leyendo una version anterior. Se arregla con "
+                f"`python main.py publicar-diccionario`, subiendo `version` si el "
+                f"cambio hay que comunicarlo."
+            )
+
+    if not informe.ok or desfasado:
+        raise SystemExit(1)
+
+
+@cli.command("check-unicidad")
+@click.option(
+    "--todos",
+    is_flag=True,
+    default=False,
+    help="Comprueba TODO objeto con clave, no solo la superficie de consumo.",
+)
+@click.option(
+    "--timeout",
+    default=30,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
+    """
+    Comprueba contra la base que cada `clave_negocio` declarada identifica UNA fila.
+
+    Es la mitad del problema que la puerta offline no puede cubrir: sabe si la
+    clave nombra columnas de mas, pero no si es demasiado CORTA. Y esa mitad se
+    propaga, porque la deteccion de fan-out deriva la unicidad de la clave
+    declarada: una clave reducida ademas desarma esa comprobacion.
+
+    Por defecto solo la superficie de consumo, que es donde una clave corta
+    produce un numero falso en una respuesta. `--todos` hace la pasada completa;
+    piensalo antes, porque `stg.plan_mensual` ronda los 29 millones de filas y
+    esto corre contra un servidor compartido con `albaranes` y `partes` EN
+    PRODUCCION. Cada consulta lleva su `statement_timeout` y la transaccion va
+    `READ ONLY`.
+
+    OJO CON EL VERDE: que no haya duplicados no prueba que la clave sea
+    correcta. Prueba que los datos de HOY no la contradicen.
+    """
+    from etl_sigrid.application.steps.publicar_diccionario_step import DIR_DICCIONARIO
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+    from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+        consultas_de_unicidad,
+        interpretar_resultado,
+        objetos_saltados,
+        veredicto_no_comprobado,
+        veredicto_no_existe,
+    )
+
+    dicc, _hash = cargar_diccionario(DIR_DICCIONARIO)
+    consultas = consultas_de_unicidad(dicc, solo_consumo=not todos)
+    saltados = objetos_saltados(dicc, solo_consumo=not todos)
+
+    alcance = "TODO objeto con clave" if todos else "solo la superficie de consumo"
+    click.echo(f"Comprobacion de unicidad · {alcance}")
+    click.echo(f"  {len(consultas)} objeto(s) a comprobar, {len(saltados)} saltado(s)")
+    click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
+    click.echo("")
+
+    if dry_run:
+        for c in consultas:
+            click.echo(f"-- {c.objeto}  clave: ({', '.join(c.clave)})")
+            click.echo(c.sql + ";")
+            click.echo("")
+        click.echo(f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    fallos = 0
+    sin_comprobar = 0
+    inexistentes = 0
+    for c in consultas:
+        resultado = pg.comprobar_unicidad(c, timeout)
+        if resultado == "NO_EXISTE":
+            inexistentes += 1
+            click.echo(veredicto_no_existe(c))
+            continue
+        if resultado is None:
+            sin_comprobar += 1
+            click.echo(veredicto_no_comprobado(c, f"timeout de {timeout}s"))
+            continue
+        duplicadas, filas = resultado
+        if duplicadas:
+            fallos += 1
+        click.echo(interpretar_resultado(c, duplicadas, filas))
+
+    click.echo("")
+    click.echo(
+        f"Resumen: {len(consultas) - fallos - sin_comprobar - inexistentes} sin "
+        f"contradiccion, {fallos} con la clave rota, {sin_comprobar} sin "
+        f"comprobar, {inexistentes} fichados que no existen en la base."
+    )
+    click.echo(
+        "Un objeto sin contradiccion NO tiene la clave demostrada: los datos de "
+        "hoy no la contradicen, que es otra cosa."
+    )
+    if fallos or sin_comprobar or inexistentes:
+        raise SystemExit(1)
+
+
+@cli.command("check-relaciones")
+@click.option(
+    "--todos",
+    is_flag=True,
+    default=False,
+    help="Comprueba TODA relacion declarada, no solo la superficie de consumo.",
+)
+@click.option(
+    "--timeout",
+    default=30,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_relaciones_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
+    """
+    Comprueba contra la base que cada relacion declarada UNE de verdad (T40).
+
+    Nace de un defecto medido: `retenciones.movimientos.obra_id ->
+    maestro.obras.obra_id` casaba **0 de 261** valores porque `obra_id` es ahi
+    el `ide` del CENTRO DE COSTE, no el de la obra. Un INNER JOIN por esa
+    relacion devuelve cero filas y un LEFT JOIN devuelve todo a NULL, **en
+    silencio**. El validador offline no podia verlo: la relacion resolvia
+    perfectamente contra el diccionario, y lo que fallaba estaba en los datos.
+
+    Muestrea 500 valores distintos del lado izquierdo y mira cuantos existen en
+    el derecho. **Cero casos sale KO**; una cobertura por debajo del 50 % avisa,
+    porque un hueco puede ser legitimo (`cierre` solo cubre 583 de 918 obras).
+
+    Como `check-unicidad`: cada consulta lleva su `statement_timeout`, la
+    transaccion va `READ ONLY`, y esto corre contra un servidor compartido con
+    `albaranes` y `partes` EN PRODUCCION.
+
+    OJO CON EL VERDE: que una relacion una no prueba que sea la correcta.
+    Prueba que une.
+    """
+    from etl_sigrid.application.steps.publicar_diccionario_step import DIR_DICCIONARIO
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+    from etl_sigrid.infrastructure.postgres.relaciones_sql import (
+        consultas_de_relaciones,
+        interpretar_relacion,
+        relaciones_saltadas,
+        veredicto_relacion_no_comprobada,
+        veredicto_relacion_no_existe,
+    )
+
+    dicc, _hash = cargar_diccionario(DIR_DICCIONARIO)
+    consultas = consultas_de_relaciones(dicc, solo_consumo=not todos)
+    saltadas = relaciones_saltadas(dicc, solo_consumo=not todos)
+
+    alcance = "TODA relacion declarada" if todos else "solo la superficie de consumo"
+    click.echo(f"Comprobacion de relaciones · {alcance}")
+    click.echo(
+        f"  {len(consultas)} relacion(es) a comprobar, {len(saltadas)} saltada(s)"
+    )
+    click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
+    click.echo("")
+
+    if dry_run:
+        for c in consultas:
+            click.echo(f"-- {c.nombre} -> {c.a}  [{c.cardinalidad}]")
+            click.echo(c.sql + ";")
+            click.echo("")
+        click.echo(f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    fallos = 0
+    avisos = 0
+    sin_comprobar = 0
+    inexistentes = 0
+    for c in consultas:
+        resultado = pg.comprobar_relacion(c, timeout)
+        if resultado == "NO_EXISTE":
+            inexistentes += 1
+            click.echo(veredicto_relacion_no_existe(c))
+            continue
+        if resultado is None:
+            sin_comprobar += 1
+            click.echo(veredicto_relacion_no_comprobada(c, f"timeout de {timeout}s"))
+            continue
+        muestreados, casan = resultado
+        veredicto = interpretar_relacion(c, muestreados, casan)
+        if veredicto.startswith("KO"):
+            fallos += 1
+        elif veredicto.startswith("AVISO"):
+            avisos += 1
+        elif veredicto.startswith("?"):
+            sin_comprobar += 1
+        click.echo(veredicto)
+
+    for nombre, motivo in saltadas:
+        click.echo(f"-    {nombre}: saltada, {motivo}")
+
+    correctas = len(consultas) - fallos - avisos - sin_comprobar - inexistentes
+    click.echo("")
+    click.echo(
+        f"Resumen: {correctas} que unen, {avisos} con cobertura escasa, {fallos} "
+        f"que NO unen, {sin_comprobar} sin comprobar, {inexistentes} con un "
+        f"extremo que no existe en la base."
+    )
+    click.echo(
+        "Una relacion que une NO esta demostrada: podria unir por la columna "
+        "equivocada y coincidir. Prueba que une, que es otra cosa."
+    )
+    if fallos or sin_comprobar or inexistentes:
+        raise SystemExit(1)
+
+
+@cli.command("publicar-diccionario")
+def publicar_diccionario_cmd() -> None:
+    """
+    Publica el diccionario semántico en `_meta` para que el MCP lo lea por SQL.
+
+    Valida los YAML de `config/diccionario/`, comprueba que cubran todo lo que
+    el repositorio publica y reemplaza el contenido de `_meta.diccionario`,
+    `_meta.diccionario_reglas` y `_meta.diccionario_publicacion` en UNA
+    transacción. Si algo no valida, no escribe nada: el diccionario anterior se
+    queda publicado entero.
+
+    Este comando y `run-all` son las DOS únicas vías de publicación (DA-1). Los
+    builds manuales (`build-cierre`, `build-compras`, `build-maestros`,
+    `build-retenciones`) NO republican: el diccionario no depende de los datos,
+    y publicarlo cinco veces no añadiría nada salvo superficie de fallo.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    # Los pasos nocturnos salen de la composición REAL del pipeline, no de una
+    # lista escrita aquí: el comando suelto tiene que validar con el mismo
+    # criterio que la noche, o un diccionario podría publicarse a mano y que
+    # `run-all` lo rechazase después, que es peor que rechazarlo ya.
+    nocturnos = [p.name for p in build_pipeline_steps(settings)]
+    _ejecutar_paso(
+        PublicarDiccionarioStep(
+            settings,
+            pasos_nocturnos=nocturnos,
+            batch_id=ejecucion.batch_id,
+            client=pg,
+        ),
+        pg,
+        ejecucion,
+    )
 
 
 @cli.command("check-coherencia")

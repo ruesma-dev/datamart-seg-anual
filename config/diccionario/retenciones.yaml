@@ -1,0 +1,869 @@
+# config/diccionario/retenciones.yaml
+#
+# Fichas del esquema `retenciones`: las retenciones de garantia, en los dos
+# sentidos.
+#
+# LA REGLA QUE MAS DINERO HA COSTADO DE TODO EL DATAMART:
+#
+#   **NUNCA se une un efecto de retencion a las lineas de su factura.**
+#   `retenciones.movimientos` tiene UN registro por efecto, con el importe total
+#   retenido; unirlo a las lineas del documento origen multiplica ese importe
+#   por el numero de lineas. El error real dio **38,9 M€ de retencion en UNA
+#   sola obra**, siendo esa la cifra de toda la empresa. Si hace falta detalle,
+#   se agrega primero por documento y se une despues por documento.
+#
+# Y otras tres que hay que saber antes de consultar nada:
+#
+# 1. **Dos lecturas del saldo, y no dan lo mismo.** `saldo_vivo` es lo que
+#    sigue retenido (efectos con estado VIVA); `neto_practicado` es la suma de
+#    TODOS los efectos, cargos menos abonos. La de por defecto para "cuanto nos
+#    deben" o "cuanto debemos" es **`saldo_vivo`**.
+# 2. **`retenciones` NO filtra por `stg.obras`**: pueden aparecer obras
+#    administrativas que el seguimiento excluye a proposito.
+# 3. **NO SE REFRESCA DE NOCHE, y su fecha de build no es consultable.**
+#    `build-retenciones` ejecuta el SQL en linea sin registrar paso en
+#    `_meta.etl_runs`, asi que no aparece en `_meta.v_frescura` y la frescura de
+#    estos objetos sale a NULO. De un dato de aqui hay que advertir que la
+#    antiguedad se desconoce, en vez de callarlo.
+#
+# Nombres y granos verificados contra el SQL de
+# `etl_sigrid/infrastructure/postgres/sql/retenciones/`.
+
+version: 1
+esquema: retenciones
+
+objetos:
+
+  movimientos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Un registro por efecto de retencion de garantia, unificando las dos
+      direcciones. Con sentido PROVEEDOR es dinero nuestro que todavia no hemos
+      pagado al subcontratista; con sentido CLIENTE es dinero nuestro que el
+      cliente todavia no nos ha pagado. Es la tabla base de todo el esquema.
+    grano: >-
+      UNA FILA POR EFECTO, no por linea de factura, y su clave es el par
+      (`sentido`, `movimiento_id`): el identificador solo es unico dentro de su
+      sentido. Unirla a las lineas del documento origen multiplica el importe
+      por el numero de lineas: es el error que dio 38,9 M€ en una sola obra.
+      Para cruzar con el detalle hay que agregar antes por documento.
+    clave_negocio: [sentido, movimiento_id]
+    paso_etl: build_retenciones
+    refresco: manual
+
+    columnas:
+      sentido:
+        significado: >-
+          Quien retiene a quien. PROVEEDOR es lo que practicamos nosotros;
+          CLIENTE es lo que nos practican. Casi toda consulta necesita filtrar
+          por aqui, porque los dos son dinero pendiente pero en direcciones
+          contrarias.
+        valores: [PROVEEDOR, CLIENTE]
+      movimiento_id:
+        significado: >-
+          Identificador del efecto en Sigrid. Es unico dentro de su sentido, no
+          entre los dos: la clave completa incluye `sentido`.
+        agregacion: no_sumable
+      tipo_id:
+        significado: >-
+          Tipo de retencion aplicado. En Ruesma el 97 % de los efectos son de un
+          solo tipo, la retencion de garantia estandar. Nunca es nulo: **la tabla
+          se construye filtrando `retide <> 0`**, asi que un efecto sin tipo no
+          es una retencion y no entra. Buscar `WHERE tipo_id IS NULL` devuelve
+          cero filas siempre.
+        agregacion: no_sumable
+      tipo_descripcion:
+        significado: Nombre del tipo de retencion, ya resuelto para no tener que unir.
+        nulo_significa: El tipo no existe en el catalogo.
+      documento_id:
+        significado: >-
+          Documento del que nace la retencion, que es la factura de compra o de
+          venta. Es la clave por la que hay que agregar antes de cruzar con el
+          detalle de lineas.
+        nulo_significa: El efecto no tiene documento origen informado.
+        agregacion: no_sumable
+      codigo_documento: Codigo del documento origen tal y como se ve en Sigrid.
+      tipo_documento:
+        significado: >-
+          Codigo interno de Sigrid del tipo de documento origen, sin traducir.
+          15 es factura de compra y 11 es factura de venta.
+        agregacion: no_sumable
+      fecha_documento:
+        significado: Fecha del documento origen, ya tipada.
+        agregacion: no_sumable
+        nulo_significa: El documento origen no tenia fecha informada.
+      entidad_id:
+        significado: >-
+          Proveedor o cliente al que afecta la retencion, segun el sentido. Es
+          la misma columna para los dos a proposito.
+        nulo_significa: El efecto no tiene entidad informada.
+        agregacion: no_sumable
+      entidad_nombre: Nombre del proveedor o del cliente, de `con.res`.
+      entidad_cif:
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+        nulo_significa: >-
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
+      obra_id:
+        significado: >-
+          **NO es el identificador de la obra y NO une con `maestro.obras`: es
+          el `ide` del CENTRO DE COSTE.** El centro de coste es una entidad
+          distinta de la obra, con su propio `ide` y **contiguo** al de ella:
+          la obra 0655 es `1990273` en todo el datamart y `1990274` aqui. Medido
+          el 2026-08-25: **0 de 261** valores de esta columna existen en
+          `maestro.obras.obra_id`, asi que un `INNER JOIN` devuelve cero filas y
+          un `LEFT JOIN` todo a NULL, sin error y sin aviso. Para cruzar con
+          obras, ver las relaciones de esta ficha: se pasa por
+          `cierre.v_pbi_cierre_cabecera.centro_coste_ide`. El valor sale en
+          cascada: primero el centro de coste del efecto y, si no lo hay, las
+          lineas del documento origen, pero SOLO si todas apuntan a la misma
+          obra.
+        nulo_significa: >-
+          No se pudo atribuir. Si ademas `num_obras_documento` es mayor que 1,
+          es que la factura reparte entre varias obras y no se ha querido
+          adivinar. Estas filas no se pueden perder al sumar por obra.
+        agregacion: no_sumable
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid, y **el unico campo de
+        esta tabla que un humano reconoce**. Casa al 100 % con
+        `maestro.obras.codigo_obra` (257 de 257 valores, medido el 2026-08-25)
+        pero **no identifica una obra**: `maestro.obras` tiene 919 filas y solo
+        844 codigos distintos, y unir por el convierte las 261 filas de
+        `v_pbi_retencion_obra` en **329**. Sirve para MOSTRAR y para FILTRAR una
+        obra concreta; no para unir sin agregar antes.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      num_obras_documento:
+        significado: >-
+          Entre cuantas obras reparte el documento origen. Mayor que 1 con
+          `obra_id` nulo es la marca de "esta factura toca varias obras y la
+          retencion no se ha repartido". OJO: en sentido CLIENTE vale **siempre
+          0**, porque se alimenta de `retenciones.v_src_lineas_venta`, que esta
+          vacia; ahi no explica nada y una obra vacia solo significa que el
+          efecto no tenia centro de coste.
+        agregacion: no_sumable
+      importe:
+        significado: >-
+          Importe retenido, CON SIGNO. Los negativos son ajustes o devoluciones
+          registradas como efecto negativo, y se conservan tal cual: un SUM
+          sobre todo da el neto practicado.
+        unidad: EUR
+        agregacion: suma
+      fecha_prevista_devolucion:
+        significado: Cuando estaba previsto liberar o cobrar la retencion.
+        nulo_significa: El efecto no tiene fecha de vencimiento informada.
+        agregacion: no_sumable
+      fecha_devolucion_real:
+        significado: Cuando se libero o se cobro de verdad.
+        nulo_significa: >-
+          Sigue viva: es exactamente lo que distingue una retencion pendiente de
+          una liquidada.
+        agregacion: no_sumable
+      estado:
+        significado: >-
+          Si el efecto sigue retenido o ya se liquido. Se deriva de que exista o
+          no fecha de devolucion real.
+        valores: [VIVA, LIQUIDADA]
+      vencida_sin_liquidar:
+        significado: >-
+          Marca los efectos que seguian vivos y cuya fecha prevista ya habia
+          pasado **EN EL MOMENTO DEL BUILD**, no hoy: la tabla se materializa y
+          la comparacion contra la fecha actual se congela ahi. En un esquema de
+          refresco manual cuya fecha de build ni siquiera es consultable por SQL,
+          esta lista puede llevar semanas parada. Para el vencimiento a dia de
+          hoy hay que recalcularlo sobre `fecha_prevista_devolucion`.
+      dias_desde_vencimiento:
+        significado: >-
+          Dias transcurridos desde la fecha prevista **hasta el dia del build**,
+          no hasta hoy. Negativo significa que aun no habia vencido entonces.
+          Para los dias reales se recalcula sobre `fecha_prevista_devolucion`.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene fecha de vencimiento con la que contar.
+
+    relaciones:
+      - de: tipo_id
+        a: retenciones.tipos.tipo_id
+        cardinalidad: "N:1"
+        porque: Para el porcentaje y el plazo de devolucion del tipo aplicado.
+      - de: obra_id
+        a: cierre.v_pbi_cierre_cabecera.centro_coste_ide
+        cardinalidad: "N:N"
+        porque: >-
+          **El unico puente medido entre retenciones y el resto del datamart.**
+          `obra_id` es aqui el `ide` del CENTRO DE COSTE, y esta es la unica
+          columna publicada que lo lleva; desde la cabecera de cierre se salta a
+          `obra_id` de verdad y de ahi a `maestro.obras`. Medido el 2026-08-25:
+          **249 de 261** valores casan (95 %). Los 12 que no son centros de
+          coste de obras sin cabecera de cierre, y **se pierden en un INNER
+          JOIN**. Es `N:N` y no `N:1` porque dos centros de coste estan
+          repetidos en la cabecera (4 filas), asi que el JOIN convierte 261
+          filas en 251 y **hay que agregar por `centro_coste_ide` antes de unir
+          importes**. Lo que NO vale: unir por `obra_id` contra
+          `maestro.obras.obra_id` (0 de 261, cero filas en silencio) ni por
+          `codigo_obra`, que casa al 100 % pero multiplica filas porque
+          `maestro.obras` repite codigo.
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para llegar a la factura de compra de la que nace la retencion. Solo
+          casa en sentido PROVEEDOR: las de CLIENTE nacen de facturas de venta,
+          que no se ingieren. Y NUNCA se sigue hasta `compras.factura_lineas` sin
+          agregar antes por `documento_id`: hacerlo multiplica el importe
+          retenido por el numero de lineas de la factura, y es el error que dio
+          38,9 M€ en una obra.
+
+    ejemplos_preguntas:
+      - Que retenciones tengo de los proveedores de la obra X
+      - Cuanto nos retiene todavia el cliente de la obra X
+      - Que retenciones estan vencidas y sin liquidar
+
+  tipos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Catalogo de los tipos de retencion configurados en Sigrid, con su
+      porcentaje, su plazo de devolucion y su forma de calculo. Explica POR QUE
+      un efecto tiene el importe que tiene.
+    grano: Una fila por tipo de retencion. `tipo_id` es clave primaria.
+    clave_negocio: [tipo_id]
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      tipo_id:
+        significado: >-
+          Identificador del tipo en Sigrid. En Ruesma el 97 % de los efectos
+          usan uno solo, el de garantia estandar.
+        agregacion: no_sumable
+      codigo:
+        significado: Codigo corto del tipo, tal y como se ve en Sigrid.
+        nulo_significa: El tipo no tiene concepto asociado en `raw.con`.
+      descripcion:
+        significado: Nombre legible del tipo de retencion.
+        nulo_significa: El tipo no tiene concepto asociado en `raw.con`.
+      clase:
+        significado: >-
+          Clasificacion interna de Sigrid del tipo de retencion. Se expone tal
+          cual porque no hay catalogo que la traduzca en el datamart.
+        agregacion: no_sumable
+      porcentaje:
+        significado: >-
+          Porcentaje que se retiene sobre la base. Vale 0 en los tipos que
+          retienen una cantidad fija en vez de un porcentaje.
+        unidad: "%"
+        agregacion: no_sumable
+      importe_fijo:
+        significado: >-
+          Cantidad fija a retener, para los tipos que no van por porcentaje.
+          Vale 0 en los que si van por porcentaje.
+        unidad: EUR
+        agregacion: no_sumable
+      tipo_devolucion:
+        significado: >-
+          Como esta previsto devolver la retencion, segun la configuracion de
+          Sigrid. Se expone sin traducir.
+        agregacion: no_sumable
+      dias_vencimiento:
+        significado: >-
+          Dias desde la factura hasta la fecha prevista de devolucion. Es de
+          donde sale el vencimiento de cada efecto.
+        agregacion: no_sumable
+    relaciones:
+      - de: tipo_id
+        a: retenciones.movimientos.tipo_id
+        cardinalidad: "1:N"
+        porque: >-
+          Un tipo se aplica a muchos efectos. **Pero el catalogo esta casi
+          entero sin usar**: de los 2.177 tipos, solo **15** aparecen en algun
+          movimiento (medido el 2026-08-25). Recorrer esta tabla para listar
+          "los tipos de retencion que usamos" devuelve 2.177 filas de las que
+          2.162 no se han aplicado nunca; para los que se usan de verdad hay
+          que partir de `retenciones.movimientos` y no de aqui.
+    ejemplos_preguntas:
+      - Que tipos de retencion se aplican y con que porcentaje
+
+  v_pbi_retencion_entidad:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El saldo de retenciones con cada proveedor y con cada cliente, con LAS DOS
+      LECTURAS del saldo a la vista para que no haya que elegir a ciegas: la de
+      estado (`saldo_vivo`) y la de signo (`neto_practicado`).
+    grano: >-
+      Una fila por (`sentido`, `entidad_id`), que es su clave de negocio. Los
+      efectos sin entidad informada quedan FUERA de esta vista, asi que su total
+      puede ser menor que el de `retenciones.movimientos`.
+    clave_negocio: [sentido, entidad_id]
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      sentido:
+        significado: Si la retencion la practicamos nosotros o nos la practican.
+        valores: [PROVEEDOR, CLIENTE]
+      entidad_id:
+        significado: Identificador del proveedor o del cliente.
+        agregacion: no_sumable
+      entidad_nombre: Nombre de la entidad, de `con.res`.
+      entidad_cif:
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+        nulo_significa: >-
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
+      num_movimientos:
+        significado: Cuantos efectos hay detras de las cifras de la fila.
+        agregacion: suma
+      saldo_vivo:
+        significado: >-
+          LA LECTURA POR DEFECTO. Suma de los efectos que siguen VIVOS, es decir
+          lo que aun esta retenido con esa entidad. Es la cifra que responde
+          "cuanto le debemos" o "cuanto nos deben".
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La entidad no tiene ningun efecto vivo.
+      importe_liquidado:
+        significado: Suma de los efectos ya devueltos o cobrados.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La entidad no tiene ningun efecto liquidado.
+      num_vivas:
+        significado: Cuantos efectos siguen retenidos.
+        agregacion: suma
+      num_liquidadas:
+        significado: Cuantos efectos ya se liquidaron.
+        agregacion: suma
+      total_cargos:
+        significado: Suma de los efectos positivos, sin mirar su estado.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La entidad no tiene ningun efecto positivo.
+      total_abonos:
+        significado: >-
+          Suma de los efectos negativos, ya con el signo cambiado para que sea
+          una cifra positiva que se resta.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La entidad no tiene ningun efecto negativo.
+      neto_practicado:
+        significado: >-
+          LA OTRA LECTURA. Suma de TODOS los efectos con su signo, vivos y
+          liquidados. NO es lo mismo que `saldo_vivo` y las dos pueden divergir:
+          esta dice cuanto se ha practicado historicamente, aquella cuanto queda
+          pendiente. Decir cual se usa forma parte de la respuesta.
+        unidad: EUR
+        agregacion: suma
+      importe_vencido:
+        significado: >-
+          Suma de los efectos vivos cuya fecha prevista ya habia pasado EN EL
+          BUILD. Hereda el congelado de `vencida_sin_liquidar`: quien quiera lo
+          vencido a dia de hoy tiene que recalcularlo sobre
+          `fecha_prevista_devolucion`.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La entidad no tiene ningun efecto vencido.
+      num_vencidas:
+        significado: >-
+          Cuantos efectos estaban vencidos y sin liquidar EN EL BUILD. Mismo
+          congelado que `importe_vencido`.
+        agregacion: suma
+      primera_devolucion_prevista:
+        significado: La fecha de devolucion mas proxima de esa entidad.
+        agregacion: no_sumable
+        nulo_significa: Ningun efecto tiene fecha de vencimiento informada.
+      ultima_devolucion_prevista:
+        significado: La fecha de devolucion mas lejana de esa entidad.
+        agregacion: no_sumable
+        nulo_significa: Ningun efecto tiene fecha de vencimiento informada.
+    relaciones:
+      - de: entidad_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la direccion y el CIF del proveedor. Solo aplica a las filas de
+          sentido PROVEEDOR: los clientes no estan en ese maestro.
+    ejemplos_preguntas:
+      - Cuanto le retenemos todavia al proveedor P
+      - Que proveedores acumulan mas retencion viva
+
+  v_pbi_retencion_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las retenciones de cada obra en LAS DOS DIRECCIONES a la vez, con la
+      posicion neta: cuanto retenemos a proveedores frente a cuanto nos retiene
+      el cliente. Es la vista para "como esta la obra X en garantias".
+    grano: >-
+      Una fila por (`obra_id`, `codigo_obra`, `nombre_obra`), que es su clave de
+      negocio y son TRES columnas, no una. No basta con `obra_id`: en
+      `retenciones.movimientos` las tres se resuelven con cascadas DISTINTAS
+      —`obra_id` sale del centro de coste del efecto o, en su defecto, de la
+      obra unica del documento; `codigo_obra` y `nombre_obra` salen de
+      `COALESCE` sobre dos JOIN distintos—, asi que un mismo `obra_id` puede
+      aparecer con dos codigos y dar DOS filas. Unir solo por `obra_id` duplica
+      —y ademas ese `obra_id` es el `ide` del CENTRO DE COSTE, no el de la obra:
+      ver su columna. Ademas, los efectos sin obra
+      atribuida quedan FUERA, asi que la suma de esta vista es menor que el
+      total de la empresa: lo que falta esta en `sin_obra_asignada` de
+      `retenciones.v_pbi_retencion_resumen`, que es un RECUENTO y no un
+      importe.
+    clave_negocio: [obra_id, codigo_obra, nombre_obra]
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: >-
+          **NO es el identificador de la obra: es el `ide` del CENTRO DE COSTE**,
+          heredado tal cual de `retenciones.movimientos`. Mismo defecto y mismas
+          cifras que alli: **0 de 261** valores existen en
+          `maestro.obras.obra_id` (medido el 2026-08-25). Para cruzar con obras
+          se pasa por `cierre.v_pbi_cierre_cabecera.centro_coste_ide`, que es la
+          relacion declarada mas abajo.
+        agregacion: no_sumable
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid, y el unico campo que un
+        humano reconoce. Casa al 100 % con `maestro.obras.codigo_obra` pero **no
+        identifica una obra**: el maestro repite codigo (919 filas, 844 codigos)
+        y unir por el convierte las 261 filas de esta vista en **329**. Para
+        mostrar y filtrar, si; para unir, no.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      retenido_a_proveedores:
+        significado: >-
+          Lo que seguimos reteniendo a proveedores en esa obra. Es dinero
+          nuestro que todavia no hemos pagado.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La obra no tiene retenciones vivas a proveedor.
+      num_retenciones_proveedor:
+        significado: Cuantos efectos vivos de proveedor hay en la obra.
+        agregacion: suma
+      devuelto_a_proveedores:
+        significado: Lo que ya se libero a proveedores en esa obra.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La obra no tiene retenciones liquidadas a proveedor.
+      retenido_por_cliente:
+        significado: >-
+          Lo que el cliente nos sigue reteniendo en esa obra. Es dinero nuestro
+          que todavia no hemos cobrado.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La obra no tiene retenciones vivas de cliente.
+      num_retenciones_cliente:
+        significado: Cuantos efectos vivos de cliente hay en la obra.
+        agregacion: suma
+      cobrado_de_cliente:
+        significado: Lo que el cliente ya nos ha liberado en esa obra.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La obra no tiene retenciones liquidadas de cliente.
+      posicion_neta:
+        significado: >-
+          Lo retenido a proveedores menos lo retenido por el cliente, ambos
+          vivos. Positivo significa que en esa obra retenemos mas de lo que nos
+          retienen, es decir que la garantia juega a nuestro favor.
+        unidad: EUR
+        agregacion: suma
+      vencido_proveedores:
+        significado: >-
+          Retencion a proveedor que estaba vencida y sin liberar EN EL BUILD.
+          Hereda el congelado de `vencida_sin_liquidar`.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: No hay nada vencido en ese sentido.
+      vencido_cliente:
+        significado: >-
+          Retencion de cliente que estaba vencida y sin cobrar EN EL BUILD.
+          Mismo congelado.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: No hay nada vencido en ese sentido.
+    relaciones:
+      - de: obra_id
+        a: cierre.v_pbi_cierre_cabecera.centro_coste_ide
+        cardinalidad: "N:N"
+        porque: >-
+          **El unico puente medido con el resto del datamart**, y desde el que
+          se llega al presupuesto y a las fechas de la obra. `obra_id` es aqui
+          el `ide` del CENTRO DE COSTE, y esta es la unica columna publicada que
+          lo lleva. Medido el 2026-08-25: **249 de 261** valores casan (95 %);
+          los 12 restantes son centros de coste de obras sin cabecera de cierre
+          y **se pierden en un INNER JOIN**. Es `N:N` porque dos
+          `centro_coste_ide` se repiten en la cabecera, asi que hay que agregar
+          antes de unir importes. Las DOS relaciones que habia aqui antes
+          —`obra_id -> maestro.obras.obra_id` y
+          `obra_id -> cierre.v_pbi_cierre_cabecera.obra_id`— casaban **0 de
+          261** las dos: devolvian cero filas en silencio. Ojo, ademas, con que
+          los dos esquemas se construyen a mano y por separado.
+    ejemplos_preguntas:
+      - Que retenciones tengo de los proveedores de la obra X
+      - En que obras retenemos mas de lo que nos retienen
+
+  v_pbi_retenciones_vivas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El detalle, efecto a efecto, de todo lo que sigue retenido. Es la lista de
+      trabajo: cada fila es una retencion concreta que habra que liberar o
+      reclamar.
+    grano: >-
+      Una fila por efecto vivo, en los dos sentidos; su clave es el par
+      (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
+      de su sentido.
+    clave_negocio: [sentido, movimiento_id]
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      sentido:
+        significado: Si la retencion la practicamos nosotros o nos la practican.
+        valores: [PROVEEDOR, CLIENTE]
+      movimiento_id:
+        significado: Identificador del efecto en Sigrid, unico dentro de su sentido.
+        agregacion: no_sumable
+      codigo_documento: Codigo de la factura de la que nace la retencion.
+      fecha_documento:
+        significado: Fecha de esa factura.
+        agregacion: no_sumable
+        nulo_significa: El documento origen no tenia fecha informada.
+      entidad_nombre: Nombre del proveedor o del cliente.
+      entidad_cif:
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+        nulo_significa: >-
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
+      codigo_obra:
+        significado: Codigo de la obra a la que se atribuyo el efecto.
+        nulo_significa: >-
+          El efecto no se pudo atribuir a una obra. Si ademas
+          `num_obras_documento` es mayor que 1, la factura reparte entre varias.
+      nombre_obra:
+        significado: Nombre de la obra atribuida.
+        nulo_significa: El efecto no se pudo atribuir a una obra.
+      tipo_descripcion:
+        significado: Tipo de retencion aplicado.
+        nulo_significa: El tipo no existe en el catalogo.
+      importe:
+        significado: Importe retenido, con signo.
+        unidad: EUR
+        agregacion: suma
+      fecha_prevista_devolucion:
+        significado: Cuando esta previsto liberar o cobrar la retencion.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene fecha de vencimiento informada.
+      vencida_sin_liquidar:
+        significado: >-
+          Si la fecha prevista ya habia pasado **EN EL MOMENTO DEL BUILD**, no
+          hoy: se hereda de `retenciones.movimientos`, que es una tabla
+          materializada. Para el vencimiento a dia de hoy hay que recalcularlo
+          sobre `fecha_prevista_devolucion`.
+      dias_desde_vencimiento:
+        significado: >-
+          Dias desde el vencimiento **hasta el dia del build**, no hasta hoy.
+          Negativo significa que aun no habia vencido entonces. Para los dias
+          reales se recalcula sobre `fecha_prevista_devolucion`.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene fecha de vencimiento con la que contar.
+      num_obras_documento:
+        significado: >-
+          Entre cuantas obras reparte la factura de origen. Es lo que explica
+          que la obra este vacia.
+        agregacion: no_sumable
+    relaciones:
+      - de: movimiento_id
+        a: retenciones.movimientos.movimiento_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es el mismo efecto, filtrado a los que siguen vivos. El JOIN va por
+          `(sentido, movimiento_id)`: el identificador solo es unico DENTRO de
+          su sentido, asi que unir por el a secas cruza retenciones de proveedor
+          con retenciones de cliente.
+    ejemplos_preguntas:
+      - Que retenciones seguimos teniendo vivas en la obra X
+
+  v_pbi_retenciones_vencidas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las retenciones cuya fecha prevista ya paso y que siguen vivas, con un
+      tramo de antiguedad para priorizar. En sentido CLIENTE es dinero que hay
+      que reclamar; en PROVEEDOR, dinero que habria que haber liberado.
+    grano: >-
+      Una fila por efecto vencido y sin liquidar; su clave es el par
+      (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
+      de su sentido. **Vencido A FECHA DEL BUILD**, no de hoy: ver
+      `vencida_sin_liquidar`.
+    clave_negocio: [sentido, movimiento_id]
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      sentido:
+        significado: Si la retencion la practicamos nosotros o nos la practican.
+        valores: [PROVEEDOR, CLIENTE]
+      movimiento_id:
+        significado: Identificador del efecto en Sigrid, unico dentro de su sentido.
+        agregacion: no_sumable
+      codigo_documento: Codigo de la factura de la que nace la retencion.
+      fecha_documento:
+        significado: Fecha de esa factura.
+        agregacion: no_sumable
+        nulo_significa: El documento origen no tenia fecha informada.
+      entidad_nombre: Nombre del proveedor o del cliente.
+      entidad_cif:
+        significado: >-
+          CIF de la entidad, y **solo existe en la mitad PROVEEDOR**. En
+          `sentido = 'CLIENTE'` la consulta escribe un NULL constante.
+        nulo_significa: >-
+          **Depende de la mitad, y son dos mecanismos distintos.** En
+          `sentido = 'CLIENTE'` es NULL **siempre**: la consulta proyecta el
+          literal `NULL::VARCHAR(24)`, porque el CIF de cliente no se trae. En
+          `sentido = 'PROVEEDOR'` el NULL significa que la entidad **no tiene
+          ficha de proveedor** —el `LEFT JOIN` con `raw.prv` no casa—, y **no**
+          que el proveedor exista sin CIF: ahi `prv.cif` va en crudo, sin el
+          `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
+          vacio trae **cadena vacia**.
+      codigo_obra:
+        significado: Codigo de la obra a la que se atribuyo el efecto.
+        nulo_significa: El efecto no se pudo atribuir a una obra.
+      nombre_obra:
+        significado: Nombre de la obra atribuida.
+        nulo_significa: El efecto no se pudo atribuir a una obra.
+      importe:
+        significado: >-
+          Importe retenido, con signo, de un efecto que estaba vencido EN EL
+          BUILD: la vista filtra por `vencida_sin_liquidar` y hereda su
+          congelado.
+        unidad: EUR
+        agregacion: suma
+      fecha_prevista_devolucion:
+        significado: La fecha en la que debio liberarse o cobrarse.
+        agregacion: no_sumable
+      dias_desde_vencimiento:
+        significado: >-
+          Cuantos dias llevaba vencido **EL DIA DEL BUILD**, no hoy: la columna
+          se materializa en `retenciones.movimientos` y se congela ahi. Aqui
+          siempre es positivo, porque la vista filtra por vencidas. Para los
+          dias reales se recalcula sobre `fecha_prevista_devolucion`, y en un
+          esquema de refresco manual cuya fecha de build no es consultable, la
+          diferencia pueden ser semanas.
+        agregacion: no_sumable
+      antiguedad:
+        significado: >-
+          Tramo de antiguedad del vencimiento, para priorizar sin tener que
+          calcular. Es presentacion derivada de `dias_desde_vencimiento`, asi
+          que hereda su congelado: los tramos son los del dia del build.
+        valores:
+          - Menos de 3 meses
+          - 3-6 meses
+          - 6-12 meses
+          - 1-2 años
+          - Más de 2 años
+    relaciones:
+      - de: movimiento_id
+        a: retenciones.movimientos.movimiento_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es el mismo efecto, filtrado a los vencidos sin liquidar. El JOIN va
+          por `(sentido, movimiento_id)`: el identificador solo es unico DENTRO
+          de su sentido.
+    ejemplos_preguntas:
+      - Que retenciones vencen este trimestre y siguen vivas
+      - Que retencion llevamos mas tiempo sin reclamar al cliente
+
+  v_pbi_retencion_resumen:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Los totales de la empresa en cada sentido, con las dos lecturas del saldo
+      y con cuanto queda sin atribuir a obra. Es la vista de contraste: sirve
+      para comprobar que una cifra de detalle tiene sentido antes de darla por
+      buena.
+    grano: Dos filas, una por sentido. Cubre TODOS los efectos, con y sin obra.
+    clave_negocio: [sentido]
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      sentido:
+        significado: Si la retencion la practicamos nosotros o nos la practican.
+        valores: [PROVEEDOR, CLIENTE]
+      num_movimientos:
+        significado: >-
+          Total de efectos de ese sentido. En Ruesma son del orden de 25.000 en
+          PROVEEDOR y 2.200 en CLIENTE.
+        agregacion: suma
+      num_entidades:
+        significado: >-
+          Cuantos proveedores o clientes distintos hay detras. NO SE SUMA entre
+          las dos filas: es un `COUNT(DISTINCT)` y un proveedor que sea a la vez
+          cliente se contaria dos veces.
+        agregacion: no_sumable
+      num_obras:
+        significado: >-
+          Cuantas obras distintas tienen efectos de ese sentido. Misma
+          advertencia: es un recuento de distintos y no se suma entre filas.
+        agregacion: no_sumable
+      saldo_vivo:
+        significado: >-
+          Lo que sigue retenido en toda la empresa. Del orden de 34,7 M€ en
+          PROVEEDOR y 21,9 M€ en CLIENTE: una cifra muy lejos de esos ordenes de
+          magnitud es una senal de que la consulta esta mal.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: >-
+          No hay ningun efecto vivo en ese sentido. Es NULO y no cero, porque la
+          suma no lleva `COALESCE`.
+      num_vivas:
+        significado: Cuantos efectos siguen retenidos.
+        agregacion: suma
+      importe_liquidado:
+        significado: Lo que ya se libero o se cobro, en toda la empresa.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: No hay ningun efecto liquidado en ese sentido. Nulo, no cero.
+      num_liquidadas:
+        significado: Cuantos efectos ya se liquidaron.
+        agregacion: suma
+      importe_vencido:
+        significado: >-
+          Lo que estaba vencido y sin liquidar EN EL BUILD, en toda la empresa.
+          Hereda el congelado de `vencida_sin_liquidar`.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: No hay nada vencido en ese sentido. Nulo, no cero.
+      num_vencidas:
+        significado: >-
+          Cuantos efectos estaban vencidos y sin liquidar EN EL BUILD. Mismo
+          congelado.
+        agregacion: suma
+      neto_practicado:
+        significado: >-
+          Suma de todos los efectos con su signo, vivos y liquidados. NO es el
+          saldo vivo, y compararlos SI tiene sentido: que diverjan es el
+          diagnostico de que hay ajustes o devoluciones registradas como efectos
+          negativos. Lo que no vale es usar una por la otra.
+        unidad: EUR
+        agregacion: suma
+      sin_obra_asignada:
+        significado: >-
+          CUANTOS efectos no se pudieron atribuir a ninguna obra. Es un
+          recuento, no un importe: sirve para saber que falta gente en el reparto
+          por obra, pero NO cuadra euros contra
+          `retenciones.v_pbi_retencion_obra`. Conviene citarlo cuando se den
+          totales por obra, precisamente para decir que no suman el total.
+        agregacion: suma
+    relaciones: []
+    ejemplos_preguntas:
+      - Cuanta retencion viva tenemos en total con proveedores
+      - Cuantos efectos de retencion se quedan sin obra
+
+  v_src_lineas_compra:
+    tipo: vista
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es una vista interna del build de retenciones, no una superficie de
+      consulta. Solo expone dos identificadores en crudo de Sigrid y existe para
+      resolver la obra de un efecto cuando el centro de coste no la da.
+    descripcion: >-
+      Las lineas de las facturas de COMPRA, reducidas a documento y obra, que se
+      usan como respaldo para atribuir a obra una retencion de proveedor. Se
+      crea de dos formas segun exista o no `raw.dcfpro`; en Ruesma esa tabla SI
+      se ingiere, asi que el respaldo esta activo.
+    grano: >-
+      Una fila por LINEA de factura de compra, no por factura: el par
+      (documento, obra) se repite tantas veces como lineas tenga esa factura
+      contra esa obra. Es exactamente el par que produce el fan-out de
+      `R-RETENCION-NO-JOIN-LINEAS`, y por eso esta vista se agrega SIEMPRE por
+      documento antes de usarse.
+    clave_negocio: []
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      docide:
+        significado: Identificador de la factura de compra a la que pertenece la linea.
+        agregacion: no_sumable
+      obride:
+        significado: Identificador de la obra que la linea imputa.
+        agregacion: no_sumable
+    relaciones: []
+    ejemplos_preguntas: []
+
+  v_src_lineas_venta:
+    tipo: vista
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es una vista interna del build de retenciones y ademas ESTA SIEMPRE VACIA
+      en Ruesma, asi que consultarla no devuelve nada y no responde ninguna
+      pregunta.
+    descripcion: >-
+      El equivalente de `retenciones.v_src_lineas_compra` para las facturas de
+      VENTA. **Esta siempre vacia por diseno**: se construye sobre `dvfpro`, una
+      tabla de Sigrid que **no se ingiere** —por eso no tiene ficha en `raw`—,
+      asi que el SQL crea la variante sin filas. La
+      consecuencia practica es que una retencion de CLIENTE solo se puede
+      atribuir a obra por su centro de coste, sin el respaldo de las lineas.
+    grano: >-
+      Ninguna fila, hoy. Tendria una por LINEA de factura de venta, no por
+      factura: el par (documento, obra) se repetiria por cada linea, igual que en
+      su gemela de compras.
+    clave_negocio: []
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas:
+      docide:
+        significado: Identificador de la factura de venta. Hoy nunca tiene valor.
+        agregacion: no_sumable
+      obride:
+        significado: Identificador de la obra imputada. Hoy nunca tiene valor.
+        agregacion: no_sumable
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_sigrid_date:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de retenciones, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Convierte una fecha de Sigrid —un entero con formato YYYYMMDD— en una
+      fecha de verdad, tratando el 0 como ausencia de fecha. Es lo que hace que
+      `fecha_devolucion_real` sea nula en vez de cero cuando la retencion sigue
+      viva, y por tanto lo que permite distinguir VIVA de LIQUIDADA.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_retenciones
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

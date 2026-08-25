@@ -1,0 +1,335 @@
+# config/diccionario/maestro.yaml
+#
+# Fichas del esquema `maestro`: obras, proveedores y su relacion, pensados para
+# consultarse tal cual.
+#
+# TRES COSAS ANTES DE CONSULTAR NADA:
+#
+# 1. **`maestro.obras` NO FILTRA NADA.** Es superconjunto de `stg.obras`, que es
+#    el universo del SEGUIMIENTO: aqui estan tambien las obras administrativas
+#    (gastos generales, centros de personal) y los codigos con cinco o mas
+#    digitos. Contar obras en una o en otra da resultados distintos **a
+#    proposito**, y toda respuesta que cuente obras tiene que decir cual usa.
+# 2. **`importe_contratado` lleva IVA.** Es la suma del total del documento,
+#    mientras que todos los importes de `compras` son sin IVA. La diferencia
+#    entre las dos cifras no es sobrecoste ni ahorro: es el impuesto.
+# 3. **NO SE REFRESCA DE NOCHE.** Lo construye `build-maestros`, que si registra
+#    paso, asi que su fecha de build SI es consultable con
+#    `SELECT * FROM _meta.v_frescura WHERE paso = 'build_maestros'`.
+#
+# Nombres y granos verificados contra el SQL de
+# `etl_sigrid/infrastructure/postgres/sql/maestro/`.
+
+version: 1
+esquema: maestro
+
+objetos:
+
+  obras:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El maestro de obras SIN filtrar: codigo, nombre, estado, fechas de alta y
+      baja, y el cliente. Es la vista para poner contexto a una obra; **NO** es
+      el universo del seguimiento y **NO sirve para saber si una obra sigue
+      viva**: `es_activa` vale TRUE en las 919 filas porque `fecha_baja` no se
+      informa nunca (ver R-OBRA-ACTIVA). Esta descripcion prometia justo eso
+      hasta que la bateria de aceptacion lo midio.
+    grano: >-
+      Una fila por `obra_id`, y son TODAS las obras de Sigrid. Es superconjunto
+      de `stg.obras`, que excluye las administrativas y los codigos de cinco o
+      mas digitos: contar aqui da mas obras que contar alli, y esa diferencia es
+      deliberada.
+    clave_negocio: [obra_id]
+    paso_etl: build_maestros
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: >-
+          Identificador de la obra en Sigrid (`con.ide`). Es la clave universal
+          del modelo y la que une con el resto de esquemas.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid, de `con.cod`.
+      nombre_obra: >-
+        Nombre legible de la obra, de `con.res`. En Sigrid no existe ninguna
+        columna `nom`: el nombre siempre es el resumen del concepto.
+      estado_id:
+        significado: >-
+          Codigo interno de estado de Sigrid, sin traducir: su catalogo **no se
+          ingiere**, asi que hay codigos sin nombre. Aun asi es **lo unico de
+          esta vista que discrimina algo**: reparte las 919 obras en once
+          valores (465 en el `25`, 226 en el `1`, 175 en el `15`, que el SQL de
+          `maestro/01_obras.sql` documenta como EN CURSO; medido el
+          2026-08-25). No mandar a `es_activa`, que vale TRUE para las 919.
+        agregacion: no_sumable
+      fecha_alta:
+        significado: Fecha de alta de la obra, ya tipada desde el entero de Sigrid.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene fecha de alta informada.
+      fecha_baja:
+        significado: >-
+          Fecha en que se dio de baja la obra. **Sigrid no la informa nunca**:
+          esta a NULL en las 919 filas (medido el 2026-08-25), y por eso
+          `es_activa`, que se deriva de ella, no discrimina nada.
+        agregacion: no_sumable
+        nulo_significa: >-
+          En teoria "la obra sigue de alta"; en la practica **no significa
+          nada**, porque no hay ni una sola fila con fecha de baja.
+      es_activa: >-
+        **NO USAR: vale TRUE en las 919 filas** (medido el 2026-08-25). Se
+        deriva de `fecha_baja`, que Sigrid no informa nunca, asi que es tan
+        vacia como la `activa` de `stg.obras` que R-OBRA-ACTIVA denuncia —solo
+        que esta lo disimula mejor, porque parece calculada. Contar
+        `WHERE es_activa` devuelve el total de obras disfrazado de obras
+        activas. Esta ficha la anunciaba como "la columna buena" hasta que la
+        bateria de aceptacion la midio. Ver R-OBRA-ACTIVA para lo que si se
+        puede decir y con que limites.
+      cliente_id:
+        significado: >-
+          Identificador del cliente en Sigrid, copiado de `obr.entide` **tal
+          cual, sin `NULLIF`**. Por eso **la obra sin cliente trae 0, no NULL**:
+          Sigrid no guarda nulos en sus enteros. Un
+          `WHERE cliente_id IS NULL` devuelve cero filas siempre; lo que hay que
+          escribir es `WHERE cliente_id = 0`. Para saber si el cliente ademas
+          existe, mirar `nombre_cliente`, que si es NULL cuando no resuelve.
+        agregacion: no_sumable
+      codigo_cliente:
+        significado: Codigo del cliente, de `con.cod`.
+        nulo_significa: >-
+          La obra no tiene cliente —`cliente_id` = 0— o el que tiene no existe en
+          `raw.con`. Aqui el NULL si es real: lo produce el `LEFT JOIN`.
+      nombre_cliente:
+        significado: >-
+          Nombre del cliente, de `con.res`. Es lo UNICO que el datamart sabe del
+          cliente: la tabla de clientes de Sigrid no se ingiere, asi que no hay
+          CIF, ni direccion, ni facturacion de cliente. Es F-040.
+        nulo_significa: >-
+          La obra no tiene cliente —`cliente_id` = 0— o el que tiene no existe en
+          `raw.con`. Este NULL si es real, lo produce el `LEFT JOIN`, asi que es
+          la forma fiable de preguntar por las obras sin cliente resuelto.
+    relaciones:
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Es el universo del seguimiento, que es un SUBCONJUNTO de este. Unir
+          por aqui equivale a filtrar a las obras reales; no unir deja dentro
+          las administrativas.
+      - de: obra_id
+        a: cierre.v_pbi_cierre_cabecera.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para el presupuesto, los modificados y las fechas de ejecucion de la
+          obra, que aqui no estan.
+    ejemplos_preguntas:
+      - Cuantas obras hay dadas de alta en Sigrid
+      - Quien es el cliente de la obra X
+      - Que codigo tiene la obra que se llama X
+
+  proveedores:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El maestro global de proveedores: codigo, nombre, CIF, razon social y la
+      direccion cuando la hay. Es la ficha del proveedor, no lo que se le ha
+      comprado. **No expone el oficio ni la naturaleza** del proveedor aunque
+      Sigrid los tenga: los campos correspondientes estan cargados en `raw.prv`
+      y ninguna vista los saca todavia. Es F-036, y es la razon de que hoy la
+      pregunta de quien fue el fontanero de una obra solo se pueda responder por
+      texto libre.
+    grano: >-
+      Una fila por `proveedor_id`. La direccion se toma la de menor posicion
+      cuando hay varias, y **la mayoria de proveedores no tiene ninguna**.
+    clave_negocio: [proveedor_id]
+    paso_etl: build_maestros
+    refresco: manual
+    columnas:
+      proveedor_id:
+        significado: >-
+          Identificador del proveedor en Sigrid: un proveedor ES un concepto con
+          propiedades de proveedor, asi que su `ide` es el mismo en las dos
+          tablas.
+        agregacion: no_sumable
+      codigo: Codigo del proveedor tal y como se ve en Sigrid, de `con.cod`.
+      nombre: Nombre del proveedor, de `con.res`.
+      cif:
+        significado: >-
+          CIF del proveedor segun su ficha. Ojo: no es el mismo dato que el
+          `proveedor_cif` de `compras`, que se guarda documento a documento y
+          puede diferir.
+        nulo_significa: La ficha del proveedor no tiene CIF, o esta en blanco.
+      razon_social:
+        significado: >-
+          Razon social completa, que puede diferir del nombre comercial.
+          **Nunca es NULL**: se proyecta `p.raz` en crudo desde `raw.prv`, la
+          tabla del `FROM`, asi que una razon social sin informar llega como
+          **cadena vacia**. `razon_social IS NULL` devuelve cero filas; lo que
+          hay que escribir es `TRIM(razon_social) = ''`. Ojo: `cif`, aqui al
+          lado, **si** lleva `NULLIF(TRIM(...))` y por tanto si puede ser NULL.
+      dir1:
+        significado: Primera linea de la direccion.
+        nulo_significa: >-
+          El proveedor no tiene direccion cargada en Sigrid, que es lo habitual.
+      dir2:
+        significado: Segunda linea de la direccion.
+        nulo_significa: No hay direccion cargada, o solo tiene una linea.
+      codigo_postal:
+        significado: Codigo postal de la direccion.
+        nulo_significa: El proveedor no tiene direccion cargada.
+      provincia:
+        significado: Provincia, resuelta desde el catalogo de Sigrid.
+        nulo_significa: No hay direccion, o su provincia no esta en el catalogo.
+      municipio:
+        significado: Municipio, resuelto desde el catalogo de Sigrid.
+        nulo_significa: No hay direccion, o su municipio no esta en el catalogo.
+      direccion_completa:
+        significado: La direccion en una sola cadena, tal y como la guarda Sigrid.
+        nulo_significa: El proveedor no tiene direccion cargada.
+      telefono:
+        significado: Telefono de la direccion.
+        nulo_significa: No hay direccion, o no tiene telefono.
+    relaciones:
+      - de: proveedor_id
+        a: compras.fact_compras_linea.proveedor_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para saber que se le ha comprado. Hay muchas lineas por proveedor: se
+          agrega el lado de compras por `proveedor_id` antes de unir, y se
+          filtra su `tipo_doc`.
+      - de: proveedor_id
+        a: retenciones.movimientos.entidad_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para la retencion viva del proveedor. Hay muchos efectos por
+          proveedor, y hay que filtrar el sentido PROVEEDOR: en el otro sentido
+          esa columna es un cliente y no esta en este maestro. **Solo 1.269 de
+          los 9.545 proveedores tienen alguna retencion** (13 %, medido el
+          2026-08-25): con `INNER JOIN` desaparecen los otros 8.276, asi que un
+          listado de proveedores que cruce por aqui tiene que ir por `LEFT
+          JOIN` o decir que solo cuenta los que tienen retencion.
+    ejemplos_preguntas:
+      - Que datos tenemos del proveedor P
+      - Que proveedores hay dados de alta y con que CIF
+
+  proveedores_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Que proveedores han trabajado en cada obra y por cuanto, derivado de los
+      CONTRATOS de compra. No sale de un maestro de proveedores por obra:
+      `raw.obrprv`, la tabla que Sigrid tiene para eso, **esta vacia en
+      Ruesma**, asi que el vinculo obra-proveedor se reconstruye desde los
+      contratos.
+    grano: >-
+      Una fila por (`obra_id`, `proveedor_id`), sumando todos los contratos de
+      compra entre los dos. Solo entran las filas con obra Y proveedor
+      informados: un contrato sin obra no aparece aqui.
+    clave_negocio: [obra_id, proveedor_id]
+    paso_etl: build_maestros
+    refresco: manual
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      proveedor_id:
+        significado: Identificador del proveedor en Sigrid.
+        agregacion: no_sumable
+      codigo_proveedor: Codigo del proveedor, de `con.cod`.
+      nombre_proveedor: Nombre del proveedor, de `con.res`.
+      cif:
+        significado: CIF del proveedor, tomado de su ficha de proveedor.
+        nulo_significa: >-
+          La entidad contratada no tiene ficha de proveedor, o la tiene sin CIF.
+          Ver `es_proveedor`.
+      razon_social:
+        significado: >-
+          Razon social del proveedor, de su ficha (`prv.raz`), **en crudo**: sin
+          el `NULLIF(TRIM(...))` que si lleva `cif` aqui al lado. Una razon
+          social vacia llega como **cadena vacia**, no como NULL.
+        nulo_significa: >-
+          La entidad contratada **no tiene ficha de proveedor**: el `LEFT JOIN`
+          con `raw.prv` no casa. Ver `es_proveedor`. **No** significa que la
+          ficha exista sin razon social; ese caso trae cadena vacia.
+      es_proveedor: >-
+        Si la entidad contratada tiene ficha de proveedor en Sigrid. FALSE
+        significa que se contrato a alguien que no esta dado de alta como
+        proveedor, y explica que el CIF y la razon social vengan vacios.
+      dir1:
+        significado: Primera linea de la direccion del proveedor.
+        nulo_significa: El proveedor no tiene direccion cargada, que es lo habitual.
+      dir2:
+        significado: Segunda linea de la direccion.
+        nulo_significa: No hay direccion cargada, o solo tiene una linea.
+      codigo_postal:
+        significado: Codigo postal de la direccion del proveedor.
+        nulo_significa: El proveedor no tiene direccion cargada.
+      provincia:
+        significado: Provincia del proveedor, del catalogo de Sigrid.
+        nulo_significa: No hay direccion, o su provincia no esta en el catalogo.
+      municipio:
+        significado: Municipio del proveedor, del catalogo de Sigrid.
+        nulo_significa: No hay direccion, o su municipio no esta en el catalogo.
+      direccion_completa:
+        significado: La direccion del proveedor en una sola cadena.
+        nulo_significa: El proveedor no tiene direccion cargada.
+      telefono:
+        significado: Telefono de la direccion del proveedor.
+        nulo_significa: No hay direccion, o no tiene telefono.
+      n_contratos:
+        significado: Cuantos contratos de compra hay entre esa obra y ese proveedor.
+        agregacion: suma
+      importe_contratado:
+        significado: >-
+          Suma del TOTAL DEL DOCUMENTO de esos contratos, y **lleva IVA**. NO es
+          comparable con `importe_contratado` de
+          `compras.v_pbi_contrato_consumo`, que suma las lineas SIN IVA: la
+          diferencia entre las dos cifras es el impuesto, no un sobrecoste. Para
+          compararlas hay que sumar aparte la `cuota_iva` de
+          `compras.contrato_lineas`.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el estado, las fechas y el cliente de la obra.
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: Para la ficha completa del proveedor.
+      - de: obra_id
+        a: compras.v_pbi_proveedor_obra.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la misma pregunta desde el mundo documental, y con IVA frente a sin
+          IVA. Alli el corte es ANUAL y aqui no, asi que hay que agregar por
+          `(obra_id, proveedor_id)` antes de comparar, y aun asi las cifras no
+          coinciden por el impuesto.
+    ejemplos_preguntas:
+      - Con que proveedores hemos contratado en la obra X y por cuanto
+      - En cuantas obras trabaja el proveedor P
+
+  fn_fecha:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de maestros, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Convierte una fecha de Sigrid —un entero con formato YYYYMMDD— en una
+      fecha de verdad, tratando el 0 y los negativos como ausencia de fecha. Es
+      una copia local de la de `stg`, y la copia es deliberada: asi el esquema
+      `maestro` se puede construir sin depender de que `stg` exista.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_maestros
+    refresco: manual
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

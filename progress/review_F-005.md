@@ -62,9 +62,15 @@ IPv4 literales, base64 de 24+ caracteres, y un barrido de bytes NUL sobre
 | `progress/`, `specs/` | **Limpio** |
 
 **Un hallazgo, no imputable a F-005:** `infra/00_vars.ps1:5` versiona el ID de
-suscripción `$SUB = "863dfedd-..."`. Verificado con `git show dev:infra/00_vars.ps1`:
+suscripción `$SUB = "<ID DE SUSCRIPCION REDACTADO — F-043>"`. Verificado con `git show dev:infra/00_vars.ps1`:
 **ya estaba en `dev`**, F-005 no lo introdujo. Es deuda previa y queda como aviso
 para el humano, no como cambio requerido de esta feature.
+
+> **Redactado el 2026-08-21 (F-043).** El valor se ha retirado de este fichero.
+> `infra/00_vars.ps1` ya fue saneado en F-003 (`bb1efa2`): hoy toma la
+> suscripción del entorno o de `az account show`. El historial de git **sí
+> conserva** el valor original, y el humano lo aceptó por escrito: ver
+> `progress/decisiones_abiertas.md`.
 
 ## Checkpoints
 

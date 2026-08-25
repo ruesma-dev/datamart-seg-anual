@@ -18,7 +18,7 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -637,6 +637,124 @@ class PostgresClient:
             fila = cur.fetchone()
             return tuple(fila) if fila else ()
 
+    def comprobar_unicidad(
+        self, consulta, timeout_s: int
+    ) -> tuple[int, int] | str | None:
+        """Ejecuta UNA comprobación de unicidad (F-006, T26).
+
+        Devuelve `(claves_duplicadas, filas_implicadas)`, o **`None` si la
+        consulta agotó el `statement_timeout`**. Ese `None` no es un cero: es
+        «no lo sabemos», y quien lo reciba tiene que reportarlo como NO
+        COMPROBADO. Contarlo como correcto convertiría el límite de tiempo
+        —que está para no ahogar un servidor compartido con `albaranes` y
+        `partes`— en una forma de aprobar sin mirar.
+
+        La transacción va `READ ONLY` y el `statement_timeout` es `SET LOCAL`,
+        así que ni escribe ni cambia la configuración del servidor.
+        """
+        import psycopg
+
+        from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+            sentencias_previas,
+        )
+
+        # NO se toca `autocommit`: `self.connection()` devuelve una conexion que
+        # ya viene EN TRANSACCION (`INTRANS`), y cambiarlo ahi revienta con
+        # `can't change 'autocommit' now`. Paso de verdad al ejecutar T26 contra
+        # la base: el doble no lo reprodujo porque en el `autocommit` era un
+        # atributo normal. Es justo lo que un doble no puede garantizar, y por
+        # eso hacia falta la ejecucion real.
+        with self.connection() as conn:
+            try:
+                with conn.cursor() as cur:
+                    for previa in sentencias_previas(timeout_s):
+                        cur.execute(previa)
+                    cur.execute(consulta.sql)
+                    fila = cur.fetchone()
+                conn.commit()
+            except psycopg.errors.QueryCanceled:
+                conn.rollback()
+                return None
+            except psycopg.errors.UndefinedTable:
+                # El objeto esta fichado y NO existe en la base. No es un fallo
+                # del chequeo: es el hallazgo. Paso de verdad con
+                # `cierre.v_pbi_planif_vs_real`, que el repositorio crea y la
+                # base no tiene porque `build-cierre` no se ha vuelto a lanzar.
+                conn.rollback()
+                return "NO_EXISTE"
+            except Exception:
+                conn.rollback()
+                raise
+        if fila is None:
+            return (0, 0)
+        return (int(fila[0]), int(fila[1]))
+
+    def comprobar_relacion(
+        self, consulta, timeout_s: int
+    ) -> tuple[int, int] | str | None:
+        """Ejecuta UNA comprobación de relación (F-006, T40).
+
+        Devuelve `(valores_muestreados, valores_que_casan)`, **`None` si la
+        consulta agotó el `statement_timeout`** y `"NO_EXISTE"` si falta en la
+        base alguno de los dos extremos o la columna. Los tres desenlaces se
+        distinguen porque exigen cosas distintas de quien los lea: «la relación
+        no une» se arregla en la ficha, «no he podido comprobarlo» se vuelve a
+        lanzar, y «eso no está en la base» significa que falta un build.
+
+        `UndefinedColumn` va junto a `UndefinedTable` porque es el caso que de
+        verdad aparece cuando la base va por detrás del árbol: el objeto está y
+        la columna todavía no. Sin capturarlo, una sola relación reventaría el
+        barrido entero.
+
+        Mismas dos sentencias previas que `comprobar_unicidad`, y las emite el
+        cliente: la transacción va `READ ONLY` y el `statement_timeout` es `SET
+        LOCAL`, así que ni escribe ni toca la configuración del servidor, que
+        comparten `albaranes` y `partes` en producción.
+        """
+        import psycopg
+
+        from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+            sentencias_previas,
+        )
+
+        # NO se toca `autocommit`: `self.connection()` devuelve la conexion ya
+        # EN TRANSACCION (`INTRANS`) y cambiarlo ahi revienta. Mismo motivo,
+        # mismo comentario y misma cicatriz que en `comprobar_unicidad`.
+        with self.connection() as conn:
+            try:
+                with conn.cursor() as cur:
+                    for previa in sentencias_previas(timeout_s):
+                        cur.execute(previa)
+                    cur.execute(consulta.sql)
+                    fila = cur.fetchone()
+                conn.commit()
+            except psycopg.errors.QueryCanceled:
+                conn.rollback()
+                return None
+            except (psycopg.errors.UndefinedTable, psycopg.errors.UndefinedColumn):
+                conn.rollback()
+                return "NO_EXISTE"
+            except Exception:
+                conn.rollback()
+                raise
+        if fila is None:
+            return (0, 0)
+        return (int(fila[0]), int(fila[1]))
+
+    def fetch_hash_publicado(self) -> tuple[str, str] | None:
+        """`(version, hash_fuente)` de lo que hay publicado, o `None` si no hay.
+
+        Es lo que permite detectar que **lo publicado ya no es lo del
+        repositorio**, que es como se quedo `_meta` sirviendo un grano que T26
+        habia demostrado falso: la ficha se corrigio y no se republico.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT version, hash_fuente FROM _meta.diccionario_publicacion"
+            )
+            fila = cur.fetchone()
+            return (str(fila[0]), str(fila[1])) if fila else None
+
     # ---------------------------------------------------------------------
     # Permisos del rol de solo lectura
     # ---------------------------------------------------------------------
@@ -692,6 +810,95 @@ class PostgresClient:
             statements=len(sentencias),
         )
         return sentencias
+
+    # ---------------------------------------------------------------------
+    # Diccionario semántico (F-006)
+    # ---------------------------------------------------------------------
+
+    def publicar_diccionario(
+        self,
+        dicc,
+        *,
+        hash_fuente: str,
+        informe,
+        batch_id: str | None = None,
+        ahora: datetime | None = None,
+    ) -> int:
+        """Reemplaza el diccionario publicado y devuelve las filas escritas.
+
+        TODO ocurre dentro de UNA transacción, y esa es la garantía que el
+        contrato con `mcp-bbdd` le debe a quien consulte mientras se publica:
+        verá el diccionario anterior completo o el nuevo completo, nunca uno a
+        medias y nunca vacío. Una tabla vacía dejaría al MCP inventándose los
+        significados, que es justo lo que esta feature existe para impedir.
+
+        El vaciado es `DELETE` y jamás `DROP`: un `DROP` se lleva por delante
+        los `GRANT` del rol de lectura y dejaría al MCP ciego hasta el
+        `apply-grants` siguiente.
+        """
+        from etl_sigrid.infrastructure.postgres.diccionario_sql import (
+            SQL_BORRAR_CONTEXTO,
+            SQL_BORRAR_DICCIONARIO,
+            SQL_BORRAR_PUBLICACION,
+            SQL_BORRAR_REGLAS,
+            SQL_INSERT_CONTEXTO,
+            SQL_INSERT_DICCIONARIO,
+            SQL_INSERT_PUBLICACION,
+            SQL_INSERT_REGLA,
+            fila_publicacion,
+            filas_diccionario,
+            filas_contexto,
+            filas_reglas,
+        )
+
+        instante = ahora if ahora is not None else datetime.utcnow()
+        fichas = filas_diccionario(dicc)
+        reglas = filas_reglas(dicc)
+        contexto = filas_contexto(dicc)
+        publicacion = fila_publicacion(dicc, hash_fuente, instante, batch_id, informe)
+
+        with self.connection() as conn, conn.cursor() as cur:
+            # Borrar antes de insertar: al revés chocaría con la clave primaria.
+            cur.execute(SQL_BORRAR_DICCIONARIO)
+            cur.execute(SQL_BORRAR_REGLAS)
+            cur.execute(SQL_BORRAR_CONTEXTO)
+            cur.execute(SQL_BORRAR_PUBLICACION)
+            if fichas:
+                cur.executemany(SQL_INSERT_DICCIONARIO, fichas)
+            if reglas:
+                cur.executemany(SQL_INSERT_REGLA, reglas)
+            if contexto:
+                cur.executemany(SQL_INSERT_CONTEXTO, contexto)
+            cur.execute(SQL_INSERT_PUBLICACION, publicacion)
+
+        escritas = len(fichas) + len(reglas) + len(contexto) + 1
+        logger.info(
+            "diccionario_publicado",
+            version=publicacion[1],
+            hash_fuente=hash_fuente[:12],
+            objetos=len(fichas),
+            reglas=len(reglas),
+            contexto=len(contexto),
+            filas=escritas,
+        )
+        return escritas
+
+    def list_objetos_catalogo(self, schemas: Sequence[str]) -> list[tuple]:
+        """Los objetos que la base tiene DE VERDAD, para `check-diccionario`.
+
+        Es la única fuente no heurística: la puerta offline lee el SQL del
+        repositorio con expresiones regulares y no puede ver un objeto creado
+        por otra vía. Incluye funciones además de tablas y vistas, porque el
+        diccionario también las documenta.
+        """
+        from etl_sigrid.infrastructure.postgres.diccionario_sql import (
+            SQL_OBJETOS_CATALOGO,
+        )
+
+        pedidos = list(schemas)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_OBJETOS_CATALOGO, (pedidos, pedidos))
+            return list(cur.fetchall())
 
     # ---------------------------------------------------------------------
     # Ejecución de archivos SQL (DDL, transformaciones stg/mart)

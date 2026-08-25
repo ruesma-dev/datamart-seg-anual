@@ -604,3 +604,37 @@ lista:
   manual. Alternativa descartada: `CREATE OR REPLACE VIEW` conserva permisos
   pero no admite cambiar tipos, nombres ni orden de columnas.
 - **Specs de F-005, F-003 y F-004 APROBADAS** por el humano. Arranca F-005.
+
+---
+
+## D13 · El ID de suscripción versionado (F-043) — RESUELTA 2026-08-21
+
+**Qué pasó.** `progress/review_F-005.md:65` traía el ID de suscripción de Azure
+en claro, desde el cierre de F-005 (`5b486d4`). Estaba en el historial y ya
+subido a GitHub. El `CLAUDE.md` del ecosistema lo prohíbe expresamente: «ni IDs
+de suscripción o tenant… da igual que el repositorio sea privado: el historial
+de git no suelta lo que entra».
+
+**Decisión del humano: redactar en HEAD y aceptar el historial.** Se valoraron
+las tres vías —reescribir el historial con push forzado, redactar solo en HEAD,
+o aceptarlo entero— y se eligió la segunda. Motivo: un ID de suscripción no es
+una credencial y por sí solo no da acceso; reescribir el historial rompería los
+clones existentes.
+
+**Qué queda, dicho sin adornos.** El valor **sigue siendo recuperable** en el
+historial por cualquiera con acceso al repositorio, y GitHub puede conservar
+copias en caché. Esto es una excepción aceptada a la regla, no un cierre limpio.
+
+**Lo que sí quedó comprobado el 2026-08-21:**
+
+- `infra/00_vars.ps1` ya estaba saneado desde F-003 (`bb1efa2`): hoy toma la
+  suscripción de `$env:AZ_SUBSCRIPTION_ID` o de `az account show`.
+- Auditoría del árbol completo buscando GUID, contraseñas, claves privadas,
+  tokens e IPs privadas: **25 coincidencias, todas falsos positivos** —
+  marcadores (`<generada>`), parámetros de `psql` (`:'app_pwd'`), variables de
+  entorno (`$env:PGPASSWORD`) y contraseñas ficticias en tests. Ningún valor
+  real.
+- `.idea/` y `.ruff_cache/` no están versionados.
+
+**Si algún día cambia el criterio**, la vía es `git filter-repo` más push
+forzado, avisando antes a quien tenga un clon.

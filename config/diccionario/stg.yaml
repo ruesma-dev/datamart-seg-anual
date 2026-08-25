@@ -1,0 +1,832 @@
+# config/diccionario/stg.yaml
+#
+# Fichas del esquema `stg`: la capa intermedia que normaliza Sigrid y explota la
+# planificacion a nivel mensual.
+#
+# **NINGUNO DE ESTOS OBJETOS ES SUPERFICIE DE CONSULTA**, y no es una
+# recomendacion de estilo: aqui es donde estan las trampas que producen numeros
+# falsos con mas facilidad de todo el datamart.
+#
+# 1. **En `stg.plan_mensual` conviven TODAS las versiones master.** Filtrar solo
+#    por obra y ambito multiplica los importes por el numero de versiones de esa
+#    obra. La version vigente solo esta resuelta AGUAS ABAJO, en `mart`.
+# 2. **`fas` significa dos cosas.** En los ambitos reales (3 y 7) es el MES; en
+#    los master (8 y 11) es el NUMERO DE VERSION. Y cambia de nombre segun la
+#    capa: `fase_num` en `stg.presupuesto`, `version` en `stg.plan_mensual`,
+#    `fasnum` en `raw.obrfas`.
+# 3. **`stg.obras.activa` esta cableada a TRUE** y no significa nada.
+# 4. **`stg.partidas.categoria` es una HEURISTICA** sobre el codigo del capitulo
+#    raiz, no una taxonomia de Sigrid.
+# 5. **`stg.ambitos.uso_seguimiento` esta DESFASADO**: marca solo los ambitos 8 y
+#    11, y `mart` ya construye tambien los reales 3 y 7.
+#
+# Lo que se pregunta esta en `mart` y en `cierre`. Estas fichas existen para que
+# un agente entienda de donde sale aquello, y para que sepa por que NO debe
+# consultar esto directamente.
+#
+# Nombres y granos verificados contra el SQL de
+# `etl_sigrid/infrastructure/postgres/sql/stg/`.
+
+version: 1
+esquema: stg
+
+objetos:
+
+  plan_mensual:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el objeto mas peligroso del datamart. Aqui conviven TODAS las versiones
+      master de cada obra, asi que una consulta por obra y ambito sin filtrar
+      version multiplica los importes por el numero de versiones. La eleccion de
+      la version vigente solo esta hecha aguas abajo: para planificacion hay que
+      ir a `mart.fact_seguimiento_mensual`, que ya la resuelve mes a mes.
+    descripcion: >-
+      El nucleo temporal del datamart: la explosion MENSUAL del presupuesto, con
+      una fila por cada mes en el que una partida tiene importe, para los cuatro
+      ambitos que usa el seguimiento. De aqui salen `mart` y `cierre`.
+    grano: >-
+      Una fila por (`obra_id`, `partida_id`, `ambito_id`, `version`,
+      `anio_mes`), que es su clave de negocio y son CINCO columnas. Omitir
+      `version` es exactamente lo que multiplica los importes. Es la tabla mas
+      grande del datamart, del orden de decenas de millones de filas, y por eso
+      su build va troceado por lotes de obras.
+    clave_negocio: [obra_id, partida_id, ambito_id, version, anio_mes]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      plan_id:
+        significado: >-
+          Clave tecnica de la fila. BIGSERIAL sobre una tabla que se vacia y se
+          reconstruye en cada build: no identifica nada de forma estable.
+        agregacion: clave_sustituta
+      presupuesto_id:
+        significado: >-
+          Fila de `stg.presupuesto` de la que sale esta explosion mensual. Es la
+          trazabilidad hacia el importe total sin distribuir.
+        agregacion: no_sumable
+      obra_id:
+        significado: Identificador de la obra en Sigrid. Estable entre builds.
+        agregacion: no_sumable
+      partida_id:
+        significado: Identificador de la partida o capitulo en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: >-
+          Ambito de Sigrid al que pertenece la fila. Los cuatro que se explotan
+          son 3 (coste real), 7 (venta real), 8 (coste master) y 11 (venta
+          master). El ambito decide que significa `version`.
+        valores: ["3", "7", "8", "11"]
+        agregacion: no_sumable
+      version:
+        significado: >-
+          El campo `fas` de Sigrid, y **significa dos cosas segun el ambito**: en
+          los REALES (3 y 7) es el MES —con `fas = 0` como el "Previsto" vivo— y
+          en los MASTER (8 y 11) es el NUMERO DE VERSION. Cruzar las dos
+          lecturas produce series temporales inventadas.
+        agregacion: no_sumable
+      version_descripcion:
+        significado: Etiqueta legible de la version master, o del mes en los ambitos reales.
+        nulo_significa: La fase no tiene descripcion en Sigrid.
+      version_tex:
+        significado: >-
+          Texto libre que escribio el jefe de obra al crear la version ("ABC",
+          "PLANIFICACION CUATRIMESTRAL FEB-26"). Es de donde `mart` deduce el
+          tipo de master.
+        nulo_significa: La fase no tiene texto libre.
+      version_fec_creacion:
+        significado: >-
+          Fecha en que se creo la version en Sigrid. Es el origen de verdad y
+          esta siempre presente en los master.
+        agregacion: no_sumable
+        nulo_significa: La fase no tiene fecha de creacion, tipico de los ambitos reales.
+      version_fec_efectiva:
+        significado: >-
+          La fecha que se usa para elegir la version vigente. Coincide con la de
+          creacion salvo en las CUATRIMESTRALES ENTREGADAS TARDE, donde se
+          adelanta al periodo que la version representa: sin ese ajuste, una
+          cuatrimestral de febrero entregada en marzo no regiria febrero.
+        agregacion: no_sumable
+        nulo_significa: No se pudo resolver, tipico de los ambitos reales.
+      anio_mes:
+        significado: Mes al que se imputa la fila, como fecha del dia 1.
+        agregacion: no_sumable
+      posicion_mes:
+        significado: >-
+          Posicion de ese mes dentro de la serie de la partida, empezando en 1.
+          Es lo que ancla la explosion al mes de arranque de la obra.
+        agregacion: no_sumable
+      pct_acumulado:
+        significado: >-
+          Porcentaje ACUMULADO de avance hasta ese mes, tal y como lo escribe
+          Sigrid en su cadena de planificacion. Un cero intermedio es un estorno
+          literal; un cero final arrastra el ultimo valor positivo.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La fila no procede de una cadena de planificacion porcentual.
+      pct_mes:
+        significado: >-
+          El porcentaje que corresponde a ESE mes, ya desacumulado como la
+          diferencia con el mes anterior.
+        unidad: "%"
+        agregacion: promedio
+        nulo_significa: La fila no procede de una cadena de planificacion porcentual.
+      precio_unitario:
+        significado: >-
+          Precio unitario de la partida, con seis decimales. Redondearlo antes
+          de multiplicar cambia el importe, y por eso se guarda asi.
+        unidad: EUR
+        agregacion: no_sumable
+      can_mes:
+        significado: >-
+          Cantidad imputada a ese mes. En las partidas de tipo porcentaje puede
+          ser un coeficiente con seis decimales y no una cantidad fisica:
+          redondearla infla el importe.
+        agregacion: suma_solo_dentro_del_mes
+      can_origen:
+        significado: Cantidad acumulada desde el inicio hasta ese mes.
+        agregacion: ultimo_valor
+      importe_mes:
+        significado: Importe imputado A ESE MES concreto, ya desacumulado.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_origen:
+        significado: >-
+          Importe ACUMULADO desde el inicio hasta ese mes. Sumarlo a lo largo del
+          tiempo multiplica el resultado.
+        unidad: EUR
+        agregacion: ultimo_valor
+      importe_mes_raw:
+        significado: El importe del mes calculado con el precio SIN redondear a dos decimales.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+        nulo_significa: No se calculo la version sin redondear para esa fila.
+      importe_origen_raw:
+        significado: Version sin redondear del acumulado a origen.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: No se calculo la version sin redondear para esa fila.
+      total_incurrido:
+        significado: >-
+          Calculo paralelo de Sigrid del incurrido a origen (`obrparpre.totinc`).
+          Normalmente coincide con cantidad por precio, pero a veces difiere en
+          centimos.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: >-
+          La fila no es de un ambito REAL. Llega en los **dos** reales —3
+          (coste) y 7 (venta)—, no solo en coste, porque el bloque que lo trae
+          filtra `ambito_id IN (3, 7)`. En los master (8 y 11) es nulo.
+      total_incurrido_mes:
+        significado: El incurrido de Sigrid imputado a ese mes.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+        nulo_significa: La fila no es de coste real.
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: presupuesto_id
+        a: stg.presupuesto.presupuesto_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el importe TOTAL de la partida sin distribuir. La suma mensual de
+          aqui deberia cuadrar con aquel, y cuando no cuadra es senal de estorno.
+      - de: ambito_id
+        a: stg.ambitos.ambito_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para saber si el ambito es real o master, que es lo que decide como se
+          lee `version`.
+      - de: obra_id
+        a: mart.fact_seguimiento_mensual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la tabla de la que sale el seguimiento, ya con la version vigente
+          elegida. Para comparar hay que agregar por
+          `(obra_id, partida_id, anio_mes)` y **filtrar antes la version**, o los
+          importes no cuadraran.
+    ejemplos_preguntas:
+      - De donde sale el planificado de la obra X antes de elegir version
+
+  presupuesto:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es capa intermedia y exige aplicar a mano dos reglas que aguas abajo ya
+      estan resueltas: elegir la columna de importe segun el ambito y filtrar la
+      fase correcta. Se documenta porque es **la fuente buena para "cual es el
+      presupuesto de la obra"**, que no se responde sumando `stg.plan_mensual`.
+    descripcion: >-
+      El presupuesto por partida y ambito, con su cantidad, su precio y su
+      importe, sin distribucion mensual propia. La explosion a meses vive en
+      `stg.plan_mensual`.
+
+      **Dos trampas antes de escribir nada, y las dos multiplican importes.**
+
+      **1. En los ambitos REALES (3 = coste, 7 = venta) el valor esta ACUMULADO
+      A ORIGEN.** La fila de la fase 5 trae lo llevado hasta el mes 5, no lo del
+      mes 5. Por eso `stg.plan_mensual` desacumula por diferencia con la fase
+      anterior (`cantidad - LAG(cantidad)`). Un `SUM` a traves de `fase_num`
+      cuenta el mismo importe una vez por cada mes transcurrido: para el total
+      de la obra hay que quedarse con la fase MAYOR.
+
+      **2. En los ambitos MASTER (8 = coste, 11 = venta) conviven TODAS las
+      versiones**, igual que en `stg.plan_mensual`: alli `fase_num` no es un mes
+      sino el numero de version, y hay una fila por cada una. Sin filtrar la
+      version vigente —`stg.version_master_vigente`— se suman todas las
+      revisiones del presupuesto como si fueran partidas distintas.
+    grano: >-
+      Una fila por (`obra_id`, `partida_id`, `ambito_id`, `fase_num`), y cada una
+      identificada por `presupuesto_id`, que es la clave primaria y viene de
+      Sigrid. **`fase_num` NO es una dimension sumable**: en los ambitos reales
+      (3 y 7) es el mes y el valor viene ACUMULADO A ORIGEN, y en los master (8
+      y 11) es el numero de version y estan todas. Se declara esa como clave de negocio porque es la que usan los JOIN
+      —`stg.plan_mensual` referencia justo esa columna— y la combinacion de
+      cuatro es el grano conceptual. `fase_num` es el mismo campo `fas` de Sigrid
+      y arrastra su ambiguedad: mes en los ambitos reales, numero de version en
+      los master.
+
+      **`fase_num = 0` no es un mes: es el "Previsto" vivo**, la estimacion
+      vigente de la obra. De ahi sale el fallback del cierre para el mes en curso
+      sin master (`cierre/02_build_fact.sql`, bloque E), asi que filtrar
+      `fase_num >= 1` lo deja fuera y filtrar `= 0` da justo esa foto.
+    clave_negocio: [presupuesto_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      presupuesto_id:
+        significado: >-
+          Identificador de la fila en Sigrid. A diferencia de las claves
+          sustitutas del datamart, este viene del origen y es estable.
+        agregacion: no_sumable
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      partida_id:
+        significado: Identificador de la partida o capitulo en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: >-
+          Ambito de Sigrid. Decide cual de las dos columnas de importe hay que
+          usar: `importe` para coste (3 y 8) e `importe_oficial` para venta
+          (7 y 11).
+        agregacion: no_sumable
+      fase_num:
+        significado: >-
+          El campo `fas` de Sigrid. **Mes en los ambitos reales, numero de
+          version en los master**, y aqui se llama `fase_num` mientras que en
+          `stg.plan_mensual` se llama `version` y en `raw.obrfas`, `fasnum`.
+        agregacion: no_sumable
+      cantidad:
+        significado: >-
+          Cantidad presupuestada, con SEIS decimales y **sin redondear a
+          proposito**: en las partidas de tipo porcentaje la cantidad es un
+          coeficiente diminuto, y redondearlo infla el importe de forma visible.
+
+          **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
+          Sumar por obra o por partida con la fase fija es correcto, y es lo
+          que hace `cierre/02_build_fact.sql` con `WHERE fase_num = 0`. Lo
+          que no vale es cruzar fases: en los ambitos REALES (3 y 7) el
+          valor viene **acumulado a origen** —la fila de la fase 5 trae lo
+          llevado hasta el mes 5, no lo del mes 5—, asi que sumarlas cuenta
+          el mismo importe una vez por cada mes transcurrido. Para el total
+          hay que quedarse con la fase MAYOR; para el valor de un mes,
+          restar la anterior, que es lo que hace `stg.plan_mensual`.
+        agregacion: suma_solo_dentro_del_mes
+      precio:
+        significado: Precio unitario, con seis decimales para no perder precision de Sigrid.
+        unidad: EUR
+        agregacion: no_sumable
+      importe:
+        significado: >-
+          Importe total de la partida, redondeado con los decimales que la obra
+          tenga configurados. **Es la columna de COSTE** (ambitos 3 y 8).
+
+          **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
+          Sumar por obra o por partida con la fase fija es correcto, y es lo
+          que hace `cierre/02_build_fact.sql` con `WHERE fase_num = 0`. Lo
+          que no vale es cruzar fases: en los ambitos REALES (3 y 7) el
+          valor viene **acumulado a origen** —la fila de la fase 5 trae lo
+          llevado hasta el mes 5, no lo del mes 5—, asi que sumarlas cuenta
+          el mismo importe una vez por cada mes transcurrido. Para el total
+          hay que quedarse con la fase MAYOR; para el valor de un mes,
+          restar la anterior, que es lo que hace `stg.plan_mensual`.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      importe_oficial:
+        significado: >-
+          El importe con los coeficientes que Sigrid aplica SOLO EN VENTA. **Es
+          la columna de VENTA** (ambitos 7 y 11). Cuando no hay coeficiente vale
+          lo mismo que `importe`, y por eso confundirlas pasa desapercibido en
+          coste y falsea la venta.
+
+          **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
+          Sumar por obra o por partida con la fase fija es correcto, y es lo
+          que hace `cierre/02_build_fact.sql` con `WHERE fase_num = 0`. Lo
+          que no vale es cruzar fases: en los ambitos REALES (3 y 7) el
+          valor viene **acumulado a origen** —la fila de la fase 5 trae lo
+          llevado hasta el mes 5, no lo del mes 5—, asi que sumarlas cuenta
+          el mismo importe una vez por cada mes transcurrido. Para el total
+          hay que quedarse con la fase MAYOR; para el valor de un mes,
+          restar la anterior, que es lo que hace `stg.plan_mensual`.
+        unidad: EUR
+        agregacion: suma_solo_dentro_del_mes
+      dec_cantidades:
+        significado: >-
+          Decimales de cantidad configurados en la obra (`obr.decc`; por
+          defecto 3). **Se expone y NO interviene en ningun calculo de esta
+          tabla.** El importe se computa `ROUND(can * ROUND(pre, decp), deci)`:
+          la cantidad **no se redondea**, y el propio SQL explica por que —las
+          partidas tipo porcentaje tienen cantidades como 0.0015 que,
+          redondeadas a tres decimales, se irian a 0.002 e inflarian el
+          importe—.
+
+          Se conserva para que `stg.plan_mensual` tenga a mano los decimales de
+          la obra. **Ojo con los comentarios del SQL**: alguno repite una formula
+          con `decc` dentro que el codigo no ejecuta. Manda el codigo.
+        agregacion: no_sumable
+      dec_precios:
+        significado: Decimales de precio configurados en la obra.
+        agregacion: no_sumable
+      dec_importes:
+        significado: Decimales de importe configurados en la obra.
+        agregacion: no_sumable
+      _source_tiemod:
+        significado: >-
+          El `tiemod` que la fila de Sigrid tenia **cuando entro en `raw`**.
+          Instrumentacion, no negocio.
+
+          **No es una marca de modificacion vigente.** Nadie la actualiza
+          despues: en la recarga nocturna (`run-all --full`) se reescribe con el
+          valor del momento de la carga, y en un `ingest` sin `--full` la fila ni
+          siquiera vuelve a leerse. Sirve para saber con que version del origen
+          entro un dato, no para detectar cambios.
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: Para el arbol de capitulos, la categoria y la descripcion.
+      - de: ambito_id
+        a: stg.ambitos.ambito_id
+        cardinalidad: "N:1"
+        porque: Para saber si el ambito es de coste o de venta, real o master.
+    ejemplos_preguntas:
+      - Cual es el presupuesto de la obra X
+      - Cuanto suma el presupuesto de venta de la obra X en su master vigente
+
+  partidas:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Capa intermedia. Para consultar partidas esta `mart.v_pbi_dim_partida`, que
+      es la misma informacion con etiquetas listas y forma parte de la superficie
+      de consumo.
+    descripcion: >-
+      El arbol de partidas de cada obra, reconstruido: cada fila sabe de que
+      capitulo cuelga, cual es su capitulo raiz, su ruta completa y su nivel. En
+      Sigrid un capitulo es tambien una fila de partidas, asi que aqui conviven
+      los dos.
+    grano: >-
+      Una fila por `partida_id`: una partida de detalle o un capitulo de
+      cualquier nivel de una obra.
+    clave_negocio: [partida_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      partida_id:
+        significado: Identificador de la partida o capitulo en Sigrid.
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que pertenece. Los codigos de partida solo son unicos DENTRO
+          de su obra.
+        agregacion: no_sumable
+      codigo_partida:
+        significado: >-
+          Codigo jerarquico de la partida dentro de su obra. **Nunca es NULL**:
+          la rama raiz del recorrido filtra `p.cod IS NOT NULL AND p.cod <> ''`,
+          y las descendientes cuelgan de un padre que ya paso ese filtro. Una
+          partida sin codigo en Sigrid **no llega a esta tabla**.
+      capitulo_padre_id:
+        significado: Capitulo del que cuelga directamente.
+        agregacion: no_sumable
+        nulo_significa: Es un capitulo raiz, no cuelga de nada.
+      descripcion_corta:
+        significado: >-
+          Descripcion de la partida tal y como la escribio el jefe de obra. Es
+          texto libre, y hoy es la unica via —heuristica— de adivinar el oficio.
+          **Nunca es NULL**: se proyecta `p.res` en crudo desde `raw.obrparpar`,
+          asi que una partida sin descripcion llega como **cadena vacia**.
+        nulo_significa: null
+      unidad_medida:
+        significado: Unidad de medicion (m3, m2, ud, kg...).
+        nulo_significa: La partida no tiene unidad, tipico de los capitulos.
+      capitulo_raiz_id:
+        significado: >-
+          Identificador del capitulo raiz del que desciende. **Nunca es NULL**:
+          en la raiz la fila se apunta a si misma, asi que
+          `capitulo_raiz_id = partida_id`. Buscar las raices con
+          `WHERE capitulo_raiz_id IS NULL` devuelve cero filas siempre; lo que
+          hay que escribir es `WHERE capitulo_raiz_id = partida_id`, o bien
+          `WHERE capitulo_padre_id IS NULL`, que ese si es nulo en la raiz.
+        agregacion: no_sumable
+      capitulo_raiz_cod:
+        significado: >-
+          Codigo del capitulo raiz. Es la ENTRADA de la heuristica que decide la
+          categoria.
+        nulo_significa: null
+      categoria:
+        significado: >-
+          Clasificacion del coste. **Es una HEURISTICA sobre el codigo del
+          capitulo raiz, no una taxonomia de Sigrid**: el catalogo oficial de
+          tipos de capitulo esta ingerido en `raw.auxobrtca` y ningun SQL lo usa
+          todavia. Una obra cuyo jefe no siga la convencion de codigos se
+          clasifica mal y nada lo delata.
+        valores: [CD, CI, CP, OTRO]
+      ruta_capitulos:
+        significado: >-
+          Camino completo de capitulos hasta la partida, separado por " > ". Es
+          lo que permite reconstruir el arbol sin recursion, y de donde salen los
+          niveles de `mart.v_pbi_dim_partida_niveles`. **Nunca es NULL**: se
+          concatena a partir de codigos que el filtro de entrada ya garantiza no
+          nulos.
+      nivel:
+        significado: >-
+          Profundidad en el arbol de capitulos, empezando en 0 para el raiz.
+          **Nunca es NULL**: la raiz entra con un `0` literal y cada
+          descendiente suma uno al de su padre.
+        agregacion: no_sumable
+      activa: >-
+        Marca de partida vigente, tomada del origen. Ojo, no confundir con la
+        `activa` de `stg.obras`, que esta cableada a TRUE.
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: partida_id
+        a: mart.v_pbi_dim_partida.partida_id
+        cardinalidad: "1:1"
+        porque: Es la misma fila con etiquetas listas para consumo.
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el codigo y el nombre de la obra.
+      - de: capitulo_padre_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: >-
+          Es el arbol: el padre de una partida es otra fila de esta misma tabla.
+          Recorrerlo a mano no hace falta, para eso esta `ruta_capitulos`.
+    ejemplos_preguntas:
+      - Que estructura de capitulos tiene la obra X
+
+  obras:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Capa intermedia, y ademas su columna `activa` no significa nada. Para
+      consultar obras estan `maestro.obras` —el universo completo, con estado y
+      cliente— y `mart.v_pbi_dim_obra` —el universo del seguimiento, con
+      etiquetas—.
+    descripcion: >-
+      El universo del SEGUIMIENTO: las obras reales, sin las administrativas.
+      Excluye una lista cerrada de codigos de gestion, excluye los codigos con
+      cinco o mas digitos seguidos —el numero de obra de Ruesma es de cuatro— y
+      deduplica los codigos repetidos por el mecanismo de Sigrid que marca cual
+      es la ficha vigente.
+    grano: >-
+      Una fila por `obra_id`, ya deduplicada. Es SUBCONJUNTO de `maestro.obras`,
+      y esa diferencia es deliberada: contar aqui da menos obras.
+    clave_negocio: [obra_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid. Clave primaria de la tabla.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid. **Nunca es NULL**: sale
+          de `con.cod` en crudo y ademas el build excluye las obras sin codigo.
+        nulo_significa: null
+      nombre_obra:
+        significado: >-
+          Nombre legible de la obra, de `con.res`. **Nunca es NULL**: se proyecta
+          en crudo, asi que una obra sin resumen llega como **cadena vacia**.
+      activa: >-
+        **NO SIGNIFICA NADA.** La construye un literal `TRUE` y vale TRUE para
+        las 583, incluidas las cerradas hace anos. **Y `maestro.obras.es_activa`
+        tampoco sirve**: vale TRUE en las 919 porque su `fecha_baja` no se
+        informa nunca (medido el 2026-08-25). Esta ficha mandaba alli, o sea de
+        una trampa a la gemela. Lo unico que discrimina hoy son
+        `maestro.obras.estado_id` —sin catalogo de nombres— y las fechas reales
+        de `cierre.v_pbi_cierre_cabecera`, que solo cubre 583 obras. Ver
+        R-OBRA-ACTIVA.
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para el estado real, el cliente y las fechas. El maestro es
+          SUPERCONJUNTO de esta tabla: tiene ademas las obras administrativas.
+    ejemplos_preguntas:
+      - Que obras entran en el seguimiento y cuales quedan fuera
+
+  fases:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Capa intermedia. Lo que un usuario pregunta sobre plazos esta en
+      `cierre.v_pbi_cierre_cabecera`, con las fechas ya resueltas en cascada.
+    descripcion: >-
+      Las fases de cada obra con sus fechas ya tipadas y su plazo. En los ambitos
+      reales una fase ES un mes de cierre, y de ahi salen el mes canonico del
+      cierre y el ancla temporal de la explosion mensual.
+    grano: >-
+      Una fila por (`obra_id`, `numero_fase`), cada una identificada por
+      `fase_id`, que es la clave primaria y viene de Sigrid. Se declara esa como
+      clave de negocio por el mismo motivo que en `stg.presupuesto`: es la que
+      usan los JOIN. `numero_fase` es el campo `fasnum` de Sigrid, que en los
+      ambitos reales es el MES y en los master el numero de version.
+    clave_negocio: [fase_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      fase_id:
+        significado: Identificador de la fase en Sigrid. Clave primaria de la tabla.
+        agregacion: no_sumable
+      obra_id:
+        significado: Obra a la que pertenece la fase.
+        agregacion: no_sumable
+      numero_fase:
+        significado: >-
+          El `fasnum` de Sigrid. En los ambitos REALES es el numero de MES y en
+          los MASTER el numero de version: la misma columna significa dos cosas
+          segun con que ambito se cruce.
+        agregacion: no_sumable
+      fecha_inicio:
+        significado: Fecha de inicio de la fase, ya tipada.
+        agregacion: no_sumable
+        nulo_significa: La fase no tiene fecha de inicio informada.
+      fecha_fin:
+        significado: Fecha de fin de la fase, ya tipada.
+        agregacion: no_sumable
+        nulo_significa: La fase no tiene fecha de fin informada.
+      plazo_meses:
+        significado: Meses entre el inicio y el fin de la fase.
+        agregacion: no_sumable
+        nulo_significa: Falta alguna de las dos fechas con las que calcularlo.
+      anio:
+        significado: >-
+          Ano de la fase, copiado tal cual de `obrfas.ano` en `raw.obrfas`. **No
+          se deriva de `fecha_inicio`**: son campos independientes en Sigrid y
+          pueden no coincidir.
+
+          **Nunca es NULL**: se proyecta en crudo y Sigrid no guarda nulos en
+          los enteros, asi que "sin informar" llega como **0**.
+
+          Consecuencia que conviene conocer: el filtro `f.anio IS NOT NULL` de
+          `stg/08_plan_mensual.sql` **no descarta nada**, porque no hay nulos
+          que descartar. La guarda que de verdad actua contra una fase mal
+          informada es `make_date(f.anio, f.mes, 1)` unas lineas mas abajo: con
+          `anio = 0` **aborta el build** en vez de colar una fila silenciosa. Al
+          escribir un `WHERE` sobre estas columnas, comprobar contra `0` y no
+          contra NULL.
+        agregacion: no_sumable
+        nulo_significa: null
+      mes:
+        significado: >-
+          Mes de la fase, copiado tal cual de `obrfas.mes` en `raw.obrfas`. **No
+          se deriva de `fecha_inicio`**, igual que `anio`. Y **nunca es NULL**
+          por el mismo motivo: es un entero de Sigrid proyectado en crudo, y
+          "sin informar" llega como **0**.
+        agregacion: no_sumable
+        nulo_significa: null
+      nombre_mes:
+        significado: >-
+          Nombre del mes escrito en la fase. **Manda sobre la fecha** cuando las
+          dos existen y no coinciden: es la regla que dicto el jefe de obra y la
+          que implementa `cierre.fn_mes_de_fase`.
+        nulo_significa: La fase no tiene nombre.
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el codigo y el nombre de la obra.
+      - de: obra_id
+        a: cierre.fact_cierre_mensual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          El cierre se apoya en estas fases para decidir a que mes pertenece cada
+          corte. Hay muchas fases y muchos cierres por obra: se une por
+          `(obra_id, numero_fase)` contra `fase_numero`.
+    ejemplos_preguntas:
+      - Que fases de cierre tiene registradas la obra X
+
+  version_master_vigente:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Resuelve la version vigente de forma GLOBAL, una por obra, y eso no es lo
+      que usa el seguimiento: `mart` elige la vigente MES A MES, que es distinto
+      y mas fino. Consultar esta tabla para saber "que plan rige" da una
+      respuesta que no coincide con la de `mart` en los meses anteriores a la
+      ultima version.
+    descripcion: >-
+      La version master que Sigrid marca como vigente para cada obra, resuelta
+      por el mecanismo propio de Sigrid para senalar la ficha en vigor. Es una
+      foto global, sin dimension temporal.
+    grano: Una fila por `obra_id`. Es la clave primaria de la tabla.
+    clave_negocio: [obra_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      version_vigente:
+        significado: >-
+          Numero de la version master que Sigrid marca como vigente para esa
+          obra. OJO: es la vigente HOY, no la que regia en un mes pasado.
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: mart.v_master_vigente_anual.obra_id
+        cardinalidad: "1:N"
+        porque: >-
+          Es la misma pregunta resuelta de otra forma: aqui **una fila por obra**,
+          alli una por (`obra_id`, `anio`, `ambito_id`) y con el criterio del
+          seguimiento. De ahi el `1:N`: unir por `obra_id` multiplica esta fila
+          por cada ano y ambito que tenga alli. Las dos respuestas pueden no
+          coincidir, y la buena para el seguimiento es la de `mart`.
+    ejemplos_preguntas:
+      - Que version master marca Sigrid como vigente en la obra X
+
+  ambitos:
+    tipo: vista
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es un catalogo de apoyo del build, y ademas su columna `uso_seguimiento`
+      esta desfasada: consultarla para saber que ambitos usa el seguimiento da
+      una respuesta incompleta. Para los escenarios del seguimiento esta
+      `mart.v_pbi_dim_escenario`, que si esta al dia.
+    descripcion: >-
+      La clasificacion de los ambitos de Sigrid: que es cada uno y que papel
+      juega en el seguimiento. El tipo se deduce de la DESCRIPCION del ambito y
+      no de su codigo, porque en Sigrid los dos no siempre concuerdan: hay un
+      ambito cuyo codigo dice produccion y cuya descripcion dice venta, y manda
+      la descripcion.
+    grano: Una fila por `ambito_id`, uno por cada ambito dado de alta en Sigrid.
+    clave_negocio: [ambito_id]
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas:
+      ambito_id:
+        significado: >-
+          Identificador del ambito en Sigrid. Los cuatro que importan al
+          seguimiento son 3 (coste real), 7 (venta real), 8 (coste master) y 11
+          (venta master).
+        agregacion: no_sumable
+      codigo:
+        significado: >-
+          Nemonico del ambito. NO sirve para clasificar: puede contradecir a la
+          descripcion. **Nunca es NULL**: se proyecta `a.cod` en crudo desde
+          `raw.auxobramb`, la tabla del `FROM`, asi que un ambito sin codigo
+          llega como **cadena vacia**.
+      descripcion:
+        significado: >-
+          Descripcion del ambito, y la fuente REAL de su significado: es de donde
+          se deduce el tipo. **Nunca es NULL**: se proyecta `a.res` en crudo
+          desde `raw.auxobramb`, la tabla del `FROM`, asi que un ambito sin
+          descripcion llega como **cadena vacia**.
+      clase_sigrid:
+        significado: >-
+          Clasificacion interna de Sigrid, expuesta sin traducir. **Nunca es
+          NULL**: se proyecta `a.ambcla` en crudo desde `raw.auxobramb`, la tabla
+          del `FROM`; Sigrid no guarda nulos en los enteros, asi que "sin clase"
+          llega como **0**.
+        agregacion: no_sumable
+      tipo:
+        significado: >-
+          Categoria semantica del ambito, deducida de su descripcion. Es
+          informativa: no decide que usa el seguimiento.
+        valores:
+          - VENTA
+          - PRODUCCION_REAL
+          - COSTE
+          - MASTER_COSTE
+          - MASTER_VENTA
+          - MASTER_CERTIFICACION
+          - CERTIFICACION
+          - OTRO
+      uso_seguimiento:
+        significado: >-
+          Que papel juega el ambito en el seguimiento mensual. **ESTA
+          DESFASADO**: marca solo los ambitos 8 y 11, que eran los unicos de la
+          primera iteracion, y hoy `mart` construye tambien los REALES 3 y 7. Un
+          agente que filtre por esta columna para saber que alimenta el
+          seguimiento se dejara fuera la mitad. La lista al dia son los cuatro
+          escenarios de `mart.v_pbi_dim_escenario`.
+        valores: [PLANIFICADO_COSTES, PLANIFICADO_VENTA]
+        nulo_significa: >-
+          Segun esta vista, el ambito no alimenta el seguimiento. Es lo que hay
+          que leer con cuidado: los ambitos 3 y 7 salen nulos y SI lo alimentan.
+    relaciones:
+      - de: ambito_id
+        a: stg.plan_mensual.ambito_id
+        cardinalidad: "1:N"
+        porque: Para saber si la `version` de esa fila es un mes o un numero de version.
+    ejemplos_preguntas:
+      - Que ambitos de Sigrid existen y que significa cada uno
+
+  fn_master_fecha_efectiva:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build. Se documenta porque explica una correccion que
+      cambia que version rige en un mes, y eso se nota en los importes.
+    descripcion: >-
+      Decide desde cuando rige de verdad una version master. Normalmente es su
+      fecha de creacion, pero cuando una CUATRIMESTRAL se entrego tarde —se creo
+      en un mes que no es el suyo— la adelanta al periodo que la version
+      representa. Sin ese ajuste, una cuatrimestral de febrero entregada en marzo
+      no regiria febrero y ese mes se quedaria con el plan anterior. No toca las
+      versiones ABC ni las de cierre mensual, que no son cuatrimestrales.
+
+      **Solo corrige con DOBLE evidencia, y la segunda mitad de la regla es tan
+      importante como la primera**: ademas de que el texto parsee un mes
+      distinto al de creacion, hace falta que el mes de creacion **no sea uno de
+      los oficiales** —febrero, junio u octubre, los tres meses cuatrimestrales
+      (`IF v_mes_creac IN (2, 6, 10) THEN RETURN p_fec_creacion`)—. Una version
+      creada en un mes oficial se respeta aunque su texto diga otra cosa, porque
+      entonces lo mas probable es que el texto este mal, no la fecha. Contar solo
+      la primera mitad hace creer que cualquier discrepancia de texto mueve la
+      fecha, y no es asi.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_master_mes_representado:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build, usada solo dentro del SQL que construye `stg`.
+    descripcion: >-
+      Extrae de un texto de version master el mes que esa version representa:
+      del texto de una planificacion cuatrimestral de febrero de 2026 saca ese
+      mes, tanto si el mes viene escrito entero como abreviado. Devuelve nulo
+      para las versiones de CIERRE, que no se procesan por esta via. Es la
+      entrada de `stg.fn_master_fecha_efectiva`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_sigrid_date_to_date:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build, usada solo dentro del SQL que construye `stg`.
+    descripcion: >-
+      Convierte una fecha de Sigrid —un entero con formato YYYYMMDD— en una
+      fecha de verdad, tratando el 0 como ausencia de fecha y no como el ano 0.
+      Es la original: `compras`, `retenciones` y `maestro` tienen cada uno su
+      copia, a proposito, para no depender del orden de construccion.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
