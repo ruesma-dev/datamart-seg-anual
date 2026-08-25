@@ -683,6 +683,23 @@
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-044-esquemas-nocturnos"
+    },
+    {
+      "id": "F-045",
+      "title": "Las retenciones no se pueden atribuir a una obra",
+      "description": "Nacida el 2026-08-25 de la bateria de aceptacion de F-006, y es un HUECO DE NEGOCIO, no de documentacion. EL CASO DE USO 3 DEL HUMANO -saber las retenciones que tengo de los proveedores de una obra- HOY NO SE PUEDE RESPONDER. EL HALLAZGO, MEDIDO: retenciones.movimientos.obra_id NO une con maestro.obras.obra_id, 0 de 261 valores casan. Ese campo es el `ide` del CENTRO DE COSTE, una entidad distinta y contigua a la de la obra (para 0655: 1990274 en retenciones, 1990273 en el resto del datamart). Un INNER JOIN devuelve cero filas y un LEFT JOIN todo a NULL, las dos cosas EN SILENCIO. POR QUE NO LO CAZO NADIE ANTES: el validador offline no podia verlo, porque la relacion resolvia perfectamente contra el diccionario -los dos extremos existen y los tipos encajan-; lo que falla esta en los datos. F-006 dejo la puerta que si lo ve, check-relaciones, que ejecuta el JOIN de cada relacion declarada contra la base real. Esta feature es el ARREGLO del dato que esa puerta delato, no la puerta. LA SALIDA FACIL NO EXISTE: tampoco vale unir por codigo_obra, porque codigo_obra SE REPITE en maestro.obras -918 filas, 843 valores distintos-. Hay que averiguar la relacion real entre centro de coste y obra en Sigrid, que puede no ser 1:1, y modelarla. DATO ADICIONAL del build de retenciones del 2026-08-21: 533 retenciones de PROVEEDOR salen ya marcadas SIN OBRA, sobre 24.779 vivas y 35,3 M EUR de saldo vivo. Conviene saber si son el mismo problema o uno distinto. MIENTRAS NO SE ARREGLE: la ficha del diccionario debe seguir diciendo que esa union NO existe, en vez de ofrecer una relacion que miente; eso es lo que hizo F-006.",
+      "acceptance": [
+        "Averiguada y documentada la relacion real entre centro de coste y obra en Sigrid, con su cardinalidad medida y no supuesta",
+        "Existe un camino declarado que responde obra -> retenciones de sus proveedores, y check-relaciones lo confirma contra la base real",
+        "Las 533 retenciones de proveedor sin obra estan explicadas: mismo problema u otro distinto, con el recuento actualizado",
+        "La ficha del diccionario deja de declarar el hueco y declara la union buena, y check-diccionario sigue en biyeccion exacta",
+        "El caso de uso 3 del humano -retenciones de los proveedores de una obra- se responde de punta a punta desde el MCP"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 2,
+      "branch": "feature/F-045-retenciones-obra"
     }
   ]
 }
