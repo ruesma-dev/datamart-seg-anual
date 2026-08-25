@@ -31,8 +31,11 @@ objetos:
     consumo_recomendado: true
     descripcion: >-
       El maestro de obras SIN filtrar: codigo, nombre, estado, fechas de alta y
-      baja, y el cliente. Es la vista para poner contexto a una obra y para
-      saber si sigue viva; NO es el universo del seguimiento.
+      baja, y el cliente. Es la vista para poner contexto a una obra; **NO** es
+      el universo del seguimiento y **NO sirve para saber si una obra sigue
+      viva**: `es_activa` vale TRUE en las 919 filas porque `fecha_baja` no se
+      informa nunca (ver R-OBRA-ACTIVA). Esta descripcion prometia justo eso
+      hasta que la bateria de aceptacion lo midio.
     grano: >-
       Una fila por `obra_id`, y son TODAS las obras de Sigrid. Es superconjunto
       de `stg.obras`, que excluye las administrativas y los codigos de cinco o
@@ -53,22 +56,35 @@ objetos:
         columna `nom`: el nombre siempre es el resumen del concepto.
       estado_id:
         significado: >-
-          Codigo interno de estado de Sigrid, sin traducir: no hay catalogo de
-          estados en el datamart. Para saber si la obra vive es mas fiable
-          `es_activa`.
+          Codigo interno de estado de Sigrid, sin traducir: su catalogo **no se
+          ingiere**, asi que hay codigos sin nombre. Aun asi es **lo unico de
+          esta vista que discrimina algo**: reparte las 919 obras en once
+          valores (465 en el `25`, 226 en el `1`, 175 en el `15`, que el SQL de
+          `maestro/01_obras.sql` documenta como EN CURSO; medido el
+          2026-08-25). No mandar a `es_activa`, que vale TRUE para las 919.
         agregacion: no_sumable
       fecha_alta:
         significado: Fecha de alta de la obra, ya tipada desde el entero de Sigrid.
         agregacion: no_sumable
         nulo_significa: La obra no tiene fecha de alta informada.
       fecha_baja:
-        significado: Fecha en que se dio de baja la obra.
+        significado: >-
+          Fecha en que se dio de baja la obra. **Sigrid no la informa nunca**:
+          esta a NULL en las 919 filas (medido el 2026-08-25), y por eso
+          `es_activa`, que se deriva de ella, no discrimina nada.
         agregacion: no_sumable
-        nulo_significa: La obra sigue de alta. Es la fuente de `es_activa`.
+        nulo_significa: >-
+          En teoria "la obra sigue de alta"; en la practica **no significa
+          nada**, porque no hay ni una sola fila con fecha de baja.
       es_activa: >-
-        Si la obra sigue de alta, derivado de que no tenga fecha de baja. **Esta
-        es la columna buena para saber si una obra vive**: la `activa` de
-        `stg.obras` esta cableada a TRUE y no significa nada.
+        **NO USAR: vale TRUE en las 919 filas** (medido el 2026-08-25). Se
+        deriva de `fecha_baja`, que Sigrid no informa nunca, asi que es tan
+        vacia como la `activa` de `stg.obras` que R-OBRA-ACTIVA denuncia —solo
+        que esta lo disimula mejor, porque parece calculada. Contar
+        `WHERE es_activa` devuelve el total de obras disfrazado de obras
+        activas. Esta ficha la anunciaba como "la columna buena" hasta que la
+        bateria de aceptacion la midio. Ver R-OBRA-ACTIVA para lo que si se
+        puede decir y con que limites.
       cliente_id:
         significado: >-
           Identificador del cliente en Sigrid, copiado de `obr.entide` **tal
@@ -107,9 +123,9 @@ objetos:
           Para el presupuesto, los modificados y las fechas de ejecucion de la
           obra, que aqui no estan.
     ejemplos_preguntas:
-      - Cuantas obras activas tenemos
+      - Cuantas obras hay dadas de alta en Sigrid
       - Quien es el cliente de la obra X
-      - Que obras se dieron de baja el ano pasado
+      - Que codigo tiene la obra que se llama X
 
   proveedores:
     tipo: vista

@@ -811,9 +811,18 @@ objetos:
         agregacion: no_sumable
         nulo_significa: La obra no ha empezado, o no se registro la fecha.
       fecha_fin_real:
-        significado: Fin real de la obra.
+        significado: >-
+          Fin real de la obra, y **la mejor aproximacion que hay hoy a "obra en
+          curso"**, porque las dos columnas que lo aparentan —`stg.obras.activa`
+          y `maestro.obras.es_activa`— valen TRUE para todas sus filas. Con un
+          limite que hay que declarar al responder: esta vista solo cubre **583
+          de las 919 obras**, y de ellas 247 tienen fin real y **107 tienen
+          inicio real sin fin real** (medido el 2026-08-25).
         agregacion: no_sumable
-        nulo_significa: La obra sigue viva. Es la forma fiable de saber si esta acabada.
+        nulo_significa: >-
+          La obra no ha acabado **o no se registro la fecha**. No distingue una
+          cosa de la otra: para "en curso" hay que exigir ademas
+          `fecha_inicio_real IS NOT NULL`, que es lo que deja las 107.
       fecha_adjudicacion:
         significado: >-
           Fecha de adjudicacion, con una cascada amplia: adjudicacion real, firma

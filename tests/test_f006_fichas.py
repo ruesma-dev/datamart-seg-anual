@@ -1248,6 +1248,45 @@ def test_f006_r2_compras_las_filas_sin_obra_no_se_pueden_perder() -> None:
     assert "no se pueden perder" in nulo.lower()
 
 
+def test_f006_r2_ninguna_ficha_recomienda_es_activa_para_saber_si_una_obra_vive() -> None:
+    """La regla apartaba de una trampa para empujar a la gemela.
+
+    `R-OBRA-ACTIVA` desviaba de `stg.obras.activa` —literal TRUE— hacia
+    `maestro.obras.es_activa`, que **también es TRUE en las 919 filas**, porque
+    se deriva de `fecha_baja` y Sigrid no la informa nunca. Una regla que
+    desvía de una trampa hacia otra idéntica es peor que no tener regla: da
+    confianza injustificada.
+
+    Se barre el diccionario CARGADO, nunca el YAML crudo: el plegado parte las
+    frases y ya rompió cuatro barridos de esta feature.
+    """
+    dicc = _diccionario()
+
+    obras = dicc.por_nombre["maestro.obras"]
+    es_activa = next(c for c in obras.columnas if c.nombre == "es_activa")
+    assert "NO USAR" in (es_activa.significado or "")
+    assert "919" in (es_activa.significado or ""), "la cifra medida"
+
+    stg = dicc.por_nombre["stg.obras"]
+    activa = next(c for c in stg.columnas if c.nombre == "activa")
+    texto_stg = " ".join((activa.significado or "").split())
+    assert "tampoco sirve" in texto_stg, (
+        "stg.obras.activa seguia mandando a la gemela rota"
+    )
+
+    regla = next(r for r in dicc.reglas if r.codigo == "R-OBRA-ACTIVA")
+    assert "NO se puede responder" in regla.regla
+    assert "919" in regla.regla and "583" in regla.regla
+
+    # Y ninguna ficha anuncia como ejemplo una pregunta que no puede contestar.
+    for ficha in dicc.fichas:
+        for pregunta in ficha.ejemplos_preguntas:
+            assert "obras activas" not in pregunta.lower(), (
+                f"{ficha.nombre} anuncia '{pregunta}', que R-OBRA-ACTIVA declara "
+                f"no respondible"
+            )
+
+
 def test_f006_r2_contratos_no_promete_nombrar_el_oficio() -> None:
     """La afirmación que la batería midió como falsa.
 

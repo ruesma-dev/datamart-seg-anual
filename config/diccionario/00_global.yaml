@@ -103,19 +103,35 @@ reglas:
       dar la del maestro como "obras de la empresa" infla el numero.
 
   - codigo: R-OBRA-ACTIVA
-    titulo: stg.obras.activa esta cableada a TRUE y no significa nada
+    titulo: El datamart NO sabe si una obra esta activa. Las dos columnas mienten
     severidad: bloqueante
     ambito:
       - stg.obras
       - maestro.obras
+      - cierre.v_pbi_cierre_cabecera
     regla: >-
-      No uses `stg.obras.activa` para saber si una obra vive: la construye un
-      literal `TRUE AS activa` y vale TRUE para todas. Para el estado real usa
-      `maestro.obras.es_activa`, que se deriva de `con.fecbaj`, o las fechas de
-      `cierre.v_pbi_cierre_cabecera`.
+      **"Cuantas obras activas tenemos" NO se puede responder con el datamart, y
+      hay que decirlo en vez de dar un numero.** Las DOS columnas que lo
+      aparentan valen TRUE para todas las filas: `stg.obras.activa` es un
+      literal `TRUE AS activa` (583 de 583) y `maestro.obras.es_activa` se
+      deriva de `con.fecbaj`, que **no se informa nunca** (919 de 919 activas,
+      0 con fecha de baja, medido el 2026-08-25). Un recuento con cualquiera de
+      las dos devuelve el total de obras disfrazado de obras activas. Lo que si
+      discrimina, con sus limites: `maestro.obras.estado_id` reparte las 919 en
+      once valores (465 en el 25, 226 en el 1, 175 en el 15 = EN CURSO), pero su
+      catalogo de Sigrid **no esta ingerido**, asi que hay codigos sin nombre; y
+      `cierre.v_pbi_cierre_cabecera` da **107 obras con inicio real y sin fin
+      real**, que es la mejor aproximacion a "en curso" que hay hoy, pero solo
+      cubre 583 de las 919. Cualquier respuesta tiene que decir cual de los tres
+      criterios usa y a cuantas obras alcanza.
     motivo: >-
-      `sql/stg/03_obras.sql` la escribe como constante. Una columna que se llama
-      `activa` y siempre dice TRUE es una trampa perfecta: nadie la comprueba.
+      `sql/stg/03_obras.sql` escribe `activa` como constante. Una columna que se
+      llama `activa` y siempre dice TRUE es una trampa perfecta: nadie la
+      comprueba. **Y esta regla llevaba diecisiete pasadas apartando de esa
+      trampa para empujar a la gemela, que miente igual**: la bateria de
+      aceptacion del 2026-08-22 midio `es_activa` TRUE en las 919 filas. Una
+      regla que desvia de una trampa hacia otra identica es peor que no tener
+      regla, porque da confianza injustificada.
 
   - codigo: R-VERSION-MASTER
     titulo: En stg.plan_mensual conviven TODAS las versiones master

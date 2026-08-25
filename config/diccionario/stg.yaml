@@ -524,9 +524,13 @@ objetos:
           en crudo, asi que una obra sin resumen llega como **cadena vacia**.
       activa: >-
         **NO SIGNIFICA NADA.** La construye un literal `TRUE` y vale TRUE para
-        todas las obras, incluidas las cerradas hace anos. Para saber si una obra
-        vive hay que usar `maestro.obras.es_activa`, que sale de la fecha de
-        baja, o las fechas de `cierre.v_pbi_cierre_cabecera`.
+        las 583, incluidas las cerradas hace anos. **Y `maestro.obras.es_activa`
+        tampoco sirve**: vale TRUE en las 919 porque su `fecha_baja` no se
+        informa nunca (medido el 2026-08-25). Esta ficha mandaba alli, o sea de
+        una trampa a la gemela. Lo unico que discrimina hoy son
+        `maestro.obras.estado_id` —sin catalogo de nombres— y las fechas reales
+        de `cierre.v_pbi_cierre_cabecera`, que solo cubre 583 obras. Ver
+        R-OBRA-ACTIVA.
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
         agregacion: no_sumable
