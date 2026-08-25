@@ -590,12 +590,13 @@
     {
       "id": "F-039",
       "title": "Vistas puente que faltan para las preguntas de negocio",
-      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el datamart puede responder pero obligan a escribir SQL de agregacion no evidente, justo lo que hace fallar a un agente. (1) Que retenciones tengo de los proveedores de una obra: las dos vistas agregadas existentes cortan por un solo eje cada una -v_pbi_retencion_obra pierde el proveedor, v_pbi_retencion_entidad pierde la obra-; falta retenciones.v_pbi_retencion_obra_entidad. (2) Que proveedores han facturado mas: v_pbi_proveedor_obra esta agrupada por obra y ano, asi que el ranking global exige agregar sin perder las filas con obra_id NULL -facturas de estructura y generales-; falta una vista proveedor x periodo con grano mensual. (3) EL EJE MAS VALIOSO Y HOY INEXPLOTADO: partida_id une el mundo del seguimiento -stg.partidas, plan_mensual, mart.fact_seguimiento_mensual- con el mundo documental -compras.v_pbi_partida_coste-, y permite comparar coste PLANIFICADO de una partida con coste INCURRIDO documental de esa partida. Ninguna vista lo hace. Aviso para la implementacion: compras y retenciones no filtran por stg.obras, asi que pueden traer obras administrativas que el seguimiento excluye; las vistas nuevas deben decidir y documentar que universo de obra usan.",
+      "description": "Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el datamart puede responder pero obligan a escribir SQL de agregacion no evidente, justo lo que hace fallar a un agente. (1) Que retenciones tengo de los proveedores de una obra: las dos vistas agregadas existentes cortan por un solo eje cada una -v_pbi_retencion_obra pierde el proveedor, v_pbi_retencion_entidad pierde la obra-; falta retenciones.v_pbi_retencion_obra_entidad. (2) Que proveedores han facturado mas: v_pbi_proveedor_obra esta agrupada por obra y ano, asi que el ranking global exige agregar sin perder las filas con obra_id NULL -facturas de estructura y generales-; falta una vista proveedor x periodo con grano mensual. (3) EL EJE MAS VALIOSO Y HOY INEXPLOTADO: partida_id une el mundo del seguimiento -stg.partidas, plan_mensual, mart.fact_seguimiento_mensual- con el mundo documental -compras.v_pbi_partida_coste-, y permite comparar coste PLANIFICADO de una partida con coste INCURRIDO documental de esa partida. Ninguna vista lo hace. Aviso para la implementacion: compras y retenciones no filtran por stg.obras, asi que pueden traer obras administrativas que el seguimiento excluye; las vistas nuevas deben decidir y documentar que universo de obra usan. AMPLIADO el 2026-08-25 al probar el MCP contra Azure desde Claude Escritorio: el cruce obra x proveedor SI se puede hacer sobre retenciones.movimientos (trae obra_id, codigo_obra, entidad_id y entidad_nombre en la misma fila), pero las metricas que el diccionario manda usar -saldo_vivo y neto_practicado- NO estan en esa tabla: solo existen en v_pbi_retencion_entidad y v_pbi_retencion_resumen, que ya vienen agregadas y han perdido la obra. Es decir: por obra tienes importe, y por metrica correcta pierdes la obra. La vista cruzada tiene que traer las dos.",
       "acceptance": [
         "Existe retenciones.v_pbi_retencion_obra_entidad con los dos ejes",
         "Existe una vista de facturacion por proveedor y periodo mensual que no pierde las filas sin obra",
         "Existe una vista puente por partida que enfrenta planificado e incurrido documental, con el universo de obra elegido y justificado",
-        "Cada vista nueva queda documentada en el diccionario semantico de F-006"
+        "Cada vista nueva queda documentada en el diccionario semantico de F-006",
+        "retenciones.v_pbi_retencion_obra_entidad expone saldo_vivo y neto_practicado, no solo importe: hoy esas dos metricas solo viven en vistas que ya han perdido el eje de obra"
       ],
       "status": "pending",
       "sdd": false,
@@ -700,6 +701,21 @@
       "rigor": "estandar",
       "priority": 2,
       "branch": "feature/F-045-retenciones-obra"
+    },
+    {
+      "id": "F-046",
+      "title": "El diccionario obliga a contrastar todo desglose contra su total publicado",
+      "description": "Nacida el 2026-08-25 de la primera prueba del MCP en Claude Escritorio contra el datamart real (obra 0694, retenciones por proveedor). El MCP hizo su trabajo bien: SQL correcto, 22 filas, y ademas una segunda consulta a retenciones.v_pbi_retencion_obra que le devolvio el total exacto (34.523,22 EUR en 61 efectos). El modelo, al redactar la tabla, copio en la casilla de saldo vivo de un proveedor el valor de la columna vencido (251,32 en vez de 1.575,96), perdio un efecto de 1.324,64 EUR -el cuarto mayor de la obra- y luego sumo SU PROPIA tabla, publicando 33.198,58 EUR en 60 efectos y contradiciendo el total que tenia delante. La respuesta parecia impecable: desglose por proveedor, fechas de devolucion, matices de vencimiento y hasta una nota de fiabilidad. Es el fallo que la capa semantica NO puede evitar, porque el dato llego bien y el error se produjo al escribir. La defensa es barata y el agente ya pedia la vista por su cuenta: que la ficha de cada objeto con vista de totales publicada mande contrastar el desglose contra ella y declarar el descuadre en la respuesta si no cuadra.",
+      "acceptance": [
+        "Las fichas de los objetos que tienen vista de totales publicada (empezando por retenciones) declaran cual es esa vista y que todo desglose se contrasta contra ella",
+        "Una regla global del diccionario prohibe recalcular un total sumando un desglose propio cuando existe el total publicado, y manda declarar el descuadre si aparece",
+        "La bateria de aceptacion incluye el caso de la obra 0694 con su cifra correcta (34.523,22 EUR en 61 efectos) como control de no regresion"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 3,
+      "branch": "feature/F-046-contraste-desgloses"
     }
   ]
 }
