@@ -332,9 +332,22 @@ escribe libremente; la ejecución contra Azure necesita firma.
       este es el motivo» correcto.** Atención especial a las cuatro preguntas
       trampa (P9, P10, P11, P16): si el agente cae en alguna, **la ficha
       correspondiente está mal escrita** y se corrige antes de cerrar.
-- [ ] **T40**: Corregir las fichas que la batería haya delatado y republicar.
+- [x] **T40**: Corregir las fichas que la batería haya delatado y republicar.
       | Verificación: `pytest tests/test_f006_cobertura.py` en verde +
       `python main.py publicar-diccionario` (MANUAL, humano).
+      |
+      | **HECHO el 2026-08-25.** Informe en `progress/impl_F-006.md`, sección
+      «T40». Publicado en **versión 8**; `check-diccionario` dice que lo
+      publicado ES lo del árbol.
+      |
+      | **AMPLIACIÓN no prevista: la comprobación se DERIVÓ.** El encargo era
+      corregir fichas; corregirlas a mano habría dejado vivas las que nadie
+      señaló. Nuevo comando `python main.py check-relaciones`, hermano de
+      `check-unicidad`: ejecuta el JOIN de cada relación declarada y falla si
+      devuelve cero casos. Encontró **tres** relaciones rotas donde la batería
+      vio una. Cierra la otra mitad de lo que la puerta offline no puede ver:
+      la relación resuelve contra el diccionario y **lo que falla está en los
+      datos**.
 
 ---
 

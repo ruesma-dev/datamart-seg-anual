@@ -4469,3 +4469,295 @@ devuelve 9.
 
 Publicado en **versión 7**, biyección exacta 103/103 y lo publicado casa con el
 árbol.
+
+---
+
+# T40 · Corregir lo que la batería delató (2026-08-25)
+
+Retomada tras la parada por límite de gasto del 2026-08-22
+(`progress/parada_2026-08-22_limite_gasto.md`). Cinco encargos por gravedad,
+más tres cosas que llegaron del agente de `mcp-bbdd`
+(`progress/impl_F-006_mcp_bbdd.md`, que **no es mío**).
+
+**El diff preservado (`progress/pendiente_T40_retenciones.diff`) NO se aplicó**,
+y con razón: proponía `codigo_obra -> maestro.obras.codigo_obra` como «la vía
+buena». Medido, ese JOIN convierte las 261 filas de `v_pbi_retencion_obra` en
+**329**, porque el maestro repite código. Habría cambiado un JOIN vacío por uno
+que multiplica importes, que es peor. Se reaprovechó su diagnóstico —el centro
+de coste— y se descartó su conclusión.
+
+## 1 · La relación que devolvía cero filas — y eran TRES, no una
+
+Lo primero fue **derivar la comprobación**, no arreglar la ficha a mano: nuevo
+comando `python main.py check-relaciones`, que ejecuta el JOIN de cada relación
+declarada y falla si devuelve cero casos. Se derivan del diccionario, así que
+una relación nueva entra sola.
+
+La puerta encontró **tres relaciones rotas**; la batería había visto una:
+
+```
+KO   retenciones.movimientos.obra_id -> maestro.obras.obra_id: 0 de 261
+KO   retenciones.v_pbi_retencion_obra.obra_id -> maestro.obras.obra_id: 0 de 261
+KO   retenciones.v_pbi_retencion_obra.obra_id -> cierre.v_pbi_cierre_cabecera.obra_id: 0 de 261
+```
+
+**La causa, y el camino real.** `obra_id` en `retenciones` sale de
+`COALESCE(NULLIF(p.cenide,0), ...)` en `sql/retenciones/01_movimientos.sql`:
+es el `ide` del **centro de coste**, una entidad `raw.con` con `tip = 21`,
+distinta y contigua a la de la obra (`tip = 42`). La obra 0655 es `1990273`
+como obra y `1990274` como centro de coste.
+
+El puente existe y está publicado: **`raw.obr.cenide`** enlaza obra → centro de
+coste, y eso ya está expuesto en
+**`cierre.v_pbi_cierre_cabecera.centro_coste_ide`**. Medido el 2026-08-25:
+
+| Camino | Casan | Efecto en filas |
+|---|---|---|
+| `obra_id -> maestro.obras.obra_id` | **0 de 261** | cero filas, en silencio |
+| `codigo_obra -> maestro.obras.codigo_obra` | 257 de 257 | 261 filas → **329** (fan-out) |
+| `obra_id -> cierre...centro_coste_ide` | **249 de 261 (95 %)** | 261 filas → 251 |
+
+Se declara el tercero, `N:N` (dos `centro_coste_ide` se repiten, 4 filas) y
+diciendo que los 12 que no casan son centros de coste de obras sin cabecera de
+cierre, que **se pierden en un INNER JOIN**.
+
+**Y el defecto vivía en el campo de al lado, otra vez.** Un barrido sobre el
+diccionario **cargado** (nunca sobre el YAML crudo: el plegado ya rompió cuatro
+barridos de esta feature) encontró la misma afirmación falsa —«el centro de
+coste coincide con la obra»— en tres fichas más, las tres de `compras`:
+
+| Columna | Casan como obra | Casan como centro de coste |
+|---|---|---|
+| `compras.contrato_lineas.centro_coste_id` | **0 de 447** | 432 |
+| `compras.albaran_lineas.centro_coste_id` | **0 de 519** | 484 |
+| `compras.factura_lineas.centro_coste_id` | **0 de 611** | 526 |
+
+**Un test verde sostenía la mentira.**
+`test_f006_r2_retenciones_explica_la_cascada_de_atribucion_a_obra` exigía
+literalmente `assert "98" in obra.significado`, o sea la frase «coincide con la
+obra en torno al 98 % de los casos». Sustituido por una guarda de los hechos
+medidos más un barrido que impide que la frase vuelva a ninguna ficha.
+
+**Resultado de la puerta tras la corrección**: `0 que NO unen`.
+
+## 2 · «`contratos.descripcion` suele nombrar el oficio»: falso, medido
+
+De los 18.879 contratos, **5 (0,03 %)** contienen «fontan» y **17.372 (92 %)**
+repiten el nombre del proveedor. La heurística que sí funciona es
+`compras.fact_compras_linea.descripcion`: **4.506 líneas en 293 obras y 227
+proveedores**. Las dos fichas se contradecían y la equivocada era la que la
+batería designaba como objeto esperado; ahora la de contratos manda a la otra, y
+la pregunta del oficio vive en la ficha que puede contestarla.
+
+De paso, **H-9**: la descripción de `compras.contratos` prometía «a quién, para
+qué obra, **por cuánto**» y la tabla no tiene ninguna columna de dinero. Eso es
+lo que hizo escribir `importe_contrato`, que no existe.
+
+## 3 · `es_activa` miente igual que la columna de la que aparta
+
+`maestro.obras.es_activa` es TRUE en **919 de 919** porque `fecha_baja` está a
+NULL en las 919. `R-OBRA-ACTIVA` apartaba de `stg.obras.activa` (literal TRUE,
+583 de 583) para empujar a la gemela.
+
+La regla ahora dice que **«cuántas obras activas tenemos» no se puede responder
+con el datamart**, y da los dos criterios que sí discriminan con su alcance:
+`estado_id` (once valores: 465 en el `25`, 226 en el `1`, 175 en el `15` = EN
+CURSO, sin catálogo de nombres) y las fechas reales de la cabecera de cierre
+(**107 obras con inicio real y sin fin real**, sobre 583 de las 919).
+
+El defecto vivía en **cinco sitios**: la regla, la descripción de
+`maestro.obras`, sus columnas `es_activa`/`fecha_baja`/`estado_id`,
+`stg.obras.activa` —que seguía mandando a la gemela rota— y
+`cierre...fecha_fin_real`. Y dos `ejemplos_preguntas` anunciaban preguntas que
+la ficha responde mal.
+
+## 4 · El coste de consulta, que no existía — y son CUATRO vistas
+
+Medido el 2026-08-25 con `SELECT * ... LIMIT 5`:
+
+| Objeto | Sin filtro | Filtrado por obra |
+|---|---|---|
+| `mart.v_pbi_cp_tipologia` | >40 s | **>60 s** |
+| `mart.v_fact_periodificado` | >40 s | **>60 s** |
+| `cierre.v_pbi_cierre_indirectos_detalle` | >40 s | **>60 s** |
+| `mart.v_master_vigente_anual` | >40 s | **20 s** |
+| `mart.v_master_versiones_tipadas` | 16 s | — |
+| `count(*)` de `stg.plan_mensual` | 25 s | — |
+| `count(*)` de `compras.fact_compras_linea` | 10 s | — |
+| `maestro.obras`, `v_pbi_cierre_resumen`, `v_pbi_proveedor_obra`, `v_pbi_partida_coste` | <5 s | — |
+
+**Cómo llega al agente sin tocar el contrato de `_meta`**: como regla dura
+`R-COSTE-CONSULTA` cuyo `ambito` son los objetos caros. `derivar_avisos` cuelga
+su código de cada ficha alcanzada, así que aparece en `describir_tabla` sin
+haber leído el bloque global. Se descartó añadir una columna a
+`_meta.diccionario` justamente para no romper a `mcp-bbdd`, que ya cerró.
+
+**Y las dos que no devuelven ni una fila dejan de ser superficie de consumo.**
+`consumo_recomendado: false` con su `motivo_no_consumo`: recomendar para
+consulta algo que no se puede consultar es la misma clase de defecto que una
+relación que no une. La superficie de consumo pasa de **48 a 46**.
+
+## 5 · El dato absurdo, ahora avisado — y la barrera no cubría donde falló
+
+Los órdenes de magnitud eran **cuatro, las cuatro de `retenciones`**. En
+`compras` salieron 68,7 billones de euros y ninguna barrera saltó porque para
+ese esquema no había ninguna.
+
+**Cinco magnitudes nuevas**, medidas contra la base: facturado neto anual
+(113,6 M€ en 2025; 53,0/70,9/91,2 en 2022-2024, con banda de cordura 40-150 M€),
+entregado y no facturado (260,6 M€ saneado), coste real anual del seguimiento
+(105,9 M€ en 2024, con los cuatro escenarios en el mismo orden), **techo por
+obra (32,7 M€**, que es como se caza un fan-out en una sola obra) y venta
+ejecutada del cierre (110,0 M€, que tiene que parecerse a los 110,1 del
+seguimiento).
+
+**`R-ALBARAN-ABSURDO`** deja la anomalía con nombre y apellidos: dos líneas del
+albarán `AC21/03345` (2021-02-28, obra 0609, líneas **588705** y **588733**,
+«SUMINISTRO PLATO DUCHA ACRÍLICO») con `cantidad = 184.493.959.731` e
+`importe_pendiente_facturar = 34.361.999.999.898,80 €` cada una. Inflan la vista
+de **260,6 M€** a **68.724.260,6 millones**. La regla y la descripción del
+objeto llevan el aviso: los dos canales que un agente lee.
+
+**Dos tests sostenían el hueco** y hubo que ampliarlos: el vocabulario de
+`criterio` no admitía `anual` ni `maximo`, y la fuente exigía un `.md`, lo que
+prohibía declarar una medición contra la base. Ahora vale la medición **si lleva
+su fecha**, que es lo que evita que envejezca en silencio.
+
+## Lo que llegó del consumidor (`mcp-bbdd`)
+
+- **Erratas de `_meta.diccionario_contexto`**: el valor `ocultar` **faltaba** en
+  los `valores posibles` de su columna `bloque` llevándose publicado desde el
+  principio. Corregido. La otra errata («~21 filas») **ya no está en el árbol**:
+  el barrido sobre el diccionario cargado no la encuentra, así que el consumidor
+  la leyó de una versión publicada anterior. Hoy son **29 filas** y el recuento
+  no se escribe en la ficha a propósito, porque caduca: se cuenta con SQL.
+- **Intragrupo**: `R-PROVEEDOR-INTRAGRUPO`. El nº 1 del ranking de facturado es
+  `CONSTRUCCIONES RUESMA, S.A.` con **23,8 M€**, más del doble que el segundo, y
+  detrás hay UTEs (`UTE VALDEBEBAS VI` 9,7 M€, `UTE JARAS BOADILLA` 8,1 M€) que
+  son coinversiones. **Resolverlo bien exige modelar el intragrupo** —marcar las
+  sociedades del grupo y decidir qué se hace con las UTE— y eso **no es de esta
+  feature**: va al backlog. Aquí solo se declara la trampa.
+
+## Los dos AVISO de la puerta, declarados en su `porque`
+
+`check-relaciones` avisa (sin fallar) cuando una relación une por debajo del
+50 %. Los dos casos son huecos legítimos y ahora están medidos en la ficha:
+
+- `retenciones.tipos -> movimientos`: de los **2.177** tipos del catálogo solo
+  **15** se han aplicado alguna vez.
+- `maestro.proveedores -> movimientos.entidad_id`: solo **1.269 de los 9.545**
+  proveedores tienen alguna retención; con `INNER JOIN` desaparecen 8.276.
+
+## Lo que queda sin comprobar, y por qué
+
+Tras la corrección, `check-relaciones --todos` da **77 que unen, 2 con cobertura
+escasa, 0 que NO unen, 17 sin comprobar, 2 con un extremo que no existe**. Sale
+con código 1 por los dos últimos grupos, y las causas están todas declaradas:
+
+- **2 no existen**: las dos relaciones de `cierre.v_pbi_planif_vs_real`, que el
+  repositorio crea y la base no tiene porque `build-cierre` no se ha vuelto a
+  lanzar. **Deuda anterior**, ya documentada en este mismo informe.
+- **2 con muestra vacía**: `aux.periodificacion_partida`, que se crea vacía por
+  diseño (lo dice su propia ficha y la de `mart.v_fact_periodificado`).
+- **13 por timeout**: todas sobre los objetos que `R-COSTE-CONSULTA` declara
+  caros. Se reintentaron a 90 s y **tres pasaron a verde**
+  (`v_pbi_cierre_generales_detalle.tipologia` 100 %,
+  `v_pbi_partida_coste.partida_id -> fact_seguimiento_mensual` 95 %,
+  `proveedores_obra.obra_id -> maestro.obras` 100 %); **cuatro siguen sin
+  comprobar a 90 s** y quedan como deuda declarada:
+  `proveedores_obra.obra_id -> v_pbi_proveedor_obra`,
+  las dos de `v_master_versiones_tipadas.obra_id` y
+  `stg.ambitos.ambito_id -> stg.plan_mensual.ambito_id`.
+
+No se cuentan como OK: un timeout es «no lo sabemos», y contarlo como correcto
+convertiría el límite de tiempo en una forma de aprobar sin mirar.
+
+## Fase RED (nivel `critico`)
+
+El módulo de la puerta se escribió **después** de sus tests. Traza real del
+fallo, con el comando exacto:
+
+```
+$ python -m pytest tests/test_f006_relaciones.py -x -q
+ImportError while importing test module 'tests\test_f006_relaciones.py'.
+Traceback:
+tests\test_f006_relaciones.py:34: in <module>
+    from etl_sigrid.infrastructure.postgres.relaciones_sql import (
+E   ModuleNotFoundError: No module named 'etl_sigrid.infrastructure.postgres.relaciones_sql'
+=========================== short test summary info ===========================
+ERROR tests/test_f006_relaciones.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.54s
+```
+
+Escrito el módulo, la misma orden da `23 passed in 0.72s`.
+
+Las correcciones de fichas siguieron el mismo orden en el punto que más importa:
+el test que sostenía la afirmación del 98 % **falló primero** al corregir la
+ficha, y esa es la evidencia de que guardaba la mentira:
+
+```
+$ python -m pytest tests/ -q -k "f006"
+FAILED tests/test_f006_fichas.py::test_f006_r2_retenciones_explica_la_cascada_de_atribucion_a_obra
+    assert "98" in obra.significado, "la cascada acierta en torno al 98 % por cenide"
+1 failed, 1218 passed, 124 skipped, 798 deselected
+```
+
+## Publicado
+
+```
+diccionario_publicado_ok  version=8  n_objetos=103  n_reglas=16  n_columnas=798
+                          cobertura_cols=100.0  contexto=29  hash=86651c493cb7
+[SUCCESS] publicar_diccionario   rows=149   duration=1.2s
+```
+
+`python main.py check-diccionario`: **`OK lo publicado ES lo del árbol`**
+(versión 8). La biyección es **102 de 103**, con la única huérfana
+`cierre.v_pbi_planif_vs_real` — la deuda anterior de `build-cierre`, no algo que
+introduzca T40. El árbol estaba **commiteado antes de publicar**.
+
+## Verificaciones MANUAL pendientes
+
+- **Relanzar la batería de 18 preguntas** contra la versión 8 publicada. T40
+  corrige lo que la batería delató, pero **no vuelve a ejecutarla**: que las
+  fichas ya no mientan no demuestra que las respuestas salgan bien.
+- **`build-cierre`** para que `cierre.v_pbi_planif_vs_real` exista y sus dos
+  relaciones se puedan comprobar.
+- Decidir con el humano si el **intragrupo** entra al backlog como feature.
+
+## Evidencias
+
+| Evidencia | Valor |
+|---|---|
+| **Tests ejecutados** | **2025 pasados**, 124 saltados, 0 fallos (`bash harness/init.sh`) |
+| **Cobertura de las líneas cambiadas** | **98,0 %** — 1117/1140, umbral 80 %, nivel `critico` |
+| **Tiempo de la suite** | **347,32 s** (5 min 47 s) |
+| **Mutantes generados y supervivientes** | **NO MEDIDO, y a propósito** |
+
+Salida literal de la puerta:
+
+```
+[OK] pytest en verde (con medición de cobertura)
+[OK] PUERTA COBERTURA: 98.0% de 1140 líneas cambiadas cubiertas (1117/1140, umbral 80%, nivel critico)
+[OK] Rama actual: feature/F-006-mcp-azure
+ENTORNO LISTO. Puedes trabajar.
+```
+
+La suite pasa de **1985 a 2025** tests (+40).
+
+**Sobre la mutación.** No se lanzó campaña y **no se aporta ningún número**,
+porque en este repositorio no serían evidencia: **F-041** tiene registrado que
+la puerta de mutación cuenta cualquier `returncode != 0` como mutante muerto,
+sobre una suite ya rota en el worktree. Dar un porcentaje de aquí sería
+exactamente el tipo de cifra plausible y falsa que toda esta feature existe para
+evitar. Queda como deuda de F-041, con su superviviente real conocido
+(`and`→`or` en `diccionario_sql.py:297`).
+
+## Comandos que lo verifican
+
+```
+bash harness/init.sh                              # 2025 tests, cobertura 98,0 %
+python main.py check-relaciones --todos           # 0 que NO unen
+python main.py check-diccionario                  # publicado == árbol, versión 8
+python -m pytest tests/test_f006_relaciones.py    # 23 tests de la puerta nueva
+```

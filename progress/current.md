@@ -6,6 +6,31 @@
 Rama `feature/F-006-mcp-azure`. **APROBADO** en la undécima pasada, tras
 corregir los defectos de la séptima a la décima.
 
+### T40 hecho (2026-08-25) · lo que la batería delató, corregido
+
+Publicado en **versión 8**. Detalle en `progress/impl_F-006.md`, sección «T40».
+
+- **Puerta nueva `python main.py check-relaciones`**: ejecuta el JOIN de cada
+  relación declarada y falla si devuelve cero casos. Encontró **tres**
+  relaciones rotas donde la batería vio una, y tras corregirlas da **0 que NO
+  unen**.
+- `retenciones.*.obra_id` es el `ide` del **centro de coste**, no el de la obra
+  (0 de 261 contra `maestro.obras`). El puente real es
+  `cierre.v_pbi_cierre_cabecera.centro_coste_ide`, 249 de 261. La misma
+  afirmación falsa vivía en tres fichas más de `compras`.
+- Tres reglas duras nuevas: **R-COSTE-CONSULTA** (cuatro vistas que no se
+  pueden consultar), **R-ALBARAN-ABSURDO** (los 68,7 billones) y
+  **R-PROVEEDOR-INTRAGRUPO** (el mayor proveedor es la propia empresa).
+- Cinco órdenes de magnitud nuevos: cubrían solo `retenciones`, y el disparate
+  salió en `compras`.
+- **R-OBRA-ACTIVA** apartaba de una trampa para empujar a la gemela: `es_activa`
+  es TRUE en las 919.
+- **Un test verde sostenía la mentira del 98 %.** Sustituido por una guarda de
+  los hechos medidos.
+
+**Pendiente MANUAL**: relanzar la batería de 18 preguntas contra la versión 8.
+Que las fichas ya no mientan no demuestra que las respuestas salgan bien.
+
 **El contenido del diccionario está cerrado y no hay que seguir puliéndolo.** El
 argumento del reviewer, que el líder asume: cerrar seis defectos de matiz en la
 décima pasada **generó tres nuevos de la misma clase**, así que otra ronda no
