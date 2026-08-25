@@ -216,13 +216,21 @@ en git) consume `_meta` y sirve **los cinco bloques** de contexto.
 - **Cierre**: T41 (mutación) y T42 (`init.sh`), más el veredicto del reviewer
   contra `CHECKPOINTS.md`. Sin él, la feature **no se marca `done`**.
 
-### Del humano, y ningún agente puede hacerlo
-- **Probar el MCP dentro de Claude Escritorio.** Todo va por la misma fábrica y
-  los mismos servicios, pero **el protocolo MCP no se ha ejercitado nunca**.
-- **T32 🔏: verificar que Power BI no lee de `stg` ni de `raw`.** De eso depende
-  si los `REVOKE` (T29-T31) se encienden aquí o se entregan a F-034. Hoy el rol
-  `mcp_sigrid_dm_ro` **lo comparten el MCP y Power BI**, y por eso los REVOKE
-  están **construidos y apagados**.
+### Del humano: las dos, resueltas el 2026-08-25
+- ~~Probar el MCP dentro de Claude Escritorio.~~ **HECHO.** El protocolo quedó
+  ejercitado de punta a punta contra Azure; ver la sección «El MCP, probado por
+  fin en Claude Escritorio» más arriba.
+- **T32 🔏 (Power BI): DECIDIDA — no se hace aquí.** Decisión del humano:
+  *«del BI olvídate, será una feature posterior»*. Con eso, la decisión abierta
+  **DA-3 se resuelve por su opción B**: los `REVOKE` (T29-T31) se quedan
+  **construidos y apagados**, y T32, T33 y T34 se **entregan a F-034**, que es
+  la feature que se ocupa de Power BI. Ya no bloquean el cierre de F-006.
+
+  Lo que hay que llevarse a F-034, porque es la trampa: el rol
+  `mcp_sigrid_dm_ro` **lo comparten hoy el MCP y Power BI**. Encender los
+  `REVOKE` sin verificar antes qué lee Power BI le rompe los informes. Y la
+  urgencia sube cuando el MCP se abra a más usuarios (backlog de `mcp-bbdd`),
+  porque ese rol compartido pasa a ser el de todos ellos.
 
 ### El objetivo que todavía NO está cumplido
 El humano pidió **«un MCP que pueda usar cualquier usuario desde cualquier
