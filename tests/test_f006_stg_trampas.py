@@ -987,3 +987,63 @@ def test_f006_r10_control_una_remision_inventada_no_pasa() -> None:
         "`mart.fact_seguimiento_mensual`, junto a la explicacion."
     )
     assert _REMISION.search(vieja), "la remisión vaga tiene que ser reconocida"
+
+
+# ---------------------------------------------------------------------------
+# El 22 mide la CAUSA y el 9 el EFECTO: nunca van separados (17ª pasada)
+# ---------------------------------------------------------------------------
+#
+# «22 obras» se publicó durante varias pasadas como si fuese el número de obras
+# con filas duplicadas en el fact. No lo es: **22** obras tienen dos fases con el
+# mismo `ano` y `mes` en Sigrid —la causa—, y de ellas solo **9** llegan a
+# producir filas duplicadas, porque las demás no tienen presupuesto en esos
+# meses. La corrección llegó a la cabecera y **no viajó** a las fichas de
+# columna, que es el patrón de esta feature: el defecto sobrevive en el campo de
+# al lado.
+#
+# Barrer el YAML crudo no lo habría visto —las frases van plegadas—, así que esto
+# barre el diccionario **cargado**, campo a campo, cabecera y columnas.
+#
+# El criterio: donde se nombre el 22 tiene que estar el 9. Un 22 solo es la cifra
+# mal atribuida otra vez.
+
+
+def _parrafos_con_la_causa() -> list[tuple[str, str]]:
+    """Párrafos del diccionario cargado que nombran las 22 obras."""
+    salida: list[tuple[str, str]] = []
+    for ficha in _dicc().fichas:
+        for ruta, texto in _prosa_de(ficha.nombre):
+            parrafos = [p for p in texto.split("\n") if p.strip()]
+            for i, parrafo in enumerate(parrafos):
+                if "22" in _cifras(parrafo):
+                    salida.append((f"{ruta}#{i}", parrafo))
+    for regla in _dicc().reglas:
+        for campo in ("regla", "motivo"):
+            texto = getattr(regla, campo) or ""
+            for i, parrafo in enumerate(p for p in texto.split("\n") if p.strip()):
+                if "22" in _cifras(parrafo):
+                    salida.append((f"{regla.codigo}.{campo}#{i}", parrafo))
+    return salida
+
+
+def test_f006_r10_control_el_22_sigue_publicado_en_algun_sitio() -> None:
+    """Si nadie lo nombrara, el test de abajo pasaría sin mirar nada."""
+    parrafos = _parrafos_con_la_causa()
+    assert len(parrafos) >= 4, f"solo {[r for r, _ in parrafos]}: barrido corto"
+    rutas = {ruta.split("#")[0] for ruta, _ in parrafos}
+    assert any("::importe_origen." in r for r in rutas), (
+        "las fichas de COLUMNA son las que se quedaron sin la corrección: si ya "
+        "no nombran la causa, revisar este control antes de fiarse"
+    )
+
+
+@pytest.mark.parametrize("ruta,parrafo", _parrafos_con_la_causa())
+def test_f006_r10_donde_se_nombra_la_causa_se_nombra_el_efecto(
+    ruta: str, parrafo: str
+) -> None:
+    """22 son las obras con dos fases; 9, las que duplican filas en el fact."""
+    assert "9" in _cifras(parrafo), (
+        f"{ruta} nombra las 22 obras sin decir que solo 9 duplican filas aquí. "
+        f"El 22 mide la CAUSA en `stg.fases`; atribuirlo al duplicado del fact es "
+        f"la cifra mal atribuida que ya se publicó.\n  párrafo: {parrafo[:300]}"
+    )
