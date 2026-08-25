@@ -768,9 +768,16 @@ objetos:
       tecnico_responsable: Nombre del tecnico responsable de la obra.
       centro_coste_ide:
         significado: >-
-          Identificador del centro de coste. En Ruesma cada obra suele ser su
-          propio centro, y esa equivalencia es la que usa el modulo de
-          retenciones para atribuir efectos a obra.
+          Identificador del centro de coste, y **la unica pasarela publicada
+          entre `retenciones` y el resto del datamart**. El centro de coste
+          **NO es la obra**: es una entidad distinta, con su propio `ide` y
+          contiguo al de ella (la obra 0655 es `1990273` como obra y `1990274`
+          como centro de coste). Por eso el `obra_id` de `retenciones` —que es
+          este `ide`, no el de la obra— casa **0 de 261** contra
+          `maestro.obras.obra_id` y **249 de 261** contra esta columna (medido
+          el 2026-08-25). Decir que "cada obra es su propio centro" era lo que
+          inducia el JOIN equivocado. **No es unica**: dos valores se repiten
+          (4 filas), asi que unir por aqui es `N:N` y hay que agregar antes.
         agregacion: no_sumable
         nulo_significa: La obra no tiene centro de coste asignado.
       centro_coste_nombre: Nombre del centro de coste.

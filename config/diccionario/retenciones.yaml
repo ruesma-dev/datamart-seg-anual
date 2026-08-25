@@ -116,16 +116,31 @@ objetos:
           vacio trae **cadena vacia**.
       obra_id:
         significado: >-
-          Obra a la que se atribuye la retencion, resuelta en cascada. Primero
-          por el CENTRO DE COSTE del efecto, que en Ruesma coincide con la obra
-          en torno al 98 % de los casos; y si no lo hay, por las lineas del
-          documento origen, pero SOLO si todas apuntan a la misma obra.
+          **NO es el identificador de la obra y NO une con `maestro.obras`: es
+          el `ide` del CENTRO DE COSTE.** El centro de coste es una entidad
+          distinta de la obra, con su propio `ide` y **contiguo** al de ella:
+          la obra 0655 es `1990273` en todo el datamart y `1990274` aqui. Medido
+          el 2026-08-25: **0 de 261** valores de esta columna existen en
+          `maestro.obras.obra_id`, asi que un `INNER JOIN` devuelve cero filas y
+          un `LEFT JOIN` todo a NULL, sin error y sin aviso. Para cruzar con
+          obras, ver las relaciones de esta ficha: se pasa por
+          `cierre.v_pbi_cierre_cabecera.centro_coste_ide`. El valor sale en
+          cascada: primero el centro de coste del efecto y, si no lo hay, las
+          lineas del documento origen, pero SOLO si todas apuntan a la misma
+          obra.
         nulo_significa: >-
           No se pudo atribuir. Si ademas `num_obras_documento` es mayor que 1,
           es que la factura reparte entre varias obras y no se ha querido
           adivinar. Estas filas no se pueden perder al sumar por obra.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid, y **el unico campo de
+        esta tabla que un humano reconoce**. Casa al 100 % con
+        `maestro.obras.codigo_obra` (257 de 257 valores, medido el 2026-08-25)
+        pero **no identifica una obra**: `maestro.obras` tiene 919 filas y solo
+        844 codigos distintos, y unir por el convierte las 261 filas de
+        `v_pbi_retencion_obra` en **329**. Sirve para MOSTRAR y para FILTRAR una
+        obra concreta; no para unir sin agregar antes.
       nombre_obra: Nombre legible de la obra, de `con.res`.
       num_obras_documento:
         significado: >-
@@ -180,11 +195,22 @@ objetos:
         cardinalidad: "N:1"
         porque: Para el porcentaje y el plazo de devolucion del tipo aplicado.
       - de: obra_id
-        a: maestro.obras.obra_id
-        cardinalidad: "N:1"
+        a: cierre.v_pbi_cierre_cabecera.centro_coste_ide
+        cardinalidad: "N:N"
         porque: >-
-          Para el nombre y el cliente de la obra. Se usa el maestro y no
-          `stg.obras` porque este esquema no filtra obras administrativas.
+          **El unico puente medido entre retenciones y el resto del datamart.**
+          `obra_id` es aqui el `ide` del CENTRO DE COSTE, y esta es la unica
+          columna publicada que lo lleva; desde la cabecera de cierre se salta a
+          `obra_id` de verdad y de ahi a `maestro.obras`. Medido el 2026-08-25:
+          **249 de 261** valores casan (95 %). Los 12 que no son centros de
+          coste de obras sin cabecera de cierre, y **se pierden en un INNER
+          JOIN**. Es `N:N` y no `N:1` porque dos centros de coste estan
+          repetidos en la cabecera (4 filas), asi que el JOIN convierte 261
+          filas en 251 y **hay que agregar por `centro_coste_ide` antes de unir
+          importes**. Lo que NO vale: unir por `obra_id` contra
+          `maestro.obras.obra_id` (0 de 261, cero filas en silencio) ni por
+          `codigo_obra`, que casa al 100 % pero multiplica filas porque
+          `maestro.obras` repite codigo.
       - de: documento_id
         a: compras.facturas.factura_id
         cardinalidad: "N:1"
@@ -385,9 +411,10 @@ objetos:
       `retenciones.movimientos` las tres se resuelven con cascadas DISTINTAS
       —`obra_id` sale del centro de coste del efecto o, en su defecto, de la
       obra unica del documento; `codigo_obra` y `nombre_obra` salen de
-      `COALESCE` sobre dos JOIN distintos—, asi que un `obra_id` cuyo centro de
-      coste no exista en el maestro puede aparecer con dos codigos y dar DOS
-      filas. Unir solo por `obra_id` duplica. Ademas, los efectos sin obra
+      `COALESCE` sobre dos JOIN distintos—, asi que un mismo `obra_id` puede
+      aparecer con dos codigos y dar DOS filas. Unir solo por `obra_id` duplica
+      —y ademas ese `obra_id` es el `ide` del CENTRO DE COSTE, no el de la obra:
+      ver su columna. Ademas, los efectos sin obra
       atribuida quedan FUERA, asi que la suma de esta vista es menor que el
       total de la empresa: lo que falta esta en `sin_obra_asignada` de
       `retenciones.v_pbi_retencion_resumen`, que es un RECUENTO y no un
@@ -397,9 +424,20 @@ objetos:
     refresco: manual
     columnas:
       obra_id:
-        significado: Obra a la que se atribuyeron los efectos.
+        significado: >-
+          **NO es el identificador de la obra: es el `ide` del CENTRO DE COSTE**,
+          heredado tal cual de `retenciones.movimientos`. Mismo defecto y mismas
+          cifras que alli: **0 de 261** valores existen en
+          `maestro.obras.obra_id` (medido el 2026-08-25). Para cruzar con obras
+          se pasa por `cierre.v_pbi_cierre_cabecera.centro_coste_ide`, que es la
+          relacion declarada mas abajo.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra: >-
+        Codigo de obra tal y como se teclea en Sigrid, y el unico campo que un
+        humano reconoce. Casa al 100 % con `maestro.obras.codigo_obra` pero **no
+        identifica una obra**: el maestro repite codigo (919 filas, 844 codigos)
+        y unir por el convierte las 261 filas de esta vista en **329**. Para
+        mostrar y filtrar, si; para unir, no.
       nombre_obra: Nombre legible de la obra, de `con.res`.
       retenido_a_proveedores:
         significado: >-
@@ -454,17 +492,21 @@ objetos:
         nulo_significa: No hay nada vencido en ese sentido.
     relaciones:
       - de: obra_id
-        a: maestro.obras.obra_id
-        cardinalidad: "N:1"
+        a: cierre.v_pbi_cierre_cabecera.centro_coste_ide
+        cardinalidad: "N:N"
         porque: >-
-          Para el cliente y el estado de la obra. Es N:1 y no 1:1 porque esta
-          vista puede traer mas de una fila por `obra_id`: ver el grano.
-      - de: obra_id
-        a: cierre.v_pbi_cierre_cabecera.obra_id
-        cardinalidad: "N:1"
-        porque: >-
-          Para poner la garantia en contexto con el presupuesto y las fechas de
-          la obra. Ojo, los dos esquemas se construyen a mano y por separado.
+          **El unico puente medido con el resto del datamart**, y desde el que
+          se llega al presupuesto y a las fechas de la obra. `obra_id` es aqui
+          el `ide` del CENTRO DE COSTE, y esta es la unica columna publicada que
+          lo lleva. Medido el 2026-08-25: **249 de 261** valores casan (95 %);
+          los 12 restantes son centros de coste de obras sin cabecera de cierre
+          y **se pierden en un INNER JOIN**. Es `N:N` porque dos
+          `centro_coste_ide` se repiten en la cabecera, asi que hay que agregar
+          antes de unir importes. Las DOS relaciones que habia aqui antes
+          —`obra_id -> maestro.obras.obra_id` y
+          `obra_id -> cierre.v_pbi_cierre_cabecera.obra_id`— casaban **0 de
+          261** las dos: devolvian cero filas en silencio. Ojo, ademas, con que
+          los dos esquemas se construyen a mano y por separado.
     ejemplos_preguntas:
       - Que retenciones tengo de los proveedores de la obra X
       - En que obras retenemos mas de lo que nos retienen

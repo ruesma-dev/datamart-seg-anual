@@ -1272,7 +1272,21 @@ def test_f006_r12_retenciones_hereda_la_regla_del_join() -> None:
     assert "R-RETENCION-NO-JOIN-LINEAS" in avisos
 
 
-def test_f006_r2_retenciones_explica_la_cascada_de_atribucion_a_obra() -> None:
+def test_f006_r2_retenciones_avisa_de_que_su_obra_id_no_es_la_obra() -> None:
+    """El defecto que la batería destapó, con su guarda de regresión.
+
+    Este test decía antes `assert "98" in obra.significado`, exigiendo la frase
+    «el centro de coste coincide con la obra en torno al 98 % de los casos».
+    **Era falsa y el test la sostenía**: medido el 2026-08-25, `obra_id` casa
+    **0 de 261** contra `maestro.obras.obra_id`, porque es el `ide` del centro
+    de coste, una entidad distinta y contigua a la de la obra. Un test verde
+    puede ser el candado de una mentira, y este lo fue durante diecisiete
+    pasadas.
+
+    Lo que se exige ahora no es una redacción sino los tres hechos que evitan
+    el JOIN vacío: que NO es la obra, cuánto casa de verdad, y por dónde se
+    cruza.
+    """
     columnas = {
         c.nombre: c
         for c in _diccionario().por_nombre["retenciones.movimientos"].columnas
@@ -1280,8 +1294,38 @@ def test_f006_r2_retenciones_explica_la_cascada_de_atribucion_a_obra() -> None:
 
     obra = columnas["obra_id"]
     assert "CENTRO DE COSTE" in obra.significado
-    assert "98" in obra.significado, "la cascada acierta en torno al 98 % por cenide"
+    assert "NO es el identificador de la obra" in obra.significado
+    assert "0 de 261" in obra.significado, "la cifra medida, no una impresion"
+    assert "centro_coste_ide" in obra.significado, "por donde SI se cruza"
+    assert "98" not in obra.significado, (
+        "la afirmacion del 98 % era falsa: no puede volver por la puerta de atras"
+    )
     assert "num_obras_documento" in (obra.nulo_significa or "")
+
+
+def test_f006_r2_ninguna_ficha_dice_que_el_centro_de_coste_sea_la_obra() -> None:
+    """El mismo defecto vivía en cinco sitios, no en uno.
+
+    Lo señalado fue `retenciones.movimientos`. Un barrido sobre el diccionario
+    **cargado** —nunca sobre el YAML crudo, que el plegado parte por la mitad y
+    ya rompió cuatro barridos de esta feature— encontró la misma afirmación en
+    `retenciones.v_pbi_retencion_obra`, en `cierre.v_pbi_cierre_cabecera` y en
+    las tres tablas de línea de `compras`. Las tres de `compras` casan **0** de
+    sus 447, 519 y 611 centros de coste contra `maestro.obras.obra_id`.
+    """
+    prohibidas = ("suele coincidir con la obra", "cada obra suele ser su propio centro")
+    culpables: list[str] = []
+
+    for ficha in _diccionario().fichas:
+        for columna in ficha.columnas:
+            texto = " ".join((columna.significado or "").split())
+            if any(frase in texto for frase in prohibidas):
+                culpables.append(f"{ficha.nombre}.{columna.nombre}")
+
+    assert culpables == [], (
+        f"estas fichas siguen diciendo que el centro de coste es la obra: "
+        f"{culpables}. Medido: casan 0 contra `maestro.obras.obra_id`"
+    )
 
 
 def test_f006_r2_retenciones_declara_las_dos_lecturas_del_saldo() -> None:

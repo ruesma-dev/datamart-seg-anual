@@ -270,8 +270,13 @@ objetos:
         agregacion: no_sumable
       centro_coste_id:
         significado: >-
-          Centro de coste de la linea. En Ruesma cada obra suele ser su propio
-          centro, y esa equivalencia es la que usa el modulo de retenciones.
+          Centro de coste de la linea, y **NO es la obra**: es el `ide` de una
+          entidad distinta, contigua a la de la obra. Medido el 2026-08-25:
+          **0 de 447** valores distintos existen en `maestro.obras.obra_id`, y
+          432 en `cierre.v_pbi_cierre_cabecera.centro_coste_ide`. Para la obra
+          de la linea esta `obra_id`, que si es la obra; esta columna solo sirve
+          para cruzar con `retenciones`, cuyo `obra_id` es tambien un centro de
+          coste.
         nulo_significa: La linea no tiene centro de coste informado.
         agregacion: no_sumable
       cantidad:
@@ -412,7 +417,13 @@ objetos:
       descripcion: Texto libre de la linea entregada.
       unidad_medida: Unidad en la que se mide la cantidad.
       centro_coste_id:
-        significado: Centro de coste de la linea; en Ruesma suele coincidir con la obra.
+        significado: >-
+          Centro de coste de la linea, y **NO es la obra**: es el `ide` de una
+          entidad distinta, contigua a la de la obra. Medido el 2026-08-25:
+          **0 de 519** valores distintos existen en `maestro.obras.obra_id`, y
+          484 en `cierre.v_pbi_cierre_cabecera.centro_coste_ide`. La obra de la
+          linea es `obra_id`; esta columna solo sirve para cruzar con
+          `retenciones`, cuyo `obra_id` es tambien un centro de coste.
         nulo_significa: La linea no tiene centro de coste informado.
         agregacion: no_sumable
       cantidad:
@@ -547,7 +558,13 @@ objetos:
       descripcion: Texto libre de la linea facturada.
       unidad_medida: Unidad en la que se mide la cantidad.
       centro_coste_id:
-        significado: Centro de coste de la linea; en Ruesma suele coincidir con la obra.
+        significado: >-
+          Centro de coste de la linea, y **NO es la obra**: es el `ide` de una
+          entidad distinta, contigua a la de la obra. Medido el 2026-08-25:
+          **0 de 611** valores distintos existen en `maestro.obras.obra_id`, y
+          526 en `cierre.v_pbi_cierre_cabecera.centro_coste_ide`. La obra de la
+          linea es `obra_id`; esta columna solo sirve para cruzar con
+          `retenciones`, cuyo `obra_id` es tambien un centro de coste.
         nulo_significa: La linea no tiene centro de coste informado.
         agregacion: no_sumable
       cantidad:
