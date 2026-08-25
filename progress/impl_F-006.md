@@ -49,9 +49,9 @@ que cualquier agente conectado por MCP construya sus propios casos de uso. Rama
 | **T29** | `build_readonly_grant_statements(revocar_en=…)` | ⬜ **pendiente** (no existe en código) | — |
 | **T30** | `PG_REVOKE_FUERA_DE_CONSUMO` en settings | ⬜ **pendiente** (no existe) | — |
 | **T31** | `DEFAULT_CONSUMPTION_SCHEMAS` a los siete | ⬜ **pendiente** (siguen los nueve) | — |
-| **T32** 🔏 | Verificar que Power BI no lee de `stg`/`raw` | ⬜ **pendiente · solo el humano** | L4719 |
-| **T33** 🔏 | Aplicar los `REVOKE` (solo si T32 sale limpia) | ⬜ pendiente; **entregable a F-034** si DA-3 = B | — |
-| **T34** 🔏 | Comprobar que Power BI sigue refrescando | ⬜ pendiente | — |
+| **T32** 🔏 | Verificar que Power BI no lee de `stg`/`raw` | ➡️ **entregada a F-034** (2026-08-25) | L4719 |
+| **T33** 🔏 | Aplicar los `REVOKE` (solo si T32 sale limpia) | ➡️ **entregada a F-034**: DA-3 se resuelve = B | — |
+| **T34** 🔏 | Comprobar que Power BI sigue refrescando | ➡️ **entregada a F-034** | — |
 | **T35** | `runbook_postgres_azure.md` — firewall | ⬜ **pendiente** (el runbook existe, de F-005) | — |
 | **T36** | Sección en `docs/ARCHITECTURE.md` | ⬜ **pendiente** | — |
 | **T37** | `azure-apps/datamart_seg_anual.md` | ⬜ **pendiente y obligatoria**: cambió lo que se expone | L4235 |
@@ -62,8 +62,8 @@ que cualquier agente conectado por MCP construya sus propios casos de uso. Rama
 | **T42** | `bash harness/init.sh` en verde | ✅ verde (2025 tests) — reejecutable al cierre | L4728 |
 | **T43** | Registrar la deuda y decidir con el humano | ◐ **registrada** (§6); la decisión es del humano | tasks.md §Deuda |
 
-Ninguna tarea entregada a otra feature de forma definitiva: T33 lo sería solo si el
-humano resuelve DA-3 = B; T41 depende de **F-041**.
+**T32, T33 y T34 entregadas a F-034** el 2026-08-25 por decisión del humano («del BI olvídate»): DA-3 queda resuelta por su opción B y los `REVOKE` se quedan construidos y apagados. Ya no bloquean el cierre.
+T41 (mutación) sigue dependiendo de **F-041**.
 
 ---
 
