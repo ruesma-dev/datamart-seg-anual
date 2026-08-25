@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **43 features**, 29 abiertas, 14 terminadas.
+Resumen: **44 features**, 30 abiertas, 14 terminadas.
 
 En curso: **F-006**.
 
@@ -19,6 +19,7 @@ En curso: **F-006**.
 | F-045 | Las retenciones no se pueden atribuir a una obra | 2 | pendiente | estandar | `feature/F-045-retenciones-obra` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 3 | pendiente | critico | `feature/F-037-tesoreria` |
 | F-043 | Un ID de suscripcion de Azure esta versionado y subido a GitHub | 3 | pendiente | estandar | `feature/F-043-secreto-versionado` |
+| F-046 | El diccionario obliga a contrastar todo desglose contra su total publicado | 3 | pendiente | estandar | `feature/F-046-contraste-desgloses` |
 | F-038 | Modelar los comparativos de ofertas en compras | 4 | pendiente | estandar | `feature/F-038-comparativos` |
 | F-039 | Vistas puente que faltan para las preguntas de negocio | 5 | pendiente | estandar | `feature/F-039-vistas-puente` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 6 | pendiente | critico | `feature/F-040-ingresos` |
@@ -110,6 +111,12 @@ estado **pendiente** · prioridad 3 · rigor `estandar` · SDD no · rama `featu
 
 Detectado el 2026-08-21 al auditar el repositorio buscando secretos, durante F-006. progress/review_F-005.md:65 contiene el ID de suscripcion de Azure en claro, y entro en el commit 5b486d4 -el cierre de F-005-, asi que esta en el historial y ya subido a GitHub. El CLAUDE.md de PycharmProjects lo prohibe expresamente y con estas palabras: ni contrasenas, ni cadenas de conexion, ni claves, NI IDS DE SUSCRIPCION O TENANT, ni IPs internas; da igual que el repositorio sea privado, porque el historial de git no suelta lo que entra. Un ID de suscripcion no es una credencial y por si solo no da acceso, pero es superficie de reconocimiento y la regla del proyecto no admite matices. El propio texto de esa linea dice haberlo verificado con git show dev:infra/00_vars.ps1, asi que hay que comprobar si ese fichero lo trae tambien en alguna revision. DECISION DEL HUMANO, no del agente: (a) reescribir el historial -git filter-repo o similar- y forzar el push, que rompe los clones existentes y hay que avisar a quien tenga uno; (b) redactar solo en HEAD y aceptar por escrito que el historial lo conserva; o (c) aceptarlo entero por escrito, dejando constancia de que se valoro. Cualquiera de las tres vale, pero elegir por omision no. Hacer ademas una pasada de auditoria por si hay mas: la busqueda de hoy solo cubrio los tres identificadores conocidos.
 
+### F-046 · El diccionario obliga a contrastar todo desglose contra su total publicado
+
+estado **pendiente** · prioridad 3 · rigor `estandar` · SDD no · rama `feature/F-046-contraste-desgloses`
+
+Nacida el 2026-08-25 de la primera prueba del MCP en Claude Escritorio contra el datamart real (obra 0694, retenciones por proveedor). El MCP hizo su trabajo bien: SQL correcto, 22 filas, y ademas una segunda consulta a retenciones.v_pbi_retencion_obra que le devolvio el total exacto (34.523,22 EUR en 61 efectos). El modelo, al redactar la tabla, copio en la casilla de saldo vivo de un proveedor el valor de la columna vencido (251,32 en vez de 1.575,96), perdio un efecto de 1.324,64 EUR -el cuarto mayor de la obra- y luego sumo SU PROPIA tabla, publicando 33.198,58 EUR en 60 efectos y contradiciendo el total que tenia delante. La respuesta parecia impecable: desglose por proveedor, fechas de devolucion, matices de vencimiento y hasta una nota de fiabilidad. Es el fallo que la capa semantica NO puede evitar, porque el dato llego bien y el error se produjo al escribir. La defensa es barata y el agente ya pedia la vista por su cuenta: que la ficha de cada objeto con vista de totales publicada mande contrastar el desglose contra ella y declarar el descuadre en la respuesta si no cuadra.
+
 ### F-038 · Modelar los comparativos de ofertas en compras
 
 estado **pendiente** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-038-comparativos`
@@ -120,7 +127,7 @@ Nacida el 2026-08-20 del analisis de dominio de F-006. El humano pidio poder ver
 
 estado **pendiente** · prioridad 5 · rigor `estandar` · SDD no · rama `feature/F-039-vistas-puente`
 
-Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el datamart puede responder pero obligan a escribir SQL de agregacion no evidente, justo lo que hace fallar a un agente. (1) Que retenciones tengo de los proveedores de una obra: las dos vistas agregadas existentes cortan por un solo eje cada una -v_pbi_retencion_obra pierde el proveedor, v_pbi_retencion_entidad pierde la obra-; falta retenciones.v_pbi_retencion_obra_entidad. (2) Que proveedores han facturado mas: v_pbi_proveedor_obra esta agrupada por obra y ano, asi que el ranking global exige agregar sin perder las filas con obra_id NULL -facturas de estructura y generales-; falta una vista proveedor x periodo con grano mensual. (3) EL EJE MAS VALIOSO Y HOY INEXPLOTADO: partida_id une el mundo del seguimiento -stg.partidas, plan_mensual, mart.fact_seguimiento_mensual- con el mundo documental -compras.v_pbi_partida_coste-, y permite comparar coste PLANIFICADO de una partida con coste INCURRIDO documental de esa partida. Ninguna vista lo hace. Aviso para la implementacion: compras y retenciones no filtran por stg.obras, asi que pueden traer obras administrativas que el seguimiento excluye; las vistas nuevas deben decidir y documentar que universo de obra usan.
+Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el datamart puede responder pero obligan a escribir SQL de agregacion no evidente, justo lo que hace fallar a un agente. (1) Que retenciones tengo de los proveedores de una obra: las dos vistas agregadas existentes cortan por un solo eje cada una -v_pbi_retencion_obra pierde el proveedor, v_pbi_retencion_entidad pierde la obra-; falta retenciones.v_pbi_retencion_obra_entidad. (2) Que proveedores han facturado mas: v_pbi_proveedor_obra esta agrupada por obra y ano, asi que el ranking global exige agregar sin perder las filas con obra_id NULL -facturas de estructura y generales-; falta una vista proveedor x periodo con grano mensual. (3) EL EJE MAS VALIOSO Y HOY INEXPLOTADO: partida_id une el mundo del seguimiento -stg.partidas, plan_mensual, mart.fact_seguimiento_mensual- con el mundo documental -compras.v_pbi_partida_coste-, y permite comparar coste PLANIFICADO de una partida con coste INCURRIDO documental de esa partida. Ninguna vista lo hace. Aviso para la implementacion: compras y retenciones no filtran por stg.obras, asi que pueden traer obras administrativas que el seguimiento excluye; las vistas nuevas deben decidir y documentar que universo de obra usan. AMPLIADO el 2026-08-25 al probar el MCP contra Azure desde Claude Escritorio: el cruce obra x proveedor SI se puede hacer sobre retenciones.movimientos (trae obra_id, codigo_obra, entidad_id y entidad_nombre en la misma fila), pero las metricas que el diccionario manda usar -saldo_vivo y neto_practicado- NO estan en esa tabla: solo existen en v_pbi_retencion_entidad y v_pbi_retencion_resumen, que ya vienen agregadas y han perdido la obra. Es decir: por obra tienes importe, y por metrica correcta pierdes la obra. La vista cruzada tiene que traer las dos.
 
 ### F-040 · El lado de ingresos: ventas, certificaciones y clientes
 

@@ -120,6 +120,62 @@ procedencia en el registro de versiones y no en el docstring del módulo.
 
 ---
 
+## El MCP, probado por fin en Claude Escritorio (2026-08-25)
+
+**El protocolo MCP queda ejercitado de punta a punta.** Era el agujero que
+ningún agente podía cerrar —hacía falta la máquina y la aplicación del humano— y
+ya está hecho: `initialize` → `notifications/initialized` → `tools/list`, los tres
+con `result`, contra el datamart real en Azure.
+
+Dos cosas que costaron encontrarse y conviene no volver a buscar:
+
+- **Claude Escritorio está instalado desde la Microsoft Store**, así que NO lee
+  `%APPDATA%\Claude\claude_desktop_config.json`. El fichero bueno es
+  `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`.
+- Su entrada `bbdd-ruesma` **no declara bloque `env`**, y eso es lo correcto: sin
+  variables que lo pisen, el servidor lee el `.env` de `mcp-bbdd`, que apunta a
+  Azure con el rol de solo lectura. El `claude_desktop_config.json` que vive
+  DENTRO del repositorio `mcp-bbdd` apunta a `localhost` con el usuario
+  `postgres`: si alguien lo copia tal cual, se conecta a la base local con un rol
+  de escritura.
+
+Arranque bueno, para reconocerlo en `mcp-bbdd/logs/mcp_bbdd.log`:
+
+```
+Pool creado contra mcp_sigrid_dm_ro@psql-albaranes-rs9k2...  (sslmode=require)
+Diccionario cargado de _meta: 103 objetos, 16 reglas, 29 entradas de contexto
+                              en 5 bloques, 3 columnas ocultas (versión 8)
+```
+
+### El fallo que la capa semántica no puede evitar (→ F-046)
+
+Primera pregunta de negocio real: retenciones a proveedores de la obra 0694. **El
+MCP acertó y el modelo falló al escribir.** Lanzó el SQL correcto (22 filas) y
+además consultó `retenciones.v_pbi_retencion_obra`, que le devolvió el total
+exacto: **34.523,22 € en 61 efectos**. Al redactar la tabla copió en la casilla de
+saldo vivo de un proveedor el valor de la columna *vencido* (251,32 en vez de
+1.575,96), perdió un efecto de **1.324,64 €** —el cuarto mayor de la obra— y sumó
+su propia tabla, publicando **33.198,58 € en 60 efectos**: contradijo el total que
+tenía delante.
+
+Todo lo demás estaba bien y verificado contra la base: 61 efectos vivos, ninguno
+liquidado, cliente sin retenciones en la obra, 6.380,73 € vencidos, y el desglose
+de OCL, Demoltécnica y Tepuy exacto. **Por eso es peligroso: la respuesta parece
+impecable.** Es el diagnóstico del reviewer llevado al extremo —*el problema nunca
+han sido los datos, sino los instrumentos que decían que los datos estaban
+bien*—, solo que aquí el instrumento es el modelo. Ficha: **F-046**.
+
+### Y un hueco de dominio (→ ampliado en F-039)
+
+El cruce obra × proveedor **sí** se puede hacer: `retenciones.movimientos` trae
+obra y entidad en la misma fila. Pero `saldo_vivo` y `neto_practicado` —las
+métricas que el propio diccionario manda usar— **solo existen en
+`v_pbi_retencion_entidad` y `v_pbi_retencion_resumen`**, que ya vienen agregadas
+y han perdido la obra. Por obra tienes `importe`; por métrica correcta pierdes la
+obra. Un agente obediente acabará llamando saldo vivo a un importe acumulado.
+
+---
+
 ## Lo que hace F-006, en una línea
 
 Publicar en `_meta` la **capa semántica** del datamart —qué significa cada
