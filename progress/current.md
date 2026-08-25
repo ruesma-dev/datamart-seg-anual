@@ -129,9 +129,12 @@ decimotercera regla: estaba escrita en una cabecera YAML, que es un comentario y
 - **Bloque global** (bloque B): las doce reglas duras, los órdenes de magnitud,
   las convenciones, los nueve esquemas y las 18 preguntas de la batería.
 - **Fichas**: los **103 objetos** del datamart con **798 columnas**, todas
-  contrastadas contra el SQL. La superficie de consumo son 48 de esos 103, con
-  el **100 %** de sus columnas con significado; los otros 55 llevan
-  `motivo_no_consumo` diciendo a dónde ir en su lugar.
+  contrastadas contra el SQL. La superficie de consumo son 46 de esos 103, con
+  el **100 %** de sus columnas con significado; los otros 57 llevan
+  `motivo_no_consumo` diciendo a dónde ir en su lugar. Eran 48 hasta que T40
+  midió que `mart.v_pbi_cp_tipologia` y `cierre.v_pbi_cierre_indirectos_detalle`
+  **no devuelven ni una fila** dentro de la ventana de 30 s, ni filtradas por
+  obra: una vista que no se puede ejecutar no es superficie de consumo.
 
 El trinquete `pendientes` recorrió 98 → 96 → 85 → 73 → 77 → 53 → 49 → 39 → 38 →
 31 → **0**, anclado al inventario y al historial de git: un objeto documentado

@@ -102,6 +102,44 @@ reglas:
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
       dar la del maestro como "obras de la empresa" infla el numero.
 
+  - codigo: R-COSTE-CONSULTA
+    titulo: Cuatro vistas no se pueden consultar, y una base compartida que cuidar
+    severidad: bloqueante
+    ambito:
+      - mart.v_master_vigente_anual
+      - mart.v_pbi_cp_tipologia
+      - mart.v_fact_periodificado
+      - cierre.v_pbi_cierre_indirectos_detalle
+      - mart.v_master_versiones_tipadas
+      - stg.plan_mensual
+    regla: >-
+      **Antes de lanzar una consulta hay que saber lo que cuesta**, porque esto
+      corre contra `psql-albaranes-rs9k2`, **compartido con `albaranes` y
+      `partes` EN PRODUCCION**, y la ventana util son 30 s. Medido el
+      2026-08-25, con `SELECT * ... LIMIT 5`:
+      **(1) NO SE PUEDEN CONSULTAR, ni siquiera filtradas por obra**:
+      `mart.v_pbi_cp_tipologia`, `mart.v_fact_periodificado` y
+      `cierre.v_pbi_cierre_indirectos_detalle` agotan **mas de 60 s**. Con
+      cualquiera de las tres, la respuesta correcta es "no puedo consultarla" y
+      el motivo, no una consulta que se va a cortar.
+      **(2) SOLO FILTRADA**: `mart.v_master_vigente_anual` agota los 40 s con
+      `LIMIT 5` y responde en **20 s** con `WHERE obra_id = ... AND anio = ...`.
+      Nunca sin filtro de obra.
+      **(3) CARAS PERO VIABLES, una sola vez y agregando**:
+      `mart.v_master_versiones_tipadas` **16 s**, un `count(*)` de
+      `stg.plan_mensual` **25 s**, uno de `compras.fact_compras_linea` **10 s**.
+      **(4) BARATAS**: `maestro.obras`, `cierre.v_pbi_cierre_resumen`,
+      `compras.v_pbi_proveedor_obra` y `compras.v_pbi_partida_coste`, todas por
+      debajo de 5 s. Empezar siempre por estas.
+    motivo: >-
+      El diccionario no tenia ninguna nocion de coste: ni un `[LENTO]`, ni un
+      "filtra siempre por obra". La bateria de aceptacion del 2026-08-22 se
+      choco **cinco veces** con el timeout de 30 s, y
+      `mart.v_master_vigente_anual` —marcada como recomendada y anunciada como
+      la que responde que version de plan rige en una obra— no respondia nada.
+      Un agente que no sabe que es caro lanza consultas que se cortan o, peor,
+      consultas que terminan y molestan a dos aplicaciones en produccion.
+
   - codigo: R-OBRA-ACTIVA
     titulo: El datamart NO sabe si una obra esta activa. Las dos columnas mienten
     severidad: bloqueante

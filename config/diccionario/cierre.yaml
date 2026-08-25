@@ -486,7 +486,14 @@ objetos:
   v_pbi_cierre_indirectos_detalle:
     tipo: vista
     capa: consumo
-    consumo_recomendado: true
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **NO SE PUEDE CONSULTAR HOY.** Agota los 40 s con `SELECT * ... LIMIT 5` y
+      los **60 s filtrada a una sola obra** (medido el 2026-08-25). Estaba
+      marcada como recomendada mientras no devolvia ni una fila dentro de la
+      ventana util. Para los indirectos por obra y mes que si responden, ir a
+      `cierre.fact_cierre_mensual` con `concepto = 'INDIRECTOS'`. Ver
+      R-COSTE-CONSULTA.
     descripcion: >-
       Detalle de los costes INDIRECTOS de cada obra abierto por grupo y
       subcategoria, con CUATRO variantes de periodificacion calculadas en

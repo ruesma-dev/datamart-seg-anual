@@ -957,7 +957,11 @@ objetos:
       Para cada obra y ano, cual es la version master que rige: la ultima de tipo
       'Planif Inicial', 'ABC' o 'Cuatrimestral' con fecha efectiva anterior al
       corte. El corte es el 31 de diciembre si el ano ya paso, y hoy si es el ano
-      en curso.
+      en curso. **NUNCA SE CONSULTA SIN FILTRAR POR OBRA**: medido el
+      2026-08-25, `SELECT * ... LIMIT 5` agota los 40 s, y
+      `WHERE obra_id = ... AND anio = ...` responde en **20 s**. Un `LIMIT` no
+      la salva, porque el limite se aplica DESPUES de calcular la vista entera.
+      Ver R-COSTE-CONSULTA.
     grano: >-
       Una fila por (`obra_id`, `anio`, `ambito_id`), que es su clave de
       negocio.
@@ -1006,7 +1010,14 @@ objetos:
   v_pbi_cp_tipologia:
     tipo: vista
     capa: consumo
-    consumo_recomendado: true
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **NO SE PUEDE CONSULTAR HOY.** Agota los 40 s con `SELECT * ... LIMIT 5` y
+      los **60 s filtrada a una sola obra** (medido el 2026-08-25), asi que no
+      hay forma de sacarle una fila dentro de la ventana util. Estaba marcada
+      como recomendada mientras no respondia nada. Ver R-COSTE-CONSULTA. Su
+      contenido sigue siendo el correcto para la pregunta; lo que falta es que
+      se pueda ejecutar, y eso pasa por materializarla.
     descripcion: >-
       Desglose ANUAL de los Costes Proporcionales por tipologia de negocio
       (seguros, avales, levantamiento, contratacion, medio ambiente y aporte a

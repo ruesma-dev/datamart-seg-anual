@@ -1248,6 +1248,61 @@ def test_f006_r2_compras_las_filas_sin_obra_no_se_pueden_perder() -> None:
     assert "no se pueden perder" in nulo.lower()
 
 
+def test_f006_r2_el_diccionario_declara_el_coste_de_consultar() -> None:
+    """El diccionario no tenía NINGUNA noción de coste, y eso rompió la batería.
+
+    Ni un `[LENTO]`, ni un «filtra siempre por obra». La batería se chocó cinco
+    veces con el `statement_timeout` de 30 s, y `mart.v_master_vigente_anual`
+    —marcada como recomendada— agota el tiempo **con `LIMIT 5`**.
+
+    El coste viaja por el canal que ya existe: una regla dura cuyo ámbito son
+    los objetos caros, que `derivar_avisos` cuelga de cada ficha afectada. Así
+    aparece en `describir_tabla` sin que el agente lea el bloque global.
+    """
+    dicc = _diccionario()
+    regla = next((r for r in dicc.reglas if r.codigo == "R-COSTE-CONSULTA"), None)
+
+    assert regla is not None, "el diccionario sigue sin decir lo que cuesta consultar"
+    assert regla.severidad == "bloqueante"
+    for medido in ("60 s", "20 s", "16 s"):
+        assert medido in regla.regla, f"falta la cifra medida {medido}"
+
+    from etl_sigrid.domain.diccionario import derivar_avisos
+
+    derivado = derivar_avisos(dicc)
+    caras = (
+        "mart.v_master_vigente_anual",
+        "mart.v_pbi_cp_tipologia",
+        "mart.v_fact_periodificado",
+        "cierre.v_pbi_cierre_indirectos_detalle",
+    )
+    for objeto in caras:
+        assert objeto in regla.ambito, f"{objeto} es cara y no esta en el ambito"
+        assert "R-COSTE-CONSULTA" in derivado.por_nombre[objeto].avisos, (
+            f"el aviso no llega a la ficha de {objeto}, que es donde se lee"
+        )
+
+
+def test_f006_r2_una_vista_que_no_se_puede_ejecutar_no_es_superficie_de_consumo() -> None:
+    """Estaban marcadas `consumo_recomendado: true` sin devolver una sola fila.
+
+    Las dos agotan 40 s con `LIMIT 5` y 60 s filtradas a una obra. Recomendar
+    para consulta algo que no se puede consultar es la misma clase de defecto
+    que una relación que no une: el agente lo intenta y se queda sin respuesta.
+    """
+    dicc = _diccionario()
+
+    for objeto in ("mart.v_pbi_cp_tipologia", "cierre.v_pbi_cierre_indirectos_detalle"):
+        ficha = dicc.por_nombre[objeto]
+        assert not ficha.consumo_recomendado, f"{objeto} no se puede ejecutar"
+        assert "NO SE PUEDE CONSULTAR" in (ficha.motivo_no_consumo or "")
+
+    # La que sí sirve filtrada conserva su sitio, pero lo dice en la ficha.
+    vigente = dicc.por_nombre["mart.v_master_vigente_anual"]
+    assert vigente.consumo_recomendado
+    assert "NUNCA SE CONSULTA SIN FILTRAR POR OBRA" in vigente.descripcion
+
+
 def test_f006_r2_ninguna_ficha_recomienda_es_activa_para_saber_si_una_obra_vive() -> None:
     """La regla apartaba de una trampa para empujar a la gemela.
 
