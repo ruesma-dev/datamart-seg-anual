@@ -1248,6 +1248,47 @@ def test_f006_r2_compras_las_filas_sin_obra_no_se_pueden_perder() -> None:
     assert "no se pueden perder" in nulo.lower()
 
 
+def test_f006_r2_contratos_no_promete_nombrar_el_oficio() -> None:
+    """La afirmación que la batería midió como falsa.
+
+    «`compras.contratos.descripcion` suele nombrar el oficio» son **5 de
+    18.879 contratos (0,03 %)**; en 17.372 (92 %) la descripción repite el
+    nombre del proveedor. Seguirla lleva a responder «no hay contratos de
+    fontanería en esa obra»: incorrecta con aspecto de correcta.
+
+    Además las dos fichas se contradecían, y la equivocada era la que la
+    batería designaba como objeto esperado. Aquí se exige que la contradicción
+    no vuelva.
+    """
+    contratos = _diccionario().por_nombre["compras.contratos"]
+    columnas = {c.nombre: c for c in contratos.columnas}
+    texto = columnas["descripcion"].significado or ""
+
+    assert "NOMBRE DEL PROVEEDOR" in texto
+    assert "0,03 %" in texto, "la cifra medida, no una impresion"
+    assert "fact_compras_linea" in texto, "hay que mandar donde SI funciona"
+
+    # Y la pregunta del oficio vive en la ficha que puede contestarla.
+    linea = _diccionario().por_nombre["compras.fact_compras_linea"]
+    assert any("fontaneria" in p.lower() for p in linea.ejemplos_preguntas)
+    assert not any("fontaneria" in p.lower() for p in contratos.ejemplos_preguntas), (
+        "esta ficha no puede anunciar una pregunta que responde mal"
+    )
+
+
+def test_f006_r2_contratos_no_promete_un_importe_que_no_tiene() -> None:
+    """La descripción decía «a quién, para qué obra, **por cuánto**» y no hay
+    ninguna columna de dinero en la tabla: invitaba a escribir
+    `importe_contrato`, que no existe."""
+    contratos = _diccionario().por_nombre["compras.contratos"]
+
+    assert not [
+        c for c in contratos.columnas if (c.unidad or "").upper() == "EUR"
+    ], "si algun dia tiene importe, esta guarda hay que reescribirla"
+    assert "NO trae el importe" in contratos.descripcion
+    assert "importe_contratado" in contratos.descripcion, "y donde SI esta"
+
+
 def test_f006_r2_retenciones_prohibe_el_join_a_las_lineas() -> None:
     """La regla que más dinero ha costado: 38,9 M€ en una sola obra."""
     ficha = _diccionario().por_nombre["retenciones.movimientos"]

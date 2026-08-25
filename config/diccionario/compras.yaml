@@ -119,6 +119,10 @@ objetos:
       descripcion: >-
         Texto libre de la linea. Es lo unico que hoy permite adivinar el oficio
         (fontaneria, electricidad...) y es una heuristica, no una clasificacion.
+        **Es aqui y no en `compras.contratos.descripcion`**, que casi siempre
+        repite el nombre del proveedor: medido el 2026-08-25, "fontan" aparece
+        en **4.506 lineas de 293 obras** aqui y en **5 contratos de 18.879**
+        alli.
       cantidad:
         significado: Cantidad de la linea, en su unidad de medida.
         agregacion: suma
@@ -176,15 +180,20 @@ objetos:
       - Que proveedores nos han facturado mas este ano
       - Cuanto le hemos comprado al proveedor P en toda la empresa
       - En que partidas se ha ido el coste incurrido de la obra X
+      - Quien fue el proveedor de fontaneria de la obra X
 
   contratos:
     tipo: tabla
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      Cabecera de cada contrato con un proveedor: a quien, para que obra, por
-      cuanto y de que comparativo salio. Es el documento que fija el compromiso;
-      lo que luego se consume llega por albaranes y facturas.
+      Cabecera de cada contrato con un proveedor: a quien, para que obra y de
+      que comparativo salio. Es el documento que fija el compromiso; lo que
+      luego se consume llega por albaranes y facturas. **NO trae el importe**:
+      aqui no hay ninguna columna de dinero, y la frase "por cuanto" que esta
+      descripcion decia antes hacia escribir `importe_contrato`, que no existe.
+      El importe comprometido esta en
+      `compras.v_pbi_contrato_consumo.importe_contratado`.
     grano: Una fila por contrato de compra. `contrato_id` es clave primaria.
     clave_negocio: [contrato_id]
     paso_etl: build_compras
@@ -196,9 +205,16 @@ objetos:
       codigo_contrato: Codigo del contrato tal y como se ve en Sigrid.
       serie: Prefijo alfabetico del codigo, que identifica el tipo de documento.
       descripcion: >-
-        Texto libre del contrato. En Ruesma suele nombrar el oficio
-        ("FONTANERIA Y SANEAMIENTO"), y es la unica via —heuristica— de
-        responder quien hizo que en una obra.
+        Texto libre del contrato, y **casi siempre es el NOMBRE DEL PROVEEDOR,
+        no el oficio**. Medido el 2026-08-25 sobre los 18.879 contratos:
+        **17.372 (92 %)** repiten el nombre del proveedor y solo **5 (0,03 %)**
+        contienen "fontan". **No sirve para responder quien hizo que en una
+        obra**: buscar el oficio aqui devuelve "no hay contratos de fontaneria
+        en esa obra", que es una respuesta incorrecta con aspecto de correcta.
+        Para el oficio, la unica heuristica que funciona hoy es
+        `compras.fact_compras_linea.descripcion` (4.506 lineas con "fontan" en
+        293 obras y 227 proveedores), y sigue siendo una heuristica, no una
+        clasificacion.
       fecha:
         significado: Fecha del contrato, ya tipada.
         agregacion: no_sumable
@@ -235,8 +251,8 @@ objetos:
         cardinalidad: "N:1"
         porque: Para el nombre y el cliente de la obra.
     ejemplos_preguntas:
-      - Quien fue el proveedor de fontaneria de la obra X
       - Que contratos tiene abiertos la obra X y con quien
+      - Con que proveedores tiene contrato la obra X
 
   contrato_lineas:
     tipo: tabla
