@@ -553,12 +553,66 @@ def test_f006_r39_bateria_cada_trampa_nombra_la_regla_que_la_evita() -> None:
 # concluya que su numero esta mal cuando esta bien.
 # ===========================================================================
 
-CRITERIOS_MAGNITUD = ("saldo_vivo", "total")
+#: Vocabulario CERRADO del criterio con el que se midio la magnitud.
+#:
+#: Mezclar dos criterios sin decirlo invierte la utilidad del orden de
+#: magnitud. Se amplio el 2026-08-25 al anadir las magnitudes de `compras`,
+#: `mart` y `cierre`, que no son saldos ni totales historicos: `anual` es lo
+#: que ocurre en un ejercicio completo y `maximo` es un techo (la obra mas
+#: grande), que es la forma de cazar un fan-out en una sola obra.
+CRITERIOS_MAGNITUD = ("saldo_vivo", "total", "anual", "maximo")
 
 
 def test_f006_r10_cada_orden_de_magnitud_declara_su_criterio() -> None:
     for orden in _diccionario_real().global_raw["ordenes_de_magnitud"]:
         assert orden.get("criterio") in CRITERIOS_MAGNITUD, orden["concepto"]
+
+
+#: Esquemas donde viven los importes grandes y donde, por tanto, una cifra
+#: absurda hace daño. `retenciones` no está: es el único que YA estaba cubierto.
+ESQUEMAS_CON_IMPORTES_GRANDES = ("compras", "mart", "cierre")
+
+
+def test_f006_r10_los_ordenes_de_magnitud_cubren_donde_estan_los_importes() -> None:
+    """El mecanismo existía y no cubría el sitio donde falló.
+
+    Las cuatro entradas eran las CUATRO de `retenciones`. En `compras` salió
+    una cifra de **68,7 billones de euros** y ninguna barrera saltó, porque
+    para ese esquema no había ninguna barrera que saltar. Los órdenes de
+    magnitud sirven para que una respuesta absurda se note; si solo cubren un
+    esquema, solo se nota en ese esquema.
+    """
+    ordenes = _diccionario_real().global_raw["ordenes_de_magnitud"]
+    texto = " ".join(
+        f"{o['concepto']} {o.get('fuente', '')}" for o in ordenes
+    ).lower()
+
+    faltan = [e for e in ESQUEMAS_CON_IMPORTES_GRANDES if e not in texto]
+    assert faltan == [], (
+        f"no hay ningun orden de magnitud para {faltan}, que es donde estan los "
+        f"importes grandes. Son {len(ordenes)} entradas en total"
+    )
+
+
+def test_f006_r10_la_cifra_absurda_de_compras_llega_avisada() -> None:
+    """68,7 billones de euros por dos líneas de un albarán de 2021.
+
+    El dato de origen es malo y eso no se arregla aguas abajo, pero el
+    diccionario **se atribuye la misión de que se note** y no la cumplía. Tiene
+    que llegar por los dos canales que un agente lee: la regla dura, que
+    `derivar_avisos` cuelga de la ficha, y la propia descripción del objeto.
+    """
+    dicc = _diccionario_real()
+    regla = next((r for r in dicc.reglas if r.codigo == "R-ALBARAN-ABSURDO"), None)
+
+    assert regla is not None, "la anomalia de 68,7 billones no esta declarada"
+    assert regla.severidad == "bloqueante"
+    assert "AC21/03345" in regla.regla, "sin el albaran concreto no es accionable"
+    assert "260,6" in regla.regla, "la cifra buena, para saber a que aspirar"
+
+    ficha = dicc.por_nombre["compras.v_pbi_albaranes_sin_facturar"]
+    assert "68,7 BILLONES" in ficha.descripcion
+    assert "R-ALBARAN-ABSURDO" in derivar_avisos(dicc).por_nombre[ficha.nombre].avisos
 
 
 def test_f006_r10_las_cifras_de_retencion_son_de_saldo_vivo_y_lo_dicen() -> None:
@@ -578,17 +632,35 @@ def test_f006_r10_las_cifras_de_retencion_son_de_saldo_vivo_y_lo_dicen() -> None
         )
 
 
-def test_f006_r10_la_fuente_es_un_documento_que_existe_en_el_repositorio() -> None:
-    """Una medición sin fuente comprobable envejece sin que nadie lo note."""
+def test_f006_r10_la_fuente_es_comprobable_y_no_envejece_en_silencio() -> None:
+    """Una medición sin fuente comprobable envejece sin que nadie lo note.
+
+    Hay DOS formas legítimas de ser comprobable, y el test exige una de las dos:
+
+    * **Citar un documento** del repositorio, que es de donde salieron las
+      cuatro magnitudes de `retenciones`. El fichero tiene que existir.
+    * **Declarar la fecha de la medición contra la base**, que es de donde
+      salen las de `compras`, `mart` y `cierre` (T40, 2026-08-25). Es una
+      fuente MEJOR que un documento —el dato es el de verdad— pero solo si
+      lleva su fecha: sin ella nadie sabe si la cifra sigue valiendo.
+
+    Lo que no vale es una cifra a secas, que es lo que envejece en silencio.
+    """
+    import re
     from pathlib import Path
 
     raiz = Path(__file__).resolve().parents[1]
+    fechada = re.compile(r"medid[oa] el \d{4}-\d{2}-\d{2}", re.I)
 
     for orden in _diccionario_real().global_raw["ordenes_de_magnitud"]:
-        fuente = orden.get("fuente", "")
+        fuente = " ".join(str(orden.get("fuente", "")).split())
         candidatos = (t.strip("`,.;:()") for t in fuente.split())
         ficheros = [c for c in candidatos if c.endswith(".md")]
-        assert ficheros, f"{orden['concepto']}: la fuente no cita ningún documento"
+
+        assert ficheros or fechada.search(fuente), (
+            f"{orden['concepto']}: la fuente no cita ningún documento ni dice "
+            f"cuándo se midió contra la base"
+        )
         for fichero in ficheros:
             assert (raiz / fichero).exists(), (
                 f"{orden['concepto']}: `{fichero}` no existe en el repositorio"

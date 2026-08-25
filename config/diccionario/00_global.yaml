@@ -102,6 +102,34 @@ reglas:
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
       dar la del maestro como "obras de la empresa" infla el numero.
 
+  - codigo: R-ALBARAN-ABSURDO
+    titulo: Dos lineas de un albaran de 2021 inflan las compras a 68,7 billones
+    severidad: bloqueante
+    ambito:
+      - compras.v_pbi_albaranes_sin_facturar
+      - compras.albaran_lineas
+      - compras.fact_compras_linea
+    regla: >-
+      **Antes de dar una cifra de "entregado y no facturado", descartar las
+      lineas absurdas.** Dos lineas del albaran `AC21/03345` (2021-02-28, obra
+      0609, lineas 588705 y 588733, "SUMINISTRO PLATO DUCHA ACRILICO") traen
+      `cantidad = 184.493.959.731` e `importe_pendiente_facturar =
+      34.361.999.999.898,80 €` **cada una**. Inflan
+      `compras.v_pbi_albaranes_sin_facturar` de **260,6 M€** —cifra plausible—
+      a **68.724.260,6 millones de euros**, o sea 68,7 billones. Con su espejo
+      negativo en `compras.albaran_lineas`. Cualquier suma sobre esas dos
+      tablas tiene que llevar `WHERE abs(importe_pendiente_facturar) < 1e8`, o
+      excluir ese albaran, **y decir en la respuesta que se ha excluido**.
+      Si un total de compras sale por encima de mil millones de euros, no es un
+      hallazgo: es esta anomalia.
+    motivo: >-
+      Es un problema de calidad del dato de ORIGEN, no del datamart, y por eso
+      no se corrige aguas abajo. Pero el diccionario se atribuye la mision de
+      que una cifra absurda **se note**, y en la bateria del 2026-08-22 no la
+      cumplio: los ordenes de magnitud solo cubrian `retenciones`, asi que el
+      agente dio 68,7 billones de euros con total aplomo. La barrera existia y
+      no cubria el sitio donde fallo.
+
   - codigo: R-COSTE-CONSULTA
     titulo: Cuatro vistas no se pueden consultar, y una base compartida que cuidar
     severidad: bloqueante
@@ -426,6 +454,66 @@ ordenes_de_magnitud:
     fuente: >-
       LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `cob` con
       `retide <> 0`, sin filtrar por estado.
+
+  # -------------------------------------------------------------------------
+  # COMPRAS, MART y CIERRE. Anadidos el 2026-08-25 por T40.
+  #
+  # Hasta ese dia estas cuatro entradas eran las de `retenciones` y NADA MAS:
+  # el mecanismo existia y no cubria el sitio donde fallo. En `compras`
+  # aparecieron 68,7 BILLONES de euros y ninguna barrera salto, porque no habia
+  # ninguna barrera que saltar para ese esquema.
+  # -------------------------------------------------------------------------
+  - concepto: Facturado neto a proveedores en un ano completo, toda la empresa
+    valor_aproximado: 113600000
+    unidad: EUR
+    criterio: anual
+    fuente: >-
+      Medido el 2026-08-25 sobre `compras.fact_compras_linea` con
+      `tipo_doc IN ('FACTURA','ABONO')`. La serie sube de forma sostenida:
+      53,0 M€ en 2022, 70,9 en 2023, 91,2 en 2024 y 113,6 en 2025. **Una cifra
+      de compras anual fuera del rango 40-150 M€ esta mal**: casi siempre por
+      sumar CONTRATO, ALBARAN y FACTURA juntos, que es el mismo coste contado
+      tres veces (R-COMPRAS-TIPO-DOC).
+  - concepto: Entregado y pendiente de facturar, toda la empresa
+    valor_aproximado: 260600000
+    unidad: EUR
+    criterio: total
+    fuente: >-
+      Medido el 2026-08-25 sobre `compras.v_pbi_albaranes_sin_facturar`
+      **descartando dos lineas anomalas**. Sin descartarlas la vista suma
+      **68.724.260,6 millones de euros** —68,7 billones—, y esa es la cifra que
+      sale por defecto: ver R-ALBARAN-ABSURDO. Si este numero pasa de mil
+      millones, la respuesta esta contaminada por la anomalia.
+  - concepto: Coste real de toda la empresa en un ano, en el seguimiento
+    valor_aproximado: 105900000
+    unidad: EUR
+    criterio: anual
+    fuente: >-
+      Medido el 2026-08-25 sobre `mart.fact_seguimiento_mensual` en 2024. Los
+      cuatro escenarios de ese ano van juntos y en el mismo orden de magnitud:
+      Coste Real 105,9 M€, Coste Planificado 112,8, Venta Real 110,1 y Venta
+      Planificada 115,2. **Un escenario que se despegue de los otros en mas de
+      un 30 % suele ser un filtro de escenario mal puesto**, no un hallazgo.
+  - concepto: Coste real acumulado de la obra mas grande de la empresa
+    valor_aproximado: 32700000
+    unidad: EUR
+    criterio: maximo
+    fuente: >-
+      Medido el 2026-08-25 sobre `mart.fact_seguimiento_mensual`, escenario
+      Coste Real, agregando por obra en toda su historia. **Es el techo por
+      obra**: cualquier cifra de una sola obra por encima de 40 M€ es fan-out,
+      normalmente el JOIN a lineas de factura que R-RETENCION-NO-JOIN-LINEAS
+      prohibe y que ya dio 38,9 M€ en una obra.
+  - concepto: Venta ejecutada de toda la empresa en un ano, en el cierre
+    valor_aproximado: 110000000
+    unidad: EUR
+    criterio: anual
+    fuente: >-
+      Medido el 2026-08-25 sobre `cierre.fact_cierre_mensual` en 2024, sumando
+      `ejecutado_mes`. Sus otros tres conceptos del mismo ano: DIRECTOS
+      73,3 M€, INDIRECTOS 15,8 y GENERALES 11,2. La venta del cierre y la del
+      seguimiento (110,0 y 110,1 M€) **tienen que parecerse**: si no lo hacen,
+      uno de los dos lados esta mal filtrado.
 
 # ===========================================================================
 # CONVENCIONES (R4)

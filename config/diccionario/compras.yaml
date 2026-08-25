@@ -846,7 +846,10 @@ objetos:
     descripcion: >-
       El detalle, linea a linea, de lo que esta entregado y todavia no facturado,
       con la antiguedad de cada entrega para poder priorizar. Responde a "que
-      nos van a facturar y aun no ha llegado".
+      nos van a facturar y aun no ha llegado". **CUIDADO CON EL TOTAL: sumarla
+      tal cual da 68,7 BILLONES de euros.** Dos lineas del albaran `AC21/03345`
+      llevan importes absurdos y se comen la cifra entera; descartandolas son
+      **260,6 M€**, que es la respuesta buena. Ver R-ALBARAN-ABSURDO.
     grano: >-
       Una fila por `linea_id` de albaran o proforma con pendiente. **Esta vista
       SI filtra por tipo**: solo ALBARAN y PROFORMA, asi que las notas de cargo

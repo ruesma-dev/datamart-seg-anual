@@ -505,8 +505,14 @@ objetos:
       bloque:
         significado: >-
           De que familia es la entrada. Cada una responde una pregunta distinta,
-          y las cuatro se sirven juntas al arrancar.
-        valores: [convenciones, ordenes_de_magnitud, ejes, esquemas]
+          y las CINCO se sirven juntas al arrancar. **`ocultar` faltaba en esta
+          lista** aunque la tabla lleva publicandolo desde el principio: el
+          consumidor que se fiara de los valores posibles no sabria que existe.
+          Hoy son 29 filas (5 convenciones, 9 ordenes de magnitud, 3 ejes,
+          9 esquemas y 3 de `ocultar`), y el recuento no se escribe aqui porque
+          caduca: se cuenta con
+          `SELECT bloque, count(*) FROM _meta.diccionario_contexto GROUP BY 1`.
+        valores: [convenciones, ordenes_de_magnitud, ejes, esquemas, ocultar]
         agregacion: no_sumable
       clave:
         significado: >-
