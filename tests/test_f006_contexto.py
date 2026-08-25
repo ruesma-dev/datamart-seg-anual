@@ -257,11 +257,26 @@ def test_f006_r28_control_toda_entrada_de_lista_de_texto_se_identifica_sola() ->
 
     Cualquier bloque que publique una lista de cadenas —hoy solo `ocultar`, pero
     mañana otro— tiene que identificarse por su valor, no por su índice.
+
+    **Los tres casos de cadena están aquí a propósito, y hay que mirar el valor
+    devuelto en los tres.** La condición es
+    `isinstance(entrada, str) and entrada.strip()`, y ese `and` mutado a `or`
+    sobrevivió a la suite entera hasta la 16ª pasada: ningún test llamaba a la
+    función con una cadena. Con `or`, una cadena vacía o de solo espacios se
+    publicaría **como clave** —una clave en blanco en el contrato que el
+    consumidor compara contra nombres de columna—, y ejercitar la función sin
+    comprobar qué devuelve no lo caza.
     """
     from etl_sigrid.infrastructure.postgres.diccionario_sql import _clave_de
 
-    assert _clave_de("_built_at", 7) == "_built_at"
     assert _clave_de({"eje": "magnitud"}, 3) == "magnitud"
     # Y lo que no tiene nombre propio sí cae en la posición.
     assert _clave_de({"sin": "nombre"}, 5) == "5"
+
+    # 1 · cadena normal: se identifica por sí misma.
+    assert _clave_de("_built_at", 7) == "_built_at"
+    # 2 · cadena vacía: no es un nombre, cae en la posición.
     assert _clave_de("", 2) == "2"
+    # 3 · cadena de solo espacios: tampoco, y es la que el `strip()` distingue.
+    assert _clave_de("   ", 4) == "4"
+    assert _clave_de("\n\t ", 6) == "6"
