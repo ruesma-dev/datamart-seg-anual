@@ -1,6 +1,12 @@
 # tests/test_f006_comandos.py
 """
-Los dos comandos de F-006, ejercitados con `CliRunner` y sin conexión.
+Los comandos de F-006, ejercitados con `CliRunner` y sin conexión.
+
+Eran dos —`check-unicidad` y `check-diccionario`— y son tres desde que la
+batería de aceptación obligó a `check-relaciones`. El tercero entra aquí y no en
+un fichero aparte por el mismo motivo que los otros dos: **el cuerpo de un
+comando es código**, y dejarlo fuera de la suite es lo que ya convirtió 64
+líneas sin cubrir en paisaje.
 
 Llevaba tres tandas **explicando** que la cobertura bajaba porque el cuerpo de
 `check-unicidad` y `check-diccionario` «no se puede cubrir sin base». Medido por
@@ -47,6 +53,21 @@ class _PgUnicidad:
         return self.respuestas.get(consulta.objeto, self.por_defecto)
 
 
+class _PgRelaciones:
+    """Devuelve lo que se le diga por relación, y anota qué se le preguntó."""
+
+    def __init__(self, respuestas=None, por_defecto=(500, 500)):
+        self.respuestas = respuestas or {}
+        self.por_defecto = por_defecto
+        self.preguntadas: list[str] = []
+        self.timeouts: list[int] = []
+
+    def comprobar_relacion(self, consulta, timeout_s):
+        self.preguntadas.append(f"{consulta.nombre} -> {consulta.a}")
+        self.timeouts.append(timeout_s)
+        return self.respuestas.get(f"{consulta.nombre} -> {consulta.a}", self.por_defecto)
+
+
 class _PgCatalogo:
     def __init__(self, catalogo, publicado):
         self.catalogo = catalogo
@@ -71,6 +92,27 @@ def _cuantas_consultas(solo_consumo=True) -> int:
 
     dicc, _ = _diccionario_real()
     return len(consultas_de_unicidad(dicc, solo_consumo=solo_consumo))
+
+
+def _cuantas_relaciones(solo_consumo=True) -> int:
+    """Cuántas relaciones toca comprobar, derivado del diccionario."""
+    from etl_sigrid.infrastructure.postgres.relaciones_sql import (
+        consultas_de_relaciones,
+    )
+
+    dicc, _ = _diccionario_real()
+    return len(consultas_de_relaciones(dicc, solo_consumo=solo_consumo))
+
+
+def _una_relacion_real(solo_consumo=True) -> str:
+    """La primera relación del alcance, para nombrarla sin cablearla."""
+    from etl_sigrid.infrastructure.postgres.relaciones_sql import (
+        consultas_de_relaciones,
+    )
+
+    dicc, _ = _diccionario_real()
+    consulta = consultas_de_relaciones(dicc, solo_consumo=solo_consumo)[0]
+    return f"{consulta.nombre} -> {consulta.a}"
 
 
 def _runner(monkeypatch, pg) -> CliRunner:
@@ -190,6 +232,128 @@ def test_f006_t26_cli_el_timeout_llega_al_cliente(monkeypatch) -> None:
     _runner(monkeypatch, pg).invoke(main.cli, ["check-unicidad", "--timeout", "180"])
 
     assert set(pg.timeouts) == {180}, "la bandera no llega al cliente"
+
+
+# ---------------------------------------------------------------------------
+# check-relaciones
+# ---------------------------------------------------------------------------
+
+
+def test_f006_t40_cli_dry_run_no_toca_la_base(monkeypatch) -> None:
+    import main
+
+    pg = _PgRelaciones()
+    resultado = _runner(monkeypatch, pg).invoke(
+        main.cli, ["check-relaciones", "--dry-run"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert pg.preguntadas == [], "el dry-run ha abierto conexion"
+    assert "No se ha abierto ninguna conexion" in resultado.output
+    assert "WITH muestra AS" in resultado.output
+    assert "WHERE EXISTS" in resultado.output
+
+
+def test_f006_t40_cli_todo_une_sale_con_cero(monkeypatch) -> None:
+    import main
+
+    pg = _PgRelaciones()
+    resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert len(pg.preguntadas) == _cuantas_relaciones()
+    assert "0 que NO unen" in resultado.output
+    # El aviso que impide leer un verde como una garantia.
+    assert "NO esta demostrada" in resultado.output
+
+
+def test_f006_t40_cli_una_relacion_que_no_une_sale_con_uno(monkeypatch) -> None:
+    """El caso real que trajo esta puerta: 0 de 261."""
+    import main
+
+    rota = _una_relacion_real()
+    pg = _PgRelaciones(respuestas={rota: (261, 0)})
+    resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones"])
+
+    assert resultado.exit_code == 1
+    assert f"KO   {rota}" in resultado.output
+    assert "0 de 261" in resultado.output
+    assert "cero filas" in resultado.output
+    assert "1 que NO unen" in resultado.output
+
+
+def test_f006_t40_cli_una_cobertura_escasa_avisa_y_no_tumba(monkeypatch) -> None:
+    """Un hueco puede ser legítimo: `cierre` solo cubre 583 de 918 obras."""
+    import main
+
+    escasa = _una_relacion_real()
+    pg = _PgRelaciones(respuestas={escasa: (261, 3)})
+    resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert f"AVISO {escasa}" in resultado.output
+    assert "1 con cobertura escasa" in resultado.output
+
+
+def test_f006_t40_cli_una_muestra_vacia_no_cuenta_como_ok(monkeypatch) -> None:
+    """Cero valores muestreados es «no lo sabemos», no «correcto»."""
+    import main
+
+    vacia = _una_relacion_real()
+    pg = _PgRelaciones(respuestas={vacia: (0, 0)})
+    resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones"])
+
+    assert resultado.exit_code == 1
+    assert "sin valores" in resultado.output
+    assert "1 sin comprobar" in resultado.output
+
+
+def test_f006_t40_cli_un_timeout_no_cuenta_como_ok(monkeypatch) -> None:
+    import main
+
+    lenta = _una_relacion_real()
+    pg = _PgRelaciones(respuestas={lenta: None})
+    resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones"])
+
+    assert resultado.exit_code == 1
+    assert "NO COMPROBADA" in resultado.output
+    assert "1 sin comprobar" in resultado.output
+
+
+def test_f006_t40_cli_un_extremo_que_no_existe_no_tumba_el_recorrido(
+    monkeypatch,
+) -> None:
+    import main
+
+    ausente = _una_relacion_real()
+    pg = _PgRelaciones(respuestas={ausente: "NO_EXISTE"})
+    resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones"])
+
+    assert resultado.exit_code == 1
+    assert "NO EXISTE en la base" in resultado.output
+    assert len(pg.preguntadas) == _cuantas_relaciones(), (
+        "el recorrido tiene que continuar"
+    )
+
+
+def test_f006_t40_cli_todos_amplia_el_alcance(monkeypatch) -> None:
+    import main
+
+    pg = _PgRelaciones()
+    resultado = _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones", "--todos"])
+
+    assert resultado.exit_code == 0
+    assert len(pg.preguntadas) == _cuantas_relaciones(solo_consumo=False)
+    assert "TODA relacion declarada" in resultado.output
+
+
+def test_f006_t40_cli_el_timeout_llega_al_cliente(monkeypatch) -> None:
+    import main
+
+    pg = _PgRelaciones()
+    _runner(monkeypatch, pg).invoke(main.cli, ["check-relaciones", "--timeout", "90"])
+
+    assert set(pg.timeouts) == {90}, "la bandera no llega al cliente"
 
 
 # ---------------------------------------------------------------------------

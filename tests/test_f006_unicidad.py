@@ -230,6 +230,7 @@ def test_f006_t26_la_transaccion_acota_el_tiempo_y_no_escribe() -> None:
 #: que esta feature lleva trece pasadas corrigiendo.
 MODULOS_BARRIDOS = (
     "etl_sigrid/infrastructure/postgres/unicidad_sql.py",
+    "etl_sigrid/infrastructure/postgres/relaciones_sql.py",
     "etl_sigrid/infrastructure/postgres/catalogo.py",
     "etl_sigrid/infrastructure/postgres/diccionario_sql.py",
     "etl_sigrid/domain/inventario.py",

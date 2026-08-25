@@ -759,6 +759,120 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
         raise SystemExit(1)
 
 
+@cli.command("check-relaciones")
+@click.option(
+    "--todos",
+    is_flag=True,
+    default=False,
+    help="Comprueba TODA relacion declarada, no solo la superficie de consumo.",
+)
+@click.option(
+    "--timeout",
+    default=30,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_relaciones_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
+    """
+    Comprueba contra la base que cada relacion declarada UNE de verdad (T40).
+
+    Nace de un defecto medido: `retenciones.movimientos.obra_id ->
+    maestro.obras.obra_id` casaba **0 de 261** valores porque `obra_id` es ahi
+    el `ide` del CENTRO DE COSTE, no el de la obra. Un INNER JOIN por esa
+    relacion devuelve cero filas y un LEFT JOIN devuelve todo a NULL, **en
+    silencio**. El validador offline no podia verlo: la relacion resolvia
+    perfectamente contra el diccionario, y lo que fallaba estaba en los datos.
+
+    Muestrea 500 valores distintos del lado izquierdo y mira cuantos existen en
+    el derecho. **Cero casos sale KO**; una cobertura por debajo del 50 % avisa,
+    porque un hueco puede ser legitimo (`cierre` solo cubre 583 de 918 obras).
+
+    Como `check-unicidad`: cada consulta lleva su `statement_timeout`, la
+    transaccion va `READ ONLY`, y esto corre contra un servidor compartido con
+    `albaranes` y `partes` EN PRODUCCION.
+
+    OJO CON EL VERDE: que una relacion una no prueba que sea la correcta.
+    Prueba que une.
+    """
+    from etl_sigrid.application.steps.publicar_diccionario_step import DIR_DICCIONARIO
+    from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+    from etl_sigrid.infrastructure.postgres.relaciones_sql import (
+        consultas_de_relaciones,
+        interpretar_relacion,
+        relaciones_saltadas,
+        veredicto_relacion_no_comprobada,
+        veredicto_relacion_no_existe,
+    )
+
+    dicc, _hash = cargar_diccionario(DIR_DICCIONARIO)
+    consultas = consultas_de_relaciones(dicc, solo_consumo=not todos)
+    saltadas = relaciones_saltadas(dicc, solo_consumo=not todos)
+
+    alcance = "TODA relacion declarada" if todos else "solo la superficie de consumo"
+    click.echo(f"Comprobacion de relaciones · {alcance}")
+    click.echo(
+        f"  {len(consultas)} relacion(es) a comprobar, {len(saltadas)} saltada(s)"
+    )
+    click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
+    click.echo("")
+
+    if dry_run:
+        for c in consultas:
+            click.echo(f"-- {c.nombre} -> {c.a}  [{c.cardinalidad}]")
+            click.echo(c.sql + ";")
+            click.echo("")
+        click.echo(f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    fallos = 0
+    avisos = 0
+    sin_comprobar = 0
+    inexistentes = 0
+    for c in consultas:
+        resultado = pg.comprobar_relacion(c, timeout)
+        if resultado == "NO_EXISTE":
+            inexistentes += 1
+            click.echo(veredicto_relacion_no_existe(c))
+            continue
+        if resultado is None:
+            sin_comprobar += 1
+            click.echo(veredicto_relacion_no_comprobada(c, f"timeout de {timeout}s"))
+            continue
+        muestreados, casan = resultado
+        veredicto = interpretar_relacion(c, muestreados, casan)
+        if veredicto.startswith("KO"):
+            fallos += 1
+        elif veredicto.startswith("AVISO"):
+            avisos += 1
+        elif veredicto.startswith("?"):
+            sin_comprobar += 1
+        click.echo(veredicto)
+
+    for nombre, motivo in saltadas:
+        click.echo(f"-    {nombre}: saltada, {motivo}")
+
+    correctas = len(consultas) - fallos - avisos - sin_comprobar - inexistentes
+    click.echo("")
+    click.echo(
+        f"Resumen: {correctas} que unen, {avisos} con cobertura escasa, {fallos} "
+        f"que NO unen, {sin_comprobar} sin comprobar, {inexistentes} con un "
+        f"extremo que no existe en la base."
+    )
+    click.echo(
+        "Una relacion que une NO esta demostrada: podria unir por la columna "
+        "equivocada y coincidir. Prueba que une, que es otra cosa."
+    )
+    if fallos or sin_comprobar or inexistentes:
+        raise SystemExit(1)
+
+
 @cli.command("publicar-diccionario")
 def publicar_diccionario_cmd() -> None:
     """

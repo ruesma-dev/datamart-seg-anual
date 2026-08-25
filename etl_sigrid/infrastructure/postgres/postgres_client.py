@@ -689,6 +689,58 @@ class PostgresClient:
             return (0, 0)
         return (int(fila[0]), int(fila[1]))
 
+    def comprobar_relacion(
+        self, consulta, timeout_s: int
+    ) -> tuple[int, int] | str | None:
+        """Ejecuta UNA comprobación de relación (F-006, T40).
+
+        Devuelve `(valores_muestreados, valores_que_casan)`, **`None` si la
+        consulta agotó el `statement_timeout`** y `"NO_EXISTE"` si falta en la
+        base alguno de los dos extremos o la columna. Los tres desenlaces se
+        distinguen porque exigen cosas distintas de quien los lea: «la relación
+        no une» se arregla en la ficha, «no he podido comprobarlo» se vuelve a
+        lanzar, y «eso no está en la base» significa que falta un build.
+
+        `UndefinedColumn` va junto a `UndefinedTable` porque es el caso que de
+        verdad aparece cuando la base va por detrás del árbol: el objeto está y
+        la columna todavía no. Sin capturarlo, una sola relación reventaría el
+        barrido entero.
+
+        Mismas dos sentencias previas que `comprobar_unicidad`, y las emite el
+        cliente: la transacción va `READ ONLY` y el `statement_timeout` es `SET
+        LOCAL`, así que ni escribe ni toca la configuración del servidor, que
+        comparten `albaranes` y `partes` en producción.
+        """
+        import psycopg
+
+        from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+            sentencias_previas,
+        )
+
+        # NO se toca `autocommit`: `self.connection()` devuelve la conexion ya
+        # EN TRANSACCION (`INTRANS`) y cambiarlo ahi revienta. Mismo motivo,
+        # mismo comentario y misma cicatriz que en `comprobar_unicidad`.
+        with self.connection() as conn:
+            try:
+                with conn.cursor() as cur:
+                    for previa in sentencias_previas(timeout_s):
+                        cur.execute(previa)
+                    cur.execute(consulta.sql)
+                    fila = cur.fetchone()
+                conn.commit()
+            except psycopg.errors.QueryCanceled:
+                conn.rollback()
+                return None
+            except (psycopg.errors.UndefinedTable, psycopg.errors.UndefinedColumn):
+                conn.rollback()
+                return "NO_EXISTE"
+            except Exception:
+                conn.rollback()
+                raise
+        if fila is None:
+            return (0, 0)
+        return (int(fila[0]), int(fila[1]))
+
     def fetch_hash_publicado(self) -> tuple[str, str] | None:
         """`(version, hash_fuente)` de lo que hay publicado, o `None` si no hay.
 
