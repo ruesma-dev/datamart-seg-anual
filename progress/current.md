@@ -21,8 +21,12 @@ aceptación**, no la especificación.
 
 ## Dónde está
 
-Diccionario en **versión 8**, publicado y verificado contra la base. Tres
-puertas que lo contrastan **contra el dato real**, no contra sí mismo:
+Diccionario en **versión 8**, publicado y verificado contra la base: **103
+objetos** documentados, **798 columnas**, **46 de consumo recomendado**. (Estas
+cifras las comprueba un test: si envejecen, la suite se pone roja. Ya caducaron
+dos veces.)
+
+Tres puertas que lo contrastan **contra el dato real**, no contra sí mismo:
 
 | Comando | Qué comprueba |
 |---|---|
