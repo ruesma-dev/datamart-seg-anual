@@ -102,6 +102,34 @@ reglas:
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
       dar la del maestro como "obras de la empresa" infla el numero.
 
+  - codigo: R-PROVEEDOR-INTRAGRUPO
+    titulo: El mayor proveedor de la empresa es la propia empresa
+    severidad: bloqueante
+    ambito:
+      - compras.fact_compras_linea
+      - compras.v_pbi_proveedor_obra
+      - maestro.proveedores
+      - maestro.proveedores_obra
+    regla: >-
+      **Todo ranking de "a quien le hemos comprado mas" tiene que decir que
+      hace con las operaciones intragrupo, porque el numero 1 es la propia
+      empresa.** Medido el 2026-08-25 sobre `compras.fact_compras_linea` con
+      `tipo_doc IN ('FACTURA','ABONO')`: `CONSTRUCCIONES RUESMA, S.A.` (CIF
+      `A81873903`) encabeza la lista con **23,8 M€**, mas del doble que el
+      segundo. Y detras hay varias **UTE** —`UTE VALDEBEBAS VI` 9,7 M€,
+      `UTE JARAS BOADILLA` 8,1 M€— que son coinversiones, no proveedores
+      externos. Un ranking que las mezcle sin avisar dice que nuestro mayor
+      proveedor somos nosotros, que es cierto y no es lo que preguntaban.
+      Como no hay ninguna marca de grupo en el datamart, la unica salida hoy es
+      **declararlo en la respuesta**: dar la lista tal cual y decir cuales son
+      intragrupo, o excluirlos por CIF diciendo que se han excluido.
+    motivo: >-
+      Es uno de los seis casos de uso del humano y salio mal en la primera
+      pregunta de la bateria del 2026-08-22. **Resolverlo bien exige modelar el
+      intragrupo** —marcar que sociedades son del grupo y decidir que se hace
+      con las UTE—, y eso no es de esta feature: aqui solo se declara la trampa
+      para que ninguna respuesta la ignore.
+
   - codigo: R-ALBARAN-ABSURDO
     titulo: Dos lineas de un albaran de 2021 inflan las compras a 68,7 billones
     severidad: bloqueante

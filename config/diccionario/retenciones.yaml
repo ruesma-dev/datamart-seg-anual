@@ -282,7 +282,13 @@ objetos:
       - de: tipo_id
         a: retenciones.movimientos.tipo_id
         cardinalidad: "1:N"
-        porque: Un tipo se aplica a muchos efectos.
+        porque: >-
+          Un tipo se aplica a muchos efectos. **Pero el catalogo esta casi
+          entero sin usar**: de los 2.177 tipos, solo **15** aparecen en algun
+          movimiento (medido el 2026-08-25). Recorrer esta tabla para listar
+          "los tipos de retencion que usamos" devuelve 2.177 filas de las que
+          2.162 no se han aplicado nunca; para los que se usan de verdad hay
+          que partir de `retenciones.movimientos` y no de aqui.
     ejemplos_preguntas:
       - Que tipos de retencion se aplican y con que porcentaje
 

@@ -204,7 +204,11 @@ objetos:
         porque: >-
           Para la retencion viva del proveedor. Hay muchos efectos por
           proveedor, y hay que filtrar el sentido PROVEEDOR: en el otro sentido
-          esa columna es un cliente y no esta en este maestro.
+          esa columna es un cliente y no esta en este maestro. **Solo 1.269 de
+          los 9.545 proveedores tienen alguna retencion** (13 %, medido el
+          2026-08-25): con `INNER JOIN` desaparecen los otros 8.276, asi que un
+          listado de proveedores que cruce por aqui tiene que ir por `LEFT
+          JOIN` o decir que solo cuenta los que tienen retencion.
     ejemplos_preguntas:
       - Que datos tenemos del proveedor P
       - Que proveedores hay dados de alta y con que CIF
