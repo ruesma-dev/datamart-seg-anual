@@ -39,6 +39,15 @@ que ese resumen se pueda construir sin releer el diff: deja explícito **qué
 cambió**, **qué se verificó y con qué resultado real** (no «debería
 funcionar»), **qué quedó fuera del alcance** y **qué falta**.
 
+**Tope: `progress/impl_F-XXX.md` ≤ 220 líneas.** El número vive en el bloque
+`tamano` de `harness/rigor.json` y lo mide `bash harness/init.sh` sobre la
+feature en curso (sección 7 quater): pasarse pone el portero en rojo, así que
+no puedes cerrar con un informe de 400 líneas. Es un tope, no un objetivo, y
+recortar no es tirar evidencia: **lo que no cabe se resume y se enlaza** al
+fichero donde vive el detalle (`progress/mutacion_F-XXX.md`, la traza completa,
+el commit). Lo que NO se puede sacrificar por el tope: las trazas de la fase
+RED, la sección «Evidencias» y el resultado real de `bash harness/init.sh`.
+
 ## Fase RED (obligatoria en niveles `estandar` y `critico`)
 
 Que un test pase no demuestra nada: hay que demostrar que **fallaba antes de
@@ -59,8 +68,8 @@ error: vale la traza pegada. Sin ella, el reviewer trata el punto de C4 bis
 como checkbox vacío.
 
 El nivel de rigor de la feature sale del campo `rigor` de
-`harness/features.json`; si no lo declara, se aplica el más exigente. Consulta
-la tabla de niveles en `CHECKPOINTS.md`.
+`harness/features.json`; si no lo declara, se aplica el `nivel_por_defecto`
+de `harness/rigor.json`. Consulta la tabla de niveles en `CHECKPOINTS.md`.
 
 ## Sección «Evidencias» del informe (obligatoria)
 

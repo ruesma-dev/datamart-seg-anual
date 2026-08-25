@@ -20,17 +20,28 @@ El árbol principal no se muta NUNCA en modo paralelo, y por eso se exige que
 esté limpio: los worktrees se crean desde `HEAD` y con cambios sin commitear
 evaluarían un código distinto del que se ve en disco.
 
-Limitaciones conocidas del modo paralelo (en serie no aplican, porque la suite
-corre sobre el propio árbol):
+Riesgos propios del modo paralelo, y qué los detecta ahora (1.5.3). Los tres
+tienen el mismo síntoma —la suite del worker arranca ROJA sin mutar nada, y
+entonces TODO mutante sale «muerto»—, así que los caza la misma comprobación:
+la **línea base** que `ejecutar_campania` corre dentro de cada worktree antes
+de juzgar a nadie. Si no está verde, la campaña aborta con `BaseRota` en vez de
+publicar un cero de supervivientes que nadie ha medido.
 
 - **Instalación editable apuntando al árbol principal.** Si el venv de un
   servicio instala su paquete en modo editable contra el árbol principal, la
-  suite del worker importaría el código SIN mutar y darían supervivientes
-  falsos. Los venvs no se copian al worktree: solo se reutiliza su intérprete.
+  suite del worker importaría el código SIN mutar. Los venvs no se copian al
+  worktree: solo se reutiliza su intérprete.
 - **Suites que dependan de ficheros no versionados** (`.env`, datos locales):
-  no existen dentro de un worktree. Las convenciones ya prohíben unit tests con
-  esas dependencias; un proyecto que las viole verá la suite roja en el worker
-  y contará mutantes «muertos» de más.
+  no existen dentro de un worktree.
+- **Detached HEAD**: el worktree no está en ninguna rama, así que un test que
+  lea `git branch --show-current` recibe cadena vacía.
+
+Esto no es teoría: hasta la 1.5.2 estos tres casos estaban escritos aquí como
+«limitaciones conocidas» y NADA los comprobaba. El 2026-08-19, en
+`datamart-seg-anual`, la misma feature y el mismo árbol dieron `108 generados,
+108 muertos, 0 supervivientes` en paralelo y `108, 106, 2 supervivientes` con
+`--workers 1`. El cero era falso: dos `bold=True -> bold=False` que ningún test
+menciona.
 
 Todo con biblioteca estándar, como el resto del arnés.
 """
@@ -49,13 +60,17 @@ from types import TracebackType
 
 from harness.alcance import Alcance
 from harness.mutacion import (
+    MARCA_LINEA_BASE,
     TIMEOUT_POR_DEFECTO,
+    Centinela,
     EjecutorPytest,
     InformeMutacion,
     Mutante,
     ejecutar_campania,
     ejecutor_para,
     generar_mutantes,
+    restauracion_ante_senales,
+    restaurar_desde_centinela,
 )
 from harness.mutacion import (
     # privado de `harness.mutacion` a sabiendas: la campaña paralela tiene que
@@ -101,12 +116,18 @@ def fusionar(
     muestreado: bool = False,
     max_mutantes: int | None = None,
     semilla: int | None = None,
+    workers: int | None = None,
 ) -> InformeMutacion:
     """Funde los informes de los workers en el informe único de la campaña.
 
     Los totales se suman y las listas se reordenan por la clave estable, de
     forma que el resultado no delata en qué worker cayó cada mutante. Los
     metadatos de muestreo son los del coordinador, que es quien muestreó.
+
+    El timeout efectivo del conjunto es el MÁXIMO de los parciales: cada worker
+    lo deriva de la línea base de SU worktree, y el informe tiene que declarar
+    el reloj más largo que se concedió, que es el que explica el peor caso. La
+    media de tres relojes distintos no es ningún reloj.
     """
     informe = InformeMutacion(
         feature=alcance.feature,
@@ -118,11 +139,37 @@ def fusionar(
         max_mutantes=max_mutantes,
         semilla=semilla,
     )
-    for atributo in ("supervivientes", "timeouts", "mutantes_evaluados"):
+    for atributo in ("supervivientes", "timeouts", "mutantes_evaluados", "base_rota"):
         juntos: list[Mutante] = []
         for parcial in parciales:
             juntos.extend(getattr(parcial, atributo))
         setattr(informe, atributo, sorted(juntos, key=clave_estable))
+    # Todos los workers nacen del MISMO `HEAD`, así que el primero que lo sepa
+    # habla por todos; y cada uno midió su propia línea base, en su worktree,
+    # así que sus tiempos se juntan en vez de pisarse (R10–R12). Sin parciales
+    # —campaña sin nada que evaluar— no hay dato, y el informe imprime `n/d`.
+    informe.sha_head = next(
+        (parcial.sha_head for parcial in parciales if parcial.sha_head), None
+    )
+    for parcial in parciales:
+        informe.segundos_linea_base.update(parcial.segundos_linea_base)
+    informe.workers = workers
+    efectivos = [
+        parcial.timeout_efectivo
+        for parcial in parciales
+        if parcial.timeout_efectivo is not None
+    ]
+    informe.timeout_efectivo = max(efectivos) if efectivos else None
+    suelos = [
+        parcial.timeout_suelo for parcial in parciales if parcial.timeout_suelo is not None
+    ]
+    informe.timeout_suelo = max(suelos) if suelos else None
+    informe.timeout_fijado = any(parcial.timeout_fijado for parcial in parciales)
+    # Basta con que UN worker haya perdido la base para que la campaña entera
+    # deje de valer: su partición no está medida y el total no cuadra.
+    avisos = [parcial.aviso_base for parcial in parciales if parcial.aviso_base]
+    if avisos:
+        informe.aviso_base = avisos[0]
     return informe
 
 
@@ -147,6 +194,14 @@ def _git(raiz: str, *args: str) -> tuple[int, str]:
     return proceso.returncode, (proceso.stdout or "") + (proceso.stderr or "")
 
 
+#: Rutas que NO cuentan para decidir si el árbol está limpio: son estado del
+#: propio arnés (caché de suites, centinela de la campaña en curso), no trabajo.
+#: El bloque gestionado del `.gitignore` ya las ignora, pero un repositorio
+#: puede llevar un `.gitignore` viejo y entonces la campaña se negaría a
+#: arrancar por culpa del fichero que ella misma acaba de escribir.
+RUTAS_DEL_ARNES: tuple[str, ...] = (".arnes_cache/",)
+
+
 def arbol_limpio(raiz: str = ".") -> bool:
     """¿El árbol de trabajo está sin cambios pendientes de commitear?
 
@@ -155,7 +210,13 @@ def arbol_limpio(raiz: str = ".") -> bool:
     prudente es abortar.
     """
     codigo, salida = _git(raiz, "status", "--porcelain")
-    return codigo == 0 and not salida.strip()
+    if codigo != 0:
+        return False
+    for linea in salida.splitlines():
+        ruta = linea[3:].strip().strip('"') if len(linea) > 3 else ""
+        if ruta and not ruta.startswith(RUTAS_DEL_ARNES):
+            return False
+    return True
 
 
 class Worktrees:
@@ -341,6 +402,9 @@ def ejecutar_campania_paralela(
     semilla: int | None = None,
     eco: Callable[[str], None] | None = None,
     fabrica: Fabrica | None = None,
+    centinela: Centinela | None = None,
+    timeout_base_s: int | None = None,
+    timeout_fijado: bool = False,
 ) -> InformeMutacion:
     """Evalúa los mutantes del alcance repartidos entre varios worktrees.
 
@@ -350,7 +414,9 @@ def ejecutar_campania_paralela(
 
     Lanza `ValueError` si el árbol principal tiene cambios sin commitear o si
     un servicio del alcance declara un venv sin intérprete. En ambos casos, sin
-    haber creado ningún worktree ni tocado ningún fichero.
+    haber creado ningún worktree ni tocado ningún fichero. Y `BaseRota` si la
+    suite de algún worktree no está verde SIN mutar nada, que es como se
+    manifiestan las tres trampas de la cabecera de este módulo.
     """
     inicio = time.monotonic()
     resolver_interpretes(alcance, servicios, raiz)  # R11: revienta aquí o nunca
@@ -369,6 +435,12 @@ def ejecutar_campania_paralela(
         nonlocal hechos
         if eco is None:
             return
+        if linea.startswith(MARCA_LINEA_BASE):
+            # La línea base no es un mutante: contarla en el `[i/n]` haría que
+            # el progreso pasara de n antes de empezar (`[9/5]`, visto de
+            # verdad) y que el usuario dudase de todo lo demás.
+            eco(linea)
+            return
         with cerrojo:
             hechos += 1
             indice = hechos
@@ -383,6 +455,17 @@ def ejecutar_campania_paralela(
             mutantes=particion,  # type: ignore[arg-type]
             eco=eco_compartido if eco is not None else None,
             ejecutor_de=lambda fichero: fabrica(fichero, raiz_worker),
+            centinela=centinela,
+            # Cada worker deriva SU timeout de la línea base de SU worktree: es
+            # ahí donde se nota la contención de los W workers, y es lo que hace
+            # que el reloj se adapte a la máquina sin fórmula que lo adivine.
+            timeout_base_s=timeout_base_s,
+            timeout_fijado=timeout_fijado,
+            workers=efectivo,
+            # El worktree acaba de nacer de HEAD: comprobar que está limpio
+            # sería preguntarle a git lo que git acaba de hacer. Lo que sí se
+            # comprueba, y aquí es donde importa, es su LÍNEA BASE.
+            comprobar_arbol=False,
         )
 
     def informe_final(parciales: list[InformeMutacion]) -> InformeMutacion:
@@ -394,12 +477,33 @@ def ejecutar_campania_paralela(
             muestreado=muestreado,
             max_mutantes=max_mutantes,
             semilla=semilla,
+            workers=efectivo,
         )
 
     # R8: con menos de dos mutantes que evaluar, paralelizar solo cuesta. Se
-    # muta in situ, como toda la vida, y no se crea ni un worktree.
+    # muta in situ, como toda la vida, y no se crea ni un worktree. Como aquí sí
+    # se escribe en el árbol principal, la guardia de árbol limpio vuelve a
+    # aplicar: es exactamente el caso que puede dejarte un mutante en el diff.
     if efectivo < 2:
-        parciales = [correr(raiz, mutantes)] if mutantes else []
+        parciales = (
+            [
+                ejecutar_campania(
+                    alcance,
+                    EjecutorPytest(raiz=raiz),
+                    timeout_s=timeout_s,
+                    raiz=raiz,
+                    mutantes=mutantes,
+                    eco=eco_compartido if eco is not None else None,
+                    ejecutor_de=lambda fichero: fabrica(fichero, raiz),
+                    centinela=centinela,
+                    timeout_base_s=timeout_base_s,
+                    timeout_fijado=timeout_fijado,
+                    workers=efectivo,
+                )
+            ]
+            if mutantes
+            else []
+        )
         return informe_final(parciales)
 
     if not arbol_limpio(raiz):
@@ -426,7 +530,21 @@ def ejecutar_campania_paralela(
             with cerrojo:
                 fallos.append(error)
 
-    with Worktrees(raiz, efectivo, etiqueta=alcance.feature) as rutas:
+    def rescate() -> None:
+        """Qué hacer si al coordinador le llega una señal: cortar y restaurar.
+
+        Los workers corren en hilos secundarios y ahí `signal.signal` no se
+        puede registrar, así que el único manejador posible es éste. Deshace lo
+        que el centinela diga que está aplicado —en cualquier worktree— antes de
+        que el proceso muera.
+        """
+        evento.set()
+        if centinela is not None:
+            restaurar_desde_centinela(raiz)
+
+    with restauracion_ante_senales(rescate), Worktrees(
+        raiz, efectivo, etiqueta=alcance.feature
+    ) as rutas:
         hilos = [
             threading.Thread(
                 target=trabajo, args=(indice, ruta), name=f"mutacion-{indice}"
@@ -438,7 +556,7 @@ def ejecutar_campania_paralela(
         try:
             for hilo in hilos:
                 hilo.join()
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, SystemExit):
             # Los workers dejan de coger mutantes; el que tenga una suite en
             # vuelo la termina o agota su timeout. La limpieza la garantiza el
             # `with` de Worktrees, pase lo que pase.

@@ -28,6 +28,19 @@ Produces: la carpeta `specs/F-XXX-slug/` con TRES ficheros. NO tocas código.
 - `specs/F-XXX-slug/tasks.md` — lista ordenada de tareas atómicas (T1, T2...),
   cada una con su criterio de verificación (qué test o comando la valida).
 
+### Topes de tamaño (obligatorios)
+
+`requirements.md` **≤ 150 líneas**, `design.md` **≤ 250**, `tasks.md` sin tope
+duro pero con **una tarea por línea**. Los números viven en el bloque `tamano`
+de `harness/rigor.json` y los mide `bash harness/init.sh` sobre la feature en
+curso: pasarse pone el portero en rojo.
+
+Cada línea que escribes se paga tres veces —la escribes tú, la lee el
+implementer, la relee el reviewer—, así que son topes y no objetivos: **lo que
+no cabe se resume y se enlaza** al fichero donde vive el detalle. Recortar
+nunca es tirar un requisito: si de verdad no cabe, la feature es demasiado
+grande y hay que proponer partirla.
+
 ## Reglas
 
 - Si la feature toca datos o esquemas, respeta la semántica de dominio

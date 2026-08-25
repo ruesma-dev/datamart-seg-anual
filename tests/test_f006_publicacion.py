@@ -1026,7 +1026,7 @@ def test_f006_r15_las_dieciocho_del_diseno_conservan_su_posicion() -> None:
     """
     from tests.test_f006_fichas import columnas_proyectadas
 
-    diseno = (RAIZ / "specs" / "F-006-mcp-azure" / "design.md").read_text(
+    diseno = (RAIZ / "specs" / "F-006-mcp-azure" / "design_detalle.md").read_text(
         encoding="utf-8"
     )
     inicio = diseno.index("CREATE OR REPLACE VIEW _meta.v_diccionario AS")
@@ -1050,7 +1050,7 @@ def test_f006_r15_las_dieciocho_del_diseno_conservan_su_posicion() -> None:
 
 def test_f006_r23_el_diseno_documenta_la_columna_anadida() -> None:
     """Enmendar el documento es parte de anadir la columna, no un extra."""
-    diseno = (RAIZ / "specs" / "F-006-mcp-azure" / "design.md").read_text(
+    diseno = (RAIZ / "specs" / "F-006-mcp-azure" / "design_detalle.md").read_text(
         encoding="utf-8"
     )
     seccion = diseno[diseno.index("### 4.2"):diseno.index("### 4.3")]

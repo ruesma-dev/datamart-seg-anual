@@ -28,8 +28,11 @@ No todas las features merecen la misma vigilancia. Cada una declara su nivel
 en el campo `rigor` de su entrada de `harness/features.json`; lo que exige
 cada nivel vive en `harness/rigor.json` y lo valida `bash harness/init.sh`.
 
-**Si una feature no declara nivel se le aplica el más exigente (`critico`).**
-La omisión no puede ser la vía fácil para saltarse las puertas.
+**Si una feature no declara nivel se le aplica el `nivel_por_defecto` de
+`harness/rigor.json`**, hoy `estandar`: con puertas de fase RED, cobertura y
+mutación, pero sin la exigencia de cero supervivientes. Omitirlo no es gratis
+—se sigue exigiendo evidencia— y tampoco arrastra el modo más caro a features
+que no lo necesitan. Lo `critico` se declara: no se hereda por descuido.
 
 | Nivel | Para qué features | Exige |
 |---|---|---|
@@ -41,13 +44,15 @@ Comandos de las puertas:
 
 ```bash
 bash harness/init.sh                        # cobertura de las líneas cambiadas
+                                            # y topes de tamaño del papeleo
 python -m harness.mutacion --feature F-XXX  # campaña de mutación
+python -m harness.tamano --feature F-XXX    # solo los topes de tamaño
 ```
 
-Ambas herramientas son **solo para proyectos Python**. En un proyecto de otro
-lenguaje, `init.sh` declara la puerta N/A con su motivo y el nivel de rigor se
-sigue usando para exigir fase RED y evidencias: lo que se pierde es la
-medición automática, no la disciplina.
+Esas herramientas son **solo para proyectos Python**. En un proyecto de otro
+lenguaje, `init.sh` declara cada puerta N/A **con su motivo impreso** —no en
+silencio— y el nivel de rigor se sigue usando para exigir fase RED y
+evidencias: lo que se pierde es la medición automática, no la disciplina.
 
 ## C1 — El arnés está completo y en verde
 
@@ -114,11 +119,21 @@ Si no toca ninguno, es N/A.
 ## C4 bis — El rigor declarado se cumple
 
 Comprobar que los tests son de verdad, no solo que pasan. El reviewer resuelve
-primero el nivel de la feature (campo `rigor`, o `critico` por omisión) y
-recorre estos puntos **contra ese nivel**.
+primero el nivel de la feature (campo `rigor`, o el `nivel_por_defecto` de
+`harness/rigor.json` si no lo declara) y recorre estos puntos **contra ese
+nivel**.
+
+Los cuatro puntos marcados **RM** son las reglas de revisión de campañas
+acordadas con el humano el 2026-08-19. Bloquean el cierre, pero **ninguna es
+puerta automática de `init.sh`**: exigen juicio (¿ha crecido la rama desde que
+se midió?, ¿es equivalente este mutante?). Lo que la herramienta garantiza son
+los DATOS sobre los que se juzga: el SHA, la línea base y la media por mutante,
+que el informe de mutación imprime siempre. RM3 (un equivalente no puede salir
+muerto) y RM4 (reejecutar el subconjunto de tests sobre una copia) viven en
+`.claude/agents/reviewer.md` como criterio, sin checkbox.
 
 - [ ] La feature declara `rigor` en `harness/features.json` con un valor
-      válido, o consta por escrito que se le aplica el más exigente.
+      válido, o consta por escrito qué nivel por defecto se le aplicó.
 - [ ] **Fase RED** (niveles `estandar` y `critico`): el informe
       `progress/impl_F-XXX.md` contiene, para los requisitos centrales, la
       **salida real** del fallo del test antes de existir el código. No vale
@@ -135,12 +150,103 @@ recorre estos puntos **contra ese nivel**.
       totales reales, **verificados de forma independiente por el reviewer**
       (alcance y nº de mutantes recalculados con `harness.alcance` y
       `harness.mutacion`; cálculo puro, sin ejecutar la suite).
+- [ ] **Los muertos están comprobados, no solo contados.** Si el «Tiempo
+      total» que declara el informe de mutación es **inferior a 60 segundos**,
+      el reviewer **reejecuta la campaña** con
+      `python -m harness.mutacion --feature F-XXX --salida <ruta fuera de
+      progress/>` y compara los totales. La salida no puede escribirse en
+      `progress/` (pisaría el informe del implementer) y el árbol debe quedar
+      limpio después (`git status`). Si la campaña pasa de 60 segundos, vale el
+      recálculo puro más los puntos siguientes, pero el informe de review **lo
+      dice explícitamente**. Recalcular alcance y nº de mutantes no demuestra
+      que los muertos lo estén: unos «N muertos» inventados pasarían ese
+      control.
+- [ ] **La campaña tardó lo que tenía que tardar.** Evaluar un mutante es
+      **ejecutar entera la suite del servicio**, así que el coste por mutante
+      no puede bajar de lo que tarda esa suite. Se calcula:
+
+      > coste por mutante = «Tiempo total» × nº de workers ÷ nº de mutantes
+
+      El factor de workers **no es opcional**: la campaña es paralela por
+      defecto y su «Tiempo total» es tiempo de reloj, no de CPU. Sin corregir,
+      toda campaña paralela sana parece sospechosa. Por eso el implementer
+      declara en **«Evidencias»** con cuántos workers la lanzó; si fue en
+      serie (`--workers 1`), el factor es 1.
+
+      Si ese coste sale **por debajo de un segundo**, la campaña es
+      **sospechosa por construcción**: no da tiempo a arrancar el intérprete,
+      importar el proyecto y recorrer los tests. Lo normal es que la suite ni
+      siquiera se estuviera ejecutando de verdad —un árbol con bytecode
+      envenenado, una caché que devuelve el veredicto anterior, un fallo de
+      importación que mata a todos los mutantes por la misma razón—. **Se
+      relanza con la caché limpia** (`__pycache__` y `.pytest_cache` borrados)
+      y se comparan los totales; si cambian, el informe válido es el segundo y
+      el primero se descarta por escrito.
+
+      Complementa la regla de los 60 segundos: aquella mira el total, esta
+      mira el coste por mutante, y una campaña grande y rápida solo la caza la
+      segunda. **Cuándo un coste bajo pero mayor que un segundo es sospechoso
+      lo decide RM2**, más abajo, que ya trabaja sobre la línea base y la media
+      que el propio informe imprime: aquí no se juzga eso a ojo.
+- [ ] **El informe de mutación NO lleva la cabecera «⚠ CAMPAÑA NO VÁLIDA» ni
+      una fila «Sin veredicto (base rota)» distinta de cero.** Cualquiera de
+      las dos significa que la propia herramienta declara que sus números no
+      valen: se arregla la línea base y se repite la campaña. Un cero de
+      supervivientes medido sobre una suite que ya fallaba es el defecto que
+      arregló el arnés 1.6.0, y antes de él se colaba entero.
+- [ ] **RM1 · El informe de mutación declara el SHA completo de HEAD** contra
+      el que se midió (fila «SHA de HEAD medido»), y el reviewer comprueba que
+      el alcance medido es el que está revisando. En F-034 la rama creció de 56
+      a 1.057 líneas después de medir y el informe seguía pareciendo válido.
+- [ ] **RM2 · El tiempo del informe es internamente coherente:** lo que se
+      rechaza **sin reejecutar nada** es un **salto de orden de magnitud** —una
+      «Media por mutante evaluado (s)» que no llega ni a la décima parte de la
+      «Línea base (s)», o un «Tiempo total» que no cuadra con
+      `mutantes × media`—. Que la media quede **por debajo** de la línea base no
+      es sospechoso por sí solo: la campaña evalúa con `-x` y el mutante que
+      muere aborta la suite en el primer fallo, así que a más muertos, más baja
+      la media (caso legítimo de libro: base 52,1 s, media 36,4 s, 19 de 20
+      muertos). El caso que esta regla caza es F-034: 18 mutantes en 111 s
+      cuando la realidad eran 63 minutos.
+      **Con W workers la aritmética cambia, y el informe declara W** (fila
+      «Workers», nueva desde la 1.7.2). La «Media por mutante evaluado (s)» es
+      tiempo de PARED dividido entre los mutantes, así que **ya viene dividida
+      entre W**: `mutantes × media` ES el «Tiempo total» por construcción y
+      comparar esos dos no descubre nada. Lo que sí se compara es el coste real
+      de juzgar un mutante, `media × W`, contra la «Línea base (s)» —el mismo
+      número de la regla del coste por mutante de más arriba—. Sin corregir por
+      W, cuatro workers hunden la media a la cuarta parte y la regla marca como
+      inventada una campaña legítima (medido: base 64,9 s, media 16,8 s,
+      **4 workers** → 67 s reales por mutante, coherente).
+      Lee también el «Timeout efectivo por mutante (s)», y **no compares
+      tiempos entre campañas con timeouts efectivos distintos**: desde la 1.7.2
+      el timeout se deriva de la línea base medida en vez de ser un fijo de
+      `rigor.json`, así que las campañas anteriores **no son comparables** con
+      las posteriores.
+- [ ] **RM5 · Solo en rigor `critico`:** cada superviviente declarado
+      «equivalente» trae demostración ejecutable, y el reviewer reproduce **una
+      muestra de UNO**, elegido por él. En rigor `estandar` basta la
+      justificación escrita, y este punto es N/A por nivel (justificado).
+- [ ] **RM6 · Si para matar un mutante se quitó código defensivo**, el
+      invariante está verificado en QUIEN CONSTRUYE EL DATO y consta por
+      escrito. Borrar una guarda `x is None` para que muera un mutante es
+      exactamente la ausencia de defensa que causó F-019 y F-027.
+- [ ] **Si la campaña automática dio 0 mutantes y se sustituyó por una
+      MANUAL**: el informe trae una tabla con **una fila por mutante** y, en
+      cada fila, el fichero y la línea, el **texto exacto original → mutado**
+      de la sustitución, y el resultado con su **número de fallos**. Sin ese
+      texto exacto el punto NO se marca: describir la mutación con palabras
+      («se invierte la guarda») no la hace reproducible, y una campaña manual
+      que nadie puede repetir no es evidencia, es un párrafo. El reviewer
+      reproduce al menos dos filas al pie de la letra.
 - [ ] Cada superviviente de esa campaña tiene su sección de análisis
       **completada** (ninguna en `PENDIENTE`). En nivel `critico`, además,
       cero supervivientes salvo justificación escrita aceptada por el humano.
 - [ ] El informe del implementer trae la sección **«Evidencias»** con los
       cuatro números: tests ejecutados y resultado, cobertura de las líneas
       cambiadas, mutantes generados y supervivientes, y tiempo de la suite.
+      Con la campaña de mutación, además, **el nº de workers con que se lanzó**:
+      sin él no se puede calcular el coste por mutante del punto anterior.
 - [ ] Ningún punto de este bloque marcado N/A sin justificación escrita.
 
 ## C4 ter — Las verificaciones extra por rutas sensibles están hechas

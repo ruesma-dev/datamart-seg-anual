@@ -740,7 +740,11 @@ def test_f006_r2_cliente_ide_avisa_de_que_el_cero_es_el_sin_cliente() -> None:
 # error se propague desde el documento.
 # ---------------------------------------------------------------------------
 
-DESIGN = RAIZ / "specs" / "F-006-mcp-azure" / "design.md"
+# NOTA (2026-08-25, arnés 1.7.4): el diseño se partió en dos por la puerta de
+# tamaño del papeleo. `design.md` es ahora el resumen navegable y el contrato
+# literal —bloques YAML, DDL y la §4.2— vive en `design_detalle.md`, que es el
+# que se lee aquí.
+DESIGN = RAIZ / "specs" / "F-006-mcp-azure" / "design_detalle.md"
 
 
 def _yaml_del_contrato() -> str:
