@@ -35,6 +35,7 @@ import re
 from functools import lru_cache
 
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+from tests._texto import contiene
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
@@ -124,7 +125,7 @@ def test_f006_r9_la_regla_no_promete_nada_del_catalogo_en_pdf() -> None:
     assert "sigrid_tablas.md" in motivo, (
         "la regla tiene que decir dónde está lo que ella no cubre"
     )
-    assert "no se deja segmentar" in motivo or "no es verificable" in motivo, (
+    assert contiene(motivo, "no se deja segmentar") or contiene(motivo, "no es verificable"), (
         "y por qué no lo afirma: el documento no es una fuente de la que derivar"
     )
 

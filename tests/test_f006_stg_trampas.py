@@ -181,7 +181,7 @@ def test_f006_r26_anio_y_mes_nunca_son_nulos_y_la_ficha_lo_dice() -> None:
     # Y que el filtro inerte siga estando, porque es lo que la ficha explica.
     plan = _sql("stg/08_plan_mensual.sql")
     assert re.search(r"f\.anio\s+IS\s+NOT\s+NULL", plan, re.IGNORECASE)
-    assert "no descarta nada" in _columna("stg.fases", "anio").significado, (
+    assert contiene(_columna("stg.fases", "anio").significado, "no descarta nada"), (
         "la ficha tiene que decir que ese filtro no filtra: quien lo lea en el SQL "
         "va a suponer lo contrario"
     )
@@ -204,7 +204,7 @@ def test_f006_r2_el_capitulo_raiz_se_apunta_a_si_mismo_en_la_raiz() -> None:
         "`capitulo_raiz_id` nunca es NULL: en la raíz vale su propio `ide`. "
         f"La ficha declara: {c.nulo_significa!r}"
     )
-    assert "capitulo_raiz_id = partida_id" in c.significado, (
+    assert contiene(c.significado, "capitulo_raiz_id = partida_id"), (
         "tiene que decir cómo se reconoce una raíz de verdad, que es comparándola "
         "consigo misma"
     )
@@ -558,7 +558,7 @@ def test_f006_r10_todo_objeto_que_sirve_medidas_del_fact_avisa(objeto: str) -> N
     """Quien publica una medida del fact tiene que avisar, y con una cifra medida."""
     ficha = _dicc().por_nombre[objeto]
     texto = f"{ficha.descripcion} {ficha.grano or ''}"
-    assert any(n in texto for n in NUMEROS_DEL_DEFECTO), (
+    assert any(contiene(texto, n) for n in NUMEROS_DEL_DEFECTO), (
         f"{objeto} sirve medidas de `mart.fact_seguimiento_mensual` y no avisa "
         f"del duplicado con ninguna cifra medida ({list(NUMEROS_DEL_DEFECTO)})"
     )
@@ -699,7 +699,7 @@ def test_f006_r10_la_columna_sana_dice_que_lo_es(objeto: str) -> None:
     mes = next((c for c in ficha.columnas if c.nombre == "importe_mes"), None)
     if mes is None:
         pytest.skip(f"{objeto} no publica `importe_mes`")
-    assert "NO esta afectada" in mes.significado, (
+    assert contiene(mes.significado, "NO esta afectada"), (
         f"{objeto}.importe_mes es la vía buena y su ficha no lo dice: sin eso, el "
         f"aviso de al lado se lee como que todo el objeto está mal"
     )
@@ -792,6 +792,12 @@ def test_f006_r10_control_el_guardian_de_coherencia_muerde() -> None:
     """Las tres vías por las que entró, convertidas en control permanente.
 
     Sin esto, cualquiera de los tres arreglos podría revertirse en verde.
+
+    La 17ª pasada añade una cuarta, que es la segunda otra vez: el plegado
+    seguía sin normalizar en el guardián hermano, dentro de este mismo módulo.
+    Arreglar una comparación y dejar la de al lado es el patrón que lleva
+    dieciséis pasadas repitiéndose, así que el criterio derivado que lo caza
+    vive en `test_f006_copias.py` y barre todos los módulos, no este.
     """
     afectadas = ["importe_origen", "importe_origen_raw"]
 
@@ -807,6 +813,14 @@ def test_f006_r10_control_el_guardian_de_coherencia_muerde() -> None:
     assert [c for c in afectadas if not contiene(partida, c)] == [], (
         "normalizando espacios, una cabecera envuelta cuenta igual"
     )
+
+    # Vía 2 bis · el mismo plegado seguía vivo **en el guardián de al lado**:
+    # `..._la_columna_sana_dice_que_lo_es` buscaba «NO esta afectada» con `in` a
+    # pelo sobre el `significado`. Una línea en blanco del bloque `>-` y el aviso
+    # de la medida buena desaparecía para el test, no para el lector.
+    plegada = "importe_mes NO esta\n\nafectada por el duplicado del fact"
+    assert "NO esta afectada" not in plegada, "así estaba escrito, y así no se veía"
+    assert contiene(plegada, "NO esta afectada"), "normalizando, sí"
 
     # Vía 3 · ya no hay lista de frases, así que no hay salvoconducto que la
     # apague. Se comprueba lo objetivo: que la constante no vuelva.

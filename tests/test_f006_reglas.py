@@ -24,6 +24,7 @@ from etl_sigrid.domain.diccionario import (
     derivar_avisos,
     validar,
 )
+from tests._texto import contiene
 from tests.test_f006_formato import (  # reutiliza las fábricas de fixtures
     PASOS_NOCTURNOS,
     _dicc,
@@ -611,7 +612,7 @@ def test_f006_r10_la_cifra_absurda_de_compras_llega_avisada() -> None:
     assert "260,6" in regla.regla, "la cifra buena, para saber a que aspirar"
 
     ficha = dicc.por_nombre["compras.v_pbi_albaranes_sin_facturar"]
-    assert "68,7 BILLONES" in ficha.descripcion
+    assert contiene(ficha.descripcion, "68,7 BILLONES")
     assert "R-ALBARAN-ABSURDO" in derivar_avisos(dicc).por_nombre[ficha.nombre].avisos
 
 

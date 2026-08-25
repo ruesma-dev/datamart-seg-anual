@@ -37,6 +37,7 @@ from pathlib import Path
 import pytest
 
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+from tests._texto import contiene
 
 RAIZ = Path(__file__).resolve().parents[1]
 DIR_SQL = RAIZ / "etl_sigrid" / "infrastructure" / "postgres" / "sql"
@@ -1052,9 +1053,10 @@ def test_f006_r2_la_periodificacion_no_anula_todas_sus_columnas() -> None:
 
     assert columnas["importe_fase0"].nulo_significa
     assert "periodifica" not in (columnas["importe_fase0"].nulo_significa or "")
-    assert "todas las columnas de periodificacion son nulas" not in ficha.grano
-    assert "todas las columnas de periodificacion son nulas" not in (
-        columnas["es_infraestructura"].significado
+    assert not contiene(ficha.grano, "todas las columnas de periodificacion son nulas")
+    assert not contiene(
+        columnas["es_infraestructura"].significado,
+        "todas las columnas de periodificacion son nulas",
     )
 
 
@@ -1109,7 +1111,7 @@ def test_f006_r2_final_pct_dice_cuantos_porcentajes_cambian_y_cuales() -> None:
 
     significado = columnas["final_pct"].significado
 
-    assert "cinco porcentajes" not in significado
+    assert not contiene(significado, "cinco porcentajes")
     assert "cuatro" in significado.lower(), (
         "hay que decir cuántos cambian de divisor de verdad"
     )
@@ -1131,7 +1133,7 @@ def test_f006_r2_variacion_pct_no_declara_una_excepcion_que_no_tiene() -> None:
     significado = columnas["variacion_pct"].significado
 
     if "VENTA" in significado:
-        assert "NO cambia" in significado, (
+        assert contiene(significado, "NO cambia"), (
             "si se nombra la fila VENTA, tiene que ser para decir que este "
             "porcentaje no tiene excepción"
         )
@@ -1204,7 +1206,7 @@ def test_f006_r2_compras_linea_id_no_se_declara_unico() -> None:
 
     assert list(ficha.clave_negocio) == ["tipo_doc", "linea_id"]
     columnas = {c.nombre: c for c in ficha.columnas}
-    assert "NO ES UNICO" in columnas["linea_id"].significado
+    assert contiene(columnas["linea_id"].significado, "NO ES UNICO")
     assert "tipo_doc" in columnas["linea_id"].significado
 
     sql = (DIR_SQL / "compras/02_fact_linea.sql").read_text(encoding="utf-8")
@@ -1304,7 +1306,7 @@ def test_f006_r2_una_vista_que_no_se_puede_ejecutar_no_es_superficie_de_consumo(
     # La que sí sirve filtrada conserva su sitio, pero lo dice en la ficha.
     vigente = dicc.por_nombre["mart.v_master_vigente_anual"]
     assert vigente.consumo_recomendado
-    assert "NUNCA SE CONSULTA SIN FILTRAR POR OBRA" in vigente.descripcion
+    assert contiene(vigente.descripcion, "NUNCA SE CONSULTA SIN FILTRAR POR OBRA")
 
 
 def test_f006_r2_ninguna_ficha_recomienda_es_activa_para_saber_si_una_obra_vive() -> None:
@@ -1334,7 +1336,7 @@ def test_f006_r2_ninguna_ficha_recomienda_es_activa_para_saber_si_una_obra_vive(
     )
 
     regla = next(r for r in dicc.reglas if r.codigo == "R-OBRA-ACTIVA")
-    assert "NO se puede responder" in regla.regla
+    assert contiene(regla.regla, "NO se puede responder")
     assert "919" in regla.regla and "583" in regla.regla
 
     # Y ninguna ficha anuncia como ejemplo una pregunta que no puede contestar.
@@ -1383,7 +1385,7 @@ def test_f006_r2_contratos_no_promete_un_importe_que_no_tiene() -> None:
     assert not [
         c for c in contratos.columnas if (c.unidad or "").upper() == "EUR"
     ], "si algun dia tiene importe, esta guarda hay que reescribirla"
-    assert "NO trae el importe" in contratos.descripcion
+    assert contiene(contratos.descripcion, "NO trae el importe")
     assert "importe_contratado" in contratos.descripcion, "y donde SI esta"
 
 
@@ -1392,7 +1394,7 @@ def test_f006_r2_retenciones_prohibe_el_join_a_las_lineas() -> None:
     ficha = _diccionario().por_nombre["retenciones.movimientos"]
 
     assert "38,9" in ficha.grano
-    assert "UNA FILA POR EFECTO" in ficha.grano
+    assert contiene(ficha.grano, "UNA FILA POR EFECTO")
 
     hacia_factura = next(
         r for r in ficha.relaciones if r.a.startswith("compras.facturas")
@@ -1432,9 +1434,9 @@ def test_f006_r2_retenciones_avisa_de_que_su_obra_id_no_es_la_obra() -> None:
     }
 
     obra = columnas["obra_id"]
-    assert "CENTRO DE COSTE" in obra.significado
-    assert "NO es el identificador de la obra" in obra.significado
-    assert "0 de 261" in obra.significado, "la cifra medida, no una impresion"
+    assert contiene(obra.significado, "CENTRO DE COSTE")
+    assert contiene(obra.significado, "NO es el identificador de la obra")
+    assert contiene(obra.significado, "0 de 261"), "la cifra medida, no una impresion"
     assert "centro_coste_ide" in obra.significado, "por donde SI se cruza"
     assert "98" not in obra.significado, (
         "la afirmacion del 98 % era falsa: no puede volver por la puerta de atras"
@@ -1477,7 +1479,7 @@ def test_f006_r2_retenciones_declara_las_dos_lecturas_del_saldo() -> None:
         }
         assert "saldo_vivo" in columnas
         assert "neto_practicado" in columnas
-        assert "NO es" in columnas["neto_practicado"].significado, objeto
+        assert contiene(columnas["neto_practicado"].significado, "NO es"), objeto
 
     entidad = {
         c.nombre: c
@@ -2051,13 +2053,13 @@ def test_f006_r2_los_filtros_que_pierden_filas_se_declaran() -> None:
     """
     proveedor = _columna("compras.v_pbi_proveedor_obra", "proveedor_id")
     assert proveedor.nulo_significa is None
-    assert "no aparecen" in proveedor.significado or "quedan fuera" in (
-        proveedor.significado
+    assert contiene(proveedor.significado, "no aparecen") or contiene(
+        proveedor.significado, "quedan fuera"
     )
 
     tipo = _columna("retenciones.movimientos", "tipo_id")
     assert tipo.nulo_significa is None
-    assert "retide" in tipo.significado or "sin tipo" in tipo.significado
+    assert "retide" in tipo.significado or contiene(tipo.significado, "sin tipo")
 
 
 @pytest.mark.parametrize(

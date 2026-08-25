@@ -23,11 +23,14 @@ Este fichero mira el **texto crudo**: prosa, comentarios y todo.
 
 from __future__ import annotations
 
+import ast
+import dataclasses
 import pathlib
 import re
 
 import pytest
 
+from etl_sigrid.domain.diccionario import Columna, Ficha, Regla
 from tests._texto import contiene
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
@@ -250,23 +253,95 @@ def test_f006_r26_control_la_comparacion_ignora_el_ajuste_de_linea() -> None:
     assert contiene(envuelto, "sin implementar"), "normalizando, sí"
 
 
-def test_f006_r26_ninguna_guarda_de_prosa_compara_subcadenas_crudas() -> None:
-    """Que el arreglo no se quede en los dos sitios de hoy.
+def _campos_de_prosa() -> set[str]:
+    """Los campos de texto del diccionario, DERIVADOS de sus dataclases.
 
-    Es la **tercera** aparición del mismo defecto y la primera fue en un barrido
-    que se arregló solo para sí mismo. Este test recorre los ficheros que
-    comparan prosa y exige que usen `contiene`, no `in` a pelo, sobre las listas
-    de frases vigiladas.
+    Nada de enumerarlos: se preguntan a `Columna`, `Ficha` y `Regla`. Si mañana
+    una ficha gana un campo de prosa, entra solo en la vigilancia.
     """
-    raiz = pathlib.Path(__file__).resolve().parents[1]
-    vigilados = {
-        "tests/test_f006_copias.py": "FRASES_RECHAZADAS",
-        "tests/test_f006_cobertura.py": "lo_dan_por_futuro",
-    }
-    for ruta, marca in vigilados.items():
-        texto = (raiz / ruta).read_text(encoding="utf-8")
-        assert marca in texto, f"{ruta} ya no contiene {marca}: revisar este test"
-        assert "from tests._texto import contiene" in texto, (
-            f"{ruta} compara prosa y no importa `contiene`: volvería a ser ciego "
-            f"a una frase partida por el ajuste de línea"
-        )
+    campos: set[str] = set()
+    for cls in (Columna, Ficha, Regla):
+        for campo in dataclasses.fields(cls):
+            tipo = str(campo.type)
+            if "str" in tipo and "tuple" not in tipo:
+                campos.add(campo.name)
+    return campos
+
+
+def _comparaciones_crudas_de_prosa() -> list[str]:
+    """Sitios donde una frase de varias palabras se busca con `in` a pelo.
+
+    El criterio, sin listas: en cualquier módulo de tests que **cargue el
+    diccionario**, una comparación `"varias palabras" in x.significado` (o
+    `descripcion`, `grano`, `motivo`… los campos que las dataclases declaran de
+    texto) es ciega al plegado. Una sola palabra no puede partirse, así que solo
+    se vigilan los literales de dos o más.
+    """
+    campos = _campos_de_prosa()
+    sitios: list[str] = []
+    for ruta in sorted((RAIZ / "tests").glob("test_*.py")):
+        fuente = ruta.read_text(encoding="utf-8")
+        if "cargar_diccionario" not in fuente:
+            continue
+        for nodo in ast.walk(ast.parse(fuente)):
+            if not isinstance(nodo, ast.Compare) or len(nodo.ops) != 1:
+                continue
+            if not isinstance(nodo.ops[0], (ast.In, ast.NotIn)):
+                continue
+            izq = nodo.left
+            if not (isinstance(izq, ast.Constant) and isinstance(izq.value, str)):
+                continue
+            if " " not in izq.value.strip():
+                continue
+            derecha = nodo.comparators[0]
+            nombre = (
+                derecha.attr
+                if isinstance(derecha, ast.Attribute)
+                else derecha.id
+                if isinstance(derecha, ast.Name)
+                else None
+            )
+            if nombre in campos:
+                sitios.append(f"{ruta.name}:{nodo.lineno}: «{izq.value}» in {nombre}")
+    return sitios
+
+
+def test_f006_r26_control_el_criterio_encuentra_donde_mirar() -> None:
+    """Si el barrido no viera ningún módulo, el test de abajo pasaría solo."""
+    campos = _campos_de_prosa()
+    assert {"significado", "descripcion", "grano", "motivo"} <= campos, (
+        f"los campos de prosa derivados son {sorted(campos)}: falta alguno"
+    )
+    modulos = [
+        r.name
+        for r in (RAIZ / "tests").glob("test_*.py")
+        if "cargar_diccionario" in r.read_text(encoding="utf-8")
+    ]
+    assert len(modulos) >= 8, f"solo {modulos} cargan el diccionario: revisar"
+
+
+def test_f006_r26_ninguna_guarda_de_prosa_compara_subcadenas_crudas() -> None:
+    """Que el arreglo no se quede en los sitios de hoy.
+
+    Antes esto era una **lista de dos ficheros escrita a mano** que solo miraba
+    si importaban `contiene`. No comprobaba ni una comparación, y dejaba fuera
+    `test_f006_stg_trampas.py`, donde el guardián del doblado seguía buscando
+    «NO esta afectada» con `in` a pelo: la misma piedra de las pasadas 8, 10, 13
+    y 15, dentro del dispositivo escrito para evitarla.
+
+    Ahora es un criterio: se derivan los campos de prosa de las dataclases del
+    diccionario y se exige que ninguna comparación con literal de varias
+    palabras vaya contra ellos sin `contiene`.
+
+    **Límite declarado.** El barrido reconoce la prosa por el nombre del campo
+    (`x.significado`, `significado`), así que **no ve** un texto que antes pasó
+    por una variable local (`texto = f"{ficha.descripcion} {ficha.grano}"`).
+    Saberlo exigiría seguir el flujo de datos y no se intenta; esos sitios se
+    corrigen a mano y se declaran, en vez de fingir que están cubiertos.
+    """
+    crudas = _comparaciones_crudas_de_prosa()
+    assert crudas == [], (
+        "estas comparaciones son ciegas a una frase partida por una línea en "
+        "blanco del plegado YAML; usa `tests._texto.contiene`:\n  "
+        + "\n  ".join(crudas)
+    )
