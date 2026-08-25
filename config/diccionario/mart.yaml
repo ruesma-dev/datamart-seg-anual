@@ -316,9 +316,11 @@ objetos:
       Real`; los master no. Es defecto del build, abierto, y no se arregla desde
       F-006.
 
-      La consulta que da ese numero esta en el grano de
-      `mart.fact_seguimiento_mensual`, junto a la explicacion de por que 8.778,
-      37 y 22 son numeros distintos que miden cosas distintas.
+      La consulta publicada en el grano de `mart.fact_seguimiento_mensual`
+      devuelve 8.778 combinaciones con dos filas, en 9 obras: esa es la CAUSA de
+      este defecto, no su medida. Las 37 celdas y los 39,07 M EUR se midieron
+      aparte el 2026-08-22 y su consulta NO esta publicada todavia. Alli esta
+      ademas por que 8.778, 37 y 22 miden cosas distintas.
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -577,9 +579,11 @@ objetos:
       series— y es la via buena para un total. Para un acumulado fiable hay que
       deduplicar en `mart.fact_seguimiento_mensual` antes de sumar.
 
-      La consulta que da ese numero esta en el grano de
-      `mart.fact_seguimiento_mensual`, junto a la explicacion de por que 8.778,
-      37 y 22 son numeros distintos que miden cosas distintas.
+      La consulta publicada en el grano de `mart.fact_seguimiento_mensual`
+      devuelve 8.778 combinaciones con dos filas, en 9 obras: esa es la CAUSA de
+      este defecto, no su medida. Las 37 celdas y los 39,07 M EUR se midieron
+      aparte el 2026-08-22 y su consulta NO esta publicada todavia. Alli esta
+      ademas por que 8.778, 37 y 22 miden cosas distintas.
     grano: >-
       Una fila por (`obra_id`, `anio_mes`, `categoria`, `escenario`).
     clave_negocio: [obra_id, anio_mes, categoria, escenario]

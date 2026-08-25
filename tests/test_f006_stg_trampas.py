@@ -29,7 +29,7 @@ from functools import lru_cache
 
 import pytest
 
-from tests._texto import contiene
+from tests._texto import contiene, normalizado
 
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 
@@ -846,3 +846,144 @@ def test_f006_r10_control_la_coherencia_se_comprueba_sobre_alguien() -> None:
         if any("DOBLADO" in (c.significado or "") for c in _dicc().por_nombre[o].columnas)
     ]
     assert len(con_aviso) >= 2, f"solo {con_aviso} llevan el aviso en columna"
+
+
+# ---------------------------------------------------------------------------
+# Una remisión tiene que llevar a donde dice (17ª pasada)
+# ---------------------------------------------------------------------------
+#
+# Las dos fichas del preagregado remitían así, en el texto que ve el agente:
+#
+#   «La consulta que da ese numero esta en el grano de
+#    `mart.fact_seguimiento_mensual`, junto a la explicacion de por que 8.778,
+#    37 y 22 son numeros distintos…»
+#
+# **Y la consulta que hay allí devuelve 8.778 y 9 obras**, no las 37 celdas ni
+# los 39,07 M EUR de los que hablaba «ese numero». Quien la ejecute para
+# comprobar el aviso obtiene otra cosa, y lo razonable es que desconfíe del aviso
+# entero: justo el que más importa. Una remisión que no lleva a donde dice es
+# peor que no ponerla, porque el agente la va a seguir.
+#
+# El criterio, derivable y sin juzgar prosa: **los números que una remisión
+# atribuye a la consulta de otro objeto tienen que estar declarados junto a esa
+# consulta**. Si no lo están, la remisión les atribuye un resultado que esa
+# consulta no da. Y una remisión sin ningún número no dice qué devuelve: también
+# falla, porque es la formulación vaga con la que entró este defecto.
+
+_REMISION = re.compile(
+    r"consult[ao][^.]{0,140}?\ben (?:el grano|la descripcion|la ficha) de "
+    r"`([a-z_]+\.[a-z_0-9]+)`",
+    re.IGNORECASE,
+)
+
+
+def _prosa_de(objeto: str) -> list[tuple[str, str]]:
+    """Todos los campos de texto de una ficha, cabecera y columnas.
+
+    Barrer solo `descripcion` es el punto ciego que ya costó cuatro pasadas: el
+    defecto sobrevive **en el campo de al lado**.
+    """
+    ficha = _dicc().por_nombre[objeto]
+    campos = [
+        (f"{objeto}.descripcion", ficha.descripcion),
+        (f"{objeto}.grano", ficha.grano or ""),
+    ]
+    campos += [(f"{objeto}.avisos[{i}]", a) for i, a in enumerate(ficha.avisos)]
+    for columna in ficha.columnas:
+        campos.append((f"{objeto}::{columna.nombre}.significado", columna.significado or ""))
+        campos.append(
+            (f"{objeto}::{columna.nombre}.nulo_significa", columna.nulo_significa or "")
+        )
+    return [(ruta, texto) for ruta, texto in campos if texto]
+
+
+def _cifras(texto: str) -> set[str]:
+    """Los números de un texto, sin las fechas ISO, que no son medidas."""
+    sin_fechas = re.sub(r"\d{4}-\d{2}-\d{2}", " ", texto)
+    return set(re.findall(r"\d[\d.,]*\d|\d", sin_fechas))
+
+
+def _entorno_de_la_consulta(objeto: str) -> str:
+    """El párrafo que publica una consulta y el que la presenta.
+
+    Los bloques `>-` pliegan las líneas de un párrafo con espacios y dejan un
+    salto real donde había una línea en blanco, así que un párrafo es una línea
+    del texto cargado.
+    """
+    trozos: list[str] = []
+    for _, texto in _prosa_de(objeto):
+        parrafos = [p for p in texto.split("\n") if p.strip()]
+        for i, parrafo in enumerate(parrafos):
+            if re.search(r"\bSELECT\b", parrafo, re.IGNORECASE):
+                trozos.extend(parrafos[max(0, i - 1) : i + 1])
+    return " ".join(trozos)
+
+
+def _remisiones_a_una_consulta() -> list[tuple[str, str, str]]:
+    """(campo que remite, objeto remitido, frase). DERIVADO, sin lista."""
+    salida: list[tuple[str, str, str]] = []
+    for ficha in _dicc().fichas:
+        for ruta, texto in _prosa_de(ficha.nombre):
+            for frase in re.split(r"(?<=\.)\s+", normalizado(texto)):
+                encontrada = _REMISION.search(frase)
+                if encontrada:
+                    salida.append((ruta, encontrada.group(1), frase))
+    return salida
+
+
+def test_f006_r10_control_hay_remisiones_que_comprobar() -> None:
+    """Si el derivador se quedara vacío, el test de abajo pasaría sin mirar."""
+    remisiones = _remisiones_a_una_consulta()
+    assert len(remisiones) >= 2, f"solo {remisiones}: la derivación se ha quedado corta"
+    destinos = {destino for _, destino, _ in remisiones}
+    assert "mart.fact_seguimiento_mensual" in destinos, (
+        "es el único objeto que publica una consulta y al que se remite"
+    )
+    entorno = _entorno_de_la_consulta("mart.fact_seguimiento_mensual")
+    assert "8.778" in _cifras(entorno), (
+        f"el entorno de la consulta remitida no declara su resultado: {entorno[:200]}"
+    )
+
+
+@pytest.mark.parametrize("origen,destino,frase", _remisiones_a_una_consulta())
+def test_f006_r10_una_remision_dice_lo_que_esa_consulta_devuelve(
+    origen: str, destino: str, frase: str
+) -> None:
+    """Y los números que le atribuye son los que están declarados con ella."""
+    assert destino in _dicc().por_nombre, f"{origen} remite a `{destino}`, que no existe"
+
+    entorno = _entorno_de_la_consulta(destino)
+    assert entorno, (
+        f"{origen} remite a la consulta de `{destino}` y `{destino}` no publica "
+        f"ninguna consulta"
+    )
+
+    citadas = _cifras(frase)
+    assert citadas, (
+        f"{origen} remite a la consulta de `{destino}` sin decir qué devuelve. "
+        f"«La consulta que da ese numero está en…» es la formulación con la que "
+        f"entró una remisión falsa: el agente la sigue y obtiene otra cosa"
+    )
+
+    inventadas = sorted(citadas - _cifras(entorno))
+    assert inventadas == [], (
+        f"{origen} atribuye {inventadas} a la consulta de `{destino}`, y allí no "
+        f"está declarado que la consulta dé eso. Quien la ejecute para comprobar "
+        f"el aviso obtendrá otro número y desconfiará del aviso entero.\n"
+        f"  frase: {frase}"
+    )
+
+
+def test_f006_r10_control_una_remision_inventada_no_pasa() -> None:
+    """Sin esto, un entorno con muchos números dejaría pasar cualquier cosa."""
+    entorno = _entorno_de_la_consulta("mart.fact_seguimiento_mensual")
+    inventada = "La consulta del grano de `x.y` devuelve 123.456 filas."
+    assert sorted(_cifras(inventada) - _cifras(entorno)) == ["123.456"], (
+        "una cifra que la consulta no declara tiene que salir como inventada"
+    )
+    # Y el patrón reconoce la formulación vaga con la que entró el defecto.
+    vieja = (
+        "La consulta que da ese numero esta en el grano de "
+        "`mart.fact_seguimiento_mensual`, junto a la explicacion."
+    )
+    assert _REMISION.search(vieja), "la remisión vaga tiene que ser reconocida"
