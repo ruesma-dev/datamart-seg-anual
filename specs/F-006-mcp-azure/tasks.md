@@ -155,7 +155,7 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
       `_arrancar_ejecucion` / `_ejecutar_paso` de F-024.
       | Verificación: `pytest tests/test_f006_publicacion.py -k cli` con
       `CliRunner` y dobles de `main.get_settings` y `main._get_pg`.
-- [ ] **T19**: Publicar contra la BBDD real y comprobar el contrato.
+- [x] **T19**: Publicar contra la BBDD real y comprobar el contrato.
       | Verificación: MANUAL (humano) —
       `python main.py publicar-diccionario`, y después, con `psql`:
       `SELECT esquema, objeto, refresco, avisos FROM _meta.diccionario ORDER BY 1,2;`
@@ -208,7 +208,7 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
 
 ## Bloque H · La puerta absoluta y el chequeo contra la base real
 
-- [ ] **T26**: Comando `python main.py check-diccionario` (R28): compara contra
+- [x] **T26**: Comando `python main.py check-diccionario` (R28): compara contra
       `information_schema`, lista objetos sin ficha y fichas huérfanas, sale con
       código 1 si hay discrepancias.
       | Verificación: `pytest tests/test_f006_cobertura.py -k check_cli` con
@@ -237,7 +237,7 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
       | objeto sobre tablas ya construidas: unas decenas de consultas baratas.
       | Ojo con `raw` y con las fichas de clave vacía: se saltan, no tienen clave
       | que comprobar.
-- [ ] **T27**: Ejecutar el chequeo contra la base real y cerrar las
+- [x] **T27**: Ejecutar el chequeo contra la base real y cerrar las
       discrepancias que aparezcan (la puerta offline es heurística: R29).
       | Verificación: MANUAL (humano) — `python main.py check-diccionario`
       termina con código 0. Salida real en `progress/impl_F-006.md`.
@@ -322,7 +322,7 @@ escribe libremente; la ejecución contra Azure necesita firma.
 
 ## Bloque K · La batería de aceptación (criterio de éxito)
 
-- [ ] **T39**: Ejecutar las 18 preguntas de `requirements.md` §9 contra el
+- [x] **T39**: Ejecutar las 18 preguntas de `requirements.md` §9 contra el
       diccionario publicado (DA-4: con el prototipo `mcp-bbdd` local apuntado a
       Azure) y anotar, pregunta a pregunta, qué objetos usó la respuesta y qué
       advertencias citó.
