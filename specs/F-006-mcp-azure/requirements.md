@@ -87,10 +87,10 @@ produce **el dato que ese servidor consumirá** y **el permiso con el que lo har
 
 | id | Qué exige | Estado |
 |---|---|---|
-| **R30** | `DEFAULT_CONSUMPTION_SCHEMAS` pasa a `_meta,mart,cierre,compras,maestro,retenciones,aux`, retirando `raw` y `stg` | vigente, pero **sin efecto real hasta F-034** (ver R32) |
-| **R31** | `build_readonly_grant_statements` debe poder emitir **`REVOKE`** sobre los esquemas fuera de la lista de consumo (hoy la función solo concede) | vigente: se construye y se prueba |
+| **R30** | `DEFAULT_CONSUMPTION_SCHEMAS` pasa a `_meta,mart,cierre,compras,maestro,retenciones,aux`, retirando `raw` y `stg` | **ENMENDADO (2026-08-27): NO se hizo.** `config/settings.py` sigue con los **nueve** esquemas. Se entrega a F-034 sin construir (ver R32) |
+| **R31** | `build_readonly_grant_statements` debe poder emitir **`REVOKE`** sobre los esquemas fuera de la lista de consumo (hoy la función solo concede) | **ENMENDADO (2026-08-27): NO se construyó.** `grants.py` no tiene `revocar_en` ni nada equivalente: la función solo concede. Se entrega a F-034 **por construir** |
 | **R32** | Sin `PG_REVOKE_FUERA_DE_CONSUMO=true` (default `false`) no se emite ningún `REVOKE` | **enmendado (2026-08-21, DA-3→B): queda APAGADO y se entrega a F-034**; el MCP seguirá viendo `raw` y `stg` |
-| **R33** | Los `REVOKE` nunca sobre `public`, `pg_catalog`, `information_schema`, `pg_toast`, y solo sobre esquemas de `list_schemas()` | vigente |
+| **R33** | Los `REVOKE` nunca sobre `public`, `pg_catalog`, `information_schema`, `pg_toast`, y solo sobre esquemas de `list_schemas()` | **ENMENDADO (2026-08-27): sin `REVOKE` que gobernar.** La regla sigue siendo válida y **la hereda F-034**, que es quien construirá el mecanismo |
 | **R34** | Verificar `MANUAL (humano)` que Power BI no lee de `stg` ni de `raw` antes de activar | **aplazado con R32**: la activación es de F-034; F-032 conserva la limpieza de secretos |
 
 > **Consecuencia de alcance (humano, 2026-08-21):** el **bloque I deja de ser

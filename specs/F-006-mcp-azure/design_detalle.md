@@ -899,11 +899,25 @@ exige la verificación manual **antes** de activarlo, y por eso el rollback es u
 ### 11.4 · Encaje con F-034 y F-032
 
 - **F-034** (Power BI deja de leer de local, con su propio rol
-  `pbi_sigrid_dm_ro`): esta feature **no crea el segundo rol**. Lo que le
-  entrega es la lista de consumo ya estrechada y el mecanismo de `REVOKE`
-  construido y probado, que es exactamente la pieza que F-034 necesitaría y que
-  hoy no existe. Si la verificación de R34 sale sucia, la activación se pospone
-  y pasa a ser trabajo de F-034 (DA-3, opción B).
+  `pbi_sigrid_dm_ro`): esta feature **no crea el segundo rol**.
+
+  **ENMENDADO el 2026-08-27, y esto es lo que F-034 tiene que saber antes de
+  empezar.** Este párrafo decía que se le entregaba «la lista de consumo ya
+  estrechada y el mecanismo de `REVOKE` construido y probado». **Ninguna de las
+  dos cosas se hizo**, verificado contra el árbol: `grants.py` no tiene
+  `revocar_en` ni equivalente —solo concede—, `PG_REVOKE_FUERA_DE_CONSUMO` no
+  existe en ningún fichero y `config/settings.py` sigue con los **nueve**
+  esquemas, `raw` y `stg` incluidos.
+
+  Lo que F-006 entrega de verdad es la **decisión** (DA-3 por su opción B, del
+  humano, 2026-08-25) y el **encargo**: T29-T31 pasan a F-034 **por construir**,
+  no construidas. Lo cazó el reviewer en la 20ª pasada; si esto no se corrige,
+  F-034 arranca buscando una pieza que no está con su propia ficha diciéndole
+  que sí.
+
+  **Y la trampa que sigue viva**: el rol `mcp_sigrid_dm_ro` **lo comparten hoy
+  el MCP y Power BI**. Encender los `REVOKE` sin verificar antes qué lee Power BI
+  le rompe los informes.
 - **F-032** (retirar copias viejas de secretos, incluido
   `pg-mcp-sigrid-dm-ro`, y las reglas de firewall del puesto): **aquí no se
   retira ningún secreto ni ninguna regla**. Esta feature *añade* una regla de
