@@ -241,7 +241,7 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
       discrepancias que aparezcan (la puerta offline es heurística: R29).
       | Verificación: MANUAL (humano) — `python main.py check-diccionario`
       termina con código 0. Salida real en `progress/impl_F-006.md`.
-- [ ] **T28**: Regla nueva en `docs/CONVENTIONS.md`: quien añade o cambia un
+- [x] **T28**: Regla nueva en `docs/CONVENTIONS.md`: quien añade o cambia un
       objeto publicado actualiza su ficha en el mismo trabajo.
       | Verificación: `pytest tests/test_f006_docs.py -k convenciones`.
 
@@ -293,16 +293,16 @@ escribe libremente; la ejecución contra Azure necesita firma.
 
 ## Bloque J · 🔏 Conectividad y documentación del ecosistema
 
-- [ ] **T35**: `docs/runbook_postgres_azure.md` — procedimiento del firewall
+- [x] **T35**: `docs/runbook_postgres_azure.md` — procedimiento del firewall
       para el entorno del MCP (R35–R37): IP de salida estática, entorno **sin
       VNet**, que no sirve perseguir la IP del puesto (D11) y que no se debe
       depender de la regla que autoriza a cualquier recurso de Azure. Enlaza los
       nombres de parámetro de `infra/README.md:153-170`, no los copia.
       | Verificación: `pytest tests/test_f006_docs.py -k firewall`.
-- [ ] **T36**: `docs/ARCHITECTURE.md` — sección «El datamart se explica solo
+- [x] **T36**: `docs/ARCHITECTURE.md` — sección «El datamart se explica solo
       (F-006)».
       | Verificación: `pytest tests/test_f006_docs.py -k arquitectura`.
-- [ ] **T37**: `azure-apps/datamart_seg_anual.md` (repositorio `azure-apps`) —
+- [x] **T37**: `azure-apps/datamart_seg_anual.md` (repositorio `azure-apps`) —
       R38: `_meta.v_diccionario` y las tres tablas como superficie expuesta, el
       rol estrechado, y corregir que el MCP ya no es «un cliente de escritorio».
       **En este mismo trabajo**, como manda `CLAUDE.md`.
