@@ -4916,3 +4916,449 @@ vocabulario cerrado validado**, no solo que el campo exista. El defecto 1 de
 esta review —un `1:1` que YAML convierte en `61` y que ningún test vio— es
 justo lo que ese punto habría cazado, y no lo cazan ni la cobertura (la línea
 se ejecuta) ni la mutación (el valor viene del dato, no del código).
+
+---
+
+# 20ª pasada · 2026-08-26 — la campaña válida, reverificada por el reviewer
+
+**Revisión completa** (no incremental: el veredicto vigente era RECHAZADO desde
+la 16ª, así que no hay «último commit aprobado» desde el que medir un delta).
+`HEAD = 6332995`. Rama `feature/F-006-mcp-azure`. Nivel `critico` declarado en
+`harness/features.json`.
+
+Todo lo que sigue se midió **contra el árbol**, no leyendo el papeleo. Donde no
+he podido verificar algo, lo digo.
+
+## 1 · El entorno
+
+`bash harness/init.sh`, tal cual, exit **0**:
+
+```
+2473 passed, 128 skipped, 909 warnings in 603.92s (0:10:03)
+[OK] pytest en verde (con medición de cobertura)
+[OK] PUERTA COBERTURA: 100.0% de 33 líneas cambiadas cubiertas (33/33, umbral 80%, nivel critico)
+[OK] PUERTA TAMAÑO: F-006 dentro de los topes (requirements 132/150, design 191/250, impl 219/220, review 125/140)
+[OK] Rama actual: feature/F-006-mcp-azure
+ENTORNO LISTO. Puedes trabajar.
+```
+
+`git status` limpio, sin ficheros sin trackear, `git worktree list` con una sola
+entrada. Ningún mutante aplicado.
+
+**Sobre las «33 líneas cambiadas».** El alcance por diff de la rama
+(`harness.alcance`, base `dev`, merge-base `7dd010d`) da **139 líneas de
+producción en 4 ficheros, todos de `harness/`** —`mutacion_paralela.py` 101,
+`mutacion.py` 29, `tamano.py` 7, `rigor.py` 2—. Las 33 son la intersección con
+las líneas *ejecutables*; el resto son comentarios y docstrings. El número es
+correcto. Lo que hay que entender es que **el cuerpo de F-006 ya está en `dev`**
+y no aparece en el diff de la rama: por eso la campaña se lanzó con `--ficheros`
+sobre los ocho módulos del diccionario, que es lo correcto y más exigente que el
+diff.
+
+## 2 · La campaña de mutación (T41), verificada de forma independiente
+
+### 2.1 · Recálculo puro del alcance y del nº de mutantes
+
+Ejecutado por el reviewer con `harness.alcance.alcance_de_ficheros` +
+`harness.mutacion.generar_mutantes` (cálculo puro: no ejecuta la suite ni
+escribe en disco), sobre los ocho ficheros declarados:
+
+| Fichero | Líneas | Mutantes |
+|---|---|---|
+| `application/steps/publicar_diccionario_step.py` | 190 | 5 |
+| `domain/diccionario.py` | 1089 | 93 |
+| `domain/inventario.py` | 288 | 24 |
+| `infrastructure/diccionario/cargador_yaml.py` | 468 | 42 |
+| `infrastructure/postgres/catalogo.py` | 166 | 14 |
+| `infrastructure/postgres/diccionario_sql.py` | 332 | 25 |
+| `infrastructure/postgres/relaciones_sql.py` | 319 | 26 |
+| `infrastructure/postgres/unicidad_sql.py` | 274 | 27 |
+| **Total** | **3126** | **256** |
+
+**Coincide exactamente** con el informe: 3126 líneas y 256 mutantes.
+
+### 2.2 · Los 52 supervivientes son mutantes reales
+
+No basta con que los totales cuadren: un informe con el alcance bien y unos
+supervivientes inventados pasaría el recálculo. Se parsearon los **52** bloques
+del informe y se contrastó cada uno —fichero, línea, **operador** y el **texto
+exacto original → mutado**— contra el conjunto de mutantes que el mutador genera
+hoy sobre el árbol:
+
+```
+supervivientes parseados: 52
+supervivientes NO reproducibles como mutante real: 0
+```
+
+**52 de 52 reproducibles**, byte a byte. Reparto por fichero: `diccionario.py`
+15, `cargador_yaml.py` 10, `diccionario_sql.py` 8, `unicidad_sql.py` 7,
+`relaciones_sql.py` 5, `catalogo.py` 4, `inventario.py` 3.
+
+### 2.3 · RM1 — el SHA medido y el alcance revisado
+
+El informe declara `SHA de HEAD medido = 99e23356a69a1bf79ac803a25fdf5a4f53393bf4`.
+HEAD es hoy `6332995`. **Comprobado el diff `99e2335..HEAD`**: 13 ficheros, y
+**ninguno de los ocho del alcance**. Solo cambiaron `progress/`, `BACKLOG.md`,
+`harness/features.json` y **cinco ficheros de tests**. El alcance medido ES el
+alcance que reviso. **RM1 se cumple.**
+
+### 2.4 · La campaña tardó lo que tenía que tardar
+
+| Dato | Valor |
+|---|---|
+| Tiempo total | 8368,3 s (2 h 19 min) |
+| Workers | **6** (declarados por el informe) |
+| Media por mutante evaluado | 32,7 s |
+| Línea base por worker | 462,6 – 485,8 s |
+| Timeout efectivo | 972 s (línea base × 2,0), suelo 120 s |
+
+- **Coste real por mutante** = 8368,3 × 6 ÷ 256 = **196,1 s**. Muy por encima
+  del segundo: la campaña no es sospechosa por construcción.
+- **RM2**: `media × W` = 32,7 × 6 = 196,2 s frente a una línea base de ~470 s →
+  ratio **0,42**, muy lejos del «ni la décima parte» que obliga a rechazar sin
+  reejecutar. Y es lo esperable: la campaña evalúa con `-x`, **204 de 256
+  mutantes mueren** (79,7 %) y abortan la suite en el primer fallo. El caso que
+  RM2 caza —F-034, 18 mutantes en 111 s— no se parece a este.
+- `256 × 32,7 = 8371 ≈ 8368,3`: internamente coherente.
+- **Regla de los 60 segundos: NO se reejecuta la campaña**, porque el «Tiempo
+  total» declarado (8368,3 s) supera con mucho el umbral. **Queda dicho
+  explícitamente**, como manda C4 bis: campaña no reejecutada, 2 h 19 min según
+  el informe. En su lugar se aplican el recálculo puro (§2.1-2.2), RM1-RM6 y la
+  reverificación de mutantes concretos de §2.6.
+- Sin cabecera «⚠ CAMPAÑA NO VÁLIDA». «Sin veredicto (base rota)» = **0**.
+  Timeouts = **0**. Las **seis líneas base** salieron en verde y están impresas.
+
+### 2.5 · RM5 — reproducción de UN equivalente, elegido por el reviewer
+
+Elijo **`relaciones_sql.py:282`**, `int(UMBRAL_AVISO_COBERTURA * 100)` →
+`int(... * 101)`. Reproducido de verdad, no leído: el mutante se generó con
+`harness.mutacion.generar_mutantes` (aparecen dos en esa línea; se tomó el
+`[entero]`), se aplicó con `aplicar_mutante` a una copia en memoria del módulo,
+se cargaron original y mutante como dos módulos distintos y se comparó la salida
+de `interpretar_relacion` en once combinaciones, **ocho de ellas dentro de la
+rama `AVISO`** que es la única donde la línea se ejecuta:
+
+```
+casos que entran en la rama AVISO: 8 de 11
+ejemplo AVISO original: AVISO x.y.a -> z.w: une, pero poco. 1 de 10 valores casan (10%), por debajo del 50 % ...
+ejemplo AVISO mutado  : AVISO x.y.a -> z.w: une, pero poco. 1 de 10 valores casan (10%), por debajo del 50 % ...
+int(0.5*100)= 50 int(0.5*101)= 50
+SALIDAS IDENTICAS: True
+```
+
+**Equivalente confirmado.** La advertencia que deja el implementer —si el umbral
+deja de ser 0,5 el mutante puede volverse matable— es correcta y está escrita.
+Añado el dato que la sostiene: `tests/test_f006_relaciones.py:308` afirma
+`f"{int(UMBRAL_AVISO_COBERTURA * 100)}" in escasa`, es decir **calcula la misma
+expresión que vigila**, así que ese test tampoco podría matarlo. No es un
+defecto aquí (no hay nada que matar), pero es el antipatrón que esta feature ya
+aprendió a evitar en las constantes.
+
+**Los otros dos equivalentes (`ensure_ascii=False → True`) no los reproduje
+contra la base** —no ejecuto consultas contra producción para una review—, pero
+**sí verifiqué desde el árbol lo que hace verdadera la demostración**, que es
+más fuerte que repetirla:
+
+1. `sql/ddl/01_diccionario.sql:59` declara `ficha JSONB NOT NULL` y `:98`
+   declara `datos JSONB NOT NULL`. Los dos `json.dumps` en cuestión
+   (`diccionario_sql.py:142` y `:277`) alimentan exactamente esas dos columnas.
+   PostgreSQL **parsea** el JSON al insertarlo en `jsonb` y decodifica los
+   escapes `\uXXXX`: lo almacenado y lo que recupera el MCP es idéntico.
+2. Comprobé que **ningún hash depende del texto serializado**: el único
+   `hashlib.sha256` del proyecto (`cargador_yaml.py:203`) se calcula sobre los
+   **bytes de los YAML**, no sobre el JSON. `ensure_ascii` no puede mover
+   `hash_fuente`.
+
+Con eso, el único efecto observable es el texto en el cable y al depurar, que es
+lo que dice el implementer. **Los tres equivalentes se sostienen.**
+
+### 2.6 · RM4 — reverificación de mutantes concretos, por el reviewer
+
+`git worktree add --detach` en mi scratchpad desde `6332995`, `.env` volcado con
+`harness.mutacion_paralela.volcar_variables` (25 variables), mutantes aplicados
+con el **propio mutador** (nunca `sed`), `PYTHONDONTWRITEBYTECODE=1`, sin caché
+de pytest. **Línea base primero**, para no repetir el error de diagnóstico de la
+tarde del 26:
+
+```
+base: exit=0 | 189 passed, 3 skipped in 41.16s
+```
+
+| Mutante | Por qué lo elijo | Veredicto |
+|---|---|---|
+| `inventario.py:234` [not] #0 (quita el `not` a `avisos_columnas`) | **es el falso muerto confirmado** de `control_mutacion_F-006.md` | **MUERTO** (2 failed) |
+| `inventario.py:234` [not] #1 (quita el 2.º `not`) | mismo sitio | **MUERTO** (3 failed) |
+| `unicidad_sql.py:189` [not] | superviviente nº 52 de la lista | **MUERTO** (3 failed) |
+| `diccionario.py:299` [booleano] `frozen=True→False` | superviviente nº 6 | **MUERTO** (1 failed) |
+| `diccionario.py:299` [booleano] `slots=True→False` | superviviente nº 7 | **MUERTO** (1 failed) |
+
+**5 de 5 muertos, con la línea base verde delante.** Worktree eliminado; `git
+worktree list` y `git status` limpios después.
+
+Lo importante del primero: el mutante que la campaña paralela declaró MUERTO
+siendo superviviente **hoy está muerto de verdad**, y lo he comprobado yo. El
+implementer lo cazó porque al verificar los 17 encargados verificó también los
+**5 mutantes vecinos** que el mutador genera en esas mismas líneas y que no
+figuraban en la lista (`impl_F-006_detalle.md` L5208, fila «+5»). Es el mismo
+método que salvó los dos supervivientes que el líder se dejó fuera del encargo:
+**no fiarse de la lista, barrer el sitio**.
+
+### 2.7 · RM3 y RM6
+
+- **RM3** (un equivalente no puede salir MUERTO): revisados los tres declarados
+  equivalentes, ninguno figura entre los muertos. No hay contradicción.
+- **RM6** (matar un mutante quitando código defensivo): **no aplica**. Los 49
+  se mataron **sin tocar una línea de producción** —el diff `99e2335..HEAD` lo
+  demuestra: los únicos ficheros de código que cambian son cinco de `tests/`—.
+  No se retiró ninguna guarda. Es exactamente lo contrario del patrón que RM6
+  vigila, y merece decirse en positivo: los 52 eran **huecos de test**, no
+  defectos de código.
+
+## 3 · Mi criterio sobre LA LIMITACIÓN (pregunta explícita del líder)
+
+**La pregunta:** la campaña paralela produce algún falso muerto; los 204 muertos
+no son una lista cerrada; ¿basta para un `critico`?
+
+**Mi respuesta: SÍ, basta para cerrar F-006 — y no bastaría sin las dos
+condiciones que ya se cumplen.** Lo razono, porque un «sí» sin razones aquí no
+vale nada.
+
+**Lo que hace aceptable el riesgo residual:**
+
+1. **La dirección peligrosa está tapada donde importa.** Un falso muerto esconde
+   un superviviente. Pero **todo lo que se declaró muerto por los tests nuevos se
+   reverificó EN SERIE**, no por campaña paralela; y yo he reverificado cinco
+   más, también en serie y con línea base. El riesgo no está en lo que se
+   arregló: está en los 204 que la campaña paralela juzgó y nadie volvió a mirar.
+2. **El único caso confirmado se persiguió hasta matarlo.** `inventario.py:234`
+   no se documentó y se dejó: se cazó, se explicó y hoy muere. Verificado por mí.
+3. **Está declarado por escrito, con dueño y con consecuencia práctica.**
+   `control_mutacion_F-006.md` no maquilla el cero de la muestra de control:
+   escribe que doce casos no descartan una tasa baja y que **52 es un suelo, no
+   una lista cerrada**. Eso está fichado en **F-041** (`pending`, prioridad 2,
+   `critico`) y en el `BACKLOG.md`, con la regla operativa —«lo que una campaña
+   paralela declare MUERTO hay que reverificarlo en serie antes de cerrar un
+   `critico`»— escrita para la próxima feature. Un instrumento con un defecto
+   medido, acotado y fichado es utilizable; uno con un defecto no declarado, no.
+
+**Lo que NO acepto, y quede dicho por si vuelve:** este razonamiento **no vale
+como precedente general**. Si en la próxima feature `critico` los supervivientes
+se matan y se dan por muertos **por una segunda campaña paralela**, el argumento
+se cae entero y el veredicto sería otro. Lo que aquí salva la campaña no es que
+el defecto sea pequeño: es que **el paso decisivo —confirmar la muerte— se hizo
+en serie**. Mientras F-041 no esté, esa es la condición.
+
+**Una hipótesis que sigue sin demostrarse** y conviene no perder: las líneas
+base bajo contención tardaron 462-486 s frente a 216-268 s en solitario. La
+sospecha (algún test cae bajo contención y `-x` lo convierte en «muerto») **no
+está probada**: no se ha identificado el test culpable ni descartado la
+interferencia entre los seis worktrees, que comparten `.git` y el mismo `.env`
+apuntando a la misma base. Es trabajo de F-041 y aquí solo lo dejo apuntado.
+
+## 4 · Lo que SÍ bloquea: el papeleo no dice lo que dice el árbol
+
+Y esto es lo que duele, porque es el defecto que ya quemó dos veces a esta
+feature: no el contenido, sino **el documento que lo cuenta**.
+
+### H1 · Los 52 análisis siguen literalmente en `PENDIENTE`
+
+`progress/mutacion_F-006.md` tiene **52 secciones de superviviente y las 52
+dicen**:
+
+```
+#### Análisis (PENDIENTE del implementer)
+
+> Por qué ningún test lo caza: PENDIENTE.
+> Decisión: ¿test nuevo o mutante equivalente justificado?
+```
+
+Contadas: 52 encabezados `#### Análisis (PENDIENTE del implementer)` y 104
+apariciones de la palabra `PENDIENTE`. **Ni una sola completada**, y el informe
+no lleva ningún puntero a dónde vive el análisis.
+
+C4 bis es explícito: «Cada superviviente de esa campaña tiene su sección de
+análisis **completada** (ninguna en `PENDIENTE`)». Es un checkbox vacío.
+
+El análisis **existe** —está en `impl_F-006_detalle.md`, y es bueno—, así que
+esto no es trabajo de investigación: es trabajo de escritura. Pero no es
+cosmético. Quien abra `mutacion_F-006.md` dentro de seis meses —o quien lo lea
+sin poder preguntar, que es el usuario que esta feature construye— lee un
+informe que dice que **nadie analizó nada**. Es una afirmación falsa servida a
+quien decide con ella.
+
+### H2 · `impl_F-006.md` contradice al árbol en su sección «Evidencias»
+
+El informe resumen —el que nombra C4 bis— dice hoy, en §2:
+
+| Lo que dice `impl_F-006.md` | Lo que mide el árbol |
+|---|---|
+| Tests: **2305 pasados, 125 saltados** | **2473 pasados, 128 saltados** |
+| Cobertura: **1 de 1 línea** | **33 de 33 líneas** |
+| Tiempo de la suite: **466,09 s** | **603,92 s** |
+| Mutación: **«NO MEDIDO, a propósito»** | **256 mutantes, 204 muertos, 52 supervivientes, 52/52 resueltos** |
+
+Y además:
+
+- **§1, fila T41**: «⬜ **pendiente y no declarable**: ver §4 (feature F-041)».
+  Falso: la campaña está hecha, es válida y la he verificado.
+- **§1, fila T42**: «✅ verde el 2026-08-26: 2305 pasados, 125 saltados».
+  Desfasado.
+- **§4** entero, «Mutación: por qué no hay número», sigue diciendo «Hasta que
+  F-041 esté hecho **no se declara ningún número**». Ya no es cierto: el defecto
+  que lo justificaba (línea base roja en el worktree) lo arregló el arnés 1.7.7,
+  y esa es precisamente la novedad de esta pasada.
+- **Falta el nº de workers en «Evidencias»**, que C4 bis exige de forma
+  literal («sin él no se puede calcular el coste por mutante»). La palabra
+  `workers` no aparece **ni una vez** en `impl_F-006.md` ni en sus 5768 líneas
+  de anexo. El 6 solo consta en el informe generado por la herramienta.
+  *Atenuante*: el dato existe y viene de la herramienta, que es la fuente
+  fiable; por sí solo no justificaría un rechazo.
+
+Solo **§9** (la última línea del fichero) está al día. Es decir: el mismo
+documento afirma en §2 que la mutación no se midió y en §9 que hay 52/52
+resueltos. **Un informe que se contradice a sí mismo no es evidencia.**
+
+Nota de contexto, no excusa: `impl_F-006.md` está en **219/220 líneas**, al
+filo de la puerta de tamaño. Corregir §1, §2 y §4 exige podar; §4 entero (diez
+líneas sobre por qué no hay número) ya sobra y paga el arreglo.
+
+### H3 · `tasks.md`: tareas hechas sin marcar, tareas entregadas sin anotar
+
+C5 exige todas las tareas `[x]` con su commit `F-006 Tn:`. Estado real:
+
+| Tarea | En `tasks.md` | En el árbol |
+|---|---|---|
+| **T41** | `[ ]` | **hecha**, commit `e89f71f F-006 T41: la campana de mutacion, entera y por primera vez valida` |
+| **T42** | `[ ]` | **hecha**, `init.sh` exit 0 verificado por mí |
+| **T29-T31** | `[ ]` a secas | **no existen en código** (verificado, H4) y el bloque I ya no es condición de cierre: hay que anotarlo, no dejarlo en blanco |
+| **T32-T34** | `[ ]` a secas | **entregadas a F-034** el 2026-08-25; `impl_F-006.md` §1 lo dice, `tasks.md` no |
+| **T38** | `[ ]` | bloqueada legítimamente, pero su propia cláusula de escape dice «se entrega a `mcp-bbdd` **y se anota como tal**», y esa anotación no está: `impl_F-006.md` solo dice «⛔ bloqueada» |
+| **T43** | `[ ]` | deuda registrada; la decisión es del humano |
+
+Ninguna de estas tareas necesita trabajo de ingeniería. Necesitan que el fichero
+diga lo que pasó. Y dos commits `F-006 T42:` (`143fa07`, `4d336fb`) hablan en
+realidad de matar supervivientes, que es T41: mal etiquetados.
+
+### H4 · La spec promete a F-034 un mecanismo que no existe
+
+Este es el hallazgo con consecuencias fuera de F-006, y por eso lo separo.
+
+**Verificado en el árbol** (`grep` sobre todo el repositorio):
+
+- `build_readonly_grant_statements` (`etl_sigrid/infrastructure/postgres/grants.py:24`)
+  tiene la firma `(readonly_role, owner_role, schemas, *, database=None)`:
+  **no existe `revocar_en`** (T29/R31).
+- **`PG_REVOKE_FUERA_DE_CONSUMO` no aparece en ningún fichero** del repositorio
+  (T30/R32).
+- `config/settings.py:81` `DEFAULT_CONSUMPTION_SCHEMAS` sigue siendo los
+  **nueve** esquemas: `mart,cierre,compras,maestro,retenciones,raw,stg,aux,_meta`
+  (T31/R30), con `raw` y `stg` dentro.
+- No existe `tests/test_f006_grants.py`, y **R30, R31, R32, R33 y R34 no tienen
+  ni un test trazable** (comprobado sobre los 41 requisitos EARS: los únicos sin
+  test son R30-R38; R35 y R36 sí lo tienen pero nombrados `test_f006_t35_*` /
+  `test_f006_t36_*` en vez de `test_f006_rNN_*`, y R37/R38 son `MANUAL`).
+
+**Nada de eso bloquea por sí mismo**: el humano decidió el 2026-08-25 («del BI
+olvídate») que DA-3 se resuelve por su opción B, y `requirements.md` recoge la
+consecuencia: «el **bloque I deja de ser condición de cierre de F-006** y pasa a
+ser entrega documentada a F-034». **Confirmo esa lectura: T29-T31 no bloquean.**
+
+Lo que sí bloquea es que **tres documentos siguen afirmando lo contrario**:
+
+1. `requirements.md` marca **R30 «vigente»**, **R31 «vigente: se construye y se
+   prueba»** y **R33 «vigente»**. Solo R32 y R34 llevan la enmienda. Un
+   requisito «vigente» sin código y sin test es un checkbox de C4 vacío.
+2. `design_detalle.md` §11.4 dice que F-006 entrega a F-034 «la lista de consumo
+   ya estrechada y el mecanismo de `REVOKE` **construido y probado**, que es
+   exactamente la pieza que F-034 necesitaría y que hoy no existe».
+3. **Peor**, porque lo lee otra feature: la ficha de **F-034** en `BACKLOG.md`
+   y en `harness/features.json` dice que recibe de F-006 «aplicar los `REVOKE`
+   que F-006 deja **CONSTRUIDOS Y APAGADOS** (`PG_REVOKE_FUERA_DE_CONSUMO`)».
+
+Si F-006 se cierra hoy, F-034 arranca buscando una variable de entorno, un
+parámetro y una lista estrechada que **no existen**, con su propia spec
+diciéndole que sí. Es el mismo tipo de fallo que esta feature entera se dedica a
+impedir: una ficha que describe mal un objeto no es documentación incompleta, es
+una afirmación falsa servida a quien decide con ella. Aquí el lector no es un
+agente MCP: es el spec-author de F-034.
+
+**El arreglo es documental**, no de código, y el humano ya tomó la decisión de
+fondo: basta con que R30/R31/R33 lleven la misma enmienda que R32/R34, que
+§11.4 diga que el mecanismo **no** se construyó, y que la ficha de F-034 diga
+que recibe el trabajo entero y no solo la activación. Salvo que el humano
+prefiera lo contrario —construir T29-T31 aquí— y entonces lo que sobra es la
+enmienda.
+
+## 5 · Lo que sí está bien, y conviene que conste
+
+- **C3, arquitectura y convenciones: limpio.** Los ocho módulos del alcance y
+  los ficheros nuevos de test llevan su ruta relativa en la primera línea. Cero
+  `print()` de debug. Cero TODO/FIXME sin contexto (los únicos aciertos del
+  `grep` son la palabra «TODOS»). `domain/diccionario.py` y `domain/inventario.py`
+  importan **solo** `re`, `collections.abc`, `dataclasses` y entre sí: dominio
+  sin infraestructura. El DDL vive en `sql/ddl/01_diccionario.sql`, con la
+  numeración `NN_nombre.sql` y documentado en `docs/ARCHITECTURE.md:230`.
+- **Las tres trampas del dominio Sigrid están escritas en el diccionario**, que
+  es donde tienen que estar para el agente que no puede preguntar:
+  `fasnum`/`fas` (`00_global.yaml:263` «Nunca cruces las dos lecturas»;
+  `stg.yaml:576` «en los ámbitos reales es el MES y en los master el número de
+  versión: la misma columna significa dos cosas»);
+  `importe_origen`/`importe_mes` (regla dura en `00_global.yaml:57`, con la
+  medición que la sostiene en `mart.yaml:61`: `SUM(importe_mes)` iguala al
+  último `importe_origen` en 200 de 200 series); y las **versiones master
+  duplicadas** (`stg.yaml:10` «conviven TODAS las versiones master», más el
+  objeto `stg.version_master_vigente`).
+- **Barrido de datos sensibles** sobre los 37 ficheros del diff `dev...HEAD`,
+  con los patrones `password=`, `pwd=`, `secret=`, `api[_-]?key`,
+  `BEGIN … PRIVATE KEY`, GUID (`8-4-4-4-12`), `Server=…Password`,
+  `postgres://user:pass@`, IPs privadas `10.*`/`192.168.*` y cadenas base64 de
+  40+ caracteres: **cero hallazgos**. El único acierto de `pwd=` es
+  `runbook_postgres_azure.md:141`, `-v app_pwd="$APP_PWD"`, que es una
+  referencia a variable de shell y no un valor.
+- **C3 bis: N/A justificado.** El diff no toca ningún fichero de
+  `docs/referencia/`. (El barrido de secretos se hizo igual, arriba.)
+- **C4 ter: N/A y sin nada que justificar.** No existe
+  `harness/rutas_sensibles.json` en este repositorio, que es el caso
+  mayoritario que el propio checkpoint declara N/A.
+- **T37 confirmada hecha.** `azure-apps/datamart_seg_anual.md`, commit
+  `2e9bee8` del 2026-08-22. No la reverifiqué en el repositorio `azure-apps`
+  (está fuera de este árbol): **lo digo en vez de darla por buena en silencio**.
+  Lo que sí puedo verificar es que `docs/ARCHITECTURE.md` enlaza a `azure-apps`
+  en vez de duplicarlo, y lo hace
+  (`test_f006_t36_arquitectura_enlaza_azure_apps_sin_duplicarlo`).
+- **T28, T35 y T36 verificadas**: `tests/test_f006_docs.py` existe con 12 tests
+  que **derivan** lo que el documento afirma de la fuente que manda (los
+  `@cli.command` de `main.py`, los `CREATE TABLE` del DDL) en vez de comprobar
+  que una frase esté escrita. Es el método correcto.
+- **La fase RED está pegada con traza real** en todas las tandas, incluidas las
+  dos últimas: `cargador_yaml.py:361` (`assert 2024 == '2024'` y
+  `assert '' is None`) y `relaciones_sql.py:278` (los tres casos frontera
+  parametrizados). No hay ni un «se siguió TDD» sin traza.
+- **C2 limpio**: una sola feature `in_progress`, rama correcta,
+  `progress/current.md` describe solo la sesión del 2026-08-26.
+
+## 6 · Lo que NO he podido verificar, y así queda escrito
+
+- **Que `_meta` sirva hoy la versión 9.** Exige la base; no ejecuto consultas
+  contra producción para una review. El hash del árbol es el que reporta el
+  humano, pero la medición es suya.
+- **La demostración de los dos equivalentes `ensure_ascii` contra la base
+  real.** Verifiqué en su lugar las dos premisas desde el árbol (columnas
+  `JSONB` y hash sobre los YAML, §2.5), que es lo que las hace verdaderas.
+- **T19, T27, T32-T34, T38, T39**: verificaciones `MANUAL (humano)`. No se
+  reetiquetan.
+- **T37 en el repositorio `azure-apps`** (fuera de este árbol).
+- **Los 204 muertos de la campaña, uno a uno.** La regla de los 60 segundos no
+  obliga y reejecutar cuesta 2 h 19 min de máquina. Verifiqué cinco (§2.6) más
+  el recálculo puro de los totales (§2.1-2.2).
+
+## 7 · Propuesta de mejora del protocolo (no aplicada)
+
+Para `CHECKPOINTS.md` y `.claude/agents/implementer.md`, a decisión del humano:
+**cuando el análisis de los supervivientes no quepa en el informe de la campaña,
+el informe debe llevar en su cabecera un puntero al fichero donde vive**, y el
+checkbox de C4 bis debería aceptar ese puntero como «análisis completado». Hoy
+la regla obliga a rellenar 52 secciones a mano en un fichero generado por la
+herramienta, que es justo el trabajo que nadie hace y por eso se queda en
+`PENDIENTE`. Lo que la regla quiere impedir —que un superviviente se cierre sin
+juicio— se consigue igual con el puntero, y se consigue de verdad.

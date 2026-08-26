@@ -1,125 +1,139 @@
 <!-- progress/review_F-006.md -->
 # F-006 · Review — el diccionario semántico (resumen)
 
-> El detalle íntegro de las dieciséis pasadas —hallazgos, citas de código,
-> experimentos y discusión— vive en
-> [`review_F-006_detalle.md`](review_F-006_detalle.md) (4918 líneas). **Este
-> fichero es el índice de entrada**: veredicto vigente, checkpoints, hallazgos
-> abiertos y qué falta para cerrar. Los enlaces apuntan a secciones del anexo.
+> El detalle de las veinte pasadas —hallazgos, citas de código y las
+> reverificaciones de esta— vive en
+> [`review_F-006_detalle.md`](review_F-006_detalle.md) (5364 líneas). **Este
+> fichero es el índice de entrada.**
 
-## Veredicto vigente
+## Veredicto · 20ª pasada, 2026-08-26
 
-**RECHAZADO**, decimosexta pasada (la última; sin fecha en cabecera, posterior al
-2026-08-21). Nivel de rigor `critico`.
+**Revisión COMPLETA** (pasada 20), no incremental: el veredicto vigente era
+RECHAZADO desde la 16ª, así que no hay «último commit aprobado» desde el que
+medir un delta. `HEAD = 6332995`.
 
-Es, a la vez, **la mejor tanda de las dieciséis** en contenido: la formulación
-del aviso de doblado es exacta, `ocultar` viaja usable, `_ACUMULADAS` se deriva
-de verdad y por primera vez una comprobación ataca la clase y no el caso. Lo que
-bloquea **no es el contenido publicado, son los instrumentos**: la puerta de
-mutación del arnés declara «0 supervivientes» sin medir nada (demostrado con
-control), el guardián de coherencia tiene tres vías de evasión —una lo deja
-inerte hoy— y la corrección 22 → 9 llegó a la cabecera y no a las fichas de
-columna.
+# RECHAZADO
 
-**La batería de las 18 preguntas SÍ puede lanzarse ya**: nada de lo que bloquea
-el APROBADO bloquea la batería
-([anexo](review_F-006_detalle.md#la-batería--sí-lanzadla-y-lo-que-falta-se-corrige-mientras-corre)).
+**Nivel de rigor: `critico`**, declarado en `harness/features.json`: exige C1-C5,
+fase RED, cobertura, campaña de mutación, **cero supervivientes** salvo
+justificación escrita aceptada por el humano, y RM1-RM6.
 
-### Evolución de las rondas
+**Quede claro qué se rechaza y qué no.** La ingeniería está hecha y la he
+verificado yo, no leída: la campaña de mutación es **válida por primera vez**,
+sus totales cuadran con mi recálculo independiente, los 52 supervivientes son
+mutantes reales byte a byte, los tres equivalentes se sostienen y los cinco
+mutantes que reverifiqué en serie mueren. **Lo que bloquea es que los documentos
+no dicen lo que dice el árbol** — el mismo defecto que ya quemó dos veces a esta
+feature, y que aquí llega a prometerle a F-034 un mecanismo que no existe.
+**Ninguno de los cuatro hallazgos exige ingeniería: los cuatro son escritura.**
 
-| # | Fecha | Veredicto | Eje |
-|---|---|---|---|
-| 1 | 20-ago | RECHAZADO | 10 defectos en 25 fichas; la puerta de cobertura no protege |
-| 2 | 20-ago | APROBADO | Los 10 cerrados; 4 arrastres antes de publicar en `_meta` |
-| 3 | 20-ago | RECHAZADO | `compras`/`retenciones`: claves compuestas y `agregacion` falsos |
-| 4 | 20-ago | RECHAZADO | Defectos cerrados en un campo y vivos en el campo vecino |
-| 5 | 20-ago | RECHAZADO | Grano derivado: el defecto era sistemático, no puntual |
-| 6 | 20-ago | **APROBADO** | Bloques A–D, E y F parcial (49 fichas) |
-| 7 | 20-ago | RECHAZADO | Diccionario completo (53 objetos más): `raw` y `stg` con fichas falsas |
-| 8 | 21-ago | RECHAZADO | Regla de oro y carga de `raw`: una falsedad sustituida por otra |
-| 9 | 21-ago | RECHAZADO | Bug del derivador (alias `l` machacado) y copia superviviente |
-| 10 | 21-ago | RECHAZADO | Vicio de fondo cerrado; 2 defectos en superficie de consumo |
-| 11 | 21-ago | **APROBADO** | Los seis cerrados; punto de rendimientos decrecientes |
-| 12 | 21-ago | RECHAZADO | Primera contra la base real: `READ ONLY` inexistente, evidencia recortada |
-| 13 | 21-ago | RECHAZADO | Guardián verde sobre afirmación falsa; código muerto nuevo |
-| 14 | s/f | RECHAZADO | Campaña de mutación caducada; `importe_origen` doblado |
-| 15 | s/f | RECHAZADO | El aviso bajó a la columna, la cabecera sigue tranquilizando |
-| 16 | s/f | **RECHAZADO (vigente)** | La puerta de mutación no mide nada |
+## Lo que verifiqué contra el árbol (no contra el papeleo)
 
-Patrón recurrente, escrito por el propio reviewer: **rectificó seis veces un
-APROBADO ya emitido** por emitir antes de que volviera la auditoría que él mismo
-encargaba, y por verificar lo que la tanda dice haber hecho en vez de lo que se
-le escapó. El diagnóstico de fondo de las dieciséis: *el problema nunca han sido
-los datos, sino los instrumentos que decían que los datos estaban bien*.
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Entorno | `bash harness/init.sh` tal cual | **exit 0**, 2473 pasados, 128 saltados, 603,92 s; cobertura 100 % de 33 líneas; tamaño dentro (impl 219/220) |
+| Alcance y nº de mutantes | recálculo puro con `harness.alcance` + `harness.mutacion.generar_mutantes` | **3126 líneas / 256 mutantes: coincide exacto** |
+| Que los 52 supervivientes existan | parseo del informe y contraste de fichero, línea, **operador** y texto original→mutado | **52 de 52 reproducibles**, 0 fallos |
+| RM1 · SHA medido | diff `99e2335..HEAD` | **ninguno de los 8 ficheros del alcance cambió**: solo `progress/`, `BACKLOG`, `features.json` y 5 de `tests/` |
+| RM2 · tiempos | `media × W` = 32,7 × 6 = **196,2 s** vs línea base ~470 s (ratio 0,42) | coherente; el 80 % de muertos con `-x` explica la media |
+| Los 60 s | «Tiempo total» 8368,3 s (2 h 19 min) | **campaña NO reejecutada**, y queda dicho: la regla no obliga por encima de 60 s |
+| RM5 · un equivalente | `relaciones_sql.py:282` `int(UMBRAL*100)→*101`, aplicado con el propio mutador, 11 casos (8 en la rama `AVISO`) | **salidas idénticas: equivalente confirmado** |
+| Los otros dos equivalentes | premisas verificadas desde el árbol: `ficha`/`datos` son **JSONB** en el DDL, y el único `sha256` va sobre los **bytes del YAML** | `ensure_ascii` no es observable: se sostienen |
+| RM4 · 5 mutantes en serie | worktree aparte, `.env` volcado, línea base **verde** primero (189 passed) | **5 de 5 MUERTOS**, incluido el falso muerto de `inventario.py:234` |
+| RM6 | diff `99e2335..HEAD` | **ninguna línea de producción tocada**: no se quitó ninguna guarda |
+| Secretos | 10 patrones sobre los 37 ficheros del diff `dev...HEAD` | **cero hallazgos** |
+| T29-T31 | `grep` en todo el repositorio | **no existen**: sin `revocar_en`, sin `PG_REVOKE_FUERA_DE_CONSUMO`, `DEFAULT_CONSUMPTION_SCHEMAS` sigue en nueve esquemas |
 
-## Recorrido de `CHECKPOINTS.md` (decimosexta pasada)
+## Recorrido de `CHECKPOINTS.md`
 
 | CP | Estado | Motivo |
 |---|---|---|
-| **C1** Entorno en verde | CUMPLE | `init.sh` verde: 1982 pasados, 124 saltados, cobertura 98,1 % de 979 líneas |
-| **C2** Trazabilidad requisito → test | **NO CUMPLE** | Mitad del guardián de coherencia inerte; el arreglo de `ocultar` no lo protege ningún test; `_acumuladas_de` pierde `can_origen` en silencio |
-| **C3** Diff conforme al diseño | CUMPLE | Solo los ficheros previstos; `design.md` §4.4 actualizado (su §159 se contradice: menor) |
-| **C3 bis** Sin secretos ni prints | CUMPLE | Sin GUID ni correo en el árbol |
-| **C4** Convenciones y veracidad | **NO CUMPLE** | Remisión a una consulta que da otro número; tres fichas de columna con el «22» mal atribuido; dos de los tres números sin consulta publicada |
-| **C4 bis** Campaña de mutación | **NO CUMPLE** | La puerta no mide: en worktree detached la suite ya está roja antes de mutar y `returncode != 0` cuenta como mutante muerto |
-| **C4 ter** Cero supervivientes | **NO CUMPLE** | Al menos un superviviente real (`diccionario_sql.py:297`, `and`→`or`), declarado muerto por las dos campañas |
-| **C5** Tareas y commits | CUMPLE PARCIAL | Reserva: `azure-apps` no recoge `ocultar` (R38 pedía el mismo trabajo). Las verificaciones MANUAL (T19, T27, T29–T34) siguen abiertas **por diseño** — N/A para el reviewer, las ejecuta el humano |
+| **C1** Arnés en verde | `[x]` | `init.sh` exit 0; los siete ficheros obligatorios existen |
+| **C2** Estado coherente | `[x]` | Una sola `in_progress`; rama correcta; `current.md` solo la sesión del 26 |
+| **C3** Arquitectura y convenciones | `[x]` | Dominio sin infraestructura; ruta en la 1ª línea; sin `print()` ni TODO; SQL en `sql/ddl/01_diccionario.sql` con numeración. **Las tres trampas Sigrid documentadas en el diccionario**: `fasnum`/`fas`, `importe_origen`/`importe_mes` (con la medición 200/200) y las versiones master duplicadas |
+| **C3 bis** Documentos de fuera | **N/A justificado** | El diff no toca `docs/referencia/`. El barrido de secretos se hizo igual: cero |
+| **C4** Verificación real | `[ ]` | **R30-R34 sin un solo test trazable** (H4). Menor: R35/R36 se prueban pero nombrados `test_f006_t35_*` en vez de `test_f006_r35_*` |
+| **C4 bis** El rigor declarado | `[ ]` | **Los 52 análisis de supervivientes siguen en `PENDIENTE`** (H1) y la sección «Evidencias» de `impl_F-006.md` contradice al árbol y **omite el nº de workers** (H2). Todo lo demás del bloque —RM1 a RM6, totales, cero cabecera de campaña no válida, 0 timeouts, 0 «sin veredicto»— **cumple y está verificado** |
+| **C4 ter** Rutas sensibles | **N/A sin nada que justificar** | No existe `harness/rutas_sensibles.json`: es el caso mayoritario que el propio checkpoint declara N/A |
+| **C5** Sesión cerrada | `[ ]` | **T41 y T42 hechas y sin marcar**; T29-T34 y T38 sin anotar su entrega (H3). Árbol limpio, sin ficheros sin trackear, sin worktrees huérfanos |
 
-El reviewer **rectifica en la propia pasada** los C4 bis y C4 ter que había puesto
-en verde: su recálculo confirmaba el **conteo** de mutantes (254, exacto), no el
-**veredicto** de cada uno
-([anexo](review_F-006_detalle.md#checkpoints)).
+## Mi criterio sobre LA LIMITACIÓN (respuesta a la pregunta del líder)
 
-## Hallazgos abiertos (bloquean el cierre)
+**¿Basta para un `critico` que la campaña paralela produzca falsos muertos y que
+los 204 muertos no sean lista cerrada? SÍ, basta para cerrar F-006** — y no
+bastaría sin las dos condiciones que ya se cumplen. Razones, porque un «sí» sin
+razones aquí no vale nada:
 
-| # | Hallazgo | Estado | Anexo |
-|---|---|---|---|
-| H1 | **La puerta de mutación del arnés falla en verde.** Falta línea base verde y veredicto por comparación de tests fallidos, no por `returncode`. **Es fallo del arnés, no de F-006**: afecta a `arnes-base` y a las campañas de F-003/004/005/011/015/016/019/020/024 lanzadas en paralelo con «0 supervivientes» | Abierto · GRAVE | [§GRAVE](review_F-006_detalle.md#grave--la-puerta-de-mutación-del-arnés-da-0-supervivientes-sin-comprobar-nada) |
-| H2 | **Mutante vivo conocido**: `diccionario_sql.py:297` (`and`→`or`) sobrevive a la suite completa; ningún test cubre `_clave_de` con entradas de tipo cadena | Abierto · GRAVE | [§GRAVE](review_F-006_detalle.md#grave--la-puerta-de-mutación-del-arnés-da-0-supervivientes-sin-comprobar-nada) |
-| H3 | **El guardián de coherencia tiene tres vías de evasión** (otra redacción no listada; frase partida por línea en blanco del plegado YAML; y el salvoconducto evaluado sobre toda la cabecera, que lo deja inerte hoy) | Abierto · GRAVE | [§Guardián](review_F-006_detalle.md#el-guardián-de-coherencia-atacado-corta-el-caso-real-y-tiene-tres-puertas) |
-| H4 | **El 22 → 9 no viajó**: las tres fichas de columna (`fact_seguimiento_categoria.importe_origen`, `…_raw`, `v_pbi_fact_categoria.importe_origen`) conservan «22 obras», la cifra mal atribuida | Abierto · MEDIA | [§Motivo 3](review_F-006_detalle.md#motivo-3--la-corrección-22--9-llegó-a-un-sitio-y-no-a-los-otros) |
-| H5 | **Remisión falsa publicada al agente**: «la consulta que da ese numero esta en el grano de `mart.fact_seguimiento_mensual`» apunta a una consulta que devuelve 8.778 y 9 obras, no el doblado | Abierto · MEDIA | [§Motivo 3](review_F-006_detalle.md#y-una-afirmación-falsa-publicada-al-agente) |
+1. **La dirección peligrosa está tapada donde importa.** Un falso muerto esconde
+   un superviviente, pero **todo lo que se declaró muerto por los tests nuevos se
+   reverificó EN SERIE**. Yo he reverificado cinco más, también en serie y con
+   línea base verde delante. El riesgo residual vive solo en los 204 que la
+   campaña paralela juzgó y nadie volvió a mirar.
+2. **El único falso muerto confirmado se persiguió hasta matarlo.**
+   `inventario.py:234 [not]` no se documentó y se dejó: se cazó, se explicó y
+   hoy muere. Lo he comprobado en mi propio worktree.
+3. **Está declarado por escrito, con dueño y con consecuencia práctica.**
+   `control_mutacion_F-006.md` no maquilla el cero de la muestra de control:
+   escribe que doce casos no descartan una tasa baja y que **52 es un suelo, no
+   una lista cerrada**. Está fichado en **F-041** (`pending`, prioridad 2) con la
+   regla operativa escrita para la próxima feature.
 
-### Abiertos de higiene (no bloquean)
+**Lo que NO acepto, por si vuelve:** esto **no es precedente general**. Si en la
+próxima feature `critico` los supervivientes se matan y se dan por muertos **por
+una segunda campaña paralela**, el argumento se cae entero. Lo que aquí salva la
+campaña no es que el defecto sea pequeño: es que **el paso decisivo se hizo en
+serie**. Mientras F-041 no esté, esa es la condición.
 
-| # | Hallazgo | Anexo |
+**Y confirmo lo otro que preguntabas: T29-T31 NO bloquean.** El humano resolvió
+DA-3 por su opción B el 2026-08-25 y `requirements.md` recoge que el bloque I
+deja de ser condición de cierre. Lo que bloquea es lo de H4: que tres documentos
+sigan diciendo lo contrario.
+
+## Hallazgos abiertos (numerados y accionables)
+
+| # | Hallazgo | Fichero y sitio |
 |---|---|---|
-| h6 | Falta publicar la consulta del «37 celdas / 39,07 M€» y la del «22 obras» | [§Motivo 3](review_F-006_detalle.md#motivo-3--la-corrección-22--9-llegó-a-un-sitio-y-no-a-los-otros) |
-| h7 | `_acumuladas_de` pierde `can_origen` (no declara `unidad`); el control ancla solo 2 de 4 y un solo objeto | [§`_ACUMULADAS`](review_F-006_detalle.md#_acumuladas-derivada-de-verdad--con-una-pérdida-silenciosa) |
-| h8 | El guardián hermano se relajó a aceptar cualquiera de tres cadenas: un objeto puede citar el número de otro y pasar | [§Guardián hermano](review_F-006_detalle.md#y-el-guardián-hermano-se-relajó-en-esta-misma-tanda) |
-| h9 | `azure-apps/datamart_seg_anual.md` no recoge `ocultar` en el contrato ampliado (R38) | [§`ocultar`](review_F-006_detalle.md#ocultar--viaja-usable-y-resuelve-lo-que-planteé) |
-| h10 | `design.md:159` describe `ocultar` como «patrones fnmatch» y contradice a su §4.4 | [§`ocultar`](review_F-006_detalle.md#ocultar--viaja-usable-y-resuelve-lo-que-planteé) |
-| h11 | El doblado sigue vivo **en la base**: el diccionario avisa bien, el número seguirá mal hasta arreglar el build (recogido en F-042 como dato erróneo) | [§Batería](review_F-006_detalle.md#la-batería--sí-lanzadla-y-lo-que-falta-se-corrige-mientras-corre) |
+| **H1** | **Los 52 supervivientes tienen su análisis literalmente en `PENDIENTE`**: 52 encabezados `#### Análisis (PENDIENTE del implementer)` y 104 apariciones de la palabra, ninguna completada, y sin puntero a dónde vive el análisis. C4 bis lo exige completado. El análisis **existe y es bueno** en `impl_F-006_detalle.md`: falta traerlo o enlazarlo | `progress/mutacion_F-006.md`, las 52 secciones |
+| **H2** | **`impl_F-006.md` se contradice a sí mismo.** §2 «Evidencias» dice 2305 tests (son 2473), 1 línea de cobertura (son 33), 466,09 s (son 603,92) y **«Mutación: NO MEDIDO, a propósito»**; §1 marca **T41 «pendiente y no declarable»** y §4 sigue diciendo que hasta F-041 no se declara ningún número. Solo §9 está al día. Falta además el **nº de workers** (6), que C4 bis exige literalmente: la palabra no aparece ni una vez en el informe ni en sus 5768 líneas de anexo | `progress/impl_F-006.md` §1 (filas T41, T42), §2 entera, §4 entera |
+| **H3** | **`tasks.md` no refleja el árbol.** T41 y T42 están `[ ]` estando **hechas** (commit `e89f71f F-006 T41: …`, e `init.sh` exit 0 verificado). T29-T31 `[ ]` a secas cuando el bloque I está entregado; T32-T34 `[ ]` cuando `impl_F-006.md` §1 ya las da entregadas a F-034; T38 `[ ]` sin la anotación de entrega a `mcp-bbdd` que su propia cláusula de escape exige. Menor: `143fa07` y `4d336fb` van etiquetados `F-006 T42:` y son trabajo de T41 | `specs/F-006-mcp-azure/tasks.md` líneas 255-271, 311, 356-360 |
+| **H4** | **La spec le promete a F-034 un mecanismo que no existe.** Verificado: sin `revocar_en` en `grants.py:24`, `PG_REVOKE_FUERA_DE_CONSUMO` en ningún fichero, `settings.py:81` con los nueve esquemas. Pero `requirements.md` marca **R30 «vigente»**, **R31 «vigente: se construye y se prueba»** y **R33 «vigente»**; `design_detalle.md` §11.4 dice que se entrega «el mecanismo de `REVOKE` **construido y probado**»; y la ficha de **F-034** en `BACKLOG.md` y `features.json` dice que recibe «los `REVOKE` que F-006 deja **CONSTRUIDOS Y APAGADOS**». Si F-006 cierra hoy, F-034 arranca buscando algo que no está, con su spec diciéndole que sí | `requirements.md` R30/R31/R33; `design_detalle.md` §11.4; `BACKLOG.md` y `harness/features.json`, ficha de F-034 |
 
-### Resueltos
+## Qué falta para APROBADO
 
-**Unos 55 hallazgos cerrados y verificados a lo largo de las pasadas 1 a 16** —los
-10 de la primera, los 5 de la tercera, los 6 de la cuarta y quinta, los 10 de la
-séptima, los defectos de `raw`/regla de oro de la octava, los 5 de la novena, los
-6 de la décima, los 5 de la duodécima y los 4 de la decimotercera—, cada uno con
-su comprobación contra el SQL en el anexo. Ninguno vuelve a abrirse.
+1. **Completar los 52 análisis** de `progress/mutacion_F-006.md`, o —si el humano
+   acepta la automejora del §7 del anexo— poner en su cabecera el puntero exacto
+   a la sección de `impl_F-006_detalle.md` donde vive cada uno.
+2. **Poner al día `impl_F-006.md`**: §2 con los cuatro números reales **más el
+   nº de workers (6)**, §1 con T41 y T42 en ✅, y §4 reescrita —hoy dice lo
+   contrario de lo que pasó—. El fichero está en 219/220: §4 entera es lo que
+   sobra y paga el arreglo.
+3. **Marcar `tasks.md`**: T41 y T42 `[x]`; T29-T31 y T32-T34 con su marca de
+   entrega a F-034; T38 anotada como entregada a `mcp-bbdd`.
+4. **Deshacer la promesa falsa a F-034**: enmendar R30/R31/R33 igual que R32/R34,
+   corregir `design_detalle.md` §11.4 y la ficha de F-034 para que digan que el
+   mecanismo **no** se construyó. (O construir T29-T31 aquí, si el humano lo
+   prefiere; entonces lo que sobra es la enmienda.)
 
-## Qué falta para APROBADO (palabras del reviewer)
+**No verificable desde el árbol, y así queda escrito**: que `_meta` sirva hoy la
+versión 9 (exige la base), los `ensure_ascii` contra la base real —verifiqué sus
+premisas—, T37 en `azure-apps`, y las `MANUAL` T19, T27, T32-T34, T38 y T39.
 
-**Bloqueantes**
+## Evolución de las rondas
 
-1. **Arreglar la puerta de mutación** (línea base verde obligatoria + veredicto
-   por comparación con los tests que ya fallaban) y **relanzar la campaña** para
-   saber cuántos supervivientes hay de verdad. Hoy se conoce uno; no se sabe si
-   son diez. La corrección va a `harness/mutacion.py` **y a `arnes-base`** por la
-   regla de propagación.
-2. **Cerrar el mutante conocido**: un test que compruebe `_clave_de` con entradas
-   de tipo cadena, que es lo que hace `ocultar` usable.
-3. **Quitar el salvoconducto** del guardián de coherencia, normalizar antes de
-   comparar (`tests/_texto.py::normalizado()`, que ya existe) y sustituir la lista
-   de frases a mano por un criterio, como ya se hizo con `_ACUMULADAS`.
-4. **Propagar el 22 → 9** a las tres fichas de columna y corregir la remisión «la
-   consulta que da ese numero está en el grano de…».
+| # | Veredicto | Eje |
+|---|---|---|
+| 1-15 | 3 APROBADO, 12 RECHAZADO | Fichas falsas, guardianes verdes sobre afirmaciones falsas, campañas caducadas |
+| 16 | **RECHAZADO** | La puerta de mutación no medía nada: base roja y `returncode != 0` contado como muerto |
+| 17-19 | (sin veredicto) | Arnés 1.7.7 arregla la campaña; 52 supervivientes resueltos: 49 muertos, 3 equivalentes |
+| **20** | **RECHAZADO** | **La campaña ya es válida y lo he verificado. Bloquea el papeleo, no el código** |
 
-**De higiene, no bloqueantes:** h6 a h10 de la tabla anterior.
+Diagnóstico de las veinte: *el problema nunca han sido los datos, sino los
+instrumentos que decían que los datos estaban bien*. Vuelta de tuerca de esta
+pasada: arreglado el instrumento, lo que miente es **el informe que cuenta lo
+que el instrumento midió**.
 
-**Automejoras propuestas y no aplicadas**
-([anexo](review_F-006_detalle.md#automejora-que-propongo-no-aplico)): línea base
-verde en la puerta de mutación (urgente, va a `arnes-base`); que todo guardián
-nuevo venga con **su intento de evasión** además de su control anti-vacío; y que
-los tests que comparan prosa normalicen el marcado.
+**Automejora propuesta y no aplicada** ([§7 del anexo](review_F-006_detalle.md)):
+que C4 bis acepte un **puntero al fichero donde vive el análisis** de los
+supervivientes cuando no quepa en el informe generado — hoy obliga a rellenar 52
+secciones a mano en un fichero de la herramienta, que es justo el trabajo que
+nadie hace y por eso se queda en `PENDIENTE`.
