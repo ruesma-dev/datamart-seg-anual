@@ -2,11 +2,17 @@
 # Estado actual · 2026-08-26
 
 **Feature en curso: F-006 · MCP sobre el datamart.** Rama
-`feature/F-006-mcp-azure`, con el arnés **1.7.6** dentro. `bash harness/init.sh`
-**en verde: 2.291 tests, 125 saltados** (615 s); cobertura 100 % de 1 línea
-cambiada y puerta de tamaño cumplida, con **impl al filo: 219 de 220 líneas**.
-Árbol limpio y **sin mutantes aplicados** (verificado con
-`python -m harness.mutacion --estado`).
+`feature/F-006-mcp-azure`, con el arnés **1.7.7** dentro. `bash harness/init.sh`
+**en verde: 2.336 tests, 125 saltados** (526 s); cobertura 100 % de 33 líneas
+cambiadas y puerta de tamaño cumplida (impl 215/220). Árbol limpio y **sin
+mutantes aplicados**.
+
+**AL RETOMAR, LO PRIMERO: mira si terminó la campaña de mutación.** Se lanzó el
+2026-08-26 a las 15:20 con **6 workers**, alcance de 8 ficheros y **256
+mutantes**, salida en `progress/mutacion_F-006.md`. **No muta el árbol
+principal** —cada worker va en su worktree—, así que si la sesión murió, el
+árbol está intacto; compruébalo igual con `python -m harness.mutacion --estado`
+y `git worktree list`.
 
 ---
 
@@ -16,12 +22,52 @@ cambiada y puerta de tamaño cumplida, con **impl al filo: 219 de 220 líneas**.
 más el bloque de documentación T28/T35/T36. La decisión de cómo se mide **ya la
 tomó el humano**: campaña **en serie, de noche**.
 
-### Cómo se mide F-006: DECIDIDO (2026-08-26)
+### Cómo se mide F-006: el modo PARALELO, arreglado el 2026-08-26
 
-**Opción elegida: lanzarla de noche, en serie.** Funciona hoy, sin trabajo
-previo en el arnés, y es la evidencia que el reviewer lleva diecisiete pasadas
-pidiendo. Se descartaron arreglar antes el modo paralelo (media jornada de
-trabajo para bajar a 3-4 h) y el muestreo declarado (no cumple `critico`).
+**La decisión cambió a media tarde, y por un dato.** Primero se eligió la
+campaña en serie de noche. Luego el humano señaló que el arnés ya trae
+`harness/mutacion_paralela.py`, se midió qué lo impedía de verdad, y resultó
+ser **una sola causa**, no media jornada de trabajo.
+
+**Lo que se midió** (suite completa corrida dentro de un `git worktree` recién
+creado desde HEAD): **25 fallos**. Veintitrés eran lo mismo —sin `.env`, la
+configuración no valida (`SigridApiSettings: base_url Field required`) y el CLI
+devuelve salida vacía—, uno era `test_f015_r12` por el detached HEAD y el otro
+lo había roto yo en `current.md`. Con la línea base en rojo, la campaña abortaba
+con `BaseRota` sin juzgar un solo mutante. **El modo paralelo no mentía: se
+negaba a arrancar**, que es lo que hace desde la 1.5.3.
+
+**Los dos arreglos, hechos hoy:**
+
+| Pieza | Dónde vive | Qué hace |
+|---|---|---|
+| El `.env` llega a los workers | **`arnes-base` 1.7.7** (`62acb62`), instalado aquí en `c541c23` | El coordinador vuelca las variables al entorno del proceso **antes** de crear los worktrees; los workers las heredan porque `EjecutorPytest` ya lanza pytest con `{**os.environ}`. **El fichero NO se copia**: dejarlo en el temp del sistema pondría credenciales fuera del repositorio y de su `.gitignore`. Lo sostiene un test que levanta una campaña real de dos worktrees y comprueba que ninguno recibe copia |
+| `test_f015_r12` | **aquí** (`eba4898`), no existe en `arnes-base` | Ya no pregunta por la rama del repositorio de al lado: monta un repo de juguete y fija la regla entera —con rama devuelve **esa** rama; en detached, cadena vacía, que es el contrato del que depende la puerta de cobertura |
+
+**Y funcionó.** Prueba con 2 workers (`99e2335`): las dos líneas base **en
+verde** (331,0 s y 335,5 s), timeout derivado solo (671 s = max(120, 335,5×2)),
+**4 mutantes en 1.043 s: 3 muertos, 1 superviviente, 0 timeouts**. El árbol
+principal no se mutó y los worktrees se retiraron solos.
+
+**Alcance real: 256 mutantes** (contados con `generar_mutantes`, no estimados),
+repartidos así: `diccionario.py` 93, `cargador_yaml.py` 42, `unicidad_sql.py`
+27, `relaciones_sql.py` 26, `diccionario_sql.py` 25, `inventario.py` 24,
+`catalogo.py` 14, `publicar_diccionario_step.py` 5. **No son los ~400 que se
+estimaron ayer.**
+
+| Vía | Duración | Árbol |
+|---|---|---|
+| Serie (lo decidido por la mañana) | ~18,3 h | mutado toda la noche |
+| Paralelo, 2 workers | ~12,6 h | **nunca se muta** |
+| Paralelo, 6 workers ← **elegido** | **~5 h** | ídem |
+
+**El coste que no son horas de máquina.** En la prueba salió **1 superviviente
+de 4** (`inventario.py:234`: quitarle el `not` a `informe.avisos_columnas` no
+mata a nadie). Cuatro no son una muestra, pero `critico` exige **cero
+supervivientes**, y cada uno cuesta un test nuevo o una justificación escrita
+que acepte el humano. **Decisión del humano: primero ver la lista analizada por
+grupos, y solo entonces decidir** — si son decenas, la conversación deja de ser
+«escribe tests» y pasa a ser si F-006 puede sostener el rigor que declara (T43).
 
 **El alcance real es mayor que el que se midió ayer.** No son seis módulos:
 son **ocho**, todos nacidos en F-006 (verificado con `git log --diff-filter=A`,
@@ -368,14 +414,28 @@ en git) consume `_meta` y sirve **los cinco bloques** de contexto.
 ## Lo que falta para cerrar F-006
 
 ### Nuestro
-- **Bloque J, documentación** (T35-T37): `docs/runbook_postgres_azure.md`,
-  sección de arquitectura, y actualizar `azure-apps/datamart_seg_anual.md`.
-  T37 es **obligatoria**: cambió lo que este proyecto expone.
-- **T28**: la regla en `docs/CONVENTIONS.md` (quien cambia un objeto publicado
-  actualiza su ficha en el mismo trabajo).
+- ~~**Bloque J, documentación** (T35-T37)~~ y ~~**T28**~~: **HECHAS el
+  2026-08-26** (18ª pasada). T28 en `33808dc`, T35 en `4e180c0`, T36 en
+  `cf12d9a`; **T37 ya estaba hecha desde el 2026-08-22** (`2e9bee8` de
+  `azure-apps`) y el informe la daba por pendiente. Las tres nuevas van atadas
+  por 14 tests (`tests/test_f006_docs.py`): la documentación deja de poder
+  envejecer en silencio.
+- **La tabla de tareas de `impl_F-006.md` está reverificada fila a fila** contra
+  el árbol, con cuatro desfases corregidos: T15 decía 3 tablas y el DDL crea 4;
+  T24 decía 7 objetos en `_meta.yaml` y son 8; T37 constaba pendiente estando
+  hecha; y la progresión de la suite contradecía desde hacía tres pasadas a su
+  propia fila de al lado.
+- **T29-T31** (los `REVOKE` construidos y apagados) **siguen sin existir en
+  código**. No bloquean el cierre —DA-3 se resolvió por B—, pero la tabla los
+  cuenta como pendientes y conviene no confundirlos con «entregados a F-034»,
+  que son T32-T34.
 - **T43**: decidir con el humano qué deuda declarada se paga y cuál viaja.
-- **Cierre**: T41 (mutación) y T42 (`init.sh`), más el veredicto del reviewer
-  contra `CHECKPOINTS.md`. Sin él, la feature **no se marca `done`**.
+  **Los supervivientes de la campaña son materia de T43**: si son muchos, la
+  pregunta no es cuántos tests se escriben, sino si esta feature puede sostener
+  el rigor que declara.
+- **Cierre**: T41 (mutación, **lanzada**) y T42 (`init.sh`, **verde**: 2.336
+  tests), más el veredicto del reviewer contra `CHECKPOINTS.md`. Sin él, la
+  feature **no se marca `done`**.
 
 ### Del humano: las dos, resueltas el 2026-08-25
 - ~~Probar el MCP dentro de Claude Escritorio.~~ **HECHO.** El protocolo quedó
