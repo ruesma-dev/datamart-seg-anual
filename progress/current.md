@@ -3,16 +3,20 @@
 
 **Feature en curso: F-006 · MCP sobre el datamart.** Rama
 `feature/F-006-mcp-azure`, con el arnés **1.7.7** dentro. `bash harness/init.sh`
-**en verde: 2.336 tests, 125 saltados** (526 s); cobertura 100 % de 33 líneas
-cambiadas y puerta de tamaño cumplida (impl 215/220). Árbol limpio y **sin
-mutantes aplicados**.
+**en verde: 2.473 tests, 128 saltados** (622 s); cobertura 100 % de 33 líneas
+cambiadas y puerta de tamaño cumplida (impl 219/220, **al filo**). Árbol limpio
+y **sin mutantes aplicados**.
 
-**AL RETOMAR, LO PRIMERO: mira si terminó la campaña de mutación.** Se lanzó el
-2026-08-26 a las 15:20 con **6 workers**, alcance de 8 ficheros y **256
-mutantes**, salida en `progress/mutacion_F-006.md`. **No muta el árbol
-principal** —cada worker va en su worktree—, así que si la sesión murió, el
-árbol está intacto; compruébalo igual con `python -m harness.mutacion --estado`
-y `git worktree list`.
+**AL RETOMAR, LO PRIMERO: F-006 está lista para el reviewer (19ª pasada).** La
+campaña de mutación **está hecha y sus 52 supervivientes, resueltos**: 49
+muertos con tests nuevos y **3 equivalentes aprobados por el humano el
+2026-08-26**. Falta el veredicto del reviewer contra `CHECKPOINTS.md`, que
+arrastra un RECHAZADO desde la 16ª pasada. Sin él, F-006 **no se marca `done`**.
+
+**Lo que el reviewer tiene que mirar sí o sí:** `progress/control_mutacion_F-006.md`.
+La campaña paralela **produce algún falso muerto** —demostrado y fichado en
+F-041—, así que los 204 «muertos» no son una lista cerrada. Todo lo que se
+mató se verificó **en serie**, y ese es el motivo.
 
 ---
 
@@ -61,70 +65,36 @@ estimaron ayer.**
 | Paralelo, 2 workers | ~12,6 h | **nunca se muta** |
 | Paralelo, 6 workers ← **elegido** | **~5 h** | ídem |
 
-**El coste que no son horas de máquina.** En la prueba salió **1 superviviente
-de 4** (`inventario.py:234`: quitarle el `not` a `informe.avisos_columnas` no
-mata a nadie). Cuatro no son una muestra, pero `critico` exige **cero
-supervivientes**, y cada uno cuesta un test nuevo o una justificación escrita
-que acepte el humano. **Decisión del humano: primero ver la lista analizada por
-grupos, y solo entonces decidir** — si son decenas, la conversación deja de ser
-«escribe tests» y pasa a ser si F-006 puede sostener el rigor que declara (T43).
+**El coste que no son horas de máquina: RESUELTO el 2026-08-26 por la noche.**
+La campaña dio **52 supervivientes** y `critico` exige cero. Así quedaron:
 
-**El alcance real es mayor que el que se midió ayer.** No son seis módulos:
-son **ocho**, todos nacidos en F-006 (verificado con `git log --diff-filter=A`,
-2026-08-26):
+| | |
+|---|---:|
+| Muertos con tests nuevos, **verificados en serie** | **49** |
+| **Equivalentes** demostrados y aprobados por el humano | **3** |
 
-| Módulo | Líneas | Nació en |
-|---|---:|---|
-| `etl_sigrid/domain/diccionario.py` | 1.089 | T3 |
-| `etl_sigrid/infrastructure/diccionario/cargador_yaml.py` | 468 | T7 |
-| `etl_sigrid/infrastructure/postgres/diccionario_sql.py` | 332 | T16 |
-| `etl_sigrid/infrastructure/postgres/relaciones_sql.py` | 319 | T40 |
-| `etl_sigrid/domain/inventario.py` | 288 | T6 |
-| `etl_sigrid/infrastructure/postgres/unicidad_sql.py` | 274 | 2026-08-21 |
-| `etl_sigrid/application/steps/publicar_diccionario_step.py` | 190 | T17 |
-| `etl_sigrid/infrastructure/postgres/catalogo.py` | 166 | 12ª pasada |
-| **Total** | **3.126** | |
+Los tres equivalentes, con su demostración, en `progress/impl_F-006_detalle.md`:
+`relaciones_sql.py:282` —`int(0.5*100)` e `int(0.5*101)` son ambos 50, el mismo
+texto— y los dos `ensure_ascii`, **comprobados contra la base real**: Postgres
+considera el mismo `jsonb` el escapado y el literal, así que el MCP lee
+exactamente lo mismo. Si algún día cambia `UMBRAL_AVISO_COBERTURA`, el primero
+**puede volverse matable**: está escrito en su ficha.
 
-Son **489 líneas más** que las 2.637 anotadas ayer: un ~19 % más de mutantes, y
-con ellos más horas. Lo demás medido sigue valiendo: **~4,3 min por mutante**
-con la suite completa (2.291 tests), **~2,2 min** con solo los 617 de F-006. El
-intento de ayer se paró a los 82 minutos, por la línea 219 de 1.089 del primer
-fichero; el árbol quedó restaurado.
+**Dos se escaparon del encargo y hay que saber por qué.** El líder analizó los
+19 no equivalentes y pasó al implementer una lista de **17**: `cargador_yaml.py:361`
+y `relaciones_sql.py:278` se quedaron fuera al confeccionarla a mano. Lo cazó la
+reevaluación de los 52, no el recuento. **Lección de encargos, no de mutación:
+una lista hecha a mano desde un análisis pierde elementos; verifica contra la
+fuente, no contra tu resumen de ella.**
 
-**La conclusión incómoda no cambia, y ahora es más grande**: 3.126 líneas de
-producción con `rigor: critico` cuestan una campaña de una noche larga cada vez.
-**F-006 es demasiado grande para el rigor que declara**, y eso es materia de
-T43.
+Números de la jornada, para no repetir mediciones:
 
-**Ojo con el modo serie**: muta el ÁRBOL PRINCIPAL (`muta_arbol_principal: true`).
-Si una campaña muere a medias, queda código mutado en disco. El centinela
-`.arnes_cache/mutacion_en_curso.json` lo declara y
-`python -m harness.mutacion --restaurar` lo deshace. Compruébalo SIEMPRE antes de
-fiarte de cualquier medición.
-
-### Lo demás de F-006, ya cerrado
-
-- Los **cuatro hallazgos** del review (H2-H5): cerrados, ver la sección siguiente.
-- El **diccionario está en versión 9 y PUBLICADO** en `_meta` (103 objetos, 798
-  columnas, 16 reglas, cobertura 100 %), verificado contra la base con
-  `check-diccionario` y `check-unicidad`. La remisión falsa ya no se sirve.
-- El **bloque de Power BI**, entregado a F-034.
-- El **MCP, probado de punta a punta** en Claude Escritorio y en el móvil.
-
-### Y un aviso sobre el papeleo
-
-`progress/review_F-006.md` (el resumen) **arrastra como abiertos hallazgos que ya
-estaban cerrados en el árbol**: se escribió copiando la tabla de la 16ª pasada sin
-contrastarla contra el código. Cuando el reviewer haga la 17ª pasada, que
-reverifique contra el árbol y reescriba esa tabla. La lección, que ya está en
-este fichero desde F-006: **verificar lo que la tanda dice haber hecho, no lo que
-parece**.
-
-### Nada se ha subido a ningún remoto
-
-`dev` va **145+ commits** por delante de `origin/dev` y no se ha hecho `git push`
-en toda la sesión. `arnes-base` tiene la 1.7.5 y la 1.7.6 sin subir. `mcp-bbdd`
-**no tiene remoto configurado**: sus commits existen solo en este disco.
+| | |
+|---|---|
+| Campaña completa | 256 mutantes, 204 muertos, 52 supervivientes, **0 timeouts**, 8.368 s con 6 workers |
+| Media por mutante | 32,7 s (un muerto no llega a correr la suite entera: `-x` para en el primer fallo) |
+| Líneas base | 462-486 s con seis workers compitiendo; **216-268 s sin carga** |
+| Reevaluación en serie de los 52 | línea base 315 s, 2.467 pasados; 47 muertos entonces, +2 después |
 
 ---
 
