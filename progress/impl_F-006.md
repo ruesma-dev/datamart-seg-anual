@@ -72,7 +72,7 @@ T41 (mutación) sigue dependiendo de **F-041**. **Toda esta tabla se ha reverifi
 | Mutación | **NO MEDIDO, a propósito** — ver §4 | — |
 | Diccionario | **versión 9 publicada**: `_meta` la sirve desde la nocturna del 2026-08-26 a las 06:59. Medido en el árbol: hash `72125091cc25`, 103 objetos, 798 columnas, 16 reglas, 29 filas de contexto, 0 pendientes, 46 objetos de consumo, cobertura de columnas 100 % | árbol: `cargar_diccionario` + `filas_*`. Publicación y `check-diccionario`: **medición del humano**, no verificable desde el árbol (§8) |
 | Biyección publicado ↔ árbol | **102 de 103**; única huérfana `cierre.v_pbi_planif_vs_real` (deuda previa de `build-cierre`) | `check-diccionario` |
-| Relaciones | **77 unen, 2 con cobertura escasa, 0 que NO unen, 17 sin comprobar, 2 con un extremo inexistente** | `check-relaciones --todos` |
+| Relaciones | **78 unen, 2 con cobertura escasa, 0 que NO unen, 16 sin comprobar, 2 con un extremo inexistente** (medido el 2026-08-26 a las 12:05; una relación más verificada que el día anterior) | `check-relaciones --todos` |
 | Superficie de consumo | **46** objetos (bajó de 48 al retirar dos vistas inconsultables) | `cobertura_columnas` |
 | Trinquete `pendientes` | **0**, desde 98 | `PENDIENTES_MAX` |
 
