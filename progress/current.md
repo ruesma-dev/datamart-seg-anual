@@ -351,7 +351,7 @@ Tres puertas que lo contrastan **contra el dato real**, no contra sí mismo:
 
 | Puerta | Resultado |
 |---|---|
-| `check-diccionario` | **OK, lo publicado ES lo del árbol** (v9, hash `72125091cc25`). 103 fichas / 102 objetos: la única huérfana sigue siendo `cierre.v_pbi_planif_vs_real`, la deuda de F-047 (la base va por detrás del repositorio) |
+| `check-diccionario` | **OK, lo publicado ES lo del árbol** (v9, hash `72125091cc25`). 103 fichas frente a los 102 que hoy existen en la base: la única huérfana sigue siendo `cierre.v_pbi_planif_vs_real`, la deuda de F-047 (la base va por detrás del repositorio) |
 | `check-unicidad` | **39 sin contradicción, 0 con la clave rota**, 6 sin comprobar por timeout de 30 s (`mart.fact_seguimiento_mensual`, `v_pbi_fact`, `v_master_versiones_tipadas`, `v_master_vigente_anual` entre ellas), 1 fichado que no existe |
 | `check-relaciones --todos` | **78 unen, 0 que NO unen**, 2 con cobertura escasa, 16 sin comprobar, 2 con un extremo inexistente |
 
