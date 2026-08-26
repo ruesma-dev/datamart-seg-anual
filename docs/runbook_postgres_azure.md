@@ -172,7 +172,8 @@ diagnóstico de `datacl` del bloque 2 de `03_diagnostico.sql` delante.
 
 El servidor ya tiene la IP pública de la sede y una regla de puesto individual.
 **Primero se comprueba si la IP ya está cubierta**; solo se crea regla si no lo
-está.
+está. La convención de nombre fechado que sigue vale para servicios y sedes; el
+puesto de trabajo es la excepción y tiene su propio procedimiento en **6 bis**.
 
 ```bash
 az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
@@ -196,7 +197,7 @@ nueva. Ninguna preexistente puede quedar modificada ni eliminada.
 2026-08-08: el MCP pasa a ser un servicio en cloud, multi-base, en su propio
 repositorio. Lo que necesitará es la **IP de salida del entorno de Container
 Apps** donde se despliegue, no la IP de un PC. No se crea aquí: se crea cuando
-ese entorno exista y se conozca su IP estática de salida.
+ese entorno exista y se conozca su IP estática de salida (**6 ter**).
 
 **Estas reglas caducan de hecho.** Una regla de IP deja de servir en cuanto la
 IP de salida cambia —un reinicio del router, un cambio de operador, un portátil
@@ -207,7 +208,74 @@ moleste:
 - cuando un puesto o servicio deje de necesitar acceso, **borra su regla** con
   `az postgres flexible-server firewall-rule delete -g <grupo> --server-name <servidor> --name <nombre>`;
 - revisa el listado cada vez que pases por este runbook y borra las que no
-  reconozcas: el nombre lleva fecha justamente para eso.
+  reconozcas: el nombre lleva fecha justamente para eso. La excepción, otra vez,
+  es la regla única del puesto de **6 bis**, que no caduca porque se reescribe.
+
+### 6 bis. El puesto: una regla única, sin fecha, que se reescribe
+
+Es la **única** excepción al nombre fechado, y conviene entender por qué antes
+de replicarla. La IP pública del puesto de trabajo **rota cada pocos minutos**
+(el operador da direccionamiento **CGNAT**, compartido y sin garantía de
+permanencia): durante una sola tanda de F-006 hubo que rehacer la autorización
+**seis veces**. Con la convención fechada, eso deja seis reglas muertas en un
+servidor de producción compartido, que es exactamente lo que nadie va a
+auditar dentro de seis meses.
+
+Así que el puesto tiene **una regla única y sin fecha**, `datamart-puesto-pgris`,
+y lo que se hace con ella es que **se reescribe** con la IP del momento: no se
+crean reglas nuevas por cada IP, y no se tocan las ajenas. `psql-albaranes-rs9k2`
+lo comparten `albaranes` y `partes`, las dos **en producción**; sus reglas no
+son nuestras y borrarlas o modificarlas los deja fuera.
+
+```bash
+# 1) La IP de salida de ahora mismo
+curl -s https://api.ipify.org
+
+# 2) Reescribirla. Si la regla aún no existiera, el mismo comando con `create`.
+az postgres flexible-server firewall-rule update -g rg-albaranes-dev --server-name psql-albaranes-rs9k2 --name datamart-puesto-pgris --start-ip-address <IP> --end-ip-address <IP>
+
+# 3) El listado posterior debe ser el de antes, con esa única regla movida
+az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
+```
+
+**`-n` es el nombre de la REGLA; el servidor va en `--server-name`.** Los
+nombres de parámetro son los que explica `infra/README.md` («Ojo con los
+nombres de los parámetros del `create`») y **no se copian aquí**: `--rule-name`
+no existe y devuelve «unrecognized arguments», y en el `list` de la tercera
+línea `-n` **sí** es el servidor. Es la asimetría de la CLI, no un descuido.
+
+**Y esta vía no sirve para un servicio desplegado.** Funciona solo porque hay
+una persona delante relanzando el comando antes de cada tanda. Un job o un
+contenedor no pueden perseguir una IP que rota: necesitan lo de 6 ter.
+
+### 6 ter. El entorno del MCP: IP de salida estática (F-006)
+
+**La regla del MCP no se crea persiguiendo ninguna IP.** El patrón bueno ya
+está probado con el ETL: el entorno de Container Apps `cae-datamart-seg-dev` se
+creó **sin integración de red virtual a propósito**, y es esa decisión —y no
+otra— la que le da **IP de salida estática**; su autorización en el firewall es
+la regla `caj-datamart-seg-dev`. El MCP repite el patrón: entorno propio sin
+VNet, se lee su `properties.staticIp` y se crea **una** regla con el nombre del
+entorno.
+
+```bash
+az containerapp env show -g <rg del MCP> -n <entorno> --query properties.staticIp -o tsv
+az postgres flexible-server firewall-rule create -g rg-albaranes-dev --server-name psql-albaranes-rs9k2 --name <entorno> --start-ip-address <IP> --end-ip-address <IP>
+az postgres flexible-server firewall-rule list -g rg-albaranes-dev -n psql-albaranes-rs9k2 -o table
+```
+
+Tres advertencias que no son formalismo:
+
+- **Se escribe sobre un recurso de otro proyecto.** `rg-albaranes-dev` no es del
+  datamart. La autorización la da el humano recurso a recurso y **la ejecuta
+  él**; ningún agente del arnés lanza esto.
+- **No se depende de la regla que autoriza a cualquier recurso de Azure.** El
+  servidor tiene una, y autoriza también a suscripciones ajenas. Que el MCP
+  conecte gracias a ella no significa que esté autorizado: significa que la
+  puerta está abierta para todos. Ver `infra/README.md`.
+- **Mientras el entorno del MCP no exista, esta regla no se crea.** Hoy el MCP
+  corre en el puesto y entra por la de 6 bis, que es también el motivo de que
+  «un MCP que use cualquiera desde cualquier puesto» siga sin estar cumplido.
 
 ## 7. Configuración del ETL contra Azure
 

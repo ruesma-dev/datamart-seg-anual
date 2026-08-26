@@ -59,26 +59,41 @@ def _texto(ruta: pathlib.Path) -> str:
     return ruta.read_text(encoding="utf-8")
 
 
+#: Un encabezado Markdown de verdad: almohadillas y **un espacio**. Un
+#: `# 1) La IP de ahora mismo` dentro de un bloque ```bash no lo es, y tomarlo
+#: por encabezado parte la sección justo antes de lo que se quiere comprobar.
+_ENCABEZADO = re.compile(r"^(#{1,6})\s")
+
+
+def _encabezados(texto: str):
+    """`(nº de línea, nivel, línea)` de cada encabezado, **fuera** de los fences."""
+    dentro_de_codigo = False
+    for numero, linea in enumerate(texto.splitlines()):
+        if linea.lstrip().startswith("```"):
+            dentro_de_codigo = not dentro_de_codigo
+            continue
+        if dentro_de_codigo:
+            continue
+        marca = _ENCABEZADO.match(linea)
+        if marca:
+            yield numero, len(marca.group(1)), linea
+
+
 def _seccion(texto: str, titulo: str) -> str:
-    """El bloque que arranca en la línea que contiene `titulo`.
+    """El bloque que arranca en el encabezado que contiene `titulo`.
 
     Termina en el siguiente encabezado del MISMO nivel o de uno superior, para
     que una aserción sobre una sección no se cuele por lo que dice otra.
     """
     lineas = texto.splitlines()
-    inicio = next(
-        (i for i, linea in enumerate(lineas) if linea.startswith("#") and titulo in linea),
-        None,
-    )
-    if inicio is None:
+    cabeceras = list(_encabezados(texto))
+    arranque = next(((n, nivel) for n, nivel, l in cabeceras if titulo in l), None)
+    if arranque is None:
         return ""
-    nivel = len(lineas[inicio]) - len(lineas[inicio].lstrip("#"))
-    for j in range(inicio + 1, len(lineas)):
-        candidato = lineas[j]
-        if not candidato.startswith("#"):
-            continue
-        if len(candidato) - len(candidato.lstrip("#")) <= nivel:
-            return "\n".join(lineas[inicio:j])
+    inicio, nivel = arranque
+    for numero, otro_nivel, _ in cabeceras:
+        if numero > inicio and otro_nivel <= nivel:
+            return "\n".join(lineas[inicio:numero])
     return "\n".join(lineas[inicio:])
 
 
