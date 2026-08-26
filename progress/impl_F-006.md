@@ -73,7 +73,7 @@ T41 (mutación) sigue dependiendo de **F-041**.
 |---|---|---|
 | Tests | **2290 pasados**, 125 saltados, **0 fallos** (2026-08-26, tras la 17ª pasada) | `bash harness/init.sh` |
 | Cobertura de líneas cambiadas | **N/A**: F-006 no cambia líneas Python de producción frente a `dev` (antes 98,0 %, 1117/1140) | línea `PUERTA COBERTURA` |
-| Tiempo de la suite | **465,77 s** (7 min 46 s) bajo `coverage` | ídem |
+| Tiempo de la suite | **342,92 s** (5 min 43 s) bajo `coverage`; 465,77 s en una pasada con carga | ídem |
 | Mutación | **NO MEDIDO, a propósito** — ver §4 | — |
 | Diccionario | **versión 9 en el árbol, SIN publicar**; `_meta` sirve la **8** (103 objetos, 798 columnas, 16 reglas, 29 filas de contexto, hash `86651c493cb7`) | `publicar-diccionario`, pendiente del humano |
 | Biyección publicado ↔ árbol | **102 de 103**; única huérfana `cierre.v_pbi_planif_vs_real` (deuda previa de `build-cierre`) | `check-diccionario` |
