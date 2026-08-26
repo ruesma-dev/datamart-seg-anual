@@ -530,3 +530,9 @@ construido es la capa semántica, que era el prerrequisito, no el despliegue.
 - Sin `git push` ni PRs sin petición explícita.
 - Commits **con rutas explícitas** (`git add <ruta>`, nunca `-A`): más de un
   agente sobre el mismo árbol, y ya se mezcló trabajo ajeno en un commit.
+  **Y no basta** (medido el 2026-08-26, commit `9c04534`): la ruta explícita
+  protege de arrastrar *otros ficheros*, no de arrastrar a otro agente dentro
+  del **mismo** fichero, porque `git add` se lleva lo que ese fichero tenga ya
+  en el índice. Con dos agentes escribiendo en un anexo compartido no hay forma
+  de commitear por separado: **cada uno a su propio fichero**, o el primero que
+  commitee se lleva lo que el otro tuviera preparado.
