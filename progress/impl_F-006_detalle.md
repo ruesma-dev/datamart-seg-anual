@@ -5152,7 +5152,11 @@ encargo de esta sesión era documentación y el arreglo toca `main.py`: queda
 | `tests/test_f006_supervivientes_logica.py` | **nuevo**, 22 tests. Bloque A: los 12 supervivientes de lógica |
 | `tests/test_f006_supervivientes_mensajes.py` | **nuevo**, 6 tests. Bloque B: los 5 de mensajes de diagnóstico |
 
-Commits: `c96ef88` (bloque A) y `64df916` (bloque B).
+Commits: `c96ef88` (bloque A), `64df916` (bloque B) y `d8143d8` (los cuatro
+avisos de ruff que traían: `UTC` en vez de `timezone.utc` y tres nombres de test
+con fragmentos en mayúscula; sin cambio de comportamiento). La verificación de
+mutantes se **relanzó entera** tras el renombrado, para que la traza sea la del
+código commiteado y no la de un estado anterior.
 
 ## Decisiones de diseño
 
@@ -5193,7 +5197,7 @@ parten de qué se rompería en producción:
 
 No basta con que el test pase. Se aplicó **cada mutante** y se comprobó que la
 suite se pone roja, en un **`git worktree` aparte** (`wt-f006-mut`, desde
-`HEAD` = `64df916`) para no tocar el árbol donde trabajan dos agentes, y con el
+`HEAD` = `d8143d8`) para no tocar el árbol donde trabajan dos agentes, y con el
 `.env` volcado al entorno vía `harness.mutacion_paralela.volcar_variables` —
 sin ese volcado 23 tests caen por configuración ausente y el rojo que se obtiene
 **no es el del mutante**. El mutante se aplicó con el **propio mutador**
@@ -5204,7 +5208,7 @@ Se verificaron **22** y no 17: el mutador genera en esas mismas líneas 5
 mutantes vecinos más (`unicidad_sql.py:133` ×2, `inventario.py:234` ×3) que no
 figuraban como supervivientes. Se comprueban igual, y también mueren.
 
-**Línea base del worktree, sin mutar: `28 passed in 7.09s`.** Sin ella, un rojo
+**Línea base del worktree, sin mutar: `28 passed in 0.79s`.** Sin ella, un rojo
 no demuestra nada.
 
 | # | Mutante | Veredicto | Test(s) que se ponen en rojo |
@@ -5212,15 +5216,15 @@ no demuestra nada.
 | 1 | `diccionario_sql.py:239` `fila[1] → fila[2]` | MUERTO | `..._no_cruza_ningun_campo`, `..._describe_la_fila_que_de_verdad_se_publica` |
 | 2 | `diccionario_sql.py:160` `or → and` | MUERTO | `..._llega_a_la_fila_publicada[motivo_no_consumo-5]`, `..._se_publica_como_null[motivo_no_consumo-5]` |
 | 3 | `diccionario_sql.py:162` `or → and` | MUERTO | `..._llega_a_la_fila_publicada[grano-7]`, `..._se_publica_como_null[grano-7]` |
-| 4 | `diccionario_sql.py:326` `== → !=` (`"ejes"`) | MUERTO | `..._se_formatea_con_SU_plantilla`, `..._se_vuelca_entero` |
-| 5 | `diccionario_sql.py:329` `== → !=` (`"esquemas"`) | MUERTO | `..._se_formatea_con_SU_plantilla`, `..._se_vuelca_entero` |
+| 4 | `diccionario_sql.py:326` `== → !=` (`"ejes"`) | MUERTO | `..._se_formatea_con_su_propia_plantilla`, `..._se_vuelca_entero` |
+| 5 | `diccionario_sql.py:329` `== → !=` (`"esquemas"`) | MUERTO | `..._se_formatea_con_su_propia_plantilla`, `..._se_vuelca_entero` |
 | 6 | `diccionario.py:774` `and → or` | MUERTO | `..._fanout...[con_clave_y_sin_columnas]`, `[sin_clave_y_con_columnas]` |
 | 7 | `diccionario.py:774` quitar 1.er `not` | MUERTO | `..._fanout...[con_clave_y_sin_columnas]`, `[sin_clave_y_sin_columnas]` |
 | 8 | `diccionario.py:774` quitar 2.º `not` | MUERTO | `..._fanout...[sin_clave_y_con_columnas]`, `[sin_clave_y_sin_columnas]` |
 | 9 | `unicidad_sql.py:133` `or → and` | MUERTO | `..._sin_clave_de_negocio_no_hay_consulta`, `..._una_funcion_no_genera_consulta` |
 | 10 | `unicidad_sql.py:189` `and → or` | MUERTO | `..._dentro_de_la_superficie...no_se_salta_nada`, `..._con_todos_deja_de_haber...` |
 | 11 | `unicidad_sql.py:189` quitar `not` | MUERTO | `..._fuera_de_la_superficie...se_salta_diciendolo`, `..._no_se_salta_nada` |
-| 12 | `inventario.py:234` `and → or` (1.º) | MUERTO | `..._con_avisos...`, `..._con_pendientes...`, `..._un_hueco_bloqueante_no_puede_salir_como_OK` |
+| 12 | `inventario.py:234` `and → or` (1.º) | MUERTO | `..._con_avisos...`, `..._con_pendientes...`, `..._un_hueco_bloqueante_no_puede_salir_como_ok` |
 | 13 | `cargador_yaml.py:245` `or → and` | MUERTO | `..._conserva_el_detalle_real_del_parser` ×2, `..._texto_de_reserva` |
 | 14 | `cargador_yaml.py:248` `line + 1 → line - 1` | MUERTO | `..._senala_la_linea_y_la_columna_del_editor` ×2 |
 | 15 | `cargador_yaml.py:248` `line + 1 → line + 2` | MUERTO | `..._senala_la_linea_y_la_columna_del_editor` ×2 |
@@ -5242,7 +5246,7 @@ etl_sigrid/infrastructure/diccionario/cargador_yaml.py:248 [aritmetico] col=55  
       DESPUES: return f"el YAML no parsea en la linea {marca.line - 1}, columna {marca.column + 1}: {problema}"
       FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[segundos_dos_puntos_en_la_linea_3]
       FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[lista_sin_cerrar_que_estalla_en_la_6]
-      2 failed, 26 passed in 1.39s
+      2 failed, 26 passed in 1.45s
 ```
 
 y los tres de la guarda de `_es_unica_por`, que es donde estaba el hueco más
@@ -5252,9 +5256,9 @@ peligroso —de él depende la detección de fan-out que ya dejó pasar F-042:
 etl_sigrid/domain/diccionario.py:774 [logico] col=31  ->  MUERTO por mis tests
       ANTES:   if not ficha.clave_negocio and not ficha.columnas:
       DESPUES: if not ficha.clave_negocio or not ficha.columnas:
-      FAILED ...[con_clave_y_sin_columnas]
+      FAILED ...test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_nada_con_que_juzgarlo[con_clave_y_sin_columnas]
       FAILED ...[sin_clave_y_con_columnas]
-      2 failed, 26 passed in 1.29s
+      2 failed, 26 passed in 0.90s
 etl_sigrid/domain/diccionario.py:774 [not] col=7   -> MUERTO  (2 failed: [con_clave_y_sin_columnas], [sin_clave_y_sin_columnas])
 etl_sigrid/domain/diccionario.py:774 [not] col=35  -> MUERTO  (2 failed: [sin_clave_y_con_columnas], [sin_clave_y_sin_columnas])
 ```
@@ -5274,12 +5278,16 @@ Ninguna de este encargo: todo lo de aquí es offline y no toca red ni base.
 
 ## Lo que queda fuera de este encargo
 
-- **Los 35 supervivientes restantes** de los 52 de la campaña. 30 los está
-  matando el otro implementer (20 de `@dataclass(frozen/slots)`, ~10 de
-  constantes); 3 están **demostrados equivalentes** por el líder
-  (`relaciones_sql.py:282`, porque `int(0.5*100) == int(0.5*101)`; y los dos
-  `ensure_ascii`, porque Postgres considera el mismo `jsonb` el escapado y el
-  literal). El resto lo reparte el líder.
+- **Los 35 supervivientes restantes** de los 52 de la campaña, y cómo queda el
+  reparto: **31** los ha matado el otro implementer en la misma sesión (los 20
+  de `@dataclass(frozen/slots)` y 11 de constantes, commit `f38f792`, sección
+  «19ª pasada» más abajo); **17** son estos; **3** están **demostrados
+  equivalentes** por el líder (`relaciones_sql.py:282`, porque
+  `int(0.5*100) == int(0.5*101)`; y los dos `ensure_ascii`, porque Postgres
+  considera el mismo `jsonb` el escapado y el literal). Suman **51 de 52**: el
+  que falta lo tiene que ubicar el líder al recontar, y **no se da por cerrado
+  aquí** — un superviviente sin dueño es exactamente lo que dejó viva la
+  primera tanda.
 - **Relanzar la campaña completa** para confirmar el cero que exige `critico`:
   256 mutantes a 4,3 min de media son horas de máquina, y con dos agentes
   corriendo suites a la vez el resultado no sería fiable. Lo decide el líder
@@ -5289,9 +5297,9 @@ Ninguna de este encargo: todo lo de aquí es offline y no toca red ni base.
 
 | Evidencia | Valor medido | De dónde sale |
 |---|---|---|
-| **Tests añadidos** | **28** (22 lógica + 6 mensajes), todos en verde | `python -m pytest tests/test_f006_supervivientes_logica.py tests/test_f006_supervivientes_mensajes.py -q` → `28 passed in 7.09s` |
+| **Tests añadidos** | **28** (22 lógica + 6 mensajes), todos en verde | `python -m pytest tests/test_f006_supervivientes_logica.py tests/test_f006_supervivientes_mensajes.py -q` → `28 passed in 5.41s` |
 | **Tests ejecutados (suite completa)** | **2467 passed, 128 skipped**, 0 fallos | `bash harness/init.sh` |
-| **Tiempo de ejecución de la suite** | **1053,86 s (17 min 33 s)**. Alto porque el otro implementer corría su suite a la vez en la misma máquina | el que imprime la propia suite |
+| **Tiempo de ejecución de la suite** | **1290,52 s (21 min 30 s)**. Alto porque el otro implementer corría su suite a la vez en la misma máquina; medición limpia previa del mismo árbol, 1053,86 s | el que imprime la propia suite |
 | **Cobertura de las líneas cambiadas** | **100,0 %** — 33/33 líneas cambiadas cubiertas (umbral 80 %, nivel `critico`) | línea `PUERTA COBERTURA` de `bash harness/init.sh` |
 | **Mutantes generados y supervivientes** | **22 aplicados, 22 muertos, 0 supervivientes** sobre las 12 líneas objetivo | verificación dirigida con `harness.mutacion` en worktree aparte; traza en `progress/mutacion_F-006_supervivientes_17.txt` |
 | **Análisis de supervivientes** | **no queda ninguno vivo** en el alcance de este encargo; 0 equivalentes | tabla de arriba |
@@ -5305,14 +5313,22 @@ el «0 supervivientes» falso con 4 timeouts de T25.
 ## Resultado de la puerta
 
 ```
+2467 passed, 128 skipped, 909 warnings in 1290.52s (0:21:30)
 [OK] pytest en verde (con medición de cobertura)
 [OK] PUERTA COBERTURA: 100.0% de 33 líneas cambiadas cubiertas (33/33, umbral 80%, nivel critico)
-[OK] PUERTA TAMAÑO: F-006 dentro de los topes (requirements 132/150, design 191/250, impl 215/220, review 125/140)
+[OK] PUERTA TAMAÑO: F-006 dentro de los topes (requirements 132/150, design 191/250, impl 219/220, review 125/140)
 [OK] Rama actual: feature/F-006-mcp-azure
 ----------------------------------------
 ENTORNO LISTO. Puedes trabajar.
 [exited with code 0]
 ```
+
+**Un aviso para el líder, medido y no supuesto**: la puerta de tamaño da ahora
+`impl 219/220`. El resumen `progress/impl_F-006.md` está a **una línea** del tope
+y esta sesión no lo ha tocado —todo lo de aquí vive en el anexo—, pero la
+siguiente que le añada dos líneas pone el portero en rojo. O se recorta el
+resumen enlazando al anexo, o se sube el tope en `harness/rigor.json` con su
+motivo.
 
 # 19ª pasada · los 31 supervivientes baratos de la 2ª campaña (2026-08-26)
 
@@ -5529,3 +5545,13 @@ Dos commits, uno por grupo, con `git add` explícito: `4d336fb` (grupo 1) y `143
   falta.
 - **Ninguna línea de producción.** Ningún mutante de estos 31 ha necesitado un cambio de
   comportamiento para morir: todos eran huecos de test, no defectos.
+
+## Evidencias (19ª pasada)
+
+| Evidencia | Valor medido |
+|---|---|
+| Tests ejecutados y resultado | **2.467 pasados, 128 saltados, 0 fallos** (`bash harness/init.sh`, exit 0). De ellos, **106 nuevos** de esta pasada: 78 del barrido (75 + 3 saltados por `MUTABLES_HEREDADAS`), 24 de constantes y 4 bordes nuevos |
+| Cobertura de las líneas cambiadas | **100,0 %** — 33/33, umbral 80 %, nivel `critico` |
+| Mutantes del encargo y supervivientes | **31 asignados, 31 muertos, 0 supervivientes, 0 equivalentes**. Verificados uno a uno aplicando la mutación en un worktree: `exit=1` en los 31. No se relanza la campaña completa (4,3 min/mutante en esta máquina): la lanza el humano con el árbol quieto |
+| Tiempo de ejecución de la suite | **1.274,77 s (21:14)** en la medición final. La anterior del mismo árbol dio **1.036,23 s (17:16)**: la diferencia es contención de CPU con la corrida simultánea del líder, no trabajo nuevo |
+| Puerta de tamaño | `impl_F-006.md` **219/220** |
