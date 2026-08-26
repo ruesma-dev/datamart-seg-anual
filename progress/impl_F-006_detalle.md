@@ -5130,3 +5130,186 @@ encargo de esta sesión era documentación y el arreglo toca `main.py`: queda
   modelar el grupo → **F-045**/backlog, no es de esta feature (L4634).
 - Los 39 «sin contradicción» de `check-unicidad` **no tienen la clave demostrada**: los
   datos de hoy no la contradicen, que es otra cosa (L3634).
+
+---
+
+# Anexo · 17 supervivientes de mutación matados (bloques A y B)
+
+> Sesión del 2026-08-26, rama `feature/F-006-mcp-azure`, rigor `critico`.
+> Encargo acotado: los **17 supervivientes** que el líder analizó de los 52 de
+> la primera campaña válida de F-006 (256 mutantes, 204 muertos, 0 timeouts —
+> `progress/mutacion_F-006.md`, commit `e89f71f`). **Solo tests**: no se ha
+> tocado ni una línea de código de producción, y no ha hecho falta.
+>
+> Trabajo en paralelo con otro implementer sobre el mismo árbol (los 20 de
+> `@dataclass(frozen/slots)` y los ~10 de constantes). Por eso los tests van en
+> ficheros nuevos y propios y los commits llevan `git add <ruta>` explícito.
+
+## Ficheros tocados
+
+| Fichero | Qué es |
+|---|---|
+| `tests/test_f006_supervivientes_logica.py` | **nuevo**, 22 tests. Bloque A: los 12 supervivientes de lógica |
+| `tests/test_f006_supervivientes_mensajes.py` | **nuevo**, 6 tests. Bloque B: los 5 de mensajes de diagnóstico |
+
+Commits: `c96ef88` (bloque A) y `64df916` (bloque B).
+
+## Decisiones de diseño
+
+**Fijar el comportamiento, no repetir la línea.** Un test escrito contra el
+mutante («que `fila[1]` sea `fila[1]`») lo mata y no dice nada. Los de aquí
+parten de qué se rompería en producción:
+
+- **`resumen_publicacion`** se comprueba con una tupla en la que **ningún índice
+  vale por otro** (`"version-en-el-1"`, `"hash-en-el-2"`, 50/60/70/80.5), así
+  que **cualquier** cruce de índices se ve, no solo el que sobrevivió. Y un
+  segundo test lo contrasta contra la fila que `fila_publicacion` produce de
+  verdad, con 2 fichas / 3 reglas / 5 columnas —los tres recuentos distintos—
+  para que el mapeo no pueda ser internamente coherente y estar leyendo
+  posiciones que la fila real no tiene ahí.
+- **`or None` en `motivo_no_consumo` y `grano`**: se cubren las **dos** ramas.
+  Con texto presente el valor tiene que llegar entero a `_meta` (con `and`
+  viaja `None`); con texto vacío tiene que publicarse `NULL` y no cadena vacía
+  (con `and` viaja `""`). En SQL no es lo mismo: `WHERE grano IS NULL` encuentra
+  lo no documentado, `WHERE grano = ''` no.
+- **La guarda de `_es_unica_por`** se ejercita a través de **`validar`**, no
+  llamando a la función privada: lo observable es que el veredicto de fan-out se
+  **aplaza** (fichas de `raw`, sin clave ni columnas) o se **emite** (los otros
+  tres cuadrantes). Un solo test parametrizado con los cuatro cuadrantes mata
+  las tres mutaciones vivas de la línea.
+- **Los `+1` de línea y columna del error de YAML** no se comprueban repitiendo
+  la fórmula. El test hace el **viaje de vuelta**: extrae los dos números del
+  mensaje con una regex, les resta uno e indexa el texto original, y exige que
+  caigan **sobre el carácter exacto** que el parser rechazó. Eso *es* la
+  definición de «1-based», y es lo que ninguna de las cuatro mutaciones cumple.
+  Se usan **dos** YAML rotos en sitios distintos (línea 3 columna 13; línea 6
+  columna 6) para que ningún número pueda acertar por casualidad.
+- **Casos positivos junto a los negativos.** «No genera consulta de unicidad» lo
+  cumpliría también una puerta que no comprueba nada, así que va acompañado del
+  caso en que sí la genera. Lo mismo con `objetos_saltados` y con las cuatro
+  salidas de `formatear_cobertura`.
+
+## Verificación: cada mutante aplicado y el test comprobado en ROJO
+
+No basta con que el test pase. Se aplicó **cada mutante** y se comprobó que la
+suite se pone roja, en un **`git worktree` aparte** (`wt-f006-mut`, desde
+`HEAD` = `64df916`) para no tocar el árbol donde trabajan dos agentes, y con el
+`.env` volcado al entorno vía `harness.mutacion_paralela.volcar_variables` —
+sin ese volcado 23 tests caen por configuración ausente y el rojo que se obtiene
+**no es el del mutante**. El mutante se aplicó con el **propio mutador**
+(`harness.mutacion.generar_mutantes` + `aplicar_mutante`), nunca con una
+sustitución de texto a ojo.
+
+Se verificaron **22** y no 17: el mutador genera en esas mismas líneas 5
+mutantes vecinos más (`unicidad_sql.py:133` ×2, `inventario.py:234` ×3) que no
+figuraban como supervivientes. Se comprueban igual, y también mueren.
+
+**Línea base del worktree, sin mutar: `28 passed in 7.09s`.** Sin ella, un rojo
+no demuestra nada.
+
+| # | Mutante | Veredicto | Test(s) que se ponen en rojo |
+|---|---|---|---|
+| 1 | `diccionario_sql.py:239` `fila[1] → fila[2]` | MUERTO | `..._no_cruza_ningun_campo`, `..._describe_la_fila_que_de_verdad_se_publica` |
+| 2 | `diccionario_sql.py:160` `or → and` | MUERTO | `..._llega_a_la_fila_publicada[motivo_no_consumo-5]`, `..._se_publica_como_null[motivo_no_consumo-5]` |
+| 3 | `diccionario_sql.py:162` `or → and` | MUERTO | `..._llega_a_la_fila_publicada[grano-7]`, `..._se_publica_como_null[grano-7]` |
+| 4 | `diccionario_sql.py:326` `== → !=` (`"ejes"`) | MUERTO | `..._se_formatea_con_SU_plantilla`, `..._se_vuelca_entero` |
+| 5 | `diccionario_sql.py:329` `== → !=` (`"esquemas"`) | MUERTO | `..._se_formatea_con_SU_plantilla`, `..._se_vuelca_entero` |
+| 6 | `diccionario.py:774` `and → or` | MUERTO | `..._fanout...[con_clave_y_sin_columnas]`, `[sin_clave_y_con_columnas]` |
+| 7 | `diccionario.py:774` quitar 1.er `not` | MUERTO | `..._fanout...[con_clave_y_sin_columnas]`, `[sin_clave_y_sin_columnas]` |
+| 8 | `diccionario.py:774` quitar 2.º `not` | MUERTO | `..._fanout...[sin_clave_y_con_columnas]`, `[sin_clave_y_sin_columnas]` |
+| 9 | `unicidad_sql.py:133` `or → and` | MUERTO | `..._sin_clave_de_negocio_no_hay_consulta`, `..._una_funcion_no_genera_consulta` |
+| 10 | `unicidad_sql.py:189` `and → or` | MUERTO | `..._dentro_de_la_superficie...no_se_salta_nada`, `..._con_todos_deja_de_haber...` |
+| 11 | `unicidad_sql.py:189` quitar `not` | MUERTO | `..._fuera_de_la_superficie...se_salta_diciendolo`, `..._no_se_salta_nada` |
+| 12 | `inventario.py:234` `and → or` (1.º) | MUERTO | `..._con_avisos...`, `..._con_pendientes...`, `..._un_hueco_bloqueante_no_puede_salir_como_OK` |
+| 13 | `cargador_yaml.py:245` `or → and` | MUERTO | `..._conserva_el_detalle_real_del_parser` ×2, `..._texto_de_reserva` |
+| 14 | `cargador_yaml.py:248` `line + 1 → line - 1` | MUERTO | `..._senala_la_linea_y_la_columna_del_editor` ×2 |
+| 15 | `cargador_yaml.py:248` `line + 1 → line + 2` | MUERTO | `..._senala_la_linea_y_la_columna_del_editor` ×2 |
+| 16 | `cargador_yaml.py:248` `column + 1 → column - 1` | MUERTO | `..._senala_la_linea_y_la_columna_del_editor` ×2 |
+| 17 | `cargador_yaml.py:248` `column + 1 → column + 2` | MUERTO | `..._senala_la_linea_y_la_columna_del_editor` ×2 |
+| +5 | vecinos: `unicidad_sql.py:133` `==→!=` y quitar `not`; `inventario.py:234` quitar 1.er `not`, `and→or` (2.º), quitar 2.º `not` | MUERTOS | (ver traza) |
+
+**Recuento final de la verificación: `22 mutantes aplicados, 22 muertos por mis
+tests, 0 vivos` · `worktree limpio`.** Traza completa por mutante (comando, línea
+antes/después, `FAILED` de cada test y el `N failed, M passed`) en
+`progress/mutacion_F-006_supervivientes_17.txt`.
+
+Muestra literal de la traza, con el más importante de los 17 —el que apunta a la
+línea equivocada del YAML:
+
+```
+etl_sigrid/infrastructure/diccionario/cargador_yaml.py:248 [aritmetico] col=55  ->  MUERTO por mis tests
+      ANTES:   return f"el YAML no parsea en la linea {marca.line + 1}, columna {marca.column + 1}: {problema}"
+      DESPUES: return f"el YAML no parsea en la linea {marca.line - 1}, columna {marca.column + 1}: {problema}"
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[segundos_dos_puntos_en_la_linea_3]
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[lista_sin_cerrar_que_estalla_en_la_6]
+      2 failed, 26 passed in 1.39s
+```
+
+y los tres de la guarda de `_es_unica_por`, que es donde estaba el hueco más
+peligroso —de él depende la detección de fan-out que ya dejó pasar F-042:
+
+```
+etl_sigrid/domain/diccionario.py:774 [logico] col=31  ->  MUERTO por mis tests
+      ANTES:   if not ficha.clave_negocio and not ficha.columnas:
+      DESPUES: if not ficha.clave_negocio or not ficha.columnas:
+      FAILED ...[con_clave_y_sin_columnas]
+      FAILED ...[sin_clave_y_con_columnas]
+      2 failed, 26 passed in 1.29s
+etl_sigrid/domain/diccionario.py:774 [not] col=7   -> MUERTO  (2 failed: [con_clave_y_sin_columnas], [sin_clave_y_sin_columnas])
+etl_sigrid/domain/diccionario.py:774 [not] col=35  -> MUERTO  (2 failed: [sin_clave_y_con_columnas], [sin_clave_y_sin_columnas])
+```
+
+## Equivalentes: ninguno
+
+De los 17 encargados, **ninguno resultó equivalente**. Los cuatro cuadrantes de
+`_es_unica_por` eran el candidato más plausible —parecía que `or` no cambiaría
+el veredicto— y sí lo cambia: con `or`, las fichas con clave y sin columnas y
+las que tienen columnas y no declaran clave pasan de juzgarse a aplazarse, o
+sea el `N:1` mentiroso deja de denunciarse. Es exactamente el fallo que produjo
+los 39,07 M€ de más de F-042.
+
+## Verificaciones MANUAL pendientes
+
+Ninguna de este encargo: todo lo de aquí es offline y no toca red ni base.
+
+## Lo que queda fuera de este encargo
+
+- **Los 35 supervivientes restantes** de los 52 de la campaña. 30 los está
+  matando el otro implementer (20 de `@dataclass(frozen/slots)`, ~10 de
+  constantes); 3 están **demostrados equivalentes** por el líder
+  (`relaciones_sql.py:282`, porque `int(0.5*100) == int(0.5*101)`; y los dos
+  `ensure_ascii`, porque Postgres considera el mismo `jsonb` el escapado y el
+  literal). El resto lo reparte el líder.
+- **Relanzar la campaña completa** para confirmar el cero que exige `critico`:
+  256 mutantes a 4,3 min de media son horas de máquina, y con dos agentes
+  corriendo suites a la vez el resultado no sería fiable. Lo decide el líder
+  cuando el árbol esté quieto.
+
+## Evidencias
+
+| Evidencia | Valor medido | De dónde sale |
+|---|---|---|
+| **Tests añadidos** | **28** (22 lógica + 6 mensajes), todos en verde | `python -m pytest tests/test_f006_supervivientes_logica.py tests/test_f006_supervivientes_mensajes.py -q` → `28 passed in 7.09s` |
+| **Tests ejecutados (suite completa)** | **2467 passed, 128 skipped**, 0 fallos | `bash harness/init.sh` |
+| **Tiempo de ejecución de la suite** | **1053,86 s (17 min 33 s)**. Alto porque el otro implementer corría su suite a la vez en la misma máquina | el que imprime la propia suite |
+| **Cobertura de las líneas cambiadas** | **100,0 %** — 33/33 líneas cambiadas cubiertas (umbral 80 %, nivel `critico`) | línea `PUERTA COBERTURA` de `bash harness/init.sh` |
+| **Mutantes generados y supervivientes** | **22 aplicados, 22 muertos, 0 supervivientes** sobre las 12 líneas objetivo | verificación dirigida con `harness.mutacion` en worktree aparte; traza en `progress/mutacion_F-006_supervivientes_17.txt` |
+| **Análisis de supervivientes** | **no queda ninguno vivo** en el alcance de este encargo; 0 equivalentes | tabla de arriba |
+
+Nota sobre la fila de mutación: **no es una campaña completa** de F-006 —esa la
+lanza el líder sobre el árbol quieto—, es la verificación dirigida de los 17
+supervivientes encargados más los 5 vecinos de sus mismas líneas. Se dice así
+para que el número no se lea como lo que no es, que es justo la lección que dejó
+el «0 supervivientes» falso con 4 timeouts de T25.
+
+## Resultado de la puerta
+
+```
+[OK] pytest en verde (con medición de cobertura)
+[OK] PUERTA COBERTURA: 100.0% de 33 líneas cambiadas cubiertas (33/33, umbral 80%, nivel critico)
+[OK] PUERTA TAMAÑO: F-006 dentro de los topes (requirements 132/150, design 191/250, impl 215/220, review 125/140)
+[OK] Rama actual: feature/F-006-mcp-azure
+----------------------------------------
+ENTORNO LISTO. Puedes trabajar.
+[exited with code 0]
+```

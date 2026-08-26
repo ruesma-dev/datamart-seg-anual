@@ -1,0 +1,175 @@
+# F-006 · Verificación dirigida de los 17 supervivientes encargados (bloques A y B)
+#
+# Sesión 2026-08-26. Cada mutante se aplicó con el propio mutador del arnés
+# (harness.mutacion.generar_mutantes + aplicar_mutante) sobre un git worktree
+# aparte creado desde HEAD=64df916, con el .env volcado al entorno mediante
+# harness.mutacion_paralela.volcar_variables. Suite ejecutada: solo los dos
+# ficheros nuevos de esta sesión.
+#
+# Script: scratchpad/verificar_mutantes.py (efímero; el procedimiento está en
+# progress/impl_F-006_detalle.md, sección «Anexo · 17 supervivientes»).
+
+==============================================================================
+LINEA BASE (sin mutar), solo mis dos ficheros
+      28 passed in 7.09s
+
+etl_sigrid/infrastructure/postgres/diccionario_sql.py:160 [logico] col=36  ->  MUERTO por mis tests
+      ANTES:   ficha.motivo_no_consumo or None,
+      DESPUES: ficha.motivo_no_consumo and None,
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r22_el_texto_presente_llega_a_la_fila_publicada[motivo_no_consumo-5]
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r22_el_texto_vacio_se_publica_como_null[motivo_no_consumo-5]
+      2 failed, 26 passed in 1.10s
+
+etl_sigrid/infrastructure/postgres/diccionario_sql.py:162 [logico] col=24  ->  MUERTO por mis tests
+      ANTES:   ficha.grano or None,
+      DESPUES: ficha.grano and None,
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r22_el_texto_presente_llega_a_la_fila_publicada[grano-7]
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r22_el_texto_vacio_se_publica_como_null[grano-7]
+      2 failed, 26 passed in 1.26s
+
+etl_sigrid/infrastructure/postgres/diccionario_sql.py:239 [entero] col=24  ->  MUERTO por mis tests
+      ANTES:   "version": fila[1],
+      DESPUES: "version": fila[2],
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t28_el_resumen_de_publicacion_no_cruza_ningun_campo
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t28_el_resumen_describe_la_fila_que_de_verdad_se_publica
+      2 failed, 26 passed in 6.30s
+
+etl_sigrid/infrastructure/postgres/diccionario_sql.py:326 [comparacion] col=14  ->  MUERTO por mis tests
+      ANTES:   if bloque == "ejes":
+      DESPUES: if bloque != "ejes":
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r28_cada_bloque_del_contexto_se_formatea_con_SU_plantilla
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r28_un_bloque_sin_plantilla_propia_se_vuelca_entero
+      2 failed, 26 passed in 1.66s
+
+etl_sigrid/infrastructure/postgres/diccionario_sql.py:329 [comparacion] col=14  ->  MUERTO por mis tests
+      ANTES:   if bloque == "esquemas":
+      DESPUES: if bloque != "esquemas":
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r28_cada_bloque_del_contexto_se_formatea_con_SU_plantilla
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r28_un_bloque_sin_plantilla_propia_se_vuelca_entero
+      2 failed, 26 passed in 1.37s
+
+etl_sigrid/domain/diccionario.py:774 [not] col=7  ->  MUERTO por mis tests
+      ANTES:   if not ficha.clave_negocio and not ficha.columnas:
+      DESPUES: if ficha.clave_negocio and not ficha.columnas:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_NADA_con_que_juzgarlo[con_clave_y_sin_columnas]
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_NADA_con_que_juzgarlo[sin_clave_y_sin_columnas]
+      2 failed, 26 passed in 1.03s
+
+etl_sigrid/domain/diccionario.py:774 [logico] col=31  ->  MUERTO por mis tests
+      ANTES:   if not ficha.clave_negocio and not ficha.columnas:
+      DESPUES: if not ficha.clave_negocio or not ficha.columnas:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_NADA_con_que_juzgarlo[con_clave_y_sin_columnas]
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_NADA_con_que_juzgarlo[sin_clave_y_con_columnas]
+      2 failed, 26 passed in 1.29s
+
+etl_sigrid/domain/diccionario.py:774 [not] col=35  ->  MUERTO por mis tests
+      ANTES:   if not ficha.clave_negocio and not ficha.columnas:
+      DESPUES: if not ficha.clave_negocio and ficha.columnas:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_NADA_con_que_juzgarlo[sin_clave_y_con_columnas]
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_NADA_con_que_juzgarlo[sin_clave_y_sin_columnas]
+      2 failed, 26 passed in 1.76s
+
+etl_sigrid/infrastructure/postgres/unicidad_sql.py:133 [comparacion] col=22  ->  MUERTO por mis tests
+      ANTES:   if ficha.tipo == "funcion" or not ficha.clave_negocio:
+      DESPUES: if ficha.tipo != "funcion" or not ficha.clave_negocio:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_una_funcion_no_genera_consulta_de_unicidad
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_una_tabla_con_clave_si_genera_su_consulta
+      2 failed, 26 passed in 1.96s
+
+etl_sigrid/infrastructure/postgres/unicidad_sql.py:133 [logico] col=35  ->  MUERTO por mis tests
+      ANTES:   if ficha.tipo == "funcion" or not ficha.clave_negocio:
+      DESPUES: if ficha.tipo == "funcion" and not ficha.clave_negocio:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_sin_clave_de_negocio_no_hay_consulta_de_unicidad
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_una_funcion_no_genera_consulta_de_unicidad
+      2 failed, 26 passed in 7.18s
+
+etl_sigrid/infrastructure/postgres/unicidad_sql.py:133 [not] col=38  ->  MUERTO por mis tests
+      ANTES:   if ficha.tipo == "funcion" or not ficha.clave_negocio:
+      DESPUES: if ficha.tipo == "funcion" or ficha.clave_negocio:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_sin_clave_de_negocio_no_hay_consulta_de_unicidad
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_una_tabla_con_clave_si_genera_su_consulta
+      2 failed, 26 passed in 1.10s
+
+etl_sigrid/infrastructure/postgres/unicidad_sql.py:189 [logico] col=26  ->  MUERTO por mis tests
+      ANTES:   elif solo_consumo and not ficha.consumo_recomendado:
+      DESPUES: elif solo_consumo or not ficha.consumo_recomendado:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_dentro_de_la_superficie_de_consumo_no_se_salta_nada
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_con_todos_deja_de_haber_objetos_saltados_por_consumo
+      2 failed, 26 passed in 1.13s
+
+etl_sigrid/infrastructure/postgres/unicidad_sql.py:189 [not] col=30  ->  MUERTO por mis tests
+      ANTES:   elif solo_consumo and not ficha.consumo_recomendado:
+      DESPUES: elif solo_consumo and ficha.consumo_recomendado:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_fuera_de_la_superficie_de_consumo_se_salta_diciendolo
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_t26_dentro_de_la_superficie_de_consumo_no_se_salta_nada
+      2 failed, 26 passed in 0.72s
+
+etl_sigrid/domain/inventario.py:234 [logico] col=18  ->  MUERTO por mis tests
+      ANTES:   if informe.ok and not informe.avisos_columnas and not informe.pendientes_declarados:
+      DESPUES: if informe.ok or not informe.avisos_columnas and not informe.pendientes_declarados:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r26_con_avisos_de_columnas_el_verde_deja_de_ser_limpio
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r27_con_pendientes_declarados_el_verde_deja_de_ser_limpio
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r25_un_hueco_bloqueante_no_puede_salir_como_OK
+      3 failed, 25 passed in 1.08s
+
+etl_sigrid/domain/inventario.py:234 [not] col=22  ->  MUERTO por mis tests
+      ANTES:   if informe.ok and not informe.avisos_columnas and not informe.pendientes_declarados:
+      DESPUES: if informe.ok and informe.avisos_columnas and not informe.pendientes_declarados:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r25_el_verde_limpio_solo_se_canta_sin_avisos_ni_pendientes
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r26_con_avisos_de_columnas_el_verde_deja_de_ser_limpio
+      2 failed, 26 passed in 0.85s
+
+etl_sigrid/domain/inventario.py:234 [logico] col=50  ->  MUERTO por mis tests
+      ANTES:   if informe.ok and not informe.avisos_columnas and not informe.pendientes_declarados:
+      DESPUES: if informe.ok and not informe.avisos_columnas or not informe.pendientes_declarados:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r26_con_avisos_de_columnas_el_verde_deja_de_ser_limpio
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r27_con_pendientes_declarados_el_verde_deja_de_ser_limpio
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r25_un_hueco_bloqueante_no_puede_salir_como_OK
+      3 failed, 25 passed in 0.78s
+
+etl_sigrid/domain/inventario.py:234 [not] col=54  ->  MUERTO por mis tests
+      ANTES:   if informe.ok and not informe.avisos_columnas and not informe.pendientes_declarados:
+      DESPUES: if informe.ok and not informe.avisos_columnas and informe.pendientes_declarados:
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r25_el_verde_limpio_solo_se_canta_sin_avisos_ni_pendientes
+      FAILED tests/test_f006_supervivientes_logica.py::test_f006_r27_con_pendientes_declarados_el_verde_deja_de_ser_limpio
+      2 failed, 26 passed in 1.28s
+
+etl_sigrid/infrastructure/diccionario/cargador_yaml.py:245 [logico] col=45  ->  MUERTO por mis tests
+      ANTES:   problema = getattr(exc, "problem", None) or "YAML mal formado"
+      DESPUES: problema = getattr(exc, "problem", None) and "YAML mal formado"
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_conserva_el_detalle_real_del_parser[segundos_dos_puntos_en_la_linea_3]
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_conserva_el_detalle_real_del_parser[lista_sin_cerrar_que_estalla_en_la_6]
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_sin_detalle_del_parser_se_usa_el_texto_de_reserva
+      3 failed, 25 passed in 1.05s
+
+etl_sigrid/infrastructure/diccionario/cargador_yaml.py:248 [aritmetico] col=55  ->  MUERTO por mis tests
+      ANTES:   return f"el YAML no parsea en la linea {marca.line + 1}, columna {marca.column + 1}: {problema}"
+      DESPUES: return f"el YAML no parsea en la linea {marca.line - 1}, columna {marca.column + 1}: {problema}"
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[segundos_dos_puntos_en_la_linea_3]
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[lista_sin_cerrar_que_estalla_en_la_6]
+      2 failed, 26 passed in 1.39s
+
+etl_sigrid/infrastructure/diccionario/cargador_yaml.py:248 [entero] col=57  ->  MUERTO por mis tests
+      ANTES:   return f"el YAML no parsea en la linea {marca.line + 1}, columna {marca.column + 1}: {problema}"
+      DESPUES: return f"el YAML no parsea en la linea {marca.line + 2}, columna {marca.column + 1}: {problema}"
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[segundos_dos_puntos_en_la_linea_3]
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[lista_sin_cerrar_que_estalla_en_la_6]
+      2 failed, 26 passed in 0.55s
+
+etl_sigrid/infrastructure/diccionario/cargador_yaml.py:248 [aritmetico] col=83  ->  MUERTO por mis tests
+      ANTES:   return f"el YAML no parsea en la linea {marca.line + 1}, columna {marca.column + 1}: {problema}"
+      DESPUES: return f"el YAML no parsea en la linea {marca.line + 1}, columna {marca.column - 1}: {problema}"
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[segundos_dos_puntos_en_la_linea_3]
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[lista_sin_cerrar_que_estalla_en_la_6]
+      2 failed, 26 passed in 1.24s
+
+etl_sigrid/infrastructure/diccionario/cargador_yaml.py:248 [entero] col=85  ->  MUERTO por mis tests
+      ANTES:   return f"el YAML no parsea en la linea {marca.line + 1}, columna {marca.column + 1}: {problema}"
+      DESPUES: return f"el YAML no parsea en la linea {marca.line + 1}, columna {marca.column + 2}: {problema}"
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[segundos_dos_puntos_en_la_linea_3]
+      FAILED tests/test_f006_supervivientes_mensajes.py::test_f006_r1_el_error_de_yaml_senala_la_linea_y_la_columna_del_editor[lista_sin_cerrar_que_estalla_en_la_6]
+      2 failed, 26 passed in 0.92s
+
+==============================================================================
+22 mutantes aplicados, 22 muertos por mis tests, 0 vivos
+worktree limpio
