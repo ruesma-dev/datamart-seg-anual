@@ -30,11 +30,17 @@ publicar un cero de supervivientes que nadie ha medido.
 - **Instalación editable apuntando al árbol principal.** Si el venv de un
   servicio instala su paquete en modo editable contra el árbol principal, la
   suite del worker importaría el código SIN mutar. Los venvs no se copian al
-  worktree: solo se reutiliza su intérprete.
+  worktree: solo se reutiliza su intérprete. DETECTADO, no resuelto.
 - **Suites que dependan de ficheros no versionados** (`.env`, datos locales):
-  no existen dentro de un worktree.
+  no existen dentro de un worktree. El caso más común —un `.env` con la
+  configuración sin la que la suite ni arranca— queda RESUELTO desde la 1.7.7:
+  el coordinador vuelca sus variables al entorno del proceso antes de crear
+  ningún worktree y los workers las heredan (ver `volcar_variables`). El
+  fichero NO se copia a ninguna parte. Cualquier OTRO fichero no versionado
+  que la suite necesite —datos locales, certificados, un fixture generado—
+  sigue sin existir en el worktree, y ahí solo hay detección.
 - **Detached HEAD**: el worktree no está en ninguna rama, así que un test que
-  lea `git branch --show-current` recibe cadena vacía.
+  lea `git branch --show-current` recibe cadena vacía. DETECTADO, no resuelto.
 
 Esto no es teoría: hasta la 1.5.2 estos tres casos estaban escritos aquí como
 «limitaciones conocidas» y NADA los comprobaba. El 2026-08-19, la misma
@@ -47,6 +53,7 @@ Todo con biblioteca estándar, como el resto del arnés.
 
 from __future__ import annotations
 
+import os
 import random
 import shutil
 import subprocess
@@ -283,6 +290,88 @@ class Worktrees:
             self._temporal = None
 
 
+# --- El `.env` del árbol principal, al entorno del proceso -------------------
+
+#: Fichero de variables de entorno que el coordinador vuelca antes de crear los
+#: worktrees. Es el nombre de facto en cualquier proyecto que use un fichero de
+#: configuración local no versionado.
+FICHERO_ENTORNO = ".env"
+
+
+def parsear_variables(texto: str) -> dict[str, str]:
+    """Convierte un texto `CLAVE=valor` en un diccionario de variables.
+
+    Parseo deliberadamente mínimo y con biblioteca estándar, como el resto del
+    arnés: no se añade una dependencia para leer un fichero de dos columnas.
+    Lo que entiende, y nada más:
+
+    - líneas en blanco y comentarios de línea entera (`#`): se ignoran;
+    - `export CLAVE=valor`: el prefijo `export ` se descarta;
+    - espacios alrededor de la clave, del `=` y del valor: se recortan;
+    - un valor entero entre comillas simples o dobles: se le quitan.
+
+    Lo que NO hace, a propósito: quitar comentarios al final de una línea con
+    valor (un `#` puede ser parte de una contraseña perfectamente válida) ni
+    expandir `$OTRA_VARIABLE`. Una línea sin `=`, o con una clave vacía o con
+    espacios dentro, no es una asignación y se salta en silencio: el fichero es
+    del proyecto y esta función no está para validarlo, sino para no reventar.
+    """
+    variables: dict[str, str] = {}
+    for cruda in texto.splitlines():
+        linea = cruda.strip()
+        if not linea or linea.startswith("#"):
+            continue
+        if linea.startswith("export "):
+            linea = linea[len("export ") :].lstrip()
+        clave, separador, valor = linea.partition("=")
+        clave = clave.strip()
+        if not separador or not clave or any(letra.isspace() for letra in clave):
+            continue
+        valor = valor.strip()
+        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in ("'", '"'):
+            valor = valor[1:-1]
+        variables[clave] = valor
+    return variables
+
+
+def volcar_variables(raiz: str = ".", fichero: str = FICHERO_ENTORNO) -> list[str]:
+    """Vuelca al proceso las variables del fichero de entorno del árbol principal.
+
+    Devuelve las claves realmente añadidas, en el orden del fichero. Sin fichero
+    —o si no se puede leer— devuelve la lista vacía y no pasa nada más: la
+    campaña sigue exactamente como sin esta función.
+
+    POR QUÉ existe. Un worktree solo contiene lo versionado, y un fichero de
+    entorno local no lo está. En un proyecto cuya configuración se lee de ahí,
+    la suite del worker ni arranca: la validación de la configuración revienta y
+    la campaña aborta con `BaseRota` sin haber juzgado un solo mutante. El modo
+    paralelo quedaba inservible justo donde más se nota (una campaña de horas).
+
+    POR QUÉ ASÍ y no copiando el fichero. Copiarlo escribiría la configuración
+    local —credenciales incluidas— en el temp del sistema, fuera del repositorio
+    y de su `.gitignore`, y una campaña muerta a machetazos la dejaría ahí. Las
+    variables viven en la memoria de este proceso y de los subprocesos que
+    lanza; no se escriben en ningún disco. Los workers las heredan solos: la
+    suite de cada mutante se lanza con `env={**os.environ, ...}`.
+
+    PRECEDENCIA: lo que ya esté en el entorno MANDA y no se pisa. Es lo que
+    hacen las bibliotecas de configuración al leer un fichero así, y lo que
+    espera quien exporta una variable a mano para una tanda concreta.
+    """
+    try:
+        texto = (Path(raiz) / fichero).read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return []
+
+    anadidas: list[str] = []
+    for clave, valor in parsear_variables(texto).items():
+        if clave in os.environ:
+            continue
+        os.environ[clave] = valor
+        anadidas.append(clave)
+    return anadidas
+
+
 # --- Piezas del coordinador --------------------------------------------------
 
 
@@ -419,6 +508,11 @@ def ejecutar_campania_paralela(
     """
     inicio = time.monotonic()
     resolver_interpretes(alcance, servicios, raiz)  # R11: revienta aquí o nunca
+    # ANTES de crear ningún worktree: lo que un worktree no tiene es lo no
+    # versionado, y el fichero de entorno del árbol principal es justo eso. Sus
+    # variables pasan a este proceso y los workers las heredan; el fichero no se
+    # copia a ninguna parte. Ver `volcar_variables` para el porqué completo.
+    volcar_variables(raiz)
 
     mutantes, generados, muestreado = generar_y_muestrear(
         alcance, raiz, max_mutantes, semilla
