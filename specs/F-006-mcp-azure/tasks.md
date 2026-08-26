@@ -252,6 +252,16 @@ Entregable: `_meta.diccionario` publicada y consultable. No toca permisos.
 **Todo este bloque toca permisos sobre el servidor compartido.** El código se
 escribe libremente; la ejecución contra Azure necesita firma.
 
+> ➡️ **BLOQUE ENTREGADO A F-034 el 2026-08-25, y ya NO es condición de cierre
+> de F-006.** El humano resolvió DA-3 por su **opción B** («del BI olvídate»).
+> Las siete tareas siguen en `[ ]` porque **no están hechas**, y eso es lo que
+> hay que leer aquí. Estado real, medido contra el árbol el 2026-08-27 —no
+> copiado de ninguna tabla—: **no existe `revocar_en` en `grants.py`, no existe
+> `PG_REVOKE_FUERA_DE_CONSUMO` en ningún fichero, y `DEFAULT_CONSUMPTION_SCHEMAS`
+> (`config/settings.py:81`) sigue con los NUEVE esquemas.** O sea: el mecanismo
+> de `REVOKE` **no se construyó**, ni siquiera apagado. Quien recoja F-034
+> arranca de cero en este bloque.
+
 - [ ] **T29**: `build_readonly_grant_statements(..., revocar_en=())` (R31) y el
       cálculo de la lista en `apply_readonly_grants` con `ESQUEMAS_SISTEMA`
       (R33). Función pura, probada sin BBDD, incluido el **orden** de las tres
@@ -268,6 +278,8 @@ escribe libremente; la ejecución contra Azure necesita firma.
       comentario actualizado.
       | Verificación: `pytest tests/test_f006_grants.py -k consumo` +
       `pytest tests/test_f005_grants.py` (no regresión).
+      | **T29, T30 y T31: NO HECHAS**, verificado por `grep` contra el árbol el
+      2026-08-27 (ver el aviso de cabecera del bloque). ➡️ **entregadas a F-034**.
 - [ ] **T32** 🔏: **Verificar que Power BI no lee de `stg` ni de `raw`** (R34).
       Hoy `mcp_sigrid_dm_ro` es el único rol de lectura y lo usan los dos
       consumidores.
@@ -275,6 +287,8 @@ escribe libremente; la ejecución contra Azure necesita firma.
       publicados y, contra la base:
       `SELECT usename, application_name, query FROM pg_stat_activity WHERE usename='mcp_sigrid_dm_ro';`
       durante un refresco. Veredicto escrito en `progress/impl_F-006.md`.
+      | ➡️ **ENTREGADA A F-034 el 2026-08-25** (decisión del humano, DA-3 = B).
+      No se ejecutó: sigue siendo `MANUAL` y sin veredicto.
 - [ ] **T33** 🔏: (solo si T32 sale limpia; si no, DA-3 = B y se entrega a
       F-034) Activar `PG_REVOKE_FUERA_DE_CONSUMO=true` y ejecutar
       `python main.py apply-grants`.
@@ -283,11 +297,16 @@ escribe libremente; la ejecución contra Azure necesita firma.
       Debe pasar de `t` a `f` en `raw` y `stg`, y seguir en `t` en los siete
       restantes. **Rollback**: `PG_REVOKE_FUERA_DE_CONSUMO=false`, restaurar la
       lista antigua en `PG_CONSUMPTION_SCHEMAS` y `apply-grants`.
+      | ➡️ **ENTREGADA A F-034 el 2026-08-25**: DA-3 se resolvió por la opción B.
+      Ojo, la variable que este texto manda activar **no existe** (T30 no se
+      hizo): F-034 tiene que construirla antes de poder ejecutar esto.
 - [ ] **T34** 🔏: Comprobar que **Power BI sigue refrescando** y que el MCP
       sigue leyendo, después de T33.
       | Verificación: MANUAL (humano) — un refresco completo de los informes y
       una consulta del MCP a `mart` y a `_meta.v_diccionario`. Resultado real
       anotado.
+      | ➡️ **ENTREGADA A F-034 el 2026-08-25**: sin T33 no hay nada que
+      comprobar después.
 
 ---
 
@@ -317,6 +336,10 @@ escribe libremente; la ejecución contra Azure necesita firma.
       mostrando la regla nueva. **Si el entorno del MCP no existe todavía, esta
       tarea se entrega a `mcp-bbdd` y se anota como tal: no bloquea el cierre de
       F-006.**
+      | ➡️ **ENTREGADA A `mcp-bbdd`**, que es lo que manda la cláusula de escape
+      de arriba: **el entorno desplegado del MCP no existe** —hoy el MCP corre en
+      el puesto de pgris—, así que no hay IP de salida a la que abrir el
+      firewall. Anotado el 2026-08-27. **No bloquea el cierre de F-006.**
 
 ---
 
@@ -353,12 +376,26 @@ escribe libremente; la ejecución contra Azure necesita firma.
 
 ## Cierre
 
-- [ ] **T41**: Campaña de mutación del rigor `critico`.
+- [x] **T41**: Campaña de mutación del rigor `critico`.
       | Verificación: `python -m harness.mutacion --feature F-006`, cero
       supervivientes sin justificación escrita y aceptada por el humano
       (informe en `progress/mutacion_F-006.md`).
-- [ ] **T42**: Ejecutar `bash harness/init.sh` en verde.
+      | **HECHA**, commit `e89f71f`: campaña completa y válida, **256 mutantes,
+      204 muertos, 52 supervivientes, 0 timeouts, 0 sin veredicto**, 6 workers.
+      Los 52 resueltos: **49 muertos con tests nuevos y 3 equivalentes**
+      demostrados y aprobados por el humano el 2026-08-26. Los 52 análisis,
+      completados y con puntero a su traza, en `progress/mutacion_F-006.md`. La
+      limitación de la campaña paralela va declarada en
+      `progress/control_mutacion_F-006.md` y fichada en **F-041**.
+- [x] **T42**: Ejecutar `bash harness/init.sh` en verde.
       | Verificación: `bash harness/init.sh` con exit code 0.
+      | **HECHA**: exit 0, **2.473 pasados, 128 saltados, 0 fallos**. Lo verificó
+      el reviewer por su cuenta en la 20ª pasada, y se reverifica en cada pasada.
+
+> **Nota de trazabilidad**: los commits `4d336fb` y `143fa07` llevan la etiqueta
+> `F-006 T42:` y son **trabajo de T41** (matar supervivientes de la campaña). No
+> se reescribe el historial por una etiqueta; queda dicho aquí para que quien
+> siga los commits de T41 no se los salte.
 
 ---
 
@@ -370,6 +407,9 @@ escribe libremente; la ejecución contra Azure necesita firma.
 | **T33** | **`REVOKE` sobre `mcp_sigrid_dm_ro`** en `sigrid_dm` | Power BI deja de refrescar **en silencio**. Rollback: una variable de entorno y `apply-grants` |
 | **T34** | Refresco real de Power BI | Ninguno: verificación |
 | **T38** | **Regla de firewall en `rg-albaranes-dev`**, recurso de otro proyecto | Superficie de red abierta de más. Se crea con nombre del entorno y se revisa en la lista |
+
+**Ninguna de las cuatro se ejecutó**: T32, T33 y T34 quedaron **entregadas a
+F-034** el 2026-08-25 y T38 a **`mcp-bbdd`**. Ninguna firma se llegó a pedir.
 
 Ninguna otra tarea escribe contra producción. T19, T27 y T40 escriben en
 `_meta` de `sigrid_dm` —tres tablas propias de esta feature, creadas por ella—
