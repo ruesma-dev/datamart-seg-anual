@@ -3,48 +3,52 @@
 
 **Feature en curso: F-006 · MCP sobre el datamart.** Rama
 `feature/F-006-mcp-azure`, con el arnés **1.7.6** dentro. `bash harness/init.sh`
-**en verde: 2.290 tests, 125 saltados**; puerta de cobertura N/A (F-006 no
-cambia líneas Python de producción frente a `dev`) y puerta de tamaño cumplida.
+**en verde: 2.291 tests, 125 saltados** (615 s); cobertura 100 % de 1 línea
+cambiada y puerta de tamaño cumplida, con **impl al filo: 219 de 220 líneas**.
 Árbol limpio y **sin mutantes aplicados** (verificado con
 `python -m harness.mutacion --estado`).
 
 ---
 
-## LO PRIMERO AL RETOMAR (2026-08-26)
+## LO PRIMERO AL RETOMAR (2026-08-26, tarde)
 
-**F-006 está a UNA sola cosa de poder ir a revisión: la campaña de mutación.**
-Todo lo demás está hecho. Y hay una decisión del humano pendiente, con los
-números ya medidos, que es justo donde se cortó la sesión.
+**F-006 está a UNA sola cosa de poder ir a revisión: la campaña de mutación**,
+más el bloque de documentación T28/T35/T36. La decisión de cómo se mide **ya la
+tomó el humano**: campaña **en serie, de noche**.
 
-### La decisión pendiente: cómo se mide F-006
+### Cómo se mide F-006: DECIDIDO (2026-08-26)
 
-La campaña completa **no cabe en una tarde**, y esto no es una impresión:
+**Opción elegida: lanzarla de noche, en serie.** Funciona hoy, sin trabajo
+previo en el arnés, y es la evidencia que el reviewer lleva diecisiete pasadas
+pidiendo. Se descartaron arreglar antes el modo paralelo (media jornada de
+trabajo para bajar a 3-4 h) y el muestreo declarado (no cumple `critico`).
 
-| Medido el 2026-08-26 | |
-|---|---|
-| Alcance | 6 módulos, **2.637 líneas** de producción, del orden de **400 mutantes** |
-| Suite completa (2.290 tests) por mutante | **~4,3 min** |
-| Solo los tests de F-006 (617 tests) | **~2,2 min** |
-| Campaña entera en serie | **15-30 horas** |
+**El alcance real es mayor que el que se midió ayer.** No son seis módulos:
+son **ocho**, todos nacidos en F-006 (verificado con `git log --diff-filter=A`,
+2026-08-26):
 
-Se lanzó y se paró a los 82 minutos: iba por el **primer fichero de seis**, línea
-219 de 1.089. El árbol quedó restaurado.
+| Módulo | Líneas | Nació en |
+|---|---:|---|
+| `etl_sigrid/domain/diccionario.py` | 1.089 | T3 |
+| `etl_sigrid/infrastructure/diccionario/cargador_yaml.py` | 468 | T7 |
+| `etl_sigrid/infrastructure/postgres/diccionario_sql.py` | 332 | T16 |
+| `etl_sigrid/infrastructure/postgres/relaciones_sql.py` | 319 | T40 |
+| `etl_sigrid/domain/inventario.py` | 288 | T6 |
+| `etl_sigrid/infrastructure/postgres/unicidad_sql.py` | 274 | 2026-08-21 |
+| `etl_sigrid/application/steps/publicar_diccionario_step.py` | 190 | T17 |
+| `etl_sigrid/infrastructure/postgres/catalogo.py` | 166 | 12ª pasada |
+| **Total** | **3.126** | |
 
-**Acotar el alcance NO sirve**: los seis módulos nacieron con F-006, así que «las
-líneas que la feature cambió» son los ficheros enteros. La conclusión incómoda
-es otra: **F-006 es demasiado grande para el rigor que declara**. 2.637 líneas de
-producción con `rigor: critico` cuestan una campaña de una noche cada vez.
+Son **489 líneas más** que las 2.637 anotadas ayer: un ~19 % más de mutantes, y
+con ellos más horas. Lo demás medido sigue valiendo: **~4,3 min por mutante**
+con la suite completa (2.291 tests), **~2,2 min** con solo los 617 de F-006. El
+intento de ayer se paró a los 82 minutos, por la línea 219 de 1.089 del primer
+fichero; el árbol quedó restaurado.
 
-Las tres salidas que se le plantearon al humano, sin que eligiera todavía:
-
-1. **Lanzarla de noche** en serie (funciona hoy, sin trabajo previo) y mirarla por
-   la mañana. Es la evidencia que el reviewer lleva pidiendo dieciséis pasadas.
-2. **Arreglar antes el modo paralelo** —que los worktrees tengan `.env` y que
-   `test_f015_r12` no dependa de `git branch --show-current`— y acotar la suite:
-   bajaría a 3-4 h, a cambio de media jornada de trabajo en el arnés.
-3. **Muestreo declarado** (60-100 mutantes con semilla fija, una hora). NO cumple
-   lo que exige `critico`: habría que declarar la desviación por escrito y que el
-   reviewer la acepte o la rechace.
+**La conclusión incómoda no cambia, y ahora es más grande**: 3.126 líneas de
+producción con `rigor: critico` cuestan una campaña de una noche larga cada vez.
+**F-006 es demasiado grande para el rigor que declara**, y eso es materia de
+T43.
 
 **Ojo con el modo serie**: muta el ÁRBOL PRINCIPAL (`muta_arbol_principal: true`).
 Si una campaña muere a medias, queda código mutado en disco. El centinela
@@ -102,12 +106,18 @@ que no lo has hecho.**
 
 **Dos cosas paradas, a la espera del humano:**
 
-1. **Republicar el diccionario.** El árbol va por la **versión 9**; `_meta`
-   sirve la **8**, con la remisión falsa dentro. `publicar-diccionario` escribe
-   en Azure.
-2. **La campaña de mutación** (RM1: se lanza con el árbol quieto). Tampoco se
-   han podido ejecutar `check-diccionario`, `check-unicidad` ni
-   `check-relaciones`, que exigen base.
+1. ~~**Republicar el diccionario.**~~ **RESUELTO SOLO, y conviene saber por qué**
+   (verificado el 2026-08-26 a las 11:42). No hizo falta publicar nada: **la
+   nocturna ya lo hizo a las 06:59**, porque `publicar_diccionario` es un paso
+   de `run-all`. `_meta` sirve la **versión 9**, hash `72125091cc25`, batch
+   `20260826T065947Z-f0d443`, **idéntico al que calcula el árbol**. La remisión
+   falsa ya no se sirve. Los permisos del rol del MCP sobrevivieron a que se
+   recreara la vista: `mcp_sigrid_dm_ro` conserva `SELECT` sobre los ocho
+   objetos de `_meta`, `v_diccionario` incluida, así que **no hizo falta
+   `apply-grants`**. **La lección: antes de dar por pendiente una publicación,
+   pregúntale a la base**; la nocturna publica sin avisar a nadie.
+2. **La campaña de mutación** (RM1: se lanza con el árbol quieto). Las tres
+   puertas contra la base **ya están ejecutadas** (2026-08-26, ver más abajo).
 
 **Sigue abierto de higiene (h6):** publicar la consulta que da «37 celdas /
 39,07 M€» y la del «22 obras». Exige medir contra la base; mientras tanto la
@@ -320,14 +330,14 @@ aceptación**, no la especificación.
 
 ## Dónde está
 
-Diccionario en **versión 9 en el árbol, sin publicar**: **103 objetos**
+Diccionario en **versión 9, publicada y verificada**: **103 objetos**
 documentados, **798 columnas**, **46 de consumo recomendado**. (Estas cifras las
 comprueba un test: si envejecen, la suite se pone roja. Ya caducaron dos veces.)
 
-**Cuidado con lo que sirve `_meta` hoy: la versión 8**, que es la última
-publicada y **lleva dentro la remisión falsa** que la 17ª pasada corrigió
-(2026-08-26). Republicar escribe en Azure y **esa autorización es del humano**:
-hasta que la dé, el agente lee el texto viejo.
+**Lo que sirve `_meta` hoy ES lo del árbol**: versión 9, hash `72125091cc25`,
+publicada por la **nocturna** del 2026-08-26 a las 06:59 y contrastada a las
+11:42 con `check-diccionario` («OK lo publicado ES lo del arbol»). La remisión
+falsa que corrigió la 17ª pasada ya no llega al agente.
 
 Tres puertas que lo contrastan **contra el dato real**, no contra sí mismo:
 
@@ -336,6 +346,19 @@ Tres puertas que lo contrastan **contra el dato real**, no contra sí mismo:
 | `check-diccionario` | biyección ficha ↔ objeto que existe en la base |
 | `check-unicidad` | que la clave declarada sea de verdad única |
 | `check-relaciones` | que el JOIN de cada relación declarada **devuelva filas** |
+
+**Las tres, ejecutadas contra Azure el 2026-08-26 a las 11:42-12:05:**
+
+| Puerta | Resultado |
+|---|---|
+| `check-diccionario` | **OK, lo publicado ES lo del árbol** (v9, hash `72125091cc25`). 103 fichas / 102 objetos: la única huérfana sigue siendo `cierre.v_pbi_planif_vs_real`, la deuda de F-047 (la base va por detrás del repositorio) |
+| `check-unicidad` | **39 sin contradicción, 0 con la clave rota**, 6 sin comprobar por timeout de 30 s (`mart.fact_seguimiento_mensual`, `v_pbi_fact`, `v_master_versiones_tipadas`, `v_master_vigente_anual` entre ellas), 1 fichado que no existe |
+| `check-relaciones --todos` | **78 unen, 0 que NO unen**, 2 con cobertura escasa, 16 sin comprobar, 2 con un extremo inexistente |
+
+Comparado con la medición del 2026-08-25 (77 unen / 17 sin comprobar), **una
+relación más queda verificada**. Y lo que ninguna de las tres demuestra, dicho
+por ellas mismas: *un objeto sin contradicción no tiene la clave demostrada, y
+una relación que une podría unir por la columna equivocada y coincidir*.
 
 El lado consumidor (`C:\Users\pgris\PycharmProjects\mcp-bbdd`, repo aparte, ya
 en git) consume `_meta` y sirve **los cinco bloques** de contexto.
