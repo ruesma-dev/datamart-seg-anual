@@ -717,6 +717,22 @@
       "rigor": "estandar",
       "priority": 3,
       "branch": "feature/F-046-contraste-desgloses"
+    },
+    {
+      "id": "F-047",
+      "title": "La base va por detras del repositorio: la nocturna no crea lo que el codigo declara",
+      "description": "Detectada el 2026-08-26 por `python main.py check-diccionario` contra Azure, al publicar el diccionario en version 9: 103 fichas contra 102 objetos en la base. `cierre.v_pbi_planif_vs_real` esta fichada, publicada en `_meta` y su SQL existe en el repositorio (`etl_sigrid/infrastructure/postgres/sql/cierre/06_views_planif_vs_real.sql`), pero la vista NO existe en la base. Es decir: el MCP esta publicando a los agentes una vista que, si alguien la consulta, no esta. Lo que hay que averiguar NO es como crear esa vista —eso es lanzar el build—, sino POR QUE la carga nocturna no la crea: si el build de `cierre` no entra en la nocturna, si entra pero falla en silencio, o si se quedo fuera al anadir la vista. Mientras eso no se sepa, cualquier objeto nuevo del esquema `cierre` volvera a quedarse sin crear y el diccionario volvera a mentir. Decision del humano el 2026-08-26: prioridad 1 y se investiga la nocturna. Contexto que da el humano: el cierre NO esta terminado (ver F-017 y F-018), asi que al revisar la nocturna hay que distinguir lo que falta por construir de lo que falla al cargarse. Relacionada con F-044 (los cuatro build entran en la carga nocturna).",
+      "acceptance": [
+        "Escrito por que la nocturna no creo cierre.v_pbi_planif_vs_real: no entra en la nocturna, entra y falla en silencio, o se quedo fuera al anadirse",
+        "La vista existe en la base y `check-diccionario` deja de declarar la discrepancia",
+        "La nocturna deja de poder fallar en silencio: si un build no crea lo que el repositorio declara, se entera alguien",
+        "Comprobado que no hay MAS objetos del repositorio sin crear en la base, en todos los esquemas"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "critico",
+      "priority": 1,
+      "branch": "feature/F-047-nocturna-desfasada"
     }
   ]
 }
