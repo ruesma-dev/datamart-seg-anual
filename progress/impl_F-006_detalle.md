@@ -4941,3 +4941,192 @@ han podido ejecutar `check-diccionario` ni `check-relaciones`, que exigen base.
   contra la base. Se ha declarado el hueco en la ficha en vez de inventar una consulta.
 - **h7 a h10** (higiene del review): fuera del encargo de esta sesión.
 - **Republicar en `_meta`**: parado a la espera del humano.
+
+---
+
+# 18ª pasada · T28, T35, T36 y la reverificación de la tabla (2026-08-26)
+
+Encargo: las tres tareas de documentación que quedaban del bloque J y de T28, más
+**reverificar contra el árbol** la tabla de estado del resumen, que ya se había copiado
+sin contrastar dos veces.
+
+## Fase RED de T28, T35 y T36
+
+`tasks.md` fija como criterio de verificación de las tres tareas
+`pytest tests/test_f006_docs.py -k <convenciones|firewall|arquitectura>`. **Ese fichero
+no existía**: lo primero fue escribirlo, y ejecutarlo antes de tocar un solo documento.
+
+```
+$ python -m pytest tests/test_f006_docs.py -q
+FFFFF.FFFFF...                                                           [100%]
+_______ test_f006_t28_convenciones_exigen_la_ficha_en_el_mismo_trabajo ________
+E       AssertionError: las convenciones no nombran el directorio del diccionario semántico
+E       assert False
+E        +  where False = contiene('<!-- docs/CONVENTIONS.md -->\n# Convenciones · datamart-seg-anual\n…', 'config/diccionario')
+____________ test_f006_t28_convenciones_citan_comandos_que_existen ____________
+E       AssertionError: las convenciones no citan ni un comando del diccionario
+E       assert set()
+_____ test_f006_t35_firewall_la_regla_del_puesto_es_unica_y_se_reescribe ______
+E       AssertionError: el runbook no fija la regla única del puesto:
+E         ['datamart-puesto-pgris', 'se reescribe', 'no se crean reglas nuevas', 'CGNAT']
+____________ test_f006_t35_firewall_el_entorno_del_mcp_documentado ____________
+E       AssertionError: el runbook no documenta el firewall del MCP:
+E         ['properties.staticIp', 'sin integración de red virtual', 'rg-albaranes-dev',
+E          'cualquier recurso de Azure']
+______ test_f006_t36_arquitectura_nombra_el_paso_como_lo_llama_el_codigo ______
+E       AssertionError: la arquitectura no llama al paso `publicar_diccionario`, que es como se llama
+E       assert 'publicar_diccionario' in ''
+_________ test_f006_t36_arquitectura_enlaza_azure_apps_sin_duplicarlo _________
+E       AssertionError: la sección no enlaza el documento del ecosistema
+E       assert False
+E        +  where False = contiene('', 'azure-apps/datamart_seg_anual.md')
+=========================== short test summary info ===========================
+10 failed, 4 passed in 0.32s
+```
+
+Los 4 que pasaban en RED son los tres controles de existencia de fichero y
+`ningun_comando_usa_rule_name`, que ya era cierto sobre el runbook de F-005: un test
+verde en RED no es una guarda inútil, es la línea base que impide una regresión.
+
+Verde tras escribir los tres documentos:
+
+```
+$ python -m pytest tests/test_f006_docs.py -q
+..............                                                           [100%]
+14 passed in 0.22s
+```
+
+### Un defecto del propio guardián, encontrado a mitad
+
+`test_f006_t35_firewall_el_servidor_compartido_esta_advertido` siguió rojo después de
+escribir la sección, diciendo que faltaban `partes` y `no se tocan las ajenas` cuando
+estaban las dos:
+
+```
+E       AssertionError: la sección de firewall no advierte del servidor compartido:
+E         ['partes', 'no se tocan las ajenas']
+```
+
+El helper `_seccion` tomaba por encabezado **cualquier** línea que empezara por `#`,
+incluidos los comentarios `# 1) La IP de ahora mismo` de dentro de un bloque de código,
+y cortaba la sección justo antes de lo que había que comprobar. Es el mismo patrón que
+la 13ª pasada: el dispositivo escrito para evitar un fallo, fallando por dentro.
+Corregido con un criterio real —`^#{1,6}\s` más seguimiento de los fences—, no con un
+parche al caso.
+
+## Qué se escribió
+
+| Tarea | Fichero | Qué queda dicho |
+|---|---|---|
+| **T28** | `docs/CONVENTIONS.md`, sección «El diccionario semántico» | La ficha se actualiza en el mismo trabajo que el objeto; si no se puede, se declara pendiente y el trinquete solo baja; `check-diccionario` la contrasta contra la base; subir `version`; el diccionario dice lo que el dato **es**, no cómo se decide con él |
+| **T35** | `docs/runbook_postgres_azure.md`, **6 bis** y **6 ter** | 6 bis: la regla del puesto es única, sin fecha, `datamart-puesto-pgris`, y se reescribe; no se crean reglas nuevas ni se tocan las ajenas (servidor compartido con `albaranes` y `partes` en producción); `-n` es la REGLA, el servidor va en `--server-name`. 6 ter: el entorno del MCP se crea **sin integración de red virtual**, que es lo que da `properties.staticIp`; se escribe sobre `rg-albaranes-dev`, de otro proyecto; no se depende de la regla que autoriza a cualquier recurso de Azure |
+| **T36** | `docs/ARCHITECTURE.md`, «El datamart se explica solo (F-006)» | Los YAML como fuente, `publicar_diccionario` dentro de `run-all` entre `build_mart` y `apply_grants` y por qué el orden importa, las **cuatro** tablas y `v_diccionario`, la publicación atómica, `mcp-bbdd` por SQL con `mcp_sigrid_dm_ro`, y el enlace a `azure-apps/datamart_seg_anual.md` sin duplicarlo |
+
+Dos decisiones de diseño de los guardianes, las dos por la misma razón —que una tabla
+escrita a mano envejece en silencio—:
+
+- Los comandos que `CONVENTIONS.md` cite se contrastan contra los `@cli.command("…")`
+  de `main.py`. Una convención no puede mandar ejecutar un comando inventado.
+- Las tablas del contrato que `ARCHITECTURE.md` nombra se **derivan** de los
+  `CREATE TABLE` de `01_diccionario.sql`. El día que el contrato gane una quinta tabla,
+  el test lo dice en vez de dejar la arquitectura mintiendo. Ese mismo test es el que
+  destapó el desfase de T15 (ver abajo).
+
+Contradicción resuelta de paso: la §6 del runbook mandaba nombre **fechado** para toda
+regla nueva, lo que contradice a la 6 bis. Se marca explícitamente en los dos sitios que
+el puesto es la excepción, en vez de dejar dos reglas incompatibles en el mismo
+documento —que es justo la trampa que esta feature lleva cinco rechazos cazando—.
+
+## Reverificación de la tabla §1 CONTRA EL ÁRBOL
+
+Método: no se leyó la tabla para buscarle confirmación. Se midió cada afirmación con el
+cargador real (`cargar_diccionario(Path('config/diccionario'))`), `yaml.safe_load` por
+fichero y `grep` sobre el código; y **después** se comparó con lo que decía la tabla.
+
+Verificado y **exacto**: T3 (`domain/diccionario.py:365 def validar`), T4
+(`:1038 derivar_avisos`), T5 (`_validar_frescura:880`), T6 (`domain/inventario.py`,
+`evaluar_cobertura:181`), T7 (`cargador_yaml.py:203`, `hash_fuente`), T8 (la puerta vive
+en `tests/test_f006_cobertura.py`, que corre dentro de `init.sh`, con
+`PENDIENTES_MAX = 0`), T9 (**16** reglas, y la tabla ya decía 16), T10 (9 esquemas;
+`convenciones`, `ejes` y `ocultar` presentes en `00_global.yaml`), T11 (18 preguntas),
+T12 (2 tablas de hecho en `mart`), T13 (11 vistas de `mart`), T14 (`cierre` = 1 tabla +
+8 vistas + 3 funciones), T16 (`filas_diccionario`, `filas_reglas`, `filas_contexto` y
+`fila_publicacion` en `diccionario_sql.py`; `publicar_diccionario:818` y
+`fetch_hash_publicado:744` en el cliente), T17/T18 (`PublicarDiccionarioStep` compuesto
+en `main.py:440` y comando en `:876`), T20/T21 (`compras.yaml` 14 objetos,
+`retenciones.yaml` 10), T22 (4 objetos), T23 (10), T25 (31 fichas de `raw`), T26
+(`check-diccionario` en `main.py:603`), y T29/T30/T31, que **siguen pendientes de
+verdad**: `build_readonly_grant_statements` (`infrastructure/postgres/grants.py:24`) no
+tiene `revocar_en`, `PG_REVOKE_FUERA_DE_CONSUMO` no existe en `config/settings.py`, y
+`DEFAULT_CONSUMPTION_SCHEMAS` (`config/settings.py:81`) sigue con los nueve esquemas,
+`raw` y `stg` incluidos, igual que `infra/sql/02_roles.sql:102`.
+
+**Cuatro desfases encontrados**, dos de ellos que nadie había señalado:
+
+1. **T15 · «3 tablas + `v_diccionario`» es falso: son CUATRO tablas.**
+   `01_diccionario.sql` crea `_meta.diccionario`:45, `_meta.diccionario_reglas`:67,
+   `_meta.diccionario_contexto`:93 y `_meta.diccionario_publicacion`:119, más
+   `_meta.v_diccionario`:143. La cabecera del propio fichero ya dice «Estas CUATRO
+   tablas». El «3» venía del texto original de la tarea, de antes de que
+   `diccionario_contexto` existiera, y se arrastró pasada tras pasada.
+2. **T24 · `_meta.yaml` tiene 8 objetos, no 7**: `etl_runs`, `v_raw_state`, `v_frescura`,
+   `diccionario`, `diccionario_reglas`, `diccionario_publicacion`, `diccionario_contexto`
+   y `v_diccionario`. Mismo origen: la ficha de `diccionario_contexto` llegó después.
+3. **T37 constaba pendiente y está HECHA** desde el 2026-08-22: commit `2e9bee8` de
+   `C:\Users\pgris\PycharmProjects\azure-apps`, «datamart-seg-anual: el datamart publica
+   su semantica en _meta (F-006)». Documenta las cuatro tablas y la vista, quién las
+   consume, dónde está el contrato completo y las reglas de compatibilidad.
+4. **Las cifras del diccionario habían cambiado**: el árbol está en **versión 9**, hash
+   `72125091cc25`, y es esa la que `_meta` sirve desde la nocturna de hoy a las 06:59.
+
+Medición del árbol, para que las cifras del resumen sean comprobables:
+
+```
+$ python -c "…cargar_diccionario(Path('config/diccionario'))…"
+version 9 hash 72125091cc25
+fichas 103 · columnas 798 · reglas 16 · pendientes 0 · esquemas 9 · consumo 46
+
+$ python -c "…filas_*(d)…"
+filas_diccionario 103 · filas_reglas 16 · filas_contexto 29 · cobertura_columnas 100.0
+```
+
+## Lo que NO se ha podido verificar desde el árbol, dicho así
+
+- **Que `_meta` sirva hoy la versión 9.** Exige conexión a Azure y firewall abierto. Lo
+  que sí se ha medido es que **el hash del árbol es `72125091cc25`**, el mismo que el
+  humano reporta como publicado y verificado con `check-diccionario`: los dos lados
+  coinciden, pero la coincidencia se apoya en su medición, no en una mía.
+- **T19, T27, T32, T33, T34, T38 y T39**: todas `MANUAL` o entregadas a otra feature. Se
+  anotan como lo que son; no se reetiquetan por comodidad.
+- **T41 (mutación)**: sigue sin número y sigue dependiendo de **F-041**.
+
+## Un hallazgo que NO se ha arreglado, por estar fuera del encargo
+
+`main.py:434` lleva un comentario que dice que publicar después de `apply_grants`
+dejaría «**las tres tablas** del diccionario dependiendo solo del
+`ALTER DEFAULT PRIVILEGES`». Son **cuatro**, por lo mismo que T15. Es una afirmación
+falsa dentro de código de producción, del tipo exacto que esta feature persigue, pero el
+encargo de esta sesión era documentación y el arreglo toca `main.py`: queda
+**declarado, no tocado**, para quien retome el bloque I.
+
+## Deuda técnica medida, sin arreglar aquí (movida del resumen por la puerta de tamaño)
+
+- **`mart.fact_seguimiento_mensual` tiene la clave rota** (T27): 8.778 claves duplicadas
+  / 17.556 filas, siempre exactamente dos. Causa: 22 obras con dos fases con el mismo
+  `ano`/`mes` en Sigrid, de las que **9** duplican en el fact. Efecto: `SUM` doblado y
+  fan-out; y la detección de cardinalidades **derivaba la unicidad de esa clave**, así
+  que las relaciones al fact se validaron sobre una premisa falsa → **F-042** (39,07 M€
+  de más en 8 obras, alimentando KPI de Power BI). Corregida la ficha, no el build (L3567).
+- **`build-compras` y `build-retenciones` no registran paso en `_meta.etl_runs`**: su
+  frescura no es consultable por SQL. Dicho dentro de `R-FRESCURA-MANUAL` (L474).
+- **`cierre.v_pbi_planif_vs_real`**: el repositorio la crea, la base no la tiene porque
+  `build-cierre` no se ha relanzado. Deja 2 relaciones sin comprobar.
+- **4 relaciones sin comprobar a 90 s** (objetos que `R-COSTE-CONSULTA` declara caros),
+  contadas como «no lo sabemos», nunca como OK (L4662).
+- **`aux.periodificacion_partida` se crea vacía por diseño** → `mart.v_fact_periodificado`
+  no periodifica nada; `consumo_recomendado: false` con motivo.
+- **Intragrupo**: el mayor proveedor de la empresa es la propia empresa (23,8 M€, más
+  del doble que el segundo) más UTEs. Tumba cualquier ranking de facturación; exige
+  modelar el grupo → **F-045**/backlog, no es de esta feature (L4634).
+- Los 39 «sin contradicción» de `check-unicidad` **no tienen la clave demostrada**: los
+  datos de hoy no la contradicen, que es otra cosa (L3634).
