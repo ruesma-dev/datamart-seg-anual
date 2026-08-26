@@ -5620,3 +5620,122 @@ altera ningún comportamiento observable del sistema: precisamente el tipo de
 test que esta feature aprendió a no escribir («un test verde puede sostener una
 mentira»). Se deja la intención documentada aquí: `ensure_ascii=False` está
 puesto **para que lo publicado sea legible al depurar**, no por corrección.
+
+---
+
+## Los dos supervivientes que se quedaron fuera del encargo (2026-08-26)
+
+De los 52 supervivientes de la campaña, 47 se mataron con tests nuevos y 3
+quedaron aprobados como equivalentes. **Estos dos se quedaron fuera por un
+descuido del líder al repartir el trabajo**, no por análisis: la reevaluación en
+serie contra el código actual los confirmó vivos. No son equivalentes; son
+huecos de cobertura reales, y los dos son del tipo que no rompe nada al
+aplicarse y falsea el dato en silencio.
+
+Tests añadidos a `tests/test_f006_supervivientes_logica.py`, secciones **13** y
+**14**. **No se tocó código de producción.**
+
+### 1 · `cargador_yaml.py:361` — `is None` → `is not None`
+
+```python
+grano=cuerpo.get("grano") if cuerpo.get("grano") is None else _texto(cuerpo.get("grano")),
+```
+
+El condicional tiene las ramas escritas al revés de como se leen, y por eso el
+mutante pasa inadvertido: **intercambia las dos ramas** sin romper ningún tipo.
+`_texto(v)` es `"" if v is None else str(v)`, así que con el mutante vivo un
+`grano` presente se guardaría **crudo** —sin `str()`— y uno ausente pasaría de
+`None` a `""`.
+
+Las dos ramas están fijadas, cada una con su motivo:
+
+* **Presente → normalizado.** El valor de entrada es `grano: 2024`, un escalar
+  donde el crudo (`2024`, `int`) y el normalizado (`"2024"`, `str`) **se
+  distinguen**; con un grano ya escrito como texto, saltarse `_texto()` no
+  cambiaría nada observable y el test no mataría nada. El grano viaja a
+  `_meta.diccionario_objetos` y de ahí al prompt del MCP: el tipo con el que
+  sale del cargador es el tipo con el que viaja.
+* **Ausente → `None`, no `""`.** `None` es la única forma de decir «esta ficha
+  no declara grano». Un `""` colado aquí aparenta un grano declarado:
+  `ficha.grano or None` lo publicaría igual como NULO, pero `validar` dejaría de
+  distinguirlo del caso legítimo y el autor no vería el aviso.
+
+**Fase RED** — worktree aparte (`git worktree add --detach`), `.env` volcado con
+`harness.mutacion_paralela.volcar_variables`, mutante aplicado con
+`harness.mutacion.generar_mutantes` + `aplicar_mutante` (no sustitución a ojo):
+
+```
+APLICADO: grano=cuerpo.get("grano") if cuerpo.get("grano") is None else _texto(cuerpo.get("grano")),
+      ==> grano=cuerpo.get("grano") if cuerpo.get("grano") is not None else _texto(cuerpo.get("grano")),
+
+>       assert ficha.grano == "2024"
+E       AssertionError: assert 2024 == '2024'
+E        +  where 2024 = Ficha(...).grano
+tests\test_f006_supervivientes_logica.py:642: AssertionError
+
+>       assert ficha.grano is None
+E       AssertionError: assert '' is None
+E        +  where '' = Ficha(...).grano
+tests\test_f006_supervivientes_logica.py:662: AssertionError
+
+FAILED ...::test_f006_r6_un_grano_escrito_en_el_yaml_llega_normalizado_a_texto
+FAILED ...::test_f006_r6_una_ficha_sin_grano_lo_deja_en_none_y_no_en_cadena_vacia
+2 failed, 26 deselected in 4.57s
+```
+
+Sobre el código sin mutar, los mismos dos tests pasan.
+
+### 2 · `relaciones_sql.py:278` — `<` → `<=`
+
+```python
+cobertura = casan / muestreados
+if cobertura < UMBRAL_AVISO_COBERTURA:   # 0.5
+```
+
+El off-by-one de manual: `<` y `<=` coinciden en todo el dominio salvo en el
+valor **exactamente igual al umbral**. Con cobertura 0.5 justa hoy **no** avisa;
+con el mutante **sí**.
+
+Importa porque el AVISO no es decorativo: dice «la relación es cierta y
+prácticamente inútil» y obliga a justificar el hueco en el `porque` de la ficha.
+Emitirlo sobre una relación que casa exactamente la mitad —una tabla partida en
+dos, normal en `stg`— manda a alguien a escribir una excusa por algo que el
+propio umbral declara aceptable, y el ruido en una puerta que el humano lee en
+cada pasada es lo que acaba haciendo que se deje de leer.
+
+El test frontera va parametrizado con tres pares que dan la misma fracción
+exacta (`1/2`, `250/500`, `5/10`) y **afirma primero** que
+`casan / muestreados == UMBRAL_AVISO_COBERTURA`: si mañana el umbral se mueve,
+el test deja de mentir en vez de fijar un número escrito a mano. Lo acompaña el
+contrapunto por debajo (249 de 500 → AVISO), sin el cual un
+`interpretar_relacion` que no avisara nunca dejaría verde la frontera.
+
+**Fase RED**, mismo procedimiento:
+
+```
+APLICADO: if cobertura < UMBRAL_AVISO_COBERTURA: ==> if cobertura <= UMBRAL_AVISO_COBERTURA:
+
+>       assert veredicto.startswith("OK"), veredicto
+E       AssertionError: AVISO retenciones.movimientos.obra_id -> maestro.obras.obra_id:
+E       une, pero poco. 5 de 10 valores casan (50%), por debajo del 50 % desde el que
+E       esto avisa. ...
+tests\test_f006_supervivientes_logica.py:712: AssertionError
+
+FAILED ...::test_f006_t40_una_cobertura_justo_en_el_umbral_todavia_no_avisa[2-1]
+FAILED ...::test_f006_t40_una_cobertura_justo_en_el_umbral_todavia_no_avisa[500-250]
+FAILED ...::test_f006_t40_una_cobertura_justo_en_el_umbral_todavia_no_avisa[10-5]
+3 failed, 1 passed, 24 deselected in 0.50s
+```
+
+El que pasa es el contrapunto por debajo del umbral, que el mutante no altera:
+correcto, es su función.
+
+### Nota de método: por qué el worktree y por qué el `.env`
+
+Aplicar el mutante en el árbol de trabajo y lanzar `pytest -x` sin el `.env`
+volcado al entorno hace caer 23 tests por configuración ausente, `-x` para en el
+primero y el rojo que se obtiene **no es el del mutante**. Le pasó hoy al líder y
+le llevó a un diagnóstico equivocado. El procedimiento correcto —worktree
+desechable, `volcar_variables`, mutante aplicado con la API de `harness.mutacion`
+y no con un `sed`— es el que se siguió aquí y el que hay que seguir para
+reevaluar cualquier superviviente.

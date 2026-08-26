@@ -43,6 +43,7 @@ por índice con una tupla en la que ningún índice vale por otro.
 
 from __future__ import annotations
 
+import pathlib
 from datetime import UTC, datetime
 
 import pytest
@@ -55,11 +56,17 @@ from etl_sigrid.domain.diccionario import (
     validar,
 )
 from etl_sigrid.domain.inventario import InformeCobertura, ObjetoPublicado, formatear_cobertura
+from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 from etl_sigrid.infrastructure.postgres.diccionario_sql import (
     fila_publicacion,
     filas_contexto,
     filas_diccionario,
     resumen_publicacion,
+)
+from etl_sigrid.infrastructure.postgres.relaciones_sql import (
+    UMBRAL_AVISO_COBERTURA,
+    ConsultaRelacion,
+    interpretar_relacion,
 )
 from etl_sigrid.infrastructure.postgres.unicidad_sql import (
     consultas_de_unicidad,
@@ -568,3 +575,152 @@ def test_f006_r25_un_hueco_bloqueante_no_puede_salir_como_ok() -> None:
     assert not informe.ok
     assert salida.splitlines()[0] == LINEA_KO
     assert LINEA_LIMPIA not in salida
+
+
+# ---------------------------------------------------------------------------
+# 13 · el `grano` del YAML: presente se normaliza, ausente sigue siendo `None`
+# ---------------------------------------------------------------------------
+#
+# `grano=cuerpo.get("grano") if cuerpo.get("grano") is None else _texto(...)` es
+# un condicional con las dos ramas invertidas respecto a lo que uno esperaría
+# leer, y esa forma es justo la que hace que el mutante `is None -> is not None`
+# pase desapercibido: intercambia las dos ramas sin cambiar el número de líneas
+# ni romper ningún tipo. Con el mutante vivo, un `grano` escrito en el YAML se
+# publicaría CRUDO —sin pasar por `_texto`, y sin ser necesariamente `str`— y un
+# `grano` ausente pasaría a ser `""` en vez de `None`.
+#
+# Las dos ramas importan y por motivos distintos:
+#
+# * `None` y `""` NO son lo mismo aguas abajo. `filas_diccionario` publica
+#   `ficha.grano or None`, y `validar` distingue «esta ficha no declara grano»
+#   —que es un fallo que hay que cantar— de «lo declara vacío». Un `""` que se
+#   cuela como si fuera un grano declarado apaga esa distinción.
+# * La normalización no es cosmética: el grano viaja a `_meta` y de ahí al
+#   prompt del MCP. Un escalar no textual del YAML (un año suelto, un `true`)
+#   llegaría a la base sin ser `str`.
+
+
+def _diccionario_en_disco(tmp_path: pathlib.Path, linea_grano: str) -> Diccionario:
+    """Escribe un diccionario mínimo de una sola ficha y lo carga.
+
+    `linea_grano` se inserta tal cual en el cuerpo de la ficha; con la cadena
+    vacía, la clave `grano` simplemente no aparece en el YAML.
+    """
+    (tmp_path / "00_global.yaml").write_text(
+        "version: 1\nbase: sigrid_dm\nesquemas: {mart: x}\nreglas: []\npendientes: []\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "mart.yaml").write_text(
+        "version: 1\nesquema: mart\nobjetos:\n"
+        "  ejemplo:\n    tipo: tabla\n    capa: consumo\n"
+        "    consumo_recomendado: true\n"
+        "    descripcion: x\n"
+        f"{linea_grano}"
+        "    clave_negocio: []\n"
+        "    refresco: nocturno\n    columnas: {}\n",
+        encoding="utf-8",
+    )
+    dicc, _ = cargar_diccionario(tmp_path)
+    return dicc
+
+
+def test_f006_r6_un_grano_escrito_en_el_yaml_llega_normalizado_a_texto(
+    tmp_path: pathlib.Path,
+) -> None:
+    """El valor entra como entero de YAML y tiene que salir como `str`.
+
+    Se elige a propósito un escalar donde el crudo y el normalizado se
+    distinguen —`2024` frente a `"2024"`—: con un grano ya escrito como texto,
+    saltarse `_texto()` no cambiaría nada observable y el test no fijaría nada.
+    El grano se publica en `_meta.diccionario_objetos` y de ahí lo lee el MCP,
+    así que el tipo con el que sale del cargador es el tipo con el que viaja.
+    """
+    dicc = _diccionario_en_disco(tmp_path, "    grano: 2024\n")
+
+    (ficha,) = dicc.fichas
+
+    assert ficha.grano == "2024"
+    assert type(ficha.grano) is str, (
+        "el grano tiene que pasar por `_texto()`: llegó crudo del YAML"
+    )
+
+
+def test_f006_r6_una_ficha_sin_grano_lo_deja_en_none_y_no_en_cadena_vacia(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Ausente es `None`, que es la única forma de decir «no lo declara».
+
+    `_texto(None)` devuelve `""`, y un `""` aquí sería una ficha que aparenta
+    declarar su grano: `ficha.grano or None` lo publicaría igual como NULO, pero
+    `validar` ya no podría distinguirlo del caso legítimo, y el autor de la
+    ficha no vería el aviso que le dice que le falta el dato.
+    """
+    dicc = _diccionario_en_disco(tmp_path, "")
+
+    (ficha,) = dicc.fichas
+
+    assert ficha.grano is None
+
+
+# ---------------------------------------------------------------------------
+# 14 · el umbral de cobertura escasa avisa POR DEBAJO, no al tocarlo
+# ---------------------------------------------------------------------------
+#
+# `if cobertura < UMBRAL_AVISO_COBERTURA` es el off-by-one de manual: `<` y `<=`
+# se comportan igual en todo el dominio salvo en un único punto, el valor
+# exactamente igual al umbral. Ese punto es el que fija esta sección.
+#
+# La frontera importa porque el AVISO no es decorativo: dice «la relación es
+# cierta y prácticamente inútil» y obliga a que la ficha justifique el hueco en
+# su `porque`. Emitirlo sobre una relación que casa exactamente la mitad —el
+# caso de una tabla partida en dos, que es normal en `stg`— manda a alguien a
+# escribir una excusa por algo que el propio umbral declara aceptable; y el
+# ruido en una puerta que el humano lee en cada pasada es lo que acaba haciendo
+# que se deje de leer.
+
+
+def _consulta() -> ConsultaRelacion:
+    """Una consulta ya construida: aquí solo se juzga cómo se lee el resultado."""
+    return ConsultaRelacion(
+        origen="retenciones.movimientos",
+        de="obra_id",
+        a="maestro.obras.obra_id",
+        cardinalidad="N:1",
+        porque="Cada movimiento de retención cuelga de una obra.",
+        muestra=500,
+        sql="SELECT 1",
+        sql_detalle="SELECT 2",
+    )
+
+
+@pytest.mark.parametrize(("muestreados", "casan"), [(2, 1), (500, 250), (10, 5)])
+def test_f006_t40_una_cobertura_justo_en_el_umbral_todavia_no_avisa(
+    muestreados: int, casan: int
+) -> None:
+    """Exactamente el 50 % NO es «por debajo del 50 %».
+
+    Es el único caso que separa `<` de `<=`, y por eso va con varios pares que
+    dan la misma fracción exacta: si mañana el umbral se moviera, el test
+    seguiría hablando de la frontera y no de un número escrito a mano.
+    """
+    assert casan / muestreados == UMBRAL_AVISO_COBERTURA, (
+        "el caso deja de ser la frontera si el umbral cambia"
+    )
+
+    veredicto = interpretar_relacion(_consulta(), muestreados=muestreados, casan=casan)
+
+    assert veredicto.startswith("OK"), veredicto
+    assert "AVISO" not in veredicto
+
+
+def test_f006_t40_una_cobertura_por_debajo_del_umbral_si_avisa() -> None:
+    """El contrapunto del caso frontera, para que el test de arriba no pase por
+    el motivo equivocado.
+
+    Sin esta mitad, un `interpretar_relacion` que nunca avisara —el AVISO
+    borrado entero— dejaría el test de la frontera en verde igual.
+    """
+    veredicto = interpretar_relacion(_consulta(), muestreados=500, casan=249)
+
+    assert veredicto.startswith("AVISO"), veredicto
+    assert "249 de 500" in veredicto
