@@ -5330,6 +5330,21 @@ siguiente que le añada dos líneas pone el portero en rojo. O se recorta el
 resumen enlazando al anexo, o se sube el tope en `harness/rigor.json` con su
 motivo.
 
+**Y una cosa que salió mal, dicha aquí porque callarla sería peor.** El commit
+`9c04534` de esta sesión arrastró **10 líneas ajenas**: la tabla «Evidencias
+(19ª pasada)» que el otro implementer tenía **ya en el índice** de este mismo
+fichero cuando yo hice `git add progress/impl_F-006_detalle.md`. No se ha
+perdido ni alterado nada —su contenido está íntegro y es coherente— y por eso
+**no se ha revertido**: deshacerlo habría borrado del árbol trabajo que el otro
+agente podía estar editando, que es un daño real a cambio de un commit más
+limpio.
+
+La lección, para que el arnés la cobre: **`git add <ruta>` explícito protege de
+arrastrar otros ficheros, no de arrastrar a otro agente dentro del MISMO
+fichero.** Dos agentes escribiendo en un anexo compartido no tienen forma de
+commitear por separado; o cada uno escribe en su propio fichero, o se acepta
+que el primero que commitee se lleve lo que el otro tuviera preparado.
+
 # 19ª pasada · los 31 supervivientes baratos de la 2ª campaña (2026-08-26)
 
 **Encargo**: los dos grupos baratos de los 52 supervivientes de la campaña del 2026-08-26
