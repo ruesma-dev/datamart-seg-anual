@@ -111,11 +111,29 @@ def _ficha_con(grano: str, ejemplo: str) -> Ficha:
 #:
 #: Escribirlos aquí los convierte en contrato: cambiar `MINIMOS_TEXTO` obliga a
 #: cambiar también esta línea, y entonces se ve en el diff.
-MINIMOS_FIJADOS = {"grano": 20, "ejemplo_pregunta": 20}
+#:
+#: **Estaban solo los dos que la 1ª campaña señaló.** La 2ª sacó vivos
+#: `descripcion: 40` y `motivo_no_consumo: 30`, los hermanos de al lado, por el
+#: mismo motivo exacto. Ahora están los CINCO, y el test de abajo exige que el
+#: juego de claves sea idéntico: un mínimo nuevo entra aquí o rompe la suite.
+MINIMOS_FIJADOS = {
+    "descripcion": 40,
+    "grano": 20,
+    "motivo_no_consumo": 30,
+    "significado": 15,
+    "ejemplo_pregunta": 20,
+}
 
 
 def test_f006_r2_los_minimos_fijados_son_los_que_usa_el_dominio() -> None:
     """Une las dos listas: si divergen, es que alguien movió el umbral."""
+    assert set(MINIMOS_FIJADOS) == set(MINIMOS_TEXTO), (
+        f"`MINIMOS_TEXTO` tiene {sorted(set(MINIMOS_TEXTO) - set(MINIMOS_FIJADOS))} "
+        f"de más y {sorted(set(MINIMOS_FIJADOS) - set(MINIMOS_TEXTO))} de menos "
+        f"respecto de lo que este fichero fija. Un mínimo que no está aquí es un "
+        f"mínimo que nadie vigila: es como sobrevivieron `descripcion` y "
+        f"`motivo_no_consumo` a la primera ronda"
+    )
     for campo, valor in MINIMOS_FIJADOS.items():
         assert MINIMOS_TEXTO[campo] == valor, (
             f"`MINIMOS_TEXTO[{campo!r}]` vale {MINIMOS_TEXTO[campo]} y este "
@@ -155,6 +173,66 @@ def test_f006_r2_el_minimo_de_longitud_rechaza_un_caracter_menos(campo: str) -> 
     assert errores, f"un `{campo}` de {minimo - 1} caracteres tiene que fallar"
 
 
+# ---------------------------------------------------------------------------
+# Clase 2 bis · los otros dos mínimos, los de la 2ª campaña
+# ---------------------------------------------------------------------------
+#
+# `descripcion` y `motivo_no_consumo` no se comprueban con `_ficha_con`: el
+# primero vive en TODA ficha y el segundo solo en las que renuncian al consumo,
+# que es justo la puerta trasera que R3 cierra. Rebajar `motivo_no_consumo` es
+# la forma silenciosa de esquivar la cobertura de columnas.
+
+
+def _ficha_no_recomendada(descripcion: str, motivo: str) -> Ficha:
+    """Una ficha fuera de la superficie de consumo, válida salvo lo que se rompa."""
+    return Ficha(
+        esquema="stg",
+        objeto="intermedia",
+        tipo="tabla",
+        capa="preparacion",
+        consumo_recomendado=False,
+        motivo_no_consumo=motivo,
+        descripcion=descripcion,
+        grano="g" * MINIMOS_FIJADOS["grano"],
+        clave_negocio=("obra_id",),
+        paso_etl="build_stg",
+        refresco="nocturno",
+        columnas=(Columna(nombre="obra_id", significado="S" * 40),),
+        relaciones=(),
+        ejemplos_preguntas=(),
+    )
+
+
+def _errores_de(ficha: Ficha) -> list:
+    return [e for e in validar(_dicc(ficha), [ficha.paso_etl or ""]) if e.objeto == ficha.nombre]
+
+
+@pytest.mark.parametrize("desvio", [0, -1], ids=["el largo exacto pasa", "uno menos falla"])
+def test_f006_r2_el_minimo_de_descripcion_esta_en_el_borde(desvio: int) -> None:
+    """40 vale y 39 no. Sin el borde, subir el umbral no cambia ningún veredicto."""
+    minimo = MINIMOS_FIJADOS["descripcion"]
+    ficha = _ficha_no_recomendada(
+        descripcion="d" * (minimo + desvio), motivo="m" * MINIMOS_FIJADOS["motivo_no_consumo"]
+    )
+    assert bool(_errores_de(ficha)) is (desvio < 0), (
+        f"una `descripcion` de {minimo + desvio} caracteres tiene que "
+        f"{'fallar' if desvio < 0 else 'valer'}: el mínimo declarado es {minimo}"
+    )
+
+
+@pytest.mark.parametrize("desvio", [0, -1], ids=["el largo exacto pasa", "uno menos falla"])
+def test_f006_r3_el_minimo_de_motivo_no_consumo_esta_en_el_borde(desvio: int) -> None:
+    """30 vale y 29 no. Es la puerta trasera de R3: se cierra por el borde."""
+    minimo = MINIMOS_FIJADOS["motivo_no_consumo"]
+    ficha = _ficha_no_recomendada(
+        descripcion="d" * MINIMOS_FIJADOS["descripcion"], motivo="m" * (minimo + desvio)
+    )
+    assert bool(_errores_de(ficha)) is (desvio < 0), (
+        f"un `motivo_no_consumo` de {minimo + desvio} caracteres tiene que "
+        f"{'fallar' if desvio < 0 else 'valer'}: el mínimo declarado es {minimo}"
+    )
+
+
 def _dicc(ficha: Ficha):
     from etl_sigrid.domain.diccionario import Diccionario
 
@@ -163,7 +241,7 @@ def _dicc(ficha: Ficha):
         base="d",
         fichas=(ficha,),
         reglas=(),
-        esquemas={"mart": {}},
+        esquemas={ficha.esquema: {}},
         pendientes=(),
         global_raw={},
     )
