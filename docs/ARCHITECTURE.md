@@ -192,6 +192,63 @@ marca de «tabla ingerida» solo se escribe cuando la tabla termina en `SUCCESS`
 así que una tabla parcial queda con su última fila en `RUNNING` → `ABORTED` y
 la puerta la rechaza igual.
 
+### El datamart se explica solo (F-006)
+
+El datamart publica **su propia semántica dentro de la base**: qué significa
+cada objeto y cada columna, qué grano tiene, qué trampas hay que respetar al
+leerlo y qué preguntas de negocio contesta. No es documentación para personas:
+es un **contrato de datos** que un agente conectado por MCP lee por SQL, sin
+poder preguntarle a nadie si algo no encaja.
+
+- **La fuente son los YAML de `config/diccionario/`**: uno por esquema —los
+  nueve del datamart— más `00_global.yaml`, que lleva las reglas duras
+  transversales, los ejes, las convenciones de nombre y la batería de preguntas
+  de aceptación. Están en este repositorio a propósito: qué significa
+  `mart.fact_seguimiento_mensual` lo sabe quien escribió el SQL que la
+  construye, y cualquier otro sitio se desincroniza. Por eso la ficha se
+  actualiza en el mismo trabajo que el objeto (`docs/CONVENTIONS.md`).
+- **El paso `publicar_diccionario`** los carga, valida, deriva los avisos y los
+  escribe. Va dentro de `run-all`, **entre `build_mart` y `apply_grants`**, y
+  ese orden no es cosmético: `apply_grants` concede `SELECT` sobre lo que hay
+  en `_meta` en ese instante, así que publicar después dejaría las tablas del
+  contrato colgando solo de los privilegios por defecto. Suelto, el comando es
+  `python main.py publicar-diccionario`.
+- **El contrato en `_meta` son cuatro tablas y una vista.** `_meta.diccionario`
+  (una fila por objeto documentado, con la ficha entera en `JSONB` y en
+  columnas lo que se filtra barato); `_meta.diccionario_reglas` (las reglas
+  duras que no son de ningún objeto en particular);
+  `_meta.diccionario_contexto` (los bloques de contexto, que crecen **por
+  filas**, no por columnas); y `_meta.diccionario_publicacion`, una única fila
+  con `version`, `hash_fuente` y los recuentos. Encima, `_meta.v_diccionario`
+  es la vista plana que consulta el cliente.
+- **La publicación es atómica**: `DELETE` + `INSERT` dentro de UNA transacción,
+  así que quien consulte mientras se publica ve el diccionario anterior
+  completo o el nuevo completo, nunca uno a medias. **Nunca `DROP` ni
+  `TRUNCATE`**, y nunca quitar o reordenar columnas de la vista: eso exige un
+  `DROP VIEW`, y un `DROP` se lleva por delante los `GRANT` del rol de lectura.
+  Las reglas de compatibilidad completas están en la cabecera de
+  `etl_sigrid/infrastructure/postgres/sql/ddl/01_diccionario.sql`.
+- **Quien lo consume es `mcp-bbdd`**, un servicio con su propio repositorio, y
+  lo hace **por SQL** con el rol de solo lectura `mcp_sigrid_dm_ro`. No hay API
+  que versionar ni fichero que exportar: la base es la interfaz, y por eso un
+  cambio en esas cinco formas es un cambio de API.
+- **Dónde está la línea**: el MCP sabe de transporte, permisos, auditoría y
+  multi-base; el significado del dato es del dueño del dato. Por eso el
+  diccionario vive aquí y el servidor MCP no. Y el diccionario describe lo que
+  el dato **es**, no cómo se decide con él: un procedimiento de negocio es otro
+  repositorio.
+- **La frescura no se declara, se une.** El `paso_etl` de cada ficha casa con
+  `_meta.v_frescura.paso` (F-024), así que el consumidor sabe de cuándo es lo
+  que está mirando sin tener que creerse un texto escrito a mano.
+- **Verificación**: `python main.py check-diccionario` contrasta el diccionario
+  del árbol contra el catálogo real de la base en las dos direcciones —objeto
+  publicado sin ficha, ficha sin objeto, tipo que no casa— y avisa si lo
+  publicado va por detrás del repositorio. La puerta offline de
+  `bash harness/init.sh` solo puede exigir ficha **o** pendiente declarado.
+
+Lo que este proyecto **expone al ecosistema** y quién lo consume está en
+`azure-apps/datamart_seg_anual.md`, y no se duplica aquí.
+
 ## Infra
 
 - `Dockerfile` en raíz. `infra/` con scripts PowerShell 5.1 (UTF-8 BOM, CRLF)
