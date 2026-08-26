@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -291,9 +292,59 @@ def test_f015_r13_la_disponibilidad_de_la_medicion_se_consulta_de_verdad() -> No
     assert isinstance(cobertura.hay_coverage(), bool)
 
 
-def test_f015_r12_la_rama_actual_se_lee_de_git() -> None:
-    # git local, de solo lectura: ni red ni BBDD.
-    assert cobertura.rama_actual(str(RAIZ)) != ""
+def test_f015_r12_la_rama_actual_se_lee_de_git(tmp_path: Path) -> None:
+    """R12 contra un repositorio de juguete, no contra el de al lado.
+
+    Hasta el 2026-08-26 esto era `rama_actual(RAIZ) != ""`, y esa aserción
+    ataba la regla al estado del repositorio real. Rompía justo donde más
+    duele: la campaña de mutación en PARALELO crea sus worktrees con
+    `git worktree add --detach`, y en un worktree detached
+    `git branch --show-current` devuelve cadena vacía **por diseño**. Es decir,
+    este test ponía la línea base de todos los workers en rojo y abortaba la
+    campaña, que es la que da la evidencia de las features con rigor crítico.
+    Medido ese día: 24 tests caídos dentro de un worktree, y este era uno.
+
+    Se fija ahora la regla entera, que es más de lo que fijaba antes: en un
+    repositorio con rama se lee ESA rama —no una cualquiera no vacía— y en
+    detached se devuelve cadena vacía, que es el contrato con el que
+    `harness/cobertura.py` decide que la puerta no aplica.
+
+    git local, de solo lectura: ni red ni BBDD.
+    """
+    repositorio = tmp_path / "juguete"
+    repositorio.mkdir()
+    subprocess.run(
+        ["git", "init", "-q", "-b", "prueba", str(repositorio)],
+        check=True,
+        capture_output=True,
+    )
+    (repositorio / "a.txt").write_text("uno\n", encoding="utf-8")
+    for orden in (
+        ["git", "add", "a.txt"],
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "uno"],
+    ):
+        subprocess.run(orden, cwd=repositorio, check=True, capture_output=True)
+
+    assert cobertura.rama_actual(str(repositorio)) == "prueba"
+
+    # Y el caso que rompía el modo paralelo, ahora fijado como contrato.
+    sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repositorio,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "checkout", "-q", "--detach", sha],
+        cwd=repositorio,
+        check=True,
+        capture_output=True,
+    )
+    assert cobertura.rama_actual(str(repositorio)) == "", (
+        "en detached HEAD la rama actual es cadena vacía: es lo que ve cada "
+        "worker de la campaña paralela dentro de su worktree"
+    )
 
 
 def test_f015_r13_configuracion_de_rigor_ilegible_es_ko(
