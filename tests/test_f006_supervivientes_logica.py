@@ -43,7 +43,7 @@ por índice con una tupla en la que ningún índice vale por otro.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -181,7 +181,7 @@ def test_f006_t28_el_resumen_describe_la_fila_que_de_verdad_se_publica() -> None
     fila = fila_publicacion(
         dicc,
         hash_fuente="a" * 64,
-        ahora=datetime(2026, 8, 26, 9, 0, tzinfo=timezone.utc),
+        ahora=datetime(2026, 8, 26, 9, 0, tzinfo=UTC),
         batch_id="lote-1",
         informe=InformeCobertura(),
     )
@@ -254,7 +254,7 @@ def _texto_del_contexto(dicc: Diccionario) -> dict[tuple[str, str], str]:
     return {(f[0], f[1]): f[3] for f in filas_contexto(dicc)}
 
 
-def test_f006_r28_cada_bloque_del_contexto_se_formatea_con_SU_plantilla() -> None:
+def test_f006_r28_cada_bloque_del_contexto_se_formatea_con_su_propia_plantilla() -> None:
     """`ejes` y `esquemas` tienen forma propia, y no es intercambiable.
 
     De `ejes` lo que importa son los **literales exactos** que el agente va a
@@ -374,7 +374,7 @@ CUADRANTES = {
     list(CUADRANTES.values()),
     ids=list(CUADRANTES),
 )
-def test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_NADA_con_que_juzgarlo(
+def test_f006_r5_el_fanout_solo_se_aplaza_cuando_no_hay_nada_con_que_juzgarlo(
     clave: tuple[str, ...], columnas: tuple[Columna, ...], se_denuncia: bool
 ) -> None:
     """Los cuatro cuadrantes de la guarda, y por qué el borde importa.
@@ -544,7 +544,7 @@ def test_f006_r27_con_pendientes_declarados_el_verde_deja_de_ser_limpio() -> Non
     assert LINEA_LIMPIA not in salida
 
 
-def test_f006_r25_un_hueco_bloqueante_no_puede_salir_como_OK() -> None:
+def test_f006_r25_un_hueco_bloqueante_no_puede_salir_como_ok() -> None:
     """Publicado y sin ficha: el agente lo verá en el catálogo e inventará su
     significado.
 
