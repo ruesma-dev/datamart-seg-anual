@@ -4761,3 +4761,183 @@ python main.py check-relaciones --todos           # 0 que NO unen
 python main.py check-diccionario                  # publicado == árbol, versión 8
 python -m pytest tests/test_f006_relaciones.py    # 23 tests de la puerta nueva
 ```
+
+---
+
+# 17ª pasada · los cuatro hallazgos abiertos del review (2026-08-26)
+
+Encargo del líder: cerrar H2, H3, H4 y H5. H1 (puerta de mutación) viene arreglado
+río arriba en el arnés 1.7.4 y no se toca `harness/`. El bloque de Power BI (T32–T34)
+está entregado a F-034. La campaña de mutación **no se relanza** (regla RM1: la lanza
+el humano con el árbol quieto).
+
+**Aviso importante sobre el estado del review.** `progress/review_F-006.md` es el
+resumen escrito el 2026-08-25 al partir el papeleo, y su tabla de «hallazgos abiertos»
+copia el veredicto de la 16ª pasada **sin reverificar el árbol**. La 16ª pasada y sus
+arreglos viajan en **el mismo commit** (`3ec962c`, 2026-08-22): el reviewer escribió el
+informe, el implementer arregló y se comitearon juntos. Resultado: H2, H3 y H4 ya
+estaban cerrados en el árbol cuando el resumen los listó como abiertos. Verificado uno
+a uno, no dado por bueno.
+
+## H2 · El mutante vivo de `_clave_de` — YA MUERTO, y ahora por tres vías
+
+Fase RED, mutante aplicado a mano sobre
+`etl_sigrid/infrastructure/postgres/diccionario_sql.py:297`
+(`isinstance(entrada, str) and entrada.strip()` → `or`):
+
+```
+$ .venv/Scripts/python.exe -m pytest tests/test_f006_contexto.py -q -p no:cacheprovider
+....................F                                                    [100%]
+___ test_f006_r28_control_toda_entrada_de_lista_de_texto_se_identifica_sola ___
+>       assert _clave_de("", 2) == "2"
+E       AssertionError: assert '' == '2'
+tests\test_f006_contexto.py:267: AssertionError
+1 failed, 20 passed in 1.00s
+```
+
+O sea: **el mutante ya moría** con el test que la 16ª pasada añadió. Lo que faltaba era
+lo que el líder pide explícitamente: los tres casos de cadena con su valor devuelto
+comprobado. Medido bajo el mutante, importando la función directamente:
+
+```
+MUTANTE and->or aplicado:
+'   '       -> '   '       (el original devuelve '4')
+'\n\t '     -> '\n\t '     (el original devuelve '6')
+'_built_at' -> '_built_at'
+```
+
+Los tres casos entran al test (cadena normal, vacía y de solo espacios), así que
+**cualquiera de ellos mata el mutante por su cuenta** y el arreglo no depende de que
+nadie borre una línea. Mutante revertido y el fichero comprobado idéntico a HEAD antes
+de comitear.
+
+## H3 · El guardián de coherencia — las tres vías cerradas; la CLASE, no
+
+Las tres evasiones que el reviewer consiguió están cerradas desde `3ec962c`: no hay
+salvoconducto, se compara con `tests/_texto.py::contiene()` y la lista
+`_TRANQUILIZADORAS` se sustituyó por un criterio (**la cabecera tiene que NOMBRAR cada
+columna afectada**). El control permanente
+`test_f006_r10_control_el_guardian_de_coherencia_muerde` recorre las tres y sigue verde.
+
+**Lo que seguía abierto es la clase.** El guardián que vigilaba el plegado
+(`test_f006_r26_ninguna_guarda_de_prosa_compara_subcadenas_crudas`) era una **lista de
+dos ficheros escrita a mano** que solo comprobaba si importaban `contiene` —ni una
+comparación— y dejaba fuera `test_f006_stg_trampas.py`, donde
+`"NO esta afectada" in mes.significado` seguía cruda **dentro del propio dispositivo
+escrito para evitar eso**. Es la vía 2 del reviewer, viva en el guardián de al lado.
+
+Sustituida por un criterio derivado: los campos de prosa salen de las dataclases
+`Columna`/`Ficha`/`Regla` con `dataclasses.fields`, y un barrido `ast` recorre todo
+módulo de tests que cargue el diccionario buscando `"varias palabras" in <campo>`.
+
+Fase RED (22 sitios en 4 ficheros):
+
+```
+E       AssertionError: estas comparaciones son ciegas a una frase partida por una
+        línea en blanco del plegado YAML; usa `tests._texto.contiene`:
+E           test_f006_fichas.py:1055: «todas las columnas de periodificacion son nulas» in grano
+E           test_f006_fichas.py:1112: «cinco porcentajes» in significado
+E           test_f006_fichas.py:1307: «NUNCA SE CONSULTA SIN FILTRAR POR OBRA» in descripcion
+E           test_f006_fichas.py:1337: «NO se puede responder» in regla
+E           ... (22 en total)
+E           test_f006_regla_de_oro.py:127: «no se deja segmentar» in motivo
+E           test_f006_reglas.py:614: «68,7 BILLONES» in descripcion
+E           test_f006_stg_trampas.py:702: «NO esta afectada» in significado
+1 failed, 1 passed
+```
+
+Las 22 reescritas a `contiene(...)`. Ninguna de las que eran `not in` se puso roja al
+endurecerse, así que **no había ninguna afirmación falsa escondida** tras ellas.
+`NUMEROS_DEL_DEFECTO` (que compara contra una variable local, fuera del alcance del
+barrido `ast`) se corrigió a mano, y el caso quedó como cuarta vía del control
+permanente.
+
+**Límite declarado en el docstring**: el barrido reconoce la prosa por el nombre del
+campo, así que no ve un texto que pasó antes por una variable local
+(`texto = f"{ficha.descripcion} {ficha.grano}"`). Seguir el flujo de datos no se
+intenta; esos sitios se corrigen a mano y se dicen, en vez de fingir cobertura.
+
+## H4 · El 22 → 9 — ya viajó; lo que faltaba era la guarda
+
+Barrido del diccionario **cargado** (no del YAML crudo, que no ve las frases plegadas),
+campo a campo, cabecera y columnas, sobre el 22 suelto y sin fechas ISO. **Siete
+apariciones, las siete bien atribuidas**:
+
+| Dónde | Qué dice |
+|---|---|
+| `mart.fact_seguimiento_mensual.grano` (×2) | «22 obras tienen dos fases… —eso es la CAUSA—, pero solo 9 llegan a producir filas duplicadas aquí» |
+| `mart.fact_seguimiento_categoria::importe_origen.significado` | «la causa son 22 obras…, de las que **9** llegan a duplicar filas en el fact» |
+| `…::importe_origen_raw.significado` | ídem |
+| `mart.v_pbi_fact_categoria::importe_origen.significado` | ídem |
+| `mart.fact_seguimiento_categoria.grano` y `mart.v_pbi_fact_categoria.descripcion` | eran la remisión falsa de H5; corregidas ahí |
+
+Las tres fichas de columna que el reviewer citaba **ya llevaban la corrección**
+(`3ec962c`). Lo que no había era guarda, así que se añade el criterio: **un párrafo que
+nombre el 22 tiene que nombrar el 9**, porque el 22 mide la causa en `stg.fases` y el 9
+el efecto en el fact.
+
+Fase RED, inyectando la regresión (quitando «de las que 9 llegan a duplicar filas en el
+fact» de `importe_origen`):
+
+```
+E  AssertionError: mart.fact_seguimiento_categoria::importe_origen.significado#1 nombra
+   las 22 obras sin decir que solo 9 duplican filas aquí. El 22 mide la CAUSA en
+   `stg.fases`; atribuirlo al duplicado del fact es la cifra mal atribuida que ya se
+   publicó.
+1 failed, 7 passed
+```
+
+Regresión revertida y verde.
+
+## H5 · La remisión falsa — ABIERTA de verdad, y corregida
+
+Las dos fichas del preagregado decían:
+
+> «La consulta que da ese numero esta en el grano de `mart.fact_seguimiento_mensual`,
+> junto a la explicacion de por que 8.778, 37 y 22 son numeros distintos…»
+
+Y la consulta publicada allí devuelve **8.778 y 9 obras**, no las 37 celdas ni los
+39,07 M€. Texto nuevo, en `mart.fact_seguimiento_categoria.grano` y en
+`mart.v_pbi_fact_categoria.descripcion`:
+
+> «La consulta publicada en el grano de `mart.fact_seguimiento_mensual` devuelve 8.778
+> combinaciones con dos filas, en 9 obras: esa es la CAUSA de este defecto, no su
+> medida. Las 37 celdas y los 39,07 M EUR se midieron aparte el 2026-08-22 y su consulta
+> NO esta publicada todavia. Alli esta ademas por que 8.778, 37 y 22 miden cosas
+> distintas.»
+
+Se dice el número correcto **y** se declara el hueco (h6 sigue abierto: la consulta del
+37 / 39,07 M€ no se puede medir sin base).
+
+Guardián derivado, sin listas de frases: se detectan las remisiones a la consulta de
+otro objeto y se exige que **los números que le atribuyen estén declarados junto a esa
+consulta** —el párrafo del `SELECT` y el que lo presenta—. Una remisión sin ningún
+número tampoco pasa: es la formulación vaga con la que entró el defecto.
+
+Fase RED, los dos sitios:
+
+```
+E  AssertionError: mart.v_pbi_fact_categoria.descripcion atribuye ['22', '37'] a la
+   consulta de `mart.fact_seguimiento_mensual`, y allí no está declarado que la consulta
+   dé eso. Quien la ejecute para comprobar el aviso obtendrá otro número y desconfiará
+   del aviso entero.
+     frase: La consulta que da ese numero esta en el grano de
+     `mart.fact_seguimiento_mensual`, junto a la explicacion de por que 8.778, 37 y 22
+     son numeros distintos que miden cosas distintas.
+2 failed, 2 passed
+```
+
+## Diccionario a versión 9 — NO publicado
+
+`config/diccionario/00_global.yaml` pasa de 8 a 9 porque el contenido cambió. **No se ha
+ejecutado `publicar-diccionario`**: escribe en Azure y esa autorización es del humano.
+Mientras tanto `_meta` sirve la **versión 8**, con la remisión falsa dentro. Tampoco se
+han podido ejecutar `check-diccionario` ni `check-relaciones`, que exigen base.
+
+## Lo que NO se ha hecho, y por qué
+
+- **H1 / T41 · campaña de mutación**: no se relanza (RM1). Sin número de mutación.
+- **h6 · publicar la consulta del 37 celdas / 39,07 M€ y la del 22 obras**: exige medir
+  contra la base. Se ha declarado el hueco en la ficha en vez de inventar una consulta.
+- **h7 a h10** (higiene del review): fuera del encargo de esta sesión.
+- **Republicar en `_meta`**: parado a la espera del humano.

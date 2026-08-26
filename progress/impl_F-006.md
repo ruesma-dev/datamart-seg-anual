@@ -71,11 +71,11 @@ T41 (mutación) sigue dependiendo de **F-041**.
 
 | Evidencia | Valor | Comando |
 |---|---|---|
-| Tests | **2025 pasados**, 124 saltados, **0 fallos** | `bash harness/init.sh` |
-| Cobertura de líneas cambiadas | **98,0 %** (1117/1140; umbral 80 %, nivel `critico`) | línea `PUERTA COBERTURA` |
-| Tiempo de la suite | **347,32 s** (5 min 47 s) bajo `coverage` | ídem |
+| Tests | **2290 pasados**, 125 saltados, **0 fallos** (2026-08-26, tras la 17ª pasada) | `bash harness/init.sh` |
+| Cobertura de líneas cambiadas | **N/A**: F-006 no cambia líneas Python de producción frente a `dev` (antes 98,0 %, 1117/1140) | línea `PUERTA COBERTURA` |
+| Tiempo de la suite | **465,77 s** (7 min 46 s) bajo `coverage` | ídem |
 | Mutación | **NO MEDIDO, a propósito** — ver §4 | — |
-| Diccionario publicado | **versión 8**, 103 objetos, 798 columnas, 16 reglas, 29 filas de contexto, cobertura de columnas 100,00 %, hash `86651c493cb7` | `publicar-diccionario` |
+| Diccionario | **versión 9 en el árbol, SIN publicar**; `_meta` sirve la **8** (103 objetos, 798 columnas, 16 reglas, 29 filas de contexto, hash `86651c493cb7`) | `publicar-diccionario`, pendiente del humano |
 | Biyección publicado ↔ árbol | **102 de 103**; única huérfana `cierre.v_pbi_planif_vs_real` (deuda previa de `build-cierre`) | `check-diccionario` |
 | Relaciones | **77 unen, 2 con cobertura escasa, 0 que NO unen, 17 sin comprobar, 2 con un extremo inexistente** | `check-relaciones --todos` |
 | Superficie de consumo | **46** objetos (bajó de 48 al retirar dos vistas inconsultables) | `cobertura_columnas` |
@@ -126,7 +126,7 @@ mutación. `harness/mutacion.py` es del arnés y no se ha tocado.
 | `frozen=True → False` en `Relacion` (`diccionario.py:189`) | **test añadido**, misma tanda | L2411, L2454 |
 | `MINIMOS_TEXTO["grano"] 20→21` (`:137`) | **test añadido** tras un primer arreglo fallido (el test se movía con lo que vigilaba) | L2412, L2433 |
 | `MINIMOS_TEXTO["ejemplo_pregunta"] 20→21` (`:140`) | **test añadido**, mismo caso | L2410, L2433 |
-| `and → or` en `diccionario_sql.py:297` | **test añadido** (`_clave_de("", 2) == "2"`), verificado a mano: MUERTO | **L4395** |
+| `and → or` en `diccionario_sql.py:297` | **test añadido**, verificado a mano dos veces (16ª y 17ª): MUERTO por los tres casos de cadena | **L4395**, L4790 |
 
 Los cuatro primeros llegaron como «timeouts» y **eran supervivientes**: un timeout es
 un mutante **sin evaluar**, nunca uno muerto. Ninguno es equivalente. Hallazgos de
@@ -195,3 +195,25 @@ verificación con Power BI, documentación de bloque J y firewall del entorno MC
 El objetivo del humano —«un MCP que use cualquiera desde cualquier puesto»— **no está
 cumplido**: hoy el MCP corre en el puesto de pgris. Lo construido es la capa semántica,
 que era el prerrequisito, no el despliegue.
+
+---
+
+## 7 · 17ª pasada: los cuatro hallazgos del review (2026-08-26, anexo **L4767+**)
+
+| # | Hallazgo | Estado | Qué se hizo |
+|---|---|---|---|
+| **H2** | Mutante `and→or` en `diccionario_sql.py:297` | **CERRADO** | Ya moría desde `3ec962c`; verificado aplicando el mutante. Añadidos los otros dos casos de cadena (solo espacios y blancos mezclados): cualquiera lo mata solo |
+| **H3** | Guardián de coherencia, tres vías | **CERRADO** | Las tres, cerradas desde `3ec962c` y verificadas hoy. Seguía abierta la **clase**: la vigilancia del plegado era una lista de dos ficheros a mano. Sustituida por criterio derivado (`ast` + campos de prosa de las dataclases); RED con **22 comparaciones crudas** en 4 ficheros, las 22 reescritas |
+| **H4** | «22 obras» mal atribuido | **CERRADO** | Barrido del diccionario **cargado**: 7 apariciones, las 7 bien atribuidas ya desde `3ec962c`. Añadida la guarda que faltaba: **donde se nombra el 22 hay que nombrar el 9** |
+| **H5** | Remisión falsa al agente | **CERRADO** | Era el único abierto de verdad. Corregido en los dos sitios y añadido el criterio: los números que una remisión atribuye a una consulta tienen que estar declarados junto a ella |
+
+**Antes de la 18ª pasada**: el resumen `review_F-006.md` se escribió el 2026-08-25
+copiando el veredicto de la 16ª **sin reverificar el árbol**, y esa pasada y sus
+arreglos viajan en el mismo commit (`3ec962c`): por eso H2, H3 y H4 constaban abiertos
+estando ya cerrados.
+
+**Parada declarada**: el diccionario sube a **versión 9 y NO se publica** —
+`publicar-diccionario` escribe en Azure y esa autorización es del humano; hasta que la
+dé, `_meta` sirve la 8 **con la remisión falsa dentro**—. Tampoco se han ejecutado
+`check-diccionario`, `check-unicidad` ni `check-relaciones`, que exigen base, ni la
+campaña de mutación (RM1: la lanza el humano con el árbol quieto).

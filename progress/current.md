@@ -1,24 +1,52 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-08-25
+# Estado actual · 2026-08-26
 
 **Feature en curso: F-006 · MCP sobre el datamart.** Rama
-`feature/F-006-mcp-azure`. `bash harness/init.sh` **en verde: 2025 tests,
-cobertura 98,0 %**. Árbol limpio.
-
-**Trabajo aparte, sin integrar: el arnés pasó de 1.5.1 a 1.7.4** en la rama
-`chore/arnes-1.7.4`, con el portero **en verde: 2.278 tests (253 más, los del
-arnés), cobertura 98,0 %** y las tres puertas cumplidas. Lee la sección
-siguiente antes de retomar F-006: el papeleo de la feature cambió de sitio, y
-esa rama **todavía no está integrada** en `dev` ni en `feature/F-006-mcp-azure`,
-así que desde ellas no se ve nada de esto.
-
-Esta sesión retomó la parada del 2026-08-22
-(`progress/parada_2026-08-22_limite_gasto.md`, ya histórica: lo que describe
-está hecho).
+`feature/F-006-mcp-azure`, ya con el arnés 1.7.4 dentro. `bash harness/init.sh`
+**en verde: 2.290 tests, 125 saltados, 465,77 s**; puerta de cobertura N/A
+(F-006 no cambia líneas Python de producción frente a `dev`) y puerta de tamaño
+cumplida. Árbol limpio.
 
 ---
 
-## El arnés, de 1.5.1 a 1.7.4 (2026-08-25, rama `chore/arnes-1.7.4`)
+## 17ª pasada: los cuatro hallazgos del review, cerrados (2026-08-26)
+
+Encargo del humano tras resolver por vía externa el H1 (fallo del arnés, ya
+arreglado río arriba) y el bloque de Power BI (entregado a F-034). Cuatro
+commits, uno por hallazgo; el detalle con las trazas RED está en
+`progress/impl_F-006.md` §7 y en el anexo (`impl_F-006_detalle.md`, L4767+).
+
+| # | Qué era | Cómo queda |
+|---|---|---|
+| H2 | Mutante `and→or` en `diccionario_sql.py:297` | **cerrado**: ya moría; añadidos los tres casos de cadena, cada uno lo mata solo |
+| H3 | Guardián de coherencia, tres vías de evasión | **cerrado**: las tres, desde la 16ª; hoy se cierra la CLASE con un criterio `ast` (22 comparaciones crudas reescritas) |
+| H4 | «22 obras» mal atribuido | **cerrado**: las 7 apariciones ya estaban bien; se añade la guarda «donde va el 22 va el 9» |
+| H5 | Remisión falsa publicada al agente | **cerrado**: era el único abierto de verdad |
+
+**Lección que conviene no perder: el resumen del review mentía sin querer.**
+`review_F-006.md` se escribió el 2026-08-25 partiendo el papeleo y copió la
+tabla de hallazgos de la 16ª pasada **sin reverificar el árbol**. Y esa pasada
+viaja en el **mismo commit** que sus arreglos (`3ec962c`): el reviewer escribió,
+el implementer arregló y se comitearon juntos. Resultado: tres hallazgos
+constaban abiertos estando cerrados. **Al resumir un informe, reverifica o di
+que no lo has hecho.**
+
+**Dos cosas paradas, a la espera del humano:**
+
+1. **Republicar el diccionario.** El árbol va por la **versión 9**; `_meta`
+   sirve la **8**, con la remisión falsa dentro. `publicar-diccionario` escribe
+   en Azure.
+2. **La campaña de mutación** (RM1: se lanza con el árbol quieto). Tampoco se
+   han podido ejecutar `check-diccionario`, `check-unicidad` ni
+   `check-relaciones`, que exigen base.
+
+**Sigue abierto de higiene (h6):** publicar la consulta que da «37 celdas /
+39,07 M€» y la del «22 obras». Exige medir contra la base; mientras tanto la
+ficha **declara el hueco** en vez de inventar una consulta.
+
+---
+
+## El arnés, de 1.5.1 a 1.7.4 (2026-08-25, ya integrado en la rama de F-006)
 
 Actualización con el instalador de `arnes-base` en modo actualizar. Lo genérico
 entró solo; `harness/init.sh` y `CHECKPOINTS.md` se **fusionaron a mano** para
@@ -186,10 +214,14 @@ aceptación**, no la especificación.
 
 ## Dónde está
 
-Diccionario en **versión 8**, publicado y verificado contra la base: **103
-objetos** documentados, **798 columnas**, **46 de consumo recomendado**. (Estas
-cifras las comprueba un test: si envejecen, la suite se pone roja. Ya caducaron
-dos veces.)
+Diccionario en **versión 9 en el árbol, sin publicar**: **103 objetos**
+documentados, **798 columnas**, **46 de consumo recomendado**. (Estas cifras las
+comprueba un test: si envejecen, la suite se pone roja. Ya caducaron dos veces.)
+
+**Cuidado con lo que sirve `_meta` hoy: la versión 8**, que es la última
+publicada y **lleva dentro la remisión falsa** que la 17ª pasada corrigió
+(2026-08-26). Republicar escribe en Azure y **esa autorización es del humano**:
+hasta que la dé, el agente lee el texto viejo.
 
 Tres puertas que lo contrastan **contra el dato real**, no contra sí mismo:
 
