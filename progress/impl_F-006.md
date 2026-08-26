@@ -55,30 +55,31 @@ rigor `critico`.
 | **T38** 🔏 | Firewall del entorno del MCP | ⛔ **bloqueada**: ese entorno no existe todavía | — |
 | **T39** | Ejecutar las 18 preguntas | ✅ ejecutada 2026-08-22 → `progress/bateria_F-006.md` | §5 |
 | **T40** | Corregir lo que la batería delató y republicar | ✅ hecha 2026-08-25 | L4475 |
-| **T41** | Campaña de mutación del rigor `critico` | ⬜ **pendiente y no declarable**: ver §4 (feature F-041) | L4375 |
-| **T42** | `bash harness/init.sh` en verde | ✅ **verde el 2026-08-26**: 2305 pasados, 125 saltados, 0 fallos | §2 |
+| **T41** | Campaña de mutación del rigor `critico` | ✅ **hecha**: campaña completa y **válida**, commit `e89f71f` (256 mutantes, 52 supervivientes resueltos — §4) | L4375 |
+| **T42** | `bash harness/init.sh` en verde | ✅ **verde**: exit 0, 2.473 pasados, 128 saltados, 0 fallos; reverificado por el reviewer en la 20ª pasada | §2 |
 | **T43** | Registrar la deuda y decidir con el humano | ◐ **registrada** (§6); la decisión es del humano | tasks.md §Deuda |
 
 **T32, T33 y T34 entregadas a F-034** el 2026-08-25 por decisión del humano («del BI olvídate»): DA-3 queda resuelta por su opción B y los `REVOKE` se quedan construidos y apagados. Ya no bloquean el cierre.
-T41 (mutación) sigue dependiendo de **F-041**. **Toda esta tabla se ha reverificado fila a fila contra el árbol el 2026-08-26**: método, evidencia y los cuatro desfases encontrados, en §8.
+**T41 está hecha** y sus 52 supervivientes resueltos (§4); lo que va a **F-041** es la limitación de la campaña paralela, no la campaña. **Toda esta tabla se ha reverificado fila a fila contra el árbol** (§8), y el reviewer la reverificó otra vez en la 20ª pasada.
 
-## 2 · Evidencias de la última medición (2026-08-26, tras la 18ª pasada)
+## 2 · Evidencias de la última medición (2026-08-26, reverificadas por el reviewer en la 20ª pasada)
 
 | Evidencia | Valor | Comando |
 |---|---|---|
-| Tests | **2305 pasados**, 125 saltados, **0 fallos** (2026-08-26, cierre de la 18ª pasada; +15 respecto a la 17ª: los 14 de `test_f006_docs.py` y uno parametrizado) | `bash harness/init.sh` |
-| Cobertura de líneas cambiadas | **100,0 %** — 1 de 1 línea (umbral 80 %, nivel `critico`). El denominador es 1 porque esta pasada es documentación: no toca Python de producción | línea `PUERTA COBERTURA` |
-| Tiempo de la suite | **466,09 s** (7 min 46 s) bajo `coverage`, en la pasada de cierre; 342,92 s en la más rápida medida | ídem |
-| Mutación | **NO MEDIDO, a propósito** — ver §4 | — |
+| Tests ejecutados y resultado | **2.473 pasados, 128 saltados, 0 fallos**, exit 0. Medición del reviewer sobre este mismo árbol; coincide con la última del implementer | `bash harness/init.sh` |
+| Cobertura de líneas cambiadas | **100,0 %** — **33 de 33** líneas cambiadas cubiertas (umbral 80 %, nivel `critico`) | línea `PUERTA COBERTURA` |
+| Tiempo de la suite | **603,92 s** (10 min 04 s) bajo `coverage`, en la pasada del reviewer. Sobre el mismo árbol se midieron antes 675,15 s y 1.274,77 s: la diferencia es contención de CPU con otra suite a la vez, no trabajo nuevo | ídem |
+| Mutantes generados y supervivientes | **256 generados, 256 evaluados, 204 muertos, 52 supervivientes**, 0 timeouts, 0 sin veredicto. Los **52 resueltos: 49 muertos con tests nuevos y 3 equivalentes** aprobados por el humano — §4 | `python -m harness.mutacion --feature F-006` |
+| **Workers de la campaña** | **6** (fila «Workers» del informe). Con ellos el coste real por mutante es 32,7 s × 6 = **196,2 s**, frente a una línea base de ~470 s: coherente, porque el 80 % de los muertos para con `-x` | ídem |
 | Diccionario | **versión 9 publicada**: `_meta` la sirve desde la nocturna del 2026-08-26 a las 06:59. Medido en el árbol: hash `72125091cc25`, 103 objetos, 798 columnas, 16 reglas, 29 filas de contexto, 0 pendientes, 46 objetos de consumo, cobertura de columnas 100 % | árbol: `cargar_diccionario` + `filas_*`. Publicación y `check-diccionario`: **medición del humano**, no verificable desde el árbol (§8) |
 | Biyección publicado ↔ árbol | **102 de 103**; única huérfana `cierre.v_pbi_planif_vs_real` (deuda previa de `build-cierre`) | `check-diccionario` |
 | Relaciones | **78 unen, 2 con cobertura escasa, 0 que NO unen, 16 sin comprobar, 2 con un extremo inexistente** (medido el 2026-08-26 a las 12:05; una relación más verificada que el día anterior) | `check-relaciones --todos` |
 | Superficie de consumo | **46** objetos (bajó de 48 al retirar dos vistas inconsultables) | `cobertura_columnas` |
 | Trinquete `pendientes` | **0**, desde 98 | `PENDIENTES_MAX` |
 
-Progresión de la suite: 1052 → 1133 → 1171 → 1496 → 1985 → 2025 → 2290 → **2305**. (Aquí
-ponía 2025, contradiciendo tres pasadas seguidas a la fila «Tests» de al lado: otro dato
-copiado sin contrastar, corregido en la 18ª.)
+Progresión de la suite: 1052 → 1133 → 1171 → 1496 → 1985 → 2025 → 2290 → 2305 → 2467 →
+**2473**. (Aquí llegó a poner 2025, contradiciendo tres pasadas seguidas a la fila
+«Tests» de al lado: dato copiado sin contrastar, y la misma causa que el H2 de la 20ª.)
 
 ## 3 · Fase RED
 
@@ -97,31 +98,29 @@ código. La más significativa es la de T40: el test que sostenía la afirmació
 | T40 (`relaciones_sql.py`) | **L4675–L4704** |
 | T28, T35 y T36 (18ª pasada) | **L4953–L5015**: 10 rojos de 14 antes de tocar un documento, y el verde después |
 
-## 4 · Mutación: por qué no hay número, y los supervivientes analizados
+## 4 · Mutación: la campaña, sus números y su limitación
 
-**Los números de mutación de las tandas anteriores NO son evidencia** (L501, L4377). La
-campaña corre en un `git worktree` con HEAD detached, donde
-`test_f015_r12_la_rama_actual_se_lee_de_git` falla siempre; con `-x` la suite para ahí y
-`harness/mutacion.py` cuenta **cualquier `returncode != 0` como mutante muerto**: estaba
-roja antes de mutar nada, y el reviewer lo controló con el mismo worktree sin mutar.
-Quedan como registro de lo declarado, no como prueba: 112/112 · 132/132 · 166/166 ·
-254/254. **Hasta que F-041 esté hecho no se declara ningún número**, y
-`harness/mutacion.py` no se ha tocado (es del arnés).
+**Campaña completa y VÁLIDA**, la primera de F-006 (commit `e89f71f`, informe en
+`progress/mutacion_F-006.md`): **256 mutantes generados y evaluados, 204 muertos, 52
+supervivientes, 0 timeouts, 0 sin veredicto**, sobre 3.126 líneas de 8 ficheros, con **6
+workers**, en 8.368,3 s; SHA medido `99e2335`, y ninguno de esos 8 ficheros ha cambiado
+desde entonces. El reviewer recalculó alcance y nº de mutantes por su cuenta en la 20ª
+pasada: **coincide exacto**.
 
-### Supervivientes analizados
+**Los 52 supervivientes, resueltos: 49 muertos con tests nuevos** —ni una línea de
+producción tocada— **y 3 equivalentes** demostrados y **aprobados por el humano el
+2026-08-26**. Los 52 análisis están completados, cada uno con el puntero a su traza, en el
+propio informe de la campaña; el reparto y las fases RED, en §9 y en el anexo (L5136,
+L5355, L5463, L5576, L5626). Lo que se declara muerto por los tests nuevos se reverificó
+**EN SERIE**, nunca por una segunda campaña paralela.
 
-| Superviviente | Veredicto | Anexo |
-|---|---|---|
-| `frozen=True → False` en `Columna` (`diccionario.py:173`) | **test añadido** (`MINIMOS_FIJADOS` + `test_f006_supervivientes.py`) | L2409, L2452 |
-| `frozen=True → False` en `Relacion` (`diccionario.py:189`) | **test añadido**, misma tanda | L2411, L2454 |
-| `MINIMOS_TEXTO["grano"] 20→21` (`:137`) | **test añadido** tras un primer arreglo fallido (el test se movía con lo que vigilaba) | L2412, L2433 |
-| `MINIMOS_TEXTO["ejemplo_pregunta"] 20→21` (`:140`) | **test añadido**, mismo caso | L2410, L2433 |
-| `and → or` en `diccionario_sql.py:297` | **test añadido**, verificado a mano dos veces (16ª y 17ª): MUERTO por los tres casos de cadena | **L4395**, L4790 |
-
-Los cuatro primeros llegaron como «timeouts» y **eran supervivientes**: un timeout es un
-mutante **sin evaluar**, nunca uno muerto. **Ninguno es equivalente.** Hallazgos de arnés
-asociados, no aplicados por no tocar `harness/`: la campaña deja mutantes vivos en
-`__pycache__` (falso verde posible) y dejó 16 worktrees huérfanos (L2458, L2491).
+**LA LIMITACIÓN, declarada, medida y con dueño** — `progress/control_mutacion_F-006.md`:
+la campaña paralela produce **falsos muertos** (uno confirmado, `inventario.py:234
+[not]`, perseguido hasta matarlo), así que **204 muertos no es lista cerrada y 52 es un
+SUELO**; la muestra de control —12 de los 204, reevaluados en serie— dio **0 cambios de
+veredicto**, que no descarta una tasa baja. Fichada en **F-041**. Y los números de las
+tandas anteriores —112/112, 132/132, 166/166, 254/254— **siguen sin ser evidencia**:
+corrían con la base roja, contando cualquier `returncode != 0` como muerto (L501, L4377).
 
 ## 5 · Batería de aceptación (T39, 2026-08-22, versión 6 publicada)
 
@@ -160,9 +159,9 @@ contradicción» de `check-unicidad`, que **no tienen la clave demostrada**.
 de fan-out), y que el `significado` de una columna lo sea. Solo lo cazan la revisión
 humana y la batería.
 
-**Fuera del alcance entregado**, tras la 18ª pasada: **T29, T30 y T31** (los `REVOKE`,
-verificados como no escritos), **T38** (firewall del entorno del MCP, que no existe) y
-**T41** (mutación, atada a F-041). El objetivo del humano —«un MCP que use cualquiera
+**Fuera del alcance entregado**: **T29, T30 y T31** (los `REVOKE`, verificados como no
+escritos) y **T38** (firewall del entorno del MCP, que no existe). **T41 ya no está en
+esta lista: se hizo** (§4). El objetivo del humano —«un MCP que use cualquiera
 desde cualquier puesto»— **sigue sin cumplirse**: hoy corre en el puesto de pgris. Lo
 construido es la capa semántica, que era el prerrequisito, no el despliegue.
 
