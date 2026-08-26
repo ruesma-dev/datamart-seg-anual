@@ -5739,3 +5739,30 @@ le llevó a un diagnóstico equivocado. El procedimiento correcto —worktree
 desechable, `volcar_variables`, mutante aplicado con la API de `harness.mutacion`
 y no con un `sed`— es el que se siguió aquí y el que hay que seguir para
 reevaluar cualquier superviviente.
+
+### Evidencias de esta pasada
+
+`bash harness/init.sh` **en verde** (exit 0, `ENTORNO LISTO`), sin pipes ni tail:
+
+```
+2473 passed, 128 skipped, 909 warnings in 675.15s (0:11:15)
+[OK] pytest en verde (con medición de cobertura)
+[OK] PUERTA COBERTURA: 100.0% de 33 líneas cambiadas cubiertas (33/33, umbral 80%, nivel critico)
+[OK] PUERTA TAMAÑO: F-006 dentro de los topes (requirements 132/150, design 191/250,
+     impl 219/220, review 125/140)
+[OK] Rama actual: feature/F-006-mcp-azure
+```
+
+* **Tests ejecutados:** 2.473 pasados, 128 saltados, 0 fallidos. **+6 sobre los
+  2.467 de la 19ª pasada**: los 2 del `grano`, los 3 del caso frontera
+  parametrizado y el contrapunto por debajo del umbral.
+* **Tiempo de la suite:** 11:15 (675,15 s), el que imprime pytest.
+* **Cobertura de las líneas cambiadas:** 100 % (33/33), umbral 80 % del nivel
+  `critico`.
+* **Mutantes:** no se lanza campaña nueva —solo se han añadido tests, no hay
+  líneas de producción nuevas que mutar—. Los dos mutantes en cuestión se
+  verificaron **uno a uno** (trazas arriba): rojo con el mutante, verde sin él.
+  Cierra el recuento de la 2ª campaña en **52/52 resueltos: 49 muertos, 3
+  equivalentes, 0 supervivientes**.
+* **Producción tocada:** ninguna. Único fichero de código: el de tests.
+* **Pendiente:** nada de este encargo. Commit `a43de96`, sin `push`.
