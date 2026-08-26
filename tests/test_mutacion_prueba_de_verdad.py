@@ -198,6 +198,36 @@ def arnes_1_5_2() -> Iterator[None]:
         mutacion_paralela.ejecutar_campania = campania_original  # type: ignore[assignment]
 
 
+def _entorno_que_escribe_bytecode() -> dict[str, str]:
+    """Entorno para los subprocesos que TIENEN que dejar `.pyc` en disco.
+
+    El escenario C necesita que el intérprete hijo escriba bytecode; si no lo
+    escribe, no hay `.pyc` rancio que reutilizar y el test no prueba nada. Y
+    quién lo escribe no lo decide el test: lo decide **quien invoca a pytest**,
+    porque `PYTHONDONTWRITEBYTECODE` se hereda.
+
+    Eso reventó el 2026-08-26 en `datamart-seg-anual` de la peor manera
+    posible: la campaña de mutación lanza cada evaluación con
+    `PYTHONDONTWRITEBYTECODE=1` —es el arreglo de la 1.6.3, el que evita
+    envenenar el árbol—, y la línea base que mide antes de mutar corre la suite
+    del proyecto, este test incluido. Resultado: línea base SIEMPRE en rojo y
+    campaña abortada sin informe. El test que vigila el bytecode no sobrevivía
+    a la propia campaña del arnés.
+
+    Por eso el entorno del hijo se construye aquí y no se hereda tal cual: se
+    parte de `os.environ` —el subproceso necesita `PATH` y compañía— y se
+    quitan las dos variables que deciden dónde y si se escribe bytecode.
+    Quitarlas es lo contrario de debilitar el test: es lo que garantiza que
+    haya `.pyc` que comprobar en cualquier entorno.
+    """
+    entorno = dict(os.environ)
+    entorno.pop("PYTHONDONTWRITEBYTECODE", None)
+    # Si apunta a otro árbol, el `__pycache__` no aparece junto al fuente y el
+    # `glob` sale vacío igual que con la anterior.
+    entorno.pop("PYTHONPYCACHEPREFIX", None)
+    return entorno
+
+
 def _sin_mutar(repositorio: Path) -> None:
     """El árbol quedó como estaba: ni un mutante escrito en disco."""
     assert _leer(repositorio / "app.py") == APP, (
@@ -324,12 +354,20 @@ def test_C_un_mutante_nunca_se_juzga_con_el_bytecode_del_anterior(
     segundos enteros—.
 
     Aquí se fuerza esa coincidencia con `os.utime` en vez de esperar a que el
-    reloj la regale, que es lo que la hace reproducible.
+    reloj la regale, que es lo que la hace reproducible. Y los dos subprocesos
+    parten del entorno que fija `_entorno_que_escribe_bytecode()`, no del que
+    traiga quien invoque a pytest: ver allí por qué.
     """
+    entorno = _entorno_que_escribe_bytecode()
+
     modulo = tmp_path / "m.py"
     _escribir(modulo, "VALOR = 1\n")
     subprocess.run(
-        [sys.executable, "-c", "import m"], cwd=tmp_path, check=True, capture_output=True
+        [sys.executable, "-c", "import m"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        env=entorno,
     )
     assert list((tmp_path / "__pycache__").glob("m.*.pyc")), (
         "el intérprete no dejó bytecode: este test no estaría probando nada"
@@ -345,11 +383,59 @@ def test_C_un_mutante_nunca_se_juzga_con_el_bytecode_del_anterior(
         check=True,
         capture_output=True,
         text=True,
+        env=entorno,
     ).stdout.strip()
 
     assert salida == "9", (
         "se ejecutó el bytecode rancio y no el fuente que hay en disco: un "
         "mutante juzgado así sale muerto sin que ningún test lo cace"
+    )
+
+
+def test_C_regresion_el_escenario_del_bytecode_aguanta_la_variable_puesta() -> None:
+    """El escenario C, corrido con `PYTHONDONTWRITEBYTECODE=1` puesta.
+
+    Esta es la regresión del defecto de la 1.7.6, y se ejecuta de la única
+    forma que demuestra algo: relanzando el test C en un subproceso con la
+    variable envenenada, exactamente como se la pone la campaña de mutación al
+    medir su línea base. Si vuelve a salir en rojo, es que alguien ha dejado el
+    escenario C a merced del entorno que herede.
+
+    No vale con comprobar el código fuente ni con marcar el test como `skip`
+    cuando la variable esté puesta: saltárselo apagaría justo el test que
+    protege el arreglo de la 1.6.3, y entonces la campaña arrancaría verde
+    sobre un árbol envenenado sin que nadie lo notara.
+    """
+    raiz = Path(__file__).resolve().parents[1]
+    fichero = Path(__file__).resolve().relative_to(raiz).as_posix()
+    caso = test_C_un_mutante_nunca_se_juzga_con_el_bytecode_del_anterior.__name__
+
+    completado = subprocess.run(
+        # `-m pytest` y no el ejecutable: es lo que mete la raíz en `sys.path`
+        # y lo que hace que `from harness import ...` importe aquí dentro.
+        # `-p no:cacheprovider` para no ensuciar `.pytest_cache` del anidado.
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            f"{fichero}::{caso}",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+        ],
+        cwd=raiz,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+        timeout=TIMEOUT_S,
+        check=False,  # el veredicto lo da el assert, con la salida delante
+    )
+
+    assert completado.returncode == 0, (
+        "el escenario C falla con PYTHONDONTWRITEBYTECODE puesta, que es como "
+        "lo corre la campaña de mutación al medir la línea base: la campaña "
+        "aborta sin escribir informe y ninguna feature se puede cerrar.\n"
+        f"{completado.stdout}\n{completado.stderr}"
     )
 
 
