@@ -5570,3 +5570,53 @@ Dos commits, uno por grupo, con `git add` explícito: `4d336fb` (grupo 1) y `143
 | Mutantes del encargo y supervivientes | **31 asignados, 31 muertos, 0 supervivientes, 0 equivalentes**. Verificados uno a uno aplicando la mutación en un worktree: `exit=1` en los 31. No se relanza la campaña completa (4,3 min/mutante en esta máquina): la lanza el humano con el árbol quieto |
 | Tiempo de ejecución de la suite | **1.274,77 s (21:14)** en la medición final. La anterior del mismo árbol dio **1.036,23 s (17:16)**: la diferencia es contención de CPU con la corrida simultánea del líder, no trabajo nuevo |
 | Puerta de tamaño | `impl_F-006.md` **219/220** |
+
+---
+
+## Los tres mutantes equivalentes, APROBADOS POR EL HUMANO (2026-08-26)
+
+El nivel `critico` exige cero supervivientes, y admite **una sola** salida
+alternativa: que un mutante sea **equivalente** —que no cambie ningún
+comportamiento observable— y que esa demostración la acepte el humano por
+escrito. Estos tres lo son, y **el humano los aprobó el 2026-08-26**. No se les
+escribe test: forzarlo ataría la suite a un detalle interno sin fijar nada real.
+
+### 1 · `relaciones_sql.py:282` — `int(UMBRAL * 100)` → `int(UMBRAL * 101)`
+
+Está dentro del texto del aviso de cobertura escasa. `UMBRAL_AVISO_COBERTURA`
+vale **0.5**, y por tanto:
+
+```
+int(0.5 * 100) = 50        int(0.5 * 101) = 50
+```
+
+**El mismo texto, byte a byte.** No hay entrada que distinga las dos versiones,
+así que no existe test capaz de matarlo. Nota para quien cambie el umbral: si
+algún día deja de ser 0.5, este mutante **puede volverse matable** —con 0.8,
+`int(80.8)` sigue siendo 80, pero con 0.55 serían 55 y 55.5→55; conviene
+recalcularlo en vez de dar por buena esta ficha.
+
+### 2 y 3 · `diccionario_sql.py:142` y `:277` — `ensure_ascii=False` → `True`
+
+Cambian cómo se serializan los acentos en el JSON que se publica en `_meta`
+como `JSONB`. **Comprobado contra la base real** (Azure, transacción de solo
+lectura, 2026-08-26):
+
+```
+ensure_ascii=False -> {"significado": "cómputo de la obra número 3 (parámetro añadido)"}
+ensure_ascii=True  -> {"significado": "cómputo de la obra número 3 ..."}
+
+¿Postgres los considera el MISMO jsonb? -> True
+lo que devuelve el escapado           -> cómputo de la obra número 3 (parámetro añadido)
+```
+
+Postgres decodifica los escapes al parsear, así que **el valor almacenado y el
+que recupera el MCP son idénticos**. El agente lee exactamente lo mismo.
+
+**Lo que sí cambiaría, y por qué no basta para matarlo:** el texto que viaja por
+el cable y el que se ve al depurar. Un test podría fijar la cadena literal
+generada, pero estaría atando la suite a un detalle de serialización que no
+altera ningún comportamiento observable del sistema: precisamente el tipo de
+test que esta feature aprendió a no escribir («un test verde puede sostener una
+mentira»). Se deja la intención documentada aquí: `ensure_ascii=False` está
+puesto **para que lo publicado sea legible al depurar**, no por corrección.
