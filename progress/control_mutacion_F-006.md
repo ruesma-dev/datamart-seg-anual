@@ -85,3 +85,42 @@ mismo `.env`, que apunta a la misma base) o E/S de disco.
 3. **Antes de cerrar F-006**, el reviewer debería exigir que los supervivientes
    que se declaren muertos por los tests nuevos se verifiquen **en serie**, no
    por una campaña paralela.
+
+---
+
+## Reevaluación de los 52 supervivientes, EN SERIE (2026-08-26, noche)
+
+Tras escribir los tests, **no basta con que la suite pase**: hay que aplicar cada
+mutante otra vez y ver que muere. Se hizo **en serie y en limpio**, con el `.env`
+volcado al entorno, y aplicando cada mutante con el propio mutador del arnés
+(`generar_mutantes` + `aplicar_mutante`), nunca por sustitución de texto.
+
+**En serie a propósito**: esta misma noche se demostró que el modo paralelo
+produce falsos muertos, y aquí un falso muerto sería el peor de los errores
+—nos haría creer que hemos matado algo que sigue vivo—.
+
+La primera medición fue la **línea base sin mutar**, para no repetir el error de
+diagnóstico de la tarde:
+
+```
+LINEA BASE (sin mutar): codigo 0 -> 2467 passed, 128 skipped en 315.03 s
+RESULTADO: 47 muertos, 5 siguen vivos, 0 no localizados
+```
+
+**Los cinco que siguen vivos:**
+
+| Mutante | Situación |
+|---|---|
+| `diccionario_sql.py:142` `ensure_ascii` | equivalente, **aprobado por el humano** |
+| `diccionario_sql.py:277` `ensure_ascii` | equivalente, **aprobado por el humano** |
+| `relaciones_sql.py:282` `int(UMBRAL*100)` | equivalente, **aprobado por el humano** |
+| `cargador_yaml.py:361` `is None → is not None` | **no equivalente**: se quedó fuera del encargo por un descuido del líder |
+| `relaciones_sql.py:278` `< → <=` | **no equivalente**: mismo descuido |
+
+Los tres primeros están demostrados y documentados en
+`progress/impl_F-006_detalle.md`. Los dos últimos se encargaron aparte esa misma
+noche: el líder los había **analizado** —al de `:278` llegó a calificarlo de
+«matable pero de bajo valor»— y luego **no los pasó a la lista** que entregó al
+implementer. La lección no es sobre mutación sino sobre encargos: **una lista
+que se confecciona a mano a partir de un análisis pierde elementos**, y aquí lo
+único que lo cazó fue reevaluar los 52 en vez de fiarse del recuento.
