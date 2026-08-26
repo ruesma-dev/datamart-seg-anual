@@ -105,10 +105,11 @@ FACTOR_HOLGURA_BASE = 5
 #: Tope del número de workers CALCULADO por defecto. No limita lo que se pida a
 #: mano con `--workers` ni lo declarado en `rigor.json` (R10).
 #:
-#: Fue 16 hasta F-040, y ese 16 hacía la campaña paralela inutilizable por
-#: defecto: el 2026-08-21, en esta máquina de 22 núcleos, la suite limpia tardó
-#: 51 s en reposo, 97,5 s con UN worker y 119-122 s con TRES, contra un timeout
-#: configurado de 120 s. Con 16 no habría cabido ni una línea base.
+#: Fue 16 hasta que alguien lo midió, y ese 16 hacía la campaña paralela
+#: inutilizable por defecto: el 2026-08-21, en una máquina de 22 núcleos, la
+#: suite limpia tardó 51 s en reposo, 97,5 s con UN worker y 119-122 s con
+#: TRES, contra un timeout configurado de 120 s. Con 16 no habría cabido ni
+#: una línea base.
 #:
 #: El único punto medido y verde son 3 workers, y ya ahí la suite sube un 25 %.
 #: 4 es un paso sobre lo medido, no un salto; subirlo es una decisión CON
@@ -535,7 +536,7 @@ class EjecutorPytest:
     `ruta` acota la RECOLECCIÓN dentro de esa raíz. Sin ella, `python -m pytest`
     a secas recoge todo lo que cuelgue del directorio: en un monorepo eso
     arrastra `services/**/tests` y muere en la recolección con el intérprete
-    equivocado, así que ningún mutante llega a juzgarse (F-038, R1–R3). Es la
+    equivocado, así que ningún mutante llega a juzgarse (R1–R3). Es la
     misma ruta explícita que `harness/init.sh` usa para la suite de la raíz.
     """
 
@@ -587,8 +588,8 @@ class EjecutorPytest:
                 # envenenado: la campaña mide contra un código que ya no está y
                 # la suite del proyecto puede pasar o fallar sin que nadie haya
                 # tocado nada. El síntoma que lo delata es una campaña
-                # absurdamente rápida. Visto el 2026-08-19 en
-                # `postventa-incidencias` (review de F-010).
+                # absurdamente rápida. Pasó de verdad el 2026-08-19, y costó
+                # una review entera averiguar de dónde salía.
                 env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
         except subprocess.TimeoutExpired:
@@ -635,13 +636,13 @@ CAUSAS_CONOCIDAS = (
 )
 
 #: Causas que NO tienen nada que ver con el paralelismo y muerden igual con
-#: `--workers 1`. La primera se descubrió el 2026-08-19 en albaranes: un
-#: fichero de `harness/` no pertenece a ningún servicio, así que `ejecutor_para`
-#: lo juzga con `python -m pytest` SIN ruta desde la raíz; sin configuración de
-#: pytest ahí, esa invocación recoge las suites de todos los servicios y muere
-#: en la recolección en menos de un segundo, haga lo que haga el mutante. Los
-#: 19 mutantes de F-034 y los 61 de F-012 salieron «muertos» sin que un solo
-#: test los juzgara.
+#: `--workers 1`. La primera se descubrió el 2026-08-19: un fichero de
+#: `harness/` no pertenece a ningún servicio, así que `ejecutor_para` lo juzga
+#: con `python -m pytest` SIN ruta desde la raíz; sin configuración de pytest
+#: ahí, esa invocación recoge las suites de todos los servicios y muere en la
+#: recolección en menos de un segundo, haga lo que haga el mutante. Dos
+#: campañas enteras, de 19 y de 61 mutantes sobre ficheros de `harness/`,
+#: salieron «muertas» sin que un solo test las juzgara.
 CAUSAS_EN_CUALQUIER_MODO = (
     (
         "la suite se invoca SIN ruta —`python -m pytest` desde la raíz— porque "
@@ -1186,10 +1187,10 @@ class InformeMutacion:
     #: Nivel de rigor que fijó el muestreo, para que el informe diga quién lo
     #: decidió (R9). Lo rellena el CLI, que es quien lo resuelve.
     nivel: str | None = None
-    #: Segundos concedidos a CADA mutante en esta campaña (R4). Desde F-040 no
-    #: es el valor de `rigor.json` sino uno derivado de la línea base medida, y
-    #: sin declararlo los tiempos de dos campañas dejan de ser comparables sin
-    #: que nadie se entere.
+    #: Segundos concedidos a CADA mutante en esta campaña (R4). Ya no es el
+    #: valor de `rigor.json` sino uno derivado de la línea base medida, y sin
+    #: declararlo los tiempos de dos campañas dejan de ser comparables sin que
+    #: nadie se entere.
     timeout_efectivo: int | None = None
     #: El SUELO del que se partió (`mutacion.timeout_por_mutante_s`), o el valor
     #: de `--timeout` si se fijó a mano.
@@ -1306,8 +1307,8 @@ def ejecutar_campania(
         )
         # Aquí es donde la campaña deja de adivinar: la suite limpia ya se ha
         # corrido en el sitio donde se va a juzgar y con los W workers
-        # compitiendo, así que lo que tardó ES la medida buena. Antes de F-040
-        # ese número se tiraba y el timeout salía de un fijo de `rigor.json`.
+        # compitiendo, así que lo que tardó ES la medida buena. Antes ese
+        # número se tiraba y el timeout salía de un fijo de `rigor.json`.
         if not timeout_fijado:
             timeout_s = timeout_derivado(suelo, informe.segundos_linea_base)
             informe.timeout_efectivo = timeout_s
@@ -1554,7 +1555,7 @@ def analisis_escritos(texto: str) -> dict[tuple, str]:
 #: dejó el test flaky durante semanas. Se compara por PREFIJO a propósito:
 #: `| Línea base (s) — \`etiqueta\`` lleva pegada la etiqueta del ejecutor.
 #:
-#: `Workers` y `Timeout efectivo` entran desde F-040: una campaña en serie y una
+#: `Workers` y `Timeout efectivo` entraron después: una campaña en serie y una
 #: paralela sobre el mismo commit tienen que dar informes comparables, y esas
 #: dos filas no coinciden nunca. El `Suelo configurado` NO entra: sale de
 #: `rigor.json`, es el mismo en las dos, y que deje de coincidir es una
@@ -1677,8 +1678,8 @@ def escribir_informe(informe: InformeMutacion, ruta: Path) -> None:
         if media is not None
         else "| Media por mutante evaluado (s) | n/d |"
     )
-    # R4. Desde F-040 el timeout por mutante ya no es el fijo de `rigor.json`:
-    # se deriva de la línea base medida. Sin declararlo, los tiempos de dos
+    # R4. El timeout por mutante ya no es el fijo de `rigor.json`: se deriva
+    # de la línea base medida. Sin declararlo, los tiempos de dos
     # campañas dejan de ser comparables sin que nadie se entere, y el reviewer
     # compara peras con manzanas creyendo que compara lo mismo.
     if informe.timeout_efectivo is None:
@@ -1942,7 +1943,7 @@ def workers_por_defecto() -> int:
     """Workers cuando nadie dice nada: `min(max(1, (núcleos - 2) // 2), tope)`.
 
     Los dos primeros núcleos son los de siempre: la máquina y el coordinador. El
-    `// 2` es lo que cambia en F-040, y cambia porque la fórmula vieja suponía
+    `// 2` es lo que cambió sobre la fórmula vieja, y cambió porque aquélla suponía
     que el cuello de botella es la CPU. No lo es: cada worker arranca un proceso
     **pytest completo** —intérprete, importaciones, recolección, E/S de disco y,
     en un monorepo, un venv por servicio—, así que el recurso escaso es la
@@ -2077,10 +2078,10 @@ def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
 
     Las dos guardas de D4 viven AQUÍ y no en `harness.alcance` a sabiendas. El
     mismo modo de fallo —una campaña de cero que sale en verde— ha entrado ya
-    por tres puertas distintas: la invocación de pytest sin ruta (F-038),
-    `--ficheros ","` (F-039) y `--feature` sobre una rama ya mergeada. Poner
-    una cuarta guarda en el cuarto constructor de alcance es esperar a la
-    quinta; `main` es el único punto por el que pasan todas las vías, incluidas
+    por tres puertas distintas: la invocación de pytest sin ruta, `--ficheros
+    ","` y `--feature` sobre una rama ya mergeada. Poner una cuarta guarda en
+    el cuarto constructor de alcance es esperar a la quinta; `main` es el
+    único punto por el que pasan todas las vías, incluidas
     las que todavía no existen, y además es quien escribe el informe y elige el
     código de salida. La guarda de entrada de `alcance_de_ficheros` NO se
     retira (R17): ésa sabe QUÉ ruta sobra, y ésta solo sabe que no quedó nada.

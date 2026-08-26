@@ -159,8 +159,8 @@ def max_mutantes_nivel(nivel: str, rigor: dict) -> int | None:
 
     Clave OPCIONAL, como `workers_mutacion`: ausencia, `null`, un booleano o un
     entero absurdo (cero o negativo) se tratan como «sin tope». Un `rigor.json`
-    anterior a F-038 sigue funcionando y mide la campaña entera, que es lo que
-    hacía.
+    anterior a esta clave sigue funcionando y mide la campaña entera, que es lo
+    que hacía.
     """
     valor = rigor.get("niveles", {}).get(nivel, {}).get("max_mutantes")
     if isinstance(valor, bool) or not isinstance(valor, int) or valor < 1:

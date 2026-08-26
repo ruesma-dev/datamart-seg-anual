@@ -37,11 +37,10 @@ publicar un cero de supervivientes que nadie ha medido.
   lea `git branch --show-current` recibe cadena vacía.
 
 Esto no es teoría: hasta la 1.5.2 estos tres casos estaban escritos aquí como
-«limitaciones conocidas» y NADA los comprobaba. El 2026-08-19, en
-`datamart-seg-anual`, la misma feature y el mismo árbol dieron `108 generados,
-108 muertos, 0 supervivientes` en paralelo y `108, 106, 2 supervivientes` con
-`--workers 1`. El cero era falso: dos `bold=True -> bold=False` que ningún test
-menciona.
+«limitaciones conocidas» y NADA los comprobaba. El 2026-08-19, la misma
+feature y el mismo árbol dieron `108 generados, 108 muertos, 0
+supervivientes` en paralelo y `108, 106, 2 supervivientes` con `--workers 1`.
+El cero era falso: dos `bold=True -> bold=False` que ningún test menciona.
 
 Todo con biblioteca estándar, como el resto del arnés.
 """

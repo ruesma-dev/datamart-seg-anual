@@ -2,10 +2,79 @@
 # Estado actual · 2026-08-26
 
 **Feature en curso: F-006 · MCP sobre el datamart.** Rama
-`feature/F-006-mcp-azure`, ya con el arnés 1.7.4 dentro. `bash harness/init.sh`
-**en verde: 2.290 tests, 125 saltados, 465,77 s**; puerta de cobertura N/A
-(F-006 no cambia líneas Python de producción frente a `dev`) y puerta de tamaño
-cumplida. Árbol limpio.
+`feature/F-006-mcp-azure`, con el arnés **1.7.6** dentro. `bash harness/init.sh`
+**en verde: 2.290 tests, 125 saltados**; puerta de cobertura N/A (F-006 no
+cambia líneas Python de producción frente a `dev`) y puerta de tamaño cumplida.
+Árbol limpio y **sin mutantes aplicados** (verificado con
+`python -m harness.mutacion --estado`).
+
+---
+
+## LO PRIMERO AL RETOMAR (2026-08-26)
+
+**F-006 está a UNA sola cosa de poder ir a revisión: la campaña de mutación.**
+Todo lo demás está hecho. Y hay una decisión del humano pendiente, con los
+números ya medidos, que es justo donde se cortó la sesión.
+
+### La decisión pendiente: cómo se mide F-006
+
+La campaña completa **no cabe en una tarde**, y esto no es una impresión:
+
+| Medido el 2026-08-26 | |
+|---|---|
+| Alcance | 6 módulos, **2.637 líneas** de producción, del orden de **400 mutantes** |
+| Suite completa (2.290 tests) por mutante | **~4,3 min** |
+| Solo los tests de F-006 (617 tests) | **~2,2 min** |
+| Campaña entera en serie | **15-30 horas** |
+
+Se lanzó y se paró a los 82 minutos: iba por el **primer fichero de seis**, línea
+219 de 1.089. El árbol quedó restaurado.
+
+**Acotar el alcance NO sirve**: los seis módulos nacieron con F-006, así que «las
+líneas que la feature cambió» son los ficheros enteros. La conclusión incómoda
+es otra: **F-006 es demasiado grande para el rigor que declara**. 2.637 líneas de
+producción con `rigor: critico` cuestan una campaña de una noche cada vez.
+
+Las tres salidas que se le plantearon al humano, sin que eligiera todavía:
+
+1. **Lanzarla de noche** en serie (funciona hoy, sin trabajo previo) y mirarla por
+   la mañana. Es la evidencia que el reviewer lleva pidiendo dieciséis pasadas.
+2. **Arreglar antes el modo paralelo** —que los worktrees tengan `.env` y que
+   `test_f015_r12` no dependa de `git branch --show-current`— y acotar la suite:
+   bajaría a 3-4 h, a cambio de media jornada de trabajo en el arnés.
+3. **Muestreo declarado** (60-100 mutantes con semilla fija, una hora). NO cumple
+   lo que exige `critico`: habría que declarar la desviación por escrito y que el
+   reviewer la acepte o la rechace.
+
+**Ojo con el modo serie**: muta el ÁRBOL PRINCIPAL (`muta_arbol_principal: true`).
+Si una campaña muere a medias, queda código mutado en disco. El centinela
+`.arnes_cache/mutacion_en_curso.json` lo declara y
+`python -m harness.mutacion --restaurar` lo deshace. Compruébalo SIEMPRE antes de
+fiarte de cualquier medición.
+
+### Lo demás de F-006, ya cerrado
+
+- Los **cuatro hallazgos** del review (H2-H5): cerrados, ver la sección siguiente.
+- El **diccionario está en versión 9 y PUBLICADO** en `_meta` (103 objetos, 798
+  columnas, 16 reglas, cobertura 100 %), verificado contra la base con
+  `check-diccionario` y `check-unicidad`. La remisión falsa ya no se sirve.
+- El **bloque de Power BI**, entregado a F-034.
+- El **MCP, probado de punta a punta** en Claude Escritorio y en el móvil.
+
+### Y un aviso sobre el papeleo
+
+`progress/review_F-006.md` (el resumen) **arrastra como abiertos hallazgos que ya
+estaban cerrados en el árbol**: se escribió copiando la tabla de la 16ª pasada sin
+contrastarla contra el código. Cuando el reviewer haga la 17ª pasada, que
+reverifique contra el árbol y reescriba esa tabla. La lección, que ya está en
+este fichero desde F-006: **verificar lo que la tanda dice haber hecho, no lo que
+parece**.
+
+### Nada se ha subido a ningún remoto
+
+`dev` va **145+ commits** por delante de `origin/dev` y no se ha hecho `git push`
+en toda la sesión. `arnes-base` tiene la 1.7.5 y la 1.7.6 sin subir. `mcp-bbdd`
+**no tiene remoto configurado**: sus commits existen solo en este disco.
 
 ---
 
@@ -46,7 +115,36 @@ ficha **declara el hueco** en vez de inventar una consulta.
 
 ---
 
-## El arnés, de 1.5.1 a 1.7.4 (2026-08-25, ya integrado en la rama de F-006)
+## El otro frente: `mcp-bbdd`, el servidor que sirve este diccionario
+
+Repositorio aparte (`C:\Users\pgris\PycharmProjects\mcp-bbdd`), **sin remoto**.
+El 2026-08-25 recibió el arnés (hoy 1.7.5), se le crearon las ramas `main`/`dev`
+—antes se trabajaba directo en `main`— y se le sembró el backlog del despliegue.
+Su `progress/current.md` manda sobre lo que aquí se resuma.
+
+**Objetivo acordado con el humano:** migrar el MCP a Azure y exponerlo como MCP
+remoto, para que cualquier usuario lo use desde Claude Escritorio **y desde el
+móvil**. El móvil descarta `stdio` por definición: no hay proceso local que
+lanzar.
+
+Backlog: F-002 (verificar conectores) **done**; luego F-003 (transporte
+`streamable-http`, entregando escuchando **solo en local**), F-004 (OAuth con
+Entra ID), F-005 (auditoría con identidad desde el primer día), F-009 (las
+reglas de negocio dejan de estar duplicadas), F-006 (contenedor y Container
+App), F-007 (documento en `azure-apps/`) y F-008 (acotar por persona, aplazada
+a propósito: hoy **todos ven todo**, decisión explícita del humano).
+
+Tres hallazgos de la prueba de F-002 que ya viajan en sus fichas: Claude
+descubre OAuth pidiendo `/.well-known/oauth-protected-resource[/mcp]` y
+`/.well-known/oauth-authorization-server` —eso ES la especificación de F-004—;
+el SDK responde **`421 Invalid Host header`** a lo que venga de fuera si el Host
+no está en su lista blanca, y en Azure pasará igual; y **el cliente no protege
+nada**: aceptó un servidor sin autenticación ninguna.
+
+---
+
+
+## El arnés, de 1.5.1 a 1.7.6 (2026-08-25 y 26, integrado en la rama de F-006)
 
 Actualización con el instalador de `arnes-base` en modo actualizar. Lo genérico
 entró solo; `harness/init.sh` y `CHECKPOINTS.md` se **fusionaron a mano** para
@@ -54,6 +152,14 @@ no perder lo propio del proyecto (la cabecera de configuración y la sección 9
 del primero; las trampas del dominio Sigrid y la regla del SQL por capas del
 segundo). `CLAUDE.md`, `docs/CONVENTIONS.md` y `docs/referencia/README.md` se
 conservaron: el payload solo traía la plantilla sin adaptar.
+
+**La 1.7.6 nació aquí, el 2026-08-26, y desbloquea las campañas de mutación de
+cualquier proyecto con el arnés.** El test del propio arnés que vigila el
+bytecode (`test_C_un_mutante_nunca_se_juzga_con_el_bytecode_del_anterior`)
+fallaba cuando `PYTHONDONTWRITEBYTECODE` estaba en el entorno, que es justo la
+variable que la campaña define en cada evaluación desde la 1.6.3. Resultado: la
+línea base salía **siempre** en rojo y la campaña abortaba sin escribir informe.
+Arreglado río arriba y reinstalado aquí; verificado con y sin la variable.
 
 ### Lo que cambia en el día a día
 

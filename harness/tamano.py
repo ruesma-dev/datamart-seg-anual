@@ -9,8 +9,9 @@ script—. Aquí se mide lo que cuesta ese papeleo, contra los topes que declara
 
 Dos decisiones que explican la forma de esta herramienta:
 
-1. **Solo se mide la feature en curso.** Las specs anteriores a F-038 exceden
-   hoy los topes (de 114 a 333 líneas en `requirements.md`), y medirlas dejaría
+1. **Solo se mide la feature en curso.** Las specs escritas antes de que
+   existieran estos topes los exceden hoy (de 114 a 333 líneas en
+   `requirements.md`), y medirlas dejaría
    el portero en rojo permanente o exigiría una lista de excepciones que
    mantener. Lo viejo queda amnistiado por construcción; una spec vieja que se
    retome y se edite pasará a medirse, que es el resultado deseado.
@@ -63,7 +64,7 @@ def contar_lineas(ruta: Path) -> int:
 
 
 def slug_de_feature(feature: str, raiz: str = ".") -> str | None:
-    """Slug de la carpeta de spec de `feature` (`F-038-coste-...`), o `None`.
+    """Slug de la carpeta de spec de `feature` (`F-XXX-lo-que-sea`), o `None`.
 
     Primero la rama declarada en `features.json`, que es la fuente de verdad del
     arnés; si no la hay, el único directorio `specs/F-XXX-*`. Con dos
@@ -152,7 +153,9 @@ def main(argv: list[str] | None = None) -> int:
             "líneas declarados en harness/rigor.json."
         ),
     )
-    analizador.add_argument("--feature", required=True, help="Identificador, p. ej. F-038")
+    analizador.add_argument(
+        "--feature", required=True, help="Identificador de la feature, formato F-XXX"
+    )
     analizador.add_argument("--raiz", default=".", help="Raíz del repositorio")
     opciones = analizador.parse_args(argv)
 
