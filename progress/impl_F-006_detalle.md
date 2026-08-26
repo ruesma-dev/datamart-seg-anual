@@ -5313,3 +5313,219 @@ el «0 supervivientes» falso con 4 timeouts de T25.
 ENTORNO LISTO. Puedes trabajar.
 [exited with code 0]
 ```
+
+# 19ª pasada · los 31 supervivientes baratos de la 2ª campaña (2026-08-26)
+
+**Encargo**: los dos grupos baratos de los 52 supervivientes de la campaña del 2026-08-26
+(256 mutantes, 204 muertos, 52 supervivientes, 0 timeouts; traza completa en `e89f71f`).
+Los otros 21 los analiza el líder aparte. **Solo se han tocado tests**: ni una línea de
+producción, y ningún mutante ha exigido tocarla.
+
+## Grupo 1 · los 20 `frozen`/`slots` — un barrido, no veinte tests
+
+`tests/test_f006_dataclasses_inmutables.py` (nuevo, 183 líneas).
+
+**Por qué existe, dicho sin rodeos.** Es la lección número uno de F-006 cobrada por
+segunda vez. La 1ª campaña dejó vivo `frozen=True → frozen=False` en `Columna` y
+`Relacion`; se tapó con un `parametrize` de **dos casos escritos a mano** en
+`test_f006_supervivientes.py`; y la 2ª campaña sacó **veinte supervivientes de la misma
+clase** en las doce dataclasses de al lado — `Ficha`, `Regla`, `Diccionario`,
+`ErrorValidacion`, `ObjetoPublicado`, `InformeCobertura`, `Discrepancia`,
+`InformeCatalogo`, `ConsultaRelacion`, `ConsultaUnicidad`. *El defecto sobrevive en el
+campo de al lado; corregir donde te lo señalan no es corregir.*
+
+**Cómo está hecho.** No hay lista de clases: `pkgutil.walk_packages` recorre `etl_sigrid`
+entero y `dataclasses.is_dataclass` + `obj.__module__ == mod.__name__` recoge las
+**38 dataclasses** definidas en el paquete. Cada una pasa dos comprobaciones **de
+comportamiento**, no de bandera —comprobar `cls.__dataclass_params__.frozen` sería
+repetir el decorador, no ejercitarlo—:
+
+| Garantía | Cómo se ejercita | Qué impide de verdad |
+|---|---|---|
+| `frozen` | `object.__new__(cls)` y `setattr(inst, primer_campo, ...)` → `FrozenInstanceError` | que una `Columna` cambie entre que se valida y que se publica: lo publicado no sería lo validado |
+| `slots` | `object.__setattr__(inst, "_atributo_que_no_es_un_campo", 1)` → `AttributeError` | que la instancia lleve `__dict__` y se trague en silencio un `descripciom` mal escrito |
+
+`object.__setattr__` se usa a propósito en el segundo: salta por encima del `frozen`, que
+si no lo taparía (`FrozenInstanceError` **hereda de** `AttributeError`).
+
+**Las tres redes que impiden que este barrido envejezca**, que es lo que falló la vez
+anterior:
+
+1. `test_f006_el_barrido_ve_todos_los_modulos_que_declaran_dataclasses` compara los
+   módulos que el barrido ha visto contra los que **tienen `@dataclass` en su fuente**,
+   leídos del árbol. Sin esto, un barrido que dejara de encontrar una carpeta seguiría
+   verde sobre lo que sí ve, que es el fallo silencioso clásico de un `parametrize`
+   generado.
+2. `MUTABLES_HEREDADAS` es una lista de **excepciones**, no de cobertura: lo que no está
+   en ella se exige. Contiene las tres de `etl_sigrid/domain/entities.py` —`StepResult`,
+   `TableSpec`, `ColumnSpec`—, mutables **desde antes de F-006** porque se rellenan por
+   fases mientras el step corre. Congelarlas es un cambio de producción que no cabe en
+   el cierre de F-006 y no es una decisión de tests. `slots` **sí** lo tienen las tres,
+   así que la exención es solo para `frozen`.
+3. `test_f006_la_lista_de_excepciones_no_envejece` exige que cada exención siga
+   existiendo **y siga siendo mutable**: el día que alguien congele `StepResult`, la
+   suite obliga a borrar la entrada en vez de dejar la alfombra puesta.
+
+### Fase RED · condición (a): una dataclass NUEVA y mutable
+
+No basta con quitarle `frozen` a una que ya está vigilada; lo que había que demostrar es
+que el barrido caza lo que **aún no existe**. En el worktree se añadió a
+`etl_sigrid/domain/inventario.py` una `@dataclass class ClaseNuevaMutable` sin `frozen`
+ni `slots`, con un único campo. Salida real, **sin tocar ninguna lista del test**:
+
+```
+$ python -m pytest tests/test_f006_dataclasses_inmutables.py -q --no-header
+FAILED tests/test_f006_dataclasses_inmutables.py::test_f006_toda_dataclass_del_paquete_es_inmutable[etl_sigrid.domain.inventario.ClaseNuevaMutable]
+FAILED tests/test_f006_dataclasses_inmutables.py::test_f006_toda_dataclass_del_paquete_usa_slots[etl_sigrid.domain.inventario.ClaseNuevaMutable]
+2 failed, 75 passed, 3 skipped in 3.36s
+```
+
+Es la condición (b) del encargo por el otro lado: la clase entró sola porque **no hay
+lista de nombres que actualizar**.
+
+### Fase RED · los 20 mutantes, uno a uno
+
+Aplicados de verdad sobre un `git worktree` aparte (detached en `e89f71f`), con `.env`
+volcado al entorno vía `harness.mutacion_paralela.volcar_variables` —sin ese volcado caen
+23 tests por configuración ausente y el rojo que se ve NO es el tuyo—. Una traza completa
+como muestra:
+
+```
+### MUTANTE etl_sigrid/domain/diccionario.py:237  'slots=True' -> 'slots=False'
+### exit=1  (ROJO: mutante MUERTO)
+_ test_f006_toda_dataclass_del_paquete_usa_slots[etl_sigrid.domain.diccionario.Columna] _
+cls = <class 'etl_sigrid.domain.diccionario.Columna'>
+        instancia = object.__new__(cls)
+>       with pytest.raises(AttributeError):
+E       Failed: DID NOT RAISE AttributeError
+tests\test_f006_dataclasses_inmutables.py:157: Failed
+1 failed, 74 passed, 3 skipped in 3.96s
+```
+
+Y los veinte, con el test nominal que cazó a cada uno (`exit=1` en los veinte):
+
+| Mutante | Clase | Test que lo mata |
+|---|---|---|
+| `diccionario.py:237` slots | `Columna` | `..._usa_slots[...Columna]` |
+| `diccionario.py:253` slots | `Relacion` | `..._usa_slots[...Relacion]` |
+| `diccionario.py:268` slots | `Ficha` | `..._usa_slots[...Ficha]` |
+| `diccionario.py:299` frozen | `Regla` | `..._es_inmutable[...Regla]` |
+| `diccionario.py:299` slots | `Regla` | `..._usa_slots[...Regla]` |
+| `diccionario.py:317` frozen | `Diccionario` | `..._es_inmutable[...Diccionario]` |
+| `diccionario.py:317` slots | `Diccionario` | `..._usa_slots[...Diccionario]` |
+| `diccionario.py:341` frozen | `ErrorValidacion` | `..._es_inmutable[...ErrorValidacion]` |
+| `diccionario.py:341` slots | `ErrorValidacion` | `..._usa_slots[...ErrorValidacion]` |
+| `inventario.py:69` frozen | `ObjetoPublicado` | `..._es_inmutable[...ObjetoPublicado]` |
+| `inventario.py:69` slots | `ObjetoPublicado` | `..._usa_slots[...ObjetoPublicado]` |
+| `inventario.py:146` slots | `InformeCobertura` | `..._usa_slots[...InformeCobertura]` |
+| `catalogo.py:35` frozen | `Discrepancia` | `..._es_inmutable[...Discrepancia]` |
+| `catalogo.py:35` slots | `Discrepancia` | `..._usa_slots[...Discrepancia]` |
+| `catalogo.py:44` frozen | `InformeCatalogo` | `..._es_inmutable[...InformeCatalogo]` |
+| `catalogo.py:44` slots | `InformeCatalogo` | `..._usa_slots[...InformeCatalogo]` |
+| `relaciones_sql.py:83` frozen | `ConsultaRelacion` | `..._es_inmutable[...ConsultaRelacion]` |
+| `relaciones_sql.py:83` slots | `ConsultaRelacion` | `..._usa_slots[...ConsultaRelacion]` |
+| `unicidad_sql.py:65` frozen | `ConsultaUnicidad` | `..._es_inmutable[...ConsultaUnicidad]` |
+| `unicidad_sql.py:65` slots | `ConsultaUnicidad` | `..._usa_slots[...ConsultaUnicidad]` |
+
+**Cero equivalentes en el grupo 1**: los veinte mueren.
+
+## Grupo 2 · las 11 constantes, fijadas por su EFECTO
+
+`tests/test_f006_constantes_de_contrato.py` (nuevo) y ampliación de
+`tests/test_f006_supervivientes.py`.
+
+**El patrón común de los once**: el valor se usa, pero nadie comprueba cuál es. Y hay una
+trampa que ya está puesta en el repositorio y que hay que nombrar, porque es la forma de
+«arreglarlo» que no arregla nada: `tests/test_f006_nombres_fichero.py` lleva su **propia
+copia a mano** de `DISPOSITIVOS_RESERVADOS`, así que cambiar el conjunto del cargador no
+rompe ese fichero. Un test que lee la constante y la compara consigo misma **se mueve con
+ella**. Es el mismo error que ya se documentó con `MINIMOS_TEXTO` en la 11ª pasada.
+
+| Superviviente | Cómo queda fijado, y por qué así |
+|---|---|
+| `diccionario.py:200` `"descripcion": 40` | `MINIMOS_FIJADOS` pasa de 2 entradas a las **5**, con `set(MINIMOS_FIJADOS) == set(MINIMOS_TEXTO)` exigido: un mínimo nuevo entra ahí o rompe la suite. **Más el borde**: 40 caracteres valen y 39 no |
+| `diccionario.py:202` `"motivo_no_consumo": 30` | Igual, sobre una ficha `consumo_recomendado: false`, que es la puerta trasera que R3 cierra: rebajar este mínimo es la forma silenciosa de esquivar la cobertura de columnas |
+| `diccionario.py:314` `orden: int = 0` | Una regla **sin** `orden` tiene que servirse ANTES que una con `orden: 1`. Los códigos van al revés del alfabeto a propósito: si el defecto empatara en 1, el desempate alfabético cambiaría la prioridad con la que el agente lee las reglas duras, en silencio |
+| `unicidad_sql.py:62` `TIMEOUT_POR_CONSULTA_S = 30` | Por el literal que se emite: `SET LOCAL statement_timeout = '30s'` y `SET LOCAL transaction_read_only = on`. Corre contra un Postgres **compartido con `albaranes` y `partes` en producción** |
+| `relaciones_sql.py:72` `TAMANO_MUESTRA = 500` | Por el `LIMIT 500` que aparece en el SQL generado y por `consulta.muestra == 500`. La cota existe para no barrer tablas de decenas de millones de filas |
+| `diccionario_sql.py:202` `round(..., 2)` | Por **un tercio**: 1 de 3 columnas documentadas da 33.33 a dos decimales y 33.333 a tres. Cualquier reparto redondo —la mitad, un cuarto— pasa con los dos, que es por lo que nadie lo cazaba |
+| `unicidad_sql.py:173` `solo_consumo = True` | Llamando **sin** el argumento: el objeto fuera de consumo se salta **y lo dice** (`fuera de la superficie de consumo (usa --todos)`). Y la otra mitad: `solo_consumo=False` lo levanta, no lo invierte |
+| `relaciones_sql.py:227` `solo_consumo = True` | Lo mismo en el barrido de relaciones (ver nota abajo) |
+| `cargador_yaml.py:50` `range(1, 10)` ×2 | Por `nombre_de_fichero("com1") == "com1_.yaml"` (borde de abajo: MS-DOS numeró desde el **uno**) y `nombre_de_fichero("com10") == "com10.yaml"` (borde de arriba: la familia acaba en el **nueve**) |
+| `cargador_yaml.py:51` `range(1, 10)` ×2 | Ídem con `lpt1` y `lpt10` |
+
+Escapar de más tampoco es inocuo, y por eso el borde de arriba también se fija: el
+cargador exige que el nombre del fichero case con el esquema, y `com10_.yaml` no casaría
+con `com10`. La excepción es para lo que impone el sistema operativo, no un colchón.
+
+**Nota sobre `relaciones_sql.py:227`.** El encargo lo listaba, pero **no aparece entre los
+52 supervivientes** de `mutacion_F-006.md`: en esa campaña murió. Se ha cubierto igual,
+por simetría con `unicidad_sql.py:173` y porque el test es el mismo párrafo; y aplicado a
+mano da `exit=1`, o sea que hoy tiene quien lo cace por dos vías.
+
+### Fase RED · los 11 mutantes, uno a uno
+
+Mismo worktree y mismo método. `exit=1` en los once:
+
+```
+### MUTANTE etl_sigrid/domain/diccionario.py:200  '"descripcion": 40' -> '"descripcion": 41'
+### exit=1  (ROJO: mutante MUERTO)
+FAILED ...test_f006_r2_los_minimos_fijados_son_los_que_usa_el_dominio
+FAILED ...test_f006_r2_el_minimo_de_descripcion_esta_en_el_borde[el largo exacto pasa]
+FAILED ...test_f006_r3_el_minimo_de_motivo_no_consumo_esta_en_el_borde[el largo exacto pasa]
+3 failed, 32 passed in 1.01s
+
+### MUTANTE etl_sigrid/domain/diccionario.py:202  '"motivo_no_consumo": 30' -> '"motivo_no_consumo": 31'
+### exit=1  (ROJO: mutante MUERTO)   3 failed, 32 passed in 1.04s
+
+### MUTANTE etl_sigrid/domain/diccionario.py:314  'orden: int = 0' -> 'orden: int = 1'
+### exit=1  (ROJO: mutante MUERTO)
+FAILED ...test_f006_una_regla_sin_orden_se_sirve_antes_que_una_con_orden_1
+FAILED ...test_f006_el_orden_por_defecto_se_publica_como_cero
+2 failed, 33 passed in 0.87s
+
+### MUTANTE cargador_yaml.py:50  'range(1, 10)' -> 'range(2, 10)'
+### exit=1  FAILED ...un_esquema_con_nombre_reservado_lleva_sufijo[com1] y [Com1]
+### MUTANTE cargador_yaml.py:50  'range(1, 10)' -> 'range(1, 11)'
+### exit=1  FAILED ...un_esquema_normal_no_lleva_sufijo[com10]
+### MUTANTE cargador_yaml.py:51  'range(1, 10)' -> 'range(2, 10)'
+### exit=1  FAILED ...un_esquema_con_nombre_reservado_lleva_sufijo[lpt1]
+### MUTANTE cargador_yaml.py:51  'range(1, 10)' -> 'range(1, 11)'
+### exit=1  FAILED ...un_esquema_normal_no_lleva_sufijo[lpt10]
+
+### MUTANTE diccionario_sql.py:202  'len(de_consumo), 2)' -> 'len(de_consumo), 3)'
+### exit=1  FAILED ...la_cobertura_de_columnas_se_redondea_a_dos_decimales
+### MUTANTE relaciones_sql.py:72  'TAMANO_MUESTRA = 500' -> '501'
+### exit=1  FAILED ...la_muestra_de_una_relacion_son_quinientos_valores
+### MUTANTE unicidad_sql.py:62  'TIMEOUT_POR_CONSULTA_S = 30' -> '31'
+### exit=1  FAILED ...las_sentencias_previas_llevan_el_timeout_y_el_solo_lectura
+### MUTANTE unicidad_sql.py:173  'solo_consumo: bool = True' -> 'False'
+### exit=1  FAILED ...por_defecto_la_unicidad_solo_mira_lo_recomendado
+### MUTANTE relaciones_sql.py:227  'solo_consumo: bool = True' -> 'False'
+### exit=1  FAILED ...por_defecto_las_relaciones_solo_miran_lo_recomendado
+```
+
+**Cero equivalentes en el grupo 2**: los once mueren.
+
+## Ficheros tocados
+
+| Fichero | Qué |
+|---|---|
+| `tests/test_f006_dataclasses_inmutables.py` | **nuevo**, 183 líneas. El barrido del grupo 1 |
+| `tests/test_f006_constantes_de_contrato.py` | **nuevo**. Nueve de los once del grupo 2 |
+| `tests/test_f006_supervivientes.py` | `MINIMOS_FIJADOS` de 2 a 5 entradas + juego de claves exigido + los dos bordes nuevos; `_dicc` deriva `esquemas` de la ficha en vez de fijar `mart` |
+
+Dos commits, uno por grupo, con `git add` explícito: `4d336fb` (grupo 1) y `143fa07`
+(grupo 2). Ningún `git push`.
+
+## Lo que NO se ha hecho, y por qué
+
+- **Los otros 21 supervivientes** (mensajes de diagnóstico, `not`/`or` de
+  `diccionario.py:774`, `ensure_ascii`, `fila[1]`, el `<`/`<=` del umbral de cobertura…)
+  son del encargo del líder. No se han tocado.
+- **`etl_sigrid/domain/entities.py` sigue mutable.** Es producción y es anterior a F-006:
+  la decisión de congelarla es del humano, no de esta pasada. Queda vigilada por
+  `MUTABLES_HEREDADAS` con test que obliga a retirar la exención en cuanto deje de hacer
+  falta.
+- **Ninguna línea de producción.** Ningún mutante de estos 31 ha necesitado un cambio de
+  comportamiento para morir: todos eran huecos de test, no defectos.

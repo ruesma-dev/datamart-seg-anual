@@ -21,7 +21,7 @@ Por eso aquí cada constante se fija por lo que produce:
 * el `solo_consumo` por defecto, por qué objetos se saltan al llamar SIN el
   argumento, que es lo que hace el comando cuando no se le pasa `--todos`;
 * los rangos, por `nombre_de_fichero("com9")` y `nombre_de_fichero("com10")`,
-  que son los dos bordes que distinguen COM1–COM9 de cualquier otra cosa.
+  que son los dos bordes que distinguen COM1-COM9 de cualquier otra cosa.
 """
 
 from __future__ import annotations
@@ -242,7 +242,7 @@ def test_f006_por_defecto_las_relaciones_solo_miran_lo_recomendado() -> None:
 
 
 # ---------------------------------------------------------------------------
-# `range(1, 10)`: los dispositivos reservados son COM1–COM9 y LPT1–LPT9
+# `range(1, 10)`: los dispositivos reservados son COM1-COM9 y LPT1-LPT9
 # ---------------------------------------------------------------------------
 
 
