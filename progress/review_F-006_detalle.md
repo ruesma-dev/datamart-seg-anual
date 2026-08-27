@@ -5362,3 +5362,254 @@ la regla obliga a rellenar 52 secciones a mano en un fichero generado por la
 herramienta, que es justo el trabajo que nadie hace y por eso se queda en
 `PENDIENTE`. Lo que la regla quiere impedir —que un superviviente se cierre sin
 juicio— se consigue igual con el puntero, y se consigue de verdad.
+
+---
+
+# 21ª pasada · 2026-08-27 — los cuatro hallazgos cerrados, y el portero que se aflojó de más
+
+**Revisión INCREMENTAL desde `735b53a`** (mi commit de la 20ª pasada) hasta
+`HEAD = 0c6d5f1`. Lo aprobado y verificado en la 20ª —la campaña, los 52
+supervivientes, los tres equivalentes, la arquitectura, el barrido de secretos—
+queda dado por bueno y no se vuelve a leer, con una excepción que sí se
+recomprueba entera: **que ninguno de los ocho ficheros del alcance haya
+cambiado**. No ha cambiado ninguno (`git diff 99e2335..HEAD -- etl_sigrid/`
+vacío), así que RM1 sigue en pie y la campaña sigue midiendo lo que reviso.
+
+El delta son 9 ficheros: `progress/` (4), `specs/` (3), `BACKLOG.md`,
+`harness/features.json` y **`tests/test_f003_infra.py`**, que es el único código.
+
+## 1 · H1 — los 52 análisis: CERRADO, y verificado uno a uno
+
+No me basta con que la palabra `PENDIENTE` haya desaparecido, así que verifiqué
+la estructura entera por programa:
+
+```
+PENDIENTE restantes:            0
+secciones de superviviente:    52
+encabezados de análisis:       52
+bloques sin puntero o sin decisión: 0
+```
+
+**El reparto de decisiones cuadra con lo que verifiqué en la 20ª pasada**: 49
+`MUERTO por test nuevo` + 3 `MUTANTE EQUIVALENTE` = 52.
+
+Y lo que de verdad importa: **los punteros no son decorativos**. Se usan doce
+líneas del anexo y **las doce caen sobre un encabezado real** de
+`progress/impl_F-006_detalle.md` —fichero que este delta **no toca**, así que la
+numeración sigue valiendo—:
+
+| Puntero | Cae sobre |
+|---|---|
+| L5136 / L5196 | `# Anexo · 17 supervivientes…` / `## Verificación: cada mutante aplicado…` |
+| L5355 / L5417 | `## Grupo 1 · los 20 frozen/slots…` / `### Fase RED · los 20 mutantes…` |
+| L5463 / L5497 | `## Grupo 2 · las 11 constantes…` / `### Fase RED · los 11 mutantes…` |
+| L5576 / L5584 / L5599 | `## Los tres mutantes equivalentes…` / `### 1 · relaciones_sql.py:282` / `### 2 y 3 · diccionario_sql.py:142 y :277` |
+| L5626 / L5638 / L5688 | `## Los dos supervivientes que se quedaron fuera…` / `### 1 · cargador_yaml.py:361` / `### 2 · relaciones_sql.py:278` |
+
+Y **cada superviviente apunta al sitio que le toca**, no a un puntero genérico:
+20 bloques de `frozen`/`slots` → L5355+L5417; 16 → L5136+L5196; 11 de constantes
+→ L5463+L5497; los 3 equivalentes → L5584 y L5599; los 2 del descuido → L5638 y
+L5688. Comprobado por programa contra la lista esperada: **0 discrepancias**.
+
+## 2 · H2 — el informe deja de contradecirse: CERRADO
+
+`progress/impl_F-006.md` §2 trae ahora los cuatro números reales **y una fila
+propia para los workers**, que era lo que C4 bis exigía literalmente y faltaba:
+
+> **Workers de la campaña · 6** — «con ellos el coste real por mutante es
+> 32,7 s × 6 = **196,2 s**, frente a una línea base de ~470 s: coherente, porque
+> el 80 % de los muertos para con `-x`».
+
+Es exactamente la aritmética que hice yo por mi cuenta en la 20ª pasada, con el
+mismo resultado. §1 marca T41 y T42 como hechas con su commit; §4, que decía
+«por qué no hay número», está reescrita y ahora cuenta la campaña, sus totales y
+**la limitación con su dueño (F-041)**; y la lista de «fuera del alcance» ya no
+arrastra T41.
+
+## 3 · H3 — `tasks.md` deja de contradecir al árbol: CERRADO
+
+T41 y T42 pasan a `[x]` con su evidencia pegada. Y lo que me parece bien
+resuelto: **T29-T31 siguen en `[ ]` a propósito**, con un aviso de cabecera de
+bloque que dice por qué —«las siete tareas siguen en `[ ]` porque **no están
+hechas**, y eso es lo que hay que leer aquí»— y con el estado medido contra el
+árbol. Eso es preferible a marcarlas `[x]` por estar entregadas: un `[x]` habría
+vuelto a sugerir que el mecanismo existe.
+
+T32-T34 llevan su marca de entrega a F-034; **T38 la de entrega a `mcp-bbdd`**,
+que es lo que su propia cláusula de escape exigía y no estaba; y la tabla de
+tareas con firma 🔏 dice ahora que **ninguna de las cuatro se ejecutó**.
+
+Detalle menor bien tratado: los commits `4d336fb` y `143fa07` van etiquetados
+`F-006 T42:` siendo trabajo de T41. **No se reescribió el historial**; se dejó
+dicho en una nota de trazabilidad. Es la decisión correcta.
+
+## 4 · H4 — la promesa falsa a F-034: CERRADO, y bien cerrado
+
+Decisión del humano del 2026-08-27: **enmendar los documentos, no construir el
+mecanismo**. Reverificado contra el árbol que sigue sin existir (`grants.py` sin
+`revocar_en`, `PG_REVOKE_FUERA_DE_CONSUMO` en ningún fichero,
+`config/settings.py:81` con los nueve esquemas), que es lo que las enmiendas
+afirman.
+
+- `requirements.md`: **R30, R31 y R33 enmendados** diciendo «NO se hizo» / «NO se
+  construyó» / «sin `REVOKE` que gobernar», los tres con la entrega a F-034.
+- `design_detalle.md` §11.4 reescrito, y **conserva la trampa que importa**: que
+  el rol `mcp_sigrid_dm_ro` lo comparten hoy el MCP y Power BI, así que encender
+  los `REVOKE` sin verificar antes qué lee Power BI le rompe los informes.
+- La ficha de **F-034**, en `BACKLOG.md` **y** en `harness/features.json` (las
+  dos, que es lo que hay que comprobar porque una se genera de la otra): pasa de
+  «aplicar los `REVOKE` que F-006 deja CONSTRUIDOS Y APAGADOS» a «**CONSTRUIR Y**
+  aplicar los `REVOKE`, que F-006 **NO dejó construidos** pese a lo que decía su
+  spec», con la verificación pegada y con «**T29, T30 y T31 llegan aquí POR
+  CONSTRUIR**».
+
+Quien recoja F-034 ya no arranca buscando una pieza que no está.
+
+**Nit, no hallazgo.** R32 sigue redactado como «queda **APAGADO** y se entrega a
+F-034», que insinúa un mecanismo que existe y está desactivado. Es la única fila
+del bloque sin enmendar. No puede engañar a nadie hoy —R30, R31 y R33 dicen lo
+contrario en la fila de al lado, y el aviso de cabecera de `tasks.md` remata con
+«no se construyó, **ni siquiera apagado**»—, pero si algún día se lee esa fila
+suelta, vuelve el problema. Una línea de arreglo.
+
+## 5 · El cambio en el guardián de secretos, que me pediste que juzgara
+
+Lo primero, y va por delante de la crítica: **el diagnóstico es correcto, la
+decisión de no tocar mi informe es la correcta, y la versión fácil se descartó
+por la razón correcta.** Eximir la comilla invertida a secas habría dejado pasar
+un secreto citado como código, y quien lo arregló lo vio, lo escribió y lo fijó
+con un test. Eso es exactamente cómo se toca un guardián.
+
+**Pero el arreglo llega más lejos de lo que quería, y lo he medido.**
+
+El patrón exime ahora la comilla invertida cuando **no la sigue** un carácter de
+`[A-Za-z0-9_./+-]`. La intención escrita es «cuando cierra el código en línea,
+sin valor pegado detrás». El problema es que **un valor puede empezar por un
+carácter que no está en esa clase**, y entonces la exención se lo traga.
+
+Probado con el patrón de antes y el de ahora, sobre el árbol:
+
+```
+ANTES  AHORA  caso
+ True  False  'con los patrones `password=`, `pwd=`'      <- el falso positivo, resuelto
+ True   True  secreto en backticks que empieza por letra
+ True  False  secreto en backticks que empieza por !      <- REGRESION
+ True  False  ... por @, &, ~, (, ^, :, [, |              <- REGRESION (8 mas)
+```
+
+**Nueve casos que el guardián cazaba y ya no caza.** Y no es la clase
+inofensiva: una contraseña que empieza por símbolo es, si acaso, **más** probable
+que una que empieza por letra.
+
+Hay un segundo defecto, en la dirección contraria: **el falso positivo no está
+resuelto del todo**. Una cita seguida de punto —`` `…=` `` y punto y seguido,
+que es como termina media frase de un informe— **sigue disparando** el guardián.
+Es el mismo caso que lo puso en rojo, con otra puntuación detrás.
+
+Total sobre 17 casos de prueba: **el patrón actual falla 10** (9 por defecto de
+sensibilidad, 1 por falso positivo).
+
+**La causa es la de siempre en esta feature**, y por eso la señalo en vez de
+dejarla pasar: los ocho casos parametrizados fijan **las dos caras que el autor
+pensó** —cita con coma detrás, secreto que empieza por letra— y no barren el
+vecindario de la segunda. Es la misma lección que ya se cobró dos veces aquí:
+*«aquellos dos se taparon a mano y el defecto sobrevivió en las doce clases de al
+lado»*. La respuesta buena fue la de los `frozen`/`slots`: un barrido derivado,
+no una lista escrita a mano.
+
+**Alternativa verificada**, por si sirve —eximir la comilla solo cuando la sigue
+fin de línea o puntuación de prosa—:
+
+```
+r"(?i)\bpassword\s*=\s*(?![#$%<*{\"'\s]|secretref:|keyvaultref:|`(?=[\s,;.)\]]|$))\S"
+```
+
+Sobre los mismos 17 casos: **0 fallos**. Caza los nueve que ahora se escapan y
+además resuelve la cita terminada en punto. No la aplico —no es mi trabajo
+escribir el código—, pero la dejo medida para que el arreglo no cueste otra
+investigación.
+
+**Y lo que hay que tener en la cabeza al ponderar esto**, porque cambia el
+tamaño del problema: el patrón **ya era poroso antes** para valores que empiezan
+por símbolo. `password=%x`, `password=#x`, `password=<x` y `password='x'` estaban
+exentos **sin ninguna comilla invertida**, desde siempre. Lo que este cambio hace
+no es abrir una clase nueva de agujero: es **ensanchar uno que ya estaba ahí**,
+de ocho símbolos a unos veinte, y solo dentro de comillas invertidas.
+
+**Comprobado además que no hay ningún secreto de verdad en el árbol.** Barrí el
+delta `dev...HEAD` con patrones **más amplios que los del guardián** —GUID, clave
+privada, `AccountKey`, SAS, cadena de conexión con credencial, IP privada,
+`x-functions-key` y un patrón de contraseña deliberadamente más laxo que el
+oficial—. Cuatro aciertos, **los cuatro autorreferenciales**: `postgres://user:pass@`
+es la lista de patrones de mi propio informe, y `hunter2` / `SuperSecreta1` son
+los valores de pega del test nuevo. **Cero credenciales.**
+
+## 6 · El papeleo que volvió a quedarse atrás (y por qué no bloquea)
+
+Tres afirmaciones del delta que **el árbol contradice**, las tres nacidas en esta
+misma sesión y superadas por commits posteriores de la propia sesión:
+
+| Dónde | Qué dice | Qué es |
+|---|---|---|
+| `progress/impl_F-006.md:83` | «El portero está **HOY en rojo**» | verde: `init.sh` exit 0 |
+| `progress/current.md:4` | encabezado «🔴 LO PRIMERO: `init.sh` está **EN ROJO**» | lo desmiente **su propio párrafo siguiente**, que dice «el portero está en verde» |
+| `progress/current.md:41-54` | «desde `735b53a` está en rojo», «impl **218**/220», «**H4 esperando decisión** del humano», «Falta H4, el portero en verde» | H4 cerrado en `31152c0`; impl 219/220 |
+
+**Por qué esto no bloquea, y quiero que la diferencia con la 20ª pasada quede
+escrita, porque es la misma clase de defecto y merezco que me la exijan.**
+
+En la 20ª, lo que `impl_F-006.md` falseaba era **la evidencia de la feature**:
+decía que la campaña de mutación no se había medido. Cerrar con eso habría
+metido en `history.md`, para siempre, una afirmación falsa sobre aquello en lo
+que se apoya un cierre `critico`.
+
+Hoy el informe es exacto en todo eso —lo he reverificado— y lo que queda mal es
+**el estado transitorio del portero en un commit intermedio de la sesión que
+cierra**. Nadie que lea F-006 dentro de seis meses se lleva una idea equivocada
+de qué se construyó ni de qué se verificó. Es bookkeeping caducado, no evidencia
+falsa. Se arregla borrando cuatro frases, y **la próxima sesión que toque
+`current.md` lo hace de todos modos**.
+
+Aplicar aquí el mismo rechazo sería, además, caer justo en lo que esta feature ya
+tiene medido y escrito en su propia deuda (T43): *cerrar seis defectos de matiz
+en la décima pasada generó tres nuevos de la misma clase, así que otra ronda no
+acerca al objetivo, solo cambia qué frase está mal*.
+
+## 7 · Recorrido de checkpoints, y qué cambia respecto a la 20ª
+
+| CP | 20ª | 21ª | Por qué |
+|---|---|---|---|
+| C1 | `[x]` | `[x]` | `init.sh` exit 0 |
+| C2 | `[x]` | `[x]` con reserva | Una sola `in_progress`, rama correcta. `current.md` **no** trae restos de sesiones anteriores —lo que trae son restos de un estado intermedio de ESTA—, así que el checkpoint literal se cumple; la reserva queda en §6 |
+| C3 | `[x]` | `[x]` | Ningún fichero de producción del ETL cambió en el delta. El único código tocado es `tests/test_f003_infra.py` (§5) |
+| C3 bis | N/A | N/A | El delta no toca `docs/referencia/`. Barrido de secretos hecho igual: cero (§5) |
+| C4 | `[ ]` | `[x]` | R30/R31/R33 dejan de estar «vigentes» sin código: enmendados diciendo que no se hicieron y entregados a F-034 (§4). Ya no hay requisito vigente sin test |
+| C4 bis | `[ ]` | `[x]` | Los 52 análisis, completados y con puntero verificado (§1); «Evidencias» con los cuatro números **y los workers** (§2). RM1-RM6 siguen cumpliéndose: los 8 ficheros del alcance no han cambiado |
+| C4 ter | N/A | N/A | No existe `harness/rutas_sensibles.json` |
+| C5 | `[ ]` | `[x]` | T41 y T42 `[x]` con su commit; el bloque I y T38 con su entrega anotada y su estado real medido (§3). T43 queda `[ ]` **justificado**: el registro está hecho y lo que falta es una decisión del humano, igual que una verificación `MANUAL` |
+
+## 8 · Lo que exijo antes de marcar `done`, y lo que NO he verificado
+
+**Antes de `done`** (no reabre la review; es condición de C5, «`features.json`
+refleja el estado real»):
+
+1. **Fichar el hallazgo del guardián** (§5) como entrada propia de backlog, con
+   los nueve casos medidos y la alternativa verificada. Si esto no se ficha, el
+   siguiente reviewer debe tratarlo como abierto: un control de secretos más
+   flojo que ayer no puede quedar vivo solo en un informe de review que nadie
+   reabre.
+
+**Recomendado, no exigido:** borrar las cuatro frases caducadas de §6 y enmendar
+la fila R32 del nit de §4.
+
+**No verificado en esta pasada, y así queda escrito:**
+
+- **No reejecuté la campaña de mutación** ni volví a reverificar mutantes: los
+  ocho ficheros del alcance no han cambiado desde `99e2335`, así que vale lo
+  medido en la 20ª (recálculo puro 3126/256 exacto, 52/52 supervivientes
+  reproducibles, 5 mutantes reevaluados en serie con línea base verde).
+- **No releí el cuerpo de F-006** (fichas, YAML, SQL, dominio): revisión
+  incremental, y el delta no lo toca.
+- Siguen sin ser verificables desde este árbol: que `_meta` sirva la versión 9,
+  T37 en el repositorio `azure-apps`, y las `MANUAL (humano)` T19, T27, T32-T34,
+  T38 y T39.
