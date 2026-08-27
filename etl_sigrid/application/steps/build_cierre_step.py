@@ -55,7 +55,21 @@ class BuildCierreStep(PipelineStep):
 
     @property
     def depends_on(self) -> list[str]:
-        return ["build_stg"]
+        """`build_stg` porque lee de `stg`; `build_mart` porque `mart` LO BORRA.
+
+        La segunda no es una dependencia de datos, es una dependencia de
+        destrucción, y es la causa raíz de F-047:
+        `sql/mart/03_agg_categoria.sql` hace `DROP TABLE IF EXISTS
+        mart.fact_seguimiento_categoria CASCADE`, y `06_views_planif_vs_real.sql`
+        crea `cierre.v_pbi_planif_vs_real` LEYENDO de esa tabla, así que la vista
+        cuelga de ella en `pg_depend` y el `CASCADE` se la lleva por delante.
+
+        Construir `cierre` antes que `mart` es construir para nada. Declararlo
+        aquí, y no confiarlo al orden de la lista de `build_pipeline_steps`, es
+        lo que hace que el orden lo garantice el orden topológico: un comentario
+        se borra sin que nadie se entere.
+        """
+        return ["build_stg", "build_mart"]
 
     def run(self) -> StepResult:
         result = self._new_result()

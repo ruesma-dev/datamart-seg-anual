@@ -18,10 +18,12 @@ CLI del ETL. Comandos:
 Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
 
     python main.py apply-grants       - Reaplica los permisos del rol de lectura
-                                        del MCP. Obligatorio tras build-cierre,
-                                        build-compras, build-maestros y
-                                        build-retenciones: recrean vistas con
-                                        DROP + CREATE y un DROP se lleva los GRANT
+                                        del MCP. `run-all` ya lo hace al final;
+                                        a mano solo hace falta tras lanzar
+                                        build-cierre, build-compras,
+                                        build-maestros o build-retenciones
+                                        sueltos: recrean vistas con DROP +
+                                        CREATE y un DROP se lleva los GRANT
     python main.py timings            - Tiempos por paso de _meta.etl_runs
     python main.py fingerprint-views  - Huella de las vistas de consumo a CSV
     python main.py compare-fingerprints LOCAL AZURE
@@ -69,7 +71,11 @@ from etl_sigrid.application.steps.publicar_diccionario_step import (
     PublicarDiccionarioStep,
 )  # noqa: E402
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
+from etl_sigrid.application.steps.build_compras_step import BuildComprasStep  # noqa: E402
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
+from etl_sigrid.application.steps.build_retenciones_step import (
+    BuildRetencionesStep,
+)  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
 from etl_sigrid.application.steps.build_stg_step import BuildStgStep  # noqa: E402
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: E402
@@ -424,12 +430,26 @@ def build_pipeline_steps(
     para que TODAS las filas de la noche compartan identidad. Ninguno de los
     dos steps del pipeline recibe `omitir_puerta`: `run-all` no tiene vía de
     escape a propósito.
+
+    F-047 (que absorbe F-044) mete aquí los CUATRO build que se lanzaban a
+    mano. El orden dentro de la lista es legible, pero lo que lo GARANTIZA es
+    el `depends_on` de cada paso, que es lo que obedece el orden topológico.
     """
     pasos = [
         IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
         LoadExcelAuxStep(settings),
         BuildStgStep(settings, batch_id=batch_id),
         BuildMartStep(settings, batch_id=batch_id),
+        # F-047: los cuatro esquemas que se construían a mano y podían estar
+        # arbitrariamente desfasados respecto a `raw` y `stg`. `maestro`,
+        # `compras` y `retenciones` solo leen de `raw`; `cierre` lee de `stg` y
+        # va DESPUÉS de `build_mart` porque `mart/03_agg_categoria.sql` dropea
+        # con CASCADE la tabla de la que cuelga `cierre.v_pbi_planif_vs_real`.
+        # Eso lo declara `BuildCierreStep.depends_on`, no esta posición.
+        BuildMaestrosStep(settings),
+        BuildComprasStep(settings),
+        BuildRetencionesStep(settings),
+        BuildCierreStep(settings),
         # F-006: entre build_mart y apply_grants, y el orden NO es cosmético.
         # `apply_grants` concede SELECT ON ALL TABLES IN SCHEMA _meta, que es
         # una foto del instante en que corre: publicar después dejaría las tres
@@ -458,11 +478,16 @@ def build_pipeline_steps(
 def run_all(full_refresh: bool) -> None:
     """
     Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
-    apply_grants.
+    los cuatro build (maestros, compras, retenciones, cierre) →
+    publicar_diccionario → apply_grants.
 
-    OJO: `cierre`, `compras`, `maestro` y `retenciones` NO están aquí; se
-    construyen con sus comandos propios. Como también recrean vistas, tras
-    ejecutarlos hay que lanzar `python main.py apply-grants`.
+    Los cuatro esquemas que antes se construían a mano entraron aquí con F-047:
+    se quedaban desfasados semanas y, en el caso de `cierre`, la nocturna
+    llegaba a DESTRUIR una de sus vistas sin recrearla.
+
+    Al terminar contrasta el SQL del repositorio contra el catálogo real
+    (`check-declarados`): si un build no ha creado lo que el repositorio
+    declara, `run-all` sale con código 1 en vez de terminar en verde mintiendo.
     """
     settings = get_settings()
     pg = _get_pg()
@@ -590,9 +615,10 @@ def apply_grants() -> None:
     """
     Reaplica los permisos de lectura del rol del MCP (PG_READONLY_ROLE).
 
-    Hay que lanzarlo tras `build-cierre`, `build-compras`, `build-maestros` y
-    `build-retenciones`: esos comandos recrean vistas con DROP + CREATE y un
-    DROP se lleva los GRANT concedidos.
+    `run-all` ya lo ejecuta como último paso de la noche. A mano hace falta
+    tras lanzar `build-cierre`, `build-compras`, `build-maestros` o
+    `build-retenciones` SUELTOS: esos comandos recrean vistas con DROP +
+    CREATE y un DROP se lleva los GRANT concedidos.
     """
     settings = get_settings()
     pg = _get_pg()
@@ -3517,58 +3543,17 @@ def build_compras() -> None:
 
     Requiere haber ingerido antes las tablas de compras (ingest tras añadir
     el bloque de config/tables_sigrid_compras_snippet.yaml al YAML).
+
+    F-047: desde que `compras` entra en la carga nocturna esto es un STEP, y
+    por eso deja fila en `_meta.etl_runs`. Antes ejecutaba el SQL en línea y su
+    fecha de build no era consultable por SQL. Los conteos de control que este
+    comando imprimía a mano viven ahora en `inspect-contrato-consumo` y en el
+    propio `_meta.etl_runs`, que es donde alguien los puede volver a mirar.
     """
-    import time as _time
-
+    settings = get_settings()
     pg = _get_pg()
-    # Escribe, así que cierra las huérfanas de procesos muertos (F-024, R4).
-    # No registra paso: ejecuta SQL en línea sin step, y por eso queda fuera
-    # de `v_frescura` (DA-6). Convertirlo en step es otra feature.
-    _arrancar_ejecucion(pg)
-    sql_dir = (
-        Path(__file__).resolve().parent
-        / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "compras"
-    )
-    archivos = [
-        "00_setup.sql",
-        "01_documentos.sql",
-        "02_fact_linea.sql",
-        "03_views.sql",
-    ]
-
-    faltan = [f for f in archivos if not (sql_dir / f).exists()]
-    if faltan:
-        click.secho(f"Faltan archivos SQL en {sql_dir}: {faltan}", fg="red", err=True)
-        sys.exit(2)
-
-    total_t0 = _time.monotonic()
-    for nombre in archivos:
-        t0 = _time.monotonic()
-        sql = (sql_dir / nombre).read_text(encoding="utf-8")
-        try:
-            with pg.connection() as conn, conn.cursor() as cur:
-                cur.execute(sql)
-                conn.commit()
-        except Exception as e:  # noqa: BLE001
-            click.secho(f"[FALLO ] {nombre}: {e}", fg="red", err=True)
-            sys.exit(1)
-        click.secho(
-            f"[OK     ] {nombre:<22} {_time.monotonic() - t0:>7.1f}s", fg="green"
-        )
-
-    # Conteos de control
-    with pg.connection() as conn, conn.cursor() as cur:
-        for tabla in ("contratos", "contrato_lineas", "albaranes",
-                      "albaran_lineas", "facturas", "factura_lineas",
-                      "fact_compras_linea"):
-            cur.execute(f"SELECT COUNT(*) FROM compras.{tabla}")
-            row = cur.fetchone()
-            click.echo(f"   · compras.{tabla}: {row[0]:,} filas")
-
-    click.secho(
-        f"build-compras completado en {_time.monotonic() - total_t0:,.1f}s",
-        fg="green", bold=True,
-    )
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildComprasStep(settings), pg, ejecucion)
 
 
 @cli.command("reset-compras")
@@ -3820,65 +3805,15 @@ def build_retenciones() -> None:
       02_views.sql        vistas de saldo por entidad, obra, vivas y vencidas
 
     Requiere haber ingerido antes cob, pag y rec.
+
+    F-047: igual que `build-compras`, ahora es un STEP y deja fila en
+    `_meta.etl_runs`. El resumen por sentido que imprimía a mano se consulta
+    con `inspect-retenciones`.
     """
-    import time as _time
-
+    settings = get_settings()
     pg = _get_pg()
-    # Igual que `build-compras`: escribe, así que marca huérfanas; no registra
-    # paso porque no hay step al que atribuírselo (DA-6).
-    _arrancar_ejecucion(pg)
-    sql_dir = (
-        Path(__file__).resolve().parent
-        / "etl_sigrid" / "infrastructure" / "postgres" / "sql" / "retenciones"
-    )
-    archivos = ["00_setup.sql", "01_movimientos.sql", "02_views.sql"]
-
-    faltan = [f for f in archivos if not (sql_dir / f).exists()]
-    if faltan:
-        click.secho(f"Faltan archivos SQL en {sql_dir}: {faltan}", fg="red", err=True)
-        sys.exit(2)
-
-    total_t0 = _time.monotonic()
-    for nombre in archivos:
-        t0 = _time.monotonic()
-        sql = (sql_dir / nombre).read_text(encoding="utf-8")
-        try:
-            with pg.connection() as conn, conn.cursor() as cur:
-                cur.execute(sql)
-                conn.commit()
-        except Exception as e:  # noqa: BLE001
-            click.secho(f"[FALLO ] {nombre}: {e}", fg="red", err=True)
-            sys.exit(1)
-        click.secho(
-            f"[OK     ] {nombre:<22} {_time.monotonic() - t0:>7.1f}s", fg="green"
-        )
-
-    with pg.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM retenciones.tipos")
-        click.echo(f"   · retenciones.tipos: {cur.fetchone()[0]:,} filas")
-        cur.execute("SELECT COUNT(*) FROM retenciones.movimientos")
-        click.echo(f"   · retenciones.movimientos: {cur.fetchone()[0]:,} filas")
-        cur.execute(
-            """
-            SELECT sentido, num_vivas, saldo_vivo, num_vencidas,
-                   importe_vencido, sin_obra_asignada
-            FROM retenciones.v_pbi_retencion_resumen ORDER BY sentido
-            """
-        )
-        click.echo("")
-        click.echo(f"   {'sentido':<10} {'vivas':>8} {'saldo vivo':>16} "
-                   f"{'vencidas':>9} {'imp.vencido':>16} {'sin obra':>9}")
-        click.echo("   " + "-" * 72)
-        for s, nv, sv, nven, iven, so in cur.fetchall():
-            click.echo(
-                f"   {s:<10} {nv or 0:>8,} {float(sv or 0):>16,.2f} "
-                f"{nven or 0:>9,} {float(iven or 0):>16,.2f} {so or 0:>9,}"
-            )
-
-    click.secho(
-        f"\nbuild-retenciones completado en {_time.monotonic() - total_t0:,.1f}s",
-        fg="green", bold=True,
-    )
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildRetencionesStep(settings), pg, ejecucion)
 
 
 @cli.command("reset-retenciones")

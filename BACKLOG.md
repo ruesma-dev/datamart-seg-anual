@@ -5,12 +5,14 @@
 
 Resumen: **46 features**, 31 abiertas, 15 terminadas.
 
+En curso: **F-047**.
+
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-044 | Los cuatro build entran en la carga nocturna | 1 | pendiente | critico | `feature/F-044-esquemas-nocturnos` |
-| F-047 | La base va por detras del repositorio: la nocturna no crea lo que el codigo declara | 1 | pendiente | critico | `feature/F-047-nocturna-desfasada` |
+| F-047 | La base va por detras del repositorio: la nocturna no crea lo que el codigo declara | 1 | en curso | critico | `feature/F-047-nocturna-desfasada` |
 | F-036 | Clasificacion por oficio y categoria oficial de partida | 2 | pendiente | estandar | `feature/F-036-oficios` |
 | F-041 | La campana de mutacion miente: timeouts, bytecode y worktrees | 2 | pendiente | critico | `feature/F-041-mutacion-fiable` |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | pendiente | critico | `feature/F-042-clave-fact` |
@@ -71,9 +73,9 @@ DECIDIDA POR EL HUMANO EL 2026-08-22: los cuatro build entran en la carga noctur
 
 ### F-047 · La base va por detras del repositorio: la nocturna no crea lo que el codigo declara
 
-estado **pendiente** · prioridad 1 · rigor `critico` · SDD no · rama `feature/F-047-nocturna-desfasada`
+estado **en curso** · prioridad 1 · rigor `critico` · SDD no · rama `feature/F-047-nocturna-desfasada`
 
-Detectada el 2026-08-26 por `python main.py check-diccionario` contra Azure, al publicar el diccionario en version 9: 103 fichas contra 102 objetos en la base. `cierre.v_pbi_planif_vs_real` esta fichada, publicada en `_meta` y su SQL existe en el repositorio (`etl_sigrid/infrastructure/postgres/sql/cierre/06_views_planif_vs_real.sql`), pero la vista NO existe en la base. Es decir: el MCP esta publicando a los agentes una vista que, si alguien la consulta, no esta. Lo que hay que averiguar NO es como crear esa vista —eso es lanzar el build—, sino POR QUE la carga nocturna no la crea: si el build de `cierre` no entra en la nocturna, si entra pero falla en silencio, o si se quedo fuera al anadir la vista. Mientras eso no se sepa, cualquier objeto nuevo del esquema `cierre` volvera a quedarse sin crear y el diccionario volvera a mentir. Decision del humano el 2026-08-26: prioridad 1 y se investiga la nocturna. Contexto que da el humano: el cierre NO esta terminado (ver F-017 y F-018), asi que al revisar la nocturna hay que distinguir lo que falta por construir de lo que falla al cargarse. Relacionada con F-044 (los cuatro build entran en la carga nocturna).
+Detectada el 2026-08-26 por `python main.py check-diccionario` contra Azure, al publicar el diccionario en version 9: 103 fichas contra 102 objetos en la base. `cierre.v_pbi_planif_vs_real` esta fichada, publicada en `_meta` y su SQL existe en el repositorio (`etl_sigrid/infrastructure/postgres/sql/cierre/06_views_planif_vs_real.sql`), pero la vista NO existe en la base. Es decir: el MCP esta publicando a los agentes una vista que, si alguien la consulta, no esta. Lo que hay que averiguar NO es como crear esa vista —eso es lanzar el build—, sino POR QUE la carga nocturna no la crea: si el build de `cierre` no entra en la nocturna, si entra pero falla en silencio, o si se quedo fuera al anadir la vista. Mientras eso no se sepa, cualquier objeto nuevo del esquema `cierre` volvera a quedarse sin crear y el diccionario volvera a mentir. Decision del humano el 2026-08-26: prioridad 1 y se investiga la nocturna. Contexto que da el humano: el cierre NO esta terminado (ver F-017 y F-018), asi que al revisar la nocturna hay que distinguir lo que falta por construir de lo que falla al cargarse. Relacionada con F-044 (los cuatro build entran en la carga nocturna). ABSORBE EL ALCANCE DE F-044 (decidido por el humano el 2026-08-28): las dos se trabajan juntas en la rama feature/F-047-nocturna-desfasada, porque el arreglo de F-047 no se sostiene sin F-044. CAUSA RAIZ ENCONTRADA EL 2026-08-28, y no es ninguna de las tres que esta ficha proponia: la nocturna NO deja de crear la vista, la DESTRUYE. sql/mart/03_agg_categoria.sql linea 17 hace DROP TABLE IF EXISTS mart.fact_seguimiento_categoria CASCADE, y cierre.v_pbi_planif_vs_real es la unica vista del repositorio fuera de mart que cuelga de esa tabla. build_mart corre cada noche y se la lleva por delante; build-cierre no entra en run-all y nadie la recrea. Explica que falte exactamente UNA de 103: stg no dropea sus tablas, asi que las demas vistas de cierre sobreviven. Detalle en progress/explore_F-047.md.
 
 ### F-036 · Clasificacion por oficio y categoria oficial de partida
 
