@@ -3,52 +3,39 @@
 
 ## 🔴 LO PRIMERO: `bash harness/init.sh` está EN ROJO, y no por el papeleo
 
-**Los tres hallazgos H1, H2 y H3 de la 20ª review están hechos** (tres commits,
-uno por hallazgo; H4 lo decide el humano y no se ha tocado). Pero el portero
-**no cierra en verde**, y el motivo es ajeno a ellos:
+**Los cuatro hallazgos de la 20ª review están cerrados y el portero está en
+verde: 2.481 pasados, 128 saltados (367 s).** Falta la **21ª pasada del
+reviewer**, que es quien levanta el RECHAZADO vigente.
 
-> `FAILED tests/test_f003_infra.py::test_f003_r4_sin_secretos_ni_identificadores_en_infra_y_spec`
-> — `progress/review_F-006_detalle.md`: «contraseña escrita».
+| Hallazgo | Qué era | Commit |
+|---|---|---|
+| **H1** | Los 52 análisis de supervivientes, en `PENDIENTE` | `c6eb17f` |
+| **H2** | `impl_F-006.md` se contradecía y no declaraba los workers | `d60b3f1` |
+| **H3** | `tasks.md` no reflejaba el árbol | `67267ec` |
+| **H4** | La spec prometía a F-034 unos `REVOKE` que nunca se construyeron | `31152c0` |
 
-**Es un falso positivo, y viaja en el commit del propio reviewer** (`735b53a`,
-20ª pasada). En `progress/review_F-006_detalle.md:5312` el reviewer **enumera
-los patrones con los que barrió** buscando secretos, y los escribe como código
-en línea de Markdown. El guardián de F-003 barre `progress/` entero y casa con
-esa enumeración: **es el escáner cazando la lista de lo que él mismo busca**.
-No hay ninguna credencial.
+**Y un quinto arreglo que no estaba en la lista: el portero llevaba en rojo
+desde el commit del reviewer**, y conviene entender por qué antes de que vuelva
+a pasar. Su informe de la 20ª pasada **enumera los patrones con los que barrió
+buscando secretos**, escritos como código en línea; el guardián de F-003 barre
+`progress/` entero y casaba con esa lista: **el escáner cazándose a sí mismo**.
+Cero credenciales.
 
-**La causa exacta, para que el arreglo no sea a ciegas.** El patrón «contraseña
-escrita» (`tests/test_f003_infra.py:313`) es la palabra, un `=` y un carácter
-que no esté en `[#$%<*{"'` ni sea espacio. **La comilla invertida no está en esa
-lista de exclusión**, así que la palabra escrita como código en línea de
-Markdown —comilla invertida justo detrás del `=`— cuenta como un valor literal.
-El comentario de al lado (líneas 310-313) dice que lo que se busca «es un
-literal, no la palabra, que aparece por todas partes»: aquí no hay literal.
+El arreglo tenía una versión fácil y equivocada —eximir la comilla invertida a
+secas—, que habría dejado pasar una contraseña citada como código. Se comprobó
+antes de descartarla. Lo que se hizo (`tests/test_f003_infra.py`): eximirla
+**solo cuando cierra** el código en línea, sin valor pegado detrás, con **ocho
+casos parametrizados** que fijan las dos caras. **No se tocó el informe del
+reviewer**: la evidencia de otro agente no se reescribe para que pase un test.
 
-Verificado, no supuesto: en `6332995` ese fichero tenía **0** apariciones y en
-`HEAD` tiene **1**. O sea, **init.sh lleva rojo desde `735b53a`**, y la nota de
-«en verde, 2.473 pasados» de más abajo es la medición del reviewer en
-`6332995`, un commit ANTES del suyo.
-
-**Por qué no lo he arreglado yo:** mi encargo era el papeleo de H1/H2/H3, el
-fichero es el informe del reviewer y el guardián es un test. Tocarle la
-evidencia a otro agente —o aflojar un guardián de secretos— sin que nadie lo
-pida es justo lo que ya quemó dos veces a esta feature. **Lo decide el líder.**
-Las dos salidas:
-
-1. **En el fichero del reviewer**, una línea: separar la palabra del `=` en esa
-   enumeración (o meter un espacio detrás del `=`, que el propio patrón ya
-   exime) sin cambiar lo que dice. Barato, pero es reescribir prosa ajena y no
-   impide que vuelva a pasar.
-2. **En el guardián** (`tests/test_f003_infra.py:313`): **añadir la comilla
-   invertida al conjunto de exclusión**. Es un carácter, no afloja nada —una
-   contraseña de verdad no empieza por comilla invertida— y evita que el
-   próximo informe que documente su propio barrido vuelva a poner el árbol en
-   rojo. Toca **tests**, así que necesita encargo explícito. **Es la buena.**
-
-Consecuencia mecánica mientras siga rojo: `pytest` para con `-x` en ese fallo y
-**la PUERTA COBERTURA sale 12,1 % de 33 líneas** — no es una regresión de
-cobertura, es que la suite no llegó a correr.
+**H4 es el que sale de esta feature y muerde a otra.** `requirements.md`,
+`design_detalle.md` §11.4 y la ficha de F-034 decían que F-006 entregaba los
+`REVOKE` «construidos y apagados». Verificado contra el árbol: `grants.py` no
+tiene `revocar_en`, `PG_REVOKE_FUERA_DE_CONSUMO` no existe y `settings.py` sigue
+con los **nueve** esquemas. Decisión del humano el 2026-08-27: **enmendar los
+documentos**, no construir el mecanismo aquí. **T29-T31 llegan a F-034 por
+construir**, y con el aviso de que el rol `mcp_sigrid_dm_ro` lo comparten hoy el
+MCP y Power BI.
 
 ---
 
