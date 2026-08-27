@@ -80,6 +80,9 @@ rigor `critico`.
 Progresión de la suite: 1052 → 1133 → 1171 → 1496 → 1985 → 2025 → 2290 → 2305 → 2467 →
 **2473**. (Aquí llegó a poner 2025, contradiciendo tres pasadas seguidas a la fila
 «Tests» de al lado: dato copiado sin contrastar, y la misma causa que el H2 de la 20ª.)
+**El portero está HOY en rojo, y no por el papeleo**: `test_f003_r4` caza un falso positivo
+en `progress/review_F-006_detalle.md:5312` (commit `735b53a`). Diagnóstico y salidas, en
+`progress/current.md`.
 
 ## 3 · Fase RED
 
@@ -104,23 +107,21 @@ código. La más significativa es la de T40: el test que sostenía la afirmació
 `progress/mutacion_F-006.md`): **256 mutantes generados y evaluados, 204 muertos, 52
 supervivientes, 0 timeouts, 0 sin veredicto**, sobre 3.126 líneas de 8 ficheros, con **6
 workers**, en 8.368,3 s; SHA medido `99e2335`, y ninguno de esos 8 ficheros ha cambiado
-desde entonces. El reviewer recalculó alcance y nº de mutantes por su cuenta en la 20ª
-pasada: **coincide exacto**.
+desde entonces. El reviewer recalculó alcance y nº de mutantes: **coincide exacto**.
 
 **Los 52 supervivientes, resueltos: 49 muertos con tests nuevos** —ni una línea de
 producción tocada— **y 3 equivalentes** demostrados y **aprobados por el humano el
 2026-08-26**. Los 52 análisis están completados, cada uno con el puntero a su traza, en el
 propio informe de la campaña; el reparto y las fases RED, en §9 y en el anexo (L5136,
-L5355, L5463, L5576, L5626). Lo que se declara muerto por los tests nuevos se reverificó
-**EN SERIE**, nunca por una segunda campaña paralela.
+L5355, L5463, L5576, L5626). Lo declarado muerto se reverificó **EN SERIE**.
 
 **LA LIMITACIÓN, declarada, medida y con dueño** — `progress/control_mutacion_F-006.md`:
-la campaña paralela produce **falsos muertos** (uno confirmado, `inventario.py:234
-[not]`, perseguido hasta matarlo), así que **204 muertos no es lista cerrada y 52 es un
-SUELO**; la muestra de control —12 de los 204, reevaluados en serie— dio **0 cambios de
-veredicto**, que no descarta una tasa baja. Fichada en **F-041**. Y los números de las
-tandas anteriores —112/112, 132/132, 166/166, 254/254— **siguen sin ser evidencia**:
-corrían con la base roja, contando cualquier `returncode != 0` como muerto (L501, L4377).
+la campaña paralela produce **falsos muertos** (uno confirmado, `inventario.py:234 [not]`,
+perseguido hasta matarlo), así que **204 muertos no es lista cerrada y 52 es un SUELO**; la
+muestra de control —12 de los 204, en serie— dio **0 cambios de veredicto**, que no
+descarta una tasa baja. Fichada en **F-041**. Y los números de las tandas anteriores
+—112/112, 132/132, 166/166, 254/254— **siguen sin ser evidencia**: base roja, y cualquier
+`returncode != 0` contado como muerto (L501, L4377).
 
 ## 5 · Batería de aceptación (T39, 2026-08-22, versión 6 publicada)
 

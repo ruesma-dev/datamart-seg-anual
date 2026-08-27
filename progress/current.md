@@ -1,17 +1,71 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-08-26
+# Estado actual · 2026-08-27
+
+## 🔴 LO PRIMERO: `bash harness/init.sh` está EN ROJO, y no por el papeleo
+
+**Los tres hallazgos H1, H2 y H3 de la 20ª review están hechos** (tres commits,
+uno por hallazgo; H4 lo decide el humano y no se ha tocado). Pero el portero
+**no cierra en verde**, y el motivo es ajeno a ellos:
+
+> `FAILED tests/test_f003_infra.py::test_f003_r4_sin_secretos_ni_identificadores_en_infra_y_spec`
+> — `progress/review_F-006_detalle.md`: «contraseña escrita».
+
+**Es un falso positivo, y viaja en el commit del propio reviewer** (`735b53a`,
+20ª pasada). En `progress/review_F-006_detalle.md:5312` el reviewer **enumera
+los patrones con los que barrió** buscando secretos, y los escribe como código
+en línea de Markdown. El guardián de F-003 barre `progress/` entero y casa con
+esa enumeración: **es el escáner cazando la lista de lo que él mismo busca**.
+No hay ninguna credencial.
+
+**La causa exacta, para que el arreglo no sea a ciegas.** El patrón «contraseña
+escrita» (`tests/test_f003_infra.py:313`) es la palabra, un `=` y un carácter
+que no esté en `[#$%<*{"'` ni sea espacio. **La comilla invertida no está en esa
+lista de exclusión**, así que la palabra escrita como código en línea de
+Markdown —comilla invertida justo detrás del `=`— cuenta como un valor literal.
+El comentario de al lado (líneas 310-313) dice que lo que se busca «es un
+literal, no la palabra, que aparece por todas partes»: aquí no hay literal.
+
+Verificado, no supuesto: en `6332995` ese fichero tenía **0** apariciones y en
+`HEAD` tiene **1**. O sea, **init.sh lleva rojo desde `735b53a`**, y la nota de
+«en verde, 2.473 pasados» de más abajo es la medición del reviewer en
+`6332995`, un commit ANTES del suyo.
+
+**Por qué no lo he arreglado yo:** mi encargo era el papeleo de H1/H2/H3, el
+fichero es el informe del reviewer y el guardián es un test. Tocarle la
+evidencia a otro agente —o aflojar un guardián de secretos— sin que nadie lo
+pida es justo lo que ya quemó dos veces a esta feature. **Lo decide el líder.**
+Las dos salidas:
+
+1. **En el fichero del reviewer**, una línea: separar la palabra del `=` en esa
+   enumeración (o meter un espacio detrás del `=`, que el propio patrón ya
+   exime) sin cambiar lo que dice. Barato, pero es reescribir prosa ajena y no
+   impide que vuelva a pasar.
+2. **En el guardián** (`tests/test_f003_infra.py:313`): **añadir la comilla
+   invertida al conjunto de exclusión**. Es un carácter, no afloja nada —una
+   contraseña de verdad no empieza por comilla invertida— y evita que el
+   próximo informe que documente su propio barrido vuelva a poner el árbol en
+   rojo. Toca **tests**, así que necesita encargo explícito. **Es la buena.**
+
+Consecuencia mecánica mientras siga rojo: `pytest` para con `-x` en ese fallo y
+**la PUERTA COBERTURA sale 12,1 % de 33 líneas** — no es una regresión de
+cobertura, es que la suite no llegó a correr.
+
+---
 
 **Feature en curso: F-006 · MCP sobre el datamart.** Rama
 `feature/F-006-mcp-azure`, con el arnés **1.7.7** dentro. `bash harness/init.sh`
-**en verde: 2.473 tests, 128 saltados** (622 s); cobertura 100 % de 33 líneas
-cambiadas y puerta de tamaño cumplida (impl 219/220, **al filo**). Árbol limpio
-y **sin mutantes aplicados**.
+dio **verde: 2.473 tests, 128 saltados** (603,92 s), cobertura 100 % de 33
+líneas cambiadas y puerta de tamaño cumplida, **en `6332995`**; desde `735b53a`
+está en rojo por el falso positivo de arriba, que **no toca ni un test del ETL**.
+Puerta de tamaño hoy: impl **218/220**. Árbol limpio y **sin mutantes aplicados**.
 
-**AL RETOMAR, LO PRIMERO: F-006 está lista para el reviewer (19ª pasada).** La
-campaña de mutación **está hecha y sus 52 supervivientes, resueltos**: 49
+**AL RETOMAR: F-006 está en la 20ª review, RECHAZADO, con H1/H2/H3 ya
+arreglados** (2026-08-27, tres commits) y **H4 esperando decisión del humano**.
+La campaña de mutación **está hecha y sus 52 supervivientes, resueltos**: 49
 muertos con tests nuevos y **3 equivalentes aprobados por el humano el
-2026-08-26**. Falta el veredicto del reviewer contra `CHECKPOINTS.md`, que
-arrastra un RECHAZADO desde la 16ª pasada. Sin él, F-006 **no se marca `done`**.
+2026-08-26**; sus 52 análisis están ya completados, cada uno con el puntero a su
+traza. Falta H4, el portero en verde y el veredicto del reviewer contra
+`CHECKPOINTS.md`. Sin él, F-006 **no se marca `done`**.
 
 **Lo que el reviewer tiene que mirar sí o sí:** `progress/control_mutacion_F-006.md`.
 La campaña paralela **produce algún falso muerto** —demostrado y fichado en
@@ -403,9 +457,11 @@ en git) consume `_meta` y sirve **los cinco bloques** de contexto.
   **Los supervivientes de la campaña son materia de T43**: si son muchos, la
   pregunta no es cuántos tests se escriben, sino si esta feature puede sostener
   el rigor que declara.
-- **Cierre**: T41 (mutación, **lanzada**) y T42 (`init.sh`, **verde**: 2.336
-  tests), más el veredicto del reviewer contra `CHECKPOINTS.md`. Sin él, la
-  feature **no se marca `done`**.
+- **Cierre**: T41 y T42 **marcadas `[x]` en `tasks.md`** el 2026-08-27, cada una
+  verificada contra el árbol antes de marcarla: T41 con la campaña `e89f71f`
+  (256 mutantes, 52 supervivientes resueltos) y T42 con el `init.sh` en verde de
+  `6332995`. Queda el falso positivo de arriba y el veredicto del reviewer
+  contra `CHECKPOINTS.md`. Sin él, la feature **no se marca `done`**.
 
 ### Del humano: las dos, resueltas el 2026-08-25
 - ~~Probar el MCP dentro de Claude Escritorio.~~ **HECHO.** El protocolo quedó
