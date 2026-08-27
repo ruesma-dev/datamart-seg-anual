@@ -1,6 +1,40 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-27
 
+## LO SIGUIENTE: F-047 · la vista de cierre que no se carga
+
+Decidido por el humano el 2026-08-27, al cerrar F-006. **La ficha ya existe**
+(F-047, prioridad 1, rigor `critico`): `cierre.v_pbi_planif_vs_real` está
+fichada, **publicada en `_meta`** y su SQL está en el repositorio
+(`sql/cierre/06_views_planif_vs_real.sql`), pero **la vista no existe en la
+base**. El MCP está sirviendo a los agentes una vista que, si alguien la
+consulta, no está.
+
+### La pista que no está en la ficha y conviene no perder
+
+**Esa vista SÍ existió, y volvió a desaparecer.** Contrastando las dos fichas:
+
+| Fecha | Qué dice la evidencia | Dónde |
+|---|---|---|
+| **2026-08-21** | tras lanzar los cuatro build a mano, `check-diccionario` da **biyección exacta, 103 fichas y 103 objetos**, y la huérfana **había desaparecido** | ficha de F-044 |
+| **2026-08-26** | `check-diccionario` contra Azure da **103 fichas frente a 102 en la base**: la huérfana **ha vuelto** | ficha de F-047, y verificado otra vez el 27 |
+
+Eso acota mucho la investigación. Si `build-cierre` **no** entra en la
+nocturna, la vista creada el 21 debería seguir ahí el 26 sin que nadie hiciera
+nada. **Luego algo la quitó entre medias**, y esa es la pregunta que hay que
+responder primero: no «por qué no se crea», sino **qué la borró**. Sospechosos a
+descartar por orden: un `reset-cierre` lanzado a mano, un build que hace `DROP
+SCHEMA ... CASCADE` y luego no recrea esa vista, o un fallo silencioso a mitad
+del build de `cierre` que deja el esquema a medias.
+
+**Cuidado al interpretar lo que se encuentre**: el humano avisó de que **el
+cierre NO está terminado** (F-017 y F-018), así que hay que distinguir lo que
+falta por construir de lo que se construye y se pierde. Relacionada con **F-044**
+(meter los cuatro build en la nocturna, ya medido: 37,5 min, el disco no se
+mueve).
+
+---
+
 ## F-006 · CERRADA el 2026-08-27
 
 **APROBADA por el reviewer en su 21ª pasada** y marcada `done`. Levanta el
