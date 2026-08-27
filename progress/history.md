@@ -535,3 +535,47 @@ reviewer con `--workers 1`.
 **serviría un plan viejo en silencio**, porque `obrparpre.planif` se edita sin
 crear filas. Está clavado en `progress/decisiones_abiertas.md` como **D12**,
 fuera de esta feature, porque una feature cerrada deja de leerse.
+
+---
+
+## F-006 · MCP sobre el datamart: la capa semántica en `_meta` · 2026-08-27
+
+Rama `feature/F-006-mcp-azure`. Rigor `critico`. **APROBADA en la 21ª pasada**
+del reviewer, tras arrastrar un RECHAZADO desde la 16ª. Detalle en
+`progress/review_F-006.md` (+ anexo) e `progress/impl_F-006.md` (+ anexo).
+
+**Qué entrega.** El diccionario semántico del datamart publicado en `_meta`
+—qué significa cada objeto y cada columna y qué reglas hay que respetar para
+leerlo— para que cualquier agente conectado por MCP construya sus propios casos
+de uso. **Versión 9 publicada y verificada** contra la base: 103 objetos, 798
+columnas, 16 reglas, cobertura 100 %, hash `72125091cc25`. Lo consume `mcp-bbdd`
+por SQL, con el rol de solo lectura `mcp_sigrid_dm_ro`.
+
+**Por qué costó 21 pasadas: no había evidencia, y nadie lo sabía.** Las cuatro
+campañas de mutación anteriores (112/112, 132/132, 166/166, 254/254) declaraban
+cero supervivientes porque la suite arrancaba ROJA dentro del worktree y
+`mutacion.py` contaba cualquier `returncode != 0` como muerto. La causa —el
+`.env` no existe en un `git worktree`— se arregló en el **arnés 1.7.7**, y la
+campaña midió por primera vez de verdad: **256 mutantes, 204 muertos, 52
+supervivientes, 0 timeouts**, 2 h 19 min con 6 workers. Los 52 quedaron
+resueltos: **49 muertos** con tests nuevos y **3 equivalentes** aprobados por el
+humano con su demostración escrita. La suite pasó de 2.290 a **2.505 tests**.
+
+**Lo que se lleva al backlog:**
+
+- **F-041** — la campaña paralela produce **falsos muertos** (cuarto defecto,
+  fichado con su reproducción en `progress/control_mutacion_F-006.md`). Regla
+  operativa mientras no se arregle: *lo que una campaña paralela declare muerto
+  se reverifica en serie antes de cerrar un `critico`*. El reviewer lo aceptó
+  para esta feature y dejó dicho que **no es precedente general**.
+- **F-034** — recibe T29-T31 **POR CONSTRUIR**. La spec decía que se entregaban
+  «construidos y apagados» y era falso; enmendado. Trampa: el rol
+  `mcp_sigrid_dm_ro` **lo comparten hoy el MCP y Power BI**.
+- **F-048** — nueva: el guardián de secretos decide por el primer carácter del
+  valor, así que `password=%x` o `password=#x` están exentos desde siempre.
+
+**Lo que NO entrega, y conviene no confundirlo con el cierre.** El humano pidió
+«un MCP que pueda usar cualquier usuario desde cualquier puesto». Hoy corre en
+el puesto de pgris apuntando a Azure. F-006 construyó la capa semántica, que era
+el prerrequisito; el despliegue vive en el backlog de `mcp-bbdd` (F-003
+transporte, F-004 OAuth con Entra ID, F-006 contenedor).
