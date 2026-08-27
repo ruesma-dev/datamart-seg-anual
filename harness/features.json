@@ -176,7 +176,7 @@
       "acceptance": [
         "Definida en detalle por specs/F-006-mcp-azure/ (sdd=true)"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,

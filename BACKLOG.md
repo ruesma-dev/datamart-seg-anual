@@ -3,15 +3,12 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **46 features**, 32 abiertas, 14 terminadas.
-
-En curso: **F-006**.
+Resumen: **46 features**, 31 abiertas, 15 terminadas.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-006 | MCP de bases de datos como servicio en cloud | 1 | en curso | critico | `feature/F-006-mcp-azure` |
 | F-044 | Los cuatro build entran en la carga nocturna | 1 | pendiente | critico | `feature/F-044-esquemas-nocturnos` |
 | F-047 | La base va por detras del repositorio: la nocturna no crea lo que el codigo declara | 1 | pendiente | critico | `feature/F-047-nocturna-desfasada` |
 | F-036 | Clasificacion por oficio y categoria oficial de partida | 2 | pendiente | estandar | `feature/F-036-oficios` |
@@ -49,6 +46,7 @@ En curso: **F-006**.
 | # | Feature | Prioridad | Rigor |
 |---|---|---|---|
 | F-001 | Comando 'version' en el CLI | 1 | estandar |
+| F-006 | MCP de bases de datos como servicio en cloud | 1 | critico |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-005 | Postgres del datamart en Azure | 3 | critico |
 | F-014 | Arnes generico versionado, reutilizable en cualquier proyecto | 4 | estandar |
@@ -64,12 +62,6 @@ En curso: **F-006**.
 | F-008 | Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api | 20 | documental |
 
 ## Detalle
-
-### F-006 · MCP de bases de datos como servicio en cloud
-
-estado **en curso** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-006-mcp-azure`
-
-REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno). AMPLIADA 2026-08-19 por el humano. EL USUARIO OBJETIVO ES DE NEGOCIO, no tecnico: cualquier persona con permiso debe poder preguntar a la base en lenguaje natural y obtener respuestas de negocio, sin saber que es un esquema ni escribir SQL. Eso cambia el criterio de exito: no basta con que el servidor MCP funcione y este desplegado; tiene que poder usarlo alguien que no sepa nada del modelo de datos. QUE SE CONSERVA DEL PROTOTIPO, porque ha funcionado bien en local: el pipeline de validacion de solo lectura y, sobre todo, LA CAPA SEMANTICA (config/diccionario_datos.yaml de mcp-bbdd), que explica el significado de cada tabla y cada columna. Esa es la pieza que convierte una pregunta de negocio en el SQL correcto; sin ella el MCP contesta cualquier cosa con aplomo. DEPENDENCIA QUE SI ES DE ESTE REPOSITORIO: el diccionario semantico del datamart -que significa mart.fact_periodificado, cierre.v_pbi_cierre_cabecera, que es una obra abierta- lo sabe este proyecto, no el del MCP. El MCP sabe de conexiones, permisos, validacion y auditoria; el significado del dato es del dueño del dato. Hay que producirlo aqui y publicarlo al MCP, y si merece rigor propio se saca a feature. Prioridad subida de 14 a 12 el 2026-08-19: va justo detras de F-011 (carga incremental). AMPLIACION 2026-08-19 (2): el MCP debe exponer PROMPTS Y RECURSOS, no solo herramientas. Es la pieza que hace que las reglas de negocio sean LAS MISMAS PARA TODOS los usuarios sin que nadie copie nada en su proyecto: el servidor publica el procedimiento -por ejemplo, como se aborda una planificacion temporal- y cada sesion recibe la version vigente. El caso de uso que lo motiva no es determinista y no se puede codificar: asignar partidas a la temporalidad exige juicio, lo decide la IA pensando y el usuario la corrige de forma interactiva. De ahi dos exigencias que van con esto: que quede TRAZA de que decidio la IA, con que criterio y que corrigio el usuario -una planificacion que nadie puede auditar seis meses despues es un numero huerfano-, y que las correcciones puedan volver al repositorio de reglas cuando revelen una regla de empresa no escrita. Ver F-030 y la decision D8. PRIORIDAD SUBIDA A 1 el 2026-08-20 por el humano: pasa a ser lo primero, por delante del estudio del tiempo de carga y de la ventana de negocio. Recordatorio de alcance que esa prioridad no cambia: el grueso de esta feature se ejecuta en el arnes de SU PROPIO repositorio; aqui solo queda lo que toca a sigrid_dm -el rol de solo lectura y la regla de firewall- y el diccionario semantico del datamart, que es del dueño del dato.
 
 ### F-044 · Los cuatro build entran en la carga nocturna
 
@@ -262,6 +254,12 @@ Extraido de F-023 el 2026-08-19 por decision del humano: era limpieza operativa 
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-001-cli-version`
 
 Añadir 'python main.py version' que imprima la versión del ETL, la fecha de build y el tag de imagen (si viene por entorno). Feature de calentamiento del arnés y, a la vez, herramienta de diagnóstico imprescindible para saber qué imagen corre en Azure.
+
+### F-006 · MCP de bases de datos como servicio en cloud
+
+estado **terminada** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-006-mcp-azure`
+
+REFORMULADA 2026-08-08. D4 cerrada: el MCP esta en C:/Users/pgris/PycharmProjects/mcp-bbdd, es un prototipo local (arquitectura hexagonal, pipeline de validacion de solo lectura, servicio de catalogo) y NO es un repositorio git. El humano decide que deje de ser local: debe estar en cloud y ser accesible desde otros equipos sin que su PC este encendido. Y sera multi-base: ademas de sigrid_dm, posiblemente albaranes, partes y otras. Por eso vive en SU PROPIO repositorio y su propio servicio, no dentro de este proyecto. Alcance: rediseno como servidor MCP remoto sobre HTTP desplegado en Container Apps, con autenticacion Entra y autorizacion por grupo, registro de conexiones con lista blanca de esquemas por base, credenciales desde Key Vault y nunca en disco, y auditoria de quien consulta que. Conserva el pipeline de validacion de solo lectura del prototipo, que es la parte bien resuelta. Esta feature la ejecuta el arnes de ESE repositorio: aqui solo queda lo que toque a sigrid_dm (rol de solo lectura y regla de firewall para la IP de salida del entorno). AMPLIADA 2026-08-19 por el humano. EL USUARIO OBJETIVO ES DE NEGOCIO, no tecnico: cualquier persona con permiso debe poder preguntar a la base en lenguaje natural y obtener respuestas de negocio, sin saber que es un esquema ni escribir SQL. Eso cambia el criterio de exito: no basta con que el servidor MCP funcione y este desplegado; tiene que poder usarlo alguien que no sepa nada del modelo de datos. QUE SE CONSERVA DEL PROTOTIPO, porque ha funcionado bien en local: el pipeline de validacion de solo lectura y, sobre todo, LA CAPA SEMANTICA (config/diccionario_datos.yaml de mcp-bbdd), que explica el significado de cada tabla y cada columna. Esa es la pieza que convierte una pregunta de negocio en el SQL correcto; sin ella el MCP contesta cualquier cosa con aplomo. DEPENDENCIA QUE SI ES DE ESTE REPOSITORIO: el diccionario semantico del datamart -que significa mart.fact_periodificado, cierre.v_pbi_cierre_cabecera, que es una obra abierta- lo sabe este proyecto, no el del MCP. El MCP sabe de conexiones, permisos, validacion y auditoria; el significado del dato es del dueño del dato. Hay que producirlo aqui y publicarlo al MCP, y si merece rigor propio se saca a feature. Prioridad subida de 14 a 12 el 2026-08-19: va justo detras de F-011 (carga incremental). AMPLIACION 2026-08-19 (2): el MCP debe exponer PROMPTS Y RECURSOS, no solo herramientas. Es la pieza que hace que las reglas de negocio sean LAS MISMAS PARA TODOS los usuarios sin que nadie copie nada en su proyecto: el servidor publica el procedimiento -por ejemplo, como se aborda una planificacion temporal- y cada sesion recibe la version vigente. El caso de uso que lo motiva no es determinista y no se puede codificar: asignar partidas a la temporalidad exige juicio, lo decide la IA pensando y el usuario la corrige de forma interactiva. De ahi dos exigencias que van con esto: que quede TRAZA de que decidio la IA, con que criterio y que corrigio el usuario -una planificacion que nadie puede auditar seis meses despues es un numero huerfano-, y que las correcciones puedan volver al repositorio de reglas cuando revelen una regla de empresa no escrita. Ver F-030 y la decision D8. PRIORIDAD SUBIDA A 1 el 2026-08-20 por el humano: pasa a ser lo primero, por delante del estudio del tiempo de carga y de la ventana de negocio. Recordatorio de alcance que esa prioridad no cambia: el grueso de esta feature se ejecuta en el arnes de SU PROPIO repositorio; aqui solo queda lo que toca a sigrid_dm -el rol de solo lectura y la regla de firewall- y el diccionario semantico del datamart, que es del dueño del dato.
 
 ### F-009 · Inventario del entorno Azure existente
 

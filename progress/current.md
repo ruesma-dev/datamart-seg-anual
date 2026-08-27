@@ -1,41 +1,58 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-27
 
-## LO PRIMERO: F-006 está APROBADA por el reviewer (21ª pasada)
+## F-006 · CERRADA el 2026-08-27
 
-**Los cuatro hallazgos de la 20ª review están cerrados y el portero está en
-verde: 2.481 pasados, 128 saltados (367 s).** Falta la **21ª pasada del
-reviewer**, que es quien levanta el RECHAZADO vigente.
+**APROBADA por el reviewer en su 21ª pasada** y marcada `done`. Levanta el
+RECHAZADO que arrastraba desde la 16ª. `bash harness/init.sh` en verde:
+**2.505 tests, 128 saltados**; cobertura 100 % de 33 líneas; tamaño dentro.
 
-| Hallazgo | Qué era | Commit |
-|---|---|---|
-| **H1** | Los 52 análisis de supervivientes, en `PENDIENTE` | `c6eb17f` |
-| **H2** | `impl_F-006.md` se contradecía y no declaraba los workers | `d60b3f1` |
-| **H3** | `tasks.md` no reflejaba el árbol | `67267ec` |
-| **H4** | La spec prometía a F-034 unos `REVOKE` que nunca se construyeron | `31152c0` |
+### Qué la desbloqueó, después de 21 pasadas
 
-**Y un quinto arreglo que no estaba en la lista: el portero llevaba en rojo
-desde el commit del reviewer**, y conviene entender por qué antes de que vuelva
-a pasar. Su informe de la 20ª pasada **enumera los patrones con los que barrió
-buscando secretos**, escritos como código en línea; el guardián de F-003 barre
-`progress/` entero y casaba con esa lista: **el escáner cazándose a sí mismo**.
-Cero credenciales.
+**La evidencia de mutación, que nunca había existido.** Las cuatro campañas
+anteriores (112/112, 132/132, 166/166, 254/254) daban cero supervivientes
+porque la suite del worktree arrancaba ROJA y `mutacion.py` contaba cualquier
+`returncode != 0` como muerto. El 2026-08-26 se arregló la causa —el `.env` no
+llega a un worktree— en el **arnés 1.7.7**, y la campaña midió de verdad:
 
-El arreglo tenía una versión fácil y equivocada —eximir la comilla invertida a
-secas—, que habría dejado pasar una contraseña citada como código. Se comprobó
-antes de descartarla. Lo que se hizo (`tests/test_f003_infra.py`): eximirla
-**solo cuando cierra** el código en línea, sin valor pegado detrás, con **ocho
-casos parametrizados** que fijan las dos caras. **No se tocó el informe del
-reviewer**: la evidencia de otro agente no se reescribe para que pase un test.
+| | |
+|---|---|
+| Campaña | **256 mutantes**, 204 muertos, **52 supervivientes**, 0 timeouts, 2 h 19 min con 6 workers |
+| Los 52 | **49 muertos** con tests nuevos + **3 equivalentes** aprobados por el humano |
+| Verificación | **en serie**, no por segunda campaña paralela: es la condición que puso el reviewer |
+| Suite | de 2.290 a **2.505** tests |
 
-**H4 es el que sale de esta feature y muerde a otra.** `requirements.md`,
-`design_detalle.md` §11.4 y la ficha de F-034 decían que F-006 entregaba los
-`REVOKE` «construidos y apagados». Verificado contra el árbol: `grants.py` no
-tiene `revocar_en`, `PG_REVOKE_FUERA_DE_CONSUMO` no existe y `settings.py` sigue
-con los **nueve** esquemas. Decisión del humano el 2026-08-27: **enmendar los
-documentos**, no construir el mecanismo aquí. **T29-T31 llegan a F-034 por
-construir**, y con el aviso de que el rol `mcp_sigrid_dm_ro` lo comparten hoy el
-MCP y Power BI.
+### Lo que hay que llevarse de aquí
+
+1. **La campaña paralela produce falsos muertos** (F-041, cuarto defecto
+   fichado el 2026-08-26). Un mutante dio veredictos opuestos el mismo día
+   sobre el mismo commit. Los 204 muertos **no son lista cerrada**. Evidencia:
+   `progress/control_mutacion_F-006.md`. **Regla operativa mientras F-041 no
+   esté: lo que una campaña paralela declare muerto se reverifica en serie
+   antes de cerrar un `critico`.** El reviewer lo dijo con todas las letras:
+   *«esto no es precedente general»*.
+2. **F-034 recibe T29-T31 POR CONSTRUIR**, no construidas. La spec decía lo
+   contrario y era falso (hallazgo H4, enmendado en `31152c0`). Y la trampa:
+   el rol `mcp_sigrid_dm_ro` **lo comparten hoy el MCP y Power BI**; encender
+   los `REVOKE` sin mirar qué lee Power BI le rompe los informes.
+3. **F-048**, nueva: el guardián de secretos decide por el primer carácter del
+   valor, así que `password=%x` o `password=#x` están exentos desde siempre.
+4. **El objetivo de fondo sigue sin cumplirse**: el humano pidió «un MCP que
+   pueda usar cualquier usuario desde cualquier puesto». Hoy corre **en el
+   puesto de pgris** apuntando a Azure. Eso vive en el backlog de `mcp-bbdd`,
+   no aquí. F-006 construyó la capa semántica, que era el prerrequisito.
+
+### Lo que esta feature enseñó sobre cómo se trabaja
+
+- **Verifica contra la fuente, no contra tu resumen de ella.** Pasó tres veces
+  en dos días: la tabla de tareas con cuatro desfases, la lista de 17 que
+  debían ser 19, y los ocho casos del guardián que fijaban solo las dos caras
+  pensadas. Las tres las cazó un barrido, nunca un recuento.
+- **Un test rojo no dice por qué está rojo.** Un mutante se dio por muerto
+  cuando lo que fallaba era un test caído por `.env` ausente.
+- **Dos agentes no pueden commitear por separado sobre el mismo fichero.**
+  `git add <ruta>` protege de arrastrar otros ficheros, no de arrastrar a otro
+  agente dentro del mismo. **Propuesto para `arnes-base`.**
 
 ---
 
