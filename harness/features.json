@@ -733,6 +733,21 @@
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-047-nocturna-desfasada"
+    },
+    {
+      "id": "F-048",
+      "title": "El guardian de secretos exime por el primer caracter y deja pasar contrasenas que empiezan por simbolo",
+      "description": "Nace el 2026-08-27 del hallazgo del reviewer en la 21a pasada de F-006, y NO es el falso positivo que se arreglo ese dia --ese esta cerrado y con 24 casos barriendo el vecindario--: es la porosidad DE ORIGEN que aquel destapo. El patron 'contrasena escrita' de tests/test_f003_infra.py decide si hay secreto MIRANDO EL PRIMER CARACTER del valor: exime [#$%<*{\"'] porque son marcadores ($VAR, <pon-la-tuya>, {placeholder}, comillas). El efecto colateral es que password=%x, password=#x, password=<x y password='x' estan exentos DESDE SIEMPRE, sin ninguna comilla invertida de por medio. Y una contrasena que empieza por simbolo no es el caso raro: es, si acaso, MAS probable que una que empieza por letra. MEDIDO por el reviewer sobre el arbol, no supuesto. Contexto de como se llego aqui, porque es la leccion util: el falso positivo del 2026-08-26 (el informe del reviewer enumeraba los patrones del propio barrido y el escaner se cazo a si mismo) tuvo DOS intentos de arreglo fallidos antes del bueno. El primero eximia la comilla invertida a secas y dejaba pasar un secreto citado como codigo. El segundo la eximia salvo que la siguiera [A-Za-z0-9_./+-], parecia resolverlo y abria nueve casos (!, @, &, ~, (, ^, :, [, |) ademas de no arreglar la cita terminada en punto: 16 fallos de 25 casos, frente a 0 del que quedo. Los dos fallaron por lo mismo, que es la leccion repetida de F-006: fijar las dos caras que uno tiene pensadas en vez de barrer el vecindario. QUE HAY QUE DECIDIR AQUI: si la deteccion debe dejar de apoyarse en el primer caracter --por ejemplo distinguiendo referencia de literal por su FORMA completa ($VAR entero, <marcador> entero, {placeholder} entero) en vez de por como empieza-- o si la porosidad se acepta declarandola por escrito. Lo que NO vale es dejarla sin decidir: hoy no esta escrita en ningun sitio salvo el anexo de una review.",
+      "acceptance": [
+        "El patron distingue referencia de literal por la forma completa del valor, no por su primer caracter, o la porosidad queda declarada por escrito con su alcance medido",
+        "Existe un barrido de casos derivado (no una lista escrita a mano) que cubre valores que empiezan por cada simbolo imprimible",
+        "Se comprueba contra el arbol que el cambio no reintroduce el falso positivo de la cita de Markdown"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 7,
+      "branch": "feature/F-048-guardian-secretos-poroso"
     }
   ]
 }

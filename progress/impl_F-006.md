@@ -80,9 +80,9 @@ rigor `critico`.
 Progresión de la suite: 1052 → 1133 → 1171 → 1496 → 1985 → 2025 → 2290 → 2305 → 2467 →
 **2473**. (Aquí llegó a poner 2025, contradiciendo tres pasadas seguidas a la fila
 «Tests» de al lado: dato copiado sin contrastar, y la misma causa que el H2 de la 20ª.)
-**El portero está HOY en rojo, y no por el papeleo**: `test_f003_r4` caza un falso positivo
-en `progress/review_F-006_detalle.md:5312` (commit `735b53a`). Diagnóstico y salidas, en
-`progress/current.md`.
+**El portero está en verde.** El falso positivo de `test_f003_r4` sobre
+`review_F-006_detalle.md:5312` (commit `735b53a`) se cerró afinando el patrón, en dos
+intentos: el segundo lo cazó el reviewer. Porosidad de origen fichada como **F-048**.
 
 ## 3 · Fase RED
 

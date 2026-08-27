@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **45 features**, 31 abiertas, 14 terminadas.
+Resumen: **46 features**, 32 abiertas, 14 terminadas.
 
 En curso: **F-006**.
 
@@ -24,6 +24,7 @@ En curso: **F-006**.
 | F-038 | Modelar los comparativos de ofertas en compras | 4 | pendiente | estandar | `feature/F-038-comparativos` |
 | F-039 | Vistas puente que faltan para las preguntas de negocio | 5 | pendiente | estandar | `feature/F-039-vistas-puente` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 6 | pendiente | critico | `feature/F-040-ingresos` |
+| F-048 | El guardian de secretos exime por el primer caracter y deja pasar contrasenas que empiezan por simbolo | 7 | pendiente | estandar | `feature/F-048-guardian-secretos-poroso` |
 | F-035 | Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna | 9 | pendiente | critico | `feature/F-035-estudio-tiempo-carga` |
 | F-025 | Ventana de negocio: acotar el build de stg y mart a lo que se mueve | 10 | pendiente | critico | `feature/F-025-ventana-negocio-build` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 10 | pendiente | critico | `feature/F-029-mutacion-fiable` |
@@ -141,6 +142,12 @@ Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el dat
 estado **pendiente** · prioridad 6 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
 
 Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse.
+
+### F-048 · El guardian de secretos exime por el primer caracter y deja pasar contrasenas que empiezan por simbolo
+
+estado **pendiente** · prioridad 7 · rigor `estandar` · SDD no · rama `feature/F-048-guardian-secretos-poroso`
+
+Nace el 2026-08-27 del hallazgo del reviewer en la 21a pasada de F-006, y NO es el falso positivo que se arreglo ese dia --ese esta cerrado y con 24 casos barriendo el vecindario--: es la porosidad DE ORIGEN que aquel destapo. El patron 'contrasena escrita' de tests/test_f003_infra.py decide si hay secreto MIRANDO EL PRIMER CARACTER del valor: exime [#$%<*{"'] porque son marcadores ($VAR, <pon-la-tuya>, {placeholder}, comillas). El efecto colateral es que password=%x, password=#x, password=<x y password='x' estan exentos DESDE SIEMPRE, sin ninguna comilla invertida de por medio. Y una contrasena que empieza por simbolo no es el caso raro: es, si acaso, MAS probable que una que empieza por letra. MEDIDO por el reviewer sobre el arbol, no supuesto. Contexto de como se llego aqui, porque es la leccion util: el falso positivo del 2026-08-26 (el informe del reviewer enumeraba los patrones del propio barrido y el escaner se cazo a si mismo) tuvo DOS intentos de arreglo fallidos antes del bueno. El primero eximia la comilla invertida a secas y dejaba pasar un secreto citado como codigo. El segundo la eximia salvo que la siguiera [A-Za-z0-9_./+-], parecia resolverlo y abria nueve casos (!, @, &, ~, (, ^, :, [, |) ademas de no arreglar la cita terminada en punto: 16 fallos de 25 casos, frente a 0 del que quedo. Los dos fallaron por lo mismo, que es la leccion repetida de F-006: fijar las dos caras que uno tiene pensadas en vez de barrer el vecindario. QUE HAY QUE DECIDIR AQUI: si la deteccion debe dejar de apoyarse en el primer caracter --por ejemplo distinguiendo referencia de literal por su FORMA completa ($VAR entero, <marcador> entero, {placeholder} entero) en vez de por como empieza-- o si la porosidad se acepta declarandola por escrito. Lo que NO vale es dejarla sin decidir: hoy no esta escrita en ningun sitio salvo el anexo de una review.
 
 ### F-035 · Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna
 

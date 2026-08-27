@@ -1,7 +1,7 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-27
 
-## 🔴 LO PRIMERO: `bash harness/init.sh` está EN ROJO, y no por el papeleo
+## LO PRIMERO: F-006 está APROBADA por el reviewer (21ª pasada)
 
 **Los cuatro hallazgos de la 20ª review están cerrados y el portero está en
 verde: 2.481 pasados, 128 saltados (367 s).** Falta la **21ª pasada del
@@ -41,18 +41,12 @@ MCP y Power BI.
 
 **Feature en curso: F-006 · MCP sobre el datamart.** Rama
 `feature/F-006-mcp-azure`, con el arnés **1.7.7** dentro. `bash harness/init.sh`
-dio **verde: 2.473 tests, 128 saltados** (603,92 s), cobertura 100 % de 33
-líneas cambiadas y puerta de tamaño cumplida, **en `6332995`**; desde `735b53a`
-está en rojo por el falso positivo de arriba, que **no toca ni un test del ETL**.
-Puerta de tamaño hoy: impl **218/220**. Árbol limpio y **sin mutantes aplicados**.
+**en verde**, cobertura 100 % de 33 líneas cambiadas y puerta de tamaño cumplida
+(impl **219**/220). Árbol limpio y **sin mutantes aplicados**.
 
-**AL RETOMAR: F-006 está en la 20ª review, RECHAZADO, con H1/H2/H3 ya
-arreglados** (2026-08-27, tres commits) y **H4 esperando decisión del humano**.
-La campaña de mutación **está hecha y sus 52 supervivientes, resueltos**: 49
-muertos con tests nuevos y **3 equivalentes aprobados por el humano el
-2026-08-26**; sus 52 análisis están ya completados, cada uno con el puntero a su
-traza. Falta H4, el portero en verde y el veredicto del reviewer contra
-`CHECKPOINTS.md`. Sin él, F-006 **no se marca `done`**.
+**AL RETOMAR: F-006 está APROBADA** (21ª pasada del reviewer, 2026-08-27),
+con los cuatro hallazgos de la 20ª cerrados y el guardián de secretos afinado
+por segunda vez tras el hallazgo del propio reviewer. Queda marcarla `done`.
 
 **Lo que el reviewer tiene que mirar sí o sí:** `progress/control_mutacion_F-006.md`.
 La campaña paralela **produce algún falso muerto** —demostrado y fichado en

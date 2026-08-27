@@ -312,14 +312,22 @@ PATRONES_PROHIBIDOS = {
     # literal, no la palabra 'password', que aparece por todas partes.
     #
     # La comilla invertida se exime SOLO cuando CIERRA un código en línea de
-    # Markdown, o sea cuando no lleva un valor pegado detrás. La distinción
-    # importa y por eso no vale eximirla a secas: un informe que enumera los
-    # patrones de este mismo barrido escribe `password=` como código y no es
-    # ningún secreto —pasó el 2026-08-26 y dejó el portero en rojo—, mientras
-    # que una contraseña citada como código sí tiene que seguir cazándose.
+    # Markdown, y eso se reconoce por lo que viene DETRÁS: puntuación de prosa
+    # o fin de línea. Es una lista blanca a propósito, y costó dos intentos:
+    #
+    #   1. Eximirla a secas dejaba pasar una contraseña citada como código.
+    #   2. Eximirla salvo que la siguiera `[A-Za-z0-9_./+-]` parecía resolverlo
+    #      y NO: un valor puede empezar por símbolo, así que se escapaban nueve
+    #      casos (`!`, `@`, `&`, `~`, `(`, `^`, `:`, `[`, `|`), justamente los
+    #      más plausibles en una contraseña. Y la cita terminada en punto
+    #      seguía dando falso positivo.
+    #
+    # Preguntar por lo que SÍ puede cerrar una cita, en vez de enumerar lo que
+    # no puede abrir un valor, cierra las dos caras. Lo que lo destapó: barrer
+    # el vecindario de casos en vez de fijar los dos que uno tenía pensados.
     "contraseña escrita": (
         r"(?i)\bpassword\s*=\s*"
-        r"(?![#$%<*{\"'\s]|secretref:|keyvaultref:|`(?![A-Za-z0-9_./+-]))\S"
+        r"(?![#$%<*{\"'\s]|secretref:|keyvaultref:|`(?=[\s,;.)\]]|$))\S"
     ),
 }
 
@@ -367,43 +375,83 @@ def test_f003_r4_sin_secretos_ni_identificadores_en_infra_y_spec() -> None:
     )
 
 
+# Cómo puede terminar una cita de Markdown dentro de una frase. Se BARRE el
+# vecindario en vez de escoger dos: la primera versión de este test fijaba la
+# cita con coma y el secreto que empieza por letra —las dos caras que su autor
+# tenía pensadas— y por debajo se escapaban nueve casos y quedaba vivo el falso
+# positivo con punto. Misma lección que los `frozen`/`slots` de F-006: barrido
+# derivado, no lista escrita a mano.
+CIERRES_DE_CITA = (",", ".", ";", ")", "]", " ", "")
+
+# Con qué puede empezar una contraseña de verdad citada como código. Los
+# símbolos NO son el caso raro: una contraseña que empieza por símbolo es, si
+# acaso, más probable que una que empieza por letra.
+INICIOS_DE_SECRETO = tuple("hH7!@&~(^:[|#$%<*{")
+
+
+@pytest.mark.parametrize("cierre", CIERRES_DE_CITA)
+def test_f003_r4_una_cita_de_markdown_no_es_una_contrasena(cierre: str) -> None:
+    """`password=` citado como código, con cualquier puntuación detrás.
+
+    Es el falso positivo real del 2026-08-26: el informe de la 20ª review
+    enumeraba los patrones de este mismo barrido, escritos como código, y dejó
+    el portero en rojo. El escáner cazándose a sí mismo.
+    """
+    texto = f"barrido con los patrones `password=`{cierre} y alguno mas"
+    hallado = re.search(PATRONES_PROHIBIDOS["contraseña escrita"], texto)
+    assert not hallado, (
+        f"falso positivo con una cita cerrada por {cierre!r}: "
+        f"{texto!r} -> {hallado.group(0)!r}" if hallado else ""
+    )
+
+
+@pytest.mark.parametrize("inicio", INICIOS_DE_SECRETO)
+def test_f003_r4_una_contrasena_citada_como_codigo_se_sigue_cazando(inicio: str) -> None:
+    """La otra cara, y la que impide que el arreglo afloje el guardián.
+
+    Documentar una credencial entre comillas invertidas es una forma
+    perfectamente normal de documentarla mal, así que tiene que seguir
+    cazándose empiece por donde empiece. El segundo intento de arreglo eximía
+    la comilla salvo que la siguiera `[A-Za-z0-9_./+-]`, y por ahí se colaban
+    los nueve símbolos de esta lista.
+    """
+    texto = f"password=`{inicio}unter2`"
+    assert re.search(PATRONES_PROHIBIDOS["contraseña escrita"], texto), (
+        f"el guardián deja pasar una contraseña que empieza por {inicio!r}: {texto!r}"
+    )
+
+
 @pytest.mark.parametrize(
-    "texto, debe_cazarlo, que_es",
+    "texto, que_es",
     [
-        # El falso positivo real del 2026-08-26: el informe del reviewer
-        # enumeraba los patrones de este mismo barrido y dejó el portero rojo.
-        ("con los patrones `password=`, `pwd=`, `secret=`", False, "cita de Markdown"),
-        # Y la otra cara, que es la que impide que el arreglo afloje el
-        # guardián: una contraseña citada como código SIGUE cazándose.
-        ("password=`hunter2`", True, "contraseña entre comillas invertidas"),
-        ("password=hunter2", True, "contraseña a pelo"),
-        ("Password = SuperSecreta1", True, "con mayúscula y espacios"),
-        ("password=$PGPASSWORD", False, "referencia a variable"),
-        ("password=", False, "valor vacío"),
-        ("password=<pon-la-tuya>", False, "marcador"),
-        ("password=secretref:pg-pass", False, "referencia a secreto"),
+        ("password=hunter2", "contraseña a pelo"),
+        ("Password = SuperSecreta1", "con mayúscula y espacios"),
     ],
 )
-def test_f003_r4_la_contrasena_escrita_distingue_la_cita_del_secreto(
-    texto: str, debe_cazarlo: bool, que_es: str
-) -> None:
-    """El patrón «contraseña escrita», caso a caso, por sus dos caras.
+def test_f003_r4_una_contrasena_sin_citar_se_caza(texto: str, que_es: str) -> None:
+    assert re.search(PATRONES_PROHIBIDOS["contraseña escrita"], texto), (
+        f"el guardián deja pasar {que_es}: {texto!r}"
+    )
 
-    Existe porque el arreglo del falso positivo tenía una versión fácil y
-    equivocada: eximir la comilla invertida a secas. Eso habría dejado pasar
-    una contraseña escrita como código en línea, que es una forma
-    perfectamente normal de documentar mal un secreto. Se exime solo cuando la
-    comilla CIERRA —sin valor pegado detrás—, y este test fija las dos caras
-    para que nadie afloje la de arriba creyendo que arregla la de abajo.
-    """
+
+@pytest.mark.parametrize(
+    "texto, que_es",
+    [
+        ("password=$PGPASSWORD", "referencia a variable"),
+        ("password=", "valor vacío"),
+        ("password=<pon-la-tuya>", "marcador"),
+        ("password=secretref:pg-pass", "referencia a secreto"),
+        ("password=keyvaultref:pg-pass", "referencia a Key Vault"),
+    ],
+)
+def test_f003_r4_lo_que_no_es_un_valor_no_se_denuncia(texto: str, que_es: str) -> None:
+    """Las exenciones que ya existían antes de todo esto, fijadas de paso."""
     hallado = re.search(PATRONES_PROHIBIDOS["contraseña escrita"], texto)
-    if debe_cazarlo:
-        assert hallado, f"el guardián deja pasar {que_es}: {texto!r}"
-    else:
-        assert not hallado, (
-            f"el guardián da un falso positivo con {que_es}: {texto!r} -> "
-            f"{hallado.group(0)!r}" if hallado else ""
-        )
+    assert not hallado, (
+        f"falso positivo con {que_es}: {texto!r} -> {hallado.group(0)!r}"
+        if hallado
+        else ""
+    )
 
 
 def test_f003_r26_el_script_de_alerta_no_lleva_correos_literales() -> None:
