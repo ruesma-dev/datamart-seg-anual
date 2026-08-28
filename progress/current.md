@@ -21,7 +21,8 @@ La conexión se recuperó: la IP del puesto no estaba en el firewall del
 servidor; regla `datamart-puesto-pgris-2026-08-28` creada con autorización del
 humano. Detalle en `progress/explore_F-047.md`.
 
-- `check-diccionario`: 103 fichas, 102 objetos. La huérfana es esa **y solo esa**.
+- `check-diccionario`: **103 fichas y 102 construidas** en la base. La
+  huérfana es esa **y solo esa**.
 - `check-declarados` contra el servidor real: señala el objeto **y su fichero**,
   y sale con **código 1** (medido sin pipe: con `| tail` se lee el exit de `tail`).
 - `_meta.etl_runs` **cierra el caso**: `build_cierre` último OK el **2026-08-21
@@ -53,7 +54,9 @@ Las tres son escrituras contra producción y las autoriza el humano una a una.
 2. **Dejar correr una nocturna** (o lanzar `build-cierre` a mano para recrear la
    vista hoy; autorizado por el humano el 2026-08-28, **bloqueado por el
    clasificador de permisos de la sesión**, sin ejecutar).
-3. **`publicar-diccionario`** (versión 10). `R-FRESCURA` promete que la fecha de
+3. **`publicar-diccionario`** (versión 10). El diccionario del árbol son hoy
+   **103 objetos**, **798 columnas** documentadas y **46 fichas de consumo**: el
+   contenido cambió (40 fichas y una regla dura), el inventario no. `R-FRESCURA` promete que la fecha de
    build de los cuatro «siempre es consultable», y `_meta.v_frescura` **no tiene
    hoy ninguna fila** de `build_compras` ni `build_retenciones`. Publicarlo antes
    de que corra una noche haría que el MCP sirviera una regla **bloqueante** que
