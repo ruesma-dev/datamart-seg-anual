@@ -1,115 +1,70 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-28
 
-## EN CURSO: F-047 · la nocturna desfasada (absorbe F-044)
+## F-047 · CERRADA el 2026-08-28 (absorbio F-044)
 
-Rama `feature/F-047-nocturna-desfasada`. Implementación **terminada**, `bash
-harness/init.sh` **en verde** (2.581 tests, 128 saltados; cobertura 100 % de 259
-líneas cambiadas). Campaña de mutación **en serie**: 70 mutantes, 63 muertos,
-**7 supervivientes, todos con test, 0 finales**. Informes:
-`progress/impl_F-047.md` y `progress/mutacion_F-047.md`.
+Aprobada por el reviewer en la 3ª pasada y **desplegada en producción el mismo
+día**. Rama `feature/F-047-nocturna-desfasada`, `bash harness/init.sh` en verde
+(2.581 tests, 128 saltados; cobertura 100 % de 259 líneas), campaña de mutación
+en serie de 70 mutantes con 0 supervivientes finales.
 
-**La causa raíz, ya cerrada** (`progress/explore_F-047.md`): la nocturna no
-dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**.
+**La causa raíz, y no era ninguna de las tres que proponía la ficha**: la
+nocturna no dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**.
 `mart/03_agg_categoria.sql` dropea `mart.fact_seguimiento_categoria` con
-`CASCADE` y esa vista cuelga de la tabla; `build-cierre` no entraba en `run-all`,
-así que nadie la recreaba.
+`CASCADE` y esa vista cuelga de la tabla. Detalle en
+`progress/explore_F-047.md`; el trabajo, en `impl_F-047.md` y `review_F-047.md`.
 
-### Verificado contra la base el 2026-08-28 (ya no está pendiente)
+### Lo que se hizo en producción el 2026-08-28, en este orden
 
-La conexión se recuperó: la IP del puesto no estaba en el firewall del
-servidor; regla `datamart-puesto-pgris-2026-08-28` creada con autorización del
-humano. Detalle en `progress/explore_F-047.md`.
+| # | Acción | Resultado |
+|---|---|---|
+| 1 | `70_build_image.ps1` + `85_update_job.ps1` | imagen **`r20260828-1942`**, el job ya apunta a ella (venía de la del **18 de agosto**) |
+| 2 | los cuatro build + `apply-grants` a mano | 37 min: maestros 0,8 · compras 7,3 · retenciones 1 · cierre 27,9 · grants 0,1 |
+| 3 | `publicar-diccionario` | **versión 10**: 149 filas, 103 objetos, 798 columnas, 16 reglas y 46 fichas de consumo |
 
-- `check-diccionario`: **103 fichas y 102 construidas** en la base. La
-  huérfana es esa **y solo esa**.
-- `check-declarados` contra el servidor real: señala el objeto **y su fichero**,
-  y sale con **código 1** (medido sin pipe: con `| tail` se lee el exit de `tail`).
-- `_meta.etl_runs` **cierra el caso**: `build_cierre` último OK el **2026-08-21
-  23:30** (la ejecución manual del humano), `build_mart` el **2026-08-28 04:56**
-  (la nocturna). La vista nació el 21 y la nocturna del 22 se la llevó.
+**El orden no fue casual.** Publicar el diccionario antes de los build habría
+dejado al MCP sirviendo `R-FRESCURA` —regla **bloqueante**— apuntando a una
+consulta vacía, porque `_meta.v_frescura` no tenía ninguna fila de
+`build_compras` ni `build_retenciones`. Lo advirtió el reviewer; el humano
+eligió lanzar los cuatro build a mano el mismo día en vez de esperar.
 
-### LA CONDICIÓN DE CIERRE PRINCIPAL: el despliegue lleva congelado desde el 18
+**Verificación final**: `check-declarados` **103 declarados / 103 construidos**,
+código 0. `check-diccionario` **biyección exacta 103 = 103** y «lo publicado ES
+lo del árbol». **La vista ha vuelto.** Disco **57,81 %** (18 GB de 32), contra
+57,92 % del 21: no se mueve.
 
-El job nocturno `caj-datamart-seg-dev` (cron `0 2 * * *`, grupo
-`rg-datamart-seg-dev`) ejecuta la imagen
-**`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260818-2146`**, del 18 de
-agosto, que además **es la más reciente del ACR**. Lleva diez noches terminando
-`Succeeded` con código de hace diez días.
+### La segunda capa, que nadie buscaba
 
-Lo delató que `publicar_diccionario` —paso de F-006— no dejara rastro nocturno
-mientras `apply_grants`, que va justo después en el pipeline, sí lo dejaba.
+El despliegue llevaba **congelado desde el 18 de agosto**: diez noches
+terminando `Succeeded` con código de hace diez días, y todo F-006 fuera. Lo
+delató que `publicar_diccionario` no dejara rastro nocturno mientras
+`apply_grants`, el paso siguiente, sí lo dejaba. **La lección, y vale para
+cualquier feature futura: el repositorio en verde no es producción.** Ver
+`azure-apps/datamart_seg_anual.md` y **F-033**.
 
-**Nada de F-006 ni de F-047 corre hoy en producción.** La causa raíz tiene dos
-capas: el `CASCADE` (destruye la vista) y el despliegue parado (impide que el
-arreglo llegue). Enlaza con **F-033**. Desplegar lo decide el humano.
+### Lo que quedó abierto
 
-### La SECUENCIA de las acciones manuales (el orden IMPORTA)
+- **F-044 sigue `in_progress`**, y no por descuido: tres de sus cinco criterios
+  están cumplidos y verificados, pero **el tiempo real de la ventana completa y
+  el pico de disco solo se pueden medir observando la primera nocturna con los
+  diez pasos**, la del **29 de agosto a las 02:00 UTC**. Lo de hoy fueron cuatro
+  build a mano sobre un `stg`/`mart` ya construidos, que no es lo mismo.
+  Previsión a confirmar: ~3 h 24, final hacia las 05:24 UTC.
+- **F-041** recibió un quinto defecto: el `__pycache__` opera **también en
+  serie**, y es bidireccional. La serie no es inmune a los falsos muertos; solo
+  no se ha visto uno todavía.
+- **F-049**, nueva: `mutacion.py` deja el sello `PENDIENTE` puesto después de
+  resolverse, trampa para el próximo reviewer con `grep`. Se porta a
+  `arnes-base` en el mismo trabajo.
+- **F-012** tiene material nuevo: siete reglas de firewall de puestos sueltos
+  acumuladas en `psql-albaranes-rs9k2`, una por día que cambió la IP.
 
-Las tres son escrituras contra producción y las autoriza el humano una a una.
-**Publicar el diccionario va el ÚLTIMO, y no es un detalle de estilo:**
+## LO SIGUIENTE
 
-1. **Construir y desplegar imagen nueva.** Sin esto, los otros dos pasos
-   maquillan el síntoma y la nocturna vuelve a destruir la vista esa misma noche.
-2. **Dejar correr una nocturna** (o lanzar `build-cierre` a mano para recrear la
-   vista hoy; autorizado por el humano el 2026-08-28, **bloqueado por el
-   clasificador de permisos de la sesión**, sin ejecutar).
-3. **`publicar-diccionario`** (versión 10). El diccionario del árbol son hoy
-   **103 objetos**, **798 columnas** documentadas y **46 fichas de consumo**: el
-   contenido cambió (40 fichas y una regla dura), el inventario no. `R-FRESCURA` promete que la fecha de
-   build de los cuatro «siempre es consultable», y `_meta.v_frescura` **no tiene
-   hoy ninguna fila** de `build_compras` ni `build_retenciones`. Publicarlo antes
-   de que corra una noche haría que el MCP sirviera una regla **bloqueante** que
-   manda a una consulta vacía: una mentira nueva del tipo que F-047 vino a matar.
-   Hoy no hay daño porque `_meta` sigue sirviendo la versión 9.
-
-### La decisión de ventana, que tampoco toma el agente
-
-La nocturna pasa de 2 h 46 a unas 3 h 24 (+37,5 min medidos el 2026-08-21).
-Arrancando a las 02:00 UTC el final se mueve de 04:46 a ~05:24 UTC (07:24 hora
-local). Entra, pero deja menos margen para un reintento. Adelantar el arranque o
-recortar es decisión del humano.
-
-### Estado de la review: APROBADO el 2026-08-28, en la 3ª pasada
-
-`progress/review_F-047.md`. **NO se marca `done`**, y no es un descuido: dos
-criterios de aceptación —F-047·2 «la vista existe en la base» y F-044·1/·5— se
-cumplen **en el repositorio y no en producción**, y solo las tres escrituras de
-arriba los cierran. El reviewer lo aprueba con esas condiciones pendientes y
-deja constancia de que no cuentan como incumplimiento del trabajo: están sin
-respuesta del humano.
-
-Las dos pasadas anteriores, por si sirven de aviso a quien retome esto:
-
-- **1ª · RECHAZADO por documentación**, con el código aprobado sin retoque. El
-  documento de `azure-apps` —el que otros equipos leen para saber qué hay
-  desplegado— afirmaba en pretérito que la nocturna «destruía» la vista cuando
-  **la sigue destruyendo**. Corregido por el implementer (`e4f0f9b` allí), que
-  encontró además una séptima afirmación falsa del mismo tipo.
-- **2ª · RECHAZADO por un fallo del líder, no del implementer**: al reescribir
-  este fichero se perdieron los recuentos del diccionario y `init.sh` se puso en
-  rojo. El guardián de F-006 hizo su trabajo. Restaurado en `aebdf10`.
-
-### Lo que hay que mirar sí o sí en la review
-
-- **La regla dura `R-FRESCURA-MANUAL` pasa a llamarse `R-FRESCURA`.** Lo que
-  decía —«el pipeline nocturno construye SOLO raw, stg y mart»— dejó de ser
-  cierto, y es una regla **bloqueante** que el MCP sirve a los agentes. El
-  peligro que queda, y que la regla nueva fija: el paso de esos cuatro no es
-  dependencia de nadie, así que puede fallar sin tumbar la noche.
-- **Los tests que cambiaron de veredicto.** No son rendiciones: el validador de
-  frescura compara contra `main.build_pipeline_steps`, así que meter los cuatro
-  build invierte R14 solo. El caso que merece más atención es
-  `test_f006_r13_una_ficha_cuyo_paso_no_deja_rastro_lo_advierte`, que exigía
-  ADVERTIR de un agujero y ahora exige que el agujero no exista.
-- **La campaña de mutación se lanzó EN SERIE** (`--workers 1`), no en paralelo:
-  con 70 mutantes salía a cuenta, y así no aplica la regla de reverificación de
-  F-041 —la paralela produce falsos muertos—. Costó **2 h 32 min**.
-- **HALLAZGO PARA F-041, y es nuevo**: uno de los siete supervivientes era
-  **FALSO**, y la campaña era EN SERIE. F-041 solo documenta falsos MUERTOS del
-  modo paralelo; esto es un falso superviviente con un solo worker, y el
-  sospechoso es el `__pycache__` (defecto 2 de esa ficha, que se creía exclusivo
-  del paralelo). Dirección inofensiva, pero **hay que añadirlo a la ficha**.
+**Mirar la nocturna del 29** y cerrar F-044 con las dos mediciones que le
+faltan. Si termina antes de las 05:24 UTC y el disco no se mueve, se marca
+`done`; si invade la mañana, la decisión de recortar es del humano y enlaza con
+F-035 (las cuatro palancas) y F-025 (la ventana de negocio).
 
 ---
 
