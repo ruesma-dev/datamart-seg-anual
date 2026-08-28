@@ -36,6 +36,9 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
                                         Sale 0 si sí, 1 si no, 2 si no puede leer
     python main.py check-frescura     - ¿Cuánto hace que no hay un build_mart
                                         completo? Sale 0 solo si está FRESCO
+    python main.py check-declarados   - ¿Existe en la base todo lo que el SQL
+                                        del repositorio declara crear? (F-047)
+                                        Corre solo al final de run-all
 
 Medición del coste de la carga (F-011). Los tres son de SOLO LECTURA y ninguno
 escribe en _meta; el «medir antes de optimizar» de esa feature vive aquí:
@@ -73,9 +76,7 @@ from etl_sigrid.application.steps.publicar_diccionario_step import (
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
 from etl_sigrid.application.steps.build_compras_step import BuildComprasStep  # noqa: E402
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
-from etl_sigrid.application.steps.build_retenciones_step import (
-    BuildRetencionesStep,
-)  # noqa: E402
+from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep  # noqa: E402
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
 from etl_sigrid.application.steps.build_stg_step import BuildStgStep  # noqa: E402
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: E402
@@ -508,9 +509,53 @@ def run_all(full_refresh: bool) -> None:
     for r in results:
         _print_result(r)
 
+    # F-047, EL GUARDIÁN. Va DESPUÉS de todo y no es un step: es una lectura, no
+    # una construcción, y meterlo en el DAG lo convertiría en dependencia de
+    # `apply_grants` o al revés. La noche del incidente terminó en verde
+    # habiendo DESTRUIDO `cierre.v_pbi_planif_vs_real`; con esto, una noche que
+    # no deje construido lo que el repositorio declara sale con código 1.
+    click.echo("")
+    guardian_ok = _guardian_de_lo_declarado(pg)
+
     failed = sum(1 for r in results if r.status == StepStatus.FAILED)
-    if failed:
+    if failed or not guardian_ok:
         sys.exit(1)
+
+
+def _guardian_de_lo_declarado(pg: PostgresClient) -> bool:
+    """Contrasta `sql/**` contra el catálogo real e imprime el veredicto.
+
+    Devuelve si está limpio. Un fallo LEYENDO el catálogo no se traga: se
+    imprime y cuenta como veredicto negativo. Callarlo dejaría exactamente el
+    agujero que esta feature cierra —una noche que termina en verde sin haber
+    comprobado nada—, y es el mismo criterio que el `assert` de inventario no
+    vacío de la puerta offline.
+    """
+    from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+    from etl_sigrid.infrastructure.inventario_repositorio import (
+        cargar_pendientes_construccion,
+        inventario_del_repositorio,
+    )
+    from etl_sigrid.infrastructure.postgres.catalogo import (
+        evaluar_construccion,
+        formatear_construccion,
+    )
+
+    try:
+        informe = evaluar_construccion(
+            inventario_del_repositorio(),
+            pg.list_objetos_catalogo(list(ESQUEMAS_DEL_DATAMART)),
+            cargar_pendientes_construccion(),
+        )
+    except Exception as e:  # noqa: BLE001
+        click.secho(
+            f"KO   no se pudo comprobar lo declarado contra la base: {e}",
+            fg="red", err=True,
+        )
+        return False
+
+    click.echo(formatear_construccion(informe))
+    return informe.ok
 
 
 @cli.command("fingerprint-views")
@@ -683,6 +728,50 @@ def check_diccionario_cmd() -> None:
             )
 
     if not informe.ok or desfasado:
+        raise SystemExit(1)
+
+
+@cli.command("check-declarados")
+def check_declarados_cmd() -> None:
+    """
+    Contrasta lo que el SQL del repositorio DECLARA contra la base (F-047).
+
+    Es la pregunta que no hacia nadie, y por ese hueco se colo F-047. Las otras
+    dos puertas miran otra cosa: la de `init.sh` compara el SQL contra las
+    FICHAS, y `check-diccionario` compara las FICHAS contra la base. Ninguna
+    responde «lo que `sql/**` dice que crea, ¿existe de verdad?».
+
+    Recorre los `CREATE [OR REPLACE] TABLE|VIEW|FUNCTION` de
+    `etl_sigrid/infrastructure/postgres/sql/**` mas las tablas de `raw` que
+    declara `config/tables_sigrid.yaml`, y comprueba contra `information_schema`
+    que cada objeto existe y con su tipo.
+
+    Un objeto que legitimamente aun no toca construir --el cierre no esta
+    terminado: F-017 y F-018-- se declara en `config/objetos_pendientes.yaml`.
+    Es un trinquete y solo baja: un pendiente ya construido, o uno que el
+    repositorio no declara, rompen la puerta.
+
+    Corre solo al final de `run-all`. Sale con codigo 1 si hay discrepancias.
+    """
+    from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+    from etl_sigrid.infrastructure.inventario_repositorio import (
+        cargar_pendientes_construccion,
+        inventario_del_repositorio,
+    )
+    from etl_sigrid.infrastructure.postgres.catalogo import (
+        evaluar_construccion,
+        formatear_construccion,
+    )
+
+    pg = _get_pg()
+    informe = evaluar_construccion(
+        inventario_del_repositorio(),
+        pg.list_objetos_catalogo(list(ESQUEMAS_DEL_DATAMART)),
+        cargar_pendientes_construccion(),
+    )
+    click.echo(formatear_construccion(informe))
+
+    if not informe.ok:
         raise SystemExit(1)
 
 

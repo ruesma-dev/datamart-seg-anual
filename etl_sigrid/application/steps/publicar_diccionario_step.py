@@ -35,15 +35,13 @@ from typing import TYPE_CHECKING
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.diccionario import derivar_avisos, formatear_errores, validar
 from etl_sigrid.domain.entities import StepResult, StepStatus
-from etl_sigrid.domain.inventario import (
-    evaluar_cobertura,
-    formatear_cobertura,
-    objetos_de_raw,
-    objetos_de_sql,
-)
+from etl_sigrid.domain.inventario import evaluar_cobertura, formatear_cobertura
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import (
     DiccionarioIlegible,
     cargar_diccionario,
+)
+from etl_sigrid.infrastructure.inventario_repositorio import (
+    inventario_del_repositorio,
 )
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
@@ -171,17 +169,15 @@ class PublicarDiccionarioStep(PipelineStep):
     # -----------------------------------------------------------------
 
     def _inventario(self):
-        """Los objetos que este repositorio publica, leídos de sus ficheros."""
-        import yaml
+        """Los objetos que este repositorio publica, leídos de sus ficheros.
 
-        textos = {
-            str(ruta.relative_to(DIR_SQL)).replace("\\", "/"): ruta.read_text(
-                encoding="utf-8"
-            )
-            for ruta in DIR_SQL.rglob("*.sql")
-        }
-        tablas = yaml.safe_load(YAML_TABLAS.read_text(encoding="utf-8"))["tables"]
-        return objetos_de_sql(textos) + objetos_de_raw(tablas)
+        F-047 se llevó las doce líneas de lectura a
+        `infrastructure/inventario_repositorio.py`: estaban copiadas aquí, en la
+        puerta de `tests/test_f006_cobertura.py` y hacían falta una tercera vez
+        para `check-declarados`. Tres inventarios que pueden divergir son tres
+        puertas verdes contra tres verdades distintas.
+        """
+        return inventario_del_repositorio(DIR_SQL, YAML_TABLAS)
 
     def _fallo(self, result: StepResult, mensaje: str) -> StepResult:
         result.status = StepStatus.FAILED

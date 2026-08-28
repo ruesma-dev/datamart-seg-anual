@@ -127,7 +127,9 @@ class PgFalso:
         frescura: list[FilaFrescura] | None = None,
         error_al_abortar: Exception | None = None,
         error_al_leer: Exception | None = None,
+        catalogo: list[tuple[str, str, str]] | None = None,
     ) -> None:
+        self._catalogo = catalogo
         self._huerfanas = huerfanas or []
         self._estados = estados if estados is not None else []
         self._ultimo_stg = ultimo_stg
@@ -160,6 +162,23 @@ class PgFalso:
         return None
 
     # --- lecturas ---
+    def list_objetos_catalogo(self, schemas: object) -> list[tuple[str, str, str]]:
+        """Lo que el guardián de F-047 pide al terminar `run-all`.
+
+        Devuelve por defecto EXACTAMENTE lo que el repositorio declara, que es
+        la única respuesta que deja `run-all` en verde. No es complacencia con
+        el test: un `run-all` que termina sin haber construido lo que el
+        repositorio declara TIENE que salir con código 1, y eso lo comprueban
+        los tests de `tests/test_f047_nocturna.py` quitando objetos de aquí.
+        """
+        from etl_sigrid.infrastructure.inventario_repositorio import (
+            inventario_del_repositorio,
+        )
+
+        if self._catalogo is not None:
+            return list(self._catalogo)
+        return [(o.esquema, o.objeto, o.tipo) for o in inventario_del_repositorio()]
+
     def fetch_estado_raw(self) -> list[EstadoTablaRaw]:
         if self._error_al_leer is not None:
             raise self._error_al_leer

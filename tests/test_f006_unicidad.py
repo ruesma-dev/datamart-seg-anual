@@ -243,6 +243,11 @@ CONSUMIDORES = (
     "main.py",
     "etl_sigrid/infrastructure/postgres/postgres_client.py",
     "etl_sigrid/application/steps/publicar_diccionario_step.py",
+    # F-047: el único consumidor de `objetos_de_sql` y `objetos_de_raw` desde
+    # que las doce líneas de lectura de ficheros —copiadas en el step de
+    # publicación y en la puerta de cobertura— se unificaron aquí. El barrido
+    # las dio por muertas en cuanto se movieron, que es exactamente su trabajo.
+    "etl_sigrid/infrastructure/inventario_repositorio.py",
 )
 
 

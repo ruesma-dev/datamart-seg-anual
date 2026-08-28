@@ -1,0 +1,30 @@
+# config/objetos_pendientes.yaml
+#
+# Objetos que el SQL de este repositorio DECLARA y que todavia no toca construir
+# en la base. Es la valvula de la puerta `python main.py check-declarados`
+# (F-047), que corre al final de `run-all` y contrasta lo que `sql/**` dice que
+# crea contra `information_schema`.
+#
+# POR QUE EXISTE. El cierre NO esta terminado --F-017 (costes indirectos) y
+# F-018 (validacion de los numeros)--, asi que puede haber objetos escritos en
+# el repositorio que aun no formen parte de ningun build. Aplazarlos es
+# legitimo; ignorarlos, no. Mismo criterio y mismo patron que `pendientes` en
+# `config/diccionario/00_global.yaml`: OBJETO CONSTRUIDO O PENDIENTE DECLARADO.
+#
+# ES UN TRINQUETE: SOLO BAJA.
+#   * un pendiente que YA existe en la base rompe la puerta: borralo de aqui;
+#   * un pendiente que el repositorio ni siquiera declara rompe la puerta:
+#     infla el trinquete sin aplazar nada real.
+# La constante PENDIENTES_CONSTRUCCION_MAX de tests/test_f047_guardian.py vale
+# exactamente lo que hay aqui, y bajarla es parte de la tarea que construye el
+# objeto, no un apano posterior.
+#
+# HOY LA LISTA ESTA VACIA, y eso es un dato, no un descuido: los 72 objetos que
+# `sql/**` declara mas las 31 tablas de `raw` los construyen los diez pasos de
+# `run-all`. Medido el 2026-08-21 tras lanzar los cuatro build a mano:
+# `check-diccionario` dio biyeccion exacta, 103 fichas y 103 objetos.
+#
+# Formato: `esquema.objeto`, uno por linea, con un comentario que diga POR QUE
+# se aplaza y que feature lo construye.
+
+pendientes: []

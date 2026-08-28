@@ -433,10 +433,11 @@ def test_f006_r25_dominio_el_informe_es_inmutable() -> None:
 
 from pathlib import Path  # noqa: E402 - la puerta sí toca ficheros
 
-import yaml  # noqa: E402
-
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import (  # noqa: E402
     cargar_diccionario,
+)
+from etl_sigrid.infrastructure.inventario_repositorio import (  # noqa: E402
+    inventario_del_repositorio,
 )
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -465,15 +466,14 @@ PENDIENTES_MAX = 0
 
 
 def _inventario_del_repositorio():
-    """Los objetos que este repositorio publica, leídos de sus propios ficheros."""
-    textos = {
-        str(ruta.relative_to(DIR_SQL)).replace("\\", "/"): ruta.read_text(
-            encoding="utf-8"
-        )
-        for ruta in DIR_SQL.rglob("*.sql")
-    }
-    tablas = yaml.safe_load(YAML_TABLAS.read_text(encoding="utf-8"))["tables"]
-    return objetos_de_sql(textos) + objetos_de_raw(tablas)
+    """Los objetos que este repositorio publica, leídos de sus propios ficheros.
+
+    Delega en la función de producción (F-047): esta puerta y la del step de
+    publicación tenían cada una su copia de la lectura, y una puerta que se
+    comprueba contra su propio inventario puede quedarse verde mientras el
+    inventario de verdad cambia.
+    """
+    return inventario_del_repositorio(DIR_SQL, YAML_TABLAS)
 
 
 def test_f006_r24_puerta_el_inventario_no_esta_vacio() -> None:

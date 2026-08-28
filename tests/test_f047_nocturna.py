@@ -162,3 +162,102 @@ def test_f047_r4_los_cuatro_son_steps_de_verdad_y_dejan_fila(paso: str) -> None:
 
     assert isinstance(step, PipelineStep)
     assert step.stage == paso
+
+
+# ===========================================================================
+# R5 · el guardián corre AL FINAL de `run-all`
+#
+# El incidente de F-047 no fue una noche en rojo: fue una noche EN VERDE que
+# había destruido `cierre.v_pbi_planif_vs_real`. Mientras nadie contraste lo
+# que el repositorio declara contra lo que la base tiene, un build puede dejar
+# de crear un objeto y la carga seguirá diciendo que todo fue bien.
+#
+# Se reutilizan los dobles de F-024 —el mismo `PgFalso` y el mismo `cli`— en
+# vez de montar otros: son los que ya ejercitan `run-all` entero.
+# ===========================================================================
+
+from click.testing import CliRunner  # noqa: E402
+
+from tests.test_f024_cli import (  # noqa: E402
+    STEPS_POR_COMANDO,
+    PgFalso,
+    paso_falso,
+    settings_falsos,
+)
+
+
+def _run_all(monkeypatch, pg) -> object:
+    """Invoca `run-all` con los dobles de F-024 y sin red ni BBDD.
+
+    Se replican aquí las cinco líneas de la fixture `cli` de F-024 en vez de
+    importarla: importar una fixture de otro módulo de test la redefine en el
+    espacio de nombres y ruff lo marca (F811) en cada test que la use.
+    """
+    monkeypatch.setattr(main, "get_settings", lambda: settings_falsos())
+    monkeypatch.setattr(main, "configure_logging", lambda **_k: None)
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    for atributo, nombre, stage in STEPS_POR_COMANDO.values():
+        monkeypatch.setattr(main, atributo, paso_falso(nombre, stage))
+    return CliRunner().invoke(main.cli, ["run-all"])
+
+
+def _catalogo_completo() -> list[tuple[str, str, str]]:
+    """Lo que la base tendría tras una noche que sí construyó todo."""
+    from etl_sigrid.infrastructure.inventario_repositorio import (
+        inventario_del_repositorio,
+    )
+
+    return [(o.esquema, o.objeto, o.tipo) for o in inventario_del_repositorio()]
+
+
+def test_f047_r5_run_all_con_todo_construido_termina_en_verde(monkeypatch) -> None:
+    """Control: sin esto, el test de abajo pasaría aunque `run-all` fallara
+    siempre por cualquier otro motivo."""
+    resultado = _run_all(monkeypatch, PgFalso(catalogo=_catalogo_completo()))
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "declarados" in resultado.output
+
+
+def test_f047_r5_run_all_sale_con_uno_si_falta_lo_que_el_repositorio_declara(
+    monkeypatch,
+) -> None:
+    """LA REGRESIÓN DE F-047, reproducida de punta a punta.
+
+    Todos los pasos terminan en SUCCESS —la noche «fue bien»— y aun así falta
+    en la base la vista que `cierre/06_views_planif_vs_real.sql` declara. Antes
+    esto salía con código 0 y nadie se enteraba durante semanas.
+    """
+    catalogo = [f for f in _catalogo_completo() if f[1] != "v_pbi_planif_vs_real"]
+
+    resultado = _run_all(monkeypatch, PgFalso(catalogo=catalogo))
+
+    assert resultado.exit_code == 1
+    assert "DECLARADO Y NO CONSTRUIDO" in resultado.output
+    assert "cierre.v_pbi_planif_vs_real" in resultado.output
+
+
+def test_f047_r5_run_all_no_se_traga_un_fallo_al_leer_el_catalogo(
+    monkeypatch,
+) -> None:
+    """Si el guardián no puede comprobar nada, la noche NO puede darse por
+    buena: sería exactamente el agujero que viene a tapar."""
+
+    class PgQueNoSabeMirar(PgFalso):
+        def list_objetos_catalogo(self, schemas: object):
+            raise RuntimeError("permission denied for schema _meta")
+
+    resultado = _run_all(monkeypatch, PgQueNoSabeMirar())
+
+    assert resultado.exit_code == 1
+    assert "no se pudo comprobar lo declarado" in resultado.output
+
+
+def test_f047_r5_el_guardian_corre_despues_del_ultimo_paso(monkeypatch) -> None:
+    """Antes de `apply_grants` no probaría nada: los grants no crean objetos,
+    pero los cuatro build sí, y el guardián tiene que ver el resultado de todos.
+    """
+    resultado = _run_all(monkeypatch, PgFalso(catalogo=_catalogo_completo()))
+
+    salida = resultado.output
+    assert salida.index("apply_grants") < salida.index("declarados"), salida

@@ -98,7 +98,9 @@ class BuildComprasStep(PipelineStep):
             t0 = datetime.utcnow()
             try:
                 pg.execute_sql_file(sql_path)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # captura amplia a proposito:
+                # cualquier fallo del SQL tiene que salir con el nombre
+                # del sub-paso, no como traza cruda a las tres de la manana
                 duration = (datetime.utcnow() - t0).total_seconds()
                 logger.error(
                     "compras_substep_failed",
