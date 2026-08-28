@@ -72,9 +72,16 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 ## Mapa del repositorio (no leas todo el proyecto, ve a lo que necesites)
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
-  stage, build-mart, publicar-diccionario, run-all, status.
+  stage, build-mart, publicar-diccionario, run-all, status. `run-all` construye
+  el datamart ENTERO desde F-047: diez pasos, con los cuatro build de negocio
+  —maestros, compras, retenciones y cierre— dentro y en ese orden. `cierre` va
+  después de `mart` porque `mart` destruye lo que `cierre` construye.
 - `config/` — `settings.py` (pydantic-settings sobre `.env`),
-  `tables_sigrid.yaml` (tablas a ingerir), `business_rules.yaml`.
+  `tables_sigrid.yaml` (tablas a ingerir), `business_rules.yaml`,
+  `objetos_pendientes.yaml` (F-047: los objetos que el SQL declara y que aún no
+  toca construir; lo vigila `check-declarados`, que corre al final de `run-all`
+  y hace salir con código 1 la noche que un build no deje lo que el repositorio
+  declara. Trinquete: solo baja).
 - `config/diccionario/` — el **diccionario semántico** del datamart (F-006):
   un YAML por esquema más `00_global.yaml` con las reglas duras. Lo publica en
   `_meta` el paso `publicar_diccionario`, y de ahí lo lee el MCP por SQL. Quien

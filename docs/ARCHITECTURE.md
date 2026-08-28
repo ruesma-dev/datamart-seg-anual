@@ -208,8 +208,8 @@ poder preguntarle a nadie si algo no encaja.
   construye, y cualquier otro sitio se desincroniza. Por eso la ficha se
   actualiza en el mismo trabajo que el objeto (`docs/CONVENTIONS.md`).
 - **El paso `publicar_diccionario`** los carga, valida, deriva los avisos y los
-  escribe. Va dentro de `run-all`, **entre `build_mart` y `apply_grants`**, y
-  ese orden no es cosmético: `apply_grants` concede `SELECT` sobre lo que hay
+  escribe. Va dentro de `run-all`, **entre los cuatro build de negocio y
+  `apply_grants`**, y ese orden no es cosmético: `apply_grants` concede `SELECT` sobre lo que hay
   en `_meta` en ese instante, así que publicar después dejaría las tablas del
   contrato colgando solo de los privilegios por defecto. Suelto, el comando es
   `python main.py publicar-diccionario`.
@@ -248,6 +248,51 @@ poder preguntarle a nadie si algo no encaja.
 
 Lo que este proyecto **expone al ecosistema** y quién lo consume está en
 `azure-apps/datamart_seg_anual.md`, y no se duplica aquí.
+
+### La nocturna construye TODO el datamart, y lo demuestra (F-047)
+
+Hasta el 2026-08-28 `run-all` construía `raw → stg → mart` y nada más.
+`cierre`, `compras`, `maestro` y `retenciones` se lanzaban a mano y podían
+estar desfasados semanas. Los diez pasos de hoy, en orden:
+
+```
+ingest_raw → load_excel_aux → build_stg → build_mart
+           → build_maestros → build_compras → build_retenciones → build_cierre
+           → publicar_diccionario → apply_grants
+```
+
+- **`build_cierre` va después de `build_mart`, y es una dependencia de
+  DESTRUCCIÓN, no de datos.** `mart/03_agg_categoria.sql` dropea
+  `mart.fact_seguimiento_categoria` con `CASCADE`, y
+  `cierre.v_pbi_planif_vs_real` cuelga de esa tabla en `pg_depend`: la
+  nocturna la **destruía** cada noche y nadie la recreaba. Está declarado en
+  `BuildCierreStep.depends_on`, no confiado al orden de la lista: un
+  comentario se borra, el orden topológico obedece.
+- **`apply_grants` sigue siendo el último.** Los cuatro build recrean vistas
+  con `DROP` + `CREATE` y un `DROP` se lleva los `GRANT`. Y **no** depende de
+  ellos a propósito: si `build_cierre` falla una noche, los permisos del MCP
+  se reaplican igual. El precio es que un esquema puede quedarse atrás sin
+  tumbar la carga, y por eso la regla dura `R-FRESCURA` del diccionario manda
+  citar la frescura DEL PASO, no la del pipeline.
+- **Los cuatro registran paso** en `_meta.etl_runs` con el `batch_id` de la
+  noche. `build-compras` y `build-retenciones` no lo hacían —ejecutaban SQL en
+  línea, sin step—, así que su fecha de build no era consultable por SQL
+  mientras el diccionario mandaba citarla.
+- **Coste medido** (2026-08-21, con el disco vigilado): +37,5 min sobre 2 h 46,
+  de los que `build_cierre` se lleva el 74 %. El disco no se movió (57,92 % →
+  57,93 % sobre un límite del 80 %): estos cuatro reconstruyen desde `raw` y
+  `stg`, no acumulan como `plan_mensual`.
+
+**El guardián.** `run-all` termina contrastando **lo que el SQL del
+repositorio declara crear** contra `information_schema`, y sale con código 1
+si falta algo. Es la pregunta que no hacía nadie: la puerta de `init.sh`
+compara el SQL contra las fichas y `check-diccionario` compara las fichas
+contra la base, y por el hueco entre las dos se coló F-047 durante semanas.
+Suelto es `python main.py check-declarados`, de solo lectura. Lo que
+legítimamente aún no toca construir se declara en
+`config/objetos_pendientes.yaml`, mismo patrón y mismo trinquete que
+`pendientes` en el diccionario: **objeto construido o pendiente declarado**, y
+la lista solo baja.
 
 ## Infra
 
