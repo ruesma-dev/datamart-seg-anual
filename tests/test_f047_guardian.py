@@ -242,3 +242,25 @@ def test_f047_r7_la_evaluacion_es_inmutable() -> None:
     assert isinstance(informe, EvaluacionConstruccion)
     with pytest.raises(FrozenInstanceError):
         informe.no_construidos = ()  # type: ignore[misc]
+
+
+def test_f047_r7_una_evaluacion_recien_construida_no_cuenta_nada() -> None:
+    """Los valores por defecto son parte del contrato, no relleno.
+
+    `EvaluacionConstruccion()` se puede construir sin un solo argumento —todos
+    sus campos tienen defecto— y entonces tiene que significar «no se declaró
+    nada y no se construyó nada». Un defecto de 1 haría que una evaluación
+    vacía afirmase un objeto declarado y otro construido, y ese número es el
+    que sale impreso en la cabecera del informe de la nocturna.
+
+    Lo destapó la campaña de mutación: `declarados: int = 0 -> 1` y
+    `construidos: int = 0 -> 1` sobrevivían las dos, porque
+    `evaluar_construccion` siempre pasa los dos campos y nadie miraba el
+    defecto.
+    """
+    vacia = EvaluacionConstruccion()
+
+    assert (vacia.declarados, vacia.construidos) == (0, 0)
+    assert vacia.ok
+    assert "declarados: 0" in formatear_construccion(vacia)
+    assert "construidos: 0" in formatear_construccion(vacia)

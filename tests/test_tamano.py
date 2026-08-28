@@ -295,3 +295,21 @@ def test_la_puerta_de_init_descarta_las_features_done() -> None:
 
     assert 'ficha.get("status") == "done"' in bloque
     assert "ficha = None" in bloque
+
+
+def test_sin_feature_el_cli_no_adivina_cual_medir() -> None:
+    """`--feature` es OBLIGATORIA, y sin ella argparse aborta con codigo 2.
+
+    Lo destapo la campana de mutacion de F-047: con `required=False` la opcion
+    llegaria a `None` y la puerta mediria «la feature None», es decir, ningun
+    fichero, y saldria en verde sin haber comprobado nada. Un tope que no mide
+    nada es peor que no tenerlo, porque parece que mide.
+    """
+    import pytest as _pytest
+
+    from harness.tamano import main as _main
+
+    with _pytest.raises(SystemExit) as salida:
+        _main([])
+
+    assert salida.value.code == 2

@@ -251,6 +251,11 @@ def test_f047_r5_run_all_no_se_traga_un_fallo_al_leer_el_catalogo(
 
     assert resultado.exit_code == 1
     assert "no se pudo comprobar lo declarado" in resultado.output
+    # Y por STDERR, no por stdout: el job nocturno redirige cada uno a su sitio,
+    # y un aviso de que la comprobacion no se pudo hacer enterrado entre las
+    # cuatro mil lineas de la carga es un aviso que no lee nadie. Lo destapo la
+    # campana de mutacion: `err=True -> False` sobrevivia.
+    assert "no se pudo comprobar lo declarado" in resultado.stderr
 
 
 def test_f047_r5_el_guardian_corre_despues_del_ultimo_paso(monkeypatch) -> None:

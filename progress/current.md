@@ -4,8 +4,10 @@
 ## EN CURSO: F-047 · la nocturna desfasada (absorbe F-044)
 
 Rama `feature/F-047-nocturna-desfasada`. Implementación **terminada**, `bash
-harness/init.sh` **en verde** (2.569 tests, 128 saltados; cobertura 100 % de 259
-líneas cambiadas). Informe: `progress/impl_F-047.md`.
+harness/init.sh` **en verde** (2.581 tests, 128 saltados; cobertura 100 % de 259
+líneas cambiadas). Campaña de mutación **en serie**: 70 mutantes, 63 muertos,
+**7 supervivientes, todos con test, 0 finales**. Informes:
+`progress/impl_F-047.md` y `progress/mutacion_F-047.md`.
 
 **La causa raíz, ya cerrada** (`progress/explore_F-047.md`): la nocturna no
 dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**.
@@ -49,7 +51,12 @@ así que nadie la recreaba.
   ADVERTIR de un agujero y ahora exige que el agujero no exista.
 - **La campaña de mutación se lanzó EN SERIE** (`--workers 1`), no en paralelo:
   con 70 mutantes salía a cuenta, y así no aplica la regla de reverificación de
-  F-041 —la campaña paralela produce falsos muertos—.
+  F-041 —la paralela produce falsos muertos—. Costó **2 h 32 min**.
+- **HALLAZGO PARA F-041, y es nuevo**: uno de los siete supervivientes era
+  **FALSO**, y la campaña era EN SERIE. F-041 solo documenta falsos MUERTOS del
+  modo paralelo; esto es un falso superviviente con un solo worker, y el
+  sospechoso es el `__pycache__` (defecto 2 de esa ficha, que se creía exclusivo
+  del paralelo). Dirección inofensiva, pero **hay que añadirlo a la ficha**.
 
 ---
 

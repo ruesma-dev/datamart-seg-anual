@@ -170,6 +170,13 @@ def test_un_fichero_de_entorno_ilegible_tampoco_rompe_nada(
         ("CLAVE='valor'", {"CLAVE": "valor"}),
         ('CLAVE="', {"CLAVE": '"'}),
         ("CLAVE=", {"CLAVE": ""}),
+        # Las comillas que envuelven un valor VACIO tambien se quitan: son dos
+        # caracteres y el valor de dentro es la cadena vacia. Lo caza la campana
+        # de mutacion de F-047: con `len(valor) > 2` en vez de `>= 2`, un
+        # `CLAVE=""` acababa valiendo literalmente `""`, dos comillas, y esa
+        # variable se exportaba asi al entorno del worker.
+        ('CLAVE=""', {"CLAVE": ""}),
+        ("CLAVE=''", {"CLAVE": ""}),
         ("CLAVE=uno=dos", {"CLAVE": "uno=dos"}),
         ("CLAVE=contra#seña", {"CLAVE": "contra#seña"}),
         ("# CLAVE=valor", {}),
