@@ -15,27 +15,66 @@ dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**.
 `CASCADE` y esa vista cuelga de la tabla; `build-cierre` no entraba en `run-all`,
 así que nadie la recreaba.
 
-### Lo que queda para cerrarla
+### Verificado contra la base el 2026-08-28 (ya no está pendiente)
 
-1. **Verificación contra la base, pendiente de conexión.** El puesto no llega a
-   `psql-albaranes-rs9k2` (puerto 5432 cerrado desde esta IP). Todo lo de abajo
-   es LECTURA salvo donde se diga:
-   - `python main.py check-declarados` → debería dar los 103 declarados y decir
-     cuántos faltan de verdad hoy;
-   - `python main.py check-diccionario` → la huérfana sigue siendo esa y solo esa;
-   - `_meta.etl_runs` → fechar el borrado contra la última nocturna;
-   - `pg_depend` → que no haya otros dependientes de
-     `mart.fact_seguimiento_categoria` creados fuera del repositorio.
-2. **La decisión de ventana la toma el humano, no el agente.** La nocturna pasa
-   de 2 h 46 a unas 3 h 24 (+37,5 min medidos el 2026-08-21). Arrancando a las
-   02:00 UTC el final se mueve de 04:46 a ~05:24 UTC. Entra, pero deja menos
-   margen para un reintento. Adelantar el arranque o recortar es decisión suya.
-3. **Publicar el diccionario versión 10** (`publicar-diccionario` es una
-   ESCRITURA contra Azure: la autoriza el humano). Hasta entonces `_meta` sirve
-   la versión 9, que dice que `cierre`, `compras`, `maestro` y `retenciones` son
-   de refresco manual, y ya no lo son. El diccionario del árbol son hoy **103
-   objetos**, **798 columnas** documentadas y **46 fichas de consumo**; el
-   contenido cambió (40 fichas y una regla dura), el inventario no.
+La conexión se recuperó: la IP del puesto no estaba en el firewall del
+servidor; regla `datamart-puesto-pgris-2026-08-28` creada con autorización del
+humano. Detalle en `progress/explore_F-047.md`.
+
+- `check-diccionario`: 103 fichas, 102 objetos. La huérfana es esa **y solo esa**.
+- `check-declarados` contra el servidor real: señala el objeto **y su fichero**,
+  y sale con **código 1** (medido sin pipe: con `| tail` se lee el exit de `tail`).
+- `_meta.etl_runs` **cierra el caso**: `build_cierre` último OK el **2026-08-21
+  23:30** (la ejecución manual del humano), `build_mart` el **2026-08-28 04:56**
+  (la nocturna). La vista nació el 21 y la nocturna del 22 se la llevó.
+
+### LA CONDICIÓN DE CIERRE PRINCIPAL: el despliegue lleva congelado desde el 18
+
+El job nocturno `caj-datamart-seg-dev` (cron `0 2 * * *`, grupo
+`rg-datamart-seg-dev`) ejecuta la imagen
+**`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260818-2146`**, del 18 de
+agosto, que además **es la más reciente del ACR**. Lleva diez noches terminando
+`Succeeded` con código de hace diez días.
+
+Lo delató que `publicar_diccionario` —paso de F-006— no dejara rastro nocturno
+mientras `apply_grants`, que va justo después en el pipeline, sí lo dejaba.
+
+**Nada de F-006 ni de F-047 corre hoy en producción.** La causa raíz tiene dos
+capas: el `CASCADE` (destruye la vista) y el despliegue parado (impide que el
+arreglo llegue). Enlaza con **F-033**. Desplegar lo decide el humano.
+
+### La SECUENCIA de las acciones manuales (el orden IMPORTA)
+
+Las tres son escrituras contra producción y las autoriza el humano una a una.
+**Publicar el diccionario va el ÚLTIMO, y no es un detalle de estilo:**
+
+1. **Construir y desplegar imagen nueva.** Sin esto, los otros dos pasos
+   maquillan el síntoma y la nocturna vuelve a destruir la vista esa misma noche.
+2. **Dejar correr una nocturna** (o lanzar `build-cierre` a mano para recrear la
+   vista hoy; autorizado por el humano el 2026-08-28, **bloqueado por el
+   clasificador de permisos de la sesión**, sin ejecutar).
+3. **`publicar-diccionario`** (versión 10). `R-FRESCURA` promete que la fecha de
+   build de los cuatro «siempre es consultable», y `_meta.v_frescura` **no tiene
+   hoy ninguna fila** de `build_compras` ni `build_retenciones`. Publicarlo antes
+   de que corra una noche haría que el MCP sirviera una regla **bloqueante** que
+   manda a una consulta vacía: una mentira nueva del tipo que F-047 vino a matar.
+   Hoy no hay daño porque `_meta` sigue sirviendo la versión 9.
+
+### La decisión de ventana, que tampoco toma el agente
+
+La nocturna pasa de 2 h 46 a unas 3 h 24 (+37,5 min medidos el 2026-08-21).
+Arrancando a las 02:00 UTC el final se mueve de 04:46 a ~05:24 UTC (07:24 hora
+local). Entra, pero deja menos margen para un reintento. Adelantar el arranque o
+recortar es decisión del humano.
+
+### Estado de la review
+
+**RECHAZADO el 2026-08-28** (`progress/review_F-047.md`), y con una distinción
+que importa: **código, tests y campaña quedan APROBADOS y sin retoque**. El
+rechazo es de documentación —seis afirmaciones en presente de
+`azure-apps/datamart_seg_anual.md` que hoy son falsas en producción, la peor un
+pretérito («la nocturna **destruía**») cuando la sigue destruyendo cada noche—,
+más esta secuencia y este fichero. En corrección.
 
 ### Lo que hay que mirar sí o sí en la review
 
