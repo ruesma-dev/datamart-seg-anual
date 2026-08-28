@@ -1,6 +1,67 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-28
 
+## F-042 · `in_progress` — FASE 1 (evidencia) ENTREGADA, spec EN ESPERA
+
+Rama `feature/F-042-clave-fact`. El humano pidió **antes que la spec** un
+resumen de las obras afectadas y del problema exacto, para contrastarlo con los
+números que él conoce de cada obra. Está en **`progress/explore_F-042.md`**,
+medido hoy contra la base real **en solo lectura** (`default_transaction_read_only
+= on`, cierre con `ROLLBACK`; ni una escritura).
+
+**Lo que hay que llevarse de la evidencia:**
+
+1. **Los tres conjuntos están encajados: 22 ⊃ 9 ⊃ 7.** 22 obras con fases que
+   chocan, 9 que llegan a duplicar filas, y **7 —no 8— con dinero mal
+   publicado**. **0433** y **0606** duplican filas pero su gemela vale 0 €.
+2. **NO hay un patrón, hay dos**, y se separan con «¿la fase termina dentro del
+   mes que declara?». **Patrón 1** (14 obras, 16 colisiones): dos cierres de
+   quincena dentro del mismo mes, el `mes` es correcto en las dos. **Patrón 2**
+   (8 obras, 8 colisiones): la fase abarca varios meses y `ano/mes` se quedó en
+   el de arranque —el ejemplo de la ficha, la 0246 «AGOSTO 2010» con `mes = 6`—.
+   **Cada patrón pide un arreglo distinto: una sola hipótesis para las 22 no se
+   sostiene.**
+3. **La cifra de la ficha no reproduce.** 8.778 / 17.556 / 9 obras / 22 obras
+   salen **clavados**; los **39,07 M€ en 37 celdas de 8 obras, no**, y no hay
+   forma de repetirlos porque esa consulta nunca se publicó. Medido hoy con la
+   regla que se sostiene («manda la fase que termina dentro del mes»):
+   **30.425.881,56 € en 35 celdas de 7 obras**. La regla ingenua («la fase de
+   número mayor») da 48,67 M€ e incluye 18,24 M€ falsos de la 0606.
+4. **Hallazgos nuevos que la ficha no traía**, y que la spec debe recoger:
+   - **El patrón 2 hace desaparecer meses**: la 0246 no tiene jul ni ago 2010;
+     la 0571 no tiene jun, jul ni ago 2020.
+   - **La 0462 · RETAMAR tiene el mes en conflicto como ÚLTIMO mes**: su total
+     definitivo está publicado al doble **para siempre** (395.309,32 € cuando
+     costó 197.654,52 €). No hay mes posterior que lo corrija.
+   - **`cierre.v_pbi_planif_vs_real` también cuelga** de
+     `mart.fact_seguimiento_categoria` —la ficha solo nombraba
+     `v_pbi_fact_categoria`—. Se salva del doblado porque usa `importe_mes`,
+     pero el patrón 2 le mete tres meses de real en uno.
+   - **El aviso del diccionario NO llega al consumidor**: está en la ficha de
+     `mart.fact_seguimiento_categoria` pero **no** en la de
+     `mart.v_pbi_fact_categoria`, que es la vista que Power BI y el MCP abren.
+     Es la lección de F-006 repetida un nivel más abajo.
+   - Los **seis** objetos afectados tienen `SELECT` para `mcp_sigrid_dm_ro`, rol
+     **compartido hoy por el MCP y Power BI**.
+5. **No está creciendo: cero colisiones en 2022, 2023, 2024, 2025 y 2026**,
+   mientras el volumen de fases pasaba de 297 a 462 al año. La última es de
+   feb-2021 y es justo la que no cuesta dinero. Todas las obras afectadas están
+   terminadas (la más reciente cerró en sep-2020). Es residuo histórico: no hay
+   prisa de nocturna, pero cada `build-mart` lo reescribe igual.
+
+**DECISIÓN DE NEGOCIO PENDIENTE, y el spec-author PARA aquí.** En las 14 obras
+de patrón 1, ¿los dos cierres del mes son dos medidas que Negocio quiere
+conservar por separado —y entonces la clave necesita el número de fase,
+publicado— o son un apaño de obra que a efectos de seguimiento anual sobra? De
+eso depende el diseño entero, y **no lo decide ningún agente**. Consecuencias
+numéricas de cada hipótesis, en el §8 de `explore_F-042.md`.
+
+**Lo siguiente en F-042**: con la respuesta del humano, escribir
+`specs/F-042-clave-fact/` (requirements + design + tasks). Sin la respuesta, la
+spec no se puede cerrar: patrón 1 y patrón 2 no admiten el mismo arreglo.
+
+---
+
 ## F-047 · CERRADA el 2026-08-28 (absorbio F-044)
 
 Aprobada por el reviewer en la 3ª pasada y **desplegada en producción el mismo
