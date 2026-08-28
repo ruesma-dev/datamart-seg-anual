@@ -40,6 +40,28 @@ class _SubStep:
     target_table: str | None = None
 
 
+#: Los tres ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#:
+#: Vive fuera de `run()` por lo mismo que en `build_compras_step`: es DATO, y
+#: sustituirla en un test es lo único que permite ejercitar el guardián de
+#: `target_schema`/`target_table`.
+SUB_PASOS: tuple[_SubStep, ...] = (
+    _SubStep(
+        name="setup",
+        sql_file="00_setup.sql",
+        target_schema="retenciones",
+        target_table="tipos",
+    ),
+    _SubStep(
+        name="movimientos",
+        sql_file="01_movimientos.sql",
+        target_schema="retenciones",
+        target_table="movimientos",
+    ),
+    _SubStep(name="views", sql_file="02_views.sql"),
+)
+
+
 class BuildRetencionesStep(PipelineStep):
     """Construye el schema `retenciones` (movimientos y vistas de saldo)."""
 
@@ -68,24 +90,8 @@ class BuildRetencionesStep(PipelineStep):
             / "infrastructure" / "postgres" / "sql" / "retenciones"
         )
 
-        sub_steps: list[_SubStep] = [
-            _SubStep(
-                name="setup",
-                sql_file="00_setup.sql",
-                target_schema="retenciones",
-                target_table="tipos",
-            ),
-            _SubStep(
-                name="movimientos",
-                sql_file="01_movimientos.sql",
-                target_schema="retenciones",
-                target_table="movimientos",
-            ),
-            _SubStep(name="views", sql_file="02_views.sql"),
-        ]
-
         total_rows = 0
-        for sub in sub_steps:
+        for sub in SUB_PASOS:
             sql_path = sql_dir / sub.sql_file
             if not sql_path.exists():
                 result.status = StepStatus.FAILED

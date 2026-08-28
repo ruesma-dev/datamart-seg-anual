@@ -41,6 +41,31 @@ class _SubStep:
     target_table: str | None = None
 
 
+#: Los cuatro ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#:
+#: Vive fuera de `run()` a propósito: es DATO, no lógica. Así se puede leer sin
+#: entrar en el bucle y —lo que lo motivó— se puede sustituir en un test para
+#: ejercitar el guardián de `target_schema`/`target_table`, que con esta lista
+#: cableada no se podía: todos sus sub-pasos declaran los dos campos o ninguno,
+#: y por eso el mutante `and -> or` sobrevivía a la campaña.
+SUB_PASOS: tuple[_SubStep, ...] = (
+    _SubStep(name="setup", sql_file="00_setup.sql"),
+    _SubStep(
+        name="documentos",
+        sql_file="01_documentos.sql",
+        target_schema="compras",
+        target_table="contratos",
+    ),
+    _SubStep(
+        name="fact_linea",
+        sql_file="02_fact_linea.sql",
+        target_schema="compras",
+        target_table="fact_compras_linea",
+    ),
+    _SubStep(name="views", sql_file="03_views.sql"),
+)
+
+
 class BuildComprasStep(PipelineStep):
     """Construye el schema `compras` (contratos, albaranes, facturas)."""
 
@@ -69,25 +94,8 @@ class BuildComprasStep(PipelineStep):
             / "infrastructure" / "postgres" / "sql" / "compras"
         )
 
-        sub_steps: list[_SubStep] = [
-            _SubStep(name="setup", sql_file="00_setup.sql"),
-            _SubStep(
-                name="documentos",
-                sql_file="01_documentos.sql",
-                target_schema="compras",
-                target_table="contratos",
-            ),
-            _SubStep(
-                name="fact_linea",
-                sql_file="02_fact_linea.sql",
-                target_schema="compras",
-                target_table="fact_compras_linea",
-            ),
-            _SubStep(name="views", sql_file="03_views.sql"),
-        ]
-
         total_rows = 0
-        for sub in sub_steps:
+        for sub in SUB_PASOS:
             sql_path = sql_dir / sub.sql_file
             if not sql_path.exists():
                 result.status = StepStatus.FAILED
