@@ -52,7 +52,7 @@ def test_f006_r9_son_trece_reglas_y_estas() -> None:
     assert len(CODIGOS_REGLAS_OBLIGATORIAS) == 13
     assert set(CODIGOS_REGLAS_OBLIGATORIAS) == {
         "R-SIGRID-CON",
-        "R-FRESCURA-MANUAL",
+        "R-FRESCURA",
         "R-IMPORTE-MES",
         "R-UNIVERSO-OBRA",
         "R-OBRA-ACTIVA",
@@ -395,7 +395,7 @@ def test_f006_r9_retencion_no_join_lineas_cita_el_incidente() -> None:
 
 def test_f006_r9_frescura_manual_nombra_los_cuatro_esquemas() -> None:
     dicc = _diccionario_real()
-    regla = next(r for r in dicc.reglas if r.codigo == "R-FRESCURA-MANUAL")
+    regla = next(r for r in dicc.reglas if r.codigo == "R-FRESCURA")
 
     assert set(regla.ambito) >= {"cierre", "compras", "maestro", "retenciones"}
     assert "_meta.v_frescura" in regla.regla
@@ -684,7 +684,7 @@ def test_f006_r10_los_recuentos_de_efectos_van_por_sentido() -> None:
 # ===========================================================================
 # Las reglas no pueden mandar consultar lo que no existe (defecto 6)
 #
-# `R-FRESCURA-MANUAL` mandaba usar `_meta.v_diccionario`, que la crea el bloque
+# `R-FRESCURA` mandaba usar `_meta.v_diccionario`, que la crea el bloque
 # E y hoy no existe. Una instruccion que el agente no puede ejecutar es una
 # instruccion que no se cumple, y el resultado es el mismo que no haberla
 # escrito: un dato de hace semanas dado sin advertencia.
@@ -723,7 +723,7 @@ def test_f006_r39_la_bateria_tampoco_cita_objetos_que_no_existen() -> None:
 
 def test_f006_r16_frescura_manual_cita_la_vista_que_si_existe_hoy() -> None:
     regla = next(
-        r for r in _diccionario_real().reglas if r.codigo == "R-FRESCURA-MANUAL"
+        r for r in _diccionario_real().reglas if r.codigo == "R-FRESCURA"
     )
 
     assert "_meta.v_frescura" in regla.regla
@@ -905,7 +905,7 @@ def test_f006_r9_la_regla_de_oro_de_sigrid_se_publica() -> None:
 
 
 # ---------------------------------------------------------------------------
-# La evidencia que cita `R-FRESCURA-MANUAL` tiene que seguir siendo cierta
+# La evidencia que cita `R-FRESCURA` tiene que seguir siendo cierta
 # ---------------------------------------------------------------------------
 #
 # Su `motivo` enumeraba los pasos de `run-all` —«IngestRaw, LoadExcelAux,
@@ -925,12 +925,12 @@ def test_f006_r9_la_regla_de_frescura_cita_el_pipeline_real() -> None:
 
     pasos = [p.name for p in main.build_pipeline_steps(get_settings())]
 
-    regla = next(r for r in _diccionario_real().reglas if r.codigo == "R-FRESCURA-MANUAL")
+    regla = next(r for r in _diccionario_real().reglas if r.codigo == "R-FRESCURA")
     texto = f"{regla.regla} {regla.motivo}"
 
     faltan = [p for p in pasos if p not in texto]
     assert faltan == [], (
-        f"`R-FRESCURA-MANUAL` enumera el pipeline nocturno y se ha dejado {faltan}. "
+        f"`R-FRESCURA` enumera el pipeline nocturno y se ha dejado {faltan}. "
         f"Los pasos reales son {pasos}: la lista de la regla se escribió a mano y "
         f"se quedó atrás cuando el bloque E insertó un paso nuevo"
     )

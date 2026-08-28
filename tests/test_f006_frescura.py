@@ -2,16 +2,19 @@
 """
 F-006 · Tests de frescura del diccionario (R13, R14).
 
-Por qué esto importa más de lo que parece. `run-all` construye `raw -> stg ->
-mart` y aplica los grants. **`cierre`, `compras`, `maestro` y `retenciones` NO
-están en el pipeline nocturno**: se construyen con comandos propios y pueden
-estar arbitrariamente desfasados. Una ficha que diga `refresco: nocturno` sobre
-uno de esos cuatro es exactamente la mentira que produce respuestas de hace
-semanas dadas con aplomo.
+Por qué esto importa más de lo que parece. Hasta el 2026-08-28 `run-all`
+construía `raw -> stg -> mart` y aplicaba los grants, y **`cierre`, `compras`,
+`maestro` y `retenciones` NO estaban en el pipeline nocturno**: se construían
+con comandos propios y podían estar arbitrariamente desfasados. F-047 metió los
+cuatro dentro, así que la mentira que este fichero vigila **ha cambiado de
+sentido**: ya no es declararse nocturno sin serlo, sino declararse `manual`
+corriendo de noche, que hace que el agente desconfíe de un dato bueno y cite una
+fecha que no hacía falta citar. Las dos direcciones se comprueban igual.
 
 La lista de pasos nocturnos **no se copia a mano**: se lee de
-`main.build_pipeline_steps`, la composición real. Si mañana `build-cierre` entra
-en el pipeline, estos tests cambian de veredicto solos.
+`main.build_pipeline_steps`, la composición real. Esa decisión de diseño es lo
+que hizo que el veredicto cambiara solo el día que `build-cierre` entró: ni el
+validador ni estos tests tenían una lista escrita a mano que actualizar.
 
 Ningún test de este fichero abre red ni BBDD: `build_pipeline_steps` solo
 construye objetos.
@@ -51,8 +54,10 @@ def pasos_del_pipeline_nocturno() -> tuple[str, ...]:
 
 PASOS_NOCTURNOS = pasos_del_pipeline_nocturno()
 
-#: Los cuatro esquemas que se construyen a mano (requirements §0.6).
-ESQUEMAS_MANUALES = ("cierre", "compras", "maestro", "retenciones")
+#: Los cuatro esquemas que se construían a mano y entraron en la nocturna con
+#: F-047. Se conservan como grupo porque siguen siendo un caso aparte: su paso
+#: no es dependencia de ningún otro, así que puede fallar sin tumbar la noche.
+ESQUEMAS_QUE_ENTRARON = ("cierre", "compras", "maestro", "retenciones")
 
 
 # ---------------------------------------------------------------------------
@@ -60,18 +65,23 @@ ESQUEMAS_MANUALES = ("cierre", "compras", "maestro", "retenciones")
 # ---------------------------------------------------------------------------
 
 
-def test_f006_r14_el_pipeline_nocturno_es_este_y_no_incluye_los_manuales() -> None:
+def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cuatro() -> None:
     """Si esto cambia, cambia el veredicto de R14, y así debe ser."""
     assert PASOS_NOCTURNOS == (
         "ingest_raw",
         "load_excel_aux",
         "build_stg",
         "build_mart",
+        "build_maestros",
+        "build_compras",
+        "build_retenciones",
+        "build_cierre",
         "publicar_diccionario",
         "apply_grants",
     )
-    for paso in ("build_cierre", "build_maestros", "build_compras", "build_retenciones"):
-        assert paso not in PASOS_NOCTURNOS
+    for paso in ("build_cierre", "build_maestros", "build_compras",
+                 "build_retenciones"):
+        assert paso in PASOS_NOCTURNOS
 
 
 # ---------------------------------------------------------------------------
@@ -114,23 +124,29 @@ def test_f006_r13_refresco_estatico_esta_exento_de_paso_etl() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("esquema", ESQUEMAS_MANUALES)
-def test_f006_r14_los_cuatro_esquemas_manuales_no_pueden_ser_nocturnos(
+@pytest.mark.parametrize("esquema", ESQUEMAS_QUE_ENTRARON)
+def test_f006_r14_un_paso_que_no_corre_de_noche_no_puede_ser_nocturno(
     esquema: str,
 ) -> None:
-    """Es la mentira que produce respuestas de hace semanas dadas con aplomo."""
+    """Es la mentira que produce respuestas de hace semanas dadas con aplomo.
+
+    Se prueba con un paso INVENTADO (`build_<esquema>_a_mano`) en vez de con el
+    paso real, porque los cuatro reales ya corren de noche desde F-047. La
+    dirección del error es la misma y sigue vigilada; lo que ya no se puede es
+    ilustrarla con un esquema concreto del repositorio.
+    """
     mentirosa = _ficha(
         esquema=esquema,
         objeto="un_objeto",
         refresco="nocturno",
-        paso_etl=f"build_{esquema}",
+        paso_etl=f"build_{esquema}_a_mano",
     )
 
     errores = validar(_dicc(fichas=[mentirosa]), PASOS_NOCTURNOS)
 
     assert errores, f"{esquema} declarándose nocturno tenía que fallar"
     assert any(e.regla == "R14" for e in errores)
-    assert any(f"build_{esquema}" in e.detalle for e in errores)
+    assert any(f"build_{esquema}_a_mano" in e.detalle for e in errores)
 
 
 def test_f006_r14_declararse_manual_con_un_paso_nocturno_tambien_falla() -> None:
@@ -153,24 +169,27 @@ def test_f006_r14_una_ficha_manual_con_paso_fuera_del_pipeline_valida() -> None:
         esquema="cierre",
         objeto="fact_cierre_mensual",
         refresco="manual",
-        paso_etl="build_cierre",
+        paso_etl="build_cierre_a_mano",
     )
 
     assert validar(_dicc(fichas=[correcta]), PASOS_NOCTURNOS) == []
 
 
 def test_f006_r14_el_veredicto_sigue_al_pipeline_y_no_a_una_lista_copiada() -> None:
-    """El día que `build_cierre` entre en `run-all`, la misma ficha pasa a valer.
+    """Y PASÓ DE VERDAD: el 2026-08-28 `build_cierre` entró en `run-all` y las
+    doce fichas de `cierre` pasaron a valer sin tocar una línea del validador.
 
     Este test es la razón de que `pasos_nocturnos` se inyecte: comprueba que el
-    validador obedece a la composición que le den, no a una constante suya.
+    validador obedece a la composición que le den, no a una constante suya. Se
+    conserva con un paso que sigue fuera del pipeline, porque lo que fija es el
+    mecanismo, no qué esquema está dentro esta semana.
     """
     ficha = _ficha(esquema="cierre", objeto="fact_cierre_mensual",
-                   refresco="nocturno", paso_etl="build_cierre")
+                   refresco="nocturno", paso_etl="build_cierre_a_mano")
     dicc = _dicc(fichas=[ficha])
 
-    assert validar(dicc, PASOS_NOCTURNOS), "hoy build_cierre no corre de noche"
-    assert validar(dicc, (*PASOS_NOCTURNOS, "build_cierre")) == []
+    assert validar(dicc, PASOS_NOCTURNOS), "ese paso no corre de noche"
+    assert validar(dicc, (*PASOS_NOCTURNOS, "build_cierre_a_mano")) == []
 
 
 def test_f006_r14_refresco_estatico_no_se_cruza_con_el_pipeline() -> None:
@@ -199,14 +218,14 @@ def test_f006_r16_el_global_real_dice_como_citar_la_fecha_de_build() -> None:
     dicc, _ = cargar_diccionario(
         Path(__file__).resolve().parents[1] / "config" / "diccionario"
     )
-    regla = next(r for r in dicc.reglas if r.codigo == "R-FRESCURA-MANUAL")
+    regla = next(r for r in dicc.reglas if r.codigo == "R-FRESCURA")
 
     assert "_meta.v_frescura" in regla.regla
     assert "SELECT" in regla.regla.upper()
     assert regla.severidad == "bloqueante"
 
 
-def test_f006_r16_los_esquemas_manuales_del_global_coinciden_con_el_pipeline() -> None:
+def test_f006_r16_el_regimen_del_global_coincide_con_el_pipeline() -> None:
     """Lo que el bloque global promete tiene que ser lo que el pipeline hace."""
     from pathlib import Path
 

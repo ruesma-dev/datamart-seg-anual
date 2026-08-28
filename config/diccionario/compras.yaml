@@ -47,7 +47,7 @@ objetos:
       dentro de `OTRO` el par puede volver a repetirse.
     clave_negocio: [tipo_doc, linea_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
 
     columnas:
       tipo_doc:
@@ -197,7 +197,7 @@ objetos:
     grano: Una fila por contrato de compra. `contrato_id` es clave primaria.
     clave_negocio: [contrato_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       contrato_id:
         significado: Identificador del contrato en Sigrid (`con.ide`). Estable.
@@ -264,7 +264,7 @@ objetos:
     grano: Una fila por linea de contrato. `linea_id` es clave primaria aqui.
     clave_negocio: [linea_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       linea_id:
         significado: >-
@@ -345,7 +345,7 @@ objetos:
     grano: Una fila por documento de entrega. `albaran_id` es clave primaria.
     clave_negocio: [albaran_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       albaran_id:
         significado: Identificador del documento en Sigrid (`con.ide`).
@@ -407,7 +407,7 @@ objetos:
     grano: Una fila por linea de albaran, proforma o nota. `linea_id` es clave.
     clave_negocio: [linea_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       linea_id:
         significado: Identificador de la linea en Sigrid. Unico dentro de esta tabla.
@@ -503,7 +503,7 @@ objetos:
     grano: Una fila por factura o abono recibido. `factura_id` es clave primaria.
     clave_negocio: [factura_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       factura_id:
         significado: Identificador del documento en Sigrid (`con.ide`).
@@ -548,7 +548,7 @@ objetos:
     grano: Una fila por linea de factura o abono. `linea_id` es clave primaria.
     clave_negocio: [linea_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       linea_id:
         significado: Identificador de la linea en Sigrid. Unico dentro de esta tabla.
@@ -643,7 +643,7 @@ objetos:
       Una fila por `contrato_id`.
     clave_negocio: [contrato_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       contrato_id:
         significado: Identificador del contrato en Sigrid.
@@ -756,7 +756,7 @@ objetos:
       agrupar por la fecha.
     clave_negocio: [obra_id, codigo_obra, proveedor_id, proveedor_nombre, proveedor_cif, anio]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: Obra del gasto.
@@ -858,7 +858,7 @@ objetos:
       alli las notas SI cuentan.
     clave_negocio: [linea_id]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       albaran_id:
         significado: Documento de entrega al que pertenece la linea.
@@ -959,7 +959,7 @@ objetos:
       `compras.fact_compras_linea`.
     clave_negocio: [obra_id, codigo_obra, partida_id, codigo_partida, descripcion_partida]
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: >-
@@ -1039,7 +1039,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
@@ -1060,7 +1060,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
@@ -1080,7 +1080,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_compras
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []

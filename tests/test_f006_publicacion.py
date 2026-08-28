@@ -658,6 +658,13 @@ def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None
         "load_excel_aux",
         "build_stg",
         "build_mart",
+        # F-047 metió los cuatro build que se lanzaban a mano. Van ANTES de
+        # publicar y de los grants: los cuatro recrean vistas con DROP +
+        # CREATE, y un DROP se lleva los GRANT que `apply_grants` concede.
+        "build_maestros",
+        "build_compras",
+        "build_retenciones",
+        "build_cierre",
         "publicar_diccionario",
         "apply_grants",
     ]
@@ -676,8 +683,8 @@ def test_f006_r14_pipeline_los_pasos_nocturnos_se_inyectan_desde_la_composicion(
     """Ni el paso ni el validador tienen una lista de pasos escrita a mano.
 
     Se inyecta DESPUÉS de componer el pipeline, que es lo único que evita la
-    copia: el día que `build-cierre` entre en `run-all`, el veredicto de R14
-    cambia solo.
+    copia. Y funcionó: el 2026-08-28 `build-cierre` entró en `run-all` y el
+    veredicto de R14 cambió solo, sin tocar el validador ni el step.
     """
     import main
 
@@ -685,7 +692,7 @@ def test_f006_r14_pipeline_los_pasos_nocturnos_se_inyectan_desde_la_composicion(
     publicar = next(p for p in pasos if p.name == "publicar_diccionario")
 
     assert tuple(publicar.pasos_nocturnos) == tuple(p.name for p in pasos)
-    assert "build_cierre" not in publicar.pasos_nocturnos
+    assert "build_cierre" in publicar.pasos_nocturnos
 
 
 class _ClienteEspia:

@@ -184,8 +184,9 @@ objetos:
     consumo_recomendado: true
     descripcion: >-
       De cuando es el dato de cada paso del pipeline, y como fue el ultimo
-      intento. **Es el objeto que hay que citar al dar cualquier cifra**, y con
-      mas motivo si sale de un esquema de refresco manual.
+      intento. **Es el objeto que hay que citar al dar cualquier cifra**: cada
+      paso de la noche tiene su propia frescura y uno puede haber fallado sin
+      tumbar a los demas.
 
       Separa dos noticias que no son la misma: el ULTIMO OK y el ULTIMO INTENTO.
       Un `build_mart` que fallo esta noche deja `mart` con lo de ayer, y quien

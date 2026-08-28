@@ -39,7 +39,7 @@ objetos:
       la vista de resumen.
     clave_negocio: [obra_id, anio_mes, concepto]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
 
     columnas:
       cierre_id:
@@ -207,7 +207,7 @@ objetos:
       tabla base, se derivan aqui.
     clave_negocio: [obra_id, anio_mes, concepto]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
 
     columnas:
       obra_id:
@@ -380,12 +380,12 @@ objetos:
       Catalogo FIJO de los seis conceptos del cuadro de cierre, con su
       descripcion legible y su orden. No lee ninguna tabla: son seis filas
       escritas en la propia vista, asi que su contenido no cambia nunca. Declara
-      `refresco: manual` porque la VISTA se recrea con `build-cierre`, que es
-      otra cosa que el contenido.
+      `refresco: nocturno` porque la VISTA se recrea cada noche con
+      `build_cierre`, que es otra cosa que el contenido.
     grano: Una fila por concepto. Siempre seis.
     clave_negocio: [concepto]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas:
       concepto:
         significado: Clave del concepto, tal y como aparece en el cuadro de cierre.
@@ -411,12 +411,12 @@ objetos:
     descripcion: >-
       Catalogo FIJO de las seis tipologias de coste proporcional, con su
       descripcion y su orden. Mismas seis que usa `mart.v_pbi_cp_tipologia`. Su
-      contenido no cambia nunca; declara `refresco: manual` porque la VISTA se
-      recrea con `build-cierre`.
+      contenido no cambia nunca; declara `refresco: nocturno` porque la VISTA se
+      recrea cada noche con `build_cierre`.
     grano: Una fila por tipologia. Siempre seis.
     clave_negocio: [tipologia]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas:
       tipologia:
         significado: Clave de la tipologia de coste proporcional.
@@ -450,7 +450,7 @@ objetos:
       subcategoria del tercero.
     clave_negocio: [obra_id, grupo_cod, subcategoria_cod]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: >-
@@ -510,7 +510,7 @@ objetos:
       `nulo_significa`.
     clave_negocio: [obra_id, anio_mes, grupo_cod, subcategoria_cod]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: Identificador de la obra en Sigrid.
@@ -668,7 +668,7 @@ objetos:
       negocio.
     clave_negocio: [obra_id, anio_mes, tipologia]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: Identificador de la obra en Sigrid.
@@ -746,7 +746,7 @@ objetos:
       la mas reciente para los finales.
     clave_negocio: [obra_id]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: Identificador de la obra en Sigrid.
@@ -920,7 +920,7 @@ objetos:
       noche, aunque la vista se recree con `build-cierre`.
     clave_negocio: [obra_id, anio_mes, concepto_cuadro]
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: Identificador de la obra en Sigrid.
@@ -1009,7 +1009,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
@@ -1030,7 +1030,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
@@ -1050,7 +1050,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_cierre
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []

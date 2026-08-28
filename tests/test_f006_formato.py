@@ -982,15 +982,22 @@ def test_f006_r4_raw_y_stg_quedan_fuera_de_la_superficie_de_consumo() -> None:
         assert dicc.esquemas[consumo]["consumo_recomendado"] is True
 
 
-def test_f006_r4_los_cuatro_esquemas_manuales_lo_declaran_en_el_global() -> None:
+def test_f006_r4_el_regimen_de_refresco_se_declara_en_el_global() -> None:
     """El régimen de refresco tiene que verse ya al listar los esquemas, sin
-    tener que abrir una ficha."""
+    tener que abrir una ficha.
+
+    F-047 cambió el veredicto de los cuatro que se construían a mano: entraron
+    en `run-all` y por tanto son `nocturno` como los demás. `aux` sigue siendo
+    el único `estatico` —su tabla se crea vacía por diseño— y comprobarlo aquí
+    evita que este test se convierta en «todo es nocturno», que no probaría
+    nada.
+    """
     dicc = _global_real()
 
-    for manual in ("cierre", "compras", "maestro", "retenciones"):
-        assert dicc.esquemas[manual]["refresco"] == "manual", manual
-    for nocturno in ("raw", "stg", "mart", "_meta"):
+    for nocturno in ("raw", "stg", "mart", "_meta",
+                     "cierre", "compras", "maestro", "retenciones"):
         assert dicc.esquemas[nocturno]["refresco"] == "nocturno", nocturno
+    assert dicc.esquemas["aux"]["refresco"] == "estatico"
 
 
 def test_f006_r4_el_global_real_trae_las_convenciones_que_mas_confunden() -> None:

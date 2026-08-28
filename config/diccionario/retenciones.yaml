@@ -51,7 +51,7 @@ objetos:
       Para cruzar con el detalle hay que agregar antes por documento.
     clave_negocio: [sentido, movimiento_id]
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
 
     columnas:
       sentido:
@@ -177,10 +177,12 @@ objetos:
         significado: >-
           Marca los efectos que seguian vivos y cuya fecha prevista ya habia
           pasado **EN EL MOMENTO DEL BUILD**, no hoy: la tabla se materializa y
-          la comparacion contra la fecha actual se congela ahi. En un esquema de
-          refresco manual cuya fecha de build ni siquiera es consultable por SQL,
-          esta lista puede llevar semanas parada. Para el vencimiento a dia de
-          hoy hay que recalcularlo sobre `fecha_prevista_devolucion`.
+          la comparacion contra la fecha actual se congela ahi. El build es
+          nocturno, asi que la foto es de anoche como muy tarde —consultable en
+          `_meta.v_frescura` con `paso = 'build_retenciones'`—, pero si esa
+          noche fallo el paso la lista puede llevar dias parada. Para el
+          vencimiento a dia de hoy hay que recalcularlo sobre
+          `fecha_prevista_devolucion`.
       dias_desde_vencimiento:
         significado: >-
           Dias transcurridos desde la fecha prevista **hasta el dia del build**,
@@ -238,7 +240,7 @@ objetos:
     grano: Una fila por tipo de retencion. `tipo_id` es clave primaria.
     clave_negocio: [tipo_id]
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       tipo_id:
         significado: >-
@@ -306,7 +308,7 @@ objetos:
       puede ser menor que el de `retenciones.movimientos`.
     clave_negocio: [sentido, entidad_id]
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       sentido:
         significado: Si la retencion la practicamos nosotros o nos la practican.
@@ -427,7 +429,7 @@ objetos:
       importe.
     clave_negocio: [obra_id, codigo_obra, nombre_obra]
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: >-
@@ -531,7 +533,7 @@ objetos:
       de su sentido.
     clave_negocio: [sentido, movimiento_id]
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       sentido:
         significado: Si la retencion la practicamos nosotros o nos la practican.
@@ -622,7 +624,7 @@ objetos:
       `vencida_sin_liquidar`.
     clave_negocio: [sentido, movimiento_id]
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       sentido:
         significado: Si la retencion la practicamos nosotros o nos la practican.
@@ -670,9 +672,9 @@ objetos:
           Cuantos dias llevaba vencido **EL DIA DEL BUILD**, no hoy: la columna
           se materializa en `retenciones.movimientos` y se congela ahi. Aqui
           siempre es positivo, porque la vista filtra por vencidas. Para los
-          dias reales se recalcula sobre `fecha_prevista_devolucion`, y en un
-          esquema de refresco manual cuya fecha de build no es consultable, la
-          diferencia pueden ser semanas.
+          dias reales se recalcula sobre `fecha_prevista_devolucion`: entre el
+          build de anoche y ahora la diferencia es de un dia, y de mas si el
+          paso `build_retenciones` fallo esa noche.
         agregacion: no_sumable
       antiguedad:
         significado: >-
@@ -709,7 +711,7 @@ objetos:
     grano: Dos filas, una por sentido. Cubre TODOS los efectos, con y sin obra.
     clave_negocio: [sentido]
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       sentido:
         significado: Si la retencion la practicamos nosotros o nos la practican.
@@ -805,7 +807,7 @@ objetos:
       documento antes de usarse.
     clave_negocio: []
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       docide:
         significado: Identificador de la factura de compra a la que pertenece la linea.
@@ -837,7 +839,7 @@ objetos:
       su gemela de compras.
     clave_negocio: []
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas:
       docide:
         significado: Identificador de la factura de venta. Hoy nunca tiene valor.
@@ -863,7 +865,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_retenciones
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []

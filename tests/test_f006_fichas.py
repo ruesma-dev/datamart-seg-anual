@@ -374,21 +374,26 @@ def test_f006_r26_las_columnas_tecnicas_no_se_declaran_de_negocio(nombre: str) -
 
 
 # ---------------------------------------------------------------------------
-# `cierre` · el esquema que NO se refresca de noche (T14)
+# `cierre` · el esquema que entró en la nocturna con F-047 (T14)
 # ---------------------------------------------------------------------------
 
 
-def test_f006_r14_cierre_entero_se_declara_de_refresco_manual() -> None:
-    """`cierre` no está en `build_pipeline_steps`: se construye a mano.
+def test_f006_r14_cierre_entero_se_declara_de_refresco_nocturno() -> None:
+    """`cierre` YA está en `build_pipeline_steps`: F-047 lo metió.
 
-    Que una sola ficha de este esquema se declarase `nocturno` bastaría para que
-    el agente diera un dato de hace semanas sin advertirlo.
+    Este test decía lo contrario, y decirlo dejó de ser cierto el 2026-08-28.
+    No es una rendición ante un test rojo: el veredicto lo dicta la composición
+    real —`_validar_frescura` compara contra `main.build_pipeline_steps`—, así
+    que dejar `manual` aquí pondría en rojo la validación del diccionario
+    entero. La mentira que este test vigila sigue vigilada, solo que ahora en el
+    otro sentido: declararse `manual` corriendo de noche hace que el agente
+    desconfíe de un dato bueno.
     """
     fichas = _fichas_de("cierre")
 
     assert fichas, "no hay fichas de `cierre`"
     for nombre, ficha in fichas.items():
-        assert ficha.refresco == "manual", nombre
+        assert ficha.refresco == "nocturno", nombre
         assert ficha.paso_etl == "build_cierre", nombre
 
 
@@ -400,7 +405,7 @@ def test_f006_r12_cierre_hereda_el_aviso_de_frescura() -> None:
 
     for nombre in _fichas_de("cierre"):
         avisos = derivado.por_nombre[f"cierre.{nombre}"].avisos
-        assert "R-FRESCURA-MANUAL" in avisos, nombre
+        assert "R-FRESCURA" in avisos, nombre
 
 
 def test_f006_r26_cierre_la_tabla_de_hecho_documenta_sus_columnas() -> None:
@@ -1076,17 +1081,19 @@ def test_f006_r2_los_dos_plazos_se_advierten_entre_si() -> None:
 
 
 def test_f006_r2_los_catalogos_estaticos_no_se_contradicen_con_su_refresco() -> None:
-    """Se describían como «catálogo ESTATICO» declarando `refresco: manual`.
+    """Se describían como «catálogo ESTATICO» declarando un refresco periódico.
 
     Las dos cosas son ciertas y no se contradicen —el contenido está escrito en
-    la vista, y la vista se recrea con `build-cierre`—, pero había que decirlo,
-    porque leídas juntas parecen un error.
+    la vista, y la vista se RECREA en cada build—, pero había que decirlo,
+    porque leídas juntas parecen un error. Lo que cambió con F-047 es el
+    régimen: `cierre` pasó a construirse de noche, así que la ficha ya no puede
+    decir `manual` y la explicación tiene que citar el paso, no el comando.
     """
     for objeto in ("v_pbi_dim_concepto", "v_pbi_dim_tipologia_cp"):
         ficha = _fichas_de("cierre")[objeto]
 
-        assert ficha.refresco == "manual"
-        assert "build-cierre" in ficha.descripcion, objeto
+        assert ficha.refresco == "nocturno"
+        assert "build_cierre" in ficha.descripcion, objeto
 
 
 # ---------------------------------------------------------------------------
@@ -1499,13 +1506,19 @@ def test_f006_r2_retenciones_dice_que_la_vista_de_venta_esta_vacia() -> None:
     assert ficha.consumo_recomendado is False
 
 
-def test_f006_r14_los_dos_esquemas_manuales_lo_declaran_en_todas_sus_fichas() -> None:
+def test_f006_r14_compras_y_retenciones_lo_declaran_en_todas_sus_fichas() -> None:
+    """Los otros dos que entraron en la nocturna con F-047.
+
+    Antes eran `manual` y además su paso no dejaba fila en `_meta.etl_runs`, así
+    que la fecha de build que la regla mandaba citar no existía. Ahora son
+    `nocturno` y su paso es un step de verdad.
+    """
     for esquema, paso in (("compras", "build_compras"),
                           ("retenciones", "build_retenciones")):
         fichas = _fichas_de(esquema)
         assert fichas, esquema
         for nombre, ficha in fichas.items():
-            assert ficha.refresco == "manual", f"{esquema}.{nombre}"
+            assert ficha.refresco == "nocturno", f"{esquema}.{nombre}"
             assert ficha.paso_etl == paso, f"{esquema}.{nombre}"
 
 
@@ -1529,46 +1542,40 @@ def test_f006_r13_control_hay_pasos_registrables_de_verdad() -> None:
     assert {"build_mart", "build_stg", "build_cierre", "publicar_diccionario"} <= (
         registrables
     )
-    assert "build_compras" not in registrables
-    assert "build_retenciones" not in registrables
+    # F-047 cerró el hueco: los dos que ejecutaban SQL en línea son steps.
+    assert {"build_compras", "build_retenciones"} <= registrables
 
 
-def test_f006_r13_una_ficha_cuyo_paso_no_deja_rastro_lo_advierte() -> None:
-    """`build-compras` y `build-retenciones` ejecutan SQL en línea, sin step.
+def test_f006_r13_ninguna_ficha_manda_a_una_vista_que_no_le_va_a_responder() -> None:
+    """EL HUECO QUE F-047 CERRÓ, vigilado por si vuelve a abrirse.
 
-    Su fecha de build NO es consultable por SQL, así que `_meta.v_diccionario`
-    dará frescura a nulo para estos objetos. La ficha tiene que decirlo en vez
-    de mandar al agente a una vista que no le va a responder.
+    Antes había fichas —las 24 de `compras` y `retenciones`— cuyo `paso_etl`
+    NO existía como step: su SQL se ejecutaba en línea dentro del comando, no
+    dejaba fila en `_meta.etl_runs` y `_meta.v_frescura` no las conocía. La
+    regla de frescura les mandaba citar una fecha de build que nadie podía
+    consultar, y este test se conformaba con que la ficha lo ADVIRTIERA.
+
+    Advertir de un agujero es peor que taparlo cuando taparlo es posible, y con
+    los cuatro build dentro de la nocturna lo es. El test se invierte: **ningún
+    `paso_etl` declarado puede quedar fuera de los pasos registrables**. Si
+    mañana alguien vuelve a meter SQL en línea sin step, esto se pone rojo en
+    vez de pedirle una nota en el YAML.
     """
-    from etl_sigrid.domain.diccionario import derivar_avisos
-
     registrables = _pasos_registrables()
-    derivado = derivar_avisos(_diccionario())
-    reglas = {r.codigo: r for r in derivado.reglas}
 
-    afectadas = [
-        f for f in derivado.fichas
-        if f.paso_etl and f.paso_etl not in registrables
-    ]
-    assert afectadas, "el control de arriba dice que hay pasos no registrables"
+    huerfanos = sorted(
+        {
+            f"{f.nombre} -> {f.paso_etl}"
+            for f in _diccionario().fichas
+            if f.paso_etl and f.paso_etl not in registrables
+        }
+    )
 
-    for ficha in afectadas:
-        # El aviso puede llegar por el texto de la propia ficha o —lo normal—
-        # por una regla dura que la alcance. Lo segundo es el mecanismo pensado
-        # para esto: repetir la advertencia en las 24 fichas la diluiría, y una
-        # nota en la cabecera del YAML no la ve el agente, porque los
-        # comentarios del fichero no se publican.
-        propio = _texto_de(ficha.nombre)
-        heredado = " ".join(
-            reglas[c].regla + " " + reglas[c].motivo
-            for c in ficha.avisos
-            if c in reglas
-        )
-        texto = propio + " " + heredado
-        assert "no registran paso" in texto or "no es consultable" in texto, (
-            f"{ficha.nombre} declara `paso_etl: {ficha.paso_etl}`, que no deja "
-            f"fila en `_meta.etl_runs`, y ni la ficha ni sus avisos lo advierten"
-        )
+    assert huerfanos == [], (
+        f"estas fichas declaran un `paso_etl` que no existe como step, así que "
+        f"no deja fila en `_meta.etl_runs` y su fecha de build no es "
+        f"consultable: {huerfanos}"
+    )
 
 
 def test_f006_r13_el_aviso_de_frescura_llega_a_compras_y_retenciones() -> None:
@@ -1581,7 +1588,7 @@ def test_f006_r13_el_aviso_de_frescura_llega_a_compras_y_retenciones() -> None:
         fichas = [f for f in derivado.fichas if f.esquema == esquema]
         assert fichas, esquema
         for ficha in fichas:
-            assert "R-FRESCURA-MANUAL" in ficha.avisos, ficha.nombre
+            assert "R-FRESCURA" in ficha.avisos, ficha.nombre
 
 
 # ===========================================================================

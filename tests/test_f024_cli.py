@@ -40,18 +40,20 @@ STEPS_POR_COMANDO = {
     "build-mart": ("BuildMartStep", "build_mart", "build_mart"),
     "build-cierre": ("BuildCierreStep", "build_cierre", "build_cierre"),
     "build-maestros": ("BuildMaestrosStep", "build_maestros", "build_maestros"),
+    # F-047: los dos que faltaban. `build-compras` y `build-retenciones`
+    # ejecutaban su SQL EN LÍNEA, sin step, así que marcaban huérfanas pero no
+    # registraban paso y quedaban fuera de `v_frescura` (era el DA-6 de F-024).
+    # Al entrar los cuatro esquemas en la carga nocturna eso dejó de ser
+    # tolerable: sin fila en `_meta.etl_runs` no hay fecha de build que citar.
+    "build-compras": ("BuildComprasStep", "build_compras", "build_compras"),
+    "build-retenciones": (
+        "BuildRetencionesStep", "build_retenciones", "build_retenciones",
+    ),
     "apply-grants": ("ApplyGrantsStep", "apply_grants", "apply_grants"),
 }
 
 #: Comandos que ESCRIBEN y por tanto tienen que marcar las huérfanas (R4).
-#: `build-compras` y `build-retenciones` escriben SQL en línea sin step: marcan
-#: huérfanas pero no registran paso (DA-6 los deja fuera de `v_frescura`).
-COMANDOS_QUE_ESCRIBEN = (
-    *STEPS_POR_COMANDO,
-    "build-compras",
-    "build-retenciones",
-    "run-all",
-)
+COMANDOS_QUE_ESCRIBEN = (*STEPS_POR_COMANDO, "run-all")
 
 #: Comandos de SOLO LECTURA: no pueden escribir ni una fila en `_meta` (R5).
 #: `bootstrap` está aquí porque solo ejecuta DDL idempotente: se lanza «para
@@ -469,8 +471,12 @@ def test_f024_r3_run_all_un_solo_batch_para_todas_las_filas(cli) -> None:
 
     # Y todas las filas de paso se escribieron con ese mismo batch.
     assert {b for _step, _estado, b in pg.pasos_registrados} == {batch}
-    assert len(pg.pasos_registrados) == 6, (
-        "no se registraron los seis pasos del pipeline (F-006 añadió publicar_diccionario entre build_mart y apply_grants)"
+    # El número NO se escribe a mano: era 6, F-047 lo dejó en 10 y la constante
+    # se quedó atrás. Se ancla a la composición real, que es la que manda.
+    esperados = len(main.build_pipeline_steps(settings_falsos()))
+    assert len(pg.pasos_registrados) == esperados, (
+        f"se registraron {len(pg.pasos_registrados)} filas y el pipeline tiene "
+        f"{esperados} pasos: alguno no dejó rastro en `_meta.etl_runs`"
     )
 
 

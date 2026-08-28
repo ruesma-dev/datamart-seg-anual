@@ -11,8 +11,14 @@
 # `pendientes` es un TRINQUETE (R27): solo baja. La constante PENDIENTES_MAX de
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
+#
+# version 10 (F-047, 2026-08-28): `cierre`, `compras`, `maestro` y
+# `retenciones` pasan de `refresco: manual` a `nocturno` porque sus cuatro
+# build entraron en `run-all`, y `R-FRESCURA-MANUAL` pasa a llamarse
+# `R-FRESCURA` porque lo que decia -que la nocturna construye SOLO raw, stg y
+# mart- dejo de ser cierto.
 
-version: 9
+version: 10
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -31,27 +37,33 @@ titulo: Datamart de seguimiento anual de obra
 
 reglas:
 
-  - codigo: R-FRESCURA-MANUAL
-    titulo: Cuatro esquemas no se refrescan de noche
+  - codigo: R-FRESCURA
+    titulo: Cuatro esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
     ambito: [cierre, compras, maestro, retenciones]
     regla: >-
-      El pipeline nocturno (`run-all`) construye SOLO raw, stg y mart. Los
-      esquemas `cierre`, `compras`, `maestro` y `retenciones` se construyen con
-      comandos propios y pueden estar desfasados semanas respecto a Sigrid.
-      Toda respuesta que salga de ellos DEBE citar su fecha de build, que se
-      obtiene con `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'`
-      (o el paso que toque). Ojo: `build-compras` y `build-retenciones` no
-      registran paso propio, asi que NO aparecen en esa vista y su fecha de
-      build no es consultable por SQL: de esos dos esquemas hay que advertir que
-      la antiguedad se desconoce, en vez de callarlo.
+      Desde F-047 estos cuatro esquemas SI se construyen cada noche dentro de
+      `run-all`, y los cuatro registran paso, asi que su fecha de build siempre
+      es consultable. Lo que no cambia es que su paso NO es dependencia de
+      ningun otro: si `build_cierre`, `build_compras`, `build_maestros` o
+      `build_retenciones` falla, la noche continua y termina, y ese esquema se
+      queda con el dato de una noche anterior mientras `raw`, `stg` y `mart`
+      estan al dia. Toda respuesta que salga de ellos DEBE citar su fecha de
+      build: `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'` (o
+      `build_compras`, `build_maestros`, `build_retenciones`). Que el pipeline
+      sea uno solo NO significa que todo el datamart tenga la misma frescura.
     motivo: >-
       La composicion real esta en `main.build_pipeline_steps`, y sus pasos se
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
-      `build_stg`, `build_mart`, `publicar_diccionario` y `apply_grants`. Dar
-      un dato de `cierre`
-      sin fecha es dar una respuesta de hace semanas con aplomo.
+      `build_stg`, `build_mart`, `build_maestros`, `build_compras`,
+      `build_retenciones`, `build_cierre`, `publicar_diccionario` y
+      `apply_grants`. Hasta el 2026-08-28 los cuatro se lanzaban A MANO y podian
+      llevar semanas parados; peor aun, `mart` DESTRUIA cada noche
+      `cierre.v_pbi_planif_vs_real` —cuelga de
+      `mart.fact_seguimiento_categoria`, que `03_agg_categoria.sql` dropea con
+      CASCADE— y nadie la recreaba. Dar un dato de `cierre` sin fecha es dar una
+      respuesta vieja con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -631,7 +643,7 @@ esquemas:
       la cabecera de la obra (cliente, tecnico, presupuestos y modificados). Es
       lo que responde "cuanto llevamos ejecutado a cierre del mes M".
     consumo_recomendado: true
-    refresco: manual
+    refresco: nocturno
     pasos_etl: [build_cierre]
 
   compras:
@@ -642,12 +654,8 @@ esquemas:
       contratado, que hay albaranado sin facturar y que coste lleva cada
       partida.
     consumo_recomendado: true
-    refresco: manual
-    pasos_etl: []
-    nota_frescura: >-
-      `build-compras` NO registra paso en `_meta.etl_runs`: ejecuta el SQL en
-      linea sin step, asi que no aparece en `_meta.v_frescura` y su fecha de
-      build no es consultable por SQL hoy.
+    refresco: nocturno
+    pasos_etl: [build_compras]
 
   retenciones:
     titulo: Retenciones de garantia practicadas y sufridas
@@ -656,11 +664,8 @@ esquemas:
       proveedores y lo que los clientes nos retienen. Con saldo vivo, fechas
       prevista y real de liquidacion, y marca de vencida sin liquidar.
     consumo_recomendado: true
-    refresco: manual
-    pasos_etl: []
-    nota_frescura: >-
-      `build-retenciones` tampoco registra paso propio: misma limitacion que
-      `compras`.
+    refresco: nocturno
+    pasos_etl: [build_retenciones]
 
   maestro:
     titulo: Maestros de consulta directa
@@ -669,7 +674,7 @@ esquemas:
       pensados para consultarse tal cual. `maestro.obras` es el universo SIN
       filtrar, superconjunto de `stg.obras`.
     consumo_recomendado: true
-    refresco: manual
+    refresco: nocturno
     pasos_etl: [build_maestros]
 
   _meta:
@@ -677,8 +682,8 @@ esquemas:
     para_que_sirve: >-
       Responde "de cuando es el dato que me estas dando". Guarda una fila por
       ejecucion de paso, el estado de cada tabla de `raw` y, desde F-006, el
-      diccionario semantico publicado. Es lo que hay que citar cuando la
-      respuesta sale de un esquema de refresco manual.
+      diccionario semantico publicado. Es de donde sale la fecha de build que
+      toda respuesta tiene que citar.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [ingest_raw, build_stg, build_mart]
@@ -764,8 +769,9 @@ preguntas_aceptacion:
       existe la otra lectura, `neto_practicado`, y que pueden divergir. NO une
       el efecto a las lineas de su factura. Senala las filas con obra_id nulo y
       num_obras_documento > 1, que son facturas repartidas entre varias obras.
-      Cita la fecha de build porque `retenciones` no se refresca de noche.
-    reglas_implicadas: [R-RETENCION-NO-JOIN-LINEAS, R-FRESCURA-MANUAL]
+      Cita la fecha de build de `build_retenciones`: se refresca de noche, pero
+      su paso puede fallar sin tumbar el resto de la carga.
+    reglas_implicadas: [R-RETENCION-NO-JOIN-LINEAS, R-FRESCURA]
     estado: respondible
     nota: >-
       La vista cruzada obra x proveedor no existe: las dos agregadas cortan por
@@ -823,10 +829,11 @@ preguntas_aceptacion:
       - cierre.v_pbi_cierre_resumen
       - cierre.v_pbi_cierre_cabecera
     respuesta_correcta: >-
-      CITA LA FECHA DE BUILD, porque `cierre` es de refresco manual. Los
+      CITA LA FECHA DE BUILD de `build_cierre`: el esquema se refresca de noche,
+      pero su paso puede haber fallado sin tumbar el resto de la carga. Los
       porcentajes van contra la VENTA de esa misma columna y ese mismo mes, no
       contra el presupuesto global.
-    reglas_implicadas: [R-FRESCURA-MANUAL]
+    reglas_implicadas: [R-FRESCURA]
     estado: respondible
 
   - id: P8
@@ -890,7 +897,7 @@ preguntas_aceptacion:
       `compras.v_pbi_contrato_consumo` el pendiente se suma sin filtrar, asi que
       alli las NOTA tambien cuentan. Cita la fecha de build de `compras`, o
       advierte de que no es consultable.
-    reglas_implicadas: [R-COMPRAS-TIPO-DOC, R-FRESCURA-MANUAL]
+    reglas_implicadas: [R-COMPRAS-TIPO-DOC, R-FRESCURA]
     estado: respondible
 
   - id: P13
@@ -900,8 +907,9 @@ preguntas_aceptacion:
       - retenciones.v_pbi_retenciones_vivas
     respuesta_correcta: >-
       Usa las vistas de vivas y vencidas en lugar de recalcular el estado, y
-      cita la fecha de build porque `retenciones` es de refresco manual.
-    reglas_implicadas: [R-FRESCURA-MANUAL]
+      cita la fecha de build de `build_retenciones`: su paso puede haber fallado
+      esta noche sin tumbar el resto de la carga.
+    reglas_implicadas: [R-FRESCURA]
     estado: respondible
 
   - id: P14
@@ -924,8 +932,10 @@ preguntas_aceptacion:
     respuesta_correcta: >-
       Devuelve el ultimo OK y el ultimo intento POR SEPARADO —que un paso haya
       fallado esta noche no borra el dato bueno de ayer— y la version del
-      diccionario publicado. Distingue los esquemas nocturnos de los manuales.
-    reglas_implicadas: [R-FRESCURA-MANUAL]
+      diccionario publicado. Da la frescura DEL PASO que construyo el objeto de
+      la pregunta, no la del pipeline: los diez pasos de la noche tienen cada
+      uno la suya y uno puede haber fallado.
+    reglas_implicadas: [R-FRESCURA]
     estado: respondible
     nota: >-
       Es la prueba de aceptacion de R15 y R16. Cuando exista `_meta.v_diccionario`

@@ -43,7 +43,7 @@ objetos:
       deliberada.
     clave_negocio: [obra_id]
     paso_etl: build_maestros
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: >-
@@ -144,7 +144,7 @@ objetos:
       cuando hay varias, y **la mayoria de proveedores no tiene ninguna**.
     clave_negocio: [proveedor_id]
     paso_etl: build_maestros
-    refresco: manual
+    refresco: nocturno
     columnas:
       proveedor_id:
         significado: >-
@@ -229,7 +229,7 @@ objetos:
       informados: un contrato sin obra no aparece aqui.
     clave_negocio: [obra_id, proveedor_id]
     paso_etl: build_maestros
-    refresco: manual
+    refresco: nocturno
     columnas:
       obra_id:
         significado: Identificador de la obra en Sigrid.
@@ -329,7 +329,7 @@ objetos:
     grano: null
     clave_negocio: []
     paso_etl: build_maestros
-    refresco: manual
+    refresco: nocturno
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
