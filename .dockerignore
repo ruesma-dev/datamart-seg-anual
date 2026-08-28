@@ -1,0 +1,34 @@
+# Lo que NO sube al servicio de build de Azure.
+#
+# El Dockerfile solo copia requirements.txt, config/, etl_sigrid/ y main.py, asi
+# que la imagen resultante es identica con este fichero y sin el. Lo que cambia
+# es el CONTEXTO que `az acr build` empaqueta y sube: sin esto viajaba el `.env`
+# con las credenciales de produccion y el `.git` entero. Anadido el 2026-08-28,
+# antes del primer despliegue desde F-047.
+
+# Secretos. Lo primero y el motivo de este fichero.
+.env
+.env.*
+infra/env/
+
+# El historial no se construye.
+.git/
+.gitignore
+
+# Entornos y cachés locales.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Papeleo del arnés y documentación: no entran en la imagen.
+progress/
+specs/
+docs/
+harness/
+tests/
+.claude/
