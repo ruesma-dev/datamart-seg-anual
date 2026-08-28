@@ -1,140 +1,112 @@
 <!-- progress/review_F-047.md -->
-Revisión completa (pasada 1) de `aea1307..82b58cf`, 7 commits, 33 ficheros.
+Revisión **incremental desde `ac8a426` (pasada 3)**: delta `ac8a426..aebdf10`,
+3 ficheros, +11/-7. Nada de código, tests, campaña ni `azure-apps` cambió en
+este delta —verificado, no supuesto—, así que lo aprobado en las pasadas 1 y 2
+queda dado por bueno. `init.sh` y la suite se ejecutan enteros, como cada pasada.
+El detalle de las pasadas anteriores vive en el historial de este fichero
+(commits `ac8a426` y `aebdf10`).
 
-# F-047 (absorbe F-044) · Review · rigor `critico`
+# F-047 (absorbe F-044) · Review · pasada 3 · rigor `critico`
 
-## Veredicto: **RECHAZADO**
+## Veredicto: **APROBADO**, con tres condiciones de cierre pendientes
 
-**Código, tests y campaña quedan APROBADOS y no necesitan retoque.** Rechazo por
-**seis afirmaciones en presente** del commit `ca0bc9e` en
-`azure-apps/datamart_seg_anual.md`, hoy **falsas en producción**, más la secuencia
-de publicación del diccionario. Arreglo de minutos, en documentación.
+El bloqueante de la pasada 2 está resuelto y las dos correcciones que pedí están
+aplicadas. **No queda ningún cambio requerido.**
 
-No rechazo por el despliegue congelado —decisión del humano, y el dato llegó
-después de implementar—, sino porque el documento que el ecosistema lee para
-saber **qué está desplegado** afirma que la vista de Power BI ya no se destruye,
-y **se sigue destruyendo cada noche**.
+Las tres pendientes son **escrituras contra producción**, están planteadas al
+humano y **sin respuesta todavía**: no son incumplimientos del trabajo, y por eso
+no bloquean la aprobación. **El orden importa** y es este:
 
-`critico` exige C1–C5 + fase RED + cobertura + **cero supervivientes** +
-verificaciones `MANUAL` con comando y resultado.
+1. **Construir y desplegar imagen nueva.** Sin esto los otros dos maquillan el
+   síntoma: la nocturna volvería a destruir la vista esa misma noche. Hoy el job
+   `caj-datamart-seg-dev` corre `r20260818-2146`, del 18 de agosto, y **nada de
+   F-047 ni de F-006 está en producción**.
+2. **Dejar correr una nocturna** (o lanzar `build-cierre` a mano para recrear
+   `cierre.v_pbi_planif_vs_real` hoy; autorizado por el humano el 2026-08-28 y
+   bloqueado por el clasificador de permisos de la sesión).
+3. **`publicar-diccionario`** (versión 10), **el último**. `R-FRESCURA` promete
+   que la fecha de build de los cuatro «siempre es consultable», y
+   `_meta.v_frescura` no tiene hoy ni una fila de `build_compras` ni de
+   `build_retenciones`. Publicarlo antes de que corra una noche dejaría al MCP
+   sirviendo una regla **bloqueante** que manda a una consulta vacía: una mentira
+   nueva del tipo que F-047 vino a matar.
 
-## Puertas y checkpoints
+Con las tres hechas quedan cubiertos los dos criterios que hoy se cumplen en el
+repositorio y no en producción: **F-047·2** (la vista existe y
+`check-diccionario` deja de reportar la huérfana) y **F-044·1/·5**.
 
-`bash harness/init.sh` **VERDE**: 2.581 pasados, 128 saltados, 421 s. `PUERTA
-COBERTURA` **[OK] 100,0 % de 259 líneas cambiadas** (umbral 80 %). `PUERTA TAMAÑO`
-**[OK]**. `ruff` 238 = 237 de base **+1** (`noqa: E402` inerte). **Fase RED**:
-trazas reales pegadas para los dos alcances en `impl_F-047.md`.
+## Lo verificado en esta pasada
+
+**1. `init.sh` en VERDE, medido entero.** Lo ejecuté yo: **2.581 pasados, 128
+saltados**, 405,9 s. `PUERTA COBERTURA` **[OK] 100,0 % (259/259 líneas
+cambiadas)**, umbral 80 %, nivel `critico`. `PUERTA TAMAÑO` **[OK]** (impl
+220/220, review 140/140). Cero fallos.
+
+Los tres recuentos de `current.md` están y son los reales, comprobados contra el
+diccionario cargado, no contra el texto: **103 objetos, 798 columnas, 46 fichas
+de consumo**. El test que los vigila vuelve a pasar y **no se tocó**, que era lo
+correcto: el guardián de F-006 hizo su trabajo dos veces seguidas.
+
+Buena la salida del segundo intento, además: `102 objetos` desaparece del fichero
+sustituido por «**103 fichas y 102 construidas**», que dice lo mismo sin disparar
+un test deliberadamente literal. Cero ocurrencias de la cadena, verificado.
+
+**2. F-041, quinto defecto: reescrito, y dice lo que tiene que decir.** Lo leí en
+`features.json`. Recoge los cuatro puntos: que lo demostrado es que **el defecto
+2 opera también en serie**; que es **bidireccional** («pudo igual importar
+bytecode MUTADO del 3 y matarlo por el motivo equivocado, que es un FALSO MUERTO
+EN SERIE, la dirección peligrosa»); que **la serie no es inmune, solo no se ha
+visto uno todavía**; que la regla sobre el modo paralelo **sigue en pie tal
+cual**; y que lo que cierra esto es el **criterio de aceptación 5**, no una regla
+operativa. Nada que objetar.
+
+**3. F-049: los dos apuntes recogidos, y el primero como cuarto criterio.** El
+criterio 4 —«Decidido y escrito DÓNDE vive el análisis del superviviente, para
+que la herramienta pueda saber que está resuelto sin adivinar»— es exactamente el
+contrato que faltaba. El solape con F-041 queda anotado en la descripción.
+`rigor: estandar`, prioridad 8: me cuadran, por lo dicho en la pasada 2.
+
+`BACKLOG.md` está regenerado y coherente con `features.json`. `azure-apps` sigue
+en `e4f0f9b` con el árbol limpio.
+
+## Checkpoints · veredicto final
 
 | | | Nota |
 |---|---|---|
-| **C1** | `[x]` | exit 0; los siete ficheros obligatorios existen |
-| **C2** | `[x]` | una sola `in_progress`; rama correcta |
-| **C3** | `[x]` | ruta en la 1ª línea de los 8 ficheros nuevos; sin `print()` de debug; `inventario_repositorio.py` es adaptador en `infrastructure/` e importa de `domain/`, nunca al revés; sin dependencias nuevas |
-| **C3 bis** | `N/A` | **justificado**: el diff no toca `docs/referencia/` y `git log --diff-filter=A` no añade ningún PDF/ofimática en la rama |
-| **C4** | `[x]` | 9 criterios → 48 funciones (77 casos); ninguno toca red ni BBDD |
-| **C4 bis** | `[x]` | ver abajo |
+| **C1** | `[x]` | `init.sh` exit 0, suite entera en verde; los siete ficheros obligatorios existen |
+| **C2** | `[x]` | una sola `in_progress`; rama `feature/F-047-nocturna-desfasada`; `current.md` solo de la sesión activa, con lo verificado contra la base |
+| **C3** | `[x]` | ruta en la 1ª línea de los 8 ficheros nuevos; sin `print()` de debug ni secretos; capas respetadas (dominio sin infraestructura) |
+| **C3 bis** | `N/A` | **justificado**: el diff no toca `docs/referencia/`; `git log --diff-filter=A` no añade ningún PDF/ofimática en la rama |
+| **C4** | `[x]` | los 9 criterios (F-047 **y** F-044) trazados; 48 funciones / 77 casos `test_f047_*`; ninguno toca red ni BBDD |
+| **C4 bis** | `[x]` | rigor `critico` cumplido; ver abajo |
 | **C4 ter** | `N/A` | **justificado**: no existe `harness/rutas_sensibles.json`; sin declaración el bloque es N/A por diseño |
-| **C5** | `[~]` | commits `F-047 Tn:` correctos; `tasks.md` N/A (`sdd=false`). Ver cambio 3 |
+| **C5** | `[x]` | commits `F-047 Tn:`; `tasks.md` N/A (`sdd=false`); `features.json` refleja el estado real y con su salto de línea final |
 
-**Barrido de secretos**, dos pasadas (líneas añadidas y contenido completo de los
-37 ficheros). Patrones: contraseñas y cadenas de conexión, claves y tokens
-(`api[_-]?key|secret|token|bearer|-----BEGIN|eyJ|sk-`), GUID, IPs, correos y
-base64 largo. **CERO secretos**: los hits son prosa, nombres de rol, rutas y
-dos SHA de git; `.env` no trackeado y el diff no lo añade.
+**C4 bis, resumen de las tres pasadas.** Fase RED con trazas reales pegadas.
+Cobertura 100 % de las líneas cambiadas. Campaña de mutación **recalculada de
+forma independiente** por mí: alcance **831 líneas en 12 ficheros** y **70
+mutantes**, idénticos a los del informe; los **7 supervivientes verificados uno a
+uno** como mutantes reales, con el mismo operador y el mismo texto
+original→mutado. **Cero supervivientes finales** (15 encontrados, 15 con test,
+cero equivalentes declarados), que es la exigencia dura de `critico`. RM1–RM6
+recorridos: campaña no reejecutada por durar 2 h 32 min, y dicho por escrito.
 
-## Mutación · C4 bis
+## Barrido de secretos
 
-**Recalculado, no leído del informe.** `harness.alcance` da **831 líneas en 12
-ficheros**, idénticas fichero a fichero; `generar_mutantes` da **exactamente 70**.
-Muestreé **los 7 supervivientes**: existen como mutantes reales, con el mismo
-operador y el mismo texto original→mutado.
+Ejecutado por mí en la pasada 1 sobre los 37 ficheros del diff (contraseñas y
+cadenas de conexión, claves y tokens, GUID, IPs internas, correos, base64 largo):
+**cero secretos**. `.env` no trackeado. El delta de esta pasada no añade nada.
 
-- **Campaña NO reejecutada**: «Tiempo total» **9.117,3 s (2 h 32 min)**, muy por
-  encima de los 60 s. Aplico recálculo puro + RM1–RM6, y lo digo como pide C4 bis.
-- **RM1.** Mide `977b957`; HEAD es `82b58cf`. **Verificado, no supuesto**: ese
-  commit toca solo `progress/` y cuatro ficheros de test, y el alcance recalculado
-  **hoy en HEAD** sale idéntico (831/12). Añadir tests solo mata.
-- **RM2.** Workers **1** → coste real por mutante **130,2 s** contra línea base
-  **185,7 s**: sin salto de orden de magnitud (0,70×), y la media bajo la base es
-  el caso de libro (con `-x`, 63 de 70 muertos abortan al primer fallo).
-  `70 × 130,2 = 9.114 ≈ 9.117,3` ✓. Timeout 372 = 185,7 × 2,0 ✓.
-- Sin «⚠ CAMPAÑA NO VÁLIDA»; «Sin veredicto (base rota): 0» ✓. **Cero
-  supervivientes finales**. **RM3** y **RM5** N/A: cero equivalentes declarados.
-- **RM6.** Las únicas guardas que el diff borra (`if not (sql_dir/f).exists()`,
-  `except Exception`) caen con el bloque en línea de `build-compras`/
-  `build-retenciones`, y **reaparecen en los steps nuevos** con test propio.
-- **RM4 · falso superviviente.** El test citado existe y hace lo que dice:
-  `_r4_cuenta_las_filas...:121` afirma `rows_processed == 11 * len(contados)` (2
-  tablas → 22; el mutante da 23). Falso superviviente EN SERIE: nuevo en F-041.
+## Nota para el cierre
 
-## Trazabilidad · criterio → test (`sdd=false`: los 9 de F-047 **y** F-044)
+La feature entrega el arreglo **y el guardián que impide que vuelva a pasar en
+silencio**: `check-declarados` contrasta lo que `sql/**` declara contra el
+catálogo real y hace salir `run-all` con código 1. Verifiqué que el
+`config/objetos_pendientes.yaml` vacío es real —parser contrastado contra un
+regex independiente: 72 objetos idénticos, cero diferencia— y que el trinquete
+rompe la puerta en los dos sentidos.
 
-Los nueve tienen cobertura y los `test_f047_rN_*` siguen esa numeración:
-**F-047·1** `explore_F-047.md` + `_r2_build_cierre_corre_despues_de_build_mart`;
-**·3** `_r5_*` (4), `_r7_*` (6), `_r8_*` (10); **·4** `_r8_cli_*`. **F-044·1**
-`_r1_*`, `_r2_*`, `_r3_*`; **·2** `_r4_*` (8). Los otros cuatro son **MANUAL**:
-**F-044·3** y **·4** medidos el 2026-08-21 (+37,5 min, 2 h 46 → 3 h 24; disco
-57,92 → 57,93 %); **F-047·2** y **F-044·5** los verificó el líder (103/102).
-
-## Los cinco puntos del encargo
-
-1. **Decisión 2 bien pagada**, con red doble. `test_f005_grants.py` **no se tocó**
-   (`--stat` vacío) y sigue fijando `depends_on == ["build_mart"]` y **`orden[-1]
-   == "apply_grants"`**; `_r3_publicar_y_grants_van_despues_de_los_cuatro_build`
-   añade que los cuatro le preceden **en el orden topológico**, no en la lista.
-   Verifiqué el mecanismo (DFS post-order sobre `self._steps`: nadie depende de
-   `apply_grants` y va última) y lo que nadie declaraba: los cuatro esquemas
-   **están** en `DEFAULT_CONSUMPTION_SCHEMAS`, luego sus `GRANT` se reaplican.
-2. **Los nueve ficheros de test, contra el diff y no contra el resumen.** Ninguno
-   se tocó para que pasara: el veredicto lo dicta la composición real, porque
-   `_validar_frescura` compara contra `main.build_pipeline_steps`. Tres merecían
-   mirada y la aguantan: `_una_ficha_cuyo_paso_no_deja_rastro_lo_advierte` se
-   **invierte a un contrato más fuerte** (ningún `paso_etl` fuera de los
-   registrables) en vez de relajarse; `f006_formato` fija que `aux` sigue siendo el
-   único `estatico`; `f024_cli` ancla el `== 6` a `len(build_pipeline_steps(...))`.
-3. **`R-FRESCURA` dice la verdad contra el código.** Enumera los **diez** pasos con
-   el nombre que tienen en `_meta.v_frescura.paso`, y
-   `test_f006_r9_la_regla_de_frescura_cita_el_pipeline_real` lo fija solo. La vista
-   **no** tiene lista cableada (`ddl/00_meta.sql:70`, genérica sobre
-   `etl_runs.step`), luego la consulta que manda hacer funcionará. **40** fichas a
-   `nocturno` (cierre 12, compras 14, maestro 4, retenciones 10) + 4 bloques de
-   esquema = las 44 del diff, y coinciden con el inventario por esquema.
-4. **Guardián correcto, y el `pendientes: []` vacío es REAL** — no me fié del
-   comentario del YAML: contrasté el parser contra un regex independiente sobre
-   `sql/**` y da **72 objetos idénticos, cero diferencia en ambos sentidos** (el 76
-   del grep crudo son tres declarados dos veces). No hay `CREATE` sin esquema
-   cualificado ni tablas temporales que perder; 72 + 31 de `raw` = **103**. El
-   trinquete rompe la puerta en ambos sentidos, y un fallo **leyendo** da `False`.
-
-## Cambios requeridos
-
-1. **`azure-apps/datamart_seg_anual.md` (`ca0bc9e`): añadir la salvedad del
-   despliegue.** Ese repositorio documenta lo **desplegado** y lo leen otros
-   equipos. Falsas hoy: `:194` «ejecuta **diez pasos**» (ejecuta seis), `:202`,
-   `:216-217` «el final se mueve a 05:24 UTC» (sigue en 04:46), `:220` «los cuatro
-   registran fila en `_meta.etl_runs`» (no registran ninguna) y `:243-245` «sale
-   con código 1». **La más grave es `:210`**: «la nocturna la DESTRUÍA cada noche
-   y nadie la recreaba», en pretérito, cuando **la sigue destruyendo**; quien
-   investigue el hueco de Power BI cerrará el caso en falso. Basta un párrafo
-   separando «lo que hace el código» de «lo que hará al redesplegarse», nombrando
-   la imagen que corre hoy (`datamart-seg-anual:r20260818-2146`).
-2. **Escribir la SECUENCIA de las acciones manuales en `current.md`.**
-   `R-FRESCURA` promete que la fecha de build de los cuatro «siempre es
-   consultable», y `_meta.v_frescura` **no tiene hoy ninguna fila** de
-   `build_compras` ni `build_retenciones`. Publicarlo **antes** de desplegar y
-   correr una noche haría que el MCP sirviera una regla bloqueante que manda una
-   consulta vacía — mentira nueva del tipo que F-047 mata. Orden: imagen →
-   nocturna → `publicar-diccionario`. Hoy no hay daño (`_meta` sirve la 9).
-3. **`current.md` al día y `features.json` sin ensuciar.** `current.md` dice
-   «pendiente de conexión» cuando el líder ya verificó contra la base, y no cita el
-   despliegue congelado, hoy la condición de cierre principal. Y `features.json`
-   perdió el salto de línea final.
-
-**Ninguna conclusión mía depende de la base.** Para **cerrar** faltan, y son del humano: `build-cierre` (sin lanzar), `publicar-diccionario` e **imagen nueva**.
-
-## Automejora (propuesta, no aplicada)
-
-`harness/mutacion.py` debería **borrar el bloque `Análisis (PENDIENTE del
-implementer)`** cuando el implementer añade el suyo: aquí los 15 supervivientes
-están resueltos y el informe sigue diciendo siete veces `PENDIENTE`, que es justo
-lo que C4 bis manda buscar. Trampa para el próximo reviewer con `grep`.
+Queda escrito, porque es lo que más fácil se olvida: **hasta que se despliegue
+imagen nueva, todo esto vive en el repositorio y no en la nocturna.** El
+documento de `azure-apps` ya lo dice en presente y con el aviso al principio, que
+era el hallazgo que motivó el rechazo de la pasada 1.

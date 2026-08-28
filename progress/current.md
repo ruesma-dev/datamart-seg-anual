@@ -70,14 +70,25 @@ Arrancando a las 02:00 UTC el final se mueve de 04:46 a ~05:24 UTC (07:24 hora
 local). Entra, pero deja menos margen para un reintento. Adelantar el arranque o
 recortar es decisión del humano.
 
-### Estado de la review
+### Estado de la review: APROBADO el 2026-08-28, en la 3ª pasada
 
-**RECHAZADO el 2026-08-28** (`progress/review_F-047.md`), y con una distinción
-que importa: **código, tests y campaña quedan APROBADOS y sin retoque**. El
-rechazo es de documentación —seis afirmaciones en presente de
-`azure-apps/datamart_seg_anual.md` que hoy son falsas en producción, la peor un
-pretérito («la nocturna **destruía**») cuando la sigue destruyendo cada noche—,
-más esta secuencia y este fichero. En corrección.
+`progress/review_F-047.md`. **NO se marca `done`**, y no es un descuido: dos
+criterios de aceptación —F-047·2 «la vista existe en la base» y F-044·1/·5— se
+cumplen **en el repositorio y no en producción**, y solo las tres escrituras de
+arriba los cierran. El reviewer lo aprueba con esas condiciones pendientes y
+deja constancia de que no cuentan como incumplimiento del trabajo: están sin
+respuesta del humano.
+
+Las dos pasadas anteriores, por si sirven de aviso a quien retome esto:
+
+- **1ª · RECHAZADO por documentación**, con el código aprobado sin retoque. El
+  documento de `azure-apps` —el que otros equipos leen para saber qué hay
+  desplegado— afirmaba en pretérito que la nocturna «destruía» la vista cuando
+  **la sigue destruyendo**. Corregido por el implementer (`e4f0f9b` allí), que
+  encontró además una séptima afirmación falsa del mismo tipo.
+- **2ª · RECHAZADO por un fallo del líder, no del implementer**: al reescribir
+  este fichero se perdieron los recuentos del diccionario y `init.sh` se puso en
+  rojo. El guardián de F-006 hizo su trabajo. Restaurado en `aebdf10`.
 
 ### Lo que hay que mirar sí o sí en la review
 
