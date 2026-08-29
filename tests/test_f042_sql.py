@@ -64,6 +64,15 @@ def _sql() -> str:
     return RUTA.read_bytes().decode("utf-8").replace("\r\n", "\n")
 
 
+def _sin_comentarios(texto: str) -> str:
+    """El SQL sin las líneas `--`. Este fichero es medio comentario: sin esto,
+    cualquier detector de «no aparece la palabra X» cazaría la explicación de por
+    qué X no se usa."""
+    return "\n".join(
+        linea for linea in texto.splitlines() if not linea.lstrip().startswith("--")
+    )
+
+
 def _entre(texto: str, inicio: str, fin: str) -> str:
     desde = texto.index(inicio)
     return texto[desde : texto.index(fin, desde)]
@@ -171,7 +180,9 @@ def test_f042_r5_el_orden_se_desplaza_por_descartes_y_nunca_con_dense_rank():
     orden = _entre(_sql(), "reales_orden AS (", MARCADOR_FIN_REALES)
 
     assert "ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING" in orden
-    assert "dense_rank" not in _sql().lower()
+    # Sin los comentarios: la cabecera del fichero EXPLICA por qué no se usa
+    # `dense_rank()`, y esa explicación no puede hacer fallar al detector.
+    assert "dense_rank" not in _sin_comentarios(_sql()).lower()
 
 
 def test_f042_r5_la_ventana_del_desplazamiento_particiona_por_obra_y_ambito():
