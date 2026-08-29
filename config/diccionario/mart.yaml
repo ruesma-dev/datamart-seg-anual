@@ -29,15 +29,22 @@ objetos:
       identifica una fila: se puede unir por ella sin fan-out y `count(*)`
       cuenta lo que parece.
 
-      **No siempre fue asi, y conviene saberlo para leer un informe viejo.**
-      Hasta el build de F-042 esa combinacion se repetia en **8.778 casos**
-      (17.556 filas, 9 obras), porque **22 obras tienen dos fases que Sigrid
-      guarda con el mismo `ano` y el mismo `mes`** —dos cierres de quincena, o
-      una fase plurimensual archivada en su mes de arranque— y las dos caian en
-      el mismo `anio_mes` sin que ninguna columna publicada las distinguiera.
-      Cualquier `SUM` de una columna acumulada a origen contaba dos veces:
-      **30.425.881,56 EUR de mas en 35 celdas de 7 obras**, medido el
-      2026-08-28.
+      **Se comprueba con esta consulta, que hoy devuelve 0 y hasta el build
+      de F-042 devolvia 8.778:**
+
+      `SELECT count(*) FROM (SELECT obra_id, partida_id, anio_mes, escenario FROM
+      mart.fact_seguimiento_mensual GROUP BY 1,2,3,4 HAVING count(*) > 1) d`
+
+      **No siempre devolvio 0, y conviene saberlo para leer un informe viejo.**
+      Hasta el build de F-042 esa misma consulta daba **8.778** claves repetidas
+      (17.556 filas, **9** obras), porque **22** obras tienen dos fases que
+      Sigrid guarda con el mismo `ano` y el mismo `mes` —dos cierres de quincena,
+      o una fase plurimensual archivada en su mes de arranque— y las dos caian
+      en el mismo `anio_mes` sin que ninguna columna publicada las distinguiera.
+      De esas 22, solo **9** llegaban a duplicar filas aqui: las demas no tenian
+      presupuesto en el mes en conflicto. Cualquier `SUM` de una columna
+      acumulada a origen contaba dos veces: el valor estaba **DOBLADO** en
+      **35 celdas de 7 obras**, **30.425.881,56 EUR**, medido el 2026-08-28.
 
       **La regla que lo resuelve, y que hay que conocer para interpretar el
       dato:** en los ambitos reales, cuando un mes tiene mas de un cierre se
@@ -288,24 +295,25 @@ objetos:
       clave de negocio. Es la suma de todas las partidas de esa obra y mes que
       comparten categoria.
 
-      **`importe_origen` se puede leer y dar por bueno.** Hasta el build de
-      F-042 no era asi: el agregado hace `SUM(importe_origen)` sobre
-      `mart.fact_seguimiento_mensual`, y alli 8.778 combinaciones traian dos
-      filas con el **mismo acumulado**, asi que el resultado salia exactamente
-      el doble en **35 celdas de 7 obras — 30.425.881,56 EUR**, medido el
-      2026-08-28. Con un solo cierre por mes en el origen, el agregado sale
-      correcto sin haber cambiado una letra de `03_agg_categoria.sql`.
+      **`importe_origen` e `importe_origen_raw` se leen y se dan por buenos.**
+      Hasta el build de F-042 no era asi: estaban **DOBLADOS** en **35 celdas de
+      7 obras — 30.425.881,56 EUR**, medido el 2026-08-28, porque el agregado
+      hace `SUM(importe_origen)` sobre `mart.fact_seguimiento_mensual` y alli
+      cada mes en conflicto traia dos filas con el **mismo acumulado**. La causa
+      eran **22** obras con dos fases que Sigrid guarda con el mismo `ano` y
+      `mes`, de las que **9** llegaban a duplicar filas en el fact. La consulta
+      que lo comprueba esta en el grano de `mart.fact_seguimiento_mensual`, y
+      hoy devuelve **0** frente a las **8.778** de antes.
 
       Lo que dejo dicho ese defecto y sigue valiendo: **que una fila sea unica
       no dice nada de si su importe es correcto**. Esta tabla agrega, asi que
       nunca duplico filas; el numero de dentro era el que estaba mal. Un
       recuento de duplicados no lo habria visto.
 
-      **Medida a medida:** `importe_mes` es el movimiento del mes y se suma;
+      **Medida a medida:** `importe_mes` es el movimiento del mes, **telescopea**
+      —cada fila trae la diferencia con la anterior— y se suma con normalidad;
       `importe_origen` e `importe_origen_raw` son acumulados a origen y **no se
       suman entre meses** —son `ultimo_valor`—, que es distinto de estar mal.
-      El grano de `mart.fact_seguimiento_mensual` explica la regla de «un cierre
-      por mes» que hay detras y a que 9 obras les cambia la numeracion de fase.
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -366,16 +374,16 @@ objetos:
           Suma del acumulado a origen de esas partidas. Ya es acumulado: sumarlo
           en el tiempo multiplica.
 
-          Se lee y se da por bueno. Hasta el build de F-042 este valor **estaba
-          DOBLADO en 35 celdas de 7 obras - 30.425.881,56 EUR**, porque el
+          Se lee y se da por bueno. Hasta el build de F-042 este valor estaba
+          **DOBLADO en 35 celdas de 7 obras — 30.425.881,56 EUR**, porque el
           agregado sumaba las dos filas gemelas que
-          `mart.fact_seguimiento_mensual` traia en los meses con dos cierres.
-          Con un solo cierre por mes en el origen, el agregado sale correcto sin
-          haber tocado `03_agg_categoria.sql`.
+          `mart.fact_seguimiento_mensual` traia en los meses con dos cierres. La
+          causa eran **22** obras con dos fases que Sigrid guarda con el mismo
+          `ano` y `mes`, de las que **9** llegaban a duplicar filas alli.
 
           La leccion que dejo aquel defecto, y que sigue valiendo: **que una
           fila sea unica no dice nada de si su importe es correcto**. Esta tabla
-          agrega, asi que nunca duplico filas.
+          agrega, asi que nunca duplico filas; el numero de dentro era el malo.
         unidad: EUR
         agregacion: ultimo_valor
       importe_mes_raw:
@@ -385,8 +393,9 @@ objetos:
       importe_origen_raw:
         significado: >-
           Version sin redondear de `importe_origen`. Comparte con el todo lo
-          dicho alli, incluido que hasta el build de F-042 venia doblado por la
-          misma causa y que ahora no.
+          dicho alli, incluido que hasta el build de F-042 venia **DOBLADO** por
+          la misma causa —**22** obras con dos fases en el mismo mes, de las que
+          **9** duplicaban filas en el fact— y que ahora no.
 
           Sigue siendo un **acumulado a origen**: no se suma entre meses.
         unidad: EUR
@@ -556,16 +565,20 @@ objetos:
       identifica una fila.
 
       **`importe_origen` se lee y se da por bueno.** Hasta el build de F-042
-      venia DOBLADO en 35 celdas de 7 obras —30.425.881,56 EUR, medido el
-      2026-08-28— porque el agregado sumaba dos veces el mismo acumulado de las
-      filas gemelas del fact. La causa eran 22 obras con dos fases que Sigrid
-      guarda con el mismo `ano` y `mes`; hoy se publica **un solo cierre por
-      mes**, el mas moderno con acumulado distinto de cero, y el agregado sale
-      correcto sin que se haya tocado el `SUM`.
+      venia **DOBLADO** en **35 celdas de 7 obras — 30.425.881,56 EUR**, medido
+      el 2026-08-28, porque el agregado sumaba dos veces el mismo acumulado de
+      las filas gemelas del fact. La causa eran **22** obras con dos fases que
+      Sigrid guarda con el mismo `ano` y `mes`, de las que **9** llegaban a
+      duplicar filas; hoy se publica **un solo cierre por mes**, el mas moderno
+      con acumulado distinto de cero, y el agregado sale correcto sin que se
+      haya tocado el `SUM`. La consulta que lo comprueba esta en el grano de
+      `mart.fact_seguimiento_mensual`, y hoy devuelve **0** frente a las
+      **8.778** de antes.
 
-      **`importe_mes` es el movimiento del mes y se suma; `importe_origen` es un
-      acumulado y no se suma entre meses.** Esa distincion no la cambio F-042 y
-      es la que hay que tener presente al montar una tarjeta de KPI.
+      **`importe_mes` es el movimiento del mes, telescopea y se suma;
+      `importe_origen` es un acumulado y no se suma entre meses.** Esa
+      distincion no la cambio F-042 y es la que hay que tener presente al montar
+      una tarjeta de KPI.
     clave_negocio: [obra_id, anio_mes, categoria, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -600,10 +613,12 @@ objetos:
         significado: >-
           Acumulado a origen de esas partidas. No se suma en el tiempo.
 
-          Se lee y se da por bueno. Hasta el build de F-042 venia DOBLADO en
-          35 celdas de 7 obras —30.425.881,56 EUR— porque el agregado sumaba
-          dos veces el mismo acumulado de las filas gemelas del fact. Con un
-          solo cierre por mes eso desaparecio sin tocar el agregado.
+          Se lee y se da por bueno. Hasta el build de F-042 venia **DOBLADO**
+          en **35 celdas de 7 obras — 30.425.881,56 EUR** porque el agregado
+          sumaba dos veces el mismo acumulado de las filas gemelas del fact. La
+          causa eran **22** obras con dos fases en el mismo mes, de las que
+          **9** duplicaban filas. Con un solo cierre por mes eso desaparecio sin
+          tocar el agregado.
 
           Lo que no ha cambiado: **es un acumulado a origen**. Sumarlo entre
           meses multiplica; para el total de un periodo se usa `importe_mes`.

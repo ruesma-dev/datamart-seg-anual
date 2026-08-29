@@ -694,14 +694,29 @@ def test_f006_r10_el_aviso_del_doblado_esta_en_la_columna(objeto: str) -> None:
 
 @pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
 def test_f006_r10_la_columna_sana_dice_que_lo_es(objeto: str) -> None:
-    """Para no repetir el error de alarmar en bloque sobre la medida buena."""
+    """Para no repetir el error de alarmar en bloque sobre la medida buena.
+
+    **Qué exigía antes de F-042 y por qué cambió.** Exigía la frase «NO esta
+    afectada [por el duplicado]». Con el duplicado ya corregido en el build, esa
+    frase describe un defecto que no existe, y un guardián que obliga a
+    escribirla convierte la ficha en un museo: dentro de un año nadie sabrá si
+    el aviso sigue vigente.
+
+    Lo que sí es permanente, y es lo que ahora se exige, es **por qué**
+    `importe_mes` estaba sana y lo sigue estando: **telescopea**, cada fila trae
+    la diferencia con la anterior. Esa propiedad es la que hace que su suma sea
+    el movimiento del periodo, la que se midió 200/200 series, y la razón por la
+    que F-042 renumera el orden interno de las fases en vez de limitarse a
+    borrar la fila sobrante. Si algún día dejara de telescopear, este test cae.
+    """
     ficha = _dicc().por_nombre[objeto]
     mes = next((c for c in ficha.columnas if c.nombre == "importe_mes"), None)
     if mes is None:
         pytest.skip(f"{objeto} no publica `importe_mes`")
-    assert contiene(mes.significado, "NO esta afectada"), (
-        f"{objeto}.importe_mes es la vía buena y su ficha no lo dice: sin eso, el "
-        f"aviso de al lado se lee como que todo el objeto está mal"
+    assert contiene(mes.significado, "elescopea"), (
+        f"{objeto}.importe_mes es la vía buena y su ficha no dice por qué: sin "
+        f"«telescopea», el aviso de al lado se lee como que todo el objeto está "
+        f"mal, que es el error que ya se cometió una vez"
     )
 
 
