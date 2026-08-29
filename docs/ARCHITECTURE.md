@@ -32,6 +32,15 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
 - Reales (amb 3/7): `fas` = MES; fas=0 = Previsto (foto viva),
   fas=1..N cierres mensuales; planif NO explosionada;
   importe del mes = diferencia con la fase anterior.
+- **DOS CIERRES EN UN MISMO MES: manda el moderno (F-042).** 22 obras tienen
+  dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes`. `stg`
+  conserva **una sola**: la de `fas` más alto **entre las que tienen el
+  acumulado distinto de cero** (si todas están a cero, la más alta). El cierre
+  descartado sigue en `raw` y en `stg.fases`; lo que no tiene es fila en
+  `stg.plan_mensual`. Dentro del build se renumera un orden interno —solo por
+  los descartes, nunca con `dense_rank()`— para que el `LAG` de `importe_mes`
+  siga viendo el cierre inmediatamente anterior; ese orden **no se publica**, y
+  `version` conserva el número de fase original, con huecos en 9 obras.
 - `obr.ide = con.ide` (obra hereda de concepto). El nombre legible está en
   `con.res`. `con.nom` NO existe.
 - En `raw.obrfas` el campo de fase se llama `fasnum`; en `raw.obrparpre` se

@@ -12,13 +12,25 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 11 (F-042, 2026-08-29): un solo cierre por mes en los ambitos reales.
+# Se retira de `mart` el aviso de dato doblado -`importe_origen` venia al doble
+# en 35 celdas de 7 obras, 30.425.881,56 EUR- porque el build ya publica una
+# sola fila por (obra, partida, mes, escenario). La regla que lo consigue y sus
+# consecuencias visibles -que `stg.plan_mensual.version` queda con HUECOS en 9
+# obras, porque se publica el numero de fase original de Sigrid sin renumerar-
+# quedan descritas en las fichas de `stg.plan_mensual`,
+# `mart.fact_seguimiento_mensual` y `mart.fact_seguimiento_categoria`. El aviso
+# baja ademas a `mart.v_pbi_fact_categoria` y a `cierre.v_pbi_planif_vs_real`,
+# que son la superficie que Power BI y el MCP abren de verdad y que no llevaban
+# ninguno.
+#
 # version 10 (F-047, 2026-08-28): `cierre`, `compras`, `maestro` y
 # `retenciones` pasan de `refresco: manual` a `nocturno` porque sus cuatro
 # build entraron en `run-all`, y `R-FRESCURA-MANUAL` pasa a llamarse
 # `R-FRESCURA` porque lo que decia -que la nocturna construye SOLO raw, stg y
 # mart- dejo de ser cierto.
 
-version: 10
+version: 11
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
