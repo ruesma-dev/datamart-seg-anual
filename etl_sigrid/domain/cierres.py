@@ -16,10 +16,10 @@ el acumulado a **cero** no puede desbancar a otro que sí tiene dato (si no,
 ## Por qué no basta con descartar la fila
 
 `importe_mes` de los reales **no viene de Sigrid**: lo calcula el ETL como
-`importe_origen − LAG(importe_origen)`, y **solo** si la fase anterior es la
+`importe_origen - LAG(importe_origen)`, y **solo** si la fase anterior es la
 inmediatamente consecutiva; si no lo es, se queda con el acumulado entero
 (`sql/stg/08_plan_mensual.sql`). Descartar la fase 20 de la 0499 sin más dejaría
-a la 21 sin `LAG` consecutivo —19 no es 21−1— y el movimiento de febrero de 2018
+a la 21 sin `LAG` consecutivo —19 no es 21-1— y el movimiento de febrero de 2018
 pasaría de 975.249,98 € a 5.688.073,92 €: se arreglaría el acumulado y se
 rompería el movimiento. Por eso hay que **renumerar el orden interno**.
 

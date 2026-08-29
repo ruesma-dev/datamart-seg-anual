@@ -27,7 +27,7 @@ import pytest
 from click.testing import CliRunner
 
 import main
-from etl_sigrid.domain.cierres import Cierre, agrupar, contrastar
+from etl_sigrid.domain.cierres import agrupar, contrastar
 from etl_sigrid.infrastructure.postgres.cierres_sql import (
     AMBITOS_REALES,
     PALABRAS_DE_ESCRITURA,

@@ -299,7 +299,7 @@ def test_f042_r5_la_0499_recupera_el_lag_consecutivo():
 
     Descartadas la 18 y la 20, la 19 pasa a orden 18 y la 21 a orden 19: el
     `LAG` vuelve a ser consecutivo y el movimiento de febrero sale
-    5.688.073,92 − 4.712.823,94 = 975.249,98 en vez de los 5.688.073,92 que
+    5.688.073,92 - 4.712.823,94 = 975.249,98 en vez de los 5.688.073,92 que
     daría borrar sin renumerar.
     """
     plan = plan_de_cierres(
@@ -588,7 +588,7 @@ def test_f042_r5_sin_renumerar_el_movimiento_de_febrero_se_multiplica_por_seis()
     """El contrafactual, que es lo que justifica la feature entera.
 
     Descartando la fase 20 **sin** desplazar el orden, la 21 deja de tener `LAG`
-    consecutivo (19 no es 21−1) y febrero pasa de 975.249,98 € a 5.688.073,92 €:
+    consecutivo (19 no es 21-1) y febrero pasa de 975.249,98 € a 5.688.073,92 €:
     casi seis veces lo real. Se arreglaría el acumulado y se reventaría el
     movimiento.
     """

@@ -20,18 +20,38 @@ resultado esperado es cero cambios.
 
 from __future__ import annotations
 
+import re as _re
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
+from etl_sigrid.application.steps.build_stg_step import DIRECTORIO_SQL_STG
 from etl_sigrid.domain.huella import (
     AMBITOS_DE_LA_HUELLA,
     FilaHuella,
     comparar_huellas,
     veredicto,
 )
-from etl_sigrid.infrastructure.postgres.huella_obras import escribir_csv, leer_csv
+from etl_sigrid.infrastructure.postgres.cierres_sql import PALABRAS_DE_ESCRITURA
+from etl_sigrid.infrastructure.postgres.huella_obras import (
+    MARCADOR_FILTRO_OBRAS,
+    MARCADOR_FIN_REALES,
+    MARCADOR_INICIO_REALES,
+    HuellaAbortada,
+    bloque_de_reales,
+    construir_huella,
+    escribir_csv,
+    filtro_de_tramo,
+    leer_csv,
+    sql_huella_mart,
+    sql_huella_propuesta,
+    sql_huella_stg,
+)
+
+SQL_PLAN_MENSUAL = (DIRECTORIO_SQL_STG / "08_plan_mensual.sql").read_text(
+    encoding="utf-8"
+)
 
 FEBRERO = date(2018, 2, 1)
 ENERO = date(2018, 1, 1)
@@ -309,3 +329,314 @@ def test_f042_la_fila_de_huella_es_inmutable():
 
     with pytest.raises(FrozenInstanceError):
         _fila().filas = 1  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# R22 · las consultas, y que la propuesta NO materializa nada
+# ---------------------------------------------------------------------------
+
+def _consultas() -> dict[str, str]:
+    return {
+        "stg": sql_huella_stg(),
+        "mart": sql_huella_mart(),
+        "propuesta": sql_huella_propuesta(SQL_PLAN_MENSUAL, (584748,)),
+    }
+
+
+@pytest.mark.parametrize("nombre", ("stg", "mart", "propuesta"))
+def test_f042_r22_ninguna_consulta_de_la_huella_escribe(nombre: str):
+    """El nivel 1 es de solo lectura por requisito, no por costumbre.
+
+    `CREATE` está en la lista, así que un `CREATE TEMP TABLE` colado para
+    «hacerlo más fácil» rompería este test antes de llegar a la base.
+    """
+    texto = _consultas()[nombre].upper()
+
+    for palabra in PALABRAS_DE_ESCRITURA:
+        assert not _re.search(rf"\b{palabra}\b", texto), (
+            f"la huella {nombre} contiene {palabra}"
+        )
+
+
+@pytest.mark.parametrize("nombre", ("stg", "mart", "propuesta"))
+def test_f042_r22_ninguna_consulta_de_la_huella_usa_temporales(nombre: str):
+    texto = _consultas()[nombre].upper()
+
+    assert "TEMP" not in texto
+    assert "TEMPORARY" not in texto
+    assert "INTO " not in texto
+
+
+@pytest.mark.parametrize("nombre", ("stg", "mart"))
+def test_f042_r22_la_huella_cubre_los_cuatro_ambitos(nombre: str):
+    assert "ambito_id IN (3, 7, 8, 11)" in _consultas()[nombre]
+
+
+def test_f042_r22_el_agregado_de_stg_lleva_los_mismos_join_que_mart():
+    """Sin `stg.obras` y `stg.partidas` la huella contaría partidas que
+    `mart/02_build_fact.sql` descarta, y dejaría de ser predictiva."""
+    for texto in (sql_huella_stg(), sql_huella_propuesta(SQL_PLAN_MENSUAL, (1,))):
+        assert "JOIN stg.obras" in texto
+        assert "JOIN stg.partidas" in texto
+
+
+def test_f042_r22_el_grano_es_obra_ambito_mes():
+    for texto in (sql_huella_stg(), sql_huella_mart()):
+        assert "GROUP BY" in texto
+        assert "ambito_id, " in texto
+
+
+def test_f042_r22_la_propuesta_reutiliza_el_texto_del_fichero_del_build():
+    """El punto entero del bloque D: si fuera una copia de la lógica, la prueba
+    que decide estaría midiendo un texto distinto del que va a correr."""
+    bloque = bloque_de_reales(SQL_PLAN_MENSUAL)
+    texto = sql_huella_propuesta(SQL_PLAN_MENSUAL, (584748,))
+
+    for cte in ("reales_cierres AS (", "reales_vigente AS (", "reales_orden AS ("):
+        assert cte in bloque and cte in texto
+    assert "LAG(orden_fase) OVER w = orden_fase - 1" in texto
+    assert texto.startswith("WITH")
+
+
+def test_f042_r22_la_propuesta_sustituye_el_marcador_de_tramo():
+    texto = sql_huella_propuesta(SQL_PLAN_MENSUAL, (584748, 950302))
+
+    assert MARCADOR_FILTRO_OBRAS not in texto
+    assert "ARRAY[584748, 950302]::BIGINT[]" in texto
+
+
+def test_f042_r22_la_propuesta_solo_toca_los_ambitos_reales():
+    """Los master se copian; su rama ni se menciona."""
+    texto = sql_huella_propuesta(SQL_PLAN_MENSUAL, (1,))
+
+    assert "ambito_id IN (3, 7)" in texto
+    assert "master_" not in texto
+
+
+def test_f042_sin_marcadores_la_propuesta_se_niega_a_construirse():
+    """Antes que medir media rama —o SQL válido que mide otra cosa— se para."""
+    with pytest.raises(ValueError, match="marcadores"):
+        bloque_de_reales("SELECT 1")
+
+    invertido = f"{MARCADOR_FIN_REALES} ... {MARCADOR_INICIO_REALES}"
+    with pytest.raises(ValueError, match="marcadores"):
+        bloque_de_reales(invertido)
+
+
+def test_f042_el_filtro_de_tramo_no_admite_nada_que_no_sea_un_entero():
+    """Misma regla dura que F-019: `bool` es subclase de `int` y `ARRAY[True]`
+    no es una lista de obras."""
+    assert filtro_de_tramo([7, 9]) == "ARRAY[7, 9]::BIGINT[]"
+
+    with pytest.raises(ValueError):
+        filtro_de_tramo([])
+    with pytest.raises(TypeError):
+        filtro_de_tramo([True])
+    with pytest.raises(TypeError):
+        filtro_de_tramo(["584748; DROP TABLE stg.plan_mensual"])
+
+
+# ---------------------------------------------------------------------------
+# La ejecución por tramos, con la puerta de disco delante
+# ---------------------------------------------------------------------------
+
+
+class PgHuellaFalso:
+    """Sirve filas enlatadas y estalla si le piden cualquier escritura."""
+
+    def __init__(self, ocupacion_pct: float = 29.0, pesos=None):
+        self.ocupacion_pct = ocupacion_pct
+        self._pesos = pesos or {584748: 10, 950302: 10}
+        self.consultas: list[str] = []
+
+    def fetch_pesos_plan_mensual(self) -> dict[int, int]:
+        return dict(self._pesos)
+
+    def medir_ocupacion_disco_pct(self, total_gb: int) -> float:
+        return self.ocupacion_pct
+
+    def filas_solo_lectura(self, sql_text: str, timeout_s: int):
+        self.consultas.append(sql_text)
+        obra = 584748 if "584748" in sql_text else 950302
+        ambitos = (3, 7) if "reales_con_lag" in sql_text else (3, 7, 8, 11)
+        return [
+            (
+                obra,
+                "0499",
+                amb,
+                date(2018, 2, 1),
+                1,
+                "21",
+                Decimal("1.00"),
+                Decimal("2.00"),
+            )
+            for amb in ambitos
+        ]
+
+    def __getattr__(self, nombre: str):
+        raise AssertionError(
+            f"la huella es de solo lectura y ha llamado a pg.{nombre}"
+        )
+
+
+class AjustesFalsos:
+    # Imita la forma de `config.settings`: `settings.postgres.<lo que sea>`.
+    class postgres:  # noqa: N801 - imita la forma de config.settings
+        tramo_max_filas = 10
+        disco_total_gb = 64
+        disco_limite_pct = 85.0
+
+
+def test_f042_r22_la_huella_de_stg_va_por_tramos_y_no_escribe():
+    pg = PgHuellaFalso()
+
+    filas = construir_huella(pg, AjustesFalsos(), desde="stg", propuesta=False)
+
+    assert {f.obra_id for f in filas} == {584748, 950302}
+    assert {f.ambito_id for f in filas} == {3, 7, 8, 11}
+    assert len(pg.consultas) == 2, "una consulta por tramo"
+
+
+def test_f042_r22_la_propuesta_mezcla_reales_nuevos_con_master_copiados():
+    """Los ámbitos 8 y 11 salen del agregado ACTUAL, no de reejecutar su rama."""
+    pg = PgHuellaFalso()
+
+    filas = construir_huella(
+        pg,
+        AjustesFalsos(),
+        desde="stg",
+        propuesta=True,
+        sql_plan_mensual=SQL_PLAN_MENSUAL,
+    )
+
+    assert {f.ambito_id for f in filas} == {3, 7, 8, 11}
+    con_reales = [c for c in pg.consultas if "reales_con_lag" in c]
+    assert len(con_reales) == 2, "la rama de reales se reejecuta una vez por tramo"
+    for consulta in con_reales:
+        assert "8, 11" not in consulta, "la rama master no se reejecuta"
+
+
+def test_f042_la_puerta_de_disco_para_la_huella_antes_de_pasarse():
+    """La misma puerta de F-019, y por el mismo motivo: el disco es compartido."""
+    pg = PgHuellaFalso(ocupacion_pct=91.0)
+
+    with pytest.raises(HuellaAbortada, match="91"):
+        construir_huella(pg, AjustesFalsos(), desde="stg", propuesta=False)
+
+
+def test_f042_si_no_se_puede_medir_el_disco_la_huella_no_se_ejecuta_a_ciegas():
+    class PgSinMedida(PgHuellaFalso):
+        def medir_ocupacion_disco_pct(self, total_gb: int) -> float:
+            raise RuntimeError("pg_database no responde")
+
+    with pytest.raises(HuellaAbortada, match="ciegas"):
+        construir_huella(
+            PgSinMedida(), AjustesFalsos(), desde="stg", propuesta=False
+        )
+
+
+def test_f042_la_huella_de_mart_se_lee_de_una_pasada():
+    """24.684 filas y ninguna ventana: trocearla sería ceremonia sin motivo."""
+    pg = PgHuellaFalso()
+
+    construir_huella(pg, AjustesFalsos(), desde="mart", propuesta=False)
+
+    assert len(pg.consultas) == 1
+
+
+def test_f042_propuesta_desde_mart_no_tiene_sentido_y_se_rechaza():
+    with pytest.raises(ValueError, match="propuesta"):
+        construir_huella(
+            PgHuellaFalso(), AjustesFalsos(), desde="mart", propuesta=True
+        )
+
+
+def test_f042_un_origen_desconocido_se_rechaza():
+    with pytest.raises(ValueError, match="stg"):
+        construir_huella(
+            PgHuellaFalso(), AjustesFalsos(), desde="cierre", propuesta=False
+        )
+
+
+# ---------------------------------------------------------------------------
+# Los dos comandos
+# ---------------------------------------------------------------------------
+
+
+def test_f042_r22_huella_obras_esta_registrado_con_sus_opciones():
+    from click.testing import CliRunner as _CliRunner
+
+    import main
+
+    resultado = _CliRunner().invoke(main.cli, ["huella-obras", "--help"])
+
+    assert resultado.exit_code == 0
+    for opcion in ("--out", "--desde", "--propuesta"):
+        assert opcion in resultado.output
+
+
+def test_f042_r23_comparar_huellas_esta_registrado_con_sus_opciones():
+    from click.testing import CliRunner as _CliRunner
+
+    import main
+
+    resultado = _CliRunner().invoke(main.cli, ["comparar-huellas", "--help"])
+
+    assert resultado.exit_code == 0
+    assert "--obras-esperadas" in resultado.output
+
+
+def test_f042_r25_comparar_huellas_sale_distinto_de_0_si_se_mueve_otra_obra(tmp_path):
+    from click.testing import CliRunner as _CliRunner
+
+    import main
+
+    antes = tmp_path / "antes.csv"
+    despues = tmp_path / "despues.csv"
+    escribir_csv(ANTES, antes)
+    escribir_csv(
+        (
+            *DESPUES[:2],
+            _fila(obra_id=700001, codigo="0700", versiones="4", importe_origen="1.00"),
+            *DESPUES[3:],
+        ),
+        despues,
+    )
+
+    resultado = _CliRunner().invoke(
+        main.cli,
+        ["comparar-huellas", str(antes), str(despues), "--obras-esperadas", "0499"],
+    )
+
+    assert resultado.exit_code != 0
+    assert "0700" in resultado.output
+
+
+def test_f042_r24_comparar_huellas_sale_0_cuando_solo_cambia_lo_previsto(tmp_path):
+    from click.testing import CliRunner as _CliRunner
+
+    import main
+
+    antes = tmp_path / "antes.csv"
+    despues = tmp_path / "despues.csv"
+    escribir_csv(ANTES, antes)
+    escribir_csv(DESPUES, despues)
+
+    resultado = _CliRunner().invoke(
+        main.cli,
+        ["comparar-huellas", str(antes), str(despues), "--obras-esperadas", "0499"],
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "0 cambios, que es el resultado esperado" in resultado.output
+
+
+def test_f042_una_huella_con_otra_cabecera_se_rechaza(tmp_path):
+    """Leerla mal en silencio sería la peor forma de dar verde."""
+    from etl_sigrid.infrastructure.postgres.huella_obras import leer_csv as _leer
+
+    fichero = tmp_path / "otra.csv"
+    fichero.write_text("obra;mes;importe\n1;2018-02-01;3\n", encoding="utf-8-sig")
+
+    with pytest.raises(ValueError, match="cabecera"):
+        _leer(fichero)
