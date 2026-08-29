@@ -1,69 +1,55 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-29
 
-## F-042 · `in_progress` — CÓDIGO TERMINADO, ESPERANDO LAS 4 TAREAS DEL HUMANO
+## F-042 · `in_progress` — LISTA PARA EL REVIEWER
 
-Rama `feature/F-042-clave-fact`, 16 commits (T1 a T13 y T18 a T23).
-`bash harness/init.sh` en verde. Informe: **`progress/impl_F-042.md`**.
+Rama `feature/F-042-clave-fact`, 27 commits (T1–T25). `bash harness/init.sh` en
+verde. Informe: **`progress/impl_F-042.md`**.
 
-### Qué está hecho
+**La prueba que decide, ya ejecutada.** `comparar-huellas` sale con **código 0**:
+*«cambian exactamente las obras previstas y solo en lo previsto; el resto, ni un
+céntimo»*. **19 cambios de importe, −30.424.662,34 €, todos a la baja y todos en
+las 9 obras esperadas. Ámbitos master 8 y 11: 0 cambios.** La huella del después
+se generó **sin escribir una fila** y el disco no se movió (58,06 % constante en
+los 60 tramos).
 
-- **El arreglo**, en `sql/stg/08_plan_mensual.sql`: tres CTE nuevas en la rama
-  de reales y el `LAG` mirando `orden_fase`. La rama master **no cambia ni un
-  byte**, y eso lo fija un **hash** en `tests/test_f042_sql.py`.
-- **El oráculo**, en `etl_sigrid/domain/cierres.py`, y el comando de solo
-  lectura `check-cierres` que lo contrasta contra `stg.plan_mensual`.
-- **La huella antes/después**: `etl_sigrid/domain/huella.py` +
-  `infrastructure/postgres/huella_obras.py` + los comandos `huella-obras` y
-  `comparar-huellas`. El SQL del «después» **se recorta del propio fichero del
-  build**, no es una copia.
-- **El diccionario** (versión 11): retirado el aviso de dato doblado, escrita
-  la regla, y el aviso llevado a `v_pbi_fact_categoria` y
-  `cierre.v_pbi_planif_vs_real`, que eran la superficie de consumo y no lo
-  llevaban. Sigue en **103 objetos, 798 columnas y 46 fichas de consumo**:
-  F-042 no añade ni quita ninguno, solo cambia lo que dicen seis de ellas. La
-  lista de pendientes no crece.
+Tres cosas del resultado que el reviewer va a mirar, todas en §5 del informe:
 
-### LO QUE FALTA, y lo lanza el HUMANO (T14 a T17)
+1. **El matiz de PUY DU FOU funcionó**: `0606 · ámbito 3 · 2021-02:
+   [14|16] -> [14]`, y **0 € de cambio**. Sin él habría −18,24 M€ falsos ahí.
+2. **El total no cuadra con la línea base por 1.219,22 €, y es correcto**: son
+   **dos reglas distintas** y la diferencia es casi toda la 0246 (1.197,99).
+   Eso corrigió el fixture de `test_f042_regla.py`, que tenía los dos importes
+   de esa obra intercambiados.
+3. **Un solo `importe_mes` se mueve** —`0471 · ámbito 7 · 2016-03, −4.538,09`—
+   y se mueve para bien: el cierre descartado traía un acumulado **menor que el
+   mes anterior** y el movimiento arrastraba ese tramo negativo espurio.
 
-Son lecturas contra `sigrid_dm` en producción; T15 no escribe nada. **El orden
-importa: la huella de ANTES se saca antes de reconstruir nada**, porque el
-build pisa `stg.plan_mensual` y no hay vuelta atrás.
+**Se corrigió una afirmación del diseño que la medición desmintió** (§6 del
+informe y §5 de `design.md`): el agregado de `stg` es idéntico al de `mart` en
+los ámbitos reales —desviación **0 en 8.243 celdas**— pero **no en los master**,
+donde `stg` suma todas las versiones y `mart` solo la vigente. No invalida nada,
+pero la frase habría hecho creer a alguien que encontró un defecto de 40
+millones.
 
-```
-python main.py huella-obras --desde stg  --out huella_f042_stg_antes.csv     # T14
-python main.py huella-obras --desde mart --out huella_f042_mart_antes.csv    # T14
-python main.py huella-obras --desde stg --propuesta --out huella_f042_stg_despues.csv   # T15
-python main.py comparar-huellas huella_f042_stg_antes.csv huella_f042_stg_despues.csv \
-    --obras-esperadas 0246,0310,0433,0462,0471,0499,0545,0571,0606          # T16
-```
+El diccionario sigue en **103 objetos, 798 columnas y 46 fichas de consumo**:
+F-042 no añade ni quita ninguno, solo cambia lo que dicen seis. La lista de
+pendientes no crece. Los CSV de la huella **no se versionan** (`.gitignore:27`,
+precedente de F-019).
 
-- **T14**: los dos CSV existen, con ~11.883 celdas y los cuatro ámbitos.
-- **T15**: termina **sin escribir en la base** y la ocupación de disco no se
-  mueve.
-- **T16**: código 0; **cero diferencias en los ámbitos 8 y 11**; ninguna obra
-  fuera de la lista se mueve.
-- **T17**: contrastar el informe de T16 contra la tabla de
-  `progress/explore_F-042.md` §4.2, obra a obra, y pegarlo en el hueco que
-  `progress/impl_F-042.md` deja reservado.
+**Sin campaña de mutación**, por decisión del humano del 2026-08-29. El
+**reviewer debe declararla N/A en C4 bis citándola**; sin ese motivo escrito, un
+checkbox vacío ahí es CHANGES_REQUESTED. **Fase RED y cobertura sí se exigen y
+están cumplidas**: cuatro trazas de rojo en §3 y **100 % de 649 líneas
+cambiadas**.
 
-Verificado en seco: los tres comandos existen, `--help` responde y la lógica
-está cubierta por 188 tests propios de F-042.
+### Lo que falta, y son ESCRITURAS EN PRODUCCIÓN que autoriza el humano
 
-### Los pasos de cierre, después de T17
-
-Son **escrituras en producción** y también los autoriza el humano: `stage` +
-`build-mart` + `build-cierre` **sin `ingest`**, luego la huella del después ya
-materializada, `check-unicidad` (debe dar 0), `check-cierres`,
-`check-diccionario` y `publicar-diccionario`. Están en `specs/F-042-clave-fact/tasks.md`.
-
-### Sin campaña de mutación, y el reviewer tiene que saberlo
-
-Decisión del humano del 2026-08-29: «no me hacen falta mutation test».
-`CHECKPOINTS.md` la exige en C4 bis para rigor `critico`, así que **el reviewer
-debe declararla N/A citando esta decisión**; sin ese motivo por escrito, un
-checkbox vacío en C4 bis es CHANGES_REQUESTED. **Fase RED y cobertura sí se
-exigen y están cumplidas**: las trazas de los cuatro rojos están en el informe.
+En `specs/F-042-clave-fact/tasks.md`: `stage` + `build-mart` + `build-cierre`
+**sin `ingest`**, la huella del después ya materializada, `check-unicidad`
+(debe dar **0** frente a 8.778), `check-cierres`, `check-diccionario`,
+`publicar-diccionario` y `timings`. **Hasta entonces la base sigue con el
+defecto**, y por eso `publicar-diccionario` va **después** del build.
 
 ---
 

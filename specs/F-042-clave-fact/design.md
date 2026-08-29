@@ -138,9 +138,20 @@ completas de R23.
 - **El agregado lleva los mismos `JOIN` que `mart`** (`stg.obras`,
   `stg.partidas`, ambos `INNER`). No es un detalle: sin ellos la huella de `stg`
   contaría partidas que `mart/02_build_fact.sql` descarta, y dejaría de ser
-  predictiva. Con ellos, **el agregado de `stg` es exactamente el que
-  `mart.fact_seguimiento_categoria` publicaría**, porque de `stg` a esa tabla
-  solo hay una proyección y un `SUM` por las mismas dimensiones.
+  predictiva. Con ellos, **en los ámbitos REALES (3 y 7) el agregado de `stg` es
+  exactamente el que `mart.fact_seguimiento_categoria` publica**, porque de
+  `stg` a esa tabla solo hay una proyección y un `SUM` por las mismas
+  dimensiones. **Medido el 2026-08-29 celda a celda entre las dos huellas de
+  T14: desviación 0 en las 8.243 celdas de los ámbitos 3 y 7** (4.251 + 3.992).
+- **Y NO vale para los master (8 y 11)**, aunque la primera versión de este
+  diseño lo afirmara de los cuatro. Ahí `stg.plan_mensual` guarda **todas** las
+  versiones y `mart` publica **solo la vigente de cada mes**
+  (`02_build_fact.sql`, `version_vigente_por_mes`), así que el agregado de `stg`
+  suma la obra tantas veces como versiones tenga: en la 0644 son **43,6 M€ en
+  `stg` frente a 1,3 M€ en `mart`**, y salen 473 celdas de más. **No invalida la
+  prueba** —`comparar-huellas` enfrenta `stg` contra `stg`, así que el artefacto
+  se cancela, y en los master no cambia nada—, pero quien compare las dos
+  huellas de T14 sin saberlo creerá haber encontrado un defecto de 40 millones.
 - **Coste: cero escrituras y cero crecimiento de disco.** Solo lecturas.
 - **Temporales:** las ventanas ordenan por (obra, partida, ámbito). Se ejecuta
   **por tramos de obras** reutilizando `domain/tramos.py` y la **puerta de disco

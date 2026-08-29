@@ -21,7 +21,15 @@ lectura. Tres avisos para que nadie confunda dato con relleno:
    no mira cuánto vale un cierre, solo si su acumulado es **cero o no** y qué
    número de fase tiene. Poner una cifra inventada como si fuera medida sería
    fabricar evidencia; poner una simbólica y decirlo, no.
-3. **Las 13 obras del conjunto A no llegan a colisionar en `plan_mensual`**:
+3. **De qué fase es cada importe: lo que la línea base fija y lo que no.** El
+   informe publica el TOTAL del par y el superviviente **bajo su propia regla**
+   («manda la fase que termina dentro del mes»), así que el otro sale por
+   diferencia. Donde las dos reglas coinciden —23 de las 24 colisiones— el
+   reparto es el mismo lo mires como lo mires; donde no, que es **solo la
+   0246**, lo pinta la medición de T16. Lo que estos tests afirman es **la
+   decisión** —qué número de fase gana—, no la atribución de cada euro a su
+   fase, salvo en 0246 y 0545, donde sí está pinada.
+4. **Las 13 obras del conjunto A no llegan a colisionar en `plan_mensual`**:
    una de sus dos fases no tiene ni una línea de presupuesto (Q4), así que no
    produce ninguna fila y nunca llega a ser un `Cierre`. Cuál de las dos está
    vacía **no está en la línea base**, así que el test se hace con las dos
@@ -67,8 +75,16 @@ class Colision:
 # ---------------------------------------------------------------------------
 COLISIONES: tuple[Colision, ...] = (
     Colision(
+        # La UNICA obra en la que las dos reglas candidatas discrepan, y por eso
+        # su reparto esta pinado por la medicion de T16: la de la linea base
+        # -«manda la fase que TERMINA dentro del mes»- se queda con la 12
+        # (753.433,05), porque la 13 se llama «AGOSTO 2010» y acaba el 31-ago;
+        # la del humano -«manda el cierre mas moderno»- se queda con la 13
+        # (754.631,04). Esos 1.197,99 son casi toda la brecha de 1.219,22 EUR
+        # que T16 midio frente a la linea base. La primera version de este
+        # fixture los tenia al reves.
         "0246", "C.R.A. EL ENCINAR", date(2010, 6, 1),
-        ((12, Decimal("754631.04")), (13, Decimal("753433.05"))), 13, "C",
+        ((12, Decimal("753433.05")), (13, Decimal("754631.04"))), 13, "C",
     ),
     Colision(
         "0310", "O.C. CASETA BOMBAS J.DEERE", date(2011, 5, 1),
@@ -213,20 +229,28 @@ def test_f042_r1_solo_sobrevive_un_cierre_por_mes(colision: Colision):
 
 
 def test_f042_r1_el_moderno_gana_aunque_su_acumulado_sea_menor():
-    """0246: la fase 13 acumula MENOS que la 12 y aun así manda.
+    """0545 · J. DEERE en Venta Real: la fase 6 acumula 1.960,73 MENOS que la 5.
 
-    La regla es por número de fase, no por importe. Si alguien la reescribiera
-    como «gana el mayor acumulado», esta obra lo delata.
+    La regla es por número de fase, no por importe, y **esta** obra lo separa de
+    verdad: es la única de las 24 colisiones en la que el cierre moderno baja
+    respecto al anterior con **líneas valoradas**, o sea una corrección a la
+    baja legítima. Se distingue de 0606, que baja porque su fase moderna está
+    entera a cero y ahí manda R11.
+
+    Antes este test usaba la 0246 con sus dos importes intercambiados. La
+    medición de T16 los puso en su sitio —la fase 13 acumula MÁS, no menos— y
+    dejó el test afirmando lo contrario de lo que pasa en esa obra.
     """
     plan = plan_de_cierres(
         [
-            Cierre(12, date(2010, 6, 1), Decimal("754631.04")),
-            Cierre(13, date(2010, 6, 1), Decimal("753433.05")),
+            Cierre(5, date(2017, 12, 1), Decimal("159721.48")),
+            Cierre(6, date(2017, 12, 1), Decimal("157760.75")),
         ]
     )
 
-    assert plan.vigente_por_mes[date(2010, 6, 1)] == 13
-    assert plan.descartadas == (12,)
+    assert plan.vigente_por_mes[date(2017, 12, 1)] == 6
+    assert plan.descartadas == (5,)
+    assert Decimal("159721.48") - Decimal("157760.75") == Decimal("1960.73")
 
 
 # ---------------------------------------------------------------------------

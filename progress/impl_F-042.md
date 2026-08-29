@@ -1,31 +1,30 @@
 <!-- progress/impl_F-042.md -->
 # F-042 · Implementación · Un solo cierre por mes en los ámbitos reales
 
-Rama `feature/F-042-clave-fact`, 16 commits (T1–T13, T18–T23).
-**T14–T17 son MANUAL y las lanza el humano**: falta su resultado para cerrar.
+Rama `feature/F-042-clave-fact`. **T1–T25 completas**; T14–T17 las lanzó el
+humano y sus resultados están en §5. `bash harness/init.sh` en verde.
+
+**El veredicto:** `comparar-huellas` sale con **código 0** — *«cambian
+exactamente las obras previstas y solo en lo previsto; el resto, ni un
+céntimo»*—, con **0 cambios en los ámbitos master 8 y 11**.
 
 ## 1. Qué cambió
 
 | Fichero | Qué |
 |---|---|
-| `sql/stg/08_plan_mensual.sql` | Tres CTE en la rama de reales, el `LAG` mirando `orden_fase`, dos marcadores que acotan el bloque reutilizable. **La rama master no cambia ni un byte.** |
-| `etl_sigrid/domain/cierres.py` | NUEVO. La regla y el contraste de R17, puros. |
-| `etl_sigrid/domain/huella.py` | NUEVO. `FilaHuella`, `comparar_huellas()`, `veredicto()`. |
-| `etl_sigrid/infrastructure/postgres/cierres_sql.py` | NUEVO. Las tres consultas de `check-cierres`. Solo texto. |
-| `etl_sigrid/infrastructure/postgres/huella_obras.py` | NUEVO. Las tres consultas de la huella, la ejecución por tramos y el CSV. |
-| `etl_sigrid/infrastructure/postgres/postgres_client.py` | `filas_solo_lectura()`. |
-| `main.py` | `check-cierres`, `huella-obras`, `comparar-huellas`. Los tres de solo lectura. |
-| `config/diccionario/{stg,mart,cierre,00_global}.yaml` | La regla, el aviso retirado, versión 11. |
-| `etl_sigrid/domain/diccionario.py` | `_validar_cardinalidad` declara su premisa (R20). |
-| `docs/ARCHITECTURE.md` | La regla en «Semántica Sigrid imprescindible». |
-| `tests/test_f042_{regla,sql,check_cierres,huella}.py` | NUEVOS, 194 tests. |
-| `tests/test_f006_{stg_trampas,relaciones,contexto}.py` | Guardianes revisados (§4). |
+| `sql/stg/08_plan_mensual.sql` | Tres CTE en la rama de reales, el `LAG` mirando `orden_fase`, dos marcadores que acotan el bloque reutilizable. **La rama master no cambia ni un byte**, y lo fija un hash. |
+| `domain/{cierres,huella}.py` | NUEVOS. La regla y el contraste de R17; `FilaHuella`, `comparar_huellas()`, `veredicto()`. Puros. |
+| `…/postgres/{cierres_sql,huella_obras}.py` | NUEVOS. Las consultas de `check-cierres` y de la huella, la ejecución por tramos y el CSV. |
+| `…/postgres/postgres_client.py`, `main.py` | `filas_solo_lectura()`; `check-cierres`, `huella-obras` y `comparar-huellas`, los tres de solo lectura. |
+| `config/diccionario/*.yaml`, `docs/ARCHITECTURE.md` | La regla, el aviso retirado, versión 11. |
+| `domain/diccionario.py`, `specs/…/design.md` | `_validar_cardinalidad` declara su premisa (R20); §5 corregido (§6). |
+| `tests/test_f042_*.py` (4 NUEVOS, 196 tests) y 4 ficheros de guardianes | §4. |
 
 **Lo que NO se tocó, y es deliberado:** `mart/03_agg_categoria.sql` —su `SUM`
-doblaba porque veía dos filas gemelas; con una sola sale bien sin cambiar una
-letra—, `mart/01_ddl.sql`, `05_views_powerbi.sql`, los seis `JOIN` de `cierre/`
-(siguen valiendo **precisamente porque `version` no se renumera**), `stg/05_fases.sql`
-—la fase descartada sigue ahí: ese es el rastro—, `raw/` y `build_stg_step.py`.
+doblaba porque veía dos filas gemelas; con una sola sale bien—, el resto de
+`mart/`, los seis `JOIN` de `cierre/` (siguen valiendo **precisamente porque
+`version` no se renumera**), `stg/05_fases.sql` —la fase descartada sigue ahí:
+ese es el rastro—, `raw/` y `build_stg_step.py`.
 
 ## 2. Decisiones de diseño
 
@@ -33,34 +32,21 @@ letra—, `mart/01_ddl.sql`, `05_views_powerbi.sql`, los seis `JOIN` de `cierre/
 por debajo`. `dense_rank()` cerraría también los huecos que Sigrid ya trae y
 cambiaría `importe_mes` en obras que hoy están bien.
 
-**`version` publica el número original.** Seis `JOIN` de `cierre/` lo cruzan
-contra `stg.fases.numero_fase`. Consecuencia aceptada y fichada: huecos en 9
-obras. El orden renumerado vive dentro del build y muere ahí.
+**`version` publica el número original**: seis `JOIN` de `cierre/` lo cruzan
+contra `stg.fases.numero_fase`. Consecuencia aceptada: huecos en 9 obras.
 
-**El SQL de la huella propuesta se RECORTA del fichero del build**, entre
-`/*F042_INICIO_REALES*/` y `/*F042_FIN_REALES*/`, y se envuelve en su propio
-`WITH`. Si fuera una copia, la prueba que decide mediría un texto distinto del
-que va a correr esa noche.
+**El SQL de la huella propuesta se RECORTA del fichero del build**, entre sus dos
+marcadores. Si fuera una copia, la prueba que decide mediría un texto distinto
+del que va a correr. Y **el oráculo es independiente del SQL que audita**:
+`check-cierres` recompone los candidatos desde `stg.presupuesto ⨝ stg.fases`.
 
-**El oráculo es independiente del SQL que audita.** `check-cierres` recompone
-los candidatos desde `stg.presupuesto ⨝ stg.fases`, no desde `stg.plan_mensual`.
-Si salieran de ahí, la comprobación se preguntaría a sí misma.
+**Desviaciones del diseño, las tres justificadas:** `Cierre` lleva `anio_mes`
+(sin el mes no se agrupa por mes); `FilaHuella` lleva `versiones` y `codigo_obra`
+—lo primero hace **observable** la parte (a) de R23, lo segundo hace utilizable
+`--obras-esperadas 0246,…`—; y `filas_solo_lectura()` evita que los dos comandos
+tengan cada uno su copia del `SET LOCAL transaction_read_only`.
 
-**Desviaciones respecto al diseño, las tres justificadas:**
-
-1. `Cierre` lleva `anio_mes` (el diseño escribía `Cierre(numero_fase, acumulado)`):
-   sin el mes no se puede agrupar por mes, que es lo que hace la regla.
-2. `FilaHuella` lleva `versiones` y `codigo_obra` además de los seis campos del
-   diseño. `versiones` es lo que hace **observable** la parte (a) de R23 —las
-   obras cuya numeración cambia—; `codigo_obra` es lo que hace utilizable
-   `--obras-esperadas 0246,0310,…`, que el humano escribió con códigos.
-3. `PostgresClient.filas_solo_lectura()` no estaba en el diseño. Es lo que evita
-   que `check-cierres` y `huella-obras` tengan cada uno su copia del
-   `SET LOCAL transaction_read_only`. Ahí es donde una de las dos se lo deja.
-
-## 3. Fase RED · las cuatro trazas
-
-Rigor `critico`. Cada bloque empezó con su test en rojo, ejecutado y pegado.
+## 3. Fase RED · las cuatro trazas (rigor `critico`)
 
 **T1 · la regla** (`pytest tests/test_f042_regla.py`):
 
@@ -71,26 +57,26 @@ E   ModuleNotFoundError: No module named 'etl_sigrid.domain.cierres'
 ============================== 1 error in 0.27s ===============================
 ```
 
-**T4 · el SQL** (`pytest tests/test_f042_sql.py`). El rojo más informativo de
-los cuatro: **14 rojos y 5 verdes**, y los 5 verdes son justo los guardianes de
-«esto no cambia» (los dos hashes del master, el doble marcador de F-019, y que
+**T4 · el SQL** (`pytest tests/test_f042_sql.py`). El rojo más informativo:
+**14 rojos y 5 verdes**, y los 5 verdes son justo los guardianes de «esto no
+cambia» (los dos hashes del master, el doble marcador de F-019, y que
 `orden_fase` no aparece en el `INSERT`).
 
 ```
-FAILED tests/test_f042_sql.py::test_f042_r1_existen_las_tres_cte_de_la_regla[reales_cierres]
-FAILED tests/test_f042_sql.py::test_f042_r1_existen_las_tres_cte_de_la_regla[reales_vigente]
-FAILED tests/test_f042_sql.py::test_f042_r1_existen_las_tres_cte_de_la_regla[reales_orden]
-FAILED tests/test_f042_sql.py::test_f042_r1_el_vigente_prefiere_el_acumulado_con_dato_y_luego_el_mas_moderno
-FAILED tests/test_f042_sql.py::test_f042_r11_el_acumulado_del_mes_no_puede_ser_nulo
-FAILED tests/test_f042_sql.py::test_f042_r5_el_orden_se_desplaza_por_descartes_y_nunca_con_dense_rank
-FAILED tests/test_f042_sql.py::test_f042_r5_la_ventana_del_desplazamiento_particiona_por_obra_y_ambito
-FAILED tests/test_f042_sql.py::test_f042_r5_los_cuatro_case_del_lag_comparan_orden_fase
-FAILED tests/test_f042_sql.py::test_f042_r5_la_ventana_del_lag_ordena_por_orden_fase
-FAILED tests/test_f042_sql.py::test_f042_r1_reales_con_lag_lee_solo_los_cierres_que_viven
-FAILED tests/test_f042_sql.py::test_f042_r9_el_bloque_de_reales_no_menciona_ninguna_cte_del_master
-FAILED tests/test_f042_sql.py::test_f042_el_filtro_de_tramos_esta_dentro_del_bloque_de_reales
-FAILED tests/test_f042_sql.py::test_f042_r22_los_marcadores_delimitan_el_bloque_de_reales
-FAILED tests/test_f042_sql.py::test_f042_r22_el_bloque_reutilizable_no_arrastra_el_insert
+FAILED …::test_f042_r1_existen_las_tres_cte_de_la_regla[reales_cierres]
+FAILED …::test_f042_r1_existen_las_tres_cte_de_la_regla[reales_vigente]
+FAILED …::test_f042_r1_existen_las_tres_cte_de_la_regla[reales_orden]
+FAILED …::test_f042_r1_el_vigente_prefiere_el_acumulado_con_dato_y_luego_el_mas_moderno
+FAILED …::test_f042_r11_el_acumulado_del_mes_no_puede_ser_nulo
+FAILED …::test_f042_r5_el_orden_se_desplaza_por_descartes_y_nunca_con_dense_rank
+FAILED …::test_f042_r5_la_ventana_del_desplazamiento_particiona_por_obra_y_ambito
+FAILED …::test_f042_r5_los_cuatro_case_del_lag_comparan_orden_fase
+FAILED …::test_f042_r5_la_ventana_del_lag_ordena_por_orden_fase
+FAILED …::test_f042_r1_reales_con_lag_lee_solo_los_cierres_que_viven
+FAILED …::test_f042_r9_el_bloque_de_reales_no_menciona_ninguna_cte_del_master
+FAILED …::test_f042_el_filtro_de_tramos_esta_dentro_del_bloque_de_reales
+FAILED …::test_f042_r22_los_marcadores_delimitan_el_bloque_de_reales
+FAILED …::test_f042_r22_el_bloque_reutilizable_no_arrastra_el_insert
 14 failed, 5 passed in 1.32s
 ```
 
@@ -100,9 +86,7 @@ FAILED tests/test_f042_sql.py::test_f042_r22_el_bloque_reutilizable_no_arrastra_
 tests\test_f042_check_cierres.py:30: in <module>
     from etl_sigrid.domain.cierres import Cierre, agrupar, contrastar
 E   ImportError: cannot import name 'agrupar' from 'etl_sigrid.domain.cierres'
-=========================== short test summary info ===========================
-ERROR tests/test_f042_check_cierres.py
-1 error in 1.99s
+ERROR tests/test_f042_check_cierres.py — 1 error in 1.99s
 ```
 
 **T11 · la huella** (`pytest tests/test_f042_huella.py`):
@@ -114,71 +98,94 @@ E   ModuleNotFoundError: No module named 'etl_sigrid.domain.huella'
 1 error in 0.24s
 ```
 
-Un rojo intermedio que conviene contar porque cambió el código: en T2 falló
-`test_f042_r4_con_cuatro_cierres_y_los_dos_modernos_a_cero_gana_el_ultimo_con_dato`
-con `mappingproxy({2: 1}) == {2: 2}`. **La equivocada era la expectativa del
-test**, no el código: con la fase 1 descartada, la 2 baja a orden 1 —pasa a ser
-la primera de la serie, con `LAG` nulo—, que es lo que hace el
-`ROWS … AND 1 PRECEDING` del SQL. Se corrigió el test y se dejó escrito el
-porqué.
+## 4. Guardianes de otras features que había que revisar
 
-## 4. Los guardianes de F-006 que había que revisar
+**F-006 · diez tests escritos para un defecto ABIERTO.** No se desactivó
+ninguno: `la_columna_sana_dice_que_lo_es` exigía la frase «NO esta afectada»,
+que con el defecto corregido describe algo inexistente; ahora exige lo
+permanente —que `importe_mes` **telescopea**—. Los demás muerden igual.
 
-Diez tests de `test_f006_stg_trampas.py` estaban escritos para un defecto
-**abierto** y con el arreglo se quedaban en falso. No se desactivó ninguno:
+**F-011 · una barrera que estaba mintiendo.** `test_f011_r22_el_sql_de_stg_y_
+mart_no_se_toca` mira el diff de **la rama actual**, no el de F-011, que está
+`done`: fuera de su rama decía «NADIE toca nunca el SQL de `stg` ni de `mart`»,
+falso —F-025 existe para eso—. Se acota a su rama y **se salta con motivo**.
 
-- `la_columna_sana_dice_que_lo_es` exigía la frase «NO esta afectada». Con el
-  defecto corregido eso describe algo que no existe y convierte la ficha en un
-  museo. Ahora exige lo permanente: que `importe_mes` diga que **telescopea**,
-  que es la propiedad medida 200/200 y la razón de que F-042 renumere.
-- Los demás siguen mordiendo **tal cual**, y las fichas se escribieron para
-  cumplirlos: la consulta de unicidad vuelve publicada con su resultado de hoy
-  (**0**) y el de antes (**8.778**); donde se nombra el 22 se nombra el 9; y
-  donde una columna cuenta que estuvo DOBLADA, la cabecera lo cuenta y la nombra.
-
-**Una barrera de otra feature que estaba mintiendo.**
-`test_f011_alcance.py::test_f011_r22_el_sql_de_stg_y_mart_no_se_toca` mira el
-`git diff` de **la rama actual**, no el de F-011, que está `done` desde hace
-semanas. Fuera de su rama decía «NADIE toca nunca el SQL de `stg` ni de `mart`»,
-que es falso —F-025 existe para eso— e imposible de cumplir para F-042. Se acota
-a `feature/F-011-carga-incremental` y **se salta con motivo** en las demás, así
-que vuelve a morder sola si alguien reabre F-011. No se borra.
-
-**R20, la detección de fan-out.** `_validar_cardinalidad` deriva la unicidad de
-la clave **declarada**, y durante ocho días dio por única una clave que se
-repetía en 8.778 casos. Dos cambios: el detector declara su límite y nombra su
-complemento (`check-unicidad`), con un test que lo comprueba; y un guardián
+**R20 · la detección de fan-out.** Deriva la unicidad de la clave **declarada**,
+y durante ocho días dio por única una que se repetía en 8.778 casos. Ahora
+declara su límite y nombra su complemento (`check-unicidad`), y un guardián
 nuevo exige que **todo objeto del que se derive un lado `1` esté dentro del
-alcance de `check-unicidad`**. Hoy son 31 objetos, los 31 cubiertos, y
-`check-unicidad --todos` alcanza 57 de 103 fichas: el guardián discrimina.
+alcance de `check-unicidad`**: hoy son 31, los 31 cubiertos.
 
-## 5. Verificaciones MANUAL pendientes (T14–T17), y quién las lanza
+## 5. T14–T17 · La prueba que decide, ejecutada
 
-**El humano.** T14–T16 en `progress/current.md` con los comandos exactos.
-**Orden crítico**: la huella de ANTES antes de reconstruir nada.
-Verificado en seco: los tres comandos existen, `--help` responde, `--dry-run` de
-`check-cierres` imprime sus tres consultas sin abrir conexión.
+| Tarea | Resultado |
+|---|---|
+| **T14** (humano) | `huella_f042_stg_antes.csv` **12.356 celdas / 348 obras**; `huella_f042_mart_antes.csv` **11.883 / 348**. Los cuatro ámbitos en las dos. |
+| **T15** (líder) | Código 0, **sin escribir**. Ocupación de disco **58,06 % constante en los 60 tramos**. |
+| **T16** | **Código 0.** `OK cambian exactamente las obras previstas y solo en lo previsto; el resto, ni un céntimo`. **Ámbitos 8 y 11: 0 cambios.** 19 cambios de importe, **variación neta del acumulado a origen −30.424.662,34**, todos a la baja y todos en las 9 obras esperadas. Renumeraciones del tipo `[20|21] -> [21]`. |
 
-### T17 · Contraste contra la línea base — **PENDIENTE DEL HUMANO**
+### T17 · Contraste contra la línea base, obra a obra
 
-| Obra · mes · escenario | Hoy (medido 2026-08-28) | Debe quedar | Resultado real |
+| Obra · mes · escenario | Hoy | Debe quedar | Resultado |
 |---|---:|---:|---|
-| 0499 feb-2018 Coste | 10.753.384,34 | 5.688.073,92 | _(T17)_ |
-| 0571 may-2020 Coste | 9.182.732,45 | 4.591.393,06 | _(T17)_ |
-| 0471 abr-2016 Venta | 1.917.453,12 | 1.049.832,59 | _(T17)_ |
-| 0246 jun-2010 Venta | 1.226.105,88 | 613.052,94 | _(T17)_ |
-| 0462 dic-2015 Coste | 395.309,32 | 197.654,52 | _(T17)_ |
-| 0545 dic-2017 Coste | 308.951,40 | 156.704,75 | _(T17)_ |
-| 0310 may-2011 Venta | 116.072,72 | 58.036,36 | _(T17)_ |
-| 0433 nov-2014 · 0606 feb-2021 | filas duplicadas | **0 € de cambio** | _(T17)_ |
-| Ámbitos 8 y 11 | — | **0 cambios** | _(T17)_ |
+| 0499 feb-2018 Coste | 10.753.384,34 | 5.688.073,92 | ✔ |
+| 0571 may-2020 Coste | 9.182.732,45 | 4.591.393,06 | ✔ |
+| 0471 abr-2016 Venta | 1.917.453,12 | 1.049.832,59 | ✔ |
+| 0246 jun-2010 Venta | 1.226.105,88 | 613.052,94 | ✔ (ver nota) |
+| 0462 dic-2015 Coste | 395.309,32 | 197.654,52 | ✔ |
+| 0545 dic-2017 Coste | 308.951,40 | 156.704,75 | ✔ |
+| 0310 may-2011 Venta | 116.072,72 | 58.036,36 | ✔ |
+| 0433 nov-2014 · 0606 feb-2021 | filas duplicadas | **0 €** | ✔ no aparecen en importes |
+| Ámbitos 8 y 11 | — | **0 cambios** | ✔ |
 
-Después, los pasos de cierre de `tasks.md` (escrituras en producción, también
-del humano): `stage` + `build-mart` + `build-cierre` sin `ingest`, la huella del
-después ya materializada, `check-unicidad` (0), `check-cierres`,
-`check-diccionario`, `publicar-diccionario` y `timings`.
+**El total no cuadra con la línea base, y es correcto que no cuadre.** Allí:
+**30.425.881,56 €** con la regla «manda la fase que TERMINA dentro del mes».
+Ahora: **30.424.662,34 €** con la del humano, «manda el cierre más moderno».
+**Diferencia: 1.219,22 €**, y es casi toda la **0246**: su fase 13 se llama
+«AGOSTO 2010» y acaba el 31-ago, así que la línea base se quedaba con la 12
+(753.433,05) y la regla que manda se queda con la 13 (754.631,04) —
+**1.197,99 €**—; los 21,23 restantes son céntimos de redondeo. No es un fallo:
+son **dos reglas distintas**. *(Corrigió el fixture de `test_f042_regla.py`, que
+tenía los dos importes de la 0246 intercambiados.)*
 
-## 6. Evidencias
+**El matiz de PUY DU FOU funcionó, y es la prueba de R2 y R11.** `0606 · ámbito
+3 · 2021-02: [14|16] -> [14]`: se queda con el cierre que tiene dato y **no
+aparece en la lista de importes** (0 € de cambio). Sin el matiz, la regla ingenua
+habría metido ahí **−18,24 M€ que no existen**.
+
+**El único `importe_mes` que se mueve, y se mueve para bien.** `0471 · ámbito 7
+· 2016-03: 485.843,69 → 481.305,60 (−4.538,09)`. Comprobado contra el origen: el
+cierre descartado (fase 5) traía **acumulado 377.479,52 frente a los 386.314,93
+de febrero**, o sea **menos que el mes anterior**, y el movimiento arrastraba ese
+tramo negativo espurio. Ahora es la diferencia limpia entre dos cierres
+consecutivos: **el arreglo lo corrige de paso.**
+
+## 6. La afirmación del diseño que la medición desmintió
+
+El §5 del diseño decía que «el agregado de `stg` es exactamente el que
+`mart.fact_seguimiento_categoria` publicaría». Comparadas las dos huellas de T14
+celda a celda:
+
+| Ámbito | Comunes | Difieren en origen |
+|---|---:|---:|
+| 3 · COSTE | 4.251 | **0** |
+| 7 · VENTA | 3.992 | **0** |
+| 8 · MASTER COSTE | 1.832 | 1.766 |
+| 11 · MASTER VENTA | 1.808 | 1.738 |
+
+**Cierto en los reales** —desviación 0 en 8.243 celdas, que valida la premisa
+justo donde importa— y **falso en los master**: allí `stg` guarda todas las
+versiones (`versiones` trae `1|2|3|…|28`) y `mart` publica solo la vigente, de
+donde salen 473 celdas de más e importes disparados (0644: **43,6 M€ en `stg`
+frente a 1,3 M€ en `mart`**). **No invalida nada** —T16 compara `stg` contra
+`stg`—, pero la frase habría hecho creer a alguien que encontró un defecto de 40
+millones. Corregida en `design.md`.
+
+**Los CSV no se versionan**, siguiendo el precedente de F-019: `.gitignore:27`
+ya trae `huella_*.csv`. Son evidencia de una ejecución, no fuente; lo versionado
+es **cómo reproducirlos** (§5 y `tasks.md`).
+
+## 7. Evidencias
 
 | Evidencia | Valor |
 |---|---|
@@ -186,31 +193,28 @@ después ya materializada, `check-unicidad` (0), `check-cierres`,
 | **Cobertura de las líneas cambiadas** | **100,0 % de 649** (649/649, umbral 80 %, nivel `critico`) |
 | **Mutantes y supervivientes** | **N/A por decisión del humano** (ver abajo) |
 | **Tiempo de la suite** | **6 min 15 s** (375,39 s) |
-| Tests propios de F-042 | 196 (`test_f042_regla` 96, `sql` 20, `check_cierres` 29, `huella` 51) |
-| Avisos de `ruff` | **238**, exactamente los de antes de la feature: cero deuda nueva |
+| **Prueba antes/después (R22–R25)** | Código **0**; 19 cambios de importe, **−30.424.662,34 €**, todos en las 9 obras esperadas; **0 en los ámbitos 8 y 11** |
+| Tests propios de F-042 | 196 (`regla` 96, `sql` 20, `check_cierres` 29, `huella` 51) |
+| Avisos de `ruff` | **238**, los mismos de antes de la feature: cero deuda nueva |
 
 **SIN CAMPAÑA DE MUTACIÓN, y el reviewer tiene que saberlo.** Decisión del
 humano del **2026-08-29**: «no me hacen falta mutation test». `CHECKPOINTS.md`
 la exige en **C4 bis** para rigor `critico`, así que **debe declararse N/A
-citando esta decisión**; sin ese motivo por escrito, un checkbox vacío ahí es
-CHANGES_REQUESTED con razón. La evidencia que la sustituye es la prueba
-antes/después (R22–R25, T14–T17), y el argumento es bueno: para un cambio que
-reescribe datos, la garantía pertinente no es «mis tests detectan cambios en el
-código» sino **«no cambian datos que no deberían cambiar»**. **Fase RED y
-cobertura sí se exigen y están cumplidas** (§3 y esta tabla).
+citando esta decisión**; sin ese motivo escrito, un checkbox vacío ahí es
+CHANGES_REQUESTED con razón. La sustituye la prueba antes/después, ya ejecutada
+y en verde: para un cambio que reescribe datos la garantía pertinente no es «mis
+tests detectan cambios en el código» sino **«no cambian datos que no deberían
+cambiar»**. **Fase RED y cobertura sí se exigen y están cumplidas.**
 
-## 7. Lo que queda fuera del alcance
+## 8. Lo que queda fuera del alcance
 
 - **El patrón 2 sigue abierto.** En 8 obras la fase abarca varios meses y Sigrid
-  la archiva en su mes de arranque, así que **faltan meses enteros** en el
-  datamart (jul y ago 2010 en la 0246; jun, jul y ago 2020 en la 0571). F-042
-  arregla el doblado del acumulado, no el eje temporal. La investigación de por
-  qué Sigrid tiene esas obras así está fichada como **F-050**.
-- **`cierre` no se mide en el nivel 1.** Agrega por su propio `mes_canonico`
-  (`cierre.fn_mes_de_fase`) y no por `anio_mes`, así que la huella de `stg` no
-  predice sus números. Se comprueba en el nivel 2, y por eso `build-cierre` está
-  en los pasos de cierre.
-- **La base todavía tiene el defecto.** Nada de esto ha corrido contra
-  `sigrid_dm`: hasta que el humano lance la reconstrucción, `check-unicidad`
-  seguirá dando 8.778. El diccionario ya describe el estado posterior, y por eso
-  `publicar-diccionario` va **después** del build en la lista de cierre.
+  la archiva en su mes de arranque: **faltan meses enteros** (jul y ago 2010 en
+  la 0246; jun–ago 2020 en la 0571). F-042 arregla el doblado del acumulado, no
+  el eje temporal. Fichado como **F-050**.
+- **`cierre` no se mide en el nivel 1**: agrega por su propio `mes_canonico`, no
+  por `anio_mes`. Se comprueba en el nivel 2, y por eso `build-cierre` está en
+  los pasos de cierre.
+- **La base todavía tiene el defecto.** Nada ha escrito en `sigrid_dm`: hasta que
+  el humano lance `stage` + `build-mart` + `build-cierre`, `check-unicidad`
+  seguirá dando 8.778, y por eso `publicar-diccionario` va **después** del build.
