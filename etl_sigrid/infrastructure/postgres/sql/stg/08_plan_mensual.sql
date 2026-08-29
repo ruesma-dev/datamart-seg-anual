@@ -126,8 +126,18 @@
 --
 -- El corte es por obra porque NINGUNA ventana de este fichero cruza obras:
 -- todas particionan por presupuesto_id (que pertenece a una única obra) o por
--- (obra_id, partida_id, ambito_id). Por eso el resultado por tramos es, por
--- construcción, idéntico al de una pasada única.
+-- una lista que EMPIEZA por obra_id — (obra_id, partida_id, ambito_id) en el
+-- LAG de los reales y (obra_id, ambito_id) en el desplazamiento de F-042. Por
+-- eso el resultado por tramos es, por construcción, idéntico al de una pasada
+-- única.
+--
+-- F-042 no necesita marcador nuevo, y esto no es una intuición: las tres CTE
+-- que añade agregan y ordenan dentro de una obra, así que un tramo no puede
+-- ver ni descartar el cierre de otra. `build_stg_step.py` sigue con el único
+-- marcador de F-019 y sin una línea de cambio. Quien añada una ventana a este
+-- fichero tiene que respetar la misma condición: lo comprueba
+-- `tests/test_f042_sql.py::test_f042_ninguna_ventana_del_fichero_cruza_obras`,
+-- que lee TODOS los `PARTITION BY` del fichero, no una lista escrita a mano.
 --
 -- El filtro va en las DOS ramas. Filtrar solo una duplicaría las filas de la
 -- otra en cada tramo. Ni una línea de la lógica de negocio cambia.

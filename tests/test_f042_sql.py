@@ -254,6 +254,31 @@ def test_f042_r7_el_orden_interno_no_llega_a_ninguna_columna_publicada():
 # ---------------------------------------------------------------------------
 
 
+def test_f042_ninguna_ventana_del_fichero_cruza_obras():
+    """La condición que hace válido el troceo por tramos de F-019.
+
+    Se lee de TODOS los `PARTITION BY` del fichero, no de una lista escrita a
+    mano: una ventana nueva que particionara por otra cosa —o que no
+    particionara— haría que un tramo viera filas de otra obra, y el resultado
+    por tramos dejaría de ser idéntico al de una pasada única. F-042 añade dos
+    ventanas, y por eso el detector se escribe ahora en vez de seguir fiándolo a
+    un comentario de cabecera.
+    """
+    particiones = re.findall(r"PARTITION BY\s+([^\n]+)", _sin_comentarios(_sql()))
+
+    assert particiones, "no se ha encontrado ninguna ventana: el detector mira al vacio"
+    for particion in particiones:
+        # Una ventana puede venir en una línea (`PARTITION BY x ORDER BY y`) o
+        # repartida en varias: en el primer caso hay que cortar por `ORDER BY`.
+        columnas = re.split(r"\bORDER BY\b|\bROWS\b|\bRANGE\b|\)", particion)[0]
+        primera = columnas.split(",")[0].strip().split(".")[-1]
+        assert primera in ("presupuesto_id", "obra_id"), (
+            f"la ventana `PARTITION BY {particion.strip()}` no empieza por obra: "
+            f"cruzaria obras y el troceo por tramos de F-019 dejaria de ser "
+            f"equivalente a una pasada unica"
+        )
+
+
 def test_f042_el_filtro_de_tramos_sigue_en_las_dos_ramas():
     """Filtrar solo una duplicaría las filas de la otra en cada tramo."""
     assert _sql().count(MARCADOR_FILTRO_OBRAS) == 2
