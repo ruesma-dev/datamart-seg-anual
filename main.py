@@ -40,6 +40,15 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
                                         del repositorio declara crear? (F-047)
                                         Corre solo al final de run-all
 
+Un cierre por mes en los ámbitos reales (F-042). Los tres son de SOLO LECTURA:
+
+    python main.py check-cierres      - ¿Publica `stg.plan_mensual` UN cierre
+                                        por mes, y el que la regla elige?
+                                        Contrasta contra `domain/cierres.py`,
+                                        que recompone los candidatos desde
+                                        `stg.presupuesto` y no desde la tabla
+                                        que audita. Sale != 0 si discrepan
+
 Medición del coste de la carga (F-011). Los tres son de SOLO LECTURA y ninguno
 escribe en _meta; el «medir antes de optimizar» de esa feature vive aquí:
 
@@ -985,6 +994,106 @@ def check_relaciones_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
         "equivocada y coincidir. Prueba que une, que es otra cosa."
     )
     if fallos or sin_comprobar or inexistentes:
+        raise SystemExit(1)
+
+
+@cli.command("check-cierres")
+@click.option(
+    "--obras",
+    "obras",
+    type=str,
+    default=None,
+    help="obra_id separados por comas. Sin esto, todas las obras.",
+)
+@click.option(
+    "--timeout",
+    default=300,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_cierres_cmd(obras: str | None, timeout: int, dry_run: bool) -> None:
+    """
+    Contrasta `stg.plan_mensual` contra la regla «un cierre por mes» (F-042).
+
+    Obra a obra y ambito a ambito, comprueba tres cosas: que cada mes de los
+    ambitos reales publique UN solo cierre, que sea el que la regla elige —el
+    mas moderno con acumulado distinto de cero— y que el telescopio
+    `SUM(importe_mes) = ultimo importe_origen` se siga cumpliendo.
+
+    Lo que le da valor es que los dos lados son INDEPENDIENTES: los candidatos
+    se recomponen desde `stg.presupuesto` y `stg.fases`, que es de donde sale
+    `reales_base`, y la decision la toma `domain/cierres.py`, no el SQL que se
+    esta auditando. Una discrepancia significa que uno de los dos esta mal.
+
+    SOLO LECTURA: transaccion `READ ONLY` y `statement_timeout` por consulta.
+    Sale distinto de 0 si hay cualquier discrepancia, nombrando obra, ambito,
+    mes y las fases de los dos lados.
+    """
+    from etl_sigrid.domain.cierres import agrupar, contrastar
+    from etl_sigrid.infrastructure.postgres.cierres_sql import (
+        formatear_discrepancias,
+        sql_cierres_candidatos,
+        sql_cierres_publicados,
+        sql_telescopio,
+        sql_telescopio_detalle,
+    )
+
+    lista = (
+        [int(o.strip()) for o in obras.split(",") if o.strip()] if obras else None
+    )
+    consultas = {
+        "candidatos (stg.presupuesto ⨝ stg.fases)": sql_cierres_candidatos(lista),
+        "publicado (stg.plan_mensual)": sql_cierres_publicados(lista),
+        "telescopio (R16)": sql_telescopio(lista),
+    }
+
+    alcance = f"{len(lista)} obra(s)" if lista else "todas las obras"
+    click.echo(f"Contraste de cierres · {alcance}, ambitos reales 3 y 7")
+    click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
+    click.echo("")
+
+    if dry_run:
+        for nombre, texto in consultas.items():
+            click.echo(f"-- {nombre}")
+            click.echo(texto + ";")
+            click.echo("")
+        click.echo("-- 3 consulta(s). No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    candidatos = agrupar(pg.filas_solo_lectura(sql_cierres_candidatos(lista), timeout))
+    publicados = agrupar(pg.filas_solo_lectura(sql_cierres_publicados(lista), timeout))
+    discrepancias = contrastar(candidatos, publicados)
+
+    click.echo(
+        f"{sum(len(c) for c in candidatos.values())} cierre(s) candidato(s) en "
+        f"{len(candidatos)} par(es) obra/ambito; "
+        f"{sum(len(p) for p in publicados.values())} publicado(s)."
+    )
+    click.echo(formatear_discrepancias(discrepancias))
+    click.echo("")
+
+    filas = pg.filas_solo_lectura(sql_telescopio(lista), timeout)
+    comprobadas, rotas, con_hueco = (filas[0] if filas else (0, 0, 0))
+    click.echo(
+        f"Telescopio (R16): {comprobadas} serie(s) consecutiva(s) comprobada(s), "
+        f"{rotas} sin cuadrar, {con_hueco} apartada(s) por tener un hueco de "
+        f"origen que la regla NO creo (esas nunca telescopearon)."
+    )
+    if rotas:
+        click.secho(
+            "SUM(importe_mes) ha dejado de ser el ultimo importe_origen. Para ver "
+            f"cuales:\n{sql_telescopio_detalle(lista)}",
+            fg="red",
+        )
+
+    if discrepancias or rotas:
         raise SystemExit(1)
 
 
