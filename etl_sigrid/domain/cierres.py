@@ -148,3 +148,118 @@ def _vigente_del_mes(cierres_del_mes: Sequence[Cierre]) -> int:
         cierres_del_mes,
         key=lambda c: ((c.acumulado or _SIN_DATO) != 0, c.numero_fase),
     ).numero_fase
+
+
+# ---------------------------------------------------------------------------
+# El contraste de R17: lo que hay contra lo que debería haber
+# ---------------------------------------------------------------------------
+
+#: Una fila de cierre tal y como sale de la base:
+#: `(obra_id, ambito_id, anio_mes, numero_fase, acumulado)`.
+FilaDeCierre = tuple[int, int, date, int, Decimal | None]
+
+
+@dataclass(frozen=True, slots=True)
+class Discrepancia:
+    """Un mes en el que `stg.plan_mensual` no dice lo que la regla exige.
+
+    Lleva **obra, ámbito, mes y las dos listas de fases** porque un mensaje de
+    «hay discrepancias» que no se puede investigar sin volver a la base no sirve
+    de nada: quien lo lea tiene que poder ir a Sigrid con esos números.
+    """
+
+    obra_id: int
+    ambito_id: int
+    anio_mes: date
+    #: Las fases que `stg.plan_mensual` publica en ese mes, ordenadas.
+    publicado: tuple[int, ...]
+    #: Las que debería publicar según el oráculo. Siempre cero o una.
+    esperado: tuple[int, ...]
+    motivo: str
+
+
+def agrupar(filas: Sequence[FilaDeCierre]) -> dict[tuple[int, int], list[Cierre]]:
+    """Reparte las filas por (obra, ámbito), que es el alcance de la regla.
+
+    La regla decide por mes pero **renumera por (obra, ámbito)**: un descarte de
+    enero desplaza a todas las fases posteriores de esa obra y ámbito. Agrupar
+    por menos que eso daría un orden falso.
+    """
+    grupos: dict[tuple[int, int], list[Cierre]] = {}
+    for obra_id, ambito_id, anio_mes, numero_fase, acumulado in filas:
+        grupos.setdefault((obra_id, ambito_id), []).append(
+            Cierre(numero_fase=numero_fase, anio_mes=anio_mes, acumulado=acumulado)
+        )
+    return grupos
+
+
+def contrastar(
+    candidatos: Mapping[tuple[int, int], Sequence[Cierre]],
+    publicados: Mapping[tuple[int, int], Sequence[Cierre]],
+) -> tuple[Discrepancia, ...]:
+    """Qué debería haber (`candidatos`) contra qué hay (`publicados`).
+
+    `candidatos` son **todas** las fases que `reales_base` vería, recompuestas
+    desde `stg.presupuesto` ⨝ `stg.fases`; `publicados`, lo que `stg.plan_mensual`
+    tiene de verdad. El contraste solo vale porque los dos caminos son
+    independientes: si los candidatos salieran de `plan_mensual`, la
+    comprobación se estaría preguntando a sí misma.
+
+    Se reportan cuatro cosas, y las cuatro importan: un mes con **más de un**
+    cierre (el defecto de hoy), un mes con **el cierre equivocado** —que un
+    recuento de duplicados no vería—, un mes **que desaparece entero**
+    (descartar de más es tan grave como descartar de menos) y un mes publicado
+    **sin candidato** que lo sostenga.
+    """
+    discrepancias: list[Discrepancia] = []
+
+    for clave in sorted(set(candidatos) | set(publicados)):
+        obra_id, ambito_id = clave
+        del_mes_publicado: dict[date, list[int]] = {}
+        for cierre in publicados.get(clave, ()):
+            del_mes_publicado.setdefault(cierre.anio_mes, []).append(cierre.numero_fase)
+
+        plan = plan_de_cierres(list(candidatos.get(clave, ())))
+
+        for mes in sorted(set(plan.vigente_por_mes) | set(del_mes_publicado)):
+            publicado = tuple(sorted(del_mes_publicado.get(mes, ())))
+            esperado = (
+                (plan.vigente_por_mes[mes],) if mes in plan.vigente_por_mes else ()
+            )
+            if publicado == esperado:
+                continue
+            discrepancias.append(
+                Discrepancia(
+                    obra_id=obra_id,
+                    ambito_id=ambito_id,
+                    anio_mes=mes,
+                    publicado=publicado,
+                    esperado=esperado,
+                    motivo=_motivo(publicado, esperado),
+                )
+            )
+
+    return tuple(discrepancias)
+
+
+def _motivo(publicado: tuple[int, ...], esperado: tuple[int, ...]) -> str:
+    if len(publicado) > 1:
+        return (
+            f"mas de un cierre publicado en el mes ({', '.join(map(str, publicado))}): "
+            f"la clave de mart.fact_seguimiento_mensual no identifica una fila y "
+            f"todo SUM del acumulado a origen cuenta dos veces"
+        )
+    if not publicado:
+        return (
+            "el mes no tiene ningun cierre publicado y deberia tener el "
+            f"{esperado[0]}: descartar de mas hace desaparecer un mes entero"
+        )
+    if not esperado:
+        return (
+            f"el mes publica el cierre {publicado[0]} y stg.presupuesto no "
+            f"sostiene ninguno: plan_mensual va por delante de su origen"
+        )
+    return (
+        f"manda el cierre {publicado[0]} y deberia mandar el {esperado[0]}: "
+        f"un solo cierre por mes, si, pero el que no era"
+    )
