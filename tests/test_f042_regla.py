@@ -523,3 +523,174 @@ def test_f042_el_plan_es_inmutable():
 
     with pytest.raises(FrozenInstanceError):
         plan.descartadas = (1,)  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# R8 y R16 · lo que el desplazamiento tiene que dejar intacto
+#
+# El oráculo no calcula `importe_mes` —eso lo hace el SQL—, pero sí permite
+# simularlo, y esa simulación es la que demuestra que renumerar es necesario y
+# suficiente. La fórmula es la del fichero: si el orden anterior es el
+# consecutivo, diferencia; si no, el acumulado entero.
+# ---------------------------------------------------------------------------
+
+
+def _movimientos(plan, acumulados: dict[int, Decimal]) -> dict[int, Decimal]:
+    """`importe_mes` de cada superviviente, tal y como lo calcularía el `LAG`."""
+    vivas = sorted(plan.orden)
+    movimientos: dict[int, Decimal] = {}
+    anterior: int | None = None
+    for fase in vivas:
+        if anterior is not None and plan.orden[anterior] == plan.orden[fase] - 1:
+            movimientos[fase] = acumulados[fase] - acumulados[anterior]
+        else:
+            movimientos[fase] = acumulados[fase]
+        anterior = fase
+    return movimientos
+
+
+#: La serie de la 0499 · VILLANUEVA alrededor de sus dos colisiones.
+_0499 = {
+    17: Decimal("3000000.00"),
+    18: Decimal("3608280.89"),
+    19: Decimal("4712823.94"),
+    20: Decimal("5065310.42"),
+    21: Decimal("5688073.92"),
+    22: Decimal("7400000.00"),
+}
+_CIERRES_0499 = [
+    Cierre(17, date(2017, 12, 1), _0499[17]),
+    Cierre(18, date(2018, 1, 1), _0499[18]),
+    Cierre(19, date(2018, 1, 1), _0499[19]),
+    Cierre(20, date(2018, 2, 1), _0499[20]),
+    Cierre(21, date(2018, 2, 1), _0499[21]),
+    Cierre(22, date(2018, 3, 1), _0499[22]),
+]
+
+
+def test_f042_r8_el_movimiento_del_mes_es_la_suma_de_los_dos_cierres_de_hoy():
+    """0499 feb-2018: 352.486,48 + 622.763,50 = 975.249,98.
+
+    Hoy la obra publica DOS filas de febrero, con esos dos movimientos. R8 exige
+    que el superviviente publique su suma, y eso es exactamente lo que sale al
+    renumerar. Es el número que la ficha de la feature verificó a mano.
+    """
+    hoy_fase_20 = _0499[20] - _0499[19]
+    hoy_fase_21 = _0499[21] - _0499[20]
+    assert hoy_fase_20 + hoy_fase_21 == Decimal("975249.98")
+
+    plan = plan_de_cierres(_CIERRES_0499)
+
+    assert _movimientos(plan, _0499)[21] == Decimal("975249.98")
+
+
+def test_f042_r5_sin_renumerar_el_movimiento_de_febrero_se_multiplica_por_seis():
+    """El contrafactual, que es lo que justifica la feature entera.
+
+    Descartando la fase 20 **sin** desplazar el orden, la 21 deja de tener `LAG`
+    consecutivo (19 no es 21−1) y febrero pasa de 975.249,98 € a 5.688.073,92 €:
+    casi seis veces lo real. Se arreglaría el acumulado y se reventaría el
+    movimiento.
+    """
+    plan = plan_de_cierres(_CIERRES_0499)
+    sin_renumerar = type(plan)(
+        vigente_por_mes=plan.vigente_por_mes,
+        descartadas=plan.descartadas,
+        orden={fase: fase for fase in plan.orden},
+    )
+
+    assert _movimientos(sin_renumerar, _0499)[21] == Decimal("5688073.92")
+    assert _movimientos(plan, _0499)[21] == Decimal("975249.98")
+
+
+def test_f042_r16_el_telescopio_se_cumple_tras_renumerar():
+    """`SUM(importe_mes)` = último `importe_origen` de la serie.
+
+    Es la propiedad que F-006 midió 200/200 y que un desplazamiento mal hecho
+    rompería. Vale sin excepción cuando la serie de supervivientes queda
+    consecutiva, que es el caso de las 22 obras: sus huecos los crea la regla y
+    la regla los cierra.
+    """
+    plan = plan_de_cierres(_CIERRES_0499)
+    movimientos = _movimientos(plan, _0499)
+
+    assert sum(movimientos.values()) == _0499[22]
+
+
+def test_f042_r6_con_un_hueco_de_origen_el_telescopio_suma_por_tramos():
+    """El caso honesto: con un hueco que NO crea la regla, `SUM(importe_mes)` no
+    es el último acumulado, y **tampoco lo era antes** de esta feature.
+
+    La serie 1, 2, 4 se parte en dos tramos consecutivos —(1, 2) y (4)— y la suma
+    de movimientos es el acumulado del último de cada tramo. Lo que R16 exige es
+    que la feature no cambie esto, no que lo arregle: arreglarlo sería
+    `dense_rank()`, y eso movería obras que hoy están bien.
+    """
+    acumulados = {
+        1: Decimal("100.00"),
+        2: Decimal("200.00"),
+        4: Decimal("400.00"),
+    }
+    plan = plan_de_cierres(
+        [Cierre(n, date(2016, n, 1), a) for n, a in acumulados.items()]
+    )
+    movimientos = _movimientos(plan, acumulados)
+
+    assert sum(movimientos.values()) == acumulados[2] + acumulados[4]
+    assert sum(movimientos.values()) != acumulados[4]
+
+
+# ---------------------------------------------------------------------------
+# Invariantes, barridos sobre todas las formas pequeñas
+# ---------------------------------------------------------------------------
+
+#: Todas las repartos de 5 fases consecutivas en meses, como cadena de meses:
+#: "11223" = fases 1 y 2 en el mes 1, 3 y 4 en el 2, 5 en el 3. Cubre de una
+#: pasada el mes único, la pareja, el trío y el cuarteto.
+_REPARTOS = (
+    "12345", "11234", "12234", "12334", "12344",
+    "11123", "11223", "12223", "11233", "12333",
+    "11112", "11222", "12222", "11111",
+)
+
+
+@pytest.mark.parametrize("reparto", _REPARTOS)
+def test_f042_r5_el_orden_nunca_sube_y_los_supervivientes_quedan_consecutivos(
+    reparto: str,
+):
+    """Dos invariantes que ningún reparto puede romper.
+
+    1. El orden de una fase **nunca es mayor** que su número: se desplaza hacia
+       abajo o se queda, jamás hacia arriba.
+    2. Si la serie de entrada no tenía huecos, la de supervivientes queda
+       consecutiva desde 1. Es la condición que necesita el `LAG`.
+    """
+    cierres = [
+        Cierre(numero, date(2016, int(mes), 1), Decimal(numero * 100))
+        for numero, mes in enumerate(reparto, start=1)
+    ]
+
+    plan = plan_de_cierres(cierres)
+
+    assert all(plan.orden[f] <= f for f in plan.orden)
+    assert sorted(plan.orden.values()) == list(range(1, len(plan.orden) + 1))
+    assert len(plan.orden) == len(set(reparto))
+    assert len(plan.orden) + len(plan.descartadas) == len(cierres)
+
+
+@pytest.mark.parametrize("reparto", _REPARTOS)
+def test_f042_r1_de_cada_mes_sobrevive_el_de_numero_mayor_cuando_todos_tienen_dato(
+    reparto: str,
+):
+    """Con todos los acumulados distintos de cero, R11 no interviene y el
+    criterio queda desnudo: manda el número mayor de cada mes."""
+    cierres = [
+        Cierre(numero, date(2016, int(mes), 1), Decimal(numero * 100))
+        for numero, mes in enumerate(reparto, start=1)
+    ]
+
+    plan = plan_de_cierres(cierres)
+
+    for mes, vigente in plan.vigente_por_mes.items():
+        del_mes = [c.numero_fase for c in cierres if c.anio_mes == mes]
+        assert vigente == max(del_mes)
