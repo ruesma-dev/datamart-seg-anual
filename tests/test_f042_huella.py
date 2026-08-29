@@ -729,3 +729,23 @@ def test_f042_r22_la_propuesta_lee_el_sql_del_build_de_verdad(
     assert "sin materializar" in resultado.output
     assert any("reales_con_lag" in c for c in pg.consultas)
     assert any("LAG(orden_fase) OVER w = orden_fase - 1" in c for c in pg.consultas)
+
+
+def test_f042_r22_un_bloque_de_reales_sin_marcador_de_tramo_se_rechaza():
+    """Sin el filtro de F-019, la huella se ejecutaria de una pasada sobre la
+    base entera: es justo lo que lleno el disco del servidor compartido el
+    2026-08-09. Se para al construir el texto, antes de enviarlo."""
+    sin_filtro = SQL_PLAN_MENSUAL.replace(MARCADOR_FILTRO_OBRAS, "ARRAY[1]::BIGINT[]")
+
+    with pytest.raises(ValueError, match="una vez"):
+        sql_huella_propuesta(sin_filtro, (1,))
+
+
+def test_f042_r22_un_csv_sin_ni_cabecera_se_rechaza(tmp_path):
+    """Un fichero de cero bytes no es una huella vacia: es un fichero que no se
+    llego a escribir. Devolver `[]` lo haria pasar por «no cambio nada»."""
+    vacio = tmp_path / "vacio.csv"
+    vacio.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cabecera"):
+        leer_csv(vacio)

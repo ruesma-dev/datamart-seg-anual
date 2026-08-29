@@ -136,6 +136,14 @@ Diez tests de `test_f006_stg_trampas.py` estaban escritos para un defecto
   (**0**) y el de antes (**8.778**); donde se nombra el 22 se nombra el 9; y
   donde una columna cuenta que estuvo DOBLADA, la cabecera lo cuenta y la nombra.
 
+**Una barrera de otra feature que estaba mintiendo.**
+`test_f011_alcance.py::test_f011_r22_el_sql_de_stg_y_mart_no_se_toca` mira el
+`git diff` de **la rama actual**, no el de F-011, que está `done` desde hace
+semanas. Fuera de su rama decía «NADIE toca nunca el SQL de `stg` ni de `mart`»,
+que es falso —F-025 existe para eso— e imposible de cumplir para F-042. Se acota
+a `feature/F-011-carga-incremental` y **se salta con motivo** en las demás, así
+que vuelve a morder sola si alguien reabre F-011. No se borra.
+
 **R20, la detección de fan-out.** `_validar_cardinalidad` deriva la unicidad de
 la clave **declarada**, y durante ocho días dio por única una clave que se
 repetía en 8.778 casos. Dos cambios: el detector declara su límite y nombra su
@@ -174,11 +182,11 @@ después ya materializada, `check-unicidad` (0), `check-cierres`,
 
 | Evidencia | Valor |
 |---|---|
-| **Tests ejecutados** | _(init.sh)_ |
-| **Cobertura de las líneas cambiadas** | _(init.sh)_ |
+| **Tests ejecutados** | **2.791 pasados, 130 saltados, 0 fallos** (`bash harness/init.sh`, código 0) |
+| **Cobertura de las líneas cambiadas** | **100,0 % de 649** (649/649, umbral 80 %, nivel `critico`) |
 | **Mutantes y supervivientes** | **N/A por decisión del humano** (ver abajo) |
-| **Tiempo de la suite** | _(init.sh)_ |
-| Tests propios de F-042 | 194 (`test_f042_regla` 96, `sql` 20, `check_cierres` 29, `huella` 49) |
+| **Tiempo de la suite** | **6 min 15 s** (375,39 s) |
+| Tests propios de F-042 | 196 (`test_f042_regla` 96, `sql` 20, `check_cierres` 29, `huella` 51) |
 | Avisos de `ruff` | **238**, exactamente los de antes de la feature: cero deuda nueva |
 
 **SIN CAMPAÑA DE MUTACIÓN, y el reviewer tiene que saberlo.** Decisión del
