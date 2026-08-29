@@ -29,8 +29,6 @@ from functools import lru_cache
 
 import pytest
 
-from tests._texto import contiene
-
 from etl_sigrid.domain.diccionario import Columna, Diccionario, Ficha, Relacion
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 from etl_sigrid.infrastructure.postgres.relaciones_sql import (
@@ -43,6 +41,7 @@ from etl_sigrid.infrastructure.postgres.relaciones_sql import (
     veredicto_relacion_no_comprobada,
     veredicto_relacion_no_existe,
 )
+from tests._texto import contiene
 
 DIR_DICCIONARIO = pathlib.Path(__file__).resolve().parents[1] / "config" / "diccionario"
 
