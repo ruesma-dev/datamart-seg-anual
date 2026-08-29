@@ -29,6 +29,8 @@ from functools import lru_cache
 
 import pytest
 
+from tests._texto import contiene
+
 from etl_sigrid.domain.diccionario import Columna, Diccionario, Ficha, Relacion
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 from etl_sigrid.infrastructure.postgres.relaciones_sql import (
@@ -551,7 +553,7 @@ def test_f006_r20_la_unicidad_que_sostiene_el_fan_out_se_comprueba_contra_la_bas
     con_motivo = {
         nombre
         for nombre, motivo in objetos_saltados(dicc, solo_consumo=False)
-        if "PRIMARY KEY" in motivo or "clave sustituta" in motivo
+        if contiene(motivo, "PRIMARY KEY") or contiene(motivo, "clave sustituta")
     }
 
     sin_verificar = sorted(

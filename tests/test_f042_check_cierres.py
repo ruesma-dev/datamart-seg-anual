@@ -357,3 +357,102 @@ def test_f042_el_comando_esta_registrado_con_su_ayuda():
     assert resultado.exit_code == 0
     assert "--obras" in resultado.output
     assert "--dry-run" in resultado.output
+
+
+# ---------------------------------------------------------------------------
+# El cliente, con un doble. NO se abre ninguna conexion.
+# ---------------------------------------------------------------------------
+#
+# `filas_solo_lectura` es el unico sitio donde `check-cierres` y `huella-obras`
+# tocan la base, y es la pieza de la que depende que el nivel 1 de la prueba de
+# F-042 sea de solo lectura de verdad. Se prueba lo que se puede probar sin
+# servidor: que emite las DOS sentencias previas antes de la consulta, que
+# devuelve las filas, y que un error deja la transaccion en `ROLLBACK`.
+
+
+class _CursorHuella:
+    def __init__(self, filas, revienta=None):
+        self.filas = filas
+        self.revienta = revienta
+        self.ejecutadas: list[str] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def execute(self, sql, *_args):
+        self.ejecutadas.append(sql)
+        if self.revienta is not None and "SELECT" in sql.upper():
+            raise self.revienta
+
+    def fetchall(self):
+        return self.filas
+
+
+class _ConexionHuella:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.commits = 0
+        self.rollbacks = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def cursor(self):
+        return self._cursor
+
+    def commit(self):
+        self.commits += 1
+
+    def rollback(self):
+        self.rollbacks += 1
+
+
+class _ClienteConConexion:
+    def __init__(self, conexion):
+        self._conexion = conexion
+
+    def connection(self):
+        return self._conexion
+
+
+def _leer(cliente, sql, timeout=30):
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    return PostgresClient.filas_solo_lectura(cliente, sql, timeout)
+
+
+def test_f042_r17_la_lectura_va_read_only_y_con_su_timeout() -> None:
+    """Las dos sentencias previas se emiten DE VERDAD, antes de la consulta.
+
+    Es exactamente el defecto que F-006 encontro en su propia comprobacion de
+    unicidad: un constructor de `BEGIN READ ONLY` que no llamaba nadie mientras
+    el comando imprimia por pantalla «transaccion READ ONLY». La garantia iba
+    impresa y no existia.
+    """
+    cursor = _CursorHuella([(1, "0499", 3, date(2018, 2, 1), 1, "21", 0, 0)])
+    conexion = _ConexionHuella(cursor)
+
+    filas = _leer(_ClienteConConexion(conexion), "SELECT 1", timeout=42)
+
+    assert filas == [(1, "0499", 3, date(2018, 2, 1), 1, "21", 0, 0)]
+    assert cursor.ejecutadas[0] == "SET LOCAL statement_timeout = '42s'"
+    assert cursor.ejecutadas[1] == "SET LOCAL transaction_read_only = on"
+    assert cursor.ejecutadas[2] == "SELECT 1"
+    assert conexion.commits == 1 and conexion.rollbacks == 0
+
+
+def test_f042_r17_un_error_en_la_lectura_deja_la_transaccion_en_rollback() -> None:
+    cursor = _CursorHuella([], revienta=RuntimeError("el servidor dice que no"))
+    conexion = _ConexionHuella(cursor)
+
+    with pytest.raises(RuntimeError, match="el servidor dice que no"):
+        _leer(_ClienteConConexion(conexion), "SELECT 1")
+
+    assert conexion.rollbacks == 1
+    assert conexion.commits == 0

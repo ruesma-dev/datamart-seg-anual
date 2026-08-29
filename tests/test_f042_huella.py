@@ -480,11 +480,16 @@ class PgHuellaFalso:
 
 
 class AjustesFalsos:
-    # Imita la forma de `config.settings`: `settings.postgres.<lo que sea>`.
+    # Imita la forma de `config.settings`: `settings.postgres.<lo que sea>` y
+    # `settings.logging.<lo que sea>`, que es lo que lee el grupo `cli`.
     class postgres:  # noqa: N801 - imita la forma de config.settings
         tramo_max_filas = 10
         disco_total_gb = 64
         disco_limite_pct = 85.0
+
+    class logging:  # noqa: N801 - idem
+        log_level = "WARNING"
+        log_format = "console"
 
 
 def test_f042_r22_la_huella_de_stg_va_por_tramos_y_no_escribe():
@@ -640,3 +645,87 @@ def test_f042_una_huella_con_otra_cabecera_se_rechaza(tmp_path):
 
     with pytest.raises(ValueError, match="cabecera"):
         _leer(fichero)
+
+
+# ---------------------------------------------------------------------------
+# El comando `huella-obras` de punta a punta, con dobles
+# ---------------------------------------------------------------------------
+#
+# Comprobar solo `--help` deja sin ejecutar el cuerpo del comando, que es donde
+# vive lo que puede salir mal: leer el fichero del build, recorrer los tramos y
+# volcar el CSV. Aqui se ejecuta entero contra un cliente falso que estalla si
+# le piden escribir.
+
+
+def test_f042_r22_el_comando_escribe_el_csv_y_no_toca_la_base_mas_que_para_leer(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+):
+    import main
+
+    pg = PgHuellaFalso()
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    monkeypatch.setattr(main, "get_settings", AjustesFalsos)
+    destino = tmp_path / "huella_antes.csv"
+
+    from click.testing import CliRunner as _CliRunner
+
+    resultado = _CliRunner().invoke(
+        main.cli, ["huella-obras", "--out", str(destino), "--desde", "stg"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "SOLO LECTURA" in resultado.output
+    filas = leer_csv(destino)
+    assert len(filas) == 8, "dos obras x cuatro ambitos"
+    assert {f.ambito_id for f in filas} == {3, 7, 8, 11}
+
+
+def test_f042_r22_el_comando_avisa_si_la_huella_no_trae_los_cuatro_ambitos(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+):
+    """Una huella incompleta no puede salir sin que nadie lo diga: `comparar-
+    huellas` la va a rechazar, y mejor enterarse ahora que dos horas despues."""
+    import main
+
+    class PgSoloReales(PgHuellaFalso):
+        def filas_solo_lectura(self, sql_text: str, timeout_s: int):
+            return [
+                f for f in super().filas_solo_lectura(sql_text, timeout_s)
+                if f[2] in (3, 7)
+            ]
+
+    pg = PgSoloReales()
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    monkeypatch.setattr(main, "get_settings", AjustesFalsos)
+
+    from click.testing import CliRunner as _CliRunner
+
+    resultado = _CliRunner().invoke(
+        main.cli, ["huella-obras", "--out", str(tmp_path / "h.csv")]
+    )
+
+    assert resultado.exit_code == 0
+    assert "no trae los cuatro ambitos" in resultado.output
+
+
+def test_f042_r22_la_propuesta_lee_el_sql_del_build_de_verdad(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+):
+    """`--propuesta` tiene que ejecutar la rama de reales del fichero real."""
+    import main
+
+    pg = PgHuellaFalso()
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    monkeypatch.setattr(main, "get_settings", AjustesFalsos)
+
+    from click.testing import CliRunner as _CliRunner
+
+    resultado = _CliRunner().invoke(
+        main.cli,
+        ["huella-obras", "--out", str(tmp_path / "h.csv"), "--propuesta"],
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "sin materializar" in resultado.output
+    assert any("reales_con_lag" in c for c in pg.consultas)
+    assert any("LAG(orden_fase) OVER w = orden_fase - 1" in c for c in pg.consultas)
