@@ -833,6 +833,22 @@ def _validar_cardinalidad(
     cada objeto, así que la unicidad es DERIVABLE. Cuando el extremo todavía no
     tiene ficha —está en `pendientes`— el juicio se aplaza, igual que el resto de
     comprobaciones de relación.
+
+    **EL LÍMITE DE ESTA DERIVACIÓN, y no es teórico (F-042).** Lo que se deriva
+    es la clave **declarada**, no la clave **cierta**. Durante ocho días este
+    detector dio por única a `mart.fact_seguimiento_mensual` por
+    (`obra_id`, `partida_id`, `anio_mes`, `escenario`) mientras esa combinación
+    se repetía en **8.778 casos** en la base: la declaración era falsa y el
+    detector no tenía forma de saberlo, porque eso no está en el texto, está en
+    los datos. Una clave corta no solo miente sobre el grano: **desarma esta
+    comprobación**, que es lo que la convierte en un defecto que se propaga.
+
+    Por eso este detector es necesario y no suficiente, y su complemento
+    obligatorio es `python main.py check-unicidad`, que ejecuta la clave
+    declarada contra la base. Un objeto del que aquí se derive un lado `1` y que
+    `check-unicidad` no llegue a comprobar deja esta validación apoyada en una
+    afirmación que nadie ha contrastado; lo vigila
+    `tests/test_f006_relaciones.py`.
     """
     if relacion.cardinalidad not in CARDINALIDADES:
         return []
