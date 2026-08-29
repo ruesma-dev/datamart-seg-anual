@@ -372,7 +372,10 @@ def test_f042_r4_con_cuatro_cierres_y_los_dos_modernos_a_cero_gana_el_ultimo_con
 
     assert plan.vigente_por_mes[date(2015, 5, 1)] == 2
     assert plan.descartadas == (1, 3, 4)
-    assert plan.orden == {2: 2}
+    # La 1 se descarta y está POR DEBAJO de la 2, así que la 2 baja a orden 1:
+    # queda como primera fase de la serie y su `LAG` es nulo, que es justo lo
+    # que corresponde a un mes sin cierre anterior.
+    assert plan.orden == {2: 1}
 
 
 # ---------------------------------------------------------------------------

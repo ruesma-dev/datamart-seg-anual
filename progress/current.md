@@ -1,7 +1,78 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-28
 
-## F-042 · `in_progress` — FASE 1 (evidencia) ENTREGADA, spec EN ESPERA
+## F-042 · `in_progress` — SPEC ESCRITA, lista para el implementer
+
+**`specs/F-042-clave-fact/`** (requirements 149/150, design 206/250, tasks en 25
+tareas). La puerta de tamaño, en verde.
+
+**Lo que decide el diseño**, sobre la decisión de Negocio ya tomada:
+
+- **El arreglo va en una sola CTE de `sql/stg/08_plan_mensual.sql`**, rama de
+  reales. Se elige el cierre vigente del mes y se **renumera el orden interno**
+  antes del `LAG`. `mart/03_agg_categoria.sql` **no se toca**: con una sola fila
+  su `SUM` sale bien solo.
+- **`version` se publica con el número ORIGINAL de Sigrid, sin renumerar.** El
+  motivo lo encontré en el código y no estaba en la ficha: **seis `JOIN` de
+  `cierre/02_build_fact.sql` y `04_views_detalle.sql` cruzan `pm.version` contra
+  `stg.fases.numero_fase`**. Renumerar los desalinearía en silencio. Además esos
+  seis `SUM(pm.importe_origen)` **también doblan hoy**, y con el arreglo se
+  corrigen solos.
+- **Se descarta `dense_rank()` para renumerar**: cerraría también los huecos que
+  Sigrid ya trae y cambiaría `importe_mes` en obras que hoy están bien. El
+  desplazamiento cuenta solo descartes.
+
+**La prueba antes/después, que es lo que el humano pidió el 2026-08-29:**
+
+- **Cabe en un CSV.** El grano obra × ámbito × mes en los cuatro ámbitos son
+  **11.883 celdas**; `mart.fact_seguimiento_categoria` entera son 24.684 filas y
+  6,6 MB. No hay que copiar nada grande.
+- **Nivel 1, sin escribir una fila**: la huella «después» se genera ejecutando la
+  rama de reales **como `SELECT` agregado, sin materializar**, por tramos y con
+  la puerta de disco de F-019. Ámbitos 8 y 11: no se reejecuta su rama (el diff
+  no la toca y hoy tienen **cero** claves duplicadas; reejecutarla sería pagar el
+  `unnest` que provocó el incidente de F-019 para obtener el mismo número).
+- **El agregado del nivel 1 lleva los mismos `JOIN` que `mart`** (`stg.obras`,
+  `stg.partidas`, INNER). Sin ellos la huella de `stg` no sería predictiva; con
+  ellos **es exactamente lo que `mart.fact_seguimiento_categoria` publicaría**.
+- **Nivel 2, la reconstrucción real: la lanza el humano** —es escritura en
+  producción—, con `stage` + `build-mart` + `build-cierre` **sin `ingest`**.
+  **Coste en disco cero neto**: el build es en el mismo sitio.
+- **ORDEN CRÍTICO**: la huella de ANTES (T14) se saca **antes** de reconstruir.
+  El build pisa la tabla y el PITR es de servidor entero.
+
+**El disco se amplió hoy de 32 a 64 GB** (29 % ocupado, 45,4 GB libres) y los
+IOPS de 120 a 240. Consecuencias que ya están en el diseño:
+
+- Reconstruir en **esquemas paralelos** ya cabría (~9,8 GB de tablas y ~26 GB de
+  pico con el derrame de F-019, sobre 45,4 GB libres), y tendría la ventaja de
+  **no destruir el «antes»**. **No se propone**, y el motivo ya no es el disco:
+  ni `08_plan_mensual.sql` ni `mart/` están parametrizados por esquema, y
+  parametrizarlos es superficie nueva y sin probar dentro de la tarea cuyo
+  objetivo es demostrar que nada se mueve. Queda anotada como alternativa **si
+  el humano prefiere no sobrescribir `stg`**.
+- **Los tiempos van como rango, no como número**: las medidas conocidas (110 min
+  de `stage`, 21,5 de `build-mart`) son con 120 IOPS, y el techo del
+  `Standard_B1ms` —640 IOPS y **10 MiB/s**— no se ha movido: en un build de este
+  volumen manda el ancho de banda.
+- La nota de memoria «no ampliar el disco del Postgres compartido» **ha quedado
+  superada por la decisión de hoy**.
+
+**Sin campaña de mutación**, por decisión del humano del 2026-08-29. Queda
+escrito en la spec que el **reviewer debe declararla N/A en C4 bis citándola**:
+sin ese motivo por escrito, un checkbox vacío en C4 bis es CHANGES_REQUESTED.
+**Fase RED y cobertura siguen exigiéndose.**
+
+### Lo que el humano tiene que validar antes de implementar
+
+1. Que `version` se publique **sin renumerar**, con huecos en 9 obras.
+2. Que los ámbitos 8 y 11 se den por probados con la huella del nivel 2 y el
+   argumento estructural, sin reejecutar la rama master en el nivel 1.
+3. Cuándo se lanza la reconstrucción del nivel 2 y quién la ejecuta.
+
+---
+
+## F-042 · FASE 1: la evidencia
 
 Rama `feature/F-042-clave-fact`. El humano pidió **antes que la spec** un
 resumen de las obras afectadas y del problema exacto, para contrastarlo con los
