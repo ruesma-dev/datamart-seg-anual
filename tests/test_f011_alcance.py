@@ -56,6 +56,48 @@ SQL_INTOCABLE = (
 )
 
 
+#: La rama para la que se escribió esta barrera. Ver `_solo_en_la_rama_de_f011`.
+RAMA_DE_F011 = "feature/F-011-carga-incremental"
+
+
+def _solo_en_la_rama_de_f011() -> None:
+    """Salta el test si no estamos en la rama de F-011.
+
+    **Por qué hace falta, y lo destapó F-042.** Estas dos barreras miran el
+    `git diff` de *la rama actual*, no el de F-011, así que fuera de su rama
+    dejaban de decir «F-011 no toca el SQL de negocio» para decir «NADIE toca
+    nunca el SQL de negocio». Eso es falso y además imposible de cumplir: F-025
+    existe precisamente para acotar el build de `stg` y `mart`, y F-042 tuvo que
+    reescribir la rama de reales de `08_plan_mensual.sql` para dejar un solo
+    cierre por mes —con su spec aprobada y su prueba de equivalencia—.
+
+    Una barrera de ALCANCE pertenece a la feature que la puso. Aplicarla a todas
+    las ramas no la hace más estricta: la hace mentir, y lo que enseña es a
+    borrarla, que es justo lo contrario de lo que se buscaba.
+
+    Se salta con motivo en vez de desaparecer: el día que alguien reabra F-011
+    en su rama, la barrera vuelve a morder sola.
+    """
+    try:
+        salida = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as e:  # pragma: no cover
+        pytest.skip(f"git no disponible: {e}")
+
+    rama = salida.stdout.strip()
+    if rama != RAMA_DE_F011:
+        pytest.skip(
+            f"barrera de alcance de F-011; la rama actual es '{rama}'. Esta "
+            f"prohibicion es de F-011, no del repositorio: F-025 y F-042 tocan "
+            f"ese SQL con su spec aprobada"
+        )
+
+
 def _ficheros_cambiados(base: str = "dev") -> list[str]:
     """Ficheros que la rama cambia respecto de `base`, o `None` si no hay git.
 
@@ -93,6 +135,8 @@ def test_f011_r22_el_sql_de_stg_y_mart_no_se_toca() -> None:
     necesita decisión de Negocio (DA-1, sin decidir) y prueba de equivalencia.
     F-011 mide; no toca.
     """
+    _solo_en_la_rama_de_f011()
+
     cambiados = [f.replace("\\", "/") for f in _ficheros_cambiados()]
 
     intrusos = [
@@ -112,6 +156,8 @@ def test_f011_r22_tampoco_se_toca_el_troceado_de_f019() -> None:
     El troceado por tramos es lo que impide repetir el incidente del disco del
     2026-08-09, y es la pieza sobre la que F-025 se apoyará. F-011 no la mueve.
     """
+    _solo_en_la_rama_de_f011()
+
     cambiados = [f.replace("\\", "/") for f in _ficheros_cambiados()]
 
     for intocable in (
