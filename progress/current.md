@@ -171,9 +171,32 @@ las de nivel 2 son **F-036** (clasificación por oficio), **F-041** (la campaña
 mutación miente) y **F-045** (retenciones sin obra), y en el 3 entra ya
 **F-051**.
 
-**F-052 entra en prioridad 2** y, por criterio del líder, va por delante de las
-demás de ese nivel: una obra invisible es peor que un número mal sumado, porque
-no hay nada que chirríe. **F-051** va detrás, con su diagnóstico ya hecho.
+### La cola de trabajo, fijada por el humano el 2026-08-31
+
+**F-052 → F-045 → F-051 → F-050**, con las prioridades 1, 2, 3 y 4 puestas en
+`features.json` y la razón anotada en cada ficha. Salió de preguntarse qué falta
+para que **negocio pueda usar el datamart a través del MCP**:
+
+1. **F-052** — una obra que no está en el datamart no produce un número raro,
+   produce respuestas como si casi no existiera. No hay nada que chirríe, así
+   que envenena la confianza en todo lo demás.
+2. **F-045** — el caso de uso 3 del humano, las retenciones de los proveedores
+   de una obra, hoy **no tiene respuesta**: `retenciones.movimientos.obra_id` no
+   une con `maestro.obras`, 0 de 261 valores casan.
+3. **F-051** — con el diagnóstico ya hecho y medido.
+4. **F-050** — los meses que faltan, que es la raíz de negocio compartida.
+
+**Lo demás espera**, incluidas las de prioridad 2 que había antes (F-036, F-041).
+
+### Lo que no es una feature y decide el humano
+
+Antes de dar el conector del MCP a la primera persona de negocio hay dos cosas
+que no se resuelven con código: si se compra **Entra ID P1** —sin él entra
+cualquier cuenta del tenant, y eso se aceptó por escrito cuando detrás había un
+`pong`, no el seguimiento económico real— y si se encienden los **`REVOKE` de
+F-034**, sabiendo que hacerlo sin verificar antes qué lee Power BI le rompe los
+informes. El rol `mcp_sigrid_dm_ro` lo comparten hoy el MCP y Power BI, y ve
+`raw` y `stg`.
 
 Queda **una** cosa sin fichar, a propósito: la línea del diccionario que dice
 30.425.881,56 € cuando lo retirado son 30.424.662,34. Es una línea de YAML y se
