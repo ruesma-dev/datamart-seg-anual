@@ -637,6 +637,37 @@ class PostgresClient:
             fila = cur.fetchone()
             return tuple(fila) if fila else ()
 
+    def filas_solo_lectura(self, sql_text: str, timeout_s: int) -> list[tuple]:
+        """Ejecuta un `SELECT` de diagnóstico y devuelve sus filas (F-042).
+
+        La transacción va **`READ ONLY`** con su `statement_timeout`, las dos con
+        `SET LOCAL`: acotadas a esta transacción, sin tocar la configuración de un
+        servidor que comparten `albaranes` y `partes` en producción. Si el texto
+        intentara escribir, lo rechaza el motor, no la buena voluntad de quien lo
+        construyó.
+
+        Existe una sola vez y la usan `check-cierres` y `huella-obras` porque la
+        alternativa era que cada uno abriera su conexión y emitiera sus propias
+        sentencias previas. Ahí es donde una de las dos copias se deja el
+        `transaction_read_only` un martes por la tarde.
+        """
+        from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+            sentencias_previas,
+        )
+
+        with self.connection() as conn:
+            try:
+                with conn.cursor() as cur:
+                    for previa in sentencias_previas(timeout_s):
+                        cur.execute(previa)
+                    cur.execute(sql_text)
+                    filas = list(cur.fetchall())
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return filas
+
     def comprobar_unicidad(
         self, consulta, timeout_s: int
     ) -> tuple[int, int] | str | None:

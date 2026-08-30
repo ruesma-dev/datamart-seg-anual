@@ -1,108 +1,181 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-08-28
+# Estado actual · 2026-08-30
 
-## F-047 · CERRADA el 2026-08-28 (absorbio F-044)
+## F-042 · `done` — CERRADA, y con ella los 30,4 M€ que se publicaban de más
 
-Aprobada por el reviewer en la 3ª pasada y **desplegada en producción el mismo
-día**. Rama `feature/F-047-nocturna-desfasada`, `bash harness/init.sh` en verde
-(2.581 tests, 128 saltados; cobertura 100 % de 259 líneas), campaña de mutación
-en serie de 70 mutantes con 0 supervivientes finales.
+Rama `feature/F-042-clave-fact`, 27 commits (T1–T25) más el de cierre.
+`bash harness/init.sh` en código 0 (2.802 tests). Reviewer **APROBADO** en la 2ª
+pasada y **criterio 5 verificado** en una 3ª contra la base ya reconstruida.
+Informes: `progress/impl_F-042.md`, `progress/review_F-042.md`,
+`progress/explore_F-042.md`. El relato completo, en `progress/history.md`.
 
-**La causa raíz, y no era ninguna de las tres que proponía la ficha**: la
-nocturna no dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**.
-`mart/03_agg_categoria.sql` dropea `mart.fact_seguimiento_categoria` con
-`CASCADE` y esa vista cuelga de la tabla. Detalle en
-`progress/explore_F-047.md`; el trabajo, en `impl_F-047.md` y `review_F-047.md`.
+**La carga que la bloqueaba terminó.** Job `caj-datamart-seg-dev-d8y5q10`,
+imagen **`r20260830-0924`** —la primera con F-042—, `run-all --full` con los diez
+pasos: 08:06:36 → **11:38:00 UTC**, 3 h 31 min, `Succeeded`. Comprobada **la
+imagen del job**, no solo su estado: es la lección de F-047.
 
-### Lo que se hizo en producción el 2026-08-28, en este orden
+**Los cuatro comandos de cierre, contra la base reconstruida:**
 
-| # | Acción | Resultado |
-|---|---|---|
-| 1 | `70_build_image.ps1` + `85_update_job.ps1` | imagen **`r20260828-1942`**, el job ya apunta a ella (venía de la del **18 de agosto**) |
-| 2 | los cuatro build + `apply-grants` a mano | 37 min: maestros 0,8 · compras 7,3 · retenciones 1 · cierre 27,9 · grants 0,1 |
-| 3 | `publicar-diccionario` | **versión 10**: 149 filas, 103 objetos, 798 columnas, 16 reglas y 46 fichas de consumo |
+| Comando | Resultado |
+|---|---|
+| `check-unicidad --timeout 300` | `mart.fact_seguimiento_mensual` **OK**: de **8.778 combinaciones duplicadas a CERO** |
+| `check-cierres` | **0 discrepancias** en 8.540 cierres de 679 pares obra/ámbito; telescopio R16: **0 sin cuadrar** de 254.189 |
+| `check-diccionario` | Biyección exacta **103/103**; lo publicado es lo del árbol (versión 11, hash `68ecfd13f697`) |
+| `bash harness/init.sh` | **Código 0**, 2.802 tests, 100 % de 656 líneas cambiadas |
 
-**El orden no fue casual.** Publicar el diccionario antes de los build habría
-dejado al MCP sirviendo `R-FRESCURA` —regla **bloqueante**— apuntando a una
-consulta vacía, porque `_meta.v_frescura` no tenía ninguna fila de
-`build_compras` ni `build_retenciones`. Lo advirtió el reviewer; el humano
-eligió lanzar los cuatro build a mano el mismo día en vez de esperar.
+**OJO CON EL TIMEOUT, y esto vale para cualquier sesión futura:** con los 30 s por
+defecto, `check-unicidad` deja `mart.fact_seguimiento_mensual` en **NO
+COMPROBADO**, que no es un OK. Hay que lanzarlo con **`--timeout 300`**. Con ese
+timeout el cuadro completo es **44 sin contradicción · 1 con la clave rota · 1
+sin comprobar**.
 
-**Verificación final**: `check-declarados` **103 declarados / 103 construidos**,
-código 0. `check-diccionario` **biyección exacta 103 = 103** y «lo publicado ES
-lo del árbol». **La vista ha vuelto.** Disco **57,81 %** (18 GB de 32), contra
-57,92 % del 21: no se mueve.
+**El diccionario no cambia de tamaño con F-042**, que solo altera lo que dicen
+seis fichas: sigue en **103 objetos**, **798 columnas** y **46 fichas de
+consumo**, y la lista de pendientes declarados no crece.
 
-### La segunda capa, que nadie buscaba
-
-El despliegue llevaba **congelado desde el 18 de agosto**: diez noches
-terminando `Succeeded` con código de hace diez días, y todo F-006 fuera. Lo
-delató que `publicar_diccionario` no dejara rastro nocturno mientras
-`apply_grants`, el paso siguiente, sí lo dejaba. **La lección, y vale para
-cualquier feature futura: el repositorio en verde no es producción.** Ver
-`azure-apps/datamart_seg_anual.md` y **F-033**.
-
-### Lo que quedó abierto
-
-- **F-044 sigue `in_progress`**, y no por descuido: tres de sus cinco criterios
-  están cumplidos y verificados, pero **el tiempo real de la ventana completa y
-  el pico de disco solo se pueden medir observando la primera nocturna con los
-  diez pasos**, la del **29 de agosto a las 02:00 UTC**. Lo de hoy fueron cuatro
-  build a mano sobre un `stg`/`mart` ya construidos, que no es lo mismo.
-  Previsión a confirmar: ~3 h 24, final hacia las 05:24 UTC.
-- **F-041** recibió un quinto defecto: el `__pycache__` opera **también en
-  serie**, y es bidireccional. La serie no es inmune a los falsos muertos; solo
-  no se ha visto uno todavía.
-- **F-049**, nueva: `mutacion.py` deja el sello `PENDIENTE` puesto después de
-  resolverse, trampa para el próximo reviewer con `grep`. Se porta a
-  `arnes-base` en el mismo trabajo.
-- **F-012** tiene material nuevo: siete reglas de firewall de puestos sueltos
-  acumuladas en `psql-albaranes-rs9k2`, una por día que cambió la IP.
-
-## LO SIGUIENTE
-
-**Mirar la nocturna del 29** y cerrar F-044 con las dos mediciones que le
-faltan. Si termina antes de las 05:24 UTC y el disco no se mueve, se marca
-`done`; si invade la mañana, la decisión de recortar es del humano y enlaza con
-F-035 (las cuatro palancas) y F-025 (la ventana de negocio).
+**El quinto criterio —que `importe_origen` deja de venir doblado— lo verificó el
+reviewer con un oráculo independiente del build:** recompone el acumulado desde
+`stg.presupuesto ⨝ stg.fases ⨝ stg.partidas` (las tres intactas en F-042) y
+valida el propio oráculo reproduciendo al céntimo los 18 importes publicados de
+`explore_F-042.md`. Resultado: **17.289 celdas cruzadas, desvío máximo 0,00 €**;
+cambian **35 celdas de 7 obras**, exactamente la línea base honesta, por
+**30.424.662,34 €** retirados, y fuera de ellas **no se mueve ninguna otra
+celda**. Los casos que decidían, medidos en la base y no en un fixture: **0606
+PUY DU FOU** conserva la fase 14 y cambia **0,00 €**; **0462 RETAMAR**, cuyo mes
+en conflicto era el ÚLTIMO de la obra, publica ya **197.654,80 €** de coste donde
+publicaba 395.309,32; y la joroba de la 0246 desaparece.
 
 ---
 
-## F-006 · CERRADA el 2026-08-27
+## LO QUE F-042 DEJA ABIERTO (nada bloquea, todo está fichado o anotado)
 
-**APROBADA por el reviewer en su 21ª pasada** y marcada `done`. `bash
-harness/init.sh` en verde: **2.505 tests**, cobertura 100 % de 33 líneas.
+1. **F-051 · nueva, prioridad 3, rigor crítico.** `nombre_mes` de las filas
+   reales trae **la descripción del cierre** en vez del mes, y eso rompe la
+   clave de `cierre.v_pbi_planif_vs_real`. Ver la sección de abajo.
+2. **El diccionario publicado dice 30.425.881,56 € y lo retirado son
+   30.424.662,34.** Celdas (35) y obras (7) son exactas; ese importe describe la
+   regla **exploratoria**, no la implantada. Una línea a corregir en el próximo
+   `publicar-diccionario`. **Sin fichar todavía.**
+3. **F-052 · nueva, prioridad 2, rigor crítico.** La observación lateral de la
+   3ª pasada —«1.152 filas de la obra 0599 no llegan al fact»— **resultó ser dos
+   órdenes de magnitud mayor** al medirla: son **104.737 filas** de
+   `stg.presupuesto` en 6 obras, y **la 0599 TANATORIO MAJADAHONDA se ha caído
+   del datamart casi entera** (104.366 de sus 108.790 filas, el 96 %). Ver la
+   sección de abajo.
+4. **`mart.v_master_vigente_anual` no se puede comprobar.** `check-unicidad`
+   agota **300 s** sin dar veredicto, así que su clave `(obra_id, anio,
+   ambito_id)` es hoy un «no lo sabemos» **permanente**, no un OK. Ninguna otra
+   de las 46 de la superficie de consumo se queda sin medir con ese timeout.
 
-### Qué la desbloqueó, después de 21 pasadas
+---
 
-**La evidencia de mutación, que nunca había existido.** Las cuatro campañas
-anteriores daban cero supervivientes porque la suite del worktree arrancaba
-ROJA y `mutacion.py` contaba cualquier `returncode != 0` como muerto. El
-2026-08-26 se arregló la causa —el `.env` no llega a un worktree— en el **arnés
-1.7.7**, y la campaña midió de verdad: **256 mutantes, 52 supervivientes**, 49
-matados con tests nuevos y 3 equivalentes aprobados por el humano.
+## F-051 · `pending` — el mes que enseña Power BI no es el mes de la fila
 
-### Lo que hay que llevarse de aquí
+Descubierto el 2026-08-30 por `check-unicidad` sobre la base recién
+reconstruida. **No lo introducen F-042 ni F-047**: es preexistente y sale ahora
+porque F-047 hizo que la vista se construya cada noche en vez de destruirse, y
+por eso entra por primera vez en el alcance del check.
 
-1. **La campaña paralela produce falsos muertos** (F-041, cuarto defecto). Un
-   mutante dio veredictos opuestos el mismo día sobre el mismo commit.
-   Evidencia: `progress/control_mutacion_F-006.md`. **Regla operativa mientras
-   F-041 no esté: lo que una campaña paralela declare muerto se reverifica en
-   serie antes de cerrar un `critico`.**
-2. **F-034 recibe T29-T31 POR CONSTRUIR**, no construidas. Y el rol
-   `mcp_sigrid_dm_ro` **lo comparten hoy el MCP y Power BI**: encender los
-   `REVOKE` sin mirar qué lee Power BI le rompe los informes.
-3. **F-048**, nueva: el guardián de secretos decide por el primer carácter del
-   valor, así que `password=%x` o `password=#x` están exentos desde siempre.
-4. **El objetivo de fondo sigue sin cumplirse**: el humano pidió «un MCP que
-   pueda usar cualquier usuario desde cualquier puesto». Hoy corre en el puesto
-   de pgris apuntando a Azure. Eso vive en el backlog de `mcp-bbdd`.
+**El síntoma:** `cierre.v_pbi_planif_vs_real` no cumple su clave —**204
+combinaciones repetidas, 472 filas**, siempre en el renglón **BENEFICIO** y hasta
+cuatro filas por combinación—. Quien sume ese renglón ahí recibe hasta el
+cuádruple.
 
-### Lo que esa feature enseñó sobre cómo se trabaja
+**La causa, localizada en el código:** en `mart/02_build_fact.sql`, las ramas
+**COSTE REAL (línea 218, ámbito 3)** y **VENTA REAL (línea 248, ámbito 7)**
+rellenan `nombre_mes` con **`pm.version_descripcion`** —el texto que alguien
+tecleó al cerrar en Sigrid— en vez de derivarlo de `anio_mes`, que es lo que sí
+hacen las dos ramas planificadas (líneas 275 y 305). Y como el CTE `beneficio`
+de la vista une `producc` con `total_costes` **solo por `(obra_id, anio_mes)`**
+mientras ambos agrupan incluyendo `nombre_mes`, cada etiqueta distinta multiplica
+las filas en producto cartesiano.
 
-- **Verifica contra la fuente, no contra tu resumen de ella.** Tres veces en dos
-  días; las tres las cazó un barrido, nunca un recuento.
-- **Un test rojo no dice por qué está rojo.** Un mutante se dio por muerto
-  cuando lo que fallaba era un test caído por `.env` ausente.
-- **Dos agentes no pueden commitear por separado sobre el mismo fichero.**
-  Propuesto para `arnes-base`.
+**El alcance, medido en la base en solo lectura:**
+
+| Tabla | Filas REAL | Con `nombre_mes` que no es su mes | PLANIFICADO |
+|---|---|---|---|
+| `mart.fact_seguimiento_mensual` | 3.332.312 | **566.504 (17,0 %)** | **0** de 1.965.029 |
+| `mart.fact_seguimiento_categoria` | 17.289 | **3.226 (18,7 %)** | **0** de 7.395 |
+
+**36 pares (obra, mes)** tienen más de una etiqueta distinta, y esos 36 son los
+que producen el fan-out. Ejemplos reales: la obra **0571** tiene 2020-05-01
+etiquetado a la vez «Mayo 2020» y «Agosto 2020»; 186 filas de 2024 en adelante
+dicen «Diciembre 2025»; 61 filas de jun-2010 dicen «DICIEMBRE 2010», en
+mayúsculas, porque es texto libre.
+
+Comparte raíz de negocio con el **patrón 2 de F-050** (la fase abarca varios
+meses y Sigrid la archiva en el de arranque), pero **el arreglo no depende de esa
+investigación**: aquí la decisión es de qué columna se deriva `nombre_mes`.
+
+---
+
+## F-052 · `pending` — una obra entera que el datamart no ve
+
+Medido el **2026-08-31** contra la base, en solo lectura, al ir a fichar la
+observación lateral del reviewer. **La observación se quedaba muy corta.**
+
+| | Filas |
+|---|---|
+| `stg.presupuesto` con `partida_id` **sin ficha** en `stg.partidas` | **104.737** en 6 obras y 1.215 partidas |
+| De la 0599 · `stg.presupuesto` sin ficha | **104.366** de 108.790 (**96 %**) |
+| De la 0599 · `stg.plan_mensual` → `mart.fact_seguimiento_mensual` | 197.846 → **3.150** |
+| Comparación: 0613 RICHMOND PARK, de tamaño parecido | 217.230 → **62.568** |
+
+**El dato no se pierde en la ingesta, lo pierde nuestro ETL.** Las 1.215
+partidas huérfanas están **las 1.215** en `raw.obrparpar`, todas con `cod` no
+nulo y ninguna con `padide = 0`: Sigrid las tiene y la ingesta las trae.
+
+**Causa probable, a confirmar:** `stg/04_partidas.sql` construye `stg.partidas`
+con un recorrido **recursivo** que arranca en las raíces (`COALESCE(padide,0)=0`,
+línea 56) y baja por `padide` (línea 76). Una partida cuya cadena de ancestros no
+llegue a una raíz queda fuera del árbol, y entonces el **`INNER JOIN`** del build
+del fact la borra del datamart **sin decir nada**.
+
+**Lo que lo hace grave no es el importe, es el silencio.** Una obra que no está
+no produce un número raro: produce respuestas como si casi no existiera. Y
+ninguna comprobación de hoy lo caza —`check-unicidad` mira claves,
+`check-cierres` mira la regla de F-042, `check-diccionario` mira el catálogo—:
+**nadie mira que lo que entra en `stg` salga en `mart`**.
+
+---
+
+## F-047 · CERRADA el 2026-08-28 (absorbió F-044)
+
+La nocturna no dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**
+(`mart/03_agg_categoria.sql` dropea con `CASCADE` la tabla de la que cuelga).
+Detalle en `progress/explore_F-047.md`, `impl_F-047.md` y `review_F-047.md`.
+
+**La lección que vale para cualquier feature futura: el repositorio en verde no
+es producción.** El despliegue llevaba congelado desde el 18 de agosto, diez
+noches terminando `Succeeded` con código de hace diez días.
+
+**F-044**, que absorbió, quedó cerrada el 2026-08-30 con las dos mediciones que
+faltaban: la nocturna completa tarda **3 h 45** y termina a las 05:45 UTC (07:45
+locales), aceptado por el humano; y el pico de disco fue **89,25 %** sobre los 32
+GB de entonces —a 5,75 puntos del bloqueo por solo lectura—, lo que motivó la
+ampliación a 64 GB del 29 por la tarde. Con 64 GB ese mismo pico sería 44,6 %.
+
+### Lo que sigue abierto de aquella tanda
+
+- **F-041**: el `__pycache__` opera también en serie, y es bidireccional.
+- **F-049**: `mutacion.py` deja el sello `PENDIENTE` puesto tras resolverse.
+- **F-048**: el guardián de secretos decide por el primer carácter del valor.
+- **F-012**: siete reglas de firewall de puestos sueltos acumuladas.
+
+---
+
+## LO SIGUIENTE
+
+**Ninguna feature `in_progress`.** El backlog tiene 31 abiertas; por prioridad,
+las de nivel 2 son **F-036** (clasificación por oficio), **F-041** (la campaña de
+mutación miente) y **F-045** (retenciones sin obra), y en el 3 entra ya
+**F-051**.
+
+**F-052 entra en prioridad 2** y, por criterio del líder, va por delante de las
+demás de ese nivel: una obra invisible es peor que un número mal sumado, porque
+no hay nada que chirríe. **F-051** va detrás, con su diagnóstico ya hecho.
+
+Queda **una** cosa sin fichar, a propósito: la línea del diccionario que dice
+30.425.881,56 € cuando lo retirado son 30.424.662,34. Es una línea de YAML y se
+corrige **dentro de F-051**, que ya toca el diccionario y obliga a republicar;
+una feature para una línea es papeleo por papeleo.

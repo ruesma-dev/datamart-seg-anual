@@ -918,6 +918,18 @@ objetos:
       Una fila por (`obra_id`, `anio_mes`, `concepto_cuadro`), que es su clave de
       negocio. Sale de `mart.fact_seguimiento_categoria`, que si se refresca de
       noche, aunque la vista se recree con `build-cierre`.
+
+      **Cuelga de la tabla que estuvo doblada, y conviene saber por que no le
+      afecto.** Hasta el build de F-042, `mart.fact_seguimiento_categoria` traia
+      `importe_origen` doblado en 35 celdas de 7 obras; esta vista usa
+      `importe_mes`, que telescopea, y por eso sus numeros eran correctos. Es un
+      buen recordatorio de que **el defecto de una tabla no se hereda entero: se
+      hereda columna a columna**.
+
+      Lo que si le afecta, y no lo arregla F-042: en las 8 obras cuya fase
+      abarca varios meses pero Sigrid archiva en su mes de arranque, esta vista
+      compara el planificado de un mes contra un real que lleva dentro el
+      trabajo de dos o tres. La causa esta en el origen y esta fichada aparte.
     clave_negocio: [obra_id, anio_mes, concepto_cuadro]
     paso_etl: build_cierre
     refresco: nocturno

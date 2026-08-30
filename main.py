@@ -40,6 +40,23 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
                                         del repositorio declara crear? (F-047)
                                         Corre solo al final de run-all
 
+Un cierre por mes en los ámbitos reales (F-042). Los tres son de SOLO LECTURA:
+
+    python main.py check-cierres      - ¿Publica `stg.plan_mensual` UN cierre
+                                        por mes, y el que la regla elige?
+                                        Contrasta contra `domain/cierres.py`,
+                                        que recompone los candidatos desde
+                                        `stg.presupuesto` y no desde la tabla
+                                        que audita. Sale != 0 si discrepan
+    python main.py huella-obras       - Huella de obra x ambito x mes a CSV,
+                                        fuera de la base. Con --propuesta
+                                        reejecuta la rama de reales YA
+                                        MODIFICADA como SELECT, SIN materializar
+    python main.py comparar-huellas ANTES DESPUES --obras-esperadas ...
+                                      - Las dos listas completas de lo que
+                                        cambia. Sale != 0 si se mueve una obra
+                                        que no debia, o algo en los ambitos 8/11
+
 Medición del coste de la carga (F-011). Los tres son de SOLO LECTURA y ninguno
 escribe en _meta; el «medir antes de optimizar» de esa feature vive aquí:
 
@@ -986,6 +1003,234 @@ def check_relaciones_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     )
     if fallos or sin_comprobar or inexistentes:
         raise SystemExit(1)
+
+
+@cli.command("check-cierres")
+@click.option(
+    "--obras",
+    "obras",
+    type=str,
+    default=None,
+    help="obra_id separados por comas. Sin esto, todas las obras.",
+)
+@click.option(
+    "--timeout",
+    default=300,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_cierres_cmd(obras: str | None, timeout: int, dry_run: bool) -> None:
+    """
+    Contrasta `stg.plan_mensual` contra la regla «un cierre por mes» (F-042).
+
+    Obra a obra y ambito a ambito, comprueba tres cosas: que cada mes de los
+    ambitos reales publique UN solo cierre, que sea el que la regla elige —el
+    mas moderno con acumulado distinto de cero— y que el telescopio
+    `SUM(importe_mes) = ultimo importe_origen` se siga cumpliendo.
+
+    Lo que le da valor es que los dos lados son INDEPENDIENTES: los candidatos
+    se recomponen desde `stg.presupuesto` y `stg.fases`, que es de donde sale
+    `reales_base`, y la decision la toma `domain/cierres.py`, no el SQL que se
+    esta auditando. Una discrepancia significa que uno de los dos esta mal.
+
+    SOLO LECTURA: transaccion `READ ONLY` y `statement_timeout` por consulta.
+    Sale distinto de 0 si hay cualquier discrepancia, nombrando obra, ambito,
+    mes y las fases de los dos lados.
+    """
+    from etl_sigrid.domain.cierres import agrupar, contrastar
+    from etl_sigrid.infrastructure.postgres.cierres_sql import (
+        formatear_discrepancias,
+        sql_cierres_candidatos,
+        sql_cierres_publicados,
+        sql_telescopio,
+        sql_telescopio_detalle,
+    )
+
+    lista = (
+        [int(o.strip()) for o in obras.split(",") if o.strip()] if obras else None
+    )
+    consultas = {
+        "candidatos (stg.presupuesto ⨝ stg.fases)": sql_cierres_candidatos(lista),
+        "publicado (stg.plan_mensual)": sql_cierres_publicados(lista),
+        "telescopio (R16)": sql_telescopio(lista),
+    }
+
+    alcance = f"{len(lista)} obra(s)" if lista else "todas las obras"
+    click.echo(f"Contraste de cierres · {alcance}, ambitos reales 3 y 7")
+    click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
+    click.echo("")
+
+    if dry_run:
+        for nombre, texto in consultas.items():
+            click.echo(f"-- {nombre}")
+            click.echo(texto + ";")
+            click.echo("")
+        click.echo("-- 3 consulta(s). No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    candidatos = agrupar(pg.filas_solo_lectura(sql_cierres_candidatos(lista), timeout))
+    publicados = agrupar(pg.filas_solo_lectura(sql_cierres_publicados(lista), timeout))
+    discrepancias = contrastar(candidatos, publicados)
+
+    click.echo(
+        f"{sum(len(c) for c in candidatos.values())} cierre(s) candidato(s) en "
+        f"{len(candidatos)} par(es) obra/ambito; "
+        f"{sum(len(p) for p in publicados.values())} publicado(s)."
+    )
+    click.echo(formatear_discrepancias(discrepancias))
+    click.echo("")
+
+    filas = pg.filas_solo_lectura(sql_telescopio(lista), timeout)
+    comprobadas, rotas, con_hueco = (filas[0] if filas else (0, 0, 0))
+    click.echo(
+        f"Telescopio (R16): {comprobadas} serie(s) consecutiva(s) comprobada(s), "
+        f"{rotas} sin cuadrar, {con_hueco} apartada(s) por tener un hueco de "
+        f"origen que la regla NO creo (esas nunca telescopearon)."
+    )
+    if rotas:
+        click.secho(
+            "SUM(importe_mes) ha dejado de ser el ultimo importe_origen. Para ver "
+            f"cuales:\n{sql_telescopio_detalle(lista)}",
+            fg="red",
+        )
+
+    if discrepancias or rotas:
+        raise SystemExit(1)
+
+
+@cli.command("huella-obras")
+@click.option(
+    "--out",
+    "salida",
+    type=click.Path(dir_okay=False, path_type=Path),
+    required=True,
+    help="CSV donde escribir la huella (fuera de la base).",
+)
+@click.option(
+    "--desde",
+    type=click.Choice(["stg", "mart"]),
+    default="stg",
+    show_default=True,
+    help="`stg` agrega stg.plan_mensual; `mart`, fact_seguimiento_categoria.",
+)
+@click.option(
+    "--propuesta",
+    is_flag=True,
+    default=False,
+    help="Ejecuta la rama de reales YA MODIFICADA como SELECT, SIN materializar.",
+)
+@click.option(
+    "--timeout",
+    default=900,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+def huella_obras_cmd(salida: Path, desde: str, propuesta: bool, timeout: int) -> None:
+    """
+    Huella de obra x ambito x mes a CSV, en SOLO LECTURA (F-042, R22).
+
+    Es la mitad de la prueba que decide si esta feature se cierra: el humano
+    pidio demostrar que «el mensual y el acumulado de las obras no afectadas no
+    cambie», con el mismo `raw` y en los CUATRO ambitos (3, 7, 8 y 11).
+
+    Con `--propuesta` NO se materializa nada: se reejecuta la rama de reales de
+    `08_plan_mensual.sql` —el texto literal del fichero, recortado entre sus dos
+    marcadores— como `SELECT` agregado. Los ambitos 8 y 11 se copian de la
+    huella actual: su rama no se toca y hoy no tiene ni una clave duplicada.
+
+    Va por tramos de obras con la puerta de disco de F-019 delante de cada uno,
+    porque las ventanas derraman a temporales sobre un disco compartido con
+    `albaranes` y `partes`. Ni una escritura: la transaccion va READ ONLY.
+
+    ORDEN CRITICO: la huella del ANTES se saca antes de reconstruir nada. El
+    build pisa `stg.plan_mensual` y no hay vuelta atras.
+    """
+    from etl_sigrid.application.steps.build_stg_step import DIRECTORIO_SQL_STG
+    from etl_sigrid.infrastructure.postgres.huella_obras import (
+        construir_huella,
+        escribir_csv,
+    )
+
+    sql_plan_mensual = (
+        (DIRECTORIO_SQL_STG / "08_plan_mensual.sql").read_text(encoding="utf-8")
+        if propuesta
+        else None
+    )
+
+    origen = f"{desde}{' (propuesta, sin materializar)' if propuesta else ''}"
+    click.echo(f"Huella de obra x ambito x mes · desde {origen}")
+    click.echo("  SOLO LECTURA: transaccion READ ONLY, ninguna escritura")
+
+    filas = construir_huella(
+        _get_pg(),
+        get_settings(),
+        desde=desde,
+        propuesta=propuesta,
+        sql_plan_mensual=sql_plan_mensual,
+        timeout_s=timeout,
+    )
+    escribir_csv(filas, salida)
+
+    ambitos = sorted({f.ambito_id for f in filas})
+    obras = len({f.obra_id for f in filas})
+    click.secho(
+        f"✓ {len(filas)} celda(s) de {obras} obra(s) en los ambitos "
+        f"{', '.join(map(str, ambitos))} escritas en {salida}.",
+        fg="green",
+    )
+    if ambitos != [3, 7, 8, 11]:
+        click.secho(
+            "AVISO: la huella no trae los cuatro ambitos. `comparar-huellas` la "
+            "rechazara, y con razon: probaria menos de lo que dice probar.",
+            fg="yellow",
+        )
+
+
+@cli.command("comparar-huellas")
+@click.argument("antes", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("despues", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--obras-esperadas",
+    "obras_esperadas",
+    type=str,
+    default="",
+    help="Codigos de obra que SI pueden cambiar, separados por comas.",
+)
+def comparar_huellas_cmd(antes: Path, despues: Path, obras_esperadas: str) -> None:
+    """
+    Compara dos huellas y dicta el veredicto (F-042, R23 a R25).
+
+    Emite LAS DOS LISTAS COMPLETAS —no una muestra—: las obras cuya numeracion
+    de fase cambia y las obras cuyos importes cambian, con ambito, mes y
+    diferencia.
+
+    Sale distinto de 0, y entonces la feature NO se cierra, si se mueve una obra
+    fuera de `--obras-esperadas`, si se mueve algo en los ambitos master 8 u 11
+    —que es el desbordamiento— o si las huellas no traen los cuatro ambitos.
+    """
+    from etl_sigrid.domain.huella import comparar_huellas, veredicto
+    from etl_sigrid.infrastructure.postgres.huella_obras import leer_csv
+
+    esperadas = [o.strip() for o in obras_esperadas.split(",") if o.strip()]
+    comparacion = comparar_huellas(leer_csv(antes), leer_csv(despues))
+    codigo, informe = veredicto(comparacion, esperadas)
+
+    click.echo(f"ANTES:   {antes}")
+    click.echo(f"DESPUES: {despues}")
+    click.echo(
+        f"Obras que SI pueden cambiar: {', '.join(esperadas) or 'ninguna declarada'}"
+    )
+    click.echo("")
+    click.echo(informe)
+    if codigo:
+        raise SystemExit(codigo)
 
 
 @cli.command("publicar-diccionario")

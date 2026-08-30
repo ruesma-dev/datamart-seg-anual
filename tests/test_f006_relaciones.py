@@ -41,6 +41,7 @@ from etl_sigrid.infrastructure.postgres.relaciones_sql import (
     veredicto_relacion_no_comprobada,
     veredicto_relacion_no_existe,
 )
+from tests._texto import contiene
 
 DIR_DICCIONARIO = pathlib.Path(__file__).resolve().parents[1] / "config" / "diccionario"
 
@@ -476,3 +477,111 @@ def test_f006_t40_la_consulta_es_un_objeto_con_lo_necesario_para_entenderla() ->
     assert isinstance(consulta, ConsultaRelacion)
     assert consulta.cardinalidad == "N:1"
     assert consulta.porque
+
+
+# ---------------------------------------------------------------------------
+# La premisa de la que cuelga la deteccion de fan-out (F-042, R20)
+# ---------------------------------------------------------------------------
+#
+# `_validar_cardinalidad` deriva la unicidad de un extremo de su `clave_negocio`
+# DECLARADA. Es una derivacion buena —seis relaciones publicadas como `N:1`
+# sobre `obra_id` cayeron por ella— pero se apoya en una premisa que el texto no
+# puede sostener: **que la clave declarada sea cierta en los datos**.
+#
+# No es una objecion teorica. Durante ocho dias el detector dio por unica a
+# `mart.fact_seguimiento_mensual` por (obra_id, partida_id, anio_mes, escenario)
+# mientras esa combinacion se repetia en 8.778 casos: la declaracion era falsa,
+# 22 obras tenian dos fases en el mismo mes y el detector no tenia forma de
+# saberlo. F-042 arreglo el dato; lo que sigue aqui es que **la premisa se
+# verifique**, no que se de por buena.
+#
+# Lo verificable sin conexion es esto: todo objeto del que se derive un lado `1`
+# tiene que estar dentro del alcance de `check-unicidad`. Si no lo esta, esta
+# validacion cuelga de una afirmacion que nadie contrasta nunca contra la base.
+
+
+def _objetos_de_los_que_se_deriva_unicidad() -> set[str]:
+    """Los extremos cuya `clave_negocio` sostiene un lado `1` de una relacion.
+
+    Se derivan del diccionario real, sin lista a mano: una relacion nueva entra
+    sola y una que cambie de cardinalidad sale sola.
+    """
+    dicc = _dicc()
+    objetos: set[str] = set()
+    for ficha in dicc.fichas:
+        for relacion in ficha.relaciones:
+            if not relacion.cardinalidad or ":" not in relacion.cardinalidad:
+                continue
+            izquierda, derecha = relacion.cardinalidad.split(":")
+            destino = relacion.a.split(".")[0] + "." + relacion.a.split(".")[1]
+            if izquierda == "1":
+                objetos.add(ficha.nombre)
+            if derecha == "1" and destino in dicc.por_nombre:
+                objetos.add(destino)
+    return objetos
+
+
+def test_f006_r20_control_hay_lados_uno_de_los_que_se_deriva_unicidad() -> None:
+    """Si el derivador se quedara vacio, el test de abajo pasaria sin mirar."""
+    objetos = _objetos_de_los_que_se_deriva_unicidad()
+    assert len(objetos) >= 3, f"solo {sorted(objetos)}: la derivacion se ha quedado corta"
+
+
+def test_f006_r20_la_unicidad_que_sostiene_el_fan_out_se_comprueba_contra_la_base() -> None:
+    """La premisa de la deteccion de fan-out no puede quedar sin verificar.
+
+    Un objeto del que se deriva un lado `1` y que `check-unicidad` no llega a
+    comprobar deja la validacion de cardinalidad apoyada en una declaracion que
+    nadie contrasta. Es exactamente la situacion en la que estuvo
+    `mart.fact_seguimiento_mensual` hasta que la comprobacion se ejecuto por
+    primera vez y devolvio 8.778.
+
+    Se admite `--todos`: lo que no se admite es que el objeto quede fuera de
+    cualquier pasada, ni siquiera de la completa.
+    """
+    from etl_sigrid.infrastructure.postgres.unicidad_sql import (
+        consultas_de_unicidad,
+        objetos_saltados,
+    )
+
+    dicc = _dicc()
+    comprobables = {c.objeto for c in consultas_de_unicidad(dicc, solo_consumo=False)}
+    # Los que se saltan POR MOTIVO estructural —la clave la garantiza el motor,
+    # o no declaran clave— no son un hueco: son objetos sobre los que esta
+    # derivacion tampoco afirma nada.
+    con_motivo = {
+        nombre
+        for nombre, motivo in objetos_saltados(dicc, solo_consumo=False)
+        if contiene(motivo, "PRIMARY KEY") or contiene(motivo, "clave sustituta")
+    }
+
+    sin_verificar = sorted(
+        _objetos_de_los_que_se_deriva_unicidad() - comprobables - con_motivo
+    )
+    assert sin_verificar == [], (
+        f"{sin_verificar} sostienen un lado `1` de alguna relacion y "
+        f"`check-unicidad` no los comprueba ni con `--todos`. La deteccion de "
+        f"fan-out quedaria apoyada en una clave declarada que nadie contrasta "
+        f"contra la base, que es como se publicaron 8.778 duplicados durante "
+        f"ocho dias"
+    )
+
+
+def test_f006_r20_el_detector_declara_de_que_premisa_cuelga() -> None:
+    """Y lo dice donde lo va a leer quien lo mantenga, no en un informe.
+
+    Un detector que no declara su limite invita a tratarlo como suficiente. Este
+    es necesario y no suficiente: su complemento es `check-unicidad`.
+    """
+    from etl_sigrid.domain import diccionario as modulo
+
+    documentacion = modulo._validar_cardinalidad.__doc__ or ""
+
+    assert "check-unicidad" in documentacion, (
+        "`_validar_cardinalidad` no nombra la comprobacion que verifica su "
+        "premisa: quien lo mantenga lo tratara como suficiente"
+    )
+    assert "8.778" in documentacion, (
+        "el limite se declara sin el caso que lo demostro, y una advertencia sin "
+        "evidencia se borra en la siguiente limpieza"
+    )

@@ -52,6 +52,23 @@ objetos:
       `version` es exactamente lo que multiplica los importes. Es la tabla mas
       grande del datamart, del orden de decenas de millones de filas, y por eso
       su build va troceado por lotes de obras.
+
+      **UN SOLO CIERRE POR MES EN LOS AMBITOS REALES (3 y 7).** Veintidos obras
+      tienen dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes`
+      —dos cierres de quincena, o una fase que abarca varios meses archivada en
+      su mes de arranque—. Desde F-042 el build conserva **uno solo por
+      (obra, ambito, mes): el de numero de fase mas alto entre los que tienen el
+      acumulado a origen distinto de cero**; si todos estan a cero, el mas alto.
+      Lo segundo no es un adorno: la obra 0606 tiene su fase 16 de feb-2021
+      entera a cero, y quedarse con ella publicaria 0 EUR donde hay
+      9.053.263,61 EUR buenos en la fase 14.
+
+      El cierre descartado **sigue existiendo en `raw.obrfasamb` y en
+      `stg.fases`**. Lo que no tiene es fila aqui. Ese es el rastro: para saber
+      que se descarto, se comparan las dos.
+
+      Los ambitos MASTER (8 y 11) no estan afectados ni se tocan: alli `fas` es
+      el numero de version, no el mes, y nunca hubo dos por mes.
     clave_negocio: [obra_id, partida_id, ambito_id, version, anio_mes]
     paso_etl: build_stg
     refresco: nocturno
@@ -85,6 +102,19 @@ objetos:
           los REALES (3 y 7) es el MES —con `fas = 0` como el "Previsto" vivo— y
           en los MASTER (8 y 11) es el NUMERO DE VERSION. Cruzar las dos
           lecturas produce series temporales inventadas.
+
+          **Es el numero de fase ORIGINAL de Sigrid, sin renumerar, y por eso
+          TIENE HUECOS en las 9 obras a las que la regla de un cierre por mes
+          les descarto una fase**: la 0499, por ejemplo, salta de la 19 a la 21.
+          El hueco es deliberado. Se publica el numero original por tres
+          motivos: seis `JOIN` de `cierre/` cruzan esta columna contra
+          `stg.fases.numero_fase` y renumerar los desalinearia en silencio;
+          quien mire el dato tiene que poder contrastarlo contra Sigrid; y un
+          numero renumerado no existe en ningun sitio salvo aqui.
+
+          El ETL SI usa internamente un orden renumerado para calcular
+          `importe_mes`, pero **no se publica en ninguna columna**: vive dentro
+          del build y muere ahi.
         agregacion: no_sumable
       version_descripcion:
         significado: Etiqueta legible de la version master, o del mes en los ambitos reales.
