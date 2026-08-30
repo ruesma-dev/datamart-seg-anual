@@ -579,3 +579,78 @@ humano con su demostración escrita. La suite pasó de 2.290 a **2.505 tests**.
 el puesto de pgris apuntando a Azure. F-006 construyó la capa semántica, que era
 el prerrequisito; el despliegue vive en el backlog de `mcp-bbdd` (F-003
 transporte, F-004 OAuth con Entra ID, F-006 contenedor).
+
+---
+
+## F-042 · La clave de `mart.fact_seguimiento_mensual`: de 8.778 duplicados a cero · `done` (2026-08-30)
+
+**El defecto.** La tabla central del seguimiento no cumplía la clave que
+declaraba: 22 obras tienen dos fases que Sigrid archiva con el mismo año y el
+mismo mes, y al proyectarlas al mismo `anio_mes` salían dos filas
+indistinguibles. **8.778 combinaciones duplicadas, 17.556 filas.** El daño en
+dinero no estaba en el fact sino en el agregado: `SUM(importe_origen)` sobre las
+filas gemelas devolvía exactamente el doble, y así se publicaban **30,4 M€ de
+más en 35 celdas de 7 obras** a Power BI y al MCP.
+
+**La decisión de Negocio, del humano:** «el mes no se parte en 2, se coge el
+cierre más moderno de ese mes», y en el acumulado se ignora el primero. Con el
+matiz de PUY DU FOU: se descarta un cierre con acumulado **cero** cuando hay
+otro del mismo mes con acumulado positivo. Sin ese matiz, la 0606 habría pasado
+de publicar 18,24 M€ correctos a publicar cero.
+
+**El mecanismo: descartar Y RENUMERAR**, en `sql/stg/08_plan_mensual.sql`. No
+basta con borrar la fila. `importe_mes` de los reales no viene de Sigrid, lo
+calcula el ETL como diferencia con el `LAG` **consecutivo**; sin renumerar, el
+movimiento de feb-2018 de la 0499 habría pasado de 975.249,98 a 5.688.073,92.
+Se arreglaría el acumulado y se reventaría el movimiento.
+
+**Cómo se verificó, y esto es lo que el humano fijó como prueba que decide:** no
+que los tests pasen, sino que **el dato de las obras no afectadas no se mueva**.
+Antes/después sobre el mismo `raw`, los cuatro ámbitos. `comparar-huellas` salió
+en código 0 sin escribir una fila: 19 cambios de importe, **−30.424.662,34 €**,
+todos a la baja y todos en las 9 obras esperadas.
+
+**El cierre, contra la base ya reconstruida** (job
+`caj-datamart-seg-dev-d8y5q10`, imagen `r20260830-0924`, `run-all --full`,
+3 h 31 min): `check-unicidad` **0** en `fact_seguimiento_mensual` (eran 8.778),
+`check-cierres` **0 discrepancias** en 8.540 cierres y **0** series sin cuadrar
+de 254.189, `check-diccionario` biyección **103/103**, `init.sh` código 0 con
+2.802 tests y 100 % de 656 líneas cambiadas. El quinto criterio lo verificó el
+reviewer en una 3ª pasada con un **oráculo independiente del build**: 17.289
+celdas cruzadas con desvío máximo **0,00 €**, cambian **35 celdas de 7 obras** y
+ni una más.
+
+**Sin campaña de mutación**, por decisión del humano del 2026-08-29, declarada
+N/A en C4 bis. Para un cambio que reescribe datos, la garantía pertinente no es
+«mis tests detectan cambios en el código» sino «no cambian datos que no
+deberían cambiar». Fase RED y cobertura sí se exigieron y están.
+
+### Lo que esta feature enseñó
+
+1. **Un test puede pasar en verde afirmando lo contrario de la realidad.** El
+   fixture de la 0246 tenía los dos importes intercambiados y el test no lo
+   notaba, porque la regla decide por número de fase. Lo destapó perseguir una
+   brecha de **1.219 €** que se podía haber dado por redondeo.
+2. **Un guardián puede mentir justo donde hay que mirar.** `check-cierres`
+   clasificaba como hueco de origen los huecos que crea esta misma feature, y
+   habría devuelto «0 series rotas» sin mirar ninguna de las 9 obras. El
+   arreglo observa el descarte como **hecho**, no repitiendo la regla: si la
+   repitiera, un fallo del build y uno de la comprobación se cancelarían.
+3. **Tres afirmaciones del líder resultaron falsas y las cazó el reviewer**: la
+   causa del único `importe_mes` que se mueve, los «0 cambios en los ámbitos
+   master» —tautológicos, porque la herramienta copia esas filas— y que el
+   agregado de `stg` fuera idéntico al de `mart` también en los master.
+4. **Un veredicto por timeout no es un veredicto.** `check-unicidad` con sus 30 s
+   por defecto dejaba en NO COMPROBADO justo el objeto que decidía la feature.
+   Hizo falta `--timeout 300`.
+
+### Lo que deja abierto
+
+- **F-051** (nueva): `nombre_mes` de las filas reales trae la descripción del
+  cierre en vez del mes, y eso rompe la clave de `cierre.v_pbi_planif_vs_real`.
+- El diccionario publicado dice **30.425.881,56 €** retirados y lo retirado son
+  **30.424.662,34**: describe la regla exploratoria, no la implantada.
+- **1.152 filas de `stg.presupuesto` de la obra 0599** (2,6 M€ en abr-2022) no
+  llegan al fact porque su `partida_id` no tiene ficha en `stg.partidas`.
+- `check-unicidad` no consigue comprobar `mart.v_master_vigente_anual` ni con
+  300 s: su clave sigue sin verificar.
