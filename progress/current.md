@@ -56,10 +56,12 @@ publicaba 395.309,32; y la joroba de la 0246 desaparece.
    30.424.662,34.** Celdas (35) y obras (7) son exactas; ese importe describe la
    regla **exploratoria**, no la implantada. Una línea a corregir en el próximo
    `publicar-diccionario`. **Sin fichar todavía.**
-3. **1.152 filas de `stg.presupuesto` de la obra 0599 —2,6 M€ en abr-2022— no
-   llegan al fact** porque su `partida_id` no tiene ficha en `stg.partidas`.
-   Hallazgo de la 3ª pasada, **ajeno a F-042 y previo**. **Sin fichar todavía**,
-   y es dinero que se pierde en el camino: merece decisión del humano.
+3. **F-052 · nueva, prioridad 2, rigor crítico.** La observación lateral de la
+   3ª pasada —«1.152 filas de la obra 0599 no llegan al fact»— **resultó ser dos
+   órdenes de magnitud mayor** al medirla: son **104.737 filas** de
+   `stg.presupuesto` en 6 obras, y **la 0599 TANATORIO MAJADAHONDA se ha caído
+   del datamart casi entera** (104.366 de sus 108.790 filas, el 96 %). Ver la
+   sección de abajo.
 4. **`mart.v_master_vigente_anual` no se puede comprobar.** `check-unicidad`
    agota **300 s** sin dar veredicto, así que su clave `(obra_id, anio,
    ambito_id)` es hoy un «no lo sabemos» **permanente**, no un OK. Ninguna otra
@@ -107,6 +109,36 @@ investigación**: aquí la decisión es de qué columna se deriva `nombre_mes`.
 
 ---
 
+## F-052 · `pending` — una obra entera que el datamart no ve
+
+Medido el **2026-08-31** contra la base, en solo lectura, al ir a fichar la
+observación lateral del reviewer. **La observación se quedaba muy corta.**
+
+| | Filas |
+|---|---|
+| `stg.presupuesto` con `partida_id` **sin ficha** en `stg.partidas` | **104.737** en 6 obras y 1.215 partidas |
+| De la 0599 · `stg.presupuesto` sin ficha | **104.366** de 108.790 (**96 %**) |
+| De la 0599 · `stg.plan_mensual` → `mart.fact_seguimiento_mensual` | 197.846 → **3.150** |
+| Comparación: 0613 RICHMOND PARK, de tamaño parecido | 217.230 → **62.568** |
+
+**El dato no se pierde en la ingesta, lo pierde nuestro ETL.** Las 1.215
+partidas huérfanas están **las 1.215** en `raw.obrparpar`, todas con `cod` no
+nulo y ninguna con `padide = 0`: Sigrid las tiene y la ingesta las trae.
+
+**Causa probable, a confirmar:** `stg/04_partidas.sql` construye `stg.partidas`
+con un recorrido **recursivo** que arranca en las raíces (`COALESCE(padide,0)=0`,
+línea 56) y baja por `padide` (línea 76). Una partida cuya cadena de ancestros no
+llegue a una raíz queda fuera del árbol, y entonces el **`INNER JOIN`** del build
+del fact la borra del datamart **sin decir nada**.
+
+**Lo que lo hace grave no es el importe, es el silencio.** Una obra que no está
+no produce un número raro: produce respuestas como si casi no existiera. Y
+ninguna comprobación de hoy lo caza —`check-unicidad` mira claves,
+`check-cierres` mira la regla de F-042, `check-diccionario` mira el catálogo—:
+**nadie mira que lo que entra en `stg` salga en `mart`**.
+
+---
+
 ## F-047 · CERRADA el 2026-08-28 (absorbió F-044)
 
 La nocturna no dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**
@@ -139,6 +171,11 @@ las de nivel 2 son **F-036** (clasificación por oficio), **F-041** (la campaña
 mutación miente) y **F-045** (retenciones sin obra), y en el 3 entra ya
 **F-051**.
 
-Dos cosas que decidir con el humano antes de elegir: si los dos hallazgos sin
-fichar de arriba —la línea del diccionario y los 2,6 M€ de la obra 0599 que no
-llegan al fact— se convierten en features o se atienden dentro de otra.
+**F-052 entra en prioridad 2** y, por criterio del líder, va por delante de las
+demás de ese nivel: una obra invisible es peor que un número mal sumado, porque
+no hay nada que chirríe. **F-051** va detrás, con su diagnóstico ya hecho.
+
+Queda **una** cosa sin fichar, a propósito: la línea del diccionario que dice
+30.425.881,56 € cuando lo retirado son 30.424.662,34. Es una línea de YAML y se
+corrige **dentro de F-051**, que ya toca el diccionario y obliga a republicar;
+una feature para una línea es papeleo por papeleo.
