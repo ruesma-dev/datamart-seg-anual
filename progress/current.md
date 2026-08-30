@@ -9,9 +9,15 @@ verde. Informe: **`progress/impl_F-042.md`**.
 **La prueba que decide, ya ejecutada.** `comparar-huellas` sale con **código 0**:
 *«cambian exactamente las obras previstas y solo en lo previsto; el resto, ni un
 céntimo»*. **19 cambios de importe, −30.424.662,34 €, todos a la baja y todos en
-las 9 obras esperadas. Ámbitos master 8 y 11: 0 cambios.** La huella del después
-se generó **sin escribir una fila** y el disco no se movió (58,06 % constante en
-los 60 tramos).
+las 9 obras esperadas.** La huella del después se generó **sin escribir una fila**
+y el disco no se movió (58,06 % constante en los 60 tramos).
+
+**Dos matices sobre qué demuestra eso, porque la primera redacción afirmaba de
+más.** Los «0 cambios en los ámbitos 8 y 11» son ciertos **por construcción**:
+con `--propuesta` esas filas se **copian**, no se recalculan. Lo que sí prueba que
+la master no se mueve es que **su rama del SQL es byte a byte la misma**, fijada
+por hash. Y `veredicto()` demuestra el «**y solo**» —ninguna obra de más—, no que
+las 9 se hayan movido según R14: eso lo demuestra la tabla de T17, a mano.
 
 Tres cosas del resultado que el reviewer va a mirar, todas en §5 del informe:
 
@@ -22,8 +28,12 @@ Tres cosas del resultado que el reviewer va a mirar, todas en §5 del informe:
    Eso corrigió el fixture de `test_f042_regla.py`, que tenía los dos importes
    de esa obra intercambiados.
 3. **Un solo `importe_mes` se mueve** —`0471 · ámbito 7 · 2016-03, −4.538,09`—
-   y se mueve para bien: el cierre descartado traía un acumulado **menor que el
-   mes anterior** y el movimiento arrastraba ese tramo negativo espurio.
+   y **R8 no se cumple ahí**. La causa real, medida por el reviewer: una partida
+   tiene fila en las fases **4 y 6** y no en la **5**, con 4.538,09 € en la 4;
+   antes publicaba el acumulado entero por falta de `LAG` consecutivo y ahora
+   publica la diferencia. **El valor nuevo es el correcto y repara el telescopio
+   de R16.** Desviación aceptada y declarada en `design.md` §6. *(La causa que di
+   antes —«un tramo negativo espurio»— era falsa: un tramo negativo telescopa.)*
 
 **Se corrigió una afirmación del diseño que la medición desmintió** (§6 del
 informe y §5 de `design.md`): el agregado de `stg` es idéntico al de `mart` en

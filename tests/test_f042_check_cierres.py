@@ -27,7 +27,12 @@ import pytest
 from click.testing import CliRunner
 
 import main
-from etl_sigrid.domain.cierres import agrupar, contrastar
+from etl_sigrid.domain.cierres import (
+    agrupar,
+    contrastar,
+    hay_hueco_de_origen,
+    orden_de_los_publicados,
+)
 from etl_sigrid.infrastructure.postgres.cierres_sql import (
     AMBITOS_REALES,
     PALABRAS_DE_ESCRITURA,
@@ -456,3 +461,73 @@ def test_f042_r17_un_error_en_la_lectura_deja_la_transaccion_en_rollback() -> No
 
     assert conexion.rollbacks == 1
     assert conexion.commits == 0
+
+
+# ---------------------------------------------------------------------------
+# R16 · que es un hueco DE ORIGEN y que es un hueco que crea esta feature
+# ---------------------------------------------------------------------------
+#
+# El defecto que estos tests existen para impedir, y que casi se publica: la
+# clasificacion miraba si `version` era consecutiva, y `version` es el numero
+# ORIGINAL de Sigrid (R7), o sea que LLEVA LOS HUECOS QUE ESTA FEATURE CREA.
+# Tras el build, la 0499 publica 17, 19, 21, 22: se habria apartado por «hueco
+# de origen» y habria quedado FUERA del recuento de series rotas. La unica
+# comprobacion de R16 contra la base iba a excusar precisamente las 9 obras que
+# hay que vigilar, y a devolver un «0 series rotas» sin haberlas mirado.
+
+
+def test_f042_r16_una_serie_renumerada_no_es_un_hueco_de_origen():
+    """0499 tras el build: publica 17, 19, 21, 22 con la 18 y la 20 descartadas.
+
+    Sus `version` NO son consecutivos y su `orden_fase` SI lo es. La serie
+    telescopea y tiene que entrar en el recuento de comprobadas, no en el de
+    apartadas.
+    """
+    assert hay_hueco_de_origen([17, 19, 21, 22], [18, 20]) is False
+    assert orden_de_los_publicados([17, 19, 21, 22], [18, 20]) == {
+        17: 17, 19: 18, 21: 19, 22: 20
+    }
+
+
+def test_f042_r16_un_hueco_que_los_descartes_no_explican_si_se_aparta():
+    """Fases 1, 2 y 4 sin ningun descarte: la 4 publica el acumulado entero y la
+    serie no telescopea, ni telescopeaba antes de F-042."""
+    assert hay_hueco_de_origen([1, 2, 4], []) is True
+
+
+def test_f042_r16_una_partida_ausente_de_una_fase_descartada_no_es_un_hueco():
+    """El caso real de la 0471 en Venta (marzo de 2016), que es el unico
+    `importe_mes` que F-042 mueve.
+
+    Esa partida tiene fila en las fases 4 y 6 y NO en la 5. Con la 5 descartada,
+    `orden_fase(6) = 5` y la serie vuelve a ser consecutiva: pasa a publicar la
+    diferencia en vez del acumulado entero, y el telescopio, que ahi estaba roto
+    por +4.538,09, se repara.
+    """
+    assert hay_hueco_de_origen([4, 6], [5]) is False
+    assert hay_hueco_de_origen([4, 6], []) is True
+
+
+def test_f042_r16_el_telescopio_clasifica_por_orden_y_no_por_version():
+    """Y el SQL hace lo mismo que el oraculo: reconstruye el orden desde los
+    descartes en vez de mirar si `version` es consecutiva."""
+    texto = sql_telescopio()
+
+    assert "orden_previo <> orden_fase - 1" in texto
+    assert "version - 1" not in texto, (
+        "vuelve a clasificar por `version`, que lleva los huecos que crea F-042"
+    )
+    for cte in ("publicado AS (", "candidato AS (", "descarte AS (", "orden AS ("):
+        assert cte in texto, f"falta la CTE {cte}"
+    assert "ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING" in texto
+
+
+def test_f042_r16_los_descartes_del_telescopio_son_un_hecho_no_una_regla():
+    """El SQL no reimplementa «manda el mas moderno»: observa que fases sostiene
+    el origen y no estan publicadas. Si repitiera la regla, un fallo del build y
+    un fallo de la comprobacion se cancelarian."""
+    texto = sql_telescopio()
+
+    assert "acumulado <> 0" not in texto
+    assert "DISTINCT ON" not in texto
+    assert "LEFT JOIN publicado p USING (obra_id, ambito_id, numero_fase)" in texto

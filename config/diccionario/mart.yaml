@@ -43,7 +43,7 @@ objetos:
       en el mismo `anio_mes` sin que ninguna columna publicada las distinguiera.
       De esas 22, solo **9** llegaban a duplicar filas aqui: las demas no tenian
       presupuesto en el mes en conflicto. Cualquier `SUM` de una columna
-      acumulada a origen contaba dos veces: el valor estaba **DOBLADO** en
+      acumulada a origen contaba dos veces: el valor salia **al doble** en
       **35 celdas de 7 obras**, **30.425.881,56 EUR**, medido el 2026-08-28.
 
       **La regla que lo resuelve, y que hay que conocer para interpretar el
@@ -296,7 +296,7 @@ objetos:
       comparten categoria.
 
       **`importe_origen` e `importe_origen_raw` se leen y se dan por buenos.**
-      Hasta el build de F-042 no era asi: estaban **DOBLADOS** en **35 celdas de
+      Hasta el build de F-042 no era asi: salian **al doble** en **35 celdas de
       7 obras — 30.425.881,56 EUR**, medido el 2026-08-28, porque el agregado
       hace `SUM(importe_origen)` sobre `mart.fact_seguimiento_mensual` y alli
       cada mes en conflicto traia dos filas con el **mismo acumulado**. La causa
@@ -374,8 +374,8 @@ objetos:
           Suma del acumulado a origen de esas partidas. Ya es acumulado: sumarlo
           en el tiempo multiplica.
 
-          Se lee y se da por bueno. Hasta el build de F-042 este valor estaba
-          **DOBLADO en 35 celdas de 7 obras — 30.425.881,56 EUR**, porque el
+          Se lee y se da por bueno. Hasta el build de F-042 este valor salia
+          **al doble en 35 celdas de 7 obras — 30.425.881,56 EUR**, porque el
           agregado sumaba las dos filas gemelas que
           `mart.fact_seguimiento_mensual` traia en los meses con dos cierres. La
           causa eran **22** obras con dos fases que Sigrid guarda con el mismo
@@ -393,7 +393,7 @@ objetos:
       importe_origen_raw:
         significado: >-
           Version sin redondear de `importe_origen`. Comparte con el todo lo
-          dicho alli, incluido que hasta el build de F-042 venia **DOBLADO** por
+          dicho alli, incluido que hasta el build de F-042 venia **al doble** por
           la misma causa —**22** obras con dos fases en el mismo mes, de las que
           **9** duplicaban filas en el fact— y que ahora no.
 
@@ -565,7 +565,7 @@ objetos:
       identifica una fila.
 
       **`importe_origen` se lee y se da por bueno.** Hasta el build de F-042
-      venia **DOBLADO** en **35 celdas de 7 obras — 30.425.881,56 EUR**, medido
+      venia **al doble** en **35 celdas de 7 obras — 30.425.881,56 EUR**, medido
       el 2026-08-28, porque el agregado sumaba dos veces el mismo acumulado de
       las filas gemelas del fact. La causa eran **22** obras con dos fases que
       Sigrid guarda con el mismo `ano` y `mes`, de las que **9** llegaban a
@@ -613,7 +613,7 @@ objetos:
         significado: >-
           Acumulado a origen de esas partidas. No se suma en el tiempo.
 
-          Se lee y se da por bueno. Hasta el build de F-042 venia **DOBLADO**
+          Se lee y se da por bueno. Hasta el build de F-042 venia **al doble**
           en **35 celdas de 7 obras — 30.425.881,56 EUR** porque el agregado
           sumaba dos veces el mismo acumulado de las filas gemelas del fact. La
           causa eran **22** obras con dos fases en el mismo mes, de las que

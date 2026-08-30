@@ -232,10 +232,11 @@ def test_f042_r1_el_moderno_gana_aunque_su_acumulado_sea_menor():
     """0545 · J. DEERE en Venta Real: la fase 6 acumula 1.960,73 MENOS que la 5.
 
     La regla es por número de fase, no por importe, y **esta** obra lo separa de
-    verdad: es la única de las 24 colisiones en la que el cierre moderno baja
-    respecto al anterior con **líneas valoradas**, o sea una corrección a la
-    baja legítima. Se distingue de 0606, que baja porque su fase moderna está
-    entera a cero y ahí manda R11.
+    verdad: el cierre moderno baja respecto al anterior con **líneas valoradas**,
+    o sea una corrección a la baja legítima. Se distingue de 0606, que baja
+    porque su fase moderna está entera a cero y ahí manda R11. No es el único
+    caso —la 0462 también baja, 0,28 en Coste y 20,95 en Venta—, pero sí el de
+    mayor importe y el que la ficha de la feature dejó medido.
 
     Antes este test usaba la 0246 con sus dos importes intercambiados. La
     medición de T16 los puso en su sitio —la fase 13 acumula MÁS, no menos— y
@@ -298,6 +299,38 @@ def test_f042_r11_un_acumulado_negativo_cuenta_como_distinto_de_cero():
 # ---------------------------------------------------------------------------
 # R2 · si todos los cierres del mes están a cero, manda el mayor
 # ---------------------------------------------------------------------------
+
+
+def test_f042_r1_gana_el_numero_mas_alto_no_el_ultimo_que_llega():
+    """Los cierres llegan desordenados a propósito.
+
+    Ningún otro fixture separaba «gana el de mayor `numero_fase`» de «gana el
+    último de la lista», porque todos llegan ya ordenados: una implementación
+    que se quedara con el último elemento pasaría igual. Aquí no.
+    """
+    plan = plan_de_cierres(
+        [
+            Cierre(9, date(2015, 5, 1), Decimal("30.00")),
+            Cierre(7, date(2015, 5, 1), Decimal("10.00")),
+            Cierre(8, date(2015, 5, 1), Decimal("20.00")),
+        ]
+    )
+
+    assert plan.vigente_por_mes[date(2015, 5, 1)] == 9
+    assert plan.descartadas == (7, 8)
+
+
+def test_f042_r2_si_todos_estan_a_cero_manda_el_de_numero_mayor_aunque_llegue_primero():
+    """Lo mismo con R2: sin dato, el criterio sigue siendo el número."""
+    plan = plan_de_cierres(
+        [
+            Cierre(6, date(2017, 7, 1), Decimal("0.00")),
+            Cierre(4, date(2017, 7, 1), Decimal("0.00")),
+            Cierre(5, date(2017, 7, 1), Decimal("0.00")),
+        ]
+    )
+
+    assert plan.vigente_por_mes[date(2017, 7, 1)] == 6
 
 
 def test_f042_r2_si_todos_estan_a_cero_manda_el_de_numero_mayor():
@@ -631,9 +664,15 @@ def test_f042_r16_el_telescopio_se_cumple_tras_renumerar():
     """`SUM(importe_mes)` = último `importe_origen` de la serie.
 
     Es la propiedad que F-006 midió 200/200 y que un desplazamiento mal hecho
-    rompería. Vale sin excepción cuando la serie de supervivientes queda
-    consecutiva, que es el caso de las 22 obras: sus huecos los crea la regla y
-    la regla los cierra.
+    rompería.
+
+    **Alcance, y conviene no exagerarlo.** Esta simulación es a grano de OBRA; el
+    SQL particiona por (obra, **partida**, ámbito). A grano de partida la
+    propiedad NO es universal: una partida puede faltar en una fase que sí
+    sobrevive, y entonces publica el acumulado entero y no telescopea —pasa en la
+    0471—. Quien clasifica eso contra la base es
+    `domain.cierres.hay_hueco_de_origen`, y por eso ningún test de aquí puede
+    cazar ese caso.
     """
     plan = plan_de_cierres(_CIERRES_0499)
     movimientos = _movimientos(plan, _0499)

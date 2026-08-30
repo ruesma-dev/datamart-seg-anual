@@ -195,26 +195,17 @@ producción.
 ### Lo que ya sí cabe, y por qué aun así no se hace
 
 **Reconstruir en esquemas paralelos (`stg_f042`, `mart_f042`) ha dejado de ser
-un riesgo de disco.** Ocuparía **~9,8 GB** —`plan_mensual` 7.773 MB más
-`fact_seguimiento_mensual` 2.240 MB— y, sumando el derrame de temporales que
-F-019 midió (16 GB), el pico rondaría **26 GB sobre 45,4 GB libres**. Cabe con
-holgura, y tiene una ventaja real: **no destruye el «antes»**, así que la
-comparación se haría con SQL sobre las dos versiones vivas y Power BI seguiría
-sirviendo lo viejo hasta que el humano decidiera.
-
-**No se propone, y el motivo ya no es el disco sino el código:** ni
-`08_plan_mensual.sql` ni los ficheros de `mart/` están parametrizados por
-esquema —escriben `stg.plan_mensual` y `mart.*` literalmente—, así que haría
+un riesgo de disco**: ~9,8 GB de tablas y un pico de ~26 GB sobre 45,4 GB
+libres. Tiene una ventaja real —**no destruye el «antes»**— y aun así no se
+propone, **y el motivo ya no es el disco sino el código**: ni
+`08_plan_mensual.sql` ni `mart/` están parametrizados por esquema, así que haría
 falta parametrizarlos, y eso es superficie nueva y sin probar **dentro de la
-tarea cuyo objetivo es precisamente demostrar que nada se mueve**. Con el nivel
-1 corregido por los `JOIN` de `mart`, la prueba ya se obtiene sin escribir nada.
-Queda anotada como la alternativa a la que acudir **si el humano prefiere no
-sobrescribir `stg` en producción**; en ese caso, el ancho de banda de 10 MiB/s
-es el que manda sobre el tiempo, no el disco.
+tarea cuyo objetivo es demostrar que nada se mueve**. Queda anotada por si el
+humano prefiere no sobrescribir `stg`.
 
 **Reconstruir en un Postgres local:** posible y sin riesgo para los vecinos,
-pero exige reingerir ~20 M filas de Sigrid (lectura, permitida) y ~12 GB de
-disco local, y **prueba el código, no el dato de producción**.
+pero exige reingerir ~20 M filas y **prueba el código, no el dato de
+producción**.
 
 ## 6. Riesgos y decisiones descartadas
 
@@ -231,10 +222,23 @@ disco local, y **prueba el código, no el dato de producción**.
 4. **Riesgo de rendimiento del build.** Las CTE nuevas agregan `reales_base` a
    unos pocos miles de filas y añaden un `JOIN` pequeño. Se mide con
    `python main.py timings` y se compara con el 1 h 50 del 2026-08-28.
-5. **Riesgo de `<> 0` frente a `> 0`.** Se usa **distinto de cero**, que es el
+5. **R8 NO se cumple en una celda, y se acepta.** Medido en T17: en
+   **0471 · ámbito 7 · marzo de 2016** el `importe_mes` publicado cambia de
+   485.843,69 a **481.305,60 (−4.538,09)**, así que deja de ser la suma de los
+   `importe_mes` que hoy publican los dos cierres del mes. **La causa, medida:**
+   una partida tiene fila en las fases **4 y 6** y **no en la 5**, con
+   `importe_origen` de 4.538,09 € en la 4. Antes, su fila de la 6 no tenía `LAG`
+   consecutivo y publicaba **el acumulado entero**; con la 5 descartada,
+   `orden_fase(6) = 5` y pasa a publicar la diferencia. **El valor nuevo es el
+   correcto**: repara el telescopio de R16, que ahí estaba roto por +4.538,09.
+   O sea que R8, redactado como «el superviviente iguala la suma de lo que hoy
+   publican», arrastraba un defecto preexistente. Se acepta la desviación
+   —corrige, no rompe— y queda declarada aquí y en `impl_F-042.md`.
+
+6. **Riesgo de `<> 0` frente a `> 0`.** Se usa **distinto de cero**, que es el
    complemento exacto de la condición que fijó el humano («acumulado cero») y no
    inventa regla para un acumulado negativo, que hoy no existe.
-6. **Riesgo de alcance:** `cierre` cambia de números aunque no se toque su SQL.
+7. **Riesgo de alcance:** `cierre` cambia de números aunque no se toque su SQL.
    No basta con mirar `mart`: el nivel 2 debe medir los dos.
 
 ## 7. Límite de microservicio

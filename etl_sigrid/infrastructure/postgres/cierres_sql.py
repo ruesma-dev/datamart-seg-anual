@@ -151,32 +151,96 @@ def sql_telescopio(obras: Sequence[int] | None = None) -> str:
     origen. Las tres hacen falta: un «0 rotas» sobre 4 series comprobadas no
     dice lo mismo que sobre 4 millones.
 
+    **CÓMO SE DECIDE QUÉ ES UN HUECO, y la primera versión lo hacía mal.**
+    Clasificaba mirando si `version` era consecutiva. Pero `version` es el
+    número ORIGINAL de Sigrid (R7) y **lleva justamente los huecos que esta
+    feature crea**: tras el build la 0499 publica 17, 19, 21, 22, así que se
+    habría apartado por «hueco» y habría quedado **fuera** del recuento de
+    series rotas. La única comprobación de R16 contra la base iba a excusar
+    precisamente las 9 obras que hay que vigilar.
+
+    Ahora se reconstruye el `orden_fase` con el que el build calculó el `LAG`:
+    los **descartes** son las fases que `stg.presupuesto ⨝ stg.fases` sostiene y
+    `stg.plan_mensual` no publica —un hecho observable, no una regla que haya
+    que repetir aquí— y cada fase publicada baja tantas posiciones como
+    descartes queden por debajo. Es la misma aritmética que la CTE
+    `reales_orden`, y la comparte con `domain.cierres.hay_hueco_de_origen`, que
+    es donde se prueba sin base.
+
     Es la consulta cara del comando —agrega `stg.plan_mensual` entera— y por eso
     admite `--obras`.
     """
     return (
-        "WITH serie AS (\n"
-        "    SELECT obra_id, partida_id, ambito_id, version,\n"
-        "           importe_mes, importe_origen,\n"
-        "           ROW_NUMBER() OVER (\n"
-        "               PARTITION BY obra_id, partida_id, ambito_id\n"
-        "               ORDER BY version DESC\n"
-        "           ) AS desde_el_final,\n"
-        "           LAG(version) OVER (\n"
-        "               PARTITION BY obra_id, partida_id, ambito_id\n"
-        "               ORDER BY version\n"
-        "           ) AS version_previa\n"
+        "WITH publicado AS (\n"
+        "    SELECT DISTINCT obra_id, ambito_id, version AS numero_fase\n"
         "    FROM stg.plan_mensual\n"
         f"    WHERE ambito_id IN ({_AMBITOS})"
         f"{_filtro_de_obras(obras)}\n"
+        "),\n"
+        "-- Las fases que el origen sostiene: mismo universo que `reales_base`.\n"
+        "candidato AS (\n"
+        "    SELECT DISTINCT pp.obra_id, pp.ambito_id, pp.fase_num AS numero_fase\n"
+        "    FROM stg.presupuesto pp\n"
+        "    JOIN raw.obrparpre op ON op.ide = pp.presupuesto_id\n"
+        "    JOIN stg.fases     f\n"
+        "        ON f.obra_id     = pp.obra_id\n"
+        "       AND f.numero_fase = pp.fase_num\n"
+        f"    WHERE pp.ambito_id IN ({_AMBITOS})\n"
+        "      AND pp.fase_num >= 1\n"
+        "      AND f.anio IS NOT NULL\n"
+        "      AND f.mes  IS NOT NULL"
+        f"{_filtro_de_obras(obras, 'pp')}\n"
+        "),\n"
+        "-- Descarte = candidato que no llego a plan_mensual. Es un HECHO, no la\n"
+        "-- regla: aqui no se decide quien deberia mandar, eso es check-cierres.\n"
+        "descarte AS (\n"
+        "    SELECT c.obra_id, c.ambito_id, c.numero_fase\n"
+        "    FROM candidato c\n"
+        "    LEFT JOIN publicado p USING (obra_id, ambito_id, numero_fase)\n"
+        "    WHERE p.numero_fase IS NULL\n"
+        "),\n"
+        "-- El mismo desplazamiento que la CTE `reales_orden` del build.\n"
+        "orden AS (\n"
+        "    SELECT obra_id, ambito_id, numero_fase, es_descarte,\n"
+        "           numero_fase - COALESCE(SUM(es_descarte) OVER (\n"
+        "               PARTITION BY obra_id, ambito_id ORDER BY numero_fase\n"
+        "               ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)\n"
+        "               AS orden_fase\n"
+        "    FROM (\n"
+        "        SELECT obra_id, ambito_id, numero_fase, 0 AS es_descarte\n"
+        "            FROM publicado\n"
+        "        UNION ALL\n"
+        "        SELECT obra_id, ambito_id, numero_fase, 1 FROM descarte\n"
+        "    ) todas\n"
+        "),\n"
+        "serie AS (\n"
+        "    SELECT pm.obra_id, pm.partida_id, pm.ambito_id,\n"
+        "           pm.importe_mes, pm.importe_origen,\n"
+        "           ROW_NUMBER() OVER (\n"
+        "               PARTITION BY pm.obra_id, pm.partida_id, pm.ambito_id\n"
+        "               ORDER BY o.orden_fase DESC\n"
+        "           ) AS desde_el_final,\n"
+        "           o.orden_fase,\n"
+        "           LAG(o.orden_fase) OVER (\n"
+        "               PARTITION BY pm.obra_id, pm.partida_id, pm.ambito_id\n"
+        "               ORDER BY o.orden_fase\n"
+        "           ) AS orden_previo\n"
+        "    FROM stg.plan_mensual pm\n"
+        "    JOIN orden o\n"
+        "        ON o.obra_id     = pm.obra_id\n"
+        "       AND o.ambito_id   = pm.ambito_id\n"
+        "       AND o.numero_fase = pm.version\n"
+        "       AND o.es_descarte = 0\n"
+        f"    WHERE pm.ambito_id IN ({_AMBITOS})"
+        f"{_filtro_de_obras(obras, 'pm')}\n"
         "),\n"
         "resumen AS (\n"
         "    SELECT obra_id, partida_id, ambito_id,\n"
         "           SUM(importe_mes) AS suma_movimientos,\n"
         "           MAX(importe_origen) FILTER (WHERE desde_el_final = 1)\n"
         "               AS ultimo_acumulado,\n"
-        "           bool_or(version_previa IS NOT NULL\n"
-        "                   AND version_previa <> version - 1) AS con_hueco\n"
+        "           bool_or(orden_previo IS NOT NULL\n"
+        "                   AND orden_previo <> orden_fase - 1) AS con_hueco\n"
         "    FROM serie\n"
         "    GROUP BY obra_id, partida_id, ambito_id\n"
         ")\n"

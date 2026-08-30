@@ -18,9 +18,20 @@ Es el lado de infraestructura de la prueba que decide. Lee, agrega y escribe
 **El agregado de `stg` lleva los mismos `JOIN` que `mart`** (`stg.obras` y
 `stg.partidas`, los dos `INNER`). No es un detalle: sin ellos la huella de `stg`
 contaría partidas que `mart/02_build_fact.sql` descarta y dejaría de ser
-predictiva. Con ellos, el agregado de `stg` es **exactamente** lo que
-`mart.fact_seguimiento_categoria` publicaría, porque de `stg` a esa tabla solo
-hay una proyección y un `SUM` por las mismas dimensiones.
+predictiva.
+
+**Con ellos, en los ámbitos REALES (3 y 7) el agregado de `stg` es exactamente
+el que `mart.fact_seguimiento_categoria` publica** —medido el 2026-08-29 entre
+las dos huellas: desviación **0 en 8.243 celdas**—, porque de `stg` a esa tabla
+solo hay una proyección y un `SUM` por las mismas dimensiones.
+
+**Y NO vale para los master (8 y 11).** Ahí `stg.plan_mensual` guarda **todas**
+las versiones y `mart` publica **solo la vigente de cada mes**, así que este
+agregado suma la obra tantas veces como versiones tenga: 3.504 celdas difieren y
+en la 0644 son 43,6 M€ frente a 1,3 M€. **No invalida la comparación**
+—`comparar-huellas` enfrenta `stg` contra `stg` y el artefacto se cancela—, pero
+quien compare una huella de `stg` con una de `mart` sin saber esto creerá haber
+encontrado un defecto de 40 millones.
 
 ## El texto de la propuesta no es una copia
 

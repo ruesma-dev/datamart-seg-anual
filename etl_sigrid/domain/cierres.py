@@ -45,6 +45,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from itertools import pairwise
 from types import MappingProxyType
 
 #: Lo que devuelve `SUM(importe_origen_round)` cuando el grupo no tiene ni un
@@ -263,3 +264,44 @@ def _motivo(publicado: tuple[int, ...], esperado: tuple[int, ...]) -> str:
         f"manda el cierre {publicado[0]} y deberia mandar el {esperado[0]}: "
         f"un solo cierre por mes, si, pero el que no era"
     )
+
+
+def orden_de_los_publicados(
+    publicadas: Sequence[int], descartadas: Sequence[int]
+) -> dict[int, int]:
+    """`numero_fase -> orden_fase` para las fases que SÍ tienen fila publicada.
+
+    Misma aritmética que `plan_de_cierres` y que la CTE `reales_orden`: cada
+    fase baja tantas posiciones como descartes queden por debajo. La diferencia
+    es el alcance: aquí `publicadas` puede ser un SUBCONJUNTO de las fases de la
+    obra —las de UNA partida—, mientras `descartadas` es de la (obra, ámbito)
+    entera, que es exactamente como lo calcula el SQL.
+    """
+    return {
+        fase: fase - sum(1 for d in descartadas if d < fase)
+        for fase in sorted(publicadas)
+    }
+
+
+def hay_hueco_de_origen(
+    publicadas: Sequence[int], descartadas: Sequence[int]
+) -> bool:
+    """¿La serie de una partida salta un escalón que los descartes NO explican?
+
+    **Por qué existe, y es un defecto que casi se publica.** La comprobación del
+    telescopio (R16) contra la base clasificaba una serie como «hueco de origen»
+    mirando si `version` era consecutiva. Pero `version` es el número ORIGINAL de
+    Sigrid (R7) y **lleva justamente los huecos que esta feature crea**: tras el
+    build, la 0499 publica 17, 19, 21, 22, así que se habría apartado por
+    «hueco» y habría quedado **fuera** del recuento de series rotas. La única
+    comprobación de R16 contra la base iba a excusar precisamente las 9 obras que
+    hay que vigilar, y a devolver un «0 series rotas» que no las había mirado.
+
+    Un hueco de verdad es el que queda **después** de descontar los descartes: la
+    partida no tiene fila en una fase que sí existe y sí sobrevive. Ahí
+    `importe_mes` publica el acumulado entero y la serie no telescopea — y
+    tampoco telescopeaba antes de F-042.
+    """
+    orden = orden_de_los_publicados(publicadas, descartadas)
+    posiciones = [orden[f] for f in sorted(orden)]
+    return any(b != a + 1 for a, b in pairwise(posiciones))

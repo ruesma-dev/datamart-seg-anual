@@ -186,14 +186,26 @@ def veredicto(
 ) -> tuple[int, str]:
     """`(codigo, informe)`. Código distinto de 0 = **la feature no se cierra**.
 
+    **QUÉ DEMUESTRA Y QUÉ NO, porque no es lo mismo.** Demuestra el «**y solo**»:
+    que ninguna obra fuera de la lista se mueve y que los master no se mueven.
+    **No** demuestra que las obras esperadas **sí** se hayan movido ni que se
+    hayan movido **en lo previsto por R14**: eso es un contraste contra cifras
+    externas y se hace a mano (T17). Un verde aquí con las 9 obras quietas sería
+    un verde: correcto y vacío.
+
     Tres motivos de fallo, y son tres cosas distintas:
 
     1. **Se mueve una obra que no está en `obras_esperadas`** (R25). Es el
        corazón de la prueba: el arreglo tiene que tocar a las nueve obras y a
        ninguna más.
-    2. **Se mueve algo en los ámbitos 8 u 11** (R24). No lo tapa la lista de
-       obras: esos ámbitos no tienen hoy ni una clave duplicada y su rama del
-       SQL está fijada por hash. Un cambio ahí es un desbordamiento.
+    2. **Se mueve algo en los ámbitos 8 u 11** (R24). Un cambio ahí es un
+       desbordamiento. **Ojo con cuánto vale este cero cuando la huella del
+       «después» viene de `--propuesta`:** ahí esas filas se **copian** de la
+       actual, así que el cero es cierto por construcción y no es una medición.
+       La garantía real de que los master no se mueven es que **su rama del SQL
+       es byte a byte la misma**, fijada por hash en `tests/test_f042_sql.py`.
+       Cuando el «después» sale de una reconstrucción de verdad, entonces sí
+       mide.
     3. **La huella no trae los cuatro ámbitos.** Entonces no prueba lo que dice
        probar, y un verde sería una mentira cómoda.
 

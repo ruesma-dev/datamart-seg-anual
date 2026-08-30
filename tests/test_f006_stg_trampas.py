@@ -29,9 +29,8 @@ from functools import lru_cache
 
 import pytest
 
-from tests._texto import contiene, normalizado
-
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
+from tests._texto import contiene, normalizado
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
@@ -671,24 +670,46 @@ def test_f006_r10_control_se_identifican_los_objetos_que_doblan() -> None:
     assert "mart.v_pbi_fact_categoria" in objetos, "y el que lo sirve a Power BI"
 
 
+#: Lo que ancla el relato del defecto histórico en una ficha. Sustituye a la
+#: palabra «DOBLADO», que era el marcador mientras el defecto estaba ABIERTO.
+MARCA_DEFECTO_HISTORICO = "F-042"
+
+
 @pytest.mark.parametrize("objeto", _objetos_que_agregan_el_fact())
 def test_f006_r10_el_aviso_del_doblado_esta_en_la_columna(objeto: str) -> None:
     """En el `significado` de cada acumulada, no en la cabecera del objeto.
 
     Quien consulta una columna concreta recibe su ficha de columna. Un aviso en
     la descripción del objeto no le llega.
+
+    **Qué exigía y por qué cambió (F-042, R18).** Exigía la palabra **DOBLADO**
+    en cada acumulada, porque el defecto estaba ABIERTO y había que gritarlo. Con
+    el build corregido, R18 pide justo lo contrario —retirar el aviso—, así que
+    este guardián estaba **obligando a incumplir un requisito**: mientras
+    existiera, la palabra no se podía quitar. Es el patrón «el guardián enseña a
+    mirar donde él mira», ahora en su versión más cara: el guardián decidiendo lo
+    que la ficha puede decir.
+
+    Lo que ahora se exige es lo que no caduca: que la columna cuente **qué pasó**
+    —y la marca de eso es citar la feature— y que diga **que es un acumulado**,
+    que es la trampa permanente. La palabra de alarma se queda fuera, y que no
+    vuelva lo vigila
+    `test_f042_r18_ninguna_ficha_describe_el_doblado_como_vigente`.
     """
     ficha = _dicc().por_nombre[objeto]
     mudas = [
         c.nombre
         for c in ficha.columnas
         if c.nombre in _acumuladas_de(objeto)
-        and "DOBLADO" not in (c.significado or "")
+        and not (
+            contiene(c.significado or "", MARCA_DEFECTO_HISTORICO)
+            and contiene(c.significado or "", "acumulado")
+        )
     ]
     assert mudas == [], (
-        f"{objeto}: las columnas {mudas} tienen el valor almacenado DOBLADO y su "
-        f"`significado` no lo dice. Quien lea una fila recibe el doble con el "
-        f"diccionario respaldándolo"
+        f"{objeto}: las columnas {mudas} estuvieron al doble y su `significado` "
+        f"no lo cuenta, o no dice que son un acumulado. Quien lea una fila y no "
+        f"sepa ninguna de las dos cosas sumará mal o desconfiará de un dato bueno"
     )
 
 
@@ -750,15 +771,17 @@ def test_f006_r10_la_cabecera_no_contradice_a_sus_columnas(objeto: str) -> None:
     cabecera = f"{ficha.descripcion} {ficha.grano or ''}"
 
     columnas_avisadas = [
-        c.nombre for c in ficha.columnas if "DOBLADO" in (c.significado or "")
+        c.nombre
+        for c in ficha.columnas
+        if contiene(c.significado or "", MARCA_DEFECTO_HISTORICO)
     ]
     if not columnas_avisadas:
-        pytest.skip(f"{objeto} no tiene columnas con el aviso")
+        pytest.skip(f"{objeto} no tiene columnas que cuenten el defecto histórico")
 
-    assert contiene(cabecera, "DOBLADO"), (
-        f"{objeto}: las columnas {columnas_avisadas} avisan de que su valor está "
-        f"doblado y la cabecera no lo dice. Quien use `listar_tablas` recibe solo "
-        f"la cabecera y se va tranquilo"
+    assert contiene(cabecera, MARCA_DEFECTO_HISTORICO), (
+        f"{objeto}: las columnas {columnas_avisadas} cuentan que su valor estuvo "
+        f"al doble y la cabecera no lo cuenta. Quien use `listar_tablas` recibe "
+        f"solo la cabecera y no puede interpretar un informe viejo"
     )
 
 
@@ -791,9 +814,13 @@ def test_f006_r10_la_cabecera_nombra_las_columnas_afectadas(objeto: str) -> None
     ficha = _dicc().por_nombre[objeto]
     cabecera = f"{ficha.descripcion} {ficha.grano or ''}"
 
-    afectadas = [c.nombre for c in ficha.columnas if "DOBLADO" in (c.significado or "")]
+    afectadas = [
+        c.nombre
+        for c in ficha.columnas
+        if contiene(c.significado or "", MARCA_DEFECTO_HISTORICO)
+    ]
     if not afectadas:
-        pytest.skip(f"{objeto} no tiene columnas con el aviso")
+        pytest.skip(f"{objeto} no tiene columnas que cuenten el defecto histórico")
 
     sin_nombrar = [c for c in afectadas if not contiene(cabecera, c)]
     assert sin_nombrar == [], (
@@ -817,14 +844,14 @@ def test_f006_r10_control_el_guardian_de_coherencia_muerde() -> None:
     afectadas = ["importe_origen", "importe_origen_raw"]
 
     # Vía 1 · otra redacción: la cabecera tranquiliza sin nombrar nada.
-    otra = "esta DOBLADO, pero la clave sale unica y no se repite ninguna fila"
+    otra = "lo arreglo F-042, pero la clave sale unica y no se repite ninguna fila"
     assert [c for c in afectadas if not contiene(otra, c)] == afectadas, (
         "una cabecera que no nombra ninguna columna afectada tiene que fallar, "
         "diga lo que diga"
     )
 
     # Vía 2 · frase partida por el ajuste de línea: se ve igual.
-    partida = "el valor de importe_origen\n\ny de importe_origen_raw esta DOBLADO"
+    partida = "el valor de importe_origen\n\ny de importe_origen_raw, en F-042"
     assert [c for c in afectadas if not contiene(partida, c)] == [], (
         "normalizando espacios, una cabecera envuelta cuenta igual"
     )
@@ -858,9 +885,12 @@ def test_f006_r10_control_la_coherencia_se_comprueba_sobre_alguien() -> None:
     con_aviso = [
         o
         for o in objetos
-        if any("DOBLADO" in (c.significado or "") for c in _dicc().por_nombre[o].columnas)
+        if any(
+            contiene(c.significado or "", MARCA_DEFECTO_HISTORICO)
+            for c in _dicc().por_nombre[o].columnas
+        )
     ]
-    assert len(con_aviso) >= 2, f"solo {con_aviso} llevan el aviso en columna"
+    assert len(con_aviso) >= 2, f"solo {con_aviso} cuentan el defecto en columna"
 
 
 # ---------------------------------------------------------------------------
@@ -1061,4 +1091,128 @@ def test_f006_r10_donde_se_nombra_la_causa_se_nombra_el_efecto(
         f"{ruta} nombra las 22 obras sin decir que solo 9 duplican filas aquí. "
         f"El 22 mide la CAUSA en `stg.fases`; atribuirlo al duplicado del fact es "
         f"la cifra mal atribuida que ya se publicó.\n  párrafo: {parrafo[:300]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# R18 · el defecto se cuenta en PASADO, y nadie lo resucita (F-042)
+# ---------------------------------------------------------------------------
+#
+# R18 pide retirar el aviso de dato doblado. Retirarlo no es borrar la historia
+# —un informe de hace un mes sigue trayendo el doble y hay que poder
+# interpretarlo—, es dejar de afirmar que el defecto SIGUE. La diferencia se
+# nota en el tiempo verbal, y el tiempo verbal sí es comprobable.
+#
+# Hasta esta pasada lo impedia un guardian: exigia la palabra «DOBLADO» en cada
+# columna acumulada, asi que mientras existiera R18 no se podia cumplir. Un
+# guardian decidiendo lo que la ficha puede decir es el caso mas caro del patron
+# «el guardian ensena a mirar donde el mira».
+
+#: Formas de afirmar el defecto EN PRESENTE. No se enumeran redacciones (eso ya
+#: falló una vez): se enumeran los verbos en presente junto al hecho.
+_EN_PRESENTE = (
+    "esta doblado",
+    "estan doblados",
+    "viene doblado",
+    "vienen doblados",
+    "esta al doble",
+    "el valor almacenado esta",
+    "devuelve el doble",
+)
+
+
+def test_f042_r18_ninguna_ficha_describe_el_doblado_como_vigente() -> None:
+    """Barre el diccionario CARGADO, cabecera y columnas, campo a campo.
+
+    Barrer el YAML crudo no valdría: las frases van plegadas por el bloque `>-`
+    y una afirmación partida por el ajuste de línea se escaparía. Es el mismo
+    plegado que ya dejó ciega a media docena de comprobaciones de esta feature.
+    """
+    vivas: list[tuple[str, str]] = []
+    for ficha in _dicc().fichas:
+        for ruta, texto in _prosa_de(ficha.nombre):
+            for forma in _EN_PRESENTE:
+                # En minúsculas: el aviso viejo iba en MAYÚSCULAS («EL VALOR
+                # ALMACENADO ESTA DOBLADO») y un detector sensible a la caja lo
+                # habría dejado pasar entero.
+                if contiene(texto.lower(), forma):
+                    vivas.append((ruta, forma))
+
+    assert vivas == [], (
+        f"estas fichas siguen afirmando el doblado EN PRESENTE: {vivas}. R18 pide "
+        f"retirar el aviso; el hecho se cuenta en pasado, con su cifra, para que "
+        f"un informe viejo se pueda interpretar"
+    )
+
+
+def test_f042_r18_control_el_detector_de_presente_reconoce_la_redaccion_vieja() -> None:
+    """Sin esto, cambiar una tilde dejaría el barrido inerte y en verde."""
+    vieja = "**OJO: EL VALOR ALMACENADO ESTA DOBLADO en 37 celdas de 8 obras.**"
+
+    assert any(contiene(vieja.lower(), f) for f in _EN_PRESENTE)
+    # Y la redacción nueva, en pasado, tiene que pasar limpia.
+    nueva = "Hasta el build de F-042 este valor salia al doble en 35 celdas."
+    assert not any(contiene(nueva.lower(), f) for f in _EN_PRESENTE)
+
+
+# ---------------------------------------------------------------------------
+# R19 · la superficie de consumo de OTROS esquemas tambien cuelga del fact
+# ---------------------------------------------------------------------------
+#
+# `_objetos_que_agregan_el_fact()` filtra `esquema != "mart"`, asi que
+# `cierre.v_pbi_planif_vs_real` —que lee de `mart.fact_seguimiento_categoria` y
+# es superficie de consumo servida al MCP y a Power BI— no lo miraba nadie. R19
+# la nombra explicitamente y su texto se escribio, pero sin guardian: manana
+# alguien lo borra y no se entera nadie. Es la leccion de F-006 —«el aviso baja
+# al significado»— con el punto ciego una capa mas alla.
+
+
+def _objetos_que_leen_el_fact_fuera_de_mart() -> list[str]:
+    """Fichas de CUALQUIER esquema que no sea `mart` y lean de su familia."""
+    fuera: list[str] = []
+    for ficha in _dicc().fichas:
+        if ficha.esquema == "mart":
+            continue
+        from tests.test_f006_fichas import _bloque_del_objeto
+
+        origen = _ficheros_del_objeto(ficha.nombre)
+        if not origen:
+            continue
+        # SOLO su bloque: el fichero que crea `v_fact_periodificado` crea
+        # también `aux.periodificacion_partida`, y mirar el fichero entero
+        # arrastraba a una tabla de reglas que NO lee del fact. Es el mismo
+        # punto ciego que ya documenta `_objetos_que_agregan_el_fact`.
+        bloque = _bloque_del_objeto("\n".join(origen), ficha.nombre)
+        if re.search(r"FROM\s+mart\.fact_seguimiento_(mensual|categoria)", bloque):
+            fuera.append(ficha.nombre)
+    return sorted(fuera)
+
+
+def test_f006_r19_control_hay_consumidores_del_fact_fuera_de_mart() -> None:
+    """Si el derivador se vaciara, el test de abajo pasaría sin mirar nada."""
+    objetos = _objetos_que_leen_el_fact_fuera_de_mart()
+
+    assert "cierre.v_pbi_planif_vs_real" in objetos, (
+        "es la vista que F-047 rescató y que R19 nombra: si ya no lee del fact, "
+        "revisar este control antes de fiarse del verde"
+    )
+
+
+@pytest.mark.parametrize("objeto", _objetos_que_leen_el_fact_fuera_de_mart())
+def test_f006_r19_un_consumidor_del_fact_de_otro_esquema_declara_de_que_cuelga(
+    objeto: str,
+) -> None:
+    """Tiene que decir de qué tabla vive y por qué el defecto de esa tabla le
+    afectó o no. «No le afectó» es una respuesta válida —y es la de esta vista,
+    que usa `importe_mes`— pero hay que darla: el defecto de una tabla no se
+    hereda entero, se hereda columna a columna."""
+    ficha = _dicc().por_nombre[objeto]
+    cabecera = f"{ficha.descripcion} {ficha.grano or ''}"
+
+    assert contiene(cabecera, "fact_seguimiento"), (
+        f"{objeto} lee de la familia del fact y su cabecera no lo dice"
+    )
+    assert contiene(cabecera, MARCA_DEFECTO_HISTORICO), (
+        f"{objeto} cuelga de la tabla que estuvo al doble y no cuenta si eso le "
+        f"afectó. Es superficie de consumo: quien la abre no ve `mart`"
     )
