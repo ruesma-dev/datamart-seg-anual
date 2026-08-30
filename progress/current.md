@@ -86,6 +86,78 @@ hay que llevarse:
 
 ---
 
+## LO PRIMERO AL RETOMAR: comprobar la carga que quedó corriendo
+
+**El 2026-08-30 a las 08:06:36 UTC se lanzó a mano el job de Azure**
+`caj-datamart-seg-dev-d8y5q10`, con la imagen **`r20260830-0924`** (la primera
+que lleva F-042). Referencia: 3 h 36, así que debería haber terminado sobre las
+**11:42 UTC**. El humano se iba a quedar sin red, y por eso se lanzó **el job en
+Azure** y no `python main.py stage` desde el puesto: el comando local habría
+muerto con la conexión dejando `stg` a medias.
+
+Ejecuta `run-all --full`, o sea los diez pasos **incluido
+`publicar_diccionario`**, así que al terminar el diccionario ya está en la
+versión que describe el estado corregido. **No hay que publicarlo a mano.**
+
+```powershell
+az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev -o table
+python main.py check-unicidad      # EL QUE DECIDE: 8.778 -> 0
+python main.py check-cierres       # el guardián de H2, ahora sí mira las 9 obras
+python main.py check-diccionario   # biyección y que lo publicado sea lo del árbol
+```
+
+Con los cuatro en verde, **F-042 pasa a `done`** y con ella se cierra la
+corrección de los 30,4 M€. Si `check-unicidad` sigue dando 8.778, la carga no
+llegó a construir: mirar el estado del job antes de tocar nada.
+
+---
+
+## F-042 · APROBADA el 2026-08-30, a la espera de la reconstrucción
+
+Rama `feature/F-042-clave-fact`. **Aprobada por el reviewer en la 2ª pasada.**
+`bash harness/init.sh` en código 0: **2.802 tests**, 100 % de 656 líneas
+cambiadas. El diccionario del árbol son **103 objetos**, **798 columnas** y
+**46 fichas de consumo**.
+
+**El defecto:** `mart.fact_seguimiento_mensual` no cumplía su clave —8.778
+combinaciones duplicadas— porque 22 obras tienen dos fases que Sigrid archiva
+con el mismo año y mes. Efecto en dinero: `importe_origen` **doblado** en 7
+obras, **30,4 M€** que Power BI y el MCP publicaban como buenos.
+
+**La decisión de Negocio, del humano:** «el mes no se parte en 2, se coge el
+cierre más moderno de ese mes», y en el acumulado se ignora el primero. Más el
+matiz de PUY DU FOU: se descarta un cierre con acumulado **cero** cuando hay
+otro del mismo mes con acumulado positivo (sin él, esa obra pasaría de publicar
+18,24 M€ correctos a publicar cero).
+
+**El mecanismo:** descartar **y renumerar**, en `sql/stg/08_plan_mensual.sql`.
+No basta con borrar la fila: `importe_mes` se calcula como diferencia con el
+`LAG` **consecutivo**, así que sin renumerar el movimiento de feb-2018 en la
+0499 pasaría de 975.249,98 a 5.688.073,92.
+
+**La prueba, ya pasada** (T16, sin escribir una fila): «cambian exactamente las
+obras previstas y solo en lo previsto; el resto, ni un céntimo», **−30.424.662,34
+€** en las 9 obras esperadas y **0 cambios en los ámbitos master**.
+
+### Lo que esta feature enseñó, y conviene no perder
+
+1. **Un test puede pasar en verde afirmando lo contrario de la realidad.** El
+   fixture de la 0246 tenía los dos importes intercambiados y el test
+   `el_moderno_gana_aunque_su_acumulado_sea_menor` no lo notaba, porque la regla
+   decide por número de fase. Lo destapó perseguir una brecha de **1.219 €** que
+   se podría haber dado por redondeo. Se reescribió sobre la 0545.
+2. **Un guardián puede mentir justo donde hay que mirar** (H2 de la review):
+   `check-cierres` clasificaba como hueco de origen los huecos que crea esta
+   misma feature, y habría devuelto «0 series rotas» **sin mirar ninguna de las
+   9 obras**. El arreglo observa el descarte como **hecho**, no repitiendo la
+   regla: si la repitiera, un fallo del build y uno de la comprobación se
+   cancelarían.
+3. **Dos afirmaciones del líder resultaron falsas y las cazó el reviewer**: la
+   causa del único `importe_mes` que se mueve (un tramo negativo **telescopa**;
+   la causa real es una partida ausente de la fase 5), y los «0 cambios en los
+   ámbitos master», que son **tautológicos** porque la herramienta copia esas
+   filas. La garantía real es que la rama master es byte a byte la misma.
+
 ## F-047 · CERRADA el 2026-08-28 (absorbió F-044)
 
 Aprobada por el reviewer en la 3ª pasada y desplegada el mismo día. La causa
