@@ -25,7 +25,7 @@ completas de tablas de varios GB. Un agente no escribe en producción.
 
 ## Bloque C · El guardián `check-cobertura`
 
-- [ ] T7: Escribir `tests/test_f052_cobertura.py` contra un cliente Postgres falso, con un caso conforme, uno de obra invisible, uno de filas huérfanas y uno cubierto por excepción declarada | Verificación: `pytest tests/test_f052_cobertura.py` **falla** (fase RED)
+- [x] T7: Escribir `tests/test_f052_cobertura.py` contra un cliente Postgres falso, con un caso conforme, uno de obra invisible, uno de filas huérfanas y uno cubierto por excepción declarada | Verificación: `pytest tests/test_f052_cobertura.py` **falla** (fase RED)
 - [ ] T8: Crear `etl_sigrid/domain/cobertura.py` con `FilaCobertura`, `Excepcion` y `veredicto()`, que devuelve las dos listas completas y código distinto de 0 si algo cae fuera de lo declarado | Verificación: `pytest tests/test_f052_cobertura.py` en verde (R14, R15, R16)
 - [ ] T9: Crear `etl_sigrid/infrastructure/postgres/cobertura_sql.py`, que **solo construye texto** con su `SET LOCAL statement_timeout` y no abre conexión, al estilo de `unicidad_sql.py` | Verificación: `pytest tests/test_f052_cobertura.py` (R18, R19)
 - [ ] T10: Crear `config/cobertura_excepciones.yaml` con las excepciones aceptadas de hoy: las 12 partidas en ciclo, las 15 obras `OBRA PRUEBA`/`POSTVENTA`/`VAR` y las tres obras que dependen de F-053 (0517, 0252, 0720), cada una con motivo y feature que la cierra | Verificación: `pytest tests/test_f052_cobertura.py` (R16)
