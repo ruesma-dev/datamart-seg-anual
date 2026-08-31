@@ -24,6 +24,16 @@ objetos:
       planificado, mes a mes, para cada partida de cada obra, en las cuatro
       combinaciones de coste/venta y real/planificado. Es la tabla a la que hay
       que ir para cualquier pregunta de planificacion o de produccion mensual.
+
+      **AVISO · LAS CIFRAS DE LA OBRA 0599 CAMBIAN A PARTIR DE LA
+      RECONSTRUCCION DEL 2026-08-31 (F-052).** Si un informe o una captura
+      anterior a esa fecha no cuadra con lo que hay aqui, no es un error: es
+      esto. La 0599 TANATORIO MAJADAHONDA publicaba solo 117 de sus 1.443
+      partidas -un capitulo con el codigo en blanco cortaba el arbol de
+      `stg.partidas`- y con ellas 1.369.592,67 EUR de coste y CERO filas en los
+      ambitos 7 y 11. Tras la reconstruccion entran ~183.756 filas nuevas,
+      aparecen las combinaciones 0599 x ambito 7 y 0599 x ambito 11, y el margen
+      de la obra pasa del **66,3 % al 1,8 %**. Ninguna otra obra cambia.
     grano: >-
       Una fila por (`obra_id`, `partida_id`, `anio_mes`, `escenario`). La clave
       identifica una fila: se puede unir por ella sin fan-out y `count(*)`
@@ -290,6 +300,16 @@ objetos:
       categoria de coste (CD, CI, CP, OTRO), sin bajar a partida. Existe para no
       tener que agregar millones de filas en cada consulta de KPI; NO sustituye a
       la tabla de detalle, la complementa.
+
+      **AVISO · LAS CIFRAS DE LA OBRA 0599 CAMBIAN A PARTIR DE LA
+      RECONSTRUCCION DEL 2026-08-31 (F-052).** Si un informe o una captura
+      anterior a esa fecha no cuadra con lo que hay aqui, no es un error: es
+      esto. La 0599 TANATORIO MAJADAHONDA publicaba solo 117 de sus 1.443
+      partidas -un capitulo con el codigo en blanco cortaba el arbol de
+      `stg.partidas`- y con ellas 1.369.592,67 EUR de coste y CERO filas en los
+      ambitos 7 y 11. Tras la reconstruccion entran ~183.756 filas nuevas,
+      aparecen las combinaciones 0599 x ambito 7 y 0599 x ambito 11, y el margen
+      de la obra pasa del **66,3 % al 1,8 %**. Ninguna otra obra cambia.
     grano: >-
       Una fila por (`obra_id`, `anio_mes`, `categoria`, `escenario`), que es su
       clave de negocio. Es la suma de todas las partidas de esa obra y mes que

@@ -32,6 +32,17 @@ objetos:
       de coste. Es la tabla base; para consultarla con los gastos totales, el
       beneficio y los porcentajes ya calculados se va a
       `cierre.v_pbi_cierre_resumen`.
+
+      **AVISO · LAS CIFRAS DE LA OBRA 0599 CAMBIAN A PARTIR DE LA
+      RECONSTRUCCION DEL 2026-08-31 (F-052).** Si un informe o una captura
+      anterior a esa fecha no cuadra con lo que hay aqui, no es un error: es
+      esto. La 0599 TANATORIO MAJADAHONDA publicaba **DIRECTOS = 0,00 EUR** en
+      sus 28 meses -un capitulo con el codigo en blanco cortaba el arbol de
+      `stg.partidas` y 1.323 partidas nunca heredaban la categoria CD- mientras
+      publicaba 4.066.989,23 EUR de VENTA. Tras la reconstruccion DIRECTOS pasa
+      a ~2,62 M EUR y el margen de la obra, del **66,3 % al 1,8 %**. Arrastra a
+      `v_pbi_cierre_resumen`, `v_pbi_cierre_cabecera` y `v_pbi_planif_vs_real`.
+      Ninguna otra obra cambia.
     grano: >-
       Una fila por (`obra_id`, `anio_mes`, `concepto`), que es su clave de
       negocio, con cuatro conceptos base: VENTA, INDIRECTOS, DIRECTOS y
