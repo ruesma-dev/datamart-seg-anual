@@ -77,15 +77,24 @@ def _auto_bucles() -> list[Nodo]:
     ]
 
 
+#: Cuántos nodos aporta el bucle mutuo de la 0565 al censo de ciclos. Los
+#: **12** del informe salen de estos diez más los dos auto-bucles.
+NODOS_EN_BUCLE_0565 = 10
+
+
 def _bucle_mutuo_0565() -> list[Nodo]:
-    """279988 ↔ 279997, que arrastra nueve hermanos colgando de la pareja."""
+    """279988 ↔ 279997, con los hermanos que cuelgan de la pareja.
+
+    Diez nodos: la pareja en bucle y ocho más que cuelgan de ella y que, por
+    tanto, tampoco llegan a ninguna raíz.
+    """
     nodos = [
         Nodo(ide=279988, padide=279997, cod="20.12", obra_id=OBRA_0565),
         Nodo(ide=279997, padide=279988, cod="20.12.09", obra_id=OBRA_0565),
     ]
     nodos += [
         Nodo(ide=280000 + i, padide=279988, cod=f"20.12.{i:02d}", obra_id=OBRA_0565)
-        for i in range(1, 10)
+        for i in range(1, NODOS_EN_BUCLE_0565 - 1)
     ]
     return nodos
 
@@ -213,14 +222,17 @@ def test_f052_r5_un_auto_bucle_no_cuelga_el_recorrido_y_queda_denunciado():
     assert 375474 in arbol.en_ciclo
 
 
-def test_f052_r5_el_bucle_mutuo_de_la_0565_arrastra_a_sus_nueve_hermanos():
-    """279988 ↔ 279997 y los nueve que cuelgan de ellos: once nodos que no son
-    alcanzables desde ninguna raíz y que hoy se pierden en silencio."""
+def test_f052_r5_el_bucle_mutuo_de_la_0565_arrastra_a_sus_hermanos():
+    """279988 ↔ 279997 y los que cuelgan de ellos.
+
+    No son alcanzables desde ninguna raíz —su camino hacia arriba no termina
+    nunca— y hoy se pierden en silencio. El corta-ciclos los denuncia.
+    """
     arbol = _arbol_completo()
 
     en_ciclo = set(arbol.en_ciclo)
     assert {279988, 279997} <= en_ciclo
-    for i in range(1, 10):
+    for i in range(1, NODOS_EN_BUCLE_0565 - 1):
         assert 280000 + i in en_ciclo, (
             f"el hermano {280000 + i} cuelga del bucle y también se pierde"
         )
@@ -231,6 +243,7 @@ def test_f052_r5_los_doce_nodos_en_ciclo_son_los_medidos():
     arbol = _arbol_completo()
 
     assert len(arbol.en_ciclo) == 12
+    assert len(arbol.en_ciclo) == NODOS_EN_BUCLE_0565 + len(_auto_bucles())
 
 
 def test_f052_r5_el_tope_de_profundidad_corta_una_cadena_absurda():
