@@ -22,6 +22,26 @@ opcionales:
 **Hoy la 0599 sigue publicando las cifras de siempre**: el arreglo está escrito y
 probado, no reconstruido.
 
+### El riesgo (a) del informe queda ELIMINADO: el motor ya vio el SQL
+
+El implementer dejó dicho que el `WITH RECURSIVE` con `visitados` estaba probado
+en dominio y sobre el texto, **pero no contra Postgres** — porque yo le pasé
+información desactualizada: la conexión se había restablecido antes de lanzarlo.
+Validado por el líder el 2026-09-01 tomando el CTE **literal** del fichero, sin
+`TRUNCATE` ni `INSERT`, como `SELECT` de agregados en solo lectura:
+
+| Comprobación | Resultado |
+|---|---|
+| El recursivo se ejecuta y **no se cuelga** | 390.508 nodos, **390.501 publicables** — R7 al nodo |
+| La 0599 (R8) | **1.440 partidas**, de ellas **1.326 CD** (hoy son 3) |
+| Invariante R4 (`cardinality(ruta) = nivel + 1`) | **0 filas lo rompen** |
+| R3 (todo `capitulo_padre_id` apunta a fila publicada) | **0 padres colgados** |
+| Tope de 40 del corta-ciclos | **0 nodos** por encima de 39: no trunca nada |
+
+Sigue vivo el riesgo (b): la alerta solo está probada como texto, **no hay correo
+recibido**. Y R11 sigue sin ejecutarse: esto valida el árbol, no el dinero
+publicado.
+
 ## F-052 · spec aprobada — las 7 decisiones cerradas por el humano
 
 `specs/F-052-partidas-huerfanas/`. Rama `feature/F-052-partidas-huerfanas`.
