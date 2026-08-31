@@ -407,7 +407,7 @@ def build_mart(sin_puerta: bool) -> None:
     """
     Materializa mart.fact_seguimiento_mensual desde stg.plan_mensual.
 
-    Produce una fila por (obra × partida × mes × escenario), con cuatro
+    Produce una fila por (obra x partida x mes x escenario), con cuatro
     escenarios: Coste Real, Venta Real, Coste Planificado, Venta Planificada.
 
     Para los escenarios planificados, escoge automáticamente la versión del
@@ -3553,14 +3553,14 @@ def inspect_indirectos_detalle(
     anio_mes: str | None, variante: str, todas: bool,
 ) -> None:
     """
-    Muestra el desglose de INDIRECTOS por (grupo CI × subcategoría).
+    Muestra el desglose de INDIRECTOS por (grupo CI x subcategoría).
 
     Cuatro variantes de periodificación (Tanda 4.2), solo para INFRAESTRUCTURA:
 
     \b
-      prod         = fase0 × (venta_origen / venta_final)
+      prod         = fase0 x (venta_origen / venta_final)
       prod_inc     = igual pero solo desde el primer mes con incurrido
-      lineal       = fase0 × (mes_actual / plazo_total)    [sin cap al 100%]
+      lineal       = fase0 x (mes_actual / plazo_total)    [sin cap al 100%]
       lineal_inc   = lineal pero solo desde el primer mes con incurrido
 
     El PARCIAL de cada variante = origen_periodif[M] − ejecutado_origen[M−1]
@@ -3646,9 +3646,9 @@ def inspect_indirectos_detalle(
         "lineal_inc": ("LINEAL INC", 20, 21, None),
     }
     VAR_DESC = {
-        "prod":       "fase0 × (venta_origen / venta_final)",
+        "prod":       "fase0 x (venta_origen / venta_final)",
         "prod_inc":   "PROD pero solo desde el primer mes con incurrido",
-        "lineal":     "fase0 × (mes_actual / plazo_total)  [sin cap al 100%]",
+        "lineal":     "fase0 x (mes_actual / plazo_total)  [sin cap al 100%]",
         "lineal_inc": "LINEAL pero solo desde el primer mes con incurrido",
     }
 
@@ -3798,9 +3798,9 @@ def inspect_indirectos_detalle(
     click.echo("Notas:")
     click.echo("  - EJEC = incurrido real (leído de plan_mensual amb=3).")
     if todas:
-        click.echo("  - PROD   = fase0 × (venta_origen / venta_final).")
+        click.echo("  - PROD   = fase0 x (venta_origen / venta_final).")
         click.echo("  - P_INC  = PROD pero solo desde el primer mes con incurrido.")
-        click.echo("  - LIN    = fase0 × (mes_actual / plazo_total)  [sin cap].")
+        click.echo("  - LIN    = fase0 x (mes_actual / plazo_total)  [sin cap].")
         click.echo("  - L_INC  = LIN pero solo desde el primer mes con incurrido.")
     else:
         click.echo(f"  - {VAR_INFO[variante][0]:<10} = {VAR_DESC[variante]}")
@@ -4143,7 +4143,7 @@ def inspect_planif_vs_real(
     click.echo("  - PRODUCCIÓN = VENTA (mart). TOTAL COSTES = CD + CI + CP.")
     click.echo("  - BENEFICIO = PRODUCCIÓN − TOTAL COSTES.")
     click.echo("  - DIFERENCIA = Real − Planificado.")
-    click.echo("  - DESVIACIÓN % = Diferencia / Planificado × 100.")
+    click.echo("  - DESVIACIÓN % = Diferencia / Planificado x 100.")
     click.echo("")
 
 

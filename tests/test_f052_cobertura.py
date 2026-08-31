@@ -209,7 +209,7 @@ def test_f052_r16_una_excepcion_acotada_a_un_ambito_no_cubre_los_demas():
 
 def test_f052_r16_una_excepcion_sin_identidad_se_rechaza_al_construirse():
     """Una excepción que no dice a quién cubre las cubriría a todas."""
-    with pytest.raises(ValueError, match="codigo_obra|patron_nombre"):
+    with pytest.raises(ValueError, match=r"codigo_obra|patron_nombre"):
         Excepcion(tipo=TIPO_OBRA_INVISIBLE, motivo="ninguna identidad")
 
 
@@ -541,7 +541,7 @@ def test_f052_r16_una_excepcion_sin_motivo_se_rechaza_al_construirse():
 def test_f052_r16_una_excepcion_con_las_DOS_identidades_se_rechaza():  # noqa: N802
     """Con código Y patrón no se sabe cuál manda, y una excepción ambigua tapa
     más de lo que alguien creyó declarar."""
-    with pytest.raises(ValueError, match="codigo_obra|patron_nombre"):
+    with pytest.raises(ValueError, match=r"codigo_obra|patron_nombre"):
         Excepcion(
             tipo=TIPO_OBRA_INVISIBLE,
             codigo_obra="0599",

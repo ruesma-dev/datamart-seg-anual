@@ -26,14 +26,14 @@ verde**.
 
 ## Huella 4 · cierre
 
-`cierre.fact_cierre_mensual` por obra × mes × concepto, con las cuatro métricas
+`cierre.fact_cierre_mensual` por obra x mes x concepto, con las cuatro métricas
 que Negocio mira. Es la capa que esta feature mueve entera en la 0599: DIRECTOS
 pasa de 0,00 € a ~2,62 M €.
 
 ## Las dos, de una pasada
 
 Ninguna necesita tramos: la 3 devuelve una fila por obra (del orden de 700) y la
-4, una por obra × mes × concepto (unas decenas de miles). No hay ventanas, así
+4, una por obra x mes x concepto (unas decenas de miles). No hay ventanas, así
 que no derraman a los temporales del disco compartido, que es lo que obligaba a
 trocear la huella de `stg`.
 """
@@ -106,7 +106,7 @@ def sql_huella_dimension() -> str:
 
 
 def sql_huella_cierre() -> str:
-    """El cierre por obra × mes × concepto (huella 4)."""
+    """El cierre por obra x mes x concepto (huella 4)."""
     return (
         "SELECT f.obra_id,\n"
         "       COALESCE(MAX(f.codigo_obra), '') AS codigo_obra,\n"

@@ -16,7 +16,7 @@ pasó de dos huellas a **cuatro**, y estas son las dos nuevas:
   nivel, otra ruta. Para las huellas de dinero eso es invisible, y sin embargo
   sale distinto en Power BI, porque el «Árbol Presupuesto» se dibuja con
   `ruta_capitulos` y `nivel`.
-* **Huella 4 · cierre** — `cierre.fact_cierre_mensual` por obra × mes ×
+* **Huella 4 · cierre** — `cierre.fact_cierre_mensual` por obra x mes x
   concepto. Es la capa que **Negocio ve**, y la que esta feature mueve entera en
   la 0599: DIRECTOS pasa de 0,00 € a ~2,62 M €.
 

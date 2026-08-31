@@ -346,7 +346,7 @@ def test_f052_t28_un_csv_sin_ni_cabecera_se_rechaza(tmp_path):
         leer_csv_ampliada(destino)
 
 
-def test_f052_t28_un_nulo_de_la_base_se_escribe_como_vacio_y_no_como_None(tmp_path):
+def test_f052_t28_un_nulo_de_la_base_se_escribe_como_vacio(tmp_path):
     """`None` convertido con `str()` daría la cadena 'None' en el CSV, que en
     una comparación de texto es un valor más y en Excel es basura."""
     from datetime import datetime

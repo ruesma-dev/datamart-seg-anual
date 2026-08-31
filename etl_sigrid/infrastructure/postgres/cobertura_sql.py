@@ -155,7 +155,7 @@ def consultas_de_cobertura(
 def filas_de_cobertura(
     huerfanas: Sequence[Sequence], invisibles: Sequence[Sequence]
 ) -> tuple[FilaCobertura, ...]:
-    """Funde los dos resultados en una fila por (obra × ámbito).
+    """Funde los dos resultados en una fila por (obra x ámbito).
 
     Las dos mitades van juntas porque una obra puede ser invisible **y** tener
     huérfanas —la 0599 lo es en los dos sentidos— y separarlas obligaría a quien

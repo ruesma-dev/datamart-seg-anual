@@ -67,7 +67,7 @@ TIPOS = (TIPO_OBRA_INVISIBLE, TIPO_FILAS_HUERFANAS, TIPO_AMBAS)
 
 @dataclass(frozen=True, slots=True)
 class FilaCobertura:
-    """Una combinación (obra × ámbito) con lo que se sabe de ella.
+    """Una combinación (obra x ámbito) con lo que se sabe de ella.
 
     `codigo_obra` y `nombre_obra` pueden venir de `stg.obras` o, cuando la obra
     **no tiene ficha allí**, de `raw`. Sin eso la denuncia diría «obra 2824201» y
@@ -160,7 +160,7 @@ class Veredicto:
     obras_invisibles: tuple[FilaCobertura, ...]
     filas_huerfanas: tuple[FilaCobertura, ...]
     cubiertas: tuple[FilaCobertura, ...]
-    #: Cuántas combinaciones (obra × ámbito) se han mirado. Un veredicto verde
+    #: Cuántas combinaciones (obra x ámbito) se han mirado. Un veredicto verde
     #: sobre cero filas no es un verde: es que no se ha comprobado nada.
     filas_miradas: int
 
@@ -202,7 +202,7 @@ def veredicto(
     """Clasifica cada fila en hallazgo o descarte declarado.
 
     **Qué demuestra un verde y qué no.** Demuestra que hoy no hay ninguna
-    combinación (obra × ámbito) que entre en `stg` y no salga en `mart` fuera de
+    combinación (obra x ámbito) que entre en `stg` y no salga en `mart` fuera de
     lo declarado. No demuestra que las cifras publicadas sean correctas: para eso
     están `check-cierres` y la comparación de huellas.
     """
