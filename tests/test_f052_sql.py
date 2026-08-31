@@ -235,7 +235,7 @@ def test_f052_la_cabecera_ya_no_dice_que_el_filtro_descarta_al_descender():
     cabecera = _sql()[: _sql().index("TRUNCATE TABLE stg.partidas")]
 
     assert "descarta filas estructurales sin código" not in cabecera
-    assert "que se publica" in cabecera, (
+    assert "qué se publica" in cabecera.lower(), (
         "la cabecera no explica que el filtro decide qué se publica y no por "
         "dónde se desciende"
     )
