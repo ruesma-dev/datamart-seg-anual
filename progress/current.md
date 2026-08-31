@@ -1,5 +1,46 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-08-30
+# Estado actual · 2026-08-31
+
+## F-052 · spec escrita, esperando aprobación del humano
+
+`specs/F-052-partidas-huerfanas/` (requirements 150/150, design 200/250,
+tasks 23 tareas + 10 pasos de cierre manuales). Rama
+`feature/F-052-partidas-huerfanas`. La feature sigue **`pending`** en
+`harness/features.json`: el cambio a `spec_ready` lo hace el líder.
+
+Línea base: `progress/explore_F-052.md`. **La causa quedó identificada y la
+hipótesis previa desmentida**: la cadena de `padide` de la 0599 **sí llega a la
+raíz `CD`**; lo que corta es el filtro `AND h.cod <> ''` de
+`sql/stg/04_partidas.sql:78`, que impide **descender a través de** tres capítulos
+intermedios con código vacío y amputa 1.323 partidas. Las otras 12 son ciclos.
+
+El diseño propone que ese filtro decida **qué se publica y no por dónde se
+desciende**, colapsando el nodo sin código (sus hijos cuelgan del ancestro
+publicado, la ruta no gana segmento vacío), con corta-ciclos por lista de
+visitados; más un guardián nuevo de solo lectura, `check-cobertura`, que
+contrasta `stg` contra `mart` por obra × ámbito y hace fallar la nocturna.
+
+### Lo que el humano tiene que decidir para aprobar la spec
+
+Están enumeradas como **DA-1 a DA-7** en `design.md` §5, cada una con opciones y
+recomendación. Las tres que de verdad necesitan su palabra:
+
+- **DA-2 · el precio visible del arreglo.** Con la opción recomendada, «FASE 1 -
+  MOVIMIENTO TIERRAS Y CIMENTACIÓN» y sus dos hermanas **desaparecen del árbol
+  de Power BI** de la 0599 como agrupador. Si Negocio quiere seguir viendo las
+  fases, hay que darles un código sintético y decidirlo con ellos.
+- **DA-4 · si `check-cobertura` bloquea la nocturna** (código 1, lo recomendado)
+  o solo avisa, y si su coste —barre `stg.plan_mensual` entera sobre un Postgres
+  compartido con `albaranes` y `partes` en producción— es aceptable sobre una
+  nocturna que ya cuesta 3 h 45. T13 lo mide antes de engancharlo.
+- **DA-6 · el aviso a Negocio antes de publicar.** El margen de la 0599 pasa de
+  **66,3 % a 1,8 %** y su venta de 0 € a 4.066.989,23 €. La spec lo pone como
+  requisito bloqueante (R27): sin ese aviso no se publica.
+
+Además: **DA-7** propone fichar **F-053** (el desempate `rn = 1` de
+`stg/03_obras.sql:125`, que deja invisibles 0517, 0252 y 0720 —~10,65 M€ de coste
+y 10,94 M€ de venta— por otra causa). Está **fuera del alcance** de F-052 por
+instrucción del humano; T20 solo la ficha.
 
 ## F-042 · `done` — CERRADA, y con ella los 30,4 M€ que se publicaban de más
 
