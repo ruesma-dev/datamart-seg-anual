@@ -534,6 +534,14 @@ def run_all(full_refresh: bool) -> None:
     click.echo("")
     guardian_ok = _guardian_de_lo_declarado(pg)
 
+    # F-052, EL OTRO GUARDIAN. Avisa y NO bloquea (DA-4): su veredicto NO entra
+    # en el codigo de salida a proposito. La contrapartida esta declarada y es
+    # cara: al terminar la noche en verde, la alerta de fallo existente no se
+    # dispara, asi que la regla de infra/96_create_alert_cobertura.ps1 es la
+    # UNICA via por la que este hallazgo llega a una persona.
+    click.echo("")
+    _guardian_de_cobertura(pg)
+
     failed = sum(1 for r in results if r.status == StepStatus.FAILED)
     if failed or not guardian_ok:
         sys.exit(1)
@@ -1103,6 +1111,158 @@ def check_cierres_cmd(obras: str | None, timeout: int, dry_run: bool) -> None:
 
     if discrepancias or rotas:
         raise SystemExit(1)
+
+
+@cli.command("check-cobertura")
+@click.option(
+    "--timeout",
+    default=300,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_cobertura_cmd(timeout: int, dry_run: bool) -> None:
+    """
+    Contrasta lo que entra en `stg` con lo que sale en `mart`, obra a obra (F-052).
+
+    Es la pregunta que no hacia nadie, y por ese hueco la obra 0599 TANATORIO
+    MAJADAHONDA llevaba desde 2022 publicando 4.066.989,23 EUR de venta y
+    0,00 EUR de coste directo sin que nada chirriara. Las otras puertas miran
+    otra cosa: `check-unicidad` mira claves duplicadas, `check-cierres` mira la
+    regla de F-042 y `check-declarados` mira que exista lo que el SQL declara.
+
+    Dos preguntas:
+
+    
+      * OBRA INVISIBLE  filas en stg.plan_mensual para un ambito y CERO en
+                        mart.fact_seguimiento_mensual para ese mismo ambito.
+      * FILAS HUERFANAS filas de stg.plan_mensual sin ficha de partida o de
+                        obra, que los cuatro INNER JOIN del build borran hoy
+                        sin decir nada.
+
+    Los descartes que hoy son correctos se declaran en
+    `config/cobertura_excepciones.yaml`, que es un trinquete y SOLO BAJA.
+
+    LANZADO A MANO sale con codigo 1 si algo cae fuera de lo declarado, para
+    servir de puerta en una verificacion manual. DENTRO DE `run-all` avisa y NO
+    tumba el job (DA-4): registra el marcador y la nocturna termina en verde.
+
+    Solo lectura: la transaccion va READ ONLY con su statement_timeout, porque
+    esto corre contra un servidor compartido con `albaranes` y `partes` EN
+    PRODUCCION. Las dos consultas barren stg.plan_mensual entera: piensalo antes
+    de bajarle el timeout.
+    """
+    from etl_sigrid.domain.cobertura import formatear, veredicto
+    from etl_sigrid.infrastructure.cobertura_excepciones import cargar_excepciones
+    from etl_sigrid.infrastructure.postgres.cobertura_sql import (
+        consultas_de_cobertura,
+        filas_de_cobertura,
+    )
+
+    consultas = consultas_de_cobertura(timeout)
+    click.echo("Cobertura stg -> mart · SOLO LECTURA, transaccion READ ONLY")
+    click.echo(f"  statement_timeout = {timeout}s por consulta")
+    click.echo("")
+
+    if dry_run:
+        for consulta in consultas:
+            click.echo(f"-- {consulta.nombre}")
+            click.echo(consulta.sql + ";")
+            click.echo("")
+        click.echo(
+            f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion."
+        )
+        return
+
+    excepciones = cargar_excepciones()
+    pg = _get_pg()
+    por_nombre = {
+        c.nombre: pg.filas_solo_lectura(c.sql, c.timeout_s) for c in consultas
+    }
+    filas = filas_de_cobertura(
+        huerfanas=por_nombre["huerfanas"], invisibles=por_nombre["invisibles"]
+    )
+    resultado = veredicto(filas, excepciones)
+
+    click.echo(f"{len(excepciones)} excepcion(es) declarada(s) y aceptada(s).")
+    click.echo(formatear(resultado))
+
+    if resultado.codigo:
+        _emitir_marcador_de_cobertura(resultado)
+        raise SystemExit(resultado.codigo)
+
+
+def _emitir_marcador_de_cobertura(resultado) -> None:
+    """Escribe la linea que dispara la alerta, por consola Y por el log (R28).
+
+    Por las dos porque no se sabe cual de las dos mira la regla: en el job la
+    salida de `click` y la del logger acaban las dos en
+    `ContainerAppConsoleLogs_CL`, y una sola de ellas bastaria... hasta el dia
+    que alguien cambie el formato del log a `json` o al reves. El literal es uno
+    solo y vive en `domain/cobertura.py`; lo cruza tests/test_f052_marcador.py.
+    """
+    from etl_sigrid.domain.cobertura import MARCADOR_KO
+
+    click.secho(resultado.marcador, fg="red")
+    get_logger("check-cobertura").warning(
+        "cobertura_ko",
+        marcador=MARCADOR_KO,
+        obras_invisibles=resultado.obras_invisibles_distintas,
+        filas_huerfanas=resultado.total_huerfanas,
+        linea=resultado.marcador,
+    )
+
+
+def _guardian_de_cobertura(pg: PostgresClient):
+    """La cobertura al final de `run-all`. **Avisa y NO tumba el job** (DA-4).
+
+    Devuelve el `Veredicto`, o `None` si no se pudo leer. `run-all` NO mira ese
+    valor para decidir su codigo de salida, y es una decision consciente con su
+    precio declarado: al terminar la noche en verde, la alerta de fallo existente
+    (`alert-caj-datamart-seg-dev-failed`) no se dispara, asi que la regla de
+    `infra/96_create_alert_cobertura.ps1` pasa a ser la UNICA via por la que este
+    guardian se hace oir. **Si no se despliega, el guardian es mudo.**
+
+    Un fallo LEYENDO la base tampoco escala, pero se imprime: callarlo dejaria
+    una noche en verde sin haber comprobado nada.
+    """
+    from etl_sigrid.domain.cobertura import formatear, veredicto
+    from etl_sigrid.infrastructure.cobertura_excepciones import cargar_excepciones
+    from etl_sigrid.infrastructure.postgres.cobertura_sql import (
+        consultas_de_cobertura,
+        filas_de_cobertura,
+    )
+
+    try:
+        por_nombre = {
+            c.nombre: pg.filas_solo_lectura(c.sql, c.timeout_s)
+            for c in consultas_de_cobertura()
+        }
+        resultado = veredicto(
+            filas_de_cobertura(
+                huerfanas=por_nombre["huerfanas"],
+                invisibles=por_nombre["invisibles"],
+            ),
+            cargar_excepciones(),
+        )
+    except Exception as e:  # noqa: BLE001
+        click.secho(
+            f"?    no se pudo comprobar la cobertura stg -> mart: {e}. NO es un "
+            f"OK: la nocturna sigue, pero esta noche nadie ha mirado si falta "
+            f"una obra.",
+            fg="yellow", err=True,
+        )
+        return None
+
+    click.echo(formatear(resultado))
+    if resultado.codigo:
+        _emitir_marcador_de_cobertura(resultado)
+    return resultado
 
 
 @cli.command("huella-obras")

@@ -509,7 +509,8 @@ def test_f052_r17_run_all_no_cuenta_la_cobertura_para_su_codigo_de_salida():
     el código de salida y `check-cobertura` no."""
     import inspect
 
-    fuente = inspect.getsource(main.run_all)
+    # `run_all` está envuelto por click: la función de verdad es su `callback`.
+    fuente = inspect.getsource(main.run_all.callback)
 
     assert "_guardian_de_cobertura" in fuente, "el guardián no corre en la nocturna"
     assert "not guardian_ok" in fuente
