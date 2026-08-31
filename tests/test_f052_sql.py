@@ -263,3 +263,77 @@ def test_f052_el_arbol_no_escribe_fuera_de_stg_partidas():
         assert not re.search(rf"\b{palabra}\b", texto), (
             f"04_partidas.sql contiene {palabra}"
         )
+
+
+# ---------------------------------------------------------------------------
+# El `UNION ALL`, que es lo único que puede romper la nocturna a las 02:00
+# ---------------------------------------------------------------------------
+
+
+def _columnas_proyectadas(bloque: str) -> list[str]:
+    """Los nombres de las columnas de un `SELECT`, **en orden**.
+
+    Se parten por las comas de nivel cero: un `CASE WHEN … END` o un
+    `COALESCE(a, b)` llevan comas dentro y partir a lo bruto contaría columnas
+    que no existen. Una columna sin `AS` conserva el nombre de su campo, que es
+    como se comporta Postgres.
+    """
+    cuerpo = bloque[
+        bloque.index("SELECT") + len("SELECT") : bloque.index("FROM raw.obrparpar")
+    ]
+    cuerpo = re.sub(r"--[^\n]*", "", cuerpo)
+
+    piezas: list[str] = []
+    nivel = 0
+    actual = ""
+    for caracter in cuerpo:
+        if caracter == "(":
+            nivel += 1
+        elif caracter == ")":
+            nivel -= 1
+        if caracter == "," and nivel == 0:
+            piezas.append(actual)
+            actual = ""
+        else:
+            actual += caracter
+    piezas.append(actual)
+
+    nombres = []
+    for pieza in piezas:
+        pieza = " ".join(pieza.split())
+        casa = re.search(r"\bAS\s+([a-z_]+)$", pieza, re.I)
+        nombres.append(casa.group(1) if casa else pieza.split(".")[-1])
+    return nombres
+
+
+def test_f052_las_dos_ramas_del_recursivo_proyectan_lo_mismo_y_en_el_mismo_orden():
+    """Postgres rechaza un `UNION ALL` cuyas ramas no casen en número de
+    columnas, y **acepta** uno cuyas columnas casen en número pero no en
+    significado.
+
+    Lo primero rompe el build; lo segundo es peor, porque no rompe nada: llena
+    `stg.partidas` con la ruta en la columna del nivel y nadie se entera. Esta
+    feature añade **cuatro** columnas a las dos ramas de un CTE de 14, y es
+    exactamente el cambio en el que ese error se comete. No se puede ejecutar el
+    SQL desde aquí —escribe en un Postgres compartido en producción—, así que
+    esto es lo más cerca que se llega sin la base.
+    """
+    de_la_raiz = _columnas_proyectadas(_rama_raiz())
+    de_la_recursiva = _columnas_proyectadas(_rama_recursiva())
+
+    assert len(de_la_raiz) == len(de_la_recursiva), (
+        f"las ramas proyectan {len(de_la_raiz)} y {len(de_la_recursiva)} "
+        f"columnas: el UNION ALL no compila.\n"
+        f"  raiz:      {de_la_raiz}\n"
+        f"  recursiva: {de_la_recursiva}"
+    )
+    assert de_la_raiz == de_la_recursiva, (
+        f"las ramas no proyectan lo mismo en el mismo orden, y eso llena "
+        f"stg.partidas con columnas cruzadas sin que falle nada.\n"
+        f"  raiz:      {de_la_raiz}\n"
+        f"  recursiva: {de_la_recursiva}"
+    )
+    # Y son las catorce que el INSERT y el colapso necesitan.
+    assert len(de_la_raiz) == 14
+    for nueva in ("publicable", "padre_publicado_id", "visitados", "nivel_bruto"):
+        assert nueva in de_la_raiz
