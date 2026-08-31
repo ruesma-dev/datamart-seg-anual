@@ -442,3 +442,52 @@ def test_f052_por_id_devuelve_none_cuando_la_partida_no_se_publica():
 
     assert arbol.por_id(280400) is not None
     assert arbol.por_id(280353) is None, "280353 tiene cod='' y no se publica"
+
+
+def test_f052_r1_un_codigo_NULO_no_se_atraviesa_y_no_se_publica():  # noqa: N802
+    """`cod IS NULL` no es lo mismo que `cod = ''`, y se trata distinto.
+
+    El vacío se atraviesa porque su descendencia tiene códigos buenos y una ruta
+    reconstruible. Un NULL nunca formó parte de una ruta —no hay nada que
+    concatenar— y descender por él obligaría a inventarse el segmento. Sigue
+    fuera, y su descendencia con él, denunciada como inalcanzable.
+    """
+    nodos = [
+        Nodo(ide=1, padide=0, cod="CD", obra_id=5),
+        Nodo(ide=2, padide=1, cod=None, obra_id=5),
+        Nodo(ide=3, padide=2, cod="01", obra_id=5),
+    ]
+
+    arbol = construir_arbol(nodos)
+
+    assert [p.partida_id for p in arbol.publicadas] == [1]
+    assert set(arbol.inalcanzables) == {2, 3}
+    assert arbol.descartadas_sin_codigo == ()
+
+
+def test_f052_r5_un_ciclo_ALCANZABLE_desde_la_raiz_no_cuelga_el_recorrido():  # noqa: N802
+    """**El caso que de verdad colgaría la nocturna.**
+
+    Los 12 ciclos medidos hoy no son alcanzables desde ninguna raíz, así que el
+    `WITH RECURSIVE` nunca entra en ellos. Pero nada garantiza que mañana no
+    aparezca uno colgando de un capítulo bueno, y entonces el array de visitados
+    es lo único que separa un build de 3 h 45 de un build infinito.
+    """
+    nodos = [
+        Nodo(ide=1, padide=0, cod="CD", obra_id=5),
+        Nodo(ide=2, padide=1, cod="01", obra_id=5),
+        Nodo(ide=3, padide=2, cod="01.01", obra_id=5),
+        # ...y 2 vuelve a colgar de 3: 2 -> 3 -> 2 -> 3 -> ...
+        Nodo(ide=4, padide=3, cod="01.01.01", obra_id=5),
+        Nodo(ide=2_000, padide=4, cod="01.01.01.01", obra_id=5),
+    ]
+    # El bucle se cierra a mano: el hijo 3 tiene un hijo que ya está visitado.
+    nodos.append(Nodo(ide=2, padide=2_000, cod="01", obra_id=5))
+
+    arbol = construir_arbol(nodos)
+
+    publicadas = [p.partida_id for p in arbol.publicadas]
+    assert len(publicadas) == len(set(publicadas)), (
+        "una partida se ha publicado dos veces: el recorrido dio la vuelta"
+    )
+    assert 1 in publicadas

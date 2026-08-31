@@ -95,10 +95,6 @@ class FilaCobertura:
     def tiene_huerfanas(self) -> bool:
         return self.huerfanas > 0
 
-    @property
-    def clave(self) -> tuple[int, int]:
-        return (self.obra_id, self.ambito_id)
-
     def como_texto(self) -> str:
         nombre = f" {self.nombre_obra}" if self.nombre_obra else ""
         codigo = self.codigo_obra or "sin codigo"

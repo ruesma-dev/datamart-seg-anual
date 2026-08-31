@@ -529,3 +529,39 @@ def test_f052_un_fallo_leyendo_la_base_no_se_traga_dentro_de_run_all():
             raise RuntimeError("la base no responde")
 
     assert main._guardian_de_cobertura(PgQueFalla()) is None
+
+
+def test_f052_r16_una_excepcion_sin_motivo_se_rechaza_al_construirse():
+    """Una excepción sin porqué se convierte en permanente a la primera: dentro
+    de seis meses nadie sabrá si sigue haciendo falta."""
+    with pytest.raises(ValueError, match="motivo"):
+        Excepcion(tipo=TIPO_OBRA_INVISIBLE, codigo_obra="0599", motivo="   ")
+
+
+def test_f052_r16_una_excepcion_con_las_DOS_identidades_se_rechaza():  # noqa: N802
+    """Con código Y patrón no se sabe cuál manda, y una excepción ambigua tapa
+    más de lo que alguien creyó declarar."""
+    with pytest.raises(ValueError, match="codigo_obra|patron_nombre"):
+        Excepcion(
+            tipo=TIPO_OBRA_INVISIBLE,
+            codigo_obra="0599",
+            patron_nombre="TANATORIO",
+            motivo="las dos cosas",
+        )
+
+
+def test_f052_r16_una_clave_que_nadie_lee_rompe_la_carga(tmp_path):
+    """`motivos:` en vez de `motivo:` dejaría la excepción sin porqué y
+    `yaml.safe_load` no diría nada. Falla al arrancar el comando, que es cuando
+    hay alguien mirando."""
+    fichero = tmp_path / "excepciones.yaml"
+    fichero.write_text(
+        "excepciones:\n"
+        "  - codigo_obra: '0599'\n"
+        "    tipo: obra_invisible\n"
+        "    motivos: se escribio en plural\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="claves que nadie lee"):
+        cargar_excepciones(fichero)

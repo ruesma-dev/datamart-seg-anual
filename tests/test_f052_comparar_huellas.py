@@ -241,3 +241,17 @@ def test_f052_t30_la_comparacion_vieja_de_f042_sigue_funcionando(tmp_path):
 
     assert resultado.exit_code == 0, resultado.output
     assert "Ambitos master 8 y 11" in resultado.output
+
+
+def test_f052_t30_una_huella_vacia_avisa_en_vez_de_pasar_por_buena(cli, tmp_path):
+    """Un CSV vacío comparado con otro vacío da cero diferencias, y eso NO puede
+    leerse como que nada cambió. El comando lo dice al escribirlo, que es cuando
+    todavía se puede repetir la captura."""
+    destino = tmp_path / "vacia.csv"
+
+    resultado = cli(PgFalso([])).invoke(
+        main.cli, ["huella-obras", "--desde", "dimension", "--out", str(destino)]
+    )
+
+    assert resultado.exit_code == 0
+    assert "VACIA" in resultado.output

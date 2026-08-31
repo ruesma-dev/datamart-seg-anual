@@ -298,3 +298,67 @@ def test_f052_r11_el_informe_lleva_la_lista_entera_y_no_una_muestra():
 
     for i in range(1, 31):
         assert f"07{i:02d}" in informe
+
+
+def test_f052_t28_un_formato_con_una_clave_fuera_de_su_cabecera_se_rechaza():
+    """La clave se lee de la cabecera: si nombra una columna que no existe, la
+    huella se partiría al leer el primer CSV, y en mitad de una verificación
+    manual de 3 h 45."""
+    from etl_sigrid.domain.huella_ampliada import FormatoHuella
+
+    with pytest.raises(ValueError, match="clave"):
+        FormatoHuella(
+            nombre="roto",
+            cabecera=("obra_id", "codigo_obra"),
+            columnas_clave=("no_existe",),
+            proposito="x",
+        )
+
+
+def test_f052_t28_un_formato_sin_codigo_obra_se_rechaza():
+    """Sin `codigo_obra` no se puede decidir si la obra que se movió estaba en
+    `--obras-esperadas`, que es TODO el criterio de R11."""
+    from etl_sigrid.domain.huella_ampliada import FormatoHuella
+
+    with pytest.raises(ValueError, match="codigo_obra"):
+        FormatoHuella(
+            nombre="roto",
+            cabecera=("obra_id", "resumen"),
+            columnas_clave=("obra_id",),
+            proposito="x",
+        )
+
+
+def test_f052_t28_una_consulta_que_devuelve_otras_columnas_se_rechaza():
+    """Si alguien toca el SQL y se deja una columna, es preferible que reviente
+    aquí a que la huella se escriba desplazada una posición."""
+    pg = PgFalso([(1442383, "0599", 1440)])
+
+    with pytest.raises(ValueError, match="columna"):
+        construir_huella_ampliada(pg, FORMATO_DIMENSION)
+
+
+def test_f052_t28_un_csv_sin_ni_cabecera_se_rechaza(tmp_path):
+    destino = tmp_path / "vacio.csv"
+    destino.write_text("", encoding="utf-8-sig")
+
+    with pytest.raises(ValueError, match="vacio"):
+        leer_csv_ampliada(destino)
+
+
+def test_f052_t28_un_nulo_de_la_base_se_escribe_como_vacio_y_no_como_None(tmp_path):
+    """`None` convertido con `str()` daría la cadena 'None' en el CSV, que en
+    una comparación de texto es un valor más y en Excel es basura."""
+    from datetime import datetime
+
+    filas = construir_huella_ampliada(
+        PgFalso([(1442383, None, 1440, 3, 7, "aaa")]), FORMATO_DIMENSION
+    )
+
+    assert filas[0].codigo_obra == ""
+    assert "None" not in str(filas[0].valores)
+
+    # Y un `timestamp` se escribe como su fecha, no con la hora pegada.
+    from etl_sigrid.infrastructure.postgres.huella_ampliada import _texto
+
+    assert _texto(datetime(2022, 12, 1, 3, 45)) == "2022-12-01"
