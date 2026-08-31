@@ -1,0 +1,134 @@
+# config/cobertura_excepciones.yaml
+#
+# Los descartes que HOY son aceptables para `python main.py check-cobertura`
+# (F-052, R16), el guardian que contrasta lo que entra en `stg` con lo que sale
+# en `mart` obra a obra.
+#
+# POR QUE EXISTE. Sin excepciones el guardian sale en rojo todas las noches por
+# cosas que ya sabemos y que no dependen de esta feature -las 12 partidas en
+# ciclo de raw.obrparpar, las obras administrativas que stg/03_obras.sql excluye
+# a proposito y las tres que dependen de F-053-, y un guardian que siempre esta
+# rojo no lo mira nadie. Mismo criterio y mismo patron que `pendientes` en
+# `config/objetos_pendientes.yaml`: DESCARTE CORRECTO O EXCEPCION DECLARADA.
+#
+# ES UN TRINQUETE: SOLO BAJA. La constante EXCEPCIONES_MAX de
+# tests/test_f052_cobertura.py vale exactamente lo que hay aqui, y bajarla es
+# parte de la tarea que cierra la causa, no un apano posterior.
+#
+# CADA ENTRADA DECLARA:
+#   tipo          obra_invisible | filas_huerfanas | ambas
+#   motivo        POR QUE se acepta. Obligatorio: una excepcion sin porque se
+#                 convierte en permanente a la primera.
+#   codigo_obra   el codigo de la obra, O BIEN
+#   patron_nombre un trozo de su nombre, para las obras que NO tienen ficha en
+#                 stg.obras y cuyo codigo, por tanto, no siempre se resuelve
+#   ambito_id     (opcional) acota la excepcion a un ambito
+#   feature       (opcional) que feature la cerrara
+#
+# NO SE DECLARA UN TOPE DE FILAS a proposito. Habria que medirlo contra la base
+# y desde el puesto no hay conexion directa (connection timeout expired contra
+# psql-albaranes-rs9k2, 2026-08-31). Un tope inventado seria peor que ninguno:
+# de mas, tapa; de menos, alarma falsa. T15 -manual, del humano- fija la linea
+# base real y ahi se podra afinar.
+
+excepciones:
+
+  # -------------------------------------------------------------------------
+  # 1. Las 12 partidas en ciclo de raw.obrparpar (DA-3, DA-5)
+  # -------------------------------------------------------------------------
+  # No son alcanzables desde ninguna raiz -su cadena de padide da vueltas- asi
+  # que no llegan a stg.partidas y sus filas de plan_mensual quedan huerfanas.
+  # Es dato mal metido en Sigrid, y se avisa a quien lo administra (R26); el ETL
+  # no espera al saneamiento. Prioridad real solo la 0686, que sigue viva.
+
+  - codigo_obra: "0565"
+    tipo: filas_huerfanas
+    motivo: >-
+      Bucle mutuo en raw.obrparpar entre los ide 279988 (20.12) y 279997
+      (20.12.09), que arrastra a los hermanos que cuelgan de la pareja: diez de
+      las doce partidas en ciclo. Obra terminada en 2020-12. Avisado a quien
+      administra Sigrid.
+
+  - codigo_obra: "0630"
+    tipo: filas_huerfanas
+    motivo: >-
+      Auto-bucle (padide = ide) del ide 310512 CHIMENEA IGNIFUGA. Obra terminada
+      en 2022-12. Avisado a quien administra Sigrid.
+
+  - codigo_obra: "0686"
+    tipo: filas_huerfanas
+    motivo: >-
+      Auto-bucle (padide = ide) del ide 375474 LEGALIZACION Y PUESTA EN MARCHA,
+      creado en 2024. UNICA DE LAS TRES QUE SIGUE VIVA (ultima fase 2026-07-31):
+      hoy son 86 filas a 0,00 EUR, manana pueden ser dinero. Es la unica con
+      prioridad real en el aviso a Sigrid (DA-5).
+
+  # -------------------------------------------------------------------------
+  # 2. Las obras que stg/03_obras.sql excluye A PROPOSITO
+  # -------------------------------------------------------------------------
+  # No son obras: son papeleras administrativas. La lista negra de
+  # stg/03_obras.sql:106-116 las deja fuera de stg.obras, y por eso sus filas de
+  # plan_mensual salen sin ficha de obra. El descarte es CORRECTO, medido: 15 de
+  # las 19 obras ausentes de stg.obras son de este grupo.
+  #
+  # Se identifican por NOMBRE y no por codigo porque, al no tener ficha en
+  # stg.obras, su codigo solo se puede recuperar de raw y no siempre esta.
+
+  - patron_nombre: "OBRA PRUEBA"
+    tipo: filas_huerfanas
+    motivo: >-
+      Obra de prueba, excluida a proposito de stg.obras por la lista negra de
+      stg/03_obras.sql. Descarte correcto, no un defecto.
+
+  - patron_nombre: "POSTVENTA"
+    tipo: filas_huerfanas
+    motivo: >-
+      Papelera de postventa, excluida a proposito de stg.obras (codigos POSTV y
+      POSTV2 de la lista negra de stg/03_obras.sql). Descarte correcto.
+
+  - codigo_obra: "VAR"
+    tipo: filas_huerfanas
+    motivo: >-
+      Papelera de varios, excluida a proposito de stg.obras por la lista negra
+      de stg/03_obras.sql. Descarte correcto.
+
+  # -------------------------------------------------------------------------
+  # 3. Las obras que dependen de F-053 (R24, DA-7)
+  # -------------------------------------------------------------------------
+  # OTRA CAUSA, otro fichero: el desempate `WHERE rn = 1` de
+  # stg/03_obras.sql:125 se queda con un ide y descarta el otro, y en estas
+  # obras gana la ficha vacia. Aqui solo se nombra y se declara; arreglarlo -o
+  # concluir que el comportamiento actual es correcto, que es un resultado
+  # valido- es F-053, ya fichada con prioridad 2.
+
+  - codigo_obra: "0517"
+    tipo: ambas
+    motivo: >-
+      COLEGIO SESENA II. El desempate rn=1 elige el ide 1060846 (207 filas de
+      presupuesto) y descarta el 1088657 (158.737). Cero filas en
+      mart.fact_seguimiento_mensual; 6.105.401,62 EUR de coste y 6.814.253,09 de
+      venta invisibles.
+    feature: F-053
+
+  - codigo_obra: "0252"
+    tipo: ambas
+    motivo: >-
+      C.P. PRIMO DE RIVERA. El desempate rn=1 elige el ide 587639 (22 filas) y
+      descarta el 650280 (28.511). Cero filas en el fact; 4.547.711,35 EUR de
+      coste y 4.129.990,44 de venta invisibles.
+    feature: F-053
+
+  - codigo_obra: "0720"
+    tipo: ambas
+    motivo: >-
+      PROMIRIS, obra VIVA. El desempate rn=1 elige el ide 2824201 (0 filas) y
+      descarta el 2759241 (7.317). Cero filas en el fact.
+    feature: F-053
+
+  - codigo_obra: "0606"
+    tipo: filas_huerfanas
+    motivo: >-
+      PUY DU FOU. Caso APARTE, no confundir con los tres de arriba: aqui el ide
+      ganador SI publica y el perdido arrastra 1.811.434,92 / 1.890.560,92 EUR.
+      Elegir cual es el bueno es una decision de negocio, y va en F-053.
+    feature: F-053
