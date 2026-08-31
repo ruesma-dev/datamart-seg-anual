@@ -37,7 +37,7 @@ completas de tablas de varios GB. Un agente no escribe en producción.
 Sin esto el guardián es **mudo**: al no bloquear el job, la alerta de fallo
 existente no se dispara y el hallazgo se queda en el log.
 
-- [ ] T24: Escribir `tests/test_f052_marcador.py`, que cruza el marcador `[F052-COBERTURA-KO]` emitido por el código con el que busca `infra/96_create_alert_cobertura.ps1`, al estilo de `test_f024_r19_umbral_por_defecto_coincide_con_dev_json` | Verificación: `pytest tests/test_f052_marcador.py` **falla** (fase RED)
+- [x] T24: Escribir `tests/test_f052_marcador.py`, que cruza el marcador `[F052-COBERTURA-KO]` emitido por el código con el que busca `infra/96_create_alert_cobertura.ps1`, al estilo de `test_f024_r19_umbral_por_defecto_coincide_con_dev_json` | Verificación: `pytest tests/test_f052_marcador.py` **falla** (fase RED)
 - [ ] T25: Emitir el marcador desde `check-cobertura` cuando encuentre algo fuera de lo declarado, seguido del recuento de obras invisibles y de filas huérfanas | Verificación: `pytest tests/test_f052_marcador.py tests/test_f052_cobertura.py` en verde (R28)
 - [ ] T26: Crear `infra/96_create_alert_cobertura.ps1`, hermano de `95_create_alert_frescura.ps1`: regla de consulta programada sobre `log-datamart-seg-dev` que busca el marcador y notifica a `ag-datamart-seg-dev`. **Ninguna dirección de correo en el fichero** (R30) | Verificación: `pytest tests/test_f052_marcador.py`; revisión visual; el despliegue es MANUAL
 
