@@ -41,6 +41,24 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   los descartes, nunca con `dense_rank()`— para que el `LAG` de `importe_mes`
   siga viendo el cierre inmediatamente anterior; ese orden **no se publica**, y
   `version` conserva el número de fase original, con huecos en 9 obras.
+- **UN CAPÍTULO PUEDE NO TENER CÓDIGO, Y ESO NO PUEDE CORTAR EL ÁRBOL
+  (F-052).** En `raw.obrparpar` hay capítulos cuyo `cod` es la **cadena vacía**
+  —no NULL: `length(cod) = 0`—, típicamente porque alguien montó el árbol por
+  fases de obra y dejó el código en blanco. Hasta el 2026-08-31 el recorrido de
+  `stg/04_partidas.sql` se negaba a **descender a través** de ellos y amputaba
+  el subárbol entero: tres capítulos así en la obra 0599 se llevaron por delante
+  **1.323 partidas**, 2.624.793,46 € de coste directo y el 100 % de su venta, y
+  el datamart publicó durante años un margen del 66,3 % donde el real era del
+  1,8 %. La regla es: **el código vacío decide QUÉ SE PUBLICA, no POR DÓNDE SE
+  DESCIENDE**. El capítulo en blanco se atraviesa y se colapsa —sus hijos
+  cuelgan del ancestro publicado más cercano, y ni `ruta_capitulos` ni `nivel`
+  avanzan al pasar por él—, así que se mantiene el invariante
+  `cardinality(string_to_array(ruta_capitulos, ' > ')) = nivel + 1`.
+- **Y la cadena de `padide` puede dar vueltas.** Hay 12 partidas en ciclo vivas
+  —dos auto-bucles y un bucle mutuo—, así que cualquier recorrido del árbol
+  necesita corta-ciclos: array de visitados **más** tope de profundidad. Sin él,
+  relajar el filtro de código vacío es un `WITH RECURSIVE` infinito dentro de
+  una nocturna de 3 h 45.
 - `obr.ide = con.ide` (obra hereda de concepto). El nombre legible está en
   `con.res`. `con.nom` NO existe.
 - En `raw.obrfas` el campo de fase se llama `fasnum`; en `raw.obrparpre` se
