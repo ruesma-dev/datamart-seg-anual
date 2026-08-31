@@ -67,6 +67,10 @@
   "frescuraUmbralHoras": 30,
   "frescuraAlertName": "alert-caj-datamart-seg-dev-sin-build",
 
+  "$aviso_cobertura": "F-052, DA-4. El guardian `check-cobertura` corre al final de `run-all` y AVISA SIN BLOQUEAR: la nocturna termina en verde aunque encuentre una obra que entra en stg y no sale en mart. Eso significa que la alerta de fallo (alertName, arriba) NO se dispara, asi que la regla que crea 96_create_alert_cobertura.ps1 es la UNICA via por la que el hallazgo llega a una persona: si no se despliega, el guardian es MUDO. Dispara por PRESENCIA del marcador [F052-COBERTURA-KO] en los logs del job -al reves que la de frescura, que vigila una ausencia-. `coberturaVentanaHoras` es 24 porque el guardian corre una vez por noche; 1440 minutos SI es una granularidad admitida por Azure, asi que aqui no hay que traducir nada. El marcador esta duplicado en la constante MARCADOR_KO de etl_sigrid/domain/cobertura.py y en el .ps1, y lo unico que impide que diverjan es el test test_f052_r28_el_marcador_del_ps1_es_el_MISMO_que_emite_el_codigo.",
+  "coberturaVentanaHoras": 24,
+  "coberturaAlertName": "alert-caj-datamart-seg-dev-cobertura",
+
   "tags": {
     "acens-project": "datamart-seg-anual",
     "acens-environment": "dev",

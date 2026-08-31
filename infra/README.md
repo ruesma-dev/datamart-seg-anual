@@ -107,6 +107,7 @@ repetirlos no rompe nada. Se ejecutan desde la raíz del repositorio.
 | — | `85_update_job.ps1` | Despliegue habitual: apunta el job a una imagen nueva. | Sí |
 | 10 | `90_create_alert.ps1` | Grupo de acción (reutiliza el que haya) y alerta de fallo. | Sí |
 | 11 | `95_create_alert_frescura.ps1` | Alerta de **frescura** (F-024): avisa si pasan más de `frescuraUmbralHoras` sin que el job complete un `build_mart`. Exige `az extension add --name scheduled-query` una vez por puesto. | Sí |
+| 12 | `96_create_alert_cobertura.ps1` | Alerta de **cobertura** (F-052): avisa cuando una noche publica una obra que entra en `stg` y no sale en `mart`. Dispara por **presencia** del marcador `[F052-COBERTURA-KO]`, al revés que la de frescura. **Sin desplegarla el guardián es mudo**: `check-cobertura` no tumba el job. | Sí |
 
 Entre medias hay **tres** pasos **que no son scripts** y que hace el humano:
 cargar la clave de la API en el vault (después del 6), autorizar la regla de
@@ -361,6 +362,46 @@ El umbral vive en `infra/env/dev.json` (`frescuraUmbralHoras`) y de ahí salen
 la ventana de la regla, el filtro temporal de su consulta y el valor por
 defecto de `python main.py check-frescura`. Hay tests que cruzan los tres para
 que no diverjan.
+
+## Probar la alerta de cobertura (F-052)
+
+`check-cobertura` corre al final de `run-all` y **avisa sin bloquear** (DA-4):
+la nocturna termina en verde aunque encuentre una obra que entra en `stg` y no
+sale en `mart`. Eso tiene un precio, y está declarado: **la alerta de fallo no
+se dispara**, así que la regla que crea `96_create_alert_cobertura.ps1` es la
+**única** vía por la que el hallazgo llega a una persona. **Si no se despliega,
+el guardián es mudo.**
+
+Mismo paso previo por puesto (`az extension add --name scheduled-query`).
+
+La consulta que vigila la regla, ejecutada a mano. Tras una noche limpia tiene
+que devolver **0**; la alerta salta cuando devuelve **≥ 1**, que es al revés que
+la de frescura:
+
+```powershell
+$ws = az monitor log-analytics workspace show -g <resourceGroup> -n <logAnalytics> --query customerId -o tsv
+az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '<job>' | where Log_s contains '[F052-COBERTURA-KO]' | count" -o table
+```
+
+Crear la regla (idempotente) y probarla **de extremo a extremo**, que es lo
+único que la da por verificada:
+
+```powershell
+powershell -NoProfile -File infra/96_create_alert_cobertura.ps1
+
+# 1. Añadir el buzón al grupo de acción, si no está ya (paso del humano):
+powershell -NoProfile -File infra/90_create_alert.ps1 -AlertEmail <buzon>
+
+# 2. Provocar el marcador una vez, FUERA del horario de carga, y comprobar que
+#    llega el correo «Activated». La forma limpia de provocarlo es quitar
+#    temporalmente una excepción de config/cobertura_excepciones.yaml y lanzar
+#    `python main.py check-cobertura`; hay que devolverla después.
+```
+
+El marcador vive en **dos** sitios —`MARCADOR_KO` de
+`etl_sigrid/domain/cobertura.py` y este `.ps1`— y lo único que impide que
+diverjan es `tests/test_f052_marcador.py`. Si divergieran, la regla vigilaría un
+texto que ya nadie escribe y **nadie se enteraría**.
 
 ## Diagnóstico desde el puesto cuando algo huele mal
 

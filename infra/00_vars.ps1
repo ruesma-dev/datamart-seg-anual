@@ -63,6 +63,7 @@ $clavesObligatorias = @(
     "logLevel", "logFormat",
     "alertName", "alertActionGroupName", "alertActionGroupRg",
     "frescuraAlertName", "frescuraUmbralHoras",
+    "coberturaAlertName", "coberturaVentanaHoras",
     "tags"
 )
 
