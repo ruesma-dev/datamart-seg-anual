@@ -19,7 +19,7 @@ completas de tablas de varios GB. Un agente no escribe en producción.
 
 ## Bloque B · El SQL
 
-- [ ] T4: Escribir `tests/test_f052_sql.py` afirmando sobre el texto de `sql/stg/04_partidas.sql` que la rama recursiva ya no lleva `h.cod <> ''`, que existen `publicable`, `padre_publicado_id` y `visitados`, que hay tope de profundidad, y que el `INSERT` filtra por `publicable` | Verificación: `pytest tests/test_f052_sql.py` **falla** (fase RED)
+- [x] T4: Escribir `tests/test_f052_sql.py` afirmando sobre el texto de `sql/stg/04_partidas.sql` que la rama recursiva ya no lleva `h.cod <> ''`, que existen `publicable`, `padre_publicado_id` y `visitados`, que hay tope de profundidad, y que el `INSERT` filtra por `publicable` | Verificación: `pytest tests/test_f052_sql.py` **falla** (fase RED)
 - [ ] T5: Modificar `sql/stg/04_partidas.sql` según §1 del diseño (descenso relajado, columnas propagadas, ruta/nivel condicionales, corta-ciclos, filtro de publicación en el `INSERT`) y reescribir el bloque de cabecera que hoy documenta el filtro al revés | Verificación: `pytest tests/test_f052_sql.py` en verde; revisión visual del diff
 - [ ] T6: Comprobar que el cambio no necesita marcador de tramo nuevo ni tocar `build_stg_step.py`: el CTE ya particiona por obra a través de `padide`, que nunca sale de su obra (medido: causa (c) = 0 casos) | Verificación: `grep -n F019_FILTRO_OBRAS` sobre `04_partidas.sql` sigue dando lo mismo; `pytest tests/test_f019_tramos.py`
 
