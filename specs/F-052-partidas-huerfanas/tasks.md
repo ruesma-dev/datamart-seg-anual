@@ -44,7 +44,7 @@ existente no se dispara y el hallazgo se queda en el log.
 ## Bloque D · La medida ANTES, contra la base
 
 - [ ] T13: Medir el coste real de `check-cobertura` contra la base **antes** de dar por buena su entrada en la nocturna: `python main.py check-cobertura --timeout 600` | Verificación: MANUAL (humano) — anotar el tiempo de cada consulta; si supera los minutos aceptables sobre una nocturna de 3 h 45, volver a DA-4 antes de seguir
-- [ ] T14: Capturar la huella actual de los cuatro ámbitos, **antes de tocar la base**: `python main.py huella-obras --desde stg --out huella_f052_stg_antes.csv` y `--desde mart --out huella_f052_mart_antes.csv` | Verificación: MANUAL (humano) — los dos CSV existen y traen los cuatro ámbitos
+- [ ] T14: Capturar **las cuatro huellas** de los cuatro ámbitos, **antes de tocar la base**: `huella-obras --desde stg`, `--desde mart`, `--desde dimension` y `--desde cierre`, cada una a su CSV `*_antes.csv` | Verificación: MANUAL (humano) — los cuatro CSV existen y traen los cuatro ámbitos. Requiere T27-T29 hechas
 - [ ] T15: Guardar el veredicto de `check-cobertura` de HOY (en rojo) como línea base: debe nombrar la 0599 con ~183.530 filas huérfanas y las combinaciones 0599 × 7 y 0599 × 11 como obra invisible | Verificación: MANUAL (humano) — la salida cuadra con las secciones 3 y 4 del informe de exploración
 
 ## Bloque E · El diccionario y la documentación
@@ -57,7 +57,18 @@ existente no se dispara y el hallazgo se queda en el log.
 
 ## Bloque F · Cierre del trabajo del agente
 
-- [ ] T21: Ejecutar la campaña de mutación sobre los módulos nuevos de dominio y analizar por escrito cada superviviente | Verificación: `python -m harness.mutacion --feature F-052` con **cero supervivientes**, o la exención escrita del humano
+- [x] T21: **EXENTA POR DECISIÓN DEL HUMANO EL 2026-08-31.** No se ejecuta la campaña de mutación; en su lugar se amplía la revisión de datos antes/después (T27-T29, `design.md` §7). Palabras del humano: «prefiero que se haga una revisión de datos antes y después que tantos mutation test». El reviewer la declara **N/A citando esta decisión**, como en F-042. Queda dicho que la mutación cubría los módulos Python y no el SQL del bloque B | Verificación: esta línea es el registro escrito que el arnés exige
+
+## Bloque F bis · La revisión de datos que sustituye a la mutación
+
+Las huellas 1 y 2 ya existen; aquí se refuerza una y se crean dos. Todas de
+**solo lectura**, fuera de `run-all`, ejecutadas **dos veces** (antes y después)
+sobre el **mismo `raw`**.
+
+- [ ] T27: Añadir `categoria` al agrupamiento de `sql_huella_mart` para que una partida recategorizada (CI→CD) deje de ser invisible: hoy agrupa por obra × ámbito × mes y el total de la obra no se movería | Verificación: `pytest tests/test_f042_huella.py`; el CSV trae la columna nueva (huella 2)
+- [ ] T28: Crear la **huella de dimensión** de `stg.partidas` por obra —resumen de `codigo_partida`, `capitulo_padre_id`, `capitulo_raiz_id`, `categoria`, `nivel` y `ruta_capitulos`—, que caza una partida que cambie de sitio en el árbol **sin cambiar de importe** | Verificación: `pytest tests/test_f052_huella_dimension.py`; sobre la base, las 390.501 filas resumidas por obra (huella 3)
+- [ ] T29: Crear la **huella de `cierre`** por obra × mes × concepto, la capa que Negocio ve en Power BI y que esta feature mueve entera en la 0599 | Verificación: `pytest tests/test_f052_huella_cierre.py` (huella 4)
+- [ ] T30: Extender `comparar-huellas` para que acepte las huellas nuevas y falle con **cero tolerancia** ante cualquier diferencia en una obra fuera de las seis | Verificación: `pytest` de comparación; `python main.py comparar-huellas --help` (R11)
 - [ ] T22: Escribir el informe en `progress/impl_F-052.md` (≤220 líneas) con la traza de cada fase RED, la cobertura de las líneas cambiadas y la línea base de T15 | Verificación: `python -m harness.tamano --feature F-052`
 - [ ] T23: Ejecutar `bash harness/init.sh` en verde | Verificación: `bash harness/init.sh` termina con código 0
 
@@ -79,11 +90,12 @@ personas. Los autoriza y lanza el humano. Coste: una **nocturna completa,
 3. **La huella de después**: `huella-obras --desde stg --out
    huella_f052_stg_despues.csv` y `--desde mart --out
    huella_f052_mart_despues.csv`.
-4. **La prueba que decide (R11)**: `python main.py comparar-huellas
-   huella_f052_stg_antes.csv huella_f052_stg_despues.csv --obras-esperadas
-   0599,0613,0618,0630,0565,0686`, y lo mismo con las de `mart`. Debe dar
-   **código 0**: ninguna obra fuera de esas seis mueve ni una celda en los cuatro
-   ámbitos. Si se mueve una sola, la feature **no se cierra**.
+4. **La prueba que decide (R11)**: `comparar-huellas` sobre **las cuatro** —`stg`,
+   `mart` (ya con categoría), **dimensión** y **cierre**— con
+   `--obras-esperadas 0599,0613,0618,0630,0565,0686`. Las cuatro deben dar
+   **código 0**. Si se mueve una sola celda de una obra fuera de esas seis, la
+   feature **se detiene y se consulta al humano**; no hay umbral ni tolerancia.
+   Esta es la verificación que **sustituye a la campaña de mutación** (T21).
 5. **Los recuentos de R7-R10**, obra a obra, contra la línea base del informe:
    `stg.partidas` 389.178 → 390.501; 0599 de 117 a 1.440 partidas; el fact gana
    ~183.756 filas y aparecen 0599 × 7 y 0599 × 11; DIRECTOS de la 0599 de 0,00 €

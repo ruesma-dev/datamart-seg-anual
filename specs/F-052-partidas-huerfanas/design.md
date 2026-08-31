@@ -210,3 +210,33 @@ restablecerlo. Bloquea la implementación, no el diseño.
 4. **Coste del guardián** sobre un Postgres compartido en producción: §3, T13.
 5. **`check-unicidad` con 183.756 filas nuevas**: R12, se ejecuta con
    `--timeout 300` (efecto 2 del informe).
+
+## 7 · La revisión de datos, ampliada (decisión del humano, 2026-08-31)
+
+**Se exime la campaña de mutación (T21)** y a cambio la comparación antes/después
+pasa de dos huellas a **cuatro, una de ellas reforzada**. Razón del humano, literal:
+*«con respecto a la B es crucial que no cambie o rompa lo que se está construyendo
+ahora que está bien; prefiero que se haga una revisión de datos antes y después que
+tantos mutation test»*.
+
+**Matiz que quedó dicho al aceptarlo, y que el reviewer debe tener presente:** la
+campaña de mutación cubre los módulos **Python** (`arbol_partidas.py`,
+`cobertura.py`); el bloque B es **SQL** y nunca estuvo cubierto por ella. La
+exención rebaja la red del dominio, no la de B — para B, la revisión de datos
+siempre fue la única verificación real, y ahora es más ancha.
+
+| # | Huella | Qué caza que hoy no se caza |
+|---|---|---|
+| 1 | `stg.plan_mensual` por obra × ámbito × mes | *(ya existe, `sql_huella_stg`)* |
+| 2 | `mart.fact_seguimiento_categoria` por obra × ámbito × mes **× categoría** | una partida **recategorizada** (CI→CD): el total de la obra no se mueve, el desglose sí, y eso rompe informes |
+| 3 | **`stg.partidas` por obra** — resumen de `codigo_partida`, `capitulo_padre_id`, `capitulo_raiz_id`, `categoria`, `nivel`, `ruta_capitulos` | una partida publicada que **cambie de sitio en el árbol sin cambiar de importe**: hoy es invisible para las huellas de dinero y sale distinta en Power BI |
+| 4 | **`cierre`** por obra × mes × concepto | la capa que Negocio ve, que esta feature **mueve entera** en la 0599 |
+
+La 3 es barata (390.000 filas) y es la que responde en concreto al miedo del
+humano. Todas son de **solo lectura**, se ejecutan **fuera de `run-all`** dos
+veces —antes y después, sobre el **mismo `raw`**— y no añaden ni un segundo a la
+nocturna.
+
+**El criterio de R11 pasa a ser rotundo:** cualquier diferencia, en cualquiera de
+las cuatro huellas, en una obra que no sea una de las **seis** afectadas, **detiene
+la feature**. No hay umbral ni tolerancia: cero.

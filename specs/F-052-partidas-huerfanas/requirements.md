@@ -59,10 +59,11 @@ contenga ni códigos vacíos ni ciclos: mismos `partida_id`, `codigo_partida`,
 
 **R11.** *(BLOQUEANTE, DA-2.)* Ninguna obra distinta de las **seis** del informe
 (0599, 0613, 0618, 0630, 0565, 0686) puede cambiar **ni una celda** en los cuatro
-ámbitos (3, 7, 8, 11), ni en filas ni en importe; se demuestra con `huella-obras`
-/ `comparar-huellas` sobre el **mismo `raw`**, como en F-042. SI se mueve una sola
-cifra fuera de esas seis, la feature **se detiene y se consulta al humano**:
-«prefiero perder la 0599 porque no sigue el patrón correcto» (2026-08-31).
+ámbitos (3, 7, 8, 11), ni en filas, ni en importe, **ni en su sitio dentro del
+árbol**; se demuestra con las **cuatro huellas** de `design.md` §7 antes y después
+sobre el **mismo `raw`**. SI se mueve una sola cifra fuera de esas seis, la feature
+**se detiene y se consulta al humano**: «prefiero perder la 0599 porque no sigue el
+patrón correcto» (2026-08-31).
 
 **R12.** `check-unicidad` debe seguir dando **0 claves duplicadas** en
 `mart.fact_seguimiento_mensual` después del cambio.
@@ -122,8 +123,7 @@ de `capitulo_padre_id` (ancestro publicado, no el padre de Sigrid), `nivel` y
 cifras publicadas de la **0599** cambian a partir de esta reconstrucción, para
 que quien lea un informe antiguo sepa por qué no cuadra (DA-6).
 
-**R22.** `config/diccionario/00_global.yaml` debe subir `version`, y la lista de
-`pendientes` no puede crecer.
+**R22.** `00_global.yaml` sube `version` y la lista de `pendientes` no crece.
 
 **R23.** `docs/ARCHITECTURE.md`, en «Semántica Sigrid imprescindible»: un capítulo
 **puede no tener código** y eso no puede cortar el árbol.
