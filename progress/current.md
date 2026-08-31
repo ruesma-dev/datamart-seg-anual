@@ -1,5 +1,26 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-08-31
+# Estado actual · 2026-09-01
+
+## F-052 · FASE 1 IMPLEMENTADA (nada ejecutado contra la base)
+
+**Informe completo: `progress/impl_F-052.md`.** Hechas T1-T12, T16-T19 y
+T22-T30; T20 ya venía hecha y **T21 (mutación) está exenta** por decisión del
+humano del 2026-08-31. `bash harness/init.sh` en verde, cobertura de las líneas
+cambiadas al 100 %.
+
+**Pendiente del humano, y es lo que falta para cerrar:** T13, T14, T15 y los diez
+pasos de cierre de `tasks.md`. Son escrituras contra el Postgres compartido en
+producción o lecturas de varios GB, y desde el puesto **no hay conexión directa**
+(`connection timeout expired` contra `psql-albaranes-rs9k2`). Dos de ellos no son
+opcionales:
+
+* **el aviso a Negocio (R27) es BLOQUEANTE**: sin él no se publica;
+* **desplegar `infra/96_create_alert_cobertura.ps1`** y añadir el buzón al grupo
+  de acción. Sin ese paso el guardián nuevo **es mudo**, porque al no bloquear el
+  job la alerta de fallo no se dispara.
+
+**Hoy la 0599 sigue publicando las cifras de siempre**: el arreglo está escrito y
+probado, no reconstruido.
 
 ## F-052 · spec aprobada — las 7 decisiones cerradas por el humano
 
