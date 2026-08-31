@@ -41,6 +41,26 @@ posible son **226 filas de las 183.756**, a **0,00 €**; los nodos sin código 
 no trunca nada legítimo. Aun así R11 se verifica empíricamente: el argumento
 explica por qué se espera que salga limpio, no sustituye a la prueba.
 
+**MEDIDO CONTRA `raw` EL 2026-08-31, y la condición se cumple.** En cuanto se
+restableció el acceso a la base se simuló el árbol nuevo completo (descenso
+relajado, colapso y corta-ciclos) y se cruzó con `stg.partidas`:
+
+| | Resultado |
+|---|---|
+| Nodos con `cod = ''` | **7**, en 3 obras: 0599 (3), 0618 (3), 0613 (1) |
+| Partidas nuevas | **1.323, TODAS de la 0599**. Ni una en las otras cinco obras |
+| Partidas ya publicadas que cambian ruta, nivel o padre | **NINGUNA** |
+| Partidas hoy publicadas que desaparecerían | **NINGUNA** |
+| Profundidad | **7 niveles**; el tope de 40 deja 33 de margen |
+
+El árbol nuevo alcanza **390.508** nodos; menos los 7 no publicables da
+**390.501**, que es exactamente la cifra que R7 exige. Cuadra al nodo.
+
+La condición del humano —«que no cambie nada en el resto de obras»— está por
+tanto **verificada antes de tocar una línea de código**, no solo argumentada.
+R11 sigue siendo obligatorio: esto mide el árbol, y R11 mide el dinero
+publicado de punta a punta.
+
 **Contrapartida aceptada por el humano:** «FASE 1 - MOVIMIENTO TIERRAS Y
 CIMENTACIÓN» y sus dos hermanas **desaparecen del árbol de Power BI** de la 0599
 como agrupador. Los euros están todos; lo que se pierde es poder preguntar cuánto

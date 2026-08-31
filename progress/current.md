@@ -31,6 +31,14 @@ y la profundidad máxima real de `stg.partidas` es de **7 niveles, con cero part
 de nivel 8 o más sobre 389.178** (medido el 2026-08-31), lo que valida que el tope
 de 40 del corta-ciclos no trunca nada legítimo.
 
+**Y ya no hace falta el argumento: está MEDIDO contra `raw`** (2026-08-31, tras
+restablecer el acceso). Simulado el árbol nuevo entero y cruzado con
+`stg.partidas`: las partidas nuevas son **1.323 y TODAS de la 0599** —ni una en
+las otras cinco obras—; **ninguna** partida ya publicada cambia ruta, nivel ni
+padre; **ninguna** desaparece; la profundidad máxima es de 7 niveles. El árbol
+alcanza 390.508 nodos, menos los 7 no publicables = **390.501, la cifra exacta
+de R7**. La condición del humano está verificada **antes de tocar código**.
+
 ### El aviso por correo (DA-4) reutiliza lo que ya existe
 
 **No se escribe código de correo.** El patrón ya está en el repositorio:
