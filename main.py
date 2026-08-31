@@ -1275,10 +1275,12 @@ def _guardian_de_cobertura(pg: PostgresClient):
 )
 @click.option(
     "--desde",
-    type=click.Choice(["stg", "mart"]),
+    type=click.Choice(["stg", "mart", "dimension", "cierre"]),
     default="stg",
     show_default=True,
-    help="`stg` agrega stg.plan_mensual; `mart`, fact_seguimiento_categoria.",
+    help="`stg` agrega stg.plan_mensual; `mart`, fact_seguimiento_categoria; "
+         "`dimension`, el arbol de stg.partidas por obra; `cierre`, "
+         "cierre.fact_cierre_mensual por obra x mes x concepto.",
 )
 @click.option(
     "--propuesta",
@@ -1309,6 +1311,15 @@ def huella_obras_cmd(salida: Path, desde: str, propuesta: bool, timeout: int) ->
     porque las ventanas derraman a temporales sobre un disco compartido con
     `albaranes` y `partes`. Ni una escritura: la transaccion va READ ONLY.
 
+    LAS CUATRO HUELLAS DE F-052. El humano eximio la campana de mutacion el
+    2026-08-31 y puso a cambio una revision de datos mas ancha: a las dos de
+    F-042 -`stg` y `mart`, esta ultima ya con la categoria en el grano- se suman
+    `dimension`, que resume el ARBOL de stg.partidas por obra y caza una partida
+    que cambie de sitio SIN cambiar de importe, y `cierre`, que es la capa que
+    Negocio lee en Power BI. Las cuatro se capturan antes y despues sobre el
+    MISMO raw y se enfrentan con `comparar-huellas`, que falla con tolerancia
+    CERO fuera de las obras esperadas.
+
     ORDEN CRITICO: la huella del ANTES se saca antes de reconstruir nada. El
     build pisa `stg.plan_mensual` y no hay vuelta atras.
     """
@@ -1317,6 +1328,10 @@ def huella_obras_cmd(salida: Path, desde: str, propuesta: bool, timeout: int) ->
         construir_huella,
         escribir_csv,
     )
+
+    if desde in _FORMATOS_AMPLIADOS:
+        _huella_ampliada_a_csv(desde, salida, propuesta, timeout)
+        return
 
     sql_plan_mensual = (
         (DIRECTORIO_SQL_STG / "08_plan_mensual.sql").read_text(encoding="utf-8")
@@ -1353,6 +1368,97 @@ def huella_obras_cmd(salida: Path, desde: str, propuesta: bool, timeout: int) ->
         )
 
 
+def _cabecera_de(path: Path) -> list[str]:
+    """La primera linea de un CSV de huella, partida por `;`.
+
+    Es lo unico que hace falta para saber de que huella se trata. Un fichero
+    vacio devuelve una cabecera vacia, y entonces cae por la rama ampliada, que
+    es la que sabe explicar que cabeceras conoce.
+    """
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        primera = f.readline().strip()
+    return primera.split(";") if primera else []
+
+
+#: Las dos huellas nuevas de F-052, por el nombre con el que se piden en
+#: `--desde`. Viven aqui y no dentro del comando para que el propio comando
+#: pueda preguntar "¿es una de las nuevas?" antes de montar nada.
+_FORMATOS_AMPLIADOS = ("dimension", "cierre")
+
+
+def _huella_ampliada_a_csv(
+    desde: str, salida: Path, propuesta: bool, timeout: int
+) -> None:
+    """Captura una de las dos huellas nuevas de F-052 (T28, T29).
+
+    Van por un camino propio y no por `construir_huella` porque su forma es
+    otra: `dimension` no tiene ambito ni mes -es una fila por obra- y `cierre`
+    se agrupa por concepto. Forzarlas dentro de `FilaHuella` habria significado
+    dejarle la mitad de las columnas vacias, que es como se acaba comparando
+    ceros contra ceros y llamandolo verde.
+
+    Tampoco van por tramos: ninguna usa ventanas, asi que no derraman a los
+    temporales del disco que comparten `albaranes` y `partes`.
+    """
+    from etl_sigrid.domain.huella_ampliada import FORMATOS
+    from etl_sigrid.infrastructure.postgres.huella_ampliada import (
+        construir_huella_ampliada,
+        escribir_csv_ampliada,
+    )
+
+    if propuesta:
+        raise click.UsageError(
+            "`--propuesta` solo tiene sentido con `--desde stg`: reejecuta la "
+            f"rama de reales de 08_plan_mensual.sql, y `--desde {desde}` no la "
+            "usa. Sobre esta huella no significaria nada, y aceptarlo en "
+            "silencio produciria un CSV que no es el que se cree."
+        )
+
+    formato = next(f for f in FORMATOS if f.nombre == desde)
+    click.echo(f"Huella `{formato.nombre}` · {formato.proposito}")
+    click.echo("  SOLO LECTURA: transaccion READ ONLY, ninguna escritura")
+
+    filas = construir_huella_ampliada(_get_pg(), formato, timeout)
+    escribir_csv_ampliada(formato, filas, salida)
+
+    obras = len({f.codigo_obra for f in filas})
+    click.secho(
+        f"✓ {len(filas)} fila(s) de {obras} obra(s) escritas en {salida}.",
+        fg="green",
+    )
+    if not filas:
+        click.secho(
+            "AVISO: la huella ha salido VACIA. Comparada con otra vacia daria "
+            "cero diferencias, y eso no prueba nada: `comparar-huellas` la "
+            "rechazara, y con razon.",
+            fg="yellow",
+        )
+
+
+def _comparar_huellas_ampliadas(antes: Path, despues: Path, esperadas) -> None:
+    """La comparacion de las huellas 3 y 4, con tolerancia CERO (R11)."""
+    from etl_sigrid.domain.huella_ampliada import comparar_ampliada, veredicto_ampliado
+    from etl_sigrid.infrastructure.postgres.huella_ampliada import leer_csv_ampliada
+
+    formato_antes, filas_antes = leer_csv_ampliada(antes)
+    formato_despues, filas_despues = leer_csv_ampliada(despues)
+
+    if formato_antes is not formato_despues:
+        raise click.UsageError(
+            f"las dos huellas no son del mismo formato: {antes} es "
+            f"`{formato_antes.nombre}` y {despues} es `{formato_despues.nombre}`. "
+            f"Compararlas daria cientos de diferencias falsas y no significaria "
+            f"nada."
+        )
+
+    codigo, informe = veredicto_ampliado(
+        comparar_ampliada(formato_antes, filas_antes, filas_despues), esperadas
+    )
+    click.echo(informe)
+    if codigo:
+        raise SystemExit(codigo)
+
+
 @cli.command("comparar-huellas")
 @click.argument("antes", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.argument("despues", type=click.Path(exists=True, dir_okay=False, path_type=Path))
@@ -1374,11 +1480,31 @@ def comparar_huellas_cmd(antes: Path, despues: Path, obras_esperadas: str) -> No
     Sale distinto de 0, y entonces la feature NO se cierra, si se mueve una obra
     fuera de `--obras-esperadas`, si se mueve algo en los ambitos master 8 u 11
     —que es el desbordamiento— o si las huellas no traen los cuatro ambitos.
+
+    ACEPTA TAMBIEN LAS DOS HUELLAS NUEVAS DE F-052 —`dimension` y `cierre`—, que
+    se reconocen POR SU CABECERA y no por el nombre del fichero, que cualquiera
+    puede teclear mal. Ahi el criterio es de tolerancia CERO: cualquier
+    diferencia en una obra fuera de `--obras-esperadas` detiene la feature. Es lo
+    que el humano puso a cambio de eximir la campana de mutacion el 2026-08-31.
     """
     from etl_sigrid.domain.huella import comparar_huellas, veredicto
-    from etl_sigrid.infrastructure.postgres.huella_obras import leer_csv
+    from etl_sigrid.infrastructure.postgres.huella_obras import CABECERA_CSV, leer_csv
 
     esperadas = [o.strip() for o in obras_esperadas.split(",") if o.strip()]
+
+    # El formato se decide por la cabecera del ANTES; si el DESPUES no cuadra,
+    # el ayudante lo dice con las dos rutas delante.
+    if _cabecera_de(antes) != list(CABECERA_CSV):
+        click.echo(f"ANTES:   {antes}")
+        click.echo(f"DESPUES: {despues}")
+        click.echo(
+            f"Obras que SI pueden cambiar: "
+            f"{', '.join(esperadas) or 'ninguna declarada'}"
+        )
+        click.echo("")
+        _comparar_huellas_ampliadas(antes, despues, esperadas)
+        return
+
     comparacion = comparar_huellas(leer_csv(antes), leer_csv(despues))
     codigo, informe = veredicto(comparacion, esperadas)
 
