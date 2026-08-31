@@ -65,7 +65,7 @@ Las huellas 1 y 2 ya existen; aquí se refuerza una y se crean dos. Todas de
 **solo lectura**, fuera de `run-all`, ejecutadas **dos veces** (antes y después)
 sobre el **mismo `raw`**.
 
-- [ ] T27: Añadir `categoria` al agrupamiento de `sql_huella_mart` para que una partida recategorizada (CI→CD) deje de ser invisible: hoy agrupa por obra × ámbito × mes y el total de la obra no se movería | Verificación: `pytest tests/test_f042_huella.py`; el CSV trae la columna nueva (huella 2)
+- [x] T27: Añadir `categoria` al agrupamiento de `sql_huella_mart` para que una partida recategorizada (CI→CD) deje de ser invisible: hoy agrupa por obra × ámbito × mes y el total de la obra no se movería | Verificación: `pytest tests/test_f042_huella.py`; el CSV trae la columna nueva (huella 2)
 - [ ] T28: Crear la **huella de dimensión** de `stg.partidas` por obra —resumen de `codigo_partida`, `capitulo_padre_id`, `capitulo_raiz_id`, `categoria`, `nivel` y `ruta_capitulos`—, que caza una partida que cambie de sitio en el árbol **sin cambiar de importe** | Verificación: `pytest tests/test_f052_huella_dimension.py`; sobre la base, las 390.501 filas resumidas por obra (huella 3)
 - [ ] T29: Crear la **huella de `cierre`** por obra × mes × concepto, la capa que Negocio ve en Power BI y que esta feature mueve entera en la 0599 | Verificación: `pytest tests/test_f052_huella_cierre.py` (huella 4)
 - [ ] T30: Extender `comparar-huellas` para que acepte las huellas nuevas y falle con **cero tolerancia** ante cualquier diferencia en una obra fuera de las seis | Verificación: `pytest` de comparación; `python main.py comparar-huellas --help` (R11)

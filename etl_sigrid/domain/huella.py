@@ -62,10 +62,16 @@ class FilaHuella:
     versiones: str
     importe_mes: Decimal
     importe_origen: Decimal
+    #: La categoría de coste (CD, CI, CP, OTRO) en la huella de `mart`, y cadena
+    #: **vacía** en la de `stg`, que no baja a ese grano (F-052, T27). Entra en
+    #: la clave: sin ella una partida **recategorizada** —una CI que pasa a CD—
+    #: es invisible, porque el total de la obra no se mueve y sólo cambia el
+    #: desglose, que es justo lo que rompe un informe de Power BI.
+    categoria: str = ""
 
     @property
-    def clave(self) -> tuple[int, int, date]:
-        return (self.obra_id, self.ambito_id, self.periodo)
+    def clave(self) -> tuple[int, int, date, str]:
+        return (self.obra_id, self.ambito_id, self.periodo, self.categoria)
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +82,7 @@ class CambioDeNumeracion:
     periodo: date
     antes: str
     despues: str
+    categoria: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +94,7 @@ class CambioDeImporte:
     campo: str
     antes: Decimal
     despues: Decimal
+    categoria: str = ""
 
     @property
     def diferencia(self) -> Decimal:
@@ -134,7 +142,7 @@ def comparar_huellas(
     for clave in sorted(set(por_clave_antes) | set(por_clave_despues)):
         a = por_clave_antes.get(clave)
         d = por_clave_despues.get(clave)
-        obra_id, ambito_id, periodo = clave
+        obra_id, ambito_id, periodo, categoria = clave
         codigo = (a or d).codigo_obra  # type: ignore[union-attr]
 
         versiones_antes = a.versiones if a else ""
@@ -148,6 +156,7 @@ def comparar_huellas(
                     periodo=periodo,
                     antes=versiones_antes,
                     despues=versiones_despues,
+                    categoria=categoria,
                 )
             )
 
@@ -164,6 +173,7 @@ def comparar_huellas(
                         campo=campo,
                         antes=valor_antes,
                         despues=valor_despues,
+                        categoria=categoria,
                     )
                 )
 
@@ -273,12 +283,22 @@ def veredicto(
     return codigo, "\n".join(lineas)
 
 
+def _categoria(cambio) -> str:
+    """` · categoria CD` cuando la huella baja a ese grano, y nada cuando no.
+
+    La huella de `stg` no trae categoría, y escribir un ` · categoria ` vacío en
+    todas sus líneas sería ruido en el informe que más se lee de esta feature.
+    """
+    return f" · categoria {cambio.categoria}" if cambio.categoria else ""
+
+
 def _bloque_numeracion(comparacion: Comparacion) -> str:
     if not comparacion.numeracion:
         return "Numeracion de fase: 0 cambios."
     lineas = [f"Numeracion de fase: {len(comparacion.numeracion)} cambio(s)."]
     lineas += [
-        f"  {c.codigo_obra} (obra {c.obra_id}) · ambito {c.ambito_id} · "
+        f"  {c.codigo_obra} (obra {c.obra_id}) · ambito {c.ambito_id}"
+        f"{_categoria(c)} · "
         f"{c.periodo:%Y-%m}: [{c.antes or 'ninguna'}] -> [{c.despues or 'ninguna'}]"
         for c in comparacion.numeracion
     ]
@@ -294,7 +314,8 @@ def _bloque_importes(comparacion: Comparacion) -> str:
         f"Variacion neta del acumulado a origen: {total}."
     ]
     lineas += [
-        f"  {c.codigo_obra} (obra {c.obra_id}) · ambito {c.ambito_id} · "
+        f"  {c.codigo_obra} (obra {c.obra_id}) · ambito {c.ambito_id}"
+        f"{_categoria(c)} · "
         f"{c.periodo:%Y-%m} · {c.campo}: {c.antes} -> {c.despues} "
         f"({c.diferencia:+})"
         for c in comparacion.importes

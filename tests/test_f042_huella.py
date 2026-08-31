@@ -294,7 +294,13 @@ def test_f042_r22_el_csv_es_el_de_la_casa_utf8_bom_punto_y_coma_y_coma_decimal(t
     assert "10753384.34" not in texto
 
 
-def test_f042_r22_la_cabecera_nombra_las_ocho_columnas(tmp_path):
+def test_f042_r22_la_cabecera_nombra_las_nueve_columnas(tmp_path):
+    """Nueve desde F-052 (T27): `categoria` entra al final.
+
+    Va la última a propósito, para no mover de sitio las ocho que ya había: un
+    CSV de huella se abre en Excel y se compara a ojo, y reordenar columnas
+    obliga a rehacer cualquier hoja que alguien tuviera montada.
+    """
     destino = tmp_path / "huella.csv"
 
     escribir_csv(ANTES, destino)
@@ -309,7 +315,48 @@ def test_f042_r22_la_cabecera_nombra_las_ocho_columnas(tmp_path):
         "versiones",
         "importe_mes",
         "importe_origen",
+        "categoria",
     ]
+
+
+def test_f052_r11_dos_celdas_que_solo_difieren_en_categoria_son_dos_celdas(tmp_path):
+    """La huella 2 de F-052, y lo que caza: una partida **recategorizada**.
+
+    Si una CI pasa a CD, el total de la obra en ese mes no se mueve ni un
+    céntimo y la huella vieja —agregada por obra x ámbito x mes— daba cero
+    diferencias. Lo que se rompe no es el total: es el desglose que dibuja Power
+    BI. Con `categoria` en la clave salen **dos** cambios, uno en cada
+    dirección.
+    """
+    from etl_sigrid.domain.huella import FilaHuella as _F
+
+    def _celda(categoria: str, importe: str) -> _F:
+        return _F(
+            obra_id=1442383,
+            codigo_obra="0599",
+            ambito_id=3,
+            periodo=date(2022, 1, 1),
+            filas=10,
+            versiones="",
+            importe_mes=Decimal(importe),
+            importe_origen=Decimal(importe),
+            categoria=categoria,
+        )
+
+    antes = (_celda("CI", "1000.00"), _celda("CD", "0.00"))
+    despues = (_celda("CI", "0.00"), _celda("CD", "1000.00"))
+
+    comparacion = comparar_huellas(antes, despues)
+
+    assert len(comparacion.importes) == 4, (
+        "dos campos de importe x dos categorías: el movimiento tiene que verse"
+    )
+    assert {c.categoria for c in comparacion.importes} == {"CI", "CD"}
+
+    # Y el ida y vuelta por el CSV no pierde la categoría.
+    destino = tmp_path / "huella_categoria.csv"
+    escribir_csv(antes, destino)
+    assert [f.categoria for f in leer_csv(destino)] == ["CI", "CD"]
 
 
 def test_f042_r22_un_csv_vacio_se_lee_como_lista_vacia_y_no_como_verde(tmp_path):

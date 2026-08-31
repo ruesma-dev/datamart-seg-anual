@@ -87,6 +87,9 @@ CABECERA_CSV = (
     "versiones",
     "importe_mes",
     "importe_origen",
+    # F-052, T27. Vacia en las huellas de `stg` y de la propuesta, que no bajan
+    # a ese grano; con valor en la de `mart`.
+    "categoria",
 )
 
 
@@ -180,7 +183,15 @@ def sql_huella_stg(obras: Sequence[int] | None = None) -> str:
 
 
 def sql_huella_mart(obras: Sequence[int] | None = None) -> str:
-    """La huella de lo que Power BI y el MCP leen de verdad."""
+    """La huella de lo que Power BI y el MCP leen de verdad.
+
+    **Baja a CATEGORIA (F-052, T27), y no es un adorno.** Agregando sólo por
+    obra x ámbito x mes, una partida que cambie de categoría —una CI que pase a
+    CD— deja el total de la obra exactamente igual y **no se ve**. Lo que se
+    rompe entonces no es el total: es el desglose, que es lo que Power BI
+    dibuja. Con `categoria` en el grano, ese movimiento aparece como dos celdas
+    que cambian en direcciones opuestas.
+    """
     filtro = f"\n  AND fc.obra_id = ANY ({filtro_de_tramo(obras)})" if obras else ""
     return (
         "SELECT fc.obra_id,\n"
@@ -192,12 +203,13 @@ def sql_huella_mart(obras: Sequence[int] | None = None) -> str:
         # por categoria. La numeracion, por tanto, solo se puede mirar en `stg`.
         "       ''::TEXT AS versiones,\n"
         "       COALESCE(SUM(fc.importe_mes), 0)    AS importe_mes,\n"
-        "       COALESCE(SUM(fc.importe_origen), 0) AS importe_origen\n"
+        "       COALESCE(SUM(fc.importe_origen), 0) AS importe_origen,\n"
+        "       fc.categoria\n"
         "FROM mart.fact_seguimiento_categoria fc\n"
         f"WHERE fc.ambito_id IN ({_AMBITOS})"
         f"{filtro}\n"
-        "GROUP BY fc.obra_id, fc.ambito_id, fc.anio_mes\n"
-        "ORDER BY 1, 3, 4"
+        "GROUP BY fc.obra_id, fc.ambito_id, fc.anio_mes, fc.categoria\n"
+        "ORDER BY 1, 3, 4, 9"
     )
 
 
@@ -259,6 +271,9 @@ def _a_filas(resultado: Sequence[Sequence]) -> list[FilaHuella]:
             versiones=str(f[5] or ""),
             importe_mes=Decimal(str(f[6])),
             importe_origen=Decimal(str(f[7])),
+            # Solo la huella de `mart` trae la novena columna; `stg` y la
+            # propuesta agregan por encima de la categoria y la dejan vacia.
+            categoria=str(f[8] or "") if len(f) > 8 else "",
         )
         for f in resultado
     ]
@@ -383,6 +398,7 @@ def escribir_csv(filas: Sequence[FilaHuella], path: Path) -> None:
                     fila.versiones,
                     _numero(fila.importe_mes),
                     _numero(fila.importe_origen),
+                    fila.categoria,
                 ]
             )
 
@@ -415,6 +431,7 @@ def leer_csv(path: Path) -> list[FilaHuella]:
                 versiones=fila[5],
                 importe_mes=Decimal(fila[6].replace(",", ".")),
                 importe_origen=Decimal(fila[7].replace(",", ".")),
+                categoria=fila[8] if len(fila) > 8 else "",
             )
             for fila in lector
             if fila
