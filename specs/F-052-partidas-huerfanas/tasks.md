@@ -15,7 +15,7 @@ completas de tablas de varios GB. Un agente no escribe en producción.
 
 - [x] T1: Escribir `tests/test_f052_arbol.py` con las fixtures reales del informe —el subárbol `CD → 280353/280354/280356 (cod='') → hijos` de la 0599, los auto-bucles 310512 (0630) y 375474 (0686) y el bucle mutuo 279988 ↔ 279997 (0565)— contra una API que aún no existe | Verificación: `pytest tests/test_f052_arbol.py` **falla** (fase RED, traza al informe)
 - [x] T2: Crear `etl_sigrid/domain/arbol_partidas.py` con `Nodo`, `Arbol` y `construir_arbol()`: desciende a través de los nodos sin código, colapsa el nodo no publicable (padre = ancestro publicado, ruta y nivel no avanzan) y corta ciclos con la lista de visitados | Verificación: `pytest tests/test_f052_arbol.py` en verde (R1, R2, R3, R5)
-- [ ] T3: Añadir a `tests/test_f052_arbol.py` los casos de borde: dos nodos vacíos encadenados, nodo vacío como hoja, rama sin ningún vacío que debe salir idéntica, e invariante `len(ruta.split(' > ')) == nivel + 1` en toda partida publicada | Verificación: `pytest tests/test_f052_arbol.py` (R4, R6)
+- [x] T3: Añadir a `tests/test_f052_arbol.py` los casos de borde: dos nodos vacíos encadenados, nodo vacío como hoja, rama sin ningún vacío que debe salir idéntica, e invariante `len(ruta.split(' > ')) == nivel + 1` en toda partida publicada | Verificación: `pytest tests/test_f052_arbol.py` (R4, R6)
 
 ## Bloque B · El SQL
 

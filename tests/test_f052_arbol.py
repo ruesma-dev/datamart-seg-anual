@@ -26,6 +26,8 @@ Ni red ni BBDD: sólo estructuras en memoria.
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from etl_sigrid.domain.arbol_partidas import (
@@ -404,3 +406,39 @@ def test_f052_r6_todo_nodo_acaba_en_una_de_las_cuatro_listas():
         | set(arbol.inalcanzables)
     )
     assert clasificados == {n.ide for n in nodos}
+
+
+def test_f052_r6_el_orden_de_entrada_no_cambia_el_resultado():
+    """`raw.obrparpar` no llega ordenada y el CTE recursivo tampoco garantiza un
+    orden: el árbol tiene que salir igual venga como venga."""
+    nodos = _subarbol_0599() + _bucle_mutuo_0565() + _obra_sana()
+    derecho = construir_arbol(nodos)
+    del_reves = construir_arbol(list(reversed(nodos)))
+
+    assert sorted(p.partida_id for p in derecho.publicadas) == sorted(
+        p.partida_id for p in del_reves.publicadas
+    )
+    assert {p.partida_id: p for p in derecho.publicadas} == {
+        p.partida_id: p for p in del_reves.publicadas
+    }
+    assert sorted(derecho.en_ciclo) == sorted(del_reves.en_ciclo)
+    assert sorted(derecho.descartadas_sin_codigo) == sorted(
+        del_reves.descartadas_sin_codigo
+    )
+
+
+def test_f052_la_partida_publicada_es_inmutable():
+    """Una fila del árbol no se retoca después de construirla: si algo hay que
+    corregir, se corrige la regla."""
+    partida = _publicadas_por_id(_arbol_completo())[280400]
+
+    with pytest.raises(FrozenInstanceError):
+        partida.nivel = 9  # type: ignore[misc]
+
+
+def test_f052_por_id_devuelve_none_cuando_la_partida_no_se_publica():
+    """`por_id` no puede inventarse una fila para un capítulo colapsado."""
+    arbol = _arbol_completo()
+
+    assert arbol.por_id(280400) is not None
+    assert arbol.por_id(280353) is None, "280353 tiene cod='' y no se publica"
