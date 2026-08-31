@@ -12,6 +12,16 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 12 (F-052, 2026-08-31): un capitulo de Sigrid puede no tener codigo,
+# y eso ya no corta el arbol de partidas. La ficha de `stg.partidas` deja de
+# afirmar que una partida sin codigo no llega -sus DESCENDIENTES si llegan
+# ahora- y describe el significado nuevo de `capitulo_padre_id` (el ancestro
+# PUBLICADO, no siempre el padide de Sigrid), `nivel` y `ruta_capitulos`, que
+# cuentan solo nodos publicados. `mart` y `cierre` avisan, con la fecha, de que
+# las cifras de la obra 0599 TANATORIO MAJADAHONDA cambian a partir de esa
+# reconstruccion: de 117 a 1.440 partidas publicadas, DIRECTOS de 0,00 EUR a
+# ~2,62 M EUR y margen del 66,3 % al 1,8 %. Ninguna otra obra cambia.
+#
 # version 11 (F-042, 2026-08-29): un solo cierre por mes en los ambitos reales.
 # Se retira de `mart` el aviso de dato doblado -`importe_origen` venia al doble
 # en 35 celdas de 7 obras, 30.425.881,56 EUR- porque el build ya publica una
@@ -30,7 +40,7 @@
 # `R-FRESCURA` porque lo que decia -que la nocturna construye SOLO raw, stg y
 # mart- dejo de ser cierto.
 
-version: 11
+version: 12
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
