@@ -809,7 +809,7 @@
         "Existe una comprobacion que contrasta lo que entra en stg con lo que sale en mart, y falla si se vuelve a caer una obra",
         "Si la causa esta en la configuracion de Sigrid, llevada a quien lo administra: no se toca desde aqui"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
