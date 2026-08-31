@@ -1,46 +1,68 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-08-31
 
-## F-052 · spec escrita, esperando aprobación del humano
+## F-052 · spec aprobada — las 7 decisiones cerradas por el humano
 
-`specs/F-052-partidas-huerfanas/` (requirements 150/150, design 200/250,
-tasks 23 tareas + 10 pasos de cierre manuales). Rama
-`feature/F-052-partidas-huerfanas`. La feature sigue **`pending`** en
-`harness/features.json`: el cambio a `spec_ready` lo hace el líder.
-
+`specs/F-052-partidas-huerfanas/`. Rama `feature/F-052-partidas-huerfanas`.
 Línea base: `progress/explore_F-052.md`. **La causa quedó identificada y la
 hipótesis previa desmentida**: la cadena de `padide` de la 0599 **sí llega a la
 raíz `CD`**; lo que corta es el filtro `AND h.cod <> ''` de
 `sql/stg/04_partidas.sql:78`, que impide **descender a través de** tres capítulos
 intermedios con código vacío y amputa 1.323 partidas. Las otras 12 son ciclos.
 
-El diseño propone que ese filtro decida **qué se publica y no por dónde se
-desciende**, colapsando el nodo sin código (sus hijos cuelgan del ancestro
-publicado, la ruta no gana segmento vacío), con corta-ciclos por lista de
-visitados; más un guardián nuevo de solo lectura, `check-cobertura`, que
-contrasta `stg` contra `mart` por obra × ámbito y hace fallar la nocturna.
+### Las siete decisiones, cerradas el 2026-08-31
 
-### Lo que el humano tiene que decidir para aprobar la spec
+| | Decisión del humano |
+|---|---|
+| **DA-1** | Solo se relaja la rama de descenso (línea 78). La raíz **no se toca**: criterio de mínimo cambio, «ahora mismo estaba funcionando bien en general» |
+| **DA-2** | **Colapsar**, y CONDICIONADO: si se mueve una cifra de una obra distinta de las seis afectadas, **se para y se consulta**. Palabras del humano: «si cambia algo, prefiero perder la 0599 porque no sigue el patrón correcto» |
+| **DA-3** | Array de visitados **+** tope de profundidad |
+| **DA-4** | **AVISA, NO BLOQUEA** — la nocturna termina en verde. Y **aviso por correo** al buzón de desarrollo |
+| **DA-5** | Sí, se lleva a Sigrid sin esperar. Único caso prioritario: la **0686**, obra viva |
+| **DA-6** | Avisar a Negocio **antes** de publicar, y nota en el diccionario |
+| **DA-7** | Feature propia: **F-053**, prioridad 2 |
 
-Están enumeradas como **DA-1 a DA-7** en `design.md` §5, cada una con opciones y
-recomendación. Las tres que de verdad necesitan su palabra:
+**Por qué DA-2 se puede dar por segura sin medirla contra la base**: cada partida
+tiene **un solo padre**, luego un solo camino a la raíz. Una partida publicada hoy
+tiene todo su camino con código, y el algoritmo nuevo recorre ese mismo camino con
+idéntico resultado. **El cambio es estrictamente aditivo.** Datos que lo respaldan:
+fuera de la 0599 el movimiento máximo posible son **226 filas de 183.756, a 0,00 €**;
+y la profundidad máxima real de `stg.partidas` es de **7 niveles, con cero partidas
+de nivel 8 o más sobre 389.178** (medido el 2026-08-31), lo que valida que el tope
+de 40 del corta-ciclos no trunca nada legítimo.
 
-- **DA-2 · el precio visible del arreglo.** Con la opción recomendada, «FASE 1 -
-  MOVIMIENTO TIERRAS Y CIMENTACIÓN» y sus dos hermanas **desaparecen del árbol
-  de Power BI** de la 0599 como agrupador. Si Negocio quiere seguir viendo las
-  fases, hay que darles un código sintético y decidirlo con ellos.
-- **DA-4 · si `check-cobertura` bloquea la nocturna** (código 1, lo recomendado)
-  o solo avisa, y si su coste —barre `stg.plan_mensual` entera sobre un Postgres
-  compartido con `albaranes` y `partes` en producción— es aceptable sobre una
-  nocturna que ya cuesta 3 h 45. T13 lo mide antes de engancharlo.
-- **DA-6 · el aviso a Negocio antes de publicar.** El margen de la 0599 pasa de
-  **66,3 % a 1,8 %** y su venta de 0 € a 4.066.989,23 €. La spec lo pone como
-  requisito bloqueante (R27): sin ese aviso no se publica.
+### El aviso por correo (DA-4) reutiliza lo que ya existe
 
-Además: **DA-7** propone fichar **F-053** (el desempate `rn = 1` de
-`stg/03_obras.sql:125`, que deja invisibles 0517, 0252 y 0720 —~10,65 M€ de coste
-y 10,94 M€ de venta— por otra causa). Está **fuera del alcance** de F-052 por
-instrucción del humano; T20 solo la ficha.
+**No se escribe código de correo.** El patrón ya está en el repositorio:
+`infra/90_create_alert.ps1` crea el grupo de acción `ag-datamart-seg-dev` con
+destinatarios pasados por `-AlertEmail`, y `infra/95_create_alert_frescura.ps1`
+crea una regla de consulta programada sobre `log-datamart-seg-dev` que lo dispara.
+`check-cobertura` escribirá un marcador estable en el log y un script nuevo
+(`infra/96_create_alert_cobertura.ps1`) creará la regla que lo busca.
+
+**Riesgo declarado**: al no bloquear, la alerta de fallo existente
+(`alert-caj-datamart-seg-dev-failed`) **no se disparará**. Esa regla nueva es la
+única vía por la que el guardián se hace oír; **si no se despliega, es mudo**.
+Su despliegue es manual y lo ejecuta el humano.
+
+**Los correos NO se versionan** — lo dice `infra/90_create_alert.ps1` y se respeta:
+el destinatario se pasa con `-AlertEmail` en el despliegue.
+
+### Documento para Negocio, listo
+
+`specs/F-052-partidas-huerfanas/aviso_negocio.md`: qué se encontró, la tabla de
+cifras antes/después (margen de la 0599 del **66,3 % al 1,8 %**), a quién afecta,
+la pérdida del desglose por fases y lo que hay que pedirle a quien administra
+Sigrid. **Es paso bloqueante previo a publicar.**
+
+### BLOQUEO OPERATIVO para implementar
+
+**No hay conexión directa a la base desde el puesto** (2026-08-31,
+`connection timeout expired` contra `psql-albaranes-rs9k2`). La base está viva y
+responde por la vía de solo lectura del MCP, pero **esa vía no expone `raw`**, que
+es donde vive el árbol de partidas. Las verificaciones con huella antes/después no
+se pueden ejecutar hasta restablecerlo — probablemente una regla de firewall, y
+tocar ese servidor compartido lo autoriza el humano.
 
 ## F-042 · `done` — CERRADA, y con ella los 30,4 M€ que se publicaban de más
 
@@ -214,18 +236,27 @@ mutación miente) y **F-045** (retenciones sin obra), y en el 3 entra ya
 
 ### La cola de trabajo, fijada por el humano el 2026-08-31
 
-**F-052 → F-045 → F-051 → F-050**, con las prioridades 1, 2, 3 y 4 puestas en
+**F-052 → F-053 → F-045 → F-051 → F-050**, con las prioridades 1 a 5 puestas en
 `features.json` y la razón anotada en cada ficha. Salió de preguntarse qué falta
-para que **negocio pueda usar el datamart a través del MCP**:
+para que **negocio pueda usar el datamart a través del MCP**; **F-053 se insertó
+en el 2 el 2026-08-31**, al aparecer en la exploración de F-052.
 
 1. **F-052** — una obra que no está en el datamart no produce un número raro,
    produce respuestas como si casi no existiera. No hay nada que chirríe, así
    que envenena la confianza en todo lo demás.
-2. **F-045** — el caso de uso 3 del humano, las retenciones de los proveedores
+2. **F-053** — la hermana de F-052: otras tres obras invisibles (0517, 0252,
+   0720) por una causa distinta, el desempate `rn = 1` de `stg/03_obras.sql:125`
+   que elige la ficha vacía. ~10,65 M€ de coste y 10,94 M€ de venta. **Pero
+   primero hay que analizar si de verdad es un error**: la ficha llena puede ser
+   una versión jubilada a propósito, y publicarla sería resucitar datos retirados
+   o doblarlos. Es resultado válido cerrarla sin tocar código. **No se mezcla con
+   F-052**: la verificación de las dos es la misma huella antes/después, y tocar
+   dos causas a la vez impide saber cuál movió qué.
+3. **F-045** — el caso de uso 3 del humano, las retenciones de los proveedores
    de una obra, hoy **no tiene respuesta**: `retenciones.movimientos.obra_id` no
    une con `maestro.obras`, 0 de 261 valores casan.
-3. **F-051** — con el diagnóstico ya hecho y medido.
-4. **F-050** — los meses que faltan, que es la raíz de negocio compartida.
+4. **F-051** — con el diagnóstico ya hecho y medido.
+5. **F-050** — los meses que faltan, que es la raíz de negocio compartida.
 
 **Lo demás espera**, incluidas las de prioridad 2 que había antes (F-036, F-041).
 

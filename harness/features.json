@@ -700,7 +700,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 2,
+      "priority": 3,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -778,7 +778,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 4,
+      "priority": 5,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -795,7 +795,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 3,
+      "priority": 4,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -814,6 +814,25 @@
       "rigor": "critico",
       "priority": 1,
       "branch": "feature/F-052-partidas-huerfanas"
+    },
+    {
+      "id": "F-053",
+      "title": "El desempate rn=1 de stg.obras elige la ficha vacia: tres obras reales no aparecen en el datamart",
+      "description": "Hallazgo lateral de la exploracion de F-052, medido contra la base en solo lectura el 2026-08-31 (progress/explore_F-052.md, seccion 4, fila 4). MISMA FAMILIA QUE F-052 -una obra que desaparece sin que nada chirrie- pero CAUSA DISTINTA Y FICHERO DISTINTO, por eso va aparte. EL SINTOMA: 0517 COLEGIO SESENA II, 0252 C.P. PRIMO DE RIVERA y 0720 PROMIRIS tienen CERO filas en mart.fact_seguimiento_mensual. No publican cifras malas: no publican nada. LA CAUSA: en Sigrid una misma obra puede tener varios registros (ide) bajo el mismo codigo de obra, y stg/03_obras.sql:125 se queda con uno solo via ROW_NUMBER() ... WHERE rn = 1. El ORDER BY del ranking desempata por 1) vigente en raw.conext (cod='15'), 2) con.tiemod DESC, 3) obr.ide DESC. NINGUNO DE LOS TRES MIRA SI EL REGISTRO TIENE DATOS DENTRO, asi que en estas tres obras gana la ficha vacia y se descarta la llena: 0517 gana el ide 1060846 con 207 filas de presupuesto y pierde el 1088657 con 158.737; 0252 gana el 587639 con 22 y pierde el 650280 con 28.511; 0720 (VIVA) gana el 2824201 con 0 y pierde el 2759241 con 7.317. EL DINERO, con la cuenta defendible de F-052 (ultimo fase_num por ambito, ambitos 3 y 7): 0517 = 6.105.401,62 EUR de coste y 6.814.253,09 EUR de venta; 0252 = 4.547.711,35 EUR y 4.129.990,44 EUR. Total ~10,65 M EUR de coste y ~10,94 M EUR de venta invisibles. CASO APARTE, NO CONFUNDIR: la 0606 PUY DU FOU si publica, pero tiene un ide perdido con 1.811.434,92 / 1.890.560,92 EUR; ahi el ganador no esta vacio y hay que decidir cual es el bueno, seguramente con Negocio. La cabecera del propio 03_obras.sql ya documenta este 'Caso 3' y dice que si negocio decide cual es el correcto se marque en Sigrid y se reconstruya. NO SE MEZCLA CON F-052 A PROPOSITO: la verificacion de F-052 es comparar huellas antes/despues sobre el mismo raw, y tocar dos causas a la vez impide saber cual movio que en una obra que multiplica su coste por 2,9. PRIMERO HAY QUE ANALIZAR SI REALMENTE ES UN ERROR, decision del humano el 2026-08-31: que el ide con menos filas sea el descartado NO demuestra por si solo que la eleccion sea incorrecta. Sigrid marca fichas como vigentes en raw.conext y ese marcado puede ser deliberado: una obra puede haberse rehecho, refundido o reabierto con una ficha nueva a proposito, y la ficha llena ser la version ANTIGUA que negocio decidio jubilar. Publicar sus importes seria entonces resucitar datos retirados, o peor, DOBLARLOS si parte de ese presupuesto se remigro a la ficha vigente. La exploracion debe establecer, antes de proponer ningun arreglo: que significa exactamente la marca cod='15' de raw.conext y quien la pone; si las dos fichas de cada obra se solapan en fechas, en fases y en importes o son disjuntas; que dice Sigrid de esas obras por su interfaz; y si el criterio correcto es cambiar el desempate, fusionar las dos fichas o dejarlo como esta. ES UN RESULTADO VALIDO DE ESTA FEATURE concluir que el comportamiento actual es correcto y cerrarla sin tocar codigo, dejando documentado por que: lo que NO es aceptable es que el datamart siga eligiendo en silencio y que nadie sepa cual de las dos fichas es la buena.",
+      "acceptance": [
+        "ANALIZADO Y RESPONDIDO SI ES UN ERROR: que significa la marca cod='15' de raw.conext, quien la pone y si las dos fichas de cada obra se solapan o son disjuntas en fechas, fases e importes. Es resultado valido concluir que el comportamiento actual es correcto y cerrar la feature sin tocar codigo, con el porque documentado",
+        "Censo completo de codigos de obra con mas de un ide en raw, no solo los tres detectados, con cuantos tienen datos en cada ide",
+        "Verificado que publicar la ficha descartada no DOBLA importes ya publicados: si las dos fichas se solapan, el arreglo no es cambiar el desempate",
+        "Si se concluye que es un error: las obras 0517, 0252 y 0720 aparecen en mart.fact_seguimiento_mensual con el volumen que les corresponde, verificado con huella antes/despues sobre el mismo raw, y documentado por que no rompe las 48 obras duplicadas que hoy se resuelven bien",
+        "La 0606 PUY DU FOU resuelta o declarada como excepcion con motivo: su ide ganador NO esta vacio y elegir es una decision de negocio",
+        "check-cobertura (F-052) deja de declarar estas obras como excepcion aceptada: o pasa a exigirlas, o la excepcion queda documentada como definitiva con su motivo",
+        "Si la causa de fondo es dato mal metido en Sigrid, llevada a quien lo administra: no se toca desde aqui"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 2,
+      "branch": "feature/F-053-desempate-obras-duplicadas"
     }
   ]
 }

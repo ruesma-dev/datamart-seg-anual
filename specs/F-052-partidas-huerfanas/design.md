@@ -87,7 +87,39 @@ planificado no es un `JOIN` puro: `master_proyectado` elige la versión vigente,
 así que muchísimas filas de `stg` no llegan al fact **por diseño** y contar sería
 mentir. En los reales (3, 7) el build sí es `JOIN` puro y ahí se comparan filas.
 
-Se engancha en `run-all` **junto a `check-declarados`**, al final (R17).
+### Se engancha sin bloquear, y avisa por correo (DA-4)
+
+Se ejecuta al final de `run-all`, junto a `check-declarados`, pero **no hace
+fallar el job**: registra el hallazgo y la nocturna termina en verde (R17).
+Lanzado a mano fuera de `run-all` sí devuelve código distinto de 0, para poder
+usarlo como puerta en una verificación manual.
+
+**El aviso por correo no lleva código de correo nuevo**: el mecanismo ya existe
+en este repositorio y se reutiliza tal cual.
+
+| Pieza | Ya existe | Qué se añade |
+|---|---|---|
+| Grupo de acción `ag-datamart-seg-dev` (rg `rg-datamart-seg-dev`) | `infra/90_create_alert.ps1`, destinatarios por `-AlertEmail` | nada: se le suma el buzón que indique el humano |
+| Regla de consulta programada sobre `log-datamart-seg-dev` | `infra/95_create_alert_frescura.ps1` | `infra/96_create_alert_cobertura.ps1`, hermano suyo |
+| La línea que dispara la regla | — | un **marcador estable** que emite `check-cobertura` (R28) |
+
+El marcador es el literal **`[F052-COBERTURA-KO]`**, seguido del recuento de
+obras invisibles y de filas huérfanas. Vive en **dos sitios que no pueden
+divergir** —el código que lo emite y el `.ps1` que lo busca—, así que lo protege
+un test que cruza los dos extremos, exactamente como
+`test_f024_r19_umbral_por_defecto_coincide_con_dev_json` protege el umbral de
+frescura. Si divergen, la alerta vigila un texto que ya nadie escribe y **nadie
+se entera**, que es el modo de fallo que esta feature existe para eliminar.
+
+**Ninguna dirección de correo entra en el repositorio** (R30). Lo dice ya
+`infra/90_create_alert.ps1`: los destinatarios se pasan con `-AlertEmail` en el
+despliegue, que es manual y lo ejecuta el humano.
+
+> **Riesgo declarado, y es el precio de no bloquear.** Al terminar el job en
+> verde, la alerta de fallo existente (`alert-caj-datamart-seg-dev-failed`) **no
+> se dispara**. La regla nueva pasa a ser la **única** vía por la que este
+> guardián se hace oír: **si no se despliega, el guardián es mudo** — detecta la
+> obra invisible, la escribe en el log y no se entera nadie.
 
 **Coste, y por qué es un riesgo declarado.** A y B barren `stg.plan_mensual`
 entera. Con el techo de 10 MiB/s del `B1ms` eso son minutos, sobre una nocturna
@@ -109,6 +141,8 @@ eso lleva `statement_timeout`.
 | `config/diccionario/mart.yaml`, `cierre.yaml` | Aviso del cambio de cifras de la 0599 (R21). |
 | `config/diccionario/00_global.yaml` | `version` (R22). |
 | `docs/ARCHITECTURE.md` | Semántica Sigrid: capítulo sin código (R23). |
+| `infra/96_create_alert_cobertura.ps1` *(nuevo)* | Regla de consulta programada que busca el marcador y notifica a `ag-datamart-seg-dev` (R29). Despliegue manual. |
+| `tests/test_f052_marcador.py` *(nuevo)* | El marcador del código y el del `.ps1` no pueden divergir (R28). |
 
 **Ficheros que NO se tocan** (los que tientan):
 
@@ -123,66 +157,44 @@ eso lleva `statement_timeout`.
 - `sql/stg/08_plan_mensual.sql` y `sql/cierre/02_build_fact.sql` — se mueven
   solos al llegar las partidas; no hay nada que tocar en ellos.
 
-## 5 · Decisiones abiertas (las cierra el humano al aprobar la spec)
+## 5 · Decisiones tomadas por el humano el 2026-08-31
 
-**DA-1 · ¿Se relaja también la rama raíz (`04_partidas.sql:58`)?**
-(a) Solo el descenso, línea 78. (b) Las dos, simétricamente.
-**Recomendación: (a).** Medido: los 7 nodos con `cod = ''` son **todos
-intermedios**, no hay ni una raíz sin código, así que (b) no recupera ni una
-fila hoy. Y una raíz sin código no tiene `capitulo_raiz_cod` con el que
-categorizar su subárbol: obligaría a inventar reglas para `capitulo_raiz_id` sin
-un solo caso real que las valide. El día que aparezca una, la caza el guardián
-de §3, que es exactamente para lo que se construye.
+Las siete estaban abiertas al escribir esta spec. **Están cerradas.** El detalle
+—la razón de cada una y lo que se descartó— vive en **`decisiones.md`**; aquí
+queda lo que hay que saber para implementar.
 
-**DA-2 · ¿Qué reciben `ruta_capitulos` y `codigo_partida` de esos nodos?**
-(a) Colapsarlos: no se publican, sus hijos cuelgan del ancestro publicado y la
-ruta no gana segmento. (b) Publicarlos con `codigo_partida` NULL. (c) Publicarlos
-con un código sintético (`ide`, `(sin código)`).
-**Recomendación: (a)**, por §1: es lo único que no rompe la ficha del
-diccionario, ni `05b`, ni la relación declarada, ni arriesga doble conteo.
-**Contrapartida honesta que el humano debe aceptar:** «FASE 1 - MOVIMIENTO
-TIERRAS Y CIMENTACIÓN» **desaparece del árbol de Power BI** de la 0599; su
-información de fase se pierde como agrupador. Si Negocio la quiere ver, es (c) y
-hay que decidir el código sintético con ellos.
+| | Decisión |
+|---|---|
+| **DA-1** | Solo se relaja la **rama de descenso** (línea 78). La raíz no se toca |
+| **DA-2** | **Colapsar**, con R11 como condición bloqueante: si se mueve una cifra de una obra fuera de las seis, **se para y se consulta** |
+| **DA-3** | Array de visitados **+** tope de profundidad |
+| **DA-4** | **Avisa, no bloquea** (§3), y avisa **por correo** |
+| **DA-5** | Sí a Sigrid, sin esperar. Prioridad solo la **0686**, obra viva |
+| **DA-6** | Aviso a Negocio **antes** de publicar (`aviso_negocio.md`) y nota en el diccionario |
+| **DA-7** | Feature propia: **F-053**, prioridad 2 |
 
-**DA-3 · Corta-ciclos.** (a) Array de visitados en el CTE. (b) Tope de
-profundidad. (c) Detectar y romper los ciclos antes del recorrido.
-**Recomendación: (a) + (b) como respaldo.** (b) solo es arbitrario y trunca
-ramas legítimas si alguna crece; (c) es un paso más que mantener. El array es
-exacto y su coste es una decena de `bigint` por fila. Los 12 nodos en ciclo
-**siguen sin publicarse** —no son alcanzables desde ninguna raíz—, pero ahora
-quedan denunciados en vez de perdidos.
+**Por qué R11 se espera limpio, y no por optimismo.** Cada partida tiene **un
+solo padre**, luego un solo camino hasta su raíz. La que hoy se publica tiene ese
+camino entero con código, y el algoritmo nuevo lo recorre igual: misma ruta, mismo
+nivel, mismo padre. Relajar el filtro **solo añade** caminos. **El cambio es
+estrictamente aditivo**, y para que una obra sana se moviera una de sus partidas
+tendría que tener dos padres, cosa que el modelo no permite. Medido el
+2026-08-31: fuera de la 0599 el movimiento máximo posible son **226 filas de
+183.756**, a **0,00 €**; y la profundidad real máxima es de **7 niveles, cero
+partidas de nivel 8 o más sobre 389.178**, así que el tope de 40 no trunca nada.
+El argumento no sustituye a la prueba: R11 se verifica igualmente.
 
-**DA-4 · Qué se instrumenta de los nueve puntos de descarte.**
-(a) Solo el guardián post-build de §3. (b) Además, contadores dentro de
-`mart/02_build_fact.sql`. (c) Instrumentar los nueve.
-**Recomendación: (a).** Da el mismo veredicto sin tocar el camino caliente de
-5,3 M de filas, y dos de los nueve (fase 0 y ámbitos no mirados) son descartes
-**por diseño**: instrumentarlos sería ruido permanente. Falta que el humano
-decida si `check-cobertura` **bloquea la nocturna** (código 1, como
-`check-declarados` — es lo que recomendamos) o solo avisa.
+**Contrapartida aceptada (DA-2):** «FASE 1 - MOVIMIENTO TIERRAS Y CIMENTACIÓN» y
+sus dos hermanas **desaparecen del árbol de Power BI** de la 0599 como agrupador.
+Va en el aviso a Negocio para que puedan objetar antes de publicar.
 
-**DA-5 · ¿La causa se lleva a Sigrid?**
-**Recomendación: sí, pero sin esperar.** Como en F-050: aquí se protege el ETL y
-se avisa a quien administra Sigrid de los 3 capítulos sin código y los 2
-auto-bucles. Con un matiz de prioridad: 0599, 0613, 0618, 0630 y 0565 son obras
-**cerradas** entre 2020 y 2022 que nadie va a volver a tocar, así que su
-saneamiento es cosmético; el auto-bucle de la **0686 VALDEBEBAS está vivo**
-(última fase 2026-07-31) y ese sí conviene corregirlo en origen.
+### Bloqueo operativo conocido (2026-08-31)
 
-**DA-6 · El aviso a Negocio (R27).** (a) Avisar antes de publicar, con la tabla
-de la sección 3 del informe. (b) Publicar y avisar después. (c) Publicar con una
-nota en el diccionario.
-**Recomendación: (a) + (c).** El margen de la 0599 pasa de 66,3 % a 1,8 %:
-cualquier informe o captura anterior deja de cuadrar, y quien lo mire sin aviso
-va a pensar que el datamart se ha roto. La nota en la ficha (R21) es lo que
-contesta esa pregunta dentro de seis meses.
-
-**DA-7 · Alcance de F-053.** El desempate `rn = 1` de `03_obras.sql:125` deja
-**tres obras más invisibles** (0517, 0252, 0720) por otra causa, ~10,65 M€ de
-coste y 10,94 M€ de venta. **Recomendación: feature propia**, fichada en este
-mismo trabajo y declarada como excepción en `config/cobertura_excepciones.yaml`
-hasta que se cierre. Aquí solo se nombra (R24).
+**No hay conexión directa a la base desde el puesto** (`connection timeout
+expired` contra `psql-albaranes-rs9k2`). La base responde por la vía de solo
+lectura del MCP, pero **esa vía no expone `raw`**. Las verificaciones con huella
+antes/después (T13-T16 y los pasos de cierre) **no se pueden ejecutar** hasta
+restablecerlo. Bloquea la implementación, no el diseño.
 
 ## 6 · Riesgos
 

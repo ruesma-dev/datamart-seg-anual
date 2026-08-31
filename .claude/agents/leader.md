@@ -74,8 +74,12 @@ escribe su hallazgo en `progress/explore_<tema>.md`.
 
 Antes de lanzar el implementer de una feature nueva, verifica que existe la
 rama `feature/F-XXX-slug` y que estás en ella (`git branch --show-current`).
-Si no existe, créala desde `dev` actualizado: `git checkout dev && git pull
+Si no existe, créala desde `main` actualizado: `git checkout main && git pull
 && git checkout -b feature/F-XXX-slug`.
+
+La rama de integración de este repositorio es **`main`**; `dev` se mantiene
+solo como espejo. El 2026-08-31 `dev` iba 97 commits por detrás de `main`:
+crear una rama desde ahí significaba empezar a trabajar sobre código viejo.
 
 ## Al terminar la sesión
 

@@ -30,7 +30,16 @@ completas de tablas de varios GB. Un agente no escribe en producción.
 - [ ] T9: Crear `etl_sigrid/infrastructure/postgres/cobertura_sql.py`, que **solo construye texto** con su `SET LOCAL statement_timeout` y no abre conexión, al estilo de `unicidad_sql.py` | Verificación: `pytest tests/test_f052_cobertura.py` (R18, R19)
 - [ ] T10: Crear `config/cobertura_excepciones.yaml` con las excepciones aceptadas de hoy: las 12 partidas en ciclo, las 15 obras `OBRA PRUEBA`/`POSTVENTA`/`VAR` y las tres obras que dependen de F-053 (0517, 0252, 0720), cada una con motivo y feature que la cierra | Verificación: `pytest tests/test_f052_cobertura.py` (R16)
 - [ ] T11: Añadir el test del trinquete: la lista de excepciones **solo puede bajar**, con la constante del recuento actual, como hace `objetos_pendientes.yaml` | Verificación: `pytest tests/test_f052_cobertura.py` (R16)
-- [ ] T12: Añadir el comando `check-cobertura` a `main.py` (`--timeout`, `--dry-run`) y engancharlo en `run-all` junto a `check-declarados` | Verificación: `python main.py check-cobertura --help`; `python main.py check-cobertura --dry-run`; `pytest tests/test_f052_cobertura.py` (R13, R17)
+- [ ] T12: Añadir el comando `check-cobertura` a `main.py` (`--timeout`, `--dry-run`) y engancharlo en `run-all` junto a `check-declarados`, **sin hacer fallar el job**: dentro de `run-all` registra y sigue; lanzado a mano devuelve código distinto de 0 (DA-4) | Verificación: `python main.py check-cobertura --help`; `python main.py check-cobertura --dry-run`; un test cubre las dos salidas, dentro y fuera de `run-all`; `pytest tests/test_f052_cobertura.py` (R13, R17)
+
+## Bloque C bis · Que el guardián se haga oír (DA-4)
+
+Sin esto el guardián es **mudo**: al no bloquear el job, la alerta de fallo
+existente no se dispara y el hallazgo se queda en el log.
+
+- [ ] T24: Escribir `tests/test_f052_marcador.py`, que cruza el marcador `[F052-COBERTURA-KO]` emitido por el código con el que busca `infra/96_create_alert_cobertura.ps1`, al estilo de `test_f024_r19_umbral_por_defecto_coincide_con_dev_json` | Verificación: `pytest tests/test_f052_marcador.py` **falla** (fase RED)
+- [ ] T25: Emitir el marcador desde `check-cobertura` cuando encuentre algo fuera de lo declarado, seguido del recuento de obras invisibles y de filas huérfanas | Verificación: `pytest tests/test_f052_marcador.py tests/test_f052_cobertura.py` en verde (R28)
+- [ ] T26: Crear `infra/96_create_alert_cobertura.ps1`, hermano de `95_create_alert_frescura.ps1`: regla de consulta programada sobre `log-datamart-seg-dev` que busca el marcador y notifica a `ag-datamart-seg-dev`. **Ninguna dirección de correo en el fichero** (R30) | Verificación: `pytest tests/test_f052_marcador.py`; revisión visual; el despliegue es MANUAL
 
 ## Bloque D · La medida ANTES, contra la base
 
@@ -79,8 +88,14 @@ personas. Los autoriza y lanza el humano. Coste: una **nocturna completa,
    `stg.partidas` 389.178 → 390.501; 0599 de 117 a 1.440 partidas; el fact gana
    ~183.756 filas y aparecen 0599 × 7 y 0599 × 11; DIRECTOS de la 0599 de 0,00 €
    a ~2,62 M€.
-6. **`python main.py check-cobertura`** → código 0, con solo las excepciones
-   declaradas de T10 (R13-R17).
+6. **`python main.py check-cobertura`** → código 0 lanzado a mano, con solo las
+   excepciones declaradas de T10 (R13-R17).
+6 bis. **Desplegar el aviso por correo (R29, DA-4)**: ejecutar
+   `infra/96_create_alert_cobertura.ps1` y **añadir el buzón de desarrollo al
+   grupo de acción** con `-AlertEmail` de `infra/90_create_alert.ps1`. **Sin este
+   paso el guardián no avisa a nadie**, porque al no bloquear el job la alerta de
+   fallo existente no se dispara. Verificar de punta a punta provocando el
+   marcador una vez y comprobando que llega el correo.
 7. **`python main.py check-unicidad --timeout 300`** → **0 claves duplicadas**
    en `mart.fact_seguimiento_mensual` con las 183.756 filas nuevas (R12).
 8. **`python main.py check-cierres`** y **`check-diccionario`** → código 0.
