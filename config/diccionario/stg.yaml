@@ -424,6 +424,11 @@ objetos:
       capitulo cuelga, cual es su capitulo raiz, su ruta completa y su nivel. En
       Sigrid un capitulo es tambien una fila de partidas, asi que aqui conviven
       los dos.
+
+      **Un capitulo de Sigrid puede no tener codigo** (cadena vacia, no NULL).
+      Esos no se publican, pero desde F-052 (2026-08-31) el recorrido SI baja a
+      traves de ellos y sus descendientes llegan. Lee `codigo_partida` y
+      `capitulo_padre_id` antes de recorrer el arbol.
     grano: >-
       Una fila por `partida_id`: una partida de detalle o un capitulo de
       cualquier nivel de una obra.
@@ -441,12 +446,27 @@ objetos:
         agregacion: no_sumable
       codigo_partida:
         significado: >-
-          Codigo jerarquico de la partida dentro de su obra. **Nunca es NULL**:
-          la rama raiz del recorrido filtra `p.cod IS NOT NULL AND p.cod <> ''`,
-          y las descendientes cuelgan de un padre que ya paso ese filtro. Una
-          partida sin codigo en Sigrid **no llega a esta tabla**.
+          Codigo jerarquico de la partida dentro de su obra. **Nunca es NULL ni
+          vacio**: el filtro de publicacion descarta las filas con el codigo en
+          blanco.
+
+          **OJO, cambio del 2026-08-31 (F-052).** Una partida sin codigo sigue
+          sin llegar aqui, pero **sus descendientes SI llegan**. Antes no: el
+          recorrido del arbol se negaba a *descender a traves* de un capitulo
+          con el codigo en blanco y amputaba su subarbol entero, lo que dejaba
+          1.323 partidas de la obra 0599 TANATORIO MAJADAHONDA fuera del
+          datamart. Ahora el codigo vacio decide **que se publica, no por donde
+          se desciende**: el capitulo en blanco se atraviesa y se COLAPSA.
       capitulo_padre_id:
-        significado: Capitulo del que cuelga directamente.
+        significado: >-
+          El **ancestro PUBLICADO mas cercano**, que desde F-052 (2026-08-31) no
+          es siempre el padre que Sigrid guarda en `raw.obrparpar.padide`. Si el
+          padre de Sigrid es un capitulo sin codigo -y por tanto no publicado-,
+          esta columna apunta al primer ancestro que si se publica, saltandose
+          los colapsados. Se hizo asi para que la relacion apunte SIEMPRE a una
+          fila que existe en esta tabla: publicar el capitulo en blanco habria
+          exigido inventarle un codigo y habria abierto la puerta al doble
+          conteo si tuviera importes propios.
         agregacion: no_sumable
         nulo_significa: Es un capitulo raiz, no cuelga de nada.
       descripcion_corta:
@@ -488,11 +508,20 @@ objetos:
           niveles de `mart.v_pbi_dim_partida_niveles`. **Nunca es NULL**: se
           concatena a partir de codigos que el filtro de entrada ya garantiza no
           nulos.
+
+          Cuenta **solo los capitulos publicados**: los que se colapsaron por no
+          tener codigo NO dejan segmento, asi que la ruta nunca lleva un hueco
+          en blanco (`'CD >  > 01.01'` no existe). Invariante comprobable en
+          cualquier fila:
+          `cardinality(string_to_array(ruta_capitulos, ' > ')) = nivel + 1`.
       nivel:
         significado: >-
           Profundidad en el arbol de capitulos, empezando en 0 para el raiz.
-          **Nunca es NULL**: la raiz entra con un `0` literal y cada
-          descendiente suma uno al de su padre.
+          **Nunca es NULL**: la raiz entra con un `0` literal.
+
+          Cuenta **solo ancestros publicados**: atravesar un capitulo sin codigo
+          NO suma nivel, igual que no suma segmento en `ruta_capitulos`. Por eso
+          las dos columnas siguen cuadrando entre si.
         agregacion: no_sumable
       activa: >-
         Marca de partida vigente, tomada del origen. Ojo, no confundir con la
