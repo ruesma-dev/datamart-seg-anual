@@ -53,7 +53,7 @@ existente no se dispara y el hallazgo se queda en el log.
 - [x] T17: Añadir en `config/diccionario/mart.yaml` y `cierre.yaml` el aviso de que las cifras de la 0599 cambian a partir de esta reconstrucción, con la fecha y el margen antes/después | Verificación: `pytest tests/test_f006_fichas.py` (R21)
 - [x] T18: Subir `version` en `config/diccionario/00_global.yaml` y comprobar que la lista de pendientes no crece | Verificación: `pytest tests/test_f006_regla_de_oro.py tests/test_f006_cobertura.py` (R22)
 - [x] T19: Añadir a `docs/ARCHITECTURE.md`, en «Semántica Sigrid imprescindible», que un capítulo de Sigrid puede no tener código y que eso no puede cortar el árbol de partidas | Verificación: `pytest tests/test_f006_docs.py` (R23)
-- [ ] T20: Fichar **F-053** en `harness/features.json` (desempate `rn = 1` de `stg/03_obras.sql:125`: 0517, 0252 y 0720 invisibles, ~10,65 M€ de coste y 10,94 M€ de venta) con la línea base de la sección 4 del informe | Verificación: `bash harness/init.sh` (R24, DA-7)
+- [x] T20: Fichar **F-053** en `harness/features.json` (desempate `rn = 1` de `stg/03_obras.sql:125`: 0517, 0252 y 0720 invisibles, ~10,65 M€ de coste y 10,94 M€ de venta) con la línea base de la sección 4 del informe | Verificación: `bash harness/init.sh` (R24, DA-7)
 
 ## Bloque F · Cierre del trabajo del agente
 
@@ -70,7 +70,7 @@ sobre el **mismo `raw`**.
 - [x] T29: Crear la **huella de `cierre`** por obra × mes × concepto, la capa que Negocio ve en Power BI y que esta feature mueve entera en la 0599 | Verificación: `pytest tests/test_f052_huella_cierre.py` (huella 4)
 - [x] T30: Extender `comparar-huellas` para que acepte las huellas nuevas y falle con **cero tolerancia** ante cualquier diferencia en una obra fuera de las seis | Verificación: `pytest` de comparación; `python main.py comparar-huellas --help` (R11)
 - [x] T22: Escribir el informe en `progress/impl_F-052.md` (≤220 líneas) con la traza de cada fase RED, la cobertura de las líneas cambiadas y la línea base de T15 | Verificación: `python -m harness.tamano --feature F-052`
-- [ ] T23: Ejecutar `bash harness/init.sh` en verde | Verificación: `bash harness/init.sh` termina con código 0
+- [x] T23: Ejecutar `bash harness/init.sh` en verde | Verificación: `bash harness/init.sh` termina con código 0
 
 ---
 

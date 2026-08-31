@@ -199,10 +199,10 @@ como texto y ejecutando su función de composición: **no hay correo recibido**.
 
 | Evidencia | Valor |
 |---|---|
-| **Tests ejecutados** | **2.977 passed, 130 skipped**, 0 failed (`bash harness/init.sh`) |
-| De ellos, nuevos de F-052 | **122** en 6 ficheros, más 1 añadido a `test_f042_huella.py` |
+| **Tests ejecutados** | **2.978 passed, 130 skipped**, 0 failed (`bash harness/init.sh`) |
+| De ellos, nuevos de F-052 | **151** en 7 ficheros, más 1 añadido a `test_f042_huella.py` |
 | **Cobertura de las líneas cambiadas** | **100,0 % de 504** (504/504, umbral 80 %, nivel `critico`) — línea `PUERTA COBERTURA` de `init.sh` |
-| **Tiempo de la suite** | **297,42 s** (4 min 57 s), el que imprime pytest dentro de `init.sh` |
+| **Tiempo de la suite** | **308,67 s** (5 min 09 s), el que imprime pytest dentro de `init.sh` |
 | **Mutantes generados / supervivientes** | **N/A — EXENTA.** Decisión del humano del 2026-08-31, registrada en `tasks.md` (T21) y en la ficha de `harness/features.json`. En su lugar, T27-T30 |
 | **Tamaño del papeleo** | `python -m harness.tamano --feature F-052`: dentro de los topes |
 | **`bash harness/init.sh`** | **verde**, `ENTORNO LISTO. Puedes trabajar.` |
