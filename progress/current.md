@@ -1,7 +1,78 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-09-01
 
-## F-052 · FASE 1 IMPLEMENTADA Y REVISADA (nada ejecutado contra la base)
+## F-052 · FASE 2 EJECUTADA — el arreglo está PUBLICADO en la base
+
+**La 0599 ya no miente.** Cierre de 2022-12, contra lo que publicaba ayer:
+
+| Concepto | Antes | Ahora |
+|---|---|---|
+| **DIRECTOS** | **0,00 €** | **2.624.793 €** |
+| GASTOS totales | 1.369.593 € | **3.994.386 €** |
+| VENTA | 4.066.989 € | 4.066.989 € |
+| **BENEFICIO** | 2.697.396 € | **72.603 €** |
+| **Margen** | **66,3 %** | **1,8 %** |
+
+Los tres números que se predijeron el 2026-08-31 —coste 3.994.386,39, beneficio
+72.602,84, margen 1,8 %— **han salido exactos**. La obra de control **0628
+LEGAZPI no se mueve ni un céntimo**.
+
+**Lo ejecutado el 2026-09-01, desde el puesto y contra producción:**
+
+| Paso | Resultado |
+|---|---|
+| `stage` | SUCCESS, **8 h 15** (la misma tarea dentro de Azure: 1 h 37) |
+| `build-mart` | SUCCESS, 2 h 31 · el fact gana **55.165 filas, todas de la 0599** |
+| `build-cierre` | SUCCESS, 2 h 02 · 16.928 filas, las mismas de siempre |
+| `publicar-diccionario` | versión **12**, biyección 103/103, `_meta` ya sirve lo del árbol |
+
+**Las cuatro huellas, capturadas antes y después sobre el MISMO `raw`:**
+
+| Huella | Veredicto | Obras que se mueven |
+|---|---|---|
+| dimension | **OK** | solo 0599 (117 → 1.440) |
+| cierre | **OK** | solo 0599 |
+| mart | KO por master | **solo 0599**, 144 diferencias |
+| stg | KO por master | **solo 0599**, 70 diferencias |
+
+### El KO de master: FALSO POSITIVO, aceptado por el humano el 2026-09-02
+
+`comparar-huellas` arrastra de **F-042** la regla «cualquier cambio en los ámbitos
+master 8 u 11 es desbordamiento». **F-052 exige lo contrario y está escrito en
+R9**: «deben aparecer las combinaciones 0599 × ámbito 7 y 0599 × ámbito 11, hoy
+inexistentes». La herramienta marca como error justo lo que la spec pide.
+
+Comprobado antes de aceptarlo: **las 214 diferencias de las dos huellas son todas
+de la 0599**; ninguna otra obra aparece en ninguna. Palabras del humano: «si la
+única diferencia es la 599 es lo esperado, está bien».
+
+**Deuda que deja abierta**: `comparar-huellas` debería aceptar cambios en master
+**para las obras esperadas**, en vez de rechazarlos siempre. Mientras no se
+arregle, cualquier feature futura que toque master se encontrará el mismo KO y
+tendrá que volver a razonarlo a mano.
+
+### NOCTURNA DESACTIVADA — hay que revertirlo
+
+El cron del job está en **`0 2 1 1 *`** (no dispara) desde el 2026-09-01 22:00.
+Se desactivó porque la imagen del job es **`r20260830-0924`, anterior a F-052**:
+a las 02:00 habría reconstruido con el SQL viejo, deshaciendo 12 h 48 de trabajo,
+y su `ingest` habría cambiado `raw`, invalidando la comparación.
+
+**Se revierte al desplegar la imagen nueva:**
+`az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --cron-expression "0 2 * * *"`
+
+Red de seguridad si se olvida: la alerta de frescura salta a las **30 h** sin
+`build_mart` y avisa a los dos buzones del grupo de acción.
+
+### La alerta de cobertura, desplegada
+
+`alert-caj-datamart-seg-dev-cobertura`, severidad 2, ventana de 24 h evaluada
+cada hora, dispara por **presencia** del marcador `[F052-COBERTURA-KO]`. El grupo
+de acción tiene ya **dos destinatarios**. **Sigue sin verificarse de extremo a
+extremo**: no ha llegado ningún correo todavía, y no llegará hasta que el job
+corra con la imagen nueva.
+
+## F-052 · FASE 1 IMPLEMENTADA Y REVISADA
 
 **Reviewer: FASE 1 APROBADA, ningún cambio requerido** →
 `progress/review_F-052.md`. El cierre queda pendiente de la fase 2: **C5 no se
