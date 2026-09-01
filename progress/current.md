@@ -35,6 +35,30 @@ LEGAZPI no se mueve ni un céntimo**.
 | mart | KO por master | **solo 0599**, 144 diferencias |
 | stg | KO por master | **solo 0599**, 70 diferencias |
 
+### Las comprobaciones de cierre, contra la base reconstruida
+
+| Comando | Resultado |
+|---|---|
+| **R12** · clave de `mart.fact_seguimiento_mensual` | **0 claves duplicadas**, 0 filas implicadas, con las 55.165 filas nuevas dentro |
+| `check-cierres --timeout 900` | **0 discrepancias** en 8.540 cierres de 679 pares obra/ámbito; telescopio R16: **0 sin cuadrar** de 254.236 series |
+| `check-diccionario` | biyección **103/103**; publicado = árbol (**versión 12**) |
+| **`check-cobertura`** | **filas huérfanas: 183.824 → 294.** El guardián mide el arreglo: **−99,8 %** |
+
+**El dato que mejor resume la feature es ese último.** El guardián que se
+construyó para detectar el problema ahora mide su desaparición: de las 183.824
+filas que el build descartaba en silencio quedan **294**. Las 183.530 de la 0599
+ya no se pierden.
+
+Sigue en **KO**, y es correcto que lo esté: quedan **20 obras invisibles** y esas
+294 filas sin declarar. Ninguna es de F-052 —son las administrativas más 0585,
+0687, 0578, 0670 y 0606, que es **F-053**—. **T15 y la desviación 4 del review se
+afinan aquí**: esta es la línea base del DESPUÉS.
+
+**OJO con los timeouts:** `check-unicidad` dejó **3 objetos sin comprobar** (antes
+era 1) y `check-cierres` murió con `QueryCanceled` a la primera. No es un defecto:
+es el servidor tras 12 h de escritura masiva. `check-cierres` necesitó
+`--timeout 900`, y el objeto de R12 hubo que comprobarlo aparte con 900 s.
+
 ### El KO de master: FALSO POSITIVO, aceptado por el humano el 2026-09-02
 
 `comparar-huellas` arrastra de **F-042** la regla «cualquier cambio en los ámbitos
