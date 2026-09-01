@@ -1,7 +1,46 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-09-01
 
-## F-052 · FASE 1 IMPLEMENTADA (nada ejecutado contra la base)
+## F-052 · FASE 1 IMPLEMENTADA Y REVISADA (nada ejecutado contra la base)
+
+**Reviewer: FASE 1 APROBADA, ningún cambio requerido** →
+`progress/review_F-052.md`. El cierre queda pendiente de la fase 2: **C5 no se
+puede marcar** porque T13, T14 y T15 están sin hacer a propósito.
+
+**La condición de DA-2, verificada por TERCERA vez y por otro camino.** El
+reviewer ejecutó el CTE nuevo entero contra **todas las obras** y comparó el
+`md5` del sitio de cada partida contra `stg.partidas` de hoy: **cambia UNA sola
+obra, la 0599** (117 → 1.440); **las otras 734 salen idénticas al byte**. Es R6
+cumplido y la huella 3 pre-validada en solo lectura.
+
+**Dos cosas que el reviewer encontró en la huella 3 y que conviene no perder:**
+lleva `ORDER BY p.partida_id` **dentro** del `string_agg` y `COALESCE` en las seis
+columnas. Sin lo primero el `md5` bailaría solo; sin lo segundo, un
+`capitulo_padre_id` NULL haría NULL el resumen entero de cualquier obra con raíz
+y **la comparación parecería verde**. Es el modo de fallo más peligroso que tiene
+esta feature: una verificación que miente en verde.
+
+**Tres observaciones que NO bloquean, anotadas para la fase 2:**
+
+1. `check-cobertura` **da verde sobre cero filas**. Hoy cero filas es el estado
+   sano, pero un fallo que dejara las dos consultas sin resultados (tabla
+   renombrada, esquema vacío) se leería como OK. Con la línea base de **T15** cabe
+   añadir el denominador: combinaciones (obra × ámbito) vistas en `stg`.
+2. Hay una **décima excepción que T10 no pedía**, la 0606 PUY DU FOU. Justificada
+   y marcada `feature: F-053`, pero debía haberse declarado.
+3. Un CSV de huella de F-042 anterior a T27 (8 columnas) ya no lo reconoce
+   `comparar-huellas` y muere con un mensaje confuso. Hoy no existe ninguno.
+
+**Desviación 4, aceptada CON SEGUIMIENTO:** no hay tope de filas por excepción,
+así que la de 0565, 0630 y 0686 tapa **cualquier** número de huérfanas en esas
+obras. **T15 fija la línea base y ahí se afina.**
+
+**Automejora propuesta por el reviewer, sin aplicar:** `.claude/agents/reviewer.md`
+obliga a un veredicto binario, y una feature partida en dos fases por diseño no es
+ni APPROVED ni CHANGES_REQUESTED. Propone un tercero, `APPROVED_FASE_1`, que
+obligue a enumerar los checkpoints pendientes. **Decisión del humano.**
+
+### Lo entregado en la fase 1
 
 **Informe completo: `progress/impl_F-052.md`.** Hechas T1-T12, T16-T19 y
 T22-T30; T20 ya venía hecha y **T21 (mutación) está exenta** por decisión del
