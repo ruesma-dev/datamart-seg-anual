@@ -837,6 +837,24 @@
       "rigor": "documental",
       "priority": 3,
       "branch": "feature/F-054-conocimiento-de-negocio"
+    },
+    {
+      "id": "F-055",
+      "title": "Cuatro obras no publican ni una fila en los ambitos master: 0578, 0585, 0670 y 0687",
+      "description": "Fichada el 2026-09-02 al cerrar F-052, y ES UNA PREGUNTA ABIERTA, NO UN DIAGNOSTICO. `check-cobertura` -el guardian que F-052 construyo- las denuncia como OBRA INVISIBLE en los dos ambitos master y solo en ellos: 0578 12 VIVIENDAS C/CANILLAS, 0585 REF. Y AMPLIACION COLEGIO MAYOR ALCOR, 0670 CAMPO FUTBOL COLEGIO SANTILLANA y 0687 CENTRO PRIMERA ACOGIDA DE MENORES LA CANTUENA. Las cuatro tienen ficha en stg.obras, publican con normalidad en los ambitos reales 3 (coste) y 7 (venta), y tienen CERO filas en mart.fact_seguimiento_mensual para el 8 (master coste) y el 11 (master venta). Medido el 2026-09-02 contra la base ya reconstruida, en solo lectura. HAY DOS EXPLICACIONES Y NO SE SABE CUAL ES: (a) ES LEGITIMO, porque el build de planificado no es un JOIN puro -`master_proyectado` elige la version vigente de cada mes- y una obra sin version master vigente no tiene filas ahi POR DISENO; esa es justamente la razon por la que R14 de F-052 compara PRESENCIA y no conteo. (b) ES OTRO AGUJERO, hermano del de la 0599: algo del build las descarta en silencio y nadie se entera, que es el modo de fallo que F-052 existe para eliminar. NO SE SUPONE NINGUNA DE LAS DOS: la feature es contestar cual, con el dato delante, y el resultado 'no habia nada que arreglar' es un resultado valido y ademas el mas probable. POR QUE NO SE DEJO EN F-052: porque F-052 tenia una causa identificada -el filtro `AND h.cod <> ''` del arbol de partidas- y mezclar dos causas en la misma verificacion antes/despues impide saber cual movio que; es el mismo criterio con el que se separo F-053. LO QUE HAY QUE DESHACER AL CERRARLA: las OCHO excepciones que hoy tapan estas cuatro obras en `config/cobertura_excepciones.yaml` -dos por obra, acotadas con `ambito_id` a 8 y 11 para no tapar tambien el ambito 3, que es dinero-. Estan declaradas con `feature: F-055` y son 8 de las 13 que subieron EXCEPCIONES_MAX de 10 a 23 el 2026-09-02: cerrar esta feature baja el trinquete a 15. PISTA POR DONDE EMPEZAR: `stg.version_master_vigente` y el campo extendido cod 15 (`cod_version_master_vigente` de business_rules.yaml), que es de donde el build saca que version manda.",
+      "acceptance": [
+        "Contestado con el dato delante, obra a obra, si las cuatro estan ciegas en los ambitos 8 y 11 POR DISENO -sin version master vigente- o por un descarte del build. Escrito cual de las dos y por que",
+        "Si es por diseno: queda documentado en el diccionario que una obra sin version master vigente no publica en los ambitos master, para que la proxima vez no haya que investigarlo otra vez",
+        "Si es un agujero: arreglado, y verificado con las cuatro huellas antes/despues de F-052 con `--obras-esperadas` acotado a estas obras",
+        "Medido cuantas obras MAS estan en la misma situacion: las cuatro salieron de un veredicto de un dia concreto, no de un censo",
+        "Retiradas de `config/cobertura_excepciones.yaml` las ocho excepciones marcadas `feature: F-055` y bajado EXCEPCIONES_MAX de 23 a 15 en tests/test_f052_cobertura.py. El trinquete SOLO BAJA",
+        "`python main.py check-cobertura --timeout 900` sigue saliendo en codigo 0"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 4,
+      "branch": "feature/F-055-obras-ciegas-en-master"
     }
   ]
 }

@@ -57,7 +57,27 @@ from etl_sigrid.infrastructure.postgres.cobertura_sql import (
 #: y `PENDIENTES_CONSTRUCCION_MAX` para `objetos_pendientes.yaml`, la constante
 #: vive en el test a propósito: bajarla es parte de la tarea que cierra la
 #: excepción, nunca un apaño posterior.
-EXCEPCIONES_MAX = 10
+#:
+#: **SUBIDA DE 10 A 23 EL 2026-09-02, y esta es la única vez que sube.** Motivo,
+#: que es una decisión escrita del humano y no una comodidad del que implementa:
+#: cerrada la fase 2 de F-052 el guardián seguía en rojo por 20 obras invisibles
+#: y 294 filas huérfanas **ya medidas y entendidas**, y un guardián que nace en
+#: rojo permanente manda un correo cada noche que no significa nada; en dos
+#: semanas no lo mira nadie y la feature entera se queda sin servir para lo que
+#: existe. Con el residuo declarado, el día que aparezca una obra invisible
+#: **nueva** el correo significará algo.
+#:
+#: Las 13 que entran, con el desglose que hace auditable el número: **2** el
+#: residuo de la propia F-052 (0613 con 150 huérfanas y 0618 con 76, las «226
+#: filas a 0,00 €» que DA-2 anticipó), **8** las cuatro obras ciegas sólo en
+#: master —dos entradas cada una, acotadas a los ámbitos 8 y 11 en vez de
+#: taparlas enteras, porque el ámbito 3 es dinero— y **3** las papeleras de
+#: código de seis dígitos que ningún patrón por nombre cubría.
+#:
+#: De las 13, **8 las cierra F-055** y **2 las cierra F-052**: el trinquete
+#: vuelve a bajar a 13 en cuanto F-055 conteste si esas cuatro obras están
+#: ciegas en master por diseño o por otro agujero.
+EXCEPCIONES_MAX = 23
 
 
 def _fila(
