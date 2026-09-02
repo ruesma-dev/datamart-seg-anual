@@ -44,3 +44,6 @@ huella_*.csv
 *.xls
 *.ppt
 # <<< ARNES-BASE: fin del bloque gestionado. <<<
+
+# Listados de obras generados para revisar la ventana de F-025 (datos de negocio)
+obras_*.csv
