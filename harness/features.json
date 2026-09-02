@@ -495,15 +495,20 @@
     },
     {
       "id": "F-025",
-      "title": "Ventana de negocio: acotar el build de stg y mart a lo que se mueve",
-      "description": "Extraida de F-011 el 2026-08-18 por decision del humano: la definicion de 'obra abierta' (DA-1 de F-011) queda SIN DECIDIR y es de Negocio, asi que el bloque C de F-011 sale de aquella feature y se hace mas adelante en esta. Motivo de peso para priorizarla: la medicion de la carga del 18-ago demuestra que build_stg se lleva 111 de los 165 min (67 %) y build_mart 21 (13 %), mientras la ingesta son 33 (20 %); acotar el build rinde mas que la ingesta incremental. Cambia QUE VE Power BI, no solo cuanto tarda, asi que exige prueba de equivalencia como la que hizo F-019 con el troceado. No se toca el build por tramos de F-019 sin esa prueba. Por DA-5 de F-011 va con prioridad por encima del bloque B de F-011 si la medicion lo confirma.",
+      "title": "Las obras cerradas no se reconstruyen cada noche: acotar el build de stg y mart a lo que se mueve",
+      "description": "Extraida de F-011 el 2026-08-18 por decision del humano: la definicion de 'obra abierta' (DA-1 de F-011) queda SIN DECIDIR y es de Negocio, asi que el bloque C de F-011 sale de aquella feature y se hace mas adelante en esta. Motivo de peso para priorizarla: la medicion de la carga del 18-ago demuestra que build_stg se lleva 111 de los 165 min (67 %) y build_mart 21 (13 %), mientras la ingesta son 33 (20 %); acotar el build rinde mas que la ingesta incremental. Cambia QUE VE Power BI, no solo cuanto tarda, asi que exige prueba de equivalencia como la que hizo F-019 con el troceado. No se toca el build por tramos de F-019 sin esa prueba. Por DA-5 de F-011 va con prioridad por encima del bloque B de F-011 si la medicion lo confirma. ================ DESBLOQUEADA Y SUBIDA A PRIORIDAD 1 EL 2026-09-02. EL HUMANO TOMA LA DECISION QUE FALTABA: 'vamos a poner que las obras que esten cerradas no se actualizan'. Ese era el DA-1 de F-011 que dejo esta feature aparcada desde el 2026-08-18: la definicion de obra abierta era de Negocio y no estaba tomada. Ya lo esta en su principio; queda concretar EL CRITERIO en la spec (sin fases nuevas en N meses, marca en Sigrid, o ambas). ABSORBE F-035, que el humano mando eliminar el 2026-09-02 por redundante: era el estudio previo -'medir las cuatro palancas antes de tocar ninguna'- y con la decision tomada ya no hace falta elegir palanca. SE CONSERVAN SUS MEDICIONES, que son caras: sobre tres cargas completas, build_stg 110,7 min (67,0 %), ingest_raw 32,9 (19,9 %), build_mart 21,6 (13,1 %), total 165,2 min; aunque la ingesta fuera instantanea la carga duraria 2 h 12, asi que el trabajo esta en el build. Y sus otras tres palancas, por si vuelven a hacer falta: (1) mas vCPU y tramos en paralelo -los 60 tramos de F-019 corren en SERIE-, que implica reinicio de un servidor compartido; (3) build incremental por DIFF LOCAL, comparando una firma por fila contra la del dia anterior EN NUESTRA BASE, sin depender de que Sigrid tenga marca de modificacion; (4) lo que quede del troceado de F-019. POR QUE AHORA, Y NO ES UNA MEJORA DE RENDIMIENTO SINO UNA AVERIA: la nocturna del 2026-09-02 FALLO. Arranco a las 02:00, trunco stg.plan_mensual a las 03:23 y a las 06:47 iba por el TRAMO 5 DE 60, porque cada tramo tardaba 40-49 min en vez de los ~2 habituales; a las 07:00 la mato su replicaTimeout de 5 h y dejo stg.plan_mensual TRUNCADA AL 21,6 % (6.436.281 filas de 29.762.403). Solo la puerta de F-024 evito que mart se construyera sobre ese stage a medias. LA CAUSA, MEDIDA: psql-albaranes-rs9k2 es un Standard_B1ms BURSTABLE con 144 creditos de CPU; llegaron a CERO a las 04:15 UTC y Azure capo la maquina al 20 % de un nucleo. Con la hucha vacia todo va CINCO VECES mas lento. Los agoto la reconstruccion manual de F-052 del dia anterior: 12 h 48 desde el puesto. OJO, ESTO CONTRADICE LA MEDICION DE F-035: el 2026-08-20 los creditos bajaban de 128,5 a 57,4 y se concluyo, con razon entonces, que 'NO se agotan, no hay estrangulamiento'. Ya no vale. EL TAMANO DEL DESPERDICIO, MEDIDO EL 2026-09-02: la nocturna reconstruye 687 obras; solo 387 tienen fases, 80 tuvieron actividad en los ultimos 12 meses y 35 en los ultimos 90 dias. Cada noche se truncan y reescriben 29,7 M de filas para incorporar los cambios de unas decenas de obras: EL GRUESO DEL TRABAJO ES RECONSTRUIR OBRAS CERRADAS HACE ANOS, como la 0599, que termino en 2022. LA ALTERNATIVA CUESTA DINERO Y ESTA FEATURE NO: precios de Azure medidos el 2026-09-02 para Spain Central, solo computo: B1ms actual ~15 USD/mes, B2s ~58 (+43), B2ms ~116, D2ads_v5 con CPU dedicada y sin creditos ~155 (+140). Subir de SKU ademas REINICIA el servidor, que comparten albaranes y partes en produccion. Esta feature elimina el problema sin gastar un euro. EL RIESGO QUE HAY QUE CUBRIR, Y ES EL MISMO DE F-052: si una obra dada por cerrada cambia en Sigrid y el build ya no la mira, el dato se queda viejo Y NADIE SE ENTERA. No basta con acertar el criterio: hace falta red de seguridad -una reconstruccion completa periodica y un guardian que compare lo publicado contra el origen para las obras excluidas-. Enlaza con el check-cobertura de F-052. BENEFICIO DE SEGUNDO ORDEN: hoy el uso diurno y la carga nocturna comparten la misma hucha de creditos, asi que CUANTA MAS GENTE CONSULTE EL DATAMART POR EL MCP, MAS PROBABLE ES QUE LA NOCTURNA FALLE. El exito del proyecto degrada el proceso que lo alimenta. Con la carga acotada, ese conflicto desaparece.",
       "acceptance": [
-        "Definida en detalle por specs/F-025-ventana-negocio-build/ (sdd=true)"
+        "CRITERIO DE OBRA CERRADA decidido y escrito con el humano y con Negocio: que la define (sin fases nuevas en N meses, marca en Sigrid, o ambas), con el censo de cuantas obras entran y salen con ese criterio",
+        "El build de stg y mart reconstruye SOLO las obras no cerradas, y el tiempo de la nocturna baja de forma medible respecto a las 3 h 45 actuales",
+        "PRUEBA DE EQUIVALENCIA como la de F-019 y la de F-052: huella antes/despues sobre el mismo raw demostrando que lo publicado NO cambia por acotar el build. Si cambia una sola celda de una obra excluida, la feature se detiene",
+        "RED DE SEGURIDAD: reconstruccion completa periodica con su cadencia escrita, y un guardian que denuncie si una obra excluida ha cambiado en el origen. Sin esto NO se cierra: el modo de fallo es el de F-052, un dato que envejece sin que nadie se entere",
+        "Medido el efecto sobre los creditos de CPU del B1ms antes y despues: la nocturna debe terminar sin dejar la hucha a cero",
+        "Documentado en el diccionario y en azure-apps/datamart_seg_anual.md que el datamart ya no reconstruye todo cada noche, y que significa eso para quien lo consulta"
       ],
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 10,
+      "priority": 1,
       "branch": "feature/F-025-ventana-negocio-build"
     },
     {
@@ -526,25 +531,6 @@
       "rigor": "critico",
       "priority": 12,
       "branch": "feature/F-034-powerbi-azure"
-    },
-    {
-      "id": "F-035",
-      "title": "Reducir el tiempo de carga: medir las cuatro palancas del build antes de tocar ninguna",
-      "description": "Pedido por el humano el 2026-08-20 al cerrar F-011: 'hay que estudiar como reducir el tiempo de carga'. Se hace con el patron que ya funciono en el bloque A de F-011 -medir, fijar umbrales ANTES, y firmar una recomendacion-, porque ese patron evito implementar una maquina de estados entera a cambio de 2,25 min. DE DONDE SE PARTE, medido sobre tres cargas completas: build_stg 110,7 min (67,0 %), ingest_raw 32,9 (19,9 %), build_mart 21,6 (13,1 %), total 165,2 min. Aunque la ingesta fuera instantanea la carga duraria 2 h 12, asi que el trabajo esta en el build. Y un dato nuevo del 2026-08-20: durante build_stg la CPU del servidor esta al 80 % de media y 92 % de pico durante 1 h 50, con UNA SOLA vCPU (Standard_B1ms). Los creditos de rafaga NO se agotan -bajan de 128,5 a 57,4-, asi que no hay estrangulamiento: simplemente no hay mas CPU. LAS CUATRO PALANCAS A MEDIR. (1) MAS vCPU Y TRAMOS EN PARALELO: los 60 tramos de plan_mensual que troceo F-019 se ejecutan en SERIE; con mas vCPU podrian solaparse. Escalar el SKU solo durante la ventana nocturna y devolverlo despues es lo mas barato de probar y no toca una linea de SQL, pero el servidor es COMPARTIDO con albaranes y partes: el cambio implica reinicio y hay que avisarles. (2) VENTANA DE NEGOCIO: es F-025, que ya existe con prioridad 10; reconstruir solo lo que se mueve. Depende de una decision de Negocio sin tomar -que es una obra abierta-. (3) BUILD INCREMENTAL POR DIFF LOCAL: la via que F-011 no exploro porque su spec la ataba al watermark del ORIGEN. Seguir trayendo raw completo -34 min, funciona y es fiable- y comparar contra una firma del dia anterior EN NUESTRA BASE, con un hash por fila y clave, para saber que obras cambiaron y reconstruir en stg solo lo afectado. No depende de que Sigrid tenga marca de modificacion. A medir: cuanto ocupan las firmas -el disco esta al 72 % en reposo y 88 % en pico, es el limite conocido-, cuanto cuesta calcular el diff, y que porcentaje de obras cambia de verdad de un dia para otro, que es el numero que decide si esta via sirve. (4) SQL E INDICES: el plan de ejecucion del build, por si hay algo caro y evitable. RESTRICCION QUE VALE PARA LAS CUATRO: cualquiera que cambie que se construye altera LO QUE VE POWER BI, no solo cuanto tarda, asi que exige prueba de equivalencia como la que hizo F-019 con el troceado.",
-      "acceptance": [
-        "Los umbrales de decision de cada palanca se fijan en la spec ANTES de medir, como hizo DA-7 en F-011: que ahorro justifica el coste y la complejidad de cada una",
-        "Medido el reparto real del tiempo DENTRO de build_stg, no solo el total: que sub-paso y que tramos se llevan los 110,7 min",
-        "Medido el porcentaje de obras que cambian de un dia para otro, que es el numero del que depende la palanca 3; sin ese dato no se puede recomendar nada sobre el diff",
-        "Medido el efecto real de mas vCPU, en una prueba acotada y con aviso previo a los dueños de albaranes y partes, o justificado por escrito por que no se pudo probar",
-        "Recomendacion FIRMADA por palanca -implementar o descartar- con los numeros al lado de sus umbrales, y la firma del humano, igual que el bloque A de F-011",
-        "Lo que se recomiende implementar sale como feature propia o entra en F-025 segun corresponda; esta feature MIDE y RECOMIENDA, no implementa el build nuevo",
-        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
-      ],
-      "status": "pending",
-      "sdd": true,
-      "rigor": "critico",
-      "priority": 9,
-      "branch": "feature/F-035-estudio-tiempo-carga"
     },
     {
       "id": "F-036",
@@ -700,7 +686,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 3,
+      "priority": 5,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -778,7 +764,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 5,
+      "priority": 7,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -795,7 +781,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 4,
+      "priority": 6,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -812,7 +798,7 @@
       "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
-      "priority": 1,
+      "priority": 2,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -831,8 +817,26 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 2,
+      "priority": 4,
       "branch": "feature/F-053-desempate-obras-duplicadas"
+    },
+    {
+      "id": "F-054",
+      "title": "El diccionario explica el esquema pero no el negocio: la IA no sabe que es el incurrido ni como se hace un flujo de caja en Ruesma",
+      "description": "Pedida por el humano el 2026-09-02: 'enriquecer el conocimiento para cuando lea la IA a traves del MCP, por ejemplo que significa el incurrido para nosotros o como hacemos un flujo de caja'. ES LA MATERIALIZACION DEL OBJETIVO DE FONDO que el propio humano fijo el 2026-08-20 al hablar de F-006: que el datamart sea CONOCIMIENTO DE NEGOCIO DE OBRA y no solo un almacen de cifras. DE DONDE SE PARTE: F-006 dejo un diccionario semantico excelente PARA EL ESQUEMA -103 fichas, 798 columnas, claves, relaciones, avisos y 46 fichas de consumo, publicado en _meta y leido por el MCP por SQL-. Con eso la IA escribe SQL correcto y no se inventa columnas. LO QUE NO TIENE es el conocimiento de DOMINIO: que significa cada concepto EN RUESMA, como se calcula, que procedimiento sigue Negocio y que trampas tiene. Una IA con el esquema pero sin el dominio responde consultas sintacticamente correctas y de negocio equivocado, que es peor que no responder. LOS DOS EJEMPLOS DEL HUMANO, que marcan el alcance: (1) EL INCURRIDO. En Ruesma no es evidente: hay coste REAL de seguimiento (ambito 3), hay coste documental de compras (compras.v_pbi_partida_coste) y hay lo que se ha certificado; F-039 ya observo que partida_id une esos dos mundos y que NINGUNA vista los cruza. Que llama Negocio 'incurrido', de cual de los tres sale y en que momento, hoy no esta escrito en ningun sitio. (2) EL FLUJO DE CAJA: no es una tabla, es un PROCEDIMIENTO -que se cobra, cuando, que retenciones se liberan y cuando, que se paga a proveedores y con que plazo-, y el datamart tiene las piezas (cierre, compras, retenciones) sin que nadie haya escrito como se montan. QUE NO ES, para no duplicar: NO es F-030 -reglas para que la IA PLANIFIQUE, que vive en su propio repositorio con dueño en Negocio y esta explicitamente fuera de este proyecto-, ni es F-039 -vistas puente SQL que faltan-. Esta es la capa de SIGNIFICADO sobre lo que ya existe, y su vehiculo natural es el diccionario de config/diccionario/, que ya se publica en _meta y ya lo lee el MCP: la infraestructura esta hecha, falta el contenido y decidir su forma. A DECIDIR EN LA SPEC: (a) donde vive -fichas nuevas de tipo 'concepto' junto a las de objeto, un fichero de glosario, o notas de negocio en 00_global-; (b) como lo sirve el MCP para que la IA lo lea ANTES de consultar, no despues; (c) QUIEN ES EL DUENO DEL CONTENIDO, porque esto no lo puede escribir un agente solo: son definiciones de la empresa y hay que sacarlas de Negocio; (d) como se mantiene vivo. EL RIESGO QUE MATA ESTA FEATURE: conocimiento que envejece y nadie actualiza, o que CONTRADICE al dato. Una ficha que diga como se calcula algo y no case con lo que publica la vista es peor que no tenerla, porque la IA se la creera. F-006 ya resolvio esto para el esquema con check-diccionario y la puerta de init.sh: aqui hace falta el equivalente, y no es obvio como se verifica automaticamente una definicion en prosa.",
+      "acceptance": [
+        "Decidido y escrito DONDE vive el conocimiento de dominio y como lo publica el MCP para que la IA lo lea antes de consultar, no despues",
+        "Escritos, con Negocio y validados por Negocio, al menos los dos conceptos que pidio el humano: QUE ES EL INCURRIDO en Ruesma -de cual de las tres fuentes sale y en que momento- y COMO SE MONTA UN FLUJO DE CAJA con las piezas que hay (cierre, compras, retenciones)",
+        "Cada concepto enlaza con los objetos y columnas concretos del datamart que lo materializan, para que la IA pueda ir del significado al SQL sin adivinar",
+        "Existe una comprobacion que impida que el conocimiento contradiga al dato o envejezca en silencio, al estilo de lo que check-diccionario hace con el esquema. Si no puede ser automatica, queda escrito quien lo revisa y cada cuanto",
+        "Probado de punta a punta: una pregunta de negocio real formulada al MCP -por ejemplo 'cual es el incurrido de la obra X'- se responde bien SIN que el humano tenga que explicar nada en el prompt",
+        "El dueño del contenido esta nombrado y sabe que lo es"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "documental",
+      "priority": 3,
+      "branch": "feature/F-054-conocimiento-de-negocio"
     }
   ]
 }
