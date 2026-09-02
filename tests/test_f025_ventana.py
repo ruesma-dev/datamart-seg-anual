@@ -170,13 +170,13 @@ def test_f025_r2_las_tres_reglas_van_en_UNION_no_en_interseccion() -> None:  # n
         {"codigo_obra": "201503"},
         {"ultima_actividad": date(2020, 1, 1)},
     ):
-        congelada = obra(
-            estado_id=15,
-            codigo_obra="0710",
-            ultima_actividad=date(2026, 9, 1),
-            **cambio,  # type: ignore[arg-type]
-        )
-        assert motivo_de_congelacion(congelada, CRITERIO, HOY) is not None, cambio
+        base: dict = {
+            "estado_id": 15,
+            "codigo_obra": "0710",
+            "ultima_actividad": date(2026, 9, 1),
+        }
+        base.update(cambio)
+        assert motivo_de_congelacion(obra(**base), CRITERIO, HOY) is not None, cambio
 
 
 # ---------------------------------------------------------------------------
@@ -380,11 +380,16 @@ def test_f025_r2_un_criterio_sin_meses_no_es_criterio() -> None:
 
 def test_f025_r2_un_patron_de_codigo_invalido_falla_al_construir_no_al_usar() -> None:
     """Sale de un YAML editable a mano: si no compila, se dice aquí y no en
-    mitad de la nocturna."""
+    mitad de la nocturna.
+
+    El patrón de prueba es un juego de corchetes sin cerrar y no `^[0-9]{6`,
+    que era el candidato obvio: Python trata una llave sin cerrar como carácter
+    literal y lo acepta sin rechistar, así que ese ejemplo no probaba nada.
+    """
     with pytest.raises(ValueError, match="patrón|patron"):
         Criterio(
             estados_que_congelan=frozenset({25}),
-            patron_codigo="^[0-9]{6",
+            patron_codigo="^[0-9",
             meses_sin_actividad=12,
         )
 
