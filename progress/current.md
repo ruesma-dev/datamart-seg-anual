@@ -32,8 +32,8 @@ LEGAZPI no se mueve ni un céntimo**.
 |---|---|---|
 | dimension | **OK** | solo 0599 (117 → 1.440) |
 | cierre | **OK** | solo 0599 |
-| mart | KO por master | **solo 0599**, 144 diferencias |
-| stg | KO por master | **solo 0599**, 70 diferencias |
+| mart | KO por master | **solo 0599** · bloque Importes 144, bloque master 0 |
+| stg | KO por master | **solo 0599** · bloque master 70 (152 al recontarlo el reviewer), bloque Importes 42 |
 
 ### Las comprobaciones de cierre, contra la base reconstruida
 
@@ -49,10 +49,31 @@ construyó para detectar el problema ahora mide su desaparición: de las 183.824
 filas que el build descartaba en silencio quedan **294**. Las 183.530 de la 0599
 ya no se pierden.
 
-Sigue en **KO**, y es correcto que lo esté: quedan **20 obras invisibles** y esas
-294 filas sin declarar. Ninguna es de F-052 —son las administrativas más 0585,
-0687, 0578, 0670 y 0606, que es **F-053**—. **T15 y la desviación 4 del review se
-afinan aquí**: esta es la línea base del DESPUÉS.
+Seguía en **KO**, y era correcto que lo estuviera: quedaban **20 obras
+invisibles en 43 combinaciones** y esas **294 filas huérfanas en 13**. **T15 y la
+desviación 4 del review se afinan aquí**: esta es la línea base del DESPUÉS.
+
+> **CORREGIDO EL 2026-09-02.** Este párrafo decía que *ninguna* de las 294 era de
+> F-052, y **era falso**. Lo cazó el reviewer de la fase 2 ejecutando el guardián
+> él mismo. El reparto real: **0613 RICHMOND PARK 150** (ámbitos 3, 7, 8 y 11) y
+> **0618 SOTOGRANDE 76** (3, 8 y 11) —**dos de las SEIS obras de esta feature**—,
+> más 12 + 6 + 50 de MERCADO PROSPERIDAD, OBRA FORMACIÓN y OBRA CANILLAS, que son
+> papeleras de código de seis dígitos. Y esas 150 + 76 = **226 filas son
+> exactamente las «226 filas de 183.756, a 0,00 €» que la propia spec anticipó**
+> como movimiento máximo fuera de la 0599 (DA-2): residuo previsto y medido, no
+> un cabo suelto.
+>
+> El párrafo además **mezclaba dos listas distintas**. 0585, 0687, 0578, 0670 y
+> 0606 **no están entre las huérfanas**: están en la de **obras invisibles**, que
+> es otra pregunta. Y de esas cinco, sólo la 0606 es F-053; las otras cuatro
+> están ciegas **solo en los ámbitos master (8 y 11)** y son **F-055**, dada de
+> alta el 2026-09-02 como pregunta abierta —pueden no tener versión master
+> vigente, y entonces no publicar ahí es lo correcto—.
+>
+> **Las 294 quedaron declaradas enteras** en
+> `config/cobertura_excepciones.yaml` por decisión del humano, con motivo y
+> feature que las cierra. `EXCEPCIONES_MAX` sube de 10 a 23 por esa decisión,
+> y baja a 15 en cuanto F-055 conteste.
 
 **OJO con los timeouts:** `check-unicidad` dejó **3 objetos sin comprobar** (antes
 era 1) y `check-cierres` murió con `QueryCanceled` a la primera. No es un defecto:
@@ -66,9 +87,18 @@ master 8 u 11 es desbordamiento». **F-052 exige lo contrario y está escrito en
 R9**: «deben aparecer las combinaciones 0599 × ámbito 7 y 0599 × ámbito 11, hoy
 inexistentes». La herramienta marca como error justo lo que la spec pide.
 
-Comprobado antes de aceptarlo: **las 214 diferencias de las dos huellas son todas
-de la 0599**; ninguna otra obra aparece en ninguna. Palabras del humano: «si la
+Comprobado antes de aceptarlo: **todas las diferencias de las dos huellas son de
+la 0599**; ninguna otra obra aparece en ninguna. Palabras del humano: «si la
 única diferencia es la 599 es lo esperado, está bien».
+
+> **CORREGIDO EL 2026-09-02.** Aquí ponía «las **214** diferencias», y ese número
+> **no existe**: salía de sumar 144 y 70, que son **dos métricas distintas con el
+> mismo nombre**. 144 es el bloque *Importes* de la huella de `mart` y 70 el
+> bloque *master* de la de `stg`; sumarlas no significa nada. Los reales, del
+> informe del reviewer, que volvió a ejecutar `comparar-huellas` por su cuenta:
+> **`stg` 42 + 152** y **`mart` 0 + 144**. Lo que decide no es el total, sino que
+> **las cuatro huellas señalan una sola obra, la 0599** —`dimension` 1 clave,
+> `stg` 84, `mart` 80, `cierre` 28, y la 0599 en las cuatro—.
 
 **Deuda que deja abierta**: `comparar-huellas` debería aceptar cambios en master
 **para las obras esperadas**, en vez de rechazarlos siempre. Mientras no se
