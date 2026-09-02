@@ -153,6 +153,45 @@ class PostgresSettings(BaseSettings):
                     "aborta ANTES de lanzar el siguiente tramo. La protección de "
                     "Azure salta hacia el 95 %; el incidente tocó el 93,4 %.",
     )
+    # --- Ventana de negocio (F-025) ----------------------------------------
+    # La nocturna del 2026-09-02 murió por replicaTimeout en el tramo 5 de 60 y
+    # dejó stg.plan_mensual truncada al 21,6 %: el B1ms agotó sus 144 créditos
+    # de CPU y Azure lo capó al 20 % de un núcleo. Se reconstruían 920 obras
+    # cada noche cuando solo 80 habían tenido actividad en doce meses.
+    #
+    # El CRITERIO de obra congelada NO está aquí: es regla de negocio y vive en
+    # config/business_rules.yaml, para que Negocio pueda cambiarlo sin tocar el
+    # entorno de despliegue. Aquí solo están los interruptores de operación.
+    ventana_activa: bool = Field(
+        False,
+        description="Acota el build de stg.presupuesto y stg.plan_mensual a las "
+                    "obras vivas. Default FALSE (R5): mientras esté apagada, el "
+                    "comportamiento es el de hoy y se reconstruyen todas. "
+                    "Encenderla es una decisión explícita del humano.",
+    )
+    ventana_meses: int = Field(
+        12,
+        gt=0,
+        description="Meses sin actividad a partir de los cuales una obra se "
+                    "congela. Doce, decidido por el humano el 2026-09-02.",
+    )
+    ventana_dia_completa: int = Field(
+        6,
+        ge=0,
+        le=6,
+        description="Día de la reconstrucción completa semanal, en la numeración "
+                    "de date.weekday() (lunes=0). Seis = DOMINGO (DA-4): es la "
+                    "noche que puede permitirse volver a costar lo que cuesta "
+                    "hoy. De aquí sale el «hasta 6 días» de antigüedad.",
+    )
+    ventana_rescate: bool = Field(
+        False,
+        description="Con TRUE, una obra congelada cuyo origen haya cambiado se "
+                    "reconstruye en vez de solo denunciarse. Default FALSE: "
+                    "rescatarla contradiría la decisión del humano, que congela "
+                    "40 obras con actividad reciente sabiéndolo (R3). El "
+                    "interruptor existe por si cambia de idea, sin tocar código.",
+    )
 
     @field_validator("auth_mode")
     @classmethod

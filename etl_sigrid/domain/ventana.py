@@ -155,6 +155,62 @@ class Criterio:
         return re.compile(self.patron_codigo)
 
 
+#: Nombre del bloque de `config/business_rules.yaml` que declara el criterio, y
+#: de sus tres claves. Van como constantes porque el mensaje de error tiene que
+#: poder nombrar la clave que falta sin que nadie la escriba dos veces.
+BLOQUE_VENTANA = "ventana"
+CLAVE_ESTADOS = "estados_que_congelan"
+CLAVE_PATRON = "patron_codigo_administrativo"
+CLAVE_MESES = "meses_sin_actividad"
+
+
+def criterio_desde_reglas(
+    business_rules: Mapping[str, object], meses: int | None = None
+) -> Criterio:
+    """Construye el `Criterio` desde `config/business_rules.yaml`.
+
+    Es pura —recibe el diccionario ya leído, no abre el fichero— y por eso vive
+    aquí: convertir el YAML en objeto validado es parte de la regla de negocio,
+    no de la infraestructura que lo lee.
+
+    `meses` permite que `PG_VENTANA_MESES` mande sobre el YAML **si se informa
+    explícitamente**. La regla vive en el YAML, que es de Negocio; la variable de
+    entorno existe para poder ensanchar la ventana una noche concreta sin
+    cambiar la regla ni hacer un commit.
+
+    Un bloque que falte o esté incompleto **aborta al construir**: es preferible
+    a las 02:00, antes de escribir nada, que a mitad del build.
+    """
+    bloque = business_rules.get(BLOQUE_VENTANA)
+    if not isinstance(bloque, Mapping):
+        raise ValueError(
+            f"config/business_rules.yaml no declara el bloque `{BLOQUE_VENTANA}:` "
+            f"con el criterio de obra congelada. Sin el no se sabe que obras se "
+            f"reconstruyen, y adivinarlo seria peor que parar."
+        )
+
+    faltan = [c for c in (CLAVE_ESTADOS, CLAVE_PATRON, CLAVE_MESES) if c not in bloque]
+    if faltan:
+        raise ValueError(
+            f"al bloque `{BLOQUE_VENTANA}:` de config/business_rules.yaml le "
+            f"faltan estas claves: {', '.join(faltan)}. Las tres reglas de DA-1 "
+            f"van en union y ninguna es opcional."
+        )
+
+    estados = bloque[CLAVE_ESTADOS] or []
+    if not all(isinstance(e, int) and not isinstance(e, bool) for e in estados):
+        raise ValueError(
+            f"`{CLAVE_ESTADOS}` debe ser una lista de enteros (los codigos de "
+            f"`conest` tipo 42) y llego {estados!r}"
+        )
+
+    return Criterio(
+        estados_que_congelan=frozenset(int(e) for e in estados),
+        patron_codigo=str(bloque[CLAVE_PATRON]),
+        meses_sin_actividad=int(bloque[CLAVE_MESES] if meses is None else meses),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Lo que se sabe de cada obra al empezar la noche
 # ---------------------------------------------------------------------------

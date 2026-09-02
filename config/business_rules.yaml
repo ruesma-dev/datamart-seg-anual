@@ -124,3 +124,72 @@ amortizacion:
   default_metodo: LINEAL
   metodos_soportados:
     - LINEAL
+
+
+# ===========================================================================
+# LA VENTANA DE NEGOCIO: QUE OBRAS SE RECONSTRUYEN CADA NOCHE (F-025)
+# ===========================================================================
+#
+# Decidido por el humano el 2026-09-02, con el censo delante: "las obras que
+# esten cerradas no se actualizan", "que no se reconstruyan, pero que no se
+# borren, y que la informacion este consultable".
+#
+# Se congela toda obra que cumpla AL MENOS UNA de las tres reglas, en UNION.
+# Censo sobre las 920 obras de maestro.obras: 880 congeladas y 40 vivas, de
+# las cuales 38 publican en el fact.
+#
+# ESTO ES REGLA DE NEGOCIO Y VIVE AQUI a proposito: cambiar el criterio no
+# debe exigir tocar codigo Python ni SQL. Los interruptores de OPERACION
+# -encender la ventana, el dia de la reconstruccion completa, el rescate- son
+# otra cosa y estan en el entorno (PG_VENTANA_*, ver config/settings.py).
+#
+# LA CONTRAPARTIDA, ACEPTADA POR EL HUMANO CON EL DATO DELANTE: hay 80 obras
+# con actividad en los ultimos 12 meses y 40 quedan igualmente congeladas -39
+# CERRADAS y 1 de seis digitos-, asi que sus datos pueden llevar hasta 6 dias
+# de retraso entre reconstrucciones completas. De esas 39, 36 tienen su ultima
+# actividad en 2025-12, que es el cierre anual, y solo 4 algo posterior. Esta
+# spec propuso un veto -no congelar nunca una obra con actividad reciente- y
+# el humano lo rechazo explicitamente: "pon las reglas que te he dicho".
+#
+# ALTERNATIVA NO ELEGIDA, anotada por si algun dia se cambia el criterio: la
+# formulacion EN POSITIVO -solo se actualizan a diario las EN CURSO (15) y las
+# ADJUDICADAS DEFINITIVAMENTE (9)-. Es mas robusta, porque una lista de
+# estados que se actualizan es cerrada y una de estados que se congelan hay
+# que ir ampliandola. Se le enseno la ventaja y respondio: "dejalo en
+# negativo".
+ventana:
+  # REGLA 1. Estados de Sigrid que congelan. El catalogo esta VERIFICADO
+  # (2026-09-02): vive en `conest`, el tipo de las obras es el 42 y se llega
+  # por `con.est`. "25 = CERRADA" no es una suposicion nuestra.
+  #
+  #    1 EN ESTUDIO (226 obras)   ·   3 PRESENTADA (0)
+  #    5 PRESENTADA CON ACLARACIONES (0)  ·  7 ADJUDICADA PROVISIONAL (0)
+  #    9 ADJUDICADA DEFINITIVAMENTE (33)  ·  11 NO PRESENTADA (2)
+  #   13 NO ADJUDICADA (0)        ·  15 EN CURSO (176)
+  #   17 PARADA (7)               ·  19 TERMINADA (2)
+  #   21 RECIBIDA PROVISIONAL (3) ·  23 RECIBIDA DEFINITIVAMENTE (4)
+  #   25 CERRADA (465)            ·  999 PLANTILLA (1)
+  #
+  # Los tres de aqui suman 693 obras. Anadir 1 y 11 al 25 NO anade ni una
+  # obra al censo -las 226 EN ESTUDIO y las 2 NO PRESENTADAS caian ya por la
+  # regla 3, porque ninguna tiene fases-: lo que cambia es que queda escrito
+  # POR QUE se congela cada una, en vez de deducirlo de su quietud.
+  estados_que_congelan: [1, 11, 25]
+
+  # REGLA 2. Obras administrativas: 222 con codigo de seis digitos, y NINGUNA
+  # llega al fact (0 de 222). Son presupuestos y estudios de 2009-2015.
+  # Ahorro sin riesgo de negocio, y por eso el criterio no necesita una lista
+  # de codigos que mantener.
+  #
+  # El patron va ANCLADO por los dos extremos: sin el `$` congelaria tambien
+  # los codigos de siete digitos, y sin el `^` cualquiera que los contenga.
+  patron_codigo_administrativo: "^[0-9]{6}$"
+
+  # REGLA 3. Meses sin actividad. Actividad = mes mas reciente con fase
+  # cerrada (stg.fases). 840 obras no tienen ninguna en 12 meses, y 217 no
+  # tienen ni una fase en toda su vida.
+  #
+  # El limite NO congela: una obra que cerro fase justo hace doce meses cuenta
+  # como CON actividad. Se prefiere trabajar de mas a dejar un dato viejo
+  # publicado, que es el modo de fallo de F-052.
+  meses_sin_actividad: 12
