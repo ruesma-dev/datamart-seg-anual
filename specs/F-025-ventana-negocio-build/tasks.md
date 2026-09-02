@@ -1,171 +1,68 @@
 <!-- specs/F-025-ventana-negocio-build/tasks.md -->
-# F-025 · Acotar el build por ventana de negocio — Tareas
+# F-025 · Tareas
 
-Una tarea = un commit (`F-025 Tn: descripción`). Orden por dependencia; los
-tests van antes o junto a la implementación (fase RED, exigida por el rigor
-`critico`).
+Rama `feature/F-025-ventana-negocio-build`. Un commit por tarea
+(`F-025 Tn: ...`). **T0 es una parada del humano**: sin DA-1 cerrado no se
+escribe código de selección. Todo lo que escriba en producción o reconstruya va
+marcado **MANUAL (humano)**.
 
-> **T6 es una PARADA.** Las tareas T7 en adelante **no se empiezan** sin que
-> **Negocio firme DA-1** sobre `progress/ventana_F-025.md`. Es la razón por la
-> que esta feature existe separada de F-011: sin esa firma no hay ventana que
-> aplicar, y el spec-author **no** cierra DA-1.
+## Fase 0 · Decidir y medir antes de tocar nada
 
-> **T13 es la segunda PARADA**: la prueba de equivalencia. Cualquier
-> diferencia en los bloques `estructura` o `cerrado` de la huella es FALLO, la
-> feature se marca `blocked` y **no se racionaliza** (precedente de F-019 T11).
+- [ ] T0: El humano cierra DA-1..DA-6 sobre `decisiones.md`  |  Verificación: MANUAL (humano), decisiones anotadas en el propio fichero con fecha
+- [ ] T1: Medir el ahorro real del criterio elegido con la consulta de pesos que la nocturna ya ejecuta (`SQL_PESOS_PLAN_MENSUAL`), repartido entre obras a reconstruir y congeladas  |  Verificación: MANUAL (humano), cifra escrita en `mediciones.md`; si el ahorro es menor del 40 % del peso, PARAR y reconsultar
+- [ ] T2: Medir el tamaño de `stg.plan_mensual` (`pg_total_relation_size`) y el estado de `pg_stat_user_tables` como línea base del bloat  |  Verificación: MANUAL (humano), cifras en `mediciones.md`
 
----
+## Fase 1 · Dominio puro (sin BBDD)
 
-## Bloque A · Medir el peso de la ventana (se hace siempre)
+- [ ] T3: RED — tests de `domain/ventana.py`: clasificación por actividad, veto de EN CURSO, obra sin fases, obra sin filas, registro ausente  |  Verificación: `pytest tests/test_f025_ventana.py` falla por `ModuleNotFoundError` (traza en el informe)
+- [ ] T4: `domain/ventana.py`: `clasificar_obras()` devuelve reconstruidas, congeladas y **motivo por obra**; función pura  |  Verificación: `pytest tests/test_f025_ventana.py -q` en verde
+- [ ] T5: `firma_de_obra()` y `sello_sql()` deterministas, con fixtures  |  Verificación: `pytest tests/test_f025_firma.py -q`
+- [ ] T6: Tests de las tres precedencias (sello > firma > criterio) y de que **ningún filtro puede sacar una obra** de la lista  |  Verificación: `pytest tests/test_f025_precedencia.py -q`
 
-- [ ] **T1**: Añadir el bloque `ventana:` a `config/business_rules.yaml` con
-      `candidatos:` (los cuatro de DA-1: `sin_fecha_fin_real`,
-      `con_movimiento_12m`, `situacion_contrato`, `sin_fecha_cierre`, cada uno
-      con su SQL `SELECT obra_id ...` y su comentario) y `vigente: null` con el
-      comentario que apunta a **DA-1, decisión de Negocio pendiente**.
-      **Verificación**: `pytest tests/test_f025_config.py -q` (R6) — el YAML
-      carga, los candidatos tienen nombre y SQL, `vigente` es `null` y ningún
-      SQL contiene `;` ni empieza por algo distinto de `SELECT`.
+## Fase 2 · Configuración y consultas
 
-- [ ] **T2**: Crear `etl_sigrid/domain/ventana.py` con `Candidato`,
-      `PesoVentana`, `peso_de_la_ventana(...)` y `format_perfil_ventana(...)`
-      (funciones puras, sin imports de infraestructura). Tests primero.
-      **Verificación**: `pytest tests/test_f025_ventana.py -k "peso or format" -q`
-      (R1).
+- [ ] T7: `PG_VENTANA_ACTIVA` (default false), `PG_VENTANA_MESES`, `PG_VENTANA_DIAS_COMPLETA` en `config/settings.py` y el bloque `ventana:` de `config/business_rules.yaml`  |  Verificación: `pytest tests/test_f025_settings.py -q`
+- [ ] T8: `SQL_ESTADO_OBRAS` y `SQL_FIRMA_ORIGEN` como constantes de módulo en `postgres_client.py` + `fetch_estado_obras()`  |  Verificación: test estático que lee el SQL enviado, sin conexión
+- [ ] T9: `sql/ddl/00_meta.sql`: `_meta.obra_build` (`CREATE TABLE IF NOT EXISTS`) y `_meta.v_frescura_obra` (`CREATE OR REPLACE VIEW`), sin `DROP`  |  Verificación: `pytest tests/test_f025_ddl.py -q` (el fichero contiene los objetos y ningún `DROP`)
 
-- [ ] **T3**: Añadir a `etl_sigrid/domain/ventana.py` la función
-      `ahorro_estimado(duraciones_por_tramo, pesos_por_obra, obras_dentro)`,
-      que prorratea los minutos de `build_plan_mensual` (filas
-      `build_stg.build_plan_mensual.tramo_NN` de `_meta.etl_runs`) y de
-      `build_mart.build_fact` entre las obras dentro y fuera.
-      **Verificación**: `pytest tests/test_f025_ventana.py -k ahorro -q` (R2),
-      con fixture de tramos reales y los bordes (ninguna obra fuera, todas
-      fuera, tramo sin duración registrada).
+## Fase 3 · El build que no borra lo que no reconstruye
 
-- [ ] **T4**: Añadir `fetch_peso_ventana(predicado_sql)` y
-      `fetch_obras_de_la_ventana(predicado_sql)` a `postgres_client.py` (solo
-      lectura, con validación de que el predicado empieza por `SELECT` y no
-      trae `;`), y el comando `perfil-ventana [--detalle] [--out]` a `main.py`
-      **sin** `_arrancar_ejecucion()`.
-      **Verificación**: `pytest tests/test_f025_ventana.py -q` (R1, R3, R4,
-      R19) con `PostgresClient` mockeado; incluye el test de que **cero**
-      escrituras llegan a `_meta` y el de que sin candidatos declarados el
-      comando falla nombrando DA-1.
+- [ ] T10: RED — test de que el build acotado **no llama a `truncate_table`** para `plan_mensual` y sí emite `DELETE ... WHERE obra_id = ANY` por tramo  |  Verificación: `pytest tests/test_f025_build.py -q` en rojo primero
+- [ ] T11: `build_stg_step`: componer el plan de obras, borrar+insertar por tramo en la misma transacción y eliminar el `TRUNCATE` global  |  Verificación: `pytest tests/test_f025_build.py -q` en verde, con cliente simulado
+- [ ] T12: Nueva política de aborto (R13): parar sin vaciar, dejar cada obra con su última versión buena y registrar las no reconstruidas  |  Verificación: test de fallo de tramo intermedio; ninguna llamada de truncado
+- [ ] T13: Escritura de `_meta.obra_build` (upsert por obra) y recuentos en `_meta.etl_runs` (`obras_reconstruidas`, `obras_congeladas`)  |  Verificación: `pytest tests/test_f025_registro.py -q`
+- [ ] T14: `VACUUM (ANALYZE) stg.plan_mensual` al final del sub-paso, en conexión autocommit y tolerante a fallo (avisa, no tumba la noche)  |  Verificación: test de que se ejecuta fuera de transacción y de que un fallo no cambia el estado del paso
+- [ ] T15: Reconstrucción completa por cadencia y flag `--reconstruir-todo` en `run-all` y `stage`  |  Verificación: `pytest tests/test_f025_completa.py -q`
+- [ ] T16: Comando `ventana-plan` (dry-run, solo lectura): obras a reconstruir, congeladas, motivo y peso  |  Verificación: `pytest tests/test_f025_cli.py -q`
 
-- [ ] **T5 · MANUAL (humano)**: ejecutar la medición real. Con `.env`
-      apuntando a Azure:
+## Fase 4 · Guardián y alerta
 
-      ```bash
-      python main.py perfil-ventana
-      python main.py perfil-ventana --detalle --out ventana_candidatos.csv
-      python main.py timings                 # desglose por tramo, para contrastar
-      ```
+- [ ] T17: `ventana_sql.py` (solo texto, sin conexión) con `SET LOCAL statement_timeout` en cada consulta  |  Verificación: test estático de que el módulo no importa el cliente
+- [ ] T18: Comando `check-ventana`: firma divergente, obra congelada sin filas, sello no vigente, reconstrucción completa vencida  |  Verificación: `pytest tests/test_f025_check_ventana.py -q`
+- [ ] T19: Enganche al final de `run-all` **sin cambiar el código de salida** y marcador `[F025-VENTANA-KO]`  |  Verificación: test de que `run-all` termina en 0 con el guardián en KO
+- [ ] T20: `infra/97_create_alert_ventana.ps1` + test que cruza el marcador del código con el del `.ps1`  |  Verificación: `pytest tests/test_f025_marcador.py -q`
 
-      **Verificación**: `MANUAL (humano)`. El CSV **no se versiona** (va al
-      puesto, como las huellas de F-019).
+## Fase 5 · La quinta huella
 
-- [ ] **T6 · PARADA · Negocio**: escribir `progress/ventana_F-025.md` con los
-      números de T5 por candidato (obras dentro/fuera, % de filas, ahorro
-      estimado en minutos) y la recomendación; **y que Negocio firme DA-1**
-      eligiendo el predicado vigente.
-      **Verificación**: `MANUAL (humano)`. El reviewer comprueba que el informe
-      existe, que cada número cita su origen (`_meta.etl_runs` / consulta al
-      datamart) y que la firma de DA-1 está en `progress/current.md`. Si el
-      ahorro no justifica el riesgo, la feature se **cierra aquí** entregando
-      solo el bloque A, y se dice así en `progress/current.md`.
+- [ ] T21: Formato `plan_obra` en `domain/huella_ampliada.py` e implementación en `infrastructure/postgres/huella_ampliada.py`  |  Verificación: `pytest tests/test_f025_huella.py -q`
+- [ ] T22: `huella-obras --desde plan_obra` y su rama en `comparar-huellas`, con tolerancia cero  |  Verificación: `pytest tests/test_f025_huella_cli.py -q`
 
----
+## Fase 6 · Documentación
 
-## Bloque B · Acotar el refresco (solo si T6 dice que sí)
+- [ ] T23: Fichas de `_meta.obra_build` y `_meta.v_frescura_obra`, y actualización de la de `stg.plan_mensual` (no se reconstruye entera cada noche; `_built_at` por obra)  |  Verificación: `bash harness/init.sh` (puerta de diccionario) en verde
+- [ ] T24: `version` de `00_global.yaml` y `pendientes` que no crece  |  Verificación: `bash harness/init.sh`
+- [ ] T25: `docs/ARCHITECTURE.md` (la ventana junto a F-019 y F-024, con el cambio de invariante) y `azure-apps/datamart_seg_anual.md` (frescura por obra)  |  Verificación: revisión del reviewer
+- [ ] T26: Campaña de mutación sobre `domain/ventana.py`  |  Verificación: `python -m harness.mutacion` sin supervivientes, o exención escrita del humano
 
-- [ ] **T7**: Fijar el predicado elegido en `ventana.vigente` de
-      `config/business_rules.yaml` y añadir `VentanaSettings` (prefijo
-      `VENTANA_`: `activa=False`, `max_pct_fuera=95.0`) a `config/settings.py`.
-      **Verificación**: `pytest tests/test_f025_apagado.py -q` (R7) — sin
-      variables de entorno, la composición del pipeline y el SQL que se
-      ejecutaría son **idénticos** a los de hoy.
+## Fase 7 · Verificación contra la base (MANUAL, en este orden)
 
-- [ ] **T8**: Añadir a `etl_sigrid/domain/ventana.py` `filtrar_obras(...)` y
-      `validar_ventana(...)` (R13). Tests exhaustivos primero: es la pieza que
-      la campaña de mutación va a morder.
-      **Verificación**: `pytest tests/test_f025_guardias.py -q` (R13) con los
-      bordes (cero obras dentro, todas dentro, justo en el umbral, justo por
-      encima).
-
-- [ ] **T9**: Añadir el índice `idx_plan_mensual_obra` a
-      `sql/stg/01_ddl.sql` (`CREATE INDEX IF NOT EXISTS`, aditivo).
-      **Verificación**: `pytest tests/test_f025_build.py -k ddl -q` — el test
-      lee el `.sql`, comprueba `IF NOT EXISTS` y que no hay bloques `$$`.
-
-- [ ] **T10**: Modificar `build_stg_step.py`: filtrar obras antes de
-      `planificar_tramos`, sustituir el `TRUNCATE` global por `DELETE ... WHERE
-      obra_id = ANY(...)` **dentro de la transacción del tramo**, aplicar
-      `validar_ventana` y escribir el `metadata` de R14. **`componer_sql_tramo`,
-      el marcador `/*F019_FILTRO_OBRAS*/` y `tramos.py` no se tocan.**
-      **Verificación**: `pytest tests/test_f025_build.py -q` (R8, R10, R14,
-      R17) + `pytest tests/test_f019_*.py -q` **sin modificar ni un test de
-      F-019**; si alguno hay que tocarlo, el diseño se torció y hay que parar.
-
-- [ ] **T11**: Sustituir el `TRUNCATE` de `sql/mart/02_build_fact.sql` por el
-      marcador `/*F025_BORRADO*/` y hacer que `build_mart_step.py` inyecte el
-      `TRUNCATE` de siempre (sin ventana) o el `DELETE` por obra (con ventana),
-      dejando `agg_categoria` coherente.
-      **Verificación**: `pytest tests/test_f025_build.py -k mart -q` (R9) —
-      incluye el test de que, con la ventana apagada, el SQL compuesto es
-      **carácter por carácter** el fichero de hoy.
-
-- [ ] **T12**: Guardias de proceso: `run-all --full` y `stage --full`
-      reconstruyen todo aunque la ventana esté activa (R15); la puerta de
-      coherencia de `raw` de F-024 sigue intacta (R16); la puerta de disco de
-      F-019 sigue armada (R11); `stg.obras.activa` sigue cableada a `TRUE`
-      (R18).
-      **Verificación**: `pytest tests/test_f025_guardias.py tests/test_f025_alcance.py -q`
-      (R11, R15, R16, R18, R20, R21) + los tests de F-024 pasan sin
-      modificarse.
-
-- [ ] **T13 · PARADA · MANUAL (humano)**: prueba de equivalencia contra Azure.
-      Build completo y build acotado sobre **el mismo `raw`**:
-
-      ```bash
-      python main.py check-coherencia                  # raw coherente (F-024)
-      # 1) build completo, la referencia
-      python main.py stage --full
-      python main.py build-mart
-      python main.py fingerprint-views --out huella_completo_f025.csv --periodo-hasta 2026-07
-      # 2) build acotado, sin volver a ingerir
-      VENTANA_ACTIVA=1 python main.py stage
-      VENTANA_ACTIVA=1 python main.py build-mart
-      python main.py fingerprint-views --out huella_ventana_f025.csv --periodo-hasta 2026-07
-      python main.py compare-fingerprints huella_completo_f025.csv huella_ventana_f025.csv
-      ```
-
-      Esperado: **cero diferencias** en los bloques `estructura` y `cerrado`
-      (el bloque `vivo` puede avisar por `mart.v_pbi_dim_fecha`, que usa
-      `CURRENT_DATE`). Cualquier FALLO se marca `blocked` y **no se
-      racionaliza**.
-      **Verificación**: `MANUAL (humano)`. Anotar también el tiempo real de
-      cada build y el pico de ocupación de disco, para contrastarlos con la
-      estimación de T3.
-
-- [ ] **T14**: Actualizar `docs/ARCHITECTURE.md` (qué es la ventana, que acota
-      el refresco y no el contenido, cómo se declara, la reconstrucción
-      completa semanal) y `azure-apps/datamart_seg_anual.md` (perfil de carga y
-      variables de entorno nuevas; y las tablas nuevas de `sigrid-api` si DA-1
-      eligió la opción (c)). No se toca `azure-apps/sigrid_api.md`, que es de
-      otro proyecto.
-      **Verificación**: inspección del reviewer + `pytest tests/test_f025_alcance.py -q`
-      (R21: barrido de secretos sobre lo nuevo).
-
----
-
-## Cierre
-
-- [ ] **T15**: Campaña de mutación del rigor `critico` y análisis de
-      supervivientes, con foco en `etl_sigrid/domain/ventana.py`.
-      **Verificación**: `python -m harness.mutacion --feature F-025` con cero
-      supervivientes, o cada superviviente justificado por escrito en
-      `progress/mutacion_F-025.md` y **aceptado por el humano**.
-
-- [ ] **T16**: Ejecutar `bash harness/init.sh` en verde (incluye pytest y la
-      puerta de cobertura de las líneas cambiadas).
-      **Verificación**: `bash harness/init.sh` termina con exit code 0.
+- [ ] T27: Capturar las CINCO huellas del ANTES sobre el `raw` vigente, antes de reconstruir nada  |  Verificación: MANUAL (humano), cinco CSV guardados fuera de la base
+- [ ] T28: `python main.py ventana-plan` contra producción y comprobar que el conjunto coincide con el censo de `mediciones.md`  |  Verificación: MANUAL (humano)
+- [ ] T29: Primera reconstrucción acotada (`stage`), midiendo duración por tramo y ocupación de disco  |  Verificación: MANUAL (humano), `python main.py timings`
+- [ ] T30: Capturar las cinco huellas del DESPUÉS y compararlas **sin `--obras-esperadas`**  |  Verificación: MANUAL (humano), `comparar-huellas` con CERO diferencias en las cinco; cualquier diferencia PARA la feature
+- [ ] T31: Comprobar la 0599 en `cierre.v_pbi_cierre_resumen`: DIRECTOS 2.624.793 €, margen 1,8 %  |  Verificación: MANUAL (humano)
+- [ ] T32: `check-unicidad --timeout 300`, `check-cierres --timeout 900`, `check-cobertura`, `check-declarados` y `check-ventana`  |  Verificación: MANUAL (humano), mismo veredicto que antes del cambio
+- [ ] T33: Medir el bloat tras la primera semana acotada y compararlo con T2  |  Verificación: MANUAL (humano), cifra en `mediciones.md`; si crece de forma sostenida, abrir la feature de particionado
+- [ ] T34: Medir los créditos de CPU restantes al terminar la nocturna acotada (R29)  |  Verificación: MANUAL (humano), métrica de Azure; crédito restante > 0
+- [ ] T35: Desplegar `infra/97_create_alert_ventana.ps1` y añadir el buzón al grupo de acción  |  Verificación: MANUAL (humano), sin este paso el guardián es mudo
+- [ ] T36: Ejecutar `bash harness/init.sh` en verde  |  Verificación: código 0, incluidos pytest, tamaño y diccionario
