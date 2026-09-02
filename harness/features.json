@@ -505,7 +505,7 @@
         "Medido el efecto sobre los creditos de CPU del B1ms antes y despues: la nocturna debe terminar sin dejar la hucha a cero",
         "Documentado en el diccionario y en azure-apps/datamart_seg_anual.md que el datamart ya no reconstruye todo cada noche, y que significa eso para quien lo consulta"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
@@ -795,7 +795,7 @@
         "Existe una comprobacion que contrasta lo que entra en stg con lo que sale en mart, y falla si se vuelve a caer una obra",
         "Si la causa esta en la configuracion de Sigrid, llevada a quien lo administra: no se toca desde aqui"
       ],
-      "status": "in_progress",
+      "status": "blocked",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
