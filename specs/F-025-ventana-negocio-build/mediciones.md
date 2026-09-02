@@ -152,3 +152,45 @@ FROM ult;
 | Tamaño y tuplas muertas de las dos tablas acotadas | T2 y T33 | Si el `DELETE` selectivo aguanta o hay que particionar |
 | Coste del scan de la firma sobre `raw.obrparpre`, con y sin `planif` | **T3** | La forma final de la firma y la laguna de R20 |
 | Créditos de CPU al terminar la nocturna acotada | T34 | R29, el criterio de aceptación |
+
+## 7 · T2 · La línea base del bloat, medida el 2026-09-02
+
+Medido por el MCP de solo lectura sobre el **catálogo** (`pg_class`,
+`pg_stat_user_tables`): no barre ni una fila de las dos tablas, así que se pudo
+hacer con el servidor sin créditos. Es la línea contra la que T33 comparará
+después de una semana acotada.
+
+| Tabla | Total | Solo datos | Filas vivas | Tuplas muertas | Último autovacuum |
+|---|---|---|---|---|---|
+| `stg.presupuesto` | **2.893.283.328 B** (2.759 MB) | 1.589.837.824 B | 13.862.725 | **0** | 2026-09-02 03:17 |
+| `stg.plan_mensual` | **1.813.725.184 B** (1.730 MB) | 1.297.457.152 B | 6.438.486 | **0** | 2026-09-02 07:25 |
+
+**Cuidado al leer `plan_mensual`: son las cifras de la tabla TRUNCADA por la
+avería** (6,4 M de 29,8 M filas, el 21,6 %). A tabla llena el total sería del
+orden de **8 GB**, sobre un disco de 32 GB compartido con `albaranes` y
+`partes`. Es la cota que hace del bloat un riesgo real y no teórico (§9.1 de
+`design.md`), y la razón de que T33 no sea opcional.
+
+Las dos tablas están hoy con **cero tuplas muertas** y autovacuum recién pasado:
+la línea base es limpia, así que cualquier crecimiento sostenido que T33 mida
+será atribuible al `DELETE` por obra y no a deuda anterior.
+
+### Los índices que hacen barato el `DELETE` (verificado, no supuesto)
+
+`design.md` §2 afirma que el `DELETE ... WHERE obra_id = ANY (...)` va por
+índice. Comprobado contra `pg_indexes` el 2026-09-02:
+
+- `idx_plan_mensual_obra_amb` → `btree (obra_id, ambito_id)`
+- `idx_pres_obra_amb` → `btree (obra_id, ambito_id)`
+
+Las dos **empiezan por `obra_id`**, así que el borrado derivado no barre la
+tabla. **No hay ningún índice que crear.**
+
+### Lo que NO se ha medido, y por qué
+
+**T1** (peso real por obra con `SQL_PESOS_PLAN_MENSUAL`) y **T2b** (coste del
+scan de la firma sobre `raw.obrparpre`) siguen **pendientes del humano**: las
+dos barren tablas de millones de filas y el servidor está recuperando créditos
+de CPU tras la avería. Lanzarlas ahora volvería a vaciar la hucha, que es
+exactamente lo que esta feature existe para evitar. La cota estimada del §3
+(73,3 % del proxy) sigue siendo lo único que hay sobre el ahorro.
