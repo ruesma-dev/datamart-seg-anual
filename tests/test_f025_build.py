@@ -57,7 +57,16 @@ from etl_sigrid.domain.ventana import ObraCensada
 
 from tests.test_f019_tramos import LoggerFalso
 
-SELLO_CUALQUIERA = "c" * 64
+def sello_real() -> str:
+    """El sello que el step calcula de verdad sobre los SQL del repositorio.
+
+    Usarlo aquí no es un atajo: si el censo llevara un sello inventado, TODAS
+    las obras entrarían por R17 y estos tests estarían midiendo el mecanismo
+    del sello en vez del criterio de la ventana. Y de paso ejercita
+    `_sello_vigente` contra los ficheros reales.
+    """
+    paso = BuildStgStep(settings_falsos())
+    return paso._sello_vigente()
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +264,7 @@ class PgVentana:
         self.congeladas: list[dict] = []
         self.vacuums: list[tuple[str, str]] = []
         self.obras_sobrantes_pedidas: list[str] = []
+        self.hitos: list[dict] = []
         self._ultimo_run = 0
 
     # --- la ventana ---
@@ -266,7 +276,16 @@ class PgVentana:
         return self._ultima_completa
 
     def fetch_obras_con_filas(self, tabla: str) -> set[int]:
+        """Qué obras tienen hoy filas en cada tabla.
+
+        `plan_mensual` se construye DESDE `stg.presupuesto`, así que solo tiene
+        filas de las obras que pesan. Modelarlo así y no devolver el censo
+        entero importa: si no, la limpieza de sobrantes creería que hay que
+        borrar obras que nunca tuvieron filas.
+        """
         self.obras_sobrantes_pedidas.append(tabla)
+        if tabla == "plan_mensual":
+            return set(self.pesos)
         return {o.obra_id for o in self._censo}
 
     def registrar_obras_construidas(self, registros) -> int:
@@ -319,6 +338,11 @@ class PgVentana:
     ) -> None:
         self.cierres.append((run_id, status, rows_processed, error_message))
 
+    def record_run_completed(self, **kwargs: object) -> int:
+        self.traza.append("hito")
+        self.hitos.append(kwargs)
+        return 0
+
     def fetch_estado_raw(self) -> list:
         from etl_sigrid.domain.coherencia import EstadoTablaRaw
 
@@ -347,7 +371,7 @@ def censo_por_defecto() -> list[ObraCensada]:
     comun = {
         "tiene_filas": True,
         "registrada": True,
-        "sello_registrado": SELLO_CUALQUIERA,
+        "sello_registrado": sello_real(),
         "firma_origen": "f1",
         "firma_registrada": "f1",
     }
@@ -420,7 +444,10 @@ def test_f025_r10_cada_tramo_borra_e_inserta_sus_obras(
     assert tramos, "no se ejecutó ningún tramo"
     for sql in tramos:
         assert "DELETE FROM stg." in sql
-        assert "TRUNCATE" not in sql.upper()
+        # Sin comentarios: el propio SQL EXPLICA en su cabecera el `TRUNCATE`
+        # que se retiró, y buscar la palabra en el texto crudo se dispararía
+        # con la frase que dice por qué ya no está.
+        assert "TRUNCATE" not in sin_comentarios_sql(sql).upper()
 
 
 def test_f025_r13_un_tramo_que_falla_NO_vacia_la_tabla(  # noqa: N802
@@ -543,9 +570,14 @@ def test_f025_r6_el_presupuesto_tambien_se_acota(
     pg = PgVentana()
     ejecutar(pg, monkeypatch)
 
-    presupuesto = [s for s in pg.sql_ejecutado if "stg.presupuesto" in s]
-    assert len(presupuesto) == 1
+    presupuesto = [
+        s for s in pg.sql_ejecutado if s.startswith("DELETE FROM stg.presupuesto")
+    ]
+    assert len(presupuesto) == 1, "de una sola pasada, no por tramos"
     assert "ARRAY[1]::BIGINT[]" in presupuesto[0]
+    assert "INSERT INTO stg.presupuesto" in presupuesto[0], (
+        "el borrado y la insercion tienen que viajar en la MISMA transaccion"
+    )
 
 
 def test_f025_r6_el_presupuesto_ya_no_va_por_execute_sql_file(

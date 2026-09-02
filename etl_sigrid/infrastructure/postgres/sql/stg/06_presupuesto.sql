@@ -39,7 +39,40 @@
 --                       expuestos para que 08_plan_mensual reaplique el mismo
 --                       redondeo al explotar el plan mensual.
 
-TRUNCATE TABLE stg.presupuesto;
+-- ===========================================================================
+-- LA VENTANA DE NEGOCIO (F-025, decision DA-2 del humano del 2026-09-02)
+-- ===========================================================================
+-- ESTE FICHERO YA NO SE EJECUTA TAL CUAL. `build_stg_step` sustituye el
+-- marcador F025_FILTRO_OBRAS de abajo por las obras que se reconstruyen esta
+-- noche y le antepone el DELETE de esas MISMAS obras, todo en una sola
+-- transaccion. Una sola pasada: este fichero no tiene ventanas ni explosion
+-- de filas, asi que no necesita los tramos de 08_plan_mensual.sql.
+--
+-- POR QUE DESAPARECIO EL `TRUNCATE TABLE stg.presupuesto` QUE HABIA AQUI.
+-- Desde F-025 solo se reconstruyen 40 obras de 920: truncar habria borrado
+-- las otras 880 y dejado la tabla con 40. El humano lo prohibio con estas
+-- palabras: "que no se reconstruyan, pero que NO SE BORREN, y que la
+-- informacion este consultable". El borrado ahora se DERIVA de lo que se va a
+-- escribir -se borran exactamente las obras que se van a reinsertar, en la
+-- misma transaccion-, asi que es imposible borrar una obra que luego no se
+-- reescriba. No hay dos listas que puedan desincronizarse: es la misma.
+--
+-- Y REPARA UNA AVERIA DE PASO: si un fallo interrumpe la carga, las obras ya
+-- procesadas estan al dia y las demas conservan su ultima version buena. La
+-- tabla queda COHERENTE, no truncada. Es lo que le faltaba a la nocturna del
+-- 2026-09-02, que murio dejando stg.plan_mensual al 21,6 %.
+--
+-- EL CORTE POR OBRA ES SEGURO, y no es una intuicion: el DISTINCT ON de abajo
+-- empieza por `pp.obride`, asi que la deduplicacion nunca cruza obras y el
+-- resultado filtrado es identico al de una pasada entera. Es la misma
+-- propiedad estructural que hace seguro el troceado de F-019.
+--
+-- EL FILTRO VA COMO COMENTARIO SQL A PROPOSITO: un fichero al que le falte la
+-- sustitucion NO es SQL valido (`= ANY ()`), asi que no puede colarse una
+-- ejecucion sin filtro por descuido. Misma defensa que F019_FILTRO_OBRAS.
+--
+-- NI UNA LINEA DE LA LOGICA DE NEGOCIO CAMBIA.
+-- ===========================================================================
 
 INSERT INTO stg.presupuesto (
     presupuesto_id,
@@ -90,4 +123,5 @@ SELECT DISTINCT ON (pp.obride, pp.paride, pp.amb, COALESCE(pp.fas, 0))
 FROM raw.obrparpre pp
 JOIN raw.obr o ON o.ide = pp.obride       -- decimales propios de la obra
 WHERE pp.obride IS NOT NULL
+  AND pp.obride = ANY (/*F025_FILTRO_OBRAS*/)   -- ventana de negocio (F-025)
 ORDER BY pp.obride, pp.paride, pp.amb, COALESCE(pp.fas, 0), pp.ide DESC;

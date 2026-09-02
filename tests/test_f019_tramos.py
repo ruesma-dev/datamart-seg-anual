@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -236,7 +236,15 @@ def test_f019_r7_solo_enteros_en_el_filtro() -> None:
     plantilla = f"A {MARCADOR_FILTRO_OBRAS} B {MARCADOR_FILTRO_OBRAS} C"
     compuesto = componer_sql_tramo(plantilla, (10, 20, 30))
 
-    assert compuesto == "A ARRAY[10, 20, 30]::BIGINT[] B ARRAY[10, 20, 30]::BIGINT[] C"
+    # F-025 antepone el borrado derivado de LAS MISMAS obras (R10): el conjunto
+    # que se borra es el que se va a escribir, y por eso la lista aparece tres
+    # veces y no dos.
+    assert compuesto.endswith(
+        "A ARRAY[10, 20, 30]::BIGINT[] B ARRAY[10, 20, 30]::BIGINT[] C"
+    )
+    assert compuesto.startswith(
+        "DELETE FROM stg.plan_mensual WHERE obra_id = ANY (ARRAY[10, 20, 30]::BIGINT[]);"
+    )
     assert MARCADOR_FILTRO_OBRAS not in compuesto
 
     for obras_invalidas in (
@@ -269,7 +277,11 @@ def test_f019_r7_un_tramo_sin_obras_no_compone_nada() -> None:
 def test_f019_r7_el_sql_real_compuesto_queda_sin_marcadores() -> None:
     compuesto = componer_sql_tramo(_sql_plan_mensual(), (1234, 5678))
     assert MARCADOR_FILTRO_OBRAS not in compuesto
-    assert compuesto.count("= ANY (ARRAY[1234, 5678]::BIGINT[])") == RAMAS_CON_FILTRO
+    # Dos ramas del INSERT + el DELETE derivado que F-025 antepone.
+    assert (
+        compuesto.count("= ANY (ARRAY[1234, 5678]::BIGINT[])")
+        == RAMAS_CON_FILTRO + 1
+    )
 
 
 # --- Dobles del cliente Postgres ---------------------------------------------
@@ -448,6 +460,9 @@ class PgFalso:
         self.pasos_registrados: list[str] = []
         self.cierres: list[tuple[int, str, int, str | None]] = []
         self.total_gb_medidos: list[int] = []
+        self.construidas: list[dict] = []
+        self.congeladas: list[dict] = []
+        self.vacuums: list[tuple[str, str]] = []
         self._ultimo_run = 0
 
     # --- lo que usa el build por tramos ---
@@ -458,6 +473,60 @@ class PgFalso:
     def truncate_table(self, schema: str, table: str) -> None:
         self.traza.append("truncate")
         self.truncados.append((schema, table))
+
+    # --- lo que anadio F-025 -------------------------------------------------
+    # El doble tiene que seguir pareciendose a lo que sustituye: si le faltara
+    # un metodo que el step llama, el fallo seria un AttributeError en vez de
+    # la comprobacion que el test quiere hacer.
+
+    def fetch_censo_de_obras(self) -> list:
+        """Un censo con las mismas obras que pesan, todas VIVAS.
+
+        Estos tests son sobre el troceado y la puerta de DISCO, no sobre el
+        criterio de la ventana: si alguna obra saliera congelada, el tramo que
+        el test mide no se ejecutaria y el fallo no diria por que.
+        """
+        from etl_sigrid.application.steps.build_stg_step import BuildStgStep
+        from etl_sigrid.domain.ventana import ObraCensada
+
+        sello = BuildStgStep(settings_falsos())._sello_vigente()
+        return [
+            ObraCensada(
+                obra_id=obra_id,
+                codigo_obra=f"07{obra_id:02d}",
+                estado_id=15,
+                ultima_actividad=date.today(),
+                tiene_filas=True,
+                registrada=True,
+                sello_registrado=sello,
+                firma_origen="f1",
+                firma_registrada="f1",
+            )
+            for obra_id in sorted(self.pesos)
+        ]
+
+    def fetch_ultima_reconstruccion_completa(self, paso: str) -> datetime | None:
+        return datetime.utcnow()
+
+    def fetch_obras_con_filas(self, tabla: str) -> set[int]:
+        return set(self.pesos)
+
+    def fetch_filas_por_obra(self, tabla: str, obras) -> dict[int, int]:
+        return {int(o): 0 for o in obras}
+
+    def registrar_obras_construidas(self, registros) -> int:
+        self.construidas.extend(registros)
+        return len(registros)
+
+    def marcar_obras_congeladas(self, registros) -> int:
+        self.congeladas.extend(registros)
+        return len(registros)
+
+    def record_run_completed(self, **kwargs: object) -> int:
+        return 0
+
+    def vacuum_analyze(self, schema: str, table: str) -> None:
+        self.vacuums.append((schema, table))
 
     def medir_ocupacion_disco_pct(self, total_gb: int) -> float:
         self.traza.append("medicion")
@@ -563,9 +632,25 @@ def settings_falsos(
             tramo_max_filas=max_filas,
             disco_total_gb=total_gb,
             disco_limite_pct=limite_pct,
+            # F-025. La ventana va APAGADA en estos tests a proposito: miden el
+            # troceado y la puerta de disco de F-019, y encenderla cambiaria el
+            # conjunto de obras y con el los tramos que se esperan.
+            ventana_activa=False,
+            ventana_meses=12,
+            ventana_dia_completa=6,
+            ventana_rescate=False,
         ),
         business_rules={
-            "sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15"}}
+            "sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15"}},
+            # F-025: el criterio de la ventana. Con `ventana_activa=False` no
+            # llega a filtrar nada, pero el step lo lee igual para componer el
+            # plan, y un doble al que le falte revienta al construir el
+            # `Criterio`.
+            "ventana": {
+                "estados_que_congelan": [1, 11, 25],
+                "patron_codigo_administrativo": "^[0-9]{6}$",
+                "meses_sin_actividad": 12,
+            },
         },
         # F-024: de aquí saca la puerta de coherencia qué tablas exigir. Las
         # mismas que devuelve `PgFalso.fetch_estado_raw`, para que la puerta
@@ -577,7 +662,15 @@ def settings_falsos(
 
 
 def construir_por_tramos(pg: PgFalso, **kwargs: object) -> int:
+    """El build por tramos, con el plan de la ventana ya compuesto.
+
+    Desde F-025 el sub-paso no decide por su cuenta que obras construye: se lo
+    dice el plan, que compone el sub-paso `plan_ventana` justo antes. Componerlo
+    aqui es lo que mantiene estos tests midiendo lo suyo -el troceado y la
+    puerta de disco- en vez de un plan vacio.
+    """
     paso = BuildStgStep(settings_falsos(**kwargs))  # type: ignore[arg-type]
+    paso._componer_plan(pg)  # type: ignore[arg-type]
     return paso._build_plan_mensual_por_tramos(pg, RUTA_PLAN_MENSUAL)
 
 
@@ -585,18 +678,18 @@ def construir_por_tramos(pg: PgFalso, **kwargs: object) -> int:
 
 
 def test_f019_r8_mide_ocupacion_antes_de_cada_tramo() -> None:
-    """Incluido el primero, y siempre ANTES de ejecutar el tramo."""
+    """Incluido el primero, y siempre ANTES de ejecutar el tramo.
+
+    F-025 quito el `truncate` que habia entre los pesos y el primer tramo: el
+    borrado ahora va DENTRO del SQL de cada tramo, derivado de las obras que ese
+    tramo va a escribir. La secuencia de medicion no cambia.
+    """
     pg = PgFalso()
     construir_por_tramos(pg)
 
-    assert pg.traza == [
-        "pesos",
-        "truncate",      # una sola vez, antes del primer tramo
-        "medicion", "sql",
-        "medicion", "sql",
-    ]
+    assert pg.traza[-4:] == ["medicion", "sql", "medicion", "sql"]
     assert pg.total_gb_medidos == [32, 32]
-    assert pg.truncados == [("stg", "plan_mensual")]
+    assert pg.truncados == [], "F-025: las tablas acotadas no se truncan"
 
 
 # --- R9 · Límite de seguridad: aborto limpio ---------------------------------
@@ -613,10 +706,11 @@ def test_f019_r9_supera_limite_aborta_sin_ejecutar_el_tramo() -> None:
     assert "80.0" in mensaje          # límite configurado
     assert "2/2" in mensaje           # tramo en el que paró
 
-    # El segundo tramo NO se ejecutó y la tabla quedó vacía.
-    assert pg.traza == [
-        "pesos", "truncate", "medicion", "sql", "medicion", "truncate",
-    ]
+    # El segundo tramo NO se ejecutó. Y la tabla NO se vacía (F-025, R13): el
+    # primer tramo dejó sus obras al día y las demás conservan el dato de
+    # anoche, que es coherente en vez de truncado.
+    assert pg.traza[-3:] == ["medicion", "sql", "medicion"]
+    assert pg.truncados == []
     assert len(pg.sql_ejecutado) == 1
 
 
@@ -627,10 +721,17 @@ def test_f019_r9_una_ocupacion_justo_en_el_limite_no_aborta() -> None:
     assert len(pg.sql_ejecutado) == 2
 
 
-def test_f019_r9_aborto_deja_la_tabla_vacia_y_failed_en_meta(
+def test_f019_r9_aborto_deja_failed_en_meta_SIN_vaciar_la_tabla(  # noqa: N802
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """El step entero: FAILED, tabla vacía y rastro en _meta.etl_runs."""
+    """El step entero: FAILED y rastro en _meta.etl_runs, **sin vaciar nada**.
+
+    Este test se llamaba `..._deja_la_tabla_vacia_...` y comprobaba dos
+    `TRUNCATE`. F-025 (R13) invierte esa invariante a proposito: vaciar
+    destruiria las 880 obras congeladas, que es lo que el humano prohibio. Lo
+    que impide que `build_mart` construya sobre un stage a medias sigue siendo
+    la puerta de F-024, que no se toca.
+    """
     import etl_sigrid.application.steps.build_stg_step as modulo
 
     pg = PgFalso(ocupaciones=[95.0])
@@ -640,8 +741,7 @@ def test_f019_r9_aborto_deja_la_tabla_vacia_y_failed_en_meta(
 
     assert resultado.status is StepStatus.FAILED
     assert "build_plan_mensual" in (resultado.error_message or "")
-    assert pg.sql_ejecutado == []                       # ni un tramo
-    assert pg.truncados == [("stg", "plan_mensual")] * 2  # inicial + limpieza
+    assert pg.truncados == []
 
     fallidos = [c for c in pg.cierres if c[1] == "FAILED"]
     assert [c[0] for c in fallidos]                     # hay FAILED en _meta
@@ -660,7 +760,8 @@ def test_f019_r10_medicion_fallida_aborta_no_continua() -> None:
         construir_por_tramos(pg)
 
     assert pg.sql_ejecutado == []
-    assert pg.traza == ["pesos", "truncate", "medicion", "truncate"]
+    assert pg.traza[-1] == "medicion"
+    assert pg.truncados == []           # F-025, R13: no se vacía nada
 
 
 # --- R11 · Transacción por tramo y fallo limpio ------------------------------
@@ -672,22 +773,39 @@ def test_f019_r11_cada_tramo_en_su_transaccion() -> None:
     construir_por_tramos(pg)
 
     assert len(pg.sql_ejecutado) == 2
-    assert pg.sql_ejecutado[0].count("= ANY (ARRAY[1]::BIGINT[])") == RAMAS_CON_FILTRO
-    assert pg.sql_ejecutado[1].count("= ANY (ARRAY[2, 3]::BIGINT[])") == RAMAS_CON_FILTRO
+    # Dos ramas del INSERT + el DELETE derivado que F-025 antepone.
+    assert (
+        pg.sql_ejecutado[0].count("= ANY (ARRAY[1]::BIGINT[])")
+        == RAMAS_CON_FILTRO + 1
+    )
+    assert (
+        pg.sql_ejecutado[1].count("= ANY (ARRAY[2, 3]::BIGINT[])")
+        == RAMAS_CON_FILTRO + 1
+    )
     for sql in pg.sql_ejecutado:
         assert MARCADOR_FILTRO_OBRAS not in sql
-        assert "TRUNCATE" not in sql.upper()
+        codigo = chr(10).join(
+            linea for linea in sql.splitlines()
+            if not linea.lstrip().startswith("--")
+        )
+        assert "TRUNCATE" not in codigo.upper()
 
 
-def test_f019_r11_fallo_de_tramo_limpia_y_para() -> None:
+def test_f019_r11_fallo_de_tramo_para_SIN_vaciar_la_tabla() -> None:  # noqa: N802
+    """Antes se llamaba `..._limpia_y_para` y exigia el `TRUNCATE`.
+
+    F-025 (R13) cambia la invariante: parar sin vaciar es lo que convierte una
+    noche fallida en una tabla COHERENTE -cada obra con su ultima version
+    buena- en vez de en una tabla truncada. Es literalmente lo que le falto a la
+    nocturna del 2026-09-02, que murio dejando stg.plan_mensual al 21,6 %.
+    """
     pg = PgFalso(tramo_que_falla=1)
 
     with pytest.raises(PlanMensualAbortado, match="No space left on device"):
         construir_por_tramos(pg)
 
     assert len(pg.sql_ejecutado) == 1               # no hay tramos posteriores
-    assert pg.traza[-1] == "truncate"               # tabla vacía
-    assert ("stg", "plan_mensual") in pg.truncados
+    assert pg.truncados == []
     assert any(estado == "FAILED" for _, estado, _, _ in pg.cierres)
 
 

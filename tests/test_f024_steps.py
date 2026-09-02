@@ -19,7 +19,7 @@ módulo del step, que es por donde el step consigue su cliente.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -129,6 +129,56 @@ class PgFalso:
         self.traza.append("medicion")
         return 1.0
 
+    # --- lo que añadió F-025 -------------------------------------------------
+    # El doble tiene que parecerse a lo que sustituye. Estos tests son sobre la
+    # PUERTA de coherencia de raw, no sobre la ventana, así que el censo es una
+    # obra viva y con su sello al día: lo que se mide aquí es que un KO de la
+    # puerta no llegue a escribir nada, y para eso el build tiene que poder
+    # llegar hasta donde escribiría.
+
+    def fetch_censo_de_obras(self) -> list:
+        self.traza.append("censo")
+        from etl_sigrid.application.steps.build_stg_step import BuildStgStep
+        from etl_sigrid.domain.ventana import ObraCensada
+
+        sello = BuildStgStep(settings_falsos())._sello_vigente()
+        return [
+            ObraCensada(
+                obra_id=1,
+                codigo_obra="0710",
+                estado_id=15,
+                ultima_actividad=date.today(),
+                tiene_filas=True,
+                registrada=True,
+                sello_registrado=sello,
+                firma_origen="f1",
+                firma_registrada="f1",
+            )
+        ]
+
+    def fetch_ultima_reconstruccion_completa(self, paso: str) -> datetime | None:
+        return datetime.utcnow()
+
+    def fetch_obras_con_filas(self, tabla: str) -> set[int]:
+        return {1}
+
+    def fetch_filas_por_obra(self, tabla: str, obras) -> dict[int, int]:
+        return {int(o): 0 for o in obras}
+
+    def registrar_obras_construidas(self, registros) -> int:
+        self.traza.append("registrar")
+        return len(registros)
+
+    def marcar_obras_congeladas(self, registros) -> int:
+        self.traza.append("congelar")
+        return len(registros)
+
+    def record_run_completed(self, **kwargs: object) -> int:
+        return 0
+
+    def vacuum_analyze(self, schema: str, table: str) -> None:
+        self.traza.append("vacuum")
+
     # --- ayudas de aserción ---
     @property
     def escrituras(self) -> list[str]:
@@ -151,9 +201,20 @@ def settings_falsos(tablas: tuple[str, ...] = TABLAS) -> SimpleNamespace:
             tramo_max_filas=1_000_000,
             disco_total_gb=32,
             disco_limite_pct=80.0,
+            # F-025: la ventana va apagada. Estos tests miden la puerta de
+            # coherencia de raw, no el criterio de obra congelada.
+            ventana_activa=False,
+            ventana_meses=12,
+            ventana_dia_completa=6,
+            ventana_rescate=False,
         ),
         business_rules={
-            "sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15"}}
+            "sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15"}},
+            "ventana": {
+                "estados_que_congelan": [1, 11, 25],
+                "patron_codigo_administrativo": "^[0-9]{6}$",
+                "meses_sin_actividad": 12,
+            },
         },
         tables_sigrid={
             "tables": [
@@ -248,8 +309,10 @@ def test_f024_r10_puerta_ok_registra_y_continua(stg) -> None:
     assert estado == "SUCCESS"
     assert motivo is None
 
-    # Y sí construyó: los ficheros SQL de stg se ejecutaron.
-    assert pg.traza.count("fichero") >= 8
+    # Y sí construyó: los SQL de stg se ejecutaron. Desde F-025 uno de ellos
+    # —`06_presupuesto.sql`— ya no va por `execute_sql_file` sino compuesto con
+    # su filtro de obras, así que se cuentan las dos vías.
+    assert pg.traza.count("fichero") + pg.traza.count("sql") >= 8
 
 
 def test_f024_r10_la_puerta_precede_al_preflight(stg) -> None:
