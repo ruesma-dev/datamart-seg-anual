@@ -40,7 +40,36 @@ Actividad = mes más reciente con fase cerrada (`stg.fases.anio`/`mes`).
 | ≤ 36 meses | 89 |
 | **Sin ninguna fase** | **217** |
 
-Y los censos por criterio, que es lo que decide DA-1:
+### El criterio decidido (DA-1) y su censo
+
+Sobre las **920 obras de `maestro.obras`**, con el detalle obra a obra en
+**`obras_candidatas_a_congelar.csv`**, en la raíz del repositorio. **No se
+versiona** —`.gitignore` excluye `obras_*.csv`—: es dato derivado, y se regenera
+con la consulta del §5 sobre `maestro.obras`, `stg.fases` y `mart.v_pbi_dim_obra`.
+Columnas: `codigo_obra;nombre_obra;estado_id;seis_digitos;llega_al_fact;ultima_actividad`.
+
+| | Obras |
+|---|---|
+| Estado **EN ESTUDIO (1), NO PRESENTADA (11) o CERRADA (25)** | 693 |
+| Código de **seis dígitos** | **222**, y **ninguna llega al fact** |
+| **Sin actividad** en 12 meses | 840 |
+| **Congeladas (unión de las tres)** | **880** |
+| **Vivas** | **40**, de ellas **38** publican en el fact |
+| Con actividad en 12 meses **pero congeladas** | **40**: 39 CERRADAS y 1 de seis dígitos. De ellas **36 cierran en 2025-12** (el cierre anual) y solo 4 después: 2026-03 (2), 2026-04 y 2026-07 |
+
+### El catálogo de estados, verificado el 2026-09-02
+
+Vive en **`conest`**, tipo **42**, y se llega por `con.est` (confirmado contra
+Sigrid por `sigrid-api`, en solo lectura): 1 EN ESTUDIO (226 obras), 3 PRESENTADA
+(0), 5 PRESENTADA CON ACLARACIONES (0), 7 ADJUDICADA PROVISIONAL (0), 9 ADJUDICADA
+DEFINITIVAMENTE (33), 11 NO PRESENTADA (2), 13 NO ADJUDICADA (0), 15 EN CURSO (176),
+17 PARADA (7), 19 TERMINADA (2), 21 RECIBIDA PROVISIONAL (3), 23 RECIBIDA
+DEFINITIVAMENTE (4), **25 CERRADA (465)**, 999 PLANTILLA (1).
+
+### Los censos que se compararon antes de decidir
+
+Sobre el universo más estrecho de `stg.obras` (583), que es el del seguimiento. Se
+conservan porque son los que sostienen por qué la marca de Sigrid sola no bastaba:
 
 | Criterio | Congela | Falsos positivos (congelaría algo vivo) |
 |---|---|---|
@@ -86,8 +115,9 @@ nocturna ya ejecuta cada noche (`SQL_PESOS_PLAN_MENSUAL`).
 - El build reconstruye **687 obras** (universo de `stg.presupuesto`), y `stg.obras`
   tiene **583**: hay del orden de **104 obras** que se construyen en
   `stg.plan_mensual` y que **el fact descarta** con su `INNER JOIN stg.obras`
-  (`mart/02_build_fact.sql:232`). Son las administrativas (GG, CM, POSTV, VAR…).
-  Su peso lo dará T1; es DA-3.
+  (`mart/02_build_fact.sql:232`). La regla de los seis dígitos (DA-3) congela **222**
+  de las 920 del maestro y **ninguna de ellas llega al fact**: son presupuestos y
+  estudios de 2009-2015. Cuánto pesan lo dará T1.
 - `stg.plan_mensual` completa son **29.762.403** filas (01-sep). La avería la dejó
   en 6.436.281, el **21,6 %**.
 
@@ -118,7 +148,7 @@ FROM ult;
 
 | Qué | Cuándo | Decide |
 |---|---|---|
-| Peso real por obra (`SQL_PESOS_PLAN_MENSUAL`) | T1 | Si la feature merece la pena y DA-2/DA-3 |
-| Tamaño de `stg.plan_mensual` y tuplas muertas | T2 y T33 | Si el `DELETE` selectivo aguanta o hay que particionar |
+| Peso real por obra (`SQL_PESOS_PLAN_MENSUAL`) | T1 | Si la feature merece la pena |
+| Tamaño y tuplas muertas de las dos tablas acotadas | T2 y T33 | Si el `DELETE` selectivo aguanta o hay que particionar |
+| Coste del scan de la firma sobre `raw.obrparpre`, con y sin `planif` | **T3** | La forma final de la firma y la laguna de R20 |
 | Créditos de CPU al terminar la nocturna acotada | T34 | R29, el criterio de aceptación |
-| Coste de hashear `raw.obrparpre.planif` por obra | opcional | Si la firma puede cubrir la laguna de R20 |

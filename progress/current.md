@@ -1,60 +1,71 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-09-02
 
-## F-025 · SPEC ESCRITA — esperando que el humano cierre seis decisiones
+## F-025 · SPEC ESCRITA y DECISIONES CERRADAS por el humano (2026-09-02)
 
 `specs/F-025-ventana-negocio-build/`: `requirements.md` (150/150),
-`design.md` (232/250), `tasks.md`, más dos anexos —**`mediciones.md`** con la
-línea base medida hoy en solo lectura y **`decisiones.md`** con las opciones—.
-Rama `feature/F-025-ventana-negocio-build`. **Reemplaza la spec del 2026-08-28**
-(bloques A/B, commit `1f01718`), anterior a la decisión del humano y a la avería.
+`design.md` (250/250), `tasks.md`, más **`mediciones.md`** (línea base medida en
+solo lectura) y **`decisiones.md`** (lo que decidió el humano y por qué). Rama
+`feature/F-025-ventana-negocio-build`. Reemplaza la spec del 2026-08-28
+(commit `1f01718`), anterior a la decisión y a la avería.
 
-**Lo que la spec propone, en tres frases.** (1) El build ya sabe construir por
-subconjunto de obras —el marcador `/*F019_FILTRO_OBRAS*/` de F-019—, así que
-acotar es darle otro conjunto, no escribir SQL nuevo. (2) El `TRUNCATE` **está
-fuera del troceado** y se sustituye por el esquema que propuso el humano: cada
-tramo **borra solo las obras que va a reinsertar**, en su misma transacción, de
-modo que es imposible borrar lo que no se reescribe. (3) La exclusión no se
-confía al criterio: una **firma del origen** por obra (agregados de
-`stg.presupuesto` y `stg.fases`, que se rehacen enteras cada noche) y un **sello
-del SQL** reconstruyen cualquier obra que se haya movido o cuyo SQL haya cambiado.
+### El criterio, decidido: tres reglas en UNIÓN
 
-**Beneficio que vale aunque no se ahorrase nada:** con ese borrado selectivo, la
-nocturna del 02-sep habría terminado con 5 obras al día y 682 con el dato de
-ayer, en vez de la tabla al **21,6 %**.
+Se congela toda obra que cumpla al menos una: **(1)** estado **EN ESTUDIO (1),
+NO PRESENTADA (11) o CERRADA (25)**; **(2)** código de **seis dígitos**;
+**(3)** **sin actividad en 12 meses**. Censo sobre las 920 de `maestro.obras`:
+**880 congeladas, 40 vivas** (38 publican en el fact). Detalle obra a obra en
+`obras_candidatas_a_congelar.csv`.
 
-**Lo medido hoy** (`mediciones.md`, todo consultas ligeras; no se ha tocado
-`plan_mensual`, `presupuesto` ni el fact):
+**El humano rechazó dos propuestas de la spec, las dos con el dato delante**: el
+veto de actividad («pon las reglas que te he dicho») y la formulación en positivo
+—solo se actualizan EN CURSO y ADJUDICADAS— («déjalo en negativo»). Las dos
+quedan escritas como alternativas no elegidas.
 
-| | |
-|---|---|
-| Nocturna sana | 60 tramos × **1,57 min** ≈ 94 min solo `plan_mensual` |
-| 01-sep, stage manual de F-052 | **7,91** min/tramo: el servidor ya venía castigado |
-| 02-sep, la que murió | **40,77** min/tramo, 5 de 60, tabla al 21,6 % |
-| Obras con fase cerrada en 12 meses | **44** de 583 |
-| Obras sin fase en 12 meses | **322** · con veto de EN CURSO, **319** |
-| `estado_id = 25` («cerrada» en Sigrid) | 462, pero **7 cerraron mes este año** |
-| Fecha real de fin informada | 247, y deja 298 obras paradas sin congelar |
-| Ahorro estimado (proxy, no medido) | **73 %** del peso de los ámbitos reales |
+**Contrapartida, sin suavizar:** de las 80 obras con actividad en 12 meses, **40
+quedan congeladas** —39 CERRADAS, 1 de seis dígitos— y tendrán **hasta 6 días** de
+antigüedad. Pero es menor de lo que parece: **36 de esas 39 cierran en 2025-12**
+(el cierre anual) y solo 4 después (2026-03 ×2, 2026-04 y 2026-07).
 
-**Las seis decisiones que necesita el humano** (detalle y censo en
-`decisiones.md`): **DA-1** criterio de obra cerrada —recomendación: actividad a
-12 meses con veto de EN CURSO, 319 obras—; **DA-2** no acotar
-`build_presupuesto`, que es la fuente de la firma; **DA-3** congelar también las
-~104 obras administrativas que el fact descarta; **DA-4** cadencia de la
-reconstrucción completa —recomendación: semanal, sábado, disparada desde
-`run-all` y no desde un cron nuevo—; **DA-5** el guardián avisa y no bloquea;
-**DA-6** mutación además de las cinco huellas.
+**El catálogo de estados apareció y quedó verificado**: vive en `conest`, tipo 42,
+vía `con.est`. «25 = CERRADA» ya **no es una suposición**, así que el riesgo que
+iba a declararse se retira y en su lugar queda una tarea de documentación: la
+ficha de `maestro.obras.estado_id` dice hoy que el catálogo no se ingiere, y eso
+ha dejado de ser cierto (T23b, enlaza con F-054).
 
-**Lo que hay que medir antes de escribir código** (T1 y T2 de `tasks.md`): el
-peso real por obra con la consulta que la nocturna ya ejecuta, y la línea base
-de tamaño y tuplas muertas de `stg.plan_mensual`. Si el ahorro real no llega al
-40 % del peso, la spec manda **parar y volver a consultar**.
+### Lo que el diseño resuelve
 
-**El riesgo que queda abierto y no se puede suponer:** el `DELETE` selectivo deja
-tuplas muertas en un `B1ms` sin créditos. Mitigación propuesta: `VACUUM (ANALYZE)`
-al final del sub-paso y medición durante la primera semana; si crece de forma
-sostenida, la salida es particionar por obra, y eso sería otra feature.
+1. **El `TRUNCATE` es el problema, no el filtro.** Cada tramo borra **solo las
+   obras que va a reinsertar**, en su misma transacción: imposible borrar lo que no
+   se reescribe. De regalo, una muerte a mitad deja la tabla coherente —la nocturna
+   del 02-sep habría acabado con 5 obras al día y el resto con el dato de ayer, en
+   vez de al 21,6 %—.
+2. **DA-2 obligó a rehacer la señal de cambio.** El humano decidió acotar también
+   `build_presupuesto`, que era la fuente barata de la firma del origen. La firma se
+   traslada a **`raw`** —lo único que la ingesta sigue trayendo completo cada
+   noche—, en un sub-paso agregado de solo lectura tras `ingest_raw`. `tiemod` no
+   sirve (F-011: no existe en 24 de 31 tablas) y hashear en la ingesta gastaría la
+   CPU que falta. Su coste se mide en **T2b** antes de fijarla.
+3. **La firma DENUNCIA, no rescata.** Como el humano acepta congelar 40 obras
+   vivas, reconstruirlas por nuestra cuenta contradiría su decisión: el guardián las
+   **nombra** y el domingo las pone al día. Hay interruptor `PG_VENTANA_RESCATE`
+   (off) por si cambia de idea.
+4. **Reconstrucción completa semanal, los DOMINGOS**, disparada desde `run-all` por
+   antigüedad registrada y no por un cron nuevo.
+5. **Prueba de equivalencia**: las cuatro huellas de F-052 **sin obras esperadas**
+   —si la exclusión es correcta salen idénticas al byte— más una quinta por obra ×
+   ámbito, y la 0599 publicando lo mismo que hoy.
+
+### Lo que falta antes de escribir código
+
+**T1** (ahorro real por obra con la consulta de pesos que la nocturna ya ejecuta;
+si no llega al 40 % del peso, la spec manda parar), **T2** (línea base de tamaño y
+tuplas muertas) y **T2b** (coste de la firma sobre `raw`, con y sin `planif`).
+
+**Riesgo principal que queda:** el `DELETE` selectivo deja tuplas muertas en un
+`B1ms` sin créditos. Mitigación: `VACUUM (ANALYZE)` al final del sub-paso y medir
+la primera semana; si crece de forma sostenida, la salida es particionar por obra,
+y eso sería otra feature.
 
 ---
 
