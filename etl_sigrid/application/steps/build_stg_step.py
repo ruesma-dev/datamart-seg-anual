@@ -57,6 +57,25 @@ MARCADOR_FILTRO_OBRAS = "/*F019_FILTRO_OBRAS*/"
 # Filtrar solo una duplicaría las filas de la otra en cada tramo.
 RAMAS_CON_FILTRO = 2
 
+# --- Ventana de negocio (F-025) --------------------------------------------
+# El marcador equivalente en `06_presupuesto.sql`, que con DA-2 pasa también a
+# construirse solo para las obras vivas. Se llama distinto que el de F-019 a
+# propósito: son dos ficheros con dos formas de filtrar (aquí una sola pasada,
+# allí sesenta tramos), y un nombre común invitaría a sustituirlos con el mismo
+# código sin mirar cuántas veces aparece cada uno.
+MARCADOR_FILTRO_PRESUPUESTO = "/*F025_FILTRO_OBRAS*/"
+
+# `06_presupuesto.sql` no tiene ramas: su `WHERE` es uno solo.
+FILTROS_EN_PRESUPUESTO = 1
+
+# Los ficheros cuyo texto entra en el SELLO del SQL (R17). Si cambia cualquiera
+# de los dos, esa noche se reconstruyen TODAS las obras: sin esto, un arreglo
+# como el de F-052 solo alcanzaría a las 40 obras vivas y las otras 880
+# seguirían publicando lo de antes, en silencio.
+#
+# El orden es significativo (entra en el hash) y es el de ejecución.
+FICHEROS_DEL_SELLO = ("06_presupuesto.sql", "08_plan_mensual.sql")
+
 # --- Puerta de coherencia de raw (F-024) ------------------------------------
 # La puerta se registra como sub-paso para que aparezca en `timings` con su
 # duración (que debe ser de milisegundos: dos SELECT sobre `_meta`) y para que
