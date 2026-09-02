@@ -18,7 +18,7 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +33,7 @@ from etl_sigrid.domain.ejecucion import MOTIVO_HUERFANA
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.domain.perfil_carga import FilaPerfil
 from etl_sigrid.domain.tiemod import COLUMNA_TIEMOD, EstadoTiemod
+from etl_sigrid.domain.ventana import ObraCensada
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
@@ -95,6 +96,231 @@ WHERE pp.ambito_id IN (3, 7, 8, 11)
 GROUP BY pp.obra_id
 """
 
+
+# --- La ventana de negocio (F-025) ------------------------------------------
+#
+# Las consultas van como constantes de módulo, igual que las de F-019 y F-024,
+# para que los tests estáticos lean EXACTAMENTE el SQL que se envía y no una
+# reconstrucción parecida.
+
+# EL CENSO. Una fila por obra con todo lo que hace falta para decidir sobre
+# ella. Se une a `_meta.obra_build` por la IZQUIERDA: una obra que nunca se ha
+# construido sale igual, con el registro a nulo, y entra por R18. Un INNER JOIN
+# la escondería, que es justo el silencio que esta feature elimina.
+#
+# EL UNIVERSO ES `raw.obr JOIN raw.con`, la misma definición de obra que usa
+# `maestro.obras` (`c.ide = o.ide`: la obra ES un concepto). Se replica aquí en
+# vez de leer la vista por dos razones: `maestro.obras` la construye
+# `build_maestros`, que en `run-all` va DESPUÉS de este build, y en una base
+# recién creada todavía no existe. Leyendo `raw` no hay dependencia de orden y
+# el estado es el de la ingesta de esta misma noche.
+#
+# `stg.fases` sí está recién construida cuando esto se ejecuta: `05_fases.sql`
+# va antes que `06_presupuesto.sql`, que es el primer sub-paso acotado.
+#
+# LOS DOS `EXISTS` SON BARATOS, y esa es la razón de que sean `EXISTS` y no un
+# `GROUP BY`: `idx_plan_mensual_obra_amb` e `idx_pres_obra_amb` empiezan los
+# dos por `obra_id` (verificado contra `pg_indexes` el 2026-09-02), así que
+# Postgres resuelve cada uno con una sonda de índice por obra y se para en la
+# primera fila. Contar las filas de cada obra habría costado dos barridos de
+# 29 M y 13,8 M de filas en un servidor sin créditos de CPU.
+SQL_ESTADO_OBRAS = """
+SELECT
+    c.ide                                   AS obra_id,
+    COALESCE(TRIM(c.cod), '')               AS codigo_obra,
+    c.est                                   AS estado_id,
+    ult.ultima_actividad                    AS ultima_actividad,
+    EXISTS (SELECT 1 FROM stg.plan_mensual pm WHERE pm.obra_id = c.ide)
+                                            AS tiene_plan_mensual,
+    EXISTS (SELECT 1 FROM stg.presupuesto  p WHERE p.obra_id  = c.ide)
+                                            AS tiene_presupuesto,
+    (b.obra_id IS NOT NULL)                 AS registrada,
+    b.sello_sql                             AS sello_registrado,
+    b.firma_origen                          AS firma_registrada,
+    b.firma_actual                          AS firma_actual
+FROM raw.obr o
+JOIN raw.con c ON c.ide = o.ide
+LEFT JOIN LATERAL (
+    SELECT MAX(make_date(f.anio, GREATEST(f.mes, 1), 1)) AS ultima_actividad
+    FROM stg.fases f
+    WHERE f.obra_id = c.ide
+      AND f.anio BETWEEN 1990 AND 2100
+) ult ON TRUE
+LEFT JOIN _meta.obra_build b ON b.obra_id = c.ide
+ORDER BY c.ide
+"""
+
+# LA FIRMA DEL ORIGEN, sobre `raw` (R16, §3.2 del diseño). `raw` es lo único
+# que la ingesta sigue trayendo COMPLETO cada noche (R34), y por eso es la
+# única señal posible una vez que `stg.presupuesto` deja de reconstruirse
+# entera (DA-2).
+#
+# AQUÍ SOLO SE AGREGA: el hash lo calcula `domain.ventana.firma_de_obra`. No es
+# manía de capas, es lo que hace la firma testable con fixtures y lo que la
+# pone bajo la campaña de mutación de DA-6.
+#
+# ES UNA AGREGACIÓN POR HASH, SIN VENTANAS, y eso importa: no derrama a
+# ficheros temporales, que es lo que llenó el disco compartido en F-019. Y
+# sustituye a un paso que hoy lee esta misma tabla y ADEMÁS escribe 13,8 M de
+# filas.
+#
+# LA VARIANTE BARATA (R20): no incluye `planif`, que es un texto largo en 13,8
+# M de filas y habría que detoastar entero. La laguna que deja —un cambio de
+# planificación pura que no mueva ninguna cantidad ni ningún precio— queda
+# declarada en el diccionario y la cierra la reconstrucción del domingo (R25).
+# La variante cara es `SQL_FIRMA_ORIGEN_CON_PLANIF`, aquí abajo, y la mide T2b.
+SQL_FIRMA_ORIGEN = """
+WITH pre AS (
+    SELECT pp.obride                             AS obra_id,
+           count(*)                              AS pre_filas,
+           sum(pp.can::NUMERIC)                  AS pre_suma_can,
+           sum(pp.pre::NUMERIC)                  AS pre_suma_pre,
+           sum(COALESCE(pp.impcoe::NUMERIC, 0))  AS pre_suma_impcoe,
+           max(pp.fas)                           AS pre_max_fase,
+           max(pp.ide)                           AS pre_max_ide
+    FROM raw.obrparpre pp
+    WHERE pp.obride IS NOT NULL
+    GROUP BY 1
+), par AS (
+    SELECT pa.obride    AS obra_id,
+           count(*)     AS par_filas,
+           max(pa.ide)  AS par_max_ide
+    FROM raw.obrparpar pa
+    WHERE pa.obride IS NOT NULL
+    GROUP BY 1
+), fas AS (
+    SELECT fa.obride    AS obra_id,
+           count(*)     AS fas_filas,
+           max(fa.ide)  AS fas_max_ide,
+           max(COALESCE(fa.ano, 0) * 100 + COALESCE(fa.mes, 0)) AS fas_max_periodo
+    FROM raw.obrfas fa
+    WHERE fa.obride IS NOT NULL
+    GROUP BY 1
+)
+SELECT o.ide AS obra_id,
+       pre.pre_filas, pre.pre_suma_can, pre.pre_suma_pre, pre.pre_suma_impcoe,
+       pre.pre_max_fase, pre.pre_max_ide,
+       par.par_filas, par.par_max_ide,
+       fas.fas_filas, fas.fas_max_ide, fas.fas_max_periodo
+FROM raw.obr o
+LEFT JOIN pre ON pre.obra_id = o.ide
+LEFT JOIN par ON par.obra_id = o.ide
+LEFT JOIN fas ON fas.obra_id = o.ide
+ORDER BY o.ide
+"""
+
+#: Los nombres de las columnas de agregado de `SQL_FIRMA_ORIGEN`, sin
+#: `obra_id`. Entran en el hash **por nombre** (ver `firma_de_obra`), así que
+#: esta tupla es parte del contrato: cambiarla cambia la firma de las 920 obras
+#: y provoca una reconstrucción completa la primera noche. Que sea así es lo
+#: correcto —el significado de la firma ha cambiado—, pero conviene saberlo
+#: antes de tocarla.
+COLUMNAS_FIRMA_ORIGEN = (
+    "pre_filas",
+    "pre_suma_can",
+    "pre_suma_pre",
+    "pre_suma_impcoe",
+    "pre_max_fase",
+    "pre_max_ide",
+    "par_filas",
+    "par_max_ide",
+    "fas_filas",
+    "fas_max_ide",
+    "fas_max_periodo",
+)
+
+# LA VARIANTE CARA (R20, T2b). **No se ejecuta**: vive aquí para que el humano
+# pueda medir su coste sin volver a escribir el SQL, y para que la diferencia
+# entre las dos esté a la vista en un solo sitio.
+#
+# `planif` es el texto que `08_plan_mensual.sql` explota con `unnest`, así que
+# es lo único que cierra la laguna de la variante barata. El precio es
+# detoastar un texto largo en 13,8 M de filas sobre un B1ms con techo de
+# 10 MiB/s. Si T2b lo declara asumible, sustituye a `SQL_FIRMA_ORIGEN`; si no,
+# la laguna se queda declarada y la cierra el domingo.
+SQL_FIRMA_ORIGEN_CON_PLANIF = """
+SELECT pp.obride AS obra_id,
+       count(*) AS pre_filas,
+       md5(string_agg(COALESCE(pp.planif, ''), chr(10) ORDER BY pp.ide)) AS pre_planif
+FROM raw.obrparpre pp
+WHERE pp.obride IS NOT NULL
+GROUP BY 1
+ORDER BY 1
+"""
+
+# LA ÚLTIMA RECONSTRUCCIÓN COMPLETA (R25). Sale de `_meta.etl_runs` y no de una
+# tabla nueva, para que `python main.py timings` la vea como un paso más y para
+# que sobreviva a una obra que aparezca o desaparezca del maestro, que es lo
+# que rompería derivarla de un `MIN(construido_at)` sobre `_meta.obra_build`.
+SQL_ULTIMA_COMPLETA = """
+SELECT MAX(finished_at)
+FROM _meta.etl_runs
+WHERE step = %(paso)s AND status = 'SUCCESS'
+"""
+
+# EL REGISTRO POR OBRA (R14). Upsert: una fila por obra, la última manda.
+#
+# `firma_actual` NO se toca aquí —la escribe el sub-paso de la firma, tras la
+# ingesta— y `firma_origen` se fija al valor que tenía el origen CUANDO se
+# construyó la obra. Que sean dos columnas distintas es lo que permite comparar
+# «de qué es el dato» contra «qué hay ahora en el origen»: con una sola, la
+# ingesta pisaría la referencia cada noche y la comparación no diría nada.
+SQL_REGISTRAR_OBRA = """
+INSERT INTO _meta.obra_build (
+    obra_id, codigo_obra, firma_origen, sello_sql,
+    batch_id, construido_at, filas, congelada, motivo, detalle
+)
+VALUES (
+    %(obra_id)s, %(codigo_obra)s, %(firma_origen)s, %(sello_sql)s,
+    %(batch_id)s, %(construido_at)s, %(filas)s, FALSE, %(motivo)s, %(detalle)s
+)
+ON CONFLICT (obra_id) DO UPDATE SET
+    codigo_obra   = EXCLUDED.codigo_obra,
+    firma_origen  = EXCLUDED.firma_origen,
+    sello_sql     = EXCLUDED.sello_sql,
+    batch_id      = EXCLUDED.batch_id,
+    construido_at = EXCLUDED.construido_at,
+    filas         = EXCLUDED.filas,
+    congelada     = FALSE,
+    motivo        = EXCLUDED.motivo,
+    detalle       = EXCLUDED.detalle
+"""
+
+# LA MARCA DE LA DECISIÓN SOBRE UNA OBRA CONGELADA. Se escriben el motivo y el
+# detalle, pero **NO `construido_at` ni `filas`**: esta noche no se ha
+# construido nada de esa obra, y mover su fecha sería mentir sobre la frescura,
+# que es justamente el dato por el que existe `_meta.v_frescura_obra`.
+SQL_MARCAR_CONGELADA = """
+INSERT INTO _meta.obra_build (obra_id, codigo_obra, congelada, motivo, detalle)
+VALUES (%(obra_id)s, %(codigo_obra)s, TRUE, %(motivo)s, %(detalle)s)
+ON CONFLICT (obra_id) DO UPDATE SET
+    codigo_obra = EXCLUDED.codigo_obra,
+    congelada   = TRUE,
+    motivo      = EXCLUDED.motivo,
+    detalle     = EXCLUDED.detalle
+"""
+
+# LA FIRMA DE ESTA NOCHE, escrita por el sub-paso que va tras la ingesta.
+SQL_REGISTRAR_FIRMA_ACTUAL = """
+INSERT INTO _meta.obra_build (obra_id, firma_actual, firma_actual_at)
+VALUES (%(obra_id)s, %(firma_actual)s, %(firma_actual_at)s)
+ON CONFLICT (obra_id) DO UPDATE SET
+    firma_actual    = EXCLUDED.firma_actual,
+    firma_actual_at = EXCLUDED.firma_actual_at
+"""
+
+#: Las dos tablas que la ventana acota. El nombre se valida contra esta tupla
+#: antes de interpolarlo en `SQL_OBRAS_CON_FILAS`: es la única interpolación de
+#: identificador de todo el bloque y no puede depender de la buena fe de quien
+#: llame.
+TABLAS_ACOTADAS = ("plan_mensual", "presupuesto")
+
+# OBRAS QUE HOY TIENEN FILAS. Solo se consulta en la reconstrucción completa,
+# para localizar las que ya no están en el origen y que el borrado derivado no
+# alcanzaría nunca. Va por `DISTINCT` sobre el índice —del orden de 700 valores
+# distintos— y no por un `NOT IN` sobre la tabla entera, que sería un barrido
+# de 29 M de filas cada domingo.
+SQL_OBRAS_CON_FILAS = "SELECT DISTINCT obra_id FROM stg.{tabla}"
 
 # --- Coherencia ante cargas truncadas (F-024) -------------------------------
 #
@@ -1012,6 +1238,175 @@ class PostgresClient:
                 "medición no se ejecuta ningún tramo."
             )
         return porcentaje_ocupacion(int(fila[0]), total_gb)
+
+    # ---------------------------------------------------------------------
+    # La ventana de negocio (F-025)
+    # ---------------------------------------------------------------------
+
+    def fetch_censo_de_obras(self) -> list[ObraCensada]:
+        """El censo con el que se decide qué se reconstruye esta noche (R1).
+
+        Devuelve entidades de dominio ya montadas, no tuplas: la decisión la
+        toma `domain.ventana.clasificar_obras`, que no sabe de BBDD, y traducir
+        aquí es lo que le permite no saberlo.
+
+        `tiene_filas` exige las DOS tablas. Una obra con presupuesto y sin plan
+        mensual —o al revés— está a medio construir, y media obra construida no
+        se congela: se completa.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ESTADO_OBRAS)
+            filas = list(cur.fetchall())
+
+        return [
+            ObraCensada(
+                obra_id=int(fila[0]),
+                codigo_obra=str(fila[1] or ""),
+                estado_id=int(fila[2]) if fila[2] is not None else None,
+                ultima_actividad=fila[3],
+                tiene_filas=bool(fila[4]) and bool(fila[5]),
+                registrada=bool(fila[6]),
+                sello_registrado=fila[7],
+                firma_registrada=fila[8],
+                firma_origen=fila[9],
+            )
+            for fila in filas
+        ]
+
+    def fetch_firma_origen(self) -> dict[int, dict[str, Any]]:
+        """Los agregados de `raw` por obra (R16). **Aquí no se hashea nada.**
+
+        Devuelve `{obra_id: {columna: valor}}` con las columnas declaradas en
+        `COLUMNAS_FIRMA_ORIGEN`. El hash lo calcula `domain.ventana.firma_de_obra`
+        a partir de este diccionario, y por eso los nombres de las claves son
+        parte del contrato: entran en la firma.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_FIRMA_ORIGEN)
+            filas = list(cur.fetchall())
+
+        return {
+            int(fila[0]): dict(zip(COLUMNAS_FIRMA_ORIGEN, fila[1:], strict=True))
+            for fila in filas
+        }
+
+    def fetch_ultima_reconstruccion_completa(self, paso: str) -> datetime | None:
+        """Cuándo terminó la última reconstrucción completa, o `None` (R25).
+
+        `None` significa «nunca», y quien lo reciba tiene que hacer una: es la
+        línea base, y sin ella no se puede afirmar cuántos días lleva ninguna
+        obra sin reconstruirse.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ULTIMA_COMPLETA, {"paso": paso})
+            fila = cur.fetchone()
+        return fila[0] if fila and fila[0] is not None else None
+
+    def fetch_obras_con_filas(self, tabla: str) -> set[int]:
+        """Las obras que hoy tienen filas en `stg.<tabla>`.
+
+        Solo lo usa la reconstrucción completa, para encontrar las obras que ya
+        no están en el origen: el borrado derivado no las alcanza nunca —nadie
+        las va a reinsertar, así que nadie las borra— y sin esto se quedarían
+        para siempre. Es la contrapartida de haber quitado el `TRUNCATE`, y
+        está cubierta a propósito en vez de aceptada en silencio.
+        """
+        if tabla not in TABLAS_ACOTADAS:
+            raise ValueError(
+                f"tabla no acotada por la ventana: {tabla!r}. Las unicas son "
+                f"{', '.join(TABLAS_ACOTADAS)}, y este nombre se interpola en el "
+                f"SQL: no puede venir de fuera."
+            )
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_OBRAS_CON_FILAS.format(tabla=tabla))
+            return {int(fila[0]) for fila in cur.fetchall() if fila[0] is not None}
+
+    def registrar_obras_construidas(self, registros: Sequence[dict]) -> int:
+        """Escribe en `_meta.obra_build` lo construido esta noche (R14).
+
+        Todos los upserts en **una transacción**: o queda registrada la tanda
+        entera o ninguna. Un registro a medias haría que la noche siguiente unas
+        obras se reconstruyeran por R18 y otras no, sin ningún criterio.
+
+        Va en llamada aparte y no dentro del SQL del tramo por una razón
+        práctica: `execute_sql_text` devuelve el `rowcount` de la ÚLTIMA
+        sentencia, y meter aquí el upsert convertiría «filas insertadas en
+        plan_mensual» en «obras registradas». Si el proceso muere entre el tramo
+        y su registro, la obra queda construida y sin registrar, y la noche
+        siguiente entra por R18: se reconstruye de más, que es el lado correcto
+        en el que fallar.
+        """
+        if not registros:
+            return 0
+        with self.connection() as conn, conn.cursor() as cur:
+            for registro in registros:
+                cur.execute(SQL_REGISTRAR_OBRA, registro)
+        return len(registros)
+
+    def marcar_obras_congeladas(self, registros: Sequence[dict]) -> int:
+        """Deja escrito por qué NO se ha reconstruido cada obra congelada.
+
+        No toca `construido_at` ni `filas`: esta noche no se ha construido nada
+        de esas obras y mover su fecha sería mentir sobre la frescura.
+        """
+        if not registros:
+            return 0
+        with self.connection() as conn, conn.cursor() as cur:
+            for registro in registros:
+                cur.execute(SQL_MARCAR_CONGELADA, registro)
+        return len(registros)
+
+    def registrar_firmas_actuales(self, firmas: Mapping[int, str]) -> int:
+        """Guarda la firma del origen de ESTA noche, por obra (R16).
+
+        La escribe el sub-paso que va tras `ingest_raw`, sobre `raw` recién
+        cargado. Es la mitad de la comparación; la otra es `firma_origen`, que
+        solo se mueve cuando la obra se reconstruye.
+        """
+        if not firmas:
+            return 0
+        ahora = datetime.utcnow()
+        with self.connection() as conn, conn.cursor() as cur:
+            for obra_id, firma in firmas.items():
+                cur.execute(
+                    SQL_REGISTRAR_FIRMA_ACTUAL,
+                    {
+                        "obra_id": int(obra_id),
+                        "firma_actual": firma,
+                        "firma_actual_at": ahora,
+                    },
+                )
+        return len(firmas)
+
+    def vacuum_analyze(self, schema: str, table: str) -> None:
+        """`VACUUM (ANALYZE)` de una tabla acotada, **fuera de transacción**.
+
+        Postgres no admite `VACUUM` dentro de una transacción, y
+        `self.connection()` devuelve una conexión que ya viene en una: por eso
+        esto abre la suya propia en `autocommit`. Es el mismo motivo por el que
+        `comprobar_unicidad` no toca el `autocommit` de una conexión ya abierta.
+
+        Hace falta porque el borrado derivado deja tuplas muertas cada noche en
+        un servidor sin créditos de CPU, donde el autovacuum llega tarde
+        (§9.1 del diseño). Quien llama decide qué hacer si falla; aquí se
+        propaga.
+        """
+        if table not in TABLAS_ACOTADAS:
+            raise ValueError(
+                f"tabla no acotada por la ventana: {table!r}. Este nombre se "
+                f"interpola en el SQL del VACUUM: no puede venir de fuera."
+            )
+        conn = self._connect(self._conninfo, autocommit=True)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    sql.SQL("VACUUM (ANALYZE) {}.{}").format(
+                        sql.Identifier(schema), sql.Identifier(table)
+                    )
+                )
+        finally:
+            conn.close()
+        logger.info("tabla_vacuum_analyze", table=f"{schema}.{table}")
 
     def execute_sql_text(self, sql_text: str) -> int:
         """Ejecuta un SQL ya compuesto y devuelve las filas afectadas.
