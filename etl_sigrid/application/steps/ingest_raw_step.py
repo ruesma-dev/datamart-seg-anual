@@ -26,6 +26,7 @@ from datetime import datetime
 from config.settings import Settings
 from etl_sigrid.application.steps.base import PipelineStep
 from etl_sigrid.domain.entities import StepResult, StepStatus, TableSpec
+from etl_sigrid.domain.ventana import firma_de_obra
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
 from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
@@ -36,6 +37,12 @@ from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
 )
 
 logger = get_logger(__name__)
+
+# F-025. El sub-paso que firma el origen, tras cargar `raw` y antes de que nada
+# construya encima. Se registra en `_meta.etl_runs` como cualquier otro
+# sub-paso: aparece en `timings` con su duracion, que es lo que hara falta para
+# decidir si la variante cara de la firma (T2b) sale a cuenta.
+PASO_FIRMA_ORIGEN = "ingest_raw.firma_origen"
 
 
 class IngestRawStep(PipelineStep):
@@ -138,6 +145,13 @@ class IngestRawStep(PipelineStep):
                         }
                         return result
 
+        # F-025, T11c. La firma del origen se calcula AQUÍ, sobre `raw` recién
+        # cargado, y solo si la ingesta ha ido bien: firmar un `raw` a medias
+        # denunciaría media base al día siguiente.
+        firmadas = 0
+        if not failed_tables:
+            firmadas = self._calcular_firma_origen(pg)
+
         result.status = StepStatus.FAILED if failed_tables else StepStatus.SUCCESS
         result.rows_processed = total_rows
         result.finished_at = datetime.utcnow()
@@ -145,10 +159,66 @@ class IngestRawStep(PipelineStep):
             "per_table_stats": per_table_stats,
             "failed_tables": failed_tables,
             "full_refresh": self._full_refresh,
+            "obras_firmadas": firmadas,
         }
         if failed_tables:
             result.error_message = f"Fallaron: {', '.join(failed_tables)}"
         return result
+
+    # ---------------------------------------------------------------------
+    # La firma del origen (F-025, R16, §3.2)
+    # ---------------------------------------------------------------------
+
+    def _calcular_firma_origen(self, pg: PostgresClient) -> int:
+        """Firma cada obra a partir de `raw` recién cargado. Devuelve cuántas.
+
+        **Por qué vive aquí y no en `build_stg`.** Desde F-025 `stg.presupuesto`
+        ya no se reconstruye entero (DA-2), así que dejó de servir como señal de
+        que una obra ha cambiado en el origen. `raw` es lo único que la ingesta
+        sigue trayendo completo cada noche (R34), y esta es la única ventana en
+        la que está recién cargado y todavía no ha construido nada encima.
+
+        **Es de solo lectura sobre `raw`** —una agregación por hash, sin
+        ventanas, así que no derrama a los temporales del disco compartido— y su
+        única escritura es la columna `firma_actual` de `_meta.obra_build`, que
+        no toca ni un dato de negocio.
+
+        **Avisa y no tumba.** Si esto falla, la ingesta ha ido bien y el
+        datamart se puede construir igual: lo que se pierde es la DENUNCIA de
+        una obra congelada que haya cambiado, y eso lo dice el guardián al final
+        de `run-all` —`check-ventana` denuncia también las firmas que faltan—.
+        Tumbar la noche por no haber podido firmar sería cambiar un aviso por
+        una avería.
+        """
+        run_id = pg.record_run_start("ingest", PASO_FIRMA_ORIGEN, self._batch_id)
+        t0 = datetime.utcnow()
+        try:
+            agregados = pg.fetch_firma_origen()
+            firmas = {
+                obra_id: firma_de_obra(valores)
+                for obra_id, valores in agregados.items()
+            }
+            pg.registrar_firmas_actuales(firmas)
+        except Exception as error:  # noqa: BLE001
+            pg.record_run_end(run_id, StepStatus.FAILED.value, error_message=str(error))
+            logger.warning(
+                "firma_origen_fallida",
+                error=str(error),
+                nota=(
+                    "la ingesta ha ido bien y el datamart se construye igual; "
+                    "lo que se pierde es la denuncia de una obra congelada que "
+                    "haya cambiado. check-ventana lo dice al final de run-all."
+                ),
+            )
+            return 0
+
+        pg.record_run_end(run_id, StepStatus.SUCCESS.value, rows_processed=len(firmas))
+        logger.info(
+            "firma_origen_calculada",
+            obras=len(firmas),
+            duracion_s=round((datetime.utcnow() - t0).total_seconds(), 2),
+        )
+        return len(firmas)
 
     # ---------------------------------------------------------------------
     # Internos
