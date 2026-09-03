@@ -159,41 +159,36 @@ se ha tocado `infra/`**: cómo se despliega el job lo decide el humano.
 
 ### La campaña de mutación (T26, DA-6)
 
-**83 mutantes sobre `domain/ventana.py`, 78 muertos, 5 supervivientes, 0
-timeouts.** Informe completo en `progress/mutacion_F-025.md`. Los cinco están
-analizados y **ninguno era equivalente**: los cinco eran huecos de test reales,
-y los cinco están cerrados con un test que los mata.
+**Dos pasadas. La que vale es la segunda: sobre `073af30` —el HEAD real— y con
+CERO supervivientes.** La primera midió `8e9b1f2` y el review la invalidó porque
+el único fichero del alcance cambió después. Detalle completo, en
+`progress/mutacion_F-025.md`.
 
-**Todos estaban en la capa que REDACTA la denuncia**, no en la que decide. Es
-la parte que uno prueba de oído —«sale la obra en el informe, pues ya está»— y
-no es cosmética: con el guardián avisando sin bloquear (DA-5), esa capa es la
-única vía por la que el hallazgo llega a una persona.
+**Primera pasada: 83 mutantes, 78 muertos, 5 supervivientes**, ninguno
+equivalente y los cinco cerrados con test. **Todos estaban en la capa que REDACTA
+la denuncia**, no en la que decide: la parte que uno prueba de oído —«sale la obra
+en el informe, pues ya está»— y que con el guardián avisando sin bloquear (DA-5)
+es la **única** vía por la que el hallazgo llega a una persona. El peor invertía
+`if not self.codigo` en `marcador`: **marcador vacío en KO y emitido en verde**,
+o sea la alerta que no dispara nunca y la que dispara todas las noches, las dos
+mitades de la avería que existe para evitar. Otro ponía `obras_miradas` a 1 por
+defecto, que es **el defecto de `check-cobertura` otra vez**.
 
-| Superviviente | Qué habría pasado |
-|---|---|
-| `if not self.codigo` invertido en `marcador` | **Marcador vacío en KO y emitido en verde**: la alerta no dispararía nunca, y dispararía todas las noches. Las dos mitades de la avería que la alerta existe para no tener |
-| `de_tipo` con `!=` | Cada obra **bajo el epígrafe equivocado**: la 0599 saldría como «congelada sin filas» cuando lo que le pasa es que su origen cambió |
-| `obras_miradas: int = 0 → 1` | Un veredicto sin censo daría **verde**. Es el defecto de `check-cobertura` otra vez, en el default |
-| `_corto`: `[:8] → [:9]` y `or → and` | El `detalle` publicado en `_meta.obra_build` dejaría de traer los prefijos comparables de los dos sellos |
-
-**Y por qué no los cazaba nadie, que es el hallazgo útil:** mis tests del
-guardián comprobaban `MARCADOR_KO in output`, **y ese literal aparece también en
-la línea de log**, que lo escribe desde la constante: pasaban aunque el marcador
-compuesto viniera vacío. Los nuevos miran **la propiedad**, no la salida. El de
-`de_tipo` es igual: con un solo hallazgo el texto sale idéntico, solo que bajo
-el epígrafe que no toca.
+**Y por qué no los cazaba nadie, que es el hallazgo útil:** los tests del guardián
+comprobaban `MARCADOR_KO in output`, **y ese literal aparece también en la línea
+de log**, que lo escribe desde la constante: pasaban aunque el marcador compuesto
+viniera vacío. Los nuevos miran **la propiedad**, no la salida.
 
 ### Lo que la primera pasada ya cambió (resumen; detalle en `223cd1d`)
 
-La campaña **encontró un defecto real antes de terminar**: diez de sus veinte
-supervivientes vivían en `_meses_antes`, un helper que recortaba el día al
-último del mes destino y **cuya rama no se ejecutaba nunca** con el criterio
-real. No se taparon con tests: **se borró** y se sustituyó por
-`meses_transcurridos`, que cuenta meses enteros, que es lo que dice el dato
-(la actividad es `MAX(make_date(anio, mes, 1))`, siempre día 1). Los otros diez
-eran **defaults de dataclass** que ningún test alcanzaba, y cada uno era una
-decisión de seguridad sin protección —`Plan.completa` en `True` habría hecho
-que **las 880 obras no se rehicieran nunca**—. Todos tienen ya su test.
+**Encontró un defecto real antes de terminar**: diez de sus veinte supervivientes
+vivían en `_meses_antes`, un helper que recortaba el día al último del mes destino
+y **cuya rama no se ejecutaba nunca** con el criterio real. No se tapó con tests:
+**se borró**, sustituido por `meses_transcurridos`, que cuenta meses enteros —que
+es lo que dice el dato: la actividad es `MAX(make_date(anio, mes, 1))`, siempre
+día 1—. Los otros diez eran **defaults de dataclass** que ningún test alcanzaba, y
+cada uno una decisión de seguridad sin protección: `Plan.completa` en `True`
+habría hecho que **las 880 obras no se rehicieran nunca**. Todos con su test.
 
 ## El censo, remedido: la contrapartida que se le enseñó al humano estaba inflada
 
@@ -208,19 +203,18 @@ definición QUE IMPLEMENTA EL CÓDIGO** —universo `raw.obr ⨝ raw.con` y acti
 |---|---|---|---|---|---|---|---|---|
 | 920 | 880 | 40 | 38 | 693 | **226** | 872 | 48 | **8** |
 
-Las 8 son **7 CERRADAS (estado 25)** y **1 de seis dígitos**, la `180501`. Y
-**0 de las 226** de seis dígitos están en `stg.obras`, que es el `INNER JOIN`
-por el que pasa el fact: se recomprobó sobre 226, no sobre 222.
+Las 8 son **7 CERRADAS (estado 25)** y **1 de seis dígitos**, la `180501`. Y **0
+de las 226** están en `stg.obras`, el `INNER JOIN` por el que pasa el fact: se
+recomprobó sobre 226, no sobre 222.
 
-**Al humano se le presentó un 40 donde son 8**, con un desglose —39 CERRADAS,
-36 de ellas cerrando en 2025-12— que **no reproduce**: aquello se midió sobre
-`maestro.obras` con `coalesce(fecha_fin, fecha_inicio)` y salía de
-`obras_congeladas_F025.csv`, que da a 36 obras una actividad de 2025-12 que
-`stg.fases` desmiente. **El error fue de quien midió, no del código.** Su
-decisión NO cambia —880/40 cuadra al dedillo y la contrapartida real es MENOR
-que la aceptada—, pero el registro tenía que decir la verdad: queda escrito así
-en `decisiones.md` §DA-1, R2/R3, `mediciones.md` §2 y §5, `design.md`,
-`ARCHITECTURE.md`, `business_rules.yaml` y la ficha `estado_id` del diccionario.
+**Al humano se le presentó un 40 donde son 8**, con un desglose —39 CERRADAS, 36
+cerrando en 2025-12— que **no reproduce**: se midió sobre `maestro.obras` con
+`coalesce(fecha_fin, fecha_inicio)`, que atribuye a 36 obras una actividad que
+`stg.fases` desmiente. **El error fue de quien midió, no del código.** Su decisión
+NO cambia —880/40 cuadra y la contrapartida real es MENOR que la aceptada—, pero
+el registro tenía que decir la verdad: corregido en `decisiones.md` §DA-1, R2/R3,
+`mediciones.md` §2 y §5, `design.md`, `ARCHITECTURE.md`, `business_rules.yaml` y
+la ficha `estado_id` del diccionario.
 
 ## Desviaciones respecto a la spec
 

@@ -601,7 +601,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 6,
+      "priority": 8,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -686,7 +686,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 9,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -764,7 +764,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 8,
+      "priority": 11,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -781,7 +781,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 7,
+      "priority": 10,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -798,7 +798,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 3,
+      "priority": 5,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -817,7 +817,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 5,
+      "priority": 7,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -835,7 +835,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 4,
+      "priority": 6,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -854,6 +854,23 @@
       "rigor": "estandar",
       "priority": 2,
       "branch": "feature/F-055-mundo-proveedor"
+    },
+    {
+      "id": "F-056",
+      "title": "La contabilidad no entra en el datamart: los apuntes de Sigrid traen debe, haber, cuenta y OBRA, y no se ingieren",
+      "description": "Pedida por el humano el 2026-09-03: 'anade una feature de traerse la informacion contable de Sigrid'. COMPROBADO ANTES DE FICHARLA: no existe ninguna feature que lo cubra -F-037 es tesoreria (cobros y pagos) y F-040 el lado de ingresos; ninguna toca la contabilidad-. LO QUE HAY EN SIGRID, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas de `config/tables_sigrid.yaml`: NINGUNA de estas se ingiere. La principal es **`apu`, 'Apuntes Contables'**, y su contenido es exactamente lo que hace falta: `asiide` (asiento), `cueide` (cuenta, indice a `cua`), **`deb` y `hab`** (debe y haber como importe), `res` (concepto), `cenide` (CENTRO DE COSTE) y **`obr` (OBRA)**, mas `doc`, `jus` (justificante), `pun` (punteo), `concil` (conciliacion), `del` (delegacion) y `cptide`. La acompanan `asi` (la cabecera del asiento), `cua` (el plan de cuentas) y `apa`; existe ademas `antpgcapu` para la conversion del PGC antiguo. POR QUE IMPORTA, y es distinto de lo que ya esta fichado: el datamart de hoy vive del PRESUPUESTO y del SEGUIMIENTO -lo que se planifico y lo que el jefe de obra cerro cada mes-. La contabilidad es **la otra version de la verdad**: lo que de verdad se contabilizo. Con `apu` se podria por fin CONTRASTAR el coste de seguimiento contra el coste contable de la misma obra, que es la pregunta que ninguna de las dos fuentes puede responder sola. Y `apu.obr` mas `apu.cenide` dicen que ese contraste es posible por obra, no solo a nivel de empresa. OJO CON LA RELACION OBRA/CENTRO DE COSTE: `apu` trae LAS DOS -`obr` como texto de 16 caracteres y `cenide` como indice a `cen`-, y F-045 esta abierta precisamente porque `retenciones.movimientos.obra_id` resulto ser el `ide` del CENTRO DE COSTE y no el de la obra: 0 de 261 valores casaban. **Esta feature no puede suponer cual de los dos campos ata a nuestra obra: tiene que medirlo**, y lo que aprenda sirve tambien para desatascar F-045. A DECIDIR EN LA SPEC: (a) el ALCANCE, porque `apu` es la tabla mas grande que se habra traido nunca -la contabilidad de una constructora son millones de apuntes- y la nocturna hoy NO CABE, que es la razon de ser de F-025: hay que medir el volumen contra Sigrid antes de decidir si se trae entera, por ejercicios o solo las cuentas que interesan; (b) que se publica, porque un apunte contable en bruto no es una respuesta de negocio; (c) si el plan de cuentas (`cua`) entra, sin el los numeros de cuenta no significan nada para quien pregunte por el MCP; (d) quien es el dueno del criterio contable, que no es el jefe de obra. ENLAZA con F-037 (tesoreria), F-040 (ingresos), F-045 (obra vs centro de coste) y F-054 (que significa cada concepto para nosotros).",
+      "acceptance": [
+        "Medido contra Sigrid, no supuesto, el volumen real de `apu` y `asi` -filas por ejercicio- y decidido con ese numero delante que alcance se trae: entera, por ejercicios o por cuentas",
+        "Resuelto CON DATOS cual de los dos campos de `apu` ata un apunte a nuestra obra: `obr` (texto) o `cenide` (centro de coste). Es la misma trampa que tiene bloqueada a F-045, y lo que se aprenda aqui debe servir alli",
+        "Lo que se ingiera llega con su ficha en el diccionario, y si el plan de cuentas `cua` no entra, queda escrito por que y que se pierde con ello",
+        "Existe al menos un contraste util y probado entre el coste de SEGUIMIENTO y el coste CONTABLE de una misma obra, con su explicacion de por que difieren -que diferiran-",
+        "Medido el impacto de la ingesta nueva sobre la nocturna: no se cierra si empeora una carga que ya no cabe (F-025)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 4,
+      "branch": "feature/F-056-contabilidad"
     }
   ]
 }
