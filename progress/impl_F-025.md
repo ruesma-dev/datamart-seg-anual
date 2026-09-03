@@ -51,10 +51,10 @@ plan_obra`), `config/settings.py`, `config/business_rules.yaml`,
 **Fuera de este repositorio:** `azure-apps/datamart_seg_anual.md`, en su propio
 commit y en su repositorio, como manda la regla de propiedad.
 
-**Intactos, y comprobado con el diff, no de memoria** (§10 de la spec):
-`08_plan_mensual.sql` —su marcador ya estaba—, `sql/mart/**`, `sql/cierre/**` y
-`domain/tramos.py`. Y en `06_presupuesto.sql` el diff son **dos líneas**: se va
-el `TRUNCATE`, entra el filtro. Ni una de su lógica.
+**Intactos, comprobado con el diff y no de memoria** (§10): `08_plan_mensual.sql`
+—su marcador ya estaba—, `sql/mart/**`, `sql/cierre/**` y `domain/tramos.py`. En
+`06_presupuesto.sql` el diff son **dos líneas**: se va el `TRUNCATE`, entra el
+filtro.
 
 ## Decisiones de diseño que no estaban en la spec
 
@@ -62,9 +62,9 @@ el `TRUNCATE`, entra el filtro. Ni una de su lógica.
    se construyó; `firma_actual` = la de esta noche). El diseño hablaba de una.
    Con una sola, la ingesta pisaría la referencia cada noche y la comparación no
    diría nada.
-2. **El censo sale de `raw.obr JOIN raw.con`, no de `maestro.obras`.** Esa vista
-   la construye `build_maestros`, que en `run-all` va DESPUÉS de este build, y
-   en una base nueva no existe. Leyendo `raw` no hay dependencia de orden.
+2. **El censo sale de `raw.obr JOIN raw.con`, no de `maestro.obras`**: esa vista
+   la construye `build_maestros`, que va DESPUÉS de este build y en una base
+   nueva no existe. Leyendo `raw` no hay dependencia de orden.
 3. **Las obras sobrantes se NOMBRAN, no se borran.** El borrado derivado no
    alcanza a una obra que desapareciera del origen, y sin esto nadie lo sabría.
    La primera versión las borraba en la completa; se cambió al ver de dónde sale
@@ -79,8 +79,8 @@ el `TRUNCATE`, entra el filtro. Ni una de su lógica.
    proceso muere entre el tramo y su registro, la obra entra mañana por R18: se
    reconstruye de más, que es el lado correcto en el que fallar.
 5. **El sello es función de módulo, no método**: lo necesitan el step, el
-   comando y el guardián, y los dos últimos no tienen por qué instanciar un step
-   para leer dos ficheros y hacer un hash.
+   comando y el guardián, y los dos últimos no tienen por qué instanciar un
+   step para leer dos ficheros y hacer un hash.
 
 ## El arreglo de F-052 que pidió el humano
 
@@ -127,9 +127,8 @@ ERROR tests/test_f025_build.py
 1 error in 1.59s
 ```
 
-**T5 — el sello sobre el SQL real** falló en rojo por `FICHEROS_DEL_SELLO`
-inexistente (23 de 24 en verde), y **T9** por las fichas del diccionario que
-todavía no existían. Los dos, en sus commits.
+**T5** falló en rojo por `FICHEROS_DEL_SELLO` inexistente (23 de 24 en verde) y
+**T9** por las fichas del diccionario. Los dos, en sus commits.
 
 ## Verificaciones MANUAL pendientes (fase 7 entera, y T1/T2b)
 
@@ -149,18 +148,41 @@ avería.
 decisión del humano. Hasta entonces esto solo repara el `TRUNCATE`.
 
 ## Evidencias
-
 | Evidencia | Valor |
 |---|---|
-| **Tests ejecutados** | **3.294 en verde**, 134 saltados. De ellos **278 son de F-025** |
-| **Suite completa** | **164 s** (`python -m pytest tests/`) |
-| **Cobertura de las líneas cambiadas** | PENDIENTE-COBERTURA |
-| **Mutantes / supervivientes** | PENDIENTE-MUTACION |
-| **`bash harness/init.sh`** | PENDIENTE-INIT |
+| **Tests ejecutados** | **3.305 en verde**, 134 saltados. De ellos **290 son de F-025** |
+| **Suite completa** | **163 s** (`python -m pytest tests/`) |
+| **Cobertura de las líneas cambiadas** | **91,7 %** (578/630, umbral 80 %, nivel `critico`) |
+| **Mutantes generados / evaluados** | **83 / 83**, 0 timeouts, 0 sin veredicto |
+| **Supervivientes** | **5 en la campaña**, los cinco analizados y **cerrados con test**; detalle en `progress/mutacion_F-025.md` |
+| **Coste de la campaña** | **59,3 min** con 4 workers (línea base 210-214 s) |
+| **`bash harness/init.sh`** | **EN VERDE**, 3.305 pasados y 134 saltados en 385 s |
 
 ### La campaña de mutación (T26, DA-6)
 
-PENDIENTE-ANALISIS
+**83 mutantes sobre `domain/ventana.py`, 78 muertos, 5 supervivientes, 0
+timeouts.** Informe completo en `progress/mutacion_F-025.md`. Los cinco están
+analizados y **ninguno era equivalente**: los cinco eran huecos de test reales,
+y los cinco están cerrados con un test que los mata.
+
+**Todos estaban en la capa que REDACTA la denuncia**, no en la que decide. Es
+la parte que uno prueba de oído —«sale la obra en el informe, pues ya está»— y
+no es cosmética: con el guardián avisando sin bloquear (DA-5), esa capa es la
+única vía por la que el hallazgo llega a una persona.
+
+| Superviviente | Qué habría pasado |
+|---|---|
+| `if not self.codigo` invertido en `marcador` | **Marcador vacío en KO y emitido en verde**: la alerta no dispararía nunca, y dispararía todas las noches. Las dos mitades de la avería que la alerta existe para no tener |
+| `de_tipo` con `!=` | Cada obra **bajo el epígrafe equivocado**: la 0599 saldría como «congelada sin filas» cuando lo que le pasa es que su origen cambió |
+| `obras_miradas: int = 0 → 1` | Un veredicto sin censo daría **verde**. Es el defecto de `check-cobertura` otra vez, en el default |
+| `_corto`: `[:8] → [:9]` y `or → and` | El `detalle` publicado en `_meta.obra_build` dejaría de traer los prefijos comparables de los dos sellos |
+
+**Y por qué no los cazaba nadie, que es el hallazgo útil:** mis tests del
+guardián comprobaban `MARCADOR_KO in output`, **y ese literal aparece también en
+la línea de log**, que lo escribe desde la constante: pasaban aunque el marcador
+compuesto viniera vacío. Los nuevos miran **la propiedad**, no la salida. El de
+`de_tipo` es igual: con un solo hallazgo el texto sale idéntico, solo que bajo
+el epígrafe que no toca.
 
 ### Lo que la primera pasada ya cambió
 
@@ -190,9 +212,9 @@ ahora su test con su porqué.
 
 Ninguna en el alcance. Dos matices que conviene que el reviewer mire:
 
-- **El borde de los doce meses se cuenta en meses, no en días** (ver arriba). Es
-  un cambio de comportamiento en un caso: una obra cuya última fase es de hace
-  exactamente doce meses. Va del lado seguro —no congela— y es más fiel al dato.
-- **La spec pedía `filas` en el registro** y no decía de qué. Se guarda las
-  filas de `stg.plan_mensual` de esa obra, medidas con una agregación por tramo
-  acotada por el índice, no el total del tramo repartido.
+- **El borde de los doce meses se cuenta en meses, no en días** (ver arriba):
+  cambia una obra cuya última fase sea de hace exactamente doce meses. Va del
+  lado seguro —no congela— y es más fiel al dato, que es mensual.
+- **La spec pedía `filas` en el registro** y no decía de qué. Se guardan las de
+  `stg.plan_mensual` de esa obra, medidas con una agregación por tramo acotada
+  por el índice, no el total del tramo repartido.
