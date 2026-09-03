@@ -113,7 +113,7 @@ DIAS_MAXIMOS_SIN_COMPLETA = 7
 #: Separador entre los textos SQL que entran en el sello. Un literal que no
 #: puede aparecer dentro de un `.sql`: sin él, dos ficheros distintos podrían
 #: concatenarse en la misma cadena que otros dos y dar el mismo sello.
-SEPARADOR_DEL_SELLO = chr(10) + "--F025-SELLO--" + chr(10)
+SEPARADOR_DEL_SELLO = "\n--F025-SELLO--\n"
 
 
 # ---------------------------------------------------------------------------
@@ -319,23 +319,24 @@ class Plan:
 # ---------------------------------------------------------------------------
 
 
-def _meses_antes(referencia: date, meses: int) -> date:
-    """`referencia` menos `meses` meses, sin dependencias externas.
+def meses_transcurridos(desde: date, hasta: date) -> int:
+    """Meses enteros entre dos fechas, contando solo año y mes.
 
-    Se ajusta el día al último del mes destino cuando no existe (31 de marzo
-    menos un mes es el 28/29 de febrero). No se usa `dateutil`: añadir una
-    dependencia al manifiesto por esto no lo permite la spec, y el cálculo cabe
-    en seis líneas.
+    **Se cuentan MESES, no días, y no es una simplificación perezosa: es lo que
+    dice el dato.** La actividad de una obra sale de
+    `MAX(make_date(f.anio, GREATEST(f.mes, 1), 1))` sobre `stg.fases`, así que
+    siempre es el día 1 de un mes: el día no significa nada y compararlo sería
+    inventarse una precisión que el origen no tiene.
+
+    Antes esto restaba doce meses a la fecha de hoy y comparaba fechas, lo que
+    obligaba a recortar el día al último del mes destino —31 de marzo menos un
+    mes es el 28 de febrero—. Esa rama **nunca se ejecutaba** con el criterio
+    real (restar 12 meses cae en el mismo mes, que tiene los mismos días) y la
+    campaña de mutación de F-025 la delató: diez mutantes vivos, todos en cuatro
+    líneas que ningún test podía alcanzar. Se quitó en vez de taparla con
+    tests: el código que no se puede alcanzar no se prueba, se borra.
     """
-    total = referencia.year * 12 + (referencia.month - 1) - meses
-    anio, mes = divmod(total, 12)
-    mes += 1
-    if mes == 12:
-        dias_del_mes = 31
-    else:
-        siguiente = date(anio + (mes // 12), (mes % 12) + 1, 1)
-        dias_del_mes = (siguiente - date(anio, mes, 1)).days
-    return date(anio, mes, min(referencia.day, dias_del_mes))
+    return (hasta.year - desde.year) * 12 + (hasta.month - desde.month)
 
 
 def motivo_de_congelacion(
@@ -348,9 +349,13 @@ def motivo_de_congelacion(
     que se cumple, porque el motivo que se guarda es el que explica la decisión,
     no la lista entera.
 
-    El límite de los doce meses **no congela**: una obra que cerró fase justo
-    hace doce meses cuenta como CON actividad. Se prefiere trabajar de más a
-    dejar un dato viejo publicado.
+    El límite de los doce meses **no congela**: una obra cuya última fase es de
+    hace exactamente doce meses cuenta como CON actividad. Se prefiere trabajar
+    de más a dejar un dato viejo publicado.
+
+    La comparación es **en meses enteros**, no en días: la actividad sale de
+    `stg.fases` como el día 1 de un mes, así que el día no significa nada. Ver
+    `meses_transcurridos`.
     """
     if obra.estado_id is not None and obra.estado_id in criterio.estados_que_congelan:
         return f"estado {obra.estado_id} en la lista de estados que congelan"
@@ -364,11 +369,11 @@ def motivo_de_congelacion(
     if obra.ultima_actividad is None:
         return "sin ninguna fase cerrada: nunca ha tenido actividad"
 
-    umbral = _meses_antes(hoy, criterio.meses_sin_actividad)
-    if obra.ultima_actividad < umbral:
+    antiguedad = meses_transcurridos(obra.ultima_actividad, hoy)
+    if antiguedad > criterio.meses_sin_actividad:
         return (
-            f"sin actividad desde {obra.ultima_actividad.isoformat()}, mas de "
-            f"{criterio.meses_sin_actividad} meses"
+            f"sin actividad desde {obra.ultima_actividad.isoformat()}: "
+            f"{antiguedad} meses, mas de {criterio.meses_sin_actividad}"
         )
 
     return None

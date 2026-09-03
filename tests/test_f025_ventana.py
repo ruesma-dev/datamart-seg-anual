@@ -36,7 +36,9 @@ from etl_sigrid.domain.ventana import (
     MOTIVO_VENTANA,
     Criterio,
     ObraCensada,
+    Plan,
     clasificar_obras,
+    meses_transcurridos,
     motivo_de_congelacion,
 )
 
@@ -144,16 +146,69 @@ def test_f025_r2_regla_3_el_limite_de_los_doce_meses_no_congela() -> None:
     a dejar un dato viejo, que es el modo de fallo de F-052."""
     assert (
         motivo_de_congelacion(
-            obra(ultima_actividad=date(2025, 9, 2)), CRITERIO, HOY
+            obra(ultima_actividad=date(2025, 9, 1)), CRITERIO, HOY
+        )
+        is None
+    ), "septiembre de 2025 son exactamente 12 meses: no congela"
+
+
+def test_f025_r2_un_MES_antes_del_limite_si_congela() -> None:  # noqa: N802
+    """**El borde se cuenta en MESES, no en días**, y no es un detalle: la
+    actividad sale de `stg.fases` como el día 1 de un mes, así que el día no
+    significa nada y compararlo sería inventarse una precisión que el origen no
+    tiene. Agosto de 2025 son 13 meses; septiembre, 12."""
+    assert (
+        motivo_de_congelacion(
+            obra(ultima_actividad=date(2025, 8, 1)), CRITERIO, HOY
+        )
+        is not None
+    )
+
+
+def test_f025_r2_el_dia_del_mes_NO_cambia_la_decision() -> None:  # noqa: N802
+    """Todas las fechas de actividad son día 1; si alguna llegara con otro día,
+    la decisión tiene que ser la misma que la de su mes."""
+    for dia in (1, 15, 28, 30):
+        assert (
+            motivo_de_congelacion(
+                obra(ultima_actividad=date(2025, 8, dia)), CRITERIO, HOY
+            )
+            is not None
+        ), dia
+
+
+def test_f025_r2_la_cuenta_de_meses_cruza_el_cambio_de_ano() -> None:
+    """Diciembre de 2025 a septiembre de 2026 son 9 meses, no 3. Es la cuenta
+    que decide sobre las 36 obras cuya última actividad es el cierre anual."""
+    assert meses_transcurridos(date(2025, 12, 1), date(2026, 9, 1)) == 9
+    assert meses_transcurridos(date(2025, 9, 1), date(2026, 9, 1)) == 12
+    assert meses_transcurridos(date(2026, 9, 1), date(2026, 9, 1)) == 0
+
+
+def test_f025_r2_una_actividad_en_el_FUTURO_no_congela() -> None:  # noqa: N802
+    """Una fase con fecha futura da meses negativos. No debe congelar: lo que
+    se busca es lo viejo, no lo raro."""
+    assert (
+        motivo_de_congelacion(
+            obra(ultima_actividad=date(2027, 1, 1)), CRITERIO, HOY
         )
         is None
     )
 
 
-def test_f025_r2_un_dia_antes_del_limite_si_congela() -> None:
+def test_f025_r2_un_criterio_de_UN_mes_es_legitimo() -> None:  # noqa: N802
+    """Estrechar la ventana a un mes es una decisión de Negocio válida, y la
+    validación solo tiene que rechazar el cero y los negativos."""
+    criterio = Criterio(
+        estados_que_congelan=frozenset(),
+        patron_codigo="^[0-9]{6}$",
+        meses_sin_actividad=1,
+    )
+
+    assert motivo_de_congelacion(obra(ultima_actividad=HOY), criterio, HOY) is None
     assert (
         motivo_de_congelacion(
-            obra(ultima_actividad=date(2025, 9, 1)), CRITERIO, HOY
+            obra(ultima_actividad=date(2026, 7, 1)), criterio, HOY
         )
         is not None
     )
@@ -403,3 +458,102 @@ def test_f025_r2_un_criterio_sin_ninguna_regla_de_estado_sigue_siendo_valido() -
         meses_sin_actividad=12,
     )
     assert motivo_de_congelacion(obra(estado_id=25), criterio, HOY) is None
+
+
+# ---------------------------------------------------------------------------
+# Los DEFAULTS, que son decisiones de seguridad y no comodidad
+#
+# Los delató la campaña de mutación de T26: cinco mutantes vivos, todos
+# cambiando un `False` por un `True` en una dataclass. Ningún test los alcanzaba
+# porque todos construían las obras con TODOS los campos informados. Y cada uno
+# de esos `False` es una decisión: **ante la duda, no se congela y no se
+# denuncia**.
+# ---------------------------------------------------------------------------
+
+
+def test_f025_r18_una_obra_de_la_que_no_se_sabe_nada_NO_se_congela() -> None:  # noqa: N802
+    """`tiene_filas` y `registrada` nacen en `False`, y esa es la direccion
+    segura: una obra de la que no consta que este construida se reconstruye.
+
+    Si nacieran en `True`, una obra que el censo no supiera describir se daria
+    por construida y podria congelarse SIN ESTAR EN EL DATAMART, que es
+    exactamente el defecto de F-052.
+    """
+    desconocida = ObraCensada(obra_id=1, codigo_obra="0599", estado_id=25)
+
+    assert desconocida.tiene_filas is False
+    assert desconocida.registrada is False
+
+    plan = plan_de(desconocida)
+    assert plan.obras_a_reconstruir == (1,)
+    assert plan.reconstruir[0].motivo == MOTIVO_SIN_FILAS
+
+
+def test_f025_r16_una_obra_sin_firmas_NO_se_da_por_divergente() -> None:  # noqa: N802
+    """`firma_divergente` nace en `False`: "no se sabe" no es "cambio".
+
+    Si naciera en `True`, la primera noche con la ventana encendida denunciaria
+    las 880 obras congeladas de golpe, y una alerta que grita el primer dia se
+    apaga el segundo.
+    """
+    sin_firmas = ObraCensada(obra_id=1, codigo_obra="0599", estado_id=25)
+
+    assert sin_firmas.firma_divergente is False
+
+
+def test_f025_r16_basta_UNA_firma_a_nulo_para_no_denunciar() -> None:  # noqa: N802
+    """El `or` de la guarda, no un `and`: con `and`, una obra con
+    `firma_origen` a nulo y `firma_actual` informada compararia `None != 'x'` y
+    saldria divergente. Denunciaria a toda obra recien registrada."""
+    solo_origen = ObraCensada(1, "0599", firma_origen="x", firma_registrada=None)
+    solo_registrada = ObraCensada(1, "0599", firma_origen=None, firma_registrada="x")
+
+    assert solo_origen.firma_divergente is False
+    assert solo_registrada.firma_divergente is False
+
+
+def test_f025_r5_un_plan_recien_construido_NO_es_una_reconstruccion_completa() -> None:  # noqa: N802
+    """`Plan.completa` nace en `False`. Si naciera en `True`, cada noche
+    registraria el hito de la completa y `toca_reconstruccion_completa` creeria
+    para siempre que se acaba de hacer una: las 880 obras congeladas no se
+    reharian NUNCA y nadie se enteraria."""
+    assert Plan().completa is False
+    assert plan_de(obra(1, "0710")).completa is False
+
+
+def test_f025_r1_cada_decision_dice_de_que_lista_es() -> None:
+    """`Decision.reconstruir` es lo que hace legible el plan por escrito. Si
+    todas dijeran lo mismo, `como_texto()` mentiria en la mitad de las lineas y
+    el informe de `ventana-plan` seria inservible."""
+    plan = plan_de(obra(1, "0710"), obra(2, "0599", estado_id=25))
+
+    assert all(d.reconstruir is True for d in plan.reconstruir)
+    assert all(d.reconstruir is False for d in plan.congelar)
+    assert "RECONSTRUIR" in plan.reconstruir[0].como_texto()
+    assert "CONGELAR" in plan.congelar[0].como_texto()
+
+
+def test_f025_r1_el_texto_de_una_obra_denunciada_lo_dice() -> None:
+    """Quien lee `ventana-plan --detalle` tiene que ver de un vistazo cuales
+    son las obras congeladas cuyo origen se ha movido."""
+    plan = plan_de(
+        obra(1, "0599", estado_id=25, firma_origen="NUEVA", firma_registrada="f1")
+    )
+
+    assert "[firma cambiada]" in plan.congelar[0].como_texto()
+
+
+def test_f025_r17_el_separador_del_sello_no_puede_aparecer_en_un_sql() -> None:
+    """Lo que hace que dos ficheros no se confundan con uno concatenado es que
+    el separador sea un literal que ningun `.sql` contiene. Se comprueba contra
+    los ficheros reales, no contra la idea."""
+    from etl_sigrid.application.steps.build_stg_step import (
+        DIRECTORIO_SQL_STG,
+        FICHEROS_DEL_SELLO,
+    )
+    from etl_sigrid.domain.ventana import SEPARADOR_DEL_SELLO
+
+    assert "--F025-SELLO--" in SEPARADOR_DEL_SELLO
+    for nombre in FICHEROS_DEL_SELLO:
+        texto = (DIRECTORIO_SQL_STG / nombre).read_text(encoding="utf-8")
+        assert SEPARADOR_DEL_SELLO not in texto, nombre

@@ -268,3 +268,51 @@ def test_f025_r25_el_dia_de_la_completa_es_configurable() -> None:
         datetime(2026, 9, 1, 2, 0), miercoles, dia_semana=DOMINGO
     )
     assert toca_domingo is False
+
+
+def test_f025_r3_el_tope_de_dias_es_el_que_sostiene_el_HASTA_6_DIAS() -> None:  # noqa: N802
+    """**El numero que el humano acepto, cruzado con la constante que lo
+    produce.** R3 dice que una obra congelada puede llevar "hasta 6 dias" de
+    antiguedad, y eso no es una estimacion: sale de que la reconstruccion
+    completa se dispara al llegar a los 7. Si alguien sube la constante a 8, el
+    "hasta 6 dias" de la spec, del diccionario y del documento del ecosistema
+    deja de ser cierto, y nadie se entera.
+
+    Lo delato la campana de mutacion de T26: `DIAS_MAXIMOS_SIN_COMPLETA = 7 ->
+    8` sobrevivia porque ningun test fijaba el valor.
+    """
+    assert DIAS_MAXIMOS_SIN_COMPLETA == 7
+
+    # Con la completa hecha hace 6 dias todavia NO toca: esa es la antiguedad
+    # maxima que puede tener una obra congelada.
+    # `dia_semana=DOMINGO` y ninguna de las dos fechas es domingo (el 7 es
+    # lunes y el 8, martes): asi lo unico que decide es el tope de dias.
+    seis, _ = toca_reconstruccion_completa(
+        datetime(2026, 9, 1, 2, 0), datetime(2026, 9, 7, 2, 0), dia_semana=DOMINGO
+    )
+    assert seis is False, "a los 6 dias todavia no toca: por eso el tope es 6"
+
+    siete, motivo = toca_reconstruccion_completa(
+        datetime(2026, 9, 1, 2, 0), datetime(2026, 9, 8, 2, 0), dia_semana=DOMINGO
+    )
+    assert siete is True
+    assert "7" in motivo
+
+
+def test_f025_r25_el_dia_de_la_semana_se_lee_como_lo_lee_python() -> None:
+    """`DOMINGO` tiene que ser el 6 de `date.weekday()` (lunes = 0). Con el
+    valor de `isoweekday()` -donde domingo es 7- la completa no se dispararia
+    NUNCA por calendario, y solo la salvaria el tope de los siete dias."""
+    assert DOMINGO == 6
+    assert datetime(2026, 9, 6).weekday() == DOMINGO
+    assert datetime(2026, 9, 6).strftime("%w") == "0"
+
+
+def test_f025_r25_una_completa_del_mismo_dia_no_se_repite_ni_por_horas() -> None:
+    """Dos veces la misma noche vaciaria la hucha de creditos de CPU, que es la
+    averia que esta feature repara. La comparacion es por FECHA, no por horas
+    transcurridas."""
+    toca, _ = toca_reconstruccion_completa(
+        datetime(2026, 9, 6, 0, 5), datetime(2026, 9, 6, 23, 55)
+    )
+    assert toca is False
