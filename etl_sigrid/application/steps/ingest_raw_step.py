@@ -199,7 +199,7 @@ class IngestRawStep(PipelineStep):
                 for obra_id, valores in agregados.items()
             }
             pg.registrar_firmas_actuales(firmas)
-        except Exception as error:  # noqa: BLE001
+        except Exception as error:
             pg.record_run_end(run_id, StepStatus.FAILED.value, error_message=str(error))
             logger.warning(
                 "firma_origen_fallida",

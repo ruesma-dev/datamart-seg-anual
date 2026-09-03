@@ -53,6 +53,31 @@ objetos:
       grande del datamart, del orden de decenas de millones de filas, y por eso
       su build va troceado por lotes de obras.
 
+      **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
+      2026-09-03).** El datamart dejo de rehacer las 920 obras cada noche: se
+      rehacen las **40 vivas** y las **880 congeladas conservan la version que
+      se construyo la ultima vez que les tocó. NO SE BORRAN Y SIGUEN
+      CONSULTABLES: cada tramo borra solo las obras que va a reinsertar, en su
+      misma transaccion, asi que una obra congelada conserva exactamente sus
+      filas y sus importes. La ventana **no cambia ni una cifra**; cambia de
+      cuando es.
+
+      DE CUANDO ES EL DATO DE UNA OBRA lo dice `_meta.v_frescura_obra`
+      (`construido_at`, `congelada`, `motivo`). **Citala siempre que la
+      pregunta sea sobre una obra concreta y la frescura importe.** Una obra
+      congelada puede llevar hasta 6 dias de retraso: todas se rehacen enteras
+      los domingos.
+
+      QUE OBRA SE CONGELA lo decide `config/business_rules.yaml`, bloque
+      `ventana:`, con tres reglas en union: estado 1, 11 o 25; codigo de seis
+      digitos; o sin actividad en 12 meses. Hay 40 obras CON actividad reciente
+      que quedan congeladas igualmente, y es una decision de negocio tomada con
+      ese dato delante, no un defecto.
+
+      Y `plan_id`, su clave sustituta, **ya solo se reasigna en las obras que se
+      reconstruyen**: la de una obra congelada es estable entre noches. Sigue
+      sin ser un identificador de negocio.
+
       **UN SOLO CIERRE POR MES EN LOS AMBITOS REALES (3 y 7).** Veintidos obras
       tienen dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes`
       —dos cierres de quincena, o una fase que abarca varios meses archivada en
@@ -253,6 +278,15 @@ objetos:
       El presupuesto por partida y ambito, con su cantidad, su precio y su
       importe, sin distribucion mensual propia. La explosion a meses vive en
       `stg.plan_mensual`.
+
+      **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
+      2026-09-03)**, igual que `stg.plan_mensual` y por la misma decision: se
+      rehacen las 40 obras vivas y las 880 congeladas conservan la version que
+      se construyo la ultima vez que les toco. **No se borran y siguen
+      consultables**: el build borra solo las obras que va a reinsertar, en la
+      misma transaccion. De cuando es el dato de cada obra lo dice
+      `_meta.v_frescura_obra`, y una obra congelada puede llevar hasta 6 dias de
+      retraso -todas se rehacen enteras los domingos-.
 
       **Dos trampas antes de escribir nada, y las dos multiplican importes.**
 

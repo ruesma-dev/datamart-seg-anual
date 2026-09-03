@@ -56,12 +56,30 @@ objetos:
         columna `nom`: el nombre siempre es el resumen del concepto.
       estado_id:
         significado: >-
-          Codigo interno de estado de Sigrid, sin traducir: su catalogo **no se
-          ingiere**, asi que hay codigos sin nombre. Aun asi es **lo unico de
-          esta vista que discrimina algo**: reparte las 919 obras en once
-          valores (465 en el `25`, 226 en el `1`, 175 en el `15`, que el SQL de
-          `maestro/01_obras.sql` documenta como EN CURSO; medido el
-          2026-08-25). No mandar a `es_activa`, que vale TRUE para las 919.
+          Estado de la obra en Sigrid. **Es lo unico de esta vista que
+          discrimina algo**: reparte las 920 obras en once valores, y desde
+          F-025 es ademas una de las tres reglas que deciden que obras se
+          reconstruyen cada noche.
+
+          EL CATALOGO ESTA VERIFICADO (2026-09-02, contra Sigrid por
+          `sigrid-api` en solo lectura). Vive en la tabla `conest` ("Tipos de
+          Estados de Conceptos"), el tipo de las obras es el **42** y se llega
+          por `con.est`. **Esa tabla no se ingiere**, asi que el codigo llega
+          sin traducir y aqui va su equivalencia, que es la que hay que usar al
+          responder: `1` EN ESTUDIO (226 obras), `3` PRESENTADA (0), `5`
+          PRESENTADA CON ACLARACIONES (0), `7` ADJUDICADA PROVISIONAL (0), `9`
+          ADJUDICADA DEFINITIVAMENTE (33), `11` NO PRESENTADA (2), `13` NO
+          ADJUDICADA (0), `15` EN CURSO (176), `17` PARADA (7), `19` TERMINADA
+          (2), `21` RECIBIDA PROVISIONAL (3), `23` RECIBIDA DEFINITIVAMENTE
+          (4), `25` CERRADA (465), `999` PLANTILLA (1).
+
+          OJO AL LEERLO PARA SABER SI UNA OBRA ESTA VIVA: el estado de Sigrid
+          **no es fiable por si solo**. Hay 7 obras marcadas como CERRADAS (25)
+          que siguieron cerrando fases en los ultimos 12 meses. Por eso el
+          criterio de F-025 son tres reglas en union y no solo el estado, y por
+          eso `_meta.v_frescura_obra` es la fuente para "de cuando es el dato de
+          esta obra". No mandar a `es_activa`, que vale TRUE para las 920.
+        valores: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 999]
         agregacion: no_sumable
       fecha_alta:
         significado: Fecha de alta de la obra, ya tipada desde el entero de Sigrid.

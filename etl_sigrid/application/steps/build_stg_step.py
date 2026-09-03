@@ -268,6 +268,29 @@ def componer_sql_presupuesto(sql_texto: str, obras: Sequence[int]) -> str:
     return componer_borrado_derivado("presupuesto", obras) + "\n" + filtrado
 
 
+def sello_vigente_del_repositorio(settings) -> str:
+    """`sha256` del SQL del build y de sus parámetros (R17).
+
+    Es **función de módulo y no método** a propósito: la necesitan el step, el
+    comando `ventana-plan` y el guardián `check-ventana`, y los dos últimos no
+    tienen por qué instanciar un step —que abre cliente y arrastra estado— solo
+    para leer dos ficheros y hacer un hash. Además, así el guardián sigue
+    funcionando en los tests que sustituyen `BuildStgStep` por un doble.
+    """
+    textos = [
+        (DIRECTORIO_SQL_STG / nombre).read_text(encoding="utf-8")
+        for nombre in FICHEROS_DEL_SELLO
+    ]
+    return sello_sql(
+        textos,
+        {
+            "cod_version_master_vigente": settings.business_rules["sigrid"][
+                "campos_extendidos"
+            ]["cod_version_master_vigente"],
+        },
+    )
+
+
 @dataclass(slots=True, frozen=True)
 class _SubStep:
     """Un sub-paso de build_stg: un archivo SQL + tabla destino (para contar filas)."""
@@ -564,18 +587,7 @@ class BuildStgStep(PipelineStep):
 
     def _sello_vigente(self) -> str:
         """`sha256` del SQL del build y de sus parámetros (R17)."""
-        textos = [
-            (DIRECTORIO_SQL_STG / nombre).read_text(encoding="utf-8")
-            for nombre in FICHEROS_DEL_SELLO
-        ]
-        return sello_sql(
-            textos,
-            {
-                "cod_version_master_vigente": self._settings.business_rules["sigrid"][
-                    "campos_extendidos"
-                ]["cod_version_master_vigente"],
-            },
-        )
+        return sello_vigente_del_repositorio(self._settings)
 
     def _toca_completa(self, pg: PostgresClient) -> tuple[bool, str]:
         """Si esta noche toca rehacerlo todo, y por qué (R25, DA-4)."""

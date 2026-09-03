@@ -63,7 +63,7 @@ def test_f025_r1_el_censo_sale_de_raw_y_no_de_maestro_obras() -> None:
     assert "maestro.obras" not in SQL_ESTADO_OBRAS
 
 
-def test_f025_r1_la_obra_ES_un_concepto_y_el_join_va_por_ide() -> None:
+def test_f025_r1_la_obra_ES_un_concepto_y_el_join_va_por_ide() -> None:  # noqa: N802
     """`c.ide = o.ide`, la misma definición que usa `maestro.obras`. NO
     `obr.cenide`, que es el centro de coste y es otra cosa."""
     assert re.search(r"JOIN\s+raw\.con\s+c\s+ON\s+c\.ide\s*=\s*o\.ide", SQL_ESTADO_OBRAS)

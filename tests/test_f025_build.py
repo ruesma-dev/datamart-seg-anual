@@ -47,15 +47,14 @@ from etl_sigrid.application.steps.build_stg_step import (
     MARCADOR_FILTRO_PRESUPUESTO,
     RAMAS_CON_FILTRO,
     BuildStgStep,
-    PlanMensualAbortado,
     componer_borrado_derivado,
     componer_sql_presupuesto,
     componer_sql_tramo,
 )
 from etl_sigrid.domain.entities import StepStatus
 from etl_sigrid.domain.ventana import ObraCensada
-
 from tests.test_f019_tramos import LoggerFalso
+
 
 def sello_real() -> str:
     """El sello que el step calcula de verdad sobre los SQL del repositorio.

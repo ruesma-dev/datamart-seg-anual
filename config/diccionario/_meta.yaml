@@ -668,3 +668,224 @@ objetos:
         porque: >-
           Es la tabla de la que sale. El JOIN real va por (`esquema`, `objeto`)
           y es uno a uno; por `esquema` solo hay muchas filas en las dos puntas.
+
+  obra_build:
+    tipo: tabla
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el registro crudo por obra, con las dos firmas y el sello del SQL, que
+      son hashes internos y no significan nada para negocio. Para responder "de
+      cuando es el dato de esta obra" esta `_meta.v_frescura_obra`, que deja
+      fuera los hashes y trae la divergencia ya calculada.
+    descripcion: >-
+      Una fila por obra con de que noche viene lo construido y por que. Existe
+      desde F-025 (2026-09-03), cuando el datamart dejo de reconstruir las 920
+      obras cada noche: se rehacen las 40 vivas y las 880 congeladas conservan
+      su ultima version buena. Eso convierte "de cuando es este dato" en una
+      pregunta POR OBRA, y esta tabla es donde se responde.
+    grano: >-
+      Una fila por obra, con `obra_id` como clave primaria. **La ultima manda**:
+      no hay historico, se sobrescribe cada noche. El historico de que paso cada
+      noche esta en `_meta.etl_runs`.
+    clave_negocio: [obra_id]
+    refresco: nocturno
+    paso_etl: build_stg
+    columnas:
+      obra_id:
+        significado: >-
+          La obra, con el mismo identificador que `stg.obras.obra_id` y
+          `maestro.obras.obra_id` (`raw.con.ide`).
+        agregacion: clave_sustituta
+      codigo_obra:
+        significado: >-
+          El codigo legible de la obra (`0599`, `0710`), copiado al registrar
+          para que la denuncia del guardian pueda nombrarla sin cruzar nada.
+        agregacion: no_sumable
+        nulo_significa: La obra no tenia codigo cuando se registro.
+      firma_origen:
+        significado: >-
+          Hash de los agregados de `raw` que tenia la obra **cuando se
+          construyo**. Es la mitad de la comparacion que detecta que una obra
+          congelada ha cambiado en Sigrid; la otra mitad es `firma_actual`.
+          **Son dos columnas distintas a proposito**: si la ingesta pisara esta
+          cada noche, no habria contra que comparar.
+        agregacion: no_sumable
+        nulo_significa: La obra nunca se ha construido con la ventana activa.
+      firma_actual:
+        significado: >-
+          Hash de los mismos agregados de `raw` **ahora**, recalculado cada
+          noche tras la ingesta. Si difiere de `firma_origen`, la obra se ha
+          movido en el origen desde que se construyo.
+        agregacion: no_sumable
+        nulo_significa: Todavia no se ha calculado ninguna firma para esta obra.
+      firma_actual_at:
+        significado: >-
+          Cuando se calculo `firma_actual`, en **UTC sin zona** como todo
+          `_meta`. Si va muy por detras de esta noche, el sub-paso de la firma
+          fallo y la denuncia esta ciega.
+        agregacion: no_sumable
+        nulo_significa: Todavia no se ha calculado ninguna firma.
+      sello_sql:
+        significado: >-
+          Hash del SQL del build (`06_presupuesto.sql`, `08_plan_mensual.sql`) y
+          de sus parametros con el que se construyo esta obra. Cuando el SQL
+          cambia, el sello deja de coincidir y esa noche se reconstruyen TODAS
+          las obras: es lo que impide que un arreglo del SQL alcance solo a las
+          40 vivas.
+        agregacion: no_sumable
+        nulo_significa: La obra nunca se ha construido con la ventana activa.
+      batch_id:
+        significado: >-
+          De que ejecucion viene lo construido. Mismo formato y mismo
+          significado que `_meta.etl_runs.batch_id`, y se ordena como texto.
+        agregacion: no_sumable
+        nulo_significa: Se construyo antes de F-025, o fuera de una ejecucion.
+      construido_at:
+        significado: >-
+          Cuando se construyo esta obra por ultima vez, en UTC sin zona. **Solo
+          se mueve cuando la obra se reconstruye de verdad**: una obra congelada
+          conserva la fecha de su ultima construccion buena, porque moverla
+          seria mentir sobre la frescura.
+        agregacion: no_sumable
+        nulo_significa: La obra nunca se ha construido.
+      filas:
+        significado: >-
+          Filas de `stg.plan_mensual` que tenia la obra al terminar su ultima
+          construccion. Sirve para detectar de un vistazo una obra que se ha
+          quedado a cero.
+        agregacion: suma
+      congelada:
+        significado: >-
+          Si la ultima noche esta obra NO se reconstruyo. `TRUE` no significa
+          que su dato este mal: significa que es de `construido_at` y no de
+          anoche.
+        valores: [true, false]
+        agregacion: no_sumable
+      motivo:
+        significado: >-
+          Por que se decidio lo que se decidio, en un vocabulario cerrado de
+          cinco valores. `ventana` = lo decidio el criterio de negocio;
+          `completa` = la reconstruccion semanal del domingo; `sello` = cambio
+          el SQL; `sin_filas` = no estaba construida, y completar no es
+          actualizar; `firma` = el origen cambio y el rescate estaba activado.
+        valores: [ventana, completa, sello, sin_filas, firma]
+        agregacion: no_sumable
+      detalle:
+        significado: >-
+          La misma decision en una frase legible, con su dato: "estado 25 en la
+          lista de estados que congelan", "sin actividad desde 2019-06-01".
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Es la misma obra. **El universo de aqui es mas ancho**: se registran
+          las 920 obras del maestro y `stg.obras` tiene 583, porque su build
+          excluye a proposito codigos administrativos.
+
+  v_frescura_obra:
+    tipo: vista
+    capa: operacion
+    consumo_recomendado: true
+    descripcion: >-
+      **De cuando es el dato de cada obra.** Hermana de `_meta.v_frescura`, que
+      responde lo mismo por paso de pipeline; esta lo baja al grano en el que se
+      toman las decisiones desde F-025, que es la obra.
+
+      **Consultala siempre que la pregunta sea sobre una obra concreta y la
+      frescura importe.** Desde el 2026-09-03 el datamart no reconstruye todas
+      las obras cada noche: 880 de las 920 estan congeladas y conservan su
+      ultima version buena, que puede tener hasta 6 dias de antiguedad -todas se
+      rehacen enteras los domingos-. Las cifras de una obra congelada son
+      correctas; lo que hay que decir al citarlas es de cuando son.
+    grano: >-
+      Una fila por `obra_id` registrado en `_meta.obra_build`. Sin `WHERE`:
+      salen las congeladas, las recien construidas y las que nunca se han
+      construido.
+    clave_negocio: [obra_id]
+    refresco: nocturno
+    paso_etl: build_stg
+    ejemplos_preguntas:
+      - "de cuando es el dato de la obra 0599?"
+      - "que obras llevan mas de una semana sin actualizarse?"
+      - "esta congelada la obra 0710, y por que?"
+      - "hay alguna obra congelada que haya cambiado en Sigrid?"
+    columnas:
+      obra_id:
+        significado: La obra, como en `stg.obras.obra_id`.
+        agregacion: clave_sustituta
+      codigo_obra:
+        significado: El codigo legible de la obra (`0599`, `0710`).
+        agregacion: no_sumable
+        nulo_significa: La obra no tenia codigo cuando se registro.
+      construido_at:
+        significado: >-
+          Cuando se construyo esta obra por ultima vez, en UTC sin zona.
+        agregacion: no_sumable
+        nulo_significa: La obra nunca se ha construido.
+      horas_desde_construccion:
+        significado: >-
+          Antiguedad del dato de esta obra, en horas. Calculada contra
+          `now() AT TIME ZONE 'UTC'` porque las marcas de tiempo van sin zona:
+          restarles un `now()` local daria el desfase horario de Espana como
+          antiguedad, y en verano son dos horas.
+        agregacion: promedio
+        nulo_significa: La obra nunca se ha construido.
+      batch_id:
+        significado: De que ejecucion viene lo construido.
+        agregacion: no_sumable
+        nulo_significa: Se construyo antes de F-025.
+      filas:
+        significado: Filas de `stg.plan_mensual` de la obra en su ultima construccion.
+        agregacion: suma
+      congelada:
+        significado: >-
+          Si la ultima noche NO se reconstruyo. No significa que su dato este
+          mal: significa que es de `construido_at`.
+        valores: [true, false]
+        agregacion: no_sumable
+      motivo:
+        significado: >-
+          Por que, en el vocabulario cerrado de `_meta.obra_build.motivo`.
+        valores: [ventana, completa, sello, sin_filas, firma]
+        agregacion: no_sumable
+      detalle:
+        significado: La misma decision en una frase legible, con su dato.
+        agregacion: no_sumable
+      sello_sql:
+        significado: >-
+          Con que version del SQL del build se construyo. Util para saber si a
+          una obra le falta el ultimo arreglo.
+        agregacion: no_sumable
+        nulo_significa: La obra nunca se ha construido con la ventana activa.
+      firma_divergente:
+        significado: >-
+          **La denuncia.** `TRUE` = la obra esta congelada y su origen HA
+          CAMBIADO en Sigrid desde que se construyo, asi que su dato esta
+          desactualizado. No se reconstruye por su cuenta -es una decision de
+          negocio- pero queda nombrada, y la reconstruccion del domingo la pone
+          al dia. Si vas a citar cifras de una obra con esto en `TRUE`, dilo.
+
+          Es `FALSE` tambien cuando falta alguna de las dos firmas: "no se sabe"
+          no es "cambio".
+        valores: [true, false]
+        agregacion: no_sumable
+      firma_comprobada_at:
+        significado: >-
+          Cuando se comprobo el origen por ultima vez. Si va muy por detras de
+          anoche, la denuncia esta ciega: el sub-paso de la firma fallo.
+        agregacion: no_sumable
+        nulo_significa: Nunca se ha comprobado el origen de esta obra.
+    relaciones:
+      - de: obra_id
+        a: _meta.obra_build.obra_id
+        cardinalidad: "1:1"
+        porque: Es la tabla de la que sale, sin filtrar ni agrupar.
+      - de: obra_id
+        a: stg.obras.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Es la misma obra. El universo de aqui es mas ancho: 920 contra 583,
+          porque `stg.obras` excluye codigos administrativos a proposito.

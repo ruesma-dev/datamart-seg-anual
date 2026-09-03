@@ -1,5 +1,31 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-02
+# Estado actual · 2026-09-03
+
+## F-025 · IMPLEMENTADA (falta la verificacion contra la base, que es MANUAL)
+
+Rama `feature/F-025-ventana-negocio-build`. El detalle esta en
+**`progress/impl_F-025.md`**; aqui solo lo que hace falta para retomar.
+
+**Lo que ya esta en el arbol y en verde:** el dominio de la ventana
+(`domain/ventana.py`), el borrado derivado que sustituye al `TRUNCATE` en las
+dos tablas acotadas, el sub-paso de la firma sobre `raw`, el registro por obra
+(`_meta.obra_build` y `_meta.v_frescura_obra`), la reconstruccion completa de
+los domingos, `ventana-plan`, `check-ventana` con su alerta y la quinta huella.
+**El diccionario sube a la version 13 y el inventario pasa de 103 a 105
+objetos** y de 798 a **822 columnas** documentadas, con las fichas de los dos
+objetos nuevos y el aviso en las de `stg.plan_mensual` y `stg.presupuesto`.
+
+**La ventana nace APAGADA** (`PG_VENTANA_ACTIVA=false`, R5): mientras no se
+encienda, el contenido publicado es exactamente el de hoy. Lo que SI cambia ya
+es que las dos tablas dejan de truncarse, y eso repara por si solo la averia
+del 02-sep.
+
+**Lo que falta, y es del humano:** toda la fase 7 de `tasks.md` (T27-T35), que
+escribe contra produccion: las cinco huellas del antes, la primera
+reconstruccion acotada, las huellas del despues con tolerancia cero, la 0599, y
+el despliegue de `infra/97_create_alert_ventana.ps1`, **sin el cual el guardian
+es mudo**. Y las mediciones T1 y T2b, que barren tablas de millones de filas y
+no se lanzaron para no vaciar otra vez la hucha de creditos.
 
 ## F-025 · SPEC ESCRITA y DECISIONES CERRADAS por el humano (2026-09-02)
 

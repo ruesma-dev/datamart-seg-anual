@@ -12,6 +12,20 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 13 (F-025, 2026-09-03): EL DATAMART YA NO RECONSTRUYE TODAS LAS OBRAS
+# CADA NOCHE. De las 920 obras del maestro se rehacen 40 y 880 quedan
+# congeladas, conservando la version que se construyo la ultima vez que les
+# toco. NO SE BORRAN Y SIGUEN CONSULTABLES: el build borra solo las obras que
+# va a reinsertar, en la misma transaccion, asi que una obra congelada conserva
+# exactamente sus filas y sus importes. La ventana no cambia ni una cifra;
+# cambia DE CUANDO ES. Se anaden las fichas de `_meta.obra_build` y
+# `_meta.v_frescura_obra` -que es donde se responde "de cuando es el dato de
+# esta obra", y hay que citarla cuando la pregunta sea sobre una obra concreta-
+# y se avisa en las de `stg.plan_mensual` y `stg.presupuesto`. La ficha de
+# `maestro.obras.estado_id` deja de decir que su catalogo no se ingiere: los
+# catorce estados de `conest` (tipo 42) quedan documentados con su nombre,
+# verificados contra Sigrid el 2026-09-02.
+#
 # version 12 (F-052, 2026-08-31): un capitulo de Sigrid puede no tener codigo,
 # y eso ya no corta el arbol de partidas. La ficha de `stg.partidas` deja de
 # afirmar que una partida sin codigo no llega -sus DESCENDIENTES si llegan
@@ -40,7 +54,7 @@
 # `R-FRESCURA` porque lo que decia -que la nocturna construye SOLO raw, stg y
 # mart- dejo de ser cierto.
 
-version: 12
+version: 13
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

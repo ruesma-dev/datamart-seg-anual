@@ -763,6 +763,17 @@ def _se_reconstruye(nombre: str) -> bool:
                    re.IGNORECASE),
         re.compile(rf"TRUNCATE[^\n;]*\b{esquema}\.{objeto}\b", re.IGNORECASE),
         re.compile(rf"truncate_table\(\s*[\"']{esquema}[\"']\s*,\s*[\"']{objeto}[\"']"),
+        # F-025. `stg.plan_mensual` y `stg.presupuesto` ya NO se truncan: cada
+        # noche se borran y se reinsertan las obras que se reconstruyen, en la
+        # misma transaccion (borrado derivado). Su clave sustituta se sigue
+        # reasignando, pero **solo para esas obras**: las 880 congeladas
+        # conservan la suya. La regla sigue siendo cierta para ellas, y esa
+        # precision esta escrita en las fichas de las dos tablas.
+        re.compile(
+            rf"componer_borrado_derivado\(\s*[\"']{objeto}[\"']"
+            if esquema == "stg"
+            else r"(?!x)x"
+        ),
     )
     for fuente in fuentes:
         texto = fuente.read_text(encoding="utf-8")
@@ -791,7 +802,11 @@ def test_f006_r9_el_ambito_de_clave_sustituta_solo_lleva_lo_que_se_reconstruye()
 def test_f006_r9_el_control_del_detector_de_reconstruccion() -> None:
     """Si el detector diera siempre True, el test de arriba pasaría en falso."""
     assert _se_reconstruye("mart.fact_seguimiento_mensual") is True
-    assert _se_reconstruye("stg.plan_mensual") is True, "se trunca desde Python"
+    assert _se_reconstruye("stg.plan_mensual") is True, (
+        "desde F-025 ya no se trunca: se borra e inserta POR OBRA, y su clave "
+        "sustituta se reasigna solo para las obras que se reconstruyen"
+    )
+    assert _se_reconstruye("stg.presupuesto") is True
     assert _se_reconstruye("aux.periodificacion_partida") is False
 
 

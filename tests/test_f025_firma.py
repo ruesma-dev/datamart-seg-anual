@@ -204,7 +204,7 @@ def test_f025_r17_el_sello_es_un_sha256_hexadecimal() -> None:
     assert set(sello) <= set("0123456789abcdef")
 
 
-def test_f025_r17_el_sello_del_sql_REAL_del_repositorio_se_calcula() -> None:
+def test_f025_r17_el_sello_del_sql_REAL_del_repositorio_se_calcula() -> None:  # noqa: N802
     """Contraste de realidad: no basta con que funcione sobre cadenas de
     juguete. Se sella el SQL que ejecuta la nocturna de verdad."""
     from etl_sigrid.application.steps.build_stg_step import (

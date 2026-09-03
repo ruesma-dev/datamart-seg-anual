@@ -55,6 +55,13 @@ infraestructura.
 > `contexto_bbdd()`, así que con el origen en base **se perdían**, y el MCP en
 > cloud habría respondido *peor* que el prototipo. Se añade una tabla, con lo
 > que el inventario pasa a **103 objetos**. Detalle en §4.4.
+>
+> **Enmienda del 2026-09-03 (F-025).** Entran `_meta.obra_build` y
+> `_meta.v_frescura_obra` y el inventario pasa a **105 objetos**. Responden una
+> pregunta que antes no existía: «¿de cuándo es el dato de ESTA obra?». Desde
+> F-025 el datamart no reconstruye las 920 obras cada noche —se rehacen 40 y
+> 880 conservan su última versión buena—, así que la frescura dejó de ser una
+> propiedad del datamart entero y pasó a serlo de cada obra.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
