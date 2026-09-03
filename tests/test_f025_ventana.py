@@ -29,6 +29,7 @@ from datetime import date
 import pytest
 
 from etl_sigrid.domain.ventana import (
+    MARCADOR_KO,
     MOTIVO_COMPLETA,
     MOTIVO_FIRMA,
     MOTIVO_SELLO,
@@ -582,3 +583,141 @@ def test_f025_r16_una_decision_sin_divergencia_declarada_NO_denuncia() -> None: 
     assert decision.firma_divergente is False
     assert "[firma cambiada]" not in decision.como_texto()
     assert Plan(congelar=(decision,)).denunciadas == ()
+
+
+# ---------------------------------------------------------------------------
+# Los CINCO supervivientes de la campana de T26, y por que ninguno era
+# equivalente
+#
+# Los cinco estaban en la capa que REDACTA la denuncia, no en la que decide. Es
+# la parte que se prueba de oido -"sale la obra en el informe, pues ya esta"- y
+# la campana lo demostro: mis tests del guardian miraban `MARCADOR_KO in
+# output`, y ese literal aparece TAMBIEN en la linea de log, asi que pasaban
+# aunque el marcador compuesto viniera vacio.
+#
+# Y esa capa no es cosmetica: es la unica via por la que este guardian se hace
+# oir (DA-5, avisa y no bloquea).
+# ---------------------------------------------------------------------------
+
+
+def test_f025_r17_el_detalle_del_sello_compara_los_dos_hashes_ABREVIADOS() -> None:  # noqa: N802
+    """El mensaje viaja a `_meta.obra_build.detalle`, que se consulta por SQL.
+
+    Dos `sha256` de 64 caracteres dentro de una frase la hacen ilegible; ocho
+    bastan para distinguirlos, y los dos con la MISMA longitud para poder
+    compararlos sin contar caracteres. Sin este test sobrevivian dos mutantes:
+    uno que alargaba el recorte y otro que sustituia el hash por el literal
+    "(ninguno)" en todos los casos.
+    """
+    from etl_sigrid.domain.ventana import LONGITUD_SELLO_CORTO, _corto
+
+    plan = plan_de(obra(1, "0599", estado_id=25, sello_registrado=OTRO_SELLO))
+    detalle = plan.reconstruir[0].detalle
+
+    assert OTRO_SELLO[:8] in detalle, "el sello con el que se construyo"
+    assert SELLO[:8] in detalle, "y el vigente, para poder compararlos"
+    assert SELLO not in detalle, "pero NO el hash entero: 64 caracteres son ilegibles"
+
+    assert _corto(SELLO) == SELLO[:8]
+    assert len(_corto(SELLO)) == LONGITUD_SELLO_CORTO == 8
+    assert len(_corto(SELLO)) == len(_corto(OTRO_SELLO)), (
+        "los dos con la misma longitud o no se pueden comparar de un vistazo"
+    )
+
+
+def test_f025_r17_una_obra_sin_sello_lo_dice_con_el_literal_ENTERO() -> None:  # noqa: N802
+    """`(ninguno)`, no `(ninguno` recortado a ocho: un parentesis sin cerrar en
+    un dato publicado parece un truncamiento y hace dudar del resto."""
+    from etl_sigrid.domain.ventana import _corto
+
+    assert _corto(None) == "(ninguno)"
+    assert _corto("") == "(ninguno)"
+
+
+def test_f025_r26_cada_hallazgo_sale_bajo_SU_epigrafe_y_no_bajo_otro() -> None:  # noqa: N802
+    """**El superviviente mas serio de la campana.** Con la comparacion de
+    `de_tipo` invertida, cada bloque del informe listaria los hallazgos de los
+    OTROS tres tipos: la 0599 apareceria bajo "obras congeladas SIN filas"
+    cuando lo que le pasa es que su origen ha cambiado.
+
+    Ningun test lo cazaba porque todos ejercitaban UN tipo cada vez, y con un
+    solo hallazgo el texto aparece igual, solo que bajo el epigrafe equivocado.
+    Hace falta mezclar dos tipos para notarlo.
+    """
+    from etl_sigrid.domain.ventana import (
+        TIPO_CONGELADA_SIN_FILAS,
+        TIPO_FIRMA_DIVERGENTE,
+        HallazgoVentana,
+        VeredictoVentana,
+        formatear_ventana,
+    )
+
+    veredicto = VeredictoVentana(
+        hallazgos=(
+            HallazgoVentana(TIPO_FIRMA_DIVERGENTE, 1, "0599", "el origen cambio"),
+            HallazgoVentana(TIPO_CONGELADA_SIN_FILAS, 2, "0710", "no tiene filas"),
+        ),
+        obras_miradas=920,
+    )
+
+    assert [h.codigo_obra for h in veredicto.de_tipo(TIPO_FIRMA_DIVERGENTE)] == ["0599"]
+    assert [h.codigo_obra for h in veredicto.de_tipo(TIPO_CONGELADA_SIN_FILAS)] == ["0710"]
+
+    informe = formatear_ventana(veredicto)
+    bloque_firma = informe[informe.index("ORIGEN ha cambiado") :]
+    bloque_firma = bloque_firma[: bloque_firma.index("SIN filas")]
+
+    assert "0599" in bloque_firma
+    assert "0710" not in bloque_firma, "cada obra bajo SU epigrafe"
+
+
+def test_f025_r26_el_marcador_se_emite_en_KO_y_NO_en_verde() -> None:  # noqa: N802
+    """**El otro superviviente serio**: invertir esta condicion deja el marcador
+    VACIO cuando hay hallazgos -la alerta no dispararia nunca- y lo emite cuando
+    todo esta bien -dispararia todas las noches-. Las dos mitades de la averia
+    que la alerta existe para no tener.
+
+    Los tests del comando no lo cazaban: comprobaban `MARCADOR_KO in output`, y
+    ese literal aparece TAMBIEN en la linea de log, que lo escribe desde la
+    constante. Por eso este test mira la propiedad, no la salida.
+    """
+    from etl_sigrid.domain.ventana import (
+        TIPO_FIRMA_DIVERGENTE,
+        HallazgoVentana,
+        VeredictoVentana,
+    )
+
+    con_hallazgo = VeredictoVentana(
+        hallazgos=(HallazgoVentana(TIPO_FIRMA_DIVERGENTE, 1, "0599", "cambio"),),
+        obras_miradas=920,
+    )
+    en_verde = VeredictoVentana(hallazgos=(), obras_miradas=920)
+
+    assert con_hallazgo.codigo == 1
+    assert MARCADOR_KO in con_hallazgo.marcador
+    assert f"{TIPO_FIRMA_DIVERGENTE}=1" in con_hallazgo.marcador
+
+    assert en_verde.codigo == 0
+    assert en_verde.marcador == "", (
+        "en verde NO se emite: un marcador que aparece todas las noches entrena "
+        "a todo el mundo a ignorarlo, y entonces la alerta ya no vale"
+    )
+
+
+def test_f025_r26_un_veredicto_sin_censo_declarado_es_un_KO() -> None:  # noqa: N802
+    """`obras_miradas` nace en 0, y esa es la direccion segura: un veredicto que
+    no dice cuantas obras miro no ha mirado ninguna.
+
+    Si naciera en 1, el guardian daria verde sobre una base vacia, que es
+    EXACTAMENTE el defecto que se le arreglo a `check-cobertura` el 2026-09-03 y
+    con el que este nacio resuelto. La campana encontro que el default no
+    estaba protegido.
+    """
+    from etl_sigrid.domain.ventana import VeredictoVentana
+
+    recien_hecho = VeredictoVentana()
+
+    assert recien_hecho.obras_miradas == 0
+    assert recien_hecho.no_ha_mirado_nada is True
+    assert recien_hecho.codigo == 1
+    assert MARCADOR_KO in recien_hecho.marcador

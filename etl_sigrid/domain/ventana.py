@@ -110,6 +110,12 @@ DOMINGO = 6
 #: perder un domingo dejaría las 880 obras congeladas dos semanas.
 DIAS_MAXIMOS_SIN_COMPLETA = 7
 
+#: Caracteres de un `sha256` que se muestran al comparar dos sellos en un
+#: mensaje. Ocho: suficientes para distinguirlos, pocos para que la frase se
+#: lea. Los 64 completos harían ilegible el `detalle` que se publica en
+#: `_meta.obra_build`.
+LONGITUD_SELLO_CORTO = 8
+
 #: Separador entre los textos SQL que entran en el sello. Un literal que no
 #: puede aparecer dentro de un `.sql`: sin él, dos ficheros distintos podrían
 #: concatenarse en la misma cadena que otros dos y dar el mismo sello.
@@ -488,8 +494,21 @@ def _decidir(
 
 
 def _corto(sello: str | None) -> str:
-    """Los ocho primeros caracteres de un hash, que es lo que lee una persona."""
-    return (sello or "(ninguno)")[:8]
+    """Un hash abreviado, que es lo que lee una persona.
+
+    Los mensajes de `detalle` comparan dos sellos —«construida con X y el
+    vigente es Y»— y viajan a `_meta.obra_build.detalle`, que se consulta por
+    SQL. Meter ahí dos `sha256` de 64 caracteres hace la frase ilegible; ocho
+    bastan para distinguirlos de un vistazo, y **los dos con la misma longitud**
+    para poder compararlos sin contar caracteres.
+
+    Se escribe con un `if` y no con `sello or "(ninguno)"` porque así el caso de
+    «no hay sello» devuelve el literal ENTERO en vez de recortado a ocho, que
+    era lo que salía antes: `(ninguno`, sin cerrar el paréntesis.
+    """
+    if not sello:
+        return "(ninguno)"
+    return sello[:LONGITUD_SELLO_CORTO]
 
 
 # ---------------------------------------------------------------------------
