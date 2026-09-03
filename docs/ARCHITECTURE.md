@@ -139,19 +139,123 @@ Desde F-019, el sub-paso `build_plan_mensual` **no se ejecuta de una pasada**:
   obra + tope), `build_stg_step` orquesta y `postgres_client` mide y ejecuta.
   El fichero SQL lleva un marcador que el step sustituye por las obras del
   tramo, **en las dos ramas** (master amb 8/11 y reales amb 3/7); filtrar solo
-  una duplicaría la otra. El vaciado de la tabla lo hace el step una vez.
+  una duplicaría la otra. **El vaciado de la tabla lo hacía el step una vez,
+  antes del primer tramo; desde F-025 ya no existe** —ver la sección siguiente:
+  cada tramo borra las obras que va a reinsertar, en su misma transacción—.
 - **Una transacción por tramo**, para que el pico de temporales de un tramo no
   se apile con el del siguiente.
 - **Puerta de disco antes de CADA tramo**: se mide la ocupación del servidor
   (suma de `pg_database_size` de todas las bases) y, si supera el límite, el
-  build **para**, deja la tabla **vacía** y marca FAILED. Si la medición
-  falla, también para: seguir a ciegas es lo que provocó el incidente.
+  build **para** y marca FAILED. Si la medición falla, también para: seguir a
+  ciegas es lo que provocó el incidente. **Hasta F-025 el aborto además vaciaba
+  la tabla**; ya no, porque vaciarla destruiría las 880 obras congeladas.
 - **Tres settings**, todos con default y sin secretos: `PG_TRAMO_MAX_FILAS`
   (1 000 000), `PG_DISCO_TOTAL_GB` (32) y `PG_DISCO_LIMITE_PCT` (80). Un
   máximo enorme reproduce el comportamiento antiguo si alguna vez hiciera
   falta diagnosticar, sin conservar una rama de código con el arma cargada.
 - Cada tramo deja su fila en `_meta.etl_runs`, así que `python main.py timings`
   desglosa el coste real tramo a tramo.
+
+### La ventana de negocio: no todas las obras se reconstruyen (F-025)
+
+La nocturna del **2026-09-02 murió** por `replicaTimeout` en el tramo 5 de 60 y
+dejó `stg.plan_mensual` truncada al **21,6 %**. La causa, medida: el
+`Standard_B1ms` es *burstable*, agotó sus 144 créditos de CPU a las 04:15 UTC y
+Azure lo capó al 20 % de un núcleo; cada tramo pasó de **1,57 min** a **40,77**.
+Y se reconstruían **920 obras** cada noche cuando solo **80** habían tenido
+actividad en los últimos doce meses. Esto no fue una mejora de rendimiento: fue
+la reparación de una avería.
+
+Desde F-025, `06_presupuesto.sql` y `08_plan_mensual.sql` se construyen **solo
+para las obras vivas**. Lo importante no es cuáles, sino **cómo se escribe**.
+
+#### El borrado se DERIVA de lo que se escribe (y esto cambia una invariante)
+
+El `TRUNCATE` global desapareció de las dos tablas. En su lugar, **cada tramo
+borra exactamente las obras que va a reinsertar, en su misma transacción**:
+
+```sql
+DELETE FROM stg.plan_mensual WHERE obra_id = ANY (ARRAY[...]::BIGINT[]);
+INSERT INTO stg.plan_mensual ... AND pp.obra_id = ANY (ARRAY[...]::BIGINT[]);
+```
+
+Las dos listas se componen **del mismo dato**, así que no pueden
+desincronizarse: es imposible borrar una obra que luego no se reescriba. El
+`DELETE` va por índice —`idx_plan_mensual_obra_amb` e `idx_pres_obra_amb`
+empiezan los dos por `obra_id`, verificado contra `pg_indexes`—, así que no
+barre la tabla.
+
+**Eso invierte la invariante de aborto de F-019.** Allí, parar dejaba la tabla
+**vacía**, porque una tabla a medias era indistinguible de una completa. Ya no
+aplica: lo que queda tras un fallo no es media tabla, son **obras enteras con su
+última versión buena**, y vaciarlas destruiría las 880 congeladas. Quien impide
+que `build_mart` construya sobre un stage a medias sigue siendo **la puerta de
+F-024**, que no se toca.
+
+Y repara la avería de paso: la noche del 02-sep habría terminado con cinco obras
+al día y el resto con el dato de anoche —coherente— en vez de con la tabla al
+21,6 %. **Vale por sí solo aunque el acotado no ahorrase nada.**
+
+#### Quién se congela, y quién decide
+
+El criterio lo fijó el humano el 2026-09-02 y son **tres reglas en unión**:
+estado **EN ESTUDIO (1), NO PRESENTADA (11) o CERRADA (25)**; código de **seis
+dígitos**; o **sin actividad en 12 meses**. Censo: **880 congeladas, 40 vivas**.
+Vive en `config/business_rules.yaml`, bloque `ventana:`, y se evalúa en dominio
+puro (`domain/ventana.py`): cambiarlo no toca código.
+
+Por encima hay tres mecanismos que **solo añaden** obras, nunca quitan:
+
+- **Reconstrucción completa** (domingos, por antigüedad registrada desde
+  `run-all`, no por un cron nuevo: un cron aparte es lo que se olvida).
+- **Sello del SQL**: si `06`/`08` cambian, esa noche entran **todas**. Sin esto,
+  un arreglo como el de F-052 solo alcanzaría a las 40 vivas y las otras 880
+  seguirían publicando lo de antes, **en silencio**.
+- **Obra sin construir**: sin filas o sin registro. Completar no es actualizar.
+
+La asimetría es deliberada: equivocarse por exceso cuesta CPU una noche;
+equivocarse por defecto deja un dato viejo publicado.
+
+#### La firma DENUNCIA, no rescata
+
+La decisión congela **40 obras con actividad reciente** y acepta hasta **6 días**
+de antigüedad. Cuando el origen de una obra congelada cambia, el sistema **la
+nombra y la deja congelada**: rescatarla contradiría esa decisión. La firma se
+calcula sobre **`raw`** —lo único que la ingesta sigue trayendo completo— en un
+sub-paso propio tras `ingest_raw`, porque `stg.presupuesto` dejó de
+reconstruirse entera y con ello dejó de servir como señal.
+
+#### De cuándo es el dato de cada obra
+
+`_meta.obra_build` (una fila por obra: firmas, sello, `batch_id`,
+`construido_at`, motivo) y `_meta.v_frescura_obra`, hermana de `_meta.v_frescura`
+pero al grano de obra. Es la respuesta consultable a *«¿de cuándo es esto?»*, y
+la leen igual el MCP y Power BI. `construido_at` **solo se mueve cuando la obra
+se reconstruye de verdad**: moverlo al congelar sería mentir sobre la frescura,
+que es el dato por el que existe la vista.
+
+#### El guardián
+
+`check-ventana` corre al final de `run-all`, **avisa y no bloquea**, y mira las
+cuatro maneras de que una obra congelada envejezca sin que nadie se entere:
+firma divergente, congelada sin filas, sello no vigente y completa vencida.
+Marcador `[F025-VENTANA-KO]`; **sin desplegar
+`infra/97_create_alert_ventana.ps1` es mudo**, y ese es el precio declarado de
+no bloquear.
+
+**Un verde sobre cero obras es un KO.** Confundir «no hay nada malo» con «no he
+podido mirar» es el modo de fallo exacto que estos guardianes existen para
+eliminar, y le pasó de verdad a `check-cobertura` el 02-sep, con
+`stg.plan_mensual` truncada: las dos consultas devolvieron cero filas y dijo OK.
+Se arregló en F-025, y `check-ventana` nació con la regla puesta.
+
+#### Cuatro ajustes, y la ventana nace apagada
+
+`PG_VENTANA_ACTIVA` (**false** por defecto), `PG_VENTANA_MESES` (12),
+`PG_VENTANA_DIA_COMPLETA` (6 = domingo) y `PG_VENTANA_RESCATE` (off). Mientras
+esté apagada, el contenido publicado es exactamente el de hoy; lo que **no**
+vuelve es el `TRUNCATE`, porque borrar y reescribir todas las obras deja el
+mismo resultado y además sobrevive a un tramo que falle.
 
 ### Coherencia ante cargas truncadas (F-024)
 
