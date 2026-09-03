@@ -144,45 +144,45 @@ se ha tocado `infra/`**: cómo se despliega el job lo decide el humano.
 | Evidencia | Valor |
 |---|---|
 | **Tests ejecutados** | **3.305 en verde**, 134 saltados. De ellos **290 son de F-025** |
-| **Suite completa** | **163 s** (`python -m pytest tests/`) |
+| **Suite completa** | **163 s** suelta; **422 s** dentro de `init.sh`, con cobertura |
 | **Cobertura de las líneas cambiadas** | **91,7 %** (578/630, umbral 80 %, nivel `critico`) |
-| **Mutantes generados / evaluados** | **83 / 83**, 0 timeouts, 0 sin veredicto |
-| **Supervivientes** | **5 en la campaña**, los cinco analizados y **cerrados con test**; detalle en `progress/mutacion_F-025.md` |
-| **Coste de la campaña** | **59,3 min** con 4 workers (línea base 210-214 s) |
-| **`bash harness/init.sh`** | **EN VERDE**, 3.305 pasados y 134 saltados en 385 s |
+| **Mutantes generados / evaluados** | **83 / 83** sobre `domain/ventana.py` = el **38 % del alcance real** (219 en 10 ficheros). El resto, **EXENTO por el humano** (DA-6) |
+| **Supervivientes** | **0**, ninguno equivalente y ningún `PENDIENTE` |
+| **Timeouts** | **4** — ni muertos ni supervivientes: **sin veredicto por reloj**. Cerrados por el reviewer (RM4), que los reprodujo sobre HEAD: **los cuatro MUEREN** en 5-9 s. **83 de 83 con veredicto** |
+| **Coste de la campaña** | **7.720 s** (2 h 09) con **4 workers**; línea base **467-473 s** por worker, media 93,0 s por mutante |
+| **`bash harness/init.sh`** | **EN VERDE**: 3.305 pasados, 134 saltados, 422 s |
 
-### La campaña de mutación (T26, DA-6)
+### La campaña (T26, DA-6): qué midió y qué NO
 
-**Dos pasadas. La que vale es la segunda: sobre `073af30` —el HEAD real— y con
-CERO supervivientes.** La primera midió `8e9b1f2` y el review la invalidó porque
-el único fichero del alcance cambió después. Detalle completo, en
+**Dos pasadas, y vale la segunda:** sobre `073af30` —el HEAD real de `ventana.py`,
+sin cambios desde entonces— y con **CERO supervivientes**. El review invalidó la
+primera (`8e9b1f2`), y **sus números —5 supervivientes, 59,3 min, base 210-214 s—
+estuvieron publicados en esta tabla por error hasta el 2026-09-04**. Las dos, en
 `progress/mutacion_F-025.md`.
 
-**Primera pasada: 83 mutantes, 78 muertos, 5 supervivientes**, ninguno
-equivalente y los cinco cerrados con test. **Todos estaban en la capa que REDACTA
-la denuncia**, no en la que decide: la parte que uno prueba de oído —«sale la obra
-en el informe, pues ya está»— y que con el guardián avisando sin bloquear (DA-5)
-es la **única** vía por la que el hallazgo llega a una persona. El peor invertía
-`if not self.codigo` en `marcador`: **marcador vacío en KO y emitido en verde**,
-o sea la alerta que no dispara nunca y la que dispara todas las noches, las dos
-mitades de la avería que existe para evitar. Otro ponía `obras_miradas` a 1 por
-defecto, que es **el defecto de `check-cobertura` otra vez**.
+**Lo que NO midió.** El alcance se declaró a mano («Origen del diff: **ficheros**») y
+cubrió **un fichero de diez**: recalculado con `harness.alcance`, la feature son **10
+ficheros, 2.610 líneas, 219 mutantes**. Fuera quedaron **`build_stg_step.py` (34),
+donde vive `componer_borrado_derivado`, o sea LO QUE SE BORRA**, `main.py` (37),
+`postgres_client.py` (31, con `SQL_ESTADO_OBRAS`), `ventana_sql.py` (15) y
+`cobertura.py` (6).
 
-**Y por qué no los cazaba nadie, que es el hallazgo útil:** los tests del guardián
-comprobaban `MARCADOR_KO in output`, **y ese literal aparece también en la línea
-de log**, que lo escribe desde la constante: pasaban aunque el marcador compuesto
-viniera vacío. Los nuevos miran **la propiedad**, no la salida.
+**El humano lo eximió por escrito el 2026-09-04**, como en F-042 y F-052: DA-6 de `decisiones.md`,
+la ficha de `features.json` y T26. Lo cubren en su lugar `test_f025_build.py`, el 91,7 % de cobertura
+y **las cinco huellas con tolerancia CERO de T27/T30**, la prueba de verdad de que no se pierde una
+fila —pero **T27/T30 siguen sin ejecutar**, así que hoy ese hueco lo cubren solo los tests.
 
-### Lo que la primera pasada ya cambió (resumen; detalle en `223cd1d`)
+### Qué encontró (resumen; detalle en `mutacion_F-025.md` y en `223cd1d`)
 
-**Encontró un defecto real antes de terminar**: diez de sus veinte supervivientes
-vivían en `_meses_antes`, un helper que recortaba el día al último del mes destino
-y **cuya rama no se ejecutaba nunca** con el criterio real. No se tapó con tests:
-**se borró**, sustituido por `meses_transcurridos`, que cuenta meses enteros —que
-es lo que dice el dato: la actividad es `MAX(make_date(anio, mes, 1))`, siempre
-día 1—. Los otros diez eran **defaults de dataclass** que ningún test alcanzaba, y
-cada uno una decisión de seguridad sin protección: `Plan.completa` en `True`
-habría hecho que **las 880 obras no se rehicieran nunca**. Todos con su test.
+**Encontró un defecto real y lo borró en vez de taparlo**: `_meses_antes`, un helper
+**cuya rama no se ejecutaba nunca**, sustituido por `meses_transcurridos`. Y diez
+**defaults de dataclass** sin test, cada uno una decisión de seguridad sin
+protección: `Plan.completa` en `True` habría hecho que **las 880 obras no se
+rehicieran nunca**. Los cinco supervivientes de la primera pasada, cerrados con
+test, estaban todos en la capa que REDACTA la denuncia: el peor dejaba el
+**marcador vacío en KO y emitido en verde**, las dos mitades de la avería que el
+guardián existe para evitar. No los cazaba nadie porque los tests miraban
+`MARCADOR_KO in output`, **literal que sale también en la línea de log**.
 
 ## El censo, remedido: la contrapartida que se le enseñó al humano estaba inflada
 
