@@ -730,42 +730,58 @@ class BuildStgStep(PipelineStep):
         logger.info("presupuesto_acotado", obras=len(obras), filas=filas)
 
         if self._plan and self._plan.completa:
-            self._limpiar_obras_sobrantes(pg, "presupuesto", obras)
+            self._denunciar_obras_sobrantes(pg, "presupuesto", obras)
 
         self._registrar_construidas(pg, obras, "presupuesto")
         return filas
 
-    def _limpiar_obras_sobrantes(
+    def _denunciar_obras_sobrantes(
         self, pg: PostgresClient, tabla: str, obras: Sequence[int]
     ) -> None:
-        """Borra las obras que tienen filas y **ya no están en el origen**.
+        """Nombra las obras que tienen filas y **no están en el conjunto**.
 
-        Es la contrapartida de haber quitado el `TRUNCATE`, y se cubre a
-        propósito en vez de aceptarse en silencio: el borrado derivado solo
-        alcanza a las obras que se van a reescribir, así que una obra que
-        desaparezca de Sigrid conservaría sus filas para siempre.
+        Es la contrapartida de haber quitado el `TRUNCATE`: el borrado derivado
+        solo alcanza a las obras que se van a reescribir, así que una obra que
+        desapareciera de Sigrid conservaría sus filas para siempre. Sin esto,
+        nadie lo sabría.
+
+        **NO LAS BORRA, Y ESO ES UNA DECISIÓN.** La primera versión sí lo hacía,
+        en la reconstrucción completa, con el argumento de que esa noche el
+        conjunto es el universo entero y lo que no está en él sobra. El
+        argumento se cae en cuanto se mira de dónde sale el universo: del censo,
+        que es `raw.obr JOIN raw.con`. Si ese `JOIN` dejara fuera una sola obra
+        que sí tiene filas —hoy son 920 y `maestro.obras` da las mismas 920,
+        pero es la clase de suposición que costó F-052—, borrarlas sería
+        **destruir datos buenos en silencio**.
+
+        Y R10 es más estricto que aquella red: *«lo que se borra se deriva de lo
+        que se va a escribir»*. Borrar obras que nadie va a reescribir lo
+        contradice, aunque sea con buena intención. Así que se aplica la misma
+        regla que a la firma del origen (§3.1): **se nombra y decide una
+        persona.** El precio, declarado: una obra retirada de Sigrid conserva
+        sus filas hasta que alguien las borre a mano.
 
         **Solo en la reconstrucción completa**, que es la única noche en la que
-        el conjunto a reconstruir es el universo entero y por tanto lo que no
-        está en él sobra de verdad. En una noche acotada, «no está en el
-        conjunto» significa «está congelada», que es lo contrario.
+        «no está en el conjunto» significa algo: en una noche acotada significa
+        «está congelada», que es lo contrario.
 
-        Lo normal es que no borre nada: es una red, no un paso del pipeline.
+        Lo normal es que no denuncie nada. Es una red, no un paso del pipeline.
         """
         vivas = set(obras)
         sobrantes = sorted(pg.fetch_obras_con_filas(tabla) - vivas)
         if not sobrantes:
             return
 
-        pg.execute_sql_text(componer_borrado_derivado(tabla, sobrantes))
         logger.warning(
-            "ventana_obras_sobrantes_borradas",
+            "ventana_obras_sobrantes",
             tabla=f"stg.{tabla}",
             obras=sobrantes,
             nota=(
-                "tenian filas construidas y ya no estan en el origen: se "
-                "borran en la reconstruccion completa, que es la unica noche "
-                "en la que 'no esta en el conjunto' significa 'ya no existe'"
+                "tienen filas construidas y NO estan en el censo de esta noche. "
+                "NO se borran: el censo sale de raw.obr JOIN raw.con y borrar "
+                "por lo que ese JOIN no vea seria destruir datos buenos en "
+                "silencio. Comprobar si esas obras siguen en Sigrid y, si no, "
+                "borrarlas a mano."
             ),
         )
 
@@ -897,7 +913,7 @@ class BuildStgStep(PipelineStep):
             )
 
         if self._plan and self._plan.completa:
-            self._limpiar_obras_sobrantes(
+            self._denunciar_obras_sobrantes(
                 pg, "plan_mensual", sorted(pesos_por_obra)
             )
 

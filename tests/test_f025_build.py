@@ -704,3 +704,70 @@ def test_f025_r14_cada_obra_congelada_deja_escrito_su_motivo(
     for registro in pg.congeladas:
         assert registro["motivo"] == "ventana"
         assert registro["detalle"].strip()
+
+
+# ---------------------------------------------------------------------------
+# R10 · Lo unico que podia borrar sin reescribir, ya no borra
+# ---------------------------------------------------------------------------
+
+
+def test_f025_r10_las_obras_SOBRANTES_se_nombran_pero_NO_se_borran(  # noqa: N802
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """**La invariante de R10, sin excepciones**: *lo que se borra se deriva de
+    lo que se va a escribir*. Una obra que tiene filas y no esta en el censo no
+    la va a reescribir nadie, asi que tampoco la borra nadie.
+
+    La primera version SI las borraba en la reconstruccion completa, con el
+    argumento de que esa noche el conjunto es el universo entero. El argumento
+    se cae en cuanto se mira de donde sale el universo: del censo, que es
+    `raw.obr JOIN raw.con`. Si ese JOIN dejara fuera una sola obra con filas
+    -hoy son 920 y maestro.obras da las mismas 920, pero es la clase de
+    suposicion que costo F-052-, borrarlas seria destruir datos buenos en
+    silencio.
+    """
+    import etl_sigrid.application.steps.build_stg_step as modulo
+
+    registro = LoggerFalso()
+    monkeypatch.setattr(modulo, "logger", registro)
+
+    # El doble dice que la obra 9 tiene filas y no esta en el censo.
+    pg = PgVentana()
+    pg.pesos = {1: 10, 2: 10, 3: 10, 9: 10}
+    ejecutar(pg, monkeypatch, ventana_activa=False)
+
+    borrados = [s for s in pg.sql_ejecutado if s.startswith("DELETE FROM stg.")]
+    for sql in borrados:
+        assert "ARRAY[9]" not in sql, "la obra sobrante NO se borra"
+
+
+def test_f025_r10_pero_la_obra_sobrante_QUEDA_NOMBRADA(  # noqa: N802
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No borrarla no es callarse: si no se nombrara, una obra retirada de
+    Sigrid conservaria sus filas para siempre y nadie lo sabria, que es el modo
+    de fallo que esta feature existe para eliminar."""
+    import etl_sigrid.application.steps.build_stg_step as modulo
+
+    registro = LoggerFalso()
+    monkeypatch.setattr(modulo, "logger", registro)
+
+    pg = PgVentana(censo=censo_por_defecto()[:2])   # el censo no trae la obra 3
+    ejecutar(pg, monkeypatch, ventana_activa=False)
+
+    avisos = registro.de("ventana_obras_sobrantes")
+    assert avisos, "una obra con filas fuera del censo tiene que nombrarse"
+    assert 3 in avisos[0]["obras"]
+    assert "NO se borran" in avisos[0]["nota"]
+
+
+def test_f025_r10_las_sobrantes_solo_se_miran_en_la_reconstruccion_completa(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """En una noche acotada, «no esta en el conjunto» significa «esta
+    congelada», que es justo lo contrario de «sobra». Mirarlo ahi denunciaria
+    las 880 obras congeladas todas las noches."""
+    pg = PgVentana()
+    ejecutar(pg, monkeypatch, ventana_activa=True)
+
+    assert pg.obras_sobrantes_pedidas == []

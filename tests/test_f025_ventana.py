@@ -557,3 +557,28 @@ def test_f025_r17_el_separador_del_sello_no_puede_aparecer_en_un_sql() -> None:
     for nombre in FICHEROS_DEL_SELLO:
         texto = (DIRECTORIO_SQL_STG / nombre).read_text(encoding="utf-8")
         assert SEPARADOR_DEL_SELLO not in texto, nombre
+
+
+def test_f025_r16_una_decision_sin_divergencia_declarada_NO_denuncia() -> None:  # noqa: N802
+    """`Decision.firma_divergente` nace en `False`, igual que el de
+    `ObraCensada`, y por lo mismo: "no consta" no es "cambio".
+
+    Lo delato la campana de mutacion de T26. Es la direccion segura: si naciera
+    en `True`, cualquier decision construida sin ese campo -en un test, en un
+    comando futuro- apareceria en `plan.denunciadas` y en el informe de
+    `ventana-plan` con el aviso `[firma cambiada]` sin que nada se haya movido.
+    Una alerta que nombra obras que estan bien deja de leerse.
+    """
+    from etl_sigrid.domain.ventana import Decision, Plan
+
+    decision = Decision(
+        obra_id=1,
+        codigo_obra="0599",
+        reconstruir=False,
+        motivo=MOTIVO_VENTANA,
+        detalle="estado 25",
+    )
+
+    assert decision.firma_divergente is False
+    assert "[firma cambiada]" not in decision.como_texto()
+    assert Plan(congelar=(decision,)).denunciadas == ()
