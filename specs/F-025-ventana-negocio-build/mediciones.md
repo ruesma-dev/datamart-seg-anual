@@ -26,7 +26,14 @@ Lecturas que importan:
 - 40,77 / 1,57 ≈ **26 veces más lento**, coherente con un `B1ms` capado al 20 %
   de un núcleo más la contención de `albaranes` y `partes`.
 
-## 2 · El censo de obras (universo `stg.obras`, 583)
+## 2 · El censo de obras
+
+Dos universos y dos definiciones de actividad conviven en esta sección. **Manda
+la de «El criterio decidido (DA-1) y su censo»**, que es la del código (universo
+`raw.obr ⨝ raw.con`, 920). Lo que viene justo debajo es el sondeo previo sobre
+`stg.obras` (583), que sirvió para elegir criterio y **no** para censarlo.
+
+### Sondeo previo (universo `stg.obras`, 583)
 
 Actividad = mes más reciente con fase cerrada (`stg.fases.anio`/`mes`).
 
@@ -40,22 +47,44 @@ Actividad = mes más reciente con fase cerrada (`stg.fases.anio`/`mes`).
 | ≤ 36 meses | 89 |
 | **Sin ninguna fase** | **217** |
 
-### El criterio decidido (DA-1) y su censo
+### El criterio decidido (DA-1) y su censo — REMEDIDO EL 2026-09-03
 
-Sobre las **920 obras de `maestro.obras`**, con el detalle obra a obra en
-**`obras_candidatas_a_congelar.csv`**, en la raíz del repositorio. **No se
-versiona** —`.gitignore` excluye `obras_*.csv`—: es dato derivado, y se regenera
-con la consulta del §5 sobre `maestro.obras`, `stg.fases` y `mart.v_pbi_dim_obra`.
-Columnas: `codigo_obra;nombre_obra;estado_id;seis_digitos;llega_al_fact;ultima_actividad`.
+**Esta es la tabla que manda.** Está medida con la definición **que implementa el
+código**: universo `raw.obr JOIN raw.con` y actividad =
+`MAX(make_date(f.anio, GREATEST(f.mes,1), 1))` sobre `stg.fases`, o sea
+literalmente `postgres_client.SQL_ESTADO_OBRAS`, la consulta que el guardán corre
+cada noche. El corte de los 12 meses es el de `_meses_entre` en
+`domain/ventana.py`: se congela cuando la antigüedad en meses es **> 12**, lo que
+con `hoy = 2026-09-03` deja dentro todo lo que sea `>= 2025-09-01`.
 
-| | Obras |
-|---|---|
-| Estado **EN ESTUDIO (1), NO PRESENTADA (11) o CERRADA (25)** | 693 |
-| Código de **seis dígitos** | **222**, y **ninguna llega al fact** |
-| **Sin actividad** en 12 meses | 840 |
-| **Congeladas (unión de las tres)** | **880** |
-| **Vivas** | **40**, de ellas **38** publican en el fact |
-| Con actividad en 12 meses **pero congeladas** | **40**: 39 CERRADAS y 1 de seis dígitos. De ellas **36 cierran en 2025-12** (el cierre anual) y solo 4 después: 2026-03 (2), 2026-04 y 2026-07 |
+| | Obras | Fuente |
+|---|---|---|
+| **Universo** (`raw.obr ⨝ raw.con`) | **920** | `SQL_ESTADO_OBRAS` |
+| Regla 1 · estado **EN ESTUDIO (1), NO PRESENTADA (11) o CERRADA (25)** | 693 | `raw.con.est` |
+| Regla 2 · código de **seis dígitos** | **226**, y **ninguna llega al fact** (0 de 226 están en `stg.obras`) | `raw.con.cod` ⨝ `stg.obras` |
+| Regla 3 · **sin actividad** en 12 meses | 872 | `stg.fases` |
+| **Congeladas (unión de las tres)** | **880** | — |
+| **Actualización diaria (vivas)** | **40**, de ellas **38** publican en el fact | — |
+| Con actividad en 12 meses | 48 | `stg.fases` |
+| Con actividad en 12 meses **pero congeladas** | **8**: **7** CERRADAS (estado 25) y **1** de seis dígitos (`180501`). Últimas actividades: 2026-07, 2026-04, 2026-01 (×2), 2025-11, 2025-10 (×2), 2025-09 | — |
+
+40 vivas + 8 congeladas = las 48 con actividad: la tabla cierra por sí sola.
+
+#### La medición vieja, y por qué NO vale
+
+La primera versión de esta sección (2026-09-02) medía sobre **`maestro.obras`** con
+`coalesce(fecha_fin, fecha_inicio)` como actividad, y su detalle obra a obra vivía
+en **`obras_candidatas_a_congelar.csv`** / `obras_congeladas_F025.csv` (en la raíz,
+**no versionados**: `.gitignore` excluye `obras_*.csv`). Decía **222** de seis
+dígitos, **840** sin actividad y **40** congeladas pese a tener actividad, 39 de
+ellas CERRADAS y 36 con última actividad en 2025-12.
+
+**Ninguna de esas cuatro cifras reproduce con la definición del código**, y el CSV
+es la raíz del error: da a 36 obras un `2025-12` que `stg.fases` no confirma —la
+`0620` la tiene en `2024-01`, y `raw.obrfas` igual—. **El código va bien; lo que
+no reproduce es el CSV.** Se conservan aquí los números viejos solo para que
+quien los vea citados en un documento anterior sepa que están muertos. Las que
+SÍ cuadran, y por eso el titular de la decisión se sostiene, son **880 / 40**.
 
 ### El catálogo de estados, verificado el 2026-09-02
 
@@ -115,15 +144,19 @@ nocturna ya ejecuta cada noche (`SQL_PESOS_PLAN_MENSUAL`).
 - El build reconstruye **687 obras** (universo de `stg.presupuesto`), y `stg.obras`
   tiene **583**: hay del orden de **104 obras** que se construyen en
   `stg.plan_mensual` y que **el fact descarta** con su `INNER JOIN stg.obras`
-  (`mart/02_build_fact.sql:232`). La regla de los seis dígitos (DA-3) congela **222**
-  de las 920 del maestro y **ninguna de ellas llega al fact**: son presupuestos y
-  estudios de 2009-2015. Cuánto pesan lo dará T1.
+  (`mart/02_build_fact.sql:232`). La regla de los seis dígitos (DA-3) congela **226**
+  de las 920 del universo y **ninguna de ellas llega al fact** —recomprobado el
+  2026-09-03: 0 de esas 226 están en `stg.obras`, que es el `INNER JOIN` del fact—:
+  son presupuestos y estudios de 2009-2015. Cuánto pesan lo dará T1.
 - `stg.plan_mensual` completa son **29.762.403** filas (01-sep). La avería la dejó
   en 6.436.281, el **21,6 %**.
 
 ## 5 · Las consultas exactas
 
-Todas por el MCP de solo lectura (`mcp-bbdd`, rol `mcp_sigrid_dm_ro`).
+Todas por el MCP de solo lectura (`mcp-bbdd`, rol `mcp_sigrid_dm_ro`), **salvo la
+del censo remedido**: el MCP no autoriza el esquema `raw`, así que esa se lanzó
+en solo lectura por `psycopg` con la conexión del `.env`, `read_only = True` y
+`statement_timeout = 120s`. Respondió en segundos.
 
 ```sql
 -- Censo de actividad
@@ -138,6 +171,39 @@ SELECT COUNT(*),
        COUNT(*) FILTER (WHERE n_fases = 0),
        COUNT(*) FILTER (WHERE ultimo_mes_fase >= date '2026-09-01' - INTERVAL '12 months')
 FROM ult;
+
+-- CENSO DEL CRITERIO, REMEDIDO EL 2026-09-03 con la definicion DEL CODIGO.
+-- Es el que produce la tabla de arriba. Ligero: raw.obr/raw.con (920),
+-- stg.fases (4.551) y stg.obras (583). No toca el fact ni plan_mensual.
+WITH universo AS (
+  SELECT c.ide AS obra_id, COALESCE(TRIM(c.cod),'') AS codigo_obra, c.est AS estado_id,
+         ult.ultima_actividad
+  FROM raw.obr o
+  JOIN raw.con c ON c.ide = o.ide
+  LEFT JOIN LATERAL (
+      SELECT MAX(make_date(f.anio, GREATEST(f.mes, 1), 1)) AS ultima_actividad
+      FROM stg.fases f WHERE f.obra_id = c.ide AND f.anio BETWEEN 1990 AND 2100
+  ) ult ON TRUE
+), clas AS (
+  SELECT u.*,
+         (u.estado_id IS NOT NULL AND u.estado_id IN (1,11,25))            AS r1,
+         (u.codigo_obra ~ '^[0-9]{6}$')                                    AS r2,
+         (u.ultima_actividad IS NULL OR u.ultima_actividad < date '2025-09-01') AS r3,
+         (u.ultima_actividad >= date '2025-09-01')                         AS con_act,
+         EXISTS (SELECT 1 FROM stg.obras s WHERE s.obra_id = u.obra_id)    AS en_stg
+  FROM universo u)
+SELECT count(*)                                                            AS universo,
+       count(*) FILTER (WHERE r1 OR r2 OR r3)                              AS congeladas,
+       count(*) FILTER (WHERE NOT (r1 OR r2 OR r3))                        AS vivas,
+       count(*) FILTER (WHERE NOT (r1 OR r2 OR r3) AND en_stg)             AS vivas_en_fact,
+       count(*) FILTER (WHERE r1)                                          AS regla1,
+       count(*) FILTER (WHERE r2)                                          AS regla2,
+       count(*) FILTER (WHERE r2 AND en_stg)                               AS regla2_en_fact,
+       count(*) FILTER (WHERE r3)                                          AS regla3,
+       count(*) FILTER (WHERE con_act)                                     AS con_actividad,
+       count(*) FILTER (WHERE con_act AND (r1 OR r2 OR r3))                AS congeladas_con_actividad
+FROM clas;
+-- Resultado 2026-09-03: 920 | 880 | 40 | 38 | 693 | 226 | 0 | 872 | 48 | 8
 
 -- Peso proxy por grupo: partidas x fases (ver §3)
 -- Estado de Sigrid: maestro.obras.estado_id LEFT JOIN stg.obras

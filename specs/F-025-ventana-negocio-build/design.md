@@ -84,9 +84,9 @@ dominio puro. Por encima, dos mecanismos que **solo añaden obras** a la lista:
 
 ### 3.1 · La firma del origen: DENUNCIA, no rescate
 
-La decisión del humano congela **40 obras con actividad reciente** (39 CERRADAS —36 de
-ellas por el cierre anual de 2025-12— y 1 por código) y acepta hasta **6 días** de
-antigüedad. Por eso la firma no puede reconstruirlas por su cuenta: **rescatarlas
+La decisión del humano congela **8 obras con actividad reciente** (7 CERRADAS y 1 por
+código de seis dígitos; cifra remedida el 2026-09-03, ver el aviso de DA-1) y acepta
+hasta **6 días** de antigüedad. Por eso la firma no puede reconstruirlas por su cuenta: **rescatarlas
 contradiría la decisión**. Su papel es que **eso no pase en silencio** —el modo de
 fallo de F-052—: detecta que una obra congelada cambió en el origen y **la nombra**
 (R26); el domingo la pone al día. El interruptor `PG_VENTANA_RESCATE` (default
@@ -244,7 +244,7 @@ Detalle y censo en **`decisiones.md`**.
 | **DA-1** | Criterio: **estado 1, 11 o 25 · código de seis dígitos · sin actividad en 12 meses**, en unión. **880 congeladas, 40 vivas.** El humano **rechazó** el veto de actividad y la formulación en positivo, las dos con el dato y la ventaja delante |
 | **DA-1 bis** | Catálogo de estados **verificado** (`conest`, tipo 42): «25 = CERRADA» es un hecho. Queda documentarlo en el diccionario |
 | **DA-2** | **Sí** se acota `build_presupuesto`. Obliga a mover la firma a `raw` (§3.2) |
-| **DA-3** | **Sí** se congelan las administrativas: **222 obras de seis dígitos, 0 llegan al fact** |
+| **DA-3** | **Sí** se congelan las administrativas: **226 obras de seis dígitos, 0 llegan al fact** (recomprobado el 2026-09-03; eran 222 mal medidas) |
 | **DA-4** | Reconstrucción completa **semanal, los domingos**, disparada desde `run-all` |
 | **DA-5** | *(Sin pronunciamiento; recomendación no contradicha.)* El guardián **avisa y no bloquea** |
 | **DA-6** | *(Sin pronunciamiento; recomendación no contradicha.)* Campaña de mutación sobre `domain/ventana.py` **además** de las cinco huellas |

@@ -218,7 +218,8 @@ equivocarse por defecto deja un dato viejo publicado.
 
 #### La firma DENUNCIA, no rescata
 
-La decisión congela **40 obras con actividad reciente** y acepta hasta **6 días**
+La decisión congela **8 obras con actividad reciente** —7 CERRADAS y 1 de seis
+dígitos, de 48 con actividad; remedido el 2026-09-03— y acepta hasta **6 días**
 de antigüedad. Cuando el origen de una obra congelada cambia, el sistema **la
 nombra y la deja congelada**: rescatarla contradiría esa decisión. La firma se
 calcula sobre **`raw`** —lo único que la ingesta sigue trayendo completo— en un

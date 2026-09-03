@@ -54,10 +54,15 @@ veto de actividad («pon las reglas que te he dicho») y la formulación en posi
 —solo se actualizan EN CURSO y ADJUDICADAS— («déjalo en negativo»). Las dos
 quedan escritas como alternativas no elegidas.
 
-**Contrapartida, sin suavizar:** de las 80 obras con actividad en 12 meses, **40
-quedan congeladas** —39 CERRADAS, 1 de seis dígitos— y tendrán **hasta 6 días** de
-antigüedad. Pero es menor de lo que parece: **36 de esas 39 cierran en 2025-12**
-(el cierre anual) y solo 4 después (2026-03 ×2, 2026-04 y 2026-07).
+**Contrapartida, sin suavizar y CON LA CIFRA CORREGIDA (2026-09-03):** de las **48
+obras con actividad en 12 meses, 8 quedan congeladas** —7 CERRADAS (estado 25) y 1
+de seis dígitos, la `180501`— y tendrán **hasta 6 días** de antigüedad.
+**Al humano se le presentó un 40, y son 8**: aquel número se midió sobre
+`maestro.obras` con `coalesce(fecha_fin, fecha_inicio)`, no con la definición del
+código (`raw.obr ⨝ raw.con` y `MAX(make_date(...))` de `stg.fases`,
+`SQL_ESTADO_OBRAS`). **Su decisión no cambia** —880 congeladas y 40 vivas cuadran
+al dedillo— y la contrapartida real es **menor** que la que aceptó. El detalle,
+con fuentes, en el aviso de `decisiones.md` §DA-1 y en `mediciones.md` §2.
 
 **El catálogo de estados apareció y quedó verificado**: vive en `conest`, tipo 42,
 vía `con.est`. «25 = CERRADA» ya **no es una suposición**, así que el riesgo que

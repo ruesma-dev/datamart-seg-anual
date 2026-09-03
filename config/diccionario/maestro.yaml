@@ -74,11 +74,25 @@ objetos:
           (4), `25` CERRADA (465), `999` PLANTILLA (1).
 
           OJO AL LEERLO PARA SABER SI UNA OBRA ESTA VIVA: el estado de Sigrid
-          **no es fiable por si solo**. Hay 7 obras marcadas como CERRADAS (25)
-          que siguieron cerrando fases en los ultimos 12 meses. Por eso el
-          criterio de F-025 son tres reglas en union y no solo el estado, y por
-          eso `_meta.v_frescura_obra` es la fuente para "de cuando es el dato de
-          esta obra". No mandar a `es_activa`, que vale TRUE para las 920.
+          **no es fiable por si solo**. Hay **7 obras marcadas como CERRADAS
+          (25) que siguieron cerrando fases en los ultimos 12 meses**, y F-025
+          las congela igualmente: son `0669` (2026-04), `0660` y `0689`
+          (2026-01), `0665` (2025-11), `0656` y `0683` (2025-10) y `0668`
+          (2025-09). Con la regla del codigo de seis digitos entra una octava,
+          la `180501` (2026-07), que ni siquiera llega al fact: **8 obras con
+          actividad reciente quedan congeladas, de 48 que la tienen**. Por eso
+          el criterio de F-025 son tres reglas en union y no solo el estado, y
+          por eso `_meta.v_frescura_obra` es la fuente para "de cuando es el
+          dato de esta obra". No mandar a `es_activa`, que vale TRUE para las
+          920.
+
+          MEDIDO EL 2026-09-03 con la definicion que implementa el ETL:
+          universo `raw.obr JOIN raw.con` (920 obras) y actividad =
+          `MAX(make_date(f.anio, GREATEST(f.mes,1), 1))` sobre `stg.fases`, que
+          es la consulta `SQL_ESTADO_OBRAS` que el guardian corre cada noche.
+          Una medicion anterior sobre `maestro.obras` con
+          `coalesce(fecha_fin, fecha_inicio)` daba 39 CERRADAS con actividad:
+          **esa cifra esta muerta**, no reproduce.
         valores: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 999]
         agregacion: no_sumable
       fecha_alta:

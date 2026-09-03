@@ -18,8 +18,10 @@ Se excluye de la actualización diaria toda obra que cumpla **al menos una**:
 2. su código son **seis dígitos** (`codigo_obra ~ '^[0-9]{6}$'`);
 3. **no tiene actividad** en los últimos 12 meses.
 
-**Censo medido sobre las 920 obras de `maestro.obras`: se congelan 880 y quedan 40
-en la actualización diaria**, de las cuales **38** publican en el fact.
+**Censo medido sobre el universo del código —`raw.obr JOIN raw.con`, 920 obras—:
+se congelan 880 y quedan 40 en la actualización diaria**, de las cuales **38**
+publican en el fact. Por regla, y sin repartir los solapes: 693 por estado, **226**
+por código de seis dígitos y 872 por quietud.
 
 La regla 1 se amplió de «25» a «1, 11 y 25» al aparecer el catálogo (DA-1 bis).
 **No añade ni una obra**: las 226 EN ESTUDIO y las 2 NO PRESENTADAS caían ya por la
@@ -29,20 +31,44 @@ cubre el caso futuro de una obra EN ESTUDIO que genere una fase.
 
 ### La contrapartida, con su número, sin suavizar
 
-**Hay 80 obras con actividad en los últimos 12 meses y 40 quedan igualmente
-congeladas: 39 por estar CERRADAS y 1 por tener código de seis dígitos. Sus datos
-podrán tener hasta 6 días de antigüedad entre reconstrucciones completas.**
+**Hay 48 obras con actividad en los últimos 12 meses y 8 quedan igualmente
+congeladas: 7 por estar CERRADAS (estado 25) y 1 por tener código de seis dígitos
+(la `180501`, que además no llega al fact). Sus datos podrán tener hasta 6 días de
+antigüedad entre reconstrucciones completas.** Las ocho, con su última actividad:
+`180501` 2026-07, `0669` 2026-04, `0660` y `0689` 2026-01, `0665` 2025-11, `0656` y
+`0683` 2025-10, `0668` 2025-09.
 
-Es una decisión del humano tomada **con ese dato delante**: esta spec propuso un
-veto —no congelar nunca una obra con actividad reciente— y lo **rechazó
+Es una decisión del humano tomada **con el dato delante**: esta spec propuso un veto
+—no congelar nunca una obra con actividad reciente— y lo **rechazó
 explícitamente**: «pon las reglas que te he dicho».
 
-**Y el tamaño real de la contrapartida es mucho menor de lo que parecía.** De esas
-39 obras cerradas con actividad, **36 tienen su última actividad en 2025-12**, que
-es el cierre anual, y solo **4** tienen algo posterior (dos en 2026-03, una en
-2026-04 y una en 2026-07, la más reciente). No son obras vivas: son obras cerradas a
-las que se les pasó el cierre del año. Recuento hecho sobre
-`obras_candidatas_a_congelar.csv`.
+### AVISO · la contrapartida que se le presentó al humano estaba INFLADA
+
+**Se le dijo que 40 obras con actividad quedarían congeladas. Son 8.** Y el desglose
+que acompañaba a aquel 40 —«39 CERRADAS, de las que 36 cierran en 2025-12»—
+tampoco reproduce: **ninguna** de las ocho tiene su última actividad en 2025-12.
+
+- **De dónde salía el 40:** de contar sobre `maestro.obras` con
+  `coalesce(fecha_fin, fecha_inicio)` como actividad, y del CSV derivado
+  `obras_candidatas_a_congelar.csv` / `obras_congeladas_F025.csv`, que asigna a 36
+  obras una `ultima_actividad` de 2025-12 que `stg.fases` no confirma (la `0620`,
+  por ejemplo, la tiene en 2024-01, y `raw.obrfas` igual). **El error fue de quien
+  midió, no del código.**
+- **De dónde sale el 8:** del universo `raw.obr JOIN raw.con` y de
+  `MAX(make_date(f.anio, GREATEST(f.mes,1), 1))` sobre `stg.fases`, que es
+  literalmente `postgres_client.SQL_ESTADO_OBRAS`, la consulta que el guardán
+  ejecuta cada noche. **Remedido en solo lectura el 2026-09-03**, y confirmado por
+  el reviewer de forma independiente.
+- **La decisión del humano NO cambia:** el titular con el que decidió —**880
+  congeladas y 40 en actualización diaria**— cuadra al dedillo con la medición
+  buena, y la contrapartida real es **menor** que la que aceptó, nunca mayor. Lo
+  que cambia es el registro, que tenía que decir la verdad.
+
+**Y el tamaño real de la contrapartida es mucho menor de lo que parecía**, pero no
+por el motivo que se escribió aquí el 2026-09-02: no es que 36 de 39 sean el cierre
+anual, es que **nunca fueron 40**. Siete de las ocho son obras CERRADAS a las que se
+les pasó algún mes tarde, y la octava es un estudio administrativo que el fact ni
+publica.
 
 **Consecuencia de diseño (§3.1 de `design.md`):** la firma del origen deja de ser un
 mecanismo de **rescate** —reconstruir la obra que cambió— y pasa a ser de
@@ -103,8 +129,11 @@ noche, en un sub-paso propio de solo lectura. Alternativas y coste: **§3 de
 
 ## DA-3 · Las administrativas — **DECIDIDO: SÍ se congelan**
 
-**222 obras con código de seis dígitos y NINGUNA llega al fact** (0 de 222): son
-presupuestos y estudios de 2009-2015. Ahorro sin riesgo de negocio. Es la regla 2
+**226 obras con código de seis dígitos y NINGUNA llega al fact** (0 de 226,
+recomprobado el 2026-09-03 sobre el universo del código `raw.obr JOIN raw.con`
+contra `stg.obras`, que es el `INNER JOIN` por el que pasa el fact): son
+presupuestos y estudios de 2009-2015. **Eran 222 en la primera medición**, hecha
+sobre `maestro.obras`; el recuento bueno es 226 y la conclusión no cambia. Ahorro sin riesgo de negocio. Es la regla 2
 de DA-1, y por eso el criterio no necesita una lista de códigos administrativos
 que mantener.
 
