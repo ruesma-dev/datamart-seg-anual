@@ -135,21 +135,29 @@ amortizacion:
 # borren, y que la informacion este consultable".
 #
 # Se congela toda obra que cumpla AL MENOS UNA de las tres reglas, en UNION.
-# Censo sobre las 920 obras de maestro.obras: 880 congeladas y 40 vivas, de
-# las cuales 38 publican en el fact.
+# Censo sobre el universo del codigo -raw.obr JOIN raw.con, 920 obras-: 880
+# congeladas y 40 vivas, de las cuales 38 publican en el fact. Por regla, sin
+# repartir solapes: 693 por estado, 226 por codigo de seis digitos y 872 por
+# quietud (remedido el 2026-09-03).
 #
 # ESTO ES REGLA DE NEGOCIO Y VIVE AQUI a proposito: cambiar el criterio no
 # debe exigir tocar codigo Python ni SQL. Los interruptores de OPERACION
 # -encender la ventana, el dia de la reconstruccion completa, el rescate- son
 # otra cosa y estan en el entorno (PG_VENTANA_*, ver config/settings.py).
 #
-# LA CONTRAPARTIDA, ACEPTADA POR EL HUMANO CON EL DATO DELANTE: hay 80 obras
-# con actividad en los ultimos 12 meses y 40 quedan igualmente congeladas -39
-# CERRADAS y 1 de seis digitos-, asi que sus datos pueden llevar hasta 6 dias
-# de retraso entre reconstrucciones completas. De esas 39, 36 tienen su ultima
-# actividad en 2025-12, que es el cierre anual, y solo 4 algo posterior. Esta
+# LA CONTRAPARTIDA, ACEPTADA POR EL HUMANO CON EL DATO DELANTE: hay 48 obras
+# con actividad en los ultimos 12 meses y 8 quedan igualmente congeladas -7
+# CERRADAS (estado 25) y 1 de seis digitos, la 180501-, asi que sus datos
+# pueden llevar hasta 6 dias de retraso entre reconstrucciones completas. Esta
 # spec propuso un veto -no congelar nunca una obra con actividad reciente- y
 # el humano lo rechazo explicitamente: "pon las reglas que te he dicho".
+#
+# OJO: al humano se le presento un 40 donde son 8. Aquella cifra se midio
+# sobre maestro.obras con coalesce(fecha_fin, fecha_inicio), no con la
+# definicion del ETL -raw.obr JOIN raw.con y MAX(make_date(...)) de stg.fases,
+# o sea SQL_ESTADO_OBRAS-. Remedido el 2026-09-03; su decision NO cambia
+# -880/40 cuadra al dedillo- y la contrapartida real es MENOR que la que
+# acepto. El detalle, en specs/F-025-ventana-negocio-build/decisiones.md.
 #
 # ALTERNATIVA NO ELEGIDA, anotada por si algun dia se cambia el criterio: la
 # formulacion EN POSITIVO -solo se actualizan a diario las EN CURSO (15) y las
