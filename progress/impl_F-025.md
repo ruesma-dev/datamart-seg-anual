@@ -97,10 +97,7 @@ $ python -m pytest tests/test_f025_ventana.py -q
 tests\test_f025_ventana.py:31: in <module>
     from etl_sigrid.domain.ventana import (
 E   ModuleNotFoundError: No module named 'etl_sigrid.domain.ventana'
-=========================== short test summary info ===========================
-ERROR tests/test_f025_ventana.py
-!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
-1 error in 0.28s
+ERROR tests/test_f025_ventana.py — Interrupted: 1 error in 0.28s
 ```
 
 **T10 — el build que no borra lo que no reconstruye.** Igual, antes del código:
@@ -111,10 +108,7 @@ tests\test_f025_build.py:45: in <module>
     from etl_sigrid.application.steps.build_stg_step import (
 E   ImportError: cannot import name 'componer_borrado_derivado' from
     'etl_sigrid.application.steps.build_stg_step'
-=========================== short test summary info ===========================
-ERROR tests/test_f025_build.py
-!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
-1 error in 1.59s
+ERROR tests/test_f025_build.py — Interrupted: 1 error in 1.59s
 ```
 
 **T5** falló en rojo por `FICHEROS_DEL_SELLO` inexistente (23 de 24 en verde) y
@@ -220,9 +214,7 @@ la ficha `estado_id` del diccionario.
 
 Ninguna en el alcance. Dos matices que conviene que el reviewer mire:
 
-- **El borde de los doce meses se cuenta en meses, no en días** (ver arriba):
-  cambia una obra cuya última fase sea de hace exactamente doce meses. Va del
-  lado seguro —no congela— y es más fiel al dato, que es mensual.
-- **La spec pedía `filas` en el registro** y no decía de qué. Se guardan las de
-  `stg.plan_mensual` de esa obra, medidas con una agregación por tramo acotada
-  por el índice, no el total del tramo repartido.
+- **El borde de los doce meses se cuenta en meses, no en días**: cambia una obra
+  cuya última fase sea de hace justo doce meses. Va del lado seguro y es más fiel al dato.
+- **La spec pedía `filas` y no decía de qué.** Se guardan las de `stg.plan_mensual`
+  de esa obra, con agregación por tramo acotada por índice, no el total repartido.
