@@ -315,9 +315,9 @@ ON CONFLICT (obra_id) DO UPDATE SET
 #: llame.
 TABLAS_ACOTADAS = ("plan_mensual", "presupuesto")
 
-# OBRAS QUE HOY TIENEN FILAS. Solo se consulta en la reconstrucción completa,
-# para localizar las que ya no están en el origen y que el borrado derivado no
-# alcanzaría nunca. Va por `DISTINCT` sobre el índice —del orden de 700 valores
+# OBRAS QUE HOY TIENEN FILAS. Solo se consulta en la reconstrucción completa, y
+# solo para NOMBRAR las que no están en el censo (ver `fetch_obras_con_filas`:
+# no se borran). Va por `DISTINCT` sobre el índice —del orden de 700 valores
 # distintos— y no por un `NOT IN` sobre la tabla entera, que sería un barrido
 # de 29 M de filas cada domingo.
 SQL_OBRAS_CON_FILAS = "SELECT DISTINCT obra_id FROM stg.{tabla}"
@@ -1305,11 +1305,17 @@ class PostgresClient:
     def fetch_obras_con_filas(self, tabla: str) -> set[int]:
         """Las obras que hoy tienen filas en `stg.<tabla>`.
 
-        Solo lo usa la reconstrucción completa, para encontrar las obras que ya
-        no están en el origen: el borrado derivado no las alcanza nunca —nadie
-        las va a reinsertar, así que nadie las borra— y sin esto se quedarían
-        para siempre. Es la contrapartida de haber quitado el `TRUNCATE`, y
-        está cubierta a propósito en vez de aceptada en silencio.
+        Solo lo usa la reconstrucción completa, y **solo para NOMBRAR** las
+        obras que tienen filas y no están en el censo: el borrado derivado no
+        las alcanza nunca —nadie las va a reinsertar, así que nadie las borra— y
+        sin esto se quedarían ahí sin que nadie lo supiera. Es la contrapartida
+        de haber quitado el `TRUNCATE`, y se denuncia en vez de aceptarse en
+        silencio.
+
+        **Lo que NO se hace con esta lista es borrarla.** Ver
+        `build_stg_step._denunciar_obras_sobrantes`: borrar por lo que un `JOIN`
+        del censo no vea sería destruir datos buenos en silencio, y R10 dice que
+        lo que se borra se deriva de lo que se va a escribir.
         """
         if tabla not in TABLAS_ACOTADAS:
             raise ValueError(
