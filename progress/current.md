@@ -186,18 +186,23 @@ local, en `.env`:
 PG_VENTANA_ACTIVA=true
 ```
 
-**AVISO, y es un hueco real: el job de Azure NO recibe hoy esta variable.**
-`infra/80_create_job.ps1` enumera las `--env-vars` una a una y ninguna
-`PG_VENTANA_*` esta en la lista; `infra/85_update_job.ps1` solo cambia la
-imagen. Encender la ventana en produccion exige **anadir la variable a
-`80_create_job.ps1` y volver a lanzarlo**, o fijarla a mano sobre el job:
+En Azure, **el valor esta versionado** desde el 2026-09-04 (hallazgo 2 del
+review): `infra/env/dev.json` declara `ventanaActiva`, `ventanaMeses`,
+`ventanaDiaCompleta` y `ventanaRescate`, y `infra/80_create_job.ps1` los inyecta
+como `PG_VENTANA_*`. Encenderla es **cambiar `"ventanaActiva": "true"` en
+`dev.json`** y volver a lanzar `80_create_job.ps1`.
+
+**OJO: `85_update_job.ps1` NO sirve para esto.** Solo cambia la imagen y dice
+expresamente que no toca el entorno, asi que el despliegue habitual no llevara
+el valor nuevo. Si no se quiere recrear el job, se fija a mano —pero entonces el
+valor vuelve a vivir fuera del repositorio y desaparece la proxima vez que
+alguien lo recree:
 
 ```powershell
 az containerapp job update -g <resourceGroup> -n <job> --set-env-vars "PG_VENTANA_ACTIVA=true"
 ```
 
-**No se ha tocado `infra/` a proposito:** cambiar como se despliega el job es
-una decision del humano, no del implementer. Verificar despues que llego:
+En cualquiera de los dos caminos, verificar despues que llego:
 
 ```powershell
 az containerapp job show -g <resourceGroup> -n <job> --query "properties.template.containers[0].env[?name=='PG_VENTANA_ACTIVA']" -o table

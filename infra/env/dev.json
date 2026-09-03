@@ -56,6 +56,12 @@
   "pgAutoCreateDb": "false",
   "pgResourceGroup": "rg-albaranes-dev",
 
+  "$aviso_ventanaEnv": "F-025, R5. Los cuatro interruptores de OPERACION de la ventana de negocio, que el job inyecta como PG_VENTANA_*. El CRITERIO de obra congelada NO esta aqui: es regla de negocio y vive en config/business_rules.yaml, bloque ventana:, dentro de la imagen. Estan aqui, y no solo en un comando suelto, porque 80_create_job.ps1 es la verdad de como se construye el job: fijar la variable con 'az containerapp job update --set-env-vars' la deja FUERA del repositorio y el dia que alguien recree el job desaparece sin ruido, la ventana se apaga y la nocturna vuelve a reconstruir las 920 obras y a vaciar la hucha de creditos -el modo de fallo de F-052 aplicado a la configuracion: algo que se degrada sin que nadie se entere, porque 'apagada' es el comportamiento viejo-. 'ventanaActiva' NACE EN false a proposito (R5): mientras lo siga estando el comportamiento es el de hoy y se reconstruyen las 920. Encenderla es una decision explicita del humano y se hace CAMBIANDO ESTE VALOR a \"true\" y redesplegando, no con un comando suelto; el paso 4 de la fase manual de F-025 lo detalla. OJO: 85_update_job.ps1 solo cambia la imagen y NO toca el entorno, asi que cambiar aqui un valor exige volver a pasar por 80_create_job.ps1 o fijarlo a mano en el job.",
+  "ventanaActiva": "false",
+  "ventanaMeses": 12,
+  "ventanaDiaCompleta": 6,
+  "ventanaRescate": "false",
+
   "logLevel": "INFO",
   "logFormat": "json",
 

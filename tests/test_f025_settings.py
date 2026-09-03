@@ -225,3 +225,87 @@ def test_f025_r2_el_yaml_documenta_el_censo_y_la_contrapartida() -> None:
         "el bloque no advierte de la contrapartida: hasta 6 dias de antiguedad"
     )
     assert "conest" in bloque, "el bloque no dice de donde sale el catalogo de estados"
+
+
+# ---------------------------------------------------------------------------
+# R5 · el tercer extremo: los interruptores, DECLARADOS EN EL DESPLIEGUE
+#
+# Un default en `settings.py` no llega a Azure por su cuenta. Hasta el
+# 2026-09-04 ninguna `PG_VENTANA_*` figuraba en `80_create_job.ps1`, así que la
+# ventana **no se podía encender en el job** más que con un `az ... --set-env-vars`
+# suelto: un valor fuera del repositorio que desaparece sin ruido el día que
+# alguien recrea el job, dejando la nocturna reconstruyendo las 920 obras otra
+# vez. Es el modo de fallo de F-052 —algo que se degrada y nadie se entera—
+# aplicado a la configuración, y agravado porque «apagada» es el comportamiento
+# viejo y por tanto no llama la atención.
+#
+# Estos tres tests cierran el circuito nombre→valor→inyección. Los helpers de
+# `infra/` se IMPORTAN de `test_f003_infra.py`, no se copian (F-024).
+# ---------------------------------------------------------------------------
+
+INTERRUPTORES = {
+    "PG_VENTANA_ACTIVA": "ventanaActiva",
+    "PG_VENTANA_MESES": "ventanaMeses",
+    "PG_VENTANA_DIA_COMPLETA": "ventanaDiaCompleta",
+    "PG_VENTANA_RESCATE": "ventanaRescate",
+}
+
+
+def test_f025_r5_el_job_inyecta_los_cuatro_interruptores_de_la_ventana() -> None:
+    """Los cuatro `PG_VENTANA_*` se pasan al contenedor y **su valor sale del
+    fichero de entorno**, no escrito a mano en el script."""
+    from tests.test_f003_infra import _script
+
+    texto = _script("80_create_job.ps1")
+
+    for variable, clave in INTERRUPTORES.items():
+        assert f'"{variable}=$($CFG.{clave})"' in texto, (
+            f"80_create_job.ps1 no inyecta {variable} desde $CFG.{clave}: la "
+            f"ventana no se puede configurar en el job sin un comando suelto"
+        )
+
+
+def test_f025_r5_el_entorno_declara_los_cuatro_y_la_ventana_NACE_APAGADA() -> None:  # noqa: N802
+    """**El test de R5 en el despliegue.** `ventanaActiva` en `false` en TODOS
+    los entornos: encenderla es una decisión explícita del humano, nunca el
+    efecto lateral de crear el job.
+
+    Booleanos como cadena, igual que `pgAutoCreateDb`: un `false` de JSON llega
+    a PowerShell como `$false` y se interpolaría en el `--env-vars` como
+    `False`, que no es lo que pydantic espera leer.
+    """
+    from tests.test_f003_infra import _config, _entornos
+
+    for ruta in _entornos():
+        cfg = _config(ruta.stem)
+        faltan = sorted(set(INTERRUPTORES.values()) - set(cfg))
+        assert not faltan, f"{ruta.name} no declara: {faltan}"
+        assert cfg["ventanaActiva"] == "false", (
+            f"{ruta.name} despliega la ventana ENCENDIDA; R5 dice que nace apagada"
+        )
+        assert cfg["ventanaRescate"] == "false", (
+            f"{ruta.name} despliega el rescate encendido; §3.1: la firma denuncia"
+        )
+
+
+def test_f025_r5_el_entorno_y_el_codigo_no_divergen_en_lo_que_no_es_interruptor() -> None:  # noqa: N802
+    """`ventanaMeses` y `ventanaDiaCompleta` no son interruptores que se enciendan:
+    son **el criterio**, y el contenedor no lleva `dev.json`, así que el valor
+    está duplicado. Si divergen, la nocturna corre con una ventana y todo lo que
+    está escrito —spec, censo, `--help`— describe otra. Misma red que
+    `test_f024_r19_umbral_por_defecto_coincide_con_dev_json`.
+
+    `ventanaActiva` y `ventanaRescate` quedan FUERA a propósito: esos sí son
+    interruptores y el día que el humano encienda la ventana, `dev.json` dirá
+    `true` donde el código sigue diciendo `False`, que es justo lo que R5 quiere.
+    """
+    from tests.test_f003_infra import _config
+
+    cfg = _config("dev")
+
+    assert cfg["ventanaMeses"] == PostgresSettings.model_fields["ventana_meses"].default
+    assert (
+        cfg["ventanaDiaCompleta"]
+        == PostgresSettings.model_fields["ventana_dia_completa"].default
+        == DOMINGO
+    )

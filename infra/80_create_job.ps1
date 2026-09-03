@@ -174,6 +174,10 @@ Invoke-Az containerapp job create `
         "PG_SET_ROLE=$($CFG.pgSetRole)" `
         "PG_READONLY_ROLE=$($CFG.pgReadonlyRole)" `
         "PG_AUTO_CREATE_DB=$($CFG.pgAutoCreateDb)" `
+        "PG_VENTANA_ACTIVA=$($CFG.ventanaActiva)" `
+        "PG_VENTANA_MESES=$($CFG.ventanaMeses)" `
+        "PG_VENTANA_DIA_COMPLETA=$($CFG.ventanaDiaCompleta)" `
+        "PG_VENTANA_RESCATE=$($CFG.ventanaRescate)" `
         "AUX_EXCEL_TIPO_PARTIDA=$baseAux/$($CFG.auxBlobs.tipo_partida)" `
         "AUX_EXCEL_TIPO_COSTE=$baseAux/$($CFG.auxBlobs.tipo_coste)" `
         "AUX_EXCEL_MAPEO_PROPORCIONALES=$baseAux/$($CFG.auxBlobs.mapeo_proporcionales)" `
