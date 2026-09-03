@@ -108,6 +108,7 @@ repetirlos no rompe nada. Se ejecutan desde la raíz del repositorio.
 | 10 | `90_create_alert.ps1` | Grupo de acción (reutiliza el que haya) y alerta de fallo. | Sí |
 | 11 | `95_create_alert_frescura.ps1` | Alerta de **frescura** (F-024): avisa si pasan más de `frescuraUmbralHoras` sin que el job complete un `build_mart`. Exige `az extension add --name scheduled-query` una vez por puesto. | Sí |
 | 12 | `96_create_alert_cobertura.ps1` | Alerta de **cobertura** (F-052): avisa cuando una noche publica una obra que entra en `stg` y no sale en `mart`. Dispara por **presencia** del marcador `[F052-COBERTURA-KO]`, al revés que la de frescura. **Sin desplegarla el guardián es mudo**: `check-cobertura` no tumba el job. | Sí |
+| 13 | `97_create_alert_ventana.ps1` | Alerta de **ventana de negocio** (F-025): avisa cuando una obra congelada se queda vieja —su origen cambió, no tiene filas, su sello de SQL no es el vigente o la reconstrucción completa está vencida—. Dispara por **presencia** del marcador `[F025-VENTANA-KO]`. **Sin desplegarla el guardián es mudo**: `check-ventana` no tumba el job. | Sí |
 
 Entre medias hay **tres** pasos **que no son scripts** y que hace el humano:
 cargar la clave de la API en el vault (después del 6), autorizar la regla de
@@ -388,6 +389,7 @@ Crear la regla (idempotente) y probarla **de extremo a extremo**, que es lo
 
 ```powershell
 powershell -NoProfile -File infra/96_create_alert_cobertura.ps1
+powershell -NoProfile -File infra/97_create_alert_ventana.ps1
 
 # 1. Añadir el buzón al grupo de acción, si no está ya (paso del humano):
 powershell -NoProfile -File infra/90_create_alert.ps1 -AlertEmail <buzon>

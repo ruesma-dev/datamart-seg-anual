@@ -92,7 +92,10 @@ from etl_sigrid.application.steps.build_compras_step import BuildComprasStep
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
-from etl_sigrid.application.steps.build_stg_step import BuildStgStep
+from etl_sigrid.application.steps.build_stg_step import (
+    BuildStgStep,
+    sello_vigente_del_repositorio,
+)
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
 from etl_sigrid.application.steps.load_excel_aux_step import LoadExcelAuxStep
 from etl_sigrid.application.steps.publicar_diccionario_step import (
@@ -1591,12 +1594,13 @@ def _guardian_de_ventana(pg):
 )
 @click.option(
     "--desde",
-    type=click.Choice(["stg", "mart", "dimension", "cierre"]),
+    type=click.Choice(["stg", "mart", "dimension", "cierre", "plan_obra"]),
     default="stg",
     show_default=True,
     help="`stg` agrega stg.plan_mensual; `mart`, fact_seguimiento_categoria; "
          "`dimension`, el arbol de stg.partidas por obra; `cierre`, "
-         "cierre.fact_cierre_mensual por obra x mes x concepto.",
+         "cierre.fact_cierre_mensual por obra x mes x concepto; `plan_obra`, "
+         "filas e importe de stg.plan_mensual por obra x ambito (F-025).",
 )
 @click.option(
     "--propuesta",
@@ -1699,7 +1703,7 @@ def _cabecera_de(path: Path) -> list[str]:
 #: Las dos huellas nuevas de F-052, por el nombre con el que se piden en
 #: `--desde`. Viven aqui y no dentro del comando para que el propio comando
 #: pueda preguntar "¿es una de las nuevas?" antes de montar nada.
-_FORMATOS_AMPLIADOS = ("dimension", "cierre")
+_FORMATOS_AMPLIADOS = ("dimension", "cierre", "plan_obra")
 
 
 def _huella_ampliada_a_csv(

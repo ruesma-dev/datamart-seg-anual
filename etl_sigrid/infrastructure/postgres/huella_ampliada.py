@@ -49,6 +49,7 @@ from pathlib import Path
 from etl_sigrid.domain.huella_ampliada import (
     FORMATO_CIERRE,
     FORMATO_DIMENSION,
+    FORMATO_PLAN_OBRA,
     FilaAmpliada,
     FormatoHuella,
     formato_de,
@@ -125,9 +126,40 @@ def sql_huella_cierre() -> str:
 
 #: Qué consulta corresponde a cada formato. Se resuelve aquí y no en el comando
 #: para que añadir una huella sea declarar un formato y su SQL, y nada más.
+def sql_huella_plan_obra() -> str:
+    """`stg.plan_mensual` por obra x ambito (huella 5, F-025 R22).
+
+    **Es la unica de las cinco que barre la tabla grande**, y eso es a
+    proposito: es justo la tabla que la ventana deja de reconstruir, asi que es
+    donde una perdida seria directa. Del orden de 700 obras x 4 ambitos = unas
+    2.800 filas de salida sobre 29,7 M leidas, agregando por
+    `idx_plan_mensual_obra_amb`.
+
+    **No filtra por ambito**: si se limitara a los cuatro del fact, una obra
+    congelada podria perder sus filas de los otros ambitos -6,7 M en total- sin
+    que esta huella dijera nada. Aqui se compara la tabla ENTERA.
+
+    Se captura antes y despues del primer build acotado, y cualquier diferencia
+    en una obra congelada detiene la feature (R21, tolerancia CERO).
+    """
+    partes = [
+        "SELECT pm.obra_id,",
+        "       COALESCE(MAX(o.codigo_obra), '') AS codigo_obra,",
+        "       pm.ambito_id,",
+        "       count(*) AS filas,",
+        "       COALESCE(SUM(pm.importe_origen), 0) AS importe_origen",
+        "FROM stg.plan_mensual pm",
+        "LEFT JOIN stg.obras o ON o.obra_id = pm.obra_id",
+        "GROUP BY pm.obra_id, pm.ambito_id",
+        "ORDER BY 1, 3",
+    ]
+    return chr(10).join(partes)
+
+
 _CONSULTAS = {
     FORMATO_DIMENSION.nombre: sql_huella_dimension,
     FORMATO_CIERRE.nombre: sql_huella_cierre,
+    FORMATO_PLAN_OBRA.nombre: sql_huella_plan_obra,
 }
 
 
@@ -209,7 +241,7 @@ def leer_csv_ampliada(path: Path) -> tuple[FormatoHuella, tuple[FilaAmpliada, ..
         if formato is None:
             conocidas = "; ".join(
                 f"{f.nombre}: {','.join(f.cabecera)}"
-                for f in (FORMATO_DIMENSION, FORMATO_CIERRE)
+                for f in (FORMATO_DIMENSION, FORMATO_CIERRE, FORMATO_PLAN_OBRA)
             )
             raise ValueError(
                 f"{path} no tiene la cabecera de ninguna huella ampliada de "
