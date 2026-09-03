@@ -33,45 +33,37 @@ sigue siendo la puerta de F-024, intacta.
 
 ## Ficheros tocados
 
-**Creados:** `etl_sigrid/domain/ventana.py` (el criterio, la firma, el sello, el
-veredicto), `etl_sigrid/infrastructure/postgres/ventana_sql.py` (las cuatro
-consultas del guardián, solo texto), `infra/97_create_alert_ventana.ps1`, y once
-`tests/test_f025_*.py`.
+**Creados:** `domain/ventana.py` (criterio, firma, sello, veredicto),
+`infrastructure/postgres/ventana_sql.py` (las cuatro consultas del guardián,
+solo texto), `infra/97_create_alert_ventana.ps1` y once `tests/test_f025_*.py`.
 
 **Modificados:** `build_stg_step.py` (plan, borrado derivado, registro, aborto,
 VACUUM), `ingest_raw_step.py` (sub-paso de la firma), `postgres_client.py` (seis
-consultas y ocho métodos), `sql/ddl/00_meta.sql` (`_meta.obra_build` y
-`_meta.v_frescura_obra`), `sql/stg/06_presupuesto.sql` (marcador y `TRUNCATE`
-fuera; **ni una línea de su lógica**), `huella_ampliada.py` (quinta huella),
-`main.py` (`ventana-plan`, `check-ventana`, `--reconstruir-todo`, `--desde
-plan_obra`), `config/settings.py`, `config/business_rules.yaml`,
-`config/diccionario/{00_global,_meta,stg,maestro}.yaml`, `docs/ARCHITECTURE.md`,
-`infra/env/dev.json`, `infra/README.md`.
-
-**Fuera de este repositorio:** `azure-apps/datamart_seg_anual.md`, en su propio
-commit y en su repositorio, como manda la regla de propiedad.
+consultas, ocho métodos), `sql/ddl/00_meta.sql`, `sql/stg/06_presupuesto.sql`,
+`huella_ampliada.py`, `main.py` (`ventana-plan`, `check-ventana`,
+`--reconstruir-todo`, `--desde plan_obra`), `config/settings.py`,
+`config/business_rules.yaml`, cuatro fichas del diccionario,
+`docs/ARCHITECTURE.md`, `infra/env/dev.json` e `infra/README.md`. Fuera del
+repositorio, `azure-apps/datamart_seg_anual.md`, en su propio commit.
 
 **Intactos, comprobado con el diff y no de memoria** (§10): `08_plan_mensual.sql`
 —su marcador ya estaba—, `sql/mart/**`, `sql/cierre/**` y `domain/tramos.py`. En
 `06_presupuesto.sql` el diff son **dos líneas**: se va el `TRUNCATE`, entra el
-filtro.
+filtro; **ni una línea de su lógica**.
 
 ## Decisiones de diseño que no estaban en la spec
 
 1. **La firma se parte en dos columnas** (`firma_origen` = la del origen cuando
-   se construyó; `firma_actual` = la de esta noche). El diseño hablaba de una.
-   Con una sola, la ingesta pisaría la referencia cada noche y la comparación no
-   diría nada.
+   se construyó; `firma_actual` = la de esta noche). Con una sola, la ingesta
+   pisaría la referencia cada noche y la comparación no diría nada.
 2. **El censo sale de `raw.obr JOIN raw.con`, no de `maestro.obras`**: esa vista
    la construye `build_maestros`, que va DESPUÉS de este build y en una base
    nueva no existe. Leyendo `raw` no hay dependencia de orden.
-3. **Las obras sobrantes se NOMBRAN, no se borran.** El borrado derivado no
-   alcanza a una obra que desapareciera del origen, y sin esto nadie lo sabría.
-   La primera versión las borraba en la completa; se cambió al ver de dónde sale
-   el universo con el que se decide: del censo, que es `raw.obr JOIN raw.con`.
-   Borrar por lo que ese `JOIN` no vea sería destruir datos buenos en silencio,
-   y R10 dice que **lo que se borra se deriva de lo que se va a escribir**. Con
-   el cambio, la invariante de la feature no tiene ni una excepción. El precio,
+3. **Las obras sobrantes se NOMBRAN, no se borran.** La primera versión las
+   borraba en la completa; se cambió al ver de dónde sale el universo con el que
+   se decide —ese mismo `JOIN`—: borrar por lo que no vea sería destruir datos
+   buenos en silencio, y R10 dice que **lo que se borra se deriva de lo que se
+   va a escribir**. Así la invariante no tiene ni una excepción. Precio
    declarado: una obra retirada de Sigrid conserva sus filas hasta que alguien
    las borre a mano.
 4. **El registro va en llamada aparte, no dentro del SQL del tramo**, porque
@@ -89,14 +81,12 @@ teórico: pasó contra producción el 02-sep, con `stg.plan_mensual` truncada al
 21,6 % —las dos consultas devolvieron cero filas y dijo OK—, y por eso F-052
 está `blocked`. Ahora sale KO, con marcador y con un informe que lo explica.
 
-Lo más incómodo del hallazgo: **el propio módulo ya lo declaraba** en el
-docstring de `Veredicto` —«un veredicto verde sobre cero filas no es un verde»—
-y guardaba `filas_miradas` para eso. Faltaba la línea que lo aplicase.
-
-Y un test de F-052 que pasaba en falso: comprobaba que el comando sale con 0
-«cuando todo está declarado» usando un doble **sin ninguna fila**, así que
-verificaba justo el defecto. Ahora se le da una combinación sana, y el caso de
-cero tiene su test aparte. `check-ventana` nació con la regla puesta.
+Lo más incómodo: **el propio módulo ya lo declaraba** en el docstring de
+`Veredicto` y guardaba `filas_miradas` para eso; faltaba la línea que lo
+aplicase. Y un test de F-052 pasaba en falso —comprobaba el «todo declarado» con
+un doble **sin ninguna fila**, o sea verificaba justo el defecto—: ahora recibe
+una combinación sana y el caso de cero tiene su test aparte. `check-ventana`
+nació con la regla puesta.
 
 ## Fase RED · las trazas
 
@@ -144,8 +134,17 @@ avería.
 | **T32-T34** | Los cinco `check-*`, el bloat contra la línea base de T2 y los créditos de CPU |
 | **T35** | Desplegar `infra/97_create_alert_ventana.ps1`. **Sin esto el guardián es mudo** |
 
+**LAS ONCE, CON SU COMANDO LITERAL Y EN ORDEN, EN `progress/current.md`**
+(sección «LAS MANUAL DE LA FASE 7»): el humano puede ejecutarlas sin releer la
+spec. Es el tercer punto de C4, el que el reviewer marcó en rojo.
+
 **Y una que no está en `tasks.md`:** encender `PG_VENTANA_ACTIVA` es una
-decisión del humano. Hasta entonces esto solo repara el `TRUNCATE`.
+decisión del humano. Hasta entonces esto solo repara el `TRUNCATE`. **Con un
+hueco recién encontrado:** `infra/80_create_job.ps1` enumera las `--env-vars`
+del job una a una y **ninguna `PG_VENTANA_*` está en la lista**;
+`85_update_job.ps1` solo cambia la imagen. Encenderla en producción exige tocar
+infra o fijarla sobre el job (`az containerapp job update --set-env-vars`). **No
+se ha tocado `infra/`**: cómo se despliega el job lo decide el humano.
 
 ## Evidencias
 | Evidencia | Valor |
@@ -184,29 +183,44 @@ compuesto viniera vacío. Los nuevos miran **la propiedad**, no la salida. El de
 `de_tipo` es igual: con un solo hallazgo el texto sale idéntico, solo que bajo
 el epígrafe que no toca.
 
-### Lo que la primera pasada ya cambió
+### Lo que la primera pasada ya cambió (resumen; detalle en `223cd1d`)
 
 La campaña **encontró un defecto real antes de terminar**: diez de sus veinte
-supervivientes estaban en cuatro líneas de `_meses_antes`, el helper que restaba
-doce meses a una fecha y recortaba el día al último del mes destino. **Esa rama
-nunca se ejecutaba** con el criterio real —restar 12 meses cae en el mismo mes,
-que tiene los mismos días— y ningún test podía alcanzarla.
+supervivientes vivían en `_meses_antes`, un helper que recortaba el día al
+último del mes destino y **cuya rama no se ejecutaba nunca** con el criterio
+real. No se taparon con tests: **se borró** y se sustituyó por
+`meses_transcurridos`, que cuenta meses enteros, que es lo que dice el dato
+(la actividad es `MAX(make_date(anio, mes, 1))`, siempre día 1). Los otros diez
+eran **defaults de dataclass** que ningún test alcanzaba, y cada uno era una
+decisión de seguridad sin protección —`Plan.completa` en `True` habría hecho
+que **las 880 obras no se rehicieran nunca**—. Todos tienen ya su test.
 
-La respuesta no fue escribir tests que la taparan, sino **borrarla**: se
-sustituyó por `meses_transcurridos`, que cuenta meses enteros. Y no es una
-simplificación perezosa, es lo que dice el dato: la actividad sale de
-`MAX(make_date(anio, mes, 1))`, siempre día 1, así que comparar días era
-inventarse una precisión que el origen no tiene. Cambia un borde —una obra cuya
-última fase es de hace exactamente doce meses ya no depende del día— y hay un
-test que lo dice.
+## El censo, remedido: la contrapartida que se le enseñó al humano estaba inflada
 
-Los otros diez eran **defaults de dataclass** que ningún test alcanzaba porque
-todos construían las obras con todos los campos informados. Cada uno era una
-decisión de seguridad sin protección: `tiene_filas` y `registrada` en `False`
-—ante la duda no se congela—, `firma_divergente` en `False` —«no se sabe» no es
-«cambió»— y `Plan.completa` en `False` —si naciera en `True`, el hito se
-registraría cada noche y **las 880 obras no se reharían nunca**—. Todos tienen
-ahora su test con su porqué.
+Circulaban tres cifras para «congeladas pese a tener actividad» (7, 39, 8) y dos
+para la regla 2 (222, 226). **Remedido el 2026-09-03 en solo lectura con la
+definición QUE IMPLEMENTA EL CÓDIGO** —universo `raw.obr ⨝ raw.con` y actividad
+`MAX(make_date(f.anio, GREATEST(f.mes,1), 1))` de `stg.fases`, o sea
+`postgres_client.SQL_ESTADO_OBRAS`—, con la consulta entera guardada en
+`mediciones.md` §5:
+
+| universo | congeladas | diarias | al fact | regla 1 | regla 2 | regla 3 | con actividad | **congeladas con actividad** |
+|---|---|---|---|---|---|---|---|---|
+| 920 | 880 | 40 | 38 | 693 | **226** | 872 | 48 | **8** |
+
+Las 8 son **7 CERRADAS (estado 25)** y **1 de seis dígitos**, la `180501`. Y
+**0 de las 226** de seis dígitos están en `stg.obras`, que es el `INNER JOIN`
+por el que pasa el fact: se recomprobó sobre 226, no sobre 222.
+
+**Al humano se le presentó un 40 donde son 8**, con un desglose —39 CERRADAS,
+36 de ellas cerrando en 2025-12— que **no reproduce**: aquello se midió sobre
+`maestro.obras` con `coalesce(fecha_fin, fecha_inicio)` y salía de
+`obras_congeladas_F025.csv`, que da a 36 obras una actividad de 2025-12 que
+`stg.fases` desmiente. **El error fue de quien midió, no del código.** Su
+decisión NO cambia —880/40 cuadra al dedillo y la contrapartida real es MENOR
+que la aceptada—, pero el registro tenía que decir la verdad: queda escrito así
+en `decisiones.md` §DA-1, R2/R3, `mediciones.md` §2 y §5, `design.md`,
+`ARCHITECTURE.md`, `business_rules.yaml` y la ficha `estado_id` del diccionario.
 
 ## Desviaciones respecto a la spec
 
