@@ -144,13 +144,13 @@ se ha tocado `infra/`**: cómo se despliega el job lo decide el humano.
 | Evidencia | Valor |
 |---|---|
 | **Tests ejecutados** | **3.305 en verde**, 134 saltados. De ellos **290 son de F-025** |
-| **Suite completa** | **163 s** suelta; **422 s** dentro de `init.sh`, con cobertura |
+| **Suite completa** | **163 s** suelta; **291 s** dentro de `init.sh`, con cobertura |
 | **Cobertura de las líneas cambiadas** | **91,7 %** (578/630, umbral 80 %, nivel `critico`) |
 | **Mutantes generados / evaluados** | **83 / 83** sobre `domain/ventana.py` = el **38 % del alcance real** (219 en 10 ficheros). El resto, **EXENTO por el humano** (DA-6) |
 | **Supervivientes** | **0**, ninguno equivalente y ningún `PENDIENTE` |
 | **Timeouts** | **4** — ni muertos ni supervivientes: **sin veredicto por reloj**. Cerrados por el reviewer (RM4), que los reprodujo sobre HEAD: **los cuatro MUEREN** en 5-9 s. **83 de 83 con veredicto** |
 | **Coste de la campaña** | **7.720 s** (2 h 09) con **4 workers**; línea base **467-473 s** por worker, media 93,0 s por mutante |
-| **`bash harness/init.sh`** | **EN VERDE**: 3.305 pasados, 134 saltados, 422 s |
+| **`bash harness/init.sh`** | **EN VERDE** el 2026-09-04: 3.305 pasados, 134 saltados, 291 s |
 
 ### La campaña (T26, DA-6): qué midió y qué NO
 

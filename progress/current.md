@@ -35,6 +35,20 @@ produccion el 02-sep, con `stg.plan_mensual` truncada. Ahora sale KO. F-052
 sigue esperando a que `stg` vuelva a estar completo, que es lo que desbloquea
 la fase 7 de esta feature.
 
+**Los tres cambios de la pasada 2 del review, cerrados el 2026-09-04.** (1) **DA-6
+queda EXENTA por decision del humano**: no se extiende la campana de mutacion a los
+219 mutantes del alcance real, asi que `build_stg_step.py` -34 mutantes, DONDE VIVE
+EL BORRADO DERIVADO-, `main.py`, `postgres_client.py`, `ventana_sql.py` y
+`cobertura.py` NO han pasado por mutacion; lo escrito, en `decisiones.md` §DA-6, en
+la ficha de `features.json` y en T26. **Lo que cubre ese hueco es T27/T30, que sigue
+sin ejecutar**: una razon mas para no dejar la fase 7 sin hacer. (2) La tabla
+«Evidencias» de `impl_F-025.md` publicaba los numeros de la campana invalidada; ya
+trae los de la que vale (0 supervivientes, 4 timeouts cerrados por el reviewer,
+7.720 s, base 467-473 s, 4 workers). (3) Corregidas las cuatro cifras viejas del
+censo -222/222 y 840 en `business_rules.yaml`, y el «80 de 920» de `requirements.md`
+y `ARCHITECTURE.md`-: mandan **920 · 880 · 40 · 226 · 872 · 693 · 48 · 8**. Y **T36
+marcado**.
+
 ## F-025 · LAS MANUAL DE LA FASE 7, CON SU COMANDO EXACTO (C4)
 
 **Para el humano.** Esto es el guion completo de lo que queda, en el orden en

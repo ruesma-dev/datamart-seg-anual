@@ -3,7 +3,7 @@
 
 Rama `feature/F-025-ventana-negocio-build`. Un commit por tarea
 (`F-025 Tn: ...`). **Las decisiones DA-1 a DA-4 las cerró el humano el 2026-09-02**
-(`decisiones.md`); DA-5 y DA-6 quedan con la recomendación de la spec. Todo lo que
+(`decisiones.md`); DA-5 queda con la recomendación de la spec y **DA-6 la EXIMIÓ el humano el 2026-09-04** (ver T26). Todo lo que
 escriba en producción o reconstruya va marcado **MANUAL (humano)**.
 
 ## Fase 0 · Medir antes de tocar nada
@@ -69,4 +69,4 @@ escriba en producción o reconstruya va marcado **MANUAL (humano)**.
 - [ ] T33: Medir el bloat tras la primera semana acotada y compararlo con T2  |  Verificación: MANUAL (humano), cifra en `mediciones.md`; si crece de forma sostenida, abrir la feature de particionado
 - [ ] T34: Medir los créditos de CPU restantes al terminar la nocturna acotada (R29)  |  Verificación: MANUAL (humano), métrica de Azure; crédito restante > 0
 - [ ] T35: Desplegar `infra/97_create_alert_ventana.ps1` y añadir el buzón al grupo de acción  |  Verificación: MANUAL (humano), sin este paso el guardián es mudo
-- [ ] T36: Ejecutar `bash harness/init.sh` en verde  |  Verificación: código 0, incluidos pytest, tamaño y diccionario
+- [x] T36: Ejecutar `bash harness/init.sh` en verde  |  Verificación: código 0, incluidos pytest, tamaño y diccionario

@@ -162,7 +162,7 @@ La nocturna del **2026-09-02 murió** por `replicaTimeout` en el tramo 5 de 60 y
 dejó `stg.plan_mensual` truncada al **21,6 %**. La causa, medida: el
 `Standard_B1ms` es *burstable*, agotó sus 144 créditos de CPU a las 04:15 UTC y
 Azure lo capó al 20 % de un núcleo; cada tramo pasó de **1,57 min** a **40,77**.
-Y se reconstruían **920 obras** cada noche cuando solo **80** habían tenido
+Y se reconstruían **920 obras** cada noche cuando solo **48** habían tenido
 actividad en los últimos doce meses. Esto no fue una mejora de rendimiento: fue
 la reparación de una avería.
 

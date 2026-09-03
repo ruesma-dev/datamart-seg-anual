@@ -184,8 +184,12 @@ ventana:
   # POR QUE se congela cada una, en vez de deducirlo de su quietud.
   estados_que_congelan: [1, 11, 25]
 
-  # REGLA 2. Obras administrativas: 222 con codigo de seis digitos, y NINGUNA
-  # llega al fact (0 de 222). Son presupuestos y estudios de 2009-2015.
+  # REGLA 2. Obras administrativas: 226 con codigo de seis digitos, y NINGUNA
+  # llega al fact (0 de 226 estan en stg.obras, el INNER JOIN por el que pasa
+  # el fact). Son presupuestos y estudios de 2009-2015. Remedido el 2026-09-03:
+  # antes decia 222, cifra de otra medicion que contradecia al censo de la
+  # cabecera de esta seccion.
+  #
   # Ahorro sin riesgo de negocio, y por eso el criterio no necesita una lista
   # de codigos que mantener.
   #
@@ -194,8 +198,14 @@ ventana:
   patron_codigo_administrativo: "^[0-9]{6}$"
 
   # REGLA 3. Meses sin actividad. Actividad = mes mas reciente con fase
-  # cerrada (stg.fases). 840 obras no tienen ninguna en 12 meses, y 217 no
-  # tienen ni una fase en toda su vida.
+  # cerrada (stg.fases). 872 de las 920 no tienen ninguna en 12 meses -o sea
+  # que 48 SI tienen actividad-, remedido el 2026-09-03 con SQL_ESTADO_OBRAS.
+  # Aqui decia 840, cifra de una medicion anterior con otra definicion.
+  #
+  # OJO al mezclar universos, que es de donde salieron las cifras viejas: el
+  # "217 obras sin ninguna fase en toda su vida" que acompanaba a este parrafo
+  # NO es de las 920, es del sondeo previo sobre stg.obras (583). Ver
+  # specs/F-025-ventana-negocio-build/mediciones.md §2.
   #
   # El limite NO congela: una obra que cerro fase justo hace doce meses cuenta
   # como CON actividad. Se prefiere trabajar de mas a dejar un dato viejo

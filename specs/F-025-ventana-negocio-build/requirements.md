@@ -11,7 +11,7 @@ del **2026-09-02 murió** por `replicaTimeout` en el tramo **5 de 60** y dejó
 tramo pasó de **1,57 min** —media de 15 noches— a **40,77**: el `Standard_B1ms`
 **agotó sus 144 créditos de CPU a las 04:15 UTC** y Azure lo capó al 20 % de un
 núcleo. Solo la puerta de F-024 evitó que `mart` construyera encima. Y se
-reconstruyen **todas** las obras cada noche cuando solo **80 de 920** han tenido
+reconstruyen **todas** las obras cada noche cuando solo **48 de 920** han tenido
 actividad en los últimos 12 meses.
 
 **Las dos frases del humano del 2026-09-02**, que cierran el principio de DA-1 y
