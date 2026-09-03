@@ -51,6 +51,11 @@ plan_obra`), `config/settings.py`, `config/business_rules.yaml`,
 **Fuera de este repositorio:** `azure-apps/datamart_seg_anual.md`, en su propio
 commit y en su repositorio, como manda la regla de propiedad.
 
+**Intactos, y comprobado con el diff, no de memoria** (§10 de la spec):
+`08_plan_mensual.sql` —su marcador ya estaba—, `sql/mart/**`, `sql/cierre/**` y
+`domain/tramos.py`. Y en `06_presupuesto.sql` el diff son **dos líneas**: se va
+el `TRUNCATE`, entra el filtro. Ni una de su lógica.
+
 ## Decisiones de diseño que no estaban en la spec
 
 1. **La firma se parte en dos columnas** (`firma_origen` = la del origen cuando
@@ -60,10 +65,15 @@ commit y en su repositorio, como manda la regla de propiedad.
 2. **El censo sale de `raw.obr JOIN raw.con`, no de `maestro.obras`.** Esa vista
    la construye `build_maestros`, que en `run-all` va DESPUÉS de este build, y
    en una base nueva no existe. Leyendo `raw` no hay dependencia de orden.
-3. **Las obras sobrantes se limpian en la completa.** El borrado derivado no
-   alcanza a una obra que desaparezca del origen —nadie la reinserta, así que
-   nadie la borra— y conservaría sus filas para siempre. Es la contrapartida de
-   quitar el `TRUNCATE`, y se cubre en vez de aceptarse en silencio.
+3. **Las obras sobrantes se NOMBRAN, no se borran.** El borrado derivado no
+   alcanza a una obra que desapareciera del origen, y sin esto nadie lo sabría.
+   La primera versión las borraba en la completa; se cambió al ver de dónde sale
+   el universo con el que se decide: del censo, que es `raw.obr JOIN raw.con`.
+   Borrar por lo que ese `JOIN` no vea sería destruir datos buenos en silencio,
+   y R10 dice que **lo que se borra se deriva de lo que se va a escribir**. Con
+   el cambio, la invariante de la feature no tiene ni una excepción. El precio,
+   declarado: una obra retirada de Sigrid conserva sus filas hasta que alguien
+   las borre a mano.
 4. **El registro va en llamada aparte, no dentro del SQL del tramo**, porque
    `execute_sql_text` devuelve el `rowcount` de la última sentencia. Si el
    proceso muere entre el tramo y su registro, la obra entra mañana por R18: se
