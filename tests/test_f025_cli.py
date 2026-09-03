@@ -405,7 +405,7 @@ def test_f025_r27_el_guardian_de_la_ventana_NO_entra_en_el_codigo_de_salida() ->
     assert "guardian_ok" in salida
 
 
-def test_f025_r27_un_fallo_leyendo_dentro_de_run_all_devuelve_None() -> None:
+def test_f025_r27_un_fallo_leyendo_dentro_de_run_all_devuelve_None() -> None:  # noqa: N802
     """No escala, pero se imprime: callarlo dejaría una noche en verde sin haber
     comprobado nada."""
     assert main._guardian_de_ventana(PgSoloLectura(revienta=True)) is None

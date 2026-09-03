@@ -1418,10 +1418,24 @@ class PostgresClient:
         El recuento sale del `rowcount` del cursor, no de un `COUNT(*)` sobre
         la tabla: un seq-scan por tramo sobre millones de filas en 1 vCPU
         sería castigo gratuito.
+
+        **Se devuelve el recuento de la ÚLTIMA sentencia, y desde F-025 eso
+        importa.** El texto de un tramo ya no es una sola sentencia: es un
+        `DELETE` de las obras del tramo seguido del `INSERT` que las reescribe.
+        `cur.execute()` con varias sentencias deja el cursor **en el primer
+        resultado** —lo dice `Cursor.nextset`: «move to the next result set if
+        execute() returned more than one»—, así que leer `rowcount` sin avanzar
+        devolvería **las filas BORRADAS en vez de las escritas**.
+
+        Y sería un error de los caros de detectar: la primera noche los dos
+        números son parecidos, así que el dato de `_meta.etl_runs` y de
+        `python main.py timings` saldría plausible y equivocado.
         """
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute(sql_text)
             filas = cur.rowcount
+            while cur.nextset():
+                filas = cur.rowcount
 
         # psycopg deja rowcount en -1 cuando la sentencia no trae recuento.
         return max(int(filas), 0) if filas is not None else 0

@@ -441,7 +441,7 @@ def test_f025_r2_un_patron_de_codigo_invalido_falla_al_construir_no_al_usar() ->
     que era el candidato obvio: Python trata una llave sin cerrar como carácter
     literal y lo acepta sin rechistar, así que ese ejemplo no probaba nada.
     """
-    with pytest.raises(ValueError, match="patrón|patron"):
+    with pytest.raises(ValueError, match=r"patr(ó|o)n"):
         Criterio(
             estados_que_congelan=frozenset({25}),
             patron_codigo="^[0-9",

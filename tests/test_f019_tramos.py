@@ -203,10 +203,13 @@ def test_f019_r6_marcador_presente_en_ambas_ramas() -> None:
 
 
 def test_f019_r6_el_sql_ya_no_contiene_truncate() -> None:
-    """El TRUNCATE lo ejecuta el step UNA vez, antes del primer tramo.
-
-    Si volviera al fichero, cada tramo borraría lo que insertó el anterior y
+    """Si volviera al fichero, cada tramo borraría lo que insertó el anterior y
     `stg.plan_mensual` acabaría con las obras del último tramo y nada más.
+
+    Hasta F-025 el vaciado lo ejecutaba el step **una vez, antes del primer
+    tramo**. Desde F-025 no lo ejecuta nadie: cada tramo borra las obras que va
+    a reinsertar, en su misma transacción, porque un `TRUNCATE` global habría
+    borrado las 920 obras para reescribir 40.
     """
     assert "TRUNCATE" not in _sql_plan_mensual().upper()
 
@@ -293,10 +296,18 @@ def test_f019_r7_el_sql_real_compuesto_queda_sin_marcadores() -> None:
 class CursorFalso:
     """Cursor de mentira: guarda lo ejecutado y devuelve filas preparadas."""
 
-    def __init__(self, filas: list[tuple] | None = None, rowcount: int | None = 0):
+    def __init__(
+        self,
+        filas: list[tuple] | None = None,
+        rowcount: int | None = 0,
+        recuentos: list[int] | None = None,
+    ):
         self.filas = filas if filas is not None else []
         self.rowcount = rowcount
         self.ejecutado: list[str] = []
+        # Los rowcounts de las sentencias SIGUIENTES a la primera, que es lo que
+        # devuelve `nextset()` (F-025).
+        self.recuentos = list(recuentos or [])
 
     def __enter__(self) -> CursorFalso:
         return self
@@ -312,6 +323,21 @@ class CursorFalso:
 
     def fetchall(self) -> list[tuple]:
         return list(self.filas)
+
+    def nextset(self) -> bool | None:
+        """Avanza al siguiente resultado, como el cursor de verdad.
+
+        F-025 lo necesita: el texto de un tramo es `DELETE` + `INSERT`, y
+        `cur.execute()` con varias sentencias deja el cursor en el PRIMER
+        resultado. Sin este metodo el doble no se pareceria a lo que sustituye
+        justo en el punto que hay que probar.
+
+        `recuentos` es la lista de rowcounts, uno por sentencia, en orden.
+        """
+        if not getattr(self, "recuentos", None):
+            return None
+        self.rowcount = self.recuentos.pop(0)
+        return True
 
 
 class ConexionFalsa:
@@ -904,3 +930,32 @@ def test_f019_r5_las_obras_se_empaquetan_de_mayor_a_menor_peso() -> None:
     """Orden estable declarado: peso descendente y, a igual peso, obra_id."""
     tramos = planificar_tramos({1: 100, 2: 300, 3: 300, 4: 200}, 10_000)
     assert tramos == [Tramo(indice=1, obras=(2, 3, 4, 1), peso=900)]
+
+
+# --- F-025 · el recuento de un texto con VARIAS sentencias -------------------
+
+
+def test_f025_r10_execute_sql_text_devuelve_las_filas_de_la_ULTIMA_sentencia() -> None:  # noqa: N802
+    """**El error caro que esto evita.** Desde F-025 el texto de un tramo es un
+    `DELETE` de las obras del tramo seguido del `INSERT` que las reescribe, y
+    `cur.execute()` con varias sentencias deja el cursor EN EL PRIMER RESULTADO
+    (`Cursor.nextset`: «move to the next result set if execute() returned more
+    than one»).
+
+    Sin avanzar, `rowcount` devolveria las filas BORRADAS en vez de las
+    escritas. Y seria de los errores de los caros de detectar: la primera noche
+    los dos numeros son parecidos, asi que `_meta.etl_runs` y `python main.py
+    timings` saldrian plausibles y equivocados.
+    """
+    cursor = CursorFalso(rowcount=700, recuentos=[1_200])   # DELETE 700, INSERT 1.200
+    pg, _ = cliente_con(cursor)
+
+    assert pg.execute_sql_text("DELETE ...; INSERT ...") == 1_200
+
+
+def test_f025_r10_con_una_sola_sentencia_el_recuento_no_cambia() -> None:
+    """El contraste: el comportamiento de F-019 sigue intacto para un texto de
+    una sola sentencia, que es lo que ejecutan los demas sub-pasos."""
+    pg, _ = cliente_con(CursorFalso(rowcount=900))
+
+    assert pg.execute_sql_text("INSERT ...") == 900
