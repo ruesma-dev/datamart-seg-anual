@@ -172,8 +172,8 @@ CREATE INDEX IF NOT EXISTS idx_obra_build_codigo
 --
 -- `firma_divergente` es la denuncia de la que habla R16: la obra esta
 -- congelada y su origen HA CAMBIADO. No se reconstruye por su cuenta -eso
--- contradiria la decision del humano, que congela 40 obras con actividad
--- reciente sabiendolo- pero queda NOMBRADA, que es lo contrario del modo de
+-- contradiria la decision del humano, que congela 8 de las 48 obras con
+-- actividad reciente sabiendolo- pero queda NOMBRADA, que es lo contrario del modo de
 -- fallo de F-052: un dato que envejece sin que nadie se entere.
 --
 -- Las dos firmas se comparan solo cuando LAS DOS existen. Con cualquiera a

@@ -57,7 +57,7 @@ def test_f025_r5_la_ventana_nace_apagada() -> None:
 
 def test_f025_r5_el_rescate_nace_apagado() -> None:
     """§3.1: la firma DENUNCIA, no rescata. Rescatar contradiría la decisión del
-    humano de congelar 40 obras con actividad reciente."""
+    humano de congelar 8 de las 48 obras con actividad reciente (R3)."""
     assert PostgresSettings.model_fields["ventana_rescate"].default is False
 
 
@@ -213,8 +213,8 @@ def test_f025_r2_los_booleanos_no_pasan_por_enteros() -> None:
 
 def test_f025_r2_el_yaml_documenta_el_censo_y_la_contrapartida() -> None:
     """El bloque tiene que explicarse solo: quien lo edite dentro de un año
-    tiene que ver ahí mismo que hay 40 obras vivas congeladas a propósito, y que
-    el humano rechazó el veto con el dato delante."""
+    tiene que ver ahí mismo el censo —880 congeladas y 40 vivas de 920— y que el
+    humano rechazó el veto con el dato delante."""
     with open(RUTA_REGLAS, encoding="utf-8") as f:
         texto = f.read()
 

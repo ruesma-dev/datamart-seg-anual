@@ -8,7 +8,7 @@ F-025 · La ventana de negocio: qué obras se reconstruyen esta noche y cuáles 
 La nocturna del **2026-09-02 murió** por `replicaTimeout` en el tramo 5 de 60 y
 dejó `stg.plan_mensual` truncada al **21,6 %**. El `Standard_B1ms` agotó sus 144
 créditos de CPU a las 04:15 UTC y Azure lo capó al 20 % de un núcleo. Y se
-reconstruían **920 obras** cada noche cuando solo **80** habían tenido actividad
+reconstruían **920 obras** cada noche cuando solo **48** habían tenido actividad
 en los últimos doce meses. Esto no es una mejora de rendimiento: es la
 reparación de una avería.
 
@@ -23,11 +23,13 @@ entra y quién no—; que no se borre es el borrado derivado de
 Se congela toda obra que cumpla **AL MENOS UNA** de estas tres, en unión:
 
 1. su estado es **EN ESTUDIO (1)**, **NO PRESENTADA (11)** o **CERRADA (25)**;
-2. su código son **seis dígitos** (222 obras administrativas, **ninguna llega al
+2. su código son **seis dígitos** (226 obras administrativas, **ninguna llega al
    fact**);
 3. **no tiene actividad** en los últimos doce meses.
 
-Censo sobre las 920 obras del maestro: **880 congeladas, 40 vivas**. El catálogo
+Censo del universo del código (`raw.obr JOIN raw.con`, 920 obras): **880
+congeladas, 40 vivas**; por regla, 693 por estado, 226 por código y 872 por
+quietud. El catálogo
 de estados está verificado contra `conest` tipo 42 (DA-1 bis): «25 = CERRADA»
 **no es una suposición nuestra**.
 
@@ -54,9 +56,12 @@ deja un dato viejo publicado, que es el modo de fallo de F-052.
 
 ## La firma DENUNCIA, no rescata (§3.1 del diseño)
 
-La decisión del humano congela **40 obras con actividad reciente** —39 CERRADAS,
-36 de ellas por el cierre anual de 2025-12, y 1 por código— y acepta hasta
-**6 días** de antigüedad entre reconstrucciones completas. Por eso, cuando la
+De las **48 obras con actividad** en doce meses, la decisión del humano congela
+**8** —7 CERRADAS (25) y 1 por código, la `180501`— y acepta hasta **6 días** de
+antigüedad entre reconstrucciones completas. (Cifra CORREGIDA el 2026-09-03: el
+«40 obras, 39 CERRADAS, 36 del cierre de 2025-12» que se le presentó salía de
+`maestro.obras` y NO reproduce; manda `SQL_ESTADO_OBRAS`. Ver `decisiones.md`
+§DA-1 y `mediciones.md` §2.) Por eso, cuando la
 firma del origen de una obra congelada cambia, este módulo **la nombra y la deja
 congelada**: reconstruirla por su cuenta contradiría la decisión que el humano
 tomó con ese dato delante. El domingo la pone al día, y el interruptor

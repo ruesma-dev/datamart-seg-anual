@@ -157,7 +157,7 @@ class PostgresSettings(BaseSettings):
     # La nocturna del 2026-09-02 murió por replicaTimeout en el tramo 5 de 60 y
     # dejó stg.plan_mensual truncada al 21,6 %: el B1ms agotó sus 144 créditos
     # de CPU y Azure lo capó al 20 % de un núcleo. Se reconstruían 920 obras
-    # cada noche cuando solo 80 habían tenido actividad en doce meses.
+    # cada noche cuando solo 48 habían tenido actividad en doce meses.
     #
     # El CRITERIO de obra congelada NO está aquí: es regla de negocio y vive en
     # config/business_rules.yaml, para que Negocio pueda cambiarlo sin tocar el
@@ -189,7 +189,7 @@ class PostgresSettings(BaseSettings):
         description="Con TRUE, una obra congelada cuyo origen haya cambiado se "
                     "reconstruye en vez de solo denunciarse. Default FALSE: "
                     "rescatarla contradiría la decisión del humano, que congela "
-                    "40 obras con actividad reciente sabiéndolo (R3). El "
+                    "8 de las 48 obras con actividad reciente sabiéndolo (R3). El "
                     "interruptor existe por si cambia de idea, sin tocar código.",
     )
 

@@ -316,8 +316,8 @@ ha dejado de ser cierto (T23b, enlaza con F-054).
    noche—, en un sub-paso agregado de solo lectura tras `ingest_raw`. `tiemod` no
    sirve (F-011: no existe en 24 de 31 tablas) y hashear en la ingesta gastaría la
    CPU que falta. Su coste se mide en **T2b** antes de fijarla.
-3. **La firma DENUNCIA, no rescata.** Como el humano acepta congelar 40 obras
-   vivas, reconstruirlas por nuestra cuenta contradiría su decisión: el guardián las
+3. **La firma DENUNCIA, no rescata.** Como el humano acepta congelar 8 de las 48
+   obras con actividad reciente, reconstruirlas por nuestra cuenta contradiría su decisión: el guardián las
    **nombra** y el domingo las pone al día. Hay interruptor `PG_VENTANA_RESCATE`
    (off) por si cambia de idea.
 4. **Reconstrucción completa semanal, los DOMINGOS**, disparada desde `run-all` por

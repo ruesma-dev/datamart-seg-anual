@@ -70,9 +70,10 @@ objetos:
 
       QUE OBRA SE CONGELA lo decide `config/business_rules.yaml`, bloque
       `ventana:`, con tres reglas en union: estado 1, 11 o 25; codigo de seis
-      digitos; o sin actividad en 12 meses. Hay 40 obras CON actividad reciente
-      que quedan congeladas igualmente, y es una decision de negocio tomada con
-      ese dato delante, no un defecto.
+      digitos; o sin actividad en 12 meses. El censo: 920 obras, 880 congeladas
+      y 40 vivas. De las 48 obras CON actividad reciente hay 8 que quedan
+      congeladas igualmente -7 CERRADAS y 1 de seis digitos-, y es una decision
+      de negocio tomada con ese dato delante, no un defecto.
 
       Y `plan_id`, su clave sustituta, **ya solo se reasigna en las obras que se
       reconstruyen**: la de una obra congelada es estable entre noches. Sigue

@@ -111,7 +111,7 @@ def test_f025_r2_regla_1_los_demas_estados_no_congelan_por_si_solos(
 
 
 def test_f025_r2_regla_2_seis_digitos_congela_aunque_este_viva() -> None:
-    """DA-3: 222 obras administrativas, y NINGUNA llega al fact."""
+    """DA-3: 226 obras administrativas, y NINGUNA llega al fact."""
     motivo = motivo_de_congelacion(
         obra(codigo_obra="201503", estado_id=15, ultima_actividad=HOY),
         CRITERIO,
@@ -340,9 +340,9 @@ def test_f025_r17_el_sello_alcanza_a_TODAS_las_congeladas() -> None:  # noqa: N8
 
 
 def test_f025_r16_una_firma_distinta_NO_reconstruye_por_su_cuenta() -> None:  # noqa: N802
-    """**El punto más delicado de la feature.** El humano congela 40 obras con
-    actividad reciente sabiéndolo (R3) y acepta hasta 6 días de antigüedad:
-    rescatarlas aquí contradiría su decisión."""
+    """**El punto más delicado de la feature.** El humano congela 8 de las 48
+    obras con actividad reciente sabiéndolo (R3) y acepta hasta 6 días de
+    antigüedad: rescatarlas aquí contradiría su decisión."""
     plan = plan_de(
         obra(1, "0599", estado_id=25, firma_origen="NUEVA", firma_registrada="f1")
     )

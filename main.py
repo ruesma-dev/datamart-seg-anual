@@ -1330,11 +1330,15 @@ def ventana_plan_cmd(reconstruir_todo: bool, detalle: bool) -> None:
     digitos; o sin actividad en 12 meses. Censo esperado sobre las 920 obras
     del maestro: 880 congeladas y 40 vivas.
 
-    OJO CON LA CONTRAPARTIDA, que esta aceptada y medida: 40 obras CON
-    actividad en los ultimos 12 meses quedan igualmente congeladas -39 CERRADAS
-    y 1 de seis digitos-, asi que sus datos pueden llevar hasta 6 dias de
-    retraso entre reconstrucciones completas. No es un defecto: es la decision
-    del humano tomada con ese dato delante.
+    OJO CON LA CONTRAPARTIDA, que esta aceptada y medida: de las 48 obras CON
+    actividad en los ultimos 12 meses, 8 quedan igualmente congeladas -7
+    CERRADAS y 1 de seis digitos, la 180501-, asi que sus datos pueden llevar
+    hasta 6 dias de retraso entre reconstrucciones completas. No es un defecto:
+    es la decision del humano tomada con ese dato delante.
+
+    CIFRA CORREGIDA el 2026-09-03: antes decia 40, con un desglose -39 CERRADAS,
+    36 por el cierre de 2025-12- que NO reproduce. Salia de `maestro.obras`;
+    manda `SQL_ESTADO_OBRAS`, que es lo que ejecuta el guardian cada noche.
 
     Lee `stg.fases` y `raw`, asi que da el plan que se ejecutaria AHORA, con lo
     que haya construido en este momento.
