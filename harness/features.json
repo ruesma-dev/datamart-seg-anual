@@ -686,7 +686,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -764,7 +764,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -781,7 +781,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -798,7 +798,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 2,
+      "priority": 3,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -817,7 +817,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 4,
+      "priority": 5,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -835,8 +835,25 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 3,
+      "priority": 4,
       "branch": "feature/F-054-conocimiento-de-negocio"
+    },
+    {
+      "id": "F-055",
+      "title": "Falta el mundo del proveedor: firmas, familias y actividades no se ingieren, y la cobertura de albaranes esta sin revisar",
+      "description": "Pedida por el humano el 2026-09-03: 'apunta que hay que meter o revisar si estan en las tablas: albaranes, firmas, familias y actividades de los proveedores'. COMPROBADO ANTES DE FICHARLA, para que la feature diga que hay que revisar y no que hay que hacer algo que ya existe. LO QUE YA ESTA: los ALBARANES si. `config/tables_sigrid.yaml` ingiere hoy 31 tablas, entre ellas `dca`, `dcapro`, `dcf`, `dcfpro` y `dcfprodes`, y el diccionario publica `compras.albaranes`, `compras.albaran_lineas`, `compras.facturas`, `compras.factura_lineas` y la vista `compras.v_pbi_albaranes_sin_facturar`. Aqui el trabajo NO es meterlos: es REVISAR SI LA COBERTURA ES COMPLETA -que no falte ningun tipo de documento, ni lineas, ni estados- y si el universo de obra que usan casa con el del seguimiento; F-039 ya avisa de que compras y retenciones NO filtran por `stg.obras` y pueden traer obras administrativas. LO QUE NO ESTA, con su nombre en Sigrid, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas que se ingieren -ninguna de estas aparece-: (1) FIRMAS -> `PFfir`, 'Tabla de Firma de Documentos', con `tipfir` (tipo de firma), `estfir` (estado), `fec` y `hor`. Es el circuito de aprobacion de documentos, y hoy el datamart no sabe nada de el: no puede responder quien aprobo que ni cuanto tarda una factura en firmarse. (2) FAMILIAS -> `auxfam`, 'Familia de productos', a la que apunta el campo `famide`. Sin ella no se puede agrupar el gasto por familia de producto, que es una de las preguntas naturales de compras. (3) ACTIVIDADES -> `act` ('Registros de actividad', declarada como propiedades de `con`), con `auxacttip` (tipo de actividad), `actent` (actividad-entidades) y `actseg` (seguimiento). Es la clasificacion de actividad del proveedor, y sin ella no se puede responder 'que proveedores de tal actividad trabajan en tal obra'. POR QUE IMPORTA, y enlaza con el objetivo de fondo: el humano quiere que Negocio consulte el datamart por el MCP. Las tres cosas que faltan son EJES DE ANALISIS del gasto -quien aprueba, que familia de producto, que actividad-, y sin ellas la IA puede sumar euros pero no agruparlos como los agrupa Negocio. Enlaza con F-039 (vistas puente que faltan) y con F-054 (el diccionario explica el esquema pero no el negocio). A DECIDIR EN LA SPEC: que se ingiere de verdad y que no -meter cuatro tablas mas a la nocturna tiene coste, y F-025 existe justamente porque la carga no cabe-; si `act` es lo que Negocio llama 'actividad del proveedor' o es otra cosa -el nombre en Sigrid es generico y hay que confirmarlo con el dato delante, no suponerlo-; y si esto se queda en `raw` + `stg` o llega a la superficie de consumo con sus fichas.",
+      "acceptance": [
+        "Revisada la cobertura de ALBARANES contra Sigrid: que tipos de documento y que lineas quedan fuera hoy, y si el universo de obra que usa compras casa con el del seguimiento (F-039)",
+        "Confirmado con el dato delante, no por el nombre, que `act`/`auxacttip` es lo que Negocio llama actividad del proveedor; si no lo es, localizado lo que si lo sea",
+        "Decidido y escrito que tablas se ingieren de verdad -`PFfir`, `auxfam`, `act`, `auxacttip`, `actent`, `actseg`- y cual es el coste de anadirlas a la nocturna, medido, no supuesto: F-025 existe porque la carga no cabe",
+        "Lo que se ingiera llega con su ficha en el diccionario y, si sube a la superficie de consumo, con su vista y su clave declarada",
+        "Probado que responde al menos una pregunta de negocio que hoy no se puede responder: por ejemplo el gasto agrupado por familia de producto, o los proveedores de una actividad concreta en una obra"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 2,
+      "branch": "feature/F-055-mundo-proveedor"
     }
   ]
 }
