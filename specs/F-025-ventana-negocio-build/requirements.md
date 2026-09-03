@@ -28,25 +28,14 @@ datos ampliada, como en F-052.
 - **R2.** *(Decisión del humano, 2026-09-02.)* Se congela toda obra que cumpla **al
   menos una** de estas tres, en unión: (1) su estado es **EN ESTUDIO (1), NO
   PRESENTADA (11) o CERRADA (25)**; (2) `codigo_obra ~ '^[0-9]{6}$'`; (3) sin
-  actividad en 12 meses. Censo sobre el universo del código —`raw.obr JOIN
-  raw.con`, **920** obras—: **880 congeladas, 40 vivas**, de ellas **38** publican
-  en el fact. Reglas por separado: 693 por estado, **226** por código de seis
-  dígitos y 872 por quietud (remedido el 2026-09-03).
-- **R3.** *(Contrapartida aceptada por el humano. **Cifra corregida el 2026-09-03**:
-  ver el aviso al final de DA-1.)* De las **48 obras con actividad en 12 meses, 8
-  quedan congeladas** —**7** CERRADAS (estado 25) y **1** de seis dígitos, la
-  `180501`— y tendrán **hasta 6 días de antigüedad**. Sus últimas actividades son
-  2026-07 (la `180501`), 2026-04, 2026-01 (dos), 2025-11, 2025-10 (dos) y 2025-09.
-  El sistema **no debe** rescatarlas por su cuenta: debe **nombrarlas** (R26) y
-  esperar al domingo (R25).
-
-  **Medido con la definición QUE IMPLEMENTA EL CÓDIGO**, no con otra: universo
-  `raw.obr JOIN raw.con` (920) y actividad = `MAX(make_date(f.anio,
-  GREATEST(f.mes,1), 1))` de `stg.fases`, que es literalmente
-  `postgres_client.SQL_ESTADO_OBRAS`. La cifra anterior de este requisito —80
-  con actividad y 40 congeladas, 39 de ellas CERRADAS— salía de `maestro.obras`
-  con `coalesce(fecha_fin, fecha_inicio)` y **no reproduce**; `mediciones.md` §2
-  guarda las dos y dice cuál manda.
+  actividad en 12 meses. Censo del universo del código (`raw.obr ⨝ raw.con`, **920**):
+  **880 congeladas, 40 vivas** (**38** al fact); por regla, 693 / **226** / 872.
+- **R3.** *(Contrapartida aceptada por el humano. **CIFRA CORREGIDA el 2026-09-03**;
+  porqué y fuentes, en el aviso de DA-1 y en `mediciones.md` §2.)* De las **48 obras
+  con actividad en 12 meses, 8 quedan congeladas** —**7** CERRADAS (25) y **1** de
+  seis dígitos, la `180501`—, con **hasta 6 días de antigüedad**. El sistema **no
+  debe** rescatarlas: debe **nombrarlas** (R26) y esperar al domingo (R25). El 40 que
+  se le presentó salía de `maestro.obras` y **no reproduce**: manda `SQL_ESTADO_OBRAS`.
 - **R4.** El catálogo de estados **está verificado** (2026-09-02): vive en
   `conest`, tipo **42**, y se llega por `con.est`. El sistema debe publicarlo en el
   diccionario para que deje de haber códigos sin nombre.

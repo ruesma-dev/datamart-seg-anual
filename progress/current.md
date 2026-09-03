@@ -25,13 +25,232 @@ escribe contra produccion: las cinco huellas del antes, la primera
 reconstruccion acotada, las huellas del despues con tolerancia cero, la 0599, y
 el despliegue de `infra/97_create_alert_ventana.ps1`, **sin el cual el guardian
 es mudo**. Y las mediciones T1 y T2b, que barren tablas de millones de filas y
-no se lanzaron para no vaciar otra vez la hucha de creditos.
+no se lanzaron para no vaciar otra vez la hucha de creditos. **Todo eso esta
+ahora paso a paso y con el comando literal** en la seccion siguiente, «LAS
+MANUAL DE LA FASE 7»: no hace falta releer la spec para ejecutarlo.
 
 **De paso queda arreglado el defecto de F-052 que la dejo `blocked`**:
 `check-cobertura` salia OK habiendo mirado CERO combinaciones. Paso contra
 produccion el 02-sep, con `stg.plan_mensual` truncada. Ahora sale KO. F-052
 sigue esperando a que `stg` vuelva a estar completo, que es lo que desbloquea
 la fase 7 de esta feature.
+
+## F-025 · LAS MANUAL DE LA FASE 7, CON SU COMANDO EXACTO (C4)
+
+**Para el humano.** Esto es el guion completo de lo que queda, en el orden en
+que hay que hacerlo y con el comando literal de cada paso: no hace falta releer
+la spec. Todo desde la raiz del repositorio, con el `.env` de produccion y el
+entorno virtual activado. Los comandos van en **PowerShell**, que es la consola
+de este puesto.
+
+**PRECONDICION, y hoy NO se cumple:** `stg.plan_mensual` sigue truncada al
+21,6 % por la averia del 02-sep. Nada de lo de abajo vale hasta que una
+nocturna la deje completa (29,7 M de filas). Comprobarlo antes de empezar:
+
+```powershell
+python main.py status-stg
+python main.py check-coherencia
+```
+
+### Paso 1 · T1 · El peso real, que decide si la feature merece la pena
+
+Reparte el peso de `SQL_PESOS_PLAN_MENSUAL` entre las 40 obras vivas y las 880
+congeladas. **Es caro**: barre `stg.presupuesto` (13,8 M filas) unido a
+`raw.obrparpre`. Lanzarlo **fuera del horario de carga**.
+
+```powershell
+@'
+import datetime, main
+from config.settings import get_settings
+from etl_sigrid.application.steps.build_stg_step import sello_vigente_del_repositorio
+from etl_sigrid.domain.ventana import clasificar_obras, criterio_desde_reglas
+
+s = get_settings(); pg = main._get_pg()
+plan = clasificar_obras(
+    pg.fetch_censo_de_obras(),
+    criterio_desde_reglas(s.business_rules, s.postgres.ventana_meses),
+    datetime.date.today(), sello_vigente_del_repositorio(s),
+    completa=False, rescate=s.postgres.ventana_rescate)
+pesos = pg.fetch_pesos_plan_mensual()          # <-- lo caro de T1
+vivas = sum(pesos.get(d.obra_id, 0) for d in plan.reconstruir)
+frias = sum(pesos.get(d.obra_id, 0) for d in plan.congelar)
+print(f"obras vivas={len(plan.reconstruir)} peso={vivas:,}")
+print(f"congeladas={len(plan.congelar)} peso={frias:,}")
+print(f"AHORRO = {100*frias/(vivas+frias):.1f} %   (si baja del 40 %, PARAR)")
+'@ | python -
+```
+
+**Criterio de parada de T1: si el ahorro es menor del 40 %, PARAR** y volver a
+consultar antes de encender nada. La cota estimada de `mediciones.md` §3 es
+73,3 %, pero es un proxy que no cubre los ambitos master (8 y 11).
+
+La cifra se escribe en `mediciones.md` §3.
+
+### Paso 2 · T2b · Cuanto cuesta la firma, que decide su forma final
+
+Las dos variantes, cronometradas. La cara detoasta `planif` en 13,8 M de filas.
+**Tambien fuera del horario de carga.**
+
+```powershell
+@'
+import time, main
+from etl_sigrid.infrastructure.postgres.postgres_client import (
+    SQL_FIRMA_ORIGEN, SQL_FIRMA_ORIGEN_CON_PLANIF)
+
+pg = main._get_pg()
+for nombre, consulta in (("barata (sin planif)", SQL_FIRMA_ORIGEN),
+                         ("cara (md5(planif))", SQL_FIRMA_ORIGEN_CON_PLANIF)):
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute("SET LOCAL statement_timeout = '1800s'")
+        t0 = time.perf_counter(); cur.execute(consulta); filas = cur.fetchall()
+        print(f"{nombre}: {time.perf_counter()-t0:.1f} s, {len(filas)} obras")
+'@ | python -
+```
+
+Si la cara resulta asumible, sustituye a `SQL_FIRMA_ORIGEN` (R20); si no, la
+laguna se queda declarada y la cierra el domingo. Los segundos de cada variante
+van a `mediciones.md` §6.
+
+### Paso 3 · T35 · Desplegar la alerta. SIN ESTO EL GUARDIAN ES MUDO
+
+`check-ventana` **avisa y no tumba el job** (DA-5), asi que la alerta de fallo
+no se dispara y esta regla es la **unica** via por la que el hallazgo llega a
+una persona. Va **antes** de encender la ventana, no despues.
+
+```powershell
+az extension add --name scheduled-query          # una vez por puesto
+powershell -NoProfile -File infra/97_create_alert_ventana.ps1
+
+# El buzon vive en el grupo de accion, no en el .ps1 (R30 de F-052):
+powershell -NoProfile -File infra/90_create_alert.ps1 -AlertEmail <buzon>
+```
+
+Comprobar que la consulta de la regla ve el marcador, con el workspace de Log
+Analytics:
+
+```powershell
+$ws = az monitor log-analytics workspace show -g <resourceGroup> -n <logAnalytics> --query customerId -o tsv
+az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '<job>' | where Log_s contains '[F025-VENTANA-KO]' | count" -o table
+```
+
+**No esta verificada hasta que llegue un correo de verdad.**
+
+### Paso 4 · T27 · Las CINCO huellas del ANTES
+
+**Antes de reconstruir nada y sobre el `raw` vigente.** Solo lectura. Si se
+capturan despues, ya no prueban nada.
+
+```powershell
+mkdir huellas -Force
+python main.py huella-obras --out huellas/antes_stg.csv       --desde stg       --timeout 900
+python main.py huella-obras --out huellas/antes_mart.csv      --desde mart      --timeout 900
+python main.py huella-obras --out huellas/antes_dimension.csv --desde dimension --timeout 900
+python main.py huella-obras --out huellas/antes_cierre.csv    --desde cierre    --timeout 900
+python main.py huella-obras --out huellas/antes_plan_obra.csv --desde plan_obra --timeout 900
+```
+
+Guardar los cinco CSV **fuera de la base**; `huellas/` no se versiona.
+
+### Paso 5 · T28 · El plan, en seco, contra produccion
+
+```powershell
+python main.py ventana-plan
+python main.py ventana-plan --detalle
+```
+
+**Tiene que decir 920 censadas, 40 a reconstruir y 880 congeladas.** Si no
+cuadra con `mediciones.md` §2, PARAR: el criterio no esta viendo lo que se
+midio. Ojo, con la ventana todavia apagada imprime `completa: True`; eso es
+correcto y no es un fallo.
+
+### Paso 6 · Encender `PG_VENTANA_ACTIVA`. **Decision del humano**
+
+Nace apagada (R5): nada de lo anterior cambia una sola cifra publicada. En
+local, en `.env`:
+
+```
+PG_VENTANA_ACTIVA=true
+```
+
+**AVISO, y es un hueco real: el job de Azure NO recibe hoy esta variable.**
+`infra/80_create_job.ps1` enumera las `--env-vars` una a una y ninguna
+`PG_VENTANA_*` esta en la lista; `infra/85_update_job.ps1` solo cambia la
+imagen. Encender la ventana en produccion exige **anadir la variable a
+`80_create_job.ps1` y volver a lanzarlo**, o fijarla a mano sobre el job:
+
+```powershell
+az containerapp job update -g <resourceGroup> -n <job> --set-env-vars "PG_VENTANA_ACTIVA=true"
+```
+
+**No se ha tocado `infra/` a proposito:** cambiar como se despliega el job es
+una decision del humano, no del implementer. Verificar despues que llego:
+
+```powershell
+az containerapp job show -g <resourceGroup> -n <job> --query "properties.template.containers[0].env[?name=='PG_VENTANA_ACTIVA']" -o table
+```
+
+### Paso 7 · T29 · La primera reconstruccion acotada
+
+```powershell
+python main.py stage
+python main.py timings --last 1
+```
+
+Anotar duracion por tramo y ocupacion de disco. Para forzar la completa —lo que
+hace sola la noche del domingo—: `python main.py stage --reconstruir-todo`.
+
+### Paso 8 · T30 · Las cinco huellas del DESPUES, y la comparacion
+
+**SIN `--obras-esperadas`.** Tolerancia cero: **una sola diferencia PARA la
+feature.**
+
+```powershell
+python main.py huella-obras --out huellas/despues_stg.csv       --desde stg       --timeout 900
+python main.py huella-obras --out huellas/despues_mart.csv      --desde mart      --timeout 900
+python main.py huella-obras --out huellas/despues_dimension.csv --desde dimension --timeout 900
+python main.py huella-obras --out huellas/despues_cierre.csv    --desde cierre    --timeout 900
+python main.py huella-obras --out huellas/despues_plan_obra.csv --desde plan_obra --timeout 900
+
+python main.py comparar-huellas huellas/antes_stg.csv       huellas/despues_stg.csv
+python main.py comparar-huellas huellas/antes_mart.csv      huellas/despues_mart.csv
+python main.py comparar-huellas huellas/antes_dimension.csv huellas/despues_dimension.csv
+python main.py comparar-huellas huellas/antes_cierre.csv    huellas/despues_cierre.csv
+python main.py comparar-huellas huellas/antes_plan_obra.csv huellas/despues_plan_obra.csv
+```
+
+Las cinco tienen que salir con **codigo 0 y cero diferencias**.
+
+### Paso 9 · T31 y T31b · La 0599 y la frescura por obra
+
+```powershell
+python main.py inspect-cierre --codigo 0599
+```
+
+Tiene que seguir dando **DIRECTOS 2.624.793 €** y margen **1,8 %**. Y que las
+40 vivas se rehicieron mientras las 880 conservan su `_built_at` anterior:
+
+```sql
+SELECT congelada, count(*), min(construido_at), max(construido_at)
+FROM _meta.v_frescura_obra
+GROUP BY congelada;
+```
+
+### Paso 10 · T32 · Los guardianes, con el mismo veredicto que antes
+
+```powershell
+python main.py check-unicidad --timeout 300
+python main.py check-cierres --timeout 900
+python main.py check-cobertura
+python main.py check-declarados
+python main.py check-ventana
+```
+
+### Paso 11 · T33 y T34 · Tras una semana acotada
+
+Repetir la medicion de bloat de `mediciones.md` §7 sobre `pg_class` y
+`pg_stat_user_tables` y compararla con T2; **si crece de forma sostenida, abrir
+la feature de particionado**. Y mirar en el portal de Azure los creditos de CPU
+restantes al terminar la nocturna (R29): **tienen que quedar por encima de 0**.
 
 ## F-025 · SPEC ESCRITA y DECISIONES CERRADAS por el humano (2026-09-02)
 
