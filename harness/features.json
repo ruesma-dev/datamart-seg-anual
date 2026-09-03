@@ -798,7 +798,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 5,
+      "priority": 8,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -817,7 +817,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 7,
+      "priority": 10,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -835,7 +835,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 6,
+      "priority": 9,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -857,20 +857,72 @@
     },
     {
       "id": "F-056",
-      "title": "La contabilidad no entra en el datamart: los apuntes de Sigrid traen debe, haber, cuenta y OBRA, y no se ingieren",
-      "description": "Pedida por el humano el 2026-09-03: 'anade una feature de traerse la informacion contable de Sigrid'. COMPROBADO ANTES DE FICHARLA: no existe ninguna feature que lo cubra -F-037 es tesoreria (cobros y pagos) y F-040 el lado de ingresos; ninguna toca la contabilidad-. LO QUE HAY EN SIGRID, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas de `config/tables_sigrid.yaml`: NINGUNA de estas se ingiere. La principal es **`apu`, 'Apuntes Contables'**, y su contenido es exactamente lo que hace falta: `asiide` (asiento), `cueide` (cuenta, indice a `cua`), **`deb` y `hab`** (debe y haber como importe), `res` (concepto), `cenide` (CENTRO DE COSTE) y **`obr` (OBRA)**, mas `doc`, `jus` (justificante), `pun` (punteo), `concil` (conciliacion), `del` (delegacion) y `cptide`. La acompanan `asi` (la cabecera del asiento), `cua` (el plan de cuentas) y `apa`; existe ademas `antpgcapu` para la conversion del PGC antiguo. POR QUE IMPORTA, y es distinto de lo que ya esta fichado: el datamart de hoy vive del PRESUPUESTO y del SEGUIMIENTO -lo que se planifico y lo que el jefe de obra cerro cada mes-. La contabilidad es **la otra version de la verdad**: lo que de verdad se contabilizo. Con `apu` se podria por fin CONTRASTAR el coste de seguimiento contra el coste contable de la misma obra, que es la pregunta que ninguna de las dos fuentes puede responder sola. Y `apu.obr` mas `apu.cenide` dicen que ese contraste es posible por obra, no solo a nivel de empresa. OJO CON LA RELACION OBRA/CENTRO DE COSTE: `apu` trae LAS DOS -`obr` como texto de 16 caracteres y `cenide` como indice a `cen`-, y F-045 esta abierta precisamente porque `retenciones.movimientos.obra_id` resulto ser el `ide` del CENTRO DE COSTE y no el de la obra: 0 de 261 valores casaban. **Esta feature no puede suponer cual de los dos campos ata a nuestra obra: tiene que medirlo**, y lo que aprenda sirve tambien para desatascar F-045. A DECIDIR EN LA SPEC: (a) el ALCANCE, porque `apu` es la tabla mas grande que se habra traido nunca -la contabilidad de una constructora son millones de apuntes- y la nocturna hoy NO CABE, que es la razon de ser de F-025: hay que medir el volumen contra Sigrid antes de decidir si se trae entera, por ejercicios o solo las cuentas que interesan; (b) que se publica, porque un apunte contable en bruto no es una respuesta de negocio; (c) si el plan de cuentas (`cua`) entra, sin el los numeros de cuenta no significan nada para quien pregunte por el MCP; (d) quien es el dueno del criterio contable, que no es el jefe de obra. ENLAZA con F-037 (tesoreria), F-040 (ingresos), F-045 (obra vs centro de coste) y F-054 (que significa cada concepto para nosotros).",
+      "title": "Traer la contabilidad de Sigrid: plan de cuentas de todas las empresas, asientos y apuntes, y el mart de mayor",
+      "description": "Pedida por el humano el 2026-09-03: 'anade una feature de traerse la informacion contable de Sigrid'. COMPROBADO ANTES DE FICHARLA: no existe ninguna feature que lo cubra -F-037 es tesoreria (cobros y pagos) y F-040 el lado de ingresos; ninguna toca la contabilidad-. LO QUE HAY EN SIGRID, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas de `config/tables_sigrid.yaml`: NINGUNA de estas se ingiere. La principal es **`apu`, 'Apuntes Contables'**, y su contenido es exactamente lo que hace falta: `asiide` (asiento), `cueide` (cuenta, indice a `cua`), **`deb` y `hab`** (debe y haber como importe), `res` (concepto), `cenide` (CENTRO DE COSTE) y **`obr` (OBRA)**, mas `doc`, `jus` (justificante), `pun` (punteo), `concil` (conciliacion), `del` (delegacion) y `cptide`. La acompanan `asi` (la cabecera del asiento), `cua` (el plan de cuentas) y `apa`; existe ademas `antpgcapu` para la conversion del PGC antiguo. POR QUE IMPORTA, y es distinto de lo que ya esta fichado: el datamart de hoy vive del PRESUPUESTO y del SEGUIMIENTO -lo que se planifico y lo que el jefe de obra cerro cada mes-. La contabilidad es **la otra version de la verdad**: lo que de verdad se contabilizo. Con `apu` se podria por fin CONTRASTAR el coste de seguimiento contra el coste contable de la misma obra, que es la pregunta que ninguna de las dos fuentes puede responder sola. Y `apu.obr` mas `apu.cenide` dicen que ese contraste es posible por obra, no solo a nivel de empresa. OJO CON LA RELACION OBRA/CENTRO DE COSTE: `apu` trae LAS DOS -`obr` como texto de 16 caracteres y `cenide` como indice a `cen`-, y F-045 esta abierta precisamente porque `retenciones.movimientos.obra_id` resulto ser el `ide` del CENTRO DE COSTE y no el de la obra: 0 de 261 valores casaban. **Esta feature no puede suponer cual de los dos campos ata a nuestra obra: tiene que medirlo**, y lo que aprenda sirve tambien para desatascar F-045. A DECIDIR EN LA SPEC: (a) el ALCANCE, porque `apu` es la tabla mas grande que se habra traido nunca -la contabilidad de una constructora son millones de apuntes- y la nocturna hoy NO CABE, que es la razon de ser de F-025: hay que medir el volumen contra Sigrid antes de decidir si se trae entera, por ejercicios o solo las cuentas que interesan; (b) que se publica, porque un apunte contable en bruto no es una respuesta de negocio; (c) si el plan de cuentas (`cua`) entra, sin el los numeros de cuenta no significan nada para quien pregunte por el MCP; (d) quien es el dueno del criterio contable, que no es el jefe de obra. ENLAZA con F-037 (tesoreria), F-040 (ingresos), F-045 (obra vs centro de coste) y F-054 (que significa cada concepto para nosotros). ================ MEDIDO CONTRA SIGRID EL 2026-09-03, y cambia el planteamiento de la ficha original. VOLUMEN REAL: `apu` 2.153.736 apuntes, `asi` 783.080 asientos, `cua` 34.129 cuentas, `apa` 709.167. DONDE VIVE CADA COSA, que no es donde parecia: la jerarquia del plan NO esta en `cua` sino en `con` (tip=16); `cua` solo EXTIENDE las cuentas imputables -33.875 de nivel 5 frente a 254 de nivel 0-, y el codigo y el nombre legibles salen de `con.cod` y `con.res`. Mismo patron que `rec` en retenciones. EL PLAN NO ES ANUAL: SE PARTE POR EMPRESA. La cuenta 4300000000 aparece SEIS veces y las seis se diferencian en un unico campo, `con.emp`. No hay ningun campo de ejercicio en `cua`; `ejealta`/`mesalta` son el alta de la cuenta y valen 0. Hay ~30 empresas con apuntes: **emp=1 concentra 1.936.044 apuntes (90 %) desde 2008**, y el resto son sociedades y UTEs, algunas ya cerradas (emp=10 hasta 2016, emp=6 hasta 2018, emp=19 solo 2015). LA FECHA NO ESTA EN `apu`: `asi` extiende `con`, y la fecha del asiento es `con.fec`, un ENTERO AAAAMMDD. Para fechar un apunte hacen falta dos saltos: `apu.asiide` -> `asi.ide` = `con.ide` -> `con.fec`. LA ATRIBUCION A OBRA VA POR `cenide`, NO POR `obr`. Medido: de los 2.153.736 apuntes, **`obr` solo esta informado en 142 y con 2 obras distintas**; `cenide` lo esta en **1.169.398 (54 %)**. Es EXACTAMENTE la trampa de F-045, donde `retenciones.movimientos.obra_id` resulto ser el centro de coste: aqui ya esta medido y no hay que volver a suponerlo, pero SIGUE HACIENDO FALTA resolver como se ata un centro de coste a nuestra obra, que es lo que F-045 tiene abierto. EL PUENTE CON LO QUE YA PUBLICAMOS: `pag.cueide` apunta directamente a la cuenta contable del efecto. Medido sobre 2025: los 2.737 efectos de retencion de proveedor tienen cuenta, los 2.737. Eso permite CUADRAR nuestras retenciones contra el mayor, que seria la primera vez que el datamart se verifica contra una fuente independiente. ALCANCE DE ESTA FEATURE: ingesta de `cua`, `asi`, `apu` y lo que haga falta de `con` para el plan, mas el mart BASE -el mayor consultable por cuenta, ano, empresa y tercero-. Los estados financieros son F-058 y van encima de esto. El caso de uso que lo motivo: Juan Romero pidio el mayor de la cuenta 4308000197 y hoy no se puede dar.",
       "acceptance": [
-        "Medido contra Sigrid, no supuesto, el volumen real de `apu` y `asi` -filas por ejercicio- y decidido con ese numero delante que alcance se trae: entera, por ejercicios o por cuentas",
-        "Resuelto CON DATOS cual de los dos campos de `apu` ata un apunte a nuestra obra: `obr` (texto) o `cenide` (centro de coste). Es la misma trampa que tiene bloqueada a F-045, y lo que se aprenda aqui debe servir alli",
-        "Lo que se ingiera llega con su ficha en el diccionario, y si el plan de cuentas `cua` no entra, queda escrito por que y que se pierde con ello",
-        "Existe al menos un contraste util y probado entre el coste de SEGUIMIENTO y el coste CONTABLE de una misma obra, con su explicacion de por que difieren -que diferiran-",
-        "Medido el impacto de la ingesta nueva sobre la nocturna: no se cierra si empeora una carga que ya no cabe (F-025)"
+        "Ingeridas cua, asi y apu con su jerarquia de `con` (tip=16), y decidido y escrito el alcance por empresa: si se traen las ~30 o solo las vivas, con el coste medido de cada opcion",
+        "La fecha de cada apunte se resuelve por los dos saltos (apu -> asi -> con.fec) y queda publicada como fecha real, no como entero AAAAMMDD",
+        "La atribucion a obra se hace por `cenide` -medido: `obr` esta vacio en el 99,99 %- y queda escrito como se ata un centro de coste a una obra, o declarado que depende de F-045",
+        "Existe un MAYOR consultable por cuenta, ano, empresa y tercero, y responde la pregunta que hoy no se puede: el mayor de una cuenta concreta como la 4308000197",
+        "El plan de cuentas se publica como ARBOL, con su jerarquia navegable, y una cuenta se puede localizar por codigo dentro de su empresa",
+        "Medido el impacto en la nocturna y decidido si la ingesta es completa o incremental: son 2,15 M de apuntes sobre una carga que hoy no cabe (F-025)"
       ],
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
       "priority": 4,
       "branch": "feature/F-056-contabilidad"
+    },
+    {
+      "id": "F-057",
+      "title": "Traer recursos, empleados y partes de trabajo: el coste de personal que hoy no se puede atribuir",
+      "description": "Pedida por el humano el 2026-09-03, y confirmada con Juan Romero, que pregunto por los nombres exactos en su correo del 2026-09-03 17:19. COMPROBADO CONTRA SIGRID ese mismo dia: las tres tablas existen y se llaman como el suponia. `res` RECURSOS con **2.610 filas**, `emp` EMPLEADOS con **1.351** y `hmo` PARTES DE TRABAJO con **6.848**. Ninguna de las tres se ingiere hoy -la ingesta son 31 tablas y no estan-. POR QUE IMPORTA: el datamart sabe lo que CUESTA una obra en material y subcontrata -eso viene de compras- pero no sabe QUIEN ha trabajado en ella ni cuantas horas. Los partes de trabajo son el eslabon que ata persona, horas y obra, y sin el no se puede responder ni el coste real de mano de obra por obra ni la dedicacion de un equipo. Juan aporto ademas el criterio de negocio en su correo 'RECURSOS PARTES TRABAJO' del 2026-09-03: los recursos en rojo estan de baja y no se consideran, y todos los de alta estan codificados como 'Apellidos, Nombre' con el DNI. A DECIDIR EN LA SPEC: la relacion entre `res` (recurso) y `emp` (empleado), que no tiene por que ser 1:1 -un recurso puede ser maquinaria y no persona-; como se ata un parte a la obra, sabiendo que en `apu` la atribucion va por `cenide` y no por `obr`, y que F-045 tiene abierta esa misma pregunta; y si esto llega a la superficie de consumo o se queda en `stg` hasta que haya un caso de uso escrito. DATO SENSIBLE, y hay que tratarlo como tal: `emp` y `res` traen datos personales -nombre y DNI-. La spec debe decidir QUE SE PUBLICA y que no, y el DNI no deberia salir del `raw` sin una razon escrita. ENLAZA con F-056 (el coste de personal tambien esta en la contabilidad, grupo 64) y con F-045.",
+      "acceptance": [
+        "Ingeridas `res`, `emp` y `hmo`, con el criterio de Juan Romero aplicado y escrito: los recursos de baja no se consideran",
+        "Resuelta y documentada la relacion entre recurso y empleado, y como se ata un parte de trabajo a una obra",
+        "Decidido por escrito que datos personales se publican y cuales se quedan en raw; el DNI no sube sin razon escrita",
+        "Se puede responder al menos una pregunta que hoy no tiene respuesta: por ejemplo las horas imputadas a una obra en un periodo, o quien ha trabajado en ella",
+        "Medido el impacto en la nocturna antes de anadir las tres tablas (F-025)"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 6,
+      "branch": "feature/F-057-recursos-empleados-partes"
+    },
+    {
+      "id": "F-058",
+      "title": "Estados financieros y cuenta de resultados por obra: el mart que se monta encima de la contabilidad",
+      "description": "Pedida por el humano el 2026-09-03: 'habra que montarlos de manera que pueda saber lo que se hizo por ano u otras consultas (montar estados financieros, etc)'. DEPENDE DE F-056: sin los apuntes ingeridos esto no existe. EL PLANTEAMIENTO, pensado con el dato medido delante y no de oido: el mart NO se parte por ano. El plan de cuentas se parte por EMPRESA (`con.emp`) y los asientos llevan su fecha en `con.fec`, asi que el grano natural es **cuenta x periodo x empresa x tercero x centro de coste**, con el ano como DIMENSION y no como particion. De ahi salen por agregacion tanto 'lo que se hizo en 2025' como los estados financieros, sin duplicar modelo. LO QUE SE PUEDE MONTAR, con el volumen ya medido de 2025: BALANCE con los grupos 1 a 5 del PGC y CUENTA DE RESULTADOS con los grupos 6 y 7 -en 2025 el grupo 6 tiene 45.015 apuntes y 129 M EUR y el grupo 7 tiene 1.035 y 131 M EUR-, los dos por empresa y por ano, agregando la jerarquia de cuentas que vive en `con` (tip=16). Y LA PIEZA MAS VALIOSA, que no es un estado financiero: la CUENTA DE RESULTADOS POR OBRA. El 54 % de los apuntes (1.169.398) llevan `cenide`, asi que el resultado contable se puede bajar a obra y CONTRASTARSE con el margen que publica hoy la capa `cierre`, que sale del seguimiento del jefe de obra. Hoy el datamart tiene UNA version de la verdad; esto daria la segunda, y la diferencia entre ambas es informacion de negocio por si misma. Es tambien la unica forma de detectar un caso como el de la 0599 sin depender de que alguien mire. AVISO QUE LA SPEC DEBE RECOGER, medido el 2026-09-03: el apunte contable y el efecto NO son sumables. El efecto es un registro vivo -nace cuando se retiene y muere cuando se devuelve- y la contabilidad registra los dos movimientos por separado, por eso debe = haber en todos los anos. Cualquier vista que junte las dos fuentes sin explicarlo dara un numero que no significa nada.",
+      "acceptance": [
+        "Existe un mart con grano cuenta x periodo x empresa x tercero x centro de coste, con el ano como dimension y no como particion",
+        "Se puede obtener el BALANCE (grupos 1-5) y la CUENTA DE RESULTADOS (grupos 6-7) por empresa y ano, agregando la jerarquia de cuentas",
+        "Existe una CUENTA DE RESULTADOS POR OBRA y esta contrastada contra el margen que publica la capa cierre, con las diferencias explicadas y no escondidas",
+        "El diccionario explica que significa cada estado y de que cuentas sale, para que el MCP pueda responder sin que nadie explique nada en el prompt (enlaza con F-054)",
+        "Queda escrito, y comprobado en las vistas, que apuntes y efectos no son sumables"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 5,
+      "branch": "feature/F-058-estados-financieros"
+    },
+    {
+      "id": "F-059",
+      "title": "Las retenciones son ciegas antes de 2016: la contabilidad las tiene desde 2009 y el datamart no las ve",
+      "description": "Pedida por el humano el 2026-09-03 -'apunta que hay que corregir retenciones'- despues de medirlo. NACE DE UNA QUEJA REAL: Juan Romero escribio el 2026-09-03 que al sacar las retenciones historicas de Ahorramas 'solo me da resultado desde 2016' y que faltaban cobros. MEDIDO CONTRA SIGRID, y no es un fallo de nuestro ETL: el efecto de retencion MAS ANTIGUO que existe en `pag` es del **20160112**. Antes de esa fecha no hay ni uno. Probablemente una migracion de sistema en enero de 2016. El modulo de retenciones de este repositorio se construye sobre `pag`/`cob` con `retide <> 0`, asi que es ESTRUCTURALMENTE CIEGO antes de 2016 y ninguna correccion de nuestro codigo lo arregla. PERO LA CONTABILIDAD SI LAS TIENE. Apuntes en las familias de cuenta de retencion (4008, 4108 y 4180) por ano: 2009 -> 1.025 apuntes y 1,73 M EUR; 2010 -> 1.183; 2011 -> 961; 2012 -> 1.002; 2013 -> 1.333; 2014 -> 1.629; 2015 -> 1.598 apuntes y 1,89 M EUR. **Mas de 11.500 apuntes de retencion anteriores a 2016** que el datamart no puede ver por ninguna via. OJO CON LA FAMILIA DE CUENTA, que es la trampa: la cuenta que se llama 'Retenciones Proveedores' es la 4008, pero **el 87 % del dinero esta en la 4108**, que NO lleva esa palabra en el nombre. Buscar por el literal del nombre da una respuesta gravemente incompleta; en 2025 la 4008 son 354.533 EUR por efectos y la 4108 son 2.682.806 EUR. COMO SE ATAN LAS DOS FUENTES: `pag.cueide` apunta directamente a la cuenta contable, y en 2025 los 2.737 efectos de retencion la tienen informada, los 2.737. El puente existe y esta medido. DEPENDE DE F-056: sin los apuntes ingeridos no hay historia que anadir. A DECIDIR EN LA SPEC: si las retenciones historicas se publican en el mismo objeto que las de efectos -con una columna que diga de que fuente vienen- o en uno aparte; y como se evita el doble conteo desde 2016, donde las dos fuentes se solapan. NO son sumables: el efecto es un registro vivo y la contabilidad registra alta y devolucion por separado.",
+      "acceptance": [
+        "Escrito y verificado por que el datamart no ve retenciones antes de 2016: el efecto mas antiguo de `pag` es del 20160112, y no es un defecto de nuestro codigo",
+        "Las retenciones anteriores a 2016 se pueden consultar desde el datamart, con su origen contable identificado",
+        "Resuelto el solape desde 2016 sin doble conteo, y comprobado con una obra o proveedor concreto que las cifras publicadas hoy NO cambian",
+        "La respuesta a la pregunta de Juan Romero -las retenciones historicas de un cliente o proveedor- se puede dar de punta a punta por el MCP",
+        "Documentado en el diccionario que apuntes y efectos no son sumables, y por que la familia 4108 pesa mas que la 4008 pese a no llamarse 'retenciones'"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 7,
+      "branch": "feature/F-059-retenciones-historicas"
     }
   ]
 }

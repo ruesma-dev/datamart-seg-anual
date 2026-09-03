@@ -1,140 +1,152 @@
 <!-- progress/review_F-025.md -->
-Revisión completa (pasada 1) · `905d13d..b4be5ee`, 30 commits.
+Revisión incremental desde `b4be5ee` (pasada 2). La pasada 1 fue completa
+(`905d13d..b4be5ee`); su informe entero vive en el commit `a34ed9b`.
 
 # F-025 · Review · Las obras cerradas no se reconstruyen cada noche
 
 ## Veredicto: **CHANGES_REQUESTED**
 
-No es un rechazo del diseño: lo entregado es sólido y el requisito que manda
-—«que no se reconstruyan, pero que no se borren»— está cumplido, verificado
-camino a camino y no leyendo el informe. Lo bloquean **tres cosas concretas y
-baratas** (§Cambios requeridos) más la **fase 7 entera**, del humano, sobre la
-que no dictamino. **Rigor `critico`**: RED, cobertura ≥ 80 %, **cero
-supervivientes** y las MANUAL con comando y resultado.
+**No es un rechazo del trabajo.** De los tres cambios que pedí: **campaña sobre
+HEAD `[x]`** (RM1 cumplida), **MANUAL con su comando `[x]`**, y **censo remedido
+pero mal propagado**. Lo que impide aprobar es: **la fase 7 entera sigue sin
+ejecutar** (C5, y sobre ella no dictamino), **un hallazgo nuevo sobre el alcance
+de la campaña de mutación** que se me pasó en la pasada 1, y **cuatro cifras
+viejas del censo que sobrevivieron al remedido**. **Rigor `critico`**: RED,
+cobertura ≥ 80 %, cero supervivientes y las MANUAL con comando y resultado.
 
-## ¿Puede algo de esto borrar una obra congelada? NO
+**El delta no toca ni una línea de código:** `git diff --name-only b4be5ee..HEAD`
+no devuelve ningún `.py` ni `.sql`, y en `business_rules.yaml` es **solo
+comentarios**. Todo lo verificado en la pasada 1 —borrado derivado, `TRUNCATE`
+retirado, hexagonal, convenciones, trazabilidad— sigue en pie sin re-mirarlo.
 
-Barrido propio de `TRUNCATE`/`DELETE`/`DROP` sobre `etl_sigrid/` y `main.py`:
+**El censo, comprobado:** 920 · 880 · 40 · 38 al fact · 693/226/872 · 48 con
+actividad · **8** congeladas pese a tenerla (7 CERRADAS + la `180501`) son **las
+cifras que medí yo contra la base en la pasada 1** —no he reconsultado el
+`B1ms`—; cuadran en R2/R3, DA-1/DA-3, `mediciones.md` §2 y §5, `design.md`,
+`maestro.yaml` y `business_rules.yaml`, y cierran solas (40 + 8 = 48). Fallan
+cuatro residuos (§Cambios 3).
 
-- **El único `DELETE` sobre `stg`** lo compone `componer_borrado_derivado`
-  (`build_stg_step.py:211-241`), y sus dos llamantes lo construyen **con la
-  misma variable `obras`** que sustituye el marcador: no pueden divergir.
-- **`TRUNCATE` desapareció de las dos tablas acotadas**: en `sql/stg/` solo
-  queda en `03`, `04`, `05` y `07`, enteros (R7), y `truncate_table()` solo lo
-  llama `ingest_raw_step.py:272`, sobre `raw`.
-- **El aborto ya no vacía** (`_abortar_plan_mensual`, l. 986): registra qué obras
-  quedaron sin rehacer y propaga. Invariante de F-019 invertida a propósito, con
-  los tests reescritos y su porqué en cada docstring.
-- **Escrituras nuevas: solo `_meta.obra_build`**, por upsert.
+## Hallazgo nuevo: la campaña mide el 38 % de la feature
 
-## Los cuatro hallazgos, juzgados
-
-1. **`execute_sql_text` devolvía las filas BORRADAS** (`4667c6f`). Bien resuelto
-   con `while cur.nextset()`. **No afecta a nadie más**: solo lo usan los dos
-   sitios de F-025.
-2. **La limpieza de sobrantes solo denuncia** (`8e9b1f2`): **cierto**,
-   `_denunciar_obras_sobrantes` (l. 736) hace un `SELECT DISTINCT` y un
-   `logger.warning`. Y el argumento es el correcto: el universo sale de
-   `raw.obr JOIN raw.con`, y borrar por lo que ese `JOIN` no vea contradice R10.
-3. **Código inalcanzable borrado** (`223cd1d`): correcto, la actividad es
-   siempre día 1 y recortar días inventaba precisión. **El criterio sigue siendo
-   el del humano**: tres reglas en unión, patrón anclado por los dos extremos,
-   estados `[1, 11, 25]`, y el borde de doce meses cae del lado seguro.
-4. **Los cinco supervivientes**: los tests **prueban algo real**; miran la
-   propiedad (`marcador`, `de_tipo`, `codigo`) y no `MARCADOR_KO in output`, que
-   era el agujero. **Verificado por mí (RM4)**: en un worktree aislado apliqué
-   las cinco mutaciones equivalentes sobre HEAD, una a una, y **las cinco mueren**
-   con `tests/test_f025_ventana.py`. **RM6 no aplica**: no se quitó guarda.
+Recalculado con `harness.alcance`, el **alcance automático de F-025 son 10
+ficheros, 2.610 líneas y 219 mutantes**. La campaña lo declaró a mano —«Origen
+del diff: **ficheros**»— y midió **uno solo**. Los 136 que nunca se generaron no
+son periferia: **`build_stg_step.py` (34), donde vive `componer_borrado_derivado`,
+o sea LO QUE SE BORRA**; `main.py` (37); `postgres_client.py` (31, con
+`SQL_ESTADO_OBRAS`); `ventana_sql.py` (15); `cobertura.py` (6). Sale de **DA-6**,
+que acota la campaña a `domain/ventana.py` y que `decisiones.md` declara **«sin
+pronunciamiento del humano»**. En `critico` `rigor.json` dice `max_mutantes:
+null` = *«aquí se mide la campaña entera»*, y solo se exime con **justificación
+escrita aceptada por el humano**: aquí se la concedió la spec a sí misma. **Es mi
+fallo de la pasada 1**, por no recalcular el alcance. Cerrarlo: ~**2 h 40**.
 
 ## Verificación independiente de la campaña
 
-Recalculado con `harness.alcance` y `generar_mutantes` sobre el fichero **tal
-como estaba en `8e9b1f2`**: **760 líneas, 83 mutantes**, lo mismo que el
-informe, y los cinco supervivientes **existen como mutantes reales**, mismo
-operador y mismo texto original→mutado: no está inventado. **RM2 coherente**
-(83 × 42,9 s = 3.560 s; media × 4 workers = 171,6 s frente a una base de
-209-214 s, por debajo por el `-x`). **Campaña NO reejecutada: 59,3 min según el
-informe**, por encima del umbral de 60 s. **RM1 FALLA**: mide `8e9b1f2` y HEAD
-es `b4be5ee`; en medio `3991076` modificó `domain/ventana.py`, **el único
-fichero del alcance**, hoy de **779 líneas**.
+Mide `073af30aec64992dd1b4b0183a8c2c1373808ee9` y **`ventana.py` no ha cambiado
+desde entonces** (diff vacío): **RM1 cumplida**. **Recálculo puro:** 779 líneas y
+**83 mutantes**, idénticos al informe; 79 muertos, **0 supervivientes, 0 sin
+veredicto, ningún `PENDIENTE`**, sin «⚠ CAMPAÑA NO VÁLIDA». **Campaña NO
+reejecutada: 7.720 s (2 h 8) según el informe**, muy por encima del umbral de
+60 s. **RM2 coherente**: `83 × 93,0 = 7.720` y `media × 4 workers = 372 s` contra
+una base de 467-473 s, por debajo como manda el `-x`. **RM3** sin caso; **RM5 y
+RM6 `N/A` justificados**: ni equivalentes declarados ni código defensivo retirado.
 
-## El arreglo de F-052
-
-`Veredicto.no_ha_mirado_nada` mete `filas_miradas == 0` en `codigo` y en
-`marcador`. **No rompe F-052**: el test que pasaba en falso recibe una
-combinación sana, el de cero tiene el suyo y el de `run-all` sigue verde.
-
-## Lo que NO reproduce: la contrapartida del censo
-
-Medido por mí en solo lectura sobre `raw.obr JOIN raw.con` (920) y `stg.fases`,
-con **el criterio tal y como lo implementa el código**:
-
-| | Código (hoy) | Spec (R3, `decisiones`, `mediciones`) | Diccionario |
-|---|---|---|---|
-| Congeladas / vivas | **880 / 40** | 880 / 40 | — |
-| Regla 2 (seis dígitos) | **226** | 222 | — |
-| Sin actividad 12 m | **872** | 840 | — |
-| Congeladas **con** actividad | **8** | **40** (39 CERRADAS + 1) | **7** |
-
-**El titular cuadra al dedillo: 880 y 40.** Lo que no cuadra es la
-contrapartida, el número con el que el humano aceptó la decisión.
-`obras_congeladas_F025.csv` da a 36 obras una `ultima_actividad` de `2025-12`
-que **`stg.fases` no confirma** (la 0620 la tiene en **2024-01**, y `raw.obrfas`
-igual). El código usa la definición de `mediciones.md` §2: **va bien él y el CSV
-no reproduce**. Va a favor, pero hay tres cifras publicadas y una la sirve el MCP.
+**Los 4 timeouts, cerrados por mí (RM4).** Ni muertos ni supervivientes: son
+**mutantes sin veredicto**, y un timeout tira hacia superviviente (el que muere
+aborta pronto con `-x`). Los reproduje **sobre una copia de HEAD en mi
+scratchpad** (`git archive`, sin tocar el árbol) y **los cuatro MUEREN** con
+`pytest -k f025 -x` en 5-9 s: `ventana.py:207` (`not all`→`all`, y `and`→`or`),
+`216` (`is None`→`is not None`) y `242` (`tiene_filas False`→`True`), cazados por
+`test_f025_r10_el_build_NO_llama_a_truncate...` y `..._r30_ventana_plan_...`. Era
+contención de máquina: **83 de 83 con veredicto**; `git status` limpio.
 
 ## Checkpoints
 
-- **C1** `[x]` — `init.sh` **exit 0**: 3.305 pasados, 134 saltados en 412,9 s;
-  `PUERTA COBERTURA [OK] 91,7 % (578/630, umbral 80 %, critico)`; `PUERTA
-  TAMAÑO [OK]`. Avisos previos: 207 de ruff y F-052 blocked.
-- **C2** `[x]` — una `in_progress`, rama correcta, `current.md` al día.
-- **C3** `[x]` — `domain/ventana.py` importa solo stdlib; `ventana_sql.py` no
-  abre conexión; ruta en la primera línea de los 14 ficheros nuevos; sin `print`
-  ni secretos. En `06_presupuesto.sql` el diff son dos líneas y el `DISTINCT ON`
-  sigue particionando por obra.
-- **C3 bis** y **C4 ter** `N/A` **justificados**: no toca `docs/referencia/` ni
-  existe `harness/rutas_sensibles.json`.
-- **C4** `[ ]` — trazabilidad buena (22 requisitos con `test_f025_rN_*`: R10 16,
-  R14 20, R16 38, R17 19, R26 13, R27 23) y ningún test toca red ni BBDD. **Falla
-  el tercer punto**: las MANUAL están en prosa, **sin comando exacto**.
-- **C4 bis** `[ ]` — RED `[x]` (trazas de T3 y T10); cobertura `[x]`;
-  **mutación `[ ]` y RM1 `[ ]`**; RM2, RM3 y RM4 `[x]` (el último, mío); RM5 y
-  RM6 `N/A` **justificados** (ni equivalentes declarados ni código defensivo
-  retirado); Evidencias `[x]`, con sus cuatro números y sus 4 workers.
-- **C5** `[ ]` — `tasks.md` con T1, T2b y T27-T35 sin marcar: la fase manual.
+- **C1** `[x]` — `bash harness/init.sh` **EN VERDE**: 3.305 pasados, 134 saltados
+  en 361 s; `COBERTURA [OK] 91,7 % (578/630, umbral 80 %, critico)`; `TAMAÑO
+  [OK]`. *(La primera salida fue KO por `test_f015_r4_ejecutar_git_de_verdad...`:
+  **interferencia mía** —lo corrí a la vez que mis pruebas de mutación y ese test
+  lanza `git` de verdad, sin timeout, devolviendo `""` ante rc≠0—. Solo, pasa.)*
+- **C2** `[x]` — una `in_progress`, rama correcta, `current.md` al día. **C3**
+  `[x]`; **C3 bis** y **C4 ter** `N/A` justificados: sin código en el delta, el
+  veredicto de la pasada 1 se mantiene entero.
+- **C4** `[x]` — las once MANUAL de `current.md` ya traen su comando **literal**,
+  la precondición delante y el criterio de parada de T1; la trazabilidad
+  requisito→test de la pasada 1 sigue válida (ningún test cambió).
+- **C4 bis** `[ ]` — RED `[x]`, cobertura `[x]`, RM1-RM4 `[x]` (RM4, mío),
+  RM5/RM6 `N/A` justificados. **Falla por dos**: el **alcance** de la campaña
+  (38 % de los mutantes, sin exención del humano) y la sección **«Evidencias»**,
+  que publica los números de la campaña **descartada**.
+- **C5** `[ ]` — `tasks.md`: 28 de 41. T1, T2b y T27-T35 son la fase manual;
+  **T36 («init.sh en verde») está sin marcar y sí está hecho**.
+- **Fase RED tras el recorte de `6f77759`: suficiente para `critico`.** Solo cayó
+  la decoración; **las trazas siguen enteras** —fichero, línea y la línea `E`
+  real— para los dos requisitos centrales, T3 y T10.
 
 ## Cambios requeridos
 
-1. **Reejecutar la campaña sobre HEAD y completar el informe.**
-   `mutacion_F-025.md` mide `8e9b1f2` (760 líneas) y HEAD es `b4be5ee` (779),
-   con el único fichero del alcance modificado en medio; y **los cinco
-   supervivientes siguen con su análisis en `PENDIENTE`**, checkbox de C4 bis.
-   En `critico` hacen falta **cero supervivientes**.
-2. **Reconciliar la contrapartida del censo** en R3, `decisiones.md` DA-1,
-   `mediciones.md` §2 y `config/diccionario/maestro.yaml` (7 vs 39 vs 8).
-   Re-medir con la definición del código y **volver a enseñárselo al humano**:
-   decidió con la cifra vieja. Y la regla 2 son **226**, no 222: «ninguna llega
-   al fact» hay que recomprobarlo sobre esas 226.
-3. **Listar las MANUAL con su comando exacto** en `progress/current.md` (C4).
+1. **Decidir el alcance de la campaña, y que lo decida el humano.** O se extiende
+   a los 219 mutantes (`python -m harness.mutacion --feature F-025`), o **DA-6 se
+   exime por escrito**, como el propio DA-6 previó. Lo que no vale es que la spec
+   se autoexima en `critico`. Si no se hace entera, **al menos
+   `build_stg_step.py`** (34), que es donde vive el borrado.
+2. **Rehacer la tabla «Evidencias» de `impl_F-025.md`**: dice «Supervivientes
+   **5**», «**0 timeouts**» y «59,3 min, base 210-214 s», los números de la
+   campaña que este review invalidó. Los buenos: **0 supervivientes, 4 timeouts
+   (cerrados aquí), 7.720 s, base 467-473 s, 4 workers**.
+3. **Las cuatro cifras viejas del censo, dichas como hechos:**
+   `business_rules.yaml:187-188` («**222** de seis digitos… 0 de **222**», contra
+   el 226 de su propia línea 140), `business_rules.yaml:197` («**840** obras»,
+   contra 872) y el «**80** de 920 con actividad» de `requirements.md:14` y
+   `docs/ARCHITECTURE.md:165`, que es 920−840 y contradice las 48 que ambos
+   declaran más abajo. `business_rules.yaml` **es** la regla de negocio: quien la
+   lea se lleva 222. **Y marcar T36** en `tasks.md`.
 
-## Observaciones (no bloquean; decidir antes de encender)
+## El círculo del `PG_VENTANA_ACTIVA`: NO, y no por prudencia
 
-- **R5 al pie de la letra**: apagada la ventana, el `DELETE` derivado no alcanza
-  a una obra con filas que no esté en el censo; el `TRUNCATE` sí. T30 lo detecta.
-- **`registrada` se vuelve verdadera para todas** (la firma inserta fila por
-  obra tras la ingesta): la segunda mitad de R18 deja de alcanzarse. La cubren
-  `tiene_filas` y el sello nulo, pero ya no vigila nada.
-- **Automejora propuesta**: C4 bis no dice qué hacer cuando el implementer
-  arregla un superviviente —el arreglo toca el alcance y RM1 invalida la campaña
-  siempre—. Añadir a RM1 que *el informe de mutación es el ÚLTIMO commit de la
-  feature*. Va a `arnes-base`.
+Encenderla antes de verificar **no es un atajo arriesgado: es la única acción que
+empeora el problema que dice resolver.** Primero, **congelaría la corrupción**:
+«congelar» es *conservar la última versión buena*, y hoy la de `stg.plan_mensual`
+no lo es —está al 21,6 %—; encendida la ventana, las 880 dejan de reconstruirse
+**conservando ese agujero**, y la única vía de repararlo —la completa del domingo
+(R25)— choca con la misma pared de créditos que causó la avería: de una tabla
+rota que se intenta rehacer cada noche a una **que ya nadie rehace**. Segundo,
+**destruiría la prueba y para siempre**: T27/T30 —cinco huellas antes, cinco
+después, **tolerancia cero**— son la única evidencia de que la ventana no cambia
+ni una cifra publicada, y el «antes» solo existe mientras se reconstruyan las
+920; encendida, ese estado no vuelve y la comparación pasa a dar miles de
+diferencias que explicar una a una: **el defecto de F-052 con otra ropa**, dar
+por bueno un veredicto que no tuvo nada válido que medir.
+
+**Y el círculo no es tal.** La precondición no es «una nocturna completa», es
+**una `stg.plan_mensual` completa y coherente**, y eso se logra **con la ventana
+apagada**: retirado el `TRUNCATE`, una nocturna que muera en el tramo 5 ya no
+vacía la tabla. Falta completarla a propósito y de día —**`python main.py stage`
+con los 144 créditos llenos**, en una o varias sesiones, o subiendo el `B1ms` un
+escalón una noche—, y luego `check-coherencia` y `status-stg` en verde.
+**Propongo el orden de `current.md` con un paso 0 delante:** (0) completar
+`plan_mensual` con la ventana apagada; (1) T27, las huellas del antes sobre ese
+estado ya coherente; (2) T1 y T2b, que necesitan la misma base sana —si T1 baja
+del 40 %, PARAR—; (3) T35, que el guardián no puede estar mudo al girar el
+interruptor; (4) **entonces** `PG_VENTANA_ACTIVA=true`, T29 y T30 con tolerancia
+cero. Al guion no le falta el orden: le falta **decir cómo** cumplir su propia
+precondición, que hoy enuncia y deja en el aire.
 
 ## Pendiente de la fase manual (no dictamino sobre ello)
 
-| | Qué | Qué decide |
-|---|---|---|
-| **T1 / T2b** | Peso real por obra; coste de la firma sobre `raw.obrparpre` | Si merece la pena (bajo el 40 %, PARAR) y la forma de la firma (R20) |
-| **T27-T31b** | Las cinco huellas del antes, la reconstrucción acotada, las del después **sin `--obras-esperadas`**, la 0599 (DIRECTOS 2.624.793 €) y `v_frescura_obra` | R11-R12, R21-R23. **Bloqueante**: una sola diferencia para la feature |
-| **T32-T35** | Los `check-*`, el bloat contra T2, los créditos de CPU y desplegar `infra/97_create_alert_ventana.ps1` | R24, R29; **sin el `.ps1` el guardián es mudo** (DA-5) |
-| — | Encender `PG_VENTANA_ACTIVA` | Del humano. Hasta entonces esto solo repara el `TRUNCATE` |
+| Qué | Qué decide |
+|---|---|
+| **T1 / T2b** · peso por obra y coste de la firma | Si merece la pena (bajo el 40 %, PARAR) y la forma de la firma (R20) |
+| **T27-T31b** · huellas del antes, reconstrucción acotada, huellas del después **sin `--obras-esperadas`**, la 0599 y `v_frescura_obra` | R11-R12, R21-R23. **Una sola diferencia PARA la feature** |
+| **T32-T35** · los `check-*`, el bloat contra T2, los créditos de CPU y desplegar `infra/97_create_alert_ventana.ps1` | R24, R29; y **sin ese `.ps1` el guardián es mudo** (DA-5) |
+| Encender `PG_VENTANA_ACTIVA` | Del humano, y **la última**, no la primera |
+
+## Automejora propuesta (no aplicada)
+
+A C4 bis de `CHECKPOINTS.md`, y de ahí a `arnes-base`. **(1) RM7 · el alcance de
+la campaña es el de la feature**: el reviewer recalcula `harness.alcance`; si se
+acotó a mano, la reducción exige **exención escrita del humano**, no de la spec.
+Sin esto, en `critico` se aprueba una campaña que mide el 38 % y todos los
+números cuadran. **(2) Los timeouts no son muertos**: C4 bis exige «cero
+supervivientes» y calla sobre los mutantes sin veredicto por reloj; **cada uno se
+cierra por RM4 o se repite la campaña con más reloj**.
