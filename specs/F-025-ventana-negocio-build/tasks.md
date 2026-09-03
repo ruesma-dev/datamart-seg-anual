@@ -55,7 +55,7 @@ escriba en producción o reconstruya va marcado **MANUAL (humano)**.
 - [x] T23b: Documentar los catorce estados de `conest` (tipo 42) en la ficha de `maestro.obras.estado_id` de `config/diccionario/maestro.yaml`, que hoy dice que el catálogo no se ingiere; enlazar con F-054  |  Verificación: `python main.py check-diccionario` (MANUAL) y revisión del reviewer
 - [x] T24: `version` de `00_global.yaml` y `pendientes` que no crece  |  Verificación: `bash harness/init.sh`
 - [x] T25: `docs/ARCHITECTURE.md` (la ventana junto a F-019 y F-024, con el cambio de invariante) y `azure-apps/datamart_seg_anual.md` (frescura por obra)  |  Verificación: revisión del reviewer
-- [x] T26: Campaña de mutación sobre `domain/ventana.py`  |  Verificación: `python -m harness.mutacion` sin supervivientes, o exención escrita del humano
+- [x] T26: Campaña de mutación sobre `domain/ventana.py`  |  Verificación: `python -m harness.mutacion` sin supervivientes, o exención escrita del humano — **hecha sobre `domain/ventana.py` (83 mutantes, CERO supervivientes) y el resto del alcance EXENTO por el humano el 2026-09-04 (DA-6)**: no se extiende a los 219 mutantes de los diez ficheros, así que `build_stg_step.py` (34, el borrado derivado), `main.py` (37), `postgres_client.py` (31), `ventana_sql.py` (15) y `cobertura.py` (6) NO pasan por mutación; los cubren T27/T30 con tolerancia cero, `test_f025_build.py` y la cobertura de líneas cambiadas. El porqué entero, en `decisiones.md` §DA-6
 
 ## Fase 7 · Verificación contra la base (MANUAL, en este orden)
 

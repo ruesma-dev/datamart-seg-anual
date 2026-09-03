@@ -4,8 +4,9 @@
 El principio se decidió el 2026-09-02: *«las obras que estén cerradas no se
 actualizan»*, *«que no se reconstruyan, pero que no se borren, y que la
 información esté consultable»*. **Ese mismo día quedaron cerradas DA-1 a DA-4.**
-DA-5 y DA-6 no se preguntaron: quedan con la recomendación de esta spec, no como
-decisión del humano. Censos y fuentes: `mediciones.md` y
+DA-5 quedó con la recomendación de esta spec, no como decisión del humano.
+**DA-6 sí es suya: la decidió el 2026-09-04, a raíz del review, y EXIME la
+campaña de mutación** (ver abajo). Censos y fuentes: `mediciones.md` y
 `obras_candidatas_a_congelar.csv`.
 
 ---
@@ -145,19 +146,53 @@ desactivado). De aquí sale el **«hasta 6 días»** de DA-1.
 
 ---
 
-## DA-5 y DA-6 · Sin pronunciamiento del humano
+## DA-5 · Sin pronunciamiento del humano
 
-Quedan con la recomendación de esta spec. **No son decisiones suyas**; si al
-revisar quiere otra cosa, cambian sin discusión.
+Queda con la recomendación de esta spec. **No es decisión suya**; si al revisar
+quiere otra cosa, cambia sin discusión.
 
 - **DA-5 · El guardián avisa y no bloquea**, como `check-cobertura` de F-052.
   Contrapartida heredada: al no bloquear, la alerta de fallo del job no se
   dispara, y la regla nueva de Azure es la **única** vía por la que el guardián se
   hace oír. Sin desplegarla, es mudo.
-- **DA-6 · Campaña de mutación sobre `domain/ventana.py` además de las cinco
-  huellas.** Hay dominio nuevo y mutable —clasificación, firma, sello— y un
-  superviviente ahí es una obra que se congela cuando no debía. Si el humano la
-  exime, por escrito, como en F-042 y F-052.
+
+## DA-6 · La campaña de mutación — **EXENTA por el humano el 2026-09-04**
+
+Esta spec propuso la campaña sobre `domain/ventana.py` —dominio nuevo y mutable
+(clasificación, firma, sello), donde un superviviente es una obra que se congela
+cuando no debía— y **se autoconcedió el recorte del alcance**, que en rigor
+`critico` no le corresponde: `rigor.json` fija `max_mutantes: null`, o sea *la
+campaña entera*, y solo el humano puede eximirla por escrito. El review de la
+pasada 2 lo detectó, recalculó el alcance con `harness.alcance` —**10 ficheros,
+2.610 líneas, 219 mutantes**, de los que la campaña midió **83, uno solo de los
+diez**— y planteó la disyuntiva: extenderla o eximirla.
+
+**El humano exime. No se extiende la campaña.** Registrado también en la ficha de
+`harness/features.json` y en T26.
+
+**Y queda dicho sin suavizar lo que eso significa**, que es lo que el reviewer
+necesita para declararlo N/A con conocimiento y lo que tiene que leer quien venga
+después: **el código que decide QUÉ SE BORRA en cada tramo —
+`build_stg_step.py`, donde vive `componer_borrado_derivado`, 34 mutantes— NO ha
+pasado por mutación.** Tampoco `main.py` (37), `postgres_client.py` (31, con
+`SQL_ESTADO_OBRAS`), `ventana_sql.py` (15) ni `cobertura.py` (6).
+
+Lo que lo cubre en su lugar, por orden de fuerza:
+
+1. **La prueba de las cinco huellas de T27/T30, con tolerancia CERO** —cinco
+   antes, cinco después, y *una sola diferencia PARA la feature*—. Es la que
+   demuestra de verdad que no se pierde una fila, y ninguna campaña de mutación
+   da esa garantía sobre el dato publicado.
+2. Los tests de `tests/test_f025_build.py`, escritos en RED antes del código
+   (traza en `progress/impl_F-025.md`).
+3. La **cobertura de las líneas cambiadas**: **91,7 %** (578/630) medido por
+   `bash harness/init.sh`, sobre el umbral del 80 % de `critico`.
+
+**Precedente**: el humano ya eximió la campaña en **F-042** y en **F-052**, y en
+los dos casos la sustituyó por revisión de datos antes/después. Aquí es la misma
+sustitución, con la diferencia de que la revisión de datos —la fase 7— **está
+pendiente de ejecutar**: la exención vale, pero **T27/T30 dejan de ser una
+comprobación más y pasan a ser la red única**.
 
 ## Lo que NO se decide aquí
 
