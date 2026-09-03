@@ -27,6 +27,12 @@ el despliegue de `infra/97_create_alert_ventana.ps1`, **sin el cual el guardian
 es mudo**. Y las mediciones T1 y T2b, que barren tablas de millones de filas y
 no se lanzaron para no vaciar otra vez la hucha de creditos.
 
+**De paso queda arreglado el defecto de F-052 que la dejo `blocked`**:
+`check-cobertura` salia OK habiendo mirado CERO combinaciones. Paso contra
+produccion el 02-sep, con `stg.plan_mensual` truncada. Ahora sale KO. F-052
+sigue esperando a que `stg` vuelva a estar completo, que es lo que desbloquea
+la fase 7 de esta feature.
+
 ## F-025 · SPEC ESCRITA y DECISIONES CERRADAS por el humano (2026-09-02)
 
 `specs/F-025-ventana-negocio-build/`: `requirements.md` (150/150),
