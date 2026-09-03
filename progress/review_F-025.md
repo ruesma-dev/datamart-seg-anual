@@ -17,12 +17,11 @@ cobertura ≥ 80 %, cero supervivientes y las MANUAL con comando y resultado.
 **El delta no toca ni una línea de código:** `git diff --name-only b4be5ee..HEAD`
 no devuelve ningún `.py` ni `.sql`, y en `business_rules.yaml` es **solo
 comentarios**. Todo lo verificado en la pasada 1 —borrado derivado, `TRUNCATE`
-retirado, hexagonal, convenciones, trazabilidad— sigue en pie sin re-mirarlo.
-
-**El censo, comprobado:** 920 · 880 · 40 · 38 al fact · 693/226/872 · 48 con
-actividad · **8** congeladas pese a tenerla (7 CERRADAS + la `180501`) son **las
-cifras que medí yo contra la base en la pasada 1** —no he reconsultado el
-`B1ms`—; cuadran en R2/R3, DA-1/DA-3, `mediciones.md` §2 y §5, `design.md`,
+retirado, hexagonal, convenciones, trazabilidad— sigue en pie sin re-mirarlo. Y
+**el censo remedido** —920 · 880 · 40 · 38 al fact · 693/226/872 · 48 con
+actividad · **8** congeladas pese a tenerla (7 CERRADAS + la `180501`)— **son las
+cifras que medí yo contra la base en la pasada 1**, así que no he reconsultado el
+`B1ms`; cuadran en R2/R3, DA-1/DA-3, `mediciones.md` §2 y §5, `design.md`,
 `maestro.yaml` y `business_rules.yaml`, y cierran solas (40 + 8 = 48). Fallan
 cuatro residuos (§Cambios 3).
 
@@ -65,8 +64,7 @@ contención de máquina: **83 de 83 con veredicto**; `git status` limpio.
 - **C1** `[x]` — `bash harness/init.sh` **EN VERDE**: 3.305 pasados, 134 saltados
   en 361 s; `COBERTURA [OK] 91,7 % (578/630, umbral 80 %, critico)`; `TAMAÑO
   [OK]`. *(La primera salida fue KO por `test_f015_r4_ejecutar_git_de_verdad...`:
-  **interferencia mía** —lo corrí a la vez que mis pruebas de mutación y ese test
-  lanza `git` de verdad, sin timeout, devolviendo `""` ante rc≠0—. Solo, pasa.)*
+  **interferencia mía**; ese test lanza `git` de verdad, sin timeout. Solo, pasa.)*
 - **C2** `[x]` — una `in_progress`, rama correcta, `current.md` al día. **C3**
   `[x]`; **C3 bis** y **C4 ter** `N/A` justificados: sin código en el delta, el
   veredicto de la pasada 1 se mantiene entero.
@@ -87,13 +85,13 @@ contención de máquina: **83 de 83 con veredicto**; `git status` limpio.
 
 1. **Decidir el alcance de la campaña, y que lo decida el humano.** O se extiende
    a los 219 mutantes (`python -m harness.mutacion --feature F-025`), o **DA-6 se
-   exime por escrito**, como el propio DA-6 previó. Lo que no vale es que la spec
-   se autoexima en `critico`. Si no se hace entera, **al menos
-   `build_stg_step.py`** (34), que es donde vive el borrado.
+   exime por escrito**, como él mismo previó; lo que no vale es que la spec se
+   autoexima en `critico`. Si no se hace entera, **al menos `build_stg_step.py`**
+   (34), que es donde vive el borrado.
 2. **Rehacer la tabla «Evidencias» de `impl_F-025.md`**: dice «Supervivientes
    **5**», «**0 timeouts**» y «59,3 min, base 210-214 s», los números de la
-   campaña que este review invalidó. Los buenos: **0 supervivientes, 4 timeouts
-   (cerrados aquí), 7.720 s, base 467-473 s, 4 workers**.
+   campaña invalidada. Los buenos: **0 supervivientes, 4 timeouts (cerrados
+   aquí), 7.720 s, base 467-473 s, 4 workers**.
 3. **Las cuatro cifras viejas del censo, dichas como hechos:**
    `business_rules.yaml:187-188` («**222** de seis digitos… 0 de **222**», contra
    el 226 de su propia línea 140), `business_rules.yaml:197` («**840** obras»,
@@ -145,8 +143,8 @@ precondición, que hoy enuncia y deja en el aire.
 
 A C4 bis de `CHECKPOINTS.md`, y de ahí a `arnes-base`. **(1) RM7 · el alcance de
 la campaña es el de la feature**: el reviewer recalcula `harness.alcance`; si se
-acotó a mano, la reducción exige **exención escrita del humano**, no de la spec.
-Sin esto, en `critico` se aprueba una campaña que mide el 38 % y todos los
-números cuadran. **(2) Los timeouts no son muertos**: C4 bis exige «cero
-supervivientes» y calla sobre los mutantes sin veredicto por reloj; **cada uno se
-cierra por RM4 o se repite la campaña con más reloj**.
+acotó a mano, la reducción exige **exención escrita del humano**, no de la spec
+—sin esto se aprueba una campaña que mide el 38 % y cuyos números cuadran—.
+**(2) Los timeouts no son muertos**: C4 bis exige «cero supervivientes» y calla
+sobre los que no tienen veredicto por reloj; **cada uno se cierra por RM4 o se
+repite la campaña con más reloj**.

@@ -923,6 +923,85 @@
       "rigor": "critico",
       "priority": 7,
       "branch": "feature/F-059-retenciones-historicas"
+    },
+    {
+      "id": "F-060",
+      "title": "Posicion y antiguedad de saldos por tercero: que debemos, que nos deben y desde cuando",
+      "description": "Hoy el datamart sabe lo que se ha comprado a un proveedor y lo que se le retiene, pero NO cual es la posicion con el: el saldo vivo. Y no sabe nada de la antiguedad de ese saldo. Nace de la propuesta que el lider hizo al humano el 2026-09-03 al preguntarle que mas se puede deducir del plan contable, y que el humano mando fichar. DEPENDE DE F-056: sin los apuntes ingeridos no existe. Las cifras que cita estan MEDIDAS contra Sigrid ese dia, no estimadas. DE DONDE SALE: las cuentas del grupo 4 por tercero -400 y 410 acreedores, 430 clientes, 4008/4108/4180 retenciones-. En 2025 el grupo 4 tiene **131.910 apuntes y 641 M EUR** movidos, que es con diferencia el grupo mas activo. El tercero se identifica por la subcuenta, que en Sigrid lleva el nombre en `con.res` (por ejemplo 'AIMAD, S.L., Retenciones'). DOS PREGUNTAS QUE HOY NO TIENEN RESPUESTA y que son de Administracion, no de obra: cual es la posicion neta con un proveedor o cliente concreto, y que parte de lo pendiente lleva mas de 30, 60 o 90 dias. La segunda es el *aging* clasico y sale del mayor sin datos nuevos. A DECIDIR: como se identifica al tercero de forma estable -la subcuenta cambia entre empresas y el nombre es texto libre-, y si esto se cruza con `prv` y con compras, que ya estan ingeridos, o vive solo de la contabilidad.",
+      "acceptance": [
+        "Se puede responder la posicion neta con un proveedor o cliente concreto, por empresa y a una fecha",
+        "Existe el aging por tramos (30/60/90/mas) y esta contrastado contra al menos un tercero cuyo saldo se conozca por otra via",
+        "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
+        "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
+      ],
+      "priority": 11,
+      "rigor": "estandar",
+      "branch": "feature/F-060-posicion-terceros",
+      "status": "pending",
+      "sdd": true
+    },
+    {
+      "id": "F-061",
+      "title": "Coste real de mano de obra por obra: la contabilidad dice cuanto y los partes dicen donde",
+      "description": "El datamart sabe lo que cuesta una obra en material y subcontrata, pero el coste de personal propio no esta atribuido a obra por ninguna via. Nace de la propuesta que el lider hizo al humano el 2026-09-03 al preguntarle que mas se puede deducir del plan contable, y que el humano mando fichar. DEPENDE DE F-056: sin los apuntes ingeridos no existe. Las cifras que cita estan MEDIDAS contra Sigrid ese dia, no estimadas. DEPENDE TAMBIEN DE F-057 (recursos, empleados y partes). LA IDEA: el grupo 64 de la contabilidad dice CUANTO costo el personal y los partes de trabajo (`hmo`, 6.848 filas) dicen QUIEN trabajo y DONDE. Ninguna de las dos fuentes responde sola la pregunta -cuanto cuesta de personal una obra- y juntas si. AVISO MEDIDO: la atribucion contable a obra va por `cenide` (1.169.398 apuntes, 54 %) y NO por `obr` (142 apuntes). Y el nudo de F-045 sigue sin resolver: como se ata un centro de coste a nuestra obra. Esta feature no puede empezar sin eso. DATO SENSIBLE: cruzar coste con persona es informacion de nomina. Hay que decidir por escrito a que grano se publica -por obra y periodo, no por persona- y quien puede verlo.",
+      "acceptance": [
+        "Se puede responder cuanto ha costado el personal propio de una obra en un periodo",
+        "Resuelta la atribucion por centro de coste, o declarada la dependencia de F-045 y por que sin ella no se cierra",
+        "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
+        "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
+      ],
+      "priority": 12,
+      "rigor": "critico",
+      "branch": "feature/F-061-coste-personal-obra",
+      "status": "pending",
+      "sdd": true
+    },
+    {
+      "id": "F-062",
+      "title": "Impuestos: IVA, IRPF y Seguridad Social contabilizados, para cuadrar lo declarado",
+      "description": "El datamart no tiene nada de impuestos y la contabilidad los tiene todos. Nace de la propuesta que el lider hizo al humano el 2026-09-03 al preguntarle que mas se puede deducir del plan contable, y que el humano mando fichar. DEPENDE DE F-056: sin los apuntes ingeridos no existe. Las cifras que cita estan MEDIDAS contra Sigrid ese dia, no estimadas. DE DONDE SALE: IVA soportado y repercutido (472 y 477), retenciones de IRPF (4751) y Seguridad Social (476), todas dentro del grupo 4, que en 2025 mueve 641 M EUR en 131.910 apuntes. PARA QUE SIRVE: cuadrar lo declarado contra lo contabilizado, por empresa y periodo. Es una comprobacion que hoy se hace fuera del sistema y que el datamart podria responder directamente, y ademas por las ~30 empresas del grupo, no solo por la principal. OJO: aqui el usuario natural NO es el jefe de obra sino Administracion, asi que el criterio de que es correcto lo pone Juan Romero, no la obra.",
+      "acceptance": [
+        "Se pueden obtener las bases y cuotas de IVA soportado y repercutido por empresa y periodo",
+        "Se puede obtener lo retenido de IRPF y lo devengado de Seguridad Social por empresa y periodo",
+        "Validado por Administracion contra al menos una declaracion real ya presentada",
+        "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
+      ],
+      "priority": 13,
+      "rigor": "estandar",
+      "branch": "feature/F-062-impuestos",
+      "status": "pending",
+      "sdd": true
+    },
+    {
+      "id": "F-063",
+      "title": "Los GENERALES del cierre se reparten por un criterio: la contabilidad dice el gasto real",
+      "description": "La capa `cierre` publica un concepto GENERALES que sale de un criterio de reparto de la estructura entre las obras. Nadie ha comprobado nunca si ese reparto se parece al gasto real. Nace de la propuesta que el lider hizo al humano el 2026-09-03 al preguntarle que mas se puede deducir del plan contable, y que el humano mando fichar. DEPENDE DE F-056: sin los apuntes ingeridos no existe. Las cifras que cita estan MEDIDAS contra Sigrid ese dia, no estimadas. LA IDEA: los grupos 62 (servicios exteriores) y 64 (personal) de la contabilidad dan el gasto de estructura REAL por periodo y empresa; en 2025 el grupo 6 entero son 45.015 apuntes y 129 M EUR. Contrastarlo contra lo que el cierre reparte diria si el criterio esta bien calibrado o lleva anos desviado. POR QUE IMPORTA: GENERALES entra en el margen de CADA obra. Si el reparto esta mal, todas las obras publican un margen sesgado en la misma direccion, y eso no lo detecta ninguna comprobacion actual porque es coherente consigo mismo. A DECIDIR: si el resultado solo se informa o llega a corregir el reparto, que seria cambiar una cifra que Negocio lleva anos usando; eso exige aviso, como en F-052.",
+      "acceptance": [
+        "Medido el gasto de estructura real por periodo y empresa, de los grupos 62 y 64",
+        "Contrastado contra lo que la capa cierre reparte como GENERALES, con la desviacion cuantificada por ano",
+        "Decidido con el humano y con Negocio si el reparto se corrige o solo se informa, y si se corrige, avisado antes de publicar"
+      ],
+      "priority": 14,
+      "rigor": "critico",
+      "branch": "feature/F-063-generales-reparto",
+      "status": "pending",
+      "sdd": true
+    },
+    {
+      "id": "F-064",
+      "title": "Control interno sobre la contabilidad: apuntes sin centro de coste, asientos manuales y descuadres",
+      "description": "Sale gratis del mismo mart de F-056 y es la unica de este grupo que no responde una pregunta de negocio sino que VIGILA. Nace de la propuesta que el lider hizo al humano el 2026-09-03 al preguntarle que mas se puede deducir del plan contable, y que el humano mando fichar. DEPENDE DE F-056: sin los apuntes ingeridos no existe. Las cifras que cita estan MEDIDAS contra Sigrid ese dia, no estimadas. TRES COSAS MEDIBLES DESDE EL PRIMER DIA: (1) apuntes SIN centro de coste -hoy son el 46 %, 984.338 de 2.153.736-, que son gasto que no se puede atribuir a ninguna obra; (2) asientos cuyo debe y haber no cuadran, que no deberia existir ninguno; (3) asientos manuales frente a los generados por documento, usando `apu.ori` (origen del apunte). POR QUE IMPORTA: es el mismo patron que F-052 llevo al seguimiento -un guardian que denuncia lo que se pierde en silencio- aplicado a la contabilidad. Y el 46 % sin centro de coste es un numero que conviene entender antes de fiarse de la cuenta de resultados por obra de F-058: si esa mitad del gasto no se puede atribuir, el margen contable por obra esta incompleto y hay que decir cuanto.",
+      "acceptance": [
+        "Medido y publicado que porcentaje del gasto no se puede atribuir a obra, por ano y empresa, y explicado si es esperable o es un problema",
+        "Existe una comprobacion que denuncia asientos descuadrados y que hoy da cero, o dice cuantos hay",
+        "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
+        "El resultado alimenta el aviso de F-058: la cuenta de resultados por obra debe declarar que parte del gasto no cubre"
+      ],
+      "priority": 15,
+      "rigor": "estandar",
+      "branch": "feature/F-064-control-interno-contable",
+      "status": "pending",
+      "sdd": true
     }
   ]
 }
