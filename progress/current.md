@@ -1,6 +1,21 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-09-04 (fin de sesion)
 
+## Comprobado al abrir la sesión del 2026-09-05
+
+**El paso 4 NO se ejecutó.** Verificado en los dos sitios, no supuesto: `main`
+sigue en `cd18e09` (la rama va 53 commits por delante) y el job de Azure sigue
+apuntando a la imagen **`r20260902-0019`** y **sin `PG_VENTANA_ACTIVA`**. La
+nocturna del 04 corrió, por tanto, con la imagen del 02-sep y sin F-025.
+
+**El diccionario del árbol está en 105 objetos, 822 columnas y 47 fichas de
+consumo** (subió de 103/798/46 con las dos fichas de F-025; el diccionario pasa
+a la versión 13 al publicarse). El commit de cierre del 04 se llevó por delante
+esta frase y dejó `init.sh` en rojo: el test
+`test_f006_los_recuentos_de_current_son_los_de_hoy` existe justo para que estos
+recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de
+este fichero, los tres números se quedan.**
+
 ## POR DONDE SE SIGUE: F-025, paso 4 de la fase manual
 
 **Todo lo anterior esta hecho.** El punto exacto de retomada es **construir la
