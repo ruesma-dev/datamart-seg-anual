@@ -1,53 +1,109 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-03
+# Estado actual · 2026-09-04 (fin de sesion)
 
-## F-025 · IMPLEMENTADA (falta la verificacion contra la base, que es MANUAL)
+## POR DONDE SE SIGUE: F-025, paso 4 de la fase manual
 
-Rama `feature/F-025-ventana-negocio-build`. El detalle esta en
-**`progress/impl_F-025.md`**; aqui solo lo que hace falta para retomar.
+**Todo lo anterior esta hecho.** El punto exacto de retomada es **construir la
+imagen con F-025, apuntar el job y encender la ventana para que la nocturna haga
+la primera reconstruccion**. El humano lo aprobo el 2026-09-04: «prepara la
+imagen y que lo haga la nocturna».
 
-**Lo que ya esta en el arbol y en verde:** el dominio de la ventana
-(`domain/ventana.py`), el borrado derivado que sustituye al `TRUNCATE` en las
-dos tablas acotadas, el sub-paso de la firma sobre `raw`, el registro por obra
-(`_meta.obra_build` y `_meta.v_frescura_obra`), la reconstruccion completa de
-los domingos, `ventana-plan`, `check-ventana` con su alerta y la quinta huella.
-**El diccionario sube a la version 13 y el inventario pasa de 103 a 105
-objetos** y de 798 a **822 columnas** documentadas, con las fichas de los dos
-objetos nuevos y el aviso en las de `stg.plan_mensual` y `stg.presupuesto`.
+**Los cuatro comandos, en orden.** La rama `feature/F-025-ventana-negocio-build`
+esta **52 commits por delante de `main`** y el avance es **fast-forward limpio**
+(comprobado). Se merge a `main` porque `az acr build` sube el directorio de
+trabajo y la imagen debe salir de `main`, no de una rama suelta: es la leccion de
+F-042.
 
-**La ventana nace APAGADA** (`PG_VENTANA_ACTIVA=false`, R5): mientras no se
-encienda, el contenido publicado es exactamente el de hoy. Lo que SI cambia ya
-es que las dos tablas dejan de truncarse, y eso repara por si solo la averia
-del 02-sep.
+```powershell
+# 1) main al dia, sin tocar el arbol de trabajo
+git fetch . feature/F-025-ventana-negocio-build:main
 
-**Lo que falta, y es del humano:** toda la fase 7 de `tasks.md` (T27-T35), que
-escribe contra produccion: las cinco huellas del antes, la primera
-reconstruccion acotada, las huellas del despues con tolerancia cero, la 0599, y
-el despliegue de `infra/97_create_alert_ventana.ps1`, **sin el cual el guardian
-es mudo**. Y las mediciones T1 y T2b, que barren tablas de millones de filas y
-no se lanzaron para no vaciar otra vez la hucha de creditos. **Todo eso esta
-ahora paso a paso y con el comando literal** en la seccion siguiente, «LAS
-MANUAL DE LA FASE 7»: no hace falta releer la spec para ejecutarlo.
+# 2) construir la imagen; ANOTAR el tag rAAAAMMDD-HHMM que imprime
+powershell -NoProfile -File infra/70_build_image.ps1
 
-**De paso queda arreglado el defecto de F-052 que la dejo `blocked`**:
-`check-cobertura` salia OK habiendo mirado CERO combinaciones. Paso contra
-produccion el 02-sep, con `stg.plan_mensual` truncada. Ahora sale KO. F-052
-sigue esperando a que `stg` vuelva a estar completo, que es lo que desbloquea
-la fase 7 de esta feature.
+# 3) apuntar el job a esa imagen
+powershell -NoProfile -File infra/85_update_job.ps1 -Tag rAAAAMMDD-HHMM
 
-**Los tres cambios de la pasada 2 del review, cerrados el 2026-09-04.** (1) **DA-6
-queda EXENTA por decision del humano**: no se extiende la campana de mutacion a los
-219 mutantes del alcance real, asi que `build_stg_step.py` -34 mutantes, DONDE VIVE
-EL BORRADO DERIVADO-, `main.py`, `postgres_client.py`, `ventana_sql.py` y
-`cobertura.py` NO han pasado por mutacion; lo escrito, en `decisiones.md` §DA-6, en
-la ficha de `features.json` y en T26. **Lo que cubre ese hueco es T27/T30, que sigue
-sin ejecutar**: una razon mas para no dejar la fase 7 sin hacer. (2) La tabla
-«Evidencias» de `impl_F-025.md` publicaba los numeros de la campana invalidada; ya
-trae los de la que vale (0 supervivientes, 4 timeouts cerrados por el reviewer,
-7.720 s, base 467-473 s, 4 workers). (3) Corregidas las cuatro cifras viejas del
-censo -222/222 y 840 en `business_rules.yaml`, y el «80 de 920» de `requirements.md`
-y `ARCHITECTURE.md`-: mandan **920 · 880 · 40 · 226 · 872 · 693 · 48 · 8**. Y **T36
-marcado**.
+# 4) encender la ventana. OJO: NO vale relanzar 80_create_job.ps1 -lanza
+#    excepcion si el job ya existe-. Sobre un job vivo, la unica via es esta:
+az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --set-env-vars PG_VENTANA_ACTIVA=true
+
+# 5) COMPROBAR contra Azure, que es lo que fallo una vez en este proyecto
+az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "{imagen:properties.template.containers[0].image, cron:properties.configuration.scheduleTriggerConfig.cronExpression}" -o yaml
+```
+
+**Y a la manana siguiente**, con la nocturna ya corrida:
+
+1. **Las cinco huellas del DESPUES** y `comparar-huellas` con **tolerancia CERO**
+   contra las de `huellas/antes_*.csv`. Una sola diferencia PARA la feature.
+2. **T1 otra vez** (ver aviso abajo).
+3. Los `check-*`, el bloat y los creditos (T32-T34).
+
+## Lo hecho el 2026-09-04
+
+| | |
+|---|---|
+| Review de F-025 | **APROBADO lo entregable** en la 4a pasada; C5 sigue abierto por la fase 7 |
+| DA-6 | **EXENTA por el humano**, con lo que implica escrito |
+| Paso 0 · `stg` completa | **ya lo estaba**: las nocturnas del 03 y 04 corrieron enteras (1 h 38) |
+| Paso 1 · cinco huellas del ANTES | **HECHO**, en `huellas/antes_*.csv` (ignoradas por git) |
+| Paso 3 · alerta de la ventana | **DESPLEGADA**: `alert-caj-datamart-seg-dev-ventana`, activa, sev 2 |
+| Paso 2 · T1 | **no medible aun**, ver abajo |
+
+**Las cinco huellas del ANTES**, sobre el datamart que dejo la nocturna del 04:
+`stg` 12.407 celdas / 349 obras · `mart` 24.775 / 349 · `cierre` 16.948 / 330 ·
+`dimension` 735 / 504 · `plan_obra` 938 / 350.
+
+## AVISO · T1 dio 0 % y NO es lo que parece
+
+`T1` midio **920 a reconstruir, 0 a congelar, ahorro 0,0 %**, por debajo del 40 %
+que la spec fija como criterio de parada. **No hay que parar: la medicion no es
+valida todavia.** La causa esta comprobada: **`_meta.obra_build` tiene CERO
+filas** porque el build de F-025 no ha corrido nunca, y R18 dice que una obra sin
+registro se reconstruye siempre («completar no es actualizar»). La primera pasada
+reconstruye las 920 por diseno y a partir de la segunda ya congela.
+
+**Consecuencia para la spec:** el orden que fijo el reviewer pone T1 en el paso 2,
+antes de encender, y **en ese momento T1 no puede dar otra cosa que 0 %**. Hay que
+**repetir T1 despues de la primera reconstruccion**, que es cuando la cifra
+significa algo. Anotarlo en la spec al cerrar.
+
+## AVISO · la conexion del puesto se cayo DOS veces en una hora
+
+La huella de `stg` fallo dos veces y hubo que lanzarla tres: la primera con
+`server closed the connection unexpectedly` **con la IP rotando a mitad de
+consulta** (paso de 88.26.22.183 a 62.174.237.73, las dos autorizadas), y la
+segunda con `connection timeout expired`. **Ninguna fue culpa del servidor**: en
+ese momento tenia **60 creditos de 144** y la CPU al 12 %. A la tercera termino en
+**15 minutos**.
+
+Por eso el paso 4 **se lanza como job en Azure y no desde el puesto**: la
+reconstruccion dura mucho mas que esa huella, y desde aqui se cae. Ademas dentro
+de Azure tarda **1 h 38** frente a las **8 h 15** del 01-sep.
+
+## Estado del servidor, para no repetir el error del 01-sep
+
+`Standard_B1ms` Burstable, **144 creditos** de CPU. El 02-sep llegaron a **cero**
+tras nuestras 12 h 48 de reconstruccion manual y la nocturna murio en el tramo 6
+de 60. **Se ha recuperado solo**: 5,2 creditos el 04 a las 07:28 y **60 a las
+21:15**. Las nocturnas del 03 y del 04 corrieron enteras.
+
+## F-052 · SIGUE BLOQUEADA, y el motivo REAL no era el que se penso
+
+Su unico pendiente es certificar `check-cobertura` en verde. Lanzado el 04 sobre
+`stg` ya completa: **58 combinaciones miradas, 37 cubiertas** —antes decia CERO,
+asi que **el guardian ya no miente**, que era el bloqueo de verdad— pero sale
+**KO** con 20 obras invisibles y 294 filas huerfanas.
+
+**Y eso tiene explicacion, comprobada:** el `check-cobertura` se lanzo desde la
+rama de F-025, que **NO contiene los cinco commits de cierre de F-052**
+(`ec516bd`..`fa2312c`, que viven solo en `feature/F-052-partidas-huerfanas`).
+El fichero de excepciones de esta rama es el viejo: **10 entradas y con los
+`tipo` sin corregir**. En la rama de F-052 estan las 23 y los tipos arreglados.
+
+**Como se cierra F-052:** terminar F-025, volver a su rama, relanzar
+`check-cobertura --timeout 900` **alli**, y si da codigo 0, al reviewer y a
+`done`. **No se mezclan las dos ramas** sin decidirlo.
 
 ## F-025 · LAS MANUAL DE LA FASE 7, CON SU COMANDO EXACTO (C4)
 
@@ -57,9 +113,10 @@ la spec. Todo desde la raiz del repositorio, con el `.env` de produccion y el
 entorno virtual activado. Los comandos van en **PowerShell**, que es la consola
 de este puesto.
 
-**PRECONDICION, y hoy NO se cumple:** `stg.plan_mensual` sigue truncada al
-21,6 % por la averia del 02-sep. Nada de lo de abajo vale hasta que una
-nocturna la deje completa (29,7 M de filas). Comprobarlo antes de empezar:
+**PRECONDICION: YA SE CUMPLE desde el 2026-09-03.** Este parrafo decia que
+`stg.plan_mensual` seguia truncada al 21,6 % por la averia del 02-sep, y **eso
+dejo de ser cierto**: las nocturnas del 03 y del 04 corrieron enteras y la
+dejaron en 29,7 M de filas. Comprobarlo igualmente antes de empezar:
 
 ```powershell
 python main.py status-stg

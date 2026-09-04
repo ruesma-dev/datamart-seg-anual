@@ -47,3 +47,6 @@ huella_*.csv
 
 # Listados de obras generados para revisar la ventana de F-025 (datos de negocio)
 obras_*.csv
+
+# Huellas de verificacion de F-025 (datos, evidencia local)
+huellas/
