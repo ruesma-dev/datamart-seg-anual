@@ -1,12 +1,13 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-04 (fin de sesion)
+# Estado actual · 2026-09-05 (madrugada)
 
 ## Comprobado al abrir la sesión del 2026-09-05
 
-**El paso 4 NO se ejecutó.** Verificado en los dos sitios, no supuesto: `main`
-sigue en `cd18e09` (la rama va 53 commits por delante) y el job de Azure sigue
-apuntando a la imagen **`r20260902-0019`** y **sin `PG_VENTANA_ACTIVA`**. La
-nocturna del 04 corrió, por tanto, con la imagen del 02-sep y sin F-025.
+**El paso 4 no se había ejecutado al abrir la sesión:** `main` seguía en
+`cd18e09` y el job de Azure apuntaba a **`r20260902-0019`** sin
+`PG_VENTANA_ACTIVA`, o sea que la nocturna del 04 corrió con la imagen del
+02-sep y sin F-025. **Se ejecutó esa misma madrugada**, ver la sección
+siguiente.
 
 **El diccionario del árbol está en 105 objetos, 822 columnas y 47 fichas de
 consumo** (subió de 103/798/46 con las dos fichas de F-025; el diccionario pasa
@@ -16,43 +17,49 @@ esta frase y dejó `init.sh` en rojo: el test
 recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de
 este fichero, los tres números se quedan.**
 
-## POR DONDE SE SIGUE: F-025, paso 4 de la fase manual
+## POR DONDE SE SIGUE: F-025, las verificaciones del día después
 
-**Todo lo anterior esta hecho.** El punto exacto de retomada es **construir la
-imagen con F-025, apuntar el job y encender la ventana para que la nocturna haga
-la primera reconstruccion**. El humano lo aprobo el 2026-09-04: «prepara la
-imagen y que lo haga la nocturna».
+**El paso 4 YA ESTÁ EJECUTADO**, en la madrugada del 2026-09-05 entre las 00:22 y
+las 00:40 locales. Los cuatro comandos, con su resultado real:
 
-**Los cuatro comandos, en orden.** La rama `feature/F-025-ventana-negocio-build`
-esta **52 commits por delante de `main`** y el avance es **fast-forward limpio**
-(comprobado). Se merge a `main` porque `az acr build` sube el directorio de
-trabajo y la imagen debe salir de `main`, no de una rama suelta: es la leccion de
-F-042.
+| | |
+|---|---|
+| `main` al día | fast-forward limpio `cd18e09` → **`d6d72f2`**, sin tocar el árbol |
+| Imagen construida | **`r20260905-0034`**, digest `sha256:2b1ac7bd3414…`, 38 s en ACR |
+| Job apuntado | `85_update_job.ps1 -Tag r20260905-0034`, disparo `Schedule` |
+| Ventana encendida | `PG_VENTANA_ACTIVA=true` sobre el job vivo |
+
+**Comprobado contra Azure, no supuesto** (es lo que falló una vez en este
+proyecto): el job responde `imagen: …:r20260905-0034`, `cron: 0 2 * * *`,
+`ventana: ['true']`. Y las **18 variables de entorno siguen las 18**: se verificó
+una por una que `--set-env-vars` añadiera `PG_VENTANA_ACTIVA` sin llevarse por
+delante `PG_PASSWORD`, `SIGRID_API_FUNCTION_KEY` ni las demás.
+
+**La nocturna de las 02:00 UTC del 05-sep (04:00 locales) es la primera
+reconstrucción con F-025 y la ventana activa.** Créditos de CPU al lanzar: la
+última métrica publicada (17:23 UTC) daba **45 y subiendo a ~8/h**, así que la
+nocturna debería arrancar por encima de 100 de los 144. Las métricas de este
+servidor se publican con varias horas de retraso: no busques el dato de la
+última media hora, no está.
+
+### Lo primero de la mañana, antes que las huellas
+
+Comprobar que el job corrió **y con qué imagen**, que es la lección de
+`repositorio-verde-no-es-produccion`:
 
 ```powershell
-# 1) main al dia, sin tocar el arbol de trabajo
-git fetch . feature/F-025-ventana-negocio-build:main
-
-# 2) construir la imagen; ANOTAR el tag rAAAAMMDD-HHMM que imprime
-powershell -NoProfile -File infra/70_build_image.ps1
-
-# 3) apuntar el job a esa imagen
-powershell -NoProfile -File infra/85_update_job.ps1 -Tag rAAAAMMDD-HHMM
-
-# 4) encender la ventana. OJO: NO vale relanzar 80_create_job.ps1 -lanza
-#    excepcion si el job ya existe-. Sobre un job vivo, la unica via es esta:
-az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --set-env-vars PG_VENTANA_ACTIVA=true
-
-# 5) COMPROBAR contra Azure, que es lo que fallo una vez en este proyecto
-az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "{imagen:properties.template.containers[0].image, cron:properties.configuration.scheduleTriggerConfig.cronExpression}" -o yaml
+az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "[0].{nombre:name, estado:properties.status, arranque:properties.startTime}" -o yaml
 ```
 
-**Y a la manana siguiente**, con la nocturna ya corrida:
+Y después, en este orden:
 
-1. **Las cinco huellas del DESPUES** y `comparar-huellas` con **tolerancia CERO**
+1. **Las cinco huellas del DESPUÉS** y `comparar-huellas` con **tolerancia CERO**
    contra las de `huellas/antes_*.csv`. Una sola diferencia PARA la feature.
-2. **T1 otra vez** (ver aviso abajo).
-3. Los `check-*`, el bloat y los creditos (T32-T34).
+   Las del ANTES: `stg` 12.407 celdas / 349 obras · `mart` 24.775 / 349 ·
+   `cierre` 16.948 / 330 · `dimension` 735 / 504 · `plan_obra` 938 / 350.
+2. **T1 otra vez** (ver el aviso de más abajo: la medición del 04 dio 0 % y no
+   era válida; ahora sí lo será, con `_meta.obra_build` ya poblada).
+3. Los `check-*`, el bloat y los créditos (T32-T34).
 
 ## Lo hecho el 2026-09-04
 
