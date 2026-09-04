@@ -190,7 +190,18 @@ En Azure, **el valor esta versionado** desde el 2026-09-04 (hallazgo 2 del
 review): `infra/env/dev.json` declara `ventanaActiva`, `ventanaMeses`,
 `ventanaDiaCompleta` y `ventanaRescate`, y `infra/80_create_job.ps1` los inyecta
 como `PG_VENTANA_*`. Encenderla es **cambiar `"ventanaActiva": "true"` en
-`dev.json`** y volver a lanzar `80_create_job.ps1`.
+`dev.json`** y llevar ese valor al job.
+
+**OJO, Y ESTO SE PROBO: sobre el job de produccion NO vale relanzar
+`80_create_job.ps1`.** Ese script lanza excepcion si el job ya existe
+(`80_create_job.ps1:85-87`: «el job ya existe. Para cambiarle la imagen usa
+85_update_job.ps1»), que es exactamente el caso de hoy. El camino versionado
+solo funciona **al crear el job de cero**. Sobre un job vivo, la unica via que
+funciona hoy es fijarla a mano:
+
+```
+az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --set-env-vars PG_VENTANA_ACTIVA=true
+```
 
 **OJO: `85_update_job.ps1` NO sirve para esto.** Solo cambia la imagen y dice
 expresamente que no toca el entorno, asi que el despliegue habitual no llevara
