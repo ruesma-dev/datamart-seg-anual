@@ -203,9 +203,8 @@ acaba de dejar buenas—.
    y el `DELETE` añade WAL. Mitigación: bajar `PG_TRAMO_MAX_FILAS`, que el
    planificador ya admite sin tocar código.
 3. **8 obras con actividad reciente quedan congeladas**, de las 48 que la tienen
-   (R3). Es la decisión del humano, no un defecto, pero su dato puede llevar hasta
-   6 días de retraso. Mitigación: la firma las **nombra** cada noche (§3.1) y el
-   domingo las pone al día.
+   (R3). Decisión del humano, no defecto; su dato puede llevar 6 días de retraso.
+   Mitigación: la firma las **nombra** cada noche (§3.1) y el domingo las actualiza.
 4. **Que la ventana esconda un fallo del build.** Una obra congelada no vuelve a
    pasar por el SQL, así que un error nuevo solo se vería en las vivas. Lo cubre el
    sello del SQL (R17): cambiar el fichero reconstruye todo.
