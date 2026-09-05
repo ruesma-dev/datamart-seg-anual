@@ -310,7 +310,13 @@ el tope de 144 que este proyecto asumía era falso).
 mano con `az containerapp job start` sobre la imagen `r20260905-1237`, la del
 arreglo. Saldo al arrancar: **57 créditos**, subiendo ~4/h. Duración esperada
 4-5 h por las nocturnas completas del 03 (4 h 18) y del 04 (4 h 50).
-**Resultado: pendiente de anotar aquí.**
+**Resultado: FALLÓ por `replicaTimeout` (5 h), con el código ya bien.**
+`build_presupuesto` pasó (13.874.194 filas, 1.438,6 s) **y el registro en
+`_meta.obra_build` también**: el arreglo funciona. Murió en `plan_mensual`,
+tramo **35/60**, con los créditos **a 1 desde antes de las 15:01**: los tramos
+33-35 tardaron **788 / 728 / 539 s** frente a los ~120 s a ritmo normal. Se
+paró el reintento, se quitó la nocturna y el timeout pasó a **7 h**. Relanzar
+el domingo con la hucha llena (288).
 
 ### Sigue sin medirse
 

@@ -1,5 +1,5 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-05 (madrugada)
+# Estado actual · 2026-09-05 (sábado, cierre a las 15:50 UTC)
 
 ## Comprobado al abrir la sesión del 2026-09-05
 
@@ -47,76 +47,57 @@ el job y **relanzar la reconstrucción como job de Azure** (no desde el puesto).
 Hasta que esa ejecución termine, **T29 sigue sin ejecutar y T30 —las huellas del
 DESPUÉS— no se puede hacer**. Las cinco huellas del ANTES siguen válidas.
 
-## POR DONDE SE SIGUE: la reconstrucción ESTÁ CORRIENDO (lanzada a mano)
+## POR DONDE SE SIGUE: el DOMINGO 06, con la hucha llena (sesión cerrada el sábado a las 15:50 UTC)
 
-**Ejecución `caj-datamart-seg-dev-kcb9n2r`, arrancada a mano el 2026-09-05 a las
-10:44 UTC** con la imagen **`r20260905-1237`**, la que lleva el arreglo del
-método ausente. No se esperó a la nocturna: el humano dijo «construye y
-relanzamos». La programada de las 02:00 sigue en pie y correrá igual.
+**La reconstrucción manual `kcb9n2r` MURIÓ por el `replicaTimeout` de 5 h**, no
+por el código. **El arreglo del método funciona**: `build_presupuesto` terminó a
+las 11:42 con 13.874.194 filas y pasó el registro en `_meta.obra_build`, justo
+donde anoche reventaba. Lo que la mató fue **la hucha de créditos**: arrancó con
+57, llegó a **1 antes de las 15:01** y Azure la capó al 20 % de CPU. Cada tramo
+de `plan_mensual` pasó de ~2 min a **9-13 min**; iba por el **35/60** a las
+15:36 cuando el timeout la cortó a las 15:44. Es el 02-sep calcado.
 
-Todo lo previo, verificado antes de disparar:
+**Lo que se hizo al morir, con autorización del humano** («vamos con los 4
+pasos»), todo comprobado contra Azure:
 
 | | |
 |---|---|
-| `main` al día | fast-forward `eba0704` → **`8cbf213`** |
-| `init.sh` | **verde**, 3.321 pasados · cobertura **91,9 %** de 640 líneas |
-| Imagen | **`r20260905-1237`**, 42 s en ACR |
-| Job apuntado | `85_update_job.ps1 -Tag r20260905-1237` |
-| Comprobado **contra Azure** | imagen ok · `cron: 0 2 * * *` · `ventana: ['true']` · **18 variables intactas** |
-| Lanzada | `az containerapp job start` → `kcb9n2r`, 10:44 UTC, estado `Running` |
+| 1 · reintento | `az containerapp job stop` sobre `kcb9n2r`: **nada en `Running`** |
+| 2 · nocturna | cron a **`0 2 1 1 *`** (no dispara), como el 02-sep |
+| 4a · timeout | `replicaTimeout` **18.000 → 25.200 s (7 h)** |
+| sin tocar | imagen `r20260905-1237` · `PG_VENTANA_ACTIVA=true` · 18 variables |
 
-**Dura entre 4 y 5 horas**: las nocturnas completas del 03 y del 04 tardaron
-**4 h 18** y **4 h 50**. Mientras corre no se toca la base.
+**El estado de la base**: `stg.plan_mensual` a medias (tramo 35/60), como el
+02-sep. La protección de F-024 impide construir `mart` sobre ese `stage`, así
+que el datamart publicado sigue siendo el del día 4. `_meta.obra_build` **ya
+tiene filas** (las de `presupuesto`); la nocturna siguiente decide por R18/R19
+qué rehace.
 
-### Lo PRIMERO cuando termine: que terminó bien, y con qué imagen
+### El domingo, en este orden
 
-Es la lección de `repositorio-verde-no-es-produccion`, y la del 05 por la
-mañana: el job puede decir `Failed` con la imagen correcta.
+1. **Créditos.** Con 12/h desde las 15:45 del sábado, el tope (288) se alcanza
+   hacia las **15:30 UTC del domingo**. Comprobar con `--interval PT1M` (comando
+   en la sección de créditos); **no lanzar por debajo de ~250**: la de hoy
+   demostró que 57 no dan ni para `plan_mensual`.
+2. **Lanzar a mano**: `az containerapp job start -g rg-datamart-seg-dev -n caj-datamart-seg-dev`.
+   Con la hucha llena y 7 h de tope debe caber (el día 4 fueron 4 h 50).
+3. **Vigilar** con el comando de estado de más abajo; si `Failed`, la consulta
+   de Log Analytics con `ContainerGroupName_s startswith '<ejecución>'`.
+4. **Si termina bien**: T29 cumplida → fase 7 (T30 huellas del DESPUÉS con
+   tolerancia cero, T31/T31b, T32, T1, T2b, T28). El guion con comando literal
+   está en «LAS MANUAL DE LA FASE 7».
+5. **Al final del domingo, reactivar la nocturna**:
+   `az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --cron-expression "0 2 * * *"`.
+   Red de seguridad: la alerta de frescura salta a las 30 h sin `build_mart`.
+
+**Pendiente de decisión (no urgente):** si esto se repite tras F-025, el
+**B2s** (+37,38 €/mes) dobla el baseline; ver la tabla de precios más abajo.
+
+**Cómo se ve el estado de una ejecución:**
 
 ```powershell
 az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "[0:3].{nombre:name, estado:properties.status, arranque:properties.startTime, fin:properties.endTime, imagen:properties.template.containers[0].image}" -o yaml
 ```
-
-Si sale `Failed`, los logs de una ejecución **ya terminada** NO se sacan con
-`az containerapp job logs show` —responde `No replicas found for execution`—.
-La vía buena, con el filtro que funciona:
-
-```bash
-WS=$(az monitor log-analytics workspace show -g rg-datamart-seg-dev -n log-datamart-seg-dev --query customerId -o tsv)
-az monitor log-analytics query -w "$WS" --analytics-query "ContainerAppConsoleLogs_CL | where ContainerGroupName_s startswith 'caj-datamart-seg-dev-kcb9n2r' | where Log_s has_any ('ERROR','Traceback','FAILED') | project TimeGenerated, Log_s | order by TimeGenerated asc" -o tsv
-```
-
-### Y si terminó bien, la fase 7 entera, en este orden
-
-**T29 queda cumplida por esta ejecución** (es «la primera reconstrucción
-acotada»): anotar su duración por tramo con `python main.py timings --last 1`.
-
-1. **T30 · las cinco huellas del DESPUÉS**, y `comparar-huellas` **sin
-   `--obras-esperadas`**. Tolerancia CERO: una sola diferencia PARA la feature.
-   Las del ANTES, ya capturadas en `huellas/antes_*.csv`: `stg` 12.407 celdas /
-   349 obras · `mart` 24.775 / 349 · `cierre` 16.948 / 330 · `dimension` 735 /
-   504 · `plan_obra` 938 / 350.
-2. **T31 y T31b** · la 0599 con DIRECTOS 2.624.793 € y margen 1,8 %; y que las
-   40 vivas se rehicieron mientras las 880 conservan su `_built_at`.
-3. **T32** · los cinco `check-*`, con el mismo veredicto que antes.
-4. **T1 otra vez.** Ahora sí significa algo: `_meta.obra_build` ya estará
-   poblada. La medición del 04 dio 0 % **por diseño**, no por fracaso.
-5. **T2b** · el coste de la firma en sus dos variantes. **No se ha ejecutado
-   nunca** y decide su forma final.
-6. **T28** · `ventana-plan` contra producción. Tampoco consta hecho.
-7. A la semana: **T33** (bloat contra T2) y **T34** (créditos > 0).
-
-Los comandos literales de cada uno están más abajo, en «LAS MANUAL DE LA FASE 7».
-
-### Papeleo pendiente que ya está ganado
-
-`specs/F-025-ventana-negocio-build/tasks.md` tiene las 12 manuales en `[ ]`,
-pero **T27** (huellas del ANTES) y **T35** (alerta desplegada) se hicieron el
-2026-09-04, y **T29** la ejecución de hoy. `mediciones.md` no tiene aún **ni una
-cifra**: le faltan T1, T2b, la duración por tramo de T29 y el bloat.
-
-Y la feature **no se marca `done`** hasta que el reviewer haga la 5ª pasada:
-**C5 sigue en `[ ]`, 29 de 41 tareas**.
 
 ## Lo hecho el 2026-09-04
 
