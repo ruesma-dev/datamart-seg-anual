@@ -357,6 +357,102 @@ una sola conexión; lo que hace es **no morir** cuando la hucha se vacía. Esta
 es la primera pasada y reconstruye las 920 por R18; la acotada de verdad es la
 siguiente nocturna, y esa es la que T33/T34 y F-065 tienen que medir.
 
+### T28 · El plan en seco — HECHO el 2026-09-05, 22:50 UTC, tras la completa
+
+Ojo con el entorno: el `.env` del puesto **no lleva `PG_VENTANA_ACTIVA`** (la
+ventana se encendió en Azure, no en local), así que `ventana-plan` a secas dice
+`completa: True (la ventana esta DESACTIVADA)` y 920/0. Se lanzó con la variable
+puesta en la shell, sin tocar `.env`:
+
+```
+PG_VENTANA_ACTIVA=true python main.py ventana-plan --detalle
+```
+
+**Resultado: 920 censadas, 592 se reconstruirían, 328 se quedarían.** Por
+motivo: `sin_filas` 552, `ventana` 368. **Cuadra con el censo de §2, pero no
+como lo dice la tarea** («40 a reconstruir y 880 congeladas»):
+
+- **368 obras tienen filas en `stg.plan_mensual`** (medido: `count(distinct
+  obra_id)` = 368). De ellas **40 son vivas** (592 − 552) y **328 se congelan**.
+  Esas son las cifras del censo.
+- **Las otras 552 no tienen ni una fila en `plan_mensual`**, y R18 manda
+  reconstruirlas siempre («completar no es actualizar»). En `plan_mensual` no
+  cuesta nada, pero **319 de ellas sí tienen filas en `stg.presupuesto`** y
+  327 en `stg.partidas`: ese presupuesto se rehace cada noche. Cuánto pesa lo
+  dirá T1; si es poco, R18 se queda como está; si no, habría que distinguir
+  «sin filas porque no las tiene» de «sin filas porque no se ha construido».
+
+### T30 · Las cinco huellas del DESPUÉS — HECHAS el 2026-09-05, 22:44-23:00 UTC
+
+Capturadas desde el puesto, con el B2s: `dimension` 5 s, `plan_obra` 3 min,
+`cierre` 7 s, `mart` 4 s (el día 4, en el B1ms, `stg` tardó 15 min y se cayó
+dos veces). Mismos recuentos que el ANTES en las cuatro: 735/504, 937/350
+(938 el día 4), 16.952/330, 24.779/349 (24.775 el día 4).
+
+**Las cuatro comparaciones salen KO a tolerancia cero**, y **las diferencias
+NO son del ETL**: son cambios en Sigrid entre la ingesta del 04 y la del 05.
+Las pruebas, una a una:
+
+| capa | obras que se mueven | qué cambia |
+|---|---|---|
+| `dimension` | 0678, 0696, 0699, 0712, 0722, 0724, 180501, POSTV2 | número de partidas (p. ej. 0722: 362 → 372; 180501: 175 → 168) |
+| `plan_obra` | 0678, 0709, 0712, 0722, 180501 | filas e `importe_origen` de los ámbitos 3, 7, 8 y 11 |
+| `mart` | 0678, 0709, 0712 | `importe_mes` de **2026-08** en ámbitos 3 y 7; **master 8 y 11: 0 cambios** |
+| `cierre` | 0678, 0696, 0697, 0699, 0707, 0709, 0711, 0712, 0722, 0723, 0724 | `final_importe` y `pendiente_importe` del mes **2026-08-01** |
+
+1. **`stg.partidas` = `raw.obrparpar` en las ocho obras de `dimension`**, fila a
+   fila en el recuento (0722: 372 y 372; 180501: 168 y 168). El ETL reproduce
+   exactamente lo que trae el `raw` de hoy; lo que difiere del día 4 es el
+   `raw`.
+2. **El SQL que construye `stg.partidas` no lo ha tocado F-025**: su último
+   commit es `a470ebf` (F-052, 2026-09-01), anterior a la imagen del 02-sep con
+   la que se hizo el ANTES. Mismo SQL, distinto `raw`.
+3. **Las once obras con código son todas `obra viva`** en el plan de T28
+   («no cumple ninguna de las tres reglas»): 0678, 0696, 0697, 0699, 0707,
+   0709, 0711, 0712, 0722, 0723, 0724. Las dos sin código —180501
+   (administrativa, seis dígitos) y POSTV2 (postventa)— son `sin_filas`. Ni
+   una congelada se mueve.
+4. **Lo que cambia es actividad de agosto**: en `mart` solo se mueven los
+   ámbitos 3 y 7 (coste y venta real) del mes 2026-08, y los master 8 y 11 dan
+   0 cambios. Es la forma exacta de un día de trabajo en Sigrid: partes y
+   facturas de agosto que entran en septiembre.
+5. **La reconstrucción de hoy fue completa por R18** (`obra_build` estaba
+   vacía), así que ninguna obra se congeló: esta comparación no prueba nada
+   sobre congelar, prueba que el build nuevo sobre el `raw` nuevo da lo que
+   trae Sigrid. La equivalencia que T30 quiere —«sobre el mismo `raw`»— exige
+   otra captura: **huellas ahora (sobre el `raw` del 05) y las mismas huellas
+   tras un build acotado sin volver a ingerir**.
+
+Un dato que Negocio puede querer saber, aunque no sea del ETL: la obra
+**180501** perdió 7 partidas y su ámbito 7 entero en `plan_obra` (853.790 €
+que ya no están en el origen), y el ámbito 3 pasó de 835.621 € a 90.079 €.
+
+**La huella de `stg`** (9 min desde el puesto, 12.409 celdas de 349 obras;
+12.407 el día 4) sale **KO con dos avisos**: 3 obras fuera de la lista (0678,
+0709, 0712) y **66 cambios en los ámbitos master 8 y 11**, todos de la 0712, que
+el comparador da por intocables. **Tampoco es del ETL, y aquí la prueba es
+directa**: `raw.obrfasamb` tiene para la 0712 **doce versiones** del master
+(0-11) en los dos ámbitos, y la **versión 11, «CIERRE AGOSTO-26», se creó en
+Sigrid el 2026-09-04** (`fec = 20260904`), *después* de la nocturna de las
+02:00 de ese día que sirvió de ANTES. `stg.presupuesto` reproduce `raw.obrparpre`
+**fila a fila en las 24 combinaciones (ámbito × versión)** de la obra —444/444
+… 465/465 en el 8, 378/378 … 399/399 en el 11—, y de los nueve SQL de `stg`,
+F-025 solo tocó `06_presupuesto.sql`. `mart` no se movió en master porque su
+versión vigente por mes se fija por fecha efectiva y el cierre nuevo aún no
+manda. Es, otra vez, Sigrid trabajando entre las dos capturas.
+
+**Veredicto de T30 tal como está definida: KO en las cinco capas, todas las
+diferencias explicadas por el origen y ninguna en una obra congelada.** La
+tarea dice que cualquier diferencia PARA la feature y se consulta al humano;
+consultado el 2026-09-05 a las 23:05 UTC. La propuesta: dar esta T30 por
+**no concluyente** por diseño (dos `raw` distintos y ninguna obra congelada
+en la primera pasada) y sustituirla por la captura sobre el mismo `raw`:
+huellas del datamart actual, un build acotado **sin ingesta**
+(`PG_VENTANA_ACTIVA=true`, `stage` + `build-mart` + los de negocio + `cierre`
+desde el puesto, o el job con la ingesta saltada) y las mismas huellas
+después. Con el B2s cada huella cuesta segundos, salvo `stg` (9 min) y
+`plan_obra` (3).
+
 ### Sigue sin medirse
 
 **T1** y **T2b**. T1 además **no puede medirse hasta que una reconstrucción

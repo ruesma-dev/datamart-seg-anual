@@ -44,6 +44,22 @@ terminar; `mart` y `cierre` no gastan (E/S). Detalle, curva y tabla de pasos en
 la nocturna del domingo 06 NO va a correr sola; se reactiva al cerrar la fase 7
 o, si el domingo no se llega, a mano al final del día.
 
+**T28 y T30 HECHAS esa misma noche (22:44-23:05 UTC), Y T30 PIDE UNA
+DECISIÓN DEL HUMANO.** Las cinco huellas del DESPUÉS capturadas (con el B2s,
+segundos cada una salvo `stg` 9 min); las cinco comparaciones **KO a
+tolerancia cero**, y **todas las diferencias son de Sigrid, no del ETL**:
+once obras vivas con actividad de agosto, la versión 11 del master de la 0712
+creada en Sigrid el 04-sep después del ANTES, `stg` = `raw` fila a fila en
+todas ellas, y ninguna obra congelada se mueve. Pruebas y veredicto en
+`mediciones.md` («T30 · Las cinco huellas del DESPUÉS»). **Propuesta**: T30
+no concluyente por diseño (dos `raw` distintos, y la primera pasada no
+congela nada); repetirla sobre el mismo `raw` con un build acotado sin
+ingesta. **Lo decide el humano.** T28: 920 censadas, **40 vivas y 328
+congeladas de las 368 con `plan_mensual`**; las 552 sin filas se rehacen por
+R18 y 319 de ellas tienen presupuesto (T1 dirá cuánto pesa). Ojo: el `.env`
+del puesto NO lleva `PG_VENTANA_ACTIVA`; T28 se lanzó con la variable en la
+shell. Las huellas ANTES/DESPUÉS están en `huellas/` (no versionadas).
+
 **El plan de los próximos días, aprobado por el humano:**
 
 1. ~~Hoy: `hamsh8o` termina~~ **HECHO, `Succeeded` a las 22:22**. T29
@@ -279,13 +295,13 @@ lo lleva escrito; este es el resumen para no tener que recorrerlos:
 | 3 | T35 · la alerta | **HECHO** 04-sep |
 | 4 | T27 · huellas del ANTES | **HECHO** 04-sep |
 | 6 | encender `PG_VENTANA_ACTIVA` | **HECHO** 05-sep 00:40 |
-| 7 | T29 · primera reconstrucción | **EN CURSO** · `kcb9n2r` desde 10:44 UTC |
-| 8 | T30 · huellas del DESPUÉS | **LO SIGUIENTE**, en cuanto termine el 7 |
+| 7 | T29 · primera reconstrucción | **HECHO** · `hamsh8o`, 4 h 52 en B2s |
+| 8 | T30 · huellas del DESPUÉS | **HECHO 05-sep 23:05 · KO explicado por el origen · DECISIÓN PENDIENTE** |
 | 9 | T31 · la 0599 · T31b · frescura | pendiente |
 | 10 | T32 · los cinco `check-*` | pendiente |
 | 1 | T1 · el peso real | pendiente · **repetir**, la del 04 no valía |
 | 2 | T2b · el coste de la firma | pendiente · **nunca ejecutado** |
-| 5 | T28 · `ventana-plan` en seco | pendiente |
+| 5 | T28 · `ventana-plan` en seco | **HECHO 05-sep** · 40 vivas / 328 congeladas / 552 sin filas |
 | 11 | T33 bloat · T34 créditos | a la semana |
 
 El orden de ejecución **no es el de la numeración**: es 8 → 9 → 10 → 1 → 2 → 5,
