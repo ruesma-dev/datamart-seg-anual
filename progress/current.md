@@ -90,8 +90,13 @@ qué rehace.
    `az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --cron-expression "0 2 * * *"`.
    Red de seguridad: la alerta de frescura salta a las 30 h sin `build_mart`.
 
-**Pendiente de decisión (no urgente):** si esto se repite tras F-025, el
-**B2s** (+37,38 €/mes) dobla el baseline; ver la tabla de precios más abajo.
+**La decisión del SKU ya tiene ficha: F-065** (prioridad 2, documental,
+`sdd=false`), pedida por el humano el sábado: medir durante una semana de
+nocturnas acotadas cuánto gasta cada una, el peor caso de una completa con la
+hucha llena, y el saldo mínimo que queda para el uso diurno; con el criterio de
+decisión escrito **antes** de medir. T33/T34 de F-025 alimentan esa tabla. Hasta
+tener el veredicto, **no se toca el SKU**: el B2s (+37,38 €/mes) está en la
+tabla de precios más abajo por si el domingo hace falta la salida rápida.
 
 **Cómo se ve el estado de una ejecución:**
 

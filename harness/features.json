@@ -1004,6 +1004,23 @@
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
       "sdd": true
+    },
+    {
+      "id": "F-065",
+      "title": "Con la ventana de F-025 en marcha: ¿cabe la nocturna en la hucha de créditos o hay que subir de SKU?",
+      "description": "Nace el 2026-09-05, sábado, del humano, tras perder el día entero por los créditos de CPU: la primera reconstrucción completa con F-025 (`kcb9n2r`) arrancó con 57 créditos, llegó a 1 en cuatro horas y el `replicaTimeout` la mató en el tramo 35/60 de `plan_mensual`; cada tramo pasó de ~2 min a 9-13 con la CPU capada al 20 %. Es la segunda vez (la primera, el 02-sep). LA PREGUNTA, literal del humano: «valorar si con el cambio de actualizar solo vivas esto funciona mejor o hay que subir créditos». No se responde con una opinión sino MIDIENDO durante una semana de nocturnas acotadas, que es justo lo que T33/T34 de F-025 dejan a medias. DATOS YA VERIFICADOS ESE DÍA, para no rehacerlos: el servidor `psql-albaranes-rs9k2` es un `Standard_B1ms` Burstable (baseline 20 % de 1 vCPU, recupera 12 créditos/hora, tope 288 —NO 144, que es lo que el repositorio decía hasta entonces; se han visto 300 el 8-ago—); es COMPARTIDO con albaranes, partes, remesas y el portal, así que cambiarle el SKU lo reinicia para todos y probablemente resetea el saldo (60 créditos iniciales según la tabla oficial). Precios reales de Spain Central (EUR, 730 h/mes, API de tarifas): B1ms 12,48 €/mes; B2s 49,86 €/mes (+37,38: 2 vCPU, 24 créditos/hora, tope 576; es el ÚNICO Burstable superior disponible en la región); General Purpose D2ds_v5 132,86 €/mes (+120,38: sin créditos, nunca se estrangula). Un disco mayor NO da créditos. Tercera vía apuntada y no valorada: servidor propio para el datamart, que dejaría de competir con las apps por la misma hucha. QUÉ HAY QUE MEDIR: (1) créditos gastados por CADA nocturna acotada, con `cpu_credits_remaining` (`--interval PT1M`, ver infra/README.md) antes y después del job; (2) créditos gastados por una nocturna COMPLETA con la hucha llena, para tener el peor caso (la del domingo); (3) el saldo mínimo al que baja la hucha en la semana y cuánto le queda para el uso diurno (MCP, Power BI), porque el objetivo del proyecto es que Negocio consulte de día contra el mismo servidor; (4) la duración de cada nocturna frente a las 4 h 18 / 4 h 50 de las completas del 03 y 04. EL CRITERIO DE DECISIÓN, escrito antes de medir para no amañarlo: si la nocturna acotada gasta menos de la mitad de lo que recupera en 24 h (144) y el saldo semanal no baja de ~150 dejando margen diurno, F-025 basta y no se toca el SKU; si la hucha tiende a vaciarse o una completa no cabe ni con 288, se sube a B2s (+37,38 €/mes) y se documenta en azure-apps porque afecta a los demás proyectos. SDD=false: no hay código, es una medición con veredicto escrito. Rigor documental.",
+      "acceptance": [
+        "Una tabla en specs/F-025-ventana-negocio-build/mediciones.md (o su propio documento) con, por cada nocturna de la semana: fecha, acotada o completa, créditos al empezar, créditos al terminar, gastados, duración y estado",
+        "El peor caso medido: lo que gasta una reconstrucción COMPLETA arrancando con la hucha llena, y si cabe en el tope de 288 y en las 7 h de replicaTimeout",
+        "El saldo mínimo semanal y una estimación escrita de cuánto uso diurno (MCP, Power BI) aguanta el servidor sin comprometer la nocturna siguiente",
+        "Un veredicto escrito con el criterio fijado de antemano: F-025 basta / subir a B2s / otra cosa, con su coste mensual real y quién decide",
+        "Si el veredicto es subir de SKU: el impacto sobre los demás proyectos del servidor compartido está escrito en azure-apps/ antes de tocar nada, y lo ejecuta el humano"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "documental",
+      "priority": 2,
+      "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     }
   ]
 }
