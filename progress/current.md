@@ -54,7 +54,7 @@ todas ellas, y ninguna obra congelada se mueve. Pruebas y veredicto en
 `mediciones.md` («T30 · Las cinco huellas del DESPUÉS»). **Propuesta**: T30
 no concluyente por diseño (dos `raw` distintos, y la primera pasada no
 congela nada); repetirla sobre el mismo `raw` con un build acotado sin
-ingesta. **Lo decide el humano.** T28: 920 censadas, **40 vivas y 328
+ingesta. **DECIDIDO el 06 a la 01:10 local: el humano la da por buena** («parecen cambios de obras vivas, es normal»). T28: 920 censadas, **40 vivas y 328
 congeladas de las 368 con `plan_mensual`**; las 552 sin filas se rehacen por
 R18 y 319 de ellas tienen presupuesto (T1 dirá cuánto pesa). Ojo: el `.env`
 del puesto NO lleva `PG_VENTANA_ACTIVA`; T28 se lanzó con la variable en la
@@ -296,7 +296,7 @@ lo lleva escrito; este es el resumen para no tener que recorrerlos:
 | 4 | T27 · huellas del ANTES | **HECHO** 04-sep |
 | 6 | encender `PG_VENTANA_ACTIVA` | **HECHO** 05-sep 00:40 |
 | 7 | T29 · primera reconstrucción | **HECHO** · `hamsh8o`, 4 h 52 en B2s |
-| 8 | T30 · huellas del DESPUÉS | **HECHO 05-sep 23:05 · KO explicado por el origen · DECISIÓN PENDIENTE** |
+| 8 | T30 · huellas del DESPUÉS | **HECHO 05-sep · KO explicado por el origen · DADA POR BUENA por el humano el 06** |
 | 9 | T31 · la 0599 · T31b · frescura | pendiente |
 | 10 | T32 · los cinco `check-*` | pendiente |
 | 1 | T1 · el peso real | pendiente · **repetir**, la del 04 no valía |

@@ -444,8 +444,14 @@ manda. Es, otra vez, Sigrid trabajando entre las dos capturas.
 **Veredicto de T30 tal como está definida: KO en las cinco capas, todas las
 diferencias explicadas por el origen y ninguna en una obra congelada.** La
 tarea dice que cualquier diferencia PARA la feature y se consulta al humano;
-consultado el 2026-09-05 a las 23:05 UTC. La propuesta: dar esta T30 por
-**no concluyente** por diseño (dos `raw` distintos y ninguna obra congelada
+consultado el 2026-09-05 a las 23:05 UTC. **DECISIÓN DEL HUMANO (2026-09-06,
+01:10 local): T30 se da por buena** —«parecen cambios de obras vivas, es
+normal»—, con la confirmación de que el origen de cada diferencia es que se
+ingirieron dos volcados de Sigrid distintos en días distintos. La propuesta
+de repetirla sobre el mismo `raw` queda como opción, no como obligación: la
+prueba de que congelar no cambia una celda la dará T31b en la primera
+nocturna acotada. Lo que sigue era la propuesta antes de la decisión: dar
+esta T30 por **no concluyente** por diseño (dos `raw` distintos y ninguna obra congelada
 en la primera pasada) y sustituirla por la captura sobre el mismo `raw`:
 huellas del datamart actual, un build acotado **sin ingesta**
 (`PG_VENTANA_ACTIVA=true`, `stage` + `build-mart` + los de negocio + `cierre`
