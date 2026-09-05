@@ -47,49 +47,76 @@ el job y **relanzar la reconstrucción como job de Azure** (no desde el puesto).
 Hasta que esa ejecución termine, **T29 sigue sin ejecutar y T30 —las huellas del
 DESPUÉS— no se puede hacer**. Las cinco huellas del ANTES siguen válidas.
 
-## POR DONDE SE SIGUE: F-025, las verificaciones del día después
+## POR DONDE SE SIGUE: la reconstrucción ESTÁ CORRIENDO (lanzada a mano)
 
-**El paso 4 YA ESTÁ EJECUTADO**, en la madrugada del 2026-09-05 entre las 00:22 y
-las 00:40 locales. Los cuatro comandos, con su resultado real:
+**Ejecución `caj-datamart-seg-dev-kcb9n2r`, arrancada a mano el 2026-09-05 a las
+10:44 UTC** con la imagen **`r20260905-1237`**, la que lleva el arreglo del
+método ausente. No se esperó a la nocturna: el humano dijo «construye y
+relanzamos». La programada de las 02:00 sigue en pie y correrá igual.
+
+Todo lo previo, verificado antes de disparar:
 
 | | |
 |---|---|
-| `main` al día | fast-forward limpio `cd18e09` → **`d6d72f2`**, sin tocar el árbol |
-| Imagen construida | **`r20260905-0034`**, digest `sha256:2b1ac7bd3414…`, 38 s en ACR |
-| Job apuntado | `85_update_job.ps1 -Tag r20260905-0034`, disparo `Schedule` |
-| Ventana encendida | `PG_VENTANA_ACTIVA=true` sobre el job vivo |
+| `main` al día | fast-forward `eba0704` → **`8cbf213`** |
+| `init.sh` | **verde**, 3.321 pasados · cobertura **91,9 %** de 640 líneas |
+| Imagen | **`r20260905-1237`**, 42 s en ACR |
+| Job apuntado | `85_update_job.ps1 -Tag r20260905-1237` |
+| Comprobado **contra Azure** | imagen ok · `cron: 0 2 * * *` · `ventana: ['true']` · **18 variables intactas** |
+| Lanzada | `az containerapp job start` → `kcb9n2r`, 10:44 UTC, estado `Running` |
 
-**Comprobado contra Azure, no supuesto** (es lo que falló una vez en este
-proyecto): el job responde `imagen: …:r20260905-0034`, `cron: 0 2 * * *`,
-`ventana: ['true']`. Y las **18 variables de entorno siguen las 18**: se verificó
-una por una que `--set-env-vars` añadiera `PG_VENTANA_ACTIVA` sin llevarse por
-delante `PG_PASSWORD`, `SIGRID_API_FUNCTION_KEY` ni las demás.
+**Dura entre 4 y 5 horas**: las nocturnas completas del 03 y del 04 tardaron
+**4 h 18** y **4 h 50**. Mientras corre no se toca la base.
 
-**La nocturna de las 02:00 UTC del 05-sep (04:00 locales) es la primera
-reconstrucción con F-025 y la ventana activa.** Créditos de CPU al lanzar: la
-última métrica publicada (17:23 UTC) daba **45 y subiendo a ~8/h**, así que la
-nocturna debería arrancar por encima de 100 de los 144. Las métricas de este
-servidor se publican con varias horas de retraso: no busques el dato de la
-última media hora, no está.
+### Lo PRIMERO cuando termine: que terminó bien, y con qué imagen
 
-### Lo primero de la mañana, antes que las huellas
-
-Comprobar que el job corrió **y con qué imagen**, que es la lección de
-`repositorio-verde-no-es-produccion`:
+Es la lección de `repositorio-verde-no-es-produccion`, y la del 05 por la
+mañana: el job puede decir `Failed` con la imagen correcta.
 
 ```powershell
-az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "[0].{nombre:name, estado:properties.status, arranque:properties.startTime}" -o yaml
+az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "[0:3].{nombre:name, estado:properties.status, arranque:properties.startTime, fin:properties.endTime, imagen:properties.template.containers[0].image}" -o yaml
 ```
 
-Y después, en este orden:
+Si sale `Failed`, los logs de una ejecución **ya terminada** NO se sacan con
+`az containerapp job logs show` —responde `No replicas found for execution`—.
+La vía buena, con el filtro que funciona:
 
-1. **Las cinco huellas del DESPUÉS** y `comparar-huellas` con **tolerancia CERO**
-   contra las de `huellas/antes_*.csv`. Una sola diferencia PARA la feature.
-   Las del ANTES: `stg` 12.407 celdas / 349 obras · `mart` 24.775 / 349 ·
-   `cierre` 16.948 / 330 · `dimension` 735 / 504 · `plan_obra` 938 / 350.
-2. **T1 otra vez** (ver el aviso de más abajo: la medición del 04 dio 0 % y no
-   era válida; ahora sí lo será, con `_meta.obra_build` ya poblada).
-3. Los `check-*`, el bloat y los créditos (T32-T34).
+```bash
+WS=$(az monitor log-analytics workspace show -g rg-datamart-seg-dev -n log-datamart-seg-dev --query customerId -o tsv)
+az monitor log-analytics query -w "$WS" --analytics-query "ContainerAppConsoleLogs_CL | where ContainerGroupName_s startswith 'caj-datamart-seg-dev-kcb9n2r' | where Log_s has_any ('ERROR','Traceback','FAILED') | project TimeGenerated, Log_s | order by TimeGenerated asc" -o tsv
+```
+
+### Y si terminó bien, la fase 7 entera, en este orden
+
+**T29 queda cumplida por esta ejecución** (es «la primera reconstrucción
+acotada»): anotar su duración por tramo con `python main.py timings --last 1`.
+
+1. **T30 · las cinco huellas del DESPUÉS**, y `comparar-huellas` **sin
+   `--obras-esperadas`**. Tolerancia CERO: una sola diferencia PARA la feature.
+   Las del ANTES, ya capturadas en `huellas/antes_*.csv`: `stg` 12.407 celdas /
+   349 obras · `mart` 24.775 / 349 · `cierre` 16.948 / 330 · `dimension` 735 /
+   504 · `plan_obra` 938 / 350.
+2. **T31 y T31b** · la 0599 con DIRECTOS 2.624.793 € y margen 1,8 %; y que las
+   40 vivas se rehicieron mientras las 880 conservan su `_built_at`.
+3. **T32** · los cinco `check-*`, con el mismo veredicto que antes.
+4. **T1 otra vez.** Ahora sí significa algo: `_meta.obra_build` ya estará
+   poblada. La medición del 04 dio 0 % **por diseño**, no por fracaso.
+5. **T2b** · el coste de la firma en sus dos variantes. **No se ha ejecutado
+   nunca** y decide su forma final.
+6. **T28** · `ventana-plan` contra producción. Tampoco consta hecho.
+7. A la semana: **T33** (bloat contra T2) y **T34** (créditos > 0).
+
+Los comandos literales de cada uno están más abajo, en «LAS MANUAL DE LA FASE 7».
+
+### Papeleo pendiente que ya está ganado
+
+`specs/F-025-ventana-negocio-build/tasks.md` tiene las 12 manuales en `[ ]`,
+pero **T27** (huellas del ANTES) y **T35** (alerta desplegada) se hicieron el
+2026-09-04, y **T29** la ejecución de hoy. `mediciones.md` no tiene aún **ni una
+cifra**: le faltan T1, T2b, la duración por tramo de T29 y el bloat.
+
+Y la feature **no se marca `done`** hasta que el reviewer haga la 5ª pasada:
+**C5 sigue en `[ ]`, 29 de 41 tareas**.
 
 ## Lo hecho el 2026-09-04
 
@@ -133,12 +160,48 @@ Por eso el paso 4 **se lanza como job en Azure y no desde el puesto**: la
 reconstruccion dura mucho mas que esa huella, y desde aqui se cae. Ademas dentro
 de Azure tarda **1 h 38** frente a las **8 h 15** del 01-sep.
 
-## Estado del servidor, para no repetir el error del 01-sep
+## Estado del servidor · LOS 144 CRÉDITOS ERAN FALSOS (corregido el 2026-09-05)
 
-`Standard_B1ms` Burstable, **144 creditos** de CPU. El 02-sep llegaron a **cero**
-tras nuestras 12 h 48 de reconstruccion manual y la nocturna murio en el tramo 6
-de 60. **Se ha recuperado solo**: 5,2 creditos el 04 a las 07:28 y **60 a las
-21:15**. Las nocturnas del 03 y del 04 corrieron enteras.
+`Standard_B1ms` Burstable, y este repositorio llevaba meses diciendo que el tope
+eran **144 créditos**. **No lo es.** La tabla oficial de la serie Bv1 da para el
+`B1ms`: **baseline 20 %** de 1 vCPU, **12 créditos/hora** con la CPU ociosa y
+**288 de tope**. Y la métrica lo confirma: el servidor ha estado a **300 el
+8-ago**, **277 el 15-ago** y 163 el 29-ago.
+
+Consecuencia: cuando el saldo marca 57, **no estamos al 40 % del depósito sino
+al 20 %**. Todas las cuentas de créditos anteriores al 05-sep están hechas sobre
+un techo equivocado.
+
+**Cómo se consulta el saldo de verdad**, que también costó descubrirlo: hay que
+pedirlo con **`--interval PT1M`** y una ventana corta. Con `PT15M` la API
+devuelve los primeros puntos del rango y parece que la métrica lleva 13 horas de
+retraso; no es cierto, llega al minuto.
+
+```bash
+az monitor metrics list --resource psql-albaranes-rs9k2 --resource-group rg-albaranes-dev   --resource-type Microsoft.DBforPostgreSQL/flexibleServers   --metric cpu_credits_remaining --interval PT1M --aggregation Average   --start-time $(date -u -d '-50 minutes' +%Y-%m-%dT%H:%M:%SZ) -o tsv
+```
+
+**Historia del saldo.** El 02-sep llegaron a **cero** tras nuestras 12 h 48 de
+reconstrucción manual y la nocturna murió en el tramo 6 de 60. Se recuperó solo:
+60 el 04 a las 21:15 local, **78 a las 02:03 UTC del 05**. La nocturna fallida
+del 05 (2 h 19, dos `ingest_raw` de 20 M filas) se comió **unos 40**: quedaban
+**53 a las 09:03** y **57 a las 09:59**, subiendo ~4/h con la CPU al 12 %.
+
+**Qué costaría tener más** (precios reales de Spain Central, EUR, 730 h/mes,
+consultados el 05-sep en la API de tarifas de Azure):
+
+| vía | qué da | coste |
+|---|---|---|
+| esperar | ~12 créditos/h con el servidor ocioso; lleno en ~19 h | 0 € |
+| **B2s** permanente | 2 vCPU, 4 GB · 24 créditos/h, tope 576 · IOPS 1.280 | 49,86 €/mes frente a 12,48 → **+37,38 €/mes** |
+| B2s solo de noche | lo mismo durante la ventana | ~**+12,3 €/mes** |
+| General Purpose D2ds_v5 | 2 vCPU, 8 GB, **sin créditos** | 132,86 €/mes → **+120,38 €/mes** |
+
+En Spain Central **solo existen B1ms y B2s** en Burstable: B2ms y superiores no
+están disponibles, así que el salto siguiente es ya General Purpose. Y ojo con
+escalar: **reinicia el servidor** —que es compartido con albaranes, partes,
+remesas y el portal— y **probablemente resetea el saldo de créditos** (la tabla
+oficial da 60 «initial credits» al B2s); eso habría que medirlo antes de fiarse.
 
 ## F-052 · SIGUE BLOQUEADA, y el motivo REAL no era el que se penso
 
@@ -159,6 +222,26 @@ El fichero de excepciones de esta rama es el viejo: **10 entradas y con los
 
 ## F-025 · LAS MANUAL DE LA FASE 7, CON SU COMANDO EXACTO (C4)
 
+**ESTADO DE LOS ONCE PASOS al 2026-09-05, 12:45 local.** Cada cabecera de abajo
+lo lleva escrito; este es el resumen para no tener que recorrerlos:
+
+| paso | tarea | estado |
+|---|---|---|
+| 3 | T35 · la alerta | **HECHO** 04-sep |
+| 4 | T27 · huellas del ANTES | **HECHO** 04-sep |
+| 6 | encender `PG_VENTANA_ACTIVA` | **HECHO** 05-sep 00:40 |
+| 7 | T29 · primera reconstrucción | **EN CURSO** · `kcb9n2r` desde 10:44 UTC |
+| 8 | T30 · huellas del DESPUÉS | **LO SIGUIENTE**, en cuanto termine el 7 |
+| 9 | T31 · la 0599 · T31b · frescura | pendiente |
+| 10 | T32 · los cinco `check-*` | pendiente |
+| 1 | T1 · el peso real | pendiente · **repetir**, la del 04 no valía |
+| 2 | T2b · el coste de la firma | pendiente · **nunca ejecutado** |
+| 5 | T28 · `ventana-plan` en seco | pendiente |
+| 11 | T33 bloat · T34 créditos | a la semana |
+
+El orden de ejecución **no es el de la numeración**: es 8 → 9 → 10 → 1 → 2 → 5,
+y el 11 a la semana.
+
 **Para el humano.** Esto es el guion completo de lo que queda, en el orden en
 que hay que hacerlo y con el comando literal de cada paso: no hace falta releer
 la spec. Todo desde la raiz del repositorio, con el `.env` de produccion y el
@@ -175,7 +258,7 @@ python main.py status-stg
 python main.py check-coherencia
 ```
 
-### Paso 1 · T1 · El peso real, que decide si la feature merece la pena
+### Paso 1 · T1 · [PENDIENTE — REPETIR tras la reconstrucción] El peso real
 
 Reparte el peso de `SQL_PESOS_PLAN_MENSUAL` entre las 40 obras vivas y las 880
 congeladas. **Es caro**: barre `stg.presupuesto` (13,8 M filas) unido a
@@ -209,7 +292,7 @@ consultar antes de encender nada. La cota estimada de `mediciones.md` §3 es
 
 La cifra se escribe en `mediciones.md` §3.
 
-### Paso 2 · T2b · Cuanto cuesta la firma, que decide su forma final
+### Paso 2 · T2b · [PENDIENTE — NUNCA EJECUTADO] Cuanto cuesta la firma
 
 Las dos variantes, cronometradas. La cara detoasta `planif` en 13,8 M de filas.
 **Tambien fuera del horario de carga.**
@@ -234,7 +317,7 @@ Si la cara resulta asumible, sustituye a `SQL_FIRMA_ORIGEN` (R20); si no, la
 laguna se queda declarada y la cierra el domingo. Los segundos de cada variante
 van a `mediciones.md` §6.
 
-### Paso 3 · T35 · Desplegar la alerta. SIN ESTO EL GUARDIAN ES MUDO
+### Paso 3 · T35 · [HECHO el 2026-09-04] Desplegar la alerta
 
 `check-ventana` **avisa y no tumba el job** (DA-5), asi que la alerta de fallo
 no se dispara y esta regla es la **unica** via por la que el hallazgo llega a
@@ -258,7 +341,7 @@ az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs
 
 **No esta verificada hasta que llegue un correo de verdad.**
 
-### Paso 4 · T27 · Las CINCO huellas del ANTES
+### Paso 4 · T27 · [HECHO el 2026-09-04] Las CINCO huellas del ANTES
 
 **Antes de reconstruir nada y sobre el `raw` vigente.** Solo lectura. Si se
 capturan despues, ya no prueban nada.
@@ -274,7 +357,7 @@ python main.py huella-obras --out huellas/antes_plan_obra.csv --desde plan_obra 
 
 Guardar los cinco CSV **fuera de la base**; `huellas/` no se versiona.
 
-### Paso 5 · T28 · El plan, en seco, contra produccion
+### Paso 5 · T28 · [PENDIENTE] El plan, en seco, contra produccion
 
 ```powershell
 python main.py ventana-plan
@@ -286,7 +369,7 @@ cuadra con `mediciones.md` §2, PARAR: el criterio no esta viendo lo que se
 midio. Ojo, con la ventana todavia apagada imprime `completa: True`; eso es
 correcto y no es un fallo.
 
-### Paso 6 · Encender `PG_VENTANA_ACTIVA`. **Decision del humano**
+### Paso 6 · [HECHO el 2026-09-05 a las 00:40] Encender
 
 Nace apagada (R5): nada de lo anterior cambia una sola cifra publicada. En
 local, en `.env`:
@@ -328,7 +411,7 @@ En cualquiera de los dos caminos, verificar despues que llego:
 az containerapp job show -g <resourceGroup> -n <job> --query "properties.template.containers[0].env[?name=='PG_VENTANA_ACTIVA']" -o table
 ```
 
-### Paso 7 · T29 · La primera reconstruccion acotada
+### Paso 7 · T29 · [EN CURSO — kcb9n2r, lanzada 10:44 UTC] La primera reconstruccion
 
 ```powershell
 python main.py stage
@@ -338,7 +421,7 @@ python main.py timings --last 1
 Anotar duracion por tramo y ocupacion de disco. Para forzar la completa —lo que
 hace sola la noche del domingo—: `python main.py stage --reconstruir-todo`.
 
-### Paso 8 · T30 · Las cinco huellas del DESPUES, y la comparacion
+### Paso 8 · T30 · [PENDIENTE — ES LO SIGUIENTE] Las cinco huellas del DESPUES
 
 **SIN `--obras-esperadas`.** Tolerancia cero: **una sola diferencia PARA la
 feature.**
@@ -359,7 +442,7 @@ python main.py comparar-huellas huellas/antes_plan_obra.csv huellas/despues_plan
 
 Las cinco tienen que salir con **codigo 0 y cero diferencias**.
 
-### Paso 9 · T31 y T31b · La 0599 y la frescura por obra
+### Paso 9 · T31 y T31b · [PENDIENTE] La 0599 y la frescura por obra
 
 ```powershell
 python main.py inspect-cierre --codigo 0599
@@ -374,7 +457,7 @@ FROM _meta.v_frescura_obra
 GROUP BY congelada;
 ```
 
-### Paso 10 · T32 · Los guardianes, con el mismo veredicto que antes
+### Paso 10 · T32 · [PENDIENTE] Los guardianes
 
 ```powershell
 python main.py check-unicidad --timeout 300
@@ -384,7 +467,7 @@ python main.py check-declarados
 python main.py check-ventana
 ```
 
-### Paso 11 · T33 y T34 · Tras una semana acotada
+### Paso 11 · T33 y T34 · [PENDIENTE — a la semana]
 
 Repetir la medicion de bloat de `mediciones.md` §7 sobre `pg_class` y
 `pg_stat_user_tables` y compararla con T2; **si crece de forma sostenida, abrir

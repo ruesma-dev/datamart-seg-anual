@@ -260,3 +260,61 @@ dos barren tablas de millones de filas y el servidor está recuperando créditos
 de CPU tras la avería. Lanzarlas ahora volvería a vaciar la hucha, que es
 exactamente lo que esta feature existe para evitar. La cota estimada del §3
 (73,3 % del proxy) sigue siendo lo único que hay sobre el ahorro.
+
+---
+
+## Fase 7 · Lo medido de verdad (bitácora, 2026-09-04 y 05)
+
+### T27 · Las cinco huellas del ANTES — HECHA el 2026-09-04
+
+Sobre el datamart que dejó la nocturna del 04, en `huellas/antes_*.csv` (fuera
+de git). Son la línea base contra la que T30 compara **con tolerancia cero**:
+
+| capa | celdas | obras |
+|---|---|---|
+| `stg` | 12.407 | 349 |
+| `mart` | 24.775 | 349 |
+| `cierre` | 16.948 | 330 |
+| `dimension` | 735 | 504 |
+| `plan_obra` | 938 | 350 |
+
+La huella de `stg` **hubo que lanzarla tres veces**: dos caídas de la conexión
+del puesto —una con la IP rotando a mitad de consulta— y a la tercera, 15 min.
+No fue culpa del servidor: tenía 60 créditos y la CPU al 12 %.
+
+### T35 · La alerta de la ventana — HECHA el 2026-09-04
+
+`alert-caj-datamart-seg-dev-ventana`, desplegada, **activa**, severidad 2. Sin
+ella el guardián es mudo (DA-5).
+
+### T29 · La primera reconstrucción acotada
+
+**Intento 1 · 2026-09-05 02:00 UTC · `caj-datamart-seg-dev-29809560` · FALLÓ.**
+`AttributeError: 'PostgresClient' object has no attribute 'fetch_filas_por_obra'`
+en `build_stg_step.py:628`, dos veces. Detalle en
+`progress/incidencia_F-025_nocturna_20260905.md`. Lo que sí dejó medido:
+
+| paso | resultado |
+|---|---|
+| `ingest_raw` | SUCCESS · 20.147.626 filas · 2.206 s y 1.782 s |
+| `build_stg` | **FAILED** · 395.929 filas · 1.299,7 s y 1.463,7 s |
+| `build_compras` | SUCCESS · 2.500.592 · 488 s |
+| `build_maestros` / `build_retenciones` | SUCCESS · 26.170 / 29.966 |
+| `mart` · `cierre` · `diccionario` · `grants` | SKIPPED |
+
+**Coste en créditos de CPU**: 78 a las 02:03 → 53 a las 09:03. Las 2 h 19 de job
+se llevaron **unos 40 créditos** de los 288 del tope (ver `progress/current.md`:
+el tope de 144 que este proyecto asumía era falso).
+
+**Intento 2 · 2026-09-05 10:44 UTC · `caj-datamart-seg-dev-kcb9n2r`**, lanzado a
+mano con `az containerapp job start` sobre la imagen `r20260905-1237`, la del
+arreglo. Saldo al arrancar: **57 créditos**, subiendo ~4/h. Duración esperada
+4-5 h por las nocturnas completas del 03 (4 h 18) y del 04 (4 h 50).
+**Resultado: pendiente de anotar aquí.**
+
+### Sigue sin medirse
+
+**T1** y **T2b**. T1 además **no puede medirse hasta que una reconstrucción
+puebla `_meta.obra_build`**: mientras esté vacía, R18 manda reconstruir todas
+las obras y el ahorro sale 0 % **por diseño**, no por fracaso. La medición del
+2026-09-04 (920 a reconstruir, 0 a congelar, 0,0 %) es eso y hay que repetirla.

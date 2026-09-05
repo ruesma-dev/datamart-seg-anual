@@ -59,7 +59,7 @@ escriba en producción o reconstruya va marcado **MANUAL (humano)**.
 
 ## Fase 7 · Verificación contra la base (MANUAL, en este orden)
 
-- [ ] T27: Capturar las CINCO huellas del ANTES sobre el `raw` vigente, antes de reconstruir nada  |  Verificación: MANUAL (humano), cinco CSV guardados fuera de la base
+- [x] T27: Capturar las CINCO huellas del ANTES sobre el `raw` vigente, antes de reconstruir nada  |  Verificación: MANUAL (humano), cinco CSV guardados fuera de la base  |  **HECHA 2026-09-04: cinco CSV en huellas/antes_*.csv**
 - [ ] T28: `python main.py ventana-plan` contra producción y comprobar que el conjunto coincide con el censo de `mediciones.md`  |  Verificación: MANUAL (humano)
 - [ ] T29: Primera reconstrucción acotada (`stage`), midiendo duración por tramo y ocupación de disco  |  Verificación: MANUAL (humano), `python main.py timings`
 - [ ] T30: Capturar las cinco huellas del DESPUÉS y compararlas **sin `--obras-esperadas`**  |  Verificación: MANUAL (humano), `comparar-huellas` con CERO diferencias en las cinco; cualquier diferencia PARA la feature
@@ -68,5 +68,5 @@ escriba en producción o reconstruya va marcado **MANUAL (humano)**.
 - [ ] T32: `check-unicidad --timeout 300`, `check-cierres --timeout 900`, `check-cobertura`, `check-declarados` y `check-ventana`  |  Verificación: MANUAL (humano), mismo veredicto que antes del cambio
 - [ ] T33: Medir el bloat tras la primera semana acotada y compararlo con T2  |  Verificación: MANUAL (humano), cifra en `mediciones.md`; si crece de forma sostenida, abrir la feature de particionado
 - [ ] T34: Medir los créditos de CPU restantes al terminar la nocturna acotada (R29)  |  Verificación: MANUAL (humano), métrica de Azure; crédito restante > 0
-- [ ] T35: Desplegar `infra/97_create_alert_ventana.ps1` y añadir el buzón al grupo de acción  |  Verificación: MANUAL (humano), sin este paso el guardián es mudo
+- [x] T35: Desplegar `infra/97_create_alert_ventana.ps1` y añadir el buzón al grupo de acción  |  Verificación: MANUAL (humano), sin este paso el guardián es mudo  |  **HECHA 2026-09-04: alert-caj-datamart-seg-dev-ventana, activa, sev 2**
 - [x] T36: Ejecutar `bash harness/init.sh` en verde  |  Verificación: código 0, incluidos pytest, tamaño y diccionario

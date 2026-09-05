@@ -270,6 +270,41 @@ Si algún nombre de columna no coincide, comprueba el esquema real con
 `ContainerAppConsoleLogs_CL | getschema` y **corrige este README**; no
 improvises otra vía.
 
+### Acotar a UNA ejecución concreta (añadido el 2026-09-05)
+
+`ContainerJobName_s` sirve para ver los logs del job, pero mezcla todas sus
+ejecuciones. Para leer **una sola** —por ejemplo la que falló anoche— el filtro
+que funciona es **`ContainerGroupName_s startswith '<nombre de la ejecución>'`**:
+
+```powershell
+$ws = az monitor log-analytics workspace show -g rg-datamart-seg-dev -n log-datamart-seg-dev --query customerId -o tsv
+az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerGroupName_s startswith 'caj-datamart-seg-dev-29809560' | where Log_s has_any ('ERROR','Traceback','FAILED') | project TimeGenerated, Log_s | order by TimeGenerated asc" -o tsv
+```
+
+**Y NO uses `az containerapp job logs show --execution <nombre>` para una
+ejecución pasada**: en cuanto termina y sus réplicas se reciclan responde
+`ERROR: No replicas found for execution`, que parece un fallo de permisos o de
+nombre y no lo es. Para una ejecución terminada, la única vía es Log Analytics.
+El nombre de la ejecución sale de:
+
+```powershell
+az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "[0:3].{nombre:name, estado:properties.status, arranque:properties.startTime, imagen:properties.template.containers[0].image}" -o yaml
+```
+
+## Consultar los créditos de CPU del Postgres (añadido el 2026-09-05)
+
+El servidor es Burstable: si se queda sin créditos, Azure lo capa al 20 % y la
+nocturna no termina. **El tope del `B1ms` son 288 créditos, no 144** (ver
+`progress/current.md`); se ha llegado a ver 300.
+
+**Pídelos con `--interval PT1M` y una ventana de menos de una hora.** Con
+`PT15M` la API devuelve los **primeros** puntos del rango, no los últimos, y
+parece que la métrica lleva medio día de retraso: no es verdad, llega al minuto.
+
+```bash
+az monitor metrics list --resource psql-albaranes-rs9k2 --resource-group rg-albaranes-dev   --resource-type Microsoft.DBforPostgreSQL/flexibleServers   --metric cpu_credits_remaining --interval PT1M --aggregation Average   --start-time $(date -u -d '-50 minutes' +%Y-%m-%dT%H:%M:%SZ) -o tsv
+```
+
 Para saber qué build corrió, una ejecución puntual con el comando cambiado (no
 altera la programada):
 
