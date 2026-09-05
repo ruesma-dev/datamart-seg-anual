@@ -22,7 +22,10 @@ az postgres flexible-server update -g rg-albaranes-dev -n psql-albaranes-rs9k2 -
 Ojo: sin `--yes` el CLI pide confirmación interactiva del reinicio y muere con
 `EOF when reading a line` desde un agente. Reinicio de **7 minutos**
 (17:21 → 17:28), el servidor volvió `Ready`, `check-pg` responde y las 17 apps
-del servidor compartido siguen `Running`. Anotado en `azure-apps/`
+del servidor compartido siguen `Running`. **Y el saldo se resetea al escalar,
+medido**: 6 créditos a las 17:19, **60 a las 17:28**, los «initial credits» de
+la tabla oficial. Hoy juega a favor; al bajar a B1ms pasará lo mismo, así que
+la bajada no debe hacerse justo antes de una nocturna completa. Anotado en `azure-apps/`
 (`datamart_seg_anual.md` y `red_postgresql_compartido.md`, commit `c59eee8`)
 con fecha límite **2026-09-20** para preguntar si la bajada se olvidó. La ficha
 de F-065 lleva el giro.
