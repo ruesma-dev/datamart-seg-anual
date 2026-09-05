@@ -104,7 +104,7 @@ class PgFalso:
         self.cierres.append((run_id, status, rows_processed, error_message))
 
     # --- lo que NO debe pasar tras un KO ---
-    def execute_sql_file(self, path: object, params: object = None) -> None:
+    def execute_sql_file(self, path: object, *, params: object = None) -> None:
         self.traza.append("fichero")
 
     def execute_sql_text(self, sql_text: str) -> int:
@@ -115,7 +115,9 @@ class PgFalso:
         self.traza.append("truncate")
 
     # --- resto del andamiaje que usan los steps ---
-    def assert_columns_exist(self, schema: str, table: str, cols: list[str]) -> None:
+    def assert_columns_exist(
+        self, schema: str, table: str, required_columns: list[str]
+    ) -> None:
         self.traza.append("preflight")
 
     def count_rows(self, schema: str, table: str) -> int:
@@ -180,6 +182,14 @@ class PgFalso:
         self.traza.append("vacuum")
 
     # --- ayudas de aserción ---
+    #
+    # NO imitan nada del cliente: las usan los tests para leer la traza. Van
+    # declaradas porque `test_f025_contrato_cliente` exige que todo método
+    # público de un doble exista en `PostgresClient`, y esa regla es la que
+    # habría cazado el `fetch_filas_por_obra` que tumbó la nocturna del
+    # 2026-09-05. Lo que se declara aquí se declara a sabiendas.
+    AYUDAS_DEL_DOBLE = frozenset({"escrituras", "cierre_de"})
+
     @property
     def escrituras(self) -> list[str]:
         """Todo lo que TOCA datos. Es lo que un KO no puede haber hecho."""

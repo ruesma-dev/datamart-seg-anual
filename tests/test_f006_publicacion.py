@@ -860,9 +860,6 @@ class _PgDeCli:
         self.pasos.append((kwargs.get("step", "?"), kwargs.get("status", "?")))
         return 1
 
-    def record_run(self, *_a, **_k):
-        return 1
-
     # lo que usa el paso
     def execute_sql_file(self, path, **_k):
         self.llamadas.append(f"execute_sql_file:{path.name}")

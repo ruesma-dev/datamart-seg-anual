@@ -354,14 +354,16 @@ class PgVentana:
             for tabla in TABLAS_DEL_YAML_FALSO
         ]
 
-    def execute_sql_file(self, path: object, params: object = None) -> None:
+    def execute_sql_file(self, path: object, *, params: object = None) -> None:
         self.traza.append("fichero")
         self.ficheros_ejecutados.append(getattr(path, "name", str(path)))
 
     def count_rows(self, schema: str, table: str) -> int:
         return 0
 
-    def assert_columns_exist(self, schema: str, table: str, columnas: list[str]) -> None:
+    def assert_columns_exist(
+        self, schema: str, table: str, required_columns: list[str]
+    ) -> None:
         return None
 
 

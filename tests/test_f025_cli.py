@@ -75,16 +75,16 @@ class PgSoloLectura:
     def fetch_ultima_reconstruccion_completa(self, paso: str) -> datetime | None:
         return self._ultima
 
-    def filas_solo_lectura(self, sql: str, timeout_s: int) -> list:
+    def filas_solo_lectura(self, sql_text: str, timeout_s: int) -> list:
         if self._revienta:
             raise RuntimeError("connection reset by peer")
-        self.consultas.append(sql)
+        self.consultas.append(sql_text)
         self.timeouts.append(timeout_s)
-        if "count(*) FROM _meta.obra_build" in sql:
+        if "count(*) FROM _meta.obra_build" in sql_text:
             return self._filas.get("censo", [(len(self._censo),)])
-        if "firma_origen <> firma_actual" in sql:
+        if "firma_origen <> firma_actual" in sql_text:
             return self._filas.get("firma_divergente", [])
-        if "NOT EXISTS" in sql:
+        if "NOT EXISTS" in sql_text:
             return self._filas.get("sin_filas", [])
         return self._filas.get("sello", [])
 
