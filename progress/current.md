@@ -1,5 +1,56 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-05 (sábado, cierre a las 15:50 UTC)
+# Estado actual · 2026-09-05 (sábado, sesión reabierta a las 16:31 UTC)
+
+## EL SERVIDOR ESTÁ EN B2s DESDE LAS 17:21 UTC, Y LA RECONSTRUCCIÓN VA POR SEGUNDA VEZ (`hamsh8o`)
+
+**El giro del sábado por la tarde.** Con la hucha a **3 créditos** a las 16:24
+UTC y todo el trabajo de la fase 7 parado hasta el domingo, el humano preguntó
+si se podía **subir el SKU unos días, procesar lo pendiente y bajar cuando esté
+estable**. Sí, y lo autorizó. Lo comprobado antes de tocar nada: en Spain
+Central el único Burstable por encima del `B1ms` es el **`Standard_B2s`** (2
+vCPU, 4 GB, 1.280 IOPS, 576 créditos de tope, 24/h); lo decisivo no es la hucha
+doble sino que **su base con la hucha vacía es 0,8 vCPU**, cuatro veces el
+B1ms estrangulado. Coste +37,38 €/mes, facturado por horas: ~1,23 €/día.
+
+**Ejecutado por el líder con autorización expresa** (saldo de partida 6
+créditos a las 17:14):
+
+```
+az postgres flexible-server update -g rg-albaranes-dev -n psql-albaranes-rs9k2 --sku-name Standard_B2s --tier Burstable --yes
+```
+
+Ojo: sin `--yes` el CLI pide confirmación interactiva del reinicio y muere con
+`EOF when reading a line` desde un agente. Reinicio de **7 minutos**
+(17:21 → 17:28), el servidor volvió `Ready`, `check-pg` responde y las 17 apps
+del servidor compartido siguen `Running`. Anotado en `azure-apps/`
+(`datamart_seg_anual.md` y `red_postgresql_compartido.md`, commit `c59eee8`)
+con fecha límite **2026-09-20** para preguntar si la bajada se olvidó. La ficha
+de F-065 lleva el giro.
+
+**T29 relanzada a las 17:30 UTC como `caj-datamart-seg-dev-hamsh8o`**, sin
+tocar nada más del job: imagen `r20260905-1237`, `PG_VENTANA_ACTIVA=true`,
+timeout 7 h, cron aún en `0 2 1 1 *`. Estado con el comando de más abajo; logs
+con `az containerapp job logs show ... --execution caj-datamart-seg-dev-hamsh8o --container caj-datamart-seg-dev --tail 50`.
+
+**El plan de los próximos días, aprobado por el humano:**
+
+1. Hoy: `hamsh8o` termina (2 a 5 h sin estrangulamiento). Si `Succeeded`, T29
+   cumplida y el cron NO se reactiva hasta cerrar la fase 7.
+2. Domingo: fase 7 en el orden 8 → 9 → 10 → 1 → 2 → 5 (guion más abajo, sin
+   cambios), reviewer, cierre de F-025, reactivar el cron a las 02:00.
+3. Lunes: F-052 en su rama, `check-cobertura --timeout 900` sobre `stg`
+   completa.
+4. Unos días de nocturnas acotadas en B2s, anotando créditos antes y después
+   de cada una (tabla de F-065, con columna SKU).
+5. **Bajar a B1ms** en hora de poco uso (segundo reinicio; lo ejecuta el humano
+   o el líder con autorización expresa para ese comando). A partir de ahí, la
+   semana de medición de F-065 sobre el régimen estable, que es la que responde
+   a la pregunta real.
+
+Lo que sigue debajo es el estado tal como quedó a las 15:50; sigue siendo
+válido salvo lo que esta sección corrige (la espera al domingo ya no aplica).
+
+# Estado a las 15:50 UTC (antes del giro)
 
 ## Comprobado al abrir la sesión del 2026-09-05
 
