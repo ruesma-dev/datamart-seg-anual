@@ -17,6 +17,36 @@ esta frase y dejó `init.sh` en rojo: el test
 recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de
 este fichero, los tres números se quedan.**
 
+## LA NOCTURNA DEL 05 FALLÓ, Y YA ESTÁ ARREGLADA (2026-09-05, tarde)
+
+La primera nocturna con F-025 (`caj-datamart-seg-dev-29809560`, imagen correcta
+`r20260905-0034`) murió **dos veces** con
+`AttributeError: 'PostgresClient' object has no attribute 'fetch_filas_por_obra'`
+en `build_stg_step.py:628`. Diagnóstico completo, con los logs y el estado de la
+base: `progress/incidencia_F-025_nocturna_20260905.md`.
+
+**La base NO está rota**: el fallo cae *después* de construir el tramo, en el
+registro de la traza. `stg` conserva sus cifras de siempre; lo que no hay es
+refresco, y `_meta.obra_build` sigue vacía.
+
+**Arreglado en tres commits** (`a9e51ed`, `202f0e4`, `481f6ca`), informe en
+`progress/impl_F-025_metodo_ausente.md`:
+
+1. `fetch_filas_por_obra` implementado en `PostgresClient` —nunca se escribió;
+   solo existía en tres dobles de test, de ahí los 3.308 tests en verde—.
+2. `tests/test_f025_contrato_cliente.py`: cruza cada doble con el original y
+   cada llamada de producción con la clase, por barrido `ast` y sin lista a
+   mano. Barrido hecho: **no había más métodos fantasma**.
+3. La lección en `CHECKPOINTS.md` (C4) y portada a `arnes-base` 1.7.9.
+
+`bash harness/init.sh` **en verde**: 3.321 pasados, 134 saltados, cobertura
+**91,9 %** de 640 líneas cambiadas (umbral 80, nivel crítico).
+
+**LO SIGUIENTE, y lo decide el humano:** volver a construir la imagen, apuntar
+el job y **relanzar la reconstrucción como job de Azure** (no desde el puesto).
+Hasta que esa ejecución termine, **T29 sigue sin ejecutar y T30 —las huellas del
+DESPUÉS— no se puede hacer**. Las cinco huellas del ANTES siguen válidas.
+
 ## POR DONDE SE SIGUE: F-025, las verificaciones del día después
 
 **El paso 4 YA ESTÁ EJECUTADO**, en la madrugada del 2026-09-05 entre las 00:22 y
