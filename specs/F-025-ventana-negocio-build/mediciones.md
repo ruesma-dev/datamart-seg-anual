@@ -318,6 +318,45 @@ tramo **35/60**, con los créditos **a 1 desde antes de las 15:01**: los tramos
 paró el reintento, se quitó la nocturna y el timeout pasó a **7 h**. Relanzar
 el domingo con la hucha llena (288).
 
+**Intento 3 · 2026-09-05 17:30 UTC · `caj-datamart-seg-dev-hamsh8o` · SUCCEEDED
+en 4 h 52 (17:30:12 → 22:22:37).** Lanzado a mano nueve minutos después de
+escalar el servidor a **`Standard_B2s`** (el humano autorizó subir unos días y
+bajar cuando esté estable; ver `progress/current.md`). Saldo al arrancar: **60**,
+los créditos iniciales que Azure da al escalar (el reseteo está medido: de 6 a
+60 en el reinicio). **T29 cumplida**: `_meta.obra_build` tiene **920 filas, 920
+obras** (construidas entre las 18:18 y las 20:23), `stg.plan_mensual`
+**29.772.701 filas**, `check-ventana` **OK** (920 miradas, 0 hallazgos),
+`check-cobertura` en el **KO conocido** de F-052 (20 obras invisibles, 294
+huérfanas: esta rama no lleva sus excepciones), diccionario publicado en
+**versión 13**.
+
+| paso | resultado |
+|---|---|
+| `ingest_raw` | SUCCESS · 20.147.626 filas · **1.832 s** (2.206 y 1.782 el día antes estrangulado) |
+| `build_stg` | SUCCESS · 44.042.947 · **9.527 s** (2 h 39; `plan_mensual` 60/60, tramos de 47 a 220 s) |
+| `build_mart` | SUCCESS · 5.384.370 · 2.840 s (47 min) |
+| `build_maestros` / `build_compras` / `build_retenciones` | SUCCESS · 4 / 456 / 53 s |
+| `build_cierre` | SUCCESS · 16.952 · **2.665 s** (44 min, casi todo `build_fact`) |
+| `publicar_diccionario` · `apply_grants` | SUCCESS · 0,6 / 0,3 s |
+
+**Coste en créditos, curva medida a un minuto (B2s: 24/h de recarga, base 0,8
+vCPU)**: 60 (17:40) → 50 (18:10) → 31 (19:05) → 15 (19:40) → **mínimo 6 a las
+20:05**, al final de `plan_mensual` → **sube** durante `mart` y `cierre` (13 a
+las 21:00, 17 a las 21:55) → 14 al terminar. Dos lecturas: (1) el gasto neto de
+la completa es **~54 créditos más lo recargado en 4 h 52 (~117)**, o sea del
+orden de **170 créditos**, y por eso no cabía en los 57 de la mañana ni en un
+B1ms a medias; (2) `mart` y `cierre` **no consumen créditos** en el B2s: su CPU
+media queda por debajo del 40 % de base, son pasos de E/S. Todo el gasto está
+en `ingest_raw` y `build_stg`. Nota: aun con la hucha casi a cero el B2s no se
+estranguló (los últimos tramos iban a 47-57 s), que era el argumento para
+subirlo.
+
+**Ojo con la comparación de duraciones**: 4 h 52 es lo mismo que la completa
+del 04 en B1ms con créditos (4 h 50). El B2s no acelera un build en serie de
+una sola conexión; lo que hace es **no morir** cuando la hucha se vacía. Esta
+es la primera pasada y reconstruye las 920 por R18; la acotada de verdad es la
+siguiente nocturna, y esa es la que T33/T34 y F-065 tienen que medir.
+
 ### Sigue sin medirse
 
 **T1** y **T2b**. T1 además **no puede medirse hasta que una reconstrucción

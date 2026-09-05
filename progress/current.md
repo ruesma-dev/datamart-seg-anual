@@ -35,10 +35,19 @@ tocar nada más del job: imagen `r20260905-1237`, `PG_VENTANA_ACTIVA=true`,
 timeout 7 h, cron aún en `0 2 1 1 *`. Estado con el comando de más abajo; logs
 con `az containerapp job logs show ... --execution caj-datamart-seg-dev-hamsh8o --container caj-datamart-seg-dev --tail 50`.
 
+**`hamsh8o` TERMINÓ EN `Succeeded` A LAS 22:22 UTC, 4 h 52. T29 CUMPLIDA.**
+920 obras en `_meta.obra_build`, `stg.plan_mensual` completa (29,77 M),
+`check-ventana` OK, `check-cobertura` en el KO conocido de F-052, diccionario
+en versión 13. Créditos: 60 → mínimo **6** al acabar `plan_mensual` → 14 al
+terminar; `mart` y `cierre` no gastan (E/S). Detalle, curva y tabla de pasos en
+`mediciones.md`, intento 3 de T29. **El cron sigue apagado** (`0 2 1 1 *`):
+la nocturna del domingo 06 NO va a correr sola; se reactiva al cerrar la fase 7
+o, si el domingo no se llega, a mano al final del día.
+
 **El plan de los próximos días, aprobado por el humano:**
 
-1. Hoy: `hamsh8o` termina (2 a 5 h sin estrangulamiento). Si `Succeeded`, T29
-   cumplida y el cron NO se reactiva hasta cerrar la fase 7.
+1. ~~Hoy: `hamsh8o` termina~~ **HECHO, `Succeeded` a las 22:22**. T29
+   cumplida; el cron NO se reactiva hasta cerrar la fase 7.
 2. Domingo: fase 7 en el orden 8 → 9 → 10 → 1 → 2 → 5 (guion más abajo, sin
    cambios), reviewer, cierre de F-025, reactivar el cron a las 02:00.
 3. Lunes: F-052 en su rama, `check-cobertura --timeout 900` sobre `stg`
