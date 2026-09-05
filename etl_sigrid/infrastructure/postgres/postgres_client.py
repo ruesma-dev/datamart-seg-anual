@@ -322,6 +322,38 @@ TABLAS_ACOTADAS = ("plan_mensual", "presupuesto")
 # de 29 M de filas cada domingo.
 SQL_OBRAS_CON_FILAS = "SELECT DISTINCT obra_id FROM stg.{tabla}"
 
+# CUÁNTAS FILAS HA DEJADO CADA OBRA EN EL TRAMO (R14). Alimenta la columna
+# `filas` de `_meta.obra_build`, que es lo que permite responder «esta obra se
+# construyó y salió vacía» sin volver a barrer la tabla.
+#
+# El `WHERE` NO es decoración: sin él esto sería un `GROUP BY` sobre 29,7 M de
+# filas cada noche en un servidor sin créditos de CPU. Se cuenta SOLO lo que se
+# acaba de construir —decenas de obras—, que además es lo único de lo que se va
+# a escribir la traza. Las obras van por parámetro (`= ANY`); el nombre de tabla
+# es la segunda y última interpolación de identificador del bloque, y se valida
+# contra `TABLAS_ACOTADAS` igual que `SQL_OBRAS_CON_FILAS`.
+SQL_FILAS_POR_OBRA = """
+SELECT obra_id, COUNT(*)
+FROM stg.{tabla}
+WHERE obra_id = ANY(%(obras)s)
+GROUP BY obra_id
+"""
+
+
+def _exigir_tabla_acotada(tabla: str) -> None:
+    """Corta antes de interpolar un nombre de tabla que venga de fuera.
+
+    Lo comparten las dos consultas que interpolan identificador
+    (`SQL_OBRAS_CON_FILAS` y `SQL_FILAS_POR_OBRA`) para que la lista blanca sea
+    una sola y no dos copias que puedan divergir.
+    """
+    if tabla not in TABLAS_ACOTADAS:
+        raise ValueError(
+            f"tabla no acotada por la ventana: {tabla!r}. Las unicas son "
+            f"{', '.join(TABLAS_ACOTADAS)}, y este nombre se interpola en el "
+            f"SQL: no puede venir de fuera."
+        )
+
 # --- Coherencia ante cargas truncadas (F-024) -------------------------------
 #
 # Las consultas van como constantes de módulo, igual que `SQL_OCUPACION_DISCO`,
@@ -1317,15 +1349,51 @@ class PostgresClient:
         del censo no vea sería destruir datos buenos en silencio, y R10 dice que
         lo que se borra se deriva de lo que se va a escribir.
         """
-        if tabla not in TABLAS_ACOTADAS:
-            raise ValueError(
-                f"tabla no acotada por la ventana: {tabla!r}. Las unicas son "
-                f"{', '.join(TABLAS_ACOTADAS)}, y este nombre se interpola en el "
-                f"SQL: no puede venir de fuera."
-            )
+        _exigir_tabla_acotada(tabla)
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute(SQL_OBRAS_CON_FILAS.format(tabla=tabla))
             return {int(fila[0]) for fila in cur.fetchall() if fila[0] is not None}
+
+    def fetch_filas_por_obra(
+        self, tabla: str, obras: Sequence[int]
+    ) -> dict[int, int]:
+        """Cuántas filas tiene en `stg.<tabla>` cada una de esas obras (R14).
+
+        Es la pareja de `registrar_obras_construidas`: de aquí sale la columna
+        `filas` de `_meta.obra_build`, o sea, cuánto dejó construido esta noche
+        cada obra. Se pregunta SOLO por las obras que se acaban de construir
+        —decenas—, nunca por la tabla entera: un `GROUP BY` sobre los 29,7 M de
+        `plan_mensual` costaría más que el propio tramo en un `B1ms` sin
+        créditos de CPU.
+
+        **Una obra sin filas NO lleva clave en el resultado**, porque no sale
+        del `GROUP BY`. Es deliberado y quien llama ya lo espera
+        (`build_stg_step._registrar_construidas` resuelve con
+        `filas.get(obra_id, 0)`): así el diccionario dice lo que respondió la
+        base y no lo que suponemos que habría respondido. Inventar un `0` por
+        cada obra pedida sería afirmar «la miré y estaba vacía» también en el
+        caso en que la consulta ni siquiera la alcanzó.
+
+        Sin obras no se abre conexión: el sub-paso puede quedarse sin nada que
+        reconstruir (R9) y preguntarlo sería un viaje a la base para nada.
+
+        `tabla` llega del step como nombre corto del tramo y se interpola en el
+        SQL, así que se valida contra `TABLAS_ACOTADAS` antes de tocar nada.
+        """
+        _exigir_tabla_acotada(tabla)
+        if not obras:
+            return {}
+
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                SQL_FILAS_POR_OBRA.format(tabla=tabla),
+                {"obras": [int(obra) for obra in obras]},
+            )
+            return {
+                int(fila[0]): int(fila[1])
+                for fila in cur.fetchall()
+                if fila[0] is not None
+            }
 
     def registrar_obras_construidas(self, registros: Sequence[dict]) -> int:
         """Escribe en `_meta.obra_build` lo construido esta noche (R14).

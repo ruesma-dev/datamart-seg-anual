@@ -30,6 +30,7 @@ from etl_sigrid.infrastructure.postgres import postgres_client as cliente
 from etl_sigrid.infrastructure.postgres.postgres_client import (
     COLUMNAS_FIRMA_ORIGEN,
     SQL_ESTADO_OBRAS,
+    SQL_FILAS_POR_OBRA,
     SQL_FIRMA_ORIGEN,
     SQL_FIRMA_ORIGEN_CON_PLANIF,
     SQL_MARCAR_CONGELADA,
@@ -41,8 +42,29 @@ from etl_sigrid.infrastructure.postgres.postgres_client import (
     PostgresClient,
 )
 
+from tests.test_f019_tramos import CursorFalso, cliente_con
+
+
+class CursorConParametros(CursorFalso):
+    """`CursorFalso` que además guarda los parámetros de cada `execute`.
+
+    Hace falta aquí porque lo que se prueba del recuento por obra no es solo el
+    texto que se envía, sino QUE SE ACOTA a las obras que se acaban de
+    construir: eso vive en los parámetros, no en el SQL.
+    """
+
+    def __init__(self, filas: list[tuple] | None = None) -> None:
+        super().__init__(filas=filas)
+        self.parametros: list[object] = []
+
+    def execute(self, sql: str, params: object = None) -> None:
+        super().execute(sql, params)
+        self.parametros.append(params)
+
+
 CONSULTAS_DE_LECTURA = (
     SQL_ESTADO_OBRAS,
+    SQL_FILAS_POR_OBRA,
     SQL_FIRMA_ORIGEN,
     SQL_FIRMA_ORIGEN_CON_PLANIF,
     SQL_ULTIMA_COMPLETA,
@@ -259,6 +281,8 @@ def test_f025_r13_una_tabla_fuera_de_la_lista_se_rechaza_sin_conectar(
     with pytest.raises(ValueError, match="no acotada"):
         PostgresClient.fetch_obras_con_filas(falso, tabla)
     with pytest.raises(ValueError, match="no acotada"):
+        PostgresClient.fetch_filas_por_obra(falso, tabla, (1, 2))
+    with pytest.raises(ValueError, match="no acotada"):
         PostgresClient.vacuum_analyze(falso, "stg", tabla)
 
 
@@ -287,9 +311,66 @@ def test_f025_r14_los_metodos_de_la_ventana_existen_en_el_cliente() -> None:
         "fetch_firma_origen",
         "fetch_ultima_reconstruccion_completa",
         "fetch_obras_con_filas",
+        "fetch_filas_por_obra",
         "registrar_obras_construidas",
         "marcar_obras_congeladas",
         "registrar_firmas_actuales",
         "vacuum_analyze",
     ):
         assert callable(getattr(cliente.PostgresClient, metodo))
+
+
+# ---------------------------------------------------------------------------
+# El recuento por obra que alimenta `_meta.obra_build.filas` (R14)
+# ---------------------------------------------------------------------------
+
+
+def test_f025_r14_el_recuento_por_obra_agrupa_y_va_parametrizado() -> None:
+    """La columna `filas` de `_meta.obra_build` sale de aquí, y esta consulta es
+    la SEGUNDA interpolación de identificador del bloque: el nombre de tabla se
+    valida contra `TABLAS_ACOTADAS`, y las obras van por parámetro."""
+    assert "{tabla}" in SQL_FILAS_POR_OBRA
+    assert re.search(r"GROUP\s+BY\s+obra_id", SQL_FILAS_POR_OBRA)
+    assert "%(obras)s" in SQL_FILAS_POR_OBRA
+    # Las obras NO se concatenan al texto: la lista entra como parámetro.
+    assert "{obras}" not in SQL_FILAS_POR_OBRA
+    assert "ANY(%(obras)s)" in SQL_FILAS_POR_OBRA
+    # Y no se cuenta la tabla entera: el filtro por obra es lo que hace barata
+    # la consulta en un servidor sin créditos.
+    assert re.search(r"WHERE\s+obra_id", SQL_FILAS_POR_OBRA)
+
+
+def test_f025_r14_el_recuento_solo_mira_las_obras_que_se_le_piden() -> None:
+    """Un `COUNT(*) GROUP BY` sin filtro sería un barrido de 29 M de filas en un
+    servidor sin créditos. Se cuenta lo que se acaba de construir, y nada más."""
+    cursor = CursorConParametros(filas=[(7, 120), (9, 3)])
+    cliente_pg, _ = cliente_con(cursor)
+
+    cliente_pg.fetch_filas_por_obra("presupuesto", (7, 8, 9))
+
+    assert cursor.parametros == [{"obras": [7, 8, 9]}]
+    assert "stg.presupuesto" in cursor.ejecutado[0]
+
+
+def test_f025_r14_una_obra_sin_filas_no_aparece_en_el_recuento() -> None:
+    """El contrato del método: la obra que no sale del `GROUP BY` NO lleva
+    clave. Quien llama resuelve con `.get(obra_id, 0)`, y así el diccionario
+    dice lo que la base respondió y no lo que suponemos que respondería."""
+    cursor = CursorConParametros(filas=[(7, 120), (9, 3)])
+    cliente_pg, _ = cliente_con(cursor)
+
+    recuento = cliente_pg.fetch_filas_por_obra("plan_mensual", (7, 8, 9))
+
+    assert recuento == {7: 120, 9: 3}
+    assert 8 not in recuento
+    assert all(isinstance(k, int) and isinstance(v, int) for k, v in recuento.items())
+
+
+def test_f025_r14_sin_obras_no_se_consulta_nada() -> None:
+    """El sub-paso puede quedarse sin obras que reconstruir (R9). Preguntar por
+    una lista vacía sería una conexión y un barrido para nada."""
+    cursor = CursorConParametros(filas=[])
+    cliente_pg, _ = cliente_con(cursor)
+
+    assert cliente_pg.fetch_filas_por_obra("presupuesto", ()) == {}
+    assert cursor.ejecutado == []
