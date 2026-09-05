@@ -8,9 +8,9 @@ escriba en producción o reconstruya va marcado **MANUAL (humano)**.
 
 ## Fase 0 · Medir antes de tocar nada
 
-- [ ] T1: Medir el ahorro real del criterio con la consulta de pesos que la nocturna ya ejecuta (`SQL_PESOS_PLAN_MENSUAL`), repartido entre las 40 obras vivas y las 880 congeladas  |  Verificación: MANUAL (humano), cifra escrita en `mediciones.md`; si el ahorro es menor del 40 % del peso, PARAR y reconsultar
+- [x] T1: Medir el ahorro real del criterio con la consulta de pesos que la nocturna ya ejecuta (`SQL_PESOS_PLAN_MENSUAL`), repartido entre las 40 obras vivas y las 880 congeladas  |  Verificación: MANUAL (humano), cifra escrita en `mediciones.md`; si el ahorro es menor del 40 % del peso, PARAR y reconsultar  |  **HECHA 2026-09-05 tras `hamsh8o`: ahorro 59,2 % (vivas 30,5 M / congeladas 44,4 M; las 552 sin filas pesan 24.697). La del 04 (0 %) no valía: `obra_build` vacía**
 - [x] T2: Medir tamaño (`pg_total_relation_size`) y `pg_stat_user_tables` de `stg.plan_mensual` y `stg.presupuesto` como línea base del bloat  |  Verificación: MANUAL (humano), cifras en `mediciones.md`
-- [ ] T2b: Medir el coste del scan agregado de la firma sobre `raw.obrparpre`, en sus dos variantes (sin `planif` y con `md5(planif)`)  |  Verificación: MANUAL (humano), segundos de cada variante en `mediciones.md`; decide la forma final de la firma
+- [x] T2b: Medir el coste del scan agregado de la firma sobre `raw.obrparpre`, en sus dos variantes (sin `planif` y con `md5(planif)`)  |  Verificación: MANUAL (humano), segundos de cada variante en `mediciones.md`; decide la forma final de la firma  |  **MEDIDA 2026-09-05 en B2s: barata 110,7 s / 920 obras; cara 186,1 s / 728 obras (solo añade `obrparpre`; iría sumada, no en sustitución). ~3 min más por noche. Implantarla es código y una completa la primera noche: decisión del humano, tarea aparte**
 
 ## Fase 1 · Dominio puro (sin BBDD)
 

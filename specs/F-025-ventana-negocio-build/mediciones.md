@@ -121,7 +121,7 @@ congelaría 7 obras que siguen cerrando meses y la fecha de fin real falla en lo
 dos sentidos. La actividad medida es objetiva y se equivoca solo por exceso de
 trabajo, nunca por dato viejo.
 
-## 3 · El peso, estimado (no medido)
+## 3 · El peso, estimado (no medido) — MEDIDO el 2026-09-05 en la Fase 7 (T1): ahorro real 59,2 %
 
 `stg.plan_mensual` no se puede contar hoy. **Estimación** con el proxy
 `partidas × fases` por obra, que aproxima el peso de los ámbitos reales (3 y 7):
@@ -466,9 +466,63 @@ MAJADAHONDA), último mes Diciembre 2022, fase 28: **DIRECTOS 2.624.793,46 €**
 BENEFICIO 72.603,10 € sobre 4.066.989,23 € de venta = **1,79 %**. Las mismas
 cifras de F-052.
 
+### T32 · Los cinco `check-*` — 2026-09-05/06, tras `hamsh8o`
+
+| check | veredicto | igual que antes del cambio |
+|---|---|---|
+| `check-ventana` (en `run-all`) | **OK**, 920 miradas, 0 hallazgos | primera vez que corre |
+| `check-declarados` (en `run-all`) | OK (el job salió en `Succeeded`, y este es el que tumba) | sí |
+| `check-cobertura` (en `run-all`) | **KO conocido de F-052**: 20 invisibles, 294 huérfanas (esta rama no lleva sus excepciones) | sí, 04-sep |
+| `check-unicidad --timeout 300` (11 min) | **KO conocido de F-051**: `cierre.v_pbi_planif_vs_real`, 204 combinaciones / 472 filas, renglón BENEFICIO; 43 sin contradicción | sí, 30-ago, mismas cifras |
+| `check-cierres --timeout 900` | **primer intento CANCELADO por timeout** a los 900 s: corría a la vez que `check-unicidad` (culpa del guion, no de la base). Relanzado solo con 1.800 s; resultado debajo | — |
+
+`check-unicidad` dejó **dos** vistas sin comprobar por timeout
+(`mart.v_master_vigente_anual`, que ya era un «no lo sabemos» permanente, y
+`mart.v_master_versiones_tipadas`, que esta vez corría en paralelo con
+`check-cierres`).
+
+### T1 · El peso real — MEDIDO el 2026-09-05, 23:40-23:47 UTC (7 min en B2s)
+
+Sobre `_meta.obra_build` ya poblada por `hamsh8o` (la del 04 no valía: R18
+mandaba reconstruir las 920). Con `PG_VENTANA_ACTIVA=true` en la shell y
+`completa=False`:
+
+| conjunto | obras | peso (`SQL_PESOS_PLAN_MENSUAL`) |
+|---|---|---|
+| a reconstruir | 592 (40 `ventana` + 552 `sin_filas`) | **30.534.657** |
+| de ellas, las 552 `sin_filas` | 552 | **24.697** (el 0,08 %) |
+| congeladas | 328 | **44.395.641** |
+| **AHORRO** | | **59,2 %** (criterio de parada: < 40 %) |
+
+Dos lecturas. (1) **No hay que parar**: el ahorro medido es del 59,2 %, por
+debajo del 73,3 % que estimaba §3 —el proxy no cubría los ámbitos master 8 y
+11, y las obras vivas tienen mucho master— pero muy por encima del umbral. (2)
+**Las 552 obras `sin_filas` no pesan nada** (24.697 de 74,9 M): R18 se queda
+como está, no hace falta distinguir «sin filas porque no las tiene» de «sin
+construir». La duda que dejó T28 queda cerrada.
+
+### T2b · Cuánto cuesta la firma — MEDIDO el 2026-09-05, 23:47-23:52 UTC (B2s)
+
+| variante | tiempo | obras |
+|---|---|---|
+| barata, `SQL_FIRMA_ORIGEN` (la que corre cada noche) | **110,7 s** | 920 (sale de `raw.obr`) |
+| cara, `SQL_FIRMA_ORIGEN_CON_PLANIF` (`md5(string_agg(planif))`) | **186,1 s** | 728 (solo las que tienen filas en `obrparpre`) |
+
+Ojo con la lectura: la cara **no sustituye** a la barata, **se le añade**. Solo
+agrega `raw.obrparpre` (por eso 728 obras y no 920): en producción sería la
+barata más un `LEFT JOIN` con este hash por `obra_id`, y su precio es **~3
+minutos más por noche en el B2s**; en el B1ms, con 10 MiB/s de techo, cabe
+esperar el doble o el triple. Sobre unas 4 h de nocturna es asumible en
+tiempo; lo que compra es cerrar la laguna de R20 (un cambio de planificación
+pura, sin mover cantidades ni precios, hoy no cambia la firma y espera al
+domingo). **Decisión pendiente del humano**: implantarla es código (sumar
+`pre_planif` a `COLUMNAS_FIRMA_ORIGEN` y al SQL, con su test), y cambiar la
+firma provoca una reconstrucción completa la primera noche, como avisa el
+propio código. Si se implanta, va como tarea nueva con su spec, no en la
+fase 7.
+
 ### Sigue sin medirse
 
-**T1** y **T2b**. T1 además **no puede medirse hasta que una reconstrucción
-puebla `_meta.obra_build`**: mientras esté vacía, R18 manda reconstruir todas
-las obras y el ahorro sale 0 % **por diseño**, no por fracaso. La medición del
-2026-09-04 (920 a reconstruir, 0 a congelar, 0,0 %) es eso y hay que repetirla.
+**T31b, T33 y T34**: las tres necesitan nocturnas acotadas, y la primera será
+la del lunes 07 (el domingo toca completa por R25). T1 y T2b, medidas arriba
+el 05-sep.
