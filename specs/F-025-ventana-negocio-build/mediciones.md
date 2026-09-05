@@ -459,6 +459,13 @@ desde el puesto, o el job con la ingesta saltada) y las mismas huellas
 después. Con el B2s cada huella cuesta segundos, salvo `stg` (9 min) y
 `plan_obra` (3).
 
+### T31 · La 0599 — HECHA el 2026-09-05, 23:07 UTC
+
+`python main.py inspect-cierre --codigo 0599` (obra 1442383, TANATORIO
+MAJADAHONDA), último mes Diciembre 2022, fase 28: **DIRECTOS 2.624.793,46 €**,
+BENEFICIO 72.603,10 € sobre 4.066.989,23 € de venta = **1,79 %**. Las mismas
+cifras de F-052.
+
 ### Sigue sin medirse
 
 **T1** y **T2b**. T1 además **no puede medirse hasta que una reconstrucción
