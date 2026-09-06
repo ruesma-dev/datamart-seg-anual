@@ -1,5 +1,43 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-06 (domingo, ~11:30 UTC)
+# Estado actual · 2026-09-06 (domingo, cierre a las 19:40 UTC)
+
+## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
+
+**Tres cosas esperan al humano, en este orden:**
+
+1. **F-068, y corre prisa.** Comprobado a las 19:35 UTC contra Azure:
+   `raw.emp` **ya esta ahi** con sus 1.352 filas y con `dni`, `tarseg`
+   (Seguridad Social), `bancue`/`ban` (cuenta bancaria), `dir1` (domicilio),
+   `tel` y `esigpas` (contraseña del portal); y `mcp_sigrid_dm_ro` tiene
+   `SELECT` sobre ella. **No es un riesgo futuro: cualquier cuenta del tenant
+   que consulte por el conector MCP puede leerla hoy.** No es un fallo de
+   F-066 -el humano decidio traer `emp` entera, con el aviso delante- pero la
+   consecuencia hay que decidirla: sacar `raw` de `PG_CONSUMPTION_SCHEMAS`,
+   revocar el `SELECT` solo sobre esas dos tablas, o aceptarlo por escrito.
+   `raw.res` no trae columnas de ese tipo.
+2. **T13 de F-066**: construir y desplegar la imagen, y dejar correr la
+   nocturna, que cargara las 8 tablas grandes (5,19 M filas) y **recargara
+   `dcf`**, que es lo unico que crea sus columnas `pagtex`/`pagfor`. Requiere
+   `infra/` y `az`: lo autoriza el humano. Detalle en `progress/impl_F-066.md`,
+   seccion «Que necesita T13». Mejor decidir F-068 ANTES.
+3. **F-025**, `blocked` a proposito, espera la nocturna acotada del **lunes
+   07** para T31b y T34; con T31b en verde, reviewer y `done`. **OJO: la
+   nocturna del lunes llevara la imagen que se despliegue en T13**, asi que si
+   se despliega, esa nocturna hace las dos cosas a la vez.
+
+**El servidor sigue en `Standard_B2s`** (temporal desde el 05-sep, 17:21 UTC).
+La bajada a B1ms sigue pendiente, con fecha limite 2026-09-20 anotada en
+`azure-apps/` para preguntar si se olvido. Al bajar, el saldo se resetea a 60.
+
+## F-066: IMPLEMENTADA HASTA T12; T13, T14 y T15 ESPERAN AL HUMANO
+
+**T15 HECHA por el lider el 2026-09-06 a las 19:40 UTC**: los hallazgos de R22
+estan en las fichas de F-055, F-056, F-057 y F-067 de `harness/features.json`,
+y **nace F-068** con lo del MCP. Los cuatro hallazgos que cambian esas fichas:
+`hmores` es donde estan las horas (F-057); `apu.fec` viene informada al 100 %,
+lo que desmiente la ficha de F-056; la actividad del proveedor es
+`conact`→`auxpronat` y no `act`, que esta vacia (F-055); y Sigrid no guarda
+las fechas de cambio de estado, asi que F-067 las construira por foto diaria.
 
 ## F-066: IMPLEMENTADA HASTA T12; T13, T14 y T15 ESPERAN AL HUMANO
 

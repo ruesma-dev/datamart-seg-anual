@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 40,
+      "priority": 41,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 42,
+      "priority": 43,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 43,
+      "priority": 44,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 45,
+      "priority": 46,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -529,7 +529,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-034-powerbi-azure"
     },
     {
@@ -545,7 +545,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -558,7 +558,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -571,7 +571,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -588,7 +588,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -601,7 +601,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -619,7 +619,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -652,7 +652,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -686,7 +686,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -701,7 +701,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -732,7 +732,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -748,7 +748,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -764,7 +764,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -781,7 +781,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -798,7 +798,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -817,7 +817,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -835,13 +835,13 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 21,
+      "priority": 22,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
       "id": "F-055",
       "title": "Los ejes del proveedor en la superficie de consumo: firmas, familias y actividades, y la cobertura de albaranes revisada (raw por F-066)",
-      "description": "Pedida por el humano el 2026-09-03: 'apunta que hay que meter o revisar si estan en las tablas: albaranes, firmas, familias y actividades de los proveedores'. COMPROBADO ANTES DE FICHARLA, para que la feature diga que hay que revisar y no que hay que hacer algo que ya existe. LO QUE YA ESTA: los ALBARANES si. `config/tables_sigrid.yaml` ingiere hoy 31 tablas, entre ellas `dca`, `dcapro`, `dcf`, `dcfpro` y `dcfprodes`, y el diccionario publica `compras.albaranes`, `compras.albaran_lineas`, `compras.facturas`, `compras.factura_lineas` y la vista `compras.v_pbi_albaranes_sin_facturar`. Aqui el trabajo NO es meterlos: es REVISAR SI LA COBERTURA ES COMPLETA -que no falte ningun tipo de documento, ni lineas, ni estados- y si el universo de obra que usan casa con el del seguimiento; F-039 ya avisa de que compras y retenciones NO filtran por `stg.obras` y pueden traer obras administrativas. LO QUE NO ESTA, con su nombre en Sigrid, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas que se ingieren -ninguna de estas aparece-: (1) FIRMAS -> `PFfir`, 'Tabla de Firma de Documentos', con `tipfir` (tipo de firma), `estfir` (estado), `fec` y `hor`. Es el circuito de aprobacion de documentos, y hoy el datamart no sabe nada de el: no puede responder quien aprobo que ni cuanto tarda una factura en firmarse. (2) FAMILIAS -> `auxfam`, 'Familia de productos', a la que apunta el campo `famide`. Sin ella no se puede agrupar el gasto por familia de producto, que es una de las preguntas naturales de compras. (3) ACTIVIDADES -> `act` ('Registros de actividad', declarada como propiedades de `con`), con `auxacttip` (tipo de actividad), `actent` (actividad-entidades) y `actseg` (seguimiento). Es la clasificacion de actividad del proveedor, y sin ella no se puede responder 'que proveedores de tal actividad trabajan en tal obra'. POR QUE IMPORTA, y enlaza con el objetivo de fondo: el humano quiere que Negocio consulte el datamart por el MCP. Las tres cosas que faltan son EJES DE ANALISIS del gasto -quien aprueba, que familia de producto, que actividad-, y sin ellas la IA puede sumar euros pero no agruparlos como los agrupa Negocio. Enlaza con F-039 (vistas puente que faltan) y con F-054 (el diccionario explica el esquema pero no el negocio). A DECIDIR EN LA SPEC: que se ingiere de verdad y que no -meter cuatro tablas mas a la nocturna tiene coste, y F-025 existe justamente porque la carga no cabe-; si `act` es lo que Negocio llama 'actividad del proveedor' o es otra cosa -el nombre en Sigrid es generico y hay que confirmarlo con el dato delante, no suponerlo-; y si esto se queda en `raw` + `stg` o llega a la superficie de consumo con sus fichas. ================ REALCANZADA EL 2026-09-06 POR EL HUMANO: LA INGESTA SALE DE AQUI Y VA A F-066, que trae de una vez todos los raw que faltaban. Esta feature queda en construir stg y el mart sobre esos raw ya ingeridos; lo que abajo hable de ingerir, medir la carga o dar de alta tablas se lee como hecho por F-066. Va DESPUES de F-066.",
+      "description": "Pedida por el humano el 2026-09-03: 'apunta que hay que meter o revisar si estan en las tablas: albaranes, firmas, familias y actividades de los proveedores'. COMPROBADO ANTES DE FICHARLA, para que la feature diga que hay que revisar y no que hay que hacer algo que ya existe. LO QUE YA ESTA: los ALBARANES si. `config/tables_sigrid.yaml` ingiere hoy 31 tablas, entre ellas `dca`, `dcapro`, `dcf`, `dcfpro` y `dcfprodes`, y el diccionario publica `compras.albaranes`, `compras.albaran_lineas`, `compras.facturas`, `compras.factura_lineas` y la vista `compras.v_pbi_albaranes_sin_facturar`. Aqui el trabajo NO es meterlos: es REVISAR SI LA COBERTURA ES COMPLETA -que no falte ningun tipo de documento, ni lineas, ni estados- y si el universo de obra que usan casa con el del seguimiento; F-039 ya avisa de que compras y retenciones NO filtran por `stg.obras` y pueden traer obras administrativas. LO QUE NO ESTA, con su nombre en Sigrid, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas que se ingieren -ninguna de estas aparece-: (1) FIRMAS -> `PFfir`, 'Tabla de Firma de Documentos', con `tipfir` (tipo de firma), `estfir` (estado), `fec` y `hor`. Es el circuito de aprobacion de documentos, y hoy el datamart no sabe nada de el: no puede responder quien aprobo que ni cuanto tarda una factura en firmarse. (2) FAMILIAS -> `auxfam`, 'Familia de productos', a la que apunta el campo `famide`. Sin ella no se puede agrupar el gasto por familia de producto, que es una de las preguntas naturales de compras. (3) ACTIVIDADES -> `act` ('Registros de actividad', declarada como propiedades de `con`), con `auxacttip` (tipo de actividad), `actent` (actividad-entidades) y `actseg` (seguimiento). Es la clasificacion de actividad del proveedor, y sin ella no se puede responder 'que proveedores de tal actividad trabajan en tal obra'. POR QUE IMPORTA, y enlaza con el objetivo de fondo: el humano quiere que Negocio consulte el datamart por el MCP. Las tres cosas que faltan son EJES DE ANALISIS del gasto -quien aprueba, que familia de producto, que actividad-, y sin ellas la IA puede sumar euros pero no agruparlos como los agrupa Negocio. Enlaza con F-039 (vistas puente que faltan) y con F-054 (el diccionario explica el esquema pero no el negocio). A DECIDIR EN LA SPEC: que se ingiere de verdad y que no -meter cuatro tablas mas a la nocturna tiene coste, y F-025 existe justamente porque la carga no cabe-; si `act` es lo que Negocio llama 'actividad del proveedor' o es otra cosa -el nombre en Sigrid es generico y hay que confirmarlo con el dato delante, no suponerlo-; y si esto se queda en `raw` + `stg` o llega a la superficie de consumo con sus fichas. ================ REALCANZADA EL 2026-09-06 POR EL HUMANO: LA INGESTA SALE DE AQUI Y VA A F-066, que trae de una vez todos los raw que faltaban. Esta feature queda en construir stg y el mart sobre esos raw ya ingeridos; lo que abajo hable de ingerir, medir la carga o dar de alta tablas se lee como hecho por F-066. Va DESPUES de F-066. ================ HALLAZGOS DE F-066 (R22), llevados aqui por el lider el 2026-09-06, y CAMBIAN EL OBJETO DE ESTA FEATURE: (1) `act`, `auxacttip`, `actent`, `actseg` Y `auxfam` ESTAN VACIAS en Sigrid: son el modulo CRM, que Ruesma no usa. No se ingieren y esta feature NO puede montarse sobre ellas. (2) LA ACTIVIDAD DEL PROVEEDOR EN RUESMA ES `conact` -> `auxpronat`: 7.090 filas que atan 4.773 proveedores con 409 naturalezas de producto, y el catalogo `auxpronat` (514 filas) casa 409 de 409. Las dos estan ya en `raw` por F-066. Ahi si hay dato. (3) 'VALIDADA' NO SE INFORMA: `conact.homolo` vale 0 en las 7.090 filas. Lo mas cercano a una homologacion son los certificados con caducidad de `prvcer` (2.741 filas, con `fec`, `feccad`, `cadval`). Si Compras entiende otra cosa por 'actividad validada', hay que preguntarselo antes de modelarlo. (4) FIRMAS: el circuito real es `confir` + `deffir`, no `PFfir` (vacia). 69.993 firmas, de las que 65.761 son de comparativos con fecha en el 90 %. Sirve para 'quien aprobo que comparativo y cuando'.",
       "acceptance": [
         "Revisada la cobertura de ALBARANES contra Sigrid: que tipos de documento y que lineas quedan fuera hoy, y si el universo de obra que usa compras casa con el del seguimiento (F-039)",
         "Confirmado con el dato delante, no por el nombre, que `act`/`auxacttip` es lo que Negocio llama actividad del proveedor; si no lo es, localizado lo que si lo sea",
@@ -852,13 +852,13 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
       "id": "F-056",
       "title": "El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066)",
-      "description": "Pedida por el humano el 2026-09-03: 'anade una feature de traerse la informacion contable de Sigrid'. COMPROBADO ANTES DE FICHARLA: no existe ninguna feature que lo cubra -F-037 es tesoreria (cobros y pagos) y F-040 el lado de ingresos; ninguna toca la contabilidad-. LO QUE HAY EN SIGRID, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas de `config/tables_sigrid.yaml`: NINGUNA de estas se ingiere. La principal es **`apu`, 'Apuntes Contables'**, y su contenido es exactamente lo que hace falta: `asiide` (asiento), `cueide` (cuenta, indice a `cua`), **`deb` y `hab`** (debe y haber como importe), `res` (concepto), `cenide` (CENTRO DE COSTE) y **`obr` (OBRA)**, mas `doc`, `jus` (justificante), `pun` (punteo), `concil` (conciliacion), `del` (delegacion) y `cptide`. La acompanan `asi` (la cabecera del asiento), `cua` (el plan de cuentas) y `apa`; existe ademas `antpgcapu` para la conversion del PGC antiguo. POR QUE IMPORTA, y es distinto de lo que ya esta fichado: el datamart de hoy vive del PRESUPUESTO y del SEGUIMIENTO -lo que se planifico y lo que el jefe de obra cerro cada mes-. La contabilidad es **la otra version de la verdad**: lo que de verdad se contabilizo. Con `apu` se podria por fin CONTRASTAR el coste de seguimiento contra el coste contable de la misma obra, que es la pregunta que ninguna de las dos fuentes puede responder sola. Y `apu.obr` mas `apu.cenide` dicen que ese contraste es posible por obra, no solo a nivel de empresa. OJO CON LA RELACION OBRA/CENTRO DE COSTE: `apu` trae LAS DOS -`obr` como texto de 16 caracteres y `cenide` como indice a `cen`-, y F-045 esta abierta precisamente porque `retenciones.movimientos.obra_id` resulto ser el `ide` del CENTRO DE COSTE y no el de la obra: 0 de 261 valores casaban. **Esta feature no puede suponer cual de los dos campos ata a nuestra obra: tiene que medirlo**, y lo que aprenda sirve tambien para desatascar F-045. A DECIDIR EN LA SPEC: (a) el ALCANCE, porque `apu` es la tabla mas grande que se habra traido nunca -la contabilidad de una constructora son millones de apuntes- y la nocturna hoy NO CABE, que es la razon de ser de F-025: hay que medir el volumen contra Sigrid antes de decidir si se trae entera, por ejercicios o solo las cuentas que interesan; (b) que se publica, porque un apunte contable en bruto no es una respuesta de negocio; (c) si el plan de cuentas (`cua`) entra, sin el los numeros de cuenta no significan nada para quien pregunte por el MCP; (d) quien es el dueno del criterio contable, que no es el jefe de obra. ENLAZA con F-037 (tesoreria), F-040 (ingresos), F-045 (obra vs centro de coste) y F-054 (que significa cada concepto para nosotros). ================ MEDIDO CONTRA SIGRID EL 2026-09-03, y cambia el planteamiento de la ficha original. VOLUMEN REAL: `apu` 2.153.736 apuntes, `asi` 783.080 asientos, `cua` 34.129 cuentas, `apa` 709.167. DONDE VIVE CADA COSA, que no es donde parecia: la jerarquia del plan NO esta en `cua` sino en `con` (tip=16); `cua` solo EXTIENDE las cuentas imputables -33.875 de nivel 5 frente a 254 de nivel 0-, y el codigo y el nombre legibles salen de `con.cod` y `con.res`. Mismo patron que `rec` en retenciones. EL PLAN NO ES ANUAL: SE PARTE POR EMPRESA. La cuenta 4300000000 aparece SEIS veces y las seis se diferencian en un unico campo, `con.emp`. No hay ningun campo de ejercicio en `cua`; `ejealta`/`mesalta` son el alta de la cuenta y valen 0. Hay ~30 empresas con apuntes: **emp=1 concentra 1.936.044 apuntes (90 %) desde 2008**, y el resto son sociedades y UTEs, algunas ya cerradas (emp=10 hasta 2016, emp=6 hasta 2018, emp=19 solo 2015). LA FECHA NO ESTA EN `apu`: `asi` extiende `con`, y la fecha del asiento es `con.fec`, un ENTERO AAAAMMDD. Para fechar un apunte hacen falta dos saltos: `apu.asiide` -> `asi.ide` = `con.ide` -> `con.fec`. LA ATRIBUCION A OBRA VA POR `cenide`, NO POR `obr`. Medido: de los 2.153.736 apuntes, **`obr` solo esta informado en 142 y con 2 obras distintas**; `cenide` lo esta en **1.169.398 (54 %)**. Es EXACTAMENTE la trampa de F-045, donde `retenciones.movimientos.obra_id` resulto ser el centro de coste: aqui ya esta medido y no hay que volver a suponerlo, pero SIGUE HACIENDO FALTA resolver como se ata un centro de coste a nuestra obra, que es lo que F-045 tiene abierto. EL PUENTE CON LO QUE YA PUBLICAMOS: `pag.cueide` apunta directamente a la cuenta contable del efecto. Medido sobre 2025: los 2.737 efectos de retencion de proveedor tienen cuenta, los 2.737. Eso permite CUADRAR nuestras retenciones contra el mayor, que seria la primera vez que el datamart se verifica contra una fuente independiente. ALCANCE DE ESTA FEATURE: ingesta de `cua`, `asi`, `apu` y lo que haga falta de `con` para el plan, mas el mart BASE -el mayor consultable por cuenta, ano, empresa y tercero-. Los estados financieros son F-058 y van encima de esto. El caso de uso que lo motivo: Juan Romero pidio el mayor de la cuenta 4308000197 y hoy no se puede dar. ================ REALCANZADA EL 2026-09-06 POR EL HUMANO: LA INGESTA SALE DE AQUI Y VA A F-066, que trae de una vez todos los raw que faltaban. Esta feature queda en construir stg y el mart sobre esos raw ya ingeridos; lo que abajo hable de ingerir, medir la carga o dar de alta tablas se lee como hecho por F-066. Va DESPUES de F-066.",
+      "description": "Pedida por el humano el 2026-09-03: 'anade una feature de traerse la informacion contable de Sigrid'. COMPROBADO ANTES DE FICHARLA: no existe ninguna feature que lo cubra -F-037 es tesoreria (cobros y pagos) y F-040 el lado de ingresos; ninguna toca la contabilidad-. LO QUE HAY EN SIGRID, localizado en `azure-apps/sigrid_tablas.md` el 2026-09-03 y contrastado contra las 31 tablas de `config/tables_sigrid.yaml`: NINGUNA de estas se ingiere. La principal es **`apu`, 'Apuntes Contables'**, y su contenido es exactamente lo que hace falta: `asiide` (asiento), `cueide` (cuenta, indice a `cua`), **`deb` y `hab`** (debe y haber como importe), `res` (concepto), `cenide` (CENTRO DE COSTE) y **`obr` (OBRA)**, mas `doc`, `jus` (justificante), `pun` (punteo), `concil` (conciliacion), `del` (delegacion) y `cptide`. La acompanan `asi` (la cabecera del asiento), `cua` (el plan de cuentas) y `apa`; existe ademas `antpgcapu` para la conversion del PGC antiguo. POR QUE IMPORTA, y es distinto de lo que ya esta fichado: el datamart de hoy vive del PRESUPUESTO y del SEGUIMIENTO -lo que se planifico y lo que el jefe de obra cerro cada mes-. La contabilidad es **la otra version de la verdad**: lo que de verdad se contabilizo. Con `apu` se podria por fin CONTRASTAR el coste de seguimiento contra el coste contable de la misma obra, que es la pregunta que ninguna de las dos fuentes puede responder sola. Y `apu.obr` mas `apu.cenide` dicen que ese contraste es posible por obra, no solo a nivel de empresa. OJO CON LA RELACION OBRA/CENTRO DE COSTE: `apu` trae LAS DOS -`obr` como texto de 16 caracteres y `cenide` como indice a `cen`-, y F-045 esta abierta precisamente porque `retenciones.movimientos.obra_id` resulto ser el `ide` del CENTRO DE COSTE y no el de la obra: 0 de 261 valores casaban. **Esta feature no puede suponer cual de los dos campos ata a nuestra obra: tiene que medirlo**, y lo que aprenda sirve tambien para desatascar F-045. A DECIDIR EN LA SPEC: (a) el ALCANCE, porque `apu` es la tabla mas grande que se habra traido nunca -la contabilidad de una constructora son millones de apuntes- y la nocturna hoy NO CABE, que es la razon de ser de F-025: hay que medir el volumen contra Sigrid antes de decidir si se trae entera, por ejercicios o solo las cuentas que interesan; (b) que se publica, porque un apunte contable en bruto no es una respuesta de negocio; (c) si el plan de cuentas (`cua`) entra, sin el los numeros de cuenta no significan nada para quien pregunte por el MCP; (d) quien es el dueno del criterio contable, que no es el jefe de obra. ENLAZA con F-037 (tesoreria), F-040 (ingresos), F-045 (obra vs centro de coste) y F-054 (que significa cada concepto para nosotros). ================ MEDIDO CONTRA SIGRID EL 2026-09-03, y cambia el planteamiento de la ficha original. VOLUMEN REAL: `apu` 2.153.736 apuntes, `asi` 783.080 asientos, `cua` 34.129 cuentas, `apa` 709.167. DONDE VIVE CADA COSA, que no es donde parecia: la jerarquia del plan NO esta en `cua` sino en `con` (tip=16); `cua` solo EXTIENDE las cuentas imputables -33.875 de nivel 5 frente a 254 de nivel 0-, y el codigo y el nombre legibles salen de `con.cod` y `con.res`. Mismo patron que `rec` en retenciones. EL PLAN NO ES ANUAL: SE PARTE POR EMPRESA. La cuenta 4300000000 aparece SEIS veces y las seis se diferencian en un unico campo, `con.emp`. No hay ningun campo de ejercicio en `cua`; `ejealta`/`mesalta` son el alta de la cuenta y valen 0. Hay ~30 empresas con apuntes: **emp=1 concentra 1.936.044 apuntes (90 %) desde 2008**, y el resto son sociedades y UTEs, algunas ya cerradas (emp=10 hasta 2016, emp=6 hasta 2018, emp=19 solo 2015). LA FECHA NO ESTA EN `apu`: `asi` extiende `con`, y la fecha del asiento es `con.fec`, un ENTERO AAAAMMDD. Para fechar un apunte hacen falta dos saltos: `apu.asiide` -> `asi.ide` = `con.ide` -> `con.fec`. LA ATRIBUCION A OBRA VA POR `cenide`, NO POR `obr`. Medido: de los 2.153.736 apuntes, **`obr` solo esta informado en 142 y con 2 obras distintas**; `cenide` lo esta en **1.169.398 (54 %)**. Es EXACTAMENTE la trampa de F-045, donde `retenciones.movimientos.obra_id` resulto ser el centro de coste: aqui ya esta medido y no hay que volver a suponerlo, pero SIGUE HACIENDO FALTA resolver como se ata un centro de coste a nuestra obra, que es lo que F-045 tiene abierto. EL PUENTE CON LO QUE YA PUBLICAMOS: `pag.cueide` apunta directamente a la cuenta contable del efecto. Medido sobre 2025: los 2.737 efectos de retencion de proveedor tienen cuenta, los 2.737. Eso permite CUADRAR nuestras retenciones contra el mayor, que seria la primera vez que el datamart se verifica contra una fuente independiente. ALCANCE DE ESTA FEATURE: ingesta de `cua`, `asi`, `apu` y lo que haga falta de `con` para el plan, mas el mart BASE -el mayor consultable por cuenta, ano, empresa y tercero-. Los estados financieros son F-058 y van encima de esto. El caso de uso que lo motivo: Juan Romero pidio el mayor de la cuenta 4308000197 y hoy no se puede dar. ================ REALCANZADA EL 2026-09-06 POR EL HUMANO: LA INGESTA SALE DE AQUI Y VA A F-066, que trae de una vez todos los raw que faltaban. Esta feature queda en construir stg y el mart sobre esos raw ya ingeridos; lo que abajo hable de ingerir, medir la carga o dar de alta tablas se lee como hecho por F-066. Va DESPUES de F-066. ================ HALLAZGOS DE F-066 (R22), llevados aqui por el lider el 2026-09-06, y uno DESMIENTE esta ficha: (1) `apu.fec` ESTA INFORMADA AL 100 %. Esta ficha decia 'LA FECHA NO ESTA EN apu' y que hacian falta dos saltos (`apu.asiide` -> `asi.ide` = `con.ide` -> `con.fec`). Medido el 2026-09-06 sobre las 2.154.543 filas: `fec` viene informada en todas. El puente por `asi` sigue existiendo y esta feature debe CONTRASTAR las dos fechas antes de elegir cual publica, pero el camino corto existe. (2) `apa` YA ESTA EN `raw` (709.403 filas, desglose analitico con `cenide` al 99,98 % y `apuide` al 88 %): es candidata a fuente de la cuenta de resultados por obra de F-058. Su `obride` esta a 0, asi que NO es el puente obra/centro de coste que F-045 busca. (3) `apu` NO TIENE `tiemod`: se recarga entera cada noche (2,15 M filas). Si el coste crece, se reabre con cifra. (4) El plan de cuentas se parte por EMPRESA y su jerarquia vive en `con` (tip=16), 44.778 filas y 38 empresas, ya en `raw`.",
       "acceptance": [
         "Sobre cua, asi, apu y la jerarquia de con (tip=16) ya en raw (F-066): decidido y escrito el alcance del mart por empresa, si las ~30 o solo las vivas",
         "La fecha de cada apunte se resuelve por los dos saltos (apu -> asi -> con.fec) y queda publicada como fecha real, no como entero AAAAMMDD",
@@ -869,13 +869,13 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 4,
+      "priority": 5,
       "branch": "feature/F-056-contabilidad"
     },
     {
       "id": "F-057",
       "title": "El coste de personal por obra: stg y mart sobre recursos, empleados y partes (raw por F-066)",
-      "description": "Pedida por el humano el 2026-09-03, y confirmada con Juan Romero, que pregunto por los nombres exactos en su correo del 2026-09-03 17:19. COMPROBADO CONTRA SIGRID ese mismo dia: las tres tablas existen y se llaman como el suponia. `res` RECURSOS con **2.610 filas**, `emp` EMPLEADOS con **1.351** y `hmo` PARTES DE TRABAJO con **6.848**. Ninguna de las tres se ingiere hoy -la ingesta son 31 tablas y no estan-. POR QUE IMPORTA: el datamart sabe lo que CUESTA una obra en material y subcontrata -eso viene de compras- pero no sabe QUIEN ha trabajado en ella ni cuantas horas. Los partes de trabajo son el eslabon que ata persona, horas y obra, y sin el no se puede responder ni el coste real de mano de obra por obra ni la dedicacion de un equipo. Juan aporto ademas el criterio de negocio en su correo 'RECURSOS PARTES TRABAJO' del 2026-09-03: los recursos en rojo estan de baja y no se consideran, y todos los de alta estan codificados como 'Apellidos, Nombre' con el DNI. A DECIDIR EN LA SPEC: la relacion entre `res` (recurso) y `emp` (empleado), que no tiene por que ser 1:1 -un recurso puede ser maquinaria y no persona-; como se ata un parte a la obra, sabiendo que en `apu` la atribucion va por `cenide` y no por `obr`, y que F-045 tiene abierta esa misma pregunta; y si esto llega a la superficie de consumo o se queda en `stg` hasta que haya un caso de uso escrito. DATO SENSIBLE, y hay que tratarlo como tal: `emp` y `res` traen datos personales -nombre y DNI-. La spec debe decidir QUE SE PUBLICA y que no, y el DNI no deberia salir del `raw` sin una razon escrita. ENLAZA con F-056 (el coste de personal tambien esta en la contabilidad, grupo 64) y con F-045. ================ REALCANZADA EL 2026-09-06 POR EL HUMANO: LA INGESTA SALE DE AQUI Y VA A F-066, que trae de una vez todos los raw que faltaban. Esta feature queda en construir stg y el mart sobre esos raw ya ingeridos; lo que abajo hable de ingerir, medir la carga o dar de alta tablas se lee como hecho por F-066. Va DESPUES de F-066.",
+      "description": "Pedida por el humano el 2026-09-03, y confirmada con Juan Romero, que pregunto por los nombres exactos en su correo del 2026-09-03 17:19. COMPROBADO CONTRA SIGRID ese mismo dia: las tres tablas existen y se llaman como el suponia. `res` RECURSOS con **2.610 filas**, `emp` EMPLEADOS con **1.351** y `hmo` PARTES DE TRABAJO con **6.848**. Ninguna de las tres se ingiere hoy -la ingesta son 31 tablas y no estan-. POR QUE IMPORTA: el datamart sabe lo que CUESTA una obra en material y subcontrata -eso viene de compras- pero no sabe QUIEN ha trabajado en ella ni cuantas horas. Los partes de trabajo son el eslabon que ata persona, horas y obra, y sin el no se puede responder ni el coste real de mano de obra por obra ni la dedicacion de un equipo. Juan aporto ademas el criterio de negocio en su correo 'RECURSOS PARTES TRABAJO' del 2026-09-03: los recursos en rojo estan de baja y no se consideran, y todos los de alta estan codificados como 'Apellidos, Nombre' con el DNI. A DECIDIR EN LA SPEC: la relacion entre `res` (recurso) y `emp` (empleado), que no tiene por que ser 1:1 -un recurso puede ser maquinaria y no persona-; como se ata un parte a la obra, sabiendo que en `apu` la atribucion va por `cenide` y no por `obr`, y que F-045 tiene abierta esa misma pregunta; y si esto llega a la superficie de consumo o se queda en `stg` hasta que haya un caso de uso escrito. DATO SENSIBLE, y hay que tratarlo como tal: `emp` y `res` traen datos personales -nombre y DNI-. La spec debe decidir QUE SE PUBLICA y que no, y el DNI no deberia salir del `raw` sin una razon escrita. ENLAZA con F-056 (el coste de personal tambien esta en la contabilidad, grupo 64) y con F-045. ================ REALCANZADA EL 2026-09-06 POR EL HUMANO: LA INGESTA SALE DE AQUI Y VA A F-066, que trae de una vez todos los raw que faltaban. Esta feature queda en construir stg y el mart sobre esos raw ya ingeridos; lo que abajo hable de ingerir, medir la carga o dar de alta tablas se lee como hecho por F-066. Va DESPUES de F-066. ================ HALLAZGOS DE F-066 (R22), llevados aqui por el lider el 2026-09-06: (1) LAS HORAS NO ESTAN EN `hmo` SINO EN `hmores`. Medido: `hmo` son 6.850 filas y es solo la CABECERA del parte; `hmores` son 328.760 filas y trae `reside` (99,9 %), `obride` (99,6 %, 536 obras), `fec`, `can` y `tot`. F-066 la ingiere; sin ella esta feature no responde 'horas por obra'. La ficha original solo nombraba `hmo` y se habria quedado corta. (2) `res` Y `emp` VIENEN ENTERAS A `raw`, por decision del humano del 2026-09-06: con DNI, numero de la Seguridad Social, cuenta bancaria y domicilio. Eso NO cambia que esta feature tenga que decidir QUE PUBLICA: `raw` es la copia del origen, la superficie de consumo la decide aqui, y el criterio por defecto sigue siendo que un dato personal no sube sin razon escrita. (3) AVISO VIGENTE: hoy el rol del MCP (`mcp_sigrid_dm_ro`) lee `raw` entero, asi que `raw.emp` y `raw.res` son legibles por cualquier agente conectado. Es la razon de ser de F-068.",
       "acceptance": [
         "Sobre `res`, `emp` y `hmo` ya en raw (F-066): el criterio de Juan Romero aplicado y escrito en stg, los recursos de baja no se consideran",
         "Resuelta y documentada la relacion entre recurso y empleado, y como se ata un parte de trabajo a una obra",
@@ -885,7 +885,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 3,
+      "priority": 4,
       "branch": "feature/F-057-recursos-empleados-partes"
     },
     {
@@ -902,7 +902,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -919,7 +919,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -932,7 +932,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 28,
+      "priority": 29,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -948,7 +948,7 @@
         "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
       ],
-      "priority": 33,
+      "priority": 34,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -964,7 +964,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 37,
+      "priority": 38,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -980,7 +980,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 39,
+      "priority": 40,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -997,7 +997,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 41,
+      "priority": 42,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -1017,13 +1017,13 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
       "id": "F-066",
       "title": "Ingerir de Sigrid los raw que faltan: recursos, empleados y partes; la contabilidad; firmas, familias y actividades del proveedor",
-      "description": "Nace el 2026-09-06 del humano, al reordenar el backlog tras F-025: 'lo que quiero es una primera ficha de ingesta de esas 3 features, y luego esas tres features serian solo reconstruir los mart de cada una'. Es decir: TODA LA INGESTA que F-055, F-056 y F-057 llevaban dentro sale de ellas y se hace AQUI, de una vez y en una sola nocturna; las tres quedan como features de mart sobre estos raw. LAS TABLAS, todas localizadas en azure-apps/sigrid_tablas.md y contrastadas contra las 31 de config/tables_sigrid.yaml el 2026-09-03 (ninguna se ingiere hoy), con su volumen MEDIDO contra Sigrid ese dia: (A) PERSONAL, de F-057: `res` RECURSOS 2.610 filas, `emp` EMPLEADOS 1.351, `hmo` PARTES DE TRABAJO 6.848. (B) CONTABILIDAD, de F-056: `apu` APUNTES 2.153.736 (la tabla mas grande que se habra traido nunca), `asi` ASIENTOS 783.080, `cua` PLAN DE CUENTAS 34.129, `apa` 709.167 (decidir si hace falta), y lo que falte de `con` para la jerarquia del plan (tip=16; `con` ya se ingiere, comprobar que trae esas filas y esos campos). Recordar lo medido: la fecha del apunte esta en `con.fec` via `asi`, la atribucion a obra va por `cenide` (54 %) y no por `obr` (142 filas), y el plan se parte por EMPRESA (`con.emp`), no por ejercicio. (C) PROVEEDOR, de F-055: `PFfir` FIRMAS de documentos, `auxfam` FAMILIAS de producto, y `act`, `auxacttip`, `actent`, `actseg` ACTIVIDADES (con la duda de F-055 en pie: confirmar con el dato delante que `act` es la actividad del proveedor y no otra cosa). ALCANCE: `raw` y solo `raw` -alta en tables_sigrid.yaml, columnas excluidas si las hay, clave, recuento igual al de Sigrid- mas lo que exija la puerta de init.sh (ficha o pendiente declarado). NI stg NI mart: eso es F-057, F-056 y F-055, en ese orden. LO QUE ESTA FEATURE TIENE QUE MEDIR, porque F-025 existe porque la nocturna no cabia: el volumen y la duracion de la ingesta nueva (hoy `ingest_raw` son 20,1 M filas y 30 min en B2s; `apu` sola es un 10 % mas), y decidir con cifra si `apu` se trae entera, por empresa (emp=1 es el 90 %) o incremental por `_source_tiemod` si Sigrid lo informa (en `obrparpre` viene a NULL: comprobarlo en `apu` antes de contar con ello). Y anotar los creditos gastados por esa nocturna en la tabla de F-065. DATOS PERSONALES: `emp` y `res` traen nombre y DNI. En esta feature no se publica nada -es `raw`-, pero el DNI entra en la base compartida: decidir en la spec si se excluye la columna en la ingesta (como se excluyen `ima`/`tex` en otras tablas) o se trae y se declara; lo que se decida queda escrito y F-057 lo hereda. EL SERVIDOR: esta temporalmente en B2s (desde el 2026-09-05) y volvera a B1ms; la medicion de la ingesta nueva debe decir en que SKU se hizo. ENLAZA con F-057, F-056, F-055 (los marts), F-065 (creditos) y F-045 (obra vs centro de coste). ================ AMPLIADA EL 2026-09-06 (10:40 UTC) por el humano tras el correo de Compras (ver F-067): 'el spec tiene que anadir los raw pertinentes a esa info, y todo lo de comparativos, ofertas, firmas etc.'. Entran tambien: las OFERTAS de compra (`dco`, `dcopro`, `dcoproana`, `dcoprodes`; el comparativo `com`/`comlin`/`comprv` ya se ingiere), lo que lleve los ESTADOS y fechas de cambio de estado de contratos (`ctr`) y facturas (`dcf`) -si es `PFfir` ya esta; si hay historico en otra tabla, localizarla-, y comprobar que `ctr` trae `forpag`, `penpor`, `penimp` y que `pag` trae lo necesario para atar factura y pago. Comunicado al spec-author en marcha. ================ DECISIONES DEL HUMANO SOBRE LA SPEC (2026-09-06, 12:05 UTC): (1) `emp` y `res` se traen ENTERAS, sin excluir DNI ni el resto de datos personales -solo exclusiones tecnicas-; (2) el historico de estados va a F-067 como foto diaria, tras verificar el lider contra Sigrid que concam no audita `est` y confir no tiene contratos; F-066 anade `conest` (catalogo de estados) a la ingesta; (3) `apu` entera con --full y `apa` dentro, aprobado. Spec en revision con estos tres puntos.",
+      "description": "Nace el 2026-09-06 del humano, al reordenar el backlog tras F-025: 'lo que quiero es una primera ficha de ingesta de esas 3 features, y luego esas tres features serian solo reconstruir los mart de cada una'. Es decir: TODA LA INGESTA que F-055, F-056 y F-057 llevaban dentro sale de ellas y se hace AQUI, de una vez y en una sola nocturna; las tres quedan como features de mart sobre estos raw. LAS TABLAS, todas localizadas en azure-apps/sigrid_tablas.md y contrastadas contra las 31 de config/tables_sigrid.yaml el 2026-09-03 (ninguna se ingiere hoy), con su volumen MEDIDO contra Sigrid ese dia: (A) PERSONAL, de F-057: `res` RECURSOS 2.610 filas, `emp` EMPLEADOS 1.351, `hmo` PARTES DE TRABAJO 6.848. (B) CONTABILIDAD, de F-056: `apu` APUNTES 2.153.736 (la tabla mas grande que se habra traido nunca), `asi` ASIENTOS 783.080, `cua` PLAN DE CUENTAS 34.129, `apa` 709.167 (decidir si hace falta), y lo que falte de `con` para la jerarquia del plan (tip=16; `con` ya se ingiere, comprobar que trae esas filas y esos campos). Recordar lo medido: la fecha del apunte esta en `con.fec` via `asi`, la atribucion a obra va por `cenide` (54 %) y no por `obr` (142 filas), y el plan se parte por EMPRESA (`con.emp`), no por ejercicio. (C) PROVEEDOR, de F-055: `PFfir` FIRMAS de documentos, `auxfam` FAMILIAS de producto, y `act`, `auxacttip`, `actent`, `actseg` ACTIVIDADES (con la duda de F-055 en pie: confirmar con el dato delante que `act` es la actividad del proveedor y no otra cosa). ALCANCE: `raw` y solo `raw` -alta en tables_sigrid.yaml, columnas excluidas si las hay, clave, recuento igual al de Sigrid- mas lo que exija la puerta de init.sh (ficha o pendiente declarado). NI stg NI mart: eso es F-057, F-056 y F-055, en ese orden. LO QUE ESTA FEATURE TIENE QUE MEDIR, porque F-025 existe porque la nocturna no cabia: el volumen y la duracion de la ingesta nueva (hoy `ingest_raw` son 20,1 M filas y 30 min en B2s; `apu` sola es un 10 % mas), y decidir con cifra si `apu` se trae entera, por empresa (emp=1 es el 90 %) o incremental por `_source_tiemod` si Sigrid lo informa (en `obrparpre` viene a NULL: comprobarlo en `apu` antes de contar con ello). Y anotar los creditos gastados por esa nocturna en la tabla de F-065. DATOS PERSONALES: `emp` y `res` traen nombre y DNI. En esta feature no se publica nada -es `raw`-, pero el DNI entra en la base compartida: decidir en la spec si se excluye la columna en la ingesta (como se excluyen `ima`/`tex` en otras tablas) o se trae y se declara; lo que se decida queda escrito y F-057 lo hereda. EL SERVIDOR: esta temporalmente en B2s (desde el 2026-09-05) y volvera a B1ms; la medicion de la ingesta nueva debe decir en que SKU se hizo. ENLAZA con F-057, F-056, F-055 (los marts), F-065 (creditos) y F-045 (obra vs centro de coste). ================ AMPLIADA EL 2026-09-06 (10:40 UTC) por el humano tras el correo de Compras (ver F-067): 'el spec tiene que anadir los raw pertinentes a esa info, y todo lo de comparativos, ofertas, firmas etc.'. Entran tambien: las OFERTAS de compra (`dco`, `dcopro`, `dcoproana`, `dcoprodes`; el comparativo `com`/`comlin`/`comprv` ya se ingiere), lo que lleve los ESTADOS y fechas de cambio de estado de contratos (`ctr`) y facturas (`dcf`) -si es `PFfir` ya esta; si hay historico en otra tabla, localizarla-, y comprobar que `ctr` trae `forpag`, `penpor`, `penimp` y que `pag` trae lo necesario para atar factura y pago. Comunicado al spec-author en marcha. ================ DECISIONES DEL HUMANO SOBRE LA SPEC (2026-09-06, 12:05 UTC): (1) `emp` y `res` se traen ENTERAS, sin excluir DNI ni el resto de datos personales -solo exclusiones tecnicas-; (2) el historico de estados va a F-067 como foto diaria, tras verificar el lider contra Sigrid que concam no audita `est` y confir no tiene contratos; F-066 anade `conest` (catalogo de estados) a la ingesta; (3) `apu` entera con --full y `apa` dentro, aprobado. Spec en revision con estos tres puntos. ================ T15 HECHA por el lider el 2026-09-06 a las 19:40 UTC: los hallazgos de R22 estan en las fichas de F-055, F-056, F-057 y F-067, y nace F-068 con lo del permiso del MCP sobre raw.emp. Quedan T13 (desplegar la imagen y dejar correr la nocturna) y T14 (check-raw-recuentos y check-diccionario tras ella), las dos a la espera del humano.",
       "acceptance": [
         "Las tablas de los tres grupos (res, emp, hmo; apu, asi, cua y lo que se decida de apa y con; PFfir, auxfam, act, auxacttip, actent, actseg) estan en config/tables_sigrid.yaml y se ingieren en raw con el recuento igual al de Sigrid, comprobado tabla a tabla",
         "Los raw que necesita F-067 estan tambien: ofertas de compra (dco y sus lineas), los estados y fechas de estado de contratos y facturas (o escrito que no existen en Sigrid), y las condiciones del contrato en ctr",
@@ -1042,7 +1042,7 @@
     {
       "id": "F-067",
       "title": "Compras por el MCP: estados y fechas de contratos y facturas, sus condiciones, los comparativos con sus ofertas, las actividades del proveedor y el enlace con pagos",
-      "description": "Nace el 2026-09-06 de un correo de Compras que el humano reenvia tras 'una serie de pruebas y consultas a Claude' por el conector MCP: cuatro carencias 'que se deben revisar para que resulte util en compras'. Es la primera devolucion de un usuario de Negocio sobre el datamart en uso, y va de lo que el proyecto persigue: que Negocio consulte por el MCP. LAS CUATRO, con sus palabras y con lo comprobado en el diccionario ese dia: (1) CONTRATOS. Hoy `compras.contratos` publica contrato_id, fecha (la de ALTA del documento en Sigrid), obra_id, proveedor y comparativo_id. Compras quiere las FECHAS EN QUE EL CONTRATO CAMBIA DE ESTADO -enviado pendiente de firma, recibido, firmado- para perseguir 'todos los contratos que lleven mas de 3 semanas enviados y no se hayan firmado', y las CONDICIONES del contrato: forma de pago, retencion y penalizacion. En Sigrid: `ctr` trae `forpag`, `penpor` y `penimp`; el circuito de firma es `PFfir` (`tipfir`, `estfir`, `fec`, `hor`), que F-066 ingiere; si el historico de estados vive en otra tabla, F-066 lo localiza. (2) COMPARATIVOS. 'No hay tabla ni vista de comparativos cargada': cierto, y es F-038, que sigue pendiente desde el 2026-08-20: `raw.com`, `raw.comlin` y `raw.comprv` se ingieren y ningun SQL los lee. Compras quiere el numero de comparativos por ACTIVIDAD y cuantos comparativos se adjudican a un mismo proveedor con distintas actividades. Sigrid tiene ademas las OFERTAS de compra (`dco`, 'Oferta de compra', con `dcopro`, `dcoproana`, `dcoprodes`), que NO se ingieren: F-066 las trae. (3) PROVEEDORES. 'Remite al historico de contratos sin tener en cuenta las actividades que tenga validadas cada proveedor': las actividades (`act`, `auxacttip`, `actent`, `actseg`) no se ingieren hoy; F-066 las trae y F-055 las modela. (4) FACTURAS. Hoy `compras.facturas` publica factura_id, tipo_documento, fecha (de alta), proveedor y referencia. Compras quiere el ESTADO de la factura y la FECHA en que cambia de estado, la FECHA DE LA PROPIA FACTURA (no la de alta), y el ENLACE CON PAGOS 'para saber si se ha pagado'. `raw.pag` se ingiere entero (F-037 lo describe: `conide` documento origen, `fecven`, `fecrea`) pero el esquema compras no lo cruza. ALCANCE DE ESTA FEATURE: la capa de consumo -stg y mart en `compras`, con sus vistas para el MCP y sus fichas en el diccionario- de esos cuatro bloques. DEPENDE de F-066 (los raw: firmas, ofertas, actividades y lo que falte de estados) y ABSORBE EL SEGUIMIENTO de F-038, que sigue siendo el modelo del comparativo y va justo antes. NO es de aqui la tesoreria completa (F-037): aqui solo se ata factura -> pago para responder 'pagada o no y cuando'. CRITERIO DE HECHO: cada una de las cuatro preguntas del correo se responde por el MCP con una consulta al diccionario, y se prueba con el propio Compras: los contratos enviados hace mas de tres semanas sin firmar; comparativos por actividad y adjudicaciones repetidas por proveedor; proveedores por actividad validada; facturas por estado, fecha de factura y pagadas o no. A DECIDIR EN LA SPEC: si los estados de contrato y factura tienen historico en Sigrid o solo estado actual (si solo hay actual, la fecha del cambio no existe y hay que decirselo a Compras); que es 'fecha de la factura' en `dcf` frente a la de alta; y el universo de obra, que compras no filtra por `stg.obras` (F-039). El correo original no se versiona; esta ficha lo resume. ================ VERIFICADO CONTRA SIGRID EL 2026-09-06 (leer_sql, solo lectura), y cambia lo que se le puede prometer a Compras: (a) LOS ESTADOS EXISTEN Y SON LOS QUE COMPRAS NOMBRA. `conest` (catalogo de estados por tipo de concepto, que F-066 ingiere) define para los contratos (tip 44): 1 'Pdt. envio de firma', 3 'Enviado', 5 'Recibido', 6 'Comprobada documentacion', 7 'Firmado', 8 'Terminado', 9 'Rescindido'. Hoy hay 554/811/549/232/13.418/3.179/176 contratos en cada uno: 'los contratos enviados y no firmados' son 811 y SE PUEDE RESPONDER YA por estado actual. Para facturas (tip 15) hay 26 estados (Recibida, Comprobada, Contabilizada, Aprobada por jefe de obra/grupo/administracion, Aprobado pago, Retenida, Rechazada...) y para comparativos (tip 46) 27. (b) LA FECHA DEL CAMBIO DE ESTADO NO EXISTE EN SIGRID. `concam` (1,5 M cambios auditados) no tiene ni una fila del campo `est`: audita forma de pago, efecto, fecha de documento, centro de coste... nunca el estado. `confir` (circuito de firma, 70.000 firmas) no tiene contratos: 65.761 son de comparativos (con fecha en el 90 %), 3.436 de facturas SIN fecha y 796 de obras. `ctr` no tiene fecha de envio, recepcion ni firma; `PFfir` esta vacia. (c) LO QUE SI HAY para la antiguedad: `con.tiemod` (ya en raw como `_source_tiemod`), la ultima modificacion del documento, que sirve como proxy mientras no haya historia. DECISION DEL HUMANO (2026-09-06): el historico de estados se construye AQUI como FOTO DIARIA en el datamart -(documento, tipo, estado, fecha)- a partir de raw, y empieza a contar el dia que se despliegue; con ella 'mas de tres semanas enviado' se responde de verdad a las tres semanas de desplegarla, y hasta entonces con el proxy de tiemod. Decirselo a Compras por escrito. (d) PENALIZACION: no existe como campo de `ctr` (146 columnas); solo podria vivir en el texto libre `ctr.tex`. Preguntar a Compras donde la escriben. Forma de pago y retencion si: `ctr.pagide` -> `auxpag`, `pagtex`, `pagfor`, y `ctrrec`. (e) ACTIVIDADES DEL PROVEEDOR: no son `act` (vacia) sino `conact` -> `auxpronat` (naturalezas de producto, 4.773 proveedores); `homolo` = 0 en todas, asi que 'validada' no se informa en Sigrid; lo mas cercano son los certificados con caducidad de `prvcer`. F-055 lo modela. (f) FACTURA <-> PAGO: `pag.conide -> dcf.ide`, con `fecven`, `fecrea` (0 = pendiente) y `retide`, todo ya en raw; la fecha de la factura es `dcf.fecdoc`, tambien en raw. Fuente de todo esto: `specs/F-066-ingesta-raw-pendientes/design.md` §1 y §6.",
+      "description": "Nace el 2026-09-06 de un correo de Compras que el humano reenvia tras 'una serie de pruebas y consultas a Claude' por el conector MCP: cuatro carencias 'que se deben revisar para que resulte util en compras'. Es la primera devolucion de un usuario de Negocio sobre el datamart en uso, y va de lo que el proyecto persigue: que Negocio consulte por el MCP. LAS CUATRO, con sus palabras y con lo comprobado en el diccionario ese dia: (1) CONTRATOS. Hoy `compras.contratos` publica contrato_id, fecha (la de ALTA del documento en Sigrid), obra_id, proveedor y comparativo_id. Compras quiere las FECHAS EN QUE EL CONTRATO CAMBIA DE ESTADO -enviado pendiente de firma, recibido, firmado- para perseguir 'todos los contratos que lleven mas de 3 semanas enviados y no se hayan firmado', y las CONDICIONES del contrato: forma de pago, retencion y penalizacion. En Sigrid: `ctr` trae `forpag`, `penpor` y `penimp`; el circuito de firma es `PFfir` (`tipfir`, `estfir`, `fec`, `hor`), que F-066 ingiere; si el historico de estados vive en otra tabla, F-066 lo localiza. (2) COMPARATIVOS. 'No hay tabla ni vista de comparativos cargada': cierto, y es F-038, que sigue pendiente desde el 2026-08-20: `raw.com`, `raw.comlin` y `raw.comprv` se ingieren y ningun SQL los lee. Compras quiere el numero de comparativos por ACTIVIDAD y cuantos comparativos se adjudican a un mismo proveedor con distintas actividades. Sigrid tiene ademas las OFERTAS de compra (`dco`, 'Oferta de compra', con `dcopro`, `dcoproana`, `dcoprodes`), que NO se ingieren: F-066 las trae. (3) PROVEEDORES. 'Remite al historico de contratos sin tener en cuenta las actividades que tenga validadas cada proveedor': las actividades (`act`, `auxacttip`, `actent`, `actseg`) no se ingieren hoy; F-066 las trae y F-055 las modela. (4) FACTURAS. Hoy `compras.facturas` publica factura_id, tipo_documento, fecha (de alta), proveedor y referencia. Compras quiere el ESTADO de la factura y la FECHA en que cambia de estado, la FECHA DE LA PROPIA FACTURA (no la de alta), y el ENLACE CON PAGOS 'para saber si se ha pagado'. `raw.pag` se ingiere entero (F-037 lo describe: `conide` documento origen, `fecven`, `fecrea`) pero el esquema compras no lo cruza. ALCANCE DE ESTA FEATURE: la capa de consumo -stg y mart en `compras`, con sus vistas para el MCP y sus fichas en el diccionario- de esos cuatro bloques. DEPENDE de F-066 (los raw: firmas, ofertas, actividades y lo que falte de estados) y ABSORBE EL SEGUIMIENTO de F-038, que sigue siendo el modelo del comparativo y va justo antes. NO es de aqui la tesoreria completa (F-037): aqui solo se ata factura -> pago para responder 'pagada o no y cuando'. CRITERIO DE HECHO: cada una de las cuatro preguntas del correo se responde por el MCP con una consulta al diccionario, y se prueba con el propio Compras: los contratos enviados hace mas de tres semanas sin firmar; comparativos por actividad y adjudicaciones repetidas por proveedor; proveedores por actividad validada; facturas por estado, fecha de factura y pagadas o no. A DECIDIR EN LA SPEC: si los estados de contrato y factura tienen historico en Sigrid o solo estado actual (si solo hay actual, la fecha del cambio no existe y hay que decirselo a Compras); que es 'fecha de la factura' en `dcf` frente a la de alta; y el universo de obra, que compras no filtra por `stg.obras` (F-039). El correo original no se versiona; esta ficha lo resume. ================ VERIFICADO CONTRA SIGRID EL 2026-09-06 (leer_sql, solo lectura), y cambia lo que se le puede prometer a Compras: (a) LOS ESTADOS EXISTEN Y SON LOS QUE COMPRAS NOMBRA. `conest` (catalogo de estados por tipo de concepto, que F-066 ingiere) define para los contratos (tip 44): 1 'Pdt. envio de firma', 3 'Enviado', 5 'Recibido', 6 'Comprobada documentacion', 7 'Firmado', 8 'Terminado', 9 'Rescindido'. Hoy hay 554/811/549/232/13.418/3.179/176 contratos en cada uno: 'los contratos enviados y no firmados' son 811 y SE PUEDE RESPONDER YA por estado actual. Para facturas (tip 15) hay 26 estados (Recibida, Comprobada, Contabilizada, Aprobada por jefe de obra/grupo/administracion, Aprobado pago, Retenida, Rechazada...) y para comparativos (tip 46) 27. (b) LA FECHA DEL CAMBIO DE ESTADO NO EXISTE EN SIGRID. `concam` (1,5 M cambios auditados) no tiene ni una fila del campo `est`: audita forma de pago, efecto, fecha de documento, centro de coste... nunca el estado. `confir` (circuito de firma, 70.000 firmas) no tiene contratos: 65.761 son de comparativos (con fecha en el 90 %), 3.436 de facturas SIN fecha y 796 de obras. `ctr` no tiene fecha de envio, recepcion ni firma; `PFfir` esta vacia. (c) LO QUE SI HAY para la antiguedad: `con.tiemod` (ya en raw como `_source_tiemod`), la ultima modificacion del documento, que sirve como proxy mientras no haya historia. DECISION DEL HUMANO (2026-09-06): el historico de estados se construye AQUI como FOTO DIARIA en el datamart -(documento, tipo, estado, fecha)- a partir de raw, y empieza a contar el dia que se despliegue; con ella 'mas de tres semanas enviado' se responde de verdad a las tres semanas de desplegarla, y hasta entonces con el proxy de tiemod. Decirselo a Compras por escrito. (d) PENALIZACION: no existe como campo de `ctr` (146 columnas); solo podria vivir en el texto libre `ctr.tex`. Preguntar a Compras donde la escriben. Forma de pago y retencion si: `ctr.pagide` -> `auxpag`, `pagtex`, `pagfor`, y `ctrrec`. (e) ACTIVIDADES DEL PROVEEDOR: no son `act` (vacia) sino `conact` -> `auxpronat` (naturalezas de producto, 4.773 proveedores); `homolo` = 0 en todas, asi que 'validada' no se informa en Sigrid; lo mas cercano son los certificados con caducidad de `prvcer`. F-055 lo modela. (f) FACTURA <-> PAGO: `pag.conide -> dcf.ide`, con `fecven`, `fecrea` (0 = pendiente) y `retide`, todo ya en raw; la fecha de la factura es `dcf.fecdoc`, tambien en raw. Fuente de todo esto: `specs/F-066-ingesta-raw-pendientes/design.md` §1 y §6. ================ LO QUE F-066 YA DEJO EN `raw` (implementada el 2026-09-06, T1-T12 en verde): `conest` (catalogo de estados, 193 filas: los siete del contrato y los 26 de la factura, con su nombre), `confir` + `deffir` (firmas), `dco`/`dcopro`/`dcorec`/`dnc`/`dncpro` (ofertas y necesidades), `ctrrec`/`dcfrec`/`dcarec` (retenciones y recargos), `auxpag`/`auxefp` (formas y medios de pago), `conact`/`auxpronat` (actividades) y `prvcer` (certificados). ADEMAS `dcf` RECUPERA `pagtex` y `pagfor` -las condiciones de pago de la factura, que estaban excluidas por tamano-, pero OJO: esas dos columnas no existen en `raw.dcf` hasta que la nocturna recargue la tabla; hasta entonces estan las filas viejas sin ellas. `concam` NO se ingiere (1,5 M filas de auditoria que nunca registran el campo `est`); si esta feature la necesita para otra cosa, entra con `where: tip = 15`.",
       "acceptance": [
         "compras.contratos publica el estado actual con su nombre (conest), forma de pago y retencion; la penalizacion queda como pregunta a Compras (no hay campo)",
         "Existe una FOTO DIARIA de estados (documento, tipo, estado, fecha) para contratos y facturas, construida en el datamart, y sobre ella la vista de contratos enviados y no firmados con su antiguedad (proxy tiemod hasta que la foto acumule historia); 'mas de tres semanas' se responde por el MCP",
@@ -1055,8 +1055,24 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-067-compras-seguimiento-mcp"
+    },
+    {
+      "id": "F-068",
+      "title": "El MCP lee raw entero, y desde F-066 eso incluye DNI, Seguridad Social, cuentas bancarias y domicilios de 1.352 empleados",
+      "description": "Nace el 2026-09-06 del informe de implementacion de F-066, que lo senala como 'lo que mas me preocupa de esta entrega'. NO es un fallo de F-066: el humano decidio ese dia, con el aviso escrito delante, traer `emp` y `res` ENTERAS a `raw` -sin excluir DNI ni datos bancarios-, y F-066 lo declara en las fichas del diccionario, en `docs/ARCHITECTURE.md` y en `azure-apps/`. Lo que esta ficha recoge es la CONSECUENCIA, que vive en la frontera del proyecto y por eso no se resolvio alli (spec de F-066, seccion 7). EL HECHO, comprobado: por una decision del 2026-08-08, el rol de solo lectura del MCP (`mcp_sigrid_dm_ro`) tiene `SELECT` sobre TODOS los esquemas, `raw` incluido, y `apply_grants` lo renueva cada noche. Desde la primera nocturna con F-066, `raw.emp` (1.352 empleados: DNI en 1.341, numero de la Seguridad Social en 1.171, cuenta bancaria en 985, domicilio, telefonos y credenciales) y `raw.res` (2.610 recursos) son legibles ENTERAS por cualquier persona del tenant que consulte por el conector, que es 'cualquier cuenta del tenant' segun `azure-apps/mcp_bbdd.md`. Hasta ahora `raw` solo tenia datos de obra y de proveedor; el salto cualitativo lo da esta ingesta. TRES SALIDAS, a decidir por el humano y ninguna de este repositorio en solitario: (a) sacar `raw` de `PG_CONSUMPTION_SCHEMAS` -el MCP se queda con las capas de negocio, que es lo que consulta de verdad-; (b) revocar el `SELECT` solo sobre `raw.emp` y `raw.res` y anadir la excepcion a `infra/sql/02_roles.sql` y a `apply_grants_step.py`, para que la nocturna no lo devuelva; (c) aceptarlo por escrito, y entonces conviene que conste quien lo acepta y por que, porque son datos personales de empleados en una base compartida por cinco proyectos. TIENE PRISA RELATIVA: `emp` y `res` estan entre las 17 tablas pequenas que F-066 ya ingirio DESDE EL PUESTO, asi que COMPROBAR si ya estan en Azure antes que nada. Lo suyo es decidir ANTES del despliegue de T13 de F-066. ENLAZA con F-066 (la ingesta), F-057 (que decide que se publica de personal) y con `azure-apps/mcp_bbdd.md` y `red_postgresql_compartido.md`, que hay que actualizar con lo que se decida. ================ COMPROBADO POR EL LIDER EL 2026-09-06 A LAS 19:35 UTC, y NO es 'tras la nocturna': YA ESTA PASANDO. `raw.emp` existe en el Postgres de Azure con sus 1.352 filas -la ingirio F-066 desde el puesto, porque es una de las tablas pequenas- y sus columnas incluyen `dni`, `tarseg` (Seguridad Social), `bancue` y `ban` (cuenta bancaria), `dir1` (domicilio), `tel` y `esigpas` (contrasena del portal). El rol `mcp_sigrid_dm_ro` tiene hoy `SELECT` sobre `raw.emp` y `raw.res`, verificado en `information_schema.table_privileges`. `raw` tiene ya 48 tablas de las 56 declaradas. MATIZ: `raw.res` (2.610 filas) NO trae columnas de ese tipo; el problema esta en `raw.emp`. La primera de las cuatro condiciones de aceptacion queda respondida: son legibles AHORA.",
+      "acceptance": [
+        "HECHO 2026-09-06: comprobado que raw.emp ya esta en Azure con 1.352 filas, con dni, tarseg, bancue, ban, dir1, tel y esigpas, y que mcp_sigrid_dm_ro tiene SELECT sobre ella; raw.res no trae columnas sensibles",
+        "El humano elige entre las tres salidas y queda escrito quien decide y por que",
+        "Si se revoca: el cambio vive en infra/sql/02_roles.sql y en apply_grants_step.py, con su test, para que la nocturna no devuelva el permiso al dia siguiente",
+        "azure-apps/mcp_bbdd.md y azure-apps/red_postgresql_compartido.md dicen que ve y que no ve el MCP tras la decision"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "critico",
+      "priority": 3,
+      "branch": "feature/F-068-mcp-datos-personales-raw"
     }
   ]
 }
