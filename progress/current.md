@@ -1,5 +1,29 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-05 (sábado, sesión reabierta a las 16:31 UTC)
+# Estado actual · 2026-09-06 (domingo, 07:45 UTC)
+
+## F-025 BLOQUEADA A PROPÓSITO; LO SIGUIENTE ES F-066, LA INGESTA DE LOS RAW QUE FALTAN
+
+**Decidido por el humano el domingo 06 a las 07:40 UTC.** F-025 pasa a
+`blocked` mientras espera las nocturnas acotadas (T31b y T34 con la del lunes
+07, T33 a la semana); cuando T31b esté en verde, reviewer y `done`. No es una
+avería.
+
+**El backlog se ha reordenado** (commit de esta mañana): nace **F-066**, una
+sola feature de INGESTA que trae de una vez todos los raw que F-055, F-056 y
+F-057 llevaban dentro (personal: `res`, `emp`, `hmo`; contabilidad: `apu`,
+`asi`, `cua`, `apa`?, `con` tip=16; proveedor: `PFfir`, `auxfam`, `act`,
+`auxacttip`, `actent`, `actseg`). Esas tres quedan como features de **mart**
+sobre esos raw, en el orden F-057 → F-056 → F-055. Y las 45 vivas tienen ahora
+**prioridad única** (1 a 45), conservando el orden relativo que tenían.
+Palabras del humano: «una primera ficha de ingesta de esas 3 features, y luego
+esas tres features serían solo reconstruir los mart de cada una».
+
+**Por dónde se sigue**: F-066 por el flujo SDD, `spec-author` primero. Lo que
+la spec tiene que decidir está en la ficha: cómo se trae `apu` (2,15 M, la
+mayor jamás traída), qué pasa con el DNI de `emp`/`res` en `raw`, y la
+medición de la ingesta nueva con su SKU. El servidor sigue en B2s.
+
+# Estado a las 16:31 UTC del sábado 05 (sesión anterior)
 
 ## EL SERVIDOR ESTÁ EN B2s DESDE LAS 17:21 UTC, Y LA RECONSTRUCCIÓN VA POR SEGUNDA VEZ (`hamsh8o`)
 
