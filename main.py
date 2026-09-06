@@ -117,6 +117,10 @@ from etl_sigrid.domain.perfil_carga import (
     format_perfil,
     perfil_de_carga,
 )
+from etl_sigrid.domain.recuentos import (
+    comparar_recuentos,
+    formatear as formatear_recuentos,
+)
 from etl_sigrid.domain.tiemod import (
     comparar_tiemod,
     escribir_csv_tiemod,
@@ -153,7 +157,10 @@ from etl_sigrid.infrastructure.sigrid.bench_extraccion import (
     barrer_paginas,
     escribir_csv_bench,
 )
-from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient
+from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
+    SigridApiClient,
+    SigridApiError,
+)
 
 #: Cap de filas por petición que documenta `azure-apps/sigrid_api.md`. El real
 #: son 20.000 (DA-6, dato del humano el 2026-08-18): la divergencia se avisa,
@@ -188,6 +195,23 @@ def _get_pg() -> PostgresClient:
         target_db=pg.db,
         auto_create_db=pg.auto_create_db,
         set_role=pg.set_role,
+    )
+
+
+def _get_api() -> SigridApiClient:
+    """Construye el cliente de `sigrid-api` con lo que declara el `.env`.
+
+    Existe por el mismo motivo que `_get_pg`: un único sitio donde se decide
+    cómo se abre la puerta a Sigrid, que es lo que permite doblarla entera en
+    un test sin tocar la red.
+    """
+    api = get_settings().sigrid_api
+    return SigridApiClient(
+        base_url=api.base_url,
+        function_key=api.function_key.get_secret_value(),
+        database=api.database,
+        page_size=api.page_size,
+        timeout_s=api.timeout_s,
     )
 
 
@@ -1913,6 +1937,65 @@ def check_coherencia() -> None:
     click.echo(formatear_veredicto_stg(veredicto_stg))
 
     if not veredicto_raw.ok or not veredicto_stg.ok:
+        sys.exit(1)
+
+
+def _contar_en_sigrid(api, source_table: str, where: str | None) -> int | None:
+    """`COUNT(*)` de una tabla de Sigrid, con su mismo filtro. `None` si falla.
+
+    Que la excepción se trague AQUÍ y no aborte el barrido es deliberado: con
+    56 tablas, parar en la primera que Sigrid rechaza deja sin mirar las 55
+    restantes. La tabla queda `sin_medir`, que **no** está conforme (R17).
+    """
+    consulta = f"SELECT COUNT(*) AS n FROM [dbo].[{source_table}]"
+    if where:
+        consulta = f"{consulta} WHERE {where}"
+    try:
+        respuesta = api.leer_sql(consulta, max_rows=1)
+    except SigridApiError as e:
+        click.secho(f"  ! {source_table}: Sigrid no contestó ({e})", fg="yellow", err=True)
+        return None
+    filas = respuesta["rows"]
+    return int(filas[0][0]) if filas else None
+
+
+@cli.command("check-raw-recuentos")
+def check_raw_recuentos_cmd() -> None:
+    """
+    ¿Tiene `raw` las mismas filas que Sigrid, tabla a tabla? SOLO LECTURA.
+
+    Una ingesta puede terminar «en verde» y dejar media tabla: un `COPY`
+    cortado, un timeout del balanceador, una página que no volvió. Este
+    comando manda un `COUNT(*)` por tabla declarada —con su mismo `where`— y
+    lo compara con el de `raw`.
+
+    No escribe en Sigrid ni registra la ejecución en `_meta.etl_runs`: no es un
+    paso del pipeline, es una pregunta. Fuera de `run-all` a propósito.
+
+    Sale 0 solo si las 56 cuadran. Una tabla que Sigrid no pudo contar sale
+    como SIN MEDIR y **también** devuelve 1: «no he podido mirar» no es «está
+    bien».
+    """
+    tablas = get_settings().tables_sigrid.get("tables", [])
+    pg = _get_pg()
+    sigrid: dict[str, int | None] = {}
+    raw: dict[str, int | None] = {}
+
+    with _get_api() as api:
+        for tabla in tablas:
+            origen = tabla["source_table"]
+            destino = tabla.get("target_table", origen)
+            sigrid[origen] = _contar_en_sigrid(api, origen, tabla.get("where"))
+            raw[origen] = (
+                pg.count_rows("raw", destino) if pg.table_exists("raw", destino) else None
+            )
+
+    informe = comparar_recuentos([t["source_table"] for t in tablas], sigrid, raw)
+
+    click.secho("=== raw frente a Sigrid, tabla a tabla ===", fg="cyan", bold=True)
+    click.echo(formatear_recuentos(informe))
+
+    if not informe.ok:
         sys.exit(1)
 
 

@@ -76,7 +76,7 @@ VACIAS_EN_SIGRID = (
 #: Las tres tablas nuevas que tienen `tiemod` (medido: ninguna otra lo tiene).
 CON_TIEMOD = ("auxpronat", "auxpag", "auxefp")
 
-#: Las que bajan el tamaño de página a 5.000 por número de filas × columnas
+#: Las que bajan el tamaño de página a 5.000 por número de filas por columnas
 #: (R9), como ya hacen `dcapro` y `dcfpro`.
 PAGINA_CORTA = ("dcopro", "dncpro")
 
@@ -303,7 +303,7 @@ def test_f066_r8_dca_no_cambia() -> None:
 
 @pytest.mark.parametrize("tabla", PAGINA_CORTA)
 def test_f066_r9_las_tablas_de_linea_bajan_el_tamano_de_pagina(tabla: str) -> None:
-    """787.641 filas × 71 columnas y 286.432 × 73: mismo caso que `dcapro`."""
+    """787.641 filas por 71 columnas y 286.432 por 73: mismo caso que `dcapro`."""
     assert _ingesta()[tabla].get("page_size") == 5000
 
 

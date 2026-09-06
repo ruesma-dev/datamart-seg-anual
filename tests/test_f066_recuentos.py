@@ -37,7 +37,6 @@ from etl_sigrid.domain.recuentos import (
 )
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiBusinessError
 
-
 # ---------------------------------------------------------------------------
 # R16 · el veredicto es dominio puro: los cuatro casos
 # ---------------------------------------------------------------------------
@@ -256,9 +255,17 @@ class PgDoble:
         )
 
 
+class LoggingDoble:
+    """Lo que el grupo `cli` mira antes de despachar el subcomando."""
+
+    log_level = "WARNING"
+    log_format = "console"
+
+
 class SettingsDoble:
     def __init__(self, tablas: list[dict]) -> None:
         self.tables_sigrid = {"tables": tablas}
+        self.logging = LoggingDoble()
 
 
 def _tabla(source: str, where: str | None = None) -> dict:
