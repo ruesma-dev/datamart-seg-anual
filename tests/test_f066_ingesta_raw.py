@@ -448,3 +448,37 @@ def test_f066_r14_las_fichas_de_compras_dicen_a_que_pregunta_responden(
     assert "**No** responde" in texto, (
         f"la ficha de raw.{tabla} no dice qué pregunta NO responde"
     )
+
+
+# ---------------------------------------------------------------------------
+# El hueco que `check-raw-recuentos` cazó el 2026-09-06
+# ---------------------------------------------------------------------------
+#
+# El generador del bloque de compras se ejecutó dos veces por un despiste y el
+# YAML quedó con **73 entradas, 17 de ellas repetidas**. Ni un solo test de este
+# fichero lo vio, y no por casualidad: todos leen la ingesta a través de
+# `_ingesta()`, que es un `dict` indexado por `source_table` y **colapsa los
+# duplicados**. Contra la base, en cambio, se vio a la primera: el comando
+# imprimió 73 líneas y las 17 últimas dos veces.
+#
+# La lección no es «revisa el YAML»: es que una vista que deduplica no puede
+# comprobar unicidad. Esta comprobación lee la LISTA, no el diccionario.
+
+
+def test_f066_r1_ninguna_tabla_esta_declarada_dos_veces() -> None:
+    """Una entrada repetida se ingiere dos veces cada noche, sin decir nada."""
+    datos = yaml.safe_load(FICHERO_TABLAS.read_text(encoding="utf-8"))
+    nombres = [t["source_table"] for t in datos["tables"]]
+    repetidas = sorted({n for n in nombres if nombres.count(n) > 1})
+
+    assert repetidas == [], (
+        f"declaradas dos veces: {repetidas}. La ingesta las cargaría dos veces "
+        f"por noche y ningún test que lea el YAML como diccionario lo vería"
+    )
+
+
+def test_f066_r1_la_lista_del_yaml_tiene_las_entradas_que_dice_el_diccionario() -> None:
+    """Control del anterior: si `_ingesta()` y la lista discrepan, hay duplicados."""
+    datos = yaml.safe_load(FICHERO_TABLAS.read_text(encoding="utf-8"))
+
+    assert len(datos["tables"]) == len(_ingesta()) == TOTAL_TABLAS
