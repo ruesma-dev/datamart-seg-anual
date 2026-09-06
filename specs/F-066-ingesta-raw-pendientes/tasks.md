@@ -17,8 +17,29 @@ Rigor crítico: T1-T3 son la fase RED (los tests se escriben y fallan antes de t
 - [x] T12: Cobertura de las líneas cambiadas ≥ 80 % y campaña de mutación completa sobre `etl_sigrid/domain/recuentos.py` y el comando (`python -m harness.mutacion`), 0 supervivientes o justificación aceptada; informe en `progress/`  |  Verificación: `bash harness/init.sh` secciones 7b y mutación en verde
 - [ ] T13: Desplegar la imagen (`infra/`, tag fechado) y esperar la primera nocturna con las 25 tablas; anotar en `mediciones.md` filas y segundos por tabla, total frente a 1.832 s, créditos antes/después y SKU (R19), y la fila de F-065 (R20)  |  Verificación: MANUAL (humano): `python main.py timings` y `az monitor metrics list ... cpu_credits_remaining`
 - [ ] T14: Contra Azure, tras esa nocturna: `python main.py check-raw-recuentos` con código 0 y `python main.py check-diccionario` sin objetos sin ficha  |  Verificación: MANUAL (humano)
-- [ ] T15: Pasar al líder los hallazgos de R22 para que actualice las fichas de F-055, F-056, F-057 y F-067 en `harness/features.json`  |  Verificación: MANUAL (humano): `bash harness/init.sh` regenera `BACKLOG.md` con las fichas cambiadas
+- [x] T15: Pasar al líder los hallazgos de R22 para que actualice las fichas de F-055, F-056, F-057 y F-067 en `harness/features.json`  |  Verificación: MANUAL (humano): `bash harness/init.sh` regenera `BACKLOG.md` con las fichas cambiadas
 - [x] T16: Ejecutar `bash harness/init.sh` en verde  |  Verificación: exit 0
+
+## Estado de las tres MANUAL (2026-09-06)
+
+* **T13 · PENDIENTE, y no por falta de trabajo.** Construir la imagen y
+  desplegarla toca `infra/` y `az`, que **solo autoriza el humano** (regla dura
+  de `CLAUDE.md`), y además el líder decidió con él **retrasar el despliegue a
+  después de la nocturna del lunes 07**: esa nocturna es la primera acotada y
+  es la que da T31b y T34 de F-025; meterle un 26 % más de filas la
+  contaminaría y no valdría ni para F-025 ni para F-065. Lo que hace falta,
+  paso a paso, está en `progress/impl_F-066.md`, sección «Qué necesita T13».
+* **T14 · PENDIENTE por dependencia de T13.** Comprueba contra Azure lo que la
+  nocturna de T13 deja: no hay nada que ejecutar hasta que esa nocturna haya
+  corrido. Sus dos comandos están en `progress/current.md`.
+* **T15 · HECHA** por el líder el 2026-09-06 a las 19:40 UTC (commit
+  `26ce092`): los hallazgos de R22 están en las fichas de F-055, F-056, F-057 y
+  F-067 de `harness/features.json`, y nace **F-068** con lo del permiso del MCP
+  sobre `raw.emp`.
+
+**Consecuencia para el cierre**: R19, R20 y R24 dependen de T13/T14 y siguen
+PENDIENTES en `mediciones.md` §3 y §4. La feature no puede pasar a `done` con
+ellas abiertas; lo que se somete a revisión es todo lo demás.
 
 ## Nota de T12 (2026-09-06)
 

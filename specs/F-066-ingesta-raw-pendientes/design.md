@@ -8,7 +8,12 @@ compra (`dco`), 14 albarán (`dca`), 15 factura (`dcf`), 16 cuenta del plan,
 20 asiento (`asi`), 33 recurso (`res`), 42 obra, 43 empleado (`emp`), 44
 contrato (`ctr`), 46 comparativo (`com`).
 
-**Las 25 tablas que entran** (filas · columnas · notas):
+**Las 25 tablas que entran** (filas · columnas · notas). La cifra de
+`dncpro` decía **286.428** por un error de transcripción y estaba en
+contradicción con `mediciones.md` §1; **remedida contra Sigrid el 2026-09-06**
+(`SELECT COUNT(*) FROM [dbo].[dncpro]` por `sigrid-api`, solo lectura): son
+**286.432**, que es lo que ya decían `mediciones.md`, `tables_sigrid.yaml` y
+la ficha de `raw.dncpro`. Corregida aquí y en R9:
 
 | Grupo | Tabla | Filas | Cols | Nota |
 |---|---|---|---|---|
@@ -30,7 +35,7 @@ contrato (`ctr`), 46 comparativo (`com`).
 | C | `dcopro` | 787.641 | 71 | líneas de oferta (`comlin.dcoproide` apunta aquí) |
 | C | `dcorec` | 748 | 21 | recargos de la oferta |
 | C | `dnc` | 275 | 15 | necesidades de compra (`com.dncide`) |
-| C | `dncpro` | 286.428 | 73 | líneas de necesidad (`comlin.dncproide`) |
+| C | `dncpro` | 286.432 | 73 | líneas de necesidad (`comlin.dncproide`) |
 | C condiciones | `ctrrec` | 6.342 | 21 | **retención del contrato**: `recide` 558368 en 6.125, `valpor`, `bas`, `cuo` |
 | C | `dcfrec` | 32.650 | 21 | recargos/retención en factura |
 | C | `dcarec` | 40.930 | 21 | recargos en albarán |

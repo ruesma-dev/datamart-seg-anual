@@ -48,7 +48,7 @@ raw del seguimiento de COMPRAS por el MCP. Toda cifra de Sigrid se **midió el
   (condiciones de pago de la factura, informadas en 165.387 de 165.391) y
   **no** excluirlas en `dco`; `ctr` ya las trae. `dca` no cambia.
 - **R9.** El sistema debe declarar `page_size: 5000` en `dcopro` (787.641
-  filas, 71 columnas) y `dncpro` (286.428, 73), como `dcapro`; el resto usa
+  filas, 71 columnas) y `dncpro` (286.432, 73), como `dcapro`; el resto usa
   el global (10.000).
 
 ## B · La puerta del diccionario (`config/diccionario/raw.yaml`)

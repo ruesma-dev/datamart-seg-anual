@@ -380,6 +380,62 @@ def test_f066_r11_la_ficha_de_dcf_dice_veintiuna() -> None:
 
 
 # ---------------------------------------------------------------------------
+# R12 · ninguna ficha de `raw` se aplaza por la lista de pendientes
+# ---------------------------------------------------------------------------
+
+
+def _pendientes_declarados() -> dict[str, list[str]]:
+    """Los dos trinquetes de pendientes, cada uno con su lista de objetos.
+
+    Los dos ficheros tienen la misma clave (`pendientes`) y el mismo criterio
+    —aplazar una ficha es legítimo, ignorarla no—, así que se leen igual.
+    """
+    salida: dict[str, list[str]] = {}
+    for fichero in (FICHERO_GLOBAL, FICHERO_PENDIENTES):
+        datos = yaml.safe_load(fichero.read_text(encoding="utf-8")) or {}
+        salida[fichero.name] = list(datos.get("pendientes") or [])
+    return salida
+
+
+@pytest.mark.parametrize("fichero", ["00_global.yaml", "objetos_pendientes.yaml"])
+def test_f066_r12_ninguna_tabla_de_raw_se_aplaza_como_pendiente(fichero: str) -> None:
+    """R12: las 56 tablas llevan ficha escrita, no una excusa en el trinquete.
+
+    Aplazar la ficha de un objeto es legítimo y por eso existen las dos listas
+    de `pendientes`; lo que R12 prohíbe es usarlas **aquí**, porque el
+    trinquete solo baja y aplazar 25 fichas de golpe habría dejado el techo
+    donde nadie lo volvería a apretar. Este test es lo que faltaba para que R12
+    fuera trazable: lo comprobado hasta ahora era el efecto (la biyección
+    ficha↔tabla y el `PENDIENTES_MAX` de `test_f006_cobertura.py`), no la regla.
+
+    Se mira objeto a objeto y no `== []` a propósito: el día que otra feature
+    aplace legítimamente un objeto de `stg` o de `mart`, esas listas dejarán de
+    estar vacías y este test tiene que seguir diciendo la verdad sobre `raw`.
+    """
+    declarados = _pendientes_declarados()[fichero]
+
+    aplazadas = [
+        objeto for objeto in declarados if str(objeto).strip().lower().startswith("raw.")
+    ]
+    assert not aplazadas, (
+        f"{fichero} aplaza fichas de `raw` con el trinquete de pendientes, y "
+        f"R12 lo prohíbe: {aplazadas}"
+    )
+
+
+def test_f066_r12_las_cincuenta_y_seis_tablas_tienen_ficha_escrita() -> None:
+    """La otra mitad de R12: si ninguna se aplaza, todas tienen que estar.
+
+    Sin este par, la comprobación de arriba pasaría también en el mundo en que
+    faltan fichas y nadie las declaró pendientes, que es peor que aplazarlas.
+    """
+    sin_ficha = sorted(
+        t["target_table"] for t in _ingesta().values() if t["target_table"] not in _fichas()
+    )
+    assert not sin_ficha, f"tablas de `raw` sin ficha y sin aplazar: {sin_ficha}"
+
+
+# ---------------------------------------------------------------------------
 # R13 · el número que tres documentos citan
 # ---------------------------------------------------------------------------
 
