@@ -27,6 +27,15 @@ T31b y T34 de F-025. Desplegar F-066 antes la contaminaria con un 26 % mas de
 filas y la medicion no valdria ni para cerrar F-025 ni para F-065. Decidido con
 el humano. El despliegue de F-066 va **despues**, para la nocturna del martes.
 
+**F-066 TIENE VEREDICTO: APROBADO LO ENTREGABLE** (review pasada 2, 2026-09-06
+a las 22:47 UTC, en `progress/review_F-066.md`). Los 7 cambios requeridos de la
+pasada 1 estan cerrados y verificados uno a uno por el reviewer. **C4 y C5
+quedan ABIERTOS hasta T13-T14**, y con ellos R19, R20 y R24: la feature **no
+pasa a `done`** hasta que la nocturna con la imagen nueva haya cargado las 8
+tablas grandes y `check-raw-recuentos` de codigo 0. Un hallazgo nuevo, no
+bloqueante, ya atendido: el commit del cron viajaba en esta rama sin estar en la
+spec, y ahora esta escrito en `tasks.md`.
+
 **Tres cosas esperan al humano, en este orden:**
 
 1. **F-068, y corre prisa.** Comprobado a las 19:35 UTC contra Azure:

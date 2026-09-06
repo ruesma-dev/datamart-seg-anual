@@ -85,3 +85,22 @@ reabre.**
 
 Los otros dos supervivientes de la 1.ª pasada **sí eran huecos reales** y están
 muertos desde `ca31adb`: `max_rows=1` y `err=True`.
+
+## Un commit de esta rama que NO es de F-066 (hallazgo 11 del review, pasada 2)
+
+`b964c6e` **cambia produccion y no pertenece a esta feature**: mueve la nocturna
+de `0 2 * * *` a **`0 0 * * *`** y sube `replicaTimeoutSeconds` de 18000 a
+**25200** en `infra/env/dev.json`, con su reflejo en `docs/ARCHITECTURE.md` y en
+`test_f003_r9_cron_del_entorno_dev_es_medianoche`. Lo pidio el humano el
+2026-09-06 a las 20:20 UTC -una carga completa dura ~4 h 50 y arrancando a las
+02:00 el dato no estaba listo hasta media manana- y el lider lo ejecuto en el
+job de Azure y en los cuatro sitios donde el valor esta versionado, mas
+`azure-apps/datamart_seg_anual.md` (commit `3916ca6` alli). El cambio del
+timeout no es una decision nueva: **corrige una divergencia** que existia desde
+el 05-sep, cuando se subio a 7 h en Azure tras morir la reconstruccion
+`kcb9n2r` por ese techo, y el repositorio se quedo diciendo 5 h.
+
+Queda escrito aqui, y no solo en el cuerpo del commit, porque un cambio de
+produccion que viaja de polizon en la rama de otra feature es invisible para
+quien lea la spec. **No altera el alcance medido de F-066**: son JSON, Markdown
+y un test.
