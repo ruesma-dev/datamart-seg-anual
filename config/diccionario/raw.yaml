@@ -1137,10 +1137,16 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 23 columnas: 6 de direcciones, 2 de descripciones
+      **No se traen** 21 columnas: 6 de direcciones, 2 de descripciones
       largas, 2 de observaciones, 11 sueltas entre textos y campos
       auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
       "columna inexistente".
+
+      **Las condiciones de pago de la factura SI estan** desde el
+      2026-09-06 (F-066): eran dos de esas exclusiones y estaban fuera por
+      tamano, no por decision de negocio. Medido antes de recuperarlas:
+      vienen informadas en 165.390 de las 165.391 facturas, con 15,6 bytes
+      de media. Eran la carencia (4) del correo de Compras.
     grano: Una fila por factura de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
