@@ -190,15 +190,15 @@ min más. Si pasa de 45 min, F-065 tiene que verlo.
 
 | Evidencia | Valor | De dónde sale |
 |---|---|---|
-| Tests ejecutados | **3.868 passed, 159 skipped**, 0 fallos | `bash harness/init.sh` |
-| Tiempo de la suite | **572,42 s** (con medición de cobertura) | ídem |
-| Tests propios de la feature | **342** (312 + 30) | los dos ficheros nuevos |
+| Tests ejecutados | **3.871 passed, 159 skipped**, 0 fallos (07-sep) | `bash harness/init.sh` |
+| Tiempo de la suite | **293,40 s** (con medición de cobertura) | ídem |
+| Tests propios de la feature | **345** (315 + 30) | los dos ficheros nuevos |
 | Cobertura de líneas cambiadas | **92,5 %** (662/716, umbral 80, nivel crítico) | `PUERTA COBERTURA` |
 | Mutantes generados / evaluados | **23 / 23** | `progress/mutacion_F-066.md` |
 | Muertos / supervivientes / timeouts | **22 / 1 / 0**, 0 sin veredicto | ídem, HEAD `d8c73b8` |
 | Tiempo de la campaña | **2.072,2 s** en serie, campaña **VÁLIDA** (3.ª pasada) | ídem |
 | Ingesta desde el puesto | **17 tablas, 136.536 filas**, ~37 s de datos | `mediciones.md` §2 |
-| Puerta de tamaño | requirements 128/150, design 218/250 | `PUERTA TAMAÑO` |
+| Puerta de tamaño | req 128/150, design 218/250, impl 219/220 | `PUERTA TAMAÑO` |
 
 **El superviviente que queda es `bold=True -> bold=False`** en el título del
 comando: **mutante equivalente**, no cambia ni una letra del texto ni el código
