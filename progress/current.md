@@ -72,6 +72,14 @@ guarda histórico de estados de contratos ni facturas (DA-7, afecta a lo que
 se le puede prometer a Compras). Los tests de F-025 que fallaban los domingos
 están arreglados (`5fedc48`, informe en `progress/impl_F-025_tests_domingo.md`).
 
+**Las tres decisiones del humano sobre la spec (12:05 UTC)**: `emp`/`res`
+enteras, sin excluir DNI ni datos personales; el histórico de estados a F-067
+como foto diaria (verificado por el líder contra Sigrid: `concam` nunca
+audita `est`, `confir` no tiene contratos, `conest` define los siete estados
+del contrato; F-066 añade `conest`); `apu` entera y `apa` dentro. El
+`spec-author` revisa la spec con eso; al entregar, F-066 pasa a `in_progress`
+y arranca el `implementer`.
+
 **Por dónde se sigue**: F-066 por el flujo SDD, `spec-author` primero. Lo que
 la spec tiene que decidir está en la ficha: cómo se trae `apu` (2,15 M, la
 mayor jamás traída), qué pasa con el DNI de `emp`/`res` en `raw`, y la
