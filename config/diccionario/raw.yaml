@@ -1384,7 +1384,7 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Es la ficha de personal en bruto, con 150 columnas de codigos de Sigrid y datos personales sin filtrar. Nadie deberia consultarla para responder una pregunta de negocio: el coste de mano de obra por obra sale del mart de personal (F-057) cruzando partes de trabajo.
+      Es la ficha de personal en bruto, con 161 columnas de codigos de Sigrid y datos personales sin filtrar. Nadie deberia consultarla para responder una pregunta de negocio: el coste de mano de obra por obra sale del mart de personal (F-057) cruzando partes de trabajo.
     descripcion: >-
       **Empleados** (1.352 filas, 161 columnas). Extension del concepto de tipo 43 en `con`.
 

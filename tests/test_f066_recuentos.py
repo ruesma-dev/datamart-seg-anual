@@ -213,9 +213,11 @@ class ApiDoble:
     def __init__(self, filas: dict[str, int | None]) -> None:
         self._filas = filas
         self.consultas: list[str] = []
+        self.max_rows: list[int | None] = []
 
     def leer_sql(self, sql: str, parameters=None, max_rows=None) -> dict:
         self.consultas.append(sql)
+        self.max_rows.append(max_rows)
         tabla = sql.split("[dbo].[", 1)[1].split("]", 1)[0]
         valor = self._filas.get(tabla)
         if isinstance(valor, Exception):
@@ -413,3 +415,53 @@ def test_f066_r16_el_informe_es_inmutable() -> None:
     assert isinstance(informe, InformeRecuentos)
     with pytest.raises((AttributeError, TypeError)):
         informe.iguales = ()  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Los dos supervivientes de la campaña de mutación (2026-09-06)
+# ---------------------------------------------------------------------------
+#
+# La campaña dejó vivos tres mutantes sobre el comando. Dos eran huecos de
+# verdad y los cierran estas dos comprobaciones; el tercero —`bold=True` del
+# título— es decoración y se justifica en `progress/impl_F-066.md`.
+
+
+def test_f066_r18_el_count_no_pide_a_sigrid_mas_de_una_fila(cli) -> None:
+    """Superviviente `max_rows=1 -> max_rows=2`.
+
+    Un `COUNT(*)` devuelve una fila y solo una. Pedir más no cambia el
+    resultado hoy, pero Sigrid **corta por filas y por tiempo** —tope duro de
+    10.000 filas por petición y 230 s de balanceador—, y este comando manda 56
+    consultas seguidas: el tope de una fila es lo que garantiza que ninguna de
+    ellas pueda traerse un resultado grande por accidente.
+    """
+    runner, api, _ = cli([_tabla("apu")], {"apu": 1}, {"apu": 1})
+
+    runner.invoke(main.cli, ["check-raw-recuentos"])
+
+    assert api.max_rows == [1], (
+        f"el COUNT(*) pidió {api.max_rows} filas; un recuento pide una"
+    )
+
+
+def test_f066_r15_el_aviso_de_una_tabla_sin_medir_no_ensucia_el_informe(cli) -> None:
+    """Superviviente `err=True -> err=False`.
+
+    El aviso de que Sigrid no contestó va a **stderr**, y no por gusto: la
+    salida estándar es el informe tabla a tabla, que alguien puede redirigir a
+    un fichero o pegar en un parte. Un aviso suelto en medio de la tabla la
+    rompe justo la noche en que hay algo que mirar.
+    """
+    runner, _, _ = cli(
+        [_tabla("apu")],
+        {"apu": SigridApiBusinessError("consulta rechazada")},
+        {"apu": 10},
+    )
+
+    resultado = runner.invoke(main.cli, ["check-raw-recuentos"])
+
+    assert "Sigrid no contestó" in resultado.stderr
+    assert "Sigrid no contestó" not in resultado.stdout, (
+        "el aviso se ha colado en el informe, que es lo que se lee y se comparte"
+    )
+    assert ESTADO_SIN_MEDIR in resultado.stdout, "el informe sí va a la salida estándar"
