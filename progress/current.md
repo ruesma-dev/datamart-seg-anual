@@ -1,7 +1,32 @@
 <!-- progress/current.md -->
 # Estado actual · 2026-09-06 (domingo, ~11:30 UTC)
 
-## F-066: SPEC ESCRITA, PENDIENTE DE APROBACIÓN DEL HUMANO (PARADA 1)
+## F-066: IMPLEMENTADA HASTA T12; T13, T14 y T15 ESPERAN AL HUMANO
+
+**Al día 2026-09-06, tarde.** T1 a T12 y T16 están hechas, con un commit por
+tarea. La ingesta pasa de **31 a 56 tablas**; las 17 de menos de 100.000 filas
+ya están en `raw` (136.536 filas), y las 8 grandes más la recarga de `dcf`
+esperan a la primera nocturna. Informe completo en `progress/impl_F-066.md`,
+mediciones en `specs/F-066-ingesta-raw-pendientes/mediciones.md`.
+
+**Lo que NO se ha tocado, y por qué:** T13 construye y despliega la imagen en
+Azure —eso lo autoriza el humano—, T14 depende de que esa nocturna haya
+corrido, y T15 es del líder. No se ha ejecutado nada de `infra/` ni `az`.
+
+**Dos cosas que conviene no perder:**
+
+1. **`check-raw-recuentos` cazó un fallo real el día que nació**: el YAML tenía
+   17 entradas duplicadas que la nocturna habría cargado dos veces cada noche.
+   Ningún test lo veía porque todos leían la ingesta como un `dict`, que
+   colapsa duplicados. Corregido, con dos comprobaciones nuevas.
+2. **`tests/test_f024_dominio.py::test_f024_r1_batch_id_tiene_forma_y_es_unico`
+   es aleatorio por construcción y falla el 0,8 % de las veces** (medido: 25
+   fallos en 3.000 repeticiones; la paradoja del cumpleaños predice 0,741 %).
+   Genera 500 `batch_id` con sufijo de 3 bytes y exige 500 distintos. Invalidó
+   la campaña de mutación de esta feature al romper la línea base final. **Es
+   de F-024 y no se ha tocado**; queda para el líder decidir quién lo arregla.
+
+## F-066: la spec (histórico del 2026-09-06 por la mañana)
 
 `spec-author` ha dejado `specs/F-066-ingesta-raw-pendientes/` (requirements,
 design, tasks) con el alcance ampliado a las 10:40 UTC (raw de COMPRAS por el

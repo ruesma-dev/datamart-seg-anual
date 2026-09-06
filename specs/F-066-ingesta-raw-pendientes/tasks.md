@@ -14,8 +14,27 @@ Rigor crítico: T1-T3 son la fase RED (los tests se escriben y fallan antes de t
 - [x] T9: Ingestar en local, tabla a tabla, las 25 nuevas y `dcf` con `python main.py ingest --table <t> --full` y comprobar que `raw.<t>` se crea con PK `ide` y el recuento de Sigrid  |  Verificación: MANUAL (humano): `python main.py check-raw-recuentos` termina con código 0
 - [x] T10: Párrafo en `docs/ARCHITECTURE.md` («Acceso a datos»): grupos nuevos, mapa de `con.tip`, `apu` sin `tiemod`, `hmores`, datos personales en `raw`, lo que Sigrid no guarda (DA-6, DA-7)  |  Verificación: `pytest tests/test_f006_docs.py tests/test_documentos_del_arnes.py`
 - [x] T11: Actualizar `azure-apps/datamart_seg_anual.md` (R21: 56 tablas, las 25 nuevas, las descartadas, `dcf` con `pagtex`/`pagfor`, datos personales enteros en `raw.emp`/`raw.res`) y hacer commit en ese repositorio  |  Verificación: MANUAL (humano): `git -C ../azure-apps log -1 --stat`
-- [ ] T12: Cobertura de las líneas cambiadas ≥ 80 % y campaña de mutación completa sobre `etl_sigrid/domain/recuentos.py` y el comando (`python -m harness.mutacion`), 0 supervivientes o justificación aceptada; informe en `progress/`  |  Verificación: `bash harness/init.sh` secciones 7b y mutación en verde
+- [x] T12: Cobertura de las líneas cambiadas ≥ 80 % y campaña de mutación completa sobre `etl_sigrid/domain/recuentos.py` y el comando (`python -m harness.mutacion`), 0 supervivientes o justificación aceptada; informe en `progress/`  |  Verificación: `bash harness/init.sh` secciones 7b y mutación en verde
 - [ ] T13: Desplegar la imagen (`infra/`, tag fechado) y esperar la primera nocturna con las 25 tablas; anotar en `mediciones.md` filas y segundos por tabla, total frente a 1.832 s, créditos antes/después y SKU (R19), y la fila de F-065 (R20)  |  Verificación: MANUAL (humano): `python main.py timings` y `az monitor metrics list ... cpu_credits_remaining`
 - [ ] T14: Contra Azure, tras esa nocturna: `python main.py check-raw-recuentos` con código 0 y `python main.py check-diccionario` sin objetos sin ficha  |  Verificación: MANUAL (humano)
 - [ ] T15: Pasar al líder los hallazgos de R22 para que actualice las fichas de F-055, F-056, F-057 y F-067 en `harness/features.json`  |  Verificación: MANUAL (humano): `bash harness/init.sh` regenera `BACKLOG.md` con las fichas cambiadas
-- [ ] T16: Ejecutar `bash harness/init.sh` en verde  |  Verificación: exit 0
+- [x] T16: Ejecutar `bash harness/init.sh` en verde  |  Verificación: exit 0
+
+## Nota de T12 (2026-09-06)
+
+Campaña completa **en serie** (`--workers 1`, base `d1f56aa`), dos pasadas:
+
+* **1.ª** — 23 mutantes, 20 muertos, **3 supervivientes**, 3.621,8 s.
+* **2.ª**, tras matar dos — 23 mutantes, **22 muertos, 1 superviviente**,
+  3.311,2 s, sobre HEAD `ca31adb`.
+
+El superviviente que queda es `bold=True -> bold=False` en el título del
+comando: **mutante equivalente**, exento por escrito en
+`progress/mutacion_F-066.md` y en el informe. Cazarlo exigiría afirmar sobre
+secuencias ANSI, no sobre comportamiento.
+
+**La 2.ª pasada la marcó el arnés como CAMPAÑA NO VÁLIDA**, y no por el código
+de esta feature: la línea base terminó roja en el test aleatorio de F-024
+(`test_f024_r1_batch_id_tiene_forma_y_es_unico`, 0,833 % de fallo medido sobre
+3.000 repeticiones). Por eso los dos supervivientes reales se verificaron
+**a mano**, aplicando cada mutación y comprobando que el test nuevo falla.
