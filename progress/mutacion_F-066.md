@@ -1,13 +1,23 @@
 <!-- progress/mutacion_F-066.md -->
 # F-066 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-066` el 2026-09-06 16:40.
+Generado por `python -m harness.mutacion --feature F-066` el 2026-09-07 00:22.
 
-> ## ⚠ CAMPAÑA NO VÁLIDA
+> **EL COMANDO EXACTO, CON SU BASE** (hallazgo 5 del review; la plantilla del
+> arnés no imprime `--base` y por eso hay que escribirlo):
 >
-> La línea base estaba VERDE al empezar y ROJA al terminar en . (tests/test_f024_dominio.py::test_f024_r1_batch_id_tiene_forma_y_es_unico). La base se rompió durante la campaña, así que los mutantes contados como «muertos» pueden no estarlo: estos números NO valen para cerrar una feature. Arregla la suite y repite la campaña.
+> ```bash
+> python -m harness.mutacion --feature F-066 --base d1f56aa --workers 1
+> ```
 >
-> **No cierres la feature con estos números.** Arregla la línea base y repite la campaña.
+> **`--base d1f56aa` no es un recorte, es la base correcta.** El valor por
+> defecto es `--base dev`, y esta rama **nace de `feature/F-025` sin fusionar**,
+> así que el merge-base con `dev` es `cd18e096` y el alcance sale **2.904 líneas
+> y 247 mutantes en 11 ficheros**: los de F-025, no los de F-066. Con
+> `d1f56aa` —el commit del que sale realmente esta rama— el alcance son las
+> **218 líneas y 23 mutantes** de esta feature, que es lo que hay que mutar.
+> Quien recalcule con el comando de la cabecera verá 247 y no debe leerlo como
+> una campaña recortada.
 
 ## Alcance
 
@@ -29,11 +39,11 @@ Origen del diff: **rama** (`d1f56aa100c7ea94a0c6161dc3de5dde87a773dd` .. `featur
 | Supervivientes | 1 |
 | Timeouts | 0 |
 | Sin veredicto (base rota) | 0 |
-| Tiempo total | 3311.2 s |
-| SHA de HEAD medido | `ca31adb6ea75db1aa8242534ed14554da89af1ef` |
-| Línea base (s) — `.` | 208.9 |
-| Media por mutante evaluado (s) | 144.0 |
-| Timeout efectivo por mutante (s) | 418 — derivado de la línea base × 2.0 |
+| Tiempo total | 2072.2 s |
+| SHA de HEAD medido | `d8c73b8e6750a2afe9ecc7c9a2ac28b770b14117` |
+| Línea base (s) — `.` | 132.7 |
+| Media por mutante evaluado (s) | 90.1 |
+| Timeout efectivo por mutante (s) | 266 — derivado de la línea base × 2.0 |
 | Suelo configurado (s) | 120 |
 | Workers | 1 |
 | Muestreo | no: campaña completa |
@@ -55,8 +65,19 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > salida capturada. Un test que lo cazara tendría que afirmar sobre secuencias
 > de escape ANSI, es decir, comprobar decoración en vez de comportamiento.
 >
-> **Decisión: MUTANTE EQUIVALENTE, exento.** Se documenta aquí y en
-> `progress/impl_F-066.md`; queda para el humano aceptarlo o pedir el test.
+> **Decisión: MUTANTE EQUIVALENTE, exento.**
+>
+> **FIRMADO POR EL HUMANO el 2026-09-06 a las 20:45 UTC**, que es lo que el
+> rigor `critico` exige para levantar `supervivientes_maximos: 0`. Palabra
+> literal: «firmo». Queda registrado en la ficha de F-066 de
+> `harness/features.json` (commit `5564975`) y en `specs/.../tasks.md`, nota de
+> T12. El reviewer lo reprodujo por su cuenta aplicando el mutante y da por
+> buena la exención (hallazgo 9 de `progress/review_F-066.md`). Precedente: el
+> humano ya eximió campañas enteras en F-042, F-052 y F-025.
+>
+> **Sobrevivió también en esta campaña**, la tercera y la primera VÁLIDA
+> (2026-09-07, 23 mutantes / 22 muertos / 1 superviviente / 0 sin veredicto),
+> con el mismo operador y el mismo texto.
 >
 > Los otros dos supervivientes de la primera pasada **sí eran huecos reales** y
 > están muertos desde el commit `ca31adb`: `max_rows=1` (cuántas filas se le
@@ -65,25 +86,5 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > se comprobaron a mano aplicando cada mutación: con el mutante fallan, con el
 > código bueno pasan.
 
-## Nota sobre el veredicto del arnés
-
-La campaña terminó con **CAMPAÑA NO VÁLIDA**: la línea base estaba verde al
-empezar y roja al terminar, en
-`tests/test_f024_dominio.py::test_f024_r1_batch_id_tiene_forma_y_es_unico`.
-
-**No es el código de esta feature: ese test es aleatorio por construcción.**
-Genera 500 `batch_id` con un sufijo de 3 bytes (16.777.216 valores) y exige que
-los 500 sean distintos. Medido aquí mismo, 3.000 repeticiones: **25 lotes con
-un repetido, 0,833 %**, contra el 0,741 % que predice la paradoja del
-cumpleaños. Con 24 pasadas de la suite en una campaña, la probabilidad de que
-salte al menos una vez es de un **18 %**.
-
-Consecuencia para quien lea estos números: los 22 muertos se evaluaron **antes**
-de esa rotura y con la base verde en el arranque, pero **el arnés no los
-avala**, y con razón: su regla es la correcta. La conclusión que sí se sostiene
-sin depender de esta campaña es que los dos supervivientes reales están muertos,
-porque eso se verificó **a mano, mutante a mutante**.
-
-El test flaky es de F-024 y **no se ha tocado**: arreglarlo es de esa feature, no
-de esta. Queda anotado para el líder.
+> _Análisis traído de la campaña anterior de esta feature: el mutante volvió a sobrevivir con el mismo operador y el mismo texto. Reléelo si el código de alrededor ha cambiado._
 

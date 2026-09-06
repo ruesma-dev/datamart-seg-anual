@@ -141,16 +141,24 @@ comprobar unicidad. Se añadieron dos comprobaciones que leen la **lista**.
 cumpleaños. Con 24 pasadas de la suite en una campaña, salta el **18 %** de las
 veces, y eso es lo que dejó la segunda campaña marcada como NO VÁLIDA.
 
-**No se ha tocado: es de F-024.** Queda para el líder decidir quién lo arregla;
-mientras siga así, cualquier campaña de mutación de este repositorio tiene esa
-probabilidad de invalidarse, y el portero puede caer al azar.
+**ARREGLADO el 2026-09-06, tras el review** (`progress/impl_F-066_correcciones.md`).
+El líder decidió arreglarlo y no excluirlo: el defecto estaba en el test —afirma
+una unicidad que el código no promete— y no en el `batch_id`, así que
+`etl_sigrid/domain/` no se tocó. El test comprueba ahora la forma de los 500 y
+que el espacio de sufijos es grande de verdad; remedido, **0 fallos en 3.000
+pasadas**. **La campaña se repitió entera y salió VÁLIDA**: 23 mutantes, 22
+muertos, 1 superviviente (el equivalente firmado), 0 sin veredicto, 2.072,2 s.
+Lo que sigue debajo describe el estado ANTES de esa corrección.
 
 ## Verificaciones MANUAL pendientes
 
 * **T13** · construir y desplegar la imagen, y esperar la primera nocturna.
 * **T14** · tras ella, `check-raw-recuentos` con código 0 y
   `check-diccionario` sin objetos sin ficha.
-* **T15** · el líder lleva a `harness/features.json` los hallazgos de R22.
+* **T15** · **HECHA** por el líder el 2026-09-06 (commit `26ce092`).
+
+Las cinco, con su **comando literal**, en `progress/current.md` § «F-066 · LAS
+VERIFICACIONES `MANUAL (humano)`».
 
 ## Qué necesita T13
 
@@ -187,28 +195,25 @@ min más. Si pasa de 45 min, F-065 tiene que verlo.
 | Tests propios de la feature | **342** (312 + 30) | los dos ficheros nuevos |
 | Cobertura de líneas cambiadas | **92,5 %** (662/716, umbral 80, nivel crítico) | `PUERTA COBERTURA` |
 | Mutantes generados / evaluados | **23 / 23** | `progress/mutacion_F-066.md` |
-| Muertos / supervivientes / timeouts | **22 / 1 / 0** | ídem, HEAD `ca31adb` |
-| Tiempo de la campaña | **3.311,2 s** en serie (1.ª pasada: 3.621,8 s) | ídem |
+| Muertos / supervivientes / timeouts | **22 / 1 / 0**, 0 sin veredicto | ídem, HEAD `d8c73b8` |
+| Tiempo de la campaña | **2.072,2 s** en serie, campaña **VÁLIDA** (3.ª pasada) | ídem |
 | Ingesta desde el puesto | **17 tablas, 136.536 filas**, ~37 s de datos | `mediciones.md` §2 |
-| Puerta de tamaño | requirements 128/150, design 213/250 | `PUERTA TAMAÑO` |
+| Puerta de tamaño | requirements 128/150, design 218/250 | `PUERTA TAMAÑO` |
 
 **El superviviente que queda es `bold=True -> bold=False`** en el título del
-comando: **mutante equivalente y exento por escrito**. No cambia ni una letra
-del texto ni el código de salida, y `CliRunner` invoca sin color, así que un
-test que lo cazara estaría afirmando sobre secuencias ANSI en vez de sobre
-comportamiento. Queda al humano aceptarlo o pedir el test.
+comando: **mutante equivalente**, no cambia ni una letra del texto ni el código
+de salida y `CliRunner` invoca sin color, así que cazarlo exigiría afirmar sobre
+secuencias ANSI y no sobre comportamiento. **Firmado por el humano el 2026-09-06
+a las 20:45 UTC** («firmo»), registrado en la ficha de `harness/features.json`
+(commit `5564975`) y reproducido por el reviewer.
 
 **Los otros dos supervivientes de la primera pasada eran huecos reales y están
 muertos**: `max_rows=1` (cuántas filas se le piden a Sigrid, que corta por filas
-y por tiempo, con 56 consultas seguidas) y `err=True` (el aviso de tabla no
-medida se colaba en el informe de la salida estándar). Los mató un test cada
-uno, y **los dos se verificaron a mano** aplicando la mutación.
+y por tiempo) y `err=True` (el aviso de tabla no medida se colaba en el informe
+de la salida estándar). Los dos se verificaron además a mano.
 
-**Aviso honesto sobre la campaña:** el arnés la marcó **CAMPAÑA NO VÁLIDA**
-porque la línea base terminó roja en el test flaky de F-024 descrito arriba. Los
-22 muertos se evaluaron con la base verde al arrancar, pero **el arnés no los
-avala y su regla es la correcta**. Lo que sí se sostiene sin depender de esa
-campaña es que los dos supervivientes reales están muertos, porque eso se
-comprobó mutante a mutante a mano. La campaña completa y su análisis, en
-`progress/mutacion_F-066.md`; la primera pasada, en
+**La 2.ª pasada la marcó el arnés CAMPAÑA NO VÁLIDA** por el test flaky de
+F-024; arreglado ese test, la **3.ª pasada salió válida** y es la que valen
+estas cifras. Detalle y comando exacto (`--base d1f56aa`) en
+`progress/mutacion_F-066.md`; la 1.ª, en
 `progress/mutacion_F-066_primera_pasada.md`.

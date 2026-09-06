@@ -41,21 +41,47 @@ Rigor crítico: T1-T3 son la fase RED (los tests se escriben y fallan antes de t
 PENDIENTES en `mediciones.md` §3 y §4. La feature no puede pasar a `done` con
 ellas abiertas; lo que se somete a revisión es todo lo demás.
 
-## Nota de T12 (2026-09-06)
+## Nota de T12 · la campaña de mutación (2026-09-07)
 
-Campaña completa **en serie** (`--workers 1`, base `d1f56aa`), dos pasadas:
+Campaña completa **en serie**, con el comando y la base escritos enteros —el
+informe no imprime `--base` y con el defecto (`dev`) salen 247 mutantes en 11
+ficheros, porque esta rama nace de la de F-025 sin fusionar—:
 
-* **1.ª** — 23 mutantes, 20 muertos, **3 supervivientes**, 3.621,8 s.
-* **2.ª**, tras matar dos — 23 mutantes, **22 muertos, 1 superviviente**,
-  3.311,2 s, sobre HEAD `ca31adb`.
+```bash
+python -m harness.mutacion --feature F-066 --base d1f56aa --workers 1
+```
 
-El superviviente que queda es `bold=True -> bold=False` en el título del
-comando: **mutante equivalente**, exento por escrito en
-`progress/mutacion_F-066.md` y en el informe. Cazarlo exigiría afirmar sobre
-secuencias ANSI, no sobre comportamiento.
+Tres pasadas, y **solo la tercera es válida**:
 
-**La 2.ª pasada la marcó el arnés como CAMPAÑA NO VÁLIDA**, y no por el código
-de esta feature: la línea base terminó roja en el test aleatorio de F-024
-(`test_f024_r1_batch_id_tiene_forma_y_es_unico`, 0,833 % de fallo medido sobre
-3.000 repeticiones). Por eso los dos supervivientes reales se verificaron
-**a mano**, aplicando cada mutación y comprobando que el test nuevo falla.
+| # | HEAD | Mutantes | Muertos | Supervivientes | Tiempo | Veredicto del arnés |
+|---|---|---|---|---|---|---|
+| 1.ª | — | 23 | 20 | 3 | 3.621,8 s | válida |
+| 2.ª | `ca31adb` | 23 | 22 | 1 | 3.311,2 s | **CAMPAÑA NO VÁLIDA** |
+| **3.ª** | `d8c73b8` | **23** | **22** | **1** | **2.072,2 s** | **válida** · 0 timeouts · 0 sin veredicto |
+
+**Por qué la 2.ª salió no válida, y qué se hizo.** No fue el código de esta
+feature: la línea base terminó roja en un test aleatorio **de F-024**
+(`test_f024_r1_batch_id_tiene_forma_y_es_unico`), que generaba 500 `batch_id`
+en el mismo segundo y exigía los 500 distintos. El sufijo son 6 hexadecimales
+—16.777.216 valores—, así que por el problema del cumpleaños la probabilidad de
+colisión es 1 - exp(-500²/(2·16.777.216)) ≈ **0,74 %**, que casa con el 0,833 %
+medido sobre 3.000 repeticiones. Con la suite corriendo 23 veces seguidas, ese
+test invalidaba campañas ajenas cada dos por tres. **El líder decidió arreglarlo
+y no excluirlo**: el defecto estaba en el test, no en el `batch_id`. Reescrito
+el 2026-09-06 para comprobar lo que R1 sí garantiza (la forma de los 500 y que
+el espacio de sufijos es grande de verdad); remedido, **0 fallos en 3.000
+pasadas**. La 3.ª campaña es la que se corrió con él ya arreglado.
+
+**El único superviviente** es `bold=True -> bold=False` en el título del
+comando `check-raw-recuentos` (`main.py:1995`): **mutante equivalente**, no
+cambia ni una letra del texto ni el código de salida y `CliRunner` invoca sin
+color, así que cazarlo exigiría afirmar sobre secuencias ANSI y no sobre
+comportamiento. **Lo FIRMÓ el humano el 2026-09-06 a las 20:45 UTC** —palabra
+literal, «firmo»—, que es lo que el rigor `critico` exige para levantar
+`supervivientes_maximos: 0`; consta en la ficha de F-066 de
+`harness/features.json` (commit `5564975`) y en `progress/mutacion_F-066.md`.
+El reviewer lo reprodujo por su cuenta y da la exención por buena. **No se
+reabre.**
+
+Los otros dos supervivientes de la 1.ª pasada **sí eran huecos reales** y están
+muertos desde `ca31adb`: `max_rows=1` y `err=True`.
