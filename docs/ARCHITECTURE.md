@@ -94,6 +94,69 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
+### Qué se copia de Sigrid: 56 tablas, y qué NO está ahí (F-066)
+
+`config/tables_sigrid.yaml` declara **56 tablas** desde el 2026-09-06 (eran 31).
+Las 25 que entraron ese día vienen en tres grupos, y ninguna se supuso: todo lo
+que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
+
+- **Personal** — `res` (2.610 recursos), `emp` (1.352 empleados), `hmo` (6.850
+  cabeceras de parte) y **`hmores` (328.760 líneas)**. Las horas están en
+  `hmores`, no en `hmo`: en la cabecera el recurso viene informado en 6 filas de
+  6.850. Es la corrección que hace posible «horas por obra».
+- **Contabilidad** — `cua` (34.139 cuentas), `asi` (783.386 asientos), **`apu`
+  (2.154.543 apuntes)** y `apa` (709.403 líneas de desglose). `apu` es la tabla
+  más grande del datamart, por encima de `con`.
+- **Compras y proveedor** — la cadena entera necesidad (`dnc`, `dncpro`) →
+  comparativo (ya estaba) → oferta (`dco`, `dcopro`, `dcorec`) → contrato (ya
+  estaba), más condiciones (`ctrrec`, `dcfrec`, `dcarec`, `auxpag`, `auxefp`),
+  firmas (`confir`, `deffir`), estados (`conest`) y proveedor (`conact`,
+  `auxpronat`, `prvcer`, `prvobrpag`).
+
+**El mapa de `con.tip`**, verificado por recuento y necesario para leer `raw`:
+5 proveedor, 12 oferta de compra, 14 albarán, 15 factura, 16 cuenta del plan,
+20 asiento, 33 recurso, 42 obra, 43 empleado, 44 contrato, 46 comparativo.
+
+**Ninguna de las cuatro tablas de contabilidad tiene columna de última
+modificación**, así que la carga incremental por columna de corte no existe para
+ellas: van enteras. Da igual en la práctica —la nocturna es `--full`— pero
+importa si alguien intenta acortarla. `apu` se trae entera y sin filtro:
+partirla por empresa ahorra ≤ 10 % y exige subconsulta, y por ejercicio, ≤ 15 %.
+
+**`raw.emp` y `raw.res` llevan datos personales completos**, por decisión
+explícita del humano del 2026-09-06 frente a la propuesta de excluir 72
+columnas: DNI, número de la Seguridad Social, cuenta bancaria, domicilio,
+contacto, fecha de nacimiento y credenciales de acceso. Solo se excluye lo
+binario y el texto ilimitado, que es criterio técnico. **La ficha de cada una
+declara qué contiene**, y hay que saber que `mcp_sigrid_dm_ro` alcanza `raw`:
+las dos tablas son legibles enteras por cualquier agente conectado al MCP.
+Acotar eso —sacar `raw` de los esquemas de consumo o revocar el `SELECT` sobre
+esas dos— es una decisión de plataforma que no se ha tomado.
+
+**Lo que Sigrid NO guarda**, medido dos veces y escrito aquí para que nadie
+vuelva a buscarlo:
+
+- **No hay histórico de cambios de estado** de contratos ni de facturas. La
+  tabla de auditoría registra 1,5 M de cambios de forma de pago y de fecha de
+  factura desde 2017, y **ni uno solo del campo de estado**. Lo que hay es el
+  estado actual (`con.est`), su nombre **por tipo de documento** (`conest`: la
+  misma cifra significa cosas distintas en un contrato y en una factura), el
+  alta (`con.fec`) y la última modificación (`con.tiemod`, ya en
+  `raw.con._source_tiemod`) como aproximación de su antigüedad. El histórico lo
+  construye F-067 como foto diaria sobre `raw`, y empieza a contar el día que se
+  despliegue.
+- **Los contratos no pasan por el circuito de firma** (`confir`): sus 69.993
+  firmas son de comparativos, facturas y obras, y las de factura vienen sin
+  fecha. `PFfir` y `logfirdoc`, donde el backlog esperaba encontrarlo, están
+  vacías, como otras 17 candidatas que por eso no se ingieren.
+- **La penalización del contrato no existe como campo**, y la actividad del
+  proveedor no es `act` (vacía) sino `conact` → `auxpronat`.
+
+`python main.py check-raw-recuentos` compara, tabla a tabla y con el mismo
+filtro, el `COUNT(*)` de Sigrid con el de `raw`. Es de solo lectura, va fuera de
+`run-all` y sale con código 1 también cuando Sigrid **no pudo** contestar: «no
+he podido mirar» no es «está bien».
+
 ### El datamart en Azure (F-005)
 
 - **No hay servidor propio.** La base `sigrid_dm` vive dentro de
