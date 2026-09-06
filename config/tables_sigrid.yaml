@@ -564,3 +564,73 @@ tables:
     # informado en el 99,9 %, `obride` en el 99,6 % (536 obras distintas), mas
     # fecha, cantidad e importe por linea. Sin ella no se puede responder
     # "horas por obra", que es lo que F-057 tiene que construir.
+
+  # ===========================================================================
+  # MODULO CONTABILIDAD (F-066, tanda K) -- la otra version de la verdad
+  #
+  # El datamart vive del PRESUPUESTO y del SEGUIMIENTO: lo que se planifico y
+  # lo que el jefe de obra cerro cada mes. La contabilidad es lo que de verdad
+  # se contabilizo, y con ella se puede contrastar por primera vez el coste de
+  # seguimiento contra el coste contable de la misma obra.
+  #
+  # NINGUNA DE LAS CUATRO TIENE `tiemod` (medido el 2026-09-06), asi que no hay
+  # carga incremental posible por columna de corte: van enteras. La nocturna ya
+  # recarga entera de todos modos (`CMD` del Dockerfile: `run-all --full`).
+  #
+  # El plan de cuentas NO entra aqui: la jerarquia vive en `con` (tip=16,
+  # 44.778 filas de 38 empresas), que ya se ingiere; `cua` solo EXTIENDE las
+  # cuentas imputables. La fecha del asiento tambien sale de `con`.
+  # ===========================================================================
+
+  - source_table: cua
+    target_table: cua
+    id_column: ide
+    incremental_column: null
+    where: null
+    exclude_columns: []
+    # Plan de cuentas (34.139 filas, 16 columnas). "Propiedades de con" 1:1:
+    # extiende las cuentas imputables (33.875 de nivel 5 frente a 254 de nivel
+    # 0). El codigo y el nombre legibles salen de `con`, no de aqui.
+    # Medido: ninguna columna ilimitada.
+
+  - source_table: asi
+    target_table: asi
+    id_column: ide
+    incremental_column: null
+    where: null
+    exclude_columns: []
+    # Asientos contables (783.386 filas, 7 columnas, tip=20 en con). 0
+    # huerfanos medidos. La FECHA del asiento es `con.fec` (entero AAAAMMDD),
+    # no vive aqui. Medido: ninguna columna ilimitada.
+
+  - source_table: apu
+    target_table: apu
+    id_column: ide
+    incremental_column: null
+    where: null
+    exclude_columns:
+      - tex    # texto libre del apunte (Texto ilimitado)
+    # APUNTES CONTABLES (2.154.543 filas, 36 columnas): la tabla mas grande que
+    # se ha traido nunca, por encima de `con` (2,18 M).
+    #
+    # POR QUE ENTERA Y NO PARTIDA (DA-1 de la spec): no tiene `tiemod`, asi que
+    # el incremental por columna de corte esta descartado. Partir por empresa
+    # ahorra <= 10 % (emp=1 es el 89,9 % de los apuntes) y exige una subconsulta
+    # a `con` via `asi`; por ejercicio, 2017+ es el 85 %. Se reabre solo si la
+    # medicion de la primera nocturna pasa de 15 minutos.
+    #
+    # Medido y contra lo que la ficha de F-056 suponia: `fec` viene informada
+    # en el 100 % de las filas. La atribucion a obra va por `cenide` (54 %) y
+    # NO por `obr` (informado en 142 filas y con 2 obras distintas).
+
+  - source_table: apa
+    target_table: apa
+    id_column: ide
+    incremental_column: null
+    where: null
+    exclude_columns:
+      - tex
+    # Desglose analitico del apunte (709.403 filas, 20 columnas): `cenide` en
+    # el 99,98 %, `apuide` en el 88 %, `obride` en 0. Candidata a fuente de la
+    # cuenta de resultados por obra de F-058. No es el puente obra<->centro de
+    # coste que F-045 busca: `obride` esta a cero en todas.
