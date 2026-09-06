@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 41,
+      "priority": 42,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 43,
+      "priority": 44,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 45,
+      "priority": 46,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 47,
+      "priority": 48,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 37,
+      "priority": 38,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 40,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -529,7 +529,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 33,
+      "priority": 34,
       "branch": "feature/F-034-powerbi-azure"
     },
     {
@@ -545,7 +545,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -558,7 +558,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -588,7 +588,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -601,7 +601,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -619,7 +619,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -652,7 +652,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -686,7 +686,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 21,
+      "priority": 22,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -701,7 +701,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -732,7 +732,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -748,7 +748,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -764,7 +764,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -781,7 +781,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -798,7 +798,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -817,7 +817,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -835,7 +835,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -902,7 +902,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -919,7 +919,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -932,7 +932,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 29,
+      "priority": 30,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -948,7 +948,7 @@
         "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
       ],
-      "priority": 34,
+      "priority": 35,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -964,7 +964,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 38,
+      "priority": 39,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -980,7 +980,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 40,
+      "priority": 41,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -997,7 +997,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 42,
+      "priority": 43,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -1073,6 +1073,22 @@
       "rigor": "critico",
       "priority": 3,
       "branch": "feature/F-068-mcp-datos-personales-raw"
+    },
+    {
+      "id": "F-069",
+      "title": "Tres mejoras del arnes que salen del review de F-066: la puerta de dobles, el comando del informe de mutacion y el resumen en history.md",
+      "description": "Nace el 2026-09-06 de las observaciones no bloqueantes del review de F-066 (`progress/review_F-066.md`, hallazgos 8 y 10, y su seccion de automejora). El implementer NO las hizo por orden del lider: dos cruzan la frontera del proyecto y van a `arnes-base`, y la tercera es deuda documental del propio lider. Se fichan juntas porque las tres son del arnes y ninguna toca el ETL. (1) LA PUERTA DE DOBLES SOLO CUBRE UN CLIENTE. `tests/test_f025_contrato_cliente.py` nacio el 2026-09-05 tras la averia de la nocturna: `fetch_filas_por_obra` no existia en `PostgresClient` y sin embargo 3.308 tests estaban en verde, porque el metodo solo vivia en tres dobles de test. La puerta cruza cada doble con su clase real por barrido `ast`. Pero **solo mira `PostgresClient`**: `ApiDoble` -el doble del cliente de Sigrid- queda fuera, y F-066 acaba de anadir uno nuevo, asi que el mismo agujero sigue abierto por el lado de la API. Generalizarla a los dos clientes y **portarla a `arnes-base`**, que es donde vale para cualquier proyecto. De paso, `_contar_en_sigrid(api, ...)` en `main.py` no anota el tipo de `api`. (2) EL INFORME DE MUTACION NO DICE COMO REPRODUCIRLO. El de F-066 declaraba `python -m harness.mutacion --feature F-066`, pero ese comando usa `--base dev` y, como la rama nacia de la de F-025 sin fusionar, daba **247 mutantes en 11 ficheros** en vez de los 23 en 2 que se midieron con `--base d1f56aa`. Quien recalcule no distingue un recorte legitimo de uno interesado. El parche fue escribir la base a mano; la cura es que `harness/mutacion.py` imprima en el informe el comando exacto con su `--base` resuelto. Va a `arnes-base`. Ahi mismo, el reviewer propone que `.claude/agents/reviewer.md` avise de que un worktree nuevo NO hereda el `.env`, que le costo descubrirlo. (3) `history.md` NO TIENE EL RESUMEN DE F-044 NI DE F-047, las dos `done`. Deuda del lider, que es quien escribe ese fichero. Sin el resumen, una feature cerrada deja de contar por que se hizo en cuanto pasa el tiempo, que es justo lo que `history.md` existe para evitar.",
+      "acceptance": [
+        "La puerta de contrato cubre los dos clientes (PostgresClient y el de sigrid-api) y esta portada a arnes-base con su version subida",
+        "harness/mutacion.py escribe en el informe el comando exacto que lo reproduce, con el --base resuelto, y la mejora esta en arnes-base",
+        "reviewer.md avisa de que un worktree nuevo no hereda el .env, en este repositorio y en arnes-base",
+        "history.md tiene el resumen de F-044 y de F-047"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 10,
+      "branch": "feature/F-069-mejoras-arnes-review-f066"
     }
   ]
 }
