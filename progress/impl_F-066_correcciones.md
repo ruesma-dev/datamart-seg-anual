@@ -163,9 +163,9 @@ reviewer, y la prueba del arreglo son los **0 fallos en 3.000 pasadas**.
 
 | Evidencia | Valor | De dónde sale |
 |---|---|---|
-| `bash harness/init.sh` | **exit 0** · «ENTORNO LISTO» | ejecución del 2026-09-07 |
+| `bash harness/init.sh` | **exit 0** · «ENTORNO LISTO», dos veces | 2026-09-07, la 2.ª sobre el árbol final |
 | Tests ejecutados | **3.871 passed, 159 skipped**, 0 fallos | ídem |
-| Tiempo de la suite | **293,40 s** (con medición de cobertura) | ídem |
+| Tiempo de la suite | **293,40 s** y **300,00 s** (con cobertura) | ídem |
 | Cobertura de líneas cambiadas | **92,5 %** (662/716, umbral 80, nivel crítico) | `PUERTA COBERTURA` |
 | Puerta de tamaño | req 128/150, design 218/250, impl 219/220, review 140/140 | `PUERTA TAMAÑO` |
 | Mutantes generados / evaluados | **23 / 23** | `progress/mutacion_F-066.md` |
