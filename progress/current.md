@@ -68,12 +68,23 @@ para que corran; la del domingo 06 a las 02:00 UTC sería una completa más en
 B2s (~4 h 52, como `hamsh8o`). Con T31b en verde: reviewer contra
 `CHECKPOINTS.md` y `done`. Cifras de todo en `mediciones.md`, Fase 7.
 
+**CRON REACTIVADO el domingo 06 a las 07:31 UTC** («sí, reactívalo ya»):
+`0 2 * * *`, imagen `r20260905-1237`, 18 variables, `PG_VENTANA_ACTIVA=true`
+comprobado con `show` después del `update` (ojo: la salida del propio `update`
+enseña `env` vacío y asusta; no es real). La nocturna del domingo 06 **no
+corrió** (el cron estaba apagado a las 02:00). Calendario que sale de R25:
+**lunes 07, 02:00 UTC: primera acotada** (40 vivas + 552 sin filas de peso
+nulo; da T31b y T34) · martes a sábado, acotadas · **domingo 13, completa**.
+Aviso: la alerta de frescura (30 h sin `build_mart`) puede saltar el lunes
+hacia las 03:30 UTC porque el último `build_mart` fue el sábado a las 21:27 y
+la acotada del lunes no habrá terminado; si salta, es por el domingo sin
+nocturna, no por un fallo.
+
 **El plan de los próximos días, aprobado por el humano:**
 
 1. ~~Hoy: `hamsh8o` termina~~ **HECHO, `Succeeded` a las 22:22**. T29
    cumplida; el cron NO se reactiva hasta cerrar la fase 7.
-2. Domingo: fase 7 en el orden 8 → 9 → 10 → 1 → 2 → 5 (guion más abajo, sin
-   cambios), reviewer, cierre de F-025, reactivar el cron a las 02:00.
+2. ~~Domingo: fase 7~~ **HECHA en la madrugada del 05 al 06** salvo T31b/T33/T34; **cron reactivado el 06 a las 07:31 UTC**. Reviewer y cierre cuando T31b esté en verde (lunes 07).
 3. Lunes: F-052 en su rama, `check-cobertura --timeout 900` sobre `stg`
    completa.
 4. Unos días de nocturnas acotadas en B2s, anotando créditos antes y después
