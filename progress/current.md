@@ -1,5 +1,50 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-06 (domingo, 07:45 UTC)
+# Estado actual · 2026-09-06 (domingo, ~11:30 UTC)
+
+## F-066: SPEC ESCRITA, PENDIENTE DE APROBACIÓN DEL HUMANO (PARADA 1)
+
+`spec-author` ha dejado `specs/F-066-ingesta-raw-pendientes/` (requirements,
+design, tasks) con el alcance ampliado a las 10:40 UTC (raw de COMPRAS por el
+MCP). Todo lo afirmado sobre Sigrid se **midió** ese día con lecturas por
+`sigrid-api` (`design.md` §1); ningún dato personal se imprimió ni se guardó.
+
+**Lo que cambia respecto a la ficha, y el humano tiene que validar:**
+
+1. **`hmores` entra** (328.760 filas): las horas están ahí, no en `hmo` (DA-4).
+2. **Las seis de «proveedor» de la ficha están VACÍAS en Sigrid** (`PFfir`,
+   `auxfam`, `act`, `auxacttip`, `actent`, `actseg`: 0 filas). No se
+   ingieren. La actividad del proveedor real es **`conact` → `auxpronat`**
+   (7.090 filas, 4.773 proveedores, 409 naturalezas; `homolo` = 0 en todas)
+   más `prvcer` (certificados). F-055 se replantea sobre eso (DA-3).
+3. **Firmas = `confir` + `deffir`** (69.993): fechas de firma por rol solo
+   para comparativos; facturas sin fecha; contratos no pasan por ahí (DA-6).
+4. **Sigrid NO guarda el histórico de estados de contratos ni facturas**
+   (`concam` no audita `est`; `ctr` no tiene fechas de circuito; `PFID`
+   vacío). La carencia (1) de Compras no se resuelve con ingesta: F-067
+   tendrá que construir una foto diaria en el datamart (DA-7). `concam` no se
+   ingiere.
+5. **`apu` entera y `--full`** (DA-1): no tiene `tiemod`, incremental
+   imposible; emp=1 es el 89,9 %. Y `apu.fec` viene informada al 100 %,
+   contra lo que dice la ficha de F-056.
+6. **`apa` entra** (709 k, desglose analítico; DA-2).
+7. **Datos personales**: 72 columnas fuera en `emp`, 7 en `res`; nombre y
+   apellidos se quedan y se declaran. **Aviso**: `mcp_sigrid_dm_ro` lee
+   `raw` entero (decisión del 2026-08-08), así que `raw.emp` será legible por
+   el MCP; revocar es decisión del humano (DA-5). Además 388 recursos ya
+   llevan un `cod` con forma de DNI en `raw.con`.
+8. **`dcf` recupera `pagtex`/`pagfor`** (condiciones de pago, DA-9) y entran
+   `dco`/`dcopro`/`dcorec`/`dnc`/`dncpro` (ofertas y necesidades, DA-10),
+   `ctrrec`/`dcfrec`/`dcarec` (retención), `auxpag`/`auxefp`.
+9. Total: **24 tablas nuevas, +5,33 M filas (+26 %), ~+8-13 min** sobre los
+   30 de `ingest_raw` en B2s. `raw` pasa de 31 a 55 tablas y fichas.
+10. Nuevo comando **`check-raw-recuentos`** (dominio puro + CLI, solo
+    lectura) para el criterio «recuento igual al de Sigrid» (DA-11); es el
+    único Python nuevo y el que lleva la campaña de mutación de rigor crítico.
+
+Los sondeos están en el scratchpad de la sesión (no versionados); las cifras
+que importan están copiadas en `design.md` §1.
+
+# Estado a las 07:45 UTC del domingo 06 (sesión anterior)
 
 ## F-025 BLOQUEADA A PROPÓSITO; LO SIGUIENTE ES F-066, LA INGESTA DE LOS RAW QUE FALTAN
 
@@ -17,6 +62,15 @@ sobre esos raw, en el orden F-057 → F-056 → F-055. Y las 45 vivas tienen aho
 **prioridad única** (1 a 45), conservando el orden relativo que tenían.
 Palabras del humano: «una primera ficha de ingesta de esas 3 features, y luego
 esas tres features serían solo reconstruir los mart de cada una».
+
+**F-066 en `spec_ready` desde el domingo 06 a las 11:40 UTC** (spec en
+`specs/F-066-ingesta-raw-pendientes/`, ampliada con lo que Compras pidió; ver
+F-067). **Espera la aprobación del humano**: las once decisiones de
+`design.md` §6 (DA-1 a DA-11) están enseñadas en el chat; las que necesitan
+al humano son la lectura de `raw.emp` por el MCP (DA-5) y que Sigrid no
+guarda histórico de estados de contratos ni facturas (DA-7, afecta a lo que
+se le puede prometer a Compras). Los tests de F-025 que fallaban los domingos
+están arreglados (`5fedc48`, informe en `progress/impl_F-025_tests_domingo.md`).
 
 **Por dónde se sigue**: F-066 por el flujo SDD, `spec-author` primero. Lo que
 la spec tiene que decidir está en la ficha: cómo se trae `apu` (2,15 M, la

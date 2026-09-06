@@ -1033,7 +1033,7 @@
         "La puerta de init.sh en verde: cada objeto nuevo con ficha o declarado pendiente, y azure-apps/datamart_seg_anual.md dice que tablas nuevas se consumen de Sigrid",
         "F-057, F-056 y F-055 reescritas como features de mart sobre estos raw, sin ingesta dentro"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
