@@ -474,7 +474,7 @@ cifras de F-052.
 | `check-declarados` (en `run-all`) | OK (el job salió en `Succeeded`, y este es el que tumba) | sí |
 | `check-cobertura` (en `run-all`) | **KO conocido de F-052**: 20 invisibles, 294 huérfanas (esta rama no lleva sus excepciones) | sí, 04-sep |
 | `check-unicidad --timeout 300` (11 min) | **KO conocido de F-051**: `cierre.v_pbi_planif_vs_real`, 204 combinaciones / 472 filas, renglón BENEFICIO; 43 sin contradicción | sí, 30-ago, mismas cifras |
-| `check-cierres --timeout 900` | **primer intento CANCELADO por timeout** a los 900 s: corría a la vez que `check-unicidad` (culpa del guion, no de la base). Relanzado solo con 1.800 s; resultado debajo | — |
+| `check-cierres --timeout 1800` (20 min, solo) | **0 discrepancias** en 8.552 cierres candidatos / 8.531 publicados de 679 pares obra/ámbito; telescopio R16: 254.388 series, **0 sin cuadrar**, 18.592 apartadas por hueco de origen. (El primer intento con 900 s murió por `QueryCanceled` porque corría a la vez que `check-unicidad`: culpa del guion, no de la base) | sí: el 04-sep dio 0 y 0 sobre 8.540 / 254.236 |
 
 `check-unicidad` dejó **dos** vistas sin comprobar por timeout
 (`mart.v_master_vigente_anual`, que ya era un «no lo sabemos» permanente, y

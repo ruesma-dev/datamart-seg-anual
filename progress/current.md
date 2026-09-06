@@ -60,6 +60,14 @@ R18 y 319 de ellas tienen presupuesto (T1 dirá cuánto pesa). Ojo: el `.env`
 del puesto NO lleva `PG_VENTANA_ACTIVA`; T28 se lanzó con la variable en la
 shell. Las huellas ANTES/DESPUÉS están en `huellas/` (no versionadas).
 
+**FASE 7 CASI CERRADA (06-sep, 00:15 UTC).** Hechas T27, T28, T29, T30 (dada
+por buena), T31, T32, T35, T1 y T2b. **Quedan T31b, T33 y T34, que necesitan
+nocturnas acotadas**: la primera acotada será la del **lunes 07** (el domingo
+toca completa por R25), así que **hay que reactivar el cron** (`0 2 * * *`)
+para que corran; la del domingo 06 a las 02:00 UTC sería una completa más en
+B2s (~4 h 52, como `hamsh8o`). Con T31b en verde: reviewer contra
+`CHECKPOINTS.md` y `done`. Cifras de todo en `mediciones.md`, Fase 7.
+
 **El plan de los próximos días, aprobado por el humano:**
 
 1. ~~Hoy: `hamsh8o` termina~~ **HECHO, `Succeeded` a las 22:22**. T29
@@ -297,10 +305,10 @@ lo lleva escrito; este es el resumen para no tener que recorrerlos:
 | 6 | encender `PG_VENTANA_ACTIVA` | **HECHO** 05-sep 00:40 |
 | 7 | T29 · primera reconstrucción | **HECHO** · `hamsh8o`, 4 h 52 en B2s |
 | 8 | T30 · huellas del DESPUÉS | **HECHO 05-sep · KO explicado por el origen · DADA POR BUENA por el humano el 06** |
-| 9 | T31 · la 0599 · T31b · frescura | pendiente |
-| 10 | T32 · los cinco `check-*` | pendiente |
-| 1 | T1 · el peso real | pendiente · **repetir**, la del 04 no valía |
-| 2 | T2b · el coste de la firma | pendiente · **nunca ejecutado** |
+| 9 | T31 · la 0599 · T31b · frescura | **T31 HECHO** (2.624.793 / 1,79 %) · T31b espera la primera acotada (lunes 07) |
+| 10 | T32 · los cinco `check-*` | **HECHO** · mismo veredicto que antes en los cinco |
+| 1 | T1 · el peso real | **HECHO** · ahorro 59,2 % (umbral 40) |
+| 2 | T2b · el coste de la firma | **HECHO** · barata 111 s, cara +186 s; implantarla es decisión del humano |
 | 5 | T28 · `ventana-plan` en seco | **HECHO 05-sep** · 40 vivas / 328 congeladas / 552 sin filas |
 | 11 | T33 bloat · T34 créditos | a la semana |
 
