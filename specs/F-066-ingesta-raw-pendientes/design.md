@@ -8,7 +8,7 @@ compra (`dco`), 14 albarán (`dca`), 15 factura (`dcf`), 16 cuenta del plan,
 20 asiento (`asi`), 33 recurso (`res`), 42 obra, 43 empleado (`emp`), 44
 contrato (`ctr`), 46 comparativo (`com`).
 
-**Las 24 tablas que entran** (filas · columnas · notas):
+**Las 25 tablas que entran** (filas · columnas · notas):
 
 | Grupo | Tabla | Filas | Cols | Nota |
 |---|---|---|---|---|
@@ -36,6 +36,7 @@ contrato (`ctr`), 46 comparativo (`com`).
 | C | `dcarec` | 40.930 | 21 | recargos en albarán |
 | C | `auxpag` | 69 | 13 | formas de pago (`ctr.pagide`, `dcf.pagide`, `dco.pagide`) |
 | C | `auxefp` | 10 | 13 | medios de pago (`auxpag.efeide`) |
+| C estados | `conest` | 193 | 17 | catálogo de estados **por `tip`** (29 tipos; 69 filas de compras): `tip`, `est`, `cod`, `res`, `pos`. Para `tip = 44`: 1 PFP, 3 EPF enviado, 5 RFP recibido, 6 COMD, 7 FIR firmado, 8 TER, 9 RES |
 
 **Lo que NO está en Sigrid, medido** (esto es lo que la ficha de F-067 tiene
 que saber): `ctr` no tiene fecha de envío, recepción ni firma —solo `fecdoc`,
@@ -51,7 +52,7 @@ columnas); solo podría vivir en `ctr.tex` (738 informados, media 13 bytes).
 `pag.conide → dcf.ide` con `fecven`, `fecrea`, `retide`, ya en `raw`.
 
 **Base y estimación.** `ingest_raw` el 2026-09-05 en B2s: 20.148.546 filas,
-1.832 s (`con` 2,18 M/118 s; `dcapro` 1,15 M/209 s). Nuevo: **+5.328.648
+1.832 s (`con` 2,18 M/118 s; `dcapro` 1,15 M/209 s). Nuevo: **+5.328.841
 filas (+26 %)**, ~+8 a +13 min, ~+0,9 GB en `raw`. `raw.con` ya tiene el
 plan: 44.778 filas `tip = 16`, 38 empresas. En `raw.con`, 388 recursos llevan
 un `cod` con forma de DNI: ya está en la base, esta feature no lo toca.
@@ -66,8 +67,8 @@ un `cod` con forma de DNI: ya está en la base, esta feature no lo toca.
 **Modificar**: `config/tables_sigrid.yaml` (tres bloques nuevos al final —
 PERSONAL, CONTABILIDAD, COMPRAS/PROVEEDOR— y en `dcf` quitar `pagtex`,
 `pagfor` de `exclude_columns`; comentario con las 19 descartadas por vacías);
-`config/diccionario/raw.yaml` (24 fichas + `dcf`; cabecera «Son 55 tablas»);
-`config/diccionario/00_global.yaml` (`version` +1; «las 31 tablas» → 55);
+`config/diccionario/raw.yaml` (25 fichas + `dcf`; cabecera «Son 56 tablas»);
+`config/diccionario/00_global.yaml` (`version` +1; «las 31 tablas» → 56);
 `config/objetos_pendientes.yaml` (comentario); `main.py`
 (`check-raw-recuentos`); `docs/ARCHITECTURE.md` (párrafo en «Acceso a
 datos»: grupos nuevos, `apu` sin `tiemod`, `hmores`, mapa de `tip`, política
@@ -81,27 +82,22 @@ de datos personales, qué no guarda Sigrid); `azure-apps/datamart_seg_anual.md`
 `business_rules.yaml` y `domain/ventana.py` (la firma de origen solo agrega
 tablas de obra).
 
-## 3 · `emp`: las 72 columnas excluidas (R5, R7)
+## 3 · `emp` y `res`: solo exclusiones técnicas (R5, R6, R7)
 
-- Identidad legal y laboral: `dni`, `dnipai`, `tipnif`, `tipdoc`, `tarseg`,
-  `numtar`, `legajo`, `fecexpvis`.
-- Bancarias: `banban`, `bansuc`, `bandig`, `bancue`, `ban`, `bantipide`.
-- Personales y familiares: `fecnac`, `sexo`, `estciv`, `munnacide`,
-  `pronacide`, `painacide`, `numhij`, `apesol`, `trlnacide`, `trlpaiide`.
-- Domicilio y contacto: `dir1`, `dir2`, `dircpo`, `munide`, `proide`,
-  `paiide`, `dir`, `munreside`, `tel`, `tel2`, `fax`, `telsin`, `tel2sin`,
-  `telmov`, `teldir`, `telext`, `telmovsin`, `teldirsin`, `ele`, `eleloc`,
-  `eleenv`, `eledir`, `web`, `traext`, `traextmov`, `tratel`, `tramov`,
-  `tratelsin`, `tramovsin`, `traexttelsin`, `traextmovsin`, `trafax`,
-  `traele`, `tracta`.
-- Credenciales: `clamai`, `esiglog`, `esigpas`, `esigres`, `g3wlog`,
-  `g3wpas`, `esiglogmnet`, `esigpasmnet`.
-- Binario y texto libre: `ima`, `tex`, `dirtex`, `disobs`, `podtex`, `obsnom`.
+Decisión del humano (2026-09-06, 12:05 UTC): **no se excluye ninguna columna
+por ser dato personal**. La regla es la misma que en el resto del YAML:
+fuera lo binario y el texto ilimitado, dentro todo lo demás.
 
-Se conservan `nomnom`, `nomape1`, `nomape2`, `res`, `nomtra`, `nomabr`,
-`fecalt`, `fecbaj`, `cargo` y los enlaces (`reside`, `cetide`, `cenide`,
-`caaide`, `dptide`, `delide`, `tipempide`, `empreside`). El test de R5 fija
-las cinco primeras categorías como mínimo; la ficha dice el número exacto.
+- `emp` (161 columnas) excluye **11**: `ima` (Binario ilimitado, la foto) y
+  las diez de Texto ilimitado `dir`, `dirtex`, `web`, `tex`, `eleloc`,
+  `disobs`, `podtex`, `traele`, `tracta`, `obsnom`. Entran `dni`, `dnipai`,
+  `tarseg`, `fecnac`, `banban`..`ban`, `dir1`, `dir2`, `tel*`, `ele`,
+  `clamai`, `esigpas`, `g3wpas`, etc.
+- `res` (55 columnas) excluye **0**: no tiene binarios ni texto ilimitado;
+  `cif`, `logacc`, `ideacc`, `ipacc`, `recema` entran.
+
+La ficha de cada una **declara** qué datos personales contiene (R11); el
+test de R5 comprueba que ninguna columna personal está excluida.
 
 ## 4 · Clases y funciones
 
@@ -156,27 +152,35 @@ El `SELECT` del MCP lo cubre `ALTER DEFAULT PRIVILEGES ... IN SCHEMA raw`
   F-055 se replantea sobre estas dos.
 - **DA-4 · `hmores` entra aunque la ficha no la nombraba**: las horas están
   ahí, no en `hmo`. Sin ella F-057 no responde «horas por obra».
-- **DA-5 · Datos personales: minimización, no ausencia.** 72 columnas fuera
-  en `emp`, 7 en `res`; nombre y apellidos se quedan porque F-057 los
-  necesita, y se declaran. **Aviso para el humano**: por decisión del
-  2026-08-08, `mcp_sigrid_dm_ro` lee **todos** los esquemas, `raw` incluido:
-  `raw.emp` y `raw.res` serán legibles por cualquier agente conectado.
-  Opción fuera de esta spec: sacar `raw` de `PG_CONSUMPTION_SCHEMAS` o
-  revocar `SELECT` sobre esas dos tablas.
+- **DA-5 · Datos personales: se trae todo y se declara.** Decidido por el
+  humano el 2026-09-06 frente a la propuesta inicial de excluir 72 columnas:
+  `emp` y `res` entran enteras salvo las exclusiones técnicas de §3, y la
+  ficha de cada una dice qué contiene (DNI, Seguridad Social, cuenta
+  bancaria, domicilio, contacto, fecha de nacimiento, credenciales de
+  acceso). Lo que se publique de eso lo decide F-057, no `raw`. **Aviso, y
+  ahora con más motivo**: por decisión del 2026-08-08, `mcp_sigrid_dm_ro`
+  lee **todos** los esquemas, `raw` incluido, así que `raw.emp` y `raw.res`
+  serán legibles enteras por cualquier agente conectado al MCP. Opción fuera
+  de esta spec: sacar `raw` de `PG_CONSUMPTION_SCHEMAS` o revocar `SELECT`
+  sobre esas dos tablas (`infra/sql/` + humano).
 - **DA-6 · Firmas = `confir` + `deffir`, no `PFfir`.** Responde «quién
   aprobó el comparativo, con qué rol y cuándo» (65.761 firmas). **No**
   responde la carencia (1) de Compras: los contratos (`tip = 44`) no pasan
   por `confir`, y para facturas (`tip = 15`) las 3.436 firmas vienen sin
   fecha. Es un hecho del origen, no un hueco de la ingesta.
 - **DA-7 · Sigrid no guarda el histórico de estados de contratos ni
-  facturas** (`concam` no audita `est`; `ctr` sin fechas de circuito). Lo que
-  sí hay: el estado actual (`con.est`), la alta (`con.fec`), la última
-  modificación (`con.tiemod`, ya en `_source_tiemod`) y las fechas de
-  documento. **Propuesta para F-067**: una foto diaria `(documento, est,
-  fecha)` construida en el datamart a partir de `raw`, que empieza a contar
-  el día que se despliegue. `concam` **no** se ingiere: 1,5 M filas para
-  cambios de forma de pago y fecha de factura; si F-067 lo pide, entra con
-  `where: tip = 15`.
+  facturas.** Confirmado dos veces con `leer_sql` (spec-author y líder):
+  `concam` no tiene ninguna fila con `cam = 'est'` ni parecido, `confir` no
+  tiene conceptos `tip = 44`, `ctr` no tiene fechas de circuito. Lo que sí
+  hay: el estado actual (`con.est`), su nombre por tipo en **`conest`** (que
+  por eso entra: 193 filas, sin ella `7` no significa «Firmado»), la alta
+  (`con.fec`) y la última modificación (`con.tiemod`, ya en
+  `raw.con._source_tiemod`), que sirve de **proxy de la antigüedad del
+  estado actual** mientras la foto diaria no acumule historia. Decidido:
+  el histórico se construye en **F-067** como foto diaria `(documento, est,
+  fecha)` sobre `raw`, y empieza a contar el día que se despliegue. `concam`
+  **no** se ingiere (1,5 M filas de cambios de forma de pago y fecha de
+  factura); si F-067 lo pide, entra con `where: tip = 15`.
 - **DA-8 · Condiciones del contrato: lo que hay.** Forma de pago
   (`ctr.pagide` → `auxpag`, `pagtex`, `pagfor`, ya en `raw`), retención
   (`ctrrec` + `rec`), garantía (`ctr.tipgar`: −1 en 7.408, 0 en 11.425, 1 en
@@ -190,16 +194,16 @@ El `SELECT` del MCP lo cubre `ALTER DEFAULT PRIVILEGES ... IN SCHEMA raw`
   `dcorec`, `dnc`, `dncpro`): son la cadena necesidad → comparativo →
   oferta → contrato que Compras pide ver, y `comlin` ya apunta a `dcopro` y
   `dncpro`. Coste ~+4 min y ~1,1 M filas; el mayor sumando tras `apu`.
-- **DA-11 · El recuento se compara con un comando**, no a mano: 55 `COUNT(*)`
+- **DA-11 · El recuento se compara con un comando**, no a mano: 56 `COUNT(*)`
   en Sigrid cuestan segundos (`apu`: 0,3 s). Fuera de `run-all`.
 - **Riesgo · la nocturna crece un 26 % en filas.** Con B2s sobra; R19/R20
   lo miden antes de bajar a B1ms. Si allí `ingest_raw` supera 45 min, F-065
   lo verá.
 - **Riesgo · `apu.fec` contradice la ficha de F-056** («la fecha no está en
   `apu`»): está al 100 %. F-056 la contrasta contra `con.fec` vía `asi`.
-- **Riesgo · `emp` cambia de esquema**: una columna sensible nueva entraría
-  sola. Mitigación: lista mínima fijada por test y ficha que cuenta; revisar
-  si `emp` pasa de 161 columnas (anotado en la ficha).
+- **Riesgo · `emp` cambia de esquema**: una columna de texto ilimitado nueva
+  haría fallar el `COPY` (el YAML lo documenta). Mitigación: la ficha cuenta
+  las 11 excluidas y anota revisar la lista si `emp` pasa de 161 columnas.
 
 ## 7 · Límite del microservicio
 

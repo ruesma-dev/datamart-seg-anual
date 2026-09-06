@@ -27,11 +27,19 @@ MCP). Todo lo afirmado sobre Sigrid se **midió** ese día con lecturas por
    imposible; emp=1 es el 89,9 %. Y `apu.fec` viene informada al 100 %,
    contra lo que dice la ficha de F-056.
 6. **`apa` entra** (709 k, desglose analítico; DA-2).
-7. **Datos personales**: 72 columnas fuera en `emp`, 7 en `res`; nombre y
-   apellidos se quedan y se declaran. **Aviso**: `mcp_sigrid_dm_ro` lee
-   `raw` entero (decisión del 2026-08-08), así que `raw.emp` será legible por
-   el MCP; revocar es decisión del humano (DA-5). Además 388 recursos ya
-   llevan un `cod` con forma de DNI en `raw.con`.
+7. **Datos personales — DECIDIDO por el humano a las 12:05 UTC**: `emp` y
+   `res` se traen **enteras** (DNI, bancarias, domicilio, credenciales
+   incluidos); solo se excluyen las 11 columnas técnicas de `emp` (`ima` y
+   diez de texto ilimitado) y ninguna de `res`. La ficha declara qué
+   contienen. **Aviso vigente**: `mcp_sigrid_dm_ro` lee `raw` entero
+   (decisión del 2026-08-08), así que `raw.emp` será legible entera por el
+   MCP; revocar es decisión del humano (DA-5). Además 388 recursos ya llevan
+   un `cod` con forma de DNI en `raw.con`.
+   **También decidido**: `apu` entera con `--full` y `apa` dentro (DA-1,
+   DA-2); el histórico de estados va a F-067 como foto diaria y entra
+   **`conest`** (193 filas, catálogo de estados por `tip`) para traducir
+   `con.est`; `con.tiemod` sirve de proxy de la antigüedad del estado
+   mientras tanto (DA-7). Con `conest` son **25 tablas nuevas, raw 31 → 56**.
 8. **`dcf` recupera `pagtex`/`pagfor`** (condiciones de pago, DA-9) y entran
    `dco`/`dcopro`/`dcorec`/`dnc`/`dncpro` (ofertas y necesidades, DA-10),
    `ctrrec`/`dcfrec`/`dcarec` (retención), `auxpag`/`auxefp`.
