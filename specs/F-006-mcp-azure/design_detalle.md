@@ -62,6 +62,12 @@ infraestructura.
 > F-025 el datamart no reconstruye las 920 obras cada noche —se rehacen 40 y
 > 880 conservan su última versión buena—, así que la frescura dejó de ser una
 > propiedad del datamart entero y pasó a serlo de cada obra.
+>
+> **Enmienda del 2026-09-06 (F-066).** La ingesta pasa de 31 a 56 tablas
+> —personal, contabilidad y la cadena entera de compras— y con ellas entran
+> 25 fichas nuevas de `raw`, así que el inventario pasa a **130 objetos**.
+> Ninguna es superficie de consumo y ninguna documenta columnas (DA-2), así
+> que la cobertura de columnas no se mueve: siguen siendo 822.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

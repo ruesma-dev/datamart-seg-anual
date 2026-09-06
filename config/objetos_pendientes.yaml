@@ -20,7 +20,7 @@
 # objeto, no un apano posterior.
 #
 # HOY LA LISTA ESTA VACIA, y eso es un dato, no un descuido: los 72 objetos que
-# `sql/**` declara mas las 31 tablas de `raw` los construyen los diez pasos de
+# `sql/**` declara mas las 56 tablas de `raw` los construyen los diez pasos de
 # `run-all`. Medido el 2026-08-21 tras lanzar los cuatro build a mano:
 # `check-diccionario` dio biyeccion exacta, 103 fichas y 103 objetos.
 #

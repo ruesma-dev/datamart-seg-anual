@@ -201,9 +201,10 @@ válido salvo lo que esta sección corrige (la espera al domingo ya no aplica).
 02-sep y sin F-025. **Se ejecutó esa misma madrugada**, ver la sección
 siguiente.
 
-**El diccionario del árbol está en 105 objetos, 822 columnas y 47 fichas de
-consumo** (subió de 103/798/46 con las dos fichas de F-025; el diccionario pasa
-a la versión 13 al publicarse). El commit de cierre del 04 se llevó por delante
+**El diccionario del árbol está en 130 objetos, 822 columnas y 47 fichas de
+consumo** (subió de 105/822/47 con las 25 fichas de `raw` que trae F-066, todas
+sin columnas y ninguna de consumo; el diccionario pasa a la versión 14 al
+publicarse). El commit de cierre del 04 se llevó por delante
 esta frase y dejó `init.sh` en rojo: el test
 `test_f006_los_recuentos_de_current_son_los_de_hoy` existe justo para que estos
 recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de

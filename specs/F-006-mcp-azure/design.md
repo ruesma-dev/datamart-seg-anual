@@ -106,6 +106,7 @@ IngestRaw -> LoadExcelAux -> BuildStg -> BuildMart -> PublicarDiccionario -> App
 | 2026-08-20 (4.ª review) | La puerta offline pasa a contrastar contra el SQL (agregación, clave, grano) |
 | 2026-08-22 | Entra `_meta.diccionario_contexto`: el bloque global se perdía al leer de base. Inventario a **103** objetos |
 | 2026-09-03 (F-025) | Entran `_meta.obra_build` y `_meta.v_frescura_obra`, que responden «de cuándo es el dato de ESTA obra» ahora que el datamart no reconstruye todas cada noche. Inventario a **105** objetos |
+| 2026-09-06 (F-066) | Entran las **25 tablas de `raw`** que faltaban --personal, contabilidad y la cadena de compras--, cada una con su ficha. Inventario a **130** objetos |
 
 ## 3 · Componentes y ficheros que toca
 
