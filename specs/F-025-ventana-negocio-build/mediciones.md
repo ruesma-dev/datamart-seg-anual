@@ -526,3 +526,20 @@ fase 7.
 **T31b, T33 y T34**: las tres necesitan nocturnas acotadas, y la primera será
 la del lunes 07 (el domingo toca completa por R25). T1 y T2b, medidas arriba
 el 05-sep.
+
+### Cinco tests que dependían del día real — arreglados el 2026-09-06
+
+Los domingos `bash harness/init.sh` salía en rojo: cinco tests de
+`tests/test_f025_build.py` (`r9_sin_obras_que_reconstruir_no_se_toca_nada`,
+`r9_con_el_conjunto_vacio_las_congeladas_igual_se_registran`,
+`r6_el_presupuesto_tambien_se_acota`,
+`r30_el_paso_registra_cuantas_reconstruye_y_cuantas_congela` y
+`r10_las_sobrantes_solo_se_miran_en_la_reconstruccion_completa`) daban por
+hecho un día laborable y no fijaban la fecha, así que R25 les mandaba
+reconstrucción completa y las cuentas de obras reconstruidas/congeladas no
+cuadraban. Arreglado **en los tests**: el auxiliar `ejecutar` congela ahora la
+fecha en el jueves 2026-09-03 mediante una subclase de `datetime`, con un
+parámetro `ahora` para pedir otro día, y se añadió
+`test_f025_r25_el_domingo_se_reconstruye_todo` que ejercita el domingo a
+propósito. **El step no cambia**: sigue tomando la fecha real con
+`datetime.utcnow()`, que es lo correcto en producción.
