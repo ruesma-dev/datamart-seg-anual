@@ -3,6 +3,20 @@
 
 ## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
 
+**LA NOCTURNA PASA A LAS 00:00 UTC** (decidido por el humano el 2026-09-06 a
+las 20:20 UTC; antes `0 2 * * *`). Cambiado en el job de Azure **y** en el
+repositorio, que es donde se mentia: `infra/env/dev.json`, el test
+`test_f003_r9_cron_del_entorno_dev_es_medianoche`, `docs/ARCHITECTURE.md` y
+`azure-apps/datamart_seg_anual.md` (commit `3916ca6` alli). De paso se corrigio
+otra divergencia: `dev.json` declaraba `replicaTimeoutSeconds` 18000 y Azure
+tiene 25200 desde el 05-sep, cuando se subio a 7 h; ahora coinciden.
+
+**LA NOCTURNA DE ESTA NOCHE (lunes 07, 00:00 UTC) ES LA PRIMERA ACOTADA**, y se
+deja correr **con la imagen vieja `r20260905-1237` a proposito**: es la que da
+T31b y T34 de F-025. Desplegar F-066 antes la contaminaria con un 26 % mas de
+filas y la medicion no valdria ni para cerrar F-025 ni para F-065. Decidido con
+el humano. El despliegue de F-066 va **despues**, para la nocturna del martes.
+
 **Tres cosas esperan al humano, en este orden:**
 
 1. **F-068, y corre prisa.** Comprobado a las 19:35 UTC contra Azure:

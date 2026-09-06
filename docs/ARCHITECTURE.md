@@ -358,7 +358,7 @@ coherencia se garantiza por **verificación** y **visibilidad**:
   `TRUNCATE` y `mart/01_ddl.sql` con un `DROP`, y eso no se deshace porque el
   step devuelva `FAILED` después.
 - **`--sin-puerta`, solo en los comandos sueltos.** `stage` y `build-mart` la
-  admiten; `run-all` **no**, porque a las 02:00 no hay nadie delante para
+  admiten; `run-all` **no**, porque a medianoche no hay nadie delante para
   valorar si saltársela es razonable. Con la opción, la puerta se evalúa
   igualmente y su fila queda `SKIPPED` con el veredicto dentro: lo que esa fila
   cuenta es que el build se hizo **sin** puerta, no lo que la puerta habría
@@ -503,7 +503,8 @@ la lista solo baja.
 - `infra/sql/` contiene la provisión de `sigrid_dm` (base, roles, diagnóstico).
   Se ejecuta a mano con `psql`, nunca desde el ETL: usa bloques `$$`, que el
   troceador de sentencias de `postgres_client.py` no sabe manejar.
-- Destino: **Container Apps Job programado** (`0 2 * * *` UTC, siempre
+- Destino: **Container Apps Job programado** (`0 0 * * *` UTC desde el
+  2026-09-06, antes `0 2 * * *`; siempre
   `run-all --full`) en un resource group propio del datamart, región
   `spaincentral`, con entorno **sin integración de red virtual** — así tiene IP
   de salida estática, que es lo que se autoriza en el firewall del Postgres.
