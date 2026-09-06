@@ -490,3 +490,77 @@ tables:
     # Catálogo de retenciones/recargos. Extiende con: el nombre legible está
     # en con.res, NO en rec (rec no tiene cod ni res propios).
     # El tipo dominante en Ruesma es ide=558368 (97 % de los efectos).
+
+  # ===========================================================================
+  # MODULO PERSONAL (F-066, tanda P) -- recursos, empleados y partes de trabajo
+  #
+  # Lo pidio Juan Romero el 2026-09-03: el datamart sabe lo que CUESTA una obra
+  # en material y subcontrata, pero no quien ha trabajado en ella ni cuantas
+  # horas. Las horas NO estan en `hmo` (6.850 cabeceras de parte) sino en
+  # `hmores` (328.760 lineas, con recurso, obra, fecha, cantidad e importe).
+  #
+  # DATOS PERSONALES, decidido por el humano el 2026-09-06: `emp` y `res` se
+  # traen ENTERAS salvo exclusiones tecnicas (binario y texto ilimitado). No se
+  # excluye ninguna columna por ser dato personal -- ni DNI, ni Seguridad
+  # Social, ni cuenta bancaria, ni domicilio, ni credenciales de acceso--; lo
+  # que se publique de eso lo decide F-057, no `raw`. La ficha de cada tabla en
+  # `config/diccionario/raw.yaml` DECLARA que contiene. Aviso que va con la
+  # decision: `mcp_sigrid_dm_ro` lee todos los esquemas, `raw` incluido.
+  # ===========================================================================
+
+  - source_table: res
+    target_table: res
+    id_column: ide
+    incremental_column: null   # medido 2026-09-06: `res` no tiene tiemod
+    where: null
+    exclude_columns: []
+    # Recursos (2.610 filas, 55 columnas, tip=33 en con). 1.723 de baja.
+    # Medido: ninguna columna binaria ni de texto ilimitado, asi que entra
+    # entera. Incluye el NIF de la persona en `cif` (informado en 626).
+    # Criterio de negocio de Juan Romero: los recursos en rojo estan de baja y
+    # no se consideran; todos los de alta van codificados "Apellidos, Nombre".
+
+  - source_table: emp
+    target_table: emp
+    id_column: ide
+    incremental_column: null   # medido 2026-09-06: `emp` no tiene tiemod
+    where: null
+    exclude_columns:
+      - ima      # la foto del empleado (Binario ilimitado)
+      - dir      # y las diez siguientes son Texto ilimitado
+      - dirtex
+      - web
+      - tex
+      - eleloc
+      - disobs
+      - podtex
+      - traele
+      - tracta
+      - obsnom
+    # Empleados (1.352 filas, 161 columnas, tip=43 en con). Las 11 de arriba
+    # son EXACTAMENTE las 11 columnas ilimitadas que tiene la tabla, medidas el
+    # 2026-09-06 contra INFORMATION_SCHEMA: la exclusion es tecnica, no de
+    # negocio. Si `emp` pasa de 161 columnas, revisar la lista: una columna de
+    # texto ilimitado nueva entraria sin querer.
+
+  - source_table: hmo
+    target_table: hmo
+    id_column: ide
+    incremental_column: null
+    where: null
+    exclude_columns: []
+    # Cabecera del parte de trabajo (6.850 filas, 16 columnas). Medido: no
+    # tiene ninguna columna ilimitada, ni siquiera `tex`. `reside` solo viene
+    # informado en 6 filas: el recurso esta en la LINEA, no en la cabecera.
+
+  - source_table: hmores
+    target_table: hmores
+    id_column: ide
+    incremental_column: null
+    where: null
+    exclude_columns:
+      - tex    # observaciones de la linea (Texto ilimitado)
+    # LAS HORAS (328.760 filas, 56 columnas). Es la tabla que faltaba: `reside`
+    # informado en el 99,9 %, `obride` en el 99,6 % (536 obras distintas), mas
+    # fecha, cantidad e importe por linea. Sin ella no se puede responder
+    # "horas por obra", que es lo que F-057 tiene que construir.
