@@ -114,6 +114,16 @@ Avisos preexistentes que **no** introduce este cambio: `ruff` con 211 avisos
 
 ## Ramas y commit
 
-Commit hecho en `feature/F-025-ventana-negocio-build` y traído a
+Commit `5fedc48` hecho en `feature/F-025-ventana-negocio-build` y traído a
 `feature/F-066-ingesta-raw-pendientes` con `git merge --ff-only`. Ambas ramas
-apuntan al mismo commit; HEAD queda en la de F-066. Sin `git push`.
+apuntan a `5fedc48`; HEAD queda en la de F-066. Sin `git push`.
+
+**Un efecto colateral que conviene saber.** Mientras yo trabajaba con HEAD en la
+rama de F-025, otro agente hizo su commit de backlog `1ce9985` («nace F-067…»,
+`BACKLOG.md` + `harness/features.json`) y, como HEAD estaba ahí, **aterrizó en la
+rama de F-025** en vez de en la de F-066. Mi commit quedó encima, y el
+`--ff-only` ha llevado los dos a `feature/F-066-ingesta-raw-pendientes`. No se ha
+perdido ni duplicado nada —ambas ramas contienen ahora los dos commits, y el de
+backlog es bookkeeping compartido, no código—, pero explica por qué el
+`git merge` avanza 5 ficheros y no los 3 de este trabajo. No se ha reescrito
+historia para separarlos: no compensa el riesgo con dos agentes en paralelo.
