@@ -128,10 +128,24 @@ explícita del humano del 2026-09-06 frente a la propuesta de excluir 72
 columnas: DNI, número de la Seguridad Social, cuenta bancaria, domicilio,
 contacto, fecha de nacimiento y credenciales de acceso. Solo se excluye lo
 binario y el texto ilimitado, que es criterio técnico. **La ficha de cada una
-declara qué contiene**, y hay que saber que `mcp_sigrid_dm_ro` alcanza `raw`:
-las dos tablas son legibles enteras por cualquier agente conectado al MCP.
-Acotar eso —sacar `raw` de los esquemas de consumo o revocar el `SELECT` sobre
-esas dos— es una decisión de plataforma que no se ha tomado.
+declara qué contiene**.
+
+**El MCP ya no las lee, y eso es TEMPORAL (F-068, 2026-09-07).** Hasta esa
+fecha `mcp_sigrid_dm_ro` alcanzaba `raw` entero y las dos tablas eran legibles
+por cualquier cuenta del tenant. El humano decidió quitarle el permiso —«de
+momento quita el permiso. Cuando pongamos límites o guardarraíles por usuario,
+habrá que volver a ponerlo para algunos usuarios»—, así que **no es una
+prohibición permanente**: es un tapón mientras el MCP no distinga QUIÉN
+pregunta, y su reversión ya está decidida para cuando exista ese control.
+
+Cómo se sostiene, que es la parte que no se ve: `GRANT SELECT ON ALL TABLES IN
+SCHEMA` no sabe saltarse una tabla, y `apply_grants` lo reaplica cada noche. Por
+eso la revocación **no es una orden suelta contra la base** —esa duraría hasta
+la nocturna siguiente— sino parte del propio paso: concede el esquema, revoca
+las tablas de `PG_EXCLUDED_TABLES` y cambia el `ALTER DEFAULT PRIVILEGES` de
+`raw` de `GRANT` a `REVOKE`, para que una tabla recreada tampoco nazca legible.
+La lista es `DEFAULT_EXCLUDED_TABLES` en `config/settings.py`, y ahí está
+escrita la condición para levantarla.
 
 **Lo que Sigrid NO guarda**, medido dos veces y escrito aquí para que nadie
 vuelva a buscarlo:

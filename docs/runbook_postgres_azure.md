@@ -396,3 +396,21 @@ psql "host=<host> dbname=albaranes user=mcp_sigrid_dm_ro sslmode=require" \
 cinco de consumo. Se revisará al rediseñar el MCP en F-006. La lista efectiva
 es el parámetro `PG_CONSUMPTION_SCHEMAS`: estrecharla es cambiar una variable,
 no tocar código.
+
+**Con dos excepciones, y son TEMPORALES (F-068, 2026-09-07)**: `raw.emp` y
+`raw.res` traen datos personales de empleados (DNI, Seguridad Social, cuenta
+bancaria, NIF, credenciales) y el rol tiene el `SELECT` revocado sobre ellas.
+La lista es `PG_EXCLUDED_TABLES`, y la aplica el propio `apply_grants` cada
+noche: no se puede hacer a mano, porque el `GRANT ... ON ALL TABLES IN SCHEMA
+raw` de la nocturna siguiente devolvería el permiso. El humano ya decidió
+volver a concederlas cuando el MCP tenga control por usuario.
+
+Para comprobar que la revocación está puesta (cero filas es lo correcto):
+
+```sql
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'mcp_sigrid_dm_ro'
+  AND table_schema = 'raw'
+  AND table_name IN ('emp', 'res');
+```
