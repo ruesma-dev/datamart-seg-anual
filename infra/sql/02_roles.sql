@@ -149,6 +149,15 @@ $$;
 --    `config/settings.py`, parametrizable con PG_EXCLUDED_TABLES. Este fichero
 --    solo cubre el arranque, porque la nocturna (`apply_grants`) es quien lo
 --    sostiene noche tras noche. Un test comprueba que las dos listas coinciden.
+--
+--    DOS VECES, Y NO ES UN DESPISTE. En PostgreSQL un REVOKE solo quita la
+--    concesión hecha por EL MISMO concedente: la ACL guarda una entrada por
+--    cada uno (`mcp=r/admin` y `mcp=r/sigrid_dm_etl` son dos). Y aquí hay dos
+--    concedentes reales: el punto 5 de este fichero concede como el
+--    ADMINISTRADOR que lo ejecuta, y la nocturna concede como `sigrid_dm_etl`
+--    (que es además el propietario, así que es el concedente de lo que nace
+--    por privilegio por defecto). Revocar solo con uno deja la tabla legible
+--    y sin ningún error a la vista: PostgreSQL avisa con un NOTICE y sigue.
 DO $$
 DECLARE
     objeto text;
@@ -164,12 +173,32 @@ BEGIN
             );
         END IF;
     END LOOP;
+END
+$$;
 
+SET ROLE sigrid_dm_etl;
+DO $$
+DECLARE
+    objeto text;
+BEGIN
+    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res']
+    LOOP
+        IF to_regclass(objeto) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON TABLE %s FROM mcp_sigrid_dm_ro', objeto
+            );
+        END IF;
+    END LOOP;
+
+    -- La regla de privilegios por defecto: es lo que haría legible una tabla
+    -- recreada sin que nadie ejecutase un GRANT. Se declara POR rol creador,
+    -- y el creador es este.
     EXECUTE
         'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA raw '
         'REVOKE SELECT ON TABLES FROM mcp_sigrid_dm_ro';
 END
 $$;
+RESET ROLE;
 
 -- 6. Comprobaciones. Deben salir: los tres roles, sigrid_dm_app dentro de
 --    sigrid_dm_etl, y los nueve esquemas.

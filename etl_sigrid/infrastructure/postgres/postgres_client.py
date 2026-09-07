@@ -39,8 +39,8 @@ from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
 from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
 from etl_sigrid.infrastructure.postgres.grants import (
-    partir_tabla_cualificada,
     build_readonly_grant_statements,
+    partir_tabla_cualificada,
 )
 from etl_sigrid.infrastructure.postgres.timings import Timing
 
