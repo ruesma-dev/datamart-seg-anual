@@ -36,7 +36,37 @@ tablas grandes y `check-raw-recuentos` de codigo 0. Un hallazgo nuevo, no
 bloqueante, ya atendido: el commit del cron viajaba en esta rama sin estar en la
 spec, y ahora esta escrito en `tasks.md`.
 
+## LA NOCTURNA DEL LUNES 07 FALLO, Y LA CAUSA ES DE FUERA
+
+**`caj-datamart-seg-dev-29812320`, 00:00 -> 01:26 UTC, `Failed` las dos veces
+(reintenta una).** Era la primera acotada, la que tenia que dar T31b y T34.
+
+**Causa**: hay un inquilino NUEVO en el Postgres compartido, la base
+**`facturas`** (dueño `facturas_owner`), sobre la que `sigrid_dm_etl` **no tiene
+`CONNECT`**; y la puerta de disco de F-019 suma `pg_database_size` de **todas**
+las bases antes de cada tramo. `permission denied for database facturas`.
+
+**LA BASE ESTA INTACTA** y no por suerte: la puerta se niega a ejecutar a
+ciegas y aborto **antes del tramo 1/21**. `stg.plan_mensual` conserva sus
+29.772.701 filas y `mart` sus 5.359.591; `cierre`, diccionario y grants
+quedaron `SKIPPED` por la puerta de F-024. **Lo publicado es el datamart del
+sabado 05**: no hay perdida, hay falta de refresco.
+
+**Diagnostico completo, censo de bases y las tres salidas**:
+`progress/incidencia_nocturna_20260907.md`. Resumen de las salidas: (1) pedir
+`CONNECT` sobre `facturas` a quien administre el servidor; (2) filtrar por
+`has_database_privilege` y avisar, a cambio de una medicion parcial que
+subestima la ocupacion; (3) las dos. **Recomendacion del lider: la 3.**
+**No se ha tocado codigo**: la regla del arnes es no improvisar ante un fallo
+inesperado, y la salida cruza la frontera del proyecto.
+
+**Ojo: la causa es permanente.** Fallara todas las noches hasta que se arregle.
+
 **Tres cosas esperan al humano, en este orden:**
+
+0. **Decidir la salida de la averia de arriba.** Va por delante de todo lo
+   demas: sin ella no hay nocturna, y sin nocturna no se cierran ni F-025 ni
+   F-066.
 
 1. **F-068, y corre prisa.** Comprobado a las 19:35 UTC contra Azure:
    `raw.emp` **ya esta ahi** con sus 1.352 filas y con `dni`, `tarseg`
