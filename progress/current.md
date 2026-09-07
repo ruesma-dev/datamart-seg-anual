@@ -1,5 +1,5 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-06 (domingo; sesión de correcciones del review de F-066)
+# Estado actual · 2026-09-07 (lunes; la averia de la nocturna y el disco de 64 GB)
 
 > **PURGADO el 2026-09-06 (C2 del review de F-066).** Este fichero tenía 1.263
 > líneas y arrastraba cinco sesiones cerradas —F-042 del 28-08, F-047, las fases
@@ -36,37 +36,50 @@ tablas grandes y `check-raw-recuentos` de codigo 0. Un hallazgo nuevo, no
 bloqueante, ya atendido: el commit del cron viajaba en esta rama sin estar en la
 spec, y ahora esta escrito en `tasks.md`.
 
-## LA NOCTURNA DEL LUNES 07 FALLO, Y LA CAUSA ES DE FUERA
+## LA NOCTURNA DEL LUNES 07 FALLO Y YA ESTA ARREGLADO (con premio detras)
 
-**`caj-datamart-seg-dev-29812320`, 00:00 -> 01:26 UTC, `Failed` las dos veces
-(reintenta una).** Era la primera acotada, la que tenia que dar T31b y T34.
+**`caj-datamart-seg-dev-29812320`, 00:00 -> 01:26 UTC, `Failed` las dos veces.**
+Era la primera acotada, la que tenia que dar T31b y T34.
 
-**Causa**: hay un inquilino NUEVO en el Postgres compartido, la base
-**`facturas`** (dueño `facturas_owner`), sobre la que `sigrid_dm_etl` **no tiene
-`CONNECT`**; y la puerta de disco de F-019 suma `pg_database_size` de **todas**
-las bases antes de cada tramo. `permission denied for database facturas`.
+**Causa**: un inquilino NUEVO del Postgres compartido, la base **`facturas`**
+(dueño `facturas_owner`), sobre la que `sigrid_dm_etl` no tenia `CONNECT`; y la
+puerta de disco de F-019 suma `pg_database_size` de **todas** las bases antes de
+cada tramo. `permission denied for database facturas`. **La base quedo intacta**
+y no por suerte: la puerta se niega a ejecutar a ciegas y aborto antes del tramo
+1/21.
 
-**LA BASE ESTA INTACTA** y no por suerte: la puerta se niega a ejecutar a
-ciegas y aborto **antes del tramo 1/21**. `stg.plan_mensual` conserva sus
-29.772.701 filas y `mart` sus 5.359.591; `cierre`, diccionario y grants
-quedaron `SKIPPED` por la puerta de F-024. **Lo publicado es el datamart del
-sabado 05**: no hay perdida, hay falta de refresco.
+**RESUELTO el mismo dia, y mejor que la salida que se propuso.** El humano
+concedio a `sigrid_dm_etl` el rol predefinido **`pg_read_all_stats`**, que mide
+cualquier base **sin `CONNECT`, sin acceso a los datos y cubriendo las bases
+futuras** -que es lo que de verdad fallo-. Verificado: `pg_has_role` da `t` y la
+consulta devuelve las **nueve** bases. Por eso **`SQL_OCUPACION_DISCO` no se
+toca**: filtrar por permiso habria dejado la medicion parcial y subestimando,
+que es justo el riesgo que la puerta vigila.
 
-**Diagnostico completo, censo de bases y las tres salidas**:
-`progress/incidencia_nocturna_20260907.md`. Resumen de las salidas: (1) pedir
-`CONNECT` sobre `facturas` a quien administre el servidor; (2) filtrar por
-`has_database_privilege` y avisar, a cambio de una medicion parcial que
-subestima la ocupacion; (3) las dos. **Recomendacion del lider: la 3.**
-**No se ha tocado codigo**: la regla del arnes es no improvisar ante un fallo
-inesperado, y la salida cruza la frontera del proyecto.
+**EL SEGUNDO HALLAZGO, PEOR QUE EL PRIMERO.** Al verificar el arreglo salio que
+el disco **se amplio de 32 a 64 GB el 2026-08-29** y el job **no declaraba**
+`PG_DISCO_TOTAL_GB`: durante nueve dias la puerta midio contra 32 GB y veia un
+**74,32 %** donde la ocupacion real es del **37,16 %**. Aborta al 80 %: estaba a
+menos de seis puntos de tumbar la nocturna todas las noches sin que nada
+estuviera mal, y F-066 suma ~0,9 GB. Arreglado en tres sitios para que no vuelva
+a divergir: el defecto pasa a 64, `dev.json` declara `discoTotalGb` y
+`80_create_job.ps1` la inyecta, y un test ata las dos.
 
-**Ojo: la causa es permanente.** Fallara todas las noches hasta que se arregle.
+Informe: `progress/impl_disco_64gb.md`. Incidencia completa (diagnostico, censo
+de bases y cierre): `progress/incidencia_nocturna_20260907.md`. En `azure-apps`,
+commit `eccf6a4`: sexto inquilino, `pg_read_all_stats` y el disco de 64 GB.
+
+**LA NOCTURNA SE RELANZO A MANO**: `caj-datamart-seg-dev-swtg78p`, arrancada a
+las **07:48:46 UTC** del lunes 07 con **475 creditos** de 576 (SKU B2s) y con la
+imagen vieja `r20260905-1237` a proposito. De ella salen T31b y T34.
 
 **Tres cosas esperan al humano, en este orden:**
 
-0. **Decidir la salida de la averia de arriba.** Va por delante de todo lo
-   demas: sin ella no hay nocturna, y sin nocturna no se cierran ni F-025 ni
-   F-066.
+0. **Fijar `PG_DISCO_TOTAL_GB=64` en el job de Azure.** El codigo ya lo dice,
+   pero el job **no**: `85_update_job.ps1` solo cambia la imagen y no toca el
+   entorno. Se arregla al desplegar la imagen de F-066 (que ya lleva el defecto
+   en 64) o pasando por `80_create_job.ps1`. **No se hace mientras corra
+   `swtg78p`.**
 
 1. **F-068, y corre prisa.** Comprobado a las 19:35 UTC contra Azure:
    `raw.emp` **ya esta ahi** con sus 1.352 filas y con `dni`, `tarseg`
