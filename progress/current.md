@@ -13,6 +13,25 @@
 
 ## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
 
+**F-068 ESTA IMPLEMENTADA Y ESPERA DOS COSAS DEL HUMANO** (2026-09-07). El
+codigo esta en la rama `feature/F-066-ingesta-raw-pendientes` (las dos van
+juntas en la misma imagen) y el informe en `progress/impl_F-068.md`. Lo que
+falta **no es codigo**:
+
+1. **La revocacion contra Azure**, que el implementer NO ha ejecutado: el SQL
+   exacto y su verificacion estan en la seccion «Lo que tiene que ejecutar el
+   lider» de `progress/impl_F-068.md`. Hasta que se lance, `raw.emp` sigue
+   siendo legible por el rol del MCP.
+2. **`azure-apps/mcp_bbdd.md` y `red_postgresql_compartido.md`**, que cruzan la
+   frontera del proyecto y los actualiza el lider. Es el 4.º criterio de
+   aceptacion de la ficha y es lo unico que queda de ella.
+
+Y hay que leerlo entero al menos una vez, porque **la revocacion es TEMPORAL**
+y su reversion ya esta decidida por el humano: vuelve en cuanto el MCP tenga
+control por usuario. Esta escrito en `config/settings.py`, `02_roles.sql`,
+`docs/ARCHITECTURE.md`, el runbook y las fichas del diccionario, para que nadie
+lo lea dentro de seis meses como una prohibicion permanente.
+
 **LA NOCTURNA PASA A LAS 00:00 UTC** (decidido por el humano el 2026-09-06 a
 las 20:20 UTC; antes `0 2 * * *`). Cambiado en el job de Azure **y** en el
 repositorio, que es donde se mentia: `infra/env/dev.json`, el test
