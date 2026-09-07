@@ -505,7 +505,7 @@
         "Medido el efecto sobre los creditos de CPU del B1ms antes y despues: la nocturna debe terminar sin dejar la hucha a cero",
         "Documentado en el diccionario y en azure-apps/datamart_seg_anual.md que el datamart ya no reconstruye todo cada noche, y que significa eso para quien lo consulta"
       ],
-      "status": "blocked",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,
@@ -1068,7 +1068,7 @@
         "Si se revoca: el cambio vive en infra/sql/02_roles.sql y en apply_grants_step.py, con su test, para que la nocturna no devuelva el permiso al dia siguiente",
         "azure-apps/mcp_bbdd.md y azure-apps/red_postgresql_compartido.md dicen que ve y que no ve el MCP tras la decision"
       ],
-      "status": "in_progress",
+      "status": "blocked",
       "sdd": false,
       "rigor": "critico",
       "priority": 3,

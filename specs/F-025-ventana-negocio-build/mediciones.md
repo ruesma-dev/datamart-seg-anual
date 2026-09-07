@@ -521,36 +521,92 @@ firma provoca una reconstrucción completa la primera noche, como avisa el
 propio código. Si se implanta, va como tarea nueva con su spec, no en la
 fase 7.
 
-### T31b y T34 · La PRIMERA NOCTURNA ACOTADA — en curso desde el 2026-09-07, 00:00 UTC
+### T31b y T34 · LA PRIMERA NOCTURNA ACOTADA — MEDIDAS el 2026-09-07
 
-`caj-datamart-seg-dev-29812320`, arrancada a las **00:00:00 UTC** del lunes 07.
-Es la primera nocturna con la ventana encendida que **no** es completa: la del
-domingo 06 no llego a correr porque el cron estuvo apagado hasta las 07:31, y
-la ultima completa fue `hamsh8o` el sabado 05. La proxima completa toca el
-**domingo 13** por R25.
+**La del cron (`29812320`, 00:00 UTC) murió** antes de medir nada, por una causa
+ajena a esta feature: un inquilino nuevo del Postgres compartido, la base
+`facturas`, sobre la que el rol del ETL no tenía `CONNECT`, y la puerta de disco
+de F-019 suma todas las bases antes de cada tramo. Ver
+`progress/incidencia_nocturna_20260907.md`.
 
-**Corre a proposito con la imagen vieja `r20260905-1237`**, la de F-025 sin
-F-066: desplegar la ingesta nueva antes habria anadido un 26 % de filas y la
-medicion no valdria ni para cerrar F-025 ni para F-065. Decidido con el humano
-el 06 por la tarde.
+**Se relanzó a mano tras el arreglo**: `caj-datamart-seg-dev-swtg78p`,
+**07:48:46 → 10:52 UTC**, `Succeeded`, con la imagen vieja `r20260905-1237` a
+propósito (F-025 sin F-066). Los diez pasos en verde y `check-declarados` en
+105/105.
 
-| dato | valor |
+#### T34 · Créditos — CUMPLE con enorme margen
+
+| momento | créditos (de 576, `Standard_B2s`) |
 |---|---|
-| Creditos al arrancar | **388** de 576 (SKU `Standard_B2s`) |
-| Hora de arranque | 00:00:00 UTC (el cron paso de `0 2 * * *` a `0 0 * * *` el 06) |
-| Referencia de completa | `hamsh8o`, 4 h 52, minimo de 6 creditos |
+| al arrancar | 475 |
+| **mínimo durante todo el build** | **454** |
+| al terminar | 456, ya recuperando |
 
-**Lo que esta nocturna tiene que dejar medido**: T31b, que las 40 obras vivas
-se rehicieron esa noche y las 328 congeladas conservan su `_built_at` anterior
-(consulta sobre `_meta.v_frescura_obra`); y T34, los creditos restantes al
-terminar, que R29 exige mayores que cero. Con las dos en verde, F-025 va al
-reviewer y a `done`.
+Gasto neto: **21 créditos en 3 horas**. R29 exige mayores que cero. La completa
+`hamsh8o` había bajado hasta 6.
+
+#### T31b · Quién se reconstruyó y quién no — CUMPLE
+
+`_meta.obra_build`, consultado a las 12:55 UTC:
+
+| `construido_at` | obras | filas |
+|---|---|---|
+| **2026-09-05** (conservan el de la completa) | **328** | 18.153.844 |
+| **2026-09-07** (rehechas esa noche) | **592** | 11.668.006 |
+
+Y el desglose por motivo, que es lo que de verdad enseña:
+
+| congelada | motivo | obras |
+|---|---|---|
+| sí | `ventana` | **328** |
+| no | `ventana` | **40** ← las obras vivas |
+| no | `sin_filas` | **552** |
+
+Las 328 congeladas **conservan su `_built_at` anterior**: es exactamente lo que
+R26 exige y lo que T31b tenía que demostrar.
+
+### EL AHORRO REAL: 71,2 %, y el error de medición que casi lo entierra
+
+**Comparado contra la completa `hamsh8o` del 05-sep:**
+
+| paso | completa | acotada | |
+|---|---|---|---|
+| `ingest_raw` | 1.832 s | 2.256 s | +23 % (fuera de alcance) |
+| **`build_stg`** | **9.527 s** | **2.740 s** | **−71,2 %** |
+| `build_mart` | 2.840 s | 2.512 s | −11,6 % (ruido) |
+| `build_cierre` | 2.665 s | 2.842 s | +6,6 % (ruido) |
+| **noche entera** | **4 h 52** | **3 h 00** | **−38,3 %** |
+
+`build_stg` baja **1 h 53**. El criterio de parada de la fase era el 40 % y T1
+había predicho el 59,2 %: la realidad ha superado la predicción.
+
+**EL ERROR, anotado a propósito para que no se repita.** El líder comparó
+primero `build_mart` —que esta feature **nunca toca**, y así lo dice
+`design.md:162-163` y `:235`— y concluyó un ahorro del 9 %, dando la feature por
+fallida e informando de ello al humano. La trampa: **hay dos ficheros llamados
+`02_build_fact.sql`**, uno en `sql/stg/` y otro en `sql/mart/`. La señal que
+delataba el error estaba a la vista y no se usó: **la acotada produjo MÁS filas
+que la completa** (5.361.017 frente a 5.359.591), lo que es imposible si el paso
+estuviera acotado. Análisis completo en `progress/explore_F-025_coste_fijo.md`.
+
+### El defecto que sí destapó esta nocturna: 552 obras de ruido en el censo
+
+De las 552 que entran por `sin_filas`, **512 siguen con cero filas después de
+reconstruirlas**. No están a medio construir: no tienen nada que construir. El
+censo sale de `SQL_ESTADO_OBRAS` (`postgres_client.py:144`), que lo toma de
+`raw.obr ⨝ raw.con`: **920 fichas del maestro crudo**, frente a 583 en
+`stg.obras` y **368 con datos** (= 328 + 40, cuadra exacto). Entre ellas, `0000`
+= «PLANTILLA DE OBRA» y el código `0001` repetido **ocho veces** con el nombre en
+blanco.
+
+`domain/ventana.py:472` las trata como «completar no es actualizar», que es
+correcto para una obra a medio hacer y falso para una plantilla. **No bloquea
+esta feature** —el ahorro ya es del 71 %— y se ha abierto **F-071** para
+arreglarlo junto con lo que la IA ve de esas obras.
 
 ### Sigue sin medirse
 
-**T31b, T33 y T34**: las tres necesitan nocturnas acotadas, y la primera será
-la del lunes 07 (el domingo toca completa por R25). T1 y T2b, medidas arriba
-el 05-sep.
+**T33**. T31b y T34 quedan medidas arriba; T1 y T2b el 05-sep.
 
 ### Cinco tests que dependían del día real — arreglados el 2026-09-06
 
