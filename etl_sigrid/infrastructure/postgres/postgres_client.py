@@ -64,11 +64,27 @@ ConnInfo = str | Callable[[], str]
 BYTES_POR_GB = 1024 * 1024 * 1024
 
 # Ocupación del disco del SERVIDOR, no de nuestra base: el disco es compartido
-# con `albaranes` y `partes`, y lo que hay que vigilar es el total.
-# `pg_database_size` sobre otra base exige privilegio CONNECT; el rol del ETL
-# lo tiene (frontera medida en F-005). No cuenta WAL ni logs del servidor: ese
-# hueco lo absorbe el margen entre el límite (80 %) y la protección de Azure
-# (~95 %).
+# con otros CINCO inquilinos —`albaranes`, `partes`, `dedicacion`, `postventa`
+# y `facturas`—, y lo que hay que vigilar es el total.
+#
+# `pg_database_size` sobre otra base exige normalmente privilegio CONNECT, y
+# durante un año el rol del ETL lo tuvo sobre todas las que había (frontera
+# medida en F-005). Dejó de ser verdad sin que nadie nos avisara: el 2026-09-07
+# apareció `facturas`, con dueño propio (`facturas_owner`) y sin CONNECT para
+# nosotros, y la nocturna murió justo aquí —«permission denied for database
+# facturas»— sin llegar al tramo 1 y sin tocar una tabla; está contado en
+# progress/incidencia_nocturna_20260907.md.
+#
+# La frontera de hoy YA NO es CONNECT. El 2026-09-07 el humano concedió a
+# `sigrid_dm_etl` el rol predefinido `pg_read_all_stats`, que permite
+# `pg_database_size` sobre CUALQUIER base sin CONNECT y sin dar acceso a sus
+# datos, y que además cubre las bases que se creen en el futuro: eso es lo que
+# de verdad falló, que la lista de inquilinos crece sola. Verificado ese mismo
+# día: `pg_has_role('sigrid_dm_etl','pg_read_all_stats','member')` devuelve `t`
+# y esta consulta devuelve las nueve bases del servidor.
+#
+# No cuenta WAL ni logs del servidor: ese hueco lo absorbe el margen entre el
+# límite (80 %) y la protección de Azure (~95 %).
 SQL_OCUPACION_DISCO = "SELECT SUM(pg_database_size(datname)) FROM pg_database"
 
 # Peso de cada obra = filas de raw.obrparpre que le tocan, ponderando la rama
