@@ -54,7 +54,13 @@
 # `R-FRESCURA` porque lo que decia -que la nocturna construye SOLO raw, stg y
 # mart- dejo de ser cierto.
 
-version: 14
+# version 15 (F-068, 2026-09-07): las fichas de `raw.emp` y `raw.res` dicen que
+# el rol de lectura del MCP ya NO las alcanza, y que esa exclusion es TEMPORAL
+# -el humano ya decidio revertirla cuando el MCP tenga control por usuario-.
+# Hasta la version 14 esas dos fichas avisaban de lo contrario: que cualquier
+# agente conectado las leia enteras.
+
+version: 15
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

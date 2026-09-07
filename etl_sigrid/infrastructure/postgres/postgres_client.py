@@ -38,7 +38,10 @@ from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
 from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
-from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
+from etl_sigrid.infrastructure.postgres.grants import (
+    partir_tabla_cualificada,
+    build_readonly_grant_statements,
+)
 from etl_sigrid.infrastructure.postgres.timings import Timing
 
 logger = get_logger(__name__)
@@ -1082,6 +1085,7 @@ class PostgresClient:
         readonly_role: str,
         owner_role: str,
         schemas: Iterable[str],
+        excluded_tables: Iterable[str] = (),
     ) -> list[str]:
         """
         Reaplica los permisos de lectura y devuelve las sentencias ejecutadas.
@@ -1091,6 +1095,13 @@ class PostgresClient:
         comandos aparte), así que en una base recién creada esos esquemas
         pueden no estar todavía. Intentarlo daría error y tumbaría el paso por
         algo que no es un problema.
+
+        `excluded_tables` (F-068) son tablas `esquema.tabla` que el rol NO debe
+        poder leer. Se filtran por existencia con el mismo criterio: un REVOKE
+        sobre una tabla que aún no se ha ingerido daría error y tumbaría el
+        paso. Ojo con la lectura de ese filtro: que una tabla excluida no
+        exista NO es un agujero —si no existe, no hay nada que leer—, pero sí
+        se avisa, porque lo normal es que sea una errata en la lista.
         """
         existentes = set(self.list_schemas())
         pedidos = list(schemas)
@@ -1099,8 +1110,25 @@ class PostgresClient:
         if ausentes:
             logger.warning("grants_esquemas_inexistentes", schemas=ausentes)
 
+        # La validación de forma la hace `build_readonly_grant_statements`;
+        # aquí solo hace falta separar esquema y tabla para preguntar por ella.
+        excluidas: list[str] = []
+        sin_tabla: list[str] = []
+        for entrada in excluded_tables:
+            esquema, tabla = partir_tabla_cualificada(entrada)
+            if esquema in aplicables and not self.table_exists(esquema, tabla):
+                sin_tabla.append(entrada)
+            else:
+                excluidas.append(entrada)
+        if sin_tabla:
+            logger.warning("grants_tablas_excluidas_inexistentes", tables=sin_tabla)
+
         sentencias = build_readonly_grant_statements(
-            readonly_role, owner_role, aplicables, database=self._target_db
+            readonly_role,
+            owner_role,
+            aplicables,
+            database=self._target_db,
+            excluded_tables=excluidas,
         )
         if not sentencias:
             return []
@@ -1113,6 +1141,7 @@ class PostgresClient:
             "grants_aplicados",
             role=readonly_role,
             schemas=aplicables,
+            excluded_tables=excluidas,
             statements=len(sentencias),
         )
         return sentencias

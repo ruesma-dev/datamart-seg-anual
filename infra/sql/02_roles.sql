@@ -93,6 +93,10 @@ RESET ROLE;
 --    ALCANCE: por decisión del humano de 2026-08-08 el MCP lee TODOS los
 --    esquemas, no solo los cinco de consumo. Se revisará al rediseñar el MCP
 --    en F-006. La lista efectiva la manda PG_CONSUMPTION_SCHEMAS.
+--
+--    OJO: este bloque concede `raw` ENTERO, y eso incluye tablas con datos
+--    personales. El punto 5 bis, justo debajo, se las quita. No se puede
+--    hacer aquí: `GRANT SELECT ON ALL TABLES IN SCHEMA` no admite excepciones.
 DO $$
 DECLARE
     esquema text;
@@ -114,6 +118,59 @@ BEGIN
 END
 $$;
 
+-- 5 bis. Tablas que el MCP NO puede leer (F-068, 2026-09-07).
+--
+--    #################################################################
+--    #  ESTO ES TEMPORAL Y SU REVERSIÓN YA ESTÁ DECIDIDA             #
+--    #################################################################
+--
+--    Palabras del humano el 2026-09-07: «de momento quita el permiso. Cuando
+--    pongamos límites o guardarraíles por usuario, habrá que volver a ponerlo
+--    para algunos usuarios». No es una prohibición permanente: es un tapón
+--    mientras el MCP no sepa QUIÉN pregunta. Quien lo lea dentro de seis
+--    meses, la pregunta correcta es «¿ya hay control por usuario?».
+--
+--    QUÉ ES CADA UNA. `raw.emp` son 1.352 empleados con DNI, número de la
+--    Seguridad Social, cuenta bancaria, domicilio, teléfonos y credenciales
+--    del portal. `raw.res` son 2.610 recursos con el NIF de la persona en
+--    `cif` y las credenciales de acceso a Sigrid. Las trajo enteras F-066, por
+--    decisión del humano del 2026-09-06; el rol de lectura del MCP lo usa
+--    cualquier cuenta del tenant.
+--
+--    LAS DOS MITADES, y las dos hacen falta:
+--      a) REVOKE sobre la tabla, DESPUÉS del GRANT del punto 5, que la alcanza
+--         (`ON ALL TABLES IN SCHEMA` no sabe saltarse una);
+--      b) quitar el ALTER DEFAULT PRIVILEGES de `raw`, que es una regla del
+--         catálogo: mientras esté puesta, cualquier tabla que nazca en `raw`
+--         es legible sin que nadie ejecute un GRANT. Dejar de emitirla no la
+--         borra; hay que emitir su REVOKE.
+--
+--    LA LISTA VIVE EN EL CÓDIGO, no aquí: `DEFAULT_EXCLUDED_TABLES` de
+--    `config/settings.py`, parametrizable con PG_EXCLUDED_TABLES. Este fichero
+--    solo cubre el arranque, porque la nocturna (`apply_grants`) es quien lo
+--    sostiene noche tras noche. Un test comprueba que las dos listas coinciden.
+DO $$
+DECLARE
+    objeto text;
+BEGIN
+    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res']
+    LOOP
+        -- to_regclass devuelve NULL en vez de fallar si la tabla no existe:
+        -- este fichero se ejecuta también sobre una base recién creada, antes
+        -- de la primera ingesta.
+        IF to_regclass(objeto) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON TABLE %s FROM mcp_sigrid_dm_ro', objeto
+            );
+        END IF;
+    END LOOP;
+
+    EXECUTE
+        'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA raw '
+        'REVOKE SELECT ON TABLES FROM mcp_sigrid_dm_ro';
+END
+$$;
+
 -- 6. Comprobaciones. Deben salir: los tres roles, sigrid_dm_app dentro de
 --    sigrid_dm_etl, y los nueve esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
@@ -132,3 +189,12 @@ FROM pg_namespace
 WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
                   'cierre', 'compras', 'maestro', 'retenciones')
 ORDER BY nspname;
+
+-- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el
+-- resultado correcto; una fila significa que el MCP las sigue leyendo.
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'mcp_sigrid_dm_ro'
+  AND table_schema = 'raw'
+  AND table_name IN ('emp', 'res')
+ORDER BY table_name, privilege_type;
