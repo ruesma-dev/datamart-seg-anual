@@ -143,9 +143,18 @@ class PostgresSettings(BaseSettings):
                     "un tramo unitario, con aviso.",
     )
     disco_total_gb: int = Field(
-        32,
+        64,
         description="Tamaño total del disco del servidor Postgres, en GB. No se "
-                    "cablea: el servidor puede crecer sin que cambie el código.",
+                    "cablea: el servidor puede crecer sin que cambie el código. "
+                    "64 desde el 2026-08-29, que es cuando se amplió el disco "
+                    "compartido (antes 32). Este default es la ÚLTIMA RED, no la "
+                    "configuración: el valor bueno lo inyecta el job desde "
+                    "infra/env/dev.json (discoTotalGb) como PG_DISCO_TOTAL_GB, y "
+                    "los dos los ata el test "
+                    "test_f019_r8_el_disco_por_defecto_coincide_con_dev_json. "
+                    "Mientras estuvo en 32 con el disco ya ampliado, la puerta "
+                    "leía el 37 % real de ocupación como un 74 % y estaba a seis "
+                    "puntos de abortar la nocturna cada noche sin motivo.",
     )
     disco_limite_pct: float = Field(
         80.0,

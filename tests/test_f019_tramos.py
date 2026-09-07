@@ -11,9 +11,11 @@ función pura del dominio y solo recibe un diccionario de pesos.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -42,6 +44,8 @@ from etl_sigrid.infrastructure.postgres.postgres_client import (
 # Variables de entorno de la feature. Se limpian en los tests de settings para
 # que el .env del puesto (que apunta a Azure) no decida el resultado.
 VARIABLES_F019 = ("PG_TRAMO_MAX_FILAS", "PG_DISCO_TOTAL_GB", "PG_DISCO_LIMITE_PCT")
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # El mismo fichero que ejecuta el step, resuelto por la misma constante: si el
 # step cambiara de sitio el SQL, estos tests no seguirían mirando a otro lado.
@@ -164,15 +168,17 @@ def test_f019_r4_maximo_configurable_desde_settings(
 
     por_defecto = PostgresSettings(_env_file=None)
     assert por_defecto.tramo_max_filas == 1_000_000
-    assert por_defecto.disco_total_gb == 32
+    assert por_defecto.disco_total_gb == 64
     assert por_defecto.disco_limite_pct == 80.0
 
+    # El valor de la variable NO puede coincidir con el default, o el test
+    # pasaria igual sin leerla: 128 no es el defecto de nadie.
     monkeypatch.setenv("PG_TRAMO_MAX_FILAS", "250000")
-    monkeypatch.setenv("PG_DISCO_TOTAL_GB", "64")
+    monkeypatch.setenv("PG_DISCO_TOTAL_GB", "128")
     monkeypatch.setenv("PG_DISCO_LIMITE_PCT", "65.5")
     configurado = PostgresSettings(_env_file=None)
     assert configurado.tramo_max_filas == 250_000
-    assert configurado.disco_total_gb == 64
+    assert configurado.disco_total_gb == 128
     assert configurado.disco_limite_pct == 65.5
 
 

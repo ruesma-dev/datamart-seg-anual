@@ -389,7 +389,7 @@ def censo_por_defecto() -> list[ObraCensada]:
 def settings_falsos(ventana_activa: bool = True, **extra: object) -> SimpleNamespace:
     postgres = {
         "tramo_max_filas": 1_000_000,
-        "disco_total_gb": 32,
+        "disco_total_gb": 64,
         "disco_limite_pct": 80.0,
         "ventana_activa": ventana_activa,
         "ventana_meses": 12,

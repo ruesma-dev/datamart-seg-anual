@@ -209,7 +209,7 @@ def settings_falsos(tablas: tuple[str, ...] = TABLAS) -> SimpleNamespace:
     return SimpleNamespace(
         postgres=SimpleNamespace(
             tramo_max_filas=1_000_000,
-            disco_total_gb=32,
+            disco_total_gb=64,
             disco_limite_pct=80.0,
             # F-025: la ventana va apagada. Estos tests miden la puerta de
             # coherencia de raw, no el criterio de obra congelada.
