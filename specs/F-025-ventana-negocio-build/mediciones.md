@@ -521,6 +521,31 @@ firma provoca una reconstrucción completa la primera noche, como avisa el
 propio código. Si se implanta, va como tarea nueva con su spec, no en la
 fase 7.
 
+### T31b y T34 · La PRIMERA NOCTURNA ACOTADA — en curso desde el 2026-09-07, 00:00 UTC
+
+`caj-datamart-seg-dev-29812320`, arrancada a las **00:00:00 UTC** del lunes 07.
+Es la primera nocturna con la ventana encendida que **no** es completa: la del
+domingo 06 no llego a correr porque el cron estuvo apagado hasta las 07:31, y
+la ultima completa fue `hamsh8o` el sabado 05. La proxima completa toca el
+**domingo 13** por R25.
+
+**Corre a proposito con la imagen vieja `r20260905-1237`**, la de F-025 sin
+F-066: desplegar la ingesta nueva antes habria anadido un 26 % de filas y la
+medicion no valdria ni para cerrar F-025 ni para F-065. Decidido con el humano
+el 06 por la tarde.
+
+| dato | valor |
+|---|---|
+| Creditos al arrancar | **388** de 576 (SKU `Standard_B2s`) |
+| Hora de arranque | 00:00:00 UTC (el cron paso de `0 2 * * *` a `0 0 * * *` el 06) |
+| Referencia de completa | `hamsh8o`, 4 h 52, minimo de 6 creditos |
+
+**Lo que esta nocturna tiene que dejar medido**: T31b, que las 40 obras vivas
+se rehicieron esa noche y las 328 congeladas conservan su `_built_at` anterior
+(consulta sobre `_meta.v_frescura_obra`); y T34, los creditos restantes al
+terminar, que R29 exige mayores que cero. Con las dos en verde, F-025 va al
+reviewer y a `done`.
+
 ### Sigue sin medirse
 
 **T31b, T33 y T34**: las tres necesitan nocturnas acotadas, y la primera será
