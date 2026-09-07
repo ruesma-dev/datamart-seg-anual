@@ -7,15 +7,17 @@ implementación de F-005 dejó el código y los scripts, no tocó Azure.
 
 > **Lo primero que hay que entender.** No se aprovisiona ningún servidor. Se
 > crea la base `sigrid_dm` **dentro de `psql-albaranes-rs9k2`**, que ya sirve a
-> `albaranes` y `partes`, **las dos en uso**. Cualquier error de alcance afecta
-> a dos aplicaciones vivas.
+> `albaranes`, `partes`, `dedicacion`, `postventa` y `facturas`, **todas en
+> uso**. Cualquier error de alcance afecta a cinco aplicaciones vivas. Eran dos
+> cuando se escribió esto: la lista crece sin avisarnos, y el 2026-09-07 una
+> base nueva tumbó la nocturna.
 
 | | |
 |---|---|
 | Servidor | `psql-albaranes-rs9k2.postgres.database.azure.com` |
 | Resource group | `rg-albaranes-dev` (`spaincentral`) — **no** es el del datamart |
 | Versión / SKU | PostgreSQL 16 · `Standard_B1ms` (1 vCPU, 2 GB RAM) |
-| Almacenamiento | 32 GB **compartidos** con `albaranes` y `partes` |
+| Almacenamiento | **64 GB** (ampliado el 2026-08-29 desde 32) **compartidos** con `albaranes`, `partes`, `dedicacion`, `postventa` y `facturas` |
 | Red | Endpoint público con reglas de firewall por IP |
 | HA / Backup | Sin HA · PITR 7 días, **de servidor entero** |
 
@@ -70,8 +72,9 @@ recuperación utilizable**. Lo que sí lo es: `sigrid_dm` es regenerable al
 
 ## 3. Puerta de espacio — antes de nada
 
-32 GB compartidos. Sigrid son ~4 GB en origen, y `raw` + `stg` + `mart` con
-índices proyecta **10-12 GB**.
+64 GB compartidos desde el 2026-08-29 (32 cuando se escribió este runbook y
+cuando se ejecutó su puerta de T13, que por eso pide 14 GB libres). Sigrid son
+~4 GB en origen, y `raw` + `stg` + `mart` con índices proyecta **10-12 GB**.
 
 ```bash
 # Fotografía previa del servidor (solo lectura). Guarda las salidas.

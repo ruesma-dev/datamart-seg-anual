@@ -21,7 +21,8 @@ Los scripts están completos y probados como texto, pero **no se han ejecutado
 contra Azure**. Hay dos cosas que deben cerrarse antes de llegar al job:
 
 1. **El disco del servidor de Postgres (incidente del 2026-08-09).** Una carga
-   completa llenó el disco de 32 GB del servidor compartido y lo dejó en solo
+   completa llenó el disco del servidor compartido —32 GB entonces; ampliado a
+   64 el 2026-08-29— y lo dejó en solo
    lectura diez minutos, afectando a otras dos aplicaciones en producción. El
    job nocturno ejecuta **esa misma carga**. Qué hacer ya está decidido —la
    opción B, trocear el build—, así que lo que falta no es decidir: es

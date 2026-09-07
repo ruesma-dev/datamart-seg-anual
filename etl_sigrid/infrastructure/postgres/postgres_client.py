@@ -60,7 +60,8 @@ ConnInfo = str | Callable[[], str]
 # --- Troceo y puerta de disco del build de plan_mensual (F-019) -------------
 
 # Gigabyte binario: es la unidad en la que Azure declara el disco del Flexible
-# Server (32 GB) y en la que se compara `PG_DISCO_TOTAL_GB`.
+# Server (64 GB desde el 2026-08-29; 32 antes) y en la que se compara
+# `PG_DISCO_TOTAL_GB`. El tamaño no se cablea aquí: lo dice esa variable.
 BYTES_POR_GB = 1024 * 1024 * 1024
 
 # Ocupación del disco del SERVIDOR, no de nuestra base: el disco es compartido

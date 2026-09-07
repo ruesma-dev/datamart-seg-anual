@@ -161,8 +161,10 @@ he podido mirar» no es «está bien».
 
 - **No hay servidor propio.** La base `sigrid_dm` vive dentro de
   `psql-albaranes-rs9k2.postgres.database.azure.com` (`rg-albaranes-dev`,
-  PostgreSQL 16, `Standard_B1ms`, 32 GB), que ya sirve a `albaranes` y
-  `partes`, **las dos en uso**. Base propia y no esquema compartido: PostgreSQL
+  PostgreSQL 16, `Standard_B1ms`, **64 GB** desde el 2026-08-29; antes 32), que
+  ya sirve a `albaranes`, `partes`, `dedicacion`, `postventa` y `facturas`,
+  **todas en uso** —la última apareció sola el 2026-09-07 y tumbó una
+  nocturna—. Base propia y no esquema compartido: PostgreSQL
   no permite consultas entre bases, y esa es la frontera que impide que el rol
   de lectura vea `albaranes`.
 - **Tres roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
@@ -213,7 +215,8 @@ Desde F-019, el sub-paso `build_plan_mensual` **no se ejecuta de una pasada**:
   ciegas es lo que provocó el incidente. **Hasta F-025 el aborto además vaciaba
   la tabla**; ya no, porque vaciarla destruiría las 880 obras congeladas.
 - **Tres settings**, todos con default y sin secretos: `PG_TRAMO_MAX_FILAS`
-  (1 000 000), `PG_DISCO_TOTAL_GB` (32) y `PG_DISCO_LIMITE_PCT` (80). Un
+  (1 000 000), `PG_DISCO_TOTAL_GB` (64, el disco de hoy) y
+  `PG_DISCO_LIMITE_PCT` (80). Un
   máximo enorme reproduce el comportamiento antiguo si alguna vez hiciera
   falta diagnosticar, sin conservar una rama de código con el arma cargada.
 - Cada tramo deja su fila en `_meta.etl_runs`, así que `python main.py timings`

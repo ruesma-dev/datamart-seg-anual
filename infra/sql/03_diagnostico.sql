@@ -7,8 +7,9 @@
 --        -f infra/sql/03_diagnostico.sql
 --
 -- Responde a tres preguntas del runbook:
---   1. ¿Cuánto espacio queda de los 32 GB compartidos? (puerta de T13: si
---      quedan menos de 14 GB libres, la carga inicial NO empieza)
+--   1. ¿Cuánto espacio queda de los 64 GB compartidos? (puerta de T13: si
+--      quedan menos de 14 GB libres, la carga inicial NO empieza; ese margen
+--      se calculó sobre los 32 GB de entonces y no se ha vuelto a tocar)
 --   2. ¿Quién puede conectarse a cada base?
 --   3. ¿Cómo ha crecido sigrid_dm, por esquema? (medición de T19)
 --
@@ -22,12 +23,14 @@ FROM pg_database
 WHERE datistemplate = false
 ORDER BY pg_database_size(datname) DESC;
 
--- 32 GB es el almacenamiento contratado del Flexible Server. El hueco real es
--- menor que este cálculo (WAL, índices en construcción, ficheros temporales),
--- por eso la puerta de T13 exige 14 GB libres y no 12.
+-- 64 GB es el almacenamiento contratado del Flexible Server desde el
+-- 2026-08-29 (antes 32). Si se vuelve a ampliar, hay que cambiarlo AQUÍ y en
+-- `discoTotalGb` de infra/env/dev.json, que es de donde sale PG_DISCO_TOTAL_GB.
+-- El hueco real es menor que este cálculo (WAL, índices en construcción,
+-- ficheros temporales), por eso la puerta de T13 exige 14 GB libres y no 12.
 SELECT pg_size_pretty(SUM(pg_database_size(datname))::numeric) AS total_ocupado,
        pg_size_pretty(
-           32::numeric * 1024 * 1024 * 1024 - SUM(pg_database_size(datname))::numeric
+           64::numeric * 1024 * 1024 * 1024 - SUM(pg_database_size(datname))::numeric
        ) AS libre_aprox
 FROM pg_database
 WHERE datistemplate = false;
