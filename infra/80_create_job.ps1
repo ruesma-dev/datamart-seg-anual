@@ -174,6 +174,7 @@ Invoke-Az containerapp job create `
         "PG_SET_ROLE=$($CFG.pgSetRole)" `
         "PG_READONLY_ROLE=$($CFG.pgReadonlyRole)" `
         "PG_AUTO_CREATE_DB=$($CFG.pgAutoCreateDb)" `
+        "PG_DISCO_TOTAL_GB=$($CFG.discoTotalGb)" `
         "PG_VENTANA_ACTIVA=$($CFG.ventanaActiva)" `
         "PG_VENTANA_MESES=$($CFG.ventanaMeses)" `
         "PG_VENTANA_DIA_COMPLETA=$($CFG.ventanaDiaCompleta)" `

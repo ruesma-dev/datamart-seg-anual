@@ -182,6 +182,33 @@ def test_f019_r4_maximo_configurable_desde_settings(
     assert configurado.disco_limite_pct == 65.5
 
 
+def test_f019_r8_el_disco_por_defecto_coincide_con_dev_json() -> None:
+    """El tamano del disco vive en UN sitio conceptual y aparece en dos.
+
+    El contenedor no lleva `infra/env/dev.json`, asi que el codigo no puede
+    leerlo en ejecucion: el default de `disco_total_gb` y la clave
+    `discoTotalGb` del entorno se escriben por separado y este test es lo unico
+    que impide que diverjan. Misma red que
+    `test_f024_r19_umbral_por_defecto_coincide_con_dev_json`.
+
+    Que diverjan no es teorico: el disco se amplio de 32 a 64 GB el 2026-08-29,
+    el job no inyectaba `PG_DISCO_TOTAL_GB` y la puerta siguio midiendo contra
+    32. El 2026-09-07 la ocupacion real (37 % de 64 GB) se leia como 74 %, a
+    menos de seis puntos del umbral del 80 % que aborta el build. Una nocturna
+    tumbada cada noche sin que nada estuviera mal.
+    """
+    dev = json.loads(
+        (REPO_ROOT / "infra" / "env" / "dev.json").read_text(encoding="utf-8-sig")
+    )
+    assert (
+        dev["discoTotalGb"]
+        == PostgresSettings.model_fields["disco_total_gb"].default
+    ), (
+        "dev.json y el default de config/settings.py declaran discos distintos: "
+        "la puerta de disco medira contra un tamano que no es el del servidor"
+    )
+
+
 # --- R6 · El SQL filtra por obra en las DOS ramas ----------------------------
 #
 # Tests estáticos: leen el fichero .sql y no ejecutan SQL contra nada. No
