@@ -93,3 +93,70 @@ servidor una vez.
   hay seis. Hay que actualizarlo con `facturas` y con lo que se decida.
 * **El comentario de `postgres_client.py:68-72`** afirma una frontera que ya no
   se cumple; se corrige con el arreglo, sea cual sea.
+
+---
+
+## RESUELTO el 2026-09-07 (y un segundo hallazgo, peor que el primero)
+
+### 1. El permiso: `pg_read_all_stats`, no `CONNECT`
+
+El humano concedió a `sigrid_dm_etl` el **rol predefinido
+`pg_read_all_stats`**, que es mejor que la salida 1 de arriba:
+
+* permite `pg_database_size` sobre **cualquier** base **sin `CONNECT`** y **sin
+  dar acceso a los datos** de esa base;
+* **cubre las bases que se creen en el futuro**, que es lo que de verdad falló.
+  Pedir `CONNECT` sobre `facturas` habría arreglado el lunes y nos habría dejado
+  esperando la próxima base nueva.
+
+Verificado el mismo día: `pg_has_role('sigrid_dm_etl','pg_read_all_stats',
+'member')` devuelve `t` y `SELECT SUM(pg_database_size(datname)) FROM
+pg_database` devuelve las **nueve** bases del servidor sin error.
+
+Así que **la salida 2 (filtrar por permiso) no se implementa**: habría dejado la
+medición parcial y subestimando la ocupación, que es justo el riesgo que la
+puerta vigila. El SQL de `SQL_OCUPACION_DISCO` se queda **tal cual**.
+
+El comentario de `postgres_client.py` que afirmaba la frontera vieja ya está
+reescrito con lo que hoy es cierto.
+
+### 2. El hallazgo: la puerta medía contra un disco que no existe
+
+Al comprobar el arreglo salió algo que nadie estaba buscando. El disco del
+servidor **se amplió de 32 a 64 GB el 2026-08-29**, pero el job **no declaraba
+`PG_DISCO_TOTAL_GB`**, así que la puerta usaba el defecto de
+`config/settings.py`, que seguía diciendo 32.
+
+| medida | contra 32 GB (lo que veía) | contra 64 GB (lo real) |
+|---|---|---|
+| 25.537.336.573 bytes ocupados | **74,32 %** | **37,16 %** |
+
+El umbral al que la puerta **aborta el build** es el 80 %. Estaba a **menos de
+seis puntos** de tumbar la nocturna todas las noches sin que nada estuviera mal,
+y la ingesta de `raw` pendientes de F-066 añade ~0,9 GB, que la habría dejado en
+el 77 % ficticio. Es decir: arreglado el permiso, la nocturna habría seguido
+muriendo en semanas, por otra causa y con el mismo síntoma.
+
+Arreglado en tres sitios, para que no vuelva a divergir:
+
+* el defecto de `disco_total_gb` pasa a **64**, con nota fechada;
+* `infra/env/dev.json` declara `discoTotalGb: 64` y **`80_create_job.ps1` la
+  inyecta** como `PG_DISCO_TOTAL_GB` (antes no la pasaba nadie);
+* un test nuevo ata las dos, igual que hace F-024 con el umbral de frescura.
+
+De paso se corrigieron los sitios donde el repositorio afirmaba «32 GB» o «el
+disco compartido con `albaranes` y `partes`»: hoy son **64 GB y seis
+inquilinos**.
+
+## Lo que sigue pendiente
+
+* **Actualizar el job de Azure.** Nada de esto llega a producción hasta que se
+  vuelva a pasar por `80_create_job.ps1` (o se fije la variable en el job):
+  `85_update_job.ps1` solo cambia la imagen y **no toca el entorno**. Mientras
+  tanto el job sigue midiendo contra 32 GB. Lo hace el humano; el implementer no
+  ha ejecutado ningún `.ps1` ni ningún `az`.
+* **`azure-apps/red_postgresql_compartido.md`** sigue hablando de cinco
+  inquilinos donde hay seis, y no menciona `pg_read_all_stats`. Lo actualiza el
+  líder: cruza la frontera de este repositorio.
+* **T31b y T34 de F-025 siguen sin medir**: hacen falta una o dos nocturnas
+  buenas con el job ya actualizado.
