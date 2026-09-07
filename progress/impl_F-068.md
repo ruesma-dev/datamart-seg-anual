@@ -214,7 +214,7 @@ sin nada en PENDIENTE.
 | Evidencia | Valor |
 |---|---|
 | Tests ejecutados y resultado | **3.895 passed, 159 skipped** en `bash harness/init.sh` (0 fallos). De ellos, **23 nuevos** de F-068 |
-| Tiempo de la suite | **435,70 s (7 min 15 s)** |
+| Tiempo de la suite | **601,50 s (10 min 01 s)** en la pasada final; 435,70 s en la anterior |
 | Cobertura de las líneas cambiadas | **100,0 % — 36/36** líneas (`python -m harness.cobertura --base 120d327`), umbral 80 %, nivel `critico`. La puerta de `init.sh` mide la rama entera y da 92,8 % de 752 líneas, porque ahí van también las de F-066 |
 | Mutantes generados y supervivientes | **8 generados, 8 evaluados, 0 supervivientes**. Hicieron falta dos pasadas y los 8 se mataron además a mano: el análisis completo, en `progress/mutacion_F-068.md` |
-| `bash harness/init.sh` | **ENTORNO LISTO** (verde) |
+| `bash harness/init.sh` | **ENTORNO LISTO**, exit 0. La puerta de tamaño de `init.sh` mide F-066 (va por el nombre de la rama); la de F-068 se midió aparte: `python -m harness.tamano --feature F-068` -> **impl 220/220** |
