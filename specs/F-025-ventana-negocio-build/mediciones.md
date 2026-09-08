@@ -589,6 +589,29 @@ delataba el error estaba a la vista y no se usó: **la acotada produjo MÁS fila
 que la completa** (5.361.017 frente a 5.359.591), lo que es imposible si el paso
 estuviera acotado. Análisis completo en `progress/explore_F-025_coste_fijo.md`.
 
+### SEGUNDA NOCTURNA ACOTADA · `p1gq8ks` — 2026-09-08, confirma el ahorro
+
+Escrita aquí a petición del reviewer (pasada 6, observación 2): la citaba el
+líder por chat y no vivía en ningún fichero.
+
+`caj-datamart-seg-dev-p1gq8ks`, **11:16 → 14:19 UTC**, `Succeeded`. Es la
+primera con la imagen `r20260908-1248`, que ya lleva F-066 (25 tablas nuevas) y
+F-068. Los diez pasos en verde y `check-declarados` en **130/130**.
+
+| paso | completa `hamsh8o` | acotada 1 `swtg78p` | acotada 2 `p1gq8ks` |
+|---|---|---|---|
+| `ingest_raw` | 1.832 s | 2.256 s | 2.454 s (con 25 tablas más) |
+| **`build_stg`** | **9.527 s** | **2.740 s (−71,2 %)** | **2.652 s (−72,2 %)** |
+| noche entera | 4 h 52 | 3 h 00 | 3 h 03 |
+
+**Dos mediciones independientes, en dos días distintos y con imágenes
+distintas, dan el mismo resultado.** La segunda ingiere un 26 % más de filas
+(25.491.959 frente a 20.150.778) y aun así `build_stg` baja: la ventana no
+depende del volumen de `raw`.
+
+**Créditos**: mínimo **552 de 576** durante toda la ejecución. La primera
+acotada gastó 21 créditos; ésta, prácticamente ninguno.
+
 ### El defecto que sí destapó esta nocturna: 552 obras de ruido en el censo
 
 De las 552 que entran por `sin_filas`, **512 siguen con cero filas después de
