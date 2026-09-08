@@ -118,6 +118,7 @@ from etl_sigrid.domain.perfil_carga import (
     perfil_de_carga,
 )
 from etl_sigrid.domain.recuentos import (
+    TOLERANCIA_DERIVA_PCT,
     comparar_recuentos,
     formatear as formatear_recuentos,
 )
@@ -1959,8 +1960,38 @@ def _contar_en_sigrid(api, source_table: str, where: str | None) -> int | None:
     return int(filas[0][0]) if filas else None
 
 
+def _horas_desde_ultima_ingesta(pg, paso: str = "ingest_raw") -> float | None:
+    """Horas desde la última ingesta correcta, o `None` si no se pudo saber.
+
+    Es **contexto** del informe de recuentos, no criterio: la deriva esperable
+    del origen es proporcional al tiempo transcurrido. Por eso la excepción se
+    traga entera —una `_meta.v_frescura` que no se puede leer no puede volver
+    rojo un día bueno ni verde uno malo— y por eso se usa la columna de la
+    vista tal cual, sin recalcular nada.
+    """
+    try:
+        filas = pg.fetch_frescura()
+    except Exception:  # noqa: BLE001 — el contexto nunca tumba el veredicto
+        return None
+    return next(
+        (f.horas_desde_ultimo_ok for f in filas if f.paso == paso),
+        None,
+    )
+
+
 @cli.command("check-raw-recuentos")
-def check_raw_recuentos_cmd() -> None:
+@click.option(
+    "--tolerancia-pct",
+    "tolerancia_pct",
+    type=float,
+    default=TOLERANCIA_DERIVA_PCT,
+    show_default=True,
+    help="Porcentaje de filas que Sigrid puede tener DE MÁS en una tabla sin "
+         "que cuente como fallo. Es por tabla y relativo a su tamaño. Con 0 "
+         "se exige igualdad exacta. Que Sigrid tenga filas de MENOS es alarma "
+         "siempre, y esta opción no la afecta.",
+)
+def check_raw_recuentos_cmd(tolerancia_pct: float) -> None:
     """
     ¿Tiene `raw` las mismas filas que Sigrid, tabla a tabla? SOLO LECTURA.
 
@@ -1972,9 +2003,12 @@ def check_raw_recuentos_cmd() -> None:
     No escribe en Sigrid ni registra la ejecución en `_meta.etl_runs`: no es un
     paso del pipeline, es una pregunta. Fuera de `run-all` a propósito.
 
-    Sale 0 solo si las 56 cuadran. Una tabla que Sigrid no pudo contar sale
-    como SIN MEDIR y **también** devuelve 1: «no he podido mirar» no es «está
-    bien».
+    **La tolerancia tiene dirección.** Que Sigrid tenga filas de MÁS es la
+    deriva normal de un ERP vivo frente a una foto, y se acepta mientras no
+    pase de `--tolerancia-pct` en esa tabla. Que las tenga de MENOS es alarma
+    inmediata, sea de una fila: eso no lo hace el paso del tiempo. Una tabla
+    que falta en `raw`, o que Sigrid no pudo contar, sale con código 1 igual
+    que antes: «no he podido mirar» no es «está bien».
     """
     tablas = get_settings().tables_sigrid.get("tables", [])
     pg = _get_pg()
@@ -1990,10 +2024,16 @@ def check_raw_recuentos_cmd() -> None:
                 pg.count_rows("raw", destino) if pg.table_exists("raw", destino) else None
             )
 
-    informe = comparar_recuentos([t["source_table"] for t in tablas], sigrid, raw)
+    informe = comparar_recuentos(
+        [t["source_table"] for t in tablas], sigrid, raw, tolerancia_pct=tolerancia_pct
+    )
 
     click.secho("=== raw frente a Sigrid, tabla a tabla ===", fg="cyan", bold=True)
-    click.echo(formatear_recuentos(informe))
+    click.echo(
+        formatear_recuentos(
+            informe, horas_desde_ingesta=_horas_desde_ultima_ingesta(pg)
+        )
+    )
 
     if not informe.ok:
         sys.exit(1)

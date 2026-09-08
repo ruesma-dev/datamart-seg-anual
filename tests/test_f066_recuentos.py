@@ -28,7 +28,8 @@ from click.testing import CliRunner
 import main
 from etl_sigrid.domain.recuentos import (
     ESTADO_AUSENTE,
-    ESTADO_DISTINTA,
+    ESTADO_DERIVA,
+    ESTADO_FALTAN,
     ESTADO_OK,
     ESTADO_SIN_MEDIR,
     InformeRecuentos,
@@ -38,7 +39,7 @@ from etl_sigrid.domain.recuentos import (
 from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiBusinessError
 
 # ---------------------------------------------------------------------------
-# R16 · el veredicto es dominio puro: los cuatro casos
+# R16 · el veredicto es dominio puro: los seis casos
 # ---------------------------------------------------------------------------
 
 
@@ -49,17 +50,24 @@ def test_f066_r16_todo_cuadra_y_el_informe_esta_conforme() -> None:
 
     assert informe.ok
     assert informe.iguales == ("apu", "res")
-    assert informe.distintas == ()
+    assert informe.toleradas == ()
+    assert informe.faltantes == ()
+    assert informe.sobrantes == ()
     assert informe.ausentes == ()
     assert informe.sin_medir == ()
 
 
-def test_f066_r16_una_tabla_a_medias_sale_en_distintas_con_las_dos_cifras() -> None:
-    """El caso que motiva el comando: la ingesta terminó y faltan 43 filas."""
-    informe = comparar_recuentos(["dcf"], {"dcf": 165_391}, {"dcf": 165_348})
+def test_f066_r16_una_tabla_a_medias_sale_en_faltantes_con_las_dos_cifras() -> None:
+    """El caso que motiva el comando: la ingesta terminó y falta media tabla.
+
+    Las 43 filas del ejemplo original (0,026 %) hoy son deriva tolerada: ese
+    fue justamente el error de criterio que se corrigió el 2026-09-08. Lo que
+    el comando tiene que cazar es esto otro: 45.391 filas, el 27 % de `dcf`.
+    """
+    informe = comparar_recuentos(["dcf"], {"dcf": 165_391}, {"dcf": 120_000})
 
     assert not informe.ok
-    assert informe.distintas == (("dcf", 165_391, 165_348),)
+    assert informe.faltantes == (("dcf", 165_391, 120_000),)
     assert informe.iguales == ()
 
 
@@ -69,7 +77,7 @@ def test_f066_r16_una_tabla_que_no_existe_en_raw_sale_en_ausentes() -> None:
 
     assert not informe.ok
     assert informe.ausentes == ("conest",)
-    assert informe.distintas == ()
+    assert informe.faltantes == ()
 
 
 def test_f066_r16_una_tabla_vacia_en_raw_no_es_una_tabla_ausente() -> None:
@@ -77,7 +85,7 @@ def test_f066_r16_una_tabla_vacia_en_raw_no_es_una_tabla_ausente() -> None:
     informe = comparar_recuentos(["conest"], {"conest": 193}, {"conest": 0})
 
     assert informe.ausentes == ()
-    assert informe.distintas == (("conest", 193, 0),)
+    assert informe.faltantes == (("conest", 193, 0),)
 
 
 def test_f066_r16_el_informe_respeta_el_orden_del_yaml() -> None:
@@ -128,7 +136,7 @@ def test_f066_r17_una_tabla_sin_medir_deja_el_informe_no_conforme() -> None:
 @pytest.mark.parametrize(
     "sigrid, raw",
     [
-        ({"t": 1}, {"t": 2}),      # distinta
+        ({"t": 1}, {"t": 2}),      # Sigrid con menos filas que raw
         ({"t": 1}, {"t": None}),   # ausente
         ({"t": None}, {"t": 1}),   # sin medir
     ],
@@ -173,24 +181,26 @@ def test_f066_r15_cada_linea_dice_su_veredicto_y_sus_cifras() -> None:
     lineas = {ln.split()[0]: ln for ln in formatear(informe).splitlines() if ln.startswith("  ")}
 
     assert ESTADO_OK in lineas["apu"]
-    assert ESTADO_DISTINTA in lineas["dcf"]
+    assert ESTADO_DERIVA in lineas["dcf"]
     assert "165391" in lineas["dcf"].replace(".", "")
     assert "165348" in lineas["dcf"].replace(".", "")
     assert ESTADO_AUSENTE in lineas["conest"]
     assert ESTADO_SIN_MEDIR in lineas["apa"]
 
 
-def test_f066_r15_el_resumen_final_cuenta_las_cuatro_categorias() -> None:
+def test_f066_r15_el_resumen_final_cuenta_las_seis_categorias() -> None:
     informe = comparar_recuentos(
-        ["a", "b", "c", "d"],
-        {"a": 1, "b": 1, "c": 1, "d": None},
-        {"a": 1, "b": 2, "c": None, "d": 1},
+        ["a", "b", "c", "d", "e", "f"],
+        {"a": 1, "b": 1, "c": 1, "d": None, "e": 1_000_000, "f": 1_000_000},
+        {"a": 1, "b": 2, "c": None, "d": 1, "e": 999_800, "f": 900_000},
     )
 
     texto = formatear(informe)
 
     assert "1 iguales" in texto
-    assert "1 distintas" in texto
+    assert "1 con deriva tolerada" in texto
+    assert "1 con filas que faltan en raw" in texto
+    assert "1 con filas que sobran en raw" in texto
     assert "1 ausentes" in texto
     assert "1 sin medir" in texto
 
@@ -250,6 +260,15 @@ class PgDoble:
     def count_rows(self, schema: str, table: str) -> int:
         self.consultadas.append(table)
         return int(self._filas[table])
+
+    def fetch_frescura(self) -> list:
+        """`_meta.v_frescura`, para decir cuánto hace de la última ingesta.
+
+        Es una lectura, y por eso está permitida; devolver la lista vacía deja
+        el informe diciendo que el tiempo transcurrido es desconocido, que es
+        el caso interesante para el resto de tests de este fichero.
+        """
+        return []
 
     def __getattr__(self, nombre: str):
         raise AssertionError(
@@ -322,7 +341,7 @@ def test_f066_r15_una_tabla_a_medias_sale_con_codigo_1(cli) -> None:
     resultado = runner.invoke(main.cli, ["check-raw-recuentos"])
 
     assert resultado.exit_code == 1
-    assert ESTADO_DISTINTA in resultado.output
+    assert ESTADO_FALTAN in resultado.output
 
 
 def test_f066_r15_una_tabla_que_falta_en_raw_sale_con_codigo_1(cli) -> None:

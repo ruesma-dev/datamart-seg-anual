@@ -171,6 +171,17 @@ filtro, el `COUNT(*)` de Sigrid con el de `raw`. Es de solo lectura, va fuera de
 `run-all` y sale con código 1 también cuando Sigrid **no pudo** contestar: «no
 he podido mirar» no es «está bien».
 
+**La tolerancia tiene dirección** (corregido el 2026-09-08, tras la primera
+medición real). Exigir igualdad exacta era inalcanzable: Sigrid es un ERP vivo
+y el datamart una foto, así que cinco horas después de la ingesta 25 de 56
+tablas tenían filas de más —4.883 sobre 25.287.500, un 0,0193 %— y ninguna de
+menos. Ahora las filas **de más** en Sigrid son deriva normal y se aceptan
+mientras no pasen de `--tolerancia-pct` (0,05 % por defecto, relativo a cada
+tabla); las filas de **menos** son alarma inmediata, sea de una fila, porque
+eso no lo hace el paso del tiempo sino un borrado en origen, una ingesta
+duplicada o una carga equivocada. `AUSENTE EN RAW` y `SIN MEDIR` siguen siendo
+fallo con cualquier tolerancia.
+
 ### El datamart en Azure (F-005)
 
 - **No hay servidor propio.** La base `sigrid_dm` vive dentro de
