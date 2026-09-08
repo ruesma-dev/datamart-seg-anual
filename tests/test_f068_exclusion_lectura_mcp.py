@@ -437,3 +437,186 @@ def test_f068_r8_esta_escrito_que_es_temporal() -> None:
     ):
         assert "TEMPORAL" in texto, f"{nombre} no dice que la exclusión es temporal"
         assert "F-068" in texto, f"{nombre} no cita la feature que lo decidió"
+
+
+# ---------------------------------------------------------------------------
+# R9 · la regla del catálogo no depende de que la tabla exista HOY
+# ---------------------------------------------------------------------------
+#
+# El agujero que cerró la revisión de F-068: el cliente filtraba de la lista de
+# exclusión las tablas que no existen —necesario para el `REVOKE ... ON TABLE`,
+# que fallaría sobre una tabla ausente— y la función pura derivaba de ESA lista
+# ya filtrada qué esquemas cambian su `ALTER DEFAULT PRIVILEGES`. Resultado: un
+# `DROP` de `raw.emp` desactivaba solo la mitad que protege el futuro, la
+# nocturna reponía la regla del catálogo y la siguiente `raw.emp` nacía
+# legible. Es justo el escenario para el que se diseñó la segunda mitad.
+
+
+def test_f068_r9_el_catalogo_se_revoca_aunque_la_tabla_no_exista() -> None:
+    """
+    La regla de `ALTER DEFAULT PRIVILEGES` se declara sobre el ESQUEMA, no
+    sobre la tabla: no necesita que la tabla exista y es precisamente lo que
+    protege a la tabla que aún no ha nacido.
+    """
+    sentencias = build_readonly_grant_statements(
+        ROL,
+        DUENO,
+        TODOS_LOS_ESQUEMAS,
+        excluded_tables=["raw.emp", "raw.res"],
+        missing_tables=["raw.emp", "raw.res"],
+    )
+
+    esperada = (
+        f'ALTER DEFAULT PRIVILEGES FOR ROLE "{DUENO}" IN SCHEMA "raw" '
+        f'REVOKE SELECT ON TABLES FROM "{ROL}"'
+    )
+    assert esperada in sentencias, (
+        "sin ninguna de las tablas excluidas presente se deja de revocar el "
+        "privilegio por defecto de raw: la siguiente tabla nacería legible"
+    )
+
+    prohibida = (
+        f'ALTER DEFAULT PRIVILEGES FOR ROLE "{DUENO}" IN SCHEMA "raw" '
+        f'GRANT SELECT ON TABLES TO "{ROL}"'
+    )
+    assert prohibida not in sentencias
+
+
+def test_f068_r9_la_tabla_ausente_no_recibe_revoke_de_tabla() -> None:
+    """
+    La otra mitad sigue filtrándose: un `REVOKE ... ON TABLE` sobre una tabla
+    que no existe da error y tumbaría el paso. Las dos listas son distintas y
+    cada una manda sobre lo suyo.
+    """
+    sentencias = build_readonly_grant_statements(
+        ROL,
+        DUENO,
+        TODOS_LOS_ESQUEMAS,
+        excluded_tables=["raw.emp", "raw.res"],
+        missing_tables=["raw.res"],
+    )
+
+    revokes_de_tabla = [
+        s for s in sentencias if s.startswith("REVOKE ALL PRIVILEGES ON TABLE")
+    ]
+    assert revokes_de_tabla == [
+        f'REVOKE ALL PRIVILEGES ON TABLE "raw"."emp" FROM "{ROL}"'
+    ]
+
+
+def test_f068_r9_sin_lista_de_ausentes_se_revoca_todo_lo_declarado() -> None:
+    """
+    El defecto es el seguro: quien no diga qué falta, revoca lo declarado. Un
+    llamante que se olvide del parámetro falla ruidosamente contra la BBDD, no
+    en silencio dejando la tabla legible.
+    """
+    sentencias = build_readonly_grant_statements(
+        ROL, DUENO, TODOS_LOS_ESQUEMAS, excluded_tables=["raw.emp", "raw.res"]
+    )
+
+    revokes_de_tabla = [
+        s for s in sentencias if s.startswith("REVOKE ALL PRIVILEGES ON TABLE")
+    ]
+    assert len(revokes_de_tabla) == 2
+
+
+def test_f068_r9_el_cliente_mantiene_el_catalogo_tras_un_drop() -> None:
+    """
+    El test de extremo a extremo del agujero, con el cliente real: `raw.emp`
+    no existe (un DROP manual, o una tabla de personal que aún no se ha
+    ingerido) y la nocturna NO puede reponer el privilegio por defecto de
+    `raw`, porque entonces la siguiente `raw.emp` nacería legible.
+    """
+    from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+
+    ejecutadas: list[str] = []
+
+    class _Cursor:
+        def execute(self, stmt: str) -> None:
+            ejecutadas.append(stmt)
+
+        def __enter__(self) -> _Cursor:
+            return self
+
+        def __exit__(self, *a: object) -> None:
+            return None
+
+    class _Conn:
+        def cursor(self) -> _Cursor:
+            return _Cursor()
+
+        def __enter__(self) -> _Conn:
+            return self
+
+        def __exit__(self, *a: object) -> None:
+            return None
+
+    cliente = PostgresClient.__new__(PostgresClient)
+    cliente._target_db = "sigrid_dm"  # type: ignore[attr-defined]
+    cliente.list_schemas = lambda: ["raw", "mart"]  # type: ignore[method-assign]
+    cliente.table_exists = lambda esquema, tabla: False  # type: ignore[method-assign]
+    cliente.connection = lambda: _Conn()  # type: ignore[method-assign]
+
+    cliente.apply_readonly_grants(
+        readonly_role=ROL,
+        owner_role=DUENO,
+        schemas=["raw", "mart"],
+        excluded_tables=["raw.emp", "raw.res"],
+    )
+
+    revoke_catalogo = (
+        f'ALTER DEFAULT PRIVILEGES FOR ROLE "{DUENO}" IN SCHEMA "raw" '
+        f'REVOKE SELECT ON TABLES FROM "{ROL}"'
+    )
+    grant_catalogo = (
+        f'ALTER DEFAULT PRIVILEGES FOR ROLE "{DUENO}" IN SCHEMA "raw" '
+        f'GRANT SELECT ON TABLES TO "{ROL}"'
+    )
+    assert revoke_catalogo in ejecutadas
+    assert grant_catalogo not in ejecutadas, (
+        "con las tablas excluidas ausentes la nocturna repone la regla del "
+        "catálogo sobre raw: la siguiente raw.emp nace legible"
+    )
+
+    # Y no intenta revocar sobre tablas que no existen, que era el motivo del
+    # filtro.
+    assert not any(s.startswith("REVOKE ALL PRIVILEGES ON TABLE") for s in ejecutadas)
+
+
+# ---------------------------------------------------------------------------
+# R10 · el fichero de provisión, sin ventana y sin esquemas a mano
+# ---------------------------------------------------------------------------
+
+
+def test_f068_r10_el_grant_y_su_revoke_van_en_una_transaccion() -> None:
+    """
+    `psql` sin `BEGIN` explícito confirma cada sentencia por separado: entre el
+    GRANT del punto 5 y el primer REVOKE del 5 bis las tablas quedan legibles,
+    y si el script muere ahí con ON_ERROR_STOP quedan legibles Y confirmadas.
+    Las dos mitades tienen que ser atómicas.
+    """
+    sql = (REPO_ROOT / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+
+    apertura = sql.index("\nBEGIN;")
+    cierre = sql.index("\nCOMMIT;")
+    grant_esquemas = sql.index("GRANT SELECT ON ALL TABLES IN SCHEMA")
+    ultimo_revoke = sql.rindex("REVOKE SELECT ON TABLES FROM")
+
+    assert apertura < grant_esquemas, "el GRANT del punto 5 queda fuera de la transacción"
+    assert ultimo_revoke < cierre, "el REVOKE del punto 5 bis queda fuera de la transacción"
+
+
+def test_f068_r10_el_esquema_del_catalogo_no_esta_escrito_a_mano() -> None:
+    """
+    `grants.py` deriva de la lista qué esquemas cambian su privilegio por
+    defecto; este fichero escribía `raw` a mano. Con una exclusión en otro
+    esquema (PG_EXCLUDED_TABLES) la nocturna lo resolvería y el fichero de
+    provisión no, y el rol nacería con la regla puesta sobre ese esquema.
+    """
+    sql = (REPO_ROOT / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+
+    assert "ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA raw " not in sql, (
+        "el esquema del ALTER DEFAULT PRIVILEGES del punto 5 bis sigue escrito "
+        "a mano; hay que derivarlo de la lista de tablas excluidas"
+    )
+    assert "split_part(objeto, '.', 1)" in sql

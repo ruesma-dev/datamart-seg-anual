@@ -54,6 +54,7 @@ def build_readonly_grant_statements(
     *,
     database: str | None = None,
     excluded_tables: Sequence[str] = (),
+    missing_tables: Sequence[str] = (),
 ) -> list[str]:
     """
     Sentencias que dejan a `readonly_role` con lectura sobre `schemas`.
@@ -81,6 +82,20 @@ def build_readonly_grant_statements(
         esté puesta, una tabla que nazca en ese esquema es legible sin que
         nadie ejecute un GRANT, y dejar de emitirla NO la borra. Hay que
         emitir su REVOKE.
+
+    `missing_tables` son las de `excluded_tables` que HOY no existen en la
+    base. Solo se les quita el `REVOKE ... ON TABLE`, que fallaría sobre una
+    tabla ausente; la regla del catálogo se emite igual, porque se declara
+    sobre el ESQUEMA y es precisamente la que protege a la tabla que todavía
+    no ha nacido. Las dos listas van separadas por eso: derivar los esquemas
+    con exclusión de las tablas existentes desactivaba la protección justo en
+    el escenario para el que se diseñó —tras un `DROP` de `raw.emp` la
+    nocturna reponía el GRANT por defecto y la siguiente `raw.emp` nacía
+    legible— (agujero cazado en la revisión de F-068, 2026-09-08).
+
+    El defecto es el seguro: quien no diga qué falta, revoca todo lo
+    declarado. Equivocarse por ahí da un error contra la BBDD, ruidoso; al
+    revés dejaría la tabla legible en silencio.
     """
     ro = sql.Identifier(readonly_role)
     sentencias: list[sql.Composable] = []
@@ -90,7 +105,15 @@ def build_readonly_grant_statements(
     # configuración y se denuncia siempre, no solo cuando toca revocar.
     excluidas = [partir_tabla_cualificada(t) for t in excluded_tables]
     aplicables = [(esq, tab) for esq, tab in excluidas if esq in set(schemas)]
+
+    # Los esquemas con exclusión salen de lo DECLARADO, no de lo que exista
+    # hoy: la regla del catálogo no necesita la tabla para valer, y quitarla
+    # cuando la tabla no está es justo lo contrario de lo que hace falta.
     esquemas_con_exclusion = {esq for esq, _ in aplicables}
+
+    # Lo que sí necesita la tabla presente es el REVOKE tabla a tabla.
+    ausentes = {partir_tabla_cualificada(t) for t in missing_tables}
+    revocables = [par for par in aplicables if par not in ausentes]
 
     if database:
         sentencias.append(
@@ -135,7 +158,7 @@ def build_readonly_grant_statements(
 
     # Al final del todo: el GRANT del esquema ya ha pasado y esto lo deshace
     # tabla a tabla. En el orden contrario no serviría de nada.
-    for esquema, tabla in aplicables:
+    for esquema, tabla in revocables:
         sentencias.append(
             sql.SQL("REVOKE ALL PRIVILEGES ON TABLE {} FROM {}").format(
                 sql.Identifier(esquema, tabla), ro

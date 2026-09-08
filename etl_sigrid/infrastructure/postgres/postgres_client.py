@@ -1276,11 +1276,16 @@ class PostgresClient:
         algo que no es un problema.
 
         `excluded_tables` (F-068) son tablas `esquema.tabla` que el rol NO debe
-        poder leer. Se filtran por existencia con el mismo criterio: un REVOKE
-        sobre una tabla que aún no se ha ingerido daría error y tumbaría el
-        paso. Ojo con la lectura de ese filtro: que una tabla excluida no
-        exista NO es un agujero —si no existe, no hay nada que leer—, pero sí
-        se avisa, porque lo normal es que sea una errata en la lista.
+        poder leer. El filtro por existencia alcanza SOLO al `REVOKE ... ON
+        TABLE`, que sobre una tabla que aún no se ha ingerido daría error y
+        tumbaría el paso: la lista entera se le pasa igualmente a
+        `build_readonly_grant_statements` para que el esquema conserve el
+        `ALTER DEFAULT PRIVILEGES ... REVOKE`. Esa regla vive en el catálogo y
+        no necesita que la tabla exista; es la que impide que la siguiente
+        `raw.emp` nazca legible después de un `DROP`. Filtrarla también aquí
+        desactivaba la protección justo en ese escenario (agujero cazado en la
+        revisión de F-068, 2026-09-08). Que una tabla excluida no exista se
+        avisa igual, porque lo normal es que sea una errata en la lista.
         """
         existentes = set(self.list_schemas())
         pedidos = list(schemas)
@@ -1291,14 +1296,12 @@ class PostgresClient:
 
         # La validación de forma la hace `build_readonly_grant_statements`;
         # aquí solo hace falta separar esquema y tabla para preguntar por ella.
-        excluidas: list[str] = []
+        excluidas = list(excluded_tables)
         sin_tabla: list[str] = []
-        for entrada in excluded_tables:
+        for entrada in excluidas:
             esquema, tabla = partir_tabla_cualificada(entrada)
             if esquema in aplicables and not self.table_exists(esquema, tabla):
                 sin_tabla.append(entrada)
-            else:
-                excluidas.append(entrada)
         if sin_tabla:
             logger.warning("grants_tablas_excluidas_inexistentes", tables=sin_tabla)
 
@@ -1308,6 +1311,7 @@ class PostgresClient:
             aplicables,
             database=self._target_db,
             excluded_tables=excluidas,
+            missing_tables=sin_tabla,
         )
         if not sentencias:
             return []
@@ -1321,6 +1325,7 @@ class PostgresClient:
             role=readonly_role,
             schemas=aplicables,
             excluded_tables=excluidas,
+            excluded_tables_missing=sin_tabla,
             statements=len(sentencias),
         )
         return sentencias
