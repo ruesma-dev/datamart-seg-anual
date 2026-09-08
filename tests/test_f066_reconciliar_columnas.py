@@ -550,3 +550,39 @@ def test_f066_r27_un_tipo_con_parentesis_sin_cerrar_no_revienta() -> None:
 
     assert _tipo_normalizado("varchar(30") == "varchar(30"
     assert _tipo_normalizado("") == ""
+
+
+def test_f066_r28_el_log_no_puede_mentir_sobre_como_nace_la_columna(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El log dice `nullable=True`, y el DDL emitido tiene que respaldarlo.
+
+    Es la única evidencia que tendrá un humano leyendo la traza de la nocturna
+    a las 00:00 UTC: si alguien cambiara el `ADD COLUMN` a `NOT NULL` y dejara
+    el log diciendo `nullable=True`, la traza estaría mintiendo sobre un
+    cambio de esquema en producción, que es peor que no registrarlo. Este test
+    ata las dos mitades: lo que se ejecuta y lo que se cuenta que se ejecutó.
+    """
+    from etl_sigrid.infrastructure.postgres import postgres_client as pc
+
+    cliente, cursor = _cliente(monkeypatch, _DCF_EN_AZURE)
+    eventos: list[tuple[str, dict[str, Any]]] = []
+
+    def _info(evento: str, **kwargs: Any) -> None:
+        eventos.append((evento, kwargs))
+
+    monkeypatch.setattr(pc.logger, "info", _info)
+
+    cliente.ensure_raw_table("dcf", _DCF_ESPERADA, primary_key="ide")
+
+    anadidas = [kwargs for _, kwargs in eventos if kwargs.get("column") is not None]
+    assert anadidas, "no se ha registrado ninguna columna añadida"
+
+    alter = next(s for s in cursor.ejecutadas if "ALTER TABLE" in s)
+    for kwargs in anadidas:
+        assert kwargs["nullable"] is True, (
+            f"el log dice que {kwargs['column']} NO nace nullable: {kwargs}"
+        )
+        assert "NOT NULL" not in alter, (
+            f"el log dice nullable=True y el DDL dice NOT NULL: {alter}"
+        )
