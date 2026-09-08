@@ -1971,7 +1971,7 @@ def _horas_desde_ultima_ingesta(pg, paso: str = "ingest_raw") -> float | None:
     """
     try:
         filas = pg.fetch_frescura()
-    except Exception:  # noqa: BLE001 — el contexto nunca tumba el veredicto
+    except Exception:  # el contexto nunca puede tumbar el veredicto
         return None
     return next(
         (f.horas_desde_ultimo_ok for f in filas if f.paso == paso),

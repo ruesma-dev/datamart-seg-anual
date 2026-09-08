@@ -13,6 +13,21 @@
 
 ## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
 
+**F-066 · EL CRITERIO DE `check-raw-recuentos`, CORREGIDO (2026-09-08).** El
+comando exigia igualdad exacta y eso era inalcanzable por diseno: Sigrid es un
+ERP vivo y el datamart una foto. La primera comparacion real dio 31 iguales y
+25 distintas, las 25 con Sigrid POR ENCIMA y ninguna al reves (4.883 filas
+sobre 25.287.500, 0,0193 %), y salia con codigo 1. Ahora la tolerancia tiene
+**direccion**: filas de mas en Sigrid son deriva y se toleran hasta
+`--tolerancia-pct` (0,05 % por tabla, relativo); filas de MENOS son alarma
+inmediata sea de una fila; `ausentes` y `sin_medir` siguen siendo fallo.
+Informe: `progress/impl_F-066_tolerancia_recuentos.md`. Commits `da965c8`,
+`29f7c62` y `4a3cd2c` de esta rama. **Aviso**: el T1 arrastro los tres
+ficheros de `specs/F-070-auditoria-calidad-diccionario/` que estaban en el
+indice de la sesion anterior, y el T2 los cambios sin commitear de
+`harness/features.json` y `BACKLOG.md` (repriorizacion del backlog); no se ha
+perdido nada, pero no son mios.
+
 **F-068 ESTA IMPLEMENTADA Y ESPERA DOS COSAS DEL HUMANO** (2026-09-07). El
 codigo esta en la rama `feature/F-066-ingesta-raw-pendientes` (las dos van
 juntas en la misma imagen) y el informe en `progress/impl_F-068.md`. Lo que

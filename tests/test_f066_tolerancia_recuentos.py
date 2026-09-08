@@ -61,7 +61,7 @@ _MEDIDAS = (
 )
 
 #: Las otras veinte que también derivaron, con desviaciones más pequeñas.
-_RESTO = tuple((f"t{i:02d}", 186_235, 13) for i in range(19)) + (("t19", 186_251, 16),)
+_RESTO = (*[(f"t{i:02d}", 186_235, 13) for i in range(19)], ("t19", 186_251, 16))
 
 #: Y las treinta y una que cuadraron al alma.
 _IGUALES = tuple((f"q{i:02d}", 1_000, 0) for i in range(31))
@@ -215,8 +215,10 @@ def test_f066_r16_la_tolerancia_por_defecto_cae_en_la_unica_ventana_util() -> No
     peor_dia_medido = 100 * 3_969 / 13_884_933
     pagina_perdida = 100 * 10_000 / 13_884_933
 
-    assert TOLERANCIA_DERIVA_PCT >= peor_dia_medido * 1.5, "se pondría rojo un día normal"
-    assert TOLERANCIA_DERIVA_PCT < pagina_perdida, "no vería una página perdida"
+    umbral = TOLERANCIA_DERIVA_PCT
+
+    assert umbral >= peor_dia_medido * 1.5, "se pondría rojo un día normal"
+    assert umbral < pagina_perdida, "no vería una página perdida"
 
 
 def test_f066_r16_una_pagina_perdida_de_la_ingesta_no_pasa_la_tolerancia() -> None:
@@ -340,7 +342,7 @@ def test_f066_r15_la_linea_de_cada_tabla_lleva_su_desviacion() -> None:
         ["obrparpre"], {"obrparpre": 13_884_933}, {"obrparpre": 13_880_964}
     )
 
-    linea = [ln for ln in formatear(informe).splitlines() if ln.startswith("  ")][0]
+    linea = next(ln for ln in formatear(informe).splitlines() if ln.startswith("  "))
 
     assert "0,0286 %" in linea
     assert ESTADO_DERIVA in linea
@@ -354,7 +356,7 @@ def test_f066_r16_una_tabla_vaciada_en_origen_se_lee_al_cien_por_cien() -> None:
     """
     informe = comparar_recuentos(["conest"], {"conest": 0}, {"conest": 193})
 
-    linea = [ln for ln in formatear(informe).splitlines() if ln.startswith("  ")][0]
+    linea = next(ln for ln in formatear(informe).splitlines() if ln.startswith("  "))
 
     assert informe.recuentos[0].desviacion_pct == 100.0
     assert "100,0000 %" in linea
