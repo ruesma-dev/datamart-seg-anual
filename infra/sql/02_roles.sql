@@ -97,6 +97,20 @@ RESET ROLE;
 --    OJO: este bloque concede `raw` ENTERO, y eso incluye tablas con datos
 --    personales. El punto 5 bis, justo debajo, se las quita. No se puede
 --    hacer aquí: `GRANT SELECT ON ALL TABLES IN SCHEMA` no admite excepciones.
+--
+--    LA TRANSACCIÓN QUE ABRE AQUÍ Y CIERRA AL FINAL DEL 5 BIS NO ES ADORNO.
+--    Sin `BEGIN` explícito, psql confirma cada `DO` por separado: entre el
+--    GRANT de este punto y el primer REVOKE del 5 bis los datos personales
+--    quedan legibles, y si el script muere justo ahí con ON_ERROR_STOP quedan
+--    legibles Y CONFIRMADOS, sin que nadie lo note. En PostgreSQL GRANT,
+--    REVOKE y ALTER DEFAULT PRIVILEGES son transaccionales, así que las dos
+--    mitades entran juntas o no entra ninguna. Si aun así el script se corta
+--    entre el BEGIN y el COMMIT (se cae la sesión, Ctrl-C), el servidor hace
+--    rollback y el rol se queda como estaba: se vuelve a ejecutar el fichero
+--    entero, que es reejecutable. Lo que NO se puede hacer es dar por buena
+--    una ejecución cortada y seguir.
+BEGIN;
+
 DO $$
 DECLARE
     esquema text;
@@ -180,6 +194,7 @@ SET ROLE sigrid_dm_etl;
 DO $$
 DECLARE
     objeto text;
+    esquema text;
 BEGIN
     FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res']
     LOOP
@@ -193,12 +208,32 @@ BEGIN
     -- La regla de privilegios por defecto: es lo que haría legible una tabla
     -- recreada sin que nadie ejecutase un GRANT. Se declara POR rol creador,
     -- y el creador es este.
-    EXECUTE
-        'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA raw '
-        'REVOKE SELECT ON TABLES FROM mcp_sigrid_dm_ro';
+    --
+    -- El esquema se DERIVA de la lista, igual que hace `grants.py`: escribir
+    -- `raw` a mano funcionaba mientras las dos exclusiones fueran de `raw`,
+    -- pero el día que PG_EXCLUDED_TABLES traiga una tabla de otro esquema la
+    -- nocturna lo resolvería y este fichero no, y el rol nacería con la regla
+    -- puesta sobre ese esquema. Y a diferencia del REVOKE de tabla, esta
+    -- regla NO necesita que la tabla exista: se declara sobre el esquema y es
+    -- justo lo que protege a la que todavía no ha nacido.
+    FOR esquema IN
+        -- El alias NO puede llamarse `objeto`: plpgsql daría «column
+        -- reference is ambiguous» contra la variable de arriba.
+        SELECT DISTINCT split_part(excluida, '.', 1)
+        FROM unnest(ARRAY['raw.emp', 'raw.res']) AS excluida
+    LOOP
+        IF to_regnamespace(esquema) IS NOT NULL THEN
+            EXECUTE format(
+                'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
+                'REVOKE SELECT ON TABLES FROM mcp_sigrid_dm_ro', esquema
+            );
+        END IF;
+    END LOOP;
 END
 $$;
 RESET ROLE;
+
+COMMIT;
 
 -- 6. Comprobaciones. Deben salir: los tres roles, sigrid_dm_app dentro de
 --    sigrid_dm_etl, y los nueve esquemas.

@@ -24,6 +24,11 @@ es donde una revocación suelta se pierde:
       revoca sobre las tablas que existen.
   R8  `infra/sql/02_roles.sql` excluye exactamente las mismas tablas que el
       código, y ambos sitios dicen que esto es TEMPORAL.
+  R9  La regla del catálogo (`ALTER DEFAULT PRIVILEGES`) se revoca aunque la
+      tabla excluida no exista hoy: es la que protege a la que aún no ha
+      nacido. Solo el REVOKE tabla a tabla se filtra por existencia.
+  R10 `02_roles.sql` mete el GRANT y su REVOKE en una transacción, y deriva de
+      la lista el esquema cuyo privilegio por defecto revoca.
 
 Sin red ni BBDD: `build_readonly_grant_statements` es una función pura y el
 paso se prueba con un cliente Postgres de mentira.
@@ -595,7 +600,12 @@ def test_f068_r10_el_grant_y_su_revoke_van_en_una_transaccion() -> None:
     y si el script muere ahí con ON_ERROR_STOP quedan legibles Y confirmadas.
     Las dos mitades tienen que ser atómicas.
     """
-    sql = (REPO_ROOT / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+    crudo = (REPO_ROOT / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+    # Sin las líneas de comentario: los comentarios de este fichero citan las
+    # sentencias, y una cita no abre ni cierra ninguna transacción.
+    sql = "\n".join(
+        linea for linea in crudo.splitlines() if not linea.lstrip().startswith("--")
+    )
 
     apertura = sql.index("\nBEGIN;")
     cierre = sql.index("\nCOMMIT;")
@@ -619,4 +629,4 @@ def test_f068_r10_el_esquema_del_catalogo_no_esta_escrito_a_mano() -> None:
         "el esquema del ALTER DEFAULT PRIVILEGES del punto 5 bis sigue escrito "
         "a mano; hay que derivarlo de la lista de tablas excluidas"
     )
-    assert "split_part(objeto, '.', 1)" in sql
+    assert "split_part(excluida, '.', 1)" in sql
