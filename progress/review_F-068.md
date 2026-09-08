@@ -1,138 +1,140 @@
 <!-- progress/review_F-068.md -->
-Revisión completa (pasada 1) · rango `120d327..7d7c0f8` · árbol en `96bb7b9`
+Revisión incremental desde `96bb7b9` (pasada 2) · rango `96bb7b9..f2fb04d`
 
 # F-068 · Review
 
-## Veredicto: CHANGES_REQUESTED
+## Veredicto: APPROVED
 
-**No es un rechazo del enfoque.** El mecanismo es correcto, la campaña de
-mutación es honesta y reproducible, y la revocación está verificada en
-producción. Bloquea **un agujero real en la segunda mitad del mecanismo**
-(cambio 1), que se desactiva sola justo en el escenario para el que se diseñó y
-no la cubre ningún test. Los demás cambios son pequeños.
-
-**Nivel de rigor: `critico`** (declarado en la ficha). Exige C1–C5 + tests
-trazables + fase RED + cobertura ≥ 80 % + **cero supervivientes** en mutación +
-verificaciones MANUAL listadas.
+Los seis puntos están cerrados. El bloqueante lo está **de verdad**: reproduje
+el agujero sobre una copia y ahora muere. La exención de la campaña automática
+de mutación es legítima, y la comprobé en vez de creérmela. **Rigor `critico`**:
+C1–C5 + fase RED + cobertura ≥ 80 % + cero supervivientes + verificaciones
+MANUAL. **Lo aprobado hasta `96bb7b9` queda dado por bueno**: el delta no cambia
+firmas públicas ni mueve ficheros; sí amplía el alcance medido, y por eso lo
+recalculé entero. **No cuento F-066.**
 
 ## Checkpoints
 
-- **C1 [x]** — `bash harness/init.sh` sobre `96bb7b9`: **exit 0**, `3961 passed,
-  159 skipped` en 450,8 s, `PUERTA COBERTURA 93.6 % de 841 líneas (787/841, umbral
-  80 %, nivel critico)`. Existen los siete ficheros del arnés.
-- **C2 [ ]** — La rama en curso es `feature/F-066-ingesta-raw-pendientes` y la
-  ficha declara `branch: feature/F-068-mcp-datos-personales-raw`, **que no existe**
-  (`git branch -a`). Compartir rama es defendible —van en la misma imagen—, pero
-  entonces la ficha miente. Una feature `in_progress` ✓.
-- **C3 [x]** — Hexagonal respetada: la lista en `config/settings.py`, el SQL puro
-  en `grants.py` (sin conexión), el I/O en `postgres_client.py`, la orquestación
-  en `application/steps/`. Primera línea con la ruta en los cinco ficheros. Sin
-  `print()`, sin secretos, sin dependencias nuevas. Identificadores con
-  `sql.Identifier`, con test antiinyección (`r5`).
-- **C3 bis N/A** — justificado: el diff no toca nada bajo `docs/referencia/`, así que no hay documento de fuera que barrer.
-- **C4 [x]** — Trazabilidad abajo. Los 18 tests son puros (función pura, un
-  `_ClienteFalso` y un `PostgresClient.__new__` con `connection` sustituida): ni
-  red ni BBDD. Doble contrastado con el original: `apply_readonly_grants`
-  (línea 1262) y `role_exists` (1250) existen con la misma firma. Verificaciones
-  MANUAL en `current.md` 31-42, con puntero al SQL exacto de `impl_F-068.md`.
-- **C5 [x]** — `tasks.md` N/A por `sdd: false`; los tres commits de código usan
-  `F-068 Tn: ...`. Sin artefactos sospechosos. `features.json` dice el estado real.
+- **C1 [x]** — `bash harness/init.sh` sobre `f2fb04d`: **exit 0**, `3967 passed,
+  159 skipped` en 417,04 s, `PUERTA COBERTURA 93.6 % (788/842, umbral 80 %,
+  nivel critico)`. Clavado con lo que declara el informe.
+- **C2 [x]** — punto 6 resuelto: la ficha declara
+  `feature/F-066-ingesta-raw-pendientes`, que **existe y es la rama actual**, y
+  dice por qué se comparte. Una feature `in_progress`: F-068.
+- **C3 [x]** — el delta se queda en su capa: SQL puro en `grants.py` (sin
+  conexión), el I/O en `postgres_client.py`, `02_roles.sql` en `infra/`. Sin
+  `print()`, secretos ni dependencias nuevas. `ruff` deja **un** aviso, previo:
+  idéntico contra la versión `96bb7b9` del fichero.
+- **C3 bis N/A** — justificado: el delta no toca `docs/referencia/`.
+- **C4 [x]** — trazabilidad abajo. Los seis tests nuevos son puros (función
+  pura, `PostgresClient.__new__` con `connection`/`table_exists` sustituidos,
+  texto del `.sql`): ni red ni BBDD. Verificado, 42 passed en 1,6 s.
+- **C5 [x]** — `tasks.md` N/A por `sdd: false`; los siete commits usan
+  `F-068 Tn: ...` y `features.json` dice el estado real.
 
 ## C4 bis · verificación del rigor
 
-- **Fase RED [x]** — traza real pegada (`23 failed`, más `TypeError: ... keyword argument 'excluded_tables'` e `ImportError: ... DEFAULT_EXCLUDED_TABLES`).
-- **Mutación [x], recalculada por mí** (cobertura: puerta en `[OK]`, 93,6 %) — `harness.alcance` sobre
-  `120d327..7d7c0f8` da **49/18/78/31 = 176 líneas**, idéntico al informe;
-  `generar_mutantes` (cálculo puro) da **8 mutantes**, los mismos, mismo operador
-  y mismo texto original→mutado. **Campaña NO reejecutada: 5.937,6 s**, muy por
-  encima del umbral de 60 s.
-- **RM1 [x]** — SHA medido `31d5085`; hasta `7d7c0f8` solo cambian dos ficheros
-  de `progress/`. Lo posterior (F-066, F-025) toca `postgres_client.py` pero
-  **no** `apply_readonly_grants`.
-- **RM2 [x]** — base 256-263 s/worker, media 742,2 s, 8 × 742,2 = 5.937,6 s:
-  coherente. Salió **más lenta**, no más rápida: contraria a la del fraude.
-  **RM3 / RM5 N/A**: no se declara ningún mutante equivalente.
-- **RM4 [x], reproducidos 5 de 8 sobre una COPIA en scratchpad** (`git archive
-  7d7c0f8`, nunca el árbol real; base `36 passed`). Los cuatro timeouts «matados a
-  mano» y el superviviente falso de la 1.ª pasada dan **exactamente** los números
-  del informe: `grants.py:47 partes[0]→partes[1]` 7 failed; `partes[1]→partes[2]`
-  10 failed; `grants.py:42 [not]` **13 failed**; `client:1119 and→or` y `[not]`,
-  1 failed cada uno.
-- **RM6 [x]** — nada se mató quitando guardas: la entrega **añade** (`partir_tabla_cualificada` revienta ante una entrada mal escrita).
+- **Fase RED [x]** — traza real pegada: `TypeError: ... unexpected keyword
+  argument 'missing_tables'`, `ValueError: substring not found` del `BEGIN;` y
+  el `assert ... in [...]` del catálogo, `5 failed, 1 passed`. El log de esa
+  traza (`excluded_tables=[]`) **es el agujero en una línea**.
+- **Cobertura [x]** — puerta en `[OK]`, 93,6 %. **Mutación [x]**, con exención
+  razonada y verificada por mí (abajo). Cero supervivientes.
+- **RM1 [x]** — `git log e78e1e5..HEAD --name-only` confirma que **ni
+  `grants.py` ni `postgres_client.py` cambian después de T1**. Y da igual:
+  reproduje los tres mutantes sobre `f2fb04d`, el HEAD de hoy.
+- **RM2 N/A justificado** — no hay campaña automática que cronometrar (cero
+  mutantes). **RM3 / RM5 N/A**: no se declara ningún equivalente.
+- **RM4 [x], aplicado**: `git archive f2fb04d` a una **copia en el scratchpad**,
+  nunca el árbol real; base 42 passed, copia borrada, `git status` sin código.
+- **RM6 [x]** — no se mató nada quitando una guarda: lo retirado
+  (`else: excluidas.append(...)`) **era** el defecto, y el filtro por existencia
+  se conserva para el `REVOKE ... ON TABLE`. El invariante se comprueba en quien
+  construye el dato: `apply_readonly_grants` calcula `sin_tabla`.
 
-## Trazabilidad `acceptance` → test
+## La campaña de mutación: por qué acepto la exención
 
+**El hueco es real y lo confirmé en el código**: `COMPARACIONES`
+(`harness/mutacion.py:165`) trae `==`, `!=`, `<`, `<=`, `>`, `>=`, `is`,
+`is not` y **no trae `ast.In` / `ast.NotIn`**. La única decisión del delta
+(`par not in ausentes`) es justo eso. **Recálculo independiente**
+(`harness.alcance` + `harness.mutacion`, `96bb7b9..f2fb04d`): **38 líneas de
+producción** (24 + 14) y **0 mutantes**, idéntico al informe. **Prueba de
+control del cero**, lo que distingue «no había nada que mutar» de «el generador
+está roto»: `generar_mutantes` sobre esos mismos ficheros **ignorando el
+alcance** da **6 y 237 mutantes**. El cero viene de las líneas, no de la
+herramienta. **Los tres mutantes manuales los reproduje uno a uno** sobre la
+copia: salen **exactamente** los números y los tests del informe.
+
+| # | Sustitución | Declarado | Medido por mí |
+|---|---|---|---|
+| M1 | `grants.py:117` `revocables = [par for par in aplicables if par not in ausentes]` → `list(aplicables)` | 3 failed (r7, r9×2) | **3 failed**, mismos tests |
+| M2 | `grants.py:113` `esquemas_con_exclusion` derivado de `revocables` (el agujero del review, reintroducido) | 2 failed (r9×2) | **2 failed**, mismos tests |
+| M3 | `postgres_client.py:1314` `missing_tables=sin_tabla` → `missing_tables=()` | 2 failed (r7, r9) | **2 failed**, mismos tests |
+
+**Mi juicio: exención razonable, no hueco de rigor.** (a) El delta son 38 líneas
+y las leí todas: la única lógica de decisión es la separación de las dos listas,
+y los tres mutantes atacan las tres formas de colapsarlas otra vez en una.
+(b) **M2 es literalmente el defecto que rechacé en la pasada 1**, y muere. (c) La
+automática no habría dicho «verde por poco» sino «0 de 0», ceguera con pinta de
+verde, y el informe lo dice con esas palabras. Pero **una campaña manual es
+autoseleccionada** —prueba lo que el implementer eligió atacar, no la ausencia
+de puntos ciegos—: solo la acepto por ser el alcance pequeño y revisable.
+
+## Los tres puntos que el encargo pedía mirar de cerca
+
+1. **El bloqueante (punto 1): cerrado.** `esquemas_con_exclusion` sale de
+   `aplicables` (lo **declarado** dentro de los esquemas concedidos) y ya no de
+   la lista filtrada; `revocables = aplicables - ausentes` manda solo sobre el
+   `REVOKE ... ON TABLE`. Con `raw.emp` y `raw.res` ausentes la nocturna emite
+   `ALTER DEFAULT PRIVILEGES ... IN SCHEMA "raw" REVOKE SELECT` y **no** el
+   `GRANT` por defecto: comprobado con el cliente real en
+   `r9_el_cliente_mantiene_el_catalogo_tras_un_drop`, el test que habría cazado
+   esto en la pasada 1. **El defecto ES el seguro, verificado**:
+   `missing_tables: Sequence[str] = ()` → `ausentes = set()` → se revoca todo lo
+   declarado, y el olvidadizo se lleva un error ruidoso de PostgreSQL, no una
+   tabla legible en silencio (`r9_sin_lista_de_ausentes_...`).
+2. **Punto 2, la ventana de `02_roles.sql`: cerrada, no solo documentada.**
+   `BEGIN;` en la 112 (antes del `DO` del punto 5) y `COMMIT;` en la 236 (tras
+   el `RESET ROLE` del 5 bis). Dentro solo hay `DO`, `SET ROLE` y `RESET ROLE`,
+   todo transaccional —ni `VACUUM`, ni `CREATE DATABASE`, ni `CONCURRENTLY`—:
+   las dos mitades entran juntas o no entra ninguna. El test lo ata por posición
+   **y** falla si alguien mete un `COMMIT` intermedio.
+3. **Punto 3: el esquema se deriva.** `split_part(excluida, '.', 1)` sobre el
+   `unnest` de la lista, con `to_regnamespace` y el alias renombrado. Correcto.
+
+## Trazabilidad `acceptance` → test (delta)
 | Criterio | Cubierto por |
 |---|---|
-| 1 · `raw.emp` en Azure y el rol la lee | hecho histórico verificado por el líder el 06-09; sin test, no es código |
-| 2 · queda escrito quién decide y por qué | ficha, `settings.py`, `02_roles.sql`, `ARCHITECTURE.md`; test `r8_esta_escrito_que_es_temporal` |
-| 3 · vive en `02_roles.sql` y `apply_grants_step.py`, con test, y la nocturna no lo devuelve | `r1`(×4) `r2`(×2) `r3` `r4` `r5`(×3) `r6`(×3) `r7`(×2) `r8`(×2) |
-| 4 · los dos documentos de `azure-apps` | commit `9bc3944`: lo esencial está; quedan dos restos (cambio 4) |
+| 3 · la nocturna no devuelve el permiso al día siguiente | `r9`×4 (uno de extremo a extremo con el cliente) |
+| 3 · el arranque desde cero tampoco lo devuelve | `r10`×2 sobre el texto de `02_roles.sql` |
+| 4 · los dos documentos de `azure-apps` | commit `02025db`, leído: los dos restos corregidos, más el matiz de que los `REVOKE` no cegaron al MCP **por suerte** y el aviso pasa a «avisad antes» |
 
-## Las cinco preguntas del encargo
+## Lo que NO he verificado yo, y las observaciones
 
-1. **¿Ventana entre GRANT y REVOKE en la nocturna? NO.** `_connect` abre con
-   `autocommit=False` y `connection()` hace un solo `commit`: las 20+ sentencias
-   van en **una transacción** y un fallo a mitad hace `rollback`. Ventana sí la
-   hay en `02_roles.sql` — cambio 2.
-2. **`ALTER DEFAULT PRIVILEGES`: razonamiento correcto, implementación con agujero.** Cambio 1.
-3. **Los dos concedentes: correcto y bien resuelto.** Un `REVOKE` solo anula lo
-   del mismo concedente. El 5 bis emite dos bloques: uno como administrador (el
-   punto 4 dejó `RESET ROLE`) y otro tras `SET ROLE sigrid_dm_etl`, con su
-   `RESET ROLE`. Y la nocturna concede y revoca siempre como `sigrid_dm_etl`:
-   `_connect` emite `SET ROLE` como primera sentencia de cada sesión.
-4. **`raw.res` entra con razón.** Su ficha, escrita por F-066 con el dato
-   delante, declara NIF en `cif` (626 filas) y credenciales `logacc`, `ideacc`,
-   `ipacc`, `recema`, contrastado con `azure-apps/sigrid_tablas.md`.
-5. **Temporalidad: bien cubierta.** `settings.py` (banner + cita literal),
-   `grants.py`, `apply_grants_step.py`, `02_roles.sql`, `ARCHITECTURE.md`, el
-   runbook, `.env.example` y las dos fichas del diccionario, que son lo que lee
-   el agente por `_meta`. Nadie lo confundirá con algo permanente.
-
-## Cambios requeridos
-
-1. **(BLOQUEANTE) El `ALTER DEFAULT PRIVILEGES` se desactiva solo si la tabla
-   excluida no existe.** `postgres_client.py:1296-1301` saca de `excluidas` la
-   tabla inexistente y `grants.py:88-90` deriva `esquemas_con_exclusion` de esa
-   lista ya filtrada, así que el esquema **vuelve a emitir su `GRANT`**.
-   Demostrado con el código de la entrega (`table_exists` → False): emite
-   `ALTER DEFAULT PRIVILEGES ... IN SCHEMA "raw" GRANT SELECT ON TABLES TO
-   "mcp_sigrid_dm_ro"`. Es justo el caso que el informe dice cubrir («basta un
-   DROP manual o una tabla de personal nueva»): tras un `DROP` la nocturna repone
-   la regla del catálogo y la siguiente `raw.emp` **nace legible**; con `main.py
-   ingest` suelto —que no corre `apply_grants`, y es como F-066 la ingirió desde el
-   puesto— sigue legible hasta la nocturna. La regla de catálogo no necesita que la
-   tabla exista: el filtro solo hace falta para el `REVOKE ... ON TABLE`. Separar
-   las dos listas y **añadir el test que falta**.
-2. **`infra/sql/02_roles.sql`: ventana entre el punto 5 y el 5 bis.** `psql` sin
-   `BEGIN` explícito confirma cada `DO` por separado: entre el `GRANT` del 5 y el
-   primer `REVOKE` del 5 bis las tablas quedan legibles, y si el script muere ahí
-   con `ON_ERROR_STOP`, legibles **y commiteadas**. Envolverlos en un `BEGIN …
-   COMMIT`, o decir qué hacer si se corta.
-3. **`02_roles.sql`, 5 bis: `raw` está escrito a mano** en el `ALTER DEFAULT PRIVILEGES`, mientras `grants.py` lo deriva. Con una exclusión de otro esquema por `PG_EXCLUDED_TABLES`, la nocturna lo resuelve y este fichero no.
-4. **`azure-apps` (lo cierra el líder), dos restos que contradicen lo nuevo:**
-   `mcp_bbdd.md` §6.3 (466-473) habla de los `REVOKE` en futuro y «en el backlog»
-   cuando ya se aplicaron; `red_postgresql_compartido.md:175` dice que el rol «ve
-   todos los esquemas», sin excepción ni puntero.
-5. **`config/diccionario/raw.yaml:1395`**: «el rol **alcanza** `raw` entero, así que **hasta esa fecha** …» mezcla presente y pasado. `alcanzaba`. Va publicado en `_meta` y lo lee el agente.
-6. **Alinear `branch` en `harness/features.json`** con la rama real, o crear la
-   de F-068 (C2).
-
-## Observaciones no bloqueantes
-
-- **O1** — `test_f068_r8_esta_escrito_que_es_temporal` vigila 3 de los 9 sitios
-  donde está escrita la temporalidad; los otros seis pueden envejecer sin aviso.
-- **O2** — `00_global.yaml` trae la nota de F-068 como comentario YAML (no llega
-  a `_meta.v_diccionario`) y dice «version 15» con el fichero ya en `version: 16`.
-  **No lo cuento contra F-068**: el salto a 16 lo hizo una feature posterior.
-- **O3** — `current.md` 31-42 sigue dando por pendientes la revocación y `azure-apps`, que el líder ya ejecutó. Territorio del líder.
-- **O4** — `a961a9f` y `ae7e3de` arrastraron ficheros ajenos (`specs/F-070/`,
-  `features.json`, `BACKLOG.md`): confesado en `current.md`, ensucia el diff.
+- **Los privilegios vivos en Azure.** El MCP rechaza `information_schema`
+  (`OBJETO_NO_PERMITIDO`) y un `SELECT count(*) FROM raw.emp` responde «el
+  esquema 'raw' está fuera del ámbito autorizado»: **corrobora el matiz del
+  punto 4** —el MCP no ve `raw` por su lista, no por el `REVOKE`—, no lo prueba.
+  Lo verificó el líder; el delta solo cambia la próxima nocturna.
+- **`02_roles.sql` no lo ejecuta nadie**: solo se comprueba su texto y sus dos
+  cambios solo los valida `psql`. Suscribo la verificación MANUAL del informe:
+  antes de reprovisionar un rol, ejecutarlo con `-v ON_ERROR_STOP=1` contra una
+  base de prueba.
+- **O1** — `ARRAY['raw.emp','raw.res']` sigue escrito **tres veces** en
+  `02_roles.sql`; anterior, y el fichero dice que la fuente es `settings.py`.
+- **O2** — efecto lateral del punto 6: con la rama compartida, `PUERTA TAMAÑO`
+  de `init.sh` mide **F-066**, no F-068. Medí F-068 a mano: dentro de topes.
+- **O3** — sin commitear `harness/features.json` y `BACKLOG.md` (anotación de
+  F-069, del líder): `init.sh` pide incluir el `BACKLOG.md` regenerado.
+- **O4** — la tabla de mutación manual no da `fichero:línea` por fila.
 
 ## Automejora (propuesta, no aplicada)
 
-`CHECKPOINTS.md`, C4 bis: la regla del coste por mutante solo caza campañas
-**demasiado rápidas**. La de F-068 es 11 veces su línea base y eso tampoco se
-explica solo con la carga. Propongo anotar en el review, con su explicación, todo
-coste **por encima de 10 × la línea base**: no como rechazo, sino para que no se
-normalice un dato que nadie entiende.
+`CHECKPOINTS.md`, C4 bis: subir a la lista dos exigencias que hoy solo viven en
+`.claude/agents/reviewer.md`, para que el implementer las conozca **antes** de
+escribir el informe: (1) una campaña de **cero mutantes** trae su **prueba de
+control** —generar sobre los mismos ficheros ignorando el alcance—, porque si no
+«0 de 0» y «el generador está roto» son el mismo número; y (2) toda fila de una
+campaña **manual** lleva `fichero:línea` y el texto exacto `original → mutado`,
+lo único que la hace reproducible por otro.
