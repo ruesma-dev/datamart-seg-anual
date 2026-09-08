@@ -152,11 +152,11 @@ arriba sobre `96bb7b9`, el árbol anterior a T1.
 
 | Evidencia | Valor |
 |---|---|
-| Tests ejecutados (suite completa, `harness/init.sh`) | **3.967 passed, 159 skipped**, exit 0 |
+| Tests ejecutados (suite completa, `harness/init.sh`) | **3.967 passed, 159 skipped**, exit 0, árbol limpio |
 | Cobertura de las líneas cambiadas | **93,6 %** (788/842, umbral 80 %, nivel `critico`) |
 | Mutantes generados / supervivientes (campaña automática) | **0 / 0** — ver abajo |
 | Mutantes manuales aplicados / supervivientes | **3 / 0** |
-| Tiempo de la suite | **457,33 s** (0:07:37) |
+| Tiempo de la suite | **406,28 s** (0:06:46) |
 | Subconjunto directo (`test_f068_*` + `test_f005_grants.py`) | 42 passed en 1,15 s |
 | Cobertura de `grants.py` con solo esos dos ficheros | **100 %** (35/35 sentencias, `coverage report -m`) |
 
