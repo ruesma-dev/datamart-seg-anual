@@ -115,10 +115,25 @@ imagen vieja `r20260905-1237` a proposito. De ella salen T31b y T34.
    `dcf`**, que es lo unico que crea sus columnas `pagtex`/`pagfor`. Requiere
    `infra/` y `az`: lo autoriza el humano. Detalle en `progress/impl_F-066.md`,
    seccion «Que necesita T13». Mejor decidir F-068 ANTES.
-3. **F-025**, `blocked` a proposito, espera la nocturna acotada del **lunes
-   07** para T31b y T34; con T31b en verde, reviewer y `done`. **OJO: la
-   nocturna del lunes llevara la imagen que se despliegue en T13**, asi que si
-   se despliega, esa nocturna hace las dos cosas a la vez.
+3. **F-025: MEDIDA, REVISADA y con los cuatro cambios del review YA HECHOS**
+   (2026-09-08). T31b y T34 salieron en la nocturna `swtg78p` del 07 y el
+   reviewer las verifico **contra la base**, no contra el informe. **El ahorro
+   real es del 71,2 %** en `build_stg` (9.527 s -> 2.740 s), por encima del
+   40 % que exigia el criterio de parada y del 59,2 % que predijo T1; la noche
+   entera baja de 4 h 52 a 3 h 00. Veredicto en `progress/review_F-025.md`
+   (CHANGES_REQUESTED, cuatro cambios, ninguno de codigo). **Lo que falta para
+   `done`: una pasada mas del reviewer sobre los cambios ya aplicados.**
+
+   Los cuatro, hechos el 08: (1) el diccionario contaba el CRITERIO (40/880)
+   como si fuera la CONDUCTA (592/328), y de ahi salia un consejo falso —que
+   esas obras tienen «hasta 6 dias» cuando 552 se rehacen cada noche—;
+   corregido en `stg.yaml`, `_meta.yaml` y `00_global.yaml`, **diccionario a
+   version 16**. (2) El mismo error en `azure-apps/datamart_seg_anual.md`, mas
+   una cifra muerta que R3 habia corregido el 03-sep (commit `ed20043` alli).
+   (3) T31b y T34 marcadas en `tasks.md` con su evidencia, T34 con el matiz de
+   que se midio en B2s y para el B1ms queda diferido a F-065. (4) **T33
+   decidida por escrito: pasa a F-065**, con dueño y umbral (mas de 10 puntos
+   de bloat sobre la linea base de T2 tras siete noches acotadas).
 
 **El servidor sigue en `Standard_B2s`** (temporal desde el 05-sep, 17:21 UTC).
 La bajada a B1ms sigue pendiente, con fecha limite 2026-09-20 anotada en

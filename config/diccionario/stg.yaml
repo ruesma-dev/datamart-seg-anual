@@ -54,9 +54,10 @@ objetos:
       su build va troceado por lotes de obras.
 
       **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
-      2026-09-03).** El datamart dejo de rehacer las 920 obras cada noche: se
-      rehacen las **40 vivas** y las **880 congeladas conservan la version que
-      se construyo la ultima vez que les tocó. NO SE BORRAN Y SIGUEN
+      2026-09-03).** El datamart dejo de rehacer las 920 obras cada noche: las
+      congeladas conservan la version que se construyo la ultima vez que les
+      toco. **El CRITERIO y la CONDUCTA son dos cifras distintas, y las dos son ciertas.** El criterio dice **40 vivas / 880 congeladas**: a cuantas obras del maestro les toca por actividad. La conducta real de una noche, medida el 2026-09-07 en la ejecucion acotada `swtg78p`, es **592 rehechas / 328 congeladas**. De las 592, solo **40 son obras vivas**; las otras **552 entran porque no tienen filas construidas**, y **512 siguen vacias despues** -son fichas del maestro crudo sin presupuesto ni planificacion: plantillas y codigos repetidos-. **CONSECUENCIA AL CITAR FRESCURA: esas 552 se rehacen TODAS las noches, asi que su dato tiene horas, no seis dias.** El 'hasta 6 dias' vale para las 328 congeladas de verdad. Quien cite frescura por obra debe mirar `_meta.v_frescura_obra`, no suponerlo. Arreglar el dato en si es F-071.
+      NO SE BORRAN Y SIGUEN CONSULTABLES. NO SE BORRAN Y SIGUEN
       CONSULTABLES: cada tramo borra solo las obras que va a reinsertar, en su
       misma transaccion, asi que una obra congelada conserva exactamente sus
       filas y sus importes. La ventana **no cambia ni una cifra**; cambia de
@@ -282,7 +283,8 @@ objetos:
 
       **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
       2026-09-03)**, igual que `stg.plan_mensual` y por la misma decision: se
-      rehacen las 40 obras vivas y las 880 congeladas conservan la version que
+      rehacen solo las obras que lo necesitan y las congeladas conservan la
+      version que
       se construyo la ultima vez que les toco. **No se borran y siguen
       consultables**: el build borra solo las obras que va a reinsertar, en la
       misma transaccion. De cuando es el dato de cada obra lo dice

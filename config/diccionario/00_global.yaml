@@ -13,9 +13,12 @@
 # F-006 esta lista queda vacia.
 #
 # version 13 (F-025, 2026-09-03): EL DATAMART YA NO RECONSTRUYE TODAS LAS OBRAS
-# CADA NOCHE. De las 920 obras del maestro se rehacen 40 y 880 quedan
-# congeladas, conservando la version que se construyo la ultima vez que les
-# toco. NO SE BORRAN Y SIGUEN CONSULTABLES: el build borra solo las obras que
+# CADA NOCHE. Las congeladas conservan la version que se construyo la ultima
+# vez que les toco. OJO CON LAS CIFRAS, corregido en la version 16 con la
+# nocturna del 2026-09-07 delante: el CRITERIO dice 40 vivas / 880 congeladas,
+# pero la CONDUCTA real de una noche es 592 rehechas / 328 congeladas, porque
+# 552 obras entran por no tener filas construidas y 512 siguen vacias despues.
+# Esas 552 se rehacen todas las noches: su dato tiene horas, no seis dias. NO SE BORRAN Y SIGUEN CONSULTABLES: el build borra solo las obras que
 # va a reinsertar, en la misma transaccion, asi que una obra congelada conserva
 # exactamente sus filas y sus importes. La ventana no cambia ni una cifra;
 # cambia DE CUANDO ES. Se anaden las fichas de `_meta.obra_build` y
@@ -60,7 +63,7 @@
 # Hasta la version 14 esas dos fichas avisaban de lo contrario: que cualquier
 # agente conectado las leia enteras.
 
-version: 15
+version: 16
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

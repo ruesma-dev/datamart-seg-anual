@@ -1,121 +1,140 @@
 <!-- progress/review_F-025.md -->
-Revisión incremental desde `9ce89c4` (pasada 4), tres commits. Las pasadas 1
-(completa), 2 y 3 viven en `a34ed9b`, `fbfd0fe` y `9ce89c4`.
+Revisión incremental desde `79059f8` (pasada 6). **El delta es VACÍO**: `HEAD` es
+`79059f8`, el mismo commit de la pasada 5. Pasadas 1 (completa) a 5: `a34ed9b`,
+`fbfd0fe`, `9ce89c4`, `11b4306`, `79059f8`.
 
 # F-025 · Review · Las obras cerradas no se reconstruyen cada noche
 
-## Veredicto sobre lo entregable: **APROBADO**
+## Veredicto: **CHANGES_REQUESTED**
 
-**El código y el papeleo de F-025 están en condiciones de que el humano ejecute
-la fase manual con confianza.** Los tres cambios de la pasada 3 están cerrados y
-dos de ellos mejor de lo que pedí. No queda nada que deba tocar el implementer.
-Quedan **dos observaciones que NO bloquean** —una de ellas, una frase de las
-MANUAL que falla si se ejecuta tal cual, y conviene arreglarla antes del paso 4—.
+**No por nada nuevo: porque no hay nada nuevo.** Los cuatro cambios que pidió la
+pasada 5 siguen abiertos, comprobados **fichero a fichero, no de memoria**. El
+mecanismo queda demostrado: las cuatro preguntas del líder se responden a favor
+de la feature. Falta papeleo, ninguna nocturna más.
 
-**Esto no es cerrar la feature.** **C5 sigue abierto**: 12 de 41 tareas son la
-fase 7 (T1, T2b, T27-T35), no se han ejecutado y su precondición —una
-`stg.plan_mensual` completa— sigue sin cumplirse. Sobre eso no dictamino. La
-feature no se marca `done` hasta que esa fase corra y sus huellas den cero
-diferencias; lo que aquí queda aprobado es **lo entregable**.
+**Aviso de método (obligatorio decirlo).** Por orden expresa del líder **NO he
+ejecutado `bash harness/init.sh`** (dos intentos previos murieron a los 600 s) ni
+he conectado a la base. Doy por buena su ejecución de **hoy 16:30 UTC sobre este
+mismo commit**: `3.895 passed, 159 skipped`, `COBERTURA 92,8 % de 752 líneas
+(umbral 80 %, critico)`, `TAMAÑO OK`, exit 0 — **verificado por el líder, no por
+mí**. Las cifras de producción salen de lo escrito y de la verificación contra
+Azure de la pasada 5.
 
-## Los tres cambios de la pasada 3
+**Nivel de rigor: `critico`** (`harness/features.json`): exige fase RED,
+cobertura de lo cambiado y mutación sin supervivientes.
 
-**1 · Las cifras muertas del código `[x]`, y eran 11.** Barrido propio del árbol
-entero, todas las extensiones: **no queda ninguna viva**. Sobreviven solo las que
-**nombran la vieja para enterrarla** —`main.py:1339`, `ventana.py:62`,
-`decisiones.md`, `mediciones.md`, `business_rules.yaml`, `maestro.yaml`—, que es
-lo correcto. Y lo que sí sigue diciendo «40» —`stg.yaml:285`,
-`build_stg_step.py:92`, `ventana.py:52`, `00_meta.sql:134`, T1 y T31b— es **el 40
-bueno, el de obras vivas**, no el de congeladas-con-actividad: la trampa de este
-barrido es justo esa, que la cifra muerta se esconde detrás de una viva idéntica.
-El `--help` de `ventana-plan` ya dice «de las 48… 8 quedan congeladas» y añade la
-corrección con su fecha.
+## Las cuatro preguntas, con veredicto propio
 
-**2 · Las `PG_VENTANA_*` en `infra/` `[x]`, y con red.** `80_create_job.ps1`
-inyecta las cuatro **desde `$CFG`**, no escritas a mano; `dev.json` las declara
-con su `$aviso_` —que además deja escrito el porqué: el modo de fallo de F-052
-aplicado a la configuración— y con los booleanos **como cadena**, igual que
-`pgAutoCreateDb`, que es lo que pydantic espera. **Nacen apagadas.** Y trae lo
-que no había pedido y es lo que lo sostiene: **tres tests nuevos** que cierran el
-circuito nombre→valor→inyección, comprueban que `ventanaActiva` y
-`ventanaRescate` están en `false` **en todos los entornos**, y ponen la red
-anti-divergencia sobre `ventanaMeses`/`ventanaDiaCompleta` —dejando fuera los dos
-interruptores a propósito, porque el día que se encienda la ventana `dev.json`
-dirá `true` y el código seguirá diciendo `False`—. Reutilizan los helpers de
-`test_f003_infra` en vez de copiarlos. Los tres pasan.
+**1 · El 71,2 % es legítimo.** Mismo paso (`build_stg`), los dos `SUCCEEDED`, los
+dos en **`Standard_B2s`**, los dos con la imagen `r20260905-1237` (F-025 sin
+F-066, a propósito), y las dos cifras salen de `_meta.etl_runs`. `hamsh8o` es
+**la referencia correcta**: la única completa con el mismo código y el mismo SKU.
+La objeción seria —`hamsh8o` bajó a **6 créditos** y `swtg78p` no bajó de 454, y
+una base estrangulada inflaría el ahorro— **no se sostiene, por tres caminos**:
+(a) en `hamsh8o`, con la hucha a 6, los últimos tramos iban a **47-57 s**, los
+rápidos de la noche; (b) `ingest_raw` fue **más lento** en la acotada (2.256 s
+con 475 créditos) que en la completa (1.832 s con 60), justo lo contrario de una
+completa capada; (c) el **suelo volumétrico** no depende del reloj: se rehacen
+**11,67 M de 29,77 M filas**, ~61 % menos, y T1 predijo 59,2 % por peso. Ruido en
+los pasos no acotados: ±6 a ±12 %. Límite honesto: es **un par de ejecuciones**;
+cítese el 59-61 % como suelo garantizado y el 71,2 % como lo medido una vez.
 
-**3 · La cobertura `[x]`:** `features.json` ya dice **91,7 %**.
+**2 · T33 no bloquea el cierre, pero no puede quedarse en `[ ]`.** No es criterio
+de aceptación (los seis de `features.json` no la piden), mide el **riesgo 1 de
+`design.md`** y su único desenlace es abrir otra feature, no tocar este código. Y
+está mitigada: T14 dejó `VACUUM (ANALYZE)` al final del sub-paso y la puerta de
+disco de F-019 vigila entretanto. **Pero es el riesgo que esta feature se creó a
+sí misma** —el `DELETE`+`INSERT` deja tuplas muertas cada noche, en un disco de
+64 GB con seis inquilinos que ya dio un susto el 07-sep—, y una casilla vacía
+dentro de una feature `done` es el modo de fallo de F-052 aplicado a sí misma.
+**Se cierra con una decisión escrita —dueño y umbral—, no con una semana de
+espera**: T2 ya dejó la línea base. Recomiendo F-065.
 
-## La campaña de mutación sigue siendo válida (RM1, comprobado)
+**3 · La conclusión corregida se sostiene.** Verificado por mí en el código:
+`postgres_client.py:336` `TABLAS_ACOTADAS = ("plan_mensual", "presupuesto")`, y
+`design.md:162-163` y `:235` dejan `sql/mart/**` y `sql/cierre/**` fuera de
+alcance (R33): cronometrar `build_mart` era medir un paso que la feature nunca
+tocó. **Tres agujeros menores, ninguno bloqueante:** (a) las filas del mart que
+cita `explore_F-025_coste_fijo.md` (5.359.591 / 5.361.017) no son las de
+`etl_runs` (5.384.370 / 5.385.800) —será un sub-paso—, y siendo esa «la prueba de
+una línea», conviene decir de dónde sale; (b) sin `EXPLAIN`, el reparto de los
+2.740 s es deducción, y el informe lo avisa; (c) **el agujero de verdad es
+de alcance**: R29 y el criterio 5 hablan de los créditos **del B1ms** y lo medido
+es un **B2s** de 576 de tope. No hay respuesta hasta bajar de SKU —para eso nace
+F-065— y debe quedar escrito como **diferido**, no como respondido.
 
-`ventana.py` **cambió** después del SHA que midió la campaña (`073af30`): 779 →
-784 líneas. Por RM1 eso obliga a mirar si hay que repetirla. **No hay que
-repetirla, y no lo doy por supuesto:** el diff es solo docstring, y he comparado
-el juego de mutantes de `073af30` con el de HEAD por **operador y texto
-original→mutado**, ignorando el número de línea: **83 mutantes y la misma huella
-(`f63d521836650b62`) en los dos**. Byte a byte, la campaña juzgó exactamente
-estos 83. El resto del alcance sigue **`N/A` por la exención escrita del humano
-del 2026-09-04**.
+**4 · Las 552 obras no bloquean el mecanismo; sí bloquean el papeleo publicado.**
+De acuerdo con no bloquear, y no por confianza: (a) pesan **24.697 de 74,9 M**
+por `SQL_PESOS_PLAN_MENSUAL` (T1) y 47.723 filas contadas en la base por la
+pasada 5, el 0,16 %: no comprometen el 71,2 %; (b) el código cumple R18 al pie de
+la letra —`ventana.py:472`—, y el defecto está **aguas arriba**, en el censo
+`SQL_ESTADO_OBRAS` sobre `raw.obr ⨝ raw.con`, anterior a esta feature y conectado
+con F-053; (c) no tocan R11, R12 ni R21: ninguna congelada se mueve y la 0599
+sigue en 2.624.793,46 € y 1,79 %. **Lo que sí se llevan por delante es la
+frescura publicada**: quien pregunte al MCP por esas 552 recibirá «hasta 6 días»
+cuando se rehacen cada noche. Es el cambio 1, y es de cierre, no de F-071.
 
-## Observaciones que NO bloquean
+## Cambios requeridos (los cuatro de la pasada 5, verificados hoy sin tocar)
 
-**1 · La instrucción de encendido falla si se ejecuta tal cual.** Las MANUAL
-dicen ahora «cambiar `"ventanaActiva": "true"` en `dev.json` y volver a lanzar
-`80_create_job.ps1`». Pero `80_create_job.ps1:85-87` **lanza excepción si el job
-ya existe** —«el job ya existe. Para cambiarle la imagen usa
-`85_update_job.ps1`»—, que es el caso de producción. El párrafo siguiente sí da
-la salida buena (fijarla a mano sobre el job), así que el humano no se queda
-parado, pero la que va a probar primero es la que falla. **Arreglo: una frase.**
+**1 · El diccionario publicado dice lo que la ventana NO hace.** Comprobado con
+`grep` sobre HEAD: `config/diccionario/stg.yaml:58`, `:73-74`, `:285`;
+`_meta.yaml:684`, `:735`, `:799`; `00_global.yaml:16` siguen diciendo «se rehacen
+las 40 vivas y las 880 congeladas conservan la versión». La nocturna acotada real
+dice **592 rehechas y 328 congeladas**. Distíngase el **censo del criterio**
+(880/40, correcto donde se explica la regla) de la **conducta nocturna**
+(592/328). Sube `version`. R31 y criterio 6.
 
-Y respondiendo a lo que se me preguntó: **sí, `85_update_job.ps1` —o un `86`
-nuevo— haría falta** si se quiere que encender la ventana sea un cambio dirigido
-por el repositorio. Hoy el camino versionado solo funciona **al crear el job de
-cero**; sobre un job vivo, el único que funciona es el `az … --set-env-vars` a
-mano. Eso no anula lo ganado: el valor ya está versionado y una recreación futura
-lo lleva, que era el agujero de la pasada 3.
+**2 · El mismo error fuera del repositorio.** `azure-apps/datamart_seg_anual.md`:
+`:206` repite el 880; **`:250` conserva además la cifra muerta** «Hay 40 obras
+con actividad reciente que quedan congeladas —39 cerradas…—», corregida por R3 el
+03-sep a **8 de las 48**. R32.
 
-**2 · Queda un «40» muerto, en la spec.** `design.md:205`, en la lista de
-riesgos: «**40 obras vivas congeladas** (R3)». R3 dice **8 de las 48**, y
-«obras vivas congeladas» es además una contradicción. Es exactamente la trampa
-del punto 1: el 40 muerto escondido detrás del 40 bueno.
+**3 · `tasks.md` contradice a `mediciones.md`.** T31b y T34 siguen `[ ]` («necesitan
+nocturnas acotadas») y las dos están medidas el 07-sep y verificadas contra la
+base en la pasada 5 (328 obras con `construido_at` del 05, 592 del 07; 21
+créditos, mínimo 454). Márquense `[x]` con su evidencia, y **T34 con su matiz**:
+medida en B2s, la respuesta para el B1ms es de F-065.
+
+**4 · T33: decidir por escrito.** Pasarla a F-065 (recomendado) o a ficha propia,
+**con umbral y dueño**. La casilla vacía no vale.
 
 ## Checkpoints
 
-- **C1** `[x]` — `bash harness/init.sh` **EN VERDE**: **3.308** pasados (los 3
-  nuevos), 134 saltados en 242 s; `COBERTURA [OK] 91,7 % (578/630, umbral 80 %,
-  critico)`; `TAMAÑO [OK]`; rama correcta.
-- **C2** `[x]` — una `in_progress`, `current.md` al día con las MANUAL.
-- **C3** `[x]` — el delta toca `.py`, `.sql`, `.ps1` y `.json`, y lo revisé: son
-  **docstrings y comentarios** salvo el bloque `--env-vars` y los tres tests.
-  Dominio sin infraestructura, ruta en la primera línea, sin secretos ni prints.
-  **Ni una línea de lógica cambia**, así que lo aprobado en la pasada 1 sigue.
-- **C3 bis** y **C4 ter** `N/A` justificados: no toca `docs/referencia/` ni
-  existe `harness/rutas_sensibles.json`.
-- **C4** `[x]` — cerrado lo que lo tenía en `[ ]`: las 11 referencias al día.
-  Trazabilidad requisito→test intacta y las MANUAL con su comando literal.
-- **C4 bis** `[x]` — RED `[x]`, cobertura `[x]`, RM1 `[x]` **revalidada arriba**,
-  RM2-RM4 `[x]`, RM5/RM6 `N/A`, y la mutación fuera de `ventana.py` `N/A` por
-  **exención escrita del humano** (`features.json`, `decisiones.md` §DA-6, T26).
-- **C5** `[ ]` — **29 de 41**. Las 12 que faltan son la fase manual, y ninguna
-  es del implementer.
-
-## Lo que falta para cerrar (no dictamino sobre ello)
-
-El orden acordado, con **el paso 0 de la pasada 2**: (0) completar
-`stg.plan_mensual` de día y **con la ventana apagada**, hasta `check-coherencia`
-y `status-stg` en verde; (1) **T27**, las cinco huellas del antes sobre ese
-estado ya coherente; (2) **T1 y T2b** —si T1 baja del 40 %, PARAR—; (3) **T35**,
-la alerta, que sin ella el guardián es mudo (DA-5); (4) **entonces**
-`PG_VENTANA_ACTIVA`, **T28/T29** y **T30/T31/T31b** con tolerancia cero, donde
-una sola diferencia PARA la feature; (5) **T32-T34**: los `check-*`, el bloat
-contra T2 y los créditos de CPU (R24, R29).
+- **C1** `[x]` — init.sh en verde **según la ejecución del líder de hoy sobre este
+  commit**, no mía (ver el aviso de método): cobertura 92,8 % y tamaño OK.
+- **C2** `[ ]` — una sola feature `in_progress` (F-025) `[x]`; rama actual
+  `feature/F-066-…` **justificado**: `feature/F-025-…` (`5fedc48`) es **ancestro
+  de HEAD** (`git merge-base --is-ancestor`). Falla el tercer punto:
+  `progress/current.md:118` sigue diciendo que F-025 está `blocked` esperando «la
+  nocturna del lunes», que ya corrió y ya está medida.
+- **C3** `[x]` — arrastrado de la pasada 5 sin delta que revisar: el árbol de
+  código es byte a byte el que aprobó. **C3 bis** y **C4 ter** `N/A`: no entra
+  documentación de fuera y no existe `harness/rutas_sensibles.json`.
+- **C4** `[x]` — la verificación es la fase 7 entera: cinco huellas (T30 KO con
+  las diferencias probadas del origen y **dada por buena por el humano el
+  2026-09-06**), la 0599 (T31), los cinco `check-*` con el mismo veredicto que
+  antes (T32) y T31b/T34 en la primera acotada.
+- **C4 bis** `[x]` — RED `[x]` (trazas en `impl_F-025_metodo_ausente.md`).
+  Cobertura `[x]`. **RM1 revalidada por mí**: el informe midió `073af30` y HEAD
+  es `79059f8`, pero el único commit que toca `ventana.py` desde entonces es
+  `f7fe187`, y su diff es **solo docstring** (`git show`): el alcance medido
+  sigue siendo el revisado. **RM2 `[x]`**: 83 × 93,0 s = 7.719 ≈ 7.720,4 s de
+  total; la media (93 s) queda muy por debajo de la línea base (467-473 s) y eso
+  es **legítimo**: 79 de 83 mutantes mueren y `-x` aborta la suite en el primer
+  fallo. **Campaña NO reejecutada** (7.720 s, muy por encima del umbral de 60 s).
+  Cero supervivientes, cero «sin veredicto», sin cabecera de campaña no válida; 4
+  timeouts listados con su texto. RM3-RM6 `N/A`: ni equivalentes declarados ni
+  guardas quitadas. **La mutación fuera de `ventana.py`, `N/A` por exención
+  escrita del humano del 2026-09-04** (DA-6, `features.json` y T26), que deja
+  `build_stg_step.py` —donde vive el borrado derivado— sin mutación, cubierto por
+  `test_f025_build.py`, la cobertura y las cinco huellas.
+- **C5** `[ ]` — **38 de 41**: T31b y T34 hechas y sin marcar (cambio 3); T33 sin
+  medir y sin dueño (cambio 4).
 
 ## Automejora propuesta (no aplicada)
 
-Las tres de las pasadas anteriores siguen en pie —RM7 · el alcance de la campaña
-es el de la feature; los timeouts no son muertos; y el barrido de una cifra
-corregida va sobre el árbol entero—. Esta pasada añade el matiz que las hace
-útiles: **cuando la cifra retirada y la vigente son el mismo número con distinto
-significado** —aquí, «40 vivas» frente a «40 congeladas con actividad»— el grep
-no basta y hay que leer cada acierto. Se coló en `design.md` después de tres
-barridos. Va a `CHECKPOINTS.md`, C4.
+Sigue en pie la de la pasada 5 (el barrido de una cifra corregida cubre el árbol,
+`azure-apps/` y los campos **publicados** del diccionario). Añado una para
+`.claude/agents/reviewer.md`: **con el delta vacío —`HEAD` idéntico al de la
+pasada anterior— no se revisa de nuevo; se comprueban los cambios requeridos uno
+a uno y se declara en la primera línea.** Cuesta un `git log`.

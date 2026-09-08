@@ -681,8 +681,9 @@ objetos:
     descripcion: >-
       Una fila por obra con de que noche viene lo construido y por que. Existe
       desde F-025 (2026-09-03), cuando el datamart dejo de reconstruir las 920
-      obras cada noche: se rehacen las 40 vivas y las 880 congeladas conservan
-      su ultima version buena. Eso convierte "de cuando es este dato" en una
+      obras cada noche: las congeladas conservan su ultima version buena.
+      **El CRITERIO y la CONDUCTA son dos cifras distintas, y las dos son ciertas.** El criterio dice **40 vivas / 880 congeladas**: a cuantas obras del maestro les toca por actividad. La conducta real de una noche, medida el 2026-09-07 en la ejecucion acotada `swtg78p`, es **592 rehechas / 328 congeladas**. De las 592, solo **40 son obras vivas**; las otras **552 entran porque no tienen filas construidas**, y **512 siguen vacias despues** -son fichas del maestro crudo sin presupuesto ni planificacion: plantillas y codigos repetidos-. **CONSECUENCIA AL CITAR FRESCURA: esas 552 se rehacen TODAS las noches, asi que su dato tiene horas, no seis dias.** El 'hasta 6 dias' vale para las 328 congeladas de verdad. Quien cite frescura por obra debe mirar `_meta.v_frescura_obra`, no suponerlo. Arreglar el dato en si es F-071.
+      Eso convierte "de cuando es este dato" en una
       pregunta POR OBRA, y esta tabla es donde se responde.
     grano: >-
       Una fila por obra, con `obra_id` como clave primaria. **La ultima manda**:
@@ -796,9 +797,10 @@ objetos:
 
       **Consultala siempre que la pregunta sea sobre una obra concreta y la
       frescura importe.** Desde el 2026-09-03 el datamart no reconstruye todas
-      las obras cada noche: 880 de las 920 estan congeladas y conservan su
-      ultima version buena, que puede tener hasta 6 dias de antiguedad -todas se
-      rehacen enteras los domingos-. Las cifras de una obra congelada son
+      las obras cada noche: las congeladas conservan su ultima version buena,
+      que puede tener hasta 6 dias de antiguedad -todas se rehacen enteras los
+      domingos-. **El CRITERIO y la CONDUCTA son dos cifras distintas, y las dos son ciertas.** El criterio dice **40 vivas / 880 congeladas**: a cuantas obras del maestro les toca por actividad. La conducta real de una noche, medida el 2026-09-07 en la ejecucion acotada `swtg78p`, es **592 rehechas / 328 congeladas**. De las 592, solo **40 son obras vivas**; las otras **552 entran porque no tienen filas construidas**, y **512 siguen vacias despues** -son fichas del maestro crudo sin presupuesto ni planificacion: plantillas y codigos repetidos-. **CONSECUENCIA AL CITAR FRESCURA: esas 552 se rehacen TODAS las noches, asi que su dato tiene horas, no seis dias.** El 'hasta 6 dias' vale para las 328 congeladas de verdad. Quien cite frescura por obra debe mirar `_meta.v_frescura_obra`, no suponerlo. Arreglar el dato en si es F-071.
+      Las cifras de una obra congelada son
       correctas; lo que hay que decir al citarlas es de cuando son.
     grano: >-
       Una fila por `obra_id` registrado en `_meta.obra_build`. Sin `WHERE`:
