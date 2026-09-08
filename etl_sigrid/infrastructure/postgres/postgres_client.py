@@ -102,16 +102,21 @@ def _tipo_normalizado(tipo: str) -> str:
     """
     texto = " ".join(tipo.strip().lower().split())
 
+    # `partition` y no `find`: `find` obliga a comparar contra el centinela -1
+    # dos veces, y esas dos comparaciones son huecos de test que no se pueden
+    # cerrar —un tipo con `)` y sin `(` no existe—. Con `partition` el
+    # «no lo encontré» es la cadena vacía del separador y no hay centinela.
     argumentos = ""
-    inicio = texto.find("(")
-    if inicio != -1:
-        fin = texto.find(")", inicio)
-        if fin != -1:
-            argumentos = texto[inicio + 1 : fin].replace(" ", "")
-            texto = " ".join((texto[:inicio] + " " + texto[fin + 1 :]).split())
+    antes, abre, resto = texto.partition("(")
+    if abre:
+        dentro, cierra, cola = resto.partition(")")
+        if cierra:
+            argumentos = dentro.replace(" ", "")
+            texto = " ".join(f"{antes} {cola}".split())
 
     base = _ALIAS_TIPOS_PG.get(texto, texto)
     return f"{base}({argumentos})" if argumentos else base
+
 
 # Cuántas mediciones devolver cuando no hay un arranque de `ingest_raw` al que
 # anclarse. Evita volcar el histórico entero de _meta.etl_runs.

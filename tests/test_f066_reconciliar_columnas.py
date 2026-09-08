@@ -488,3 +488,65 @@ def test_f066_r28_un_catalogo_vacio_no_intenta_reconciliar_nada(
     assert not [s for s in cursor.ejecutadas if "ALTER TABLE" in s], (
         f"sin catálogo no hay nada que reconciliar: {cursor.ejecutadas}"
     )
+
+
+# ---------------------------------------------------------------------------
+# R27 · `_tipo_normalizado` a solas: es quien decide si un tipo «ya no casa»
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("escrito_por_el_etl", "devuelto_por_el_catalogo"),
+    [
+        ("VARCHAR(30)", "character varying(30)"),
+        ("NUMERIC(18,4)", "numeric(18, 4)"),
+        ("TIMESTAMP", "timestamp without time zone"),
+        ("TIME", "time without time zone"),
+        ("DOUBLE PRECISION", "double precision"),
+        ("BOOLEAN", "boolean"),
+        ("TEXT", "text"),
+        ("INTEGER", "integer"),
+        ("BYTEA", "bytea"),
+    ],
+)
+def test_f066_r27_los_dos_nombres_del_mismo_tipo_se_normalizan_igual(
+    escrito_por_el_etl: str, devuelto_por_el_catalogo: str
+) -> None:
+    """Las dos caras de cada tipo: la que escribe el DDL y la que lee el
+    catálogo. Si alguna pareja dejara de casar, el ETL avisaría cada noche de
+    un cambio de tipo que no ha ocurrido."""
+    from etl_sigrid.infrastructure.postgres.postgres_client import _tipo_normalizado
+
+    assert _tipo_normalizado(escrito_por_el_etl) == _tipo_normalizado(
+        devuelto_por_el_catalogo
+    )
+
+
+@pytest.mark.parametrize(
+    ("uno", "otro"),
+    [
+        ("VARCHAR(30)", "character varying(10)"),  # cambia el largo
+        ("TIMESTAMP", "timestamp with time zone"),  # cambia la zona
+        ("NUMERIC(18,4)", "numeric(18,2)"),  # cambia la escala
+        ("INTEGER", "bigint"),  # cambia el ancho
+        ("TEXT", "bytea"),  # cambia todo
+    ],
+)
+def test_f066_r27_dos_tipos_distintos_no_se_normalizan_al_mismo(
+    uno: str, otro: str
+) -> None:
+    """La otra mitad: normalizar no puede llegar a igualar lo que sí difiere,
+    o el aviso no saltaría nunca y el arreglo seria ciego a un cambio real."""
+    from etl_sigrid.infrastructure.postgres.postgres_client import _tipo_normalizado
+
+    assert _tipo_normalizado(uno) != _tipo_normalizado(otro)
+
+
+def test_f066_r27_un_tipo_con_parentesis_sin_cerrar_no_revienta() -> None:
+    """Nada garantiza que `format_type` devuelva siempre algo bien formado, y
+    esta función corre en la ingesta de las 56 tablas: si tropieza, tumba la
+    noche entera por un aviso que ni siquiera era un error."""
+    from etl_sigrid.infrastructure.postgres.postgres_client import _tipo_normalizado
+
+    assert _tipo_normalizado("varchar(30") == "varchar(30"
+    assert _tipo_normalizado("") == ""
