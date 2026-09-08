@@ -6,7 +6,7 @@ F-066 · `check-raw-recuentos` con **tolerancia con dirección** (R15, R16, R17)
 código 1 en cuanto una sola tabla no cuadraba al alma, y eso no puede pasar
 nunca: Sigrid es un ERP vivo que se sigue usando mientras el datamart es una
 foto de un instante. Medido el 2026-09-08, con la ingesta de las 11:16-11:57
-UTC y el verificador pasado a las 16:30 UTC:
+UTC y el verificador pasado unas cinco horas después:
 
     31 iguales · 25 distintas · 0 ausentes · 0 sin medir      -> código 1
 
@@ -344,6 +344,30 @@ def test_f066_r15_la_linea_de_cada_tabla_lleva_su_desviacion() -> None:
 
     assert "0,0286 %" in linea
     assert ESTADO_DERIVA in linea
+
+
+def test_f066_r16_una_tabla_vaciada_en_origen_se_lee_al_cien_por_cien() -> None:
+    """Sigrid a cero y `raw` con 193 filas: la desviación es del 100 %.
+
+    Es el único sitio donde no se puede dividir por la cifra de Sigrid, y la
+    respuesta correcta no es «0 %» ni un error: sobra la tabla entera.
+    """
+    informe = comparar_recuentos(["conest"], {"conest": 0}, {"conest": 193})
+
+    linea = [ln for ln in formatear(informe).splitlines() if ln.startswith("  ")][0]
+
+    assert informe.recuentos[0].desviacion_pct == 100.0
+    assert "100,0000 %" in linea
+    assert ESTADO_SOBRAN in linea
+
+
+def test_f066_r16_dos_ceros_son_iguales_y_no_una_division_por_cero() -> None:
+    """Una tabla vacía en los dos lados cuadra, y su desviación es cero."""
+    informe = comparar_recuentos(["t"], {"t": 0}, {"t": 0})
+
+    assert informe.iguales == ("t",)
+    assert informe.recuentos[0].desviacion_pct == 0.0
+    assert informe.peor is None, "sin desviación no hay «peor tabla» que enseñar"
 
 
 def test_f066_r15_la_salida_dice_cuanto_hace_de_la_ultima_ingesta() -> None:

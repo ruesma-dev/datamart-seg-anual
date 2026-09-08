@@ -13,7 +13,7 @@ hace que no hay build; ninguno compara el **número de filas** con el origen.
 La primera versión exigía que las 56 cifras coincidieran al alma. Eso no puede
 pasar nunca: Sigrid es un ERP que se sigue usando mientras el datamart es una
 foto de un instante. La primera medición real lo dejó claro —ingesta de las
-11:16-11:57 UTC, verificación a las 16:30 UTC—:
+11:16-11:57 UTC, verificación unas cinco horas después—:
 
     31 iguales · 25 distintas · 0 ausentes · 0 sin medir      -> código 1
 
