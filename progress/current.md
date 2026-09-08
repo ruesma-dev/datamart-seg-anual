@@ -47,6 +47,31 @@ control por usuario. Esta escrito en `config/settings.py`, `02_roles.sql`,
 `docs/ARCHITECTURE.md`, el runbook y las fichas del diccionario, para que nadie
 lo lea dentro de seis meses como una prohibicion permanente.
 
+**F-068 · LOS CAMBIOS DEL REVIEW, APLICADOS (2026-09-08).** Veredicto
+`CHANGES_REQUESTED` en `progress/review_F-068.md`; informe de la correccion en
+`progress/impl_F-068_correcciones.md`. Cerrados los puntos 1, 2, 3, 5 y 6:
+
+1. **El bloqueante era real y estaba abierto.** La regla del catalogo
+   (`ALTER DEFAULT PRIVILEGES`) se desactivaba sola cuando la tabla excluida no
+   existia, que es justo el escenario para el que se diseno: tras un `DROP` de
+   `raw.emp` la nocturna reponia el GRANT por defecto de `raw` y la siguiente
+   `raw.emp` nacia legible. Arreglado separando las dos listas -lo declarado
+   manda sobre el catalogo; el filtro por existencia solo alcanza al `REVOKE
+   ... ON TABLE`- y con cuatro tests nuevos (R9).
+2. `infra/sql/02_roles.sql` mete el punto 5 y el 5 bis en una transaccion (ya no
+   hay ventana con los datos personales legibles y confirmados) y deriva de la
+   lista el esquema del `ALTER DEFAULT PRIVILEGES`, en vez de escribir `raw` a
+   mano. Dos tests nuevos (R10).
+3. La ficha de `raw.emp` deja de decir «alcanza» en presente, que hacia creer al
+   agente de IA que el permiso sigue vivo, y la ficha de F-068 declara la rama
+   real (C2).
+
+**PENDIENTE DE VERIFICACION MANUAL**: `02_roles.sql` no lo ejecuta ningun test
+-solo se comprueba su texto- y esta corregido en dos sitios que solo prueba
+`psql`. Antes de volver a provisionar un rol desde cero hay que ejecutarlo
+contra una base de prueba. El punto 4 del review (los dos restos de
+`azure-apps`) es del lider, no del implementer.
+
 **LA NOCTURNA PASA A LAS 00:00 UTC** (decidido por el humano el 2026-09-06 a
 las 20:20 UTC; antes `0 2 * * *`). Cambiado en el job de Azure **y** en el
 repositorio, que es donde se mentia: `infra/env/dev.json`, el test
