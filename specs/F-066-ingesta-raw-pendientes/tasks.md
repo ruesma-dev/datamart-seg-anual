@@ -104,3 +104,5 @@ Queda escrito aqui, y no solo en el cuerpo del commit, porque un cambio de
 produccion que viaja de polizon en la rama de otra feature es invisible para
 quien lea la spec. **No altera el alcance medido de F-066**: son JSON, Markdown
 y un test.
+- [x] T17: Arreglar el defecto de R25-R28: `tests/test_f066_reconciliar_columnas.py` en rojo primero, después `_reconciliar_columnas_raw` en `postgres_client.py`  |  Verificación: `pytest tests/test_f066_reconciliar_columnas.py` en verde y traza RED en `progress/impl_F-066_reconciliar_columnas.md`
+- [x] T18: Cobertura y campaña de mutación del arreglo, e informe  |  Verificación: `bash harness/init.sh` en verde

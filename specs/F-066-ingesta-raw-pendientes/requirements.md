@@ -126,3 +126,22 @@ raw del seguimiento de COMPRAS por el MCP. Toda cifra de Sigrid se **midió el
   cada uno justificado y aceptado por el humano.
 - **R24.** La primera ingesta real y la comparación con `check-raw-recuentos`
   contra Azure son **MANUAL (humano)**.
+
+## F · Reconciliar columnas de un `raw` preexistente (defecto, 2026-09-08)
+
+Nace del fallo que R8 destapó: quitar `pagtex`/`pagfor` de `exclude_columns`
+cambia el esquema de una tabla que **ya existía**, y `ensure_raw_table` solo
+emitía `CREATE TABLE IF NOT EXISTS`. Tumbó dos nocturnas (`k251zrq` y
+`29813760`) con `UndefinedColumn: column "pagtex" of relation "dcf"`.
+
+- **R25.** CUANDO `ensure_raw_table` encuentre una tabla `raw` que ya existe,
+  el sistema debe comparar sus columnas reales con las esperadas y **añadir
+  con un solo `ALTER TABLE` todas las que falten**, aunque falten varias.
+- **R26.** La columna añadida debe nacer **NULL** —la tabla ya tiene filas—
+  y con el tipo Postgres de su `ColumnSpec`.
+- **R27.** El sistema **nunca** debe borrar una columna ni cambiar un tipo:
+  SI el origen deja de traer una columna, o su tipo ya no casa, ENTONCES
+  registra un `warning` con tabla y columna y **sigue**. Las columnas
+  técnicas (`_ingested_at`, `_source_tiemod`) quedan fuera de la comparación.
+- **R28.** La reconciliación debe ir **antes** del `TRUNCATE` del
+  full-refresh, y cada `ADD COLUMN` debe dejar su línea en el log.

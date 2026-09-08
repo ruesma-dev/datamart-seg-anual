@@ -216,3 +216,24 @@ Copiar tablas de Sigrid a `raw` es la responsabilidad de este ETL. Fuera:
 revocar permisos del MCP sobre `raw` (plataforma, `infra/sql/` + humano), el
 histórico de estados por foto diaria (F-067, `stg`) y cualquier dato de
 nómina o RRHH que no esté en Sigrid.
+
+## 8 · Reconciliar columnas de un `raw` preexistente (R25-R28)
+
+`ensure_raw_table` gana `_reconciliar_columnas_raw(cur, tabla, columnas)`, que
+corre en la MISMA transacción que el `CREATE TABLE IF NOT EXISTS`.
+
+- **De dónde salen las columnas reales**: `pg_attribute` + `format_type`, no
+  `information_schema.columns`, porque hace falta el tipo CON su precisión
+  (`character varying(30)`, `numeric(18,4)`) para poder compararlo.
+- **DA-8 · antes del TRUNCATE, no después.** Si el DDL fallara después de
+  vaciar, la tabla quedaría sin dato Y sin la columna: se habría destruido la
+  carga de ayer sin poder cargar la de hoy. `ADD COLUMN` sin `DEFAULT` es
+  metadato puro en Postgres —no reescribe la tabla—, así que adelantarlo no
+  cuesta nada ni en `apu` (2,1 M filas). El orden ya era ése en el step
+  (`ensure` en el punto 2, `truncate` en el 3); un test lo fija.
+- **DA-9 · varias columnas, un solo `ALTER TABLE`.** Un bloqueo y un cambio
+  atómico: `dcf` necesita `pagfor` y `pagtex` a la vez.
+- **DA-10 · comparar tipos exige normalizar.** El ETL escribe `VARCHAR(30)` y
+  el catálogo devuelve `character varying(30)`. Sin `_tipo_normalizado` el
+  aviso saltaría en cada columna de cada tabla, todas las noches, y el log
+  dejaría de servir para ver los cambios de verdad.

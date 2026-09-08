@@ -50,6 +50,69 @@ logger = get_logger(__name__)
 # Schemas del data mart
 SCHEMAS = ("raw", "aux", "stg", "mart", "_meta")
 
+# Las dos columnas que el ETL añade a cada tabla de `raw` y que NO vienen de
+# Sigrid. Quedan fuera de la comparación de esquema de `ensure_raw_table`: si
+# entraran, se leerían como columnas «sobrantes» del destino y ensuciarían el
+# log con un aviso falso por tabla y por noche.
+COLUMNAS_TECNICAS_RAW = frozenset({"_ingested_at", "_source_tiemod"})
+
+# Alias de tipos de Postgres. El catálogo devuelve el nombre canónico
+# (`character varying`) y el ETL escribe el alias corto (`VARCHAR`): sin esta
+# tabla, comparar tipos daría un falso positivo en cada columna de cada tabla.
+_ALIAS_TIPOS_PG = {
+    "character varying": "varchar",
+    "character": "char",
+    "timestamp without time zone": "timestamp",
+    "timestamp with time zone": "timestamptz",
+    "time without time zone": "time",
+    "time with time zone": "timetz",
+    "decimal": "numeric",
+    "int8": "bigint",
+    "int4": "integer",
+    "int2": "smallint",
+    "float8": "double precision",
+    "bool": "boolean",
+}
+
+# Columnas reales de una tabla, con su tipo tal y como Postgres lo escribe.
+# Se lee de `pg_attribute` y no de `information_schema.columns` porque
+# `format_type` devuelve el tipo CON su precisión —`character varying(30)`,
+# `numeric(18,4)`—, que es lo que hay que comparar.
+_SQL_COLUMNAS_REALES = """
+    SELECT a.attname, format_type(a.atttypid, a.atttypmod)
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = %s
+      AND c.relname = %s
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+    ORDER BY a.attnum
+"""
+
+
+def _tipo_normalizado(tipo: str) -> str:
+    """
+    Reduce un tipo de Postgres a una forma canónica comparable.
+
+    `VARCHAR(30)` y `character varying(30)` son el mismo tipo escrito de dos
+    maneras: el ETL usa la primera al crear la tabla y el catálogo devuelve la
+    segunda al leerla. Esta función las iguala para que el aviso de «tipo que
+    ya no casa» solo salte cuando el tipo cambia de verdad.
+    """
+    texto = " ".join(tipo.strip().lower().split())
+
+    argumentos = ""
+    inicio = texto.find("(")
+    if inicio != -1:
+        fin = texto.find(")", inicio)
+        if fin != -1:
+            argumentos = texto[inicio + 1 : fin].replace(" ", "")
+            texto = " ".join((texto[:inicio] + " " + texto[fin + 1 :]).split())
+
+    base = _ALIAS_TIPOS_PG.get(texto, texto)
+    return f"{base}({argumentos})" if argumentos else base
+
 # Cuántas mediciones devolver cuando no hay un arranque de `ingest_raw` al que
 # anclarse. Evita volcar el histórico entero de _meta.etl_runs.
 TIMINGS_SIN_ANCLA = 100
@@ -753,7 +816,14 @@ class PostgresClient:
         de la metadata de Sigrid. Añade dos columnas técnicas:
             _ingested_at   TIMESTAMP   cuándo se cargó la fila en Postgres
             _source_tiemod DOUBLE PRECISION  valor de tiemod de Sigrid (NULL si no existe)
-        Si la tabla ya existe, no la toca.
+
+        Si la tabla YA existe, reconcilia su esquema: compara las columnas
+        reales con las esperadas y **añade** las que falten. Ver
+        `_reconciliar_columnas_raw` para la regla completa (solo se añade;
+        nunca se borra una columna ni se cambia un tipo).
+
+        Ambas cosas van en la MISMA transacción: o la tabla queda con el
+        esquema completo, o no cambia nada.
         """
         if not columns:
             raise ValueError(f"Sin columnas para crear raw.{target_table}")
@@ -786,12 +856,116 @@ class PostgresClient:
 
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute(ddl)
+            self._reconciliar_columnas_raw(cur, target_table, columns)
 
         logger.info(
             "raw_table_ready",
             table=f"raw.{target_table}",
             columns=len(columns),
             pk=primary_key,
+        )
+
+    def _reconciliar_columnas_raw(
+        self,
+        cur: Any,
+        target_table: str,
+        columns: list[ColumnSpec],
+    ) -> None:
+        """
+        Ajusta el esquema de una tabla `raw` que ya existía al que Sigrid trae
+        hoy. **Solo añade.** La regla, aprobada por el humano el 2026-09-08:
+
+          - Columna esperada que NO está en el destino -> `ADD COLUMN`, y una
+            línea de log por cada una: es un cambio de esquema en producción.
+          - Columna del destino que el origen ya NO trae -> **aviso y nada
+            más**. Borrar sincronizando destruiría datos ya cargados.
+          - Columna cuyo tipo ya no casa -> **aviso y nada más**. Cambiar un
+            tipo en caliente puede truncar el dato.
+
+        Por qué existe: F-066 dejó de excluir `pagfor` y `pagtex` de `dcf`,
+        pero `raw.dcf` llevaba meses creada sin ellas. `CREATE TABLE IF NOT
+        EXISTS` no hace nada sobre una tabla que ya está, así que el `COPY`
+        siguiente nombraba dos columnas inexistentes y tumbó la nocturna del
+        2026-09-07 y la del 2026-09-08 (`UndefinedColumn: column "pagtex" of
+        relation "dcf" does not exist`). En local no se ve: contra una base
+        vacía todas las tablas nacen de cero.
+
+        Se llama DENTRO de `ensure_raw_table`, es decir **antes** del TRUNCATE
+        del full-refresh: si el DDL fallara después de vaciar, la tabla
+        quedaría sin dato Y sin la columna. `ADD COLUMN` sin `DEFAULT` es
+        metadato puro en Postgres —no reescribe la tabla—, así que hacerlo
+        antes no cuesta nada ni en `apu`, con 2,1 M de filas.
+        """
+        cur.execute(_SQL_COLUMNAS_REALES, ("raw", target_table))
+        catalogo = cur.fetchall()
+        if not catalogo:
+            # La tabla no está en el catálogo: nada que reconciliar. No se
+            # inventa un ALTER a ciegas sobre algo que no se ha podido leer.
+            return
+
+        reales = {
+            nombre: tipo
+            for nombre, tipo in catalogo
+            if nombre not in COLUMNAS_TECNICAS_RAW
+        }
+        esperadas = {c.name: c for c in columns}
+
+        for nombre, spec in esperadas.items():
+            tipo_real = reales.get(nombre)
+            if tipo_real is None:
+                continue
+            if _tipo_normalizado(tipo_real) != _tipo_normalizado(spec.postgres_type):
+                logger.warning(
+                    "raw_columna_cambia_de_tipo",
+                    table=f"raw.{target_table}",
+                    column=nombre,
+                    tipo_en_destino=tipo_real,
+                    tipo_en_origen=spec.postgres_type,
+                    accion="ninguna: el ETL avisa, no altera tipos",
+                )
+
+        for nombre in sorted(set(reales) - set(esperadas)):
+            logger.warning(
+                "raw_columna_sobrante_en_destino",
+                table=f"raw.{target_table}",
+                column=nombre,
+                tipo_en_destino=reales[nombre],
+                accion="ninguna: el ETL avisa, no borra columnas",
+            )
+
+        faltantes = [c for c in columns if c.name not in reales]
+        if not faltantes:
+            return
+
+        # Todas en UNA sola sentencia: un solo bloqueo de la tabla y un cambio
+        # atómico. `dcf` necesita dos a la vez (`pagfor` y `pagtex`).
+        # Nacen NULL aunque el origen las declare NOT NULL: la tabla ya tiene
+        # filas y `ADD COLUMN ... NOT NULL` sin DEFAULT fallaría sobre ellas.
+        alter = sql.SQL("ALTER TABLE raw.{} {}").format(
+            sql.Identifier(target_table),
+            sql.SQL(", ").join(
+                sql.SQL("ADD COLUMN IF NOT EXISTS {} {} NULL").format(
+                    sql.Identifier(c.name),
+                    sql.SQL(c.postgres_type),
+                )
+                for c in faltantes
+            ),
+        )
+        cur.execute(alter)
+
+        for c in faltantes:
+            logger.info(
+                "raw_columna_anadida",
+                table=f"raw.{target_table}",
+                column=c.name,
+                tipo=c.postgres_type,
+                nullable=True,
+            )
+        logger.info(
+            "raw_tabla_reconciliada",
+            table=f"raw.{target_table}",
+            columnas_anadidas=len(faltantes),
+            columnas=[c.name for c in faltantes],
         )
 
     def table_exists(self, schema: str, table: str) -> bool:
