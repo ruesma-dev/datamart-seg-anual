@@ -112,16 +112,27 @@ Dominio, `etl_sigrid/domain/recuentos.py` (sin imports de infraestructura):
 @dataclass(frozen=True, slots=True)
 class InformeRecuentos:
     iguales: tuple[str, ...]
-    distintas: tuple[tuple[str, int, int], ...]   # (tabla, sigrid, raw)
+    toleradas: tuple[tuple[str, int, int], ...]   # Sigrid de más, deriva
+    faltantes: tuple[tuple[str, int, int], ...]   # Sigrid de más, se pasa
+    sobrantes: tuple[tuple[str, int, int], ...]   # Sigrid de MENOS: alarma
     ausentes: tuple[str, ...]                     # sin tabla en raw
     sin_medir: tuple[str, ...]                    # Sigrid no respondió
     @property
-    def ok(self) -> bool: ...                     # todo en `iguales`
+    def ok(self) -> bool: ...     # ni faltantes, ni sobrantes, ni las dos últimas
 
 def comparar_recuentos(declaradas: Sequence[str],
                        sigrid: Mapping[str, int | None],
-                       raw: Mapping[str, int | None]) -> InformeRecuentos: ...
+                       raw: Mapping[str, int | None],
+                       tolerancia_pct: float = TOLERANCIA_DERIVA_PCT,
+                       ) -> InformeRecuentos: ...
 ```
+
+La tolerancia es **relativa a cada tabla** y no global ni absoluta: 50 filas
+son ruido en `obrparpre` (13,9 M) y un cuarto de un catálogo de 200; y un
+umbral global quedaría dominado por `obrparpre`, que ella sola es el 55 % de
+las filas. El 0,05 % por defecto es lo único que cabe entre el peor día medido
+(0,0286 %) y una página perdida de la ingesta en la tabla más grande
+(10.000 filas = 0,072 %), que es justo lo que el comando existe para cazar.
 
 CLI, `main.py` → `check-raw-recuentos`, junto a `check-coherencia`: lee
 `settings.tables_sigrid`; por tabla manda por `leer_sql`

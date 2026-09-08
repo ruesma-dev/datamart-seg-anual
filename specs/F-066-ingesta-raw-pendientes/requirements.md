@@ -84,15 +84,18 @@ raw del seguimiento de COMPRAS por el MCP. Toda cifra de Sigrid se **midió el
 ## C · Recuento igual al de Sigrid, tabla a tabla
 
 - **R15.** El sistema debe ofrecer `python main.py check-raw-recuentos`, de
-  solo lectura, que para cada tabla del YAML compare `COUNT(*)` en Sigrid
-  (con el mismo `where`) contra `COUNT(*)` en `raw`, imprima una línea por
-  tabla y salga con código 1 si alguna difiere o falta en `raw`.
-- **R16.** El veredicto debe ser dominio puro (`etl_sigrid/domain/
-  recuentos.py`): dos mapas `tabla → filas | None` → informe con `iguales`,
-  `distintas` (ambas cifras), `ausentes` y `sin_medir`, en el orden del YAML.
-- **R17.** SI Sigrid rechaza o corta un `COUNT(*)`, ENTONCES esa tabla queda
-  `sin_medir`, el barrido continúa y el comando sale con código 1: «no he
-  podido mirar» no es «está bien» (`check-cobertura`, 2026-09-02).
+  solo lectura, que compare `COUNT(*)` en Sigrid (con el mismo `where`)
+  contra el de `raw` tabla a tabla, saque una línea por tabla con su
+  desviación —los hallazgos aparte de la deriva tolerada— y salga con código
+  1 si hay alguno. Dominio puro (`domain/recuentos.py`), orden del YAML.
+- **R16.** La tolerancia debe tener **dirección** (reformulado el 2026-09-08:
+  la igualdad exacta era inalcanzable). SI Sigrid tiene filas de MÁS que
+  `raw`, ENTONCES es deriva conforme mientras no pase de `--tolerancia-pct`,
+  relativa a esa tabla y 0,05 % por defecto; SI las tiene de MENOS, ENTONCES
+  es fallo sea cual sea la magnitud, que es lo que caza un borrado en origen.
+- **R17.** SI Sigrid rechaza un `COUNT(*)` la tabla queda `sin_medir`, y si
+  no existe en `raw`, `ausente`: fallo con **cualquier** tolerancia, y el
+  barrido sigue hasta el final (`check-cobertura`, 2026-09-02).
 - **R18.** MIENTRAS corre, el comando no debe escribir en Sigrid ni en
   `_meta.etl_runs`; un test con dobles comprueba que solo llama a
   `leer_sql`, `table_exists` y `count_rows`.
