@@ -135,7 +135,7 @@ pasaba en rojo es `r9_sin_lista_de_ausentes_se_revoca_todo_lo_declarado`, que
 es un guardarraíl de no-regresión y ya se cumplía.
 
 Traza íntegra guardada durante la sesión; reproducible con el comando de
-arriba sobre `e2e2ad8`.
+arriba sobre `96bb7b9`, el árbol anterior a T1.
 
 ## Verificaciones MANUAL pendientes
 
@@ -162,7 +162,8 @@ arriba sobre `e2e2ad8`.
 
 ### Por qué la campaña automática da cero mutantes, medido
 
-`harness.alcance` sobre `e2e2ad8..HEAD` (el diff de ESTA corrección) da **38
+`harness.alcance` sobre `96bb7b9..HEAD` (el diff de ESTA corrección; `96bb7b9`
+es el cierre de F-025 que el líder commiteó justo antes) da **38
 líneas de producción**: 24 en `grants.py` y 14 en `postgres_client.py`.
 `generar_mutantes` sobre esas líneas devuelve **0 mutantes**, y el motivo está
 en el propio mutador: `COMPARACIONES` (`harness/mutacion.py:165`) cubre `==`,
