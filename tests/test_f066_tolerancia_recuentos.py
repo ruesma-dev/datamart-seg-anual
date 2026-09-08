@@ -372,6 +372,44 @@ def test_f066_r16_dos_ceros_son_iguales_y_no_una_division_por_cero() -> None:
     assert informe.peor is None, "sin desviación no hay «peor tabla» que enseñar"
 
 
+def test_f066_r15_la_peor_tabla_es_la_de_mas_desviacion_y_no_la_primera() -> None:
+    """`peor` tiene que ORDENAR, no quedarse con la primera que derivó.
+
+    La de más desviación va la ÚLTIMA a propósito. Si la clave de ordenación se
+    rompe, `max` devuelve la primera de la lista y el resumen manda a mirar la
+    tabla equivocada, que es peor que no señalar ninguna: `peor` existe para
+    decirle al de guardia por dónde empezar.
+    """
+    informe = comparar_recuentos(
+        ["primera", "ultima"],
+        {"primera": 1_000_000, "ultima": 1_000_000},
+        {"primera": 999_999, "ultima": 999_000},
+    )
+
+    assert informe.peor is not None
+    assert informe.peor.tabla == "ultima"
+    assert "(ultima)" in formatear(informe)
+
+
+def test_f066_r15_cada_bloque_dice_cuantas_filas_bailan_y_hacia_donde() -> None:
+    """Los dos bloques llevan la diferencia CON SIGNO, y es la de verdad.
+
+    El signo es lo que distingue las dos averías —filas que faltan en `raw` de
+    filas que sobran— y la magnitud es lo que se mira para decidir si se
+    reingiere. Un bloque que dijera «—», o una cifra que fuese la suma en vez
+    de la resta, se leerían igual de bien y mandarían a mirar otra cosa.
+    """
+    sobran = formatear(
+        comparar_recuentos(["apu"], {"apu": 2_154_543}, {"apu": 2_154_544})
+    )
+    faltan = formatear(
+        comparar_recuentos(["obrparpre"], {"obrparpre": 1_000_000}, {"obrparpre": 990_000})
+    )
+
+    assert "apu: Sigrid 2.154.543, raw 2.154.544 (-1)" in sobran
+    assert "obrparpre: Sigrid 1.000.000, raw 990.000 (+10.000)" in faltan
+
+
 def test_f066_r15_la_salida_dice_cuanto_hace_de_la_ultima_ingesta() -> None:
     """La deriva esperable es proporcional al tiempo: 0,03 % cinco horas
     después de la ingesta es normal; cinco minutos después, no."""
@@ -514,3 +552,17 @@ def test_f066_r15_si_no_se_puede_leer_la_frescura_el_veredicto_no_cambia(cli) ->
 
     assert resultado.exit_code == 0, resultado.output
     assert "desconocido" in resultado.output
+
+
+def test_f066_r15_la_ayuda_dice_con_que_tolerancia_se_va_a_ejecutar() -> None:
+    """Quien lanza el comando a ciegas tiene que ver el umbral en `--help`.
+
+    Es el mismo argumento que obliga a imprimir el umbral en la salida —sin él
+    un verde no se puede interpretar—, pero en la ayuda: sin el valor por
+    defecto escrito, `--tolerancia-pct` se documenta como «un porcentaje» y
+    nadie puede saber si el verde de anoche salió con 0,05 % o con 5 %.
+    """
+    resultado = CliRunner().invoke(main.cli, ["check-raw-recuentos", "--help"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert str(TOLERANCIA_DERIVA_PCT) in resultado.output
