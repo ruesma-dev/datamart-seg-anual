@@ -196,3 +196,13 @@ mutación en curso», copia borrada y `git status` sin cambios de código.
 `ruff check` sobre los tres ficheros tocados deja **un** aviso, `I001` en
 `postgres_client.py`, que es **previo**: sale igual sobre la versión `7d7c0f8`
 del fichero. Cero avisos nuevos.
+
+## Automejora del arnés (propuesta, NO aplicada)
+
+`harness/mutacion.py` no sabe mutar `in` / `not in`, y esta corrección es el
+caso de libro de por qué importa: toda la lógica que decide quién se revoca es
+pertenencia a un conjunto. Un cambio así entra hoy en el repositorio con una
+campaña que dice «0 supervivientes de 0 mutantes» y suena a verde. Añadir
+`ast.In` / `ast.NotIn` a `COMPARACIONES` es una línea, pero cambia los números
+de todas las campañas y vale para cualquier proyecto: es decisión del líder y,
+si se toma, se porta a `arnes-base` en el mismo trabajo.
