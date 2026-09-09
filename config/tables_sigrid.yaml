@@ -168,6 +168,16 @@ tables:
     where: null
     exclude_columns:
       - tex    # observaciones largas
+    # SE QUEDA, DECIDIDO EN F-074 (2026-09-09) y no por inercia. Tiene
+    # 0 filas en Sigrid y 0 filas en `raw`: la noche le cuesta UNA peticion
+    # HTTP que devuelve cero. A cambio es el canario de un hecho del que
+    # dependen dos ficheros --`sql/maestro/02_proveedores.sql` y
+    # `03_proveedores_obra.sql` construyen el vinculo obra-proveedor POR OTRA
+    # VIA justamente porque esta vacia--, y `check-raw-recuentos` es lo unico
+    # que diria que ha dejado de estarlo. Sacarla convertiria un hecho
+    # vigilado en una suposicion de 2026. No contradice la regla de F-066
+    # (una tabla vacia no se DA DE ALTA): esta ya esta de alta, ya tiene
+    # ficha y ya tiene dos consumidores que dependen de su vacio.
     # Obras: Proveedores (1N). Lista de proveedores por obra.
     # Cruce: obrprv.obride → obr.ide. Trae cod (código proveedor) y
     # res (nombre proveedor). El enlace al maestro de proveedor (CIF) se
@@ -232,7 +242,14 @@ tables:
   - source_table: com
     target_table: com
     id_column: ide
-    incremental_column: tiemod
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09 (F-074): `tiemod` NO EXISTE en
+    # esta tabla. La consulta contra INFORMATION_SCHEMA devuelve 42S22 y
+    # `_source_tiemod` esta a NULL en las 287.673 filas de las tres. Lo
+    # declaraba y el paso lo degradaba a None en silencio
+    # (`ingest_raw_step.py:279`), asi que la declaracion no hacia nada salvo
+    # afirmar algo falso. NO HAY SUSTITUTO: ninguna de las tres tiene otra
+    # columna de tipo fecha que sirva de corte.
+    incremental_column: null
     where: null
     exclude_columns:
       - tex
@@ -254,7 +271,14 @@ tables:
   - source_table: comlin
     target_table: comlin
     id_column: ide
-    incremental_column: tiemod
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09 (F-074): `tiemod` NO EXISTE en
+    # esta tabla. La consulta contra INFORMATION_SCHEMA devuelve 42S22 y
+    # `_source_tiemod` esta a NULL en las 287.673 filas de las tres. Lo
+    # declaraba y el paso lo degradaba a None en silencio
+    # (`ingest_raw_step.py:279`), asi que la declaracion no hacia nada salvo
+    # afirmar algo falso. NO HAY SUSTITUTO: ninguna de las tres tiene otra
+    # columna de tipo fecha que sirva de corte.
+    incremental_column: null
     where: null
     exclude_columns:
       - tex
@@ -275,7 +299,14 @@ tables:
   - source_table: comprv
     target_table: comprv
     id_column: ide
-    incremental_column: tiemod
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09 (F-074): `tiemod` NO EXISTE en
+    # esta tabla. La consulta contra INFORMATION_SCHEMA devuelve 42S22 y
+    # `_source_tiemod` esta a NULL en las 287.673 filas de las tres. Lo
+    # declaraba y el paso lo degradaba a None en silencio
+    # (`ingest_raw_step.py:279`), asi que la declaracion no hacia nada salvo
+    # afirmar algo falso. NO HAY SUSTITUTO: ninguna de las tres tiene otra
+    # columna de tipo fecha que sirva de corte.
+    incremental_column: null
     where: null
     exclude_columns:
       - tex
@@ -726,8 +757,11 @@ tables:
     id_column: ide
     incremental_column: null
     where: null
+    # F-074: `tex` SALE de la lista de exclusion y se ingiere. Es el UNICO
+    # campo que dice de que es cada certificado --la tabla no tiene campo
+    # de tipo-- y estaba fuera solo porque la lista estandar del modulo
+    # COMPRAS se aplica a bulto. Quedan 12 exclusiones, no 13.
     exclude_columns:
-      - tex
       - med
       - des
       - obs
@@ -1081,3 +1115,168 @@ tables:
     # distintas en un contrato y en una factura. Para los contratos
     # (`tip`=44): 1 PFP, 3 EPF enviado, 5 RFP recibido, 6 COMD, 7 FIR
     # firmado, 8 TER, 9 RES.
+
+  # ===========================================================================
+  # MODULO CENSO (F-074, tanda N) -- las nueve que destapo el censo de F-072
+  #
+  # Nueve tablas que el origen tiene y este ETL no traia, y sin las cuales la
+  # mitad de lo que el censo del 2026-09-09 propone construir no se puede
+  # escribir. Medidas una a una contra Sigrid ese dia por `sigrid-api` en solo
+  # lectura (INFORMATION_SCHEMA.COLUMNS y COUNT(*)); el detalle esta en
+  # `progress/explore_F-074_las_nueve.md`. `ide` es `int` y UNICO en las nueve
+  # (COUNT(*) = COUNT(DISTINCT ide)), asi que sirve de cursor sin reservas.
+  #
+  # SOLO TRES TIENEN `tiemod` -- `auxdpt`, `auxhor` y `auxrestip`, en `float`
+  # (fecha serie) y poblado al 100 %. Las otras seis NO TIENEN NINGUNA COLUMNA
+  # DE TIPO FECHA: lo que lo parece (`fec`, `fecalt`, `fecult`, `fecultact`) es
+  # un entero AAAAMMDD, que no sirve de corte.
+  #
+  # Y ESO NO ABRE NINGUN AGUJERO, aunque lo parezca. `incremental_column` NO es
+  # un interruptor de modo de carga: lo unico que decide es si `copy_rows`
+  # rellena `_source_tiemod` con el sello del origen. QUIEN DECIDE COMO SE
+  # CARGA ES EL `CMD` DEL `Dockerfile`, que arranca `run-all --full`, o sea
+  # TRUNCATE y recarga entera de TODAS las tablas cada noche. Por eso "esta
+  # tabla no tiene tiemod" significa "su fila de raw no lleva sello de origen",
+  # y NO "lo que se modifique en Sigrid no volvera a bajar": eso solo es cierto
+  # lanzando `ingest` a mano sin `--full`. Es el error exacto que F-006 cometio
+  # dos veces seguidas y que `tests/test_f006_fuente_que_gobierna.py` existe
+  # para impedir. La consecuencia practica es que NO hace falta ninguna recarga
+  # completa por tabla, y por eso aqui no se inventa ninguna: el ETL no sabe
+  # hacerla y no la necesita.
+  #
+  # NINGUNA FIJA `page_size`: el global (SIGRID_API_PAGE_SIZE) ya vale 10.000,
+  # que es con lo que se midieron las dos grandes (10.000 filas de `dcaprodes`
+  # en 0,7 s y de `ctrprodes` en 0,5 s). Escribirlo aqui no cambiaria nada hoy
+  # y las dejaria pinchadas el dia que haya que bajar el global.
+  #
+  # DATO SENSIBLE: `reshor` y `emphis` son datos de NOMINA y quedan fuera del
+  # alcance del rol del MCP por el mecanismo de F-068 (PG_EXCLUDED_TABLES).
+  # `cet` trae ademas el DNI y el nombre del representante legal: se excluyen
+  # en origen, que sale mas barato que protegerlos despues.
+  # ===========================================================================
+
+  - source_table: auxdpt
+    target_table: auxdpt
+    id_column: ide
+    incremental_column: tiemod   # existe y poblado al 100 % (7 de 7 filas)
+    where: null
+    exclude_columns: []
+    # Departamentos (7 filas, 8 columnas). Decodifica `emphis.dptide`.
+
+  - source_table: auxhor
+    target_table: auxhor
+    id_column: ide
+    incremental_column: tiemod   # existe y poblado al 100 % (60 de 60 filas)
+    where: null
+    exclude_columns: []
+    # Horarios y conceptos de hora (60 filas, 23 columnas). `reshor.horide`
+    # apunta aqui. Es lo que hace legible `hmores`: el catalogo MEZCLA horas
+    # de verdad con "mes vehiculo" y "consumos telefono", asi que sumar
+    # `hmores` sin cortar por aqui da una cifra falsa (medido en F-072).
+
+  - source_table: auxrestip
+    target_table: auxrestip
+    id_column: ide
+    incremental_column: tiemod   # existe y poblado al 100 % (37 de 37 filas)
+    where: null
+    exclude_columns: []
+    # Tipos de recurso (37 filas, 10 columnas). Traduce la clase de recurso:
+    # persona, medio o consumo imputable. De las 2.610 filas de `res`, 1.353
+    # son personas, 1.157 consumos y 106 medios (medido en F-072).
+
+  - source_table: cet
+    target_table: cet
+    id_column: ide
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09: no tiene `tiemod` ni ninguna
+    # otra columna de tipo fecha. Carga entera cada noche, como todas.
+    incremental_column: null
+    where: null
+    exclude_columns:
+      - repnom      # DATO PERSONAL: nombre y apellidos del representante
+      - repno1      # legal, poblados en 18 de las 40 filas. No entran al
+      - repap1      # datamart: nadie los consulta y el rol del MCP lee `raw`.
+      - repap2
+      - repdni      # DATO PERSONAL: documento de identidad del representante
+      - repcar
+      - dirtex      # text ilimitado, 1 fila con 48 bytes, sin uso en seguimiento
+    # Centros de trabajo y empresas propias (40 filas, 69 columnas). Nombra el
+    # centro de trabajo. OJO: la columna `cod` que el documento de Sigrid le
+    # atribuye NO EXISTE en la base -- el recuento sobre
+    # INFORMATION_SCHEMA.COLUMNS con TABLE_NAME='cet' y COLUMN_NAME='cod'
+    # devuelve 0 --, asi que cualquier join a esta tabla va por `ide`. El
+    # censo de F-072 tenia razon y el documento se equivoca.
+
+  - source_table: pro
+    target_table: pro
+    id_column: ide
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09: no tiene `tiemod`. Lo que parece
+    # una marca de modificacion, `fecultact`, es un entero AAAAMMDD.
+    incremental_column: null
+    where: null
+    exclude_columns:
+      - esigurl1    # modulo e-commerce de Sigrid: 0 filas con contenido
+      - esigurl2    # idem
+      - esigpromt   # idem
+      - carprotex   # text de caracteristicas: 0 filas con contenido
+    # Maestro de articulos (55.179 filas, 108 columnas). Hoy el producto NO
+    # TIENE NOMBRE en el datamart pese a que lo referencian `dcopro` (99,9 %
+    # informado) y `dncpro` (95,4 %). Reparto por clase: 9 -> 19.448,
+    # 11 -> 17.807, 10 -> 16.614, 3 -> 1.308, 13 -> 2.
+
+  - source_table: reshor
+    target_table: reshor
+    id_column: ide
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09: no tiene `tiemod`.
+    incremental_column: null
+    where: null
+    exclude_columns: []
+    # DATO SENSIBLE (NOMINA), fuera del alcance del rol del MCP por el
+    # mecanismo de F-068: precio de coste por recurso y tipo de hora. 8.949
+    # filas y 11 columnas, 2.061 recursos, 58 horarios y 2.036 filas con
+    # precio distinto de cero. Es el multiplicador que a F-061 le falta para
+    # pasar de horas a euros.
+
+  - source_table: emphis
+    target_table: emphis
+    id_column: ide
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09: no tiene `tiemod`. Su campo de
+    # fecha es un entero AAAAMMDD.
+    incremental_column: null
+    where: null
+    exclude_columns:
+      - notas       # DATO PERSONAL: texto libre sobre el empleado. 1 fila
+                    # informada, 6 bytes. No compensa traerlo.
+    # DATO SENSIBLE (NOMINA), fuera del alcance del rol del MCP por el
+    # mecanismo de F-068, como `emp` y `res`: historico de contrato. 1.633
+    # filas y 117 columnas, 1.017 empleados, del 19891102 al 20260601, con el
+    # tipo de contrato informado al 100 %. Es el UNICO sitio de Sigrid con
+    # historico laboral de verdad.
+
+  # --- Los desgloses de documento: la trazabilidad linea a linea -------------
+  # Las dos grandes de la tanda, 1.275.460 filas entre ambas y el 95 % de todo
+  # lo que F-074 anade. Son enlaces de trazabilidad, no documentos: hoy el
+  # esquema `compras` aproxima esa cadena por `linoriide`.
+
+  - source_table: dcaprodes
+    target_table: dcaprodes
+    id_column: ide
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09: no tiene `tiemod` ni ninguna
+    # columna de tipo fecha. Solo 7 columnas y las siete son numericas.
+    incremental_column: null
+    where: null
+    exclude_columns: []
+    # Desglose de linea de albaran (850.985 filas, 7 columnas). Trazabilidad
+    # linea a linea albaran -> factura. `docproide` apunta a `dcapro.ide`.
+    # Medido: 10.000 filas en 0,7 s por la pasarela.
+
+  - source_table: ctrprodes
+    target_table: ctrprodes
+    id_column: ide
+    # VERIFICADO CONTRA SIGRID EL 2026-09-09: no tiene `tiemod` ni ninguna
+    # columna de tipo fecha.
+    incremental_column: null
+    where: null
+    exclude_columns: []
+    # Desglose de linea de contrato (424.475 filas, 8 columnas). Trazabilidad
+    # linea a linea contrato -> albaran o factura. `docproide` apunta a
+    # `ctrpro.ide`. Medido: 10.000 filas en 0,5 s por la pasarela.
