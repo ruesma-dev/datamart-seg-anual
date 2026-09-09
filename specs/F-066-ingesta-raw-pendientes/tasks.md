@@ -15,31 +15,35 @@ Rigor crítico: T1-T3 son la fase RED (los tests se escriben y fallan antes de t
 - [x] T10: Párrafo en `docs/ARCHITECTURE.md` («Acceso a datos»): grupos nuevos, mapa de `con.tip`, `apu` sin `tiemod`, `hmores`, datos personales en `raw`, lo que Sigrid no guarda (DA-6, DA-7)  |  Verificación: `pytest tests/test_f006_docs.py tests/test_documentos_del_arnes.py`
 - [x] T11: Actualizar `azure-apps/datamart_seg_anual.md` (R21: 56 tablas, las 25 nuevas, las descartadas, `dcf` con `pagtex`/`pagfor`, datos personales enteros en `raw.emp`/`raw.res`) y hacer commit en ese repositorio  |  Verificación: MANUAL (humano): `git -C ../azure-apps log -1 --stat`
 - [x] T12: Cobertura de las líneas cambiadas ≥ 80 % y campaña de mutación completa sobre `etl_sigrid/domain/recuentos.py` y el comando (`python -m harness.mutacion`), 0 supervivientes o justificación aceptada; informe en `progress/`  |  Verificación: `bash harness/init.sh` secciones 7b y mutación en verde
-- [ ] T13: Desplegar la imagen (`infra/`, tag fechado) y esperar la primera nocturna con las 25 tablas; anotar en `mediciones.md` filas y segundos por tabla, total frente a 1.832 s, créditos antes/después y SKU (R19), y la fila de F-065 (R20)  |  Verificación: MANUAL (humano): `python main.py timings` y `az monitor metrics list ... cpu_credits_remaining`
-- [ ] T14: Contra Azure, tras esa nocturna: `python main.py check-raw-recuentos` con código 0 y `python main.py check-diccionario` sin objetos sin ficha  |  Verificación: MANUAL (humano)
+- [x] T13: Desplegar la imagen (`infra/`, tag fechado) y esperar la primera nocturna con las 25 tablas; anotar en `mediciones.md` filas y segundos por tabla, total frente a 1.832 s, créditos antes/después y SKU (R19), y la fila de F-065 (R20)  |  Verificación: MANUAL (humano): `python main.py timings` y `az monitor metrics list ... cpu_credits_remaining`
+- [ ] T14 (PENDIENTE, del líder): Contra Azure, tras esa nocturna: `python main.py check-raw-recuentos` con código 0 y `python main.py check-diccionario` sin objetos sin ficha  |  Verificación: MANUAL (humano)
 - [x] T15: Pasar al líder los hallazgos de R22 para que actualice las fichas de F-055, F-056, F-057 y F-067 en `harness/features.json`  |  Verificación: MANUAL (humano): `bash harness/init.sh` regenera `BACKLOG.md` con las fichas cambiadas
 - [x] T16: Ejecutar `bash harness/init.sh` en verde  |  Verificación: exit 0
 
-## Estado de las tres MANUAL (2026-09-06)
+## Estado de las tres MANUAL (actualizado el 2026-09-09)
 
-* **T13 · PENDIENTE, y no por falta de trabajo.** Construir la imagen y
-  desplegarla toca `infra/` y `az`, que **solo autoriza el humano** (regla dura
-  de `CLAUDE.md`), y además el líder decidió con él **retrasar el despliegue a
-  después de la nocturna del lunes 07**: esa nocturna es la primera acotada y
-  es la que da T31b y T34 de F-025; meterle un 26 % más de filas la
-  contaminaría y no valdría ni para F-025 ni para F-065. Lo que hace falta,
-  paso a paso, está en `progress/impl_F-066.md`, sección «Qué necesita T13».
-* **T14 · PENDIENTE por dependencia de T13.** Comprueba contra Azure lo que la
-  nocturna de T13 deja: no hay nada que ejecutar hasta que esa nocturna haya
-  corrido. Sus dos comandos están en `progress/current.md`.
+* **T13 · HECHA el 2026-09-08.** El humano construyó y desplegó la imagen
+  `r20260908-1248` —con F-066 y F-068 dentro, que era la condición del bloqueo—
+  y la nocturna `caj-datamart-seg-dev-p1gq8ks` corrió de 11:16 a 14:19 UTC en
+  `Succeeded`, con los diez pasos en verde y `check-declarados` 130/130.
+  **R19 y R20 quedan cumplidos**: `mediciones.md` §3 trae filas y segundos por
+  tabla de las 8 grandes y de `dcf` sacados de `_meta.etl_runs`, el total
+  (25.491.959 filas / 2.454,1 s) frente a la línea base (20.147.626 / 1.832,4 s,
+  +26,5 % y +33,9 %), los créditos (mínimo 552 de 576) y el SKU
+  (`Standard_B2s`); §4 trae la fila de F-065 con sus siete celdas. La nocturna
+  `29815200` del 09-sep lo repite en producción (25.497.946 filas / 2.921,1 s).
+* **T14 · PENDIENTE, y es del líder.** R24 la declara `MANUAL (humano)` y sus
+  dos comandos hacen 56 `COUNT(*)` contra Sigrid y contra el Postgres
+  compartido: no se lanzan con una nocturna corriendo. **El hueco está
+  preparado, con los dos comandos y el criterio de cierre, en `mediciones.md`
+  §6**; se rellena pegando la salida. Lo único medido contra Azure (08-sep,
+  16:30 UTC, 31 iguales · 25 distintas, código 1) es con el criterio **viejo**,
+  anterior a T19-T24. **Mientras T14 siga en `[ ]`, C4 sigue abierto y la
+  feature no pasa a `done`.**
 * **T15 · HECHA** por el líder el 2026-09-06 a las 19:40 UTC (commit
   `26ce092`): los hallazgos de R22 están en las fichas de F-055, F-056, F-057 y
   F-067 de `harness/features.json`, y nace **F-068** con lo del permiso del MCP
   sobre `raw.emp`.
-
-**Consecuencia para el cierre**: R19, R20 y R24 dependen de T13/T14 y siguen
-PENDIENTES en `mediciones.md` §3 y §4. La feature no puede pasar a `done` con
-ellas abiertas; lo que se somete a revisión es todo lo demás.
 
 ## Nota de T12 · la campaña de mutación (2026-09-07)
 
@@ -106,3 +110,43 @@ quien lea la spec. **No altera el alcance medido de F-066**: son JSON, Markdown
 y un test.
 - [x] T17: Arreglar el defecto de R25-R28: `tests/test_f066_reconciliar_columnas.py` en rojo primero, después `_reconciliar_columnas_raw` en `postgres_client.py`  |  Verificación: `pytest tests/test_f066_reconciliar_columnas.py` en verde y traza RED en `progress/impl_F-066_reconciliar_columnas.md`
 - [x] T18: Cobertura y campaña de mutación del arreglo, e informe  |  Verificación: `bash harness/init.sh` en verde
+
+## Fase de tolerancia con dirección (2026-09-08) · T19-T24
+
+Estas seis tareas **se declaran a posteriori**, el 2026-09-09, y hay que decirlo:
+los seis commits que las implementan **se rotularon mal**. Van etiquetados
+`F-066 T1` … `F-066 T6`, pero T1-T6 son las tareas de la ingesta, hechas el
+06-sep y ya cerradas. El trabajo es real y está revisado —el reviewer aprobó el
+código en la pasada 3—, lo que faltaba era la tarea que lo respaldara, igual que
+sí se hizo con T17/T18 para la reconciliación de columnas. La correspondencia
+commit → tarea es esta, y es lo que hay que leer en vez de la etiqueta del
+commit:
+
+| Commit | Rótulo que lleva | Tarea que es en realidad |
+|---|---|---|
+| `da965c8` | `F-066 T1` | **T19** |
+| `29f7c62` | `F-066 T2` | **T20** |
+| `4a3cd2c` | `F-066 T3` | **T21** |
+| `e2e2ad8` | `F-066 T4` | **T22** |
+| `ddcf8b2` | `F-066 T5` | **T23** |
+| `084f75a` | `F-066 T6` | **T24** |
+
+No se reescribe el historial para corregir los mensajes: la rama ya está
+revisada y un `rebase` invalidaría los SHA que citan `mediciones.md`,
+`progress/review_F-066.md` y los informes de mutación.
+
+- [x] T19: Tolerancia CON DIRECCIÓN en `check-raw-recuentos` (`domain/recuentos.py` y `main.py`): filas de más en Sigrid son deriva y se toleran hasta `--tolerancia-pct` (0,05 % por tabla, relativo); filas de menos son alarma sea de una fila; `ausentes` y `sin_medir` siguen siendo fallo. La salida separa los cuatro casos, dice el umbral aplicado, la peor desviación y cuánto hace de la última ingesta correcta  |  Verificación: `pytest tests/test_f066_tolerancia_recuentos.py` en verde tras la fase RED (traza en `progress/impl_F-066_tolerancia_recuentos.md`) · commit `da965c8`
+- [x] T20: Escribir el criterio nuevo donde manda: R15-R17 reformulados en `requirements.md`, el contrato de `InformeRecuentos` y el porqué del 0,05 % en `design.md`, y el criterio de aceptación en `harness/features.json`  |  Verificación: `pytest tests/test_documentos_del_arnes.py` y `bash harness/init.sh` regenera `BACKLOG.md` · commit `29f7c62`
+- [x] T21: Cerrar la rama de Sigrid a cero (el 100 % de desviación cuando Sigrid dice 0 y `raw` trae filas, la única división que no se puede hacer) con dos tests, y quitar de las cabeceras la hora exacta que no se había verificado  |  Verificación: cobertura de líneas cambiadas 100 % · commit `4a3cd2c`
+- [x] T22: Dejar `ruff check` sin avisos nuevos sobre `recuentos.py`, el test nuevo y `main.py`, y escribir `progress/impl_F-066_tolerancia_recuentos.md`  |  Verificación: `ruff check etl_sigrid/domain/recuentos.py tests/test_f066_tolerancia_recuentos.py` limpio · commit `e2e2ad8`
+- [x] T23: Campaña de mutación en serie sobre el diff de la tolerancia (`b3abcf4..e2e2ad8`, `--workers 1`) y matar con test los supervivientes que son huecos reales  |  Verificación: `python -m harness.mutacion --feature F-066 --base b3abcf4 --workers 1`; 35 mutantes, 6 supervivientes → 4 muertos con test · commit `ddcf8b2`
+- [x] T24: Segunda pasada de la campaña y análisis escrito de los dos supervivientes que quedan (equivalentes de `recuentos.py:129`), más las tres celdas que faltaban en «Evidencias»  |  Verificación: 35 mutantes, 33 muertos, 2 supervivientes equivalentes, 0 timeouts; `bash harness/init.sh` en verde · commit `084f75a`
+
+## Pasada de cierre del review (2026-09-09) · T25-T27
+
+Los seis cambios requeridos de la pasada 3 de `progress/review_F-066.md`. El
+punto 3 (las dos verificaciones MANUAL de T14) **no está aquí**: es del líder.
+
+- [x] T25: Rellenar `mediciones.md` §3 y §4 con la nocturna `p1gq8ks` (R19 y R20): filas y segundos por tabla de las 8 grandes y de `dcf` desde `_meta.etl_runs`, total frente a la línea base, créditos y SKU, y la fila de F-065 con sus siete celdas  |  Verificación: ni «PENDIENTE» ni celda vacía en §3 y §4 de `mediciones.md`
+- [x] T26: Dejar preparado en `mediciones.md` §6 el hueco de T14 (los dos comandos, el criterio de cierre y el bloque donde se pega la salida), actualizar `tasks.md` (T13, T14, la sección de las MANUAL y estas tareas nuevas) y `progress/current.md` al estado real de la sesión  |  Verificación: `pytest tests/test_documentos_del_arnes.py`
+- [x] T27: `bash harness/init.sh` en verde y árbol limpio, con el informe en `progress/impl_F-066_cierre.md`  |  Verificación: exit 0

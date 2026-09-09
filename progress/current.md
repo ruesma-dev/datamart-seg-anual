@@ -1,99 +1,99 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-07 (lunes; la averia de la nocturna y el disco de 64 GB)
+# Estado actual · 2026-09-09 (miercoles; F-025 y F-068 cerradas, F-066 en su pasada de cierre)
 
-> **PURGADO el 2026-09-06 (C2 del review de F-066).** Este fichero tenía 1.263
-> líneas y arrastraba cinco sesiones cerradas —F-042 del 28-08, F-047, las fases
-> 1 y 2 de F-052, la spec de F-025 y el «Estado» de tres días distintos—, más el
-> encabezado de F-066 escrito dos veces. C2 pide que describa **solo la sesión
-> activa**. Lo que se ha quitado no se ha perdido: vive en `progress/history.md`,
-> en los informes `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las
-> specs. Lo que queda aquí es lo que sigue vivo: F-066 (en revisión), F-025 y
-> F-052 (las dos `blocked`), el estado del servidor y las verificaciones
-> `MANUAL` que esperan al humano.
+> **PURGADO dos veces.** C2 pide que este fichero describa **solo la sesion
+> activa**. El 2026-09-06 (review de F-066, pasada 1) bajo de 1.263 a 638 lineas,
+> quitando cinco sesiones cerradas —F-042, F-047, las fases 1 y 2 de F-052, la
+> spec de F-025— y el encabezado de F-066 escrito dos veces. El 2026-09-09
+> (pasada 3 del mismo review) se le quitan las 253 lineas de la fase 7 de F-025,
+> ya `done`, y el estado de F-066 anterior a T13. **Nada se pierde**: vive en
+> `progress/history.md`, en los informes `impl_*`/`review_*`/`incidencia_*` de
+> `progress/` y en las specs. Lo que queda aqui es lo que sigue vivo: **F-066**
+> (solo le falta T14), **F-052** (`blocked`), el estado del servidor y la
+> averia de la nocturna del 07 con su premio.
 
 ## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
 
-**F-066 · EL CRITERIO DE `check-raw-recuentos`, CORREGIDO (2026-09-08).** El
-comando exigia igualdad exacta y eso era inalcanzable por diseno: Sigrid es un
-ERP vivo y el datamart una foto. La primera comparacion real dio 31 iguales y
-25 distintas, las 25 con Sigrid POR ENCIMA y ninguna al reves (4.883 filas
-sobre 25.287.500, 0,0193 %), y salia con codigo 1. Ahora la tolerancia tiene
-**direccion**: filas de mas en Sigrid son deriva y se toleran hasta
-`--tolerancia-pct` (0,05 % por tabla, relativo); filas de MENOS son alarma
-inmediata sea de una fila; `ausentes` y `sin_medir` siguen siendo fallo.
-Informe: `progress/impl_F-066_tolerancia_recuentos.md`. Commits `da965c8`,
-`29f7c62` y `4a3cd2c` de esta rama. **Aviso**: el T1 arrastro los tres
-ficheros de `specs/F-070-auditoria-calidad-diccionario/` que estaban en el
-indice de la sesion anterior, y el T2 los cambios sin commitear de
-`harness/features.json` y `BACKLOG.md` (repriorizacion del backlog); no se ha
-perdido nada, pero no son mios.
+**LO UNICO ABIERTO ES F-066, Y LE FALTA UNA COSA: T14.** Son las dos
+verificaciones `MANUAL (humano)` contra Azure, y **las hace el lider**, no el
+implementer. El hueco esta preparado, con los dos comandos, el criterio de
+cierre y el bloque donde se pega la salida, en
+`specs/F-066-ingesta-raw-pendientes/mediciones.md` **§6**:
 
-**F-068 ESTA IMPLEMENTADA Y ESPERA DOS COSAS DEL HUMANO** (2026-09-07). El
-codigo esta en la rama `feature/F-066-ingesta-raw-pendientes` (las dos van
-juntas en la misma imagen) y el informe en `progress/impl_F-068.md`. Lo que
-falta **no es codigo**:
+```powershell
+python main.py check-raw-recuentos    # tiene que salir con codigo 0
+python main.py check-diccionario      # sin objetos sin ficha
+```
 
-1. **La revocacion contra Azure**, que el implementer NO ha ejecutado: el SQL
-   exacto y su verificacion estan en la seccion «Lo que tiene que ejecutar el
-   lider» de `progress/impl_F-068.md`. Hasta que se lance, `raw.emp` sigue
-   siendo legible por el rol del MCP.
-2. **`azure-apps/mcp_bbdd.md` y `red_postgresql_compartido.md`**, que cruzan la
-   frontera del proyecto y los actualiza el lider. Es el 4.º criterio de
-   aceptacion de la ficha y es lo unico que queda de ella.
+**Cuando lanzarlos**: con la nocturna **terminada**, nunca mientras corre. Cada
+uno hace 56 `COUNT(*)` contra Sigrid y contra el Postgres compartido, que esta
+en produccion con `albaranes` y `partes` dentro. La nocturna del 09-sep
+(`29815200`) arranco a las 00:00 UTC.
 
-Y hay que leerlo entero al menos una vez, porque **la revocacion es TEMPORAL**
-y su reversion ya esta decidida por el humano: vuelve en cuanto el MCP tenga
-control por usuario. Esta escrito en `config/settings.py`, `02_roles.sql`,
-`docs/ARCHITECTURE.md`, el runbook y las fichas del diccionario, para que nadie
-lo lea dentro de seis meses como una prohibicion permanente.
+**Que se espera ver.** La unica medicion contra Azure es del 08-sep a las 16:30
+UTC y es con el criterio **viejo**: 31 iguales, 25 distintas, codigo 1. Con la
+tolerancia con direccion que entro en T19-T24 eso mismo sale **conforme**, y lo
+que hay que mirar es que no haya ninguna tabla con Sigrid **por debajo** de
+`raw` (esas son alarma sea de una fila) y que `ausentes` y `sin_medir` esten a
+cero. Rellenado el §6, T14 pasa a `[x]`, C4 se cierra y la feature va al
+reviewer para la pasada 4.
 
-**F-068 · LOS CAMBIOS DEL REVIEW, APLICADOS (2026-09-08).** Veredicto
-`CHANGES_REQUESTED` en `progress/review_F-068.md`; informe de la correccion en
-`progress/impl_F-068_correcciones.md`. Cerrados los puntos 1, 2, 3, 5 y 6:
+**F-066 · LOS CAMBIOS DE LA PASADA 3 DEL REVIEW, APLICADOS (2026-09-09).**
+Veredicto `CHANGES_REQUESTED` con el **codigo aprobado**: los seis puntos eran
+de papeleo. Informe en `progress/impl_F-066_cierre.md`. Cerrados los puntos 1,
+2, 4, 5 y 6; el 3 es T14 y es del lider.
 
-1. **El bloqueante era real y estaba abierto.** La regla del catalogo
-   (`ALTER DEFAULT PRIVILEGES`) se desactivaba sola cuando la tabla excluida no
-   existia, que es justo el escenario para el que se diseno: tras un `DROP` de
-   `raw.emp` la nocturna reponia el GRANT por defecto de `raw` y la siguiente
-   `raw.emp` nacia legible. Arreglado separando las dos listas -lo declarado
-   manda sobre el catalogo; el filtro por existencia solo alcanza al `REVOKE
-   ... ON TABLE`- y con cuatro tests nuevos (R9).
-2. `infra/sql/02_roles.sql` mete el punto 5 y el 5 bis en una transaccion (ya no
-   hay ventana con los datos personales legibles y confirmados) y deriva de la
-   lista el esquema del `ALTER DEFAULT PRIVILEGES`, en vez de escribir `raw` a
-   mano. Dos tests nuevos (R10).
-3. La ficha de `raw.emp` deja de decir «alcanza» en presente, que hacia creer al
-   agente de IA que el permiso sigue vivo, y la ficha de F-068 declara la rama
-   real (C2).
+* **R19 y R20 cumplidos** en `mediciones.md` §3 y §4, con las cifras sacadas de
+  `_meta.etl_runs` y no del chat: la nocturna `p1gq8ks` (08-sep, 11:16 -> 14:19
+  UTC, `Succeeded`, imagen `r20260908-1248`, SKU `Standard_B2s`) hizo
+  `ingest_raw` en **2.454,1 s con 25.491.959 filas**, frente a **1.832,4 s y
+  20.147.626** de la linea base del 05-sep: **+26,5 % de filas y +33,9 % de
+  tiempo**. Filas y segundos **por tabla** de las 8 grandes y de `dcf`, en la
+  tabla de §3. Creditos: **minimo 552 de 576**, o sea **hasta 24 gastados**.
+* **Un numero de la spec estaba mal y ahora se sabe por que.** R19 declara la
+  linea base en «20.148.546 filas»; el `rows_processed` de ese paso es
+  **20.147.626**. Las 920 de diferencia son el tramo `ingest_raw.firma_origen`,
+  que el paso padre no suma. Las dos lecturas valen; mezclarlas, no.
+* **Seis commits estaban mal rotulados** (`da965c8`, `29f7c62`, `4a3cd2c`,
+  `e2e2ad8`, `ddcf8b2`, `084f75a` dicen `F-066 T1`...`T6`, que son las tareas de
+  la ingesta). El trabajo real —la tolerancia con direccion— ya esta declarado
+  como **T19-T24** en `tasks.md`, con la tabla commit -> tarea. **No se
+  reescribe el historial**: la rama ya esta revisada y un `rebase` invalidaria
+  los SHA que citan `mediciones.md`, el review y los informes de mutacion.
 
-**PENDIENTE DE VERIFICACION MANUAL**: `02_roles.sql` no lo ejecuta ningun test
--solo se comprueba su texto- y esta corregido en dos sitios que solo prueba
-`psql`. Antes de volver a provisionar un rol desde cero hay que ejecutarlo
-contra una base de prueba. El punto 4 del review (los dos restos de
-`azure-apps`) es del lider, no del implementer.
+**F-025 CERRADA** el 2026-09-08 (commit `96bb7b9`). La ventana de negocio
+ahorra el **71,2 %** en `build_stg` (9.527 s -> 2.652 s) y la noche entera baja
+de 4 h 52 a 3 h 03; dos mediciones independientes, en dos dias y con dos
+imagenes distintas. Detalle en `specs/F-025-ventana-negocio-build/mediciones.md`
+y `progress/review_F-025.md`. **T33 paso a F-065** (bloat tras siete noches
+acotadas). De su cierre salio **F-071**.
 
-**LA NOCTURNA PASA A LAS 00:00 UTC** (decidido por el humano el 2026-09-06 a
-las 20:20 UTC; antes `0 2 * * *`). Cambiado en el job de Azure **y** en el
-repositorio, que es donde se mentia: `infra/env/dev.json`, el test
-`test_f003_r9_cron_del_entorno_dev_es_medianoche`, `docs/ARCHITECTURE.md` y
-`azure-apps/datamart_seg_anual.md` (commit `3916ca6` alli). De paso se corrigio
-otra divergencia: `dev.json` declaraba `replicaTimeoutSeconds` 18000 y Azure
-tiene 25200 desde el 05-sep, cuando se subio a 7 h; ahora coinciden.
+**F-068 CERRADA** el 2026-09-08 (commit `f94fae6`). Los datos personales de
+`raw.emp` dejan de ser legibles por el rol del MCP y la nocturna lo mantiene:
+lo declarado manda sobre el catalogo, asi que un `DROP` de la tabla ya no
+repone el GRANT por defecto. **La revocacion es TEMPORAL** y su reversion esta
+decidida por el humano: vuelve en cuanto el MCP tenga control por usuario, y
+esta escrito en `config/settings.py`, `02_roles.sql`, `docs/ARCHITECTURE.md`,
+el runbook y las fichas del diccionario para que nadie lo lea dentro de seis
+meses como una prohibicion permanente. Informes: `progress/impl_F-068.md` y
+`progress/impl_F-068_correcciones.md`.
 
-**LA NOCTURNA DE ESTA NOCHE (lunes 07, 00:00 UTC) ES LA PRIMERA ACOTADA**, y se
-deja correr **con la imagen vieja `r20260905-1237` a proposito**: es la que da
-T31b y T34 de F-025. Desplegar F-066 antes la contaminaria con un 26 % mas de
-filas y la medicion no valdria ni para cerrar F-025 ni para F-065. Decidido con
-el humano. El despliegue de F-066 va **despues**, para la nocturna del martes.
+**PENDIENTE QUE SOBREVIVE A F-068**: `infra/sql/02_roles.sql` no lo ejecuta
+ningun test —solo se comprueba su texto— y esta corregido en dos sitios que
+solo prueba `psql`. Antes de volver a provisionar un rol desde cero, ejecutarlo
+contra una base de prueba.
 
-**F-066 TIENE VEREDICTO: APROBADO LO ENTREGABLE** (review pasada 2, 2026-09-06
-a las 22:47 UTC, en `progress/review_F-066.md`). Los 7 cambios requeridos de la
-pasada 1 estan cerrados y verificados uno a uno por el reviewer. **C4 y C5
-quedan ABIERTOS hasta T13-T14**, y con ellos R19, R20 y R24: la feature **no
-pasa a `done`** hasta que la nocturna con la imagen nueva haya cargado las 8
-tablas grandes y `check-raw-recuentos` de codigo 0. Un hallazgo nuevo, no
-bloqueante, ya atendido: el commit del cron viajaba en esta rama sin estar en la
-spec, y ahora esta escrito en `tasks.md`.
+**EL BACKLOG, REORDENADO** (por el humano, y ya en `harness/features.json` y
+`BACKLOG.md`). Lo siguiente cuando F-066 cierre:
+
+| Prioridad | Feature | Que es |
+|---|---|---|
+| 4 | **F-071** | La IA ve 583 obras cuando solo 349 tienen datos: marcarlas y declararlo, no borrarlas. Nace del hallazgo de F-025 (552 obras de ruido en el censo, 512 sin nada que construir, `0000` = «PLANTILLA DE OBRA» y el `0001` repetido ocho veces). |
+| 5 | **F-070** | Auditar la calidad de las fichas del diccionario, **acotada a los ocho esquemas que el MCP lee** (`mart`, `cierre`, `stg`, `compras`, `maestro`, `retenciones`, `aux`, `_meta`): lo que el agente no puede consultar no se audita. Su spec ya esta escrita en `specs/F-070-auditoria-calidad-diccionario/`. |
+| 6 | **F-034** | Power BI deja de leer de local y pasa a leer el datamart de Azure. |
+
+Detras, F-057 (7) y F-056 (8), las dos ya sin ingesta dentro porque F-066 se la
+llevo.
 
 ## LA NOCTURNA DEL LUNES 07 FALLO Y YA ESTA ARREGLADO (con premio detras)
 
@@ -132,187 +132,60 @@ commit `eccf6a4`: sexto inquilino, `pg_read_all_stats` y el disco de 64 GB.
 las **07:48:46 UTC** del lunes 07 con **475 creditos** de 576 (SKU B2s) y con la
 imagen vieja `r20260905-1237` a proposito. De ella salen T31b y T34.
 
-**Tres cosas esperan al humano, en este orden:**
-
-0. **Fijar `PG_DISCO_TOTAL_GB=64` en el job de Azure.** El codigo ya lo dice,
-   pero el job **no**: `85_update_job.ps1` solo cambia la imagen y no toca el
-   entorno. Se arregla al desplegar la imagen de F-066 (que ya lleva el defecto
-   en 64) o pasando por `80_create_job.ps1`. **No se hace mientras corra
-   `swtg78p`.**
-
-1. **F-068, y corre prisa.** Comprobado a las 19:35 UTC contra Azure:
-   `raw.emp` **ya esta ahi** con sus 1.352 filas y con `dni`, `tarseg`
-   (Seguridad Social), `bancue`/`ban` (cuenta bancaria), `dir1` (domicilio),
-   `tel` y `esigpas` (contraseña del portal); y `mcp_sigrid_dm_ro` tiene
-   `SELECT` sobre ella. **No es un riesgo futuro: cualquier cuenta del tenant
-   que consulte por el conector MCP puede leerla hoy.** No es un fallo de
-   F-066 -el humano decidio traer `emp` entera, con el aviso delante- pero la
-   consecuencia hay que decidirla: sacar `raw` de `PG_CONSUMPTION_SCHEMAS`,
-   revocar el `SELECT` solo sobre esas dos tablas, o aceptarlo por escrito.
-   `raw.res` no trae columnas de ese tipo.
-2. **T13 de F-066**: construir y desplegar la imagen, y dejar correr la
-   nocturna, que cargara las 8 tablas grandes (5,19 M filas) y **recargara
-   `dcf`**, que es lo unico que crea sus columnas `pagtex`/`pagfor`. Requiere
-   `infra/` y `az`: lo autoriza el humano. Detalle en `progress/impl_F-066.md`,
-   seccion «Que necesita T13». Mejor decidir F-068 ANTES.
-3. **F-025: MEDIDA, REVISADA y con los cuatro cambios del review YA HECHOS**
-   (2026-09-08). T31b y T34 salieron en la nocturna `swtg78p` del 07 y el
-   reviewer las verifico **contra la base**, no contra el informe. **El ahorro
-   real es del 71,2 %** en `build_stg` (9.527 s -> 2.740 s), por encima del
-   40 % que exigia el criterio de parada y del 59,2 % que predijo T1; la noche
-   entera baja de 4 h 52 a 3 h 00. Veredicto en `progress/review_F-025.md`
-   (CHANGES_REQUESTED, cuatro cambios, ninguno de codigo). **Lo que falta para
-   `done`: una pasada mas del reviewer sobre los cambios ya aplicados.**
-
-   Los cuatro, hechos el 08: (1) el diccionario contaba el CRITERIO (40/880)
-   como si fuera la CONDUCTA (592/328), y de ahi salia un consejo falso —que
-   esas obras tienen «hasta 6 dias» cuando 552 se rehacen cada noche—;
-   corregido en `stg.yaml`, `_meta.yaml` y `00_global.yaml`, **diccionario a
-   version 16**. (2) El mismo error en `azure-apps/datamart_seg_anual.md`, mas
-   una cifra muerta que R3 habia corregido el 03-sep (commit `ed20043` alli).
-   (3) T31b y T34 marcadas en `tasks.md` con su evidencia, T34 con el matiz de
-   que se midio en B2s y para el B1ms queda diferido a F-065. (4) **T33
-   decidida por escrito: pasa a F-065**, con dueño y umbral (mas de 10 puntos
-   de bloat sobre la linea base de T2 tras siete noches acotadas).
+**Las tres cosas que esta seccion dejaba esperando al humano ESTAN HECHAS**
+(se dejan nombradas para que se entienda el resto de la seccion, sin repetir su
+detalle): (0) `PG_DISCO_TOTAL_GB=64` entro en el job al desplegar la imagen de
+F-066; (1) **F-068 cerrada** el 08-sep; (2) **T13 de F-066 hecha** el 08-sep,
+con la nocturna `p1gq8ks`; (3) **F-025 cerrada** el 08-sep. El estado de las
+tres esta arriba, en «POR DONDE SE SIGUE».
 
 **El servidor sigue en `Standard_B2s`** (temporal desde el 05-sep, 17:21 UTC).
 La bajada a B1ms sigue pendiente, con fecha limite 2026-09-20 anotada en
 `azure-apps/` para preguntar si se olvido. Al bajar, el saldo se resetea a 60.
 
-## F-066 · IMPLEMENTADA HASTA T12 Y T15; T13 Y T14 ESPERAN AL HUMANO
+## F-066 · TODO HECHO SALVO T14, QUE ES DEL LIDER
 
-**Encabezado único.** Este mismo título estaba escrito dos veces (líneas 32 y
-42 del fichero viejo, hallazgo 4 del review); las dos secciones se han fundido
-en esta.
+**Al 2026-09-09.** T1-T13 y T15-T27 hechas, con un commit por tarea. La ingesta
+pasa de **31 a 56 tablas** y las 56 corren cada noche en produccion desde la
+imagen `r20260908-1248`. Lo que queda es **T14**, las dos verificaciones
+`MANUAL` contra Azure: comando, criterio y hueco donde pegar la salida, en
+`specs/F-066-ingesta-raw-pendientes/mediciones.md` §6.
 
-**REVIEW RECHAZADO el 2026-09-06** (`progress/review_F-066.md`, 10 hallazgos,
-4 bloqueantes) y **corregido esa misma noche**
-(`progress/impl_F-066_correcciones.md`). El fondo lo dio por bueno el reviewer,
-reejecutando él los 23 mutantes; lo que bloqueaba era que la herramienta
-declaraba **inválida su propia campaña** porque un test aleatorio **de F-024**
-rompía la línea base, más tres desajustes de papeleo. Lo hecho: se arregló el
-test de F-024 —el defecto estaba en el test, no en el `batch_id`—, se repitió la
-campaña entera, y se cerraron los hallazgos 2 a 7. Quedan sin hacer, fichadas
-para el líder, las observaciones **8** (generalizar la puerta de dobles al
-cliente de Sigrid y portarla a `arnes-base`) y **10** (F-044 y F-047 `done` sin
-resumen en `history.md`, deuda previa).
-
-**Las decisiones de la spec (DA-1 a DA-11) no se repiten aquí**: viven en
+**Las decisiones de la spec (DA-1 a DA-11) no se repiten aqui**: viven en
 `specs/F-066-ingesta-raw-pendientes/design.md` §6 y en la ficha de
-`harness/features.json`. Las tres que cerró el humano el 2026-09-06 a las 12:05
+`harness/features.json`. Las tres que cerro el humano el 2026-09-06 a las 12:05
 UTC: `emp` y `res` **enteras** (DNI, cuenta bancaria y domicilio incluidos, solo
-11 exclusiones técnicas en `emp`), el histórico de estados a **F-067** como foto
+11 exclusiones tecnicas en `emp`), el historico de estados a **F-067** como foto
 diaria —Sigrid no lo guarda— con `conest` dentro de F-066, y `apu` entera con
-`--full` más `apa`.
+`--full` mas `apa`.
 
-**T15 HECHA por el lider el 2026-09-06 a las 19:40 UTC**: los hallazgos de R22
-estan en las fichas de F-055, F-056, F-057 y F-067 de `harness/features.json`,
-y **nace F-068** con lo del MCP. Los cuatro hallazgos que cambian esas fichas:
-`hmores` es donde estan las horas (F-057); `apu.fec` viene informada al 100 %,
-lo que desmiente la ficha de F-056; la actividad del proveedor es
-`conact`→`auxpronat` y no `act`, que esta vacia (F-055); y Sigrid no guarda
-las fechas de cambio de estado, asi que F-067 las construira por foto diaria.
+**Informes de la feature**, por si hay que volver a ellos:
+`progress/impl_F-066.md` (la ingesta), `impl_F-066_correcciones.md` (pasada 1
+del review), `impl_F-066_reconciliar_columnas.md` (R25-R28, el defecto que
+tumbo dos nocturnas), `impl_F-066_tolerancia_recuentos.md` (T19-T24) e
+`impl_F-066_cierre.md` (pasada 3). El review, en `progress/review_F-066.md`.
 
-**Al día 2026-09-06, tarde.** T1 a T12 y T16 están hechas, con un commit por
-tarea. La ingesta pasa de **31 a 56 tablas**; las 17 de menos de 100.000 filas
-ya están en `raw` (136.536 filas), y las 8 grandes más la recarga de `dcf`
-esperan a la primera nocturna. Informe completo en `progress/impl_F-066.md`,
-mediciones en `specs/F-066-ingesta-raw-pendientes/mediciones.md`.
+**Cuatro cosas que conviene no perder:**
 
-**Lo que NO se ha tocado, y por qué:** T13 construye y despliega la imagen en
-Azure —eso lo autoriza el humano—, T14 depende de que esa nocturna haya
-corrido, y T15 es del líder. No se ha ejecutado nada de `infra/` ni `az`.
-
-**Dos cosas que conviene no perder:**
-
-1. **`check-raw-recuentos` cazó un fallo real el día que nació**: el YAML tenía
-   17 entradas duplicadas que la nocturna habría cargado dos veces cada noche.
-   Ningún test lo veía porque todos leían la ingesta como un `dict`, que
+1. **`check-raw-recuentos` cazo un fallo real el dia que nacio**: el YAML tenia
+   17 entradas duplicadas que la nocturna habria cargado dos veces cada noche.
+   Ningun test lo veia porque todos leian la ingesta como un `dict`, que
    colapsa duplicados. Corregido, con dos comprobaciones nuevas.
-2. **`tests/test_f024_dominio.py::test_f024_r1_batch_id_tiene_forma_y_es_unico`
-   es aleatorio por construcción y falla el 0,8 % de las veces** (medido: 25
-   fallos en 3.000 repeticiones; la paradoja del cumpleaños predice 0,741 %).
-   Genera 500 `batch_id` con sufijo de 3 bytes y exige 500 distintos. Invalidó
-   la campaña de mutación de esta feature al romper la línea base final. **Es
-   de F-024 y no se ha tocado**; queda para el líder decidir quién lo arregla.
-
-## F-066 · LAS VERIFICACIONES `MANUAL (humano)`, CON SU COMANDO EXACTO (C4)
-
-Las cinco `MANUAL` de `tasks.md`, en el orden en que se ejecutan y con el
-comando literal: no hace falta abrir la spec. Todo desde la raíz del
-repositorio, con el `.env` que toque y el entorno virtual activado. Los
-comandos de Python van igual en PowerShell y en bash; el de `az` está escrito
-para **bash** (`date -u -d`), que es donde se midieron los créditos.
-
-| MANUAL | tarea | estado |
-|---|---|---|
-| 1 · recuento local | T9 | **HECHA** el 2026-09-06: código 0 sobre las 17 tablas pequeñas |
-| 2 · commit en `azure-apps` | T11 | **HECHA**: commit `a900682` en `../azure-apps` |
-| 3 · tiempos de la nocturna | T13 | **PENDIENTE** — espera el despliegue, que autoriza el humano |
-| 4 · créditos de la nocturna | T13 | **PENDIENTE** — misma nocturna |
-| 5 · recuento y diccionario contra Azure | T14 | **PENDIENTE** — depende de la 3 y la 4 |
-
-### MANUAL 1 · T9 · [HECHA] `raw` tiene las mismas filas que Sigrid
-
-```powershell
-python main.py check-raw-recuentos
-```
-
-Solo lectura. Sale con código 1 si alguna tabla difiere, falta en `raw` o no se
-pudo medir. **El día que nació cazó un fallo real**: 17 entradas duplicadas en
-`config/tables_sigrid.yaml` que la nocturna habría cargado dos veces cada noche.
-
-### MANUAL 2 · T11 · [HECHA] El documento del ecosistema, actualizado
-
-```powershell
-git -C ../azure-apps log -1 --stat
-```
-
-Tiene que enseñar el commit que pone `datamart_seg_anual.md` en 56 tablas, con
-las 25 nuevas, las descartadas por vacías, `dcf` recuperando `pagtex`/`pagfor` y
-el aviso de datos personales en `raw.emp`/`raw.res`.
-
-### MANUAL 3 · T13 · [PENDIENTE] Qué tarda la ingesta nueva (R19)
-
-Después de desplegar la imagen y de que corra la primera nocturna con las 25
-tablas. Da los segundos y las filas por tabla, que van a `mediciones.md` §3:
-
-```powershell
-python main.py timings
-```
-
-La referencia contra la que se compara está medida: `ingest_raw` el 2026-09-05
-en B2s fueron **20.148.546 filas y 1.832 s**; lo nuevo son **+5.328.841 filas
-(+26 %)**.
-
-### MANUAL 4 · T13 · [PENDIENTE] Qué créditos se come esa nocturna (R20)
-
-El saldo de créditos del servidor, **antes y después** de la nocturna. Va a la
-tabla de F-065 con la columna del SKU (hoy `Standard_B2s`).
-
-```bash
-az monitor metrics list --resource psql-albaranes-rs9k2 --resource-group rg-albaranes-dev \
-  --resource-type Microsoft.DBforPostgreSQL/flexibleServers \
-  --metric cpu_credits_remaining --interval PT1M --aggregation Average \
-  --start-time $(date -u -d '-50 minutes' +%Y-%m-%dT%H:%M:%SZ) -o tsv
-```
-
-**`--interval PT1M` no es un detalle**: con `PT15M` la API devuelve los primeros
-puntos del rango y parece que la métrica lleva trece horas de retraso. No es
-cierto, llega al minuto. Costó descubrirlo.
-
-### MANUAL 5 · T14 · [PENDIENTE] Contra Azure, tras esa nocturna
-
-Los dos, contra la base de Azure y no contra la local. El primero tiene que
-salir con **código 0** y el segundo **sin objetos sin ficha**:
-
-```powershell
-python main.py check-raw-recuentos
-python main.py check-diccionario
-```
-
-Hasta que estas tres pendientes estén hechas, **R19, R20 y R24 siguen
-PENDIENTES** en `mediciones.md` §3 y §4, y F-066 no puede pasar a `done`.
+2. **El criterio de igualdad exacta era inalcanzable por diseno** —Sigrid es un
+   ERP vivo y el datamart una foto— y se sustituyo por **tolerancia CON
+   DIRECCION**: filas de mas en Sigrid son deriva y se toleran hasta 0,05 % por
+   tabla; filas de MENOS son alarma sea de una fila; `ausentes` y `sin_medir`
+   siguen siendo fallo. La grieta, dicha en voz alta por el reviewer: 0,05 % de
+   `obrparpre` son ~6.940 filas. **Revisar el umbral si baja `page_size` o
+   aparece una tabla mayor.**
+3. **`tests/test_f024_dominio.py::test_f024_r1_batch_id_tiene_forma_y_es_unico`
+   era aleatorio** y fallaba el 0,8 % de las veces, invalidando campanas de
+   mutacion ajenas. Arreglado el 06-sep: 0 fallos en 3.000 pasadas.
+4. **`harness/mutacion.py` no muta constantes `float` ni la division.** En el
+   alcance de la tolerancia son seis sitios ciegos, y uno es
+   `TOLERANCIA_DERIVA_PCT = 0.05`, el numero del que depende entero el criterio.
+   Estan cubiertos por tests —el reviewer los muto a mano y mueren—, pero eso lo
+   demuestran los tests y no la campana. **Automejora fichada para F-069.**
 
 **El diccionario del árbol está en 130 objetos, 822 columnas y 47 fichas de
 consumo** (subió de 105/822/47 con las 25 fichas de `raw` que trae F-066, todas
@@ -383,256 +256,16 @@ El fichero de excepciones de esta rama es el viejo: **10 entradas y con los
 `check-cobertura --timeout 900` **alli**, y si da codigo 0, al reviewer y a
 `done`. **No se mezclan las dos ramas** sin decidirlo.
 
-## F-025 · LAS MANUAL DE LA FASE 7, CON SU COMANDO EXACTO (C4)
+## F-025 · CERRADA el 2026-09-08 — esta seccion se ha retirado
 
-**ESTADO DE LOS ONCE PASOS al 2026-09-05, 12:45 local.** Cada cabecera de abajo
-lo lleva escrito; este es el resumen para no tener que recorrerlos:
+Ocupaba 253 lineas con los once pasos de la fase 7 y sus comandos, todos
+ejecutados. **F-025 esta `done`** (commit `96bb7b9`), asi que aqui no queda
+sesion activa que describir. Donde vive lo que habia:
 
-| paso | tarea | estado |
-|---|---|---|
-| 3 | T35 · la alerta | **HECHO** 04-sep |
-| 4 | T27 · huellas del ANTES | **HECHO** 04-sep |
-| 6 | encender `PG_VENTANA_ACTIVA` | **HECHO** 05-sep 00:40 |
-| 7 | T29 · primera reconstrucción | **HECHO** · `hamsh8o`, 4 h 52 en B2s |
-| 8 | T30 · huellas del DESPUÉS | **HECHO 05-sep · KO explicado por el origen · DADA POR BUENA por el humano el 06** |
-| 9 | T31 · la 0599 · T31b · frescura | **T31 HECHO** (2.624.793 / 1,79 %) · T31b espera la primera acotada (lunes 07) |
-| 10 | T32 · los cinco `check-*` | **HECHO** · mismo veredicto que antes en los cinco |
-| 1 | T1 · el peso real | **HECHO** · ahorro 59,2 % (umbral 40) |
-| 2 | T2b · el coste de la firma | **HECHO** · barata 111 s, cara +186 s; implantarla es decisión del humano |
-| 5 | T28 · `ventana-plan` en seco | **HECHO 05-sep** · 40 vivas / 328 congeladas / 552 sin filas |
-| 11 | T33 bloat · T34 créditos | a la semana |
-
-El orden de ejecución **no es el de la numeración**: es 8 → 9 → 10 → 1 → 2 → 5,
-y el 11 a la semana.
-
-**Para el humano.** Esto es el guion completo de lo que queda, en el orden en
-que hay que hacerlo y con el comando literal de cada paso: no hace falta releer
-la spec. Todo desde la raiz del repositorio, con el `.env` de produccion y el
-entorno virtual activado. Los comandos van en **PowerShell**, que es la consola
-de este puesto.
-
-**PRECONDICION: YA SE CUMPLE desde el 2026-09-03.** Este parrafo decia que
-`stg.plan_mensual` seguia truncada al 21,6 % por la averia del 02-sep, y **eso
-dejo de ser cierto**: las nocturnas del 03 y del 04 corrieron enteras y la
-dejaron en 29,7 M de filas. Comprobarlo igualmente antes de empezar:
-
-```powershell
-python main.py status-stg
-python main.py check-coherencia
-```
-
-### Paso 1 · T1 · [PENDIENTE — REPETIR tras la reconstrucción] El peso real
-
-Reparte el peso de `SQL_PESOS_PLAN_MENSUAL` entre las 40 obras vivas y las 880
-congeladas. **Es caro**: barre `stg.presupuesto` (13,8 M filas) unido a
-`raw.obrparpre`. Lanzarlo **fuera del horario de carga**.
-
-```powershell
-@'
-import datetime, main
-from config.settings import get_settings
-from etl_sigrid.application.steps.build_stg_step import sello_vigente_del_repositorio
-from etl_sigrid.domain.ventana import clasificar_obras, criterio_desde_reglas
-
-s = get_settings(); pg = main._get_pg()
-plan = clasificar_obras(
-    pg.fetch_censo_de_obras(),
-    criterio_desde_reglas(s.business_rules, s.postgres.ventana_meses),
-    datetime.date.today(), sello_vigente_del_repositorio(s),
-    completa=False, rescate=s.postgres.ventana_rescate)
-pesos = pg.fetch_pesos_plan_mensual()          # <-- lo caro de T1
-vivas = sum(pesos.get(d.obra_id, 0) for d in plan.reconstruir)
-frias = sum(pesos.get(d.obra_id, 0) for d in plan.congelar)
-print(f"obras vivas={len(plan.reconstruir)} peso={vivas:,}")
-print(f"congeladas={len(plan.congelar)} peso={frias:,}")
-print(f"AHORRO = {100*frias/(vivas+frias):.1f} %   (si baja del 40 %, PARAR)")
-'@ | python -
-```
-
-**Criterio de parada de T1: si el ahorro es menor del 40 %, PARAR** y volver a
-consultar antes de encender nada. La cota estimada de `mediciones.md` §3 es
-73,3 %, pero es un proxy que no cubre los ambitos master (8 y 11).
-
-La cifra se escribe en `mediciones.md` §3.
-
-### Paso 2 · T2b · [PENDIENTE — NUNCA EJECUTADO] Cuanto cuesta la firma
-
-Las dos variantes, cronometradas. La cara detoasta `planif` en 13,8 M de filas.
-**Tambien fuera del horario de carga.**
-
-```powershell
-@'
-import time, main
-from etl_sigrid.infrastructure.postgres.postgres_client import (
-    SQL_FIRMA_ORIGEN, SQL_FIRMA_ORIGEN_CON_PLANIF)
-
-pg = main._get_pg()
-for nombre, consulta in (("barata (sin planif)", SQL_FIRMA_ORIGEN),
-                         ("cara (md5(planif))", SQL_FIRMA_ORIGEN_CON_PLANIF)):
-    with pg.connection() as conn, conn.cursor() as cur:
-        cur.execute("SET LOCAL statement_timeout = '1800s'")
-        t0 = time.perf_counter(); cur.execute(consulta); filas = cur.fetchall()
-        print(f"{nombre}: {time.perf_counter()-t0:.1f} s, {len(filas)} obras")
-'@ | python -
-```
-
-Si la cara resulta asumible, sustituye a `SQL_FIRMA_ORIGEN` (R20); si no, la
-laguna se queda declarada y la cierra el domingo. Los segundos de cada variante
-van a `mediciones.md` §6.
-
-### Paso 3 · T35 · [HECHO el 2026-09-04] Desplegar la alerta
-
-`check-ventana` **avisa y no tumba el job** (DA-5), asi que la alerta de fallo
-no se dispara y esta regla es la **unica** via por la que el hallazgo llega a
-una persona. Va **antes** de encender la ventana, no despues.
-
-```powershell
-az extension add --name scheduled-query          # una vez por puesto
-powershell -NoProfile -File infra/97_create_alert_ventana.ps1
-
-# El buzon vive en el grupo de accion, no en el .ps1 (R30 de F-052):
-powershell -NoProfile -File infra/90_create_alert.ps1 -AlertEmail <buzon>
-```
-
-Comprobar que la consulta de la regla ve el marcador, con el workspace de Log
-Analytics:
-
-```powershell
-$ws = az monitor log-analytics workspace show -g <resourceGroup> -n <logAnalytics> --query customerId -o tsv
-az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '<job>' | where Log_s contains '[F025-VENTANA-KO]' | count" -o table
-```
-
-**No esta verificada hasta que llegue un correo de verdad.**
-
-### Paso 4 · T27 · [HECHO el 2026-09-04] Las CINCO huellas del ANTES
-
-**Antes de reconstruir nada y sobre el `raw` vigente.** Solo lectura. Si se
-capturan despues, ya no prueban nada.
-
-```powershell
-mkdir huellas -Force
-python main.py huella-obras --out huellas/antes_stg.csv       --desde stg       --timeout 900
-python main.py huella-obras --out huellas/antes_mart.csv      --desde mart      --timeout 900
-python main.py huella-obras --out huellas/antes_dimension.csv --desde dimension --timeout 900
-python main.py huella-obras --out huellas/antes_cierre.csv    --desde cierre    --timeout 900
-python main.py huella-obras --out huellas/antes_plan_obra.csv --desde plan_obra --timeout 900
-```
-
-Guardar los cinco CSV **fuera de la base**; `huellas/` no se versiona.
-
-### Paso 5 · T28 · [PENDIENTE] El plan, en seco, contra produccion
-
-```powershell
-python main.py ventana-plan
-python main.py ventana-plan --detalle
-```
-
-**Tiene que decir 920 censadas, 40 a reconstruir y 880 congeladas.** Si no
-cuadra con `mediciones.md` §2, PARAR: el criterio no esta viendo lo que se
-midio. Ojo, con la ventana todavia apagada imprime `completa: True`; eso es
-correcto y no es un fallo.
-
-### Paso 6 · [HECHO el 2026-09-05 a las 00:40] Encender
-
-Nace apagada (R5): nada de lo anterior cambia una sola cifra publicada. En
-local, en `.env`:
-
-```
-PG_VENTANA_ACTIVA=true
-```
-
-En Azure, **el valor esta versionado** desde el 2026-09-04 (hallazgo 2 del
-review): `infra/env/dev.json` declara `ventanaActiva`, `ventanaMeses`,
-`ventanaDiaCompleta` y `ventanaRescate`, y `infra/80_create_job.ps1` los inyecta
-como `PG_VENTANA_*`. Encenderla es **cambiar `"ventanaActiva": "true"` en
-`dev.json`** y llevar ese valor al job.
-
-**OJO, Y ESTO SE PROBO: sobre el job de produccion NO vale relanzar
-`80_create_job.ps1`.** Ese script lanza excepcion si el job ya existe
-(`80_create_job.ps1:85-87`: «el job ya existe. Para cambiarle la imagen usa
-85_update_job.ps1»), que es exactamente el caso de hoy. El camino versionado
-solo funciona **al crear el job de cero**. Sobre un job vivo, la unica via que
-funciona hoy es fijarla a mano:
-
-```
-az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --set-env-vars PG_VENTANA_ACTIVA=true
-```
-
-**OJO: `85_update_job.ps1` NO sirve para esto.** Solo cambia la imagen y dice
-expresamente que no toca el entorno, asi que el despliegue habitual no llevara
-el valor nuevo. Si no se quiere recrear el job, se fija a mano —pero entonces el
-valor vuelve a vivir fuera del repositorio y desaparece la proxima vez que
-alguien lo recree:
-
-```powershell
-az containerapp job update -g <resourceGroup> -n <job> --set-env-vars "PG_VENTANA_ACTIVA=true"
-```
-
-En cualquiera de los dos caminos, verificar despues que llego:
-
-```powershell
-az containerapp job show -g <resourceGroup> -n <job> --query "properties.template.containers[0].env[?name=='PG_VENTANA_ACTIVA']" -o table
-```
-
-### Paso 7 · T29 · [EN CURSO — kcb9n2r, lanzada 10:44 UTC] La primera reconstruccion
-
-```powershell
-python main.py stage
-python main.py timings --last 1
-```
-
-Anotar duracion por tramo y ocupacion de disco. Para forzar la completa —lo que
-hace sola la noche del domingo—: `python main.py stage --reconstruir-todo`.
-
-### Paso 8 · T30 · [PENDIENTE — ES LO SIGUIENTE] Las cinco huellas del DESPUES
-
-**SIN `--obras-esperadas`.** Tolerancia cero: **una sola diferencia PARA la
-feature.**
-
-```powershell
-python main.py huella-obras --out huellas/despues_stg.csv       --desde stg       --timeout 900
-python main.py huella-obras --out huellas/despues_mart.csv      --desde mart      --timeout 900
-python main.py huella-obras --out huellas/despues_dimension.csv --desde dimension --timeout 900
-python main.py huella-obras --out huellas/despues_cierre.csv    --desde cierre    --timeout 900
-python main.py huella-obras --out huellas/despues_plan_obra.csv --desde plan_obra --timeout 900
-
-python main.py comparar-huellas huellas/antes_stg.csv       huellas/despues_stg.csv
-python main.py comparar-huellas huellas/antes_mart.csv      huellas/despues_mart.csv
-python main.py comparar-huellas huellas/antes_dimension.csv huellas/despues_dimension.csv
-python main.py comparar-huellas huellas/antes_cierre.csv    huellas/despues_cierre.csv
-python main.py comparar-huellas huellas/antes_plan_obra.csv huellas/despues_plan_obra.csv
-```
-
-Las cinco tienen que salir con **codigo 0 y cero diferencias**.
-
-### Paso 9 · T31 y T31b · [PENDIENTE] La 0599 y la frescura por obra
-
-```powershell
-python main.py inspect-cierre --codigo 0599
-```
-
-Tiene que seguir dando **DIRECTOS 2.624.793 €** y margen **1,8 %**. Y que las
-40 vivas se rehicieron mientras las 880 conservan su `_built_at` anterior:
-
-```sql
-SELECT congelada, count(*), min(construido_at), max(construido_at)
-FROM _meta.v_frescura_obra
-GROUP BY congelada;
-```
-
-### Paso 10 · T32 · [PENDIENTE] Los guardianes
-
-```powershell
-python main.py check-unicidad --timeout 300
-python main.py check-cierres --timeout 900
-python main.py check-cobertura
-python main.py check-declarados
-python main.py check-ventana
-```
-
-### Paso 11 · T33 y T34 · [PENDIENTE — a la semana]
-
-Repetir la medicion de bloat de `mediciones.md` §7 sobre `pg_class` y
-`pg_stat_user_tables` y compararla con T2; **si crece de forma sostenida, abrir
-la feature de particionado**. Y mirar en el portal de Azure los creditos de CPU
-restantes al terminar la nocturna (R29): **tienen que quedar por encima de 0**.
+* **Las mediciones** (el 71,2 % de ahorro, las tres nocturnas comparadas, los
+  creditos, el bloat de T2): `specs/F-025-ventana-negocio-build/mediciones.md`.
+* **El estado de los once pasos y de cada T**: `tasks.md` de esa misma carpeta.
+* **El veredicto y los cuatro cambios del review**: `progress/review_F-025.md`.
+* **Lo que quedo abierto**: **T33** (bloat sostenido tras siete noches
+  acotadas) pasa a **F-065**, con dueno y umbral escritos; y el hallazgo de las
+  552 obras de ruido en el censo abre **F-071**, hoy en prioridad 4.
