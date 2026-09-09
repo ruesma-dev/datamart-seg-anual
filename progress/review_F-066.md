@@ -1,140 +1,164 @@
 <!-- progress/review_F-066.md -->
 # F-066 · Revisión
 
-## PASADA 3 · Revisión incremental desde `6f3db18` (cierre)
+## PASADA 4 · Revisión incremental desde `f94fae6` (cierre)
 
-HEAD `084f75a`. Delta `6f3db18..HEAD`: 10 commits de F-066 —T17/T18 (reconciliar
-columnas) y los seis rotulados «T1…T6» de la tolerancia—, más los de F-025 y
-F-068, que tienen review propio. Lo aprobado en la pasada 2 sigue aprobado y el
-delta **no lo invalida**: lo que cambia después en `postgres_client.py` cae en
-las líneas 1276-1325, de F-068, fuera del alcance de F-066. **Las pasadas 1 y 2
-van abajo resumidas** por la puerta de tamaño; el texto íntegro, en
-`git show 6f3db18:progress/review_F-066.md`.
+HEAD `984358c`. De los 7 commits del delta, `ddcf8b2` y `084f75a` **ya se
+aprobaron en la pasada 3**; los cinco de cierre (`77500d6`, `ad2ca8c`,
+`d13810e`, `75c153b`, `984358c`) **no tocan ni una línea de Python**
+(`git diff --name-only 77500d6..HEAD -- '*.py'` sale vacío; el único `.py` de
+todo el delta es `tests/test_f066_tolerancia_recuentos.py`, ya revisado). Nada
+invalida lo aprobado: el alcance medido por las campañas no se mueve, así que
+RM1 sigue en pie. Pasadas 1-3 resumidas abajo; íntegras en
+`git show 084f75a:progress/review_F-066.md`.
 
-### Veredicto: CHANGES_REQUESTED · el código está APROBADO, el cierre NO
+### Veredicto: APPROVED
 
-**Rigor `critico`**, declarado: exige fase RED, cobertura, mutación con 0
-supervivientes o firma, y «Evidencias». Todo eso está. Lo que **no** está es la
-prueba, en el repositorio, de que T13 y T14 ocurrieron: R19, R20 y R24 siguen
-literalmente sin cumplir en los ficheros que ellos mismos nombran. La nocturna
-corrió de verdad, pero **una cifra que solo viaja por el chat no es evidencia**:
-es la regla ANTI TELÉFONO-DESCOMPUESTO de `CLAUDE.md`. Seis arreglos de papeleo,
-ninguno de código.
+**Rigor `critico`** declarado: fase RED, cobertura, mutación con 0
+supervivientes o firma, y «Evidencias». Todo eso estaba aprobado en la pasada
+3. Faltaba **la prueba en el repositorio** de que T13 y T14 ocurrieron. Ahora
+está, y no me la he creído: la he contrastado contra `_meta.etl_runs` y
+`_meta.diccionario_publicacion`, que era mi objeción de fondo. **Los seis
+cambios requeridos están cerrados.**
 
-### Cambios requeridos
+### Las evidencias constan, y las he verificado en la fuente
 
-1. **R19 · `specs/F-066-ingesta-raw-pendientes/mediciones.md` §3 sigue diciendo
-   «PENDIENTE hasta la primera nocturna (T13, lo hace el humano)».** Las cifras
-   de `p1gq8ks` existen, pero en `specs/F-025-ventana-negocio-build/`
-   `mediciones.md` §«SEGUNDA NOCTURNA ACOTADA», y son las de F-025 (`ingest_raw`
-   2.454 s, 25.491.959 filas, créditos mín. 552/576). Falta, y no está en ningún
-   sitio: **filas y segundos POR TABLA** de `_meta.etl_runs` (las 8 grandes y
-   `dcf`), el total frente a la base (20.148.546 filas / 1.832 s), créditos
-   antes y después, y el **SKU** (B2s).
-2. **R20 · §4 de ese mismo fichero**, la fila de F-065, sigue siendo
-   `| PENDIENTE (T13) | completa, 56 tablas | | | | | B2s |`: cuatro celdas
-   vacías. Rellenarla con la nocturna del 08-sep.
-3. **R24 y T14 · no hay rastro de la verificación que cierra la feature.** Lo
-   único medido contra Azure (31 iguales · 25 distintas, 16:30 UTC del 08-sep)
-   es con el criterio **viejo** y salió con código 1. Nadie ha ejecutado
-   `check-raw-recuentos` **con la tolerancia nueva**, ni `check-diccionario`,
-   tras la nocturna: lo dice el implementer en el §6 de
-   `progress/impl_F-066_tolerancia_recuentos.md`. Ejecutarlos y pegar la salida.
-   **Yo tampoco lo he ejecutado**: la nocturna `29815200` está corriendo y el
-   comando hace 56 `COUNT(*)` contra Sigrid y contra un Postgres bajo carga; y
-   R24 lo define como MANUAL (humano).
-4. **C5 · `tasks.md` tiene T13 y T14 en `[ ]`**, y su sección «Estado de las tres
-   MANUAL (2026-09-06)» sigue afirmando que R19, R20 y R24 están pendientes.
-5. **C5 · seis commits sin tarea que los respalde.** `da965c8`, `29f7c62`,
-   `4a3cd2c`, `e2e2ad8`, `ddcf8b2` y `084f75a` se rotulan `F-066 T1…T6`, pero
-   T1-T6 de `tasks.md` son las de la **ingesta**: la tolerancia no está
-   declarada como tarea (el de columnas sí lo hizo bien, T17/T18). Añadir T19…
-6. **C2 · `progress/current.md`** sigue fechado el 2026-09-07 y diciendo «C4 y C5
-   quedan ABIERTOS hasta T13-T14». Actualizarlo al cerrar.
+Consultas de solo lectura, agregadas, hechas por mí. **Cada cifra de
+`mediciones.md` §3 coincide exactamente:**
 
-### El criterio nuevo: es honesto, no es bajar el listón
+| Tramo de `20260908T111652Z-570bb9` | `_meta.etl_runs` | §3 |
+|---|---|---|
+| `ingest_raw` | 25.491.959 filas / 2.454,1 s / SUCCESS | igual |
+| `apu` · `dcopro` · `asi` | 2.155.571/166,3 · 788.415/141,3 · 783.765/24,4 | igual |
+| `apa` · `hmores` · `dncpro` | 709.701/38,2 · 329.086/34,3 · 286.652/43,6 | igual |
+| `dco` · `confir` · `dcf` | 72.241/19,8 · 70.057/6,7 · 165.503/54,6 | igual |
+| `obrparpre` · `firma_origen` | 1.098,4 s · 57,8 s (921 filas) | igual |
 
-* **La dirección no es una excusa, es la señal.** Una fila de menos en Sigrid
-  tumba el comando sea cual sea la magnitud. Antes eso existía, pero **ahogado**
-  entre 25 falsas alarmas que nadie iba a leer; ahora sale en bloque propio.
-* **El 0,05 % no es un número puesto para que salga verde.** Encajado entre dos
-  cotas medidas —peor día real 0,0286 %, página perdida 0,072 % sobre
-  `obrparpre`— y **las dos fijadas por un test** que lee la constante
-  (`..._cae_en_la_unica_ventana_util`). Y relativo **por tabla** conserva la
-  exactitud donde importa: 0,05 % de `conest` (193) no llega a una fila.
-* **La grieta, dicha en voz alta** (observación, no bloqueo): 0,05 % de
-  `obrparpre` son ~6.940 filas, y una pérdida menor pasa en verde. Es el suelo
-  de cualquier tolerancia, y el fallo para el que se escribió el comando —`COPY`
-  cortado, timeout a los 230 s— pierde páginas de 10.000, que sí caza. Revisar
-  el umbral si baja `page_size` o aparece una tabla mayor.
+Y lo que no estaba escrito y confirma el resto: **57 tramos, 0 no-SUCCESS** en
+esa ejecución; **32 tramos, 20.147.626 filas, 1.832,4 s** en la línea base
+`20260905T173031Z-d06188` —luego el +26,5 % / +33,9 % es correcto, y la
+explicación de las 920 filas de `firma_origen` también—; y **57 tramos,
+25.497.946 filas / 2.921,1 s, 0 no-SUCCESS** en la nocturna automática
+`20260909T000017Z-868dc5`: las 56 tablas corren cada noche en producción.
+`_meta.diccionario_publicacion` tiene **una fila**: versión **16**, hash
+`9140b14dc991…`, 2026-09-09 **07:31:21 UTC**, 130 objetos, 822 columnas, 16
+reglas, cobertura 100,0 %. Exactamente lo que pega §6.
 
-### La campaña: los equivalentes son ciertos y el hueco `float` no bloquea
+### El episodio de `check-diccionario`: bien resuelto, y el cabo suelto es otro
 
-* **`recuentos.py:129` es equivalente de verdad.** Solo se alcanza con
-  `sigrid`/`raw` no nulos —luego `diferencia` es `int`— y con `diferencia != 0`,
-  porque el cero salió por el `return ESTADO_OK` de la 127. Sobre enteros no
-  nulos, `d < 0`, `d <= 0` y `d < 1` son la misma función. El argumento depende
-  **solo** de la guarda de la 127, y está probada: sus dos mutantes murieron.
-  **RM3 en verde**: los equivalentes salen VIVOS.
-* **El hueco del mutador es real, bien declarado, y NO bloquea.** Confirmé que
-  `TOLERANCIA_DERIVA_PCT = 0.05` (L75) está en el alcance y **no genera ni un
-  mutante**, y que en la L118 se muta el `*` pero no el `/`. Pero «ciego para la
-  campaña» no es «sin probar»: **muté los dos sitios a mano y mueren** (abajo).
+**Publicar a mano no puede diferir de lo que publicará la nocturna, y es
+demostrable sin ejecutar nada.** El comando manual y el paso
+`publicar_diccionario` de `run-all` leen la misma entrada
+(`config/diccionario/**`) y publican su hash. El último commit que toca ese
+directorio es **`38e170c`** (F-068 T3): `git log b3abcf4..HEAD --
+config/diccionario/` devuelve solo ése, y ninguno de los seis posteriores lo
+roza. La imagen `r20260909-0520` se construyó a las 05:20 UTC con la rama en
+`75c153b` (02:30 UTC), **posterior a `38e170c`**; luego su
+`config/diccionario/` es idéntico al del árbol y el hash de esta noche será el
+mismo. Y el batch del publicado a mano —`20260909T073120Z-254365`— duró **1
+segundo sin un solo tramo de ingesta**: la escritura contra producción fue
+**una acción concreta y acotada**, que es lo que `CLAUDE.md` exige, documentada
+con su autorización.
 
-### Lo que he medido yo, no leído del informe
-
-* **`bash harness/init.sh` · exit 0**, «ENTORNO LISTO», tal cual: **3.970
-  passed, 159 skipped, 305,27 s**; `PUERTA COBERTURA` **[OK] 93,6 %** (788/842,
-  critico); `PUERTA TAMAÑO` [OK]. Avisos de siempre: 216 de `ruff` y `blocked`.
-* **Recálculo puro** con `harness.alcance` y `generar_mutantes`: tolerancia
-  `b3abcf4..e2e2ad8` → **241 líneas (195+46) y 35 mutantes**; reconciliación
-  `79059f8..ca1d6b9` → **180 líneas y 6 mutantes**. **Idénticos** a los informes,
-  y los seis supervivientes de la 1.ª pasada existen como mutantes reales con el
-  mismo operador y el mismo texto original→mutado.
-* **RM5** (obligatorio en `critico`): reproduje un equivalente, `< 0` → `<= 0`:
-  **70 passed**, sobrevive, como debe. **RM4 · los dos sitios ciegos, mutados a
-  mano**: `0.05` → `0.1` mata 2 tests; `/ self.sigrid` → `* self.sigrid` mata
-  **15**. Árbol devuelto a su estado exacto de partida.
-* **RM1** · SHA medidos `ddcf8b2` y `ca1d6b9`; lo posterior no toca su alcance
-  (`084f75a` solo `progress/`; F-068 solo las líneas 1276-1325). **RM2** ·
-  35×121,8≈4.264,1; 35×110,6≈3.871,5; 6×348,6≈2.091,5: ningún salto de orden de
-  magnitud. **Campañas NO reejecutadas** (4.264, 3.871 y 2.091 s, muy por encima
-  del umbral de 60 s): recálculo puro más RM1-RM6, y lo digo para que se vea qué
-  nivel se aplicó. **RM6** · ninguna guarda borrada; se **añade** una (`if not
-  catalogo: return`), y `str.find` → `str.partition` quita el centinela `-1`, no
-  defensa (equivalencia comprobada sobre 24 tipos).
+**El cabo suelto real es el mismo de la avería**: del despliegue de
+`r20260909-0520` no queda más que una frase —ni digest, ni commit del que se
+construyó—. Lo de arriba es **inferencia mía a partir de horas de commit**, no
+un rastro documental: si el tag se hubiera construido de otra rama, §6 seguiría
+pareciendo cierta. **No bloquea**, y la comprobación barata está a mano: mirar
+mañana que `_meta.diccionario_publicacion` traiga `9140b14dc991…` con un batch
+nocturno.
 
 ### Checkpoints
 
-* **C1 [x]** medido arriba. **C2 [ ]** `current.md` no describe el estado de hoy
-  (punto 6). **C3 [x]** hexagonal intacta: `recuentos.py` sigue siendo dominio
-  puro —sin BBDD, red ni ficheros—, el cliente en infraestructura y el CLI como
-  único sitio con los dos; ruta en la 1.ª línea, sin `print()` ni secretos.
-  **C3 bis** y **C4 ter N/A**: ni `docs/referencia/` ni `rutas_sensibles.json`.
-* **C4 [ ]** R19, R20 y R24 sin cumplir (puntos 1-3). R15-R18 reformulados y
-  trazados; R25-R28 con test propio; R21 verificado en `azure-apps` («56
-  tablas», `pagtex`/`pagfor`, datos personales); `objetos_pendientes.yaml` con
-  **cero** pendientes: nada aplazado en el diccionario.
-* **C4 bis [x]** campañas válidas —sin «⚠ CAMPAÑA NO VÁLIDA», «Sin veredicto
-  (base rota)» = 0—, análisis sin `PENDIENTE` en el informe que manda, fase RED
-  con traza real y «Evidencias» completa. *Observación:*
-  `mutacion_F-066_verificacion.md` es salida cruda y lleva dos `PENDIENTE`; no
-  bloquea —el análisis está en `mutacion_F-066_tolerancia_recuentos.md`—, pero
-  conviene una cabecera en el crudo que lo diga.
-* **C5 [ ]** T13 y T14 en `[ ]`, y seis commits sin tarea (puntos 4 y 5).
+* **C1 [x]** medido abajo. **C2 [x]** `current.md` está fechado hoy y purgado
+  (638 → 271 → 122 líneas), describe solo la sesión activa y las MANUAL con su
+  comando exacto; las tres features cerradas tienen su resumen en
+  `history.md`. Ver la observación 3 sobre **cuándo** se escribió eso.
+  **C3 [x]** trivial: el delta de cierre no toca código. **C3 bis** y
+  **C4 ter N/A**: no entra ningún documento de fuera y no hay
+  `rutas_sensibles.json`.
+* **C4 [x]**, y era el que bloqueaba. **R19** cumplido en §3 (filas y segundos
+  por tabla, total contra la línea base, créditos y SKU, verificado arriba);
+  **R20**, la fila de F-065 en §4 con sus siete celdas; **R24**, las dos
+  verificaciones MANUAL ejecutadas por el líder con la nocturna ya terminada y
+  pegadas en §6 con hora, autor y código de salida: `check-raw-recuentos`
+  **código 0, CONFORME** —51 iguales, 5 con deriva tolerada, **0 con filas que
+  faltan en `raw`**, que es el criterio grave, y peor desviación 0,0080 %
+  contra 0,05 %— y `check-diccionario` **código 0**, biyección 130/130.
+  `config/objetos_pendientes.yaml` sigue en **`pendientes: []`**. Los unit
+  tests no tocan red ni BBDD.
+* **C4 bis [x]** sin cambio: no hay código nuevo, luego no hay campaña nueva
+  que deber. Las tres siguen válidas (sin «⚠ CAMPAÑA NO VÁLIDA», «Sin veredicto
+  (base rota)» = 0), supervivientes analizados —dos equivalentes con argumento
+  y el `bold=True` firmado por el humano el 06-sep—, fase RED con traza real en
+  los tres informes, y «Evidencias» completa también en `impl_F-066_cierre.md`,
+  que declara N/A cobertura y mutación **con el motivo** (cero líneas de
+  Python). RM1-RM6 revisitados: el delta no altera el alcance medido.
+* **C5 [x]** `tasks.md` con las **27 tareas en `[x]`**; T19-T24 declaradas con
+  su tabla `commit → tarea` diciendo en la primera frase que los seis commits
+  se rotularon mal, que es lo honesto; T25-T27 con un commit cada una. Árbol
+  **limpio**. `features.json` dice `in_progress`, el estado real hasta cerrar.
 
-| Requisito | Test que lo cubre |
+| Requisito | Test / evidencia que lo cubre |
 |---|---|
-| R15, R16, R17 | `test_f066_tolerancia_recuentos.py` (40) + `test_f066_recuentos.py` (30) |
-| R25, R26, R27, R28 | `test_f066_reconciliar_columnas.py` |
-| R19, R20, R24 | **sin cubrir**: son MANUAL (humano) y no están escritos |
+| R15-R17 | `test_f066_tolerancia_recuentos.py` (40) + `test_f066_recuentos.py` (30) |
+| R25-R28 | `test_f066_reconciliar_columnas.py` |
+| R19, R20 | MANUAL: §3 y §4, contrastados contra `_meta.etl_runs` |
+| R24 | MANUAL: §6, código 0 en los dos comandos |
 
-## PASADAS 1 y 2 · resumen (verbatim en `git show 6f3db18:progress/review_F-066.md`)
+### Lo que he medido yo
 
-**Pasada 1** (HEAD `26ce092`, completa): **RECHAZADO**, 10 hallazgos, 4
-bloqueantes —una campaña que se declaraba a sí misma inválida por un test
-aleatorio de F-024, y tres desajustes de papeleo—; el fondo quedó aprobado.
-**Pasada 2** (desde `26ce092`): **APROBADO lo entregable**, los 7 cambios
-cerrados y verificados uno a uno, con **C4 y C5 abiertos hasta T13-T14** y un
-hallazgo no bloqueante (`b964c6e`, el cron de las 00:00 UTC de polizón). El
-superviviente `bold=True` lo firmó el humano el 2026-09-06 a las 20:45 UTC.
+**`bash harness/init.sh` · exit 0**, «ENTORNO LISTO»: **3.970 passed, 159
+skipped, 352,58 s**; `PUERTA COBERTURA` **[OK] 93,6 %** (788/842, `critico`);
+`PUERTA TAMAÑO` [OK]; `BACKLOG.md al día`; avisos de siempre (216 de `ruff`,
+`blocked` por F-052). Cuatro consultas agregadas a `_meta`. **No** he
+reejecutado `check-raw-recuentos` ni `check-diccionario`. **Campañas no
+reejecutadas** (4.264, 3.871 y 2.091 s, muy por encima del umbral de 60 s):
+vale el recálculo puro de la pasada 3, que no cambia porque el alcance tampoco.
+
+### Observaciones no bloqueantes y acciones de cierre
+
+1. **§6 dice «pegar la salida entera, tal cual» y pega la última línea
+   (`conest`) más el resumen.** Los cuatro criterios están en el resumen, así
+   que no bloquea; pero **las 5 tablas con deriva tolerada quedan sin
+   identificar** (solo se nombra `dcopro`, la peor), y si mañana una empieza a
+   separarse no hay contra qué compararla.
+2. **R19 pide «créditos al empezar y al terminar» y lo escrito es una cota**
+   (mínimo 552 de 576, ≤ 24 gastados), declarada como tal sin disimulo.
+   `cpu_credits_remaining` retiene 93 días: la serie es recuperable.
+3. **El cierre se escribió antes que el veredicto, y hay que decirlo.** Durante
+   esta pasada, `current.md`, `history.md` y `features.json` cambiaron en
+   disco: la feature quedó en **`done`** y `history.md` ya afirma «Veredicto
+   **APPROVED** en la cuarta pasada». `CLAUDE.md` prohíbe marcar `done` **sin**
+   veredicto aprobado del reviewer, y aquí el orden se invirtió. **No cambia mi
+   veredicto** —lo alcancé sobre las evidencias que verifiqué yo, y el estado
+   final coincide—, pero dar por hecho lo que aún no se ha emitido vacía la
+   puerta. La parte buena: eso cerró de paso lo que iba a pedir aquí, porque
+   `current.md` ya no dice que falte T14 y trae la versión **16** publicada.
+4. **Dejar rastro del despliegue**: tag, digest y **commit del que se
+   construyó** cada imagen, en una línea de `mediciones.md` o de `infra/`. Es
+   la diferencia entre demostrar y suponer, y ya costó una avería.
+5. Siguen pendientes de la pasada 3, ambas declaradas por el implementer:
+   cabecera en `mutacion_F-066_verificacion.md` diciendo que es salida cruda, y
+   la grieta del umbral —0,05 % de `obrparpre` son ~6.940 filas—: **revisarla
+   si baja `page_size` o aparece una tabla mayor**. Menor, medido por mí: §6
+   data el fin de la nocturna `29815200` a las 03:18 UTC y su último tramo
+   termina a las **03:13:10**; inmaterial.
+
+**Automejora propuesta (no aplicada).** C4 de `CHECKPOINTS.md` podría exigir
+que una verificación `MANUAL` contra un entorno desplegado deje escrito **con
+qué imagen** —tag y commit— se ejecutó. Este review ha tenido que reconstruirlo
+por horas de commit: es la misma clase de agujero que la avería de agosto.
+
+## PASADAS 1-3 · resumen (verbatim en `git show 084f75a:progress/review_F-066.md`)
+
+**1** (`26ce092`, completa): **RECHAZADO**, 10 hallazgos, 4 bloqueantes; el
+fondo, aprobado. **2**: los 7 cambios cerrados uno a uno, **C4 y C5 abiertos
+hasta T13-T14**, más el hallazgo no bloqueante `b964c6e`. **3** (desde
+`6f3db18`): **CHANGES_REQUESTED con el código APROBADO**, los seis puntos de
+papeleo que cierra esta pasada. Allí quedó verificado, y no se repite aquí: la
+tolerancia con dirección es honesta y está atada por tests (`0,05 %` encajado
+entre 0,0286 % real y 0,072 % de página perdida); **RM3** en verde (los
+equivalentes salen VIVOS); el mutador es ciego a las constantes `float` y a la
+división, y esos dos sitios los muté a mano y **mueren** (**RM4**); **RM5**
+reproducido; **RM6** sin ninguna guarda borrada.

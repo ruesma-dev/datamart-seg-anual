@@ -654,3 +654,98 @@ deberían cambiar». Fase RED y cobertura sí se exigieron y están.
   llegan al fact porque su `partida_id` no tiene ficha en `stg.partidas`.
 - `check-unicidad` no consigue comprobar `mart.v_master_vigente_anual` ni con
   300 s: su clave sigue sin verificar.
+
+---
+
+## F-025 · Ventana de negocio en el build — `done` (2026-09-08)
+
+Rama `feature/F-025-ventana-negocio-build`, commit de cierre `96bb7b9`. Rigor
+`critico`. Veredicto APROBADO en `progress/review_F-025.md`.
+
+El build dejaba de reconstruir cada noche las 920 fichas del censo y pasa a
+acotar `plan_mensual` y `presupuesto` a las obras vivas. **Ahorro medido tres
+veces, con dos imágenes distintas y en dos días: 71,2 %, 72,2 % y 72,2 % en
+`build_stg`** (9.527 s → 2.652 s), y la noche entera baja de **4 h 52 a
+3 h 00-3 h 18**. Las cifras, con las tres ejecuciones comparadas, en
+`specs/F-025-ventana-negocio-build/mediciones.md`.
+
+**El error que costó la mañana y que quedó en memoria**: se cronometró
+`build_mart` —un paso que esta feature no toca— y se declaró la feature fallida
+con un 9 %. Había dos ficheros `02_build_fact.sql` en capas distintas. El paso
+que mide la feature se verifica antes de creerse un número.
+
+Deja abierto: **T33** (bloat sostenido tras siete noches acotadas) pasa a
+**F-065** con dueño y umbral; y el censo destapa **552 obras de ruido**, de las
+que 512 siguen vacías después de reconstruirlas, lo que abre **F-071**.
+
+---
+
+## F-068 · Los datos personales de `raw.emp`, fuera del alcance del MCP — `done` (2026-09-08)
+
+Rama `feature/F-068-datos-personales-mcp`, commit de cierre `f94fae6`. Rigor
+`critico`. Veredicto APROBADO en `progress/review_F-068.md`.
+
+El rol de solo lectura del MCP deja de poder leer `raw.emp` y `raw.res`, y la
+nocturna lo mantiene. **La clave del arreglo**: separar lo *declarado* de lo
+*existente*. `ALTER DEFAULT PRIVILEGES` reponía el `GRANT` en cuanto la tabla se
+recreaba, así que un `DROP` nocturno devolvía el acceso sin que nadie lo notara;
+ahora manda la lista declarada (`PG_EXCLUDED_TABLES`) sobre el catálogo, y el
+defecto es el seguro.
+
+**La revocación es TEMPORAL y su reversión está decidida por el humano**: vuelve
+en cuanto el MCP tenga control por usuario. Escrito en `config/settings.py`,
+`infra/sql/02_roles.sql`, `docs/ARCHITECTURE.md`, el runbook y las fichas del
+diccionario, para que dentro de seis meses nadie lo lea como una prohibición
+permanente.
+
+Deja abierto: `infra/sql/02_roles.sql` **no lo ejecuta ningún test** —solo se
+comprueba su texto— y está corregido en dos sitios que solo prueba `psql`.
+Antes de volver a provisionar un rol desde cero, ejecutarlo contra una base de
+prueba.
+
+---
+
+## F-066 · Ingesta de las tablas `raw` pendientes — `done` (2026-09-09)
+
+Rama `feature/F-066-ingesta-raw-pendientes`. Rigor `critico`. Veredicto
+**APPROVED** en la cuarta pasada del review, `progress/review_F-066.md`.
+
+**La ingesta pasa de 31 a 56 tablas** y las 56 corren cada noche en producción.
+La nocturna automática `29815200` (00:00 → 03:13 UTC del 09-sep) terminó
+`Succeeded` con los diez pasos, 57 tramos sin un solo no-SUCCESS, 25.497.946
+filas y 130/130 objetos declarados. Las decisiones DA-1 a DA-11 viven en
+`design.md` §6; las tres que cerró el humano el 06-sep: `emp` y `res` enteras
+(con solo 11 exclusiones técnicas), el histórico de estados a **F-067** como
+foto diaria porque Sigrid no lo guarda, y `apu` entera con `--full` más `apa`.
+
+**Tres hallazgos que valen más que la feature:**
+
+1. **`check-raw-recuentos` cazó un fallo real el día que nació**: el YAML tenía
+   17 entradas duplicadas que la nocturna habría cargado dos veces cada noche.
+   Ningún test lo veía porque todos leían la ingesta como un `dict`, que colapsa
+   duplicados.
+2. **`CREATE TABLE IF NOT EXISTS` no reconcilia columnas.** Una columna nueva en
+   el origen (`pagtex` en `raw.dcf`) tumbó dos nocturnas con `UndefinedColumn`.
+   Se arregló con `_reconciliar_columnas_raw`, en la misma transacción.
+3. **La igualdad exacta contra Sigrid era inalcanzable por diseño** —el ERP está
+   vivo y el datamart es una foto—. Se sustituyó por **tolerancia CON
+   DIRECCIÓN**: filas de más en Sigrid son deriva y se toleran hasta 0,05 % por
+   tabla; **filas de MENOS son alarma sea de una sola**; `ausentes` y `sin_medir`
+   siguen siendo fallo. El mismo estado de la base que el 08-sep daba «31
+   iguales · 25 distintas» y código 1 ahora sale CONFORME con la peor desviación
+   en 0,0080 %: seis veces de margen, y sin tapar ninguna señal grave.
+
+**La grieta, dicha en voz alta por el reviewer**: 0,05 % de `obrparpre` son unas
+6.940 filas. **Revisar el umbral si baja `page_size` o aparece una tabla mayor.**
+
+**Y una lección de método que ya había costado diez días en agosto**:
+`check-diccionario` salió en rojo con el código bien. La imagen en producción
+era del mediodía anterior y dos fichas se habían corregido después. **El
+repositorio en verde no es producción.** Se resolvió desplegando
+`r20260909-0520` y publicando el diccionario a mano, las dos cosas con
+autorización expresa del humano.
+
+Deja abierto: **F-069**, dos cegueras del mutador —no muta constantes `float` ni
+la división—, y una de ellas es `TOLERANCIA_DERIVA_PCT = 0.05`, el número del
+que depende entero el criterio. Están cubiertos por tests (el reviewer los mutó
+a mano y mueren), pero eso lo demuestran los tests y no la campaña.
