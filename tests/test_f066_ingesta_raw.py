@@ -282,7 +282,8 @@ def test_f066_r7_las_de_compras_llevan_la_lista_estandar(tabla: str) -> None:
 def test_f066_r7_la_excepcion_a_la_lista_estandar_es_solo_prvcer() -> None:
     """Control de la excepción: sin esto, vaciar el diccionario de arriba
     desactivaría la comprobación entera sin que nadie lo viera."""
-    assert EXCEPCIONES_A_LA_LISTA == {"prvcer": {"tex"}}
+    assert sorted(EXCEPCIONES_A_LA_LISTA) == ["prvcer"]
+    assert EXCEPCIONES_A_LA_LISTA["prvcer"] == {"tex"}
 
 
 def test_f066_r7_dco_anade_las_ocho_de_documento() -> None:
