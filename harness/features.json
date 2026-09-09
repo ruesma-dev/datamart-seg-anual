@@ -1255,7 +1255,7 @@
         "La version del diccionario sube y se publica: lo que el MCP lee es lo del arbol, verificado y no supuesto",
         "Se comprueba preguntando al MCP, sin explicarle nada en el prompt, que ahora enruta a `stg` una pregunta que solo `stg` puede responder"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 4,

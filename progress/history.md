@@ -855,3 +855,39 @@ así que **no se tapó aquí**: salió a ficha propia, **F-077**.
 Deja abierto: **F-077** (el flag sin test por el parser) y el aviso, ya fichado
 como **F-075**, de que la puerta de cobertura sigue midiendo 842 líneas de un
 alcance que no es el de esta feature.
+
+---
+
+## F-079 · Lo publicado es para consultarse: `stg` deja de estar desaconsejado — `done` (2026-09-09)
+
+Rama `feature/F-079-todo-lo-publicado-es-consultable`. Rigor `estandar`.
+Veredicto **APROBADO**, `progress/review_F-079.md`.
+
+Pedida por el humano: «parece que en el diccionario se indica que no se
+recomienda para consulta `stg`, **eso bórralo, todo lo expuesto es para
+consulta**». Los **7 objetos de `stg`** que no son funciones pasan a superficie
+de consulta y pierden su `motivo_no_consumo`. El diccionario sube a la
+**versión 18**.
+
+**El inventario, que era la mitad del trabajo.** Los 27 objetos marcados fuera
+de `raw` no eran lo mismo: **7 de `stg`** con preferencias de enrutado (se
+quitan), **10 funciones SQL** que no se consultan sino que se llaman desde el
+build (se quedan), y **10 objetos rotos o vacíos** donde el aviso es un hecho y
+no una preferencia (se quedan, con el motivo reescrito para que se note la
+diferencia). `mart.v_pbi_cp_tipologia` no se tocó: la arregla **F-078**, de otra
+sesión.
+
+**El riesgo, y cómo se cerró.** Dentro de los motivos borrados había
+**advertencias de corrección** mezcladas con las preferencias. La grave es la de
+`stg.plan_mensual`: ahí conviven todas las versiones master y una consulta sin
+filtrar versión **multiplica los importes**. El reviewer verificó una por una
+que **las cuatro advertencias siguen llegando al agente**, y las dos graves por
+tres vías distintas.
+
+`bash harness/init.sh` en verde: **4.215 passed**, cobertura 93,6 %.
+
+**Dos avisos del reviewer que valen para lo siguiente**: lo que el MCP sirve
+puede ir por detrás del árbol, así que el número de versión del informe no se da
+por bueno sin `check-diccionario`; y **la nocturna republica el diccionario
+desde la imagen desplegada**, de modo que una imagen vieja pisaría la 18 con la
+suya. Por eso este cierre va seguido de despliegue.
