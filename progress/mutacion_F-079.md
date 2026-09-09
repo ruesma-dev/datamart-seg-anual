@@ -240,7 +240,7 @@ propuesta de ficha del final.
 
 #### Análisis
 
-**Hueco real, YA DIAGNOSTICADO: es F-077**, ficha abierta (prioridad 12, commit
+**Hueco real, YA DIAGNOSTICADO: es F-077**, ficha abierta en el backlog (commit
 `7d2d8b9`), hallada por la campaña de F-074 y descrita en
 `progress/mutacion_F-074.md` §8 y en `progress/current.md`.
 
