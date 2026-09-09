@@ -106,6 +106,16 @@ verificado contra `INFORMATION_SCHEMA`). `_source_tiemod` está a NULL en las
 tres y el ETL **degrada en silencio** (`ingest_raw_step.py:279`): la declaración
 es falsa y oculta que esas **287.673 filas se recargan enteras cada noche**.
 
+> **CORREGIDO EL 2026-09-09 POR F-074, y la correccion importa.** Esta seccion
+> daba a entender que la declaracion falsa PROVOCA la recarga completa de esas
+> 287.673 filas. **No es asi**: el `CMD` del `Dockerfile` arranca
+> `run-all --full`, o sea que la nocturna hace `TRUNCATE` y recarga entera de
+> **todas** las tablas, tengan o no `incremental_column`.
+> `incremental_column` **no decide el modo de carga**: solo decide si se rellena
+> `_source_tiemod`. Lo que la declaracion falsa produce es una columna de
+> procedencia vacia y una expectativa equivocada en quien lea el YAML, que no es
+> poco, pero no es un coste de ingesta. Detalle en `progress/impl_F-074.md`.
+
 Y `prvcer` **excluye `tex` en la ingesta**, que es el único campo que dice de qué
 es cada certificado: la tabla no tiene campo de tipo.
 
