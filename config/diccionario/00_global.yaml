@@ -63,7 +63,41 @@
 # Hasta la version 14 esas dos fichas avisaban de lo contrario: que cualquier
 # agente conectado las leia enteras.
 
-version: 17
+# version 18 (F-079, 2026-09-09): TODO LO EXPUESTO ES PARA CONSULTA, y `stg`
+# deja de estar desaconsejado. El esquema `stg` y sus SIETE objetos que no son
+# funciones -`plan_mensual`, `presupuesto`, `partidas`, `obras`, `fases`,
+# `version_master_vigente`, `ambitos`- pasan a `consumo_recomendado: true` y
+# pierden su `motivo_no_consumo`. Lo que decian esos motivos eran PREFERENCIAS
+# DE ENRUTADO -«capa intermedia», «para consultar partidas esta
+# `mart.v_pbi_dim_partida`»- y el efecto era el contrario del buscado: el MCP
+# tiene `stg` entre sus esquemas autorizados, asi que desaconsejarlo solo
+# conseguia que el agente no mirase donde si hay dato. El caso que lo zanja: el
+# ambito de certificacion vive en `stg.presupuesto` -que no filtra por ambito- y
+# en ningun sitio aguas abajo.
+#
+# NO SE PIERDE NINGUNA ADVERTENCIA DE CORRECCION, y eran CUATRO, no dos. Las
+# cuatro se mueven a la `descripcion` de su ficha, que es texto publicado:
+# 1. `stg.plan_mensual`: aqui conviven TODAS las versiones master y consultar
+#    sin filtrar version MULTIPLICA los importes. Llega ademas por la regla dura
+#    `R-VERSION-MASTER`, bloqueante, cuyo ambito incluye la tabla.
+# 2. `stg.obras.activa` no significa nada -constante TRUE-, y `es_activa`
+#    tampoco. Llega ademas por `R-OBRA-ACTIVA` y por el propio significado de la
+#    columna.
+# 3. `stg.version_master_vigente` resuelve la version de forma GLOBAL y no
+#    coincide con `mart`, que la elige mes a mes, en los meses pasados.
+# 4. `stg.ambitos.uso_seguimiento` esta DESFASADA: filtrar por ella da una
+#    respuesta incompleta.
+#
+# NO cambian las 11 funciones `fn_*` (una funcion no se consulta: se llama desde
+# el SQL del build) ni los 9 objetos rotos, vacios o de instrumentacion
+# (`mart.v_pbi_cp_tipologia` -que arregla F-078-,
+# `cierre.v_pbi_cierre_indirectos_detalle`, `mart.v_fact_periodificado`,
+# `aux.periodificacion_partida`, `retenciones.v_src_lineas_venta`,
+# `retenciones.v_src_lineas_compra` y los tres de `_meta`). Ahi el aviso es un
+# HECHO y no una preferencia: recomendarlos haria que el agente los consultase y
+# fallara. `raw` tampoco cambia. Las fichas de consumo pasan de 47 a 54.
+
+version: 18
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -744,13 +778,18 @@ esquemas:
     pasos_etl: []
 
   stg:
-    titulo: Capa intermedia de preparacion
+    titulo: Capa intermedia de preparacion, y tambien superficie de consulta
     para_que_sirve: >-
-      Normaliza Sigrid y explota la planificacion a nivel mensual. NO es
-      superficie de consulta: en `stg.plan_mensual` conviven todas las versiones
-      master y consultarla sin filtrar version multiplica los importes. Lo que
-      se pregunta esta aguas abajo, en `mart` y en `cierre`.
-    consumo_recomendado: false
+      Normaliza Sigrid y explota la planificacion a nivel mensual. SI se
+      consulta: aqui estan el presupuesto por partida y ambito -incluidos los
+      ambitos que `mart` no construye, la certificacion entre ellos-, el arbol
+      de partidas con su jerarquia y las fases una a una. Lo que ya esta
+      resuelto aguas abajo suele ser mas comodo en `mart` y en `cierre`, y cada
+      ficha lo dice, pero eso es navegacion y no una prohibicion. LA TRAMPA que
+      hay que respetar: en `stg.plan_mensual` conviven todas las versiones
+      master y consultarla sin filtrar version multiplica los importes (regla
+      `R-VERSION-MASTER`).
+    consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_stg]
 
