@@ -267,11 +267,15 @@ def test_f068_r6_el_defecto_excluye_emp_y_res() -> None:
     `raw.res` trae el NIF de la persona en `cif` (626 filas informadas) y las
     credenciales de acceso a Sigrid: la ficha de F-068 la daba por limpia, y no
     lo está. Las dos van excluidas por defecto.
+
+    F-074 añade `raw.reshor` (precio de coste por recurso y tipo de hora) y
+    `raw.emphis` (histórico de contrato de 1.017 empleados): datos de nómina,
+    misma decisión y mismo mecanismo.
     """
     from config.settings import DEFAULT_EXCLUDED_TABLES
 
     declaradas = [t.strip() for t in DEFAULT_EXCLUDED_TABLES.split(",") if t.strip()]
-    assert declaradas == ["raw.emp", "raw.res"]
+    assert declaradas == ["raw.emp", "raw.res", "raw.reshor", "raw.emphis"]
 
 
 def test_f068_r6_la_lista_es_parametrizable_por_entorno() -> None:
@@ -283,7 +287,9 @@ def test_f068_r6_la_lista_es_parametrizable_por_entorno() -> None:
     from config.settings import PostgresSettings
 
     por_defecto = PostgresSettings(_env_file=None)
-    assert por_defecto.excluded_table_list == ["raw.emp", "raw.res"]
+    assert por_defecto.excluded_table_list == [
+        "raw.emp", "raw.res", "raw.reshor", "raw.emphis"
+    ]
 
     ampliada = PostgresSettings(_env_file=None, excluded_tables=" raw.emp , raw.res ,raw.per ")
     assert ampliada.excluded_table_list == ["raw.emp", "raw.res", "raw.per"]

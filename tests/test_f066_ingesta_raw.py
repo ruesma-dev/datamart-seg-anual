@@ -37,8 +37,11 @@ FICHERO_RAW = RAIZ / "config" / "diccionario" / "raw.yaml"
 FICHERO_GLOBAL = RAIZ / "config" / "diccionario" / "00_global.yaml"
 FICHERO_PENDIENTES = RAIZ / "config" / "objetos_pendientes.yaml"
 
-#: Cuántas tablas ingiere el ETL cuando esta feature cierra: 31 + 25.
-TOTAL_TABLAS = 56
+#: Cuántas tablas ingiere el ETL HOY. Eran 31 + 25 = 56 al cerrar F-066; F-074
+#: añadió las nueve del censo de F-072 y son 65. La constante se mueve con la
+#: realidad a propósito: es lo que hace que los tres documentos que citan el
+#: número no se queden viejos en silencio.
+TOTAL_TABLAS = 65
 
 #: La lista estándar de nombres de texto/binario ilimitado de documentos, tal y
 #: como la declara el bloque COMPRAS de `config/tables_sigrid.yaml`.
@@ -100,7 +103,11 @@ NUEVAS: dict[str, tuple[str, tuple[str, ...]]] = {
     # C · compras y proveedor (F-055, F-067)
     "conact": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "auxpronat": (GRUPO_COMPRAS, LISTA_ESTANDAR),
-    "prvcer": (GRUPO_COMPRAS, LISTA_ESTANDAR),
+    # F-074: `prvcer` deja de excluir `tex`. Es el ÚNICO campo que dice de qué
+    # es cada certificado —la tabla no tiene campo de tipo— y estaba fuera por
+    # la lista estándar del módulo, que se aplica a bulto, no por una decisión
+    # sobre esta tabla.
+    "prvcer": (GRUPO_COMPRAS, tuple(c for c in LISTA_ESTANDAR if c != "tex")),
     "prvobrpag": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "confir": (GRUPO_COMPRAS, LISTA_ESTANDAR),
     "deffir": (GRUPO_COMPRAS, LISTA_ESTANDAR),
@@ -148,8 +155,8 @@ def test_f066_r1_las_veinticinco_tablas_estan_dadas_de_alta() -> None:
     assert faltan == [], f"no se ingieren todavía: {faltan}"
 
 
-def test_f066_r1_la_ingesta_pasa_a_cincuenta_y_seis_tablas() -> None:
-    """31 + 25. El número importa porque tres documentos lo citan (R13)."""
+def test_f066_r1_la_ingesta_declara_las_tablas_que_dice_la_constante() -> None:
+    """El número importa porque tres documentos lo citan (R13)."""
     assert len(_ingesta()) == TOTAL_TABLAS
 
 
@@ -256,13 +263,26 @@ def test_f066_r7_cada_tabla_nueva_excluye_lo_que_le_toca(tabla: str) -> None:
     assert tuple(_ingesta()[tabla]["exclude_columns"]) == esperadas
 
 
+#: La única tabla de compras que NO lleva la lista estándar entera, y lo que le
+#: falta. Es una excepción medida (F-074), no un despiste: se declara aquí para
+#: que ampliarla vuelva a ser una decisión.
+EXCEPCIONES_A_LA_LISTA = {"prvcer": {"tex"}}
+
+
 @pytest.mark.parametrize(
     "tabla", sorted(t for t, (g, _) in NUEVAS.items() if g == GRUPO_COMPRAS)
 )
 def test_f066_r7_las_de_compras_llevan_la_lista_estandar(tabla: str) -> None:
     excluidas = set(_ingesta()[tabla]["exclude_columns"])
-    faltan = sorted(set(LISTA_ESTANDAR) - excluidas)
+    esperadas = set(LISTA_ESTANDAR) - EXCEPCIONES_A_LA_LISTA.get(tabla, set())
+    faltan = sorted(esperadas - excluidas)
     assert faltan == [], f"a `{tabla}` le faltan de la lista estándar: {faltan}"
+
+
+def test_f066_r7_la_excepcion_a_la_lista_estandar_es_solo_prvcer() -> None:
+    """Control de la excepción: sin esto, vaciar el diccionario de arriba
+    desactivaría la comprobación entera sin que nadie lo viera."""
+    assert EXCEPCIONES_A_LA_LISTA == {"prvcer": {"tex"}}
 
 
 def test_f066_r7_dco_anade_las_ocho_de_documento() -> None:
@@ -399,7 +419,7 @@ def _pendientes_declarados() -> dict[str, list[str]]:
 
 @pytest.mark.parametrize("fichero", ["00_global.yaml", "objetos_pendientes.yaml"])
 def test_f066_r12_ninguna_tabla_de_raw_se_aplaza_como_pendiente(fichero: str) -> None:
-    """R12: las 56 tablas llevan ficha escrita, no una excusa en el trinquete.
+    """R12: las 65 tablas llevan ficha escrita, no una excusa en el trinquete.
 
     Aplazar la ficha de un objeto es legítimo y por eso existen las dos listas
     de `pendientes`; lo que R12 prohíbe es usarlas **aquí**, porque el
@@ -423,7 +443,7 @@ def test_f066_r12_ninguna_tabla_de_raw_se_aplaza_como_pendiente(fichero: str) ->
     )
 
 
-def test_f066_r12_las_cincuenta_y_seis_tablas_tienen_ficha_escrita() -> None:
+def test_f066_r12_todas_las_tablas_ingeridas_tienen_ficha_escrita() -> None:
     """La otra mitad de R12: si ninguna se aplaza, todas tienen que estar.
 
     Sin este par, la comprobación de arriba pasaría también en el mundo en que
