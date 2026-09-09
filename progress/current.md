@@ -11,14 +11,14 @@
 
 ## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
 
-**F-025, F-068 y F-066 estan CERRADAS**, y **F-071 esta RETIRADA** (ver su
-seccion abajo: no se borra nada). **F-072, el censo, esta en su pasada 2 de
-review.** Lo abierto es el backlog, mas F-052, que sigue `blocked` y ya no
-espera a nadie.
+**F-025, F-068, F-066 y F-072 estan CERRADAS**, y **F-071 esta RETIRADA** (ver
+su seccion abajo: no se borra nada). El censo de F-072 quedo `done` en
+`e52c5f9`, y **su primer descendiente, F-074, esta en curso**. Lo abierto es el
+backlog, mas F-052, que sigue `blocked` y ya no espera a nadie.
 
 | Prioridad | Feature | Estado | Que es |
 |---|---|---|---|
-| 4 | **F-072** | en curso, review pasada 2 | El censo semantico: que hay dentro de las 31 tablas que se ingieren cada noche y no consume nadie. Entregable: `progress/explore_F-072_catalogo.md` + cuatro informes de bloque. |
+| 4 | **F-072** | `done` (`e52c5f9`) | El censo semantico: que hay dentro de las 31 tablas que se ingieren cada noche y no consume nadie. Entregable: `progress/explore_F-072_catalogo.md` + cuatro informes de bloque. **De aqui salen F-073 y F-074.** |
 | 5 | **F-073** | `pending` | Construir con lo que el censo encontro: tablas procesadas nuevas y enriquecimiento de las actuales, **sin borrar ni filtrar nada**. |
 | 6 | **F-074** | **en curso, implementacion entregada** | La ingesta que el censo destapa: **9 tablas** que faltan, la carga incremental falsa de `com`/`comlin`/`comprv` y el `tex` excluido de `prvcer`. Informe: `progress/impl_F-074.md`. |
 | 7 | **F-070** | `pending`, spec escrita | Auditar la **calidad** de las fichas del diccionario, acotada a los ocho esquemas que el MCP lee. |
@@ -76,6 +76,16 @@ alguien:
    division. Uno de los seis sitios ciegos es `TOLERANCIA_DERIVA_PCT = 0.05`, el
    numero del que depende entero el criterio de F-066.
 5. **F-065** mide el bloat sostenido tras siete noches acotadas (de F-025, T33).
+6. **Un superviviente de mutacion de F-025, aceptado y sin fichar todavia**
+   (hallado por F-074, pasada 2): `main.py:543`, el `is_flag` de
+   `--reconstruir-todo` en `run-all`. Sin el, click infiere `BOOL` y
+   `run-all --reconstruir-todo` sale con **exit 2** —medido—; la nocturna
+   (`run-all --full`) y el rebuild del domingo por antiguedad **no se enteran**.
+   Lo dejan vivo sus propios tests, T15 de `tests/test_f025_cli.py`, que
+   comprueban que la cadena salga en `--help` y que el callback la cablee, pero
+   **no invocan la opcion por el parser de click**. El arreglo, tres lineas, esta
+   escrito en `progress/mutacion_F-074.md` §8. **F-074 no lo tapa: no es su
+   codigo ni su fichero de tests.** Decidir si se ficha o si entra en F-074.
 
 **El diccionario del árbol está en 139 objetos, 822 columnas y 47 fichas de
 consumo** tras las nueve fichas de `raw` que añade F-074, y el árbol declara
@@ -195,7 +205,7 @@ El fichero de excepciones de esa rama es el viejo: **10 entradas y con los
 mezclan las dos ramas** sin decidirlo. Ojo con F-071 y F-053, que tocan
 `stg.obras` y su desempate `rn=1`.
 
-## F-072 · EN CURSO · el censo semantico de las 31 tablas que nadie consume
+## F-072 · CERRADA · el censo semantico de las 31 tablas que nadie consume
 
 **F-071 ESTA RETIRADA.** El humano la paro el 2026-09-09 al leer su spec:
 «**no vamos a borrar nada de momento, vamos a seguir dejando todo. Quitamos
@@ -227,7 +237,7 @@ las capas procesadas.
 
 **EL PLAN, EN DOS FEATURES**, aprobado por el humano:
 
-* **F-072 (en curso, prioridad 4)** — entender. Catalogo tabla por tabla: que
+* **F-072 (`done`, prioridad 4)** — entender. Catalogo tabla por tabla: que
   es, grano, volumen, **% informado columna a columna**, por donde se une, y
   que preguntas de negocio permitiria responder que hoy no se pueden
   responder. **Solo lectura de principio a fin.** Cuatro bloques tematicos,

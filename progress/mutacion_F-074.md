@@ -47,6 +47,45 @@ Origen del diff: **rama** (`cd18e0962b63edcc0017907b8c69a29352e433c4` .. `featur
 | Workers | 4 |
 | Muestreo | sí — 20 de 288 mutantes, semilla `20260820`, nivel `estandar` |
 
+## La muestra de 20, reproducida
+
+Los 288 mutantes se muestrean a 20 con la semilla del nivel `estandar`
+(`harness/rigor.json`). **Reproducida de forma independiente** tras el review de
+la pasada 1, con el mismo procedimiento que usa la herramienta
+--`random.Random(20260820).sample(mutantes, 20)` sobre los mutantes generados en
+el orden de `alcance.ficheros()`, ordenados despues por
+`(fichero, linea, col, operador)`-- y sin ejecutar la suite. Se lista aqui porque
+la pasada 1 identifico mal uno de los supervivientes y la unica forma de que eso
+no vuelva a pasar es que la muestra este escrita:
+
+| # | Fichero:linea | Operador | Original | Veredicto |
+|---:|---|---|---|---|
+| 1 | `etl_sigrid/application/steps/build_stg_step.py:732` | logico | `if self._plan and self._plan.completa:` | muerto |
+| 2 | `etl_sigrid/application/steps/build_stg_step.py:771` | aritmetico | `sobrantes = sorted(pg.fetch_obras_con_filas(tabla) - vivas)` | muerto |
+| 3 | `etl_sigrid/domain/ventana.py:149` | entero | `if self.meses_sin_actividad <= 0:` | muerto |
+| 4 | `etl_sigrid/domain/ventana.py:350` | aritmetico | `return (hasta.year - desde.year) * 12 + (hasta.month - desd...` | muerto |
+| 5 | `etl_sigrid/domain/ventana.py:706` | entero | `return 1 if (self.hay_hallazgos or self.no_ha_mirado_nada) ...` | muerto |
+| 6 | `etl_sigrid/domain/ventana.py:706` | entero | `return 1 if (self.hay_hallazgos or self.no_ha_mirado_nada) ...` | muerto |
+| 7 | `etl_sigrid/infrastructure/postgres/postgres_client.py:1529` | entero | `tiene_filas=bool(fila[4]) and bool(fila[5]),` | **vive** |
+| 8 | `etl_sigrid/infrastructure/postgres/postgres_client.py:1529` | logico | `tiene_filas=bool(fila[4]) and bool(fila[5]),` | **vive** |
+| 9 | `etl_sigrid/infrastructure/postgres/postgres_client.py:1551` | entero | `int(fila[0]): dict(zip(COLUMNAS_FIRMA_ORIGEN, fila[1:], str...` | **vive** |
+| 10 | `etl_sigrid/infrastructure/postgres/postgres_client.py:1565` | logico | `return fila[0] if fila and fila[0] is not None else None` | **vive** |
+| 11 | `etl_sigrid/infrastructure/postgres/postgres_client.py:1585` | entero | `return {int(fila[0]) for fila in cur.fetchall() if fila[0] ...` | **vive** |
+| 12 | `etl_sigrid/infrastructure/postgres/postgres_client.py:1643` | not | `if not registros:` | **vive** |
+| 13 | `etl_sigrid/infrastructure/postgres/ventana_sql.py:215` | logico | `codigo_obra=str(codigo or ""),` | **vive** |
+| 14 | `main.py:543` | booleano | `is_flag=True,` | **vive** |
+| 15 | `main.py:1428` | not | `if not censo:` | muerto |
+| 16 | `main.py:1506` | comparacion | `if veredicto is None:` | muerto |
+| 17 | `main.py:1549` | entero | `miradas = int(por_nombre["censo"][0][0]) if por_nombre["cen...` | muerto |
+| 18 | `main.py:1558` | comparacion | `dias = None if ultima is None else (datetime.utcnow() - ult...` | muerto |
+| 19 | `main.py:1957` | booleano | `click.secho(f"  ! {source_table}: Sigrid no contestó ({e})"...` | muerto |
+| 20 | `main.py:1988` | booleano | `show_default=True,` | muerto |
+
+**`main.py:539` --el `is_flag` de `--full`-- NO esta en la muestra.** El de
+`main.py:543` es el `is_flag` de `--reconstruir-todo`, cuatro lineas mas abajo en
+el mismo comando. Confundir los dos fue el error de la pasada 1; ver el
+superviviente 8.
+
 ## Supervivientes
 
 Cada superviviente es una línea que ningún test comprueba de verdad, o una mutación equivalente. Distinguirlo es trabajo del implementer: ningún análisis puede quedarse sin completar al cerrar la feature.
@@ -237,36 +276,79 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 
 #### Análisis
 
-> **CAZADO Y CERRADO POR F-074.** Este si estaba dentro de lo que esta feature
-> defiende, y era el mas grave de los ocho: `--full` es la bandera que el `CMD`
-> del `Dockerfile` pasa desnuda para que la nocturna haga `TRUNCATE` y recarga
-> entera. **Toda la decision de carga de F-074 se apoya en ella.**
+> **CORREGIDO TRAS EL REVIEW (pasada 1).** La primera version de este analisis
+> decia que esta linea era la bandera `--full` de `run-all` y que F-074 la habia
+> cerrado con un test nuevo. **Era falso, y se retira entero**: `main.py:539` es
+> `@click.option("--full", ...)` y **la 543 es el `is_flag=True,` de
+> `--reconstruir-todo`**, cuatro lineas mas abajo, en el mismo comando. Reproduje
+> la muestra con la semilla declarada (`random.Random(20260820).sample`, 20 de
+> 288) y **el mutante de la 539 NO esta en ella**; el de la 543, si. Se retiran
+> «CAZADO Y CERRADO POR F-074», «el octavo si era nuestro» y «era el peor», y con
+> ellas la traza pegada, que mutaba la 539. **Este superviviente sigue vivo.**
 >
-> **Por que sobrevivio.** `test_f006_r13_el_cli_declara_full_y_no_full_refresh`
-> comprueba que la opcion EXISTE, leyendo `main.py` con una expresion regular
-> sobre el texto. No comprueba QUE ES. Con `is_flag=False` la opcion sigue
-> llamandose `--full` y el barrido por texto la sigue encontrando, asi que el
-> mutante pasaba entero.
+> **De que opcion es.** `--reconstruir-todo` de `run-all` (F-025): «ignora la
+> ventana de negocio y rehace TODAS las obras». No la usa la nocturna --el `CMD`
+> del `Dockerfile` es `run-all --full` a secas-- ni hace falta programarla: la
+> reconstruccion completa del domingo se dispara sola por antiguedad registrada.
+> Es una bandera para forzarla a mano.
 >
-> **NO es equivalente**: sin `is_flag`, click espera un VALOR detras de `--full`.
-> El `CMD` del contenedor la pasa sola, asi que el job nocturno fallaria al
-> arrancar --o, peor, dejaria de significar «recarga completa»-- y las seis
-> tablas sin `tiemod` que F-074 da de alta quedarian congeladas de verdad.
->
-> **Cerrado con un test nuevo**, no quitando codigo:
-> `test_f074_r2_la_bandera_full_de_run_all_es_un_flag_booleano`, que se lo
-> pregunta a click y no al texto del fichero. Verificado mutando el arbol a mano
-> y restaurandolo despues:
+> **Que hace el mutante, MEDIDO y no supuesto.** Con `default=False`, click
+> infiere el tipo `BOOL`, asi que sin `is_flag` la opcion pasa a exigir un valor:
 >
 > ```
-> - @click.option("--full", "full_refresh", is_flag=True, default=False)
-> + @click.option("--full", "full_refresh", is_flag=False, default=False)
->
-> $ python -m pytest tests/test_f074_ingesta_censo.py -k "bandera_full" --tb=line
-> E   AssertionError: `--full` ha dejado de ser una bandera: el `CMD` del
->     Dockerfile la pasa sin valor y la nocturna dejaria de hacer recarga completa
->     assert False is True
->      +  where False = <Option full_refresh>.is_flag
-> 1 failed, 118 deselected in 1.11s
+> run-all --reconstruir-todo          -> exit 2  Option '--reconstruir-todo' requires an argument.
+> run-all --reconstruir-todo --full   -> exit 2  Invalid value: '--full' is not a valid boolean.
+> run-all --full                      -> exit 0  full=True  recon=False   (igual que antes)
+> run-all                             -> exit 0  full=False recon=False   (igual que antes)
+> --help                              ->        `--reconstruir-todo BOOLEAN`
 > ```
-
+>
+> **NO es equivalente**: `run-all --reconstruir-todo` deja de funcionar. Pero
+> falla **ruidosamente** (exit 2, mensaje de click) y solo en la via manual: la
+> nocturna y el rebuild del domingo no la tocan. Y **no es una limitacion del
+> mutador**: es un cambio de comportamiento real y reproducible.
+>
+> **Por que ningun test lo caza.** `--reconstruir-todo` SI tiene tests, en el
+> bloque «T15» de `tests/test_f025_cli.py`, y son ellos los que deberian haberlo
+> visto. No lo ven porque comprueban dos cosas que el mutante no rompe: que la
+> cadena `"--reconstruir-todo"` aparezca en la salida de `--help` --y sigue
+> apareciendo, ahora seguida de `BOOLEAN`-- y que el callback la cablee, leyendo
+> el codigo fuente con `inspect.getsource`. **Ningun test invoca
+> `run-all --reconstruir-todo` por el parser de click**, que es lo unico que
+> distinguiria una bandera de una opcion con valor. Es el mismo vicio que F-074
+> encontro en `test_f006_r13_el_cli_declara_full_y_no_full_refresh`: comprobar
+> que la opcion EXISTE, por texto, en vez de QUE ES.
+>
+> **Decision: superviviente ACEPTADO, y NO se tapa aqui.** Rigor `estandar` no
+> exige cero supervivientes; exige que se documenten y se puedan juzgar.
+>
+> * Es **codigo y test de F-025**, no de F-074: esta feature no toca `main.py` ni
+>   `tests/test_f025_cli.py`, y su unico `.py` de produccion tocado es la
+>   constante `DEFAULT_EXCLUDED_TABLES` de `config/settings.py`. Entra en el
+>   alcance por el `merge-base` con `dev`, como los otros siete.
+> * **Tiene dueño y sitio natural**: el arreglo es endurecer T15 de
+>   `tests/test_f025_cli.py`, no meter una asercion sobre la ventana de negocio en
+>   `tests/test_f074_ingesta_censo.py`, donde no seria trazable a ningun criterio
+>   `acceptance` de esta feature.
+> * **Severidad baja**: fallo ruidoso, via manual, nocturna intacta.
+>
+> **Queda fichado, no dado por bueno**, y el arreglo esta escrito para que sea de
+> aplicar. En `tests/test_f025_cli.py`, junto a T15:
+>
+> ```python
+> def test_f025_r15_reconstruir_todo_es_una_bandera_booleana() -> None:
+>     opcion = next(
+>         p for p in main.cli.commands["run-all"].params
+>         if "--reconstruir-todo" in getattr(p, "opts", [])
+>     )
+>     assert opcion.is_flag is True
+>     assert CliRunner().invoke(main.cli, ["run-all", "--help"]).exit_code == 0
+> ```
+>
+> **La frontera la decide el lider, no yo**: si prefiere que entre en F-074, es
+> ese bloque y esta el hueco hecho.
+>
+> **El test que F-074 SI escribio se queda**, y el review lo confirma:
+> `test_f074_r2_la_bandera_full_de_run_all_es_un_flag_booleano` es correcto y mata
+> un mutante real, el de la **539**, que la campaña nunca llego a evaluar porque
+> el muestreo no lo eligio. Lo que era falso es decir que cerraba ESTE.
