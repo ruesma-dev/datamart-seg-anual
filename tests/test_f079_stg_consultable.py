@@ -32,7 +32,6 @@ import pathlib
 
 import pytest
 
-from etl_sigrid.domain.diccionario import validar
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 from tests._texto import contiene, normalizado
 
@@ -168,11 +167,11 @@ def test_f079_r1_los_siete_cumplen_lo_que_el_validador_exige_al_recomendado(
     assert ficha.clave_negocio, "R2: quien consulta necesita saber qué es una fila"
 
 
-def test_f079_r1_el_diccionario_real_sigue_pasando_el_validador() -> None:
-    """El mismo `validar()` que corre la puerta de `init.sh`, sin sorpresas."""
-    dicc, pasos = cargar_diccionario(DIR_DICCIONARIO)
-
-    assert validar(dicc, pasos) == []
+# El validador entero sobre el diccionario real ya lo corre
+# `test_f006_formato.py::test_f006_r2_el_diccionario_global_real_valida_entero`,
+# con los pasos nocturnos leídos del pipeline. No se duplica aquí: lo que sí es
+# de esta feature es qué exigencias NUEVAS activa subir el booleano, y eso lo
+# comprueba objeto a objeto el test de arriba.
 
 
 # ---------------------------------------------------------------------------
