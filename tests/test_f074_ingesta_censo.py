@@ -203,6 +203,35 @@ def test_f074_r2_el_yaml_explica_por_que_esa_tabla_no_es_incremental(
     )
 
 
+def test_f074_r2_la_bandera_full_de_run_all_es_un_flag_booleano() -> None:
+    """El ancla de TODO el razonamiento de carga de esta feature.
+
+    La decision de F-074 --las seis sin `tiemod` no abren ningun agujero-- se
+    apoya en que el job nocturno arranque `run-all --full` y en que eso sea una
+    bandera que se activa por presencia. Si `--full` dejara de ser un flag, el
+    `CMD` del `Dockerfile` --que la pasa desnuda, sin valor-- se romperia o
+    dejaria de significar lo que significa, y las seis tablas SI quedarian
+    congeladas.
+
+    `test_f006_r13_el_cli_declara_full_y_no_full_refresh` comprueba que la
+    opcion EXISTE, leyendo `main.py` con una expresion regular. No comprueba
+    QUE ES: lo caza la campaña de mutacion de esta feature, donde
+    `is_flag=True -> is_flag=False` sobrevivio. Esto lo cierra preguntandoselo
+    a click, no al texto del fichero.
+    """
+    from main import cli
+
+    opcion = next(
+        p for p in cli.commands["run-all"].params if "--full" in getattr(p, "opts", [])
+    )
+    assert opcion.is_flag is True, (
+        "`--full` ha dejado de ser una bandera: el `CMD` del Dockerfile la pasa "
+        "sin valor y la nocturna dejaria de hacer recarga completa"
+    )
+    assert opcion.default is False, "el defecto de `run-all` no es full, y no debe serlo"
+    assert opcion.name == "full_refresh"
+
+
 @pytest.mark.parametrize("tabla", sorted(NUEVAS))
 def test_f074_r2_el_yaml_anota_el_recuento_medido_de_cada_tabla(tabla: str) -> None:
     """A1 pide el tamaño real «medido y anotado». Se anota en el fichero que
