@@ -169,15 +169,52 @@ son de verdad las cifras medidas (56 tablas, 25 desviadas, 4.883 sobre
 
 | Evidencia | Medida |
 |---|---|
-| Tests ejecutados (suite completa) | **3.959 pasados, 159 saltados, 0 fallos** |
-| Tiempo de la suite completa | **433,20 s** (7 min 13 s), sin carga |
-| Tests de esta corrección | **67** (`test_f066_recuentos.py` 30 + `test_f066_tolerancia_recuentos.py` 37) |
+| Tests ejecutados (suite completa) | **3.970 pasados, 159 saltados, 0 fallos** |
+| Tiempo de la suite completa | **302,36 s** (5 min 02 s) en el `init.sh` de cierre |
+| Tests de esta corrección | **70** (`test_f066_recuentos.py` 30 + `test_f066_tolerancia_recuentos.py` 40) |
 | Cobertura de líneas cambiadas | **100 % (65/65)**, umbral 80 %, nivel crítico |
-| Mutantes generados | PENDIENTE |
-| Supervivientes | PENDIENTE |
-| `bash harness/init.sh` | PENDIENTE |
+| Mutantes generados | **35** (campaña completa, sin muestreo) |
+| Supervivientes | **6** en la 1ª pasada → **2** en la 2ª, los dos equivalentes |
+| `bash harness/init.sh` | **VERDE**, código 0 · cobertura de rama 93,6 % (788/842) |
 
 La cobertura se midió con `python -m harness.cobertura --base <commit previo>`
 sobre una pasada de coverage con **solo los dos ficheros de test de F-066**:
 las 65 líneas de producción que introduce este cambio están cubiertas por sus
 propios tests, no de rebote por la suite entera.
+
+## 8 · Campaña de mutación (rigor crítico)
+
+Alcance acotado **a la corrección y no a la rama**: `b3abcf4..e2e2ad8` (T1-T4);
+los commits posteriores de F-025 y F-068 no tocan estos dos ficheros. **En serie
+a propósito** (`--workers 1`): la paralela da falsos muertos —F-041 sigue
+`pending`— y un falso muerto esconde un superviviente real. El mando exacto de
+las dos pasadas está en el informe de la campaña, con su `--base` resuelto.
+
+| Pasada | Mutantes | Muertos | Supervivientes | Timeouts | Sin veredicto | Tiempo |
+|---|---|---|---|---|---|---|
+| 1ª · como se entregó | 35 | 29 | **6** | 0 | 0 | 4.264,1 s |
+| 2ª · con los tests nuevos | 35 | **33** | **2** | 0 | 0 | 3.871,5 s |
+
+**Cuatro de los seis eran huecos reales**, muertos con tres tests (`ddcf8b2`):
+la tabla que señala `peor` (`:165`, que acertaba de casualidad porque en el
+fixture del día real la peor es la primera), la diferencia con signo de los dos
+bloques (`:221` y `:228`: un `—` o la suma en vez de la resta pasaban sin que
+nadie los mirase) y `show_default` (`main.py:1988`, sin él `--help` calla).
+
+**Los otros dos son equivalentes**, no exentos por firma: `recuentos.py:129`,
+`< 0` → `<= 0` y `< 0` → `< 1`. La línea solo se alcanza con `diferencia != 0`
+—el cero ya devolvió `OK` en la 127— y sobre los enteros no nulos las tres
+condiciones son la misma función: no hay entrada que las separe, luego no hay
+test que las mate. La guarda que la sostiene **sí está probada**: sus mutantes
+murieron en las dos pasadas. Análisis de los seis, sin `PENDIENTE`, en
+`progress/mutacion_F-066_tolerancia_recuentos.md`; salida cruda de la 2ª, en
+`progress/mutacion_F-066_verificacion.md`.
+
+**Automejora: dos huecos más del mutador.** Además del `in` / `not in` de F-068
+(4ª mejora de F-069), `harness/mutacion.py` **no muta constantes `float`**
+(`_candidatos` solo trata `bool` e `int`) **ni la división** (`ARITMETICOS` no
+tiene `ast.Div`). Aquí son **seis sitios ciegos** y no periféricos:
+`TOLERANCIA_DERIVA_PCT = 0.05` (L75) no genera ni un mutante, y en
+`abs(diferencia) * 100.0 / self.sigrid` se muta el `*` pero no el `/`, que es lo
+que hace relativa a la desviación: serían ~41 mutantes. Están probadas por
+tests, pero eso lo demuestran los tests y **no la campaña**. Va a F-069.
