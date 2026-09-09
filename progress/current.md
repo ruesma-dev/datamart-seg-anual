@@ -11,17 +11,33 @@
 
 ## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
 
-**Las tres features de la sesion estan CERRADAS.** Lo abierto es el backlog,
-mas F-052, que sigue `blocked` y ya no espera a nadie.
+**F-025, F-068 y F-066 estan CERRADAS**, y **F-071 esta RETIRADA** (ver su
+seccion abajo: no se borra nada). **F-072, el censo, esta en su pasada 2 de
+review.** Lo abierto es el backlog, mas F-052, que sigue `blocked` y ya no
+espera a nadie.
 
 | Prioridad | Feature | Estado | Que es |
 |---|---|---|---|
-| 4 | **F-071** | spec en curso | La IA ve 583 obras cuando solo 349 tienen datos: marcarlas y declararlo, no borrarlas. Y **subir la direccion de la obra a la capa de consumo**, que hoy solo existe en `raw` y el MCP no lee `raw`. |
-| 5 | **F-070** | `pending`, spec escrita | Auditar la **calidad** de las fichas del diccionario, acotada a los ocho esquemas que el MCP lee. |
-| 6 | **F-034** | `pending` | Power BI deja de leer de local y pasa a leer el datamart de Azure. |
+| 4 | **F-072** | en curso, review pasada 2 | El censo semantico: que hay dentro de las 31 tablas que se ingieren cada noche y no consume nadie. Entregable: `progress/explore_F-072_catalogo.md` + cuatro informes de bloque. |
+| 5 | **F-073** | `pending` | Construir con lo que el censo encontro: tablas procesadas nuevas y enriquecimiento de las actuales, **sin borrar ni filtrar nada**. |
+| 6 | **F-074** | `pending` | La ingesta que el censo destapa: **9 tablas** que faltan, la carga incremental falsa de `com`/`comlin`/`comprv` y el `tex` excluido de `prvcer`. |
+| 7 | **F-070** | `pending`, spec escrita | Auditar la **calidad** de las fichas del diccionario, acotada a los ocho esquemas que el MCP lee. |
+| 8 | **F-034** | `pending` | Power BI deja de leer de local y pasa a leer el datamart de Azure. |
 
-Detras, F-057 (7) y F-056 (8), las dos ya sin ingesta dentro porque F-066 se la
-llevo.
+Detras, F-057 (9) y F-056 (10), las dos ya sin ingesta dentro porque F-066 se
+la llevo, y las dos **con su ficha corregida por el censo**.
+
+**LO QUE F-074 TIENE QUE DECIDIR DE FRENTE**, medido el 2026-09-09
+(`progress/explore_F-074_las_nueve.md`): **solo 3 de las 9 tienen `tiemod`**
+—`auxdpt`, `auxhor`, `auxrestip`—. Las otras seis **no tienen ninguna columna
+de tipo fecha**, asi que cargarian solo por `MAX(ide)` y **una fila modificada
+no volveria a bajar nunca**. Es el mismo agujero que el censo destapo en
+`com`/`comlin`/`comprv`, pero conocido de antemano. La propuesta del lider al
+humano: **recarga completa nocturna de las cuatro pequeñas** (`cet`, `pro`,
+`reshor`, `emphis`, unos 11 k registros) y **carga por `ide` con recarga
+completa periodica de las dos grandes** (`dcaprodes` 850.985 y `ctrprodes`
+424.475). Coste medido: **+155 MB** sobre los 25 GB actuales, con el disco en
+64, y ~90 s de HTTP para las dos grandes.
 
 **F-052 sigue `blocked`** y su desbloqueo ya no depende de F-025. Ver su seccion
 abajo: es volver a su rama y relanzar `check-cobertura` alli.

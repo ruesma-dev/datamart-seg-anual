@@ -749,3 +749,63 @@ Deja abierto: **F-069**, dos cegueras del mutador —no muta constantes `float` 
 la división—, y una de ellas es `TOLERANCIA_DERIVA_PCT = 0.05`, el número del
 que depende entero el criterio. Están cubiertos por tests (el reviewer los mutó
 a mano y mueren), pero eso lo demuestran los tests y no la campaña.
+
+---
+
+## F-072 · El censo semántico de las 31 tablas que nadie consume — `done` (2026-09-09)
+
+Rama `feature/F-072-censo-semantico-raw`. Rigor `documental`. Veredicto
+**APROBADO** en la pasada 2, `progress/review_F-072.md`.
+
+Nace el mismo día, al retirar F-071: **«analizar el dato que hay ahora mismo y
+los hallazgos, y con eso crear nuevas tablas de datos procesados y enriquecer
+las actuales; usa la conexión sigrid-api para entender lo que significan»**. El
+hecho que la abre: de las 56 tablas que se ingieren cada noche, **solo 25 las
+consume algún build**. Las otras 31 ocupan disco y la IA no las ve.
+
+**Cuatro exploradores en paralelo**, un bloque cada uno, cruzando tres fuentes
+por tabla: el diccionario de Sigrid en `azure-apps`, **sigrid-api contra el
+Sigrid vivo** y mediciones de solo lectura sobre `raw`. Entregable:
+`progress/explore_F-072_catalogo.md` más los cuatro informes de bloque.
+
+**El veredicto**: se construye con 19 tablas, se descartan 6, el resto es
+catálogo. **Nueve tablas del origen no se ingieren** y bloquean media
+propuesta, lo que abre **F-074**.
+
+**Seis fichas del backlog daban por cierto algo que el censo desmiente**, y se
+corrigieron en el mismo trabajo:
+
+1. **F-057**: `res` **no es el maestro de personal**. 1.353 filas son personas,
+   1.157 son consumos imputables y 106 son medios. Sumar `hmores` sin cortar por
+   `cla` da una cifra falsa, que es lo que la feature habría hecho.
+2. **F-045**: el nudo **ya está resuelto**. `cen.obride` está a cero en las 804
+   filas, pero centro y obra son dos filas de `con` con la misma empresa y
+   código: **683 pares, 0 ambigüedades, 261 de 261** en retenciones. La
+   aritmética `+1` que se suponía solo acierta el 63,8 %.
+3. **F-061**: deja de estar bloqueada por lo anterior, y el multiplicador que le
+   falta se llama `reshor`.
+4. **F-038**: el proveedor **no** sale de `comprv.prvide` (18,11 % informado)
+   sino de `dco.entide` (99,86 %). Y `comlin` necesita saneado: 14.513 precios a
+   0, 4.100 negativos y **una línea de 363 M€ que por sí sola duplica 2020**.
+5. **F-036**: su punto 3 **no es implementable**. `auxobrtca` tiene 3 filas y
+   `obrparpar.tcaide` está a cero en las 392.207 partidas.
+6. **F-055**: `prvcer` es **dato muerto desde 2019**; 2.708 de 2.741
+   certificados caducaron antes de 2020.
+
+**Dos hallazgos que no buscaba nadie.** `com`, `comlin` y `comprv` declaran una
+`incremental_column` que **no existe en Sigrid**: el ETL degrada en silencio y
+esas 287.673 filas se recargan enteras cada noche. Y el APU **no existe como
+dato**: `catest`, `catpro` y `obrparres` están vacías y la descomposición vive
+dentro de un blob, así que no se puede prometer «de qué está hecho el precio de
+una partida».
+
+**El review cazó lo que faltaba**: los hallazgos heredados de F-071 no estaban
+medidos. Medidos ahora, **de 921 fichas de obra solo 294 traen municipio
+(31,9 %) y 305 traen dirección (33,1 %)**: a «dónde está la obra X», para dos de
+cada tres la respuesta correcta es «no consta». Acota lo que F-073 puede
+prometer.
+
+Deja abierto: **F-073** (construir), **F-074** (la ingesta de las nueve) y
+**F-075**, el defecto del arnés que el reviewer destapó: `harness.alcance`
+diffea contra una base vieja, así que **las dos puertas automáticas miden
+código de otras features**, y el fallo puede ir en la dirección mala.

@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 40,
+      "priority": 41,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 48,
+      "priority": 49,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 49,
+      "priority": 50,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 50,
+      "priority": 51,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 51,
+      "priority": 52,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 38,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 41,
+      "priority": 42,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 33,
+      "priority": 34,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 52,
+      "priority": 53,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 42,
+      "priority": 43,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -572,7 +572,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -589,7 +589,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -620,7 +620,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -653,7 +653,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -687,7 +687,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -702,7 +702,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -733,7 +733,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -749,7 +749,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -765,7 +765,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -782,7 +782,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -799,7 +799,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -818,7 +818,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -836,7 +836,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -853,7 +853,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -903,7 +903,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 21,
+      "priority": 22,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -920,7 +920,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -933,7 +933,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 35,
+      "priority": 36,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -949,7 +949,7 @@
         "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
       ],
-      "priority": 39,
+      "priority": 40,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -965,7 +965,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 43,
+      "priority": 44,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -981,7 +981,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 45,
+      "priority": 46,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -998,7 +998,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 47,
+      "priority": 48,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -1018,7 +1018,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1057,7 +1057,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-067-compras-seguimiento-mcp"
     },
     {
@@ -1089,7 +1089,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1123,7 +1123,7 @@
         "Ni una escritura contra Sigrid ni contra el Postgres: la feature es de solo lectura de principio a fin",
         "Los hallazgos heredados de F-071 -los campos de direccion y los dos ejes- quedan recogidos y medidos"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "documental",
       "priority": 4,
@@ -1168,6 +1168,23 @@
       "rigor": "estandar",
       "priority": 6,
       "branch": "feature/F-074-ingesta-tablas-del-censo"
+    },
+    {
+      "id": "F-075",
+      "title": "Las dos puertas automaticas miden codigo de otras features: `harness.alcance` diffea contra una base que se quedo vieja",
+      "description": "Pedida por el reviewer de F-072 el 2026-09-09 y confirmada por el lider. EL HECHO: al revisar F-072 -una feature `documental`, sin una sola linea de Python- la **puerta de cobertura dio `[OK] 93,6 % de 842 lineas cambiadas**. Esas 842 lineas **no son de F-072**: `harness.alcance` calcula el diff contra `cd18e09`, que es la base de F-052, y arrastra el codigo de F-025, F-066 y F-068, ya cerradas. El alcance propio de F-072 es **cero lineas**. POR QUE NO ES COSMETICO, y es el argumento del reviewer: con `dev` por detras, **las dos puertas automaticas miden codigo ajeno, y el fallo puede ir en la direccion mala**. Una feature mal cubierta puede pasar la puerta escondida detras del buen dato de las demas; y la campana de mutacion puede inflarse mutando codigo que no es de la feature, gastando horas y produciendo supervivientes que nadie tiene que analizar. Es el mismo genero de defecto que F-041 -«la campana de mutacion miente»- y conviene mirarlas juntas: las dos nacen de que el arnes no sabe donde empieza una feature. LO QUE TAPO EL SINTOMA EN F-072: al pasar la feature a rigor `documental` la puerta imprime `N/A ... no exige cobertura` y el numero engañoso desaparece. Eso arregla el caso, no la causa. A DECIDIR: cual es la base correcta contra la que diffear -la rama de la feature contra su punto de corte, no una base fija-, que hacer cuando la rama arrastra features cerradas sin mergear, y si la puerta debe negarse a medir en vez de dar un numero que parece bueno. Evidencia: `progress/review_F-072.md`, pasadas 1 y 2.",
+      "acceptance": [
+        "La puerta de cobertura mide las lineas de LA feature en curso, no las de features cerradas que la rama arrastra",
+        "Queda demostrado con un caso reproducible: una feature sin codigo propio no puede salir con un porcentaje de otra",
+        "La campana de mutacion usa el mismo alcance corregido, para no mutar codigo ajeno",
+        "Cuando el alcance no se puede determinar con fiabilidad, la puerta lo dice y se niega a medir, en vez de dar un numero que parece bueno",
+        "Se mira junto a F-041 y queda escrito que parte resuelve cada una"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 11,
+      "branch": "feature/F-075-alcance-de-las-puertas"
     }
   ]
 }
