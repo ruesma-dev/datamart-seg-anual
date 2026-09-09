@@ -16,7 +16,7 @@ Rigor crítico: T1-T3 son la fase RED (los tests se escriben y fallan antes de t
 - [x] T11: Actualizar `azure-apps/datamart_seg_anual.md` (R21: 56 tablas, las 25 nuevas, las descartadas, `dcf` con `pagtex`/`pagfor`, datos personales enteros en `raw.emp`/`raw.res`) y hacer commit en ese repositorio  |  Verificación: MANUAL (humano): `git -C ../azure-apps log -1 --stat`
 - [x] T12: Cobertura de las líneas cambiadas ≥ 80 % y campaña de mutación completa sobre `etl_sigrid/domain/recuentos.py` y el comando (`python -m harness.mutacion`), 0 supervivientes o justificación aceptada; informe en `progress/`  |  Verificación: `bash harness/init.sh` secciones 7b y mutación en verde
 - [x] T13: Desplegar la imagen (`infra/`, tag fechado) y esperar la primera nocturna con las 25 tablas; anotar en `mediciones.md` filas y segundos por tabla, total frente a 1.832 s, créditos antes/después y SKU (R19), y la fila de F-065 (R20)  |  Verificación: MANUAL (humano): `python main.py timings` y `az monitor metrics list ... cpu_credits_remaining`
-- [ ] T14 (PENDIENTE, del líder): Contra Azure, tras esa nocturna: `python main.py check-raw-recuentos` con código 0 y `python main.py check-diccionario` sin objetos sin ficha  |  Verificación: MANUAL (humano)
+- [x] T14: Contra Azure, tras esa nocturna: `python main.py check-raw-recuentos` con código 0 y `python main.py check-diccionario` sin objetos sin ficha  |  Verificación: MANUAL (humano) — **HECHA el 2026-09-09 por el líder**, tras la nocturna automática `29815200` (00:00→03:18 UTC). Recuentos: **código 0, VEREDICTO CONFORME**, 51 iguales y 5 con deriva tolerada, **0 con filas que faltan en raw**, peor desviación 0,0080 % frente a un umbral de 0,05 %. Diccionario: **código 0**, biyección exacta 130/130 y lo publicado ES lo del árbol (versión 16). Las dos salidas, con su contexto, en `mediciones.md` §6.
 - [x] T15: Pasar al líder los hallazgos de R22 para que actualice las fichas de F-055, F-056, F-057 y F-067 en `harness/features.json`  |  Verificación: MANUAL (humano): `bash harness/init.sh` regenera `BACKLOG.md` con las fichas cambiadas
 - [x] T16: Ejecutar `bash harness/init.sh` en verde  |  Verificación: exit 0
 
@@ -32,14 +32,25 @@ Rigor crítico: T1-T3 son la fase RED (los tests se escriben y fallan antes de t
   +26,5 % y +33,9 %), los créditos (mínimo 552 de 576) y el SKU
   (`Standard_B2s`); §4 trae la fila de F-065 con sus siete celdas. La nocturna
   `29815200` del 09-sep lo repite en producción (25.497.946 filas / 2.921,1 s).
-* **T14 · PENDIENTE, y es del líder.** R24 la declara `MANUAL (humano)` y sus
-  dos comandos hacen 56 `COUNT(*)` contra Sigrid y contra el Postgres
-  compartido: no se lanzan con una nocturna corriendo. **El hueco está
-  preparado, con los dos comandos y el criterio de cierre, en `mediciones.md`
-  §6**; se rellena pegando la salida. Lo único medido contra Azure (08-sep,
-  16:30 UTC, 31 iguales · 25 distintas, código 1) es con el criterio **viejo**,
-  anterior a T19-T24. **Mientras T14 siga en `[ ]`, C4 sigue abierto y la
-  feature no pasa a `done`.**
+* **T14 · HECHA** por el líder el **2026-09-09**, tras la nocturna automática
+  `29815200` (00:00→03:18 UTC, `Succeeded`, los diez pasos y 130/130 declarados).
+  Los dos comandos en verde y sus salidas pegadas en `mediciones.md` §6:
+  **`check-raw-recuentos` código 0 · CONFORME** —51 iguales, 5 con deriva
+  tolerada, **0 con filas que faltan en `raw`**, peor desviación 0,0080 % contra
+  un umbral de 0,05 %, seis veces de margen— y **`check-diccionario` código 0**,
+  biyección exacta 130/130 y lo publicado igual al árbol.
+
+  **La comparación con el 08-sep es la que justifica T19-T24**: el mismo estado
+  de la base daba entonces «31 iguales · 25 distintas» y **código 1** con el
+  criterio viejo. No se ha tapado nada —una tabla con filas de menos sigue
+  tumbando el comando sea cual sea su tamaño—; lo que ha desaparecido son 25
+  falsas alarmas que ahogaban la señal.
+
+  **`check-diccionario` costó dos pasadas, y el motivo importa**: la primera
+  (05:52 UTC) salió en **código 1** porque la imagen en producción era del
+  mediodía anterior y dos fichas se corrigieron después. El código estaba bien;
+  lo que la IA leía, no. Se resolvió desplegando `r20260909-0520` y publicando a
+  mano, las dos cosas con autorización expresa del humano. **C4 queda cerrado.**
 * **T15 · HECHA** por el líder el 2026-09-06 a las 19:40 UTC (commit
   `26ce092`): los hallazgos de R22 están en las fichas de F-055, F-056, F-057 y
   F-067 de `harness/features.json`, y nace **F-068** con lo del permiso del MCP

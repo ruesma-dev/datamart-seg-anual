@@ -177,7 +177,7 @@ duplicados**. Se corrigió el YAML y se añadieron dos comprobaciones que leen l
   y en T14 —tras una nocturna— tiene que salir 0.
 - **0 sin medir**: las 56 consultas a Sigrid contestaron.
 
-## 6 · T14 y R24 · las dos verificaciones MANUAL contra Azure — PENDIENTE (líder)
+## 6 · T14 y R24 · las dos verificaciones MANUAL contra Azure — HECHAS el 2026-09-09
 
 **Las mide el humano/líder**, no el implementer: R24 las declara `MANUAL` y los
 dos comandos hacen 56 `COUNT(*)` contra Sigrid y contra el Postgres compartido,
@@ -204,10 +204,29 @@ magnitud). Pegar la salida entera aquí, tal cual, incluidos el umbral aplicado 
 la peor desviación:
 
 ```
-(pegar aquí la salida de check-raw-recuentos — fecha y hora UTC de la ejecución)
+  conest                   193           193   0,0000 %   OK
+
+51 iguales · 5 con deriva tolerada · 0 con filas que faltan en raw · 0 con filas
+que sobran en raw · 0 ausentes · 0 sin medir
+tolerancia 0,0500 % por tabla, y solo hacia arriba · desviación máxima
+0,0080 % (dcopro)
+última ingesta correcta: hace 2,5 h
+VEREDICTO: CONFORME
 ```
 
-Código de salida: `(pegar)` · Ejecutado el `(fecha, hora UTC)` por `(quién)`.
+Código de salida: **0** · Ejecutado el **2026-09-09 a las 05:50 UTC** por el
+**líder**, con la nocturna `29815200` ya terminada (03:18 UTC).
+
+**Los cuatro criterios se cumplen**: código 0; `ausentes` 0; `sin_medir` 0; y
+**ninguna tabla con Sigrid por debajo de `raw`** —la línea «0 con filas que
+faltan en raw» es literalmente esa comprobación—.
+
+**Y la comparación con el 08-sep es la que da sentido al cambio**: aquel día,
+con el criterio viejo, el mismo estado de la base daba «31 iguales · 25
+distintas» y código 1. Hoy da 51 iguales y 5 con deriva tolerada, con la peor
+desviación en **0,0080 %** frente a un umbral de 0,05 %: **seis veces de
+margen**. No se ha tapado nada —la señal grave sigue tumbando el comando— sino
+que ha dejado de haber 25 falsas alarmas que nadie iba a leer.
 
 ### Hueco 2 · `check-diccionario`
 
@@ -219,11 +238,32 @@ Criterio de cierre: **ningún objeto sin ficha** —las 56 tablas de `raw` con l
 suya— y `objetos_pendientes.yaml` sin entradas nuevas. Pegar la salida:
 
 ```
-(pegar aquí la salida de check-diccionario — fecha y hora UTC de la ejecución)
+Diccionario contra el catalogo real de Postgres
+  fichas: 130   objetos en la base: 130
+
+OK   biyeccion exacta: ni un objeto publicado sin ficha, ni una ficha sin
+     objeto, ni un tipo que no case.
+
+OK   lo publicado ES lo del arbol (version 16, hash 9140b14dc991)
 ```
 
-Código de salida: `(pegar)` · Ejecutado el `(fecha, hora UTC)` por `(quién)`.
+Código de salida: **0** · Ejecutado el **2026-09-09 a las 07:32 UTC** por el
+**líder**.
 
-**Cuando los dos huecos estén rellenos**, T14 pasa a `[x]` en `tasks.md` y R24
-queda cumplido; hasta entonces C4 sigue abierto y la feature no puede pasar a
-`done`.
+**Hizo falta una pasada previa, y el motivo merece quedar escrito.** A las 05:52
+este mismo comando salió con **código 1**: biyección exacta 130/130, pero «LO
+PUBLICADO NO ES LO DEL ÁRBOL» —`_meta` servía el hash `9ccc80292010` y los YAML
+daban `9140b14dc991`—. **No era un fallo de esta feature**: la imagen en
+producción era `r20260908-1248`, del mediodía del 08, y dos fichas se corrigieron
+después (`b3abcf4` de F-025 y `38e170c` de F-068). El código estaba bien; lo que
+la IA leía era lo de la imagen. Es el mismo patrón que ya costó diez días en
+agosto: **el repositorio en verde no es producción**.
+
+Resuelto en dos pasos, los dos con autorización expresa del humano: se desplegó
+la imagen `r20260909-0520` (`85_update_job.ps1`) y se ejecutó
+`python main.py publicar-diccionario` a mano —176 filas, 130 objetos, 822
+columnas, 16 reglas, cobertura de columnas **100,0 %**, 1,0 s—. La nocturna lo
+republicará igual esta noche.
+
+**Los dos huecos están rellenos**, así que T14 pasa a `[x]` en `tasks.md` y R24
+queda cumplido. C4 se cierra.
