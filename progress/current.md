@@ -120,3 +120,62 @@ El fichero de excepciones de esa rama es el viejo: **10 entradas y con los
 --timeout 900` **alli**, y si da codigo 0, al reviewer y a `done`. **No se
 mezclan las dos ramas** sin decidirlo. Ojo con F-071 y F-053, que tocan
 `stg.obras` y su desempate `rn=1`.
+
+## F-072 · EN CURSO · el censo semantico de las 31 tablas que nadie consume
+
+**F-071 ESTA RETIRADA.** El humano la paro el 2026-09-09 al leer su spec:
+«**no vamos a borrar nada de momento, vamos a seguir dejando todo. Quitamos
+esta feature.**» Ya no esta en `harness/features.json`. Su carpeta
+`specs/F-071-obras-sin-datos/` se conserva con un banner de RETIRADA, solo por
+lo que costo medir. **No se implementa nada de ella.**
+
+**Lo que NO se hace, y conviene que quede escrito para que nadie lo reproponga
+dentro de tres meses:** no se borran las 472.890 filas huerfanas de
+`stg.presupuesto` (390.028) y `stg.plan_mensual` (82.862); **no se acota el
+censo de la ventana**, que era precisamente lo que las dejaba huerfanas; y no
+se filtra ni se oculta ninguna obra en ninguna vista. El marcado de obras sin
+datos sobrevive **como enriquecimiento**, no como filtro.
+
+**EL HECHO QUE ABRE F-072**, medido el 2026-09-09 cruzando
+`config/tables_sigrid.yaml` contra todo el SQL de
+`etl_sigrid/infrastructure/postgres/sql/`:
+
+| tablas ingeridas cada noche | las consume algun build | **no las consume nadie** |
+|---|---|---|
+| 56 | 25 | **31** |
+
+Las 31: `apa`, `apu`, `asi`, `auxefp`, `auxobrtca`, `auxpag`, `auxpronat`,
+`com`, `comlin`, `comprv`, `conact`, `conest`, `confir`, `ctrrec`, `cua`,
+`dcarec`, `dcfprodes`, `dcfrec`, `dco`, `dcopro`, `dcorec`, `deffir`, `dnc`,
+`dncpro`, `emp`, `hmo`, `hmores`, `obrprv`, `prvcer`, `prvobrpag`, `res`. Se
+ingieren cada noche, ocupan disco y **la IA no las ve**, porque el MCP solo lee
+las capas procesadas.
+
+**EL PLAN, EN DOS FEATURES**, aprobado por el humano:
+
+* **F-072 (en curso, prioridad 4)** — entender. Catalogo tabla por tabla: que
+  es, grano, volumen, **% informado columna a columna**, por donde se une, y
+  que preguntas de negocio permitiria responder que hoy no se pueden
+  responder. **Solo lectura de principio a fin.** Cuatro bloques tematicos,
+  un informe `progress/explore_F-072_*.md` por bloque, mas un catalogo que los
+  une y los enruta a las features de construccion.
+* **F-073 (pendiente, prioridad 5)** — construir. **Su contenido lo fija
+  F-072.** Lo unico que ya se sabe que entra es la direccion de la obra en la
+  capa de consumo y las marcas de obra con/sin datos. Buena parte del resto
+  caera en features de dominio que YA existen en el backlog: F-055, F-056,
+  F-057, F-058, F-067, F-038, F-037 y F-040.
+
+**EL TOPE DE LA PASARELA ESTABA MAL EN MI CABEZA, y lo corrigio el humano.**
+`azure-apps/sigrid_api.md` §4.1: la instancia `dev` tiene `MAX_ALLOWED_ROWS` en
+**500.000**, no en 1.000 (ese es el tope por codigo, que dev sobreescribe), y
+`MAX_QUERY_TIMEOUT_SECONDS` en **230**. Los 230 s **si** son un techo duro: es
+el balanceador de Azure y subir el ajuste no da mas tiempo. El cliente es
+`SigridApiClient.leer_sql(sql, parameters, max_rows)`.
+
+**HALLAZGOS DE F-071 QUE SOBREVIVEN** (medidos, no supuestos): de los ocho
+campos de direccion de `raw.obr`, **tres no son la direccion de la obra**
+—`diride` es el **director de obra**, `perdir` su **persona de contacto** y
+`entdiride` la direccion **del cliente**—; y los dos ejes de agrupacion que
+faltaban, **municipio** y **provincia**, viven en `raw.auxmun` y `raw.auxpro`
+via `obr.munide` y `obr.proide`. Lo demas, en
+`specs/F-071-obras-sin-datos/design.md` §1.

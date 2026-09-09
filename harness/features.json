@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 47,
+      "priority": 48,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 48,
+      "priority": 49,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 49,
+      "priority": 50,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 40,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 50,
+      "priority": 51,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 40,
+      "priority": 41,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 42,
+      "priority": 43,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -530,7 +530,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-034-powerbi-azure"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -572,7 +572,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -589,7 +589,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -620,7 +620,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -653,7 +653,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -687,7 +687,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -702,7 +702,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -733,7 +733,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -749,7 +749,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -765,7 +765,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -782,7 +782,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -799,7 +799,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -818,7 +818,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -836,7 +836,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -853,7 +853,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -870,7 +870,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-056-contabilidad"
     },
     {
@@ -886,7 +886,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-057-recursos-empleados-partes"
     },
     {
@@ -903,7 +903,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -920,7 +920,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 21,
+      "priority": 22,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -933,7 +933,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 33,
+      "priority": 34,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -949,7 +949,7 @@
         "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
       ],
-      "priority": 37,
+      "priority": 38,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -965,7 +965,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 41,
+      "priority": 42,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -981,7 +981,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 43,
+      "priority": 44,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -998,7 +998,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 45,
+      "priority": 46,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -1018,7 +1018,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1057,7 +1057,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-067-compras-seguimiento-mcp"
     },
     {
@@ -1089,7 +1089,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1107,29 +1107,46 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
-      "id": "F-071",
-      "title": "La IA ve 583 obras cuando solo 349 tienen datos: marcarlas y declararlo, no borrarlas",
-      "description": "Pedida por el humano el 2026-09-07, al ver el censo de la ventana de F-025: «esas obras vacias hay que quitarlas, el objetivo es que no confundan a la IA a la hora de extraer info». LO MEDIDO ESE DIA contra la base de Azure, tras la nocturna `swtg78p`: `mart.v_pbi_dim_obra` -la dimension que consulta el MCP- publica **583 obras**, y **234 de ellas (el 40 %) no tienen ni un hecho** en `mart.fact_seguimiento_mensual`, que solo cubre 349. En `stg.obras`, de las mismas 583: 498 tienen presupuesto, 349 plan mensual y **85 no tienen ninguna de las dos**. A la pregunta «cuantas obras tenemos» el datamart contesta hoy 583, y es enganoso. POR QUE NO SE BORRAN, que fue lo primero que se planteo y se descarto con el humano: (1) esas 234 **son obras reales de la empresa**, con nombre reconocible -«EDIFICIO PZA SANTA ANA, MADRID», «22 VIVIENDAS CARCAVAS», «BIBLIOTECA PARACUELLOS DEL JARAMA»-: son antiguas o sin seguimiento cargado, no basura. Si se borran, a quien pregunte por una de ellas la IA le dira «esa obra no existe», que es **peor mentira** que el ruido actual; la respuesta correcta es «existe, pero no tiene datos de seguimiento en el datamart». Y (2) borrar no funciona: `raw` se reingiere ENTERO desde Sigrid cada noche (R34), asi que lo borrado reaparece en horas. Solo funcionaria borrando en Sigrid, que no es de este proyecto y donde ademas solo tenemos lectura. LA SALIDA APROBADA POR EL HUMANO: **marcar y declarar, en dos capas.** CAPA 1, lo que consume la IA: cada obra lleva si tiene seguimiento y si tiene presupuesto; se publica una superficie de consumo que por defecto solo trae las obras con datos; y -esto es lo que cierra el problema de verdad- **queda escrito en el diccionario** como regla dura, para que el modelo sepa que la dimension incluye obras sin datos y cual debe usar segun lo que le pregunten. Es **aditivo**: no se quita nada de las vistas `v_pbi_*` que ya existen, porque Power BI las lee (ver F-034). CAPA 2, el censo interno de la ventana, que la IA no ve: `SQL_ESTADO_OBRAS` (`postgres_client.py:144`) censa **920 fichas** desde `raw.obr x raw.con`, 337 mas que las 583 de `stg.obras`. Ahi si hay ruido puro: `0000` es «PLANTILLA DE OBRA», el codigo `0001` aparece **ocho veces** con el nombre en blanco, 58 codigos tienen mas de un `obra_id` y 294 no llegan a `stg.obras`. Filtrarlo no afecta a ningun consumidor y ademas deja de reprocesar 552 obras cada noche por el motivo `sin_filas` de `domain/ventana.py:472`, de las que 512 siguen vacias despues de reconstruirlas. FRONTERA: no es F-070 -auditar la calidad de las fichas ya publicadas-, aunque su capa 1 se publique por el mismo vehiculo; ni F-053 -el desempate `rn=1` de `stg.obras` elige la ficha vacia-, con la que **conviene coordinarse** porque tocan el mismo sitio; ni F-034 -Power BI-. Evidencia y consultas: `progress/explore_F-025_coste_fijo.md`. ================ AMPLIADA EL 2026-09-08 por el humano: «con respecto a F-071, anade la direccion de las obras al mart». Y SUBIDA A PRIORIDAD 4, por delante de F-070. EL HECHO, comprobado ese dia: **la direccion de una obra NO se puede consultar por el MCP**. Existe en el origen -`raw.obr` trae `dir`, `dir1`, `dir2`, `dircpo`, `diride`, `dirtex`, `entdiride` y `perdir`- pero **no esta publicada en ninguna capa de consumo**: en `mart`, `cierre`, `compras`, `maestro`, `retenciones` y `stg` las unicas columnas de direccion son las de PROVEEDOR (`maestro.proveedores` y `maestro.proveedores_obra`: `dir1`, `dir2`, `direccion_completa`, `municipio`, `provincia`). La dimension de obra solo tiene `obra_id`, `codigo_obra`, `nombre_obra` y `obra_label`. Y `raw` esta fuera del ambito del MCP: verificado preguntandoselo, responde «El esquema 'raw' esta fuera del ambito autorizado». QUE HAY QUE HACER: subir la direccion de la obra a la capa de consumo, en la misma dimension que ya toca esta feature para marcar las obras sin datos -las dos cosas tocan el mismo sitio y se hacen de una vez-, con su ficha en el diccionario para que la IA sepa que existe. A DECIDIR EN LA SPEC: cuales de los ocho campos de `raw.obr` valen la pena y cual es la direccion util -hace falta mirar cuantos vienen informados, como se hizo con `pagtex` en F-066-; si se compone una `direccion_completa` como ya hace `maestro.proveedores`, para no inventar dos formas distintas de decir lo mismo en la misma base; y si el municipio y la provincia salen aparte, porque son ejes de agrupacion y no solo texto.",
+      "id": "F-072",
+      "title": "31 de las 56 tablas que ingerimos cada noche no las consume nadie: entender que hay dentro antes de construir",
+      "description": "Pedida por el humano el 2026-09-09, al retirar F-071: «no vamos a borrar nada de momento, vamos a seguir dejando todo. Lo que vamos a hacer es analizar el dato que hay ahora mismo y los hallazgos, con eso vamos a crear nuevas tablas de datos procesados y a enriquecer las actuales. Usa la conexion sigrid-api para entender lo que significan y la info que hay en las tablas originales.» EL HECHO MEDIDO ese dia: de las 56 tablas declaradas en `config/tables_sigrid.yaml`, **solo 25 las referencia algun SQL de build**; las otras **31 se ingieren cada noche y no alimentan ninguna capa de consumo**, asi que la IA no las ve: `apa`, `apu`, `asi`, `auxefp`, `auxobrtca`, `auxpag`, `auxpronat`, `com`, `comlin`, `comprv`, `conact`, `conest`, `confir`, `ctrrec`, `cua`, `dcarec`, `dcfprodes`, `dcfrec`, `dco`, `dcopro`, `dcorec`, `deffir`, `dnc`, `dncpro`, `emp`, `hmo`, `hmores`, `obrprv`, `prvcer`, `prvobrpag`, `res`. ESTA FEATURE NO ESCRIBE NADA EN PRODUCCION: produce el catalogo que dice que construir. Para cada una de las 31: que es en Sigrid y que significa cada campo (fuente: `azure-apps/sigrid_tablas.md` y consultas de solo lectura por sigrid-api), cuantas filas tiene, que porcentaje viene informado columna a columna, por donde se une al resto del modelo, cual es su grano, y que preguntas de negocio permitiria responder que hoy no se pueden responder. TOPES REALES DE LA PASARELA, corregidos el 2026-09-09 contra `azure-apps/sigrid_api.md`: la instancia `dev` acepta **max_rows hasta 500.000** (no 1.000, que es el tope por codigo) y **timeout hasta 230 s**, que es el limite del balanceador y no se puede subir. Aun asi la exploracion se hace con recuentos y muestras, no descargando tablas enteras. HALLAZGOS HEREDADOS DE F-071, que se retiro sin implementar: tres de los ocho campos de direccion de `raw.obr` no son la direccion de la obra (`diride` es el director de obra, `perdir` su persona de contacto y `entdiride` la direccion del cliente), y los dos ejes de agrupacion que faltaban -municipio y provincia- viven en `raw.auxmun` y `raw.auxpro`. FRONTERA: aqui no se decide el diseño de ninguna tabla nueva ni se toca SQL de build; eso es F-073 y las features de dominio que ya estan en el backlog (F-055, F-056, F-057, F-058, F-067, F-038, F-037, F-040), a las que este catalogo debe decir explicitamente que alimenta.",
       "acceptance": [
-        "La superficie que consume la IA distingue una obra CON datos de una obra que existe y no los tiene, sin que haya que adivinarlo cruzando con el hecho",
-        "A la pregunta «cuantas obras tenemos» el datamart deja de responder 583 a secas: o responde las que tienen datos, o responde las dos cifras diciendo que es cada una",
-        "Una obra sin datos sigue siendo encontrable por nombre y por codigo: preguntar por ella devuelve «existe, sin datos de seguimiento», nunca «no existe»",
-        "El diccionario lo publica como regla dura, con que objeto usar para cada tipo de pregunta, y se verifica preguntandoselo al MCP sin explicarle nada en el prompt",
-        "Nada de lo existente en las vistas `v_pbi_*` se quita ni se filtra: el cambio es aditivo y Power BI sigue leyendo lo mismo (F-034)",
-        "El censo de la ventana deja fuera las fichas que no llegan a `stg.obras` -plantillas, codigos repetidos y fichas en blanco-, y queda medido cuantas obras se dejan de reprocesar cada noche",
-        "Ninguna obra con datos desaparece de ningun sitio por este cambio: se comprueba contra las 349 con hechos y las 498 con presupuesto medidas el 2026-09-07",
-        "La direccion de la obra se puede consultar por el MCP: esta en la capa de consumo, con su ficha en el diccionario, y una pregunta como «donde esta la obra X» se responde sin que el humano explique nada en el prompt",
-        "Queda medido cuantas obras traen direccion informada en el origen, para no publicar una columna que este vacia en la mitad de los casos sin decirlo"
+        "Las 31 tablas sin consumidor tienen ficha en el catalogo: que es, grano, volumen real, y por donde se une al modelo",
+        "Cada ficha dice el porcentaje informado de sus columnas, medido y no supuesto, para no construir sobre columnas vacias",
+        "El significado de los campos sale de sigrid-api y de `azure-apps/sigrid_tablas.md`, no de adivinar por el nombre",
+        "Cada tabla dice que preguntas de negocio permitiria responder que hoy no se pueden responder",
+        "El catalogo enruta cada tabla a la feature de construccion que la usaria, y nombra las que no valen la pena y por que",
+        "Ni una escritura contra Sigrid ni contra el Postgres: la feature es de solo lectura de principio a fin",
+        "Los hallazgos heredados de F-071 -los campos de direccion y los dos ejes- quedan recogidos y medidos"
+      ],
+      "status": "in_progress",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 4,
+      "branch": "feature/F-072-censo-semantico-raw"
+    },
+    {
+      "id": "F-073",
+      "title": "Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales",
+      "description": "La segunda mitad de lo que pidio el humano el 2026-09-09: «con eso vamos a crear nuevas tablas de datos procesados y a enriquecer las actuales». **Su contenido lo fija F-072**, que es quien mide que hay dentro de las 31 tablas sin consumidor; hasta que ese catalogo exista, esta ficha no puede decir que se construye sin inventarselo. LO QUE YA SE SABE QUE ENTRA, heredado de F-071 y sin nada que borrar: la **direccion de la obra** en la capa de consumo -hoy solo existe en `raw`, que el MCP no puede leer, asi que a la pregunta «donde esta la obra X» el datamart no sabe responder-, con `dir1`, `dir2`, codigo postal, **municipio** y **provincia** (estos dos por `raw.auxmun` y `raw.auxpro`) y una `direccion_completa` con los mismos nombres que ya usa `maestro.proveedores`, para no inventar un segundo vocabulario; y las **marcas de si una obra tiene seguimiento y presupuesto**, que son enriquecimiento puro. IMPORTANTE, y es la correccion del humano que mato a F-071: **no se borra ni se filtra nada**. Las 472.890 filas huerfanas de `stg.presupuesto` y `stg.plan_mensual` se quedan donde estan, el censo de la ventana NO se acota, y ninguna obra desaparece de ninguna vista: solo se añade informacion. REPARTO: buena parte de lo que salga de F-072 cae en features de dominio que ya existen (F-055 proveedor, F-056 mayor y plan de cuentas, F-057 coste de personal, F-058 estados financieros, F-067 compras, F-038 comparativos, F-037 tesoreria, F-040 ingresos); esta feature recoge lo que no tenga sitio y coordina el orden. Al terminar, cada objeto nuevo lleva su ficha en el diccionario, que es lo unico que hace que la IA lo entienda.",
+      "acceptance": [
+        "Lo que se construye sale del catalogo de F-072 y cada objeto nuevo cita la tabla de origen que lo justifica",
+        "La direccion de la obra se puede consultar por el MCP y una pregunta como «donde esta la obra X» se responde sin explicarle nada en el prompt",
+        "Se publica el municipio y la provincia como ejes de agrupacion, no solo como texto",
+        "Una obra se puede distinguir con datos de sin datos sin cruzar a mano con el hecho",
+        "NADA se borra ni se filtra: las filas huerfanas siguen, el censo no se acota y ninguna vista pierde filas ni columnas",
+        "Cada objeto nuevo o ampliado lleva su ficha en el diccionario, con el grano y el significado de cada columna",
+        "Queda medido el porcentaje informado de cada columna nueva, para no publicar una columna vacia sin decirlo"
       ],
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 4,
-      "branch": "feature/F-071-obras-sin-datos"
+      "priority": 5,
+      "branch": "feature/F-073-tablas-nuevas-y-enriquecimiento"
     }
   ]
 }
