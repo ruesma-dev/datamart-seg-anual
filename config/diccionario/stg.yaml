@@ -478,15 +478,15 @@ objetos:
       Sigrid un capitulo es tambien una fila de partidas, asi que aqui conviven
       los dos.
 
-      La misma informacion con etiquetas ya listas esta ademas en
-      `mart.v_pbi_dim_partida`, que suele ser mas comoda para una respuesta de
-      negocio; aqui esta el arbol entero, con la jerarquia y la ruta, que es lo
-      que `mart` no da.
-
       **Un capitulo de Sigrid puede no tener codigo** (cadena vacia, no NULL).
       Esos no se publican, pero desde F-052 (2026-08-31) el recorrido SI baja a
       traves de ellos y sus descendientes llegan. Lee `codigo_partida` y
       `capitulo_padre_id` antes de recorrer el arbol.
+
+      La misma informacion con etiquetas ya listas esta ademas en
+      `mart.v_pbi_dim_partida`, que suele ser mas comoda para una respuesta de
+      negocio; aqui esta el arbol entero, con la jerarquia y la ruta, que es lo
+      que `mart` no da.
     grano: >-
       Una fila por `partida_id`: una partida de detalle o un capitulo de
       cualquier nivel de una obra.
