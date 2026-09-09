@@ -52,7 +52,10 @@ Origen del diff: **rama** (`cd18e0962b63edcc0017907b8c69a29352e433c4` .. `featur
 Cada superviviente es una línea que ningún test comprueba de verdad, o una mutación equivalente. Distinguirlo es trabajo del implementer: ningún análisis puede quedarse sin completar al cerrar la feature.
 
 > **LEER ESTO ANTES QUE LOS OCHO ANÁLISIS.** El alcance que la herramienta ha
-> medido **no es el cambio de F-079**. F-079 toca `config/diccionario/*.yaml`,
+> medido **no es el cambio de F-079**, y eso **ya tiene ficha abierta: F-075**
+> («las dos puertas automáticas miden código de otras features: `harness.alcance`
+> diffea contra una base que se quedó vieja»). Esta campaña es un caso más de lo
+> mismo. F-079 toca `config/diccionario/*.yaml`,
 > `tests/` y `progress/`: **cero líneas de Python de producción**. Lo que sale
 > en la tabla de arriba —3.527 líneas en 14 ficheros— es el diff de la RAMA
 > contra `cd18e096`, o sea todo lo que ha entrado en esta línea de commits desde
@@ -262,7 +265,8 @@ Python de producción. Los ocho salen del alcance heredado de la rama (3.527
 líneas de F-025, F-066, F-072 y F-074) y **ninguno se tapa aquí**, por la regla
 del protocolo: no se improvisa sobre código de otra feature.
 
-Lo que sí deja esta campaña es un diagnóstico con nombre, y merece **ficha
+Que el alcance venga inflado **ya tiene ficha: F-075**. Lo que esta campaña
+añade es un diagnóstico distinto, sobre el código medido, y ese sí merece **ficha
 propia**:
 
 > **La capa de adaptadores de la ventana de negocio se comprueba por el texto de

@@ -206,14 +206,14 @@ ejecutarlas**, y sin la 1 la feature no surte efecto:
 una campaña falsa. 0 sin veredicto, sin cabecera «CAMPAÑA NO VÁLIDA».
 
 **Los ocho supervivientes están analizados uno a uno en
-`progress/mutacion_F-079.md`, ninguno en `PENDIENTE`**, y hay que leerlos con un
-dato delante: **el alcance medido no es el de F-079**. La herramienta diffea la
-RAMA contra `cd18e096` y arrastra 3.527 líneas de F-025, F-066, F-072 y F-074;
-**F-079 no toca una línea de Python de producción**. Los ocho son huecos
-preexistentes —siete, traducciones fila → entidad en `postgres_client.py` y
-`ventana_sql.py` que ningún test ejecuta; el octavo, `main.py:543`, ya tiene
-ficha: **F-077**— y **no se tapan aquí**, que sería meter mano en código de otra
-feature. El informe de mutación cierra proponiendo ficha para ese hueco.
+`progress/mutacion_F-079.md`, ninguno en `PENDIENTE`**, y se leen con un dato
+delante: **el alcance medido no es el de F-079**. `harness.alcance` diffea la
+RAMA contra `cd18e096` y arrastra 3.527 líneas de F-025, F-066, F-072 y F-074 —
+**es el defecto que ya tiene ficha, F-075**—, y F-079 no toca una línea de Python
+de producción. Los ocho son huecos preexistentes: siete, traducciones fila →
+entidad en `postgres_client.py` y `ventana_sql.py` que ningún test ejecuta; el
+octavo, `main.py:543`, ya con ficha **F-077**. **No se tapan aquí**: es código de
+otra feature. El informe de mutación cierra proponiendo ficha para los siete.
 
 **SHA medido (RM1): `bc1ce726cd9f050554efd64c209d8e25dbc4c140`.** Después llegan
 `e17220e` —solo reordena dos párrafos de `stg.yaml`— y el commit de este informe:
