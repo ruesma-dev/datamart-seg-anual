@@ -1163,7 +1163,7 @@
         "Queda escrito que hacer con `obrprv`, que tiene 0 filas en origen: sale de la ingesta o se justifica por que se queda",
         "Queda medido cuanto crece la nocturna con las nueve dentro, para saber si sigue cabiendo en la ventana"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": false,
       "rigor": "estandar",
       "priority": 6,

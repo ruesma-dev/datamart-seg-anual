@@ -5,6 +5,8 @@
 
 Resumen: **71 features**, 49 abiertas, 22 terminadas.
 
+En curso: **F-074**.
+
 Bloqueadas: **F-052**.
 
 ## Trabajo abierto
@@ -12,7 +14,7 @@ Bloqueadas: **F-052**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-073 | Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales | 5 | pendiente | estandar | `feature/F-073-tablas-nuevas-y-enriquecimiento` |
-| F-074 | La ingesta que destapa el censo: 9 tablas que faltan, una carga incremental falsa y un campo excluido que hacia falta | 6 | pendiente | estandar | `feature/F-074-ingesta-tablas-del-censo` |
+| F-074 | La ingesta que destapa el censo: 9 tablas que faltan, una carga incremental falsa y un campo excluido que hacia falta | 6 | en curso | estandar | `feature/F-074-ingesta-tablas-del-censo` |
 | F-070 | El MCP solo entiende lo que el diccionario le explica: auditar la calidad de las 103 fichas, no que existan | 7 | pendiente | estandar | `feature/F-070-auditoria-calidad-diccionario` |
 | F-034 | Power BI deja de leer de local y pasa a leer el datamart de Azure | 8 | pendiente | critico | `feature/F-034-powerbi-azure` |
 | F-057 | El coste de personal por obra: stg y mart sobre recursos, empleados y partes (raw por F-066) | 9 | pendiente | estandar | `feature/F-057-recursos-empleados-partes` |
@@ -98,7 +100,7 @@ La segunda mitad de lo que pidio el humano el 2026-09-09: «con eso vamos a crea
 
 ### F-074 · La ingesta que destapa el censo: 9 tablas que faltan, una carga incremental falsa y un campo excluido que hacia falta
 
-estado **pendiente** · prioridad 6 · rigor `estandar` · SDD no · rama `feature/F-074-ingesta-tablas-del-censo`
+estado **en curso** · prioridad 6 · rigor `estandar` · SDD no · rama `feature/F-074-ingesta-tablas-del-censo`
 
 Sale del censo de F-072 (2026-09-09), pedida por el humano el mismo dia: «ingiere todas las tablas que falten (las 9)». **Sin esto, la mitad de lo que el censo propone construir no se puede escribir.** LAS NUEVE, con su tamaño medido y por que bloquean: `auxhor` (60 filas) traduce el tipo de hora, y sin ella `hmores` es ilegible -no se puede separar una hora de albañil de un recibo de movil-; `auxrestip` (37) traduce la clase de recurso, que es lo que distingue una persona de un vehiculo o de un consumo; `cet` (40) nombra el centro de trabajo, **y su columna `cod`, que el documento de Sigrid declara, NO existe en la base**; `auxdpt` (7) nombra el departamento; `pro` (por medir) es el producto, que hoy **no tiene nombre en el datamart** pese a que lo referencian `dcopro` (99,9 %) y `dncpro` (95,4 %); `reshor` (8.949) es **el precio de coste por recurso y tipo de hora**, el multiplicador que a F-061 le falta para pasar de horas a euros; `emphis` (1.633 filas, 1.017 empleados, 1989-11-02 a 2026-06-01, tipo de contrato al 100 %) es **el unico sitio de Sigrid con historico laboral de verdad**; y `dcaprodes` (850.977) y `ctrprodes` (424.454) son **la trazabilidad linea a linea** de albaran -> factura y de contrato -> albaran/factura, la cadena que hoy el esquema `compras` aproxima por `linoriide`. DATO SENSIBLE: **`reshor` y `emphis` son datos de nomina** y entran, si entran, con la misma restriccion que `emp` y `res`, o sea declaradas en `PG_EXCLUDED_TABLES` (el mecanismo de F-068), no legibles por el rol del MCP. DOS ARREGLOS QUE VIENEN EN EL MISMO PAQUETE porque tocan el mismo fichero: (1) **`com`, `comlin` y `comprv` declaran `incremental_column: tiemod` y esa columna NO EXISTE en Sigrid** -error 42S22 verificado contra `INFORMATION_SCHEMA`-. `_source_tiemod` esta a NULL en las tres y el ETL **degrada en silencio** (`ingest_raw_step.py:279`): la declaracion es falsa y oculta que esas **287.673 filas se recargan enteras cada noche**. Quitar la declaracion no cambia el comportamiento, lo hace visible. (2) **`prvcer` excluye `tex` en la ingesta** y ese es el unico campo que dice de que es cada certificado, porque la tabla no tiene campo de tipo; si F-055 lo publica, hace falta. Y UNA LIMPIEZA: **`obrprv` tiene 0 filas en `raw` y 0 en Sigrid**, asi que se ingiere cada noche para nada; el censo la propone como candidata a salir de `tables_sigrid.yaml`, con el motivo escrito. ANTECEDENTE: esto es F-066 otra vez, y sus lecciones aplican enteras -el YAML tenia 17 entradas duplicadas que ningun test veia porque todos leian la ingesta como un `dict`; `CREATE TABLE IF NOT EXISTS` no reconcilia columnas y por eso existe `_reconciliar_columnas_raw`; y `check-raw-recuentos` es quien dice si la ingesta trajo lo que debia-. Fuente: `progress/explore_F-072_catalogo.md` §2 y §4.
 
