@@ -88,15 +88,54 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 139 objetos, 822 columnas y 47 fichas de
-consumo** tras las nueve fichas de `raw` que añade F-074, y el árbol declara
-**versión 17**. Lo publicado en `_meta` sigue siendo la **versión 16** (hash
+**El diccionario del árbol está en 139 objetos, 822 columnas y 54 fichas de
+consumo** —eran 47 hasta F-079, que sube los siete objetos de `stg` a la
+superficie de consulta; los 139 objetos incluyen las nueve fichas de `raw` que
+añade F-074— y el árbol declara **versión 18**. Lo publicado en `_meta` sigue
+siendo la **versión 16** (hash
 `9140b14dc991`, 2026-09-09 07:31 UTC, cobertura de columnas 100,0 %): publicar
 contra Azure es una escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test
 `test_f006_los_recuentos_de_current_son_los_de_hoy` existe justo para que estos
 recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de
 este fichero, los tres números se quedan.**
+
+## F-079 · todo lo publicado es consultable (implementación entregada)
+
+Rama `feature/F-079-todo-lo-publicado-es-consultable`, rigor `estandar`,
+`sdd=false`. Informe: `progress/impl_F-079.md`.
+
+Los **siete objetos de `stg`** que no son funciones —`plan_mensual`,
+`presupuesto`, `partidas`, `obras`, `fases`, `version_master_vigente`,
+`ambitos`— y la entrada del esquema `stg` en `00_global.yaml` pasan a
+`consumo_recomendado: true` y pierden su `motivo_no_consumo`. **Las cuatro
+advertencias de corrección que viajaban ahí dentro se mueven a la `descripcion`
+de su ficha** (versiones master, `stg.obras.activa`, la resolución GLOBAL de
+`version_master_vigente` y `stg.ambitos.uso_seguimiento`), y las dos primeras
+siguen llegando además por las reglas duras `R-VERSION-MASTER` y
+`R-OBRA-ACTIVA`. Las 11 funciones `fn_*` y los 9 objetos rotos, vacíos o de
+instrumentación **no se tocan**: ahí el aviso es un hecho, no una preferencia.
+
+**Diccionario del árbol en versión 18. Publicado en `_meta`: sigue la 16.**
+
+### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-079
+
+Las tres escriben contra Azure o dependen de que la escritura haya ocurrido, así
+que **ningún agente puede ejecutarlas**. En este orden:
+
+1. **Publicar el diccionario.**
+   `python main.py publicar-diccionario`
+   Sin esto el MCP sigue leyendo la versión 16 y `stg` le seguirá pareciendo
+   desaconsejado: *el repositorio en verde no es producción*.
+2. **Comprobar que lo publicado es lo del árbol.**
+   `python main.py check-diccionario`
+   Se espera **exit code 0**, biyección exacta y que la versión publicada pase a
+   ser la **18**.
+3. **Preguntar al MCP, sin explicarle nada en el prompt**, algo que solo `stg`
+   puede responder —el ámbito de certificación de una obra, que está en
+   `stg.presupuesto` y en ningún sitio aguas abajo— y comprobar que **enruta a
+   `stg`**. Es el criterio 6 de `acceptance` y es la única prueba de que el
+   cambio surtió efecto donde importa.
 
 ## VERIFICACIONES MANUAL (humano) PENDIENTES DE F-074
 
