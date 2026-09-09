@@ -20,24 +20,39 @@ espera a nadie.
 |---|---|---|---|
 | 4 | **F-072** | en curso, review pasada 2 | El censo semantico: que hay dentro de las 31 tablas que se ingieren cada noche y no consume nadie. Entregable: `progress/explore_F-072_catalogo.md` + cuatro informes de bloque. |
 | 5 | **F-073** | `pending` | Construir con lo que el censo encontro: tablas procesadas nuevas y enriquecimiento de las actuales, **sin borrar ni filtrar nada**. |
-| 6 | **F-074** | `pending` | La ingesta que el censo destapa: **9 tablas** que faltan, la carga incremental falsa de `com`/`comlin`/`comprv` y el `tex` excluido de `prvcer`. |
+| 6 | **F-074** | **en curso, implementacion entregada** | La ingesta que el censo destapa: **9 tablas** que faltan, la carga incremental falsa de `com`/`comlin`/`comprv` y el `tex` excluido de `prvcer`. Informe: `progress/impl_F-074.md`. |
 | 7 | **F-070** | `pending`, spec escrita | Auditar la **calidad** de las fichas del diccionario, acotada a los ocho esquemas que el MCP lee. |
 | 8 | **F-034** | `pending` | Power BI deja de leer de local y pasa a leer el datamart de Azure. |
 
 Detras, F-057 (9) y F-056 (10), las dos ya sin ingesta dentro porque F-066 se
 la llevo, y las dos **con su ficha corregida por el censo**.
 
-**LO QUE F-074 TIENE QUE DECIDIR DE FRENTE**, medido el 2026-09-09
-(`progress/explore_F-074_las_nueve.md`): **solo 3 de las 9 tienen `tiemod`**
-—`auxdpt`, `auxhor`, `auxrestip`—. Las otras seis **no tienen ninguna columna
-de tipo fecha**, asi que cargarian solo por `MAX(ide)` y **una fila modificada
-no volveria a bajar nunca**. Es el mismo agujero que el censo destapo en
-`com`/`comlin`/`comprv`, pero conocido de antemano. La propuesta del lider al
-humano: **recarga completa nocturna de las cuatro pequeñas** (`cet`, `pro`,
-`reshor`, `emphis`, unos 11 k registros) y **carga por `ide` con recarga
-completa periodica de las dos grandes** (`dcaprodes` 850.985 y `ctrprodes`
-424.475). Coste medido: **+155 MB** sobre los 25 GB actuales, con el disco en
-64, y ~90 s de HTTP para las dos grandes.
+**LO QUE F-074 DECIDIO, Y POR QUE NO ES LO QUE LA PROPUESTA DECIA.** La
+propuesta que llego al implementer era «recarga completa nocturna de las cuatro
+pequeñas (`cet`, `pro`, `reshor`, `emphis`) y carga por `ide` para las dos
+grandes», porque **solo 3 de las 9 tienen `tiemod`** --`auxdpt`, `auxhor`,
+`auxrestip`-- y se daba por hecho que las otras seis cargarian por `MAX(ide)` y
+que **una fila modificada en el origen no volveria a bajar nunca**.
+
+**Esa premisa es falsa, y esta comprobado en la fuente que gobierna el hecho.**
+El `CMD` del `Dockerfile` arranca `run-all --full`, o sea `TRUNCATE` y recarga
+entera de **todas** las tablas cada noche (`ingest_raw_step.py`, lineas 271-275).
+`incremental_column` **no es un interruptor de modo de carga**: lo unico que
+decide es si `copy_rows` rellena `_source_tiemod` con el sello del origen. La
+carga por `MAX(ide)` solo ocurre lanzando `ingest` a mano **sin** `--full`.
+
+Es el error exacto que F-006 cometio dos veces seguidas --su septima pasada lo
+derivo de `tables_sigrid.yaml` y su octava de `ingest_raw_step.py`, y las dos
+salieron falsas-- y para el que existe `tests/test_f006_fuente_que_gobierna.py`.
+
+**Consecuencia**: no hace falta recarga completa por tabla, el ETL no sabe
+hacerla y F-074 **no la inventa**. Las seis quedan con `incremental_column:
+null` **declarado y explicado en el propio YAML**, no solo en un informe.
+
+**Coste medido de las nueve**: 1.341.365 filas nuevas por noche, **+155 MB**
+estimados sobre los 25 GB actuales (disco de 64 GB, +0,6 %) y **+3 a 6 min** de
+ventana sobre las 3 h 45 de hoy. El 95 % de eso son `dcaprodes` (850.985) y
+`ctrprodes` (424.475).
 
 **F-052 sigue `blocked`** y su desbloqueo ya no depende de F-025. Ver su seccion
 abajo: es volver a su rama y relanzar `check-cobertura` alli.
@@ -62,13 +77,56 @@ alguien:
    numero del que depende entero el criterio de F-066.
 5. **F-065** mide el bloat sostenido tras siete noches acotadas (de F-025, T33).
 
-**El diccionario del árbol está en 130 objetos, 822 columnas y 47 fichas de
-consumo**, publicado en `_meta` como **versión 16** (hash `9140b14dc991`,
-2026-09-09 07:31 UTC, cobertura de columnas 100,0 %). El commit de cierre del 04
+**El diccionario del árbol está en 139 objetos, 822 columnas y 47 fichas de
+consumo** tras las nueve fichas de `raw` que añade F-074, y el árbol declara
+**versión 17**. Lo publicado en `_meta` sigue siendo la **versión 16** (hash
+`9140b14dc991`, 2026-09-09 07:31 UTC, cobertura de columnas 100,0 %): publicar
+contra Azure es una escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test
 `test_f006_los_recuentos_de_current_son_los_de_hoy` existe justo para que estos
 recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de
 este fichero, los tres números se quedan.**
+
+## VERIFICACIONES MANUAL (humano) PENDIENTES DE F-074
+
+Ninguna la puede ejecutar un agente: **todas escriben contra Azure o dependen de
+que la imagen nueva se haya desplegado y la nocturna haya corrido**. Van en este
+orden, y la 2 no significa nada antes de la 1.
+
+1. **Desplegar la imagen y dejar correr una nocturna.** Sin eso, las nueve
+   tablas no existen en `raw` y las comprobaciones de abajo miden el mundo de
+   ayer. Recordatorio de `progress/` : la nocturna llego a correr una imagen de
+   diez dias antes sin que nadie lo notara, asi que **comprobar el tag de la
+   imagen del job**, no solo que el repositorio este en verde.
+
+2. **Que la ingesta trajo lo que debia**, con las nueve dentro:
+
+       python main.py check-raw-recuentos
+
+   Tiene que salir con **codigo 0**. Es el criterio 4 de `acceptance`. Manda 65
+   consultas de recuento a Sigrid, nueve mas que antes.
+
+3. **Que el rol del MCP NO lee la nomina.** Es el criterio 3, y **no vale
+   suponerlo**: F-068 existe porque un `ALTER DEFAULT PRIVILEGES` reponia el
+   permiso en silencio. Contra el Postgres de Azure, en solo lectura:
+
+       SELECT table_name, grantee, privilege_type
+       FROM information_schema.table_privileges
+       WHERE table_schema = 'raw'
+         AND table_name IN ('emp','res','reshor','emphis')
+         AND grantee = 'mcp_sigrid_dm_ro';
+
+   El resultado correcto es **cero filas**. Si aparece alguna, la revocacion no
+   sobrevivio a la noche.
+
+4. **Que el diccionario del arbol casa con el catalogo real:**
+
+       python main.py check-diccionario
+
+5. **Publicar el diccionario** (version 17, con las nueve fichas nuevas). Es una
+   **escritura contra Azure**: la autoriza el humano, no un agente.
+
+       python main.py publicar-diccionario
 
 ## Estado del servidor · sigue en B2s TEMPORALMENTE
 

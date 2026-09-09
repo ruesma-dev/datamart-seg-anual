@@ -94,10 +94,11 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 56 tablas, y qué NO está ahí (F-066)
+### Qué se copia de Sigrid: 65 tablas, y qué NO está ahí (F-066, F-074)
 
-`config/tables_sigrid.yaml` declara **56 tablas** desde el 2026-09-06 (eran 31).
-Las 25 que entraron ese día vienen en tres grupos, y ninguna se supuso: todo lo
+`config/tables_sigrid.yaml` declara **65 tablas**: eran 31, F-066 las dejó en 56
+el 2026-09-06 y F-074 sumó nueve más el 2026-09-09.
+Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
 que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
 
 - **Personal** — `res` (2.610 recursos), `emp` (1.352 empleados), `hmo` (6.850
@@ -112,6 +113,54 @@ que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
   estaba), más condiciones (`ctrrec`, `dcfrec`, `dcarec`, `auxpag`, `auxefp`),
   firmas (`confir`, `deffir`), estados (`conest`) y proveedor (`conact`,
   `auxpronat`, `prvcer`, `prvobrpag`).
+
+**Las nueve de F-074** salen del censo de F-072, que encontró tablas del origen
+sin las cuales la mitad de lo que ese censo propone construir no se puede
+escribir. Medidas contra Sigrid el 2026-09-09, ninguna supuesta:
+
+- **Catálogos que traducen** — `auxhor` (60 conceptos de hora; sin ella `hmores`
+  es ilegible, porque el catálogo mezcla horas de verdad con «mes vehículo» y
+  «consumos teléfono»), `auxrestip` (37 tipos de recurso: de las 2.610 filas de
+  `res` solo 1.353 son personas), `auxdpt` (7 departamentos) y `cet` (40 centros
+  de trabajo). **La columna `cod` que el documento de Sigrid atribuye a `cet` no
+  existe en la base**: cualquier unión con ella va por `ide`.
+- **Maestro y nómina** — `pro` (55.179 artículos: hoy el producto **no tiene
+  nombre** en el datamart pese a que lo referencian `dcopro` al 99,9 % y
+  `dncpro` al 95,4 %), `reshor` (8.949 filas de precio de coste por recurso y
+  tipo de hora, el multiplicador que a F-061 le falta para pasar de horas a
+  euros) y `emphis` (1.633 filas, 1.017 empleados, de 1989 a 2026: el único
+  sitio de Sigrid con histórico laboral de verdad).
+- **Trazabilidad línea a línea** — `dcaprodes` (850.985 filas, albarán →
+  factura) y `ctrprodes` (424.475, contrato → albarán o factura). Son el 95 % de
+  lo que esta tanda añade, y sustituyen la aproximación por `linoriide` que hoy
+  hace el esquema `compras`.
+
+**Lo que cuesta**: 1.341.365 filas nuevas por noche, unos **155 MB** estimados
+sobre los 25 GB que ocupa hoy la base en un disco de 64 GB (+0,6 %), y unos
+**3 a 6 minutos** más de ventana sobre las 3 h 45 actuales, medidos a 10.000
+filas de `dcaprodes` en 0,7 s y de `ctrprodes` en 0,5 s por la pasarela. Cabe,
+pero el margen antes de la jornada ya era mínimo.
+
+**`reshor` y `emphis` son datos de nómina** y quedan fuera del alcance del rol
+del MCP por el mecanismo de F-068, como `emp` y `res`. De `cet` se excluyen en
+origen el DNI y el nombre del representante legal.
+
+**F-074 arregló además dos declaraciones falsas del mismo fichero**: `com`,
+`comlin` y `comprv` declaraban `incremental_column: tiemod` y **esa columna no
+existe en Sigrid** (error 42S22 contra `INFORMATION_SCHEMA`), con
+`_source_tiemod` a NULL en sus 287.673 filas; y `prvcer` excluía `tex`, que es
+el único campo que dice de qué es cada certificado porque la tabla no tiene
+campo de tipo. `obrprv` **se queda** pese a tener 0 filas: dos SQL de `maestro/`
+construyen el vínculo obra-proveedor por otra vía precisamente porque está
+vacía, y `check-raw-recuentos` es lo único que diría que ha dejado de estarlo.
+
+**`incremental_column` no es un interruptor de modo de carga**, y confundirlo lo
+ha sido dos veces: lo único que decide es si `copy_rows` rellena
+`_source_tiemod`. Quién decide cómo se carga es el `CMD` del `Dockerfile`, que
+arranca `run-all --full`, o sea `TRUNCATE` y recarga entera de **todas** las
+tablas cada noche. Por eso «esta tabla no tiene `tiemod`» significa «su fila de
+`raw` no lleva sello de origen», y no «lo modificado no vuelve a bajar»: eso
+solo es cierto lanzando `ingest` a mano sin `--full`.
 
 **El mapa de `con.tip`**, verificado por recuento y necesario para leer `raw`:
 5 proveedor, 12 oferta de compra, 14 albarán, 15 factura, 16 cuenta del plan,

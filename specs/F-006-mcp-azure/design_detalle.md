@@ -68,6 +68,13 @@ infraestructura.
 > 25 fichas nuevas de `raw`, así que el inventario pasa a **130 objetos**.
 > Ninguna es superficie de consumo y ninguna documenta columnas (DA-2), así
 > que la cobertura de columnas no se mueve: siguen siendo 822.
+>
+> **Enmienda del 2026-09-09 (F-074).** La ingesta pasa de 56 a 65 tablas --las
+> nueve que destapo el censo de F-072: los catalogos que traducen personal y
+> horas, el maestro de articulos y los dos desgloses de trazabilidad-- y con
+> ellas entran 9 fichas nuevas de `raw`, asi que el inventario pasa a **139
+> objetos**. Ninguna es superficie de consumo y ninguna documenta columnas
+> (DA-2), asi que la cobertura de columnas sigue sin moverse: 822.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
