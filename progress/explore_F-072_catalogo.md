@@ -135,3 +135,40 @@ dos de trazabilidad suman 1,27 M de filas y merecen decisión aparte.
 9. **El mayor contable** (`apu`, `asi`, `cua`), solo dentro de F-056.
 10. **Las firmas** (`confir` + `deffir`), publicando **solo** el circuito de
     comparativos: el de facturas nunca se usó y el de obras murió en 2020.
+
+## 6 · Los hallazgos heredados de F-071, ya medidos
+
+F-071 se retiró el 2026-09-09 sin implementar nada, y su ficha decía que sus
+mediciones pasaban a alimentar este censo. **Faltaba medirlas, y este es el
+hueco que el review de la pasada 1 destapó.** Su spec conservada, con banner de
+RETIRADA, está en `specs/F-071-obras-sin-datos/`.
+
+**Lo que F-071 dejó medido y sigue valiendo** (`design.md` §1 de esa carpeta):
+
+- **De los ocho campos de dirección de `raw.obr`, solo cuatro son la dirección
+  de la obra**: `dir1`, `dir2`, `dircpo` y `dir`. **`diride` es el director de
+  obra**, **`perdir` su persona de contacto** y **`entdiride` la dirección del
+  cliente**. Publicar los tres como dirección habría metido ruido justo donde
+  se quiere quitarlo.
+- **Los dos ejes de agrupación que el humano pidió no estaban en esa lista de
+  ocho**: **municipio** y **provincia** viven en `raw.auxmun` y `raw.auxpro`, a
+  través de `obr.munide` y `obr.proide`.
+- Las 472.890 filas huérfanas de `stg.presupuesto` (390.028) y
+  `stg.plan_mensual` (82.862) **se quedan**: el humano descartó borrar, y sin
+  acotar el censo no se generan más.
+
+**Y LO QUE FALTABA MEDIR, medido ahora y cambia lo que F-073 puede prometer:**
+
+| sobre las 921 fichas de `maestro.obras` | informadas | % |
+|---|---|---|
+| `munide` (municipio) | 294 | **31,9 %** |
+| `dir1` (primera línea de dirección) | 305 | **33,1 %** |
+
+**A la pregunta «dónde está la obra X», para dos de cada tres obras la
+respuesta correcta es «no consta».** Eso no invalida publicar la dirección
+—para un tercio de las obras es información que hoy no existe en ninguna capa
+de consumo, y el conector no puede leer `raw`— pero **obliga a que la ficha del
+diccionario diga el porcentaje informado**, y a que F-073 no prometa una
+cobertura que no tiene. Es exactamente el riesgo que la spec retirada de F-071
+había fichado como umbral de publicación, y ahora está resuelto con el número
+delante.
