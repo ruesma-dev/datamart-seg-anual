@@ -116,7 +116,9 @@ siguen llegando además por las reglas duras `R-VERSION-MASTER` y
 `R-OBRA-ACTIVA`. Las 11 funciones `fn_*` y los 9 objetos rotos, vacíos o de
 instrumentación **no se tocan**: ahí el aviso es un hecho, no una preferencia.
 
-**Diccionario del árbol en versión 18. Publicado en `_meta`: sigue la 16.**
+**Diccionario del árbol en versión 18, `hash_fuente` `4af4c3bb60d4`. Publicado
+en `_meta`: sigue la 16, hash `9140b14dc991`.** Ese par de hashes es lo que
+distingue «publicado» de «publicado de verdad» después del paso 1 de abajo.
 
 ### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-079
 

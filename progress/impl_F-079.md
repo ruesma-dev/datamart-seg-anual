@@ -192,9 +192,9 @@ ejecutarlas**, y sin la 1 la feature no surte efecto:
 | Evidencia | Número real |
 |---|---|
 | Suite completa · `init.sh` de precondición | **4162 passed, 168 skipped** en **846,37 s** |
-| Suite completa · `init.sh` de cierre | INIT-CIERRE |
+| Suite completa · `init.sh` de cierre | **4215 passed, 168 skipped** en **524,16 s**, exit 0 |
 | Tests propios de F-079 | **53 passed** en 24,34 s (19 en rojo en fase RED) |
-| Cobertura de las líneas cambiadas | COBERTURA-CIERRE |
+| Cobertura de las líneas cambiadas | **[OK] 93,6 %** (788/842, umbral 80 %, nivel `estandar`) |
 | Mutantes generados / evaluados | **288 / 20** (muestreo `estandar`, semilla `20260820`) |
 | Muertos / supervivientes / timeouts / sin veredicto | **12 / 8 / 0 / 0** |
 | **Workers** / tiempo total de la campaña | **4** / **2239,0 s** |
