@@ -117,7 +117,16 @@ DEFAULT_CONSUMPTION_SCHEMAS = (
 # tabla. Por eso el mecanismo es conceder y REVOCAR después, en la misma
 # tanda, más quitar el `ALTER DEFAULT PRIVILEGES` de `raw` para que una
 # tabla recreada no nazca legible. Ver `postgres/grants.py`.
-DEFAULT_EXCLUDED_TABLES = "raw.emp,raw.res"
+# F-074 (2026-09-09) añade `raw.reshor` y `raw.emphis` a la misma lista y
+# por el mismo motivo: son datos de NÓMINA. `raw.reshor` es el precio de
+# coste por recurso y tipo de hora —8.949 filas, 2.036 con precio distinto
+# de cero, o sea lo que cobra cada persona—, y `raw.emphis` el histórico de
+# contrato de 1.017 empleados, de 1989 a 2026, con el tipo de contrato al
+# 100 %. Entran a `raw` porque el datamart las necesita para pasar de horas
+# a euros (F-061) y para saber quién estaba de alta cuándo; no entran al
+# alcance del MCP porque hoy no sabe quién pregunta. Mismo tapón TEMPORAL
+# y misma reversión ya decidida que `emp` y `res`.
+DEFAULT_EXCLUDED_TABLES = "raw.emp,raw.res,raw.reshor,raw.emphis"
 
 AUTH_MODES = ("password", "entra")
 

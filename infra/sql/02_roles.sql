@@ -144,6 +144,13 @@ $$;
 --    mientras el MCP no sepa QUIÉN pregunta. Quien lo lea dentro de seis
 --    meses, la pregunta correcta es «¿ya hay control por usuario?».
 --
+--    F-074 (2026-09-09) añade dos más por el mismo motivo y con el mismo
+--    mecanismo: `raw.reshor` es el precio de coste por recurso y tipo de hora
+--    (8.949 filas, 2.036 con precio distinto de cero) y `raw.emphis` el
+--    histórico de contrato de 1.017 empleados (1.633 filas, de 1989 a 2026).
+--    Son datos de nómina. Las cuatro caen el mismo día que el MCP tenga
+--    control por usuario, no antes.
+--
 --    QUÉ ES CADA UNA. `raw.emp` son 1.352 empleados con DNI, número de la
 --    Seguridad Social, cuenta bancaria, domicilio, teléfonos y credenciales
 --    del portal. `raw.res` son 2.610 recursos con el NIF de la persona en
@@ -176,7 +183,7 @@ DO $$
 DECLARE
     objeto text;
 BEGIN
-    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res']
+    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res', 'raw.reshor', 'raw.emphis']
     LOOP
         -- to_regclass devuelve NULL en vez de fallar si la tabla no existe:
         -- este fichero se ejecuta también sobre una base recién creada, antes
@@ -196,7 +203,7 @@ DECLARE
     objeto text;
     esquema text;
 BEGIN
-    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res']
+    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res', 'raw.reshor', 'raw.emphis']
     LOOP
         IF to_regclass(objeto) IS NOT NULL THEN
             EXECUTE format(
@@ -220,7 +227,7 @@ BEGIN
         -- El alias NO puede llamarse `objeto`: plpgsql daría «column
         -- reference is ambiguous» contra la variable de arriba.
         SELECT DISTINCT split_part(excluida, '.', 1)
-        FROM unnest(ARRAY['raw.emp', 'raw.res']) AS excluida
+        FROM unnest(ARRAY['raw.emp', 'raw.res', 'raw.reshor', 'raw.emphis']) AS excluida
     LOOP
         IF to_regnamespace(esquema) IS NOT NULL THEN
             EXECUTE format(
