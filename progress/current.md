@@ -76,8 +76,8 @@ alguien:
    division. Uno de los seis sitios ciegos es `TOLERANCIA_DERIVA_PCT = 0.05`, el
    numero del que depende entero el criterio de F-066.
 5. **F-065** mide el bloat sostenido tras siete noches acotadas (de F-025, T33).
-6. **Un superviviente de mutacion de F-025, aceptado y sin fichar todavia**
-   (hallado por F-074, pasada 2): `main.py:543`, el `is_flag` de
+6. **Un superviviente de mutacion de F-025, aceptado y YA FICHADO como
+   **F-077** (prioridad 12, commit `7d2d8b9`), hallado por F-074: `main.py:543`, el `is_flag` de
    `--reconstruir-todo` en `run-all`. Sin el, click infiere `BOOL` y
    `run-all --reconstruir-todo` sale con **exit 2** —medido—; la nocturna
    (`run-all --full`) y el rebuild del domingo por antiguedad **no se enteran**.
@@ -85,7 +85,8 @@ alguien:
    comprueban que la cadena salga en `--help` y que el callback la cablee, pero
    **no invocan la opcion por el parser de click**. El arreglo, tres lineas, esta
    escrito en `progress/mutacion_F-074.md` §8. **F-074 no lo tapa: no es su
-   codigo ni su fichero de tests.** Decidir si se ficha o si entra en F-074.
+   codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
+   reprodujo las cinco invocaciones de click antes de aprobar.
 
 **El diccionario del árbol está en 139 objetos, 822 columnas y 47 fichas de
 consumo** tras las nueve fichas de `raw` que añade F-074, y el árbol declara

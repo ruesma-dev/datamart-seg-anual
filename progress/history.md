@@ -809,3 +809,49 @@ Deja abierto: **F-073** (construir), **F-074** (la ingesta de las nueve) y
 **F-075**, el defecto del arnés que el reviewer destapó: `harness.alcance`
 diffea contra una base vieja, así que **las dos puertas automáticas miden
 código de otras features**, y el fallo puede ir en la dirección mala.
+
+---
+
+## F-074 · La ingesta que destapó el censo: nueve tablas, una carga incremental falsa y un campo excluido — `done` (2026-09-09)
+
+Rama `feature/F-074-ingesta-tablas-del-censo`. Rigor `estandar`. Veredicto
+**APPROVED** en la pasada 2, `progress/review_F-074.md`.
+
+Da de alta nueve tablas de Sigrid que el censo de F-072 destapó y sin las
+cuales media propuesta no se podía escribir: `auxhor`, `auxrestip`, `cet`,
+`auxdpt`, `pro`, `reshor`, `emphis`, `dcaprodes` y `ctrprodes`. Las dos de
+nómina, `reshor` y `emphis`, quedan **fuera del alcance del rol del MCP** por
+el mecanismo de F-068, con el `REVOKE` posterior al `GRANT` verificado por el
+reviewer.
+
+**El hallazgo del implementer, que corrige al líder.** La feature se ordenó
+sobre una premisa falsa: que seis de las nueve cargarían solo altas por no
+tener `tiemod`, y que una fila modificada no volvería a bajar. **No es así.**
+El `CMD` del `Dockerfile` arranca `run-all --full`, o sea `TRUNCATE` y recarga
+entera de **todas** las tablas cada noche; `incremental_column` **no decide el
+modo de carga**, solo si se rellena `_source_tiemod`. No había agujero que
+tapar, y no se inventó ningún mecanismo para taparlo. Corregido por escrito en
+el YAML, en `ARCHITECTURE.md`, en `current.md` y en el §4 del catálogo de
+F-072, que lo insinuaba.
+
+**Dos arreglos y una limpieza** en el mismo paquete: `com`, `comlin` y `comprv`
+dejan de declarar una `incremental_column` que no existe en Sigrid; `prvcer`
+deja de excluir `tex`, el único campo que dice de qué es cada certificado; y
+`obrprv`, con 0 filas en origen, queda decidida con su motivo escrito.
+
+**La campaña de mutación, y la lección de método.** El implementer declaró un
+superviviente que no era: dijo `--full` y era `--reconstruir-todo`. **El
+reviewer reprodujo la muestra con la semilla declarada y el mutante de `--full`
+ni siquiera estaba en ella.** Devuelto, el implementer lo midió en vez de
+suponerlo: sin `is_flag`, click infiere `BOOL` y `run-all --reconstruir-todo`
+sale con exit 2, mientras la nocturna no se entera. Lo dejan vivo sus propios
+tests, que comprueban el `--help` por substring y el cableado por `getsource`
+pero **nunca invocan la opción por el parser**. Es código de F-025, ya cerrada,
+así que **no se tapó aquí**: salió a ficha propia, **F-077**.
+
+`bash harness/init.sh` en verde con la ejecución del propio reviewer: exit 0,
+**4.162 passed**, 168 skipped, 523 s.
+
+Deja abierto: **F-077** (el flag sin test por el parser) y el aviso, ya fichado
+como **F-075**, de que la puerta de cobertura sigue midiendo 842 líneas de un
+alcance que no es el de esta feature.
