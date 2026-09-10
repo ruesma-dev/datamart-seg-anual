@@ -472,3 +472,168 @@ def test_f073_r11_la_cabecera_ya_no_afirma_que_las_obras_no_tienen_direccion() -
     cabecera = _sql(RUTA_OBRAS).lower()
     assert "las obras no tienen dirección" not in cabecera
     assert "sin dirección" not in cabecera
+
+
+# ===========================================================================
+# `compras.formas_pago` (04) · R21 y R22
+# ===========================================================================
+
+RUTA_FORMAS_PAGO = DIRECTORIO_SQL / "compras" / "04_formas_pago.sql"
+
+
+def test_f073_r21_la_vista_de_formas_de_pago_se_crea_como_vista() -> None:
+    assert "CREATE OR REPLACE VIEW compras.formas_pago" in _compacto(
+        _sql(RUTA_FORMAS_PAGO)
+    )
+
+
+@pytest.mark.parametrize(
+    "columna",
+    [
+        "forma_pago_id",
+        "codigo",
+        "nombre",
+        "plazo_formula",
+        "medio_pago_id",
+        "medio_pago",
+        "clase_medio",
+    ],
+)
+def test_f073_r21_expone_codigo_nombre_medio_y_clase(columna: str) -> None:
+    assert columna in _columnas_publicadas(RUTA_FORMAS_PAGO), (
+        f"compras.formas_pago debe exponer {columna} (R21)"
+    )
+
+
+def test_f073_r21_resuelve_el_medio_desde_auxefp_sin_perder_filas() -> None:
+    """69 formas de pago y 10 medios: el `LEFT JOIN` conserva las 69."""
+    compacto = _compacto(_sql(RUTA_FORMAS_PAGO))
+    assert "FROM raw.auxpag" in compacto
+    assert "LEFT JOIN raw.auxefp" in compacto, (
+        "con JOIN se perderían las formas de pago sin medio (R21)"
+    )
+    assert "efeide" in compacto, "auxpag.efeide es la clave hacia auxefp (R21)"
+
+
+def test_f073_r21_el_nombre_del_medio_sale_de_res_y_no_de_est() -> None:
+    """MEDIDO en la T1: `auxefp.est` está vacío o a NULL en las 10 filas.
+
+    `config/tables_sigrid.yaml` decía que el nombre del medio era `est`; es
+    falso, y el que trae CHEQUE, EFECTIVO o TRANSFERENCIA es `res`. Este test
+    existe porque el error estaba escrito en el árbol y parecía la fuente buena.
+    """
+    compacto = _compacto(_sql(RUTA_FORMAS_PAGO))
+    assert re.search(r"\w+\.res\s+AS medio_pago", compacto), (
+        "el nombre del medio de pago es auxefp.res (R21, medido en T1)"
+    )
+    assert not re.search(r"\w+\.est\s+AS medio_pago", compacto), (
+        "auxefp.est está vacío en las 10 filas: publicarlo daría una columna "
+        "vacía con nombre convincente (R21)"
+    )
+
+
+def test_f073_r21_no_filtra_ninguna_de_las_69_formas_de_pago() -> None:
+    compacto = _compacto(_sql(RUTA_FORMAS_PAGO))
+    cuerpo = _troceado_en_profundidad_cero(
+        compacto[compacto.index("CREATE OR REPLACE VIEW compras.formas_pago") :], ";"
+    )[0]
+    assert "WHERE" not in cuerpo, "las 69 se publican enteras, bajas incluidas (R21)"
+
+
+def test_f073_r22_el_plazo_se_publica_verbatim() -> None:
+    """`30 450R` es un valor REAL del catálogo: no es un número de días."""
+    compacto = _compacto(_sql(RUTA_FORMAS_PAGO))
+    assert re.search(r"\w+\.formul\s+AS plazo_formula", compacto), (
+        "auxpag.formul se publica tal cual, sin transformar (R22)"
+    )
+    ejecutable = _sin_comentarios(_sql(RUTA_FORMAS_PAGO))
+    assert "dias_pago" not in ejecutable, (
+        "publicar un dias_pago numérico sería inventar precisión (R22, DA-5)"
+    )
+    for parseo in ("::int", "::numeric", "to_number", "regexp_", "CAST("):
+        assert parseo not in ejecutable, (
+            f"{parseo} sobre formul lo estaría interpretando, y no se puede (R22)"
+        )
+
+
+def test_f073_r22_el_comment_avisa_de_que_el_plazo_no_es_un_numero() -> None:
+    comentario = _sql(RUTA_FORMAS_PAGO)
+    comentario = comentario[comentario.index("COMMENT ON VIEW compras.formas_pago") :]
+    assert "no es" in comentario.lower() and "dias" in comentario.lower(), (
+        "el COMMENT debe decir que plazo_formula NO es un número de días (R22)"
+    )
+
+
+# ===========================================================================
+# Lo que F-073 NO puede tocar · R23, R24, R25 y R26
+# ===========================================================================
+#
+# Tripwires por hash, con el mismo idioma que `tests/test_f042_sql.py`: si el
+# fichero cambia, la suite lo dice y obliga a que el cambio sea deliberado y de
+# otra feature. Recalcular un hash es una línea; hacerlo sin querer, imposible.
+
+#: `sql/compras/01_documentos.sql` tal como está al entrar F-073. Lo reescribe
+#: entera **F-067**, y es ahí donde se recalcula este hash, no aquí (R23).
+HASH_01_DOCUMENTOS = "0a3ab862b18a95f8f896ed0f982b78e3af012e7d815b100f86b05094e093f890"
+
+#: Los dos ficheros del SELLO. Tocar una coma fuerza la reconstrucción completa
+#: de las 921 obras la noche siguiente (R25).
+HASH_06_PRESUPUESTO = "4d89e4b03b99738ace601092cf07764663a9fbc1a1e9761bcca1d0242178270d"
+HASH_08_PLAN_MENSUAL = "86f388ed3962932970aae234a55dcdd3730a9f47b83ebbd00f4188556e966361"
+
+
+def _hash(ruta: Path) -> str:
+    import hashlib
+
+    texto = ruta.read_bytes().decode("utf-8").replace("\r\n", "\n")
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def test_f073_r23_no_toca_el_sql_de_documentos_de_compra() -> None:
+    """El cableado de estado y forma de pago a `compras.contratos` es F-067."""
+    assert _hash(DIRECTORIO_SQL / "compras" / "01_documentos.sql") == (
+        HASH_01_DOCUMENTOS
+    ), (
+        "F-073 publica la DIMENSIÓN y no hace el cableado: si este fichero "
+        "cambia es porque lo está tocando F-067, y el hash se recalcula allí "
+        "(R23)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("fichero", "esperado"),
+    [
+        ("06_presupuesto.sql", "HASH_06_PRESUPUESTO"),
+        ("08_plan_mensual.sql", "HASH_08_PLAN_MENSUAL"),
+    ],
+)
+def test_f073_r25_no_toca_los_ficheros_del_sello(fichero: str, esperado: str) -> None:
+    """Cambiar una coma aquí reconstruye las 921 obras la noche siguiente."""
+    assert _hash(DIRECTORIO_SQL / "stg" / fichero) == globals()[esperado], (
+        f"{fichero} es del SELLO (FICHEROS_DEL_SELLO en build_stg_step.py). "
+        "F-073 lo LEE desde una vista, y leer no cambia su texto (R25)"
+    )
+
+
+def test_f073_r26_no_toca_el_desempate_de_stg_obras() -> None:
+    """El `rn = 1` de `03_obras.sql` es de F-053."""
+    texto = _sql(DIRECTORIO_SQL / "stg" / "03_obras.sql")
+    assert "rn = 1" in texto, "el desempate de F-053 sigue donde estaba (R26)"
+
+
+@pytest.mark.parametrize(
+    "ruta",
+    [
+        "maestro/01_obras.sql",
+        "maestro/04_centros_coste.sql",
+        "maestro/05_estados_documento.sql",
+        "compras/04_formas_pago.sql",
+    ],
+)
+def test_f073_r24_ningun_sql_de_la_feature_borra_ni_vacia_nada(ruta: str) -> None:
+    """R24: solo se AÑADE información. Las 472.890 huérfanas siguen donde están."""
+    ejecutable = _sin_comentarios(_sql(DIRECTORIO_SQL / ruta)).upper()
+    for verbo in ("DELETE ", "TRUNCATE ", "DROP ", "INSERT ", "UPDATE "):
+        assert verbo not in ejecutable, (
+            f"F-073 no escribe: {ruta} contiene {verbo.strip()} (R24)"
+        )
