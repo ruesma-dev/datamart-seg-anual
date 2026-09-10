@@ -9,10 +9,105 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-073 · IMPLEMENTACION ENTREGADA (2026-09-10)
+
+Rama `feature/F-073-tablas-nuevas-y-enriquecimiento`, rigor `estandar`,
+`sdd=true`. Informe: `progress/impl_F-073.md`. Las 21 tareas de `tasks.md`,
+hechas y con un commit cada una.
+
+**QUE SE PUBLICA**: `maestro.centros_coste` (el puente centro de coste -> obra,
+804 filas y 683 con obra), `maestro.estados_documento` (las 193 de `conest`),
+`compras.formas_pago` (las 69 de `auxpag` con su medio) y `maestro.obras` con
+once columnas nuevas -direccion, municipio y provincia con su id, el estado ya
+traducido y las dos marcas-. **No se toca `compras.contratos` ni
+`compras.facturas`**: ese cableado es F-067 y F-080.
+
+**LO QUE HAY QUE SABER Y NO SE VE EN EL DIFF:**
+
+* `build_maestros` **ahora depende de `build_stg`**. Si `build_stg` falla, el
+  orquestador marca `build_maestros` como SKIPPED, cosa que antes no pasaba. Es
+  asumible porque los seis objetos de `maestro` son vistas.
+* **La direccion viene informada en un tercio de las obras** (dir1 33,1 %,
+  municipio 31,9 %, provincia 33,2 %, dir2 5,1 %). No es un fallo del ETL: la
+  ficha lo declara y «no consta» es la respuesta correcta para dos de cada tres.
+* `tiene_seguimiento` se mide en `stg.plan_mensual` y es **superconjunto** del
+  hecho: 368 con plan frente a 349 con filas en `mart.fact_seguimiento_mensual`,
+  **19 de diferencia y ninguna al reves**.
+* **`config/tables_sigrid.yaml` se equivoca** al decir que el nombre del medio de
+  pago es `auxefp.est`: `est` viene vacio o nulo en las 10 filas y el nombre
+  esta en `res`. Medido el 2026-09-10. **No se corrige el YAML en esta feature**
+  -no es su alcance, y cambiarlo toca la ingesta-, pero la ficha de
+  `compras.formas_pago` lo deja escrito.
+
+### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-073
+
+Ningun agente las ejecuta: las tres primeras dependen de que el build haya
+corrido contra Azure, y publicar es una escritura. **En este orden**, y la 2 no
+significa nada antes de la 1.
+
+1. **Construir los objetos nuevos.** Sin esto no existen en la base y todo lo
+   de abajo mide el mundo de ayer.
+
+       python main.py build-maestros
+       python main.py build-compras
+
+2. **Los recuentos de las tres vistas nuevas**, en solo lectura. Los valores
+   esperados estan medidos contra `raw` el 2026-09-10 (T1 y T2 del informe):
+
+       SELECT COUNT(*) AS filas,
+              COUNT(DISTINCT centro_coste_id) AS centros,
+              COUNT(obra_id) AS con_obra
+       FROM maestro.centros_coste;
+       -- esperado: 804 / 804 / 683
+
+       SELECT COUNT(*) FROM maestro.estados_documento;   -- esperado: 193
+       SELECT COUNT(*) FROM compras.formas_pago;         -- esperado: 69
+       SELECT COUNT(*) FROM maestro.obras;               -- esperado: 921
+
+3. **Que `maestro.obras` no ha perdido ninguna columna** (R18). Las diez de
+   siempre siguen, y ahora son 21:
+
+       SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'maestro' AND table_name = 'obras'
+       ORDER BY ordinal_position;
+       -- esperado: 21 columnas, y entre ellas obra_id, codigo_obra,
+       -- nombre_obra, estado_id, fecha_alta, fecha_baja, es_activa,
+       -- cliente_id, codigo_cliente y nombre_cliente
+
+4. **Las dos puertas del diccionario:**
+
+       python main.py check-declarados
+       python main.py check-diccionario
+
+   Las dos con **codigo 0**. `check-diccionario` tiene que ver **142 fichas y
+   142 objetos**, biyeccion exacta.
+
+5. **Publicar el diccionario (version 19, hash `7f5e890fd5f7`).** Es una
+   **escritura contra Azure**: la autoriza el humano, no un agente. Lo publicado
+   hoy es la version 18.
+
+       python main.py publicar-diccionario
+
+6. **LA PRUEBA DE QUE EL PUENTE RESUELVE F-045.** Es la razon por la que
+   `maestro.centros_coste` existe, y es solo lectura. `retenciones.movimientos`
+   trae 261 valores distintos en `obra_id` que en realidad son centros de coste:
+
+       SELECT COUNT(DISTINCT m.obra_id) AS valores,
+              COUNT(DISTINCT c.centro_coste_id) AS casan
+       FROM retenciones.movimientos m
+       LEFT JOIN maestro.centros_coste c ON c.centro_coste_id = m.obra_id;
+       -- esperado: 261 / 261
+
+   **F-073 no toca `sql/retenciones/**`**: arreglar `movimientos.obra_id` con
+   este puente es F-045. Aqui solo se comprueba que el puente le sirve.
+
 ## F-080 · NACE EL 2026-09-10 DEL CORREO DE JUAN ROMERO (lo mas nuevo)
 
 Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, prioridad 7,
-rigor `estandar`, `sdd=true`. Fichada en `4871f89`. **Spec en curso.**
+rigor `estandar`, `sdd=true`. Fichada en `4871f89`. **SPEC ESCRITA el
+2026-09-10 en `specs/F-080-vencimientos-forma-pago-y-texto-factura/`
+(148 / 217 / 29 tareas). ESPERA APROBACION DEL HUMANO: es la PARADA 1, no se
+escribe una linea de codigo hasta entonces.**
 
 Correo de Juan Romero (Dir. Admon y Control de Costes) del 2026-09-10,
 «PETICIONES (TEXTO Y VENCIMIENTOS/FORMAS PAGO)», con dos capturas de la ficha
@@ -57,6 +152,49 @@ riesgos de datos, ignoralo»).
 **FRONTERA**: la cartera completa de cobros y pagos sigue siendo F-037 fase 1.
 Deuda declarada: cuando llegue F-037 se decide si absorbe el objeto de
 vencimientos o lo deja como vista suya.
+
+### Lo que decide la spec de F-080, y las cinco decisiones abiertas
+
+**Cinco objetos nuevos en `compras`**, todos detras de `04_formas_pago` de
+F-073: `vencimientos` (tabla, PK `vencimiento_id`, una fila por efecto de
+`raw.pag` de una factura de compra), `v_facturas_pago` (vista, una fila por
+factura, con la forma de pago resuelta contra `compras.formas_pago` y el
+resumen de efectos), `v_control_forma_pago` (vista, **una fila por par
+factura-contrato**, con el mismo enlace que ya usa `v_pbi_contrato_consumo`),
+`documento_texto` (tabla, el memo integro de `tip` 15 y 44) y
+`v_documento_comentarios` (vista, un comentario por fila). Tres ficheros SQL
+nuevos: `05_vencimientos.sql`, `06_pago_factura.sql`, `07_texto.sql`. **No se
+tocan `01_documentos.sql`, `02_fact_linea.sql` ni `03_views.sql`**, que son de
+F-067.
+
+**El parseo del memo va en SQL**, con los dos literales medidos escritos una
+sola vez en `etl_sigrid/domain/texto_comentarios.py` como oraculo ejecutable
+(patron F-052: `arbol_partidas.py` + `test_f052_sql.py`). Lo que no casa con el
+sello se publica igual, entero, con `sello_reconocido` en falso.
+
+**El coste de ventana se mide en dos tiempos antes de desplegar**: medicion A
+en solo lectura contra Sigrid (segundos y bytes por pagina de `con` con y sin
+`tex`, a 10.000 y 5.000 filas) y medicion B, MANUAL, comparando la fila
+`ingest_raw.con` de `_meta.etl_runs` antes y despues.
+
+**LAS CINCO DECISIONES ABIERTAS** (detalle en el cierre de `tasks.md`):
+
+1. **Presupuesto de ventana nocturna**: no existe escrito. La spec propone
+   **4 h** (hoy 3 h 25 min, antes de F-025 4 h 52). Es el numero con el que se
+   juzga si hay que bajar el `page_size` de `con`.
+2. **Corte de rendimiento de la vista de comentarios**: la spec propone **30 s**
+   para un recorrido completo antes de materializarla como tabla.
+3. **`codigo_efecto` (`FR26/06051_01`)**: no consta que Sigrid lo almacene. Se
+   deriva con `row_number()` por `pag.ide`, y **solo se publica si reproduce**
+   los codigos de la captura del correo; si no, se publica solo el ordinal y
+   hay que decirselo a Juan Romero.
+4. **F-080 va DETRAS de F-073**: `compras.formas_pago` es precondicion dura y,
+   si no esta, la feature se marca `blocked` en vez de duplicar la dimension.
+   Por eso a F-080 le toca la **version 20** del diccionario (F-073 reserva la
+   19). Adelantarla obliga a reabrir las dos cosas.
+5. **El banco de la rejilla**: `auxban` da nombre a banco y sucursal, pero la
+   tabla de previsiones/remesas bancarias sigue sin identificar. Conviene
+   decirselo a Administracion con la entrega.
 
 ## LO PRIMERO AL RETOMAR (sesion reiniciada el 2026-09-10)
 
@@ -215,13 +353,14 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 139 objetos, 822 columnas y 54 fichas de
-consumo** —eran 47 hasta F-079, que sube los siete objetos de `stg` a la
-superficie de consulta; los 139 objetos incluyen las nueve fichas de `raw` que
-añade F-074— y el árbol declara **versión 18**. Lo publicado en `_meta` sigue
-siendo la **versión 16** (hash
-`9140b14dc991`, 2026-09-09 07:31 UTC, cobertura de columnas 100,0 %): publicar
-contra Azure es una escritura y la autoriza el humano, no un agente. El commit de cierre del 04
+**El diccionario del árbol está en 142 objetos, 852 columnas y 57 fichas de
+consumo** —eran 139 / 822 / 54 hasta F-073, que añade `maestro.centros_coste`,
+`maestro.estados_documento` y `compras.formas_pago` (19 columnas) más las once
+columnas nuevas de `maestro.obras`; y eran 47 fichas de consumo hasta F-079, que
+subió los siete objetos de `stg` a la superficie de consulta— y el árbol declara
+**versión 19** (hash `7f5e890fd5f7`). Lo publicado en `_meta` es la **versión
+18** (hash `4af4c3bb60d4`, publicada el 2026-09-10): publicar contra Azure es una
+escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test
 `test_f006_los_recuentos_de_current_son_los_de_hoy` existe justo para que estos
 recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de
