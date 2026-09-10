@@ -72,7 +72,7 @@ def test_f073_r1_la_vista_de_centros_de_coste_se_crea_como_vista() -> None:
     ],
 )
 def test_f073_r1_expone_las_siete_columnas_del_puente(columna: str) -> None:
-    assert f"AS {columna}" in _compacto(_sql(RUTA_CENTROS)), (
+    assert re.search(rf"AS {columna}\b", _compacto(_sql(RUTA_CENTROS))), (
         f"maestro.centros_coste debe exponer {columna} (R1)"
     )
 
@@ -172,4 +172,58 @@ def test_f073_r5_el_lateral_no_puede_multiplicar_filas() -> None:
     )
     assert "ORDER BY" in lateral, (
         "LIMIT 1 sin ORDER BY declarado elige una fila al azar (R5)"
+    )
+
+
+# ===========================================================================
+# `maestro.estados_documento` (05) · R19 y R20
+# ===========================================================================
+
+RUTA_ESTADOS = DIRECTORIO_SQL / "maestro" / "05_estados_documento.sql"
+
+
+def test_f073_r19_la_vista_de_estados_se_crea_como_vista() -> None:
+    assert "CREATE OR REPLACE VIEW maestro.estados_documento" in _compacto(
+        _sql(RUTA_ESTADOS)
+    )
+
+
+@pytest.mark.parametrize(
+    "columna",
+    ["estado_documento_id", "tipo_documento", "estado_id", "codigo_estado", "estado"],
+)
+def test_f073_r19_expone_tipo_codigo_y_nombre(columna: str) -> None:
+    assert re.search(rf"AS {columna}\b", _compacto(_sql(RUTA_ESTADOS))), (
+        f"maestro.estados_documento debe exponer {columna} (R19)"
+    )
+
+
+def test_f073_r19_lee_de_raw_conest_con_los_nombres_medidos() -> None:
+    """T1: `tip` es el tipo, `est` el código del estado y `res` el nombre."""
+    compacto = _compacto(_sql(RUTA_ESTADOS))
+    assert "FROM raw.conest" in compacto
+    for origen in ("tip", "est", "res"):
+        assert re.search(rf"\.{origen}\s+AS ", compacto), (
+            f"conest.{origen} no se proyecta (R19)"
+        )
+
+
+def test_f073_r19_no_filtra_por_tipo_de_documento() -> None:
+    """Las 193 filas, no las 14 de obra: es una dimensión, no un lookup."""
+    compacto = _compacto(_sql(RUTA_ESTADOS))
+    cuerpo = compacto[
+        compacto.index("CREATE OR REPLACE VIEW maestro.estados_documento") :
+    ].split(";")[0]
+    assert "WHERE" not in cuerpo, (
+        "filtrar por tipo dejaría fuera contratos, facturas y comparativos (R19)"
+    )
+    assert "42" not in cuerpo, "el tipo de obra no se cablea aquí (R19)"
+
+
+def test_f073_r20_el_comment_avisa_de_que_la_traduccion_va_por_tipo() -> None:
+    """La misma cifra significa cosas distintas en un contrato y en una factura."""
+    comentario = _sql(RUTA_ESTADOS)
+    comentario = comentario[comentario.index("COMMENT ON VIEW maestro.estados_documento") :]
+    assert "tipo de documento" in comentario.lower(), (
+        "el COMMENT debe advertir de que la traducción va por tipo (R20)"
     )
