@@ -463,7 +463,12 @@ def test_f073_r18_el_significado_de_es_activa_no_cambia() -> None:
 
 
 def test_f073_r11_la_cabecera_ya_no_afirma_que_las_obras_no_tienen_direccion() -> None:
-    """La cabecera de hoy dice «las obras no tienen dirección propia». Es falso."""
+    """La cabecera de antes daba por hecho que la obra no tiene emplazamiento.
+
+    Es falso y lo desmiente el censo. El veto es sobre el FICHERO ENTERO, así que
+    ni siquiera la nota que corrige el error puede citar la frase textualmente:
+    lo que no está escrito no se puede copiar y pegar de vuelta dentro de un año.
+    """
     cabecera = _sql(RUTA_OBRAS).lower()
     assert "las obras no tienen dirección" not in cabecera
     assert "sin dirección" not in cabecera
