@@ -97,7 +97,38 @@
 # HECHO y no una preferencia: recomendarlos haria que el agente los consultase y
 # fallara. `raw` tampoco cambia. Las fichas de consumo pasan de 47 a 54.
 
-version: 18
+# version 19 (F-073, 2026-09-10): TRES OBJETOS NUEVOS Y ONCE COLUMNAS NUEVAS,
+# y ninguna se quita ni se renombra. `maestro.centros_coste` es EL PUENTE entre
+# el centro de coste y la obra, que no existia publicado y que necesitan tres
+# features: 804 centros, **683 resuelven a obra** y 121 no (estructura,
+# delegacion y servicios generales), que salen con `obra_id` a NULL porque aqui
+# no se filtra nada. `maestro.estados_documento` publica las **193 filas** de
+# `conest`, y su trampa es que la traduccion va POR TIPO DE DOCUMENTO: el mismo
+# numero significa otra cosa en una obra (42), un contrato (44) o una factura
+# (15). `compras.formas_pago` publica las **69 formas de pago** con su medio
+# resuelto, y avisa de que `plazo_formula` **no es un numero de dias**
+# (`30 450R` es un valor real del catalogo).
+#
+# `maestro.obras` gana once columnas: `estado` -el nombre, ya traducido, para
+# no tener que copiar el catalogo a mano-, la direccion del emplazamiento con el
+# MISMO vocabulario que `maestro.proveedores` (`dir1`, `dir2`, `codigo_postal`,
+# `direccion_completa`), `municipio`/`municipio_id` y `provincia`/`provincia_id`
+# como ejes de agrupacion, y las marcas `tiene_presupuesto` / `tiene_seguimiento`.
+#
+# LO QUE HAY QUE LEER ANTES DE USAR LA DIRECCION: **solo un tercio de las obras
+# la tiene informada** (dir1 33,1 %, municipio 31,9 %, provincia 33,2 %, dir2 un
+# 5,1 %), asi que para dos de cada tres obras **"no consta" es la respuesta
+# CORRECTA** y no un fallo del ETL. Cada columna declara su porcentaje medido el
+# 2026-09-10. Y `tiene_seguimiento` se mide en `stg.plan_mensual`, que es
+# SUPERCONJUNTO del hecho publicado: 368 obras con plan frente a 349 con filas
+# en `mart.fact_seguimiento_mensual`, 19 de diferencia y ninguna al reves.
+#
+# DOS AFIRMACIONES FALSAS CORREGIDAS de paso: la ficha de
+# `maestro.obras.estado_id` decia que `conest` no se ingiere (se ingiere cada
+# noche), y la cabecera de `maestro.yaml` decia que el esquema no se refresca de
+# noche, que dejo de ser cierto en F-047.
+
+version: 19
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -731,7 +762,9 @@ esquemas:
       Contratos, albaranes, proformas, notas, facturas y abonos de proveedor, a
       nivel de linea y sin IVA. Responde a quien se ha comprado, cuanto se ha
       contratado, que hay albaranado sin facturar y que coste lleva cada
-      partida.
+      partida. Incluye ademas el catalogo de formas de pago
+      (`compras.formas_pago`), que es la DIMENSION: dice que formas de pago
+      existen, no con cual se pago un documento concreto.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -747,11 +780,14 @@ esquemas:
     pasos_etl: [build_retenciones]
 
   maestro:
-    titulo: Maestros de consulta directa
+    titulo: Maestros y dimensiones de consulta directa
     para_que_sirve: >-
       Obras, proveedores y la relacion proveedor-obra derivada de los contratos,
-      pensados para consultarse tal cual. `maestro.obras` es el universo SIN
-      filtrar, superconjunto de `stg.obras`.
+      mas el puente centro de coste -> obra y el catalogo de estados de
+      documento, pensados para consultarse tal cual. `maestro.obras` es el
+      universo SIN filtrar, superconjunto de `stg.obras`, y trae la direccion
+      del emplazamiento -informada en un tercio de las obras- y las marcas de
+      que datos tiene cada obra dentro del datamart.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_maestros]

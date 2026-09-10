@@ -581,13 +581,15 @@ objetos:
     relaciones:
       - de: estado_id
         a: maestro.obras.estado_id
-        cardinalidad: "1:N"
+        cardinalidad: "N:N"
         porque: >-
-          Es la traduccion del estado de la obra, **valida solo filtrando
-          `tipo_documento = 42`**. Sin ese filtro la union multiplica y traduce
-          con nombres de otro tipo de documento. `maestro.obras` ya trae la
-          columna `estado` resuelta: unir aqui solo hace falta para otros
-          documentos.
+          Es la traduccion del estado de la obra, y **es N:N a proposito**: aqui
+          la clave es `(tipo_documento, estado_id)`, no `estado_id` solo, asi
+          que unir por `estado_id` a secas MULTIPLICA las filas de la obra por
+          los 29 tipos de documento. Hay que **filtrar `tipo_documento = 42`
+          antes de unir**; con ese filtro la relacion pasa a ser 1:N y la union
+          es segura. Lo mas facil, de todos modos, es no unir: `maestro.obras`
+          ya publica la columna `estado` resuelta.
     ejemplos_preguntas:
       - Que significa el estado 15 en una obra
       - Que estados puede tener un contrato en Sigrid
