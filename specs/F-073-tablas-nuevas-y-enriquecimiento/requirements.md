@@ -91,8 +91,14 @@ NADA.** Solo se añade información.
   `plazo_formula`, y la ficha debe decir que **NO es un número de días**
   (`30 450R` es un valor real del catálogo).
 - **R23.** El sistema NO debe modificar `compras.contratos` ni
-  `compras.facturas`: el cableado de forma de pago y estado a esos dos
-  objetos es criterio de aceptación declarado de **F-067**.
+  `compras.facturas`. **Corregido el 2026-09-10, y la versión anterior de este
+  requisito era imprecisa**: el criterio 1 de `acceptance` de **F-067** nombra
+  **solo `compras.contratos`** («publica el estado actual con su nombre
+  (`conest`), forma de pago y retención»). El de facturas es el criterio 5, que
+  habla de estado, fecha de cambio de estado, fecha de la propia factura y
+  cruce con `raw.pag`, y **no menciona la forma de pago**. La forma de pago de
+  la **factura** no la promete F-067: la reclama **F-080**, nacida el mismo día
+  del correo de Administración. F-073 no toca ninguno de los dos objetos.
 
 ## D · Lo que no se rompe, y el papeleo
 

@@ -22,7 +22,8 @@ todas las letras. Caso por caso:
 | `conest` como **dimensión** | **F-073** | No es de compras: nombra estados de obra (42), contrato (44), factura (15), comparativo (46) y oferta (12). Además mata una duplicación real: la ficha de `maestro.obras.estado_id` **copia a mano** 14 nombres medidos el 02-sep de una tabla que sí se ingiere |
 | `conest` **cableado a compras** | F-067 | Su `acceptance` 1 dice literalmente «`compras.contratos` publica el estado actual con su nombre (`conest`)» |
 | `auxpag`+`auxefp` como **dimensión** | **F-073** | La forma de pago no existe en ninguna capa procesada, y la necesitan F-067 **y** F-037 por separado |
-| `auxpag` **cableado a contratos y facturas** | F-067 | Misma `acceptance` 1 («forma de pago y retención»), y toca `compras/01_documentos.sql`, que F-067 reescribe entera |
+| `auxpag` **cableado a CONTRATOS** | F-067 | Misma `acceptance` 1 («forma de pago y retención»), y toca `compras/01_documentos.sql`, que F-067 reescribe entera |
+| `auxpag` **cableado a FACTURAS** | **F-080** | **Corregido el 2026-09-10**: ningún criterio de F-067 lo promete. Su criterio 5, el de facturas, habla de estado, fechas y cruce con `raw.pag`, y **no menciona la forma de pago**. Lo reclama F-080, del correo de Administración |
 | `hmores`+`auxhor`, `apa`, `apu`/`asi`/`cua`, comparativos, firmas, `ctrrec`, `dnc` | F-057, F-061, F-058, F-056, F-038, F-055, F-067 | Son hechos, y cada uno ya tiene ficha con criterios propios |
 
 **Límite de microservicio**: nada de esto se sale del ETL del datamart. Todo
