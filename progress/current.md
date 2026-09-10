@@ -9,9 +9,63 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-080 · NACE EL 2026-09-10 DEL CORREO DE JUAN ROMERO (lo mas nuevo)
+
+Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, prioridad 7,
+rigor `estandar`, `sdd=true`. Fichada en `4871f89`. **Spec en curso.**
+
+Correo de Juan Romero (Dir. Admon y Control de Costes) del 2026-09-10,
+«PETICIONES (TEXTO Y VENCIMIENTOS/FORMAS PAGO)», con dos capturas de la ficha
+de factura de compra: quiere leer la pestaña TEXTO, acceder a la pestaña
+VENCIMIENTOS y cruzar el vencimiento con la forma de pago del contrato.
+
+**EL HALLAZGO QUE CAMBIA LA PREMISA, medido contra Sigrid ese dia en solo
+lectura: el texto NO esta en `dcf.tex`.** Esta en el memo de la superclase
+`con.tex`. `dcf.tex` viene informado en **474 de 165.658** facturas (0,3 %);
+`con.tex` para `tip = 15`, en **108.445 de 165.658** (65,5 %). La factura de
+la captura (`con.cod` FR26/06051, `ide` 2776822) tiene 797 bytes en `con.tex`
+y NULL en `dcf.tex`. **Derivarlo por el nombre del campo habria salido falso**:
+es el error de F-006 otra vez, el que vigila
+`tests/test_f006_fuente_que_gobierna.py`.
+
+`con.tex` esta **excluido hoy** de la ingesta con el comentario «texto libre
+largo, no lo usamos en seguimiento», que es justo lo que la peticion
+desmiente. El precedente de como se revierte esta hecho una vez: `prvcer.tex`
+en F-074.
+
+**Lo demas medido, y esta todo en la ficha de `harness/features.json` y en
+`progress/explore_F-080_*.md`:** `con.tex` entero pesa 33,7 MB (30,6 MB si
+solo facturas y contratos); `raw.pag` ya se ingiere entero, con 255.001
+efectos y el 99,99 % de las facturas cubiertas, asi que **los vencimientos no
+cuestan ingesta**; faltan dos catalogos, `auxnap` (3 filas) y `auxban`
+(1.666); y `contex` (2.855 filas) **no es** la pestaña Texto.
+
+**TRAMPA A NO REPETIR**: `pag.fecrea = 0` NO significa «vivo». Son 158.503
+efectos, el 62 %, e incluyen vencimientos pasados sin puntear. La cartera viva
+que midio F-037 son 10.607 pagos.
+
+**Riesgo abierto que resuelve la spec**: `raw.con` tiene 2.185.737 filas y se
+ingiere entera cada noche. Traer una columna memo puede obligar a bajar su
+`page_size`, como `obrparpre.planif`. **Se mide antes de desplegar.**
+
+**DECISIONES DEL HUMANO, para que nadie las reabra**: feature nueva y acotada
+(no repartir entre F-067 y F-037); el texto se guarda entero **y ademas**
+parseado en una vista; se publica para facturas y contratos; y **el riesgo de
+datos personales del texto lo descarto expresamente** («no me preocupa el tema
+riesgos de datos, ignoralo»).
+
+**FRONTERA**: la cartera completa de cobros y pagos sigue siendo F-037 fase 1.
+Deuda declarada: cuando llegue F-037 se decide si absorbe el objeto de
+vencimientos o lo deja como vista suya.
+
 ## LO PRIMERO AL RETOMAR (sesion reiniciada el 2026-09-10)
 
-**F-073 tiene su spec escrita y ESPERA APROBACION DEL HUMANO.**
+**F-073 tiene su spec escrita y ESPERA APROBACION DEL HUMANO.** Se le
+corrigio el 2026-09-10 (`47c02d4`) una afirmacion que daba por buena: R23 y la
+tabla de `design.md` §1 decian que el cableado de forma de pago y estado a
+`compras.contratos` **y** `compras.facturas` era el criterio 1 de `acceptance`
+de F-067. Ese criterio nombra **solo los contratos**; el de facturas es el 5, y
+no menciona la forma de pago. **El alcance de F-073 no cambia.**
 `specs/F-073-tablas-nuevas-y-enriquecimiento/` (114 / 201 / 29 lineas, 21
 tareas). Nada de codigo hasta que el humano apruebe: es la PARADA 1.
 
