@@ -57,3 +57,37 @@ medio. `tables_sigrid.yaml` está equivocado y el SQL de F-073 usa `res`.
 del centro salen de su `raw.con` (mismo `ide`), que sí trae `emp`, `tip`, `cod`,
 `res` y `est`. `raw.cen.obride` existe pero **está a 0 en las 804 filas** (R3).
 
+## T2 · Los recuentos y el % informado, MEDIDOS (2026-09-10)
+
+| Medida | Valor | Requisito |
+|---|---|---|
+| `raw.cen` | **804** | R1 |
+| puente resuelto a obra | **683** (121 sin obra) | R4, R6 |
+| filas del puente / centros distintos | **804 / 804** → 1:1 | R5 |
+| `cen.obride <> 0` | **0 de 804** | R3 |
+| `raw.conest` | **193**, y `(tip, est)` único 193/193 | R19, R17 |
+| `raw.auxpag` | **69** | R21 |
+| `raw.auxefp` | **10** | R21 |
+| `maestro.obras` hoy | **921** | R17, R18 |
+| `maestro.obras` tras los 3 LEFT JOIN nuevos | **921** (no multiplica) | R17 |
+
+Porcentaje informado sobre las **921** obras (R12):
+
+| Columna | Informadas | % |
+|---|---|---|
+| `dir1` | 305 | **33,1 %** |
+| `dir2` | 47 | **5,1 %** |
+| `codigo_postal` (`dircpo`) | 303 | **32,9 %** |
+| `direccion_completa` (`dir`) | 272 | **29,5 %** |
+| `municipio` / `municipio_id` | 294 | **31,9 %** |
+| `provincia` / `provincia_id` | 306 | **33,2 %** |
+| `estado` (nombre) | 920 | **99,9 %** |
+
+Los 294 `munide` y los 306 `proide` informados **resuelven todos** a nombre en
+`auxmun` / `auxpro`: no hay identificador colgado. Una sola obra de 921 tiene un
+`con.est` sin fila en `conest` para `tip = 42`: su `estado` sale NULL.
+
+Marcas (R13–R15), sobre las mismas 921: **728 con presupuesto**, **368 con plan
+mensual**, **349 con filas en `mart.fact_seguimiento_mensual`**. La diferencia
+plan/hecho son **19 obras y ninguna al revés** — es la contrapartida declarada
+de leer de `stg` (DA-1) y va en la ficha (R15).
