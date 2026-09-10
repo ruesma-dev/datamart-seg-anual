@@ -97,7 +97,7 @@
       "status": "done",
       "sdd": true,
       "rigor": "critico",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-003-infra-caj"
     },
     {
@@ -134,7 +134,7 @@
       "status": "done",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-020-arnes-multiservicio"
     },
     {
@@ -147,7 +147,7 @@
       "status": "done",
       "sdd": true,
       "rigor": "critico",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-019-plan-mensual-por-tramos"
     },
     {
@@ -166,7 +166,7 @@
       "status": "done",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-016-refuerzo-tests-f005"
     },
     {
@@ -200,7 +200,7 @@
       "status": "done",
       "sdd": false,
       "rigor": "documental",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-008-docs-referencia-sigrid-acens"
     },
     {
@@ -212,7 +212,7 @@
       ],
       "status": "done",
       "sdd": true,
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-011-carga-incremental",
       "rigor": "critico"
     },
@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 40,
+      "priority": 41,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 50,
+      "priority": 51,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 52,
+      "priority": 53,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 53,
+      "priority": 54,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 54,
+      "priority": 55,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 55,
+      "priority": 56,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 41,
+      "priority": 42,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -348,7 +348,7 @@
       "status": "done",
       "sdd": false,
       "rigor": "critico",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-023-cierre-operativo-f003"
     },
     {
@@ -361,7 +361,7 @@
       "status": "done",
       "sdd": true,
       "rigor": "critico",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-024-coherencia-cargas-truncadas"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 45,
+      "priority": 46,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 33,
+      "priority": 34,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 42,
+      "priority": 43,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 38,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 56,
+      "priority": 57,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 48,
+      "priority": 49,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -530,7 +530,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-034-powerbi-azure"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 21,
+      "priority": 22,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -572,7 +572,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -589,7 +589,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -620,7 +620,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -653,7 +653,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -687,7 +687,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -702,7 +702,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -733,7 +733,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -749,7 +749,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -765,7 +765,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -782,7 +782,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -799,7 +799,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -818,7 +818,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -836,7 +836,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -853,7 +853,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -870,7 +870,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-056-contabilidad"
     },
     {
@@ -886,7 +886,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-057-recursos-empleados-partes"
     },
     {
@@ -903,7 +903,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -920,7 +920,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -933,7 +933,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 39,
+      "priority": 40,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -949,7 +949,7 @@
         "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
       ],
-      "priority": 43,
+      "priority": 44,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -965,7 +965,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 47,
+      "priority": 48,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -981,7 +981,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 49,
+      "priority": 50,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -998,7 +998,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 51,
+      "priority": 52,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -1018,7 +1018,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1057,7 +1057,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-067-compras-seguimiento-mcp"
     },
     {
@@ -1089,7 +1089,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1107,7 +1107,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1183,7 +1183,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1203,7 +1203,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1218,7 +1218,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1240,7 +1240,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-078-materializar-cp-tipologia"
     },
     {
@@ -1260,6 +1260,26 @@
       "rigor": "estandar",
       "priority": 4,
       "branch": "feature/F-079-todo-lo-publicado-es-consultable"
+    },
+    {
+      "id": "F-080",
+      "title": "Los vencimientos, la forma de pago y el texto de la factura de compra: lo que Administracion pide y el datamart no publica",
+      "description": "Nace el 2026-09-10 de un correo de Juan Romero (Dir. Admon y Control de Costes), asunto PETICIONES (TEXTO Y VENCIMIENTOS/FORMAS PAGO), con dos capturas de la ficha de factura de compra de Sigrid. Pide tres cosas: listar facturas y poder leer la pestaña TEXTO; acceder a la pestaña VENCIMIENTOS; y cruzar el vencimiento con la forma de pago pactada en el contrato para detectar errores. Es la segunda devolucion de un usuario de Negocio sobre el datamart en uso, despues de la de Compras que abrio F-067. ================ MEDIDO CONTRA SIGRID EL 2026-09-10 (leer_sql, solo lectura). Informes: progress/explore_F-080_vencimientos_y_texto.md y progress/explore_F-080_estado_compras.md. (1) EL TEXTO NO ESTA DONDE PARECIA. La pestaña Texto se pinta desde el memo de la SUPERCLASE con.tex, NO desde dcf.tex. Medido: dcf.tex informado en 474 de 165.658 facturas (0,3 %); con.tex para tip=15 informado en 108.445 de 165.658 (65,5 %), maximo 11.580 bytes. La factura de la captura (con.cod FR26/06051, ide 2776822) tiene 797 bytes en con.tex y NULL en dcf.tex. Derivarlo por analogia con el nombre del campo habria salido falso: es el error de F-006 otra vez. (2) con.tex ESTA EXCLUIDO HOY de la ingesta en config/tables_sigrid.yaml con el comentario 'texto libre largo, no lo usamos en seguimiento', que es exactamente lo que esta peticion desmiente. El precedente de como se revierte ya existe y esta hecho una vez: prvcer.tex en F-074. (3) FORMATO DEL MEMO, verificado sobre la factura del correo: comentarios concatenados en orden DESCENDENTE (el mas reciente primero), separados por una linea de guiones, cada uno cerrado con '[dd/mm/aaaa hh:mm:ss Usuario: <login>]' y con saltos CRLF en el cuerpo. El ultimo bloque puede traer una linea automatica de la aplicacion con otro formato. Es regular y parseable, pero es texto libre escrito a mano: nada garantiza que un comentario respete la plantilla. (4) PESO: con.tex entero son 33,7 MB (2.185.737 documentos, 120.649 con texto); solo facturas y contratos (tip 15 y 44) son 30,6 MB. Sobre 25 GB ocupados de un disco de 64 GB es ruido; el coste a vigilar es la VENTANA NOCTURNA, porque con tiene 2.185.737 filas y se ingiere entera cada noche. El patron para eso ya existe: bajar page_size de la tabla, como obrparpre.planif. (5) LOS VENCIMIENTOS NO CUESTAN INGESTA: raw.pag ya se ingiere entero. Medido: 255.001 efectos sobre 197.477 documentos; 165.636 de 165.658 facturas tienen al menos un efecto (99,99 %); maximo 16 efectos en una factura; 25.605 efectos con retencion. TRAMPA A DECLARAR EN LA FICHA: fecrea = 0 NO significa 'vivo', son 158.503 efectos (62 %) e incluyen vencimientos pasados sin puntear; la cartera viva que midio F-037 son 10.607 pagos. Confundirlos da una cifra plausible y falsa. (6) CATALOGOS QUE FALTAN: auxnap (naturalezas de pago) 3 filas y auxban (bancos y sucursales) 1.666 filas. auxpag (69) y auxefp (10) ya estan en raw y son la dimension que publica F-073. (7) contex ES OTRA COSA y conviene no confundirla: 15 columnas (conide, res, tex, y usuario, fecha y hora de alta, edicion y borrado, mas leido) y solo 2.855 filas. No es la pestaña Texto. ================ LO QUE COMPRAS PUBLICA HOY, verificado columna por columna: compras.facturas (sql/compras/01_documentos.sql:138-157) publica factura_id, codigo_factura, serie, tipo_documento, descripcion, fecha, proveedor_id, proveedor_nombre, proveedor_cif y referencia_proveedor. NADA de forma de pago, estado, vencimiento, banco ni texto. Y su fecha es con.fec, el ALTA del documento, no dcf.fecdoc. compras.contratos (lineas 22-44), igual. ================ FRONTERA CON F-037 Y F-067, decidida por el humano el 2026-09-10. F-080 se queda con LA FACTURA DE COMPRA: los efectos de sus facturas, su forma de pago, su texto y el control contra el contrato. NO hace la cartera completa de cobros y pagos, que es F-037 fase 1. DEUDA DECLARADA, no descubierta: cuando llegue F-037 hay que decidir si absorbe este objeto o lo deja como vista suya, y eso tiene que estar escrito en las dos fichas. De F-067 no se toca nada de comparativos, ofertas, actividades del proveedor ni la foto diaria de estados. ================ CORRECCION QUE SALE DE AQUI Y AFECTA A F-073: sus R23, su design.md §1 y progress/current.md afirman que el cableado de forma de pago y estado a compras.contratos Y compras.facturas es el criterio 1 de acceptance de F-067. Es impreciso: el criterio 1 nombra SOLO compras.contratos; el de facturas es el criterio 5, que habla de estado, fecha de cambio de estado, fecha de la propia factura y cruce con raw.pag, y NO menciona la forma de pago. Resultado: hasta F-080 ningun criterio del backlog prometia la forma de pago de la FACTURA, que es la mitad de lo que pide Juan Romero. ================ DECISIONES DEL HUMANO (2026-09-10), para que ningun agente las reabra: (a) feature nueva y acotada, no repartir entre F-067 y F-037, porque las dos son criticas y de prioridad 16 y 21 y esto no llegaria a Administracion; (b) el texto se guarda ENTERO y ADEMAS parseado en una vista, para que un comentario que no respete la plantilla no se pierda; (c) alcance de publicacion: facturas y contratos. OJO: la exclusion de la ingesta es POR NOMBRE DE COLUMNA, no por filas, asi que recuperar con.tex trae los 33,7 MB completos; lo que se acota a facturas y contratos es lo que se PUBLICA. (d) EL RIESGO DE DATOS PERSONALES DEL TEXTO (el login de quien escribe y nombres propios en el cuerpo) LO DESCARTO EXPRESAMENTE EL HUMANO: 'no me preocupa el tema riesgos de datos, ignoralo'. No es un olvido y no hay que volver a plantearlo.",
+      "acceptance": [
+        "raw ingiere con.tex (sale de exclude_columns de con, patron de prvcer.tex en F-074) y los catalogos auxnap (3 filas) y auxban (1.666), y la ventana nocturna sigue cabiendo: el coste medido del cambio consta en el informe antes de desplegar",
+        "compras publica los VENCIMIENTOS de la factura de compra, una fila por efecto de raw.pag cableada a la factura por pag.conide = dcf.ide, con vencimiento previsto, fecha real, importe, medio de pago, naturaleza, cuenta y banco resueltos a nombre legible",
+        "La ficha del diccionario de los vencimientos declara que fecrea = 0 NO significa vivo (158.503 efectos, el 62 %, incluyen vencimientos pasados sin puntear) y como se distingue de la cartera viva",
+        "compras publica la FORMA DE PAGO de la factura resuelta a nombre (dcf.pagide -> auxpag), que hoy no promete ningun criterio del backlog, y plazo_formula verbatim como decide F-073",
+        "compras publica el TEXTO del documento de dos formas: el memo integro por documento tal cual llega, sin perder nada, y encima una vista con un comentario por fila (fecha, hora, usuario y cuerpo); un comentario que no respete la plantilla sigue estando entero en el memo",
+        "Existe la vista de control que pide el correo: la forma de pago de la factura enfrentada a la del contrato del que cuelga, para que las discrepancias se vean sin explicarle nada al MCP",
+        "Cada objeto nuevo con su ficha en el diccionario y su clave declarada; check-unicidad, check-declarados y check-diccionario en verde",
+        "Probado por el MCP sin explicarle nada en el prompt: cuando vence una factura y si esta pagada, que dice el texto de una factura retenida, y que facturas no cuadran con la forma de pago del contrato"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 7,
+      "branch": "feature/F-080-vencimientos-forma-pago-y-texto-factura"
     }
   ]
 }
