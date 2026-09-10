@@ -7,6 +7,7 @@ Encadena los archivos SQL en orden:
     01_documentos.sql  - contratos / albaranes / facturas (cabeceras + líneas)
     02_fact_linea.sql  - hechos unificados a nivel de línea
     03_views.sql       - vistas de negocio (consumo de contrato, proveedores…)
+    04_formas_pago.sql - dimensión de formas de pago (auxpag + auxefp)
 
 Solo lee de `raw.*`. No necesita `stg` ni `mart`.
 
@@ -41,7 +42,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los cuatro ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los cinco ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` a propósito: es DATO, no lógica. Así se puede leer sin
 #: entrar en el bucle y —lo que lo motivó— se puede sustituir en un test para
@@ -63,6 +64,15 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="fact_compras_linea",
     ),
     _SubStep(name="views", sql_file="03_views.sql"),
+    # F-073: la dimensión de formas de pago. Va la última porque todavía no la
+    # lee nadie de este esquema: el cableado a `compras.contratos` es de F-067
+    # y el de la factura, de F-080.
+    _SubStep(
+        name="formas_pago",
+        sql_file="04_formas_pago.sql",
+        target_schema="compras",
+        target_table="formas_pago",
+    ),
 )
 
 

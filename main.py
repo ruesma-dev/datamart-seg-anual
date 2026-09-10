@@ -503,8 +503,9 @@ def build_pipeline_steps(
         ),
         BuildMartStep(settings, batch_id=batch_id),
         # F-047: los cuatro esquemas que se construían a mano y podían estar
-        # arbitrariamente desfasados respecto a `raw` y `stg`. `maestro`,
-        # `compras` y `retenciones` solo leen de `raw`; `cierre` lee de `stg` y
+        # arbitrariamente desfasados respecto a `raw` y `stg`. `compras` y
+        # `retenciones` solo leen de `raw`; `maestro` lee también de `stg`
+        # desde F-073 (las dos marcas de `maestro.obras`); `cierre` lee de `stg` y
         # va DESPUÉS de `build_mart` porque `mart/03_agg_categoria.sql` dropea
         # con CASCADE la tabla de la que cuelga `cierre.v_pbi_planif_vs_real`.
         # Eso lo declara `BuildCierreStep.depends_on`, no esta posición.
