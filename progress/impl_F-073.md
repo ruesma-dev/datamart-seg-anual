@@ -76,7 +76,7 @@ al revés**, que es la contrapartida declarada de leer de `stg` (DA-1).
 **Nuevos**: `sql/maestro/04_centros_coste.sql` (R1–R5),
 `sql/maestro/05_estados_documento.sql` (R19–R20),
 `sql/compras/04_formas_pago.sql` (R21–R22) y tres ficheros de tests
-(`test_f073_sql.py`, `_pipeline.py`, `_diccionario.py`, **133 tests**).
+(`test_f073_sql.py`, `_pipeline.py`, `_diccionario.py`, **130 tests**).
 
 **Modificados**: `sql/maestro/01_obras.sql` (+11 columnas, 0 quitadas, cabecera
 corregida); `build_maestros_step.py` (`SUB_PASOS` de módulo, 2 sub-pasos,
@@ -199,9 +199,9 @@ mismo orden; lo nuevo se anade DETRAS (R18)
 
 | Evidencia | Valor real |
 |---|---|
-| **Tests ejecutados** | **4.366 pasados**, 171 saltados, 0 fallidos |
+| **Tests ejecutados** | **4.367 pasados**, 171 saltados, 0 fallidos |
 | **Cobertura de las líneas cambiadas** | **93,6 %** (791/845, umbral 80 %) |
-| **Tiempo de la suite** | **777,8 s** (12 min 57 s) con medición de cobertura; **412,8 s** sin ella (la línea base de la campaña, con `-x`) |
+| **Tiempo de la suite** | **1.048,4 s** (17 min 28 s) con medición de cobertura; **412,8 s** sin ella (línea base de la campaña, con `-x`) |
 | **Mutantes** | 288 generados, **20 evaluados** (muestreo del nivel `estandar`, semilla `20260820`), **11 muertos, 9 supervivientes**, 0 timeouts |
 | **Workers de la campaña** | **1** (en serie). Coste por mutante = 5.470,2 × 1 ÷ 20 = **273,5 s** |
 | `bash harness/init.sh` | **exit 0** — «ENTORNO LISTO» |
