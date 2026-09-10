@@ -287,12 +287,11 @@ def _troceado_en_profundidad_cero(texto: str, separador: str) -> list[str]:
     return piezas
 
 
-def _columnas_publicadas(ruta: Path) -> set[str]:
-    """Los nombres que la vista EXPONE, con `AS` explícito o sin él.
+def _columnas_en_orden(ruta: Path) -> list[str]:
+    """Los nombres que la vista EXPONE, EN ORDEN, con `AS` explícito o sin él.
 
-    Sin esto el barrido se quedaría corto: `maestro.proveedores` publica `dir1`
-    y `dir2` **sin alias**, y un barrido que solo mirase los `AS` no los
-    vería. Se
+    Lo del `AS` no es un detalle: `maestro.proveedores` publica `dir1` y `dir2`
+    **sin alias**, y un barrido que solo mirase los `AS` no los vería. Se
     ignoran los paréntesis para que ni el `WITH` de proveedores ni los `EXISTS`
     de las marcas de obra cuenten como columnas.
     """
@@ -302,16 +301,21 @@ def _columnas_publicadas(ruta: Path) -> set[str]:
     seleccion = _troceado_en_profundidad_cero(cuerpo, " SELECT ")[1]
     seleccion = _troceado_en_profundidad_cero(seleccion, " FROM ")[0]
 
-    nombres: set[str] = set()
+    nombres: list[str] = []
     for pieza in _troceado_en_profundidad_cero(seleccion, ","):
         pieza = pieza.strip()
         if not pieza:
             continue
         if " AS " in pieza:
-            nombres.add(pieza.rsplit(" AS ", 1)[1].strip())
+            nombres.append(pieza.rsplit(" AS ", 1)[1].strip())
         else:
-            nombres.add(pieza.rsplit(".", 1)[-1].strip())
+            nombres.append(pieza.rsplit(".", 1)[-1].strip())
     return nombres
+
+
+def _columnas_publicadas(ruta: Path) -> set[str]:
+    """Lo mismo, cuando el orden no importa."""
+    return set(_columnas_en_orden(ruta))
 
 
 # --- R7 · el mismo vocabulario que `maestro.proveedores` -------------------
@@ -452,6 +456,25 @@ def test_f073_r18_conserva_todas_las_columnas_de_antes(columna: str) -> None:
     assert columna in _columnas_publicadas(RUTA_OBRAS), (
         f"maestro.obras publicaba {columna} antes de F-073 y tiene que seguir "
         "publicándola con el mismo nombre (R18)"
+    )
+
+
+def test_f073_r18_las_columnas_de_siempre_van_primero_y_en_su_orden() -> None:
+    """No es estética: decide si la nocturna arranca o revienta.
+
+    `CREATE OR REPLACE VIEW` de PostgreSQL **solo admite columnas nuevas AL
+    FINAL**. Si una nueva se intercala —`estado` entre `estado_id` y
+    `fecha_alta`, que es donde mejor se lee, y ahí estuvo hasta que se midió—
+    el replace falla con «cannot change name of view column "fecha_alta" to
+    "estado"» y se lleva por delante el build de `maestro` esa noche. Los tests
+    que solo miran PRESENCIA dan verde igual y el fallo sale a las tres de la
+    mañana.
+    """
+    publicadas = _columnas_en_orden(RUTA_OBRAS)
+
+    assert publicadas[: len(COLUMNAS_DE_SIEMPRE)] == list(COLUMNAS_DE_SIEMPRE), (
+        "las columnas que la vista ya publicaba van primero y en el mismo "
+        "orden; lo nuevo se añade DETRÁS (R18)"
     )
 
 

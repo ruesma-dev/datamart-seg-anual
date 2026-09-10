@@ -47,13 +47,18 @@ SELECT
     c.cod                          AS codigo_obra,
     c.res                          AS nombre_obra,
     c.est                          AS estado_id,            -- código interno (p.ej. 15 = EN CURSO)
-    es.nombre_estado               AS estado,               -- el mismo, ya traducido (tipo 42)
     maestro.fn_fecha(c.fec)        AS fecha_alta,
     maestro.fn_fecha(c.fecbaj)     AS fecha_baja,
     (c.fecbaj IS NULL OR c.fecbaj = 0) AS es_activa,
     o.entide                       AS cliente_id,
     cli.cod                        AS codigo_cliente,
     cli.res                        AS nombre_cliente,
+    -- A PARTIR DE AQUI, TODO LO QUE ANADE F-073, Y VA AL FINAL POR OBLIGACION:
+    -- `CREATE OR REPLACE VIEW` de PostgreSQL solo admite columnas NUEVAS AL
+    -- FINAL. Intercalar `estado` entre `estado_id` y `fecha_alta`, que es donde
+    -- se lee mejor, hace fallar el replace con «cannot change name of view
+    -- column» y se lleva por delante el build entero esa noche.
+    es.nombre_estado               AS estado,               -- estado_id ya traducido (tipo 42)
     NULLIF(TRIM(o.dir1), '')       AS dir1,
     NULLIF(TRIM(o.dir2), '')       AS dir2,
     NULLIF(TRIM(o.dircpo), '')     AS codigo_postal,

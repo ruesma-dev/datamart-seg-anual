@@ -106,18 +106,6 @@ objetos:
           **esa cifra esta muerta**, no reproduce.
         valores: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 999]
         agregacion: no_sumable
-      estado:
-        significado: >-
-          El estado de la obra YA TRADUCIDO a su nombre (F-073), desde
-          `raw.conest` filtrando el tipo de documento de obra (42). **Es la
-          columna que hay que citar al responder**; `estado_id` es el codigo
-          interno del que sale. La traduccion completa, para cualquier tipo de
-          documento, esta en `maestro.estados_documento`.
-        agregacion: no_sumable
-        nulo_significa: >-
-          El `estado_id` de la obra no tiene fila en `conest` para el tipo 42.
-          Le pasa a **1 de las 921 obras** (medido el 2026-09-10), asi que un
-          NULL aqui es una rareza del origen y no un fallo del ETL.
       fecha_alta:
         significado: Fecha de alta de la obra, ya tipada desde el entero de Sigrid.
         agregacion: no_sumable
@@ -163,6 +151,18 @@ objetos:
           La obra no tiene cliente —`cliente_id` = 0— o el que tiene no existe en
           `raw.con`. Este NULL si es real, lo produce el `LEFT JOIN`, asi que es
           la forma fiable de preguntar por las obras sin cliente resuelto.
+      estado:
+        significado: >-
+          El estado de la obra YA TRADUCIDO a su nombre (F-073), desde
+          `raw.conest` filtrando el tipo de documento de obra (42). **Es la
+          columna que hay que citar al responder**; `estado_id` es el codigo
+          interno del que sale. La traduccion completa, para cualquier tipo de
+          documento, esta en `maestro.estados_documento`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El `estado_id` de la obra no tiene fila en `conest` para el tipo 42.
+          Le pasa a **1 de las 921 obras** (medido el 2026-09-10), asi que un
+          NULL aqui es una rareza del origen y no un fallo del ETL.
       dir1:
         significado: >-
           Primera linea de la direccion del emplazamiento de la obra, de
