@@ -9,6 +9,35 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## EL DESPLIEGUE DEL 09-SEP Y SU VERIFICACION (hecha el 2026-09-10)
+
+**Desplegada la imagen `r20260910-0102`** a las 23:03 UTC del 09-sep, con
+autorizacion expresa del humano, y el cron intacto (`0 0 * * *`). Llevaba
+dentro F-074 (las nueve tablas) y F-079 (el diccionario version 18).
+
+**VERIFICADO el 2026-09-10 a las 07:20 UTC, tras la nocturna
+`caj-datamart-seg-dev-29816640` (00:00 -> 03:24 UTC, `Succeeded`):**
+
+* **Las nueve tablas entraron**, con los tamaños que la medicion predecia:
+  `dcaprodes` 851.195, `ctrprodes` 424.488, **`pro` 55.179** -la unica cuyo
+  tamaño no conociamos, asi que **el producto ya tiene nombre en el
+  datamart**-, `reshor` 8.949, `emphis` 1.633, `auxhor` 60, `cet` 40,
+  `auxrestip` 37 y `auxdpt` 7.
+* **`check-diccionario` en verde**: **139 fichas y 139 objetos**, biyeccion
+  exacta, y **lo publicado ES lo del arbol (version 18, hash 4af4c3bb60d4)**.
+  Las dos discrepancias de la noche anterior quedan cerradas.
+* **La noche duro 3 h 25 min**, nueve minutos mas que la anterior: eso es lo
+  que cuestan 1,34 M de filas nuevas. Sigue muy por debajo de las 4 h 52 de
+  antes de F-025.
+* **PENDIENTE, sin urgencia**: `check-raw-recuentos` sobre las 65 tablas.
+
+**HALLAZGO DEL DESPLIEGUE, para revisar sin prisa**: el job **no declara**
+`PG_DISCO_TOTAL_GB` ni `PG_EXCLUDED_TABLES`. Funciona porque el valor por
+defecto de `config/settings.py` es el correcto en las dos, pero el
+comportamiento depende de ese defecto y no de una declaracion explicita. Es la
+misma fragilidad que en agosto dejo la puerta de disco midiendo contra 32 GB
+durante nueve dias.
+
 ## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
 
 **F-025, F-068, F-066 y F-072 estan CERRADAS**, y **F-071 esta RETIRADA** (ver
