@@ -1,7 +1,8 @@
 # config/diccionario/maestro.yaml
 #
-# Fichas del esquema `maestro`: obras, proveedores y su relacion, pensados para
-# consultarse tal cual.
+# Fichas del esquema `maestro`: obras, proveedores y su relacion, el puente
+# centro de coste -> obra y el catalogo de estados de documento, todos pensados
+# para consultarse tal cual.
 #
 # TRES COSAS ANTES DE CONSULTAR NADA:
 #
@@ -13,9 +14,11 @@
 # 2. **`importe_contratado` lleva IVA.** Es la suma del total del documento,
 #    mientras que todos los importes de `compras` son sin IVA. La diferencia
 #    entre las dos cifras no es sobrecoste ni ahorro: es el impuesto.
-# 3. **NO SE REFRESCA DE NOCHE.** Lo construye `build-maestros`, que si registra
-#    paso, asi que su fecha de build SI es consultable con
-#    `SELECT * FROM _meta.v_frescura WHERE paso = 'build_maestros'`.
+# 3. **SE REFRESCA DE NOCHE desde F-047**, dentro de `run-all`, y su fecha de
+#    build es consultable con
+#    `SELECT * FROM _meta.v_frescura WHERE paso = 'build_maestros'`. Desde F-073
+#    el paso depende ademas de `build_stg`: las dos marcas de `maestro.obras`
+#    se miden alli.
 #
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/maestro/`.
@@ -30,8 +33,12 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      El maestro de obras SIN filtrar: codigo, nombre, estado, fechas de alta y
-      baja, y el cliente. Es la vista para poner contexto a una obra; **NO** es
+      El maestro de obras SIN filtrar: codigo, nombre, estado (con su nombre ya
+      traducido), fechas de alta y baja, cliente, **direccion del emplazamiento
+      con municipio y provincia**, y las dos marcas de que datos tiene la obra
+      dentro del datamart. OJO CON LA DIRECCION: solo un tercio de las obras la
+      tiene informada, asi que "no consta" es la respuesta correcta para dos de
+      cada tres y cada columna declara su porcentaje medido. Es la vista para poner contexto a una obra; **NO** es
       el universo del seguimiento y **NO sirve para saber si una obra sigue
       viva**: `es_activa` vale TRUE en las 919 filas porque `fecha_baja` no se
       informa nunca (ver R-OBRA-ACTIVA). Esta descripcion prometia justo eso
@@ -61,12 +68,16 @@ objetos:
           F-025 es ademas una de las tres reglas que deciden que obras se
           reconstruyen cada noche.
 
-          EL CATALOGO ESTA VERIFICADO (2026-09-02, contra Sigrid por
-          `sigrid-api` en solo lectura). Vive en la tabla `conest` ("Tipos de
-          Estados de Conceptos"), el tipo de las obras es el **42** y se llega
-          por `con.est`. **Esa tabla no se ingiere**, asi que el codigo llega
-          sin traducir y aqui va su equivalencia, que es la que hay que usar al
-          responder: `1` EN ESTUDIO (226 obras), `3` PRESENTADA (0), `5`
+          DONDE VIVE EL CATALOGO, corregido en F-073. Vive en la tabla
+          `conest` ("Tipos de Estados de Conceptos"), el tipo de las obras es el
+          **42** y se llega por `con.est`. Esta ficha decia que esa tabla no se
+          ingiere y **era falso**: se ingiere cada noche, y desde F-073 se
+          publica entera en `maestro.estados_documento` (193 filas). Esa es
+          ahora la fuente del nombre de un estado, y ademas la columna `estado`
+          de esta misma vista lo trae ya traducido: **no hay que traducir a
+          mano**. Lo que queda aqui es el REPARTO de obras por estado, medido el
+          2026-09-02, que es informacion de las obras y no del catalogo: `1` EN
+          ESTUDIO (226 obras), `3` PRESENTADA (0), `5`
           PRESENTADA CON ACLARACIONES (0), `7` ADJUDICADA PROVISIONAL (0), `9`
           ADJUDICADA DEFINITIVAMENTE (33), `11` NO PRESENTADA (2), `13` NO
           ADJUDICADA (0), `15` EN CURSO (176), `17` PARADA (7), `19` TERMINADA
@@ -95,6 +106,18 @@ objetos:
           **esa cifra esta muerta**, no reproduce.
         valores: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 999]
         agregacion: no_sumable
+      estado:
+        significado: >-
+          El estado de la obra YA TRADUCIDO a su nombre (F-073), desde
+          `raw.conest` filtrando el tipo de documento de obra (42). **Es la
+          columna que hay que citar al responder**; `estado_id` es el codigo
+          interno del que sale. La traduccion completa, para cualquier tipo de
+          documento, esta en `maestro.estados_documento`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El `estado_id` de la obra no tiene fila en `conest` para el tipo 42.
+          Le pasa a **1 de las 921 obras** (medido el 2026-09-10), asi que un
+          NULL aqui es una rareza del origen y no un fallo del ETL.
       fecha_alta:
         significado: Fecha de alta de la obra, ya tipada desde el entero de Sigrid.
         agregacion: no_sumable
@@ -140,6 +163,96 @@ objetos:
           La obra no tiene cliente —`cliente_id` = 0— o el que tiene no existe en
           `raw.con`. Este NULL si es real, lo produce el `LEFT JOIN`, asi que es
           la forma fiable de preguntar por las obras sin cliente resuelto.
+      dir1:
+        significado: >-
+          Primera linea de la direccion del emplazamiento de la obra, de
+          `obr.dir1`. Mismo nombre y mismo significado que en
+          `maestro.proveedores`, para que "donde esta" se escriba igual en las
+          dos. **Informada en 305 de las 921 obras (33,1 %), medido el
+          2026-09-10.**
+        nulo_significa: >-
+          La obra no tiene direccion informada en Sigrid. Es el caso de dos de
+          cada tres, asi que **"no consta" es la respuesta correcta**, no un
+          hueco del ETL.
+      dir2:
+        significado: >-
+          Segunda linea de la direccion (de `obr.dir2`): escalera, planta,
+          poligono. **Es la mas vacia de todas: 47 de 921 obras (5,1 %), medido
+          el 2026-09-10**, asi que no sirve para agrupar ni para filtrar.
+        nulo_significa: >-
+          No hay segunda linea de direccion. Lo normal: "no consta" en el 94,9 %
+          de las obras.
+      codigo_postal:
+        significado: >-
+          Codigo postal del emplazamiento, de `obr.dircpo`, **tal cual lo teclea
+          Sigrid** (es texto, no numero, y puede traer ceros a la izquierda).
+          **Informado en 303 de 921 obras (32,9 %), medido el 2026-09-10.**
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene codigo postal informado; "no consta".
+      direccion_completa:
+        significado: >-
+          La direccion en una sola linea, de `obr.dir`, tal como la guarda
+          Sigrid. Es la que se cita al responder "donde esta la obra X".
+          **Informada en 272 de 921 obras (29,5 %), medido el 2026-09-10**, y es
+          la que menos cobertura tiene de las cuatro de direccion.
+        nulo_significa: >-
+          La obra no tiene direccion informada. Antes de darla por perdida,
+          mirar `municipio`: hay obras con municipio y sin calle.
+      municipio_id:
+        significado: >-
+          Identificador del municipio en `raw.auxmun`, de `obr.munide`. **Es el
+          eje por el que hay que agrupar**, y no por el literal: el nombre puede
+          venir escrito de dos formas y el identificador no. En Sigrid el 0 es
+          "no consta", y aqui se publica como NULL.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La obra no tiene municipio informado (627 de 921); "no consta".
+      municipio:
+        significado: >-
+          Nombre del municipio del emplazamiento, resuelto desde `raw.auxmun`.
+          **Informado en 294 de 921 obras (31,9 %), medido el 2026-09-10**, y
+          los 294 identificadores informados resuelven todos a nombre: no hay
+          ningun municipio colgado.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La obra no tiene municipio informado. Es el caso de 627 de 921 obras y
+          **"no consta" es la respuesta correcta**.
+      provincia_id:
+        significado: >-
+          Identificador de la provincia en `raw.auxpro`, de `obr.proide`. Mismo
+          criterio que `municipio_id`: se agrupa por el identificador, no por el
+          literal, y el 0 de Sigrid se publica como NULL.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene provincia informada; "no consta".
+      provincia:
+        significado: >-
+          Nombre de la provincia del emplazamiento, resuelto desde `raw.auxpro`.
+          **Informada en 306 de 921 obras (33,2 %), medido el 2026-09-10.** Es
+          la columna de direccion con mas cobertura, y la unica que sirve para
+          un mapa a nivel grueso.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La obra no tiene provincia informada (615 de 921); "no consta".
+      tiene_presupuesto:
+        significado: >-
+          Booleano: la obra tiene al menos una fila en `stg.presupuesto`. **NUNCA
+          ES NULO** (se calcula con un `EXISTS`). Es la respuesta a "de esta obra,
+          que puede contar el datamart": **728 de 921 (79,0 %) el 2026-09-10**.
+          Ojo, dice si HAY presupuesto cargado, no si el presupuesto es correcto.
+        agregacion: no_sumable
+      tiene_seguimiento:
+        significado: >-
+          Booleano: la obra tiene al menos una fila en `stg.plan_mensual`.
+          **NUNCA ES NULO** (se calcula con un `EXISTS`). **368 de 921 (39,9 %)
+          el 2026-09-10.** TRAMPA MEDIDA Y DECLARADA: se mide en `stg` y es
+          **superconjunto** del hecho publicado. Hay **349** obras con filas en
+          `mart.fact_seguimiento_mensual` frente a esas 368: **19 obras de
+          diferencia, y ninguna al reves**. Asi que `tiene_seguimiento = TRUE` no
+          garantiza que haya filas en el hecho; garantiza que hay plan del que
+          construirlas. Se mide en `stg` a proposito: el DDL de `mart` dropea sus
+          tablas con CASCADE cada noche y una vista de `maestro` colgada de ahi
+          no sobreviviria (es el incidente de F-047).
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: stg.obras.obra_id
@@ -158,6 +271,9 @@ objetos:
       - Cuantas obras hay dadas de alta en Sigrid
       - Quien es el cliente de la obra X
       - Que codigo tiene la obra que se llama X
+      - En que municipio o provincia esta la obra X
+      - Cuantas obras tenemos en cada provincia
+      - De que obras tiene el datamart presupuesto y de cuales tiene seguimiento
 
   proveedores:
     tipo: vista
@@ -345,6 +461,137 @@ objetos:
     ejemplos_preguntas:
       - Con que proveedores hemos contratado en la obra X y por cuanto
       - En cuantas obras trabaja el proveedor P
+
+  centros_coste:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      EL PUENTE entre el centro de coste y la obra. En Sigrid un centro de coste
+      y una obra son **dos entidades distintas** que comparten empresa y codigo,
+      y hasta F-073 no habia forma publicada de pasar de una a otra. Todo lo que
+      el origen anota contra un centro de coste —las retenciones, y manana las
+      horas y los partes— llega sin obra: esta vista es lo que permite
+      atribuirlo.
+    grano: >-
+      Una fila por centro de coste, **804 el 2026-09-10**, de las cuales **683
+      resuelven a obra** y 121 no. Esas 121 son estructura, delegacion y
+      servicios generales: salen con `obra_id` a NULL y **no se filtran**.
+      CONTAR FILAS AQUI NO ES CONTAR OBRAS. La resolucion es **1:1** y sin
+      ambiguedad, y la vista lo garantiza por construccion.
+    clave_negocio: [centro_coste_id]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      centro_coste_id:
+        significado: >-
+          Identificador del centro de coste en Sigrid (`cen.ide`). Es el valor
+          que traen las tablas que anotan contra centro de coste, y por el que
+          se une contra ellas.
+        agregacion: no_sumable
+      codigo_centro:
+        significado: >-
+          Codigo del centro tal y como se ve en Sigrid, de `con.cod`. Cuando el
+          centro es una obra, es **el mismo codigo que `maestro.obras.codigo_obra`**:
+          esa coincidencia, junto con la empresa, es exactamente el puente.
+      nombre_centro:
+        significado: Nombre legible del centro de coste, de `con.res`.
+      empresa:
+        significado: >-
+          Empresa del grupo a la que pertenece el centro (`con.emp`). Forma
+          parte de la clave del puente: dos empresas distintas pueden usar el
+          mismo codigo.
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que corresponde el centro de coste, cuando el puente
+          resuelve. **683 de los 804 centros resuelven** (2026-09-10). SE
+          RESUELVE POR EMPRESA Y CODIGO, y no por ningun campo de relacion:
+          `cen.obride` existe, parece el puente y **esta a 0 en las 804 filas**,
+          y la aritmetica sobre el `ide` (`obride + 1`) acierta solo el 64 %.
+          Quien rehaga esto mirara `obride` primero: no sirve.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El centro de coste **no es una obra**: es estructura, delegacion o
+          servicios generales. Son 121 de 804, y su coste es real; simplemente
+          no se imputa a ninguna obra.
+      codigo_obra:
+        significado: Codigo de la obra a la que resuelve el centro, de `con.cod`.
+        nulo_significa: El centro de coste no resuelve a ninguna obra.
+      nombre_obra:
+        significado: Nombre de la obra a la que resuelve el centro, de `con.res`.
+        nulo_significa: El centro de coste no resuelve a ninguna obra.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la ficha completa de la obra a la que pertenece el centro de
+          coste. Varios centros pueden resolver a la misma obra, aunque hoy la
+          relacion medida es 1:1.
+    ejemplos_preguntas:
+      - A que obra corresponde el centro de coste X
+      - Que centros de coste no son obra
+      - Cuantos centros de coste tienen obra detras
+
+  estados_documento:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El catalogo de estados de documento de Sigrid (`conest`), publicado
+      entero. **TRAMPA PRINCIPAL: la traduccion va por TIPO DE DOCUMENTO.** El
+      estado de un documento es un numero, y lo que ese numero significa depende
+      del tipo: el 15 es "EN CURSO" en una obra (tipo 42) y en un documento de
+      tipo 15 —la factura— significa otra cosa distinta. Traducir un estado sin
+      su tipo da una respuesta plausible y falsa.
+    grano: >-
+      Una fila por entrada del catalogo: **193 el 2026-09-10**, repartidas en 29
+      tipos de documento. El par `(tipo_documento, estado_id)` es unico —193 de
+      193 medido— y es la clave por la que se une.
+    clave_negocio: [tipo_documento, estado_id]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      estado_documento_id:
+        significado: Identificador de la fila del catalogo en Sigrid (`conest.ide`).
+        agregacion: no_sumable
+      tipo_documento:
+        significado: >-
+          Tipo de documento al que aplica el estado (`conest.tip`). Los que
+          importan hoy: **42 obra**, **44 contrato**, **15 factura**, 46
+          comparativo y 12 oferta. **Sin filtrar por este campo, la traduccion
+          es falsa.**
+        agregacion: no_sumable
+      estado_id:
+        significado: >-
+          Codigo del estado (`conest.est`). Es el valor que traen las columnas
+          `est` de los documentos —`con.est`, y por tanto
+          `maestro.obras.estado_id`—, y por el que se une **junto con el tipo**.
+        agregacion: no_sumable
+      codigo_estado:
+        significado: >-
+          Codigo corto del estado en Sigrid (`conest.cod`): `EST`, `ECU`, `TER`,
+          `CER`. Es texto y **no es el valor por el que se une**: para unir se
+          usa `estado_id`.
+      estado:
+        significado: >-
+          Nombre legible del estado (`conest.res`): EN ESTUDIO, EN CURSO,
+          TERMINADA, CERRADA. Es lo que se cita al responder.
+    relaciones:
+      - de: estado_id
+        a: maestro.obras.estado_id
+        cardinalidad: "1:N"
+        porque: >-
+          Es la traduccion del estado de la obra, **valida solo filtrando
+          `tipo_documento = 42`**. Sin ese filtro la union multiplica y traduce
+          con nombres de otro tipo de documento. `maestro.obras` ya trae la
+          columna `estado` resuelta: unir aqui solo hace falta para otros
+          documentos.
+    ejemplos_preguntas:
+      - Que significa el estado 15 en una obra
+      - Que estados puede tener un contrato en Sigrid
+      - Como se llama el estado con codigo X del documento de tipo Y
 
   fn_fecha:
     tipo: funcion

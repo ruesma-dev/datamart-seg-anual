@@ -1065,6 +1065,80 @@ objetos:
     relaciones: []
     ejemplos_preguntas: []
 
+  formas_pago:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El catalogo de formas de pago de Sigrid (`auxpag`), con su medio de pago
+      resuelto (`auxefp`): cheque, efectivo, pagare, transferencia, letra,
+      confirming, compensacion de saldos, tarjeta. Es la DIMENSION, no el uso:
+      dice que formas de pago existen y que significan, **no** con cual se pago
+      un documento concreto. Ese cableado al contrato es F-067 y a la factura,
+      F-080.
+    grano: >-
+      Una fila por forma de pago, **69 el 2026-09-10**. No se filtra ninguna,
+      **tampoco las dadas de baja**: un documento antiguo puede apuntar a una
+      forma de pago que ya no se usa, y si se filtrara aqui ese documento
+      quedaria sin traducir.
+    clave_negocio: [forma_pago_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      forma_pago_id:
+        significado: >-
+          Identificador de la forma de pago en Sigrid (`auxpag.ide`). Es el
+          valor por el que apuntan los documentos que la usan.
+        agregacion: no_sumable
+      codigo:
+        significado: >-
+          Codigo de la forma de pago tal y como se ve en Sigrid
+          (`auxpag.cod`): `CFCH60`, `TR30`, `PAG90`.
+      nombre:
+        significado: >-
+          Nombre legible de la forma de pago (`auxpag.res`), que suele llevar
+          dentro el plazo en dias: "CONFIRMING CH 60 dias".
+      plazo_formula:
+        significado: >-
+          El plazo tal y como lo guarda Sigrid (`auxpag.formul`), **VERBATIM**.
+          **NO ES UN NUMERO DE DIAS**: es una formula, y `30 450R` es un valor
+          real del catalogo. La mayoria de las filas si trae solo un numero
+          ("60", "90"), y por eso es tan facil tratarla como cantidad y salir
+          con una cifra plausible y falsa. No se puede sumar, ni comparar, ni
+          ordenar como numero; si hace falta un plazo numerico, hay que decidir
+          por escrito que hacer con las que no lo son.
+      medio_pago_id:
+        significado: >-
+          Identificador del medio de pago en `raw.auxefp` (`auxpag.efeide`). El
+          0 de Sigrid se publica como NULL.
+        agregacion: no_sumable
+        nulo_significa: La forma de pago no tiene medio asociado.
+      medio_pago:
+        significado: >-
+          Nombre del medio de pago, resuelto desde `auxefp.res`: CHEQUE,
+          EFECTIVO, PAGARE, TRANSFERENCIA, LETRA, SOLO CONFIRMING, CONFIRMING /
+          PAGARE, COMPENSACION SALDOS, TARJETA CREDITO. Son **10 medios**.
+          Detalle util para quien vaya a tocar esto: `config/tables_sigrid.yaml`
+          declara que el nombre del medio es `auxefp.est`, y **es falso** —`est`
+          viene vacio o nulo en las 10 filas—; el nombre esta en `res`, medido
+          el 2026-09-10.
+        nulo_significa: >-
+          La forma de pago no tiene medio asociado, o el que tiene no existe en
+          el catalogo de medios.
+      clase_medio:
+        significado: >-
+          Clase del medio de pago (`auxefp.cla`): un entero con el que Sigrid
+          agrupa los medios (0 efectivo y compensacion, 1 transferencia, 2
+          recibo y tarjeta, 3 pagare y letra, 4 cheque, 5 confirming). Sirve
+          para agrupar por familia de medio sin depender del literal.
+        agregacion: no_sumable
+        nulo_significa: La forma de pago no tiene medio asociado.
+    relaciones: []
+    ejemplos_preguntas:
+      - Que formas de pago existen en Sigrid
+      - Que medio de pago tiene la forma de pago X
+      - Que formas de pago van por confirming
+
   fn_sigrid_date:
     tipo: funcion
     capa: operacion
