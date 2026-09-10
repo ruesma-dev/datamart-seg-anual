@@ -9,6 +9,50 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## LO PRIMERO AL RETOMAR (sesion reiniciada el 2026-09-10)
+
+**F-073 tiene su spec escrita y ESPERA APROBACION DEL HUMANO.**
+`specs/F-073-tablas-nuevas-y-enriquecimiento/` (114 / 201 / 29 lineas, 21
+tareas). Nada de codigo hasta que el humano apruebe: es la PARADA 1.
+
+**Las tres decisiones que el humano tiene que aprobar**, tal como las dejo el
+spec-author:
+
+1. **La frontera con las ocho features ya fichadas**: *F-073 publica
+   DIMENSIONES y el MAESTRO DE OBRA; la feature de dominio publica su HECHO y
+   hace el CABLEADO*. Se queda con **cuatro objetos**: `maestro.centros_coste`
+   (el puente centro -> obra), `maestro.obras` enriquecida (direccion y
+   marcas), `maestro.estados_documento` (desde `conest`) y
+   `compras.formas_pago` (desde `auxpag` y `auxefp`). **No duplica ninguna
+   ficha**: el cableado de `conest` y `auxpag` a `compras.contratos` y
+   `compras.facturas` es literalmente el criterio 1 de `acceptance` de F-067 y
+   se queda alli.
+2. **Las marcas leen de `stg`, no de `mart`**, y hay que aprobar su
+   consecuencia: `mart/01_ddl.sql` dropea `mart.fact_seguimiento_mensual` con
+   `CASCADE` y destruiria la vista de `maestro` la noche siguiente (es el
+   incidente de F-047). Por eso **`build_maestros` pasa a depender de
+   `build_stg`**: un fallo de `build_stg` ahora se lleva por delante tambien
+   los maestros.
+3. **El criterio 2 de la `acceptance` esta reformulado a proposito.** Con
+   **294 de 921 municipios informados** no se puede exigir esa cobertura: R11 y
+   R12 obligan a publicar el porcentaje en la ficha y a que **«no consta» sea
+   la respuesta correcta para dos de cada tres obras**.
+
+**Cifras medidas por el spec-author el 2026-09-10**, sobre las 921 fichas de
+`maestro.obras`: **728 con presupuesto, 368 con plan mensual, 349 con hecho,
+193 sin nada**. La diferencia entre plan y hecho son **19 obras**, y la ficha
+del diccionario las declara.
+
+**OJO, Y ESTO NO SE VE SI NO SE DICE: hay OTRA SESION DE CLAUDE trabajando en
+este mismo repositorio.** Se llama `powerbi` y lleva **F-078** (la vista
+`mart.v_pbi_cp_tipologia` que cuelga Power BI). Consecuencias practicas: los
+numeros de feature se pisan -F-078 lo cogio ella, por eso el trabajo del
+diccionario acabo siendo F-079-, y **NUNCA se hace `git add -A`**: el
+2026-09-09 su trabajo se colo dentro de un commit de esta sesion.
+
+**PENDIENTE SIN URGENCIA**: `python main.py check-raw-recuentos` sobre las 65
+tablas, que no se ha lanzado desde que entraron las nueve de F-074.
+
 ## EL DESPLIEGUE DEL 09-SEP Y SU VERIFICACION (hecha el 2026-09-10)
 
 **Desplegada la imagen `r20260910-0102`** a las 23:03 UTC del 09-sep, con
@@ -334,3 +378,45 @@ campos de direccion de `raw.obr`, **tres no son la direccion de la obra**
 faltaban, **municipio** y **provincia**, viven en `raw.auxmun` y `raw.auxpro`
 via `obr.munide` y `obr.proide`. Lo demas, en
 `specs/F-071-obras-sin-datos/design.md` §1.
+
+## F-073 · SPEC ESCRITA (spec-author, 2026-09-10)
+
+`specs/F-073-tablas-nuevas-y-enriquecimiento/` con los tres ficheros:
+requirements 114/150, design 201/250, tasks 21 tareas.
+
+**LA FRONTERA QUE TRAZA, y es lo que el humano tiene que aprobar.** Regla:
+*F-073 publica DIMENSIONES y el MAESTRO DE OBRA; la feature de dominio publica
+su HECHO y hace el CABLEADO*. Se queda con cuatro objetos —`maestro.centros_coste`
+(el puente centro de coste -> obra), `maestro.obras` enriquecida,
+`maestro.estados_documento` (`conest`, 193 filas) y `compras.formas_pago`
+(`auxpag` + `auxefp`)— y deja fuera todo lo demas del censo. No duplica ninguna
+ficha: el cableado de `conest` y `auxpag` a `compras.contratos` y
+`compras.facturas` es literalmente el criterio 1 de `acceptance` de **F-067**.
+
+**MEDIDO HOY, 2026-09-10, por el MCP y en solo lectura** (justifica las marcas):
+sobre las 921 fichas de `maestro.obras`, **728 (79,0 %) tienen filas en
+`stg.presupuesto`**, **368 (39,9 %) en `stg.plan_mensual`**, **349 (37,9 %) en
+`mart.fact_seguimiento_mensual`** y **193 (21,0 %) no tienen ninguna de las dos**.
+La diferencia plan/hecho son **19 obras, y ninguna al reves**.
+
+**DECISIONES ABIERTAS QUE NECESITAN AL HUMANO:**
+
+1. **La frontera con F-067** (arriba). Si el humano prefiere que las dos
+   dimensiones vayan enteras a F-067, F-073 se queda solo con el puente y la
+   obra, y hay que quitar R19-R23 y las tareas T5, T6, T9, T10.
+2. **Las marcas leen de `stg`, no de `mart`** (DA-1 del diseño). `mart/01_ddl.sql`
+   dropea `mart.fact_seguimiento_mensual` con CASCADE, asi que una vista de
+   `maestro` colgada de ahi la destruye la nocturna siguiente —el incidente
+   literal de F-047—. Coste declarado: `tiene_seguimiento` es superconjunto del
+   hecho en 19 obras, y la ficha lo dice.
+3. **`build_maestros` pasa a depender de `build_stg`** (DA-3). Consecuencia real:
+   si `build_stg` falla, el orquestador marca `build_maestros` como SKIPPED, cosa
+   que hoy no pasa. Es inocuo porque los cuatro objetos de `maestro` son vistas,
+   pero cambia la conducta de la noche y conviene que este aprobado.
+
+**LO QUE LA SPEC REFORMULA A PROPOSITO**: el criterio 2 de la `acceptance` de
+F-073 exige que «donde esta la obra X» se responda sin explicar nada. Con
+294/921 municipios y 305/921 direcciones informadas, eso no lo da el origen. La
+spec lo convierte en R11 y R12: se publica igual, la ficha **declara el
+porcentaje informado** y «no consta» es la respuesta correcta para dos de cada
+tres obras. Ningun criterio exige cobertura minima.

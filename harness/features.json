@@ -1142,7 +1142,7 @@
         "Cada objeto nuevo o ampliado lleva su ficha en el diccionario, con el grano y el significado de cada columna",
         "Queda medido el porcentaje informado de cada columna nueva, para no publicar una columna vacia sin decirlo"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 6,
