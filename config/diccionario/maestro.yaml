@@ -474,7 +474,8 @@ objetos:
       horas y los partes— llega sin obra: esta vista es lo que permite
       atribuirlo.
     grano: >-
-      Una fila por centro de coste, **804 el 2026-09-10**, de las cuales **683
+      Una fila por centro de coste, o sea una por `centro_coste_id`, que es
+      unico: **804 el 2026-09-10**, de las cuales **683
       resuelven a obra** y 121 no. Esas 121 son estructura, delegacion y
       servicios generales: salen con `obra_id` a NULL y **no se filtran**.
       CONTAR FILAS AQUI NO ES CONTAR OBRAS. La resolucion es **1:1** y sin

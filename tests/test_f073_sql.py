@@ -18,7 +18,7 @@ anotados en `progress/impl_F-073.md` (`conest.tip/est/res`, `auxefp.res` —y no
 from __future__ import annotations
 
 import re
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -30,7 +30,7 @@ DIRECTORIO_SQL = (
 RUTA_CENTROS = DIRECTORIO_SQL / "maestro" / "04_centros_coste.sql"
 
 
-@lru_cache(maxsize=None)
+@cache
 def _sql(ruta: Path) -> str:
     assert ruta.exists(), f"SQL no encontrado: {ruta}"
     return ruta.read_text(encoding="utf-8")

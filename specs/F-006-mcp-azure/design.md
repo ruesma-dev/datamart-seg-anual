@@ -108,6 +108,7 @@ IngestRaw -> LoadExcelAux -> BuildStg -> BuildMart -> PublicarDiccionario -> App
 | 2026-09-03 (F-025) | Entran `_meta.obra_build` y `_meta.v_frescura_obra`, que responden «de cuándo es el dato de ESTA obra» ahora que el datamart no reconstruye todas cada noche. Inventario a **105** objetos |
 | 2026-09-06 (F-066) | Entran las **25 tablas de `raw`** que faltaban --personal, contabilidad y la cadena de compras--, cada una con su ficha. Inventario a **130** objetos |
 | 2026-09-09 (F-074) | Entran las **9 tablas de `raw`** que destapo el censo de F-072 --catalogos de personal y horas, maestro de articulos y los dos desgloses de trazabilidad--, cada una con su ficha. Inventario a **139** objetos |
+| 2026-09-10 (F-073) | Entran `maestro.centros_coste` (el puente centro de coste -> obra), `maestro.estados_documento` y `compras.formas_pago`, mas once columnas nuevas en `maestro.obras`. Inventario a **142** objetos |
 
 ## 3 · Componentes y ficheros que toca
 

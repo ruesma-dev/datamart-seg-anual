@@ -1077,7 +1077,8 @@ objetos:
       un documento concreto. Ese cableado al contrato es F-067 y a la factura,
       F-080.
     grano: >-
-      Una fila por forma de pago, **69 el 2026-09-10**. No se filtra ninguna,
+      Una fila por forma de pago, o sea una por `forma_pago_id`: **69 el
+      2026-09-10**. No se filtra ninguna,
       **tampoco las dadas de baja**: un documento antiguo puede apuntar a una
       forma de pago que ya no se usa, y si se filtrara aqui ese documento
       quedaria sin traducir.
