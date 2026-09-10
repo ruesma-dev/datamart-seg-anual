@@ -227,3 +227,243 @@ def test_f073_r20_el_comment_avisa_de_que_la_traduccion_va_por_tipo() -> None:
     assert "tipo de documento" in comentario.lower(), (
         "el COMMENT debe advertir de que la traducción va por tipo (R20)"
     )
+
+
+# ===========================================================================
+# `maestro.obras` (01, ampliada) · R7-R11, R13, R14, R16, R17 y R18
+# ===========================================================================
+
+RUTA_OBRAS = DIRECTORIO_SQL / "maestro" / "01_obras.sql"
+RUTA_PROVEEDORES = DIRECTORIO_SQL / "maestro" / "02_proveedores.sql"
+
+#: Las columnas que `maestro.obras` publicaba ANTES de F-073. Ninguna se puede
+#: caer ni renombrar: hay consumo externo colgando de ellas (R18).
+COLUMNAS_DE_SIEMPRE = (
+    "obra_id",
+    "codigo_obra",
+    "nombre_obra",
+    "estado_id",
+    "fecha_alta",
+    "fecha_baja",
+    "es_activa",
+    "cliente_id",
+    "codigo_cliente",
+    "nombre_cliente",
+)
+
+#: El vocabulario de dirección, que NO se inventa: es el que ya usa
+#: `maestro.proveedores`. Preguntar «dónde está» tiene que escribirse igual
+#: para una obra y para un proveedor (R7).
+COLUMNAS_DE_DIRECCION = (
+    "dir1",
+    "dir2",
+    "codigo_postal",
+    "provincia",
+    "municipio",
+    "direccion_completa",
+)
+
+
+def _troceado_en_profundidad_cero(texto: str, separador: str) -> list[str]:
+    """Trocea por `separador`, ignorando lo que caiga dentro de paréntesis."""
+    piezas: list[str] = []
+    actual: list[str] = []
+    profundidad = 0
+    i = 0
+    while i < len(texto):
+        caracter = texto[i]
+        if caracter == "(":
+            profundidad += 1
+        elif caracter == ")":
+            profundidad -= 1
+        if profundidad == 0 and texto.startswith(separador, i):
+            piezas.append("".join(actual))
+            actual = []
+            i += len(separador)
+            continue
+        actual.append(caracter)
+        i += 1
+    piezas.append("".join(actual))
+    return piezas
+
+
+def _columnas_publicadas(ruta: Path) -> set[str]:
+    """Los nombres que la vista EXPONE, con `AS` explícito o sin él.
+
+    Sin esto el barrido se quedaría corto: `maestro.proveedores` publica `dir1`
+    y `dir2` **sin alias**, y un barrido que solo mirase los `AS` no los
+    vería. Se
+    ignoran los paréntesis para que ni el `WITH` de proveedores ni los `EXISTS`
+    de las marcas de obra cuenten como columnas.
+    """
+    compacto = _compacto(_sql(ruta))
+    cuerpo = compacto[compacto.index("CREATE OR REPLACE VIEW") :]
+    cuerpo = _troceado_en_profundidad_cero(cuerpo, ";")[0]
+    seleccion = _troceado_en_profundidad_cero(cuerpo, " SELECT ")[1]
+    seleccion = _troceado_en_profundidad_cero(seleccion, " FROM ")[0]
+
+    nombres: set[str] = set()
+    for pieza in _troceado_en_profundidad_cero(seleccion, ","):
+        pieza = pieza.strip()
+        if not pieza:
+            continue
+        if " AS " in pieza:
+            nombres.add(pieza.rsplit(" AS ", 1)[1].strip())
+        else:
+            nombres.add(pieza.rsplit(".", 1)[-1].strip())
+    return nombres
+
+
+# --- R7 · el mismo vocabulario que `maestro.proveedores` -------------------
+
+
+@pytest.mark.parametrize("columna", COLUMNAS_DE_DIRECCION)
+def test_f073_r7_la_obra_usa_el_vocabulario_de_proveedores(columna: str) -> None:
+    assert columna in _columnas_publicadas(RUTA_PROVEEDORES), (
+        f"{columna} debería existir ya en maestro.proveedores; si cambió allí, "
+        "este test está avisando de que las dos vistas se han separado (R7)"
+    )
+    assert columna in _columnas_publicadas(RUTA_OBRAS), (
+        f"maestro.obras debe publicar {columna} con el mismo nombre (R7)"
+    )
+
+
+# --- R8 y R9 · de dónde sale la dirección, y de dónde NO ------------------
+
+
+@pytest.mark.parametrize("campo", ["dir1", "dir2", "dircpo", "dir"])
+def test_f073_r8_la_direccion_sale_de_los_cuatro_campos_de_obr(campo: str) -> None:
+    assert re.search(rf"o\.{campo}\b", _compacto(_sql(RUTA_OBRAS))), (
+        f"obr.{campo} es uno de los cuatro campos de dirección de la obra (R8)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("campo", "que_es"),
+    [
+        ("diride", "el director de obra"),
+        ("perdir", "la persona de contacto del director"),
+        ("entdiride", "la dirección del cliente"),
+    ],
+)
+def test_f073_r9_no_publica_como_direccion_lo_que_no_lo_es(
+    campo: str, que_es: str
+) -> None:
+    """Los tres suenan a dirección de la obra y ninguno lo es (F-071, medido)."""
+    assert campo not in _sin_comentarios(_sql(RUTA_OBRAS)), (
+        f"obr.{campo} es {que_es}, no la dirección de la obra (R9)"
+    )
+
+
+# --- R10 · municipio y provincia como ejes de agrupación -------------------
+
+
+@pytest.mark.parametrize(
+    "columna", ["municipio", "municipio_id", "provincia", "provincia_id"]
+)
+def test_f073_r10_publica_los_dos_ejes_con_su_identificador(columna: str) -> None:
+    assert columna in _columnas_publicadas(RUTA_OBRAS), (
+        f"agrupar por {columna} no puede depender del literal (R10)"
+    )
+
+
+def test_f073_r10_el_nombre_legible_viene_de_los_catalogos() -> None:
+    compacto = _compacto(_sql(RUTA_OBRAS))
+    assert "raw.auxmun" in compacto and "raw.auxpro" in compacto, (
+        "el nombre del municipio y el de la provincia salen de auxmun/auxpro (R10)"
+    )
+    assert "NULLIF(o.munide, 0)" in compacto, (
+        "munide a 0 es «no consta»: sin NULLIF uniría contra un catálogo falso (R10)"
+    )
+    assert "NULLIF(o.proide, 0)" in compacto, (
+        "proide a 0 es «no consta»: sin NULLIF uniría contra un catálogo falso (R10)"
+    )
+
+
+# --- R13 y R14 · las dos marcas -------------------------------------------
+
+
+@pytest.mark.parametrize("marca", ["tiene_presupuesto", "tiene_seguimiento"])
+def test_f073_r13_publica_las_dos_marcas(marca: str) -> None:
+    assert marca in _columnas_publicadas(RUTA_OBRAS), f"falta la marca {marca} (R13)"
+
+
+@pytest.mark.parametrize(
+    ("marca", "tabla"),
+    [
+        ("tiene_presupuesto", "stg.presupuesto"),
+        ("tiene_seguimiento", "stg.plan_mensual"),
+    ],
+)
+def test_f073_r14_cada_marca_es_un_exists_sobre_su_tabla_de_stg(
+    marca: str, tabla: str
+) -> None:
+    """`EXISTS` y no `COUNT`: 921 sondas por índice, y nunca devuelve NULL (R13)."""
+    compacto = _compacto(_sql(RUTA_OBRAS))
+    patron = rf"EXISTS \(\s*SELECT 1 FROM {re.escape(tabla)} [^)]*\) AS {marca}"
+    assert re.search(patron, compacto), (
+        f"{marca} debe ser EXISTS sobre {tabla} (R14); el patrón buscado es "
+        f"«EXISTS (SELECT 1 FROM {tabla} …) AS {marca}»"
+    )
+
+
+def test_f073_r14_las_marcas_leen_de_stg_y_nunca_de_mart() -> None:
+    """DA-1: `mart/01_ddl.sql` dropea con CASCADE y destruiría esta vista."""
+    assert "mart." not in _sin_comentarios(_sql(RUTA_OBRAS)), (
+        "una vista de maestro colgada de mart la destruye la nocturna siguiente "
+        "(el incidente de F-047): las marcas leen de stg (R14, DA-1)"
+    )
+
+
+# --- R16 y R17 · el estado, con nombre y sin multiplicar ------------------
+
+
+def test_f073_r16_publica_el_nombre_del_estado_junto_al_codigo() -> None:
+    alias = _columnas_publicadas(RUTA_OBRAS)
+    assert "estado" in alias, "falta el nombre del estado (R16)"
+    assert "estado_id" in alias, "el código interno se conserva (R16, R18)"
+
+
+def test_f073_r16_traduce_filtrando_el_tipo_de_documento_de_obra() -> None:
+    """Sin `tip = 42` traduciría contra estados de factura o de contrato."""
+    compacto = _compacto(_sql(RUTA_OBRAS))
+    assert "raw.conest" in compacto
+    assert re.search(r"\.tip = 42\b", compacto), (
+        "la traducción del estado va por tipo de documento, y el de obra es 42 (R16)"
+    )
+
+
+def test_f073_r17_la_traduccion_del_estado_no_puede_multiplicar_filas() -> None:
+    """921 filas, ni una más: la guarda es del SQL, no del contenido de hoy."""
+    compacto = _compacto(_sql(RUTA_OBRAS))
+    bloque = compacto[compacto.index("raw.conest") :]
+    assert "LIMIT 1" in bloque or "DISTINCT ON" in bloque, (
+        "un LEFT JOIN desnudo a conest multiplica el día que (tip, est) deje de "
+        "ser único (R17)"
+    )
+    assert "ORDER BY" in bloque, "LIMIT 1 sin ORDER BY no es determinista (R17)"
+
+
+# --- R18 · no se pierde ni se renombra nada ------------------------------
+
+
+@pytest.mark.parametrize("columna", COLUMNAS_DE_SIEMPRE)
+def test_f073_r18_conserva_todas_las_columnas_de_antes(columna: str) -> None:
+    assert columna in _columnas_publicadas(RUTA_OBRAS), (
+        f"maestro.obras publicaba {columna} antes de F-073 y tiene que seguir "
+        "publicándola con el mismo nombre (R18)"
+    )
+
+
+def test_f073_r18_el_significado_de_es_activa_no_cambia() -> None:
+    compacto = _compacto(_sql(RUTA_OBRAS))
+    assert "(c.fecbaj IS NULL OR c.fecbaj = 0) AS es_activa" in compacto, (
+        "es_activa se calcula igual que antes de F-073 (R18)"
+    )
+
+
+def test_f073_r11_la_cabecera_ya_no_afirma_que_las_obras_no_tienen_direccion() -> None:
+    """La cabecera de hoy dice «las obras no tienen dirección propia». Es falso."""
+    cabecera = _sql(RUTA_OBRAS).lower()
+    assert "las obras no tienen dirección" not in cabecera
+    assert "sin dirección" not in cabecera
