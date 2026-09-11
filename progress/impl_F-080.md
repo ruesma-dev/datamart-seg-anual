@@ -128,3 +128,24 @@ publica. `con.serie` informado en **0 de 255.148** → la serie sale de
 documento de tipo 25, sin excepción.
 
 Las tres comprobaciones salen. No hay nada que parar antes de T10.
+
+## T7 y T8 · Medición B y el presupuesto de ventana · MANUAL (humano)
+
+**T7 es una ESCRITURA y ningún agente la ejecuta.** Comando exacto, también en
+`progress/current.md`:
+
+```
+python main.py ingest --table con --full
+```
+
+y después, la duración de la fila `ingest_raw.con` de `_meta.etl_runs` frente a
+las noches anteriores (`python main.py timings --last 10`).
+
+**T8, el contraste con las 4 h de referencia (R5, DA-5).** Con la medición B
+pendiente, lo único que se puede contrastar hoy es lo que sale de la medición A:
+traer `con.tex` añade **~0,5 min de lectura** (2,2 → 2,7 min) y 43 MB a una
+ventana que hoy tarda **3 h 25 min**, o sea **~3 h 26 min frente a un
+presupuesto de 4 h: unos 34 min de margen**. **No hay aviso que dar**, y por lo
+tanto nada que bloquear. Si la medición B lo desmintiera, el aviso va por
+escrito y **la feature sigue**: no es una puerta, no se marca `blocked` y el
+`page_size` lo decide el humano con el dato delante.
