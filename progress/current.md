@@ -647,3 +647,46 @@ un agujero que no existe**, y porque la confianza en el resto de veredictos de
 la campana depende de saber por que paso. Auditar `harness/mutacion.py` no es
 de esta feature -y el arnes es generico: la correccion iria a `arnes-base`-,
 asi que queda como decision del humano.
+
+## DECISION DEL HUMANO (2026-09-11): EL DESPLIEGUE ESPERA A F-080
+
+**No se despliega F-073 + F-081 por separado.** El humano decidio esperar a que
+F-080 cierre y **hacer un solo despliegue con las tres**. Se le expuso el
+argumento contrario —que F-080 es el unico de los tres cambios con riesgo sobre
+la ventana nocturna, y que desplegar junto impide atribuir una noche larga— y
+aun asi prefiere tocar produccion una sola vez. **No lo repropongas.**
+
+**Que implica, y conviene tenerlo presente:**
+
+* **Nada de F-073 ni de F-081 existe hoy en la base.** El MCP no ve
+  `maestro.centros_coste`, `maestro.estados_documento`, `compras.formas_pago` ni
+  las once columnas nuevas de `maestro.obras`. Las verificaciones MANUAL de las
+  dos features **siguen pendientes** y no se pueden ejecutar hasta el
+  despliegue.
+* **La nocturna sigue corriendo la imagen vieja cada noche**, que es lo
+  correcto: no rompe nada y republica el diccionario que esa imagen lleva
+  dentro.
+* **Cuando se despliegue, el diccionario ira a la version 21** (19 de F-073, 20
+  de F-081, 21 de F-080) y se publica **una sola vez**.
+* **El despliegue se simplifica**: con F-080 cerrada, el arbol vuelve a estar
+  limpio y **ya no hace falta el `git worktree`** que se necesitaba para no
+  empaquetar el trabajo a medias. Se construye desde el directorio de siempre.
+
+**La guia de despliegue, en cuatro comandos** (`infra/README.md` §«Despliegue
+habitual»), y **por este orden**:
+
+```powershell
+powershell -NoProfile -File infra\05_check_prereqs.ps1   # solo lectura; si falla, PARA
+powershell -NoProfile -File infra\70_build_image.ps1     # construye en Azure, tag rAAAAMMDD-hhmm
+powershell -NoProfile -File infra\85_update_job.ps1      # el job pasa a usarla
+az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev \
+  --query "properties.template.containers[0].image" -o tsv
+```
+
+**El cuarto comando no es opcional**: la nocturna llego a correr una imagen de
+diez dias antes sin que nadie lo notara. El tag que devuelva tiene que ser el
+que imprimio el segundo.
+
+Despues de la primera nocturna con la imagen nueva van, en este orden,
+`check-raw-recuentos`, `check-declarados`, `check-diccionario` y, por ultimo,
+`publicar-diccionario`, que es **la unica escritura** y la autoriza el humano.
