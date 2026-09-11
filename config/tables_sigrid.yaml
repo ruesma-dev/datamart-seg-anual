@@ -103,10 +103,18 @@ tables:
     where: null
     exclude_columns:
       - tex    # observaciones largas si existieran
-    # Centros de coste. Tabla con MUCHAS columnas según el PDF (cnaeide,
-    # ctacot, calcabide, direcciones, teléfonos…) pero a nosotros nos basta
-    # con ide + res para mostrar el texto en la cabecera del cierre. El ETL
-    # acepta cualquier columna que venga; aquí solo evitamos texto libre.
+    # Centros de coste (804 filas, 68 columnas). Tabla con MUCHAS columnas
+    # según el PDF (cnaeide, ctacot, calcabide, direcciones, teléfonos…) y a
+    # nosotros nos basta con su `ide`. El ETL acepta cualquier columna que
+    # venga; aquí solo evitamos texto libre.
+    # OJO, MEDIDO CONTRA SIGRID EL 2026-09-11: `cen` NO TIENE COLUMNA `res`.
+    # Sus 68 columnas incluyen `reside` (int, una referencia) y `resepifor1…`,
+    # que no son eso. El código, el rótulo legible y la empresa del centro
+    # salen de `raw.con` por el mismo `ide`, que es de donde los toma
+    # `sql/maestro/04_centros_coste.sql`; `cierre/05_views_cabecera.sql` solo
+    # usa `cen.ide`. Hasta F-081 esta entrada decía «basta con ide + res», que
+    # es el error que la cabecera de `tests/test_f006_fuente_que_gobierna.py`
+    # ya documenta: ese `res` es de `cenrep`, tabla que ni se ingiere.
 
   - source_table: auxobrtip
     target_table: auxobrtip
@@ -1088,7 +1096,14 @@ tables:
       - coestr
     # Medios de pago (10 filas, 13 columnas), a donde apunta
     # `auxpag.efeide`. Tiene `tiemod` (medido). Su columna `est` es texto
-    # ilimitado y entra: son 10 filas y es lo que da nombre al medio.
+    # ilimitado y entra igual: son 10 filas y no cuesta nada.
+    # EL NOMBRE LEGIBLE DEL MEDIO ESTA EN `res`, y de ahi lo publica
+    # `sql/compras/04_formas_pago.sql`. MEDIDO CONTRA SIGRID EL 2026-09-11
+    # sobre las 10 filas del catalogo: `est` viene a NULL en 5 de ellas y
+    # vacia ('') en las otras 5, mientras que `res` trae CHEQUE, EFECTIVO,
+    # PAGARE, TRANSFERENCIA, LETRA, CONFIRMING / PAGARE...
+    # Hasta F-081 esta entrada se lo atribuia a la otra columna, y era falso:
+    # quien la creyera publicaria una columna vacia con un rotulo convincente.
 
   - source_table: conest
     target_table: conest

@@ -47,6 +47,12 @@ COLUMNAS_DE_NOMBRE = ("res", "est", "cod", "raz", "nom")
 #: Con una de estas palabras, una frase está atribuyendo el nombre legible.
 PALABRAS_DE_NOMBRE = ("nombre", "legible", "texto", "literal")
 
+#: «texto ilimitado» es el TIPO de la columna, y aparece una veintena de veces
+#: en este YAML explicando por qué una columna se excluye. Contarlo como una
+#: atribución del nombre encendería la luz roja en media configuración: se
+#: descarta antes de mirar la frase, y solo esa forma exacta.
+TIPO_NO_ES_NOMBRE = re.compile(r"texto\s+(?:ilimitado|libre)", re.IGNORECASE)
+
 #: Tabla de `raw` → el SQL que GOBIERNA de dónde sale su nombre legible.
 #: `auxefp` y `cen` son las dos entradas que mentían; `auxpag`, `auxpro` y
 #: `auxmun` entran como control positivo: si el detector solo supiera encender
@@ -110,7 +116,8 @@ def columnas_a_las_que_el_yaml_atribuye_el_nombre(
     """
     encontradas: set[str] = set()
     for frase in frases(bloque_de(tabla, texto)):
-        limpia = re.sub(r"`[^`]*[./][^`]*`", " ", frase)
+        limpia = TIPO_NO_ES_NOMBRE.sub(" ", frase)
+        limpia = re.sub(r"`[^`]*[./][^`]*`", " ", limpia)
         bajada = limpia.lower()
         if not any(palabra in bajada for palabra in PALABRAS_DE_NOMBRE):
             continue
