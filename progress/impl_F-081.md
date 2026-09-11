@@ -100,3 +100,78 @@ E  assert {'res'} <= {'ide'}
 ```
 
 **El test encontró la segunda mentira él solo**: `cen` no estaba en el encargo.
+
+## T4 · Los dos supervivientes de mutación (criterios 4, 5 y 6)
+
+`tests/test_f081_supervivientes.py`, 7 tests. **Ni `ventana_sql.py` ni
+`build_stg_step.py` se tocan**: `git diff 87f4d84..HEAD` sobre los dos devuelve
+vacío. Un agujero de test se tapa con tests.
+
+La fase RED aquí es la mutación: **el mutante vivo antes y muerto después**,
+con el mismo mutante generado por `harness.mutacion.generar_mutantes` (mismo
+fichero, línea, operador y texto) y restauración verificada por `sha256`.
+
+### 4a · `ventana_sql.py:215` — la denuncia muda
+
+`codigo_obra=str(codigo or "")` → `str(codigo and "")`.
+
+**Antes** (`tests/test_f025_cli.py` + `tests/test_f025_ventana.py`, los que
+recorren ese camino):
+
+```
+MUTANTE: ventana_sql.py:215 [logico] codigo_obra=str(codigo or ""), -> codigo_obra=str(codigo and ""),
+84 passed, 34 warnings in 2.85s
+VEREDICTO: SUPERVIVIENTE (exit 0)
+RESTAURADO: sha f5def9438b0b OK
+```
+
+**Después**, contra el fichero nuevo **y solo contra él**:
+
+```
+FAILED tests/test_f081_supervivientes.py::test_f081_c4_cada_denuncia_de_la_ventana_nombra_su_obra[sello_no_vigente-0806]
+FAILED tests/test_f081_supervivientes.py::test_f081_c4_una_obra_sin_codigo_se_denuncia_igual_y_sin_reventar
+2 failed, 5 passed in 1.75s
+VEREDICTO: MUERTO (exit 1)
+RESTAURADO: sha f5def9438b0b OK
+```
+
+El aserto que faltaba es que la denuncia **diga qué obra**:
+`test_f025_r26_un_sello_viejo_se_denuncia` solo miraba que apareciera la
+palabra `SELLO`. Los otros dos tipos de hallazgo construyen el código con la
+misma expresión y entran al test paramétrico por el mismo precio.
+
+### 4b · `build_stg_step.py:732` — **el superviviente era un FALSO POSITIVO**
+
+`if self._plan and self._plan.completa:` → `... or ...`.
+
+Medido antes de escribir nada, contra la **suite entera** y con los argumentos
+del propio arnés (`-x -q --tb=no -p no:cacheprovider`):
+
+```
+FAILED tests/test_f025_build.py::test_f025_r10_las_sobrantes_solo_se_miran_en_la_reconstruccion_completa
+1 failed, 2635 passed, 170 skipped in 157.70s
+VEREDICTO: MUERTO (exit 1)
+```
+
+Ese test **ya existía** en el commit que midió la campaña (`b6eda79`, byte a
+byte el mismo: `git show b6eda79:tests/test_f025_build.py`) y ni él ni
+`build_stg_step.py` han cambiado desde entonces. La campaña de F-073 lo declaró
+superviviente con `Timeouts: 0` y `base rota: 0`, así que **no fue un timeout
+ni una base rota**: es un veredicto equivocado. Queda anotado como consulta al
+humano en `progress/current.md`; auditar el mutador es otra feature.
+
+El test se escribe igualmente, y no por formalismo: la única red que había era
+un aserto indirecto —una lista de llamadas al doble— dentro de un test que
+mide otra cosa. `test_f081_c5_*` ataca la guarda de frente, en sus tres casos
+(plan PARCIAL, plan COMPLETA y sin plan), y mata al mutante **él solo**:
+
+```
+FAILED tests/test_f081_supervivientes.py::test_f081_c5_el_presupuesto_acotado_con_plan_PARCIAL_no_mira_las_sobrantes
+1 failed, 6 passed in 1.38s
+VEREDICTO: MUERTO (exit 1)
+RESTAURADO: sha c33b27bd7c8a OK
+```
+
+Y el log del mutante enseña el daño exacto que la guarda evita: `[warning]
+ventana_obras_sobrantes obras=[9] tabla=stg.presupuesto` en una noche acotada,
+es decir, denunciar como sobrante una obra que solo está **congelada**.
