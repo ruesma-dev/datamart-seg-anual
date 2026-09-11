@@ -42,7 +42,7 @@ sobre el **texto** del SQL: ningún agente ejecuta SQL contra la base.
 
 ## La ingesta
 
-- [ ] T5: Escribir `tests/test_f080_ingesta.py` con los asserts de R1 (`con` deja una sola exclusión, `ima`), R2 (`dcf`, `dca` y `ctr` no cambian), R3 (**tres** altas: `auxnap`, `auxban` y `rpa`, con el `incremental_column` medido en T2) y R6 (fichas de `raw` para las tres)  |  Verificación: `pytest tests/test_f080_ingesta.py` en ROJO; traza pegada
+- [x] T5: Escribir `tests/test_f080_ingesta.py` con los asserts de R1 (`con` deja una sola exclusión, `ima`), R2 (`dcf`, `dca` y `ctr` no cambian), R3 (**tres** altas: `auxnap`, `auxban` y `rpa`, con el `incremental_column` medido en T2) y R6 (fichas de `raw` para las tres)  |  Verificación: `pytest tests/test_f080_ingesta.py` en ROJO; traza pegada
   - *Corrige:* antes eran dos altas y la tabla de remesas se daba por no identificada; era falso, está medida y es `raw.rpa` (3.909 remesas de pago), a la que apunta `pag.remide`.
 - [ ] T6: Modificar `config/tables_sigrid.yaml`: sacar `tex` de `con` y dar de alta `auxnap`, `auxban` y `rpa` con su comentario de por qué entran; actualizar `config/diccionario/raw.yaml` (recuento de exclusiones de `con` de 2 a 1 y **tres** fichas nuevas); subir `TOTAL_TABLAS` de 65 a **68** en `tests/test_f074_ingesta_censo.py`  |  Verificación: `pytest tests/test_f080_ingesta.py tests/test_f074_ingesta_censo.py tests/test_f006_raw_ingesta.py` en verde
   - *Corrige:* antes subía `TOTAL_TABLAS` a 67 porque contaba dos altas; son tres.
