@@ -77,3 +77,25 @@ texto; `fecrem` es un entero AAAAMMDD), así que va con `incremental_column: nul
 Es exactamente el error que F-074 cometió declarando tres `tiemod` inexistentes.
 
 Recuentos de las tres altas: `auxnap` **3**, `auxban` **1.690**, `rpa` **3.919**.
+
+## T3 · Medición A del coste de ventana (R4a), solo lectura
+
+Tres ventanas de `con` repartidas por la tabla (`ide > 0`, `ide > 1.417.302`,
+`ide > 2.434.604`), las mismas para las cuatro combinaciones. `con` tiene
+**2.186.880 filas** y 19 columnas; «sin tex» son 18 (se excluye `ima`).
+
+| variante | `page_size` | filas | segundos | MB de respuesta |
+|---|---|---|---|---|
+| sin `tex` | 10.000 | 30.000 | **1,78** | 3,98 |
+| sin `tex` | 5.000 | 15.000 | 1,02 | 1,99 |
+| con `tex` | 10.000 | 30.000 | **2,24** | 4,57 |
+| con `tex` | 5.000 | 15.000 | 1,04 | 2,25 |
+
+Página más pesada medida con `tex` a 10.000 filas: **1,71 MB**. Extrapolado a la
+tabla entera: **2,2 → 2,7 min** de lectura HTTP y **290 → 333 MB**.
+
+**Traer `tex` cuesta +26 % de tiempo de lectura y +15 % de bytes: medio minuto
+sobre el total de `con`.** Y el temor de DA-4 —«una página de 10.000 documentos
+habladores puede pesar cientos de MB»— **no se cumple**: la peor pesa 1,71 MB.
+Por eso `page_size` de `con` se queda en el default global, sin bajarlo (R5 deja
+esa decisión al humano con el dato delante, y aquí el dato dice que no hace falta).
