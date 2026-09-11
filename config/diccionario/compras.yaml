@@ -1119,10 +1119,11 @@ objetos:
           Nombre del medio de pago, resuelto desde `auxefp.res`: CHEQUE,
           EFECTIVO, PAGARE, TRANSFERENCIA, LETRA, SOLO CONFIRMING, CONFIRMING /
           PAGARE, COMPENSACION SALDOS, TARJETA CREDITO. Son **10 medios**.
-          Detalle util para quien vaya a tocar esto: `config/tables_sigrid.yaml`
-          declara que el nombre del medio es `auxefp.est`, y **es falso** —`est`
-          viene vacio o nulo en las 10 filas—; el nombre esta en `res`, medido
-          el 2026-09-10.
+          Detalle util para quien vaya a tocar esto: hasta F-081,
+          `config/tables_sigrid.yaml` declaraba que el nombre del medio era
+          `auxefp.est`, y era **falso** —`est` viene vacio o nulo en las 10
+          filas, medido el 2026-09-10 y de nuevo el 2026-09-11—. El nombre
+          esta en `res`, y el yaml ya lo dice.
         nulo_significa: >-
           La forma de pago no tiene medio asociado, o el que tiene no existe en
           el catalogo de medios.

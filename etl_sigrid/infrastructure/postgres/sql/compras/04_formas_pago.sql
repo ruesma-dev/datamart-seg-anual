@@ -12,11 +12,13 @@
 -- las 69 aunque alguna se quede sin medio; aquí no se filtra nada, ni las
 -- formas dadas de baja.
 --
--- EL NOMBRE DEL MEDIO ES `auxefp.res`, MEDIDO (T1 de F-073).
--- `config/tables_sigrid.yaml` dice que es `est` y **es falso**: `est` viene
--- vacío en 5 de las 10 filas y a NULL en las otras 5, mientras que `res` trae
--- CHEQUE, EFECTIVO, PAGARÉ, TRANSFERENCIA, LETRA, CONFIRMING / PAGARÉ…
--- Publicar `est` habría dado una columna vacía con un nombre convincente.
+-- EL NOMBRE DEL MEDIO ES `auxefp.res`, MEDIDO (T1 de F-073, vuelto a medir el
+-- 2026-09-11 en F-081): `est` viene vacío en 5 de las 10 filas y a NULL en las
+-- otras 5, mientras que `res` trae CHEQUE, EFECTIVO, PAGARÉ, TRANSFERENCIA,
+-- LETRA, CONFIRMING / PAGARÉ… Publicar `est` habría dado una columna vacía con
+-- un nombre convincente.
+-- `config/tables_sigrid.yaml` lo declaraba en `est` y era falso; **F-081 lo
+-- corrigió**, y `tests/test_f081_yaml_ingesta.py` impide que vuelva.
 --
 -- `plazo_formula` VA TAL CUAL Y NO ES UN NÚMERO DE DIAS. `auxpag.formul` es una
 -- fórmula de Sigrid: `30 450R` es un valor real del catálogo. Interpretarlo
