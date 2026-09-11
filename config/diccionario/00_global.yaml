@@ -128,7 +128,16 @@
 # noche), y la cabecera de `maestro.yaml` decia que el esquema no se refresca de
 # noche, que dejo de ser cierto en F-047.
 
-version: 19
+# version 20 (F-081, 2026-09-11): NO CAMBIA NI UN OBJETO NI UNA COLUMNA. Sube
+# porque la ficha de `compras.formas_pago.medio_pago` decia que
+# `config/tables_sigrid.yaml` declara el nombre del medio en `auxefp.est` y que
+# eso es falso. Lo era, y F-081 **ha corregido el yaml**: ahora dice `res`, con
+# la medicion escrita al lado (`est` a NULL en 5 de las 10 filas y vacia en las
+# otras 5, remedido contra Sigrid el 2026-09-11). La ficha lo cuenta en pasado,
+# que es lo unico que cambia del contenido publicado. Se sube igual: republicar
+# un texto distinto con la etiqueta de ayer es como no republicarlo.
+
+version: 20
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

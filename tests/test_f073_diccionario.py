@@ -297,7 +297,17 @@ def test_f073_r21_la_ficha_del_medio_de_pago_no_promete_lo_que_no_hay() -> None:
 
 
 def test_f073_r28_el_diccionario_sube_a_la_version_19() -> None:
-    assert str(_diccionario().version) == "19", (
+    """R28 exige que F-073 **subiera** la versión, no que el diccionario se
+    quede en la suya para siempre.
+
+    Nació como igualdad exacta contra `"19"` y eso la convertía en un candado:
+    la siguiente feature que tocara una ficha tendría que elegir entre publicar
+    con la etiqueta de ayer —lo que R28 prohíbe— o tocar este test. Le pasó a
+    F-081 el 2026-09-11, al poner en pasado la ficha del medio de pago. Se
+    cambia a «19 o más», que es lo que R28 dice; el resto de features (F-074,
+    F-079) ya lo comprobaban así.
+    """
+    assert int(_diccionario().version) >= 19, (
         "el contenido del diccionario cambia, así que `version` sube: es lo que "
         "lee una persona para saber si lo publicado es esto (R28)"
     )
