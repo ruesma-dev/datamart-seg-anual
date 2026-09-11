@@ -384,3 +384,71 @@ descripción) y cuenta para transferencia. En la rejilla, por efecto: tipo,
 fecha de emisión, código, descripción, fecha de vencimiento, fecha real,
 importe, medio (`T Medio`), estado, código de cuenta contable y código de
 banco.
+
+---
+
+# CUARTA MEDICION, 2026-09-11: la anulacion, el enlace y la serie
+
+Adelanta la T4 de la spec de F-080 y **cierra sus dos decisiones abiertas**.
+Todo contra Sigrid, en solo lectura.
+
+## LA ANULACION ES `con.fecbaj`, y encaja 8 de 8 con la captura
+
+Sobre la factura `FR25/04222`, la de los ocho efectos del correo «CAPTURAS
+EFECTOS PAGOS»:
+
+| `con.cod` | `est` | estado | **`fecbaj`** | importe | en la captura |
+|---|---|---|---|---|---|
+| `FR25/04222_01` | 2 | Aprobado | **20250908** | 87.854,56 | rojo con aspa |
+| `FR25/04222_02` | 1 | Pendiente | 0 | 4.623,93 | vivo |
+| `DIV25/0155` | 10 | Pagado | 0 | 30.418,68 | vivo |
+| `DIV25/0156` | 2 | Aprobado | **20251010** | 57.435,88 | rojo con aspa |
+| `DIV25/0168` | 10 | Pagado | 0 | 7.080,89 | vivo |
+| `DIV25/0169` | 2 | Aprobado | **20251108** | 50.354,99 | rojo con aspa |
+| `DIV25/0184` | 10 | Pagado | 0 | 25.925,15 | vivo |
+| `DIV25/0185` | 10 | Pagado | 0 | 24.429,84 | vivo |
+
+**Los tres que la pantalla pinta en rojo con aspa son exactamente los tres con
+`fecbaj <> 0`.** Ni uno más, ni uno menos. El estado **no** distingue la
+anulación: los tres anulados están «Aprobado», igual que otros 23.007 efectos
+vivos del sistema.
+
+Cobertura: **89.095 de 255.074 efectos están de baja (34,9 %)**. Sin filtrar
+por `fecbaj`, **uno de cada tres efectos es un fantasma**.
+
+## LA PRUEBA QUE LO CIERRA: los importes cuadran con la cabecera
+
+La cadena de divisiones sucesivas se ve en los números:
+
+```
+87.854,56  (_01, anulado)  =  30.418,68 + 57.435,88
+57.435,88  (DIV25/0156, anulado)  =   7.080,89 + 50.354,99
+50.354,99  (DIV25/0169, anulado)  =  25.925,15 + 24.429,84
+```
+
+Y la suma de los **cinco vivos** da **87.854,56**, que más la retención viva
+(4.623,93) da **92.478,49**: **los dos números que la propia captura muestra en
+la cabecera de la factura**, «92.478,49 (87.854,56)».
+
+Es decir: **filtrar `fecbaj = 0` reproduce el importe que Sigrid enseña**. No
+es una hipótesis, es una comprobación contra la pantalla.
+
+## EL ENLACE HIJO -> ORIGEN NO EXISTE
+
+**`pag.padide` está a 0 en los 255.074 efectos.** Es el tercer campo de esta
+familia que promete y no cumple, después de `cen.obride` (F-073) y `con.serie`
+(abajo). No se puede publicar `efecto_origen_id`, y hay que decirlo en la
+ficha: la relación padre-hijo solo se deduce por importes y fechas, y eso no se
+publica como si fuera un dato.
+
+**Camino que queda para la spec (R40)**: publicar `efecto_anulado` desde
+`fecbaj` —que es lo que de verdad hace falta para no duplicar— y **no**
+publicar `efecto_origen_id`.
+
+## `con.serie` TAMPOCO SIRVE: está a 0 en los 255.074
+
+R38 dice que la serie se publique «desde la columna de serie, sin parsear
+`cod`». **Esa columna existe y está vacía.** La serie hay que derivarla del
+código (`FR`, `DIV`, `AGR`, `NO`…), y **ya existe la función que lo hace**:
+`compras.fn_serie`, en `sql/compras/00_setup.sql`, usada por
+`01_documentos.sql`. **R38 hay que corregirlo.**
