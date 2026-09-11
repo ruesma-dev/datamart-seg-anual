@@ -1,14 +1,12 @@
 <!-- specs/F-080-vencimientos-forma-pago-y-texto-factura/requirements.md -->
 # F-080 · Requisitos (EARS)
 
-**Alcance.** La **factura de compra**: sus efectos, su forma de pago, su texto y el
-control contra el contrato. NO la cartera de cobros y pagos (F-037 fase 1) ni
-comparativos, ofertas o estados (F-067). **Consume** `compras.formas_pago` (F-073);
-no la duplica. Alternativas descartadas, en `design.md`.
+**Alcance.** La **factura de compra**: sus efectos, su forma de pago, su texto y el control contra el
+contrato. NO la cartera de cobros y pagos (F-037 fase 1) ni comparativos, ofertas o estados (F-067).
+**Consume** `compras.formas_pago` (F-073); no la duplica. Alternativas descartadas, en `design.md`.
 
-**Corregida el 2026-09-10** (2.ª y 3.ª medición) y el **2026-09-11** (4.ª: la anulación es
-`con.fecbaj`; `pag.padide` y `con.serie` están a 0), con la exploración delante. Cada requisito
-tocado lleva su línea *Corrige:*; los retirados van al final y **el resto no se renumera**.
+**Corregida el 2026-09-10** (2.ª y 3.ª medición) y el **2026-09-11** (4.ª: la anulación es `con.fecbaj`; `pag.padide` y `con.serie` están a
+0), con la exploración delante. Cada requisito tocado lleva su línea *Corrige:*; los retirados van al final y **el resto no se renumera**.
 
 ## A · La ingesta: `con.tex`, los catálogos y las remesas (criterio 1)
 

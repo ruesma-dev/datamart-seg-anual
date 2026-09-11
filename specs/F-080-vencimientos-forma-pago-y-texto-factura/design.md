@@ -1,12 +1,10 @@
 <!-- specs/F-080-vencimientos-forma-pago-y-texto-factura/design.md -->
 # F-080 · Diseño técnico
 
-> **Corregido el 2026-09-10** (2.ª y 3.ª medición) y el **2026-09-11** (4.ª). Lo tocado lleva
-> su línea *Corrige:*. Dos titulares. Uno: **el efecto de pago ES un documento** (`raw.pag` son
-> «Propiedades de `con`», `tip = 25`), así que código, descripción y estado se **leen** de
-> `raw.con` / `raw.conest`. Dos: el efecto tiene **ciclo de vida** (división, agrupación,
-> anulación); su marca es **`con.fecbaj <> 0`**, medida, y el enlace hijo → origen **no
-> existe**, porque `pag.padide` está a 0 en toda la tabla.
+> **Corregido el 2026-09-10** (2.ª y 3.ª medición) y el **2026-09-11** (4.ª). Lo tocado lleva su línea *Corrige:*. Dos titulares. Uno: **el
+> efecto de pago ES un documento** (`raw.pag` son «Propiedades de `con`», `tip = 25`), así que código, descripción y estado se **leen** de
+> `raw.con` / `raw.conest`. Dos: el efecto tiene **ciclo de vida** (división, agrupación, anulación); su marca es **`con.fecbaj <> 0`**,
+> medida, y el enlace hijo → origen **no existe**, porque `pag.padide` está a 0 en toda la tabla.
 
 ## 1 · La frontera, y el orden con F-073
 
