@@ -33,11 +33,11 @@ traducido y las dos marcas-. **No se toca `compras.contratos` ni
 * `tiene_seguimiento` se mide en `stg.plan_mensual` y es **superconjunto** del
   hecho: 368 con plan frente a 349 con filas en `mart.fact_seguimiento_mensual`,
   **19 de diferencia y ninguna al reves**.
-* **`config/tables_sigrid.yaml` se equivoca** al decir que el nombre del medio de
-  pago es `auxefp.est`: `est` viene vacio o nulo en las 10 filas y el nombre
-  esta en `res`. Medido el 2026-09-10. **No se corrige el YAML en esta feature**
-  -no es su alcance, y cambiarlo toca la ingesta-, pero la ficha de
-  `compras.formas_pago` lo deja escrito.
+* **`config/tables_sigrid.yaml` se equivocaba** al decir que el nombre del medio
+  de pago es `auxefp.est`: `est` viene vacio o nulo en las 10 filas y el nombre
+  esta en `res`. Medido el 2026-09-10, fuera del alcance de F-073 y **corregido
+  el 2026-09-11 por F-081**, que ademas encontro la misma mentira en la entrada
+  de `cen`. Ver la seccion de F-081 al final de este fichero.
 
 ### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-073
 
@@ -613,3 +613,37 @@ F-073 exige que «donde esta la obra X» se responda sin explicar nada. Con
 spec lo convierte en R11 y R12: se publica igual, la ficha **declara el
 porcentaje informado** y «no consta» es la respuesta correcta para dos de cada
 tres obras. Ningun criterio exige cobertura minima.
+
+## F-081 · IMPLEMENTACION ENTREGADA (2026-09-11) · las dos deudas del review de F-073
+
+Rama `feature/F-081-deudas-review-F-073`, rigor `estandar`, `sdd=false`: el
+contrato son los siete criterios `acceptance` de la ficha. Informe completo:
+`progress/impl_F-081.md`.
+
+**QUE CAMBIA**: `config/tables_sigrid.yaml` deja de mentir sobre que columna da
+el nombre (`auxefp` -> `res`, y la entrada de `cen`, que atribuia a la tabla una
+columna `res` **que no existe en Sigrid**); un test nuevo lo impide en el
+futuro comparando el yaml con el SQL que publica el dato; y dos tests nuevos
+cierran los dos huecos de mutacion que dejo F-073. **Ni `ventana_sql.py` ni
+`build_stg_step.py` se tocan**: un agujero de test se tapa con tests.
+
+**NO HAY VERIFICACIONES MANUAL.** Nada de lo cambiado altera lo que corre de
+noche: el yaml solo cambia comentarios, el SQL de formas de pago solo su
+cabecera, y la ficha del diccionario se republica sola con la version 20.
+
+### CONSULTA AL HUMANO (no bloquea, pero conviene mirarla)
+
+**La campana de mutacion de F-073 dio un SUPERVIVIENTE FALSO.** Su
+superviviente numero 1 -`build_stg_step.py:732`, `and` -> `or`- **no sobrevive**:
+medido el 2026-09-11 contra la suite entera y con los argumentos del propio
+arnes (`-x -q --tb=no -p no:cacheprovider`), muere en 157,7 s a manos de
+`test_f025_r10_las_sobrantes_solo_se_miran_en_la_reconstruccion_completa`, un
+test que ya existia **byte a byte** en el commit que midio la campana
+(`b6eda79`) y que no ha cambiado desde entonces. El informe de F-073 declara
+`Timeouts: 0` y `base rota: 0`, asi que no fue ninguna de las dos cosas.
+
+Importa porque un superviviente falso **manda a alguien a escribir tests para
+un agujero que no existe**, y porque la confianza en el resto de veredictos de
+la campana depende de saber por que paso. Auditar `harness/mutacion.py` no es
+de esta feature -y el arnes es generico: la correccion iria a `arnes-base`-,
+asi que queda como decision del humano.
