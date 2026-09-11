@@ -1280,6 +1280,25 @@
       "rigor": "estandar",
       "priority": 7,
       "branch": "feature/F-080-vencimientos-forma-pago-y-texto-factura"
+    },
+    {
+      "id": "F-081",
+      "title": "Dos deudas del review de F-073: el nombre del medio de pago es falso en la configuracion de la ingesta, y dos supervivientes de mutacion sin test",
+      "description": "Nace el 2026-09-11 de las observaciones del review de F-073 (progress/review_F-073.md, seccion «Observaciones»). Ninguna bloqueo el cierre y el humano mando arreglar las dos. Son pequeñas, independientes entre si y de bajo riesgo. ================ (1) UNA MENTIRA EN LA CONFIGURACION DE LA INGESTA. config/tables_sigrid.yaml declara que el nombre del medio de pago de `auxefp` esta en la columna `est`. Es FALSO y esta medido: `est` viene vacia o nula en las 10 filas del catalogo, y el nombre esta en `res`. F-073 lo descubrio al construir compras.formas_pago, lo esquivo usando `res` y lo dejo documentado en tres sitios, pero NO corrigio el yaml porque estaba fuera de su alcance. Importa porque la configuracion de la ingesta es la fuente que gobierna el hecho para quien venga detras: el proximo que escriba SQL sobre `auxefp` leera el yaml, usara `est` y publicara una columna vacia sin que ningun test se entere. Es el mismo patron que F-006 cometio dos veces y que vigila tests/test_f006_fuente_que_gobierna.py. A MEDIR antes de tocar: si la mentira se repite en otras entradas del yaml, y si algun SQL o ficha del diccionario la ha creido. ================ (2) DOS SUPERVIVIENTES DE MUTACION QUE SI SON AGUJEROS DE TEST. La campaña de F-073 dejo nueve supervivientes; siete son inalcanzables offline por la convencion de no tocar BBDD en los tests y el noveno es F-077, ya fichado. Los dos que quedan son agujeros reales y NINGUNO es codigo de F-073: (a) `etl_sigrid/.../ventana_sql.py:215`, `codigo_obra=str(codigo or \"\")`: el mutante sobrevive porque el test lo tapa con un assert que no distingue el caso. (b) `etl_sigrid/application/steps/build_stg_step.py:732`, el camino acotado con plan PARCIAL. CUIDADO, Y ES LA RESTRICCION DURA DE ESTA FICHA: `build_stg_step.py` es uno de los FICHEROS DEL SELLO. Tocar su texto fuerza la reconstruccion completa de las 921 obras la noche siguiente. Un agujero de test SE TAPA ESCRIBIENDO TESTS, no cambiando el codigo que se prueba: esta feature NO modifica build_stg_step.py ni ventana_sql.py salvo que la medicion demuestre un defecto real, y en ese caso se para y se consulta al humano antes de tocar el sello. ================ CONTEXTO DE LA TERCERA OBSERVACION, para que nadie la busque aqui: la automejora de CHECKPOINTS.md sobre las features cuyo entregable es SQL y no generan mutantes en sus propias lineas NO se implementa en este repositorio. El humano decidio el 2026-09-11 que va al arnes generico, y esta escrita en arnes-base/ENCARGO_1.7.11_mutacion_cuando_el_entregable_es_sql.md (commit 0f79bf1).",
+      "acceptance": [
+        "config/tables_sigrid.yaml deja de declarar que el nombre del medio de pago de `auxefp` esta en `est`, y dice que esta en `res`, con la medicion que lo respalda (`est` vacia o nula en las 10 filas) escrita en el propio fichero",
+        "Queda comprobado y escrito si la misma mentira se repite en otras entradas del yaml y si algun SQL o ficha del diccionario la habia creido; si la hay, se corrige, y si no la hay, se declara que se busco",
+        "Existe un test que falla si alguien vuelve a declarar el nombre del medio de pago en `est`, de forma que la correccion no se pueda deshacer en silencio",
+        "El mutante superviviente de `ventana_sql.py:215` (`codigo_obra=str(codigo or \"\")`) muere con un test nuevo que distingue el caso que el assert actual no distingue",
+        "El mutante superviviente de `build_stg_step.py:732` (camino acotado con plan PARCIAL) muere con un test nuevo, SIN modificar `build_stg_step.py`: es fichero del SELLO y cambiar su texto fuerza la reconstruccion de las 921 obras la noche siguiente",
+        "Los tests nuevos no tocan red ni BBDD",
+        "bash harness/init.sh en verde, y la campaña de mutacion acotada a las lineas cambiadas con sus supervivientes analizados"
+      ],
+      "status": "in_progress",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 8,
+      "branch": "feature/F-081-deudas-review-F-073"
     }
   ]
 }
