@@ -54,3 +54,26 @@ trampa de DA-9 dos veces más):
 código—. Medido: 110.460 de 110.477 `banban` casan (99,98 %) y 93.273 de 93.273
 `bansuc` (100 %). `auxban.tipsuc` separa las 442 entidades (0) de las 1.248
 sucursales (1).
+
+## T2 · Las cifras (2026-09-11, solo lectura)
+
+| medida | valor |
+|---|---|
+| efectos cuyo `conide` es factura de compra (grano de `compras.vencimientos`) | **195.510** |
+| facturas distintas con efectos | 165.737 |
+| reparto de `con.est` contra `raw.conest` `tip = 25` | 10 Pagado 106.262 · 14 Agrupados 55.476 · 2 Aprobado 20.848 · 1 Pendiente 10.436 · 5 En cartera 2.319 · 3 Emitido 169 |
+| efectos de factura en remesa (`remide <> 0`) | 40.090 |
+| efectos de factura con retención (`retide <> 0`) | 23.180 |
+| efectos de factura con `fecrea = 0` | 120.843 (61,8 %) |
+| documentos `tip = 15` con `con.tex` | 108.527 de 165.759 (65,5 %), máx. 11.580 bytes, 30,3 MB |
+| documentos `tip = 44` con `con.tex` | 1.614 de 18.965 (8,5 %), máx. 1.731 bytes, 0,35 MB |
+| facturas que NO cuelgan de ningún contrato (R30) | **85.324 de 165.759 (51,5 %)** |
+| series del código del efecto | `FR` 192.444 · `DI` 3.016 · `AG` 25 · `AB` 13 · `VA` 10 · `FC` 2 |
+
+**`incremental_column` MEDIDO en `INFORMATION_SCHEMA`** (R3), no por analogía:
+`auxnap.tiemod` float **sí**, `auxban.tiemod` float **sí**, y **`rpa` no tiene
+`tiemod` ni ninguna columna de tipo fecha** (sus 30 columnas son numéricas o
+texto; `fecrem` es un entero AAAAMMDD), así que va con `incremental_column: null`.
+Es exactamente el error que F-074 cometió declarando tres `tiemod` inexistentes.
+
+Recuentos de las tres altas: `auxnap` **3**, `auxban` **1.690**, `rpa` **3.919**.
