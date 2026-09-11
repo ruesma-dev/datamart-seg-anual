@@ -891,3 +891,49 @@ puede ir por detrás del árbol, así que el número de versión del informe no 
 por bueno sin `check-diccionario`; y **la nocturna republica el diccionario
 desde la imagen desplegada**, de modo que una imagen vieja pisaría la 18 con la
 suya. Por eso este cierre va seguido de despliegue.
+
+## F-073 · Tablas nuevas y enriquecimiento (cerrada el 2026-09-11, APROBADO)
+
+Rama `feature/F-073-tablas-nuevas-y-enriquecimiento`, 21 tareas, commits
+`59a6b36..d203a5a`. Informe: `progress/impl_F-073.md`; review:
+`progress/review_F-073.md`; campaña: `progress/mutacion_F-073.md`.
+
+**Qué construyó**, con la regla de frontera que fijó su diseño —*F-073 publica
+DIMENSIONES y el MAESTRO DE OBRA; la feature de dominio publica su HECHO y hace
+el CABLEADO*—:
+
+* `maestro.centros_coste`, el puente centro de coste -> obra: 804 filas, 683 con
+  obra, 1:1 por construcción. Resuelto por empresa y código en `raw.con`, **sin
+  usar `cen.obride`** (a 0 en las 804) ni aritmética sobre el `ide`.
+* `maestro.obras` enriquecida: dirección, `municipio`/`provincia` con sus dos
+  identificadores, las marcas `tiene_presupuesto` y `tiene_seguimiento`, y
+  `estado` con su nombre. **921 filas y ninguna columna perdida**: las 10 de
+  siempre van primero y en su orden, las 11 nuevas detrás.
+* `maestro.estados_documento`, las 193 filas de `conest`.
+* `compras.formas_pago`, las 69 de `auxpag` con su medio resuelto.
+
+**Las tres decisiones que aprobó el humano**: la frontera con F-067; que las
+marcas lean de `stg` y no de `mart`, con `build_maestros` pasando a depender de
+`build_stg`; y publicar la dirección con la cobertura que hay (un tercio),
+declarando el porcentaje en la ficha en vez de exigir un mínimo.
+
+**Evidencias del cierre**: `init.sh` exit 0, **4.367 passed / 171 skipped / 0
+failed**, cobertura de líneas cambiadas **93,6 % (791/845)**, 288 mutantes
+generados y los nueve supervivientes analizados uno a uno. Diccionario del árbol
+en **versión 19**.
+
+**Lo intocable siguió intocado**, verificado por `sha256` y no por el informe:
+`stg/06_presupuesto.sql`, `stg/08_plan_mensual.sql`, el `rn = 1` de
+`stg/03_obras.sql`, `compras/01_documentos.sql` y `sql/retenciones/**`.
+
+**Corrección que salió de aquí**: R23 y el diseño afirmaban que el cableado de
+forma de pago y estado a `compras.contratos` **y** `compras.facturas` era el
+criterio 1 de F-067. Ese criterio nombra solo los contratos, y ningún criterio
+prometía la forma de pago de la **factura**. La reclama **F-080**.
+
+**Tres hallazgos del review que NO bloquearon y esperan decisión del humano**:
+dos supervivientes de mutación ajenos a F-073 (`ventana_sql.py:215` y
+`build_stg_step.py:732`); que `config/tables_sigrid.yaml` declara el nombre del
+medio de pago en `auxefp.est` **y es falso** (está en `res`); y una automejora
+de `CHECKPOINTS.md` para las features cuyo entregable es SQL y no generan
+mutantes en sus propias líneas.

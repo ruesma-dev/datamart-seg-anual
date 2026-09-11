@@ -222,3 +222,165 @@ nueva**: solo build.
 | `auxefp` (medios de pago) | 10 | ya ingerido |
 
 Las dos que faltan suman 1.669 filas: coste de ventana despreciable.
+
+---
+
+# SEGUNDA MEDICION, 2026-09-10: el codigo del efecto y su estado
+
+Pedida por el humano: «hay que revisar bien si el codigo de los efectos no se
+guarda en algun lado». Todo contra Sigrid, en solo lectura.
+
+## El codigo del efecto NO se almacena
+
+`raw.pag` tiene **46 columnas** y **ninguna es un codigo de documento**: no hay
+`cod`, ni `pos`, ni `num`, ni ordinal. Los tres campos de referencia que trae
+son otra cosa, y se han medido:
+
+| campo | informado | qué es |
+|---|---|---|
+| `cypref` (varchar 64) | 638 de 255.007 | texto libre; se ven cosas como «Retencion fra 251» o un número de pagaré |
+| `entref` (varchar 128) | 192.330 | **la referencia del proveedor**, su número de factura |
+| `retref` (varchar 32) | residual | referencia de la retención |
+
+En la factura del correo (`conide` 2776822), `entref` vale `W32/260058` en los
+dos efectos, que es exactamente el «Su Nº factura» de la cabecera de la
+captura. **El sufijo `_01` / `_02` de la rejilla lo pinta la aplicación.**
+
+Lo que sí se puede afirmar: numerar por `pag.ide` **reproduce el orden de la
+pantalla** en esta factura (2776826 es el «Pago 1 de 2» y 2776827 el «Pago 2 de
+2»). Sigue siendo una derivación, no un dato del origen.
+
+## EL ESTADO DE LA REJILLA NO SALE DE `fecrea`, Y ESTO INVALIDA R10
+
+Los **dos** efectos de la factura del correo tienen **`fecrea = 0`**, y sin
+embargo la pantalla muestra **CAR** en uno y **PDT** en el otro. Luego el
+rótulo no puede derivarse de la fecha real, que es lo que proponía R10.
+
+| efecto | importe | vencimiento | `cla` | `remide` | `retide` | rótulo en pantalla |
+|---|---|---|---|---|---|---|
+| 2776826 | 48.694,65 | 15/09/2026 | 0 | **2827675** | 0 | CAR |
+| 2776827 | 2.562,88 | 09/09/2027 | 2 | 0 | 558368 | PDT |
+
+La diferencia observable es que **el primero está en una remesa de pago y el
+segundo no**. Es una hipótesis con una sola factura detrás: **no basta para
+publicar un rótulo**. Lo que sí es un hecho medido es que `fecrea` no lo
+explica.
+
+Dato de apoyo: **`pun` vale 0 en los 255.007 efectos**, así que el punteo no
+distingue nada.
+
+Reparto medido de `cla` (5 valores: 0, 1, 2, 5, 6) cruzado con fecha real y
+remesa: 77.294 efectos sin fecha real, sin remesa y `cla = 0`; 62.900 con fecha
+real; 26.698 en remesa sin fecha real. El detalle completo, en la consulta.
+
+## LA TABLA DE REMESAS SI EXISTE, y estaba dada por no identificada
+
+`pag.remide` apunta a **`rpa`, «Remesas de Pagos»** (`sigrid_tablas.md:17779` y
+`:20723`), y `cob.remide` a **`rco`, «Remesas de Cobros»**. Medido:
+
+| tabla | filas |
+|---|---|
+| `rpa` (remesas de pago) | **3.909** |
+| `rco` (remesas de cobro) | 14 |
+| efectos de `pag` dentro de una remesa | 77.576 |
+
+`rpa` trae `fecrem` (fecha de remesa), `imptot`, el bloque bancario completo
+(`banide`, `banban`, `bansuc`, `bancue`, `ban`), `efeide` y `tex`. La remesa
+del efecto CAR de la captura es **`RP26/0241`**, con estado 5 y fecha
+01/09/2026.
+
+Esto **cierra el §7 del otro informe**: la tabla de remesas ya no está sin
+identificar. Ninguna de las dos se ingiere hoy.
+
+---
+
+# TERCERA MEDICION, 2026-09-10: EL EFECTO ES UN DOCUMENTO
+
+**CORRIGE LA SECCION ANTERIOR.** Ahi se concluyo que el codigo del efecto no
+se almacenaba, mirando las 46 columnas de `raw.pag`. **Era falso, y el error
+es exactamente el mismo que con el texto**: `pag` son «Propiedades de `con`»,
+o sea que **el efecto ES un documento** (`tip = 25`), y su codigo, su
+descripcion y su estado viven en la **superclase `con`**, no en `pag`.
+
+Dos veces el mismo fallo en la misma sesion. La leccion, ya escrita en
+`tests/test_f006_fuente_que_gobierna.py`: en Sigrid, antes de concluir que un
+campo no existe, hay que mirar `con`.
+
+## El codigo existe, y es literal
+
+| ide | `con.cod` | `tip` | `con.res` | `con.est` |
+|---|---|---|---|---|
+| 2776822 | `FR26/06051` | 15 | SECOEX INTEGRATED SECURITY… | 10 |
+| 2776826 | **`FR26/06051_01`** | 25 | **Pago 1 de 2** SECOEX… | 5 |
+| 2776827 | **`FR26/06051_02`** | 25 | **Pago 2 de 2** SECOEX… | 1 |
+
+`con.res` del efecto es la columna «Descripción» de la rejilla. **Nada hay que
+derivar**: ni el código ni el ordinal ni la descripción.
+
+## El estado tampoco se deriva: es `con.est` contra `conest` con `tip = 25`
+
+El catálogo existe y tiene **10 estados**, y explica los rótulos de tres letras
+de la pantalla:
+
+| est | nombre en `conest` | rótulo en la rejilla |
+|---|---|---|
+| 1 | Pendiente | PDT |
+| 2 | Aprobado | APR |
+| 3 | Emitido | |
+| 5 | **En cartera** | **CAR** |
+| 7 | Remesado | |
+| 10 | Pagado | PAG |
+| 12 | Devuelto | |
+| 14 | Agrupados | |
+| 15 | Divididos | |
+| 20 | Anticipado | |
+
+Reparto medido sobre los 255.007 efectos: **10 (Pagado) 145.702**, 14
+(Agrupados) 58.813, 2 (Aprobado) 23.010, 1 (Pendiente) 15.826, 7 (Remesado)
+8.656, 5 (En cartera) 2.768, 3 (Emitido) 237, 15 (Divididos) 2.
+
+**Queda invalidada la hipótesis de la medición anterior**: el estado no sale de
+`fecrea` ni de `remide`. Es un campo con catálogo propio.
+
+## Las series del código, medidas por prefijo
+
+| prefijo | efectos | qué es |
+|---|---|---|
+| `FR` | 192.356 | el efecto inicial de la factura, con sufijo `_01`, `_02` |
+| `NO` | 35.846 | |
+| `AG` | 21.992 | **agrupación**, la que se usa al remesar |
+| `DI` | 3.587 | **división** de un efecto inicial |
+| `VA`, `PE`, `AB`, `AN`, `FC` | 1.071 | residuales |
+
+## EL CICLO DE VIDA, explicado por el humano y visto en las capturas del
+## correo «CAPTURAS EFECTOS PAGOS» (2026-09-10, 11:23 UTC)
+
+1. La factura nace con **dos efectos**: `<codigo>_01` el pago y `<codigo>_02`
+   **la retención** (se ve en la cuenta contable: 4100… el pago, 4108… la
+   retención).
+2. Ese efecto inicial **se puede dividir** en varios, con serie **`DIV`**. El
+   efecto original **queda anulado**: en la rejilla sale en **rojo con aspa**,
+   y los vivos en negro con la marca de pago.
+3. Al remesar, los efectos **se agrupan** con serie **`AGR`**.
+
+Ejemplo real (factura `FR25/04222`, 8 efectos): `FR25/04222_01` anulado, y de
+él salen `DIV25/0155`, `DIV25/0156` (anulado a su vez), `DIV25/0168`,
+`DIV25/0169` (anulado), `DIV25/0184` y `DIV25/0185`, cada uno con su
+vencimiento, su importe, su estado y su banco.
+
+**Consecuencia dura para el modelo: sumar los importes de todos los efectos de
+una factura DUPLICA**, porque conviven el anulado y sus hijos. La ficha del
+diccionario tiene que decirlo y la vista tiene que dar forma de excluir los
+anulados sin borrarlos.
+
+## Lo que el humano manda guardar, con sus palabras
+
+«Los efectos tienen **fecha de vencimiento y medio de pago**, mientras que las
+facturas tienen **medio de pago y método**. Hay que guardar toda esta info.»
+
+En la cabecera de la pestaña Vencimientos se ven, por factura: forma de pago
+(código y descripción), fórmula de pago, naturaleza, medio de pago (código y
+descripción) y cuenta para transferencia. En la rejilla, por efecto: tipo,
+fecha de emisión, código, descripción, fecha de vencimiento, fecha real,
+importe, medio (`T Medio`), estado, código de cuenta contable y código de
+banco.

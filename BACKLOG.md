@@ -3,9 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **76 features**, 52 abiertas, 24 terminadas.
-
-En curso: **F-073**.
+Resumen: **76 features**, 51 abiertas, 25 terminadas.
 
 Bloqueadas: **F-052**.
 
@@ -13,7 +11,6 @@ Bloqueadas: **F-052**.
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-073 | Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales | 6 | en curso | estandar | `feature/F-073-tablas-nuevas-y-enriquecimiento` |
 | F-080 | Los vencimientos, la forma de pago y el texto de la factura de compra: lo que Administracion pide y el datamart no publica | 7 | pendiente | estandar | `feature/F-080-vencimientos-forma-pago-y-texto-factura` |
 | F-076 | La certificacion al cliente se puede consultar pero no esta modelada ni explicada: los ambitos VEN y CER_PEC viven en stg y no llegan al seguimiento | 9 | pendiente | estandar | `feature/F-076-ambitos-certificacion` |
 | F-070 | El MCP solo entiende lo que el diccionario le explica: auditar la calidad de las 103 fichas, no que existan | 10 | pendiente | estandar | `feature/F-070-auditoria-calidad-diccionario` |
@@ -85,6 +82,7 @@ Bloqueadas: **F-052**.
 | F-079 | El diccionario desaconseja consultar stg y eso ya no vale: lo publicado es para consultarse | 4 | estandar |
 | F-004 | Ejecutar el ETL en Azure sin dependencias locales | 5 | estandar |
 | F-015 | Verificar que los tests son de verdad: mutacion, fase RED, cobertura y niveles de rigor | 6 | estandar |
+| F-073 | Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales | 6 | estandar |
 | F-074 | La ingesta que destapa el censo: 9 tablas que faltan, una carga incremental falsa y un campo excluido que hacia falta | 6 | estandar |
 | F-003 | Infra: despliegue como Container Apps Job diario | 8 | critico |
 | F-020 | Arnes multi-servicio: preparar arnes-base para monorepos de varias apps/servicios | 9 | estandar |
@@ -96,12 +94,6 @@ Bloqueadas: **F-052**.
 | F-008 | Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api | 21 | documental |
 
 ## Detalle
-
-### F-073 · Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales
-
-estado **en curso** · prioridad 6 · rigor `estandar` · SDD sí · rama `feature/F-073-tablas-nuevas-y-enriquecimiento`
-
-La segunda mitad de lo que pidio el humano el 2026-09-09: «con eso vamos a crear nuevas tablas de datos procesados y a enriquecer las actuales». **Su contenido lo fija F-072**, que es quien mide que hay dentro de las 31 tablas sin consumidor; hasta que ese catalogo exista, esta ficha no puede decir que se construye sin inventarselo. LO QUE YA SE SABE QUE ENTRA, heredado de F-071 y sin nada que borrar: la **direccion de la obra** en la capa de consumo -hoy solo existe en `raw`, que el MCP no puede leer, asi que a la pregunta «donde esta la obra X» el datamart no sabe responder-, con `dir1`, `dir2`, codigo postal, **municipio** y **provincia** (estos dos por `raw.auxmun` y `raw.auxpro`) y una `direccion_completa` con los mismos nombres que ya usa `maestro.proveedores`, para no inventar un segundo vocabulario; y las **marcas de si una obra tiene seguimiento y presupuesto**, que son enriquecimiento puro. IMPORTANTE, y es la correccion del humano que mato a F-071: **no se borra ni se filtra nada**. Las 472.890 filas huerfanas de `stg.presupuesto` y `stg.plan_mensual` se quedan donde estan, el censo de la ventana NO se acota, y ninguna obra desaparece de ninguna vista: solo se añade informacion. REPARTO: buena parte de lo que salga de F-072 cae en features de dominio que ya existen (F-055 proveedor, F-056 mayor y plan de cuentas, F-057 coste de personal, F-058 estados financieros, F-067 compras, F-038 comparativos, F-037 tesoreria, F-040 ingresos); esta feature recoge lo que no tenga sitio y coordina el orden. Al terminar, cada objeto nuevo lleva su ficha en el diccionario, que es lo unico que hace que la IA lo entienda. ================ MEDIDO EL 2026-09-09 EN EL REVIEW DE F-072, y **acota lo que esta feature puede prometer**: sobre las 921 fichas de `maestro.obras`, **solo 294 (31,9 %) traen municipio informado y 305 (33,1 %) traen la primera linea de direccion**. O sea que a «donde esta la obra X», que esta ficha promete responder, **para dos de cada tres obras la respuesta correcta es «no consta»**. No invalida publicarla -para un tercio de las obras es informacion que hoy no existe en ninguna capa de consumo, y el MCP no puede leer `raw`- pero **la ficha del diccionario tiene que decir el porcentaje informado** y el criterio de aceptacion no puede exigir una cobertura que el origen no tiene. Ademas, de los ocho campos de direccion de `raw.obr` **solo cuatro son la direccion de la obra**: `diride` es el director de obra, `perdir` su persona de contacto y `entdiride` la direccion del cliente. Municipio y provincia salen de `raw.auxmun` y `raw.auxpro`. Detalle en `progress/explore_F-072_catalogo.md` §6.
 
 ### F-080 · Los vencimientos, la forma de pago y el texto de la factura de compra: lo que Administracion pide y el datamart no publica
 
@@ -498,6 +490,12 @@ CORREGIDO 2026-08-08 tras la spec: la premisa anterior era falsa. LoadExcelAuxSt
 estado **terminada** · prioridad 6 · rigor `estandar` · SDD sí · rama `feature/F-015-verificar-tests`
 
 Hoy el arnes comprueba que los tests PASAN, pero nada comprueba que sean tests de verdad. Un test que pasa siempre es peor que no tener test: da falsa tranquilidad y ademas cuesta mantenerlo. Adoptado del arnes de Uncle Bob (github.com/betta-tech/harness-sdd, rama uncle-bob-harness) y de la skill old-coder (github.com/AmazingAng/old-coder), cuya tesis es que el humano no revisa codigo sino evidencias: un plan de pruebas antes y un informe con numeros reales despues. Precedente propio: el implementer de F-005 inyecto una contrasena falsa en .env.example para comprobar que el barrido de secretos saltaba. Eso ya es mutation testing sobre un test; esta feature lo generaliza. NO se adopta Gherkin: ya tenemos requisitos EARS con test trazable (test_fXXX_rN_*), que da la misma trazabilidad sin un tercer artefacto que mantener. NO se adopta que el reviewer pueda podar features: las features salen de decisiones de negocio del humano. Es una mejora GENERICA: se porta a arnes-base en el mismo trabajo.
+
+### F-073 · Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales
+
+estado **terminada** · prioridad 6 · rigor `estandar` · SDD sí · rama `feature/F-073-tablas-nuevas-y-enriquecimiento`
+
+La segunda mitad de lo que pidio el humano el 2026-09-09: «con eso vamos a crear nuevas tablas de datos procesados y a enriquecer las actuales». **Su contenido lo fija F-072**, que es quien mide que hay dentro de las 31 tablas sin consumidor; hasta que ese catalogo exista, esta ficha no puede decir que se construye sin inventarselo. LO QUE YA SE SABE QUE ENTRA, heredado de F-071 y sin nada que borrar: la **direccion de la obra** en la capa de consumo -hoy solo existe en `raw`, que el MCP no puede leer, asi que a la pregunta «donde esta la obra X» el datamart no sabe responder-, con `dir1`, `dir2`, codigo postal, **municipio** y **provincia** (estos dos por `raw.auxmun` y `raw.auxpro`) y una `direccion_completa` con los mismos nombres que ya usa `maestro.proveedores`, para no inventar un segundo vocabulario; y las **marcas de si una obra tiene seguimiento y presupuesto**, que son enriquecimiento puro. IMPORTANTE, y es la correccion del humano que mato a F-071: **no se borra ni se filtra nada**. Las 472.890 filas huerfanas de `stg.presupuesto` y `stg.plan_mensual` se quedan donde estan, el censo de la ventana NO se acota, y ninguna obra desaparece de ninguna vista: solo se añade informacion. REPARTO: buena parte de lo que salga de F-072 cae en features de dominio que ya existen (F-055 proveedor, F-056 mayor y plan de cuentas, F-057 coste de personal, F-058 estados financieros, F-067 compras, F-038 comparativos, F-037 tesoreria, F-040 ingresos); esta feature recoge lo que no tenga sitio y coordina el orden. Al terminar, cada objeto nuevo lleva su ficha en el diccionario, que es lo unico que hace que la IA lo entienda. ================ MEDIDO EL 2026-09-09 EN EL REVIEW DE F-072, y **acota lo que esta feature puede prometer**: sobre las 921 fichas de `maestro.obras`, **solo 294 (31,9 %) traen municipio informado y 305 (33,1 %) traen la primera linea de direccion**. O sea que a «donde esta la obra X», que esta ficha promete responder, **para dos de cada tres obras la respuesta correcta es «no consta»**. No invalida publicarla -para un tercio de las obras es informacion que hoy no existe en ninguna capa de consumo, y el MCP no puede leer `raw`- pero **la ficha del diccionario tiene que decir el porcentaje informado** y el criterio de aceptacion no puede exigir una cobertura que el origen no tiene. Ademas, de los ocho campos de direccion de `raw.obr` **solo cuatro son la direccion de la obra**: `diride` es el director de obra, `perdir` su persona de contacto y `entdiride` la direccion del cliente. Municipio y provincia salen de `raw.auxmun` y `raw.auxpro`. Detalle en `progress/explore_F-072_catalogo.md` §6.
 
 ### F-074 · La ingesta que destapa el censo: 9 tablas que faltan, una carga incremental falsa y un campo excluido que hacia falta
 
