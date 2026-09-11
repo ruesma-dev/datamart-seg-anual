@@ -24,7 +24,18 @@ tables:
     where: null
     exclude_columns:
       - ima    # imagen del concepto, binario pesado
-      - tex    # texto libre largo, no lo usamos en seguimiento
+    # `tex` ENTRA DESDE F-080 (2026-09-11). Hasta entonces estaba excluido con
+    # el comentario «texto libre largo, no lo usamos en seguimiento», y eso es
+    # justo lo que desmiente la peticion de Administracion: la pestana «Texto»
+    # de la factura de compra se pinta desde ESTE memo, no desde `dcf.tex`.
+    # MEDIDO contra Sigrid: `con.tex` informado en 108.527 de 165.759 facturas
+    # (65,5 %) y en 1.614 de 18.965 contratos, con un maximo de 11.580 bytes.
+    # En `dcf.tex` solo hay 474 de 165.658 (0,3 %). Mismo patron que
+    # `prvcer.tex` en F-074: estaba fuera por la lista estandar del modulo.
+    # COSTE MEDIDO de traerlo (T3 de F-080, tres ventanas de la tabla, solo
+    # lectura): +26 % de tiempo de lectura y +15 % de bytes sobre `con`, o sea
+    # 2,2 -> 2,7 min y 290 -> 333 MB en la tabla entera. La pagina mas pesada
+    # a 10.000 filas pesa 1,71 MB, asi que el page_size se queda como estaba.
     # page_size: omitido → usa default global
 
   - source_table: conext
@@ -1295,3 +1306,51 @@ tables:
     # Desglose de linea de contrato (424.475 filas, 8 columnas). Trazabilidad
     # linea a linea contrato -> albaran o factura. `docproide` apunta a
     # `ctrpro.ide`. Medido: 10.000 filas en 0,5 s por la pasarela.
+
+  # --- F-080: el bloque de pago del efecto y las remesas --------------------
+  # Las tres entran por la peticion de Administracion del 2026-09-10: los
+  # vencimientos de la factura de compra se publican con nombres, no con
+  # identificadores desnudos. `incremental_column` MEDIDO en
+  # INFORMATION_SCHEMA el 2026-09-11, tabla por tabla y no por analogia con la
+  # vecina, que es como F-074 declaro tres `tiemod` inexistentes.
+
+  - source_table: auxnap
+    target_table: auxnap
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+    # Naturalezas de pago (3 filas MEDIDAS: NOM nominas, EMB embargo, CUO
+    # cuotas), a donde apuntan `pag.natide` y `dcf.cypnatide`. Seis columnas,
+    # ninguna pesada, y `tiemod` existe (MEDIDO).
+
+  - source_table: auxban
+    target_table: auxban
+    id_column: ide
+    incremental_column: tiemod
+    where: null
+    exclude_columns: []
+    # Bancos y sucursales (1.690 filas MEDIDAS, 12 columnas), a donde apuntan
+    # `pag.banban` y `pag.bansuc`. MEDIDO como se unen, que era justo lo que
+    # no constaba: los dos campos van contra `auxban.ide` -no contra el codigo
+    # de banco- en dos joins distintos; casan 110.460 de 110.477 `banban`
+    # (99,98 %) y 93.273 de 93.273 `bansuc`. `tipsuc` separa las 442 entidades
+    # (0) de las 1.248 sucursales (1). Su `dir` es texto ilimitado y entra
+    # igual: son 1.690 filas y no cuesta nada. Tiene `tiemod` (MEDIDO).
+
+  - source_table: rpa
+    target_table: rpa
+    id_column: ide
+    # MEDIDO CONTRA SIGRID EL 2026-09-11: `rpa` NO tiene `tiemod` ni ninguna
+    # columna de tipo fecha. Sus 30 columnas son numericas o texto, y lo que
+    # parece fecha (`fecrem`) es un entero AAAAMMDD. Refresco completo.
+    incremental_column: null
+    where: null
+    exclude_columns: []
+    # Remesas de pago (3.919 filas MEDIDAS), a donde apunta `pag.remide`:
+    # 40.090 efectos de factura de compra estan en una remesa. Trae `fecrem`,
+    # `imptot` y el bloque bancario entero.
+    # OJO, Y ES LA TRAMPA DE SIEMPRE: `rpa` es «Propiedades de `con`», o sea
+    # que la remesa ES UN DOCUMENTO (`tip = 27`) y su codigo -`RP26/0254`- y su
+    # descripcion viven en `raw.con`, no aqui. Las 3.919 tienen fila en `con`
+    # (MEDIDO). `rco`, las remesas de COBRO, no entran: eso es F-037.

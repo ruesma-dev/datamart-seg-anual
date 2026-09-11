@@ -40,7 +40,7 @@ FICHERO_RAW = RAIZ / "config" / "diccionario" / "raw.yaml"
 FICHERO_GLOBAL = RAIZ / "config" / "diccionario" / "00_global.yaml"
 
 #: Cuantas tablas ingiere el ETL cuando esta feature cierra: 56 + 9.
-TOTAL_TABLAS = 65
+TOTAL_TABLAS = 68
 
 #: Las tres que SI tienen `tiemod`, comprobado en `INFORMATION_SCHEMA` y
 #: poblado al 100 % en las tres (7/7, 60/60 y 37/37).

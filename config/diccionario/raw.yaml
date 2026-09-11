@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 65 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 68 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -92,8 +92,17 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 2 columnas: solo `ima`, `tex`. Preguntar por ellas
-      aqui no devuelve nulo, devuelve "columna inexistente".
+      **No se traen** 1 columna: solo `ima`, la imagen del concepto.
+      Preguntar por ella aqui no devuelve nulo, devuelve "columna
+      inexistente".
+
+      **EL MEMO DEL DOCUMENTO SI SE TRAE, DESDE F-080** (2026-09-11). La
+      pestana "Texto" que se ve en una factura de compra o en un contrato
+      se pinta desde este memo de la superclase, y no desde el campo
+      homonimo de la tabla del documento: informado en 108.527 de 165.759
+      facturas (65,5 %) frente a 474 de 165.658 en `dcf` (0,3 %). Quien
+      quiera leerlo ya partido en comentarios tiene
+      `compras.documento_comentarios`, y entero, `compras.documento_texto`.
     grano: Una fila por concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -2064,6 +2073,66 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
     grano: Una fila por enlace entre una linea de contrato y su desglose, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxnap:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Tres filas de catalogo: traduce un codigo, no responde ninguna pregunta. El nombre ya resuelto esta en `compras.vencimientos.naturaleza_pago` y en `compras.v_facturas_pago`.
+    descripcion: >-
+      **Naturalezas de pago** (3 filas MEDIDAS el 2026-09-11: NOM nominas, EMB embargo, CUO cuotas), a donde apuntan `pag.natide` y `dcf.cypnatide`. Entra con F-080 para que el efecto y la factura publiquen la naturaleza con su nombre y no como un numero suelto. Informada en 37.053 de los 255.148 efectos, asi que en la mayoria sale a nulo, que aqui significa "pago ordinario, sin naturaleza especial".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxnap`, y se localiza con `grep -n "^| auxnap " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por naturaleza de pago, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxban:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo de bancos y sucursales: traduce codigos. El banco del efecto, ya resuelto, esta en `compras.vencimientos`.
+    descripcion: >-
+      **Bancos y sucursales** (1.690 filas MEDIDAS el 2026-09-11, 12 columnas), a donde apuntan `pag.banban` y `pag.bansuc` --y los mismos campos de `dcf` y de `rpa`--. Entra con F-080 para poder decir "CAIXABANK" donde antes habia un entero.
+
+      **COMO SE UNE, que es lo que no constaba y ahora esta medido**: los dos campos van contra el **`ide`** de esta tabla, no contra el codigo de banco, y en dos uniones distintas: `banban` da la entidad y `bansuc` la sucursal. Casan 110.460 de 110.477 `banban` (99,98 %) y 93.273 de 93.273 `bansuc`. La jerarquia se distingue por `tipsuc`: 442 entidades (valor 0) y 1.248 sucursales (valor 1).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxban`, y se localiza con `grep -n "^| auxban " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por banco o sucursal, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  rpa:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Sin unirla a `con` no tiene ni codigo ni descripcion, y sin unirla a `pag` no se sabe que efectos lleva dentro. Lo que hace falta para leer un vencimiento --codigo de remesa, fecha, importe y banco-- ya viene resuelto en `compras.vencimientos`.
+    descripcion: >-
+      **Remesas de pago** (3.919 filas MEDIDAS el 2026-09-11), a donde apunta `pag.remide`: 40.090 de los 195.510 efectos de factura de compra estan dentro de una remesa. Trae `fecrem` (fecha de la remesa, entero AAAAMMDD), `imptot` (importe total) y el bloque bancario completo.
+
+      **LA TRAMPA DE SIEMPRE, y van cuatro**: `rpa` es "Propiedades de `con`", o sea que **la remesa ES UN DOCUMENTO** (`tip = 27`) y ni su codigo --`RP26/0254`-- ni su descripcion --"REMESA CONFIRMING SABADELL"-- estan aqui: viven en `raw.con` con el mismo `ide`. MEDIDO: las 3.919 tienen su fila en `con`. Antes de dar por inexistente un campo de un documento de Sigrid, se mira `con`.
+
+      Las remesas de COBRO son `rco` y no se ingieren: eso es el lado de venta (F-037).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rpa`, y se localiza con `grep -n "^| rpa " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por remesa de pago, identificada por `ide`, el mismo de su fila en `raw.con`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno
