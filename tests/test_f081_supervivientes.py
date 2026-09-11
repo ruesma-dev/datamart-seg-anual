@@ -5,9 +5,16 @@ F-081 · Los dos supervivientes de la campaña de F-073 que sí eran de código
 
 **Un agujero de test se tapa escribiendo tests, no cambiando el código que se
 prueba.** Ninguno de los dos sitios que vigila este fichero se toca: ni
-`ventana_sql.py` ni `build_stg_step.py`, que además es de los ficheros cuyo
-texto entra en el sello de F-025 según su ficha de encargo. Aquí solo se
-añaden los asertos que faltaban.
+`ventana_sql.py` ni `build_stg_step.py`. Aquí solo se añaden los asertos que
+faltaban.
+
+Nota medida el 2026-09-11, porque una premisa equivocada se propaga: el sello
+de F-025 **no incluye este módulo**. `sello_vigente_del_repositorio` lo calcula
+con `sello_sql` sobre `FICHEROS_DEL_SELLO`, que son dos `.sql` —
+`06_presupuesto.sql` y `08_plan_mensual.sql`— más un parámetro de
+`business_rules`. Cambiar el texto de `build_stg_step.py` no movería el sello
+ni reconstruiría las 921 obras; la razón para no tocarlo es la de arriba, que
+es mejor razón.
 
 Los dos casos, tal y como los describe `progress/mutacion_F-073.md`:
 

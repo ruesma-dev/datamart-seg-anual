@@ -11,22 +11,15 @@ passed / 171 skipped en 954,53 s, PUERTA COBERTURA [OK] 93,6 % (791/845).
 ## T1 · La medición, en SOLO LECTURA y de primera mano (2026-09-11)
 
 El Postgres compartido **no era alcanzable** desde esta máquina (`connection
-timeout expired` contra `psql-albaranes-rs9k2`, dos intentos, con y sin
-sandbox), así que la medición se hizo contra **la fuente que gobierna de
-verdad**: Sigrid, por `sigrid-api` (`POST /api/sql/read`, de lectura por
-construcción), con el cliente del ETL (`main._get_api().leer_sql`).
+timeout expired`, dos intentos, con y sin sandbox), así que se midió contra la
+fuente que gobierna de verdad: Sigrid, por `sigrid-api` (`POST /api/sql/read`,
+de lectura por construcción), con `main._get_api().leer_sql`.
 
-`SELECT COUNT(*), est NULL, est vacía, res sin valor FROM dbo.auxefp`:
-
-| filas | `est` a NULL | `est` a `''` | `res` sin valor |
-|---|---|---|---|
-| **10** | **5** | **5** | **0** |
-
-Las 10 filas, una a una: `est` es `''` en los `ide` 5-9 y `NULL` en los 10-14;
+`SELECT COUNT(*), est NULL, est vacía, res sin valor FROM dbo.auxefp` da
+**10 filas**: `est` a NULL en **5** y a `''` en las otras **5**, `res` sin valor
+en **0**. Fila a fila: `est` es `''` en los `ide` 5-9 y `NULL` en los 10-14;
 `res` trae `CHEQUE`, `EFECTIVO`, `PAGARÉ`, `RECIBO`, `TRANSFERENCIA`, `LETRA`,
-`SÓLO CONFIRMING `, `CONFIRMING / PAGARÉ`, `COMPENSACIÓN SALDOS` y `TARJETA
-CRÉDITO`. **El hecho queda confirmado por mi cuenta**: el nombre está en `res`
-y `est` no dice nada de nadie.
+`SÓLO CONFIRMING `, `CONFIRMING / PAGARÉ`… **Confirmado por mi cuenta**.
 
 ## T2 · El barrido: la mentira se repite UNA vez más (criterio 2)
 
@@ -37,43 +30,39 @@ tabla la columna del nombre legible, contrastados contra
 | Entrada | Lo que dice el YAML | Medido | Veredicto |
 |---|---|---|---|
 | `auxefp` | el nombre está en `est` | `est` NULL/vacía en las 10 | **falso** |
-| `cen` | «basta con ide + **res** para mostrar el texto» | `cen` **no tiene `res`**: 68 columnas, y las que se le parecen son `reside` (int) y `resepifor1…` | **falso** |
-| `auxpro` / `auxmun` | `res` = nombre de provincia / municipio | `res` existe y está informado en 96/96 y 56.054/56.054 | cierto |
-| `auxpag` | `cod`, `res`, `formul` | `res` informado en 69/69 | cierto |
-| `prv` | `cif`, `raz`, y el nombre también en `con.res` | las tres columnas existen | cierto |
-| `obrprv` | trae `cod` y `res` | existen; la tabla tiene **0 filas** (ya declarado) | cierto |
-| `rec` | «no tiene `cod` ni `res` propios» | ninguna de las dos existe | cierto |
-| `cua` | «el código y el nombre salen de `con`, no de aquí» | ninguna de las dos existe | cierto |
-| `cet` | «la `cod` que el documento atribuye NO EXISTE» | no existe; sí `res` (40 filas, 1 vacía) | cierto |
+| `cen` | «basta con ide + **res** para mostrar el texto» | `cen` **no tiene `res`**: de sus 68 columnas, las que se le parecen son `reside` (int) y `resepifor1…` | **falso** |
 
-**`cen` es la misma mentira y es más grave**: atribuye a la tabla una columna
-que **no existe en Sigrid**. Y es el error exacto que `test_f006_fuente_que_
-gobierna.py` documenta en su cabecera —«un campo `res` atribuido a `cen` que en
-realidad es de `cenrep`»—: quedó corregido en las fichas y **siguió vivo en el
-YAML de la ingesta**, que es donde mira quien va a escribir el SQL.
+Las otras **siete afirmaciones de ese tipo son ciertas**, comprobadas una a una
+contra `INFORMATION_SCHEMA`: `auxpro` y `auxmun` (`res` informado en 96/96 y
+56.054/56.054), `auxpag` (69/69), `prv` (`cif`, `raz` y `tipsub` existen),
+`obrprv` (`cod` y `res` existen; la tabla tiene 0 filas, ya declarado), `rec` y
+`cua` (dicen que **no** tienen `cod` ni `res` propios, y no los tienen) y `cet`
+(dice que la `cod` del documento de Sigrid **no existe**, y no existe).
 
-**¿Lo creyó algún SQL o alguna ficha?** No, y está comprobado:
+**`cen` es la misma mentira y más grave**: atribuye a la tabla una columna que
+**no existe en Sigrid**. Es el error que `test_f006_fuente_que_gobierna.py`
+documenta en su cabecera —«un `res` atribuido a `cen` que en realidad es de
+`cenrep`»—: corregido en las fichas y **vivo en el YAML de la ingesta**.
 
-* `grep -rn "raw.cen" --include=*.sql`: dos usos, y ninguno lee `cen.res`.
-  `maestro/04_centros_coste.sql` toma `cc.res` de **`raw.con`**;
-  `cierre/05_views_cabecera.sql` solo usa `cen.ide`.
-* `grep -rn "auxefp"` sobre `etl_sigrid/`: un único SQL,
-  `compras/04_formas_pago.sql`, que ya usa `ef.res` (F-073 lo esquivó).
-* Fichas: `grep -rn "cen\.res"` sobre `config/diccionario/` no devuelve nada, y
-  atribuciones de ese tipo ya las veta `test_f006_r26_ninguna_ficha_atribuye_a_
-  su_tabla_un_campo_no_derivado`. La ficha de `compras.formas_pago` describe
-  `auxefp.res` y **denunciaba** la mentira del YAML (T4 la pone al día).
+**¿Lo creyó algún SQL o alguna ficha?** No, comprobado con `grep`: de
+`raw.cen` hay dos usos y ninguno lee `cen.res` —`04_centros_coste.sql` toma
+`cc.res` de **`raw.con`** y `cierre/05_views_cabecera.sql` solo usa `cen.ide`—;
+de `auxefp`, un único SQL, `compras/04_formas_pago.sql`, que ya usa `ef.res`.
+En `config/diccionario/` no aparece `cen.res`, y esas atribuciones ya las veta
+`test_f006_r26_ninguna_ficha_atribuye_a_su_tabla_un_campo_no_derivado`; la
+ficha de `compras.formas_pago` **denunciaba** la mentira del YAML (T3 la pone
+al día).
 
-La conclusión que importa: **las fichas del diccionario tenían guardián y el
-YAML de la ingesta no**. Eso es lo que arregla el criterio 3.
+La conclusión: **las fichas tenían guardián y el YAML de la ingesta no**. Eso
+es lo que arregla el criterio 3.
 
 ## T3 · Fase RED del test que impide deshacerlo (criterio 3)
 
-`tests/test_f081_yaml_ingesta.py` no compara el YAML con otro documento —eso
-es lo que produjo las dos mentiras de F-006— sino con **nuestro propio SQL**:
-la columna de nombre que el YAML atribuye a una tabla tiene que estar entre las
-que el SQL que la publica lee de verdad. Cinco entradas bajo vigilancia, tres
-de ellas (`auxpag`, `auxpro`, `auxmun`) como **control positivo**.
+`tests/test_f081_yaml_ingesta.py` no compara el YAML con otro documento —eso es
+lo que produjo las dos mentiras de F-006— sino con **nuestro propio SQL**: la
+columna de nombre que el YAML atribuye a una tabla tiene que estar entre las que
+lee el SQL que la publica. Cinco entradas vigiladas, tres (`auxpag`, `auxpro`,
+`auxmun`) como **control positivo**.
 
 Comando: `python -m pytest tests/test_f081_yaml_ingesta.py -q -p no:randomly`
 
@@ -85,18 +74,14 @@ FAILED tests/test_f081_yaml_ingesta.py::test_f081_c1_el_yaml_deja_escrita_la_med
 4 failed, 7 passed in 0.23s
 ```
 
-El detalle de los dos paramétricos, con el mensaje real del aserto:
+El mensaje real de los dos paramétricos, que es el que hace útil el fallo:
 
 ```
-E  AssertionError: config/tables_sigrid.yaml atribuye a `auxefp` ['est'] como
-E  columna de nombre legible, y compras/04_formas_pago.sql -que es quien
-E  gobierna el hecho- solo lee ['cla', 'ide', 'res'].
-E  assert {'est'} <= {'cla', 'ide', 'res'}
-
-E  AssertionError: config/tables_sigrid.yaml atribuye a `cen` ['res'] como
-E  columna de nombre legible, y maestro/04_centros_coste.sql -que es quien
-E  gobierna el hecho- solo lee ['ide'].
-E  assert {'res'} <= {'ide'}
+E  AssertionError: ... atribuye a `auxefp` ['est'] como columna de nombre
+E  legible, y compras/04_formas_pago.sql -quien gobierna el hecho- solo lee
+E  ['cla', 'ide', 'res'].            assert {'est'} <= {'cla','ide','res'}
+E  AssertionError: ... atribuye a `cen` ['res'] ..., y
+E  maestro/04_centros_coste.sql solo lee ['ide'].  assert {'res'} <= {'ide'}
 ```
 
 **El test encontró la segunda mentira él solo**: `cen` no estaba en el encargo.
@@ -104,12 +89,10 @@ E  assert {'res'} <= {'ide'}
 ## T4 · Los dos supervivientes de mutación (criterios 4, 5 y 6)
 
 `tests/test_f081_supervivientes.py`, 7 tests. **Ni `ventana_sql.py` ni
-`build_stg_step.py` se tocan**: `git diff 87f4d84..HEAD` sobre los dos devuelve
-vacío. Un agujero de test se tapa con tests.
-
-La fase RED aquí es la mutación: **el mutante vivo antes y muerto después**,
-con el mismo mutante generado por `harness.mutacion.generar_mutantes` (mismo
-fichero, línea, operador y texto) y restauración verificada por `sha256`.
+`build_stg_step.py` se tocan** (`git diff 87f4d84..HEAD` sobre los dos: vacío).
+La fase RED aquí es la mutación —**vivo antes, muerto después**— con el mutante
+que genera `harness.mutacion.generar_mutantes` (mismo fichero, línea, operador
+y texto) y restauración verificada por `sha256`.
 
 ### 4a · `ventana_sql.py:215` — la denuncia muda
 
@@ -135,10 +118,9 @@ VEREDICTO: MUERTO (exit 1)
 RESTAURADO: sha f5def9438b0b OK
 ```
 
-El aserto que faltaba es que la denuncia **diga qué obra**:
-`test_f025_r26_un_sello_viejo_se_denuncia` solo miraba que apareciera la
-palabra `SELLO`. Los otros dos tipos de hallazgo construyen el código con la
-misma expresión y entran al test paramétrico por el mismo precio.
+El aserto que faltaba: que la denuncia **diga qué obra**.
+`test_f025_r26_un_sello_viejo_se_denuncia` solo miraba la palabra `SELLO`. Los
+otros dos tipos construyen el código igual y entran al paramétrico gratis.
 
 ### 4b · `build_stg_step.py:732` — **el superviviente era un FALSO POSITIVO**
 
@@ -153,17 +135,15 @@ FAILED tests/test_f025_build.py::test_f025_r10_las_sobrantes_solo_se_miran_en_la
 VEREDICTO: MUERTO (exit 1)
 ```
 
-Ese test **ya existía** en el commit que midió la campaña (`b6eda79`, byte a
-byte el mismo: `git show b6eda79:tests/test_f025_build.py`) y ni él ni
-`build_stg_step.py` han cambiado desde entonces. La campaña de F-073 lo declaró
-superviviente con `Timeouts: 0` y `base rota: 0`, así que **no fue un timeout
-ni una base rota**: es un veredicto equivocado. Queda anotado como consulta al
-humano en `progress/current.md`; auditar el mutador es otra feature.
+Ese test **ya existía byte a byte** en el commit que midió la campaña
+(`git show b6eda79:tests/test_f025_build.py`) y ni él ni `build_stg_step.py`
+han cambiado. La campaña declaró `Timeouts: 0` y `base rota: 0`: no fue ninguna
+de las dos cosas, es un veredicto equivocado. Consulta al humano en
+`progress/current.md`; auditar el mutador es otra feature.
 
-El test se escribe igualmente, y no por formalismo: la única red que había era
-un aserto indirecto —una lista de llamadas al doble— dentro de un test que
-mide otra cosa. `test_f081_c5_*` ataca la guarda de frente, en sus tres casos
-(plan PARCIAL, plan COMPLETA y sin plan), y mata al mutante **él solo**:
+El test se escribe igual: la única red que había era un aserto indirecto —una
+lista de llamadas al doble— dentro de un test que mide otra cosa. `test_f081_c5_*`
+ataca la guarda de frente en sus tres casos y mata al mutante **él solo**:
 
 ```
 FAILED tests/test_f081_supervivientes.py::test_f081_c5_el_presupuesto_acotado_con_plan_PARCIAL_no_mira_las_sobrantes
@@ -175,3 +155,64 @@ RESTAURADO: sha c33b27bd7c8a OK
 Y el log del mutante enseña el daño exacto que la guarda evita: `[warning]
 ventana_obras_sobrantes obras=[9] tabla=stg.presupuesto` en una noche acotada,
 es decir, denunciar como sobrante una obra que solo está **congelada**.
+
+**Segunda nota medida**: el sello de F-025 **no incluye `build_stg_step.py`**.
+`sello_vigente_del_repositorio` pasa a `sello_sql` los dos `.sql` de
+`FICHEROS_DEL_SELLO` más un parámetro, así que cambiar el texto del módulo no
+movería el sello ni reconstruiría las 921 obras. No cambia nada de lo hecho
+—no se ha tocado—, pero que nadie decida lo siguiente sobre esa premisa.
+
+## T5 · La campaña de mutación (criterio 7)
+
+`python -m harness.mutacion --feature F-081 --base 87f4d84`, acotada al diff de
+**esta** feature: contra `dev` el alcance vuelven a ser las 3.617 líneas de
+F-073 —`dev` no se ha movido—, y medir eso sería medir código ajeno otra vez.
+
+```
+ALCANCE VACÍO en F-081: ni una línea de producción que mutar (origen rama,
+87f4d84..feature/F-081-deudas-review-F-073). No se ha juzgado NADA.
+  No se escribe informe: un fichero en progress/ con un cero que nadie ha
+  medido es peor que no tener fichero [...]
+```
+
+Por eso **no hay `progress/mutacion_F-081.md`**: lo decide la herramienta y
+tiene razón. El cero es legítimo y la **prueba de control** sale sola: F-081 no
+cambia ni una línea de Python de producción, así que no hay `.py` que mutar
+entero. La campaña que sí mide algo es la **acotada de T4**: dos mutantes,
+cuatro ejecuciones, vivos antes y muertos después. **Supervivientes: 0.**
+
+## Ficheros tocados
+
+**Producción** (ni una línea ejecutable): `config/tables_sigrid.yaml` —las dos
+entradas que mentían, solo comentarios—, la cabecera de
+`sql/compras/04_formas_pago.sql` y la ficha de `medio_pago` de
+`config/diccionario/compras.yaml`, las dos en pasado, y `00_global.yaml`, que
+sube a la **versión 20** con su changelog: republicar un texto distinto con la
+etiqueta de ayer es como no republicarlo.
+
+**Tests**: los dos nuevos (11 + 7). En `tests/test_f073_diccionario.py`, R28
+pasa de `== "19"` a `>= 19`: nació como candado —la siguiente feature que
+tocara una ficha tenía que elegir entre publicar con la etiqueta vieja o tocar
+el test— y F-074 y F-079 ya lo comprobaban así. **Papeleo**: `current.md` (con
+la consulta al humano) y este informe.
+
+## Lo que NO se hace aquí
+
+**No se audita `harness/mutacion.py`** por el superviviente falso: es el arnés
+genérico, la corrección iría a `arnes-base` y la decide el humano (consulta en
+`progress/current.md`). Y **no hay verificaciones MANUAL**: nada de lo cambiado
+altera lo que corre de noche.
+
+## Evidencias
+
+| Evidencia | Valor real |
+|---|---|
+| Tests ejecutados y resultado | **4.385 passed / 171 skipped / 0 failed** (`bash harness/init.sh`, exit 0, `ENTORNO LISTO`). Eran 4.367: los **18 nuevos** son 11 + 7 |
+| Cobertura de las líneas cambiadas | **93,6 % (791/845)**, umbral 80 %, nivel `estandar`. Misma cifra que antes de empezar: F-081 no añade ni una línea de producción ejecutable |
+| Mutantes generados y supervivientes | **0 generados** por el diff de F-081 (`--base 87f4d84`: alcance vacío, la herramienta se niega a escribir informe). Campaña acotada de T4: **2 mutantes, 4 ejecuciones, 0 supervivientes** |
+| Tiempo de ejecución de la suite | **1.191,96 s** (19:51) |
+| Los tests nuevos no tocan red ni BBDD | `grep -n "psycopg\|httpx\|requests\|connect(\|build_postgres_client\|SigridApiClient\|filas_solo_lectura" tests/test_f081_*.py` → **vacío** |
+
+Seis commits `F-081 Tn:`; los epígrafes de arriba van en orden de trabajo, no de
+commit: T1 = medición + barrido + fase RED, T2 y T3 = la corrección, T4 = los
+supervivientes, T5 = la versión 20, T6 = el papeleo.
