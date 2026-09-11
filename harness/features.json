@@ -1294,7 +1294,7 @@
         "Los tests nuevos no tocan red ni BBDD",
         "bash harness/init.sh en verde, y la campaña de mutacion acotada a las lineas cambiadas con sus supervivientes analizados"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 8,

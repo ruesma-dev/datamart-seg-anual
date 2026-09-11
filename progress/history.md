@@ -937,3 +937,33 @@ dos supervivientes de mutación ajenos a F-073 (`ventana_sql.py:215` y
 medio de pago en `auxefp.est` **y es falso** (está en `res`); y una automejora
 de `CHECKPOINTS.md` para las features cuyo entregable es SQL y no generan
 mutantes en sus propias líneas.
+
+## F-081 · Las dos deudas del review de F-073 (cerrada el 2026-09-11, APROBADO)
+
+Rama `feature/F-081-deudas-review-F-073`, 8 tareas, commits `87f4d84..d5e484c`.
+Informe: `progress/impl_F-081.md`; review: `progress/review_F-081.md`.
+Sin spec (`sdd=false`): el contrato fueron sus siete `acceptance`.
+
+**Deuda 1 · la mentira de la configuracion de la ingesta.**
+`config/tables_sigrid.yaml` declaraba que el nombre del medio de pago de
+`auxefp` esta en `est`. Es falso: `est` viene vacia o nula en las 10 filas y el
+nombre esta en `res`. F-073 lo esquivo usando `res` y lo documento, pero no
+corrigio el yaml. **F-081 encontro ademas la misma mentira en la entrada de
+`cen`**, que nadie habia mirado. Deja un test que falla si alguien vuelve a
+declararlo en `est`, para que la correccion no se deshaga en silencio.
+
+**Deuda 2 · los dos supervivientes de mutacion que si eran agujeros de test**,
+ninguno de codigo de F-073: `ventana_sql.py:215` y `build_stg_step.py:732`.
+**Murieron solo con tests nuevos**, verificado en el diff: ninguno de los dos
+ficheros cambia un caracter.
+
+**UNA PREMISA FALSA DE LA FICHA, corregida por el reviewer y que conviene no
+propagar**: la ficha de F-081 afirmaba que `build_stg_step.py` es fichero del
+SELLO. **No lo es.** `FICHEROS_DEL_SELLO` son solo `stg/06_presupuesto.sql` y
+`stg/08_plan_mensual.sql`. La restriccion que se impuso era mas estricta de lo
+necesario; no hizo daño, porque tapar un agujero con tests es lo correcto de
+todas formas, pero la afirmacion era erronea.
+
+**CHOQUE QUE DEJA VIVO**: F-081 sube el diccionario a la **version 20**, que la
+spec de F-080 tenia reservada. **F-080 pasa a la 21**, y su tarea de
+«comprobar que el fichero esta en 19» ya no se cumple.
