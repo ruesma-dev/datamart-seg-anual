@@ -210,7 +210,7 @@ altera lo que corre de noche.
 | Tests ejecutados y resultado | **4.385 passed / 171 skipped / 0 failed** (`bash harness/init.sh`, exit 0, `ENTORNO LISTO`). Eran 4.367: los **18 nuevos** son 11 + 7 |
 | Cobertura de las líneas cambiadas | **93,6 % (791/845)**, umbral 80 %, nivel `estandar`. Misma cifra que antes de empezar: F-081 no añade ni una línea de producción ejecutable |
 | Mutantes generados y supervivientes | **0 generados** por el diff de F-081 (`--base 87f4d84`: alcance vacío, la herramienta se niega a escribir informe). Campaña acotada de T4: **2 mutantes, 4 ejecuciones, 0 supervivientes** |
-| Tiempo de ejecución de la suite | **1.191,96 s** (19:51) |
+| Tiempo de ejecución de la suite | **1.191,96 s** (19:51). El arranque de cierre, ya sobre el árbol comiteado, repite exit 0 y las mismas 4.385/171/0 en **2.879,09 s**: la diferencia es la otra sesión trabajando en el árbol, como ya le pasó al reviewer de F-073 |
 | Los tests nuevos no tocan red ni BBDD | `grep -n "psycopg\|httpx\|requests\|connect(\|build_postgres_client\|SigridApiClient\|filas_solo_lectura" tests/test_f081_*.py` → **vacío** |
 
 Seis commits `F-081 Tn:`; los epígrafes de arriba van en orden de trabajo, no de
