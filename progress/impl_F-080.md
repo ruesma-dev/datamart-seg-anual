@@ -99,3 +99,32 @@ sobre el total de `con`.** Y el temor de DA-4 —«una página de 10.000 documen
 habladores puede pesar cientos de MB»— **no se cumple**: la peor pesa 1,71 MB.
 Por eso `page_size` de `con` se queda en el default global, sin bajarlo (R5 deja
 esa decisión al humano con el dato delante, y aquí el dato dice que no hace falta).
+
+## T4 · La anulación, VERIFICADA (no investigada) · R39, R40
+
+**(a) `FR25/04222`, la factura de los ocho efectos del correo.** Los tres con
+`con.fecbaj <> 0` son exactamente los tres que la captura pinta en rojo con aspa:
+
+| `con.cod` | est | estado | `fecbaj` | importe |
+|---|---|---|---|---|
+| `FR25/04222_01` | 2 | Aprobado | **20250908** | 87.854,56 |
+| `DIV25/0156` | 2 | Aprobado | **20251010** | 57.435,88 |
+| `DIV25/0169` | 2 | Aprobado | **20251108** | 50.354,99 |
+| `FR25/04222_02` | 1 | Pendiente | 0 | 4.623,93 |
+| `DIV25/0155` · `DIV25/0168` · `DIV25/0184` · `DIV25/0185` | 10 | Pagado | 0 | 30.418,68 · 7.080,89 · 25.925,15 · 24.429,84 |
+
+Suma de los **cinco vivos = 92.478,49**, y quitando la retención viva
+(4.623,93) quedan **87.854,56**: los **dos números de la cabecera** de la
+captura. Los anulados suman 195.645,43, que es el fantasma que aparecería sin
+filtrar. El estado NO distingue: los tres anulados están «Aprobado».
+
+**(b)** Efectos de baja: **89.228 de 255.148 (34,97 %)**; ciñéndose a los de
+factura de compra, **76.215 de 195.510 (39,0 %)**. Coherente con los 89.095 /
+255.074 del 2026-09-10 (el sistema sigue vivo).
+
+**(c)** `pag.padide` informado en **0 de 255.148** → `efecto_origen_id` NO se
+publica. `con.serie` informado en **0 de 255.148** → la serie sale de
+`compras.fn_serie`. Y `con.tip <> 25` en **0 de 255.148**: todo efecto es un
+documento de tipo 25, sin excepción.
+
+Las tres comprobaciones salen. No hay nada que parar antes de T10.
