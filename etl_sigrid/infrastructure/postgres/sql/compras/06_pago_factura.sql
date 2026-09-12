@@ -24,6 +24,12 @@
 --         raw.auxefp, raw.auxban.
 -- ============================================================================
 
+-- Las dos vistas se tiran antes de crearlas, y en orden inverso al de
+-- dependencia: `CREATE OR REPLACE VIEW` falla si la lista de columnas cambia y
+-- alguien cuelga de ella, y aquí el control cuelga del pago de la factura.
+DROP VIEW IF EXISTS compras.v_control_forma_pago CASCADE;
+DROP VIEW IF EXISTS compras.v_facturas_pago CASCADE;
+
 -- ---------------------------------------------------------------------------
 -- LA FORMA DE PAGO DE LA FACTURA (R16-R19)
 -- ---------------------------------------------------------------------------

@@ -809,7 +809,10 @@ def test_f080_r23_el_orden_no_se_invierte_en_ningun_sitio() -> None:
     `orden` 1 es el más nuevo. Un `DESC` por ahí pondría el comentario de alta
     como si fuera el último estado del documento."""
     compacto = _ejecutable(RUTA_TEXTO)
-    assert " DESC" not in compacto.upper(), (
+    # `\bDESC\b` y no « DESC»: la primera versión de este assert (T16) buscaba
+    # la subcadena, y « DESCENDENTE» del propio COMMENT la contiene. Prohibir la
+    # palabra clave es lo que se quería; prohibir el prefijo era prohibir hablar.
+    assert not re.search(r"\bDESC\b", compacto.upper()), (
         "ordenar al revés invierte el significado de `orden` (R23)"
     )
 

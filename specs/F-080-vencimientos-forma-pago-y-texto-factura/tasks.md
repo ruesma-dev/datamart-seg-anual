@@ -72,7 +72,7 @@ sobre el **texto** del SQL: ningún agente ejecuta SQL contra la base.
 - [x] T15: Crear `etl_sigrid/domain/texto_comentarios.py` con `SEPARADOR_BLOQUES`, `SELLO_COMENTARIO` y `partir_memo()`, sin un solo import de infraestructura  |  Verificación: `pytest tests/test_f080_texto.py` en verde
 - [x] T16: Ampliar `tests/test_f080_sql.py` con los asserts de R22 (`compras.documento_texto`, filtro `tip IN (15, 44)` y PK `documento_id`), R23 (`compras.documento_comentarios` es **TABLA** —`CREATE TABLE ... AS SELECT` en el build nocturno—, con `WITH ORDINALITY` para `orden`, `orden` 1 = el más reciente y `ADD PRIMARY KEY (documento_id, orden)` declarada), R24 (el SQL usa los literales del módulo de dominio, comparados contra la constante importada) y R25 (rama de bloque sin sello con `sello_reconocido` en falso y el bloque entero como cuerpo)  |  Verificación: `pytest tests/test_f080_sql.py` en ROJO; traza pegada
   - *Corrige:* antes el objeto era la vista `compras.v_documento_comentarios`; era falso que quedara por decidir, el humano lo zanjó («guárdala como tabla y como texto») y R27, el cronómetro de 30 s que condicionaba la materialización, está retirado (DA-6).
-- [ ] T17: Crear `sql/compras/07_texto.sql` con **las dos tablas**: `compras.documento_texto` y `compras.documento_comentarios`, ambas con su PK declarada  |  Verificación: `pytest tests/test_f080_sql.py` en verde
+- [x] T17: Crear `sql/compras/07_texto.sql` con **las dos tablas**: `compras.documento_texto` y `compras.documento_comentarios`, ambas con su PK declarada  |  Verificación: `pytest tests/test_f080_sql.py` en verde
 
 ## El cableado del step
 
