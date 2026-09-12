@@ -399,6 +399,6 @@ def test_f080_r41_el_codigo_de_la_remesa_se_lee_de_con_porque_rpa_no_lo_tiene() 
         "por el mismo `ide` (R41, T1)"
     )
     assert re.search(r"\w+\.cod AS codigo_remesa", compacto)
-    assert "r.cod" not in compacto, (
-        "`rpa.cod` no existe: unirse a esa columna no compila (R41, T1)"
+    assert not re.search(r"\br\.cod\b", compacto), (
+        "`rpa.cod` no existe: leer esa columna no compila (R41, T1)"
     )
