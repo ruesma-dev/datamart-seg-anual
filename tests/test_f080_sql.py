@@ -439,7 +439,13 @@ COLUMNAS_DEL_PAGO = (
     "primer_vencimiento",
     "ultimo_vencimiento",
     "importe_efectos_vivos",
-    "importe_retenido_vivo",
+    # T13: era `importe_retenido_vivo`, y lo escribió este mismo fichero en su
+    # fase RED. Se retira porque NO se ha medido qué significa `pag.retide`
+    # —si marca el efecto que ES la retención o el que la tiene—, y publicar un
+    # «importe retenido» sobre esa suposición es la cuarta versión del error que
+    # esta feature lleva corrigiendo (DA-10). Lo que sí está medido es el estado
+    # 10 «Pagado» de `raw.conest`, así que el segundo agregado es ese.
+    "importe_efectos_pagados",
 )
 
 
@@ -542,7 +548,11 @@ def test_f080_r19_el_resumen_de_efectos_agrega_ANTES_de_unir() -> None:
         "el CTE agrega `compras.vencimientos` por factura ANTES de unirse a la "
         "cabecera: agregar después rompe el grano (R19)"
     )
-    assert re.search(r"LEFT JOIN \w+ ON \w+\.factura_id = \w+\.factura_id", compacto), (
+    # El `(?: \w+)?` es el alias del CTE, que la primera versión de este assert
+    # se dejó fuera (T13): el CTE se une como `LEFT JOIN efectos e ON ...`.
+    assert re.search(
+        r"LEFT JOIN \w+(?: \w+)? ON \w+\.factura_id = \w+\.factura_id", compacto
+    ), (
         "y se une con LEFT JOIN: las facturas sin efectos medidas no se pueden "
         "perder (R19)"
     )
@@ -635,12 +645,27 @@ def test_f080_r29_el_control_enfrenta_las_dos_formas_de_pago(columna: str) -> No
 
 def test_f080_r29_las_que_cuadran_tambien_salen() -> None:
     """Filtrar a las discrepancias convierte la vista en una alarma y deja sin
-    respuesta «cuántas cuadran»: el numerador sin denominador no vale."""
+    respuesta «cuántas cuadran»: el numerador sin denominador no vale.
+
+    ESTE ASSERT SE CORRIGIÓ EN T13, y el motivo vale más que el assert: la
+    primera versión buscaba `WHERE[^;]*coincide` sobre el bloque entero, y eso
+    lo cumple **cualquier** implementación correcta —el `WHERE ... IS NOT NULL`
+    del CTE del enlace queda antes de la columna `forma_pago_coincide` y no hay
+    `;` entre los dos—. Era un test que no podía pasar, no una puerta. Se
+    sustituye por los filtros concretos que R29 prohíbe.
+    """
     compacto = _ejecutable(RUTA_PAGO_FACTURA)
     bloque = compacto[compacto.index("compras.v_control_forma_pago"):]
-    assert not re.search(r"WHERE[^;]*coincide", bloque), (
-        "la vista marca la coincidencia, no la filtra (R29)"
-    )
+    for filtro in (
+        "WHERE NOT forma_pago_coincide",
+        "forma_pago_coincide = false",
+        "forma_pago_coincide IS FALSE",
+        "HAVING",
+    ):
+        assert filtro not in bloque, (
+            f"«{filtro}» deja fuera las facturas que cuadran: la vista marca la "
+            "coincidencia, no la filtra (R29)"
+        )
     assert not re.search(r"WHERE[^;]*\w+\.pagide <> \w+\.pagide", bloque), (
         "enfrentar las formas de pago en el WHERE es filtrar por discrepancia "
         "con otro nombre (R29)"

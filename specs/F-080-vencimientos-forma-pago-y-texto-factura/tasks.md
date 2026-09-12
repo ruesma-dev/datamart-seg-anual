@@ -64,7 +64,7 @@ sobre el **texto** del SQL: ningún agente ejecuta SQL contra la base.
 
 - [x] T12: Ampliar `tests/test_f080_sql.py` con los asserts de R16 (lee de `compras.formas_pago`), R17 (`plazo_formula` verbatim, ningún `dias_pago`), R18 (naturaleza, medio de pago, cuenta y banco resueltos a nombre), R19 (el resumen de efectos agrega ANTES de unir y **sus importes agregados filtran los efectos de baja**: el test exige el `WHERE NOT efecto_anulado` —o el `filter` equivalente— en el CTE, y falla si hay un `SUM` sin ese filtro), R28 (la misma expresión `COALESCE(...contrato_id_directo...)` que `03_views.sql`), R29 (sin filtro de discrepancias) y R21 (`01_documentos.sql`, `02_fact_linea.sql` y `03_views.sql` no cambian)  |  Verificación: `pytest tests/test_f080_sql.py` en ROJO; traza pegada
   - *Corrige:* antes el assert de R19 **prohibía** cualquier importe agregado «mientras R40 siga sin resolverse»; R40 quedó resuelto el 2026-09-11, así que lo que se exige ya no es la ausencia de importes sino el filtro que los hace ciertos (sin él, uno de cada tres efectos es un fantasma).
-- [ ] T13: Crear `sql/compras/06_pago_factura.sql` con `compras.v_facturas_pago` y `compras.v_control_forma_pago`  |  Verificación: `pytest tests/test_f080_sql.py` en verde
+- [x] T13: Crear `sql/compras/06_pago_factura.sql` con `compras.v_facturas_pago` y `compras.v_control_forma_pago`  |  Verificación: `pytest tests/test_f080_sql.py` en verde
 
 ## El texto
 
