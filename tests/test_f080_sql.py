@@ -709,3 +709,232 @@ def test_f080_r21_f080_no_redefine_las_tablas_de_f067(objeto: str) -> None:
             f"añadir columnas a {objeto} mete a F-080 dentro de "
             "`01_documentos.sql`, que es de F-067 (R21, DA-7)"
         )
+
+
+# ===========================================================================
+# `compras.documento_texto` y `compras.documento_comentarios` (07) · R22-R25
+# ===========================================================================
+
+RUTA_TEXTO = DIRECTORIO_SQL / "compras" / "07_texto.sql"
+
+
+def test_f080_r22_el_memo_integro_es_una_TABLA_con_su_clave() -> None:
+    """Tabla y no vista porque el memo se lee muchas veces y filtrar `raw.con`
+    (2,18 M filas) en cada consulta es caro."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert "CREATE TABLE compras.documento_texto AS" in compacto, (
+        "`compras.documento_texto` se materializa en la nocturna (R22)"
+    )
+    assert "ALTER TABLE compras.documento_texto ADD PRIMARY KEY (documento_id)" in (
+        compacto
+    ), "un documento, una fila: la clave va declarada (R22)"
+
+
+@pytest.mark.parametrize(
+    "columna",
+    [
+        "documento_id",
+        "tipo_documento",
+        "codigo_documento",
+        "texto",
+        "bytes",
+        "num_comentarios",
+    ],
+)
+def test_f080_r22_el_memo_se_publica_con_su_tamano_y_su_recuento(columna: str) -> None:
+    assert re.search(rf"AS {columna}\b", _ejecutable(RUTA_TEXTO)), (
+        f"`compras.documento_texto` debe exponer {columna} (R22)"
+    )
+
+
+def test_f080_r22_el_memo_sale_de_con_tex_y_solo_de_facturas_y_contratos() -> None:
+    """MEDIDO (R2): la pestaña «Texto» es `con.tex` (65,5 % de las facturas), no
+    `dcf.tex` (0,3 %). Y los comparativos (`tip = 46`) son de F-067."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert "FROM raw.con c" in compacto, "el memo vive en la superclase `con` (R22)"
+    assert "c.tip IN (15, 44)" in compacto, (
+        "solo facturas (15) y contratos (44): los comparativos son de F-067 (R22)"
+    )
+    ejecutable = _sin_comentarios(_sql(RUTA_TEXTO))
+    for tabla in ("raw.dcf", "raw.ctr"):
+        assert tabla not in ejecutable, (
+            f"`{tabla}.tex` está informado en menos del 4 % de los documentos: "
+            "la pestaña se pinta desde `con.tex` (R2, R22)"
+        )
+
+
+def test_f080_r22_los_documentos_sin_texto_no_generan_fila() -> None:
+    """2,06 M de documentos no tienen memo: publicarlos daría una tabla con un
+    millón de filas vacías y un recuento inútil."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert "c.tex IS NOT NULL" in compacto, (
+        "el filtro de texto informado es obligatorio (R22)"
+    )
+    assert re.search(r"btrim\(c\.tex[^)]*\) <> ''", compacto), (
+        "y un memo de solo espacios tampoco es un memo: el mismo criterio que "
+        "`partir_memo`, que devuelve lista vacía (R22)"
+    )
+
+
+def test_f080_r23_los_comentarios_son_una_TABLA_y_no_una_vista() -> None:
+    """DA-6: son ~110.000 memos; partirlos en cada lectura es trabajo repetido
+    para siempre. El humano lo zanjó: «guárdala como tabla y como texto»."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert "CREATE TABLE compras.documento_comentarios AS" in compacto, (
+        "`compras.documento_comentarios` se materializa en el build (R23)"
+    )
+    assert "VIEW compras.documento_comentarios" not in compacto, (
+        "era una vista en el diseño anterior y dejó de serlo (R23, DA-6)"
+    )
+    assert (
+        "ALTER TABLE compras.documento_comentarios ADD PRIMARY KEY "
+        "(documento_id, orden)" in compacto
+    ), "la clave es el par (documento, orden), declarada en la tabla (R23)"
+
+
+def test_f080_r23_los_comentarios_se_parten_sobre_la_tabla_del_memo() -> None:
+    """Volver a `raw.con` sería filtrar 2,18 M de filas dos veces en el mismo
+    build, y con dos filtros que pueden divergir."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert "FROM compras.documento_texto" in compacto, (
+        "los comentarios se parten desde `compras.documento_texto` (R23)"
+    )
+    assert "regexp_split_to_table" in compacto and "WITH ORDINALITY" in compacto, (
+        "`orden` sale de `WITH ORDINALITY` sobre el corte del memo (R23)"
+    )
+
+
+def test_f080_r23_el_orden_no_se_invierte_en_ningun_sitio() -> None:
+    """Sigrid concatena el más reciente arriba y el corte conserva ese orden:
+    `orden` 1 es el más nuevo. Un `DESC` por ahí pondría el comentario de alta
+    como si fuera el último estado del documento."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert " DESC" not in compacto.upper(), (
+        "ordenar al revés invierte el significado de `orden` (R23)"
+    )
+
+
+def test_f080_r23_el_orden_se_renumera_para_no_dejar_huecos() -> None:
+    """`WITH ORDINALITY` numera ANTES de tirar los trozos vacíos, así que un
+    memo que empieza por un separador dejaría su primer comentario real en
+    `orden` 2 y la tabla no tendría ningún `orden` 1.
+
+    El oráculo (`partir_memo`) numera después de filtrar, y las dos
+    implementaciones tienen que coincidir o la comparación no vale de nada.
+    """
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert re.search(r"row_number\(\) OVER \(PARTITION BY \w+\.documento_id", compacto), (
+        "el `orden` publicado se renumera por documento sobre el orden del "
+        "corte, para que siempre empiece en 1 (R23)"
+    )
+
+
+def test_f080_r23_el_comment_dice_que_el_orden_1_es_el_mas_reciente() -> None:
+    """Sin ese aviso, «el último comentario» se lee como el de `orden` más alto,
+    que es exactamente el más viejo."""
+    comentario = _sql(RUTA_TEXTO)
+    assert "COMMENT ON TABLE compras.documento_comentarios" in comentario
+    comentario = comentario[
+        comentario.index("COMMENT ON TABLE compras.documento_comentarios"):
+    ]
+    assert re.search(r"orden 1[^.]*recient", comentario, re.I), (
+        "el COMMENT tiene que decir que `orden` 1 es el comentario MÁS "
+        "RECIENTE (R23)"
+    )
+
+
+# --- R24 · los literales son los del módulo de dominio --------------------
+
+
+def test_f080_r24_el_sql_usa_LOS_MISMOS_literales_que_el_oraculo() -> None:
+    """LA RAZÓN DE SER DE `domain/texto_comentarios.py` (R24, DA-1).
+
+    El parseo se ejecuta en SQL, pero el separador y el sello están escritos
+    **una sola vez**, en el módulo de dominio, donde hay tests que los
+    ejercitan sobre fixtures. Si el SQL escribiera los suyos, las dos
+    implementaciones divergirían y nadie se enteraría: el oráculo seguiría en
+    verde mientras la tabla publica otra cosa.
+    """
+    from etl_sigrid.domain.texto_comentarios import (
+        SELLO_COMENTARIO,
+        SEPARADOR_BLOQUES,
+    )
+
+    sql = _sql(RUTA_TEXTO)
+    assert SEPARADOR_BLOQUES in sql, (
+        f"el separador del SQL tiene que ser LITERALMENTE {SEPARADOR_BLOQUES!r}, "
+        "el del módulo de dominio (R24)"
+    )
+    assert SELLO_COMENTARIO in sql, (
+        f"el sello del SQL tiene que ser LITERALMENTE {SELLO_COMENTARIO!r} (R24)"
+    )
+
+
+def test_f080_r24_el_sql_no_cablea_los_33_guiones_medidos() -> None:
+    """DA-3: lo medido son 33 guiones, pero nada lo garantiza. El patrón es
+    tolerante (tres o más) y el literal cableado sería una bomba de relojería."""
+    ejecutable = _sin_comentarios(_sql(RUTA_TEXTO))
+    assert "-" * 10 not in ejecutable, (
+        "una tirada de guiones cableada en el SQL ejecutable es el separador "
+        "escrito a mano por segunda vez (R24, DA-3)"
+    )
+
+
+# --- R25 · el bloque que no casa se publica igual -------------------------
+
+
+@pytest.mark.parametrize(
+    "columna",
+    ["documento_id", "orden", "sello_reconocido", "fecha", "hora", "usuario", "cuerpo", "bloque"],
+)
+def test_f080_r25_cada_comentario_publica_autoria_y_cuerpo(columna: str) -> None:
+    assert re.search(rf"AS {columna}\b", _ejecutable(RUTA_TEXTO)), (
+        f"`compras.documento_comentarios` debe exponer {columna} (R23, R25)"
+    )
+
+
+def test_f080_r25_sin_sello_se_publica_el_bloque_entero_como_cuerpo() -> None:
+    """R25 y DA-2: el sello solo AÑADE columnas, no recorta. Texto escrito a
+    mano, la línea automática de la aplicación o un sello a medias salen
+    igual, con la autoría a NULL."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert "regexp_match(" in compacto, (
+        "el sello se reconoce con `regexp_match`, que devuelve NULL cuando no "
+        "casa; eso es la rama de R25"
+    )
+    assert re.search(r"ELSE \w+\.bloque END AS cuerpo", compacto), (
+        "cuando el sello no casa, el CUERPO es el bloque ENTERO (R25)"
+    )
+    for columna in ("fecha", "hora", "usuario"):
+        assert f"END AS {columna}" in compacto, (
+            f"`{columna}` sale de una rama condicionada al sello: sin sello va "
+            "a NULL, no a un valor inventado (R25)"
+        )
+    assert "desconocido" not in compacto.lower(), (
+        "rellenar el usuario ausente con una etiqueta lo convierte en un dato "
+        "falso; NULL dice la verdad (R25)"
+    )
+
+
+def test_f080_r25_una_fecha_imposible_no_cuenta_como_sello() -> None:
+    """`31/02/2026` casa con el patrón y no es una fecha.
+
+    El oráculo la descarta con `strptime`; el SQL, con la comprobación de ida y
+    vuelta. Publicarla normalizada a marzo sería inventarse el día en que
+    alguien escribió el comentario.
+    """
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert re.search(r"to_char\([^;]{0,120}'DD/MM/YYYY'\) = ", compacto), (
+        "la validación de ida y vuelta de la fecha del sello es lo que iguala "
+        "el SQL con el oráculo de `partir_memo` (R25)"
+    )
+
+
+def test_f080_r26_el_bloque_integro_se_publica_para_poder_reconstruir() -> None:
+    """R26: unir los bloques en su orden reproduce el memo original. Si la tabla
+    solo publicara el cuerpo recortado, esa verificación sería imposible."""
+    compacto = _ejecutable(RUTA_TEXTO)
+    assert re.search(r"\w+\.bloque\s+AS bloque", compacto), (
+        "el bloque íntegro se publica aparte del cuerpo: es lo que permite la "
+        "prueba reconstructiva (R26, DA-2)"
+    )
