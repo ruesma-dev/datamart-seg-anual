@@ -78,7 +78,7 @@ sobre el **texto** del SQL: ningún agente ejecuta SQL contra la base.
 
 - [x] T18: Escribir en `tests/test_f080_sql.py` (o fichero de pipeline propio) el assert de que `BuildComprasStep.SUB_PASOS` declara `vencimientos`, `pago_factura` y `texto` en el orden de sus ficheros, y que **los tres** construyen tabla y declaran `target_schema`/`target_table` (el de texto construye dos)  |  Verificación: `pytest` del fichero en ROJO; traza pegada
   - *Corrige:* antes decía «los dos que construyen tabla»; era falso, son los tres, porque los comentarios ya no son una vista.
-- [ ] T19: Añadir los tres sub-pasos a `etl_sigrid/application/steps/build_compras_step.py`  |  Verificación: `pytest` del fichero en verde
+- [x] T19: Añadir los tres sub-pasos a `etl_sigrid/application/steps/build_compras_step.py`  |  Verificación: `pytest` del fichero en verde
 
 ## El diccionario y el cierre
 

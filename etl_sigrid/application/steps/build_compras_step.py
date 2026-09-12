@@ -8,6 +8,9 @@ Encadena los archivos SQL en orden:
     02_fact_linea.sql  - hechos unificados a nivel de línea
     03_views.sql       - vistas de negocio (consumo de contrato, proveedores…)
     04_formas_pago.sql - dimensión de formas de pago (auxpag + auxefp)
+    05_vencimientos.sql- efectos de pago de la factura (F-080)
+    06_pago_factura.sql- forma de pago de la factura y control contra contrato
+    07_texto.sql       - el memo de la pestaña «Texto», íntegro y partido
 
 Solo lee de `raw.*`. No necesita `stg` ni `mart`.
 
@@ -42,7 +45,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los cinco ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los ocho ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` a propósito: es DATO, no lógica. Así se puede leer sin
 #: entrar en el bucle y —lo que lo motivó— se puede sustituir en un test para
@@ -64,14 +67,42 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="fact_compras_linea",
     ),
     _SubStep(name="views", sql_file="03_views.sql"),
-    # F-073: la dimensión de formas de pago. Va la última porque todavía no la
-    # lee nadie de este esquema: el cableado a `compras.contratos` es de F-067
-    # y el de la factura, de F-080.
+    # F-073: la dimensión de formas de pago. Ya NO es la última y ya la lee
+    # alguien: F-080 la cablea a la factura en `06_pago_factura.sql`, que va
+    # detrás por eso. El cableado a `compras.contratos` sigue siendo de F-067.
     _SubStep(
         name="formas_pago",
         sql_file="04_formas_pago.sql",
         target_schema="compras",
         target_table="formas_pago",
+    ),
+    # F-080: los efectos de pago de la factura, su forma de pago y su texto.
+    # EL ORDEN NO ES DECORATIVO: `05` necesita las funciones de `00_setup.sql`
+    # y `compras.facturas` (01); `06` agrega `compras.vencimientos` (05) y lee
+    # la dimensión `compras.formas_pago` (04, F-073), así que va detrás de las
+    # dos. `07` solo necesita `raw.con`.
+    _SubStep(
+        name="vencimientos",
+        sql_file="05_vencimientos.sql",
+        target_schema="compras",
+        target_table="vencimientos",
+    ),
+    _SubStep(
+        name="pago_factura",
+        sql_file="06_pago_factura.sql",
+        target_schema="compras",
+        target_table="v_facturas_pago",
+    ),
+    # Construye DOS tablas (`documento_texto` y `documento_comentarios`) y
+    # cuenta la de comentarios: es la que puede salir mal sin que nada falle
+    # —si el corte del memo no partiera, quedaría una fila por documento en vez
+    # de una por comentario— y contarla cubre también a `documento_texto`,
+    # porque sin memos no hay comentarios.
+    _SubStep(
+        name="texto",
+        sql_file="07_texto.sql",
+        target_schema="compras",
+        target_table="documento_comentarios",
     ),
 )
 

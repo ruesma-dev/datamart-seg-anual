@@ -46,12 +46,18 @@ FICHEROS_MAESTRO = [
     "04_centros_coste.sql",
     "05_estados_documento.sql",
 ]
+# F-080 le añadió tres (05, 06 y 07): el censo de ficheros del step crece con
+# cada feature que publica en `compras`, y su orden sigue siendo el de la
+# numeración. Quien los cuenta uno a uno es `tests/test_f080_pipeline.py`.
 FICHEROS_COMPRAS = [
     "00_setup.sql",
     "01_documentos.sql",
     "02_fact_linea.sql",
     "03_views.sql",
     "04_formas_pago.sql",
+    "05_vencimientos.sql",
+    "06_pago_factura.sql",
+    "07_texto.sql",
 ]
 
 
@@ -169,7 +175,7 @@ def test_f073_build_maestros_encadena_sus_seis_sql(doble) -> None:
     assert ("maestro", "estados_documento") in pg.contados
 
 
-def test_f073_build_compras_encadena_sus_cinco_sql(doble) -> None:
+def test_f073_build_compras_encadena_sus_sql(doble) -> None:
     pg = doble(build_compras_step)
 
     resultado = BuildComprasStep(SimpleNamespace()).run()
