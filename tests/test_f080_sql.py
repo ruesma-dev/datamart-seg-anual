@@ -402,3 +402,285 @@ def test_f080_r41_el_codigo_de_la_remesa_se_lee_de_con_porque_rpa_no_lo_tiene() 
     assert not re.search(r"\br\.cod\b", compacto), (
         "`rpa.cod` no existe: leer esa columna no compila (R41, T1)"
     )
+
+
+# ===========================================================================
+# `compras.v_facturas_pago` (06) · R16-R19
+# ===========================================================================
+
+RUTA_PAGO_FACTURA = DIRECTORIO_SQL / "compras" / "06_pago_factura.sql"
+RUTA_VIEWS_F067 = DIRECTORIO_SQL / "compras" / "03_views.sql"
+
+
+#: Lo que la cabecera de la factura enseña sobre su pago, más el resumen de
+#: sus efectos (R16-R19). `plazo_formula` sale de F-073 tal cual.
+COLUMNAS_DEL_PAGO = (
+    "factura_id",
+    "codigo_factura",
+    "fecha_factura",
+    "proveedor_id",
+    "proveedor_nombre",
+    "forma_pago_id",
+    "codigo_forma_pago",
+    "forma_pago",
+    "plazo_formula",
+    "formula_pago_documento",
+    "condiciones_pago",
+    "medio_pago_id",
+    "medio_pago",
+    "naturaleza_pago",
+    "cuenta_contable",
+    "cuenta_transferencia_id",
+    "banco",
+    "sucursal",
+    "num_efectos",
+    "num_efectos_anulados",
+    "num_efectos_pagados",
+    "primer_vencimiento",
+    "ultimo_vencimiento",
+    "importe_efectos_vivos",
+    "importe_retenido_vivo",
+)
+
+
+def test_f080_r16_el_pago_de_la_factura_es_una_vista_por_factura() -> None:
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    assert "CREATE OR REPLACE VIEW compras.v_facturas_pago" in compacto, (
+        "el pago de la factura es una VISTA: no hay nada que materializar, la "
+        "tabla pesada es `compras.vencimientos` (R16)"
+    )
+    assert re.search(r"FROM compras\.facturas \w+", compacto), (
+        "una fila por factura significa arrancar de `compras.facturas`, no de "
+        "sus líneas ni de sus efectos (R16)"
+    )
+
+
+def test_f080_r16_la_forma_de_pago_se_lee_de_la_dimension_de_f073() -> None:
+    """R20/DA-7: la dimensión ya existe; levantar una segunda desde `raw.auxpag`
+    es exactamente la duplicación que F-073 vino a evitar."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    assert re.search(
+        r"LEFT JOIN compras\.formas_pago \w+ ON \w+\.forma_pago_id = "
+        r"NULLIF\(f\.pagide, 0\)",
+        compacto,
+    ), "la forma de pago de la factura es `dcf.pagide` contra la dimension (R16)"
+    assert "raw.auxpag" not in _sin_comentarios(_sql(RUTA_PAGO_FACTURA)), (
+        "`raw.auxpag` es la fuente de `compras.formas_pago` (F-073): leerla "
+        "aquí otra vez duplica la dimensión (R16, R20)"
+    )
+
+
+def test_f080_r17_el_plazo_va_verbatim_y_no_se_convierte_en_dias() -> None:
+    """`30 450R` es un valor real del catálogo: no es un número de días."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    assert re.search(r"\w+\.plazo_formula\s+AS plazo_formula", compacto), (
+        "`plazo_formula` se arrastra tal cual desde `compras.formas_pago` (R17)"
+    )
+    ejecutable = _sin_comentarios(_sql(RUTA_PAGO_FACTURA)).lower()
+    for derivacion in ("dias_pago", "plazo_dias", "dias_plazo"):
+        assert derivacion not in ejecutable, (
+            f"`{derivacion}` inventa precisión sobre una fórmula de Sigrid que "
+            "no es un número (R17)"
+        )
+    assert "plazo_formula::" not in ejecutable, (
+        "castear la fórmula a número falla o miente: `30 450R` es real (R17)"
+    )
+
+
+@pytest.mark.parametrize("columna", COLUMNAS_DEL_PAGO)
+def test_f080_r18_expone_el_pago_de_la_factura(columna: str) -> None:
+    assert re.search(rf"AS {columna}\b", _ejecutable(RUTA_PAGO_FACTURA)), (
+        f"`compras.v_facturas_pago` debe exponer {columna} (R18, R19)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("origen", "catalogo"),
+    [
+        ("f.cypnatide", "raw.auxnap"),   # naturaleza del pago (NOM, EMB, CUO)
+        ("f.efeide", "raw.auxefp"),      # medio de pago
+        ("f.banban", "raw.auxban"),      # banco
+        ("f.bansuc", "raw.auxban"),      # sucursal
+        ("f.cueide", "raw.con"),         # cuenta contable: es un documento
+    ],
+)
+def test_f080_r18_cada_catalogo_de_la_factura_se_resuelve_a_nombre(
+    origen: str, catalogo: str
+) -> None:
+    """Los mismos catálogos que el efecto, y por la misma clave medida en T1."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    patron = (
+        rf"LEFT JOIN {re.escape(catalogo)} \w+ ON \w+\.ide = "
+        rf"NULLIF\({re.escape(origen)}, 0\)"
+    )
+    assert re.search(patron, compacto), (
+        f"{origen} se resuelve contra {catalogo} por su `ide`, con LEFT JOIN "
+        "para no perder la factura si el código está fuera de catálogo (R18)"
+    )
+
+
+def test_f080_r18_las_condiciones_y_la_formula_del_documento_van_tal_cual() -> None:
+    """F-066 ya ingirió `dcf.pagtex`: son las condiciones escritas a mano."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    assert re.search(r"f\.pagfor[^,]* AS formula_pago_documento", compacto), (
+        "la fórmula que la propia factura guarda (`dcf.pagfor`) se publica "
+        "aparte de la del catálogo: pueden no coincidir (R18)"
+    )
+    assert re.search(r"f\.pagtex[^,]* AS condiciones_pago", compacto), (
+        "`dcf.pagtex` son las condiciones de pago del documento (R18)"
+    )
+
+
+def test_f080_r19_el_resumen_de_efectos_agrega_ANTES_de_unir() -> None:
+    """Unir primero y agregar después multiplica la cabecera por sus efectos:
+    una factura con 16 efectos (el máximo medido) saldría 16 veces."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    assert re.search(r"WITH \w+ AS \( SELECT factura_id", compacto), (
+        "el resumen entra por un CTE que arranca agrupando por `factura_id` (R19)"
+    )
+    assert "FROM compras.vencimientos GROUP BY factura_id" in compacto, (
+        "el CTE agrega `compras.vencimientos` por factura ANTES de unirse a la "
+        "cabecera: agregar después rompe el grano (R19)"
+    )
+    assert re.search(r"LEFT JOIN \w+ ON \w+\.factura_id = \w+\.factura_id", compacto), (
+        "y se une con LEFT JOIN: las facturas sin efectos medidas no se pueden "
+        "perder (R19)"
+    )
+
+
+def test_f080_r19_ningun_importe_agregado_suma_los_efectos_de_baja() -> None:
+    """LA TRAMPA CARA DE ESTA FEATURE (R39, R40).
+
+    89.228 de 255.148 efectos están de baja, 76.215 de los 195.510 de factura.
+    Un `SUM(importe)` sin filtrar suma el original anulado junto con los hijos
+    de la división: sobre `FR25/04222` daría 288.123,92 en vez de 92.478,49,
+    y los dos números parecen igual de plausibles.
+    """
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    sumas = re.findall(r"SUM\(", compacto)
+    filtradas = re.findall(r"SUM\([^)]*\) FILTER \(WHERE NOT efecto_anulado", compacto)
+    assert sumas, "el resumen tiene que traer importes agregados (R19)"
+    assert len(filtradas) == len(sumas), (
+        f"{len(sumas) - len(filtradas)} de los {len(sumas)} SUM del resumen no "
+        "filtran `NOT efecto_anulado`: ese importe es un fantasma (R19, R39)"
+    )
+
+
+# ===========================================================================
+# `compras.v_control_forma_pago` (06) · R28, R29
+# ===========================================================================
+
+#: La expresión de enlace factura → contrato, tal y como la escribió F-067 en
+#: `compras.v_pbi_contrato_consumo`. NO se reescribe: se copia.
+ENLACE_FACTURA_CONTRATO = (
+    "COALESCE(fl.contrato_id_directo, alb.contrato_id, alb_l.contrato_id_linea)"
+)
+
+
+def test_f080_r28_el_enlace_a_contrato_es_LITERALMENTE_el_de_f067() -> None:
+    """Dos reglas de enlace para la misma cosa divergen, y la segunda siempre
+    se descubre cuando las dos cifras ya están en un informe."""
+    assert ENLACE_FACTURA_CONTRATO in _ejecutable(RUTA_VIEWS_F067), (
+        "el enlace de referencia vive en `03_views.sql`; si ha cambiado de "
+        "forma, es ahí donde hay que mirar antes de tocar F-080 (R28)"
+    )
+    assert ENLACE_FACTURA_CONTRATO in _ejecutable(RUTA_PAGO_FACTURA), (
+        "`v_control_forma_pago` usa la MISMA expresión que "
+        "`v_pbi_contrato_consumo`, no una nueva (R28)"
+    )
+
+
+def test_f080_r28_el_grano_es_el_par_factura_contrato() -> None:
+    """Una factura puede tener líneas de varios contratos: el grano es el par,
+    y el DISTINCT es lo que evita una fila por línea."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    assert "CREATE OR REPLACE VIEW compras.v_control_forma_pago" in compacto
+    assert re.search(r"SELECT DISTINCT \w*\.?factura_id", compacto), (
+        "sin DISTINCT el grano son las LÍNEAS de la factura, no el par (R28)"
+    )
+
+
+def test_f080_r28_la_forma_de_pago_del_contrato_se_lee_de_raw_ctr() -> None:
+    """`compras.contratos` no la publica: eso es F-067 (R21)."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    assert re.search(r"LEFT JOIN raw\.ctr \w+ ON \w+\.ide = ", compacto), (
+        "la forma de pago del contrato está en `raw.ctr.pagide` (R28)"
+    )
+    assert "pagide, 0)" in compacto, (
+        "y se resuelve contra `compras.formas_pago` como la de la factura (R28)"
+    )
+
+
+@pytest.mark.parametrize(
+    "columna",
+    [
+        "factura_id",
+        "codigo_factura",
+        "contrato_id",
+        "codigo_contrato",
+        "obra_id",
+        "proveedor_nombre",
+        "forma_pago_factura",
+        "forma_pago_contrato",
+        "plazo_formula_factura",
+        "plazo_formula_contrato",
+        "forma_pago_coincide",
+    ],
+)
+def test_f080_r29_el_control_enfrenta_las_dos_formas_de_pago(columna: str) -> None:
+    assert re.search(rf"AS {columna}\b", _ejecutable(RUTA_PAGO_FACTURA)), (
+        f"el control debe exponer {columna} (R28, R29)"
+    )
+
+
+def test_f080_r29_las_que_cuadran_tambien_salen() -> None:
+    """Filtrar a las discrepancias convierte la vista en una alarma y deja sin
+    respuesta «cuántas cuadran»: el numerador sin denominador no vale."""
+    compacto = _ejecutable(RUTA_PAGO_FACTURA)
+    bloque = compacto[compacto.index("compras.v_control_forma_pago"):]
+    assert not re.search(r"WHERE[^;]*coincide", bloque), (
+        "la vista marca la coincidencia, no la filtra (R29)"
+    )
+    assert not re.search(r"WHERE[^;]*\w+\.pagide <> \w+\.pagide", bloque), (
+        "enfrentar las formas de pago en el WHERE es filtrar por discrepancia "
+        "con otro nombre (R29)"
+    )
+
+
+# ===========================================================================
+# R21 · lo que F-080 NO toca
+# ===========================================================================
+
+
+@pytest.mark.parametrize(
+    "fichero", ["01_documentos.sql", "02_fact_linea.sql", "03_views.sql"]
+)
+def test_f080_r21_los_ficheros_de_f067_no_publican_nada_de_f080(fichero: str) -> None:
+    """F-067 reescribe esos tres ficheros enteros: meter ahí una columna de
+    F-080 es programar un conflicto para dentro de dos semanas (R21, DA-7)."""
+    texto = _sql(DIRECTORIO_SQL / "compras" / fichero)
+    for objeto in (
+        "v_facturas_pago",
+        "v_control_forma_pago",
+        "compras.vencimientos",
+        "documento_texto",
+        "documento_comentarios",
+    ):
+        assert objeto not in texto, (
+            f"{objeto} es de F-080 y se publica en su propio fichero, no en "
+            f"{fichero}, que es de F-067 (R21)"
+        )
+
+
+@pytest.mark.parametrize(
+    "objeto", ["compras.facturas", "compras.contratos", "compras.factura_lineas"]
+)
+def test_f080_r21_f080_no_redefine_las_tablas_de_f067(objeto: str) -> None:
+    """Las lee; no las reescribe ni les añade columnas (DA-7)."""
+    for ruta in (RUTA_VENCIMIENTOS, RUTA_PAGO_FACTURA):
+        ejecutable = _sin_comentarios(_sql(ruta))
+        assert f"CREATE TABLE {objeto}" not in ejecutable
+        assert f"ALTER TABLE {objeto}" not in ejecutable, (
+            f"añadir columnas a {objeto} mete a F-080 dentro de "
+            "`01_documentos.sql`, que es de F-067 (R21, DA-7)"
+        )
