@@ -353,12 +353,14 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 142 objetos, 852 columnas y 57 fichas de
-consumo** —eran 139 / 822 / 54 hasta F-073, que añade `maestro.centros_coste`,
-`maestro.estados_documento` y `compras.formas_pago` (19 columnas) más las once
-columnas nuevas de `maestro.obras`; y eran 47 fichas de consumo hasta F-079, que
-subió los siete objetos de `stg` a la superficie de consulta— y el árbol declara
-**versión 19** (hash `7f5e890fd5f7`). Lo publicado en `_meta` es la **versión
+**El diccionario del árbol está en 150 objetos, 941 columnas y 62 fichas de
+consumo** —eran 142 / 852 / 57 al cerrar F-073, y F-080 añade los **cinco
+objetos** de `compras` (`vencimientos`, `v_facturas_pago`,
+`v_control_forma_pago`, `documento_texto`, `documento_comentarios`, 89 columnas)
+más las **tres tablas nuevas de `raw`** (`auxnap`, `auxban`, `rpa`, sin columnas
+por la convención de `raw`); antes de eso eran 139 / 822 / 54 hasta F-073 y 47
+fichas de consumo hasta F-079, que subió los siete objetos de `stg` a la
+superficie de consulta— y el árbol declara **versión 21**. Lo publicado en `_meta` es la **versión
 18** (hash `4af4c3bb60d4`, publicada el 2026-09-10): publicar contra Azure es una
 escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test
@@ -690,3 +692,190 @@ que imprimio el segundo.
 Despues de la primera nocturna con la imagen nueva van, en este orden,
 `check-raw-recuentos`, `check-declarados`, `check-diccionario` y, por ultimo,
 `publicar-diccionario`, que es **la unica escritura** y la autoriza el humano.
+
+## F-080 · IMPLEMENTACION ENTREGADA (2026-09-12) · VERIFICACIONES MANUAL
+
+Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, rigor `estandar`,
+`sdd=true`. Informe: `progress/impl_F-080.md`. Las 29 tareas de `tasks.md`, con
+un commit cada una.
+
+**QUE SE PUBLICA**: `compras.vencimientos` (los 195.510 efectos de pago de las
+facturas de compra), `compras.v_facturas_pago` (forma de pago + resumen de
+efectos, una fila por factura), `compras.v_control_forma_pago` (factura contra
+contrato, una fila por par), `compras.documento_texto` (el memo integro) y
+`compras.documento_comentarios` (el memo partido, un comentario por fila). En
+`raw` entran tres tablas nuevas (`auxnap`, `auxban`, `rpa`) y **`con.tex`**.
+
+**LAS TRES COSAS QUE HAY QUE SABER Y NO SE VEN EN EL DIFF:**
+
+* **Sumar los importes de todos los efectos de una factura los cuenta hasta
+  tres veces.** El efecto que se dividio sigue en la tabla ANULADO junto a sus
+  hijos, y el estado no lo distingue. Se filtra con `efecto_anulado = false`.
+  Sobre `FR25/04222`: 92.478,49 filtrando, **288.123,92 sin filtrar**.
+* **`fecha_real` vacia no significa «vivo»** (61,8 % de los efectos de factura),
+  y **`orden` 1 de `documento_comentarios` es el comentario MAS RECIENTE**.
+* **No se publica el enlace del efecto hijo a su efecto de origen**: `pag.padide`
+  vale 0 en los 255.148 efectos. Igual que `con.serie`, de ahi que la serie se
+  derive con `compras.fn_serie`.
+
+### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-080
+
+Ningun agente las ejecuta: todas menos la 0 necesitan que el build haya corrido
+contra la base, la 1 es una ESCRITURA y publicar el diccionario tambien.
+**En este orden**, y de la 2 en adelante nada significa nada sin la 1.
+
+0. **T0 bis · que la dimension de F-073 esta construida** (R20). Si no lo esta,
+   todo lo que toque `v_facturas_pago` espera a la primera nocturna con la
+   imagen nueva; el desarrollo no espera.
+
+       SELECT count(*) FROM compras.formas_pago;   -- esperado: 69
+
+1. **T7 · Medicion B del coste de ventana** (R4b). **Es una ESCRITURA.** Trae
+   `con.tex` por primera vez:
+
+       python main.py ingest --table con --full
+       python main.py timings --last 10
+
+   Y se compara la duracion de `ingest_raw.con` con las noches anteriores. El
+   contraste con el presupuesto de referencia de 4 h esta en
+   `progress/impl_F-080.md` §T8: con la medicion A delante, la ventana pasa de
+   3 h 25 min a **~3 h 26 min**, con unos 34 min de margen. **No es una puerta**:
+   si la medicion B lo desmintiera, se avisa por escrito y la feature sigue.
+
+2. **Construir los objetos nuevos.** Sin esto no existen y todo lo de abajo mide
+   el mundo de ayer:
+
+       python main.py build-compras
+
+3. **Los recuentos de los cinco objetos y de las tres tablas de `raw`.** Solo
+   lectura. Los esperados estan medidos contra Sigrid el 2026-09-11 (T1, T2 y T4
+   del informe), asi que una diferencia pequeña es el sistema vivo y una grande
+   es un fallo:
+
+       SELECT count(*) AS efectos,
+              count(DISTINCT factura_id) AS facturas
+       FROM compras.vencimientos;
+       -- esperado: ~195.510 efectos / ~165.737 facturas
+
+       SELECT count(*) FROM compras.v_facturas_pago;        -- esperado: ~165.759
+       SELECT count(*) FROM compras.v_control_forma_pago;   -- ~80.400 pares
+       SELECT count(*) FROM compras.documento_texto;        -- esperado: ~110.141
+       SELECT count(*) FROM compras.documento_comentarios;  -- > documento_texto
+
+       SELECT count(*) FROM raw.auxnap;   -- esperado: 3
+       SELECT count(*) FROM raw.auxban;   -- esperado: 1.690
+       SELECT count(*) FROM raw.rpa;      -- esperado: 3.919
+
+   `v_control_forma_pago` no tiene esperado medido: las facturas CON contrato son
+   ~80.435 (165.759 menos las 85.324 sin contrato) y el grano es el par, asi que
+   la cifra tiene que ser **igual o algo mayor** que esa. Si es mucho mayor, el
+   `DISTINCT` del enlace no esta haciendo su trabajo.
+
+4. **El reparto de `estado_pago` contra los 10 estados** (R10). Lo medido el
+   2026-09-11 sobre los efectos de factura: 10 Pagado 106.262 · 14 Agrupados
+   55.476 · 2 Aprobado 20.848 · 1 Pendiente 10.436 · 5 En cartera 2.319 · 3
+   Emitido 169. Si sale algun `estado_pago` a NULL, hay un estado fuera de
+   catalogo y hay que mirarlo:
+
+       SELECT estado_pago_codigo, estado_pago, count(*) AS efectos
+       FROM compras.vencimientos
+       GROUP BY 1, 2
+       ORDER BY efectos DESC;
+
+5. **El recuento de anulados** (R39, R40). Es la cifra de la que depende que los
+   importes agregados sean ciertos:
+
+       SELECT count(*) AS efectos,
+              count(*) FILTER (WHERE efecto_anulado) AS anulados,
+              round(100.0 * count(*) FILTER (WHERE efecto_anulado) / count(*), 1)
+                  AS pct
+       FROM compras.vencimientos;
+       -- esperado: ~195.510 / ~76.215 / ~39,0
+
+   Y la comprobacion que lo cierra, sobre la factura de la captura del correo:
+
+       SELECT codigo_efecto, estado_pago, efecto_anulado, importe
+       FROM compras.vencimientos
+       WHERE codigo_factura = 'FR25/04222'
+       ORDER BY codigo_efecto;
+       -- esperado: 8 efectos, 3 con efecto_anulado cierto (los tres «Aprobado»),
+       -- y los cinco vivos sumando 92.478,49
+
+       SELECT num_efectos, num_efectos_anulados, importe_efectos_vivos
+       FROM compras.v_facturas_pago
+       WHERE codigo_factura = 'FR25/04222';
+       -- esperado: 8 / 3 / 92.478,49  <-- el numero de la cabecera de Sigrid
+
+6. **Efectos en remesa** (R41), y que el codigo de la remesa se resuelve:
+
+       SELECT count(*) FILTER (WHERE remesa_id IS NOT NULL)      AS en_remesa,
+              count(*) FILTER (WHERE codigo_remesa IS NOT NULL)  AS con_codigo
+       FROM compras.vencimientos;
+       -- esperado: ~40.090 / ~40.090 (los dos iguales: si el segundo es 0, el
+       -- JOIN a raw.con de la remesa no esta resolviendo)
+
+7. **LA PRUEBA RECONSTRUCTIVA DEL MEMO** (R26). Es la que hace innecesario
+   fiarse del parseo: si el memo se reconstruye, no se ha tirado nada. Primero
+   sobre una muestra:
+
+       SELECT t.documento_id, t.codigo_documento, t.num_comentarios,
+              t.texto = string_agg(c.bloque, E'\n --------------------------------- \n'
+                                   ORDER BY c.orden) AS reconstruye
+       FROM compras.documento_texto t
+       JOIN compras.documento_comentarios c ON c.documento_id = t.documento_id
+       GROUP BY t.documento_id, t.codigo_documento, t.num_comentarios, t.texto
+       LIMIT 20;
+
+   Y despues sobre el total:
+
+       SELECT count(*) AS documentos,
+              count(*) FILTER (WHERE NOT reconstruye) AS no_reconstruyen
+       FROM (
+           SELECT t.documento_id,
+                  t.texto = string_agg(c.bloque,
+                      E'\n --------------------------------- \n' ORDER BY c.orden)
+                      AS reconstruye
+           FROM compras.documento_texto t
+           JOIN compras.documento_comentarios c ON c.documento_id = t.documento_id
+           GROUP BY t.documento_id, t.texto
+       ) x;
+
+   **`no_reconstruyen` NO tiene que ser 0 necesariamente**: el separador se
+   reconoce con tolerancia (tres guiones o mas) y ahi arriba se recompone con el
+   canonico de 33, asi que un memo con otra longitud de separador sale como que
+   no reconstruye sin que se haya perdido nada. Lo que **si** tiene que ser 0 es
+   el invariante fuerte, que no depende del separador:
+
+       SELECT count(*) FROM (
+           SELECT t.documento_id
+           FROM compras.documento_texto t
+           JOIN compras.documento_comentarios c ON c.documento_id = t.documento_id
+           GROUP BY t.documento_id, t.texto
+           HAVING regexp_replace(t.texto, '\r?\n *-{3,} *\r?\n', '', 'g')
+               <> string_agg(c.bloque, '' ORDER BY c.orden)
+       ) x;
+       -- esperado: 0. Si no lo es, los documentos que salgan tienen un bloque
+       -- en blanco (que se tira a proposito) y hay que mirarlos uno a uno antes
+       -- de dar el parseo por bueno.
+
+   Y de paso, cuantos bloques no casan con el sello, que es la cifra que la ficha
+   promete declarar cuando se mida:
+
+       SELECT count(*) FILTER (WHERE NOT sello_reconocido) AS sin_sello,
+              count(*) AS bloques
+       FROM compras.documento_comentarios;
+
+8. **Las tres puertas del diccionario y la publicacion.** `check-unicidad` lee
+   las `clave_negocio` de las fichas nuevas, asi que comprueba de verdad el grano
+   de los cinco objetos:
+
+       python main.py check-unicidad
+       python main.py check-declarados
+       python main.py check-diccionario
+
+   Las tres con **codigo 0**, y `check-diccionario` tiene que ver **150 fichas y
+   150 objetos**, biyeccion exacta. Y despues, la unica escritura:
+
+       python main.py publicar-diccionario
+
+   **Version 21.** Lo publicado hoy es la 18.
