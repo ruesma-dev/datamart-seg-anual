@@ -879,3 +879,38 @@ contra la base, la 1 es una ESCRITURA y publicar el diccionario tambien.
        python main.py publicar-diccionario
 
    **Version 21.** Lo publicado hoy es la 18.
+
+### T27 · LA BATERIA DE TRES PREGUNTAS AL MCP (MANUAL, humano) · R34
+
+Es la prueba de aceptacion de verdad de esta feature: si el diccionario esta
+bien escrito, el MCP contesta **sin que se le explique nada en el prompt**. Se
+le pregunta tal cual, en lenguaje natural, **sin nombrar tablas ni columnas y
+sin darle pistas**, y se pegan sus respuestas aqui debajo.
+
+**Antes de preguntar**: el MCP lee el diccionario publicado en `_meta`, no el
+del arbol, asi que esto no significa nada hasta que `publicar-diccionario`
+(verificacion 8 de arriba) haya corrido. Con la version 18 publicada, el MCP no
+sabe que estos objetos existen.
+
+1. **«Cuando vence la factura FR25/04222 y esta pagada?»**
+   Lo que tiene que hacer bien: ir a `compras.vencimientos` o a
+   `compras.v_facturas_pago`, y **no sumar los ocho efectos**: si contesta un
+   importe de 288.123,92 en vez de 92.478,49, la ficha de la anulacion no ha
+   servido de nada y hay que reescribirla. Tambien es correcto que avise de que
+   tres efectos estan anulados.
+
+2. **«Que dice el texto de la ultima factura que tenga una retencion?»**
+   Lo que tiene que hacer bien: ir a `compras.documento_texto` o a
+   `compras.documento_comentarios` --y NO a `raw.dcf.tex`, que esta informado en
+   el 0,3 %--, y si cita «el ultimo comentario», que sea el de `orden = 1` y no
+   el del `orden` mas alto.
+
+3. **«Que facturas no cuadran con la forma de pago de su contrato?»**
+   Lo que tiene que hacer bien: usar `compras.v_control_forma_pago`, **decir que
+   la mitad de las facturas de compra no cuelgan de ningun contrato** y por lo
+   tanto no estan en la comparacion, y no confundir «falta el dato en un lado»
+   con «no coinciden» (para eso esta `forma_pago_comparable`).
+
+**Si el MCP falla una, el problema es la ficha, no la pregunta.** La respuesta
+se pega aqui con la fecha, y lo que haya que corregir del diccionario entra como
+deuda de F-080 antes de cerrarla.
