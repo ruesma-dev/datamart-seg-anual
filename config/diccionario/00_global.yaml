@@ -137,7 +137,46 @@
 # que es lo unico que cambia del contenido publicado. Se sube igual: republicar
 # un texto distinto con la etiqueta de ayer es como no republicarlo.
 
-version: 20
+# version 21 (F-080, 2026-09-12): CINCO OBJETOS NUEVOS EN `compras` y tres
+# tablas nuevas en `raw`, y ninguno se quita ni se renombra. Ya se puede
+# preguntar CUANDO VENCE una factura de compra, si esta pagada, con que forma de
+# pago y que se ha escrito sobre ella.
+#
+# `compras.vencimientos` son los **195.510 efectos de pago** de las facturas de
+# compra, uno por fila, con su estado LEIDO de `raw.conest` (tip 25, 10 estados)
+# y no derivado. `compras.v_facturas_pago` los resume por factura junto con su
+# forma de pago, resuelta contra la dimension de F-073.
+# `compras.v_control_forma_pago` enfrenta la forma de pago de la factura con la
+# de su contrato, sin filtrar las que cuadran. Y `compras.documento_texto` /
+# `compras.documento_comentarios` publican la pestaña «Texto»: el memo integro y
+# el memo partido en comentarios con su fecha, su hora y su autor.
+#
+# LA TRAMPA QUE HAY QUE LEER ANTES DE SUMAR NADA DE VENCIMIENTOS: **sumar los
+# importes de todos los efectos de una factura los cuenta hasta tres veces**.
+# El efecto que se dividio se queda en la tabla ANULADO junto a sus hijos, y el
+# estado no lo distingue. **89.228 de 255.148 efectos estan de baja (34,97 %)**
+# y 76.215 de los 195.510 de factura (39,0 %): se filtran con
+# `efecto_anulado = false`, que es lo que reproduce el numero de la cabecera de
+# Sigrid (verificado sobre `FR25/04222`: 92.478,49 filtrando, 288.123,92 sin
+# filtrar). Y dos avisos mas: `fecha_real` vacia **no significa «vivo»** (61,8 %
+# la tienen asi, frente a los 10.607 pagos de cartera viva de F-037), y en
+# `documento_comentarios` **`orden` 1 es el comentario MAS RECIENTE**, porque
+# Sigrid apila en descendente.
+#
+# LO QUE NO SE PUBLICA, Y POR QUE: el enlace del efecto hijo a su efecto de
+# origen. `pag.padide`, el campo que lo prometia, vale 0 en los 255.148 efectos,
+# igual que `con.serie` (de ahi que la serie se derive con `compras.fn_serie`).
+# Regla que deja esta feature: antes de diseñar sobre un campo del origen, se
+# mide su cobertura.
+#
+# `raw` gana `auxnap` (3 naturalezas de pago), `auxban` (1.690 bancos y
+# sucursales) y `rpa` (3.919 remesas de pago), y `con.tex` deja de excluirse de
+# la ingesta: es donde vive el texto de la factura (65,5 %), no en `dcf.tex`
+# (0,3 %). Se corrige de paso una afirmacion FALSA de la cabecera de
+# `compras.yaml`, que decia que el esquema no se refresca de noche y que su
+# fecha de build no es consultable: dejo de ser cierto en F-047.
+
+version: 21
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
