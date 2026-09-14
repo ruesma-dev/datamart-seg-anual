@@ -206,6 +206,43 @@ def test_f080_r25_un_sello_a_medias_tampoco_cuela() -> None:
     assert unico.cuerpo == bloque
 
 
+@pytest.mark.parametrize(
+    "dia_imposible", ["31/02/2026", "31/04/2026", "30/02/2026", "29/02/2026"]
+)
+def test_f080_r25_una_fecha_que_no_existe_no_cuenta_como_sello(
+    dia_imposible: str,
+) -> None:
+    """CASA CON EL PATRÓN Y NO ES UNA FECHA, que no es lo mismo que no casar.
+
+    `31/02/2026` supera el `[0-9]{2}/[0-9]{2}/[0-9]{4}` del sello y luego no
+    existe en el calendario. Publicarlo normalizado a marzo sería inventarse el
+    día en que alguien escribió el comentario, así que el sello **no cuenta
+    como reconocido**: la autoría se va a NULL y el cuerpo es el bloque entero,
+    exactamente igual que si no hubiera sello (R25). El SQL hace lo mismo con
+    su comprobación de ida y vuelta (`to_char(...) = sello[1]`), y las dos
+    implementaciones tienen que coincidir o compararlas no vale de nada.
+
+    Lo destapó la campaña de mutación de F-080
+    (`progress/mutacion_F-080_modulos.md`): sin este test, cambiar el `or` de
+    `if casado is None or fecha is None:` por un `and` sobrevivía, y con ese
+    `and` un día imposible se publicaría como sello RECONOCIDO con la fecha a
+    NULL. La rama `casado is None and fecha is not None` es inalcanzable —si no
+    hay sello, la fecha ya es None—, así que el `or` solo se distingue del
+    `and` justo aquí.
+    """
+    bloque = f"anotacion con fecha mal tecleada\r\n[{dia_imposible} 09:14:32 Usuario: jromero]"
+
+    (unico,) = partir_memo(bloque)
+
+    assert unico.sello_reconocido is False, (
+        f"«{dia_imposible}» casa con el patrón pero no existe: no es un sello"
+    )
+    assert unico.fecha is None
+    assert unico.hora is None
+    assert unico.usuario is None
+    assert unico.cuerpo == bloque, "sin sello utilizable, el cuerpo es el bloque entero"
+
+
 # ---------------------------------------------------------------------------
 # R26 · el invariante de reconstrucción
 # ---------------------------------------------------------------------------
