@@ -693,11 +693,43 @@ Despues de la primera nocturna con la imagen nueva van, en este orden,
 `check-raw-recuentos`, `check-declarados`, `check-diccionario` y, por ultimo,
 `publicar-diccionario`, que es **la unica escritura** y la autoriza el humano.
 
-## F-080 · IMPLEMENTACION ENTREGADA (2026-09-12) · VERIFICACIONES MANUAL
+## F-080 · IMPLEMENTACION ENTREGADA (2026-09-14) · VERIFICACIONES MANUAL
 
 Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, rigor `estandar`,
-`sdd=true`. Informe: `progress/impl_F-080.md`. Las 29 tareas de `tasks.md`, con
-un commit cada una.
+`sdd=true`. Informe: `progress/impl_F-080.md`. Las 29 tareas de `tasks.md`
+hechas, con un commit cada una; T0 bis queda abierta a proposito porque es
+MANUAL del humano. **`bash harness/init.sh` en verde, exit 0**: 4.677 tests
+pasan, 179 saltados, 810,1 s con medicion de cobertura, y PUERTA COBERTURA
+[OK] 93,6 % (823/879).
+
+**EL CIERRE (T24-T29) DESTAPO SEIS COSAS, y conviene saberlas:** el portero
+corre `pytest -x`, asi que el primer fallo escondia a otros cuatro. Dos eran de
+F-080 --las fichas de `pagfor`/`pagtex` prometian un NULL que el SQL nunca
+producia (arreglado con `NULLIF(x, '')`, medido: 1 NULL y 7 vacios de 165.802
+filas de `dcf`), y el grano de `v_control_forma_pago` no nombraba
+`contrato_id`-- y tres eran recuentos viejos: `TOTAL_TABLAS` de F-066 en 65
+cuando son 68, el punto 3 de `R-SIGRID-CON` sin `auxban.res` ni `auxnap.res`, y
+el inventario de `design_detalle.md` de F-006 en 142 objetos cuando son 150. La
+sexta: `compras.documento_comentarios` habia dejado de ser LEGIBLE para el
+guardian de proyecciones de F-006 y por tanto de estar vigilado; las ramas del
+sello pasan a un CTE y no cambia ni una columna publicada.
+
+**LA MUTACION NECESITO DOS CAMPANAS.** La canonica
+(`progress/mutacion_F-080.md`) no juzga a F-080: su alcance son 3.789 lineas
+calculadas contra un `dev` con 242 commits de retraso, solo 15 de sus 303
+mutantes caen en `texto_comentarios.py` y el muestreo de 20 no cogio ninguno;
+sus 6 supervivientes son de F-025 (dos, los mismos que ya senalo F-073) y van
+analizados igual. La dirigida a los dos modulos de F-080 sin muestreo
+(`progress/mutacion_F-080_modulos.md`) evalua los 27 y deja **1 superviviente,
+que era un hueco real: una fecha imposible dentro del sello (`31/02/2026`)
+estaba probada en el SQL y NO en el oraculo**. Tapado con
+`test_f080_r25_una_fecha_que_no_existe_no_cuenta_como_sello`, y comprobado
+mutante en mano que lo mata.
+
+**DEUDA DECLARADA PARA EL DESPLIEGUE**: `azure-apps/datamart_seg_anual.md` dice
+que el ETL ingiere **56 tablas** de Sigrid. Ya estaba viejo antes de F-080
+(F-074 lo dejo en 65 sin tocarlo) y F-080 lo deja en **68**. Se actualiza al
+desplegar, que es cuando la cifra se vuelve cierta en Azure.
 
 **QUE SE PUBLICA**: `compras.vencimientos` (los 195.510 efectos de pago de las
 facturas de compra), `compras.v_facturas_pago` (forma de pago + resumen de
