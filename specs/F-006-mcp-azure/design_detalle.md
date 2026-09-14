@@ -81,6 +81,15 @@ infraestructura.
 > `compras.formas_pago`--, asi que el inventario pasa a **142 objetos**. Estos
 > si documentan columnas, y ademas `maestro.obras` gana once: la cobertura de
 > columnas pasa de 822 a **852**, y las fichas de consumo de 54 a 57.
+>
+> **Enmienda del 2026-09-14 (F-080).** Entran los cinco objetos que responden
+> la peticion de Administracion --`compras.vencimientos`,
+> `compras.v_facturas_pago`, `compras.v_control_forma_pago`,
+> `compras.documento_texto` y `compras.documento_comentarios`-- y las tres
+> tablas de `raw` que necesitan (`auxnap`, `auxban` y `rpa`), asi que el
+> inventario pasa a **150 objetos**. Los cinco de `compras` documentan
+> columnas: la cobertura de columnas pasa de 852 a **941** y las fichas de
+> consumo de 57 a **62**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

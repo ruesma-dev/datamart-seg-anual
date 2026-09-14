@@ -526,13 +526,21 @@ def test_f080_r18_cada_catalogo_de_la_factura_se_resuelve_a_nombre(
 
 
 def test_f080_r18_las_condiciones_y_la_formula_del_documento_van_tal_cual() -> None:
-    """F-066 ya ingirió `dcf.pagtex`: son las condiciones escritas a mano."""
+    """F-066 ya ingirió `dcf.pagtex`: son las condiciones escritas a mano.
+
+    «Tal cual» y `NULLIF(x, '')` no se contradicen: el `NULLIF` no recorta ni
+    reescribe ningún valor, solo manda la cadena vacía a NULL. Se exige, y no
+    solo se tolera, porque las dos fichas declaran `nulo_significa` y
+    `raw.dcf` entra por `JOIN` —no por `LEFT JOIN`—: sin él, el guardián de
+    nulos de F-006 (`test_f006_r2_un_nulo_declarado_tiene_que_ser_posible`)
+    prueba que la ficha promete un NULL que nunca llega.
+    """
     compacto = _ejecutable(RUTA_PAGO_FACTURA)
-    assert re.search(r"f\.pagfor[^,]* AS formula_pago_documento", compacto), (
+    assert re.search(r"NULLIF\(f\.pagfor, ''\) AS formula_pago_documento", compacto), (
         "la fórmula que la propia factura guarda (`dcf.pagfor`) se publica "
         "aparte de la del catálogo: pueden no coincidir (R18)"
     )
-    assert re.search(r"f\.pagtex[^,]* AS condiciones_pago", compacto), (
+    assert re.search(r"NULLIF\(f\.pagtex, ''\) AS condiciones_pago", compacto), (
         "`dcf.pagtex` son las condiciones de pago del documento (R18)"
     )
 

@@ -1612,9 +1612,10 @@ objetos:
       La forma de pago del contrato se lee de `raw.ctr.pagide`, no de
       `compras.contratos`, que todavia no la publica (eso es F-067).
     grano: >-
-      Una fila por PAR (factura, contrato). No es una fila por factura: una
-      factura con lineas de dos contratos sale dos veces, asi que **contar filas
-      aqui no cuenta facturas** --para eso, `COUNT(DISTINCT factura_id)`--.
+      Una fila por PAR (`factura_id`, `contrato_id`). No es una fila por
+      factura: una factura con lineas de dos contratos sale dos veces, asi que
+      **contar filas aqui no cuenta facturas** --para eso,
+      `COUNT(DISTINCT factura_id)`--.
     clave_negocio: [factura_id, contrato_id]
     paso_etl: build_compras
     refresco: nocturno

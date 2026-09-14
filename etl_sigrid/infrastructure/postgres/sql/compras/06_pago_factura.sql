@@ -77,9 +77,14 @@ SELECT
     -- catálogo. Quien necesite un plazo numérico lo decide en su feature (R17).
     fp.plazo_formula                        AS plazo_formula,
     -- La fórmula y las condiciones que guarda la PROPIA factura, que pueden no
-    -- coincidir con las del catálogo. Van tal cual (R18).
-    f.pagfor                                AS formula_pago_documento,
-    f.pagtex                                AS condiciones_pago,
+    -- coincidir con las del catálogo. Van tal cual (R18): el `NULLIF` NO
+    -- recorta ni reescribe nada, solo convierte la cadena vacía en NULL, que
+    -- es lo que sus fichas declaran en `nulo_significa`. Medido contra Sigrid
+    -- el 2026-09-14 sobre las 165.802 filas de `dcf`: `pagfor` llega NULL en 1
+    -- y vacío en 7; `pagtex`, NULL en 1 y vacío en 3. Sin el `NULLIF` esas
+    -- ocho y cuatro filas publicarían `''` mientras la ficha promete NULL.
+    NULLIF(f.pagfor, '')                    AS formula_pago_documento,
+    NULLIF(f.pagtex, '')                    AS condiciones_pago,
     NULLIF(f.efeide, 0)                     AS medio_pago_id,
     ef.res                                  AS medio_pago,
     na.res                                  AS naturaleza_pago,

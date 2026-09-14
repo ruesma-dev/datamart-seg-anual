@@ -127,32 +127,52 @@ validados AS (
          AND to_char(f.fecha_sello, 'DD/MM/YYYY') = f.sello[1])
                                                          AS sello_ok
     FROM fechados f
+),
+publicados AS (
+    -- Las ramas del sello se resuelven AQUÍ y no en la proyección final, y no
+    -- es cosmética: el guardián de F-006 (`test_f006_r26_..._se_dejan_leer`)
+    -- lee la proyección del último `SELECT` contando paréntesis, y los
+    -- corchetes de una expresión regular dentro de ella la vuelven ilegible.
+    -- Un objeto cuya proyección no se deja leer deja de estar vigilado, así
+    -- que el `SELECT` final se queda en una lista de columnas desnudas.
+    SELECT
+        v.documento_id                       AS documento_id,
+        v.orden                              AS orden,
+        v.sello_ok                           AS sello_reconocido,
+        CASE WHEN v.sello_ok THEN v.fecha_sello END
+                                             AS fecha,
+        CASE WHEN v.sello_ok THEN v.sello[2] END
+                                             AS hora,
+        CASE WHEN v.sello_ok THEN v.sello[3] END
+                                             AS usuario,
+        -- Con sello, el cuerpo es el bloque sin él; sin sello, el bloque
+        -- ENTERO (R25). El sello no recorta: se va del cuerpo pero sigue
+        -- estando en `bloque`.
+        CASE WHEN v.sello_ok
+             THEN btrim(
+                      regexp_replace(
+                          v.bloque,
+                          '\[([0-9]{2}/[0-9]{2}/[0-9]{4}) +([0-9]{2}:[0-9]{2}:[0-9]{2}) +Usuario: *([^]]*)\]',
+                          ''
+                      ),
+                      E' \t\r\n'
+                  )
+             ELSE v.bloque END               AS cuerpo,
+        v.bloque                             AS bloque,
+        octet_length(v.bloque)               AS bytes
+    FROM validados v
 )
 SELECT
-    v.documento_id                          AS documento_id,
-    v.orden                                 AS orden,
-    v.sello_ok                              AS sello_reconocido,
-    CASE WHEN v.sello_ok THEN v.fecha_sello END
-                                            AS fecha,
-    CASE WHEN v.sello_ok THEN v.sello[2] END
-                                            AS hora,
-    CASE WHEN v.sello_ok THEN v.sello[3] END
-                                            AS usuario,
-    -- Con sello, el cuerpo es el bloque sin él; sin sello, el bloque ENTERO
-    -- (R25). El sello no recorta: se va del cuerpo pero sigue en `bloque`.
-    CASE WHEN v.sello_ok
-         THEN btrim(
-                  regexp_replace(
-                      v.bloque,
-                      '\[([0-9]{2}/[0-9]{2}/[0-9]{4}) +([0-9]{2}:[0-9]{2}:[0-9]{2}) +Usuario: *([^]]*)\]',
-                      ''
-                  ),
-                  E' \t\r\n'
-              )
-         ELSE v.bloque END                  AS cuerpo,
-    v.bloque                                AS bloque,
-    octet_length(v.bloque)                  AS bytes
-FROM validados v;
+    p.documento_id                          AS documento_id,
+    p.orden                                 AS orden,
+    p.sello_reconocido                      AS sello_reconocido,
+    p.fecha                                 AS fecha,
+    p.hora                                  AS hora,
+    p.usuario                               AS usuario,
+    p.cuerpo                                AS cuerpo,
+    p.bloque                                AS bloque,
+    p.bytes                                 AS bytes
+FROM publicados p;
 
 ALTER TABLE compras.documento_comentarios
     ADD PRIMARY KEY (documento_id, orden);

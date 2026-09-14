@@ -38,10 +38,11 @@ FICHERO_GLOBAL = RAIZ / "config" / "diccionario" / "00_global.yaml"
 FICHERO_PENDIENTES = RAIZ / "config" / "objetos_pendientes.yaml"
 
 #: Cuántas tablas ingiere el ETL HOY. Eran 31 + 25 = 56 al cerrar F-066; F-074
-#: añadió las nueve del censo de F-072 y son 65. La constante se mueve con la
-#: realidad a propósito: es lo que hace que los tres documentos que citan el
-#: número no se queden viejos en silencio.
-TOTAL_TABLAS = 65
+#: añadió las nueve del censo de F-072 y fueron 65; F-080 añade `auxnap`,
+#: `auxban` y `rpa` --las naturalezas de pago, los bancos y las remesas-- y son
+#: 68. La constante se mueve con la realidad a propósito: es lo que hace que los
+#: tres documentos que citan el número no se queden viejos en silencio.
+TOTAL_TABLAS = 68
 
 #: La lista estándar de nombres de texto/binario ilimitado de documentos, tal y
 #: como la declara el bloque COMPRAS de `config/tables_sigrid.yaml`.
