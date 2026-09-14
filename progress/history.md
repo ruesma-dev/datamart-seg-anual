@@ -967,3 +967,58 @@ todas formas, pero la afirmacion era erronea.
 **CHOQUE QUE DEJA VIVO**: F-081 sube el diccionario a la **version 20**, que la
 spec de F-080 tenia reservada. **F-080 pasa a la 21**, y su tarea de
 «comprobar que el fichero esta en 19» ya no se cumple.
+
+## F-080 · Los vencimientos, la forma de pago y el texto de la factura (cerrada el 2026-09-15, APROBADO)
+
+Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, 30 tareas,
+commits `b6cfd6e..f9ac2b4`. Nace de dos correos de **Juan Romero** (Dir. Admon
+y Control de Costes) del 2026-09-10. Informe: `progress/impl_F-080.md`; review:
+`progress/review_F-080.md`; campañas: `progress/mutacion_F-080.md` y
+`progress/mutacion_F-080_modulos.md`.
+
+**Que publica**: `compras.vencimientos` (una fila por efecto de la factura de
+compra), `compras.v_facturas_pago`, `compras.v_control_forma_pago` (el cruce
+que pedia el correo), `compras.documento_texto` (el memo integro) y
+`compras.documento_comentarios` (un comentario por fila). Mas la ingesta de
+`con.tex` y de tres tablas nuevas —`auxnap`, `auxban` y `rpa`—, de 65 a 68.
+
+**LA LECCION, que esta feature aprendio TRES veces por las malas**: en Sigrid
+muchos documentos **extienden `con`**, y antes de concluir que un campo no
+existe hay que mirar ahi. Paso con el texto (no esta en `dcf.tex`, 474 de
+165.658, sino en `con.tex`, 108.445), con el codigo y el estado del efecto (el
+efecto ES un documento, `tip = 25`) y con el codigo de la remesa (tampoco esta
+en `rpa`). **La spec se corrigio cuatro veces por esto.**
+
+**Tres campos que prometen y no cumplen, medidos**: `pag.padide` a 0 en los
+255.074 (no hay enlace hijo -> origen), `con.serie` a 0 (la serie se deriva con
+`compras.fn_serie`) y, de F-073, `cen.obride` a 0 en las 804.
+
+**LA TRAMPA QUE LA FICHA DECLARA**: sumar los importes de todos los efectos de
+una factura **DUPLICA**, porque conviven el anulado y sus hijos. La anulacion es
+`con.fecbaj <> 0` —**89.095 de 255.074 efectos, el 34,9 %**— y se comprobo
+contra la captura del correo: los tres efectos que la pantalla pinta en rojo con
+aspa son exactamente los tres con fecha de baja, y la suma de los vivos
+reproduce los dos importes de la cabecera.
+
+**Coste de ventana medido**: el memo añade ~30 s sobre una noche de 3 h 25 min.
+34 min de margen frente al presupuesto de referencia de 4 h, que **el humano
+dejo como referencia y no como puerta**.
+
+**Evidencias del cierre**: `init.sh` exit 0, **4.677 pasan / 179 saltados / 0
+fallos**, cobertura **93,9 %**, dos campañas de mutacion (303 y 27 mutantes)
+recalculadas por el reviewer fichero a fichero. Diccionario del arbol en
+**version 21**.
+
+**ESTRENA LA NORMA DEL ENCARGO 1.7.11 del arnes**: como casi todo el entregable
+es SQL, la campaña canonica no decia nada del codigo de la feature. Se declaro
+el cero y se hizo la **prueba de control** (0 mutantes en las 42 lineas
+cambiadas de `build_compras_step.py`, **12 en el fichero entero**: el motor sabe
+mutarlo, el cero viene del alcance), mas una **segunda campaña dirigida** a los
+dos modulos sin muestreo, con los 27 mutantes muertos.
+
+**PROPUESTA DEL REVIEWER, no aplicada**: cinco de los seis supervivientes de la
+campaña canonica son de **F-025**, y **dos campañas seguidas los señalan**
+(F-073 marco los mismos). Merecen ficha propia, como F-077 y F-081.
+
+**VERIFICACIONES MANUAL PENDIENTES** (T0 bis, T7, T26 y T27), anotadas con su
+comando exacto en `progress/current.md`. Ningun agente las ejecuta.

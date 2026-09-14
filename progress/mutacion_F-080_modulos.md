@@ -44,8 +44,10 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > muestreo** (`--max-mutantes 0`): los 27 mutantes, evaluados todos. Existe
 > porque la canónica (`progress/mutacion_F-080.md`) no dice nada sobre el
 > código de F-080: su alcance son 3.789 líneas calculadas contra un `dev` con
-> 242 commits de retraso, y el muestreo de 20 no cogió ninguno de los 15
-> mutantes que caen en `texto_comentarios.py`.
+> 242 commits de retraso, y el muestreo de 20 solo cogió **uno** de los 15
+> mutantes que caen en `texto_comentarios.py` —que murió—, así que aquella
+> campaña no dice casi nada sobre el código de esta feature.
+> *Corregido el 2026-09-15, tras el review*: antes decia «no cogió ninguno».
 >
 > **PRUEBA DE CONTROL del cero de `build_compras_step.py`** (cálculo puro,
 > `harness.mutacion.generar_mutantes`): sobre las **42 líneas que F-080 cambia

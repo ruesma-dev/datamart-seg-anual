@@ -60,8 +60,12 @@ Cada superviviente es una línea que ningún test comprueba de verdad, o una mut
 > calcula contra `dev`, que lleva 242 commits de retraso, así que arrastra
 > features ya cerradas —F-025 sobre todo—. Cálculo puro sobre los 303 mutantes
 > generados: **15 caen en `texto_comentarios.py` (4,95 %)** y **0 en
-> `build_compras_step.py`**; el muestreo de 20 con semilla `20260820` no cogió
-> **ninguno** de esos 15 (la esperanza era 0,99). Por eso los seis
+> `build_compras_step.py`**; el muestreo de 20 con semilla `20260820` cogió
+> **uno** de esos 15 (la esperanza era 0,99), **y murió**.
+> *Corregido el 2026-09-15, tras el review*: estas dos lineas decian que el
+> muestreo «no cogió ninguno». Salia de mirar la lista de SUPERVIVIENTES, donde
+> ese mutante no aparece precisamente porque murio. El desliz iba en contra de
+> este informe, no a su favor. Por eso los seis
 > supervivientes de abajo son de OTRAS features, y por eso F-080 lanza además
 > una **segunda campaña dirigida a sus dos módulos**, sin muestreo, cuyo
 > informe es `progress/mutacion_F-080_modulos.md`. Esta de aquí no dice nada

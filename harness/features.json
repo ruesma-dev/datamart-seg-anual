@@ -1275,7 +1275,7 @@
         "Cada objeto nuevo con su ficha en el diccionario y su clave declarada; check-unicidad, check-declarados y check-diccionario en verde",
         "Probado por el MCP sin explicarle nada en el prompt: cuando vence una factura y si esta pagada, que dice el texto de una factura retenida, y que facturas no cuadran con la forma de pago del contrato"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 7,
