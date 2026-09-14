@@ -95,7 +95,7 @@ sobre el **texto** del SQL: ningún agente ejecuta SQL contra la base.
   - *Corrige:* antes pedía cronometrar `compras.v_documento_comentarios` (R27); era falso que hiciera falta, ese requisito está retirado y el objeto es una tabla materializada en la nocturna.
 - [x] T27: Dejar anotada, también como MANUAL, la batería de tres preguntas al MCP sin explicarle nada en el prompt (R34): cuándo vence una factura y si está pagada, qué dice el texto de una factura retenida, y qué facturas no cuadran con la forma de pago del contrato  |  Verificación: MANUAL (humano) — respuestas pegadas en `progress/current.md`
 - [x] T28: Escribir `progress/impl_F-080.md` (≤ 220 líneas) con las trazas RED, las mediciones de T1–T4 y T7–T8, las tres verificaciones de la anulación (T4) y el camino A aplicado en T11, y la sección «Evidencias» con los cuatro números y el nº de workers de la campaña  |  Verificación: `python -m harness.tamano --feature F-080` en verde
-- [ ] T29: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh` termina con exit code 0
+- [x] T29: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh` termina con exit code 0
 
 ## Decisiones abiertas que necesitan al humano
 

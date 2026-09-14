@@ -198,17 +198,17 @@ copia aislada —nunca en el árbol—, `pytest tests/test_f080_texto.py` pasa d
 
 | Evidencia | Valor medido |
 |---|---|
-| **Tests ejecutados y resultado** | **4.677 pasan, 179 saltados, 0 fallos** (`bash harness/init.sh`, T29); 4.673 antes del test nuevo de T25 |
-| **Cobertura de las líneas cambiadas** | **[OK] 93,6 % (823/879)**, umbral 80 %, nivel `estandar` |
+| **Tests ejecutados y resultado** | **4.677 pasan, 179 saltados, 0 fallos** (`bash harness/init.sh` de T29, exit 0); eran 4.673 antes del test nuevo de T25 |
+| **Cobertura de las líneas cambiadas** | **[OK] 93,9 % (825/879)** en T29, umbral 80 %, nivel `estandar` (93,6 %, 823/879, en T24, antes del test nuevo) |
 | **Mutantes generados / supervivientes** | canónica **303 / 20 evaluados / 6** (todos de F-025) · dirigida **27 / 27 / 1**, tapado con un test |
-| **Tiempo de la suite** | **810,1 s** con medición de cobertura; **412–422 s** sin ella (línea base de la campaña, con `-x`) |
+| **Tiempo de la suite** | **520,6 s** con medición de cobertura en T29 (810,1 s en T24, con las campañas compitiendo por la máquina); **412–422 s** sin ella, con `-x`, que es la línea base de la campaña |
 | **Workers de las campañas** | **4** en las dos (coste real por mutante: 584 s y 480 s) |
 
 ## T29 y lo que falta
 
-`bash harness/init.sh` termina en **exit 0**, sin un solo `[KO]`. Los dos
-`[AVISO]` son deuda previa y no bloquean: F-052 sigue `blocked` y ruff arrastra
-224 avisos anteriores a esta feature.
+`bash harness/init.sh` sobre el árbol comiteado termina en **exit 0**, sin un
+solo `[KO]`. Los dos `[AVISO]` son deuda previa y no bloquean: F-052 sigue
+`blocked` y ruff arrastra 224 avisos anteriores a esta feature.
 
 Queda fuera **todo lo MANUAL (humano)** —T0 bis, T7, T26 y T27—, con su comando
 exacto en `progress/current.md`: ningún agente escribe contra Azure ni contra

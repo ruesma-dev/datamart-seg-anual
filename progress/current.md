@@ -699,8 +699,8 @@ Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, rigor `estandar`,
 `sdd=true`. Informe: `progress/impl_F-080.md`. Las 29 tareas de `tasks.md`
 hechas, con un commit cada una; T0 bis queda abierta a proposito porque es
 MANUAL del humano. **`bash harness/init.sh` en verde, exit 0**: 4.677 tests
-pasan, 179 saltados, 810,1 s con medicion de cobertura, y PUERTA COBERTURA
-[OK] 93,6 % (823/879).
+pasan, 179 saltados, 520,6 s con medicion de cobertura, y PUERTA COBERTURA
+[OK] 93,9 % (825/879).
 
 **EL CIERRE (T24-T29) DESTAPO SEIS COSAS, y conviene saberlas:** el portero
 corre `pytest -x`, asi que el primer fallo escondia a otros cuatro. Dos eran de
