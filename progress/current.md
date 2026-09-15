@@ -1022,6 +1022,21 @@ python main.py publicar-diccionario    # sube a la version 22
 
 Lo que hay que ANOTAR de cada una (criterios 3 y 4 de la ficha, que no se
 demuestran afirmando): el **tiempo** que tarda el sub-paso `cp_tipologia` de
-`build-mart` (lo imprime el log `mart_substep_done`), el **numero de
+`build-mart` (lo imprime el log `mart_substep_done`) y sus filas, el **numero de
 diferencias** que dice `check-cp-tipologia` —tiene que ser **0**— y el tiempo de
-un `SELECT * FROM mart.v_pbi_cp_tipologia` contra Azure.
+un `SELECT * FROM mart.v_pbi_cp_tipologia` contra Azure. Falta ademas abrir el
+`.pbix` y refrescar **FactCPTipologia** sin tocar una linea del `.pq`
+(criterio 2), y que `check-diccionario` de biyeccion exacta con **153 fichas y
+153 objetos** (criterio 6).
+
+**DOS AVISOS SOBRE `check-cp-tipologia`, que no son cosmeticos.** (1) Recalcula
+la vista de antes, que es *la consulta que no terminaba en 60 s*: con
+`--obra <obra>` se desploma y sirve de sonda antes de lanzarla entera. (2) Hay
+que lanzarlo **el mismo dia** en que se construyo la tabla: la mitad izquierda
+evalua `CURRENT_DATE` ahora y la derecha lo lleva **congelado del build**, asi
+que si entre medias cambia el mes, las dos cortan en meses distintos y las
+diferencias que salgan son legitimas. Ese congelado es el **unico** cambio de
+semantica de la feature y esta escrito en el SQL, en la ficha y en el `--help`.
+
+El detalle completo --decisiones, riesgos y evidencias-- en
+`progress/impl_F-078.md`.
