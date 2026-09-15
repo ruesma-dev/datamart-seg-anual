@@ -1040,3 +1040,75 @@ semantica de la feature y esta escrito en el SQL, en la ficha y en el `--help`.
 
 El detalle completo --decisiones, riesgos y evidencias-- en
 `progress/impl_F-078.md`.
+
+## F-078 · LAS VERIFICACIONES MANUAL, EJECUTADAS EL 2026-09-15 CON SU RESULTADO REAL
+
+El review (pasada 1) devolvio **CHANGES_REQUESTED** sin un solo defecto de
+codigo: faltaba **evidencia** de seis criterios. El humano **autorizo de nuevo
+la escritura** esa tarde —la del 2026-09-09 habia caducado con la nocturna— y se
+ejecutaron, en este orden y contra el Postgres de Azure.
+
+**Contexto**: la nocturna `caj-datamart-seg-dev-4kvgq5q` (imagen
+`r20260915-1014`) habia terminado a las 11:44 UTC, `Succeeded`, en **3 h 22
+min**, y con `check-declarados` y `check-diccionario` en verde sobre `main`
+(150/150, version 21).
+
+### 1 · `python main.py build-mart` — criterios 1 y 4
+
+| sub-paso | duracion | filas |
+|---|---|---|
+| `build_fact` | 1.157,74 s | 5.367.594 |
+| `agg_categoria` | 92,65 s | 24.805 |
+| **`cp_tipologia` (el nuevo)** | **1.162,06 s** | **1.740** |
+| **total `build_mart`** | **2.414,6 s** | 5.394.139 |
+
+**El paso nuevo cuesta 19 min 22 s**, casi lo mismo que el hecho principal, y
+eso con solo 1.740 filas escritas: el coste no esta en escribir, esta en
+calcular la version vigente y el corte temporal. **La ventana nocturna pasa de
+3 h 22 min a ~3 h 41 min**, aun por debajo de las 4 h de referencia, pero el
+margen baja de 38 a ~19 min. **Es el intercambio acordado**: ese calculo dejaba
+de pagarse en cada consulta.
+
+### 2 · `python main.py build-cierre` — obligatorio y NO opcional
+
+`mart/01_ddl.sql` y `mart/03_agg_categoria.sql` hacen `DROP TABLE … CASCADE`, y
+`cierre/06_views_planif_vs_real.sql` lee de `mart.fact_seguimiento_categoria`.
+**Reconstruir el mart a solas deja el cierre roto** —el incidente de F-047 en
+pequeño—. Ejecutado despues: `[SUCCESS] build_cierre rows=16.972
+duration=2.943,0 s`.
+
+### 3 · `python main.py check-cp-tipologia` — EL CRITERIO 3, EL QUE MANDA
+
+* **Sonda previa** (`--obra 650280`): `OK 23 filas y CERO diferencias`, en 3 s.
+* **Comparacion completa**, 14:31:01 → 14:59:53 UTC (**28 min 52 s**):
+  **`OK 1740 filas y CERO diferencias: materializar no cambio ninguna cifra`**.
+
+### 4 · Cronometro de la consulta — criterios 4 y 8
+
+| consulta | resultado |
+|---|---|
+| `SELECT * FROM mart.v_pbi_cp_tipologia` | **1.740 filas en 0,81 s** |
+| `count(*)` de `mart.v_master_versiones_tipadas` | 4.415 filas en 0,21 s |
+| `count(*)` de `mart.v_master_vigente_anual` | 748 filas en 0,26 s |
+
+Antes **no terminaba** y colgaba Power BI. La ventana de 30 s del MCP deja de
+ser un problema por un factor de ~37.
+
+### 5 · Las dos puertas — criterios 6 y 7
+
+* `check-declarados`: **153 declarados / 153 construidos**, salida **0**, con
+  `config/objetos_pendientes.yaml` **vacio**.
+* `check-diccionario`: **153 fichas / 153 objetos**, biyeccion exacta. Primero
+  salio **KO con codigo 1** porque el arbol iba por la **22** y lo publicado era
+  la **21**; tras `publicar-diccionario` (199 filas, 964 columnas, 16 reglas,
+  hash `89d29bab993c`) repite en verde con **codigo 0**.
+
+**AVISO DE METODO, para no repetirlo**: los primeros `EXIT=$?` que se leyeron
+venian **despues de una tuberia a `tail`**, asi que eran el codigo de `tail` y
+no del comando. Los codigos de arriba estan medidos sin tuberia.
+
+### Lo que sigue pendiente de F-078
+
+El criterio 2 exige que **Power BI cargue `FactCPTipologia` con el `.pq` actual
+sin tocar una linea**, y eso **solo lo puede probar el humano** abriendo su
+informe. Es lo unico que ningun comando puede demostrar.
