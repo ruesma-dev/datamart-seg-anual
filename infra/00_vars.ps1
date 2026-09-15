@@ -60,6 +60,7 @@ $clavesObligatorias = @(
     "pgSecretName", "pgJobSecretName", "pgReadonlySecretName",
     "pgHost", "pgPort", "pgDatabase", "pgUser", "pgAuthMode",
     "pgSetRole", "pgReadonlyRole", "pgAutoCreateDb", "pgResourceGroup",
+    "discoTotalGb",
     "logLevel", "logFormat",
     "alertName", "alertActionGroupName", "alertActionGroupRg",
     "frescuraAlertName", "frescuraUmbralHoras",

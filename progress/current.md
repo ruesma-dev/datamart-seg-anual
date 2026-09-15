@@ -1,144 +1,501 @@
 <!-- progress/current.md -->
-# Estado actual · 2026-09-05 (madrugada)
+# Estado actual · 2026-09-09 (miercoles; F-025, F-068 y F-066 cerradas)
 
-## Comprobado al abrir la sesión del 2026-09-05
+> **PURGADO tres veces.** C2 pide que este fichero describa **solo la sesion
+> activa**. El 2026-09-06 bajo de 1.263 a 638 lineas; el 2026-09-09 (pasada 3
+> del review de F-066) se le quitaron las 253 lineas de la fase 7 de F-025; y
+> hoy, al cerrar F-066, se retiran sus tres secciones y la de la averia
+> nocturna del 07, ya resuelta. **Nada se pierde**: F-025, F-068 y F-066 tienen
+> su resumen en `progress/history.md`, y el detalle vive en los informes
+> `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-**El paso 4 no se había ejecutado al abrir la sesión:** `main` seguía en
-`cd18e09` y el job de Azure apuntaba a **`r20260902-0019`** sin
-`PG_VENTANA_ACTIVA`, o sea que la nocturna del 04 corrió con la imagen del
-02-sep y sin F-025. **Se ejecutó esa misma madrugada**, ver la sección
-siguiente.
+## F-073 · IMPLEMENTACION ENTREGADA (2026-09-10)
 
-**El diccionario del árbol está en 105 objetos, 822 columnas y 47 fichas de
-consumo** (subió de 103/798/46 con las dos fichas de F-025; el diccionario pasa
-a la versión 13 al publicarse). El commit de cierre del 04 se llevó por delante
-esta frase y dejó `init.sh` en rojo: el test
+Rama `feature/F-073-tablas-nuevas-y-enriquecimiento`, rigor `estandar`,
+`sdd=true`. Informe: `progress/impl_F-073.md`. Las 21 tareas de `tasks.md`,
+hechas y con un commit cada una.
+
+**QUE SE PUBLICA**: `maestro.centros_coste` (el puente centro de coste -> obra,
+804 filas y 683 con obra), `maestro.estados_documento` (las 193 de `conest`),
+`compras.formas_pago` (las 69 de `auxpag` con su medio) y `maestro.obras` con
+once columnas nuevas -direccion, municipio y provincia con su id, el estado ya
+traducido y las dos marcas-. **No se toca `compras.contratos` ni
+`compras.facturas`**: ese cableado es F-067 y F-080.
+
+**LO QUE HAY QUE SABER Y NO SE VE EN EL DIFF:**
+
+* `build_maestros` **ahora depende de `build_stg`**. Si `build_stg` falla, el
+  orquestador marca `build_maestros` como SKIPPED, cosa que antes no pasaba. Es
+  asumible porque los seis objetos de `maestro` son vistas.
+* **La direccion viene informada en un tercio de las obras** (dir1 33,1 %,
+  municipio 31,9 %, provincia 33,2 %, dir2 5,1 %). No es un fallo del ETL: la
+  ficha lo declara y «no consta» es la respuesta correcta para dos de cada tres.
+* `tiene_seguimiento` se mide en `stg.plan_mensual` y es **superconjunto** del
+  hecho: 368 con plan frente a 349 con filas en `mart.fact_seguimiento_mensual`,
+  **19 de diferencia y ninguna al reves**.
+* **`config/tables_sigrid.yaml` se equivocaba** al decir que el nombre del medio
+  de pago es `auxefp.est`: `est` viene vacio o nulo en las 10 filas y el nombre
+  esta en `res`. Medido el 2026-09-10, fuera del alcance de F-073 y **corregido
+  el 2026-09-11 por F-081**, que ademas encontro la misma mentira en la entrada
+  de `cen`. Ver la seccion de F-081 al final de este fichero.
+
+### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-073
+
+Ningun agente las ejecuta: las tres primeras dependen de que el build haya
+corrido contra Azure, y publicar es una escritura. **En este orden**, y la 2 no
+significa nada antes de la 1.
+
+1. **Construir los objetos nuevos.** Sin esto no existen en la base y todo lo
+   de abajo mide el mundo de ayer.
+
+       python main.py build-maestros
+       python main.py build-compras
+
+2. **Los recuentos de las tres vistas nuevas**, en solo lectura. Los valores
+   esperados estan medidos contra `raw` el 2026-09-10 (T1 y T2 del informe):
+
+       SELECT COUNT(*) AS filas,
+              COUNT(DISTINCT centro_coste_id) AS centros,
+              COUNT(obra_id) AS con_obra
+       FROM maestro.centros_coste;
+       -- esperado: 804 / 804 / 683
+
+       SELECT COUNT(*) FROM maestro.estados_documento;   -- esperado: 193
+       SELECT COUNT(*) FROM compras.formas_pago;         -- esperado: 69
+       SELECT COUNT(*) FROM maestro.obras;               -- esperado: 921
+
+3. **Que `maestro.obras` no ha perdido ninguna columna** (R18). Las diez de
+   siempre siguen, y ahora son 21:
+
+       SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'maestro' AND table_name = 'obras'
+       ORDER BY ordinal_position;
+       -- esperado: 21 columnas, y entre ellas obra_id, codigo_obra,
+       -- nombre_obra, estado_id, fecha_alta, fecha_baja, es_activa,
+       -- cliente_id, codigo_cliente y nombre_cliente
+
+4. **Las dos puertas del diccionario:**
+
+       python main.py check-declarados
+       python main.py check-diccionario
+
+   Las dos con **codigo 0**. `check-diccionario` tiene que ver **142 fichas y
+   142 objetos**, biyeccion exacta.
+
+5. **Publicar el diccionario (version 19, hash `7f5e890fd5f7`).** Es una
+   **escritura contra Azure**: la autoriza el humano, no un agente. Lo publicado
+   hoy es la version 18.
+
+       python main.py publicar-diccionario
+
+6. **LA PRUEBA DE QUE EL PUENTE RESUELVE F-045.** Es la razon por la que
+   `maestro.centros_coste` existe, y es solo lectura. `retenciones.movimientos`
+   trae 261 valores distintos en `obra_id` que en realidad son centros de coste:
+
+       SELECT COUNT(DISTINCT m.obra_id) AS valores,
+              COUNT(DISTINCT c.centro_coste_id) AS casan
+       FROM retenciones.movimientos m
+       LEFT JOIN maestro.centros_coste c ON c.centro_coste_id = m.obra_id;
+       -- esperado: 261 / 261
+
+   **F-073 no toca `sql/retenciones/**`**: arreglar `movimientos.obra_id` con
+   este puente es F-045. Aqui solo se comprueba que el puente le sirve.
+
+## F-080 · NACE EL 2026-09-10 DEL CORREO DE JUAN ROMERO (lo mas nuevo)
+
+Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, prioridad 7,
+rigor `estandar`, `sdd=true`. Fichada en `4871f89`. **SPEC ESCRITA el
+2026-09-10 en `specs/F-080-vencimientos-forma-pago-y-texto-factura/`
+(148 / 217 / 29 tareas). ESPERA APROBACION DEL HUMANO: es la PARADA 1, no se
+escribe una linea de codigo hasta entonces.**
+
+Correo de Juan Romero (Dir. Admon y Control de Costes) del 2026-09-10,
+«PETICIONES (TEXTO Y VENCIMIENTOS/FORMAS PAGO)», con dos capturas de la ficha
+de factura de compra: quiere leer la pestaña TEXTO, acceder a la pestaña
+VENCIMIENTOS y cruzar el vencimiento con la forma de pago del contrato.
+
+**EL HALLAZGO QUE CAMBIA LA PREMISA, medido contra Sigrid ese dia en solo
+lectura: el texto NO esta en `dcf.tex`.** Esta en el memo de la superclase
+`con.tex`. `dcf.tex` viene informado en **474 de 165.658** facturas (0,3 %);
+`con.tex` para `tip = 15`, en **108.445 de 165.658** (65,5 %). La factura de
+la captura (`con.cod` FR26/06051, `ide` 2776822) tiene 797 bytes en `con.tex`
+y NULL en `dcf.tex`. **Derivarlo por el nombre del campo habria salido falso**:
+es el error de F-006 otra vez, el que vigila
+`tests/test_f006_fuente_que_gobierna.py`.
+
+`con.tex` esta **excluido hoy** de la ingesta con el comentario «texto libre
+largo, no lo usamos en seguimiento», que es justo lo que la peticion
+desmiente. El precedente de como se revierte esta hecho una vez: `prvcer.tex`
+en F-074.
+
+**Lo demas medido, y esta todo en la ficha de `harness/features.json` y en
+`progress/explore_F-080_*.md`:** `con.tex` entero pesa 33,7 MB (30,6 MB si
+solo facturas y contratos); `raw.pag` ya se ingiere entero, con 255.001
+efectos y el 99,99 % de las facturas cubiertas, asi que **los vencimientos no
+cuestan ingesta**; faltan dos catalogos, `auxnap` (3 filas) y `auxban`
+(1.666); y `contex` (2.855 filas) **no es** la pestaña Texto.
+
+**TRAMPA A NO REPETIR**: `pag.fecrea = 0` NO significa «vivo». Son 158.503
+efectos, el 62 %, e incluyen vencimientos pasados sin puntear. La cartera viva
+que midio F-037 son 10.607 pagos.
+
+**Riesgo abierto que resuelve la spec**: `raw.con` tiene 2.185.737 filas y se
+ingiere entera cada noche. Traer una columna memo puede obligar a bajar su
+`page_size`, como `obrparpre.planif`. **Se mide antes de desplegar.**
+
+**DECISIONES DEL HUMANO, para que nadie las reabra**: feature nueva y acotada
+(no repartir entre F-067 y F-037); el texto se guarda entero **y ademas**
+parseado en una vista; se publica para facturas y contratos; y **el riesgo de
+datos personales del texto lo descarto expresamente** («no me preocupa el tema
+riesgos de datos, ignoralo»).
+
+**FRONTERA**: la cartera completa de cobros y pagos sigue siendo F-037 fase 1.
+Deuda declarada: cuando llegue F-037 se decide si absorbe el objeto de
+vencimientos o lo deja como vista suya.
+
+### Lo que decide la spec de F-080, y las cinco decisiones abiertas
+
+**Cinco objetos nuevos en `compras`**, todos detras de `04_formas_pago` de
+F-073: `vencimientos` (tabla, PK `vencimiento_id`, una fila por efecto de
+`raw.pag` de una factura de compra), `v_facturas_pago` (vista, una fila por
+factura, con la forma de pago resuelta contra `compras.formas_pago` y el
+resumen de efectos), `v_control_forma_pago` (vista, **una fila por par
+factura-contrato**, con el mismo enlace que ya usa `v_pbi_contrato_consumo`),
+`documento_texto` (tabla, el memo integro de `tip` 15 y 44) y
+`v_documento_comentarios` (vista, un comentario por fila). Tres ficheros SQL
+nuevos: `05_vencimientos.sql`, `06_pago_factura.sql`, `07_texto.sql`. **No se
+tocan `01_documentos.sql`, `02_fact_linea.sql` ni `03_views.sql`**, que son de
+F-067.
+
+**El parseo del memo va en SQL**, con los dos literales medidos escritos una
+sola vez en `etl_sigrid/domain/texto_comentarios.py` como oraculo ejecutable
+(patron F-052: `arbol_partidas.py` + `test_f052_sql.py`). Lo que no casa con el
+sello se publica igual, entero, con `sello_reconocido` en falso.
+
+**El coste de ventana se mide en dos tiempos antes de desplegar**: medicion A
+en solo lectura contra Sigrid (segundos y bytes por pagina de `con` con y sin
+`tex`, a 10.000 y 5.000 filas) y medicion B, MANUAL, comparando la fila
+`ingest_raw.con` de `_meta.etl_runs` antes y despues.
+
+**LAS CINCO DECISIONES ABIERTAS** (detalle en el cierre de `tasks.md`):
+
+1. **Presupuesto de ventana nocturna**: no existe escrito. La spec propone
+   **4 h** (hoy 3 h 25 min, antes de F-025 4 h 52). Es el numero con el que se
+   juzga si hay que bajar el `page_size` de `con`.
+2. **Corte de rendimiento de la vista de comentarios**: la spec propone **30 s**
+   para un recorrido completo antes de materializarla como tabla.
+3. **`codigo_efecto` (`FR26/06051_01`)**: no consta que Sigrid lo almacene. Se
+   deriva con `row_number()` por `pag.ide`, y **solo se publica si reproduce**
+   los codigos de la captura del correo; si no, se publica solo el ordinal y
+   hay que decirselo a Juan Romero.
+4. **F-080 va DETRAS de F-073**: `compras.formas_pago` es precondicion dura y,
+   si no esta, la feature se marca `blocked` en vez de duplicar la dimension.
+   Por eso a F-080 le toca la **version 20** del diccionario (F-073 reserva la
+   19). Adelantarla obliga a reabrir las dos cosas.
+5. **El banco de la rejilla**: `auxban` da nombre a banco y sucursal, pero la
+   tabla de previsiones/remesas bancarias sigue sin identificar. Conviene
+   decirselo a Administracion con la entrega.
+
+## LO PRIMERO AL RETOMAR (sesion reiniciada el 2026-09-10)
+
+**F-073 tiene su spec escrita y ESPERA APROBACION DEL HUMANO.** Se le
+corrigio el 2026-09-10 (`47c02d4`) una afirmacion que daba por buena: R23 y la
+tabla de `design.md` §1 decian que el cableado de forma de pago y estado a
+`compras.contratos` **y** `compras.facturas` era el criterio 1 de `acceptance`
+de F-067. Ese criterio nombra **solo los contratos**; el de facturas es el 5, y
+no menciona la forma de pago. **El alcance de F-073 no cambia.**
+`specs/F-073-tablas-nuevas-y-enriquecimiento/` (114 / 201 / 29 lineas, 21
+tareas). Nada de codigo hasta que el humano apruebe: es la PARADA 1.
+
+**Las tres decisiones que el humano tiene que aprobar**, tal como las dejo el
+spec-author:
+
+1. **La frontera con las ocho features ya fichadas**: *F-073 publica
+   DIMENSIONES y el MAESTRO DE OBRA; la feature de dominio publica su HECHO y
+   hace el CABLEADO*. Se queda con **cuatro objetos**: `maestro.centros_coste`
+   (el puente centro -> obra), `maestro.obras` enriquecida (direccion y
+   marcas), `maestro.estados_documento` (desde `conest`) y
+   `compras.formas_pago` (desde `auxpag` y `auxefp`). **No duplica ninguna
+   ficha**: el cableado de `conest` y `auxpag` a `compras.contratos` y
+   `compras.facturas` es literalmente el criterio 1 de `acceptance` de F-067 y
+   se queda alli.
+2. **Las marcas leen de `stg`, no de `mart`**, y hay que aprobar su
+   consecuencia: `mart/01_ddl.sql` dropea `mart.fact_seguimiento_mensual` con
+   `CASCADE` y destruiria la vista de `maestro` la noche siguiente (es el
+   incidente de F-047). Por eso **`build_maestros` pasa a depender de
+   `build_stg`**: un fallo de `build_stg` ahora se lleva por delante tambien
+   los maestros.
+3. **El criterio 2 de la `acceptance` esta reformulado a proposito.** Con
+   **294 de 921 municipios informados** no se puede exigir esa cobertura: R11 y
+   R12 obligan a publicar el porcentaje en la ficha y a que **«no consta» sea
+   la respuesta correcta para dos de cada tres obras**.
+
+**Cifras medidas por el spec-author el 2026-09-10**, sobre las 921 fichas de
+`maestro.obras`: **728 con presupuesto, 368 con plan mensual, 349 con hecho,
+193 sin nada**. La diferencia entre plan y hecho son **19 obras**, y la ficha
+del diccionario las declara.
+
+**OJO, Y ESTO NO SE VE SI NO SE DICE: hay OTRA SESION DE CLAUDE trabajando en
+este mismo repositorio.** Se llama `powerbi` y lleva **F-078** (la vista
+`mart.v_pbi_cp_tipologia` que cuelga Power BI). Consecuencias practicas: los
+numeros de feature se pisan -F-078 lo cogio ella, por eso el trabajo del
+diccionario acabo siendo F-079-, y **NUNCA se hace `git add -A`**: el
+2026-09-09 su trabajo se colo dentro de un commit de esta sesion.
+
+**PENDIENTE SIN URGENCIA**: `python main.py check-raw-recuentos` sobre las 65
+tablas, que no se ha lanzado desde que entraron las nueve de F-074.
+
+## EL DESPLIEGUE DEL 09-SEP Y SU VERIFICACION (hecha el 2026-09-10)
+
+**Desplegada la imagen `r20260910-0102`** a las 23:03 UTC del 09-sep, con
+autorizacion expresa del humano, y el cron intacto (`0 0 * * *`). Llevaba
+dentro F-074 (las nueve tablas) y F-079 (el diccionario version 18).
+
+**VERIFICADO el 2026-09-10 a las 07:20 UTC, tras la nocturna
+`caj-datamart-seg-dev-29816640` (00:00 -> 03:24 UTC, `Succeeded`):**
+
+* **Las nueve tablas entraron**, con los tamaños que la medicion predecia:
+  `dcaprodes` 851.195, `ctrprodes` 424.488, **`pro` 55.179** -la unica cuyo
+  tamaño no conociamos, asi que **el producto ya tiene nombre en el
+  datamart**-, `reshor` 8.949, `emphis` 1.633, `auxhor` 60, `cet` 40,
+  `auxrestip` 37 y `auxdpt` 7.
+* **`check-diccionario` en verde**: **139 fichas y 139 objetos**, biyeccion
+  exacta, y **lo publicado ES lo del arbol (version 18, hash 4af4c3bb60d4)**.
+  Las dos discrepancias de la noche anterior quedan cerradas.
+* **La noche duro 3 h 25 min**, nueve minutos mas que la anterior: eso es lo
+  que cuestan 1,34 M de filas nuevas. Sigue muy por debajo de las 4 h 52 de
+  antes de F-025.
+* **PENDIENTE, sin urgencia**: `check-raw-recuentos` sobre las 65 tablas.
+
+**HALLAZGO DEL DESPLIEGUE, para revisar sin prisa**: el job **no declara**
+`PG_DISCO_TOTAL_GB` ni `PG_EXCLUDED_TABLES`. Funciona porque el valor por
+defecto de `config/settings.py` es el correcto en las dos, pero el
+comportamiento depende de ese defecto y no de una declaracion explicita. Es la
+misma fragilidad que en agosto dejo la puerta de disco midiendo contra 32 GB
+durante nueve dias.
+
+## POR DONDE SE SIGUE EN LA PROXIMA SESION (leer esto primero)
+
+**F-025, F-068, F-066 y F-072 estan CERRADAS**, y **F-071 esta RETIRADA** (ver
+su seccion abajo: no se borra nada). El censo de F-072 quedo `done` en
+`e52c5f9`, y **su primer descendiente, F-074, esta en curso**. Lo abierto es el
+backlog, mas F-052, que sigue `blocked` y ya no espera a nadie.
+
+| Prioridad | Feature | Estado | Que es |
+|---|---|---|---|
+| 4 | **F-072** | `done` (`e52c5f9`) | El censo semantico: que hay dentro de las 31 tablas que se ingieren cada noche y no consume nadie. Entregable: `progress/explore_F-072_catalogo.md` + cuatro informes de bloque. **De aqui salen F-073 y F-074.** |
+| 5 | **F-073** | `pending` | Construir con lo que el censo encontro: tablas procesadas nuevas y enriquecimiento de las actuales, **sin borrar ni filtrar nada**. |
+| 6 | **F-074** | **en curso, implementacion entregada** | La ingesta que el censo destapa: **9 tablas** que faltan, la carga incremental falsa de `com`/`comlin`/`comprv` y el `tex` excluido de `prvcer`. Informe: `progress/impl_F-074.md`. |
+| 7 | **F-070** | `pending`, spec escrita | Auditar la **calidad** de las fichas del diccionario, acotada a los ocho esquemas que el MCP lee. |
+| 8 | **F-034** | `pending` | Power BI deja de leer de local y pasa a leer el datamart de Azure. |
+
+Detras, F-057 (9) y F-056 (10), las dos ya sin ingesta dentro porque F-066 se
+la llevo, y las dos **con su ficha corregida por el censo**.
+
+**LO QUE F-074 DECIDIO, Y POR QUE NO ES LO QUE LA PROPUESTA DECIA.** La
+propuesta que llego al implementer era «recarga completa nocturna de las cuatro
+pequeñas (`cet`, `pro`, `reshor`, `emphis`) y carga por `ide` para las dos
+grandes», porque **solo 3 de las 9 tienen `tiemod`** --`auxdpt`, `auxhor`,
+`auxrestip`-- y se daba por hecho que las otras seis cargarian por `MAX(ide)` y
+que **una fila modificada en el origen no volveria a bajar nunca**.
+
+**Esa premisa es falsa, y esta comprobado en la fuente que gobierna el hecho.**
+El `CMD` del `Dockerfile` arranca `run-all --full`, o sea `TRUNCATE` y recarga
+entera de **todas** las tablas cada noche (`ingest_raw_step.py`, lineas 271-275).
+`incremental_column` **no es un interruptor de modo de carga**: lo unico que
+decide es si `copy_rows` rellena `_source_tiemod` con el sello del origen. La
+carga por `MAX(ide)` solo ocurre lanzando `ingest` a mano **sin** `--full`.
+
+Es el error exacto que F-006 cometio dos veces seguidas --su septima pasada lo
+derivo de `tables_sigrid.yaml` y su octava de `ingest_raw_step.py`, y las dos
+salieron falsas-- y para el que existe `tests/test_f006_fuente_que_gobierna.py`.
+
+**Consecuencia**: no hace falta recarga completa por tabla, el ETL no sabe
+hacerla y F-074 **no la inventa**. Las seis quedan con `incremental_column:
+null` **declarado y explicado en el propio YAML**, no solo en un informe.
+
+**Coste medido de las nueve**: 1.341.365 filas nuevas por noche, **+155 MB**
+estimados sobre los 25 GB actuales (disco de 64 GB, +0,6 %) y **+3 a 6 min** de
+ventana sobre las 3 h 45 de hoy. El 95 % de eso son `dcaprodes` (850.985) y
+`ctrprodes` (424.475).
+
+**F-052 sigue `blocked`** y su desbloqueo ya no depende de F-025. Ver su seccion
+abajo: es volver a su rama y relanzar `check-cobertura` alli.
+
+## LO QUE LAS TRES FEATURES CERRADAS DEJAN VIVO
+
+Su resumen esta en `progress/history.md`. Aqui solo lo que sigue pendiente de
+alguien:
+
+1. **`infra/sql/02_roles.sql` no lo ejecuta ningun test** (de F-068): solo se
+   comprueba su texto, y esta corregido en dos sitios que solo prueba `psql`.
+   **Antes de volver a provisionar un rol desde cero, ejecutarlo contra una base
+   de prueba.**
+2. **La revocacion de datos personales del MCP es TEMPORAL** (F-068): vuelve en
+   cuanto el MCP tenga control por usuario. Decision del humano, escrita en
+   cinco sitios para que nadie la lea como permanente.
+3. **El umbral de tolerancia de `check-raw-recuentos`** (F-066): 0,05 % de
+   `obrparpre` son ~6.940 filas. **Revisarlo si baja `page_size` o aparece una
+   tabla mayor.**
+4. **F-069**, fichada: `harness/mutacion.py` no muta constantes `float` ni la
+   division. Uno de los seis sitios ciegos es `TOLERANCIA_DERIVA_PCT = 0.05`, el
+   numero del que depende entero el criterio de F-066.
+5. **F-065** mide el bloat sostenido tras siete noches acotadas (de F-025, T33).
+6. **Un superviviente de mutacion de F-025, aceptado y YA FICHADO como
+   **F-077** (prioridad 12, commit `7d2d8b9`), hallado por F-074: `main.py:543`, el `is_flag` de
+   `--reconstruir-todo` en `run-all`. Sin el, click infiere `BOOL` y
+   `run-all --reconstruir-todo` sale con **exit 2** —medido—; la nocturna
+   (`run-all --full`) y el rebuild del domingo por antiguedad **no se enteran**.
+   Lo dejan vivo sus propios tests, T15 de `tests/test_f025_cli.py`, que
+   comprueban que la cadena salga en `--help` y que el callback la cablee, pero
+   **no invocan la opcion por el parser de click**. El arreglo, tres lineas, esta
+   escrito en `progress/mutacion_F-074.md` §8. **F-074 no lo tapa: no es su
+   codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
+   reprodujo las cinco invocaciones de click antes de aprobar.
+
+**El diccionario del árbol está en 150 objetos, 941 columnas y 62 fichas de
+consumo** —eran 142 / 852 / 57 al cerrar F-073, y F-080 añade los **cinco
+objetos** de `compras` (`vencimientos`, `v_facturas_pago`,
+`v_control_forma_pago`, `documento_texto`, `documento_comentarios`, 89 columnas)
+más las **tres tablas nuevas de `raw`** (`auxnap`, `auxban`, `rpa`, sin columnas
+por la convención de `raw`); antes de eso eran 139 / 822 / 54 hasta F-073 y 47
+fichas de consumo hasta F-079, que subió los siete objetos de `stg` a la
+superficie de consulta— y el árbol declara **versión 21**. Lo publicado en `_meta` es la **versión
+18** (hash `4af4c3bb60d4`, publicada el 2026-09-10): publicar contra Azure es una
+escritura y la autoriza el humano, no un agente. El commit de cierre del 04
+se llevó por delante esta frase y dejó `init.sh` en rojo: el test
 `test_f006_los_recuentos_de_current_son_los_de_hoy` existe justo para que estos
 recuentos no envejezcan en silencio. **Si vuelves a reescribir la cabecera de
 este fichero, los tres números se quedan.**
 
-## LA NOCTURNA DEL 05 FALLÓ, Y YA ESTÁ ARREGLADA (2026-09-05, tarde)
+## F-079 · todo lo publicado es consultable (implementación entregada)
 
-La primera nocturna con F-025 (`caj-datamart-seg-dev-29809560`, imagen correcta
-`r20260905-0034`) murió **dos veces** con
-`AttributeError: 'PostgresClient' object has no attribute 'fetch_filas_por_obra'`
-en `build_stg_step.py:628`. Diagnóstico completo, con los logs y el estado de la
-base: `progress/incidencia_F-025_nocturna_20260905.md`.
+Rama `feature/F-079-todo-lo-publicado-es-consultable`, rigor `estandar`,
+`sdd=false`. Informe: `progress/impl_F-079.md`.
 
-**La base NO está rota**: el fallo cae *después* de construir el tramo, en el
-registro de la traza. `stg` conserva sus cifras de siempre; lo que no hay es
-refresco, y `_meta.obra_build` sigue vacía.
+Los **siete objetos de `stg`** que no son funciones —`plan_mensual`,
+`presupuesto`, `partidas`, `obras`, `fases`, `version_master_vigente`,
+`ambitos`— y la entrada del esquema `stg` en `00_global.yaml` pasan a
+`consumo_recomendado: true` y pierden su `motivo_no_consumo`. **Las cuatro
+advertencias de corrección que viajaban ahí dentro se mueven a la `descripcion`
+de su ficha** (versiones master, `stg.obras.activa`, la resolución GLOBAL de
+`version_master_vigente` y `stg.ambitos.uso_seguimiento`), y las dos primeras
+siguen llegando además por las reglas duras `R-VERSION-MASTER` y
+`R-OBRA-ACTIVA`. Las 11 funciones `fn_*` y los 9 objetos rotos, vacíos o de
+instrumentación **no se tocan**: ahí el aviso es un hecho, no una preferencia.
 
-**Arreglado en tres commits** (`a9e51ed`, `202f0e4`, `481f6ca`), informe en
-`progress/impl_F-025_metodo_ausente.md`:
+**Diccionario del árbol en versión 18, `hash_fuente` `4af4c3bb60d4`. Publicado
+en `_meta`: sigue la 16, hash `9140b14dc991`.** Ese par de hashes es lo que
+distingue «publicado» de «publicado de verdad» después del paso 1 de abajo.
 
-1. `fetch_filas_por_obra` implementado en `PostgresClient` —nunca se escribió;
-   solo existía en tres dobles de test, de ahí los 3.308 tests en verde—.
-2. `tests/test_f025_contrato_cliente.py`: cruza cada doble con el original y
-   cada llamada de producción con la clase, por barrido `ast` y sin lista a
-   mano. Barrido hecho: **no había más métodos fantasma**.
-3. La lección en `CHECKPOINTS.md` (C4) y portada a `arnes-base` 1.7.9.
+### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-079
 
-`bash harness/init.sh` **en verde**: 3.321 pasados, 134 saltados, cobertura
-**91,9 %** de 640 líneas cambiadas (umbral 80, nivel crítico).
+Las tres escriben contra Azure o dependen de que la escritura haya ocurrido, así
+que **ningún agente puede ejecutarlas**. En este orden:
 
-**LO SIGUIENTE, y lo decide el humano:** volver a construir la imagen, apuntar
-el job y **relanzar la reconstrucción como job de Azure** (no desde el puesto).
-Hasta que esa ejecución termine, **T29 sigue sin ejecutar y T30 —las huellas del
-DESPUÉS— no se puede hacer**. Las cinco huellas del ANTES siguen válidas.
+1. **Publicar el diccionario.**
+   `python main.py publicar-diccionario`
+   Sin esto el MCP sigue leyendo la versión 16 y `stg` le seguirá pareciendo
+   desaconsejado: *el repositorio en verde no es producción*.
+2. **Comprobar que lo publicado es lo del árbol.**
+   `python main.py check-diccionario`
+   Se espera **exit code 0**, biyección exacta y que la versión publicada pase a
+   ser la **18**.
+3. **Preguntar al MCP, sin explicarle nada en el prompt**, algo que solo `stg`
+   puede responder —el ámbito de certificación de una obra, que está en
+   `stg.presupuesto` y en ningún sitio aguas abajo— y comprobar que **enruta a
+   `stg`**. Es el criterio 6 de `acceptance` y es la única prueba de que el
+   cambio surtió efecto donde importa.
 
-## POR DONDE SE SIGUE: F-025, las verificaciones del día después
+## VERIFICACIONES MANUAL (humano) PENDIENTES DE F-074
 
-**El paso 4 YA ESTÁ EJECUTADO**, en la madrugada del 2026-09-05 entre las 00:22 y
-las 00:40 locales. Los cuatro comandos, con su resultado real:
+Ninguna la puede ejecutar un agente: **todas escriben contra Azure o dependen de
+que la imagen nueva se haya desplegado y la nocturna haya corrido**. Van en este
+orden, y la 2 no significa nada antes de la 1.
 
-| | |
-|---|---|
-| `main` al día | fast-forward limpio `cd18e09` → **`d6d72f2`**, sin tocar el árbol |
-| Imagen construida | **`r20260905-0034`**, digest `sha256:2b1ac7bd3414…`, 38 s en ACR |
-| Job apuntado | `85_update_job.ps1 -Tag r20260905-0034`, disparo `Schedule` |
-| Ventana encendida | `PG_VENTANA_ACTIVA=true` sobre el job vivo |
+1. **Desplegar la imagen y dejar correr una nocturna.** Sin eso, las nueve
+   tablas no existen en `raw` y las comprobaciones de abajo miden el mundo de
+   ayer. Recordatorio de `progress/` : la nocturna llego a correr una imagen de
+   diez dias antes sin que nadie lo notara, asi que **comprobar el tag de la
+   imagen del job**, no solo que el repositorio este en verde.
 
-**Comprobado contra Azure, no supuesto** (es lo que falló una vez en este
-proyecto): el job responde `imagen: …:r20260905-0034`, `cron: 0 2 * * *`,
-`ventana: ['true']`. Y las **18 variables de entorno siguen las 18**: se verificó
-una por una que `--set-env-vars` añadiera `PG_VENTANA_ACTIVA` sin llevarse por
-delante `PG_PASSWORD`, `SIGRID_API_FUNCTION_KEY` ni las demás.
+2. **Que la ingesta trajo lo que debia**, con las nueve dentro:
 
-**La nocturna de las 02:00 UTC del 05-sep (04:00 locales) es la primera
-reconstrucción con F-025 y la ventana activa.** Créditos de CPU al lanzar: la
-última métrica publicada (17:23 UTC) daba **45 y subiendo a ~8/h**, así que la
-nocturna debería arrancar por encima de 100 de los 144. Las métricas de este
-servidor se publican con varias horas de retraso: no busques el dato de la
-última media hora, no está.
+       python main.py check-raw-recuentos
 
-### Lo primero de la mañana, antes que las huellas
+   Tiene que salir con **codigo 0**. Es el criterio 4 de `acceptance`. Manda 65
+   consultas de recuento a Sigrid, nueve mas que antes.
 
-Comprobar que el job corrió **y con qué imagen**, que es la lección de
-`repositorio-verde-no-es-produccion`:
+3. **Que el rol del MCP NO lee la nomina.** Es el criterio 3, y **no vale
+   suponerlo**: F-068 existe porque un `ALTER DEFAULT PRIVILEGES` reponia el
+   permiso en silencio. Contra el Postgres de Azure, en solo lectura:
 
-```powershell
-az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "[0].{nombre:name, estado:properties.status, arranque:properties.startTime}" -o yaml
+       SELECT table_name, grantee, privilege_type
+       FROM information_schema.table_privileges
+       WHERE table_schema = 'raw'
+         AND table_name IN ('emp','res','reshor','emphis')
+         AND grantee = 'mcp_sigrid_dm_ro';
+
+   El resultado correcto es **cero filas**. Si aparece alguna, la revocacion no
+   sobrevivio a la noche.
+
+4. **Que el diccionario del arbol casa con el catalogo real:**
+
+       python main.py check-diccionario
+
+5. **Publicar el diccionario** (version 17, con las nueve fichas nuevas). Es una
+   **escritura contra Azure**: la autoriza el humano, no un agente.
+
+       python main.py publicar-diccionario
+
+## Estado del servidor · sigue en B2s TEMPORALMENTE
+
+`psql-albaranes-rs9k2`, **`Standard_B2s`** desde el 2026-09-05 a las 17:21 UTC.
+**La bajada a `Standard_B1ms` sigue pendiente, con fecha limite 2026-09-20**
+anotada en `azure-apps/` para preguntar si se olvido. Al bajar, el saldo de
+creditos se resetea a 60.
+
+**LOS 144 CREDITOS ERAN FALSOS** (corregido el 2026-09-05). La tabla oficial de
+la serie Bv1 da para el `B1ms`: baseline 20 % de 1 vCPU, **12 creditos/hora** con
+la CPU ociosa y **288 de tope**; el `B2s` da 24/h y **576**. La metrica lo
+confirma: el servidor ha estado a 300 el 8-ago y 277 el 15-ago. Consecuencia:
+cuando el saldo marca 57 no estamos al 40 % del deposito, sino al 20 %. **Todas
+las cuentas de creditos anteriores al 05-sep estan hechas sobre un techo
+equivocado.**
+
+**Como se consulta el saldo de verdad**, que tambien costo descubrirlo: hay que
+pedirlo con **`--interval PT1M`** y una ventana corta. Con `PT15M` la API
+devuelve los primeros puntos del rango y parece que la metrica lleva 13 horas de
+retraso; no es cierto, llega al minuto.
+
+```bash
+az monitor metrics list --resource psql-albaranes-rs9k2 --resource-group rg-albaranes-dev \
+  --resource-type Microsoft.DBforPostgreSQL/flexibleServers \
+  --metric cpu_credits_remaining --interval PT1M --aggregation Average \
+  --start-time $(date -u -d '-50 minutes' +%Y-%m-%dT%H:%M:%SZ) -o tsv
 ```
 
-Y después, en este orden:
+**Que costaria tener mas** (precios reales de Spain Central, EUR, 730 h/mes,
+consultados el 05-sep en la API de tarifas de Azure):
 
-1. **Las cinco huellas del DESPUÉS** y `comparar-huellas` con **tolerancia CERO**
-   contra las de `huellas/antes_*.csv`. Una sola diferencia PARA la feature.
-   Las del ANTES: `stg` 12.407 celdas / 349 obras · `mart` 24.775 / 349 ·
-   `cierre` 16.948 / 330 · `dimension` 735 / 504 · `plan_obra` 938 / 350.
-2. **T1 otra vez** (ver el aviso de más abajo: la medición del 04 dio 0 % y no
-   era válida; ahora sí lo será, con `_meta.obra_build` ya poblada).
-3. Los `check-*`, el bloat y los créditos (T32-T34).
+| via | que da | coste |
+|---|---|---|
+| esperar | ~12 creditos/h con el servidor ocioso; lleno en ~19 h | 0 € |
+| **B2s** permanente | 2 vCPU, 4 GB · 24 creditos/h, tope 576 · IOPS 1.280 | 49,86 €/mes frente a 12,48 → **+37,38 €/mes** |
+| B2s solo de noche | lo mismo durante la ventana | ~**+12,3 €/mes** |
+| General Purpose D2ds_v5 | 2 vCPU, 8 GB, **sin creditos** | 132,86 €/mes → **+120,38 €/mes** |
 
-## Lo hecho el 2026-09-04
+En Spain Central **solo existen B1ms y B2s** en Burstable: el salto siguiente es
+ya General Purpose. Y ojo con escalar: **reinicia el servidor** —compartido con
+albaranes, partes, remesas, el portal y facturas— y **probablemente resetea el
+saldo de creditos**; eso habria que medirlo antes de fiarse.
 
-| | |
-|---|---|
-| Review de F-025 | **APROBADO lo entregable** en la 4a pasada; C5 sigue abierto por la fase 7 |
-| DA-6 | **EXENTA por el humano**, con lo que implica escrito |
-| Paso 0 · `stg` completa | **ya lo estaba**: las nocturnas del 03 y 04 corrieron enteras (1 h 38) |
-| Paso 1 · cinco huellas del ANTES | **HECHO**, en `huellas/antes_*.csv` (ignoradas por git) |
-| Paso 3 · alerta de la ventana | **DESPLEGADA**: `alert-caj-datamart-seg-dev-ventana`, activa, sev 2 |
-| Paso 2 · T1 | **no medible aun**, ver abajo |
-
-**Las cinco huellas del ANTES**, sobre el datamart que dejo la nocturna del 04:
-`stg` 12.407 celdas / 349 obras · `mart` 24.775 / 349 · `cierre` 16.948 / 330 ·
-`dimension` 735 / 504 · `plan_obra` 938 / 350.
-
-## AVISO · T1 dio 0 % y NO es lo que parece
-
-`T1` midio **920 a reconstruir, 0 a congelar, ahorro 0,0 %**, por debajo del 40 %
-que la spec fija como criterio de parada. **No hay que parar: la medicion no es
-valida todavia.** La causa esta comprobada: **`_meta.obra_build` tiene CERO
-filas** porque el build de F-025 no ha corrido nunca, y R18 dice que una obra sin
-registro se reconstruye siempre («completar no es actualizar»). La primera pasada
-reconstruye las 920 por diseno y a partir de la segunda ya congela.
-
-**Consecuencia para la spec:** el orden que fijo el reviewer pone T1 en el paso 2,
-antes de encender, y **en ese momento T1 no puede dar otra cosa que 0 %**. Hay que
-**repetir T1 despues de la primera reconstruccion**, que es cuando la cifra
-significa algo. Anotarlo en la spec al cerrar.
-
-## AVISO · la conexion del puesto se cayo DOS veces en una hora
-
-La huella de `stg` fallo dos veces y hubo que lanzarla tres: la primera con
-`server closed the connection unexpectedly` **con la IP rotando a mitad de
-consulta** (paso de 88.26.22.183 a 62.174.237.73, las dos autorizadas), y la
-segunda con `connection timeout expired`. **Ninguna fue culpa del servidor**: en
-ese momento tenia **60 creditos de 144** y la CPU al 12 %. A la tercera termino en
-**15 minutos**.
-
-Por eso el paso 4 **se lanza como job en Azure y no desde el puesto**: la
-reconstruccion dura mucho mas que esa huella, y desde aqui se cae. Ademas dentro
-de Azure tarda **1 h 38** frente a las **8 h 15** del 01-sep.
-
-## Estado del servidor, para no repetir el error del 01-sep
-
-`Standard_B1ms` Burstable, **144 creditos** de CPU. El 02-sep llegaron a **cero**
-tras nuestras 12 h 48 de reconstruccion manual y la nocturna murio en el tramo 6
-de 60. **Se ha recuperado solo**: 5,2 creditos el 04 a las 07:28 y **60 a las
-21:15**. Las nocturnas del 03 y del 04 corrieron enteras.
+**El disco esta en 64 GB** desde el 2026-08-29, y el job lo declara desde el
+07-sep (`PG_DISCO_TOTAL_GB`). Durante nueve dias la puerta de F-019 midio contra
+32 GB y veia un 74,32 % donde la ocupacion real es del 37,16 %: aborta al 80 %,
+asi que estaba a menos de seis puntos de tumbar la nocturna cada noche sin que
+nada estuviera mal. Detalle en `progress/impl_disco_64gb.md` y
+`progress/incidencia_nocturna_20260907.md`.
 
 ## F-052 · SIGUE BLOQUEADA, y el motivo REAL no era el que se penso
 
@@ -150,775 +507,442 @@ asi que **el guardian ya no miente**, que era el bloqueo de verdad— pero sale
 **Y eso tiene explicacion, comprobada:** el `check-cobertura` se lanzo desde la
 rama de F-025, que **NO contiene los cinco commits de cierre de F-052**
 (`ec516bd`..`fa2312c`, que viven solo en `feature/F-052-partidas-huerfanas`).
-El fichero de excepciones de esta rama es el viejo: **10 entradas y con los
+El fichero de excepciones de esa rama es el viejo: **10 entradas y con los
 `tipo` sin corregir**. En la rama de F-052 estan las 23 y los tipos arreglados.
 
-**Como se cierra F-052:** terminar F-025, volver a su rama, relanzar
-`check-cobertura --timeout 900` **alli**, y si da codigo 0, al reviewer y a
-`done`. **No se mezclan las dos ramas** sin decidirlo.
-
-## F-025 · LAS MANUAL DE LA FASE 7, CON SU COMANDO EXACTO (C4)
-
-**Para el humano.** Esto es el guion completo de lo que queda, en el orden en
-que hay que hacerlo y con el comando literal de cada paso: no hace falta releer
-la spec. Todo desde la raiz del repositorio, con el `.env` de produccion y el
-entorno virtual activado. Los comandos van en **PowerShell**, que es la consola
-de este puesto.
-
-**PRECONDICION: YA SE CUMPLE desde el 2026-09-03.** Este parrafo decia que
-`stg.plan_mensual` seguia truncada al 21,6 % por la averia del 02-sep, y **eso
-dejo de ser cierto**: las nocturnas del 03 y del 04 corrieron enteras y la
-dejaron en 29,7 M de filas. Comprobarlo igualmente antes de empezar:
-
-```powershell
-python main.py status-stg
-python main.py check-coherencia
-```
-
-### Paso 1 · T1 · El peso real, que decide si la feature merece la pena
-
-Reparte el peso de `SQL_PESOS_PLAN_MENSUAL` entre las 40 obras vivas y las 880
-congeladas. **Es caro**: barre `stg.presupuesto` (13,8 M filas) unido a
-`raw.obrparpre`. Lanzarlo **fuera del horario de carga**.
-
-```powershell
-@'
-import datetime, main
-from config.settings import get_settings
-from etl_sigrid.application.steps.build_stg_step import sello_vigente_del_repositorio
-from etl_sigrid.domain.ventana import clasificar_obras, criterio_desde_reglas
-
-s = get_settings(); pg = main._get_pg()
-plan = clasificar_obras(
-    pg.fetch_censo_de_obras(),
-    criterio_desde_reglas(s.business_rules, s.postgres.ventana_meses),
-    datetime.date.today(), sello_vigente_del_repositorio(s),
-    completa=False, rescate=s.postgres.ventana_rescate)
-pesos = pg.fetch_pesos_plan_mensual()          # <-- lo caro de T1
-vivas = sum(pesos.get(d.obra_id, 0) for d in plan.reconstruir)
-frias = sum(pesos.get(d.obra_id, 0) for d in plan.congelar)
-print(f"obras vivas={len(plan.reconstruir)} peso={vivas:,}")
-print(f"congeladas={len(plan.congelar)} peso={frias:,}")
-print(f"AHORRO = {100*frias/(vivas+frias):.1f} %   (si baja del 40 %, PARAR)")
-'@ | python -
-```
-
-**Criterio de parada de T1: si el ahorro es menor del 40 %, PARAR** y volver a
-consultar antes de encender nada. La cota estimada de `mediciones.md` §3 es
-73,3 %, pero es un proxy que no cubre los ambitos master (8 y 11).
-
-La cifra se escribe en `mediciones.md` §3.
-
-### Paso 2 · T2b · Cuanto cuesta la firma, que decide su forma final
-
-Las dos variantes, cronometradas. La cara detoasta `planif` en 13,8 M de filas.
-**Tambien fuera del horario de carga.**
-
-```powershell
-@'
-import time, main
-from etl_sigrid.infrastructure.postgres.postgres_client import (
-    SQL_FIRMA_ORIGEN, SQL_FIRMA_ORIGEN_CON_PLANIF)
-
-pg = main._get_pg()
-for nombre, consulta in (("barata (sin planif)", SQL_FIRMA_ORIGEN),
-                         ("cara (md5(planif))", SQL_FIRMA_ORIGEN_CON_PLANIF)):
-    with pg.connection() as conn, conn.cursor() as cur:
-        cur.execute("SET LOCAL statement_timeout = '1800s'")
-        t0 = time.perf_counter(); cur.execute(consulta); filas = cur.fetchall()
-        print(f"{nombre}: {time.perf_counter()-t0:.1f} s, {len(filas)} obras")
-'@ | python -
-```
-
-Si la cara resulta asumible, sustituye a `SQL_FIRMA_ORIGEN` (R20); si no, la
-laguna se queda declarada y la cierra el domingo. Los segundos de cada variante
-van a `mediciones.md` §6.
-
-### Paso 3 · T35 · Desplegar la alerta. SIN ESTO EL GUARDIAN ES MUDO
-
-`check-ventana` **avisa y no tumba el job** (DA-5), asi que la alerta de fallo
-no se dispara y esta regla es la **unica** via por la que el hallazgo llega a
-una persona. Va **antes** de encender la ventana, no despues.
-
-```powershell
-az extension add --name scheduled-query          # una vez por puesto
-powershell -NoProfile -File infra/97_create_alert_ventana.ps1
-
-# El buzon vive en el grupo de accion, no en el .ps1 (R30 de F-052):
-powershell -NoProfile -File infra/90_create_alert.ps1 -AlertEmail <buzon>
-```
-
-Comprobar que la consulta de la regla ve el marcador, con el workspace de Log
-Analytics:
-
-```powershell
-$ws = az monitor log-analytics workspace show -g <resourceGroup> -n <logAnalytics> --query customerId -o tsv
-az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '<job>' | where Log_s contains '[F025-VENTANA-KO]' | count" -o table
-```
-
-**No esta verificada hasta que llegue un correo de verdad.**
-
-### Paso 4 · T27 · Las CINCO huellas del ANTES
-
-**Antes de reconstruir nada y sobre el `raw` vigente.** Solo lectura. Si se
-capturan despues, ya no prueban nada.
-
-```powershell
-mkdir huellas -Force
-python main.py huella-obras --out huellas/antes_stg.csv       --desde stg       --timeout 900
-python main.py huella-obras --out huellas/antes_mart.csv      --desde mart      --timeout 900
-python main.py huella-obras --out huellas/antes_dimension.csv --desde dimension --timeout 900
-python main.py huella-obras --out huellas/antes_cierre.csv    --desde cierre    --timeout 900
-python main.py huella-obras --out huellas/antes_plan_obra.csv --desde plan_obra --timeout 900
-```
-
-Guardar los cinco CSV **fuera de la base**; `huellas/` no se versiona.
-
-### Paso 5 · T28 · El plan, en seco, contra produccion
-
-```powershell
-python main.py ventana-plan
-python main.py ventana-plan --detalle
-```
-
-**Tiene que decir 920 censadas, 40 a reconstruir y 880 congeladas.** Si no
-cuadra con `mediciones.md` §2, PARAR: el criterio no esta viendo lo que se
-midio. Ojo, con la ventana todavia apagada imprime `completa: True`; eso es
-correcto y no es un fallo.
-
-### Paso 6 · Encender `PG_VENTANA_ACTIVA`. **Decision del humano**
-
-Nace apagada (R5): nada de lo anterior cambia una sola cifra publicada. En
-local, en `.env`:
-
-```
-PG_VENTANA_ACTIVA=true
-```
-
-En Azure, **el valor esta versionado** desde el 2026-09-04 (hallazgo 2 del
-review): `infra/env/dev.json` declara `ventanaActiva`, `ventanaMeses`,
-`ventanaDiaCompleta` y `ventanaRescate`, y `infra/80_create_job.ps1` los inyecta
-como `PG_VENTANA_*`. Encenderla es **cambiar `"ventanaActiva": "true"` en
-`dev.json`** y llevar ese valor al job.
-
-**OJO, Y ESTO SE PROBO: sobre el job de produccion NO vale relanzar
-`80_create_job.ps1`.** Ese script lanza excepcion si el job ya existe
-(`80_create_job.ps1:85-87`: «el job ya existe. Para cambiarle la imagen usa
-85_update_job.ps1»), que es exactamente el caso de hoy. El camino versionado
-solo funciona **al crear el job de cero**. Sobre un job vivo, la unica via que
-funciona hoy es fijarla a mano:
-
-```
-az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --set-env-vars PG_VENTANA_ACTIVA=true
-```
-
-**OJO: `85_update_job.ps1` NO sirve para esto.** Solo cambia la imagen y dice
-expresamente que no toca el entorno, asi que el despliegue habitual no llevara
-el valor nuevo. Si no se quiere recrear el job, se fija a mano —pero entonces el
-valor vuelve a vivir fuera del repositorio y desaparece la proxima vez que
-alguien lo recree:
-
-```powershell
-az containerapp job update -g <resourceGroup> -n <job> --set-env-vars "PG_VENTANA_ACTIVA=true"
-```
-
-En cualquiera de los dos caminos, verificar despues que llego:
-
-```powershell
-az containerapp job show -g <resourceGroup> -n <job> --query "properties.template.containers[0].env[?name=='PG_VENTANA_ACTIVA']" -o table
-```
-
-### Paso 7 · T29 · La primera reconstruccion acotada
-
-```powershell
-python main.py stage
-python main.py timings --last 1
-```
-
-Anotar duracion por tramo y ocupacion de disco. Para forzar la completa —lo que
-hace sola la noche del domingo—: `python main.py stage --reconstruir-todo`.
-
-### Paso 8 · T30 · Las cinco huellas del DESPUES, y la comparacion
-
-**SIN `--obras-esperadas`.** Tolerancia cero: **una sola diferencia PARA la
-feature.**
-
-```powershell
-python main.py huella-obras --out huellas/despues_stg.csv       --desde stg       --timeout 900
-python main.py huella-obras --out huellas/despues_mart.csv      --desde mart      --timeout 900
-python main.py huella-obras --out huellas/despues_dimension.csv --desde dimension --timeout 900
-python main.py huella-obras --out huellas/despues_cierre.csv    --desde cierre    --timeout 900
-python main.py huella-obras --out huellas/despues_plan_obra.csv --desde plan_obra --timeout 900
-
-python main.py comparar-huellas huellas/antes_stg.csv       huellas/despues_stg.csv
-python main.py comparar-huellas huellas/antes_mart.csv      huellas/despues_mart.csv
-python main.py comparar-huellas huellas/antes_dimension.csv huellas/despues_dimension.csv
-python main.py comparar-huellas huellas/antes_cierre.csv    huellas/despues_cierre.csv
-python main.py comparar-huellas huellas/antes_plan_obra.csv huellas/despues_plan_obra.csv
-```
-
-Las cinco tienen que salir con **codigo 0 y cero diferencias**.
-
-### Paso 9 · T31 y T31b · La 0599 y la frescura por obra
-
-```powershell
-python main.py inspect-cierre --codigo 0599
-```
-
-Tiene que seguir dando **DIRECTOS 2.624.793 €** y margen **1,8 %**. Y que las
-40 vivas se rehicieron mientras las 880 conservan su `_built_at` anterior:
-
-```sql
-SELECT congelada, count(*), min(construido_at), max(construido_at)
-FROM _meta.v_frescura_obra
-GROUP BY congelada;
-```
-
-### Paso 10 · T32 · Los guardianes, con el mismo veredicto que antes
-
-```powershell
-python main.py check-unicidad --timeout 300
-python main.py check-cierres --timeout 900
-python main.py check-cobertura
-python main.py check-declarados
-python main.py check-ventana
-```
-
-### Paso 11 · T33 y T34 · Tras una semana acotada
-
-Repetir la medicion de bloat de `mediciones.md` §7 sobre `pg_class` y
-`pg_stat_user_tables` y compararla con T2; **si crece de forma sostenida, abrir
-la feature de particionado**. Y mirar en el portal de Azure los creditos de CPU
-restantes al terminar la nocturna (R29): **tienen que quedar por encima de 0**.
-
-## F-025 · SPEC ESCRITA y DECISIONES CERRADAS por el humano (2026-09-02)
-
-`specs/F-025-ventana-negocio-build/`: `requirements.md` (150/150),
-`design.md` (250/250), `tasks.md`, más **`mediciones.md`** (línea base medida en
-solo lectura) y **`decisiones.md`** (lo que decidió el humano y por qué). Rama
-`feature/F-025-ventana-negocio-build`. Reemplaza la spec del 2026-08-28
-(commit `1f01718`), anterior a la decisión y a la avería.
-
-### El criterio, decidido: tres reglas en UNIÓN
-
-Se congela toda obra que cumpla al menos una: **(1)** estado **EN ESTUDIO (1),
-NO PRESENTADA (11) o CERRADA (25)**; **(2)** código de **seis dígitos**;
-**(3)** **sin actividad en 12 meses**. Censo sobre las 920 de `maestro.obras`:
-**880 congeladas, 40 vivas** (38 publican en el fact). Detalle obra a obra en
-`obras_candidatas_a_congelar.csv`.
-
-**El humano rechazó dos propuestas de la spec, las dos con el dato delante**: el
-veto de actividad («pon las reglas que te he dicho») y la formulación en positivo
-—solo se actualizan EN CURSO y ADJUDICADAS— («déjalo en negativo»). Las dos
-quedan escritas como alternativas no elegidas.
-
-**Contrapartida, sin suavizar y CON LA CIFRA CORREGIDA (2026-09-03):** de las **48
-obras con actividad en 12 meses, 8 quedan congeladas** —7 CERRADAS (estado 25) y 1
-de seis dígitos, la `180501`— y tendrán **hasta 6 días** de antigüedad.
-**Al humano se le presentó un 40, y son 8**: aquel número se midió sobre
-`maestro.obras` con `coalesce(fecha_fin, fecha_inicio)`, no con la definición del
-código (`raw.obr ⨝ raw.con` y `MAX(make_date(...))` de `stg.fases`,
-`SQL_ESTADO_OBRAS`). **Su decisión no cambia** —880 congeladas y 40 vivas cuadran
-al dedillo— y la contrapartida real es **menor** que la que aceptó. El detalle,
-con fuentes, en el aviso de `decisiones.md` §DA-1 y en `mediciones.md` §2.
-
-**El catálogo de estados apareció y quedó verificado**: vive en `conest`, tipo 42,
-vía `con.est`. «25 = CERRADA» ya **no es una suposición**, así que el riesgo que
-iba a declararse se retira y en su lugar queda una tarea de documentación: la
-ficha de `maestro.obras.estado_id` dice hoy que el catálogo no se ingiere, y eso
-ha dejado de ser cierto (T23b, enlaza con F-054).
-
-### Lo que el diseño resuelve
-
-1. **El `TRUNCATE` es el problema, no el filtro.** Cada tramo borra **solo las
-   obras que va a reinsertar**, en su misma transacción: imposible borrar lo que no
-   se reescribe. De regalo, una muerte a mitad deja la tabla coherente —la nocturna
-   del 02-sep habría acabado con 5 obras al día y el resto con el dato de ayer, en
-   vez de al 21,6 %—.
-2. **DA-2 obligó a rehacer la señal de cambio.** El humano decidió acotar también
-   `build_presupuesto`, que era la fuente barata de la firma del origen. La firma se
-   traslada a **`raw`** —lo único que la ingesta sigue trayendo completo cada
-   noche—, en un sub-paso agregado de solo lectura tras `ingest_raw`. `tiemod` no
-   sirve (F-011: no existe en 24 de 31 tablas) y hashear en la ingesta gastaría la
-   CPU que falta. Su coste se mide en **T2b** antes de fijarla.
-3. **La firma DENUNCIA, no rescata.** Como el humano acepta congelar 8 de las 48
-   obras con actividad reciente, reconstruirlas por nuestra cuenta contradiría su decisión: el guardián las
-   **nombra** y el domingo las pone al día. Hay interruptor `PG_VENTANA_RESCATE`
-   (off) por si cambia de idea.
-4. **Reconstrucción completa semanal, los DOMINGOS**, disparada desde `run-all` por
-   antigüedad registrada y no por un cron nuevo.
-5. **Prueba de equivalencia**: las cuatro huellas de F-052 **sin obras esperadas**
-   —si la exclusión es correcta salen idénticas al byte— más una quinta por obra ×
-   ámbito, y la 0599 publicando lo mismo que hoy.
-
-### Lo que falta antes de escribir código
-
-**T1** (ahorro real por obra con la consulta de pesos que la nocturna ya ejecuta;
-si no llega al 40 % del peso, la spec manda parar), **T2** (línea base de tamaño y
-tuplas muertas) y **T2b** (coste de la firma sobre `raw`, con y sin `planif`).
-
-**Riesgo principal que queda:** el `DELETE` selectivo deja tuplas muertas en un
-`B1ms` sin créditos. Mitigación: `VACUUM (ANALYZE)` al final del sub-paso y medir
-la primera semana; si crece de forma sostenida, la salida es particionar por obra,
-y eso sería otra feature.
-
----
-
-# Estado del 2026-09-01
-
-## F-052 · FASE 2 EJECUTADA — el arreglo está PUBLICADO en la base
-
-**La 0599 ya no miente.** Cierre de 2022-12, contra lo que publicaba ayer:
-
-| Concepto | Antes | Ahora |
+**Como se cierra F-052:** volver a su rama, relanzar `check-cobertura
+--timeout 900` **alli**, y si da codigo 0, al reviewer y a `done`. **No se
+mezclan las dos ramas** sin decidirlo. Ojo con F-071 y F-053, que tocan
+`stg.obras` y su desempate `rn=1`.
+
+## F-072 · CERRADA · el censo semantico de las 31 tablas que nadie consume
+
+**F-071 ESTA RETIRADA.** El humano la paro el 2026-09-09 al leer su spec:
+«**no vamos a borrar nada de momento, vamos a seguir dejando todo. Quitamos
+esta feature.**» Ya no esta en `harness/features.json`. Su carpeta
+`specs/F-071-obras-sin-datos/` se conserva con un banner de RETIRADA, solo por
+lo que costo medir. **No se implementa nada de ella.**
+
+**Lo que NO se hace, y conviene que quede escrito para que nadie lo reproponga
+dentro de tres meses:** no se borran las 472.890 filas huerfanas de
+`stg.presupuesto` (390.028) y `stg.plan_mensual` (82.862); **no se acota el
+censo de la ventana**, que era precisamente lo que las dejaba huerfanas; y no
+se filtra ni se oculta ninguna obra en ninguna vista. El marcado de obras sin
+datos sobrevive **como enriquecimiento**, no como filtro.
+
+**EL HECHO QUE ABRE F-072**, medido el 2026-09-09 cruzando
+`config/tables_sigrid.yaml` contra todo el SQL de
+`etl_sigrid/infrastructure/postgres/sql/`:
+
+| tablas ingeridas cada noche | las consume algun build | **no las consume nadie** |
 |---|---|---|
-| **DIRECTOS** | **0,00 €** | **2.624.793 €** |
-| GASTOS totales | 1.369.593 € | **3.994.386 €** |
-| VENTA | 4.066.989 € | 4.066.989 € |
-| **BENEFICIO** | 2.697.396 € | **72.603 €** |
-| **Margen** | **66,3 %** | **1,8 %** |
-
-Los tres números que se predijeron el 2026-08-31 —coste 3.994.386,39, beneficio
-72.602,84, margen 1,8 %— **han salido exactos**. La obra de control **0628
-LEGAZPI no se mueve ni un céntimo**.
-
-**Lo ejecutado el 2026-09-01, desde el puesto y contra producción:**
-
-| Paso | Resultado |
-|---|---|
-| `stage` | SUCCESS, **8 h 15** (la misma tarea dentro de Azure: 1 h 37) |
-| `build-mart` | SUCCESS, 2 h 31 · el fact gana **55.165 filas, todas de la 0599** |
-| `build-cierre` | SUCCESS, 2 h 02 · 16.928 filas, las mismas de siempre |
-| `publicar-diccionario` | versión **12**, biyección 103/103, `_meta` ya sirve lo del árbol |
-
-**Las cuatro huellas, capturadas antes y después sobre el MISMO `raw`:**
-
-| Huella | Veredicto | Obras que se mueven |
-|---|---|---|
-| dimension | **OK** | solo 0599 (117 → 1.440) |
-| cierre | **OK** | solo 0599 |
-| mart | KO por master | **solo 0599**, 144 diferencias |
-| stg | KO por master | **solo 0599**, 70 diferencias |
-
-### Las comprobaciones de cierre, contra la base reconstruida
-
-| Comando | Resultado |
-|---|---|
-| **R12** · clave de `mart.fact_seguimiento_mensual` | **0 claves duplicadas**, 0 filas implicadas, con las 55.165 filas nuevas dentro |
-| `check-cierres --timeout 900` | **0 discrepancias** en 8.540 cierres de 679 pares obra/ámbito; telescopio R16: **0 sin cuadrar** de 254.236 series |
-| `check-diccionario` | biyección **103/103**; publicado = árbol (**versión 12**) |
-| **`check-cobertura`** | **filas huérfanas: 183.824 → 294.** El guardián mide el arreglo: **−99,8 %** |
-
-**El dato que mejor resume la feature es ese último.** El guardián que se
-construyó para detectar el problema ahora mide su desaparición: de las 183.824
-filas que el build descartaba en silencio quedan **294**. Las 183.530 de la 0599
-ya no se pierden.
-
-Sigue en **KO**, y es correcto que lo esté: quedan **20 obras invisibles** y esas
-294 filas sin declarar. Ninguna es de F-052 —son las administrativas más 0585,
-0687, 0578, 0670 y 0606, que es **F-053**—. **T15 y la desviación 4 del review se
-afinan aquí**: esta es la línea base del DESPUÉS.
-
-**OJO con los timeouts:** `check-unicidad` dejó **3 objetos sin comprobar** (antes
-era 1) y `check-cierres` murió con `QueryCanceled` a la primera. No es un defecto:
-es el servidor tras 12 h de escritura masiva. `check-cierres` necesitó
-`--timeout 900`, y el objeto de R12 hubo que comprobarlo aparte con 900 s.
-
-### El KO de master: FALSO POSITIVO, aceptado por el humano el 2026-09-02
-
-`comparar-huellas` arrastra de **F-042** la regla «cualquier cambio en los ámbitos
-master 8 u 11 es desbordamiento». **F-052 exige lo contrario y está escrito en
-R9**: «deben aparecer las combinaciones 0599 × ámbito 7 y 0599 × ámbito 11, hoy
-inexistentes». La herramienta marca como error justo lo que la spec pide.
-
-Comprobado antes de aceptarlo: **las 214 diferencias de las dos huellas son todas
-de la 0599**; ninguna otra obra aparece en ninguna. Palabras del humano: «si la
-única diferencia es la 599 es lo esperado, está bien».
-
-**Deuda que deja abierta**: `comparar-huellas` debería aceptar cambios en master
-**para las obras esperadas**, en vez de rechazarlos siempre. Mientras no se
-arregle, cualquier feature futura que toque master se encontrará el mismo KO y
-tendrá que volver a razonarlo a mano.
-
-### NOCTURNA DESACTIVADA — hay que revertirlo
-
-El cron del job está en **`0 2 1 1 *`** (no dispara) desde el 2026-09-01 22:00.
-Se desactivó porque la imagen del job es **`r20260830-0924`, anterior a F-052**:
-a las 02:00 habría reconstruido con el SQL viejo, deshaciendo 12 h 48 de trabajo,
-y su `ingest` habría cambiado `raw`, invalidando la comparación.
-
-**Se revierte al desplegar la imagen nueva:**
-`az containerapp job update -g rg-datamart-seg-dev -n caj-datamart-seg-dev --cron-expression "0 2 * * *"`
-
-Red de seguridad si se olvida: la alerta de frescura salta a las **30 h** sin
-`build_mart` y avisa a los dos buzones del grupo de acción.
-
-### La alerta de cobertura, desplegada
-
-`alert-caj-datamart-seg-dev-cobertura`, severidad 2, ventana de 24 h evaluada
-cada hora, dispara por **presencia** del marcador `[F052-COBERTURA-KO]`. El grupo
-de acción tiene ya **dos destinatarios**. **Sigue sin verificarse de extremo a
-extremo**: no ha llegado ningún correo todavía, y no llegará hasta que el job
-corra con la imagen nueva.
-
-## F-052 · FASE 1 IMPLEMENTADA Y REVISADA
-
-**Reviewer: FASE 1 APROBADA, ningún cambio requerido** →
-`progress/review_F-052.md`. El cierre queda pendiente de la fase 2: **C5 no se
-puede marcar** porque T13, T14 y T15 están sin hacer a propósito.
-
-**La condición de DA-2, verificada por TERCERA vez y por otro camino.** El
-reviewer ejecutó el CTE nuevo entero contra **todas las obras** y comparó el
-`md5` del sitio de cada partida contra `stg.partidas` de hoy: **cambia UNA sola
-obra, la 0599** (117 → 1.440); **las otras 734 salen idénticas al byte**. Es R6
-cumplido y la huella 3 pre-validada en solo lectura.
-
-**Dos cosas que el reviewer encontró en la huella 3 y que conviene no perder:**
-lleva `ORDER BY p.partida_id` **dentro** del `string_agg` y `COALESCE` en las seis
-columnas. Sin lo primero el `md5` bailaría solo; sin lo segundo, un
-`capitulo_padre_id` NULL haría NULL el resumen entero de cualquier obra con raíz
-y **la comparación parecería verde**. Es el modo de fallo más peligroso que tiene
-esta feature: una verificación que miente en verde.
-
-**Tres observaciones que NO bloquean, anotadas para la fase 2:**
-
-1. `check-cobertura` **da verde sobre cero filas**. Hoy cero filas es el estado
-   sano, pero un fallo que dejara las dos consultas sin resultados (tabla
-   renombrada, esquema vacío) se leería como OK. Con la línea base de **T15** cabe
-   añadir el denominador: combinaciones (obra × ámbito) vistas en `stg`.
-2. Hay una **décima excepción que T10 no pedía**, la 0606 PUY DU FOU. Justificada
-   y marcada `feature: F-053`, pero debía haberse declarado.
-3. Un CSV de huella de F-042 anterior a T27 (8 columnas) ya no lo reconoce
-   `comparar-huellas` y muere con un mensaje confuso. Hoy no existe ninguno.
-
-**Desviación 4, aceptada CON SEGUIMIENTO:** no hay tope de filas por excepción,
-así que la de 0565, 0630 y 0686 tapa **cualquier** número de huérfanas en esas
-obras. **T15 fija la línea base y ahí se afina.**
-
-**Automejora propuesta por el reviewer, sin aplicar:** `.claude/agents/reviewer.md`
-obliga a un veredicto binario, y una feature partida en dos fases por diseño no es
-ni APPROVED ni CHANGES_REQUESTED. Propone un tercero, `APPROVED_FASE_1`, que
-obligue a enumerar los checkpoints pendientes. **Decisión del humano.**
-
-### Lo entregado en la fase 1
-
-**Informe completo: `progress/impl_F-052.md`.** Hechas T1-T12, T16-T19 y
-T22-T30; T20 ya venía hecha y **T21 (mutación) está exenta** por decisión del
-humano del 2026-08-31. `bash harness/init.sh` en verde, cobertura de las líneas
-cambiadas al 100 %.
-
-**Pendiente del humano, y es lo que falta para cerrar:** T13, T14, T15 y los diez
-pasos de cierre de `tasks.md`. Son escrituras contra el Postgres compartido en
-producción o lecturas de varios GB, y desde el puesto **no hay conexión directa**
-(`connection timeout expired` contra `psql-albaranes-rs9k2`). Dos de ellos no son
-opcionales:
-
-* **el aviso a Negocio (R27) es BLOQUEANTE**: sin él no se publica;
-* **desplegar `infra/96_create_alert_cobertura.ps1`** y añadir el buzón al grupo
-  de acción. Sin ese paso el guardián nuevo **es mudo**, porque al no bloquear el
-  job la alerta de fallo no se dispara.
-
-**Hoy la 0599 sigue publicando las cifras de siempre**: el arreglo está escrito y
-probado, no reconstruido.
-
-### El riesgo (a) del informe queda ELIMINADO: el motor ya vio el SQL
-
-El implementer dejó dicho que el `WITH RECURSIVE` con `visitados` estaba probado
-en dominio y sobre el texto, **pero no contra Postgres** — porque yo le pasé
-información desactualizada: la conexión se había restablecido antes de lanzarlo.
-Validado por el líder el 2026-09-01 tomando el CTE **literal** del fichero, sin
-`TRUNCATE` ni `INSERT`, como `SELECT` de agregados en solo lectura:
-
-| Comprobación | Resultado |
-|---|---|
-| El recursivo se ejecuta y **no se cuelga** | 390.508 nodos, **390.501 publicables** — R7 al nodo |
-| La 0599 (R8) | **1.440 partidas**, de ellas **1.326 CD** (hoy son 3) |
-| Invariante R4 (`cardinality(ruta) = nivel + 1`) | **0 filas lo rompen** |
-| R3 (todo `capitulo_padre_id` apunta a fila publicada) | **0 padres colgados** |
-| Tope de 40 del corta-ciclos | **0 nodos** por encima de 39: no trunca nada |
-
-Sigue vivo el riesgo (b): la alerta solo está probada como texto, **no hay correo
-recibido**. Y R11 sigue sin ejecutarse: esto valida el árbol, no el dinero
-publicado.
-
-## F-052 · spec aprobada — las 7 decisiones cerradas por el humano
-
-`specs/F-052-partidas-huerfanas/`. Rama `feature/F-052-partidas-huerfanas`.
-Línea base: `progress/explore_F-052.md`. **La causa quedó identificada y la
-hipótesis previa desmentida**: la cadena de `padide` de la 0599 **sí llega a la
-raíz `CD`**; lo que corta es el filtro `AND h.cod <> ''` de
-`sql/stg/04_partidas.sql:78`, que impide **descender a través de** tres capítulos
-intermedios con código vacío y amputa 1.323 partidas. Las otras 12 son ciclos.
-
-### Las siete decisiones, cerradas el 2026-08-31
-
-| | Decisión del humano |
-|---|---|
-| **DA-1** | Solo se relaja la rama de descenso (línea 78). La raíz **no se toca**: criterio de mínimo cambio, «ahora mismo estaba funcionando bien en general» |
-| **DA-2** | **Colapsar**, y CONDICIONADO: si se mueve una cifra de una obra distinta de las seis afectadas, **se para y se consulta**. Palabras del humano: «si cambia algo, prefiero perder la 0599 porque no sigue el patrón correcto» |
-| **DA-3** | Array de visitados **+** tope de profundidad |
-| **DA-4** | **AVISA, NO BLOQUEA** — la nocturna termina en verde. Y **aviso por correo** al buzón de desarrollo |
-| **DA-5** | Sí, se lleva a Sigrid sin esperar. Único caso prioritario: la **0686**, obra viva |
-| **DA-6** | Avisar a Negocio **antes** de publicar, y nota en el diccionario |
-| **DA-7** | Feature propia: **F-053**, prioridad 2 |
-
-**Por qué DA-2 se puede dar por segura sin medirla contra la base**: cada partida
-tiene **un solo padre**, luego un solo camino a la raíz. Una partida publicada hoy
-tiene todo su camino con código, y el algoritmo nuevo recorre ese mismo camino con
-idéntico resultado. **El cambio es estrictamente aditivo.** Datos que lo respaldan:
-fuera de la 0599 el movimiento máximo posible son **226 filas de 183.756, a 0,00 €**;
-y la profundidad máxima real de `stg.partidas` es de **7 niveles, con cero partidas
-de nivel 8 o más sobre 389.178** (medido el 2026-08-31), lo que valida que el tope
-de 40 del corta-ciclos no trunca nada legítimo.
-
-**Y ya no hace falta el argumento: está MEDIDO contra `raw`** (2026-08-31, tras
-restablecer el acceso). Simulado el árbol nuevo entero y cruzado con
-`stg.partidas`: las partidas nuevas son **1.323 y TODAS de la 0599** —ni una en
-las otras cinco obras—; **ninguna** partida ya publicada cambia ruta, nivel ni
-padre; **ninguna** desaparece; la profundidad máxima es de 7 niveles. El árbol
-alcanza 390.508 nodos, menos los 7 no publicables = **390.501, la cifra exacta
-de R7**. La condición del humano está verificada **antes de tocar código**.
-
-### El aviso por correo (DA-4) reutiliza lo que ya existe
-
-**No se escribe código de correo.** El patrón ya está en el repositorio:
-`infra/90_create_alert.ps1` crea el grupo de acción `ag-datamart-seg-dev` con
-destinatarios pasados por `-AlertEmail`, y `infra/95_create_alert_frescura.ps1`
-crea una regla de consulta programada sobre `log-datamart-seg-dev` que lo dispara.
-`check-cobertura` escribirá un marcador estable en el log y un script nuevo
-(`infra/96_create_alert_cobertura.ps1`) creará la regla que lo busca.
-
-**Riesgo declarado**: al no bloquear, la alerta de fallo existente
-(`alert-caj-datamart-seg-dev-failed`) **no se disparará**. Esa regla nueva es la
-única vía por la que el guardián se hace oír; **si no se despliega, es mudo**.
-Su despliegue es manual y lo ejecuta el humano.
-
-**Los correos NO se versionan** — lo dice `infra/90_create_alert.ps1` y se respeta:
-el destinatario se pasa con `-AlertEmail` en el despliegue.
-
-### Documento para Negocio, listo
-
-`specs/F-052-partidas-huerfanas/aviso_negocio.md`: qué se encontró, la tabla de
-cifras antes/después (margen de la 0599 del **66,3 % al 1,8 %**), a quién afecta,
-la pérdida del desglose por fases y lo que hay que pedirle a quien administra
-Sigrid. **Es paso bloqueante previo a publicar.**
-
-### BLOQUEO OPERATIVO para implementar
-
-**No hay conexión directa a la base desde el puesto** (2026-08-31,
-`connection timeout expired` contra `psql-albaranes-rs9k2`). La base está viva y
-responde por la vía de solo lectura del MCP, pero **esa vía no expone `raw`**, que
-es donde vive el árbol de partidas. Las verificaciones con huella antes/después no
-se pueden ejecutar hasta restablecerlo — probablemente una regla de firewall, y
-tocar ese servidor compartido lo autoriza el humano.
-
-## F-042 · `done` — CERRADA, y con ella los 30,4 M€ que se publicaban de más
-
-Rama `feature/F-042-clave-fact`, 27 commits (T1–T25) más el de cierre.
-`bash harness/init.sh` en código 0 (2.802 tests). Reviewer **APROBADO** en la 2ª
-pasada y **criterio 5 verificado** en una 3ª contra la base ya reconstruida.
-Informes: `progress/impl_F-042.md`, `progress/review_F-042.md`,
-`progress/explore_F-042.md`. El relato completo, en `progress/history.md`.
-
-**La carga que la bloqueaba terminó.** Job `caj-datamart-seg-dev-d8y5q10`,
-imagen **`r20260830-0924`** —la primera con F-042—, `run-all --full` con los diez
-pasos: 08:06:36 → **11:38:00 UTC**, 3 h 31 min, `Succeeded`. Comprobada **la
-imagen del job**, no solo su estado: es la lección de F-047.
-
-**Los cuatro comandos de cierre, contra la base reconstruida:**
-
-| Comando | Resultado |
-|---|---|
-| `check-unicidad --timeout 300` | `mart.fact_seguimiento_mensual` **OK**: de **8.778 combinaciones duplicadas a CERO** |
-| `check-cierres` | **0 discrepancias** en 8.540 cierres de 679 pares obra/ámbito; telescopio R16: **0 sin cuadrar** de 254.189 |
-| `check-diccionario` | Biyección exacta **103/103**; lo publicado es lo del árbol (versión 11, hash `68ecfd13f697`) |
-| `bash harness/init.sh` | **Código 0**, 2.802 tests, 100 % de 656 líneas cambiadas |
-
-**OJO CON EL TIMEOUT, y esto vale para cualquier sesión futura:** con los 30 s por
-defecto, `check-unicidad` deja `mart.fact_seguimiento_mensual` en **NO
-COMPROBADO**, que no es un OK. Hay que lanzarlo con **`--timeout 300`**. Con ese
-timeout el cuadro completo es **44 sin contradicción · 1 con la clave rota · 1
-sin comprobar**.
-
-**El diccionario no cambia de tamaño con F-042**, que solo altera lo que dicen
-seis fichas: sigue en **103 objetos**, **798 columnas** y **46 fichas de
-consumo**, y la lista de pendientes declarados no crece.
-
-**El quinto criterio —que `importe_origen` deja de venir doblado— lo verificó el
-reviewer con un oráculo independiente del build:** recompone el acumulado desde
-`stg.presupuesto ⨝ stg.fases ⨝ stg.partidas` (las tres intactas en F-042) y
-valida el propio oráculo reproduciendo al céntimo los 18 importes publicados de
-`explore_F-042.md`. Resultado: **17.289 celdas cruzadas, desvío máximo 0,00 €**;
-cambian **35 celdas de 7 obras**, exactamente la línea base honesta, por
-**30.424.662,34 €** retirados, y fuera de ellas **no se mueve ninguna otra
-celda**. Los casos que decidían, medidos en la base y no en un fixture: **0606
-PUY DU FOU** conserva la fase 14 y cambia **0,00 €**; **0462 RETAMAR**, cuyo mes
-en conflicto era el ÚLTIMO de la obra, publica ya **197.654,80 €** de coste donde
-publicaba 395.309,32; y la joroba de la 0246 desaparece.
-
----
-
-## LO QUE F-042 DEJA ABIERTO (nada bloquea, todo está fichado o anotado)
-
-1. **F-051 · nueva, prioridad 3, rigor crítico.** `nombre_mes` de las filas
-   reales trae **la descripción del cierre** en vez del mes, y eso rompe la
-   clave de `cierre.v_pbi_planif_vs_real`. Ver la sección de abajo.
-2. **El diccionario publicado dice 30.425.881,56 € y lo retirado son
-   30.424.662,34.** Celdas (35) y obras (7) son exactas; ese importe describe la
-   regla **exploratoria**, no la implantada. Una línea a corregir en el próximo
-   `publicar-diccionario`. **Sin fichar todavía.**
-3. **F-052 · nueva, prioridad 2, rigor crítico.** La observación lateral de la
-   3ª pasada —«1.152 filas de la obra 0599 no llegan al fact»— **resultó ser dos
-   órdenes de magnitud mayor** al medirla: son **104.737 filas** de
-   `stg.presupuesto` en 6 obras, y **la 0599 TANATORIO MAJADAHONDA se ha caído
-   del datamart casi entera** (104.366 de sus 108.790 filas, el 96 %). Ver la
-   sección de abajo.
-4. **`mart.v_master_vigente_anual` no se puede comprobar.** `check-unicidad`
-   agota **300 s** sin dar veredicto, así que su clave `(obra_id, anio,
-   ambito_id)` es hoy un «no lo sabemos» **permanente**, no un OK. Ninguna otra
-   de las 46 de la superficie de consumo se queda sin medir con ese timeout.
-
----
-
-## F-051 · `pending` — el mes que enseña Power BI no es el mes de la fila
-
-Descubierto el 2026-08-30 por `check-unicidad` sobre la base recién
-reconstruida. **No lo introducen F-042 ni F-047**: es preexistente y sale ahora
-porque F-047 hizo que la vista se construya cada noche en vez de destruirse, y
-por eso entra por primera vez en el alcance del check.
-
-**El síntoma:** `cierre.v_pbi_planif_vs_real` no cumple su clave —**204
-combinaciones repetidas, 472 filas**, siempre en el renglón **BENEFICIO** y hasta
-cuatro filas por combinación—. Quien sume ese renglón ahí recibe hasta el
-cuádruple.
-
-**La causa, localizada en el código:** en `mart/02_build_fact.sql`, las ramas
-**COSTE REAL (línea 218, ámbito 3)** y **VENTA REAL (línea 248, ámbito 7)**
-rellenan `nombre_mes` con **`pm.version_descripcion`** —el texto que alguien
-tecleó al cerrar en Sigrid— en vez de derivarlo de `anio_mes`, que es lo que sí
-hacen las dos ramas planificadas (líneas 275 y 305). Y como el CTE `beneficio`
-de la vista une `producc` con `total_costes` **solo por `(obra_id, anio_mes)`**
-mientras ambos agrupan incluyendo `nombre_mes`, cada etiqueta distinta multiplica
-las filas en producto cartesiano.
-
-**El alcance, medido en la base en solo lectura:**
-
-| Tabla | Filas REAL | Con `nombre_mes` que no es su mes | PLANIFICADO |
-|---|---|---|---|
-| `mart.fact_seguimiento_mensual` | 3.332.312 | **566.504 (17,0 %)** | **0** de 1.965.029 |
-| `mart.fact_seguimiento_categoria` | 17.289 | **3.226 (18,7 %)** | **0** de 7.395 |
-
-**36 pares (obra, mes)** tienen más de una etiqueta distinta, y esos 36 son los
-que producen el fan-out. Ejemplos reales: la obra **0571** tiene 2020-05-01
-etiquetado a la vez «Mayo 2020» y «Agosto 2020»; 186 filas de 2024 en adelante
-dicen «Diciembre 2025»; 61 filas de jun-2010 dicen «DICIEMBRE 2010», en
-mayúsculas, porque es texto libre.
-
-Comparte raíz de negocio con el **patrón 2 de F-050** (la fase abarca varios
-meses y Sigrid la archiva en el de arranque), pero **el arreglo no depende de esa
-investigación**: aquí la decisión es de qué columna se deriva `nombre_mes`.
-
----
-
-## F-052 · `pending` — una obra entera que el datamart no ve
-
-Medido el **2026-08-31** contra la base, en solo lectura, al ir a fichar la
-observación lateral del reviewer. **La observación se quedaba muy corta.**
-
-| | Filas |
-|---|---|
-| `stg.presupuesto` con `partida_id` **sin ficha** en `stg.partidas` | **104.737** en 6 obras y 1.215 partidas |
-| De la 0599 · `stg.presupuesto` sin ficha | **104.366** de 108.790 (**96 %**) |
-| De la 0599 · `stg.plan_mensual` → `mart.fact_seguimiento_mensual` | 197.846 → **3.150** |
-| Comparación: 0613 RICHMOND PARK, de tamaño parecido | 217.230 → **62.568** |
-
-**El dato no se pierde en la ingesta, lo pierde nuestro ETL.** Las 1.215
-partidas huérfanas están **las 1.215** en `raw.obrparpar`, todas con `cod` no
-nulo y ninguna con `padide = 0`: Sigrid las tiene y la ingesta las trae.
-
-**Causa probable, a confirmar:** `stg/04_partidas.sql` construye `stg.partidas`
-con un recorrido **recursivo** que arranca en las raíces (`COALESCE(padide,0)=0`,
-línea 56) y baja por `padide` (línea 76). Una partida cuya cadena de ancestros no
-llegue a una raíz queda fuera del árbol, y entonces el **`INNER JOIN`** del build
-del fact la borra del datamart **sin decir nada**.
-
-**Lo que lo hace grave no es el importe, es el silencio.** Una obra que no está
-no produce un número raro: produce respuestas como si casi no existiera. Y
-ninguna comprobación de hoy lo caza —`check-unicidad` mira claves,
-`check-cierres` mira la regla de F-042, `check-diccionario` mira el catálogo—:
-**nadie mira que lo que entra en `stg` salga en `mart`**.
-
----
-
-## F-047 · CERRADA el 2026-08-28 (absorbió F-044)
-
-La nocturna no dejaba de crear `cierre.v_pbi_planif_vs_real`, **la destruía**
-(`mart/03_agg_categoria.sql` dropea con `CASCADE` la tabla de la que cuelga).
-Detalle en `progress/explore_F-047.md`, `impl_F-047.md` y `review_F-047.md`.
-
-**La lección que vale para cualquier feature futura: el repositorio en verde no
-es producción.** El despliegue llevaba congelado desde el 18 de agosto, diez
-noches terminando `Succeeded` con código de hace diez días.
-
-**F-044**, que absorbió, quedó cerrada el 2026-08-30 con las dos mediciones que
-faltaban: la nocturna completa tarda **3 h 45** y termina a las 05:45 UTC (07:45
-locales), aceptado por el humano; y el pico de disco fue **89,25 %** sobre los 32
-GB de entonces —a 5,75 puntos del bloqueo por solo lectura—, lo que motivó la
-ampliación a 64 GB del 29 por la tarde. Con 64 GB ese mismo pico sería 44,6 %.
-
-### Lo que sigue abierto de aquella tanda
-
-- **F-041**: el `__pycache__` opera también en serie, y es bidireccional.
-- **F-049**: `mutacion.py` deja el sello `PENDIENTE` puesto tras resolverse.
-- **F-048**: el guardián de secretos decide por el primer carácter del valor.
-- **F-012**: siete reglas de firewall de puestos sueltos acumuladas.
-
----
-
-## LO SIGUIENTE
-
-**Ninguna feature `in_progress`.** El backlog tiene 31 abiertas; por prioridad,
-las de nivel 2 son **F-036** (clasificación por oficio), **F-041** (la campaña de
-mutación miente) y **F-045** (retenciones sin obra), y en el 3 entra ya
-**F-051**.
-
-### La cola de trabajo, fijada por el humano el 2026-08-31
-
-**F-052 → F-053 → F-045 → F-051 → F-050**, con las prioridades 1 a 5 puestas en
-`features.json` y la razón anotada en cada ficha. Salió de preguntarse qué falta
-para que **negocio pueda usar el datamart a través del MCP**; **F-053 se insertó
-en el 2 el 2026-08-31**, al aparecer en la exploración de F-052.
-
-1. **F-052** — una obra que no está en el datamart no produce un número raro,
-   produce respuestas como si casi no existiera. No hay nada que chirríe, así
-   que envenena la confianza en todo lo demás.
-2. **F-053** — la hermana de F-052: otras tres obras invisibles (0517, 0252,
-   0720) por una causa distinta, el desempate `rn = 1` de `stg/03_obras.sql:125`
-   que elige la ficha vacía. ~10,65 M€ de coste y 10,94 M€ de venta. **Pero
-   primero hay que analizar si de verdad es un error**: la ficha llena puede ser
-   una versión jubilada a propósito, y publicarla sería resucitar datos retirados
-   o doblarlos. Es resultado válido cerrarla sin tocar código. **No se mezcla con
-   F-052**: la verificación de las dos es la misma huella antes/después, y tocar
-   dos causas a la vez impide saber cuál movió qué.
-3. **F-045** — el caso de uso 3 del humano, las retenciones de los proveedores
-   de una obra, hoy **no tiene respuesta**: `retenciones.movimientos.obra_id` no
-   une con `maestro.obras`, 0 de 261 valores casan.
-4. **F-051** — con el diagnóstico ya hecho y medido.
-5. **F-050** — los meses que faltan, que es la raíz de negocio compartida.
-
-**Lo demás espera**, incluidas las de prioridad 2 que había antes (F-036, F-041).
-
-### Lo que no es una feature y decide el humano
-
-Antes de dar el conector del MCP a la primera persona de negocio hay dos cosas
-que no se resuelven con código: si se compra **Entra ID P1** —sin él entra
-cualquier cuenta del tenant, y eso se aceptó por escrito cuando detrás había un
-`pong`, no el seguimiento económico real— y si se encienden los **`REVOKE` de
-F-034**, sabiendo que hacerlo sin verificar antes qué lee Power BI le rompe los
-informes. El rol `mcp_sigrid_dm_ro` lo comparten hoy el MCP y Power BI, y ve
-`raw` y `stg`.
-
-Queda **una** cosa sin fichar, a propósito: la línea del diccionario que dice
-30.425.881,56 € cuando lo retirado son 30.424.662,34. Es una línea de YAML y se
-corrige **dentro de F-051**, que ya toca el diccionario y obliga a republicar;
-una feature para una línea es papeleo por papeleo.
+| 56 | 25 | **31** |
+
+Las 31: `apa`, `apu`, `asi`, `auxefp`, `auxobrtca`, `auxpag`, `auxpronat`,
+`com`, `comlin`, `comprv`, `conact`, `conest`, `confir`, `ctrrec`, `cua`,
+`dcarec`, `dcfprodes`, `dcfrec`, `dco`, `dcopro`, `dcorec`, `deffir`, `dnc`,
+`dncpro`, `emp`, `hmo`, `hmores`, `obrprv`, `prvcer`, `prvobrpag`, `res`. Se
+ingieren cada noche, ocupan disco y **la IA no las ve**, porque el MCP solo lee
+las capas procesadas.
+
+**EL PLAN, EN DOS FEATURES**, aprobado por el humano:
+
+* **F-072 (`done`, prioridad 4)** — entender. Catalogo tabla por tabla: que
+  es, grano, volumen, **% informado columna a columna**, por donde se une, y
+  que preguntas de negocio permitiria responder que hoy no se pueden
+  responder. **Solo lectura de principio a fin.** Cuatro bloques tematicos,
+  un informe `progress/explore_F-072_*.md` por bloque, mas un catalogo que los
+  une y los enruta a las features de construccion.
+* **F-073 (pendiente, prioridad 5)** — construir. **Su contenido lo fija
+  F-072.** Lo unico que ya se sabe que entra es la direccion de la obra en la
+  capa de consumo y las marcas de obra con/sin datos. Buena parte del resto
+  caera en features de dominio que YA existen en el backlog: F-055, F-056,
+  F-057, F-058, F-067, F-038, F-037 y F-040.
+
+**EL TOPE DE LA PASARELA ESTABA MAL EN MI CABEZA, y lo corrigio el humano.**
+`azure-apps/sigrid_api.md` §4.1: la instancia `dev` tiene `MAX_ALLOWED_ROWS` en
+**500.000**, no en 1.000 (ese es el tope por codigo, que dev sobreescribe), y
+`MAX_QUERY_TIMEOUT_SECONDS` en **230**. Los 230 s **si** son un techo duro: es
+el balanceador de Azure y subir el ajuste no da mas tiempo. El cliente es
+`SigridApiClient.leer_sql(sql, parameters, max_rows)`.
+
+**HALLAZGOS DE F-071 QUE SOBREVIVEN** (medidos, no supuestos): de los ocho
+campos de direccion de `raw.obr`, **tres no son la direccion de la obra**
+—`diride` es el **director de obra**, `perdir` su **persona de contacto** y
+`entdiride` la direccion **del cliente**—; y los dos ejes de agrupacion que
+faltaban, **municipio** y **provincia**, viven en `raw.auxmun` y `raw.auxpro`
+via `obr.munide` y `obr.proide`. Lo demas, en
+`specs/F-071-obras-sin-datos/design.md` §1.
+
+## F-073 · SPEC ESCRITA (spec-author, 2026-09-10)
+
+`specs/F-073-tablas-nuevas-y-enriquecimiento/` con los tres ficheros:
+requirements 114/150, design 201/250, tasks 21 tareas.
+
+**LA FRONTERA QUE TRAZA, y es lo que el humano tiene que aprobar.** Regla:
+*F-073 publica DIMENSIONES y el MAESTRO DE OBRA; la feature de dominio publica
+su HECHO y hace el CABLEADO*. Se queda con cuatro objetos —`maestro.centros_coste`
+(el puente centro de coste -> obra), `maestro.obras` enriquecida,
+`maestro.estados_documento` (`conest`, 193 filas) y `compras.formas_pago`
+(`auxpag` + `auxefp`)— y deja fuera todo lo demas del censo. No duplica ninguna
+ficha: el cableado de `conest` y `auxpag` a `compras.contratos` y
+`compras.facturas` es literalmente el criterio 1 de `acceptance` de **F-067**.
+
+**MEDIDO HOY, 2026-09-10, por el MCP y en solo lectura** (justifica las marcas):
+sobre las 921 fichas de `maestro.obras`, **728 (79,0 %) tienen filas en
+`stg.presupuesto`**, **368 (39,9 %) en `stg.plan_mensual`**, **349 (37,9 %) en
+`mart.fact_seguimiento_mensual`** y **193 (21,0 %) no tienen ninguna de las dos**.
+La diferencia plan/hecho son **19 obras, y ninguna al reves**.
+
+**DECISIONES ABIERTAS QUE NECESITAN AL HUMANO:**
+
+1. **La frontera con F-067** (arriba). Si el humano prefiere que las dos
+   dimensiones vayan enteras a F-067, F-073 se queda solo con el puente y la
+   obra, y hay que quitar R19-R23 y las tareas T5, T6, T9, T10.
+2. **Las marcas leen de `stg`, no de `mart`** (DA-1 del diseño). `mart/01_ddl.sql`
+   dropea `mart.fact_seguimiento_mensual` con CASCADE, asi que una vista de
+   `maestro` colgada de ahi la destruye la nocturna siguiente —el incidente
+   literal de F-047—. Coste declarado: `tiene_seguimiento` es superconjunto del
+   hecho en 19 obras, y la ficha lo dice.
+3. **`build_maestros` pasa a depender de `build_stg`** (DA-3). Consecuencia real:
+   si `build_stg` falla, el orquestador marca `build_maestros` como SKIPPED, cosa
+   que hoy no pasa. Es inocuo porque los cuatro objetos de `maestro` son vistas,
+   pero cambia la conducta de la noche y conviene que este aprobado.
+
+**LO QUE LA SPEC REFORMULA A PROPOSITO**: el criterio 2 de la `acceptance` de
+F-073 exige que «donde esta la obra X» se responda sin explicar nada. Con
+294/921 municipios y 305/921 direcciones informadas, eso no lo da el origen. La
+spec lo convierte en R11 y R12: se publica igual, la ficha **declara el
+porcentaje informado** y «no consta» es la respuesta correcta para dos de cada
+tres obras. Ningun criterio exige cobertura minima.
+
+## F-081 · IMPLEMENTACION ENTREGADA (2026-09-11) · las dos deudas del review de F-073
+
+Rama `feature/F-081-deudas-review-F-073`, rigor `estandar`, `sdd=false`: el
+contrato son los siete criterios `acceptance` de la ficha. Informe completo:
+`progress/impl_F-081.md`.
+
+**QUE CAMBIA**: `config/tables_sigrid.yaml` deja de mentir sobre que columna da
+el nombre (`auxefp` -> `res`, y la entrada de `cen`, que atribuia a la tabla una
+columna `res` **que no existe en Sigrid**); un test nuevo lo impide en el
+futuro comparando el yaml con el SQL que publica el dato; y dos tests nuevos
+cierran los dos huecos de mutacion que dejo F-073. **Ni `ventana_sql.py` ni
+`build_stg_step.py` se tocan**: un agujero de test se tapa con tests.
+
+**NO HAY VERIFICACIONES MANUAL.** Nada de lo cambiado altera lo que corre de
+noche: el yaml solo cambia comentarios, el SQL de formas de pago solo su
+cabecera, y la ficha del diccionario se republica sola con la version 20.
+
+### CONSULTA AL HUMANO (no bloquea, pero conviene mirarla)
+
+**La campana de mutacion de F-073 dio un SUPERVIVIENTE FALSO.** Su
+superviviente numero 1 -`build_stg_step.py:732`, `and` -> `or`- **no sobrevive**:
+medido el 2026-09-11 contra la suite entera y con los argumentos del propio
+arnes (`-x -q --tb=no -p no:cacheprovider`), muere en 157,7 s a manos de
+`test_f025_r10_las_sobrantes_solo_se_miran_en_la_reconstruccion_completa`, un
+test que ya existia **byte a byte** en el commit que midio la campana
+(`b6eda79`) y que no ha cambiado desde entonces. El informe de F-073 declara
+`Timeouts: 0` y `base rota: 0`, asi que no fue ninguna de las dos cosas.
+
+Importa porque un superviviente falso **manda a alguien a escribir tests para
+un agujero que no existe**, y porque la confianza en el resto de veredictos de
+la campana depende de saber por que paso. Auditar `harness/mutacion.py` no es
+de esta feature -y el arnes es generico: la correccion iria a `arnes-base`-,
+asi que queda como decision del humano.
+
+## DECISION DEL HUMANO (2026-09-11): EL DESPLIEGUE ESPERA A F-080
+
+**No se despliega F-073 + F-081 por separado.** El humano decidio esperar a que
+F-080 cierre y **hacer un solo despliegue con las tres**. Se le expuso el
+argumento contrario —que F-080 es el unico de los tres cambios con riesgo sobre
+la ventana nocturna, y que desplegar junto impide atribuir una noche larga— y
+aun asi prefiere tocar produccion una sola vez. **No lo repropongas.**
+
+**Que implica, y conviene tenerlo presente:**
+
+* **Nada de F-073 ni de F-081 existe hoy en la base.** El MCP no ve
+  `maestro.centros_coste`, `maestro.estados_documento`, `compras.formas_pago` ni
+  las once columnas nuevas de `maestro.obras`. Las verificaciones MANUAL de las
+  dos features **siguen pendientes** y no se pueden ejecutar hasta el
+  despliegue.
+* **La nocturna sigue corriendo la imagen vieja cada noche**, que es lo
+  correcto: no rompe nada y republica el diccionario que esa imagen lleva
+  dentro.
+* **Cuando se despliegue, el diccionario ira a la version 21** (19 de F-073, 20
+  de F-081, 21 de F-080) y se publica **una sola vez**.
+* **El despliegue se simplifica**: con F-080 cerrada, el arbol vuelve a estar
+  limpio y **ya no hace falta el `git worktree`** que se necesitaba para no
+  empaquetar el trabajo a medias. Se construye desde el directorio de siempre.
+
+**La guia de despliegue, en cuatro comandos** (`infra/README.md` §«Despliegue
+habitual»), y **por este orden**:
+
+```powershell
+powershell -NoProfile -File infra\05_check_prereqs.ps1   # solo lectura; si falla, PARA
+powershell -NoProfile -File infra\70_build_image.ps1     # construye en Azure, tag rAAAAMMDD-hhmm
+powershell -NoProfile -File infra\85_update_job.ps1      # el job pasa a usarla
+az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev \
+  --query "properties.template.containers[0].image" -o tsv
+```
+
+**El cuarto comando no es opcional**: la nocturna llego a correr una imagen de
+diez dias antes sin que nadie lo notara. El tag que devuelva tiene que ser el
+que imprimio el segundo.
+
+Despues de la primera nocturna con la imagen nueva van, en este orden,
+`check-raw-recuentos`, `check-declarados`, `check-diccionario` y, por ultimo,
+`publicar-diccionario`, que es **la unica escritura** y la autoriza el humano.
+
+## F-080 · IMPLEMENTACION ENTREGADA (2026-09-14) · VERIFICACIONES MANUAL
+
+Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, rigor `estandar`,
+`sdd=true`. Informe: `progress/impl_F-080.md`. Las 29 tareas de `tasks.md`
+hechas, con un commit cada una; T0 bis queda abierta a proposito porque es
+MANUAL del humano. **`bash harness/init.sh` en verde, exit 0**: 4.677 tests
+pasan, 179 saltados, 520,6 s con medicion de cobertura, y PUERTA COBERTURA
+[OK] 93,9 % (825/879).
+
+**EL CIERRE (T24-T29) DESTAPO SEIS COSAS, y conviene saberlas:** el portero
+corre `pytest -x`, asi que el primer fallo escondia a otros cuatro. Dos eran de
+F-080 --las fichas de `pagfor`/`pagtex` prometian un NULL que el SQL nunca
+producia (arreglado con `NULLIF(x, '')`, medido: 1 NULL y 7 vacios de 165.802
+filas de `dcf`), y el grano de `v_control_forma_pago` no nombraba
+`contrato_id`-- y tres eran recuentos viejos: `TOTAL_TABLAS` de F-066 en 65
+cuando son 68, el punto 3 de `R-SIGRID-CON` sin `auxban.res` ni `auxnap.res`, y
+el inventario de `design_detalle.md` de F-006 en 142 objetos cuando son 150. La
+sexta: `compras.documento_comentarios` habia dejado de ser LEGIBLE para el
+guardian de proyecciones de F-006 y por tanto de estar vigilado; las ramas del
+sello pasan a un CTE y no cambia ni una columna publicada.
+
+**LA MUTACION NECESITO DOS CAMPANAS.** La canonica
+(`progress/mutacion_F-080.md`) no juzga a F-080: su alcance son 3.789 lineas
+calculadas contra un `dev` con 242 commits de retraso, solo 15 de sus 303
+mutantes caen en `texto_comentarios.py` y el muestreo de 20 no cogio ninguno;
+sus 6 supervivientes son de F-025 (dos, los mismos que ya senalo F-073) y van
+analizados igual. La dirigida a los dos modulos de F-080 sin muestreo
+(`progress/mutacion_F-080_modulos.md`) evalua los 27 y deja **1 superviviente,
+que era un hueco real: una fecha imposible dentro del sello (`31/02/2026`)
+estaba probada en el SQL y NO en el oraculo**. Tapado con
+`test_f080_r25_una_fecha_que_no_existe_no_cuenta_como_sello`, y comprobado
+mutante en mano que lo mata.
+
+**DEUDA DECLARADA PARA EL DESPLIEGUE**: `azure-apps/datamart_seg_anual.md` dice
+que el ETL ingiere **56 tablas** de Sigrid. Ya estaba viejo antes de F-080
+(F-074 lo dejo en 65 sin tocarlo) y F-080 lo deja en **68**. Se actualiza al
+desplegar, que es cuando la cifra se vuelve cierta en Azure.
+
+**QUE SE PUBLICA**: `compras.vencimientos` (los 195.510 efectos de pago de las
+facturas de compra), `compras.v_facturas_pago` (forma de pago + resumen de
+efectos, una fila por factura), `compras.v_control_forma_pago` (factura contra
+contrato, una fila por par), `compras.documento_texto` (el memo integro) y
+`compras.documento_comentarios` (el memo partido, un comentario por fila). En
+`raw` entran tres tablas nuevas (`auxnap`, `auxban`, `rpa`) y **`con.tex`**.
+
+**LAS TRES COSAS QUE HAY QUE SABER Y NO SE VEN EN EL DIFF:**
+
+* **Sumar los importes de todos los efectos de una factura los cuenta hasta
+  tres veces.** El efecto que se dividio sigue en la tabla ANULADO junto a sus
+  hijos, y el estado no lo distingue. Se filtra con `efecto_anulado = false`.
+  Sobre `FR25/04222`: 92.478,49 filtrando, **288.123,92 sin filtrar**.
+* **`fecha_real` vacia no significa «vivo»** (61,8 % de los efectos de factura),
+  y **`orden` 1 de `documento_comentarios` es el comentario MAS RECIENTE**.
+* **No se publica el enlace del efecto hijo a su efecto de origen**: `pag.padide`
+  vale 0 en los 255.148 efectos. Igual que `con.serie`, de ahi que la serie se
+  derive con `compras.fn_serie`.
+
+### VERIFICACIONES MANUAL (humano) PENDIENTES DE F-080
+
+Ningun agente las ejecuta: todas menos la 0 necesitan que el build haya corrido
+contra la base, la 1 es una ESCRITURA y publicar el diccionario tambien.
+**En este orden**, y de la 2 en adelante nada significa nada sin la 1.
+
+0. **T0 bis · que la dimension de F-073 esta construida** (R20). Si no lo esta,
+   todo lo que toque `v_facturas_pago` espera a la primera nocturna con la
+   imagen nueva; el desarrollo no espera.
+
+       SELECT count(*) FROM compras.formas_pago;   -- esperado: 69
+
+1. **T7 · Medicion B del coste de ventana** (R4b). **Es una ESCRITURA.** Trae
+   `con.tex` por primera vez:
+
+       python main.py ingest --table con --full
+       python main.py timings --last 10
+
+   Y se compara la duracion de `ingest_raw.con` con las noches anteriores. El
+   contraste con el presupuesto de referencia de 4 h esta en
+   `progress/impl_F-080.md` §T8: con la medicion A delante, la ventana pasa de
+   3 h 25 min a **~3 h 26 min**, con unos 34 min de margen. **No es una puerta**:
+   si la medicion B lo desmintiera, se avisa por escrito y la feature sigue.
+
+2. **Construir los objetos nuevos.** Sin esto no existen y todo lo de abajo mide
+   el mundo de ayer:
+
+       python main.py build-compras
+
+3. **Los recuentos de los cinco objetos y de las tres tablas de `raw`.** Solo
+   lectura. Los esperados estan medidos contra Sigrid el 2026-09-11 (T1, T2 y T4
+   del informe), asi que una diferencia pequeña es el sistema vivo y una grande
+   es un fallo:
+
+       SELECT count(*) AS efectos,
+              count(DISTINCT factura_id) AS facturas
+       FROM compras.vencimientos;
+       -- esperado: ~195.510 efectos / ~165.737 facturas
+
+       SELECT count(*) FROM compras.v_facturas_pago;        -- esperado: ~165.759
+       SELECT count(*) FROM compras.v_control_forma_pago;   -- ~80.400 pares
+       SELECT count(*) FROM compras.documento_texto;        -- esperado: ~110.141
+       SELECT count(*) FROM compras.documento_comentarios;  -- > documento_texto
+
+       SELECT count(*) FROM raw.auxnap;   -- esperado: 3
+       SELECT count(*) FROM raw.auxban;   -- esperado: 1.690
+       SELECT count(*) FROM raw.rpa;      -- esperado: 3.919
+
+   `v_control_forma_pago` no tiene esperado medido: las facturas CON contrato son
+   ~80.435 (165.759 menos las 85.324 sin contrato) y el grano es el par, asi que
+   la cifra tiene que ser **igual o algo mayor** que esa. Si es mucho mayor, el
+   `DISTINCT` del enlace no esta haciendo su trabajo.
+
+4. **El reparto de `estado_pago` contra los 10 estados** (R10). Lo medido el
+   2026-09-11 sobre los efectos de factura: 10 Pagado 106.262 · 14 Agrupados
+   55.476 · 2 Aprobado 20.848 · 1 Pendiente 10.436 · 5 En cartera 2.319 · 3
+   Emitido 169. Si sale algun `estado_pago` a NULL, hay un estado fuera de
+   catalogo y hay que mirarlo:
+
+       SELECT estado_pago_codigo, estado_pago, count(*) AS efectos
+       FROM compras.vencimientos
+       GROUP BY 1, 2
+       ORDER BY efectos DESC;
+
+5. **El recuento de anulados** (R39, R40). Es la cifra de la que depende que los
+   importes agregados sean ciertos:
+
+       SELECT count(*) AS efectos,
+              count(*) FILTER (WHERE efecto_anulado) AS anulados,
+              round(100.0 * count(*) FILTER (WHERE efecto_anulado) / count(*), 1)
+                  AS pct
+       FROM compras.vencimientos;
+       -- esperado: ~195.510 / ~76.215 / ~39,0
+
+   Y la comprobacion que lo cierra, sobre la factura de la captura del correo:
+
+       SELECT codigo_efecto, estado_pago, efecto_anulado, importe
+       FROM compras.vencimientos
+       WHERE codigo_factura = 'FR25/04222'
+       ORDER BY codigo_efecto;
+       -- esperado: 8 efectos, 3 con efecto_anulado cierto (los tres «Aprobado»),
+       -- y los cinco vivos sumando 92.478,49
+
+       SELECT num_efectos, num_efectos_anulados, importe_efectos_vivos
+       FROM compras.v_facturas_pago
+       WHERE codigo_factura = 'FR25/04222';
+       -- esperado: 8 / 3 / 92.478,49  <-- el numero de la cabecera de Sigrid
+
+6. **Efectos en remesa** (R41), y que el codigo de la remesa se resuelve:
+
+       SELECT count(*) FILTER (WHERE remesa_id IS NOT NULL)      AS en_remesa,
+              count(*) FILTER (WHERE codigo_remesa IS NOT NULL)  AS con_codigo
+       FROM compras.vencimientos;
+       -- esperado: ~40.090 / ~40.090 (los dos iguales: si el segundo es 0, el
+       -- JOIN a raw.con de la remesa no esta resolviendo)
+
+7. **LA PRUEBA RECONSTRUCTIVA DEL MEMO** (R26). Es la que hace innecesario
+   fiarse del parseo: si el memo se reconstruye, no se ha tirado nada. Primero
+   sobre una muestra:
+
+       SELECT t.documento_id, t.codigo_documento, t.num_comentarios,
+              t.texto = string_agg(c.bloque, E'\n --------------------------------- \n'
+                                   ORDER BY c.orden) AS reconstruye
+       FROM compras.documento_texto t
+       JOIN compras.documento_comentarios c ON c.documento_id = t.documento_id
+       GROUP BY t.documento_id, t.codigo_documento, t.num_comentarios, t.texto
+       LIMIT 20;
+
+   Y despues sobre el total:
+
+       SELECT count(*) AS documentos,
+              count(*) FILTER (WHERE NOT reconstruye) AS no_reconstruyen
+       FROM (
+           SELECT t.documento_id,
+                  t.texto = string_agg(c.bloque,
+                      E'\n --------------------------------- \n' ORDER BY c.orden)
+                      AS reconstruye
+           FROM compras.documento_texto t
+           JOIN compras.documento_comentarios c ON c.documento_id = t.documento_id
+           GROUP BY t.documento_id, t.texto
+       ) x;
+
+   **`no_reconstruyen` NO tiene que ser 0 necesariamente**: el separador se
+   reconoce con tolerancia (tres guiones o mas) y ahi arriba se recompone con el
+   canonico de 33, asi que un memo con otra longitud de separador sale como que
+   no reconstruye sin que se haya perdido nada. Lo que **si** tiene que ser 0 es
+   el invariante fuerte, que no depende del separador:
+
+       SELECT count(*) FROM (
+           SELECT t.documento_id
+           FROM compras.documento_texto t
+           JOIN compras.documento_comentarios c ON c.documento_id = t.documento_id
+           GROUP BY t.documento_id, t.texto
+           HAVING regexp_replace(t.texto, '\r?\n *-{3,} *\r?\n', '', 'g')
+               <> string_agg(c.bloque, '' ORDER BY c.orden)
+       ) x;
+       -- esperado: 0. Si no lo es, los documentos que salgan tienen un bloque
+       -- en blanco (que se tira a proposito) y hay que mirarlos uno a uno antes
+       -- de dar el parseo por bueno.
+
+   Y de paso, cuantos bloques no casan con el sello, que es la cifra que la ficha
+   promete declarar cuando se mida:
+
+       SELECT count(*) FILTER (WHERE NOT sello_reconocido) AS sin_sello,
+              count(*) AS bloques
+       FROM compras.documento_comentarios;
+
+8. **Las tres puertas del diccionario y la publicacion.** `check-unicidad` lee
+   las `clave_negocio` de las fichas nuevas, asi que comprueba de verdad el grano
+   de los cinco objetos:
+
+       python main.py check-unicidad
+       python main.py check-declarados
+       python main.py check-diccionario
+
+   Las tres con **codigo 0**, y `check-diccionario` tiene que ver **150 fichas y
+   150 objetos**, biyeccion exacta. Y despues, la unica escritura:
+
+       python main.py publicar-diccionario
+
+   **Version 21.** Lo publicado hoy es la 18.
+
+### T27 · LA BATERIA DE TRES PREGUNTAS AL MCP (MANUAL, humano) · R34
+
+Es la prueba de aceptacion de verdad de esta feature: si el diccionario esta
+bien escrito, el MCP contesta **sin que se le explique nada en el prompt**. Se
+le pregunta tal cual, en lenguaje natural, **sin nombrar tablas ni columnas y
+sin darle pistas**, y se pegan sus respuestas aqui debajo.
+
+**Antes de preguntar**: el MCP lee el diccionario publicado en `_meta`, no el
+del arbol, asi que esto no significa nada hasta que `publicar-diccionario`
+(verificacion 8 de arriba) haya corrido. Con la version 18 publicada, el MCP no
+sabe que estos objetos existen.
+
+1. **«Cuando vence la factura FR25/04222 y esta pagada?»**
+   Lo que tiene que hacer bien: ir a `compras.vencimientos` o a
+   `compras.v_facturas_pago`, y **no sumar los ocho efectos**: si contesta un
+   importe de 288.123,92 en vez de 92.478,49, la ficha de la anulacion no ha
+   servido de nada y hay que reescribirla. Tambien es correcto que avise de que
+   tres efectos estan anulados.
+
+2. **«Que dice el texto de la ultima factura que tenga una retencion?»**
+   Lo que tiene que hacer bien: ir a `compras.documento_texto` o a
+   `compras.documento_comentarios` --y NO a `raw.dcf.tex`, que esta informado en
+   el 0,3 %--, y si cita «el ultimo comentario», que sea el de `orden = 1` y no
+   el del `orden` mas alto.
+
+3. **«Que facturas no cuadran con la forma de pago de su contrato?»**
+   Lo que tiene que hacer bien: usar `compras.v_control_forma_pago`, **decir que
+   la mitad de las facturas de compra no cuelgan de ningun contrato** y por lo
+   tanto no estan en la comparacion, y no confundir «falta el dato en un lado»
+   con «no coinciden» (para eso esta `forma_pago_comparable`).
+
+**Si el MCP falla una, el problema es la ficha, no la pregunta.** La respuesta
+se pega aqui con la fecha, y lo que haya que corregir del diccionario entra como
+deuda de F-080 antes de cerrarla.

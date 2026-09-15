@@ -57,8 +57,11 @@ def test_f005_r14_grants_solo_sobre_los_esquemas_configurados() -> None:
         assert f'"{interno}"' not in texto
 
     # Y ni una sola sentencia de escritura: esto es un rol de solo lectura.
+    # Desde F-068 el barrido mira solo lo que CONCEDE: `ALL PRIVILEGES` puede
+    # aparecer en un REVOKE, que es justo lo contrario de dar permisos.
+    concesiones = "\n".join(s for s in sentencias if not s.startswith("REVOKE"))
     for prohibido in ("INSERT", "UPDATE", "DELETE", "TRUNCATE", "ALL PRIVILEGES"):
-        assert prohibido not in texto
+        assert prohibido not in concesiones
 
     # El rol es siempre el destinatario, nunca aparece sin citar.
     assert all("mcp_sigrid_dm_ro" in s for s in sentencias)
@@ -228,12 +231,19 @@ class _ClienteFalso:
         return self.rol_existe
 
     def apply_readonly_grants(
-        self, readonly_role: str, owner_role: str, schemas: object
+        self,
+        readonly_role: str,
+        owner_role: str,
+        schemas: object,
+        excluded_tables: object = (),
     ) -> list[str]:
         esquemas = list(schemas)  # type: ignore[call-overload]
+        excluidas = list(excluded_tables)  # type: ignore[call-overload]
         self.llamadas.append("apply_readonly_grants")
         self.grants.append((readonly_role, owner_role, esquemas))
-        return build_readonly_grant_statements(readonly_role, owner_role, esquemas)
+        return build_readonly_grant_statements(
+            readonly_role, owner_role, esquemas, excluded_tables=excluidas
+        )
 
 
 def _settings_falso(**postgres: object) -> SimpleNamespace:
@@ -242,6 +252,9 @@ def _settings_falso(**postgres: object) -> SimpleNamespace:
         "readonly_role": "mcp_sigrid_dm_ro",
         "set_role": "sigrid_dm_etl",
         "consumption_schema_list": ["mart", "cierre"],
+        # F-068: el step lee la lista de tablas excluidas. Aquí va vacía a
+        # propósito: lo que fija esta batería es el camino sin exclusiones.
+        "excluded_table_list": [],
     }
     base.update(postgres)
     return SimpleNamespace(postgres=SimpleNamespace(**base))

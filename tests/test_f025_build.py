@@ -389,7 +389,7 @@ def censo_por_defecto() -> list[ObraCensada]:
 def settings_falsos(ventana_activa: bool = True, **extra: object) -> SimpleNamespace:
     postgres = {
         "tramo_max_filas": 1_000_000,
-        "disco_total_gb": 32,
+        "disco_total_gb": 64,
         "disco_limite_pct": 80.0,
         "ventana_activa": ventana_activa,
         "ventana_meses": 12,
@@ -411,12 +411,79 @@ def settings_falsos(ventana_activa: bool = True, **extra: object) -> SimpleNames
     )
 
 
-def ejecutar(pg: PgVentana, monkeypatch, **kwargs):
+#: Jueves. El día laborable de referencia de estos tests: **no** es el día de la
+#: reconstrucción completa (R25), así que la ventana decide obra a obra, que es
+#: lo que casi todos ellos quieren medir.
+JUEVES_LABORABLE = datetime(2026, 9, 3, 2, 0, 0)
+
+#: Domingo. El día en que R25 manda rehacerlo todo, diga lo que diga el censo.
+#: Lo ejercita `test_f025_r25_el_domingo_se_reconstruye_todo`.
+DOMINGO_DE_COMPLETA = datetime(2026, 9, 6, 2, 0, 0)
+
+
+def reloj_parado(momento: datetime) -> type[datetime]:
+    """Un `datetime` cuyo `utcnow()` devuelve siempre `momento`.
+
+    Subclase de `datetime` y no un doble suelto **a propósito**: el step usa
+    `datetime` para más cosas que la fecha del plan —marcas de tiempo en
+    `_meta`, restas para medir duraciones—, y con una subclase todo eso sigue
+    funcionando exactamente igual.
+    """
+
+    class DatetimeParado(datetime):
+        @classmethod
+        def utcnow(cls) -> datetime:  # noqa: D102
+            return momento
+
+    return DatetimeParado
+
+
+def congelar_fecha(monkeypatch, momento: datetime) -> None:
+    """Fija la fecha que ve el step.
+
+    **Sin esto, estos tests dependían del día real.** El step toma la fecha con
+    `datetime.utcnow()`, que es lo correcto en producción; pero los domingos R25
+    manda reconstrucción completa, y cinco de estos tests —escritos dando por
+    hecho un día laborable— fallaban un día de cada siete. Arreglado el
+    2026-09-06 fijando la fecha aquí, no cambiando el step.
+    """
     import etl_sigrid.application.steps.build_stg_step as modulo
 
+    monkeypatch.setattr(modulo, "datetime", reloj_parado(momento))
+
+
+def ejecutar(
+    pg: PgVentana, monkeypatch, *, ahora: datetime = JUEVES_LABORABLE, **kwargs
+):
+    import etl_sigrid.application.steps.build_stg_step as modulo
+
+    congelar_fecha(monkeypatch, ahora)
     monkeypatch.setattr(modulo, "build_postgres_client", lambda _s: pg)
     paso = BuildStgStep(settings_falsos(**kwargs), batch_id="20260903T020000Z-f025aa")
     return paso.run()
+
+
+# --- R25 · el domingo se rehace todo ----------------------------------------
+
+
+def test_f025_r25_el_domingo_se_reconstruye_todo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """**El día en que la ventana no decide.** El censo por defecto trae dos
+    obras congeladas (una CERRADA y una administrativa), pero el domingo R25
+    manda por encima de las tres reglas: las tres obras entran, ninguna se
+    congela, y el motivo que queda escrito en `_meta.obra_build` es `completa`.
+
+    Este test existe porque ese mismo comportamiento tumbaba cinco tests sin
+    querer: ahora se prueba a propósito y con la fecha puesta a mano."""
+    pg = PgVentana()
+    resultado = ejecutar(pg, monkeypatch, ahora=DOMINGO_DE_COMPLETA)
+
+    assert resultado.status is StepStatus.SUCCESS
+    assert resultado.metadata["obras_reconstruidas"] == 3
+    assert resultado.metadata["obras_congeladas"] == 0
+    assert pg.congeladas == []
+    assert {r["motivo"] for r in pg.construidas} == {"completa"}
 
 
 # --- R10, R13 · el TRUNCATE ha desaparecido ---------------------------------

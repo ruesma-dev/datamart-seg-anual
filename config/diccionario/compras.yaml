@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `compras`: el mundo DOCUMENTAL de la compra a proveedores.
 #
-# CUATRO COSAS QUE HAY QUE SABER ANTES DE CONSULTAR NADA DE AQUI:
+# CINCO COSAS QUE HAY QUE SABER ANTES DE CONSULTAR NADA DE AQUI:
 #
 # 1. **Todos los importes son SIN IVA.** El unico importe con IVA del datamart
 #    es `maestro.proveedores_obra.importe_contratado`, que es la suma del total
@@ -14,11 +14,17 @@
 #    (gastos generales, centros de personal) que el seguimiento excluye a
 #    proposito, y filas con `obra_id` nulo que son estructura y no se pueden
 #    perder al agregar.
-# 4. **NO SE REFRESCA DE NOCHE, y su fecha de build no es consultable.**
-#    `build-compras` ejecuta el SQL en linea sin registrar paso en
-#    `_meta.etl_runs`, asi que no aparece en `_meta.v_frescura` y la frescura de
-#    estos objetos sale a NULO. De un dato de aqui hay que advertir que la
-#    antiguedad se desconoce, en vez de callarlo.
+# 4. **SI SE REFRESCA DE NOCHE, desde F-047.** Esta nota decia lo contrario
+#    --que `build-compras` ejecutaba su SQL en linea sin registrar paso en
+#    `_meta.etl_runs` y que por eso la frescura de estos objetos salia a NULO--
+#    y dejo de ser cierto el 2026-08-28, cuando F-047 lo convirtio en step y lo
+#    metio en `run-all`. Todas las fichas de aqui declaran `refresco: nocturno`
+#    desde entonces; la cabecera se quedo con la frase vieja hasta F-080.
+# 5. **Los EFECTOS de pago traen su propia trampa, y es la mas cara del
+#    esquema**: sumar los importes de todos los efectos de una factura los
+#    cuenta hasta tres veces, porque el efecto que se dividio sigue en la tabla
+#    anulado junto a sus hijos. Se filtra con `vencimientos.efecto_anulado`, y la
+#    ficha de `compras.vencimientos` lo explica con las cifras medidas.
 #
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/compras/`.
@@ -1065,6 +1071,82 @@ objetos:
     relaciones: []
     ejemplos_preguntas: []
 
+  formas_pago:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El catalogo de formas de pago de Sigrid (`auxpag`), con su medio de pago
+      resuelto (`auxefp`): cheque, efectivo, pagare, transferencia, letra,
+      confirming, compensacion de saldos, tarjeta. Es la DIMENSION, no el uso:
+      dice que formas de pago existen y que significan, **no** con cual se pago
+      un documento concreto. Ese cableado al contrato es F-067 y a la factura,
+      F-080.
+    grano: >-
+      Una fila por forma de pago, o sea una por `forma_pago_id`: **69 el
+      2026-09-10**. No se filtra ninguna,
+      **tampoco las dadas de baja**: un documento antiguo puede apuntar a una
+      forma de pago que ya no se usa, y si se filtrara aqui ese documento
+      quedaria sin traducir.
+    clave_negocio: [forma_pago_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      forma_pago_id:
+        significado: >-
+          Identificador de la forma de pago en Sigrid (`auxpag.ide`). Es el
+          valor por el que apuntan los documentos que la usan.
+        agregacion: no_sumable
+      codigo:
+        significado: >-
+          Codigo de la forma de pago tal y como se ve en Sigrid
+          (`auxpag.cod`): `CFCH60`, `TR30`, `PAG90`.
+      nombre:
+        significado: >-
+          Nombre legible de la forma de pago (`auxpag.res`), que suele llevar
+          dentro el plazo en dias: "CONFIRMING CH 60 dias".
+      plazo_formula:
+        significado: >-
+          El plazo tal y como lo guarda Sigrid (`auxpag.formul`), **VERBATIM**.
+          **NO ES UN NUMERO DE DIAS**: es una formula, y `30 450R` es un valor
+          real del catalogo. La mayoria de las filas si trae solo un numero
+          ("60", "90"), y por eso es tan facil tratarla como cantidad y salir
+          con una cifra plausible y falsa. No se puede sumar, ni comparar, ni
+          ordenar como numero; si hace falta un plazo numerico, hay que decidir
+          por escrito que hacer con las que no lo son.
+      medio_pago_id:
+        significado: >-
+          Identificador del medio de pago en `raw.auxefp` (`auxpag.efeide`). El
+          0 de Sigrid se publica como NULL.
+        agregacion: no_sumable
+        nulo_significa: La forma de pago no tiene medio asociado.
+      medio_pago:
+        significado: >-
+          Nombre del medio de pago, resuelto desde `auxefp.res`: CHEQUE,
+          EFECTIVO, PAGARE, TRANSFERENCIA, LETRA, SOLO CONFIRMING, CONFIRMING /
+          PAGARE, COMPENSACION SALDOS, TARJETA CREDITO. Son **10 medios**.
+          Detalle util para quien vaya a tocar esto: hasta F-081,
+          `config/tables_sigrid.yaml` declaraba que el nombre del medio era
+          `auxefp.est`, y era **falso** —`est` viene vacio o nulo en las 10
+          filas, medido el 2026-09-10 y de nuevo el 2026-09-11—. El nombre
+          esta en `res`, y el yaml ya lo dice.
+        nulo_significa: >-
+          La forma de pago no tiene medio asociado, o el que tiene no existe en
+          el catalogo de medios.
+      clase_medio:
+        significado: >-
+          Clase del medio de pago (`auxefp.cla`): un entero con el que Sigrid
+          agrupa los medios (0 efectivo y compensacion, 1 transferencia, 2
+          recibo y tarjeta, 3 pagare y letra, 4 cheque, 5 confirming). Sirve
+          para agrupar por familia de medio sin depender del literal.
+        agregacion: no_sumable
+        nulo_significa: La forma de pago no tiene medio asociado.
+    relaciones: []
+    ejemplos_preguntas:
+      - Que formas de pago existen en Sigrid
+      - Que medio de pago tiene la forma de pago X
+      - Que formas de pago van por confirming
+
   fn_sigrid_date:
     tipo: funcion
     capa: operacion
@@ -1084,3 +1166,689 @@ objetos:
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
+
+  vencimientos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Los EFECTOS DE PAGO de la factura de compra: la pestana «Vencimientos» de
+      la factura, fila a fila. Cuando vence cada pago, de cuanto es, en que
+      estado esta, por que banco y cuenta sale, si esta en una remesa y si esta
+      anulado. **195.510 efectos sobre 165.737 facturas**, medido el 2026-09-11.
+
+      **LA TRAMPA QUE MAS CARA SALE: SUMAR LOS IMPORTES DE TODOS LOS EFECTOS DE
+      UNA FACTURA LA CUENTA HASTA TRES VECES.** El efecto nace partido en `_01`
+      (el pago) y `_02` (la retencion); si luego se divide, los hijos van en
+      serie `DIV` y **el original se queda en la tabla, anulado**; si se remesa,
+      se agrupan en `AGR`. **89.228 de los 255.148 efectos de Sigrid estan de
+      baja (34,97 %)** y, cinendose a los de factura de compra, **76.215 de
+      195.510 (39,0 %)**: sin filtrar, uno de cada tres es un fantasma. Se
+      excluyen con `efecto_anulado = false`, y eso es lo que reproduce el numero
+      que Sigrid enseña en la cabecera. Verificado sobre `FR25/04222`, una
+      factura con ocho efectos: los cinco vivos suman 92.478,49 y, sin la
+      retencion viva, 87.854,56 --los dos numeros de la cabecera--, mientras que
+      sumarlos todos da 288.123,92. **El estado NO distingue al anulado**: los
+      tres anulados de esa factura estan «Aprobado».
+
+      **NO SE PUBLICA el enlace del efecto hijo a su efecto de origen**, y no es
+      un olvido: `pag.padide`, el campo del ERP que lo prometia, vale **0 en los
+      255.148 efectos** (medido dos veces, el 2026-09-10 y el 2026-09-11). La
+      relacion solo se podria deducir por importes y fechas, y una
+      reconstruccion a ojo no se publica como dato. Quien la necesite tiene que
+      saber que no existe en el origen, no buscarla aqui.
+
+      **Solo la COMPRA.** Los efectos de otros documentos y los cobros
+      (`raw.cob`) no entran: la cartera completa de cobros y pagos es F-037 fase
+      1. **Deuda declarada con F-037 (R35)**: cuando llegue se decide si absorbe
+      esta tabla o la deja como vista suya; lo que no se hace es levantar una
+      segunda tabla de efectos en paralelo.
+    grano: >-
+      Una fila por efecto de pago (`raw.pag.ide`) cuyo documento sea una factura
+      de compra. `vencimiento_id` es CLAVE PRIMARIA DECLARADA, asi que el build
+      falla la noche en que el grano se rompa en vez de dejar que lo descubra
+      `check-unicidad` un mes despues. Una factura tiene de 1 a 16 efectos (16
+      es el maximo medido), asi que **contar filas de esta tabla no cuenta
+      facturas**: para eso, `COUNT(DISTINCT factura_id)` o
+      `compras.v_facturas_pago`.
+    clave_negocio: [vencimiento_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      vencimiento_id:
+        significado: >-
+          Identificador del efecto en Sigrid (`pag.ide`). Es tambien el `ide` de
+          su fila en `raw.con`, porque el efecto ES un documento (`tip = 25`).
+        agregacion: no_sumable
+      factura_id:
+        significado: >-
+          Identificador de la factura de compra de la que cuelga el efecto
+          (`pag.conide`). Enlaza con `compras.facturas.factura_id`.
+        agregacion: no_sumable
+      codigo_factura:
+        significado: >-
+          Codigo de la factura tal y como se ve en Sigrid (`FR25/04222`), leido
+          del documento de la factura.
+      codigo_efecto:
+        significado: >-
+          Codigo del efecto tal y como lo enseña la rejilla (`FR26/06051_01`,
+          `DIV25/0156`), LITERAL de `con.cod`. No se compone de nada: el sufijo
+          `_01` / `_02` viene almacenado, y reconstruirlo con un ordinal
+          acertaria solo mientras el orden coincidiera.
+      descripcion_efecto:
+        significado: >-
+          La columna «Descripcion» de la rejilla, de `con.res`: "Pago 1 de 2...",
+          "Retencion...". Texto libre del ERP.
+      serie_efecto:
+        significado: >-
+          Prefijo alfabetico del codigo del efecto, derivado con
+          `compras.fn_serie`: `FR` el efecto inicial, `DIV` una division, `AGR`
+          una agrupacion al remesar, `NO` un pago sin serie de factura. Sirve
+          para saber POR QUE existe un efecto. No sale de la columna de serie
+          del origen: **`con.serie` existe y vale 0 en los 255.148 efectos**,
+          asi que publicarla habria dado una columna de ceros con un nombre
+          convincente.
+      fecha_emision:
+        significado: Fecha de emision del efecto (`pag.fecreaemi`), ya tipada.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene fecha de emision informada.
+      fecha_vencimiento:
+        significado: >-
+          Fecha en la que el efecto vence. Es la columna por la que se ordena
+          cualquier pregunta de "que vence en...".
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene fecha de vencimiento informada.
+      fecha_real:
+        significado: >-
+          Fecha real de pago (`pag.fecrea`), cuando esta punteada. **OJO: QUE
+          ESTE VACIA NO SIGNIFICA QUE EL EFECTO ESTE VIVO.** Son 120.843 de los
+          195.510 efectos de factura (61,8 %) sin fecha real, e incluyen
+          vencimientos pasados sin puntear; la cartera viva que midio F-037 son
+          10.607 pagos, doce veces menos. Esta columna avisa de la FECHA de
+          pago, no del ESTADO: el estado es `estado_pago`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El efecto no tiene fecha real de pago anotada. NO quiere decir que
+          este pendiente: 61,8 % de los efectos estan asi.
+      importe:
+        significado: >-
+          Importe del efecto (`pag.tot`). **No se puede sumar sobre todos los
+          efectos de una factura sin filtrar `efecto_anulado`**: ver la trampa
+          de la descripcion.
+      estado_pago_codigo:
+        significado: >-
+          Codigo del estado del efecto (`con.est`), conservado junto al nombre
+          para poder filtrar sin depender del literal. `10` es Pagado.
+        agregacion: no_sumable
+      estado_pago:
+        significado: >-
+          Estado del efecto, LEIDO de `raw.conest` filtrando `tip = 25` (el tipo
+          del efecto). Son **10 estados medidos**: 1 Pendiente, 2 Aprobado, 3
+          Emitido, 5 En cartera, 7 Remesado, 10 Pagado, 12 Devuelto, 14
+          Agrupados, 15 Divididos, 20 Anticipado; PDT, APR, CAR y PAG son sus
+          abreviaturas en pantalla. El `tip = 25` no es un adorno: sin el, la
+          misma cifra significa otra cosa en una factura o en una obra. **El
+          estado NO se deriva de `fecha_real`** --se probo y era falso-- y **no
+          marca la anulacion**, que es `efecto_anulado`.
+        nulo_significa: El estado del efecto no existe en el catalogo de estados.
+      efecto_anulado:
+        significado: >-
+          Cierto cuando el efecto esta dado de baja en Sigrid (`con.fecbaj`
+          distinto de 0): lo que la pantalla pinta en rojo con un aspa.
+          **FILTRAR POR ESTA COLUMNA ES OBLIGATORIO PARA SUMAR IMPORTES**: 39,0
+          % de los efectos de factura estan de baja porque su efecto original se
+          dividio o se agrupo, y siguen en la tabla a proposito para que se
+          pueda ver la historia sin que falsee las sumas.
+      fecha_anulacion:
+        significado: Fecha en la que se dio de baja el efecto, ya tipada.
+        agregacion: no_sumable
+        nulo_significa: El efecto no esta anulado.
+      medio_pago_id:
+        significado: >-
+          Identificador del medio de pago del efecto (`pag.efeide`, catalogo
+          `raw.auxefp`). El 0 de Sigrid se publica como NULL.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene medio de pago informado.
+      medio_pago:
+        significado: >-
+          Nombre del medio de pago: TRANSFERENCIA, PAGARE, CONFIRMING, CHEQUE,
+          LETRA... Es el mismo catalogo que resuelve `compras.formas_pago`.
+        nulo_significa: >-
+          El efecto no tiene medio de pago informado, o el que tiene no existe
+          en el catalogo.
+      naturaleza_pago_id:
+        significado: >-
+          Identificador de la naturaleza del pago (`pag.natide`, catalogo
+          `raw.auxnap`, 3 filas).
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene naturaleza informada.
+      naturaleza_pago:
+        significado: >-
+          Naturaleza del pago: NOMINA, EMBARGO o CUOTA. Son solo 3 valores y
+          casi todos los efectos van sin ella.
+        nulo_significa: El efecto no tiene naturaleza informada.
+      cuenta_contable_id:
+        significado: >-
+          Identificador de la cuenta contable del efecto (`pag.cueide`).
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene cuenta contable informada.
+      cuenta_contable:
+        significado: >-
+          Numero de la cuenta contable (`4100006400`). Se lee de `raw.con`, no
+          de `raw.cua`: la cuenta contable **tambien es un documento** de Sigrid
+          (`tip = 17`) y `cua` no tiene ni `cod` ni `res` --unirse a ella daria
+          una columna vacia--.
+      cuenta_contable_nombre:
+        significado: Nombre de la cuenta contable, de `con.res`.
+        nulo_significa: El efecto no tiene cuenta contable informada.
+      banco_id:
+        significado: >-
+          Identificador de la entidad bancaria del efecto. Es `pag.banban`, que
+          apunta al `ide` de `raw.auxban` --no al codigo de banco: medido, casan
+          110.460 de 110.477--.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene banco informado.
+      banco:
+        significado: Nombre de la entidad bancaria, de `auxban.res`.
+        nulo_significa: El efecto no tiene banco informado.
+      sucursal_id:
+        significado: >-
+          Identificador de la sucursal (`pag.bansuc`), que apunta al `ide` del
+          MISMO catalogo `raw.auxban` en una segunda union: `auxban.tipsuc`
+          separa las 442 entidades de las 1.248 sucursales.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene sucursal informada.
+      sucursal:
+        significado: Nombre de la sucursal, de `auxban.res`.
+        nulo_significa: El efecto no tiene sucursal informada.
+      retencion_id:
+        significado: >-
+          Identificador de la retencion asociada al efecto (`pag.retide`), para
+          23.180 efectos de factura. **Lo que significa exactamente --si marca
+          el efecto que ES la retencion o el que la tiene-- NO se ha medido en
+          esta feature**, asi que se publica el identificador y no ninguna
+          interpretacion suya. Las retenciones estan en el esquema
+          `retenciones`.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene retencion asociada.
+      centro_coste_id:
+        significado: >-
+          Identificador del centro de coste del efecto (`pag.cenide`).
+          Traducible con `maestro.centros_coste`.
+        agregacion: no_sumable
+        nulo_significa: El efecto no tiene centro de coste informado.
+      remesa_id:
+        significado: >-
+          Identificador de la remesa de pago en la que va el efecto
+          (`pag.remide`, tabla `raw.rpa`). 40.090 de los 195.510 efectos de
+          factura estan en una remesa.
+        agregacion: no_sumable
+        nulo_significa: El efecto no esta en ninguna remesa.
+      codigo_remesa:
+        significado: >-
+          Codigo de la remesa (`RP26/0254`), leido de `raw.con`: la remesa
+          **tambien es un documento** (`tip = 27`) y `raw.rpa` no tiene columna
+          `cod`.
+        nulo_significa: El efecto no esta en ninguna remesa.
+      fecha_remesa:
+        significado: Fecha de la remesa (`rpa.fecrem`), ya tipada.
+        agregacion: no_sumable
+        nulo_significa: El efecto no esta en ninguna remesa.
+      importe_remesa:
+        significado: >-
+          Importe total de la remesa completa (`rpa.imptot`). **NO es el importe
+          de este efecto**, que es `importe`: se repite igual en todos los
+          efectos de la misma remesa, asi que sumarlo cuenta la remesa tantas
+          veces como efectos lleve.
+        agregacion: no_sumable
+        nulo_significa: El efecto no esta en ninguna remesa.
+    relaciones:
+      - de: factura_id
+        a: compras.facturas.factura_id
+        cardinalidad: "N:1"
+        porque: Para la cabecera de la factura, su proveedor y su obra.
+      - de: factura_id
+        a: compras.v_facturas_pago.factura_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la forma de pago de la factura y el resumen de sus efectos, ya
+          agregado y con los anulados fuera.
+    ejemplos_preguntas:
+      - Cuando vence la factura X y esta pagada
+      - Que facturas vencen la semana que viene y por cuanto
+      - Que efectos de pago van en la remesa R
+      - Que facturas tienen algun efecto devuelto
+
+  v_facturas_pago:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      La FORMA DE PAGO de cada factura de compra, con el resumen de sus efectos
+      ya agregado: con que forma de pago se pago, con que medio, por que banco y
+      cuenta, cuantos efectos tiene, cuando vence el primero y el ultimo y
+      cuanto suman los que estan vivos. Una fila por factura, para poder
+      preguntar por la factura sin bajar al efecto.
+
+      La forma de pago sale de `dcf.pagide` resuelto contra
+      `compras.formas_pago` (la dimension, F-073), y NO se duplica aqui.
+      `formula_pago_documento` y `condiciones_pago` son lo que guarda la propia
+      factura, que puede no coincidir con el catalogo.
+
+      **LOS DOS IMPORTES AGREGADOS EXCLUYEN LOS EFECTOS ANULADOS** (39 % de los
+      de factura) porque sumarlos todos cuenta el efecto original dividido junto
+      con sus hijos: es lo que reproduce el numero que Sigrid enseña. En cambio
+      `num_efectos` los cuenta TODOS y `num_efectos_anulados` dice cuantos son,
+      para que la resta se pueda hacer. Son dos criterios distintos en la misma
+      fila, a proposito.
+    grano: >-
+      Una fila por factura de compra (`compras.facturas`), incluidas las que no
+      tienen ningun efecto: el resumen entra por un LEFT JOIN a un CTE ya
+      agregado por `factura_id`, que es lo que impide que la cabecera se
+      multiplique por sus efectos.
+    clave_negocio: [factura_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      factura_id:
+        significado: Identificador de la factura de compra en Sigrid.
+        agregacion: no_sumable
+      codigo_factura: Codigo de la factura tal y como se ve en Sigrid.
+      fecha_factura:
+        significado: Fecha de la factura, ya tipada.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: Identificador del proveedor que factura.
+        agregacion: no_sumable
+        nulo_significa: La factura no tiene proveedor informado.
+      proveedor_nombre: Nombre del proveedor.
+      forma_pago_id:
+        significado: >-
+          Identificador de la forma de pago de la factura (`dcf.pagide`), que es
+          el `forma_pago_id` de `compras.formas_pago`.
+        agregacion: no_sumable
+        nulo_significa: La factura no declara forma de pago.
+      codigo_forma_pago:
+        significado: Codigo de la forma de pago (`CFCH60`, `TR30`).
+        nulo_significa: La factura no declara forma de pago.
+      forma_pago:
+        significado: >-
+          Nombre de la forma de pago ("CONFIRMING CH 60 dias"), que suele llevar
+          el plazo dentro del propio literal.
+        nulo_significa: La factura no declara forma de pago.
+      plazo_formula:
+        significado: >-
+          El plazo tal y como lo guarda el catalogo de Sigrid, **VERBATIM**.
+          **NO ES UN NUMERO DE DIAS**: es una formula, y `30 450R` es un valor
+          real del catalogo. La mayoria de las filas trae solo un numero ("60",
+          "90") y por eso es tan facil tratarla como cantidad y salir con una
+          cifra plausible y falsa. No se suma, no se compara y no se ordena como
+          numero.
+        nulo_significa: La factura no declara forma de pago.
+      formula_pago_documento:
+        significado: >-
+          La formula de pago que guarda la PROPIA factura (`dcf.pagfor`), tal
+          cual. Puede no coincidir con la del catalogo, y por eso se publica
+          aparte en vez de elegir una de las dos.
+        nulo_significa: La factura no guarda formula propia.
+      condiciones_pago:
+        significado: >-
+          Las condiciones de pago escritas en la factura (`dcf.pagtex`), texto
+          libre. Se lee; no se interpreta.
+        nulo_significa: La factura no tiene condiciones escritas.
+      medio_pago_id:
+        significado: Identificador del medio de pago de la factura (`dcf.efeide`).
+        agregacion: no_sumable
+        nulo_significa: La factura no declara medio de pago.
+      medio_pago:
+        significado: >-
+          Nombre del medio de pago de la factura: TRANSFERENCIA, PAGARE,
+          CONFIRMING, CHEQUE... Puede diferir del medio que trae la forma de
+          pago del catalogo.
+        nulo_significa: La factura no declara medio de pago.
+      naturaleza_pago:
+        significado: >-
+          Naturaleza del pago de la factura (`dcf.cypnatide`, catalogo
+          `raw.auxnap`): NOMINA, EMBARGO o CUOTA.
+        nulo_significa: La factura no declara naturaleza de pago.
+      cuenta_contable:
+        significado: >-
+          Numero de la cuenta contable de la factura (`dcf.cueide`), leido de
+          `raw.con` porque la cuenta contable es un documento de Sigrid.
+        nulo_significa: La factura no tiene cuenta contable informada.
+      cuenta_transferencia_id:
+        significado: >-
+          Identificador de la cuenta de transferencia de la factura
+          (`dcf.banide`), **SIN RESOLVER a proposito**: a que tabla apunta no
+          esta medido, y en esta feature unir por parecido ya salio mal cuatro
+          veces. Sirve para agrupar facturas por cuenta, no para saber cual es.
+        agregacion: no_sumable
+        nulo_significa: La factura no declara cuenta de transferencia.
+      banco:
+        significado: >-
+          Nombre de la entidad bancaria de la factura (`dcf.banban` contra
+          `raw.auxban`, la misma clave medida en los efectos).
+        nulo_significa: La factura no declara banco.
+      sucursal:
+        significado: Nombre de la sucursal bancaria (`dcf.bansuc` contra `raw.auxban`).
+        nulo_significa: La factura no declara sucursal.
+      num_efectos:
+        significado: >-
+          Cuantos efectos de pago tiene la factura, **CONTANDO LOS ANULADOS**.
+          Es a proposito: `num_efectos_anulados` dice cuantos de esos estan de
+          baja, y la resta da los vivos. Ojo al cruzarlo con
+          `importe_efectos_vivos`, que SI los excluye: son dos criterios
+          distintos en la misma fila.
+      num_efectos_anulados:
+        significado: >-
+          Cuantos de los efectos de la factura estan dados de baja porque su
+          efecto original se dividio o se agrupo. El 39 % de los efectos de
+          factura lo estan, asi que esto no es un caso raro.
+      num_efectos_pagados:
+        significado: >-
+          Cuantos efectos VIVOS estan en estado «Pagado» (el 10 de
+          `raw.conest`). Se usa el estado y no la fecha real, que esta vacia en
+          el 62 % de los efectos sin que eso signifique nada.
+      primer_vencimiento:
+        significado: >-
+          Fecha de vencimiento mas temprana entre los efectos VIVOS de la
+          factura.
+        agregacion: no_sumable
+        nulo_significa: La factura no tiene ningun efecto vivo.
+      ultimo_vencimiento:
+        significado: >-
+          Fecha de vencimiento mas tardia entre los efectos VIVOS. Es la fecha
+          en la que la factura queda pagada del todo si todo se cumple.
+        agregacion: no_sumable
+        nulo_significa: La factura no tiene ningun efecto vivo.
+      importe_efectos_vivos:
+        significado: >-
+          Suma del importe de los efectos de la factura **excluyendo los
+          anulados** (`efecto_anulado = false`). Es el numero que Sigrid enseña
+          en la cabecera de la pestaña de vencimientos. Sumar sin ese filtro da
+          hasta tres veces mas.
+        nulo_significa: La factura no tiene ningun efecto vivo.
+      importe_efectos_pagados:
+        significado: >-
+          Suma del importe de los efectos vivos que estan en estado «Pagado».
+          Comparado con `importe_efectos_vivos` da lo que queda por pagar de esa
+          factura.
+        nulo_significa: La factura no tiene ningun efecto vivo pagado.
+    relaciones:
+      - de: factura_id
+        a: compras.vencimientos.factura_id
+        cardinalidad: "1:N"
+        porque: Para el detalle efecto a efecto, que aqui esta agregado.
+      - de: forma_pago_id
+        a: compras.formas_pago.forma_pago_id
+        cardinalidad: "N:1"
+        porque: Para el catalogo completo de la forma de pago.
+    ejemplos_preguntas:
+      - Con que forma de pago se pago la factura X
+      - Que facturas van por confirming y cuanto suman
+      - Cuanto queda por pagar de las facturas del proveedor P
+
+  v_control_forma_pago:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      La forma de pago de la factura de compra ENFRENTADA a la de su contrato,
+      para ver donde no coinciden. No filtra: las que cuadran salen igual, con
+      `forma_pago_coincide` en cierto, porque «cuantas no cuadran» sin el
+      denominador no significa nada.
+
+      El enlace factura-contrato **no es nuevo**: es el mismo que usa
+      `compras.v_pbi_contrato_consumo` (linea facturada directa contra contrato,
+      o via el albaran de origen). Dos reglas para la misma cosa divergen, y la
+      segunda se descubre cuando las dos cifras ya estan en un informe.
+
+      **FACTURAS QUE SE QUEDAN FUERA: 85.324 de 165.759 facturas de compra
+      (51,5 %, medido el 2026-09-11) no cuelgan de ningun contrato**, asi que no
+      aparecen aqui. Esta vista NO sirve para contar facturas de compra ni para
+      juzgar la cobertura de contratacion: solo compara las que si tienen
+      contrato.
+
+      La forma de pago del contrato se lee de `raw.ctr.pagide`, no de
+      `compras.contratos`, que todavia no la publica (eso es F-067).
+    grano: >-
+      Una fila por PAR (`factura_id`, `contrato_id`). No es una fila por
+      factura: una factura con lineas de dos contratos sale dos veces, asi que
+      **contar filas aqui no cuenta facturas** --para eso,
+      `COUNT(DISTINCT factura_id)`--.
+    clave_negocio: [factura_id, contrato_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      factura_id:
+        significado: Identificador de la factura de compra.
+        agregacion: no_sumable
+      codigo_factura: Codigo de la factura tal y como se ve en Sigrid.
+      fecha_factura:
+        significado: Fecha de la factura, ya tipada.
+        agregacion: no_sumable
+      contrato_id:
+        significado: >-
+          Identificador del contrato al que se imputa alguna linea de la
+          factura, por linea directa o via el albaran de origen.
+        agregacion: no_sumable
+      codigo_contrato: Codigo del contrato tal y como se ve en Sigrid.
+      obra_id:
+        significado: Identificador de la obra del contrato.
+        agregacion: no_sumable
+        nulo_significa: El contrato no tiene obra informada.
+      codigo_obra:
+        significado: Codigo de la obra del contrato.
+        nulo_significa: El contrato no tiene obra informada.
+      proveedor_id:
+        significado: Identificador del proveedor de la factura.
+        agregacion: no_sumable
+        nulo_significa: La factura no tiene proveedor informado.
+      proveedor_nombre: Nombre del proveedor de la factura.
+      forma_pago_factura_id:
+        significado: Identificador de la forma de pago declarada en la FACTURA.
+        agregacion: no_sumable
+        nulo_significa: La factura no declara forma de pago.
+      forma_pago_factura:
+        significado: Nombre de la forma de pago declarada en la FACTURA.
+        nulo_significa: La factura no declara forma de pago.
+      plazo_formula_factura:
+        significado: >-
+          Plazo de la forma de pago de la factura, VERBATIM del catalogo: no es
+          un numero de dias.
+        nulo_significa: La factura no declara forma de pago.
+      forma_pago_contrato_id:
+        significado: >-
+          Identificador de la forma de pago declarada en el CONTRATO
+          (`raw.ctr.pagide`).
+        agregacion: no_sumable
+        nulo_significa: El contrato no declara forma de pago.
+      forma_pago_contrato:
+        significado: Nombre de la forma de pago declarada en el CONTRATO.
+        nulo_significa: El contrato no declara forma de pago.
+      plazo_formula_contrato:
+        significado: >-
+          Plazo de la forma de pago del contrato, VERBATIM del catalogo: no es
+          un numero de dias.
+        nulo_significa: El contrato no declara forma de pago.
+      forma_pago_comparable:
+        significado: >-
+          Cierto solo si las DOS partes declaran forma de pago. Cuando es falso
+          no hay discrepancia que afirmar: falta el dato en un lado, y eso no es
+          lo mismo que un conflicto. **Filtrar por esta columna antes de contar
+          discrepancias** evita convertir un hueco en un incumplimiento.
+      forma_pago_coincide:
+        significado: >-
+          Cierto cuando factura y contrato declaran la MISMA forma de pago. Es
+          falso tanto si son distintas como si falta una de las dos:
+          `forma_pago_comparable` distingue los dos casos.
+    relaciones:
+      - de: factura_id
+        a: compras.v_facturas_pago.factura_id
+        cardinalidad: "N:1"
+        porque: Para el resto del detalle de pago de la factura.
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: Para la cabecera del contrato, su obra y su proveedor.
+    ejemplos_preguntas:
+      - Que facturas no cuadran con la forma de pago de su contrato
+      - Cuantas facturas con contrato cumplen la forma de pago pactada
+      - Que proveedores facturan con una forma de pago distinta de la contratada
+
+  documento_texto:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El memo de la pestaña «Texto» del documento de compra, INTEGRO y tal y
+      como llega: los comentarios que la gente ha ido escribiendo en la factura
+      o en el contrato, concatenados por el propio ERP.
+
+      **SALE DE `con.tex`, NO DE `dcf.tex` NI DE `ctr.tex`.** Medido: `con.tex`
+      esta informado en el **65,5 %** de las facturas (108.527 de 165.759) y en
+      el 8,5 % de los contratos, mientras que `dcf.tex` lo esta en el **0,3 %** y
+      `ctr.tex` en el 3,9 %. Quien busque el texto en la tabla del documento
+      concluira que las facturas no tienen comentarios, y es falso.
+
+      Para leer comentario a comentario --con su fecha, su hora y su autor-- esta
+      `compras.documento_comentarios`, que es este mismo texto ya partido.
+    grano: >-
+      Una fila por documento con memo, `documento_id` como clave primaria
+      declarada. Solo facturas (`tip = 15`) y contratos (`tip = 44`); los
+      documentos sin memo NO salen, y los comparativos (`tip = 46`, 5.707 con
+      texto) tampoco: son de F-067.
+    clave_negocio: [documento_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: >-
+          Identificador del documento en Sigrid (`con.ide`). Es el mismo
+          `factura_id` de `compras.facturas` o `contrato_id` de
+          `compras.contratos`.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: >-
+          El `tip` de Sigrid: 15 factura o abono, 44 contrato. Se conserva para
+          filtrar sin depender del literal.
+        agregacion: no_sumable
+        valores: [15, 44]
+      tipo_documento:
+        significado: >-
+          Que clase de documento es, resuelto con `compras.fn_tipo_documento`.
+        valores: [FACTURA, ABONO, CONTRATO, OTRO]
+      codigo_documento:
+        significado: Codigo del documento tal y como se ve en Sigrid.
+      texto:
+        significado: >-
+          El memo completo, sin tocar. Es texto libre acumulado por personas:
+          sirve para leerlo y para buscar dentro, no para decidir con el sin
+          leerlo. Los comentarios van separados por una linea de guiones y cada
+          uno suele cerrar con `[dd/mm/aaaa hh:mm:ss Usuario: login]`.
+      bytes:
+        significado: >-
+          Tamaño del memo en bytes. El mayor medido en una factura son 11.580;
+          la media, unos 280.
+      num_comentarios:
+        significado: >-
+          Cuantos comentarios tiene el memo, que es exactamente cuantas filas
+          tiene este documento en `compras.documento_comentarios`.
+    relaciones:
+      - de: documento_id
+        a: compras.documento_comentarios.documento_id
+        cardinalidad: "1:N"
+        porque: Para leer los comentarios uno a uno, con su fecha y su autor.
+    ejemplos_preguntas:
+      - Que dice el texto de la factura X
+      - Que facturas mencionan una retencion en su texto
+
+  documento_comentarios:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El memo del documento ya PARTIDO en comentarios, uno por fila, con su
+      fecha, su hora y su autor cuando se pueden reconocer. Es la tabla a la que
+      hay que ir para «que se dijo de esta factura y cuando».
+
+      Tabla materializada en la carga nocturna, no vista: son unos 110.000 memos
+      y partirlos en cada lectura seria trabajo repetido para siempre.
+
+      **LO QUE NO CASA CON LA PLANTILLA SE PUBLICA IGUAL** (y suele ser lo mas
+      interesante: el comentario que alguien escribio fuera del formulario).
+      Cuando el bloque no cierra con el sello `[dd/mm/aaaa hh:mm:ss Usuario:
+      login]` --texto escrito a mano, la linea automatica que añade la propia
+      aplicacion, o un sello incompleto--, `sello_reconocido` es falso, `fecha`,
+      `hora` y `usuario` van a **NULL** --nunca a una etiqueta inventada-- y el
+      `cuerpo` es el bloque ENTERO. Una fecha imposible dentro del sello
+      (`31/02/2026`) tampoco cuenta como reconocida, para no publicar un dia que
+      nadie escribio.
+
+      El separador y el sello estan escritos UNA SOLA VEZ en
+      `etl_sigrid/domain/texto_comentarios.py`, que es donde se prueban; el SQL
+      usa esos mismos literales.
+    grano: >-
+      Una fila por comentario, clave `(documento_id, orden)` declarada. Un
+      documento tiene tantas filas como bloques tenga su memo, y eso es lo que
+      dice `compras.documento_texto.num_comentarios`.
+    clave_negocio: [documento_id, orden]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: >-
+          Identificador del documento en Sigrid al que pertenece el comentario.
+        agregacion: no_sumable
+      orden:
+        significado: >-
+          Posicion del comentario dentro del memo. **`orden` 1 ES EL MAS
+          RECIENTE**, porque Sigrid apila los comentarios en descendente: el
+          `orden` mas alto es el mas ANTIGUO, normalmente el alta del documento.
+          Pedir «el ultimo comentario» es pedir `orden = 1`, no el maximo.
+        agregacion: no_sumable
+      sello_reconocido:
+        significado: >-
+          Cierto si el bloque cerraba con el sello `[dd/mm/aaaa hh:mm:ss
+          Usuario: login]` y su fecha existe en el calendario. Cuando es falso,
+          `fecha`, `hora` y `usuario` estan a NULL y el `cuerpo` es el bloque
+          entero: el comentario NO se descarta por no casar.
+      fecha:
+        significado: Fecha en la que se escribio el comentario, del sello.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El bloque no traia un sello reconocible, asi que no se sabe cuando se
+          escribio.
+      hora:
+        significado: >-
+          Hora a la que se escribio el comentario (`hh:mm:ss`), del sello, como
+          texto.
+        nulo_significa: El bloque no traia un sello reconocible.
+      usuario:
+        significado: >-
+          Login de quien escribio el comentario, del sello. Es el usuario de
+          Sigrid, no el nombre de la persona.
+        nulo_significa: >-
+          El bloque no traia un sello reconocible, asi que no se sabe quien lo
+          escribio. No se rellena con ninguna etiqueta.
+      cuerpo:
+        significado: >-
+          El comentario sin el sello cuando hay sello, y el bloque ENTERO cuando
+          no. Es la columna que hay que leer.
+      bloque:
+        significado: >-
+          El trozo INTEGRO tal y como sale del memo, sello incluido. Se publica
+          aparte del cuerpo porque unir los bloques de un documento en su orden
+          reproduce el memo original sin perder un caracter: es la unica forma
+          de comprobar que el partido no se ha tragado nada.
+      bytes:
+        significado: Tamaño del bloque en bytes.
+    relaciones:
+      - de: documento_id
+        a: compras.documento_texto.documento_id
+        cardinalidad: "N:1"
+        porque: Para el memo completo del documento y su recuento.
+    ejemplos_preguntas:
+      - Que fue lo ultimo que se dijo de la factura X
+      - Quien escribio el ultimo comentario del contrato C
+      - Que comentarios escribio el usuario U este mes

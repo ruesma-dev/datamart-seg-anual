@@ -32,7 +32,20 @@ STEPS = {
     "build_compras": (
         BuildComprasStep,
         "etl_sigrid.application.steps.build_compras_step",
-        ["00_setup.sql", "01_documentos.sql", "02_fact_linea.sql", "03_views.sql"],
+        # F-073 añadió `04_formas_pago.sql` y F-080 los tres siguientes: los
+        # efectos de pago de la factura, su forma de pago y su texto. La lista
+        # sigue siendo la lista COMPLETA a propósito, para que añadir un
+        # sub-paso obligue a tocar este test y no pase inadvertido.
+        [
+            "00_setup.sql",
+            "01_documentos.sql",
+            "02_fact_linea.sql",
+            "03_views.sql",
+            "04_formas_pago.sql",
+            "05_vencimientos.sql",
+            "06_pago_factura.sql",
+            "07_texto.sql",
+        ],
     ),
     "build_retenciones": (
         BuildRetencionesStep,

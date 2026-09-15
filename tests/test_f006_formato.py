@@ -970,15 +970,31 @@ def test_f006_r4_cada_esquema_global_dice_para_que_sirve() -> None:
         assert entrada.get("refresco") in REFRESCOS, f"{nombre}: refresco inválido"
 
 
-def test_f006_r4_raw_y_stg_quedan_fuera_de_la_superficie_de_consumo() -> None:
-    """`raw` es una copia literal de Sigrid sin semántica, y `stg.plan_mensual`
-    multiplica los importes si se consulta sin filtrar versión. Ofrecérselos al
-    agente es ofrecerle el camino que produce números falsos."""
+def test_f006_r4_raw_y_aux_quedan_fuera_de_la_superficie_de_consumo() -> None:
+    """Los nueve esquemas, uno a uno, para que ninguno cambie en silencio.
+
+    Fuera quedan **dos**, y por un HECHO, no por una preferencia: `raw` es una
+    copia literal de Sigrid sin semántica de negocio —nombres de cuatro letras,
+    fechas como enteros, el 0 en lugar de NULL—, y la tabla de `aux` se crea
+    VACÍA por diseño, así que consultarla no devuelve nada.
+
+    **`stg` estuvo fuera hasta F-079 (2026-09-09) y entró por orden del humano**:
+    «todo lo expuesto es para consulta». Lo que lo dejaba fuera eran preferencias
+    de enrutado, y el efecto era el contrario del buscado —el MCP tiene `stg`
+    entre sus esquemas autorizados, así que desaconsejarlo solo conseguía que el
+    agente no mirase donde sí hay dato: el ámbito de certificación está en
+    `stg.presupuesto` y en ningún sitio aguas abajo—. La trampa de las versiones
+    master no desapareció con la marca: vive en la `descripcion` de
+    `stg.plan_mensual` y en la regla dura `R-VERSION-MASTER`.
+    """
     dicc = _global_real()
 
-    assert dicc.esquemas["raw"]["consumo_recomendado"] is False
-    assert dicc.esquemas["stg"]["consumo_recomendado"] is False
-    for consumo in ("mart", "cierre", "compras", "maestro", "retenciones", "_meta"):
+    fuera = {n for n, e in dicc.esquemas.items() if not e["consumo_recomendado"]}
+
+    assert fuera == {"raw", "aux"}, (
+        f"la superficie de consulta ha cambiado sin decirlo: fuera está {fuera}"
+    )
+    for consumo in ("mart", "cierre", "compras", "maestro", "retenciones", "_meta", "stg"):
         assert dicc.esquemas[consumo]["consumo_recomendado"] is True
 
 

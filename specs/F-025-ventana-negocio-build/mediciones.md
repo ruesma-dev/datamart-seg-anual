@@ -121,7 +121,7 @@ congelaría 7 obras que siguen cerrando meses y la fecha de fin real falla en lo
 dos sentidos. La actividad medida es objetiva y se equivoca solo por exceso de
 trabajo, nunca por dato viejo.
 
-## 3 · El peso, estimado (no medido)
+## 3 · El peso, estimado (no medido) — MEDIDO el 2026-09-05 en la Fase 7 (T1): ahorro real 59,2 %
 
 `stg.plan_mensual` no se puede contar hoy. **Estimación** con el proxy
 `partidas × fases` por obra, que aproxima el peso de los ámbitos reales (3 y 7):
@@ -260,3 +260,390 @@ dos barren tablas de millones de filas y el servidor está recuperando créditos
 de CPU tras la avería. Lanzarlas ahora volvería a vaciar la hucha, que es
 exactamente lo que esta feature existe para evitar. La cota estimada del §3
 (73,3 % del proxy) sigue siendo lo único que hay sobre el ahorro.
+
+---
+
+## Fase 7 · Lo medido de verdad (bitácora, 2026-09-04 y 05)
+
+### T27 · Las cinco huellas del ANTES — HECHA el 2026-09-04
+
+Sobre el datamart que dejó la nocturna del 04, en `huellas/antes_*.csv` (fuera
+de git). Son la línea base contra la que T30 compara **con tolerancia cero**:
+
+| capa | celdas | obras |
+|---|---|---|
+| `stg` | 12.407 | 349 |
+| `mart` | 24.775 | 349 |
+| `cierre` | 16.948 | 330 |
+| `dimension` | 735 | 504 |
+| `plan_obra` | 938 | 350 |
+
+La huella de `stg` **hubo que lanzarla tres veces**: dos caídas de la conexión
+del puesto —una con la IP rotando a mitad de consulta— y a la tercera, 15 min.
+No fue culpa del servidor: tenía 60 créditos y la CPU al 12 %.
+
+### T35 · La alerta de la ventana — HECHA el 2026-09-04
+
+`alert-caj-datamart-seg-dev-ventana`, desplegada, **activa**, severidad 2. Sin
+ella el guardián es mudo (DA-5).
+
+### T29 · La primera reconstrucción acotada
+
+**Intento 1 · 2026-09-05 02:00 UTC · `caj-datamart-seg-dev-29809560` · FALLÓ.**
+`AttributeError: 'PostgresClient' object has no attribute 'fetch_filas_por_obra'`
+en `build_stg_step.py:628`, dos veces. Detalle en
+`progress/incidencia_F-025_nocturna_20260905.md`. Lo que sí dejó medido:
+
+| paso | resultado |
+|---|---|
+| `ingest_raw` | SUCCESS · 20.147.626 filas · 2.206 s y 1.782 s |
+| `build_stg` | **FAILED** · 395.929 filas · 1.299,7 s y 1.463,7 s |
+| `build_compras` | SUCCESS · 2.500.592 · 488 s |
+| `build_maestros` / `build_retenciones` | SUCCESS · 26.170 / 29.966 |
+| `mart` · `cierre` · `diccionario` · `grants` | SKIPPED |
+
+**Coste en créditos de CPU**: 78 a las 02:03 → 53 a las 09:03. Las 2 h 19 de job
+se llevaron **unos 40 créditos** de los 288 del tope (ver `progress/current.md`:
+el tope de 144 que este proyecto asumía era falso).
+
+**Intento 2 · 2026-09-05 10:44 UTC · `caj-datamart-seg-dev-kcb9n2r`**, lanzado a
+mano con `az containerapp job start` sobre la imagen `r20260905-1237`, la del
+arreglo. Saldo al arrancar: **57 créditos**, subiendo ~4/h. Duración esperada
+4-5 h por las nocturnas completas del 03 (4 h 18) y del 04 (4 h 50).
+**Resultado: FALLÓ por `replicaTimeout` (5 h), con el código ya bien.**
+`build_presupuesto` pasó (13.874.194 filas, 1.438,6 s) **y el registro en
+`_meta.obra_build` también**: el arreglo funciona. Murió en `plan_mensual`,
+tramo **35/60**, con los créditos **a 1 desde antes de las 15:01**: los tramos
+33-35 tardaron **788 / 728 / 539 s** frente a los ~120 s a ritmo normal. Se
+paró el reintento, se quitó la nocturna y el timeout pasó a **7 h**. Relanzar
+el domingo con la hucha llena (288).
+
+**Intento 3 · 2026-09-05 17:30 UTC · `caj-datamart-seg-dev-hamsh8o` · SUCCEEDED
+en 4 h 52 (17:30:12 → 22:22:37).** Lanzado a mano nueve minutos después de
+escalar el servidor a **`Standard_B2s`** (el humano autorizó subir unos días y
+bajar cuando esté estable; ver `progress/current.md`). Saldo al arrancar: **60**,
+los créditos iniciales que Azure da al escalar (el reseteo está medido: de 6 a
+60 en el reinicio). **T29 cumplida**: `_meta.obra_build` tiene **920 filas, 920
+obras** (construidas entre las 18:18 y las 20:23), `stg.plan_mensual`
+**29.772.701 filas**, `check-ventana` **OK** (920 miradas, 0 hallazgos),
+`check-cobertura` en el **KO conocido** de F-052 (20 obras invisibles, 294
+huérfanas: esta rama no lleva sus excepciones), diccionario publicado en
+**versión 13**.
+
+| paso | resultado |
+|---|---|
+| `ingest_raw` | SUCCESS · 20.147.626 filas · **1.832 s** (2.206 y 1.782 el día antes estrangulado) |
+| `build_stg` | SUCCESS · 44.042.947 · **9.527 s** (2 h 39; `plan_mensual` 60/60, tramos de 47 a 220 s) |
+| `build_mart` | SUCCESS · 5.384.370 · 2.840 s (47 min) |
+| `build_maestros` / `build_compras` / `build_retenciones` | SUCCESS · 4 / 456 / 53 s |
+| `build_cierre` | SUCCESS · 16.952 · **2.665 s** (44 min, casi todo `build_fact`) |
+| `publicar_diccionario` · `apply_grants` | SUCCESS · 0,6 / 0,3 s |
+
+**Coste en créditos, curva medida a un minuto (B2s: 24/h de recarga, base 0,8
+vCPU)**: 60 (17:40) → 50 (18:10) → 31 (19:05) → 15 (19:40) → **mínimo 6 a las
+20:05**, al final de `plan_mensual` → **sube** durante `mart` y `cierre` (13 a
+las 21:00, 17 a las 21:55) → 14 al terminar. Dos lecturas: (1) el gasto neto de
+la completa es **~54 créditos más lo recargado en 4 h 52 (~117)**, o sea del
+orden de **170 créditos**, y por eso no cabía en los 57 de la mañana ni en un
+B1ms a medias; (2) `mart` y `cierre` **no consumen créditos** en el B2s: su CPU
+media queda por debajo del 40 % de base, son pasos de E/S. Todo el gasto está
+en `ingest_raw` y `build_stg`. Nota: aun con la hucha casi a cero el B2s no se
+estranguló (los últimos tramos iban a 47-57 s), que era el argumento para
+subirlo.
+
+**Ojo con la comparación de duraciones**: 4 h 52 es lo mismo que la completa
+del 04 en B1ms con créditos (4 h 50). El B2s no acelera un build en serie de
+una sola conexión; lo que hace es **no morir** cuando la hucha se vacía. Esta
+es la primera pasada y reconstruye las 920 por R18; la acotada de verdad es la
+siguiente nocturna, y esa es la que T33/T34 y F-065 tienen que medir.
+
+### T28 · El plan en seco — HECHO el 2026-09-05, 22:50 UTC, tras la completa
+
+Ojo con el entorno: el `.env` del puesto **no lleva `PG_VENTANA_ACTIVA`** (la
+ventana se encendió en Azure, no en local), así que `ventana-plan` a secas dice
+`completa: True (la ventana esta DESACTIVADA)` y 920/0. Se lanzó con la variable
+puesta en la shell, sin tocar `.env`:
+
+```
+PG_VENTANA_ACTIVA=true python main.py ventana-plan --detalle
+```
+
+**Resultado: 920 censadas, 592 se reconstruirían, 328 se quedarían.** Por
+motivo: `sin_filas` 552, `ventana` 368. **Cuadra con el censo de §2, pero no
+como lo dice la tarea** («40 a reconstruir y 880 congeladas»):
+
+- **368 obras tienen filas en `stg.plan_mensual`** (medido: `count(distinct
+  obra_id)` = 368). De ellas **40 son vivas** (592 − 552) y **328 se congelan**.
+  Esas son las cifras del censo.
+- **Las otras 552 no tienen ni una fila en `plan_mensual`**, y R18 manda
+  reconstruirlas siempre («completar no es actualizar»). En `plan_mensual` no
+  cuesta nada, pero **319 de ellas sí tienen filas en `stg.presupuesto`** y
+  327 en `stg.partidas`: ese presupuesto se rehace cada noche. Cuánto pesa lo
+  dirá T1; si es poco, R18 se queda como está; si no, habría que distinguir
+  «sin filas porque no las tiene» de «sin filas porque no se ha construido».
+
+### T30 · Las cinco huellas del DESPUÉS — HECHAS el 2026-09-05, 22:44-23:00 UTC
+
+Capturadas desde el puesto, con el B2s: `dimension` 5 s, `plan_obra` 3 min,
+`cierre` 7 s, `mart` 4 s (el día 4, en el B1ms, `stg` tardó 15 min y se cayó
+dos veces). Mismos recuentos que el ANTES en las cuatro: 735/504, 937/350
+(938 el día 4), 16.952/330, 24.779/349 (24.775 el día 4).
+
+**Las cuatro comparaciones salen KO a tolerancia cero**, y **las diferencias
+NO son del ETL**: son cambios en Sigrid entre la ingesta del 04 y la del 05.
+Las pruebas, una a una:
+
+| capa | obras que se mueven | qué cambia |
+|---|---|---|
+| `dimension` | 0678, 0696, 0699, 0712, 0722, 0724, 180501, POSTV2 | número de partidas (p. ej. 0722: 362 → 372; 180501: 175 → 168) |
+| `plan_obra` | 0678, 0709, 0712, 0722, 180501 | filas e `importe_origen` de los ámbitos 3, 7, 8 y 11 |
+| `mart` | 0678, 0709, 0712 | `importe_mes` de **2026-08** en ámbitos 3 y 7; **master 8 y 11: 0 cambios** |
+| `cierre` | 0678, 0696, 0697, 0699, 0707, 0709, 0711, 0712, 0722, 0723, 0724 | `final_importe` y `pendiente_importe` del mes **2026-08-01** |
+
+1. **`stg.partidas` = `raw.obrparpar` en las ocho obras de `dimension`**, fila a
+   fila en el recuento (0722: 372 y 372; 180501: 168 y 168). El ETL reproduce
+   exactamente lo que trae el `raw` de hoy; lo que difiere del día 4 es el
+   `raw`.
+2. **El SQL que construye `stg.partidas` no lo ha tocado F-025**: su último
+   commit es `a470ebf` (F-052, 2026-09-01), anterior a la imagen del 02-sep con
+   la que se hizo el ANTES. Mismo SQL, distinto `raw`.
+3. **Las once obras con código son todas `obra viva`** en el plan de T28
+   («no cumple ninguna de las tres reglas»): 0678, 0696, 0697, 0699, 0707,
+   0709, 0711, 0712, 0722, 0723, 0724. Las dos sin código —180501
+   (administrativa, seis dígitos) y POSTV2 (postventa)— son `sin_filas`. Ni
+   una congelada se mueve.
+4. **Lo que cambia es actividad de agosto**: en `mart` solo se mueven los
+   ámbitos 3 y 7 (coste y venta real) del mes 2026-08, y los master 8 y 11 dan
+   0 cambios. Es la forma exacta de un día de trabajo en Sigrid: partes y
+   facturas de agosto que entran en septiembre.
+5. **La reconstrucción de hoy fue completa por R18** (`obra_build` estaba
+   vacía), así que ninguna obra se congeló: esta comparación no prueba nada
+   sobre congelar, prueba que el build nuevo sobre el `raw` nuevo da lo que
+   trae Sigrid. La equivalencia que T30 quiere —«sobre el mismo `raw`»— exige
+   otra captura: **huellas ahora (sobre el `raw` del 05) y las mismas huellas
+   tras un build acotado sin volver a ingerir**.
+
+Un dato que Negocio puede querer saber, aunque no sea del ETL: la obra
+**180501** perdió 7 partidas y su ámbito 7 entero en `plan_obra` (853.790 €
+que ya no están en el origen), y el ámbito 3 pasó de 835.621 € a 90.079 €.
+
+**La huella de `stg`** (9 min desde el puesto, 12.409 celdas de 349 obras;
+12.407 el día 4) sale **KO con dos avisos**: 3 obras fuera de la lista (0678,
+0709, 0712) y **66 cambios en los ámbitos master 8 y 11**, todos de la 0712, que
+el comparador da por intocables. **Tampoco es del ETL, y aquí la prueba es
+directa**: `raw.obrfasamb` tiene para la 0712 **doce versiones** del master
+(0-11) en los dos ámbitos, y la **versión 11, «CIERRE AGOSTO-26», se creó en
+Sigrid el 2026-09-04** (`fec = 20260904`), *después* de la nocturna de las
+02:00 de ese día que sirvió de ANTES. `stg.presupuesto` reproduce `raw.obrparpre`
+**fila a fila en las 24 combinaciones (ámbito × versión)** de la obra —444/444
+… 465/465 en el 8, 378/378 … 399/399 en el 11—, y de los nueve SQL de `stg`,
+F-025 solo tocó `06_presupuesto.sql`. `mart` no se movió en master porque su
+versión vigente por mes se fija por fecha efectiva y el cierre nuevo aún no
+manda. Es, otra vez, Sigrid trabajando entre las dos capturas.
+
+**Veredicto de T30 tal como está definida: KO en las cinco capas, todas las
+diferencias explicadas por el origen y ninguna en una obra congelada.** La
+tarea dice que cualquier diferencia PARA la feature y se consulta al humano;
+consultado el 2026-09-05 a las 23:05 UTC. **DECISIÓN DEL HUMANO (2026-09-06,
+01:10 local): T30 se da por buena** —«parecen cambios de obras vivas, es
+normal»—, con la confirmación de que el origen de cada diferencia es que se
+ingirieron dos volcados de Sigrid distintos en días distintos. La propuesta
+de repetirla sobre el mismo `raw` queda como opción, no como obligación: la
+prueba de que congelar no cambia una celda la dará T31b en la primera
+nocturna acotada. Lo que sigue era la propuesta antes de la decisión: dar
+esta T30 por **no concluyente** por diseño (dos `raw` distintos y ninguna obra congelada
+en la primera pasada) y sustituirla por la captura sobre el mismo `raw`:
+huellas del datamart actual, un build acotado **sin ingesta**
+(`PG_VENTANA_ACTIVA=true`, `stage` + `build-mart` + los de negocio + `cierre`
+desde el puesto, o el job con la ingesta saltada) y las mismas huellas
+después. Con el B2s cada huella cuesta segundos, salvo `stg` (9 min) y
+`plan_obra` (3).
+
+### T31 · La 0599 — HECHA el 2026-09-05, 23:07 UTC
+
+`python main.py inspect-cierre --codigo 0599` (obra 1442383, TANATORIO
+MAJADAHONDA), último mes Diciembre 2022, fase 28: **DIRECTOS 2.624.793,46 €**,
+BENEFICIO 72.603,10 € sobre 4.066.989,23 € de venta = **1,79 %**. Las mismas
+cifras de F-052.
+
+### T32 · Los cinco `check-*` — 2026-09-05/06, tras `hamsh8o`
+
+| check | veredicto | igual que antes del cambio |
+|---|---|---|
+| `check-ventana` (en `run-all`) | **OK**, 920 miradas, 0 hallazgos | primera vez que corre |
+| `check-declarados` (en `run-all`) | OK (el job salió en `Succeeded`, y este es el que tumba) | sí |
+| `check-cobertura` (en `run-all`) | **KO conocido de F-052**: 20 invisibles, 294 huérfanas (esta rama no lleva sus excepciones) | sí, 04-sep |
+| `check-unicidad --timeout 300` (11 min) | **KO conocido de F-051**: `cierre.v_pbi_planif_vs_real`, 204 combinaciones / 472 filas, renglón BENEFICIO; 43 sin contradicción | sí, 30-ago, mismas cifras |
+| `check-cierres --timeout 1800` (20 min, solo) | **0 discrepancias** en 8.552 cierres candidatos / 8.531 publicados de 679 pares obra/ámbito; telescopio R16: 254.388 series, **0 sin cuadrar**, 18.592 apartadas por hueco de origen. (El primer intento con 900 s murió por `QueryCanceled` porque corría a la vez que `check-unicidad`: culpa del guion, no de la base) | sí: el 04-sep dio 0 y 0 sobre 8.540 / 254.236 |
+
+`check-unicidad` dejó **dos** vistas sin comprobar por timeout
+(`mart.v_master_vigente_anual`, que ya era un «no lo sabemos» permanente, y
+`mart.v_master_versiones_tipadas`, que esta vez corría en paralelo con
+`check-cierres`).
+
+### T1 · El peso real — MEDIDO el 2026-09-05, 23:40-23:47 UTC (7 min en B2s)
+
+Sobre `_meta.obra_build` ya poblada por `hamsh8o` (la del 04 no valía: R18
+mandaba reconstruir las 920). Con `PG_VENTANA_ACTIVA=true` en la shell y
+`completa=False`:
+
+| conjunto | obras | peso (`SQL_PESOS_PLAN_MENSUAL`) |
+|---|---|---|
+| a reconstruir | 592 (40 `ventana` + 552 `sin_filas`) | **30.534.657** |
+| de ellas, las 552 `sin_filas` | 552 | **24.697** (el 0,08 %) |
+| congeladas | 328 | **44.395.641** |
+| **AHORRO** | | **59,2 %** (criterio de parada: < 40 %) |
+
+Dos lecturas. (1) **No hay que parar**: el ahorro medido es del 59,2 %, por
+debajo del 73,3 % que estimaba §3 —el proxy no cubría los ámbitos master 8 y
+11, y las obras vivas tienen mucho master— pero muy por encima del umbral. (2)
+**Las 552 obras `sin_filas` no pesan nada** (24.697 de 74,9 M): R18 se queda
+como está, no hace falta distinguir «sin filas porque no las tiene» de «sin
+construir». La duda que dejó T28 queda cerrada.
+
+### T2b · Cuánto cuesta la firma — MEDIDO el 2026-09-05, 23:47-23:52 UTC (B2s)
+
+| variante | tiempo | obras |
+|---|---|---|
+| barata, `SQL_FIRMA_ORIGEN` (la que corre cada noche) | **110,7 s** | 920 (sale de `raw.obr`) |
+| cara, `SQL_FIRMA_ORIGEN_CON_PLANIF` (`md5(string_agg(planif))`) | **186,1 s** | 728 (solo las que tienen filas en `obrparpre`) |
+
+Ojo con la lectura: la cara **no sustituye** a la barata, **se le añade**. Solo
+agrega `raw.obrparpre` (por eso 728 obras y no 920): en producción sería la
+barata más un `LEFT JOIN` con este hash por `obra_id`, y su precio es **~3
+minutos más por noche en el B2s**; en el B1ms, con 10 MiB/s de techo, cabe
+esperar el doble o el triple. Sobre unas 4 h de nocturna es asumible en
+tiempo; lo que compra es cerrar la laguna de R20 (un cambio de planificación
+pura, sin mover cantidades ni precios, hoy no cambia la firma y espera al
+domingo). **Decisión pendiente del humano**: implantarla es código (sumar
+`pre_planif` a `COLUMNAS_FIRMA_ORIGEN` y al SQL, con su test), y cambiar la
+firma provoca una reconstrucción completa la primera noche, como avisa el
+propio código. Si se implanta, va como tarea nueva con su spec, no en la
+fase 7.
+
+### T31b y T34 · LA PRIMERA NOCTURNA ACOTADA — MEDIDAS el 2026-09-07
+
+**La del cron (`29812320`, 00:00 UTC) murió** antes de medir nada, por una causa
+ajena a esta feature: un inquilino nuevo del Postgres compartido, la base
+`facturas`, sobre la que el rol del ETL no tenía `CONNECT`, y la puerta de disco
+de F-019 suma todas las bases antes de cada tramo. Ver
+`progress/incidencia_nocturna_20260907.md`.
+
+**Se relanzó a mano tras el arreglo**: `caj-datamart-seg-dev-swtg78p`,
+**07:48:46 → 10:52 UTC**, `Succeeded`, con la imagen vieja `r20260905-1237` a
+propósito (F-025 sin F-066). Los diez pasos en verde y `check-declarados` en
+105/105.
+
+#### T34 · Créditos — CUMPLE con enorme margen
+
+| momento | créditos (de 576, `Standard_B2s`) |
+|---|---|
+| al arrancar | 475 |
+| **mínimo durante todo el build** | **454** |
+| al terminar | 456, ya recuperando |
+
+Gasto neto: **21 créditos en 3 horas**. R29 exige mayores que cero. La completa
+`hamsh8o` había bajado hasta 6.
+
+#### T31b · Quién se reconstruyó y quién no — CUMPLE
+
+`_meta.obra_build`, consultado a las 12:55 UTC:
+
+| `construido_at` | obras | filas |
+|---|---|---|
+| **2026-09-05** (conservan el de la completa) | **328** | 18.153.844 |
+| **2026-09-07** (rehechas esa noche) | **592** | 11.668.006 |
+
+Y el desglose por motivo, que es lo que de verdad enseña:
+
+| congelada | motivo | obras |
+|---|---|---|
+| sí | `ventana` | **328** |
+| no | `ventana` | **40** ← las obras vivas |
+| no | `sin_filas` | **552** |
+
+Las 328 congeladas **conservan su `_built_at` anterior**: es exactamente lo que
+R26 exige y lo que T31b tenía que demostrar.
+
+### EL AHORRO REAL: 71,2 %, y el error de medición que casi lo entierra
+
+**Comparado contra la completa `hamsh8o` del 05-sep:**
+
+| paso | completa | acotada | |
+|---|---|---|---|
+| `ingest_raw` | 1.832 s | 2.256 s | +23 % (fuera de alcance) |
+| **`build_stg`** | **9.527 s** | **2.740 s** | **−71,2 %** |
+| `build_mart` | 2.840 s | 2.512 s | −11,6 % (ruido) |
+| `build_cierre` | 2.665 s | 2.842 s | +6,6 % (ruido) |
+| **noche entera** | **4 h 52** | **3 h 00** | **−38,3 %** |
+
+`build_stg` baja **1 h 53**. El criterio de parada de la fase era el 40 % y T1
+había predicho el 59,2 %: la realidad ha superado la predicción.
+
+**EL ERROR, anotado a propósito para que no se repita.** El líder comparó
+primero `build_mart` —que esta feature **nunca toca**, y así lo dice
+`design.md:162-163` y `:235`— y concluyó un ahorro del 9 %, dando la feature por
+fallida e informando de ello al humano. La trampa: **hay dos ficheros llamados
+`02_build_fact.sql`**, uno en `sql/stg/` y otro en `sql/mart/`. La señal que
+delataba el error estaba a la vista y no se usó: **la acotada produjo MÁS filas
+que la completa** (5.361.017 frente a 5.359.591), lo que es imposible si el paso
+estuviera acotado. Análisis completo en `progress/explore_F-025_coste_fijo.md`.
+
+### SEGUNDA NOCTURNA ACOTADA · `p1gq8ks` — 2026-09-08, confirma el ahorro
+
+Escrita aquí a petición del reviewer (pasada 6, observación 2): la citaba el
+líder por chat y no vivía en ningún fichero.
+
+`caj-datamart-seg-dev-p1gq8ks`, **11:16 → 14:19 UTC**, `Succeeded`. Es la
+primera con la imagen `r20260908-1248`, que ya lleva F-066 (25 tablas nuevas) y
+F-068. Los diez pasos en verde y `check-declarados` en **130/130**.
+
+| paso | completa `hamsh8o` | acotada 1 `swtg78p` | acotada 2 `p1gq8ks` |
+|---|---|---|---|
+| `ingest_raw` | 1.832 s | 2.256 s | 2.454 s (con 25 tablas más) |
+| **`build_stg`** | **9.527 s** | **2.740 s (−71,2 %)** | **2.652 s (−72,2 %)** |
+| noche entera | 4 h 52 | 3 h 00 | 3 h 03 |
+
+**Dos mediciones independientes, en dos días distintos y con imágenes
+distintas, dan el mismo resultado.** La segunda ingiere un 26 % más de filas
+(25.491.959 frente a 20.150.778) y aun así `build_stg` baja: la ventana no
+depende del volumen de `raw`.
+
+**Créditos**: mínimo **552 de 576** durante toda la ejecución. La primera
+acotada gastó 21 créditos; ésta, prácticamente ninguno.
+
+### El defecto que sí destapó esta nocturna: 552 obras de ruido en el censo
+
+De las 552 que entran por `sin_filas`, **512 siguen con cero filas después de
+reconstruirlas**. No están a medio construir: no tienen nada que construir. El
+censo sale de `SQL_ESTADO_OBRAS` (`postgres_client.py:144`), que lo toma de
+`raw.obr ⨝ raw.con`: **920 fichas del maestro crudo**, frente a 583 en
+`stg.obras` y **368 con datos** (= 328 + 40, cuadra exacto). Entre ellas, `0000`
+= «PLANTILLA DE OBRA» y el código `0001` repetido **ocho veces** con el nombre en
+blanco.
+
+`domain/ventana.py:472` las trata como «completar no es actualizar», que es
+correcto para una obra a medio hacer y falso para una plantilla. **No bloquea
+esta feature** —el ahorro ya es del 71 %— y se ha abierto **F-071** para
+arreglarlo junto con lo que la IA ve de esas obras.
+
+### Sigue sin medirse
+
+**T33**. T31b y T34 quedan medidas arriba; T1 y T2b el 05-sep.
+
+### Cinco tests que dependían del día real — arreglados el 2026-09-06
+
+Los domingos `bash harness/init.sh` salía en rojo: cinco tests de
+`tests/test_f025_build.py` (`r9_sin_obras_que_reconstruir_no_se_toca_nada`,
+`r9_con_el_conjunto_vacio_las_congeladas_igual_se_registran`,
+`r6_el_presupuesto_tambien_se_acota`,
+`r30_el_paso_registra_cuantas_reconstruye_y_cuantas_congela` y
+`r10_las_sobrantes_solo_se_miran_en_la_reconstruccion_completa`) daban por
+hecho un día laborable y no fijaban la fecha, así que R25 les mandaba
+reconstrucción completa y las cuentas de obras reconstruidas/congeladas no
+cuadraban. Arreglado **en los tests**: el auxiliar `ejecutar` congela ahora la
+fecha en el jueves 2026-09-03 mediante una subclase de `datetime`, con un
+parámetro `ahora` para pedir otro día, y se añadió
+`test_f025_r25_el_domingo_se_reconstruye_todo` que ejercita el domingo a
+propósito. **El step no cambia**: sigue tomando la fecha real con
+`datetime.utcnow()`, que es lo correcto en producción.

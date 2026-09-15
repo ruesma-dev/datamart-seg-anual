@@ -82,6 +82,52 @@ DEFAULT_CONSUMPTION_SCHEMAS = (
     "mart,cierre,compras,maestro,retenciones,raw,stg,aux,_meta"
 )
 
+# Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
+# de arriba. Formato `esquema.tabla`, separadas por comas.
+#
+# ####################################################################
+# #  ESTO ES TEMPORAL Y SU REVERSIÓN YA ESTÁ DECIDIDA (F-068)        #
+# ####################################################################
+#
+# Palabras del humano el 2026-09-07, que son la decisión completa:
+#
+#     «de momento quita el permiso. Cuando pongamos límites o
+#      guardarraíles por usuario, habrá que volver a ponerlo para
+#      algunos usuarios».
+#
+# O sea: NO es una prohibición permanente ni un juicio sobre estas dos
+# tablas. Es un tapón puesto mientras el MCP no sepa distinguir QUIÉN
+# pregunta. El día que exista control por usuario, esta lista se vacía
+# —o se queda solo para los usuarios sin permiso— sin tocar código, con
+# PG_EXCLUDED_TABLES. Quien lea esto dentro de seis meses: la pregunta
+# no es «¿se puede levantar?», es «¿ya hay control por usuario?».
+#
+# POR QUÉ hizo falta (F-066, 2026-09-06): `raw` se trae `emp` y `res`
+# ENTERAS desde Sigrid, por decisión del humano tomada con el aviso
+# delante. `raw.emp` son 1.352 empleados con DNI (1.341 filas), número
+# de la Seguridad Social (1.171), cuenta bancaria (985), domicilio,
+# teléfonos y credenciales del portal. `raw.res` son 2.610 recursos con
+# el NIF de la persona en `cif` (626 filas) y las credenciales de acceso
+# a Sigrid: la ficha de F-068 la daba por limpia y no lo está, así que
+# entra también. Y el rol `mcp_sigrid_dm_ro` lo lee cualquier cuenta del
+# tenant.
+#
+# CÓMO se sostiene: `apply_grants` corre cada noche y hace
+# `GRANT SELECT ON ALL TABLES IN SCHEMA raw`, que no sabe saltarse una
+# tabla. Por eso el mecanismo es conceder y REVOCAR después, en la misma
+# tanda, más quitar el `ALTER DEFAULT PRIVILEGES` de `raw` para que una
+# tabla recreada no nazca legible. Ver `postgres/grants.py`.
+# F-074 (2026-09-09) añade `raw.reshor` y `raw.emphis` a la misma lista y
+# por el mismo motivo: son datos de NÓMINA. `raw.reshor` es el precio de
+# coste por recurso y tipo de hora —8.949 filas, 2.036 con precio distinto
+# de cero, o sea lo que cobra cada persona—, y `raw.emphis` el histórico de
+# contrato de 1.017 empleados, de 1989 a 2026, con el tipo de contrato al
+# 100 %. Entran a `raw` porque el datamart las necesita para pasar de horas
+# a euros (F-061) y para saber quién estaba de alta cuándo; no entran al
+# alcance del MCP porque hoy no sabe quién pregunta. Mismo tapón TEMPORAL
+# y misma reversión ya decidida que `emp` y `res`.
+DEFAULT_EXCLUDED_TABLES = "raw.emp,raw.res,raw.reshor,raw.emphis"
+
 AUTH_MODES = ("password", "entra")
 
 
@@ -132,6 +178,13 @@ class PostgresSettings(BaseSettings):
         description="Esquemas, separados por comas, sobre los que el rol de solo "
                     "lectura recibe USAGE + SELECT.",
     )
+    excluded_tables: str = Field(
+        DEFAULT_EXCLUDED_TABLES,
+        description="Tablas 'esquema.tabla', separadas por comas, que el rol de "
+                    "solo lectura NO puede leer aunque su esquema esté en "
+                    "consumption_schemas. TEMPORAL (F-068): ver el comentario "
+                    "de DEFAULT_EXCLUDED_TABLES.",
+    )
     # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
     # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y
     # dejó a albaranes y partes en solo-lectura diez minutos. Estos tres valores
@@ -143,9 +196,18 @@ class PostgresSettings(BaseSettings):
                     "un tramo unitario, con aviso.",
     )
     disco_total_gb: int = Field(
-        32,
+        64,
         description="Tamaño total del disco del servidor Postgres, en GB. No se "
-                    "cablea: el servidor puede crecer sin que cambie el código.",
+                    "cablea: el servidor puede crecer sin que cambie el código. "
+                    "64 desde el 2026-08-29, que es cuando se amplió el disco "
+                    "compartido (antes 32). Este default es la ÚLTIMA RED, no la "
+                    "configuración: el valor bueno lo inyecta el job desde "
+                    "infra/env/dev.json (discoTotalGb) como PG_DISCO_TOTAL_GB, y "
+                    "los dos los ata el test "
+                    "test_f019_r8_el_disco_por_defecto_coincide_con_dev_json. "
+                    "Mientras estuvo en 32 con el disco ya ampliado, la puerta "
+                    "leía el 37 % real de ocupación como un 74 % y estaba a seis "
+                    "puntos de abortar la nocturna cada noche sin motivo.",
     )
     disco_limite_pct: float = Field(
         80.0,
@@ -234,6 +296,11 @@ class PostgresSettings(BaseSettings):
     def consumption_schema_list(self) -> list[str]:
         """`consumption_schemas` como lista, sin blancos ni entradas vacías."""
         return [s.strip() for s in self.consumption_schemas.split(",") if s.strip()]
+
+    @property
+    def excluded_table_list(self) -> list[str]:
+        """`excluded_tables` como lista, sin blancos ni entradas vacías."""
+        return [t.strip() for t in self.excluded_tables.split(",") if t.strip()]
 
     @property
     def conninfo(self) -> str:

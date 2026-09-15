@@ -654,3 +654,371 @@ deberían cambiar». Fase RED y cobertura sí se exigieron y están.
   llegan al fact porque su `partida_id` no tiene ficha en `stg.partidas`.
 - `check-unicidad` no consigue comprobar `mart.v_master_vigente_anual` ni con
   300 s: su clave sigue sin verificar.
+
+---
+
+## F-025 · Ventana de negocio en el build — `done` (2026-09-08)
+
+Rama `feature/F-025-ventana-negocio-build`, commit de cierre `96bb7b9`. Rigor
+`critico`. Veredicto APROBADO en `progress/review_F-025.md`.
+
+El build dejaba de reconstruir cada noche las 920 fichas del censo y pasa a
+acotar `plan_mensual` y `presupuesto` a las obras vivas. **Ahorro medido tres
+veces, con dos imágenes distintas y en dos días: 71,2 %, 72,2 % y 72,2 % en
+`build_stg`** (9.527 s → 2.652 s), y la noche entera baja de **4 h 52 a
+3 h 00-3 h 18**. Las cifras, con las tres ejecuciones comparadas, en
+`specs/F-025-ventana-negocio-build/mediciones.md`.
+
+**El error que costó la mañana y que quedó en memoria**: se cronometró
+`build_mart` —un paso que esta feature no toca— y se declaró la feature fallida
+con un 9 %. Había dos ficheros `02_build_fact.sql` en capas distintas. El paso
+que mide la feature se verifica antes de creerse un número.
+
+Deja abierto: **T33** (bloat sostenido tras siete noches acotadas) pasa a
+**F-065** con dueño y umbral; y el censo destapa **552 obras de ruido**, de las
+que 512 siguen vacías después de reconstruirlas, lo que abre **F-071**.
+
+---
+
+## F-068 · Los datos personales de `raw.emp`, fuera del alcance del MCP — `done` (2026-09-08)
+
+Rama `feature/F-068-datos-personales-mcp`, commit de cierre `f94fae6`. Rigor
+`critico`. Veredicto APROBADO en `progress/review_F-068.md`.
+
+El rol de solo lectura del MCP deja de poder leer `raw.emp` y `raw.res`, y la
+nocturna lo mantiene. **La clave del arreglo**: separar lo *declarado* de lo
+*existente*. `ALTER DEFAULT PRIVILEGES` reponía el `GRANT` en cuanto la tabla se
+recreaba, así que un `DROP` nocturno devolvía el acceso sin que nadie lo notara;
+ahora manda la lista declarada (`PG_EXCLUDED_TABLES`) sobre el catálogo, y el
+defecto es el seguro.
+
+**La revocación es TEMPORAL y su reversión está decidida por el humano**: vuelve
+en cuanto el MCP tenga control por usuario. Escrito en `config/settings.py`,
+`infra/sql/02_roles.sql`, `docs/ARCHITECTURE.md`, el runbook y las fichas del
+diccionario, para que dentro de seis meses nadie lo lea como una prohibición
+permanente.
+
+Deja abierto: `infra/sql/02_roles.sql` **no lo ejecuta ningún test** —solo se
+comprueba su texto— y está corregido en dos sitios que solo prueba `psql`.
+Antes de volver a provisionar un rol desde cero, ejecutarlo contra una base de
+prueba.
+
+---
+
+## F-066 · Ingesta de las tablas `raw` pendientes — `done` (2026-09-09)
+
+Rama `feature/F-066-ingesta-raw-pendientes`. Rigor `critico`. Veredicto
+**APPROVED** en la cuarta pasada del review, `progress/review_F-066.md`.
+
+**La ingesta pasa de 31 a 56 tablas** y las 56 corren cada noche en producción.
+La nocturna automática `29815200` (00:00 → 03:13 UTC del 09-sep) terminó
+`Succeeded` con los diez pasos, 57 tramos sin un solo no-SUCCESS, 25.497.946
+filas y 130/130 objetos declarados. Las decisiones DA-1 a DA-11 viven en
+`design.md` §6; las tres que cerró el humano el 06-sep: `emp` y `res` enteras
+(con solo 11 exclusiones técnicas), el histórico de estados a **F-067** como
+foto diaria porque Sigrid no lo guarda, y `apu` entera con `--full` más `apa`.
+
+**Tres hallazgos que valen más que la feature:**
+
+1. **`check-raw-recuentos` cazó un fallo real el día que nació**: el YAML tenía
+   17 entradas duplicadas que la nocturna habría cargado dos veces cada noche.
+   Ningún test lo veía porque todos leían la ingesta como un `dict`, que colapsa
+   duplicados.
+2. **`CREATE TABLE IF NOT EXISTS` no reconcilia columnas.** Una columna nueva en
+   el origen (`pagtex` en `raw.dcf`) tumbó dos nocturnas con `UndefinedColumn`.
+   Se arregló con `_reconciliar_columnas_raw`, en la misma transacción.
+3. **La igualdad exacta contra Sigrid era inalcanzable por diseño** —el ERP está
+   vivo y el datamart es una foto—. Se sustituyó por **tolerancia CON
+   DIRECCIÓN**: filas de más en Sigrid son deriva y se toleran hasta 0,05 % por
+   tabla; **filas de MENOS son alarma sea de una sola**; `ausentes` y `sin_medir`
+   siguen siendo fallo. El mismo estado de la base que el 08-sep daba «31
+   iguales · 25 distintas» y código 1 ahora sale CONFORME con la peor desviación
+   en 0,0080 %: seis veces de margen, y sin tapar ninguna señal grave.
+
+**La grieta, dicha en voz alta por el reviewer**: 0,05 % de `obrparpre` son unas
+6.940 filas. **Revisar el umbral si baja `page_size` o aparece una tabla mayor.**
+
+**Y una lección de método que ya había costado diez días en agosto**:
+`check-diccionario` salió en rojo con el código bien. La imagen en producción
+era del mediodía anterior y dos fichas se habían corregido después. **El
+repositorio en verde no es producción.** Se resolvió desplegando
+`r20260909-0520` y publicando el diccionario a mano, las dos cosas con
+autorización expresa del humano.
+
+Deja abierto: **F-069**, dos cegueras del mutador —no muta constantes `float` ni
+la división—, y una de ellas es `TOLERANCIA_DERIVA_PCT = 0.05`, el número del
+que depende entero el criterio. Están cubiertos por tests (el reviewer los mutó
+a mano y mueren), pero eso lo demuestran los tests y no la campaña.
+
+---
+
+## F-072 · El censo semántico de las 31 tablas que nadie consume — `done` (2026-09-09)
+
+Rama `feature/F-072-censo-semantico-raw`. Rigor `documental`. Veredicto
+**APROBADO** en la pasada 2, `progress/review_F-072.md`.
+
+Nace el mismo día, al retirar F-071: **«analizar el dato que hay ahora mismo y
+los hallazgos, y con eso crear nuevas tablas de datos procesados y enriquecer
+las actuales; usa la conexión sigrid-api para entender lo que significan»**. El
+hecho que la abre: de las 56 tablas que se ingieren cada noche, **solo 25 las
+consume algún build**. Las otras 31 ocupan disco y la IA no las ve.
+
+**Cuatro exploradores en paralelo**, un bloque cada uno, cruzando tres fuentes
+por tabla: el diccionario de Sigrid en `azure-apps`, **sigrid-api contra el
+Sigrid vivo** y mediciones de solo lectura sobre `raw`. Entregable:
+`progress/explore_F-072_catalogo.md` más los cuatro informes de bloque.
+
+**El veredicto**: se construye con 19 tablas, se descartan 6, el resto es
+catálogo. **Nueve tablas del origen no se ingieren** y bloquean media
+propuesta, lo que abre **F-074**.
+
+**Seis fichas del backlog daban por cierto algo que el censo desmiente**, y se
+corrigieron en el mismo trabajo:
+
+1. **F-057**: `res` **no es el maestro de personal**. 1.353 filas son personas,
+   1.157 son consumos imputables y 106 son medios. Sumar `hmores` sin cortar por
+   `cla` da una cifra falsa, que es lo que la feature habría hecho.
+2. **F-045**: el nudo **ya está resuelto**. `cen.obride` está a cero en las 804
+   filas, pero centro y obra son dos filas de `con` con la misma empresa y
+   código: **683 pares, 0 ambigüedades, 261 de 261** en retenciones. La
+   aritmética `+1` que se suponía solo acierta el 63,8 %.
+3. **F-061**: deja de estar bloqueada por lo anterior, y el multiplicador que le
+   falta se llama `reshor`.
+4. **F-038**: el proveedor **no** sale de `comprv.prvide` (18,11 % informado)
+   sino de `dco.entide` (99,86 %). Y `comlin` necesita saneado: 14.513 precios a
+   0, 4.100 negativos y **una línea de 363 M€ que por sí sola duplica 2020**.
+5. **F-036**: su punto 3 **no es implementable**. `auxobrtca` tiene 3 filas y
+   `obrparpar.tcaide` está a cero en las 392.207 partidas.
+6. **F-055**: `prvcer` es **dato muerto desde 2019**; 2.708 de 2.741
+   certificados caducaron antes de 2020.
+
+**Dos hallazgos que no buscaba nadie.** `com`, `comlin` y `comprv` declaran una
+`incremental_column` que **no existe en Sigrid**: el ETL degrada en silencio y
+esas 287.673 filas se recargan enteras cada noche. Y el APU **no existe como
+dato**: `catest`, `catpro` y `obrparres` están vacías y la descomposición vive
+dentro de un blob, así que no se puede prometer «de qué está hecho el precio de
+una partida».
+
+**El review cazó lo que faltaba**: los hallazgos heredados de F-071 no estaban
+medidos. Medidos ahora, **de 921 fichas de obra solo 294 traen municipio
+(31,9 %) y 305 traen dirección (33,1 %)**: a «dónde está la obra X», para dos de
+cada tres la respuesta correcta es «no consta». Acota lo que F-073 puede
+prometer.
+
+Deja abierto: **F-073** (construir), **F-074** (la ingesta de las nueve) y
+**F-075**, el defecto del arnés que el reviewer destapó: `harness.alcance`
+diffea contra una base vieja, así que **las dos puertas automáticas miden
+código de otras features**, y el fallo puede ir en la dirección mala.
+
+---
+
+## F-074 · La ingesta que destapó el censo: nueve tablas, una carga incremental falsa y un campo excluido — `done` (2026-09-09)
+
+Rama `feature/F-074-ingesta-tablas-del-censo`. Rigor `estandar`. Veredicto
+**APPROVED** en la pasada 2, `progress/review_F-074.md`.
+
+Da de alta nueve tablas de Sigrid que el censo de F-072 destapó y sin las
+cuales media propuesta no se podía escribir: `auxhor`, `auxrestip`, `cet`,
+`auxdpt`, `pro`, `reshor`, `emphis`, `dcaprodes` y `ctrprodes`. Las dos de
+nómina, `reshor` y `emphis`, quedan **fuera del alcance del rol del MCP** por
+el mecanismo de F-068, con el `REVOKE` posterior al `GRANT` verificado por el
+reviewer.
+
+**El hallazgo del implementer, que corrige al líder.** La feature se ordenó
+sobre una premisa falsa: que seis de las nueve cargarían solo altas por no
+tener `tiemod`, y que una fila modificada no volvería a bajar. **No es así.**
+El `CMD` del `Dockerfile` arranca `run-all --full`, o sea `TRUNCATE` y recarga
+entera de **todas** las tablas cada noche; `incremental_column` **no decide el
+modo de carga**, solo si se rellena `_source_tiemod`. No había agujero que
+tapar, y no se inventó ningún mecanismo para taparlo. Corregido por escrito en
+el YAML, en `ARCHITECTURE.md`, en `current.md` y en el §4 del catálogo de
+F-072, que lo insinuaba.
+
+**Dos arreglos y una limpieza** en el mismo paquete: `com`, `comlin` y `comprv`
+dejan de declarar una `incremental_column` que no existe en Sigrid; `prvcer`
+deja de excluir `tex`, el único campo que dice de qué es cada certificado; y
+`obrprv`, con 0 filas en origen, queda decidida con su motivo escrito.
+
+**La campaña de mutación, y la lección de método.** El implementer declaró un
+superviviente que no era: dijo `--full` y era `--reconstruir-todo`. **El
+reviewer reprodujo la muestra con la semilla declarada y el mutante de `--full`
+ni siquiera estaba en ella.** Devuelto, el implementer lo midió en vez de
+suponerlo: sin `is_flag`, click infiere `BOOL` y `run-all --reconstruir-todo`
+sale con exit 2, mientras la nocturna no se entera. Lo dejan vivo sus propios
+tests, que comprueban el `--help` por substring y el cableado por `getsource`
+pero **nunca invocan la opción por el parser**. Es código de F-025, ya cerrada,
+así que **no se tapó aquí**: salió a ficha propia, **F-077**.
+
+`bash harness/init.sh` en verde con la ejecución del propio reviewer: exit 0,
+**4.162 passed**, 168 skipped, 523 s.
+
+Deja abierto: **F-077** (el flag sin test por el parser) y el aviso, ya fichado
+como **F-075**, de que la puerta de cobertura sigue midiendo 842 líneas de un
+alcance que no es el de esta feature.
+
+---
+
+## F-079 · Lo publicado es para consultarse: `stg` deja de estar desaconsejado — `done` (2026-09-09)
+
+Rama `feature/F-079-todo-lo-publicado-es-consultable`. Rigor `estandar`.
+Veredicto **APROBADO**, `progress/review_F-079.md`.
+
+Pedida por el humano: «parece que en el diccionario se indica que no se
+recomienda para consulta `stg`, **eso bórralo, todo lo expuesto es para
+consulta**». Los **7 objetos de `stg`** que no son funciones pasan a superficie
+de consulta y pierden su `motivo_no_consumo`. El diccionario sube a la
+**versión 18**.
+
+**El inventario, que era la mitad del trabajo.** Los 27 objetos marcados fuera
+de `raw` no eran lo mismo: **7 de `stg`** con preferencias de enrutado (se
+quitan), **10 funciones SQL** que no se consultan sino que se llaman desde el
+build (se quedan), y **10 objetos rotos o vacíos** donde el aviso es un hecho y
+no una preferencia (se quedan, con el motivo reescrito para que se note la
+diferencia). `mart.v_pbi_cp_tipologia` no se tocó: la arregla **F-078**, de otra
+sesión.
+
+**El riesgo, y cómo se cerró.** Dentro de los motivos borrados había
+**advertencias de corrección** mezcladas con las preferencias. La grave es la de
+`stg.plan_mensual`: ahí conviven todas las versiones master y una consulta sin
+filtrar versión **multiplica los importes**. El reviewer verificó una por una
+que **las cuatro advertencias siguen llegando al agente**, y las dos graves por
+tres vías distintas.
+
+`bash harness/init.sh` en verde: **4.215 passed**, cobertura 93,6 %.
+
+**Dos avisos del reviewer que valen para lo siguiente**: lo que el MCP sirve
+puede ir por detrás del árbol, así que el número de versión del informe no se da
+por bueno sin `check-diccionario`; y **la nocturna republica el diccionario
+desde la imagen desplegada**, de modo que una imagen vieja pisaría la 18 con la
+suya. Por eso este cierre va seguido de despliegue.
+
+## F-073 · Tablas nuevas y enriquecimiento (cerrada el 2026-09-11, APROBADO)
+
+Rama `feature/F-073-tablas-nuevas-y-enriquecimiento`, 21 tareas, commits
+`59a6b36..d203a5a`. Informe: `progress/impl_F-073.md`; review:
+`progress/review_F-073.md`; campaña: `progress/mutacion_F-073.md`.
+
+**Qué construyó**, con la regla de frontera que fijó su diseño —*F-073 publica
+DIMENSIONES y el MAESTRO DE OBRA; la feature de dominio publica su HECHO y hace
+el CABLEADO*—:
+
+* `maestro.centros_coste`, el puente centro de coste -> obra: 804 filas, 683 con
+  obra, 1:1 por construcción. Resuelto por empresa y código en `raw.con`, **sin
+  usar `cen.obride`** (a 0 en las 804) ni aritmética sobre el `ide`.
+* `maestro.obras` enriquecida: dirección, `municipio`/`provincia` con sus dos
+  identificadores, las marcas `tiene_presupuesto` y `tiene_seguimiento`, y
+  `estado` con su nombre. **921 filas y ninguna columna perdida**: las 10 de
+  siempre van primero y en su orden, las 11 nuevas detrás.
+* `maestro.estados_documento`, las 193 filas de `conest`.
+* `compras.formas_pago`, las 69 de `auxpag` con su medio resuelto.
+
+**Las tres decisiones que aprobó el humano**: la frontera con F-067; que las
+marcas lean de `stg` y no de `mart`, con `build_maestros` pasando a depender de
+`build_stg`; y publicar la dirección con la cobertura que hay (un tercio),
+declarando el porcentaje en la ficha en vez de exigir un mínimo.
+
+**Evidencias del cierre**: `init.sh` exit 0, **4.367 passed / 171 skipped / 0
+failed**, cobertura de líneas cambiadas **93,6 % (791/845)**, 288 mutantes
+generados y los nueve supervivientes analizados uno a uno. Diccionario del árbol
+en **versión 19**.
+
+**Lo intocable siguió intocado**, verificado por `sha256` y no por el informe:
+`stg/06_presupuesto.sql`, `stg/08_plan_mensual.sql`, el `rn = 1` de
+`stg/03_obras.sql`, `compras/01_documentos.sql` y `sql/retenciones/**`.
+
+**Corrección que salió de aquí**: R23 y el diseño afirmaban que el cableado de
+forma de pago y estado a `compras.contratos` **y** `compras.facturas` era el
+criterio 1 de F-067. Ese criterio nombra solo los contratos, y ningún criterio
+prometía la forma de pago de la **factura**. La reclama **F-080**.
+
+**Tres hallazgos del review que NO bloquearon y esperan decisión del humano**:
+dos supervivientes de mutación ajenos a F-073 (`ventana_sql.py:215` y
+`build_stg_step.py:732`); que `config/tables_sigrid.yaml` declara el nombre del
+medio de pago en `auxefp.est` **y es falso** (está en `res`); y una automejora
+de `CHECKPOINTS.md` para las features cuyo entregable es SQL y no generan
+mutantes en sus propias líneas.
+
+## F-081 · Las dos deudas del review de F-073 (cerrada el 2026-09-11, APROBADO)
+
+Rama `feature/F-081-deudas-review-F-073`, 8 tareas, commits `87f4d84..d5e484c`.
+Informe: `progress/impl_F-081.md`; review: `progress/review_F-081.md`.
+Sin spec (`sdd=false`): el contrato fueron sus siete `acceptance`.
+
+**Deuda 1 · la mentira de la configuracion de la ingesta.**
+`config/tables_sigrid.yaml` declaraba que el nombre del medio de pago de
+`auxefp` esta en `est`. Es falso: `est` viene vacia o nula en las 10 filas y el
+nombre esta en `res`. F-073 lo esquivo usando `res` y lo documento, pero no
+corrigio el yaml. **F-081 encontro ademas la misma mentira en la entrada de
+`cen`**, que nadie habia mirado. Deja un test que falla si alguien vuelve a
+declararlo en `est`, para que la correccion no se deshaga en silencio.
+
+**Deuda 2 · los dos supervivientes de mutacion que si eran agujeros de test**,
+ninguno de codigo de F-073: `ventana_sql.py:215` y `build_stg_step.py:732`.
+**Murieron solo con tests nuevos**, verificado en el diff: ninguno de los dos
+ficheros cambia un caracter.
+
+**UNA PREMISA FALSA DE LA FICHA, corregida por el reviewer y que conviene no
+propagar**: la ficha de F-081 afirmaba que `build_stg_step.py` es fichero del
+SELLO. **No lo es.** `FICHEROS_DEL_SELLO` son solo `stg/06_presupuesto.sql` y
+`stg/08_plan_mensual.sql`. La restriccion que se impuso era mas estricta de lo
+necesario; no hizo daño, porque tapar un agujero con tests es lo correcto de
+todas formas, pero la afirmacion era erronea.
+
+**CHOQUE QUE DEJA VIVO**: F-081 sube el diccionario a la **version 20**, que la
+spec de F-080 tenia reservada. **F-080 pasa a la 21**, y su tarea de
+«comprobar que el fichero esta en 19» ya no se cumple.
+
+## F-080 · Los vencimientos, la forma de pago y el texto de la factura (cerrada el 2026-09-15, APROBADO)
+
+Rama `feature/F-080-vencimientos-forma-pago-y-texto-factura`, 30 tareas,
+commits `b6cfd6e..f9ac2b4`. Nace de dos correos de **Juan Romero** (Dir. Admon
+y Control de Costes) del 2026-09-10. Informe: `progress/impl_F-080.md`; review:
+`progress/review_F-080.md`; campañas: `progress/mutacion_F-080.md` y
+`progress/mutacion_F-080_modulos.md`.
+
+**Que publica**: `compras.vencimientos` (una fila por efecto de la factura de
+compra), `compras.v_facturas_pago`, `compras.v_control_forma_pago` (el cruce
+que pedia el correo), `compras.documento_texto` (el memo integro) y
+`compras.documento_comentarios` (un comentario por fila). Mas la ingesta de
+`con.tex` y de tres tablas nuevas —`auxnap`, `auxban` y `rpa`—, de 65 a 68.
+
+**LA LECCION, que esta feature aprendio TRES veces por las malas**: en Sigrid
+muchos documentos **extienden `con`**, y antes de concluir que un campo no
+existe hay que mirar ahi. Paso con el texto (no esta en `dcf.tex`, 474 de
+165.658, sino en `con.tex`, 108.445), con el codigo y el estado del efecto (el
+efecto ES un documento, `tip = 25`) y con el codigo de la remesa (tampoco esta
+en `rpa`). **La spec se corrigio cuatro veces por esto.**
+
+**Tres campos que prometen y no cumplen, medidos**: `pag.padide` a 0 en los
+255.074 (no hay enlace hijo -> origen), `con.serie` a 0 (la serie se deriva con
+`compras.fn_serie`) y, de F-073, `cen.obride` a 0 en las 804.
+
+**LA TRAMPA QUE LA FICHA DECLARA**: sumar los importes de todos los efectos de
+una factura **DUPLICA**, porque conviven el anulado y sus hijos. La anulacion es
+`con.fecbaj <> 0` —**89.095 de 255.074 efectos, el 34,9 %**— y se comprobo
+contra la captura del correo: los tres efectos que la pantalla pinta en rojo con
+aspa son exactamente los tres con fecha de baja, y la suma de los vivos
+reproduce los dos importes de la cabecera.
+
+**Coste de ventana medido**: el memo añade ~30 s sobre una noche de 3 h 25 min.
+34 min de margen frente al presupuesto de referencia de 4 h, que **el humano
+dejo como referencia y no como puerta**.
+
+**Evidencias del cierre**: `init.sh` exit 0, **4.677 pasan / 179 saltados / 0
+fallos**, cobertura **93,9 %**, dos campañas de mutacion (303 y 27 mutantes)
+recalculadas por el reviewer fichero a fichero. Diccionario del arbol en
+**version 21**.
+
+**ESTRENA LA NORMA DEL ENCARGO 1.7.11 del arnes**: como casi todo el entregable
+es SQL, la campaña canonica no decia nada del codigo de la feature. Se declaro
+el cero y se hizo la **prueba de control** (0 mutantes en las 42 lineas
+cambiadas de `build_compras_step.py`, **12 en el fichero entero**: el motor sabe
+mutarlo, el cero viene del alcance), mas una **segunda campaña dirigida** a los
+dos modulos sin muestreo, con los 27 mutantes muertos.
+
+**PROPUESTA DEL REVIEWER, no aplicada**: cinco de los seis supervivientes de la
+campaña canonica son de **F-025**, y **dos campañas seguidas los señalan**
+(F-073 marco los mismos). Merecen ficha propia, como F-077 y F-081.
+
+**VERIFICACIONES MANUAL PENDIENTES** (T0 bis, T7, T26 y T27), anotadas con su
+comando exacto en `progress/current.md`. Ningun agente las ejecuta.

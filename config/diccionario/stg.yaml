@@ -3,9 +3,19 @@
 # Fichas del esquema `stg`: la capa intermedia que normaliza Sigrid y explota la
 # planificacion a nivel mensual.
 #
-# **NINGUNO DE ESTOS OBJETOS ES SUPERFICIE DE CONSULTA**, y no es una
-# recomendacion de estilo: aqui es donde estan las trampas que producen numeros
-# falsos con mas facilidad de todo el datamart.
+# **TODOS ESTOS OBJETOS SON SUPERFICIE DE CONSULTA** desde F-079 (2026-09-09).
+# Hasta entonces esta cabecera decia lo contrario -«ninguno es superficie de
+# consulta»- y las siete fichas llevaban `motivo_no_consumo`. Eran PREFERENCIAS
+# DE ENRUTADO («capa intermedia», «para partidas esta `mart.v_pbi_dim_partida`»)
+# y el efecto era el contrario del buscado: el MCP tiene `stg` entre sus
+# esquemas autorizados, asi que desaconsejarlo solo conseguia que el agente no
+# mirase donde si hay dato. El caso que lo zanja: el ambito de certificacion
+# esta en `stg.presupuesto` y en ningun sitio aguas abajo.
+#
+# **LO QUE NO CAMBIA SON LAS TRAMPAS.** Aqui estan las que producen numeros
+# falsos con mas facilidad de todo el datamart, y ahora viven en la
+# `descripcion` de su ficha -que es texto publicado- en vez de en un campo que
+# el agente lee como «no mires aqui»:
 #
 # 1. **En `stg.plan_mensual` conviven TODAS las versiones master.** Filtrar solo
 #    por obra y ambito multiplica los importes por el numero de versiones de esa
@@ -20,9 +30,13 @@
 # 5. **`stg.ambitos.uso_seguimiento` esta DESFASADO**: marca solo los ambitos 8 y
 #    11, y `mart` ya construye tambien los reales 3 y 7.
 #
-# Lo que se pregunta esta en `mart` y en `cierre`. Estas fichas existen para que
-# un agente entienda de donde sale aquello, y para que sepa por que NO debe
-# consultar esto directamente.
+# Buena parte de lo que se pregunta esta ademas en `mart` y en `cierre`, ya
+# resuelto y mas comodo, y cada ficha lo dice. Pero eso es NAVEGACION, no una
+# prohibicion: lo que solo esta aqui, aqui se consulta.
+#
+# Las funciones `fn_*` de este fichero si siguen fuera de la superficie de
+# consulta, y por un motivo distinto: una funcion no se consulta, se llama desde
+# el SQL del build.
 #
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/stg/`.
@@ -35,17 +49,21 @@ objetos:
   plan_mensual:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Es el objeto mas peligroso del datamart. Aqui conviven TODAS las versiones
-      master de cada obra, asi que una consulta por obra y ambito sin filtrar
-      version multiplica los importes por el numero de versiones. La eleccion de
-      la version vigente solo esta hecha aguas abajo: para planificacion hay que
-      ir a `mart.fact_seguimiento_mensual`, que ya la resuelve mes a mes.
+    consumo_recomendado: true
     descripcion: >-
       El nucleo temporal del datamart: la explosion MENSUAL del presupuesto, con
       una fila por cada mes en el que una partida tiene importe, para los cuatro
       ambitos que usa el seguimiento. De aqui salen `mart` y `cierre`.
+
+      **ES EL OBJETO MAS PELIGROSO DEL DATAMART, Y ESTO NO ES UNA PREFERENCIA DE
+      ENRUTADO SINO UNA ADVERTENCIA DE CORRECCION:** aqui conviven TODAS las
+      versiones master de cada obra, asi que una consulta por obra y ambito sin
+      filtrar version multiplica los importes por el numero de versiones. La
+      eleccion de la version vigente solo esta hecha aguas abajo: para
+      planificacion ya resuelta, mes a mes, esta
+      `mart.fact_seguimiento_mensual`. Es la regla dura `R-VERSION-MASTER`, de
+      severidad bloqueante, y consultar aqui sin filtrar version da cifras
+      infladas, no aproximadas.
     grano: >-
       Una fila por (`obra_id`, `partida_id`, `ambito_id`, `version`,
       `anio_mes`), que es su clave de negocio y son CINCO columnas. Omitir
@@ -54,9 +72,10 @@ objetos:
       su build va troceado por lotes de obras.
 
       **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
-      2026-09-03).** El datamart dejo de rehacer las 920 obras cada noche: se
-      rehacen las **40 vivas** y las **880 congeladas conservan la version que
-      se construyo la ultima vez que les tocó. NO SE BORRAN Y SIGUEN
+      2026-09-03).** El datamart dejo de rehacer las 920 obras cada noche: las
+      congeladas conservan la version que se construyo la ultima vez que les
+      toco. **El CRITERIO y la CONDUCTA son dos cifras distintas, y las dos son ciertas.** El criterio dice **40 vivas / 880 congeladas**: a cuantas obras del maestro les toca por actividad. La conducta real de una noche, medida el 2026-09-07 en la ejecucion acotada `swtg78p`, es **592 rehechas / 328 congeladas**. De las 592, solo **40 son obras vivas**; las otras **552 entran porque no tienen filas construidas**, y **512 siguen vacias despues** -son fichas del maestro crudo sin presupuesto ni planificacion: plantillas y codigos repetidos-. **CONSECUENCIA AL CITAR FRESCURA: esas 552 se rehacen TODAS las noches, asi que su dato tiene horas, no seis dias.** El 'hasta 6 dias' vale para las 328 congeladas de verdad. Quien cite frescura por obra debe mirar `_meta.v_frescura_obra`, no suponerlo. Arreglar el dato en si es F-071.
+      NO SE BORRAN Y SIGUEN CONSULTABLES. NO SE BORRAN Y SIGUEN
       CONSULTABLES: cada tramo borra solo las obras que va a reinsertar, en su
       misma transaccion, asi que una obra congelada conserva exactamente sus
       filas y sus importes. La ventana **no cambia ni una cifra**; cambia de
@@ -269,20 +288,23 @@ objetos:
   presupuesto:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Es capa intermedia y exige aplicar a mano dos reglas que aguas abajo ya
-      estan resueltas: elegir la columna de importe segun el ambito y filtrar la
-      fase correcta. Se documenta porque es **la fuente buena para "cual es el
-      presupuesto de la obra"**, que no se responde sumando `stg.plan_mensual`.
+    consumo_recomendado: true
     descripcion: >-
       El presupuesto por partida y ambito, con su cantidad, su precio y su
       importe, sin distribucion mensual propia. La explosion a meses vive en
       `stg.plan_mensual`.
 
+      **Es la fuente buena para "cual es el presupuesto de la obra"**, que no se
+      responde sumando `stg.plan_mensual`. Y es la unica via para los ambitos
+      que `mart` no construye -la certificacion entre ellos-, porque aqui no se
+      filtra por ambito: estan todos los que Sigrid da de alta. A cambio hay que
+      aplicar a mano dos reglas que aguas abajo ya estan resueltas: elegir la
+      columna de importe segun el ambito y filtrar la fase correcta.
+
       **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
       2026-09-03)**, igual que `stg.plan_mensual` y por la misma decision: se
-      rehacen las 40 obras vivas y las 880 congeladas conservan la version que
+      rehacen solo las obras que lo necesitan y las congeladas conservan la
+      version que
       se construyo la ultima vez que les toco. **No se borran y siguen
       consultables**: el build borra solo las obras que va a reinsertar, en la
       misma transaccion. De cuando es el dato de cada obra lo dice
@@ -449,11 +471,7 @@ objetos:
   partidas:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Capa intermedia. Para consultar partidas esta `mart.v_pbi_dim_partida`, que
-      es la misma informacion con etiquetas listas y forma parte de la superficie
-      de consumo.
+    consumo_recomendado: true
     descripcion: >-
       El arbol de partidas de cada obra, reconstruido: cada fila sabe de que
       capitulo cuelga, cual es su capitulo raiz, su ruta completa y su nivel. En
@@ -464,6 +482,11 @@ objetos:
       Esos no se publican, pero desde F-052 (2026-08-31) el recorrido SI baja a
       traves de ellos y sus descendientes llegan. Lee `codigo_partida` y
       `capitulo_padre_id` antes de recorrer el arbol.
+
+      La misma informacion con etiquetas ya listas esta ademas en
+      `mart.v_pbi_dim_partida`, que suele ser mas comoda para una respuesta de
+      negocio; aqui esta el arbol entero, con la jerarquia y la ruta, que es lo
+      que `mart` no da.
     grano: >-
       Una fila por `partida_id`: una partida de detalle o un capitulo de
       cualquier nivel de una obra.
@@ -585,18 +608,22 @@ objetos:
   obras:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Capa intermedia, y ademas su columna `activa` no significa nada. Para
-      consultar obras estan `maestro.obras` —el universo completo, con estado y
-      cliente— y `mart.v_pbi_dim_obra` —el universo del seguimiento, con
-      etiquetas—.
+    consumo_recomendado: true
     descripcion: >-
       El universo del SEGUIMIENTO: las obras reales, sin las administrativas.
       Excluye una lista cerrada de codigos de gestion, excluye los codigos con
       cinco o mas digitos seguidos —el numero de obra de Ruesma es de cuatro— y
       deduplica los codigos repetidos por el mecanismo de Sigrid que marca cual
       es la ficha vigente.
+
+      **ADVERTENCIA DE CORRECCION: su columna `activa` no significa nada.** La
+      escribe el SQL como una constante `TRUE`, asi que vale TRUE tambien en las
+      obras cerradas hace anos, y la gemela `maestro.obras.es_activa` tampoco
+      sirve. El datamart NO sabe si una obra esta activa: es la regla dura
+      `R-OBRA-ACTIVA`, y no hay ninguna columna que responda esa pregunta.
+
+      El universo completo, con estado y cliente, esta en `maestro.obras`; el
+      del seguimiento con etiquetas listas, en `mart.v_pbi_dim_obra`.
     grano: >-
       Una fila por `obra_id`, ya deduplicada. Es SUBCONJUNTO de `maestro.obras`,
       y esa diferencia es deliberada: contar aqui da menos obras.
@@ -641,14 +668,16 @@ objetos:
   fases:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Capa intermedia. Lo que un usuario pregunta sobre plazos esta en
-      `cierre.v_pbi_cierre_cabecera`, con las fechas ya resueltas en cascada.
+    consumo_recomendado: true
     descripcion: >-
       Las fases de cada obra con sus fechas ya tipadas y su plazo. En los ambitos
       reales una fase ES un mes de cierre, y de ahi salen el mes canonico del
       cierre y el ancla temporal de la explosion mensual.
+
+      Las fechas de plazo ya resueltas en cascada estan ademas en
+      `cierre.v_pbi_cierre_cabecera`, que es lo comodo para una pregunta de
+      plazos; aqui estan las fases una a una, sin resolver, que es lo que
+      permite ver el detalle mes a mes.
     grano: >-
       Una fila por (`obra_id`, `numero_fase`), cada una identificada por
       `fase_id`, que es la clave primaria y viene de Sigrid. Se declara esa como
@@ -736,17 +765,19 @@ objetos:
   version_master_vigente:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Resuelve la version vigente de forma GLOBAL, una por obra, y eso no es lo
-      que usa el seguimiento: `mart` elige la vigente MES A MES, que es distinto
-      y mas fino. Consultar esta tabla para saber "que plan rige" da una
-      respuesta que no coincide con la de `mart` en los meses anteriores a la
-      ultima version.
+    consumo_recomendado: true
     descripcion: >-
       La version master que Sigrid marca como vigente para cada obra, resuelta
       por el mecanismo propio de Sigrid para senalar la ficha en vigor. Es una
       foto global, sin dimension temporal.
+
+      **ADVERTENCIA DE CORRECCION: resuelve la version vigente de forma GLOBAL,
+      una por obra, y eso no es lo que usa el seguimiento.**
+      `mart.fact_seguimiento_mensual` elige la vigente MES A MES, que es
+      distinto y mas fino. Consultar esta tabla para saber "que plan rige" da
+      una respuesta que no coincide con la de `mart` en los meses anteriores a
+      la ultima version. Aqui se responde cual rige HOY; que version rigio en un
+      mes pasado se responde en `mart`.
     grano: Una fila por `obra_id`. Es la clave primaria de la tabla.
     clave_negocio: [obra_id]
     paso_etl: build_stg
@@ -779,18 +810,20 @@ objetos:
   ambitos:
     tipo: vista
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Es un catalogo de apoyo del build, y ademas su columna `uso_seguimiento`
-      esta desfasada: consultarla para saber que ambitos usa el seguimiento da
-      una respuesta incompleta. Para los escenarios del seguimiento esta
-      `mart.v_pbi_dim_escenario`, que si esta al dia.
+    consumo_recomendado: true
     descripcion: >-
       La clasificacion de los ambitos de Sigrid: que es cada uno y que papel
       juega en el seguimiento. El tipo se deduce de la DESCRIPCION del ambito y
       no de su codigo, porque en Sigrid los dos no siempre concuerdan: hay un
       ambito cuyo codigo dice produccion y cuya descripcion dice venta, y manda
       la descripcion.
+
+      **ADVERTENCIA DE CORRECCION: su columna `uso_seguimiento` esta
+      DESFASADA.** Marca solo los ambitos 8 y 11, que eran los unicos de la
+      primera iteracion, y hoy `mart` construye tambien los REALES 3 y 7, asi
+      que filtrar por ella para saber que alimenta el seguimiento da una
+      respuesta INCOMPLETA. Los escenarios del seguimiento, al dia, estan en
+      `mart.v_pbi_dim_escenario`.
     grano: Una fila por `ambito_id`, uno por cada ambito dado de alta en Sigrid.
     clave_negocio: [ambito_id]
     paso_etl: build_stg

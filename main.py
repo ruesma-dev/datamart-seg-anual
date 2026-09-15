@@ -117,6 +117,11 @@ from etl_sigrid.domain.perfil_carga import (
     format_perfil,
     perfil_de_carga,
 )
+from etl_sigrid.domain.recuentos import (
+    TOLERANCIA_DERIVA_PCT,
+    comparar_recuentos,
+    formatear as formatear_recuentos,
+)
 from etl_sigrid.domain.tiemod import (
     comparar_tiemod,
     escribir_csv_tiemod,
@@ -153,7 +158,10 @@ from etl_sigrid.infrastructure.sigrid.bench_extraccion import (
     barrer_paginas,
     escribir_csv_bench,
 )
-from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient
+from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
+    SigridApiClient,
+    SigridApiError,
+)
 
 #: Cap de filas por petición que documenta `azure-apps/sigrid_api.md`. El real
 #: son 20.000 (DA-6, dato del humano el 2026-08-18): la divergencia se avisa,
@@ -188,6 +196,23 @@ def _get_pg() -> PostgresClient:
         target_db=pg.db,
         auto_create_db=pg.auto_create_db,
         set_role=pg.set_role,
+    )
+
+
+def _get_api() -> SigridApiClient:
+    """Construye el cliente de `sigrid-api` con lo que declara el `.env`.
+
+    Existe por el mismo motivo que `_get_pg`: un único sitio donde se decide
+    cómo se abre la puerta a Sigrid, que es lo que permite doblarla entera en
+    un test sin tocar la red.
+    """
+    api = get_settings().sigrid_api
+    return SigridApiClient(
+        base_url=api.base_url,
+        function_key=api.function_key.get_secret_value(),
+        database=api.database,
+        page_size=api.page_size,
+        timeout_s=api.timeout_s,
     )
 
 
@@ -478,8 +503,9 @@ def build_pipeline_steps(
         ),
         BuildMartStep(settings, batch_id=batch_id),
         # F-047: los cuatro esquemas que se construían a mano y podían estar
-        # arbitrariamente desfasados respecto a `raw` y `stg`. `maestro`,
-        # `compras` y `retenciones` solo leen de `raw`; `cierre` lee de `stg` y
+        # arbitrariamente desfasados respecto a `raw` y `stg`. `compras` y
+        # `retenciones` solo leen de `raw`; `maestro` lee también de `stg`
+        # desde F-073 (las dos marcas de `maestro.obras`); `cierre` lee de `stg` y
         # va DESPUÉS de `build_mart` porque `mart/03_agg_categoria.sql` dropea
         # con CASCADE la tabla de la que cuelga `cierre.v_pbi_planif_vs_real`.
         # Eso lo declara `BuildCierreStep.depends_on`, no esta posición.
@@ -1913,6 +1939,104 @@ def check_coherencia() -> None:
     click.echo(formatear_veredicto_stg(veredicto_stg))
 
     if not veredicto_raw.ok or not veredicto_stg.ok:
+        sys.exit(1)
+
+
+def _contar_en_sigrid(api, source_table: str, where: str | None) -> int | None:
+    """`COUNT(*)` de una tabla de Sigrid, con su mismo filtro. `None` si falla.
+
+    Que la excepción se trague AQUÍ y no aborte el barrido es deliberado: con
+    56 tablas, parar en la primera que Sigrid rechaza deja sin mirar las 55
+    restantes. La tabla queda `sin_medir`, que **no** está conforme (R17).
+    """
+    consulta = f"SELECT COUNT(*) AS n FROM [dbo].[{source_table}]"
+    if where:
+        consulta = f"{consulta} WHERE {where}"
+    try:
+        respuesta = api.leer_sql(consulta, max_rows=1)
+    except SigridApiError as e:
+        click.secho(f"  ! {source_table}: Sigrid no contestó ({e})", fg="yellow", err=True)
+        return None
+    filas = respuesta["rows"]
+    return int(filas[0][0]) if filas else None
+
+
+def _horas_desde_ultima_ingesta(pg, paso: str = "ingest_raw") -> float | None:
+    """Horas desde la última ingesta correcta, o `None` si no se pudo saber.
+
+    Es **contexto** del informe de recuentos, no criterio: la deriva esperable
+    del origen es proporcional al tiempo transcurrido. Por eso la excepción se
+    traga entera —una `_meta.v_frescura` que no se puede leer no puede volver
+    rojo un día bueno ni verde uno malo— y por eso se usa la columna de la
+    vista tal cual, sin recalcular nada.
+    """
+    try:
+        filas = pg.fetch_frescura()
+    except Exception:  # el contexto nunca puede tumbar el veredicto
+        return None
+    return next(
+        (f.horas_desde_ultimo_ok for f in filas if f.paso == paso),
+        None,
+    )
+
+
+@cli.command("check-raw-recuentos")
+@click.option(
+    "--tolerancia-pct",
+    "tolerancia_pct",
+    type=float,
+    default=TOLERANCIA_DERIVA_PCT,
+    show_default=True,
+    help="Porcentaje de filas que Sigrid puede tener DE MÁS en una tabla sin "
+         "que cuente como fallo. Es por tabla y relativo a su tamaño. Con 0 "
+         "se exige igualdad exacta. Que Sigrid tenga filas de MENOS es alarma "
+         "siempre, y esta opción no la afecta.",
+)
+def check_raw_recuentos_cmd(tolerancia_pct: float) -> None:
+    """
+    ¿Tiene `raw` las mismas filas que Sigrid, tabla a tabla? SOLO LECTURA.
+
+    Una ingesta puede terminar «en verde» y dejar media tabla: un `COPY`
+    cortado, un timeout del balanceador, una página que no volvió. Este
+    comando manda un `COUNT(*)` por tabla declarada —con su mismo `where`— y
+    lo compara con el de `raw`.
+
+    No escribe en Sigrid ni registra la ejecución en `_meta.etl_runs`: no es un
+    paso del pipeline, es una pregunta. Fuera de `run-all` a propósito.
+
+    **La tolerancia tiene dirección.** Que Sigrid tenga filas de MÁS es la
+    deriva normal de un ERP vivo frente a una foto, y se acepta mientras no
+    pase de `--tolerancia-pct` en esa tabla. Que las tenga de MENOS es alarma
+    inmediata, sea de una fila: eso no lo hace el paso del tiempo. Una tabla
+    que falta en `raw`, o que Sigrid no pudo contar, sale con código 1 igual
+    que antes: «no he podido mirar» no es «está bien».
+    """
+    tablas = get_settings().tables_sigrid.get("tables", [])
+    pg = _get_pg()
+    sigrid: dict[str, int | None] = {}
+    raw: dict[str, int | None] = {}
+
+    with _get_api() as api:
+        for tabla in tablas:
+            origen = tabla["source_table"]
+            destino = tabla.get("target_table", origen)
+            sigrid[origen] = _contar_en_sigrid(api, origen, tabla.get("where"))
+            raw[origen] = (
+                pg.count_rows("raw", destino) if pg.table_exists("raw", destino) else None
+            )
+
+    informe = comparar_recuentos(
+        [t["source_table"] for t in tablas], sigrid, raw, tolerancia_pct=tolerancia_pct
+    )
+
+    click.secho("=== raw frente a Sigrid, tabla a tabla ===", fg="cyan", bold=True)
+    click.echo(
+        formatear_recuentos(
+            informe, horas_desde_ingesta=_horas_desde_ultima_ingesta(pg)
+        )
+    )
+
+    if not informe.ok:
         sys.exit(1)
 
 

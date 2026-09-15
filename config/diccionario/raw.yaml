@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 31 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 68 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -44,7 +44,7 @@
 # produjeron una afirmacion falsa. Sirve para consultar una columna concreta a
 # mano; no para respaldar una ficha.
 #
-# Contrastado con `config/tables_sigrid.yaml` (las 31 entradas y sus
+# Contrastado con `config/tables_sigrid.yaml` (las 65 entradas y sus
 # `exclude_columns`) y con `etl_sigrid/infrastructure/postgres/sql/`.
 
 version: 1
@@ -92,8 +92,17 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 2 columnas: solo `ima`, `tex`. Preguntar por ellas
-      aqui no devuelve nulo, devuelve "columna inexistente".
+      **No se traen** 1 columna: solo `ima`, la imagen del concepto.
+      Preguntar por ella aqui no devuelve nulo, devuelve "columna
+      inexistente".
+
+      **EL MEMO DEL DOCUMENTO SI SE TRAE, DESDE F-080** (2026-09-11). La
+      pestana "Texto" que se ve en una factura de compra o en un contrato
+      se pinta desde este memo de la superclase, y no desde el campo
+      homonimo de la tabla del documento: informado en 108.527 de 165.759
+      facturas (65,5 %) frente a 474 de 165.658 en `dcf` (0,3 %). Quien
+      quiera leerlo ya partido en comentarios tiene
+      `compras.documento_comentarios`, y entero, `compras.documento_texto`.
     grano: Una fila por concepto, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1137,10 +1146,16 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
 
-      **No se traen** 23 columnas: 6 de direcciones, 2 de descripciones
+      **No se traen** 21 columnas: 6 de direcciones, 2 de descripciones
       largas, 2 de observaciones, 11 sueltas entre textos y campos
       auxiliares. Preguntar por ellas aqui no devuelve nulo, devuelve
       "columna inexistente".
+
+      **Las condiciones de pago de la factura SI estan** desde el
+      2026-09-06 (F-066): eran dos de esas exclusiones y estaban fuera por
+      tamano, no por decision de negocio. Medido antes de recuperarlas:
+      vienen informadas en 165.390 de las 165.391 facturas, con 15,6 bytes
+      de media. Eran la carencia (4) del correo de Compras.
     grano: Una fila por factura de compra, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
@@ -1346,6 +1361,778 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
     grano: Una fila por recargo, descuento o retencion, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  res:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la copia cruda del maestro de recursos de Sigrid, con sus codigos de cuatro letras y sus columnas de control de acceso. La pregunta de negocio --quien ha trabajado en que obra y cuantas horas-- la respondera el mart de personal (F-057), no esta tabla.
+    descripcion: >-
+      **Recursos** (2.610 filas, 55 columnas). Es la extension especifica del concepto de tipo 33 en `con`: comparte `ide` con una fila de `con`, de donde salen el codigo y el nombre legibles. 1.723 estan de baja.
+
+      **CONTIENE DATOS PERSONALES y se trae entera** (decision del humano del 2026-09-06): el NIF de la persona esta en la columna `cif`, informado en 626 filas, y tambien vienen las credenciales de acceso a Sigrid (`logacc`, `ideacc`, `ipacc`, `recema`). No se excluye ninguna columna por ser dato personal; lo que se publique aguas abajo lo decide F-057.
+
+      **EL MCP NO PUEDE LEER ESTA TABLA, Y ESO ES TEMPORAL (F-068, 2026-09-07).** Entra en la exclusion por lo que dice el parrafo anterior: la ficha de F-068 la daba por limpia de datos personales, y no lo esta. Vale aqui, palabra por palabra, lo escrito en la ficha de `emp`: la revocacion la sostiene `apply_grants` cada noche, la lista vive en `DEFAULT_EXCLUDED_TABLES` de `config/settings.py`, y la reversion ya esta decidida por el humano para cuando el MCP tenga control por usuario.
+
+      Criterio de negocio de Juan Romero (2026-09-03): los recursos de baja no se consideran, y los de alta van codificados como "Apellidos, Nombre".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `res`, y se localiza con `grep -n "^| res " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por recurso, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  emp:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la ficha de personal en bruto, con 161 columnas de codigos de Sigrid y datos personales sin filtrar. Nadie deberia consultarla para responder una pregunta de negocio: el coste de mano de obra por obra sale del mart de personal (F-057) cruzando partes de trabajo.
+    descripcion: >-
+      **Empleados** (1.352 filas, 161 columnas). Extension del concepto de tipo 43 en `con`.
+
+      **CONTIENE DATOS PERSONALES DE CATEGORIA SENSIBLE Y SE TRAE ENTERA.** Es una decision del humano del 2026-09-06, tomada frente a la propuesta de excluir 72 columnas, y por eso esta ficha declara que hay dentro: DNI (informado en 1.341 filas), numero de la Seguridad Social (1.171), cuenta bancaria completa (985), domicilio, telefonos fijo y movil, correo electronico, fecha de nacimiento, sexo, estado civil, numero de hijos, municipio de nacimiento y credenciales de acceso. Lo que se publique de todo eso lo decide F-057; `raw` solo lo copia.
+
+      **EL MCP NO PUEDE LEER ESTA TABLA, Y ESO ES TEMPORAL (F-068, 2026-09-07).** El rol `mcp_sigrid_dm_ro` alcanzaba `raw` entero, asi que hasta esa fecha cualquier cuenta del tenant leia esta tabla completa; desde entonces YA NO la lee. El humano decidio quitarle el permiso --sus palabras: «de momento quita el permiso. Cuando pongamos limites o guardarrailes por usuario, habra que volver a ponerlo para algunos usuarios»--, asi que **no es una prohibicion permanente ni un juicio sobre la tabla**: es un tapon mientras el MCP no sepa QUIEN pregunta. Como funciona: cada noche `apply_grants` concede `raw` entero y acto seguido revoca esta tabla, porque `GRANT SELECT ON ALL TABLES IN SCHEMA` no sabe saltarse ninguna. La lista esta en `DEFAULT_EXCLUDED_TABLES` de `config/settings.py`, y ahi esta escrita la condicion para levantarlo.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `emp`, y se localiza con `grep -n "^| emp " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 11 columnas de binario o texto ilimitado: la foto del empleado, que es binaria, y diez de texto ilimitado (direccion larga, web, observaciones, poderes y notas). Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por empleado, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  hmo:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es solo la cabecera del parte: no tiene ni las horas ni el recurso. Quien pregunte por horas tiene que ir a `hmores`, y quien pregunte por coste de personal, al mart de F-057.
+    descripcion: >-
+      **Cabecera del parte de trabajo** (6.850 filas, 16 columnas): centro, obra, ano, mes y fecha de cierre. Medido: `reside` viene informado en 6 filas de 6.850, asi que **el recurso no esta aqui**, esta en la linea. Es la tabla que el backlog llamaba "partes de trabajo" creyendo que traia las horas.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `hmo`, y se localiza con `grep -n "^| hmo " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por parte de trabajo, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  hmores:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Son las horas en bruto, sin filtrar por el universo de obras del seguimiento y sin resolver que recurso es persona y cual maquinaria. El mart de personal (F-057) es el que responde "horas por obra".
+    descripcion: >-
+      **LAS HORAS** (328.760 filas, 56 columnas). Es la tabla que faltaba para poder responder cuanto se ha trabajado en una obra: `reside` informado en el 99,9 %, `obride` en el 99,6 % --536 obras distintas--, mas `fec`, `can` (cantidad) y `tot` (importe) por linea. Cuelga de `hmo` por `hmoide`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `hmores`, y se localiza con `grep -n "^| hmores " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 1 columnas de binario o texto ilimitado: el texto libre de la linea. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por linea de parte --recurso, obra y fecha--, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cua:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      No es el plan de cuentas: es su extension. La jerarquia, el codigo y el nombre legible viven en `con` (tipo 16), y sin ese salto los numeros de cuenta de aqui no significan nada. El mayor consultable lo construye F-056.
+    descripcion: >-
+      **Plan de cuentas, la parte que extiende a `con`** (34.139 filas, 16 columnas): 33.875 cuentas de nivel 5 frente a 254 de nivel 0. Mismo patron que `rec` en retenciones.
+
+      **El plan se parte por EMPRESA, no por ejercicio** (medido 2026-09-06): la misma cuenta aparece hasta seis veces y las seis se diferencian solo en la empresa de la fila de `con` correspondiente. No hay ningun campo de ejercicio aqui.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cua`, y se localiza con `grep -n "^| cua " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por cuenta contable imputable, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  asi:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Siete columnas de importes sin fecha ni concepto legible: por si sola no responde nada. Es el puente entre el apunte y la fecha del asiento, que vive en `con`.
+    descripcion: >-
+      **Asientos contables** (783.386 filas, 7 columnas). Extension del concepto de tipo 20 en `con`; medido: 0 asientos huerfanos. **La fecha del asiento no esta aqui**: es la del concepto, un entero AAAAMMDD, y para fechar un apunte hacen falta dos saltos (`apu.asiide` a esta tabla, y de aqui a `con`).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `asi`, y se localiza con `grep -n "^| asi " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por asiento contable, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  apu:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la tabla mas grande del datamart y esta en bruto: cuentas por indice, debe y haber sin signo de negocio, y sin el plan al lado no se puede agrupar por nada. El mayor por cuenta, ano, empresa y tercero lo construye F-056.
+    descripcion: >-
+      **APUNTES CONTABLES** (2.154.543 filas, 36 columnas): la tabla mas grande que se ha traido nunca, por encima de `con`. Debe, haber, concepto, cuenta (`cueide`), asiento (`asiide`) y centro de coste (`cenide`).
+
+      **Dos cosas medidas el 2026-09-06 que corrigen lo que el backlog suponia.** La primera: la columna de fecha viene informada en el **100 %** de las filas, y la ficha de F-056 daba por hecho que la fecha no estaba aqui; contrastarla contra la del asiento es tarea de esa feature. La segunda: **la atribucion a obra va por `cenide`** (54 % informado) y no por `obr`, que solo tiene 142 filas con 2 obras distintas. Es la misma trampa de F-045.
+
+      No tiene columna de ultima modificacion, asi que no admite carga incremental por columna de corte. Se trae entera, aprobado por el humano el 2026-09-06.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `apu`, y se localiza con `grep -n "^| apu " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 1 columnas de binario o texto ilimitado: el texto libre del apunte. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por apunte contable, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  apa:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es un desglose auxiliar del apunte, no una fuente de coste por obra: su columna de obra esta a cero en las 709.403 filas. Candidata a fuente de la cuenta de resultados por centro de F-058.
+    descripcion: >-
+      **Desglose analitico del apunte** (709.403 filas, 20 columnas): `cenide` informado en el 99,98 %, `apuide` en el 88 % y **`obride` en el 0 %**. Trae cuenta analitica, debe y haber por centro de coste. Medido: no es el puente obra-centro de coste que F-045 busca.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `apa`, y se localiza con `grep -n "^| apa " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 1 columnas de binario o texto ilimitado: el texto libre de la linea. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por linea de desglose analitico, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  conact:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Son indices contra indices: sin cruzar con el catalogo de naturalezas y con el proveedor no dice nada. El eje "actividad del proveedor" para consultar lo construye F-055.
+    descripcion: >-
+      **LA ACTIVIDAD DEL PROVEEDOR** (7.090 filas, 11 columnas): 4.773 proveedores cruzados con 409 naturalezas de producto, y las 409 casan contra `auxpronat`. Es lo que F-055 buscaba en `act`, `auxacttip`, `actent` y `actseg`, que estan **vacias las cuatro** (medido el 2026-09-06): en Ruesma la actividad del proveedor es esta.
+
+      Responde que hace cada proveedor y, cruzada con los contratos, que proveedores de una actividad trabajan en una obra. **No** responde si el proveedor esta homologado: la columna `homolo` vale 0 en las 7.090 filas, esa marca no se informa en Sigrid, y lo mas cercano que hay son los certificados con caducidad de `prvcer`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `conact`, y se localiza con `grep -n "^| conact " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por pareja proveedor-naturaleza de producto, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxpronat:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es un catalogo de codigos: util para traducir, no para consultar. Quien pregunte por gasto por actividad tiene la respuesta en el mart de proveedor de F-055.
+    descripcion: >-
+      **Catalogo de naturalezas de producto** (514 filas, 23 columnas), al que apunta `conact.actide`. Es el eje por el que Compras agrupa a sus proveedores, y ocupa el sitio que el backlog daba a las familias de producto (`auxfam`, vacia en Sigrid). Es una de las tres tablas nuevas que si tienen columna de ultima modificacion.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxpronat`, y se localiza con `grep -n "^| auxpronat " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por naturaleza de producto, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  prvcer:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Certificados en bruto, sin resolver cuales siguen vigentes hoy. La pregunta "que proveedores tienen la documentacion al dia" es del mart de proveedor (F-055).
+    descripcion: >-
+      **Certificados del proveedor** (2.741 filas, 8 columnas), con fecha de emision, fecha de caducidad y marca de validez. Es lo mas parecido a un proveedor homologado que Sigrid guarda de verdad, porque la marca de homologacion de `conact` no se informa nunca.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `prvcer`, y se localiza con `grep -n "^| prvcer " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 12 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL, MENOS UNA. `tex` se excluia con el resto y F-074 lo recupera, porque es el UNICO campo que dice de que es cada certificado --esta tabla no tiene campo de tipo-- y estaba fuera por el automatismo de la lista, no por una decision sobre ella. Del resto, esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por certificado de un proveedor, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  prvobrpag:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Seis filas en total: es residual en Ruesma. Se ingiere por completitud de la cadena de condiciones de pago, no porque responda nada.
+    descripcion: >-
+      **Formas de pago del proveedor por obra** (6 filas, 16 columnas). Permite pactar con un proveedor una forma de pago distinta para una obra concreta. Con seis filas, cualquier conclusion que se saque de aqui es anecdotica.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `prvobrpag`, y se localiza con `grep -n "^| prvobrpag " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por forma de pago pactada con un proveedor para una obra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  confir:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el circuito de firma en bruto, con roles en codigo y sin resolver que documento es cada uno. El indicador "cuanto tarda en aprobarse un comparativo" lo construye F-055.
+    descripcion: >-
+      **EL CIRCUITO DE FIRMA** (69.993 filas, 28 columnas): quien firmo, con que rol, en que fase y cuando. 65.761 firmas son de comparativos (roles DCOM, JG, JEFO y demas, con fecha informada en el 90 %), 3.436 de facturas y 796 de obras. Es donde estaba de verdad lo que F-055 buscaba en `PFfir` y `logfirdoc`, que estan **vacias** (medido el 2026-09-06).
+
+      Responde quien aprobo un comparativo, con que rol y cuando. **No** responde dos cosas, y las dos son un hecho del origen y no un hueco de la ingesta: los **contratos** no pasan por este circuito --no hay una sola firma de contrato-- y las 3.436 firmas de factura vienen **sin fecha**.
+
+      Y tampoco responde --ninguna tabla de Sigrid lo hace-- cuando **cambio de estado** un contrato o una factura: la tabla de auditoria de Sigrid registra 1,5 millones de cambios de forma de pago y de fecha de factura desde 2017, y ni uno solo del campo de estado. Ese historico lo construye F-067 como foto diaria sobre `raw`, y empieza a contar el dia que se despliegue.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `confir`, y se localiza con `grep -n "^| confir " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por firma de un documento, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  deffir:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Diecisiete filas de configuracion. Sirve para leer `confir`, no para consultarla por si sola.
+    descripcion: >-
+      **Definicion de los procesos de firma** (17 filas, 19 columnas): roles que intervienen, tipo de documento al que aplica, importes minimo y maximo, y los estados inicial y final del circuito. Es el mapa que da sentido a las 69.993 firmas de `confir`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `deffir`, y se localiza con `grep -n "^| deffir " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por proceso de firma definido, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dco:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      145 columnas de cabecera de documento, con importes brutos, netos y por divisa mezclados. La comparacion de ofertas de un comparativo la publicara el mart de compras.
+    descripcion: >-
+      **OFERTAS DE PROVEEDOR** (72.151 filas, 145 columnas): lo que cada proveedor oferto, con fecha de documento, importes y forma de pago. `comide` informado en 70.583 filas y `obride` en 72.123, asi que es el eslabon que ata la necesidad y el comparativo con el contrato.
+
+      Responde que se pidio, a quien y por cuanto en cada comparativo. **No** responde cual se adjudico ni por que: la decision esta en el contrato que salio del comparativo, no aqui.
+
+      Las condiciones de pago de la oferta **si** se traen; lo excluido son las tres direcciones de entrega y el texto del transportista.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dco`, y se localiza con `grep -n "^| dco " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 21 columnas de binario o texto ilimitado: las trece de la lista estandar de documentos mas ocho de direcciones de entrega y transporte, las mismas que en el albaran y la factura. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por oferta de proveedor, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcopro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      787.641 lineas sueltas sin la cabecera al lado no dicen de que comparativo son. El detalle comparable de las ofertas lo publicara el mart de compras.
+    descripcion: >-
+      **Lineas de oferta** (787.641 filas, 71 columnas): cantidad, precio, descuento e importe por linea, con obra y partida en la propia linea. `comlin.dcoproide` apunta aqui, que es lo que permite reconstruir el comparativo linea a linea. Es la segunda tabla mas grande de esta tanda, despues de los apuntes contables.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dcopro`, y se localiza con `grep -n "^| dcopro " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por linea de oferta, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcorec:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Mezcla recargos, descuentos y retenciones sin distinguirlos salvo por su codigo, igual que `rec`. Consultarla creyendo que son solo retenciones suma cosas que no lo son.
+    descripcion: >-
+      **Recargos y retenciones de la oferta** (748 filas, 21 columnas): base, porcentaje y cuota. Misma forma exacta que `ctrrec`, `dcfrec` y `dcarec`: las cuatro son el mismo bloque de condiciones aplicado a un documento distinto.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dcorec`, y se localiza con `grep -n "^| dcorec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por recargo o retencion de una oferta, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dnc:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      275 filas de cabecera sin importes. La cadena completa necesidad, comparativo, oferta y contrato la publicara el mart de compras.
+    descripcion: >-
+      **Necesidades de compra** (275 filas, 15 columnas): la peticion con la que arranca todo, con su obra y su fase. `com.dncide` apunta aqui, asi que es el principio de la cadena necesidad, comparativo, oferta y contrato que Compras pidio poder recorrer entera.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dnc`, y se localiza con `grep -n "^| dnc " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por necesidad de compra, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dncpro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      286.432 lineas para 275 cabeceras: el grano es muy fino y sin la cabecera al lado no se sabe de que obra son. El mart de compras lo resuelve.
+    descripcion: >-
+      **Lineas de necesidad** (286.432 filas, 73 columnas): que se pidio, cuanto y para que partida. `comlin.dncproide` apunta aqui, y es lo que permite seguir una linea desde que se pide hasta que se contrata.
+
+      Nota de la ingesta: dos columnas de texto ilimitado que no estan en la lista estandar entran a proposito, y pesan poco --la de comentario viene informada en 1.039 filas de 286.432, con 38 bytes de media--.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dncpro`, y se localiza con `grep -n "^| dncpro " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por linea de necesidad, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  ctrrec:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la condicion pactada, no el dinero retenido. Quien pregunte cuanto hay retenido a un proveedor tiene la respuesta en el mart de retenciones, que ya esta publicado.
+    descripcion: >-
+      **LA RETENCION DEL CONTRATO** (6.342 filas, 21 columnas): base, porcentaje y cuota de lo pactado. Medido: 6.125 de las 6.342 apuntan al mismo tipo de retencion del catalogo, el que concentra el 97 % de los efectos.
+
+      Responde que retencion se pacto en un contrato. **No** responde cuanto se ha retenido de verdad ni cuanto se ha devuelto: eso son los efectos de `pag`, que ya se ingieren y que el mart de retenciones ya publica.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `ctrrec`, y se localiza con `grep -n "^| ctrrec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por retencion o recargo pactado en un contrato, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcfrec:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el detalle de una factura concreta, no el acumulado de un proveedor. El mart de retenciones ya publica el acumulado.
+    descripcion: >-
+      **Recargos y retenciones en factura** (32.650 filas, 21 columnas): la retencion tal y como se aplico en cada factura, con su base y su cuota.
+
+      Responde que se retuvo en una factura concreta. **No** responde cual era la regla pactada, que esta en `ctrrec`, ni si la retencion sigue viva, que se ve en el efecto de `pag`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dcfrec`, y se localiza con `grep -n "^| dcfrec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por recargo o retencion aplicado en una factura, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcarec:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Mismo caso que `dcfrec` un escalon antes en la cadena. El acumulado que interesa lo publica el mart de retenciones.
+    descripcion: >-
+      **Recargos y retenciones en albaran** (40.930 filas, 21 columnas). Cierra el juego de las cuatro tablas de condiciones: contrato, oferta, albaran y factura.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dcarec`, y se localiza con `grep -n "^| dcarec " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por recargo o retencion aplicado en un albaran, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxpag:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo de 69 filas: traduce codigos, no responde preguntas.
+    descripcion: >-
+      **Formas de pago** (69 filas, 13 columnas). Es a donde apuntan el contrato, la factura y la oferta con su `pagide`, y donde se resuelve que significa un pago a 60 dias o una confirmacion bancaria. Es una de las tres tablas nuevas con columna de ultima modificacion.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxpag`, y se localiza con `grep -n "^| auxpag " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por forma de pago, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxefp:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Diez filas de catalogo. Se ingiere para poder traducir el medio de pago al que apunta cada forma de pago.
+    descripcion: >-
+      **Medios de pago** (10 filas, 13 columnas), a donde apunta `auxpag.efeide`: transferencia, pagare, confirming y demas, con los dias de pago asociados. Es una de las tres tablas nuevas con columna de ultima modificacion.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxefp`, y se localiza con `grep -n "^| auxefp " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por medio de pago, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  conest:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es una tabla de traduccion. Quien pregunte en que estado esta un contrato tiene que mirar el estado del documento y traducirlo aqui, y eso lo resolvera F-067 en `stg`.
+    descripcion: >-
+      **CATALOGO DE ESTADOS DE DOCUMENTO** (193 filas, 17 columnas). Sin ella, el estado de un contrato o de una factura es un numero suelto que nadie puede interpretar.
+
+      **La traduccion va por `tip`, el tipo de documento**, y esto es lo que hay que saber antes de usarla: la tabla cubre 29 tipos distintos y **la misma cifra significa cosas distintas en cada uno**. Traducir el estado de una factura con la fila de un contrato da un nombre plausible y falso. Para los contratos, los siete estados medidos el 2026-09-06 son 1 pendiente de firma previa, 3 enviado, 5 recibido, 6 comprometido, 7 firmado, 8 terminado y 9 resuelto; 13.418 contratos estan en el 7.
+
+      Lo que ni esta tabla ni ninguna otra guardan es **cuando** un documento entro en su estado actual. Lo mas cercano es la marca de ultima modificacion del concepto, que sirve de aproximacion mientras F-067 no acumule su foto diaria.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `conest`, y se localiza con `grep -n "^| conest " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 13 columnas de binario o texto ilimitado: la lista estandar de documentos que comparten todas las tablas de compras del ETL; esta tabla no tiene la mayoria de esos nombres, y excluir un nombre inexistente es inofensivo. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por estado posible de un tipo de documento, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxdpt:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es un catalogo de siete filas cuyo unico valor es traducir un codigo. Quien pregunte por departamento espera el nombre ya resuelto, y eso lo dara el mart de personal (F-057); leer esta tabla suelta solo devuelve una lista de nombres sin nadie dentro.
+    descripcion: >-
+      **Departamentos** (7 filas, 8 columnas). Es el catalogo al que apunta `emphis.dptide`: sin el, el departamento de un empleado es un numero. Entra con F-074 desde el censo de F-072.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxdpt`, y se localiza con `grep -n "^| auxdpt " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por departamento, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxhor:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es media respuesta: dice como se llama cada concepto de hora, pero no cuantas se imputaron ni a que obra. Sumar horas sin cruzarlas por aqui produce una cifra falsa, y la cifra correcta la dara el mart de personal (F-057).
+    descripcion: >-
+      **Horarios y conceptos de hora** (60 filas, 23 columnas). Es la tabla que hace legible `hmores`, la de las horas: `reshor.horide` apunta aqui y sin ella no se puede distinguir una hora de albañil de un recibo de movil. Entra con F-074 desde el censo de F-072.
+
+      **La trampa, medida en F-072**: este catalogo **mezcla horas de verdad con conceptos que no son horas** --hay entradas de tipo "mes vehiculo" y "consumos telefono"--. Sumar `hmores` sin cortar por el concepto da un total que parece mano de obra y no lo es. Quien construya encima tiene que decidir explicitamente que conceptos entran.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxhor`, y se localiza con `grep -n "^| auxhor " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por concepto de hora u horario, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxrestip:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Treinta y siete filas de traduccion. Lo que responde de verdad --que parte del coste es mano de obra y que parte es maquinaria o consumo-- necesita cruzarla con los recursos y las horas, y eso es el mart de personal (F-057).
+    descripcion: >-
+      **Tipos de recurso** (37 filas, 10 columnas). Traduce la clase de un recurso: persona, medio o consumo imputable. Entra con F-074 desde el censo de F-072.
+
+      **Por que hace falta**, medido en F-072: de las 2.610 filas de `res`, solo 1.353 son personas; 1.157 son consumos imputables --movil, caja de obra, gasoil, kilometros-- y 106 son medios --vehiculos, casetas, gruas--. Tratar `res` como si fuera el maestro de personal, que es lo que se venia haciendo, cuenta como plantilla cosas que no lo son.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxrestip`, y se localiza con `grep -n "^| auxrestip " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por tipo de recurso, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  cet:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Cuarenta filas de maestro sin ningun importe. Sirve para poner nombre a un centro de trabajo, no para responder nada por si sola, y la vista de empresa ya resuelta vive en el esquema `maestro`.
+    descripcion: >-
+      **Centros de trabajo y empresas propias** (40 filas, 69 columnas). Es lo que pone nombre al centro de trabajo de un empleado o de un parte. Entra con F-074 desde el censo de F-072.
+
+      **La columna `cod` que el documento de Sigrid le atribuye NO EXISTE en la base.** Medido el 2026-09-09 contra `INFORMATION_SCHEMA.COLUMNS`: el recuento con `TABLE_NAME` igual a esta tabla y `COLUMN_NAME` igual a ese nombre devuelve cero. El censo de F-072 tenia razon y el documento se equivoca, asi que **cualquier union con esta tabla va por `ide`**.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `cet`, y se localiza con `grep -n "^| cet " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 7 columnas, y seis de ellas son datos personales del representante legal que no pintan nada en el datamart: `repnom`, `repno1`, `repap1`, `repap2`, `repcar` y su documento de identidad, `repdni`, informados en 18 de las 40 filas; la septima es `dirtex`, un texto ilimitado con 48 bytes en total. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por centro de trabajo o empresa propia, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  pro:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el maestro en bruto, con 108 columnas y sin ningun filtro por el universo de obras del seguimiento. Quien pregunte "que se compra mas" quiere el esquema `compras` con el nombre ya resuelto, no este catalogo entero.
+    descripcion: >-
+      **Maestro de articulos** (55.179 filas, 108 columnas). Entra con F-074 porque **hoy el producto no tiene nombre en el datamart** pese a que lo referencian dos tablas ya ingeridas: `dcopro` en el 99,9 % de sus lineas y `dncpro` en el 95,4 %. Sin esta tabla, una linea de oferta o de necesidad de compra es un codigo.
+
+      **Reparto por clase**, medido el 2026-09-09: la clase 9 tiene 19.448 articulos, la 11 tiene 17.807, la 10 tiene 16.614, la 3 tiene 1.308 y la 13 tiene 2. Agrupar sin cortar por clase mezcla familias que no son comparables.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `pro`, y se localiza con `grep -n "^| pro " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 4 columnas de texto ilimitado, y las cuatro estan vacias en Ruesma: `esigurl1`, `esigurl2` y `esigpromt`, del modulo de comercio electronico de Sigrid, que no se usa, y `carprotex`, las caracteristicas del articulo, con cero filas informadas. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por articulo del maestro, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  reshor:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **DATO DE NOMINA, Y EL ROL DEL MCP NO PUEDE LEERLA.** Esta declarada en `PG_EXCLUDED_TABLES` por el mecanismo de F-068, igual que `emp` y `res`: una consulta contra ella por el conector no devuelve nada, y eso no es un fallo. Es el precio de coste por persona y tipo de hora, o sea lo que cobra cada uno. Lo que se puede consultar es el coste ya agregado por obra, que construira el mart de personal (F-057). La restriccion es TEMPORAL y cae el dia que el MCP sepa quien pregunta.
+    descripcion: >-
+      **Precio de coste por recurso y tipo de hora** (8.949 filas, 11 columnas). Entra con F-074 porque es **el multiplicador que falta para pasar de horas a euros**, que es lo que F-061 no puede hacer hoy. Medido el 2026-09-09: 2.061 recursos distintos, 58 horarios y 2.036 filas con precio distinto de cero. `horide` apunta al catalogo de conceptos de hora, `auxhor`.
+
+      **Es dato de nomina**, y por eso el rol de solo lectura del MCP no la alcanza: ver el motivo de no consumo, arriba, y `config/settings.py`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `reshor`, y se localiza con `grep -n "^| reshor " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por combinacion de recurso y tipo de hora, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  emphis:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      **DATO DE NOMINA, Y EL ROL DEL MCP NO PUEDE LEERLA.** Esta declarada en `PG_EXCLUDED_TABLES` por el mecanismo de F-068, igual que `emp` y `res`: es el historico laboral de 1.017 personas con nombre y apellidos. Una consulta contra ella por el conector no devuelve nada, y eso no es un fallo. La restriccion es TEMPORAL y cae el dia que el MCP sepa quien pregunta.
+    descripcion: >-
+      **Historico de contrato del empleado** (1.633 filas, 117 columnas). Entra con F-074 porque es **el unico sitio de Sigrid con historico laboral de verdad**: 1.017 empleados distintos, del 19891102 al 20260601, con el tipo de contrato informado en el 100 % de las filas. Es lo que permite saber quien estaba de alta en un mes concreto en vez de suponerlo por las horas imputadas. `dptide` apunta al catalogo de departamentos, `auxdpt`.
+
+      **Su campo de fecha es un entero AAAAMMDD**, no una fecha: compararlo como texto ordena bien y restarlo no da dias.
+
+      **Es dato de nomina**, y por eso el rol de solo lectura del MCP no la alcanza: ver el motivo de no consumo, arriba, y `config/settings.py`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `emphis`, y se localiza con `grep -n "^| emphis " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+
+      **No se traen** 1 columna, `notas`: texto libre sobre el empleado, informado en una sola fila y con seis bytes. Preguntar por ella aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por tramo del historico de contrato de un empleado, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  dcaprodes:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Siete columnas numericas sin un solo texto: es una tabla de enlace, no de negocio. Leerla suelta no dice de que albaran ni de que factura se trata. La cadena ya resuelta la publicara el esquema `compras`.
+    descripcion: >-
+      **Desglose de linea de albaran** (850.985 filas, 7 columnas). Es **la trazabilidad linea a linea de albaran a factura**: `docproide` apunta a `dcapro.ide`. Entra con F-074 porque hoy el esquema `compras` aproxima esa cadena por `linoriide`, que es una aproximacion y no el enlace real.
+
+      Junto con `ctrprodes` es lo mas grande que añade F-074: entre las dos suman 1.275.460 filas, el 95 % de todo lo que esta tanda incorpora.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `dcaprodes`, y se localiza con `grep -n "^| dcaprodes " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por enlace entre una linea de albaran y su desglose, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  ctrprodes:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Ocho columnas numericas y ningun texto: es una tabla de enlace, no de negocio. Lo que responde --cuanto de un contrato se ha albaraneado y cuanto facturado-- exige cruzarla con las tres cabeceras, y eso es el esquema `compras`.
+    descripcion: >-
+      **Desglose de linea de contrato** (424.475 filas, 8 columnas). Es **la trazabilidad linea a linea de contrato a albaran o factura**: `docproide` apunta a `ctrpro.ide`. Entra con F-074 por el mismo motivo que `dcaprodes`: hoy esa cadena se aproxima por `linoriide`.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `ctrprodes`, y se localiza con `grep -n "^| ctrprodes " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por enlace entre una linea de contrato y su desglose, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxnap:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Tres filas de catalogo: traduce un codigo, no responde ninguna pregunta. El nombre ya resuelto esta en `compras.vencimientos.naturaleza_pago` y en `compras.v_facturas_pago`.
+    descripcion: >-
+      **Naturalezas de pago** (3 filas MEDIDAS el 2026-09-11: NOM nominas, EMB embargo, CUO cuotas), a donde apuntan `pag.natide` y `dcf.cypnatide`. Entra con F-080 para que el efecto y la factura publiquen la naturaleza con su nombre y no como un numero suelto. Informada en 37.053 de los 255.148 efectos, asi que en la mayoria sale a nulo, que aqui significa "pago ordinario, sin naturaleza especial".
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxnap`, y se localiza con `grep -n "^| auxnap " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por naturaleza de pago, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxban:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo de bancos y sucursales: traduce codigos. El banco del efecto, ya resuelto, esta en `compras.vencimientos`.
+    descripcion: >-
+      **Bancos y sucursales** (1.690 filas MEDIDAS el 2026-09-11, 12 columnas), a donde apuntan `pag.banban` y `pag.bansuc` --y los mismos campos de `dcf` y de `rpa`--. Entra con F-080 para poder decir "CAIXABANK" donde antes habia un entero.
+
+      **COMO SE UNE, que es lo que no constaba y ahora esta medido**: los dos campos van contra el **`ide`** de esta tabla, no contra el codigo de banco, y en dos uniones distintas: `banban` da la entidad y `bansuc` la sucursal. Casan 110.460 de 110.477 `banban` (99,98 %) y 93.273 de 93.273 `bansuc`. La jerarquia se distingue por `tipsuc`: 442 entidades (valor 0) y 1.248 sucursales (valor 1).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxban`, y se localiza con `grep -n "^| auxban " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por banco o sucursal, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  rpa:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Sin unirla a `con` no tiene ni codigo ni descripcion, y sin unirla a `pag` no se sabe que efectos lleva dentro. Lo que hace falta para leer un vencimiento --codigo de remesa, fecha, importe y banco-- ya viene resuelto en `compras.vencimientos`.
+    descripcion: >-
+      **Remesas de pago** (3.919 filas MEDIDAS el 2026-09-11), a donde apunta `pag.remide`: 40.090 de los 195.510 efectos de factura de compra estan dentro de una remesa. Trae `fecrem` (fecha de la remesa, entero AAAAMMDD), `imptot` (importe total) y el bloque bancario completo.
+
+      **LA TRAMPA DE SIEMPRE, y van cuatro**: `rpa` es "Propiedades de `con`", o sea que **la remesa ES UN DOCUMENTO** (`tip = 27`) y ni su codigo --`RP26/0254`-- ni su descripcion --"REMESA CONFIRMING SABADELL"-- estan aqui: viven en `raw.con` con el mismo `ide`. MEDIDO: las 3.919 tienen su fila en `con`. Antes de dar por inexistente un campo de un documento de Sigrid, se mira `con`.
+
+      Las remesas de COBRO son `rco` y no se ingieren: eso es el lado de venta (F-037).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rpa`, y se localiza con `grep -n "^| rpa " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por remesa de pago, identificada por `ide`, el mismo de su fila en `raw.con`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno

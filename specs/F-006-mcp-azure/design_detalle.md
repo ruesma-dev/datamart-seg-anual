@@ -62,6 +62,34 @@ infraestructura.
 > F-025 el datamart no reconstruye las 920 obras cada noche —se rehacen 40 y
 > 880 conservan su última versión buena—, así que la frescura dejó de ser una
 > propiedad del datamart entero y pasó a serlo de cada obra.
+>
+> **Enmienda del 2026-09-06 (F-066).** La ingesta pasa de 31 a 56 tablas
+> —personal, contabilidad y la cadena entera de compras— y con ellas entran
+> 25 fichas nuevas de `raw`, así que el inventario pasa a **130 objetos**.
+> Ninguna es superficie de consumo y ninguna documenta columnas (DA-2), así
+> que la cobertura de columnas no se mueve: siguen siendo 822.
+>
+> **Enmienda del 2026-09-09 (F-074).** La ingesta pasa de 56 a 65 tablas --las
+> nueve que destapo el censo de F-072: los catalogos que traducen personal y
+> horas, el maestro de articulos y los dos desgloses de trazabilidad-- y con
+> ellas entran 9 fichas nuevas de `raw`, asi que el inventario pasa a **139
+> objetos**. Ninguna es superficie de consumo y ninguna documenta columnas
+> (DA-2), asi que la cobertura de columnas sigue sin moverse: 822.
+>
+> **Enmienda del 2026-09-10 (F-073).** Entran tres objetos de consumo
+> --`maestro.centros_coste`, `maestro.estados_documento` y
+> `compras.formas_pago`--, asi que el inventario pasa a **142 objetos**. Estos
+> si documentan columnas, y ademas `maestro.obras` gana once: la cobertura de
+> columnas pasa de 822 a **852**, y las fichas de consumo de 54 a 57.
+>
+> **Enmienda del 2026-09-14 (F-080).** Entran los cinco objetos que responden
+> la peticion de Administracion --`compras.vencimientos`,
+> `compras.v_facturas_pago`, `compras.v_control_forma_pago`,
+> `compras.documento_texto` y `compras.documento_comentarios`-- y las tres
+> tablas de `raw` que necesitan (`auxnap`, `auxban` y `rpa`), asi que el
+> inventario pasa a **150 objetos**. Los cinco de `compras` documentan
+> columnas: la cobertura de columnas pasa de 852 a **941** y las fichas de
+> consumo de 57 a **62**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

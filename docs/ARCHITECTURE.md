@@ -94,12 +94,155 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
+### Qué se copia de Sigrid: 68 tablas, y qué NO está ahí (F-066, F-074, F-080)
+
+`config/tables_sigrid.yaml` declara **68 tablas**: eran 31, F-066 las dejó en 56
+el 2026-09-06, F-074 sumó nueve más el 2026-09-09 y F-080 otras tres el
+2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
+remesas—, además de recuperar la columna `con.tex` (el memo del documento,
+informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
+lectura sobre `con`, medio minuto de la ventana nocturna).
+Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
+que sigue se midió contra Sigrid ese día por `sigrid-api` en solo lectura.
+
+- **Personal** — `res` (2.610 recursos), `emp` (1.352 empleados), `hmo` (6.850
+  cabeceras de parte) y **`hmores` (328.760 líneas)**. Las horas están en
+  `hmores`, no en `hmo`: en la cabecera el recurso viene informado en 6 filas de
+  6.850. Es la corrección que hace posible «horas por obra».
+- **Contabilidad** — `cua` (34.139 cuentas), `asi` (783.386 asientos), **`apu`
+  (2.154.543 apuntes)** y `apa` (709.403 líneas de desglose). `apu` es la tabla
+  más grande del datamart, por encima de `con`.
+- **Compras y proveedor** — la cadena entera necesidad (`dnc`, `dncpro`) →
+  comparativo (ya estaba) → oferta (`dco`, `dcopro`, `dcorec`) → contrato (ya
+  estaba), más condiciones (`ctrrec`, `dcfrec`, `dcarec`, `auxpag`, `auxefp`),
+  firmas (`confir`, `deffir`), estados (`conest`) y proveedor (`conact`,
+  `auxpronat`, `prvcer`, `prvobrpag`).
+
+**Las nueve de F-074** salen del censo de F-072, que encontró tablas del origen
+sin las cuales la mitad de lo que ese censo propone construir no se puede
+escribir. Medidas contra Sigrid el 2026-09-09, ninguna supuesta:
+
+- **Catálogos que traducen** — `auxhor` (60 conceptos de hora; sin ella `hmores`
+  es ilegible, porque el catálogo mezcla horas de verdad con «mes vehículo» y
+  «consumos teléfono»), `auxrestip` (37 tipos de recurso: de las 2.610 filas de
+  `res` solo 1.353 son personas), `auxdpt` (7 departamentos) y `cet` (40 centros
+  de trabajo). **La columna `cod` que el documento de Sigrid atribuye a `cet` no
+  existe en la base**: cualquier unión con ella va por `ide`.
+- **Maestro y nómina** — `pro` (55.179 artículos: hoy el producto **no tiene
+  nombre** en el datamart pese a que lo referencian `dcopro` al 99,9 % y
+  `dncpro` al 95,4 %), `reshor` (8.949 filas de precio de coste por recurso y
+  tipo de hora, el multiplicador que a F-061 le falta para pasar de horas a
+  euros) y `emphis` (1.633 filas, 1.017 empleados, de 1989 a 2026: el único
+  sitio de Sigrid con histórico laboral de verdad).
+- **Trazabilidad línea a línea** — `dcaprodes` (850.985 filas, albarán →
+  factura) y `ctrprodes` (424.475, contrato → albarán o factura). Son el 95 % de
+  lo que esta tanda añade, y sustituyen la aproximación por `linoriide` que hoy
+  hace el esquema `compras`.
+
+**Lo que cuesta**: 1.341.365 filas nuevas por noche, unos **155 MB** estimados
+sobre los 25 GB que ocupa hoy la base en un disco de 64 GB (+0,6 %), y unos
+**3 a 6 minutos** más de ventana sobre las 3 h 45 actuales, medidos a 10.000
+filas de `dcaprodes` en 0,7 s y de `ctrprodes` en 0,5 s por la pasarela. Cabe,
+pero el margen antes de la jornada ya era mínimo.
+
+**`reshor` y `emphis` son datos de nómina** y quedan fuera del alcance del rol
+del MCP por el mecanismo de F-068, como `emp` y `res`. De `cet` se excluyen en
+origen el DNI y el nombre del representante legal.
+
+**F-074 arregló además dos declaraciones falsas del mismo fichero**: `com`,
+`comlin` y `comprv` declaraban `incremental_column: tiemod` y **esa columna no
+existe en Sigrid** (error 42S22 contra `INFORMATION_SCHEMA`), con
+`_source_tiemod` a NULL en sus 287.673 filas; y `prvcer` excluía `tex`, que es
+el único campo que dice de qué es cada certificado porque la tabla no tiene
+campo de tipo. `obrprv` **se queda** pese a tener 0 filas: dos SQL de `maestro/`
+construyen el vínculo obra-proveedor por otra vía precisamente porque está
+vacía, y `check-raw-recuentos` es lo único que diría que ha dejado de estarlo.
+
+**`incremental_column` no es un interruptor de modo de carga**, y confundirlo lo
+ha sido dos veces: lo único que decide es si `copy_rows` rellena
+`_source_tiemod`. Quién decide cómo se carga es el `CMD` del `Dockerfile`, que
+arranca `run-all --full`, o sea `TRUNCATE` y recarga entera de **todas** las
+tablas cada noche. Por eso «esta tabla no tiene `tiemod`» significa «su fila de
+`raw` no lleva sello de origen», y no «lo modificado no vuelve a bajar»: eso
+solo es cierto lanzando `ingest` a mano sin `--full`.
+
+**El mapa de `con.tip`**, verificado por recuento y necesario para leer `raw`:
+5 proveedor, 12 oferta de compra, 14 albarán, 15 factura, 16 cuenta del plan,
+20 asiento, 33 recurso, 42 obra, 43 empleado, 44 contrato, 46 comparativo.
+
+**Ninguna de las cuatro tablas de contabilidad tiene columna de última
+modificación**, así que la carga incremental por columna de corte no existe para
+ellas: van enteras. Da igual en la práctica —la nocturna es `--full`— pero
+importa si alguien intenta acortarla. `apu` se trae entera y sin filtro:
+partirla por empresa ahorra ≤ 10 % y exige subconsulta, y por ejercicio, ≤ 15 %.
+
+**`raw.emp` y `raw.res` llevan datos personales completos**, por decisión
+explícita del humano del 2026-09-06 frente a la propuesta de excluir 72
+columnas: DNI, número de la Seguridad Social, cuenta bancaria, domicilio,
+contacto, fecha de nacimiento y credenciales de acceso. Solo se excluye lo
+binario y el texto ilimitado, que es criterio técnico. **La ficha de cada una
+declara qué contiene**.
+
+**El MCP ya no las lee, y eso es TEMPORAL (F-068, 2026-09-07).** Hasta esa
+fecha `mcp_sigrid_dm_ro` alcanzaba `raw` entero y las dos tablas eran legibles
+por cualquier cuenta del tenant. El humano decidió quitarle el permiso —«de
+momento quita el permiso. Cuando pongamos límites o guardarraíles por usuario,
+habrá que volver a ponerlo para algunos usuarios»—, así que **no es una
+prohibición permanente**: es un tapón mientras el MCP no distinga QUIÉN
+pregunta, y su reversión ya está decidida para cuando exista ese control.
+
+Cómo se sostiene, que es la parte que no se ve: `GRANT SELECT ON ALL TABLES IN
+SCHEMA` no sabe saltarse una tabla, y `apply_grants` lo reaplica cada noche. Por
+eso la revocación **no es una orden suelta contra la base** —esa duraría hasta
+la nocturna siguiente— sino parte del propio paso: concede el esquema, revoca
+las tablas de `PG_EXCLUDED_TABLES` y cambia el `ALTER DEFAULT PRIVILEGES` de
+`raw` de `GRANT` a `REVOKE`, para que una tabla recreada tampoco nazca legible.
+La lista es `DEFAULT_EXCLUDED_TABLES` en `config/settings.py`, y ahí está
+escrita la condición para levantarla.
+
+**Lo que Sigrid NO guarda**, medido dos veces y escrito aquí para que nadie
+vuelva a buscarlo:
+
+- **No hay histórico de cambios de estado** de contratos ni de facturas. La
+  tabla de auditoría registra 1,5 M de cambios de forma de pago y de fecha de
+  factura desde 2017, y **ni uno solo del campo de estado**. Lo que hay es el
+  estado actual (`con.est`), su nombre **por tipo de documento** (`conest`: la
+  misma cifra significa cosas distintas en un contrato y en una factura), el
+  alta (`con.fec`) y la última modificación (`con.tiemod`, ya en
+  `raw.con._source_tiemod`) como aproximación de su antigüedad. El histórico lo
+  construye F-067 como foto diaria sobre `raw`, y empieza a contar el día que se
+  despliegue.
+- **Los contratos no pasan por el circuito de firma** (`confir`): sus 69.993
+  firmas son de comparativos, facturas y obras, y las de factura vienen sin
+  fecha. `PFfir` y `logfirdoc`, donde el backlog esperaba encontrarlo, están
+  vacías, como otras 17 candidatas que por eso no se ingieren.
+- **La penalización del contrato no existe como campo**, y la actividad del
+  proveedor no es `act` (vacía) sino `conact` → `auxpronat`.
+
+`python main.py check-raw-recuentos` compara, tabla a tabla y con el mismo
+filtro, el `COUNT(*)` de Sigrid con el de `raw`. Es de solo lectura, va fuera de
+`run-all` y sale con código 1 también cuando Sigrid **no pudo** contestar: «no
+he podido mirar» no es «está bien».
+
+**La tolerancia tiene dirección** (corregido el 2026-09-08, tras la primera
+medición real). Exigir igualdad exacta era inalcanzable: Sigrid es un ERP vivo
+y el datamart una foto, así que cinco horas después de la ingesta 25 de 56
+tablas tenían filas de más —4.883 sobre 25.287.500, un 0,0193 %— y ninguna de
+menos. Ahora las filas **de más** en Sigrid son deriva normal y se aceptan
+mientras no pasen de `--tolerancia-pct` (0,05 % por defecto, relativo a cada
+tabla); las filas de **menos** son alarma inmediata, sea de una fila, porque
+eso no lo hace el paso del tiempo sino un borrado en origen, una ingesta
+duplicada o una carga equivocada. `AUSENTE EN RAW` y `SIN MEDIR` siguen siendo
+fallo con cualquier tolerancia.
+
 ### El datamart en Azure (F-005)
 
 - **No hay servidor propio.** La base `sigrid_dm` vive dentro de
   `psql-albaranes-rs9k2.postgres.database.azure.com` (`rg-albaranes-dev`,
-  PostgreSQL 16, `Standard_B1ms`, 32 GB), que ya sirve a `albaranes` y
-  `partes`, **las dos en uso**. Base propia y no esquema compartido: PostgreSQL
+  PostgreSQL 16, `Standard_B1ms`, **64 GB** desde el 2026-08-29; antes 32), que
+  ya sirve a `albaranes`, `partes`, `dedicacion`, `postventa` y `facturas`,
+  **todas en uso** —la última apareció sola el 2026-09-07 y tumbó una
+  nocturna—. Base propia y no esquema compartido: PostgreSQL
   no permite consultas entre bases, y esa es la frontera que impide que el rol
   de lectura vea `albaranes`.
 - **Tres roles.** `sigrid_dm_etl` (grupo `NOLOGIN`) es el propietario de todo;
@@ -150,7 +293,8 @@ Desde F-019, el sub-paso `build_plan_mensual` **no se ejecuta de una pasada**:
   ciegas es lo que provocó el incidente. **Hasta F-025 el aborto además vaciaba
   la tabla**; ya no, porque vaciarla destruiría las 880 obras congeladas.
 - **Tres settings**, todos con default y sin secretos: `PG_TRAMO_MAX_FILAS`
-  (1 000 000), `PG_DISCO_TOTAL_GB` (32) y `PG_DISCO_LIMITE_PCT` (80). Un
+  (1 000 000), `PG_DISCO_TOTAL_GB` (64, el disco de hoy) y
+  `PG_DISCO_LIMITE_PCT` (80). Un
   máximo enorme reproduce el comportamiento antiguo si alguna vez hiciera
   falta diagnosticar, sin conservar una rama de código con el arma cargada.
 - Cada tramo deja su fila en `_meta.etl_runs`, así que `python main.py timings`
@@ -295,7 +439,7 @@ coherencia se garantiza por **verificación** y **visibilidad**:
   `TRUNCATE` y `mart/01_ddl.sql` con un `DROP`, y eso no se deshace porque el
   step devuelva `FAILED` después.
 - **`--sin-puerta`, solo en los comandos sueltos.** `stage` y `build-mart` la
-  admiten; `run-all` **no**, porque a las 02:00 no hay nadie delante para
+  admiten; `run-all` **no**, porque a medianoche no hay nadie delante para
   valorar si saltársela es razonable. Con la opción, la puerta se evalúa
   igualmente y su fila queda `SKIPPED` con el veredicto dentro: lo que esa fila
   cuenta es que el build se hizo **sin** puerta, no lo que la puerta habría
@@ -440,7 +584,8 @@ la lista solo baja.
 - `infra/sql/` contiene la provisión de `sigrid_dm` (base, roles, diagnóstico).
   Se ejecuta a mano con `psql`, nunca desde el ETL: usa bloques `$$`, que el
   troceador de sentencias de `postgres_client.py` no sabe manejar.
-- Destino: **Container Apps Job programado** (`0 2 * * *` UTC, siempre
+- Destino: **Container Apps Job programado** (`0 0 * * *` UTC desde el
+  2026-09-06, antes `0 2 * * *`; siempre
   `run-all --full`) en un resource group propio del datamart, región
   `spaincentral`, con entorno **sin integración de red virtual** — así tiene IP
   de salida estática, que es lo que se autoriza en el firewall del Postgres.
