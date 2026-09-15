@@ -946,3 +946,47 @@ sabe que estos objetos existen.
 **Si el MCP falla una, el problema es la ficha, no la pregunta.** La respuesta
 se pega aqui con la fecha, y lo que haya que corregir del diccionario entra como
 deuda de F-080 antes de cerrarla.
+
+## DESPLIEGUE DEL 2026-09-15 · imagen `r20260915-1014`
+
+**Hecho por el humano**, con las tres features ya cerradas y aprobadas:
+**F-073**, **F-081** y **F-080**. Antes del despliegue se fusionaron las tres a
+`main` en el commit de merge `c3baf88` (la rama de F-080 las contenia
+encadenadas) y el humano hizo `git push origin main`.
+
+| paso | resultado |
+|---|---|
+| `70_build_image.ps1` | imagen `acralbaranesdev.azurecr.io/datamart-seg-anual:r20260915-1014`, construida en ACR en 43 s |
+| `85_update_job.ps1` | job apuntado; imagen anterior era `r20260910-0102` |
+| Verificacion del job | `az containerapp job show` devuelve **`...:r20260915-1014`**, disparo `Schedule` |
+
+**La comprobacion del job NO es opcional y por eso esta aqui**: la nocturna
+llego a correr una imagen de diez dias antes sin que nadie lo notara.
+
+**OJO CON UN FALSO SUSTO DEL SCRIPT**: la cabecera de `85_update_job.ps1`
+imprime un tag calculado con la hora actual (`r20260915-1017`), que **no es el
+que aplica**. El aplicado es el de «Imagen nueva» y el que devuelve `az`.
+
+**`bash harness/init.sh` sobre `main` sale en ROJO por una sola razon, y no es
+del codigo**: la ultima comprobacion del arnes prohibe que los agentes trabajen
+en `main`. Lo que importa salio verde: **4.677 pasan, 179 saltados, 0 fallos**.
+
+### PENDIENTE: la primera nocturna con esta imagen
+
+**Decision del humano sobre CUANDO correrla.** Se le advirtio de que lanzarla a
+mediodia compite por los creditos de CPU del `psql-albaranes-rs9k2`, que es
+**compartido** con albaranes, partes, remesas, el portal y facturas: dia y noche
+gastan la misma hucha y, a cero, todo va unas cinco veces mas lento.
+
+Cuando la nocturna haya corrido, **en este orden**:
+
+```
+python main.py check-raw-recuentos    # 68 tablas, ocho mas que antes
+python main.py check-declarados
+python main.py check-diccionario
+python main.py publicar-diccionario   # UNICA escritura; sube a la version 21
+```
+
+Y las verificaciones MANUAL propias de cada feature, ya anotadas mas arriba:
+las de F-073 (recuentos 804/683, 193, 69, 921 y las 21 columnas, mas la prueba
+del puente 261/261) y las de F-080 (T0 bis, T7, T26 y T27).
