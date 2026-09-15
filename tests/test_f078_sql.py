@@ -723,3 +723,176 @@ def test_f078_r6_la_tabla_vacia_tambien_tumba_el_comando(
     resultado = CliRunner().invoke(main.cli, ["check-cp-tipologia"])
 
     assert resultado.exit_code == 1, "cero diferencias sobre cero filas no es un OK"
+
+
+# ===========================================================================
+# R7 · Los detalles del comando que, sin test, nadie vigila
+#
+# Esta seccion nace de la campaña de mutacion: son las lineas cuyo mutante
+# sobrevivia porque ningun test miraba el valor exacto, el recorte de la
+# salida, el color del veredicto o la posicion de cada columna. Al nivel
+# `critico` un superviviente exige test o justificacion escrita; esto es lo
+# primero.
+# ===========================================================================
+
+
+def _diferencia(n: int) -> tuple:
+    """Una fila cruda de la comparacion, identificable por su obra."""
+    return (n, 2025, "AVALES", "IMPORTES DISTINTOS", 10, 11, 12, 13, 14, 15, 16, 17)
+
+
+def test_f078_r7_el_timeout_esta_clavado_en_media_hora() -> None:
+    """Aqui una igualdad exacta SI es lo correcto, y conviene decir por que.
+
+    Este numero es el unico freno que protege a `albaranes` y a `partes` de una
+    consulta que barre `stg.plan_mensual` cinco veces contra un servidor
+    compartido EN PRODUCCION. Un `>= 600` deja pasar cualquier subida
+    silenciosa; subirlo a proposito es una decision, y una decision se toma
+    tocando este test.
+    """
+    assert _modulo_comparacion().TIMEOUT_POR_CONSULTA_S == 1800
+
+
+def test_f078_r7_el_join_sale_de_la_lista_de_claves() -> None:
+    """Dos listas que dicen lo mismo divergen: el `ON` se genera desde
+    `CLAVES`, y esto comprueba que se genera de verdad."""
+    modulo = _modulo_comparacion()
+    sql = _compacto(modulo.sql_comparacion())
+
+    assert modulo.CLAVES == ("obra_id", "anio", "tipologia")
+    for clave in modulo.CLAVES:
+        assert f"t.{clave} = v.{clave}" in sql
+
+
+def test_f078_r7_el_where_sale_de_la_lista_de_medidas() -> None:
+    modulo = _modulo_comparacion()
+    sql = _compacto(modulo.sql_comparacion())
+
+    assert modulo.MEDIDAS == (
+        "cp_real", "cp_planificado", "cp_desviacion", "orden_tipologia",
+    )
+    for medida in modulo.MEDIDAS:
+        assert f"v.{medida} IS DISTINCT FROM t.{medida}" in sql
+
+
+def test_f078_r7_el_recuento_tambien_se_acota_a_la_obra() -> None:
+    """Si el recuento no se filtrara, `--obra` compararia una obra contra el
+    recuento de todas y el veredicto hablaria de filas que no ha mirado."""
+    modulo = _modulo_comparacion()
+
+    assert "obra_id = 1442383" in modulo.sql_recuento_tabla(obra_id=1442383)
+    assert "obra_id = " not in modulo.sql_recuento_tabla()
+    assert "count(*)" in modulo.sql_recuento_tabla()
+
+
+def test_f078_r7_cada_columna_de_la_diferencia_cae_en_su_sitio() -> None:
+    """Doce valores DISTINTOS a proposito: con valores repetidos, cambiar
+    `f[6]` por `f[7]` no se nota y el error viaja hasta el informe."""
+    (diferencia,) = _modulo_comparacion().diferencias_de([_diferencia(1442383)])
+
+    assert diferencia.obra_id == 1442383
+    assert diferencia.anio == 2025
+    assert diferencia.tipologia == "AVALES"
+    assert diferencia.motivo == "IMPORTES DISTINTOS"
+    assert diferencia.cp_real_antes == 10
+    assert diferencia.cp_real_ahora == 11
+    assert diferencia.cp_plan_antes == 12
+    assert diferencia.cp_plan_ahora == 13
+    assert diferencia.cp_desv_antes == 14
+    assert diferencia.cp_desv_ahora == 15
+    assert diferencia.orden_antes == 16
+    assert diferencia.orden_ahora == 17
+
+
+def test_f078_r7_la_diferencia_es_inmutable_y_sin_diccionario() -> None:
+    """`frozen` para que nadie la retoque de camino al informe, y `slots` para
+    que una errata en el nombre de un campo reviente en vez de crear uno."""
+    (diferencia,) = _modulo_comparacion().diferencias_de([_diferencia(1)])
+
+    with pytest.raises(Exception):
+        diferencia.cp_real_antes = 99  # type: ignore[misc]
+    assert not hasattr(diferencia, "__dict__")
+
+
+def _invocar(monkeypatch, diferencias, filas_tabla, argumentos=(), color=False):
+    from click.testing import CliRunner
+
+    import main
+
+    pg = _PgComparacion(diferencias=list(diferencias), filas_tabla=filas_tabla)
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    resultado = CliRunner().invoke(
+        main.cli, ["check-cp-tipologia", *argumentos], color=color
+    )
+    return resultado, pg
+
+
+def test_f078_r7_solo_se_imprimen_las_cincuenta_primeras(monkeypatch) -> None:
+    """51 diferencias: salen las 50 primeras y se ANUNCIA la que falta. Sin
+    esto, un recorte mal puesto esconde diferencias sin decirlo, que es peor
+    que no recortar."""
+    resultado, _ = _invocar(
+        monkeypatch, [_diferencia(n) for n in range(1, 52)], filas_tabla=41_237
+    )
+
+    assert "obra 50 " in resultado.output
+    assert "obra 51 " not in resultado.output
+    assert "y 1 diferencia(s) mas" in resultado.output
+
+
+def test_f078_r7_con_cincuenta_exactas_no_se_anuncia_recorte(monkeypatch) -> None:
+    """Control del anterior: el aviso de recorte solo aparece si hay recorte."""
+    resultado, _ = _invocar(
+        monkeypatch, [_diferencia(n) for n in range(1, 51)], filas_tabla=41_237
+    )
+
+    assert "obra 50 " in resultado.output
+    assert "diferencia(s) mas" not in resultado.output
+
+
+def test_f078_r7_el_veredicto_bueno_sale_en_verde(monkeypatch) -> None:
+    """El color no es adorno: es lo primero que mira quien lanza esto de
+    madrugada. `color=True` conserva los codigos ANSI en la salida."""
+    resultado, _ = _invocar(monkeypatch, [], filas_tabla=41_237, color=True)
+
+    assert "\x1b[32m" in resultado.output, "el OK tiene que salir en verde"
+
+
+def test_f078_r7_el_veredicto_malo_sale_en_rojo(monkeypatch) -> None:
+    resultado, _ = _invocar(
+        monkeypatch, [_diferencia(1442383)], filas_tabla=41_237, color=True
+    )
+
+    assert "\x1b[31m" in resultado.output, "el KO tiene que salir en rojo"
+
+
+def test_f078_r7_las_dos_consultas_van_con_el_mismo_timeout(monkeypatch) -> None:
+    """El recuento y la comparacion comparten limite: si el recuento fuera sin
+    acotar, la parte barata seria la que se llevase por delante al servidor."""
+    _, pg = _invocar(monkeypatch, [], filas_tabla=1)
+
+    assert pg.timeouts == [1800, 1800]
+
+
+def test_f078_r7_el_timeout_se_puede_bajar_a_mano(monkeypatch) -> None:
+    _, pg = _invocar(monkeypatch, [], filas_tabla=1, argumentos=("--timeout", "60"))
+
+    assert pg.timeouts == [60, 60]
+
+
+def test_f078_r7_la_cabecera_dice_con_que_se_esta_comparando(monkeypatch) -> None:
+    """Quien lee la salida dentro de tres meses tiene que saber con que limite
+    y sobre que obra se midio, sin volver al codigo."""
+    resultado, _ = _invocar(
+        monkeypatch, [], filas_tabla=1, argumentos=("--obra", "1442383")
+    )
+
+    assert "1800s" in resultado.output
+    assert "READ ONLY" in resultado.output
+    assert "obra 1442383" in resultado.output
+
+
+def test_f078_r7_sin_obra_la_cabecera_no_inventa_un_filtro(monkeypatch) -> None:
+    resultado, _ = _invocar(monkeypatch, [], filas_tabla=1)
+
+    assert "acotado a la obra" not in resultado.output

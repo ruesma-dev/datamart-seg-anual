@@ -39,6 +39,12 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
     python main.py check-declarados   - ¿Existe en la base todo lo que el SQL
                                         del repositorio declara crear? (F-047)
                                         Corre solo al final de run-all
+    python main.py check-cp-tipologia - ¿Materializar FactCPTipologia cambió
+                                        alguna cifra? (F-078) Enfrenta
+                                        `mart.fact_cp_tipologia` a una
+                                        fotografía congelada del cálculo que
+                                        hacía la vista antes. Sale != 0 si hay
+                                        diferencias o si la tabla está vacía
 
 Un cierre por mes en los ámbitos reales (F-042). Los tres son de SOLO LECTURA:
 

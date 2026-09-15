@@ -55,10 +55,14 @@ from dataclasses import dataclass
 #: de la feature. Si salta, el comando lo dice y **no lo cuenta como correcto**.
 TIMEOUT_POR_CONSULTA_S = 1800
 
-#: Las claves de negocio sobre las que se casan las dos mitades.
+#: Las claves de negocio sobre las que se casan las dos mitades. No son
+#: decorativas: de aquí sale el `ON` del `FULL JOIN`, así que la lista y la
+#: sentencia no pueden divergir.
 CLAVES = ("obra_id", "anio", "tipologia")
 
-#: Lo que se compara además de la presencia de la fila.
+#: Lo que se compara además de la presencia de la fila: los tres importes que
+#: pide el criterio 3 de la ficha, más el orden, que es gratis. De aquí sale el
+#: `WHERE` de la comparación, por el mismo motivo que `CLAVES`.
 MEDIDAS = ("cp_real", "cp_planificado", "cp_desviacion", "orden_tipologia")
 
 
@@ -292,7 +296,15 @@ def sql_comparacion(obra_id: int | None = None) -> str:
     `IS DISTINCT FROM` y no `<>`: con `<>` una comparación contra `NULL` da
     `NULL`, la fila se cae del `WHERE` y una diferencia real se cuenta como
     coincidencia. Es el modo de fallo silencioso de este tipo de contrastes.
+
+    El `ON` y el `WHERE` se generan desde `CLAVES` y `MEDIDAS` en vez de
+    escribirse a mano: así no hay dos listas que puedan divergir, que es como se
+    cae una columna de la comparación sin que nadie lo note.
     """
+    casan = "\n   AND ".join(f"t.{c} = v.{c}" for c in CLAVES)
+    difieren = "\n   OR ".join(
+        f"v.{m} IS DISTINCT FROM t.{m}" for m in MEDIDAS
+    )
     return f"""
 WITH antes AS (
 {sql_vista_anterior(obra_id)}
@@ -318,15 +330,10 @@ SELECT
     v.orden_tipologia, t.orden_tipologia
 FROM      antes v
 FULL JOIN ahora t
-    ON t.obra_id   = v.obra_id
-   AND t.anio      = v.anio
-   AND t.tipologia = v.tipologia
+    ON {casan}
 WHERE v.tipologia IS NULL
    OR t.tipologia IS NULL
-   OR v.cp_real         IS DISTINCT FROM t.cp_real
-   OR v.cp_planificado  IS DISTINCT FROM t.cp_planificado
-   OR v.cp_desviacion   IS DISTINCT FROM t.cp_desviacion
-   OR v.orden_tipologia IS DISTINCT FROM t.orden_tipologia
+   OR {difieren}
 ORDER BY 1, 2, 3
 """.strip()
 

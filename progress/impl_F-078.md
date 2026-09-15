@@ -85,3 +85,67 @@ FFFF  4 failed
 demostró en rojo es el comando. Lo que cubre de verdad la lógica del módulo es
 la campaña de mutación de la sección «Evidencias». La fase RED completa, con el
 SQL inexistente, es la de T2.
+
+## Qué cambió
+
+| Fichero | Qué |
+|---|---|
+| `sql/mart/06_views_cp_tipologia.sql` → **`06_cp_tipologia.sql`** | Ya no crea solo vistas: crea las TRES TABLAS y luego las tres vistas que las envuelven |
+| `application/steps/build_mart_step.py` | `SUB_PASOS` sale de `run()` a nivel de módulo (como en `build_compras_step`); el sub-paso `cp_tipologia` cuenta las filas de `mart.fact_cp_tipologia` |
+| `infrastructure/postgres/cp_tipologia_sql.py` (nuevo) | La fotografía congelada del cálculo anterior a F-078 y la consulta de comparación. Solo construye texto |
+| `main.py` | Comando `check-cp-tipologia` (+ su línea en el índice de comandos) |
+| `tests/test_f078_sql.py` (nuevo) | 113 tests sobre el TEXTO del SQL y del módulo. Ni red ni BBDD |
+| `config/diccionario/mart.yaml` | Tres fichas nuevas; las tres vistas actualizadas |
+| `config/diccionario/00_global.yaml` | **R-COSTE-CONSULTA corregida**, `R-VERSION-MASTER` alcanza las tablas, versión **22** con changelog |
+| `tests/test_f006_fichas.py`, `tests/test_f079_stg_consultable.py` | Los tests que fijaban lo contrario, corregidos; uno nuevo impide que el aviso caducado vuelva |
+| `specs/F-006-mcp-azure/design.md`, `progress/current.md` | Inventario a **153** objetos, 964 columnas, 66 fichas de consumo |
+| `azure-apps/datamart_seg_anual.md` | Commit `db7c91e` en ese repositorio: toda `v_pbi_` tiene ya tabla detrás |
+
+**Lo que NO se ha tocado, a propósito**: `config/objetos_pendientes.yaml` sigue
+vacío (los objetos nuevos nacen construidos, no pendientes); no hay `GRANT` uno
+a uno, porque `apply_grants` hace `GRANT SELECT ON ALL TABLES IN SCHEMA mart` y
+corre el último de `run-all`; `cierre.yaml` y `stg.yaml` siguen apuntando a las
+vistas, que conservan nombre y columnas; y `inspect-cp-tipologia` no cambia.
+
+## Decisiones de diseño
+
+1. **Un solo fichero SQL y una sola transacción.** `execute_sql_file` manda el
+   texto entero en una llamada, así que los seis objetos se rehacen o no se
+   toca ninguno. No hay ventana en la que Power BI encuentre la vista ausente.
+   Es lo que evita repetir la avería de `03_agg_categoria.sql`, que dropeaba con
+   `CASCADE` una vista de `cierre` que nadie recreaba.
+2. **`CREATE TABLE ... AS SELECT`** y no DDL explícito: las tablas heredan el
+   tipo de la proyección —`NUMERIC(18,2)` incluido— y la puerta de F-006
+   contrasta sus columnas contra esa proyección, exactamente igual que con las
+   siete tablas de `compras`. Con DDL a mano habría dos sitios que mantener.
+3. **Sin índices.** Son decenas de miles de filas: un `seq scan` sobre eso es
+   trivial. Añadir índices a una tabla que se dropea y rehace cada noche es
+   trabajo de build a cambio de nada.
+4. **La vigencia anual se calcula contra la TABLA de versiones, no contra la
+   vista.** Es la decisión que mata el `WindowAgg` de 11,8 M de filas: con la
+   vista, el plan volvería a barrer `stg.plan_mensual` por debajo y las tablas
+   no habrían ahorrado nada. Tiene su test.
+5. **El sub-paso cuenta el HECHO y no los dos helpers.** Un `_SubStep` cuenta
+   una tabla. Se elige la que delata a las tres: sin versiones vigentes no hay
+   filas de hecho. Mismo criterio que `compras.texto`, que cuenta los
+   comentarios y no el memo.
+6. **La comparación es un comando y no una consulta de usar y tirar.** El
+   criterio 3 no se puede ejecutar hoy (hay una nocturna en curso y las tablas
+   aún no existen), así que tenía que quedar algo repetible y versionado. Y como
+   la vista ahora lee de la tabla, compararlas sería una tautología: de ahí la
+   fotografía congelada, que recalcula desde `stg`.
+
+## Desviaciones y riesgos, declarados
+
+* **`CURRENT_DATE` se congela en el build.** Es inherente a materializar y es el
+  único cambio de semántica. El "año en curso" y el "mes de corte" pasan a ser
+  los de la noche de la carga. Con refresco nocturno solo se nota el día 1 de
+  cada mes antes de que corra `run-all`. Está escrito en la cabecera del SQL,
+  en la ficha del diccionario y en el `--help` del comando de comparación.
+  **Consecuencia práctica**: `check-cp-tipologia` hay que lanzarlo el mismo día
+  en que se construyó la tabla, o las dos mitades cortan en meses distintos.
+* **El build nocturno se alarga.** El cálculo pasa de hacerse en cada consulta
+  a hacerse una vez de noche. No se ha podido cronometrar: ver más abajo.
+* **El fichero SQL se renombró.** Si alguien resucita
+  `06_views_cp_tipologia.sql`, habría dos definiciones de los mismos objetos y
+  el build ejecutaría la que esté en `SUB_PASOS`. Hay un test que lo impide.
