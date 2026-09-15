@@ -1299,6 +1299,24 @@
       "rigor": "estandar",
       "priority": 8,
       "branch": "feature/F-081-deudas-review-F-073"
+    },
+    {
+      "id": "F-082",
+      "title": "Los cinco supervivientes de mutacion de F-025 que dos campanas seguidas senalan, y dos verdes que no significan lo que parecen",
+      "description": "Nace el 2026-09-15 de la propuesta del reviewer de F-080 (progress/review_F-080.md, seccion «Propuesta (no aplicada) — merece ficha propia»). Es el mismo patron que ya produjo F-077 y F-081: un superviviente de mutacion que NO es de la feature que lo encuentra se saca a ficha propia en vez de taparlo de tapadillo. ================ LOS CINCO SUPERVIVIENTES, y lo que los hace distintos de los anteriores: **DOS CAMPANAS SEGUIDAS LOS SENALAN**. La de F-073 los marco y la canonica de F-080 los volvio a marcar, con los mismos ficheros y lineas. Son `postgres_client.py:1527`, `:1528`, `:1551`, `:1643` y `ventana_sql.py:244`, y **todos son de F-025**. El reviewer los describe como «huecos reales, inalcanzables offline porque esos metodos necesitan cursor». Ni F-073 ni F-080 hicieron mal en no tocarlos: no eran suyos, y ademas `build_stg_step.py` y su entorno son territorio de la ventana de F-025. ================ LA DECISION QUE ESTA FICHA TIENE QUE TOMAR, y es el trabajo de verdad: no es «cubrirlos» a toda costa. Son metodos que necesitan un cursor de base de datos, y la convencion de este repositorio es que **los tests no tocan red ni BBDD**. Asi que hay dos salidas honradas y hay que elegir una POR CADA UNO, con su motivo escrito: (a) cubrirlo con un doble que se compare con el original -patron de `tests/test_f025_contrato_cliente.py`, que existe justo porque un doble sin comparar produjo verde falso en F-025-; o (b) declarar por escrito que ese camino **solo lo cubre la verificacion MANUAL**, y decir cual. Lo que NO vale es dejarlos sin analizar una tercera vez. ================ DOS APUNTES MAS DEL MISMO REVIEW, que entran aqui porque son de la misma familia -cosas que los tests dan por buenas sin comprobarlas-: (1) **R36 de F-080 no tiene guardian automatico**, mientras que R21, que es del mismo tipo, si lo tiene. Un requisito de «no toques esto» sin tripwire se incumple sin que nadie se entere. (2) **Las listas de columnas de `tests/test_f080_diccionario.py` y `tests/test_f080_sql.py` estan CABLEADAS A MANO, no derivadas del SQL**. Consecuencia medida por el reviewer: una columna anadida al SQL y olvidada en la ficha del diccionario **pasaria los dos tests**. La biyeccion real solo la impone `check-diccionario`, que es MANUAL y corre contra Azure. Es un verde que no significa lo que parece, y este repositorio tiene historial de eso.",
+      "acceptance": [
+        "Cada uno de los cinco supervivientes (postgres_client.py:1527, :1528, :1551, :1643 y ventana_sql.py:244) tiene una decision escrita y razonada: o muere con un test nuevo, o queda declarado por escrito como camino que solo cubre una verificacion MANUAL, diciendo cual es esa verificacion",
+        "Los tests nuevos NO tocan red ni BBDD, y si usan un doble, ese doble se compara con el original por el patron de tests/test_f025_contrato_cliente.py",
+        "La proxima campana de mutacion sobre esos ficheros no vuelve a reportar como novedad un superviviente ya decidido: o murio, o consta declarado",
+        "R36 de F-080 tiene guardian automatico, como ya lo tiene R21, o queda escrito por que no puede tenerlo",
+        "Las listas de columnas de tests/test_f080_diccionario.py y tests/test_f080_sql.py dejan de estar cableadas a mano: se derivan del SQL, de forma que una columna anadida al SQL y olvidada en la ficha del diccionario ponga los tests en ROJO sin esperar a check-diccionario",
+        "bash harness/init.sh en verde"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 14,
+      "branch": "feature/F-082-supervivientes-f025"
     }
   ]
 }
