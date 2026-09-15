@@ -990,3 +990,33 @@ python main.py publicar-diccionario   # UNICA escritura; sube a la version 21
 Y las verificaciones MANUAL propias de cada feature, ya anotadas mas arriba:
 las de F-073 (recuentos 804/683, 193, 69, 921 y las 21 columnas, mas la prueba
 del puente 261/261) y las de F-080 (T0 bis, T7, T26 y T27).
+
+## F-078 · MATERIALIZAR FactCPTipologia (en curso, 2026-09-15)
+
+Rama `feature/F-078-materializar-cp-tipologia`, rigor `critico`, `sdd=false`.
+Informe: `progress/impl_F-078.md`, con el plan de tareas numerado.
+
+**HAY UNA NOCTURNA EN CURSO** (job lanzado a mano con la imagen
+`r20260915-1014`, `run-all --full`, unas 3 h 30). Por eso el implementer **no
+ejecuta ninguna escritura contra Azure**: `build_mart` dropea y reconstruye, y
+cruzarse con la nocturna es buscarse un problema. La autorizacion del humano del
+2026-09-09 para construir las tres tablas a mano es ANTERIOR a esta nocturna.
+
+### VERIFICACIONES MANUAL (humano) · cuando la nocturna haya TERMINADO
+
+En este orden y con el codigo de la rama ya en el arbol:
+
+```
+python main.py build-mart              # construye las tres tablas nuevas
+python main.py check-cp-tipologia      # las cifras no cambian: diferencias = 0
+python main.py inspect-cp-tipologia --obra <obra> --anio 2025
+python main.py check-declarados
+python main.py check-diccionario
+python main.py publicar-diccionario    # sube a la version 22
+```
+
+Lo que hay que ANOTAR de cada una (criterios 3 y 4 de la ficha, que no se
+demuestran afirmando): el **tiempo** que tarda el sub-paso `cp_tipologia` de
+`build-mart` (lo imprime el log `mart_substep_done`), el **numero de
+diferencias** que dice `check-cp-tipologia` —tiene que ser **0**— y el tiempo de
+un `SELECT * FROM mart.v_pbi_cp_tipologia` contra Azure.
