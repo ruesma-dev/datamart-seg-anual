@@ -353,14 +353,19 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 150 objetos, 941 columnas y 62 fichas de
-consumo** —eran 142 / 852 / 57 al cerrar F-073, y F-080 añade los **cinco
-objetos** de `compras` (`vencimientos`, `v_facturas_pago`,
-`v_control_forma_pago`, `documento_texto`, `documento_comentarios`, 89 columnas)
-más las **tres tablas nuevas de `raw`** (`auxnap`, `auxban`, `rpa`, sin columnas
-por la convención de `raw`); antes de eso eran 139 / 822 / 54 hasta F-073 y 47
-fichas de consumo hasta F-079, que subió los siete objetos de `stg` a la
-superficie de consulta— y el árbol declara **versión 21**. Lo publicado en `_meta` es la **versión
+**El diccionario del árbol está en 153 objetos, 964 columnas y 66 fichas de
+consumo** —F-078 añade las **tres tablas** de CP por tipología
+(`mart.master_versiones_tipadas`, `mart.master_vigente_anual`,
+`mart.fact_cp_tipologia`, 23 columnas) y sube `mart.v_pbi_cp_tipologia` a la
+superficie de consulta, que es lo que explica las cuatro fichas de consumo
+nuevas. Antes estaba en 150 / 941 / 62, y eran 142 / 852 / 57 al cerrar F-073,
+cuando F-080 añadió los **cinco objetos** de `compras` (`vencimientos`,
+`v_facturas_pago`, `v_control_forma_pago`, `documento_texto`,
+`documento_comentarios`, 89 columnas) más las **tres tablas nuevas de `raw`**
+(`auxnap`, `auxban`, `rpa`, sin columnas por la convención de `raw`); antes de
+eso eran 139 / 822 / 54 hasta F-073 y 47 fichas de consumo hasta F-079, que
+subió los siete objetos de `stg` a la superficie de consulta— y el árbol declara
+**versión 22**. Lo publicado en `_meta` es la **versión
 18** (hash `4af4c3bb60d4`, publicada el 2026-09-10): publicar contra Azure es una
 escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test

@@ -176,7 +176,34 @@
 # `compras.yaml`, que decia que el esquema no se refresca de noche y que su
 # fecha de build no es consultable: dejo de ser cierto en F-047.
 
-version: 21
+# version 22 (F-078, 2026-09-15): TRES OBJETOS NUEVOS, Y UNA REGLA DE COSTE QUE
+# DEJA DE SER CIERTA. `mart.v_pbi_cp_tipologia` era la unica `v_pbi_` sin tabla
+# detras: se recalculaba entera en cada consulta -6,6 millones de unidades de
+# coste estimado, cinco recorridos de `stg.plan_mensual` (29,8 M de filas, 11 GB)
+# y un `WindowAgg` sobre 11,8 M de filas intermedias-, colgaba a Power BI en el
+# paso de Navegacion y mataba cualquier pregunta del MCP que la tocase. Se
+# materializa en `mart.master_versiones_tipadas`, `mart.master_vigente_anual`
+# -calculada YA contra la anterior, que es lo que mata el `WindowAgg`- y
+# `mart.fact_cp_tipologia`. Las TRES VISTAS SE QUEDAN, con el mismo nombre y las
+# mismas columnas: el informe de Power BI no cambia ni una linea.
+#
+# LO QUE ESTO OBLIGA A CORREGIR, y es la mitad importante de esta version:
+# `R-COSTE-CONSULTA` declaraba PUBLICAMENTE que `mart.v_pbi_cp_tipologia` no se
+# podia consultar y que `mart.v_master_vigente_anual` solo filtrada por obra.
+# Era verdad y ha dejado de serlo. Un aviso de coste caduca, y dejarlo puesto
+# aparta al agente de la respuesta buena con la misma seguridad con que antes lo
+# salvaba: los tres salen del ambito de la regla, `v_pbi_cp_tipologia` pasa a
+# `consumo_recomendado: true` y pierde su `motivo_no_consumo`. La regla pasa de
+# cuatro vistas inconsultables a DOS: `mart.v_fact_periodificado` y
+# `cierre.v_pbi_cierre_indirectos_detalle`, que siguen agotando los 60 s.
+#
+# UN MATIZ NUEVO QUE ANTES NO EXISTIA: al materializar, `CURRENT_DATE` deja de
+# evaluarse en cada consulta. El "ano en curso" y el "mes de corte" de
+# `fact_cp_tipologia` son los de la NOCHE DEL BUILD, no los de quien pregunta.
+# Con refresco nocturno solo se nota el dia 1 de cada mes antes de la carga, y
+# la ficha lo dice.
+
+version: 22
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -329,14 +356,11 @@ reglas:
       no cubria el sitio donde fallo.
 
   - codigo: R-COSTE-CONSULTA
-    titulo: Cuatro vistas no se pueden consultar, y una base compartida que cuidar
+    titulo: Dos vistas no se pueden consultar, y una base compartida que cuidar
     severidad: bloqueante
     ambito:
-      - mart.v_master_vigente_anual
-      - mart.v_pbi_cp_tipologia
       - mart.v_fact_periodificado
       - cierre.v_pbi_cierre_indirectos_detalle
-      - mart.v_master_versiones_tipadas
       - stg.plan_mensual
     regla: >-
       **Antes de lanzar una consulta hay que saber lo que cuesta**, porque esto
@@ -344,15 +368,17 @@ reglas:
       `partes` EN PRODUCCION**, y la ventana util son 30 s. Medido el
       2026-08-25, con `SELECT * ... LIMIT 5`:
       **(1) NO SE PUEDEN CONSULTAR, ni siquiera filtradas por obra**:
-      `mart.v_pbi_cp_tipologia`, `mart.v_fact_periodificado` y
-      `cierre.v_pbi_cierre_indirectos_detalle` agotan **mas de 60 s**. Con
-      cualquiera de las tres, la respuesta correcta es "no puedo consultarla" y
-      el motivo, no una consulta que se va a cortar.
-      **(2) SOLO FILTRADA**: `mart.v_master_vigente_anual` agota los 40 s con
-      `LIMIT 5` y responde en **20 s** con `WHERE obra_id = ... AND anio = ...`.
-      Nunca sin filtro de obra.
-      **(3) CARAS PERO VIABLES, una sola vez y agregando**:
-      `mart.v_master_versiones_tipadas` **16 s**, un `count(*)` de
+      `mart.v_fact_periodificado` y `cierre.v_pbi_cierre_indirectos_detalle`
+      agotan **mas de 60 s**. Con cualquiera de las dos, la respuesta correcta
+      es "no puedo consultarla" y el motivo, no una consulta que se va a cortar.
+      **(2) YA NO SON CARAS, y esta regla lo decia hasta la version 21**: los
+      tres objetos de CP por tipologia —`mart.v_pbi_cp_tipologia` (mas de 60 s),
+      `mart.v_master_vigente_anual` (40 s sin filtro, **20 s** filtrada por
+      obra) y `mart.v_master_versiones_tipadas` (**16 s**)— **son TABLAS desde
+      F-078** (2026-09-15) y se consultan con normalidad, sin filtro y sin
+      aviso. Apartar a un agente de una vista que ya funciona es tan danino
+      como mandarle a una que no.
+      **(3) CARAS PERO VIABLES, una sola vez y agregando**: un `count(*)` de
       `stg.plan_mensual` **25 s**, uno de `compras.fact_compras_linea` **10 s**.
       **(4) BARATAS**: `maestro.obras`, `cierre.v_pbi_cierre_resumen`,
       `compras.v_pbi_proveedor_obra` y `compras.v_pbi_partida_coste`, todas por
@@ -364,7 +390,10 @@ reglas:
       `mart.v_master_vigente_anual` —marcada como recomendada y anunciada como
       la que responde que version de plan rige en una obra— no respondia nada.
       Un agente que no sabe que es caro lanza consultas que se cortan o, peor,
-      consultas que terminan y molestan a dos aplicaciones en produccion.
+      consultas que terminan y molestan a dos aplicaciones en produccion. La
+      otra mitad de la leccion la dejo F-078: una regla de coste **caduca**, y
+      dejarla puesta cuando el objeto ya se arreglo aparta al agente de la
+      respuesta buena con la misma seguridad con que antes lo salvaba.
 
   - codigo: R-OBRA-ACTIVA
     titulo: El datamart NO sabe si una obra esta activa. Las dos columnas mienten
@@ -402,6 +431,8 @@ reglas:
     severidad: bloqueante
     ambito:
       - stg.plan_mensual
+      - mart.master_versiones_tipadas
+      - mart.master_vigente_anual
       - mart.v_master_versiones_tipadas
       - mart.v_master_vigente_anual
     regla: >-
