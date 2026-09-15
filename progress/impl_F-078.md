@@ -64,3 +64,24 @@ El unico verde de partida era `test_f078_r1_el_fichero_de_solo_vistas_ya_no_exis
 y lo estaba **en falso**: `06_views_cp_tipologia.sql` si existia entonces. Es el
 test que comprueba una ausencia, y por eso lleva su control al lado
 (`test_f078_r5_el_fichero_del_sub_paso_existe_de_verdad`, que si fallaba).
+
+## Fase RED · el comando de comparación (T4)
+
+`check-cp-tipologia` compara la **fotografía congelada** del cálculo anterior a
+F-078 (recalculada desde `stg`) contra la tabla nueva. Antes de escribirlo, sus
+tests en rojo:
+
+```
+$ python -m pytest tests/test_f078_sql.py -q -k "r6 and comando"
+E       AssertionError: Usage: cli [OPTIONS] COMMAND [ARGS]...
+E         Error: No such command 'check-cp-tipologia'.
+E           (Did you mean one of: 'check-pg', 'inspect-cp-tipologia'?)
+E       assert 2 == 0
+FFFF  4 failed
+```
+
+**Honestidad sobre el alcance de esta RED**: el módulo
+`cp_tipologia_sql.py` se escribió antes que sus tests de texto; lo que se
+demostró en rojo es el comando. Lo que cubre de verdad la lógica del módulo es
+la campaña de mutación de la sección «Evidencias». La fase RED completa, con el
+SQL inexistente, es la de T2.

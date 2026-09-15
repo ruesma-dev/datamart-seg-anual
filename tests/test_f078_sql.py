@@ -460,3 +460,266 @@ def test_f078_r5_el_sub_paso_va_detras_del_resto_del_mart() -> None:
     ficheros = [sub.sql_file for sub in _sub_pasos()]
 
     assert ficheros[-1] == "06_cp_tipologia.sql"
+
+
+# ===========================================================================
+# R6 · `check-cp-tipologia` · el criterio 3 de la ficha, hecho comando
+#
+# «Las cifras no pueden cambiar» no se demuestra afirmandolo. Hace falta
+# comparar el resultado de la VISTA DE ANTES contra la TABLA NUEVA, fila a fila
+# sobre las claves y sobre los tres importes. Como la vista de ahora lee de la
+# tabla, compararlas seria una tautologia: por eso el comando lleva dentro una
+# **fotografia congelada** del calculo anterior a F-078, que recalcula desde
+# `stg`.
+#
+# La comparacion contra Azure es una LECTURA, pero necesita la tabla
+# construida, asi que queda como verificacion MANUAL (humano).
+# ===========================================================================
+
+
+def _modulo_comparacion():
+    from etl_sigrid.infrastructure.postgres import cp_tipologia_sql
+
+    return cp_tipologia_sql
+
+
+def test_f078_r6_la_fotografia_recalcula_desde_stg() -> None:
+    """Si leyera de las tablas nuevas, la comparacion se compararia consigo
+    misma y daria cero diferencias aunque el build estuviera mal. Es el modo de
+    fallo que convierte una comprobacion en un adorno."""
+    sql = _modulo_comparacion().sql_vista_anterior()
+
+    assert "FROM stg.plan_mensual" in sql
+    assert "stg.partidas" in sql
+    for prohibido in (
+        "mart.fact_cp_tipologia",
+        "mart.master_vigente_anual",
+        "mart.master_versiones_tipadas",
+        "mart.v_pbi_cp_tipologia",
+        "mart.v_master_vigente_anual",
+        "mart.v_master_versiones_tipadas",
+    ):
+        assert prohibido not in sql, (
+            f"la fotografia lee {prohibido}: la comparacion seria una tautologia"
+        )
+
+
+def test_f078_r6_la_comparacion_si_lee_la_tabla_nueva() -> None:
+    """Control del test anterior: la mitad derecha SI es la tabla."""
+    assert "FROM mart.fact_cp_tipologia" in _modulo_comparacion().sql_comparacion()
+
+
+@pytest.mark.parametrize(
+    "rama", CASCADA_TIPOLOGIA + ORDEN_TIPOLOGIA + TIPADO_MASTER
+)
+def test_f078_r6_la_fotografia_conserva_la_logica_de_negocio(rama: str) -> None:
+    """Misma cascada, mismo orden y mismo tipado que el SQL del build. Si la
+    fotografia se desviara, la comparacion denunciaria diferencias que no
+    existen —o peor, taparia las que si—."""
+    assert rama in _compacto(_modulo_comparacion().sql_vista_anterior())
+
+
+def test_f078_r6_se_casan_por_las_tres_claves_de_negocio() -> None:
+    sql = _compacto(_modulo_comparacion().sql_comparacion())
+
+    assert (
+        "FULL JOIN ahora t ON t.obra_id = v.obra_id AND t.anio = v.anio "
+        "AND t.tipologia = v.tipologia" in sql
+    )
+
+
+@pytest.mark.parametrize(
+    "medida", ("cp_real", "cp_planificado", "cp_desviacion", "orden_tipologia")
+)
+def test_f078_r6_se_comparan_los_tres_importes(medida: str) -> None:
+    """`IS DISTINCT FROM` y no `<>`: con `<>`, una comparacion contra NULL da
+    NULL, la fila se cae del WHERE y una diferencia real pasa por coincidencia.
+    Es el modo de fallo silencioso de este tipo de contrastes."""
+    sql = _compacto(_modulo_comparacion().sql_comparacion())
+
+    assert f"v.{medida} IS DISTINCT FROM t.{medida}" in sql
+    assert f"v.{medida} <> t.{medida}" not in sql
+
+
+def test_f078_r6_las_filas_que_faltan_a_un_lado_tambien_son_diferencia() -> None:
+    """Una fila que existe solo en una de las dos mitades es la peor de las
+    diferencias, y un `INNER JOIN` la habria escondido."""
+    sql = _compacto(_modulo_comparacion().sql_comparacion())
+
+    assert "WHERE v.tipologia IS NULL OR t.tipologia IS NULL" in sql
+    assert "'SOLO EN LA VISTA DE ANTES'" in sql
+    assert "'SOLO EN LA TABLA NUEVA'" in sql
+
+
+def test_f078_r6_el_filtro_de_obra_llega_a_las_dos_mitades() -> None:
+    """Sin el filtro a los dos lados, la comparacion enfrentaria una obra contra
+    todas las demas y saldria roja siempre."""
+    sql = _modulo_comparacion().sql_comparacion(obra_id=1442383)
+
+    assert sql.count("obra_id = 1442383") >= 2
+
+
+def test_f078_r6_sin_obra_no_se_filtra_nada() -> None:
+    sql = _modulo_comparacion().sql_comparacion()
+
+    assert "AND obra_id = " not in sql
+    assert "AND pm.obra_id = " not in sql
+
+
+def test_f078_r6_una_obra_que_no_sea_un_entero_no_llega_a_la_sentencia() -> None:
+    """No hay concatenacion de texto libre: `int()` revienta antes."""
+    with pytest.raises(ValueError):
+        _modulo_comparacion().sql_comparacion(obra_id="7 OR 1=1")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("palabra", ("INSERT", "UPDATE", "DELETE", "DROP", "CREATE"))
+def test_f078_r6_la_comparacion_no_puede_escribir(palabra: str) -> None:
+    """Corre contra un servidor compartido con `albaranes` y `partes` EN
+    PRODUCCION. La transaccion va READ ONLY, pero el texto tampoco lo intenta."""
+    assert palabra not in _modulo_comparacion().sql_comparacion().upper()
+
+
+def test_f078_r6_el_timeout_es_generoso_a_proposito() -> None:
+    """La mitad izquierda ES la consulta que no terminaba en 60 s: ponerle los
+    30 s de las demas comprobaciones garantizaria que no se pueda comprobar."""
+    assert _modulo_comparacion().TIMEOUT_POR_CONSULTA_S >= 600
+
+
+def test_f078_r6_una_tabla_vacia_no_se_lee_como_cero_diferencias() -> None:
+    """EL FALSO VERDE DE ESTA COMPROBACION: si el build no construyo nada, las
+    dos mitades estan vacias y no hay diferencias. Eso no es un OK."""
+    modulo = _modulo_comparacion()
+
+    veredicto = modulo.veredicto([], filas_tabla=0)
+
+    assert veredicto.startswith("KO")
+    assert "VACIA" in veredicto
+
+
+def test_f078_r6_cero_diferencias_con_filas_si_es_un_ok() -> None:
+    modulo = _modulo_comparacion()
+
+    veredicto = modulo.veredicto([], filas_tabla=41_237)
+
+    assert veredicto.startswith("OK")
+    assert "41237" in veredicto.replace(".", "").replace(",", "")
+    assert "CERO diferencias" in veredicto
+
+
+def test_f078_r6_una_sola_diferencia_tumba_el_veredicto() -> None:
+    modulo = _modulo_comparacion()
+    filas = [
+        (1442383, 2025, "AVALES", "IMPORTES DISTINTOS", 10, 11, 5, 5, 5, 6, 3, 3)
+    ]
+
+    diferencias = modulo.diferencias_de(filas)
+    veredicto = modulo.veredicto(diferencias, filas_tabla=41_237)
+
+    assert len(diferencias) == 1
+    assert diferencias[0].tipologia == "AVALES"
+    assert diferencias[0].cp_real_antes == 10
+    assert diferencias[0].cp_real_ahora == 11
+    assert veredicto.startswith("KO")
+    assert "1 diferencias" in veredicto
+
+
+def test_f078_r6_el_comando_esta_registrado_con_sus_opciones() -> None:
+    from click.testing import CliRunner
+
+    import main
+
+    resultado = CliRunner().invoke(main.cli, ["check-cp-tipologia", "--help"])
+
+    assert resultado.exit_code == 0
+    assert "--obra" in resultado.output
+    assert "--timeout" in resultado.output
+    assert "--dry-run" in resultado.output
+
+
+def test_f078_r6_dry_run_imprime_la_consulta_y_no_abre_conexion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from click.testing import CliRunner
+
+    import main
+
+    def revienta():
+        raise AssertionError("--dry-run ha abierto una conexion")
+
+    monkeypatch.setattr(main, "_get_pg", revienta)
+
+    resultado = CliRunner().invoke(main.cli, ["check-cp-tipologia", "--dry-run"])
+
+    assert resultado.exit_code == 0
+    assert "stg.plan_mensual" in resultado.output
+    assert "mart.fact_cp_tipologia" in resultado.output
+
+
+class _PgComparacion:
+    """Doble del cliente: devuelve lo que se le diga y NO abre nada."""
+
+    def __init__(self, diferencias, filas_tabla: int) -> None:
+        self._diferencias = diferencias
+        self._filas_tabla = filas_tabla
+        self.timeouts: list[int] = []
+
+    def filas_solo_lectura(self, sql_text: str, timeout_s: int):
+        self.timeouts.append(timeout_s)
+        if "count(*)" in sql_text:
+            return [(self._filas_tabla,)]
+        return self._diferencias
+
+
+def test_f078_r6_sin_diferencias_el_comando_sale_con_cero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from click.testing import CliRunner
+
+    import main
+
+    pg = _PgComparacion(diferencias=[], filas_tabla=41_237)
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+
+    resultado = CliRunner().invoke(main.cli, ["check-cp-tipologia"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "CERO diferencias" in resultado.output
+
+
+def test_f078_r6_con_diferencias_el_comando_sirve_de_puerta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sale con codigo 1: es una verificacion manual, y una verificacion que
+    siempre sale con cero no sirve de puerta."""
+    from click.testing import CliRunner
+
+    import main
+
+    pg = _PgComparacion(
+        diferencias=[
+            (1442383, 2025, "AVALES", "IMPORTES DISTINTOS", 10, 11, 5, 5, 5, 6, 3, 3)
+        ],
+        filas_tabla=41_237,
+    )
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+
+    resultado = CliRunner().invoke(main.cli, ["check-cp-tipologia"])
+
+    assert resultado.exit_code == 1
+    assert "1442383" in resultado.output
+    assert "AVALES" in resultado.output
+
+
+def test_f078_r6_la_tabla_vacia_tambien_tumba_el_comando(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from click.testing import CliRunner
+
+    import main
+
+    pg = _PgComparacion(diferencias=[], filas_tabla=0)
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+
+    resultado = CliRunner().invoke(main.cli, ["check-cp-tipologia"])
+
+    assert resultado.exit_code == 1, "cero diferencias sobre cero filas no es un OK"
