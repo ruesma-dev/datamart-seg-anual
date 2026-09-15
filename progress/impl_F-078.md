@@ -27,6 +27,40 @@ plan va aquí arriba para que el trabajo se pueda retomar si me cortan a mitad.
 - **T7** · `bash harness/init.sh` en verde, campaña de mutación y cierre del
   informe con la sección «Evidencias».
 
-## Estado
 
-T1 en curso.
+## Fase RED · el SQL (T2, rigor `critico`)
+
+`tests/test_f078_sql.py` escrito ANTES del SQL. 66 tests, **65 en rojo**:
+
+```
+$ python -m pytest tests/test_f078_sql.py -q
+...
+FAILED tests/test_f078_sql.py::test_f078_r3_las_filas_a_cero_siguen_sin_publicarse
+FAILED tests/test_f078_sql.py::test_f078_r4_las_vistas_proyectan_exactamente_lo_de_siempre[v_pbi_cp_tipologia]
+FAILED tests/test_f078_sql.py::test_f078_r5_el_sub_paso_cuenta_las_filas_del_hecho
+65 failed, 1 passed in 1.79s
+```
+
+Las dos trazas que sostienen los dos requisitos centrales:
+
+```
+>       assert f"CREATE TABLE mart.{tabla} AS" in _ejecutable(), (
+tests\test_f078_sql.py:101:
+    @cache
+    def _sql() -> str:
+>       assert RUTA_CP.exists(), f"SQL no encontrado: {RUTA_CP}"
+E       AssertionError: SQL no encontrado: C:\Users\pgris\PycharmProjects\
+E       datamart-seg-anual\etl_sigrid\infrastructure\postgres\sql\mart\06_cp_tipologia.sql
+```
+
+```
+>       return build_mart_step.SUB_PASOS
+E       AttributeError: module 'etl_sigrid.application.steps.build_mart_step'
+E       has no attribute 'SUB_PASOS'
+tests\test_f078_sql.py:427: AttributeError
+```
+
+El unico verde de partida era `test_f078_r1_el_fichero_de_solo_vistas_ya_no_existe`,
+y lo estaba **en falso**: `06_views_cp_tipologia.sql` si existia entonces. Es el
+test que comprueba una ausencia, y por eso lleva su control al lado
+(`test_f078_r5_el_fichero_del_sub_paso_existe_de_verdad`, que si fallaba).
