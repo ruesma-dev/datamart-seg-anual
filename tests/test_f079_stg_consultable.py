@@ -33,6 +33,7 @@ pierdan: comprueba que cada una sigue llegando al agente **y desde dónde**.
 from __future__ import annotations
 
 import pathlib
+import re
 
 import pytest
 
@@ -409,7 +410,13 @@ def test_f079_r5_el_changelog_del_global_explica_la_version_nueva() -> None:
     """La versión es lo que lee una PERSONA, y sin entrada de changelog no
     dice nada. Cada versión anterior tiene la suya en la cabecera."""
     texto = (DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8")
-    cabecera = normalizado(texto.split("version:")[0])
+    # La cabecera es todo lo anterior a la CLAVE `version:`, y la clave es la
+    # que empieza en columna cero. Partir por la primera aparición del texto
+    # «version:» cortaba dentro de la prosa —la entrada de F-078 escribe «es la
+    # mitad importante de esta version:»— y dejaba fuera el changelog de la
+    # versión siguiente, así que el test fallaba con la entrada escrita y
+    # delante (F-083, 2026-09-16).
+    cabecera = normalizado(re.split(r"^version:", texto, maxsplit=1, flags=re.M)[0])
 
     assert f"version {_dicc().version}" in cabecera, (
         "la cabecera de `00_global.yaml` no explica qué cambió en esta versión"

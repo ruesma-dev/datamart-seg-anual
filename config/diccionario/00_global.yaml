@@ -202,8 +202,30 @@
 # `fact_cp_tipologia` son los de la NOCHE DEL BUILD, no los de quien pregunta.
 # Con refresco nocturno solo se nota el dia 1 de cada mes antes de la carga, y
 # la ficha lo dice.
+#
+# version 23 (F-083, 2026-09-16): NI UN OBJETO NUEVO. `compras.facturas` gana
+# CINCO COLUMNAS y el esquema deja de tener una sola nocion de «estado». Nace de
+# un correo de Administracion: «una cosa es el estado del efecto de pago que hay
+# dentro de una factura, y otra distinta el estado de la propia factura». Tenia
+# razon: lo unico publicado era `compras.vencimientos.estado_pago`, que es el del
+# EFECTO, asi que el circuito de aprobacion de la factura -contabilizada,
+# aprobada por jefe de obra, aprobada Administracion, retenida, rechazada- no se
+# podia consultar. Ahora `compras.facturas` publica `estado_id`, `estado_codigo`
+# y `estado`, leidos de `con.est` (la superclase, NO `dcf`) con `tip = 15` y
+# traducidos por la PAREJA (tipo, estado), que es la trampa que el propio
+# catalogo declara. Se filtra por `estado_codigo` y no por el literal: `REC` y
+# `REC_ADM` se llaman los dos «Recibida».
+#
+# Y LAS TRES FECHAS, que es la otra mitad. `fecha_factura` (`dcf.fecdoc`, la del
+# documento del proveedor) y `fecha_alta` (`con.fec`, la del alta en Sigrid) se
+# publican separadas; `fecha` NO se toca, es la de alta y se conserva por
+# compatibilidad. **Se separan en el 77,8 % de las facturas** (mediana 4 dias,
+# p95 42), asi que elegir la equivocada desplaza cualquier serie temporal de
+# compras. Las fichas de las tres se nombran unas a otras a proposito, y la de
+# `compras.vencimientos.estado_pago` devuelve el aviso en sentido contrario: la
+# confusion se puede entrar por cualquiera de las dos puertas.
 
-version: 22
+version: 23
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

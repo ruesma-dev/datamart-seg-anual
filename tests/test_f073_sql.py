@@ -597,7 +597,14 @@ def test_f073_r22_el_comment_avisa_de_que_el_plazo_no_es_un_numero() -> None:
 
 #: `sql/compras/01_documentos.sql` tal como está al entrar F-073. Lo reescribe
 #: entera **F-067**, y es ahí donde se recalcula este hash, no aquí (R23).
-HASH_01_DOCUMENTOS = "0a3ab862b18a95f8f896ed0f982b78e3af012e7d815b100f86b05094e093f890"
+#:
+#: **RECALCULADO POR F-083 el 2026-09-16**, que es el caso que el guardián
+#: preveía: el fichero cambia porque **otra feature** lo toca a propósito, no
+#: porque a F-073 se le haya escapado el cableado. F-083 añade al bloque
+#: FACTURAS el estado del documento y sus dos fechas —cinco columnas al final,
+#: ninguna de las diez de siempre tocada— y deja el resto del fichero intacto
+#: precisamente porque F-067 lo reescribirá entero.
+HASH_01_DOCUMENTOS = "572a185d50b99108cb949e4d3df1438369651141bc49570bf089689d1bc2d87b"
 
 #: Los dos ficheros del SELLO. Tocar una coma fuerza la reconstrucción completa
 #: de las 921 obras la noche siguiente (R25).
