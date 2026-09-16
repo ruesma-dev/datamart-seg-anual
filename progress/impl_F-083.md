@@ -85,3 +85,67 @@ vista no puede depender de eso, y por eso va con `LATERAL ... LIMIT 1`.
   maximo **3.804**. Hay `fecdoc` tecleados a mano imposibles. No se filtra
   nada —publicar es publicar— pero la ficha avisa de que la fecha del documento
   la teclea quien recibe la factura y admite valores absurdos.
+
+## T2 · Fase RED (obligatoria en nivel `estandar`)
+
+Los dos ficheros de test se escribieron **antes** de tocar el SQL y el YAML.
+Comando exacto y salida real, con el arbol todavia sin una sola linea de
+implementacion (commit `5f2ec80`):
+
+```
+$ python -m pytest tests/test_f083_sql.py tests/test_f083_diccionario.py -q
+...
+FAILED tests/test_f083_sql.py::test_f083_publica_el_estado_de_la_factura[estado_id]
+FAILED tests/test_f083_sql.py::test_f083_el_estado_id_se_lee_de_la_superclase_con
+FAILED tests/test_f083_sql.py::test_f083_la_traduccion_filtra_el_tipo_de_documento_de_factura
+FAILED tests/test_f083_sql.py::test_f083_la_union_es_por_la_pareja_y_nunca_solo_por_estado_id
+FAILED tests/test_f083_sql.py::test_f083_la_traduccion_del_estado_no_puede_multiplicar_filas
+FAILED tests/test_f083_sql.py::test_f083_publica_la_fecha_de_la_propia_factura
+FAILED tests/test_f083_sql.py::test_f083_publica_la_fecha_de_alta_con_nombre_inequivoco
+FAILED tests/test_f083_diccionario.py::test_f083_la_ficha_nombra_las_dos_columnas_que_se_confunden
+FAILED tests/test_f083_diccionario.py::test_f083_cada_fecha_se_distingue_de_las_otras_dos[fecha]
+30 failed, 23 passed in 0.82s
+```
+
+La traza completa de los tres criterios centrales, sin resumir:
+
+```
+_______ test_f083_la_union_es_por_la_pareja_y_nunca_solo_por_estado_id ________
+>       lateral = _lateral_del_estado()
+tests\test_f083_sql.py:192:
+    def _lateral_del_estado() -> str:
+        bloque = _bloque_facturas()
+>       assert "LEFT JOIN LATERAL" in bloque, (
+E       AssertionError: `compras.facturas` no traduce el estado con un lateral:
+E       sin el no hay guarda de grano (criterio 3)
+E       assert 'LEFT JOIN LATERAL' in 'DROP TABLE IF EXISTS compras.facturas
+E       CASCADE; CREATE TABLE compras.facturas AS SELECT f.ide AS factura_id,
+E       ... FROM raw.dcf f JOIN raw.con con ON con.ide = f.ide LEFT JOIN
+E       raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0); '
+tests\test_f083_sql.py:238: AssertionError
+
+________ test_f083_la_traduccion_del_estado_no_puede_multiplicar_filas ________
+>       lateral = _lateral_del_estado()
+tests\test_f083_sql.py:213:
+E       AssertionError: `compras.facturas` no traduce el estado con un lateral:
+E       sin el no hay guarda de grano (criterio 3)
+tests\test_f083_sql.py:238: AssertionError
+
+_______________ test_f083_publica_la_fecha_de_la_propia_factura _______________
+>       assert "compras.fn_sigrid_date(f.fecdoc) AS fecha_factura" in _bloque_facturas(), (
+E       AssertionError: `fecha_factura` es la fecha que el proveedor pone en su
+E       documento y sale de `dcf.fecdoc`, informada en el 99,95 % de las facturas
+
+________ test_f083_la_ficha_avisa_de_que_las_dos_fechas_casi_nunca_coinciden ___
+>       assert "77,8" in texto, (
+E       AssertionError: la ficha tiene que traer la cifra medida el 2026-09-16:
+E       las dos fechas se separan en el 77,8 % de las facturas (129.012 de
+E       165.783), con mediana de 4 dias y p95 de 42
+E       assert '77,8' in 'Cabecera de las facturas recibidas de proveedor. ...'
+tests\test_f083_diccionario.py:218: AssertionError
+```
+
+**23 de los 53 pasaban ya en rojo, y es lo que se buscaba**: son los que
+vigilan que las diez columnas de siempre siguen ahi, en su orden y con su
+expresion. Un test de no-regresion tiene que estar verde ANTES del cambio; si
+hubiera fallado en esta pasada, el que estaria mal seria el test.
