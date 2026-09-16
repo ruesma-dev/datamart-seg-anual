@@ -9,6 +9,42 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-083 · IMPLEMENTACION ENTREGADA (2026-09-16)
+
+Rama `feature/F-083-estado-de-la-factura`, rigor `estandar`, `sdd=false`.
+Informe: `progress/impl_F-083.md`. Cinco tareas, un commit cada una.
+
+**QUE SE PUBLICA**: `compras.facturas` gana cinco columnas al final —
+`estado_id`, `estado_codigo`, `estado` (el del DOCUMENTO en su circuito de
+aprobacion, leido de `con.est` con `tip = 15` y traducido por la pareja
+(tipo, estado)), `fecha_factura` (`dcf.fecdoc`) y `fecha_alta` (`con.fec`)—.
+**Las diez de siempre, intactas y en su orden**, `fecha` incluida.
+
+**VERIFICACIONES MANUALES PENDIENTES — LAS EJECUTA EL HUMANO**, porque
+construir contra Azure no lo autoriza un agente. En este orden:
+
+```
+python main.py build-compras
+python main.py check-unicidad
+python main.py publicar-diccionario
+```
+
+`check-unicidad` es el que confirma en la base lo que aqui solo se pudo
+comprobar sobre el SELECT en solo lectura: que `factura_id` sigue siendo
+clave y que la traduccion del estado no ha multiplicado ni una fila.
+
+y despues, por el MCP y **sin explicarle nada en el prompt** (criterio 6):
+«de las facturas vencidas y sin pagar, cuales estan contabilizadas sin
+aprobar, cuales retenidas y cuales rechazadas». La respuesta correcta tiene
+que distinguir el estado de la FACTURA del `estado_pago` del efecto y decir
+que en FRARET (retenida) no hay ninguna.
+
+**LO QUE HAY QUE SABER Y NO SE VE EN EL DIFF**: el estado **no esta en `dcf`**,
+esta en `con.est`; **el literal del estado NO es unico** (`REC` y `REC_ADM` se
+llaman los dos «Recibida»), asi que se filtra por `estado_codigo`; y las dos
+fechas **se separan en el 77,8 % de las facturas**, con `fecha_factura`
+tecleada a mano y con valores absurdos que no se filtran.
+
 ## F-073 · IMPLEMENTACION ENTREGADA (2026-09-10)
 
 Rama `feature/F-073-tablas-nuevas-y-enriquecimiento`, rigor `estandar`,
