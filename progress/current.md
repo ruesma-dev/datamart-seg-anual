@@ -1185,3 +1185,13 @@ separar del estado del efecto.
 **Aviso que queda en la ficha**: hay dos parejas de estados casi homonimos
 —`APR`/`APR_DG` ambos «Aprobado pago», `REC`/`REC_ADM` ambos «Recibida»—, asi
 que **se filtra por mnemonico, nunca por el literal**.
+
+## 2026-09-16 · Despliegue de F-083
+
+Imagen construida: **`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260916-2212`**.
+Es el tag que tiene que verse en los logs del job y en `python main.py version`.
+
+`85_update_job.ps1 -Tag r20260916-2212` lanzado a las **20:13 UTC**, con **3 h 46
+min de margen** frente al cron de las 00:00 UTC. La leccion de F-078 —la
+nocturna del 16 corrio con la imagen vieja y deshizo la feature— no se repite
+esta vez.
