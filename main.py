@@ -39,6 +39,12 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
     python main.py check-declarados   - ¿Existe en la base todo lo que el SQL
                                         del repositorio declara crear? (F-047)
                                         Corre solo al final de run-all
+    python main.py check-cp-tipologia - ¿Materializar FactCPTipologia cambió
+                                        alguna cifra? (F-078) Enfrenta
+                                        `mart.fact_cp_tipologia` a una
+                                        fotografía congelada del cálculo que
+                                        hacía la vista antes. Sale != 0 si hay
+                                        diferencias o si la tabla está vacía
 
 Un cierre por mes en los ámbitos reales (F-042). Los tres son de SOLO LECTURA:
 
@@ -1074,6 +1080,100 @@ def check_relaciones_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
         "equivocada y coincidir. Prueba que une, que es otra cosa."
     )
     if fallos or sin_comprobar or inexistentes:
+        raise SystemExit(1)
+
+
+@cli.command("check-cp-tipologia")
+@click.option(
+    "--obra", "obra_id", type=int, default=None,
+    help="obra_id; acota la comparacion a una sola obra (mucho mas barata).",
+)
+@click.option(
+    "--timeout",
+    default=None,
+    type=int,
+    help="Segundos de SET LOCAL statement_timeout. Por defecto, 1800.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime la consulta y NO abre conexion.",
+)
+def check_cp_tipologia_cmd(obra_id: int | None, timeout: int | None, dry_run: bool) -> None:
+    """
+    Comprueba que materializar FactCPTipologia no cambio ni una cifra (F-078).
+
+    F-078 movio el calculo de `mart.v_pbi_cp_tipologia` de la vista a la tabla
+    `mart.fact_cp_tipologia`. Como la vista ahora LEE de la tabla, compararlas
+    entre si no demostraria nada. Lo que hace este comando es enfrentar la tabla
+    contra una FOTOGRAFIA CONGELADA del calculo anterior, que recalcula desde
+    `stg.plan_mensual` y `stg.partidas`, fila a fila sobre las claves
+    (obra_id, anio, tipologia) y sobre los tres importes.
+
+    Sale con codigo 1 si hay alguna diferencia, y TAMBIEN si la tabla esta
+    vacia: cero diferencias entre dos conjuntos vacios no es un OK.
+
+    OJO CON EL DIA. La logica usa CURRENT_DATE para decidir el ano en curso y el
+    mes de corte. En la tabla esa fecha quedo congelada en el build; aqui se
+    evalua ahora. Comparalo el MISMO dia en que se construyo la tabla.
+
+    OJO CON EL COSTE. La mitad izquierda es exactamente la consulta que no
+    terminaba en 60 s y que motivo la feature: cinco recorridos de
+    `stg.plan_mensual` (29,8 M de filas, 11 GB). Por eso el statement_timeout
+    por defecto es de media hora. Con `--obra` se desploma, y sirve de sonda
+    antes de lanzar la comparacion entera.
+
+    Solo lectura: la transaccion va READ ONLY con su statement_timeout, porque
+    esto corre contra un servidor compartido con `albaranes` y `partes` EN
+    PRODUCCION.
+    """
+    from etl_sigrid.infrastructure.postgres.cp_tipologia_sql import (
+        TIMEOUT_POR_CONSULTA_S,
+        diferencias_de,
+        sql_comparacion,
+        sql_recuento_tabla,
+        veredicto,
+    )
+
+    segundos = TIMEOUT_POR_CONSULTA_S if timeout is None else timeout
+    consulta = sql_comparacion(obra_id)
+    recuento = sql_recuento_tabla(obra_id)
+
+    click.echo("CP por tipologia · la vista de ANTES contra la tabla de AHORA")
+    click.echo(f"  statement_timeout = {segundos}s, transaccion READ ONLY")
+    if obra_id is not None:
+        click.echo(f"  acotado a la obra {obra_id}")
+    click.echo("")
+
+    if dry_run:
+        click.echo("-- recuento de la tabla nueva")
+        click.echo(recuento + ";")
+        click.echo("")
+        click.echo("-- comparacion")
+        click.echo(consulta + ";")
+        click.echo("")
+        click.echo("-- No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    filas_tabla = int(pg.filas_solo_lectura(recuento, segundos)[0][0])
+    diferencias = diferencias_de(pg.filas_solo_lectura(consulta, segundos))
+
+    for d in diferencias[:50]:
+        click.echo(
+            f"  obra {d.obra_id}  {d.anio}  {d.tipologia:<16}  {d.motivo}\n"
+            f"      cp_real        antes={d.cp_real_antes}  ahora={d.cp_real_ahora}\n"
+            f"      cp_planificado antes={d.cp_plan_antes}  ahora={d.cp_plan_ahora}\n"
+            f"      cp_desviacion  antes={d.cp_desv_antes}  ahora={d.cp_desv_ahora}"
+        )
+    if len(diferencias) > 50:
+        click.echo(f"  ... y {len(diferencias) - 50} diferencia(s) mas.")
+
+    resultado = veredicto(diferencias, filas_tabla)
+    click.secho(resultado, fg="green" if resultado.startswith("OK") else "red")
+
+    if not resultado.startswith("OK"):
         raise SystemExit(1)
 
 

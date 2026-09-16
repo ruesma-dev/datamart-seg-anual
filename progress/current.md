@@ -353,14 +353,19 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 150 objetos, 941 columnas y 62 fichas de
-consumo** —eran 142 / 852 / 57 al cerrar F-073, y F-080 añade los **cinco
-objetos** de `compras` (`vencimientos`, `v_facturas_pago`,
-`v_control_forma_pago`, `documento_texto`, `documento_comentarios`, 89 columnas)
-más las **tres tablas nuevas de `raw`** (`auxnap`, `auxban`, `rpa`, sin columnas
-por la convención de `raw`); antes de eso eran 139 / 822 / 54 hasta F-073 y 47
-fichas de consumo hasta F-079, que subió los siete objetos de `stg` a la
-superficie de consulta— y el árbol declara **versión 21**. Lo publicado en `_meta` es la **versión
+**El diccionario del árbol está en 153 objetos, 964 columnas y 66 fichas de
+consumo** —F-078 añade las **tres tablas** de CP por tipología
+(`mart.master_versiones_tipadas`, `mart.master_vigente_anual`,
+`mart.fact_cp_tipologia`, 23 columnas) y sube `mart.v_pbi_cp_tipologia` a la
+superficie de consulta, que es lo que explica las cuatro fichas de consumo
+nuevas. Antes estaba en 150 / 941 / 62, y eran 142 / 852 / 57 al cerrar F-073,
+cuando F-080 añadió los **cinco objetos** de `compras` (`vencimientos`,
+`v_facturas_pago`, `v_control_forma_pago`, `documento_texto`,
+`documento_comentarios`, 89 columnas) más las **tres tablas nuevas de `raw`**
+(`auxnap`, `auxban`, `rpa`, sin columnas por la convención de `raw`); antes de
+eso eran 139 / 822 / 54 hasta F-073 y 47 fichas de consumo hasta F-079, que
+subió los siete objetos de `stg` a la superficie de consulta— y el árbol declara
+**versión 22**. Lo publicado en `_meta` es la **versión
 18** (hash `4af4c3bb60d4`, publicada el 2026-09-10): publicar contra Azure es una
 escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test
@@ -946,3 +951,164 @@ sabe que estos objetos existen.
 **Si el MCP falla una, el problema es la ficha, no la pregunta.** La respuesta
 se pega aqui con la fecha, y lo que haya que corregir del diccionario entra como
 deuda de F-080 antes de cerrarla.
+
+## DESPLIEGUE DEL 2026-09-15 · imagen `r20260915-1014`
+
+**Hecho por el humano**, con las tres features ya cerradas y aprobadas:
+**F-073**, **F-081** y **F-080**. Antes del despliegue se fusionaron las tres a
+`main` en el commit de merge `c3baf88` (la rama de F-080 las contenia
+encadenadas) y el humano hizo `git push origin main`.
+
+| paso | resultado |
+|---|---|
+| `70_build_image.ps1` | imagen `acralbaranesdev.azurecr.io/datamart-seg-anual:r20260915-1014`, construida en ACR en 43 s |
+| `85_update_job.ps1` | job apuntado; imagen anterior era `r20260910-0102` |
+| Verificacion del job | `az containerapp job show` devuelve **`...:r20260915-1014`**, disparo `Schedule` |
+
+**La comprobacion del job NO es opcional y por eso esta aqui**: la nocturna
+llego a correr una imagen de diez dias antes sin que nadie lo notara.
+
+**OJO CON UN FALSO SUSTO DEL SCRIPT**: la cabecera de `85_update_job.ps1`
+imprime un tag calculado con la hora actual (`r20260915-1017`), que **no es el
+que aplica**. El aplicado es el de «Imagen nueva» y el que devuelve `az`.
+
+**`bash harness/init.sh` sobre `main` sale en ROJO por una sola razon, y no es
+del codigo**: la ultima comprobacion del arnes prohibe que los agentes trabajen
+en `main`. Lo que importa salio verde: **4.677 pasan, 179 saltados, 0 fallos**.
+
+### PENDIENTE: la primera nocturna con esta imagen
+
+**Decision del humano sobre CUANDO correrla.** Se le advirtio de que lanzarla a
+mediodia compite por los creditos de CPU del `psql-albaranes-rs9k2`, que es
+**compartido** con albaranes, partes, remesas, el portal y facturas: dia y noche
+gastan la misma hucha y, a cero, todo va unas cinco veces mas lento.
+
+Cuando la nocturna haya corrido, **en este orden**:
+
+```
+python main.py check-raw-recuentos    # 68 tablas, ocho mas que antes
+python main.py check-declarados
+python main.py check-diccionario
+python main.py publicar-diccionario   # UNICA escritura; sube a la version 21
+```
+
+Y las verificaciones MANUAL propias de cada feature, ya anotadas mas arriba:
+las de F-073 (recuentos 804/683, 193, 69, 921 y las 21 columnas, mas la prueba
+del puente 261/261) y las de F-080 (T0 bis, T7, T26 y T27).
+
+## F-078 · MATERIALIZAR FactCPTipologia (en curso, 2026-09-15)
+
+Rama `feature/F-078-materializar-cp-tipologia`, rigor `critico`, `sdd=false`.
+Informe: `progress/impl_F-078.md`, con el plan de tareas numerado.
+
+**HAY UNA NOCTURNA EN CURSO** (job lanzado a mano con la imagen
+`r20260915-1014`, `run-all --full`, unas 3 h 30). Por eso el implementer **no
+ejecuta ninguna escritura contra Azure**: `build_mart` dropea y reconstruye, y
+cruzarse con la nocturna es buscarse un problema. La autorizacion del humano del
+2026-09-09 para construir las tres tablas a mano es ANTERIOR a esta nocturna.
+
+### VERIFICACIONES MANUAL (humano) · cuando la nocturna haya TERMINADO
+
+En este orden y con el codigo de la rama ya en el arbol:
+
+```
+python main.py build-mart              # construye las tres tablas nuevas
+python main.py check-cp-tipologia      # las cifras no cambian: diferencias = 0
+python main.py inspect-cp-tipologia --obra <obra> --anio 2025
+python main.py check-declarados
+python main.py check-diccionario
+python main.py publicar-diccionario    # sube a la version 22
+```
+
+Lo que hay que ANOTAR de cada una (criterios 3 y 4 de la ficha, que no se
+demuestran afirmando): el **tiempo** que tarda el sub-paso `cp_tipologia` de
+`build-mart` (lo imprime el log `mart_substep_done`) y sus filas, el **numero de
+diferencias** que dice `check-cp-tipologia` —tiene que ser **0**— y el tiempo de
+un `SELECT * FROM mart.v_pbi_cp_tipologia` contra Azure. Falta ademas abrir el
+`.pbix` y refrescar **FactCPTipologia** sin tocar una linea del `.pq`
+(criterio 2), y que `check-diccionario` de biyeccion exacta con **153 fichas y
+153 objetos** (criterio 6).
+
+**DOS AVISOS SOBRE `check-cp-tipologia`, que no son cosmeticos.** (1) Recalcula
+la vista de antes, que es *la consulta que no terminaba en 60 s*: con
+`--obra <obra>` se desploma y sirve de sonda antes de lanzarla entera. (2) Hay
+que lanzarlo **el mismo dia** en que se construyo la tabla: la mitad izquierda
+evalua `CURRENT_DATE` ahora y la derecha lo lleva **congelado del build**, asi
+que si entre medias cambia el mes, las dos cortan en meses distintos y las
+diferencias que salgan son legitimas. Ese congelado es el **unico** cambio de
+semantica de la feature y esta escrito en el SQL, en la ficha y en el `--help`.
+
+El detalle completo --decisiones, riesgos y evidencias-- en
+`progress/impl_F-078.md`.
+
+## F-078 · LAS VERIFICACIONES MANUAL, EJECUTADAS EL 2026-09-15 CON SU RESULTADO REAL
+
+El review (pasada 1) devolvio **CHANGES_REQUESTED** sin un solo defecto de
+codigo: faltaba **evidencia** de seis criterios. El humano **autorizo de nuevo
+la escritura** esa tarde —la del 2026-09-09 habia caducado con la nocturna— y se
+ejecutaron, en este orden y contra el Postgres de Azure.
+
+**Contexto**: la nocturna `caj-datamart-seg-dev-4kvgq5q` (imagen
+`r20260915-1014`) habia terminado a las 11:44 UTC, `Succeeded`, en **3 h 22
+min**, y con `check-declarados` y `check-diccionario` en verde sobre `main`
+(150/150, version 21).
+
+### 1 · `python main.py build-mart` — criterios 1 y 4
+
+| sub-paso | duracion | filas |
+|---|---|---|
+| `build_fact` | 1.157,74 s | 5.367.594 |
+| `agg_categoria` | 92,65 s | 24.805 |
+| **`cp_tipologia` (el nuevo)** | **1.162,06 s** | **1.740** |
+| **total `build_mart`** | **2.414,6 s** | 5.394.139 |
+
+**El paso nuevo cuesta 19 min 22 s**, casi lo mismo que el hecho principal, y
+eso con solo 1.740 filas escritas: el coste no esta en escribir, esta en
+calcular la version vigente y el corte temporal. **La ventana nocturna pasa de
+3 h 22 min a ~3 h 41 min**, aun por debajo de las 4 h de referencia, pero el
+margen baja de 38 a ~19 min. **Es el intercambio acordado**: ese calculo dejaba
+de pagarse en cada consulta.
+
+### 2 · `python main.py build-cierre` — obligatorio y NO opcional
+
+`mart/01_ddl.sql` y `mart/03_agg_categoria.sql` hacen `DROP TABLE … CASCADE`, y
+`cierre/06_views_planif_vs_real.sql` lee de `mart.fact_seguimiento_categoria`.
+**Reconstruir el mart a solas deja el cierre roto** —el incidente de F-047 en
+pequeño—. Ejecutado despues: `[SUCCESS] build_cierre rows=16.972
+duration=2.943,0 s`.
+
+### 3 · `python main.py check-cp-tipologia` — EL CRITERIO 3, EL QUE MANDA
+
+* **Sonda previa** (`--obra 650280`): `OK 23 filas y CERO diferencias`, en 3 s.
+* **Comparacion completa**, 14:31:01 → 14:59:53 UTC (**28 min 52 s**):
+  **`OK 1740 filas y CERO diferencias: materializar no cambio ninguna cifra`**.
+
+### 4 · Cronometro de la consulta — criterios 4 y 8
+
+| consulta | resultado |
+|---|---|
+| `SELECT * FROM mart.v_pbi_cp_tipologia` | **1.740 filas en 0,81 s** |
+| `count(*)` de `mart.v_master_versiones_tipadas` | 4.415 filas en 0,21 s |
+| `count(*)` de `mart.v_master_vigente_anual` | 748 filas en 0,26 s |
+
+Antes **no terminaba** y colgaba Power BI. La ventana de 30 s del MCP deja de
+ser un problema por un factor de ~37.
+
+### 5 · Las dos puertas — criterios 6 y 7
+
+* `check-declarados`: **153 declarados / 153 construidos**, salida **0**, con
+  `config/objetos_pendientes.yaml` **vacio**.
+* `check-diccionario`: **153 fichas / 153 objetos**, biyeccion exacta. Primero
+  salio **KO con codigo 1** porque el arbol iba por la **22** y lo publicado era
+  la **21**; tras `publicar-diccionario` (199 filas, 964 columnas, 16 reglas,
+  hash `89d29bab993c`) repite en verde con **codigo 0**.
+
+**AVISO DE METODO, para no repetirlo**: los primeros `EXIT=$?` que se leyeron
+venian **despues de una tuberia a `tail`**, asi que eran el codigo de `tail` y
+no del comando. Los codigos de arriba estan medidos sin tuberia.
+
+### Lo que sigue pendiente de F-078
+
+El criterio 2 exige que **Power BI cargue `FactCPTipologia` con el `.pq` actual
+sin tocar una linea**, y eso **solo lo puede probar el humano** abriendo su
+informe. Es lo unico que ningun comando puede demostrar.

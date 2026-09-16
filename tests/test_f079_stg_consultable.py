@@ -18,7 +18,11 @@ false`, y los tres grupos no son lo mismo:
   el SQL del build. «Todo lo expuesto es para consulta» no las alcanza.
 * **GRUPO C · los 9 objetos rotos, vacíos o de instrumentación.** Ahí el aviso
   **es un hecho, no una preferencia**: recomendarlos haría que el agente los
-  consultase y fallara.
+  consultase y fallara. **Hoy son 8**: F-078 materializó
+  `mart.v_pbi_cp_tipologia` el 2026-09-15 y con ello dejó de ser un hecho que
+  no se pudiera consultar. Un aviso que era cierto y deja de serlo se retira,
+  porque apartar al agente de una vista que ya funciona hace el mismo daño que
+  mandarle a una que no.
 
 **El riesgo de esta feature no es el booleano: es lo que se borra con él.**
 Dentro de esos `motivo_no_consumo` había **advertencias de corrección**, y si
@@ -66,10 +70,10 @@ GRUPO_B_FUNCIONES = (
     "stg.fn_sigrid_date_to_date",
 )
 
-#: GRUPO C · los nueve rotos, vacíos o de instrumentación, con el HECHO que
-#: justifica que sigan fuera de la superficie de consulta.
+#: GRUPO C · los rotos, vacíos o de instrumentación, con el HECHO que justifica
+#: que sigan fuera de la superficie de consulta. Nacieron nueve y hoy son OCHO:
+#: `mart.v_pbi_cp_tipologia` salió el 2026-09-15 al materializarla F-078.
 GRUPO_C = {
-    "mart.v_pbi_cp_tipologia": "no se puede ejecutar hoy (lo arregla F-078)",
     "cierre.v_pbi_cierre_indirectos_detalle": "no se puede ejecutar hoy",
     "mart.v_fact_periodificado": "hoy no periodifica nada",
     "aux.periodificacion_partida": "se crea vacia por diseno",
@@ -345,9 +349,11 @@ def test_f079_r3_los_rotos_y_vacios_siguen_fuera_de_la_superficie(nombre: str) -
 def test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo() -> None:
     """Fuera de `raw` no puede quedar ningún desaconsejado sin inventariar.
 
-    El recuento de partida fue 27 = 7 (grupo A) + 11 funciones + 9 rotos. Si
-    aparece uno nuevo que no está en ninguna de las dos listas, este test lo
-    saca: o se documenta aquí, o se sube a la superficie de consulta.
+    El recuento de partida fue 27 = 7 (grupo A) + 11 funciones + 9 rotos, y hoy
+    son 19 = 11 funciones + 8 rotos, porque F-078 subió
+    `mart.v_pbi_cp_tipologia` a la superficie de consulta. Si aparece uno nuevo
+    que no está en ninguna de las dos listas, este test lo saca: o se documenta
+    aquí, o se sube a la superficie de consulta.
     """
     fuera = {
         f.nombre
