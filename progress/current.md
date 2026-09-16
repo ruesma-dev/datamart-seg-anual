@@ -1151,3 +1151,37 @@ no del comando. Los codigos de arriba estan medidos sin tuberia.
 El criterio 2 exige que **Power BI cargue `FactCPTipologia` con el `.pq` actual
 sin tocar una linea**, y eso **solo lo puede probar el humano** abriendo su
 informe. Es lo unico que ningun comando puede demostrar.
+
+## 2026-09-16 · F-083 cerrada: el criterio 6 verificado por el MCP
+
+El reviewer dio **APROBADO** en la pasada 1 dejando abierto el **criterio 6**,
+que no lo cierra ningun comando: hay que preguntarle al MCP, sin explicarle
+nada, lo que Juan Romero no podia preguntar. Hecho el 2026-09-16.
+
+Antes se publico el diccionario: **version 23**, hash `cdbbe0996c67`, **153
+objetos y 969 columnas**, y `check-diccionario` repitio en verde con **codigo
+0** (medido sin tuberia).
+
+La pregunta, tal cual, agrupando las facturas vencidas y sin pagar por el
+estado de la FACTURA (no por el del efecto):
+
+```sql
+SELECT f.estado, count(DISTINCT v.factura_id) AS facturas,
+       round(sum(v.importe), 2) AS importe_pendiente
+FROM compras.vencimientos v
+JOIN compras.facturas f ON f.factura_id = v.factura_id
+WHERE v.efecto_anulado = false
+  AND v.fecha_vencimiento < current_date
+  AND v.estado_pago_codigo <> 10
+GROUP BY f.estado ORDER BY sum(v.importe) DESC
+```
+
+Reparto real: **5.233 «Aprobado pago» (26.873.652 EUR)**, 382 «Fra. GG
+Contabilizada», 106 «Aprobada Jefe de grupo», 49 «Contabilizada», **26
+«Rechazada»**, 26 «Recibida», 16 «Aprobada por jefe de obra» y 15 «Aprobada
+Administracion». Eso es exactamente lo que el correo pedia y antes no se podia
+separar del estado del efecto.
+
+**Aviso que queda en la ficha**: hay dos parejas de estados casi homonimos
+—`APR`/`APR_DG` ambos «Aprobado pago», `REC`/`REC_ADM` ambos «Recibida»—, asi
+que **se filtra por mnemonico, nunca por el literal**.
