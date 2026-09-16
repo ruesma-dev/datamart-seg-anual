@@ -5,6 +5,8 @@
 
 Resumen: **82 features**, 53 abiertas, 29 terminadas.
 
+En curso: **F-084**.
+
 Bloqueadas: **F-052**.
 
 ## Trabajo abierto
@@ -15,7 +17,7 @@ Bloqueadas: **F-052**.
 | F-070 | El MCP solo entiende lo que el diccionario le explica: auditar la calidad de las 103 fichas, no que existan | 10 | pendiente | estandar | `feature/F-070-auditoria-calidad-diccionario` |
 | F-034 | Power BI deja de leer de local y pasa a leer el datamart de Azure | 11 | pendiente | critico | `feature/F-034-powerbi-azure` |
 | F-057 | El coste de personal por obra: stg y mart sobre recursos, empleados y partes (raw por F-066) | 12 | pendiente | estandar | `feature/F-057-recursos-empleados-partes` |
-| F-084 | El estado del CONTRATO, y con el la pregunta de Compras que las firmas no pueden responder: que contratos llevan semanas enviados sin firmar | 12 | pendiente | estandar | `feature/F-084-estado-del-contrato` |
+| F-084 | El estado del CONTRATO, y con el la pregunta de Compras que las firmas no pueden responder: que contratos llevan semanas enviados sin firmar | 12 | en curso | estandar | `feature/F-084-estado-del-contrato` |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 13 | pendiente | critico | `feature/F-056-contabilidad` |
 | F-086 | Quien aprobo la factura y cuando: dbo.log, las 300.438 firmas digitales que no estaban en el circuito de firma | 13 | pendiente | estandar | `feature/F-086-rastro-de-aprobacion` |
 | F-077 | El flag --reconstruir-todo de F-025 no lo prueba nadie por el parser: sus dos tests miran el texto, no el comportamiento | 14 | pendiente | estandar | `feature/F-077-flag-reconstruir-todo-sin-test` |
@@ -127,7 +129,7 @@ Pedida por el humano el 2026-09-03, y confirmada con Juan Romero, que pregunto p
 
 ### F-084 · El estado del CONTRATO, y con el la pregunta de Compras que las firmas no pueden responder: que contratos llevan semanas enviados sin firmar
 
-estado **pendiente** · prioridad 12 · rigor `estandar` · SDD no · rama `feature/F-084-estado-del-contrato`
+estado **en curso** · prioridad 12 · rigor `estandar` · SDD no · rama `feature/F-084-estado-del-contrato`
 
 Pedida por el humano el 2026-09-16 junto con los estados del comparativo y de la factura y el estado de firmas. De las cuatro piezas, esta es la barata y la que entrega ya. ================ QUE FALTA, verificado contra la base el 2026-09-16: `compras.contratos` publica contrato_id, codigo_contrato, serie, descripcion, fecha, obra_id, codigo_obra, proveedor_id, proveedor_nombre, proveedor_cif y comparativo_id, y **ninguna es el estado**. El catalogo SI esta publicado: `maestro.estados_documento` tiene los **7 estados del tipo 44** (contrato). Medidos el 2026-09-06 sobre Sigrid: 1 'Pdt. envio de firma' 554, 3 'Enviado' 811, 5 'Recibido' 549, 6 'Comprobada documentacion' 232, 7 'Firmado' 13.418, 8 'Terminado' 3.179, 9 'Rescindido' 176. ================ ES EL MISMO TRABAJO QUE F-083, que acaba de hacerlo para la FACTURA: el estado se lee de **`con.est`**, la superclase, filtrando **`tip = 44`**, y se traduce contra `raw.conest` **uniendo por la PAREJA (tipo, estado)**, nunca solo por estado_id. Reutiliza el patron, la guarda anti-multiplicacion y los tests de F-083; si al implementar se ve que el SQL se repite, **conviene factorizarlo en vez de copiarlo**. ================ POR QUE IMPORTA, y aqui esta el hallazgo que la justifica. Compras pidio en F-067 perseguir «todos los contratos que lleven mas de 3 semanas enviados y no se hayan firmado». La via natural parecia el circuito de firma, y **NO SIRVE**: medido contra Sigrid el 2026-09-16, de las 70.346 firmas de `confir` hay **CERO de contratos** (66.096 de comparativos, 3.454 de facturas y 796 de obras). No es un fallo de la ingesta: en el origen tampoco estan. **Luego esa pregunta solo se puede responder por el ESTADO del contrato**, y con los 811 que hoy estan en 'Enviado' se responde en cuanto exista la columna. ================ FRONTERA CON F-067: su criterio 1 pide para `compras.contratos` estado, forma de pago y retencion. **F-084 se queda solo con el ESTADO**; la forma de pago y la retencion siguen siendo de F-067, igual que la foto diaria que da la ANTIGUEDAD del estado. Sin esa foto, «mas de tres semanas enviado» se responde con el proxy `con.tiemod` -la ultima modificacion del documento- **y la ficha tiene que decir con esas palabras que no es la fecha del cambio de estado**, o la IA respondera «lleva X dias enviado» con un numero que no significa eso. Las dos fichas lo declaran.
 
