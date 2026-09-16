@@ -1022,3 +1022,70 @@ campaña canonica son de **F-025**, y **dos campañas seguidas los señalan**
 
 **VERIFICACIONES MANUAL PENDIENTES** (T0 bis, T7, T26 y T27), anotadas con su
 comando exacto en `progress/current.md`. Ningun agente las ejecuta.
+
+## F-078 · FactCPTipologia deja de colgar Power BI (cerrada el 2026-09-15, APROBADO)
+
+Era la **unica vista `v_pbi_` sin tabla detras**, asi que se recalculaba entera
+en cada consulta: cinco recorridos de `stg.plan_mensual` (29,8 M de filas,
+11 GB) y un WindowAgg sobre 11,8 M de filas intermedias. Contra Azure **no
+terminaba**.
+
+Se materializa en **tres tablas** construidas dentro de `build_mart`, y las tres
+vistas conservan nombre, columnas y **tipos**, leyendo de su tabla. Cambia
+DONDE se calcula, no QUE se calcula: el reviewer comparo los tres cuerpos del
+SQL viejo contra los nuevos tras normalizar y salen identicos salvo la
+referencia.
+
+**RECHAZADA EN LA PASADA 1 POR FALTA DE EVIDENCIA, no por defectos**: la spec
+exigia medir contra Azure y nadie lo habia hecho. Medido despues con
+autorizacion expresa del humano: `build_mart` **2.414,6 s** con el sub-paso
+`cp_tipologia` en **1.162,06 s / 1.740 filas**; `build_cierre` **2.943,0 s**;
+`check-cp-tipologia` **1.740 filas y CERO diferencias**; y `SELECT *` de la
+vista en **0,81 s**, cuando antes no terminaba. Aprobada en la pasada 2.
+
+**LECCION QUE COSTO UNA NOCHE**: no llegamos a desplegar antes del cron de las
+00:00 y la nocturna del 16 corrio con la imagen vieja, **deshaciendo F-078**
+—las vistas volvieron a su forma cara—. Se rehizo `mart` y `cierre` a mano.
+Vale lo que ya dice la memoria: **el repositorio en verde no es produccion**.
+
+**PENDIENTE DEL HUMANO**: que su informe de Power BI cargue `FactCPTipologia`
+sin tocar una linea del `.pq`. Ningun comando lo demuestra.
+
+## F-083 · El estado de la FACTURA, que no es el del efecto (cerrada el 2026-09-16, APROBADO)
+
+Tercera devolucion de un usuario de Negocio sobre el datamart en uso, y la
+segunda de Administracion: Juan Romero pedia separar **el estado del EFECTO de
+pago** —lo unico que se podia consultar, publicado por F-080 en
+`compras.vencimientos`— **del estado de la propia FACTURA**.
+
+El dato no esta en `dcf`: esta en **`con.est`**, la superclase, filtrando
+**`tip = 15`**, y se traduce contra `raw.conest` **uniendo por la PAREJA (tipo,
+estado)**, nunca solo por `estado_id`, porque el mismo codigo significa cosas
+distintas en una obra, un contrato o una factura. Es la cuarta vez que la regla
+de oro de Sigrid decide donde vive un campo que pareciamos buscar en la tabla
+hija.
+
+**EL HUMANO AMPLIO EL ALCANCE sobre la ficha original**: «la fecha metela, y
+separa las 2. luego debe quedar muy claro en el diccionario». Asi que
+`compras.facturas` publica **tres fechas separadas y explicadas** en vez de una
+columna `fecha` ambigua.
+
+**Evidencias del cierre**: `init.sh` exit 0, **4.879 pasan / 188 saltados**,
+cobertura **94,3 %** (901/955), puerta de tamaño OK. El alcance de mutacion
+salio **vacio de verdad** (recalculado por el reviewer: `lineas={}`), entregable
+casi todo SQL. Diccionario publicado en la **version 23** (hash `cdbbe0996c67`,
+153 objetos, 969 columnas) y `check-diccionario` en **codigo 0**.
+
+**EL CRITERIO 6 lo cerro la pregunta que el correo no podia hacer**: de las
+facturas vencidas y sin pagar, **5.233 estan en «Aprobado pago» (26,87 M EUR)**,
+382 «Fra. GG Contabilizada», 106 «Aprobada Jefe de grupo», 49 «Contabilizada»,
+**26 «Rechazada»**, 26 «Recibida», 16 «Aprobada por jefe de obra» y 15
+«Aprobada Administracion».
+
+**TRAMPA ANOTADA EN LA FICHA**: `APR`/`APR_DG` se llaman los dos «Aprobado
+pago» y `REC`/`REC_ADM` los dos «Recibida». Se filtra **por mnemonico, nunca
+por el literal**.
+
+**FRONTERA DECLARADA EN LAS DOS FICHAS**: la **fecha de cambio de estado** se
+queda en F-067, porque **no existe en Sigrid** —`concam` audita 1,5 M de
+cambios y ni uno del campo `est`— y exige construir la foto diaria.

@@ -1335,7 +1335,7 @@
         "El diccionario deja INEQUIVOCA la diferencia entre las tres fechas: cada ficha dice que es, de donde sale y en que se diferencia de las otras dos. Son tres fechas que se confunden con facilidad y una respuesta que use la equivocada es un numero falso con aspecto de dato",
         "Medido y anotado: cobertura de `dcf.fecdoc` y cuanto se separan en la practica las dos fechas"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 9,
