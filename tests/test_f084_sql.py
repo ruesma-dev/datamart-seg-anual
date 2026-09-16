@@ -220,7 +220,10 @@ def test_f084_c2_el_lateral_del_estado_es_left_y_no_pierde_contratos() -> None:
 
 
 def test_f084_c2_el_contrato_conserva_su_clave_e_indices() -> None:
-    texto = _sin_comentarios(_texto(RUTA_DOCUMENTOS))
+    # Compactado: la alineacion en columnas de los `CREATE INDEX` es estilo del
+    # fichero, no contrato, y un test que se rompa al alinear una linea manda
+    # el mensaje equivocado.
+    texto = _compacto(_texto(RUTA_DOCUMENTOS))
     assert "ALTER TABLE compras.contratos ADD PRIMARY KEY (contrato_id)" in texto, (
         "`contrato_id` sigue siendo la clave primaria: es el grano y no cambia"
     )

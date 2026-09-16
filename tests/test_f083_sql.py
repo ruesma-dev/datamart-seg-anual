@@ -177,12 +177,21 @@ def test_f083_el_estado_id_se_lee_de_la_superclase_con() -> None:
 
 
 def test_f083_la_traduccion_filtra_el_tipo_de_documento_de_factura() -> None:
-    """Sin `tip = 15` traduciria con el diccionario de obras o de contratos."""
+    """Sin `tip = 15` traduciria con el diccionario de obras o de contratos.
+
+    **Reescrito por F-084 (2026-09-16), y solo donde mira, no lo que exige.**
+    El `WHERE` de la traduccion ya no esta aqui: vive una sola vez en
+    `compras.fn_estado_documento`, y lo que este bloque escribe es el TIPO con
+    el que la llama. Que es exactamente donde se puede equivocar —el cuerpo de
+    la funcion no sabe de facturas—, asi que la comprobacion no pierde nada al
+    mudarse a la llamada. La guarda del propio `WHERE` la vigila
+    `tests/test_f084_sql.py`.
+    """
     lateral = _lateral_del_estado()
-    assert re.search(r"\.tip = 15\b", lateral), (
-        "la traduccion del estado no filtra `tip = 15`: el mismo `estado_id` "
-        "significa otra cosa en una obra (42) o en un contrato (44), asi que "
-        "sin el tipo el literal publicado es el equivocado (criterio 2)"
+    assert re.search(r"fn_estado_documento\(15, ?con\.est\)", lateral), (
+        "la traduccion del estado no se pide para `tip = 15`: el mismo "
+        "`estado_id` significa otra cosa en una obra (42) o en un contrato "
+        f"(44), y hoy la llamada es «{lateral.strip()}» (criterio 2)"
     )
 
 
@@ -191,11 +200,20 @@ def test_f083_la_union_es_por_la_pareja_y_nunca_solo_por_estado_id() -> None:
 
     Falla si alguien deja la union solo por `est`, que es exactamente el
     refactor «simplificador» que rompe la traduccion sin romper el build.
+
+    **F-084 lo hizo MAS dificil de romper, no menos.** La union vive ahora en
+    `compras.fn_estado_documento(p_tip, p_est)`, cuya firma **obliga** a pasar
+    el tipo: una llamada sin el no compila, asi que la mitad de la pareja que
+    mas se olvidaba dejo de poderse olvidar. Este test comprueba las dos
+    piezas: que el cuerpo sigue uniendo por los dos campos, y que la factura
+    sigue llamando con su tipo. La comprobacion del cuerpo esta duplicada a
+    proposito con `tests/test_f084_sql.py`: el dia que se borre una de las dos
+    features, la otra sigue guardando la traduccion que comparten.
     """
-    lateral = _lateral_del_estado()
-    condicion = lateral.split(" WHERE ")[1].split(" ORDER BY ")[0]
-    assert re.search(r"\.tip = 15\b", condicion) and re.search(
-        r"\.est = con\.est\b", condicion
+    cuerpo = _cuerpo_de_la_funcion_de_estado()
+    condicion = cuerpo.split(" WHERE ")[1].split(" ORDER BY ")[0]
+    assert re.search(r"\.tip = p_tip\b", condicion) and re.search(
+        r"\.est = p_est\b", condicion
     ), (
         "la union al catalogo tiene que ir por la PAREJA (tipo, estado): "
         f"hoy la condicion es «{condicion.strip()}»"
@@ -203,6 +221,10 @@ def test_f083_la_union_es_por_la_pareja_y_nunca_solo_por_estado_id() -> None:
     assert " AND " in condicion, (
         "una sola condicion en el WHERE del lateral significa que se esta "
         "uniendo solo por `estado_id`, que es lo que el criterio 2 prohibe"
+    )
+    assert "fn_estado_documento(15," in _bloque_facturas(), (
+        "`compras.facturas` tiene que seguir pidiendo la traduccion con su "
+        "tipo de documento: sin el 15, la pareja se queda coja en la llamada"
     )
 
 
@@ -212,13 +234,17 @@ def test_f083_la_traduccion_del_estado_no_puede_multiplicar_filas() -> None:
     Hoy `(tip, est)` es unico —21 de 21 en el tipo 15, y ni un par repetido en
     las 193 filas del catalogo—, pero una tabla que ya consume Negocio no puede
     depender de un dato de origen que nadie controla. El patron es el de F-073.
+
+    **F-084 movio la guarda al cuerpo de la funcion compartida**, que es la
+    ganancia de haberla factorizado: se escribe una vez y protege tanto a
+    `compras.facturas` como a `compras.contratos`.
     """
-    lateral = _lateral_del_estado()
-    assert "LIMIT 1" in lateral, (
+    cuerpo = _cuerpo_de_la_funcion_de_estado()
+    assert "LIMIT 1" in cuerpo, (
         "sin `LIMIT 1`, el dia en que el catalogo traiga dos filas para el "
         "mismo `(15, est)` `compras.facturas` duplica facturas en silencio"
     )
-    assert "ORDER BY" in lateral, (
+    assert "ORDER BY" in cuerpo, (
         "`LIMIT 1` sin `ORDER BY` elige una fila al azar: el literal "
         "publicado cambiaria de una noche a otra sin que nadie lo note"
     )
@@ -230,13 +256,22 @@ def test_f083_el_lateral_del_estado_es_left_y_no_pierde_facturas() -> None:
         "con `JOIN LATERAL` se perderian las facturas cuyo estado no case con "
         "el catalogo, y el criterio 4 dice que se publican igual"
     )
-    assert re.search(r"LEFT JOIN LATERAL \(.*\) \w+ ON TRUE", bloque), (
-        "el lateral tiene que cerrarse con `ON TRUE`, como en `maestro.obras`"
+    assert re.search(
+        r"LEFT JOIN LATERAL compras\.fn_estado_documento\([^)]*\) \w+ ON TRUE",
+        bloque,
+    ), (
+        "el lateral tiene que cerrarse con `ON TRUE`, como en `maestro.obras`: "
+        "sin el, una factura sin estado en catalogo no se publicaria"
     )
 
 
 def _lateral_del_estado() -> str:
-    """El `LEFT JOIN LATERAL` que traduce el estado, acotado."""
+    """La llamada a la traduccion del estado dentro del bloque, acotada.
+
+    Hasta F-084 esto devolvia el subselect entero, escrito a mano aqui. Hoy
+    devuelve el `LEFT JOIN LATERAL compras.fn_estado_documento(15, con.est) est
+    ON TRUE`: el mismo sitio del fichero, con el cuerpo mudado a `00_setup.sql`.
+    """
     bloque = _bloque_facturas()
     assert "LEFT JOIN LATERAL" in bloque, (
         "`compras.facturas` no traduce el estado con un lateral: sin el no hay "
@@ -244,6 +279,24 @@ def _lateral_del_estado() -> str:
     )
     inicio = bloque.index("LEFT JOIN LATERAL")
     return bloque[inicio : bloque.index("ON TRUE", inicio)]
+
+
+def _cuerpo_de_la_funcion_de_estado() -> str:
+    """El cuerpo de `compras.fn_estado_documento`, en `compras/00_setup.sql`.
+
+    Donde F-084 dejo la traduccion que F-083 tenia copiada en el bloque
+    FACTURAS. Este fichero la sigue vigilando: los dos tests que la miran son
+    de F-083 porque son SUS garantias, aunque el texto viva ahora en otro sitio.
+    """
+    ruta = DIRECTORIO_SQL / "compras" / "00_setup.sql"
+    texto = _sin_comentarios(ruta.read_text(encoding="utf-8"))
+    marca = "CREATE OR REPLACE FUNCTION compras.fn_estado_documento"
+    assert marca in texto, (
+        "`compras.fn_estado_documento` no esta definida: `compras.facturas` la "
+        "necesita para traducir su estado desde F-084 (criterio 3 de F-083)"
+    )
+    inicio = texto.index(marca)
+    return re.sub(r"\s+", " ", texto[inicio : texto.index("$$;", inicio)])
 
 
 # ===========================================================================

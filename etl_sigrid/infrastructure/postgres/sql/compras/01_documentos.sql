@@ -38,6 +38,30 @@
 --     la propia factura (`dcf.fecdoc`, la que el proveedor pone en su
 --     documento) y la de alta en Sigrid (`con.fec`). Se separan en el 77,8 %
 --     de las facturas. `fecha` se queda intacta y es la de ALTA.
+--
+-- F-084 (2026-09-16) · EL MISMO TRABAJO PARA EL CONTRATO. El bloque CONTRATOS
+-- gana TRES columnas al final —`estado_id`, `estado_codigo` y `estado`—, leídas
+-- igualmente de `con.est` y traducidas con `tip = 44`. Ni una de las doce de
+-- siempre se toca.
+--
+--   · LA TRADUCCIÓN YA NO ESTÁ COPIADA. F-083 escribió su lateral a mano aquí;
+--     F-084 lo factorizó en `compras.fn_estado_documento(p_tip, p_est)`
+--     (`00_setup.sql`) y los DOS bloques la llaman con su tipo. Es el criterio
+--     6 de la feature, y lo que se gana no son líneas: el tipo de documento
+--     pasa a ser argumento obligatorio, así que la unión «solo por estado_id»
+--     ya no se puede escribir.
+--   · POR QUÉ HACÍA FALTA, y es el hallazgo caro de F-084. Compras pidió
+--     perseguir «los contratos que llevan más de tres semanas enviados y sin
+--     firmar». La vía natural parecía el circuito de firma, `raw.confir`, y
+--     NO SIRVE: de sus 70.346 firmas hay **CERO de contrato** (son de
+--     comparativos, facturas y obras). No es un fallo de la ingesta: en el
+--     origen tampoco están. Luego esa pregunta SOLO se puede responder por el
+--     ESTADO, y con los 818 contratos en «Enviado» se responde desde hoy.
+--   · LO QUE SIGUE SIN PODERSE RESPONDER: cuánto lleva un contrato en su
+--     estado. El datamart no guarda cuándo cambió, y `con.tiemod` es la última
+--     modificación del DOCUMENTO, no la fecha del cambio de estado. La foto
+--     diaria que lo daría de verdad es F-067; por eso F-084 no publica ninguna
+--     columna de antigüedad, y la ficha lo dice en vez de insinuar un proxy.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -57,15 +81,31 @@ SELECT
     NULLIF(c.entide, 0)                     AS proveedor_id,
     prv_con.res                             AS proveedor_nombre,
     NULLIF(TRIM(c.entcif), '')              AS proveedor_cif,
-    NULLIF(c.comide, 0)                     AS comparativo_id
+    NULLIF(c.comide, 0)                     AS comparativo_id,
+    -- A PARTIR DE AQUÍ, TODO LO QUE AÑADE F-084, Y VA AL FINAL A PROPÓSITO:
+    -- `compras.contratos` ya está en producción y la consumen Power BI y el
+    -- MCP. Intercalar `estado` junto a `descripcion` —que es donde se lee
+    -- mejor— reordena las columnas de una tabla viva. Misma disciplina que
+    -- F-073 en `maestro.obras` y F-083 en `compras.facturas`.
+    con.est                                 AS estado_id,        -- código interno del tipo 44
+    est.codigo_estado                       AS estado_codigo,    -- mnemónico: EPF, FIR, TER…
+    est.nombre_estado                       AS estado            -- estado_id ya traducido (tipo 44)
 FROM raw.ctr c
 JOIN raw.con con          ON con.ide = c.ide
 LEFT JOIN raw.con obr_con ON obr_con.ide = NULLIF(c.obride, 0)
-LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(c.entide, 0);
+LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(c.entide, 0)
+-- La traducción del estado, con su tipo de documento y su guarda de grano,
+-- vive UNA sola vez en `compras.fn_estado_documento` (`00_setup.sql`) y la
+-- comparten este bloque y el de FACTURAS: es el criterio 6 de F-084.
+-- `LEFT ... ON TRUE` porque un contrato cuyo estado no casara con el catálogo
+-- se publica igual, con el literal a NULL. Hoy no le pasa a ninguno: 0
+-- huérfanos de 18.978, medido el 2026-09-16.
+LEFT JOIN LATERAL compras.fn_estado_documento(44, con.est) est ON TRUE;
 
 ALTER TABLE compras.contratos ADD PRIMARY KEY (contrato_id);
 CREATE INDEX idx_com_ctr_obra ON compras.contratos (obra_id);
 CREATE INDEX idx_com_ctr_prv  ON compras.contratos (proveedor_id);
+CREATE INDEX idx_com_ctr_est  ON compras.contratos (estado_id);
 
 DROP TABLE IF EXISTS compras.contrato_lineas CASCADE;
 CREATE TABLE compras.contrato_lineas AS
@@ -191,13 +231,15 @@ LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0)
 -- El `LIMIT 1` con `ORDER BY` es la guarda de grano: `(tip, est)` es único hoy
 -- —21 de 21 en el tipo 15, ni un par repetido en las 193 filas del catálogo— y
 -- esta tabla no puede depender de un dato de origen que nadie controla.
-LEFT JOIN LATERAL (
-    SELECT ce.cod AS codigo_estado, ce.res AS nombre_estado
-    FROM   raw.conest ce
-    WHERE  ce.tip = 15 AND ce.est = con.est
-    ORDER  BY ce.ide
-    LIMIT  1
-) est ON TRUE;
+--
+-- F-084 (2026-09-16): este lateral estaba escrito a mano aquí desde F-083, y
+-- CONTRATOS necesitaba el mismo con otro tipo. En vez de copiarlo, la
+-- traducción se factorizó en `compras.fn_estado_documento` (`00_setup.sql`),
+-- que conserva el LEFT, el `ORDER BY` y el `LIMIT 1` intactos y además
+-- convierte el tipo de documento en argumento obligatorio. La proyección de
+-- arriba no cambia ni una letra: la función devuelve `codigo_estado` y
+-- `nombre_estado`, los mismos nombres que tenía el lateral.
+LEFT JOIN LATERAL compras.fn_estado_documento(15, con.est) est ON TRUE;
 
 ALTER TABLE compras.facturas ADD PRIMARY KEY (factura_id);
 CREATE INDEX idx_com_fac_est ON compras.facturas (estado_id);
