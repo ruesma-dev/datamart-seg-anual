@@ -1093,3 +1093,27 @@ por el literal**.
 **FRONTERA DECLARADA EN LAS DOS FICHAS**: la **fecha de cambio de estado** se
 queda en F-067, porque **no existe en Sigrid** —`concam` audita 1,5 M de
 cambios y ni uno del campo `est`— y exige construir la foto diaria.
+
+## F-034 · Power BI deja de leer de local y pasa a leer el datamart de Azure — `done` (2026-09-16)
+
+Cerrada por decision del humano: «**f34 esta cerrada y hecha**». Y lo esta en lo
+que se pedia: **Power BI Desktop lee del datamart de Azure y no del Postgres
+local**, con **Import y no DirectQuery** —la decision (3) de la ficha, la que
+protege a un servidor compartido de una consulta por cada clic—, y desde el
+2026-09-16 carga `FactCPTipologia` sin tocar el `.pq`, que era el criterio 10 y
+lo resolvio **F-078** bajando ese `SELECT` de «no termina» a **0,81 s**.
+
+**LO QUE NO ESTA HECHO, medido contra la base el mismo dia y sacado a F-087**:
+`pg_roles` tiene **un solo rol de lectura, `mcp_sigrid_dm_ro`**, y
+**`pbi_sigrid_dm_ro` NO EXISTE**. Power BI se conecta con **el rol del MCP**,
+que lee **todos los esquemas, `raw` y `stg` incluidos**. Eso deja abiertos los
+criterios 2, 3 y 5: rol propio, contrasena en Key Vault y prueba negativa.
+
+No es teorico: el **incidente 53300 del 2026-09-16** —«remaining connection
+slots»— lo provocaron **17 conexiones ociosas de Power BI** que costo
+identificar precisamente porque comparten `usename` con el MCP.
+
+**Se cierra en vez de dejarla abierta a medias, y la deuda va a ficha propia con
+su medicion**, que es lo que este arnes hace desde F-077 y F-081. Sigue fuera de
+alcance **Power BI Service**, que exige gateway o abrir IP en un Postgres
+compartido con albaranes y partes: no es decision de este proyecto en solitario.
