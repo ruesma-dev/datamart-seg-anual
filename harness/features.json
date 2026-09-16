@@ -572,7 +572,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 3,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -853,7 +853,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 2,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -886,7 +886,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 1,
       "branch": "feature/F-057-recursos-empleados-partes"
     },
     {
