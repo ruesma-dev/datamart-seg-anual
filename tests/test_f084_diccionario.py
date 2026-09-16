@@ -68,7 +68,10 @@ REPARTO_MEDIDO = (
     ("Enviado", "818"),
     ("Pdt. envio de firma", "564"),
     ("Recibido", "550"),
-    ("Comprobada documentacion", "232"),
+    # Con tilde, que es como esta EN LA BASE: el literal que la ficha publica
+    # tiene que poderse copiar a un `WHERE` sin retocarlo. Es el unico de los
+    # siete que la lleva, y por eso mismo es el que se escribe mal.
+    ("Comprobada documentación", "232"),
     ("Rescindido", "176"),
 )
 

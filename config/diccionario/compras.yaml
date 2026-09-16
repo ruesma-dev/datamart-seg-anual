@@ -193,13 +193,40 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      Cabecera de cada contrato con un proveedor: a quien, para que obra y de
-      que comparativo salio. Es el documento que fija el compromiso; lo que
-      luego se consume llega por albaranes y facturas. **NO trae el importe**:
-      aqui no hay ninguna columna de dinero, y la frase "por cuanto" que esta
-      descripcion decia antes hacia escribir `importe_contrato`, que no existe.
-      El importe comprometido esta en
+      Cabecera de cada contrato con un proveedor: a quien, para que obra, en
+      que ESTADO esta y de que comparativo salio. Es el documento que fija el
+      compromiso; lo que luego se consume llega por albaranes y facturas. **NO
+      trae el importe**: aqui no hay ninguna columna de dinero, y la frase "por
+      cuanto" que esta descripcion decia antes hacia escribir
+      `importe_contrato`, que no existe. El importe comprometido esta en
       `compras.v_pbi_contrato_consumo.importe_contratado`.
+
+      **LO QUE SE PUEDE Y LO QUE NO SE PUEDE RESPONDER CON EL ESTADO (F-084,
+      2026-09-16). Las dos mitades importan, y la segunda mas.**
+
+      **SI se puede: en que estado esta cada contrato.** Desde F-084 esta
+      tabla publica `estado`, `estado_codigo` y `estado_id`. «Que contratos
+      estan enviados y sin firmar» se responde con
+      `estado_codigo = 'EPF'`: son **818**, de **567 proveedores** y **241
+      obras**, medido el 2026-09-16.
+
+      **NO se puede: cuanto lleva un contrato en ese estado.** El datamart no
+      guarda cuando cambio el estado —no hay foto diaria, la traera F-067— y
+      en el origen la unica aproximacion es `con.tiemod`, la ultima
+      modificacion del DOCUMENTO, que **no es la fecha del cambio de estado**:
+      a un contrato enviado en 2019 al que se le tocara una linea ayer
+      `con.tiemod` le da un dia. Ademas `con.tiemod` **no esta publicado en
+      esta tabla ni en ninguna otra del datamart**: vive en `raw`, que el MCP
+      no consulta. Asi que a «cuantos llevan mas de tres semanas enviados» la
+      respuesta correcta hoy es **no se puede saber**, acompanada de los 818
+      que estan en «Enviado»; cualquier numero de dias que se de sera falso.
+
+      **Y NO LO BUSQUES EN EL CIRCUITO DE FIRMA: para el contrato esta vacio.**
+      Parece la via natural —«enviado sin firmar» suena a firmas— y no lo es:
+      de las **70.346 firmas** de `raw.confir` medidas el 2026-09-16 hay
+      **CERO de contrato**. Son de comparativos, de facturas y de obras. No es
+      un fallo de la ingesta: en Sigrid tampoco las hay. Por eso el ESTADO es
+      la unica via.
     grano: Una fila por contrato de compra. `contrato_id` es clave primaria.
     clave_negocio: [contrato_id]
     paso_etl: build_compras
@@ -247,6 +274,48 @@ objetos:
           sus tablas de origen si estan ingeridas. Es F-038.
         nulo_significa: El contrato no viene de un comparativo.
         agregacion: no_sumable
+      estado_id:
+        significado: >-
+          Codigo interno del estado del DOCUMENTO, leido de `con.est` (la
+          superclase de documentos de Sigrid, no de `ctr`). **Solo significa
+          algo dentro del tipo de documento 44** (contrato): la misma cifra es
+          otro estado distinto en una factura (tipo 15) o en una obra (42) —el
+          7 es «Firmado» aqui y otra cosa alli—. Por eso la traduccion se hace
+          por la PAREJA (tipo, estado) y nunca solo por este numero, y por eso
+          aqui se publica ya traducido en `estado` y `estado_codigo`: para
+          filtrar, usa esos dos.
+        agregacion: no_sumable
+      estado_codigo:
+        significado: >-
+          El mnemonico del estado en Sigrid, y **lo unico estable para
+          filtrar**: PFP pendiente de envio a firma, EPF enviado, RFP
+          recibido, COMD comprobada documentacion, FIR firmado, TER terminado,
+          RES rescindido. Son los siete del tipo 44 y no hay mas. **Filtra por
+          aqui y no por el literal**: el literal lo puede reescribir Sigrid sin
+          avisar, y ademas lleva tildes («Comprobada documentación») que una
+          comparacion de texto pierde con facilidad. La pregunta de Compras
+          —contratos enviados y sin firmar— es `estado_codigo = 'EPF'`.
+        nulo_significa: >-
+          El `estado_id` del contrato no figura en el catalogo del tipo 44.
+          Hoy no le pasa a ninguno (0 de 18.978, medido el 2026-09-16).
+      estado:
+        significado: >-
+          El nombre del estado del contrato, traducido contra el catalogo de
+          Sigrid (`raw.conest`, el mismo que publica
+          `maestro.estados_documento`) filtrando el tipo de documento 44. Es el
+          punto del circuito de firma en el que esta el contrato. Reparto
+          medido el 2026-09-16 sobre los 18.978 contratos: «Firmado» 13.459,
+          «Terminado» 3.179, **«Enviado» 818**, «Pdt. envio de firma» 564,
+          «Recibido» 550, «Comprobada documentación» 232 y «Rescindido» 176.
+          **Los siete estados del catalogo los usa algun contrato**, al reves
+          que en `compras.facturas`, donde tres estan a cero: aqui, si un
+          estado sale vacio en una consulta, el sospechoso es el filtro y no el
+          catalogo. El orden del circuito es PFP -> EPF -> RFP -> COMD -> FIR
+          -> TER, con RES (rescindido) como salida; **no es un orden que se
+          pueda deducir del numero**, que va 1, 3, 5, 6, 7, 8, 9.
+        nulo_significa: >-
+          Igual que en `estado_codigo`: el estado no casa con el catalogo del
+          tipo 44. Hoy, ningun contrato.
     relaciones:
       - de: contrato_id
         a: compras.contrato_lineas.contrato_id
@@ -259,6 +328,12 @@ objetos:
     ejemplos_preguntas:
       - Que contratos tiene abiertos la obra X y con quien
       - Con que proveedores tiene contrato la obra X
+      - Que contratos estan enviados y sin firmar
+      - Cuantos contratos hay en cada estado, y cuantos sin firmar todavia
+      - >-
+        Que contratos llevan mas de tres semanas enviados sin firmar (OJO: los
+        ENVIADOS si se pueden listar, el «mas de tres semanas» NO: ver la
+        descripcion de la tabla)
 
   contrato_lineas:
     tipo: tabla
@@ -1174,6 +1249,36 @@ objetos:
       codigo no empieza por letras devuelve **cadena vacia, no nulo**, que es lo
       que hace que `compras.fn_tipo_documento` acabe clasificandolo como OTRO en
       vez de dejarlo sin tipo.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_estado_documento:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras, usada solo dentro del SQL que
+      construye el esquema. Las tablas ya publican el estado traducido en sus
+      columnas `estado` y `estado_codigo`: no hay que llamarla para consultar.
+    descripcion: >-
+      Traduce el estado de un documento de Sigrid a su codigo y su nombre,
+      **por la PAREJA (tipo de documento, estado)**. Existe porque en Sigrid el
+      estado es un numero de `con.est` cuyo significado depende del tipo: el 7
+      es «Firmado» en un contrato (tipo 44) y en el catalogo de la factura
+      (15) es otro estado distinto, asi que traducir solo por el numero da un
+      literal equivocado sin romper nada. Al ser el tipo un argumento
+      obligatorio de la firma, esa union a ciegas ya no se puede escribir.
+      Devuelve como mucho UNA fila —`ORDER BY ide LIMIT 1`—, que es la guarda
+      que impide que una tabla se multiplique el dia en que el catalogo traiga
+      dos filas para el mismo par; se llama con `LEFT JOIN LATERAL ... ON
+      TRUE`, asi que un documento con un estado fuera de catalogo se publica
+      igual con el literal a NULL. La usan `compras.contratos` (F-084) y
+      `compras.facturas` (F-083), cada una con su tipo.
     grano: null
     clave_negocio: []
     paso_etl: build_compras

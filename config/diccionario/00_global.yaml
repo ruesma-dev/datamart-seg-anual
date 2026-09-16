@@ -225,7 +225,36 @@
 # `compras.vencimientos.estado_pago` devuelve el aviso en sentido contrario: la
 # confusion se puede entrar por cualquiera de las dos puertas.
 
-version: 23
+# version 24 (F-084, 2026-09-16): UN OBJETO NUEVO —la funcion auxiliar
+# `compras.fn_estado_documento`— y el mismo trabajo de F-083 para el CONTRATO.
+# `compras.contratos` gana `estado_id`, `estado_codigo` y `estado`, leidos de
+# `con.est` con `tip = 44` y traducidos por la PAREJA (tipo, estado). Ni una de
+# las doce columnas de siempre se toca: verificado columna a columna contra la
+# tabla viva, 0 filas que no casan de 18.978.
+#
+# LA TRADUCCION DEJA DE ESTAR COPIADA. F-083 escribio su lateral a mano dentro
+# del bloque FACTURAS; en vez de duplicarlo para CONTRATOS, los dos llaman ahora
+# a `compras.fn_estado_documento(tipo, estado)`. Lo que se gana no son lineas:
+# el tipo de documento pasa a ser argumento obligatorio, asi que la union «solo
+# por estado_id» —la que publica el literal de otro documento sin romper el
+# build— ya no se puede escribir. La guarda anti-multiplicacion vive dentro de
+# la funcion y por eso protege a las dos tablas a la vez.
+#
+# LO QUE ESTA VERSION DECLARA QUE **NO** SE PUEDE RESPONDER, y es la mitad que
+# importa. Compras pregunta por «los contratos que llevan mas de tres semanas
+# enviados sin firmar». Los ENVIADOS ya se listan: 818, de 567 proveedores y 241
+# obras. El «mas de tres semanas», NO: el datamart no guarda cuando cambio el
+# estado —la foto diaria es F-067— y `con.tiemod` es la ultima modificacion del
+# DOCUMENTO, que no es la fecha del cambio de estado, y ademas ni siquiera se
+# publica. La ficha lo dice en vez de insinuar un proxy, porque un «lleva X
+# dias» falso es peor que un «no se puede saber».
+#
+# Y UN HALLAZGO QUE AHORRA TIEMPO AL SIGUIENTE: el circuito de firma NO sirve
+# para el contrato. De las 70.346 firmas de `raw.confir` medidas el 2026-09-16
+# hay CERO de contrato; son de comparativos, facturas y obras. En el origen
+# tampoco estan, asi que el ESTADO es la unica via.
+
+version: 24
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

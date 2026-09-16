@@ -389,10 +389,14 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 153 objetos, 969 columnas y 66 fichas de
-consumo** —las cinco columnas nuevas son las de F-083 en `compras.facturas`
+**El diccionario del árbol está en 154 objetos, 972 columnas y 66 fichas de
+consumo** —lo último es F-084: `compras.contratos` gana **tres columnas**
+(`estado_id`, `estado_codigo`, `estado`) y aparece **un objeto nuevo**, la
+función auxiliar `compras.fn_estado_documento`, que no es de consumo (por eso
+las fichas de consumo siguen en 66). Antes de F-084 eran 153 / 969 / 66, con
+las cinco columnas de F-083 en `compras.facturas`
 (`estado_id`, `estado_codigo`, `estado`, `fecha_factura`, `fecha_alta`): no
-añade objetos, solo ensancha uno que ya existía. Antes de F-083 eran 964, y
+añadía objetos, solo ensanchaba uno que ya existía. Antes de F-083 eran 964, y
 F-078 había añadido las **tres tablas** de CP por tipología
 (`mart.master_versiones_tipadas`, `mart.master_vigente_anual`,
 `mart.fact_cp_tipologia`, 23 columnas) y sube `mart.v_pbi_cp_tipologia` a la
@@ -404,7 +408,7 @@ cuando F-080 añadió los **cinco objetos** de `compras` (`vencimientos`,
 (`auxnap`, `auxban`, `rpa`, sin columnas por la convención de `raw`); antes de
 eso eran 139 / 822 / 54 hasta F-073 y 47 fichas de consumo hasta F-079, que
 subió los siete objetos de `stg` a la superficie de consulta— y el árbol declara
-**versión 22**. Lo publicado en `_meta` es la **versión
+**versión 24**. Lo publicado en `_meta` es la **versión
 18** (hash `4af4c3bb60d4`, publicada el 2026-09-10): publicar contra Azure es una
 escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test

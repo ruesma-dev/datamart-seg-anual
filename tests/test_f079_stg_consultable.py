@@ -64,6 +64,12 @@ GRUPO_B_FUNCIONES = (
     "compras.fn_tipo_documento",
     "compras.fn_serie",
     "compras.fn_sigrid_date",
+    # F-084 (2026-09-16): la traduccion del estado por la pareja (tipo,
+    # estado), factorizada fuera de `01_documentos.sql` para que
+    # `compras.contratos` y `compras.facturas` la compartan. Entra aqui por lo
+    # mismo que las otras tres: se llama desde el SQL del build, y las dos
+    # tablas ya publican el estado traducido en sus columnas.
+    "compras.fn_estado_documento",
     "maestro.fn_fecha",
     "retenciones.fn_sigrid_date",
     "stg.fn_master_fecha_efectiva",
