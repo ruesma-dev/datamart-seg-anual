@@ -149,3 +149,39 @@ tests\test_f083_diccionario.py:218: AssertionError
 vigilan que las diez columnas de siempre siguen ahi, en su orden y con su
 expresion. Un test de no-regresion tiene que estar verde ANTES del cambio; si
 hubiera fallado en esta pasada, el que estaria mal seria el test.
+
+## T3 · El SQL, y la verificacion del grano ANTES de construir nada
+
+`sql/compras/01_documentos.sql`, **solo el bloque FACTURAS**: cinco columnas
+nuevas al final —`estado_id`, `estado_codigo`, `estado`, `fecha_factura`,
+`fecha_alta`—, un `LEFT JOIN LATERAL` al catalogo y un indice por `estado_id`.
+Las diez de siempre no se tocan. Es de F-067, que lo reescribira entero, asi
+que el cambio se deja acotado a ese bloque y anotado en la cabecera.
+
+**Por que `estado_codigo` ademas del literal, que la ficha no pedia**: el
+correo pregunta en mnemonicos («CON contabilizada, APJO aprobada por jefe de
+obra, APRADM...»), y **el literal no es unico**: `REC` y `REC_ADM` se llaman
+los dos «Recibida», y `APR` y `APR_DG` «Aprobado pago» / «Aprobado Pago».
+Filtrar por el literal mezcla dos estados distintos; por el mnemonico, no.
+
+**EL SELECT NUEVO, EJECUTADO EN SOLO LECTURA** (no se ha construido nada: es
+un `SELECT` envuelto en `COUNT(*)`, en transaccion `READ ONLY`). Esto es la
+prueba del criterio 3, no una promesa:
+
+| Comprobacion | Resultado |
+|---|---|
+| Filas del SELECT nuevo | **165.866** |
+| `factura_id` distintos en el SELECT nuevo | **165.866** (el lateral no multiplica) |
+| Filas que `compras.facturas` publica hoy | **165.866** (mismo grano antes y despues) |
+| Facturas con `estado` sin traducir | **0** |
+| `fecha` distinta de `fecha_alta` | **0 de 165.866** (su significado no cambia) |
+| Facturas sin `fecha_factura` / sin `fecha_alta` | 80 / 3 |
+
+Y la pregunta del correo, respondida ya con el SELECT nuevo cruzado contra
+`compras.vencimientos` (efectos vivos, vencidos y sin fecha de pago real):
+**APR 32.408 facturas**, CONGG 2.677, APRJG 115, FRAAPR 65, **CON
+(contabilizada sin aprobar) 55**, **RECH (rechazada) 27**, REC 27, APRADM 17,
+APJO 17... y **FRARET (retenida) cero, porque ninguna factura esta en ese
+estado**. Esa es la respuesta correcta, no un «no se puede saber». (El corte
+no reproduce las 628 facturas / 3,84 M EUR del correo: el suyo salia de otro
+filtro, y reproducirlo no es de esta feature.)

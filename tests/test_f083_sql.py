@@ -139,12 +139,15 @@ def test_f083_la_columna_fecha_conserva_su_expresion_de_siempre() -> None:
 
 
 def test_f083_el_universo_de_facturas_no_se_filtra() -> None:
-    """Ni un WHERE en el FROM: las 165.866 facturas siguen estando.
+    """Ni un WHERE en la consulta EXTERNA: las 165.866 facturas siguen estando.
 
     Publicar el estado no puede dejar fuera a las facturas cuyo estado no case
-    con el catalogo (criterio 4: se publican igual).
+    con el catalogo (criterio 4: se publican igual). El `WHERE` que acota el
+    catalogo dentro del `LATERAL` no cuenta: ese filtra el catalogo, no las
+    facturas, y por eso el texto se corta justo antes de el.
     """
-    desde_el_from = _bloque_facturas().split("FROM raw.dcf f")[1]
+    bloque = _bloque_facturas()
+    desde_el_from = bloque.split("FROM raw.dcf f")[1].split("LEFT JOIN LATERAL")[0]
     assert " WHERE " not in desde_el_from, (
         "ha aparecido un WHERE en el FROM de `compras.facturas`: eso cambia el "
         "grano, que es justo lo que el criterio 3 prohibe"

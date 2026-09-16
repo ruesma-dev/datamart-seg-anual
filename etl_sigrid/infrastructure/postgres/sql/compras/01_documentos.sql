@@ -14,6 +14,30 @@
 --       44 = la línea origen es de contrato (ctrpro)
 --       14 = la línea origen es de albarán (dcapro)
 --   · Importes tot = línea SIN IVA. ivacuo aparte.
+--
+-- F-083 (2026-09-16) · LO ÚNICO QUE ESTA FEATURE TOCA AQUÍ, y a propósito lo
+-- mínimo, porque este fichero es de F-067 y F-067 lo reescribirá entero: el
+-- bloque FACTURAS gana CINCO columnas al final —`estado_id`, `estado_codigo`,
+-- `estado`, `fecha_factura` y `fecha_alta`—. Ni una de las diez de siempre se
+-- toca, se renombra ni cambia de sitio: `compras.facturas` ya está en
+-- producción y la consumen Power BI y el MCP.
+--
+--   · EL ESTADO DE LA FACTURA NO ES EL ESTADO DEL EFECTO. Lo que
+--     `compras.vencimientos` publica como `estado_pago` es el estado del
+--     EFECTO de pago (`con.est` con `tip = 25`); esto de aquí es el estado del
+--     DOCUMENTO en el circuito de aprobación (CON contabilizada, APJO aprobada
+--     por jefe de obra, APRADM aprobada Administración, APR aprobado pago,
+--     RECH rechazada). Confundirlos es lo que originó esta feature: un listado
+--     de «facturas sin aprobar» hecho con `estado_pago` mide otra cosa.
+--   · Y NO ESTÁ EN `dcf`: está en `con.est`, la superclase. Es la lección que
+--     F-080 aprendió tres veces por las malas.
+--   · La traducción va por la PAREJA (tipo de documento, estado): la misma
+--     cifra significa otra cosa en una obra (42) o en un contrato (44). Misma
+--     guarda que `maestro.obras` (F-073).
+--   · LAS DOS FECHAS, separadas por decisión del humano el 2026-09-16: la de
+--     la propia factura (`dcf.fecdoc`, la que el proveedor pone en su
+--     documento) y la de alta en Sigrid (`con.fec`). Se separan en el 77,8 %
+--     de las facturas. `fecha` se queda intacta y es la de ALTA.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -147,12 +171,36 @@ SELECT
     NULLIF(f.entide, 0)                     AS proveedor_id,
     prv_con.res                             AS proveedor_nombre,
     NULLIF(TRIM(f.entcif), '')              AS proveedor_cif,
-    NULLIF(TRIM(f.entref), '')              AS referencia_proveedor
+    NULLIF(TRIM(f.entref), '')              AS referencia_proveedor,
+    -- A PARTIR DE AQUÍ, TODO LO QUE AÑADE F-083, Y VA AL FINAL A PROPÓSITO.
+    -- Esto es una tabla y PostgreSQL no obligaría, pero el consumidor sí:
+    -- intercalar `estado` entre `tipo_documento` y `descripcion` —que es donde
+    -- se lee mejor— reordena las columnas de una tabla que ya está en
+    -- producción. Misma disciplina que F-073 en `maestro.obras`.
+    con.est                                 AS estado_id,        -- código interno del tipo 15
+    est.codigo_estado                       AS estado_codigo,    -- mnemónico: APR, CON, APJO…
+    est.nombre_estado                       AS estado,           -- estado_id ya traducido (tipo 15)
+    compras.fn_sigrid_date(f.fecdoc)        AS fecha_factura,    -- la del documento del proveedor
+    compras.fn_sigrid_date(con.fec)         AS fecha_alta        -- la de alta en Sigrid (= `fecha`)
 FROM raw.dcf f
 JOIN raw.con con          ON con.ide = f.ide
-LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0);
+LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(f.entide, 0)
+-- LEFT y no JOIN: una factura cuyo estado no casara con el catálogo se
+-- publica igual, con el literal a NULL. Hoy no hay ninguna (0 huérfanas de
+-- 165.866, medido el 2026-09-16), y por eso mismo un JOIN parecería inocente.
+-- El `LIMIT 1` con `ORDER BY` es la guarda de grano: `(tip, est)` es único hoy
+-- —21 de 21 en el tipo 15, ni un par repetido en las 193 filas del catálogo— y
+-- esta tabla no puede depender de un dato de origen que nadie controla.
+LEFT JOIN LATERAL (
+    SELECT ce.cod AS codigo_estado, ce.res AS nombre_estado
+    FROM   raw.conest ce
+    WHERE  ce.tip = 15 AND ce.est = con.est
+    ORDER  BY ce.ide
+    LIMIT  1
+) est ON TRUE;
 
 ALTER TABLE compras.facturas ADD PRIMARY KEY (factura_id);
+CREATE INDEX idx_com_fac_est ON compras.facturas (estado_id);
 CREATE INDEX idx_com_fac_prv ON compras.facturas (proveedor_id);
 CREATE INDEX idx_com_fac_tip ON compras.facturas (tipo_documento);
 
