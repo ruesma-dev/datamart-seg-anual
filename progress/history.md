@@ -1048,8 +1048,12 @@ vista en **0,81 s**, cuando antes no terminaba. Aprobada en la pasada 2.
 —las vistas volvieron a su forma cara—. Se rehizo `mart` y `cierre` a mano.
 Vale lo que ya dice la memoria: **el repositorio en verde no es produccion**.
 
-**PENDIENTE DEL HUMANO**: que su informe de Power BI cargue `FactCPTipologia`
-sin tocar una linea del `.pq`. Ningun comando lo demuestra.
+**CRITERIO 2 CERRADO POR EL HUMANO el 2026-09-16**, que era lo unico que ningun
+comando podia demostrar: «**f78, bi ya funciona perfectamente esta todo
+arreglado**». El informe de Power BI carga `FactCPTipologia` **sin tocar una
+linea del `.pq`**, que es exactamente lo que la spec exigia: la vista conserva
+nombre, columnas y tipos, y solo cambia de donde lee. **F-078 queda cerrada del
+todo, sin verificaciones pendientes.**
 
 ## F-083 · El estado de la FACTURA, que no es el del efecto (cerrada el 2026-09-16, APROBADO)
 
