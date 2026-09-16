@@ -9,6 +9,47 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-084 · IMPLEMENTACION ENTREGADA (2026-09-16)
+
+Rama `feature/F-084-estado-del-contrato`, rigor `estandar`, `sdd=false`.
+Informe: `progress/impl_F-084.md`. Cinco tareas, un commit cada una.
+
+**QUE SE PUBLICA**: `compras.contratos` gana tres columnas al final —
+`estado_id`, `estado_codigo` y `estado`—, leidas de `con.est` con `tip = 44` y
+traducidas por la pareja (tipo, estado). Las **doce** de siempre no se tocan:
+verificado en solo lectura columna a columna contra la tabla viva, **0 filas
+que no casan de 18.978**, y 18.978 `contrato_id` distintos.
+
+**LA DECISION DE DISENO (criterio 6)**: la traduccion del estado **se factoriza
+en vez de duplicarse**. Vive una sola vez en
+`compras.fn_estado_documento(p_tip, p_est)` (`compras/00_setup.sql`) y la
+llaman los dos bloques, CONTRATOS con 44 y FACTURAS con 15. Lo que se gana no
+son lineas: **el tipo de documento pasa a ser argumento obligatorio**, asi que
+la union «solo por estado_id» ya no se puede escribir. Los cuatro tests de
+F-083 que miraban el texto del lateral se adaptan al sitio nuevo sin aflojar
+ninguna garantia.
+
+**LO QUE NO SE PUEDE RESPONDER, y la ficha lo declara**: la ANTIGUEDAD del
+estado. Se listan los **818** contratos en «Enviado» (de 567 proveedores y 241
+obras), pero no cuanto llevan: el datamart no guarda cuando cambio el estado
+—la foto diaria es de **F-067**— y `con.tiemod` es la ultima modificacion del
+DOCUMENTO, que **no es la fecha del cambio de estado** y ademas vive en `raw`,
+que el MCP no ve. **Por eso F-084 no publica ninguna columna de antiguedad.**
+Si el humano prefiere publicar el proxy, es una linea de SQL y una de ficha.
+
+**EL HALLAZGO**: el circuito de firma NO sirve para el contrato. De las 70.346
+firmas de `raw.confir` hay **CERO de contrato** (comparativos 66.060, facturas
+3.452, obras 796); en el origen tampoco estan. Escrito en la ficha y en la
+cabecera del SQL.
+
+**MANUAL PENDIENTE (lo hace el humano)**: `python main.py build-compras`, luego
+`python main.py status` y `python main.py publicar-diccionario`. `build-compras`
+es la unica verificacion real del CUERPO de la funcion —aqui solo se pudo
+validar el parseo, en transaccion READ ONLY— y lo unico que confirma el grano
+en la base. Despues, por el MCP y sin explicarle nada: «que contratos estan
+enviados y sin firmar» debe dar los 818; y «cuantos llevan mas de tres semanas
+enviados» debe responder que **no se puede saber**.
+
 ## F-083 · IMPLEMENTACION ENTREGADA (2026-09-16)
 
 Rama `feature/F-083-estado-de-la-factura`, rigor `estandar`, `sdd=false`.
