@@ -2,34 +2,28 @@
 # F-083 · El estado de la FACTURA (y sus dos fechas) · informe de implementacion
 
 Rama `feature/F-083-estado-de-la-factura`, rigor `estandar`, `sdd=false`: el
-contrato son los **ocho criterios de `acceptance`** de la ficha, **mas la
-ampliacion de alcance que el humano decidio a mitad de tarea**: entran tambien
-las dos fechas de la factura, separadas y declaradas en el diccionario
+contrato son los **once criterios de `acceptance`** de la ficha —ocho, mas los
+tres que anadio el humano a mitad de tarea al meter en alcance las dos fechas
 («la fecha metela, y separa las 2. Luego debe quedar muy claro en el
-diccionario»).
+diccionario»)—.
 
 ## Plan de tareas (no hay `tasks.md`: esta es la lista)
 
-- [x] **T1** · Medir en SOLO LECTURA contra `raw` lo que hace falta antes de
-  escribir SQL: estado informado, reparto entre los 21 estados del tipo 15,
-  huerfanos contra el catalogo, unicidad del par `(tip, est)` y —por la
-  ampliacion— cobertura de `dcf.fecdoc` y separacion real entre las dos fechas.
-- [x] **T2** · Fase RED: `tests/test_f083_sql.py` y `tests/test_f083_diccionario.py`
+- [x] **T1** · Medir en SOLO LECTURA contra `raw` antes de escribir SQL: estado
+  informado, reparto entre los 21 estados del tipo 15, huerfanos, unicidad del
+  par `(tip, est)`, cobertura de `dcf.fecdoc` y separacion entre las dos fechas.
+- [x] **T2** · Fase RED: `tests/test_f083_sql.py` y `test_f083_diccionario.py`
   escritos ANTES del codigo, con la traza roja pegada aqui.
-- [x] **T3** · El SQL: bloque FACTURAS de `sql/compras/01_documentos.sql`
-  —estado (id, codigo y literal) por `LATERAL ... LIMIT 1` con `tip = 15`, mas
-  `fecha_factura` y `fecha_alta`—. Lo minimo, que el fichero es de F-067.
-- [x] **T4** · El diccionario: fichas de las cinco columnas nuevas, la
-  contraposicion con `compras.vencimientos` y `version` 22 -> 23.
-- [x] **T5** · `bash harness/init.sh` en verde, campana de mutacion, evidencias
-  e informe cerrado.
+- [x] **T3** · El SQL: bloque FACTURAS de `sql/compras/01_documentos.sql`, por
+  `LATERAL ... LIMIT 1` con `tip = 15`. Lo minimo: el fichero es de F-067.
+- [x] **T4** · El diccionario: las cinco columnas, la contraposicion con
+  `compras.vencimientos` y `version` 22 -> 23 con su changelog.
+- [x] **T5** · La frontera con F-067, `init.sh` en verde, evidencias e informe.
 
 ## T1 · Lo medido (2026-09-16, solo lectura, `filas_solo_lectura` READ ONLY)
 
-El MCP **no expone `raw`** (esquemas autorizados: mart, cierre, stg, compras,
-maestro, retenciones, aux, _meta), asi que la medicion va con el cliente del
-propio proyecto en transaccion `READ ONLY`. Script:
-`scratchpad/medir_f083.py` (no se versiona).
+El MCP **no expone `raw`**, asi que la medicion va con el cliente del propio
+proyecto en transaccion `READ ONLY` (script en el scratchpad, no se versiona).
 
 **El universo**: 165.866 facturas en `raw.dcf`, todas con fila en `raw.con` y
 todas con `tip = 15`. `compras.facturas` publica hoy esas mismas **165.866**
@@ -45,23 +39,20 @@ APR «Aprobado pago» 151.668, CONGG 10.607, APR UTE 856, FRAAPR 752, APRADM
 APR_JFAB 2, APJGA 2 y COMGG 1. El reparto entero, con sus literales, queda
 publicado en la ficha de `compras.facturas.estado` del diccionario.
 
-**Tres de los 21 estados del catalogo no los usa ninguna factura**: `FRARET`
-(40, «Factura retenida»), `REC_ADM` (110) y `APR_ADM` (114). Importa decirlo
-porque el correo pregunta explicitamente por las **retenidas**: la respuesta
-honesta hoy es «cero facturas en `FRARET`», no «no se puede saber».
+**Tres de los 21 estados no los usa ninguna factura**: `FRARET` (40, «Factura
+retenida»), `REC_ADM` (110) y `APR_ADM` (114). Importa porque el correo
+pregunta por las **retenidas**: la respuesta honesta es «cero en `FRARET`».
 
-**La guarda de grano (criterio 3)**: `(tip, est)` es unico en `raw.conest`
-—21 filas y 21 estados distintos para `tip = 15`— y **no hay un solo par
-duplicado en todo el catalogo** (0 de 193). El `JOIN` no multiplica hoy; la
-vista no puede depender de eso, y por eso va con `LATERAL ... LIMIT 1`.
+**La guarda de grano (criterio 3)**: `(tip, est)` es unico en `raw.conest` —21
+de 21 en el tipo 15, y ni un par duplicado en las 193 filas—. El `JOIN` no
+multiplica hoy; la tabla no puede depender de eso, y por eso va con `LATERAL`.
 
 **Las dos fechas (ampliacion, criterio 4 extendido)**:
 
-- `dcf.fecdoc` informada en **165.786 de 165.866 (99,95 %)**; 80 sin ella.
-- `con.fec` informada en **165.863 de 165.866**; 3 sin ella.
+- `dcf.fecdoc` informada en **165.786 de 165.866 (99,95 %)**, 80 sin ella;
+  `con.fec` en 165.863, 3 sin ella.
 - **Coinciden en 36.771 (22,2 %) y se separan en 129.012 (77,8 %)**: cuatro de
-  cada cinco facturas tienen dos fechas distintas. Esto solo ya justifica
-  separarlas.
+  cada cinco facturas tienen dos fechas distintas. Esto ya justifica separarlas.
 - Desfase `fecha_alta - fecha_factura`: **mediana 4 dias**, media 10,43, p95
   **42 dias**. Tramos: 1-7 dias 75.102; 8-30 38.922; 0 dias 36.771; 31-90
   8.762; **mas de 90 dias 3.352**; negativo 2.874.
@@ -72,8 +63,7 @@ vista no puede depender de eso, y por eso va con `LATERAL ... LIMIT 1`.
 ## T2 · Fase RED (obligatoria en nivel `estandar`)
 
 Los dos ficheros de test se escribieron **antes** de tocar el SQL y el YAML.
-Comando exacto y salida real, con el arbol todavia sin una sola linea de
-implementacion (commit `5f2ec80`):
+Comando exacto y salida real, con el arbol aun sin implementacion (`5f2ec80`):
 
 ```
 $ python -m pytest tests/test_f083_sql.py tests/test_f083_diccionario.py -q
@@ -123,10 +113,9 @@ E       assert '77,8' in 'Cabecera de las facturas recibidas de proveedor. ...'
 tests	est_f083_diccionario.py:218: AssertionError
 ```
 
-**23 de los 53 pasaban ya en rojo, y es lo que se buscaba**: son los que
-vigilan que las diez columnas de siempre siguen ahi, en su orden y con su
-expresion. Un test de no-regresion tiene que estar verde ANTES del cambio; si
-hubiera fallado en esta pasada, el que estaria mal seria el test.
+**23 de los 53 pasaban ya en rojo, y es lo que se buscaba**: son los de
+no-regresion de las diez columnas de siempre, que tienen que estar verdes ANTES
+del cambio. Si hubieran fallado aqui, el que estaria mal seria el test.
 
 ## T3 · El SQL, y la verificacion del grano ANTES de construir nada
 
@@ -137,10 +126,9 @@ lo reescribira entero, asi que el cambio se acota a ese bloque y se anota en la
 cabecera para que el merge de F-067 lo vea.
 
 **Por que `estado_codigo` ademas del literal, que la ficha no pedia**: el
-correo pregunta en mnemonicos («CON contabilizada, APJO aprobada por jefe de
-obra, APRADM...»), y **el literal no es unico**: `REC` y `REC_ADM` se llaman
-los dos «Recibida», y `APR` y `APR_DG` «Aprobado pago» / «Aprobado Pago».
-Filtrar por el literal mezcla dos estados distintos; por el mnemonico, no.
+correo pregunta en mnemonicos, y **el literal no es unico** (`REC` y `REC_ADM`
+son los dos «Recibida»). Filtrar por texto mezcla dos estados; por el
+mnemonico, no.
 
 **EL SELECT NUEVO, EJECUTADO EN SOLO LECTURA** (no se ha construido nada: es
 un `SELECT` envuelto en `COUNT(*)`, en transaccion `READ ONLY`). Esto es la
@@ -159,17 +147,16 @@ Y la pregunta del correo, ya respondida con el SELECT nuevo cruzado contra
 `compras.vencimientos` (efectos vivos, vencidos y sin pago real): APR 32.408,
 CONGG 2.677, APRJG 115, FRAAPR 65, **CON (contabilizada sin aprobar) 55**,
 **RECH (rechazada) 27**, REC 27, APRADM 17, APJO 17... y **FRARET (retenida)
-cero, porque ninguna factura esta en ese estado**: esa es la respuesta
-correcta, no un «no se puede saber». El corte no reproduce las 628 facturas /
-3,84 M EUR del correo, que salian de otro filtro.
+cero**: esa es la respuesta correcta, no un «no se puede saber». El corte no
+reproduce las 628 facturas / 3,84 M EUR del correo, de otro filtro.
 
 ## T4 · El diccionario, que es lo que el humano subrayo
 
 `config/diccionario/compras.yaml`: la ficha de `compras.facturas` gana las
-cinco columnas, una descripcion que abre con **las dos confusiones** y dos
-`ejemplos_preguntas` nuevos con las palabras del correo. `version` 22 -> 23 en
-`00_global.yaml` (comprobado: el valor real era 22, no el 21 publicado en la
-base).
+cinco columnas, una descripcion que abre con **las dos confusiones** y tres
+`ejemplos_preguntas` con las palabras del correo. `version` 22 -> 23 en
+`00_global.yaml`, con su entrada de changelog (el valor real era 22, no el 21
+que hay publicado en la base).
 
 **La ficha no describe: impide.** Lo que cada columna tiene que dejar cerrado:
 
@@ -180,27 +167,54 @@ base).
 * Las **tres** fechas se nombran unas a otras: cada una dice de que campo de
   Sigrid sale y en que se diferencia de las otras dos, y `fecha` declara que es
   la de ALTA y que se conserva por compatibilidad.
-* **La ficha de `compras.vencimientos.estado_pago` devuelve el aviso**: la
-  confusion se puede entrar por cualquiera de las dos puertas.
+* **La ficha de `compras.vencimientos.estado_pago` devuelve el aviso**: a esta
+  confusion se entra por cualquiera de las dos puertas.
 
 **NO se declara una relacion `estado_id -> maestro.estados_documento`**, y es
-deliberado: una relacion escrita por esa columna invita justo al `JOIN` que el
-criterio 2 prohibe. La traduccion ya viene resuelta en la tabla; quien vaya al
-catalogo tiene que ir por la pareja, y eso se dice en prosa.
+deliberado: invitaria justo al `JOIN` que el criterio 2 prohibe. La traduccion
+ya viene resuelta en la tabla, y la pareja se exige en prosa.
 
-### Tres guardianes de otras features que esto hizo saltar
+### Cuatro guardianes de otras features que esto hizo saltar
 
-No se han silenciado. Los tres estaban bien puestos y los tres se han atendido:
+No se han silenciado: los cuatro estaban bien puestos y se han atendido.
 
 1. **`test_f073_r23_no_toca_el_sql_de_documentos_de_compra`** (hash de
    `01_documentos.sql`). Es el caso que el guardian preveia: el fichero cambia
-   **a proposito y desde otra feature**. Hash recalculado, con el porque
-   escrito al lado. `0a3ab862...` -> `572a185d...`.
+   **a proposito y desde otra feature**. Hash recalculado con el porque al
+   lado: `0a3ab862...` -> `572a185d...`.
 2. **`test_f080_r21_los_ficheros_de_f067_no_publican_nada_de_f080`**. Saltaba
    porque la cabecera **nombra** `compras.vencimientos`. R21 prohibe
    **publicar** ahi un objeto de F-080; nombrarlo en un comentario es lo
-   contrario, y es justo lo que el criterio 5 exige. El guardian pasa a mirar
-   el **SQL ejecutable** (`_sin_comentarios`), que es lo que siempre quiso
-   mirar. Alternativa descartada: callar la advertencia para no verlo en rojo.
+   contrario, y es lo que el criterio 5 exige. El guardian pasa a mirar el
+   **SQL ejecutable**, que es lo que siempre quiso mirar. Alternativa
+   descartada: callar la advertencia para no verlo en rojo.
 3. **`test_f006_los_recuentos_de_current_son_los_de_hoy`**. El diccionario pasa
    de 964 a **969 columnas**; `progress/current.md` actualizado.
+4. **`test_f079_r5_el_changelog_del_global_explica_la_version_nueva`**. Pedia
+   la entrada de changelog de la version 23: escrita. Y partia el fichero por
+   la primera aparicion del texto «version:», que cae **dentro de la prosa de
+   F-078**: no veia el changelog nuevo aunque estuviera escrito y delante. Pasa
+   a partir por la CLAVE `^version:`.
+
+**`azure-apps/datamart_seg_anual.md` no cambia**: describe la ingesta y los
+pasos, no las columnas de `compras.facturas`.
+
+## Evidencias
+
+| Evidencia | Valor medido |
+|---|---|
+| **Tests ejecutados** | **4.879 pasan, 188 saltados, 0 fallos** (`bash harness/init.sh`). De ellos **53 son de F-083** |
+| **Cobertura de lineas cambiadas** | **94,3 %** (901/955), umbral 80 %, nivel `estandar` — linea `PUERTA COBERTURA` de `init.sh`. Esas 955 lineas son las del diff contra `dev`, que arrastra F-073/F-078/F-080/F-081: **F-083 no cambia ni una linea de Python de produccion**. Tiempo de la suite: **464,4 s** con cobertura |
+| **Mutantes y supervivientes** | **NO APLICA, y esta medido**: `python -m harness.mutacion --feature F-083 --base main` responde «ALCANCE VACIO: ni una linea de produccion que mutar» y **se niega a escribir informe**. No hay `progress/mutacion_F-083.md` a proposito |
+| **Tamano del papeleo** | `PUERTA TAMANO: F-083 dentro de los topes` |
+
+**Sobre la mutacion, que hay que explicar y no dejar en «no aplica».** F-083
+cambia **SQL y YAML** mas cuatro ficheros de tests; el motor muta **Python de
+produccion**, y de eso hay cero. La primera campana, con la base por defecto
+(`dev`), sí veia 19 ficheros y 4.337 lineas: son de F-073, F-078, F-080 y F-081
+—`dev` lleva meses de retraso— y ya las midieron sus campanas. La base real de
+esta rama es **`main` (`d6809a1`, el merge-base)**, y contra ella el alcance es
+cero: se aborto la primera, se relanzo con `--base main` y los cuatro worktrees
+quedaron retirados. Lo que defiende este cambio son los **53 tests sobre el
+TEXTO** y la **verificacion en solo lectura** del SELECT contra la base real,
+que es la unica que puede probar el grano.
