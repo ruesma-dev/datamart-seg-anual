@@ -690,8 +690,17 @@ def test_f080_r29_las_que_cuadran_tambien_salen() -> None:
 )
 def test_f080_r21_los_ficheros_de_f067_no_publican_nada_de_f080(fichero: str) -> None:
     """F-067 reescribe esos tres ficheros enteros: meter ahí una columna de
-    F-080 es programar un conflicto para dentro de dos semanas (R21, DA-7)."""
-    texto = _sql(DIRECTORIO_SQL / "compras" / fichero)
+    F-080 es programar un conflicto para dentro de dos semanas (R21, DA-7).
+
+    **Mira el SQL EJECUTABLE, no los comentarios** (ajuste de F-083, 2026-09-16).
+    Lo que R21 prohíbe es PUBLICAR aquí un objeto de F-080; *nombrarlo en un
+    comentario* es lo contrario, y es justo lo que hace falta: el estado que
+    F-083 añade a `compras.facturas` solo se entiende diciendo que **no** es el
+    `estado_pago` de `compras.vencimientos`, que es la confusión que originó
+    esa feature. Un guardián que se dispara con la prosa empuja a callar la
+    advertencia para no verlo en rojo, y ahí perdería la suite dos veces.
+    """
+    texto = _sin_comentarios(_sql(DIRECTORIO_SQL / "compras" / fichero))
     for objeto in (
         "v_facturas_pago",
         "v_control_forma_pago",

@@ -185,3 +185,48 @@ APJO 17... y **FRARET (retenida) cero, porque ninguna factura esta en ese
 estado**. Esa es la respuesta correcta, no un «no se puede saber». (El corte
 no reproduce las 628 facturas / 3,84 M EUR del correo: el suyo salia de otro
 filtro, y reproducirlo no es de esta feature.)
+
+## T4 · El diccionario, que es lo que el humano subrayo
+
+`config/diccionario/compras.yaml`: la ficha de `compras.facturas` gana las
+cinco columnas, una descripcion que abre con **las dos confusiones** y dos
+`ejemplos_preguntas` nuevos con las palabras del correo. `version` 22 -> 23 en
+`00_global.yaml` (comprobado: el valor real era 22, no el 21 publicado en la
+base).
+
+**La ficha no describe: impide.** Lo que cada columna tiene que dejar cerrado:
+
+* `estado` dice **en su propia ficha** —no solo en la del objeto— que NO es el
+  `estado_pago` del efecto, y trae el reparto medido.
+* `estado_codigo` enumera los mnemonicos del correo y **manda filtrar por el
+  codigo y no por el literal**, porque el literal no es unico (`REC` y
+  `REC_ADM` son los dos «Recibida»).
+* `estado_id` dice que solo significa algo dentro del tipo 15.
+* Las **tres** fechas se nombran unas a otras: cada ficha dice de que campo de
+  Sigrid sale y en que se diferencia de las otras dos, y `fecha` declara que es
+  la de ALTA y que se conserva por compatibilidad.
+* **La ficha de `compras.vencimientos.estado_pago` devuelve el aviso**: dice
+  que no es el estado de la factura y a que columna ir. La confusion se puede
+  entrar por cualquiera de las dos puertas.
+
+**NO se declara una relacion `estado_id -> maestro.estados_documento`**, y es
+deliberado: una relacion escrita por esa columna invita justo al `JOIN` que el
+criterio 2 prohibe. La traduccion ya viene resuelta en la tabla; quien vaya al
+catalogo tiene que ir por la pareja, y eso se dice en prosa.
+
+### Tres guardianes de otras features que esto hizo saltar
+
+No se han silenciado. Los tres estaban bien puestos y los tres se han atendido:
+
+1. **`test_f073_r23_no_toca_el_sql_de_documentos_de_compra`** (hash de
+   `01_documentos.sql`). Es el caso que el guardian preveia: el fichero cambia
+   **a proposito y desde otra feature**. Hash recalculado, con el porque
+   escrito al lado. `0a3ab862...` -> `572a185d...`.
+2. **`test_f080_r21_los_ficheros_de_f067_no_publican_nada_de_f080`**. Saltaba
+   porque la cabecera **nombra** `compras.vencimientos`. R21 prohibe
+   **publicar** ahi un objeto de F-080; nombrarlo en un comentario es lo
+   contrario, y es justo lo que el criterio 5 exige. El guardian pasa a mirar
+   el **SQL ejecutable** (`_sin_comentarios`), que es lo que siempre quiso
+   mirar. Alternativa descartada: callar la advertencia para no verlo en rojo.
+3. **`test_f006_los_recuentos_de_current_son_los_de_hoy`**. El diccionario pasa
+   de 964 a **969 columnas**; `progress/current.md` actualizado.

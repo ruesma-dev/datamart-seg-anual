@@ -506,6 +506,30 @@ objetos:
     descripcion: >-
       Cabecera de las facturas recibidas de proveedor. Incluye los ABONOS, que
       son el mismo concepto de Sigrid con otra serie y **entran en negativo**.
+
+      **DOS CONFUSIONES QUE HAY QUE CERRAR ANTES DE CONSULTAR ESTA TABLA. Las
+      dos nacen del mismo correo de Administracion (F-083, 2026-09-16), y las
+      dos producen numeros plausibles y falsos.**
+
+      **1. EL ESTADO DE LA FACTURA NO ES EL ESTADO DEL EFECTO DE PAGO.** Aqui
+      `estado` es el del DOCUMENTO en su circuito de aprobacion: recibida,
+      contabilizada, aprobada por jefe de obra, aprobada Administracion,
+      aprobado pago, rechazada. Lo que publica
+      `compras.vencimientos.estado_pago` es otra cosa: el estado del EFECTO de
+      pago que cuelga de la factura. **Un listado de «facturas sin aprobar»
+      hecho con `estado_pago` no mide el circuito de aprobacion**, y eso es
+      exactamente lo que el correo denuncio. Para «por donde va la factura»,
+      esta tabla; para «esta pagado el efecto», `compras.vencimientos`.
+
+      **2. HAY TRES COLUMNAS DE FECHA Y NO SON LA MISMA FECHA.**
+      `fecha_factura` es la del documento del proveedor (`dcf.fecdoc`);
+      `fecha_alta` es la del alta en Sigrid (`con.fec`); y `fecha` es la de
+      SIEMPRE, que es la de alta —la misma que `fecha_alta`— y se conserva por
+      compatibilidad con Power BI y con las respuestas ya dadas. **Las dos
+      fechas de verdad se separan en el 77,8 % de las facturas** (129.012 de
+      165.783 con las dos informadas, medido el 2026-09-16), con una mediana de
+      4 dias, un p95 de 42 y 3.352 facturas por encima de los 90 dias. Elegir
+      la equivocada desplaza cualquier serie temporal de compras.
     grano: Una fila por factura o abono recibido. `factura_id` es clave primaria.
     clave_negocio: [factura_id]
     paso_etl: build_compras
@@ -523,7 +547,15 @@ objetos:
         valores: [FACTURA, ABONO, OTRO]
       descripcion: Texto libre del documento.
       fecha:
-        significado: Fecha de la factura, ya tipada.
+        significado: >-
+          **La fecha de ALTA del documento en Sigrid** (`con.fec`), y **no** la
+          que el proveedor pone en su factura. Es la columna historica: existe
+          desde que se publico la tabla, la consumen Power BI y el MCP, y **se
+          conserva por compatibilidad**. Es la MISMA que `fecha_alta`, columna
+          a columna (0 diferencias en las 165.866 facturas, medido el
+          2026-09-16). Para la fecha del documento del proveedor,
+          `fecha_factura`; para escribir sin ambiguedad, `fecha_alta`.
+        nulo_significa: El documento no tiene fecha de alta informada (3 facturas).
         agregacion: no_sumable
       proveedor_id:
         significado: Identificador del proveedor que factura.
@@ -536,13 +568,92 @@ objetos:
       referencia_proveedor:
         significado: El numero que el proveedor le da a su propia factura.
         nulo_significa: El proveedor no dio referencia, o no se tecleo.
+      estado_id:
+        significado: >-
+          Codigo interno del estado del DOCUMENTO, leido de `con.est` (la
+          superclase de documentos de Sigrid, no de `dcf`). **Solo significa
+          algo dentro del tipo de documento 15** (factura recibida): la misma
+          cifra es otro estado distinto en una obra (tipo 42) o en un contrato
+          (44). Por eso la traduccion se hace por la PAREJA (tipo, estado) y
+          nunca solo por este numero, y por eso aqui se publica ya traducido en
+          `estado` y `estado_codigo`: para filtrar, usa esos dos.
+        agregacion: no_sumable
+      estado_codigo:
+        significado: >-
+          El mnemonico del estado en Sigrid, que es **el vocabulario en el que
+          Administracion hace la pregunta**: REC recibida, COM comprobada, CON
+          contabilizada, APJO aprobada por jefe de obra, APRJG aprobada jefe de
+          grupo, APRADM aprobada Administracion, APR aprobado pago, RECH
+          rechazada, FRARET factura retenida, FRAAPR factura aprobada, mas los
+          de GG (RECGG, COMGG, CONGG) y los especificos de Aldara, Mascaro,
+          Inesco y Fabrica. **Filtra por aqui y no por el literal**: el literal
+          NO es unico —`REC` y `REC_ADM` se llaman los dos «Recibida», y `APR`
+          y `APR_DG` «Aprobado pago»—, asi que filtrar por texto mezcla dos
+          estados distintos.
+        nulo_significa: >-
+          El `estado_id` de la factura no figura en el catalogo del tipo 15.
+          Hoy no le pasa a ninguna (0 de 165.866, medido el 2026-09-16).
+      estado:
+        significado: >-
+          El nombre del estado, traducido contra el catalogo
+          `maestro.estados_documento` filtrando el tipo de documento 15. **Es
+          el estado de la FACTURA en su circuito de aprobacion, y NO el estado
+          del efecto de pago**, que es otra columna y otra cosa:
+          `compras.vencimientos.estado_pago`. Reparto medido el 2026-09-16
+          sobre las 165.866 facturas: «Aprobado pago» 151.668, «Fra. GG
+          Contabilizada» 10.607, «Aprobada pago final Ute Inesco» 856,
+          «Factura aprobada» 752, «Aprobada Administracion» 653, «Aprobada Jefe
+          de grupo» 553, «Contabilizada» 259, «Aprobada por jefe de obra» 193,
+          «Rechazada» 164 y «Recibida» 69, mas ocho estados con menos de 50.
+          **Tres de los 21 estados del catalogo no los usa ninguna factura**:
+          FRARET (factura retenida), REC_ADM y APR_ADM. Si preguntan por las
+          facturas RETENIDAS, la respuesta correcta es «ninguna esta en
+          FRARET», no «no se puede saber».
+        nulo_significa: >-
+          Igual que en `estado_codigo`: el estado no casa con el catalogo del
+          tipo 15. Hoy, ninguna factura.
+      fecha_factura:
+        significado: >-
+          **La fecha de la propia factura**: la que el proveedor pone en su
+          documento (`dcf.fecdoc`). Es la que vale para «de cuando es esta
+          factura» y para cualquier serie temporal de compra. **No es
+          `fecha_alta`** (cuando entro en Sigrid) **ni `fecha`** (que es la de
+          alta con el nombre antiguo): las dos se separan en el 77,8 % de las
+          facturas. **La teclea una persona al recibir la factura y admite
+          valores absurdos**: hay `fecha_factura` que caen siglos fuera de
+          rango (el desfase medido va de -89.824 a +3.804 dias). No se filtra
+          ninguna, asi que un MIN o un MAX sin acotar devuelve basura.
+        nulo_significa: >-
+          La factura no trae fecha de documento: 80 de 165.866 (0,05 %).
+        agregacion: no_sumable
+      fecha_alta:
+        significado: >-
+          **La fecha de alta del documento en Sigrid** (`con.fec`): cuando se
+          dio de alta la factura en el ERP, no cuando la emitio el proveedor.
+          Es exactamente la misma columna que `fecha`, publicada con un nombre
+          que no se confunde; `fecha` se conserva por compatibilidad. Frente a
+          `fecha_factura` va casi siempre por detras: mediana 4 dias, p95 42, y
+          3.352 facturas con mas de 90 dias de diferencia.
+        nulo_significa: El documento no tiene fecha de alta informada (3 facturas).
+        agregacion: no_sumable
     relaciones:
       - de: factura_id
         a: compras.factura_lineas.factura_id
         cardinalidad: "1:N"
         porque: Para el detalle por obra y partida, que en la cabecera no esta.
+      - de: factura_id
+        a: compras.vencimientos.factura_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para pasar del estado de la FACTURA al de sus EFECTOS de pago, que
+          son dos cosas distintas y se confunden. Ojo al grano: una factura
+          tiene de 1 a 16 efectos, asi que contar filas del cruce no cuenta
+          facturas.
     ejemplos_preguntas:
       - Que facturas nos ha pasado el proveedor P este ano
+      - En que estado esta la factura X, esta aprobada o solo contabilizada
+      - Cuantas facturas hay contabilizadas sin aprobar, retenidas o rechazadas
+      - De que fecha es la factura X, la suya o la de alta en Sigrid
 
   factura_lineas:
     tipo: tabla
@@ -1290,6 +1401,15 @@ objetos:
           misma cifra significa otra cosa en una factura o en una obra. **El
           estado NO se deriva de `fecha_real`** --se probo y era falso-- y **no
           marca la anulacion**, que es `efecto_anulado`.
+
+          **Y NO ES EL ESTADO DE LA FACTURA.** Esto dice por donde va el EFECTO
+          de pago (pendiente, remesado, pagado, devuelto); por donde va la
+          FACTURA en su circuito de aprobacion --contabilizada, aprobada por
+          jefe de obra, aprobada Administracion, retenida, rechazada-- lo dice
+          `compras.facturas.estado`. Confundir las dos columnas es lo que hizo
+          nacer F-083: hasta el 2026-09-16 esta era la unica columna de estado
+          del esquema, y un listado de «facturas sin aprobar» hecho con ella
+          media el pago, no la aprobacion.
         nulo_significa: El estado del efecto no existe en el catalogo de estados.
       efecto_anulado:
         significado: >-

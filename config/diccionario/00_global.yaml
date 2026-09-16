@@ -203,7 +203,7 @@
 # Con refresco nocturno solo se nota el dia 1 de cada mes antes de la carga, y
 # la ficha lo dice.
 
-version: 22
+version: 23
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

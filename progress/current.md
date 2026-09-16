@@ -353,8 +353,11 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 153 objetos, 964 columnas y 66 fichas de
-consumo** —F-078 añade las **tres tablas** de CP por tipología
+**El diccionario del árbol está en 153 objetos, 969 columnas y 66 fichas de
+consumo** —las cinco columnas nuevas son las de F-083 en `compras.facturas`
+(`estado_id`, `estado_codigo`, `estado`, `fecha_factura`, `fecha_alta`): no
+añade objetos, solo ensancha uno que ya existía. Antes de F-083 eran 964, y
+F-078 había añadido las **tres tablas** de CP por tipología
 (`mart.master_versiones_tipadas`, `mart.master_vigente_anual`,
 `mart.fact_cp_tipologia`, 23 columnas) y sube `mart.v_pbi_cp_tipologia` a la
 superficie de consulta, que es lo que explica las cuatro fichas de consumo
