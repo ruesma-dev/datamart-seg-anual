@@ -1395,6 +1395,25 @@
       "rigor": "critico",
       "priority": 11,
       "branch": "feature/F-087-rol-propio-de-power-bi"
+    },
+    {
+      "id": "F-088",
+      "title": "El guardian de recuentos de F-006 acertaba por casualidad, y la guarda del catalogo falta en el tercer sitio",
+      "description": "Nace el 2026-09-17 de las recomendaciones 2, 3 y 4 del review de F-084 (`progress/review_F-084.md`). Mismo patron que produjo F-077, F-081 y F-082: lo que el reviewer encuentra y **no es de la feature que lo encuentra** sale a ficha propia en vez de taparse. La familia es la de siempre en este repositorio: **verdes que no significan lo que parecen**. ================ (1) EL VERDE FALSO, y esta CONFIRMADO por dos agentes independientes: lo anoto el implementer de F-084 y el reviewer lo reprodujo. `test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos` comprueba el recuento de objetos haciendo **`str(total) in texto` sobre el fichero ENTERO** de `specs/F-006-mcp-azure/design_detalle.md`. Con `total = 153`, la unica aparicion de «153» en ese fichero en `main` era **`infra/README.md:153-170`**, una referencia a lineas de otro documento. **El guardian acertaba por casualidad.** Consecuencia medida: **F-078 y F-083 no escribieron su recuento y el test paso igual**. Su gemelo `test_f006_los_recuentos_de_current_son_los_de_hoy` tiene **el mismo defecto**. La propuesta del reviewer: exigir el numero **en su contexto**, con una linea del tipo `Inventario a **N** objetos`, para que una cifra suelta en cualquier parte del fichero no valga. Es exactamente el tipo de test que este repositorio ya se ha cazado varias veces: **mide que el numero aparece, no que alguien lo haya escrito a proposito**. ================ (2) LA DUPLICACION QUE QUEDA, y el motivo de que no se arreglara en F-084: `compras/05_vencimientos.sql:75` une `raw.conest` **a mano** para `tip = 25`. Une por la PAREJA, asi que no publica el literal equivocado, **pero NO lleva la guarda `ORDER BY ide LIMIT 1`**: si algun dia el catalogo tuviera dos filas para el mismo par, ese `JOIN` **multiplicaria las filas de `compras.vencimientos`** sin que nada avisara. F-084 hizo **bien** en no tocarlo —es de F-080 y su R21 dice que es suyo— y creo en cambio `compras.fn_estado_documento(p_tip, p_est)`, que ya lleva la guarda dentro y protege a `compras.contratos` y `compras.facturas`. **Migrar el tercer sitio a la funcion cierra el patron** y deja la traduccion del catalogo en UN solo lugar de todo el esquema. ================ (3) EL AVISO QUE VA AL ARNES, porque le paso a los DOS agentes de F-084: medir en solo lectura con `build_postgres_client` **dispara `_auto_bootstrap`**, que emite `CREATE SCHEMA IF NOT EXISTS` y `CREATE TABLE IF NOT EXISTS _meta.etl_runs` **antes** de abrir la transaccion `READ ONLY`. Es idempotente y no escribe datos, pero **«solo lecturas» con ese cliente no es literal**, y un agente que lea la regla dura del `CLAUDE.md` al pie de la letra creera que la esta cumpliendo cuando no del todo. Hay que **decirlo donde se lee la regla** —el `CLAUDE.md` de este repositorio y, si vale para cualquier proyecto, `arnes-base`— o dar una via de medicion que no bootstrapee. ================ POR QUE IMPORTA EL CONJUNTO: los tres son casos de algo que el repositorio declara cumplido y que **solo se cumple por casualidad o no del todo**. El primero es un test que pasa sin comprobar nada; el segundo una guarda que existe en dos de tres sitios; el tercero una regla dura que se incumple de forma inocua sin que nadie lo sepa. Ninguno rompe hoy; los tres romperan el dia que alguien confie en ellos.",
+      "acceptance": [
+        "test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos exige el numero EN SU CONTEXTO y no con `str(total) in texto` sobre el fichero entero, y se demuestra el arreglo poniendo el test en ROJO sobre el arbol de main, donde hoy pasa por casualidad desde infra/README.md",
+        "test_f006_los_recuentos_de_current_son_los_de_hoy recibe el mismo arreglo, porque tiene el mismo defecto",
+        "Escritos los recuentos que F-078 y F-083 se dejaron sin escribir, que es lo que el guardian roto no reclamo",
+        "compras/05_vencimientos.sql deja de unir raw.conest a mano y llama a compras.fn_estado_documento, con lo que la guarda anti-multiplicacion pasa a cubrir los TRES sitios del esquema compras y la traduccion vive en UNO solo",
+        "Verificado que compras.vencimientos NO cambia de grano con la migracion: mismo numero de filas antes y despues, medido",
+        "El limite real de `solo lecturas` con build_postgres_client queda escrito donde se lee la regla, y si vale para cualquier proyecto se porta a arnes-base en el mismo trabajo",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 14,
+      "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     }
   ]
 }
