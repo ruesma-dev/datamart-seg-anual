@@ -1414,6 +1414,25 @@
       "rigor": "estandar",
       "priority": 14,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
+    },
+    {
+      "id": "F-089",
+      "title": "El MCP sirve un diccionario cacheado: publicamos la version 24 y sigue respondiendo con la vieja",
+      "description": "Descubierto el 2026-09-17 cerrando F-084, y es un fallo del CIRCUITO, no de ninguna feature: **el servidor MCP sirve un diccionario cacheado y no se entera de las publicaciones**. ================ COMO SE VIO, paso a paso y reproducible: se publico el diccionario (`publicar_diccionario`, **version 24**, hash `292f63baaf51`, **154 objetos, 972 columnas**, cobertura 100 %), y **acto seguido** se pregunto por las dos vias. **Por SQL (`_meta.v_diccionario`), correcto**: `compras.contratos` tiene **15 columnas** y las tres nuevas traen su significado entero —el aviso de filtrar por `estado_codigo` y no por el literal, que `estado_id` solo vale dentro del tipo 44, y los `ejemplos_preguntas` con el OJO de la pregunta trampa—. **Por `describir_tabla` del MCP, la version VIEJA**: 12 columnas descritas y las tres nuevas con el significado **vacio** (`-`). Llamado **dos veces despues** de publicar, con el mismo resultado. El servidor leyo el diccionario al arrancar y no lo volvio a mirar. ================ POR QUE IMPORTA, y es peor de lo que parece a primera vista: (1) **La nocturna publica cada madrugada** —desde F-047 `publicar_diccionario` es un paso de `run-all`—, asi que **la deriva es diaria y silenciosa**: el MCP puede llevar semanas sirviendo un diccionario viejo sin que nada avise. (2) **El diccionario es justo lo que impide que la IA de cifras plausibles y falsas.** Un aviso que no llega no protege: si la ficha nueva dice «filtra por mnemonico, que hay dos estados homonimos» y el MCP sirve la vieja que no lo dice, la respuesta sale mal **con aspecto de bien**, que es el fallo que este repositorio mas persigue. (3) **Rompe la verificacion de CUALQUIER feature que publique diccionario.** El criterio «se responde por el MCP sin explicarle nada» —que tienen F-083, F-084 y tendran las siguientes— **no se puede comprobar el mismo dia** sin reiniciar a mano. En F-084 hubo que leer `_meta.v_diccionario` por SQL para demostrar que el dato estaba bien publicado. (4) **La cabecera del propio servidor lo delata**: sus instrucciones anuncian «Version 12 · publicado 2026-09-03 · 103 objetos, 798 columnas» cuando la base va por la **24** con **154 objetos y 972 columnas**. Llevaba **catorce dias** desfasado y nadie lo habia notado. ================ QUE HAY QUE DECIDIR, porque hay varias salidas y no todas valen: (a) que el servidor **relea** cuando cambie el hash —hay uno publicado, `hash_fuente`, y comparar un hash es barato—; (b) un **TTL** corto, que es peor porque sigue habiendo ventana de mentira; (c) que **la publicacion avise** al servidor; o (d) como minimo, que el MCP **diga que version sirve** en cada respuesta para que la deriva sea visible en vez de invisible. **LIMITE DE RESPONSABILIDAD, y hay que mirarlo antes de escribir codigo**: el servidor MCP **NO vive en este repositorio**. Este ETL es el DUEnO DEL DATO y publica en `_meta`; quien lo cachea es otro proyecto. Asi que lo primero es **localizarlo en `azure-apps/`** y decidir donde vive el arreglo; si es alla, esta ficha se queda en **lo que aporta este lado** —publicar el hash y la version de forma que el consumidor pueda detectar el cambio barato— y **lo demas se propone al humano**, que es lo que manda la regla de limite de responsabilidad del `CLAUDE.md`.",
+      "acceptance": [
+        "Localizado y escrito DONDE vive el cacheo (que servidor, que proyecto de azure-apps, que linea), porque el servidor MCP no vive en este repositorio",
+        "Decidida y anotada la via de invalidacion, con su motivo: releer por cambio de hash_fuente, TTL, aviso en la publicacion, o la combinacion que se elija",
+        "Si el arreglo cae fuera de este repositorio, F-089 entrega SOLO su lado -que _meta publique lo necesario para que el consumidor detecte el cambio barato- y lo demas se propone al humano por escrito, sin implementarlo aqui",
+        "Como minimo, el MCP puede decir QUE VERSION de diccionario esta sirviendo, para que la deriva sea visible en vez de invisible",
+        "Reproducida la prueba que lo destapo: publicar una version nueva y comprobar que describir_tabla la ve SIN reiniciar el servidor a mano",
+        "La cabecera de instrucciones del servidor deja de anunciar una version congelada (hoy dice la 12, de hace catorce dias, con la base en la 24)",
+        "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 6,
+      "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     }
   ]
 }

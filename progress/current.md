@@ -1250,3 +1250,47 @@ Es el tag que tiene que verse en los logs del job y en `python main.py version`.
 min de margen** frente al cron de las 00:00 UTC. La leccion de F-078 —la
 nocturna del 16 corrio con la imagen vieja y deshizo la feature— no se repite
 esta vez.
+
+## 2026-09-17 · F-084 verificada en la base, y el MCP que sirve un diccionario viejo
+
+El humano ejecuto las tres verificaciones MANUAL que ningun agente puede hacer.
+
+**`build-compras`: exit 0, 233,9 s, 3.136.919 filas.** El sub-paso `documentos`
+tardo 88,3 s. **Es la unica validacion real del CUERPO de
+`compras.fn_estado_documento`**: hasta aqui solo se habia validado que el parser
+la aceptaba.
+
+**El grano, medido por el MCP contra la tabla construida**: `compras.contratos`
+publica **18.994 filas / 18.994 `contrato_id` distintos**, y **18.994 con estado
+(el 100 %)**. El lateral no multiplica. Los siete estados del tipo 44 suman
+exactamente 18.994: FIR 13.475, TER 3.179, **EPF 808**, PFP 576, RFP 548, COMD
+232, RES 176.
+
+**Las cifras bailaron respecto a lo que midieron los agentes el 16-09** —18.978
+filas y 818 enviados— **porque la nocturna del 17 reingirio**: 16 contratos
+nuevos y diez que se firmaron. Es la tabla viva, no la feature. `status`
+confirma que `raw.ctr` tiene **18.994**, las mismas.
+
+**`publicar-diccionario`: version 24**, hash `292f63baaf51`, **154 objetos, 972
+columnas**, cobertura 100 %.
+
+### EL HALLAZGO: el servidor MCP cachea el diccionario (ficha F-089)
+
+Publicada la 24, se pregunto por las dos vias **en el mismo minuto**:
+
+* **Por SQL (`_meta.v_diccionario`)**: `compras.contratos` con **15 columnas** y
+  las tres nuevas con su significado entero, el aviso de filtrar por
+  `estado_codigo` y los `ejemplos_preguntas` con el OJO de la pregunta trampa.
+  **Correcto.**
+* **Por `describir_tabla` del MCP**: **12 columnas** y las tres nuevas con el
+  significado **vacio**. Llamado **dos veces despues** de publicar.
+
+El servidor leyo el diccionario al arrancar y no lo vuelve a mirar. **La
+nocturna publica cada madrugada, asi que la deriva es diaria y silenciosa**, y
+la propia cabecera del servidor lo delata: anuncia la **version 12** del
+2026-09-03 con 103 objetos cuando la base va por la **24** con 154. **Catorce
+dias desfasado sin que nadie lo notara.**
+
+**No es un fallo de F-084**: el dato esta publicado y verificado por SQL. Pero
+obliga a **reiniciar el MCP a mano** para ver cualquier ficha nueva, y rompe la
+verificacion «se responde por el MCP» de toda feature que publique diccionario.
