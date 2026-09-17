@@ -200,3 +200,42 @@ cobertura casi total es la fase 0.**
 7. **Ingesta**: no hace falta traer nada nuevo. `obrparpre` y `obrfasamb` ya están en `raw`, y
    `stg.presupuesto` ya contiene la fase 0 del ámbito 8 (122.616 filas, 237 obras). Lo que hay
    que decidir es si la fase 0 se publica en `mart` como objeto propio o se consume de `stg`.
+
+---
+
+## CORRECCIÓN DEL HUMANO, 2026-09-18: no son dos lecturas, son DOS MAGNITUDES
+
+Este informe presentó la fase 0 como **una** magnitud con dos lecturas posibles
+que «no cuadran», y planteó como decisión 1 si «fase 0» y «Oficina Técnica» son
+lo mismo. **El humano responde que no, y que las dos lecturas son correctas
+porque miden cosas distintas**, cada una en su ámbito:
+
+> «el coste fase 0 está en el **ámbito coste**, es el previsto que está vivo. Sin
+> embargo el **abc y oficina técnica están en el ámbito master coste**, no
+> coste.»
+
+Así que el mapa queda así, y **las cuatro magnitudes del encargo siguen siendo
+cuatro**:
+
+| magnitud | ámbito | qué es | medido |
+|---|---|---|---|
+| **Coste fase 0** | **3 · COSTE** | el previsto **vivo**, `fas = 0` | **672 obras, 1.152,2 M EUR** |
+| **Oficina Técnica** | **8 · MASTER COSTE** | lo que carga Estudios/OT | **237 obras, 844,6 M EUR** (la versión 0) |
+| **Planificado ABC** | **8 · MASTER COSTE** | la última versión tipo `ABC` | 57 obras, 22 con más de una |
+| **Coste objetivo** | — | el ABC con un % de bajada | **sin localizar** |
+
+**Lo que este informe midió como «fase 0, segunda lectura» (`amb=3, fas=0`,
+672 obras, 1.152,2 M EUR) es EL COSTE FASE 0**, y lo que midió como «fase 0 =
+versión 0 del master coste» (`amb=8`, 237 obras, 844,6 M EUR) **es OFICINA
+TÉCNICA**. Que solo 7 de 236 obras coincidan al euro **no es una anomalía a
+resolver**: son dos cosas distintas y por eso no coinciden. La sección 1 de
+arriba se lee con esta corrección delante.
+
+**Sigue en pie, y sin tocar**, todo lo demás: que `Planif Inicial` NO es Oficina
+Técnica (0 de 19), que el ABC pierde casi siempre contra el cuatrimestral en
+`master_vigente_anual` (rige en 1 obra de 38 en 2026), que la comparación contra
+lo comprado funciona al grano `(obra, partida)` con un factor de 1,8 y no de 25,
+y que no hace falta ingerir nada nuevo.
+
+**El coste objetivo se vuelve a buscar** por orden del humano: «el porcentaje de
+coste objetivo revisa a ver si está en Sigrid».
