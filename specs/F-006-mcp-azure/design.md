@@ -110,6 +110,7 @@ IngestRaw -> LoadExcelAux -> BuildStg -> BuildMart -> PublicarDiccionario -> App
 | 2026-09-09 (F-074) | Entran las **9 tablas de `raw`** que destapo el censo de F-072 --catalogos de personal y horas, maestro de articulos y los dos desgloses de trazabilidad--, cada una con su ficha. Inventario a **139** objetos |
 | 2026-09-10 (F-073) | Entran `maestro.centros_coste` (el puente centro de coste -> obra), `maestro.estados_documento` y `compras.formas_pago`, mas once columnas nuevas en `maestro.obras`. Inventario a **142** objetos |
 | 2026-09-15 (F-078) | Entran `mart.master_versiones_tipadas`, `mart.master_vigente_anual` y `mart.fact_cp_tipologia`: los tres objetos de CP por tipologia dejan de ser vistas que se recalculan en cada consulta. Sus tres vistas siguen existiendo con el mismo nombre. Inventario a **153** objetos (los 150 de partida ya incluian los ocho que F-080 y F-081 anadieron sin fila propia en esta tabla) |
+| 2026-09-16 (F-084) | Entra `compras.fn_estado_documento`, la traduccion del estado de un documento por la pareja (tipo, estado), factorizada para que `compras.contratos` y `compras.facturas` la compartan en vez de copiarla. Es funcion auxiliar, no de consumo. Inventario a **154** objetos |
 
 ## 3 · Componentes y ficheros que toca
 

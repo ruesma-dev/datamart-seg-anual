@@ -604,7 +604,15 @@ def test_f073_r22_el_comment_avisa_de_que_el_plazo_no_es_un_numero() -> None:
 #: FACTURAS el estado del documento y sus dos fechas —cinco columnas al final,
 #: ninguna de las diez de siempre tocada— y deja el resto del fichero intacto
 #: precisamente porque F-067 lo reescribirá entero.
-HASH_01_DOCUMENTOS = "572a185d50b99108cb949e4d3df1438369651141bc49570bf089689d1bc2d87b"
+#:
+#: **RECALCULADO OTRA VEZ POR F-084 el 2026-09-16**, por el mismo motivo y con
+#: el mismo criterio: el bloque CONTRATOS gana el estado —tres columnas al
+#: final, ninguna de las doce de siempre tocada— y el lateral que F-083 tenía
+#: escrito a mano en FACTURAS pasa a llamar a `compras.fn_estado_documento`,
+#: para que los dos bloques compartan una sola traducción (criterio 6 de
+#: F-084). Que el guardián salte dos veces en el mismo día es lo que se le
+#: pide: cada vez ha obligado a decir qué feature toca el fichero y por qué.
+HASH_01_DOCUMENTOS = "5cc72676ef3919ef58b979537307a117c37c75d9b9440c88d312ec9e09979f9a"
 
 #: Los dos ficheros del SELLO. Tocar una coma fuerza la reconstrucción completa
 #: de las 921 obras la noche siguiente (R25).

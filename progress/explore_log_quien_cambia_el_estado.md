@@ -109,5 +109,19 @@ llamaba «la firma» de las facturas**, y no estaba en `confir` ni en `concam`.
    tabla mas grande del `raw`**; el filtro natural es `tab = 'con'`, y aun mejor
    `tab = 'con' AND tip IN (15, 44, 46)`.
 5. **Sirve para mas que las facturas**: con 149.010 filas de contrato y 183.621
-   de comparativo, esta misma tabla alimenta lo que **F-084** y **F-085** no
-   pueden responder por otra via.
+   de comparativo, esta misma tabla alimenta lo que **F-084** y el circuito de
+   firma no pueden responder por otra via.
+
+## Donde vive esto ahora
+
+Se ficho primero como **F-086**, y el 2026-09-16 el humano ordeno **fusionarla
+con F-085**: «fusiona f85 y f86 en una sola». El motivo es bueno y esta escrito
+en la ficha resultante: **`confir` y `dbo.log` son dos fuentes de la MISMA
+pregunta**, y cada una cubre lo que la otra no —el comparativo lo responde
+`confir` (66.096 firmas, 90,2 % fechadas), la factura solo `dbo.log` (300.438
+aprobaciones frente a 3.454 firmas sin una sola fecha) y el contrato tambien
+solo `dbo.log`, porque en `confir` no hay ninguna—. Separarlas obligaria a
+saber a cual preguntar segun el tipo de documento.
+
+**Todo lo medido aqui sigue vigente**; solo cambia el numero de la ficha que lo
+recoge: **F-085**.

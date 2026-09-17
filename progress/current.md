@@ -9,6 +9,47 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-084 · IMPLEMENTACION ENTREGADA (2026-09-16)
+
+Rama `feature/F-084-estado-del-contrato`, rigor `estandar`, `sdd=false`.
+Informe: `progress/impl_F-084.md`. Cinco tareas, un commit cada una.
+
+**QUE SE PUBLICA**: `compras.contratos` gana tres columnas al final —
+`estado_id`, `estado_codigo` y `estado`—, leidas de `con.est` con `tip = 44` y
+traducidas por la pareja (tipo, estado). Las **doce** de siempre no se tocan:
+verificado en solo lectura columna a columna contra la tabla viva, **0 filas
+que no casan de 18.978**, y 18.978 `contrato_id` distintos.
+
+**LA DECISION DE DISENO (criterio 6)**: la traduccion del estado **se factoriza
+en vez de duplicarse**. Vive una sola vez en
+`compras.fn_estado_documento(p_tip, p_est)` (`compras/00_setup.sql`) y la
+llaman los dos bloques, CONTRATOS con 44 y FACTURAS con 15. Lo que se gana no
+son lineas: **el tipo de documento pasa a ser argumento obligatorio**, asi que
+la union «solo por estado_id» ya no se puede escribir. Los cuatro tests de
+F-083 que miraban el texto del lateral se adaptan al sitio nuevo sin aflojar
+ninguna garantia.
+
+**LO QUE NO SE PUEDE RESPONDER, y la ficha lo declara**: la ANTIGUEDAD del
+estado. Se listan los **818** contratos en «Enviado» (de 567 proveedores y 241
+obras), pero no cuanto llevan: el datamart no guarda cuando cambio el estado
+—la foto diaria es de **F-067**— y `con.tiemod` es la ultima modificacion del
+DOCUMENTO, que **no es la fecha del cambio de estado** y ademas vive en `raw`,
+que el MCP no ve. **Por eso F-084 no publica ninguna columna de antiguedad.**
+Si el humano prefiere publicar el proxy, es una linea de SQL y una de ficha.
+
+**EL HALLAZGO**: el circuito de firma NO sirve para el contrato. De las 70.346
+firmas de `raw.confir` hay **CERO de contrato** (comparativos 66.060, facturas
+3.452, obras 796); en el origen tampoco estan. Escrito en la ficha y en la
+cabecera del SQL.
+
+**MANUAL PENDIENTE (lo hace el humano)**: `python main.py build-compras`, luego
+`python main.py status` y `python main.py publicar-diccionario`. `build-compras`
+es la unica verificacion real del CUERPO de la funcion —aqui solo se pudo
+validar el parseo, en transaccion READ ONLY— y lo unico que confirma el grano
+en la base. Despues, por el MCP y sin explicarle nada: «que contratos estan
+enviados y sin firmar» debe dar los 818; y «cuantos llevan mas de tres semanas
+enviados» debe responder que **no se puede saber**.
+
 ## F-083 · IMPLEMENTACION ENTREGADA (2026-09-16)
 
 Rama `feature/F-083-estado-de-la-factura`, rigor `estandar`, `sdd=false`.
@@ -121,6 +162,16 @@ significa nada antes de la 1.
 5. **Publicar el diccionario (version 19, hash `7f5e890fd5f7`).** Es una
    **escritura contra Azure**: la autoriza el humano, no un agente. Lo publicado
    hoy es la version 18.
+
+   > **CORREGIDO EL 2026-09-17, y las dos mitades de esta frase han caducado.**
+   > Lo encontro el reviewer de F-084. (a) La version publicada **no es la 18**:
+   > el 2026-09-16 la nocturna dejo la **21** y el trabajo de F-083 la subio a la
+   > **23**. (b) Y lo mas importante: **publicar ya no es una escritura que
+   > autorice el humano caso por caso**, porque desde **F-047**
+   > `publicar_diccionario` es un paso de `run-all` y **la nocturna publica
+   > sola**. Lo que sigue necesitando autorizacion expresa es publicar **a mano y
+   > fuera de la ventana**. Esta nota se queda aqui en vez de borrar el parrafo,
+   > porque el parrafo es el registro de lo que se penso entonces.
 
        python main.py publicar-diccionario
 
@@ -389,10 +440,14 @@ alguien:
    codigo ni su fichero de tests**, y por eso salio a ficha propia. El reviewer
    reprodujo las cinco invocaciones de click antes de aprobar.
 
-**El diccionario del árbol está en 153 objetos, 969 columnas y 66 fichas de
-consumo** —las cinco columnas nuevas son las de F-083 en `compras.facturas`
+**El diccionario del árbol está en 154 objetos, 972 columnas y 66 fichas de
+consumo** —lo último es F-084: `compras.contratos` gana **tres columnas**
+(`estado_id`, `estado_codigo`, `estado`) y aparece **un objeto nuevo**, la
+función auxiliar `compras.fn_estado_documento`, que no es de consumo (por eso
+las fichas de consumo siguen en 66). Antes de F-084 eran 153 / 969 / 66, con
+las cinco columnas de F-083 en `compras.facturas`
 (`estado_id`, `estado_codigo`, `estado`, `fecha_factura`, `fecha_alta`): no
-añade objetos, solo ensancha uno que ya existía. Antes de F-083 eran 964, y
+añadía objetos, solo ensanchaba uno que ya existía. Antes de F-083 eran 964, y
 F-078 había añadido las **tres tablas** de CP por tipología
 (`mart.master_versiones_tipadas`, `mart.master_vigente_anual`,
 `mart.fact_cp_tipologia`, 23 columnas) y sube `mart.v_pbi_cp_tipologia` a la
@@ -404,7 +459,7 @@ cuando F-080 añadió los **cinco objetos** de `compras` (`vencimientos`,
 (`auxnap`, `auxban`, `rpa`, sin columnas por la convención de `raw`); antes de
 eso eran 139 / 822 / 54 hasta F-073 y 47 fichas de consumo hasta F-079, que
 subió los siete objetos de `stg` a la superficie de consulta— y el árbol declara
-**versión 22**. Lo publicado en `_meta` es la **versión
+**versión 24**. Lo publicado en `_meta` es la **versión
 18** (hash `4af4c3bb60d4`, publicada el 2026-09-10): publicar contra Azure es una
 escritura y la autoriza el humano, no un agente. El commit de cierre del 04
 se llevó por delante esta frase y dejó `init.sh` en rojo: el test
@@ -1195,3 +1250,47 @@ Es el tag que tiene que verse en los logs del job y en `python main.py version`.
 min de margen** frente al cron de las 00:00 UTC. La leccion de F-078 —la
 nocturna del 16 corrio con la imagen vieja y deshizo la feature— no se repite
 esta vez.
+
+## 2026-09-17 · F-084 verificada en la base, y el MCP que sirve un diccionario viejo
+
+El humano ejecuto las tres verificaciones MANUAL que ningun agente puede hacer.
+
+**`build-compras`: exit 0, 233,9 s, 3.136.919 filas.** El sub-paso `documentos`
+tardo 88,3 s. **Es la unica validacion real del CUERPO de
+`compras.fn_estado_documento`**: hasta aqui solo se habia validado que el parser
+la aceptaba.
+
+**El grano, medido por el MCP contra la tabla construida**: `compras.contratos`
+publica **18.994 filas / 18.994 `contrato_id` distintos**, y **18.994 con estado
+(el 100 %)**. El lateral no multiplica. Los siete estados del tipo 44 suman
+exactamente 18.994: FIR 13.475, TER 3.179, **EPF 808**, PFP 576, RFP 548, COMD
+232, RES 176.
+
+**Las cifras bailaron respecto a lo que midieron los agentes el 16-09** —18.978
+filas y 818 enviados— **porque la nocturna del 17 reingirio**: 16 contratos
+nuevos y diez que se firmaron. Es la tabla viva, no la feature. `status`
+confirma que `raw.ctr` tiene **18.994**, las mismas.
+
+**`publicar-diccionario`: version 24**, hash `292f63baaf51`, **154 objetos, 972
+columnas**, cobertura 100 %.
+
+### EL HALLAZGO: el servidor MCP cachea el diccionario (ficha F-089)
+
+Publicada la 24, se pregunto por las dos vias **en el mismo minuto**:
+
+* **Por SQL (`_meta.v_diccionario`)**: `compras.contratos` con **15 columnas** y
+  las tres nuevas con su significado entero, el aviso de filtrar por
+  `estado_codigo` y los `ejemplos_preguntas` con el OJO de la pregunta trampa.
+  **Correcto.**
+* **Por `describir_tabla` del MCP**: **12 columnas** y las tres nuevas con el
+  significado **vacio**. Llamado **dos veces despues** de publicar.
+
+El servidor leyo el diccionario al arrancar y no lo vuelve a mirar. **La
+nocturna publica cada madrugada, asi que la deriva es diaria y silenciosa**, y
+la propia cabecera del servidor lo delata: anuncia la **version 12** del
+2026-09-03 con 103 objetos cuando la base va por la **24** con 154. **Catorce
+dias desfasado sin que nadie lo notara.**
+
+**No es un fallo de F-084**: el dato esta publicado y verificado por SQL. Pero
+obliga a **reiniciar el MCP a mano** para ver cualquier ficha nueva, y rompe la
+verificacion «se responde por el MCP» de toda feature que publique diccionario.

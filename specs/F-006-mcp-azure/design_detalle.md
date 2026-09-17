@@ -90,6 +90,18 @@ infraestructura.
 > inventario pasa a **150 objetos**. Los cinco de `compras` documentan
 > columnas: la cobertura de columnas pasa de 852 a **941** y las fichas de
 > consumo de 57 a **62**.
+>
+> **Enmienda del 2026-09-16 (F-084).** Entra `compras.fn_estado_documento`, la
+> traduccion del estado de un documento por la pareja (tipo, estado),
+> factorizada para que `compras.contratos` y `compras.facturas` la compartan en
+> vez de copiarla; es funcion auxiliar y no sube la superficie de consulta, que
+> se queda en **66** fichas. Con las tres columnas de estado que F-084 anade a
+> `compras.contratos`, el inventario pasa a **154 objetos** y la cobertura de
+> columnas a **972**. Por el camino quedaron sin enmienda propia F-078 (que
+> subio a 153 con las tres tablas de CP por tipologia) y F-083 (969 columnas,
+> sin objeto nuevo): esta entrada cierra la cuenta, y conviene saber que el
+> guardian `test_f006_r24_...` solo busca la cifra en el fichero, asi que el
+> 153 se lo daba por casualidad una referencia a `infra/README.md:153-170`.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
