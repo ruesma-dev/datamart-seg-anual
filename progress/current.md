@@ -1294,3 +1294,20 @@ dias desfasado sin que nadie lo notara.**
 **No es un fallo de F-084**: el dato esta publicado y verificado por SQL. Pero
 obliga a **reiniciar el MCP a mano** para ver cualquier ficha nueva, y rompe la
 verificacion «se responde por el MCP» de toda feature que publique diccionario.
+
+## 2026-09-17 · F-084 desplegada
+
+Imagen: **`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260917-1359`**,
+confirmada en el job a las **12:02 UTC**, con doce horas de margen frente al
+cron. Hacia falta desplegar aunque F-084 solo toque SQL: `compras/00_setup.sql`
+y `compras/01_documentos.sql` **viajan dentro de la imagen**, y sin el tag nuevo
+la nocturna habria reconstruido `compras.contratos` **sin la columna de estado**,
+deshaciendo lo construido a mano. Es lo que paso con F-078 el 16-09.
+
+**AVISO SOBRE LA SALIDA DE `85_update_job.ps1`, para no volver a dudar**: su
+cabecera anuncia una `Imagen` que **NO es la que se despliega**.
+`infra/00_vars.ps1:189` calcula `$TAG` con `Get-Date` **cada vez que se carga**,
+asi que a las 14:00 locales la cabecera dijo `r20260917-1400`, un tag que no
+existe en el registro, mientras se desplegaba `r20260917-1359`. Lo que vale es
+la linea **`Imagen nueva`** y la tabla de confirmacion. Cosmetico, pero despista
+justo en el momento de comprobar un despliegue.
