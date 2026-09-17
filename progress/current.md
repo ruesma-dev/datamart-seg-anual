@@ -163,6 +163,16 @@ significa nada antes de la 1.
    **escritura contra Azure**: la autoriza el humano, no un agente. Lo publicado
    hoy es la version 18.
 
+   > **CORREGIDO EL 2026-09-17, y las dos mitades de esta frase han caducado.**
+   > Lo encontro el reviewer de F-084. (a) La version publicada **no es la 18**:
+   > el 2026-09-16 la nocturna dejo la **21** y el trabajo de F-083 la subio a la
+   > **23**. (b) Y lo mas importante: **publicar ya no es una escritura que
+   > autorice el humano caso por caso**, porque desde **F-047**
+   > `publicar_diccionario` es un paso de `run-all` y **la nocturna publica
+   > sola**. Lo que sigue necesitando autorizacion expresa es publicar **a mano y
+   > fuera de la ventana**. Esta nota se queda aqui en vez de borrar el parrafo,
+   > porque el parrafo es el registro de lo que se penso entonces.
+
        python main.py publicar-diccionario
 
 6. **LA PRUEBA DE QUE EL PUENTE RESUELVE F-045.** Es la razon por la que
