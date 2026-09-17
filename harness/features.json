@@ -892,7 +892,7 @@
         "Decidido por escrito que datos personales se publican y cuales se quedan en raw; el DNI no sube sin razon escrita",
         "Se puede responder al menos una pregunta que hoy no tiene respuesta: por ejemplo las horas imputadas a una obra en un periodo, o quien ha trabajado en ella"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
