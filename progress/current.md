@@ -9,6 +9,48 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-057 · SPEC ESCRITA (2026-09-18)
+
+Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,
+prioridad 1. Sigue `in_progress`: la spec no cambia el estado.
+
+Entregado `specs/F-057-recursos-empleados-partes/` (requirements 142/150, design
+209/250, 19 tareas). **Resumen y cifras: `progress/spec_F-057.md`.**
+
+Tres objetos a construir: `stg.recursos`, `stg.partes_lineas` y
+`mart.v_pbi_horas_obra_mes`. Nada de ingesta (F-066 y F-074 ya la hicieron).
+
+**EL HALLAZGO**: la unidad de `hmores.can` la fija **`auxhor.medide`**
+(1 HORA, 2 DIA, 3 MES, 19 ud), **no `auxhor.ext`, que esta a cero en las 60
+filas**. Sumar `can` en bruto da 1.837.201,23 mezclando 1.249.038,44 horas con
+18.009,38 meses, 4.225,46 dias y kilometros. El **71,7 % del euro (70,46 M de
+98,28 M) esta en las lineas de MES**, no en las de hora.
+
+**Decisiones**: el eje es el RECURSO (la relacion `res`-`emp` no es 1:1 en
+ninguna direccion: 824 de 2.618 y 805 de 1.354, con 797 reciprocos y 3 recursos
+compartiendo `conide`); la obra se ata por `hmores.obride` de la LINEA (769
+lineas contradicen su cabecera) y **`maestro.centros_coste` de F-073 no se usa
+porque la trampa de `apu`/F-045 no aplica aqui**; «en rojo» = `con.fecbaj > 0` y
+es BANDERA, no filtro, porque filtrar el hecho borraria el **43,2 % de las
+horas** (539.774,87 h de 287 recursos de baja).
+
+**DATOS PERSONALES**: se publican **nombre y DNI**, autorizado por el humano el
+2026-09-18 («el dni puede salir, no es un problema») y citado en el requisito
+R7. Sin ofuscacion ni hash. El resto de la ficha de `emp` (Seguridad Social,
+banco, domicilio, nacimiento, sexo, estado civil, contacto, credenciales) NO
+sube.
+
+### Lo que el humano tiene que validar
+
+1. **`stg` o esquema modulo propio** (la unica decision que pido confirmar). Los
+   dos objetos van en `stg` porque el criterio de aceptacion dice «escrito en
+   stg», y eso los mete dentro de `build_stg`, que es la puerta de F-024: si
+   fallan, `mart` no se construye esa noche. Un modulo `personal` seria no
+   bloqueante por `R-FRESCURA`. Si lo prefiere, el SQL se mueve tal cual.
+2. **Declarado y no resuelto a proposito**: el coste de personal por obra
+   COMPLETO no es la suma de las horas; el 71,7 % del euro son lineas de MES.
+   Pasar de horas a euros con `raw.reshor` es F-061.
+
 ## F-084 · IMPLEMENTACION ENTREGADA (2026-09-16)
 
 Rama `feature/F-084-estado-del-contrato`, rigor `estandar`, `sdd=false`.
