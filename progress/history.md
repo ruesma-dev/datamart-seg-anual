@@ -1117,3 +1117,53 @@ identificar precisamente porque comparten `usename` con el MCP.
 su medicion**, que es lo que este arnes hace desde F-077 y F-081. Sigue fuera de
 alcance **Power BI Service**, que exige gateway o abrir IP en un Postgres
 compartido con albaranes y partes: no es decision de este proyecto en solitario.
+
+## F-084 · El estado del CONTRATO (cerrada el 2026-09-17, APROBADO en pasada 1)
+
+Mismo trabajo que F-083 pero para el contrato: el estado se lee de **`con.est`**
+con **`tip = 44`** y se traduce contra `raw.conest` **por la PAREJA (tipo,
+estado)**. Responde la pregunta que **Compras pidio en F-067** y que el circuito
+de firma **no puede contestar**: cuales estan enviados y sin firmar.
+
+**LO QUE APORTA DE NUEVO, y es lo que el criterio 6 pedia**: la traduccion se
+**factoriza** en `compras.fn_estado_documento(p_tip, p_est)`, dentro de
+`compras/00_setup.sql`. Lo que se gana no son las siete lineas del lateral: es
+que **el tipo de documento pasa a ser argumento obligatorio de la firma**, y la
+guarda anti-multiplicacion (`ORDER BY ide LIMIT 1`) se escribe una vez y protege
+a **`contratos` y `facturas`** a la vez. La proyeccion de F-083 no cambia una
+letra.
+
+**EL REVIEWER ROMPIO EL SQL NUEVE VECES** para ver si los tests lo cazaban: las
+nueve en ROJO (quitar el tipo del `WHERE`, quitarlo de la firma, recopiar el
+lateral a mano, borrar una columna, renombrar otra, intercalar `estado_id`,
+traducir el contrato con el `15`, quitar el `ORDER BY`, `STABLE` -> `IMMUTABLE`).
+**Y corrigio al implementer en un punto que hay que retener**: la firma solo
+impide **OMITIR** el tipo. Recopiar el lateral o pasar el tipo equivocado **si
+compilarian**; eso lo cazan los tests, no la base. Que nadie los retire.
+
+**Evidencias**: `init.sh` exit 0, **4.938 pasan / 188 saltados**, 57 tests
+nuevos, `PUERTA TAMAÑO [OK]`. Mutacion **N/A con alcance vacio de verdad**
+—`lineas={}`, ni un `.py` de produccion en el diff— y **prueba de control del
+ENCARGO 1.7.11**: el generador da **136 mutantes** si se le ignora la exclusion,
+luego el cero es por diseno y no por un motor roto.
+
+**VERIFICADO EN LA BASE POR EL HUMANO**: `build-compras` exit 0 en 233,9 s —la
+unica validacion real del CUERPO de la funcion—, **18.994 filas / 18.994
+`contrato_id` / 100 % con estado**, los siete estados sumando exacto, y
+diccionario en la **version 24**. Reparto: FIR 13.475, TER 3.179, **EPF 808**,
+PFP 576, RFP 548, COMD 232, RES 176.
+
+**LA DECISION MAS PENSADA: no se publica ninguna columna de antiguedad.**
+`con.tiemod` existe —de los 808 enviados, casi todos llevan mas de 21 dias— pero
+esta en epoca Delphi, vive en `raw` (que el MCP no ve) y, sobre todo, publicarlo
+invita al «lleva X dias enviado», que **no es lo que significa**. La ficha dice
+las tres cosas: que los ENVIADOS si se listan, que el «cuanto llevan» **no se
+puede saber** hoy, y que eso es de **F-067** con su foto diaria.
+
+**Y confirmo por tercera vez el cero que ya sabiamos**: de las 70.346 firmas de
+`confir`, **ninguna es de contrato**, por las dos vias (`docide` y `conide`).
+
+**DE PASO SALIERON TRES FICHAS**: **F-088** (el guardian de recuentos de F-006
+acertaba por casualidad, y la guarda del catalogo falta en `05_vencimientos`) y
+**F-089** (el MCP sirve un diccionario cacheado y llevaba catorce dias
+desfasado), mas la correccion de una frase caducada de `current.md`.

@@ -1354,7 +1354,7 @@
         "Si el SQL del estado se repite respecto a F-083, se factoriza en vez de duplicarse",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 12,
