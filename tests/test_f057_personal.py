@@ -767,14 +767,14 @@ def test_f057_r26_check_declarados_cubre_personal() -> None:
     catalogo real. Si el inventario no ve `sql/personal/**`, una noche que no
     construya el esquema terminaria en verde mintiendo.
     """
-    from etl_sigrid.domain.inventario import objetos_de_sql
+    from etl_sigrid.infrastructure.inventario_repositorio import (
+        inventario_del_repositorio,
+    )
 
-    textos = {
-        str(ruta.relative_to(DIRECTORIO_SQL)).replace("\\", "/"):
-            ruta.read_text(encoding="utf-8")
-        for ruta in DIR_PERSONAL.glob("*.sql")
-    }
-    nombres = {o.nombre: o.tipo for o in objetos_de_sql(textos)}
+    # El inventario REAL, el mismo que lee `check-declarados`, y no un glob
+    # escrito aqui: lo que hay que demostrar es que la puerta ve la carpeta
+    # nueva, no que la expresion regular sepa leer un CREATE.
+    nombres = {o.nombre: o.tipo for o in inventario_del_repositorio()}
 
     assert nombres.get("personal.recursos") == "tabla"
     assert nombres.get("personal.partes_lineas") == "tabla"
