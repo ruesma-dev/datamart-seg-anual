@@ -21,9 +21,10 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         del MCP. `run-all` ya lo hace al final;
                                         a mano solo hace falta tras lanzar
                                         build-cierre, build-compras,
-                                        build-maestros o build-retenciones
-                                        sueltos: recrean vistas con DROP +
-                                        CREATE y un DROP se lleva los GRANT
+                                        build-maestros, build-retenciones o
+                                        build-personal sueltos: recrean vistas
+                                        con DROP + CREATE y un DROP se lleva
+                                        los GRANT
     python main.py timings            - Tiempos por paso de _meta.etl_runs
     python main.py fingerprint-views  - Huella de las vistas de consumo a CSV
     python main.py compare-fingerprints LOCAL AZURE
@@ -97,6 +98,7 @@ from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep
 from etl_sigrid.application.steps.build_compras_step import BuildComprasStep
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep
+from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
 from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
 from etl_sigrid.application.steps.build_stg_step import (
     BuildStgStep,
@@ -497,9 +499,10 @@ def build_pipeline_steps(
     dos steps del pipeline recibe `omitir_puerta`: `run-all` no tiene vía de
     escape a propósito.
 
-    F-047 (que absorbe F-044) mete aquí los CUATRO build que se lanzaban a
-    mano. El orden dentro de la lista es legible, pero lo que lo GARANTIZA es
-    el `depends_on` de cada paso, que es lo que obedece el orden topológico.
+    F-047 (que absorbe F-044) metió aquí los CUATRO build que se lanzaban a
+    mano, y F-057 añadió el quinto (`build_personal`). El orden dentro de la
+    lista es legible, pero lo que lo GARANTIZA es el `depends_on` de cada paso,
+    que es lo que obedece el orden topológico.
     """
     pasos = [
         IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
@@ -508,7 +511,7 @@ def build_pipeline_steps(
             settings, batch_id=batch_id, reconstruir_todo=reconstruir_todo
         ),
         BuildMartStep(settings, batch_id=batch_id),
-        # F-047: los cuatro esquemas que se construían a mano y podían estar
+        # F-047: los esquemas de negocio que se construían a mano y podían estar
         # arbitrariamente desfasados respecto a `raw` y `stg`. `compras` y
         # `retenciones` solo leen de `raw`; `maestro` lee también de `stg`
         # desde F-073 (las dos marcas de `maestro.obras`); `cierre` lee de `stg` y
@@ -518,6 +521,11 @@ def build_pipeline_steps(
         BuildMaestrosStep(settings),
         BuildComprasStep(settings),
         BuildRetencionesStep(settings),
+        # F-057: `personal` entra como QUINTO build de negocio. Lee `stg.obras`
+        # para la marca `en_seguimiento`, y eso lo declara su `depends_on`; la
+        # posición aquí es legibilidad. Nadie depende de él a propósito: si
+        # falla, la noche continúa y termina.
+        BuildPersonalStep(settings),
         BuildCierreStep(settings),
         # F-006: entre build_mart y apply_grants, y el orden NO es cosmético.
         # `apply_grants` concede SELECT ON ALL TABLES IN SCHEMA _meta, que es
@@ -556,12 +564,21 @@ def build_pipeline_steps(
 def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
     Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
-    los cuatro build (maestros, compras, retenciones, cierre) →
+    los cinco build (maestros, compras, retenciones, personal, cierre) →
     publicar_diccionario → apply_grants.
 
-    Los cuatro esquemas que antes se construían a mano entraron aquí con F-047:
-    se quedaban desfasados semanas y, en el caso de `cierre`, la nocturna
-    llegaba a DESTRUIR una de sus vistas sin recrearla.
+    Cuatro de esos esquemas se construían antes a mano y entraron aquí con
+    F-047: se quedaban desfasados semanas y, en el caso de `cierre`, la
+    nocturna llegaba a DESTRUIR una de sus vistas sin recrearla. El quinto,
+    `personal` —recursos, partes de trabajo y horas por obra—, nació ya dentro
+    de la nocturna con F-057.
+
+    Los cinco comparten una propiedad que hay que conocer antes de leer un dato
+    suyo: **ninguno es dependencia de ningún otro paso**, así que un fallo en
+    cualquiera de ellos deja su esquema con el dato de una noche anterior
+    mientras `raw`, `stg` y `mart` están al día, y la noche termina en verde.
+    Eso es `R-FRESCURA`, y por eso toda respuesta que salga de ellos cita su
+    fecha de build.
 
     Al terminar contrasta el SQL del repositorio contra el catálogo real
     (`check-declarados`): si un build no ha creado lo que el repositorio
@@ -4993,6 +5010,54 @@ def reset_retenciones() -> None:
         conn.commit()
     click.secho(
         "Schema retenciones eliminado. Lanza `python main.py build-retenciones`.",
+        fg="green",
+    )
+
+
+# =============================================================================
+# MÓDULO PERSONAL (F-057): recursos, partes de trabajo y horas por obra
+# =============================================================================
+@cli.command("build-personal")
+def build_personal() -> None:
+    """
+    Construye el schema personal desde raw.* y stg.obras.
+
+    Ejecuta en orden los SQL de sql/personal:
+      00_setup.sql          schema, función de fechas local y las dos tablas
+      01_recursos.sql       una fila por recurso de Sigrid (2.618)
+      02_partes_lineas.sql  una fila por línea de parte de trabajo (330.638)
+      03_views.sql          v_pbi_horas_obra_mes, solo con unidad = 'HORA'
+
+    Requiere haber ingerido antes res, con, auxrestip, emp, hmores y auxhor
+    (lo hacen F-066 y F-074), y haber construido `stg.obras`: de ahí sale la
+    marca `en_seguimiento`.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * `personal.partes_lineas.cantidad` NO son horas. Mezcla HORA, DIA, MES
+        y UD, y sumarla sin filtrar `unidad` da una cifra falsa. Las horas se
+        piden por `personal.v_pbi_horas_obra_mes`, que lleva el corte cableado.
+      * `personal.recursos` CONTIENE DATOS PERSONALES (nombre, NIF y DNI),
+        autorizados por el responsable del dato el 2026-09-18. El esquema es
+        propio precisamente para poder dar o quitar ese acceso con un GRANT.
+      * `activo` es una bandera, no un filtro: los recursos de baja tienen el
+        43,2 % de las horas imputadas, porque el de baja de hoy trabajó ayer.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildPersonalStep(settings), pg, ejecucion)
+
+
+@cli.command("reset-personal")
+def reset_personal() -> None:
+    """Elimina el schema personal. Lanza después `build-personal`."""
+    pg = _get_pg()
+    with pg.connection() as conn, conn.cursor() as cur:
+        cur.execute("DROP SCHEMA IF EXISTS personal CASCADE")
+        conn.commit()
+    click.secho(
+        "Schema personal eliminado. Lanza `python main.py build-personal`.",
         fg="green",
     )
 
