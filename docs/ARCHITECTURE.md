@@ -21,8 +21,17 @@ obras. Microservicio único; se despliega como job programado en Azure.
 ## Capas PostgreSQL (¡no existe capa en `public`!)
 
 `raw` → `stg` → `mart` (+ `cierre` para cierres mensuales y planif vs real).
-Módulos adicionales: `compras`, `maestro`, `retenciones`, `auxiliar`.
-SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
+Módulos adicionales: `compras`, `maestro`, `retenciones`, `personal`,
+`auxiliar`. SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada
+capa.
+
+**`personal` (F-057, 2026-09-18) es el único esquema con datos personales**
+—nombre, NIF y DNI, publicados con autorización expresa del responsable del
+dato—, y es un esquema propio precisamente por eso: los permisos de PostgreSQL
+se dan POR ESQUEMA, así que «Power BI sí, datos de personal no» es un `GRANT`
+y no una lista de tablas que mantener (F-087). El segundo motivo es que no
+bloquea: metido dentro de `build_stg`, un fallo de su SQL dejaría al `mart`
+sin construir esa noche.
 
 ## Semántica Sigrid imprescindible (fuente de bugs si se ignora)
 
@@ -59,6 +68,27 @@ SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada capa.
   necesita corta-ciclos: array de visitados **más** tope de profundidad. Sin él,
   relajar el filtro de código vacío es un `WITH RECURSIVE` infinito dentro de
   una nocturna de 3 h 45.
+- **`hmores.can` NO SON HORAS, Y EL CLASIFICADOR NO ES EL QUE PARECE (F-057).**
+  La cantidad de una línea de parte de trabajo trae HORA, DIA, MES o UD en el
+  mismo campo, y lo que lo decide es **`auxhor.medide`** (1 HORA, 2 DIA, 3 MES,
+  19 UD). **No es `auxhor.ext`**, que se llama «Extra» y está **a cero en las 60
+  filas del catálogo**: quien lo mire concluirá que el catálogo no distingue
+  unidades y sumará en bruto. `SUM(can)` sin filtrar da **1.837.201,23**
+  mezclando 1.249.038,44 horas con 18.009,38 meses, 4.225,46 días y kilómetros.
+  Y el reverso, que se olvida: el **71,7 % del euro está en las líneas de MES**
+  —el coste de estructura de obra—, así que las horas tampoco son el coste de
+  personal completo. `personal.v_pbi_horas_obra_mes` lleva el corte cableado
+  para que la trampa no se pueda cometer desde la superficie de consumo.
+  `auxmed` (38 filas) no se ingiere: la unidad se traduce con un `CASE`, y la
+  rama `ELSE 'DESCONOCIDA'` es el seguro de que una unidad nueva en origen se
+  vea en vez de colarse como horas.
+- **En los partes de trabajo la obra la manda la LÍNEA, no la cabecera
+  (F-057).** `hmores.obride` está informado en el 99,58 % de las 330.638
+  líneas, y en 769 discrepa de la obra de su cabecera `hmo`. La trampa de `apu`
+  —atribuir por centro de coste, que es la pregunta abierta de F-045— **no
+  aplica aquí**: el parte trae la obra, así que `maestro.centros_coste` y
+  `res.cenconide` no participan, y los dos identificadores están vetados por
+  test en el SQL de `personal`.
 - `obr.ide = con.ide` (obra hereda de concepto). El nombre legible está en
   `con.res`. `con.nom` NO existe.
 - En `raw.obrfas` el campo de fase se llama `fasnum`; en `raw.obrparpre` se
@@ -529,11 +559,13 @@ Lo que este proyecto **expone al ecosistema** y quién lo consume está en
 
 Hasta el 2026-08-28 `run-all` construía `raw → stg → mart` y nada más.
 `cierre`, `compras`, `maestro` y `retenciones` se lanzaban a mano y podían
-estar desfasados semanas. Los diez pasos de hoy, en orden:
+estar desfasados semanas. F-057 añadió el quinto, `build_personal`, que nació
+ya dentro. Los once pasos de hoy, en orden:
 
 ```
 ingest_raw → load_excel_aux → build_stg → build_mart
-           → build_maestros → build_compras → build_retenciones → build_cierre
+           → build_maestros → build_compras → build_retenciones
+           → build_personal → build_cierre
            → publicar_diccionario → apply_grants
 ```
 
@@ -544,20 +576,22 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   nocturna la **destruía** cada noche y nadie la recreaba. Está declarado en
   `BuildCierreStep.depends_on`, no confiado al orden de la lista: un
   comentario se borra, el orden topológico obedece.
-- **`apply_grants` sigue siendo el último.** Los cuatro build recrean vistas
+- **`apply_grants` sigue siendo el último.** Los cinco build recrean vistas
   con `DROP` + `CREATE` y un `DROP` se lleva los `GRANT`. Y **no** depende de
   ellos a propósito: si `build_cierre` falla una noche, los permisos del MCP
   se reaplican igual. El precio es que un esquema puede quedarse atrás sin
   tumbar la carga, y por eso la regla dura `R-FRESCURA` del diccionario manda
   citar la frescura DEL PASO, no la del pipeline.
-- **Los cuatro registran paso** en `_meta.etl_runs` con el `batch_id` de la
+- **Los cinco registran paso** en `_meta.etl_runs` con el `batch_id` de la
   noche. `build-compras` y `build-retenciones` no lo hacían —ejecutaban SQL en
   línea, sin step—, así que su fecha de build no era consultable por SQL
   mientras el diccionario mandaba citarla.
 - **Coste medido** (2026-08-21, con el disco vigilado): +37,5 min sobre 2 h 46,
   de los que `build_cierre` se lleva el 74 %. El disco no se movió (57,92 % →
   57,93 % sobre un límite del 80 %): estos cuatro reconstruyen desde `raw` y
-  `stg`, no acumulan como `plan_mensual`.
+  `stg`, no acumulan como `plan_mensual`. `build_personal` entró después y su
+  coste está estimado, no medido: dos `INSERT ... SELECT` de 2.618 y 330.638
+  filas, unos 60 MB, del orden de segundos frente a las 3 h 45 de ventana.
 
 **El guardián.** `run-all` termina contrastando **lo que el SQL del
 repositorio declara crear** contra `information_schema`, y sale con código 1

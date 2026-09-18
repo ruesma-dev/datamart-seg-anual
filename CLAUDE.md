@@ -73,9 +73,10 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
   stage, build-mart, publicar-diccionario, run-all, status. `run-all` construye
-  el datamart ENTERO desde F-047: diez pasos, con los cuatro build de negocio
-  —maestros, compras, retenciones y cierre— dentro y en ese orden. `cierre` va
-  después de `mart` porque `mart` destruye lo que `cierre` construye.
+  el datamart ENTERO desde F-047: once pasos, con los cinco build de negocio
+  —maestros, compras, retenciones, personal y cierre— dentro y en ese orden.
+  `cierre` va después de `mart` porque `mart` destruye lo que `cierre`
+  construye.
 - `config/` — `settings.py` (pydantic-settings sobre `.env`),
   `tables_sigrid.yaml` (tablas a ingerir), `business_rules.yaml`,
   `objetos_pendientes.yaml` (F-047: los objetos que el SQL declara y que aún no
@@ -93,7 +94,12 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   cada step hereda de `steps/base.py`).
 - `etl_sigrid/infrastructure/postgres/` — cliente + `sql/` por capa:
   `raw` (implícito en ingesta), `stg/`, `mart/`, `cierre/`, `compras/`,
-  `maestro/`, `retenciones/`, `auxiliar/`.
+  `maestro/`, `retenciones/`, `personal/`, `auxiliar/`. **`personal/` (F-057) es
+  el único esquema con datos personales** —nombre, NIF y DNI, autorizados por el
+  responsable del dato el 2026-09-18— y es esquema propio para poder darlo o
+  quitarlo con un `GRANT`. Su trampa, que hay que conocer antes de sumar nada:
+  `hmores.can` no son horas, mezcla HORA/DIA/MES/UD y la clasifica
+  `auxhor.medide`.
 - `etl_sigrid/infrastructure/sigrid/` — cliente HTTP de sigrid-api.
 - `tests/` — pytest. Los de humo NO tocan red ni BBDD.
 - `specs/` — especificaciones SDD (una carpeta por feature).
