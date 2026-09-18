@@ -585,7 +585,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 3,
+      "priority": 4,
       "branch": "feature/F-038-comparativos"
     },
     {
