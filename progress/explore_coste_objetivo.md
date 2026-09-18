@@ -148,3 +148,85 @@ las 57 con ABC lo tienen**. Pero **no apunta al ABC**: de esas 56 solo **2** coi
    fuera, la vía honesta es **parametrizarlo** (`config/business_rules.yaml`) y decir en la ficha
    del diccionario que **no viene de Sigrid**, con su fecha y su dueño.
 4. **Aviso**: implementarlo sin respuesta publicaría una cifra plausible y falsa, justo el fallo que la regla `R-FRESCURA` del diccionario existe para evitar.
+
+---
+
+# CORRECCIÓN DEL 2026-09-18: EL % SÍ ESTÁ EN SIGRID, Y ESTABA DONDE NADIE MIRÓ
+
+**El veredicto de arriba —«NO ESTÁ EN SIGRID»— es FALSO, y conviene entender por
+qué se falló, porque el error es instructivo.** Lo resolvió **Elena Díaz
+(Control de Costes)** con un correo de las **10:00 del 2026-09-18**: una captura
+de la ficha de Sigrid **con la casilla rodeada a mano en rojo**.
+
+## El hallazgo: las magnitudes de planificación son OFERTAS DE PROVEEDORES FICTICIOS
+
+**El coste objetivo no es una versión del presupuesto de la obra: es UNA OFERTA
+MÁS dentro del comparativo**, presentada por un proveedor que no existe. En la
+captura, el comparativo de la obra 0696 tiene **seis ofertas** y tres de ellas
+son de proveedores inventados:
+
+| # | proveedor | importe | estado |
+|---|---|---|---|
+| 1 | **00021 OFICINA TÉCNICA** | 100.262,40 | REJ |
+| 2 | **04440 PLANIFICACIÓN CUATRIMESTRAL** | 99.846,23 | REJ |
+| 3 | **00010 OBJETIVO-RUESMA** (NIF `A99999999`) | **94.853,91** | REJ |
+| 4 | 5948 RIVISA INDUSTRIAL | 94.212,24 | **ADEF** |
+| 5 | 41000347 VALLADOS SIETE PICOS | 99.955,50 | REJ |
+| 6 | 4681 CESAR MOLPECERES | 135.053,17 | REJ |
+
+**La cuenta cuadra al céntimo**: 99.846,23 (cuatrimestral) × 0,95 = **94.853,92**
+frente a los 94.853,91 del objetivo. **El objetivo es el cuatrimestral con el 5 %
+de descuento**, y ese 5 % es lo que Elena rodeó: la columna **`Dto`** de las
+líneas de detalle.
+
+## Dónde vive, medido
+
+**`dcopro.dto`**, el descuento de la línea de la oferta. **Y es TEXTO, no un
+número**: trae `'15%'`, `'10,08%'`, `'5%'`, `'13,79%'` —con el símbolo y con
+coma decimal española—. Una consulta que lo trate como número **revienta**: el
+motor devuelve `22018 Error de conversión`. Quien lo modele tiene que parsearlo.
+
+**Cobertura sobre los 20.261 comparativos**, por el nombre de la entidad de la
+oferta (`dco.entres`):
+
+| familia | comparativos |
+|---|---|
+| ofertas REALES | 19.909 |
+| **OBJETIVO** | **11.088 (54,7 %)** |
+| **OFICINA TÉCNICA** | **7.061** |
+| PLANIFICACIÓN | 4.769 |
+| **FASE 0** | 819 |
+| CUATRIMESTRAL | 679 |
+
+Y las entidades ficticias con más ofertas: `00645 PLANIFICACION` 2.567, **`00010
+OBJETIVO RUESMA` 2.303** (CIF `A99999999`), **`00021 OFICINA TECNICA` 2.003**
+(CIF `A00000000`), `00010 OBJETIVO-RUESMA` 1.947, `00021 OFICINA TÉCNICA` 1.183,
+`04440 PLANIFICACION CUATRIMESTRAL` 411, `02700 PLANIFICACION " FASE 0 "` 459.
+
+**LOS NOMBRES NO ESTÁN NORMALIZADOS** —con tilde y sin tilde, con guion y sin
+guion, con asteriscos `*OBJETIVO*`— y **el mismo código de entidad se repite con
+razones sociales distintas**. Identificarlos por `entres` con un `LIKE` es lo
+que funciona hoy, pero es frágil: los CIF falsos (`A99999999`, `A00000000`) son
+una señal mejor y hay que medir su cobertura antes de elegir.
+
+## Por qué la búsqueda anterior falló, que es la lección
+
+Las seis vías de arriba buscaban **un porcentaje fijo aplicado al ABC del
+presupuesto de la obra**. La vía 6 concluyó que no existía porque **ningún
+importe es múltiplo constante del ABC**. Esa medición era CORRECTA y la
+conclusión que se sacó de ella, equivocada:
+
+**el porcentaje no es fijo — cada comparativo tiene el suyo**. Medidos: 15 %,
+12 %, 10,08 %, 3,5 %, 8,25 %, 20,09 %, 14,33 %, 23,13 %… Buscar un escalón en
+la distribución de ratios **no podía encontrar nada**, porque no hay un ratio,
+hay miles.
+
+Y el segundo error, más de fondo: **se buscó en el presupuesto de la obra porque
+ahí viven el ABC y la fase 0**, sin caer en que el objetivo del COMPARATIVO se
+fija **en el comparativo**. El dato estaba a un `JOIN` de lo que ya se había
+medido.
+
+**Moraleja para la siguiente vez que una búsqueda salga vacía**: un negativo bien
+demostrado sigue siendo un negativo **sobre la hipótesis que se probó**, no sobre
+la pregunta. Y cuando alguien de Negocio dice «esto existe», existe: lo que falla
+es dónde lo buscamos.
