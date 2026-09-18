@@ -25,10 +25,10 @@ hay enlace factura->asiento dentro de `apu` ni de `asi`.
 
 ### El enlace que si existe
 
-`rac`: 2.503.151 filas, 16 columnas, todas escalares salvo `tex` (`ide`,
-`conide`, `asiide`, `res`, `est1`, `est2`, `usu`, `fec`, `hor`, `dogide`...).
-Es el **log del flujo de aprobacion** de cualquier documento: `conide` es el
-documento, `asiide` el asiento que genero el paso, `res` el nombre del paso.
+`rac`: 2.503.151 filas, 16 columnas escalares salvo `tex` (`ide`, `conide`,
+`asiide`, `res`, `est1`, `est2`, `usu`, `fec`, `hor`, `dogide`...). Es el **log
+del flujo de aprobacion** de cualquier documento: `conide` es el documento,
+`asiide` el asiento que genero el paso, `res` el nombre del paso.
 
 - **165.845 de 166.009 facturas tienen asiento: el 99,90 %.**
 - Grano limpio: **exactamente 1 fila con `asiide <> 0` por factura** (165.845,
@@ -63,11 +63,10 @@ retardo del circuito. Publicar las dos cuesta lo mismo.
 ### Ruta alternativa: `regiva`, mas pobre
 
 `regiva` (Registro de IVA, tampoco ingerida): 307.266 filas, `apuide` al 100 %,
-`docide` al 98,4 %, `asifec` (fecha contable) al 100 %, y toca **165.834
-facturas (99,89 %)**; trae `doccod` y `docfec`. Pero **abre en abanico** (una
-fila por tipo de IVA) y al cruzarla con `rac` solo 199.502 de 284.023
-combinaciones (70,2 %) apuntan al mismo asiento. Util para el IVA soportado, no
-como enlace principal. **`rac` gana.**
+`docide` al 98,4 %, `asifec` al 100 %, y toca **165.834 facturas (99,89 %)**.
+Pero **abre en abanico** (una fila por tipo de IVA) y al cruzarla con `rac`
+solo 199.502 de 284.023 combinaciones (70,2 %) apuntan al mismo asiento. Util
+para el IVA soportado, no como enlace principal. **`rac` gana.**
 
 ### Lo que NO cuadra todavia (dicho con la cifra)
 
@@ -86,9 +85,9 @@ en si no esta en duda.**
 Juan barrio el diccionario del datamart y no encontro nada. Correcto: no esta
 publicado. **Pero en Sigrid si esta**, en dos tablas que no se ingieren.
 
-- **`gra`** ("Graficos"): **285.735 filas**. Columnas utiles: `nom` (varchar
-  255, nombre del fichero), `nomori`, `cod` (varchar 128, la clave en el
-  repositorio), `fec`, `usu`, `cla`, `ima` (binario), `vin`.
+- **`gra`** ("Graficos"): **285.735 filas**; utiles `nom` (varchar 255, nombre
+  del fichero), `nomori`, `cod` (varchar 128, clave del repositorio), `fec`,
+  `usu`, `cla`, `ima` (binario), `vin`.
 - **`rcg`** ("Graficos en conceptos"): **286.150 filas**, 7 columnas escalares
   (`ide`, `con`, `gra`, `pos`, `cla`, `feclee`, `fecalt`). Puente concepto <->
   grafico, 201.026 conceptos distintos.

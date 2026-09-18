@@ -962,7 +962,7 @@ def test_f006_da1_los_builds_manuales_no_republican_el_diccionario() -> None:
     fuente = Path(main.__file__).read_text(encoding="utf-8")
 
     for comando in ("build-cierre", "build-compras", "build-maestros",
-                    "build-retenciones"):
+                    "build-retenciones", "build-personal"):
         inicio = fuente.index(f'@cli.command("{comando}")')
         fin = fuente.index("@cli.command(", inicio + 10)
         assert "PublicarDiccionarioStep" not in fuente[inicio:fin], comando

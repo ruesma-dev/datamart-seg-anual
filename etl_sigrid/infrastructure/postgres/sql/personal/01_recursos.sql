@@ -91,7 +91,9 @@ LEFT JOIN LATERAL (
     -- `raw.res`— dejaría de estar garantizado. Mismo patrón, y por lo mismo,
     -- que `maestro/04_centros_coste.sql`.
     --
-    -- SOLO SEIS COLUMNAS, y la lista es el límite de lo autorizado (R8).
+    -- SOLO CINCO COLUMNAS, y esta lista es el límite de lo autorizado (R8):
+    -- el identificador, el DNI y el nombre estructurado. Nada más de las 152
+    -- columnas de `raw.emp` entra en el datamart curado.
     SELECT emp.ide, emp.dni, emp.nomnom, emp.nomape1, emp.nomape2
     FROM   raw.emp emp
     WHERE  emp.ide = r.conide

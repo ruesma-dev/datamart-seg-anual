@@ -708,6 +708,31 @@ def test_f057_r25_run_all_declara_cinco_build() -> None:
     assert "personal" in documentacion
 
 
+def test_f057_r25_build_personal_es_un_comando_que_escribe() -> None:
+    """PROPAGACION 13/12 — el punto que los doce medidos NO listaban.
+
+    Lo destapó `bash harness/init.sh`, no una revisión: `run-all` reventó en
+    `tests/test_f024_cli.py` con `AttributeError: 'SimpleNamespace' object has
+    no attribute 'postgres'`, porque su `STEPS_POR_COMANDO` sustituye por un
+    doble cada step de un comando que ESCRIBE, y `build_personal` no estaba.
+    El paso real intentaba abrir conexión dentro de un test offline.
+
+    Esa lista **es el requisito** de R4 de F-024 —todo comando que escribe
+    marca las huérfanas antes de actuar—, así que un comando de escritura que
+    no esté ahí no es un fallo del doble: es un comando sin vigilar. Se ancla
+    aquí para que el esquema `personal` no vuelva a colarse.
+    """
+    from tests.test_f024_cli import COMANDOS_QUE_ESCRIBEN, STEPS_POR_COMANDO
+
+    assert "build-personal" in COMANDOS_QUE_ESCRIBEN
+    assert STEPS_POR_COMANDO["build-personal"] == (
+        "BuildPersonalStep", "build_personal", "build_aux"
+    ), (
+        "el doble tiene que declarar el `stage` REAL (`build_aux`), que en este "
+        "paso no coincide con su nombre como sí ocurre en los cuatro de F-047"
+    )
+
+
 def test_f057_r25_personal_en_consumption_schemas() -> None:
     """PROPAGACION 6/12. La superficie que el rol del MCP puede leer."""
     from config.settings import DEFAULT_CONSUMPTION_SCHEMAS
