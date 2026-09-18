@@ -629,6 +629,97 @@ def test_f057_r24_el_step_encadena_sus_cuatro_sql(monkeypatch: pytest.MonkeyPatc
     assert resultado.rows_processed == 14
 
 
+class _PgQueRevienta:
+    """Ejecuta hasta el fichero indicado y ahi lanza, como haria Postgres."""
+
+    def __init__(self, falla_en: str) -> None:
+        self.ejecutados: list[str] = []
+        self._falla_en = falla_en
+
+    def execute_sql_file(self, path: Path) -> None:
+        self.ejecutados.append(path.name)
+        if path.name == self._falla_en:
+            raise RuntimeError('relation "raw.hmores" does not exist')
+
+    def count_rows(self, schema: str, table: str) -> int:
+        return 0
+
+
+@pytest.mark.parametrize(
+    ("falla_en", "sub_paso", "ejecutados"),
+    [
+        ("00_setup.sql", "setup", ["00_setup.sql"]),
+        ("02_partes_lineas.sql", "partes_lineas", FICHEROS_PERSONAL[:3]),
+    ],
+)
+def test_f057_r24_un_sql_que_revienta_da_failed_nombrando_el_sub_paso(
+    monkeypatch: pytest.MonkeyPatch,
+    falla_en: str,
+    sub_paso: str,
+    ejecutados: list[str],
+) -> None:
+    """A las tres de la manana «fallo el build» no sirve: hay que decir donde.
+
+    Y tiene que PARAR: `02_partes_lineas.sql` lee lo que dejo `00_setup.sql`, y
+    seguir ejecutando despues de un fallo deja el esquema a medias sin que el
+    estado del paso lo refleje.
+    """
+    from etl_sigrid.application.steps import build_personal_step
+    from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
+    from etl_sigrid.domain.entities import StepStatus
+
+    pg = _PgQueRevienta(falla_en)
+    monkeypatch.setattr(build_personal_step, "build_postgres_client", lambda _s: pg)
+
+    resultado = BuildPersonalStep(SimpleNamespace()).run()
+
+    assert resultado.status == StepStatus.FAILED
+    assert sub_paso in resultado.error_message
+    assert "relation" in resultado.error_message
+    assert resultado.finished_at is not None
+    assert pg.ejecutados == ejecutados, "siguio ejecutando despues de fallar"
+
+
+def test_f057_r24_un_sql_que_falta_da_failed_con_la_ruta(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """El modo de fallo SILENCIOSO de este tipo de step.
+
+    Si manana cambia la ruta del SQL, `execute_sql_file` no se llama y el paso
+    podria declararse SUCCESS sin haber construido nada. Tiene que ser un fallo
+    ruidoso y con la ruta dentro, que es lo unico accionable.
+    """
+    from etl_sigrid.application.steps import build_personal_step
+    from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
+    from etl_sigrid.domain.entities import StepStatus
+
+    class _PathQueApuntaA:
+        """Sustituye `Path(__file__)` para que el step busque en un vacio."""
+
+        def __init__(self, destino: Path) -> None:
+            self._destino = destino
+
+        def __call__(self, _ruta: str) -> Path:
+            return self
+
+        def resolve(self) -> _PathQueApuntaA:
+            return self
+
+        @property
+        def parents(self) -> list[Path]:
+            return [self._destino] * 5
+
+    monkeypatch.setattr(
+        build_personal_step, "build_postgres_client", lambda _s: _PgQueRevienta("")
+    )
+    monkeypatch.setattr(build_personal_step, "Path", _PathQueApuntaA(tmp_path))
+
+    resultado = BuildPersonalStep(SimpleNamespace()).run()
+
+    assert resultado.status == StepStatus.FAILED
+    assert "SQL file no encontrado" in resultado.error_message
+
+
 def test_f057_r24_orden_topologico_y_no_bloquea() -> None:
     """PROPAGACION 2/12. El orquestador es generico: se VERIFICA, no se toca.
 
@@ -669,10 +760,11 @@ def test_f057_r25_existe_comando_build_personal() -> None:
     import main
 
     assert "build-personal" in main.cli.commands
-    assert "reset-personal" in main.cli.commands, (
-        "`build-compras` y `build-retenciones` tienen su reset: el esquema "
-        "modulo se puede tirar y rehacer sin tocar el resto (R25)"
-    )
+    # `reset-personal` NO existe, y es deliberado: `build-compras` y
+    # `build-retenciones` tienen su reset, pero la spec no lo pidio para este
+    # esquema y esta implementacion no la rediseña. Si el humano lo quiere, es
+    # una tarea suya, no un extra que se cuela aqui.
+    assert "reset-personal" not in main.cli.commands
 
 
 def test_f057_r25_paso_en_el_pipeline_y_posicion() -> None:

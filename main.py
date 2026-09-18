@@ -5049,19 +5049,6 @@ def build_personal() -> None:
     _ejecutar_paso(BuildPersonalStep(settings), pg, ejecucion)
 
 
-@cli.command("reset-personal")
-def reset_personal() -> None:
-    """Elimina el schema personal. Lanza después `build-personal`."""
-    pg = _get_pg()
-    with pg.connection() as conn, conn.cursor() as cur:
-        cur.execute("DROP SCHEMA IF EXISTS personal CASCADE")
-        conn.commit()
-    click.secho(
-        "Schema personal eliminado. Lanza `python main.py build-personal`.",
-        fg="green",
-    )
-
-
 @cli.command("inspect-retenciones")
 @click.option("--sentido", type=click.Choice(["PROVEEDOR", "CLIENTE"]),
               default=None, help="Filtrar por dirección de la retención")
