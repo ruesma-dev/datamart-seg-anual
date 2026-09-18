@@ -658,12 +658,14 @@ def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None
         "load_excel_aux",
         "build_stg",
         "build_mart",
-        # F-047 metió los cuatro build que se lanzaban a mano. Van ANTES de
-        # publicar y de los grants: los cuatro recrean vistas con DROP +
-        # CREATE, y un DROP se lleva los GRANT que `apply_grants` concede.
+        # F-047 metió los cuatro build que se lanzaban a mano y F-057 añadió
+        # el quinto. Van ANTES de publicar y de los grants: los cinco recrean
+        # vistas con DROP + CREATE, y un DROP se lleva los GRANT que
+        # `apply_grants` concede.
         "build_maestros",
         "build_compras",
         "build_retenciones",
+        "build_personal",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",

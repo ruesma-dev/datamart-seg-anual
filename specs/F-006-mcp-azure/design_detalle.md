@@ -102,6 +102,18 @@ infraestructura.
 > sin objeto nuevo): esta entrada cierra la cuenta, y conviene saber que el
 > guardian `test_f006_r24_...` solo busca la cifra en el fichero, asi que el
 > 153 se lo daba por casualidad una referencia a `infra/README.md:153-170`.
+>
+> **Enmienda del 2026-09-18 (F-057).** Entra el **decimo esquema**, `personal`,
+> con cuatro objetos: `personal.recursos` --el maestro de recursos, que
+> CONTIENE DATOS PERSONALES publicados con autorizacion expresa del responsable
+> del dato: nombre, NIF y DNI--, `personal.partes_lineas` --las 330.638 lineas
+> de parte de trabajo, que son lo que ata persona, horas y obra--,
+> `personal.v_pbi_horas_obra_mes` y la funcion local `personal.fn_fecha`. El
+> inventario pasa a **158 objetos**, la cobertura de columnas a **1015** y las
+> fichas de consumo de 66 a **69** (la funcion no es de consumo). Es ademas el
+> primer esquema que entra sabiendo que hay que restringirlo: tener los datos
+> personales en un esquema propio es lo que permite darlos o quitarlos con un
+> GRANT en vez de tabla a tabla (F-087).
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

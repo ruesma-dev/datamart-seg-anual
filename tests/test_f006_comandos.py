@@ -30,6 +30,8 @@ import pathlib
 import pytest
 from click.testing import CliRunner
 
+from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -371,7 +373,12 @@ def test_f006_r28_cli_biyeccion_exacta_y_publicado_al_dia(monkeypatch) -> None:
     assert resultado.exit_code == 0, resultado.output
     assert "biyeccion exacta" in resultado.output
     assert "lo publicado ES lo del arbol" in resultado.output
-    assert pg.esquemas_pedidos is not None and len(pg.esquemas_pedidos) == 9
+    # Diez desde F-057 (2026-09-18), que anadio `personal`. Se cuenta contra
+    # la constante y no contra un literal: la lista de esquemas la fija
+    # `ESQUEMAS_DEL_DATAMART`, y duplicar aqui su tamano obliga a tocar dos
+    # sitios cada vez que entre un esquema.
+    assert pg.esquemas_pedidos is not None
+    assert len(pg.esquemas_pedidos) == len(ESQUEMAS_DEL_DATAMART)
 
 
 def test_f006_r28_cli_detecta_la_huerfana_real(monkeypatch) -> None:

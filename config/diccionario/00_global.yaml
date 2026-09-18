@@ -12,6 +12,21 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 25 (F-057, 2026-09-18): EL DATAMART YA SABE QUIEN HA TRABAJADO EN CADA
+# OBRA. Entra el esquema `personal` --el decimo-- con el maestro de recursos
+# (2.618 filas), las 330.638 lineas de parte de trabajo y la vista de horas por
+# obra y mes. Tres cosas que hay que leer antes de consultarlo y que estan en
+# sus fichas: (1) la cantidad de una linea NO son horas, mezcla HORA, DIA, MES y
+# UD, y en bruto suma 1.837.201,23 de nada frente a las 1.249.038,44 horas
+# reales; (2) el 71,7 % del euro esta en las lineas de MES --coste de estructura
+# de obra--, asi que las horas no son el coste de personal completo; (3)
+# `personal.recursos` CONTIENE DATOS PERSONALES (nombre, NIF y DNI), publicados
+# por decision expresa del responsable del dato ese mismo dia, y el esquema es
+# propio precisamente para poder dar o quitar ese acceso con un GRANT. Ademas,
+# `activo` es BANDERA y no filtro: filtrar por el borra el 43,2 % de las horas,
+# porque el recurso de baja de hoy trabajo ayer. `R-FRESCURA` pasa de cuatro
+# esquemas a cinco: `build_personal` tampoco es dependencia de ningun paso.
+#
 # version 13 (F-025, 2026-09-03): EL DATAMART YA NO RECONSTRUYE TODAS LAS OBRAS
 # CADA NOCHE. Las congeladas conservan la version que se construyo la ultima
 # vez que les toco. OJO CON LAS CIFRAS, corregido en la version 16 con la
@@ -254,7 +269,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 24
+version: 25
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -274,32 +289,36 @@ titulo: Datamart de seguimiento anual de obra
 reglas:
 
   - codigo: R-FRESCURA
-    titulo: Cuatro esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Cinco esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, maestro, retenciones]
+    ambito: [cierre, compras, maestro, retenciones, personal]
     regla: >-
-      Desde F-047 estos cuatro esquemas SI se construyen cada noche dentro de
-      `run-all`, y los cuatro registran paso, asi que su fecha de build siempre
-      es consultable. Lo que no cambia es que su paso NO es dependencia de
-      ningun otro: si `build_cierre`, `build_compras`, `build_maestros` o
-      `build_retenciones` falla, la noche continua y termina, y ese esquema se
-      queda con el dato de una noche anterior mientras `raw`, `stg` y `mart`
-      estan al dia. Toda respuesta que salga de ellos DEBE citar su fecha de
-      build: `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'` (o
-      `build_compras`, `build_maestros`, `build_retenciones`). Que el pipeline
-      sea uno solo NO significa que todo el datamart tenga la misma frescura.
+      Estos cinco esquemas SI se construyen cada noche dentro de `run-all`, y
+      los cinco registran paso, asi que su fecha de build siempre es
+      consultable. Lo que no cambia es que su paso NO es dependencia de ningun
+      otro: si `build_cierre`, `build_compras`, `build_maestros`,
+      `build_retenciones` o `build_personal` falla, la noche continua y termina,
+      y ese esquema se queda con el dato de una noche anterior mientras `raw`,
+      `stg` y `mart` estan al dia. Toda respuesta que salga de ellos DEBE citar
+      su fecha de build: `SELECT * FROM _meta.v_frescura WHERE paso =
+      'build_cierre'` (o `build_compras`, `build_maestros`,
+      `build_retenciones`, `build_personal`). Que el pipeline sea uno solo NO
+      significa que todo el datamart tenga la misma frescura.
     motivo: >-
       La composicion real esta en `main.build_pipeline_steps`, y sus pasos se
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
       `build_stg`, `build_mart`, `build_maestros`, `build_compras`,
-      `build_retenciones`, `build_cierre`, `publicar_diccionario` y
-      `apply_grants`. Hasta el 2026-08-28 los cuatro se lanzaban A MANO y podian
-      llevar semanas parados; peor aun, `mart` DESTRUIA cada noche
-      `cierre.v_pbi_planif_vs_real` —cuelga de
+      `build_retenciones`, `build_personal`, `build_cierre`,
+      `publicar_diccionario` y `apply_grants`. Hasta el 2026-08-28 cuatro de
+      ellos se lanzaban A MANO y podian llevar semanas parados; peor aun, `mart`
+      DESTRUIA cada noche `cierre.v_pbi_planif_vs_real` —cuelga de
       `mart.fact_seguimiento_categoria`, que `03_agg_categoria.sql` dropea con
-      CASCADE— y nadie la recreaba. Dar un dato de `cierre` sin fecha es dar una
-      respuesta vieja con aplomo.
+      CASCADE— y nadie la recreaba. `personal` (F-057, 2026-09-18) nacio ya
+      dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
+      un fallo del SQL de personal no puede dejar al `mart` sin construir. Dar
+      un dato de cualquiera de los cinco sin fecha es dar una respuesta vieja
+      con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -539,10 +558,10 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxhor` (`auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
-      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxobramb`, `obrfas`, `obrfasamb`, `obrparpre`
+      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`
       no se unen a `raw.con` en ningun SQL de este repositorio, asi que para
       ellas el JOIN de los puntos 2 y 3 **no existe**; su nombre esta en su
       propio `res` o no esta.
@@ -908,6 +927,23 @@ esquemas:
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_retenciones]
+
+  personal:
+    titulo: Quien ha trabajado en cada obra y cuantas horas
+    para_que_sirve: >-
+      El maestro de recursos --personas, medios y consumos imputables-- y las
+      330.638 lineas de parte de trabajo que atan persona, horas y obra, con 20
+      anos de historia. Responde "cuantas horas se han imputado a esta obra",
+      "quien ha trabajado en ella" y "cuanto cuesta su mano de obra". DOS
+      TRAMPAS antes de consultarlo: la cantidad de una linea NO son horas --
+      mezcla HORA, DIA, MES y UD, y por eso existe la vista
+      `personal.v_pbi_horas_obra_mes`, que lleva el corte cableado-- y el 71,7 %
+      del euro esta en las lineas de MES, que es el coste de estructura de obra,
+      no las horas. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), publicados
+      por decision expresa del responsable del dato el 2026-09-18.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_personal]
 
   maestro:
     titulo: Maestros y dimensiones de consulta directa

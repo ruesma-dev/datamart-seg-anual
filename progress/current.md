@@ -9,7 +9,40 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## F-057 · SPEC ESCRITA (2026-09-18)
+## F-057 · IMPLEMENTADA, PENDIENTE DE REVIEW (2026-09-18)
+
+Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,
+prioridad 1. Sigue `in_progress`: el cierre lo hace el lider tras el APROBADO.
+
+**Informe del implementer: `progress/impl_F-057.md`.** El esquema `personal`
+queda construido en el repositorio con sus cuatro objetos, los doce puntos de
+propagacion cerrados y la suite offline de 68 tests en verde. **Lo que NO se ha
+hecho, y es deliberado: construir en la base.** Contra Sigrid y el Postgres de
+produccion solo lecturas; las cifras de la spec quedan como verificacion MANUAL
+del humano (T23 y T24), con sus comandos exactos en el informe.
+
+**El diccionario del arbol sube a 158 objetos, 1015 columnas y 69 fichas de
+consumo**, y su `version` de 24 a **25**: los tres objetos publicados
+(`personal.recursos` con 17 columnas, `personal.partes_lineas` con 16 y
+`personal.v_pbi_horas_obra_mes` con 10) mas la funcion local
+`personal.fn_fecha`, que no es de consumo. `pendientes` sigue vacio: aqui no se
+aplaza ninguna ficha.
+
+Dos reglas duras cambian de alcance y hay que saberlo antes de leer un dato:
+`R-FRESCURA` pasa de cuatro esquemas a **cinco** --`build_personal` tampoco es
+dependencia de ningun paso, asi que puede quedarse atras sin tumbar la noche--
+y `R-SIGRID-CON` gana `auxhor`, `auxrestip`, `hmores` y `res` en su lista de
+campos que el ETL lee sin pasar por `con`.
+
+**Desviacion unica respecto al diseno, y su motivo**: `02_partes_lineas.sql` NO
+lee `raw.hmo`. El diseno la lista entre sus fuentes, pero R12 y D2 mandan que
+la obra salga de la LINEA y la cabecera no aporta ninguna columna publicada
+--`parte_id` ya viene en `hmores.hmoide`--. Un JOIN sin uso a la cabecera es
+justo por donde se cuela la atribucion equivocada, asi que se veta con un test.
+
+### La spec, tal y como se aprobo (2026-09-18)
+
+
 
 Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,
 prioridad 1. Sigue `in_progress`: la spec no cambia el estado.
