@@ -240,8 +240,17 @@ def test_f057_r3_activo_es_fecbaj_del_concepto() -> None:
     """
     compacto = _compacto(_sql(RUTA_RECURSOS))
 
-    assert re.search(r"\(\s*\w+\.fecbaj\s*=\s*0\s*\)(?:::BOOLEAN)?\s+AS activo", compacto), (
-        "`activo` es `con.fecbaj = 0`, sobre el concepto y no sobre `res` (R3)"
+    activo = re.search(
+        r"\(\s*(?:COALESCE\(\s*)?(?P<alias>\w+)\.fecbaj\s*(?:,\s*0\s*\))?\s*"
+        r"=\s*0\s*\)(?:::BOOLEAN)?\s+AS activo",
+        compacto,
+    )
+    assert activo, "`activo` se deriva de `fecbaj` con un `= 0` (R3)"
+    assert re.search(
+        rf"JOIN\s+raw\.con\s+{activo.group('alias')}\b", compacto
+    ), (
+        "`activo` tiene que salir de la baja del CONCEPTO (`raw.con`): "
+        "`raw.res` no tiene columna de baja propia (R3)"
     )
     assert re.search(r"personal\.fn_fecha\(\w+\.fecbaj\)\s+AS fecha_baja", compacto)
 
@@ -249,11 +258,15 @@ def test_f057_r3_activo_es_fecbaj_del_concepto() -> None:
 def test_f057_r4_no_filtra_por_activo() -> None:
     """BANDERA, no filtro. Filtrar aqui dejaria fuera a 1.722 de 2.618
     recursos, y con ellos el 43,2 % de las horas imputadas (R5)."""
-    ejecutable = _sin_comentarios(_sql(RUTA_RECURSOS))
+    compacto = _compacto(_sql(RUTA_RECURSOS))
+    # El `WHERE` del LATERAL es la correlacion `emp.ide = res.conide`, no un
+    # filtro de filas de `res`: se quita antes de mirar.
+    fuera_del_lateral = re.sub(r"LEFT JOIN LATERAL \(.*?\) \w+ ON TRUE", " ", compacto)
 
-    assert "WHERE" not in ejecutable.upper(), (
+    assert " WHERE " not in fuera_del_lateral.upper(), (
         "`personal.recursos` publica las 2.618 filas, de alta y de baja: "
-        "cualquier WHERE aqui es un filtro que el diseno prohibe (R4)"
+        "cualquier WHERE en la consulta principal es un filtro que el diseno "
+        "prohibe (R4)"
     )
 
 
@@ -347,7 +360,11 @@ def test_f057_r10_externo_y_proveedor() -> None:
     """`res.prvide`: informado en 459 de las 1.354 personas, 85 proveedores."""
     compacto = _compacto(_sql(RUTA_RECURSOS))
 
-    assert re.search(r"\(\s*\w+\.prvide\s*<>\s*0\s*\)(?:::BOOLEAN)?\s+AS es_externo", compacto)
+    assert re.search(
+        r"\(\s*(?:COALESCE\(\s*)?\w+\.prvide\s*(?:,\s*0\s*\))?\s*<>\s*0\s*\)"
+        r"(?:::BOOLEAN)?\s+AS es_externo",
+        compacto,
+    ), "`es_externo` es `res.prvide <> 0` (R10)"
     assert re.search(r"NULLIF\(\w+\.prvide, 0\)\s+AS proveedor_id", compacto)
 
 
