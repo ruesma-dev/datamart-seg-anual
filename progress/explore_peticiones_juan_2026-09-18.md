@@ -16,15 +16,9 @@ No es `apu.doc`, ni `apu.jus`, ni un `docide` en `asi`.
 
 ### Los candidatos del encargo: descartados con cifra
 
-Medido sobre las 2.163.486 filas de `apu`:
-
-| candidato | informado | % |
-|-----------|-----------|---|
-| `apu.doc` | 7.016 | 0,32 % |
-| `apu.jus` | 0 | 0,00 % |
-| `apu.docnum` | 0 | 0,00 % |
-| `apu.empide` | 1.027.534 | 47,5 % (es la ENTIDAD, no la factura) |
-
+Medido sobre las 2.163.486 filas de `apu`: **`apu.doc` informado en 7.016
+(0,32 %)**, **`apu.jus` en 0 (0,00 %)**, **`apu.docnum` en 0 (0,00 %)** y
+`apu.empide` en 1.027.534 (47,5 %), que ademas es la ENTIDAD, no la factura.
 `asi` no tiene ninguna columna de documento: sus 7 columnas son `ide`, `deb`,
 `hab`, `ori`, `canal`, `cptide`, `pexide`. Hipotesis probada y **negativa**: no
 hay enlace factura->asiento dentro de `apu` ni de `asi`.
@@ -36,8 +30,6 @@ hay enlace factura->asiento dentro de `apu` ni de `asi`.
 Es el **log del flujo de aprobacion** de cualquier documento: `conide` es el
 documento, `asiide` el asiento que genero el paso, `res` el nombre del paso.
 
-Cobertura medida:
-
 - **165.845 de 166.009 facturas tienen asiento: el 99,90 %.**
 - Grano limpio: **exactamente 1 fila con `asiide <> 0` por factura** (165.845,
   ninguna con 2) y **1 sola factura por asiento** (165.845 asientos, todos con
@@ -47,8 +39,7 @@ Cobertura medida:
   (`Comprobar factura` 129.878, `Aprobar factura` ~500.000, **`Contabilizar
   factura` 130.861, de las que 129.825 traen el asiento**).
 - Las **164 facturas sin asiento** (0,10 %) son la cola viva: 29 de 2026 con
-  `est` 20/25 (pendientes de contabilizar hoy mismo) y el resto en goteo por 17
-  anios, maximo 44 en 2008.
+  `est` 20/25 (pendientes hoy mismo) y el resto en goteo por 17 anios.
 
 El resto de la cadena ya esta ingerido: `apu.asiide` da los apuntes (**595.258
 apuntes cuelgan de asientos de factura**, el 27,5 % de `apu`), `apu.cueide` la
@@ -58,9 +49,9 @@ ingerida) y `apu.cenide` el centro de coste (209.488, 35,2 %).
 ### La fecha real de contabilizacion: hay DOS, y no son la misma
 
 1. **Fecha contable del asiento** = `con.fec` del asiento. Y **no hacen falta
-   dos saltos**: medido, `apu.fec` coincide con `con.fec` del asiento en
-   **2.163.189 de 2.163.486 apuntes (99,99 %)**, cero apuntes sin fecha. Esto
-   **corrige la ficha de F-056**, que daba por hecho el doble salto.
+   dos saltos**: `apu.fec` coincide con `con.fec` del asiento en **2.163.189 de
+   2.163.486 apuntes (99,99 %)**, cero apuntes sin fecha. Esto **corrige la
+   ficha de F-056**, que daba por hecho el doble salto.
 2. **Fecha operativa** = `rac.fec` (cuando el usuario lanzo el paso, con
    `rac.usu` al lado). Coinciden solo en 12.056 de 165.845 (7,3 %): `rac.fec`
    es posterior en 153.409 (92,5 %) y anterior en 380. Repartida: mismo dia o
@@ -69,7 +60,7 @@ ingerida) y `apu.cenide` el centro de coste (209.488, 35,2 %).
 Negocio querra la (1) para cuadrar con contabilidad y la (2) para medir el
 retardo del circuito. Publicar las dos cuesta lo mismo.
 
-### Ruta alternativa medida: `regiva`, mas pobre
+### Ruta alternativa: `regiva`, mas pobre
 
 `regiva` (Registro de IVA, tampoco ingerida): 307.266 filas, `apuide` al 100 %,
 `docide` al 98,4 %, `asifec` (fecha contable) al 100 %, y toca **165.834
@@ -83,10 +74,10 @@ como enlace principal. **`rac` gana.**
 Facturas de 2025: `dcf` suma bases 113.357.327, IVA 6.839.148, `totdoc`
 120.196.475 y `tot` 117.065.836. El **debe** de los apuntes de esos asientos
 suma **136.099.465**, un **13,2 % por encima de `totdoc`**. El saldo
-(debe - haber) es 0, o sea que los asientos cuadran solos. Hipotesis sin
-comprobar: los abonos (serie `AB`) invierten debe/haber y el `SUM(deb)` los
-suma en vez de restarlos. **La feature cierra ese cuadre antes de publicar
-importes; el enlace en si no esta en duda.**
+(debe - haber) es 0: los asientos cuadran solos. Hipotesis sin comprobar: los
+abonos (serie `AB`) invierten debe/haber y el `SUM(deb)` los suma en vez de
+restarlos. **La feature cierra ese cuadre antes de publicar importes; el enlace
+en si no esta en duda.**
 
 ---
 
@@ -121,17 +112,14 @@ externo.** Medido sobre las 285.735 filas de `gra`:
 
 ### Cobertura sobre facturas
 
-- **103.799 de 166.009 facturas (62,5 %) tienen al menos un adjunto**, con
-  132.094 relaciones en `rcg` (1,27 por factura: 80.038 con 1, 21.547 con 2,
-  2.214 con 3 o mas, maximo 25).
-- Por anio la historia es nitida: **cero hasta 2016**, arranque en 2017 (491 de
-  7.921) y 2018 (1.545 de 12.072), y **desde 2019 del 93 al 99 %**: 2019
-  11.665/13.787 · 2020 11.521/12.327 · 2021 11.653/11.932 · 2022 10.549/10.698
-  · 2023 13.542/13.780 · 2024 15.341/15.599 · 2025 15.120/15.317 · 2026
-  12.368/12.455. **De 2019 en adelante: 101.759 de 105.895 = 96,1 %.**
-
-Para lo que Juan quiere —detectar discrepancias entre el documento fisico y lo
-registrado— el material util es el de 2019 en adelante, y ahi hay un 96 %.
+**103.799 de 166.009 facturas (62,5 %) tienen al menos un adjunto**, con
+132.094 relaciones en `rcg` (1,27 por factura: 80.038 con 1, 21.547 con 2,
+2.214 con 3 o mas, maximo 25). Por anio la historia es nitida: **cero hasta
+2016**, arranque en 2017 (491 de 7.921) y 2018 (1.545 de 12.072), y **desde
+2019 del 93 al 99 %**: 2019 11.665/13.787 · 2020 11.521/12.327 · 2021
+11.653/11.932 · 2022 10.549/10.698 · 2023 13.542/13.780 · 2024 15.341/15.599 ·
+2025 15.120/15.317 · 2026 12.368/12.455. **De 2019 en adelante: 101.759 de
+105.895 = 96,1 %**, que es justo el tramo util para lo que Juan pide.
 
 ### Lo que NO sirve, una linea cada uno
 
@@ -141,7 +129,6 @@ registrado— el material util es el de 2019 en adelante, y ahi hay un 96 %.
   homologacion (24,4 GB declarados en `gratam`, cero binario dentro).
 - **`condog`** (puente concepto-documento de `dog`): **16 filas**, 13
   conceptos, **0 facturas**. Anecdotica.
-- `apu.doc` como ruta de fichero: descartado arriba (0,32 % informado).
 
 ---
 
@@ -159,10 +146,9 @@ registrado— el material util es el de 2019 en adelante, y ahi hay un 96 %.
   uso sobre 514 del catalogo, y `auxpronat` **ya se ingiere**. Aviso medido:
   sus literales estan duplicados —514 filas, solo **334 `res` distintos**—, asi
   que agrupar por `natide` no es agrupar por nombre; decidirlo en la spec.
-- Cobertura en las lineas, excelente:
-  **`dcfpro`** 1.094.551 lineas, 997.435 con `proide` (91,1 %), **las 997.435
-  casan contra `pro` (100 %)**; **`dcapro`** 1.153.191 lineas, 1.147.673 con
-  `proide` (99,5 %), **las 1.147.673 casan (100 %)**.
+- Cobertura en lineas: **`dcfpro`** 1.094.551 lineas, 997.435 con `proide`
+  (91,1 %), **las 997.435 casan contra `pro` (100 %)**; **`dcapro`** 1.153.191
+  lineas, 1.147.673 con `proide` (99,5 %), **las 1.147.673 casan (100 %)**.
 
 Nada que ingerir: `pro`, `con` y `auxpronat` ya estan en `raw`. **Es trabajo de
 capa de negocio, no de ingesta.**
@@ -175,16 +161,13 @@ capa de negocio, no de ingesta.**
 |----------|-----------|------------------|
 | Factura -> asiento -> cuenta | **VIABLE, 99,90 %** | ingerir `rac` (2,5 M filas, 16 col.). `asi`, `apu`, `cua` ya estan |
 | Fecha de contabilizacion | **VIABLE, dos fechas** | ninguna extra: `apu.fec` ya vale (99,99 %); `rac.fec`+`rac.usu` vienen con `rac` |
-| Documento adjunto | **VIABLE: 62,5 % global, 96,1 % desde 2019** | ingerir `gra` **excluyendo `ima`, `pul`, `tex` y `cam`** y `rcg` (286 k filas) |
+| Documento adjunto | **VIABLE: 62,5 % global, 96,1 % desde 2019** | ingerir `gra` **excluyendo `ima`, `pul`, `tex`, `cam`** y `rcg` (286 k filas) |
 | Maestro de productos | **VIABLE, 99,97 % con nombre** | **cero**: `pro`, `con` y `auxpronat` ya ingeridos |
 
-Advertencias para quien redacte las specs:
-
-1. `rac` **no tiene `tiemod`**: no admite carga incremental por columna de
-   corte, igual que `apu`. Se trae entera o no se trae.
-2. `gra` tiene dos columnas `image` (`ima`, `pul`) y dos `text` (`tex`, `cam`):
-   **excluirlas en `tables_sigrid.yaml`** o la ingesta arrastra binario inutil.
-3. El desfase de importes del 13,2 % en 2025 se cierra **antes** de publicar
-   euros, no despues.
-4. `gra.cod` es el identificador; la **raiz del repositorio no esta en la base**
-   y hay que preguntarsela a Sistemas para construir un enlace navegable.
+Cuatro advertencias para quien redacte las specs: (1) `rac` **no tiene
+`tiemod`**, igual que `apu`, asi que se trae entera o no se trae; (2) `gra`
+tiene dos columnas `image` (`ima`, `pul`) y dos `text` (`tex`, `cam`) que hay
+que excluir en `tables_sigrid.yaml`; (3) el desfase de importes del 13,2 % en
+2025 se cierra **antes** de publicar euros; (4) `gra.cod` es el identificador,
+pero la **raiz del repositorio no esta en la base** y hay que preguntarsela a
+Sistemas para construir un enlace navegable.

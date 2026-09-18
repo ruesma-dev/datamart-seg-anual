@@ -716,7 +716,8 @@ def test_f057_r25_personal_en_consumption_schemas() -> None:
 
     entorno = (RAIZ / ".env.example").read_text(encoding="utf-8")
     linea = next(
-        (l for l in entorno.splitlines() if l.startswith("PG_CONSUMPTION_SCHEMAS=")),
+        (fila for fila in entorno.splitlines()
+         if fila.startswith("PG_CONSUMPTION_SCHEMAS=")),
         None,
     )
     assert linea is not None
@@ -737,7 +738,8 @@ def test_f057_r25_apply_grants_no_cablea_esquemas() -> None:
 
     fuente = Path(apply_grants_step.__file__).read_text(encoding="utf-8")
     ejecutable = "\n".join(
-        l for l in fuente.splitlines() if not l.lstrip().startswith("#")
+        fila for fila in fuente.splitlines()
+        if not fila.lstrip().startswith("#")
     )
 
     assert "consumption_schema_list" in ejecutable
