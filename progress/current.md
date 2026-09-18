@@ -14,11 +14,13 @@
 Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,
 prioridad 1. Sigue `in_progress`: la spec no cambia el estado.
 
-Entregado `specs/F-057-recursos-empleados-partes/` (requirements 142/150, design
-209/250, 19 tareas). **Resumen y cifras: `progress/spec_F-057.md`.**
+Entregado `specs/F-057-recursos-empleados-partes/` (requirements 150/150, design
+246/250, 25 tareas). **Resumen y cifras: `progress/spec_F-057.md`.**
 
-Tres objetos a construir: `stg.recursos`, `stg.partes_lineas` y
-`mart.v_pbi_horas_obra_mes`. Nada de ingesta (F-066 y F-074 ya la hicieron).
+Tres objetos a construir en un **esquema modulo propio `personal`**, hermano de
+`compras`, `maestro` y `retenciones`: `personal.recursos`,
+`personal.partes_lineas` y `personal.v_pbi_horas_obra_mes`. Nada de ingesta
+(F-066 y F-074 ya la hicieron).
 
 **EL HALLAZGO**: la unidad de `hmores.can` la fija **`auxhor.medide`**
 (1 HORA, 2 DIA, 3 MES, 19 ud), **no `auxhor.ext`, que esta a cero en las 60
@@ -40,16 +42,29 @@ R7. Sin ofuscacion ni hash. El resto de la ficha de `emp` (Seguridad Social,
 banco, domicilio, nacimiento, sexo, estado civil, contacto, credenciales) NO
 sube.
 
-### Lo que el humano tiene que validar
+### DECIDIDO por el humano el 2026-09-18: esquema modulo, no `stg`
 
-1. **`stg` o esquema modulo propio** (la unica decision que pido confirmar). Los
-   dos objetos van en `stg` porque el criterio de aceptacion dice «escrito en
-   stg», y eso los mete dentro de `build_stg`, que es la puerta de F-024: si
-   fallan, `mart` no se construye esa noche. Un modulo `personal` seria no
-   bloqueante por `R-FRESCURA`. Si lo prefiere, el SQL se mueve tal cual.
-2. **Declarado y no resuelto a proposito**: el coste de personal por obra
-   COMPLETO no es la suma de las horas; el 71,7 % del euro son lineas de MES.
-   Pasar de horas a euros con `raw.reshor` es F-061.
+Deje abierto `stg` vs esquema propio y el humano eligio **`personal`**. Razon
+decisiva: **los permisos se dan por esquema**, y F-087 crea un rol para Power BI
+con acceso solo a los esquemas de consumo; con nombre y DNI en un esquema
+propio, «Power BI si, datos de personal no» es un `GRANT`. Segunda razon: **no
+bloquea** —`build_stg` es la puerta de F-024 y un fallo ahi deja al `mart` sin
+construir; un modulo falla solo y `R-FRESCURA` avisa—.
+
+El SQL no cambia; cambia donde vive. `build_personal` va detras de
+`build_retenciones` y delante de `build_cierre`, con
+`depends_on = ["build_stg"]` (lee `stg.obras`) y **sin que ningun paso lo
+declare como dependencia**. La propagacion son **doce puntos, uno por tarea**
+(T10-T20): step, orquestador, tres puntos de `main.py`, `apply_grants` +
+`DEFAULT_CONSUMPTION_SCHEMAS` + `.env.example`, `ESQUEMAS_DEL_DATAMART`,
+`check-declarados`, `check-unicidad`, `check-relaciones`,
+`config/diccionario/personal.yaml` y los tests de cada uno.
+
+### Lo que sigue abierto
+
+**Declarado y no resuelto a proposito**: el coste de personal por obra COMPLETO
+no es la suma de las horas; el 71,7 % del euro son lineas de MES. Pasar de horas
+a euros con `raw.reshor` es F-061.
 
 ## F-084 · IMPLEMENTACION ENTREGADA (2026-09-16)
 

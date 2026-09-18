@@ -2,9 +2,14 @@
 # F-057 · Spec escrita (spec-author, 2026-09-18)
 
 Entregado: `specs/F-057-recursos-empleados-partes/` con `requirements.md`
-(142/150), `design.md` (209/250) y `tasks.md` (19 tareas, una por línea).
+(150/150), `design.md` (246/250) y `tasks.md` (25 tareas, una por línea).
 Puerta de tamaño en verde. **No se ha tocado código, ni el estado de la feature,
 ni se ha hecho push.**
+
+> **REVISADA EL MISMO DÍA.** El humano resolvió A1 —el único punto que dejé
+> abierto— y los tres objetos pasan de `stg` a un **esquema módulo propio
+> `personal`**. Ver «A1, ya cerrado» al final. Las tareas T10-T20 son la
+> propagación de ese cambio: doce puntos, uno por tarea.
 
 Todas las cifras de la spec se **midieron contra Sigrid vivo el 2026-09-18** por
 `sigrid-api` en solo lectura, agregando en SQL. Nada supuesto. Los scripts de
@@ -62,8 +67,9 @@ El aviso de F-072 («`auxhor` mezcla») apuntaba al problema pero no al mecanism
    nacimiento, sexo, estado civil, contacto y credenciales. La ficha del
    diccionario declara que el objeto contiene datos personales. `res.cif`
    informado en 629 de 1.354 personas (46,5 %); `emp.dni` en el 99,2 %.
-5. **Sí sube a la superficie de consumo**, con tres objetos: `stg.recursos`,
-   `stg.partes_lineas` y **una sola vista** `mart.v_pbi_horas_obra_mes` con
+5. **Sí sube a la superficie de consumo**, con tres objetos:
+   `personal.recursos`, `personal.partes_lineas` y **una sola vista**
+   `personal.v_pbi_horas_obra_mes` con
    `unidad = 'HORA'` cableado, para que la trampa de la unidad no se pueda
    cometer desde ahí. El material lo justifica: 20 años (2002-2026), **100 % de
    `paride` existe y es de la misma obra** (302.575 de 302.575, cero
@@ -81,24 +87,50 @@ El aviso de F-072 («`auxhor` mezcla») apuntaba al problema pero no al mecanism
    330.638 (99,99 %); 11.036 líneas a cero y **9.119 negativas** (correcciones),
    que no se filtran.
 
-## Lo que dejo ABIERTO para el humano
+## A1, ya cerrado: esquema módulo `personal` (decisión del humano, 2026-09-18)
 
-**A1 · `stg` o un esquema módulo propio.** Los dos objetos van en `stg`, como
-pide el criterio de aceptación de la ficha («escrito en stg»), y eso los mete
-**dentro de `build_stg`, que es la puerta de F-024**: si fallan, `mart` no se
-construye esa noche. Un esquema módulo `personal` —hermano de `compras`,
-`maestro` y `retenciones`— sería **no bloqueante** por `R-FRESCURA` y tendría
-menos riesgo sobre la nocturna. Mitigado poniéndolos los últimos de la lista y
-con SQL plano (sin recursión, sin `unnest`, sin ventanas; 330.638 filas ≈ 60 MB,
-el 0,24 % de la base), pero **si el humano prefiere el módulo, el SQL se mueve
-tal cual y solo cambia el step**. Es la única decisión que pido confirmar.
+Lo dejé abierto —`stg` o esquema propio— y el humano eligió **esquema módulo
+propio `personal`**, hermano de `compras`, `maestro` y `retenciones`. Sus dos
+razones, por orden de peso:
+
+1. **Permisos por esquema**, el argumento decisivo. F-087 crea un rol propio
+   para Power BI con acceso solo a los esquemas de consumo. Con nombre y DNI en
+   un esquema propio, «acceso a Power BI pero no a los datos de personal» es un
+   `GRANT`; mezclados en `stg` —que además F-079 declaró consultable— esa
+   distinción exigiría trocear permisos tabla a tabla.
+2. **No bloquea.** `build_stg` es la puerta de F-024: un fallo del SQL de
+   personal dentro de `build_stg` dejaría al `mart` sin construir esa noche. Los
+   esquemas módulo fallan solos y `R-FRESCURA` avisa al consumidor.
+
+**El SQL no cambia**; cambia dónde vive y qué step lo ejecuta:
+`sql/personal/00_setup.sql` … `03_views.sql`, un
+`build_personal_step.py` calcado de `build_retenciones_step.py` (131 líneas),
+`depends_on = ["build_stg"]` —lee `stg.obras` para `en_seguimiento`— y **ningún
+paso lo declara como dependencia**. En `run-all` va con los otros build de
+negocio, detrás de `build_retenciones` y delante de `build_cierre`.
+
+**La propagación son doce puntos, y cada uno es una tarea** (T10-T20): el step,
+el orquestador, los tres puntos de `main.py` (comando propio,
+`build_pipeline_steps`, `run-all`), `apply_grants_step.py` +
+`DEFAULT_CONSUMPTION_SCHEMAS` + `.env.example`, `ESQUEMAS_DEL_DATAMART` (que es
+lo que hace que `catalogo.py` mire el esquema), `check-declarados`,
+`check-unicidad`, `check-relaciones`, el YAML nuevo
+`config/diccionario/personal.yaml`, y los tests de cada uno.
+
+**Efecto colateral aceptado**: `personal.v_pbi_horas_obra_mes` no lleva datos
+personales pero vive en el esquema restringible. Si algún día Power BI necesita
+las horas sin las personas, esa vista se mueve a `mart` y es un fichero; no se
+parte el esquema por adelantado.
+
+## Lo que sigue abierto
 
 **A2 · Declarado y no resuelto, a propósito (D8 del diseño).** El coste de
 personal por obra **completo no es `SUM(importe)` de HORA**: el **71,7 % del
 euro está en las líneas de MES** (estructura de obra: MES JEFE DE OBRA solo,
-18,80 M€). La vista publica horas; el euro por obra sale de `stg.partes_lineas`
-sin filtrar unidad, y la ficha lo dice. Pasar de horas a euros con el precio de
-coste por recurso (`raw.reshor`, 8.949 filas) es **F-061**, no esto.
+18,80 M€). La vista publica horas; el euro por obra sale de
+`personal.partes_lineas` sin filtrar unidad, y la ficha lo dice. Pasar de horas
+a euros con el precio de coste por recurso (`raw.reshor`, 8.949 filas) es
+**F-061**, no esto.
 
 **A3 · Defectos de origen que se declaran y no se corrigen**: 5 líneas con fecha
 0, una con fecha del año 3103, 6 con `ano` fuera de 1990-2030, 5 con `mes` fuera
