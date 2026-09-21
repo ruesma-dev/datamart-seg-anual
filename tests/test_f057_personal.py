@@ -629,6 +629,62 @@ def test_f057_r24_el_step_encadena_sus_cuatro_sql(monkeypatch: pytest.MonkeyPatc
     assert resultado.rows_processed == 14
 
 
+def test_f057_r24_un_sub_paso_a_medio_configurar_no_cuenta_filas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """EL GUARDIAN DE `target_schema`/`target_table`, y por que `SUB_PASOS` es
+    DATO a nivel de modulo: sustituirla es lo unico que permite ejercitarlo.
+
+    El step solo cuenta filas cuando el sub-paso declara **las dos** cosas. Con
+    un `or` en vez del `and` —que hoy da el mismo resultado, porque los cuatro
+    sub-pasos reales las tienen ambas o ninguna— un `_SubStep` a medio
+    configurar llamaria a `count_rows(esquema, None)`, y eso revienta contra la
+    base a las tres de la manana en vez de en la suite.
+
+    Lo destapo la campaña de mutacion: era el unico superviviente de
+    `build_personal_step.py` con riesgo real, y este test lo mata.
+    """
+    from etl_sigrid.application.steps import build_personal_step
+    from etl_sigrid.application.steps.build_personal_step import (
+        BuildPersonalStep,
+        _SubStep,
+    )
+    from etl_sigrid.domain.entities import StepStatus
+
+    class _PgQueAnota:
+        def __init__(self) -> None:
+            self.contados: list[tuple[str, str]] = []
+
+        def execute_sql_file(self, path: Path) -> None:
+            pass
+
+        def count_rows(self, schema: str, table: str) -> int:
+            self.contados.append((schema, table))
+            return 5
+
+    pg = _PgQueAnota()
+    monkeypatch.setattr(build_personal_step, "build_postgres_client", lambda _s: pg)
+    monkeypatch.setattr(
+        build_personal_step,
+        "SUB_PASOS",
+        (
+            _SubStep(name="solo_esquema", sql_file="00_setup.sql",
+                     target_schema="personal"),
+            _SubStep(name="solo_tabla", sql_file="01_recursos.sql",
+                     target_table="recursos"),
+        ),
+    )
+
+    resultado = BuildPersonalStep(SimpleNamespace()).run()
+
+    assert resultado.status == StepStatus.SUCCESS
+    assert pg.contados == [], (
+        "un sub-paso con solo la mitad de su destino NO puede contar filas: "
+        "`count_rows` recibiria un None y reventaria contra la base"
+    )
+    assert resultado.rows_processed == 0
+
+
 class _PgQueRevienta:
     """Ejecuta hasta el fichero indicado y ahi lanza, como haria Postgres."""
 
