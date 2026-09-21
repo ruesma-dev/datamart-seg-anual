@@ -37,8 +37,11 @@
 -- salir, no es un problema»). No es un descuido ni un pendiente: es una
 -- decisión del responsable del dato. Lo que NO sube es el resto de la ficha de
 -- `emp` —Seguridad Social, cuenta bancaria, domicilio, fecha de nacimiento,
--- sexo, estado civil, contacto y credenciales—, y eso lo vigila columna a
--- columna `test_f057_r8_no_publica_otros_datos_personales`.
+-- sexo, estado civil, contacto y credenciales—, y eso lo vigila una LISTA
+-- BLANCA, no una negra: los `test_f057_r8_*` exigen que `raw.emp` se lea una
+-- sola vez, en el lateral, y que se lean EXACTAMENTE `ide`, `dni`, `nomnom`,
+-- `nomape1` y `nomape2`. Una lista negra solo protege de lo que alguien se
+-- acordó de listar.
 -- ============================================================================
 
 TRUNCATE TABLE personal.recursos;
@@ -84,12 +87,14 @@ LEFT JOIN LATERAL (
     -- El empleado es un ATRIBUTO OPCIONAL del recurso, nunca el grano ni un
     -- filtro: 1.794 de los 2.618 recursos no tienen ficha de empleado.
     --
-    -- `ORDER BY` + `LIMIT 1` no es paranoia: hoy 3 recursos comparten
-    -- `conide`, y `raw.emp` es una copia de origen sin clave primaria
-    -- declarada. Un JOIN desnudo multiplicaría filas el día que el origen
-    -- traiga dos empleados con el mismo `ide`, y el grano —una fila por
-    -- `raw.res`— dejaría de estar garantizado. Mismo patrón, y por lo mismo,
-    -- que `maestro/04_centros_coste.sql`.
+    -- `ORDER BY` + `LIMIT 1` es defensa en profundidad, no una necesidad de
+    -- hoy: `raw.emp` SÍ tiene `PRIMARY KEY (ide)` —toda tabla de `raw` se
+    -- ingiere con `ide` como clave (`ensure_raw_table`, y por eso `raw` está en
+    -- `unicidad_sql.ESQUEMAS_CON_CLAVE_GARANTIZADA`)—, así que hoy el motor ya
+    -- impide dos empleados con el mismo `ide`. El `LIMIT 1` fija el grano —una
+    -- fila por `raw.res`— en el propio SQL, sin depender de cómo se ingiera
+    -- `raw` mañana (que 3 recursos compartan `conide` no multiplica: es el
+    -- lado del recurso). Mismo patrón que `maestro/04_centros_coste.sql`.
     --
     -- SOLO CINCO COLUMNAS, y esta lista es el límite de lo autorizado (R8):
     -- el identificador, el DNI y el nombre estructurado. Nada más de las 152
