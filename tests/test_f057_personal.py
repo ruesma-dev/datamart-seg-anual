@@ -316,43 +316,83 @@ def test_f057_r7_publica_nombre_y_dni() -> None:
         )
 
 
-#: Lo que `raw.emp` trae y NO sube: la autorizacion de R7 cubre nombre y DNI,
-#: no la ficha de 152 columnas. Nombres de columna reales de Sigrid.
-COLUMNAS_VETADAS_DE_EMP = [
-    "nss",        # numero de la Seguridad Social
-    "segsoc",
-    "iban",
-    "cuenta",
-    "banide",
-    "dirlin",     # domicilio
-    "codpos",
-    "munide",
-    "fecnac",     # fecha de nacimiento
-    "sex",        # sexo
-    "estciv",     # estado civil
-    "numhij",
-    "tel",        # contacto
-    "movil",
-    "ema",
-    "logacc",     # credenciales
-    "ideacc",
-    "ipacc",
-    "recema",
-]
+#: LO UNICO que `raw.emp` sube al datamart curado (R7, R8): el identificador,
+#: el DNI y el nombre estructurado. Es una LISTA BLANCA a proposito.
+#:
+#: La primera version era una lista negra de 19 «nombres reales de Sigrid», y
+#: 14 no existian en `emp` (`nss`, `iban`, `movil`...): con el lateral leyendo
+#: `emp.tarseg` (Seguridad Social) y `emp.ban` (banco) la suite pasaba entera.
+#: Una lista negra solo protege de lo que alguien se acordo de listar; para
+#: cerrar un conjunto, lista blanca. Los nombres reales de las 152 columnas
+#: estan en `azure-apps/sigrid_tablas.md`, tabla `emp`.
+COLUMNAS_AUTORIZADAS_DE_EMP = frozenset({"ide", "dni", "nomnom", "nomape1", "nomape2"})
+
+_LATERAL_EMP = re.compile(
+    r"LEFT JOIN LATERAL \( SELECT (?P<lista>.*?) FROM raw\.emp (?P<alias>\w+) "
+    r"(?P<resto>[^()]*?)\) (?P<exterior>\w+) ON TRUE"
+)
 
 
-@pytest.mark.parametrize("columna", COLUMNAS_VETADAS_DE_EMP)
-def test_f057_r8_no_publica_otros_datos_personales(columna: str) -> None:
-    """La lista negra, como guarda y no como buena intencion.
+def _lateral_emp() -> re.Match[str]:
+    compacto = _compacto(_sql(RUTA_RECURSOS))
+    lateral = _LATERAL_EMP.search(compacto)
+    assert lateral, "`raw.emp` se lee en un LEFT JOIN LATERAL (R8)"
+    return lateral
 
-    R8 no se puede comprobar «viendo que no estan»: se comprueba nombrandolas
-    una a una, para que anadir cualquiera de ellas rompa la suite. La
-    autorizacion del 2026-09-18 cubre nombre y DNI, y nada mas.
+
+def test_f057_r8_raw_emp_solo_se_lee_en_el_lateral() -> None:
+    """Una sola lectura de `raw.emp`: la del lateral que vigilan los demas.
+
+    Un segundo JOIN, o una subconsulta escalar en el SELECT, se saltaria la
+    lista blanca del lateral sin tocarlo.
     """
-    ejecutable = _sin_comentarios(_sql(RUTA_RECURSOS))
+    compacto = _compacto(_sql(RUTA_RECURSOS))
 
-    assert not re.search(rf"\b{columna}\b", ejecutable, re.IGNORECASE), (
-        f"`{columna}` es un dato personal de `raw.emp` que R8 deja en `raw`"
+    assert len(re.findall(r"\braw\.emp\b", compacto)) == 1, (
+        "`raw.emp` se lee UNA vez, en el lateral de la lista blanca (R8)"
+    )
+    _lateral_emp()
+
+
+def test_f057_r8_el_lateral_lee_exactamente_la_lista_blanca() -> None:
+    """El lateral selecciona EXACTAMENTE las cinco columnas autorizadas.
+
+    Cada elemento es `alias.columna` desnudo: sin `*`, sin expresiones y sin
+    renombrar, porque `emp.tarseg AS dni` pasaria por una columna autorizada.
+    """
+    lateral = _lateral_emp()
+    alias = lateral["alias"]
+    elementos = [e.strip() for e in lateral["lista"].split(",")]
+
+    columnas = []
+    for elemento in elementos:
+        desnudo = re.fullmatch(rf"{alias}\.(\w+)", elemento)
+        assert desnudo, f"`{elemento}`: el lateral lee columnas desnudas de `raw.emp` (R8)"
+        columnas.append(desnudo.group(1).lower())
+
+    assert len(columnas) == len(set(columnas)), "columna repetida en el lateral (R8)"
+    assert set(columnas) == COLUMNAS_AUTORIZADAS_DE_EMP, (
+        f"el lateral lee {sorted(columnas)}; lo autorizado el 2026-09-18 es "
+        f"{sorted(COLUMNAS_AUTORIZADAS_DE_EMP)} y nada mas (R8)"
+    )
+    resto = set(re.findall(rf"\b{alias}\.(\w+)", lateral["resto"]))
+    assert resto <= COLUMNAS_AUTORIZADAS_DE_EMP, (
+        f"el lateral mira {sorted(resto - COLUMNAS_AUTORIZADAS_DE_EMP)} de `raw.emp` (R8)"
+    )
+
+
+def test_f057_r8_el_select_exterior_no_usa_otra_columna_del_empleado() -> None:
+    """Fuera del lateral, `e.<columna>` solo puede ser una de las cinco."""
+    lateral = _lateral_emp()
+    exterior = lateral["exterior"]
+    compacto = _compacto(_sql(RUTA_RECURSOS))
+    fuera = compacto[: lateral.start()] + compacto[lateral.end():]
+
+    usadas = {c.lower() for c in re.findall(rf"\b{exterior}\.(\w+)", fuera)}
+    assert usadas, f"el SELECT exterior no usa el lateral `{exterior}` (R7)"
+    assert usadas <= COLUMNAS_AUTORIZADAS_DE_EMP, (
+        f"el SELECT exterior usa {sorted(usadas - COLUMNAS_AUTORIZADAS_DE_EMP)} "
+        "del empleado: fuera de lo autorizado (R8)"
     )
 
 
@@ -462,10 +502,22 @@ def test_f057_r16_unidad_desde_medide() -> None:
     unidad = re.search(r"CASE\s+\w+\.medide\b.*?END(?:::VARCHAR\(\d+\))?\s+AS unidad", compacto)
     assert unidad, "`unidad` se deriva de `auxhor.medide` con un CASE (R16)"
     texto = unidad.group(0)
-    assert "WHEN 1 THEN 'HORA'" in texto
-    assert "WHEN 2 THEN 'DIA'" in texto
-    assert "WHEN 3 THEN 'MES'" in texto
-    assert "WHEN 19 THEN 'UD'" in texto
+
+    # IGUALDAD EXACTA, no «contiene». Con `in` pasaban un `WHEN 4 THEN 'HORA'`
+    # anadido, un `WHEN 5 THEN 'KM'` y —el peor— un `WHEN 3 THEN 'HORA'`
+    # antepuesto, que convierte los MESES en horas: el error que esta feature
+    # existe para impedir. Cada WHEN tiene que ser `WHEN n THEN 'X'` literal.
+    pares = re.findall(r"\bWHEN (\d+) THEN '([^']*)'", texto)
+    assert len(pares) == len(re.findall(r"\bWHEN\b", texto)), (
+        "cada rama del CASE es `WHEN n THEN 'LITERAL'` (R16)"
+    )
+    valores = [int(n) for n, _ in pares]
+    assert len(valores) == len(set(valores)), (
+        f"`medide` repetido en el CASE {valores}: gana el primero y cambia la unidad (R16)"
+    )
+    assert {int(n): u for n, u in pares} == {1: "HORA", 2: "DIA", 3: "MES", 19: "UD"}, (
+        f"el CASE de la unidad es exactamente 1 HORA, 2 DIA, 3 MES, 19 UD; hay {pares} (R16)"
+    )
 
 
 def test_f057_r16b_no_usa_auxhor_ext() -> None:
@@ -492,7 +544,7 @@ def test_f057_r17_medide_desconocido_no_se_traduce() -> None:
     unidad = re.search(r"CASE\s+\w+\.medide\b.*?END", compacto)
 
     assert unidad, "falta el CASE de la unidad (R17)"
-    assert "ELSE 'DESCONOCIDA'" in unidad.group(0), (
+    assert re.findall(r"\bELSE (.*?) END\b", unidad.group(0)) == ["'DESCONOCIDA'"], (
         "sin rama ELSE, un `medide` nuevo saldria NULL y se sumaria en silencio (R17)"
     )
 
@@ -525,8 +577,14 @@ def test_f057_r21_vista_solo_horas() -> None:
     """
     compacto = _compacto(_sql(RUTA_VISTAS))
 
-    assert re.search(r"WHERE \w+\.unidad = 'HORA'", compacto), (
-        "la vista se construye SOLO con unidad = 'HORA' (R21)"
+    # EXACTAMENTE el corte, no «empieza por el corte»: con `re.search` pasaba
+    # `WHERE pl.unidad = 'HORA' OR pl.unidad = 'MES'`, que mete los meses.
+    filtros = re.findall(r"\bWHERE (.*?) GROUP BY\b", compacto)
+    assert len(filtros) == 1 and re.fullmatch(r"\w+\.unidad = 'HORA'", filtros[0]), (
+        f"la vista se construye SOLO con unidad = 'HORA', y el filtro es {filtros} (R21)"
+    )
+    assert len(re.findall(r"\bWHERE\b", compacto)) == 1, (
+        "un unico WHERE en la vista: el corte de la unidad (R21)"
     )
     for columna in ("obra_id", "codigo_obra", "nombre_obra", "anio", "mes",
                     "tipo_recurso", "es_externo", "recursos", "horas", "importe"):

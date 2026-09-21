@@ -67,8 +67,8 @@ COMMENT ON FUNCTION personal.fn_fecha(BIGINT) IS
 -- CONTIENE DATOS PERSONALES: nombre, NIF y DNI. Autorizado expresamente por el
 -- humano el 2026-09-18 («el dni puede salir, no es un problema»). No sube el
 -- resto de la ficha de `emp` —Seguridad Social, banco, domicilio, nacimiento,
--- sexo, estado civil, contacto, credenciales—, y la lista negra la vigila
--- `test_f057_r8_no_publica_otros_datos_personales`, columna a columna.
+-- sexo, estado civil, contacto, credenciales—, y lo vigila una LISTA BLANCA
+-- (`test_f057_r8_*`): de `raw.emp` se leen exactamente cinco columnas.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS personal.recursos (
     recurso_id       BIGINT       PRIMARY KEY,
