@@ -1221,3 +1221,38 @@ el precio por recurso es **F-061**.
 cerrar un conjunto, **lista blanca** —una negra solo protege de lo que alguien se
 acordo de listar—; y si una feature cambia **cuantos** elementos tiene algo, se
 busca **el numero viejo solo**, no la frase que lo acompana.
+
+## F-094 · Retenciones infladas 4,3 veces: el estado VIVA y la obra real (cerrada el 2026-09-22, APROBADO en pasada 2)
+
+Rama `feature/F-094-retenciones-estado-vivo`, `sdd=false`, rigor `estandar`.
+Informe `progress/impl_F-094.md`; review `progress/review_F-094.md`.
+
+**El defecto**: `retenciones.movimientos` decidia el estado solo con `pag.fecrea`
+y no leia la ficha `con` del propio efecto, asi que contaba como VIVA los
+originales agrupados, el agrupador AGR ya pagado y los anulados. El mismo dinero
+contaba dos veces. Lo destapo Juan Romero con FERMALUX.
+
+**El arreglo, sin borrar filas**: tres estados leidos de `raw.con` del efecto,
+BAJA (`fecbaj` o `est` 14 Agrupados / 15 Divididos) > LIQUIDADA (`fecrea` o
+`est` 10) > VIVA. Lo vivo a proveedor pasa de **35.544.786,07 a 8.345.506,03 EUR**
+(7.752 efectos); **FERMALUX 64.201,96**, igual que su cuenta contable; 27.869
+filas antes y despues. Las vistas no suman BAJA en neto ni cargos/abonos.
+
+**Absorbe el resto de F-045** (decision H6 de F-095): `obra_id` es la obra real
+traducida con `maestro.centros_coste` y el centro va en `centro_coste_id`;
+**262 de 262** casan con `maestro.obras` (antes 0). F-045 se retira del backlog.
+**Rompe** a quien una por el centro de coste (Power BI): ahora se une por `obra_id`.
+
+**Lado cliente sin tocar, a proposito**: sus 19,9 M EUR con baja estan en estado
+1 (Pendiente) y el criterio de proveedor dejaria 2,12 M frente a 13,81 M en
+contabilidad. Queda para una feature propia (H5 de F-095).
+
+**Diccionario version 26**: fuera los 34,7 M EUR de los ordenes de magnitud,
+dentro 8,35 M; cliente marcado sin verificar. `init.sh` exit 0, 5.043 pasan,
+cobertura 94,7 %. Mutacion N/A justificado (0 mutantes: el Python tocado son
+comentarios; 16 tests fijan el texto exacto de cada CASE).
+
+**Pendiente del humano**, en `current.md`: `build-retenciones` → `check-unicidad`
+→ `check-relaciones` (antes del build sale KO por la relacion nueva) →
+`publicar-diccionario`, reiniciar el MCP por su cache (F-089) y el parrafo para
+`azure-apps/datamart_seg_anual.md`.

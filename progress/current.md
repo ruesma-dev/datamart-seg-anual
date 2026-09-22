@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## F-094 · IMPLEMENTADA, PENDIENTE DE REVIEW (2026-09-22)
+## F-094 · CERRADA (done, 2026-09-22) · QUEDAN LAS VERIFICACIONES MANUAL DEL HUMANO
 
 Rama `feature/F-094-retenciones-estado-vivo`, `sdd=false`, rigor `estandar`.
 Informe: `progress/impl_F-094.md`.
