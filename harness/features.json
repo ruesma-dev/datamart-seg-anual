@@ -1549,7 +1549,7 @@
         "Cada retencion viva tiene su vencimiento calculado desde el fin de obra, con el campo de fin de obra y el plazo que el humano apruebe en la spec, y las obras sin fecha declaradas en vez de inventadas",
         "Decidido con el humano que pasa con F-059 y F-045, y el diccionario explica cual es la fuente que manda para el saldo vivo"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 3,
