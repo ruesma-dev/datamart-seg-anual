@@ -31,7 +31,7 @@ from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionar
 
 DIR_DICCIONARIO = pathlib.Path(__file__).resolve().parents[1] / "config" / "diccionario"
 
-#: `esquema.objeto`, con el esquema entre los nueve del datamart. `_meta` lleva
+#: `esquema.objeto`, con el esquema entre los de `ESQUEMAS_DEL_DATAMART`. `_meta` lleva
 #: guion bajo delante, así que el nombre admite ese primer carácter.
 #: Un `*` detrás es un comodín («las vistas `compras.v_*`»), no un objeto.
 _CITA = re.compile(

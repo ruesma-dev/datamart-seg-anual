@@ -264,16 +264,23 @@ def test_f006_r3_con_motivo_escrito_la_ficha_sin_columnas_es_valida() -> None:
 
 
 # ---------------------------------------------------------------------------
-# R4 · Los NUEVE esquemas
+# R4 · Los esquemas de `ESQUEMAS_DEL_DATAMART`
 # ---------------------------------------------------------------------------
 
 
-def test_f006_r4_son_nueve_esquemas_y_estos() -> None:
-    """Los informes de exploración dicen ocho. Son NUEVE (requirements §0.5)."""
-    assert len(ESQUEMAS_DEL_DATAMART) == 9
+def test_f006_r4_son_diez_esquemas_y_estos() -> None:
+    """Los informes de exploración dicen ocho. Eran NUEVE (requirements §0.5) y
+    son DIEZ desde F-057 (2026-09-18), que añadió `personal`.
+
+    Se enumeran uno a uno a propósito: esta tupla es lo que hace que el
+    validador exija ficha de esquema y que `check-declarados` mire la carpeta,
+    así que un esquema que entre o salga tiene que hacerlo por aquí y no en
+    silencio.
+    """
+    assert len(ESQUEMAS_DEL_DATAMART) == 10
     assert set(ESQUEMAS_DEL_DATAMART) == {
         "_meta", "raw", "stg", "aux", "mart",
-        "cierre", "compras", "maestro", "retenciones",
+        "cierre", "compras", "maestro", "retenciones", "personal",
     }
 
 
@@ -931,7 +938,7 @@ def test_f006_r1_cargador_una_ficha_sin_cuerpo_es_un_error(tmp_path) -> None:
 # El bloque global REAL (T10 · R4, R10)
 #
 # Estos tests leen `config/diccionario/00_global.yaml`, no fixtures: son la
-# diferencia entre «el validador sabe exigir nueve esquemas» y «los nueve
+# diferencia entre «el validador sabe exigir diez esquemas» y «los diez
 # esquemas están escritos».
 # ===========================================================================
 
@@ -949,7 +956,7 @@ def _global_real():
     return dicc
 
 
-def test_f006_r4_el_global_real_declara_los_nueve_esquemas() -> None:
+def test_f006_r4_el_global_real_declara_los_diez_esquemas() -> None:
     dicc = _global_real()
 
     assert set(dicc.esquemas) == set(ESQUEMAS_DEL_DATAMART)
@@ -971,7 +978,7 @@ def test_f006_r4_cada_esquema_global_dice_para_que_sirve() -> None:
 
 
 def test_f006_r4_raw_y_aux_quedan_fuera_de_la_superficie_de_consumo() -> None:
-    """Los nueve esquemas, uno a uno, para que ninguno cambie en silencio.
+    """Los esquemas de `ESQUEMAS_DEL_DATAMART`, uno a uno, para que ninguno cambie en silencio.
 
     Fuera quedan **dos**, y por un HECHO, no por una preferencia: `raw` es una
     copia literal de Sigrid sin semántica de negocio —nombres de cuatro letras,

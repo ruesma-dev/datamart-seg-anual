@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
 from etl_sigrid.infrastructure.inventario_repositorio import (
     YAML_PENDIENTES,
     cargar_pendientes_construccion,
@@ -76,7 +77,11 @@ def test_f047_r8_cli_con_todo_construido_sale_con_cero(monkeypatch) -> None:
 
     assert resultado.exit_code == 0, resultado.output
     assert "OK" in resultado.output
-    assert pg.esquemas_pedidos is not None and len(pg.esquemas_pedidos) == 9
+    # Se cuenta contra la constante, no contra un literal: la lista de
+    # esquemas la fija `ESQUEMAS_DEL_DATAMART` --diez desde F-057-- y duplicar
+    # aqui su tamano obliga a tocar dos sitios cada vez que entre uno nuevo.
+    assert pg.esquemas_pedidos is not None
+    assert len(pg.esquemas_pedidos) == len(ESQUEMAS_DEL_DATAMART)
 
 
 def test_f047_r8_cli_detecta_la_vista_que_la_nocturna_destruia(monkeypatch) -> None:

@@ -35,10 +35,17 @@ from dataclasses import dataclass, replace
 # Vocabularios cerrados
 # ---------------------------------------------------------------------------
 
-#: Los NUEVE esquemas del datamart. Los informes de exploración dicen «ocho» y
-#: se equivocan: `infra/sql/02_roles.sql` los crea uno a uno y su comentario ya
-#: dice «los nueve esquemas». Ojo a la trampa de nombres: el esquema se llama
-#: `aux` pero su carpeta de SQL es `sql/auxiliar/`.
+#: Los DIEZ esquemas del datamart. Eran nueve hasta F-057 (2026-09-18), que
+#: añadió `personal` —recursos, partes de trabajo y horas por obra— como
+#: esquema módulo propio para poder dar o quitar su acceso con un GRANT: es el
+#: único que contiene datos personales curados (nombre, NIF y DNI).
+#:
+#: Ojo a la trampa de nombres: el esquema se llama `aux` pero su carpeta de SQL
+#: es `sql/auxiliar/`.
+#:
+#: Esta tupla es lo que hace que las puertas MIREN un esquema: el validador del
+#: diccionario exige entrada propia para cada uno (R4) y `check-declarados` los
+#: recorre. Un esquema que no esté aquí se construye igual y no lo vigila nadie.
 ESQUEMAS_DEL_DATAMART = (
     "_meta",
     "aux",
@@ -46,6 +53,7 @@ ESQUEMAS_DEL_DATAMART = (
     "compras",
     "maestro",
     "mart",
+    "personal",
     "raw",
     "retenciones",
     "stg",
@@ -390,7 +398,7 @@ def validar(
 
 
 def _validar_esquemas(dicc: Diccionario) -> list[ErrorValidacion]:
-    """R4: los NUEVE esquemas tienen entrada propia en `00_global.yaml`."""
+    """R4: los esquemas de `ESQUEMAS_DEL_DATAMART` tienen entrada propia en `00_global.yaml`."""
     errores: list[ErrorValidacion] = []
     fichero = "00_global.yaml"
 
@@ -404,7 +412,7 @@ def _validar_esquemas(dicc: Diccionario) -> list[ErrorValidacion]:
                     regla="R4",
                     detalle=(
                         f"el esquema `{esquema}` no tiene entrada en `esquemas`. "
-                        f"El diccionario debe cubrir los nueve: "
+                        f"El diccionario debe cubrir los diez: "
                         f"{_lista(ESQUEMAS_DEL_DATAMART)}"
                     ),
                 )
@@ -420,7 +428,7 @@ def _validar_esquemas(dicc: Diccionario) -> list[ErrorValidacion]:
                     objeto=None,
                     regla="R4",
                     detalle=(
-                        f"`esquemas` declara `{esquema}`, que no es uno de los nueve "
+                        f"`esquemas` declara `{esquema}`, que no es uno de los diez "
                         f"esquemas del datamart: {_lista(ESQUEMAS_DEL_DATAMART)}"
                     ),
                 )
@@ -512,7 +520,7 @@ def _validar_ficha(
             )
         )
 
-    # --- R4: la ficha pertenece a uno de los nueve esquemas -----------------
+    # --- R4: la ficha pertenece a uno de los diez esquemas ------------------
     if ficha.esquema not in ESQUEMAS_DEL_DATAMART:
         error(
             "R4",

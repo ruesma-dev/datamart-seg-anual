@@ -78,8 +78,16 @@ class SigridApiSettings(BaseSettings):
 # 2026-08-08 que, de momento, el MCP lee todo; se revisará al rediseñar el MCP
 # en F-006. Sigue siendo un parámetro (PG_CONSUMPTION_SCHEMAS) precisamente
 # para poder estrecharlo entonces sin tocar código.
+#
+# F-057 añade `personal`, y es el primero que se concede sabiendo exactamente
+# qué contiene: nombre, NIF y DNI, autorizados por el responsable del dato el
+# 2026-09-18. Lo que NO cambia es `DEFAULT_EXCLUDED_TABLES`: `raw.emp` y
+# `raw.res` siguen fuera. Lo que se abre es la capa CURADA —seis columnas de
+# `emp` y ninguna credencial— no la copia del origen con sus 152 columnas.
+# Que `personal` sea un esquema propio es lo que permite que ese «sí a esto y
+# no a aquello» se escriba como un GRANT y no como una lista de tablas (F-087).
 DEFAULT_CONSUMPTION_SCHEMAS = (
-    "mart,cierre,compras,maestro,retenciones,raw,stg,aux,_meta"
+    "mart,cierre,compras,maestro,retenciones,personal,raw,stg,aux,_meta"
 )
 
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
