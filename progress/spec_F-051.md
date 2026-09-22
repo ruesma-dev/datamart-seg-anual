@@ -125,15 +125,29 @@ test: los anteriores más 0673 f8 «Diciembre-24» (fechas mar-2024) → dic-202
   publica −9.053.263,61 de coste y −9.188.957,62 de venta en sep-2021 y `stg`
   da movimiento 0. Es de F-050 / Negocio.
 
-## 7 · Decisiones para el humano
+## 7 · Decisiones TOMADAS por el humano el 2026-09-22
 
-D1–D9 con opciones, cobertura medida y recomendación: `design.md` §10.
-Resumen de las recomendaciones: D1 «tener datos» = existe fila de cierre de otra
-fase aunque valga 0; D2 F-042 sobre el mes del texto; D3 relleno solo en
-partidas con acumulado o movimiento; D4 parser nuevo solo en `stg`; D5 sin
-texto → mes de `fecfin`; D6 sin relleno después del mes del texto; D7 exención
-de mutación como F-042; D8 publicar `es_relleno`; D9 reducir F-050 y fichar
-los huecos de numeración.
+Spec **aprobada** con las nueve recomendaciones (`design.md` §10): D1 «tener
+datos» = existe fila de cierre de otra fase aunque valga 0; D2 F-042 sobre el mes
+del texto; D3 relleno solo en partidas con acumulado o movimiento; D4 parser
+nuevo solo en `stg`; D5 con matiz; D6 sin relleno después del mes del texto; D7
+mutación N/A como en F-042; D8 publicar `es_relleno`; D9 reducir F-050 y fichar
+los huecos de numeración (propuesta en §9). F-051 pasa a `spec_ready`.
+
+**Matiz de D5, con sus palabras**: «si el texto no se entiende, incluso con las
+mejoras del parser, manda la FECHA, y se coge la fecha FIN». Vale para TODAS las
+fases reales, en cascada: texto legible → mes del texto; si no, mes de
+`fecha_fin`; si no, de `fecha_inicio`; si no, `ano`/`mes` de `obrfas`.
+**Medido** (solo lectura, aproximando el parser mejorado con sus tres patrones):
+quedan ~48 fases ilegibles; **34 cambian de mes** de `fecha_inicio` a
+`fecha_fin`, todas de rango (p. ej. 0187, 0207, 0210, 0213, 0215 «POSTVENTA
+2009» y 0165, 0192, 0203 «LEVANTAMIENTO», ene-2009 → dic-2009/2010); **8 con
+dinero en `cierre`** (≈288.294,47 € de coste y ≈123.841,48 € de venta en valor
+absoluto); 0 sin ninguna fecha; en las de un solo mes el resultado no cambia.
+Cómo coinciden `mart` y `cierre`: `cierre` ya no recalcula el mes (lee
+`stg.plan_mensual.anio_mes`, R16) y `cierre.fn_mes_de_fase` pasa a envolver la
+misma función de `stg` con la cascada completa; `fn_parse_mes_fase` y
+`fn_mes_de_version_master` (masters) no se tocan.
 
 ## 8 · Coordinación
 
@@ -141,3 +155,41 @@ los huecos de numeración.
   de líneas; primero F-051 y F-096 rebasa; ámbitos disjuntos en las huellas.
 - **F-076**: no hay fuente fechada de venta (certificación comparte las fases
   de `obrfas`); nada que coordinar tras descartar el reparto.
+
+## 9 · Propuesta de ficha para el líder: los huecos de numeración de Sigrid
+
+- **Título**: «Cinco obras con un número de fase que falta en Sigrid publican el
+  acumulado entero como movimiento del mes: 0371 da +4,29 M€ en `mart` donde
+  `cierre` da −441.229,31».
+- **Descripción**: detectado el 2026-09-22 al escribir la spec de F-051 (solo
+  lectura). `importe_mes` de los reales lo calcula `stg/08_plan_mensual.sql`
+  como `importe_origen − LAG(importe_origen)` solo si la fase anterior es la
+  inmediatamente consecutiva (`LAG(orden_fase) = orden_fase − 1`); si no, se
+  queda con el acumulado ENTERO. F-042 desplaza `orden_fase` solo por sus
+  descartes y respeta a propósito los huecos que ya trae Sigrid, así que la fase
+  que sigue a un número que no existe en `obrfas` publica todo lo acumulado
+  como si fuera de un mes. Hay 5 huecos: **0371 f27→f29, 0404 f6→f8, 0455
+  f4→f6, 0562 f21→f31 y 0606 f14→f16**. Medido en 0371: f27 acumula
+  4.735.135,20 € de coste, f29 4.293.905,89 €; `stg.plan_mensual` y `mart`
+  publican **+4.293.905,89** de coste en 2015-02 (mes archivado de f29), cuando
+  el movimiento real es **−441.229,31**, que es lo que publica
+  `cierre.fact_cierre_mensual` en may-2015 porque calcula su propio `LAG` sobre
+  los meses. Consecuencias: el invariante «suma de `importe_mes` = último
+  acumulado» se rompe en esas obras, `mart` y `cierre` no cuadran, y quien sume
+  el coste del año en `mart` lo obtiene inflado. A decidir en la spec: si el
+  `LAG` debe mirar la fase vigente anterior EXISTENTE (orden denso sobre las
+  fases de `obrfas` que existen), justificando por qué F-042 eligió lo
+  contrario («movería el `importe_mes` de obras que hoy están bien») y
+  comprobando que ninguna obra sin hueco cambia. Relacionada con F-042, F-050 y
+  F-051 (que no la arregla). Toca `08_plan_mensual.sql`: reconstrucción completa.
+- **Acceptance**:
+  1. Para toda (obra, ámbito, partida), la suma de `importe_mes` de
+     `stg.plan_mensual` es igual a su último `importe_origen`, fijado por un test
+     y comprobado en la base.
+  2. 0371 f29 publica −441.229,31 € de coste en `mart`, igual que `cierre`.
+  3. Medido antes/después sobre el mismo `raw`: solo cambian las 5 obras con
+     hueco, y cada diferencia está explicada.
+  4. El diccionario de `stg.plan_mensual` dice qué pasa cuando Sigrid salta un
+     número de fase.
+- **Propuesta de clasificación**: `sdd=true`, rigor `critico`, prioridad detrás
+  de F-051 y F-096 (las tres tocan el mismo fichero del sello).

@@ -13,10 +13,10 @@ con las fuentes de coste.
 
 Línea base medida y listas: **`progress/spec_F-051.md`** (build 2026-09-22, solo
 lectura). Alcance: ámbitos **reales** 3 y 7 en `stg`, `mart` y `cierre`. Los
-master (8, 11) **no se tocan**. Decisiones abiertas D1–D9: final de `design.md`.
+master (8, 11) **no se tocan**. D1–D9 decididas el 2026-09-22: `design.md` §10.
 
 **Glosario.** *Mes del texto* = `stg.fn_mes_de_fase(fecha_inicio, nombre_mes,
-fecha_fin)`: el texto manda; sin texto legible, la fecha (R6). *Fase de rango*
+fecha_fin, …)`: el texto manda; si no se lee, la fecha fin (R6). *Fase de rango*
 = mes(`fecha_fin`) > mes(`fecha_inicio`). *Relleno* = fila de coste o venta real
 a 0 en un mes anterior al del texto. La fase es **por obra** (`raw.obrfas`) y
 vale para coste y venta: `obrfasamb` no guarda periodo (comprobado, §2 del
@@ -27,8 +27,8 @@ resumen).
 ## A · El mes de un cierre: una regla, una implementación
 
 **R1.** El sistema debe implementar la regla del mes una sola vez, en
-`stg.fn_mes_de_fase`, y `cierre.fn_mes_de_fase(fecha_inicio, nombre_mes)` debe
-devolver exactamente lo que devuelve la de `stg` con esos dos argumentos.
+`stg.fn_mes_de_fase`, y `cierre.fn_mes_de_fase` debe devolver exactamente lo
+mismo para los mismos argumentos (la resolución de masters no cambia, R5).
 
 **R2.** SI el texto y la fecha de inicio dan meses distintos, ENTONCES manda el
 texto, también en fases de un solo mes (0673 f8 «Diciembre-24», fechas de
@@ -45,9 +45,9 @@ ese mes y año, y no como texto ilegible (**D4**).
 **R5.** `cierre.fn_parse_mes_fase`, que usan las versiones master, no debe
 cambiar de comportamiento: R3 y R4 viven solo en el parser de `stg`.
 
-**R6.** SI una fase de rango no trae texto legible, ENTONCES su mes debe ser el
-de `fecha_fin` (**D5**); en una fase de un solo mes sin texto sigue siendo el de
-`fecha_inicio`, como hoy.
+**R6.** SI el texto de una fase real no se entiende, ni con R3–R4, ENTONCES
+manda la fecha en cascada: mes de `fecha_fin`; sin ella, de `fecha_inicio`; sin
+ninguna, `ano`/`mes` de `obrfas` (**D5**, matiz del humano del 2026-09-22).
 
 ## B · Dónde cae cada fila real
 

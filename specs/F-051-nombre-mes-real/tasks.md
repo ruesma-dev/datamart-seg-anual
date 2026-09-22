@@ -3,13 +3,13 @@
 
 Rama `feature/F-051-nombre-mes-real`. Un commit por tarea (`F-051 Tn: ...`). Rigor
 `critico`: **fase RED obligatoria** (traza en el informe) y **cobertura de las
-líneas cambiadas**. Campaña de mutación: según **D7** (si el humano concede la
-exención de F-042, el reviewer la declara N/A en C4 bis citándola; si no, se corre
-entera). Antes de T1, el humano resuelve D1–D9 (`design.md` §10).
+líneas cambiadas**. Campaña de mutación: **N/A por D7** (exención como en F-042; el
+reviewer la declara N/A en C4 bis citándola). D1–D9 decididas por el humano el
+2026-09-22 (`design.md` §10), con el matiz de D5: texto ilegible → fecha fin (R6).
 
 ## Bloque A · La regla, en dominio puro
 
-- [ ] T1: Escribir `tests/test_f051_regla_mes.py` con la tabla de textos reales de `progress/spec_F-051.md` §3 (rango, años 00–19, «2.013», sin texto, 0673 f8, 0692 f14, 0440 f3) y las cuatro ramas de `mes_de_fase`, contra `etl_sigrid/domain/mes_fase.py` aún inexistente | Verificación: `pytest tests/test_f051_regla_mes.py` **falla** (fase RED, traza al informe)
+- [ ] T1: Escribir `tests/test_f051_regla_mes.py` con la tabla de textos reales de `progress/spec_F-051.md` §3 (rango, años 00–19, «2.013», cascada de R6 con texto ilegible, 0673 f8, 0692 f14, 0440 f3) y las cuatro ramas de `mes_de_fase`, contra `etl_sigrid/domain/mes_fase.py` aún inexistente | Verificación: `pytest tests/test_f051_regla_mes.py` **falla** (fase RED, traza al informe)
 - [ ] T2: Implementar `parse_mes_fase` y `mes_de_fase` en `etl_sigrid/domain/mes_fase.py` | Verificación: `pytest tests/test_f051_regla_mes.py -k "parse or mes_de_fase"` en verde
 - [ ] T3: Añadir a `test_f051_regla_mes.py` los casos de relleno: R10, R11 (mes ocupado por otra fase aunque valga 0), R14 (texto = primer mes o intermedio), texto anterior a `fecha_inicio`, y colisión de F-042 sobre el mes del texto con la perdedora sin relleno (R8+R11) | Verificación: `pytest tests/test_f051_regla_mes.py -k relleno` **falla** (RED)
 - [ ] T4: Implementar `meses_relleno` y `acumulado_relleno` (R12, R13) | Verificación: `pytest tests/test_f051_regla_mes.py` en verde

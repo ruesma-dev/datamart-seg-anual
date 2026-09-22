@@ -29,13 +29,13 @@ coste y venta a la vez.
 
 | Fichero | Cambio |
 |---|---|
-| `sql/stg/00_functions.sql` | Nuevas `stg.fn_parse_mes_texto(texto)` (parser con R3–R4) y `stg.fn_mes_de_fase(fecha_inicio, nombre_mes, fecha_fin DEFAULT NULL)` (§4). |
+| `sql/stg/00_functions.sql` | Nuevas `stg.fn_parse_mes_texto(texto)` (parser con R3–R4) y `stg.fn_mes_de_fase(fecha_inicio, nombre_mes, fecha_fin, mes_archivado)` (§4). |
 | `sql/stg/01_ddl.sql` | `ALTER TABLE stg.plan_mensual ADD COLUMN es_relleno BOOLEAN NULL`, en el bloque `DO` idempotente del resto de columnas añadidas. |
 | `sql/stg/08_plan_mensual.sql` | Rama de reales (§5). Rama master: **ni una línea**. Cabecera: sección F-051. |
 | `sql/mart/01_ddl.sql` | `es_relleno BOOLEAN` en `mart.fact_seguimiento_mensual`. |
 | `sql/mart/02_build_fact.sql` | Ramas 1 y 2 (`:218`, `:243`): `nombre_mes` con el ARRAY de las ramas 3 y 4; `version_descripcion` sigue siendo el texto; `es_relleno = pm.es_relleno`. Ramas 3 y 4: `NULL::BOOLEAN`. |
 | `sql/mart/05_views_powerbi.sql` | `es_relleno` en `mart.v_pbi_fact` (**D8**). |
-| `sql/cierre/00_setup.sql` | `cierre.fn_mes_de_fase(fi, nm)` pasa a `RETURN stg.fn_mes_de_fase(fi, nm)`. `fn_parse_mes_fase` y `fn_mes_de_version_master` **no cambian** (R5). |
+| `sql/cierre/00_setup.sql` | `cierre.fn_mes_de_fase(fi, nm, ff DEFAULT NULL, ma DEFAULT NULL)` pasa a `RETURN stg.fn_mes_de_fase(...)` (misma cascada; se borra la firma de 2 argumentos). `fn_parse_mes_fase` y `fn_mes_de_version_master` **no cambian** (R5). |
 | `sql/cierre/01_ddl_fact.sql` | Columna `es_relleno BOOLEAN` en `cierre.fact_cierre_mensual`. |
 | `sql/cierre/02_build_fact.sql` | CTE A/B: el mes es `pm.anio_mes`; `fases_con_mes` deja de calcular mes y solo aporta `fase_id`, `fecha_inicio`, `nombre_mes` por `(obra, numero_fase = MAX(pm.version))`; `es_relleno = bool_and(pm.es_relleno)`. |
 | `sql/cierre/04_views_detalle.sql` | Las dos vistas (`:128`, `:508`): mismo cambio, agrupan por `pm.anio_mes`. |
@@ -78,11 +78,12 @@ parser de `cierre` (`cierre/00_setup.sql:36-97`) con tres cambios:
    Un texto de un solo mes da lo mismo que hoy.
 
 `stg.fn_mes_de_fase(fecha_inicio DATE, nombre_mes TEXT, fecha_fin DATE DEFAULT
-NULL) RETURNS DATE IMMUTABLE`: las cuatro ramas de hoy (texto y fecha iguales →
-fecha; distintos → texto; solo uno → ese) con una salvedad (R6, **D5**): si el
-texto no parsea y `fecha_fin` cae en un mes posterior al de `fecha_inicio`,
-devuelve el mes de `fecha_fin`. Con dos argumentos (lo que llama `cierre`) se
-comporta como hoy salvo R3–R4.
+NULL, mes_archivado DATE DEFAULT NULL) RETURNS DATE IMMUTABLE`, cascada (R2, R6,
+**D5** con el matiz del 22-09): texto legible → su mes; si no, mes de
+`fecha_fin`; si no, de `fecha_inicio`; si no, `mes_archivado` (`ano`/`mes`).
+Medido: tras R3–R4 quedan ~48 fases ilegibles; 34 cambian de `fecha_inicio` a
+`fecha_fin` (todas de rango: «POSTVENTA 2009», «LEVANTAMIENTO»…), 8 con dinero;
+ninguna sin fechas. `cierre` no la usa para agrupar (R16), así que coincide.
 
 Por qué un parser nuevo y no tocar el de `cierre`: `fn_parse_mes_fase` también
 decide el mes de las versiones master de cierre (`cierre/02_build_fact.sql:143`)
@@ -218,33 +219,32 @@ siempre con movimiento 0 y nunca en un mes con cierre propio) y los testigos.
   misma noche, 8/11 se atribuye a F-096 y 3/7 a F-051 (conjuntos disjuntos).
 - **R7 · F-050**: su patrón 2 lo resuelve esta regla (D9).
 
-## 10 · Decisiones para el humano (con recomendación)
+## 10 · Decisiones, TOMADAS por el humano el 2026-09-22 (las nueve recomendaciones)
 
 - **D1 · Qué es «un mes que ya tiene datos».** (a) existe fila de cierre vigente
   de otra fase en esa (obra, ámbito, mes), valga lo que valga; (b) solo si su
-  importe ≠ 0. **Recomiendo (a)**: un cierre a 0 es un cierre que Sigrid hizo;
+  importe ≠ 0. **Decidido (a)**: un cierre a 0 es un cierre que Sigrid hizo;
   con (b) el relleno tendría que sustituir filas y rompería la clave. Medido: 25
   fases de rango tienen el mes de su cierre anterior dentro de sus fechas.
 - **D2 · F-042 sobre el mes del texto**: misma regla (manda la más moderna con
-  acumulado ≠ 0); la perdedora no genera relleno. **Recomiendo sí**; 7 obras
+  acumulado ≠ 0); la perdedora no genera relleno. **Decidido sí**; 7 obras
   cambian de reparto mensual (R4) sin cambiar su total, y 0606 f16 (todo a
   cero) reaparece en may-21 con acumulado 0 como ya pasa desde su f17.
 - **D3 · Qué partidas llevan relleno**: las de acumulado anterior ≠ 0 o
-  movimiento en la fase (~1,34 M filas) o todas (~2,56 M). **Recomiendo la
+  movimiento en la fase (~1,34 M filas) o todas (~2,56 M). **Decidida la
   primera**: el acumulado del mes es idéntico y cuesta la mitad.
 - **D4 · Parser de fases** (R3 rango → último mes, R4 años 00–19 y «2.013»):
-  73 textos con dos meses, 23 con año de dos cifras, 13 con punto. **Recomiendo
+  73 textos con dos meses, 23 con año de dos cifras, 13 con punto. **Decidido
   sí**, solo en `stg` (masters intactos). Cambia `cierre` en esas fases.
-- **D5 · Fase de rango sin texto legible → mes de `fecha_fin`** (43 hoy, menos
-  tras D4). **Recomiendo sí**: es «considerar la fecha final» de Juan.
+- **D5 · Texto ilegible → manda la fecha FIN**, con el matiz del humano: en
+  TODAS las fases reales, cascada fin → inicio → archivado (R6). 34 fases.
 - **D6 · Texto = primer mes o intermedio** (59 + 16 fases de rango): el dinero
   queda en el mes del texto y los meses de después no se rellenan (R14).
-  **Recomiendo** así y pasar la lista a Juan: rellenar hacia delante diría que
+  **Decidido** así y pasar la lista a Juan: rellenar hacia delante diría que
   el coste se paró, y eso no lo dice nadie.
-- **D7 · Campaña de mutación** (C4 bis, rigor `critico`): **recomiendo** la
+- **D7 · Campaña de mutación** (C4 bis, rigor `critico`): **decidida** la
   misma exención que F-042, sustituida por las huellas y el invariante R21–R23.
 - **D8 · Publicar `es_relleno`** en `stg`, `mart`, `v_pbi_fact` y `cierre`.
-  **Recomiendo sí**: sin ella un mes a 0 de relleno no se distingue de uno sin
-  actividad.
-- **D9 · F-050**: **recomiendo** reducirla al patrón 1 (quincenas) y a la lista
+  **Decidido sí**: sin ella un relleno no se distingue de un mes sin actividad.
+- **D9 · F-050**: **decidido** reducirla al patrón 1 (quincenas) y a la lista
   de anomalías para Juan; y fichar aparte los 5 huecos de numeración de Sigrid.
