@@ -506,8 +506,11 @@ tables:
   # ===========================================================================
   # MÓDULO RETENCIONES (Tanda R1) — garantías retenidas
   # Una retención se materializa como EFECTO con retide <> 0:
-  #   pag → la practicamos a un PROVEEDOR   (25.124 efectos, 34,7 M€ vivos)
-  #   cob → nos la practica un CLIENTE      ( 2.219 efectos, 21,9 M€ vivos)
+  #   pag → la practicamos a un PROVEEDOR   (25.631 efectos, 8,35 M€ vivos)
+  #   cob → nos la practica un CLIENTE      ( 2.238 efectos, 22,2 M€ «VIVA»)
+  # Cifras del 2026-09-22 (F-094). En pag, VIVA exige ademas con.fecbaj = 0 y
+  # con.est fuera de 10/14/15: los 34,7 M€ de antes contaban los agrupados y lo
+  # pagado. La de cob sigue saliendo solo de fecrea y esta sin verificar.
   # La regla contractual (5 %) vive en obrctr.coegar, ya ingerido.
   # Los avales (avr/ava) NO se usan en Ruesma: no se ingieren.
   # ===========================================================================

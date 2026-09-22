@@ -9,6 +9,63 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-094 · CERRADA (done, 2026-09-22) · QUEDAN LAS VERIFICACIONES MANUAL DEL HUMANO
+
+Rama `feature/F-094-retenciones-estado-vivo`, `sdd=false`, rigor `estandar`.
+Informe: `progress/impl_F-094.md`.
+
+- **Estado de PROVEEDOR** en `retenciones.movimientos`: de la ficha `raw.con`
+  del propio efecto. BAJA (`fecbaj <> 0` o `est` 14/15) > LIQUIDADA (`fecrea`
+  o `est` 10) > VIVA. Medido en solo lectura: **VIVA 8.345.506,03 € (7.752)**,
+  LIQUIDADA 12.754.011,79 (2.368), BAJA 18.691.779,56 (15.511); FERMALUX
+  64.201,96. No se borran filas (25.631).
+- **CLIENTE sin cambios** en el estado (criterio de `pag` no vale en `cob`).
+- Diccionario `version` 26: **158 objetos, 1022 columnas, 69 de consumo**
+  (+7 columnas: `estado_sigrid`, `fecha_baja` y `centro_coste_id` en
+  `movimientos`, y `num_bajas`/`importe_baja` en las vistas de entidad y
+  resumen).
+- Ampliacion aprobada el 2026-09-22 (H6 de F-095, absorbe el resto de F-045):
+  `obra_id` es la obra real via `maestro.centros_coste` y el centro se publica
+  en `centro_coste_id`. Medido: 262 de 262 `obra_id` casan en `maestro.obras`
+  (antes 0 de 262); mismas 533 filas sin obra. F-045 queda para retirar como
+  absorbida (lo hace el lider).
+
+### Verificaciones MANUAL (humano), en este orden
+
+Copiadas de `progress/impl_F-094.md` §«Verificaciones MANUAL pendientes». Dos
+de ellas (2 y 3) cierran el acceptance 4. **El orden importa: build → checks →
+publicar.**
+
+1. `python main.py build-retenciones`
+2. `python main.py check-unicidad` — las claves de `retenciones` deben salir
+   OK. **El comando sigue saliendo con código 1** por
+   `cierre.v_pbi_planif_vs_real`, que es F-051 y previo: no es de F-094.
+3. `python main.py check-relaciones` — `obra_id -> maestro.obras.obra_id` debe
+   dar **262 de 262** (antes, con la relacion vieja, 0 de 261) y
+   `centro_coste_id -> maestro.centros_coste` completo. **Si se lanza ANTES del
+   build sale KO**: la relacion nueva se comprueba contra la tabla vieja.
+4. `python main.py publicar-diccionario`
+5. Consultas de contraste tras el build (cifras del 2026-09-22; se moveran con
+   la ingesta):
+   ```sql
+   SELECT sentido, estado, count(*), sum(importe) FROM retenciones.movimientos GROUP BY 1,2 ORDER BY 1,2;
+   -- PROVEEDOR VIVA 7.752 / 8.345.506,03 · LIQUIDADA 2.368 / 12.754.011,79 · BAJA 15.511 / 18.691.779,56
+   SELECT saldo_vivo, importe_liquidado, importe_baja FROM retenciones.v_pbi_retencion_entidad
+    WHERE sentido='PROVEEDOR' AND entidad_id=1958815;          -- 64.201,96 · 17.246,76 · 17.246,76
+   SELECT * FROM retenciones.v_pbi_retencion_resumen;          -- num_movimientos = vivas+liquidadas+bajas
+   SELECT count(DISTINCT m.obra_id), count(DISTINCT o.obra_id)
+     FROM retenciones.movimientos m LEFT JOIN maestro.obras o USING (obra_id);   -- 262 · 262
+   ```
+6. Por el MCP, tras `publicar-diccionario`: `contexto_bbdd` debe servir la
+   **version 26** y ya no los 34,7 M€. **Reiniciar antes el MCP**: cachea el
+   diccionario hasta reiniciar (F-089).
+7. Aplicar en `azure-apps/datamart_seg_anual.md` (no commiteado alli) el
+   parrafo propuesto en `progress/impl_F-094.md` §«`azure-apps/datamart_seg_anual.md`»,
+   tras la linea 447: `obra_id` pasa a ser la obra de `maestro.obras` (el
+   centro va en `centro_coste_id`), rompe a quien uniera `obra_id` con
+   `cierre.v_pbi_cierre_cabecera.centro_coste_ide`, PROVEEDOR gana `BAJA` y
+   las columnas nuevas.
+
 ## F-057 · IMPLEMENTADA, PENDIENTE DE REVIEW (2026-09-18)
 
 Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,

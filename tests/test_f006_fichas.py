@@ -1459,17 +1459,25 @@ def test_f006_r2_retenciones_avisa_de_que_su_obra_id_no_es_la_obra() -> None:
     Lo que se exige ahora no es una redacción sino los tres hechos que evitan
     el JOIN vacío: que NO es la obra, cuánto casa de verdad, y por dónde se
     cruza.
+
+    F-094 (2026-09-22) ARREGLA EL DATO, y este test cambia con él: `obra_id`
+    pasa a ser la obra de verdad (traducida por `maestro.centros_coste`) y el
+    centro de coste se publica aparte, en `centro_coste_id`. Los tres hechos
+    se siguen exigiendo, cada uno en la columna donde ahora es cierto.
     """
     columnas = {
         c.nombre: c
         for c in _diccionario().por_nombre["retenciones.movimientos"].columnas
     }
 
+    centro = columnas["centro_coste_id"]
+    assert contiene(centro.significado, "NO es la obra")
+    assert contiene(centro.significado, "0 de 261"), "el defecto de antes, con su cifra"
+    assert "maestro.centros_coste" in centro.significado, "por donde se traduce"
+
     obra = columnas["obra_id"]
-    assert contiene(obra.significado, "CENTRO DE COSTE")
-    assert contiene(obra.significado, "NO es el identificador de la obra")
-    assert contiene(obra.significado, "0 de 261"), "la cifra medida, no una impresion"
-    assert "centro_coste_ide" in obra.significado, "por donde SI se cruza"
+    assert "maestro.obras.obra_id" in obra.significado
+    assert contiene(obra.significado, "262 de 262"), "la cifra medida, no una impresion"
     assert "98" not in obra.significado, (
         "la afirmacion del 98 % era falsa: no puede volver por la puerta de atras"
     )

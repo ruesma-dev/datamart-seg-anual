@@ -78,7 +78,13 @@ class BuildRetencionesStep(PipelineStep):
 
     @property
     def depends_on(self) -> list[str]:
-        # Solo necesita raw.* (la ingesta). No depende de stage ni mart.
+        # Necesita raw.* (la ingesta) y, desde F-094, la VISTA
+        # `maestro.centros_coste` para traducir centro de coste -> obra. Esa
+        # vista es SQL puro sobre `raw` y existe desde F-073; `build_maestros`
+        # corre antes por su posición en `build_pipeline_steps`. NO se declara
+        # aquí a propósito: `build_maestros` depende de `build_stg`, y
+        # declararlo haría que un fallo de `stg` dejara sin construir las
+        # retenciones, que hoy sobreviven a eso.
         return ["ingest_raw"]
 
     def run(self) -> StepResult:
