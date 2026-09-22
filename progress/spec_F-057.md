@@ -98,6 +98,9 @@ razones, por orden de peso:
    un esquema propio, «acceso a Power BI pero no a los datos de personal» es un
    `GRANT`; mezclados en `stg` —que además F-079 declaró consultable— esa
    distinción exigiría trocear permisos tabla a tabla.
+   **CORREGIDO EL 2026-09-22 por el humano: Power BI SÍ ve `personal`**, y el
+   rol propio de F-087 lo incluye. El esquema propio sigue sirviendo para
+   quitar el acceso a un rol concreto con un `GRANT`.
 2. **No bloquea.** `build_stg` es la puerta de F-024: un fallo del SQL de
    personal dentro de `build_stg` dejaría al `mart` sin construir esa noche. Los
    esquemas módulo fallan solos y `R-FRESCURA` avisa al consumidor.

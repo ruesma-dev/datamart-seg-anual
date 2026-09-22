@@ -37,7 +37,8 @@ Decision del humano del 2026-09-18, frente a meterlo en `stg`. Dos motivos:
    crea un rol propio para Power BI con acceso a los esquemas de consumo; con
    nombre y DNI en un esquema propio, «Power BI si, datos de personal no» es un
    `GRANT`. Mezclados en `stg` —que ademas F-079 declaro consultable— habria que
-   trocear permisos tabla a tabla.
+   trocear permisos tabla a tabla. **CORREGIDO EL 2026-09-22: Power BI SI ve
+   `personal`** (humano); el rol de F-087 lo incluye. Se deja como registro.
 
 Efecto colateral aceptado: `personal.v_pbi_horas_obra_mes` **no lleva datos
 personales** pero vive en el esquema restringible. Si algun dia Power BI

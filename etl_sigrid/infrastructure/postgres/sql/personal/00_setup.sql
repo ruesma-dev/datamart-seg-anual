@@ -13,9 +13,11 @@
 --    Un esquema módulo falla solo, la noche continúa y `R-FRESCURA` avisa al
 --    consumidor de que ese esquema viene de una noche anterior.
 -- 2. LOS PERMISOS SE DAN POR ESQUEMA, y ese fue el argumento decisivo. Aquí
---    dentro hay nombre, NIF y DNI. F-087 crea un rol propio para Power BI: con
---    los datos de personal en su esquema, «Power BI sí, datos de personal no»
---    es un GRANT. Mezclados en `stg` habría que trocear permisos tabla a tabla.
+--    dentro hay nombre, NIF y DNI. Con los datos de personal en su esquema,
+--    dar o quitar el acceso a un rol es un GRANT; mezclados en `stg` habría
+--    que trocear permisos tabla a tabla. POWER BI SÍ VE ESTE ESQUEMA: lo
+--    decidió el humano el 2026-09-22, corrigiendo la idea inicial de F-057
+--    («Power BI sí, datos de personal no»). El rol propio de F-087 lo incluye.
 --
 -- LA TRAMPA QUE HACE FALSA UNA SUMA, y va aquí arriba porque es lo primero que
 -- hay que saber de este esquema: `hmores.can` **no son horas**. Mezcla HORA,

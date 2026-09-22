@@ -28,8 +28,11 @@ capa.
 **`personal` (F-057, 2026-09-18) es el único esquema con datos personales**
 —nombre, NIF y DNI, publicados con autorización expresa del responsable del
 dato—, y es un esquema propio precisamente por eso: los permisos de PostgreSQL
-se dan POR ESQUEMA, así que «Power BI sí, datos de personal no» es un `GRANT`
-y no una lista de tablas que mantener (F-087). El segundo motivo es que no
+se dan POR ESQUEMA, así que dar o quitar el acceso a estos datos es un `GRANT`
+y no una lista de tablas que mantener (F-087). **Power BI SÍ ve `personal`**:
+lo decidió el humano el 2026-09-22, y corrige la idea inicial de F-057 («Power
+BI sí, datos de personal no»). El esquema propio sigue sirviendo para poder
+quitárselo a un rol concreto sin trocear permisos. El segundo motivo es que no
 bloquea: metido dentro de `build_stg`, un fallo de su SQL dejaría al `mart`
 sin construir esa noche.
 
