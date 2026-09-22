@@ -507,7 +507,7 @@ es un **contrato de datos** que un agente conectado por MCP lee por SQL, sin
 poder preguntarle a nadie si algo no encaja.
 
 - **La fuente son los YAML de `config/diccionario/`**: uno por esquema —los
-  nueve del datamart— más `00_global.yaml`, que lleva las reglas duras
+  de `ESQUEMAS_DEL_DATAMART`— más `00_global.yaml`, que lleva las reglas duras
   transversales, los ejes, las convenciones de nombre y la batería de preguntas
   de aceptación. Están en este repositorio a propósito: qué significa
   `mart.fact_seguimiento_mensual` lo sabe quien escribió el SQL que la

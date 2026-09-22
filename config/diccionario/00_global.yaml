@@ -878,7 +878,8 @@ ejes:
 # ESQUEMAS (R4)
 # ===========================================================================
 #
-# Son NUEVE. Los informes de exploracion dicen ocho y se equivocan.
+# Son los de `ESQUEMAS_DEL_DATAMART` (eran nueve hasta F-057). Los informes de
+# exploracion decian ocho y se equivocaban.
 # Ojo a la trampa de nombres: el esquema se llama `aux` y su carpeta de SQL es
 # `sql/auxiliar/`.
 
