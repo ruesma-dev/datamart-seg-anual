@@ -1618,6 +1618,23 @@
       "rigor": "estandar",
       "priority": 7,
       "branch": "feature/F-099-expedientes-obra"
+    },
+    {
+      "id": "F-100",
+      "title": "La direccion de la obra que falta: comprobar si vive en condir y publicarla si vive",
+      "description": "PETICION DEL PROYECTO `facturas` (Pablo Gris, 2026-09-22), que necesita la direccion de la obra para que la IA case una factura con su obra cuando el codigo del papel no sirve. HOY NO LLEGA: sobre las 225 obras vivas o dadas de alta en los dos ultimos anios, solo 41 traen algun dato de ubicacion (direccion, codigo postal, municipio o provincia) y 44 traen cliente. Eso NO es un fallo de este ETL: `sql/maestro/01_obras.sql` ya lee los seis campos de emplazamiento de `obr` y su cabecera lo deja medido y fechado —`dir1` 305 de 921 (33,1 %)—, asi que para dos de cada tres obras «no consta» es la respuesta correcta con lo que hoy se ingiere. LA PREGUNTA ABIERTA, y es lo unico que se pide de entrada: el humano afirma que en Sigrid la direccion de la obra SI esta, y el diccionario de Sigrid describe la tabla `condir` («Direcciones de conceptos», 1:N sobre `con`, con `dir1`, `dir2`, `dircpo`, `munide`, `proide`, `paiide` y `dir`), a la que apunta `con.diride`. `condir` NO se ingiere hoy. Si las obras tienen ahi su direccion, publicarla cierra el hueco; si no la tienen, el hueco es de captura en Sigrid y hay que decirlo para dejar de buscarlo. Medir primero, publicar despues.",
+      "acceptance": [
+        "MEDIDO Y ESCRITO ANTES DE TOCAR NADA: cuantas de las 921 obras tienen al menos una fila en `condir`, cuantas de las vivas, y que trae esa fila. Si la respuesta es que casi ninguna, la feature se cierra con esa medicion y sin publicar nada: eso tambien es entregar.",
+        "Si `condir` si tiene direcciones de obra, se ingiere y se publica junto a la direccion propia de `obr`, diciendo de cual de las dos sale cada valor: no se mezclan en la misma columna sin marca.",
+        "Una obra puede tener VARIAS direcciones en `condir` (es 1:N): se decide y se escribe cual se publica y por que, y el grano de `maestro.obras` sigue siendo una fila por obra.",
+        "La cobertura nueva se mide y se declara en la ficha del diccionario, como ya hace la actual: sin porcentaje medido, no se publica.",
+        "El consumidor es `facturas`: cuando esto entregue, se le avisa, porque su F-036 usa la direccion como pista para casar la obra."
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 8,
+      "branch": "feature/F-100-direccion-obra-condir"
     }
   ]
 }
