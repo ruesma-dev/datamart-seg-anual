@@ -6,8 +6,8 @@ en solo lectura el 2026-09-22** (Sigrid por `sigrid-api`, datamart por MCP):
 `progress/explore_retenciones_contabilidad_fin_obra.md` y `design.md` §Medidas.
 Rigor `critico`. **Precondicion: F-094 `done`** (el criterio «viva de verdad» de
 los efectos lo publica F-094 en `retenciones.movimientos.estado`; aqui se lee,
-no se reescribe). Lo marcado **[Hn]** depende de la decision n del humano
-(`design.md` §Decisiones para el humano); el texto lleva la opcion recomendada.
+no se reescribe). **[Hn]** = decision del humano del 2026-09-22, ya tomada
+(`design.md` §Decisiones del humano).
 
 ## Las cuentas y los apuntes
 
@@ -15,9 +15,8 @@ R1. El sistema debe elegir las cuentas de retencion de proveedor por
 `raw.prv.cueretide <> 0` (1:1, 2.247 cuentas) y **nunca por prefijo de codigo**:
 asi entran solas 4008, 4108, 4180, 4038 (0,90 M€) y 4128, sin lista escrita.
 
-R2. El sistema debe publicar `retenciones.cuentas_proveedor` con una fila por
-proveedor con cuenta de retencion: proveedor, cuenta, codigo y nombre de la
-cuenta (de `raw.con`) y `familia` (4 primeros digitos, solo descriptiva).
+R2. El sistema debe publicar `retenciones.cuentas_proveedor`: una fila por proveedor
+con cuenta, con codigo, nombre (`raw.con`) y `familia` (4 digitos, descriptiva).
 
 R3. El sistema debe publicar `retenciones.apuntes_contables` con **una fila por
 apunte de `raw.apu`** sobre esas cuentas (49.505 medidos), sin filtrar ninguno,
@@ -37,8 +36,7 @@ debe igualar `SUM(hab - deb)` de todos sus apuntes. Medido: excluir todas las
 aperturas da 8.117.748,99 € en vez de 8.760.524,49 € (la apertura de 2008,
 642.775,50 €, es historia anterior a Sigrid).
 
-R6. El sistema debe marcar `es_prescripcion` si el concepto contiene «PRESCRI»
-(sin distinguir mayusculas), sin excluir el apunte.
+R6. El sistema debe marcar `es_prescripcion` (concepto con «PRESCRI») sin excluir el apunte.
 
 ## La obra de cada apunte
 
@@ -49,13 +47,12 @@ centro unico); `EFECTO` (`rac.conide` = efecto -> `pag.cenide`); **[H3]**
 `PROVEEDOR_UNA_OBRA` (el proveedor solo tiene efectos de retencion en una obra);
 si ninguna, `SIN_OBRA` con `obra_id` NULL.
 
-R8. El sistema no debe multiplicar apuntes al resolver la obra: cada salto
-agrega o usa `LATERAL ... ORDER BY ... LIMIT 1`, y `apunte_id` es clave primaria.
+R8. El sistema no debe multiplicar apuntes: cada salto agrega o usa `LATERAL ...
+LIMIT 1`, y `apunte_id` es clave primaria.
 
 R9. **[H4]** El sistema debe ingerir `raw.rac` con `where: asiide <> 0`
-(755.086 de 2.505.089 filas, excluida `tex`). SIN `rac`, ENTONCES las altas
-desde 2016 quedan sin obra: con `rac` 97,2 % del importe de altas con obra; sin
-ella 10,8 %.
+(755.086 de 2.505.089 filas, excluida `tex`), acordado con F-091. Sin `rac` las
+altas con obra caen del 97,2 % al 10,8 % del importe.
 
 R10. El sistema no debe usar `apu.obr` ni `cen.obride` para atribuir obra.
 
@@ -67,12 +64,10 @@ R11. El sistema debe publicar `retenciones.saldo_contable` con una fila por
 (apertura de 2016) y fechas de primer y ultimo movimiento. Cierres y aperturas
 no suman nunca aqui.
 
-R12. El diccionario debe declarar que **la fuente que manda para el saldo vivo
-de retencion a proveedor es la contabilidad** (`saldo_contable`), y que
-`retenciones.movimientos` es el detalle por efecto que la explica.
+R12. El diccionario debe declarar que **el saldo vivo a proveedor lo manda la
+contabilidad** (`saldo_contable`); `movimientos` es el detalle por efecto.
 
-R13. MIENTRAS haya importe con `via_obra = 'SIN_OBRA'`, el sistema debe
-publicarlo en la fila sin obra y no repartirlo, y la ficha debe dar su cifra.
+R13. El importe `SIN_OBRA` debe ir a la fila sin obra, sin repartir, con su cifra en la ficha.
 
 ## El cuadre contabilidad - efectos
 
@@ -87,64 +82,69 @@ R15. El sistema debe clasificar el cuadre en `categoria`: `CUADRA` (|dif| < 1 �
 `EFECTOS_MAYOR`, evaluadas en ese orden, y la ficha debe publicar el reparto
 medido (design §Medidas, **[H7]**).
 
-R16. CUANDO se construye el cuadre, FERMALUX (1958815, cuenta 4108005478) debe
-salir `CUADRA` con 64.201,96 € a los dos lados.
+R16. CUANDO se construye el cuadre, FERMALUX (1958815) debe salir `CUADRA` 64.201,96 €.
 
-## El fin de obra
+## El fin de obra **[H1]**
 
 R17. El sistema debe publicar `retenciones.fin_obra` con una fila por obra de
-`raw.obr` y cada candidata **en su columna y con su nombre**: `fecha_fin_real`
-(misma regla que `cierre.v_pbi_cierre_cabecera`: `MAX(obrctr.fecreafin)`, si no
-`obr.fecfinrea`), `fecha_recepcion_provisional` (`MAX(obrctr.fecprorec)`),
-`fecha_inicio_garantia` (`MAX(obrctr.fecinigar)`, si no `obr.garfecini`),
-`fecha_fin_prevista` (`MAX(obrctr.fecprefin)`, si no `obr.fecfinpre`), y el
-estado de la obra (`con.est`).
+`raw.obr`, con `fecha_inicio_garantia` (`MAX` no nulo de `obrctr.fecinigar`; si
+no, `obr.garfecini`), `ultimo_cierre` y, solo informativas, `fecha_fin_real`
+(regla de `cierre.v_pbi_cierre_cabecera`), `fecha_recepcion_provisional` y
+`fecha_fin_prevista`, cada una en su columna, y el estado de la obra (`con.est`).
 
-R18. **[H1]** El sistema debe calcular `fecha_fin_obra` = primera no nula de
-`fecha_fin_real`, `fecha_recepcion_provisional`; y publicar `fuente_fin_obra`
-(`FIN_REAL`, `RECEPCION_PROVISIONAL` o NULL). La fin prevista **no** entra en
-`fecha_fin_obra`.
+R18. El sistema debe tomar como `ultimo_cierre` el mayor `anio_mes` de
+`cierre.fact_cierre_mensual` de la obra con `ejecutado_mes <> 0` en algun
+concepto: el ultimo cierre que movio algo, no la ultima fase creada (124 de 330
+obras tienen fases vacias, ~12 meses despues de su ultimo movimiento).
 
-R19. SI la obra esta terminada (`con.est` en 19, 21, 23, 25) y no tiene
-`fecha_fin_obra`, ENTONCES `terminada_sin_fin_obra = TRUE` y `fecha_fin_obra`
-queda NULL: la fecha no se inventa (83 obras con retencion viva, 2,09 M€).
+R19. El sistema debe calcular `fecha_fin_obra` = `fecha_inicio_garantia`; si es
+NULL, el ultimo dia del mes siguiente a `ultimo_cierre`; y publicar
+`fuente_fin_obra` = `INICIO_GARANTIA`, `ULTIMO_CIERRE_MAS_1_MES` o NULL.
+Cobertura medida: 20,9 % + 76,1 % = 97,0 % del vivo.
 
-R20. **[H2]** El sistema debe publicar `plazo_meses` y `fuente_plazo` con la regla
-que apruebe el humano; recomendada: `obrctr.plaret`, si no `obrctr.plagar`, si no
-un plazo fijo de Negocio en una sola constante del SQL (`PLAZO_NEGOCIO`).
+R20. SI una obra no tiene ni inicio de garantia ni `ultimo_cierre`, ENTONCES
+`fecha_fin_obra` queda NULL y no se inventa (17 obras con retencion viva,
+132.544,84 €, 9 terminadas); `terminada_sin_fin_obra` marca las de `con.est`
+en 19, 21, 23, 25.
+
+R21. SI `cierre.fact_cierre_mensual` esta vacia al construir, ENTONCES el sub-paso
+`fin_obra` debe fallar con su nombre en vez de publicar todo sin fecha.
+
+R22. **[H2]** El sistema debe publicar `plazo_meses` = `obrctr.plaret`; si no,
+`obrctr.plagar`; si no, 12, y `fuente_plazo` = `PLAZO_RETENCION_CLIENTE`,
+`PLAZO_GARANTIA_CLIENTE` o `PLAZO_FIJO_12`. El 12 vive en una sola constante.
 
 ## El vencimiento
 
-R21. El sistema debe calcular `fecha_vencimiento = fecha_fin_obra +
+R23. El sistema debe calcular `fecha_vencimiento = fecha_fin_obra +
 plazo_meses meses`. **La fecha de la factura no interviene nunca** (decision del
 humano del 2026-09-22): ni `fecha_documento`, ni `pag.fecven`, ni `con.fec`.
 
-R22. El sistema debe publicar `retenciones.v_retencion_contable_obra`: por
-(proveedor, obra) con saldo distinto de 0, saldo, fechas de fin de obra, plazo,
-`fecha_vencimiento` y `estado_vencimiento`: `SIN_OBRA`, `SIN_FIN_OBRA`,
-`SIN_PLAZO`, `VENCIDA` (vencimiento < `CURRENT_DATE`) o `PENDIENTE`.
+R24. El sistema debe publicar `retenciones.v_retencion_contable_obra`: por
+(proveedor, obra) con saldo distinto de 0, saldo, fin de obra y su fuente,
+plazo y su fuente, `fecha_vencimiento` y `estado_vencimiento`: `SIN_OBRA`,
+`SIN_FIN_OBRA`, `VENCIDA` (< `CURRENT_DATE`) o `PENDIENTE`.
 
-R23. El sistema no debe tocar `fecha_prevista_devolucion` ni
-`vencida_sin_liquidar` de `retenciones.movimientos`: son el vencimiento de
-Sigrid (factura + 15 meses en el 97,8 %) y la ficha lo dice.
+R25. El sistema no debe tocar `fecha_prevista_devolucion` ni `vencida_sin_liquidar`
+de `movimientos`: son el vencimiento de Sigrid (factura + 15 meses) y la ficha lo dice.
 
 ## Alcance y propagacion
 
-R24. **[H5]** El sistema no debe construir saldo contable de cliente (4308).
+R26. **[H5]** El sistema no debe construir saldo contable de cliente (4308).
 
-R25. El paso `build_retenciones` debe ejecutar los ficheros nuevos en orden
+R27. El paso `build_retenciones` debe ejecutar los ficheros nuevos en orden
 dentro de `SUB_PASOS`, contando filas de cada tabla nueva, sin cambiar su
 `name`, `stage` ni `depends_on`.
 
-R26. `config/diccionario/retenciones.yaml` debe tener ficha de cada objeto nuevo
+R28. `config/diccionario/retenciones.yaml` debe tener ficha de cada objeto nuevo
 con grano, `clave_negocio` y `relaciones` (obra -> `maestro.obras`, proveedor ->
 `maestro.proveedores`), y `raw.yaml` la de `rac`; `00_global.yaml` sube
 `version` y sustituye el orden de magnitud falso de 34,7 M€ por el saldo contable.
 
-R27. `check-declarados`, `-unicidad` y `-relaciones` deben cubrir los objetos
+R29. `check-declarados`, `-unicidad` y `-relaciones` deben cubrir los objetos
 nuevos sin tocar su codigo; `config/objetos_pendientes.yaml` sigue vacio.
 
-R28. Los tests deben correr sin red ni BBDD; cifras, FERMALUX y R5 son MANUAL.
+R30. Los tests deben correr sin red ni BBDD; cifras, FERMALUX y R5 son MANUAL.
 
-R29. `azure-apps/datamart_seg_anual.md` debe recoger `raw.rac` y los objetos
+R31. `azure-apps/datamart_seg_anual.md` debe recoger `raw.rac` y los objetos
 nuevos en el mismo trabajo.

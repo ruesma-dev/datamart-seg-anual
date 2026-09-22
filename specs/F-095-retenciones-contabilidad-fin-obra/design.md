@@ -20,6 +20,9 @@ solo lectura; las consultas exactas, en `progress/spec_F-095.md` §Consultas.
 | Viva de verdad en efectos (criterio F-094) | 8.345.506,03 € en 179 obras |
 | FERMALUX: saldo cuenta 4108005478 = viva efectos | 64.201,96 € |
 | `rac`: filas / con `asiide <> 0` / tocan cuentas de retencion | 2.505.089 / 755.086 / 30.204 |
+| Fin de obra: inicio de garantia (44 obras) / respaldo ultimo cierre (118) | 20,9 % / 76,1 % del vivo (**97,0 %**) |
+| Sin ninguna de las dos (9 terminadas, 68.727,08 €) | 17 obras, 132.544,84 € (1,6 %) |
+| Obras con fases vacias tras su ultimo cierre con movimiento | 124 de 330, ~12 meses de media |
 
 En el agregado de estas cuentas la apertura de cada
 ejercicio es exactamente el cierre del anterior (2009-2026, al centimo), y la de
@@ -38,10 +41,12 @@ ficheros SQL nuevos detras de `02_views.sql`, que no se toca.
    `raw.prv`, `raw.con`, `raw.apu`, `raw.rac`, `raw.pag`, `maestro.centros_coste`.
 2. `sql/retenciones/04_saldo_contable.sql` — `retenciones.saldo_contable`.
 3. `sql/retenciones/05_fin_obra.sql` — `retenciones.fin_obra`. Lee `raw.obr`,
-   `raw.obrctr`, `raw.con`. Constante `PLAZO_NEGOCIO` en un CTE de una fila **[H2]**.
+   `raw.obrctr`, `raw.con` y `cierre.fact_cierre_mensual` (D7). Guarda `DO $$`
+   que aborta si esa tabla esta vacia (R21). Constante `PLAZO_FIJO_MESES = 12`
+   en un CTE de una fila **[H2]**.
 4. `sql/retenciones/06_views_contables.sql` — `DROP VIEW IF EXISTS` + `CREATE VIEW`
    de `retenciones.v_cuadre_proveedor` y `retenciones.v_retencion_contable_obra`.
-5. `tests/test_f095_retenciones_contables.py` — suite offline (R28): lee el texto
+5. `tests/test_f095_retenciones_contables.py` — suite offline (R30): lee el texto
    del SQL (comentarios `--` aparte), el YAML del diccionario, `tables_sigrid.yaml`
    y el cableado del step, al estilo de `test_f057_personal.py`.
 
@@ -60,7 +65,7 @@ ficheros SQL nuevos detras de `02_views.sql`, que no se toca.
   `saldo_contable`, `fin_obra` -> `fin_obra`, `views_contables` sin tabla) y el
   docstring. `name`, `stage` y `depends_on = ["ingest_raw"]` no cambian (D3).
 - `main.py` — **no cambia**: `build-retenciones` y `run-all` ya usan el step. Se
-  verifica con test (R25).
+  verifica con test (R27).
 - `etl_sigrid/application/orchestrator.py`, `apply_grants_step.py`,
   `config/settings.py`, `etl_sigrid/domain/diccionario.py` — **no cambian**:
   `retenciones` ya es esquema de consumo y del datamart. Se verifica con test.
@@ -69,7 +74,7 @@ ficheros SQL nuevos detras de `02_views.sql`, que no se toca.
   `relaciones`, `consumo_recomendado` (true: `saldo_contable` y las dos vistas) y
   preguntas; en `movimientos` y `v_pbi_*`, una linea: «el saldo vivo que manda es
   el contable (`saldo_contable`); `fecha_prevista_devolucion` es la de Sigrid,
-  factura + 15 meses, no la de fin de obra» (R12, R23).
+  factura + 15 meses, no la de fin de obra» (R12, R25).
 - `config/diccionario/raw.yaml` — ficha `rac` (patron de `apu`: sin columnas, DA-2,
   con el filtro y por que).
 - `config/diccionario/00_global.yaml` — `version` +1; el orden de magnitud «34,7
@@ -79,15 +84,16 @@ ficheros SQL nuevos detras de `02_views.sql`, que no se toca.
   cuentas por `cueretide`, clase de apunte, saldo inicial de 2008, y que el
   vencimiento se cuenta desde el fin de obra.
 - `azure-apps/datamart_seg_anual.md` — consume `rac`, expone seis objetos nuevos
-  en `retenciones` y cambia la fuente del saldo vivo (R29).
+  en `retenciones` y cambia la fuente del saldo vivo (R31).
 
 ## Ficheros que NO se tocan
 
 - `sql/retenciones/00_setup.sql`, `01_movimientos.sql`, `02_views.sql`: son de
   F-094. Aqui se **leen** (`movimientos.estado`), no se reescriben.
 - `sql/maestro/04_centros_coste.sql`: se consume tal cual (F-073).
-- `sql/cierre/05_views_cabecera.sql`: su regla de fin real se **replica** en
-  `05_fin_obra.sql` con test de igualdad textual (D5); no se referencia.
+- `sql/cierre/05_views_cabecera.sql`: su regla de fin real (columna informativa)
+  se **replica** en `05_fin_obra.sql` con test de igualdad textual (D5).
+- `sql/cierre/*`: `cierre.fact_cierre_mensual` se lee, no se toca (D7).
 - `config/objetos_pendientes.yaml`, codigo de `check-declarados`/`-unicidad`/
   `-relaciones`: se alimentan del SQL y del diccionario.
 
@@ -121,10 +127,19 @@ la fila `obra_id` NULL. `altas` (`SUM importe` clase ALTA), `bajas` (BAJA),
 `nombre_obra`, `proveedor_nombre`. `clave_negocio: [proveedor_id, obra_id]`.
 
 **`retenciones.fin_obra`** (TABLA, ~919) — `obra_id` PK, `codigo_obra`,
-`estado_obra` (`con.est`), las cuatro candidatas de R17, `fecha_fin_obra`,
-`fuente_fin_obra` (R18), `terminada_sin_fin_obra` (R19), `plazo_meses`,
-`fuente_plazo` (`PLAZO_RETENCION_CLIENTE`, `PLAZO_GARANTIA_CLIENTE`,
-`PLAZO_NEGOCIO`), `fecha_vencimiento` (R21), `num_contratos_obra`.
+`estado_obra` (`con.est`), `fecha_inicio_garantia`, `ultimo_cierre`,
+`fecha_fin_real`, `fecha_recepcion_provisional`, `fecha_fin_prevista` (R17-R18),
+`fecha_fin_obra`, `fuente_fin_obra` (R19), `terminada_sin_fin_obra` (R20),
+`plazo_meses`, `fuente_plazo` (R22), `fecha_vencimiento` (R23),
+`num_contratos_obra`.
+- Garantia: `MAX(NULLIF(obrctr.fecinigar,0))` por obra; si NULL,
+  `obr.garfecini`. `obrctr` manda, como en la regla de fin real de `cierre`.
+  Hoy: 13 obras la tienen en `obrctr` y 44 en `obr`; las 13 coinciden con `obr`;
+  3 obras tienen mas de una fila de `obrctr` con fecha.
+- Respaldo: `(ultimo_cierre + INTERVAL '2 months' - INTERVAL '1 day')::DATE`,
+  es decir el ultimo dia del mes siguiente al ultimo cierre con movimiento.
+- Plazo: `NULLIF(MAX(obrctr.plaret),0)`, si no `NULLIF(MAX(obrctr.plagar),0)`,
+  si no la constante; `obr.garpla` no interviene.
 
 **`retenciones.v_cuadre_proveedor`** (VISTA) — proveedor: `saldo_contable`,
 `viva_efectos`, `diferencia`, `categoria` (R15), `saldo_anterior_2016`,
@@ -132,7 +147,7 @@ la fila `obra_id` NULL. `altas` (`SUM importe` clase ALTA), `bajas` (BAJA),
 
 **`retenciones.v_retencion_contable_obra`** (VISTA) — `saldo_contable` (saldo <> 0)
 `LEFT JOIN fin_obra`: saldo, fin de obra y fuente, plazo, `fecha_vencimiento`,
-`estado_vencimiento` (R22), `dias_hasta_vencimiento`. La vista del caso de uso 3.
+`estado_vencimiento` (R24), `dias_hasta_vencimiento`. La vista del caso de uso 3.
 
 ## Riesgos y decisiones del spec-author
 
@@ -155,8 +170,21 @@ fallaria con una cuenta nueva en otra empresa; la regla «apertura sin cierre
 previo» es general.
 
 **D5 · Fin de obra propio y no `cierre.v_pbi_cierre_cabecera`**: esa vista solo
-cubre el universo del seguimiento (583 obras) y la construye `build_cierre`,
-que va despues. Se replica la regla con test de igualdad.
+cubre el universo del seguimiento y mezcla fin real con previsto. La regla de
+fin real (informativa) se replica con test de igualdad.
+
+**D7 · «Ultimo cierre» = ultimo mes con movimiento en `cierre.fact_cierre_mensual`**
+(R18). Su `anio_mes` ya es el mes canonico de la fase (`cierre.fn_mes_de_fase`:
+manda el texto de la fase sobre su fecha), asi que no se reinterpreta aqui. Medido:
+la ultima fase de `stg.fases` coincide con el ultimo `anio_mes` en las 330 obras
+del cierre, pero **124 tienen fases vacias** despues de su ultimo movimiento (84
+acaban en diciembre, ~12 meses de media): tomar la ultima fase literal alargaria
+el fin de obra casi un ano. Precio aceptado: `build_cierre` corre **despues** de
+`build_retenciones`, asi que el respaldo usa el cierre de la noche anterior (un
+fin de obra no cambia de un dia a otro), y solo existe para las obras del
+seguimiento (5 obras con fases fuera de el quedan sin respaldo, 17.710 €). No se
+anade `build_cierre` a `depends_on` por el mismo motivo que D3; la guarda R21
+evita publicar todo sin fecha si la tabla amaneciera vacia.
 
 **D6 · `SIN_OBRA` es una fila, no un hueco.** Repartir ~4,3 M€ por reglas
 inventadas seria publicar un dato que Sigrid no tiene (R13).
@@ -178,65 +206,43 @@ humano: (1) `apuntes_contables` ~49,5 mil filas y 0 cuentas que violen R5;
 `CUADRA` 64.201,96 / 64.201,96 y sus filas por obra suman 64.201,96, con las
 obras 0629/0635/0631/0650 cuadrando contra K2 en lo que venga por `APUNTE`;
 (4) reparto de `via_obra` y de `categoria` contra la tabla de Medidas y H7;
-(5) `fin_obra` = filas de `raw.obr`, y `terminada_sin_fin_obra` ~83 obras con
-saldo; (6) `check-declarados`, `check-unicidad`, `check-relaciones`,
+(5) `fin_obra` = filas de `raw.obr`; por fuente, ~44 obras `INICIO_GARANTIA`,
+~118 `ULTIMO_CIERRE_MAS_1_MES` y ~17 sin fecha entre las que tienen saldo; (6) `check-declarados`, `check-unicidad`, `check-relaciones`,
 `check-diccionario`, `check-raw-recuentos` en verde; (7) por el MCP: «que
 retenciones tengo de los proveedores de la obra 0635 y cuando vencen».
 
-## Decisiones para el humano
+## Decisiones del humano (2026-09-22)
 
-Cobertura sobre los **8,35 M€ vivos de verdad** (179 obras) salvo que se diga.
+Cobertura sobre los **8,35 M€ vivos de verdad** (179 obras).
 
-**H1 · Que fecha es «fin de obra».** (a) fin real (`MAX(obrctr.fecreafin)`, si
-no `obr.fecfinrea`): **25,3 %**; (b) (a) y si no recepcion provisional
-`obrctr.fecprorec`: **30,6 %** (2,56 M€); (c) (b) + inicio de garantia: 31,2 %;
-(d) (c) + fin previsto de respaldo: 80,5 %, pero una prevision no es un fin.
-Fila de `obrctr` (165 obras con varias): `MAX` no nulo, como `cierre`;
-`obrctr` manda sobre `obr` (difieren en 4 de 44). En 5 de 37 obras la recepcion
-es anterior al fin real. **Obras terminadas sin fecha** con (b): **83 obras,
-2,09 M€** (43 con fin previsto): (i) sin vencimiento, `SIN_FIN_OBRA` declarado y
-la lista a Administracion para completarla en Sigrid; (ii) previsto como
-respaldo marcado `FIN_PREVISTO`. **Recomiendo (b) + (i)**: la prevision de una
-obra ya terminada es la fecha que no se cumplio.
+**H1 · Fin de obra = inicio del periodo de garantia** (`obrctr.fecinigar`, si no
+`obr.garfecini`); hoy casi sin alimentar (20,9 %), pero lo estara. **Respaldo:
+ultimo cierre con movimiento + 1 mes** (D7), 76,1 %. Siempre se publica la
+fuente. Quedan sin fecha 17 obras (1,6 %, 9 terminadas): antes eran 83.
 
-**H2 · Que plazo se suma.** (a) del contrato con el cliente, `plaret` y si no
-`plagar` (meses): con fin de obra (b) cubre 1,94 de 2,56 M€; es garantia **del
-cliente** (back-to-back), no dato del subcontrato; (b) plazo fijo de Negocio para
-todas (valor dominante en `obrctr`: 12 meses; Sigrid hoy aplica 15 desde
-factura); (c) (a) y si no (b). **Recomiendo (c), y que Negocio fije el valor
-de `PLAZO_NEGOCIO`** (el SQL no lleva uno por defecto hasta entonces).
+**H2 · Plazo = `plaret` -> `plagar` del contrato con el cliente -> 12 meses fijos.**
+Con plazo del cliente: 93 obras, 61,8 % del vivo; el resto, 12. Ya no hay
+estado `SIN_PLAZO`.
 
-**H3 · Obra de las bajas sin centro** (4,27 M€ con `rac`, 26 % de las bajas).
-(a) fila `SIN_OBRA`; (b) (a) + `PROVEEDOR_UNA_OBRA`: +0,57 M€ (bajas con obra
-77,5 %), regla segura porque el proveedor solo tiene esa obra; (c) FIFO contra
-las altas por obra: resolveria ~3 M€ mas inventando el reparto. De las sin obra,
-1,23 M€ son de proveedores sin ningun efecto (historia < 2016). **Recomiendo (b).**
+**H3 · Bajas sin centro:** `SIN_OBRA` + `PROVEEDOR_UNA_OBRA` (+0,57 M€, bajas con
+obra 77,5 %). Sin FIFO. De las sin obra, 1,23 M€ son de proveedores sin efectos.
 
-**H4 · Ingerir `rac`.** Sin ella la vista por obra no sirve (altas con obra
-10,8 %). Coste **estimado** por proporcion con la nocturna del 2026-09-22 (`apu`
-2.164.160 filas, 36 col., 4,0 min, 499 MB; `asi` 787.225, 7 col., 0,7 min,
-80 MB) y la forma de `rac` medida (15 col. sin `tex`: 13 enteras, `res` 18 B y
-`usu` 7,5 B de media): **entera 2,5-4,5 min y 300-400 MB; con `asiide <> 0`
-(755.086 filas) ~1 min y 90-120 MB**, <0,5 % del disco. **Recomiendo filtrada**,
-acordado con F-091; si F-091 necesita el log completo, entera.
+**H4 · `rac` se ingiere filtrada** (`asiide <> 0`, 755.086 filas), acordado con
+F-091. Coste **estimado** por proporcion con la nocturna del 2026-09-22 (`apu`
+2.164.160 filas, 36 col., 4,0 min, 499 MB; `asi` 787.225, 7 col., 0,7 min, 80 MB)
+y la forma medida de `rac` (15 col. sin `tex`; `res` 18 B y `usu` 7,5 B de
+media): ~1 min y 90-120 MB, <0,5 % del disco.
 
-**H5 · Lado cliente.** Medido: 208 cuentas `cli.cueretide` (200 de 4308, y 4328,
-4338, 4380, 5540), saldo deudor **13,81 M€**; `cob` «VIVA» hoy 22,16 M€; con el
-criterio de `pag` 2,12 M€. Tres cifras sin relacion: el criterio de estados de
-`pag` no se traslada a `cob`. **Recomiendo fuera**, feature propia tras F-094.
+**H5 · Cliente fuera**, feature propia tras F-094 (contabilidad 13,81 M€, `cob`
+«VIVA» 22,16 M€, criterio de `pag` sobre `cob` 2,12 M€: no se traslada).
 
-**H6 · F-059 y F-045.** F-059 (retenciones antes de 2016 desde contabilidad)
-queda cubierta entera: apuntes desde 2008 y `SALDO_INICIAL`. **Recomiendo
-retirarla como absorbida** (la regla `ctrrec` sigue en F-067). F-045 (caso de uso
-3) se responde con `v_retencion_contable_obra`; lo que le queda es traducir
-`movimientos.obra_id` (hoy un centro) a obra, que toca el SQL de F-094.
-**Recomiendo absorber ese resto en F-094** y retirar F-045.
+**H6 · F-059 se retira como absorbida** (apuntes desde 2008 y `SALDO_INICIAL`; la
+regla `ctrrec` sigue en F-067). **El resto de F-045** (traducir
+`movimientos.obra_id` de centro a obra) **lo hace F-094**: F-095 no lo toca.
 
-**H7 · Los 3,28 M€ que no cuadran.** 761 proveedores con saldo o viva >= 1 € (la
-exploracion contaba 1.268 con otro filtro): `CUADRA` 520 / 5,07 M€;
-`SIN_EFECTOS_VIVOS` 81 / 0,99 M€ en libros (0,27 de antes de 2016);
-`SIN_SALDO_CONTABLE` 38 / 0,20 M€ en efectos (0,04 ya prescritos);
-`CONTABILIDAD_MAYOR` 41 / +0,10 M€; `EFECTOS_MAYOR` 81 / -0,47 M€. (a) publicar
-la categoria por proveedor, manda la contabilidad; (b) no publicar el saldo por
-obra de los que no cuadran; (c) esperar a que Administracion los explique.
-**Recomiendo (a)**, y entregar a Administracion la lista de mayores descuadres.
+**H7 · Descuadre de 3,28 M€: se publica la categoria por proveedor y manda la
+contabilidad.** Reparto medido (761 proveedores con saldo o viva >= 1 €):
+`CUADRA` 520 / 5,07 M€; `SIN_EFECTOS_VIVOS` 81 / 0,99 M€ en libros (0,27 de antes
+de 2016); `SIN_SALDO_CONTABLE` 38 / 0,20 M€ (0,04 prescritos);
+`CONTABILIDAD_MAYOR` 41 / +0,10 M€; `EFECTOS_MAYOR` 81 / -0,47 M€. La lista de
+mayores descuadres se entrega a Administracion.

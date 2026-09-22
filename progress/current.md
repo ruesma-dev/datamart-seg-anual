@@ -1524,3 +1524,12 @@ presentan los 3,28 M€ que no cuadran.
 
 **Aviso para F-094**: en `cob` el criterio de `pag` («viva de verdad») da 2,12 M€
 frente a 13,81 M€ de saldo contable de cliente: no se traslada tal cual.
+
+### F-095 · decisiones del humano incorporadas (2026-09-22, segunda pasada)
+
+H1-H7 contestadas e incorporadas a la spec (detalle en `progress/spec_F-095.md`).
+Fin de obra = inicio de garantia, con respaldo «ultimo cierre con movimiento + 1
+mes»: 97,0 % del vivo con fecha, 17 obras sin ella. Plazo `plaret` -> `plagar` ->
+12. F-059 se retira como absorbida; el resto de F-045 lo hace F-094. La spec ya
+no tiene decisiones abiertas: queda la aprobacion del humano y que F-094 este
+`done`.
