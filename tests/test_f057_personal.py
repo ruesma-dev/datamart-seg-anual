@@ -993,6 +993,36 @@ def test_f057_r25_personal_en_esquemas_del_datamart() -> None:
     assert len(ESQUEMAS_DEL_DATAMART) == 10
 
 
+def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:
+    """PROPAGACION (pasada 2 del review). `infra/sql/02_roles.sql` crea,
+    concede y comprueba los esquemas A MANO en tres listas, y las tres se
+    quedaron en nueve: la nocturna no lo nota —`apply-grants` lee la
+    configuracion—, pero un reaprovisionamiento del servidor dejaria
+    `personal` sin permisos y la comprobacion del punto 6 mentiria.
+    """
+    from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
+
+    crudo = (RAIZ / "infra" / "sql" / "02_roles.sql").read_text(encoding="utf-8")
+    sql = _sin_comentarios(crudo)
+    esperado = set(ESQUEMAS_DEL_DATAMART)
+
+    creados = set(re.findall(r"CREATE SCHEMA IF NOT EXISTS (\w+);", sql))
+    assert creados == esperado, f"punto 4: crea {sorted(creados)} (R25)"
+
+    concedidos = re.search(r"FOREACH esquema IN ARRAY ARRAY\[(.*?)\]", sql, re.DOTALL)
+    assert concedidos, "falta el ARRAY del GRANT del punto 5"
+    assert set(re.findall(r"'(\w+)'", concedidos.group(1))) == esperado, (
+        "punto 5: el GRANT del MCP no cubre los diez esquemas (R25)"
+    )
+
+    comprobados = re.search(r"WHERE nspname IN \((.*?)\)", sql, re.DOTALL)
+    assert comprobados, "falta la comprobacion de esquemas del punto 6"
+    assert set(re.findall(r"'(\w+)'", comprobados.group(1))) == esperado, (
+        "punto 6: la comprobacion no lista los diez esquemas (R25)"
+    )
+    assert "nueve" not in crudo, "`02_roles.sql` sigue hablando de nueve esquemas"
+
+
 def test_f057_r26_check_declarados_cubre_personal() -> None:
     """PROPAGACION 8/12. Los cuatro objetos entran en el inventario.
 
