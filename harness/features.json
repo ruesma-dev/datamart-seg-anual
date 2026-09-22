@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 41,
+      "priority": 45,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 45,
+      "priority": 49,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 51,
+      "priority": 55,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 53,
+      "priority": 57,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 54,
+      "priority": 58,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 55,
+      "priority": 59,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 56,
+      "priority": 60,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 42,
+      "priority": 46,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 46,
+      "priority": 50,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 34,
+      "priority": 38,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 43,
+      "priority": 47,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 38,
+      "priority": 42,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 57,
+      "priority": 61,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 47,
+      "priority": 51,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 49,
+      "priority": 53,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 39,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 22,
+      "priority": 26,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -585,7 +585,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 4,
+      "priority": 8,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 29,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -615,7 +615,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 29,
+      "priority": 33,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -633,7 +633,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 21,
+      "priority": 25,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -666,7 +666,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 23,
+      "priority": 27,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -700,7 +700,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 32,
+      "priority": 36,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -715,7 +715,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 28,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -746,7 +746,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 31,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -762,7 +762,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 34,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -778,19 +778,18 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 39,
+      "priority": 43,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
       "id": "F-051",
-      "title": "nombre_mes de las filas reales trae la descripcion del cierre, no el mes, y rompe la clave de cierre.v_pbi_planif_vs_real",
-      "description": "Descubierto el 2026-08-30 por check-unicidad, ejecutado contra la base recien reconstruida con F-042 (job caj-datamart-seg-dev-d8y5q10, imagen r20260830-0924). EL SINTOMA: cierre.v_pbi_planif_vs_real NO cumple la clave que declara. (obra_id, anio_mes, concepto_cuadro) se repite en 204 combinaciones que afectan a 472 filas, SIEMPRE en el renglon BENEFICIO y hasta CUATRO filas por combinacion. Como la deteccion de fan-out del diccionario deriva de la unicidad de la clave declarada, ademas queda desarmada ahi, que es el mismo efecto de segundo orden que ya se vio en F-006 y en F-042. LA CAUSA, localizada en el codigo y medida en la base: en mart/02_build_fact.sql, las ramas 1) COSTE REAL (linea 218, ambito 3) y 2) VENTA REAL (linea 248, ambito 7) rellenan la columna nombre_mes con pm.version_descripcion -el texto que alguien tecleo al cerrar en Sigrid- en vez de derivarla de anio_mes, que es lo que SI hacen las dos ramas planificadas (lineas 275 y 305, con el array de meses sin locale). Es decir, en las filas reales nombre_mes no es el nombre del mes: es la etiqueta del cierre. Y como el CTE beneficio de la vista une producc con total_costes SOLO por (obra_id, anio_mes) mientras los dos agrupan incluyendo nombre_mes, cada valor distinto de esa etiqueta multiplica las filas de BENEFICIO en producto cartesiano. ALCANCE MEDIDO EL 2026-08-30 contra la base reconstruida, en solo lectura: en mart.fact_seguimiento_mensual, 566.504 de 3.332.312 filas REAL (17,0 %) llevan un nombre_mes que no es la etiqueta de su anio_mes, y CERO de las 1.965.029 PLANIFICADO; en mart.fact_seguimiento_categoria, 3.226 de 17.289 REAL (18,7 %) y cero de 7.395 PLANIFICADO. Hay 36 pares (obra_id, anio_mes) con mas de un nombre_mes distinto, y esos 36 son los que producen el fan-out. Ejemplos reales: la obra 0571 tiene el mes 2020-05-01 etiquetado a la vez como 'Mayo 2020' y como 'Agosto 2020'; hay 186 filas de 2024-01-01 en adelante etiquetadas 'Diciembre 2025', y 61 filas de 2010-06-01 etiquetadas 'DICIEMBRE 2010', en mayusculas, porque es texto libre. POR QUE IMPORTA, y son dos danos distintos: (1) nombre_mes esta PUBLICADO en la superficie de consumo, asi que Power BI y el MCP muestran hoy etiquetas de mes que no corresponden al mes de la fila -su ficha dice 'Etiqueta del mes en castellano con su ano' y eso es falso para una de cada seis filas reales-; (2) el fan-out de BENEFICIO significa que quien sume ese renglon en las 204 combinaciones afectadas recibe hasta cuatro veces el importe. Eso ya no es cosmetico. QUE NO ES: NO lo introduce F-042 ni F-047. El defecto es preexistente y sale a la luz ahora por dos motivos encadenados: F-047 hizo que la vista se construya cada noche en vez de destruirse, y por eso entra por primera vez en el alcance de check-unicidad. La ficha del diccionario de la vista explica con detalle por que el doblado de F-042 no le afectaba -usa importe_mes, que telescopea- y esa explicacion sigue siendo correcta: este es OTRO defecto, con otra causa. RELACION CON F-050: la dispersion de etiquetas tiene la misma raiz de negocio que el patron 2 de F-050 -la fase abarca varios meses y Sigrid la archiva en el de arranque-, pero el arreglo del datamart NO depende de esa investigacion: aqui la decision es de que columna se deriva nombre_mes, y se puede tomar hoy. A DECIDIR EN LA SPEC: (a) si nombre_mes pasa a derivarse SIEMPRE de anio_mes en las cuatro ramas -que es lo coherente con lo que promete su ficha- y entonces si la descripcion de la version merece una columna propia y publicada, porque hoy es la unica pista de que cierre viene cada fila real; (b) si ademas se blinda la vista haciendo que el JOIN de beneficio no dependa de columnas descriptivas, para que un dato inconsistente no vuelva a convertirse en filas de mas; (c) que dice el diccionario de todo eso, porque hay fichas que hoy afirman un grano que la base no cumple. COMO SE VERIFICA: check-unicidad debe dejar cierre.v_pbi_planif_vs_real en OK -de 204 combinaciones repetidas a cero-, y el contraste antes/despues sobre el mismo raw debe demostrar que no se mueve ni un importe, porque este arreglo es de ETIQUETA y de forma, no de dinero. Ojo: v_pbi_planif_vs_real se comprueba en segundos, pero mart.fact_seguimiento_mensual necesita --timeout 300 para dar veredicto. ORDEN DE TRABAJO FIJADO POR EL HUMANO EL 2026-08-31, al preguntarse que falta para que negocio pueda usar el datamart a traves del MCP: primero F-052 -una obra que no esta en el datamart envenena la confianza en todo lo demas y no hay nada que chirrie-, luego F-045 -el caso de uso 3 del humano, las retenciones por obra, que hoy no tiene respuesta-, luego F-051 y por ultimo F-050. Las cuatro son la cola acordada; lo demas espera. ================ SUBIDA A PRIORIDAD 1 POR EL HUMANO EL 2026-09-22. Motivo operativo, medido ese dia: `check-unicidad` lleva desde el 2026-08-30 saliendo con codigo 1 SIEMPRE por esta misma vista —204 combinaciones y 472 filas, cifras identicas tres semanas despues—, asi que **un control que esta siempre en rojo ha dejado de avisar**: el dia que falle por otro objeto, nadie lo mirara. Y el dato que publica esta mal: el renglon BENEFICIO se repite hasta cuatro veces en 36 pares (obra, mes), de modo que **quien sume el beneficio de esa vista lo obtiene inflado** en esos meses.",
+      "title": "El mes de las filas reales sale del ano/mes de obrfas y no del TEXTO del cierre, que es la regla, y rompe la clave de cierre.v_pbi_planif_vs_real",
+      "description": "Descubierto el 2026-08-30 por check-unicidad, ejecutado contra la base recien reconstruida con F-042 (job caj-datamart-seg-dev-d8y5q10, imagen r20260830-0924). EL SINTOMA: cierre.v_pbi_planif_vs_real NO cumple la clave que declara. (obra_id, anio_mes, concepto_cuadro) se repite en 204 combinaciones que afectan a 472 filas, SIEMPRE en el renglon BENEFICIO y hasta CUATRO filas por combinacion. Como la deteccion de fan-out del diccionario deriva de la unicidad de la clave declarada, ademas queda desarmada ahi, que es el mismo efecto de segundo orden que ya se vio en F-006 y en F-042. LA CAUSA, localizada en el codigo y medida en la base: en mart/02_build_fact.sql, las ramas 1) COSTE REAL (linea 218, ambito 3) y 2) VENTA REAL (linea 248, ambito 7) rellenan la columna nombre_mes con pm.version_descripcion -el texto que alguien tecleo al cerrar en Sigrid- en vez de derivarla de anio_mes, que es lo que SI hacen las dos ramas planificadas (lineas 275 y 305, con el array de meses sin locale). Es decir, en las filas reales nombre_mes no es el nombre del mes: es la etiqueta del cierre. Y como el CTE beneficio de la vista une producc con total_costes SOLO por (obra_id, anio_mes) mientras los dos agrupan incluyendo nombre_mes, cada valor distinto de esa etiqueta multiplica las filas de BENEFICIO en producto cartesiano. ALCANCE MEDIDO EL 2026-08-30 contra la base reconstruida, en solo lectura: en mart.fact_seguimiento_mensual, 566.504 de 3.332.312 filas REAL (17,0 %) llevan un nombre_mes que no es la etiqueta de su anio_mes, y CERO de las 1.965.029 PLANIFICADO; en mart.fact_seguimiento_categoria, 3.226 de 17.289 REAL (18,7 %) y cero de 7.395 PLANIFICADO. Hay 36 pares (obra_id, anio_mes) con mas de un nombre_mes distinto, y esos 36 son los que producen el fan-out. Ejemplos reales: la obra 0571 tiene el mes 2020-05-01 etiquetado a la vez como 'Mayo 2020' y como 'Agosto 2020'; hay 186 filas de 2024-01-01 en adelante etiquetadas 'Diciembre 2025', y 61 filas de 2010-06-01 etiquetadas 'DICIEMBRE 2010', en mayusculas, porque es texto libre. POR QUE IMPORTA, y son dos danos distintos: (1) nombre_mes esta PUBLICADO en la superficie de consumo, asi que Power BI y el MCP muestran hoy etiquetas de mes que no corresponden al mes de la fila -su ficha dice 'Etiqueta del mes en castellano con su ano' y eso es falso para una de cada seis filas reales-; (2) el fan-out de BENEFICIO significa que quien sume ese renglon en las 204 combinaciones afectadas recibe hasta cuatro veces el importe. Eso ya no es cosmetico. QUE NO ES: NO lo introduce F-042 ni F-047. El defecto es preexistente y sale a la luz ahora por dos motivos encadenados: F-047 hizo que la vista se construya cada noche en vez de destruirse, y por eso entra por primera vez en el alcance de check-unicidad. La ficha del diccionario de la vista explica con detalle por que el doblado de F-042 no le afectaba -usa importe_mes, que telescopea- y esa explicacion sigue siendo correcta: este es OTRO defecto, con otra causa. RELACION CON F-050: la dispersion de etiquetas tiene la misma raiz de negocio que el patron 2 de F-050 -la fase abarca varios meses y Sigrid la archiva en el de arranque-, pero el arreglo del datamart NO depende de esa investigacion: aqui la decision es de que columna se deriva nombre_mes, y se puede tomar hoy. A DECIDIR EN LA SPEC: (a) si nombre_mes pasa a derivarse SIEMPRE de anio_mes en las cuatro ramas -que es lo coherente con lo que promete su ficha- y entonces si la descripcion de la version merece una columna propia y publicada, porque hoy es la unica pista de que cierre viene cada fila real; (b) si ademas se blinda la vista haciendo que el JOIN de beneficio no dependa de columnas descriptivas, para que un dato inconsistente no vuelva a convertirse en filas de mas; (c) que dice el diccionario de todo eso, porque hay fichas que hoy afirman un grano que la base no cumple. COMO SE VERIFICA: check-unicidad debe dejar cierre.v_pbi_planif_vs_real en OK -de 204 combinaciones repetidas a cero-, y el contraste antes/despues sobre el mismo raw debe demostrar que no se mueve ni un importe, porque este arreglo es de ETIQUETA y de forma, no de dinero. Ojo: v_pbi_planif_vs_real se comprueba en segundos, pero mart.fact_seguimiento_mensual necesita --timeout 300 para dar veredicto. ORDEN DE TRABAJO FIJADO POR EL HUMANO EL 2026-08-31, al preguntarse que falta para que negocio pueda usar el datamart a traves del MCP: primero F-052 -una obra que no esta en el datamart envenena la confianza en todo lo demas y no hay nada que chirrie-, luego F-045 -el caso de uso 3 del humano, las retenciones por obra, que hoy no tiene respuesta-, luego F-051 y por ultimo F-050. Las cuatro son la cola acordada; lo demas espera. ================ SUBIDA A PRIORIDAD 1 POR EL HUMANO EL 2026-09-22. Motivo operativo, medido ese dia: `check-unicidad` lleva desde el 2026-08-30 saliendo con codigo 1 SIEMPRE por esta misma vista —204 combinaciones y 472 filas, cifras identicas tres semanas despues—, asi que **un control que esta siempre en rojo ha dejado de avisar**: el dia que falle por otro objeto, nadie lo mirara. Y el dato que publica esta mal: el renglon BENEFICIO se repite hasta cuatro veces en 36 pares (obra, mes), de modo que **quien sume el beneficio de esa vista lo obtiene inflado** en esos meses. ================ CORREGIDO EL 2026-09-22 POR EL HUMANO, Y CAMBIA LA HIPOTESIS DE ESTA FICHA: «el mes bueno es el del NOMBRE; esa regla nos costo mucho esfuerzo decidirla y no se puede cambiar». Todo lo de arriba que proponga derivar `nombre_mes` de `anio_mes` queda ANULADO: borraria el unico rastro del mes bueno. Comprobado en codigo (`progress/explore_F-051_regla_mes.md`): la regla -«si texto y fecha discrepan, manda el TEXTO», dictada por el jefe de obra, `b0aebae`, `config/diccionario/cierre.yaml:12-15`- solo esta implementada en `cierre` (`cierre.fn_mes_de_fase`). En `stg` y `mart` las filas reales toman `anio_mes` del `ano`/`mes` que Sigrid archiva en `obrfas` (`stg/08_plan_mensual.sql:365`), sin mirar el texto. LO SOSPECHOSO ES `anio_mes`, NO `nombre_mes`. El fan-out sale de que `cierre.v_pbi_planif_vs_real` agrupa por `nombre_mes` (real = texto del cierre, planificado = etiqueta derivada) y une el beneficio solo por (obra, anio_mes); probablemente no solo BENEFICIO sino todos los renglones de esos meses salen repetidos (a medir). DOS ARREGLOS POSIBLES, A DECIDIR POR EL HUMANO EN LA SPEC: (1) aplicar la regla del texto en `stg` a las filas reales -mueve dinero y el eje temporal, y reabre las colisiones de F-042-; (2) solo blindar la vista para que no agrupe por columnas descriptivas -no mueve dinero, pero sigue publicando el mes de `obrfas`-. Con la regla del texto, F-051 SI depende de F-050: el patron 2 de F-050 (fase de varios meses archivada en su mes de arranque) es este mismo problema. Prioridad 1 confirmada por el humano el 2026-09-22.",
       "acceptance": [
-        "check-unicidad deja cierre.v_pbi_planif_vs_real en OK: de 204 combinaciones repetidas a cero",
-        "nombre_mes corresponde al anio_mes de su fila en las cuatro ramas del build, verificado en la base sobre las 566.504 filas hoy discrepantes",
-        "Decidido y documentado si la descripcion de la version se publica en una columna propia, ya que hoy es la unica pista del cierre de origen",
-        "Las fichas del diccionario afectadas dicen lo que la base cumple, y la deteccion de fan-out vuelve a apoyarse en una clave real",
-        "Contraste antes/despues sobre el mismo raw: ni un importe se mueve, porque el arreglo es de etiqueta y no de dinero"
+        "Aplicada la regla del proyecto -el mes de un cierre lo da el TEXTO de la fase- donde el humano decida en la spec, y ningun cambio contradice `cierre.fn_mes_de_fase`",
+        "`check-unicidad` deja `cierre.v_pbi_planif_vs_real` en OK: de 204 combinaciones repetidas a cero, y ningun renglon de la vista se repite",
+        "Medido antes/despues sobre el mismo raw: si el arreglo elegido no mueve dinero, no se mueve ni un importe; si lo mueve, cada diferencia esta explicada obra a obra",
+        "Un test fija el comportamiento de la regla del texto (hoy ningun test lo prueba) y el diccionario dice de donde sale `anio_mes` en las filas reales"
       ],
       "status": "pending",
       "sdd": true,
@@ -812,7 +811,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 31,
+      "priority": 35,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -831,7 +830,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 37,
+      "priority": 41,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -849,7 +848,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 33,
+      "priority": 37,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -866,7 +865,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 2,
+      "priority": 6,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -883,7 +882,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 13,
+      "priority": 17,
       "branch": "feature/F-056-contabilidad"
     },
     {
@@ -916,7 +915,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 26,
+      "priority": 30,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -933,7 +932,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 28,
+      "priority": 32,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -946,7 +945,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 40,
+      "priority": 44,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -962,7 +961,7 @@
         "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
       ],
-      "priority": 44,
+      "priority": 48,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -978,7 +977,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 48,
+      "priority": 52,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -994,7 +993,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 50,
+      "priority": 54,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -1011,7 +1010,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 52,
+      "priority": 56,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -1031,7 +1030,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 19,
+      "priority": 23,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1070,7 +1069,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 17,
+      "priority": 21,
       "branch": "feature/F-067-compras-seguimiento-mcp"
     },
     {
@@ -1102,7 +1101,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 24,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1120,7 +1119,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 10,
+      "priority": 14,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1196,7 +1195,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 19,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1216,7 +1215,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 13,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1231,7 +1230,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 18,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1328,7 +1327,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 18,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1385,7 +1384,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 12,
       "branch": "feature/F-085-quien-aprobo-que-y-cuando"
     },
     {
@@ -1406,7 +1405,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 11,
+      "priority": 15,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1425,7 +1424,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 18,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1444,7 +1443,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 10,
       "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     },
     {
@@ -1463,7 +1462,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 7,
+      "priority": 11,
       "branch": "feature/F-090-documento-adjunto"
     },
     {
@@ -1482,7 +1481,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 12,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1501,7 +1500,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 13,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1521,8 +1520,72 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 2,
+      "priority": 6,
       "branch": "feature/F-093-obra-de-cabecera"
+    },
+    {
+      "id": "F-094",
+      "title": "Retenciones infladas 4,3 veces: el estado VIVA sale solo de fecrea y cuenta los agrupados dos veces y lo ya pagado",
+      "description": "Arreglo INMEDIATO de un dato mal publicado hoy en produccion. Medido el 2026-09-22 en solo lectura (`progress/explore_retenciones_contabilidad_fin_obra.md` §1), a raiz del caso FERMALUX que planteo Juan Romero. `retenciones.movimientos` publica **35,54 M EUR vivos a proveedor (25.012 efectos); la retencion viva real es ~8,35 M EUR**. LA CAUSA: `sql/retenciones/01_movimientos.sql` deriva `estado` SOLO de `pag.fecrea` y no mira `con.fecbaj` ni `con.est`. Con eso cuentan como VIVA: los originales agrupados (`est 14`, `fecbaj` = fecha del AGR; 14.668 efectos, 12,99 M), los otros anulados con `fecbaj <> 0` (841, 5,70 M), los agrupadores AGR ya pagados (`est 10`; 1.444, 6,73 M) y otros pagados sin `fecrea` (311, 1,78 M). **El mismo dinero cuenta dos veces** (original + agrupador) y ninguna de las dos es viva. PRUEBA DE CUADRE: FERMALUX da hoy 98.695,48 EUR vivos; lo vivo de verdad es **64.201,96**, identico al saldo de su cuenta contable 4108005478. Criterio medido de 'viva de verdad': `fecrea = 0 AND con.fecbaj = 0 AND con.est NOT IN (10,14,15)`. Es el mismo defecto que F-080 ya resolvio para `compras.vencimientos`. ADEMAS: el orden de magnitud falso (34,7 M EUR) esta escrito en el diccionario y lo sirve `contexto_bbdd` al MCP: hay que corregirlo. LADO CLIENTE (`cob`), SIN VERIFICAR: de 22,1 M EUR 'VIVA', ~1.957 efectos / ~19,9 M tienen `fecbaj <> 0`. Sospecha del mismo defecto: se mide antes de decidir si entra en el mismo arreglo. FRONTERA: esto es sanear lo publicado con los efectos; llevar la retencion a la contabilidad, con fin de obra y vencimiento, es F-095.",
+      "acceptance": [
+        "`retenciones.movimientos` deja de publicar como VIVA un efecto con `con.fecbaj <> 0` o con `con.est` en pagado/agrupado, y el criterio queda escrito en la cabecera del SQL y en la ficha del diccionario",
+        "FERMALUX (entidad 1958815) da 64.201,96 EUR vivos, igual que el saldo de su cuenta contable, y el total vivo a proveedor queda en el orden de ~8,35 M EUR con la cifra exacta medida y explicada",
+        "El lado cliente (`cob`) esta medido: o se corrige con el mismo criterio o queda escrito por que no",
+        "La cifra de 34,7 M EUR desaparece del diccionario publicado y `check-unicidad` y `check-relaciones` siguen en verde sobre `retenciones`"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 2,
+      "branch": "feature/F-094-retenciones-estado-vivo"
+    },
+    {
+      "id": "F-095",
+      "title": "Retenciones desde la contabilidad, cuadradas con los efectos, por obra, y con vencimiento a contar desde el fin de obra",
+      "description": "Pedida por el humano el 2026-09-22: 'habia duplicidades, deben salir de la contabilidad, y hay que cuadrar efectos'. Todo lo medido esta en `progress/explore_retenciones_contabilidad_fin_obra.md` §2-§4. LA CONTABILIDAD SI LAS VE BIEN: la retencion se da de alta en el haber de la cuenta de retencion del proveedor y la agrupacion se ve como baja por obra; no duplica ni deja viva la retencion agrupada. Atribucion a PROVEEDOR resuelta: `prv.cueretide` es 1:1 (2.247 cuentas) y en efectos `pag.cueide = prv.cueretide` en el 98,1 %. Seleccionar cuentas por `prv.cueretide` y NO por prefijo: ademas de 4008/4108/4180 aparecen 4038 (0,90 M) y 4128. Saldo de todas: 8,76 M EUR frente a 8,35 M vivos en efectos. CUADRE: 1.027 de 1.268 proveedores cuadran a menos de 1 EUR (81 %), pero solo 5,07 de 8,35 M: los grandes descuadran (historia anterior a 2016, prescripciones, reclasificaciones) y hay que explicarlos. TRAMPA: los asientos de cierre y apertura (~57 M EUR por lado) multiplican si no se excluyen. ATRIBUCION A OBRA: altas 96,2 % con obra; bajas solo 72,0 % (~4,7 M EUR sin obra: pagos manuales, prescripciones, UTE). Desde 2016 el alta no lleva `cenide` y el camino pasa por `rac`, que NO se ingiere. El puente centro->obra es `maestro.centros_coste` (F-073). ================ DECIDIDO POR EL HUMANO EL 2026-09-22: **la fecha a partir de la cual se calcula el vencimiento de la retencion es el FIN DE OBRA** (no la fecha de la factura, que es lo que aplica Sigrid hoy: factura + 15 meses en el 97,8 % de los efectos). ================ ABIERTO, a decidir en la spec con el humano: (1) QUE CAMPO es el fin de obra: fin real (`obrctr.fecreafin` / `obr.fecfinrea`) cubre solo el 25,3 % del importe vivo; recepcion provisional `obrctr.fecprorec` el 21,4 %; fin previsto el 73,6 %; y 85 de las 138 obras terminadas o cerradas no tienen fin real. `obrctr` tiene varias filas por obra (165 con mas de una). (2) QUE PLAZO se suma al fin de obra: ningun dato de proveedor lo trae; `obrctr.plaret`/`plagar` es la garantia del CLIENTE (12 meses dominante, 40-62 % del importe). (3) Obra de las bajas sin centro de coste. (4) Si se ingiere `rac`. (5) Lado cliente. COORDINACION: esta feature ABSORBE el objetivo de F-059 (retenciones antes de 2016 desde la contabilidad) y el caso de uso de F-045 (retenciones por obra, cuyo nudo ya resolvio F-073). La spec propone al humano si esas dos fichas se retiran o se quedan como subtareas. Va DETRAS de F-094.",
+      "acceptance": [
+        "Existe en el datamart la retencion de proveedor por proveedor y obra calculada desde la contabilidad, con las cuentas elegidas por `prv.cueretide` y sin asientos de cierre ni apertura",
+        "Publicado el cuadre contabilidad-efectos por proveedor, con las diferencias explicadas o declaradas, y FERMALUX cuadrando al centimo",
+        "Cada retencion viva tiene su vencimiento calculado desde el fin de obra, con el campo de fin de obra y el plazo que el humano apruebe en la spec, y las obras sin fecha declaradas en vez de inventadas",
+        "Decidido con el humano que pasa con F-059 y F-045, y el diccionario explica cual es la fuente que manda para el saldo vivo"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 3,
+      "branch": "feature/F-095-retenciones-contabilidad-fin-obra"
+    },
+    {
+      "id": "F-096",
+      "title": "Las partidas que al reestimar superan el 250 % desaparecen de la planificacion: el filtro borra la subida y deja la bajada",
+      "description": "Dato mal publicado hoy en produccion. Lo destapo Juan Romero con la obra 0686 (partida `03.02.18`, versiones 27 a 30 del master): faltan meses en la planificacion valorada. Medido el 2026-09-22 en solo lectura, `progress/explore_bug_plan_mensual_meses.md`. LA CAUSA: `stg/08_plan_mensual.sql`, linea 515, `AND pct_acumulado <= 2.5` (commit `f14e443`, 2026-05-23). Se aplica DESPUES de calcular `pct_mes` con `LAG` sobre la serie completa, asi que borra los meses de la subida y conserva el de la bajada, calculado contra un mes que ya no existe. POR QUE PASA AL REESTIMAR: cuando baja el precio de la partida (0686: de 54,41 a 11,23) Sigrid reexpresa el acumulado para conservar los euros y el porcentaje supera el 250 % (4,603). El origen esta bien; el fallo es nuestro. ALCANCE: en `stg.plan_mensual` faltan **89,09 M EUR netos** (2.785 series, 84 obras); en `mart`, donde manda la version vigente, 40 filas-mes, 11 obras y 46.889 EUR. El volumen lo dominan 29 series absurdas de origen (>10.000 %, 68,4 M EUR, p. ej. 0571 `04.12` v23); la zona del caso de Juan (2,5-5) son 1.910 series, 65 obras y 10,29 M EUR. PROPUESTA: quitar el tope y MARCAR los acumulados fuera de rango en vez de borrarlos (patron `R-ALBARAN-ABSURDO`); test del invariante SUM(pct_mes) = ultimo pct_acumulado por serie; la ficha de `stg.plan_mensual` explica que el acumulado puede pasar del 100 %. RIESGOS: `08_plan_mensual.sql` esta en `FICHEROS_DEL_SELLO`, asi que fuerza la reconstruccion completa de las 920 obras esa noche (creditos de CPU del servidor compartido); cambia meses cerrados de 2021-2026 en `mart` y **la version 28 de la 0686 que Juan valido**: avisarle. Las 29 series absurdas se pasan a Negocio para que las corrija en Sigrid. NO ES DE RETENCIONES.",
+      "acceptance": [
+        "Ninguna serie partida-version de `stg.plan_mensual` pierde meses por su porcentaje: para toda serie, SUM(pct_mes) = ultimo pct_acumulado, fijado por un test",
+        "La obra 0686, partida `03.02.18`, versiones 27-30, publica enero-marzo de 2026 igual que Sigrid mes a mes",
+        "Los acumulados fuera de rango quedan marcados y declarados en el diccionario, no borrados, y la lista de series absurdas llega a Negocio",
+        "Medido antes/despues el cambio en `mart` (las 40 filas-mes vigentes) y comunicado a Juan Romero"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 4,
+      "branch": "feature/F-096-plan-mensual-sin-tope"
+    },
+    {
+      "id": "F-097",
+      "title": "Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master",
+      "description": "Pedida por Juan Romero por correo el 2026-09-22, «Datamart: publicar los descompuestos de las partidas (Descomposicion y Planificacion de compras)». Hoy de cada partida solo llegan medicion, precio e importe por ambito y fase o version (`stg.presupuesto`), pero no los elementos (precios simples) que la componen. Ejemplo suyo: la partida D05DF210 «Forj. reticular 35+10» de la 0726 cuesta 134,35 EUR/m2 y no se ve de que se compone (hormigon, acero, encofrado, mano de obra). ================ LO QUE SON, SEGUN EL HUMANO (2026-09-22), y manda sobre el nombre de la pestaña: en COSTE (ambito 3) existen los DOS: la pestaña «Planificacion compras» es **el descompuesto que necesitamos** (el del jefe de obra), y la pestaña «Descomposicion» es **la referencia que vino de Estudios**. En MASTER COSTE (ambito 8) solo existe la pestaña «Descomposicion», que conceptualmente es **la planificacion de compras del ABC en adelante** y **el descompuesto del cierre para Oficina Tecnica**. Juan propone llamarlos ESTUDIO, PLANIF_JO y MASTER_PLANIF_JO y publicarlos los tres, cada uno con su origen, sin mezclarlos. ================ LO QUE PIDE: una fila por linea de descompuesto con identificacion (obra, partida, ambito, fase o version, origen, orden), elemento (id, codigo, descripcion, tipo MO/material/maquinaria/subcontrata/%/auxiliar, unidad), valores (rendimiento, precio unitario, importe por unidad y, si es comodo, totales por la medicion), porcentajes con su base, anidamiento de partidas auxiliares (linea padre) y, solo en las de planificacion, proveedor, contrato y mes previsto de compra si la pestaña lo recoge. Un catalogo de elementos con su equivalencia al producto de compras para cruzar lo planificado con lo comprado. Controles: el descompuesto por unidad cuadra con el precio de la partida en `stg.presupuesto` (publicar las que no) y lista de partidas con precio y sin descompuesto (tanto alzado). ================ NADA MEDIDO TODAVIA: hay que localizar en Sigrid las tablas de cada pestaña (azure-apps/sigrid_tablas.md), si se ingieren, su volumen -el master tiene una copia por version y puede ser muy grande, con el coste de ventana que eso supone- y que significa 'del ABC en adelante' en el dato. Enlaza con F-092 (maestro de productos) y con F-038 (comparativo).",
+      "acceptance": [
+        "Localizadas y medidas en Sigrid las tablas de los tres descompuestos, con volumen y coste de ingesta, y confirmado con el dato delante que cada pestaña es lo que el humano describe",
+        "Publicados los descompuestos con su origen distinguido, de forma que ni la IA ni Power BI puedan mezclar el de Estudios con la planificacion del jefe de obra",
+        "Publicado el cuadre descompuesto-precio de partida y la lista de partidas sin descompuesto",
+        "Se puede responder de que se compone la partida D05DF210 de la 0726 y comparar el de Estudios con el del jefe de obra"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 5,
+      "branch": "feature/F-097-descompuestos-partidas"
     }
   ]
 }
