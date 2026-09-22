@@ -1,7 +1,15 @@
 <!-- progress/review_F-094.md -->
-Revisión completa (pasada 1) · `git diff main...HEAD` hasta `a7e647c`
+Revisión incremental desde 20e2cd6 (pasada 2) · `git diff 20e2cd6..HEAD`, HEAD = `293bc82`
 
 # F-094 · Review (2026-09-22)
+
+## Pasada 2 · **Veredicto: APPROVED**
+
+- **Delta: un solo fichero**, `progress/current.md`, +36 líneas, solo adiciones en la sección de F-094. Ni código, ni SQL, ni YAML, ni tests, ni `features.json`: nada invalida lo aprobado y el `init.sh` de la pasada 1 (exit 0, 5.043 passed) sigue valiendo; no lo reejecuto. Árbol limpio.
+- **Cambio 1, cotejado con `impl_F-094.md`** §«Verificaciones MANUAL pendientes» y §«`azure-apps/…`»: [x] los cuatro comandos exactos en orden build → `check-unicidad` → `check-relaciones` → `publicar-diccionario`, con el KO de `check-relaciones` antes del build y la salida 1 de `check-unicidad` por F-051 · [x] las cuatro consultas de contraste idénticas, con sus resultados esperados · [x] MCP: versión 26 sin 34,7 M€, reiniciando antes por la caché · [x] párrafo para `azure-apps/datamart_seg_anual.md` tras la línea 447, resumido y enlazado a su texto exacto en el informe (el resumen omite el 35,5 → 8,35 M€, que va en el párrafo enlazado; no bloquea).
+- **C4**: el `[ ]` de la pasada 1 pasa a `[x]`. El resto de checkpoints, sin cambios. Sin cambios requeridos.
+
+## Pasada 1 · Revisión completa · `git diff main...HEAD` hasta `a7e647c`
 
 **Veredicto: CHANGES_REQUESTED** (un solo `[ ]`, documental y barato: ver «Cambios requeridos»).
 Contrato: los 4 `acceptance` (sdd=false), el plan aprobado el 2026-09-22 y la ampliación H6 (resto de F-045).
@@ -123,16 +131,8 @@ están en el scratchpad) · [x] `features.json` en `in_progress`, que es el esta
 | 4 · 34,7 M€ fuera; unicidad y relaciones | `test_f094_la_cifra_inflada_sale_del_diccionario`, `test_f094_obra_la_ficha_declara_el_cruce_real_con_obras`, `test_f006_r2_retenciones_avisa_de_que_su_obra_id_no_es_la_obra`; unicidad medida (27.869 = 27.869) y relación medida (262/262); `check-unicidad`/`check-relaciones` sobre la tabla construida son MANUAL |
 | H6 · obra real | `test_f094_obra_*` (6) |
 
-## Cambios requeridos
+## Cambios requeridos (pasada 1; resuelto en la pasada 2)
 
-1. **`progress/current.md`, sección «F-094 · IMPLEMENTADA, PENDIENTE DE REVIEW»**: añadir las verificaciones
-   `MANUAL (humano)` con su comando exacto y **en su orden** (C4), copiadas de `progress/impl_F-094.md` §«Verificaciones
-   MANUAL pendientes»: `python main.py build-retenciones` → `check-unicidad` → `check-relaciones` →
-   `publicar-diccionario`, las cuatro consultas de contraste con su resultado esperado, la comprobación por MCP de
-   que la versión 26 ya no sirve 34,7 M€ (reinicio del MCP por su caché) y la aplicación del párrafo propuesto a
-   `azure-apps/datamart_seg_anual.md`. Es donde las lee el líder y el humano, y dos de ellas son las que cierran el
-   acceptance 4: sin ellas en `current.md`, el orden build → checks → publicar (con la relación nueva, un
-   `check-relaciones` antes del build sale KO) se pierde.
-
-Nada más. El SQL, las vistas, el diccionario y los tests quedan aprobados tal cual; la pasada 2 puede ser
-incremental desde `a7e647c`.
+1. **`progress/current.md`, sección de F-094**: añadir las verificaciones MANUAL (humano) de `impl_F-094.md` en su
+   orden (build → `check-unicidad` → `check-relaciones` → `publicar-diccionario`), las consultas de contraste, la
+   comprobación por MCP con reinicio de caché y el párrafo para `azure-apps/datamart_seg_anual.md`.
