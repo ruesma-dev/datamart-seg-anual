@@ -1434,3 +1434,67 @@ fuera del ambito autorizado. Esquemas disponibles: _meta, aux, cierre, compras,
 maestro, mart, retenciones, stg». Los `GRANT` de la base ya estan; lo que falta es
 anadir `personal` a esa lista, y ese servidor no vive aqui (misma frontera que
 F-089).
+
+## >>> PARA RETOMAR LA PROXIMA SESION (escrito el 2026-09-22 al cerrar F-057) <<<
+
+**Ninguna feature en curso.** F-057 cerrada y mergeada. Cola por prioridad:
+**F-051 (p1)** · F-055 y **F-093 (p2, empatadas)** · F-038 (p4) · F-089 (p6).
+
+### 1 · URGENTE: fichar lo que salio el 2026-09-22 (el humano no dio aun el OK)
+
+Todo **medido**, con su informe en `progress/`; falta escribir las fichas. Se
+propusieron estas prioridades y el humano **no las confirmo todavia**:
+
+| | que | prioridad propuesta | informe |
+|---|---|---|---|
+| 🔴 | **Retenciones infladas x4**: arreglo inmediato de lo publicado | 3 | `explore_retenciones_contabilidad_fin_obra.md` |
+| 🔴 | **El filtro del 250 %** (`stg/08_plan_mensual.sql:515`) | 5 | `explore_bug_plan_mensual_meses.md` |
+| 🟠 | Retenciones desde la contabilidad, con fin de obra y plazo (amplia F-059) | 8 | idem retenciones |
+| 🟠 | El cierre de gestion en el diccionario | 8 | (ver abajo) |
+| 🟠 | Las condiciones del contrato: forma de pago y retencion (sale de F-067) | 9 | `explore_organigrama_y_forma_pago.md` |
+| 🟠 | El organigrama de obra: delegado, jefe de grupo, jefe de obra | 9 | idem |
+| 🟡 | Conciliar IMPORTES entre capas (el guardian que habria cazado el 250 %) | 10 | — |
+| ⚪ | Publicacion atomica del cierre | 20 | — |
+
+**Las dos rojas son datos MAL publicados hoy en produccion**:
+* **Retenciones**: `retenciones.movimientos` da **35,5 M EUR vivos a proveedor; son
+  ~8,35 M**. El estado sale solo de `fecrea` y no mira `fecbaj` ni `est`: cuenta los
+  originales agrupados Y el agrupador (doble conteo) y lo ya pagado. **El orden de
+  magnitud falso (34,7 M) esta escrito en `contexto_bbdd`, que lee el MCP.** La
+  contabilidad cuadra al centimo con lo vivo real en FERMALUX (64.201,96).
+* **250 %**: el filtro borra la subida y conserva la bajada. **89 M EUR ausentes en
+  `stg`**, **46.889 EUR en `mart` vigente**. El filtro SI caza basura (68,4 M EUR de 29
+  series absurdas en origen), pero incluso ahi deja el total mal: quitar el descarte y
+  MARCAR, no borrar. **Toca la version 28 de la 0686 que Juan valido**: avisarle.
+
+**Decisiones del humano que siguen abiertas**:
+* Retenciones: **que fecha es «fin de obra»** (fin real cubre solo el 25 % del
+  importe vivo; 85 obras cerradas no tienen fin real) y **que plazo** (hoy Sigrid
+  aplica factura + 15 meses en el 97,8 %; la garantia del cliente, 12 meses, no es la
+  del subcontrato).
+* Organigrama: **dos preguntas a Juan** —que campo es para el «jefe de obra» (el
+  candidato es el tecnico responsable, pero en 160 de 479 obras es un jefe de grupo) y
+  si el «agente» (`obr.ageide`, 471 obras) es el jefe de grupo (coincide en 34 de 36)—.
+  **No publicar el codigo del agente**: en 17 tiene formato de n.º de la Seg. Social.
+
+**Cierre de gestion, ya decidido por el humano**: `importe` (sin coeficientes) es la
+venta de gestion e `importe_oficial` (con) la oficial; **el diccionario de
+`stg.presupuesto.importe_oficial` dice hoy «Es la columna de VENTA» a secas y hay que
+corregirlo**. Los historicos son las versiones `Cierre mensual`: no se guarda nada,
+solo se documenta; los ocho cierres sin version mensual se marcan provisionales.
+
+### 2 · Pendientes fuera de este repositorio
+
+* **`mcp-bbdd`**: anadir `personal` a `servidor.esquemas_permitidos` en
+  `config/config.yaml` y desplegar. El humano tiene el encargo redactado.
+* **Sistemas**: la raiz fisica del repositorio documental, para F-090.
+
+### 3 · Deudas del lider
+
+* **Portar a `arnes-base`** dos mejoras de F-057 que valen para cualquier proyecto
+  (regla de propagacion obligatoria, NO hecho aun): (a) **para cerrar un conjunto,
+  lista blanca**, y una lista negra se valida contra los nombres reales del origen;
+  (b) **si una feature cambia la cardinalidad de algo citado en prosa, se busca el
+  numero viejo solo** (`\bnueve\b`), no la frase. Van a `CHECKPOINTS.md` C4.
+* **Purgar este `current.md`** de las secciones de features ya cerradas (pedido por
+  el reviewer de F-057, cambio 8).

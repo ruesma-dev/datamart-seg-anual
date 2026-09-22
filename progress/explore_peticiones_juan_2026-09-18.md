@@ -7,8 +7,6 @@ Base de referencia medida: **166.009 facturas de compra** (`con.tip = 15`, y
 `dcf` tiene exactamente las mismas 166.009 filas). El encargo hablaba de
 165.866; la diferencia son las altas de estos dias.
 
----
-
 ## 1 · El enlace factura -> asiento: EXISTE y es casi total
 
 **La tabla es `rac` ("Contabilizacion de documentos"), que HOY NO SE INGIERE.**
@@ -16,12 +14,12 @@ No es `apu.doc`, ni `apu.jus`, ni un `docide` en `asi`.
 
 ### Los candidatos del encargo: descartados con cifra
 
-Medido sobre las 2.163.486 filas de `apu`: **`apu.doc` informado en 7.016
-(0,32 %)**, **`apu.jus` en 0 (0,00 %)**, **`apu.docnum` en 0 (0,00 %)** y
-`apu.empide` en 1.027.534 (47,5 %), que ademas es la ENTIDAD, no la factura.
-`asi` no tiene ninguna columna de documento: sus 7 columnas son `ide`, `deb`,
-`hab`, `ori`, `canal`, `cptide`, `pexide`. Hipotesis probada y **negativa**: no
-hay enlace factura->asiento dentro de `apu` ni de `asi`.
+Sobre las 2.163.486 filas de `apu`: **`apu.doc` informado en 7.016 (0,32 %)**,
+**`apu.jus` en 0**, **`apu.docnum` en 0** y `apu.empide` en 1.027.534 (47,5 %),
+que ademas es la ENTIDAD, no la factura. `asi` no tiene ninguna columna de
+documento: sus 7 columnas son `ide`, `deb`, `hab`, `ori`, `canal`, `cptide`,
+`pexide`. Hipotesis probada y **negativa**: no hay enlace factura->asiento
+dentro de `apu` ni de `asi`.
 
 ### El enlace que si existe
 
@@ -42,9 +40,9 @@ del flujo de aprobacion** de cualquier documento: `conide` es el documento,
   `est` 20/25 (pendientes hoy mismo) y el resto en goteo por 17 anios.
 
 El resto de la cadena ya esta ingerido: `apu.asiide` da los apuntes (**595.258
-apuntes cuelgan de asientos de factura**, el 27,5 % de `apu`), `apu.cueide` la
-cuenta (**595.257 de 595.258 informados y casan al 100 % contra `cua`**, ya
-ingerida) y `apu.cenide` el centro de coste (209.488, 35,2 %).
+cuelgan de asientos de factura**, 27,5 % de `apu`), `apu.cueide` la cuenta
+(**595.257 de 595.258 informados, casan al 100 % contra `cua`**, ya ingerida) y
+`apu.cenide` el centro de coste (209.488, 35,2 %).
 
 ### La fecha real de contabilizacion: hay DOS, y no son la misma
 
@@ -78,8 +76,6 @@ abonos (serie `AB`) invierten debe/haber y el `SUM(deb)` los suma en vez de
 restarlos. **La feature cierra ese cuadre antes de publicar importes; el enlace
 en si no esta en duda.**
 
----
-
 ## 2 · El documento adjunto: SI ESTA EN SIGRID, en 103.799 facturas
 
 Juan barrio el diccionario del datamart y no encontro nada. Correcto: no esta
@@ -96,18 +92,16 @@ publicado. **Pero en Sigrid si esta**, en dos tablas que no se ingieren.
 
 **No es el binario y no es una ruta de red: es un identificador de repositorio
 externo.** Medido sobre las 285.735 filas de `gra`:
-
-- `vin <> 0` (vinculado) en **285.697 (99,99 %)**; `vin = 3` en 285.541.
-- **Solo 71 filas (0,02 %) llevan el binario dentro** (`DATALENGTH(ima) > 0`),
-  12,8 MB en total. El contenido real vive fuera de la base.
-- `cod` informado al 100 % y **practicamente unico: 285.734 valores distintos
-  sobre 285.735 filas**. Forma medida: `202609181420515461.jmbecedas` = marca
-  de tiempo + usuario que subio el fichero.
-- `nom` informado en 285.726 (99,997 %), max. 171 caracteres. Muestra real de
-  facturas: `telefonica d 4328 09 OFICINA 915135156.pdf`. **Casi todo `.pdf`**:
-  las 12 terminaciones mas frecuentes en facturas son `*.pdf`.
-- La raiz fisica del repositorio **no esta en la base**: la unica candidata,
-  `sisapl.ruta`, esta **vacia (0 filas)**. Es configuracion de la aplicacion.
+`vin <> 0` (vinculado) en **285.697 (99,99 %)** y **solo 71 filas (0,02 %)
+llevan el binario dentro** (`DATALENGTH(ima) > 0`, 12,8 MB en total): el
+contenido real vive fuera. `cod` informado al 100 % y **practicamente unico
+(285.734 valores distintos sobre 285.735 filas)**, con forma medida
+`202609181420515461.jmbecedas` = marca de tiempo + usuario que subio el
+fichero. `nom` informado en 285.726 (99,997 %), max. 171 caracteres, muestra
+real de facturas `telefonica d 4328 09 OFICINA 915135156.pdf`, y **casi todo
+`.pdf`**: las 12 terminaciones mas frecuentes en facturas son `*.pdf`. La raiz
+fisica del repositorio **no esta en la base**: la unica candidata,
+`sisapl.ruta`, esta **vacia (0 filas)**; es configuracion de la aplicacion.
 
 ### Cobertura sobre facturas
 
@@ -124,12 +118,9 @@ externo.** Medido sobre las 285.735 filas de `gra`:
 
 - **`arc`** ("Archivo de disco"): **0 filas**. Vacia.
 - **`dog`** ("Documento"): 58.340 filas, pero **`conide`, `entide` y `obride` a
-  0 en el 100 %** y **ninguna cuelga de una factura**. Es el documental de
-  homologacion (24,4 GB declarados en `gratam`, cero binario dentro).
-- **`condog`** (puente concepto-documento de `dog`): **16 filas**, 13
-  conceptos, **0 facturas**. Anecdotica.
-
----
+  0 en el 100 %** y **ninguna cuelga de una factura**: es el documental de
+  homologacion (24,4 GB declarados en `gratam`, cero binario dentro). Su puente
+  **`condog`** tiene **16 filas**, 13 conceptos y **0 facturas**.
 
 ## 3 · El maestro de productos: existe, con nombre; la familia NO es `auxfam`
 
@@ -148,11 +139,8 @@ externo.** Medido sobre las 285.735 filas de `gra`:
 - Cobertura en lineas: **`dcfpro`** 1.094.551 lineas, 997.435 con `proide`
   (91,1 %), **las 997.435 casan contra `pro` (100 %)**; **`dcapro`** 1.153.191
   lineas, 1.147.673 con `proide` (99,5 %), **las 1.147.673 casan (100 %)**.
-
-Nada que ingerir: `pro`, `con` y `auxpronat` ya estan en `raw`. **Es trabajo de
-capa de negocio, no de ingesta.**
-
----
+- Nada que ingerir: `pro`, `con` y `auxpronat` ya estan en `raw`. **Es trabajo
+  de capa de negocio, no de ingesta.**
 
 ## Resumen para fichar las features
 
