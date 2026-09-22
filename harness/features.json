@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 39,
+      "priority": 40,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -585,7 +585,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -615,7 +615,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 33,
+      "priority": 34,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -633,7 +633,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -666,7 +666,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -700,7 +700,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-045-retenciones-obra"
     },
     {
@@ -715,7 +715,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -746,7 +746,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -762,7 +762,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -811,7 +811,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -848,7 +848,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 37,
+      "priority": 38,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -865,7 +865,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -882,7 +882,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-056-contabilidad"
     },
     {
@@ -915,7 +915,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -932,7 +932,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -1030,7 +1030,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1069,7 +1069,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 21,
+      "priority": 23,
       "branch": "feature/F-067-compras-seguimiento-mcp"
     },
     {
@@ -1101,7 +1101,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1119,7 +1119,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 16,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1195,7 +1195,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 22,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1215,7 +1215,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1230,7 +1230,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1327,7 +1327,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 20,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1405,7 +1405,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 15,
+      "priority": 17,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1424,7 +1424,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 21,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1481,7 +1481,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1500,7 +1500,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 15,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1520,7 +1520,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 6,
+      "priority": 8,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1586,6 +1586,22 @@
       "rigor": "estandar",
       "priority": 5,
       "branch": "feature/F-097-descompuestos-partidas"
+    },
+    {
+      "id": "F-098",
+      "title": "Las fases de obra por ambito con su estado, si estan activas y su ambito/fase originaria, y los controles de fases mal generadas",
+      "description": "Pedida por **Juan Romero** (Dir. Admon y Control de Costes) por correo el 2026-09-22, «Datamart: publicar estado, activa y ambito/fase originaria de las fases de obra», a raiz del correo sobre los cierres de varios meses (F-051). Sus palabras: «he detectado una cuestion que no se el alcance que puede llegar a tener». LO QUE PIDE: que `stg.fases` publique, del cuadro «Mantenimiento de fases de la obra» de Sigrid, ademas de numero, descripcion, fechas, ano y mes que ya llegan: (1) el **estado** de la fase (abierta o cerrada, el candado); (2) **activa** (si/no); (3) **ambito y fase originaria** (columna «Amb/Fase Originaria»: desde que ambito y fase se genero cada fase); y (4) **todo ello por cada ambito** (coste, venta...), porque **las fases se mantienen por ambito**. SU EJEMPLO, obra 0708 (Reforma Restaurante «El Tobogan» UCJC, ambito COSTE): fase 13 «Agosto 2026» con fechas 01/06/2026-31/08/2026 y sin fases de junio ni julio (agrupa tres meses); fase 5 «Octubre 2025» originada desde el ambito VENTA (fase 5) y no desde COSTE; y origenes cruzados: la 6 desde la 0 (Previsto), la 7 desde la 6 y la 0 desde la 6. LOS CONTROLES QUE QUIERE AUTOMATIZAR, para no abrir las obras una a una: fases con fechas incoherentes con el mes de su descripcion o que abarcan mas de un mes; meses sin fase entre la primera y la ultima; fases originadas desde otro ambito; origenes circulares o que no siguen la secuencia; y fases abiertas de meses ya cerrados. ================ LO QUE HAY QUE SABER ANTES: hoy `stg.fases` sale de `raw.obrfas`, UNA fila por (obra, fasnum), y el datamart la trata como comun a coste y venta. Lo que Juan describe apunta a `raw.obrfasamb` (fase x ambito), que ya se ingiere pero el ETL solo usa para las versiones master (ambitos 8 y 11). Hay que localizar en Sigrid (azure-apps/sigrid_tablas.md) los campos de estado, activa y origen, y comprobar si ya se ingieren. Si las fechas o el texto de una fase difieren entre ambitos, afecta a la regla del mes de F-051: coordinar con ella. FRONTERA: F-051 decide en que mes cae el dinero; esta feature publica la ficha de la fase y los controles. NADA MEDIDO TODAVIA.",
+      "acceptance": [
+        "Localizados y medidos en Sigrid los campos de estado, activa y ambito/fase originaria de las fases, por ambito, y resuelto si viven en `obrfasamb` o en otra tabla",
+        "Publicadas las fases POR AMBITO con esos campos y su ficha del diccionario, sin romper a los consumidores actuales de `stg.fases`",
+        "Publicados los cinco controles que pide Juan (fechas incoherentes o de varios meses, meses sin fase, origen en otro ambito, origenes circulares o fuera de secuencia, fases abiertas de meses cerrados), y la obra 0708 sale en los tres casos de su ejemplo",
+        "Coordinado con F-051: si fechas o texto difieren entre ambitos, la regla del mes lo tiene en cuenta"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 6,
+      "branch": "feature/F-098-fases-por-ambito-y-controles"
     }
   ]
 }
