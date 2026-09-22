@@ -398,7 +398,7 @@ def validar(
 
 
 def _validar_esquemas(dicc: Diccionario) -> list[ErrorValidacion]:
-    """R4: los NUEVE esquemas tienen entrada propia en `00_global.yaml`."""
+    """R4: los esquemas de `ESQUEMAS_DEL_DATAMART` tienen entrada propia en `00_global.yaml`."""
     errores: list[ErrorValidacion] = []
     fichero = "00_global.yaml"
 

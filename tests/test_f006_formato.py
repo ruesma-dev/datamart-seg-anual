@@ -264,7 +264,7 @@ def test_f006_r3_con_motivo_escrito_la_ficha_sin_columnas_es_valida() -> None:
 
 
 # ---------------------------------------------------------------------------
-# R4 · Los NUEVE esquemas
+# R4 · Los esquemas de `ESQUEMAS_DEL_DATAMART`
 # ---------------------------------------------------------------------------
 
 
@@ -978,7 +978,7 @@ def test_f006_r4_cada_esquema_global_dice_para_que_sirve() -> None:
 
 
 def test_f006_r4_raw_y_aux_quedan_fuera_de_la_superficie_de_consumo() -> None:
-    """Los nueve esquemas, uno a uno, para que ninguno cambie en silencio.
+    """Los esquemas de `ESQUEMAS_DEL_DATAMART`, uno a uno, para que ninguno cambie en silencio.
 
     Fuera quedan **dos**, y por un HECHO, no por una preferencia: `raw` es una
     copia literal de Sigrid sin semántica de negocio —nombres de cuatro letras,

@@ -33,4 +33,4 @@ se olvidan las cosas.
 - [x] T22: Campaña de mutación del nivel `estandar` sobre el código cambiado, con análisis de supervivientes en `progress/mutacion_F-057.md`.  |  Verificación: `python -m harness.mutacion --feature F-057`
 - [ ] T23: Verificar contra la base viva que los tres objetos traen las cifras de la spec: 2.618 recursos (1.354 personas, 1.034 de baja), 330.638 líneas, 1.249.038,44 horas con `unidad = 'HORA'`, 98.275.191,12 EUR de importe total y 523 obras en seguimiento.  |  Verificación: MANUAL (humano) — `python main.py build-personal`, `python main.py check-declarados`, `python main.py check-unicidad`, `python main.py check-relaciones` y las consultas del MCP sobre los tres objetos
 - [ ] T24: Publicar el diccionario en la base.  |  Verificación: MANUAL (humano) — `python main.py publicar-diccionario` (es una escritura contra Azure: la autoriza el humano, no un agente)
-- [ ] T25: Ejecutar `bash harness/init.sh` en verde.  |  Verificación: `bash harness/init.sh`
+- [x] T25: Ejecutar `bash harness/init.sh` en verde.  |  Verificación: `bash harness/init.sh`

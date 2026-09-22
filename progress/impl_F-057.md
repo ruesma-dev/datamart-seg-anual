@@ -146,21 +146,22 @@ Salida real (extracto): `BASE: 57 passed` · `R21 OR pl.unidad = 'MES' | CAE |
 passed` · `R8 fuga completa (DDL + INSERT + lateral) | CAE | 2 failed, 55
 passed` · `REVERTIDO: 57 passed`; tests viejos: `PASA | 73 passed`.
 
-**Fuera de alcance, para el lider:** el docstring de
-`etl_sigrid/domain/diccionario.py:401` («los NUEVE esquemas») y dos comentarios
-de tests de F-006 siguen diciendo nueve; no los pide el review.
+**Pasada 3 (2026-09-22):** sin numero en prosa: `_meta.yaml` (se publica al
+MCP) quita el desglose «29 filas... 9 esquemas»; `diccionario.py:401`,
+`test_f006_formato.py:267/981` y, del barrido, `test_f006_punteros.py:34`
+remiten a `ESQUEMAS_DEL_DATAMART`. T25 `[x]`. Sin cambio de `version` (ya 25).
 
 ## Evidencias
 
-`bash harness/init.sh`, cierre de la pasada 2 (2026-09-22), ejecutado tal cual.
+`bash harness/init.sh`, cierre de la pasada 3 (2026-09-22), ejecutado tal cual.
 Salida real:
 
 ```
-5027 passed, 189 skipped, 1402 warnings in 423.62s (0:07:03)
+5027 passed, 189 skipped, 1402 warnings in 428.58s (0:07:08)
 [OK] pytest en verde (con medición de cobertura)
 [OK] PUERTA COBERTURA: 94.7% de 1022 líneas cambiadas cubiertas
      (968/1022, umbral 80%, nivel estandar)
-[OK] PUERTA TAMAÑO: F-057 dentro de los topes (impl 219/220, review 139/140)
+[OK] PUERTA TAMAÑO: F-057 dentro de los topes (impl 219/220, review 140/140)
 [OK] Rama actual: feature/F-057-recursos-empleados-partes
 ENTORNO LISTO. Puedes trabajar.        (codigo de salida 0)
 ```
@@ -170,7 +171,7 @@ ENTORNO LISTO. Puedes trabajar.        (codigo de salida 0)
 | Tests ejecutados | **5.027 pasan**, 189 skipped, 0 fallos (5.042 en la pasada 1: los 19 parametrizados de la lista negra pasan a 3 de lista blanca, +1 de `02_roles.sql`) |
 | De ellos, de F-057 | **58** en `tests/test_f057_personal.py` (73 en la pasada 1) |
 | Cobertura de lineas cambiadas | **94,7 %** (968 de 1.022), umbral 80 % |
-| Tiempo de la suite | **423,62 s** (7 min 3 s) bajo medicion de cobertura (28 min el 2026-09-18; la diferencia no se ha medido) |
+| Tiempo de la suite | **428,58 s** (7 min 8 s) bajo medicion de cobertura (28 min el 2026-09-18; la diferencia no se ha medido) |
 | Mutacion, campaña de rama (muestreo 20/349, **4 workers**) | 13 muertos, **7 supervivientes, todos de F-024/F-025**: ninguno cae en codigo de F-057 |
 | Mutacion, campaña dirigida a `build_personal_step.py` (**4 workers**) | **12 generados / 12 evaluados**, 8 muertos, 4 supervivientes → **3 tras T22, los tres equivalentes** (argumentos de log) |
 
