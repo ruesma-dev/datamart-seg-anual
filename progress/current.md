@@ -30,6 +30,42 @@ Informe: `progress/impl_F-094.md`.
   (antes 0 de 262); mismas 533 filas sin obra. F-045 queda para retirar como
   absorbida (lo hace el lider).
 
+### Verificaciones MANUAL (humano), en este orden
+
+Copiadas de `progress/impl_F-094.md` §«Verificaciones MANUAL pendientes». Dos
+de ellas (2 y 3) cierran el acceptance 4. **El orden importa: build → checks →
+publicar.**
+
+1. `python main.py build-retenciones`
+2. `python main.py check-unicidad` — las claves de `retenciones` deben salir
+   OK. **El comando sigue saliendo con código 1** por
+   `cierre.v_pbi_planif_vs_real`, que es F-051 y previo: no es de F-094.
+3. `python main.py check-relaciones` — `obra_id -> maestro.obras.obra_id` debe
+   dar **262 de 262** (antes, con la relacion vieja, 0 de 261) y
+   `centro_coste_id -> maestro.centros_coste` completo. **Si se lanza ANTES del
+   build sale KO**: la relacion nueva se comprueba contra la tabla vieja.
+4. `python main.py publicar-diccionario`
+5. Consultas de contraste tras el build (cifras del 2026-09-22; se moveran con
+   la ingesta):
+   ```sql
+   SELECT sentido, estado, count(*), sum(importe) FROM retenciones.movimientos GROUP BY 1,2 ORDER BY 1,2;
+   -- PROVEEDOR VIVA 7.752 / 8.345.506,03 · LIQUIDADA 2.368 / 12.754.011,79 · BAJA 15.511 / 18.691.779,56
+   SELECT saldo_vivo, importe_liquidado, importe_baja FROM retenciones.v_pbi_retencion_entidad
+    WHERE sentido='PROVEEDOR' AND entidad_id=1958815;          -- 64.201,96 · 17.246,76 · 17.246,76
+   SELECT * FROM retenciones.v_pbi_retencion_resumen;          -- num_movimientos = vivas+liquidadas+bajas
+   SELECT count(DISTINCT m.obra_id), count(DISTINCT o.obra_id)
+     FROM retenciones.movimientos m LEFT JOIN maestro.obras o USING (obra_id);   -- 262 · 262
+   ```
+6. Por el MCP, tras `publicar-diccionario`: `contexto_bbdd` debe servir la
+   **version 26** y ya no los 34,7 M€. **Reiniciar antes el MCP**: cachea el
+   diccionario hasta reiniciar (F-089).
+7. Aplicar en `azure-apps/datamart_seg_anual.md` (no commiteado alli) el
+   parrafo propuesto en `progress/impl_F-094.md` §«`azure-apps/datamart_seg_anual.md`»,
+   tras la linea 447: `obra_id` pasa a ser la obra de `maestro.obras` (el
+   centro va en `centro_coste_id`), rompe a quien uniera `obra_id` con
+   `cierre.v_pbi_cierre_cabecera.centro_coste_ide`, PROVEEDOR gana `BAJA` y
+   las columnas nuevas.
+
 ## F-057 · IMPLEMENTADA, PENDIENTE DE REVIEW (2026-09-18)
 
 Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,
