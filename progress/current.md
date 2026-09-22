@@ -1498,3 +1498,11 @@ solo se documenta; los ocho cierres sin version mensual se marcan provisionales.
   numero viejo solo** (`\bnueve\b`), no la frase. Van a `CHECKPOINTS.md` C4.
 * **Purgar este `current.md`** de las secciones de features ya cerradas (pedido por
   el reviewer de F-057, cambio 8).
+
+## 2026-09-22 · F-057 desplegada
+
+Imagen **`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260922-1158`**,
+confirmada en el job con `az containerapp job show` (la cabecera de
+`85_update_job.ps1` anunciaba `r20260922-1200`, que es el tag calculado con la hora
+y no existe: lo que vale es «Imagen nueva»). La nocturna del 23 construira
+`personal` y publicara el diccionario 25. Sustituye a `r20260917-1359`.
