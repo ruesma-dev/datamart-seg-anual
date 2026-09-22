@@ -9,6 +9,23 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-094 · EN CURSO (implementer, 2026-09-22)
+
+Rama `feature/F-094-retenciones-estado-vivo`, `sdd=false`, rigor `estandar`.
+Informe: `progress/impl_F-094.md`.
+
+- **Estado de PROVEEDOR** en `retenciones.movimientos`: de la ficha `raw.con`
+  del propio efecto. BAJA (`fecbaj <> 0` o `est` 14/15) > LIQUIDADA (`fecrea`
+  o `est` 10) > VIVA. Medido en solo lectura: **VIVA 8.345.506,03 € (7.752)**,
+  LIQUIDADA 12.754.011,79 (2.368), BAJA 18.691.779,56 (15.511); FERMALUX
+  64.201,96. No se borran filas (25.631).
+- **CLIENTE sin cambios** en el estado (criterio de `pag` no vale en `cob`).
+- Diccionario `version` 26: **158 objetos, 1021 columnas, 69 de consumo**
+  (+6 columnas: `estado_sigrid`, `fecha_baja`, y `num_bajas`/`importe_baja` en
+  las vistas de entidad y resumen).
+- Ampliacion aprobada el 2026-09-22 (H6 de F-095): `obra_id` pasa a ser la
+  obra real y se publica `centro_coste_id` (resto de F-045). En curso.
+
 ## F-057 · IMPLEMENTADA, PENDIENTE DE REVIEW (2026-09-18)
 
 Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,

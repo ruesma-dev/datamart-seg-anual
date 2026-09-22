@@ -16,8 +16,10 @@
 #
 # 1. **Dos lecturas del saldo, y no dan lo mismo.** `saldo_vivo` es lo que
 #    sigue retenido (efectos con estado VIVA); `neto_practicado` es la suma de
-#    TODOS los efectos, cargos menos abonos. La de por defecto para "cuanto nos
-#    deben" o "cuanto debemos" es **`saldo_vivo`**.
+#    los efectos VIVA y LIQUIDADA, cargos menos abonos. La de por defecto para
+#    "cuanto nos deben" o "cuanto debemos" es **`saldo_vivo`**. Y **BAJA no se
+#    suma nunca** (F-094): es el efecto agrupado, dividido o anulado, y su
+#    dinero ya esta en el efecto que lo sustituye.
 # 2. **`retenciones` NO filtra por `stg.obras`**: pueden aparecer obras
 #    administrativas que el seguimiento excluye a proposito.
 # 3. **NO SE REFRESCA DE NOCHE, y su fecha de build no es consultable.**
@@ -154,8 +156,10 @@ objetos:
       importe:
         significado: >-
           Importe retenido, CON SIGNO. Los negativos son ajustes o devoluciones
-          registradas como efecto negativo, y se conservan tal cual: un SUM
-          sobre todo da el neto practicado.
+          registradas como efecto negativo, y se conservan tal cual. **Un SUM
+          sobre toda la tabla NO es el neto practicado**: incluye las filas
+          BAJA, cuyo importe ya esta en el efecto que las sustituye. El neto es
+          `SUM(importe) FILTER (WHERE estado <> 'BAJA')`.
         unidad: EUR
         agregacion: suma
       fecha_prevista_devolucion:
@@ -163,20 +167,62 @@ objetos:
         nulo_significa: El efecto no tiene fecha de vencimiento informada.
         agregacion: no_sumable
       fecha_devolucion_real:
-        significado: Cuando se libero o se cobro de verdad.
+        significado: >-
+          Cuando se libero o se cobro de verdad (`fecrea`). En PROVEEDOR NO es
+          lo que decide si una retencion sigue viva: los agrupadores AGR
+          pagados en remesa no la llevan (ver `estado`).
         nulo_significa: >-
-          Sigue viva: es exactamente lo que distingue una retencion pendiente de
-          una liquidada.
+          El efecto no tiene fecha real de devolucion. En CLIENTE eso es
+          exactamente VIVA; en PROVEEDOR puede ser VIVA, BAJA o LIQUIDADA por
+          `con.est = 10`.
         agregacion: no_sumable
       estado:
         significado: >-
-          Si el efecto sigue retenido o ya se liquido. Se deriva de que exista o
-          no fecha de devolucion real.
-        valores: [VIVA, LIQUIDADA]
+          Si el efecto sigue retenido, ya se liquido o se sustituyo por otro.
+          **El criterio es distinto en cada sentido (F-094, 2026-09-22).** En
+          PROVEEDOR se lee de la ficha `raw.con` DEL PROPIO EFECTO, en este
+          orden: **BAJA** si `con.fecbaj <> 0` o `con.est` es 14 (Agrupados) o
+          15 (Divididos) —el efecto se agrupo en un AGR, se dividio o se anulo,
+          y **su dinero ya cuenta en el efecto que lo sustituye**: sumarlo es
+          contar el mismo euro dos veces—; **LIQUIDADA** si tiene `fecrea` o
+          `con.est = 10` (Pagado), que recoge los agrupadores AGR ya pagados en
+          remesa sin `fecrea`; **VIVA** el resto. En CLIENTE sigue saliendo
+          SOLO de `fecrea` (VIVA si es 0) y nunca vale BAJA: el patron de `cob`
+          es otro —sus ~19,9 M€ con `fecbaj <> 0` estan en estado 1,
+          Pendiente— y queda sin verificar para una feature propia. Antes de
+          F-094 el estado de PROVEEDOR salia solo de `fecrea` y daba 35,54 M€
+          vivos; con el criterio nuevo son 8,35 M€ (medido el 2026-09-22).
+          **Para "cuanto queda retenido" se filtra `estado = 'VIVA'`; y
+          `SUM(importe)` sin filtrar el estado cuenta dos veces lo agrupado.**
+        valores: [VIVA, LIQUIDADA, BAJA]
+      estado_sigrid:
+        significado: >-
+          Estado del efecto en Sigrid (`con.est` de su propia ficha), sin
+          traducir. En PROVEEDOR (tipo de documento 25): 1 Pendiente, 2
+          Aprobado, 3 Emitido, 5 En cartera, 7 Remesado, 10 Pagado, 12
+          Devuelto, 14 Agrupados, 15 Divididos, 20 Anticipado; en CLIENTE
+          (24): 1 Pendiente, 5 Cartera, 6 Descontado, 7 Remesado, 10 Cobrado,
+          12 Devuelto, 14 Agrupado, 15 Dividido. El catalogo
+          traducido esta en `maestro.estados_documento`. Es de donde sale
+          `estado` en PROVEEDOR; en CLIENTE es solo informativo.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El efecto no tiene ficha en `raw.con`. Medido el 2026-09-22: no pasa
+          en ninguno de los 27.869 efectos.
+      fecha_baja:
+        significado: >-
+          Fecha de baja del efecto (`con.fecbaj` de su propia ficha), ya
+          tipada. En un original agrupado es la fecha del efecto agrupador AGR
+          que lo sustituye, y es la unica pista para emparejarlos: Sigrid no
+          guarda puntero del original a su agrupador. En PROVEEDOR, con fecha
+          el estado es BAJA; en CLIENTE es solo informativa y convive con
+          VIVA.
+        agregacion: no_sumable
+        nulo_significa: El efecto no esta dado de baja.
       vencida_sin_liquidar:
         significado: >-
-          Marca los efectos que seguian vivos y cuya fecha prevista ya habia
-          pasado **EN EL MOMENTO DEL BUILD**, no hoy: la tabla se materializa y
+          Marca los efectos en estado VIVA —nunca una BAJA ni una LIQUIDADA—
+          cuya fecha prevista ya habia pasado **EN EL MOMENTO DEL BUILD**, no hoy: la tabla se materializa y
           la comparacion contra la fecha actual se congela ahi. El build es
           nocturno, asi que la foto es de anoche como muy tarde —consultable en
           `_meta.v_frescura` con `paso = 'build_retenciones'`—, pero si esa
@@ -331,7 +377,9 @@ objetos:
           `NULLIF(TRIM(...))` de los maestros, asi que un proveedor con el CIF
           vacio trae **cadena vacia**.
       num_movimientos:
-        significado: Cuantos efectos hay detras de las cifras de la fila.
+        significado: >-
+          Cuantos efectos tiene la entidad, en cualquier estado: es
+          `num_vivas + num_liquidadas + num_bajas`.
         agregacion: suma
       saldo_vivo:
         significado: >-
@@ -342,7 +390,10 @@ objetos:
         agregacion: suma
         nulo_significa: La entidad no tiene ningun efecto vivo.
       importe_liquidado:
-        significado: Suma de los efectos ya devueltos o cobrados.
+        significado: >-
+          Suma de los efectos ya devueltos, pagados o cobrados (estado
+          LIQUIDADA). No incluye las BAJA: el original agrupado no se liquida,
+          se liquida su agrupador.
         unidad: EUR
         agregacion: suma
         nulo_significa: La entidad no tiene ningun efecto liquidado.
@@ -353,22 +404,26 @@ objetos:
         significado: Cuantos efectos ya se liquidaron.
         agregacion: suma
       total_cargos:
-        significado: Suma de los efectos positivos, sin mirar su estado.
+        significado: >-
+          Suma de los efectos positivos VIVA o LIQUIDADA. Excluye las BAJA,
+          cuyo importe ya esta en el efecto que las sustituye.
         unidad: EUR
         agregacion: suma
         nulo_significa: La entidad no tiene ningun efecto positivo.
       total_abonos:
         significado: >-
-          Suma de los efectos negativos, ya con el signo cambiado para que sea
-          una cifra positiva que se resta.
+          Suma de los efectos negativos VIVA o LIQUIDADA, ya con el signo
+          cambiado para que sea una cifra positiva que se resta. Excluye las
+          BAJA, como `total_cargos`.
         unidad: EUR
         agregacion: suma
         nulo_significa: La entidad no tiene ningun efecto negativo.
       neto_practicado:
         significado: >-
-          LA OTRA LECTURA. Suma de TODOS los efectos con su signo, vivos y
-          liquidados. NO es lo mismo que `saldo_vivo` y las dos pueden divergir:
-          esta dice cuanto se ha practicado historicamente, aquella cuanto queda
+          LA OTRA LECTURA. Suma con su signo de los efectos VIVA y LIQUIDADA;
+          las BAJA no entran porque su dinero ya esta en otro efecto (F-094).
+          NO es lo mismo que `saldo_vivo` y las dos pueden divergir: esta dice
+          cuanto se ha practicado historicamente, aquella cuanto queda
           pendiente. Decir cual se usa forma parte de la respuesta.
         unidad: EUR
         agregacion: suma
@@ -394,6 +449,19 @@ objetos:
         significado: La fecha de devolucion mas lejana de esa entidad.
         agregacion: no_sumable
         nulo_significa: Ningun efecto tiene fecha de vencimiento informada.
+      num_bajas:
+        significado: >-
+          Cuantos efectos de la entidad estan en BAJA: agrupados, divididos o
+          anulados (F-094). Solo en PROVEEDOR; en CLIENTE vale 0.
+        agregacion: suma
+      importe_baja:
+        significado: >-
+          Suma de los efectos en BAJA. **NO es dinero pendiente ni pagado**: es
+          el importe de efectos sustituidos por otro, y ya esta contado en ese
+          otro. Se publica para poder cuadrar, no para sumarlo a nada.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: La entidad no tiene ningun efecto en BAJA.
     relaciones:
       - de: entidad_id
         a: maestro.proveedores.proveedor_id
@@ -718,8 +786,9 @@ objetos:
         valores: [PROVEEDOR, CLIENTE]
       num_movimientos:
         significado: >-
-          Total de efectos de ese sentido. En Ruesma son del orden de 25.000 en
-          PROVEEDOR y 2.200 en CLIENTE.
+          Total de efectos de ese sentido, en cualquier estado. En Ruesma son
+          del orden de 25.600 en PROVEEDOR y 2.200 en CLIENTE (medido el
+          2026-09-22). Es `num_vivas + num_liquidadas + num_bajas`.
         agregacion: suma
       num_entidades:
         significado: >-
@@ -734,9 +803,11 @@ objetos:
         agregacion: no_sumable
       saldo_vivo:
         significado: >-
-          Lo que sigue retenido en toda la empresa. Del orden de 34,7 M€ en
-          PROVEEDOR y 21,9 M€ en CLIENTE: una cifra muy lejos de esos ordenes de
-          magnitud es una senal de que la consulta esta mal.
+          Lo que sigue retenido en toda la empresa. Del orden de 8,35 M€ en
+          PROVEEDOR (7.752 efectos, medido el 2026-09-22 con el criterio de
+          F-094) y 22,2 M€ en CLIENTE, esta ultima SIN VERIFICAR (ver `estado`
+          en `retenciones.movimientos`). Una cifra de PROVEEDOR del orden de
+          35 M€ es la de antes de F-094: cuenta los agrupados y lo pagado.
         unidad: EUR
         agregacion: suma
         nulo_significa: >-
@@ -746,7 +817,9 @@ objetos:
         significado: Cuantos efectos siguen retenidos.
         agregacion: suma
       importe_liquidado:
-        significado: Lo que ya se libero o se cobro, en toda la empresa.
+        significado: >-
+          Lo que ya se libero, se pago o se cobro, en toda la empresa. No
+          incluye las BAJA.
         unidad: EUR
         agregacion: suma
         nulo_significa: No hay ningun efecto liquidado en ese sentido. Nulo, no cero.
@@ -767,8 +840,8 @@ objetos:
         agregacion: suma
       neto_practicado:
         significado: >-
-          Suma de todos los efectos con su signo, vivos y liquidados. NO es el
-          saldo vivo, y compararlos SI tiene sentido: que diverjan es el
+          Suma con su signo de los efectos VIVA y LIQUIDADA; las BAJA no entran
+          (F-094). NO es el saldo vivo, y compararlos SI tiene sentido: que diverjan es el
           diagnostico de que hay ajustes o devoluciones registradas como efectos
           negativos. Lo que no vale es usar una por la otra.
         unidad: EUR
@@ -781,6 +854,19 @@ objetos:
           `retenciones.v_pbi_retencion_obra`. Conviene citarlo cuando se den
           totales por obra, precisamente para decir que no suman el total.
         agregacion: suma
+      num_bajas:
+        significado: >-
+          Cuantos efectos estan en BAJA (agrupados, divididos o anulados;
+          F-094). Solo en PROVEEDOR: 15.511 el 2026-09-22. En CLIENTE vale 0.
+        agregacion: suma
+      importe_baja:
+        significado: >-
+          Suma de los efectos en BAJA: 18,69 M€ en PROVEEDOR el 2026-09-22.
+          **NO se suma a nada**: es dinero ya contado en el efecto que los
+          sustituye. Se publica para que el total cuadre a la vista.
+        unidad: EUR
+        agregacion: suma
+        nulo_significa: No hay ningun efecto en BAJA en ese sentido. Nulo, no cero.
     relaciones: []
     ejemplos_preguntas:
       - Cuanta retencion viva tenemos en total con proveedores
@@ -860,8 +946,8 @@ objetos:
     descripcion: >-
       Convierte una fecha de Sigrid —un entero con formato YYYYMMDD— en una
       fecha de verdad, tratando el 0 como ausencia de fecha. Es lo que hace que
-      `fecha_devolucion_real` sea nula en vez de cero cuando la retencion sigue
-      viva, y por tanto lo que permite distinguir VIVA de LIQUIDADA.
+      `fecha_devolucion_real` y `fecha_baja` sean nulas en vez de cero cuando
+      no hay fecha.
     grano: null
     clave_negocio: []
     paso_etl: build_retenciones

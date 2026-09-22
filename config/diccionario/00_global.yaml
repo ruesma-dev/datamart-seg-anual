@@ -269,7 +269,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 25
+version: 26
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -725,27 +725,38 @@ reglas:
 
 ordenes_de_magnitud:
   - concepto: Retenido VIVO a proveedores, pendiente de devolver, en toda la empresa
-    valor_aproximado: 34700000
+    valor_aproximado: 8350000
     unidad: EUR
     criterio: saldo_vivo
     fuente: >-
-      LEEME_RETENCIONES_R1.md, tabla del modelo: efectos de `pag` con
-      `retide <> 0` y `fecrea = 0`. NO es el total practicado historicamente:
-      lo ya liquidado no cuenta aqui.
+      Medido el 2026-09-22 (F-094) en solo lectura con el SELECT de
+      `sql/retenciones/01_movimientos.sql`: 8.345.506,03 € en 7.752 efectos
+      de `pag` con `retide <> 0`, `fecrea = 0`, `con.fecbaj = 0` y `con.est`
+      fuera de 10 (Pagado), 14 (Agrupados) y 15 (Divididos). Hasta F-094 aqui
+      ponia 34,7 M€: salia solo de `fecrea` y contaba los agrupados junto a su
+      agrupador y lo ya pagado, 4,3 veces lo real. **Una cifra de proveedor del
+      orden de 35 M€ es ese error**: se esta sumando sin filtrar
+      `estado = 'VIVA'`. NO es el total practicado historicamente: lo ya
+      liquidado no cuenta aqui.
   - concepto: Retenido VIVO por clientes, pendiente de cobrar, en toda la empresa
     valor_aproximado: 21900000
     unidad: EUR
     criterio: saldo_vivo
     fuente: >-
       LEEME_RETENCIONES_R1.md, misma tabla: efectos de `cob` con `retide <> 0`
-      y `fecrea = 0`.
+      y `fecrea = 0` (22,16 M€ el 2026-09-22). **SIN VERIFICAR**: F-094 midio
+      que el criterio de proveedor no vale para `cob` y que la contabilidad
+      de las cuentas de retencion de cliente da 13,81 M€; queda para una
+      feature propia. Es el orden de lo que publica el datamart, no un saldo
+      contrastado.
   - concepto: Efectos de retencion practicados a proveedores, vivos y liquidados
     valor_aproximado: 25124
     unidad: filas
     criterio: total
     fuente: >-
       LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `pag` con
-      `retide <> 0`, sin filtrar por estado.
+      `retide <> 0`, sin filtrar por estado. El 2026-09-22 son 25.631: F-094
+      no borra filas, solo las reclasifica en VIVA, LIQUIDADA y BAJA.
   - concepto: Efectos de retencion practicados por clientes, vivos y liquidados
     valor_aproximado: 2219
     unidad: filas
