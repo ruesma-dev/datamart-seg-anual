@@ -1615,8 +1615,8 @@
         "Existe `personal.recursos_tipos_hora` (recurso x tipo de hora) con descripcion y unidad del tipo de hora, precio de coste y de venta, cantidad por defecto y centro/cuenta analitica si existen; `prenom` NO se publica (decision del humano) y la ficha declara que Sigrid no guarda historico de precios",
         "`check-unicidad`, `check-relaciones` y `check-declarados` en verde con el objeto nuevo, y `bash harness/init.sh` en verde"
       ],
-      "status": "pending",
-      "sdd": false,
+      "status": "spec_ready",
+      "sdd": true,
       "rigor": "estandar",
       "priority": 1,
       "branch": "hotfix/F-101-cabecera-del-parte"
