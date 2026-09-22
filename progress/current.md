@@ -9,6 +9,24 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-22 · F-094 DESPLEGADA (tag `r20260922-2350`)
+
+Imagen **`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260922-2350`**,
+publicada y confirmada en el job con `az containerapp job show`: imagen correcta,
+cron intacto (`0 0 * * *`), 1 reintento, timeout 25.200 s. Sustituye a
+`r20260922-1158` (F-057). **Ojo con la cabecera de `85_update_job.ps1`**: anuncia
+un tag calculado con la hora (`r20260922-2353`) que NO existe; el bueno es el que
+dice «Imagen nueva» y el que confirma `job show`.
+
+`main` con los cuatro merges pasa `init.sh` con **5.043 tests en verde** (4 h 17
+min, maquina compartida con los subagentes); el unico KO es la regla «no se
+trabaja en main», esperable.
+
+**La nocturna del 23 construira `retenciones` con el estado saneado y la obra
+real, y publicara el diccionario 26.** Despues hay que **reiniciar el MCP** (su
+cache, F-089) o seguira sirviendo los 34,7 M EUR falsos. **`git push origin main`
+SIGUE PENDIENTE**: lo bloqueo el clasificador de permisos, no el humano.
+
 ## F-094 · CERRADA (done, 2026-09-22) · QUEDAN LAS VERIFICACIONES MANUAL DEL HUMANO
 
 Rama `feature/F-094-retenciones-estado-vivo`, `sdd=false`, rigor `estandar`.
