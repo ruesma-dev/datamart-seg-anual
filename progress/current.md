@@ -1506,3 +1506,21 @@ confirmada en el job con `az containerapp job show` (la cabecera de
 `85_update_job.ps1` anunciaba `r20260922-1200`, que es el tag calculado con la hora
 y no existe: lo que vale es «Imagen nueva»). La nocturna del 23 construira
 `personal` y publicara el diccionario 25. Sustituye a `r20260917-1359`.
+
+## 2026-09-22 · F-095 · SPEC ESCRITA (spec-author), pendiente de aprobacion
+
+Entregado `specs/F-095-retenciones-contabilidad-fin-obra/` (requirements
+150/150, design 242/250, 26 tareas). **Resumen, hallazgos y consultas:
+`progress/spec_F-095.md`.** La ficha sigue `pending`; va detras de F-094
+(precondicion escrita en la spec).
+
+**Decisiones que necesita validar el humano antes de implementar** (opciones,
+cobertura medida y recomendacion en `design.md` §Decisiones para el humano):
+H1 que fecha es fin de obra y que hacer con las 83 obras terminadas sin ella;
+H2 que plazo se suma (falta que Negocio fije el valor fijo); H3 obra de las
+bajas sin centro (4,27 M€); H4 ingerir `rac` (filtrada o entera, a acordar con
+F-091); H5 lado cliente fuera o dentro; H6 retirar F-059 y F-045; H7 como se
+presentan los 3,28 M€ que no cuadran.
+
+**Aviso para F-094**: en `cob` el criterio de `pag` («viva de verdad») da 2,12 M€
+frente a 13,81 M€ de saldo contable de cliente: no se traslada tal cual.

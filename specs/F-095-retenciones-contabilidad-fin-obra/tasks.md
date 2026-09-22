@@ -1,0 +1,38 @@
+<!-- specs/F-095-retenciones-contabilidad-fin-obra/tasks.md -->
+# F-095 · Tareas
+
+Rama `feature/F-095-retenciones-contabilidad-fin-obra`. Rigor `critico`: fase RED
+obligatoria, cobertura >= 80 % de lineas cambiadas y campana de mutacion ENTERA
+con **0 supervivientes** (cada uno, test nuevo o justificacion aceptada por el
+humano). Un commit por tarea (`F-095 Tn: ...`), en espanol.
+
+**No se empieza sin**: F-094 `done` y las decisiones H1-H7 de `design.md`
+contestadas por el humano (T0). T1-T11 construyen; T12-T19 son la propagacion;
+T20-T25 cierran.
+
+- [ ] T0: Anotar en `progress/impl_F-095.md` las respuestas del humano a H1-H7 y ajustar los requisitos marcados [Hn] si alguna difiere de la recomendada (si cambia el alcance, PARAR y volver a proponer).  |  Verificacion: revision del reviewer contra `design.md` §Decisiones
+- [ ] T1: Escribir `tests/test_f095_retenciones_contables.py` en fase RED con un test por requisito R1-R29 (offline: texto del SQL sin comentarios `--`, YAML del diccionario, `tables_sigrid.yaml`, cableado del step).  |  Verificacion: `pytest tests/test_f095_retenciones_contables.py` falla y la traza queda en `progress/impl_F-095.md`
+- [ ] T2: Anadir `rac` a `config/tables_sigrid.yaml` (sin `tiemod`, `where` segun H4, excluida `tex`) y subir `TOTAL_TABLAS` de 68 a 69 en `tests/test_f074_ingesta_censo.py` y `tests/test_f080_ingesta.py`.  |  Verificacion: `test_f095_r9_rac_declarada_con_filtro`, `pytest tests/test_f074_ingesta_censo.py tests/test_f080_ingesta.py`
+- [ ] T3: Crear `sql/retenciones/03_apuntes_contables.sql` con `retenciones.cuentas_proveedor` elegida por `prv.cueretide <> 0`, sin ningun literal de prefijo de cuenta.  |  Verificacion: `test_f095_r1_cuentas_por_cueretide_no_por_prefijo`, `test_f095_r2_cuentas_proveedor`
+- [ ] T4: En `03_apuntes_contables.sql`, crear `retenciones.apuntes_contables` (una fila por apunte, `apunte_id` PK, `importe = hab - deb`) sin filtrar apuntes.  |  Verificacion: `test_f095_r3_un_apunte_una_fila`, `test_f095_r8_pk_y_sin_multiplicar`
+- [ ] T5: En el mismo fichero, derivar `clase` (CIERRE, APERTURA, SALDO_INICIAL por cuenta con `NOT EXISTS` de cierre del ejercicio anterior, ALTA, BAJA) y `es_prescripcion`, sin usar `asi.ori`.  |  Verificacion: `test_f095_r4_clase_de_apunte`, `test_f095_r5_saldo_inicial_por_cuenta`, `test_f095_r6_prescripcion_marca_no_filtra`
+- [ ] T6: En el mismo fichero, resolver la obra por la cascada APUNTE -> FACTURA -> EFECTO -> PROVEEDOR_UNA_OBRA (si H3 la aprueba) -> SIN_OBRA, con `rac` pre-agregada por `asiide`, centro -> obra solo por `maestro.centros_coste`, y publicar `via_obra`.  |  Verificacion: `test_f095_r7_cascada_de_obra`, `test_f095_r8_lateral_o_preagregado`, `test_f095_r10_veta_apu_obr_y_cen_obride`
+- [ ] T7: Crear `sql/retenciones/04_saldo_contable.sql` (`retenciones.saldo_contable` por proveedor y obra, fila sin obra propia, sin CIERRE ni APERTURA, con `saldo_anterior_2016`).  |  Verificacion: `test_f095_r11_saldo_sin_cierre_ni_apertura`, `test_f095_r13_sin_obra_no_se_reparte`
+- [ ] T8: Crear `sql/retenciones/05_fin_obra.sql` con las cuatro candidatas en su columna, `MAX` sobre `obrctr`, y la regla de `fecha_fin_real` identica a la de `cierre/05_views_cabecera.sql`.  |  Verificacion: `test_f095_r17_candidatas_con_su_nombre`, `test_f095_r17_fin_real_igual_que_cierre`
+- [ ] T9: En `05_fin_obra.sql`, calcular `fecha_fin_obra`/`fuente_fin_obra` segun H1, `terminada_sin_fin_obra` sin respaldo inventado, y `plazo_meses`/`fuente_plazo` segun H2 con `PLAZO_NEGOCIO` en una sola constante.  |  Verificacion: `test_f095_r18_fin_obra_sin_previsto`, `test_f095_r19_terminada_sin_fecha_no_se_inventa`, `test_f095_r20_plazo_y_fuente`
+- [ ] T10: En `05_fin_obra.sql`, `fecha_vencimiento = fecha_fin_obra + plazo_meses` y test-guarda que veta `fecven`, `fecha_documento` y `con.fec` en el calculo.  |  Verificacion: `test_f095_r21_vencimiento_desde_fin_de_obra`, `test_f095_r21_no_usa_fecha_de_factura`
+- [ ] T11: Crear `sql/retenciones/06_views_contables.sql` con `v_cuadre_proveedor` (lee `movimientos.estado = 'VIVA'`, sin `fecrea`/`fecbaj`/`est`, `FULL JOIN`, categorias en orden) y `v_retencion_contable_obra` (estados de vencimiento).  |  Verificacion: `test_f095_r14_cuadre_no_recalcula_viva`, `test_f095_r15_categorias_en_orden`, `test_f095_r22_estados_de_vencimiento`
+- [ ] T12: PROPAGACION 1/8 — cuatro `_SubStep` nuevos en `SUB_PASOS` de `build_retenciones_step.py` y su docstring, sin cambiar `name`, `stage` ni `depends_on`.  |  Verificacion: `test_f095_r25_sub_pasos_y_dependencias`
+- [ ] T13: PROPAGACION 2/8 — test-guarda de que `sql/maestro/04_centros_coste.sql` solo lee `raw.*` (D3) y de que `02_views.sql` y `01_movimientos.sql` no cambian (R23).  |  Verificacion: `test_f095_d3_centros_coste_solo_raw`, `test_f095_r23_movimientos_intacto`
+- [ ] T14: PROPAGACION 3/8 — verificar sin tocar codigo que `main.py` (`build-retenciones`, `run-all`), el orquestador y `apply_grants` cubren los objetos nuevos por esquema.  |  Verificacion: `test_f095_r25_main_y_grants_sin_cambios`
+- [ ] T15: PROPAGACION 4/8 — `config/diccionario/retenciones.yaml`: seis fichas con grano, `clave_negocio`, `relaciones` y cifras medidas (reparto de `via_obra`, de `categoria`, sin obra); la linea de fuente que manda en `movimientos` y `v_pbi_*`.  |  Verificacion: `test_f095_r12_fuente_que_manda`, `test_f095_r26_fichas_claves_relaciones`, puerta de diccionario de `bash harness/init.sh`
+- [ ] T16: PROPAGACION 5/8 — ficha `rac` en `config/diccionario/raw.yaml`; `00_global.yaml` con `version` +1 y el orden de magnitud de proveedor pasado al saldo contable (fuera los 34,7 M€).  |  Verificacion: `test_f095_r26_raw_rac_y_orden_de_magnitud`
+- [ ] T17: PROPAGACION 6/8 — comprobar que `check-declarados` recorre los `CREATE` nuevos y que `config/objetos_pendientes.yaml` sigue vacio.  |  Verificacion: `test_f095_r27_declarados_y_pendientes`
+- [ ] T18: PROPAGACION 7/8 — `docs/ARCHITECTURE.md` (69 tablas; cuentas por `cueretide`, clase de apunte, saldo inicial de 2008, vencimiento desde fin de obra).  |  Verificacion: revision del reviewer contra `design.md`
+- [ ] T19: PROPAGACION 8/8 — `azure-apps/datamart_seg_anual.md`: consume `rac`, expone seis objetos nuevos y la fuente del saldo vivo pasa a contabilidad; commit en el repositorio `azure-apps`.  |  Verificacion: revision del reviewer (R29)
+- [ ] T20: Cerrar la fase VERDE: `pytest` completo en verde y cobertura >= 80 % de las lineas cambiadas.  |  Verificacion: `bash harness/init.sh`
+- [ ] T21: Campana de mutacion ENTERA del nivel `critico` con analisis de cada superviviente en `progress/mutacion_F-095.md` (0 supervivientes sin test o sin justificacion aceptada).  |  Verificacion: `python -m harness.mutacion --feature F-095`
+- [ ] T22: Fotos ANTES del plan de `design.md` (saldo 1958889 por `cenide`, total de cuentas 8.760.524,49, FERMALUX en `v_pbi_retencion_entidad` tras F-094).  |  Verificacion: MANUAL (humano) — consultas K2 y B1 de `progress/spec_F-095.md` por `sigrid-api` y el MCP
+- [ ] T23: Ingesta de `rac` y build: `python main.py ingest --table rac --full` (o la nocturna), `python main.py build-retenciones`, y los puntos DESPUES 1-5 del plan (R5 sin violaciones, FERMALUX `CUADRA` 64.201,96, repartos contra Medidas).  |  Verificacion: MANUAL (humano) en el entorno que el humano autorice
+- [ ] T24: `python main.py check-raw-recuentos`, `check-declarados`, `check-unicidad`, `check-relaciones`, `check-diccionario`, y la pregunta del caso de uso 3 por el MCP; despues `python main.py publicar-diccionario`.  |  Verificacion: MANUAL (humano) — publicar es escritura contra Azure y la autoriza el humano
+- [ ] T25: Ejecutar `bash harness/init.sh` en verde.  |  Verificacion: `bash harness/init.sh`
