@@ -3,7 +3,7 @@
 # El bloque global del diccionario semantico del datamart (F-006).
 #
 # Esto es lo que el agente lee ANTES de escribir una linea de SQL. Aqui van las
-# convenciones, los nueve esquemas, las reglas duras que impiden respuestas
+# convenciones, los diez esquemas, las reglas duras que impiden respuestas
 # plausibles y falsas, los ordenes de magnitud contra los que detectar un
 # disparate, la bateria de aceptacion y la lista de lo que todavia no esta
 # documentado.
@@ -1079,7 +1079,7 @@ preguntas_aceptacion:
     objetos_esperados: []
     respuesta_correcta: >-
       "El datamart no tiene tesoreria." No hay ni un objeto de cobros o pagos en
-      los nueve esquemas. Cualquier numero es incorrecto, incluida la tentacion
+      los diez esquemas. Cualquier numero es incorrecto, incluida la tentacion
       de dar el facturado como si fuera caja.
     estado: bloqueada
     bloqueada_por: F-037

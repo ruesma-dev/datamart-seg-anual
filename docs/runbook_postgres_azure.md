@@ -146,9 +146,9 @@ psql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require" \
 ```
 
 Qué debe salir: `sigrid_dm` con propietario `sigrid_dm_etl`, los tres roles,
-`sigrid_dm_app` dentro de `sigrid_dm_etl`, y **los nueve esquemas** (`raw`,
+`sigrid_dm_app` dentro de `sigrid_dm_etl`, y **los diez esquemas** (`raw`,
 `stg`, `aux`, `mart`, `_meta`, `cierre`, `compras`, `maestro`,
-`retenciones`).
+`retenciones`, `personal`).
 
 **Comprobación obligatoria después**: que `albaranes` y `partes` siguen
 conectando y que el listado de reglas de firewall es **exactamente** el de
