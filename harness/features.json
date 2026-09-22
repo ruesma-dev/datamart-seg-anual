@@ -1621,19 +1621,20 @@
     },
     {
       "id": "F-100",
-      "title": "La direccion de la obra que falta: comprobar si vive en condir y publicarla si vive",
-      "description": "PETICION DEL PROYECTO `facturas` (Pablo Gris, 2026-09-22), que necesita la direccion de la obra para que la IA case una factura con su obra cuando el codigo del papel no sirve. HOY NO LLEGA: sobre las 225 obras vivas o dadas de alta en los dos ultimos anios, solo 41 traen algun dato de ubicacion (direccion, codigo postal, municipio o provincia) y 44 traen cliente. Eso NO es un fallo de este ETL: `sql/maestro/01_obras.sql` ya lee los seis campos de emplazamiento de `obr` y su cabecera lo deja medido y fechado —`dir1` 305 de 921 (33,1 %)—, asi que para dos de cada tres obras «no consta» es la respuesta correcta con lo que hoy se ingiere. LA PREGUNTA ABIERTA, y es lo unico que se pide de entrada: el humano afirma que en Sigrid la direccion de la obra SI esta, y el diccionario de Sigrid describe la tabla `condir` («Direcciones de conceptos», 1:N sobre `con`, con `dir1`, `dir2`, `dircpo`, `munide`, `proide`, `paiide` y `dir`), a la que apunta `con.diride`. `condir` NO se ingiere hoy. Si las obras tienen ahi su direccion, publicarla cierra el hueco; si no la tienen, el hueco es de captura en Sigrid y hay que decirlo para dejar de buscarlo. Medir primero, publicar despues.",
+      "title": "La empresa en maestro.obras: cada obra esta dos veces y la copia de la 28 viene vacia",
+      "description": "PETICION DEL PROYECTO `facturas` (Pablo Gris, 2026-09-22). La peticion nacio como «falta la direccion de la obra» y el propio humano la corrigio con el dato que lo explica todo: **cada obra esta dada de alta DOS VECES en Sigrid**, una en Ruesma (empresa 1) y otra en la **empresa 28**, con el MISMO `codigo_obra` y distinto `obra_id`. **La copia de la 28 nunca lleva direccion ni cliente.** El datamart publica las dos fichas y NO trae ninguna columna que diga de que empresa es cada una, asi que cualquier consulta por `codigo_obra` sin filtrar coge una u otra al azar. COMPROBADO el 2026-09-22 sobre 0692, 0696, 0704 y 0710: en las cuatro, la ficha con direccion y cliente tiene el `obra_id` MENOR y la otra viene vacia. MEDIDO sobre las obras en estado EN CURSO: 147 codigos distintos, **26 con ficha duplicada**, 36 con direccion y 36 con cliente. Asi que la cobertura de direccion que hoy declara la ficha del diccionario (33 %) esta contada sobre FICHAS y no sobre OBRAS, y por eso parece peor de lo que es: el humano afirma que de las 40 obras de Ruesma en curso, 34 tienen direccion. NO ES SOLO UN PROBLEMA DE DIRECCION: el humano lo ha visto tambien en los partes, donde los albaniles de la empresa 28 imputan a su propia copia de la obra (caso 0704 Siroco), asi que cualquier agregado por obra puede estar partido en dos sin que se note.",
       "acceptance": [
-        "MEDIDO Y ESCRITO ANTES DE TOCAR NADA: cuantas de las 921 obras tienen al menos una fila en `condir`, cuantas de las vivas, y que trae esa fila. Si la respuesta es que casi ninguna, la feature se cierra con esa medicion y sin publicar nada: eso tambien es entregar.",
-        "Si `condir` si tiene direcciones de obra, se ingiere y se publica junto a la direccion propia de `obr`, diciendo de cual de las dos sale cada valor: no se mezclan en la misma columna sin marca.",
-        "Una obra puede tener VARIAS direcciones en `condir` (es 1:N): se decide y se escribe cual se publica y por que, y el grano de `maestro.obras` sigue siendo una fila por obra.",
-        "La cobertura nueva se mide y se declara en la ficha del diccionario, como ya hace la actual: sin porcentaje medido, no se publica.",
-        "El consumidor es `facturas`: cuando esto entregue, se le avisa, porque su F-036 usa la direccion como pista para casar la obra."
+        "`maestro.obras` publica la EMPRESA de cada ficha, o una marca de cual es la ficha principal. Es lo que pide el consumidor y lo que evita que una consulta por codigo coja la ficha vacia.",
+        "MEDIDO Y ESCRITO: cuantas obras tienen ficha duplicada, cuantas de las vivas, y que trae cada copia. Si el criterio para elegir la principal no es la empresa sino otro campo, se dice cual y por que; elegir por `obra_id` menor es una heuristica y no vale como regla publicada sin medirla.",
+        "La cobertura de direccion se vuelve a declarar CONTADA POR OBRA y no por ficha, porque la actual induce a error: hace creer que falta la direccion cuando lo que sobra es una copia vacia.",
+        "Se comprueba si el mismo desdoble afecta a los partes y a los agregados por obra (caso 0704 Siroco, senalado por el humano), y se dice que se ha comprobado, aunque la conclusion sea que no afecta.",
+        "Si ademas `condir` (1:N, direcciones de concepto) aporta direcciones de obra que `obr` no tiene, se mide y se dice; si no aporta, se escribe para dejar de buscarlo.",
+        "El consumidor es `facturas`: cuando esto entregue, se le avisa, porque su F-036 manda la lista de obras al modelo para casar la factura con su obra y hoy tiene que elegir la ficha buena a ojo."
       ],
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 6,
       "branch": "feature/F-100-direccion-obra-condir"
     },
     {
