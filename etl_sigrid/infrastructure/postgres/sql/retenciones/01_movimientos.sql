@@ -209,5 +209,7 @@ COMMENT ON TABLE retenciones.movimientos IS
 '(agrupado, dividido o anulado: su dinero cuenta en otro efecto), LIQUIDADA '
 'si tiene fecrea o est 10 (Pagado), VIVA el resto; en CLIENTE, VIVA = '
 'fecrea 0. Ninguna lectura suma BAJA. Importes con signo: los negativos '
-'son ajustes/devoluciones. Obra resuelta por cenide del efecto, con fallback '
-'a las líneas del documento origen si apuntan a una sola obra.';
+'son ajustes/devoluciones. obra_id es la obra de maestro.obras (F-094): el '
+'cenide del efecto (publicado en centro_coste_id) traducido por '
+'maestro.centros_coste, con fallback a las líneas del documento origen si '
+'no hay centro y apuntan a una sola obra.';

@@ -12,6 +12,16 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 26 (F-094, 2026-09-22): LA RETENCION VIVA A PROVEEDOR ESTABA INFLADA
+# 4,3 VECES. `retenciones.movimientos` derivaba el estado solo de `fecrea` y
+# contaba como VIVA los efectos agrupados (su dinero ya esta en el agrupador AGR),
+# los anulados y lo ya pagado: 35,54 M€ cuando lo vivo son 8,35 M€. El estado de
+# PROVEEDOR se lee ahora de la ficha del propio efecto y gana el valor BAJA, que
+# no se suma nunca; el orden de magnitud de 34,7 M€ se sustituye por 8,35 M€. El
+# de CLIENTE no cambia y queda marcado SIN VERIFICAR. Y absorbe el resto de
+# F-045: `obra_id` de retenciones es por fin la obra de `maestro.obras` (262 de
+# 262, antes 0) y el centro de coste se publica aparte en `centro_coste_id`.
+#
 # version 25 (F-057, 2026-09-18): EL DATAMART YA SABE QUIEN HA TRABAJADO EN CADA
 # OBRA. Entra el esquema `personal` --el decimo-- con el maestro de recursos
 # (2.618 filas), las 330.638 lineas de parte de trabajo y la vista de horas por
