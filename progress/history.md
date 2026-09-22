@@ -1167,3 +1167,57 @@ puede saber** hoy, y que eso es de **F-067** con su foto diaria.
 acertaba por casualidad, y la guarda del catalogo falta en `05_vencimientos`) y
 **F-089** (el MCP sirve un diccionario cacheado y llevaba catorce dias
 desfasado), mas la correccion de una frase caducada de `current.md`.
+
+## F-057 · El coste de personal por obra: el esquema `personal` (cerrada el 2026-09-22, APROBADO en pasada 4)
+
+Por primera vez el datamart sabe **quien ha trabajado en una obra y cuantas horas**,
+no solo lo que cuesta en material y subcontrata. Pedida por el humano y confirmada
+con Juan Romero el 2026-09-03; subida a **prioridad 1** el 2026-09-17.
+
+**UN ESQUEMA MODULO PROPIO, `personal`, y NO `stg`, por decision del humano**:
+`build_stg` es puerta bloqueante —si falla, el `mart` no se construye esa noche— y
+un esquema propio permite dar o quitar el acceso con un `GRANT`, que es lo que
+necesitara **F-087**. Publica `personal.recursos`, `personal.partes_lineas` y la
+vista `personal.v_pbi_horas_obra_mes`. Construido en **7,2 s**.
+
+**LA TRAMPA QUE JUSTIFICA LA FEATURE**: `hmores.can` **no son horas**. Mezcla HORA,
+DIA, MES y UD, y el clasificador es `auxhor.medide` —no `auxhor.ext`, a cero en las
+60 filas—. Sumado en bruto da **1.837.201**, una cifra falsa; el **71,7 % del euro
+esta en lineas de MES** (estructura de obra). La vista lleva `unidad = 'HORA'`
+cableado. Tres decisiones mas, todas medidas: el eje es el **recurso** y no el
+empleado (no es 1:1 en ninguna direccion); la obra la trae **la linea del parte**
+(99,58 %), asi que la trampa del centro de coste no aplica; y «en rojo» es
+**bandera y no filtro**, porque filtrar borraria el **43,2 %** de las horas.
+
+**DATOS PERSONALES**: se publican **nombre y DNI**, con la autorizacion del humano
+citada en el requisito («el dni puede salir, no es un problema», 2026-09-18). **Nada
+mas** de la ficha del empleado.
+
+**CUATRO PASADAS DE REVIEW, y merece contarse por que**:
+* **Pasada 1, RECHAZO serio**: el SQL era correcto, pero **las dos guardas que
+  justifican la feature no vigilaban nada**. La de datos personales era una **lista
+  negra con 14 de 19 columnas inventadas**; con la Seguridad Social y el banco
+  metidos en el SQL, **la suite pasaba 45 de 45**. Y la de la unidad no caia si
+  una regla convertia los MESES en horas. Arreglado con **lista blanca**: el lateral
+  lee exactamente cinco columnas del empleado, y el reviewer intento colar la
+  Seguridad Social de cinco maneras sin conseguirlo.
+* **Pasadas 2, 3 y 4**: siempre lo mismo, **frases que decian «nueve esquemas»**
+  cuando con `personal` son diez. La primera estaba en lo que **se publica al MCP**.
+  La 3 vio por que se escapaban: se buscaba la frase «nueve esquemas» y no el
+  numero solo. Donde se pudo, **se quito el numero en vez de corregirlo**.
+
+**Evidencias**: `init.sh` exit 0, **5.027 pasan**, cobertura **94,7 %**. Dos campanas
+de mutacion con 4 workers; tres supervivientes equivalentes justificados.
+
+**VERIFICADO EN LA BASE**: 2.618 recursos, **330.853 lineas**, `check-declarados`
+158/158, las seis relaciones unen, diccionario en la **version 25**, y
+`apply-grants` con `personal` y las cuatro tablas crudas de personal excluidas.
+
+**LO QUE QUEDA FUERA**: el servidor MCP tiene su propia lista blanca de esquemas y
+no incluye `personal`; eso no vive en este repositorio. Pasar de horas a euros con
+el precio por recurso es **F-061**.
+
+**DOS MEJORAS DEL ARNES QUE SALEN DE AQUI**, validas para cualquier proyecto: para
+cerrar un conjunto, **lista blanca** —una negra solo protege de lo que alguien se
+acordo de listar—; y si una feature cambia **cuantos** elementos tiene algo, se
+busca **el numero viejo solo**, no la frase que lo acompana.

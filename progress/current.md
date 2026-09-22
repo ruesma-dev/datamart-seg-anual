@@ -1401,3 +1401,36 @@ asi que a las 14:00 locales la cabecera dijo `r20260917-1400`, un tag que no
 existe en el registro, mientras se desplegaba `r20260917-1359`. Lo que vale es
 la linea **`Imagen nueva`** y la tabla de confirmacion. Cosmetico, pero despista
 justo en el momento de comprobar un despliegue.
+
+## 2026-09-22 · F-057 verificada en la base por el humano
+
+Las verificaciones MANUAL que ningun agente puede hacer, en este orden:
+
+* **`build-personal`: 7,2 s**, 2.618 recursos y **330.853 lineas de parte** (330.638
+  en la medicion de la spec: la diferencia son partes nuevos de la nocturna).
+* **`check-declarados`: 158 / 158**, los 154 anteriores mas los cuatro de
+  `personal`.
+* **`check-unicidad`**: los tres objetos de `personal` en **OK**. Sale con codigo 1
+  por **`cierre.v_pbi_planif_vs_real` (F-051)**, con las mismas 204 combinaciones y
+  472 filas de siempre: no es de F-057. Subida a prioridad 1 por el humano ese dia.
+* **`check-relaciones`**: las **seis** relaciones de `personal` unen; la de recursos
+  hacia partes al 50 %, legitimo (no todos los recursos imputan horas). El codigo 1
+  lo dan dos timeouts y cuatro avisos preexistentes, ninguno de F-057.
+* **`publicar-diccionario`: version 25**, 158 objetos, 1.015 columnas, contexto de
+  **30 filas** (la cifra que el diccionario decia mal como 29).
+* **`apply-grants`: 35 permisos con `personal` incluido**, y `raw.emp`, `raw.res`,
+  `raw.reshor` y `raw.emphis` **excluidas** del rol del MCP.
+
+**INCIDENTE QUE NO DEBE REPETIRSE**: el primer `apply-grants` dio permiso solo a
+**nueve** esquemas, sin `personal`, porque **el `.env` local del humano fijaba
+`PG_CONSUMPTION_SCHEMAS` con la lista antigua** y manda sobre el valor por defecto
+del codigo. El humano lo corrigio y el segundo salio bien. En Azure no pasa: el job
+no fija la variable. **Leccion**: una lista escrita en dos sitios diverge; lo
+correcto es no fijarla en el `.env` y dejar que mande el defecto del codigo.
+
+**LO QUE SIGUE FUERA DE ESTE REPOSITORIO**: el servidor MCP tiene **su propia lista
+blanca de esquemas**. Consultado el 2026-09-22, responde «el esquema 'personal' esta
+fuera del ambito autorizado. Esquemas disponibles: _meta, aux, cierre, compras,
+maestro, mart, retenciones, stg». Los `GRANT` de la base ya estan; lo que falta es
+anadir `personal` a esa lista, y ese servidor no vive aqui (misma frontera que
+F-089).
