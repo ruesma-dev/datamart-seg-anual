@@ -5,6 +5,8 @@
 
 Resumen: **92 features**, 60 abiertas, 32 terminadas.
 
+En curso: **F-094**.
+
 Bloqueadas: **F-052**.
 
 ## Trabajo abierto
@@ -12,7 +14,7 @@ Bloqueadas: **F-052**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-051 | El mes de las filas reales sale del ano/mes de obrfas y no del TEXTO del cierre, que es la regla, y rompe la clave de cierre.v_pbi_planif_vs_real | 1 | pendiente | critico | `feature/F-051-nombre-mes-real` |
-| F-094 | Retenciones infladas 4,3 veces: el estado VIVA sale solo de fecrea y cuenta los agrupados dos veces y lo ya pagado | 2 | pendiente | estandar | `feature/F-094-retenciones-estado-vivo` |
+| F-094 | Retenciones infladas 4,3 veces: el estado VIVA sale solo de fecrea y cuenta los agrupados dos veces y lo ya pagado | 2 | en curso | estandar | `feature/F-094-retenciones-estado-vivo` |
 | F-095 | Retenciones desde la contabilidad, cuadradas con los efectos, por obra, y con vencimiento a contar desde el fin de obra | 3 | pendiente | critico | `feature/F-095-retenciones-contabilidad-fin-obra` |
 | F-096 | Las partidas que al reestimar superan el 250 % desaparecen de la planificacion: el filtro borra la subida y deja la bajada | 4 | pendiente | critico | `feature/F-096-plan-mensual-sin-tope` |
 | F-097 | Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master | 5 | pendiente | estandar | `feature/F-097-descompuestos-partidas` |
@@ -119,7 +121,7 @@ Descubierto el 2026-08-30 por check-unicidad, ejecutado contra la base recien re
 
 ### F-094 · Retenciones infladas 4,3 veces: el estado VIVA sale solo de fecrea y cuenta los agrupados dos veces y lo ya pagado
 
-estado **pendiente** · prioridad 2 · rigor `estandar` · SDD no · rama `feature/F-094-retenciones-estado-vivo`
+estado **en curso** · prioridad 2 · rigor `estandar` · SDD no · rama `feature/F-094-retenciones-estado-vivo`
 
 Arreglo INMEDIATO de un dato mal publicado hoy en produccion. Medido el 2026-09-22 en solo lectura (`progress/explore_retenciones_contabilidad_fin_obra.md` §1), a raiz del caso FERMALUX que planteo Juan Romero. `retenciones.movimientos` publica **35,54 M EUR vivos a proveedor (25.012 efectos); la retencion viva real es ~8,35 M EUR**. LA CAUSA: `sql/retenciones/01_movimientos.sql` deriva `estado` SOLO de `pag.fecrea` y no mira `con.fecbaj` ni `con.est`. Con eso cuentan como VIVA: los originales agrupados (`est 14`, `fecbaj` = fecha del AGR; 14.668 efectos, 12,99 M), los otros anulados con `fecbaj <> 0` (841, 5,70 M), los agrupadores AGR ya pagados (`est 10`; 1.444, 6,73 M) y otros pagados sin `fecrea` (311, 1,78 M). **El mismo dinero cuenta dos veces** (original + agrupador) y ninguna de las dos es viva. PRUEBA DE CUADRE: FERMALUX da hoy 98.695,48 EUR vivos; lo vivo de verdad es **64.201,96**, identico al saldo de su cuenta contable 4108005478. Criterio medido de 'viva de verdad': `fecrea = 0 AND con.fecbaj = 0 AND con.est NOT IN (10,14,15)`. Es el mismo defecto que F-080 ya resolvio para `compras.vencimientos`. ADEMAS: el orden de magnitud falso (34,7 M EUR) esta escrito en el diccionario y lo sirve `contexto_bbdd` al MCP: hay que corregirlo. LADO CLIENTE (`cob`), SIN VERIFICAR: de 22,1 M EUR 'VIVA', ~1.957 efectos / ~19,9 M tienen `fecbaj <> 0`. Sospecha del mismo defecto: se mide antes de decidir si entra en el mismo arreglo. FRONTERA: esto es sanear lo publicado con los efectos; llevar la retencion a la contabilidad, con fin de obra y vencimiento, es F-095.
 

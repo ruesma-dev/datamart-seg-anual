@@ -1533,7 +1533,7 @@
         "El lado cliente (`cob`) esta medido: o se corrige con el mismo criterio o queda escrito por que no",
         "La cifra de 34,7 M EUR desaparece del diccionario publicado y `check-unicidad` y `check-relaciones` siguen en verde sobre `retenciones`"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": false,
       "rigor": "estandar",
       "priority": 2,
