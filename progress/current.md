@@ -9,6 +9,32 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## F-051 · SPEC ESCRITA, PENDIENTE DE APROBACIÓN (2026-09-22)
+
+Rama `feature/F-051-nombre-mes-real` (desde `chore/fichas-2026-09-22`), rigor
+`critico`, prioridad 1. Sigue `pending` hasta que el humano apruebe. Entregado
+`specs/F-051-nombre-mes-real/` (requirements 150/150, design 250/250, 22 tareas)
+y **resumen con toda la línea base medida en `progress/spec_F-051.md`**. La ficha
+recoge las tres decisiones del humano del 22-09 y lo confirmado por Juan Romero.
+
+Qué decide: cada fila real en el mes de su TEXTO, decidido una sola vez en
+`stg.plan_mensual.anio_mes` y leído por `mart` y `cierre`; fase de rango → todo
+al mes del texto con filas de relleno a 0 desde `fecini`, sin pisar meses con
+cierre propio; vista `v_pbi_planif_vs_real` blindada. Comprobado en Sigrid que
+`obrfasamb` no guarda periodo por ámbito: la fase es por obra.
+
+**Decisiones abiertas para el humano (D1–D9, `design.md` §10)**: qué es «un mes
+que ya tiene datos», F-042 sobre el mes del texto, qué partidas llevan relleno
+(~1,34 M filas), parser nuevo solo en `stg` (rango → último mes, años 00–19,
+«2.013»), sin texto → mes de `fecfin`, nada de relleno tras el mes del texto,
+exención de mutación como F-042, publicar `es_relleno`, y reducir F-050 +
+fichar los 5 huecos de numeración de Sigrid (0371: +4,29 M€ en `mart`).
+
+`bash harness/init.sh` en el worktree del spec-author sale en rojo por entorno,
+no por la spec: `test_f006_t26_cli_dry_run_no_toca_la_base` necesita el `.env`,
+que el worktree no tiene, y la puerta de cobertura mide los cambios de
+`chore/fichas-2026-09-22` frente a `main`. La puerta de tamaño de F-051, en OK.
+
 ## F-057 · IMPLEMENTADA, PENDIENTE DE REVIEW (2026-09-18)
 
 Rama `feature/F-057-recursos-empleados-partes`, `sdd=true`, rigor `estandar`,
