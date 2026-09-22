@@ -9,6 +9,36 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-23 · F-101 · SPEC ESCRITA (`spec_ready`), ESPERANDO AL HUMANO
+
+Spec en `specs/F-101-cabecera-del-parte/` (137/150 y 236/250, puerta de tamano
+en verde). Resumen y todas las cifras medidas: **`progress/spec_F-101.md`**.
+La ficha pasa a `sdd: true` y `spec_ready`; `BACKLOG.md` regenerado.
+
+Todo se midio el 2026-09-22/23 **en solo lectura** (Sigrid por `sigrid-api`,
+tamanos por `filas_solo_lectura`). Tres hallazgos que cambian la ficha del
+backlog: **`hmo.feccie`, `hmo.cla` y `hmo.caaide` valen 0 en las 6.886 filas**
+(y `reshor.cuaide`/`proide` en las 8.959), asi que no se publican;
+**`con.cod` no es unico** (6.258 codigos para 6.886 partes); y **el usuario que
+crea el parte no existe en `con` ni en `hmo`** — esta en `dbo.log`, 8,47 M
+filas no ingeridas, asi que queda fuera del hotfix y declarado.
+
+**Decisiones abiertas que necesita validar el humano antes de implementar:**
+
+1. **Ingerir `hmores.tex`** (recomendado SI): +277 KiB sobre los 111 MB de
+   `raw.hmores`, **+0,27 %**. Sin este visto bueno, **T9 no se ejecuta** y las
+   lineas se quedan sin el texto que pidio Juan.
+2. **El tipo de hora por defecto** esta en **`res.horide`**: opcion A (solo la
+   bandera `es_por_defecto`, recomendada) u opcion B (ademas una columna en
+   `personal.recursos`, que la spec dejaba intacto). Con A, **4 recursos** se
+   quedan sin marca porque su defecto no tiene fila en `reshor`.
+3. **`precio_venta` informado en 3 de 8.959 filas**: se publica con el aviso en
+   la ficha, salvo que el humano prefiera omitirlo.
+4. **El sufijo `_cabecera_`** (`obra_cabecera_id`,
+   `centro_coste_cabecera_id`). **F-093 va a necesitar el mismo vocabulario**
+   para `compras` y todavia no lo ha fijado: conviene decidirlo aqui, que llega
+   antes.
+
 ## 2026-09-22 · F-094 DESPLEGADA (tag `r20260922-2350`)
 
 Imagen **`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260922-2350`**,
