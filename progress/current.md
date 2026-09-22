@@ -20,11 +20,15 @@ Informe: `progress/impl_F-094.md`.
   LIQUIDADA 12.754.011,79 (2.368), BAJA 18.691.779,56 (15.511); FERMALUX
   64.201,96. No se borran filas (25.631).
 - **CLIENTE sin cambios** en el estado (criterio de `pag` no vale en `cob`).
-- Diccionario `version` 26: **158 objetos, 1021 columnas, 69 de consumo**
-  (+6 columnas: `estado_sigrid`, `fecha_baja`, y `num_bajas`/`importe_baja` en
-  las vistas de entidad y resumen).
-- Ampliacion aprobada el 2026-09-22 (H6 de F-095): `obra_id` pasa a ser la
-  obra real y se publica `centro_coste_id` (resto de F-045). En curso.
+- Diccionario `version` 26: **158 objetos, 1022 columnas, 69 de consumo**
+  (+7 columnas: `estado_sigrid`, `fecha_baja` y `centro_coste_id` en
+  `movimientos`, y `num_bajas`/`importe_baja` en las vistas de entidad y
+  resumen).
+- Ampliacion aprobada el 2026-09-22 (H6 de F-095, absorbe el resto de F-045):
+  `obra_id` es la obra real via `maestro.centros_coste` y el centro se publica
+  en `centro_coste_id`. Medido: 262 de 262 `obra_id` casan en `maestro.obras`
+  (antes 0 de 262); mismas 533 filas sin obra. F-045 queda para retirar como
+  absorbida (lo hace el lider).
 
 ## F-057 · IMPLEMENTADA, PENDIENTE DE REVIEW (2026-09-18)
 

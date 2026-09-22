@@ -101,7 +101,8 @@ GROUP BY obra_id, codigo_obra, nombre_obra;
 
 COMMENT ON VIEW retenciones.v_pbi_retencion_obra IS
 'Retenciones por obra en ambos sentidos. posicion_neta > 0 significa que en '
-'esa obra retenemos a proveedores más de lo que el cliente nos retiene.';
+'esa obra retenemos a proveedores más de lo que el cliente nos retiene. '
+'obra_id es la obra de maestro.obras desde F-094 (antes, el centro de coste).';
 
 
 -- ---------------------------------------------------------------------------

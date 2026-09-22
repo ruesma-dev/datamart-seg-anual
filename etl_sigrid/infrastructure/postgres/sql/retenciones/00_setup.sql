@@ -2,7 +2,9 @@
 -- ============================================================================
 -- SCHEMA retenciones — Tanda R1
 --
--- Módulo independiente: solo lee de raw.*. No toca stg/mart/cierre/compras.
+-- Módulo independiente: lee de raw.* y, desde F-094, de la vista
+-- maestro.centros_coste (el puente centro -> obra de F-073). No toca
+-- stg/mart/cierre/compras.
 --
 -- MODELO (confirmado por diagnóstico contra Sigrid, julio 2026)
 -- ---------------------------------------------------------------------------
@@ -26,7 +28,8 @@
 -- La regla contractual vive en raw.obrctr.coegar (5.0 = 5 %) para el cliente.
 --
 -- ATRIBUCIÓN A OBRA — dos vías, en este orden de prioridad:
---   1. efecto.cenide → la obra (en Ruesma cada obra es su propio centro).
+--   1. efecto.cenide → centro de coste → OBRA por maestro.centros_coste (F-094).
+--      El centro NO es la obra: son dos filas de con con misma emp y cod.
 --   2. líneas del documento origen (dcfpro/dvfpro), SOLO si todas apuntan a
 --      la misma obra. Si la factura reparte entre varias, se deja NULL y se
 --      informa en `num_obras_documento` para poder detectarlo.

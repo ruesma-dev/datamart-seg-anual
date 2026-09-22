@@ -44,6 +44,22 @@
 --   13,81 M€ de su contabilidad. Queda para una feature propia; mientras,
 --   `estado_sigrid` y `fecha_baja` se publican también aquí, solo informativos.
 --
+-- OBRA (F-094, ampliación H6 aprobada el 2026-09-22: absorbe el resto de F-045)
+-- ---------------------------------------------------------------------------
+-- `centro_coste_id` = `cenide` del efecto, tal cual. `obra_id` es la OBRA de
+-- verdad (el `ide` de `maestro.obras`), y ya no el centro de coste:
+--   · con centro  → `maestro.centros_coste` (F-073: centro y obra son dos filas
+--                   de `con` con la misma empresa y el mismo código). Si el
+--                   centro no es una obra (estructura, delegación) queda NULL:
+--                   ese coste no se imputa a ninguna obra.
+--   · sin centro  → la obra única de las líneas del documento origen, cuyo
+--                   `obride` SÍ es una obra (575 de 575 en raw.obr).
+-- Antes era COALESCE(cenide, obra de las líneas): mezclaba el `ide` del centro
+-- y el de la obra en la misma columna, y casaba 0 de 262 contra maestro.obras.
+-- DEPENDENCIA: lee la VISTA `maestro.centros_coste`, que es SQL puro sobre
+-- `raw` y existe desde F-073. `build_maestros` corre antes en `run-all` por su
+-- posición; NO se declara en `depends_on` a propósito (ver el step).
+--
 -- Los importes NEGATIVOS se conservan con su signo (son ajustes o
 -- devoluciones registradas como efecto negativo). Por eso se exponen a la vez
 -- `importe` (neto, con signo) y las columnas separadas de cargo/abono.
@@ -89,11 +105,15 @@ SELECT
     NULLIF(p.entide, 0)                     AS entidad_id,
     ent.res                                 AS entidad_nombre,
     prv.cif                                 AS entidad_cif,
-    -- Obra: prioridad al centro de coste del efecto
-    COALESCE(NULLIF(p.cenide, 0),
-             CASE WHEN od.num_obras = 1 THEN od.obra_unica END) AS obra_id,
-    COALESCE(cen_con.cod, obr_con.cod)      AS codigo_obra,
-    COALESCE(cen_con.res, obr_con.res)      AS nombre_obra,
+    -- Obra (F-094): el centro de coste, traducido a OBRA por el puente de
+    -- F-073; sin centro, la obra única de las líneas del documento
+    NULLIF(p.cenide, 0)                     AS centro_coste_id,
+    CASE WHEN NULLIF(p.cenide, 0) IS NOT NULL THEN cc.obra_id
+         WHEN od.num_obras = 1 THEN od.obra_unica END AS obra_id,
+    CASE WHEN NULLIF(p.cenide, 0) IS NOT NULL THEN cc.codigo_obra
+         ELSE obr_con.cod END               AS codigo_obra,
+    CASE WHEN NULLIF(p.cenide, 0) IS NOT NULL THEN cc.nombre_obra
+         ELSE obr_con.res END               AS nombre_obra,
     COALESCE(od.num_obras, 0)               AS num_obras_documento,
     -- Importes (con signo)
     COALESCE(p.tot, 0)::NUMERIC(18, 2)      AS importe,
@@ -120,7 +140,7 @@ LEFT JOIN retenciones.tipos tp ON tp.tipo_id = p.retide
 LEFT JOIN raw.con doc     ON doc.ide = NULLIF(p.conide, 0)
 LEFT JOIN raw.con ent     ON ent.ide = NULLIF(p.entide, 0)
 LEFT JOIN raw.prv prv     ON prv.ide = NULLIF(p.entide, 0)
-LEFT JOIN raw.con cen_con ON cen_con.ide = NULLIF(p.cenide, 0)
+LEFT JOIN maestro.centros_coste cc ON cc.centro_coste_id = NULLIF(p.cenide, 0)
 LEFT JOIN obras_doc_compra od ON od.documento_id = NULLIF(p.conide, 0)
 LEFT JOIN raw.con obr_con ON obr_con.ide = CASE WHEN od.num_obras = 1
                                                 THEN od.obra_unica END
@@ -143,10 +163,13 @@ SELECT
     NULLIF(c.entide, 0)                     AS entidad_id,
     ent.res                                 AS entidad_nombre,
     NULL::VARCHAR(24)                       AS entidad_cif,
-    COALESCE(NULLIF(c.cenide, 0),
-             CASE WHEN od.num_obras = 1 THEN od.obra_unica END) AS obra_id,
-    COALESCE(cen_con.cod, obr_con.cod)      AS codigo_obra,
-    COALESCE(cen_con.res, obr_con.res)      AS nombre_obra,
+    NULLIF(c.cenide, 0)                     AS centro_coste_id,
+    CASE WHEN NULLIF(c.cenide, 0) IS NOT NULL THEN cc.obra_id
+         WHEN od.num_obras = 1 THEN od.obra_unica END AS obra_id,
+    CASE WHEN NULLIF(c.cenide, 0) IS NOT NULL THEN cc.codigo_obra
+         ELSE obr_con.cod END               AS codigo_obra,
+    CASE WHEN NULLIF(c.cenide, 0) IS NOT NULL THEN cc.nombre_obra
+         ELSE obr_con.res END               AS nombre_obra,
     COALESCE(od.num_obras, 0)               AS num_obras_documento,
     COALESCE(c.tot, 0)::NUMERIC(18, 2)      AS importe,
     retenciones.fn_sigrid_date(c.fecven)    AS fecha_prevista_devolucion,
@@ -166,7 +189,7 @@ LEFT JOIN raw.con efe ON efe.ide = c.ide  -- ficha del EFECTO: solo informativa
 LEFT JOIN retenciones.tipos tp ON tp.tipo_id = c.retide
 LEFT JOIN raw.con doc     ON doc.ide = NULLIF(c.conide, 0)
 LEFT JOIN raw.con ent     ON ent.ide = NULLIF(c.entide, 0)
-LEFT JOIN raw.con cen_con ON cen_con.ide = NULLIF(c.cenide, 0)
+LEFT JOIN maestro.centros_coste cc ON cc.centro_coste_id = NULLIF(c.cenide, 0)
 LEFT JOIN obras_doc_venta od ON od.documento_id = NULLIF(c.conide, 0)
 LEFT JOIN raw.con obr_con ON obr_con.ide = CASE WHEN od.num_obras = 1
                                                 THEN od.obra_unica END

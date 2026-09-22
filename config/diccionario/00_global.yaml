@@ -1063,9 +1063,12 @@ preguntas_aceptacion:
       - retenciones.movimientos
       - retenciones.v_pbi_retenciones_vivas
     respuesta_correcta: >-
-      Filtra sentido = 'PROVEEDOR'. Da `saldo_vivo` por defecto y menciona que
+      Filtra sentido = 'PROVEEDOR' y, para lo pendiente, estado = 'VIVA': las
+      filas BAJA (agrupados, divididos, anulados) no se suman nunca (F-094).
+      Da `saldo_vivo` por defecto y menciona que
       existe la otra lectura, `neto_practicado`, y que pueden divergir. NO une
-      el efecto a las lineas de su factura. Senala las filas con obra_id nulo y
+      el efecto a las lineas de su factura. La obra se filtra por `obra_id`
+      (la de `maestro.obras` desde F-094) o por `codigo_obra`. Senala las filas con obra_id nulo y
       num_obras_documento > 1, que son facturas repartidas entre varias obras.
       Cita la fecha de build de `build_retenciones`: se refresca de noche, pero
       su paso puede fallar sin tumbar el resto de la carga.
