@@ -6,7 +6,7 @@ Rama `feature/F-094-retenciones-estado-vivo` (desde `chore/fichas-2026-09-22`),
 aprobado el 2026-09-22 + la ampliación H6 (resto de F-045) aprobada el mismo día.
 
 Commits: `eeb01a2` T0 (in_progress + BACKLOG) · `0bb2e7b` T1 (estado) ·
-`489d776` T2 (obra) · T3 este informe.
+`489d776` T2 (obra) · `d988fe0` T3 (changelog v26) · `b92d7f0` T4 este informe.
 
 ## Qué cambió
 
