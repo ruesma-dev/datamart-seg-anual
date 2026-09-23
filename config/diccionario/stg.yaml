@@ -624,6 +624,24 @@ objetos:
 
       El universo completo, con estado y cliente, esta en `maestro.obras`; el
       del seguimiento con etiquetas listas, en `mart.v_pbi_dim_obra`.
+
+      **UNA FICHA POR CODIGO, Y NO SIEMPRE LA DE RUESMA (F-102).** En Sigrid la
+      obra es POR EMPRESA: el mismo codigo existe una vez por empresa --Ruesma,
+      Porsan, cada UTE-- y es la misma obra vista desde cada una, sin
+      consolidar. Esta tabla sigue eligiendo UNA ficha por codigo como hasta hoy
+      --marca de `raw.conext` con `cod = '15'`, despues la modificada mas
+      recientemente y despues el `ide` mayor--, sin mirar la empresa. F-102 NO
+      la cambia: publica en `maestro.obras` la marca `es_ficha_principal` (la
+      ficha de la empresa 1), y las dos eligen distinto en **cuatro codigos**,
+      medido el 2026-09-23: **0581** (aqui la ficha de la UTE 27, con 20 cierres
+      y todo el seguimiento; la de Ruesma no tiene cierres), **0606** (aqui la de
+      la UTE 31, con 24 cierres; la de Ruesma tiene 15), **0671** (aqui la de la
+      UTE 34) y **0720** (aqui la copia vacia de Porsan, 28, sin cierres ni plan;
+      la de Ruesma tiene 2 cierres y 142 filas de plan). Aplicar la marca aqui
+      sacaria la 0581 del `mart` y del `cierre` y reduciria la 0606, asi que se
+      deja como esta: pasar el seguimiento a la ficha de Ruesma y traer las
+      demas empresas como obras propias es **F-106**. Hasta entonces, el
+      `obra_id` de estas cuatro no es el de `es_ficha_principal`.
     grano: >-
       Una fila por `obra_id`, ya deduplicada. Es SUBCONJUNTO de `maestro.obras`,
       y esa diferencia es deliberada: contar aqui da menos obras.
@@ -638,6 +656,8 @@ objetos:
         significado: >-
           Codigo de obra tal y como se teclea en Sigrid. **Nunca es NULL**: sale
           de `con.cod` en crudo y ademas el build excluye las obras sin codigo.
+          Aqui es unico porque la tabla se queda con una ficha por codigo; en
+          `maestro.obras` NO lo es (una ficha por empresa, F-102).
         nulo_significa: null
       nombre_obra:
         significado: >-

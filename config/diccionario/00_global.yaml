@@ -386,13 +386,21 @@ reglas:
       administrativos (0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT),
       excluye codigos con cinco o mas digitos seguidos y deduplica por el
       mecanismo de Sigrid `conext.cod = '15'`. `maestro.obras` NO filtra nada:
-      es superconjunto. Toda respuesta que cuente obras debe decir cual usa.
-      `compras` y `retenciones` tampoco filtran por `stg.obras` y pueden traer
-      obras administrativas que el seguimiento excluye.
+      es superconjunto, con una fila por FICHA (una por empresa y codigo, F-102).
+      Toda respuesta que cuente obras debe decir cual usa. `compras` y
+      `retenciones` tampoco filtran por `stg.obras` y pueden traer obras
+      administrativas que el seguimiento excluye. **`stg.obras` sigue eligiendo
+      su ficha como hasta hoy y NO usa `maestro.obras.es_ficha_principal`** (la
+      ficha de Ruesma): las dos difieren en 0581, 0606, 0671 y 0720, donde
+      `stg.obras` --y con ella `mart` y `cierre`-- se queda con la ficha de una
+      UTE o de Porsan. Lo resuelve F-106.
     motivo: >-
       Los filtros estan en `sql/stg/03_obras.sql`; `sql/maestro/01_obras.sql` no
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
-      dar la del maestro como "obras de la empresa" infla el numero.
+      dar la del maestro como "obras de la empresa" infla el numero. F-102
+      (2026-09-23) midio que la eleccion de `stg.obras` no es la ficha de Ruesma
+      en 0581, 0606, 0671 y 0720, y decidio no tocarla: aplicarla sacaria la 0581
+      del seguimiento. F-106 pasa el seguimiento a la ficha de Ruesma.
 
   - codigo: R-PROVEEDOR-INTRAGRUPO
     titulo: El mayor proveedor de la empresa es la propia empresa
