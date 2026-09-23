@@ -42,6 +42,14 @@ en verde). Resumen y todas las cifras medidas: **`progress/spec_F-101.md`**.
      `prvcer`).
   4. `test_f057_r27_ddl_idempotente` cuenta `CREATE TABLE IF NOT EXISTS` == 2:
      pasa a 4 con las dos tablas nuevas.
+  5. **`lineas_en_otra_obra` NO usa el `LATERAL` del diseno §4.1.** El diseno
+     suponia `raw.hmores` «indexada por `hmoide`» y no lo esta: `pg_indexes`
+     (solo lectura, 2026-09-23) solo da `hmores_pkey (ide)`. `EXPLAIN` sin
+     ANALYZE del LATERAL: `Nested Loop` con `Seq Scan` de `hmores` por cada
+     parte, coste 119.752.314. Se agrega una vez por `hmoide` (subconsulta
+     `GROUP BY` unida por hash): coste 19.681. Mismo resultado, misma fuente
+     (`raw.hmores`, no `personal.partes_lineas`), sin tocar `raw` con un indice.
+     El test R10 se ajusto a la forma agregada y veta el LATERAL.
 La ficha pasa a `sdd: true` y `spec_ready`; `BACKLOG.md` regenerado.
 
 Todo se midio el 2026-09-22/23 **en solo lectura** (Sigrid por `sigrid-api`,
