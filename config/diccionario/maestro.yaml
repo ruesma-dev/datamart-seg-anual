@@ -11,6 +11,10 @@
 #    (gastos generales, centros de personal) y los codigos con cinco o mas
 #    digitos. Contar obras en una o en otra da resultados distintos **a
 #    proposito**, y toda respuesta que cuente obras tiene que decir cual usa.
+#    Y desde F-102, **una fila por FICHA, no por codigo**: la obra es de UNA
+#    empresa y el mismo codigo existe una vez por empresa (922 fichas, 846
+#    codigos el 2026-09-23). Por codigo se cruza SIEMPRE con `empresa_id`, o por
+#    `clave_obra`; `es_ficha_principal` marca la ficha de Ruesma de cada codigo.
 # 2. **`importe_contratado` lleva IVA.** Es la suma del total del documento,
 #    mientras que todos los importes de `compras` son sin IVA. La diferencia
 #    entre las dos cifras no es sobrecoste ni ahorro: es el impuesto.
@@ -36,28 +40,66 @@ objetos:
       El maestro de obras SIN filtrar: codigo, nombre, estado (con su nombre ya
       traducido), fechas de alta y baja, cliente, **direccion del emplazamiento
       con municipio y provincia**, y las dos marcas de que datos tiene la obra
-      dentro del datamart. OJO CON LA DIRECCION: solo un tercio de las obras la
-      tiene informada, asi que "no consta" es la respuesta correcta para dos de
-      cada tres y cada columna declara su porcentaje medido. Es la vista para poner contexto a una obra; **NO** es
+      dentro del datamart. Es la vista para poner contexto a una obra; **NO** es
       el universo del seguimiento y **NO sirve para saber si una obra sigue
       viva**: `es_activa` vale TRUE en las 919 filas porque `fecha_baja` no se
       informa nunca (ver R-OBRA-ACTIVA). Esta descripcion prometia justo eso
       hasta que la bateria de aceptacion lo midio.
+
+      **LA OBRA ES DE UNA EMPRESA (F-102, modelo del humano del 2026-09-23).**
+      En Sigrid el mismo codigo de obra existe una vez por empresa --Ruesma (1),
+      Porsan (28), cada UTE-- y es la **misma obra vista desde cada empresa, sin
+      consolidar**: en la UTE esta su informacion y en Ruesma sus suplidos a la
+      UTE. Medido el 2026-09-23: **922 fichas para 846 codigos**, 58 codigos
+      repetidos; dentro de una empresa el codigo es unico. Por eso **por
+      `codigo_obra` se cruza SIEMPRE con `empresa_id`, o por `clave_obra`**
+      (`1-0581`, `27-0581`), que es unica: cruzar solo por el codigo devuelve
+      duplicados o coge la ficha que no es. `obra_id` sigue siendo la clave
+      tecnica. `es_ficha_principal` marca la ficha de Ruesma de cada codigo (o,
+      si el codigo no la tiene, la primera del ranking), y `obra_principal_id`
+      apunta a ella como REFERENCIA: no sirve para agregar hechos de otras
+      empresas. Las **103 fichas de la empresa 28** (Porsan) **no traen ni
+      direccion ni cliente**, ni presupuesto ni cierres: 57 son obras propias de
+      Porsan (unica ficha de su codigo) y el resto, copias de una obra de
+      Ruesma. Traer al seguimiento las demas empresas como obras propias es
+      F-106.
+
+      **LA DIRECCION SE MIDE SOBRE LA FICHA DE RUESMA**, no sobre las 922: las
+      copias de otras empresas no la traen y hundian la cifra. Medido el
+      2026-09-23 sobre las 846 fichas principales, `dir1` esta en **310 de 846**
+      (36,6 %) y escasea en las obras ANTIGUAS: codigos < 0400, **77 de 252**;
+      0400-0599, 93 de 200; 0600-0671, 61 de 74; **0672 en adelante, 49 de
+      59**; cinco o mas digitos, 29 de 240; otros, 1 de 21. De cuatro digitos
+      desde la 0672 hay 57 principales, todas de la empresa 1, y 48 tienen
+      `dir1`. Cada columna de direccion declara su cifra. `raw.condir`, las
+      direcciones de concepto, **no aporta direcciones de obra**: `condir` tiene
+      fila para **0 de 922** fichas de obra, tambien en Sigrid; no hace falta
+      volver a buscarlas ahi.
     grano: >-
-      Una fila por `obra_id`, y son TODAS las obras de Sigrid. Es superconjunto
-      de `stg.obras`, que excluye las administrativas y los codigos de cinco o
-      mas digitos: contar aqui da mas obras que contar alli, y esa diferencia es
-      deliberada.
+      Una fila por FICHA de obra (`obra_id`), y son TODAS las de Sigrid: 922 el
+      2026-09-23, de todas las empresas. `codigo_obra` NO es unico --se repite
+      una vez por empresa--; `clave_obra` si. Es superconjunto de `stg.obras`,
+      que excluye las administrativas y los codigos de cinco o mas digitos y se
+      queda con una ficha por codigo: contar aqui da mas obras que contar alli,
+      y esa diferencia es deliberada. Para contar obras por codigo, filtrar
+      `es_ficha_principal` y decirlo.
     clave_negocio: [obra_id]
     paso_etl: build_maestros
     refresco: nocturno
     columnas:
       obra_id:
         significado: >-
-          Identificador de la obra en Sigrid (`con.ide`). Es la clave universal
-          del modelo y la que une con el resto de esquemas.
+          Identificador de la FICHA de obra en Sigrid (`con.ide`). Es la clave
+          tecnica del modelo y la que une con el resto de esquemas. Cada ficha
+          es de UNA empresa (`empresa_id`): un documento de la UTE apunta a la
+          ficha de la UTE, y uno de Ruesma a la de Ruesma.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid, de `con.cod`.
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid, de `con.cod`. **No es
+          unico**: el mismo codigo existe una vez por empresa (58 codigos
+          repetidos el 2026-09-23). Se filtra o se cruza siempre junto con
+          `empresa_id`, o se usa `clave_obra`.
       nombre_obra: >-
         Nombre legible de la obra, de `con.res`. En Sigrid no existe ninguna
         columna `nom`: el nombre siempre es el resumen del concepto.
@@ -168,33 +210,39 @@ objetos:
           Primera linea de la direccion del emplazamiento de la obra, de
           `obr.dir1`. Mismo nombre y mismo significado que en
           `maestro.proveedores`, para que "donde esta" se escriba igual en las
-          dos. **Informada en 305 de las 921 obras (33,1 %), medido el
-          2026-09-10.**
+          dos. **Informada en 310 de las 846 fichas principales (36,6 %), medido
+          el 2026-09-23**, y mucho mas en las obras recientes que en las
+          antiguas (ver la descripcion de la vista). Las fichas de otra empresa
+          que copian una obra de Ruesma no la traen. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 33,1 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
         nulo_significa: >-
-          La obra no tiene direccion informada en Sigrid. Es el caso de dos de
-          cada tres, asi que **"no consta" es la respuesta correcta**, no un
-          hueco del ETL.
+          La ficha no tiene direccion informada en Sigrid. En una obra antigua o
+          en la copia de otra empresa es lo normal, y **"no consta" es la
+          respuesta correcta**, no un hueco del ETL; antes de darlo, mirar la
+          ficha de Ruesma del codigo (`es_ficha_principal`).
       dir2:
         significado: >-
           Segunda linea de la direccion (de `obr.dir2`): escalera, planta,
-          poligono. **Es la mas vacia de todas: 47 de 921 obras (5,1 %), medido
-          el 2026-09-10**, asi que no sirve para agrupar ni para filtrar.
+          poligono. **Es la mas vacia de todas: 46 de las 846 fichas principales
+          (5,4 %), medido el 2026-09-23**, asi que no sirve para agrupar ni para
+          filtrar. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 5,1 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
         nulo_significa: >-
-          No hay segunda linea de direccion. Lo normal: "no consta" en el 94,9 %
-          de las obras.
+          No hay segunda linea de direccion. Lo normal: "no consta" en el 94,6 %
+          de las fichas principales.
       codigo_postal:
         significado: >-
           Codigo postal del emplazamiento, de `obr.dircpo`, **tal cual lo teclea
           Sigrid** (es texto, no numero, y puede traer ceros a la izquierda).
-          **Informado en 303 de 921 obras (32,9 %), medido el 2026-09-10.**
+          **Informado en 307 de las 846 fichas principales (36,3 %), medido el
+          2026-09-23.** Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 32,9 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
         agregacion: no_sumable
         nulo_significa: La obra no tiene codigo postal informado; "no consta".
       direccion_completa:
         significado: >-
           La direccion en una sola linea, de `obr.dir`, tal como la guarda
           Sigrid. Es la que se cita al responder "donde esta la obra X".
-          **Informada en 272 de 921 obras (29,5 %), medido el 2026-09-10**, y es
-          la que menos cobertura tiene de las cuatro de direccion.
+          **Informada en 276 de las 846 fichas principales (32,6 %), medido el
+          2026-09-23**, y es la que menos cobertura tiene de las cuatro de
+          direccion. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 29,5 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
         nulo_significa: >-
           La obra no tiene direccion informada. Antes de darla por perdida,
           mirar `municipio`: hay obras con municipio y sin calle.
@@ -206,17 +254,18 @@ objetos:
           "no consta", y aqui se publica como NULL.
         agregacion: no_sumable
         nulo_significa: >-
-          La obra no tiene municipio informado (627 de 921); "no consta".
+          La ficha no tiene municipio informado (548 de las 846 principales el
+          2026-09-23); "no consta".
       municipio:
         significado: >-
           Nombre del municipio del emplazamiento, resuelto desde `raw.auxmun`.
-          **Informado en 294 de 921 obras (31,9 %), medido el 2026-09-10**, y
-          los 294 identificadores informados resuelven todos a nombre: no hay
-          ningun municipio colgado.
+          **Informado en 298 de las 846 fichas principales (35,2 %), medido el
+          2026-09-23.** El 2026-09-10 los identificadores informados resolvian
+          todos a nombre: no habia ningun municipio colgado. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 31,9 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
         agregacion: no_sumable
         nulo_significa: >-
-          La obra no tiene municipio informado. Es el caso de 627 de 921 obras y
-          **"no consta" es la respuesta correcta**.
+          La ficha no tiene municipio informado. Es el caso de 548 de las 846
+          fichas principales y **"no consta" es la respuesta correcta**.
       provincia_id:
         significado: >-
           Identificador de la provincia en `raw.auxpro`, de `obr.proide`. Mismo
@@ -227,12 +276,12 @@ objetos:
       provincia:
         significado: >-
           Nombre de la provincia del emplazamiento, resuelto desde `raw.auxpro`.
-          **Informada en 306 de 921 obras (33,2 %), medido el 2026-09-10.** Es
-          la columna de direccion con mas cobertura, y la unica que sirve para
-          un mapa a nivel grueso.
+          **Informada en 309 de las 846 fichas principales (36,5 %), medido el
+          2026-09-23.** Sirve para un mapa a nivel grueso. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 33,2 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
         agregacion: no_sumable
         nulo_significa: >-
-          La obra no tiene provincia informada (615 de 921); "no consta".
+          La ficha no tiene provincia informada (537 de las 846 principales el
+          2026-09-23); "no consta".
       tiene_presupuesto:
         significado: >-
           Booleano: la obra tiene al menos una fila en `stg.presupuesto`. **NUNCA
@@ -253,6 +302,68 @@ objetos:
           tablas con CASCADE cada noche y una vista de `maestro` colgada de ahi
           no sobreviviria (es el incidente de F-047).
         agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de Sigrid a la que pertenece la FICHA de obra (`con.emp`), de
+          `maestro.v_obra_fichas` (F-102). `1` es Ruesma, `28` es Porsan y `12`,
+          `14`, `15`, `25`, `26`, `27`, `31` y `34` son UTE; el nombre esta en
+          `nombre_empresa`. Como la obra es de una empresa, **todo cruce o
+          filtro por `codigo_obra` va SIEMPRE con `empresa_id`**, o por
+          `clave_obra`. Medido el 2026-09-23: 782 fichas de la empresa 1, 103 de
+          la 28 y 37 repartidas en otras 17 empresas.
+        agregacion: no_sumable
+      nombre_empresa:
+        significado: >-
+          Nombre de la empresa de la ficha, de `raw.auxemp` por `numemp` =
+          `con.emp` (F-102), con un lateral `ORDER BY` + `LIMIT 1` para no
+          multiplicar filas. Es lo que se cita al responder "de que empresa es
+          esta ficha".
+        nulo_significa: >-
+          La empresa de la ficha no esta en `raw.auxemp`. No deberia pasar: las
+          38 empresas de Sigrid se ingieren enteras cada noche.
+      clave_obra:
+        significado: >-
+          **La clave legible y UNICA de la ficha de obra**: `<empresa>-<codigo>`
+          (`1-0581` es la 0581 de Ruesma, `27-0581` la de la UTE). 922 claves
+          para 922 fichas el 2026-09-23. `empresa_id` es entero, asi que lo que
+          va antes del primer `-` es la empresa y la clave no puede colisionar.
+          Es la llave para agregar y cruzar por obra sin mezclar empresas: las
+          vistas de `compras` con obra la publican con el mismo nombre.
+      num_fichas_codigo:
+        significado: >-
+          Cuantas fichas tiene el `codigo_obra` de esta fila, contando todas las
+          empresas. `1` es un codigo que solo existe en una empresa; mas de 1,
+          que la misma obra esta vista desde varias (134 fichas de 58 codigos el
+          2026-09-23, hasta 8 fichas en un codigo administrativo).
+        agregacion: no_sumable
+      es_ficha_principal:
+        significado: >-
+          Cierto en la **ficha de Ruesma** de cada codigo: exactamente una por
+          codigo, 846 para 846 el 2026-09-23. Se decide en
+          `maestro.v_obra_fichas` por este orden y solo este: (1) la de la
+          empresa 1; (2) marcada en `raw.conext` con `cod = '15'`; (3) mas
+          cierres; (4) modificada mas recientemente; (5) `ide` mayor, solo como
+          desempate. Si el codigo no tiene ficha de la empresa 1 --las obras
+          propias de Porsan, 0001-0005--, decide el resto del ranking: 64
+          principales son de otra empresa. **Filtrar por ella da una fila por
+          codigo** y es como se cuenta "obras" en este maestro. OJO: `stg.obras`
+          NO usa esta marca y elige otra ficha en 0581, 0606, 0671 y 0720, que
+          es F-106.
+        agregacion: no_sumable
+      obra_principal_id:
+        significado: >-
+          El `obra_id` de la ficha de Ruesma del codigo de esta fila (la de la
+          empresa 1), o el propio `obra_id` si el codigo no tiene ficha de la
+          empresa 1. Sale de la misma ventana que `es_ficha_principal`, asi que
+          las dos no pueden divergir. 59 fichas apuntan a otra el 2026-09-23.
+          **Es solo REFERENCIA de cual es la ficha de Ruesma: no sirve para
+          agregar hechos de otras empresas.** Sumar facturas o partes por ella
+          meteria lo de la UTE en la obra de Ruesma, que no se consolida; por eso
+          ninguna vista de `compras` la publica. OJO con 11 fichas de codigos
+          administrativos (`CM` 1, `CP` 4, `GG` 4, `POSTV2` 1, `VAR` 1): en otra
+          empresa son su propio centro de gastos, no la misma cosa que la ficha
+          de Ruesma a la que apuntan.
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: stg.obras.obra_id
@@ -260,7 +371,15 @@ objetos:
         porque: >-
           Es el universo del seguimiento, que es un SUBCONJUNTO de este. Unir
           por aqui equivale a filtrar a las obras reales; no unir deja dentro
-          las administrativas.
+          las administrativas. `stg.obras` se queda con UNA ficha por codigo, y
+          en 0581, 0606, 0671 y 0720 no es la ficha de Ruesma
+          (`es_ficha_principal`): lo resuelve F-106.
+      - de: obra_id
+        a: maestro.v_obra_fichas.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Es la definicion de las marcas de F-102 (ranking, rango y numero de
+          cierres de cada ficha). No hace falta unir: las marcas ya estan aqui.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
         cardinalidad: "1:1"
@@ -274,6 +393,91 @@ objetos:
       - En que municipio o provincia esta la obra X
       - Cuantas obras tenemos en cada provincia
       - De que obras tiene el datamart presupuesto y de cuales tiene seguimiento
+      - De que empresa es la ficha de la obra X
+      - Cual es la ficha de Ruesma de la obra X y que otras empresas tienen ficha de ella
+
+  v_obra_fichas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la DEFINICION de cual es la ficha de Ruesma de cada codigo, de la que
+      leen `maestro.obras` y las vistas de `compras`. Para consultar obras, la
+      vista es `maestro.obras`, que trae las mismas marcas con el nombre, la
+      empresa y la direccion.
+    descripcion: >-
+      Una fila por ficha de obra con su empresa, su clave legible
+      (`clave_obra`, `<empresa>-<codigo>`) y el ranking que decide cual es la
+      **ficha de Ruesma** de cada codigo (F-102). Las obras son POR EMPRESA y no
+      se consolidan: el mismo codigo es la misma obra vista desde cada empresa.
+      El orden, y solo este: (1) empresa 1; (2) marcada en `raw.conext` con
+      `cod = '15'`; (3) mas cierres en `raw.obrfas`; (4) `con.tiemod` mas
+      reciente; (5) `ide` mayor, solo como desempate. **Ninguna regla elige por
+      `obra_id` menor**: falla en la 0680, donde la copia de Porsan tiene el
+      menor. Lee SOLO `raw`, se crea en `sql/maestro/00_setup.sql` y no se
+      dropea nunca, asi que `compras` la lee sin depender de `stg`. `stg.obras`
+      NO la usa: el seguimiento sigue eligiendo como hasta hoy, y difiere de
+      esta marca en 0581, 0606, 0671 y 0720 (F-106).
+    grano: >-
+      Una fila por ficha de obra (`obra_id`): 922 el 2026-09-23, con 922
+      `clave_obra` distintas y 846 principales, una por codigo.
+    clave_negocio: [obra_id]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la ficha de obra en Sigrid (`con.ide`).
+        agregacion: no_sumable
+      codigo_obra:
+        significado: >-
+          Codigo de obra, de `con.cod`. No es unico: se repite una vez por
+          empresa.
+      empresa_id:
+        significado: >-
+          Empresa de la ficha (`con.emp`). `1` Ruesma, `28` Porsan, el resto
+          UTE; el nombre esta en `maestro.obras.nombre_empresa`.
+        agregacion: no_sumable
+      clave_obra:
+        significado: >-
+          `<empresa>-<codigo>`, unica: 922 para 922 fichas el 2026-09-23.
+      marcada_vigente:
+        significado: >-
+          Cierto si la ficha tiene fila en `raw.conext` con `cod = '15'`, la
+          marca de Sigrid que `stg.obras` usa para deduplicar. Se evalua con
+          `EXISTS`: una ficha con dos filas no se multiplica. 124 fichas el
+          2026-09-23.
+        agregacion: no_sumable
+      num_cierres:
+        significado: >-
+          Filas de la ficha en `raw.obrfas` (sus fases o cierres). 0 si no tiene
+          ninguna, nunca NULL. 388 fichas tienen alguno el 2026-09-23.
+        agregacion: no_sumable
+      num_fichas_codigo:
+        significado: Cuantas fichas tiene su codigo, contando todas las empresas.
+        agregacion: no_sumable
+      rango_ficha:
+        significado: >-
+          Puesto de la ficha dentro de su codigo segun el ranking. `1` es la
+          principal.
+        agregacion: no_sumable
+      es_ficha_principal:
+        significado: >-
+          `rango_ficha = 1`: la ficha de Ruesma del codigo, o la primera del
+          ranking si no la tiene. Exactamente una por codigo.
+        agregacion: no_sumable
+      obra_principal_id:
+        significado: >-
+          La ficha de la empresa 1 del codigo, o la propia si el codigo no la
+          tiene. Es REFERENCIA: no sirve para agregar hechos de otras empresas.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Es la misma ficha; `maestro.obras` ya trae las marcas de esta vista.
+    ejemplos_preguntas:
+      - Por que la ficha principal del codigo X es la de esa empresa
 
   proveedores:
     tipo: vista

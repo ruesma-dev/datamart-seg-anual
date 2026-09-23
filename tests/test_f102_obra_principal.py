@@ -697,14 +697,21 @@ def test_f102_r22_las_fichas_documentan_empresa_y_clave(vista: str) -> None:
 
 
 @pytest.mark.parametrize("vista", VISTAS_FICHA_COMPRAS)
-def test_f102_r22_la_relacion_por_clave_es_n_a_1(vista: str) -> None:
-    relaciones = _ficha(f"compras.{vista}")["relaciones"]
-    assert any(
-        r["de"] == "clave_obra"
-        and r["a"] == "maestro.obras.clave_obra"
-        and r["cardinalidad"] == "N:1"
-        for r in relaciones
-    ), f"{vista}: clave_obra -> maestro.obras.clave_obra (N:1) (R22)"
+def test_f102_r22_la_relacion_por_clave_esta_declarada(vista: str) -> None:
+    """DESVIACION JUSTIFICADA de R22 («(N:1)»): se declara `N:N` y el `porque`
+    dice que de hecho es N:1. El validador del diccionario (R5 de F-006,
+    `_es_unica_por`) solo acepta el lado «1» sobre la clave de negocio ENTERA o
+    una `clave_sustituta`, y la de `maestro.obras` es `obra_id`: declarar `N:1`
+    tumba la puerta, y marcar `clave_obra` como sustituta seria falso (no es un
+    BIGSERIAL y `check-unicidad` la trataria como garantizada)."""
+    relaciones = [
+        r for r in _ficha(f"compras.{vista}")["relaciones"]
+        if r["de"] == "clave_obra" and r["a"] == "maestro.obras.clave_obra"
+    ]
+    assert len(relaciones) == 1, f"{vista}: clave_obra -> maestro.obras.clave_obra (R22)"
+    relacion = relaciones[0]
+    assert relacion["cardinalidad"] == "N:N"
+    assert "DE HECHO ES N:1" in relacion["porque"] and "922 para 922" in relacion["porque"]
 
 
 @pytest.mark.parametrize("vista", VISTAS_FICHA_COMPRAS)

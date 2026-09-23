@@ -15,7 +15,22 @@ Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
 Informe del implementer: `progress/impl_F-102.md` (al terminar).
 
-- **Tarea en curso**: T8. Hechas T1-T7.
+- **Tarea en curso**: T10. Hechas T1-T9.
+- **Desviacion 4 (justificada)**: la relacion `clave_obra ->
+  maestro.obras.clave_obra` de las cinco vistas de `compras` se declara `N:N`
+  y no `N:1` (R22), con el `porque` diciendo que DE HECHO es N:1 (922 claves
+  para 922 fichas). El validador del diccionario (R5 de F-006,
+  `_es_unica_por`) solo acepta el lado «1» sobre la clave de negocio entera o
+  una `clave_sustituta`; la de `maestro.obras` es `obra_id`, y marcar
+  `clave_obra` como sustituta seria falso (y `check-unicidad` la daria por
+  garantizada). Cambiar la clave de negocio de `maestro.obras` romperia todas
+  las relaciones N:1 que apuntan a su `obra_id`.
+- **Tests de otras features tocados (sin cambiar lo que vigilan)**:
+  `test_f080_diccionario.py` (la lista de columnas de `v_control_forma_pago`
+  gana las dos de F-102), `test_f080_ingesta.py` (el censo es 69 y las tres de
+  F-080 siguen contadas), `TOTAL_TABLAS` de F-066 y F-074 a 69. Las cifras de
+  direccion de F-073 (33,1 %...) se conservan en las fichas como historia.
+  `specs/F-006-mcp-azure/design_detalle.md` gana su enmienda (163 objetos).
 - **Desviacion 3 (justificada)**: en `v_pbi_proveedor_obra` (y por coherencia
   en `v_pbi_partida_coste`) la empresa y la clave se unen ANTES de agregar y se
   agrupan con el resto, no «sobre el resultado ya agregado» (R21). La puerta de
