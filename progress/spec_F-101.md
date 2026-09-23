@@ -95,3 +95,10 @@ los grants de F-087 (son por esquema) y la revocación de F-068 sobre
 
 `azure-apps/datamart_seg_anual.md` **sí cambia** (T12): hoy lista tres objetos
 de `personal` y pasarán a cinco.
+
+## APROBADA (humano, 2026-09-23)
+
+Las cuatro decisiones, con la opcion recomendada: D-3 SI a `hmores.tex`; D-8
+opcion A (solo `es_por_defecto`); D-9 se publica `precio_venta`; D-1
+`obra_cabecera_id` / `centro_coste_cabecera_id`. D-6 (`dbo.log`) pasa a
+**F-105**, prioridad 10.

@@ -9,7 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-23 · F-101 · SPEC ESCRITA (`spec_ready`), ESPERANDO AL HUMANO
+## 2026-09-23 · F-101 · SPEC ESCRITA (`spec_ready`), APROBADA POR EL HUMANO
+
+> **APROBADA EL 2026-09-23 con las CUATRO recomendaciones**: (1) SI se ingiere
+> `hmores.tex` (T9 se ejecuta; el coste de ventana se cronometra como tarea
+> MANUAL); (2) D-8 opcion A: solo la bandera `es_por_defecto` en
+> `recursos_tipos_hora`, declarando los 4 recursos sin marca; (3) D-9: se
+> publica `precio_venta` con el aviso de sus 3 filas; (4) D-1: nombres
+> `obra_cabecera_id` y `centro_coste_cabecera_id`. El usuario creador del
+> parte (`dbo.log`) queda fichado como **F-105**, prioridad 10.
 
 Spec en `specs/F-101-cabecera-del-parte/` (137/150 y 236/250, puerta de tamano
 en verde). Resumen y todas las cifras medidas: **`progress/spec_F-101.md`**.
