@@ -1271,3 +1271,18 @@ por dos temas de datos personales, resueltos por el humano: exposicion de
 `hmores.tex` en `raw.hmores` ACEPTADA por escrito, y nombre redactado con un
 commit nuevo sin reescribir historial. Detalle: `progress/impl_F-101.md`,
 `progress/review_F-101.md`, `progress/spec_F-101.md`.
+
+## F-102 · HOTFIX 2: identificadores por empresa para obras y recursos (cerrada el 2026-09-24, APROBADO en pasada 2)
+
+Correos de Juan Romero del 22-09 (obra dada de alta en la empresa 1 y en la 28)
+y del 23-09 (`codigo_recurso` no unico). Modelo del humano: las obras son POR
+EMPRESA y no se consolidan. `maestro.obras` gana `empresa_id`, `nombre_empresa`
+(se ingiere `auxemp`), `clave_obra` ('<empresa>-<codigo>'), `num_fichas_codigo`,
+`es_ficha_principal` (la de Ruesma) y `obra_principal_id` (solo aqui, con aviso
+de no agregar hechos de otras empresas); `personal.recursos` gana `empresa_id`,
+`nombre_empresa` y `clave_recurso`; las vistas de consumo de `compras` publican
+`empresa_id` y `clave_obra`. Regla `R-CODIGO-POR-EMPRESA`, diccionario version
+29. `stg.obras` NO cambia (difiere de la ficha de Ruesma en 0581, 0606, 0671 y
+0720): lo resuelve F-106. Pasada 1 rechazada solo por papeleo; desviacion 6
+declarada (`check-unicidad` no vigila las claves nuevas). Detalle:
+`progress/impl_F-102.md`, `progress/review_F-102.md`, `progress/spec_F-102.md`.

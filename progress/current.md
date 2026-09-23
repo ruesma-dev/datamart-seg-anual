@@ -9,7 +9,11 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-23 · F-102 · EN CURSO (implementer, rama `hotfix/F-102-obra-duplicada-empresa-28`)
+## 2026-09-24 · F-102 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN T16 DEL HUMANO Y EL DESPLIEGUE
+
+> Pendiente de decision del humano (no bloquea): vigilancia permanente de
+> `clave_obra`/`clave_recurso` en base (A indice unico, B claves alternativas en
+> `check-unicidad` -recomendada-, C solo la comprobacion manual).
 
 Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).

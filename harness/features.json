@@ -1632,7 +1632,7 @@
         "Una consulta por codigo_obra filtrando la ficha principal devuelve una sola fila por codigo, y la regla esta en el diccionario",
         "Avisado el proyecto `facturas` (su F-036) y actualizado azure-apps; y medido si `condir` aporta direcciones que `obr` no tiene"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 2,
