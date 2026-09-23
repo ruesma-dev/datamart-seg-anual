@@ -644,13 +644,33 @@ def test_f102_r21_se_toman_de_la_vista_de_fichas_con_left_join(
     assert f"{alias}.clave_obra AS clave_obra" in sentencia
 
 
-def test_f102_r21_proveedor_obra_une_sobre_el_agregado() -> None:
-    """El GROUP BY va dentro; la union, fuera: el grano no cambia."""
-    sentencia = _sentencia(RUTA_VISTAS_COMPRAS, "compras.v_pbi_proveedor_obra")
-    exterior = _nivel_cero(sentencia)
-    assert "GROUP BY" not in exterior, "se agrega dentro, no fuera (R21)"
-    assert "LEFT JOIN maestro.v_obra_fichas" in exterior
-    assert "GROUP BY obra_id, codigo_obra, proveedor_id" in sentencia
+@pytest.mark.parametrize(
+    ("vista", "grupo_de_siempre"),
+    [
+        ("compras.v_pbi_proveedor_obra",
+         "GROUP BY l.obra_id, l.codigo_obra, l.proveedor_id, l.proveedor_nombre, "
+         "l.proveedor_cif, l.anio"),
+        ("compras.v_pbi_partida_coste",
+         "GROUP BY f.obra_id, f.codigo_obra, f.partida_id, par.cod, par.res"),
+    ],
+)
+def test_f102_r21_las_vistas_agregadas_no_cambian_de_grano(
+    vista: str, grupo_de_siempre: str
+) -> None:
+    """DESVIACION JUSTIFICADA de R21 («sobre el resultado ya agregado»): la union
+    va ANTES de agregar y las dos columnas se agrupan con el resto, porque la
+    puerta de F-006 (`test_f006_r2_control_el_group_by_se_lee_donde_se_puede_leer`)
+    exige el `GROUP BY` en el nivel 0. El grano no cambia: la vista de fichas
+    tiene una fila por `obra_id` y las dos columnas dependen solo de el. Lo que
+    se fija aqui es justo eso: el `GROUP BY` de siempre, entero y en su orden,
+    mas `empresa_id` y `clave_obra` DETRAS, y ni una columna mas."""
+    sentencia = _sentencia(RUTA_VISTAS_COMPRAS, vista)
+    alias = re.search(r"LEFT JOIN maestro\.v_obra_fichas (\w+) ON", sentencia).group(1)
+    esperado = f"{grupo_de_siempre}, {alias}.empresa_id, {alias}.clave_obra"
+    assert re.search(rf"{re.escape(esperado)}$", sentencia.strip()), (
+        f"{vista}: el GROUP BY de siempre mas empresa y clave, nada mas (R21)"
+    )
+    assert "GROUP BY" in _nivel_cero(sentencia), "el GROUP BY en el nivel 0"
 
 
 def test_f102_r21_ningun_sql_de_compras_publica_la_ficha_de_ruesma() -> None:

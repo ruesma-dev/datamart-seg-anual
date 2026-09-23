@@ -121,53 +121,42 @@ COMMENT ON VIEW compras.v_pbi_contrato_consumo IS
 -- ---------------------------------------------------------------------------
 -- PROVEEDORES POR OBRA / AÑO
 -- ---------------------------------------------------------------------------
--- La empresa y la clave se unen SOBRE EL AGREGADO (F-102): primero se agrega
--- como siempre, y despues se cuelga una fila de `maestro.v_obra_fichas` por
--- `obra_id`. El grano no cambia.
+-- La empresa y la clave (F-102) se cuelgan con un LEFT JOIN a
+-- `maestro.v_obra_fichas` por `obra_id` ANTES de agregar, y se agrupan con el
+-- resto. No cambia el grano: la vista de fichas tiene UNA fila por `obra_id`,
+-- asi que ni multiplica lineas ni parte grupos (las dos columnas dependen solo
+-- de `obra_id`). Medido en solo lectura el 2026-09-23: 45.185 filas antes y
+-- despues. Se une antes y no sobre el agregado porque el `GROUP BY` tiene que
+-- quedar en el nivel 0, que es donde la puerta de F-006 comprueba que la clave
+-- de negocio cabe en el (`test_f006_r2_la_clave_de_negocio_cabe_en_el_group_by`).
 CREATE OR REPLACE VIEW compras.v_pbi_proveedor_obra AS
 SELECT
-    agg.obra_id,
-    agg.codigo_obra,
-    agg.proveedor_id,
-    agg.proveedor_nombre,
-    agg.proveedor_cif,
-    agg.anio,
-    agg.facturado,
-    agg.albaranado,
-    agg.certificado_proforma,
-    agg.contratado,
-    agg.num_facturas,
-    agg.num_albaranes,
-    agg.num_contratos,
+    l.obra_id,
+    l.codigo_obra,
+    l.proveedor_id,
+    l.proveedor_nombre,
+    l.proveedor_cif,
+    l.anio,
+    SUM(l.importe) FILTER (WHERE l.tipo_doc IN ('FACTURA', 'ABONO'))
+                                            AS facturado,
+    SUM(l.importe) FILTER (WHERE l.tipo_doc = 'ALBARAN')
+                                            AS albaranado,
+    SUM(l.importe) FILTER (WHERE l.tipo_doc = 'PROFORMA')
+                                            AS certificado_proforma,
+    SUM(l.importe) FILTER (WHERE l.tipo_doc = 'CONTRATO')
+                                            AS contratado,
+    COUNT(DISTINCT l.documento_id) FILTER (WHERE l.tipo_doc IN ('FACTURA', 'ABONO'))
+                                            AS num_facturas,
+    COUNT(DISTINCT l.documento_id) FILTER (WHERE l.tipo_doc IN ('ALBARAN', 'PROFORMA'))
+                                            AS num_albaranes,
+    COUNT(DISTINCT l.contrato_id)           AS num_contratos,
     fo.empresa_id                           AS empresa_id,
     fo.clave_obra                           AS clave_obra
-FROM (
-    SELECT
-        obra_id,
-        codigo_obra,
-        proveedor_id,
-        proveedor_nombre,
-        proveedor_cif,
-        anio,
-        SUM(importe) FILTER (WHERE tipo_doc IN ('FACTURA', 'ABONO'))
-                                                AS facturado,
-        SUM(importe) FILTER (WHERE tipo_doc = 'ALBARAN')
-                                                AS albaranado,
-        SUM(importe) FILTER (WHERE tipo_doc = 'PROFORMA')
-                                                AS certificado_proforma,
-        SUM(importe) FILTER (WHERE tipo_doc = 'CONTRATO')
-                                                AS contratado,
-        COUNT(DISTINCT documento_id) FILTER (WHERE tipo_doc IN ('FACTURA', 'ABONO'))
-                                                AS num_facturas,
-        COUNT(DISTINCT documento_id) FILTER (WHERE tipo_doc IN ('ALBARAN', 'PROFORMA'))
-                                                AS num_albaranes,
-        COUNT(DISTINCT contrato_id)             AS num_contratos
-    FROM compras.fact_compras_linea
-    WHERE proveedor_id IS NOT NULL
-    GROUP BY obra_id, codigo_obra, proveedor_id, proveedor_nombre,
-             proveedor_cif, anio
-) agg
-LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = agg.obra_id;
+FROM compras.fact_compras_linea l
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = l.obra_id
+WHERE l.proveedor_id IS NOT NULL
+GROUP BY l.obra_id, l.codigo_obra, l.proveedor_id, l.proveedor_nombre,
+         l.proveedor_cif, l.anio, fo.empresa_id, fo.clave_obra;
 
 COMMENT ON VIEW compras.v_pbi_proveedor_obra IS
 'Agregado proveedor × obra × año (Tanda C2). "Proveedores con más facturación '
@@ -217,47 +206,36 @@ COMMENT ON VIEW compras.v_pbi_albaranes_sin_facturar IS
 -- ---------------------------------------------------------------------------
 -- COSTE INCURRIDO POR PARTIDA (albaranado + facturado)
 -- ---------------------------------------------------------------------------
--- Tambien aqui la empresa y la clave se unen sobre el agregado (F-102).
+-- Tambien aqui la empresa y la clave (F-102) se unen ANTES de agregar y se
+-- agrupan con el resto, por lo mismo y sin cambiar el grano: 118.415 filas
+-- antes y despues (solo lectura, 2026-09-23).
 CREATE OR REPLACE VIEW compras.v_pbi_partida_coste AS
 SELECT
-    agg.obra_id,
-    agg.codigo_obra,
-    agg.partida_id,
-    agg.codigo_partida,
-    agg.descripcion_partida,
-    agg.albaranado,
-    agg.certificado_proforma,
-    agg.facturado,
-    agg.contratado,
-    agg.num_lineas_albaran,
-    agg.num_lineas_factura,
+    f.obra_id,
+    f.codigo_obra,
+    f.partida_id,
+    par.cod                                 AS codigo_partida,
+    par.res                                 AS descripcion_partida,
+    SUM(f.importe) FILTER (WHERE f.tipo_doc = 'ALBARAN')
+                                            AS albaranado,
+    SUM(f.importe) FILTER (WHERE f.tipo_doc = 'PROFORMA')
+                                            AS certificado_proforma,
+    SUM(f.importe) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
+                                            AS facturado,
+    SUM(f.importe) FILTER (WHERE f.tipo_doc = 'CONTRATO')
+                                            AS contratado,
+    COUNT(*) FILTER (WHERE f.tipo_doc IN ('ALBARAN', 'PROFORMA'))
+                                            AS num_lineas_albaran,
+    COUNT(*) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
+                                            AS num_lineas_factura,
     fo.empresa_id                           AS empresa_id,
     fo.clave_obra                           AS clave_obra
-FROM (
-    SELECT
-        f.obra_id,
-        f.codigo_obra,
-        f.partida_id,
-        par.cod                                 AS codigo_partida,
-        par.res                                 AS descripcion_partida,
-        SUM(f.importe) FILTER (WHERE f.tipo_doc = 'ALBARAN')
-                                                AS albaranado,
-        SUM(f.importe) FILTER (WHERE f.tipo_doc = 'PROFORMA')
-                                                AS certificado_proforma,
-        SUM(f.importe) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
-                                                AS facturado,
-        SUM(f.importe) FILTER (WHERE f.tipo_doc = 'CONTRATO')
-                                                AS contratado,
-        COUNT(*) FILTER (WHERE f.tipo_doc IN ('ALBARAN', 'PROFORMA'))
-                                                AS num_lineas_albaran,
-        COUNT(*) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
-                                                AS num_lineas_factura
-    FROM compras.fact_compras_linea f
-    LEFT JOIN raw.obrparpar par ON par.ide = f.partida_id
-    WHERE f.partida_id IS NOT NULL
-    GROUP BY f.obra_id, f.codigo_obra, f.partida_id, par.cod, par.res
-) agg
-LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = agg.obra_id;
+FROM compras.fact_compras_linea f
+LEFT JOIN raw.obrparpar par ON par.ide = f.partida_id
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = f.obra_id
+WHERE f.partida_id IS NOT NULL
+GROUP BY f.obra_id, f.codigo_obra, f.partida_id, par.cod, par.res,
+         fo.empresa_id, fo.clave_obra;
 
 COMMENT ON VIEW compras.v_pbi_partida_coste IS
 'Coste incurrido por partida (Tanda C2): albaranado (AC), certificado (PROF) '

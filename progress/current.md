@@ -15,7 +15,16 @@ Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
 Informe del implementer: `progress/impl_F-102.md` (al terminar).
 
-- **Tarea en curso**: T7. Hechas T1-T6.
+- **Tarea en curso**: T8. Hechas T1-T7.
+- **Desviacion 3 (justificada)**: en `v_pbi_proveedor_obra` (y por coherencia
+  en `v_pbi_partida_coste`) la empresa y la clave se unen ANTES de agregar y se
+  agrupan con el resto, no «sobre el resultado ya agregado» (R21). La puerta de
+  F-006 `test_f006_r2_control_el_group_by_se_lee_donde_se_puede_leer` exige
+  leer el `GROUP BY` de esas dos vistas en el nivel 0 para comprobar que la
+  clave de negocio cabe en el; con el agregado en una subconsulta deja de
+  leerlo. El grano no cambia (`maestro.v_obra_fichas` tiene una fila por
+  `obra_id` y las dos columnas dependen solo de el): 45.185 y 118.415 filas,
+  las mismas que la vista publicada, medido en solo lectura.
 - **T6 verificado en solo lectura (2026-09-23)**: el cuerpo nuevo de las cinco
   vistas de `compras`, ejecutado como consulta, da las MISMAS filas que la vista
   publicada (19.024 / 45.185 / 120.415 / 118.415 / 81.665), 0 filas con obra y
