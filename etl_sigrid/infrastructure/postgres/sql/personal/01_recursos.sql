@@ -32,6 +32,15 @@
 -- CÓDIGO Y NOMBRE SALEN DE `con` (regla dura `R-SIGRID-CON`): `res` es
 -- propiedad de `con` 1:1, comparte `ide` y no tiene `cod` ni `res` propios.
 --
+-- Y LA EMPRESA TAMBIÉN (F-102). El recurso es de UNA empresa: el mismo código
+-- existe una vez por empresa —`MO/0009` tiene ficha en la 1, la 18, la 27 y la
+-- 28—, así que el código solo no identifica un recurso. Se publican
+-- `empresa_id` (`con.emp`), `nombre_empresa` (de `raw.auxemp` por `numemp`, en
+-- un lateral `ORDER BY` + `LIMIT 1` que va DETRÁS del de `raw.emp`) y la clave
+-- legible `clave_recurso` = '<empresa>-<código>', única: 2.618 para 2.618 el
+-- 2026-09-23. No se publica ninguna marca de «misma persona en otra empresa»
+-- (decisión del humano, F-102 D5).
+--
 -- DATOS PERSONALES, y con su autorización escrita: se publican **nombre y
 -- DNI**. El humano lo autorizó expresamente el 2026-09-18 («el dni puede
 -- salir, no es un problema»). No es un descuido ni un pendiente: es una
@@ -51,7 +60,8 @@ INSERT INTO personal.recursos (
     clase, tipo_recurso_id, tipo_recurso,
     activo, fecha_baja,
     nif, empleado_id, dni, nombre_pila, apellido1, apellido2,
-    es_externo, proveedor_id
+    es_externo, proveedor_id,
+    empresa_id, nombre_empresa, clave_recurso
 )
 SELECT
     r.ide                                   AS recurso_id,
@@ -79,7 +89,10 @@ SELECT
     NULLIF(e.nomape1, '')                   AS apellido1,
     NULLIF(e.nomape2, '')                   AS apellido2,
     (COALESCE(r.prvide, 0) <> 0)            AS es_externo,
-    NULLIF(r.prvide, 0)                     AS proveedor_id
+    NULLIF(r.prvide, 0)                     AS proveedor_id,
+    c.emp                                   AS empresa_id,
+    em.nombre_empresa                       AS nombre_empresa,
+    c.emp::text || '-' || c.cod             AS clave_recurso
 FROM      raw.res r
 JOIN      raw.con c ON c.ide = r.ide        -- R-SIGRID-CON: código y nombre
 LEFT JOIN raw.auxrestip t ON t.ide = r.restipide
@@ -104,7 +117,16 @@ LEFT JOIN LATERAL (
     WHERE  emp.ide = r.conide
     ORDER  BY emp.ide
     LIMIT  1
-) e ON TRUE;
+) e ON TRUE
+LEFT JOIN LATERAL (
+    -- El nombre de la empresa del recurso (F-102). Detras del lateral de
+    -- `raw.emp` a proposito: los guardas de la lista blanca buscan aquel.
+    SELECT ae.res AS nombre_empresa
+    FROM   raw.auxemp ae
+    WHERE  ae.numemp = c.emp
+    ORDER  BY ae.ide
+    LIMIT  1
+) em ON TRUE;
 
 COMMENT ON TABLE personal.recursos IS
-'Maestro de RECURSOS de Sigrid (2.618 filas el 2026-09-18), no de personal: solo 1.354 son personas, 1.158 consumos imputables y 106 medios. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), autorizados por el responsable del dato el 2026-09-18. `activo` es el criterio de Juan Romero (con.fecbaj = 0) y es BANDERA, no filtro: filtrar por el borra el 43,2 % de las horas imputadas, porque el recurso de baja de hoy trabajo ayer.';
+'Maestro de RECURSOS de Sigrid (2.618 filas el 2026-09-18), no de personal: solo 1.354 son personas, 1.158 consumos imputables y 106 medios. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), autorizados por el responsable del dato el 2026-09-18. `activo` es el criterio de Juan Romero (con.fecbaj = 0) y es BANDERA, no filtro: filtrar por el borra el 43,2 % de las horas imputadas, porque el recurso de baja de hoy trabajo ayer. El recurso es de UNA empresa (F-102): el codigo se repite entre empresas, y la clave legible unica es clave_recurso = empresa-codigo.';

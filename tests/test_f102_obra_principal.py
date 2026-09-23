@@ -835,3 +835,92 @@ def test_f102_r29_azure_apps_recoge_las_columnas_y_la_regla() -> None:
                     "maestro.v_obra_fichas", "R-CODIGO-POR-EMPRESA",
                     "v_control_forma_pago", "F-106", "69 tablas"):
         assert termino in texto, f"azure-apps no dice «{termino}» (R29)"
+
+
+# ===========================================================================
+# R26-R27 · `personal.recursos`: empresa, nombre y clave legible (T15)
+# ===========================================================================
+
+COLUMNAS_RECURSO_NUEVAS = ("empresa_id", "nombre_empresa", "clave_recurso")
+
+
+@pytest.mark.parametrize("columna", COLUMNAS_RECURSO_NUEVAS)
+def test_f102_r26_la_tabla_existente_gana_la_columna_sin_drop(columna: str) -> None:
+    """`CREATE TABLE IF NOT EXISTS` no anade columnas a la tabla que la
+    nocturna ya creo: van con `ADD COLUMN IF NOT EXISTS`, nunca con `DROP`."""
+    compacto = _compacto(_sql(RUTA_PERSONAL_SETUP))
+    assert re.search(
+        rf"ALTER TABLE personal\.recursos ADD COLUMN IF NOT EXISTS {columna} ", compacto
+    ), f"personal.recursos gana {columna} con ADD COLUMN IF NOT EXISTS (R26)"
+    assert "DROP TABLE" not in compacto.upper()
+
+
+def test_f102_r26_la_tabla_nueva_nace_con_las_tres_al_final() -> None:
+    compacto = _compacto(_sql(RUTA_PERSONAL_SETUP))
+    ddl = re.search(r"CREATE TABLE IF NOT EXISTS personal\.recursos \((.*?)\);", compacto)
+    assert ddl, "falta el CREATE TABLE de personal.recursos"
+    columnas = [c.strip().split(" ")[0] for c in _troceado_en_profundidad_cero(
+        ddl.group(1), ",")]
+    assert columnas[-3:] == list(COLUMNAS_RECURSO_NUEVAS), (
+        "en una base nueva nacen al final, igual que las anade el ALTER (R26)"
+    )
+
+
+def test_f102_r26_el_insert_publica_las_tres_al_final() -> None:
+    compacto = _compacto(_sql(RUTA_RECURSOS))
+    lista = re.search(r"INSERT INTO personal\.recursos \((.*?)\) SELECT", compacto)
+    assert lista, "falta el INSERT de personal.recursos"
+    columnas = [c.strip() for c in lista.group(1).split(",")]
+    assert columnas[-3:] == list(COLUMNAS_RECURSO_NUEVAS), "R26"
+
+
+def test_f102_r26_la_empresa_y_la_clave_salen_de_con() -> None:
+    compacto = _compacto(_sql(RUTA_RECURSOS))
+    assert re.search(r"\bc\.emp AS empresa_id\b", compacto), "R26"
+    assert "c.emp::text || '-' || c.cod AS clave_recurso" in compacto, (
+        "la clave es empresa, guion y codigo, con la empresa delante (R26)"
+    )
+
+
+def test_f102_r26_el_nombre_de_la_empresa_por_lateral_sin_where_fuera() -> None:
+    compacto = _compacto(_sql(RUTA_RECURSOS))
+    lateral = re.search(
+        r"LEFT JOIN LATERAL \( SELECT (\w+)\.res AS nombre_empresa FROM raw\.auxemp \1 "
+        r"WHERE \1\.numemp = c\.emp ORDER BY \1\.ide LIMIT 1 \) (\w+) ON TRUE",
+        compacto,
+    )
+    assert lateral, "auxemp por lateral con ORDER BY + LIMIT 1 (R26)"
+    assert f"{lateral.group(2)}.nombre_empresa AS nombre_empresa" in compacto
+    fuera = re.sub(r"LEFT JOIN LATERAL \(.*?\) \w+ ON TRUE", " ", compacto)
+    assert " WHERE " not in fuera.upper(), "ni un WHERE fuera de los laterales (R26)"
+    # El lateral de `raw.emp` sigue siendo el PRIMERO: los guardas de F-057 lo
+    # buscan asi y leen su lista blanca.
+    assert compacto.index("FROM raw.emp ") < compacto.index("FROM raw.auxemp ")
+
+
+def test_f102_r27_la_ficha_de_recursos_documenta_las_tres() -> None:
+    ficha = _ficha("personal.recursos")
+    for columna in COLUMNAS_RECURSO_NUEVAS:
+        assert columna in ficha["columnas"], f"{columna} sin ficha (R27)"
+        assert len(_significado(ficha, columna)) > 60
+    assert list(ficha["columnas"])[-3:] == list(COLUMNAS_RECURSO_NUEVAS)
+
+
+def test_f102_r27_la_ficha_dice_que_la_clave_legible_es_clave_recurso() -> None:
+    texto = _texto(_ficha("personal.recursos"))
+    for cifra in ("61", "2.618", "`MO/0009`", "`clave_recurso`"):
+        assert cifra in texto, f"la ficha no dice «{cifra}» (R27)"
+    assert "una ficha por empresa" in _normalizado(texto)
+
+
+def test_f102_r27_no_se_publica_marca_de_misma_persona() -> None:
+    """D5 (A): el humano decidio no publicar la marca de «misma persona»."""
+    columnas = _ficha("personal.recursos")["columnas"]
+    assert not [c for c in columnas if "persona" in c and c != "clase"], columnas
+    assert "misma_persona" not in _sql(RUTA_RECURSOS)
+
+
+def test_f102_r29_azure_apps_recoge_personal_recursos() -> None:
+    if not DOC_AZURE_APPS.exists():
+        pytest.skip("azure-apps no esta junto a este repositorio")
+    assert "clave_recurso" in DOC_AZURE_APPS.read_text(encoding="utf-8"), "R29"

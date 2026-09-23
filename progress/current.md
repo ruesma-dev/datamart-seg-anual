@@ -15,7 +15,11 @@ Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
 Informe del implementer: `progress/impl_F-102.md` (al terminar).
 
-- **Tarea en curso**: T15. Hechas T1-T14.
+- **Tarea en curso**: T17 (T16 es MANUAL del humano). Hechas T1-T15.
+  `azure-apps`: commits `511ffff` y `4a14173` (locales, sin push).
+- **T15 verificado en solo lectura**: el cuerpo de `personal.recursos` (con
+  `raw.auxemp` simulado) da 2.618 filas, 2.618 `recurso_id`, 2.618
+  `clave_recurso`, 2.504 codigos y 119 recursos de fuera de la empresa 1.
 - **T14**: F-101 `done` y en `main`; `main` habia avanzado (despliegue de F-101
   y prioridades F-095/F-106, solo papeleo) y se fusiono en la rama (merge
   `ecf675c`, `BACKLOG.md` regenerado). `personal.partes` entra en el ambito de

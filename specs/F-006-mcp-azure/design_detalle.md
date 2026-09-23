@@ -128,10 +128,10 @@ infraestructura.
 > su empresa, su `clave_obra` y cual es la ficha de Ruesma de cada codigo; es
 > de consumo pero no recomendada, porque es la definicion de la que leen
 > `maestro.obras` y `compras`-- y `raw.auxemp`, las 38 empresas del grupo. El
-> inventario pasa a **163 objetos** y la cobertura de columnas a **1080**
+> inventario pasa a **163 objetos** y la cobertura de columnas a **1083**
 > (seis columnas nuevas en `maestro.obras`, dos en cada una de las cinco vistas
-> de `compras` con obra y las diez de la vista nueva); las fichas de consumo
-> recomendadas se quedan en **71**.
+> de `compras` con obra, tres en `personal.recursos` y las diez de la vista
+> nueva); las fichas de consumo recomendadas se quedan en **71**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

@@ -75,6 +75,21 @@ objetos:
       empleado (31,5 %), 805 de 1.354 empleados casan con recurso, 24 empleados
       no tienen recurso-- asi que `empleado_id`, `dni` y el nombre estructurado
       vienen a nulo en el 68,5 % de las filas.
+
+      **EL RECURSO ES DE UNA EMPRESA (F-102).** En Sigrid el mismo codigo de
+      recurso existe una vez por empresa --Ruesma (1), Porsan (28), cada UTE--,
+      y una persona puede tener **una ficha por empresa**: `MO/0009` tiene
+      cuatro, en las empresas 1, 18, 27 y 28. Medido el 2026-09-23: 2.618
+      recursos para 2.504 codigos, **61 codigos repetidos y ninguno repetido
+      dentro de una empresa**; 2.499 recursos son de la empresa 1 y 119 de otras
+      siete. Por eso la clave legible y unica es **`clave_recurso`**
+      (`<empresa>-<codigo>`, 2.618 claves para 2.618 recursos), y por
+      `codigo_recurso` se cruza siempre junto con `empresa_id` (regla
+      `R-CODIGO-POR-EMPRESA`). **No se publica ninguna marca de «misma persona
+      en otra empresa»** (decision del humano): 13 de las 91 personas de fuera
+      de la empresa 1 comparten NIF con una de la 1, y juntarlas es una decision
+      de negocio que el datamart no toma. Las lineas de parte de recursos de
+      otras empresas son 26.426 (3.226.523,83 EUR).
     grano: >-
       Una fila por recurso de Sigrid, identificada por `recurso_id`. Estan las
       2.618, de alta y de baja: aqui no se filtra ninguna.
@@ -92,6 +107,9 @@ objetos:
         significado: >-
           Codigo del recurso tal y como se teclea en Sigrid, tomado del
           concepto. En las personas de alta va codificado "Apellidos, Nombre".
+          **No es unico**: se repite una vez por empresa (61 codigos el
+          2026-09-23, F-102). Se cruza junto con `empresa_id`, o se usa
+          `clave_recurso`.
       nombre_recurso:
         significado: >-
           Nombre legible del recurso. **En las personas ES EL NOMBRE DE UNA
@@ -179,6 +197,28 @@ objetos:
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
         agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de Sigrid a la que pertenece la ficha del recurso (`con.emp`,
+          F-102). `1` es Ruesma, `28` Porsan y el resto UTE u otras empresas del
+          grupo; el nombre esta en `nombre_empresa`. Una persona puede tener una
+          ficha por empresa, cada una con su `recurso_id`.
+        agregacion: no_sumable
+      nombre_empresa:
+        significado: >-
+          Nombre de la empresa del recurso, de `raw.auxemp` por `numemp` =
+          `con.emp` (F-102), en un lateral con `ORDER BY` + `LIMIT 1` que no
+          multiplica filas.
+        nulo_significa: >-
+          La empresa del recurso no esta en `raw.auxemp`. No deberia pasar: las
+          38 empresas se ingieren enteras cada noche.
+      clave_recurso:
+        significado: >-
+          **La clave legible y UNICA del recurso**: `<empresa>-<codigo>`
+          (`1-MO/0009` y `28-MO/0009` son dos fichas de la misma persona en dos
+          empresas). 2.618 claves para 2.618 recursos el 2026-09-23. `empresa_id`
+          es entero, asi que lo que va antes del primer `-` es la empresa y la
+          clave no colisiona aunque el codigo lleve guiones.
 
     relaciones:
       - de: recurso_id
