@@ -8,8 +8,7 @@ con la deduplicacion de `stg.obras` por construccion.
 
 ## 1 · Lo medido (2026-09-23, solo lectura)
 
-`raw` de la ingesta 2026-09-23 00:48 UTC en sesion `read_only`, salvo donde dice
-Sigrid (`sigrid-api`) o MCP. Consultas en `progress/spec_F-102.md`.
+`raw` de las 00:48 UTC en sesion `read_only`, salvo Sigrid o MCP (`progress/spec_F-102.md`).
 
 ### 1.1 Las fichas duplicadas
 
@@ -18,22 +17,19 @@ Sigrid (`sigrid-api`) o MCP. Consultas en `progress/spec_F-102.md`.
   es (`con.emp`, `con.cod`)**, el par de `04_centros_coste.sql`.
 - `con.emp` = `auxemp.numemp` (Sigrid, 38 filas): **28 = PORSAN E HIJOS
   CONSTRUCCIONES SL**; 12, 14, 15, 25, 26, 27, 31 y 34 son UTE.
-- Los 58: **42 empresa 1 + 28** (40 en el universo; POSTV2 y VAR fuera); 8
-  empresa 1 + UTE; 8 mas fuera del universo (0001-0005, CM, CP, GG). En esos 10
-  de fuera cada empresa usa el codigo para **obras distintas** (0001: «CALLE
-  CONCORDIA Nº 4 (VALENCIA)» en la 11, «HOTEL BAHAMAS (IBIZA)» en la 18).
+- Los 58: **42 empresa 1 + 28** (40 en el universo; POSTV2, VAR fuera); 8
+  empresa 1 + UTE; 8 fuera (0001-0005, CM, CP, GG). En los 10 de fuera son
+  **obras distintas** (0001: CALLE CONCORDIA en la 11, HOTEL BAHAMAS en la 18).
 - Las 103 fichas de la 28: **0 con direccion, cliente, `conext` 15, presupuesto
   o cierres**. 57 son unica ficha (obras propias de Porsan 0006-0060 y 0676B).
 
 ### 1.2 La regla del humano (D1) y su impacto
 
-Regla: **«la ficha principal es la de Construcciones Ruesma»**. Orden: empresa 1
--> `conext 15` -> `num_cierres` DESC -> `tiemod` DESC -> `ide` DESC. Hoy la
-empresa 1 decide en 53 de los 58; los 5 sin ficha de la 1 (0001-0005, fuera del
-universo) los decide el resto; ningun codigo tiene dos fichas de la 1.
-
-`stg.obras` cambia en **4 codigos** respecto a hoy (580 de 584 iguales) y en 5
-respecto a la opcion B que se descarto (0252, 0517, 0581, 0606, 0671):
+**«La ficha principal es la de Construcciones Ruesma»**: empresa 1 -> `conext
+15` -> `num_cierres` DESC -> `tiemod` DESC -> `ide` DESC. La 1 decide 53 de los
+58; los 5 sin ficha de la 1 (0001-0005, fuera) los decide el resto; ninguno
+tiene dos de la 1. `stg.obras` cambia en **4 codigos** frente a hoy (580 de 584
+iguales) y en 5 frente a la opcion B descartada (0252, 0517, 0581, 0606, 0671):
 
 | codigo | hoy en `stg.obras` | con la regla (empresa 1) | efecto en `mart` / `cierre` |
 |---|---|---|---|
@@ -67,15 +63,11 @@ fichas (las UTE); (c) fuera del universo, 28 fichas (no son copias). Filas:
 | `maestro.proveedores_obra` / `centros_coste` | 0 / 40 | 331 / 8 | 17 / 28 |
 | `personal.partes_lineas` | **14.079** (1.677.332,46 €) | 6.316 | 1.624 |
 
-En euros, (b) de `fact_compras_linea` FACTURA+ABONO: **31.171.472,60 €** en 8
-fichas UTE. Sin ficha de obra que pueda ser copia (no publican obra, medido en
-`information_schema`): `compras.facturas`, `albaranes`, `contrato_lineas`,
-`vencimientos`, `v_facturas_pago`, `formas_pago`, `documento_texto`,
-`documento_comentarios`. `mart` y `cierre` leen `stg.obras`: tras el cambio solo
-tienen principales **por construccion**. La 0704 Siroco: ficha 2652878 (28), 531
-lineas de parte (2.563 h, 57.667,50 €). **Filtrar por `codigo_obra`** en
-`compras`/`retenciones` ya suma todas las fichas (el codigo de la copia es el
-mismo); ningun SQL une por codigo sin empresa.
+(b) en FACTURA+ABONO: **31.171.472,60 €**. Sin columna de obra, luego sin copias
+posibles (`information_schema`): `compras.facturas`, `albaranes`,
+`contrato_lineas`, `vencimientos`, `v_facturas_pago`, `formas_pago`,
+`documento_texto`, `documento_comentarios`. `mart`/`cierre`: principales **por
+construccion**. 0704 Siroco: ficha 2652878, 531 lineas (2.563 h, 57.667,50 €).
 
 ### 1.4 Direccion sobre las principales, y `condir`
 
@@ -86,6 +78,18 @@ con `dir1`** (sin ella 0673, 0684, 0689, 0701, 0703, 0714, 0716, 0717, 0725); en
 curso, 40 / 34; a la 0715 le faltan CP y municipio. La direccion escasea en las
 obras **antiguas**. `condir` ya se ingiere (803 filas, 722 de proveedores) y **0
 de 922 fichas de obra** tienen fila (en Sigrid tambien 0).
+
+### 1.5 `personal.recursos`: mismo problema (correo de Juan, 23-09)
+
+`codigo_recurso` es `con.cod` del recurso: 2.618 recursos, 2.504 codigos, **61
+repetidos globalmente, 0 dentro de una empresa** (2.618 pares (`emp`, `cod`)).
+Por empresa: 1 -> 2.499; 12 -> 9; 14 -> 3; 18 -> 35; 25 -> 4; 27 -> 20; 28 -> 41;
+31 -> 7. `MO/0009`: 537315 (1, NIETO ROMERO), 1404513 (27), 1991024 (18, que en
+la 1 es otra ficha y otro codigo) y 2146405 (28). Personas (`cla = 1`) fuera de
+la 1: 91; 60 con NIF; **13 comparten NIF** con una de la 1 (12 con una sola, 1
+ambigua) y ninguna con el mismo codigo; 20 por nombre normalizado; 22 por
+cualquiera; 0 por empleado (`conide`). Lineas de parte de recursos de fuera de
+la 1: **26.426 y 3.226.523,83 €** (28: 17.652 y 2.082.681,46 €).
 
 ## 2 · Ficheros a crear
 
@@ -104,12 +108,11 @@ de 922 fichas de obra** tienen fila (en Sigrid tambien 0).
   y `v_pbi_partida_coste` (§5).
 - `sql/compras/06_pago_factura.sql` — lo mismo en `v_control_forma_pago` (ahi ya
   hay `DROP VIEW ... CASCADE`; la columna va al final igualmente).
-- `config/diccionario/compras.yaml` — en las cinco vistas: columna
-  `obra_principal_id` y relacion `obra_principal_id -> maestro.obras.obra_id`
-  (N:1). En `contratos`, `albaran_lineas`, `factura_lineas` y
-  `fact_compras_linea`: la ficha de `obra_id` y el `porque` de su relacion dicen
-  que puede ser una ficha no principal (cifras de §1.3) y como traducir:
-  `JOIN maestro.obras mo USING (obra_id)` -> `mo.obra_principal_id`.
+- `config/diccionario/compras.yaml` — cinco vistas: columna y relacion
+  `obra_principal_id -> maestro.obras.obra_id` (N:1). `contratos`,
+  `albaran_lineas`, `factura_lineas`, `fact_compras_linea`: `obra_id` y el
+  `porque` dicen que puede ser no principal (§1.3) y como traducir
+  (`JOIN maestro.obras USING (obra_id)` -> `obra_principal_id`).
 - `config/diccionario/retenciones.yaml` (`movimientos`, `v_pbi_retencion_obra`) y
   `maestro.yaml` (`proveedores_obra`, `centros_coste`) — mismo texto de
   traduccion en `obra_id` y en el `porque`, con sus cifras. Sin SQL.
@@ -126,19 +129,23 @@ de 922 fichas de obra** tienen fila (en Sigrid tambien 0).
   desempate en `stg.v_obra_fichas` (lo cambia F-102 por D1).
 - `docs/ARCHITECTURE.md` — bullet en «Semantica Sigrid» (obra en varias
   empresas, identidad (`emp`, `cod`), principal = empresa 1) y 68 -> 69 tablas.
-- `azure-apps/datamart_seg_anual.md` — columnas nuevas de `maestro.obras` y de
-  las vistas de `compras`, la regla, y 0720/0581/0606/0671 en `mart`/`cierre`.
-  Commit propio en `azure-apps`.
+- **Tras fusionar F-101 en `main`** (toca los mismos ficheros):
+  `personal/00_setup.sql` (`ALTER TABLE personal.recursos ADD COLUMN IF NOT
+  EXISTS empresa_id, nombre_empresa`; nunca `DROP`), `01_recursos.sql` (`c.emp`
+  y lateral a `raw.auxemp`; lista blanca de `raw.emp` intacta) y `personal.yaml`
+  (clave legible (`empresa_id`, `codigo_recurso`), §1.5, `MO/0009`).
+- `azure-apps/datamart_seg_anual.md` — columnas nuevas de `maestro.obras`, de
+  las vistas de `compras` y de `personal.recursos`, la regla, y 0720/0581/0606/0671
+  en `mart`/`cierre`. Commit propio en `azure-apps`.
 
 ## 4 · Ficheros que NO se tocan
 
-- **`sql/personal/`, `personal.yaml`, `build_personal_step.py`** (F-101 en curso):
-  su repaso (14.079 lineas de copias de la 28) se hace **despues de F-101**.
-- Tablas de `compras` (`01_documentos.sql`, `02_fact_linea.sql`, `05_*`, `07_*`)
-  y SQL de `retenciones` y `maestro/03_*`, `04_*`: el `obra_id` es el de Sigrid y
-  no se reescribe (D2 A). Tampoco ganan columna: se consultan por SQL y el
-  diccionario da la traduccion.
-- `build_compras_step.py`: **no** gana `depends_on build_stg` (ver §7).
+- **Nada de `personal` antes de que F-101 este en `main`**; despues, solo lo de
+  `recursos` (§3). `02_partes_lineas.sql` no se toca: sus 14.079 lineas de
+  copias de la 28 se traducen al leer (regla y D2).
+- Tablas de `compras` (`01_*`, `02_*`, `05_*`, `07_*`), SQL de `retenciones`,
+  `maestro/03_*`, `04_*` y `build_compras_step.py` (sin `depends_on build_stg`,
+  §7): el `obra_id` es el de Sigrid y no se reescribe ni se duplica (D2 A).
 - `stg/06_*`, `08_*` (sello de F-025), `stg/01_ddl.sql`, `sql/mart/*`,
   `sql/cierre/*`: leen `stg.obras` y recogen el cambio solos.
 - El proyecto `facturas` (esquema `fase1`, repositorio aparte e independiente:
@@ -178,26 +185,22 @@ FROM stg.v_obra_fichas vf JOIN raw.con c ON c.ide = vf.obra_id
 WHERE vf.en_universo_seguimiento AND vf.es_ficha_principal;
 ```
 
-Los filtros dependen **solo del codigo**: todas las fichas de un codigo estan
-dentro o fuera a la vez, y particionar todas da la misma particion que
-particionar las filtradas.
+Los filtros dependen **solo del codigo**: particionar todas las fichas da la
+misma particion que particionar las filtradas.
 
-`maestro/01_obras.sql`, detras de `tiene_seguimiento`: `vf.empresa_id,
-em.nombre_empresa, vf.es_ficha_principal, vf.num_fichas_codigo,
-vf.obra_principal_id`, con `LEFT JOIN stg.v_obra_fichas vf ON vf.obra_id = c.ide`
-y `LEFT JOIN LATERAL (SELECT ae.res AS nombre_empresa FROM raw.auxemp ae WHERE
-ae.numemp = c.emp ORDER BY ae.ide LIMIT 1) em ON TRUE`.
+`maestro/01_obras.sql`, tras `tiene_seguimiento`: las cinco de `vf` (`LEFT JOIN
+stg.v_obra_fichas vf ON vf.obra_id = c.ide`) y `em.nombre_empresa` de `LEFT JOIN
+LATERAL (SELECT ae.res ... FROM raw.auxemp ae WHERE ae.numemp = c.emp ORDER BY
+ae.ide LIMIT 1) em ON TRUE`. El mismo lateral en `personal/01_recursos.sql`.
 
 Vistas de `compras`: `COALESCE(vf.obra_principal_id, x.obra_id) AS
-obra_principal_id` al final, con `LEFT JOIN stg.v_obra_fichas vf ON vf.obra_id =
-x.obra_id`. En `v_pbi_proveedor_obra` el join va **fuera** del `GROUP BY`
-(subconsulta agregada y despues el join a 922 filas) para no tocar su coste. Si
-el `obra_id` es NULL, la columna tambien.
+obra_principal_id` al final (`LEFT JOIN stg.v_obra_fichas vf ON vf.obra_id =
+x.obra_id`; NULL si `obra_id` es NULL). En `v_pbi_proveedor_obra`, sobre el agregado.
 
 ## 6 · Tests (offline, `tests/test_f102_obra_principal.py`)
 
 Patron de `test_f073_sql.py` (SQL sin comentarios `--`, YAML con el dominio del
-diccionario). Un test por R salvo los MANUAL (R8, R13, R14, R31). No obvios: la
+diccionario). Un test por R salvo los MANUAL (R8, R13, R14, R33). No obvios: la
 lista de administrativos aparece **una sola vez** en `sql/`; la ventana empieza
 por `empresa_id = 1` y no contiene `MIN(`, `ide ASC` ni `obra_id ASC`; las tablas
 de `compras` y los SQL de `retenciones`/`personal` no nombran `v_obra_fichas`;
@@ -208,17 +211,14 @@ de `compras` y los SQL de `retenciones`/`personal` no nombran `v_obra_fichas`;
 - **Cambia lo publicado en `mart` y `cierre`** (§1.2): entra 0720, **sale 0581,
   se reduce 0606**. La 0720 cambia de `obra_id` en `mart.v_pbi_dim_obra`
   (2824201 -> 2759241): Power BI relaciona por `obra_id`.
-- **Power BI y `compras`**: con la regla, los hechos de las 8 fichas UTE (31,2 M€
-  facturados) dejan de casar con `mart.v_pbi_dim_obra` por `obra_id`. Por eso
-  las cinco vistas de consumo ganan `obra_principal_id` (la relacion que Power
-  BI debe usar): es el caso «cuando sea necesario». Las tablas se consultan por
-  SQL y el diccionario basta.
-- **`compras` lee una vista de `stg` sin declarar la dependencia**: mismo patron
-  que `retenciones` -> `maestro.centros_coste` (F-094). `build_stg` va antes en
-  la lista y la vista nunca se dropea; declararlo haria que un fallo de `stg`
-  dejara sin `compras` esa noche.
-- **Dependencias de vistas**: `maestro.obras` y cinco vistas de `compras` cuelgan
-  de `stg.v_obra_fichas`; sus columnas nuevas, solo al final.
+- **Power BI y `compras`**: los hechos de las 8 fichas UTE (31,2 M€) dejan de
+  casar con `mart.v_pbi_dim_obra` por `obra_id`; por eso las cinco vistas de
+  consumo ganan `obra_principal_id` («cuando sea necesario»). Las tablas se
+  consultan por SQL y les basta el diccionario.
+- **`compras` lee `stg.v_obra_fichas` sin declarar la dependencia**, como
+  `retenciones` -> `maestro.centros_coste` (F-094): `build_stg` va antes y la
+  vista no se dropea; declararla dejaria sin `compras` la noche que falle `stg`.
+  Columnas nuevas de la vista, solo al final (cuelgan de ella 6 vistas).
 - **Fusion**: F-101 toca `version` de `00_global.yaml` y otra seccion del
   documento de `azure-apps`; F-095 sube `TOTAL_TABLAS`. Se suman, no se pisan.
 - **Descartado**: «`obra_id` menor» (**falla en la 0680**: la copia de la 28,
@@ -233,16 +233,18 @@ de `compras` y los SQL de `retenciones`/`personal` no nombran `v_obra_fichas`;
   sale de `mart`/`cierre`, 0606 se reduce) o que pida separar la eleccion de
   `stg.obras` de la marca de `maestro` (romperia «la marca casa con `stg.obras`»).
 - **D2 (A)**: no se reescribe ningun `obra_id`; se traduce con `obra_principal_id`.
-- **D3**: se ingiere `auxemp`.
-- **D4**: `facturas` es independiente; no hay aviso. Entra en su lugar el
-  repaso de `compras` y de toda ficha con relacion a `maestro.obras.obra_id`
-  (§1.3, §3). Fichas con esa relacion: `compras` (6), `retenciones` (2),
-  `maestro` (2), `cierre` (2), `mart` (3), `personal` (2, tras F-101) y
-  `stg.obras`; `mart`, `cierre` y `stg.obras` no pueden tener copias tras el
-  cambio y no se tocan.
+- **D3**: se ingiere `auxemp` (sirve tambien a `personal.recursos`).
+- **D5 (abierta) · marca de «misma persona en otra empresa»** en
+  `personal.recursos`. (A, **recomendada**) no publicarla: solo 13 de 91 se
+  unen por un campo exacto (NIF), 31 no tienen NIF y el nombre es heuristica.
+  (B) `recurso_empresa1_id` por NIF exacto cuando casa con una sola ficha de la
+  1 (12 hoy). (C) NIF o nombre (22): descartada, adivina.
+- **D4**: `facturas` es independiente, sin aviso. En su lugar, repaso de toda
+  ficha con relacion a `maestro.obras.obra_id`: `compras` (6), `retenciones` (2),
+  `maestro` (2), `personal` (2, tras F-101); `mart` (3), `cierre` (2) y
+  `stg.obras` no pueden tener copias tras el cambio y no se tocan.
 
 ## 9 · Limite del microservicio
 
-Todo vive en el ETL; una tabla mas por `sigrid-api` y nada a nivel de servidor.
-**Fuera de alcance**: las 55 obras propias de Porsan (0006-0060) entran en
-`stg.obras` sin presupuesto ni seguimiento (MCP, 2026-09-23).
+Todo en el ETL; una tabla mas por `sigrid-api`. **Fuera de alcance**: las 55
+obras propias de Porsan (0006-0060) estan en `stg.obras` sin presupuesto (MCP).

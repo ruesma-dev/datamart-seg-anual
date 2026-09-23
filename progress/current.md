@@ -1669,3 +1669,13 @@ aprobadas. D4: `facturas` es independiente, sin aviso; en su lugar entra el
 repaso de `compras` (las cinco vistas de consumo con obra ganan
 `obra_principal_id`) y de toda ficha con relacion a `maestro.obras.obra_id`
 (`personal`, despues de F-101). Detalle: `progress/spec_F-102.md`.
+
+### F-102 · tercera decision (2026-09-23): `personal.recursos`
+
+Absorbe el correo de Juan Romero («codigo_recurso no es unico»): el codigo es
+unico por empresa (61 repetidos, 0 dentro de una empresa). `personal.recursos`
+ganara `empresa_id` y `nombre_empresa`, y su ficha la clave legible (`empresa_id`,
+`codigo_recurso`). **Depende de que F-101 este fusionado en `main`** (T16-T17).
+**Abierta D5**: marca de «misma persona en otra empresa»; recomendado no
+publicarla (solo 13 de 91 casan por NIF exacto). Siguen pendientes: aceptar el
+riesgo de D1 (0581 sale de `mart`/`cierre`, 0606 se reduce) y D5.

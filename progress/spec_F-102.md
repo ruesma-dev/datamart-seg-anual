@@ -3,8 +3,8 @@
 
 Entregado `specs/F-102-obra-duplicada-empresa-28/` en la rama
 `hotfix/F-102-obra-duplicada-empresa-28` (desde `main`, en worktree aislado:
-F-101 se implementa en el arbol principal). Segunda pasada con las decisiones
-del humano: requirements 150/150, design 248/250, 19 tareas (T0-T18).
+F-101 se implementa en el arbol principal). Tercera pasada con las decisiones
+del humano: requirements 149/150, design 250/250, 20 tareas (T0-T19).
 Ficha: `sdd: true`, `spec_ready`.
 
 ## Lo que la spec propone, en cinco lineas
@@ -88,6 +88,29 @@ Ficha: `sdd: true`, `spec_ready`.
   Copias de la 28 en `compras` confirmadas por objeto: 3 lineas de factura en
   `factura_lineas` y `fact_compras_linea` (484,00 €), 3 filas en
   `v_pbi_proveedor_obra`; 0 en contratos, albaranes y el resto.
+
+## Tercera decision del humano (2026-09-23): `personal.recursos`
+
+Absorbe el correo de Juan Romero del 23-09 («codigo_recurso no es unico»).
+Remedido en solo lectura sobre `raw` (cuadra con el lider): 2.618 recursos,
+2.504 codigos, **61 repetidos globalmente y 0 dentro de una empresa**. Por
+empresa: 1 -> 2.499; 12 -> 9; 14 -> 3; 18 -> 35; 25 -> 4; 27 -> 20; 28 -> 41;
+31 -> 7. `MO/0009` = 537315 (1), 1404513 (27), 1991024 (18), 2146405 (28). De
+91 personas fuera de la 1: 60 con NIF, **13 comparten NIF** con una de la 1 (12
+con una sola ficha, 1 ambigua; ninguna con el mismo codigo), 20 por nombre
+normalizado, 22 por cualquiera, 0 por empleado. Lineas de parte de recursos de
+fuera de la 1: 26.426 y 3.226.523,83 € (28: 17.652 y 2.082.681,46 €).
+
+En la spec: R29-R30 y T16-T17. `personal.recursos` publica `empresa_id` y
+`nombre_empresa` (de `auxemp`), sin perder filas ni anadir `WHERE`; su ficha
+declara la clave legible (`empresa_id`, `codigo_recurso`) y que una persona
+puede tener una ficha por empresa. **Dependencia escrita**: se hace sobre
+`main` con F-101 fusionado (T16 bloquea si no lo esta; T1-T15 se entregan igual).
+
+**D5 (abierta) · marca de «misma persona en otra empresa»**: no es obvia.
+Recomendada (A) no publicarla (solo 13 de 91 casan por un campo exacto, 31 sin
+NIF, el nombre es heuristica). (B) `recurso_empresa1_id` por NIF exacto cuando
+casa con una sola ficha de la 1 (12 hoy). (C) NIF o nombre: descartada.
 
 ## Como se midio
 
