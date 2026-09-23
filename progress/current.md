@@ -16,7 +16,12 @@ Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 Informe del implementer: `progress/impl_F-102.md`.
 
 **Diccionario del arbol tras F-102 (version 29): 163 objetos, 1083 columnas,
-71 de consumo** (+2 fichas: `maestro.v_obra_fichas` y `raw.auxemp`).
+72 de consumo** (+2 fichas: `maestro.v_obra_fichas`, de consumo, y `raw.auxemp`).
+- **Desviacion 5 (justificada)**: `maestro.v_obra_fichas` va con
+  `consumo_recomendado: true` y no «no recomendada» (design §3): F-079 reserva
+  el `false` a objetos rotos, vacios o de instrumentacion, y
+  `test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo` lo exige.
+  La descripcion enruta a `maestro.obras` para el contexto de una obra.
 
 - **Tarea en curso**: T17 (T16 es MANUAL del humano). Hechas T1-T15.
   `azure-apps`: commits `511ffff` y `4a14173` (locales, sin push).

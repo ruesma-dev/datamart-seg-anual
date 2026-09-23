@@ -548,7 +548,13 @@ def test_f102_r19_la_vista_de_fichas_tiene_ficha() -> None:
     ficha = _ficha(VISTA)
     assert ficha["tipo"] == "vista"
     assert ficha["capa"] == "consumo"
-    assert ficha["consumo_recomendado"] is False, "no recomendada: es referencia"
+    # DESVIACION JUSTIFICADA de design.md §3 («no recomendada»): F-079 fijo que
+    # `consumo_recomendado: false` es solo para objetos rotos, vacios o de
+    # instrumentacion, nunca una preferencia de enrutado
+    # (`test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo`). Esta
+    # vista es correcta y consultable: se recomienda y su descripcion enruta.
+    assert ficha["consumo_recomendado"] is True
+    assert "maestro.obras" in ficha["descripcion"]
     assert ficha["clave_negocio"] == ["obra_id"]
     assert ficha["paso_etl"] == "build_maestros"
     assert list(ficha["columnas"]) == list(COLUMNAS_FICHAS)

@@ -399,13 +399,14 @@ objetos:
   v_obra_fichas:
     tipo: vista
     capa: consumo
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Es la DEFINICION de cual es la ficha de Ruesma de cada codigo, de la que
-      leen `maestro.obras` y las vistas de `compras`. Para consultar obras, la
-      vista es `maestro.obras`, que trae las mismas marcas con el nombre, la
-      empresa y la direccion.
+    consumo_recomendado: true
     descripcion: >-
+      Es la DEFINICION de cual es la ficha de Ruesma de cada codigo, de la que
+      leen `maestro.obras` y las vistas de `compras`. Para poner contexto a una
+      obra --nombre, empresa, direccion-- la vista es `maestro.obras`, que trae
+      las mismas marcas; esta sirve para ver POR QUE una ficha es la principal
+      (su marca de `conext`, sus cierres y su puesto en el ranking).
+
       Una fila por ficha de obra con su empresa, su clave legible
       (`clave_obra`, `<empresa>-<codigo>`) y el ranking que decide cual es la
       **ficha de Ruesma** de cada codigo (F-102). Las obras son POR EMPRESA y no
@@ -478,6 +479,7 @@ objetos:
           Es la misma ficha; `maestro.obras` ya trae las marcas de esta vista.
     ejemplos_preguntas:
       - Por que la ficha principal del codigo X es la de esa empresa
+      - Que fichas tiene el codigo X, de que empresas y en que orden
 
   proveedores:
     tipo: vista

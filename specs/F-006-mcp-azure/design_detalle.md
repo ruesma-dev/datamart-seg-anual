@@ -126,12 +126,13 @@ infraestructura.
 > **Enmienda del 2026-09-23 (F-102, hotfix: la obra es de una empresa).**
 > Entran dos objetos: `maestro.v_obra_fichas` --una fila por ficha de obra con
 > su empresa, su `clave_obra` y cual es la ficha de Ruesma de cada codigo; es
-> de consumo pero no recomendada, porque es la definicion de la que leen
-> `maestro.obras` y `compras`-- y `raw.auxemp`, las 38 empresas del grupo. El
+> la definicion de la que leen `maestro.obras` y `compras`, y es de consumo
+> (F-079: el `false` es solo para lo roto o vacio)-- y `raw.auxemp`, las 38
+> empresas del grupo. El
 > inventario pasa a **163 objetos** y la cobertura de columnas a **1083**
 > (seis columnas nuevas en `maestro.obras`, dos en cada una de las cinco vistas
 > de `compras` con obra, tres en `personal.recursos` y las diez de la vista
-> nueva); las fichas de consumo recomendadas se quedan en **71**.
+> nueva); las fichas de consumo recomendadas pasan de 71 a **72**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
