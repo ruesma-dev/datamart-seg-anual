@@ -95,7 +95,9 @@ NUEVAS: dict[str, tuple[str, tuple[str, ...]]] = {
     "res": (GRUPO_PERSONAL, ()),
     "emp": (GRUPO_PERSONAL, EXCLUSIONES_EMP),
     "hmo": (GRUPO_PERSONAL, ()),
-    "hmores": (GRUPO_PERSONAL, ("tex",)),
+    # F-101 (D-3): `hmores.tex` deja de excluirse. Es el texto de la linea del
+    # parte que pidio Juan Romero; +284.080 bytes, un +0,27 % sobre la tabla.
+    "hmores": (GRUPO_PERSONAL, ()),
     # B · contabilidad (F-056)
     "cua": (GRUPO_CONTABILIDAD, ()),
     "asi": (GRUPO_CONTABILIDAD, ()),

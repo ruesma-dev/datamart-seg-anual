@@ -58,6 +58,12 @@
 -- para agrupar por parte se usa `parte_id`. La cabecera completa —y su obra, que
 -- AUDITA— esta en `personal.partes`.
 --
+-- EL TEXTO DE LA LINEA (F-101, D-3): `hmores.tex`, que se ingiere desde este
+-- hotfix. Informado en 13.390 de 330.941 lineas (4,05 %). Es TEXTO LIBRE y
+-- puede llevar nombres de persona (medido: un nombre y dos apellidos en el
+-- comentario de una linea), otra razon para que viva en `personal`. La cadena
+-- vacia se publica como NULL: no hay texto.
+--
 -- ---------------------------------------------------------------------------
 -- NO SE FILTRA NADA
 -- ---------------------------------------------------------------------------
@@ -87,7 +93,7 @@ INSERT INTO personal.partes_lineas (
     partida_id,
     fecha, anio, mes,
     tipo_hora_id, tipo_hora, unidad,
-    cantidad, precio, importe
+    cantidad, precio, importe, texto_linea
 )
 SELECT
     l.ide                                   AS linea_id,
@@ -117,7 +123,8 @@ SELECT
     END::VARCHAR(12)                        AS unidad,
     COALESCE(l.can, 0)::NUMERIC(18,2)       AS cantidad,
     COALESCE(l.pre, 0)::NUMERIC(18,4)       AS precio,
-    COALESCE(l.tot, 0)::NUMERIC(18,2)       AS importe
+    COALESCE(l.tot, 0)::NUMERIC(18,2)       AS importe,
+    NULLIF(l.tex, '')                       AS texto_linea
 FROM      raw.hmores l
 -- LEFT, y hace falta: 10 lineas apuntan a un tipo de hora que no esta en el
 -- catalogo. Con JOIN desaparecerian sin ruido; asi salen como 'DESCONOCIDA'.

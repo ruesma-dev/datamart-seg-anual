@@ -152,12 +152,15 @@ CREATE TABLE IF NOT EXISTS personal.partes_lineas (
     cantidad        NUMERIC(18,2),
     precio          NUMERIC(18,4),
     importe         NUMERIC(18,2),
+    texto_linea     TEXT,
     _built_at       TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 
 -- F-101: el codigo del parte en cada linea. `CREATE TABLE IF NOT EXISTS` no
 -- anade columnas a la tabla que la nocturna ya creo, asi que va tambien aqui.
 ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS codigo_parte VARCHAR(24);
+-- F-101 (D-3): el texto libre de la linea. Puede llevar nombres de persona.
+ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS texto_linea TEXT;
 
 -- `(unidad)` no es decorativo: es el índice del filtro que evita la cifra
 -- falsa, y el que sirve la vista de consumo.
