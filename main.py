@@ -5023,12 +5023,15 @@ def build_personal() -> None:
     Construye el schema personal desde raw.* y stg.obras.
 
     Ejecuta en orden los SQL de sql/personal:
-      00_setup.sql          schema, función de fechas local y las dos tablas
-      01_recursos.sql       una fila por recurso de Sigrid (2.618)
-      02_partes_lineas.sql  una fila por línea de parte de trabajo (330.638)
-      03_views.sql          v_pbi_horas_obra_mes, solo con unidad = 'HORA'
+      00_setup.sql               schema, funciones de fecha locales y las tablas
+      01_recursos.sql            una fila por recurso de Sigrid (2.618)
+      02_partes_lineas.sql       una fila por línea de parte de trabajo
+      03_partes.sql              una fila por cabecera de parte (F-101)
+      04_recursos_tipos_hora.sql los precios de la ficha del recurso (F-101)
+      05_views.sql               v_pbi_horas_obra_mes, solo con unidad = 'HORA'
 
-    Requiere haber ingerido antes res, con, auxrestip, emp, hmores y auxhor
+    Requiere haber ingerido antes res, con, conest, auxrestip, emp, hmo, hmores,
+    auxhor y reshor
     (lo hacen F-066 y F-074), y haber construido `stg.obras`: de ahí sale la
     marca `en_seguimiento`.
 

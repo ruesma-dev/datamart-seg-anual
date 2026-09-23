@@ -114,6 +114,14 @@ infraestructura.
 > primer esquema que entra sabiendo que hay que restringirlo: tener los datos
 > personales en un esquema propio es lo que permite darlos o quitarlos con un
 > GRANT en vez de tabla a tabla (F-087).
+>
+> **Enmienda del 2026-09-23 (F-101, hotfix de F-057).** Entran tres objetos en
+> `personal`: `personal.partes` --la cabecera del parte, con la obra de
+> CABECERA nombrada `obra_cabecera_id` porque audita y no imputa--,
+> `personal.recursos_tipos_hora` --los precios de la ficha del recurso, sin el
+> de nomina-- y la funcion local `personal.fn_fecha_serie`. El inventario pasa
+> a **161 objetos**, la cobertura de columnas a **1054** y las fichas de
+> consumo de 69 a **71**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

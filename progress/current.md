@@ -9,6 +9,67 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-23 · F-101 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN M1-M10 DEL HUMANO Y EL DESPLIEGUE
+
+HOTFIX de F-057. Spec en `specs/F-101-cabecera-del-parte/`, aprobada el
+2026-09-23 con las cuatro recomendaciones (D-3 si a `hmores.tex`, D-8 opcion
+A, D-9 se publica `precio_venta`, D-1 `obra_cabecera_id` /
+`centro_coste_cabecera_id`); el usuario creador del parte (`dbo.log`) es
+**F-105**. Cifras de la spec: `progress/spec_F-101.md`. Implementacion y sus
+siete desviaciones justificadas (todas ACEPTADAS por el reviewer):
+**`progress/impl_F-101.md`**. Review pasada 1: **`progress/review_F-101.md`**
+(pasada 1 CHANGES_REQUESTED, tres cambios sin tocar SQL; **pasada 2 APROBADO**,
+5.113 passed, cobertura 94,7 %). Pendiente del humano: M1-M10 (M9 primero),
+push de `azure-apps` y el despliegue. Nota del reviewer, no bloqueante:
+`design.md:195` y R16 de `requirements.md` conservan la premisa original.
+
+**Decisiones del humano sobre la review (2026-09-23):**
+1. `hmores.tex` tambien queda en `raw.hmores`, legible por
+   `mcp_sigrid_dm_ro`: **opcion (b), exposicion ACEPTADA por escrito**, no se
+   revoca nada. Atenuantes: el servidor MCP no expone `raw` en su lista blanca
+   y el rol ya lee nombres en `raw.con.res`. Corregidas las frases que decian
+   que el texto vive solo en `personal`.
+2. El nombre de persona sacado de `hmores.tex` que estaba en la spec se
+   redacta con un commit nuevo; **el historial no se reescribe** (el literal
+   sigue en commits anteriores a 0ea8358).
+
+**Diccionario del arbol tras F-101 (version 28): 161 objetos, 1054 columnas,
+71 de consumo** (+3 fichas: `partes`, `recursos_tipos_hora`,
+`fn_fecha_serie`). `azure-apps`: commits 87dc629 y 953e9fb, sin push.
+
+### F-101 · Verificaciones MANUALES del humano (necesitan BBDD; en este orden)
+
+**M9 va PRIMERO**: hasta que `raw.hmores` tenga `tex` (lo anade la ingesta con
+`ADD COLUMN`), `02_partes_lineas.sql` falla en `l.tex`. La nocturna ya ingiere
+antes de construir; un `build-personal` a mano, no.
+
+- **M9** · coste de ventana de `hmores.tex`: cronometrar
+  `python main.py ingest --table hmores --full` con la configuracion de `main`
+  (sin `tex`) y con la de esta rama (con `tex`), y anotar los dos tiempos.
+- **M1** · `python main.py build-personal`: los seis sub-pasos en `success`,
+  `personal.partes` ~6.886 filas y `personal.recursos_tipos_hora` ~8.968.
+- **M2** · `SELECT COUNT(*), COUNT(DISTINCT codigo_parte) FROM personal.partes;`
+  -> **6.886 / 6.258**; y
+  `SELECT estado, COUNT(*) FROM personal.partes GROUP BY estado;` ->
+  **En registro 647 / Cerrado 541 / Imputado 5.698**.
+- **M3** · `SELECT COUNT(*) FROM personal.partes WHERE lineas_en_otra_obra > 0;`
+  -> **14**; `SELECT SUM(lineas_en_otra_obra) FROM personal.partes;` -> **615**.
+- **M4** · `SELECT COUNT(*) FROM personal.partes_lineas WHERE codigo_parte IS NULL;`
+  -> **0**.
+- **M5** · `SELECT unidad, COUNT(*) FROM personal.recursos_tipos_hora GROUP BY unidad;`
+  (sin nula, 3 en `DESCONOCIDA`); y
+  `SELECT COUNT(*) FILTER (WHERE precio_coste <> 0), COUNT(*) FILTER (WHERE precio_venta <> 0), COUNT(*) FILTER (WHERE es_por_defecto) FROM personal.recursos_tipos_hora;`
+  -> **2.037 / 3 / 2.032**.
+- **M6** · el desfase de Juan:
+  `SELECT COUNT(*) FILTER (WHERE l.precio <> t.precio_coste), COUNT(*) FROM personal.partes_lineas l JOIN (SELECT DISTINCT ON (recurso_id, tipo_hora_id) recurso_id, tipo_hora_id, precio_coste FROM personal.recursos_tipos_hora ORDER BY recurso_id, tipo_hora_id, reshor_id) t USING (recurso_id, tipo_hora_id) WHERE l.precio <> 0 AND t.precio_coste <> 0;`
+  -> alrededor de **156.819 / 279.034 (56,2 %)**; mirar el recurso MO/0306.
+- **M7** · `python main.py check-declarados`, `python main.py check-unicidad` y
+  `python main.py check-relaciones` en verde, sin anadir nada a
+  `config/objetos_pendientes.yaml`.
+- **M8** · `python main.py check-diccionario` en biyeccion.
+- **M10** · `python main.py publicar-diccionario` (version 28; escritura contra
+  Azure, solo el humano).
+
 ## 2026-09-22 · F-094 DESPLEGADA (tag `r20260922-2350`)
 
 Imagen **`acralbaranesdev.azurecr.io/datamart-seg-anual:r20260922-2350`**,

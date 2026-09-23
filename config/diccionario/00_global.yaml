@@ -12,6 +12,15 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 28 (F-101, 2026-09-23): LA CABECERA DEL PARTE Y LOS PRECIOS DE LA
+# FICHA DEL RECURSO. Entran `personal.partes` (6.886 cabeceras: codigo,
+# descripcion, estado, fechas y la obra de CABECERA, que AUDITA y no imputa; el
+# codigo NO es unico, 569 repetidos) y `personal.recursos_tipos_hora` (8.968
+# filas: precio de coste y de venta de cada tipo de hora de cada recurso, los de
+# HOY, sin historico; el 56,2 % de las lineas comparables lleva otro precio).
+# `personal.partes_lineas` gana el codigo del parte y el texto de la linea. El
+# usuario que crea el parte NO esta: vive en `dbo.log`, no ingerida (F-105).
+#
 # version 27 (2026-09-23, sin feature): EL AVISO DE CLIENTE NO SE VEIA. Vivia en
 # el campo `fuente`, que el MCP no publica, y pasa al `concepto` del orden de
 # magnitud: la retencion viva de CLIENTE sale de los efectos y esta SIN
@@ -285,7 +294,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 27
+version: 28
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -574,10 +583,10 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxhor` (`auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
-      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`
+      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
       no se unen a `raw.con` en ningun SQL de este repositorio, asi que para
       ellas el JOIN de los puntos 2 y 3 **no existe**; su nombre esta en su
       propio `res` o no esta.
@@ -973,7 +982,11 @@ esquemas:
       `personal.v_pbi_horas_obra_mes`, que lleva el corte cableado-- y el 71,7 %
       del euro esta en las lineas de MES, que es el coste de estructura de obra,
       no las horas. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), publicados
-      por decision expresa del responsable del dato el 2026-09-18.
+      por decision expresa del responsable del dato el 2026-09-18. Desde F-101
+      tambien la CABECERA del parte (`personal.partes`: codigo, descripcion,
+      estado; el codigo NO es unico y su obra AUDITA, no imputa) y los precios
+      de la ficha de cada recurso (`personal.recursos_tipos_hora`), que son los
+      de HOY: Sigrid no guarda historico.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_personal]

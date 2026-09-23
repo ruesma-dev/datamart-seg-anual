@@ -29,10 +29,12 @@
 -- Todo lo numérico de estos ficheros está MEDIDO contra Sigrid vivo el
 -- 2026-09-18 por `sigrid-api` en solo lectura. Nada se supone.
 --
--- Idempotente: `CREATE ... IF NOT EXISTS` aquí, `TRUNCATE` + `INSERT` en 01 y
--- 02, `DROP VIEW IF EXISTS` + `CREATE VIEW` en 03. **Aquí no se dropea ninguna
+-- Idempotente: `CREATE ... IF NOT EXISTS` aquí, `TRUNCATE` + `INSERT` en 01 a
+-- 04, `DROP VIEW IF EXISTS` + `CREATE VIEW` en 05. **Aquí no se dropea ninguna
 -- tabla**: un DROP se llevaría por delante los GRANT y dejaría al consumidor
--- sin la tabla hasta el siguiente `apply_grants`.
+-- sin la tabla hasta el siguiente `apply_grants`. Por eso las columnas que se
+-- añaden a una tabla que ya existe van con `ALTER TABLE ... ADD COLUMN IF NOT
+-- EXISTS` (F-101): `CREATE TABLE IF NOT EXISTS` no toca una tabla ya creada.
 -- ============================================================================
 
 CREATE SCHEMA IF NOT EXISTS personal;
@@ -55,6 +57,27 @@ END $$;
 
 COMMENT ON FUNCTION personal.fn_fecha(BIGINT) IS
 'Convierte una fecha entera de Sigrid (YYYYMMDD) a DATE. NULL para 0, NULL o invalida. Local al schema personal, como las de compras, retenciones y maestro.';
+
+-- F-101. La otra forma de fecha de Sigrid: la FECHA SERIE (dias desde una
+-- epoca, con la hora en la parte decimal), que es como viene `con.tiemod`.
+-- LA EPOCA ESTA VERIFICADA, NO SUPUESTA, por dos vias (2026-09-22/23, solo
+-- lectura): `MAX(con.tiemod)` global = 46287,88 -> 2026-09-22, el dia de la
+-- medicion; y el parte mas antiguo, 39784,75 -> 2008-11-21, con
+-- `con.fec = 20081130`. Local al esquema por lo mismo que `fn_fecha`.
+CREATE OR REPLACE FUNCTION personal.fn_fecha_serie(d DOUBLE PRECISION)
+RETURNS DATE
+LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+    IF d IS NULL OR d <= 0 THEN
+        RETURN NULL;
+    END IF;
+    RETURN DATE '1899-12-30' + FLOOR(d)::INT;
+EXCEPTION WHEN OTHERS THEN
+    RETURN NULL;
+END $$;
+
+COMMENT ON FUNCTION personal.fn_fecha_serie(DOUBLE PRECISION) IS
+'Convierte una fecha serie de Sigrid (dias desde 1899-12-30, hora en la parte decimal) a DATE, descartando la hora. NULL para 0, NULL, negativa o invalida. Epoca verificada: 46287,88 -> 2026-09-22. Local al schema personal.';
 
 
 -- ---------------------------------------------------------------------------
@@ -115,6 +138,7 @@ CREATE INDEX IF NOT EXISTS idx_personal_recursos_empleado
 CREATE TABLE IF NOT EXISTS personal.partes_lineas (
     linea_id        BIGINT        PRIMARY KEY,
     parte_id        BIGINT,
+    codigo_parte    VARCHAR(24),
     recurso_id      BIGINT,
     obra_id         BIGINT,
     en_seguimiento  BOOLEAN       NOT NULL DEFAULT FALSE,
@@ -128,8 +152,15 @@ CREATE TABLE IF NOT EXISTS personal.partes_lineas (
     cantidad        NUMERIC(18,2),
     precio          NUMERIC(18,4),
     importe         NUMERIC(18,2),
+    texto_linea     TEXT,
     _built_at       TIMESTAMP     NOT NULL DEFAULT NOW()
 );
+
+-- F-101: el codigo del parte en cada linea. `CREATE TABLE IF NOT EXISTS` no
+-- anade columnas a la tabla que la nocturna ya creo, asi que va tambien aqui.
+ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS codigo_parte VARCHAR(24);
+-- F-101 (D-3): el texto libre de la linea. Puede llevar nombres de persona.
+ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS texto_linea TEXT;
 
 -- `(unidad)` no es decorativo: es el índice del filtro que evita la cifra
 -- falsa, y el que sirve la vista de consumo.
@@ -141,3 +172,80 @@ CREATE INDEX IF NOT EXISTS idx_personal_partes_partida
     ON personal.partes_lineas (partida_id);
 CREATE INDEX IF NOT EXISTS idx_personal_partes_unidad
     ON personal.partes_lineas (unidad);
+
+
+-- ---------------------------------------------------------------------------
+-- personal.partes — LA CABECERA del parte de trabajo (F-101)
+--
+-- Una fila por parte: `raw.hmo` = `raw.con` con `tip = 35`, 6.886 el
+-- 2026-09-23. **El grano es `parte_id`, no el codigo**: `con.cod` se repite en
+-- 569 valores que afectan a 1.197 partes, asi que el indice del codigo NO es
+-- unico.
+--
+-- La obra y el centro de coste llevan el sufijo `_cabecera_` A PROPOSITO (D-1,
+-- patron F-093): la obra que IMPUTA coste es la de la LINEA
+-- (`partes_lineas.obra_id`); la de cabecera sirve para AUDITAR, y en 615
+-- lineas de 14 partes no coinciden. Un `obra_id` aqui seria la forma de que
+-- alguien las confunda.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS personal.partes (
+    parte_id                  BIGINT        PRIMARY KEY,
+    codigo_parte              VARCHAR(24),
+    descripcion               VARCHAR(128),
+    fecha                     DATE,
+    anio                      INTEGER,
+    mes                       INTEGER,
+    obra_cabecera_id          BIGINT,
+    centro_coste_cabecera_id  BIGINT,
+    estado_id                 INTEGER,
+    estado                    VARCHAR(128),
+    activo                    BOOLEAN       NOT NULL DEFAULT TRUE,
+    fecha_baja                DATE,
+    fecha_modificacion        DATE,
+    num_lineas                INTEGER       NOT NULL DEFAULT 0,
+    lineas_en_otra_obra       INTEGER       NOT NULL DEFAULT 0,
+    _built_at                 TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_personal_cabecera_obra_mes
+    ON personal.partes (obra_cabecera_id, anio, mes);
+-- NO es UNIQUE: 569 codigos repetidos.
+CREATE INDEX IF NOT EXISTS idx_personal_cabecera_codigo
+    ON personal.partes (codigo_parte);
+CREATE INDEX IF NOT EXISTS idx_personal_cabecera_estado
+    ON personal.partes (estado_id);
+
+
+-- ---------------------------------------------------------------------------
+-- personal.recursos_tipos_hora — los PRECIOS DE LA FICHA del recurso (F-101)
+--
+-- Una fila por fila de `raw.reshor` (8.968 el 2026-09-23, 2.064 recursos, 58
+-- tipos de hora). La clave es `reshor_id` y NO el par (recurso, tipo de hora):
+-- hay 17 pares repetidos, uno de ellos con dos precios distintos (D-4).
+--
+-- `reshor` no tiene ninguna fecha ni `tiemod`: son los precios de HOY, sin
+-- vigencia (D-5). Y de sus columnas de precio solo entran el de coste y el de
+-- venta: el precio de nomina queda fuera por decision del humano del
+-- 2026-09-22, y las dos columnas que valen 0 en todas las filas tampoco suben.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS personal.recursos_tipos_hora (
+    reshor_id            BIGINT         PRIMARY KEY,
+    recurso_id           BIGINT,
+    tipo_hora_id         BIGINT,
+    codigo_tipo_hora     VARCHAR(16),
+    tipo_hora            VARCHAR(64),
+    unidad               VARCHAR(12),
+    precio_coste         NUMERIC(18,4),
+    precio_venta         NUMERIC(18,4),
+    cantidad_defecto     NUMERIC(18,4),
+    cuenta_analitica_id  BIGINT,
+    es_por_defecto       BOOLEAN        NOT NULL DEFAULT FALSE,
+    orden                INTEGER,
+    tipo_hora_de_baja    BOOLEAN,
+    _built_at            TIMESTAMP      NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_personal_tipos_hora_recurso
+    ON personal.recursos_tipos_hora (recurso_id);
+CREATE INDEX IF NOT EXISTS idx_personal_tipos_hora_tipo
+    ON personal.recursos_tipos_hora (tipo_hora_id);

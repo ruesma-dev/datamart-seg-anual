@@ -50,6 +50,20 @@
 -- al 75,5 % pero con 9 valores distintos— tampoco. Los dos identificadores
 -- estan vetados por `test_f057_r13_no_usa_centro_de_coste`.
 --
+-- EL CODIGO DEL PARTE SI BAJA A LA LINEA (F-101), y sin romper lo anterior:
+-- sale de `raw.con` por `hmores.hmoide` —el concepto del parte, R-SIGRID-CON—,
+-- no de `raw.hmo`. Medido el 2026-09-23: 0 de 330.941 lineas apuntan a una
+-- cabecera inexistente; el JOIN es LEFT por la misma razon que el resto del
+-- fichero. OJO: el codigo NO es unico (569 codigos repetidos en 1.197 partes):
+-- para agrupar por parte se usa `parte_id`. La cabecera completa —y su obra, que
+-- AUDITA— esta en `personal.partes`.
+--
+-- EL TEXTO DE LA LINEA (F-101, D-3): `hmores.tex`, que se ingiere desde este
+-- hotfix. Informado en 13.390 de 330.941 lineas (4,05 %). Es TEXTO LIBRE y
+-- puede llevar nombres de persona (medido: un nombre y dos apellidos en el
+-- comentario de una linea), otra razon para que viva en `personal`. La cadena
+-- vacia se publica como NULL: no hay texto.
+--
 -- ---------------------------------------------------------------------------
 -- NO SE FILTRA NADA
 -- ---------------------------------------------------------------------------
@@ -75,14 +89,16 @@
 TRUNCATE TABLE personal.partes_lineas;
 
 INSERT INTO personal.partes_lineas (
-    linea_id, parte_id, recurso_id, obra_id, en_seguimiento, partida_id,
+    linea_id, parte_id, codigo_parte, recurso_id, obra_id, en_seguimiento,
+    partida_id,
     fecha, anio, mes,
     tipo_hora_id, tipo_hora, unidad,
-    cantidad, precio, importe
+    cantidad, precio, importe, texto_linea
 )
 SELECT
     l.ide                                   AS linea_id,
     NULLIF(l.hmoide, 0)                     AS parte_id,
+    c.cod                                   AS codigo_parte,
     NULLIF(l.reside, 0)                     AS recurso_id,
     NULLIF(l.obride, 0)                     AS obra_id,
     -- MARCA, no filtro. El EXISTS pregunta al universo del seguimiento en vez
@@ -107,11 +123,14 @@ SELECT
     END::VARCHAR(12)                        AS unidad,
     COALESCE(l.can, 0)::NUMERIC(18,2)       AS cantidad,
     COALESCE(l.pre, 0)::NUMERIC(18,4)       AS precio,
-    COALESCE(l.tot, 0)::NUMERIC(18,2)       AS importe
+    COALESCE(l.tot, 0)::NUMERIC(18,2)       AS importe,
+    NULLIF(l.tex, '')                       AS texto_linea
 FROM      raw.hmores l
 -- LEFT, y hace falta: 10 lineas apuntan a un tipo de hora que no esta en el
 -- catalogo. Con JOIN desaparecerian sin ruido; asi salen como 'DESCONOCIDA'.
-LEFT JOIN raw.auxhor h ON h.ide = l.horide;
+LEFT JOIN raw.auxhor h ON h.ide = l.horide
+-- El codigo del parte, del CONCEPTO del parte (F-101). Nunca `raw.hmo` (R12).
+LEFT JOIN raw.con    c ON c.ide = l.hmoide;
 
 COMMENT ON TABLE personal.partes_lineas IS
 'Lineas de parte de trabajo (330.638 el 2026-09-18), una fila por fila de raw.hmores. NUNCA SUMAR `cantidad` SIN FILTRAR `unidad`: mezcla HORA, DIA, MES y UD, y en bruto da 1.837.201,23 de nada. Las horas son unidad = HORA (1.249.038,44 h), pero el 71,7 % del euro esta en las lineas de MES, que son el coste de estructura de obra. La obra sale de la LINEA (hmores.obride), no de la cabecera, y el universo del seguimiento se MARCA en en_seguimiento en vez de filtrarse.';
