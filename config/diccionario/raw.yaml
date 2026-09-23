@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 68 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 69 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -810,6 +810,24 @@ objetos:
       modificada en Sigrid no vuelve a leerse. Los dos modos existen; el que
       corre de noche es el primero.
     grano: Una fila por municipio, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  auxemp:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Catalogo de empresas del grupo: traduce un numero. El nombre ya resuelto esta en `maestro.obras.nombre_empresa` y en `personal.recursos.nombre_empresa`.
+    descripcion: >-
+      **Empresas** (38 filas MEDIDAS en Sigrid el 2026-09-23). Entra con F-102 para dar nombre a la empresa de cada obra y de cada recurso. **Se une por `numemp`, no por `ide`**: `numemp` es el numero de empresa que guarda `con.emp` en cada concepto de Sigrid, y es unico en el origen. `1` es Ruesma, `28` es PORSAN E HIJOS CONSTRUCCIONES SL, y `12`, `14`, `15`, `25`, `26`, `27`, `31` y `34` son UTE. Importa porque en Sigrid las obras y los recursos son POR EMPRESA: el mismo codigo existe una vez por empresa y solo es unico dentro de una (regla `R-CODIGO-POR-EMPRESA`).
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `auxemp`, y se localiza con `grep -n "^| auxemp " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
+    grano: Una fila por empresa, identificada por `ide`; `numemp`, el numero que guarda `con.emp`, tambien es unico.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno

@@ -127,12 +127,13 @@ sin construir esa noche.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 68 tablas, y qué NO está ahí (F-066, F-074, F-080)
+### Qué se copia de Sigrid: 69 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102)
 
-`config/tables_sigrid.yaml` declara **68 tablas**: eran 31, F-066 las dejó en 56
-el 2026-09-06, F-074 sumó nueve más el 2026-09-09 y F-080 otras tres el
+`config/tables_sigrid.yaml` declara **69 tablas**: eran 31, F-066 las dejó en 56
+el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
-remesas—, además de recuperar la columna `con.tex` (el memo del documento,
+remesas— y F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
+nombre a la empresa de cada obra y de cada recurso—, además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
 lectura sobre `con`, medio minuto de la ventana nocturna).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo

@@ -39,8 +39,9 @@ FICHERO_TABLAS = RAIZ / "config" / "tables_sigrid.yaml"
 FICHERO_RAW = RAIZ / "config" / "diccionario" / "raw.yaml"
 FICHERO_GLOBAL = RAIZ / "config" / "diccionario" / "00_global.yaml"
 
-#: Cuantas tablas ingiere el ETL cuando esta feature cierra: 56 + 9.
-TOTAL_TABLAS = 68
+#: Cuantas tablas ingiere el ETL HOY: 56 + 9 al cerrar esta feature, +3 de
+#: F-080 y +1 de F-102 (`auxemp`). La usan tambien F-080 y F-102.
+TOTAL_TABLAS = 69
 
 #: Las tres que SI tienen `tiemod`, comprobado en `INFORMATION_SCHEMA` y
 #: poblado al 100 % en las tres (7/7, 60/60 y 37/37).
