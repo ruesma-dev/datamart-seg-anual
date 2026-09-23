@@ -1636,3 +1636,23 @@ mes»: 97,0 % del vivo con fecha, 17 obras sin ella. Plazo `plaret` -> `plagar` 
 12. F-059 se retira como absorbida; el resto de F-045 lo hace F-094. La spec ya
 no tiene decisiones abiertas: queda la aprobacion del humano y que F-094 este
 `done`.
+
+## 2026-09-23 · F-102 · SPEC ESCRITA (spec-author), pendiente de aprobacion
+
+Entregado `specs/F-102-obra-duplicada-empresa-28/` (requirements 137/150, design
+250/250, 17 tareas) en la rama `hotfix/F-102-obra-duplicada-empresa-28`, desde
+`main` y en worktree aislado (F-101 sigue en el arbol principal; la spec no toca
+ninguno de sus ficheros). Ficha `sdd: true`, `spec_ready`. **Resumen, hallazgos y
+consultas: `progress/spec_F-102.md`.**
+
+**Hallazgo que cambia el alcance**: `stg.obras` elige hoy la ficha sin datos en
+0720 (la copia vacia de la empresa 28), 0252 y 0517, y `mart`/`cierre` pierden
+esas tres obras enteras. La empresa 28 es PORSAN E HIJOS CONSTRUCCIONES SL.
+`condir` si se ingiere y no aporta ninguna direccion de obra.
+
+**Decisiones que necesita validar el humano antes de implementar** (opciones y
+recomendacion en `design.md` §8): D1 ranking de la ficha principal (la
+recomendada arregla las tres obras y por eso cambia lo publicado en `mart` y
+`cierre`); D2 no reescribir el `obra_id` de las copias y traducir al leer; D3
+ingerir `auxemp` para el nombre de la empresa; D4 el aviso a `facturas` lo lleva
+el humano con el texto que deja el implementer.
