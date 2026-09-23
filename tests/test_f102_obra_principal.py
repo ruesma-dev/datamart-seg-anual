@@ -819,3 +819,18 @@ def test_f102_r28_la_arquitectura_explica_el_modelo() -> None:
     for termino in ("clave_obra", "clave_recurso", "es_ficha_principal", "F-106",
                     "R-CODIGO-POR-EMPRESA", "69 tablas"):
         assert termino in texto, f"ARCHITECTURE.md no dice «{termino}» (R28)"
+
+
+# ===========================================================================
+# R29 · el documento de `azure-apps`
+# ===========================================================================
+
+
+def test_f102_r29_azure_apps_recoge_las_columnas_y_la_regla() -> None:
+    if not DOC_AZURE_APPS.exists():
+        pytest.skip("azure-apps no esta junto a este repositorio")
+    texto = DOC_AZURE_APPS.read_text(encoding="utf-8")
+    for termino in ("clave_obra", "es_ficha_principal", "obra_principal_id",
+                    "maestro.v_obra_fichas", "R-CODIGO-POR-EMPRESA",
+                    "v_control_forma_pago", "F-106", "69 tablas"):
+        assert termino in texto, f"azure-apps no dice «{termino}» (R29)"
