@@ -53,7 +53,10 @@ push de `azure-apps` y el despliegue. Nota del reviewer, no bloqueante:
   rota es `cierre.v_pbi_planif_vs_real` (204 combinaciones), preexistente: F-051.
 - **M8/M10** (lider, autorizado por el humano): `publicar-diccionario` version
   28 (hash 414ea8c4aaf4, 161 objetos, 1.054 columnas) y `check-diccionario` OK.
-- Queda: el DESPLIEGUE de la imagen con F-101.
+- **DESPLEGADA el 2026-09-23 a las 14:07 UTC con el tag `r20260923-1605`**
+  (construida desde `main` 080e2b5 en un worktree limpio; el job
+  `caj-datamart-seg-dev` pasa de `r20260922-2350` a `r20260923-1605`). Queda
+  comprobar que la nocturna del 24-09 corre en verde con esa imagen.
 
 ### F-101 · Verificaciones MANUALES del humano (necesitan BBDD; en este orden)
 
