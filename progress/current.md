@@ -1693,3 +1693,9 @@ pierden datos); difiere de la marca en 0581, 0606, 0671 y 0720, y lo resuelve
 a `stg`. D2 A, D3 si, D4 sin aviso a `facturas`, D5 A. La parte de
 `personal.recursos` sigue dependiendo de F-101 en `main`. Sin decisiones
 abiertas: `progress/spec_F-102.md`.
+
+**SPEC APROBADA (humano, 2026-09-23)** con un ultimo ajuste: las cinco vistas de
+`compras` publican `empresa_id` y `clave_obra`, **no** `obra_principal_id`, que
+queda solo en `maestro.obras` como referencia (no se consolida). Lineas de fichas
+no Ruesma en `fact_compras_linea`: 91.431; 84.233 (31,77 M€) con codigo
+compartido con Ruesma.

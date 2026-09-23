@@ -31,7 +31,7 @@ R4. `es_ficha_principal` (`rango_ficha = 1`): exactamente una por codigo, 846 de
 debe multiplicarse: la marca se evalua con `EXISTS`.
 
 R5. `obra_principal_id` debe ser la ficha de la empresa 1 de su codigo, y la
-propia ficha si el codigo no tiene ficha de la 1.
+propia si el codigo no la tiene. Solo se publica en `maestro` (referencia).
 
 R6. `clave_obra` debe ser `empresa_id::text || '-' || codigo_obra` (p. ej.
 `1-0581`, `27-0581`) y ser unica: 922 claves para 922 fichas, 0 codigos vacios.
@@ -64,8 +64,7 @@ de la empresa 1, 48 con `dir1` (la cifra de Juan Romero).
 
 ## Ingesta del nombre de la empresa [D3]
 
-R13. El sistema debe declarar `auxemp` en `config/tables_sigrid.yaml` (38 filas
-el 2026-09-23, refresco completo) y subir `TOTAL_TABLAS` en uno.
+R13. `auxemp` en `config/tables_sigrid.yaml` (38 filas, refresco completo) y `TOTAL_TABLAS` +1.
 
 R14. `raw.yaml` debe tener ficha de `auxemp`: `numemp` es lo que guarda `con.emp`.
 
@@ -77,7 +76,8 @@ direccion sobre las principales por tramo y con fecha en vez de «un tercio», y
 declarar que las 103 fichas de la empresa 28 no traen direccion ni cliente.
 
 R16. Esa ficha debe decir que por `codigo_obra` se cruza **siempre** con
-`empresa_id` o por `clave_obra`, o filtrando `es_ficha_principal`.
+`empresa_id` o por `clave_obra`, y que `obra_principal_id` es solo referencia de
+cual es la ficha de Ruesma: no se usa para agregar hechos de otras empresas.
 
 R17. El sistema debe publicar la regla dura `R-CODIGO-POR-EMPRESA` (bloqueante)
 para obras y recursos, con ambito `maestro.obras`, `maestro.v_obra_fichas`,
@@ -96,29 +96,29 @@ R20. `version` de `00_global.yaml` debe subir en uno sobre la de `main`.
 
 ## `compras` y las demas fichas que apuntan a `maestro.obras.obra_id`
 
-R21. El sistema debe anadir `obra_principal_id`, al final, a
-`compras.v_pbi_contrato_consumo`, `v_pbi_proveedor_obra`,
+R21. El sistema debe anadir `empresa_id` y `clave_obra`, al final y en ese
+orden, a `compras.v_pbi_contrato_consumo`, `v_pbi_proveedor_obra`,
 `v_pbi_albaranes_sin_facturar`, `v_pbi_partida_coste` y `v_control_forma_pago`,
-tomada de `maestro.v_obra_fichas` con `LEFT JOIN` por `obra_id` (NULL si
+tomadas de `maestro.v_obra_fichas` con `LEFT JOIN` por `obra_id` (NULL si
 `obra_id` es NULL), sin cambiar su grano; en `v_pbi_proveedor_obra`, sobre el
-resultado ya agregado.
+resultado ya agregado. Ninguna vista de `compras` publica `obra_principal_id`.
 
-R22. Las fichas de esas cinco vistas en `compras.yaml` deben documentar
-`obra_principal_id`, declarar la relacion `obra_principal_id ->
-maestro.obras.obra_id` (N:1) y **advertir** que hasta F-106 no casa con
-`mart.v_pbi_dim_obra` en 0581, 0606, 0671 y 0720.
+R22. Las fichas de esas cinco vistas en `compras.yaml` deben documentar las dos
+columnas, declarar la relacion `clave_obra -> maestro.obras.clave_obra` (N:1) y
+advertir que **agregar por `codigo_obra` mezcla empresas** (la UTE dentro de la
+obra de Ruesma, que no se consolida): se agrega por `clave_obra`.
 
 R23. Las fichas de `compras.contratos`, `albaran_lineas`, `factura_lineas`,
 `fact_compras_linea`, `retenciones.movimientos`, `v_pbi_retencion_obra`,
 `maestro.proveedores_obra` y `maestro.centros_coste` deben decir, en `obra_id`
-y en el `porque` de su relacion, que el `obra_id` es el de la empresa del
-documento (cifra medida) y como llegar a la ficha de Ruesma:
-`JOIN maestro.obras USING (obra_id)` -> `obra_principal_id`.
+y en el `porque` de su relacion, que el `obra_id` es la ficha de la empresa del
+documento (cifra medida), que su empresa y clave salen de `maestro.obras`, y que
+`obra_principal_id` **no** sirve para agregar hechos de otras empresas.
 
 R24. [D2 A] El sistema NO debe reescribir ningun `obra_id` publicado: los SQL de
 las tablas de `compras` (`01`, `02`, `05`, `07`), de `retenciones`, de
-`personal` y `maestro/03_*`, `04_*` no nombran `v_obra_fichas` ni
-`obra_principal_id`, y ningun step cambia su `depends_on`.
+`personal` y `maestro/03_*`, `04_*` no nombran `v_obra_fichas`, ningun SQL de
+`compras` nombra `obra_principal_id` y ningun step cambia su `depends_on`.
 
 R25. `01_obras.sql` (cabecera y `COMMENT`) sin «un tercio» ni las frases que
 veta `test_f073_r11`.

@@ -3,8 +3,8 @@
 
 `specs/F-102-obra-duplicada-empresa-28/` en la rama
 `hotfix/F-102-obra-duplicada-empresa-28` (desde `main`, worktree aislado).
-**Cuarta pasada, con las decisiones FINALES del humano**: requirements 150/150,
-design 234/250, 17 tareas (T1-T17). Ficha: `sdd: true`, `spec_ready`. Las
+**Quinta pasada, APROBADA por el humano**: requirements 150/150, design
+242/250, 17 tareas (T1-T17). Ficha: `sdd: true`, `spec_ready`. Las
 pasadas anteriores (opcion B; empresa 1 aplicada tambien a `stg.obras`) quedan
 **sustituidas**: ver historial de commits de la rama.
 
@@ -36,9 +36,10 @@ desde la perspectiva de diferentes empresas. Lo mismo con Porsan».
   `stg/03_obras.sql` queda identico a `main` (test por hash).
 - `obra_principal_id` sale de la misma ventana que `es_ficha_principal`: ficha
   de Ruesma si el codigo la tiene, la propia si no.
-- Las cinco vistas de consumo de `compras` con obra ganan `obra_principal_id`
-  con la advertencia de que hasta F-106 no casa con `mart.v_pbi_dim_obra` en
-  0581, 0606, 0671 y 0720 (Power BI sigue relacionando por `obra_id`).
+- Las cinco vistas de consumo de `compras` con obra ganan `empresa_id` y
+  `clave_obra` (no `obra_principal_id`): cada factura queda con SU empresa y
+  nadie suma las de la UTE en la obra de Ruesma. `obra_principal_id` vive solo en
+  `maestro.obras`, como referencia, y su ficha prohibe usarlo para agregar.
 - `personal.recursos`: **depende de F-101 fusionado en `main`** (T14 bloquea;
   T1-T13 se entregan igual).
 
@@ -54,9 +55,11 @@ desde la perspectiva de diferentes empresas. Lo mismo con Porsan».
   administrativos (CM, CP, GG, POSTV2, VAR) que se advierten.
 - **Difiere de `stg.obras` en 0581, 0606, 0671 y 0720** (F-106). 0252 y 0517
   coinciden.
-- `compras` con `obra_principal_id` distinto: 84.233 lineas de
-  `fact_compras_linea` (31.770.036,29 € de FACTURA+ABONO), 1.066 filas de
-  `v_pbi_proveedor_obra`; copias de la 28 solo 3 lineas (484,00 €). Sin columna
+- `compras`, lineas de fichas no Ruesma: 91.431 en `fact_compras_linea`
+  (54.198.506,59 € de FACTURA+ABONO), de ellas **84.233 (31.770.036,29 €) con
+  codigo compartido con una ficha de Ruesma** (las que se mezclarian agregando
+  por codigo); en `v_pbi_proveedor_obra`, 1.880 y 1.066. Copias de la 28: solo 3
+  lineas (484,00 €). 9.363 lineas sin obra. Sin columna
   de obra: `facturas`, `albaranes`, `contrato_lineas`, `vencimientos`,
   `v_facturas_pago`, `formas_pago`, `documento_texto`, `documento_comentarios`.
 - Juan reproducido: 0672+, 57 principales de la 1, 48 con `dir1`; `condir` no
@@ -66,10 +69,15 @@ desde la perspectiva de diferentes empresas. Lo mismo con Porsan».
   una de la 1; sus partes: 26.426 lineas, 3.226.523,83 €.
 - «`obra_id` menor» falla en la 0680 (la copia de la 28 tiene el `ide` menor).
 
-## Pendiente
+## APROBADA (humano, 2026-09-23)
 
-Nada que decidir en esta spec. Queda la aprobacion del humano, que F-101 este en
-`main` para T14-T15, y que el lider cree la ficha **F-106**.
+Con la ultima decision incorporada: en `compras`, las cinco vistas de consumo
+publican `empresa_id` y `clave_obra`, **no** `obra_principal_id`, porque el
+humano no consolida y cada factura debe quedar con su empresa;
+`obra_principal_id` queda solo en `maestro.obras` como referencia de cual es la
+ficha de Ruesma. Sin decisiones abiertas. Condiciones para implementar: T1-T13
+ya; T14-T15 cuando F-101 este en `main`. El lider crea la ficha **F-106**
+(seguimiento por empresa: `stg.obras` «solo Ruesma» y las demas empresas).
 
 ## Como se midio
 

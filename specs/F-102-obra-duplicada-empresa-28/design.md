@@ -6,7 +6,8 @@ cosa y Ruesma otra [...] no estamos consolidando. El codigo igual representa que
 es la misma obra, pero desde la perspectiva de diferentes empresas. Lo mismo con
 Porsan». Por eso este hotfix solo publica **identificadores** para que nada
 salga duplicado por codigo: `obra_id` sigue siendo la clave tecnica, y se anade
-la clave legible (empresa + codigo) y la marca de la ficha de Ruesma.
+la clave legible (empresa + codigo), y en `maestro` la marca de la ficha de
+Ruesma como referencia.
 **`stg.obras` no cambia**: pasar el seguimiento a «solo Ruesma» y traer las
 demas empresas es F-106.
 
@@ -76,9 +77,11 @@ fichas); (b) otra empresa dentro del universo (8, las UTE); (c) fuera (28).
 | `maestro.proveedores_obra` / `centros_coste` | 0 / 40 | 331 / 8 | 17 / 28 |
 | `personal.partes_lineas` | **14.079** (1.677.332,46 €) | 6.316 | 1.624 |
 
-Con `obra_principal_id` distinto de `obra_id`: **84.233 lineas** de
-`fact_compras_linea` (31.770.036,29 € de FACTURA+ABONO) y **1.066 filas** de
-`v_pbi_proveedor_obra`. Sin columna de obra, luego sin el problema
+Lineas de fichas **no Ruesma** en `fact_compras_linea`: 91.431 (54.198.506,59 €
+de FACTURA+ABONO); de ellas, **84.233 (31.770.036,29 €)** con un codigo que
+tambien tiene ficha de Ruesma, que son las que se mezclarian agregando por
+`codigo_obra`. En `v_pbi_proveedor_obra`: 1.880 filas no Ruesma, 1.066 con
+codigo compartido. 9.363 lineas sin obra. Sin columna de obra, luego sin el problema
 (`information_schema`): `compras.facturas`, `albaranes`, `contrato_lineas`,
 `vencimientos`, `v_facturas_pago`, `formas_pago`, `documento_texto`,
 `documento_comentarios`. `mart` y `cierre` heredan la eleccion de `stg.obras`.
@@ -114,7 +117,7 @@ de recursos de fuera de la 1: 26.426 lineas, 3.226.523,83 €.
   `COMMENT ON VIEW`: el modelo, sin «un tercio» y **sin las frases que veta
   `test_f073_r11`**.
 - `sql/compras/03_views.sql` (cuatro vistas) y `06_pago_factura.sql`
-  (`v_control_forma_pago`) — `obra_principal_id` al final (§5).
+  (`v_control_forma_pago`) — `empresa_id` y `clave_obra` al final (§5).
 - `config/tables_sigrid.yaml` — `auxemp` (`incremental_column: null`, sin filtro
   ni exclusiones). `raw.yaml`: su ficha y 68 -> 69.
 - `tests/test_f066_ingesta_raw.py`, `test_f074_*`, `test_f080_*`: `TOTAL_TABLAS` +1.
@@ -122,8 +125,9 @@ de recursos de fuera de la 1: 26.426 lineas, 3.226.523,83 €.
   §1.6, modelo) y `v_obra_fichas` (vista, `consumo`, no recomendada,
   `clave_negocio: [obra_id]`, `build_maestros`); en `proveedores_obra` y
   `centros_coste`, el texto de R23. Punto 1 del comentario de cabecera.
-- `config/diccionario/compras.yaml` — cinco vistas: columna, relacion N:1 y la
-  advertencia de F-106; cuatro tablas: texto de R23 con §1.5.
+- `config/diccionario/compras.yaml` — cinco vistas: las dos columnas, relacion
+  `clave_obra -> maestro.obras.clave_obra` (N:1) y el aviso de R22; cuatro
+  tablas: texto de R23 con §1.5.
 - `config/diccionario/retenciones.yaml` — texto de R23 en sus dos fichas.
 - `config/diccionario/stg.yaml` — ficha `obras`: sigue como hoy, §1.4, F-106.
 - `config/diccionario/00_global.yaml` — `R-CODIGO-POR-EMPRESA`, `R-UNIVERSO-OBRA`
@@ -184,9 +188,9 @@ c.ide` y `LEFT JOIN LATERAL (SELECT ae.res AS nombre_empresa FROM raw.auxemp ae
 WHERE ae.numemp = c.emp ORDER BY ae.ide LIMIT 1) em ON TRUE`. El mismo lateral y
 `c.emp::text || '-' || c.cod AS clave_recurso` en `personal/01_recursos.sql`.
 
-Vistas de `compras`: `COALESCE(vf.obra_principal_id, x.obra_id) AS
-obra_principal_id` al final (`LEFT JOIN maestro.v_obra_fichas vf ON vf.obra_id =
-x.obra_id`); en `v_pbi_proveedor_obra`, sobre el agregado.
+Vistas de `compras`: `vf.empresa_id, vf.clave_obra` al final (`LEFT JOIN
+maestro.v_obra_fichas vf ON vf.obra_id = x.obra_id`); en `v_pbi_proveedor_obra`,
+sobre el agregado. **Sin `obra_principal_id`**: cada factura queda con SU empresa.
 
 ## 6 · Tests (offline, `tests/test_f102_obra_principal.py`)
 
@@ -205,8 +209,11 @@ ademas en la base: `clave_negocio` de las fichas y `check-unicidad` (R30).
   `build_compras` y la vista no se dropea (patron de `retenciones` ->
   `maestro.centros_coste`, F-094). Sus columnas nuevas, solo al final.
 - **Lo que no casa hasta F-106**: en 0581, 0606, 0671 y 0720 la ficha de Ruesma
-  no es la de `stg.obras` ni la de `mart.v_pbi_dim_obra`. Power BI debe seguir
-  relacionando `compras` por `obra_id`; `obra_principal_id` es la vista de Ruesma.
+  no es la de `stg.obras` ni la de `mart.v_pbi_dim_obra`. `compras` no se ve
+  afectado: publica la empresa y la clave de su propia ficha, no la de Ruesma.
+- **`obra_principal_id` solo en `maestro.obras`**, como referencia: usarlo para
+  agregar hechos sumaria facturas de la UTE en la obra de Ruesma, que el humano
+  no consolida. La ficha del diccionario lo prohibe expresamente.
 - **Codigos administrativos** (§1.3): 11 fichas apuntan a la de Ruesma sin ser la
   misma cosa; declarado en la ficha, no se corrige (son de gestion).
 - **Fusion**: F-101 toca `version` de `00_global.yaml` y el documento de
@@ -215,12 +222,13 @@ ademas en la base: `clave_negocio` de las fichas y `check-unicidad` (R30).
   2278106, tiene el `ide` menor que la buena, 2278832); filtrar `maestro.obras` a
   principales; reescribir el `obra_id` de los hechos (D2); cambiar `stg.obras`.
 
-## 8 · Decisiones finales del humano (2026-09-23)
+## 8 · Decisiones finales del humano (2026-09-23) · SPEC APROBADA
 
 - **D1**: principal = ficha de la empresa 1; sin ella, el resto del ranking.
   Solo identificadores; `stg.obras` no cambia; el seguimiento «solo Ruesma» y
   las demas empresas son **F-106** (prioridad 3, la ficha el lider).
-- **D2 (A)**: no se reescribe ningun `obra_id`; `obra_principal_id` para leer.
+- **D2 (A)**: no se reescribe ningun `obra_id`. En `compras`, `empresa_id` y
+  `clave_obra`, no `obra_principal_id` (decision final del humano).
 - **D3**: se ingiere `auxemp` (obras y recursos).
 - **D4**: `facturas` es independiente, sin aviso; en su lugar, repaso de toda
   ficha con relacion a `maestro.obras.obra_id`: `compras` (6), `retenciones` (2),
