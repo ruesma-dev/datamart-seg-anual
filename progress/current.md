@@ -21,6 +21,27 @@
 
 Spec en `specs/F-101-cabecera-del-parte/` (137/150 y 236/250, puerta de tamano
 en verde). Resumen y todas las cifras medidas: **`progress/spec_F-101.md`**.
+
+### F-101 · IMPLEMENTACION EN CURSO (implementer, 2026-09-23, `in_progress`)
+
+- **T1 hecha**: las cifras de gobierno se reproducen contra Sigrid en solo
+  lectura (detalle en `progress/impl_F-101.md`). Unica deriva: `reshor` tiene hoy
+  8.968 filas y 2.064 recursos (8.959/2.063 el 22-23): altas del dia, no cambia
+  el diseno.
+- **Desviaciones justificadas** respecto a la spec (todas consecuencia directa de
+  las decisiones aprobadas, ninguna cambia el alcance):
+  1. `00_global.yaml` ya estaba en **27** (lo subio el merge de main antes de
+     implementar): T11 sube **27 -> 28**, no 26 -> 27.
+  2. `ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS` para
+     `codigo_parte` y `texto_linea`: `CREATE TABLE IF NOT EXISTS` no anade
+     columnas a una tabla que ya existe en la base (la nocturna del 23 la creo).
+  3. D-3 arrastra dos ficheros que la spec no lista: la ficha `raw.hmores` de
+     `config/diccionario/raw.yaml` (decia «No se traen 1 columnas», que pasa a
+     ser falso; la vigila `test_f006_r26_*`) y la constante `NUEVAS["hmores"]`
+     de `tests/test_f066_ingesta_raw.py` (mismo cambio que hizo F-074 con
+     `prvcer`).
+  4. `test_f057_r27_ddl_idempotente` cuenta `CREATE TABLE IF NOT EXISTS` == 2:
+     pasa a 4 con las dos tablas nuevas.
 La ficha pasa a `sdd: true` y `spec_ready`; `BACKLOG.md` regenerado.
 
 Todo se midio el 2026-09-22/23 **en solo lectura** (Sigrid por `sigrid-api`,
