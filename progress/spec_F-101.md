@@ -31,8 +31,8 @@ cabecera** de 330.941.
 **`hmores.tex`**: informado en **13.390 de 330.941 (4,05 %)**, **284.080 bytes
 (277 KiB)**, máximo 318 B, presente en 2.306 de los 6.873 partes con líneas.
 `raw.hmores` pesa **111 MB** (101 MB de datos, 320,3 B/fila, 57 columnas): el
-texto es **+0,27 %**. Un ejemplo del contenido es «Angelita Cavero» — texto
-libre con nombres de persona.
+texto es **+0,27 %**. Un ejemplo del contenido es un nombre y dos apellidos —
+texto libre con nombres de persona (el literal se redacto el 2026-09-23).
 
 **`reshor`**: 8.959 filas, 2.063 recursos, 58 tipos. `pre` ≠ 0 en 2.037,
 `preven` en **3**, `prenom` en 2, `candef` en 1.614, `caaide` en 3.198, `pos`

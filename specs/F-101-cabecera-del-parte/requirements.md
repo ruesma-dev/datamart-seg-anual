@@ -75,7 +75,7 @@ Tres hechos que gobiernan todo lo demás y que no se pueden suponer:
   de datos), y presente en 2.306 de los 6.873 partes con líneas.
 - **R16.** DONDE se ingiera `hmores.tex`, el sistema debe publicarlo como
   `texto_linea` y la ficha debe advertir que es **texto libre que puede llevar
-  nombres de persona** (medido: «Angelita Cavero»), lo que refuerza que viva en
+  nombres de persona** (medido: un nombre y dos apellidos), lo que refuerza que viva en
   `personal`, el esquema restringible.
 
 ## C · `personal.recursos_tipos_hora` — los precios de la ficha

@@ -192,7 +192,7 @@ Lo que **no** se puede verificar sin base va a `tasks.md` como MANUAL.
   corrigen**, igual que en las líneas: se publican y la ficha lo advierte.
   Corregir en silencio es peor que publicar el defecto.
 - **Riesgo · `texto_linea` es texto libre y puede traer nombres de persona**
-  (medido: «Angelita Cavero»). Vive en `personal`, el esquema restringible, y
+  (medido: un nombre y dos apellidos). Vive en `personal`, el esquema restringible, y
   la ficha lo declara. Es un argumento a favor de D-3, no en contra.
 - **Riesgo · `raw.reshor` está fuera del rol del MCP por F-068** y esta feature
   publica un objeto curado derivado de ella. La revocación sobre `raw.reshor`
