@@ -162,7 +162,8 @@ def test_f057_r27_ddl_idempotente() -> None:
     assert "DROP TABLE" not in setup.upper(), (
         "el DDL de personal no puede dropear sus tablas: perderia los GRANT (R27)"
     )
-    assert setup.upper().count("CREATE TABLE IF NOT EXISTS") == 2
+    # F-101 anade `partes` y `recursos_tipos_hora`: cuatro tablas, ninguna se dropea.
+    assert setup.upper().count("CREATE TABLE IF NOT EXISTS") == 4
     assert "CREATE OR REPLACE FUNCTION personal.fn_fecha" in _compacto(_sql(RUTA_SETUP))
 
     for ruta, tabla in ((RUTA_RECURSOS, "recursos"), (RUTA_PARTES, "partes_lineas")):
