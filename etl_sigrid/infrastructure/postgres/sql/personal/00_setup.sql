@@ -112,8 +112,23 @@ CREATE TABLE IF NOT EXISTS personal.recursos (
     apellido2        VARCHAR(64),
     es_externo       BOOLEAN      NOT NULL DEFAULT FALSE,
     proveedor_id     BIGINT,
-    _built_at        TIMESTAMP    NOT NULL DEFAULT NOW()
+    _built_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
+    empresa_id       INTEGER,
+    nombre_empresa   VARCHAR(255),
+    clave_recurso    VARCHAR(40)
 );
+
+-- F-102: el recurso es de UNA empresa. En Sigrid el mismo codigo de recurso
+-- existe una vez por empresa (61 codigos repetidos, ninguno dentro de una
+-- empresa, el 2026-09-23), asi que se publican la empresa (`con.emp`), su
+-- nombre (`raw.auxemp`) y la clave legible `clave_recurso` = '<empresa>-<codigo>'
+-- (2.618 claves para 2.618 recursos). `CREATE TABLE IF NOT EXISTS` no anade
+-- columnas a la tabla que la nocturna ya creo, asi que van tambien aqui, AL
+-- FINAL (en una base nueva nacen en el mismo sitio, detras de `_built_at`).
+-- Nunca DROP: se llevaria por delante los GRANT.
+ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS empresa_id INTEGER;
+ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS nombre_empresa VARCHAR(255);
+ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS clave_recurso VARCHAR(40);
 
 -- Los dos cortes que se piden de verdad: «las personas de alta» y «el recurso
 -- de este empleado».

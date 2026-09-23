@@ -146,10 +146,14 @@ def test_f080_r3_rpa_no_finge_una_columna_de_fecha_que_no_tiene() -> None:
 
 
 def test_f080_r3_el_censo_de_tablas_ingeridas_sube_a_68() -> None:
-    """65 + 3. El contador vive en `tests/test_f074_ingesta_censo.py`."""
+    """65 + 3. El contador vive en `tests/test_f074_ingesta_censo.py`.
+
+    F-102 suma `auxemp` y el censo pasa a 69: lo que este test fija es que las
+    tres de F-080 siguen contadas, no que nadie mas pueda entrar despues.
+    """
     from tests.test_f074_ingesta_censo import TOTAL_TABLAS
 
-    assert len(_tablas()) == 68 == TOTAL_TABLAS, (
+    assert len(_tablas()) == TOTAL_TABLAS >= 68, (
         "F-080 añade tres tablas y el censo de F-074 tiene que contarlas (R3)"
     )
 

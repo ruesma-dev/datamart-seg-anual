@@ -228,6 +228,19 @@ tables:
     exclude_columns: []
     # Municipios. Decodifica condir.munide → res (nombre municipio).
 
+  - source_table: auxemp
+    target_table: auxemp
+    id_column: ide
+    incremental_column: null   # 38 filas: refresco completo
+    where: null
+    exclude_columns: []
+    # Empresas del grupo (F-102). `numemp` es el numero de empresa que guarda
+    # `con.emp` (38 filas MEDIDAS en Sigrid el 2026-09-23): 1 es Ruesma, 28
+    # PORSAN E HIJOS CONSTRUCCIONES SL, y 12, 14, 15, 25, 26, 27, 31 y 34 son
+    # UTE. Da el nombre de la empresa a `maestro.obras` y a `personal.recursos`:
+    # las obras y los recursos son POR EMPRESA y el codigo solo es unico dentro
+    # de una.
+
   - source_table: ctr
     target_table: ctr
     id_column: ide

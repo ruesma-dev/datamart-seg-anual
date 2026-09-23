@@ -1632,8 +1632,8 @@
         "Una consulta por codigo_obra filtrando la ficha principal devuelve una sola fila por codigo, y la regla esta en el diccionario",
         "Avisado el proyecto `facturas` (su F-036) y actualizado azure-apps; y medido si `condir` aporta direcciones que `obr` no tiene"
       ],
-      "status": "pending",
-      "sdd": false,
+      "status": "done",
+      "sdd": true,
       "rigor": "estandar",
       "priority": 2,
       "branch": "hotfix/F-102-obra-duplicada-empresa-28"

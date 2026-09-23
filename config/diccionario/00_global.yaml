@@ -12,6 +12,22 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 29 (F-102, 2026-09-23): LA OBRA Y EL RECURSO SON DE UNA EMPRESA. En
+# Sigrid el mismo codigo existe una vez por empresa --Ruesma (1), Porsan (28),
+# cada UTE-- y es la misma obra vista desde cada una, SIN CONSOLIDAR (modelo del
+# humano). Solo se publican IDENTIFICADORES: `maestro.obras` gana `empresa_id`,
+# `nombre_empresa`, `clave_obra` ('1-0581', '27-0581', unica: 922 para 922),
+# `num_fichas_codigo`, `es_ficha_principal` (la ficha de Ruesma de cada codigo)
+# y `obra_principal_id` (referencia, NO para agregar hechos de otras empresas);
+# la definicion vive en la vista nueva `maestro.v_obra_fichas`. Las cinco vistas
+# de consumo de `compras` con obra acaban en `empresa_id` y `clave_obra`, y
+# `personal.recursos` en `empresa_id`, `nombre_empresa` y `clave_recurso`. Entra
+# `raw.auxemp` (38 empresas) y la ingesta pasa a 69 tablas. Regla nueva
+# `R-CODIGO-POR-EMPRESA`. La direccion de `maestro.obras` deja de medirse sobre
+# las 922 fichas («un tercio») y se mide sobre la de Ruesma: 310 de 846, 49 de
+# 59 desde la 0672. `stg.obras` NO cambia y difiere de la ficha de Ruesma en
+# 0581, 0606, 0671 y 0720: el seguimiento por empresa es F-106.
+#
 # version 28 (F-101, 2026-09-23): LA CABECERA DEL PARTE Y LOS PRECIOS DE LA
 # FICHA DEL RECURSO. Entran `personal.partes` (6.886 cabeceras: codigo,
 # descripcion, estado, fechas y la obra de CABECERA, que AUDITA y no imputa; el
@@ -294,7 +310,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 28
+version: 29
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -386,13 +402,66 @@ reglas:
       administrativos (0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT),
       excluye codigos con cinco o mas digitos seguidos y deduplica por el
       mecanismo de Sigrid `conext.cod = '15'`. `maestro.obras` NO filtra nada:
-      es superconjunto. Toda respuesta que cuente obras debe decir cual usa.
-      `compras` y `retenciones` tampoco filtran por `stg.obras` y pueden traer
-      obras administrativas que el seguimiento excluye.
+      es superconjunto, con una fila por FICHA (una por empresa y codigo, F-102).
+      Toda respuesta que cuente obras debe decir cual usa. `compras` y
+      `retenciones` tampoco filtran por `stg.obras` y pueden traer obras
+      administrativas que el seguimiento excluye. **`stg.obras` sigue eligiendo
+      su ficha como hasta hoy y NO usa `maestro.obras.es_ficha_principal`** (la
+      ficha de Ruesma): las dos difieren en 0581, 0606, 0671 y 0720, donde
+      `stg.obras` --y con ella `mart` y `cierre`-- se queda con la ficha de una
+      UTE o de Porsan. Lo resuelve F-106.
     motivo: >-
       Los filtros estan en `sql/stg/03_obras.sql`; `sql/maestro/01_obras.sql` no
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
-      dar la del maestro como "obras de la empresa" infla el numero.
+      dar la del maestro como "obras de la empresa" infla el numero. F-102
+      (2026-09-23) midio que la eleccion de `stg.obras` no es la ficha de Ruesma
+      en 0581, 0606, 0671 y 0720, y decidio no tocarla: aplicarla sacaria la 0581
+      del seguimiento. F-106 pasa el seguimiento a la ficha de Ruesma.
+
+  - codigo: R-CODIGO-POR-EMPRESA
+    titulo: El codigo de una obra o de un recurso solo es unico dentro de su empresa
+    severidad: bloqueante
+    ambito:
+      - maestro.obras
+      - maestro.v_obra_fichas
+      - stg.obras
+      - personal.partes_lineas
+      - personal.partes
+      - personal.recursos
+      - retenciones.movimientos
+      - maestro.centros_coste
+      - compras.contratos
+      - compras.albaran_lineas
+      - compras.factura_lineas
+      - compras.fact_compras_linea
+    regla: >-
+      En Sigrid las obras y los recursos son POR EMPRESA: el mismo codigo existe
+      una vez por empresa --Ruesma (1), Porsan (28), cada UTE-- y es la misma
+      obra, o la misma persona, vista desde cada una, SIN CONSOLIDAR. **Por
+      `codigo_obra` o `codigo_recurso` se cruza, se filtra y se agrega SIEMPRE
+      junto con `empresa_id`, o por la clave legible**: `clave_obra` en
+      `maestro.obras` y en las vistas de `compras` con obra, y `clave_recurso` en
+      `personal.recursos`, las dos con la forma `<empresa>-<codigo>` (`1-0581`,
+      `27-0581`). Cruzar solo por el codigo devuelve duplicados o coge la ficha
+      que no es. `maestro.obras.es_ficha_principal` marca la ficha de Ruesma de
+      cada codigo, y `obra_principal_id` apunta a ella solo como REFERENCIA: no
+      sirve para agregar hechos de otras empresas, porque sumaria lo de la UTE
+      en la obra de Ruesma. Los hechos (`compras`, `retenciones`, `personal`)
+      llevan el `obra_id` de la ficha de SU empresa y no se traducen. Contar
+      obras por codigo es contar `es_ficha_principal`, y hay que decirlo.
+    motivo: >-
+      Medido en solo lectura el 2026-09-23 (F-102): 922 fichas de obra para 846
+      codigos, 58 codigos repetidos y ninguno repetido dentro de una empresa;
+      922 `clave_obra` para 922 fichas. Recursos: 2.618 para 2.504 codigos, 61
+      repetidos y ninguno dentro de una empresa; 2.618 `clave_recurso` para
+      2.618 recursos (`MO/0009` tiene ficha en las empresas 1, 18, 27 y 28). En
+      `compras.fact_compras_linea`, 91.431 lineas son de una ficha de otra
+      empresa y 84.233 de ellas (31.770.036,29 EUR) tienen un codigo que tambien
+      tiene ficha de Ruesma: son las que se mezclarian agregando por codigo. En
+      `personal.partes_lineas`, 14.079 lineas (1.677.332,46 EUR) imputan a la
+      copia de Porsan de una obra del seguimiento: en la 0704 los trabajadores
+      de Porsan imputan a su propia ficha. Lo destapo Administracion el
+      2026-09-22 al medir la direccion de las obras sobre la copia equivocada.
 
   - codigo: R-PROVEEDOR-INTRAGRUPO
     titulo: El mayor proveedor de la empresa es la propia empresa
@@ -570,7 +639,7 @@ reglas:
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
-      **1. `ide` es la clave de las 68 tablas.** Se llama igual en todas, es el
+      **1. `ide` es la clave de las 69 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 
@@ -583,7 +652,7 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
       **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`

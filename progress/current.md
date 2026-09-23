@@ -9,6 +9,130 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-24 · F-102 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN T16 DEL HUMANO Y EL DESPLIEGUE
+
+> Pendiente de decision del humano (no bloquea): vigilancia permanente de
+> `clave_obra`/`clave_recurso` en base (A indice unico, B claves alternativas en
+> `check-unicidad` -recomendada-, C solo la comprobacion manual).
+
+Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
+`bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
+Informe del implementer: `progress/impl_F-102.md`.
+
+**Diccionario del arbol tras F-102 (version 29): 163 objetos, 1083 columnas,
+72 de consumo** (+2 fichas: `maestro.v_obra_fichas`, de consumo, y `raw.auxemp`).
+- **Desviacion 5 (justificada)**: `maestro.v_obra_fichas` va con
+  `consumo_recomendado: true` y no «no recomendada» (design §3): F-079 reserva
+  el `false` a objetos rotos, vacios o de instrumentacion, y
+  `test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo` lo exige.
+  La descripcion enruta a `maestro.obras` para el contexto de una obra.
+
+- **Hechas T1-T15 y T17** (`bash harness/init.sh` en verde: 5.246 passed,
+  cobertura 94,7 %). Informe: `progress/impl_F-102.md`. **Pendiente**: T16,
+  MANUAL del humano (abajo), y el push de la rama y de `azure-apps`.
+- **Desviacion 6 (declarada; la vigilancia permanente la decide el humano)**:
+  `check-unicidad` NO vigila `clave_obra` ni `clave_recurso`. Sale de la
+  `clave_negocio` de cada ficha (`unicidad_sql.consultas_de_unicidad`), y esa
+  sigue siendo `[obra_id]` / `[recurso_id]`; la spec prometia «`check-unicidad`
+  en la base» (`design.md` §6). Hoy la unicidad de las claves la vigilan el
+  test de su construccion (R6, R26) y, en la base, **solo** las consultas
+  `count(DISTINCT ...)` de M1 y M6. Caminos para vigilarla siempre (NO
+  implementados): un indice unico en `personal.recursos (clave_recurso)`, o que
+  el validador de F-006 admita claves alternativas (resolveria tambien la
+  desviacion 4).
+
+### F-102 · T16, verificaciones MANUALES del humano (necesitan BBDD; en este orden)
+
+**ORDEN DE DESPLIEGUE, antes de nada**: `maestro.obras` y `personal.recursos`
+leen `raw.auxemp`, que crea `ingest_raw`. La nocturna ingiere antes de
+construir; un `build-maestros` o `build-personal` a mano ANTES de la primera
+ingesta con esta version falla por `raw.auxemp` inexistente (lanzar antes
+`python main.py ingest --table auxemp --full`). Y las vistas de `compras` leen
+`maestro.v_obra_fichas` sin depender de `build_maestros`: si la PRIMERA noche
+se salta `build_maestros` (porque falla `build_stg`), la vista no existe aun y
+`build_compras` falla en `03_views.sql`; a partir de la segunda noche persiste.
+
+Tras la primera nocturna con la imagen nueva:
+
+- **M1** · `SELECT count(*), count(DISTINCT clave_obra) FROM maestro.obras;`
+  -> **922 / 922** (el 2026-09-23). Es la UNICA comprobacion en base de que
+  `clave_obra` es unica (desviacion 6).
+- **M2** · `SELECT codigo_obra FROM maestro.obras WHERE es_ficha_principal GROUP BY 1 HAVING count(*) > 1;`
+  -> **0 filas**.
+- **M3** · `SELECT m.codigo_obra FROM maestro.obras m JOIN stg.obras s USING (codigo_obra) WHERE m.es_ficha_principal AND m.obra_id <> s.obra_id;`
+  -> exactamente **0581, 0606, 0671, 0720** (F-106).
+- **M4** · `SELECT empresa_id, count(*), count(dir1) FROM maestro.obras WHERE es_ficha_principal AND codigo_obra ~ '^[0-9]{4}$' AND codigo_obra >= '0672' GROUP BY 1;`
+  -> **1 / 57 / 48** (la cifra de Administracion).
+- **M5** · `SELECT count(*) FILTER (WHERE empresa_id <> 1), count(*) FILTER (WHERE obra_id IS NOT NULL AND clave_obra IS NULL) FROM compras.v_pbi_proveedor_obra;`
+  -> **1.880 / 0**.
+- **M6** · `SELECT count(*), count(DISTINCT clave_recurso) FROM personal.recursos;`
+  -> **2.618 / 2.618**. Unica comprobacion en base de `clave_recurso`.
+- **M7** · `python main.py check-unicidad`, `python main.py check-relaciones` y
+  `python main.py check-declarados`: sin errores nuevos atribuibles a F-102
+  (R30). Recordatorio: `check-unicidad` NO mira las dos claves nuevas.
+- **M8** · `python main.py publicar-diccionario` (version 29): escritura
+  contra Azure, **la lanza el humano**.
+- **M9** · reiniciar el servidor MCP (`mcp-bbdd`), que cachea el diccionario
+  hasta reiniciar.
+  `azure-apps`: commits `511ffff` y `4a14173` (locales, sin push).
+- **T15 verificado en solo lectura**: el cuerpo de `personal.recursos` (con
+  `raw.auxemp` simulado) da 2.618 filas, 2.618 `recurso_id`, 2.618
+  `clave_recurso`, 2.504 codigos y 119 recursos de fuera de la empresa 1.
+- **T14**: F-101 `done` y en `main`; `main` habia avanzado (despliegue de F-101
+  y prioridades F-095/F-106, solo papeleo) y se fusiono en la rama (merge
+  `ecf675c`, `BACKLOG.md` regenerado). `personal.partes` entra en el ambito de
+  `R-CODIGO-POR-EMPRESA`. `version` (28 -> 29) y `TOTAL_TABLAS` (68 -> 69) ya
+  sumaban sobre `main`. `azure-apps`: commit `511ffff` (local, sin push).
+- **Desviacion 4 (justificada)**: la relacion `clave_obra ->
+  maestro.obras.clave_obra` de las cinco vistas de `compras` se declara `N:N`
+  y no `N:1` (R22), con el `porque` diciendo que DE HECHO es N:1 (922 claves
+  para 922 fichas). El validador del diccionario (R5 de F-006,
+  `_es_unica_por`) solo acepta el lado «1» sobre la clave de negocio entera o
+  una `clave_sustituta`; la de `maestro.obras` es `obra_id`, y marcar
+  `clave_obra` como sustituta seria falso (y `check-unicidad` la daria por
+  garantizada). Cambiar la clave de negocio de `maestro.obras` romperia todas
+  las relaciones N:1 que apuntan a su `obra_id`.
+- **Tests de otras features tocados (sin cambiar lo que vigilan)**:
+  `test_f080_diccionario.py` (la lista de columnas de `v_control_forma_pago`
+  gana las dos de F-102), `test_f080_ingesta.py` (el censo es 69 y las tres de
+  F-080 siguen contadas), `TOTAL_TABLAS` de F-066 y F-074 a 69. Las cifras de
+  direccion de F-073 (33,1 %...) se conservan en las fichas como historia.
+  `specs/F-006-mcp-azure/design_detalle.md` gana su enmienda (163 objetos).
+- **Desviacion 3 (justificada)**: en `v_pbi_proveedor_obra` (y por coherencia
+  en `v_pbi_partida_coste`) la empresa y la clave se unen ANTES de agregar y se
+  agrupan con el resto, no «sobre el resultado ya agregado» (R21). La puerta de
+  F-006 `test_f006_r2_control_el_group_by_se_lee_donde_se_puede_leer` exige
+  leer el `GROUP BY` de esas dos vistas en el nivel 0 para comprobar que la
+  clave de negocio cabe en el; con el agregado en una subconsulta deja de
+  leerlo. El grano no cambia (`maestro.v_obra_fichas` tiene una fila por
+  `obra_id` y las dos columnas dependen solo de el): 45.185 y 118.415 filas,
+  las mismas que la vista publicada, medido en solo lectura.
+- **T6 verificado en solo lectura (2026-09-23)**: el cuerpo nuevo de las cinco
+  vistas de `compras`, ejecutado como consulta, da las MISMAS filas que la vista
+  publicada (19.024 / 45.185 / 120.415 / 118.415 / 81.665), 0 filas con obra y
+  sin clave, 0 con clave y sin obra; filas de otra empresa: 495 / 1.880 / 2.946
+  / 3.554 / 1.774.
+- **T5 verificado en solo lectura**: el cuerpo de `maestro.obras` (con
+  `raw.auxemp` simulado, aun no ingerida) da 922 filas, 922 `obra_id`, 922
+  `clave_obra`, 846 principales.
+- **T3 (MANUAL de lectura, hecha 2026-09-23, sesion `read_only`)**: el cuerpo
+  de `maestro.v_obra_fichas` como consulta da 922 fichas / 922 claves / 846
+  principales / 846 codigos; difiere de `stg.obras` exactamente en 0581, 0606,
+  0671 y 0720; 0 codigos con dos principales; 0672+ de cuatro digitos: 57
+  principales de la empresa 1 con 48 `dir1`; 310 de 846 principales con `dir1`;
+  103 fichas de la 28 con 0 `dir1` y 0 cliente; 59 fichas apuntan a otra, 11 de
+  codigos administrativos (CM 1, CP 4, GG 4, POSTV2 1, VAR 1).
+- **Desviacion 1 (justificada)**: `maestro.v_obra_fichas` se crea en
+  `sql/maestro/00_setup.sql` y no en `01_obras.sql`. `tests/test_f073_sql.py`
+  lee las columnas de `maestro.obras` del PRIMER `CREATE OR REPLACE VIEW` de
+  `01_obras.sql` (`test_f073_r18_*`): una vista antepuesta alli rompe esos
+  guardas, y T5 exige `pytest tests/test_f073_sql.py` en verde sin tocarlo.
+  `00_setup.sql` corre antes en el mismo paso, lee solo `raw` y no se dropea.
+- **Desviacion 2 (justificada)**: `num_cierres` se cuenta con `raw.obrfas`
+  agregado por `obride` y `LEFT JOIN` (mismo valor) en vez de la subconsulta
+  correlacionada del diseno: medido en solo lectura, 22 ms frente a 529 ms, y
+  la vista la leen las cinco vistas de `compras` en cada consulta.
+
 ## 2026-09-23 · F-101 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN M1-M10 DEL HUMANO Y EL DESPLIEGUE
 
 HOTFIX de F-057. Spec en `specs/F-101-cabecera-del-parte/`, aprobada el
@@ -1718,3 +1842,28 @@ mes»: 97,0 % del vivo con fecha, 17 obras sin ella. Plazo `plaret` -> `plagar` 
 12. F-059 se retira como absorbida; el resto de F-045 lo hace F-094. La spec ya
 no tiene decisiones abiertas: queda la aprobacion del humano y que F-094 este
 `done`.
+
+## 2026-09-23 · F-102 · SPEC APROBADA (resumen de la fase de spec)
+
+La spec paso cinco rondas con el humano; las intermedias (ficha principal
+aplicada tambien a `stg.obras`, `obra_principal_id` en `compras`, D5 abierta)
+quedaron **sustituidas** y su historia esta en `progress/spec_F-102.md` y en
+el historial de la rama. Lo aprobado el 2026-09-23, sin decisiones abiertas:
+
+- **Modelo**: las obras (y los recursos) son por empresa; el mismo codigo es la
+  misma obra vista desde cada empresa, SIN consolidar. Solo se publican
+  identificadores: `obra_id` sigue siendo la clave tecnica.
+- `maestro.obras` gana `empresa_id`, `nombre_empresa` (se ingiere `auxemp`,
+  D3), `clave_obra` (`<empresa>-<codigo>`), `num_fichas_codigo`,
+  `es_ficha_principal` (la ficha de la empresa 1) y `obra_principal_id` (solo
+  aqui, como referencia; no sirve para agregar hechos de otras empresas).
+- Las cinco vistas de consumo de `compras` con obra publican `empresa_id` y
+  `clave_obra`, **no** `obra_principal_id`. Ningun `obra_id` publicado se
+  reescribe (D2 A).
+- `personal.recursos` gana `empresa_id`, `nombre_empresa` y `clave_recurso`;
+  sin marca de «misma persona en otra empresa» (D5 A).
+- **`stg.obras` NO cambia**: difiere de la ficha de Ruesma en 0581, 0606, 0671 y
+  0720, y lo resuelve **F-106**. `facturas` es independiente, sin aviso (D4).
+- Regla nueva `R-CODIGO-POR-EMPRESA`.
+
+Cifras y consultas de la medicion: `progress/spec_F-102.md`.

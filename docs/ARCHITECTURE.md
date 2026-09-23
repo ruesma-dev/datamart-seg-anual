@@ -92,6 +92,25 @@ sin construir esa noche.
   aplica aquí**: el parte trae la obra, así que `maestro.centros_coste` y
   `res.cenconide` no participan, y los dos identificadores están vetados por
   test en el SQL de `personal`.
+- **LA OBRA Y EL RECURSO SON DE UNA EMPRESA (F-102).** En Sigrid el mismo
+  código existe una vez por empresa —Ruesma (1), Porsan (28), cada UTE— y es la
+  misma obra vista desde cada una, **sin consolidar** (modelo del humano del
+  2026-09-23). Medido: 922 fichas de obra para 846 códigos y 2.618 recursos
+  para 2.504 códigos; dentro de una empresa el código es único. Por eso **el
+  código solo no identifica nada**: se cruza siempre con `empresa_id`
+  (`con.emp`, nombre en `raw.auxemp` por `numemp`) o por la clave legible
+  `<empresa>-<código>` —`clave_obra` en `maestro.obras` y en las vistas de
+  `compras` con obra, `clave_recurso` en `personal.recursos`—. `obra_id` sigue
+  siendo la clave técnica y los hechos llevan la ficha de SU empresa: no se
+  traducen. `maestro.v_obra_fichas` (en `sql/maestro/00_setup.sql`, lee solo
+  `raw`) decide la **ficha de Ruesma** de cada código (`es_ficha_principal`:
+  empresa 1 → `conext` cod 15 → cierres → `tiemod` → `ide` DESC, nunca «`ide`
+  menor») y la publica en `maestro.obras` como referencia
+  (`obra_principal_id`), que no sirve para agregar hechos de otras empresas.
+  Regla dura `R-CODIGO-POR-EMPRESA`. **`stg.obras` NO la usa**: sigue eligiendo
+  una ficha por código como hasta hoy y difiere en 0581, 0606, 0671 y 0720;
+  pasar el seguimiento a la ficha de Ruesma y traer las demás empresas como
+  obras propias es **F-106**.
 - `obr.ide = con.ide` (obra hereda de concepto). El nombre legible está en
   `con.res`. `con.nom` NO existe.
 - En `raw.obrfas` el campo de fase se llama `fasnum`; en `raw.obrparpre` se
@@ -127,12 +146,13 @@ sin construir esa noche.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 68 tablas, y qué NO está ahí (F-066, F-074, F-080)
+### Qué se copia de Sigrid: 69 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102)
 
-`config/tables_sigrid.yaml` declara **68 tablas**: eran 31, F-066 las dejó en 56
-el 2026-09-06, F-074 sumó nueve más el 2026-09-09 y F-080 otras tres el
+`config/tables_sigrid.yaml` declara **69 tablas**: eran 31, F-066 las dejó en 56
+el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
-remesas—, además de recuperar la columna `con.tex` (el memo del documento,
+remesas— y F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
+nombre a la empresa de cada obra y de cada recurso—, además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
 lectura sobre `con`, medio minuto de la ventana nocturna).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
