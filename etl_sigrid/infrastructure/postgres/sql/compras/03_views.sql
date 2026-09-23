@@ -8,6 +8,17 @@
 --   compras.v_pbi_partida_coste          → coste incurrido por partida
 --
 -- Todos los importes SIN IVA. Los ABONOS restan (signo natural).
+--
+-- LA EMPRESA Y LA CLAVE DE LA OBRA (F-102). Las cuatro vistas acaban en
+-- `empresa_id` y `clave_obra` ('<empresa>-<codigo>'), tomadas de
+-- `maestro.v_obra_fichas` por `obra_id` con LEFT JOIN: NULL si la fila no tiene
+-- obra, y sin cambiar el grano (la vista tiene una fila por `obra_id`). Cada
+-- `obra_id` es la ficha de la empresa del documento, y aqui se queda asi: las
+-- obras son POR EMPRESA y no se consolidan, asi que NO se publica la ficha de
+-- Ruesma, que sumaria las facturas de la UTE en la obra de Ruesma. Agregar por
+-- `codigo_obra` mezcla empresas; se agrega por `clave_obra`. La vista de fichas
+-- lee solo `raw` y no se dropea nunca, asi que `build_compras` no gana
+-- dependencia de `build_maestros` (patron de F-094).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -93,11 +104,14 @@ SELECT
         ROUND((COALESCE(ap.albaranado, 0) + COALESCE(ap.certificado_proforma, 0)
                + COALESCE(ap.otros_docs, 0) + COALESCE(fc.facturado_directo, 0))
               / ct.contratado * 100, 2)
-    END                                              AS pct_consumido
+    END                                              AS pct_consumido,
+    fo.empresa_id                                    AS empresa_id,
+    fo.clave_obra                                    AS clave_obra
 FROM compras.contratos c
 LEFT JOIN contratado   ct ON ct.contrato_id = c.contrato_id
 LEFT JOIN alb_pivot    ap ON ap.contrato_id = c.contrato_id
-LEFT JOIN fact_por_ctr fc ON fc.contrato_id = c.contrato_id;
+LEFT JOIN fact_por_ctr fc ON fc.contrato_id = c.contrato_id
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = c.obra_id;
 
 COMMENT ON VIEW compras.v_pbi_contrato_consumo IS
 'Consumo por contrato de compra (Tanda C2). pct_consumido cerca de 100 = '
@@ -107,31 +121,53 @@ COMMENT ON VIEW compras.v_pbi_contrato_consumo IS
 -- ---------------------------------------------------------------------------
 -- PROVEEDORES POR OBRA / AÑO
 -- ---------------------------------------------------------------------------
+-- La empresa y la clave se unen SOBRE EL AGREGADO (F-102): primero se agrega
+-- como siempre, y despues se cuelga una fila de `maestro.v_obra_fichas` por
+-- `obra_id`. El grano no cambia.
 CREATE OR REPLACE VIEW compras.v_pbi_proveedor_obra AS
 SELECT
-    obra_id,
-    codigo_obra,
-    proveedor_id,
-    proveedor_nombre,
-    proveedor_cif,
-    anio,
-    SUM(importe) FILTER (WHERE tipo_doc IN ('FACTURA', 'ABONO'))
-                                            AS facturado,
-    SUM(importe) FILTER (WHERE tipo_doc = 'ALBARAN')
-                                            AS albaranado,
-    SUM(importe) FILTER (WHERE tipo_doc = 'PROFORMA')
-                                            AS certificado_proforma,
-    SUM(importe) FILTER (WHERE tipo_doc = 'CONTRATO')
-                                            AS contratado,
-    COUNT(DISTINCT documento_id) FILTER (WHERE tipo_doc IN ('FACTURA', 'ABONO'))
-                                            AS num_facturas,
-    COUNT(DISTINCT documento_id) FILTER (WHERE tipo_doc IN ('ALBARAN', 'PROFORMA'))
-                                            AS num_albaranes,
-    COUNT(DISTINCT contrato_id)             AS num_contratos
-FROM compras.fact_compras_linea
-WHERE proveedor_id IS NOT NULL
-GROUP BY obra_id, codigo_obra, proveedor_id, proveedor_nombre,
-         proveedor_cif, anio;
+    agg.obra_id,
+    agg.codigo_obra,
+    agg.proveedor_id,
+    agg.proveedor_nombre,
+    agg.proveedor_cif,
+    agg.anio,
+    agg.facturado,
+    agg.albaranado,
+    agg.certificado_proforma,
+    agg.contratado,
+    agg.num_facturas,
+    agg.num_albaranes,
+    agg.num_contratos,
+    fo.empresa_id                           AS empresa_id,
+    fo.clave_obra                           AS clave_obra
+FROM (
+    SELECT
+        obra_id,
+        codigo_obra,
+        proveedor_id,
+        proveedor_nombre,
+        proveedor_cif,
+        anio,
+        SUM(importe) FILTER (WHERE tipo_doc IN ('FACTURA', 'ABONO'))
+                                                AS facturado,
+        SUM(importe) FILTER (WHERE tipo_doc = 'ALBARAN')
+                                                AS albaranado,
+        SUM(importe) FILTER (WHERE tipo_doc = 'PROFORMA')
+                                                AS certificado_proforma,
+        SUM(importe) FILTER (WHERE tipo_doc = 'CONTRATO')
+                                                AS contratado,
+        COUNT(DISTINCT documento_id) FILTER (WHERE tipo_doc IN ('FACTURA', 'ABONO'))
+                                                AS num_facturas,
+        COUNT(DISTINCT documento_id) FILTER (WHERE tipo_doc IN ('ALBARAN', 'PROFORMA'))
+                                                AS num_albaranes,
+        COUNT(DISTINCT contrato_id)             AS num_contratos
+    FROM compras.fact_compras_linea
+    WHERE proveedor_id IS NOT NULL
+    GROUP BY obra_id, codigo_obra, proveedor_id, proveedor_nombre,
+             proveedor_cif, anio
+) agg
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = agg.obra_id;
 
 COMMENT ON VIEW compras.v_pbi_proveedor_obra IS
 'Agregado proveedor × obra × año (Tanda C2). "Proveedores con más facturación '
@@ -162,12 +198,15 @@ SELECT
     l.cantidad_facturada,
     l.importe,
     l.importe_pendiente_facturar,
-    (CURRENT_DATE - a.fecha)                AS dias_desde_albaran
+    (CURRENT_DATE - a.fecha)                AS dias_desde_albaran,
+    fo.empresa_id                           AS empresa_id,
+    fo.clave_obra                           AS clave_obra
 FROM compras.albaran_lineas l
 JOIN compras.albaranes a  ON a.albaran_id = l.albaran_id
 LEFT JOIN raw.con obr_con ON obr_con.ide = l.obra_id
 LEFT JOIN compras.contratos ctr
        ON ctr.contrato_id = COALESCE(a.contrato_id, l.contrato_id_linea)
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = l.obra_id
 WHERE l.importe_pendiente_facturar > 0
   AND a.tipo_documento IN ('ALBARAN', 'PROFORMA');
 
@@ -178,29 +217,47 @@ COMMENT ON VIEW compras.v_pbi_albaranes_sin_facturar IS
 -- ---------------------------------------------------------------------------
 -- COSTE INCURRIDO POR PARTIDA (albaranado + facturado)
 -- ---------------------------------------------------------------------------
+-- Tambien aqui la empresa y la clave se unen sobre el agregado (F-102).
 CREATE OR REPLACE VIEW compras.v_pbi_partida_coste AS
 SELECT
-    f.obra_id,
-    f.codigo_obra,
-    f.partida_id,
-    par.cod                                 AS codigo_partida,
-    par.res                                 AS descripcion_partida,
-    SUM(f.importe) FILTER (WHERE f.tipo_doc = 'ALBARAN')
-                                            AS albaranado,
-    SUM(f.importe) FILTER (WHERE f.tipo_doc = 'PROFORMA')
-                                            AS certificado_proforma,
-    SUM(f.importe) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
-                                            AS facturado,
-    SUM(f.importe) FILTER (WHERE f.tipo_doc = 'CONTRATO')
-                                            AS contratado,
-    COUNT(*) FILTER (WHERE f.tipo_doc IN ('ALBARAN', 'PROFORMA'))
-                                            AS num_lineas_albaran,
-    COUNT(*) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
-                                            AS num_lineas_factura
-FROM compras.fact_compras_linea f
-LEFT JOIN raw.obrparpar par ON par.ide = f.partida_id
-WHERE f.partida_id IS NOT NULL
-GROUP BY f.obra_id, f.codigo_obra, f.partida_id, par.cod, par.res;
+    agg.obra_id,
+    agg.codigo_obra,
+    agg.partida_id,
+    agg.codigo_partida,
+    agg.descripcion_partida,
+    agg.albaranado,
+    agg.certificado_proforma,
+    agg.facturado,
+    agg.contratado,
+    agg.num_lineas_albaran,
+    agg.num_lineas_factura,
+    fo.empresa_id                           AS empresa_id,
+    fo.clave_obra                           AS clave_obra
+FROM (
+    SELECT
+        f.obra_id,
+        f.codigo_obra,
+        f.partida_id,
+        par.cod                                 AS codigo_partida,
+        par.res                                 AS descripcion_partida,
+        SUM(f.importe) FILTER (WHERE f.tipo_doc = 'ALBARAN')
+                                                AS albaranado,
+        SUM(f.importe) FILTER (WHERE f.tipo_doc = 'PROFORMA')
+                                                AS certificado_proforma,
+        SUM(f.importe) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
+                                                AS facturado,
+        SUM(f.importe) FILTER (WHERE f.tipo_doc = 'CONTRATO')
+                                                AS contratado,
+        COUNT(*) FILTER (WHERE f.tipo_doc IN ('ALBARAN', 'PROFORMA'))
+                                                AS num_lineas_albaran,
+        COUNT(*) FILTER (WHERE f.tipo_doc IN ('FACTURA', 'ABONO'))
+                                                AS num_lineas_factura
+    FROM compras.fact_compras_linea f
+    LEFT JOIN raw.obrparpar par ON par.ide = f.partida_id
+    WHERE f.partida_id IS NOT NULL
+    GROUP BY f.obra_id, f.codigo_obra, f.partida_id, par.cod, par.res
+) agg
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = agg.obra_id;
 
 COMMENT ON VIEW compras.v_pbi_partida_coste IS
 'Coste incurrido por partida (Tanda C2): albaranado (AC), certificado (PROF) '

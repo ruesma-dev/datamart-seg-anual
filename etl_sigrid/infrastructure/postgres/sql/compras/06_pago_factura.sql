@@ -21,7 +21,7 @@
 -- Lee de: compras.facturas, compras.vencimientos, compras.factura_lineas,
 --         compras.albaran_lineas, compras.albaranes, compras.contratos,
 --         compras.formas_pago, raw.dcf, raw.ctr, raw.con, raw.auxnap,
---         raw.auxefp, raw.auxban.
+--         raw.auxefp, raw.auxban, y maestro.v_obra_fichas (F-102).
 -- ============================================================================
 
 -- Las dos vistas se tiran antes de crearlas, y en orden inverso al de
@@ -183,14 +183,20 @@ SELECT
                                             AS forma_pago_comparable,
     (vf.forma_pago_id IS NOT NULL AND fpc.forma_pago_id IS NOT NULL
      AND vf.forma_pago_id = fpc.forma_pago_id)
-                                            AS forma_pago_coincide
+                                            AS forma_pago_coincide,
+    -- F-102: la empresa y la clave de la obra DEL CONTRATO, de
+    -- `maestro.v_obra_fichas`. NULL si el contrato no tiene obra. No se publica
+    -- la ficha de Ruesma: cada documento se queda con SU empresa.
+    fo.empresa_id                           AS empresa_id,
+    fo.clave_obra                           AS clave_obra
 FROM pares pa
 JOIN compras.v_facturas_pago vf ON vf.factura_id = pa.factura_id
 JOIN compras.contratos ct       ON ct.contrato_id = pa.contrato_id
 -- La forma de pago del contrato se lee de `raw.ctr.pagide`: `compras.contratos`
 -- no la publica todavia, y publicarla ahi es F-067 (R21, R28).
 LEFT JOIN raw.ctr ctr           ON ctr.ide = pa.contrato_id
-LEFT JOIN compras.formas_pago fpc ON fpc.forma_pago_id = NULLIF(ctr.pagide, 0);
+LEFT JOIN compras.formas_pago fpc ON fpc.forma_pago_id = NULLIF(ctr.pagide, 0)
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = ct.obra_id;
 
 COMMENT ON VIEW compras.v_control_forma_pago IS
 'Forma de pago de la factura de compra enfrentada a la de su contrato. GRANO: '

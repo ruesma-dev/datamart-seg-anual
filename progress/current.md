@@ -15,7 +15,15 @@ Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
 Informe del implementer: `progress/impl_F-102.md` (al terminar).
 
-- **Tarea en curso**: T4. Hechas T1 (RED), T2 (vista) y T3.
+- **Tarea en curso**: T7. Hechas T1-T6.
+- **T6 verificado en solo lectura (2026-09-23)**: el cuerpo nuevo de las cinco
+  vistas de `compras`, ejecutado como consulta, da las MISMAS filas que la vista
+  publicada (19.024 / 45.185 / 120.415 / 118.415 / 81.665), 0 filas con obra y
+  sin clave, 0 con clave y sin obra; filas de otra empresa: 495 / 1.880 / 2.946
+  / 3.554 / 1.774.
+- **T5 verificado en solo lectura**: el cuerpo de `maestro.obras` (con
+  `raw.auxemp` simulado, aun no ingerida) da 922 filas, 922 `obra_id`, 922
+  `clave_obra`, 846 principales.
 - **T3 (MANUAL de lectura, hecha 2026-09-23, sesion `read_only`)**: el cuerpo
   de `maestro.v_obra_fichas` como consulta da 922 fichas / 922 claves / 846
   principales / 846 codigos; difiere de `stg.obras` exactamente en 0581, 0606,
