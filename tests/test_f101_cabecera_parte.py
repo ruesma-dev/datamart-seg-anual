@@ -361,6 +361,37 @@ def test_f101_r16_ficha_texto_linea_avisa_de_nombres_de_persona() -> None:
     assert "nombres de persona" in texto, "el texto puede llevar nombres (R16)"
 
 
+def test_f101_r16_la_exposicion_en_raw_esta_declarada_y_aceptada() -> None:
+    """Review de F-101, cambio 1: `tex` NO vive solo en `personal`.
+
+    Queda tambien en `raw.hmores`, que el rol de consumo puede leer (no esta en
+    la lista de exclusion de F-068, como `reshor`). El humano ACEPTO esa
+    exposicion el 2026-09-23 (opcion b). Lo que no se admite es afirmar lo
+    contrario: que el texto vive solo en el esquema restringible.
+    """
+    linea = _plano(_columna("partes_lineas", "texto_linea").significado)
+    assert "raw.hmores" in linea and "2026-09-23" in linea, (
+        "la ficha tiene que decir que el texto tambien esta en `raw.hmores` (R16)"
+    )
+    assert "restringible" not in linea, "el texto NO vive solo en `personal`"
+
+    fichas_raw = yaml.safe_load((DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8"))
+    hmores = _plano(fichas_raw["objetos"]["hmores"]["descripcion"])
+    assert "nombres de persona aqui" in hmores and "2026-09-23" in hmores
+
+    crudo = FICHERO_TABLAS.read_text(encoding="utf-8")
+    bloque = crudo.split("source_table: hmores", 1)[1].split("- source_table:", 1)[0]
+    bloque = re.sub(r"\s*#\s*", " ", bloque)
+    assert "ACEPTADA POR EL HUMANO EL 2026-09-23" in bloque
+    assert "se publica solo en el esquema" not in bloque
+
+    from config.settings import DEFAULT_EXCLUDED_TABLES
+
+    assert "raw.hmores" not in DEFAULT_EXCLUDED_TABLES.split(","), (
+        "opcion (b): no se revoca nada. Si se revoca, cambiar la ficha y este test"
+    )
+
+
 # ===========================================================================
 # C · personal.recursos_tipos_hora — los precios de la ficha (R17-R25)
 # ===========================================================================
@@ -482,7 +513,7 @@ def test_f101_r24_ficha_declara_que_no_hay_historico_de_precios() -> None:
 
 
 def test_f101_r25_ficha_cuantifica_el_desfase_con_las_lineas() -> None:
-    """La pregunta de Juan (el caso Jaime Rabadan), con su cifra."""
+    """La pregunta de Juan (el caso del recurso MO/0306), con su cifra."""
     texto = _ficha_de("recursos_tipos_hora").descripcion
 
     for cifra in ("156.819", "279.034", "56,2"):

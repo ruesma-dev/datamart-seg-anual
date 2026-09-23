@@ -230,9 +230,9 @@ objetos:
       EUR--. Para horas, `v_pbi_horas_obra_mes`; para el euro total de personal
       de una obra, esta tabla sin filtrar unidad.
 
-      **La obra sale de la LINEA, no de la cabecera del parte**: en 769 lineas
-      (0,23 %) las dos discrepan y manda la linea, que es ademas la que lleva la
-      partida (remedido el 2026-09-23: 615 lineas de 14 partes). La cabecera
+      **La obra sale de la LINEA, no de la cabecera del parte**: en 615 lineas
+      de 14 partes (medido el 2026-09-23) las dos discrepan y manda la linea,
+      que es ademas la que lleva la partida. La cabecera
       completa --codigo, descripcion, estado y su obra, que AUDITA-- esta en
       `personal.partes`; aqui solo baja el codigo del parte. La atribucion por centro de coste --la trampa de `apu`, que F-045
       tiene abierta-- **no aplica aqui**: el parte trae la obra.
@@ -368,9 +368,12 @@ objetos:
         significado: >-
           El comentario de la linea del parte tal y como se teclea en Sigrid
           (F-101). Es **texto libre y puede llevar nombres de persona** --se ha
-          medido un nombre y dos apellidos en uno--, otra razon para que viva en
-          este esquema, el restringible. Informado en 13.390 de 330.941 lineas
-          (4,05 %), de 2.306 partes; maximo 318 caracteres.
+          medido un nombre y dos apellidos en uno--. **No vive solo aqui**: el
+          mismo texto esta en la tabla de origen `raw.hmores`, que el rol de
+          consulta tambien puede leer, asi que retirar el acceso a este esquema
+          no lo retira de alli (exposicion aceptada por el responsable del dato
+          el 2026-09-23). Informado en 13.390 de 330.941 lineas (4,05 %), de
+          2.306 partes; maximo 318 caracteres.
         nulo_significa: La linea no lleva comentario (el 95,95 % de ellas).
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.

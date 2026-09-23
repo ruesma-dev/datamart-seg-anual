@@ -622,8 +622,14 @@ tables:
     # 13.390 de 330.941 lineas (4,05 %), 284.080 bytes en total (277 KiB),
     # maximo 318 bytes, presente en 2.306 de los 6.873 partes con lineas. Sobre
     # los 101 MB de datos de `raw.hmores` (320,3 B/fila) es +0,86 B/fila, un
-    # +0,27 %. Es TEXTO LIBRE y trae nombres de persona: se publica solo en el
-    # esquema `personal`, el restringible. El coste de ventana se cronometra
+    # +0,27 %. Es TEXTO LIBRE y trae nombres de persona. OJO: NO vive solo en
+    # `personal`. Queda tambien aqui, en `raw.hmores`, y el rol de consumo
+    # `mcp_sigrid_dm_ro` tiene SELECT sobre esta tabla (no esta revocada como
+    # `reshor`/`emphis` por F-068). Exposicion ACEPTADA POR EL HUMANO EL
+    # 2026-09-23 (review de F-101, opcion b; no se revoca nada). Atenuantes: el
+    # servidor MCP no expone `raw` en su lista blanca y el rol ya lee nombres
+    # en `raw.con.res`. Revocar `personal` NO retira este texto: para eso hay que
+    # anadir `hmores` a DEFAULT_EXCLUDED_TABLES. El coste de ventana se cronometra
     # (`ingest --table hmores --full` antes y despues): verificacion MANUAL M9.
     # LAS HORAS (328.760 filas, 57 columnas con `tex`). Es la tabla que faltaba: `reside`
     # informado en el 99,9 %, `obride` en el 99,6 % (536 obras distintas), mas

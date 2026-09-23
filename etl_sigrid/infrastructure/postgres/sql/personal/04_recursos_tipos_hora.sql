@@ -5,7 +5,7 @@
 -- Una fila por fila de `raw.reshor` (8.968 el 2026-09-23; 2.064 recursos, 58
 -- tipos de hora): que tipos de hora tiene definidos cada recurso, a que precio
 -- y en que unidad. Lo pidio Juan Romero para comparar lo CONFIGURADO con lo
--- IMPUTADO en los partes (el caso de Jaime Rabadan, MO/0306).
+-- IMPUTADO en los partes (el caso que puso, el recurso MO/0306).
 --
 -- ---------------------------------------------------------------------------
 -- LA CLAVE ES `reshor_id`, NO EL PAR (D-4)
