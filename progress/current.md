@@ -13,7 +13,10 @@
 
 Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
-Informe del implementer: `progress/impl_F-102.md` (al terminar).
+Informe del implementer: `progress/impl_F-102.md`.
+
+**Diccionario del arbol tras F-102 (version 29): 163 objetos, 1083 columnas,
+71 de consumo** (+2 fichas: `maestro.v_obra_fichas` y `raw.auxemp`).
 
 - **Tarea en curso**: T17 (T16 es MANUAL del humano). Hechas T1-T15.
   `azure-apps`: commits `511ffff` y `4a14173` (locales, sin push).
