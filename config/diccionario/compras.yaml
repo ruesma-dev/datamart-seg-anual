@@ -88,12 +88,19 @@ objetos:
           viene de la cabecera; en el albaran, de la propia linea con respaldo en
           la obra del contrato; y en la factura, de la linea, con respaldo en la
           linea de albaran de origen y luego en el contrato.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 91.431 lineas son de una ficha de empresa distinta de Ruesma (54.198.506,59 EUR de FACTURA y ABONO), y 84.233 de ellas (31.770.036,29 EUR) tienen un codigo que tambien tiene ficha de Ruesma: son las que se mezclarian agregando por `codigo_obra`. Solo 3 lineas (484,00 EUR) llevan la copia de Porsan (empresa 28), y 9.363 no tienen obra. `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         nulo_significa: >-
           La linea no se imputa a ninguna obra: es estructura, gastos generales
           o compra de central. **No se pueden perder al agregar**: filtrarlas
           fuera sin decirlo deja el total de compras por debajo del real.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid. **No identifica una obra
+          por si solo**: se repite en cada empresa (F-102), y agregar por el
+          mezcla empresas. La clave legible, `clave_obra`, esta en
+          `maestro.obras` por `obra_id`.
       proveedor_id:
         significado: >-
           Identificador del proveedor en Sigrid (`con.ide`). Sale de un
@@ -180,7 +187,7 @@ objetos:
         porque: >-
           Para poner nombre y cliente a la obra. Se usa el maestro y no
           `stg.obras` porque este esquema no filtra: hay obras aqui que el
-          universo del seguimiento excluye.
+          universo del seguimiento excluye. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
 
     ejemplos_preguntas:
       - Que proveedores nos han facturado mas este ano
@@ -255,6 +262,8 @@ objetos:
         significado: >-
           Obra del contrato, tomada de la CABECERA. En albaranes y facturas la
           obra viene en la linea, no aqui.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 469 contratos llevan la ficha de una UTE de un codigo del seguimiento y 21 una ficha fuera de el; ninguno la copia de Porsan (empresa 28). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         nulo_significa: El contrato no se imputa a una obra concreta.
         agregacion: no_sumable
       codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
@@ -324,7 +333,8 @@ objetos:
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
-        porque: Para el nombre y el cliente de la obra.
+        porque: >-
+          Para el nombre y el cliente de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
     ejemplos_preguntas:
       - Que contratos tiene abiertos la obra X y con quien
       - Con que proveedores tiene contrato la obra X
@@ -501,6 +511,8 @@ objetos:
           Obra a la que se imputa lo entregado. A diferencia del contrato, aqui
           la obra viene EN LA LINEA: un mismo albaran puede repartirse entre
           varias obras.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 37.646 lineas llevan la ficha de una UTE de un codigo del seguimiento y 958 una ficha fuera de el; ninguna la copia de Porsan (empresa 28). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         nulo_significa: La linea no se imputa a ninguna obra (estructura o generales).
         agregacion: no_sumable
       partida_id:
@@ -571,6 +583,11 @@ objetos:
         a: compras.contrato_lineas.linea_id
         cardinalidad: "N:1"
         porque: Para comparar lo entregado contra lo comprometido en esa linea.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el nombre, el cliente, la empresa y la clave de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
     ejemplos_preguntas:
       - Que tenemos entregado y sin facturar en la obra X
 
@@ -753,6 +770,8 @@ objetos:
           Obra a la que se imputa la linea. Puede venir vacia y resolverse
           despues por el albaran de origen: esa cascada esta ya aplicada en
           `compras.fact_compras_linea`, aqui no.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 39.223 lineas llevan la ficha de una UTE de un codigo del seguimiento, 3.468 una ficha fuera de el y 3 la copia de Porsan (empresa 28). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         nulo_significa: La factura no informo la obra en la linea.
         agregacion: no_sumable
       partida_id:
@@ -820,6 +839,11 @@ objetos:
         porque: >-
           Es la trazabilidad entrega -> factura, y de donde la factura hereda la
           obra y la partida cuando no las informa.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el nombre, el cliente, la empresa y la clave de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
     ejemplos_preguntas:
       - De que albaranes sale la factura F
 
@@ -831,6 +855,8 @@ objetos:
       El estado de cada contrato de un vistazo: cuanto se comprometio, cuanto se
       ha entregado, cuanto se ha facturado, cuanto queda disponible y que
       porcentaje se lleva consumido. Es la vista para "como va el contrato C".
+
+      **LA OBRA ES DE UNA EMPRESA (F-102).** Cada fila lleva la ficha de obra de la empresa de su documento, y acaba en `empresa_id` y `clave_obra`. **Agregar por `codigo_obra` mezcla empresas** --la UTE dentro de la obra de Ruesma, que no se consolida--: se agrega por `clave_obra`, o por `codigo_obra` junto con `empresa_id`. Medido el 2026-09-23: 495 de las 19.024 filas llevan la ficha de una empresa distinta de Ruesma.
     grano: >-
       Una fila por `contrato_id`.
     clave_negocio: [contrato_id]
@@ -849,7 +875,11 @@ objetos:
         significado: Obra del contrato, tomada de su cabecera.
         nulo_significa: El contrato no se imputa a una obra concreta.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid. **No identifica una obra
+          por si solo**: se repite en cada empresa (F-102). Para agregar, usar
+          `clave_obra`.
       nombre_obra: Nombre legible de la obra.
       proveedor_id:
         significado: Identificador del proveedor contratado.
@@ -916,7 +946,31 @@ objetos:
         unidad: "%"
         agregacion: promedio
         nulo_significa: El contrato no tiene importe contratado con el que dividir.
+      empresa_id:
+        significado: >-
+          Empresa de la ficha de obra del contrato (F-102), de
+          `maestro.v_obra_fichas`: `1` es Ruesma, `28` Porsan y el resto UTE; el
+          nombre esta en `maestro.obras.nombre_empresa`. En Sigrid la obra es POR
+          EMPRESA y cada documento lleva la ficha de SU empresa: aqui no se
+          traduce a la de Ruesma, porque no se consolida.
+        agregacion: no_sumable
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
+      clave_obra:
+        significado: >-
+          Clave legible y UNICA de la ficha de obra, `<empresa>-<codigo>`
+          (`1-0581`, `27-0581`). **Se agrega por `clave_obra`, no por
+          `codigo_obra`**: el codigo se repite en cada empresa y agregar por el
+          mezcla empresas --mete la UTE dentro de la obra de Ruesma, que no se
+          consolida--. Se cruza con `maestro.obras.clave_obra`.
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
     relaciones:
+      - de: clave_obra
+        a: maestro.obras.clave_obra
+        cardinalidad: "N:1"
+        porque: >-
+          La ficha de obra por su clave legible y unica (F-102): la misma union
+          que por `obra_id`, pero legible. Es tambien la llave por la que
+          agregar: por `codigo_obra` se juntan fichas de empresas distintas.
       - de: contrato_id
         a: compras.contratos.contrato_id
         cardinalidad: "1:1"
@@ -937,6 +991,8 @@ objetos:
       Cuanto se ha movido con cada proveedor en cada obra y cada ano, abierto
       por los cuatro momentos del gasto: contratado, entregado, certificado y
       facturado. Es la vista del ranking de proveedores.
+
+      **LA OBRA ES DE UNA EMPRESA (F-102).** Cada fila lleva la ficha de obra de la empresa de su documento, y acaba en `empresa_id` y `clave_obra`. **Agregar por `codigo_obra` mezcla empresas** --la UTE dentro de la obra de Ruesma, que no se consolida--: se agrega por `clave_obra`, o por `codigo_obra` junto con `empresa_id`. Medido el 2026-09-23: 1.880 de las 45.185 filas son de una empresa distinta de Ruesma, y 1.066 de ellas tienen un codigo que tambien tiene ficha de Ruesma: son las que se juntarian con las de Ruesma agregando por codigo.
     grano: >-
       Una fila por (`obra_id`, `codigo_obra`, `proveedor_id`,
       `proveedor_nombre`, `proveedor_cif`, `anio`), que es su clave de negocio y
@@ -956,7 +1012,11 @@ objetos:
           El gasto no se imputa a ninguna obra: estructura o generales. Estas
           filas **no se pueden perder** al hacer un ranking de proveedores.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid. **No identifica una obra
+          por si solo**: se repite en cada empresa (F-102). Para agregar, usar
+          `clave_obra`.
       proveedor_id:
         significado: >-
           Identificador del proveedor. Nunca es nulo aqui, y no porque siempre
@@ -1015,7 +1075,31 @@ objetos:
           Cuantos contratos distintos hay detras. Misma advertencia: es un
           recuento de distintos y no se suma.
         agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de la ficha de obra de la fila (F-102), de
+          `maestro.v_obra_fichas`: `1` es Ruesma, `28` Porsan y el resto UTE; el
+          nombre esta en `maestro.obras.nombre_empresa`. En Sigrid la obra es POR
+          EMPRESA y cada documento lleva la ficha de SU empresa: aqui no se
+          traduce a la de Ruesma, porque no se consolida.
+        agregacion: no_sumable
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
+      clave_obra:
+        significado: >-
+          Clave legible y UNICA de la ficha de obra, `<empresa>-<codigo>`
+          (`1-0581`, `27-0581`). **Se agrega por `clave_obra`, no por
+          `codigo_obra`**: el codigo se repite en cada empresa y agregar por el
+          mezcla empresas --mete la UTE dentro de la obra de Ruesma, que no se
+          consolida--. Se cruza con `maestro.obras.clave_obra`.
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
     relaciones:
+      - de: clave_obra
+        a: maestro.obras.clave_obra
+        cardinalidad: "N:1"
+        porque: >-
+          La ficha de obra por su clave legible y unica (F-102): la misma union
+          que por `obra_id`, pero legible. Es tambien la llave por la que
+          agregar: por `codigo_obra` se juntan fichas de empresas distintas.
       - de: proveedor_id
         a: maestro.proveedores.proveedor_id
         cardinalidad: "N:1"
@@ -1042,6 +1126,8 @@ objetos:
       tal cual da 68,7 BILLONES de euros.** Dos lineas del albaran `AC21/03345`
       llevan importes absurdos y se comen la cifra entera; descartandolas son
       **260,6 M€**, que es la respuesta buena. Ver R-ALBARAN-ABSURDO.
+
+      **LA OBRA ES DE UNA EMPRESA (F-102).** Cada fila lleva la ficha de obra de la empresa de su documento, y acaba en `empresa_id` y `clave_obra`. **Agregar por `codigo_obra` mezcla empresas** --la UTE dentro de la obra de Ruesma, que no se consolida--: se agrega por `clave_obra`, o por `codigo_obra` junto con `empresa_id`. Medido el 2026-09-23: 2.946 de las 120.415 filas llevan la ficha de una empresa distinta de Ruesma.
     grano: >-
       Una fila por `linea_id` de albaran o proforma con pendiente. **Esta vista
       SI filtra por tipo**: solo ALBARAN y PROFORMA, asi que las notas de cargo
@@ -1088,7 +1174,11 @@ objetos:
         significado: Obra a la que se imputa la entrega pendiente.
         nulo_significa: La linea no se imputa a ninguna obra.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid. **No identifica una obra
+          por si solo**: se repite en cada empresa (F-102). Para agregar, usar
+          `clave_obra`.
       partida_id:
         significado: Partida de obra de la entrega pendiente.
         nulo_significa: La linea no se imputa a una partida concreta.
@@ -1120,7 +1210,31 @@ objetos:
           Cuantos dias lleva la entrega sin facturarse. Sirve para priorizar lo
           mas antiguo, que es donde se acumulan los problemas.
         agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de la ficha de obra de la linea (F-102), de
+          `maestro.v_obra_fichas`: `1` es Ruesma, `28` Porsan y el resto UTE; el
+          nombre esta en `maestro.obras.nombre_empresa`. En Sigrid la obra es POR
+          EMPRESA y cada documento lleva la ficha de SU empresa: aqui no se
+          traduce a la de Ruesma, porque no se consolida.
+        agregacion: no_sumable
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
+      clave_obra:
+        significado: >-
+          Clave legible y UNICA de la ficha de obra, `<empresa>-<codigo>`
+          (`1-0581`, `27-0581`). **Se agrega por `clave_obra`, no por
+          `codigo_obra`**: el codigo se repite en cada empresa y agregar por el
+          mezcla empresas --mete la UTE dentro de la obra de Ruesma, que no se
+          consolida--. Se cruza con `maestro.obras.clave_obra`.
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
     relaciones:
+      - de: clave_obra
+        a: maestro.obras.clave_obra
+        cardinalidad: "N:1"
+        porque: >-
+          La ficha de obra por su clave legible y unica (F-102): la misma union
+          que por `obra_id`, pero legible. Es tambien la llave por la que
+          agregar: por `codigo_obra` se juntan fichas de empresas distintas.
       - de: linea_id
         a: compras.albaran_lineas.linea_id
         cardinalidad: "1:1"
@@ -1141,6 +1255,8 @@ objetos:
       El coste incurrido de cada partida de obra desde el lado documental:
       cuanto se ha entregado, certificado, facturado y contratado en ella. Es la
       cara "real documental" que se compara con el coste del seguimiento.
+
+      **LA OBRA ES DE UNA EMPRESA (F-102).** Cada fila lleva la ficha de obra de la empresa de su documento, y acaba en `empresa_id` y `clave_obra`. **Agregar por `codigo_obra` mezcla empresas** --la UTE dentro de la obra de Ruesma, que no se consolida--: se agrega por `clave_obra`, o por `codigo_obra` junto con `empresa_id`. Medido el 2026-09-23: 3.554 de las 118.415 filas son de una empresa distinta de Ruesma.
     grano: >-
       Una fila por (`obra_id`, `codigo_obra`, `partida_id`, `codigo_partida`,
       `descripcion_partida`), que es su clave de negocio y son CINCO columnas,
@@ -1159,7 +1275,11 @@ objetos:
           que pueden aparecer obras administrativas que el seguimiento excluye.
         nulo_significa: Las lineas no tenian obra informada.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid. **No identifica una obra
+          por si solo**: se repite en cada empresa (F-102). Para agregar, usar
+          `clave_obra`.
       partida_id:
         significado: >-
           Identificador de la partida en Sigrid. Es el eje que permite comparar
@@ -1199,7 +1319,31 @@ objetos:
       num_lineas_factura:
         significado: Cuantas lineas de factura o abono hay detras de la cifra.
         agregacion: suma
+      empresa_id:
+        significado: >-
+          Empresa de la ficha de obra de la fila (F-102), de
+          `maestro.v_obra_fichas`: `1` es Ruesma, `28` Porsan y el resto UTE; el
+          nombre esta en `maestro.obras.nombre_empresa`. En Sigrid la obra es POR
+          EMPRESA y cada documento lleva la ficha de SU empresa: aqui no se
+          traduce a la de Ruesma, porque no se consolida.
+        agregacion: no_sumable
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
+      clave_obra:
+        significado: >-
+          Clave legible y UNICA de la ficha de obra, `<empresa>-<codigo>`
+          (`1-0581`, `27-0581`). **Se agrega por `clave_obra`, no por
+          `codigo_obra`**: el codigo se repite en cada empresa y agregar por el
+          mezcla empresas --mete la UTE dentro de la obra de Ruesma, que no se
+          consolida--. Se cruza con `maestro.obras.clave_obra`.
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
     relaciones:
+      - de: clave_obra
+        a: maestro.obras.clave_obra
+        cardinalidad: "N:1"
+        porque: >-
+          La ficha de obra por su clave legible y unica (F-102): la misma union
+          que por `obra_id`, pero legible. Es tambien la llave por la que
+          agregar: por `codigo_obra` se juntan fichas de empresas distintas.
       - de: partida_id
         a: mart.fact_seguimiento_mensual.partida_id
         cardinalidad: "N:N"
@@ -1836,6 +1980,8 @@ objetos:
 
       La forma de pago del contrato se lee de `raw.ctr.pagide`, no de
       `compras.contratos`, que todavia no la publica (eso es F-067).
+
+      **LA OBRA ES DE UNA EMPRESA (F-102).** Cada fila lleva la ficha de obra de la empresa de su documento, y acaba en `empresa_id` y `clave_obra`. **Agregar por `codigo_obra` mezcla empresas** --la UTE dentro de la obra de Ruesma, que no se consolida--: se agrega por `clave_obra`, o por `codigo_obra` junto con `empresa_id`. Medido el 2026-09-23: 1.774 de las 81.665 filas llevan la ficha de una empresa distinta de Ruesma.
     grano: >-
       Una fila por PAR (`factura_id`, `contrato_id`). No es una fila por
       factura: una factura con lineas de dos contratos sale dos veces, asi que
@@ -1907,7 +2053,31 @@ objetos:
           Cierto cuando factura y contrato declaran la MISMA forma de pago. Es
           falso tanto si son distintas como si falta una de las dos:
           `forma_pago_comparable` distingue los dos casos.
+      empresa_id:
+        significado: >-
+          Empresa de la ficha de obra del contrato (F-102), de
+          `maestro.v_obra_fichas`: `1` es Ruesma, `28` Porsan y el resto UTE; el
+          nombre esta en `maestro.obras.nombre_empresa`. En Sigrid la obra es POR
+          EMPRESA y cada documento lleva la ficha de SU empresa: aqui no se
+          traduce a la de Ruesma, porque no se consolida.
+        agregacion: no_sumable
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
+      clave_obra:
+        significado: >-
+          Clave legible y UNICA de la ficha de obra, `<empresa>-<codigo>`
+          (`1-0581`, `27-0581`). **Se agrega por `clave_obra`, no por
+          `codigo_obra`**: el codigo se repite en cada empresa y agregar por el
+          mezcla empresas --mete la UTE dentro de la obra de Ruesma, que no se
+          consolida--. Se cruza con `maestro.obras.clave_obra`.
+        nulo_significa: La fila no tiene obra (`obra_id` NULL).
     relaciones:
+      - de: clave_obra
+        a: maestro.obras.clave_obra
+        cardinalidad: "N:1"
+        porque: >-
+          La ficha de obra por su clave legible y unica (F-102): la misma union
+          que por `obra_id`, pero legible. Es tambien la llave por la que
+          agregar: por `codigo_obra` se juntan fichas de empresas distintas.
       - de: factura_id
         a: compras.v_facturas_pago.factura_id
         cardinalidad: "N:1"

@@ -111,6 +111,9 @@ COLUMNAS_PUBLICADAS = {
         "plazo_formula_contrato",
         "forma_pago_comparable",
         "forma_pago_coincide",
+        # F-102: la empresa y la clave de la obra del contrato, al final.
+        "empresa_id",
+        "clave_obra",
     ),
     "compras.documento_texto": (
         "documento_id",
