@@ -244,19 +244,32 @@ def test_f101_r9_fecha_modificacion_con_fecha_serie_local() -> None:
 
 def test_f101_r10_recuento_de_lineas_en_otra_obra() -> None:
     """615 lineas en 14 partes: se cuenta contra `raw.hmores`, no contra
-    `personal.partes_lineas`, para no depender del orden de los ficheros (D-2)."""
+    `personal.partes_lineas`, para no depender del orden de los ficheros (D-2).
+
+    Y se cuenta AGREGANDO UNA VEZ, no con un `LATERAL` por parte: `raw.hmores`
+    no tiene indice por `hmoide` (solo `hmores_pkey` sobre `ide`, leido en
+    `pg_indexes` el 2026-09-23), y el `LATERAL` del diseno planificaba un
+    `Nested Loop` con un `Seq Scan` de las 330.941 lineas POR CADA uno de los
+    6.886 partes (coste estimado 119.752.314 frente a 19.681 agregando).
+    """
     compacto = _compacto(_sql(RUTA_CABECERA))
 
     assert re.search(
-        r"LEFT JOIN LATERAL \( SELECT COUNT\(\*\) AS n, COUNT\(\*\) FILTER \( "
-        r"WHERE NULLIF\(l\.obride, 0\) IS NOT NULL AND NULLIF\(h\.obride, 0\) IS NOT NULL "
-        r"AND l\.obride <> h\.obride \) AS d FROM raw\.hmores l WHERE l\.hmoide = h\.ide \) "
-        r"ln ON TRUE",
+        r"LEFT JOIN \( SELECT l\.hmoide, COUNT\(\*\) AS n, COUNT\(\*\) FILTER \( "
+        r"WHERE NULLIF\(l\.obride, 0\) IS NOT NULL AND NULLIF\(hc\.obride, 0\) IS NOT NULL "
+        r"AND l\.obride <> hc\.obride \) AS d FROM raw\.hmores l "
+        r"JOIN raw\.hmo hc ON hc\.ide = l\.hmoide GROUP BY l\.hmoide \) "
+        r"ln ON ln\.hmoide = h\.ide",
         compacto,
-    ), "falta el LATERAL del recuento de lineas (R10)"
+    ), "falta el recuento agregado de lineas (R10)"
+    assert not re.search(r"LATERAL \( SELECT COUNT", compacto), (
+        "un LATERAL por parte sobre `raw.hmores` sin indice es un seq scan por parte"
+    )
     assert re.search(r"COALESCE\(ln\.n, 0\)\s+AS num_lineas\b", compacto)
     assert re.search(r"COALESCE\(ln\.d, 0\)\s+AS lineas_en_otra_obra\b", compacto)
-    assert "personal.partes_lineas" not in compacto
+    assert not re.search(r"\b(?:FROM|JOIN) personal\.partes_lineas\b", compacto), (
+        "la cabecera no lee `personal.partes_lineas`: dependeria del orden (D-2)"
+    )
 
 
 def test_f101_r11_no_publica_las_columnas_a_cero() -> None:
