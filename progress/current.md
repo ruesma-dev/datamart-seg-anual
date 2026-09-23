@@ -1679,3 +1679,17 @@ ganara `empresa_id` y `nombre_empresa`, y su ficha la clave legible (`empresa_id
 **Abierta D5**: marca de «misma persona en otra empresa»; recomendado no
 publicarla (solo 13 de 91 casan por NIF exacto). Siguen pendientes: aceptar el
 riesgo de D1 (0581 sale de `mart`/`cierre`, 0606 se reduce) y D5.
+
+### F-102 · decisiones FINALES (2026-09-23): SUSTITUYEN lo anterior
+
+Modelo del humano: las obras son por empresa (misma obra vista desde cada
+empresa, sin consolidar). F-102 solo publica **identificadores**: `clave_obra` y
+`clave_recurso` (`<empresa>-<codigo>`, medidas unicas: 922/922 y 2.618/2.618),
+`empresa_id`, `nombre_empresa` y la ficha de Ruesma (`es_ficha_principal`,
+`obra_principal_id`) en `maestro.obras`, mas `obra_principal_id` en las cinco
+vistas de consumo de `compras`. **`stg.obras` NO cambia** (0581 y 0606 no
+pierden datos); difiere de la marca en 0581, 0606, 0671 y 0720, y lo resuelve
+**F-106** (ficha pendiente del lider). La vista va a `maestro.v_obra_fichas`, no
+a `stg`. D2 A, D3 si, D4 sin aviso a `facturas`, D5 A. La parte de
+`personal.recursos` sigue dependiendo de F-101 en `main`. Sin decisiones
+abiertas: `progress/spec_F-102.md`.
