@@ -590,9 +590,9 @@ objetos:
       anio:
         significado: >-
           Ano del parte, tal y como lo declara su cabecera. **27 partes lo traen
-          fuera de 1990-2030** y no se corrige: 21 valen 0 y el resto son
-          erratas como 22, 211, 11226, 201311, 201403 o 201831. Para agregar por
-          periodo, filtrar el rango.
+          fuera de 1990-2030** y no se corrige: 21 valen 0 y los demas son
+          erratas de tecleo (de dos a seis cifras, como 11226 o 201831). Para
+          agregar por periodo, filtrar el rango.
         agregacion: no_sumable
       mes:
         significado: >-
