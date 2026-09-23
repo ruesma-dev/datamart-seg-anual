@@ -15,7 +15,12 @@ Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
 Informe del implementer: `progress/impl_F-102.md` (al terminar).
 
-- **Tarea en curso**: T14. Hechas T1-T13. `azure-apps`: commit `511ffff` (local, sin push).
+- **Tarea en curso**: T15. Hechas T1-T14.
+- **T14**: F-101 `done` y en `main`; `main` habia avanzado (despliegue de F-101
+  y prioridades F-095/F-106, solo papeleo) y se fusiono en la rama (merge
+  `ecf675c`, `BACKLOG.md` regenerado). `personal.partes` entra en el ambito de
+  `R-CODIGO-POR-EMPRESA`. `version` (28 -> 29) y `TOTAL_TABLAS` (68 -> 69) ya
+  sumaban sobre `main`. `azure-apps`: commit `511ffff` (local, sin push).
 - **Desviacion 4 (justificada)**: la relacion `clave_obra ->
   maestro.obras.clave_obra` de las cinco vistas de `compras` se declara `N:N`
   y no `N:1` (R22), con el `porque` diciendo que DE HECHO es N:1 (922 claves

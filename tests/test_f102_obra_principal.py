@@ -568,6 +568,7 @@ AMBITO_REGLA = (
     "maestro.v_obra_fichas",
     "stg.obras",
     "personal.partes_lineas",
+    "personal.partes",
     "personal.recursos",
     "retenciones.movimientos",
     "maestro.centros_coste",
