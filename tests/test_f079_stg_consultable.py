@@ -75,6 +75,9 @@ GRUPO_B_FUNCIONES = (
     # `personal`. Entra por lo mismo que las demas, y la copia es deliberada:
     # es lo que permite construir ese esquema sin depender de ningun otro.
     "personal.fn_fecha",
+    # F-101 (2026-09-23): la conversion de la FECHA SERIE de Sigrid (la ultima
+    # modificacion del parte), local a `personal` por el mismo motivo.
+    "personal.fn_fecha_serie",
     "retenciones.fn_sigrid_date",
     "stg.fn_master_fecha_efectiva",
     "stg.fn_master_mes_representado",
