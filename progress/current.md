@@ -94,6 +94,27 @@ push de `azure-apps` y el despliegue. Nota del reviewer, no bloqueante:
 71 de consumo** (+3 fichas: `partes`, `recursos_tipos_hora`,
 `fn_fecha_serie`). `azure-apps`: commits 87dc629 y 953e9fb, sin push.
 
+### F-101 · VERIFICACIONES HECHAS EL 2026-09-23 (todas en verde)
+
+- **M9** (humano, 13:18 UTC): `ingest --table hmores --full` en 131,2 s (lectura
+  de Sigrid ~56 s para 331.002 filas; 65 s de firma de origen); anade `tex` a
+  `raw.hmores`. Sin pasada de contraste sin `tex`: se da por buena (+0,27 %).
+- **M1** (humano): `build-personal` 6 sub-pasos en `success`; `partes` 6.886,
+  `recursos_tipos_hora` 8.959 (`reshor` de la ingesta de la madrugada).
+- **M2-M6** (lider, solo lectura): 6.886/6.258; 647/541/5.698; 14 partes y 615
+  lineas; 0 sin `codigo_parte`; DIA 5.648, UD 1.804, HORA 839, MES 665,
+  DESCONOCIDA 3; 2.037/3/2.032; desfase 156.821 de 279.094 (56,2 %). 13.391
+  lineas con `texto_linea`. MO/0306 no tiene desfase (un precio, el de la ficha).
+- **M7** (lider): `check-declarados` 161/161 OK; `check-relaciones` 119 unen,
+  0 que no unen; `check-unicidad` las cuatro claves de `personal` OK; la unica
+  rota es `cierre.v_pbi_planif_vs_real` (204 combinaciones), preexistente: F-051.
+- **M8/M10** (lider, autorizado por el humano): `publicar-diccionario` version
+  28 (hash 414ea8c4aaf4, 161 objetos, 1.054 columnas) y `check-diccionario` OK.
+- **DESPLEGADA el 2026-09-23 a las 14:07 UTC con el tag `r20260923-1605`**
+  (construida desde `main` 080e2b5 en un worktree limpio; el job
+  `caj-datamart-seg-dev` pasa de `r20260922-2350` a `r20260923-1605`). Queda
+  comprobar que la nocturna del 24-09 corre en verde con esa imagen.
+
 ### F-101 · Verificaciones MANUALES del humano (necesitan BBDD; en este orden)
 
 **M9 va PRIMERO**: hasta que `raw.hmores` tenga `tex` (lo anade la ingesta con

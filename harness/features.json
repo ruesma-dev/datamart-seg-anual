@@ -1537,7 +1537,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
-      "priority": 4,
+      "priority": 3,
       "branch": "feature/F-095-retenciones-contabilidad-fin-obra"
     },
     {
@@ -1700,7 +1700,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 3,
+      "priority": 4,
       "branch": "feature/F-106-obras-por-empresa"
     }
   ]
