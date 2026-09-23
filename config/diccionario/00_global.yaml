@@ -12,6 +12,12 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 27 (2026-09-23, sin feature): EL AVISO DE CLIENTE NO SE VEIA. Vivia en
+# el campo `fuente`, que el MCP no publica, y pasa al `concepto` del orden de
+# magnitud: la retencion viva de CLIENTE sale de los efectos y esta SIN
+# VERIFICAR (la contabilidad da 13,8 M EUR; se resuelve en F-104). Se remiden
+# ademas dos recuentos desfasados (25.631 y 2.238, el 2026-09-23).
+#
 # version 26 (F-094, 2026-09-22): LA RETENCION VIVA A PROVEEDOR ESTABA INFLADA
 # 4,3 VECES. `retenciones.movimientos` derivaba el estado solo de `fecrea` y
 # contaba como VIVA los efectos agrupados (su dinero ya esta en el agrupador AGR),
@@ -279,7 +285,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 26
+version: 27
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -748,7 +754,10 @@ ordenes_de_magnitud:
       orden de 35 M€ es ese error**: se esta sumando sin filtrar
       `estado = 'VIVA'`. NO es el total practicado historicamente: lo ya
       liquidado no cuenta aqui.
-  - concepto: Retenido VIVO por clientes, pendiente de cobrar, en toda la empresa
+  - concepto: >-
+      Retenido VIVO por clientes segun los efectos, SIN VERIFICAR: la
+      contabilidad da 13,8 M EUR y el criterio de proveedor daria 2,1 M EUR
+      (pendiente de su feature propia)
     valor_aproximado: 21900000
     unidad: EUR
     criterio: saldo_vivo
@@ -760,20 +769,22 @@ ordenes_de_magnitud:
       feature propia. Es el orden de lo que publica el datamart, no un saldo
       contrastado.
   - concepto: Efectos de retencion practicados a proveedores, vivos y liquidados
-    valor_aproximado: 25124
+    valor_aproximado: 25631
     unidad: filas
     criterio: total
     fuente: >-
-      LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `pag` con
-      `retide <> 0`, sin filtrar por estado. El 2026-09-22 son 25.631: F-094
-      no borra filas, solo las reclasifica en VIVA, LIQUIDADA y BAJA.
+      Medido en la base el 2026-09-23, tras la nocturna que construyo F-094:
+      25.631 filas de `pag` con `retide <> 0`, sin filtrar por estado (7.751
+      VIVA + 2.369 LIQUIDADA + 15.511 BAJA). F-094 no borra filas, solo las
+      reclasifica. Hasta hoy aqui ponia 25.124, de LEEME_RETENCIONES_R1.md.
   - concepto: Efectos de retencion practicados por clientes, vivos y liquidados
-    valor_aproximado: 2219
+    valor_aproximado: 2238
     unidad: filas
     criterio: total
     fuente: >-
-      LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `cob` con
-      `retide <> 0`, sin filtrar por estado.
+      Medido en la base el 2026-09-23: 2.238 filas de `cob` con
+      `retide <> 0`, sin filtrar por estado (2.196 VIVA + 42 LIQUIDADA).
+      Hasta hoy aqui ponia 2.219, de LEEME_RETENCIONES_R1.md.
 
   # -------------------------------------------------------------------------
   # COMPRAS, MART y CIERRE. Anadidos el 2026-08-25 por T40.
