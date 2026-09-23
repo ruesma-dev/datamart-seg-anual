@@ -22,7 +22,13 @@
 Spec en `specs/F-101-cabecera-del-parte/` (137/150 y 236/250, puerta de tamano
 en verde). Resumen y todas las cifras medidas: **`progress/spec_F-101.md`**.
 
-### F-101 · IMPLEMENTACION EN CURSO (implementer, 2026-09-23, `in_progress`)
+### F-101 · IMPLEMENTACION TERMINADA (implementer, 2026-09-23), pendiente de reviewer
+
+T1-T13 hechas, `bash harness/init.sh` en verde (5.112 passed, cobertura
+94,7 %, mutacion: 0 mutantes). Informe: **`progress/impl_F-101.md`**.
+`azure-apps`: commit 87dc629, sin push. Ficha sigue `in_progress` hasta el
+APROBADO. Pendiente del humano: M1-M10, **M9 (ingesta de `hmores` con `tex`)
+antes que un `build-personal` a mano**.
 
 - **T1 hecha**: las cifras de gobierno se reproducen contra Sigrid en solo
   lectura (detalle en `progress/impl_F-101.md`). Unica deriva: `reshor` tiene hoy

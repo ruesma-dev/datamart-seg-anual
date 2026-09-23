@@ -16,7 +16,7 @@ Una tarea = un commit (`F-101 Tn: ...`). Rama `hotfix/F-101-cabecera-del-parte`
 - [x] T10: Escribir las fichas de `partes` y `recursos_tipos_hora` y las columnas nuevas de `partes_lineas` en `config/diccionario/personal.yaml`, con `clave_negocio`, `relaciones`, `ejemplos_preguntas` y las trampas medidas (569 códigos repetidos, 27 años fuera de rango, sin histórico de precios, 56,2 % de desfase, `preven` en 3 filas, los 4 recursos sin fila de su defecto, el usuario en `dbo.log`) | Verificación: `pytest -k "f101 and ficha"` y `python scripts/check_yaml.py`
 - [x] T11: Subir `version` de `config/diccionario/personal.yaml` (1 → 2) y de `config/diccionario/00_global.yaml` (26 → 27) | Verificación: `pytest -k "f101 and version"`
 - [x] T12: Actualizar `azure-apps/datamart_seg_anual.md` (tabla de objetos de `personal` de 3 a 5 filas + las trampas nuevas) y hacer su commit en ESE repositorio | Verificación: `git -C ../azure-apps status` limpio tras el commit; revisión del reviewer
-- [ ] T13: Ejecutar `bash harness/init.sh` en verde | Verificación: salida del propio comando
+- [x] T13: Ejecutar `bash harness/init.sh` en verde | Verificación: salida del propio comando
 
 ## Verificación MANUAL (humano) — necesita BBDD y escribe en el datamart
 
