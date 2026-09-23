@@ -15,7 +15,14 @@ Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
 `bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
 Informe del implementer: `progress/impl_F-102.md` (al terminar).
 
-- **Tarea en curso**: T1 (tests RED).
+- **Tarea en curso**: T4. Hechas T1 (RED), T2 (vista) y T3.
+- **T3 (MANUAL de lectura, hecha 2026-09-23, sesion `read_only`)**: el cuerpo
+  de `maestro.v_obra_fichas` como consulta da 922 fichas / 922 claves / 846
+  principales / 846 codigos; difiere de `stg.obras` exactamente en 0581, 0606,
+  0671 y 0720; 0 codigos con dos principales; 0672+ de cuatro digitos: 57
+  principales de la empresa 1 con 48 `dir1`; 310 de 846 principales con `dir1`;
+  103 fichas de la 28 con 0 `dir1` y 0 cliente; 59 fichas apuntan a otra, 11 de
+  codigos administrativos (CM 1, CP 4, GG 4, POSTV2 1, VAR 1).
 - **Desviacion 1 (justificada)**: `maestro.v_obra_fichas` se crea en
   `sql/maestro/00_setup.sql` y no en `01_obras.sql`. `tests/test_f073_sql.py`
   lee las columnas de `maestro.obras` del PRIMER `CREATE OR REPLACE VIEW` de
