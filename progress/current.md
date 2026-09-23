@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-23 · F-101 · EN REVISION (`in_progress`), pasada 2 del implementer
+## 2026-09-23 · F-101 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN M1-M10 DEL HUMANO Y EL DESPLIEGUE
 
 HOTFIX de F-057. Spec en `specs/F-101-cabecera-del-parte/`, aprobada el
 2026-09-23 con las cuatro recomendaciones (D-3 si a `hmores.tex`, D-8 opcion
@@ -18,7 +18,10 @@ A, D-9 se publica `precio_venta`, D-1 `obra_cabecera_id` /
 **F-105**. Cifras de la spec: `progress/spec_F-101.md`. Implementacion y sus
 siete desviaciones justificadas (todas ACEPTADAS por el reviewer):
 **`progress/impl_F-101.md`**. Review pasada 1: **`progress/review_F-101.md`**
-(CHANGES_REQUESTED, tres cambios, sin tocar SQL).
+(pasada 1 CHANGES_REQUESTED, tres cambios sin tocar SQL; **pasada 2 APROBADO**,
+5.113 passed, cobertura 94,7 %). Pendiente del humano: M1-M10 (M9 primero),
+push de `azure-apps` y el despliegue. Nota del reviewer, no bloqueante:
+`design.md:195` y R16 de `requirements.md` conservan la premisa original.
 
 **Decisiones del humano sobre la review (2026-09-23):**
 1. `hmores.tex` tambien queda en `raw.hmores`, legible por
