@@ -287,7 +287,7 @@ def test_f102_r1_la_empresa_es_con_emp() -> None:
 def _criterios_del_ranking() -> list[str]:
     sentencia = _sentencia(RUTA_FICHAS, VISTA)
     hallazgo = re.search(
-        r"WINDOW w AS \(PARTITION BY codigo_obra ORDER BY (.*?) ROWS BETWEEN",
+        r"WINDOW w AS \(\s*PARTITION BY codigo_obra ORDER BY (.*?) ROWS BETWEEN",
         sentencia,
     )
     assert hallazgo, "la ventana `w` ordena las fichas de cada codigo (R2)"
