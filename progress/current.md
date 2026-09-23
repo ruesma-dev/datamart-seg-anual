@@ -23,7 +23,7 @@ Informe del implementer: `progress/impl_F-102.md`.
   `test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo` lo exige.
   La descripcion enruta a `maestro.obras` para el contexto de una obra.
 
-- **Tarea en curso**: T17 (T16 es MANUAL del humano). Hechas T1-T15.
+- **Hechas T1-T15 y T17** (`bash harness/init.sh` en verde: 5.246 passed, cobertura 94,7 %). **Pendiente**: T16, MANUAL del humano tras la primera nocturna; review. Informe: `progress/impl_F-102.md`.
   `azure-apps`: commits `511ffff` y `4a14173` (locales, sin push).
 - **T15 verificado en solo lectura**: el cuerpo de `personal.recursos` (con
   `raw.auxemp` simulado) da 2.618 filas, 2.618 `recurso_id`, 2.618
