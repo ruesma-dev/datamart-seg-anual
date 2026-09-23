@@ -42,7 +42,7 @@ DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
 RUTA_SETUP = DIR_PERSONAL / "00_setup.sql"
 RUTA_RECURSOS = DIR_PERSONAL / "01_recursos.sql"
 RUTA_PARTES = DIR_PERSONAL / "02_partes_lineas.sql"
-RUTA_VISTAS = DIR_PERSONAL / "03_views.sql"
+RUTA_VISTAS = DIR_PERSONAL / "05_views.sql"
 
 #: Los cuatro ficheros del step, EN ORDEN. El orden es el de la numeracion:
 #: `00_setup.sql` crea el esquema y las tablas, y los demas las llenan.
@@ -50,7 +50,7 @@ FICHEROS_PERSONAL = [
     "00_setup.sql",
     "01_recursos.sql",
     "02_partes_lineas.sql",
-    "03_views.sql",
+    "05_views.sql",
 ]
 
 

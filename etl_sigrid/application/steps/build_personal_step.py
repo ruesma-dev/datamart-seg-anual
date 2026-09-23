@@ -70,7 +70,7 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_schema="personal",
         target_table="partes_lineas",
     ),
-    _SubStep(name="views", sql_file="03_views.sql"),
+    _SubStep(name="views", sql_file="05_views.sql"),
 )
 
 
