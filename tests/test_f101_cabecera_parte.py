@@ -164,7 +164,9 @@ def test_f101_r2_codigo_parte_desde_con_cod() -> None:
 
 def test_f101_r4_descripcion_desde_con_res_y_no_tex() -> None:
     """`con.res` en 6.883 de 6.886; `con.tex` solo en 3 partes (660 bytes)."""
-    assert re.search(r"\bc\.res\s+AS descripcion\b", _compacto(_sql(RUTA_CABECERA)))
+    assert re.search(
+        r"NULLIF\(c\.res, ''\)\s+AS descripcion\b", _compacto(_sql(RUTA_CABECERA))
+    ), "la cadena vacia no es una descripcion: sale NULL (3 partes)"
     assert not re.search(r"\btex\b", _sin_comentarios(_sql(RUTA_CABECERA))), (
         "la descripcion del parte es `con.res`, no `con.tex` (R4)"
     )

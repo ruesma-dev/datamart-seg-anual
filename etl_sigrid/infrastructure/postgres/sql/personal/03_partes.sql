@@ -69,7 +69,8 @@ INSERT INTO personal.partes (
 SELECT
     h.ide                                   AS parte_id,
     c.cod                                   AS codigo_parte,
-    c.res                                   AS descripcion,
+    -- La cadena vacia es «sin descripcion» (3 partes): se publica NULL.
+    NULLIF(c.res, '')                       AS descripcion,
     personal.fn_fecha(c.fec)                AS fecha,
     h.ano                                   AS anio,
     h.mes                                   AS mes,

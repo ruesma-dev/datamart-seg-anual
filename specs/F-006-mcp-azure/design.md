@@ -112,6 +112,7 @@ IngestRaw -> LoadExcelAux -> BuildStg -> BuildMart -> PublicarDiccionario -> App
 | 2026-09-15 (F-078) | Entran `mart.master_versiones_tipadas`, `mart.master_vigente_anual` y `mart.fact_cp_tipologia`: los tres objetos de CP por tipologia dejan de ser vistas que se recalculan en cada consulta. Sus tres vistas siguen existiendo con el mismo nombre. Inventario a **153** objetos (los 150 de partida ya incluian los ocho que F-080 y F-081 anadieron sin fila propia en esta tabla) |
 | 2026-09-16 (F-084) | Entra `compras.fn_estado_documento`, la traduccion del estado de un documento por la pareja (tipo, estado), factorizada para que `compras.contratos` y `compras.facturas` la compartan en vez de copiarla. Es funcion auxiliar, no de consumo. Inventario a **154** objetos |
 | 2026-09-18 (F-057) | Entra el esquema **`personal`** --el decimo--, con `personal.recursos` (el maestro de recursos, que CONTIENE DATOS PERSONALES autorizados: nombre, NIF y DNI), `personal.partes_lineas` (las 330.638 lineas de parte de trabajo) y `personal.v_pbi_horas_obra_mes`, mas su funcion local `personal.fn_fecha`. Inventario a **158** objetos |
+| 2026-09-23 (F-101) | Hotfix de F-057: entran `personal.partes` (la cabecera del parte, con la obra de CABECERA nombrada `obra_cabecera_id` porque audita y no imputa), `personal.recursos_tipos_hora` (los precios de la ficha del recurso, sin el de nomina) y su funcion local `personal.fn_fecha_serie`. Inventario a **161** objetos |
 
 ## 3 · Componentes y ficheros que toca
 
