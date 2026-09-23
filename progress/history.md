@@ -1256,3 +1256,18 @@ comentarios; 16 tests fijan el texto exacto de cada CASE).
 → `check-relaciones` (antes del build sale KO por la relacion nueva) →
 `publicar-diccionario`, reiniciar el MCP por su cache (F-089) y el parrafo para
 `azure-apps/datamart_seg_anual.md`.
+
+## F-101 · HOTFIX de F-057: cabecera del parte, codigo y texto de linea, tipos de hora y precios del recurso (cerrada el 2026-09-23, APROBADO en pasada 2)
+
+Correo de Juan Romero del 22-09. Entran `personal.partes` (6.886 cabeceras,
+estado En registro/Cerrado/Imputado, obra y centro de cabecera sufijados
+`_cabecera_id`, `lineas_en_otra_obra`: 615 lineas en 14 partes) y
+`personal.recursos_tipos_hora` (precios de la ficha, `es_por_defecto`, sin
+`prenom`); `partes_lineas` gana `codigo_parte` y `texto_linea` (`hmores.tex`
+pasa a ingerirse). Diccionario version 28. Hallazgo: el 56,2 % de las lineas
+comparables lleva un precio distinto del de la ficha, que solo guarda el de hoy.
+Fuera: el usuario creador del parte, en `dbo.log` (F-105). Pasada 1 RECHAZADA
+por dos temas de datos personales, resueltos por el humano: exposicion de
+`hmores.tex` en `raw.hmores` ACEPTADA por escrito, y nombre redactado con un
+commit nuevo sin reescribir historial. Detalle: `progress/impl_F-101.md`,
+`progress/review_F-101.md`, `progress/spec_F-101.md`.

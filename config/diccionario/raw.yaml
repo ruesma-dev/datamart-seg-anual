@@ -1439,13 +1439,13 @@ objetos:
     motivo_no_consumo: >-
       Son las horas en bruto, sin filtrar por el universo de obras del seguimiento y sin resolver que recurso es persona y cual maquinaria. El mart de personal (F-057) es el que responde "horas por obra".
     descripcion: >-
-      **LAS HORAS** (328.760 filas, 56 columnas). Es la tabla que faltaba para poder responder cuanto se ha trabajado en una obra: `reside` informado en el 99,9 %, `obride` en el 99,6 % --536 obras distintas--, mas `fec`, `can` (cantidad) y `tot` (importe) por linea. Cuelga de `hmo` por `hmoide`.
+      **LAS HORAS** (328.760 filas, 57 columnas). Es la tabla que faltaba para poder responder cuanto se ha trabajado en una obra: `reside` informado en el 99,9 %, `obride` en el 99,6 % --536 obras distintas--, mas `fec`, `can` (cantidad) y `tot` (importe) por linea. Cuelga de `hmo` por `hmoide`.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `hmores`, y se localiza con `grep -n "^| hmores " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
       **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
 
-      **No se traen** 1 columnas de binario o texto ilimitado: el texto libre de la linea. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+      **Se trae entera desde F-101 (2026-09-23)**, incluido `tex`, el texto libre de la linea: informado en 13.390 de 330.941 lineas (4,05 %). Es texto libre y **puede llevar nombres de persona AQUI**, en `raw.hmores`: el rol de consulta tiene lectura sobre esta tabla (no esta revocada como `reshor`), y esa exposicion la acepto el responsable del dato el 2026-09-23, con dos atenuantes: el servidor MCP no expone `raw` en su lista blanca, y los nombres ya eran legibles en `raw.con`. Su superficie de consulta es `personal.partes_lineas.texto_linea`.
     grano: Una fila por linea de parte --recurso, obra y fecha--, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
