@@ -380,7 +380,10 @@ objetos:
     refresco: nocturno
     columnas:
       obra_id:
-        significado: Identificador de la obra en Sigrid.
+        significado: >-
+          Identificador de la obra en Sigrid, la del CONTRATO de compra.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 331 filas llevan la ficha de una UTE de un codigo del seguimiento y 17 una ficha fuera de el; ninguna la copia de Porsan (empresa 28). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         agregacion: no_sumable
       codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
       nombre_obra: Nombre legible de la obra, de `con.res`.
@@ -445,7 +448,8 @@ objetos:
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
-        porque: Para el estado, las fechas y el cliente de la obra.
+        porque: >-
+          Para el estado, las fechas y el cliente de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
       - de: proveedor_id
         a: maestro.proveedores.proveedor_id
         cardinalidad: "N:1"
@@ -511,6 +515,8 @@ objetos:
           `cen.obride` existe, parece el puente y **esta a 0 en las 804 filas**,
           y la aritmetica sobre el `ide` (`obride + 1`) acierta solo el 64 %.
           Quien rehaga esto mirara `obride` primero: no sirve.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** --aqui, la del propio centro de coste-- (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 40 centros resuelven a la copia de Porsan (empresa 28) de una obra del seguimiento, 8 a la ficha de una UTE y 28 a una ficha fuera del seguimiento. No es un error del puente: cruza por empresa y codigo, asi que cada centro cae en la ficha de SU empresa. `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         agregacion: no_sumable
         nulo_significa: >-
           El centro de coste **no es una obra**: es estructura, delegacion o
@@ -529,7 +535,7 @@ objetos:
         porque: >-
           Para la ficha completa de la obra a la que pertenece el centro de
           coste. Varios centros pueden resolver a la misma obra, aunque hoy la
-          relacion medida es 1:1.
+          relacion medida es 1:1. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
     ejemplos_preguntas:
       - A que obra corresponde el centro de coste X
       - Que centros de coste no son obra

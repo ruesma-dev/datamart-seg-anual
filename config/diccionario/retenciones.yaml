@@ -141,6 +141,8 @@ objetos:
           **262 de 262** valores distintos existen en `maestro.obras` (antes de
           F-094, 0 de 262, porque aqui se publicaba el centro de coste). Para
           el centro, ver `centro_coste_id`.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 516 efectos llevan la ficha de una UTE de un codigo del seguimiento y 21 una ficha fuera de el; ninguno la copia de Porsan (empresa 28). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         nulo_significa: >-
           No se pudo atribuir: el efecto no tiene centro de coste y su factura
           no apunta a una sola obra —si ademas `num_obras_documento` es mayor
@@ -268,7 +270,7 @@ objetos:
           devolvia CERO filas en silencio, porque aqui estaba el centro de
           coste; por eso el camino viejo pasaba por la cabecera de cierre. Lo
           que sigue sin valer: unir por `codigo_obra`, que `maestro.obras`
-          repite.
+          repite. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
       - de: centro_coste_id
         a: maestro.centros_coste.centro_coste_id
         cardinalidad: "N:1"
@@ -523,6 +525,8 @@ objetos:
           heredado de `retenciones.movimientos` (F-094). Hasta F-094 era el
           `ide` del CENTRO DE COSTE y casaba 0 de 261 contra `maestro.obras`;
           hoy casan 262 de 262 (medido el 2026-09-22).
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 5 filas llevan la ficha de una UTE de un codigo del seguimiento y 3 una ficha fuera de el; ninguna la copia de Porsan (empresa 28). Agregar esta vista por `codigo_obra` mezcla empresas. `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         agregacion: no_sumable
       codigo_obra: >-
         Codigo de obra tal y como se teclea en Sigrid, y el campo que un humano
@@ -589,7 +593,7 @@ objetos:
           Para la ficha de la obra y, desde ella, el presupuesto y las fechas.
           Directo desde F-094: 262 de 262 valores casan (2026-09-22). Antes de
           F-094 esta misma relacion casaba 0 de 261 y el unico camino era la
-          cabecera de cierre por el centro de coste.
+          cabecera de cierre por el centro de coste. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
     ejemplos_preguntas:
       - Que retenciones tengo de los proveedores de la obra X
       - En que obras retenemos mas de lo que nos retienen
