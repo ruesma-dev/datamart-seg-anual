@@ -3,13 +3,17 @@
 Step que materializa el schema `personal` (recursos, partes de trabajo, horas).
 
 Encadena los archivos SQL en orden:
-    00_setup.sql          - schema, función de fechas local y las dos tablas
-                            con sus índices (`CREATE ... IF NOT EXISTS`)
-    01_recursos.sql       - una fila por recurso de Sigrid (2.618)
-    02_partes_lineas.sql  - una fila por línea de parte de trabajo (330.638)
-    03_views.sql          - `v_pbi_horas_obra_mes`, solo `unidad = 'HORA'`
+    00_setup.sql               - schema, las dos funciones de fecha locales y
+                                 las cuatro tablas con sus índices
+                                 (`CREATE ... IF NOT EXISTS`, nunca `DROP`)
+    01_recursos.sql            - una fila por recurso de Sigrid (2.618)
+    02_partes_lineas.sql       - una fila por línea de parte de trabajo
+    03_partes.sql              - F-101: una fila por CABECERA de parte (6.886)
+    04_recursos_tipos_hora.sql - F-101: los precios de la ficha del recurso
+    05_views.sql               - `v_pbi_horas_obra_mes`, solo `unidad = 'HORA'`
 
-Lee de `raw.*` (res, con, auxrestip, emp, hmores, auxhor) y de **una** cosa
+Lee de `raw.*` (res, con, conest, auxrestip, emp, hmo, hmores, auxhor, reshor)
+y de **una** cosa
 fuera de `raw`: `stg.obras`, para marcar qué líneas caen dentro del universo
 del seguimiento. Eso, y solo eso, es lo que fija `depends_on = ["build_stg"]`.
 
@@ -47,7 +51,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los cuatro ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los seis ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` por lo mismo que en `build_compras_step` y
 #: `build_retenciones_step`: es DATO, y sustituirla en un test es lo único que
@@ -70,12 +74,27 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_schema="personal",
         target_table="partes_lineas",
     ),
+    # F-101. `03_partes.sql` cuenta sus lineas contra `raw.hmores` y no contra
+    # `personal.partes_lineas`: no depende de que el sub-paso anterior termine.
+    _SubStep(
+        name="partes",
+        sql_file="03_partes.sql",
+        target_schema="personal",
+        target_table="partes",
+    ),
+    _SubStep(
+        name="recursos_tipos_hora",
+        sql_file="04_recursos_tipos_hora.sql",
+        target_schema="personal",
+        target_table="recursos_tipos_hora",
+    ),
     _SubStep(name="views", sql_file="05_views.sql"),
 )
 
 
 class BuildPersonalStep(PipelineStep):
-    """Construye el schema `personal` (recursos, líneas de parte y la vista)."""
+    """Construye el schema `personal` (recursos, partes, sus líneas, los
+    tipos de hora de cada recurso y la vista de horas)."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings

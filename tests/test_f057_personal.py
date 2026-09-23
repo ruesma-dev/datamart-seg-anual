@@ -44,12 +44,15 @@ RUTA_RECURSOS = DIR_PERSONAL / "01_recursos.sql"
 RUTA_PARTES = DIR_PERSONAL / "02_partes_lineas.sql"
 RUTA_VISTAS = DIR_PERSONAL / "05_views.sql"
 
-#: Los cuatro ficheros del step, EN ORDEN. El orden es el de la numeracion:
-#: `00_setup.sql` crea el esquema y las tablas, y los demas las llenan.
+#: Los seis ficheros del step, EN ORDEN. El orden es el de la numeracion:
+#: `00_setup.sql` crea el esquema y las tablas, y los demas las llenan. F-101
+#: anade `03_partes.sql` y `04_recursos_tipos_hora.sql` y renumera la vista.
 FICHEROS_PERSONAL = [
     "00_setup.sql",
     "01_recursos.sql",
     "02_partes_lineas.sql",
+    "03_partes.sql",
+    "04_recursos_tipos_hora.sql",
     "05_views.sql",
 ]
 
@@ -684,8 +687,11 @@ def test_f057_r24_el_step_encadena_sus_cuatro_sql(monkeypatch: pytest.MonkeyPatc
 
     assert resultado.status == StepStatus.SUCCESS
     assert pg.ejecutados == FICHEROS_PERSONAL
-    assert pg.contados == [("personal", "recursos"), ("personal", "partes_lineas")]
-    assert resultado.rows_processed == 14
+    assert pg.contados == [
+        ("personal", "recursos"), ("personal", "partes_lineas"),
+        ("personal", "partes"), ("personal", "recursos_tipos_hora"),
+    ]
+    assert resultado.rows_processed == 28
 
 
 def test_f057_r24_un_sub_paso_a_medio_configurar_no_cuenta_filas(
