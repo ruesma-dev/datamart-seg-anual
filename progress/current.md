@@ -1656,3 +1656,16 @@ recomendada arregla las tres obras y por eso cambia lo publicado en `mart` y
 `cierre`); D2 no reescribir el `obra_id` de las copias y traducir al leer; D3
 ingerir `auxemp` para el nombre de la empresa; D4 el aviso a `facturas` lo lleva
 el humano con el texto que deja el implementer.
+
+### F-102 · decisiones del humano incorporadas (2026-09-23, segunda pasada)
+
+D1: **la ficha principal es la de Construcciones Ruesma** (empresa 1 primero,
+luego `conext 15`, cierres, `tiemod`, `ide`). Medido: frente a hoy cambian 0720
+(entra en `mart`), **0581 (sale de `mart`/`cierre`: 85.524 y 76 filas)**, **0606
+(se reduce: de 279.817 filas de plan a 1.097)** y 0671 (sin efecto); 0252 y 0517
+siguen fuera de `mart` como hoy. **Ese riesgo esta pendiente de aceptacion
+expresa del humano: T0 bloquea la implementacion hasta entonces.** D2 (A) y D3
+aprobadas. D4: `facturas` es independiente, sin aviso; en su lugar entra el
+repaso de `compras` (las cinco vistas de consumo con obra ganan
+`obra_principal_id`) y de toda ficha con relacion a `maestro.obras.obra_id`
+(`personal`, despues de F-101). Detalle: `progress/spec_F-102.md`.
