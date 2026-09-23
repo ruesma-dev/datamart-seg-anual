@@ -12,6 +12,15 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 28 (F-101, 2026-09-23): LA CABECERA DEL PARTE Y LOS PRECIOS DE LA
+# FICHA DEL RECURSO. Entran `personal.partes` (6.886 cabeceras: codigo,
+# descripcion, estado, fechas y la obra de CABECERA, que AUDITA y no imputa; el
+# codigo NO es unico, 569 repetidos) y `personal.recursos_tipos_hora` (8.968
+# filas: precio de coste y de venta de cada tipo de hora de cada recurso, los de
+# HOY, sin historico; el 56,2 % de las lineas comparables lleva otro precio).
+# `personal.partes_lineas` gana el codigo del parte y el texto de la linea. El
+# usuario que crea el parte NO esta: vive en `dbo.log`, no ingerida (F-105).
+#
 # version 27 (2026-09-23, sin feature): EL AVISO DE CLIENTE NO SE VEIA. Vivia en
 # el campo `fuente`, que el MCP no publica, y pasa al `concepto` del orden de
 # magnitud: la retencion viva de CLIENTE sale de los efectos y esta SIN
@@ -285,7 +294,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 27
+version: 28
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

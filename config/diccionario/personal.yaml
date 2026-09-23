@@ -39,7 +39,7 @@
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/personal/`.
 
-version: 1
+version: 2
 esquema: personal
 
 objetos:
