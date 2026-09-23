@@ -9,83 +9,63 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-23 · F-101 · SPEC ESCRITA (`spec_ready`), APROBADA POR EL HUMANO
+## 2026-09-23 · F-101 · EN REVISION (`in_progress`), pasada 2 del implementer
 
-> **APROBADA EL 2026-09-23 con las CUATRO recomendaciones**: (1) SI se ingiere
-> `hmores.tex` (T9 se ejecuta; el coste de ventana se cronometra como tarea
-> MANUAL); (2) D-8 opcion A: solo la bandera `es_por_defecto` en
-> `recursos_tipos_hora`, declarando los 4 recursos sin marca; (3) D-9: se
-> publica `precio_venta` con el aviso de sus 3 filas; (4) D-1: nombres
-> `obra_cabecera_id` y `centro_coste_cabecera_id`. El usuario creador del
-> parte (`dbo.log`) queda fichado como **F-105**, prioridad 10.
+HOTFIX de F-057. Spec en `specs/F-101-cabecera-del-parte/`, aprobada el
+2026-09-23 con las cuatro recomendaciones (D-3 si a `hmores.tex`, D-8 opcion
+A, D-9 se publica `precio_venta`, D-1 `obra_cabecera_id` /
+`centro_coste_cabecera_id`); el usuario creador del parte (`dbo.log`) es
+**F-105**. Cifras de la spec: `progress/spec_F-101.md`. Implementacion y sus
+siete desviaciones justificadas (todas ACEPTADAS por el reviewer):
+**`progress/impl_F-101.md`**. Review pasada 1: **`progress/review_F-101.md`**
+(CHANGES_REQUESTED, tres cambios, sin tocar SQL).
 
-Spec en `specs/F-101-cabecera-del-parte/` (137/150 y 236/250, puerta de tamano
-en verde). Resumen y todas las cifras medidas: **`progress/spec_F-101.md`**.
+**Decisiones del humano sobre la review (2026-09-23):**
+1. `hmores.tex` tambien queda en `raw.hmores`, legible por
+   `mcp_sigrid_dm_ro`: **opcion (b), exposicion ACEPTADA por escrito**, no se
+   revoca nada. Atenuantes: el servidor MCP no expone `raw` en su lista blanca
+   y el rol ya lee nombres en `raw.con.res`. Corregidas las frases que decian
+   que el texto vive solo en `personal`.
+2. El nombre de persona sacado de `hmores.tex` que estaba en la spec se
+   redacta con un commit nuevo; **el historial no se reescribe** (el literal
+   sigue en commits anteriores a 0ea8358).
 
-### F-101 · IMPLEMENTACION TERMINADA (implementer, 2026-09-23), pendiente de reviewer
+**Diccionario del arbol tras F-101 (version 28): 161 objetos, 1054 columnas,
+71 de consumo** (+3 fichas: `partes`, `recursos_tipos_hora`,
+`fn_fecha_serie`). `azure-apps`: commits 87dc629 y 953e9fb, sin push.
 
-T1-T13 hechas, `bash harness/init.sh` en verde (5.112 passed, cobertura
-94,7 %, mutacion: 0 mutantes). Informe: **`progress/impl_F-101.md`**.
-`azure-apps`: commit 87dc629, sin push. Ficha sigue `in_progress` hasta el
-APROBADO. Pendiente del humano: M1-M10, **M9 (ingesta de `hmores` con `tex`)
-antes que un `build-personal` a mano**.
+### F-101 · Verificaciones MANUALES del humano (necesitan BBDD; en este orden)
 
-- **T1 hecha**: las cifras de gobierno se reproducen contra Sigrid en solo
-  lectura (detalle en `progress/impl_F-101.md`). Unica deriva: `reshor` tiene hoy
-  8.968 filas y 2.064 recursos (8.959/2.063 el 22-23): altas del dia, no cambia
-  el diseno.
-- **Desviaciones justificadas** respecto a la spec (todas consecuencia directa de
-  las decisiones aprobadas, ninguna cambia el alcance):
-  1. `00_global.yaml` ya estaba en **27** (lo subio el merge de main antes de
-     implementar): T11 sube **27 -> 28**, no 26 -> 27.
-  2. `ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS` para
-     `codigo_parte` y `texto_linea`: `CREATE TABLE IF NOT EXISTS` no anade
-     columnas a una tabla que ya existe en la base (la nocturna del 23 la creo).
-  3. D-3 arrastra dos ficheros que la spec no lista: la ficha `raw.hmores` de
-     `config/diccionario/raw.yaml` (decia «No se traen 1 columnas», que pasa a
-     ser falso; la vigila `test_f006_r26_*`) y la constante `NUEVAS["hmores"]`
-     de `tests/test_f066_ingesta_raw.py` (mismo cambio que hizo F-074 con
-     `prvcer`).
-  4. `test_f057_r27_ddl_idempotente` cuenta `CREATE TABLE IF NOT EXISTS` == 2:
-     pasa a 4 con las dos tablas nuevas.
-  5. **`lineas_en_otra_obra` NO usa el `LATERAL` del diseno §4.1.** El diseno
-     suponia `raw.hmores` «indexada por `hmoide`» y no lo esta: `pg_indexes`
-     (solo lectura, 2026-09-23) solo da `hmores_pkey (ide)`. `EXPLAIN` sin
-     ANALYZE del LATERAL: `Nested Loop` con `Seq Scan` de `hmores` por cada
-     parte, coste 119.752.314. Se agrega una vez por `hmoide` (subconsulta
-     `GROUP BY` unida por hash): coste 19.681. Mismo resultado, misma fuente
-     (`raw.hmores`, no `personal.partes_lineas`), sin tocar `raw` con un indice.
-     El test R10 se ajusto a la forma agregada y veta el LATERAL.
-  6. `main.py`: solo el docstring de `build-personal` (listaba `03_views.sql`);
-     ninguna logica cambia.
-- **Diccionario del arbol tras F-101 (version 28): 161 objetos, 1054
-  columnas, 71 de consumo** (+3 fichas: `partes`, `recursos_tipos_hora`,
-  `fn_fecha_serie`; +32 columnas).
-La ficha pasa a `sdd: true` y `spec_ready`; `BACKLOG.md` regenerado.
+**M9 va PRIMERO**: hasta que `raw.hmores` tenga `tex` (lo anade la ingesta con
+`ADD COLUMN`), `02_partes_lineas.sql` falla en `l.tex`. La nocturna ya ingiere
+antes de construir; un `build-personal` a mano, no.
 
-Todo se midio el 2026-09-22/23 **en solo lectura** (Sigrid por `sigrid-api`,
-tamanos por `filas_solo_lectura`). Tres hallazgos que cambian la ficha del
-backlog: **`hmo.feccie`, `hmo.cla` y `hmo.caaide` valen 0 en las 6.886 filas**
-(y `reshor.cuaide`/`proide` en las 8.959), asi que no se publican;
-**`con.cod` no es unico** (6.258 codigos para 6.886 partes); y **el usuario que
-crea el parte no existe en `con` ni en `hmo`** — esta en `dbo.log`, 8,47 M
-filas no ingeridas, asi que queda fuera del hotfix y declarado.
-
-**Decisiones abiertas que necesita validar el humano antes de implementar:**
-
-1. **Ingerir `hmores.tex`** (recomendado SI): +277 KiB sobre los 111 MB de
-   `raw.hmores`, **+0,27 %**. Sin este visto bueno, **T9 no se ejecuta** y las
-   lineas se quedan sin el texto que pidio Juan.
-2. **El tipo de hora por defecto** esta en **`res.horide`**: opcion A (solo la
-   bandera `es_por_defecto`, recomendada) u opcion B (ademas una columna en
-   `personal.recursos`, que la spec dejaba intacto). Con A, **4 recursos** se
-   quedan sin marca porque su defecto no tiene fila en `reshor`.
-3. **`precio_venta` informado en 3 de 8.959 filas**: se publica con el aviso en
-   la ficha, salvo que el humano prefiera omitirlo.
-4. **El sufijo `_cabecera_`** (`obra_cabecera_id`,
-   `centro_coste_cabecera_id`). **F-093 va a necesitar el mismo vocabulario**
-   para `compras` y todavia no lo ha fijado: conviene decidirlo aqui, que llega
-   antes.
+- **M9** · coste de ventana de `hmores.tex`: cronometrar
+  `python main.py ingest --table hmores --full` con la configuracion de `main`
+  (sin `tex`) y con la de esta rama (con `tex`), y anotar los dos tiempos.
+- **M1** · `python main.py build-personal`: los seis sub-pasos en `success`,
+  `personal.partes` ~6.886 filas y `personal.recursos_tipos_hora` ~8.968.
+- **M2** · `SELECT COUNT(*), COUNT(DISTINCT codigo_parte) FROM personal.partes;`
+  -> **6.886 / 6.258**; y
+  `SELECT estado, COUNT(*) FROM personal.partes GROUP BY estado;` ->
+  **En registro 647 / Cerrado 541 / Imputado 5.698**.
+- **M3** · `SELECT COUNT(*) FROM personal.partes WHERE lineas_en_otra_obra > 0;`
+  -> **14**; `SELECT SUM(lineas_en_otra_obra) FROM personal.partes;` -> **615**.
+- **M4** · `SELECT COUNT(*) FROM personal.partes_lineas WHERE codigo_parte IS NULL;`
+  -> **0**.
+- **M5** · `SELECT unidad, COUNT(*) FROM personal.recursos_tipos_hora GROUP BY unidad;`
+  (sin nula, 3 en `DESCONOCIDA`); y
+  `SELECT COUNT(*) FILTER (WHERE precio_coste <> 0), COUNT(*) FILTER (WHERE precio_venta <> 0), COUNT(*) FILTER (WHERE es_por_defecto) FROM personal.recursos_tipos_hora;`
+  -> **2.037 / 3 / 2.032**.
+- **M6** · el desfase de Juan:
+  `SELECT COUNT(*) FILTER (WHERE l.precio <> t.precio_coste), COUNT(*) FROM personal.partes_lineas l JOIN (SELECT DISTINCT ON (recurso_id, tipo_hora_id) recurso_id, tipo_hora_id, precio_coste FROM personal.recursos_tipos_hora ORDER BY recurso_id, tipo_hora_id, reshor_id) t USING (recurso_id, tipo_hora_id) WHERE l.precio <> 0 AND t.precio_coste <> 0;`
+  -> alrededor de **156.819 / 279.034 (56,2 %)**; mirar el recurso MO/0306.
+- **M7** · `python main.py check-declarados`, `python main.py check-unicidad` y
+  `python main.py check-relaciones` en verde, sin anadir nada a
+  `config/objetos_pendientes.yaml`.
+- **M8** · `python main.py check-diccionario` en biyeccion.
+- **M10** · `python main.py publicar-diccionario` (version 28; escritura contra
+  Azure, solo el humano).
 
 ## 2026-09-22 · F-094 DESPLEGADA (tag `r20260922-2350`)
 
