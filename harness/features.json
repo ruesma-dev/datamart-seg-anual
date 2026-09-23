@@ -225,7 +225,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 49,
+      "priority": 50,
       "branch": "feature/F-017-cierre-costes-indirectos"
     },
     {
@@ -237,7 +237,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 53,
+      "priority": 54,
       "branch": "feature/F-018-validacion-cierre-mensual"
     },
     {
@@ -249,7 +249,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 59,
+      "priority": 60,
       "branch": "feature/F-002-plan-vigente"
     },
     {
@@ -268,7 +268,7 @@
       ],
       "status": "pending",
       "sdd": false,
-      "priority": 61,
+      "priority": 62,
       "branch": "feature/F-012-auditoria-costes-azure"
     },
     {
@@ -293,7 +293,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 62,
+      "priority": 63,
       "branch": "feature/F-013-carga-excels-aux"
     },
     {
@@ -305,7 +305,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 63,
+      "priority": 64,
       "branch": "feature/F-010-carga-excels-auxiliares"
     },
     {
@@ -317,7 +317,7 @@
       ],
       "status": "pending",
       "sdd": true,
-      "priority": 64,
+      "priority": 65,
       "branch": "feature/F-007-disparo-manual-web"
     },
     {
@@ -330,7 +330,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 50,
+      "priority": 51,
       "branch": "feature/F-022-desempate-obrfasamb"
     },
     {
@@ -380,7 +380,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 54,
+      "priority": 55,
       "branch": "feature/F-028-puerta-stg-distingue-fallo"
     },
     {
@@ -404,7 +404,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 43,
+      "priority": 44,
       "branch": "feature/F-029-mutacion-fiable"
     },
     {
@@ -421,7 +421,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 51,
+      "priority": 52,
       "branch": "feature/F-030-reglas-negocio-compartidas"
     },
     {
@@ -439,7 +439,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 46,
+      "priority": 47,
       "branch": "feature/F-031-alerta-no-se-resuelve"
     },
     {
@@ -456,7 +456,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 65,
+      "priority": 66,
       "branch": "feature/F-032-limpieza-secretos-y-puesto"
     },
     {
@@ -473,7 +473,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 55,
+      "priority": 56,
       "branch": "feature/F-033-azure-apps-al-dia"
     },
     {
@@ -490,7 +490,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 57,
+      "priority": 58,
       "branch": "feature/F-026-rbac-propagacion"
     },
     {
@@ -546,7 +546,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 44,
+      "priority": 45,
       "branch": "feature/F-036-oficios"
     },
     {
@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 32,
+      "priority": 33,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -585,7 +585,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 14,
+      "priority": 15,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -602,7 +602,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 35,
+      "priority": 36,
       "branch": "feature/F-039-vistas-puente"
     },
     {
@@ -615,7 +615,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 39,
+      "priority": 40,
       "branch": "feature/F-040-ingresos"
     },
     {
@@ -633,7 +633,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 31,
+      "priority": 32,
       "branch": "feature/F-041-mutacion-fiable"
     },
     {
@@ -666,7 +666,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 33,
+      "priority": 34,
       "branch": "feature/F-043-secreto-versionado"
     },
     {
@@ -698,7 +698,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 34,
+      "priority": 35,
       "branch": "feature/F-046-contraste-desgloses"
     },
     {
@@ -729,7 +729,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 37,
+      "priority": 38,
       "branch": "feature/F-048-guardian-secretos-poroso"
     },
     {
@@ -745,7 +745,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 40,
+      "priority": 41,
       "branch": "feature/F-049-sello-pendiente-mutacion"
     },
     {
@@ -761,7 +761,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 47,
+      "priority": 48,
       "branch": "feature/F-050-fases-duplicadas-sigrid"
     },
     {
@@ -779,7 +779,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
-      "priority": 5,
+      "priority": 6,
       "branch": "feature/F-051-nombre-mes-real"
     },
     {
@@ -796,7 +796,7 @@
       "status": "blocked",
       "sdd": true,
       "rigor": "critico",
-      "priority": 41,
+      "priority": 42,
       "branch": "feature/F-052-partidas-huerfanas"
     },
     {
@@ -815,7 +815,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 45,
+      "priority": 46,
       "branch": "feature/F-053-desempate-obras-duplicadas"
     },
     {
@@ -833,7 +833,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "documental",
-      "priority": 42,
+      "priority": 43,
       "branch": "feature/F-054-conocimiento-de-negocio"
     },
     {
@@ -850,7 +850,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 12,
+      "priority": 13,
       "branch": "feature/F-055-mundo-proveedor"
     },
     {
@@ -867,7 +867,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 23,
+      "priority": 24,
       "branch": "feature/F-056-contabilidad"
     },
     {
@@ -900,7 +900,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 36,
+      "priority": 37,
       "branch": "feature/F-058-estados-financieros"
     },
     {
@@ -917,7 +917,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 38,
+      "priority": 39,
       "branch": "feature/F-059-retenciones-historicas"
     },
     {
@@ -930,7 +930,7 @@
         "Resuelto y escrito como se identifica al mismo tercero entre empresas distintas, que tienen subcuentas distintas",
         "Documentado en el diccionario que significa 'posicion' y 'pendiente' aqui, para que el MCP no lo confunda con lo que publica compras"
       ],
-      "priority": 48,
+      "priority": 49,
       "rigor": "estandar",
       "branch": "feature/F-060-posicion-terceros",
       "status": "pending",
@@ -946,7 +946,7 @@
         "Decidido y escrito el grano de publicacion para no exponer datos de nomina individuales",
         "Contrastado contra el coste de personal que hoy publica el seguimiento, con las diferencias explicadas"
       ],
-      "priority": 52,
+      "priority": 53,
       "rigor": "critico",
       "branch": "feature/F-061-coste-personal-obra",
       "status": "pending",
@@ -962,7 +962,7 @@
         "Validado por Administracion contra al menos una declaracion real ya presentada",
         "Documentado que este objeto NO sustituye a la declaracion oficial y para que sirve exactamente"
       ],
-      "priority": 56,
+      "priority": 57,
       "rigor": "estandar",
       "branch": "feature/F-062-impuestos",
       "status": "pending",
@@ -978,7 +978,7 @@
         "Contrastado contra el total que la analitica reparte como GENERALES, con la diferencia cuantificada por ano Y EXPLICADA: que parte es gasto no repartido, que parte es diferencia de criterio y que parte no cuadra",
         "NO se cambia el criterio de reparto en esta feature. Si la diferencia sugiere que deberia cambiarse, se lleva a Negocio como propuesta con el numero delante"
       ],
-      "priority": 58,
+      "priority": 59,
       "rigor": "critico",
       "branch": "feature/F-063-generales-reparto",
       "status": "pending",
@@ -995,7 +995,7 @@
         "Distinguidos los apuntes manuales de los generados por documento, con su volumen",
         "El aviso que se pasa a F-058 dice que parte del gasto NO DEBE atribuirse a obra por ser estructura, y que parte falta por error"
       ],
-      "priority": 60,
+      "priority": 61,
       "rigor": "estandar",
       "branch": "feature/F-064-control-interno-contable",
       "status": "pending",
@@ -1015,7 +1015,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "documental",
-      "priority": 29,
+      "priority": 30,
       "branch": "feature/F-065-creditos-cpu-tras-la-ventana"
     },
     {
@@ -1054,7 +1054,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 28,
+      "priority": 29,
       "branch": "feature/F-067-compras-seguimiento-mcp"
     },
     {
@@ -1086,7 +1086,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 30,
+      "priority": 31,
       "branch": "feature/F-069-mejoras-arnes-review-f066"
     },
     {
@@ -1104,7 +1104,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 21,
+      "priority": 22,
       "branch": "feature/F-070-auditoria-calidad-diccionario"
     },
     {
@@ -1180,7 +1180,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 27,
+      "priority": 28,
       "branch": "feature/F-075-alcance-de-las-puertas"
     },
     {
@@ -1200,7 +1200,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 19,
+      "priority": 20,
       "branch": "feature/F-076-ambitos-certificacion"
     },
     {
@@ -1215,7 +1215,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 24,
+      "priority": 25,
       "branch": "feature/F-077-flag-reconstruir-todo-sin-test"
     },
     {
@@ -1312,7 +1312,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 25,
+      "priority": 26,
       "branch": "feature/F-082-supervivientes-f025"
     },
     {
@@ -1369,7 +1369,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 18,
       "branch": "feature/F-085-quien-aprobo-que-y-cuando"
     },
     {
@@ -1390,7 +1390,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "critico",
-      "priority": 22,
+      "priority": 23,
       "branch": "feature/F-087-rol-propio-de-power-bi"
     },
     {
@@ -1409,7 +1409,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 26,
+      "priority": 27,
       "branch": "feature/F-088-guardian-de-recuentos-y-la-guarda-que-falta"
     },
     {
@@ -1428,7 +1428,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 15,
+      "priority": 16,
       "branch": "feature/F-089-el-mcp-cachea-el-diccionario"
     },
     {
@@ -1447,7 +1447,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 16,
+      "priority": 17,
       "branch": "feature/F-090-documento-adjunto"
     },
     {
@@ -1466,7 +1466,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 18,
+      "priority": 19,
       "branch": "feature/F-091-factura-asiento"
     },
     {
@@ -1485,7 +1485,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 21,
       "branch": "feature/F-092-productos-y-centro-de-coste"
     },
     {
@@ -1505,7 +1505,7 @@
       "status": "pending",
       "sdd": false,
       "rigor": "estandar",
-      "priority": 13,
+      "priority": 14,
       "branch": "feature/F-093-obra-de-cabecera"
     },
     {
@@ -1537,7 +1537,7 @@
       "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
-      "priority": 3,
+      "priority": 4,
       "branch": "feature/F-095-retenciones-contabilidad-fin-obra"
     },
     {
@@ -1553,7 +1553,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 6,
+      "priority": 7,
       "branch": "feature/F-096-plan-mensual-sin-tope"
     },
     {
@@ -1569,7 +1569,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 8,
+      "priority": 9,
       "branch": "feature/F-097-descompuestos-partidas"
     },
     {
@@ -1585,7 +1585,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 9,
+      "priority": 10,
       "branch": "feature/F-098-fases-por-ambito-y-controles"
     },
     {
@@ -1601,7 +1601,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 11,
+      "priority": 12,
       "branch": "feature/F-099-expedientes-obra"
     },
     {
@@ -1651,7 +1651,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 7,
+      "priority": 8,
       "branch": "feature/F-103-huecos-numeracion-fases"
     },
     {
@@ -1667,7 +1667,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 4,
+      "priority": 5,
       "branch": "feature/F-104-retenciones-cliente"
     },
     {
@@ -1684,8 +1684,24 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 10,
+      "priority": 11,
       "branch": "feature/F-105-log-sigrid-usuarios"
+    },
+    {
+      "id": "F-106",
+      "title": "Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar",
+      "description": "Decidido por el humano el 2026-09-23, prioridad 3, detras del hotfix F-102. MODELO DE NEGOCIO, en palabras del humano: «las obras son por empresa. La UTE es una cosa y Ruesma otra. En la UTE hay una info y en Ruesma unos suplidos (a la UTE), no estamos consolidando. El codigo igual representa que es la misma obra, pero desde la perspectiva de diferentes empresas. Lo mismo con Porsan. Ahora mismo estamos trayendo cosas de Ruesma, no de las demas empresas; despues traeremos las demas». HOY: `stg.obras` elige UNA ficha por codigo con un ranking (conext 15 -> tiemod, F-053) que mezcla empresas: para 0581 y 0606 elige la ficha de la UTE (27 y 31), para 0720 la copia vacia de Porsan (28), y 0252 y 0517 pierden sus datos de UTE (7.564 y 72.737 filas de plan). Medido por el spec-author de F-102 el 2026-09-23. F-102 publica los identificadores (`empresa_id`, `nombre_empresa`, `clave_obra` = '<empresa>-<codigo>', `clave_recurso`, `es_ficha_principal` = empresa 1) pero NO toca la eleccion de `stg.obras`, para no perder datos. QUE HACER: (1) el seguimiento de Ruesma (`stg`, `mart`, `cierre`) pasa a leer SOLO la ficha de la empresa 1, con la clave `obra_id`/`clave_obra`; (2) las demas empresas (UTE, Porsan, 12, 14, 18, 25, 27, 31...) se traen como obras PROPIAS, cada una con su perspectiva, SIN CONSOLIDAR y sin mezclarse con Ruesma; decidir con el humano donde viven (mismo `mart` con dimension empresa, o esquema aparte) y como las ve Power BI; (3) lo mismo para RECURSOS y partes (correo de Juan Romero del 23-09: el codigo de recurso es unico por empresa; 26.426 lineas de parte y 3,23 M EUR imputadas a recursos de otras empresas) y para compras (83.375 lineas y 31,17 M EUR de las 8 fichas UTE). RIESGO: cambia el `obra_id` de obras visibles en Power BI (0581, 0606, 0671, 0720) y el universo de `R-UNIVERSO-OBRA`; hay que contrastar la huella con `huella-obras --propuesta` como en F-042.",
+      "acceptance": [
+        "El seguimiento de Ruesma lee solo fichas de la empresa 1 y lo que cambia frente a hoy (obras, filas e importes) esta medido y aceptado por el humano",
+        "Las obras de las demas empresas se publican como obras propias, identificadas por `obra_id`/`clave_obra`, sin consolidar con Ruesma, en el sitio que decida el humano",
+        "Recursos, partes y compras de otras empresas quedan atribuidos a la obra de SU empresa",
+        "Diccionario, reglas duras y `azure-apps/datamart_seg_anual.md` explican el modelo por empresa en el mismo trabajo"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 3,
+      "branch": "feature/F-106-obras-por-empresa"
     }
   ]
 }
