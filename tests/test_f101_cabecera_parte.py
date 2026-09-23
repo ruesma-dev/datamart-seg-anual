@@ -641,8 +641,8 @@ def test_f101_r28_ficha_relaciones_declaradas() -> None:
     lineas = {r.de: r.a for r in _ficha_de("partes_lineas").relaciones}
     assert lineas.get("parte_id") == "personal.partes.parte_id"
 
-    tipos = {r.de: r.a for r in _ficha_de("recursos_tipos_hora").relaciones}
-    assert tipos.get("recurso_id") == "personal.recursos.recurso_id"
+    tipos = {(r.de, r.a) for r in _ficha_de("recursos_tipos_hora").relaciones}
+    assert ("recurso_id", "personal.recursos.recurso_id") in tipos
 
 
 def test_f101_r3_ficha_codigo_parte_no_es_clave() -> None:

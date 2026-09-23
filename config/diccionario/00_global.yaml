@@ -973,7 +973,11 @@ esquemas:
       `personal.v_pbi_horas_obra_mes`, que lleva el corte cableado-- y el 71,7 %
       del euro esta en las lineas de MES, que es el coste de estructura de obra,
       no las horas. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), publicados
-      por decision expresa del responsable del dato el 2026-09-18.
+      por decision expresa del responsable del dato el 2026-09-18. Desde F-101
+      tambien la CABECERA del parte (`personal.partes`: codigo, descripcion,
+      estado; el codigo NO es unico y su obra AUDITA, no imputa) y los precios
+      de la ficha de cada recurso (`personal.recursos_tipos_hora`), que son los
+      de HOY: Sigrid no guarda historico.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_personal]

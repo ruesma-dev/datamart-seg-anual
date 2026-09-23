@@ -50,6 +50,11 @@ en verde). Resumen y todas las cifras medidas: **`progress/spec_F-101.md`**.
      `GROUP BY` unida por hash): coste 19.681. Mismo resultado, misma fuente
      (`raw.hmores`, no `personal.partes_lineas`), sin tocar `raw` con un indice.
      El test R10 se ajusto a la forma agregada y veta el LATERAL.
+  6. `main.py`: solo el docstring de `build-personal` (listaba `03_views.sql`);
+     ninguna logica cambia.
+- **Diccionario del arbol tras F-101 (version 28): 161 objetos, 1054
+  columnas, 71 de consumo** (+3 fichas: `partes`, `recursos_tipos_hora`,
+  `fn_fecha_serie`; +32 columnas).
 La ficha pasa a `sdd: true` y `spec_ready`; `BACKLOG.md` regenerado.
 
 Todo se midio el 2026-09-22/23 **en solo lectura** (Sigrid por `sigrid-api`,
