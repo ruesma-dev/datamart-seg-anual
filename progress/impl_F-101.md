@@ -175,3 +175,42 @@ que en crudo nunca es NULL).
 - **Lo que no se ha verificado aqui**: que los dos SQL nuevos corran contra una
   base (M1-M8). Construir `personal` escribe en el Postgres compartido: es del
   humano. El riesgo concreto es M9 antes que M1 (ver arriba).
+
+## Pasada 2 (tras la review CHANGES_REQUESTED, 2026-09-23)
+
+Decisiones del humano sobre los tres cambios de `progress/review_F-101.md`; los
+tres aplicados, sin tocar SQL salvo un comentario:
+
+1. **`hmores.tex` tambien en `raw.hmores`: opcion (b), exposicion ACEPTADA**
+   ("aceptada por el humano el 2026-09-23; atenuantes: el servidor MCP no
+   expone `raw` en su lista blanca y el rol ya lee nombres en `raw.con.res`").
+   Corregido en `config/tables_sigrid.yaml` (bloque `hmores`), ficha
+   `texto_linea` de `personal.yaml` (ya no dice «restringible») y ficha
+   `raw.hmores` de `raw.yaml` («puede llevar nombres de persona AQUI»). Test
+   nuevo `test_f101_r16_la_exposicion_en_raw_esta_declarada_y_aceptada`: exige
+   la declaracion con fecha en las tres, veta «restringible» y «se publica solo
+   en el esquema», y fija que `raw.hmores` NO esta en `DEFAULT_EXCLUDED_TABLES`
+   (si un dia se revoca, el test obliga a reescribir la ficha). Commit 5f17e5a.
+   `azure-apps/datamart_seg_anual.md`: nota bajo «Y `hmores` recupero `tex`»
+   con la exposicion, la aceptacion y como cerrarla (commit **953e9fb** en ese
+   repo, sin push).
+2. **Nombre de persona de Sigrid redactado** con commit NUEVO **0ea8358**, sin
+   reescribir historial: «un nombre y dos apellidos» en `requirements.md:78`,
+   `design.md:195`, `progress/spec_F-101.md:34` y en el propio
+   `review_F-101.md` (que lo citaba y se commitea en ese mismo commit).
+   Comprobado con `grep -rl` sobre el arbol entero (sin `.git` ni `.venv`,
+   incluidos los worktrees de `.claude/`) y sobre `azure-apps`: **0 ficheros**.
+   El literal sigue en commits anteriores (desde fd4f706): lo decide el humano.
+3. **`progress/current.md`**: la seccion de F-101 se reescribe entera; M1-M10
+   con su comando exacto, **M9 primero**, y fuera el bloque de decisiones
+   abiertas y la frase «pasa a `spec_ready`». Commit 89e47f7.
+
+Observaciones no bloqueantes atendidas de paso (commit 5f17e5a): sin nombre de
+persona en `04_recursos_tipos_hora.sql` ni en el docstring de `test_f101_r25`
+(queda el codigo MO/0306); la ficha de `partes_lineas` cita solo 615 lineas de
+14 partes, con fecha. No atendida: `tipo_hora_de_baja` con `auxhor.fecbaj`
+NULL (hoy es un entero de Sigrid, que guarda 0 y no NULL; queda anotado).
+**`bash harness/init.sh` pasada 2**, tal cual: **ENTORNO LISTO**, **5.113
+passed** (uno mas: el test nuevo de R16), 189 skipped, 0 failed, **1.346,96 s**;
+cobertura [OK] 94,7 % (968/1022); tamano [OK] (impl 212/220, review 135/140).
+Mutacion sin cambios: el Python de produccion tocado sigue siendo el mismo (0).
