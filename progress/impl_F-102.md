@@ -65,6 +65,16 @@ sale vacio. `facturas` y `mcp-bbdd` no se tocan (D4).
    vista es correcta y consultable; su descripcion manda a `maestro.obras` para
    el contexto de una obra. Diccionario: **163 objetos, 1.083 columnas, 72 de
    consumo** recomendadas.
+6. **`check-unicidad` NO vigila `clave_obra` ni `clave_recurso`** (declarada en
+   la review, pasada 1). La spec prometia «un test lo vigila por la
+   construccion y `check-unicidad` en la base» (`design.md` §6), pero
+   `check-unicidad` sale de la `clave_negocio` de cada ficha
+   (`unicidad_sql.consultas_de_unicidad`), que sigue en `[obra_id]` /
+   `[recurso_id]`. Hoy las vigilan el test de su construccion (R6, R26) y, en la
+   base, **solo** las consultas `count(DISTINCT ...)` de T16 (M1 y M6 en
+   `current.md`). La vigilancia permanente NO se implementa: la decide el
+   humano (indice unico en `personal.recursos (clave_recurso)`, o claves
+   alternativas en el validador de F-006, que resolveria tambien la 4).
 
 Ademas, las cifras de direccion de F-073 (33,1 %...) se conservan en las fichas
 como HISTORIA («contando las 921 fichas... salia el 33,1 %: mezclaba las copias»),
@@ -141,7 +151,9 @@ tiene `auxemp` (la crea la ingesta), asi que donde hace falta se simula con un
 
 - **T16 MANUAL, tras la primera nocturna con la imagen nueva** (y reiniciar el
   MCP por su cache): las consultas de `tasks.md` T16 y `python main.py
-  check-unicidad`, `check-relaciones`, `check-declarados` sin errores nuevos.
+  check-unicidad`, `check-relaciones`, `check-declarados` sin errores nuevos
+  (`check-unicidad` no mira las claves nuevas: desviacion 6). Lista completa,
+  con comando y resultado esperado, en `progress/current.md` (M1-M9).
   Esperado: 922/922; 0 filas; 0581, 0606, 0671, 0720; 1/57/48; 1.880/0;
   2.618/2.618. **Despues, `publicar-diccionario` (version 29)**: escritura
   contra Azure, solo el humano.
