@@ -9,6 +9,24 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-23 · F-102 · EN CURSO (implementer, rama `hotfix/F-102-obra-duplicada-empresa-28`)
+
+Spec APROBADA en `specs/F-102-obra-duplicada-empresa-28/` (17 tareas).
+`bash harness/init.sh` en verde al arrancar (5.113 passed, cobertura 94,7 %).
+Informe del implementer: `progress/impl_F-102.md` (al terminar).
+
+- **Tarea en curso**: T1 (tests RED).
+- **Desviacion 1 (justificada)**: `maestro.v_obra_fichas` se crea en
+  `sql/maestro/00_setup.sql` y no en `01_obras.sql`. `tests/test_f073_sql.py`
+  lee las columnas de `maestro.obras` del PRIMER `CREATE OR REPLACE VIEW` de
+  `01_obras.sql` (`test_f073_r18_*`): una vista antepuesta alli rompe esos
+  guardas, y T5 exige `pytest tests/test_f073_sql.py` en verde sin tocarlo.
+  `00_setup.sql` corre antes en el mismo paso, lee solo `raw` y no se dropea.
+- **Desviacion 2 (justificada)**: `num_cierres` se cuenta con `raw.obrfas`
+  agregado por `obride` y `LEFT JOIN` (mismo valor) en vez de la subconsulta
+  correlacionada del diseno: medido en solo lectura, 22 ms frente a 529 ms, y
+  la vista la leen las cinco vistas de `compras` en cada consulta.
+
 ## 2026-09-23 · F-101 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN M1-M10 DEL HUMANO Y EL DESPLIEGUE
 
 HOTFIX de F-057. Spec en `specs/F-101-cabecera-del-parte/`, aprobada el
