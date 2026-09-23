@@ -138,6 +138,7 @@ CREATE INDEX IF NOT EXISTS idx_personal_recursos_empleado
 CREATE TABLE IF NOT EXISTS personal.partes_lineas (
     linea_id        BIGINT        PRIMARY KEY,
     parte_id        BIGINT,
+    codigo_parte    VARCHAR(24),
     recurso_id      BIGINT,
     obra_id         BIGINT,
     en_seguimiento  BOOLEAN       NOT NULL DEFAULT FALSE,
@@ -153,6 +154,10 @@ CREATE TABLE IF NOT EXISTS personal.partes_lineas (
     importe         NUMERIC(18,2),
     _built_at       TIMESTAMP     NOT NULL DEFAULT NOW()
 );
+
+-- F-101: el codigo del parte en cada linea. `CREATE TABLE IF NOT EXISTS` no
+-- anade columnas a la tabla que la nocturna ya creo, asi que va tambien aqui.
+ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS codigo_parte VARCHAR(24);
 
 -- `(unidad)` no es decorativo: es el índice del filtro que evita la cifra
 -- falsa, y el que sirve la vista de consumo.
