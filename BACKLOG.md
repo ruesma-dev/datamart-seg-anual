@@ -5,13 +5,15 @@
 
 Resumen: **100 features**, 65 abiertas, 35 terminadas.
 
+En curso: **F-107**.
+
 Bloqueadas: **F-052**.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-107 | Contrapartidas del recurso y catalogo de cuentas analiticas (correo de Juan Romero del 23-09) | 1 | pendiente | estandar | `feature/F-107-contrapartidas-cuentas-analiticas` |
+| F-107 | Contrapartidas del recurso y catalogo de cuentas analiticas (correo de Juan Romero del 23-09) | 1 | en curso | estandar | `feature/F-107-contrapartidas-cuentas-analiticas` |
 | F-095 | Retenciones desde la contabilidad, cuadradas con los efectos, por obra, y con vencimiento a contar desde el fin de obra | 4 | spec lista | critico | `feature/F-095-retenciones-contabilidad-fin-obra` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 5 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 6 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
@@ -121,7 +123,7 @@ Bloqueadas: **F-052**.
 
 ### F-107 · Contrapartidas del recurso y catalogo de cuentas analiticas (correo de Juan Romero del 23-09)
 
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-107-contrapartidas-cuentas-analiticas`
+estado **en curso** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-107-contrapartidas-cuentas-analiticas`
 
 Pedido por el humano el 2026-09-24 para hacer YA (prioridad 1). Correo de Juan Romero del 23-09 18:02: tras F-101 ya cuadra los precios de la ficha contra los partes, pero le faltan (1) LAS CONTRAPARTIDAS de la ficha del recurso —centro de coste y cuenta analitica de contrapartida, que descargan los partes contra el coste real de nomina; sin ellas tiene el cargo a la obra pero no el abono y no puede reproducir el asiento— y (2) EL CATALOGO DE CUENTAS ANALITICAS para traducir los identificadores (496869, 496923, 496935...) a codigo y descripcion. MEDIDO POR EL LIDER EL 2026-09-24 en solo lectura: `raw.reshor` NO tiene columnas de contrapartida (solo `cuaide`, `caaide`, `proide`; `cuaide` y `proide` a 0 en todas las filas), tampoco en el diccionario de Sigrid (`azure-apps/sigrid_tablas.md`). Las contrapartidas estan en el RECURSO: `res.cenconide` («Centro de coste contrapartida», indice a `cen`) y `res.caaconide` («Cuenta analitica contrapartida», indice a `caa`), informadas en 1.979 recursos, 9 centros distintos y 848 cuentas distintas; `res` ya se ingiere. Una cuenta analitica es un concepto de Sigrid (`con`): 496869 = '00000.CIMO02' JEFE DE OBRA, 496923 = '00000.CICO01' COMBUSTIBLES-GASOIL, 496935 = '00000.CICO13' TELEFONO MOVIL (`con.tip = 19`, comprobar); sus propiedades estan en `caa` (padide -> `cag`, cenide, niv, prpide, prbide, rep), tabla NO ingerida. QUE HACER: (a) `personal.recursos` gana `centro_coste_contrapartida_id` y `cuenta_analitica_contrapartida_id` (NULLIF 0), con su ficha diciendo que la contrapartida es del RECURSO y no por tipo de hora; (b) ingerir `caa` y publicar `maestro.cuentas_analiticas` (una fila por cuenta: id, empresa_id, codigo, descripcion desde `con`; cuenta padre, nivel, centro de coste y partida presupuestaria desde `caa`; activa/fecha_baja como el resto de maestros), sin filtrar; (c) relaciones en el diccionario desde `personal.recursos_tipos_hora.cuenta_analitica_id`, las dos contrapartidas y `personal.partes_lineas` si trae cuenta; (d) medir cuantas cuentas usadas en `personal` casan con el catalogo. Respetar `R-CODIGO-POR-EMPRESA` (F-102): el codigo de cuenta puede repetirse por empresa.
 

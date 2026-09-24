@@ -9,6 +9,20 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-24 · F-107 · EN CURSO (implementer) · contrapartidas del recurso y catalogo de cuentas analiticas
+
+Rama `feature/F-107-contrapartidas-cuentas-analiticas` (desde `main` con F-101 y
+F-102). `sdd: false`, rigor `estandar`. `bash harness/init.sh` en verde al
+arrancar (5.246 passed, cobertura 94,7 %). Tareas derivadas de los `acceptance`:
+
+- [x] T1 tests en fase RED (`tests/test_f107_contrapartidas_cuentas.py`)
+- [ ] T2 ingesta de `caa` (censo 69 -> 70) y ficha `raw.caa`
+- [ ] T3 `personal.recursos` gana las dos contrapartidas y su ficha
+- [ ] T4 `maestro.cuentas_analiticas` (06, ultimo sub-paso) y su ficha
+- [ ] T5 relaciones, regla, version 30 del diccionario y ARCHITECTURE
+- [ ] T6 `azure-apps/datamart_seg_anual.md` (commit local alli)
+- [ ] T7 informe, lista MANUAL y `init.sh` en verde
+
 ## 2026-09-24 · F-102 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN T16 DEL HUMANO Y EL DESPLIEGUE
 
 > Pendiente de decision del humano (no bloquea): vigilancia permanente de
