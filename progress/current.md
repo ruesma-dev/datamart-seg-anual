@@ -41,6 +41,14 @@ Informe del implementer: `progress/impl_F-102.md`.
   el validador de F-006 admita claves alternativas (resolveria tambien la
   desviacion 4).
 
+### F-102 · DESPLEGADA el 2026-09-24 ~07:17 UTC con el tag `r20260924-0915`
+
+Construida desde `main` 86732fb; el job pasa de `r20260923-1605` a
+`r20260924-0915`. La nocturna del 24 (00:00-04:06 UTC) corrio en verde con la
+imagen de F-101 (`r20260923-1605`): primera noche de F-101, OK. La primera
+nocturna con F-102 es la del 25-09, salvo que se construya a mano antes
+(respetando el ORDEN de abajo).
+
 ### F-102 · T16, verificaciones MANUALES del humano (necesitan BBDD; en este orden)
 
 **ORDEN DE DESPLIEGUE, antes de nada**: `maestro.obras` y `personal.recursos`
