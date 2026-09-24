@@ -181,21 +181,18 @@ despues. Tras T2-T6: **34 passed**.
 
 ## Evidencias
 
-- **`bash harness/init.sh`** tal cual, al cerrar (tras el commit T7): **ENTORNO
-  LISTO**, exit 0. `[OK] pytest en verde`, `[OK] PUERTA COBERTURA`, `[OK]
-  PUERTA TAMAÑO: F-107 dentro de los topes (impl 144/220)`, `[OK] Rama actual`;
-  avisos previos: ruff 232 (deuda previa) y la feature `blocked` F-052.
-- **Tests**: **5.295 passed, 193 skipped, 0 failed** (al arrancar: 5.246 /
-  191). `tests/test_f107_contrapartidas_cuentas.py`: **34 passed**.
-- **Tiempo de la suite**: **1.445,00 s (24 min 05 s)**, el que imprime pytest
-  dentro de `init.sh`; al arrancar la sesion fueron 569,94 s. La diferencia es
-  la maquina: habia otros procesos Python de otras sesiones en marcha. `init.sh`
-  se lanzo en primer plano; el Bash de la sesion lo movio a segundo plano al
-  agotar sus 600 s y se espero a su final.
+- **`bash harness/init.sh`** tal cual, al cerrar la AMPLIACION (tras T11):
+  **ENTORNO LISTO**, exit 0; `[OK] BACKLOG.md al día`, `[OK] PUERTA TAMAÑO
+  (impl 215/220)`, `[OK] Rama actual`; avisos previos: ruff 232 y F-052.
+- **Tests**: **5.300 passed, 193 skipped, 0 failed** (antes de la ampliacion
+  5.295; al arrancar 5.246). `test_f107_contrapartidas_cuentas.py`: **39 passed**.
+- **Tiempo de la suite**: **1.222,42 s (20 min 22 s)** (antes: 1.445,00 s; al
+  arrancar 569,94 s: la maquina compartia CPU con otras sesiones). El Bash lo
+  paso a segundo plano a los 600 s y se espero a su final.
 - **Cobertura de lineas cambiadas**: **94,7 %** (968/1022, umbral 80 %),
   `PUERTA COBERTURA`. Se mide contra `dev`, que va por detras de `main`: la
   cifra es la misma que la de F-102 porque incluye lineas de otras features.
-  F-107 solo cambia 14 lineas Python de produccion (la entrada nueva de
+  F-107 (con la ampliacion) solo cambia 14 lineas Python de produccion (la entrada nueva de
   `SUB_PASOS` y el docstring), cubiertas por `test_f073_build_maestros_*` y
   `test_f107_r2_el_paso_de_maestros_la_construye_la_ultima`.
 - **Mutacion**: `python -m harness.mutacion --feature F-107 --base main` ->
