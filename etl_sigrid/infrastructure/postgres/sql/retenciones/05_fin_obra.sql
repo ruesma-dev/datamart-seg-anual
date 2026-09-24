@@ -5,7 +5,8 @@
 -- Construye:
 --   retenciones.fin_obra  una fila por obra de raw.obr
 --
--- Lee de raw.obr, raw.obrctr y raw.con.
+-- Lee de raw.obr, raw.obrctr, raw.con y cierre.fact_cierre_mensual (D7): de
+-- `cierre` SOLO esa tabla de hechos.
 --
 -- LAS FECHAS CANDIDATAS, CADA UNA EN SU COLUMNA (R17)
 -- ---------------------------------------------------------------------------
@@ -24,7 +25,36 @@
 --                                que usa la cabecera: aqui solo fechas de Sigrid).
 -- obrctr tiene varias filas por obra (165 obras con mas de una): se agrega
 -- ANTES de unir, una fila por obra.
+--
+-- EL ULTIMO CIERRE CON MOVIMIENTO (R18, D7)
+-- ---------------------------------------------------------------------------
+--   ultimo_cierre  el mayor `anio_mes` de cierre.fact_cierre_mensual de la obra
+--                  con `ejecutado_mes <> 0` en algun concepto: el ultimo cierre
+--                  que MOVIO algo, no la ultima fase creada. 124 de 330 obras
+--                  tienen fases vacias despues de su ultimo movimiento (~12
+--                  meses de media): tomar la ultima fase alargaria el fin de
+--                  obra casi un ano. `anio_mes` ya es el mes canonico de la fase
+--                  (cierre.fn_mes_de_fase) y no se reinterpreta aqui.
+-- PRECIO ACEPTADO: `build_cierre` corre DESPUES de `build_retenciones`, asi que
+-- este respaldo usa el cierre de la noche anterior (una noche de retraso; un
+-- fin de obra no cambia de un dia a otro), y solo existe para las obras del
+-- seguimiento. No se declara `build_cierre` en `depends_on` por lo mismo que
+-- D3: un fallo de otra rama dejaria la noche sin retenciones.
+--
+-- LA GUARDA (R21): si la tabla del cierre no existe o esta VACIA, este fichero
+-- falla con el nombre del sub-paso en vez de publicar todas las obras sin
+-- fecha de respaldo.
 -- ============================================================================
+
+DO $$
+BEGIN
+    IF to_regclass('cierre.fact_cierre_mensual') IS NULL THEN
+        RAISE EXCEPTION 'fin_obra: no existe la tabla cierre.fact_cierre_mensual; lanza build-cierre antes de build-retenciones';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM cierre.fact_cierre_mensual) THEN
+        RAISE EXCEPTION 'fin_obra: cierre.fact_cierre_mensual esta vacia; sin ella ninguna obra tendria fin de obra de respaldo';
+    END IF;
+END $$;
 
 DROP TABLE IF EXISTS retenciones.fin_obra CASCADE;
 CREATE TABLE retenciones.fin_obra AS
@@ -39,6 +69,13 @@ WITH oc AS (
         COUNT(*)                                                  AS num_contratos_obra
     FROM raw.obrctr c GROUP BY c.obride
 ),
+cierres AS (
+    -- El ultimo mes que movio algo, por obra
+    SELECT f.obra_id, MAX(f.anio_mes) AS ultimo_cierre
+    FROM cierre.fact_cierre_mensual f
+    WHERE f.ejecutado_mes <> 0
+    GROUP BY f.obra_id
+),
 base AS (
     SELECT
         obr.ide                                    AS obra_id,
@@ -49,6 +86,7 @@ base AS (
         con.est                                    AS estado_obra,
         COALESCE(retenciones.fn_sigrid_date(oc.fec_inicio_garantia),
                  retenciones.fn_sigrid_date(obr.garfecini)) AS fecha_inicio_garantia,
+        ci.ultimo_cierre                           AS ultimo_cierre,
         -- Fin real: la regla de cierre.v_pbi_cierre_cabecera (D5)
         COALESCE(
             oc.fec_real_fin,
@@ -63,6 +101,7 @@ base AS (
     FROM raw.obr obr
     LEFT JOIN raw.con con ON con.ide = obr.ide
     LEFT JOIN oc ON oc.obra_id = obr.ide
+    LEFT JOIN cierres ci ON ci.obra_id = obr.ide
 )
 SELECT
     b.obra_id,
@@ -72,6 +111,7 @@ SELECT
     b.nombre_obra,
     b.estado_obra,
     b.fecha_inicio_garantia,
+    b.ultimo_cierre,
     b.fecha_fin_real,
     b.fecha_recepcion_provisional,
     b.fecha_fin_prevista,
