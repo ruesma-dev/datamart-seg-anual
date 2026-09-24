@@ -119,8 +119,9 @@ def _tablas() -> dict[str, dict]:
 def test_f095_r1_cuentas_por_cueretide_no_por_prefijo() -> None:
     cuentas = _bloque(APUNTES, "CREATE TABLE retenciones.cuentas_proveedor AS", ";")
     assert "FROM raw.prv prv" in cuentas
-    assert "WHERE COALESCE(prv.cueretide, 0) <> 0" in cuentas, (
-        "las cuentas de retencion son las que el proveedor declara (R1)"
+    assert cuentas.strip().endswith("WHERE COALESCE(prv.cueretide, 0) <> 0"), (
+        "las cuentas de retencion son TODAS las que el proveedor declara, sin "
+        "ningun otro filtro (R1, R2)"
     )
     texto = _sql(APUNTES)
     assert not re.search(r"'4\d{2,}", texto), (
