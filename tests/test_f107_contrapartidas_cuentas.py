@@ -448,3 +448,64 @@ def test_f107_r4_azure_apps_recoge_lo_nuevo() -> None:
     for termino in ("maestro.cuentas_analiticas", "centro_coste_contrapartida_id",
                     "cuenta_analitica_contrapartida_id", "70 tablas", "F-107"):
         assert termino in texto, f"azure-apps no dice «{termino}» (R4)"
+
+
+# ===========================================================================
+# R5 · AMPLIACION (decision del humano, 2026-09-24): la cuenta de cada linea
+# ===========================================================================
+#
+# `hmores.caaide` es la cuenta analitica de CARGO de la linea: medido en Sigrid,
+# 310.553 de 331.003 lineas, 3.782 cuentas, 0 huerfanas contra `caa`, y en
+# 309.182 el prefijo del codigo de la cuenta es el codigo de la obra de la
+# linea. Solo 45 lineas llevan la cuenta de contrapartida del recurso.
+
+RUTA_LINEAS = DIR_SQL / "personal" / "02_partes_lineas.sql"
+
+
+def test_f107_r5_la_tabla_de_lineas_gana_la_cuenta_sin_drop() -> None:
+    compacto = _compacto(_sql(RUTA_PERSONAL_SETUP))
+    assert re.search(
+        r"ALTER TABLE personal\.partes_lineas ADD COLUMN IF NOT EXISTS "
+        r"cuenta_analitica_id BIGINT;",
+        compacto,
+    ), "personal.partes_lineas gana cuenta_analitica_id con ADD COLUMN IF NOT EXISTS (R5)"
+    ddl = re.search(r"CREATE TABLE IF NOT EXISTS personal\.partes_lineas \((.*?)\);", compacto)
+    assert ddl, "falta el CREATE TABLE de personal.partes_lineas"
+    columnas = [c.strip().split(" ")[0] for c in _troceado_en_profundidad_cero(
+        ddl.group(1), ",")]
+    assert columnas[-1] == "cuenta_analitica_id", "nace al final en una base nueva (R5)"
+
+
+def test_f107_r5_la_linea_publica_la_cuenta_con_nullif_y_sin_join() -> None:
+    compacto = _compacto(_sql(RUTA_LINEAS))
+    lista = re.search(r"INSERT INTO personal\.partes_lineas \((.*?)\) SELECT", compacto)
+    assert lista, "falta el INSERT de personal.partes_lineas"
+    assert [c.strip() for c in lista.group(1).split(",")][-1] == "cuenta_analitica_id"
+    assert "NULLIF(l.caaide, 0) AS cuenta_analitica_id FROM raw.hmores l" in compacto, "R5"
+    for tabla in ("raw.caa", "maestro.cuentas_analiticas"):
+        assert tabla not in compacto, f"02_partes_lineas.sql no une {tabla} (R5)"
+
+
+def test_f107_r5_la_ficha_documenta_la_cuenta_de_la_linea() -> None:
+    ficha = _ficha("personal.partes_lineas")
+    assert list(ficha["columnas"])[-1] == "cuenta_analitica_id"
+    texto = _normalizado(_texto(ficha["columnas"]["cuenta_analitica_id"]))
+    for cifra in ("310.55", "3.782", "0 huerfanas", "cargo", "contrapartida"):
+        assert cifra in texto, f"la ficha de la cuenta de la linea no dice «{cifra}» (R5)"
+
+
+def test_f107_r5_la_cuenta_de_la_linea_relaciona_con_el_catalogo() -> None:
+    relaciones = [r for r in _relaciones("personal.partes_lineas")
+                  if r["de"] == "cuenta_analitica_id"]
+    assert relaciones, "falta la relacion de la cuenta de la linea (R5)"
+    assert relaciones[0]["a"] == "maestro.cuentas_analiticas.cuenta_analitica_id"
+    assert relaciones[0]["cardinalidad"] == "N:1"
+
+
+def test_f107_r5_el_criterio_esta_en_la_ficha_de_la_feature() -> None:
+    import json
+
+    features = json.loads((RAIZ / "harness" / "features.json").read_text(encoding="utf-8"))
+    f107 = next(f for f in features["features"] if f["id"] == "F-107")
+    assert any("personal.partes_lineas" in a and "cuenta_analitica_id" in a
+               for a in f107["acceptance"]), "el criterio nuevo va en acceptance (R5)"
