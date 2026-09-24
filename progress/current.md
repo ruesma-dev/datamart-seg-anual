@@ -23,7 +23,7 @@ consumo; +2 columnas en `personal.recursos`).
 - [x] T2 ingesta de `caa` (censo 69 -> 70) y ficha `raw.caa`
 - [x] T3 `personal.recursos` gana las dos contrapartidas y su ficha
 - [x] T4 `maestro.cuentas_analiticas` (06, ultimo sub-paso) y su ficha
-- [ ] T5 relaciones, regla, version 30 del diccionario y ARCHITECTURE
+- [x] T5 relaciones, regla, version 30 del diccionario y ARCHITECTURE
 - [ ] T6 `azure-apps/datamart_seg_anual.md` (commit local alli)
 - [ ] T7 informe, lista MANUAL y `init.sh` en verde
 
