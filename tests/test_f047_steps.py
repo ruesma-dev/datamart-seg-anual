@@ -50,7 +50,16 @@ STEPS = {
     "build_retenciones": (
         BuildRetencionesStep,
         "etl_sigrid.application.steps.build_retenciones_step",
-        ["00_setup.sql", "01_movimientos.sql", "02_views.sql"],
+        # F-095 añade los cuatro de la retencion desde la contabilidad.
+        [
+            "00_setup.sql",
+            "01_movimientos.sql",
+            "02_views.sql",
+            "03_apuntes_contables.sql",
+            "04_saldo_contable.sql",
+            "05_fin_obra.sql",
+            "06_views_contables.sql",
+        ],
     ),
 }
 

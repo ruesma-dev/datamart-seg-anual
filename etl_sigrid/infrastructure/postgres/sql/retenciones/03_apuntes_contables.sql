@@ -91,7 +91,8 @@ COMMENT ON TABLE retenciones.cuentas_proveedor IS
 -- NUNCA `apu.obr` (142 filas y 2 obras) ni el campo de obra de `cen` (a 0 en
 -- las 804 filas): R10.
 -- La obra se publica con SU empresa (R-CODIGO-POR-EMPRESA, F-102): `empresa_id`
--- y `clave_obra` = '<empresa>-<codigo>', la misma regla que maestro.v_obra_fichas.
+-- y `clave_obra` = '<empresa>-<codigo>', la misma regla que la vista de fichas
+-- de obra de maestro (se replica: no se lee, F-102 R24).
 -- ============================================================================
 
 DROP TABLE IF EXISTS retenciones.apuntes_contables CASCADE;
