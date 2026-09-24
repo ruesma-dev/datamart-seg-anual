@@ -101,15 +101,16 @@ objetos:
       parte CARGA a la obra el coste de la linea; la ficha del recurso declara
       contra que centro de coste y que cuenta analitica se ABONA, que es lo que
       descarga los partes contra el coste real de nomina. Sin ella se tiene el
-      cargo pero no el abono, y el asiento no se puede reproducir. La cuenta
-      del CARGO esta en cada linea (`personal.partes_lineas.cuenta_analitica_id`). Esta en
-      `centro_coste_contrapartida_id` y `cuenta_analitica_contrapartida_id`, y
-      sale de la ficha del recurso: la de tipos de hora
-      (`personal.recursos_tipos_hora`) no tiene contrapartida, solo la cuenta de
-      cada tipo de hora. Medido en Sigrid el 2026-09-24: informada en **1.979 de
-      2.619 recursos**, siempre las dos juntas; 8 centros y 847 cuentas
-      distintas, todas en el catalogo (`maestro.centros_coste`,
-      `maestro.cuentas_analiticas`) y todas de la misma empresa que el recurso.
+      cargo pero no el abono, y el asiento no se puede reproducir. La
+      contrapartida esta en `centro_coste_contrapartida_id` y
+      `cuenta_analitica_contrapartida_id`, y sale de la ficha del recurso: la de
+      tipos de hora (`personal.recursos_tipos_hora`) no tiene contrapartida,
+      solo la cuenta de cada tipo de hora. Medido en Sigrid el 2026-09-24:
+      informada en **1.979 de 2.619 recursos**, siempre las dos juntas; 8
+      centros y 847 cuentas distintas, todas en el catalogo
+      (`maestro.centros_coste`, `maestro.cuentas_analiticas`) y todas de la
+      misma empresa que el recurso. La cuenta del CARGO no esta en esta tabla:
+      va en cada linea de parte (`personal.partes_lineas.cuenta_analitica_id`).
     grano: >-
       Una fila por recurso de Sigrid, identificada por `recurso_id`. Estan las
       2.618, de alta y de baja: aqui no se filtra ninguna.
