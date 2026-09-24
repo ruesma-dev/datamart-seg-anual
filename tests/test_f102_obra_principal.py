@@ -472,7 +472,9 @@ def test_f102_r13_el_censo_sube_a_69() -> None:
     from tests.test_f066_ingesta_raw import TOTAL_TABLAS as TOTAL_F066
     from tests.test_f074_ingesta_censo import TOTAL_TABLAS as TOTAL_F074
 
-    assert len(_tablas()) == 69 == TOTAL_F066 == TOTAL_F074
+    # F-107 suma `caa` y el censo pasa a 70: lo que este test fija es que
+    # `auxemp` sigue contada, no que nadie mas pueda entrar despues.
+    assert len(_tablas()) == TOTAL_F066 == TOTAL_F074 >= 69
 
 
 def test_f102_r14_la_ficha_de_auxemp_dice_que_numemp_es_con_emp() -> None:
@@ -486,7 +488,8 @@ def test_f102_r14_la_ficha_de_auxemp_dice_que_numemp_es_con_emp() -> None:
 
 def test_f102_r14_la_cabecera_de_raw_yaml_cuenta_69() -> None:
     texto = (DIR_DICCIONARIO / "raw.yaml").read_text(encoding="utf-8")
-    assert re.search(r"[Ss]on 69 tablas", texto)
+    hallazgo = re.search(r"[Ss]on (\d+) tablas", texto)
+    assert hallazgo and int(hallazgo.group(1)) >= 69, "F-107 la sube a 70"
 
 
 # ===========================================================================
@@ -824,7 +827,7 @@ def test_f102_r25_el_comment_explica_el_modelo() -> None:
 def test_f102_r28_la_arquitectura_explica_el_modelo() -> None:
     texto = DOC_ARQUITECTURA.read_text(encoding="utf-8")
     for termino in ("clave_obra", "clave_recurso", "es_ficha_principal", "F-106",
-                    "R-CODIGO-POR-EMPRESA", "69 tablas"):
+                    "R-CODIGO-POR-EMPRESA", "F-102"):
         assert termino in texto, f"ARCHITECTURE.md no dice «{termino}» (R28)"
 
 
@@ -839,7 +842,7 @@ def test_f102_r29_azure_apps_recoge_las_columnas_y_la_regla() -> None:
     texto = DOC_AZURE_APPS.read_text(encoding="utf-8")
     for termino in ("clave_obra", "es_ficha_principal", "obra_principal_id",
                     "maestro.v_obra_fichas", "R-CODIGO-POR-EMPRESA",
-                    "v_control_forma_pago", "F-106", "69 tablas"):
+                    "v_control_forma_pago", "F-106", "auxemp"):
         assert termino in texto, f"azure-apps no dice «{termino}» (R29)"
 
 

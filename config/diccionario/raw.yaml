@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 69 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 70 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -828,6 +828,24 @@ objetos:
 
       **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana.
     grano: Una fila por empresa, identificada por `ide`; `numemp`, el numero que guarda `con.emp`, tambien es unico.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  caa:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Propiedades de un concepto: sin `con` no tiene ni codigo ni nombre. El catalogo ya traducido esta en `maestro.cuentas_analiticas`.
+    descripcion: >-
+      **Cuentas analiticas** (184.234 filas MEDIDAS en Sigrid el 2026-09-24). Entra con F-107 para traducir las cuentas que traen el recurso (`res.caaconide`, la cuenta de CONTRAPARTIDA) y la ficha de tipos de hora (`reshor.caaide`). Es una tabla de **propiedades de `con`** en 1:1, mismo `ide`, y las 184.234 son `con.tip = 19`: el codigo (`00000.CIMO02`), la descripcion (JEFE DE OBRA), la empresa y la baja salen de `con`, nunca de aqui (regla `R-SIGRID-CON`). El codigo solo es unico dentro de su empresa (`R-CODIGO-POR-EMPRESA`). Lo que aporta esta tabla es la jerarquia: `padide` (el padre, un grupo analitico `cag` --no ingerido, pero tambien es un `con`-- salvo en 4 cuentas cuyo padre es otra `caa`), `niv` (nivel 1 a 5), `cenide` (el centro de coste) y `prpide` (la partida presupuestaria). Medido: `deb`, `hab`, `rep`, `prpide` y `prbide` valen 0 en las 184.234 filas.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `caa`, y se localiza con `grep -n "^| caa " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene `tiemod`; leerla entera tarda 4,3 s.
+    grano: Una fila por cuenta analitica, identificada por `ide`, que es tambien el `ide` de su fila en `con`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno
