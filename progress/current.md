@@ -24,8 +24,55 @@ consumo; +2 columnas en `personal.recursos`).
 - [x] T3 `personal.recursos` gana las dos contrapartidas y su ficha
 - [x] T4 `maestro.cuentas_analiticas` (06, ultimo sub-paso) y su ficha
 - [x] T5 relaciones, regla, version 30 del diccionario y ARCHITECTURE
-- [x] T6 `azure-apps/datamart_seg_anual.md` (commit local alli)
-- [ ] T7 informe, lista MANUAL y `init.sh` en verde
+- [x] T6 `azure-apps/datamart_seg_anual.md` (commit local alli, `6af6e2c`, sin push)
+- [x] T7 informe (`progress/impl_F-107.md`), lista MANUAL y `init.sh` en verde
+
+**Decisiones y desviaciones** (detalle en `progress/impl_F-107.md`):
+- Nombres `codigo_cuenta` / `descripcion_cuenta` (patron `codigo_centro`,
+  `codigo_obra` de `maestro`); `codigo_cuenta_padre` y `descripcion_cuenta_padre`
+  se anaden porque el padre es un `cag` NO ingerido y su id solo no se traduce.
+- `partida_presupuestaria_id` se publica aunque vale 0 en las 184.234 filas.
+- `personal.partes_lineas` NO gana cuenta: la descripcion decia «si trae
+  cuenta» y hoy no la publica; el origen si (`hmores.caaide`, 310.552 de
+  331.002 lineas). Propuesta para el humano: feature aparte.
+- El guarda `test_f057_r13_no_usa_centro_de_coste` se estrecha: descuenta la
+  unica proyeccion literal `NULLIF(r.cenconide, 0) AS
+  centro_coste_contrapartida_id`; cualquier otro uso sigue en rojo.
+
+### F-107 · verificaciones MANUALES del humano (necesitan BBDD; en este orden)
+
+**ORDEN DE DESPLIEGUE, antes de nada**: `maestro.cuentas_analiticas` lee
+`raw.caa`, que crea `ingest_raw`. La nocturna ingiere antes de construir. Un
+`build-maestros` a mano ANTES de la primera ingesta con esta version falla en
+`06_cuentas_analiticas.sql` (el ultimo sub-paso; las otras seis vistas si se
+construyen). Antes de un build a mano: `python main.py ingest --table caa --full`.
+`build-personal` no gana dependencias (`raw.res` ya se ingiere). Y la imagen
+del job tiene que ser la nueva (memoria: «el repositorio en verde no es
+produccion»).
+
+- **M1** · `python main.py ingest --table caa --full` y luego
+  `python main.py check-raw-recuentos` -> `caa` OK con **~184.234** filas.
+- **M2** · `python main.py build-personal`; luego
+  `SELECT count(*), count(centro_coste_contrapartida_id), count(cuenta_analitica_contrapartida_id), count(DISTINCT centro_coste_contrapartida_id), count(DISTINCT cuenta_analitica_contrapartida_id) FROM personal.recursos;`
+  -> **2.619 / 1.979 / 1.979 / 8 / 847** (medido el 2026-09-24 en solo lectura
+  sobre el SELECT del build).
+- **M3** · `python main.py build-maestros`; luego
+  `SELECT count(*), count(DISTINCT cuenta_analitica_id), count(DISTINCT (empresa_id, codigo_cuenta)), count(DISTINCT codigo_cuenta) FROM maestro.cuentas_analiticas;`
+  -> **184.234 / 184.234 / 184.234 / 163.247** (medido en Sigrid el 2026-09-24;
+  ±altas del dia).
+- **M4** · `SELECT cuenta_analitica_id, codigo_cuenta, descripcion_cuenta, codigo_cuenta_padre FROM maestro.cuentas_analiticas WHERE cuenta_analitica_id IN (496869, 496923, 496935) ORDER BY 1;`
+  -> `00000.CIMO02` JEFE DE OBRA (padre `00000.CIMO`), `00000.CICO01`
+  COMBUSTIBLES-GASOIL y `00000.CICO13` TELEFONO MOVIL (padre `00000.CICO`).
+- **M5** · casamiento:
+  `SELECT count(*) FROM personal.recursos r LEFT JOIN maestro.cuentas_analiticas c ON c.cuenta_analitica_id = r.cuenta_analitica_contrapartida_id WHERE r.cuenta_analitica_contrapartida_id IS NOT NULL AND c.cuenta_analitica_id IS NULL;`
+  -> **0**; la misma con `personal.recursos_tipos_hora.cuenta_analitica_id` -> **0**.
+- **M6** · `python main.py check-declarados`, `check-relaciones` (4 relaciones
+  nuevas, todas unen) y `check-unicidad` (`maestro.cuentas_analiticas` unica
+  por `cuenta_analitica_id`): sin errores nuevos.
+- **M7** · `python main.py publicar-diccionario` -> **version 30**, 165
+  objetos, 1097 columnas; y `check-diccionario` OK. Escritura contra Azure:
+  **la lanza el humano**.
+- **M8** · reiniciar el servidor MCP (`mcp-bbdd`), que cachea el diccionario.
 
 ## 2026-09-24 · F-102 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN T16 DEL HUMANO Y EL DESPLIEGUE
 
