@@ -617,7 +617,7 @@ def test_f102_r18_la_regla_del_universo_tambien() -> None:
 
 def test_f102_r20_la_version_sube_sobre_la_de_main() -> None:
     """`main` publica la 28 (F-101); F-102 la sube en uno."""
-    assert int(_yaml("00_global.yaml")["version"]) == 29
+    assert int(_yaml("00_global.yaml")["version"]) >= 29, "F-107 la sube a 30"
 
 
 # ===========================================================================
@@ -852,6 +852,21 @@ def test_f102_r29_azure_apps_recoge_las_columnas_y_la_regla() -> None:
 
 COLUMNAS_RECURSO_NUEVAS = ("empresa_id", "nombre_empresa", "clave_recurso")
 
+#: Lo que features POSTERIORES anaden detras de las tres de F-102, tambien al
+#: final: F-107, la contrapartida del recurso. «Al final» para F-102 es «justo
+#: antes de estas».
+COLUMNAS_RECURSO_POSTERIORES = (
+    "centro_coste_contrapartida_id",
+    "cuenta_analitica_contrapartida_id",
+)
+
+
+def _sin_posteriores(columnas: list[str]) -> list[str]:
+    """Quita por la cola las columnas que anadieron features posteriores."""
+    n = len(COLUMNAS_RECURSO_POSTERIORES)
+    assert columnas[-n:] == list(COLUMNAS_RECURSO_POSTERIORES), columnas[-n:]
+    return columnas[:-n]
+
 
 @pytest.mark.parametrize("columna", COLUMNAS_RECURSO_NUEVAS)
 def test_f102_r26_la_tabla_existente_gana_la_columna_sin_drop(columna: str) -> None:
@@ -870,7 +885,7 @@ def test_f102_r26_la_tabla_nueva_nace_con_las_tres_al_final() -> None:
     assert ddl, "falta el CREATE TABLE de personal.recursos"
     columnas = [c.strip().split(" ")[0] for c in _troceado_en_profundidad_cero(
         ddl.group(1), ",")]
-    assert columnas[-3:] == list(COLUMNAS_RECURSO_NUEVAS), (
+    assert _sin_posteriores(columnas)[-3:] == list(COLUMNAS_RECURSO_NUEVAS), (
         "en una base nueva nacen al final, igual que las anade el ALTER (R26)"
     )
 
@@ -880,7 +895,7 @@ def test_f102_r26_el_insert_publica_las_tres_al_final() -> None:
     lista = re.search(r"INSERT INTO personal\.recursos \((.*?)\) SELECT", compacto)
     assert lista, "falta el INSERT de personal.recursos"
     columnas = [c.strip() for c in lista.group(1).split(",")]
-    assert columnas[-3:] == list(COLUMNAS_RECURSO_NUEVAS), "R26"
+    assert _sin_posteriores(columnas)[-3:] == list(COLUMNAS_RECURSO_NUEVAS), "R26"
 
 
 def test_f102_r26_la_empresa_y_la_clave_salen_de_con() -> None:
@@ -912,7 +927,7 @@ def test_f102_r27_la_ficha_de_recursos_documenta_las_tres() -> None:
     for columna in COLUMNAS_RECURSO_NUEVAS:
         assert columna in ficha["columnas"], f"{columna} sin ficha (R27)"
         assert len(_significado(ficha, columna)) > 60
-    assert list(ficha["columnas"])[-3:] == list(COLUMNAS_RECURSO_NUEVAS)
+    assert _sin_posteriores(list(ficha["columnas"]))[-3:] == list(COLUMNAS_RECURSO_NUEVAS)
 
 
 def test_f102_r27_la_ficha_dice_que_la_clave_legible_es_clave_recurso() -> None:

@@ -41,6 +41,15 @@
 -- 2026-09-23. No se publica ninguna marca de «misma persona en otra empresa»
 -- (decisión del humano, F-102 D5).
 --
+-- Y LA CONTRAPARTIDA (F-107, pedida por Juan Romero el 2026-09-23). La ficha
+-- del recurso declara contra qué centro de coste y qué cuenta analítica se
+-- ABONA lo que sus partes CARGAN a la obra: sin ella no se reproduce el
+-- asiento. Es del RECURSO (`res.cenconide`, `res.caaconide`), no del tipo de
+-- hora. Medido en Sigrid el 2026-09-24: informada en 1.979 de 2.619 recursos,
+-- siempre las dos juntas, 8 centros y 847 cuentas, 0 huérfanas. Se publican
+-- solo los identificadores, con NULLIF 0 y sin JOIN: no se pierde ni se
+-- multiplica ninguna fila.
+--
 -- DATOS PERSONALES, y con su autorización escrita: se publican **nombre y
 -- DNI**. El humano lo autorizó expresamente el 2026-09-18 («el dni puede
 -- salir, no es un problema»). No es un descuido ni un pendiente: es una
@@ -61,7 +70,8 @@ INSERT INTO personal.recursos (
     activo, fecha_baja,
     nif, empleado_id, dni, nombre_pila, apellido1, apellido2,
     es_externo, proveedor_id,
-    empresa_id, nombre_empresa, clave_recurso
+    empresa_id, nombre_empresa, clave_recurso,
+    centro_coste_contrapartida_id, cuenta_analitica_contrapartida_id
 )
 SELECT
     r.ide                                   AS recurso_id,
@@ -92,7 +102,14 @@ SELECT
     NULLIF(r.prvide, 0)                     AS proveedor_id,
     c.emp                                   AS empresa_id,
     em.nombre_empresa                       AS nombre_empresa,
-    c.emp::text || '-' || c.cod             AS clave_recurso
+    c.emp::text || '-' || c.cod             AS clave_recurso,
+    -- F-107. La contrapartida es del RECURSO, no del tipo de hora. Solo los
+    -- identificadores: el nombre del centro y de la cuenta se resuelven en
+    -- `maestro.centros_coste` y `maestro.cuentas_analiticas` por relacion,
+    -- sin JOIN aqui (una fila por `raw.res`, como siempre). NO es la obra:
+    -- el centro es 'CP' CENTRO PERSONAL en 1.875 de los 1.979 recursos.
+    NULLIF(r.cenconide, 0)                  AS centro_coste_contrapartida_id,
+    NULLIF(r.caaconide, 0)                  AS cuenta_analitica_contrapartida_id
 FROM      raw.res r
 JOIN      raw.con c ON c.ide = r.ide        -- R-SIGRID-CON: código y nombre
 LEFT JOIN raw.auxrestip t ON t.ide = r.restipide
@@ -129,4 +146,4 @@ LEFT JOIN LATERAL (
 ) em ON TRUE;
 
 COMMENT ON TABLE personal.recursos IS
-'Maestro de RECURSOS de Sigrid (2.618 filas el 2026-09-18), no de personal: solo 1.354 son personas, 1.158 consumos imputables y 106 medios. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), autorizados por el responsable del dato el 2026-09-18. `activo` es el criterio de Juan Romero (con.fecbaj = 0) y es BANDERA, no filtro: filtrar por el borra el 43,2 % de las horas imputadas, porque el recurso de baja de hoy trabajo ayer. El recurso es de UNA empresa (F-102): el codigo se repite entre empresas, y la clave legible unica es clave_recurso = empresa-codigo.';
+'Maestro de RECURSOS de Sigrid (2.618 filas el 2026-09-18), no de personal: solo 1.354 son personas, 1.158 consumos imputables y 106 medios. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), autorizados por el responsable del dato el 2026-09-18. `activo` es el criterio de Juan Romero (con.fecbaj = 0) y es BANDERA, no filtro: filtrar por el borra el 43,2 % de las horas imputadas, porque el recurso de baja de hoy trabajo ayer. El recurso es de UNA empresa (F-102): el codigo se repite entre empresas, y la clave legible unica es clave_recurso = empresa-codigo. La contrapartida (centro de coste y cuenta analitica contra los que se abona lo que el parte carga a la obra) es del RECURSO, no del tipo de hora (F-107).';
