@@ -121,6 +121,14 @@ AJUSTARON durante el verde, con motivo: `r4`/`r5` (anti-join, desviacion 2) y
 `r10` (cuenta `JOIN maestro.centros_coste`, porque el COMMENT de la tabla nombra
 la vista).
 
+## Review pasada 1 (CHANGES_REQUESTED) y lo que se hizo
+
+1. S1-S11 (formulas con el alias fijado pero no la expresion): nuevo
+   `test_f095_contrato_expresion_a_expresion` (6 objetos) + control del parser.
+2-5. Campana sistematica de 264 mutantes, tabla con `fichero:linea`, SHA,
+   tiempo, linea base y workers, #6 sustituido por `_SubStep` quitados que
+   compilan, 0 supervivientes: `progress/mutacion_F-095.md`.
+
 ## Evidencias
 
 - **`bash harness/init.sh`** tal cual, rama `feature/F-095-...` en `dbe7613`+`83ada78`+`951d65e`:
@@ -136,45 +144,20 @@ la vista).
   (ficheros `test_f079*` en adelante, 994 passed) confirmado antes de relanzar.
 - **Tiempo de la suite**: **2.190,84 s** (36 min 31 s) con cobertura, maquina
   compartida con otra `init.sh` de `albaranes` en paralelo.
-- **Mutacion**: `python -m harness.mutacion --feature F-095 --base main` ->
-  **CERO MUTANTES** («38 linea(s) de produccion pero no se ha generado ni un
-  mutante»: docstring, comentarios y la declaracion de `SUB_PASOS`); no escribe
-  `progress/mutacion_F-095.md`. `--base main` porque `dev` va 490 commits por
-  detras. Sustituta: **campana MANUAL, 1 worker, en serie**, un mutante cada vez
-  con restauracion por `git checkout`, contra `tests/test_f095_retenciones_contables.py`
-  + `tests/test_f047_steps.py` (script `f095/mut.py` del scratchpad). Incluye el
-  SQL, que la herramienta no cubre:
-
-| # | fichero | original -> mutado | tests en rojo |
-|---|---|---|---|
-| 1 | `build_retenciones_step.py` | `sql_file="03_apuntes_contables.sql"` -> `sql_file="03_apuntes.sql"` | 5 |
-| 2 | `build_retenciones_step.py` | `target_table="apuntes_contables"` -> `target_table="apuntes"` | 2 |
-| 3 | `build_retenciones_step.py` | `target_table="saldo_contable"` -> `target_table="saldo"` | 2 |
-| 4 | `build_retenciones_step.py` | `name="fin_obra"` -> `name="fin"` | 2 |
-| 5 | `build_retenciones_step.py` | `sql_file="05_fin_obra.sql",         target_schema="retenciones"` -> `sql_file="05_fin_obra.sql",         target_schema="cierre"` | 3 |
-| 6 | `build_retenciones_step.py` | `    _SubStep(name="views_contables", sql_file="06_views_contables.sql"` -> `` | 3 |
-| 7 | `03_apuntes_contables.sql` | `AND cc.cuenta_id IS NULL THEN 'SALDO_INICIAL'` -> `THEN 'SALDO_INICIAL'` | 1 |
-| 8 | `03_apuntes_contables.sql` | `WHEN ap.importe > 0 THEN 'ALTA'` -> `WHEN ap.importe >= 0 THEN 'ALTA'` | 1 |
-| 9 | `03_apuntes_contables.sql` | `AND ef.num_centros = 1` -> `` | 1 |
-| 10 | `03_apuntes_contables.sql` | `HAVING COUNT(DISTINCT p.cenide) = 1` -> `HAVING COUNT(DISTINCT p.cenide) >= 1` | 1 |
-| 11 | `03_apuntes_contables.sql` | `WHERE COALESCE(prv.cueretide, 0) <> 0` -> `WHERE COALESCE(prv.cueretide, 0) <> 0 AND prv.ide > 0` | 0 -> **1** tras endurecer `test_f095_r1` (ver abajo) |
-| 12 | `04_saldo_contable.sql` | `FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL')), 0)::NUMER` -> `FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL', 'APERTURA')` | 1 |
-| 13 | `04_saldo_contable.sql` | ` NULLS NOT DISTINCT` -> `` | 1 |
-| 14 | `05_fin_obra.sql` | `WHERE f.ejecutado_mes <> 0` -> `` | 1 |
-| 15 | `05_fin_obra.sql` | `INTERVAL '2 months'` -> `INTERVAL '1 month'` | 1 |
-| 16 | `05_fin_obra.sql` | `COALESCE(oc.plazo_retencion, oc.plazo_garantia, k.plazo_fijo_meses)` -> `COALESCE(oc.plazo_garantia, oc.plazo_retencion, k.plazo_fijo_meses)` | 1 |
-| 17 | `05_fin_obra.sql` | `IF NOT EXISTS (SELECT 1 FROM cierre.fact_cierre_mensual) THEN` -> `IF FALSE THEN` | 1 |
-| 18 | `05_fin_obra.sql` | `(19, 21, 23, 25)` -> `(19, 21, 23)` | 1 |
-| 19 | `06_views_contables.sql` | `estado = 'VIVA'` -> `estado <> 'BAJA'` | 1 |
-| 20 | `06_views_contables.sql` | `WHEN ABS(x.saldo_contable - x.viva_efectos) < 1 THEN 'CUADRA'` -> `WHEN ABS(x.saldo_contable - x.viva_efectos) < 10 THEN 'CUADRA'` | 1 |
-| 21 | `06_views_contables.sql` | `FULL JOIN efectos e` -> `LEFT JOIN efectos e` | 1 |
-| 22 | `06_views_contables.sql` | `WHEN f.fecha_vencimiento < CURRENT_DATE THEN 'VENCIDA'` -> `WHEN f.fecha_vencimiento <= CURRENT_DATE THEN 'VENCIDA'` | 1 |
-
-  **22 generados, 22 muertos, 0 supervivientes.** El unico superviviente de la
-  primera pasada (#11, un filtro anadido a las cuentas) era un hueco real del
-  test, no un equivalente: `test_f095_r1` exigia que el filtro estuviera, no que
-  fuera el UNICO. Endurecido (`endswith`) en `83ada78`; reejecutado el #11: 1
-  failed. No se quito ningun codigo defensivo para matar mutantes.
+- **Mutacion** (rehecha tras el review, pasada 1): `python -m harness.mutacion
+  --feature F-095 --base main` -> **CERO MUTANTES** (38 lineas de docstring,
+  comentarios y `SUB_PASOS`); control con `generar_mutantes` sobre el fichero
+  entero -> 12, fuera del alcance: el 0 es legitimo. Sustituta: **campana MANUAL
+  SISTEMATICA** en `progress/mutacion_F-095.md`, generada por script (no elegida
+  a mano): una por cada expresion proyectada, DISTINCT, FILTER, condicion de
+  WHERE/HAVING y JOIN (tipo y cada condicion del ON) de los seis `CREATE` de
+  `03`-`06`, los 11 del reviewer y los campos y `_SubStep` del step. SHA
+  `528c2eb39af762e086d7130b3ca41870e3015795`, **3 workers** (una copia
+  `git archive HEAD` cada uno), linea base 10,5-17,2 s (94 passed, 1 skipped),
+  **1.212 s** en total. **264 generados, 264 muertos, 0 supervivientes, 0
+  mortinatos**; S1-S11 incluidos. Los mato `test_f095_contrato_expresion_a_expresion`
+  (fija cada formula, no el alias). La campana de 22 de la pasada anterior queda
+  sustituida por esta. No se quito codigo defensivo (RM6).
 
 ## Lo que queda fuera del alcance
 
