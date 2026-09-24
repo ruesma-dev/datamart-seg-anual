@@ -52,6 +52,24 @@
 -- que ademas estan terminadas, recibidas o cerradas (con.est 19, 21, 23, 25).
 -- Las informativas (fin real, recepcion provisional, fin previsto) no entran.
 --
+-- EL PLAZO Y EL VENCIMIENTO (R22, R23) [H2]
+-- ---------------------------------------------------------------------------
+--   plazo_meses        obrctr.plaret (plazo de retencion del contrato con el
+--                      CLIENTE); si no, obrctr.plagar (su plazo de garantia);
+--                      si no, 12. El 12 vive en UNA constante (`constantes`).
+--                      obr.garpla no interviene. Aplicar el plazo del cliente al
+--                      proveedor es un criterio de Negocio (back-to-back), no un
+--                      dato de Sigrid: por eso se publica `fuente_plazo`.
+--   fuente_plazo       PLAZO_RETENCION_CLIENTE | PLAZO_GARANTIA_CLIENTE |
+--                      PLAZO_FIJO_12
+--   fecha_vencimiento  = fecha_fin_obra + plazo_meses meses.
+-- LA FECHA DE LA FACTURA NO INTERVIENE NUNCA (decision del humano del
+-- 2026-09-22): ni la del documento, ni el vencimiento del efecto, ni la de alta
+-- del concepto. El vencimiento de Sigrid (factura + 15 meses) sigue en
+-- retenciones.movimientos.fecha_prevista_devolucion, intacto (R25).
+-- Esta tabla NO lee la fecha de hoy: el estado VENCIDA/PENDIENTE lo calcula la
+-- vista v_retencion_contable_obra al consultarla, para no congelarlo en el build.
+--
 -- LA GUARDA (R21): si la tabla del cierre no existe o esta VACIA, este fichero
 -- falla con el nombre del sub-paso en vez de publicar todas las obras sin
 -- fecha de respaldo.
@@ -69,7 +87,11 @@ END $$;
 
 DROP TABLE IF EXISTS retenciones.fin_obra CASCADE;
 CREATE TABLE retenciones.fin_obra AS
-WITH oc AS (
+WITH constantes AS (
+    -- [H2] el plazo por defecto, en UN solo sitio
+    SELECT 12 AS plazo_fijo_meses
+),
+oc AS (
     -- obrctr agregada: una fila por obra
     SELECT
         c.obride                                                  AS obra_id,
@@ -77,6 +99,8 @@ WITH oc AS (
         retenciones.fn_sigrid_date(MAX(NULLIF(c.fecreafin, 0)))   AS fec_real_fin,
         retenciones.fn_sigrid_date(MAX(NULLIF(c.fecprorec, 0)))   AS fec_recepcion_provisional,
         retenciones.fn_sigrid_date(MAX(NULLIF(c.fecprefin, 0)))   AS fec_prev_fin,
+        NULLIF(MAX(c.plaret), 0)                                  AS plazo_retencion,
+        NULLIF(MAX(c.plagar), 0)                                  AS plazo_garantia,
         COUNT(*)                                                  AS num_contratos_obra
     FROM raw.obrctr c GROUP BY c.obride
 ),
@@ -108,11 +132,16 @@ base AS (
             oc.fec_prev_fin,
             retenciones.fn_sigrid_date(obr.fecfinpre)
         )                                          AS fecha_fin_prevista,
+        COALESCE(oc.plazo_retencion, oc.plazo_garantia, k.plazo_fijo_meses)::INT AS plazo_meses,
+        CASE WHEN oc.plazo_retencion IS NOT NULL THEN 'PLAZO_RETENCION_CLIENTE'
+             WHEN oc.plazo_garantia IS NOT NULL THEN 'PLAZO_GARANTIA_CLIENTE'
+             ELSE 'PLAZO_FIJO_12' END AS fuente_plazo,
         COALESCE(oc.num_contratos_obra, 0)         AS num_contratos_obra
     FROM raw.obr obr
     LEFT JOIN raw.con con ON con.ide = obr.ide
     LEFT JOIN oc ON oc.obra_id = obr.ide
     LEFT JOIN cierres ci ON ci.obra_id = obr.ide
+    CROSS JOIN constantes k
 ),
 fin AS (
     SELECT
@@ -141,7 +170,20 @@ SELECT
     f.fecha_fin_obra,
     f.fuente_fin_obra,
     (f.fecha_fin_obra IS NULL AND COALESCE(f.estado_obra, 0) IN (19, 21, 23, 25)) AS terminada_sin_fin_obra,
+    f.plazo_meses,
+    f.fuente_plazo,
+    (f.fecha_fin_obra + make_interval(months => f.plazo_meses))::DATE AS fecha_vencimiento,
     f.num_contratos_obra
 FROM fin f;
 
 ALTER TABLE retenciones.fin_obra ADD PRIMARY KEY (obra_id);
+
+COMMENT ON TABLE retenciones.fin_obra IS
+'F-095. Una fila por obra de raw.obr. fecha_fin_obra = inicio de garantia '
+'(obrctr.fecinigar, si no obr.garfecini); si no hay, ultimo dia del mes '
+'siguiente al ultimo cierre con movimiento; si tampoco, NULL (fuente en '
+'fuente_fin_obra). plazo_meses = plaret, plagar del contrato con el cliente '
+'o el plazo fijo por defecto (fuente_plazo). fecha_vencimiento = fin de obra '
+'+ plazo: la fecha de '
+'la factura no interviene. Fin real, recepcion provisional y fin previsto '
+'son solo informativas.';
