@@ -131,6 +131,12 @@ la vista).
 
 ## Evidencias
 
+- **Tras el review (pasada 1)**, `bash harness/init.sh` tal cual en `80b6436`:
+  **5.424 passed, 203 skipped, 0 failed** en **2.117,93 s**; `[OK] PUERTA
+  COBERTURA 94.7% (968/1022)`, `[OK] PUERTA TAMANO` (impl 176/220), **ENTORNO
+  LISTO**, exit 0. `test_f095_retenciones_contables.py`: 73 casos. Lo de abajo es
+  la pasada anterior, salvo la mutacion, ya reescrita.
+
 - **`bash harness/init.sh`** tal cual, rama `feature/F-095-...` en `dbe7613`+`83ada78`+`951d65e`:
   `[OK] pytest en verde`, `[OK] PUERTA COBERTURA: 94.7% de 1022 lineas cambiadas
   (968/1022, umbral 80%, nivel critico)`, `[OK] PUERTA TAMANO` (impl 140/220),
