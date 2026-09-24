@@ -12,7 +12,7 @@ Bloqueadas: **F-052**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-095 | Retenciones desde la contabilidad, cuadradas con los efectos, por obra, y con vencimiento a contar desde el fin de obra | 2 | spec lista | critico | `feature/F-095-retenciones-contabilidad-fin-obra` |
-| F-108 | `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102) | 3 | pendiente | estandar | `feature/F-108-claves-alternativas` |
+| F-108 | `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102) | 3 | spec lista | estandar | `feature/F-108-claves-alternativas` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 4 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 5 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
 | F-051 | El mes de las filas reales sale del ano/mes de obrfas y no del TEXTO del cierre, que es la regla, y rompe la clave de cierre.v_pbi_planif_vs_real | 6 | spec lista | critico | `feature/F-051-nombre-mes-real` |
@@ -128,7 +128,7 @@ Pedida por el humano el 2026-09-22: 'habia duplicidades, deben salir de la conta
 
 ### F-108 · `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102)
 
-estado **pendiente** · prioridad 3 · rigor `estandar` · SDD no · rama `feature/F-108-claves-alternativas`
+estado **spec lista** · prioridad 3 · rigor `estandar` · SDD sí · rama `feature/F-108-claves-alternativas`
 
 Decidido por el humano el 2026-09-24 (opcion B), prioridad 2, detras de F-107. Sale de la desviacion 6 de F-102: la spec prometia que `check-unicidad` vigilaria en la base las claves legibles nuevas, pero la puerta lee solo `clave_negocio` (`unicidad_sql.consultas_de_unicidad`), que sigue siendo `obra_id` / `recurso_id`; hoy `maestro.obras.clave_obra` (922/922) y `personal.recursos.clave_recurso` (2.619/2.619) son unicas, pero si un dia dejan de serlo nadie avisa. Tambien resolveria la desviacion 4 de F-102: las relaciones `clave_obra -> maestro.obras.clave_obra` de `compras` se declaran `N:N` porque el validador del diccionario (R5 de F-006, `_es_unica_por`) solo acepta el lado 1 sobre la clave de negocio o una `clave_sustituta`. QUE HACER: admitir en las fichas del diccionario una o varias CLAVES ALTERNATIVAS (p. ej. `claves_alternativas: [[clave_obra]]`), que `check-unicidad` compruebe cada una igual que la de negocio (AVISA, no rompe la nocturna: por eso se descarto el indice unico), que el validador de relaciones las acepte como lado 1, y declarar las dos claves y pasar las relaciones de `compras` a `N:1`. Revisar si otras fichas tienen claves alternativas candidatas (p. ej. `clave_cuenta` si F-107 la crea).
 
