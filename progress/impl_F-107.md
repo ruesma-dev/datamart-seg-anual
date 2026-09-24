@@ -20,7 +20,7 @@ cuatro `acceptance`, un commit por tarea (T1 `430ec5d` ... T6 `653c11e`).
 | `config/diccionario/personal.yaml` | `recursos`: parrafo «la contrapartida es del recurso, no por tipo de hora», dos columnas y dos relaciones N:1; `recursos_tipos_hora`: aviso de que ahi no esta la contrapartida y relacion `cuenta_analitica_id -> maestro.cuentas_analiticas` |
 | `config/diccionario/00_global.yaml` | Version 30; «las 70 tablas»; `R-CODIGO-POR-EMPRESA` alcanza a `maestro.cuentas_analiticas` (con la cifra en `motivo`); textos de los esquemas `maestro` y `personal` |
 | `docs/ARCHITECTURE.md` | 70 tablas; bullet de F-107 con el orden de despliegue; matiz a la frase «`res.cenconide` no participa» |
-| `specs/F-006-mcp-azure/design_detalle.md` | Enmienda: 165 objetos, 1097 columnas, 73 de consumo |
+| `specs/F-006-mcp-azure/design_detalle.md` | Enmienda: 165 objetos, 1098 columnas, 73 de consumo |
 | `azure-apps/datamart_seg_anual.md` | 70 tablas, columnas nuevas de `personal.recursos`, seccion de F-107 con dependencia de despliegue |
 | Tests | `tests/test_f107_contrapartidas_cuentas.py` (34 tests, R1-R4); ajustes en F-057, F-066, F-073, F-074, F-102 (abajo) |
 
@@ -189,24 +189,27 @@ despues. Tras T2-T6: **34 passed**.
 - **Tiempo de la suite**: **1.222,42 s (20 min 22 s)** (antes: 1.445,00 s; al
   arrancar 569,94 s: la maquina compartia CPU con otras sesiones). El Bash lo
   paso a segundo plano a los 600 s y se espero a su final.
-- **Cobertura de lineas cambiadas**: **94,7 %** (968/1022, umbral 80 %),
-  `PUERTA COBERTURA`. Se mide contra `dev`, que va por detras de `main`: la
-  cifra es la misma que la de F-102 porque incluye lineas de otras features.
-  F-107 (con la ampliacion) solo cambia 14 lineas Python de produccion (la entrada nueva de
-  `SUB_PASOS` y el docstring), cubiertas por `test_f073_build_maestros_*` y
-  `test_f107_r2_el_paso_de_maestros_la_construye_la_ultima`.
+- **Cobertura de lineas cambiadas**: **94,7 %** (968/1022, umbral 80 %), medida
+  contra `dev` (incluye lineas de otras features). Las 14 lineas Python de F-107
+  (`SUB_PASOS` y docstring) las cubren `test_f073_build_maestros_*` y `test_f107_r2_*`.
 - **Mutacion**: `python -m harness.mutacion --feature F-107 --base main` ->
-  **CERO MUTANTES**: «el alcance tiene 14 linea(s) de produccion pero no se ha
-  generado ni un mutante» (son cadenas y una declaracion de dato); la
-  herramienta no escribe `progress/mutacion_F-107.md` a proposito. Evidencia
-  sustitutiva, **mutacion a mano** de esa entrada, una a una y restaurando con
-  `git checkout`, contra `tests/test_f073_pipeline.py` +
-  `tests/test_f107_contrapartidas_cuentas.py`: `sql_file` a `06_cuentas.sql`
-  -> 4 failed; `target_table` a `cuentas` -> 1 failed; `name` a `cuentas` -> 1
-  failed; borrar el sub-paso entero -> 3 failed. **4 generados, 4 muertos, 0
-  supervivientes.** El SQL y el YAML no son mutables por la herramienta: los
-  vigilan los 34 tests de texto (con la fase RED de arriba) y las lecturas en
-  solo lectura contra la base.
+  **CERO MUTANTES** («14 linea(s) de produccion pero no se ha generado ni un
+  mutante»: cadenas y una declaracion de dato; no escribe
+  `progress/mutacion_F-107.md`). Sustituta: **campana a mano** sobre
+  `etl_sigrid/application/steps/build_maestros_step.py`, una a una, restaurando
+  con `git checkout`, contra `tests/test_f073_pipeline.py` +
+  `tests/test_f107_contrapartidas_cuentas.py`:
+
+| # | fichero:linea | original -> mutado | tests en rojo |
+|---|---|---|---|
+| 1 | `build_maestros_step.py:101` | `sql_file="06_cuentas_analiticas.sql"` -> `sql_file="06_cuentas.sql"` | 4 |
+| 2 | `build_maestros_step.py:103` | `target_table="cuentas_analiticas"` -> `target_table="cuentas"` | 1 |
+| 3 | `build_maestros_step.py:100` | `name="cuentas_analiticas"` -> `name="cuentas"` | 1 |
+| 4 | `build_maestros_step.py:99-104` | el `_SubStep(...)` entero -> borrado | 3 |
+
+  **4 generados, 4 muertos, 0 supervivientes.** SQL y YAML no son mutables por
+  la herramienta: los vigilan los 39 tests de texto (RED arriba) y las lecturas
+  en solo lectura contra la base.
 - **Lo que no se ha verificado aqui**: el DDL real (crear la vista y anadir las
   columnas escribe en el Postgres compartido) ni `raw.caa` ingerida: M1-M8 de
   `progress/current.md`, del humano.
