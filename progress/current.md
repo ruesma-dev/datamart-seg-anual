@@ -15,10 +15,14 @@ Rama `feature/F-107-contrapartidas-cuentas-analiticas` (desde `main` con F-101 y
 F-102). `sdd: false`, rigor `estandar`. `bash harness/init.sh` en verde al
 arrancar (5.246 passed, cobertura 94,7 %). Tareas derivadas de los `acceptance`:
 
+**Diccionario del arbol tras F-107 (version 30): 165 objetos, 1097 columnas,
+73 de consumo** (+2 fichas: `raw.caa` y `maestro.cuentas_analiticas`, de
+consumo; +2 columnas en `personal.recursos`).
+
 - [x] T1 tests en fase RED (`tests/test_f107_contrapartidas_cuentas.py`)
-- [ ] T2 ingesta de `caa` (censo 69 -> 70) y ficha `raw.caa`
-- [ ] T3 `personal.recursos` gana las dos contrapartidas y su ficha
-- [ ] T4 `maestro.cuentas_analiticas` (06, ultimo sub-paso) y su ficha
+- [x] T2 ingesta de `caa` (censo 69 -> 70) y ficha `raw.caa`
+- [x] T3 `personal.recursos` gana las dos contrapartidas y su ficha
+- [x] T4 `maestro.cuentas_analiticas` (06, ultimo sub-paso) y su ficha
 - [ ] T5 relaciones, regla, version 30 del diccionario y ARCHITECTURE
 - [ ] T6 `azure-apps/datamart_seg_anual.md` (commit local alli)
 - [ ] T7 informe, lista MANUAL y `init.sh` en verde

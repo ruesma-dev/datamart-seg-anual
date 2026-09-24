@@ -11,6 +11,10 @@ Encadena los archivos SQL en orden:
     03_proveedores_obra.sql  - vista maestro.proveedores_obra (vía ctr)
     04_centros_coste.sql     - vista maestro.centros_coste (puente centro→obra)
     05_estados_documento.sql - vista maestro.estados_documento (desde conest)
+    06_cuentas_analiticas.sql - vista maestro.cuentas_analiticas (caa + con,
+                               F-107). La ULTIMA a proposito: lee `raw.caa`,
+                               y si un build a mano llega antes que la primera
+                               ingesta con esta version, falla solo ella.
 
 DE DÓNDE LEE, Y LAS DOS AFIRMACIONES QUE ESTE DOCSTRING TENÍA Y ERAN FALSAS.
 Afirmaba dos cosas: que este paso se alimentaba únicamente de `raw`, y que
@@ -53,7 +57,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los seis ficheros SQL, EN ORDEN, y de qué vista se cuentan filas.
+#: Los siete ficheros SQL, EN ORDEN, y de qué vista se cuentan filas.
 #:
 #: Vive fuera de `run()` a propósito, igual que en `build_compras_step.py`: es
 #: DATO, no lógica, y así se puede comprobar sin ejecutar el step que cada
@@ -92,12 +96,19 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_schema="maestro",
         target_table="estados_documento",
     ),
+    _SubStep(
+        name="cuentas_analiticas",
+        sql_file="06_cuentas_analiticas.sql",
+        target_schema="maestro",
+        target_table="cuentas_analiticas",
+    ),
 )
 
 
 class BuildMaestrosStep(PipelineStep):
     """Construye el schema `maestro`: obras, proveedores, el puente de
-    centros de coste y el catálogo de estados de documento."""
+    centros de coste y los catálogos de estados de documento y de cuentas
+    analíticas."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -115,7 +126,7 @@ class BuildMaestrosStep(PipelineStep):
         # `raw` por todo lo demás y `stg` por las dos marcas de `maestro.obras`
         # (F-073, R27). Coste declarado: si `build_stg` falla, el orquestador
         # marca este paso como SKIPPED, cosa que antes no pasaba. Es asumible
-        # porque los seis objetos de `maestro` son VISTAS: saltarlas una noche
+        # porque los objetos de `maestro` son VISTAS: saltarlas una noche
         # deja exactamente la definición de ayer, que es idéntica.
         return ["ingest_raw", "build_stg"]
 

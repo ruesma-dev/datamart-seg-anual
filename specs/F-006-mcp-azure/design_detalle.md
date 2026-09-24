@@ -133,6 +133,14 @@ infraestructura.
 > (seis columnas nuevas en `maestro.obras`, dos en cada una de las cinco vistas
 > de `compras` con obra, tres en `personal.recursos` y las diez de la vista
 > nueva); las fichas de consumo recomendadas pasan de 71 a **72**.
+>
+> **Enmienda del 2026-09-24 (F-107, contrapartidas y cuentas analiticas).**
+> Entran dos objetos: `maestro.cuentas_analiticas` --el catalogo de cuentas
+> analiticas, codigo y descripcion desde `con`, padre, nivel y centro desde
+> `caa`; de consumo-- y `raw.caa`, las 184.234 cuentas de Sigrid. El
+> inventario pasa a **165 objetos** y la cobertura de columnas a **1097** (las
+> doce de la vista nueva y dos en `personal.recursos`, la contrapartida del
+> recurso); las fichas de consumo recomendadas pasan de 72 a **73**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
