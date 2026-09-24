@@ -90,8 +90,25 @@ sin construir esa noche.
   líneas, y en 769 discrepa de la obra de su cabecera `hmo`. La trampa de `apu`
   —atribuir por centro de coste, que es la pregunta abierta de F-045— **no
   aplica aquí**: el parte trae la obra, así que `maestro.centros_coste` y
-  `res.cenconide` no participan, y los dos identificadores están vetados por
-  test en el SQL de `personal`.
+  `res.cenconide` no participan en la atribución, y los dos identificadores
+  están vetados por test en el SQL de `personal`. Única excepción, de F-107:
+  `res.cenconide` se publica en `personal.recursos` como lo que es —el centro
+  de CONTRAPARTIDA del recurso— en una sola proyección que el test descuenta.
+- **LA CONTRAPARTIDA ES DEL RECURSO Y LAS CUENTAS SE TRADUCEN EN `maestro`
+  (F-107).** El parte CARGA a la obra; la ficha del recurso declara contra qué
+  centro de coste y qué cuenta analítica se ABONA (`res.cenconide`,
+  `res.caaconide`, informadas en 1.979 de 2.619 recursos). `reshor` no tiene
+  contrapartida. `personal.recursos` publica los dos identificadores sin unir
+  nada, y `maestro.cuentas_analiticas` (`sql/maestro/06_cuentas_analiticas.sql`,
+  sobre `raw.caa` + `raw.con`, `tip = 19`) los traduce: 184.234 cuentas, el
+  código único solo dentro de su empresa (`R-CODIGO-POR-EMPRESA`). La cuenta
+  de CARGO de cada línea va en `personal.partes_lineas.cuenta_analitica_id`
+  (`hmores.caaide`, 93,8 % de las líneas). **Orden de
+  despliegue**: `06_cuentas_analiticas.sql` lee `raw.caa`, que crea
+  `ingest_raw`; por eso es el ÚLTIMO sub-paso de `build_maestros`, y un
+  `build-maestros` a mano antes de la primera ingesta con esta versión falla
+  solo en él (`python main.py ingest --table caa --full` antes). `personal` no
+  gana dependencias: `raw.res` ya se ingería.
 - **LA OBRA Y EL RECURSO SON DE UNA EMPRESA (F-102).** En Sigrid el mismo
   código existe una vez por empresa —Ruesma (1), Porsan (28), cada UTE— y es la
   misma obra vista desde cada una, **sin consolidar** (modelo del humano del
@@ -146,13 +163,15 @@ sin construir esa noche.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 69 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102)
+### Qué se copia de Sigrid: 70 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107)
 
-`config/tables_sigrid.yaml` declara **69 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **70 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
-remesas— y F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
-nombre a la empresa de cada obra y de cada recurso—, además de recuperar la columna `con.tex` (el memo del documento,
+remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
+nombre a la empresa de cada obra y de cada recurso— y F-107 otra el 2026-09-24
+—`caa`, las 184.234 cuentas analíticas, que traduce la contrapartida del recurso
+y la cuenta de su ficha de tipos de hora; leerla entera cuesta 4,3 s—, además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
 lectura sobre `con`, medio minuto de la ventana nocturna).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo

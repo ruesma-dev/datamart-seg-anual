@@ -241,6 +241,22 @@ tables:
     # las obras y los recursos son POR EMPRESA y el codigo solo es unico dentro
     # de una.
 
+  - source_table: caa
+    target_table: caa
+    id_column: ide
+    incremental_column: null   # MEDIDO 2026-09-24: sin tiemod; refresco completo
+    where: null
+    exclude_columns: []
+    # Cuentas analiticas (F-107): las PROPIEDADES de un concepto `con` con
+    # `tip = 19`, mismo `ide` (R-SIGRID-CON: codigo, nombre, empresa y baja
+    # salen de `con`). MEDIDO en Sigrid el 2026-09-24, solo lectura: 184.234
+    # filas y nueve columnas enteras o reales (`ide`, `deb`, `hab`, `rep`,
+    # `padide`, `cenide`, `niv`, `prpide`, `prbide`), ni texto ni binario; leer
+    # la tabla entera tarda 4,3 s en una sola pagina. `deb`, `hab`, `rep`,
+    # `prpide` y `prbide` valen 0 en todas las filas. La publica
+    # `maestro.cuentas_analiticas` y traduce la contrapartida del recurso
+    # (`res.caaconide`) y la cuenta del tipo de hora (`reshor.caaide`).
+
   - source_table: ctr
     target_table: ctr
     id_column: ide

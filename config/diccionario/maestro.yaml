@@ -24,6 +24,10 @@
 #    el paso depende ademas de `build_stg`: las dos marcas de `maestro.obras`
 #    se miden alli.
 #
+# F-107 (2026-09-24) anade `cuentas_analiticas`, el catalogo de cuentas
+# analiticas: su codigo, como el de obras y recursos, solo es unico dentro de
+# su empresa.
+#
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/maestro/`.
 
@@ -807,6 +811,148 @@ objetos:
       - Que significa el estado 15 en una obra
       - Que estados puede tener un contrato en Sigrid
       - Como se llama el estado con codigo X del documento de tipo Y
+
+  cuentas_analiticas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL CATALOGO DE CUENTAS ANALITICAS de Sigrid** (F-107): traduce el
+      identificador de una cuenta a su codigo y su descripcion, con su empresa,
+      su cuenta padre, su nivel y su centro de coste. Lo pidio Juan Romero el
+      2026-09-23 para reproducir el asiento de los partes: la cuenta de
+      CONTRAPARTIDA del recurso (`personal.recursos.cuenta_analitica_contrapartida_id`)
+      y la cuenta de cada tipo de hora de su ficha
+      (`personal.recursos_tipos_hora.cuenta_analitica_id`) llegan como numeros.
+      Las tres del correo, traducidas: **496869 = '00000.CIMO02' JEFE DE OBRA**,
+      **496923 = '00000.CICO01' COMBUSTIBLES-GASOIL** y **496935 =
+      '00000.CICO13' TELEFONO MOVIL**, las tres de la empresa 1, nivel 4 y
+      centro de coste 496688.
+
+      **184.234 cuentas el 2026-09-24, sin filtrar**: de alta y de baja (solo 1
+      de baja). **EL CODIGO SOLO ES UNICO DENTRO DE SU EMPRESA** (regla
+      `R-CODIGO-POR-EMPRESA`): 14.063 codigos se repiten entre empresas y
+      ninguno dentro de una, asi que por `codigo_cuenta` se cruza siempre junto
+      con `empresa_id`. Son tantas porque el prefijo del codigo es el centro de
+      coste: `00000.CIMO02` es la cuenta CIMO02 del centro 00000, y cada centro
+      repite su juego de cuentas. 146.238 son de la empresa 1 y 26.684 de la 28.
+
+      **CASAMIENTO MEDIDO en Sigrid el 2026-09-24** (solo lectura, con la misma
+      union que esta vista): las cuentas de `personal.recursos_tipos_hora`
+      --3.199 filas informadas, 50 cuentas distintas-- y las de contrapartida de
+      `personal.recursos` --1.979 recursos, 847 cuentas distintas-- estan
+      **todas** en el catalogo: 0 huerfanas, y todas de la misma empresa que su
+      recurso. La cuenta de contrapartida es ademas del mismo centro de coste
+      que `personal.recursos.centro_coste_contrapartida_id` en los 1.979.
+      Y la cuenta de CARGO de cada linea de parte
+      (`personal.partes_lineas.cuenta_analitica_id`, ampliacion de F-107):
+      310.553 de 331.003 lineas, 3.782 cuentas, 0 huerfanas; en 309.182 el
+      codigo de la cuenta empieza por el de la obra de la linea.
+    grano: >-
+      Una fila por cuenta analitica, identificada por `cuenta_analitica_id`, que
+      es unico. El par (`empresa_id`, `codigo_cuenta`) tambien lo es; el codigo
+      solo, no.
+    clave_negocio: [cuenta_analitica_id]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      cuenta_analitica_id:
+        significado: >-
+          Identificador de la cuenta en Sigrid (`caa.ide`, el mismo que su fila
+          de `con`). Es el valor que traen `cuenta_analitica_contrapartida_id`
+          del recurso y `cuenta_analitica_id` del tipo de hora, y por el que se
+          une.
+        agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de Sigrid a la que pertenece la cuenta (`con.emp`): `1` es
+          Ruesma y `28` Porsan. Forma parte de la identidad legible: el mismo
+          codigo existe en varias empresas.
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: >-
+          Codigo de la cuenta tal y como se ve en Sigrid (`con.cod`), con el
+          centro de coste delante del punto: '00000.CIMO02'. **No es unico**: se
+          repite entre empresas (14.063 codigos). Se cruza junto con
+          `empresa_id`.
+      descripcion_cuenta:
+        significado: Descripcion legible de la cuenta (`con.res`), la que se cita al responder ("JEFE DE OBRA").
+      cuenta_padre_id:
+        significado: >-
+          La cuenta padre en el arbol analitico (`caa.padide`). Casi siempre es
+          un GRUPO analitico (`cag`, no ingerido); en 4 cuentas de la empresa 18
+          es otra cuenta de este catalogo. Su codigo y descripcion van en las
+          dos columnas siguientes.
+        nulo_significa: La cuenta no tiene padre (2.476 cuentas, entre ellas las 68 de nivel 1).
+        agregacion: no_sumable
+      codigo_cuenta_padre:
+        significado: >-
+          Codigo de la cuenta padre, de `con` por `cuenta_padre_id`
+          ('00000.CIMO' para JEFE DE OBRA). El grupo analitico tambien es un
+          concepto de Sigrid, y por eso se nombra sin ingerir `cag`.
+        nulo_significa: La cuenta no tiene padre.
+      descripcion_cuenta_padre:
+        significado: Descripcion de la cuenta padre, de `con` ('MANO DE OBRA INDIRECTA', 'CONSUMOS').
+        nulo_significa: La cuenta no tiene padre.
+      nivel:
+        significado: >-
+          Nivel de la cuenta en el arbol analitico (`caa.niv`), de 1 a 5.
+          Reparto el 2026-09-24: 68 de nivel 1, 63 de nivel 2, 3.872 de nivel
+          3, 179.965 de nivel 4 y 266 de nivel 5.
+        agregacion: no_sumable
+      centro_coste_id:
+        significado: >-
+          Centro de coste de la cuenta (`caa.cenide`), informado en 181.806 de
+          184.234. Su codigo y nombre estan en `maestro.centros_coste`.
+        nulo_significa: La cuenta no declara centro de coste.
+        agregacion: no_sumable
+      partida_presupuestaria_id:
+        significado: >-
+          Partida presupuestaria de la cuenta (`caa.prpide`). **Esta vacia**:
+          vale 0 en las 184.234 filas medidas el 2026-09-24, y aqui sale a NULL.
+          Se publica porque se pidio y para que se vea cuando empiece a
+          informarse.
+        nulo_significa: La cuenta no tiene partida presupuestaria (todas, hoy).
+        agregacion: no_sumable
+      fecha_baja:
+        significado: Fecha de baja de la cuenta, la de su concepto (`con.fecbaj`) ya tipada. Solo 1 cuenta de baja el 2026-09-24.
+        nulo_significa: La cuenta sigue de alta.
+        agregacion: no_sumable
+      es_activa:
+        significado: >-
+          Cierto si la cuenta no tiene fecha de baja, como en el resto de
+          maestros. Casi todas lo son (184.233 de 184.234). Es una bandera: la
+          cuenta de baja de hoy pudo imputarse ayer.
+        agregacion: no_sumable
+    relaciones:
+      - de: centro_coste_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y el nombre del centro de coste de la cuenta. Muchas
+          cuentas por centro: cada centro repite su juego de cuentas.
+      - de: cuenta_analitica_id
+        a: personal.recursos.cuenta_analitica_contrapartida_id
+        cardinalidad: "1:N"
+        porque: >-
+          La cuenta de CONTRAPARTIDA de la ficha del recurso: 847 cuentas para
+          1.979 recursos, 0 huerfanas (2026-09-24).
+      - de: cuenta_analitica_id
+        a: personal.recursos_tipos_hora.cuenta_analitica_id
+        cardinalidad: "1:N"
+        porque: >-
+          La cuenta de cada tipo de hora de la ficha del recurso: 50 cuentas
+          para 3.199 filas, 0 huerfanas (2026-09-24).
+      - de: cuenta_analitica_id
+        a: personal.partes_lineas.cuenta_analitica_id
+        cardinalidad: "1:N"
+        porque: >-
+          La cuenta de CARGO de cada linea de parte: 3.782 cuentas para 310.553
+          lineas, 0 huerfanas (2026-09-24). Agregar las lineas antes de unir.
+    ejemplos_preguntas:
+      - Que cuenta analitica es la 496869
+      - Cual es la cuenta de contrapartida del recurso X y como se llama
+      - Que cuentas cuelgan del grupo analitico X
 
   fn_fecha:
     tipo: funcion

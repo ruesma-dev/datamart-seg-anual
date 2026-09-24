@@ -115,7 +115,9 @@ CREATE TABLE IF NOT EXISTS personal.recursos (
     _built_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
     empresa_id       INTEGER,
     nombre_empresa   VARCHAR(255),
-    clave_recurso    VARCHAR(40)
+    clave_recurso    VARCHAR(40),
+    centro_coste_contrapartida_id      BIGINT,
+    cuenta_analitica_contrapartida_id  BIGINT
 );
 
 -- F-102: el recurso es de UNA empresa. En Sigrid el mismo codigo de recurso
@@ -129,6 +131,14 @@ CREATE TABLE IF NOT EXISTS personal.recursos (
 ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS empresa_id INTEGER;
 ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS nombre_empresa VARCHAR(255);
 ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS clave_recurso VARCHAR(40);
+
+-- F-107: la CONTRAPARTIDA de la ficha del recurso --el centro de coste y la
+-- cuenta analitica contra los que se abona lo que el parte carga a la obra--.
+-- Es del RECURSO (`res.cenconide`, `res.caaconide`), no del tipo de hora:
+-- `reshor` no tiene contrapartida. Mismo patron que F-102: al final, con
+-- `ADD COLUMN IF NOT EXISTS`, nunca DROP.
+ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS centro_coste_contrapartida_id BIGINT;
+ALTER TABLE personal.recursos ADD COLUMN IF NOT EXISTS cuenta_analitica_contrapartida_id BIGINT;
 
 -- Los dos cortes que se piden de verdad: «las personas de alta» y «el recurso
 -- de este empleado».
@@ -168,7 +178,8 @@ CREATE TABLE IF NOT EXISTS personal.partes_lineas (
     precio          NUMERIC(18,4),
     importe         NUMERIC(18,2),
     texto_linea     TEXT,
-    _built_at       TIMESTAMP     NOT NULL DEFAULT NOW()
+    _built_at       TIMESTAMP     NOT NULL DEFAULT NOW(),
+    cuenta_analitica_id  BIGINT
 );
 
 -- F-101: el codigo del parte en cada linea. `CREATE TABLE IF NOT EXISTS` no
@@ -176,6 +187,9 @@ CREATE TABLE IF NOT EXISTS personal.partes_lineas (
 ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS codigo_parte VARCHAR(24);
 -- F-101 (D-3): el texto libre de la linea. Puede llevar nombres de persona.
 ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS texto_linea TEXT;
+-- F-107 (ampliacion del 2026-09-24): la cuenta analitica de CARGO de la linea
+-- (`hmores.caaide`). Al final, con ADD COLUMN IF NOT EXISTS, nunca DROP.
+ALTER TABLE personal.partes_lineas ADD COLUMN IF NOT EXISTS cuenta_analitica_id BIGINT;
 
 -- `(unidad)` no es decorativo: es el índice del filtro que evita la cifra
 -- falsa, y el que sirve la vista de consumo.

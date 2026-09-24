@@ -1286,3 +1286,16 @@ de no agregar hechos de otras empresas); `personal.recursos` gana `empresa_id`,
 0720): lo resuelve F-106. Pasada 1 rechazada solo por papeleo; desviacion 6
 declarada (`check-unicidad` no vigila las claves nuevas). Detalle:
 `progress/impl_F-102.md`, `progress/review_F-102.md`, `progress/spec_F-102.md`.
+
+## F-107 · Contrapartidas del recurso y catalogo de cuentas analiticas (cerrada el 2026-09-24, APROBADO en pasada 2)
+
+Correo de Juan Romero del 23-09 18:02. La contrapartida es del RECURSO
+(`res.cenconide`, `res.caaconide`), no de `reshor`: `personal.recursos` gana
+`centro_coste_contrapartida_id` y `cuenta_analitica_contrapartida_id`. Se
+ingiere `caa` (184.234 cuentas) y se publica `maestro.cuentas_analiticas`
+(codigo, descripcion, empresa, padre con su codigo y nombre, nivel, centro,
+partida). Ampliada por el humano: `personal.partes_lineas.cuenta_analitica_id`
+(`hmores.caaide`, 93,8 % de las lineas, 0 huerfanas), que es la cuenta de CARGO
+del centro de la obra. Diccionario version 30. Pasada 1 rechazada por una frase
+ambigua de la ficha y el formato de la mutacion. Detalle:
+`progress/impl_F-107.md`, `progress/review_F-107.md`.

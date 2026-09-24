@@ -45,6 +45,8 @@ FICHEROS_MAESTRO = [
     "03_proveedores_obra.sql",
     "04_centros_coste.sql",
     "05_estados_documento.sql",
+    # F-107: el catalogo de cuentas analiticas, el ultimo.
+    "06_cuentas_analiticas.sql",
 ]
 # F-080 le añadió tres (05, 06 y 07): el censo de ficheros del step crece con
 # cada feature que publica en `compras`, y su orden sigue siendo el de la

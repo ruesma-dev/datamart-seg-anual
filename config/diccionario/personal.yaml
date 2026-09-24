@@ -36,6 +36,12 @@
 # parte NO es unico (569 codigos repetidos) y la obra de la cabecera AUDITA, no
 # imputa. Y una ausencia declarada: el usuario que crea el parte no esta (F-105).
 #
+# F-107 (2026-09-24, Juan Romero): `recursos` gana la CONTRAPARTIDA de la ficha
+# del recurso --centro de coste y cuenta analitica del abono--, que es del
+# RECURSO y no por tipo de hora; y `partes_lineas` la cuenta de CARGO de cada
+# linea (ampliacion decidida por el humano el mismo dia). Las cuentas se
+# traducen en `maestro.cuentas_analiticas`.
+#
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/personal/`.
 
@@ -90,6 +96,21 @@ objetos:
       de la empresa 1 comparten NIF con una de la 1, y juntarlas es una decision
       de negocio que el datamart no toma. Las lineas de parte de recursos de
       otras empresas son 26.426 (3.226.523,83 EUR).
+
+      **LA CONTRAPARTIDA ES DEL RECURSO, NO POR TIPO DE HORA (F-107).** Cada
+      parte CARGA a la obra el coste de la linea; la ficha del recurso declara
+      contra que centro de coste y que cuenta analitica se ABONA, que es lo que
+      descarga los partes contra el coste real de nomina. Sin ella se tiene el
+      cargo pero no el abono, y el asiento no se puede reproducir. La
+      contrapartida esta en `centro_coste_contrapartida_id` y
+      `cuenta_analitica_contrapartida_id`, y sale de la ficha del recurso: la de
+      tipos de hora (`personal.recursos_tipos_hora`) no tiene contrapartida,
+      solo la cuenta de cada tipo de hora. Medido en Sigrid el 2026-09-24:
+      informada en **1.979 de 2.619 recursos**, siempre las dos juntas; 8
+      centros y 847 cuentas distintas, todas en el catalogo
+      (`maestro.centros_coste`, `maestro.cuentas_analiticas`) y todas de la
+      misma empresa que el recurso. La cuenta del CARGO no esta en esta tabla:
+      va en cada linea de parte (`personal.partes_lineas.cuenta_analitica_id`).
     grano: >-
       Una fila por recurso de Sigrid, identificada por `recurso_id`. Estan las
       2.618, de alta y de baja: aqui no se filtra ninguna.
@@ -219,6 +240,33 @@ objetos:
           empresas). 2.618 claves para 2.618 recursos el 2026-09-23. `empresa_id`
           es entero, asi que lo que va antes del primer `-` es la empresa y la
           clave no colisiona aunque el codigo lleve guiones.
+      centro_coste_contrapartida_id:
+        significado: >-
+          Centro de coste de CONTRAPARTIDA de la ficha del recurso (F-107): el
+          centro contra el que se abona lo que sus partes cargan a la obra. Es
+          del recurso, no del tipo de hora. **No es la obra ni sirve para
+          atribuir obra**: medido el 2026-09-24, solo hay 8 centros distintos y
+          1.875 de los 1.979 recursos con contrapartida apuntan al 'CP' CENTRO
+          PERSONAL de la empresa 1 (el resto: CENTRO MAQUINARIA, GASTOS
+          GENERALES y el centro de personal de cuatro UTE). Su codigo y nombre
+          se leen en `maestro.centros_coste`.
+        nulo_significa: >-
+          La ficha del recurso no declara contrapartida (640 de 2.619 recursos
+          el 2026-09-24). Si falta el centro falta tambien la cuenta.
+        agregacion: no_sumable
+      cuenta_analitica_contrapartida_id:
+        significado: >-
+          Cuenta analitica de CONTRAPARTIDA de la ficha del recurso (F-107): la
+          cuenta contra la que se abona lo que sus partes cargan a la obra. Es
+          del recurso, no del tipo de hora. 847 cuentas distintas el 2026-09-24,
+          todas en `maestro.cuentas_analiticas` (0 huerfanas), de la misma
+          empresa que el recurso y del mismo centro que
+          `centro_coste_contrapartida_id`. Su codigo y descripcion se leen alli:
+          por ejemplo, 496869 es '00000.CIMO02' JEFE DE OBRA.
+        nulo_significa: >-
+          La ficha del recurso no declara contrapartida (640 de 2.619 recursos
+          el 2026-09-24).
+        agregacion: no_sumable
 
     relaciones:
       - de: recurso_id
@@ -241,6 +289,20 @@ objetos:
         porque: >-
           Para ver los tipos de hora configurados en la ficha del recurso y su
           precio de coste y de venta: los precios de HOY, sin historico.
+      - de: centro_coste_contrapartida_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y el nombre del centro de coste de contrapartida (F-107).
+          Muchos recursos comparten centro: 1.875 apuntan al CENTRO PERSONAL.
+          No resuelve a obra, y no hay que usarlo para atribuir obra.
+      - de: cuenta_analitica_contrapartida_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y la descripcion de la cuenta analitica de
+          contrapartida (F-107): lo que Juan Romero necesita para reproducir el
+          abono del asiento. 847 cuentas para 1.979 recursos, 0 huerfanas.
 
     ejemplos_preguntas:
       - Que recursos son personas y cuantos estan hoy de alta
@@ -418,8 +480,34 @@ objetos:
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
         agregacion: no_sumable
+      cuenta_analitica_id:
+        significado: >-
+          La cuenta analitica de CARGO de la linea (F-107): contra que cuenta se
+          imputa el coste en la obra. Sale de la propia linea del parte en
+          Sigrid. Medido en solo lectura el 2026-09-24: informada en 310.553 de
+          331.003 lineas (93,8 %), 3.782 cuentas distintas, 0 huerfanas contra
+          el catalogo y todas de la misma empresa que el recurso. En 309.182
+          lineas el codigo de la cuenta empieza por el codigo de la obra de la
+          linea (codigo de obra, punto, cuenta): es la cuenta del centro de la
+          obra. **No es la
+          contrapartida**: el abono va contra la cuenta de la ficha del recurso
+          (`personal.recursos.cuenta_analitica_contrapartida_id`), y solo 45
+          lineas llevan esa misma cuenta. Su codigo y descripcion estan en
+          `maestro.cuentas_analiticas`.
+        nulo_significa: >-
+          La linea no lleva cuenta analitica (20.450 lineas, 4,62 M EUR de los
+          98,33 M EUR del total el 2026-09-24).
+        agregacion: no_sumable
 
     relaciones:
+      - de: cuenta_analitica_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y la descripcion de la cuenta de CARGO de la linea
+          (F-107): 3.782 cuentas para 310.553 lineas, 0 huerfanas el
+          2026-09-24. Junto con la contrapartida del recurso, es el asiento
+          completo del parte.
       - de: parte_id
         a: personal.partes.parte_id
         cardinalidad: "N:1"
@@ -760,7 +848,12 @@ objetos:
       responsable del dato del 2026-09-22 (solo 2 filas lo tienen distinto de
       0, y podrian ser nomina real); ni la cuenta ni el proyecto de la ficha,
       que valen 0 en todas las filas. La cuenta analitica si esta, informada en
-      3.198 filas.
+      3.198 filas, y se traduce en `maestro.cuentas_analiticas` (F-107).
+
+      **Aqui NO esta la contrapartida** (F-107): el centro de coste y la cuenta
+      contra los que se abona lo imputado son del RECURSO, no del tipo de hora,
+      y se publican en `personal.recursos`
+      (`centro_coste_contrapartida_id`, `cuenta_analitica_contrapartida_id`).
     grano: >-
       Una fila por tipo de hora definido en la ficha de un recurso, identificada
       por `reshor_id`. El par (recurso, tipo de hora) se repite 17 veces.
@@ -823,7 +916,10 @@ objetos:
       cuenta_analitica_id:
         significado: >-
           Cuenta analitica asociada a ese tipo de hora en la ficha del recurso.
-          Informada en 3.198 filas.
+          Informada en 3.198 filas (3.199 en Sigrid el 2026-09-24, 50 cuentas
+          distintas, 0 huerfanas). Su codigo y descripcion estan en
+          `maestro.cuentas_analiticas`. No es la contrapartida: esa es del
+          recurso (`personal.recursos.cuenta_analitica_contrapartida_id`).
         nulo_significa: La ficha no asocia cuenta analitica a ese tipo de hora.
         agregacion: no_sumable
       es_por_defecto:
@@ -862,6 +958,13 @@ objetos:
           `(recurso_id, tipo_hora_id)`, nunca solo por el recurso. Aun asi el par
           se repite 17 veces aqui: agregar o elegir una fila por par antes de
           unir, o las lineas de esos recursos salen duplicadas.
+      - de: cuenta_analitica_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y la descripcion de la cuenta analitica del tipo de
+          hora (F-107). 50 cuentas para 3.199 filas informadas, 0 huerfanas el
+          2026-09-24.
 
     ejemplos_preguntas:
       - Que precio de coste tiene configurado hoy el recurso X para cada tipo de hora

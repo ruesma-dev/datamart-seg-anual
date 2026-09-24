@@ -12,6 +12,18 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 30 (F-107, 2026-09-24): LA CONTRAPARTIDA DEL RECURSO Y EL CATALOGO DE
+# CUENTAS ANALITICAS. `personal.recursos` gana `centro_coste_contrapartida_id` y
+# `cuenta_analitica_contrapartida_id`: el centro y la cuenta contra los que se
+# abona lo que el parte carga a la obra, que son del RECURSO y no por tipo de
+# hora (1.979 de 2.619 recursos). Entra `raw.caa` (184.234 cuentas; la ingesta
+# pasa a 70 tablas) y `maestro.cuentas_analiticas` las publica con codigo y
+# descripcion de `con`, padre, nivel y centro. Todas las cuentas usadas en
+# `personal` casan con el catalogo (0 huerfanas). `R-CODIGO-POR-EMPRESA` alcanza
+# tambien a las cuentas: 14.063 codigos se repiten entre empresas. Ampliacion
+# del mismo dia: `personal.partes_lineas` gana `cuenta_analitica_id`, la cuenta
+# de CARGO de la linea (310.553 de 331.003 lineas).
+#
 # version 29 (F-102, 2026-09-23): LA OBRA Y EL RECURSO SON DE UNA EMPRESA. En
 # Sigrid el mismo codigo existe una vez por empresa --Ruesma (1), Porsan (28),
 # cada UTE-- y es la misma obra vista desde cada una, SIN CONSOLIDAR (modelo del
@@ -310,7 +322,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 29
+version: 30
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -434,6 +446,7 @@ reglas:
       - compras.albaran_lineas
       - compras.factura_lineas
       - compras.fact_compras_linea
+      - maestro.cuentas_analiticas
     regla: >-
       En Sigrid las obras y los recursos son POR EMPRESA: el mismo codigo existe
       una vez por empresa --Ruesma (1), Porsan (28), cada UTE-- y es la misma
@@ -462,6 +475,9 @@ reglas:
       copia de Porsan de una obra del seguimiento: en la 0704 los trabajadores
       de Porsan imputan a su propia ficha. Lo destapo Administracion el
       2026-09-22 al medir la direccion de las obras sobre la copia equivocada.
+      Las cuentas analiticas (F-107, 2026-09-24) tambien: 184.234 cuentas, 14.063
+      codigos repetidos entre empresas y ninguno dentro de una; en
+      `maestro.cuentas_analiticas` se cruza por codigo junto con `empresa_id`.
 
   - codigo: R-PROVEEDOR-INTRAGRUPO
     titulo: El mayor proveedor de la empresa es la propia empresa
@@ -639,7 +655,7 @@ reglas:
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
-      **1. `ide` es la clave de las 69 tablas.** Se llama igual en todas, es el
+      **1. `ide` es la clave de las 70 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 
@@ -1055,7 +1071,9 @@ esquemas:
       tambien la CABECERA del parte (`personal.partes`: codigo, descripcion,
       estado; el codigo NO es unico y su obra AUDITA, no imputa) y los precios
       de la ficha de cada recurso (`personal.recursos_tipos_hora`), que son los
-      de HOY: Sigrid no guarda historico.
+      de HOY: Sigrid no guarda historico. Desde F-107 `personal.recursos` trae
+      la CONTRAPARTIDA del recurso (centro de coste y cuenta analitica del
+      abono), que es del recurso y no por tipo de hora.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_personal]
@@ -1064,8 +1082,9 @@ esquemas:
     titulo: Maestros y dimensiones de consulta directa
     para_que_sirve: >-
       Obras, proveedores y la relacion proveedor-obra derivada de los contratos,
-      mas el puente centro de coste -> obra y el catalogo de estados de
-      documento, pensados para consultarse tal cual. `maestro.obras` es el
+      mas el puente centro de coste -> obra y los catalogos de estados de
+      documento y de cuentas analiticas (`maestro.cuentas_analiticas`, F-107),
+      pensados para consultarse tal cual. `maestro.obras` es el
       universo SIN filtrar, superconjunto de `stg.obras`, y trae la direccion
       del emplazamiento -informada en un tercio de las obras- y las marcas de
       que datos tiene cada obra dentro del datamart.

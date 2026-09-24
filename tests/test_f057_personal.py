@@ -447,9 +447,20 @@ def test_f057_r13_no_usa_centro_de_coste() -> None:
     Se veta en los DOS ficheros y sobre el texto ejecutable, comentarios `--`
     aparte, al estilo de `test_f073_r3_no_usa_cen_obride`. `res.cenconide` esta
     informado al 75,5 % pero con 9 valores distintos: no es la obra.
+
+    F-107 publica `res.cenconide` en `personal.recursos`, pero como lo que es
+    --la CONTRAPARTIDA del recurso, un identificador de centro de coste-- y en
+    una sola proyeccion literal. Esa proyeccion, y solo esa, se descuenta del
+    texto antes de vetar: cualquier otro uso (un JOIN, un filtro, atribuir obra
+    con el) sigue en rojo, y en las lineas de parte no se admite ninguno.
     """
+    permitida = "NULLIF(r.cenconide, 0) AS centro_coste_contrapartida_id"
     for ruta in (RUTA_RECURSOS, RUTA_PARTES):
         ejecutable = _sin_comentarios(_sql(ruta))
+        if ruta == RUTA_RECURSOS:
+            ejecutable = re.sub(r"\s+", " ", ejecutable)
+            assert ejecutable.count(permitida) == 1, "F-107: la contrapartida, una vez"
+            ejecutable = ejecutable.replace(permitida, " ")
         assert "maestro.centros_coste" not in ejecutable, (
             f"{ruta.name}: F-073 no participa en la atribucion de obra (R13)"
         )
