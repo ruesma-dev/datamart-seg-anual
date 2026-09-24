@@ -24,7 +24,7 @@ consumo; +2 columnas en `personal.recursos`).
 - [x] T3 `personal.recursos` gana las dos contrapartidas y su ficha
 - [x] T4 `maestro.cuentas_analiticas` (06, ultimo sub-paso) y su ficha
 - [x] T5 relaciones, regla, version 30 del diccionario y ARCHITECTURE
-- [ ] T6 `azure-apps/datamart_seg_anual.md` (commit local alli)
+- [x] T6 `azure-apps/datamart_seg_anual.md` (commit local alli)
 - [ ] T7 informe, lista MANUAL y `init.sh` en verde
 
 ## 2026-09-24 · F-102 · CERRADA (`done`, APROBADO en pasada 2) · QUEDAN T16 DEL HUMANO Y EL DESPLIEGUE
