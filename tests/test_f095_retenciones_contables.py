@@ -79,9 +79,9 @@ def _bloque(nombre: str, desde: str, hasta: str | None = None) -> str:
 def _cte(nombre: str, cte: str) -> str:
     """El cuerpo de un CTE, con los parentesis equilibrados."""
     texto = _sql(nombre)
-    marca = f"{cte} AS ("
-    assert marca in texto, f"no encuentro el CTE «{cte}» en {nombre}"
-    inicio = texto.index(marca) + len(marca)
+    marca = re.search(rf"(?<![\w.]){cte} AS (?:MATERIALIZED )?\(", texto)
+    assert marca, f"no encuentro el CTE «{cte}» en {nombre}"
+    inicio = marca.end()
     nivel = 1
     for pos in range(inicio, len(texto)):
         if texto[pos] == "(":
@@ -182,9 +182,8 @@ def test_f095_r4_clase_de_apunte() -> None:
     texto = _sql(APUNTES)
     esperado = (
         "CASE WHEN ap.concepto LIKE 'Asiento de cierre%' THEN 'CIERRE' "
-        "WHEN ap.concepto LIKE 'Asiento de apertura%' AND NOT EXISTS ( "
-        "SELECT 1 FROM cierres_cuenta cc WHERE cc.cuenta_id = ap.cuenta_id "
-        "AND cc.ejercicio = ap.ejercicio - 1 ) THEN 'SALDO_INICIAL' "
+        "WHEN ap.concepto LIKE 'Asiento de apertura%' AND cc.cuenta_id IS NULL "
+        "THEN 'SALDO_INICIAL' "
         "WHEN ap.concepto LIKE 'Asiento de apertura%' THEN 'APERTURA' "
         "WHEN ap.importe > 0 THEN 'ALTA' "
         "ELSE 'BAJA' END AS clase"
@@ -199,6 +198,13 @@ def test_f095_r5_saldo_inicial_por_cuenta() -> None:
     y no por fecha (D4). Excluirla perderia 642.775,50 EUR de 2008."""
     cierres = _cte(APUNTES, "cierres_cuenta")
     assert "SELECT DISTINCT ap.cuenta_id, ap.ejercicio FROM apuntes ap" in cierres
+    # «NOT EXISTS un cierre de la misma cuenta el ejercicio anterior», escrito
+    # como anti-join: dentro del CASE el NOT EXISTS no se hashea (desviacion de
+    # forma justificada en progress/current.md, misma semantica)
+    assert (
+        "LEFT JOIN cierres_cuenta cc ON cc.cuenta_id = ap.cuenta_id "
+        "AND cc.ejercicio = ap.ejercicio - 1"
+    ) in _sql(APUNTES)
     assert "WHERE ap.concepto LIKE 'Asiento de cierre%'" in cierres
     assert "EXTRACT(YEAR FROM retenciones.fn_sigrid_date(a.fec))::INT AS ejercicio" in _sql(APUNTES)
     assert "2008" not in _sql(APUNTES), "nada de fechas escritas: la regla es por cuenta"
@@ -280,7 +286,7 @@ def test_f095_r10_veta_apu_obr_y_cen_obride() -> None:
     assert not re.search(r"\ba\.obr\b", texto), "`apu.obr` no atribuye obra (R10)"
     assert "obride" not in texto, "`cen.obride` esta a 0 en las 804 filas (R10)"
     assert "raw.cen" not in texto and "raw.obr " not in texto
-    assert texto.count("maestro.centros_coste") == 4, "centro -> obra solo por el puente"
+    assert texto.count("JOIN maestro.centros_coste") == 4, "centro -> obra solo por el puente"
 
 
 # ===========================================================================

@@ -68,6 +68,30 @@ COMMENT ON TABLE retenciones.cuentas_proveedor IS
 -- (D4): una cuenta nueva en otra empresa tendria su saldo inicial otro ano.
 -- `asi.ori` NO sirve para distinguirlos: vale 0 en todos.
 -- `es_prescripcion` MARCA (concepto con 'PRESCRI'), no filtra (R6).
+--
+-- LA OBRA DE CADA APUNTE (R7): cascada, y `via_obra` dice que salto resolvio.
+-- Cada salto termina en un CENTRO DE COSTE que se traduce a obra SIEMPRE por
+-- `maestro.centros_coste` (F-073, vista sobre raw); si el centro no es una
+-- obra (estructura, delegacion), ese salto no resuelve y se prueba el siguiente.
+--   APUNTE              el centro del propio apunte (`apu.cenide`)
+--   FACTURA             `apu.asiide` -> `rac.conide` = la factura -> sus
+--                       efectos de retencion (`pag.retide <> 0`), SOLO si todos
+--                       llevan el mismo centro (uno sin centro cuenta como otro
+--                       valor: no se atribuye una factura a medias)
+--   EFECTO              `rac.conide` = un efecto de pago -> su `pag.cenide`
+--   PROVEEDOR_UNA_OBRA  [H3] el proveedor tiene todos sus efectos de retencion
+--                       con centro en UN solo centro
+--   SIN_OBRA            ninguna de las anteriores: `obra_id` NULL, y no se
+--                       reparte por reglas inventadas (D6, R13)
+-- `rac` se pre-agrega por asiento (`MIN(conide)`: 1 fila por asiento, medido
+-- en F-091); los efectos, por factura y por proveedor; `raw.pag` solo se une
+-- por su `ide`. Ningun salto multiplica (R8). Desde 2016 el alta ya no lleva
+-- centro en el apunte: sin `rac`, las altas con obra caerian del 97,2 % al
+-- 10,8 % del importe (R9).
+-- NUNCA `apu.obr` (142 filas y 2 obras) ni el campo de obra de `cen` (a 0 en
+-- las 804 filas): R10.
+-- La obra se publica con SU empresa (R-CODIGO-POR-EMPRESA, F-102): `empresa_id`
+-- y `clave_obra` = '<empresa>-<codigo>', la misma regla que maestro.v_obra_fichas.
 -- ============================================================================
 
 DROP TABLE IF EXISTS retenciones.apuntes_contables CASCADE;
@@ -89,13 +113,40 @@ WITH apuntes AS (
     FROM raw.apu a
     JOIN retenciones.cuentas_proveedor cp ON cp.cuenta_id = a.cueide
 ),
--- Las cuentas con cierre en cada ejercicio: una fila por (cuenta, ejercicio)
+-- Las cuentas con cierre en cada ejercicio: una fila por (cuenta, ejercicio),
+-- DISTINCT para que el anti-join de la clase no multiplique
 cierres_cuenta AS (
     SELECT DISTINCT ap.cuenta_id, ap.ejercicio
     FROM apuntes ap
     WHERE ap.concepto LIKE 'Asiento de cierre%'
-)
-SELECT
+),
+-- Salto FACTURA / EFECTO: el documento que genero el asiento, uno por asiento
+rac_asiento AS (
+    SELECT r.asiide AS asiento_id, MIN(r.conide) AS documento_id
+    FROM raw.rac r
+    WHERE r.asiide <> 0 AND r.conide <> 0
+    GROUP BY r.asiide
+),
+-- Los efectos de retencion de cada factura, y si comparten centro
+efectos_factura AS (
+    SELECT
+        p.conide                             AS documento_id,
+        COUNT(DISTINCT COALESCE(p.cenide, 0)) AS num_centros,
+        MIN(COALESCE(p.cenide, 0))           AS centro_coste_id
+    FROM raw.pag p
+    WHERE COALESCE(p.retide, 0) <> 0 AND COALESCE(p.conide, 0) <> 0
+    GROUP BY p.conide
+),
+-- [H3] Proveedores con todos sus efectos de retencion (con centro) en UN centro
+proveedor_una_obra AS (
+    SELECT p.entide AS proveedor_id, MIN(p.cenide) AS centro_coste_id
+    FROM raw.pag p
+    WHERE COALESCE(p.retide, 0) <> 0 AND COALESCE(p.cenide, 0) <> 0
+    GROUP BY p.entide
+    HAVING COUNT(DISTINCT p.cenide) = 1
+),
+resuelto AS (
+    SELECT
     ap.apunte_id,
     ap.asiento_id,
     ap.fecha,
@@ -108,17 +159,68 @@ SELECT
     ap.importe_baja,
     ap.importe,
     CASE WHEN ap.concepto LIKE 'Asiento de cierre%' THEN 'CIERRE'
-         WHEN ap.concepto LIKE 'Asiento de apertura%' AND NOT EXISTS (
-              SELECT 1 FROM cierres_cuenta cc
-              WHERE cc.cuenta_id = ap.cuenta_id AND cc.ejercicio = ap.ejercicio - 1
-         ) THEN 'SALDO_INICIAL'
+         -- «no existe cierre de la cuenta el ejercicio anterior», como anti-join:
+         -- un NOT EXISTS aqui dentro no se hashea y recorreria los apuntes
+         -- una vez por cada apertura
+         WHEN ap.concepto LIKE 'Asiento de apertura%' AND cc.cuenta_id IS NULL THEN 'SALDO_INICIAL'
          WHEN ap.concepto LIKE 'Asiento de apertura%' THEN 'APERTURA'
          WHEN ap.importe > 0 THEN 'ALTA'
          ELSE 'BAJA' END AS clase,
     UPPER(COALESCE(ap.concepto, '')) LIKE '%PRESCRI%' AS es_prescripcion,
-    ap.centro_coste_id
-FROM apuntes ap;
+    ap.centro_coste_id,
+    COALESCE(cc_apu.obra_id, cc_fac.obra_id, cc_efe.obra_id, cc_prv.obra_id) AS obra_id,
+    CASE WHEN cc_apu.obra_id IS NOT NULL THEN 'APUNTE'
+         WHEN cc_fac.obra_id IS NOT NULL THEN 'FACTURA'
+         WHEN cc_efe.obra_id IS NOT NULL THEN 'EFECTO'
+         WHEN cc_prv.obra_id IS NOT NULL THEN 'PROVEEDOR_UNA_OBRA'
+         ELSE 'SIN_OBRA' END AS via_obra,
+    ra.documento_id AS documento_id
+    FROM apuntes ap
+    LEFT JOIN cierres_cuenta cc ON cc.cuenta_id = ap.cuenta_id AND cc.ejercicio = ap.ejercicio - 1
+    LEFT JOIN maestro.centros_coste cc_apu ON cc_apu.centro_coste_id = ap.centro_coste_id
+    LEFT JOIN rac_asiento ra ON ra.asiento_id = ap.asiento_id
+    LEFT JOIN efectos_factura ef ON ef.documento_id = ra.documento_id AND ef.num_centros = 1
+    LEFT JOIN maestro.centros_coste cc_fac ON cc_fac.centro_coste_id = NULLIF(ef.centro_coste_id, 0)
+    LEFT JOIN raw.pag efe ON efe.ide = ra.documento_id
+    LEFT JOIN maestro.centros_coste cc_efe ON cc_efe.centro_coste_id = NULLIF(efe.cenide, 0)
+    LEFT JOIN proveedor_una_obra pu ON pu.proveedor_id = ap.proveedor_id
+    LEFT JOIN maestro.centros_coste cc_prv ON cc_prv.centro_coste_id = pu.centro_coste_id
+)
+SELECT
+    r.apunte_id,
+    r.asiento_id,
+    r.fecha,
+    r.ejercicio,
+    r.cuenta_id,
+    r.codigo_cuenta,
+    r.proveedor_id,
+    r.concepto,
+    r.importe_alta,
+    r.importe_baja,
+    r.importe,
+    r.clase,
+    r.es_prescripcion,
+    r.centro_coste_id,
+    r.obra_id,
+    ob.emp                             AS empresa_id,
+    ob.cod                             AS codigo_obra,
+    ob.emp::text || '-' || ob.cod      AS clave_obra,
+    ob.res                             AS nombre_obra,
+    r.via_obra,
+    r.documento_id
+FROM resuelto r
+LEFT JOIN raw.con ob ON ob.ide = r.obra_id;
 
 ALTER TABLE retenciones.apuntes_contables ADD PRIMARY KEY (apunte_id);
 CREATE INDEX idx_ret_apc_proveedor ON retenciones.apuntes_contables (proveedor_id);
+CREATE INDEX idx_ret_apc_obra      ON retenciones.apuntes_contables (obra_id);
 CREATE INDEX idx_ret_apc_clase     ON retenciones.apuntes_contables (clase);
+
+COMMENT ON TABLE retenciones.apuntes_contables IS
+'F-095. Una fila por apunte de raw.apu en las cuentas de retencion de '
+'proveedor (retenciones.cuentas_proveedor), sin filtrar ninguno. importe = '
+'haber - debe (positivo se retiene, negativo se devuelve o da de baja). clase: '
+'CIERRE, APERTURA, SALDO_INICIAL (apertura sin cierre previo de la cuenta), '
+'ALTA, BAJA; cierres y aperturas no se suman nunca. obra_id por cascada '
+'(via_obra: APUNTE, FACTURA, EFECTO, PROVEEDOR_UNA_OBRA, SIN_OBRA), siempre '
+'traducida por maestro.centros_coste, con su empresa y su clave_obra.';
