@@ -141,6 +141,30 @@ sin construir esa noche.
 - La ingesta nocturna SIEMPRE `--full` (el cursor incremental por `ide`
   pierde los UPDATE).
 - Palabra reservada `real` en vistas de `cierre` → siempre entre comillas.
+- **La retención de proveedor la manda la contabilidad (F-095).** El saldo vivo
+  es `retenciones.saldo_contable` (proveedor × obra, con una fila sin obra por
+  proveedor); `retenciones.movimientos` (los efectos) es el detalle, y el cuadre
+  entre los dos, `retenciones.v_cuadre_proveedor`. Cuatro cosas del origen que
+  lo sostienen:
+  - Las cuentas de retención son las que declara el proveedor en
+    `prv.cueretide` (1:1), **nunca por prefijo**: 4038 y 4128 se escapaban.
+  - Cada ejercicio cierra y reabre esas cuentas (~52 M € por lado): la clase
+    del apunte separa `CIERRE`, `APERTURA`, `SALDO_INICIAL`, `ALTA` y `BAJA`, y
+    el saldo es la suma de las tres últimas. La apertura de 2008 no tiene cierre
+    previo —es la historia anterior a Sigrid, 642.775,50 €— y por eso es
+    `SALDO_INICIAL` y cuenta; la regla es por cuenta, no por fecha.
+  - Desde 2016 el alta no lleva centro de coste en el apunte: la obra sale de
+    `raw.rac` (asiento → factura → sus efectos) y, si no, del propio efecto o
+    del proveedor con una sola obra; siempre por `maestro.centros_coste`.
+  - El vencimiento cuenta desde el **fin de obra** (decisión del humano del
+    2026-09-22), nunca desde la factura: inicio de garantía
+    (`obrctr.fecinigar` / `obr.garfecini`) o, si no hay, el último día del mes
+    siguiente al último cierre con movimiento de `cierre.fact_cierre_mensual`,
+    más el plazo del cliente (`plaret` → `plagar` → 12). Ese respaldo va con
+    **una noche de desfase**: `build_cierre` corre después de
+    `build_retenciones`, y si su tabla estuviera vacía el sub-paso `fin_obra`
+    falla en vez de publicar sin fechas. `retenciones.fin_obra` y
+    `retenciones.v_retencion_contable_obra`.
 
 ## Acceso a datos
 
