@@ -40,3 +40,53 @@ COMMENT ON TABLE retenciones.cuentas_proveedor IS
 'F-095. Una fila por proveedor con cuenta de retencion (prv.cueretide <> 0), '
 'con el codigo y el nombre de la cuenta (raw.con) y su familia (4 digitos, '
 'descriptiva). Las cuentas se eligen por el proveedor, nunca por prefijo.';
+
+
+-- ============================================================================
+--   retenciones.apuntes_contables  una fila por apunte de raw.apu en esas cuentas
+--
+-- Lee ademas raw.apu.
+--
+-- UNA FILA POR APUNTE, SIN FILTRAR NINGUNO (R3): 49.505 el 2026-09-22.
+-- `importe = hab - deb`: positivo es retencion que se practica (haber de la
+-- cuenta), negativo es retencion que se devuelve o se da de baja (debe). Los
+-- dos lados van tambien por separado, sin signo, en importe_alta/importe_baja.
+-- `apunte_id` es clave primaria: nada de lo que se une aqui multiplica (R8).
+-- ============================================================================
+
+DROP TABLE IF EXISTS retenciones.apuntes_contables CASCADE;
+CREATE TABLE retenciones.apuntes_contables AS
+WITH apuntes AS (
+    SELECT
+        a.ide                                                   AS apunte_id,
+        NULLIF(a.asiide, 0)                                     AS asiento_id,
+        retenciones.fn_sigrid_date(a.fec)                       AS fecha,
+        EXTRACT(YEAR FROM retenciones.fn_sigrid_date(a.fec))::INT AS ejercicio,
+        a.cueide                                                AS cuenta_id,
+        cp.codigo_cuenta                                        AS codigo_cuenta,
+        cp.proveedor_id                                         AS proveedor_id,
+        a.res                                                   AS concepto,
+        COALESCE(a.hab, 0)::NUMERIC(18, 2)                      AS importe_alta,
+        COALESCE(a.deb, 0)::NUMERIC(18, 2)                      AS importe_baja,
+        (COALESCE(a.hab, 0) - COALESCE(a.deb, 0))::NUMERIC(18, 2) AS importe,
+        NULLIF(a.cenide, 0)                                     AS centro_coste_id
+    FROM raw.apu a
+    JOIN retenciones.cuentas_proveedor cp ON cp.cuenta_id = a.cueide
+)
+SELECT
+    ap.apunte_id,
+    ap.asiento_id,
+    ap.fecha,
+    ap.ejercicio,
+    ap.cuenta_id,
+    ap.codigo_cuenta,
+    ap.proveedor_id,
+    ap.concepto,
+    ap.importe_alta,
+    ap.importe_baja,
+    ap.importe,
+    ap.centro_coste_id
+FROM apuntes ap;
+
+ALTER TABLE retenciones.apuntes_contables ADD PRIMARY KEY (apunte_id);
+CREATE INDEX idx_ret_apc_proveedor ON retenciones.apuntes_contables (proveedor_id);
