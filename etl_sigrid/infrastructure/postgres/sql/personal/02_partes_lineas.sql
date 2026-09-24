@@ -80,6 +80,16 @@
 -- 330.596 de 330.638 lineas; 11.036 valen 0 y 9.119 son negativas
 -- (correcciones). Un ABS o un `WHERE tot > 0` borraria las correcciones.
 --
+-- LA CUENTA ANALITICA DE LA LINEA (F-107, ampliacion decidida por el humano el
+-- 2026-09-24): `hmores.caaide`, la cuenta de CARGO. Medido en Sigrid en solo
+-- lectura: informada en 310.553 de 331.003 lineas (93,8 %), 3.782 cuentas, 0
+-- huerfanas contra `caa` y todas de la empresa del recurso. En 309.182 el
+-- prefijo del codigo de la cuenta es el codigo de la obra de la linea: es la
+-- cuenta del centro de la obra. NO es la contrapartida (esa es del recurso,
+-- `personal.recursos`): solo 45 lineas la llevan. Se publica el id con NULLIF
+-- 0 y sin JOIN; medido el SELECT en solo lectura: 3,05 s sin ella, 3,1 s con
+-- ella.
+--
 -- DEFECTOS DE CALIDAD MEDIDOS EN ORIGEN, que se declaran y NO se corrigen:
 -- 5 lineas con fecha 0, una con fecha del año 3103, 6 con año fuera de
 -- 1990-2030 y 5 con mes fuera de 1-12. `personal.fn_fecha` devuelve NULL para
@@ -93,7 +103,8 @@ INSERT INTO personal.partes_lineas (
     partida_id,
     fecha, anio, mes,
     tipo_hora_id, tipo_hora, unidad,
-    cantidad, precio, importe, texto_linea
+    cantidad, precio, importe, texto_linea,
+    cuenta_analitica_id
 )
 SELECT
     l.ide                                   AS linea_id,
@@ -124,7 +135,10 @@ SELECT
     COALESCE(l.can, 0)::NUMERIC(18,2)       AS cantidad,
     COALESCE(l.pre, 0)::NUMERIC(18,4)       AS precio,
     COALESCE(l.tot, 0)::NUMERIC(18,2)       AS importe,
-    NULLIF(l.tex, '')                       AS texto_linea
+    NULLIF(l.tex, '')                       AS texto_linea,
+    -- F-107: la cuenta de CARGO de la linea, solo el id (se traduce en
+    -- `maestro.cuentas_analiticas` por relacion; aqui no se une nada).
+    NULLIF(l.caaide, 0)                     AS cuenta_analitica_id
 FROM      raw.hmores l
 -- LEFT, y hace falta: 10 lineas apuntan a un tipo de hora que no esta en el
 -- catalogo. Con JOIN desaparecerian sin ruido; asi salen como 'DESCONOCIDA'.
@@ -133,4 +147,4 @@ LEFT JOIN raw.auxhor h ON h.ide = l.horide
 LEFT JOIN raw.con    c ON c.ide = l.hmoide;
 
 COMMENT ON TABLE personal.partes_lineas IS
-'Lineas de parte de trabajo (330.638 el 2026-09-18), una fila por fila de raw.hmores. NUNCA SUMAR `cantidad` SIN FILTRAR `unidad`: mezcla HORA, DIA, MES y UD, y en bruto da 1.837.201,23 de nada. Las horas son unidad = HORA (1.249.038,44 h), pero el 71,7 % del euro esta en las lineas de MES, que son el coste de estructura de obra. La obra sale de la LINEA (hmores.obride), no de la cabecera, y el universo del seguimiento se MARCA en en_seguimiento en vez de filtrarse.';
+'Lineas de parte de trabajo (330.638 el 2026-09-18), una fila por fila de raw.hmores. NUNCA SUMAR `cantidad` SIN FILTRAR `unidad`: mezcla HORA, DIA, MES y UD, y en bruto da 1.837.201,23 de nada. Las horas son unidad = HORA (1.249.038,44 h), pero el 71,7 % del euro esta en las lineas de MES, que son el coste de estructura de obra. La obra sale de la LINEA (hmores.obride), no de la cabecera, y el universo del seguimiento se MARCA en en_seguimiento en vez de filtrarse. cuenta_analitica_id es la cuenta analitica de CARGO de la linea (F-107), no la contrapartida del recurso.';
