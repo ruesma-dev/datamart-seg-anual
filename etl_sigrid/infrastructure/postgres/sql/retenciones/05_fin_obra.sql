@@ -41,6 +41,17 @@
 -- seguimiento. No se declara `build_cierre` en `depends_on` por lo mismo que
 -- D3: un fallo de otra rama dejaria la noche sin retenciones.
 --
+-- EL FIN DE OBRA (R19, R20) [H1]
+-- ---------------------------------------------------------------------------
+--   fecha_fin_obra   = fecha_inicio_garantia; si no hay, el ULTIMO DIA DEL MES
+--                      SIGUIENTE a ultimo_cierre; si tampoco, NULL.
+--   fuente_fin_obra  INICIO_GARANTIA | ULTIMO_CIERRE_MAS_1_MES | NULL.
+-- Cobertura medida el 2026-09-22 sobre el vivo de verdad: 20,9 % + 76,1 % =
+-- 97,0 %. Sin ninguna de las dos quedan 17 obras con retencion viva
+-- (132.544,84 EUR): NO SE INVENTA una fecha. `terminada_sin_fin_obra` marca las
+-- que ademas estan terminadas, recibidas o cerradas (con.est 19, 21, 23, 25).
+-- Las informativas (fin real, recepcion provisional, fin previsto) no entran.
+--
 -- LA GUARDA (R21): si la tabla del cierre no existe o esta VACIA, este fichero
 -- falla con el nombre del sub-paso en vez de publicar todas las obras sin
 -- fecha de respaldo.
@@ -102,20 +113,35 @@ base AS (
     LEFT JOIN raw.con con ON con.ide = obr.ide
     LEFT JOIN oc ON oc.obra_id = obr.ide
     LEFT JOIN cierres ci ON ci.obra_id = obr.ide
+),
+fin AS (
+    SELECT
+        b.*,
+        CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN b.fecha_inicio_garantia
+             WHEN b.ultimo_cierre IS NOT NULL
+             THEN (b.ultimo_cierre + INTERVAL '2 months' - INTERVAL '1 day')::DATE
+        END AS fecha_fin_obra,
+        CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN 'INICIO_GARANTIA'
+             WHEN b.ultimo_cierre IS NOT NULL THEN 'ULTIMO_CIERRE_MAS_1_MES'
+        END AS fuente_fin_obra
+    FROM base b
 )
 SELECT
-    b.obra_id,
-    b.empresa_id,
-    b.codigo_obra,
-    b.clave_obra,
-    b.nombre_obra,
-    b.estado_obra,
-    b.fecha_inicio_garantia,
-    b.ultimo_cierre,
-    b.fecha_fin_real,
-    b.fecha_recepcion_provisional,
-    b.fecha_fin_prevista,
-    b.num_contratos_obra
-FROM base b;
+    f.obra_id,
+    f.empresa_id,
+    f.codigo_obra,
+    f.clave_obra,
+    f.nombre_obra,
+    f.estado_obra,
+    f.fecha_inicio_garantia,
+    f.ultimo_cierre,
+    f.fecha_fin_real,
+    f.fecha_recepcion_provisional,
+    f.fecha_fin_prevista,
+    f.fecha_fin_obra,
+    f.fuente_fin_obra,
+    (f.fecha_fin_obra IS NULL AND COALESCE(f.estado_obra, 0) IN (19, 21, 23, 25)) AS terminada_sin_fin_obra,
+    f.num_contratos_obra
+FROM fin f;
 
 ALTER TABLE retenciones.fin_obra ADD PRIMARY KEY (obra_id);
