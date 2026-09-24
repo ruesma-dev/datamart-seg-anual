@@ -870,3 +870,482 @@ def test_f095_r31_arquitectura_y_azure_apps() -> None:
     texto = DOC_AZURE_APPS.read_text(encoding="utf-8")
     for termino in ("71 tablas", "`rac`", "F-095", *(f"retenciones.{o}" for o in OBJETOS_NUEVOS)):
         assert termino in texto, f"azure-apps no dice «{termino}» (R31)"
+
+
+# ===========================================================================
+# EL CONTRATO DEL SQL, EXPRESION A EXPRESION (review de F-095, pasada 1)
+# ===========================================================================
+#
+# El review encontro 11 mutantes vivos (S1-S11): los tests fijaban el ALIAS de
+# una columna y no su FORMULA, asi que `SUM(s.altas) AS saldo_contable` pasaba.
+# Aqui se fija, para cada SELECT de cada CREATE de `03`-`06` (CTE incluidos, en
+# orden de aparicion): si lleva DISTINCT, cada expresion proyectada tal cual y
+# cada clausula de su FROM (JOIN con su ON, WHERE, GROUP BY, HAVING). Cambiar
+# una formula obliga a cambiar esta tabla, delante del reviewer. Revisada
+# contra la spec linea a linea: R1-R8 (03), R11 (04), R17-R23 (05), R14-R15 y
+# R24 (06), y R-CODIGO-POR-EMPRESA en las claves de obra.
+
+_CLAUSULAS = ("WHERE ", "GROUP BY ", "HAVING ", "LEFT JOIN ", "FULL JOIN ",
+              "CROSS JOIN ", "JOIN ", "ORDER BY ")
+
+
+def _profundidades(texto: str) -> list[int]:
+    nivel, prof, cadena = 0, [], False
+    for c in texto:
+        if c == "'":
+            cadena = not cadena
+        if not cadena and c == "(":
+            prof.append(nivel)
+            nivel += 1
+        elif not cadena and c == ")":
+            nivel -= 1
+            prof.append(nivel)
+        else:
+            prof.append(nivel if not cadena else -1)
+    return prof
+
+
+def _trocear(texto: str, ini: int, fin: int, prof: list[int], nivel: int) -> list[str]:
+    trozos, a = [], ini
+    for i in range(ini, fin):
+        if prof[i] == nivel and texto[i] == ",":
+            trozos.append(texto[a:i])
+            a = i + 1
+    trozos.append(texto[a:fin])
+    return [t.strip() for t in trozos if t.strip()]
+
+
+def _consultas_de(texto: str, ini: int, fin: int) -> list[tuple[bool, list[str], list[str]]]:
+    """(DISTINCT, expresiones, clausulas) de cada SELECT del tramo, en orden."""
+    prof = _profundidades(texto)
+    res = []
+    for m in re.finditer(r"(?<![\w.])SELECT ", texto[ini:fin]):
+        s = ini + m.start()
+        nivel = prof[s]
+        q_fin = s
+        while q_fin < fin and not (texto[q_fin] == ")" and prof[q_fin] < nivel):
+            q_fin += 1
+        desde = next((k for k in range(s + 7, q_fin)
+                      if prof[k] == nivel and texto.startswith(" FROM ", k)), None)
+        lista = s + 7
+        distinct = texto.startswith("DISTINCT ", lista)
+        if distinct:
+            lista += 9
+        items = _trocear(texto, lista, desde if desde is not None else q_fin, prof, nivel)
+        clausulas: list[str] = []
+        if desde is not None:
+            marcas = []
+            for k in range(desde + 6, q_fin):
+                if prof[k] != nivel or texto[k - 1] != " ":
+                    continue
+                for kw in _CLAUSULAS:
+                    if texto.startswith(kw, k) and not (
+                        kw == "JOIN " and texto[k - 5:k] in ("LEFT ", "FULL ", "ROSS ")
+                    ):
+                        marcas.append(k)
+                        break
+            for i, k in enumerate(marcas):
+                hasta = marcas[i + 1] if i + 1 < len(marcas) else q_fin
+                clausulas.append(texto[k:hasta].strip())
+        res.append((distinct, items, clausulas))
+    return res
+
+
+def _contrato_real(objeto: str) -> list[tuple[bool, list[str], list[str]]]:
+    for nombre in (APUNTES, SALDO, FIN_OBRA, VISTAS):
+        texto = _sql(nombre)
+        m = re.search(rf"CREATE (?:TABLE|VIEW) {re.escape(objeto)} AS ", texto)
+        if m:
+            return _consultas_de(texto, m.end(), texto.index(";", m.end()))
+    raise AssertionError(f"{objeto} no se crea en ningun fichero de F-095")
+
+
+CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
+    'retenciones.cuentas_proveedor': [
+        (
+            False,
+            [
+                'prv.ide AS proveedor_id',
+                'ent.res AS proveedor_nombre',
+                'prv.cueretide AS cuenta_id',
+                'cue.cod AS codigo_cuenta',
+                'cue.res AS nombre_cuenta',
+                'LEFT(cue.cod, 4) AS familia',
+            ],
+            [
+                'LEFT JOIN raw.con ent ON ent.ide = prv.ide',
+                'LEFT JOIN raw.con cue ON cue.ide = prv.cueretide',
+                'WHERE COALESCE(prv.cueretide, 0) <> 0',
+            ],
+        ),
+    ],
+    'retenciones.apuntes_contables': [
+        (
+            False,
+            [
+                'a.ide AS apunte_id',
+                'NULLIF(a.asiide, 0) AS asiento_id',
+                'retenciones.fn_sigrid_date(a.fec) AS fecha',
+                'EXTRACT(YEAR FROM retenciones.fn_sigrid_date(a.fec))::INT AS ejercicio',
+                'a.cueide AS cuenta_id',
+                'cp.codigo_cuenta AS codigo_cuenta',
+                'cp.proveedor_id AS proveedor_id',
+                'a.res AS concepto',
+                'COALESCE(a.hab, 0)::NUMERIC(18, 2) AS importe_alta',
+                'COALESCE(a.deb, 0)::NUMERIC(18, 2) AS importe_baja',
+                '(COALESCE(a.hab, 0) - COALESCE(a.deb, 0))::NUMERIC(18, 2) AS importe',
+                'NULLIF(a.cenide, 0) AS centro_coste_id',
+            ],
+            [
+                'JOIN retenciones.cuentas_proveedor cp ON cp.cuenta_id = a.cueide',
+            ],
+        ),
+        (
+            True,
+            [
+                'ap.cuenta_id',
+                'ap.ejercicio',
+            ],
+            [
+                "WHERE ap.concepto LIKE 'Asiento de cierre%'",
+            ],
+        ),
+        (
+            False,
+            [
+                'r.asiide AS asiento_id',
+                'MIN(r.conide) AS documento_id',
+            ],
+            [
+                'WHERE r.asiide <> 0 AND r.conide <> 0',
+                'GROUP BY r.asiide',
+            ],
+        ),
+        (
+            False,
+            [
+                'p.conide AS documento_id',
+                'COUNT(DISTINCT COALESCE(p.cenide, 0)) AS num_centros',
+                'MIN(COALESCE(p.cenide, 0)) AS centro_coste_id',
+            ],
+            [
+                'WHERE COALESCE(p.retide, 0) <> 0 AND COALESCE(p.conide, 0) <> 0',
+                'GROUP BY p.conide',
+            ],
+        ),
+        (
+            False,
+            [
+                'p.entide AS proveedor_id',
+                'MIN(p.cenide) AS centro_coste_id',
+            ],
+            [
+                'WHERE COALESCE(p.retide, 0) <> 0 AND COALESCE(p.cenide, 0) <> 0',
+                'GROUP BY p.entide',
+                'HAVING COUNT(DISTINCT p.cenide) = 1',
+            ],
+        ),
+        (
+            False,
+            [
+                'ap.apunte_id',
+                'ap.asiento_id',
+                'ap.fecha',
+                'ap.ejercicio',
+                'ap.cuenta_id',
+                'ap.codigo_cuenta',
+                'ap.proveedor_id',
+                'ap.concepto',
+                'ap.importe_alta',
+                'ap.importe_baja',
+                'ap.importe',
+                "CASE WHEN ap.concepto LIKE 'Asiento de cierre%' THEN 'CIERRE' WHEN ap.concepto LIKE 'Asiento de apertura%' AND cc.cuenta_id IS NULL THEN 'SALDO_INICIAL' WHEN ap.concepto LIKE 'Asiento de apertura%' THEN 'APERTURA' WHEN ap.importe > 0 THEN 'ALTA' ELSE 'BAJA' END AS clase",
+                "UPPER(COALESCE(ap.concepto, '')) LIKE '%PRESCRI%' AS es_prescripcion",
+                'ap.centro_coste_id',
+                'COALESCE(cc_apu.obra_id, cc_fac.obra_id, cc_efe.obra_id, cc_prv.obra_id) AS obra_id',
+                "CASE WHEN cc_apu.obra_id IS NOT NULL THEN 'APUNTE' WHEN cc_fac.obra_id IS NOT NULL THEN 'FACTURA' WHEN cc_efe.obra_id IS NOT NULL THEN 'EFECTO' WHEN cc_prv.obra_id IS NOT NULL THEN 'PROVEEDOR_UNA_OBRA' ELSE 'SIN_OBRA' END AS via_obra",
+                'ra.documento_id AS documento_id',
+            ],
+            [
+                'LEFT JOIN cierres_cuenta cc ON cc.cuenta_id = ap.cuenta_id AND cc.ejercicio = ap.ejercicio - 1',
+                'LEFT JOIN maestro.centros_coste cc_apu ON cc_apu.centro_coste_id = ap.centro_coste_id',
+                'LEFT JOIN rac_asiento ra ON ra.asiento_id = ap.asiento_id',
+                'LEFT JOIN efectos_factura ef ON ef.documento_id = ra.documento_id AND ef.num_centros = 1',
+                'LEFT JOIN maestro.centros_coste cc_fac ON cc_fac.centro_coste_id = NULLIF(ef.centro_coste_id, 0)',
+                'LEFT JOIN raw.pag efe ON efe.ide = ra.documento_id',
+                'LEFT JOIN maestro.centros_coste cc_efe ON cc_efe.centro_coste_id = NULLIF(efe.cenide, 0)',
+                'LEFT JOIN proveedor_una_obra pu ON pu.proveedor_id = ap.proveedor_id',
+                'LEFT JOIN maestro.centros_coste cc_prv ON cc_prv.centro_coste_id = pu.centro_coste_id',
+            ],
+        ),
+        (
+            False,
+            [
+                'r.apunte_id',
+                'r.asiento_id',
+                'r.fecha',
+                'r.ejercicio',
+                'r.cuenta_id',
+                'r.codigo_cuenta',
+                'r.proveedor_id',
+                'r.concepto',
+                'r.importe_alta',
+                'r.importe_baja',
+                'r.importe',
+                'r.clase',
+                'r.es_prescripcion',
+                'r.centro_coste_id',
+                'r.obra_id',
+                'ob.emp AS empresa_id',
+                'ob.cod AS codigo_obra',
+                "ob.emp::text || '-' || ob.cod AS clave_obra",
+                'ob.res AS nombre_obra',
+                'r.via_obra',
+                'r.documento_id',
+            ],
+            [
+                'LEFT JOIN raw.con ob ON ob.ide = r.obra_id',
+            ],
+        ),
+    ],
+    'retenciones.saldo_contable': [
+        (
+            False,
+            [
+                'a.proveedor_id',
+                'cp.proveedor_nombre',
+                'a.obra_id',
+                'a.empresa_id',
+                'a.codigo_obra',
+                'a.clave_obra',
+                'a.nombre_obra',
+                "COALESCE(SUM(a.importe) FILTER (WHERE a.clase = 'ALTA'), 0)::NUMERIC(18, 2) AS altas",
+                "COALESCE(SUM(a.importe) FILTER (WHERE a.clase = 'BAJA'), 0)::NUMERIC(18, 2) AS bajas",
+                "COALESCE(SUM(a.importe) FILTER (WHERE a.clase = 'SALDO_INICIAL'), 0)::NUMERIC(18, 2) AS saldo_inicial",
+                "COALESCE(SUM(a.importe) FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL')), 0)::NUMERIC(18, 2) AS saldo",
+                "COALESCE(SUM(a.importe) FILTER (WHERE a.clase IN ('APERTURA', 'SALDO_INICIAL') AND a.ejercicio = 2016), 0)::NUMERIC(18, 2) AS saldo_anterior_2016",
+                "COUNT(*) FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL')) AS num_apuntes",
+                "MIN(a.fecha) FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL')) AS primer_movimiento",
+                "MAX(a.fecha) FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL')) AS ultimo_movimiento",
+            ],
+            [
+                'JOIN retenciones.cuentas_proveedor cp ON cp.proveedor_id = a.proveedor_id',
+                "WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL') OR (a.clase = 'APERTURA' AND a.ejercicio = 2016)",
+                'GROUP BY a.proveedor_id, cp.proveedor_nombre, a.obra_id, a.empresa_id, a.codigo_obra, a.clave_obra, a.nombre_obra',
+            ],
+        ),
+    ],
+    'retenciones.fin_obra': [
+        (
+            False,
+            [
+                '12 AS plazo_fijo_meses',
+            ],
+            [
+            ],
+        ),
+        (
+            False,
+            [
+                'c.obride AS obra_id',
+                'MAX(NULLIF(c.fecinigar, 0)) AS fec_inicio_garantia',
+                'retenciones.fn_sigrid_date(MAX(NULLIF(c.fecreafin, 0))) AS fec_real_fin',
+                'retenciones.fn_sigrid_date(MAX(NULLIF(c.fecprorec, 0))) AS fec_recepcion_provisional',
+                'retenciones.fn_sigrid_date(MAX(NULLIF(c.fecprefin, 0))) AS fec_prev_fin',
+                'NULLIF(MAX(c.plaret), 0) AS plazo_retencion',
+                'NULLIF(MAX(c.plagar), 0) AS plazo_garantia',
+                'COUNT(*) AS num_contratos_obra',
+            ],
+            [
+                'GROUP BY c.obride',
+            ],
+        ),
+        (
+            False,
+            [
+                'f.obra_id',
+                'MAX(f.anio_mes) AS ultimo_cierre',
+            ],
+            [
+                'WHERE f.ejecutado_mes <> 0',
+                'GROUP BY f.obra_id',
+            ],
+        ),
+        (
+            False,
+            [
+                'obr.ide AS obra_id',
+                'con.emp AS empresa_id',
+                'con.cod AS codigo_obra',
+                "con.emp::text || '-' || con.cod AS clave_obra",
+                'con.res AS nombre_obra',
+                'con.est AS estado_obra',
+                'COALESCE(retenciones.fn_sigrid_date(oc.fec_inicio_garantia), retenciones.fn_sigrid_date(obr.garfecini)) AS fecha_inicio_garantia',
+                'ci.ultimo_cierre AS ultimo_cierre',
+                'COALESCE( oc.fec_real_fin, retenciones.fn_sigrid_date(obr.fecfinrea) ) AS fecha_fin_real',
+                'oc.fec_recepcion_provisional AS fecha_recepcion_provisional',
+                'COALESCE( oc.fec_prev_fin, retenciones.fn_sigrid_date(obr.fecfinpre) ) AS fecha_fin_prevista',
+                'COALESCE(oc.plazo_retencion, oc.plazo_garantia, k.plazo_fijo_meses)::INT AS plazo_meses',
+                "CASE WHEN oc.plazo_retencion IS NOT NULL THEN 'PLAZO_RETENCION_CLIENTE' WHEN oc.plazo_garantia IS NOT NULL THEN 'PLAZO_GARANTIA_CLIENTE' ELSE 'PLAZO_FIJO_12' END AS fuente_plazo",
+                'COALESCE(oc.num_contratos_obra, 0) AS num_contratos_obra',
+            ],
+            [
+                'LEFT JOIN raw.con con ON con.ide = obr.ide',
+                'LEFT JOIN oc ON oc.obra_id = obr.ide',
+                'LEFT JOIN cierres ci ON ci.obra_id = obr.ide',
+                'CROSS JOIN constantes k',
+            ],
+        ),
+        (
+            False,
+            [
+                'b.*',
+                "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN b.fecha_inicio_garantia WHEN b.ultimo_cierre IS NOT NULL THEN (b.ultimo_cierre + INTERVAL '2 months' - INTERVAL '1 day')::DATE END AS fecha_fin_obra",
+                "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN 'INICIO_GARANTIA' WHEN b.ultimo_cierre IS NOT NULL THEN 'ULTIMO_CIERRE_MAS_1_MES' END AS fuente_fin_obra",
+            ],
+            [
+            ],
+        ),
+        (
+            False,
+            [
+                'f.obra_id',
+                'f.empresa_id',
+                'f.codigo_obra',
+                'f.clave_obra',
+                'f.nombre_obra',
+                'f.estado_obra',
+                'f.fecha_inicio_garantia',
+                'f.ultimo_cierre',
+                'f.fecha_fin_real',
+                'f.fecha_recepcion_provisional',
+                'f.fecha_fin_prevista',
+                'f.fecha_fin_obra',
+                'f.fuente_fin_obra',
+                '(f.fecha_fin_obra IS NULL AND COALESCE(f.estado_obra, 0) IN (19, 21, 23, 25)) AS terminada_sin_fin_obra',
+                'f.plazo_meses',
+                'f.fuente_plazo',
+                '(f.fecha_fin_obra + make_interval(months => f.plazo_meses))::DATE AS fecha_vencimiento',
+                'f.num_contratos_obra',
+            ],
+            [
+            ],
+        ),
+    ],
+    'retenciones.v_cuadre_proveedor': [
+        (
+            False,
+            [
+                's.proveedor_id',
+                'MAX(s.proveedor_nombre) AS proveedor_nombre',
+                'SUM(s.saldo) AS saldo_contable',
+                'SUM(s.saldo_anterior_2016) AS saldo_anterior_2016',
+            ],
+            [
+                'GROUP BY s.proveedor_id',
+            ],
+        ),
+        (
+            False,
+            [
+                'a.proveedor_id',
+                '-SUM(a.importe) AS prescrito',
+            ],
+            [
+                "WHERE a.es_prescripcion AND a.clase IN ('ALTA', 'BAJA')",
+                'GROUP BY a.proveedor_id',
+            ],
+        ),
+        (
+            False,
+            [
+                'entidad_id AS proveedor_id',
+                'MAX(entidad_nombre) AS proveedor_nombre',
+                'SUM(importe) AS viva_efectos',
+            ],
+            [
+                "WHERE sentido = 'PROVEEDOR' AND estado = 'VIVA' AND entidad_id IS NOT NULL",
+                'GROUP BY entidad_id',
+            ],
+        ),
+        (
+            False,
+            [
+                'COALESCE(c.proveedor_id, e.proveedor_id) AS proveedor_id',
+                'COALESCE(c.proveedor_nombre, e.proveedor_nombre) AS proveedor_nombre',
+                'COALESCE(c.saldo_contable, 0)::NUMERIC(18, 2) AS saldo_contable',
+                'COALESCE(e.viva_efectos, 0)::NUMERIC(18, 2) AS viva_efectos',
+                'COALESCE(c.saldo_anterior_2016, 0)::NUMERIC(18, 2) AS saldo_anterior_2016',
+            ],
+            [
+                'FULL JOIN efectos e ON e.proveedor_id = c.proveedor_id',
+            ],
+        ),
+        (
+            False,
+            [
+                'x.proveedor_id',
+                'x.proveedor_nombre',
+                'x.saldo_contable',
+                'x.viva_efectos',
+                '(x.saldo_contable - x.viva_efectos)::NUMERIC(18, 2) AS diferencia',
+                "CASE WHEN ABS(x.saldo_contable - x.viva_efectos) < 1 THEN 'CUADRA' WHEN ABS(x.viva_efectos) < 1 THEN 'SIN_EFECTOS_VIVOS' WHEN ABS(x.saldo_contable) < 1 THEN 'SIN_SALDO_CONTABLE' WHEN x.saldo_contable > x.viva_efectos THEN 'CONTABILIDAD_MAYOR' ELSE 'EFECTOS_MAYOR' END AS categoria",
+                'x.saldo_anterior_2016',
+                'COALESCE(p.prescrito, 0)::NUMERIC(18, 2) AS prescrito',
+            ],
+            [
+                'LEFT JOIN prescripciones p ON p.proveedor_id = x.proveedor_id',
+                'WHERE ABS(x.saldo_contable) >= 1 OR ABS(x.viva_efectos) >= 1',
+            ],
+        ),
+    ],
+    'retenciones.v_retencion_contable_obra': [
+        (
+            False,
+            [
+                's.proveedor_id',
+                's.proveedor_nombre',
+                's.obra_id',
+                's.empresa_id',
+                's.codigo_obra',
+                's.clave_obra',
+                's.nombre_obra',
+                's.saldo',
+                's.ultimo_movimiento',
+                'f.fecha_fin_obra',
+                'f.fuente_fin_obra',
+                'f.plazo_meses',
+                'f.fuente_plazo',
+                'f.fecha_vencimiento',
+                "CASE WHEN s.obra_id IS NULL THEN 'SIN_OBRA' WHEN f.fecha_vencimiento IS NULL THEN 'SIN_FIN_OBRA' WHEN f.fecha_vencimiento < CURRENT_DATE THEN 'VENCIDA' ELSE 'PENDIENTE' END AS estado_vencimiento",
+                '(f.fecha_vencimiento - CURRENT_DATE) AS dias_hasta_vencimiento',
+                'f.terminada_sin_fin_obra',
+            ],
+            [
+                'LEFT JOIN retenciones.fin_obra f ON f.obra_id = s.obra_id',
+                'WHERE s.saldo <> 0',
+            ],
+        ),
+    ],
+}
+
+
+@pytest.mark.parametrize("objeto", sorted(CONTRATO_SQL))
+def test_f095_contrato_expresion_a_expresion(objeto: str) -> None:
+    real = _contrato_real(objeto)
+    esperado = CONTRATO_SQL[objeto]
+    assert len(real) == len(esperado), f"{objeto}: cambio el numero de SELECT (CTE)"
+    for n, ((d_r, i_r, c_r), (d_e, i_e, c_e)) in enumerate(zip(real, esperado, strict=True), 1):
+        assert d_r == d_e, f"{objeto}, SELECT {n}: cambio el DISTINCT"
+        assert i_r == i_e, f"{objeto}, SELECT {n}: cambio una expresion proyectada"
+        assert c_r == c_e, f"{objeto}, SELECT {n}: cambio un JOIN, WHERE, GROUP BY o HAVING"
+
+
+def test_f095_contrato_control_el_parser_ve_lo_que_debe() -> None:
+    """Si el parser dejara de ver expresiones, el contrato pasaria en vacio."""
+    total = sum(len(i) for q in CONTRATO_SQL.values() for _, i, _ in q)
+    clausulas = sum(len(c) for q in CONTRATO_SQL.values() for _, _, c in q)
+    assert total >= 150 and clausulas >= 35
+    x = _contrato_real("retenciones.v_cuadre_proveedor")
+    assert "SUM(s.saldo) AS saldo_contable" in x[0][1]
+    assert "(x.saldo_contable - x.viva_efectos)::NUMERIC(18, 2) AS diferencia" in x[4][1]
