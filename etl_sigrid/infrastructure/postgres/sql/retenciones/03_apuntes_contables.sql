@@ -52,6 +52,22 @@ COMMENT ON TABLE retenciones.cuentas_proveedor IS
 -- cuenta), negativo es retencion que se devuelve o se da de baja (debe). Los
 -- dos lados van tambien por separado, sin signo, en importe_alta/importe_baja.
 -- `apunte_id` es clave primaria: nada de lo que se une aqui multiplica (R8).
+--
+-- CLASE DEL APUNTE (R4), evaluada en este orden:
+--   CIERRE         el concepto empieza por 'Asiento de cierre'
+--   SALDO_INICIAL  empieza por 'Asiento de apertura' y ESA CUENTA no tiene
+--                  cierre en el ejercicio anterior: es historia anterior a
+--                  Sigrid (la apertura de 2008, 642.775,50 EUR el 2026-09-22)
+--   APERTURA       apertura con cierre previo de la misma cuenta
+--   ALTA           importe > 0
+--   BAJA           importe <= 0
+-- En el agregado de estas cuentas la apertura de cada ejercicio es exactamente
+-- el cierre del anterior (2009-2026, al centimo), asi que sumar ALTA + BAJA +
+-- SALDO_INICIAL da el saldo contable sin contar dos veces (R5). Excluir TODAS
+-- las aperturas perderia la de 2008. La regla es por cuenta y no por fecha
+-- (D4): una cuenta nueva en otra empresa tendria su saldo inicial otro ano.
+-- `asi.ori` NO sirve para distinguirlos: vale 0 en todos.
+-- `es_prescripcion` MARCA (concepto con 'PRESCRI'), no filtra (R6).
 -- ============================================================================
 
 DROP TABLE IF EXISTS retenciones.apuntes_contables CASCADE;
@@ -72,6 +88,12 @@ WITH apuntes AS (
         NULLIF(a.cenide, 0)                                     AS centro_coste_id
     FROM raw.apu a
     JOIN retenciones.cuentas_proveedor cp ON cp.cuenta_id = a.cueide
+),
+-- Las cuentas con cierre en cada ejercicio: una fila por (cuenta, ejercicio)
+cierres_cuenta AS (
+    SELECT DISTINCT ap.cuenta_id, ap.ejercicio
+    FROM apuntes ap
+    WHERE ap.concepto LIKE 'Asiento de cierre%'
 )
 SELECT
     ap.apunte_id,
@@ -85,8 +107,18 @@ SELECT
     ap.importe_alta,
     ap.importe_baja,
     ap.importe,
+    CASE WHEN ap.concepto LIKE 'Asiento de cierre%' THEN 'CIERRE'
+         WHEN ap.concepto LIKE 'Asiento de apertura%' AND NOT EXISTS (
+              SELECT 1 FROM cierres_cuenta cc
+              WHERE cc.cuenta_id = ap.cuenta_id AND cc.ejercicio = ap.ejercicio - 1
+         ) THEN 'SALDO_INICIAL'
+         WHEN ap.concepto LIKE 'Asiento de apertura%' THEN 'APERTURA'
+         WHEN ap.importe > 0 THEN 'ALTA'
+         ELSE 'BAJA' END AS clase,
+    UPPER(COALESCE(ap.concepto, '')) LIKE '%PRESCRI%' AS es_prescripcion,
     ap.centro_coste_id
 FROM apuntes ap;
 
 ALTER TABLE retenciones.apuntes_contables ADD PRIMARY KEY (apunte_id);
 CREATE INDEX idx_ret_apc_proveedor ON retenciones.apuntes_contables (proveedor_id);
+CREATE INDEX idx_ret_apc_clase     ON retenciones.apuntes_contables (clase);
