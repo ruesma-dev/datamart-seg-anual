@@ -141,4 +141,35 @@ despues. Tras T2-T6: **34 passed**.
 
 ## Evidencias
 
-(Se completa con la salida real de `bash harness/init.sh` al cerrar; ver abajo.)
+- **`bash harness/init.sh`** tal cual, al cerrar (tras el commit T7): **ENTORNO
+  LISTO**, exit 0. `[OK] pytest en verde`, `[OK] PUERTA COBERTURA`, `[OK]
+  PUERTA TAMAÑO: F-107 dentro de los topes (impl 144/220)`, `[OK] Rama actual`;
+  avisos previos: ruff 232 (deuda previa) y la feature `blocked` F-052.
+- **Tests**: **5.295 passed, 193 skipped, 0 failed** (al arrancar: 5.246 /
+  191). `tests/test_f107_contrapartidas_cuentas.py`: **34 passed**.
+- **Tiempo de la suite**: **1.445,00 s (24 min 05 s)**, el que imprime pytest
+  dentro de `init.sh`; al arrancar la sesion fueron 569,94 s. La diferencia es
+  la maquina: habia otros procesos Python de otras sesiones en marcha. `init.sh`
+  se lanzo en primer plano; el Bash de la sesion lo movio a segundo plano al
+  agotar sus 600 s y se espero a su final.
+- **Cobertura de lineas cambiadas**: **94,7 %** (968/1022, umbral 80 %),
+  `PUERTA COBERTURA`. Se mide contra `dev`, que va por detras de `main`: la
+  cifra es la misma que la de F-102 porque incluye lineas de otras features.
+  F-107 solo cambia 14 lineas Python de produccion (la entrada nueva de
+  `SUB_PASOS` y el docstring), cubiertas por `test_f073_build_maestros_*` y
+  `test_f107_r2_el_paso_de_maestros_la_construye_la_ultima`.
+- **Mutacion**: `python -m harness.mutacion --feature F-107 --base main` ->
+  **CERO MUTANTES**: «el alcance tiene 14 linea(s) de produccion pero no se ha
+  generado ni un mutante» (son cadenas y una declaracion de dato); la
+  herramienta no escribe `progress/mutacion_F-107.md` a proposito. Evidencia
+  sustitutiva, **mutacion a mano** de esa entrada, una a una y restaurando con
+  `git checkout`, contra `tests/test_f073_pipeline.py` +
+  `tests/test_f107_contrapartidas_cuentas.py`: `sql_file` a `06_cuentas.sql`
+  -> 4 failed; `target_table` a `cuentas` -> 1 failed; `name` a `cuentas` -> 1
+  failed; borrar el sub-paso entero -> 3 failed. **4 generados, 4 muertos, 0
+  supervivientes.** El SQL y el YAML no son mutables por la herramienta: los
+  vigilan los 34 tests de texto (con la fase RED de arriba) y las lecturas en
+  solo lectura contra la base.
+- **Lo que no se ha verificado aqui**: el DDL real (crear la vista y anadir las
+  columnas escribe en el Postgres compartido) ni `raw.caa` ingerida: M1-M8 de
+  `progress/current.md`, del humano.
