@@ -21,6 +21,10 @@ spec) ya estaba en `main`. `sdd: true`, rigor `critico`. Ficha a `in_progress`.
   F-091»): el enlace factura -> asiento de F-091 es justo la fila con `asiide`.
 - Tarea en curso: ver la lista de `tasks.md` (se marca `[x]` al completar).
 
+**Diccionario del arbol tras F-095 (version 31): 172 objetos, 1183 columnas,
+76 de consumo.** Sin publicar: `publicar-diccionario` es escritura contra Azure
+y la lanza el humano (T25).
+
 ## 2026-09-24 · F-107 · CERRADA (`done`, APROBADO en pasada 2) · contrapartidas del recurso y catalogo de cuentas analiticas · DESPLEGADA · QUEDAN LAS MANUAL
 
 > **DESPLEGADA el 2026-09-24 a las 13:02 UTC con el tag `r20260924-1500`**

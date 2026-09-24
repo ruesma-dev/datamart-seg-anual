@@ -46,7 +46,7 @@ objetos:
       pagado al subcontratista; con sentido CLIENTE es dinero nuestro que el
       cliente todavia no nos ha pagado. Es la tabla base de todo el esquema.
 
-      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA** es el de la contabilidad (F-095):
       `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
       el detalle, y el cuadre entre los dos esta en
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
@@ -381,7 +381,7 @@ objetos:
       LECTURAS del saldo a la vista para que no haya que elegir a ciegas: la de
       estado (`saldo_vivo`) y la de signo (`neto_practicado`).
 
-      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA** es el de la contabilidad (F-095):
       `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
       el detalle, y el cuadre entre los dos esta en
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
@@ -521,7 +521,7 @@ objetos:
       posicion neta: cuanto retenemos a proveedores frente a cuanto nos retiene
       el cliente. Es la vista para "como esta la obra X en garantias".
 
-      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA** es el de la contabilidad (F-095):
       `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
       el detalle, y el cuadre entre los dos esta en
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
@@ -634,7 +634,7 @@ objetos:
       trabajo: cada fila es una retencion concreta que habra que liberar o
       reclamar.
 
-      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA** es el de la contabilidad (F-095):
       `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
       el detalle, y el cuadre entre los dos esta en
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
@@ -731,7 +731,7 @@ objetos:
       tramo de antiguedad para priorizar. En sentido CLIENTE es dinero que hay
       que reclamar; en PROVEEDOR, dinero que habria que haber liberado.
 
-      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA** es el de la contabilidad (F-095):
       `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
       el detalle, y el cuadre entre los dos esta en
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
@@ -829,7 +829,7 @@ objetos:
       para comprobar que una cifra de detalle tiene sentido antes de darla por
       buena.
 
-      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA** es el de la contabilidad (F-095):
       `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
       el detalle, y el cuadre entre los dos esta en
       `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el

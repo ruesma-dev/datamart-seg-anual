@@ -12,6 +12,17 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 31 (F-095, 2026-09-24): LA RETENCION DE PROVEEDOR DESDE LA CONTABILIDAD.
+# El saldo vivo a proveedor lo manda la contabilidad: `retenciones.saldo_contable`
+# (por proveedor y obra, con fila sin obra; ~8,76 M EUR), sobre
+# `retenciones.apuntes_contables` (los apuntes de las cuentas `prv.cueretide`,
+# con clase CIERRE/APERTURA/SALDO_INICIAL/ALTA/BAJA y obra por cascada) y
+# `retenciones.cuentas_proveedor`. Cuadre con los efectos en
+# `retenciones.v_cuadre_proveedor`; vencimiento desde el FIN DE OBRA (inicio de
+# garantia o ultimo cierre + 1 mes, mas el plazo del cliente o 12) en
+# `retenciones.fin_obra` y `retenciones.v_retencion_contable_obra`. Entra
+# `raw.rac` filtrada a `asiide <> 0` (la ingesta pasa a 71 tablas).
+#
 # version 30 (F-107, 2026-09-24): LA CONTRAPARTIDA DEL RECURSO Y EL CATALOGO DE
 # CUENTAS ANALITICAS. `personal.recursos` gana `centro_coste_contrapartida_id` y
 # `cuenta_analitica_contrapartida_id`: el centro y la cuenta contra los que se
@@ -322,7 +333,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 30
+version: 31
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -441,6 +452,10 @@ reglas:
       - personal.partes
       - personal.recursos
       - retenciones.movimientos
+      - retenciones.apuntes_contables
+      - retenciones.saldo_contable
+      - retenciones.fin_obra
+      - retenciones.v_retencion_contable_obra
       - maestro.centros_coste
       - compras.contratos
       - compras.albaran_lineas
@@ -834,7 +849,22 @@ reglas:
 # cazar el error de retenciones en el prototipo.
 
 ordenes_de_magnitud:
-  - concepto: Retenido VIVO a proveedores, pendiente de devolver, en toda la empresa
+  - concepto: >-
+      Retenido VIVO a proveedores segun la CONTABILIDAD, la cifra que manda
+      (`retenciones.saldo_contable`, suma de `saldo`)
+    valor_aproximado: 8760000
+    unidad: EUR
+    criterio: saldo_vivo
+    fuente: >-
+      Medido el 2026-09-22 en Sigrid en solo lectura (F-095, consulta B1 de
+      progress/spec_F-095.md): 8.760.524,49 EUR, el saldo de todas las cuentas
+      `prv.cueretide`; remedido el 2026-09-24 en el datamart con la regla de
+      `sql/retenciones/03_apuntes_contables.sql`: 8.775.052,87 EUR. Es la suma
+      de ALTA, BAJA y SALDO_INICIAL; **una cifra del orden de 60 M EUR** es que
+      se han sumado los asientos de cierre o de apertura (52,12 M EUR por lado).
+      Los efectos vivos dan 8,35 M EUR: la diferencia se explica proveedor a
+      proveedor en `retenciones.v_cuadre_proveedor`.
+  - concepto: Retenido VIVO a proveedores segun los EFECTOS (el detalle; manda la contabilidad)
     valor_aproximado: 8350000
     unidad: EUR
     criterio: saldo_vivo
@@ -1050,7 +1080,11 @@ esquemas:
     para_que_sirve: >-
       Un registro por efecto de retencion, en los dos sentidos: lo retenido a
       proveedores y lo que los clientes nos retienen. Con saldo vivo, fechas
-      prevista y real de liquidacion, y marca de vencida sin liquidar.
+      prevista y real de liquidacion, y marca de vencida sin liquidar. Desde
+      F-095, la retencion de PROVEEDOR desde la contabilidad: el saldo vivo que
+      MANDA es `retenciones.saldo_contable` (por proveedor y obra), cuadrado con
+      los efectos en `retenciones.v_cuadre_proveedor`, y su vencimiento desde el
+      fin de obra en `retenciones.v_retencion_contable_obra`.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_retenciones]
