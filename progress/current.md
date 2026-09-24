@@ -9,7 +9,12 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-24 · F-107 · CERRADA (`done`, APROBADO en pasada 2) · contrapartidas del recurso y catalogo de cuentas analiticas · QUEDAN LAS MANUAL Y EL DESPLIEGUE
+## 2026-09-24 · F-107 · CERRADA (`done`, APROBADO en pasada 2) · contrapartidas del recurso y catalogo de cuentas analiticas · DESPLEGADA · QUEDAN LAS MANUAL
+
+> **DESPLEGADA el 2026-09-24 a las 13:02 UTC con el tag `r20260924-1500`**
+> (construida desde `main` b483e49; el job pasa de `r20260924-0915` a
+> `r20260924-1500`). Build a mano pendiente del humano: primero
+> `ingest --table caa --full`, luego `build-maestros` y `build-personal`.
 
 Rama `feature/F-107-contrapartidas-cuentas-analiticas` (desde `main` con F-101 y
 F-102). `sdd: false`, rigor `estandar`. `bash harness/init.sh` en verde al
