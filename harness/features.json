@@ -1714,7 +1714,7 @@
         "Diccionario con fichas y relaciones nuevas, `tables_sigrid.yaml`, recuentos de raw y `azure-apps/datamart_seg_anual.md` actualizados en el mismo trabajo",
         "AMPLIACION (decision del humano, 2026-09-24): `personal.partes_lineas` publica `cuenta_analitica_id` (la cuenta de cargo de la linea, desde `hmores.caaide` con NULLIF 0, por ADD COLUMN IF NOT EXISTS), con su ficha, su relacion a `maestro.cuentas_analiticas`, medido cuantas lineas la traen y casan con el catalogo y el efecto en el tiempo del sub-paso"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": false,
       "rigor": "estandar",
       "priority": 1,
