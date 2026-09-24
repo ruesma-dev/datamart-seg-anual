@@ -36,4 +36,4 @@ son la propagacion; T21-T26 cierran.
 - [ ] T23: Fotos ANTES del plan de `design.md` (saldo 1958889 por `cenide`, total de cuentas 8.760.524,49, FERMALUX en `v_pbi_retencion_entidad` tras F-094).  |  Verificacion: MANUAL (humano) — consultas K2 y B1 de `progress/spec_F-095.md` por `sigrid-api` y el MCP
 - [ ] T24: Ingesta de `rac` y build: `python main.py ingest --table rac --full` (o la nocturna), `python main.py build-retenciones`, y los puntos DESPUES 1-5 del plan (R5 sin violaciones, FERMALUX `CUADRA` 64.201,96, repartos contra Medidas, ~97 % del vivo con fin de obra).  |  Verificacion: MANUAL (humano) en el entorno que el humano autorice
 - [ ] T25: `python main.py check-raw-recuentos`, `check-declarados`, `check-unicidad`, `check-relaciones`, `check-diccionario`, y la pregunta del caso de uso 3 por el MCP; despues `python main.py publicar-diccionario`.  |  Verificacion: MANUAL (humano) — publicar es escritura contra Azure y la autoriza el humano
-- [ ] T26: Ejecutar `bash harness/init.sh` en verde.  |  Verificacion: `bash harness/init.sh`
+- [x] T26: Ejecutar `bash harness/init.sh` en verde.  |  Verificacion: `bash harness/init.sh`

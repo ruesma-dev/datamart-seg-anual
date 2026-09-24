@@ -37,11 +37,11 @@ sin cambios, verificado por test (R27, R29).
 **Tests**: nuevo `tests/test_f095_retenciones_contables.py` (54 funciones, 66
 casos con parametrizacion, offline). Tocados: `test_f066`/`test_f074`
 (`TOTAL_TABLAS` 71), `test_f107` (los pines de 70 pasan a `>= 70`),
-`test_f047_steps.py` (lista completa de ficheros del paso).
+`test_f047_steps.py` (lista completa de ficheros del paso), `test_f079` (inventario de lo que no es consumo).
 
 ## Decisiones de diseno y desviaciones
 
-Detalle y justificacion en `progress/current.md` §F-095 «Desviaciones» (8
+Detalle y justificacion en `progress/current.md` §F-095 «Desviaciones» (9
 puntos). Resumen: censo 70 -> 71 (la spec decia 68 -> 69, anterior a F-102 y
 F-107); SALDO_INICIAL como anti-join (misma semantica; el `NOT EXISTS` dentro
 del CASE costaba 2,7e11 en el EXPLAIN); FACTURA estricta (un efecto sin centro
@@ -123,7 +123,58 @@ la vista).
 
 ## Evidencias
 
-EVIDENCIAS_PENDIENTES
+- **`bash harness/init.sh`** tal cual, rama `feature/F-095-...` en `dbe7613`+`83ada78`+`951d65e`:
+  `[OK] pytest en verde`, `[OK] PUERTA COBERTURA: 94.7% de 1022 lineas cambiadas
+  (968/1022, umbral 80%, nivel critico)`, `[OK] PUERTA TAMANO` (impl 140/220),
+  `[OK] Rama actual`, **ENTORNO LISTO**, exit 0. Avisos previos: ruff 232 (deuda
+  ajena; los ficheros de F-095 pasan `ruff check` limpios) y F-052 `blocked`.
+  La cobertura se mide contra `dev` (muy por detras): incluye lineas de otras
+  features; las 38 lineas Python de F-095 las cubren `test_f095_r27_*` y `test_f047_*`.
+- **Tests**: **5.417 passed, 203 skipped, 0 failed**. `test_f095_retenciones_contables.py`: 66 casos, verdes.
+  Una pasada anterior de `init.sh` (con `-x`) paro en `test_f079_r3_el_inventario...`
+  (desviacion 9 de `current.md`): arreglado en `dbe7613` y el resto de la suite
+  (ficheros `test_f079*` en adelante, 994 passed) confirmado antes de relanzar.
+- **Tiempo de la suite**: **2.190,84 s** (36 min 31 s) con cobertura, maquina
+  compartida con otra `init.sh` de `albaranes` en paralelo.
+- **Mutacion**: `python -m harness.mutacion --feature F-095 --base main` ->
+  **CERO MUTANTES** («38 linea(s) de produccion pero no se ha generado ni un
+  mutante»: docstring, comentarios y la declaracion de `SUB_PASOS`); no escribe
+  `progress/mutacion_F-095.md`. `--base main` porque `dev` va 490 commits por
+  detras. Sustituta: **campana MANUAL, 1 worker, en serie**, un mutante cada vez
+  con restauracion por `git checkout`, contra `tests/test_f095_retenciones_contables.py`
+  + `tests/test_f047_steps.py` (script `f095/mut.py` del scratchpad). Incluye el
+  SQL, que la herramienta no cubre:
+
+| # | fichero | original -> mutado | tests en rojo |
+|---|---|---|---|
+| 1 | `build_retenciones_step.py` | `sql_file="03_apuntes_contables.sql"` -> `sql_file="03_apuntes.sql"` | 5 |
+| 2 | `build_retenciones_step.py` | `target_table="apuntes_contables"` -> `target_table="apuntes"` | 2 |
+| 3 | `build_retenciones_step.py` | `target_table="saldo_contable"` -> `target_table="saldo"` | 2 |
+| 4 | `build_retenciones_step.py` | `name="fin_obra"` -> `name="fin"` | 2 |
+| 5 | `build_retenciones_step.py` | `sql_file="05_fin_obra.sql",         target_schema="retenciones"` -> `sql_file="05_fin_obra.sql",         target_schema="cierre"` | 3 |
+| 6 | `build_retenciones_step.py` | `    _SubStep(name="views_contables", sql_file="06_views_contables.sql"` -> `` | 3 |
+| 7 | `03_apuntes_contables.sql` | `AND cc.cuenta_id IS NULL THEN 'SALDO_INICIAL'` -> `THEN 'SALDO_INICIAL'` | 1 |
+| 8 | `03_apuntes_contables.sql` | `WHEN ap.importe > 0 THEN 'ALTA'` -> `WHEN ap.importe >= 0 THEN 'ALTA'` | 1 |
+| 9 | `03_apuntes_contables.sql` | `AND ef.num_centros = 1` -> `` | 1 |
+| 10 | `03_apuntes_contables.sql` | `HAVING COUNT(DISTINCT p.cenide) = 1` -> `HAVING COUNT(DISTINCT p.cenide) >= 1` | 1 |
+| 11 | `03_apuntes_contables.sql` | `WHERE COALESCE(prv.cueretide, 0) <> 0` -> `WHERE COALESCE(prv.cueretide, 0) <> 0 AND prv.ide > 0` | 0 -> **1** tras endurecer `test_f095_r1` (ver abajo) |
+| 12 | `04_saldo_contable.sql` | `FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL')), 0)::NUMER` -> `FILTER (WHERE a.clase IN ('ALTA', 'BAJA', 'SALDO_INICIAL', 'APERTURA')` | 1 |
+| 13 | `04_saldo_contable.sql` | ` NULLS NOT DISTINCT` -> `` | 1 |
+| 14 | `05_fin_obra.sql` | `WHERE f.ejecutado_mes <> 0` -> `` | 1 |
+| 15 | `05_fin_obra.sql` | `INTERVAL '2 months'` -> `INTERVAL '1 month'` | 1 |
+| 16 | `05_fin_obra.sql` | `COALESCE(oc.plazo_retencion, oc.plazo_garantia, k.plazo_fijo_meses)` -> `COALESCE(oc.plazo_garantia, oc.plazo_retencion, k.plazo_fijo_meses)` | 1 |
+| 17 | `05_fin_obra.sql` | `IF NOT EXISTS (SELECT 1 FROM cierre.fact_cierre_mensual) THEN` -> `IF FALSE THEN` | 1 |
+| 18 | `05_fin_obra.sql` | `(19, 21, 23, 25)` -> `(19, 21, 23)` | 1 |
+| 19 | `06_views_contables.sql` | `estado = 'VIVA'` -> `estado <> 'BAJA'` | 1 |
+| 20 | `06_views_contables.sql` | `WHEN ABS(x.saldo_contable - x.viva_efectos) < 1 THEN 'CUADRA'` -> `WHEN ABS(x.saldo_contable - x.viva_efectos) < 10 THEN 'CUADRA'` | 1 |
+| 21 | `06_views_contables.sql` | `FULL JOIN efectos e` -> `LEFT JOIN efectos e` | 1 |
+| 22 | `06_views_contables.sql` | `WHEN f.fecha_vencimiento < CURRENT_DATE THEN 'VENCIDA'` -> `WHEN f.fecha_vencimiento <= CURRENT_DATE THEN 'VENCIDA'` | 1 |
+
+  **22 generados, 22 muertos, 0 supervivientes.** El unico superviviente de la
+  primera pasada (#11, un filtro anadido a las cuentas) era un hueco real del
+  test, no un equivalente: `test_f095_r1` exigia que el filtro estuviera, no que
+  fuera el UNICO. Endurecido (`endswith`) en `83ada78`; reejecutado el #11: 1
+  failed. No se quito ningun codigo defensivo para matar mutantes.
 
 ## Lo que queda fuera del alcance
 
@@ -133,6 +184,8 @@ lider quien cambia su ficha. No se toca `01_movimientos.sql` ni `02_views.sql`
 base ni contra Sigrid.
 
 ## Lo que falta (del humano)
+
+T21, T22 y T26 hechas (arriba).
 
 T23-T25 = M1-M6 de `progress/current.md` §F-095, con comandos y resultados
 esperados: foto ANTES, `ingest --table rac --full`, `build-retenciones` +
