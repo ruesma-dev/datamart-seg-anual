@@ -47,8 +47,8 @@ Contra **Sigrid** por `sigrid-api` (`leer_sql`, validador de solo lectura):
   cuentas: hoy son 8 y 847 (la cifra se mueve con las altas y bajas).
 - **`reshor.caaide`**: 3.199 de 8.968 filas, 50 cuentas, 0 huerfanas, 0 de
   otra empresa. `res.caaide` vale 0 en todas.
-- **`hmores.caaide`** (la cuenta de la linea de parte): 310.552 de 331.002
-  lineas, 3.782 cuentas. **No** se publica (ver «Fuera de alcance»).
+- **`hmores.caaide`** (la cuenta de la linea de parte): se publica en la
+  ampliacion (seccion «Ampliacion», abajo).
 
 Contra el **Postgres de produccion**, `filas_solo_lectura` (transaccion
 `READ ONLY` con `statement_timeout`), sin escribir nada:
@@ -99,10 +99,6 @@ Contra el **Postgres de produccion**, `filas_solo_lectura` (transaccion
 
 ## Fuera de alcance / pendiente
 
-- **`personal.partes_lineas` no gana cuenta analitica.** La descripcion pedia
-  la relacion «si trae cuenta», y hoy no la publica; el origen si la tiene
-  (`hmores.caaide`, 93,8 % de las lineas). Anadirla toca el hecho de 331.000
-  filas y sus guardas: **propuesta para el humano, feature aparte**.
 - `cag` (grupos analiticos, 18.499) no se ingiere: su codigo y nombre ya salen
   de `con`; su jerarquia propia (padre del padre) no esta.
 - La lista «Diez tablas son Propiedades de `con`» de `R-SIGRID-CON` no incluye
@@ -111,6 +107,50 @@ Contra el **Postgres de produccion**, `filas_solo_lectura` (transaccion
   resultado esperado): ingesta de `caa`, builds, recuentos, casamiento,
   `check-*`, `publicar-diccionario` (version 30) y reinicio del MCP. Push de la
   rama y de `azure-apps`: del humano.
+
+## Ampliacion (decision del humano, 2026-09-24): la cuenta de cada linea
+
+El reviewer se paro y la cuenta analitica de la linea de parte entro en F-107
+(criterio nuevo en `acceptance`, `BACKLOG.md` regenerado). Tareas T8-T11,
+commits `755525d` (RED), `dfe2f7e` (SQL), `d7177d9` (fichas y acceptance);
+`azure-apps` `25cc649` (local, sin push).
+
+- **Cambio**: `personal.partes_lineas` gana `cuenta_analitica_id` BIGINT =
+  `NULLIF(l.caaide, 0)`, al final del INSERT y del `CREATE TABLE` (detras de
+  `_built_at`, donde la deja el `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` en
+  la tabla que ya existe). Sin JOIN: los guardas de F-057 (`raw.hmo` vetado,
+  obra de la linea, centro de coste vetado) y de F-101 (`raw.con` por
+  `hmoide`, texto) siguen en verde sin tocarlos. Ficha de la columna,
+  relacion N:1 a `maestro.cuentas_analiticas` (y su inversa 1:N en el
+  catalogo), textos de `recursos`, del catalogo, de `00_global` (sigue la
+  version 30: no se ha publicado) y de ARCHITECTURE.
+- **Medido en Sigrid** (solo lectura): informada en **310.553 de 331.003**
+  lineas (93,8 %); sin ella, 20.450 lineas y 4,62 M EUR de 98,33 M EUR.
+  **3.782** cuentas, **0 huerfanas** contra `caa`, 0 de otra empresa que el
+  recurso. En **309.182** el codigo de la cuenta empieza por el codigo de la
+  obra de la linea: es la cuenta de CARGO del centro de la obra. Solo 45
+  lineas llevan la contrapartida del recurso, y 1.365 la cuenta de su tipo
+  de hora en la ficha.
+- **Medido en produccion** (`filas_solo_lectura`, READ ONLY): `raw.hmores` ya
+  trae `caaide` (331.002 filas, 310.552 informadas, 3.782 distintas): no hace
+  falta ingesta nueva. **Tiempo**: el SELECT completo del sub-paso, forzando
+  todas las columnas, **3,05-3,13 s sin la columna y 3,06-3,21 s con ella**
+  (dos pasadas de cada, la primera en frio 4,93 s): el efecto es de ruido. La
+  escritura suma 8 bytes por fila (~2,6 MB); sobre los ~9 s actuales del
+  sub-paso no se espera cambio medible. La cifra real sale del primer build
+  (M5b de `progress/current.md`).
+- **RED** (`python -m pytest tests/test_f107_contrapartidas_cuentas.py -q -p no:cacheprovider -k r5`):
+
+```
+E       AssertionError: personal.partes_lineas gana cuenta_analitica_id con ADD COLUMN IF NOT EXISTS (R5)
+E       AssertionError: assert 'texto_linea' == 'cuenta_analitica_id'
+E       AssertionError: assert '_built_at' == 'cuenta_analitica_id'
+E       AssertionError: falta la relacion de la cuenta de la linea (R5)
+E       AssertionError: el criterio nuevo va en acceptance (R5)
+5 failed, 34 deselected in 0.51s
+```
+
+  Tras T9-T10: **39 passed** en el fichero.
 
 ## Fase RED
 
