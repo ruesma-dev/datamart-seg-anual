@@ -186,7 +186,7 @@ despues. Tras T2-T6: **34 passed**.
   (impl 215/220)`, `[OK] Rama actual`; avisos previos: ruff 232 y F-052.
 - **Tests**: **5.300 passed, 193 skipped, 0 failed** (antes de la ampliacion
   5.295; al arrancar 5.246). `test_f107_contrapartidas_cuentas.py`: **39 passed**.
-- **Tiempo de la suite**: **1.222,42 s (20 min 22 s)** (antes: 1.445,00 s; al
+- **Tiempo de la suite**: **1.222,42 s**; tras los cambios de la review, **1.348,63 s** (5.300 passed, verde) (antes: 1.445,00 s; al
   arrancar 569,94 s: la maquina compartia CPU con otras sesiones). El Bash lo
   paso a segundo plano a los 600 s y se espero a su final.
 - **Cobertura de lineas cambiadas**: **94,7 %** (968/1022, umbral 80 %), medida
