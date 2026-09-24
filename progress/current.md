@@ -9,6 +9,23 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-24 · F-108 · SPEC LISTA (`spec_ready`) · claves alternativas en el diccionario y en `check-unicidad`
+
+Spec en `specs/F-108-claves-alternativas/`, escrita en la rama
+`feature/F-108-claves-alternativas` (desde `main`, en un worktree aparte
+mientras F-095 sigue en el arbol principal). Ficha: `sdd: true`, `spec_ready`.
+Opcion B del humano: `claves_alternativas` en la ficha; `check-unicidad` las
+comprueba y avisa (no esta en `run-all`, asi que la nocturna no cambia); el
+validador R5 las acepta como lado 1; las cinco relaciones de `compras` por
+`clave_obra` pasan a `N:1`. Ningun SQL se toca.
+
+**Pendiente de la PARADA 1 (el humano valida antes de T1)**: decisiones D1-D5
+(NULL excluidos; KO de alternativa sale con 1; cuatro candidatas extra; `mcp-bbdd`
+fuera; version 31 frente a F-095). Hallazgo H1, fuera de alcance:
+`(obra_id, codigo_partida)` NO es unico en `stg.partidas` (5.203 pares
+repetidos, 159 obras) y tres fichas dicen que si. Detalle en
+`progress/spec_F-108.md`.
+
 ## 2026-09-24 · F-107 · CERRADA (`done`, APROBADO en pasada 2) · contrapartidas del recurso y catalogo de cuentas analiticas · DESPLEGADA · QUEDAN LAS MANUAL
 
 > **DESPLEGADA el 2026-09-24 a las 13:02 UTC con el tag `r20260924-1500`**
