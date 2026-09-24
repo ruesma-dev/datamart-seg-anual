@@ -65,3 +65,16 @@ partida solo son unicos dentro de su obra») y
 `mart.fact_seguimiento_mensual.codigo_partida` («unico por obra»). Puede tener
 que ver con el colapso de capitulos en blanco de F-052, pero no se ha
 investigado.
+
+## APROBADA (humano, 2026-09-24)
+
+Las cinco decisiones con la recomendacion: D1 las filas con NULL en una clave
+alternativa se excluyen de la comprobacion; D2 una clave alternativa rota hace
+salir `check-unicidad` con codigo 1, como la de negocio; D3 SI se declaran las
+cuatro claves extra (`maestro.v_obra_fichas.clave_obra`,
+`maestro.cuentas_analiticas (empresa_id, codigo_cuenta)`,
+`maestro.centros_coste (empresa, codigo_centro)`, `stg.obras.codigo_obra`); D4
+servir las claves al agente es feature aparte en `mcp-bbdd` (texto entregado al
+humano para llevarlo alli); D5 quien fusione segundo con F-095 toma la version
+siguiente del diccionario. El hallazgo H1 (partidas no unicas por obra y codigo)
+se ficha como feature propia (F-109).
