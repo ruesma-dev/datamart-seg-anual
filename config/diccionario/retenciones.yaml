@@ -45,6 +45,13 @@ objetos:
       direcciones. Con sentido PROVEEDOR es dinero nuestro que todavia no hemos
       pagado al subcontratista; con sentido CLIENTE es dinero nuestro que el
       cliente todavia no nos ha pagado. Es la tabla base de todo el esquema.
+
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
+      el detalle, y el cuadre entre los dos esta en
+      `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
+      vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
+      esta en `retenciones.v_retencion_contable_obra`.
     grano: >-
       UNA FILA POR EFECTO, no por linea de factura, y su clave es el par
       (`sentido`, `movimiento_id`): el identificador solo es unico dentro de su
@@ -181,7 +188,13 @@ objetos:
         unidad: EUR
         agregacion: suma
       fecha_prevista_devolucion:
-        significado: Cuando estaba previsto liberar o cobrar la retencion.
+        significado: >-
+          Cuando estaba previsto liberar o cobrar la retencion SEGUN SIGRID: la
+          fecha de la factura + 15 meses en el 97,8 % de los efectos de
+          proveedor. NO es el vencimiento desde el fin de obra que decidio el
+          humano el 2026-09-22 (F-095): ese esta en
+          `retenciones.v_retencion_contable_obra.fecha_vencimiento`, fin de
+          obra + plazo. Esta columna no se toca (R25).
         nulo_significa: El efecto no tiene fecha de vencimiento informada.
         agregacion: no_sumable
       fecha_devolucion_real:
@@ -367,6 +380,13 @@ objetos:
       El saldo de retenciones con cada proveedor y con cada cliente, con LAS DOS
       LECTURAS del saldo a la vista para que no haya que elegir a ciegas: la de
       estado (`saldo_vivo`) y la de signo (`neto_practicado`).
+
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
+      el detalle, y el cuadre entre los dos esta en
+      `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
+      vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
+      esta en `retenciones.v_retencion_contable_obra`.
     grano: >-
       Una fila por (`sentido`, `entidad_id`), que es su clave de negocio. Los
       efectos sin entidad informada quedan FUERA de esta vista, asi que su total
@@ -500,6 +520,13 @@ objetos:
       Las retenciones de cada obra en LAS DOS DIRECCIONES a la vez, con la
       posicion neta: cuanto retenemos a proveedores frente a cuanto nos retiene
       el cliente. Es la vista para "como esta la obra X en garantias".
+
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
+      el detalle, y el cuadre entre los dos esta en
+      `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
+      vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
+      esta en `retenciones.v_retencion_contable_obra`.
     grano: >-
       Una fila por (`obra_id`, `codigo_obra`, `nombre_obra`), que es su clave de
       negocio y son TRES columnas, no una. No basta con `obra_id`: en
@@ -606,6 +633,13 @@ objetos:
       El detalle, efecto a efecto, de todo lo que sigue retenido. Es la lista de
       trabajo: cada fila es una retencion concreta que habra que liberar o
       reclamar.
+
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
+      el detalle, y el cuadre entre los dos esta en
+      `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
+      vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
+      esta en `retenciones.v_retencion_contable_obra`.
     grano: >-
       Una fila por efecto vivo, en los dos sentidos; su clave es el par
       (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
@@ -696,6 +730,13 @@ objetos:
       Las retenciones cuya fecha prevista ya paso y que siguen vivas, con un
       tramo de antiguedad para priorizar. En sentido CLIENTE es dinero que hay
       que reclamar; en PROVEEDOR, dinero que habria que haber liberado.
+
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
+      el detalle, y el cuadre entre los dos esta en
+      `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
+      vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
+      esta en `retenciones.v_retencion_contable_obra`.
     grano: >-
       Una fila por efecto vencido y sin liquidar; su clave es el par
       (`sentido`, `movimiento_id`), porque el identificador solo es unico dentro
@@ -787,6 +828,13 @@ objetos:
       y con cuanto queda sin atribuir a obra. Es la vista de contraste: sirve
       para comprobar que una cifra de detalle tiene sentido antes de darla por
       buena.
+
+      **EL SALDO VIVO A PROVEEDOR QUE MANDA ES EL DE LA CONTABILIDAD** (F-095):
+      `retenciones.saldo_contable`, por proveedor y obra; esto son los efectos,
+      el detalle, y el cuadre entre los dos esta en
+      `retenciones.v_cuadre_proveedor`. Y `fecha_prevista_devolucion` es el
+      vencimiento de Sigrid (factura + 15 meses), no el de fin de obra, que
+      esta en `retenciones.v_retencion_contable_obra`.
     grano: Dos filas, una por sentido. Cubre TODOS los efectos, con y sin obra.
     clave_negocio: [sentido]
     paso_etl: build_retenciones
@@ -882,6 +930,614 @@ objetos:
     ejemplos_preguntas:
       - Cuanta retencion viva tenemos en total con proveedores
       - Cuantos efectos de retencion se quedan sin obra
+
+  # -------------------------------------------------------------------------
+  # F-095 · LA RETENCION DE PROVEEDOR DESDE LA CONTABILIDAD
+  # -------------------------------------------------------------------------
+
+  cuentas_proveedor:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el catalogo de cuentas del que parte el build de la retencion contable:
+      dice que cuenta es de que proveedor, pero no trae importes. Para el saldo
+      se consulta `retenciones.saldo_contable`.
+    descripcion: >-
+      Las cuentas contables de retencion de cada proveedor (F-095): una fila por
+      proveedor que declara cuenta de retencion en Sigrid (`prv.cueretide`), con
+      el codigo y el nombre de la cuenta. Las cuentas se eligen por lo que
+      declara el proveedor y NUNCA por prefijo: ademas de las familias 4008,
+      4108 y 4180 aparecen 4038 (0,90 M EUR) y 4128, que una lista escrita
+      dejaba fuera. 2.247 cuentas el 2026-09-22 y 2.250 el 2026-09-24, 1:1 con
+      el proveedor.
+    grano: >-
+      Una fila por proveedor con cuenta de retencion. `proveedor_id` es clave
+      primaria y `cuenta_id` es unica: si Sigrid llegara a compartir una cuenta
+      entre dos proveedores, el build falla en vez de duplicar apuntes.
+    clave_negocio: [proveedor_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      proveedor_id:
+        significado: Proveedor de Sigrid (`prv.ide`), el mismo identificador que `maestro.proveedores`.
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre del proveedor, de su ficha en `raw.con`.
+      cuenta_id:
+        significado: >-
+          La cuenta contable de retencion del proveedor (`prv.cueretide`). Es la
+          cuenta de `raw.apu.cueide` de sus apuntes.
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: Codigo de la cuenta tal y como se ve en la contabilidad (p. ej. 4108005478).
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      nombre_cuenta:
+        significado: Nombre de la cuenta en el plan contable, de `raw.con`.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      familia:
+        significado: >-
+          Los cuatro primeros digitos del codigo de la cuenta (4008, 4108,
+          4180, 4038, 4128...). SOLO descriptiva: no se usa para elegir cuentas.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+    relaciones:
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "1:1"
+        porque: Para el CIF y la direccion del proveedor de la cuenta.
+    ejemplos_preguntas: []
+
+  apuntes_contables:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el detalle apunte a apunte, con los cierres y aperturas dentro: sumar
+      aqui sin filtrar `clase` multiplica el saldo. El saldo ya agregado y sin
+      esa trampa esta en `retenciones.saldo_contable`.
+    descripcion: >-
+      Los apuntes contables de las cuentas de retencion de proveedor (F-095):
+      una fila por apunte de `raw.apu` sobre las cuentas de
+      `retenciones.cuentas_proveedor`, SIN FILTRAR NINGUNO, con su clase y su
+      obra. 49.505 apuntes el 2026-09-22 (Sigrid) y 49.511 el 2026-09-24
+      (datamart). `importe` = haber - debe: positivo es retencion que se
+      practica y negativo la que se devuelve o se da de baja.
+
+      **LA TRAMPA: los asientos de cierre y apertura.** Cada ejercicio cierra y
+      reabre estas cuentas (8.870 apuntes de cierre y 8.870 de apertura, 52,12 M
+      EUR por lado el 2026-09-24). Sumar sin filtrar `clase` los mezcla; el
+      saldo es `SUM(importe)` de `ALTA`, `BAJA` y `SALDO_INICIAL`. La apertura
+      de 2008 no tiene cierre previo: es la historia anterior a Sigrid
+      (642.775,50 EUR, 72 apuntes) y por eso es `SALDO_INICIAL` y cuenta.
+      Medido el 2026-09-24: por cada una de las 2.250 cuentas, ALTA + BAJA +
+      SALDO_INICIAL da exactamente la suma de todos sus apuntes (0 cuentas
+      fuera).
+
+      **LA OBRA, por cascada** (`via_obra`): APUNTE (el centro del propio
+      apunte), FACTURA (el asiento -> `raw.rac` -> la factura -> sus efectos de
+      retencion, solo si todos llevan el mismo centro), EFECTO (el documento
+      del asiento es un efecto de pago), PROVEEDOR_UNA_OBRA (el proveedor tiene
+      todos sus efectos de retencion en un solo centro) y SIN_OBRA. Cada salto
+      acaba en un centro de coste que se traduce a obra SOLO por
+      `maestro.centros_coste`. Medido en la spec (2026-09-22, Sigrid): las
+      altas con obra son el 97,2 % del importe (10,8 % sin `rac`) y las bajas
+      el 77,5 % con PROVEEDOR_UNA_OBRA. El reparto real por `via_obra` se mide
+      tras el primer build con `rac` (verificacion MANUAL).
+    grano: >-
+      Una fila por apunte contable, y `apunte_id` es clave primaria: ningun
+      salto de la cascada multiplica (cada uno se une a algo unico por su
+      clave). Incluye cierres y aperturas: filtrar `clase` es obligatorio al
+      sumar.
+    clave_negocio: [apunte_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      apunte_id:
+        significado: Identificador del apunte en Sigrid (`apu.ide`).
+        agregacion: no_sumable
+      asiento_id:
+        significado: Asiento contable del apunte (`apu.asiide`).
+        agregacion: no_sumable
+        nulo_significa: El apunte no tiene asiento informado.
+      fecha:
+        significado: Fecha contable del apunte (`apu.fec`, que es la del asiento en el 99,99 %).
+        agregacion: no_sumable
+      ejercicio:
+        significado: Ano de la fecha contable. Es con el que se empareja un cierre con la apertura siguiente.
+        agregacion: no_sumable
+      cuenta_id:
+        significado: La cuenta de retencion del apunte (`apu.cueide`).
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: Codigo legible de esa cuenta contable.
+        nulo_significa: La cuenta no tiene ficha en `raw.con`.
+      proveedor_id:
+        significado: El proveedor duenyo de la cuenta de retencion.
+        agregacion: no_sumable
+      concepto:
+        significado: Texto del apunte (`apu.res`). De aqui salen la clase y la marca de prescripcion.
+      importe_alta:
+        significado: El haber del apunte, sin signo. Es la retencion que se practica.
+        unidad: EUR
+        agregacion: suma
+      importe_baja:
+        significado: El debe del apunte, sin signo. Es la retencion que se devuelve o se da de baja.
+        unidad: EUR
+        agregacion: suma
+      importe:
+        significado: >-
+          Haber menos debe, CON SIGNO. Sumarlo sin filtrar `clase` mete los
+          cierres y aperturas: el saldo es la suma de ALTA, BAJA y SALDO_INICIAL.
+        unidad: EUR
+        agregacion: suma
+      clase:
+        significado: >-
+          Que es el apunte, evaluado en este orden: CIERRE (asiento de cierre),
+          SALDO_INICIAL (apertura sin cierre previo de ESA cuenta el ejercicio
+          anterior), APERTURA (apertura con cierre previo), ALTA (importe > 0) y
+          BAJA (el resto). Medido el 2026-09-24: ALTA 26.843 apuntes y 25,71 M
+          EUR; BAJA 4.856 y -17,58 M EUR; SALDO_INICIAL 72 y 642.775,50 EUR.
+        valores: [CIERRE, APERTURA, SALDO_INICIAL, ALTA, BAJA]
+      es_prescripcion:
+        significado: >-
+          El concepto habla de prescripcion ('PRESCRI'). Solo marca: el apunte
+          sigue dentro. Lo prescrito neto eran 329.278,72 EUR el 2026-09-24.
+      centro_coste_id:
+        significado: Centro de coste del PROPIO apunte (`apu.cenide`), tal cual. No es la obra.
+        agregacion: no_sumable
+        nulo_significa: El apunte no lleva centro; desde 2016 el alta casi nunca lo lleva.
+      obra_id:
+        significado: >-
+          La OBRA del apunte, el mismo identificador que `maestro.obras.obra_id`,
+          resuelta por la cascada de `via_obra`. Es la ficha de la empresa del
+          documento (R-CODIGO-POR-EMPRESA): se cruza por `obra_id` o por
+          `clave_obra`, nunca por el codigo solo.
+        agregacion: no_sumable
+        nulo_significa: >-
+          `via_obra` = SIN_OBRA: ningun salto de la cascada resolvio. No se
+          reparte: en el saldo va a la fila sin obra del proveedor.
+      empresa_id:
+        significado: Empresa de la ficha de la obra (`con.emp`).
+        agregacion: no_sumable
+        nulo_significa: El apunte no tiene obra.
+      codigo_obra:
+        significado: Codigo de la obra, sin la empresa. Repetido entre empresas.
+        nulo_significa: El apunte no tiene obra.
+      clave_obra:
+        significado: La clave legible de la obra, '<empresa>-<codigo>', unica.
+        nulo_significa: El apunte no tiene obra.
+      nombre_obra:
+        significado: Nombre de la obra, de su ficha `con`.
+        nulo_significa: El apunte no tiene obra.
+      via_obra:
+        significado: >-
+          Que salto de la cascada dio la obra: APUNTE, FACTURA, EFECTO,
+          PROVEEDOR_UNA_OBRA o SIN_OBRA. Sirve para saber cuanto de la obra es
+          dato del apunte y cuanto deduccion.
+        valores: [APUNTE, FACTURA, EFECTO, PROVEEDOR_UNA_OBRA, SIN_OBRA]
+      documento_id:
+        significado: >-
+          El documento que genero el asiento segun `raw.rac` (la factura o el
+          efecto de pago), uno por asiento.
+        agregacion: no_sumable
+        nulo_significa: El asiento no tiene documento en `raw.rac` (asientos manuales, cierres, aperturas).
+    relaciones:
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: Para el CIF y el nombre del proveedor de cada apunte.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra (y de su empresa) de cada apunte.
+      - de: centro_coste_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: El centro del propio apunte, del que sale la via APUNTE.
+    ejemplos_preguntas: []
+
+  saldo_contable:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL SALDO VIVO DE RETENCION A PROVEEDOR, Y LA FUENTE QUE MANDA** (F-095):
+      el saldo de las cuentas contables de retencion por proveedor y obra.
+      `retenciones.movimientos` (los efectos) es el detalle; si las dos cifras
+      difieren, manda la contabilidad y el cuadre esta en
+      `retenciones.v_cuadre_proveedor`. Saldo total 8.760.524,49 EUR el
+      2026-09-22 (Sigrid) y 8.775.052,87 EUR el 2026-09-24 (datamart), frente a
+      8,35 M EUR vivos en efectos.
+
+      `saldo` = `altas` + `bajas` + `saldo_inicial`: los asientos de cierre y
+      apertura no suman nunca. `saldo_anterior_2016` es la apertura de 2016, el
+      saldo a 31-12-2015: 1.427.463,67 EUR en total (2026-09-24), la historia
+      anterior a los efectos.
+
+      **LA FILA SIN OBRA**: lo que la cascada de `retenciones.apuntes_contables`
+      no atribuye va a la fila `obra_id` NULL del proveedor, SIN_OBRA y sin
+      repartir: repartirlo por reglas inventadas seria publicar un dato que
+      Sigrid no tiene. Estimado en la spec (2026-09-22): unos 4,3 M EUR de
+      movimientos sin obra, sobre todo bajas (pagos manuales, prescripciones,
+      UTE); la cifra real tras el primer build es verificacion MANUAL.
+    grano: >-
+      Una fila por (`proveedor_id`, `obra_id`), con UNA fila `obra_id` NULL por
+      proveedor para lo que no tiene obra (indice unico con NULLS NOT DISTINCT).
+      Sumar por proveedor da su saldo contable completo; sumar por obra deja
+      fuera la fila sin obra.
+    clave_negocio: [proveedor_id, obra_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      proveedor_id:
+        significado: El proveedor duenyo de la cuenta de retencion.
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre del proveedor, de su ficha en `raw.con`.
+      obra_id:
+        significado: >-
+          La obra, el mismo identificador que `maestro.obras.obra_id`: la ficha
+          de SU empresa (R-CODIGO-POR-EMPRESA).
+        agregacion: no_sumable
+        nulo_significa: >-
+          La fila SIN_OBRA del proveedor: lo que ninguna via atribuye, sin
+          repartir.
+      empresa_id:
+        significado: Empresa de la ficha de la obra.
+        agregacion: no_sumable
+        nulo_significa: Es la fila sin obra.
+      codigo_obra:
+        significado: Codigo de la obra, sin la empresa; se repite entre empresas.
+        nulo_significa: Es la fila sin obra.
+      clave_obra:
+        significado: La clave legible de la obra, '<empresa>-<codigo>', unica. Por esta se filtra una obra.
+        nulo_significa: Es la fila sin obra.
+      nombre_obra:
+        significado: Nombre de la obra, de su ficha `con`.
+        nulo_significa: Es la fila sin obra.
+      altas:
+        significado: Suma de los apuntes ALTA (haber), la retencion practicada. Positiva.
+        unidad: EUR
+        agregacion: suma
+      bajas:
+        significado: >-
+          Suma de los apuntes BAJA (debe): la retencion devuelta o dada de baja.
+          NEGATIVA, porque el saldo es la suma de las tres.
+        unidad: EUR
+        agregacion: suma
+      saldo_inicial:
+        significado: >-
+          Suma de los apuntes SALDO_INICIAL: aperturas sin cierre previo de la
+          cuenta, la historia anterior a Sigrid (la apertura de 2008).
+        unidad: EUR
+        agregacion: suma
+      saldo:
+        significado: >-
+          LA CIFRA. altas + bajas + saldo_inicial: lo que queda retenido segun
+          la contabilidad. Es el saldo vivo que manda.
+        unidad: EUR
+        agregacion: suma
+      saldo_anterior_2016:
+        significado: >-
+          La apertura de 2016, es decir el saldo a 31-12-2015. Explica
+          descuadres contra los efectos, que casi no cubren lo anterior.
+          INFORMATIVA: ya esta dentro de `saldo`, no se le suma.
+        unidad: EUR
+        agregacion: suma
+      num_apuntes:
+        significado: Cuantos apuntes ALTA, BAJA o SALDO_INICIAL forman el saldo.
+        agregacion: suma
+      primer_movimiento:
+        significado: Fecha del primer apunte que forma el saldo.
+        agregacion: no_sumable
+        nulo_significa: La fila solo tiene la apertura de 2016.
+      ultimo_movimiento:
+        significado: Fecha del ultimo apunte que forma el saldo.
+        agregacion: no_sumable
+        nulo_significa: La fila solo tiene la apertura de 2016.
+    relaciones:
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: Para el CIF y la direccion del proveedor.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          La ficha de la obra y de su empresa. La fila sin obra no casa y no
+          debe perderse al sumar por proveedor.
+    ejemplos_preguntas:
+      - Cuanta retencion le debemos todavia al proveedor P segun la contabilidad
+      - Cuanta retencion de proveedores queda viva en la obra X
+
+  fin_obra:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la tabla de fechas de la que sale el vencimiento; la pregunta de
+      negocio (que retencion vence y cuando) se responde con
+      `retenciones.v_retencion_contable_obra`, que ya la une al saldo.
+    descripcion: >-
+      El fin de obra, el plazo y el vencimiento de la retencion de cada obra
+      (F-095, decisiones H1 y H2 del humano del 2026-09-22): una fila por obra
+      de `raw.obr` (922 el 2026-09-24). **La fecha de la factura no interviene
+      nunca**: el vencimiento es fin de obra + plazo.
+
+      `fecha_fin_obra` = el inicio del periodo de garantia (`obrctr.fecinigar`,
+      si no `obr.garfecini`); si no lo hay, el ultimo dia del mes siguiente al
+      ultimo cierre con movimiento (`fuente_fin_obra` INICIO_GARANTIA o
+      ULTIMO_CIERRE_MAS_1_MES). Cobertura sobre la retencion viva: 20,9 % +
+      76,1 % = 97,0 % en la spec (2026-09-22); 24,3 % (46 obras) + 72,7 % (116
+      obras) = 97,0 % de 8,36 M EUR el 2026-09-24. Sin ninguna quedan 17 obras con
+      retencion viva, 132.544,84 EUR, 9 de ellas terminadas: su fecha es NULL,
+      no se inventa.
+
+      El respaldo lee `cierre.fact_cierre_mensual`, que se construye DESPUES de
+      las retenciones: va con una noche de retraso, y solo existe para las
+      obras del seguimiento. Si esa tabla estuviera vacia, el build falla en
+      vez de publicar todo sin fecha.
+
+      `plazo_meses` = el plazo de retencion del contrato con el CLIENTE
+      (`plaret`), si no su plazo de garantia (`plagar`), si no 12 meses fijos
+      (`fuente_plazo` PLAZO_RETENCION_CLIENTE, PLAZO_GARANTIA_CLIENTE o
+      PLAZO_FIJO_12). Es un criterio de Negocio (back-to-back), no un dato del
+      proveedor. El 2026-09-24: 81 obras con plazo de retencion (40,5 % del
+      vivo con obra), 12 con el de garantia (22,3 %) y 86 con los 12 fijos (37,3 %).
+
+      Fin real, recepcion provisional y fin previsto van en su columna, SOLO
+      informativas.
+    grano: Una fila por obra de `raw.obr`; `obra_id` es clave primaria.
+    clave_negocio: [obra_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: La obra, el mismo identificador que `maestro.obras.obra_id`.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de la ficha de la obra (`con.emp`).
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de la obra, sin la empresa; se repite entre empresas.
+      clave_obra:
+        significado: La clave legible de la obra, '<empresa>-<codigo>', unica.
+      nombre_obra:
+        significado: Nombre de la obra, de su ficha `con`.
+      estado_obra:
+        significado: >-
+          Estado de la obra en Sigrid (`con.est`), sin traducir. 19, 21, 23 y 25
+          son terminada, recibida o cerrada.
+        agregacion: no_sumable
+      fecha_inicio_garantia:
+        significado: >-
+          Inicio del periodo de garantia: el mayor `fecinigar` no nulo de los
+          contratos de la obra con el cliente; si no hay, el de la ficha de la
+          obra. Es el fin de obra que manda.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no tiene inicio de garantia de la obra (el caso mas comun hoy).
+      ultimo_cierre:
+        significado: >-
+          El ultimo mes de cierre de la obra que MOVIO algo (`ejecutado_mes`
+          distinto de 0), no la ultima fase creada: 124 de 330 obras tienen
+          fases vacias despues. Es el del cierre de la noche anterior.
+        agregacion: no_sumable
+        nulo_significa: La obra no esta en el cierre del seguimiento o nunca movio nada.
+      fecha_fin_real:
+        significado: INFORMATIVA. Fin real con la regla de la cabecera de cierre. No entra en el vencimiento.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no tiene fin real de la obra.
+      fecha_recepcion_provisional:
+        significado: INFORMATIVA. Recepcion provisional del contrato con el cliente. No entra en el vencimiento.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no la tiene.
+      fecha_fin_prevista:
+        significado: INFORMATIVA. Fin previsto de los contratos o de la ficha de la obra. No entra en el vencimiento.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no la tiene.
+      fecha_fin_obra:
+        significado: >-
+          EL FIN DE OBRA desde el que cuenta el vencimiento: el inicio de
+          garantia o, si no hay, el ultimo dia del mes siguiente al ultimo
+          cierre con movimiento.
+        agregacion: no_sumable
+        nulo_significa: No hay ninguna de las dos, y no se inventa una fecha.
+      fuente_fin_obra:
+        significado: De donde sale el fin de obra.
+        valores: [INICIO_GARANTIA, ULTIMO_CIERRE_MAS_1_MES]
+        nulo_significa: La obra no tiene fin de obra.
+      terminada_sin_fin_obra:
+        significado: >-
+          La obra esta terminada, recibida o cerrada y aun asi no tiene fin de
+          obra: el caso que Administracion tiene que completar en Sigrid.
+      plazo_meses:
+        significado: >-
+          Meses que se suman al fin de obra: el plazo de retencion del contrato
+          con el cliente, si no su plazo de garantia, si no 12.
+        unidad: meses
+        agregacion: no_sumable
+      fuente_plazo:
+        significado: De donde sale el plazo que se suma al fin de obra.
+        valores: [PLAZO_RETENCION_CLIENTE, PLAZO_GARANTIA_CLIENTE, PLAZO_FIJO_12]
+      fecha_vencimiento:
+        significado: Fin de obra + plazo. Nunca usa la fecha de la factura.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene fin de obra.
+      num_contratos_obra:
+        significado: Cuantos contratos con el cliente (`obrctr`) tiene la obra; se agregan antes de unir.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "1:1"
+        porque: La ficha completa de la obra y de su empresa.
+    ejemplos_preguntas: []
+
+  v_cuadre_proveedor:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **El cuadre contabilidad - efectos de la retencion, por proveedor**
+      (F-095): el saldo contable (`retenciones.saldo_contable`, la fuente que
+      manda) frente a lo vivo en los efectos (`retenciones.movimientos` con
+      estado VIVA, el criterio de F-094, que aqui solo se lee). Solo
+      proveedores con saldo o viva de al menos 1 EUR.
+
+      `categoria`, evaluada en este orden: CUADRA (diferencia de menos de 1
+      EUR), SIN_EFECTOS_VIVOS, SIN_SALDO_CONTABLE, CONTABILIDAD_MAYOR y
+      EFECTOS_MAYOR. Reparto medido en la spec (2026-09-22, 761 proveedores):
+      CUADRA 520 / 5,07 M EUR; SIN_EFECTOS_VIVOS 81 / 0,99 M EUR en libros
+      (0,27 de antes de 2016); SIN_SALDO_CONTABLE 38 / 0,20 M EUR (0,04
+      prescritos); CONTABILIDAD_MAYOR 41 / +0,10 M EUR; EFECTOS_MAYOR 81 /
+      -0,47 M EUR. **Manda la contabilidad**; la lista de descuadres es para
+      Administracion (H7).
+
+      Caso testigo: FERMALUX (proveedor 1958815, cuenta 4108005478) tiene
+      64.201,96 EUR de saldo contable y 64.201,96 EUR vivos en efectos: CUADRA.
+    grano: Una fila por proveedor (`proveedor_id`), de cualquiera de los dos lados.
+    clave_negocio: [proveedor_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      proveedor_id:
+        significado: El proveedor, de la contabilidad o de los efectos (FULL JOIN).
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre del proveedor, de su ficha en `raw.con`.
+      saldo_contable:
+        significado: Saldo de su cuenta de retencion (suma de sus filas de `retenciones.saldo_contable`). 0 si no tiene.
+        unidad: EUR
+        agregacion: suma
+      viva_efectos:
+        significado: Suma de sus efectos de retencion VIVA en `retenciones.movimientos`. 0 si no tiene.
+        unidad: EUR
+        agregacion: suma
+      diferencia:
+        significado: saldo_contable - viva_efectos. Positiva, la contabilidad tiene mas.
+        unidad: EUR
+        agregacion: suma
+      categoria:
+        significado: Como cuadra el proveedor, evaluada en el orden de la lista.
+        valores: [CUADRA, SIN_EFECTOS_VIVOS, SIN_SALDO_CONTABLE, CONTABILIDAD_MAYOR, EFECTOS_MAYOR]
+      saldo_anterior_2016:
+        significado: >-
+          Su apertura de 2016 (saldo a 31-12-2015): la parte del saldo contable
+          anterior a los efectos. Explica muchos SIN_EFECTOS_VIVOS.
+        unidad: EUR
+        agregacion: suma
+      prescrito:
+        significado: >-
+          Lo dado de baja por prescripcion en su cuenta, en positivo (neto de
+          altas y bajas con 'PRESCRI' en el concepto). Los efectos no lo ven.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "1:1"
+        porque: Para el CIF y la direccion del proveedor que descuadra.
+    ejemplos_preguntas:
+      - Que proveedores no cuadran entre la contabilidad y los efectos de retencion
+      - Cuadra la retencion del proveedor P entre contabilidad y efectos
+
+  v_retencion_contable_obra:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **Que retencion le debemos a cada proveedor en cada obra y cuando vence**
+      (F-095): cada (proveedor, obra) con saldo contable distinto de 0, con su
+      fin de obra, su plazo y su vencimiento de `retenciones.fin_obra`. El
+      vencimiento es fin de obra + plazo y **la fecha de la factura no
+      interviene** (decision del humano del 2026-09-22): no es la
+      `fecha_prevista_devolucion` de los efectos, que es la de Sigrid (factura
+      + 15 meses).
+
+      `estado_vencimiento` se calcula AL CONSULTAR, contra la fecha de hoy:
+      SIN_OBRA (la fila sin obra del proveedor), SIN_FIN_OBRA (la obra no tiene
+      ni inicio de garantia ni cierre con movimiento), VENCIDA o PENDIENTE.
+    grano: >-
+      Una fila por (`proveedor_id`, `obra_id`) con saldo distinto de 0, con la
+      fila sin obra del proveedor (`obra_id` NULL). Es un filtro de
+      `retenciones.saldo_contable`: no multiplica.
+    clave_negocio: [proveedor_id, obra_id]
+    paso_etl: build_retenciones
+    refresco: nocturno
+    columnas:
+      proveedor_id:
+        significado: El proveedor al que se le retiene.
+        agregacion: no_sumable
+      proveedor_nombre:
+        significado: Nombre del proveedor, de su ficha en `raw.con`.
+      obra_id:
+        significado: La obra, el mismo identificador que `maestro.obras.obra_id` (la ficha de su empresa).
+        agregacion: no_sumable
+        nulo_significa: La fila sin obra del proveedor (estado SIN_OBRA).
+      empresa_id:
+        significado: Empresa de la ficha de la obra.
+        agregacion: no_sumable
+        nulo_significa: Es la fila sin obra.
+      codigo_obra:
+        significado: Codigo de la obra, sin la empresa; se repite entre empresas.
+        nulo_significa: Es la fila sin obra.
+      clave_obra:
+        significado: La clave legible de la obra, '<empresa>-<codigo>'. Por esta se filtra una obra.
+        nulo_significa: Es la fila sin obra.
+      nombre_obra:
+        significado: Nombre de la obra, de su ficha `con`.
+        nulo_significa: Es la fila sin obra.
+      saldo:
+        significado: El saldo contable vivo de la retencion de ese proveedor en esa obra.
+        unidad: EUR
+        agregacion: suma
+      ultimo_movimiento:
+        significado: Fecha del ultimo apunte que forma el saldo.
+        agregacion: no_sumable
+        nulo_significa: La fila solo tiene la apertura de 2016.
+      fecha_fin_obra:
+        significado: El fin de obra desde el que cuenta el vencimiento.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene fin de obra, o es la fila sin obra.
+      fuente_fin_obra:
+        significado: De donde sale el fin de obra de esa obra.
+        valores: [INICIO_GARANTIA, ULTIMO_CIERRE_MAS_1_MES]
+        nulo_significa: Sin fin de obra.
+      plazo_meses:
+        significado: Los meses que se suman al fin de obra.
+        unidad: meses
+        agregacion: no_sumable
+        nulo_significa: Es la fila sin obra.
+      fuente_plazo:
+        significado: De donde sale el plazo que se suma al fin de obra.
+        valores: [PLAZO_RETENCION_CLIENTE, PLAZO_GARANTIA_CLIENTE, PLAZO_FIJO_12]
+        nulo_significa: Es la fila sin obra.
+      fecha_vencimiento:
+        significado: Fin de obra + plazo. Nunca la fecha de la factura.
+        agregacion: no_sumable
+        nulo_significa: Sin fin de obra, o es la fila sin obra.
+      estado_vencimiento:
+        significado: Si la retencion ya vencio, calculado contra la fecha de HOY al consultar.
+        valores: [SIN_OBRA, SIN_FIN_OBRA, VENCIDA, PENDIENTE]
+      dias_hasta_vencimiento:
+        significado: Dias desde hoy hasta el vencimiento; negativo si ya vencio.
+        agregacion: no_sumable
+        nulo_significa: No hay vencimiento.
+      terminada_sin_fin_obra:
+        significado: La obra esta terminada, recibida o cerrada y no tiene fin de obra.
+        nulo_significa: Es la fila sin obra.
+    relaciones:
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: Para el CIF y la direccion del proveedor.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra y de su empresa.
+    ejemplos_preguntas:
+      - Que retenciones tengo de los proveedores de la obra X y cuando vencen
+      - Que retenciones de proveedor estan ya vencidas segun el fin de obra
 
   v_src_lineas_compra:
     tipo: vista
