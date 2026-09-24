@@ -15,9 +15,9 @@ Rama `feature/F-107-contrapartidas-cuentas-analiticas` (desde `main` con F-101 y
 F-102). `sdd: false`, rigor `estandar`. `bash harness/init.sh` en verde al
 arrancar (5.246 passed, cobertura 94,7 %). Tareas derivadas de los `acceptance`:
 
-**Diccionario del arbol tras F-107 (version 30): 165 objetos, 1097 columnas,
+**Diccionario del arbol tras F-107 (version 30): 165 objetos, 1098 columnas,
 73 de consumo** (+2 fichas: `raw.caa` y `maestro.cuentas_analiticas`, de
-consumo; +2 columnas en `personal.recursos`).
+consumo; +2 columnas en `personal.recursos` y +1 en `personal.partes_lineas`).
 
 - [x] T1 tests en fase RED (`tests/test_f107_contrapartidas_cuentas.py`)
 - [x] T2 ingesta de `caa` (censo 69 -> 70) y ficha `raw.caa`
@@ -27,14 +27,21 @@ consumo; +2 columnas en `personal.recursos`).
 - [x] T6 `azure-apps/datamart_seg_anual.md` (commit local alli, `6af6e2c`, sin push)
 - [x] T7 informe (`progress/impl_F-107.md`), lista MANUAL y `init.sh` en verde
 
+**AMPLIACION (decision del humano, 2026-09-24, reviewer parado)**: la cuenta
+analitica de cada linea de parte entra en F-107.
+
+- [x] T8 tests en fase RED de la ampliacion (`test_f107_r5_*`)
+- [x] T9 `personal.partes_lineas` gana `cuenta_analitica_id` (`hmores.caaide`)
+- [x] T10 ficha, relaciones, `acceptance` de F-107, `BACKLOG.md`, ARCHITECTURE
+- [x] T11 `azure-apps` (commit local), informe («Ampliacion») e `init.sh` en verde
+
 **Decisiones y desviaciones** (detalle en `progress/impl_F-107.md`):
 - Nombres `codigo_cuenta` / `descripcion_cuenta` (patron `codigo_centro`,
   `codigo_obra` de `maestro`); `codigo_cuenta_padre` y `descripcion_cuenta_padre`
   se anaden porque el padre es un `cag` NO ingerido y su id solo no se traduce.
 - `partida_presupuestaria_id` se publica aunque vale 0 en las 184.234 filas.
-- `personal.partes_lineas` NO gana cuenta: la descripcion decia «si trae
-  cuenta» y hoy no la publica; el origen si (`hmores.caaide`, 310.552 de
-  331.002 lineas). Propuesta para el humano: feature aparte.
+- `personal.partes_lineas` gana `cuenta_analitica_id` por decision del humano
+  (ampliacion): la cuenta de CARGO de la linea, no la contrapartida.
 - El guarda `test_f057_r13_no_usa_centro_de_coste` se estrecha: descuenta la
   unica proyeccion literal `NULLIF(r.cenconide, 0) AS
   centro_coste_contrapartida_id`; cualquier otro uso sigue en rojo.
@@ -46,7 +53,8 @@ consumo; +2 columnas en `personal.recursos`).
 `build-maestros` a mano ANTES de la primera ingesta con esta version falla en
 `06_cuentas_analiticas.sql` (el ultimo sub-paso; las otras seis vistas si se
 construyen). Antes de un build a mano: `python main.py ingest --table caa --full`.
-`build-personal` no gana dependencias (`raw.res` ya se ingiere). Y la imagen
+`build-personal` no gana dependencias (`raw.res` y `raw.hmores` ya se
+ingieren; `hmores.caaide` ya esta en `raw`). Y la imagen
 del job tiene que ser la nueva (memoria: «el repositorio en verde no es
 produccion»).
 
@@ -66,11 +74,19 @@ produccion»).
 - **M5** · casamiento:
   `SELECT count(*) FROM personal.recursos r LEFT JOIN maestro.cuentas_analiticas c ON c.cuenta_analitica_id = r.cuenta_analitica_contrapartida_id WHERE r.cuenta_analitica_contrapartida_id IS NOT NULL AND c.cuenta_analitica_id IS NULL;`
   -> **0**; la misma con `personal.recursos_tipos_hora.cuenta_analitica_id` -> **0**.
-- **M6** · `python main.py check-declarados`, `check-relaciones` (4 relaciones
+- **M5b** · la cuenta de la linea (ampliacion), tras `build-personal` y
+  `build-maestros`:
+  `SELECT count(*), count(l.cuenta_analitica_id), count(DISTINCT l.cuenta_analitica_id), count(*) FILTER (WHERE l.cuenta_analitica_id IS NOT NULL AND c.cuenta_analitica_id IS NULL) FROM personal.partes_lineas l LEFT JOIN maestro.cuentas_analiticas c ON c.cuenta_analitica_id = l.cuenta_analitica_id;`
+  -> **~331.002 / ~310.552 / ~3.782 / 0** (medido el 2026-09-24 en solo
+  lectura sobre `raw.hmores` de produccion y en Sigrid). Y el sub-paso
+  `partes_lineas` de `build_personal` en el log (`_meta.etl_runs`): del orden
+  de hoy (~9 s); el SELECT medido en solo lectura pasa de 3,05-3,13 s a
+  3,06-3,21 s.
+- **M6** · `python main.py check-declarados`, `check-relaciones` (8 relaciones
   nuevas, todas unen) y `check-unicidad` (`maestro.cuentas_analiticas` unica
   por `cuenta_analitica_id`): sin errores nuevos.
 - **M7** · `python main.py publicar-diccionario` -> **version 30**, 165
-  objetos, 1097 columnas; y `check-diccionario` OK. Escritura contra Azure:
+  objetos, 1098 columnas; y `check-diccionario` OK. Escritura contra Azure:
   **la lanza el humano**.
 - **M8** · reiniciar el servidor MCP (`mcp-bbdd`), que cachea el diccionario.
 

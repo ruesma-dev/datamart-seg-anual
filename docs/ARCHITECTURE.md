@@ -101,7 +101,9 @@ sin construir esa noche.
   contrapartida. `personal.recursos` publica los dos identificadores sin unir
   nada, y `maestro.cuentas_analiticas` (`sql/maestro/06_cuentas_analiticas.sql`,
   sobre `raw.caa` + `raw.con`, `tip = 19`) los traduce: 184.234 cuentas, el
-  código único solo dentro de su empresa (`R-CODIGO-POR-EMPRESA`). **Orden de
+  código único solo dentro de su empresa (`R-CODIGO-POR-EMPRESA`). La cuenta
+  de CARGO de cada línea va en `personal.partes_lineas.cuenta_analitica_id`
+  (`hmores.caaide`, 93,8 % de las líneas). **Orden de
   despliegue**: `06_cuentas_analiticas.sql` lee `raw.caa`, que crea
   `ingest_raw`; por eso es el ÚLTIMO sub-paso de `build_maestros`, y un
   `build-maestros` a mano antes de la primera ingesta con esta versión falla

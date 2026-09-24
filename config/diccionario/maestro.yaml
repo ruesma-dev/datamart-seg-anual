@@ -844,9 +844,10 @@ objetos:
       **todas** en el catalogo: 0 huerfanas, y todas de la misma empresa que su
       recurso. La cuenta de contrapartida es ademas del mismo centro de coste
       que `personal.recursos.centro_coste_contrapartida_id` en los 1.979.
-      `personal.partes_lineas` NO publica cuenta analitica, aunque el origen la
-      trae (`hmores.caaide`, informada en 310.552 de 331.002 lineas, 3.782
-      cuentas): publicarla es otra feature.
+      Y la cuenta de CARGO de cada linea de parte
+      (`personal.partes_lineas.cuenta_analitica_id`, ampliacion de F-107):
+      310.553 de 331.003 lineas, 3.782 cuentas, 0 huerfanas; en 309.182 el
+      codigo de la cuenta empieza por el de la obra de la linea.
     grano: >-
       Una fila por cuenta analitica, identificada por `cuenta_analitica_id`, que
       es unico. El par (`empresa_id`, `codigo_cuenta`) tambien lo es; el codigo
@@ -942,6 +943,12 @@ objetos:
         porque: >-
           La cuenta de cada tipo de hora de la ficha del recurso: 50 cuentas
           para 3.199 filas, 0 huerfanas (2026-09-24).
+      - de: cuenta_analitica_id
+        a: personal.partes_lineas.cuenta_analitica_id
+        cardinalidad: "1:N"
+        porque: >-
+          La cuenta de CARGO de cada linea de parte: 3.782 cuentas para 310.553
+          lineas, 0 huerfanas (2026-09-24). Agregar las lineas antes de unir.
     ejemplos_preguntas:
       - Que cuenta analitica es la 496869
       - Cual es la cuenta de contrapartida del recurso X y como se llama

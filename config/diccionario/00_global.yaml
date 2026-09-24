@@ -20,7 +20,9 @@
 # pasa a 70 tablas) y `maestro.cuentas_analiticas` las publica con codigo y
 # descripcion de `con`, padre, nivel y centro. Todas las cuentas usadas en
 # `personal` casan con el catalogo (0 huerfanas). `R-CODIGO-POR-EMPRESA` alcanza
-# tambien a las cuentas: 14.063 codigos se repiten entre empresas.
+# tambien a las cuentas: 14.063 codigos se repiten entre empresas. Ampliacion
+# del mismo dia: `personal.partes_lineas` gana `cuenta_analitica_id`, la cuenta
+# de CARGO de la linea (310.553 de 331.003 lineas).
 #
 # version 29 (F-102, 2026-09-23): LA OBRA Y EL RECURSO SON DE UNA EMPRESA. En
 # Sigrid el mismo codigo existe una vez por empresa --Ruesma (1), Porsan (28),

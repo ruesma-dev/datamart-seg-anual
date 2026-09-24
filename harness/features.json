@@ -1711,7 +1711,8 @@
         "`personal.recursos` publica el centro de coste y la cuenta analitica de contrapartida, sin perder filas, y su ficha explica que la contrapartida es del recurso",
         "Se ingiere `caa` y `maestro.cuentas_analiticas` publica codigo, descripcion, empresa, cuenta padre, nivel, centro y partida de cada cuenta analitica, sin filtrar",
         "Medido que las cuentas de `personal.recursos_tipos_hora` y de las contrapartidas casan con el catalogo (496869, 496923 y 496935 traducidas como en el correo de Juan)",
-        "Diccionario con fichas y relaciones nuevas, `tables_sigrid.yaml`, recuentos de raw y `azure-apps/datamart_seg_anual.md` actualizados en el mismo trabajo"
+        "Diccionario con fichas y relaciones nuevas, `tables_sigrid.yaml`, recuentos de raw y `azure-apps/datamart_seg_anual.md` actualizados en el mismo trabajo",
+        "AMPLIACION (decision del humano, 2026-09-24): `personal.partes_lineas` publica `cuenta_analitica_id` (la cuenta de cargo de la linea, desde `hmores.caaide` con NULLIF 0, por ADD COLUMN IF NOT EXISTS), con su ficha, su relacion a `maestro.cuentas_analiticas`, medido cuantas lineas la traen y casan con el catalogo y el efecto en el tiempo del sub-paso"
       ],
       "status": "in_progress",
       "sdd": false,

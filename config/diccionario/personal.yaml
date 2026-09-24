@@ -38,8 +38,9 @@
 #
 # F-107 (2026-09-24, Juan Romero): `recursos` gana la CONTRAPARTIDA de la ficha
 # del recurso --centro de coste y cuenta analitica del abono--, que es del
-# RECURSO y no por tipo de hora. Las cuentas se traducen en
-# `maestro.cuentas_analiticas`.
+# RECURSO y no por tipo de hora; y `partes_lineas` la cuenta de CARGO de cada
+# linea (ampliacion decidida por el humano el mismo dia). Las cuentas se
+# traducen en `maestro.cuentas_analiticas`.
 #
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/personal/`.
@@ -100,7 +101,8 @@ objetos:
       parte CARGA a la obra el coste de la linea; la ficha del recurso declara
       contra que centro de coste y que cuenta analitica se ABONA, que es lo que
       descarga los partes contra el coste real de nomina. Sin ella se tiene el
-      cargo pero no el abono, y el asiento no se puede reproducir. Esta en
+      cargo pero no el abono, y el asiento no se puede reproducir. La cuenta
+      del CARGO esta en cada linea (`personal.partes_lineas.cuenta_analitica_id`). Esta en
       `centro_coste_contrapartida_id` y `cuenta_analitica_contrapartida_id`, y
       sale de la ficha del recurso: la de tipos de hora
       (`personal.recursos_tipos_hora`) no tiene contrapartida, solo la cuenta de
@@ -477,8 +479,34 @@ objetos:
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
         agregacion: no_sumable
+      cuenta_analitica_id:
+        significado: >-
+          La cuenta analitica de CARGO de la linea (F-107): contra que cuenta se
+          imputa el coste en la obra. Sale de la propia linea del parte en
+          Sigrid. Medido en solo lectura el 2026-09-24: informada en 310.553 de
+          331.003 lineas (93,8 %), 3.782 cuentas distintas, 0 huerfanas contra
+          el catalogo y todas de la misma empresa que el recurso. En 309.182
+          lineas el codigo de la cuenta empieza por el codigo de la obra de la
+          linea (codigo de obra, punto, cuenta): es la cuenta del centro de la
+          obra. **No es la
+          contrapartida**: el abono va contra la cuenta de la ficha del recurso
+          (`personal.recursos.cuenta_analitica_contrapartida_id`), y solo 45
+          lineas llevan esa misma cuenta. Su codigo y descripcion estan en
+          `maestro.cuentas_analiticas`.
+        nulo_significa: >-
+          La linea no lleva cuenta analitica (20.450 lineas, 4,62 M EUR de los
+          98,33 M EUR del total el 2026-09-24).
+        agregacion: no_sumable
 
     relaciones:
+      - de: cuenta_analitica_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y la descripcion de la cuenta de CARGO de la linea
+          (F-107): 3.782 cuentas para 310.553 lineas, 0 huerfanas el
+          2026-09-24. Junto con la contrapartida del recurso, es el asiento
+          completo del parte.
       - de: parte_id
         a: personal.partes.parte_id
         cardinalidad: "N:1"
