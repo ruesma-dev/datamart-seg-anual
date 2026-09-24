@@ -390,7 +390,7 @@ def test_f095_r17_fin_real_igual_que_cierre() -> None:
         )
 
     cierre = (DIR_SQL / "cierre" / "05_views_cabecera.sql").read_text(encoding="utf-8")
-    cierre = re.sub(r"\s+", " ", "\n".join(l.split("--", 1)[0] for l in cierre.splitlines()))
+    cierre = re.sub(r"\s+", " ", "\n".join(linea.split("--", 1)[0] for linea in cierre.splitlines()))
     agregado = "FECHA(MAX(NULLIF(c.fecreafin, 0))) AS fec_real_fin"
     fin_real = "COALESCE( oc.fec_real_fin, FECHA(obr.fecfinrea) ) AS fecha_fin_real"
     assert agregado in normalizado(cierre) and fin_real in normalizado(cierre), (
@@ -715,7 +715,7 @@ def test_f095_r27_main_y_grants_sin_cambios() -> None:
 
 def test_f095_d3_centros_coste_solo_raw() -> None:
     texto = (DIR_SQL / "maestro" / "04_centros_coste.sql").read_text(encoding="utf-8")
-    compacto = re.sub(r"\s+", " ", "\n".join(l.split("--", 1)[0] for l in texto.splitlines()))
+    compacto = re.sub(r"\s+", " ", "\n".join(linea.split("--", 1)[0] for linea in texto.splitlines()))
     lecturas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+)\.\w+", compacto))
     assert lecturas == {"raw"}, (
         f"`maestro.centros_coste` lee {sorted(lecturas)}: si deja de ser SQL puro "
