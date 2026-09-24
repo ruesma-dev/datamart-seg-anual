@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 70 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 71 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -1565,6 +1565,32 @@ objetos:
 
       **No se traen** 1 columnas de binario o texto ilimitado: el texto libre de la linea. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
     grano: Una fila por linea de desglose analitico, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  rac:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el log en bruto del circuito de cada documento, y FILTRADO: solo estan los pasos que generaron asiento. El enlace ya resuelto --de que obra es cada apunte de retencion-- esta en `retenciones.apuntes_contables`.
+    descripcion: >-
+      **CONTABILIZACION DE DOCUMENTOS** (F-095): el log del circuito de aprobacion de cualquier documento. `conide` es el documento, `asiide` el asiento que genero el paso, `res` el nombre del paso, y `fec` + `usu` cuando y quien lo lanzo. Es **el unico enlace documento -> asiento**: ni `apu` ni `asi` tienen columna de documento.
+
+      **ESTA FILTRADA: solo las filas con `asiide <> 0`** (decision H4 del humano, 2026-09-22, acordada con F-091): 755.086 de 2.505.089 filas en Sigrid. Las demas son pasos que no contabilizan (comprobar, aprobar) y aqui **no estan**: contar pasos del circuito sobre esta tabla da un numero falso. Con asiento hay exactamente 1 fila por factura (165.845 de 166.009, medido en F-091).
+
+      **Para que**: desde 2016 el alta de retencion no lleva centro de coste en el apunte; sin `rac` las altas de retencion con obra caen del 97,2 % al 10,8 % del importe. `retenciones.apuntes_contables` la usa agregada por `asiide` (`MIN(conide)`), nunca uniendo fila a fila.
+
+      **Dato personal**: `usu` es el login de quien contabilizo, y `raw` es legible por el rol del MCP.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `rac`, y se localiza con `grep -n "^| rac " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid, con el mismo filtro: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+
+      **No se traen** 1 columnas de binario o texto ilimitado: el texto libre del paso. Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por paso del circuito que genero asiento, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno
