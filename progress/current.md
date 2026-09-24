@@ -49,6 +49,18 @@ imagen de F-101 (`r20260923-1605`): primera noche de F-101, OK. La primera
 nocturna con F-102 es la del 25-09, salvo que se construya a mano antes
 (respetando el ORDEN de abajo).
 
+### F-102 · T16 HECHA el 2026-09-24 (builds a mano del humano; resto, lider)
+
+- **M1** 922/922 · **M2** 0 filas · **M3** 0581, 0606, 0671, 0720 · **M4** 1/57/48
+  · **M5** 1.884/0 · **M6** 2.619/2.619 (+4 y +1 sobre ayer: altas en Sigrid).
+  MO/0009 sale como 1-, 18-, 27- y 28-MO/0009, cada uno con su empresa.
+- **M7** `check-declarados` 163/163 OK; `check-relaciones` 127 unen, 0 que no
+  unen; `check-unicidad` sin novedad (la unica rota sigue siendo
+  `cierre.v_pbi_planif_vs_real`, F-051).
+- **M8** `publicar-diccionario` version 29 (hash 4d4518295c3b, 163 objetos,
+  1.083 columnas, 17 reglas) y `check-diccionario` OK.
+- **M9** reinicio del MCP: lo lanza el humano.
+
 ### F-102 · T16, verificaciones MANUALES del humano (necesitan BBDD; en este orden)
 
 **ORDEN DE DESPLIEGUE, antes de nada**: `maestro.obras` y `personal.recursos`
