@@ -9,6 +9,18 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-24 · F-095 · EN CURSO (implementer) · retenciones desde la contabilidad, por obra y con vencimiento desde el fin de obra
+
+Rama `feature/F-095-retenciones-contabilidad-fin-obra`, reapuntada a `main`
+(249b683) con `git branch -f` antes de sacarla: su unico commit (cd5f440, la
+spec) ya estaba en `main`. `sdd: true`, rigor `critico`. Ficha a `in_progress`.
+
+- **T0**: F-094 `done` (y su `01_movimientos.sql` ya traduce `obra_id` por
+  `maestro.centros_coste`: el resto de F-045 esta hecho). F-091 sigue `pending`;
+  el filtro `asiide <> 0` de `rac` lo acordo el humano en **H4** («acordado con
+  F-091»): el enlace factura -> asiento de F-091 es justo la fila con `asiide`.
+- Tarea en curso: ver la lista de `tasks.md` (se marca `[x]` al completar).
+
 ## 2026-09-24 · F-107 · CERRADA (`done`, APROBADO en pasada 2) · contrapartidas del recurso y catalogo de cuentas analiticas · DESPLEGADA · QUEDAN LAS MANUAL
 
 > **DESPLEGADA el 2026-09-24 a las 13:02 UTC con el tag `r20260924-1500`**

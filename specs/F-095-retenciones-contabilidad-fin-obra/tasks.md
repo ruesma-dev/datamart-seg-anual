@@ -10,7 +10,7 @@ Las decisiones H1-H7 las tomo el humano el 2026-09-22 (`design.md` §Decisiones
 del humano). **No se empieza sin F-094 `done`** (T0). T1-T12 construyen; T13-T20
 son la propagacion; T21-T26 cierran.
 
-- [ ] T0: Comprobar que F-094 esta `done` (y que ya tradujo `movimientos.obra_id` a obra, resto de F-045) y que F-091 acepta el filtro `asiide <> 0` de `rac`; si no, `blocked` con el motivo en `progress/current.md`.  |  Verificacion: `harness/features.json` y anotacion en `progress/impl_F-095.md`
+- [x] T0: Comprobar que F-094 esta `done` (y que ya tradujo `movimientos.obra_id` a obra, resto de F-045) y que F-091 acepta el filtro `asiide <> 0` de `rac`; si no, `blocked` con el motivo en `progress/current.md`.  |  Verificacion: `harness/features.json` y anotacion en `progress/impl_F-095.md`
 - [ ] T1: Escribir `tests/test_f095_retenciones_contables.py` en fase RED con un test por requisito R1-R31 (offline: texto del SQL sin comentarios `--`, YAML del diccionario, `tables_sigrid.yaml`, cableado del step).  |  Verificacion: `pytest tests/test_f095_retenciones_contables.py` falla y la traza queda en `progress/impl_F-095.md`
 - [ ] T2: Anadir `rac` a `config/tables_sigrid.yaml` (sin `tiemod`, `where: "asiide <> 0"`, excluida `tex`) y subir `TOTAL_TABLAS` de 68 a 69 en `tests/test_f074_ingesta_censo.py` y `tests/test_f080_ingesta.py`.  |  Verificacion: `test_f095_r9_rac_declarada_con_filtro`, `pytest tests/test_f074_ingesta_censo.py tests/test_f080_ingesta.py`
 - [ ] T3: Crear `sql/retenciones/03_apuntes_contables.sql` con `retenciones.cuentas_proveedor` elegida por `prv.cueretide <> 0`, sin ningun literal de prefijo de cuenta.  |  Verificacion: `test_f095_r1_cuentas_por_cueretide_no_por_prefijo`, `test_f095_r2_cuentas_proveedor`
