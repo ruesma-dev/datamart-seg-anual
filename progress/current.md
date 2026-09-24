@@ -63,6 +63,15 @@ ingieren; `hmores.caaide` ya esta en `raw`). Y la imagen
 del job tiene que ser la nueva (memoria: «el repositorio en verde no es
 produccion»).
 
+- **VERIFICADO EL 2026-09-24** (build a mano del humano; resto, lider en solo
+  lectura desde un worktree limpio de `main`): M1 `raw.caa` 184.234; M2
+  2.619/1.979/1.979/8/847; M3 184.234/184.234/184.234/163.247; M4 las tres
+  cuentas de Juan traducidas (padres `00000.CIMO` y `00000.CICO`); M5 0 y 0;
+  M5b 331.002/310.552/3.782/0; M6 165/165 declarados, 132 relaciones unen y 0
+  no unen (dos AVISO de cobertura escasa en las inversas catalogo -> recursos y
+  -> tipos de hora: legitimas, el catalogo tiene 184.234 cuentas), unicidad
+  sin novedad (solo la rota de F-051); M7 version 30 publicada (hash
+  2ce19a432132, 165 objetos) y `check-diccionario` OK; M8 MCP reiniciado.
 - **M1** · `python main.py ingest --table caa --full` y luego
   `python main.py check-raw-recuentos` -> `caa` OK con **~184.234** filas.
 - **M2** · `python main.py build-personal`; luego
