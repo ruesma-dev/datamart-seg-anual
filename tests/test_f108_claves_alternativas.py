@@ -607,6 +607,10 @@ def test_f108_r14_un_objeto_que_no_existe_se_informa_una_vez(monkeypatch) -> Non
         ("maestro.obras", "negocio", ("obra_id",))
     ], "las demas consultas del objeto no se lanzan"
     assert "0 con la clave rota" in resultado.output
+    # La consulta omitida no se cuenta como OK: de todas, una no existe y otra
+    # (la alternativa de `maestro.obras`) ni se lanzo. Superviviente de T10.
+    total = len(consultas_de_unicidad(_dicc_real()))
+    assert f"Resumen: {total - 2} sin contradiccion" in resultado.output
     # El recorrido sigue con los demas objetos.
     assert ("personal.recursos", "alternativa", ("clave_recurso",)) in pg.preguntadas
 
