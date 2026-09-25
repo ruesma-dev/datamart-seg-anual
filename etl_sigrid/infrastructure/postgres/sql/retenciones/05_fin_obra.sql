@@ -77,11 +77,17 @@
 
 DO $$
 BEGIN
+    IF to_regclass('mart.master_versiones_tipadas') IS NULL THEN
+        RAISE EXCEPTION 'fin_obra: no existe la tabla mart.master_versiones_tipadas; lanza build-mart antes de build-retenciones';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM mart.master_versiones_tipadas WHERE tipo_master = 'Cuatrimestral') THEN
+        RAISE EXCEPTION 'fin_obra: mart.master_versiones_tipadas no tiene ninguna version Cuatrimestral; sin ella ninguna obra sin garantia tendria fin de obra';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM stg.plan_mensual WHERE ambito_id IN (8, 11)) THEN
+        RAISE EXCEPTION 'fin_obra: stg.plan_mensual no tiene filas de los ambitos master 8 u 11; lanza build-stg antes de build-retenciones';
+    END IF;
     IF to_regclass('cierre.fact_cierre_mensual') IS NULL THEN
         RAISE EXCEPTION 'fin_obra: no existe la tabla cierre.fact_cierre_mensual; lanza build-cierre antes de build-retenciones';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM cierre.fact_cierre_mensual) THEN
-        RAISE EXCEPTION 'fin_obra: cierre.fact_cierre_mensual esta vacia; sin ella ninguna obra tendria fin de obra de respaldo';
     END IF;
 END $$;
 
