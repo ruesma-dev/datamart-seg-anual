@@ -594,6 +594,9 @@ def test_f108_r13_un_timeout_en_una_alternativa_no_es_un_ok(monkeypatch) -> None
     assert resultado.exit_code == 1
     assert "?    personal.recursos: NO COMPROBADO" in resultado.output
     assert "1 sin comprobar" in resultado.output
+    # Y no se cuenta como sin contradiccion (superviviente de T10).
+    total = len(consultas_de_unicidad(_dicc_real()))
+    assert f"Resumen: {total - 1} sin contradiccion" in resultado.output
 
 
 def test_f108_r14_un_objeto_que_no_existe_se_informa_una_vez(monkeypatch) -> None:
