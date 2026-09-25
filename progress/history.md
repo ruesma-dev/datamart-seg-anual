@@ -1299,3 +1299,19 @@ partida). Ampliada por el humano: `personal.partes_lineas.cuenta_analitica_id`
 del centro de la obra. Diccionario version 30. Pasada 1 rechazada por una frase
 ambigua de la ficha y el formato de la mutacion. Detalle:
 `progress/impl_F-107.md`, `progress/review_F-107.md`.
+
+## F-095 · Retenciones desde la contabilidad, cuadradas con los efectos, por obra y con vencimiento desde el fin de obra (cerrada el 2026-09-25, APROBADO en pasada 2)
+
+Rigor `critico`. Cuatro sub-pasos nuevos en `retenciones` (`03`-`06`): cuentas
+de retencion por `prv.cueretide`, un apunte contable por fila (se ingiere `rac`,
+71 tablas), saldo por proveedor y obra con el saldo inicial de 2008 y la
+apertura de 2016 exactos (8,78 M EUR el 24-09), obra por cascada APUNTE ->
+FACTURA -> EFECTO -> PROVEEDOR_UNA_OBRA, fin de obra (H1: inicio de garantia;
+si no, ultimo cierre + 1 mes) y plazo (`plaret` -> `plagar` -> 12 meses), y el
+cuadre contra la VIVA de los efectos de F-094 en 5 categorias. Diccionario
+version 31. Pasada 1 RECHAZADA por la mutacion (11 de 16 mutantes del reviewer
+sobrevivian, el nucleo del cuadre entre ellos); pasada 2: contrato del SQL
+expresion a expresion y campana sistematica de 264 mutantes, 0 supervivientes.
+**F-059 retirada** («las retenciones son ciegas antes de 2016»): absorbida por
+F-095, decision H6 del humano. Detalle: `progress/impl_F-095.md`,
+`progress/review_F-095.md`, `progress/mutacion_F-095.md`.

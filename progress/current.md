@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-24 · F-095 · EN CURSO (implementer) · retenciones desde la contabilidad, por obra y con vencimiento desde el fin de obra
+## 2026-09-25 · F-095 · CERRADA (`done`, APROBADO en pasada 2) · retenciones desde la contabilidad, por obra y con vencimiento desde el fin de obra · QUEDAN M1-M6 Y EL DESPLIEGUE
 
 Rama `feature/F-095-retenciones-contabilidad-fin-obra`, reapuntada a `main`
 (249b683) con `git branch -f` antes de sacarla: su unico commit (cd5f440, la

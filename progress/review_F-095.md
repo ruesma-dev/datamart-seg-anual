@@ -1,140 +1,135 @@
 <!-- progress/review_F-095.md -->
-Revisión completa (pasada 1) · `main`(249b683)..`215addc` · 2026-09-25
+Revisión incremental desde 215addc (pasada 2) · delta `215addc..bdf7c7a` · 2026-09-25
 
-# F-095 · Review · CHANGES_REQUESTED (RECHAZADO)
+# F-095 · Review · APPROVED (APROBADO)
 
-**Veredicto: RECHAZADO.** El SQL cumple la spec y H1-H7, `init.sh` está en
-verde y las nueve desviaciones están justificadas. **Lo que falla es la campaña
-de mutación de rigor `critico`.** El implementer eligió a mano 22 mutantes, y
-los 22 caen sobre fragmentos que los tests ya fijan literalmente. Yo lancé una
-muestra independiente de 16 mutantes sobre el mismo SQL y **sobreviven 11**,
-entre ellos el núcleo del cuadre (R14): `saldo_contable`, `viva_efectos` y
-`diferencia` pueden calcular otra cosa con la suite en verde.
+**Veredicto: APROBADO.** Los cinco cambios de la pasada 1 están hechos y
+verificados por mi cuenta:
+
+- el contrato del SQL fija ahora cada fórmula;
+- la campaña es sistemática (264 generados, 264 muertos);
+- mi muestra S1-S11 muere;
+- una segunda muestra mía, independiente, muere entera.
+
+Lo aprobado en la pasada 1 (SQL, spec, H1-H7, desviaciones, diccionario,
+`azure-apps`, MANUAL) se da por bueno. El delta **no toca el SQL, el step ni la
+spec**: solo `tests/test_f095_retenciones_contables.py` (+479) y `progress/`.
+Nada de lo ya aprobado queda invalidado.
 
 **Rigor:** `critico`, declarado. Exige fase RED, cobertura ≥ 80 %, campaña
 entera con 0 supervivientes y verificaciones MANUAL con su comando.
 
 ## Qué se ejecutó (resultados reales)
 
-- `bash harness/init.sh`: **exit 0**. `5417 passed, 203 skipped` en 2.269 s.
-  Cobertura `[OK] 94.7% (968/1022)`. Tamaño `[OK]`.
-- `harness.alcance` (`--base main`): 38 líneas de Python, 0 mutantes. La
-  **prueba de control** (el fichero entero, sin la exclusión de alcance) da 12:
-  el 0 es legítimo. La herramienta no muta SQL.
-- **Campaña manual del implementer, reproducida entera** sobre una copia
-  (`git archive HEAD`) en el scratchpad, con `test_f095` y `test_f047_steps`,
-  en serie. Base: 87 passed. Tiempo: 440 s para 38 mutantes. **Mueren los 22**,
-  con los mismos fallos salvo el #6: sale 1 error de colección, no 3. Además el
-  #6 es mortinato: deja un `)` suelto y lo mata un `SyntaxError`, no un test.
-- Árbol limpio (`git status`). Nada escrito en Sigrid ni en Postgres.
+- `bash harness/init.sh` tal cual, en `bdf7c7a`. El resultado está en
+  «Puertas», al final de este informe.
+- **Trazabilidad del delta.** Por `git diff --stat`: `215addc..528c2eb` toca el
+  test y `review_F-095.md`; `528c2eb..HEAD` solo toca `progress/`.
+- **RM1.** La campaña mide `528c2eb`, y de ahí a HEAD no cambia nada del
+  alcance. OK.
+- **RM2.** 1.212 s × 3 workers / 264 mutantes = 13,8 s por mutante, frente a
+  una base de 10,5-17,2 s por copia. Es coherente.
+- **Sistemática.** Crucé la tabla con el contrato (`CONTRATO_SQL`: 21 SELECT,
+  165 expresiones, 21 JOIN, de los que 20 llevan ON):
 
-## Supervivientes del reviewer (RM4: copia en el scratchpad; script `mut_review.py`)
+  | Tipo de mutante | En la campaña | Lo que cabía esperar |
+  |---|---|---|
+  | Expresiones | 164 | 165: falta solo `b.*` del CTE `fin`, que no admite `NULL` |
+  | Tipo de JOIN | 20 | 21 JOIN menos el `CROSS JOIN` |
+  | Condiciones de ON | 22 | 20 ON con 22 condiciones |
+  | WHERE / HAVING / FILTER / DISTINCT | 19 / 1 / 8 / 1 | todos los que hay |
+  | Step | 11 campos, 3 esquemas y 4 sub-pasos quitados | — |
 
-| # | fichero:línea | original → mutado |
-|---|---|---|
-| S1 | `06_views_contables.sql:46` | `SUM(s.saldo)              AS saldo_contable` → `SUM(s.altas) ...` |
-| S2 | `06:82` | `(x.saldo_contable - x.viva_efectos)` → `(x.viva_efectos - x.saldo_contable)` |
-| S3 | `06:53` | `-SUM(a.importe) AS prescrito` → `SUM(a.importe) AS prescrito` |
-| S4 | `06:62` | `SUM(importe)         AS viva_efectos` → `COUNT(*)             AS viva_efectos` |
-| S5 | `06:124` | `(f.fecha_vencimiento - CURRENT_DATE)` → `(CURRENT_DATE - f.fecha_vencimiento)` |
-| S6 | `06:113` | `    s.saldo,` → `    s.altas AS saldo,` |
-| S7 | `06:47` | `SUM(s.saldo_anterior_2016) AS ...` → `SUM(s.saldo_inicial) AS ...` |
-| S8 | `03_apuntes_contables.sql:128` | `WHERE r.asiide <> 0 AND r.conide <> 0` → `WHERE r.asiide <> 0` |
-| S9 | `03:213` | `LEFT JOIN raw.con ob ON ob.ide = r.obra_id` → `... = r.centro_coste_id` |
-| S10 | `03:208` | `ob.emp::text \|\| '-' \|\| ob.cod` → `ob.cod \|\| '-' \|\| ob.emp::text` |
-| S11 | `04_saldo_contable.sql:48` | `COUNT(*) FILTER (WHERE a.clase IN (...)) AS num_apuntes` → `COUNT(*) AS num_apuntes` |
+  No los eligió quien escribió los tests: los genera un script, y la tabla
+  trae `fichero:línea`, el texto exacto y el número de fallos.
+- **Reproducción literal de dos filas.** En una copia `git archive HEAD` del
+  scratchpad:
+  - #33 (`r.conide <> 0` → `TRUE`): 1 fallo, igual que la tabla;
+  - #190 (`a.clase IN ('ALTA', 'BAJA')` → `TRUE`): 1 fallo, igual que la tabla.
+- **S1-S11 y los 5 muertos de mi muestra anterior**, reejecutados sobre HEAD:
+  mueren los 16 (entre 1 y 2 fallos cada uno).
+- **Segunda muestra independiente, 12 mutantes**, de tipos que el generador
+  del implementer no produce: fuente del FROM, GROUP BY, orden del COALESCE de
+  la cascada, `UPPER`, `INTERVAL '1 day'`, la constante 12 → 15, un filtro
+  nuevo en `obrctr`, los bordes `<` → `<=` y `>` → `>=` de `categoria`, un
+  filtro nuevo en el CTE `contable` y un JOIN nuevo en `prescripciones`.
+  **Mueren los 12.** Base: 94 passed. Total: 204 s, en serie. Script:
+  `scratchpad/mut_review2.py`.
+- Control del 0 automático: sigue siendo el de la pasada 1 (12 mutantes fuera
+  de alcance). El 0 es legítimo.
+- El árbol queda limpio (`git status`). Nada escrito en Sigrid ni en Postgres.
 
-Los 11 dan 0 fallos. Murieron 5: el año 2016→2015, MAX→MIN de `fecinigar` y
-de `plaret`, la `clave_obra` invertida en `05` y `ejercicio - 1` → `+ 1`.
-**Ninguno de los 11 es equivalente**: todos cambian una cifra o una clave que
-se publica. S9 y S10 rompen `R-CODIGO-POR-EMPRESA` en `apuntes_contables`:
-hoy la clave solo la fija un test en `05`.
+## Juicio sobre el contrato (RM3)
+
+`test_f095_contrato_expresion_a_expresion` compara cada SELECT contra una
+tabla **escrita en el test**, no generada desde el SQL que vigila, así que no es
+tautológico. El control `..._el_parser_ve_lo_que_debe` impide que pase en vacío
+(≥ 150 expresiones y ≥ 35 cláusulas, más dos fórmulas testigo).
+
+El precio es explícito: es un contrato de texto. Cualquier cambio de fórmula
+obliga a cambiar la tabla delante del reviewer, y por eso muere todo mutante
+de texto. **Lo que valida la SEMÁNTICA con datos sigue siendo MANUAL (M4)**:
+R5, FERMALUX, reparto de `via_obra` y categorías.
+
+El #13 de la pasada 1 (`NULLS NOT DISTINCT`) queda declarado como equivalente
+semántico, muerto por un test de texto, como se pidió. No invalida la campaña.
 
 ## Checkpoints
 
-- **C1** [x] · **C2** [x] (observación para el líder: `current.md` arrastra
-  2.064 líneas de sesiones anteriores, deuda previa) · **C3** [x] hexagonal,
-  rutas en la primera línea, sin prints ni secretos, semántica Sigrid.
+- **C1** [x], si `init.sh` sale con exit 0 (ver «Puertas»).
+- **C2** [x] · **C3** [x], sin cambios desde la pasada 1.
 - **C3 bis** N/A: no toca `docs/referencia/`.
-- **C4** [x] R1-R31 trazables y en verde · [x] offline · [x] MANUAL M1-M6 con
-  comando y resultado esperado · [x] `_PgFalso` casa con `postgres_client.py:1061,1426`.
-- **C4 bis**
-  - [x] `rigor` declarado · [x] RED con traza real (64 failed) · [x] cobertura OK.
-  - [ ] **Mutación**: no hay `progress/mutacion_F-095.md`, y la campaña manual
-    no es la entera: es una selección sobre texto ya fijado, y quedan 11
-    supervivientes (S1-S11).
-  - [x] Reejecuté los 22 · [x] 8-17 s por mutante con base de 12 s · [x] base verde.
-  - [ ] **RM1**: no declara el SHA. El alcance no cambió después de `83ada78`
-    (lo comprobé): es un defecto de papeleo.
-  - [ ] **RM2**: sin tiempo total ni línea base.
-  - N/A RM5: nadie declara ningún mutante equivalente.
-  - [x] RM6: el #11 se mató endureciendo el test, sin quitar código.
-  - [ ] **Tabla manual**: le falta la línea en todas las filas, y el #6 es
-    mortinato con fallos que no reproduzco.
-  - [ ] **Cero supervivientes en `critico`**: S1-S11 no tienen ni test ni justificación.
-  - [x] «Evidencias» completa, con «1 worker, en serie».
-- **C4 ter** N/A: no hay `harness/rutas_sensibles.json`.
-- **C5** [x] T0-T22 y T26 `[x]`, con commit `F-095 Tn:`. T23-T25 son MANUAL
-  del humano, y así debe ser · [x] sin temporales · [x] `in_progress` coherente.
+- **C4** [x]:
+  - R1-R31 trazables (tabla de la pasada 1, más el contrato por objeto);
+  - offline;
+  - MANUAL M1-M6 en `current.md`;
+  - dobles: sin cambios.
+- **C4 bis**:
+  - [x] rigor · [x] RED · [x] cobertura;
+  - [x] **Mutación**: `progress/mutacion_F-095.md` existe, con 264/264/0. Recalculé el
+    alcance y el control del 0.
+  - [x] Muertos comprobados (el total pasa de 60 s): reproduje dos filas y
+    reejecuté 28 mutantes propios. No reejecuté los 264 por mi cuenta.
+  - [x] Coste por mutante coherente · [x] sin «CAMPAÑA NO VÁLIDA», base en verde.
+  - [x] RM1 (SHA completo) · [x] RM2 (base, media y workers) · N/A RM5
+    (0 supervivientes, ningún equivalente dentro de la campaña) · [x] RM6.
+  - [x] Tabla manual: `fichero:línea`, texto exacto y fallos; el #6 mortinato,
+    sustituido por sub-pasos quitados enteros que compilan.
+  - [x] 0 supervivientes · [x] «Evidencias» actualizadas.
+- **C4 ter** N/A: no hay `rutas_sensibles.json`.
+- **C5** [x] T0-T22 y T26 con commit. **T23-T25 son MANUAL del humano**: las
+  siguientes, pendientes y bien descritas, NO hechas.
 
-## Los ocho puntos del líder
+## Lo que falta para `done` (humano)
 
-1. Desviaciones correctas. El anti-join equivale al `NOT EXISTS` porque
-   `cierres_cuenta` lleva DISTINCT; R5 medido: 0 violaciones, 72 apuntes y
-   642.775,50 €, todos de 2008. FACTURA estricta es más conservadora (su cifra,
-   en M4). El cuadre usa `ABS(...) >= 1` e incluye los saldos negativos: es lo
-   seguro. Censo 71: los pines de F-107 pasan a `>=` con su motivo.
-2. `01` y `02` fuera del diff (R25). El cuadre lee `estado = 'VIVA'`, sin
-   `fecrea`, `fecbaj` ni `est`.
-3. H1 y H2 cumplidos: `MAX(obrctr.fecinigar)` → `obr.garfecini` → último día
-   del mes siguiente al último `anio_mes` con movimiento (DATE); plazo
-   `plaret` → `plagar` → 12 en una constante; 46 / 116 / 17 obras
-   (24,3 % + 72,7 %), 132.544,84 € sin fecha.
-4. `R-CODIGO-POR-EMPRESA`: fórmula de `maestro/00_setup.sql:84` y ámbito
-   ampliado. Hueco de test en `03` (S9, S10).
-5. Campaña: ver C4 bis.
-6. Nombres de persona: barrido de las líneas añadidas (mayúsculas y «Nombre
-   Apellido»); solo sale FERMALUX, que es una empresa.
-7. `azure-apps` `a698815`, en `master`: recoge `rac`, los seis objetos, la
-   nueva fuente del saldo y la dependencia del cierre.
-8. `rac` con `where: "asiide <> 0"` (la única filtrada; `check-raw-recuentos`
-   aplica el filtro) y el orden M1-M6, escritos.
+M1-M6 de `progress/current.md` §F-095, en este orden:
 
-## Cobertura requisito → test (`tests/test_f095_retenciones_contables.py`)
+1. foto ANTES (K2, B1, FERMALUX);
+2. `ingest --table rac --full`;
+3. `build-retenciones` y después `apply-grants`;
+4. las cifras (R5 = 0, FERMALUX `CUADRA`, repartos);
+5. los `check-*` y la pregunta al MCP, y después `publicar-diccionario`;
+6. la imagen nueva.
 
-| Requisitos | Tests |
-|---|---|
-| R1-R6 | `r1_*`, `r2_*`, `r3_*`, `r4_*`, `r5_*`, `r6_*` |
-| R7-R10 | `r7_*` (3), `r8_*` (2), `r9_*` (2), `r10_*` |
-| R11-R16 | `r11_*` (2), `r12_*`, `r13_*`, `r14_*`, `r15_*`, `r15_y_r16_*` (las cifras de FERMALUX son MANUAL) |
-| R17-R26 | `r17_*` (4), `r18_*`, `r19_*` (2), `r20_*`, `r21_*` (2), `r22_*` (2), `r23_*` (2), `r24_*`, `r25_*` (2), `r26_*` |
-| R27-R31 | `r27_*` (6), `r28_*` (4), `r29_*`, R30 (toda la suite es offline), `r31_*` |
+**Sin `rac` en `raw`, `build-retenciones` falla en `apuntes`.**
 
-Todos tienen test, pero **en R11, R14 y R24 el test comprueba el alias y no la
-fórmula** (S1-S7, S11).
+## Observaciones (no bloquean)
 
-## Cambios requeridos
-
-1. **Matar S1-S11** con tests que fijen la expresión, no solo el alias:
-   - `06`: líneas 46-47, 53-55 (con su `WHERE`), 62, 82, 113 y 124;
-   - `03`: línea 128, y de la 206 a la 213 (`empresa_id`, `codigo_obra`,
-     `clave_obra` y el `JOIN` por `r.obra_id`);
-   - `04`: línea 48.
-2. **Repetir la campaña manual de forma sistemática.** Al menos un mutante por
-   cada expresión del SELECT, cada `WHERE`/`FILTER`/`HAVING` y cada `JOIN` de
-   los seis `CREATE` de `03`-`06`, más S1-S11. Va en `progress/mutacion_F-095.md`,
-   que es lo que pide la verificación de T22, junto con la prueba de control del
-   0 automático.
-3. **Completar la tabla**: `fichero:línea` en cada fila, «SHA de HEAD medido»
-   completo, tiempo total, línea base y workers (RM1 y RM2).
-4. **Sustituir el #6** por un mutante que compile (quitar la línea entera
-   `_SubStep(name="views_contables", ...),`) y anotar su número real de fallos.
-5. **Cero supervivientes**, o la justificación de cada uno para que la acepte el humano.
+- `current.md` arrastra 2.064 líneas de sesiones anteriores. Es deuda previa;
+  al cerrar, lo purga el líder.
+- El generador del implementer no muta GROUP BY ni la fuente del FROM. Los
+  cubre el contrato, y mi segunda muestra lo confirma.
 
 ## Automejora (propuesta, no aplicada)
 
-- C4 bis: una campaña MANUAL sobre SQL con tests de texto genera sus mutantes
-  de forma **sistemática** (uno por expresión, filtro o join de cada `CREATE`),
-  no elegidos por quien escribió los tests; el reviewer añade su muestra.
-- RM3: con tests de texto un equivalente sí puede morir (el #13, `NULLS NOT
-  DISTINCT`, redundante con el `GROUP BY`). No invalida la campaña: se declara.
+- Mantengo la de la pasada 1: en C4 bis, que la campaña MANUAL de SQL sea
+  sistemática (script, uno por expresión, filtro o join) y el reviewer añada
+  su muestra.
+- Además, que la campaña cubra GROUP BY y la fuente del FROM. Este generador
+  no los muta.
+
+## Puertas
+
+`bash harness/init.sh` en `bdf7c7a`: **exit 0**, `5424 passed, 203 skipped`
+(1.620 s), `[OK] PUERTA COBERTURA 94.7% (968/1022)`, `[OK] PUERTA TAMAÑO`,
+**ENTORNO LISTO**. C1 [x].
