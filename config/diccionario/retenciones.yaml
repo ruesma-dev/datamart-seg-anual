@@ -1292,9 +1292,10 @@ objetos:
       100.351,55 EUR (1,2 %), 8 de ellas terminadas (42.647,96 EUR): su fecha
       es NULL, no se inventa; el 1,4 % restante son efectos sin obra. La
       garantia sube porque en Sigrid se estan dando de alta fechas de inicio
-      de garantia. Historico: 20,9 % + 76,1 % en la spec (2026-09-22); 146 y
-      200 obras de las 922, y 24,3 % (46 obras) + 72,7 % (116 obras) con 17
-      obras y 132.544,84 EUR sin fecha, el 2026-09-24.
+      de garantia. Historico: 20,9 % + 76,1 % = 97,0 % en la spec
+      (2026-09-22); 146 y 200 obras de las 922, y 24,3 % (46 obras) + 72,7 %
+      (116 obras) = 97,0 % con 17 obras y 132.544,84 EUR sin fecha, el
+      2026-09-24.
 
       El respaldo lee `cierre.fact_cierre_mensual`, que se construye DESPUES de
       las retenciones: va con una noche de retraso, y solo existe para las
@@ -1421,7 +1422,10 @@ objetos:
       prescritos); CONTABILIDAD_MAYOR 41 / +97.117,40 EUR; EFECTOS_MAYOR 81 /
       -473.670,76 EUR. Diferencia total +415.673,88 EUR (8.778.606,41
       contables, sin los saldos de menos de 1 EUR, frente a 8.362.932,53 en
-      efectos). Los recuentos son exactamente los de la spec (2026-09-22).
+      efectos). Historico, el reparto de H7 medido en la spec (2026-09-22,
+      761 proveedores), con los mismos recuentos: CUADRA 520 / 5,07 M EUR;
+      SIN_EFECTOS_VIVOS 81 / 0,99 M EUR; SIN_SALDO_CONTABLE 38 / 0,20 M EUR;
+      CONTABILIDAD_MAYOR 41 / +0,10 M EUR; EFECTOS_MAYOR 81 / -0,47 M EUR.
       **Manda la contabilidad**; la lista de descuadres es para
       Administracion (H7).
 
