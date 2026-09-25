@@ -35,6 +35,9 @@ muertos (`progress/mutacion_F-110.md`). `init.sh` verde en `cab45cd` (5.519
 passed). **Quedan T16-T18, MANUAL del humano**: build-retenciones +
 apply-grants, check-*, publicar-diccionario (v34), reinicio del MCP y
 despliegue de imagen; comandos en `progress/impl_F-110.md` §Lo que falta.
+Segunda pasada de `bash harness/init.sh` en `f730acf` (con el informe ya
+commiteado): 5.519 passed, 203 skipped en 765,82 s; COBERTURA 95,1 %; TAMANO
+impl 194/220; ENTORNO LISTO, exit 0.
 
 ## 2026-09-25 · F-110 · SPEC APROBADA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes
 
