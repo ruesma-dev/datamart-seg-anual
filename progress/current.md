@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-25 · F-110 · IMPLEMENTACION EN CURSO (`in_progress`) · fin de obra por el ultimo cuatrimestral + 1 mes
+## 2026-09-25 · F-110 · IMPLEMENTADA, PENDIENTE DE REVIEW (`in_progress`) · fin de obra por el ultimo cuatrimestral + 1 mes
 
 Implementer en la rama `feature/F-110-fin-obra-cuatrimestral` (desde `main`
 79a4505, con F-108: el diccionario sube a la **34**). T0 hecha: F-095 `done` y la
@@ -27,6 +27,14 @@ Decisiones de implementacion:
 **Diccionario del arbol tras F-110 (version 34): 172 objetos, 1185 columnas,
 76 de consumo** (las dos columnas nuevas de `retenciones.fin_obra`). Sin
 publicar: `publicar-diccionario` es escritura contra Azure y la lanza el humano.
+
+T0-T15 y T19 hechas (commit por tarea; `azure-apps` f087516). Verificado en
+solo lectura el SELECT nuevo: 922 filas, 198/36/688 por fuente, viva 97/32/50
+obras con las cifras exactas de `design.md`. Mutacion sistematica: 114/114
+muertos (`progress/mutacion_F-110.md`). `init.sh` verde en `cab45cd` (5.519
+passed). **Quedan T16-T18, MANUAL del humano**: build-retenciones +
+apply-grants, check-*, publicar-diccionario (v34), reinicio del MCP y
+despliegue de imagen; comandos en `progress/impl_F-110.md` §Lo que falta.
 
 ## 2026-09-25 · F-110 · SPEC APROBADA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes
 
