@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-24 · F-108 · SPEC LISTA (`spec_ready`) · claves alternativas en el diccionario y en `check-unicidad`
+## 2026-09-24 · F-108 · SPEC (historico; cerrada el 2026-09-25) · claves alternativas en el diccionario y en `check-unicidad`
 
 Spec en `specs/F-108-claves-alternativas/`, escrita en la rama
 `feature/F-108-claves-alternativas` (desde `main`, en un worktree aparte
@@ -2130,7 +2130,7 @@ el historial de la rama. Lo aprobado el 2026-09-23, sin decisiones abiertas:
 
 Cifras y consultas de la medicion: `progress/spec_F-102.md`.
 
-## 2026-09-25 · F-108 · IMPLEMENTACION en curso (implementer)
+## 2026-09-25 · F-108 · CERRADA (`done`, APROBADO) · claves alternativas · QUEDA PUBLICAR EL DICCIONARIO v33 Y DESPLEGAR
 
 Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
 `in_progress`. Decisiones D1-D5 aprobadas (`progress/spec_F-108.md`).

@@ -1714,7 +1714,7 @@
         "`maestro.obras.clave_obra` y `personal.recursos.clave_recurso` declaradas como claves alternativas; las relaciones por `clave_obra` de `compras` pasan a `N:1`",
         "Tests de la puerta con un caso que colisiona y otro que no, sin red"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 3,
