@@ -190,7 +190,7 @@ def test_f110_r8_fin_de_obra() -> None:
 def test_f110_r9_fuente_del_fin_de_obra() -> None:
     assert FUENTE_ESPERADA in _cte(FIN_OBRA, "fin")
     assert "ULTIMO_CIERRE_MAS_1_MES" not in _sql(FIN_OBRA), "ese valor deja de existir (R9)"
-    valores = set(re.findall(r"'([A-Z_]+_[A-Z_]+)'", _cte(FIN_OBRA, "fin")))
+    valores = set(re.findall(r"'([A-Z][A-Z0-9_]*)'", _cte(FIN_OBRA, "fin")))
     assert valores == set(FUENTES), "sin mas valores"
     assert _ficha("fin_obra")["columnas"]["fuente_fin_obra"]["valores"] == FUENTES
     assert _ficha("v_retencion_contable_obra")["columnas"]["fuente_fin_obra"]["valores"] == FUENTES
