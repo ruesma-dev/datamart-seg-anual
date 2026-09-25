@@ -80,6 +80,32 @@ y la lanza el humano (T25).
    fuera del consumo (`cuentas_proveedor`, `apuntes_contables`, `fin_obra`),
    cada una con su hecho: el test obliga a inventariarlas o subirlas.
 
+### F-095 · VERIFICACIONES HECHAS EL 2026-09-25 (lider, autorizado por el humano)
+
+Tras la nocturna del 25 (verde, 00:00-03:49 UTC, imagen de F-107):
+- **M1** antes: FERMALUX (1958815) `saldo_vivo` 64.201,96.
+- **M2** `ingest --table rac --full`: 755.634 filas en 134 s; `check-raw-recuentos` OK.
+- **M3** `build-retenciones` SUCCESS en 65 s (apuntes 49.520, saldo 6.468,
+  fin_obra 922) y `apply-grants` SUCCESS.
+- **M4** R5 0 cuentas; saldo contable 8.778.606,70; FERMALUX CUADRA
+  64.201,96/64.201,96; categorias EXACTAS a H7: CUADRA 520 (5,08 M),
+  EFECTOS_MAYOR 81, SIN_EFECTOS_VIVOS 81, CONTABILIDAD_MAYOR 41,
+  SIN_SALDO_CONTABLE 38. `via_obra`: altas con obra **93,7 %** (la spec decia
+  ~97 %), bajas **77,3 %** (spec ~77 %).
+- **Fin de obra, DISTINTO de lo medido el 24-09, y por buena causa**: 198 obras
+  con INICIO_GARANTIA y 150 con ULTIMO_CIERRE_MAS_1_MES (el 24-09: 146 / 200).
+  `raw.obrctr` se reingirio esta noche: se estan dando de alta fechas de inicio
+  de garantia en Sigrid (lo anticipo el humano en H1). Sobre la retencion viva:
+  INICIO_GARANTIA **97 obras / 5,03 M EUR**, ULTIMO_CIERRE **67 / 3,12 M**, sin
+  fecha **15 / 100.351,55** (el 24-09: 46 / 116 / 17). La ficha de
+  `retenciones.yaml` (l. ~1270) aun cita 20,9 % + 76,1 %: cifra vieja, a
+  remedir en la proxima feature que toque `retenciones`.
+- **M5** `check-declarados` 172/172; `check-relaciones` 137 unen, 0 no unen;
+  `check-unicidad` sin novedad (solo la rota de F-051); `publicar-diccionario`
+  **version 31** (hash 0dbcbe259d45, 172 objetos) y `check-diccionario` OK; MCP
+  reiniciado.
+- **M6** desplegada ya (`r20260925-0233`).
+
 ### VERIFICACIONES MANUAL (humano) — F-095
 
 Orden obligatorio: `rac` no existe todavia en `raw`; sin ella `build-retenciones`
