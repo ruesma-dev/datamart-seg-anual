@@ -577,6 +577,9 @@ def test_f108_r12_una_alternativa_rota_sale_con_uno(monkeypatch) -> None:
     assert ("maestro.obras", "alternativa", ("clave_obra",)) in pg.preguntadas
     assert "KO   maestro.obras: la clave alternativa (clave_obra)" in resultado.output
     assert "1 con la clave rota" in resultado.output
+    # Y no se cuenta como sin contradiccion (superviviente de T10).
+    total = len(consultas_de_unicidad(_dicc_real()))
+    assert f"Resumen: {total - 1} sin contradiccion" in resultado.output
 
 
 def test_f108_r12_todo_limpio_con_alternativas_sale_con_cero(monkeypatch) -> None:
