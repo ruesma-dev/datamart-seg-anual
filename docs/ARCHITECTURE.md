@@ -620,6 +620,16 @@ poder preguntarle a nadie si algo no encaja.
   publicado sin ficha, ficha sin objeto, tipo que no casa— y avisa si lo
   publicado va por detrás del repositorio. La puerta offline de
   `bash harness/init.sh` solo puede exigir ficha **o** pendiente declarado.
+- **Claves alternativas (F-108).** Además de su `clave_negocio`, una ficha
+  puede declarar `claves_alternativas: [[col, ...], ...]`: otras combinaciones
+  de columnas que TAMBIÉN identifican una fila, como `clave_obra` en
+  `maestro.obras` (cuya clave de negocio sigue siendo `obra_id`). El validador
+  del diccionario acepta una alternativa de UNA columna como lado 1 de una
+  relación —por eso las relaciones de `compras` por `clave_obra` son `N:1`—, y
+  `python main.py check-unicidad` la comprueba contra la base igual que la de
+  negocio, sin contar las filas con la clave a NULL; una rota sale con código 1.
+  Es un aviso de auditoría y no un índice único: un duplicado no tumba la
+  nocturna. Se publican dentro del `JSONB` de la ficha, sin DDL.
 
 Lo que este proyecto **expone al ecosistema** y quién lo consume está en
 `azure-apps/datamart_seg_anual.md`, y no se duplica aquí.
