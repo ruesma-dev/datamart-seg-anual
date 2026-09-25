@@ -2160,7 +2160,12 @@ el historial de la rama. Lo aprobado el 2026-09-23, sin decisiones abiertas:
 
 Cifras y consultas de la medicion: `progress/spec_F-102.md`.
 
-## 2026-09-25 · F-108 · CERRADA (`done`, APROBADO) · claves alternativas · QUEDA PUBLICAR EL DICCIONARIO v33 Y DESPLEGAR
+## 2026-09-25 · F-108 · CERRADA (`done`, APROBADO) · claves alternativas · DESPLEGADA Y PUBLICADA
+
+> **2026-09-25 ~19:46 UTC**: imagen `r20260925-2144` desde `main` 79a4505 (el job
+> pasa de `r20260925-0233`); diccionario **version 33** publicado (hash
+> e11e2586f079, `check-diccionario` OK) y MCP reiniciado (sirve la v33). Sin
+> builds: F-108 no toca datos.
 
 Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
 `in_progress`. Decisiones D1-D5 aprobadas (`progress/spec_F-108.md`).
