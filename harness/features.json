@@ -1746,7 +1746,7 @@
         "Medido y escrito el efecto: obras y euros de lo vivo por fuente antes y despues, obras que se quedan sin fecha y vencimientos que cambian de estado",
         "Definido y justificado de donde se lee el cuatrimestral (y la dependencia del paso) sin romper la nocturna"
       ],
-      "status": "spec_ready",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 1,

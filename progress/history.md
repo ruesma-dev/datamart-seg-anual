@@ -1329,3 +1329,18 @@ codigo_cuenta)`, `maestro.centros_coste (empresa, codigo_centro)`,
 `stg.obras.codigo_obra`). Diccionario version 33. Servir las claves al agente es
 cosa de `mcp-bbdd` (D4). Detalle: `progress/impl_F-108.md`,
 `progress/review_F-108.md`.
+
+## F-110 · Retenciones: fin de obra por el ultimo mes planificado del ultimo cuatrimestral + 1 (cerrada el 2026-09-26, APROBADO en pasada 1)
+
+Cambia la decision H1 de F-095 por decision del humano del 2026-09-25: el fin de
+obra es el inicio de garantia; si no, el ultimo mes con importe planificado de la
+ultima version `Cuatrimestral` (por numero) + 1 mes, al ultimo dia del mes
+siguiente (ejemplo del humano: planificada hasta marzo 28 -> 30-04-2028); si no,
+SIN FECHA. El ultimo cierre ya no interviene y `ultimo_cierre` queda como columna
+informativa. Lee `mart.master_versiones_tipadas` y `stg.plan_mensual` sin tocar
+`depends_on`. Efecto medido: 15 obras en curso (2,72 M EUR) retrasan su fin
++6,6 meses de media; 35 obras vivas (159.677 EUR) y 102 de saldo contable
+(643.735 EUR) quedan sin fecha; `1-0692` pasa a VENCIDA. Rigor `critico`:
+campana sistematica de 114 mutantes, 0 supervivientes; muestra del reviewer de
+12, todos muertos. Diccionario version 34. Detalle: `progress/impl_F-110.md`,
+`progress/review_F-110.md`, `progress/spec_F-110.md`.

@@ -159,12 +159,17 @@ sin construir esa noche.
   - El vencimiento cuenta desde el **fin de obra** (decisión del humano del
     2026-09-22), nunca desde la factura: inicio de garantía
     (`obrctr.fecinigar` / `obr.garfecini`) o, si no hay, el último día del mes
-    siguiente al último cierre con movimiento de `cierre.fact_cierre_mensual`,
-    más el plazo del cliente (`plaret` → `plagar` → 12). Ese respaldo va con
-    **una noche de desfase**: `build_cierre` corre después de
-    `build_retenciones`, y si su tabla estuviera vacía el sub-paso `fin_obra`
-    falla en vez de publicar sin fechas. `retenciones.fin_obra` y
-    `retenciones.v_retencion_contable_obra`.
+    siguiente al último mes con importe planificado de la **última versión
+    cuatrimestral** de la obra (F-110, decisión del humano del 2026-09-25:
+    `mart.master_versiones_tipadas` dice qué versión y `stg.plan_mensual` qué
+    meses); si tampoco, sin fecha. Más el plazo del cliente (`plaret` →
+    `plagar` → 12). Las dos tablas son de la **misma noche**: en `run-all`,
+    `build_stg` y `build_mart` corren antes que `build_retenciones`, sin
+    declararlos en `depends_on` (si fallan, se usan las de la noche anterior).
+    El último cierre con movimiento (`cierre.fact_cierre_mensual`) se publica
+    solo como columna informativa, con **una noche de desfase** porque
+    `build_cierre` corre después, y ya no interviene en el vencimiento.
+    `retenciones.fin_obra` y `retenciones.v_retencion_contable_obra`.
 
 ## Acceso a datos
 

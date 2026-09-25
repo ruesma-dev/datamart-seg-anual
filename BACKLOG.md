@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **102 features**, 64 abiertas, 38 terminadas.
+Resumen: **102 features**, 63 abiertas, 39 terminadas.
 
 Bloqueadas: **F-052**.
 
@@ -11,7 +11,6 @@ Bloqueadas: **F-052**.
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-110 | Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1) | 1 | spec lista | critico | `feature/F-110-fin-obra-cuatrimestral` |
 | F-109 | El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras | 5 | pendiente | estandar | `feature/F-109-partidas-codigo-no-unico` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 6 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 7 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
@@ -88,6 +87,7 @@ Bloqueadas: **F-052**.
 | F-057 | El coste de personal por obra: stg y mart sobre recursos, empleados y partes (raw por F-066) | 1 | estandar |
 | F-101 | HOTFIX de F-057: la cabecera del parte, el codigo y el texto en cada linea, y los tipos de hora con sus precios de la ficha del recurso | 1 | estandar |
 | F-107 | Contrapartidas del recurso y catalogo de cuentas analiticas (correo de Juan Romero del 23-09) | 1 | estandar |
+| F-110 | Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1) | 1 | critico |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-066 | Ingerir de Sigrid los raw que faltan: recursos, empleados y partes; la contabilidad; firmas, familias y actividades del proveedor | 2 | critico |
@@ -120,12 +120,6 @@ Bloqueadas: **F-052**.
 | F-008 | Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api | 21 | documental |
 
 ## Detalle
-
-### F-110 · Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1)
-
-estado **spec lista** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-110-fin-obra-cuatrimestral`
-
-Decidido por el humano el 2026-09-25, prioridad 1. CAMBIA LA DECISION H1 DE F-095 (2026-09-22). Regla nueva de `retenciones.fin_obra.fecha_fin_obra`, en este orden y SIN MAS PASOS: (1) el inicio del periodo de garantia (`obrctr.fecinigar`, si no `obr.garfecini`), como hoy; (2) si no lo hay, el ULTIMO MES PLANIFICADO EN LA ULTIMA VERSION CUATRIMESTRAL (master) de la obra + 1 mes; (3) si tampoco hay cuatrimestral, SIN FECHA (NULL, no se inventa). **SE ELIMINA el respaldo «ultimo cierre con movimiento + 1 mes»** (`ULTIMO_CIERRE_MAS_1_MES`, que leia `cierre.fact_cierre_mensual`): el humano lo quita porque mira hacia atras y en una obra en curso adelanta el vencimiento. El resto de F-095 no cambia: plazo `plaret` -> `plagar` -> 12 meses y vencimiento = fin de obra + plazo. POR QUE: el ultimo cierre + 1 da, en una obra viva, una fecha de hace poco; el cuatrimestral dice cuando PREVE la obra terminar. MEDIDO EL 2026-09-25 (verificaciones de F-095): sobre la retencion viva, INICIO_GARANTIA 97 obras / 5.026.655,18 EUR, ULTIMO_CIERRE_MAS_1_MES 67 / 3.120.260,42 y sin fecha 15 / 100.351,55; en las 922 obras, 198 con garantia y 150 con ultimo cierre. QUE HAY QUE MEDIR ANTES DE ESCRIBIR: cuantas obras tienen version cuatrimestral y cual es su ultimo mes planificado (las versiones master viven en `stg` —ambitos 8 y 11, `stg.version_master_vigente`, `stg.fn_master_mes_representado`—; decidir si «la ultima» es la vigente de F-042 o la de mayor fecha), cuantas de las 67 pasan a tener fecha por cuatrimestral y cuantas se quedan sin fecha, y cuanto se mueven los vencimientos (VENCIDA -> PENDIENTE). Ojo a la dependencia: si el cuatrimestral se lee de `stg`, `build_retenciones` pasa a depender de `build_stg` (hoy lee `cierre`, que va con una noche de retraso); decidirlo y escribirlo. Respetar `R-CODIGO-POR-EMPRESA`.
 
 ### F-109 · El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras
 
@@ -552,6 +546,12 @@ HOTFIX de F-057, pedido por **Juan Romero** el 2026-09-22 y marcado **prioritari
 estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-107-contrapartidas-cuentas-analiticas`
 
 Pedido por el humano el 2026-09-24 para hacer YA (prioridad 1). Correo de Juan Romero del 23-09 18:02: tras F-101 ya cuadra los precios de la ficha contra los partes, pero le faltan (1) LAS CONTRAPARTIDAS de la ficha del recurso —centro de coste y cuenta analitica de contrapartida, que descargan los partes contra el coste real de nomina; sin ellas tiene el cargo a la obra pero no el abono y no puede reproducir el asiento— y (2) EL CATALOGO DE CUENTAS ANALITICAS para traducir los identificadores (496869, 496923, 496935...) a codigo y descripcion. MEDIDO POR EL LIDER EL 2026-09-24 en solo lectura: `raw.reshor` NO tiene columnas de contrapartida (solo `cuaide`, `caaide`, `proide`; `cuaide` y `proide` a 0 en todas las filas), tampoco en el diccionario de Sigrid (`azure-apps/sigrid_tablas.md`). Las contrapartidas estan en el RECURSO: `res.cenconide` («Centro de coste contrapartida», indice a `cen`) y `res.caaconide` («Cuenta analitica contrapartida», indice a `caa`), informadas en 1.979 recursos, 9 centros distintos y 848 cuentas distintas; `res` ya se ingiere. Una cuenta analitica es un concepto de Sigrid (`con`): 496869 = '00000.CIMO02' JEFE DE OBRA, 496923 = '00000.CICO01' COMBUSTIBLES-GASOIL, 496935 = '00000.CICO13' TELEFONO MOVIL (`con.tip = 19`, comprobar); sus propiedades estan en `caa` (padide -> `cag`, cenide, niv, prpide, prbide, rep), tabla NO ingerida. QUE HACER: (a) `personal.recursos` gana `centro_coste_contrapartida_id` y `cuenta_analitica_contrapartida_id` (NULLIF 0), con su ficha diciendo que la contrapartida es del RECURSO y no por tipo de hora; (b) ingerir `caa` y publicar `maestro.cuentas_analiticas` (una fila por cuenta: id, empresa_id, codigo, descripcion desde `con`; cuenta padre, nivel, centro de coste y partida presupuestaria desde `caa`; activa/fecha_baja como el resto de maestros), sin filtrar; (c) relaciones en el diccionario desde `personal.recursos_tipos_hora.cuenta_analitica_id`, las dos contrapartidas y `personal.partes_lineas` si trae cuenta; (d) medir cuantas cuentas usadas en `personal` casan con el catalogo. Respetar `R-CODIGO-POR-EMPRESA` (F-102): el codigo de cuenta puede repetirse por empresa.
+
+### F-110 · Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1)
+
+estado **terminada** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-110-fin-obra-cuatrimestral`
+
+Decidido por el humano el 2026-09-25, prioridad 1. CAMBIA LA DECISION H1 DE F-095 (2026-09-22). Regla nueva de `retenciones.fin_obra.fecha_fin_obra`, en este orden y SIN MAS PASOS: (1) el inicio del periodo de garantia (`obrctr.fecinigar`, si no `obr.garfecini`), como hoy; (2) si no lo hay, el ULTIMO MES PLANIFICADO EN LA ULTIMA VERSION CUATRIMESTRAL (master) de la obra + 1 mes; (3) si tampoco hay cuatrimestral, SIN FECHA (NULL, no se inventa). **SE ELIMINA el respaldo «ultimo cierre con movimiento + 1 mes»** (`ULTIMO_CIERRE_MAS_1_MES`, que leia `cierre.fact_cierre_mensual`): el humano lo quita porque mira hacia atras y en una obra en curso adelanta el vencimiento. El resto de F-095 no cambia: plazo `plaret` -> `plagar` -> 12 meses y vencimiento = fin de obra + plazo. POR QUE: el ultimo cierre + 1 da, en una obra viva, una fecha de hace poco; el cuatrimestral dice cuando PREVE la obra terminar. MEDIDO EL 2026-09-25 (verificaciones de F-095): sobre la retencion viva, INICIO_GARANTIA 97 obras / 5.026.655,18 EUR, ULTIMO_CIERRE_MAS_1_MES 67 / 3.120.260,42 y sin fecha 15 / 100.351,55; en las 922 obras, 198 con garantia y 150 con ultimo cierre. QUE HAY QUE MEDIR ANTES DE ESCRIBIR: cuantas obras tienen version cuatrimestral y cual es su ultimo mes planificado (las versiones master viven en `stg` —ambitos 8 y 11, `stg.version_master_vigente`, `stg.fn_master_mes_representado`—; decidir si «la ultima» es la vigente de F-042 o la de mayor fecha), cuantas de las 67 pasan a tener fecha por cuatrimestral y cuantas se quedan sin fecha, y cuanto se mueven los vencimientos (VENCIDA -> PENDIENTE). Ojo a la dependencia: si el cuatrimestral se lee de `stg`, `build_retenciones` pasa a depender de `build_stg` (hoy lee `cierre`, que va con una noche de retraso); decidirlo y escribirlo. Respetar `R-CODIGO-POR-EMPRESA`.
 
 ### F-009 · Inventario del entorno Azure existente
 

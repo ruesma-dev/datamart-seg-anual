@@ -14,6 +14,13 @@ Decisiones del humano del 2026-09-22 que estos tests sostienen (H1-H7 de
 fin de obra + plazo y la fecha de la factura no interviene NUNCA (R23); fin de
 obra = inicio de garantia con respaldo en el ultimo cierre con movimiento + 1
 mes (H1); plazo = `plaret` -> `plagar` -> 12 (H2); `rac` filtrada (H4).
+
+**F-110 (decision del humano del 2026-09-25) cambia H1**: sin inicio de
+garantia, el fin de obra es el ultimo mes planificado de la ultima version
+`Cuatrimestral` + 1 mes, y `ultimo_cierre` se queda como columna INFORMATIVA.
+Los tests de aqui que fijaban el respaldo por el cierre estan REESCRITOS a la
+regla nueva y lo dicen en su docstring (R21 de F-110); la suite propia de la
+regla es `tests/test_f110_fin_obra_cuatrimestral.py`.
 """
 
 from __future__ import annotations
@@ -412,6 +419,7 @@ def test_f095_r17_informativas_cada_una_en_su_columna() -> None:
 
 
 def test_f095_r18_ultimo_cierre_con_movimiento() -> None:
+    """La regla de `ultimo_cierre` no cambia; desde F-110 es solo INFORMATIVA (D5)."""
     bloque = _cte(FIN_OBRA, "cierres")
     assert "SELECT f.obra_id, MAX(f.anio_mes) AS ultimo_cierre" in bloque
     assert "FROM cierre.fact_cierre_mensual f WHERE f.ejecutado_mes <> 0" in bloque, (
@@ -422,30 +430,37 @@ def test_f095_r18_ultimo_cierre_con_movimiento() -> None:
 
 
 def test_f095_r21_guarda_cierre_vacio() -> None:
+    """Reescrito por F-110 (R14): del cierre queda solo la guarda de EXISTENCIA.
+
+    `ultimo_cierre` ya es informativa, asi que una tabla del cierre VACIA no
+    tumba el vencimiento; las otras tres guardas son de la version y del plan.
+    """
     texto = _sql(FIN_OBRA)
     guarda = _bloque(FIN_OBRA, "DO $$", "END $$;")
     assert "to_regclass('cierre.fact_cierre_mensual') IS NULL" in guarda
-    assert "IF NOT EXISTS (SELECT 1 FROM cierre.fact_cierre_mensual)" in guarda
-    assert guarda.count("RAISE EXCEPTION") == 2
-    assert "fin_obra" in guarda, "el fallo lleva el nombre del sub-paso (R21)"
+    assert "IF NOT EXISTS (SELECT 1 FROM cierre.fact_cierre_mensual)" not in guarda
+    assert guarda.count("RAISE EXCEPTION") == 4
+    assert guarda.count("RAISE EXCEPTION 'fin_obra: ") == 4, "el fallo lleva el nombre del sub-paso (R21)"
     assert texto.index("DO $$") < texto.index("CREATE TABLE retenciones.fin_obra"), (
         "la guarda va ANTES de publicar nada"
     )
 
 
 def test_f095_r19_fin_obra_y_fuente() -> None:
+    """Reescrito por F-110 (R8, R9): el respaldo es el ultimo cuatrimestral, no el cierre."""
     texto = _sql(FIN_OBRA)
     assert (
         "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN b.fecha_inicio_garantia "
-        "WHEN b.ultimo_cierre IS NOT NULL THEN "
-        "(b.ultimo_cierre + INTERVAL '2 months' - INTERVAL '1 day')::DATE "
+        "WHEN b.ultimo_mes_planificado IS NOT NULL THEN "
+        "(b.ultimo_mes_planificado + INTERVAL '2 months' - INTERVAL '1 day')::DATE "
         "END AS fecha_fin_obra"
-    ) in texto, "garantia; si no, ultimo dia del mes siguiente al ultimo cierre (R19)"
+    ) in texto, "garantia; si no, ultimo dia del mes siguiente al ultimo mes planificado (F-110)"
     assert (
         "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN 'INICIO_GARANTIA' "
-        "WHEN b.ultimo_cierre IS NOT NULL THEN 'ULTIMO_CIERRE_MAS_1_MES' "
+        "WHEN b.ultimo_mes_planificado IS NOT NULL THEN 'ULTIMO_CUATRIMESTRAL_MAS_1_MES' "
         "END AS fuente_fin_obra"
     ) in texto
+    assert "ULTIMO_CIERRE_MAS_1_MES" not in texto
 
 
 def test_f095_r19_no_usa_informativas() -> None:
@@ -459,13 +474,14 @@ def test_f095_r19_no_usa_informativas() -> None:
 
 
 def test_f095_r20_sin_fecha_no_se_inventa() -> None:
+    """Reescrito por F-110 (R11): sin garantia ni cuatrimestral con plan, NULL."""
     texto = _sql(FIN_OBRA)
     assert (
         "(f.fecha_fin_obra IS NULL AND COALESCE(f.estado_obra, 0) IN (19, 21, 23, 25)) "
         "AS terminada_sin_fin_obra"
     ) in texto
     assert "ELSE" not in _bloque(FIN_OBRA, "END AS fuente_plazo,", "END AS fecha_fin_obra"), (
-        "sin garantia ni cierre, NULL: no se inventa una fecha (R20)"
+        "sin garantia ni cuatrimestral con plan, NULL: no se inventa una fecha (F-110 R11)"
     )
 
 
@@ -664,6 +680,7 @@ def test_f095_r27_el_step_encadena_y_cuenta(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_f095_r21_un_fallo_en_fin_obra_sale_con_su_nombre(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reescrito por F-110 (R14): el error de ejemplo es una de las guardas nuevas."""
     from etl_sigrid.application.steps import build_retenciones_step
     from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
     from etl_sigrid.domain.entities import StepStatus
@@ -675,7 +692,9 @@ def test_f095_r21_un_fallo_en_fin_obra_sale_con_su_nombre(monkeypatch: pytest.Mo
         def execute_sql_file(self, path: Path) -> None:
             self.ejecutados.append(path.name)
             if path.name == FIN_OBRA:
-                raise RuntimeError("cierre.fact_cierre_mensual esta vacia")
+                raise RuntimeError(
+                    "fin_obra: mart.master_versiones_tipadas no tiene ninguna version Cuatrimestral"
+                )
 
         def count_rows(self, schema: str, table: str) -> int:
             return 1
@@ -726,13 +745,16 @@ def test_f095_d3_centros_coste_solo_raw() -> None:
 
 
 def test_f095_d7_solo_fact_cierre() -> None:
+    """Reescrito por F-110 (D4): ademas de `raw` y el cierre, la version y el plan."""
     texto = _sql(FIN_OBRA)
-    de_cierre = set(re.findall(r"cierre\.(\w+)", texto))
+    de_cierre = set(re.findall(r"(?<![\w])cierre\.(\w+)", texto))
     assert de_cierre == {"fact_cierre_mensual"}, (
         f"de `cierre` solo se lee la tabla de hechos (D7), no {sorted(de_cierre)}"
     )
+    assert set(re.findall(r"(?<![\w])mart\.(\w+)", texto)) == {"master_versiones_tipadas"}
+    assert set(re.findall(r"(?<![\w])stg\.(\w+)", texto)) == {"plan_mensual"}
     esquemas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+)\.\w+", texto))
-    assert esquemas <= {"raw", "cierre"}, f"05_fin_obra.sql lee {sorted(esquemas)}"
+    assert esquemas == {"raw", "cierre", "mart", "stg"}, f"05_fin_obra.sql lee {sorted(esquemas)}"
 
 
 def test_f095_d7_apuntes_solo_raw_y_el_puente() -> None:
@@ -816,13 +838,16 @@ def test_f095_r28_claves_de_negocio() -> None:
 
 
 def test_f095_r28_las_fichas_traen_las_cifras_medidas() -> None:
+    """Reescrito por F-110 (R19): las cifras de `fin_obra` son las de la regla nueva;
+    las de F-095 siguen en la ficha como historicas y con fecha."""
     apuntes = _texto_ficha(_ficha("apuntes_contables"))
     for dato in ("49.505", "APUNTE", "FACTURA", "EFECTO", "PROVEEDOR_UNA_OBRA", "SIN_OBRA",
                  "642.775,50", "SALDO_INICIAL"):
         assert dato in apuntes, f"la ficha de apuntes_contables no dice «{dato}»"
     fin = _texto_ficha(_ficha("fin_obra"))
     for dato in ("20,9", "76,1", "97,0", "132.544,84", "INICIO_GARANTIA",
-                 "ULTIMO_CIERRE_MAS_1_MES", "PLAZO_FIJO_12", "una noche"):
+                 "ULTIMO_CUATRIMESTRAL_MAS_1_MES", "2.960.583,38", "260.028,59",
+                 "PLAZO_FIJO_12", "una noche"):
         assert dato in fin, f"la ficha de fin_obra no dice «{dato}»"
     saldo = _texto_ficha(_ficha("saldo_contable"))
     assert "8.760.524,49" in saldo
@@ -883,7 +908,9 @@ def test_f095_r31_arquitectura_y_azure_apps() -> None:
 # cada clausula de su FROM (JOIN con su ON, WHERE, GROUP BY, HAVING). Cambiar
 # una formula obliga a cambiar esta tabla, delante del reviewer. Revisada
 # contra la spec linea a linea: R1-R8 (03), R11 (04), R17-R23 (05), R14-R15 y
-# R24 (06), y R-CODIGO-POR-EMPRESA en las claves de obra.
+# R24 (06), y R-CODIGO-POR-EMPRESA en las claves de obra. F-110 reescribe la
+# entrada de `fin_obra`: CTE `cuatrimestral` y `plan`, sus dos columnas en `base`
+# y en la lista final, y el fin de obra por el ultimo mes planificado.
 
 _CLAUSULAS = ("WHERE ", "GROUP BY ", "HAVING ", "LEFT JOIN ", "FULL JOIN ",
               "CROSS JOIN ", "JOIN ", "ORDER BY ")
@@ -1174,6 +1201,29 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
         (
             False,
             [
+                'v.obra_id',
+                'MAX(v.version) AS version_cuatrimestral',
+            ],
+            [
+                "WHERE v.tipo_master = 'Cuatrimestral'",
+                'GROUP BY v.obra_id',
+            ],
+        ),
+        (
+            False,
+            [
+                'c.obra_id',
+                'c.version_cuatrimestral',
+                'MAX(pm.anio_mes) FILTER (WHERE pm.importe_mes <> 0) AS ultimo_mes_planificado',
+            ],
+            [
+                'LEFT JOIN stg.plan_mensual pm ON pm.obra_id = c.obra_id AND pm.version = c.version_cuatrimestral AND pm.ambito_id IN (8, 11)',
+                'GROUP BY c.obra_id, c.version_cuatrimestral',
+            ],
+        ),
+        (
+            False,
+            [
                 'obr.ide AS obra_id',
                 'con.emp AS empresa_id',
                 'con.cod AS codigo_obra',
@@ -1182,6 +1232,8 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 'con.est AS estado_obra',
                 'COALESCE(retenciones.fn_sigrid_date(oc.fec_inicio_garantia), retenciones.fn_sigrid_date(obr.garfecini)) AS fecha_inicio_garantia',
                 'ci.ultimo_cierre AS ultimo_cierre',
+                'pl.version_cuatrimestral AS version_cuatrimestral',
+                'pl.ultimo_mes_planificado AS ultimo_mes_planificado',
                 'COALESCE( oc.fec_real_fin, retenciones.fn_sigrid_date(obr.fecfinrea) ) AS fecha_fin_real',
                 'oc.fec_recepcion_provisional AS fecha_recepcion_provisional',
                 'COALESCE( oc.fec_prev_fin, retenciones.fn_sigrid_date(obr.fecfinpre) ) AS fecha_fin_prevista',
@@ -1193,6 +1245,7 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 'LEFT JOIN raw.con con ON con.ide = obr.ide',
                 'LEFT JOIN oc ON oc.obra_id = obr.ide',
                 'LEFT JOIN cierres ci ON ci.obra_id = obr.ide',
+                'LEFT JOIN plan pl ON pl.obra_id = obr.ide',
                 'CROSS JOIN constantes k',
             ],
         ),
@@ -1200,8 +1253,8 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
             False,
             [
                 'b.*',
-                "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN b.fecha_inicio_garantia WHEN b.ultimo_cierre IS NOT NULL THEN (b.ultimo_cierre + INTERVAL '2 months' - INTERVAL '1 day')::DATE END AS fecha_fin_obra",
-                "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN 'INICIO_GARANTIA' WHEN b.ultimo_cierre IS NOT NULL THEN 'ULTIMO_CIERRE_MAS_1_MES' END AS fuente_fin_obra",
+                "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN b.fecha_inicio_garantia WHEN b.ultimo_mes_planificado IS NOT NULL THEN (b.ultimo_mes_planificado + INTERVAL '2 months' - INTERVAL '1 day')::DATE END AS fecha_fin_obra",
+                "CASE WHEN b.fecha_inicio_garantia IS NOT NULL THEN 'INICIO_GARANTIA' WHEN b.ultimo_mes_planificado IS NOT NULL THEN 'ULTIMO_CUATRIMESTRAL_MAS_1_MES' END AS fuente_fin_obra",
             ],
             [
             ],
@@ -1217,6 +1270,8 @@ CONTRATO_SQL: dict[str, list[tuple[bool, list[str], list[str]]]] = {
                 'f.estado_obra',
                 'f.fecha_inicio_garantia',
                 'f.ultimo_cierre',
+                'f.version_cuatrimestral',
+                'f.ultimo_mes_planificado',
                 'f.fecha_fin_real',
                 'f.fecha_recepcion_provisional',
                 'f.fecha_fin_prevista',

@@ -9,6 +9,36 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · QUEDAN DESPLIEGUE Y MANUAL
+
+Implementer en la rama `feature/F-110-fin-obra-cuatrimestral` (desde `main`
+79a4505, con F-108: el diccionario sube a la **34**). T0 hecha: F-095 `done` y la
+aprobacion D1-D6 del 2026-09-25 constan aqui abajo y en `progress/spec_F-110.md`.
+Tarea en curso y desviaciones: se anotan aqui; el informe final va en
+`progress/impl_F-110.md`.
+
+Decisiones de implementacion:
+- R12 se prueba en dos tests: `test_f110_r12_*` (las tres informativas de
+  Sigrid, verde antes de tocar el SQL, como pide T2) y
+  `test_f110_r10_ultimo_cierre_no_interviene` (el `ultimo_cierre` fuera del
+  fin, rojo antes). Asi T2 (`-k "r11 or r12 or r13"` verde antes) se cumple sin
+  rebajar R12.
+
+**Diccionario del arbol tras F-110 (version 34): 172 objetos, 1185 columnas,
+76 de consumo** (las dos columnas nuevas de `retenciones.fin_obra`). Sin
+publicar: `publicar-diccionario` es escritura contra Azure y la lanza el humano.
+
+T0-T15 y T19 hechas (commit por tarea; `azure-apps` f087516). Verificado en
+solo lectura el SELECT nuevo: 922 filas, 198/36/688 por fuente, viva 97/32/50
+obras con las cifras exactas de `design.md`. Mutacion sistematica: 114/114
+muertos (`progress/mutacion_F-110.md`). `init.sh` verde en `cab45cd` (5.519
+passed). **Quedan T16-T18, MANUAL del humano**: build-retenciones +
+apply-grants, check-*, publicar-diccionario (v34), reinicio del MCP y
+despliegue de imagen; comandos en `progress/impl_F-110.md` §Lo que falta.
+Segunda pasada de `bash harness/init.sh` en `f730acf` (con el informe ya
+commiteado): 5.519 passed, 203 skipped en 765,82 s; COBERTURA 95,1 %; TAMANO
+impl 194/220; ENTORNO LISTO, exit 0.
+
 ## 2026-09-25 · F-110 · SPEC APROBADA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes
 
 **APROBADA por el humano el 2026-09-25**: D1 (A) ultima `Cuatrimestral` por
