@@ -11,7 +11,7 @@ Bloqueadas: **F-052**.
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-110 | Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1) | 1 | pendiente | critico | `feature/F-110-fin-obra-cuatrimestral` |
+| F-110 | Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1) | 1 | spec lista | critico | `feature/F-110-fin-obra-cuatrimestral` |
 | F-108 | `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102) | 4 | spec lista | estandar | `feature/F-108-claves-alternativas` |
 | F-109 | El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras | 5 | pendiente | estandar | `feature/F-109-partidas-codigo-no-unico` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 6 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
@@ -123,7 +123,7 @@ Bloqueadas: **F-052**.
 
 ### F-110 · Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1)
 
-estado **pendiente** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-110-fin-obra-cuatrimestral`
+estado **spec lista** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-110-fin-obra-cuatrimestral`
 
 Decidido por el humano el 2026-09-25, prioridad 1. CAMBIA LA DECISION H1 DE F-095 (2026-09-22). Regla nueva de `retenciones.fin_obra.fecha_fin_obra`, en este orden y SIN MAS PASOS: (1) el inicio del periodo de garantia (`obrctr.fecinigar`, si no `obr.garfecini`), como hoy; (2) si no lo hay, el ULTIMO MES PLANIFICADO EN LA ULTIMA VERSION CUATRIMESTRAL (master) de la obra + 1 mes; (3) si tampoco hay cuatrimestral, SIN FECHA (NULL, no se inventa). **SE ELIMINA el respaldo «ultimo cierre con movimiento + 1 mes»** (`ULTIMO_CIERRE_MAS_1_MES`, que leia `cierre.fact_cierre_mensual`): el humano lo quita porque mira hacia atras y en una obra en curso adelanta el vencimiento. El resto de F-095 no cambia: plazo `plaret` -> `plagar` -> 12 meses y vencimiento = fin de obra + plazo. POR QUE: el ultimo cierre + 1 da, en una obra viva, una fecha de hace poco; el cuatrimestral dice cuando PREVE la obra terminar. MEDIDO EL 2026-09-25 (verificaciones de F-095): sobre la retencion viva, INICIO_GARANTIA 97 obras / 5.026.655,18 EUR, ULTIMO_CIERRE_MAS_1_MES 67 / 3.120.260,42 y sin fecha 15 / 100.351,55; en las 922 obras, 198 con garantia y 150 con ultimo cierre. QUE HAY QUE MEDIR ANTES DE ESCRIBIR: cuantas obras tienen version cuatrimestral y cual es su ultimo mes planificado (las versiones master viven en `stg` —ambitos 8 y 11, `stg.version_master_vigente`, `stg.fn_master_mes_representado`—; decidir si «la ultima» es la vigente de F-042 o la de mayor fecha), cuantas de las 67 pasan a tener fecha por cuatrimestral y cuantas se quedan sin fecha, y cuanto se mueven los vencimientos (VENCIDA -> PENDIENTE). Ojo a la dependencia: si el cuatrimestral se lee de `stg`, `build_retenciones` pasa a depender de `build_stg` (hoy lee `cierre`, que va con una noche de retraso); decidirlo y escribirlo. Respetar `R-CODIGO-POR-EMPRESA`.
 

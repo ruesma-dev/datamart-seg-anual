@@ -9,6 +9,26 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-25 · F-110 · SPEC LISTA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes · PENDIENTE DE VALIDAR D1-D6
+
+Spec en `specs/F-110-fin-obra-cuatrimestral/`, escrita en la rama
+`feature/F-110-fin-obra-cuatrimestral` (desde `main`, en un worktree aparte
+mientras F-108 esta en el arbol principal y F-109 en otro worktree). Resumen,
+cifras y consultas en `progress/spec_F-110.md`.
+
+Lo que el humano tiene que saber antes de aprobar (medido en solo lectura el
+2026-09-25): **ningun vencimiento pasa de VENCIDA a PENDIENTE hoy** (en las
+obras en curso lo que se mueve es la fecha, +6,6 meses de media); **35 obras
+con retencion viva (159.677,04 €) y 102 de saldo contable (643.734,57 €) se
+quedan sin fecha**, casi todas cerradas antes de que hubiera cuatrimestrales; y
+`1-0692` pasa a VENCIDA (43.476,54 €) porque su ultima cuatrimestral acaba en
+2025-02. Decisiones abiertas D1-D6 con la recomendada en `design.md`: D1 ultima
+`Cuatrimestral` por numero (o incluir Planif Inicial/ABC, +3 obras); D2 ultimo
+mes con movimiento en coste o venta; D3 ultimo dia del mes siguiente; D4 leer
+`mart.master_versiones_tipadas` + `stg.plan_mensual` sin tocar `depends_on`
+(desaparece el desfase de una noche); D5 retirar `ultimo_cierre`; D6 confirmar
+las consecuencias. `00_global.yaml` `version` en carrera con F-108/F-109.
+
 ## 2026-09-24 · F-108 · SPEC LISTA (`spec_ready`) · claves alternativas en el diccionario y en `check-unicidad`
 
 Spec en `specs/F-108-claves-alternativas/`, escrita en la rama
