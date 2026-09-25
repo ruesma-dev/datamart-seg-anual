@@ -111,11 +111,30 @@ oc AS (
     FROM raw.obrctr c GROUP BY c.obride
 ),
 cierres AS (
-    -- El ultimo mes que movio algo, por obra
+    -- El ultimo mes que movio algo, por obra (INFORMATIVO desde F-110)
     SELECT f.obra_id, MAX(f.anio_mes) AS ultimo_cierre
     FROM cierre.fact_cierre_mensual f
     WHERE f.ejecutado_mes <> 0
     GROUP BY f.obra_id
+),
+cuatrimestral AS (
+    -- D1: la ultima Cuatrimestral por numero, en el ambito 8 o en el 11
+    SELECT v.obra_id, MAX(v.version) AS version_cuatrimestral
+    FROM mart.master_versiones_tipadas v
+    WHERE v.tipo_master = 'Cuatrimestral'
+    GROUP BY v.obra_id
+),
+plan AS (
+    -- D2: el ultimo mes de esa version con importe planificado (la cola a
+    -- cero no cuenta); LEFT JOIN para que una version sin meses quede en NULL
+    SELECT c.obra_id, c.version_cuatrimestral,
+           MAX(pm.anio_mes) FILTER (WHERE pm.importe_mes <> 0) AS ultimo_mes_planificado
+    FROM cuatrimestral c
+    LEFT JOIN stg.plan_mensual pm
+           ON pm.obra_id = c.obra_id
+          AND pm.version = c.version_cuatrimestral
+          AND pm.ambito_id IN (8, 11)
+    GROUP BY c.obra_id, c.version_cuatrimestral
 ),
 base AS (
     SELECT
@@ -128,6 +147,8 @@ base AS (
         COALESCE(retenciones.fn_sigrid_date(oc.fec_inicio_garantia),
                  retenciones.fn_sigrid_date(obr.garfecini)) AS fecha_inicio_garantia,
         ci.ultimo_cierre                           AS ultimo_cierre,
+        pl.version_cuatrimestral                   AS version_cuatrimestral,
+        pl.ultimo_mes_planificado                  AS ultimo_mes_planificado,
         -- Fin real: la regla de cierre.v_pbi_cierre_cabecera (D5)
         COALESCE(
             oc.fec_real_fin,
@@ -147,6 +168,7 @@ base AS (
     LEFT JOIN raw.con con ON con.ide = obr.ide
     LEFT JOIN oc ON oc.obra_id = obr.ide
     LEFT JOIN cierres ci ON ci.obra_id = obr.ide
+    LEFT JOIN plan pl ON pl.obra_id = obr.ide
     CROSS JOIN constantes k
 ),
 fin AS (
@@ -170,6 +192,8 @@ SELECT
     f.estado_obra,
     f.fecha_inicio_garantia,
     f.ultimo_cierre,
+    f.version_cuatrimestral,
+    f.ultimo_mes_planificado,
     f.fecha_fin_real,
     f.fecha_recepcion_provisional,
     f.fecha_fin_prevista,
