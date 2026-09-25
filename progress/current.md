@@ -2145,3 +2145,9 @@ Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
 - R23: `test_f107_r4_la_version_sube_a_30` ya exigia `>= 30` en `main` (lo
   ajusto F-095); no se toca. `test_f102_r22` exige ahora `N:1`.
 - T8: las guardas R16 y R17 son tests de T1; pasan sin codigo nuevo.
+- T9 hecha (ARCHITECTURE + `azure-apps` commit local `ae8edd3`).
+- T10: la primera campana (`--base main`, 4 workers por defecto) salio con
+  codigo 3: «LINEA BASE SIN TERMINAR», la suite limpia no cupo en 600 s con 4
+  workers compitiendo. Se relanza como indica el propio mensaje de la
+  herramienta: `--workers 2 --timeout 1800` (linea base 9.000 s). Sin tocar
+  `harness/rigor.json`.
