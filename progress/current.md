@@ -9,7 +9,17 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-25 · F-110 · SPEC LISTA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes · PENDIENTE DE VALIDAR D1-D6
+## 2026-09-25 · F-110 · SPEC APROBADA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes
+
+**APROBADA por el humano el 2026-09-25**: D1 (A) ultima `Cuatrimestral` por
+numero; D2 ultimo mes del cuatrimestral con importe planificado (ejemplo literal:
+«el cuatrimestral de junio 26 puede tener planificada la obra hasta marzo 28;
+entonces el dia a partir del que contar las retenciones seria el 30 de abril»);
+D3 ultimo dia del mes siguiente; D4 (A); **D5 `ultimo_cierre` SE QUEDA como
+columna informativa** (no interviene); D6 aceptado. Derivado de D5 (revocable):
+se retira la guarda de `cierre` VACIA y se conserva la de existencia. Detalle en
+la seccion «APROBADA» de `progress/spec_F-110.md`. Lo de abajo es la propuesta
+tal como se presento.
 
 Spec en `specs/F-110-fin-obra-cuatrimestral/`, escrita en la rama
 `feature/F-110-fin-obra-cuatrimestral` (desde `main`, en un worktree aparte

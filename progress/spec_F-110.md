@@ -1,19 +1,54 @@
 <!-- progress/spec_F-110.md -->
-# F-110 · Spec escrita (spec-author, 2026-09-25) · pendiente de aprobacion
+# F-110 · Spec escrita (spec-author, 2026-09-25) · APROBADA
 
 Spec en `specs/F-110-fin-obra-cuatrimestral/` (rama
 `feature/F-110-fin-obra-cuatrimestral`, desde `main` 4586916, en un worktree
-aparte). Ficha a `spec_ready`. Rigor `critico`.
+aparte). Ficha en `spec_ready`. Rigor `critico`.
+
+## APROBADA (humano, 2026-09-25)
+
+- **D1 (A)**: la ultima version `Cuatrimestral` por numero.
+- **D2**: «es el ultimo mes planificado en el cuatrimestral. Por ejemplo, el
+  cuatrimestral de junio 26 puede tener planificada la obra hasta marzo 28;
+  entonces el dia a partir del que contar las retenciones seria el 30 de abril».
+  Escrito como el ultimo mes de ese cuatrimestral con importe planificado
+  (`importe_mes <> 0` en coste o venta); los meses finales a cero no cuentan.
+- **D3**: +1 mes = ultimo dia del mes siguiente (30-04-2028 en el ejemplo).
+- **D4 (A)**: leer `mart.master_versiones_tipadas` + `stg.plan_mensual` sin tocar
+  `depends_on`.
+- **D5**: `ultimo_cierre` NO se retira: se QUEDA en `retenciones.fin_obra` como
+  dato INFORMATIVO, sin intervenir en `fecha_fin_obra`, y su ficha lo dice.
+- **D6**: aceptado: sin cuatrimestral, SIN FECHA (35 obras / 159.677,04 € de lo
+  vivo y 102 / 643.734,57 € de saldo contable pasan a SIN_FIN_OBRA; `1-0692` pasa
+  a VENCIDA).
+
+**Consecuencia de D5 que decide el spec-author (revocable, `design.md` D5 y R14)**:
+se conserva la lectura de `cierre.fact_cierre_mensual` y su guarda de EXISTENCIA,
+pero se retira la de tabla VACIA: una columna informativa no debe tumbar el
+vencimiento de toda la retencion. Si el humano quiere las dos, es una linea.
+
+**La cola a cero (D2), para que el humano la vea.** 15 de las 117 obras con
+cuatrimestral arrastran meses finales con `importe_mes = 0`. Solo pesan en 7
+(las que toman fecha por cuatrimestral y tienen retencion viva, 2.006.420,81 €):
+frente a tomar la ultima fila, su fin queda antes `1-0678` 5 meses (170.019,37 €),
+`1-0686` 3 (1.058.925,82 €), `1-0696` 2 (676.656,98 €) y `1-0588`, `1-0619`,
+`1-0697`, `1-0702` 1 mes (100.818,64 €). Ninguna cambia de estado por ello. Las
+otras 8 tienen inicio de garantia (`1-0693`, la de 10 meses, entre ellas) o no
+tienen retencion viva. Consulta Q7.
+
+Cambios en la spec por la aprobacion: R5 con el ejemplo literal, R7 con la cola,
+R10-R12/R14/R17/R19 por D5, `design.md` §Decisiones del humano y §Medidas, y
+`tasks.md` T2-T6/T8/T10/T12/T13 (`test_f095_r18` ya no se reescribe).
 
 ## Que cambia
 
 Solo `retenciones.fin_obra` (y por arrastre `v_retencion_contable_obra`, sin
 tocar su SQL). Regla del humano del 2026-09-25: garantia -> ultimo mes
-planificado de la ultima cuatrimestral + 1 mes -> sin fecha. Fuera el ultimo
-cierre, su columna, la lectura de `cierre` y su guarda. El fin de obra pasa a
-leer `mart.master_versiones_tipadas` (que version) y `stg.plan_mensual` (que
-mes), los dos de la MISMA noche: desaparece el desfase de una noche de F-095.
-`depends_on` sigue `["ingest_raw"]`.
+planificado de la ultima cuatrimestral + 1 mes -> sin fecha. El ultimo cierre
+deja de intervenir y se queda como columna informativa (D5). El fin de obra pasa
+a leer `mart.master_versiones_tipadas` (que version) y `stg.plan_mensual` (que
+mes), los dos de la MISMA noche: el fin de obra ya no va con una noche de
+desfase. `depends_on` sigue `["ingest_raw"]`.
 
 ## Lo medido (detalle en `design.md` §Medidas)
 
@@ -37,7 +72,7 @@ mes), los dos de la MISMA noche: desaparece el desfase de una noche de F-095.
 - Saldo contable: **102 obras / 643.734,57 € pasan de VENCIDA a SIN_FIN_OBRA**.
 - Coste: +15-40 s estimados al sub-paso `fin_obra`.
 
-## Decisiones abiertas que el humano valida
+## Decisiones que se propusieron (ya decididas arriba; se conservan como rastro)
 
 - **D1** version: (A, recomendada) ultima `Cuatrimestral` por numero; (B) ultima
   de Planif Inicial/ABC/Cuatrimestral: +3 obras con fecha (`1-0723`, `1-0630`,
@@ -101,3 +136,8 @@ Resultado: 102/117 iguales, cola hasta 10 meses, coste despues de venta en 20.
 
 **Q6 · Variante D1-B:** Q1-Q3 con `tipo_master IN ('Cuatrimestral', 'ABC',
 'Planif Inicial')`.
+
+**Q7 · La cola a cero, obra a obra:** sobre `cuat`, `MAX(anio_mes)` y
+`MAX(anio_mes) FILTER (WHERE importe_mes <> 0)` por obra (8 y 11), las filas donde
+difieren, con los meses de diferencia (`age`), si la obra tiene inicio de
+garantia y su viva de los efectos. 15 filas, 48 s.
