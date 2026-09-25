@@ -949,8 +949,9 @@ objetos:
       el codigo y el nombre de la cuenta. Las cuentas se eligen por lo que
       declara el proveedor y NUNCA por prefijo: ademas de las familias 4008,
       4108 y 4180 aparecen 4038 (0,90 M EUR) y 4128, que una lista escrita
-      dejaba fuera. 2.247 cuentas el 2026-09-22 y 2.250 el 2026-09-24, 1:1 con
-      el proveedor.
+      dejaba fuera. 2.247 cuentas el 2026-09-22 y 2.250 el 2026-09-24 y el
+      2026-09-25 (primer build con `rac`), 1:1 con el proveedor; 1.669 de ellas
+      tienen apuntes.
     grano: >-
       Una fila por proveedor con cuenta de retencion. `proveedor_id` es clave
       primaria y `cuenta_id` es unica: si Sigrid llegara a compartir una cuenta
@@ -999,19 +1000,20 @@ objetos:
       Los apuntes contables de las cuentas de retencion de proveedor (F-095):
       una fila por apunte de `raw.apu` sobre las cuentas de
       `retenciones.cuentas_proveedor`, SIN FILTRAR NINGUNO, con su clase y su
-      obra. 49.505 apuntes el 2026-09-22 (Sigrid) y 49.511 el 2026-09-24
-      (datamart). `importe` = haber - debe: positivo es retencion que se
+      obra. 49.520 apuntes el 2026-09-25 en el primer build con `rac`
+      (historico: 49.505 el 2026-09-22 en Sigrid y 49.511 el 2026-09-24 en el
+      datamart). `importe` = haber - debe: positivo es retencion que se
       practica y negativo la que se devuelve o se da de baja.
 
       **LA TRAMPA: los asientos de cierre y apertura.** Cada ejercicio cierra y
       reabre estas cuentas (8.870 apuntes de cierre y 8.870 de apertura, 52,12 M
-      EUR por lado el 2026-09-24). Sumar sin filtrar `clase` los mezcla; el
+      EUR por lado el 2026-09-24 y el 2026-09-25). Sumar sin filtrar `clase` los mezcla; el
       saldo es `SUM(importe)` de `ALTA`, `BAJA` y `SALDO_INICIAL`. La apertura
       de 2008 no tiene cierre previo: es la historia anterior a Sigrid
       (642.775,50 EUR, 72 apuntes) y por eso es `SALDO_INICIAL` y cuenta.
-      Medido el 2026-09-24: por cada una de las 2.250 cuentas, ALTA + BAJA +
-      SALDO_INICIAL da exactamente la suma de todos sus apuntes (0 cuentas
-      fuera).
+      Medido el 2026-09-25 en el primer build: por cada una de las 1.669
+      cuentas con apuntes, ALTA + BAJA + SALDO_INICIAL da exactamente la suma
+      de todos sus apuntes (0 cuentas fuera, como el 2026-09-24).
 
       **LA OBRA, por cascada** (`via_obra`): APUNTE (el centro del propio
       apunte), FACTURA (el asiento -> `raw.rac` -> la factura -> sus efectos de
@@ -1019,10 +1021,13 @@ objetos:
       del asiento es un efecto de pago), PROVEEDOR_UNA_OBRA (el proveedor tiene
       todos sus efectos de retencion en un solo centro) y SIN_OBRA. Cada salto
       acaba en un centro de coste que se traduce a obra SOLO por
-      `maestro.centros_coste`. Medido en la spec (2026-09-22, Sigrid): las
-      altas con obra son el 97,2 % del importe (10,8 % sin `rac`) y las bajas
-      el 77,5 % con PROVEEDOR_UNA_OBRA. El reparto real por `via_obra` se mide
-      tras el primer build con `rac` (verificacion MANUAL).
+      `maestro.centros_coste`. Medido el 2026-09-25 en el primer build con
+      `rac`: las altas con obra son el **93,7 %** del importe (FACTURA 83,1 %,
+      APUNTE 10,0 %, PROVEEDOR_UNA_OBRA 0,5 %, EFECTO 0,04 %; SIN_OBRA 635
+      apuntes y 1.620.277,30 EUR, el 6,3 %) y las bajas el **77,3 %** (APUNTE
+      69,1 %, PROVEEDOR_UNA_OBRA 3,7 %, EFECTO 3,5 %, FACTURA 1,0 %; SIN_OBRA
+      1.497 apuntes y -3.989.080,14 EUR, el 22,7 %). Historico: la spec
+      (2026-09-22, Sigrid) estimaba el 97,2 % en altas y el 77,5 % en bajas.
     grano: >-
       Una fila por apunte contable, y `apunte_id` es clave primaria: ningun
       salto de la cascada multiplica (cada uno se une a algo unico por su
@@ -1075,13 +1080,16 @@ objetos:
           Que es el apunte, evaluado en este orden: CIERRE (asiento de cierre),
           SALDO_INICIAL (apertura sin cierre previo de ESA cuenta el ejercicio
           anterior), APERTURA (apertura con cierre previo), ALTA (importe > 0) y
-          BAJA (el resto). Medido el 2026-09-24: ALTA 26.843 apuntes y 25,71 M
-          EUR; BAJA 4.856 y -17,58 M EUR; SALDO_INICIAL 72 y 642.775,50 EUR.
+          BAJA (el resto). Medido el 2026-09-25 en el primer build con `rac`:
+          ALTA 26.852 apuntes y 25,72 M EUR; BAJA 4.856 y -17,58 M EUR;
+          SALDO_INICIAL 72 y 642.775,50 EUR; CIERRE y APERTURA 8.870 cada una
+          (el 2026-09-24: ALTA 26.843 y 25,71 M EUR).
         valores: [CIERRE, APERTURA, SALDO_INICIAL, ALTA, BAJA]
       es_prescripcion:
         significado: >-
           El concepto habla de prescripcion ('PRESCRI'). Solo marca: el apunte
-          sigue dentro. Lo prescrito neto eran 329.278,72 EUR el 2026-09-24.
+          sigue dentro. Lo prescrito neto eran 329.278,72 EUR el 2026-09-24 y
+          el 2026-09-25.
       centro_coste_id:
         significado: Centro de coste del PROPIO apunte (`apu.cenide`), tal cual. No es la obra.
         agregacion: no_sumable
@@ -1145,21 +1153,29 @@ objetos:
       el saldo de las cuentas contables de retencion por proveedor y obra.
       `retenciones.movimientos` (los efectos) es el detalle; si las dos cifras
       difieren, manda la contabilidad y el cuadre esta en
-      `retenciones.v_cuadre_proveedor`. Saldo total 8.760.524,49 EUR el
-      2026-09-22 (Sigrid) y 8.775.052,87 EUR el 2026-09-24 (datamart), frente a
-      8,35 M EUR vivos en efectos.
+      `retenciones.v_cuadre_proveedor`. Saldo total **8.778.606,70 EUR** el
+      2026-09-25 en el primer build con `rac` (6.468 filas, 1.669
+      proveedores), frente a 8.362.932,53 EUR vivos en efectos el mismo dia.
+      Historico: 8.760.524,49 EUR el 2026-09-22 (Sigrid) y 8.775.052,87 EUR el
+      2026-09-24 (datamart).
 
       `saldo` = `altas` + `bajas` + `saldo_inicial`: los asientos de cierre y
       apertura no suman nunca. `saldo_anterior_2016` es la apertura de 2016, el
-      saldo a 31-12-2015: 1.427.463,67 EUR en total (2026-09-24), la historia
-      anterior a los efectos.
+      saldo a 31-12-2015: 1.427.463,67 EUR en total (2026-09-24 y
+      2026-09-25), la historia anterior a los efectos.
 
       **LA FILA SIN OBRA**: lo que la cascada de `retenciones.apuntes_contables`
       no atribuye va a la fila `obra_id` NULL del proveedor, SIN_OBRA y sin
       repartir: repartirlo por reglas inventadas seria publicar un dato que
-      Sigrid no tiene. Estimado en la spec (2026-09-22): unos 4,3 M EUR de
-      movimientos sin obra, sobre todo bajas (pagos manuales, prescripciones,
-      UTE); la cifra real tras el primer build es verificacion MANUAL.
+      Sigrid no tiene. Medido el 2026-09-25 en el primer build con `rac`: 590
+      filas sin obra, 476 con saldo distinto de 0, que suman **-1.739.408,96
+      EUR** (altas 1.620.277,30, bajas -3.989.080,14, saldo inicial
+      629.393,88; 61 filas positivas por 1,36 M EUR y 415 negativas por
+      -3,10 M EUR). Es NEGATIVA porque las bajas sin obra (pagos manuales,
+      prescripciones, UTE) superan a las altas sin obra; por eso las filas CON
+      obra suman 10,52 M EUR, mas que el total de 8,78 M EUR: sumar solo por
+      obra sobrestima el saldo vivo del proveedor. Historico: la spec
+      (2026-09-22) estimaba unos 4,3 M EUR de movimientos sin obra.
     grano: >-
       Una fila por (`proveedor_id`, `obra_id`), con UNA fila `obra_id` NULL por
       proveedor para lo que no tiene obra (indice unico con NULLS NOT DISTINCT).
@@ -1261,17 +1277,25 @@ objetos:
     descripcion: >-
       El fin de obra, el plazo y el vencimiento de la retencion de cada obra
       (F-095, decisiones H1 y H2 del humano del 2026-09-22): una fila por obra
-      de `raw.obr` (922 el 2026-09-24). **La fecha de la factura no interviene
+      de `raw.obr` (922 el 2026-09-24 y el 2026-09-25). **La fecha de la factura no interviene
       nunca**: el vencimiento es fin de obra + plazo.
 
       `fecha_fin_obra` = el inicio del periodo de garantia (`obrctr.fecinigar`,
       si no `obr.garfecini`); si no lo hay, el ultimo dia del mes siguiente al
       ultimo cierre con movimiento (`fuente_fin_obra` INICIO_GARANTIA o
-      ULTIMO_CIERRE_MAS_1_MES). Cobertura sobre la retencion viva: 20,9 % +
-      76,1 % = 97,0 % en la spec (2026-09-22); 24,3 % (46 obras) + 72,7 % (116
-      obras) = 97,0 % de 8,36 M EUR el 2026-09-24. Sin ninguna quedan 17 obras con
-      retencion viva, 132.544,84 EUR, 9 de ellas terminadas: su fecha es NULL,
-      no se inventa.
+      ULTIMO_CIERRE_MAS_1_MES). Medido el 2026-09-25 en el primer build con
+      `rac`: de las 922 obras, 198 con INICIO_GARANTIA y 150 con
+      ULTIMO_CIERRE_MAS_1_MES. Cobertura sobre la retencion viva de los
+      efectos (8.362.932,53 EUR): INICIO_GARANTIA 97 obras y 5.026.655,18 EUR
+      (60,1 %) y ULTIMO_CIERRE_MAS_1_MES 67 obras y 3.120.260,42 EUR (37,3 %),
+      97,4 % entre las dos. Sin ninguna quedan 15 obras con retencion viva,
+      100.351,55 EUR (1,2 %), 8 de ellas terminadas (42.647,96 EUR): su fecha
+      es NULL, no se inventa; el 1,4 % restante son efectos sin obra. La
+      garantia sube porque en Sigrid se estan dando de alta fechas de inicio
+      de garantia. Historico: 20,9 % + 76,1 % = 97,0 % en la spec
+      (2026-09-22); 146 y 200 obras de las 922, y 24,3 % (46 obras) + 72,7 %
+      (116 obras) = 97,0 % con 17 obras y 132.544,84 EUR sin fecha, el
+      2026-09-24.
 
       El respaldo lee `cierre.fact_cierre_mensual`, que se construye DESPUES de
       las retenciones: va con una noche de retraso, y solo existe para las
@@ -1282,8 +1306,12 @@ objetos:
       (`plaret`), si no su plazo de garantia (`plagar`), si no 12 meses fijos
       (`fuente_plazo` PLAZO_RETENCION_CLIENTE, PLAZO_GARANTIA_CLIENTE o
       PLAZO_FIJO_12). Es un criterio de Negocio (back-to-back), no un dato del
-      proveedor. El 2026-09-24: 81 obras con plazo de retencion (40,5 % del
-      vivo con obra), 12 con el de garantia (22,3 %) y 86 con los 12 fijos (37,3 %).
+      proveedor. Medido el 2026-09-25 sobre la retencion viva de los efectos
+      con obra (8.247.267,15 EUR en 179 obras): 81 obras con plazo de
+      retencion (3.335.767,86 EUR, 40,4 %), 12 con el de garantia
+      (1.834.299,50 EUR, 22,2 %) y 86 con los 12 fijos (3.077.199,79 EUR,
+      37,3 %), las mismas obras que el 2026-09-24. En las 922 obras: 144, 34 y
+      744.
 
       Fin real, recepcion provisional y fin previsto van en su columna, SOLO
       informativas.
@@ -1386,15 +1414,24 @@ objetos:
 
       `categoria`, evaluada en este orden: CUADRA (diferencia de menos de 1
       EUR), SIN_EFECTOS_VIVOS, SIN_SALDO_CONTABLE, CONTABILIDAD_MAYOR y
-      EFECTOS_MAYOR. Reparto medido en la spec (2026-09-22, 761 proveedores):
-      CUADRA 520 / 5,07 M EUR; SIN_EFECTOS_VIVOS 81 / 0,99 M EUR en libros
-      (0,27 de antes de 2016); SIN_SALDO_CONTABLE 38 / 0,20 M EUR (0,04
-      prescritos); CONTABILIDAD_MAYOR 41 / +0,10 M EUR; EFECTOS_MAYOR 81 /
-      -0,47 M EUR. **Manda la contabilidad**; la lista de descuadres es para
+      EFECTOS_MAYOR. Reparto medido el 2026-09-25 en el primer build con
+      `rac` (761 proveedores; el importe es la `diferencia`): CUADRA 520
+      (5.081.179,16 EUR de saldo, diferencia 0,72); SIN_EFECTOS_VIVOS 81 /
+      +989.141,26 EUR en libros (271.714,18 de antes de 2016);
+      SIN_SALDO_CONTABLE 38 / -196.914,74 EUR en efectos (39.778,56
+      prescritos); CONTABILIDAD_MAYOR 41 / +97.117,40 EUR; EFECTOS_MAYOR 81 /
+      -473.670,76 EUR. Diferencia total +415.673,88 EUR (8.778.606,41
+      contables, sin los saldos de menos de 1 EUR, frente a 8.362.932,53 en
+      efectos). Historico, el reparto de H7 medido en la spec (2026-09-22,
+      761 proveedores), con los mismos recuentos: CUADRA 520 / 5,07 M EUR;
+      SIN_EFECTOS_VIVOS 81 / 0,99 M EUR; SIN_SALDO_CONTABLE 38 / 0,20 M EUR;
+      CONTABILIDAD_MAYOR 41 / +0,10 M EUR; EFECTOS_MAYOR 81 / -0,47 M EUR.
+      **Manda la contabilidad**; la lista de descuadres es para
       Administracion (H7).
 
       Caso testigo: FERMALUX (proveedor 1958815, cuenta 4108005478) tiene
-      64.201,96 EUR de saldo contable y 64.201,96 EUR vivos en efectos: CUADRA.
+      64.201,96 EUR de saldo contable y 64.201,96 EUR vivos en efectos: CUADRA
+      (comprobado el 2026-09-25 en el primer build con `rac`).
     grano: Una fila por proveedor (`proveedor_id`), de cualquiera de los dos lados.
     clave_negocio: [proveedor_id]
     paso_etl: build_retenciones
