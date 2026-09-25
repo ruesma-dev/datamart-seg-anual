@@ -8,8 +8,19 @@ Encadena los archivos SQL en orden:
                           dinámico según lo que exista en `raw`)
     01_movimientos.sql  - un registro por efecto de retención (ambos sentidos)
     02_views.sql        - vistas de saldo por entidad, obra, vivas y vencidas
+    03_apuntes_contables.sql - F-095: cuentas de retencion de proveedor y sus
+                          apuntes contables, con clase y obra
+    04_saldo_contable.sql    - F-095: saldo contable por proveedor y obra, la
+                          fuente que manda para el saldo vivo
+    05_fin_obra.sql     - F-095: fin de obra, plazo y vencimiento por obra
+    06_views_contables.sql   - F-095: cuadre contabilidad-efectos y retencion
+                          contable por obra con su vencimiento
 
-Solo lee de `raw.*` (cob, pag, rec). No necesita `stg` ni `mart`.
+Lee de `raw.*` (cob, pag, rec, prv, con, apu, rac, obr, obrctr), de la vista
+`maestro.centros_coste` y, desde F-095, de `cierre.fact_cierre_mensual` (el
+ultimo cierre con movimiento de cada obra, de la noche anterior: `build_cierre`
+corre despues). No necesita `stg` ni `mart`. Si la tabla del cierre esta vacia,
+el sub-paso `fin_obra` falla con su nombre (R21).
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). Igual que `compras`:
 `build-retenciones` ejecutaba su SQL en línea, sin step, así que **no dejaba
@@ -40,7 +51,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los tres ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` por lo mismo que en `build_compras_step`: es DATO, y
 #: sustituirla en un test es lo único que permite ejercitar el guardián de
@@ -59,6 +70,26 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="movimientos",
     ),
     _SubStep(name="views", sql_file="02_views.sql"),
+    # F-095: la retencion desde la contabilidad, en el mismo paso (D1)
+    _SubStep(
+        name="apuntes",
+        sql_file="03_apuntes_contables.sql",
+        target_schema="retenciones",
+        target_table="apuntes_contables",
+    ),
+    _SubStep(
+        name="saldo",
+        sql_file="04_saldo_contable.sql",
+        target_schema="retenciones",
+        target_table="saldo_contable",
+    ),
+    _SubStep(
+        name="fin_obra",
+        sql_file="05_fin_obra.sql",
+        target_schema="retenciones",
+        target_table="fin_obra",
+    ),
+    _SubStep(name="views_contables", sql_file="06_views_contables.sql"),
 )
 
 
@@ -85,6 +116,10 @@ class BuildRetencionesStep(PipelineStep):
         # aquí a propósito: `build_maestros` depende de `build_stg`, y
         # declararlo haría que un fallo de `stg` dejara sin construir las
         # retenciones, que hoy sobreviven a eso.
+        #
+        # F-095 (D7): tampoco se declara `build_cierre`, aunque `05_fin_obra.sql`
+        # lee `cierre.fact_cierre_mensual`: usa el cierre de la noche anterior y,
+        # si la tabla amaneciera vacia, su guarda hace fallar el sub-paso.
         return ["ingest_raw"]
 
     def run(self) -> StepResult:

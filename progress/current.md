@@ -19,12 +19,101 @@ comprueba y avisa (no esta en `run-all`, asi que la nocturna no cambia); el
 validador R5 las acepta como lado 1; las cinco relaciones de `compras` por
 `clave_obra` pasan a `N:1`. Ningun SQL se toca.
 
-**Pendiente de la PARADA 1 (el humano valida antes de T1)**: decisiones D1-D5
+**APROBADA por el humano el 2026-09-24 con D1-D5 recomendadas** (ver `progress/spec_F-108.md`); decisiones D1-D5
 (NULL excluidos; KO de alternativa sale con 1; cuatro candidatas extra; `mcp-bbdd`
 fuera; version 31 frente a F-095). Hallazgo H1, fuera de alcance:
 `(obra_id, codigo_partida)` NO es unico en `stg.partidas` (5.203 pares
 repetidos, 159 obras) y tres fichas dicen que si. Detalle en
 `progress/spec_F-108.md`.
+
+## 2026-09-25 · F-095 · CERRADA (`done`, APROBADO en pasada 2) · retenciones desde la contabilidad, por obra y con vencimiento desde el fin de obra · QUEDAN M1-M6 Y EL DESPLIEGUE
+
+Rama `feature/F-095-retenciones-contabilidad-fin-obra`, reapuntada a `main`
+(249b683) con `git branch -f` antes de sacarla: su unico commit (cd5f440, la
+spec) ya estaba en `main`. `sdd: true`, rigor `critico`. Ficha a `in_progress`.
+
+- **T0**: F-094 `done` (y su `01_movimientos.sql` ya traduce `obra_id` por
+  `maestro.centros_coste`: el resto de F-045 esta hecho). F-091 sigue `pending`;
+  el filtro `asiide <> 0` de `rac` lo acordo el humano en **H4** («acordado con
+  F-091»): el enlace factura -> asiento de F-091 es justo la fila con `asiide`.
+- T1-T22 y T26 hechas por el implementer (`tasks.md`); **T23-T25 son MANUAL
+  del humano** (lista abajo). Informe: `progress/impl_F-095.md`.
+
+**Diccionario del arbol tras F-095 (version 31): 172 objetos, 1183 columnas,
+76 de consumo.** Sin publicar: `publicar-diccionario` es escritura contra Azure
+y la lanza el humano (T25).
+
+### Desviaciones respecto a la spec (justificadas)
+
+1. **Censo 70 -> 71, no 68 -> 69**: la spec se escribio antes de F-102 y F-107.
+   Se tocan `TOTAL_TABLAS` de `test_f066` y `test_f074` (el de `test_f080` ya
+   era `>= 68`) y los tests de F-107 que clavaban 70 pasan a `>= 70`, igual que
+   F-102 hizo con 69. Tambien `test_f047_steps.py`: su lista completa de
+   ficheros existe para que anadir un sub-paso obligue a tocarla.
+2. **SALDO_INICIAL como anti-join y no `NOT EXISTS`**: misma semantica
+   («apertura sin cierre de la cuenta el ejercicio anterior»), pero dentro del
+   `CASE` el `NOT EXISTS` no se hashea: el EXPLAIN (solo lectura) daba coste
+   2,7e11 frente a 1,6e7. Medido: 0 cuentas violan R5.
+3. **FACTURA estricta**: «todos los efectos con el mismo centro» cuenta un
+   efecto SIN centro como otro valor (no se atribuye una factura a medias).
+4. **Universo del cuadre**: `v_cuadre_proveedor` solo publica proveedores con
+   saldo o viva >= 1 EUR (el universo del reparto de H7); SIN_EFECTOS_VIVOS y
+   SIN_SALDO_CONTABLE usan el mismo umbral de 1 EUR que CUADRA.
+5. **`empresa_id` y `clave_obra`** en `apuntes_contables`, `saldo_contable`,
+   `fin_obra` y `v_retencion_contable_obra` (R-CODIGO-POR-EMPRESA, pedido por el
+   lider); la regla replicada de `maestro.v_obra_fichas`, sin leerla.
+6. **Orden de magnitud**: el vocabulario de `criterio` es cerrado
+   (`test_f006_r10`), asi que el saldo contable va con `saldo_vivo` y el
+   `retenciones.saldo_contable` en el concepto; se anade PRIMERO y el de 8,35 M
+   de efectos se queda como detalle (lo exigen los tests de F-094).
+7. **R-SIGRID-CON punto 3** gana `apu` (`apu.fec`, `apu.res`): el barrido de
+   `test_f006_fuente_que_gobierna` lo exige al leerlos sin pasar por `con`.
+8. **Fila de F-006 design.md** (inventario 172): el test de recuento lo exige.
+9. **`test_f079` gana un GRUPO_D_F095** con las tres piezas que la spec deja
+   fuera del consumo (`cuentas_proveedor`, `apuntes_contables`, `fin_obra`),
+   cada una con su hecho: el test obliga a inventariarlas o subirlas.
+
+### VERIFICACIONES MANUAL (humano) — F-095
+
+Orden obligatorio: `rac` no existe todavia en `raw`; sin ella `build-retenciones`
+falla en el sub-paso `apuntes`. Lanzar desde la rama o tras el merge.
+
+- **M1 · ANTES (T23, solo lectura)**. Por `sigrid-api`: consulta K2 de
+  `progress/spec_F-095.md` (`SELECT a.cenide, SUM(a.hab-a.deb) FROM apu a WHERE
+  a.cueide=1958889 GROUP BY a.cenide`) -> suma 64.201,96; consulta B1 -> ~8,77 M
+  (8.760.524,49 el 22-09; 8.775.052,87 medido en el datamart el 24-09). MCP:
+  `SELECT saldo_vivo FROM retenciones.v_pbi_retencion_entidad WHERE
+  sentido='PROVEEDOR' AND entidad_id=1958815` -> 64.201,96.
+- **M2 · Ingesta (T24)**: `python main.py ingest --table rac --full` -> ~755 mil
+  filas, ~1 min. Luego `python main.py check-raw-recuentos` -> `rac` OK (aplica
+  el `where`).
+- **M3 · Build (T24)**: `python main.py build-retenciones` -> SUCCESS; filas:
+  `apuntes_contables` ~49.500, `fin_obra` 922 (= `raw.obr`). Despues
+  `python main.py apply-grants` (el build suelto dropea vistas).
+- **M4 · Cifras (T24)**, por SQL o MCP:
+  - R5: `SELECT COUNT(*) FROM (SELECT cuenta_id FROM retenciones.apuntes_contables
+    GROUP BY cuenta_id HAVING SUM(importe) <> SUM(importe) FILTER (WHERE clase IN
+    ('ALTA','BAJA','SALDO_INICIAL'))) x` -> 0.
+  - `SELECT SUM(saldo) FROM retenciones.saldo_contable` -> ~8,77 M (= B1 ± deriva).
+  - `SELECT * FROM retenciones.v_cuadre_proveedor WHERE proveedor_id=1958815` ->
+    CUADRA, 64.201,96 / 64.201,96; y sus filas de `saldo_contable` suman lo mismo
+    (obras 0629/0635/0631/0650 contra K2 en lo que venga por APUNTE).
+  - `SELECT via_obra, clase, COUNT(*), SUM(importe) FROM
+    retenciones.apuntes_contables GROUP BY 1,2` -> altas con obra ~97 %, bajas
+    ~77 % (spec); anotar la cifra real en la ficha si difiere.
+  - `SELECT categoria, COUNT(*), SUM(saldo_contable) FROM
+    retenciones.v_cuadre_proveedor GROUP BY 1` -> cerca de H7 (520/81/38/41/81).
+  - `SELECT fuente_fin_obra, COUNT(*) FROM retenciones.fin_obra GROUP BY 1` ->
+    146 INICIO_GARANTIA y 200 ULTIMO_CIERRE_MAS_1_MES en las 922 (medido 24-09
+    con el SELECT en solo lectura); sobre el vivo, 46 / 116 / 17 obras.
+- **M5 · Puertas (T25)**: `python main.py check-declarados`, `check-unicidad`,
+  `check-relaciones`, `check-diccionario` -> verdes; MCP: «que retenciones tengo
+  de los proveedores de la obra 0635 y cuando vencen» -> responde desde
+  `v_retencion_contable_obra` (por `clave_obra`). Despues `python main.py
+  publicar-diccionario` (escritura contra Azure: la autoriza el humano).
+- **M6 · Despliegue**: nueva imagen con tag fechado; sin ella la nocturna no
+  ingiere `rac` ni construye nada de esto (memoria «el repositorio en verde no
+  es produccion»).
 
 ## 2026-09-24 · F-107 · CERRADA (`done`, APROBADO en pasada 2) · contrapartidas del recurso y catalogo de cuentas analiticas · DESPLEGADA · QUEDAN LAS MANUAL
 

@@ -141,6 +141,30 @@ sin construir esa noche.
 - La ingesta nocturna SIEMPRE `--full` (el cursor incremental por `ide`
   pierde los UPDATE).
 - Palabra reservada `real` en vistas de `cierre` → siempre entre comillas.
+- **La retención de proveedor la manda la contabilidad (F-095).** El saldo vivo
+  es `retenciones.saldo_contable` (proveedor × obra, con una fila sin obra por
+  proveedor); `retenciones.movimientos` (los efectos) es el detalle, y el cuadre
+  entre los dos, `retenciones.v_cuadre_proveedor`. Cuatro cosas del origen que
+  lo sostienen:
+  - Las cuentas de retención son las que declara el proveedor en
+    `prv.cueretide` (1:1), **nunca por prefijo**: 4038 y 4128 se escapaban.
+  - Cada ejercicio cierra y reabre esas cuentas (~52 M € por lado): la clase
+    del apunte separa `CIERRE`, `APERTURA`, `SALDO_INICIAL`, `ALTA` y `BAJA`, y
+    el saldo es la suma de las tres últimas. La apertura de 2008 no tiene cierre
+    previo —es la historia anterior a Sigrid, 642.775,50 €— y por eso es
+    `SALDO_INICIAL` y cuenta; la regla es por cuenta, no por fecha.
+  - Desde 2016 el alta no lleva centro de coste en el apunte: la obra sale de
+    `raw.rac` (asiento → factura → sus efectos) y, si no, del propio efecto o
+    del proveedor con una sola obra; siempre por `maestro.centros_coste`.
+  - El vencimiento cuenta desde el **fin de obra** (decisión del humano del
+    2026-09-22), nunca desde la factura: inicio de garantía
+    (`obrctr.fecinigar` / `obr.garfecini`) o, si no hay, el último día del mes
+    siguiente al último cierre con movimiento de `cierre.fact_cierre_mensual`,
+    más el plazo del cliente (`plaret` → `plagar` → 12). Ese respaldo va con
+    **una noche de desfase**: `build_cierre` corre después de
+    `build_retenciones`, y si su tabla estuviera vacía el sub-paso `fin_obra`
+    falla en vez de publicar sin fechas. `retenciones.fin_obra` y
+    `retenciones.v_retencion_contable_obra`.
 
 ## Acceso a datos
 
@@ -163,15 +187,18 @@ sin construir esa noche.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 70 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107)
+### Qué se copia de Sigrid: 71 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095)
 
-`config/tables_sigrid.yaml` declara **70 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **71 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
 nombre a la empresa de cada obra y de cada recurso— y F-107 otra el 2026-09-24
 —`caa`, las 184.234 cuentas analíticas, que traduce la contrapartida del recurso
-y la cuenta de su ficha de tipos de hora; leerla entera cuesta 4,3 s—, además de recuperar la columna `con.tex` (el memo del documento,
+y la cuenta de su ficha de tipos de hora; leerla entera cuesta 4,3 s—, F-095 otra
+el 2026-09-24 —`rac`, la contabilización de documentos, el único enlace
+documento -> asiento, y la **única que se trae filtrada**: `where: asiide <> 0`,
+755.086 de 2.505.089 filas—, además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
 lectura sobre `con`, medio minuto de la ventana nocturna).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo

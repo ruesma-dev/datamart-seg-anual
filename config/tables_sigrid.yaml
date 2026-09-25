@@ -735,6 +735,27 @@ tables:
     # cuenta de resultados por obra de F-058. No es el puente obra<->centro de
     # coste que F-045 busca: `obride` esta a cero en todas.
 
+  - source_table: rac
+    target_table: rac
+    id_column: ide
+    incremental_column: null   # como `apu`: no tiene tiemod
+    where: "asiide <> 0"
+    exclude_columns:
+      - tex    # texto libre del paso (Texto ilimitado)
+    # CONTABILIZACION DE DOCUMENTOS (F-095, H4 del humano del 2026-09-22): el
+    # log del circuito de cada documento; `conide` es el documento y `asiide`
+    # el asiento que genero el paso. Es el unico enlace documento -> asiento.
+    #
+    # POR QUE FILTRADA: de 2.505.089 filas solo 755.086 tienen `asiide <> 0`
+    # (las demas son pasos que no contabilizan) y solo esas sirven, a F-095 y
+    # a F-091, cuyo enlace factura -> asiento es precisamente la fila con
+    # asiento (1 por factura, 165.845 de 166.009). Acordado con F-091 en H4.
+    # Coste estimado sobre la nocturna del 2026-09-22: ~1 min y 90-120 MB.
+    #
+    # PARA QUE (F-095): desde 2016 el alta de retencion NO lleva `cenide` en el
+    # apunte; sin `rac` las altas con obra caen del 97,2 % al 10,8 % del
+    # importe. `check-raw-recuentos` ya aplica este `where` al contar en Sigrid.
+
   # ===========================================================================
   # MODULO COMPRAS/PROVEEDOR (F-066, tanda C3) -- ofertas, firmas, condiciones
   #

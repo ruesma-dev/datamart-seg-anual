@@ -113,6 +113,7 @@ IngestRaw -> LoadExcelAux -> BuildStg -> BuildMart -> PublicarDiccionario -> App
 | 2026-09-16 (F-084) | Entra `compras.fn_estado_documento`, la traduccion del estado de un documento por la pareja (tipo, estado), factorizada para que `compras.contratos` y `compras.facturas` la compartan en vez de copiarla. Es funcion auxiliar, no de consumo. Inventario a **154** objetos |
 | 2026-09-18 (F-057) | Entra el esquema **`personal`** --el decimo--, con `personal.recursos` (el maestro de recursos, que CONTIENE DATOS PERSONALES autorizados: nombre, NIF y DNI), `personal.partes_lineas` (las 330.638 lineas de parte de trabajo) y `personal.v_pbi_horas_obra_mes`, mas su funcion local `personal.fn_fecha`. Inventario a **158** objetos |
 | 2026-09-23 (F-101) | Hotfix de F-057: entran `personal.partes` (la cabecera del parte, con la obra de CABECERA nombrada `obra_cabecera_id` porque audita y no imputa), `personal.recursos_tipos_hora` (los precios de la ficha del recurso, sin el de nomina) y su funcion local `personal.fn_fecha_serie`. Inventario a **161** objetos |
+| 2026-09-24 (F-095) | Entran `raw.rac` (la contabilizacion de documentos, filtrada a `asiide <> 0`) y seis objetos de `retenciones` desde la contabilidad: `cuentas_proveedor`, `apuntes_contables`, `saldo_contable`, `fin_obra`, `v_cuadre_proveedor` y `v_retencion_contable_obra`. Entre medias F-102 y F-107 sumaron cuatro sin fila propia (`raw.auxemp`, `maestro.v_obra_fichas`, `raw.caa`, `maestro.cuentas_analiticas`). Inventario a **172** objetos |
 
 ## 3 · Componentes y ficheros que toca
 

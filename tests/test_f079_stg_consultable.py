@@ -98,6 +98,16 @@ GRUPO_C = {
     "_meta.obra_build": "log crudo del ETL",
 }
 
+#: GRUPO D · las piezas de preparacion de F-095 que la spec APROBADA por el
+#: humano (design §Ficheros a modificar) deja fuera de la superficie a
+#: proposito: la pregunta se responde desde `retenciones.saldo_contable` y sus
+#: dos vistas. Cada una con el HECHO que lo justifica.
+GRUPO_D_F095 = {
+    "retenciones.cuentas_proveedor": "no trae importes",
+    "retenciones.apuntes_contables": "sumar sin filtrar la clase multiplica el saldo",
+    "retenciones.fin_obra": "la pregunta la responde v_retencion_contable_obra",
+}
+
 
 def _dicc():
     return cargar_diccionario(DIR_DICCIONARIO)[0]
@@ -375,10 +385,11 @@ def test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo() -> None:
         if not f.consumo_recomendado and f.esquema != "raw"
     }
 
-    assert fuera == set(GRUPO_B_FUNCIONES) | set(GRUPO_C), (
-        f"sin inventariar: {sorted(fuera - set(GRUPO_B_FUNCIONES) - set(GRUPO_C))}; "
+    inventario = set(GRUPO_B_FUNCIONES) | set(GRUPO_C) | set(GRUPO_D_F095)
+    assert fuera == inventario, (
+        f"sin inventariar: {sorted(fuera - inventario)}; "
         f"inventariado y ya no está: "
-        f"{sorted((set(GRUPO_B_FUNCIONES) | set(GRUPO_C)) - fuera)}"
+        f"{sorted(inventario - fuera)}"
     )
 
 
