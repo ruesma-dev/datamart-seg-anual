@@ -80,6 +80,14 @@ y la lanza el humano (T25).
    fuera del consumo (`cuentas_proveedor`, `apuntes_contables`, `fin_obra`),
    cada una con su hecho: el test obliga a inventariarlas o subirlas.
 
+### Diccionario v32 PUBLICADO el 2026-09-25 12:11 UTC (cifras de retenciones tras el primer build)
+
+Refresco de texto de las fichas de F-095 (`progress/impl_cifras_retenciones_v32.md`):
+hash 4f688ab53ad9, 172 objetos, `check-diccionario` OK y MCP reiniciado (sirve
+la v32). Hallazgo escrito en la ficha: la fila sin obra de `saldo_contable` es
+NEGATIVA (-1.739.408,96): sumar solo por obra da 10,52 M EUR frente a 8,78 M del
+total. Juan Romero avisado por correo ese dia (sin detalle tecnico).
+
 ### F-095 · VERIFICACIONES HECHAS EL 2026-09-25 (lider, autorizado por el humano)
 
 Tras la nocturna del 25 (verde, 00:00-03:49 UTC, imagen de F-107):
