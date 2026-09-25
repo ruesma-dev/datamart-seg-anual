@@ -12,6 +12,18 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 33 (F-108, 2026-09-25): LAS CLAVES ALTERNATIVAS. Una ficha puede
+# declarar `claves_alternativas: [[col, ...], ...]`: otras combinaciones de
+# columnas que TAMBIEN identifican una fila. `check-unicidad` las comprueba
+# contra la base (sin contar las filas con la clave a NULL) y el validador
+# acepta una de UNA columna como lado 1 de una relacion. Declaradas:
+# `maestro.obras` y `maestro.v_obra_fichas` por `clave_obra`,
+# `personal.recursos` por `clave_recurso`, `stg.obras` por `codigo_obra`,
+# `maestro.cuentas_analiticas` por (empresa_id, codigo_cuenta) y
+# `maestro.centros_coste` por (empresa, codigo_centro). Las cinco relaciones
+# `clave_obra -> maestro.obras.clave_obra` de `compras` pasan de `N:N` a `N:1`.
+# Viajan en el JSONB `ficha` de `_meta.diccionario`, sin DDL.
+#
 # version 32 (2026-09-25, sin feature): LAS CIFRAS DE F-095 TRAS EL PRIMER BUILD.
 # Las fichas de `retenciones` que F-095 escribio antes de tener `raw.rac` se
 # remiden sobre el primer build real (2026-09-25 05:49 UTC), solo texto: saldo
@@ -344,7 +356,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 32
+version: 33
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
