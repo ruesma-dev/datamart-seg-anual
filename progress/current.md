@@ -15,9 +15,13 @@ Spec en `specs/F-109-partidas-codigo-no-unico/`, escrita en la rama
 `feature/F-109-partidas-codigo-no-unico` (desde `main` 323910f, en un worktree
 aparte mientras F-108 sigue en el arbol principal). Ficha: `sdd: true`,
 `spec_ready`. Medido en solo lectura el 2026-09-25: 5.202 pares, 8.933 filas de
-mas, 158 obras; tres causas (subarbol copiado por bloque, arboles por fase con
-raiz propia, hermanas homonimas); **nada que ver con F-052** (0 filas
-colapsadas) ni con las copias por empresa. Hoy ningun importe se duplica en el
+mas, 158 obras. **Revisada el mismo dia con el analisis exhaustivo que pidio
+el humano**: siete causas excluyentes que suman el total —contrato distinto
+(637 + 175), expediente distinto (61), subarbol bajo otro capitulo (1.932),
+raices paralelas (2.360), hermanas homonimas (28), copias identicas sin
+explicar (9)—; lo que distingue las copias es el capitulo, no el contrato
+(`(obra, contrato, codigo)` repite 4.437; `(obra, ruta)` 155). **Nada que ver
+con F-052** (0 filas colapsadas) ni con la empresa (cada par, una ficha). Hoy ningun importe se duplica en el
 repositorio (todo une por `partida_id`), pero unir por `(obra, codigo)` infla la
 0437 x3,9; y los nombres de escalon de `v_pbi_dim_partida_niveles` y de la
 dimension CI salen de otra partida en 10.593 filas. Propuesta: solo texto de

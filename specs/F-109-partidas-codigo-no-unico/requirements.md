@@ -11,26 +11,27 @@ escriben con la opción recomendada.
 
 ## Lo que se ha medido (criterio 1 de la ficha)
 
-`(obra_id, codigo_partida)` se repite en **5.202 pares** (4.017 dos veces, 1.185
-tres o más, máximo 22), **8.933 filas de más**, **158 obras** (92 del
-seguimiento, 2.177 pares), idéntico en `stg.partidas` y `mart.v_pbi_dim_partida`
-(394.035 filas). Todas las filas repetidas son partidas activas y distintas en
-Sigrid (`partida_id` distinto). Tres causas, ninguna de ellas un defecto del ETL:
+`(obra_id, codigo_partida)` se repite en **5.202 pares** (8.933 filas de más, 158
+obras; 92 del seguimiento con 2.177 pares), idéntico en `stg.partidas` y
+`mart.v_pbi_dim_partida`. Todas son partidas activas y distintas en Sigrid. Las
+siete causas, excluyentes y en este orden, SUMAN el total (`design.md` §1.1,
+con ejemplos y su significado en Sigrid):
 
-- **D · subárbol copiado bajo otro capítulo** (2.713 pares, 6.043 filas, 135
-  obras): el jefe de obra replica el capítulo por bloque o portal y conserva los
-  códigos. 0560: `1.1.3.2 HORM. HA-25` cuelga de once capítulos distintos.
-- **B · otra raíz** (2.340 pares, 2.739 filas, 19 obras): árboles por fase con
-  raíz propia (0444 `CD` y `CD-FII`, `CI` y `CI-FII`; 0692 `CI` y `CI.F2`), o una
-  raíz que copia un capítulo (0515 raíz `2` y `CD > 2`).
-- **A · misma ruta** (149 pares, 151 filas, 23 obras): hermanas con el mismo
-  código, casi siempre marcadores (`N/A`, `----------`, código de solo espacios)
-  o errores de tecleo (0510 `04.04.14` dos veces), y raíces duplicadas.
+| # | Causa | Pares | Filas de más |
+|---|---|---|---|
+| 1a | un contrato con el cliente (`obrctr`) por copia | 637 | 941 |
+| 1b | contrato distinto, alguna copia sin contrato | 175 | 194 |
+| 2 | mismo contrato, expediente distinto (`obrctrexp`) | 61 | 70 |
+| 3 | subárbol repetido bajo capítulos hermanos (vivienda tipo, fase, parcela, bloque) | 1.932 | 4.979 |
+| 4 | raíces paralelas (fases con raíz propia, raíz duplicada) | 2.360 | 2.710 |
+| 5 | hermanas homónimas o marcadores (erratas, `N/A`) | 28 | 30 |
+| 6 | sin explicar: copias idénticas pegadas dos veces | 9 | 9 |
 
-Descartado con el dato: códigos vacíos, versiones, ámbitos coste/venta
-(`tipvis`, `parcoside`/`parvenide`), copias de MenfisNet (`parideori`), copias
-por empresa (`R-CODIGO-POR-EMPRESA`: el par vive dentro de un `obra_id`, que es
-una ficha) y el colapso de F-052 (0 de las 14.135 filas implicadas está colapsada).
+Descartado con el dato: la empresa (cada par vive en una ficha de obra:
+`R-CODIGO-POR-EMPRESA` no aplica), el colapso de F-052 (0 filas colapsadas),
+versiones, coste/venta, copias MenfisNet y los demás campos de `raw.obrparpar`.
+**Lo que distingue las copias es el capítulo, no el contrato**: `(obra, contrato,
+codigo)` sigue repitiendo 4.437; `(obra, ruta)` 155; `(obra, contrato, ruta)` 150.
 
 ## Las fichas dicen la verdad (criterio 3)
 
@@ -51,7 +52,9 @@ obra», «solo son únicos dentro de su obra» y equivalentes, con o sin tildes)
 
 R5. La ficha de `stg.partidas`, columna `codigo_partida`, debe decir que el
 código NO es único dentro de la obra, con la cifra medida (5.202 pares, 158
-obras) y su fecha, y las tres causas (subárbol copiado, otra raíz, misma ruta).
+obras) y su fecha, las causas (contrato o expediente por copia, subárbol
+repetido bajo otro capítulo, raíces paralelas, erratas) y que el contrato no lo
+desambigua (4.437 repetidos por obra, contrato y código).
 
 R6. [D5] La ficha de `stg.partidas`, columna `codigo_partida`, NO debe afirmar
 «nunca vacío» sin matizar: 2 filas traen un código de solo espacios, que el
