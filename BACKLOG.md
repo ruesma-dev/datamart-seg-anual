@@ -12,7 +12,7 @@ Bloqueadas: **F-052**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-108 | `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102) | 3 | spec lista | estandar | `feature/F-108-claves-alternativas` |
-| F-109 | El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras | 4 | pendiente | estandar | `feature/F-109-partidas-codigo-no-unico` |
+| F-109 | El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras | 4 | spec lista | estandar | `feature/F-109-partidas-codigo-no-unico` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 5 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 6 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
 | F-051 | El mes de las filas reales sale del ano/mes de obrfas y no del TEXTO del cierre, que es la regla, y rompe la clave de cierre.v_pbi_planif_vs_real | 7 | spec lista | critico | `feature/F-051-nombre-mes-real` |
@@ -128,7 +128,7 @@ Decidido por el humano el 2026-09-24 (opcion B), prioridad 2, detras de F-107. S
 
 ### F-109 · El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras
 
-estado **pendiente** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-109-partidas-codigo-no-unico`
+estado **spec lista** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-109-partidas-codigo-no-unico`
 
 Fichada por el humano el 2026-09-24, prioridad 4. Hallazgo H1 del spec-author de F-108, medido en solo lectura por el MCP el 2026-09-24: `(obra_id, codigo_partida)` NO es unico en `stg.partidas` ni en `mart.v_pbi_dim_partida`: 5.203 pares repetidos (4.018 dos veces, 1.185 mas; maximo 22), 8.934 filas de mas, 159 obras, todas activas. CONTRADICE TEXTOS PUBLICADOS en el diccionario: `stg.partidas.obra_id` y `mart.v_pbi_dim_partida.obra_id` («los codigos de partida solo son unicos dentro de su obra») y `mart.fact_seguimiento_mensual.codigo_partida` («unico por obra»). RIESGO: quien una por codigo de partida dentro de una obra (Power BI, el MCP, un informe) puede duplicar importes sin aviso. Posible relacion con el colapso de capitulos en blanco de F-052; sin investigar. QUE HACER: averiguar que son las repeticiones (mismo codigo en capitulos distintos, partidas de versiones o ambitos distintos, codigos vacios, copias), decidir con el humano cual es la clave legible correcta de una partida, corregir las fichas que mienten y, si procede, publicar esa clave y declararla como clave alternativa (F-108).
 

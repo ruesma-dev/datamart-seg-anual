@@ -9,6 +9,26 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-25 · F-109 · SPEC LISTA (`spec_ready`) · el codigo de partida NO es unico dentro de su obra
+
+Spec en `specs/F-109-partidas-codigo-no-unico/`, escrita en la rama
+`feature/F-109-partidas-codigo-no-unico` (desde `main` 323910f, en un worktree
+aparte mientras F-108 sigue en el arbol principal). Ficha: `sdd: true`,
+`spec_ready`. Medido en solo lectura el 2026-09-25: 5.202 pares, 8.933 filas de
+mas, 158 obras; tres causas (subarbol copiado por bloque, arboles por fase con
+raiz propia, hermanas homonimas); **nada que ver con F-052** (0 filas
+colapsadas) ni con las copias por empresa. Hoy ningun importe se duplica en el
+repositorio (todo une por `partida_id`), pero unir por `(obra, codigo)` infla la
+0437 x3,9; y los nombres de escalon de `v_pbi_dim_partida_niveles` y de la
+dimension CI salen de otra partida en 10.593 filas. Propuesta: solo texto de
+diccionario + regla dura + guardas offline; ningun SQL.
+
+**PENDIENTE DEL HUMANO: D1-D5** (`progress/spec_F-109.md` y `design.md` §8):
+D1 clave legible = ninguna, `partida_id` (recomendada); D2 regla
+`R-PARTIDA-CODIGO-NO-UNICO` si; D3 arreglar los nombres en feature aparte; D4
+version siguiente a `main` al fusionar; D5 los 2 codigos de solo espacios, solo
+texto.
+
 ## 2026-09-24 · F-108 · SPEC LISTA (`spec_ready`) · claves alternativas en el diccionario y en `check-unicidad`
 
 Spec en `specs/F-108-claves-alternativas/`, escrita en la rama
