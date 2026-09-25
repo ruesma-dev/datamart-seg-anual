@@ -24,6 +24,10 @@ Decisiones de implementacion:
   fin, rojo antes). Asi T2 (`-k "r11 or r12 or r13"` verde antes) se cumple sin
   rebajar R12.
 
+**Diccionario del arbol tras F-110 (version 34): 172 objetos, 1185 columnas,
+76 de consumo** (las dos columnas nuevas de `retenciones.fin_obra`). Sin
+publicar: `publicar-diccionario` es escritura contra Azure y la lanza el humano.
+
 ## 2026-09-25 · F-110 · SPEC APROBADA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes
 
 **APROBADA por el humano el 2026-09-25**: D1 (A) ultima `Cuatrimestral` por
