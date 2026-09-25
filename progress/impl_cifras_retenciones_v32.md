@@ -51,7 +51,17 @@ orden de magnitud; no cambia ningun SQL.
 ## Verificacion
 
 - YAML de las dos fichas carga con `yaml.safe_load`.
-- `bash harness/init.sh`: ver el resultado real al pie.
+- Primer `bash harness/init.sh`: ROJO, 1 failed (`-x`): R15 y R28 de
+  `tests/test_f095_retenciones_contables.py` fijan cifras de la spec en las
+  fichas (5,07 / 0,99 / 0,20 / 0,10 / 0,47 M EUR del cuadre; 97,0 % del fin de
+  obra; 49.505; 8.760.524,49). Corregido SIN tocar los tests: esas cifras
+  vuelven a la ficha como «Historico» con su fecha (commit d838273).
+- `bash harness/init.sh` final (2026-09-25 12:05 UTC): **VERDE**, «ENTORNO
+  LISTO»; pytest **5.424 passed, 203 skipped** en 841,95 s. Puerta de
+  cobertura N/A (rama sin feature declarada).
+
+Commits en la rama: ca92a35 (cifras y v32), d838273 (historicas que fijan los
+tests), mas el de este informe.
 
 ## Fuera de alcance / pendiente (lider)
 
