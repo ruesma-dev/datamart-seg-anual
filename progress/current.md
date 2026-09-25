@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-25 · F-110 · IMPLEMENTADA, PENDIENTE DE REVIEW (`in_progress`) · fin de obra por el ultimo cuatrimestral + 1 mes
+## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · QUEDAN DESPLIEGUE Y MANUAL
 
 Implementer en la rama `feature/F-110-fin-obra-cuatrimestral` (desde `main`
 79a4505, con F-108: el diccionario sube a la **34**). T0 hecha: F-095 `done` y la
