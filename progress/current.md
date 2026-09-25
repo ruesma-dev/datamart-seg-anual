@@ -2151,3 +2151,8 @@ Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
   workers compitiendo. Se relanza como indica el propio mensaje de la
   herramienta: `--workers 2 --timeout 1800` (linea base 9.000 s). Sin tocar
   `harness/rigor.json`.
+- T10 hecha: 20 mutantes, 15 muertos; 4 supervivientes (recuento del resumen de
+  `check-unicidad`) cerrados con test, 1 equivalente (`ensure_ascii`).
+- T12: `bash harness/init.sh` ENTORNO LISTO (5.486 passed, cobertura 95,1 %).
+- **Queda T11 MANUAL (humano)**: `check-unicidad` y `--todos` con su `.env`,
+  y `publicar-diccionario` (version 33). Informe: `progress/impl_F-108.md`.
