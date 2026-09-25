@@ -2129,3 +2129,14 @@ el historial de la rama. Lo aprobado el 2026-09-23, sin decisiones abiertas:
 - Regla nueva `R-CODIGO-POR-EMPRESA`.
 
 Cifras y consultas de la medicion: `progress/spec_F-102.md`.
+
+## 2026-09-25 · F-108 · IMPLEMENTACION en curso (implementer)
+
+Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
+`in_progress`. Decisiones D1-D5 aprobadas (`progress/spec_F-108.md`).
+
+- **Desviacion acordada con el lider (D5)**: la version del diccionario sube a
+  **33**, no a 31 como dice la spec: `main` ya esta en la 32 (F-095 y sus
+  cifras). `test_f108_r19` exige `>= 33` y la cabecera `version 33 (F-108`.
+- T1 hecha: `tests/test_f108_claves_alternativas.py` en RED (58 fallan, 4 pasan:
+  los controles y las guardas de R16, que ya se cumplen por construccion).
