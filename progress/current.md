@@ -9,6 +9,21 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-25 · F-110 · IMPLEMENTACION EN CURSO (`in_progress`) · fin de obra por el ultimo cuatrimestral + 1 mes
+
+Implementer en la rama `feature/F-110-fin-obra-cuatrimestral` (desde `main`
+79a4505, con F-108: el diccionario sube a la **34**). T0 hecha: F-095 `done` y la
+aprobacion D1-D6 del 2026-09-25 constan aqui abajo y en `progress/spec_F-110.md`.
+Tarea en curso y desviaciones: se anotan aqui; el informe final va en
+`progress/impl_F-110.md`.
+
+Decisiones de implementacion:
+- R12 se prueba en dos tests: `test_f110_r12_*` (las tres informativas de
+  Sigrid, verde antes de tocar el SQL, como pide T2) y
+  `test_f110_r10_ultimo_cierre_no_interviene` (el `ultimo_cierre` fuera del
+  fin, rojo antes). Asi T2 (`-k "r11 or r12 or r13"` verde antes) se cumple sin
+  rebajar R12.
+
 ## 2026-09-25 · F-110 · SPEC APROBADA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes
 
 **APROBADA por el humano el 2026-09-25**: D1 (A) ultima `Cuatrimestral` por
