@@ -2140,3 +2140,8 @@ Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
   cifras). `test_f108_r19` exige `>= 33` y la cabecera `version 33 (F-108`.
 - T1 hecha: `tests/test_f108_claves_alternativas.py` en RED (58 fallan, 4 pasan:
   los controles y las guardas de R16, que ya se cumplen por construccion).
+- T2-T7 hechas (dominio, cargador, `unicidad_sql`, comando y JSONB, seis claves
+  declaradas y version 33, relaciones de `compras` a `N:1`).
+- R23: `test_f107_r4_la_version_sube_a_30` ya exigia `>= 30` en `main` (lo
+  ajusto F-095); no se toca. `test_f102_r22` exige ahora `N:1`.
+- T8: las guardas R16 y R17 son tests de T1; pasan sin codigo nuevo.
