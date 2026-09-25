@@ -12,6 +12,17 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 32 (2026-09-25, sin feature): LAS CIFRAS DE F-095 TRAS EL PRIMER BUILD.
+# Las fichas de `retenciones` que F-095 escribio antes de tener `raw.rac` se
+# remiden sobre el primer build real (2026-09-25 05:49 UTC), solo texto: saldo
+# contable 8.778.606,70 EUR; 49.520 apuntes; `via_obra` con obra el 93,7 % de
+# las altas y el 77,3 % de las bajas; la fila sin obra de `saldo_contable` suma
+# -1.739.408,96 EUR (NEGATIVA: sumar solo por obra da 10,52 M EUR); el cuadre
+# con los efectos 520/81/81/41/38 con su diferencia; y el fin de obra, que ya
+# cubre con garantia 97 obras y 5,03 M EUR de lo vivo porque en Sigrid se
+# estan dando de alta fechas de inicio de garantia. Las cifras de la spec
+# quedan como historicas y con su fecha.
+#
 # version 31 (F-095, 2026-09-24): LA RETENCION DE PROVEEDOR DESDE LA CONTABILIDAD.
 # El saldo vivo a proveedor lo manda la contabilidad: `retenciones.saldo_contable`
 # (por proveedor y obra, con fila sin obra; ~8,76 M EUR), sobre
@@ -333,7 +344,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 31
+version: 32
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -859,11 +870,15 @@ ordenes_de_magnitud:
       Medido el 2026-09-22 en Sigrid en solo lectura (F-095, consulta B1 de
       progress/spec_F-095.md): 8.760.524,49 EUR, el saldo de todas las cuentas
       `prv.cueretide`; remedido el 2026-09-24 en el datamart con la regla de
-      `sql/retenciones/03_apuntes_contables.sql`: 8.775.052,87 EUR. Es la suma
-      de ALTA, BAJA y SALDO_INICIAL; **una cifra del orden de 60 M EUR** es que
-      se han sumado los asientos de cierre o de apertura (52,12 M EUR por lado).
-      Los efectos vivos dan 8,35 M EUR: la diferencia se explica proveedor a
-      proveedor en `retenciones.v_cuadre_proveedor`.
+      `sql/retenciones/03_apuntes_contables.sql`: 8.775.052,87 EUR; y medido el
+      2026-09-25 en el primer build con `raw.rac` (`SUM(saldo)` de
+      `retenciones.saldo_contable`): 8.778.606,70 EUR. Es la suma de ALTA, BAJA
+      y SALDO_INICIAL; **una cifra del orden de 60 M EUR** es que se han sumado
+      los asientos de cierre o de apertura (52,12 M EUR por lado), y **una del
+      orden de 10,5 M EUR** es que se ha sumado solo por obra, dejando fuera la
+      fila sin obra, que es NEGATIVA (-1,74 M EUR el 2026-09-25). Los efectos
+      vivos dan 8,36 M EUR (8.362.932,53 el 2026-09-25): la diferencia se
+      explica proveedor a proveedor en `retenciones.v_cuadre_proveedor`.
   - concepto: Retenido VIVO a proveedores segun los EFECTOS (el detalle; manda la contabilidad)
     valor_aproximado: 8350000
     unidad: EUR
