@@ -910,6 +910,10 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     """
     Comprueba contra la base que cada `clave_negocio` declarada identifica UNA fila.
 
+    Y desde F-108 tambien cada `claves_alternativas` (`maestro.obras.clave_obra`),
+    excluyendo las filas con la clave a NULL: una alternativa rota sale con 1,
+    igual que la de negocio.
+
     Es la mitad del problema que la puerta offline no puede cubrir: sabe si la
     clave nombra columnas de mas, pero no si es demasiado CORTA. Y esa mitad se
     propaga, porque la deteccion de fan-out deriva la unicidad de la clave
@@ -939,15 +943,21 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     consultas = consultas_de_unicidad(dicc, solo_consumo=not todos)
     saltados = objetos_saltados(dicc, solo_consumo=not todos)
 
+    alternativas = sum(1 for c in consultas if c.tipo_clave == "alternativa")
+
     alcance = "TODO objeto con clave" if todos else "solo la superficie de consumo"
     click.echo(f"Comprobacion de unicidad · {alcance}")
-    click.echo(f"  {len(consultas)} objeto(s) a comprobar, {len(saltados)} saltado(s)")
+    click.echo(
+        f"  {len(consultas)} comprobacion(es) ({alternativas} de clave alternativa), "
+        f"{len(saltados)} saltado(s)"
+    )
     click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
     click.echo("")
 
     if dry_run:
         for c in consultas:
-            click.echo(f"-- {c.objeto}  clave: ({', '.join(c.clave)})")
+            etiqueta = "clave alternativa" if c.tipo_clave == "alternativa" else "clave"
+            click.echo(f"-- {c.objeto}  {etiqueta}: ({', '.join(c.clave)})")
             click.echo(c.sql + ";")
             click.echo("")
         click.echo(f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion.")
@@ -957,10 +967,18 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     fallos = 0
     sin_comprobar = 0
     inexistentes = 0
+    # F-108: un objeto puede tener varias claves. Si no existe, se dice UNA vez
+    # y sus demas consultas ni se lanzan ni se cuentan.
+    no_existen: set[str] = set()
+    omitidas = 0
     for c in consultas:
+        if c.objeto in no_existen:
+            omitidas += 1
+            continue
         resultado = pg.comprobar_unicidad(c, timeout)
         if resultado == "NO_EXISTE":
             inexistentes += 1
+            no_existen.add(c.objeto)
             click.echo(veredicto_no_existe(c))
             continue
         if resultado is None:
@@ -974,7 +992,7 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
 
     click.echo("")
     click.echo(
-        f"Resumen: {len(consultas) - fallos - sin_comprobar - inexistentes} sin "
+        f"Resumen: {len(consultas) - omitidas - fallos - sin_comprobar - inexistentes} sin "
         f"contradiccion, {fallos} con la clave rota, {sin_comprobar} sin "
         f"comprobar, {inexistentes} fichados que no existen en la base."
     )

@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **102 features**, 65 abiertas, 37 terminadas.
+Resumen: **102 features**, 64 abiertas, 38 terminadas.
 
 Bloqueadas: **F-052**.
 
@@ -12,7 +12,6 @@ Bloqueadas: **F-052**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-110 | Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1) | 1 | spec lista | critico | `feature/F-110-fin-obra-cuatrimestral` |
-| F-108 | `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102) | 4 | spec lista | estandar | `feature/F-108-claves-alternativas` |
 | F-109 | El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras | 5 | pendiente | estandar | `feature/F-109-partidas-codigo-no-unico` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 6 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 7 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
@@ -100,6 +99,7 @@ Bloqueadas: **F-052**.
 | F-072 | 31 de las 56 tablas que ingerimos cada noche no las consume nadie: entender que hay dentro antes de construir | 4 | documental |
 | F-079 | El diccionario desaconseja consultar stg y eso ya no vale: lo publicado es para consultarse | 4 | estandar |
 | F-094 | Retenciones infladas 4,3 veces: el estado VIVA sale solo de fecrea y cuenta los agrupados dos veces y lo ya pagado | 4 | estandar |
+| F-108 | `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102) | 4 | estandar |
 | F-004 | Ejecutar el ETL en Azure sin dependencias locales | 5 | estandar |
 | F-015 | Verificar que los tests son de verdad: mutacion, fase RED, cobertura y niveles de rigor | 6 | estandar |
 | F-073 | Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales | 6 | estandar |
@@ -126,12 +126,6 @@ Bloqueadas: **F-052**.
 estado **spec lista** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-110-fin-obra-cuatrimestral`
 
 Decidido por el humano el 2026-09-25, prioridad 1. CAMBIA LA DECISION H1 DE F-095 (2026-09-22). Regla nueva de `retenciones.fin_obra.fecha_fin_obra`, en este orden y SIN MAS PASOS: (1) el inicio del periodo de garantia (`obrctr.fecinigar`, si no `obr.garfecini`), como hoy; (2) si no lo hay, el ULTIMO MES PLANIFICADO EN LA ULTIMA VERSION CUATRIMESTRAL (master) de la obra + 1 mes; (3) si tampoco hay cuatrimestral, SIN FECHA (NULL, no se inventa). **SE ELIMINA el respaldo «ultimo cierre con movimiento + 1 mes»** (`ULTIMO_CIERRE_MAS_1_MES`, que leia `cierre.fact_cierre_mensual`): el humano lo quita porque mira hacia atras y en una obra en curso adelanta el vencimiento. El resto de F-095 no cambia: plazo `plaret` -> `plagar` -> 12 meses y vencimiento = fin de obra + plazo. POR QUE: el ultimo cierre + 1 da, en una obra viva, una fecha de hace poco; el cuatrimestral dice cuando PREVE la obra terminar. MEDIDO EL 2026-09-25 (verificaciones de F-095): sobre la retencion viva, INICIO_GARANTIA 97 obras / 5.026.655,18 EUR, ULTIMO_CIERRE_MAS_1_MES 67 / 3.120.260,42 y sin fecha 15 / 100.351,55; en las 922 obras, 198 con garantia y 150 con ultimo cierre. QUE HAY QUE MEDIR ANTES DE ESCRIBIR: cuantas obras tienen version cuatrimestral y cual es su ultimo mes planificado (las versiones master viven en `stg` —ambitos 8 y 11, `stg.version_master_vigente`, `stg.fn_master_mes_representado`—; decidir si «la ultima» es la vigente de F-042 o la de mayor fecha), cuantas de las 67 pasan a tener fecha por cuatrimestral y cuantas se quedan sin fecha, y cuanto se mueven los vencimientos (VENCIDA -> PENDIENTE). Ojo a la dependencia: si el cuatrimestral se lee de `stg`, `build_retenciones` pasa a depender de `build_stg` (hoy lee `cierre`, que va con una noche de retraso); decidirlo y escribirlo. Respetar `R-CODIGO-POR-EMPRESA`.
-
-### F-108 · `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102)
-
-estado **spec lista** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-108-claves-alternativas`
-
-Decidido por el humano el 2026-09-24 (opcion B), prioridad 2, detras de F-107. Sale de la desviacion 6 de F-102: la spec prometia que `check-unicidad` vigilaria en la base las claves legibles nuevas, pero la puerta lee solo `clave_negocio` (`unicidad_sql.consultas_de_unicidad`), que sigue siendo `obra_id` / `recurso_id`; hoy `maestro.obras.clave_obra` (922/922) y `personal.recursos.clave_recurso` (2.619/2.619) son unicas, pero si un dia dejan de serlo nadie avisa. Tambien resolveria la desviacion 4 de F-102: las relaciones `clave_obra -> maestro.obras.clave_obra` de `compras` se declaran `N:N` porque el validador del diccionario (R5 de F-006, `_es_unica_por`) solo acepta el lado 1 sobre la clave de negocio o una `clave_sustituta`. QUE HACER: admitir en las fichas del diccionario una o varias CLAVES ALTERNATIVAS (p. ej. `claves_alternativas: [[clave_obra]]`), que `check-unicidad` compruebe cada una igual que la de negocio (AVISA, no rompe la nocturna: por eso se descarto el indice unico), que el validador de relaciones las acepte como lado 1, y declarar las dos claves y pasar las relaciones de `compras` a `N:1`. Revisar si otras fichas tienen claves alternativas candidatas (p. ej. `clave_cuenta` si F-107 la crea).
 
 ### F-109 · El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras
 
@@ -624,6 +618,12 @@ Pedida por el humano el 2026-09-09: «parece que en el diccionario se indica que
 estado **terminada** · prioridad 4 · rigor `estandar` · SDD no · rama `feature/F-094-retenciones-estado-vivo`
 
 Arreglo INMEDIATO de un dato mal publicado hoy en produccion. Medido el 2026-09-22 en solo lectura (`progress/explore_retenciones_contabilidad_fin_obra.md` §1), a raiz del caso FERMALUX que planteo Juan Romero. `retenciones.movimientos` publica **35,54 M EUR vivos a proveedor (25.012 efectos); la retencion viva real es ~8,35 M EUR**. LA CAUSA: `sql/retenciones/01_movimientos.sql` deriva `estado` SOLO de `pag.fecrea` y no mira `con.fecbaj` ni `con.est`. Con eso cuentan como VIVA: los originales agrupados (`est 14`, `fecbaj` = fecha del AGR; 14.668 efectos, 12,99 M), los otros anulados con `fecbaj <> 0` (841, 5,70 M), los agrupadores AGR ya pagados (`est 10`; 1.444, 6,73 M) y otros pagados sin `fecrea` (311, 1,78 M). **El mismo dinero cuenta dos veces** (original + agrupador) y ninguna de las dos es viva. PRUEBA DE CUADRE: FERMALUX da hoy 98.695,48 EUR vivos; lo vivo de verdad es **64.201,96**, identico al saldo de su cuenta contable 4108005478. Criterio medido de 'viva de verdad': `fecrea = 0 AND con.fecbaj = 0 AND con.est NOT IN (10,14,15)`. Es el mismo defecto que F-080 ya resolvio para `compras.vencimientos`. ADEMAS: el orden de magnitud falso (34,7 M EUR) esta escrito en el diccionario y lo sirve `contexto_bbdd` al MCP: hay que corregirlo. LADO CLIENTE (`cob`), SIN VERIFICAR: de 22,1 M EUR 'VIVA', ~1.957 efectos / ~19,9 M tienen `fecbaj <> 0`. Sospecha del mismo defecto: se mide antes de decidir si entra en el mismo arreglo. FRONTERA: esto es sanear lo publicado con los efectos; llevar la retencion a la contabilidad, con fin de obra y vencimiento, es F-095.
+
+### F-108 · `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102)
+
+estado **terminada** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-108-claves-alternativas`
+
+Decidido por el humano el 2026-09-24 (opcion B), prioridad 2, detras de F-107. Sale de la desviacion 6 de F-102: la spec prometia que `check-unicidad` vigilaria en la base las claves legibles nuevas, pero la puerta lee solo `clave_negocio` (`unicidad_sql.consultas_de_unicidad`), que sigue siendo `obra_id` / `recurso_id`; hoy `maestro.obras.clave_obra` (922/922) y `personal.recursos.clave_recurso` (2.619/2.619) son unicas, pero si un dia dejan de serlo nadie avisa. Tambien resolveria la desviacion 4 de F-102: las relaciones `clave_obra -> maestro.obras.clave_obra` de `compras` se declaran `N:N` porque el validador del diccionario (R5 de F-006, `_es_unica_por`) solo acepta el lado 1 sobre la clave de negocio o una `clave_sustituta`. QUE HACER: admitir en las fichas del diccionario una o varias CLAVES ALTERNATIVAS (p. ej. `claves_alternativas: [[clave_obra]]`), que `check-unicidad` compruebe cada una igual que la de negocio (AVISA, no rompe la nocturna: por eso se descarto el indice unico), que el validador de relaciones las acepte como lado 1, y declarar las dos claves y pasar las relaciones de `compras` a `N:1`. Revisar si otras fichas tienen claves alternativas candidatas (p. ej. `clave_cuenta` si F-107 la crea).
 
 ### F-004 · Ejecutar el ETL en Azure sin dependencias locales
 

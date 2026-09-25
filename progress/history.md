@@ -1315,3 +1315,17 @@ expresion a expresion y campana sistematica de 264 mutantes, 0 supervivientes.
 **F-059 retirada** («las retenciones son ciegas antes de 2016»): absorbida por
 F-095, decision H6 del humano. Detalle: `progress/impl_F-095.md`,
 `progress/review_F-095.md`, `progress/mutacion_F-095.md`.
+
+## F-108 · Claves alternativas en el diccionario y en `check-unicidad` (cerrada el 2026-09-25, APROBADO)
+
+Opcion B del humano (desviacion 6 de F-102): las fichas declaran
+`claves_alternativas`; `check-unicidad` las comprueba (NULL excluidos, sale con
+1 si una se rompe; no esta en `run-all`) y el validador de F-006 acepta una
+alternativa de una columna como lado 1, asi que las cinco relaciones de
+`compras` por `clave_obra` pasan a N:1. Seis claves declaradas
+(`maestro.obras.clave_obra`, `personal.recursos.clave_recurso`,
+`maestro.v_obra_fichas.clave_obra`, `maestro.cuentas_analiticas (empresa_id,
+codigo_cuenta)`, `maestro.centros_coste (empresa, codigo_centro)`,
+`stg.obras.codigo_obra`). Diccionario version 33. Servir las claves al agente es
+cosa de `mcp-bbdd` (D4). Detalle: `progress/impl_F-108.md`,
+`progress/review_F-108.md`.

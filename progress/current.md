@@ -39,7 +39,7 @@ mes con movimiento en coste o venta; D3 ultimo dia del mes siguiente; D4 leer
 (desaparece el desfase de una noche); D5 retirar `ultimo_cierre`; D6 confirmar
 las consecuencias. `00_global.yaml` `version` en carrera con F-108/F-109.
 
-## 2026-09-24 · F-108 · SPEC LISTA (`spec_ready`) · claves alternativas en el diccionario y en `check-unicidad`
+## 2026-09-24 · F-108 · SPEC (historico; cerrada el 2026-09-25) · claves alternativas en el diccionario y en `check-unicidad`
 
 Spec en `specs/F-108-claves-alternativas/`, escrita en la rama
 `feature/F-108-claves-alternativas` (desde `main`, en un worktree aparte
@@ -2159,3 +2159,30 @@ el historial de la rama. Lo aprobado el 2026-09-23, sin decisiones abiertas:
 - Regla nueva `R-CODIGO-POR-EMPRESA`.
 
 Cifras y consultas de la medicion: `progress/spec_F-102.md`.
+
+## 2026-09-25 · F-108 · CERRADA (`done`, APROBADO) · claves alternativas · QUEDA PUBLICAR EL DICCIONARIO v33 Y DESPLEGAR
+
+Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
+`in_progress`. Decisiones D1-D5 aprobadas (`progress/spec_F-108.md`).
+
+- **Desviacion acordada con el lider (D5)**: la version del diccionario sube a
+  **33**, no a 31 como dice la spec: `main` ya esta en la 32 (F-095 y sus
+  cifras). `test_f108_r19` exige `>= 33` y la cabecera `version 33 (F-108`.
+- T1 hecha: `tests/test_f108_claves_alternativas.py` en RED (58 fallan, 4 pasan:
+  los controles y las guardas de R16, que ya se cumplen por construccion).
+- T2-T7 hechas (dominio, cargador, `unicidad_sql`, comando y JSONB, seis claves
+  declaradas y version 33, relaciones de `compras` a `N:1`).
+- R23: `test_f107_r4_la_version_sube_a_30` ya exigia `>= 30` en `main` (lo
+  ajusto F-095); no se toca. `test_f102_r22` exige ahora `N:1`.
+- T8: las guardas R16 y R17 son tests de T1; pasan sin codigo nuevo.
+- T9 hecha (ARCHITECTURE + `azure-apps` commit local `ae8edd3`).
+- T10: la primera campana (`--base main`, 4 workers por defecto) salio con
+  codigo 3: «LINEA BASE SIN TERMINAR», la suite limpia no cupo en 600 s con 4
+  workers compitiendo. Se relanza como indica el propio mensaje de la
+  herramienta: `--workers 2 --timeout 1800` (linea base 9.000 s). Sin tocar
+  `harness/rigor.json`.
+- T10 hecha: 20 mutantes, 15 muertos; 4 supervivientes (recuento del resumen de
+  `check-unicidad`) cerrados con test, 1 equivalente (`ensure_ascii`).
+- T12: `bash harness/init.sh` ENTORNO LISTO (5.486 passed, cobertura 95,1 %).
+- **Queda T11 MANUAL (humano)**: `check-unicidad` y `--todos` con su `.env`,
+  y `publicar-diccionario` (version 33). Informe: `progress/impl_F-108.md`.
