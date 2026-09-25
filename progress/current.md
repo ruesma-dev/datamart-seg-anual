@@ -26,7 +26,14 @@ fuera; version 31 frente a F-095). Hallazgo H1, fuera de alcance:
 repetidos, 159 obras) y tres fichas dicen que si. Detalle en
 `progress/spec_F-108.md`.
 
-## 2026-09-25 · F-095 · CERRADA (`done`, APROBADO en pasada 2) · retenciones desde la contabilidad, por obra y con vencimiento desde el fin de obra · QUEDAN M1-M6 Y EL DESPLIEGUE
+## 2026-09-25 · F-095 · CERRADA (`done`, APROBADO en pasada 2) · retenciones desde la contabilidad, por obra y con vencimiento desde el fin de obra · DESPLEGADA · QUEDAN M1-M6
+
+> **DESPLEGADA el 2026-09-25 hacia las 00:35 UTC con el tag `r20260925-0233`**
+> (desde `main` bc9dc4a; el job pasa de `r20260924-1500` a `r20260925-0233`).
+> La nocturna del 25 ya estaba en marcha con `r20260924-1500` (F-107) y NO se
+> ve afectada. M1-M6 (ingesta de `rac`, `build-retenciones`, cifras,
+> `publicar-diccionario` v31) los lanza el lider a mano cuando esa nocturna
+> termine; si no, los hace la nocturna del 26.
 
 Rama `feature/F-095-retenciones-contabilidad-fin-obra`, reapuntada a `main`
 (249b683) con `git branch -f` antes de sacarla: su unico commit (cd5f440, la
