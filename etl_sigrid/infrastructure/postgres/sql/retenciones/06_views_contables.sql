@@ -32,7 +32,8 @@
 -- el plazo y el vencimiento de retenciones.fin_obra. `estado_vencimiento` se
 -- calcula AL CONSULTAR (fecha de hoy), no en el build:
 --   SIN_OBRA      la fila sin obra del proveedor
---   SIN_FIN_OBRA  la obra no tiene ni inicio de garantia ni cierre con movimiento
+--   SIN_FIN_OBRA  la obra no tiene ni inicio de garantia ni cuatrimestral con plan
+--                 (F-110; antes de F-110, ni cierre con movimiento)
 --   VENCIDA       el vencimiento ya paso
 --   PENDIENTE     el resto
 -- ============================================================================
