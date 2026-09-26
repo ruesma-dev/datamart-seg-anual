@@ -113,3 +113,14 @@ antes de `build_cierre`, `depends_on = ["ingest_raw"]`), que lee `raw` y el puen
 
 Scripts de medición (solo lectura): scratchpad de la sesión, `q.py` (Postgres con
 `default_transaction_read_only`) y `s.py` (`sigrid-api`, `leer_sql`).
+
+## APROBADA (humano, 2026-09-26)
+
+Las ocho decisiones con la recomendacion: D1 las 38 empresas con historia desde
+2008; D2 materializar el mayor (tabla); D3 publicar `plan_cuentas`, `mayor` y
+`saldos_cuenta_mes`, y la vista de saldos por nodo del arbol a F-058; D4 `apa`
+fuera, a F-061, con el enlace `apa.apuide` -> `mayor.apunte_id` listo; D5
+esquema nuevo `contabilidad` (el lider avisa al humano para que `mcp-bbdd` lo
+anada a su lista blanca: sin eso el MCP no lo ve); D6 publicar las dos fechas;
+D7 arbol por prefijo, sin ingerir `cug`; D8 convergencia con F-095 en ficha
+aparte. La version del diccionario sera la siguiente libre de `main` al fusionar.
