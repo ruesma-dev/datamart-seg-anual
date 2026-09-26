@@ -106,7 +106,7 @@ F-052): `140 passed`, sin tocar ninguna.
 ## Qué se hace con `dev` (DECIDIDO: opción B, espejo de `main`; no se ha tocado)
 
 **Decisión del humano (2026-09-26, tras la review 1): se MANTIENE como espejo**,
-adelantada por el líder en cada cierre (`git merge --no-ff main`); ninguna feature
+adelantada por el humano tras cada cierre (el líder le recuerda el comando); ninguna feature
 nace de ella. Escrita en `CONVENTIONS.md` y `leader.md`; acciones y comandos, en
 `current.md` §F-112 «Verificaciones MANUAL». Lo que sigue es la propuesta original.
 

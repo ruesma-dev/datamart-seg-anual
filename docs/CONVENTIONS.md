@@ -77,9 +77,10 @@ encaja: `docs/ARCHITECTURE.md`.
 - Ramas: `main` (integración) ← `feature/F-XXX-slug`. Es la rama que declara
   `RAMA_BASE` en `harness/init.sh` y contra la que miden las puertas.
 - `dev` es un **espejo de `main`** (decisión del humano, 2026-09-26, F-112):
-  el líder la adelanta en cada cierre de feature con `git checkout dev &&
-  git merge --no-ff main` (no es fast-forward: `dev` tiene dos commits
-  propios) y el push lo hace el humano. **Ninguna feature nace de `dev`**:
+  la adelanta el **humano** tras cada cierre de feature con `git checkout dev
+  && git merge --no-ff main && git push origin dev && git checkout main` (no
+  es fast-forward: `dev` tiene dos commits propios); el líder solo se lo
+  recuerda con ese comando al cerrar. **Ninguna feature nace de `dev`**:
   una rama que naciera de ella pondría en rojo la puerta de cobertura.
 - Commits: `F-XXX Tn: descripción` (tareas) o `F-XXX: descripción` (ajustes).
 - Los agentes solo hacen commit local en ramas feature. Push, merge a main y

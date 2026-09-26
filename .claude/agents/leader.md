@@ -84,10 +84,11 @@ feature nace de `dev`**: el 2026-08-31 iba 97 commits por detrás de `main`, y
 el 2026-09-26, 552; una rama nacida de ahí trabaja sobre código viejo y la
 puerta de cobertura la pone en rojo.
 
-**Paso del líder en cada cierre**, después del merge de la feature en `main`:
-adelantar el espejo con `git checkout dev && git merge --no-ff main` (no es
-fast-forward: `dev` tiene dos commits propios, `a1a3df2` y `a1845db`) y volver
-a `main`. El push de `dev` lo hace el humano.
+**El espejo lo adelanta el HUMANO**, no un agente (regla dura: nunca commits
+directos a `dev` ni a `main`). Al cerrar cada feature, el líder se lo
+**recuerda** en la PARADA 2 con el comando exacto:
+`git checkout dev && git merge --no-ff main && git push origin dev && git checkout main`
+(no es fast-forward: `dev` tiene dos commits propios, `a1a3df2` y `a1845db`).
 
 ## Al terminar la sesión
 

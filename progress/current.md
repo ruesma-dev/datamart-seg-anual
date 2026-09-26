@@ -26,23 +26,23 @@ Implementer en `feature/F-112-cobertura-contra-main` (desde `main` fb52d96).
 - [x] T7 · `init.sh` en verde, mutacion e informe `progress/impl_F-112.md`.
 
 Decisión del humano sobre `dev` (2026-09-26): **opción B, se MANTIENE como
-espejo de `main`**, adelantada por el líder en cada cierre; ninguna feature nace
-de ella. Escrita en `docs/CONVENTIONS.md` (Git) y `.claude/agents/leader.md`
+espejo de `main`**, que adelanta el humano tras cada cierre (el líder se lo
+recuerda con el comando); ninguna feature nace de ella. Escrita en `docs/CONVENTIONS.md` (Git) y `.claude/agents/leader.md`
 (Ramas). Review pasada 1: CHANGES_REQUESTED solo documental
 (`progress/review_F-112.md`), atendido en esta sección y en esos dos ficheros.
 
 ### Verificaciones MANUAL (humano) de F-112
 
 - [ ] **Primer adelantamiento de `dev` a `main`** (la pone al día de 552
-  commits; no es fast-forward por sus dos commits propios). Tras el cierre de
-  F-112; el push, solo el humano:
+  commits; no es fast-forward por sus dos commits propios). Lo hace el
+  **humano** tras el cierre de F-112, merge y push; el líder solo se lo
+  recuerda con este comando en cada cierre:
   `git checkout dev && git merge --no-ff main && git push origin dev && git checkout main`
-- [ ] **PENDIENTE DE DECISIÓN: las dos peticiones de `mcp-bbdd` que solo viven
-  en `dev`** (`a1a3df2`, `a1845db`: regla del aviso de las columnas `_raw` y
-  orden de magnitud de `stg.presupuesto`, fichadas allí como F-057/F-058, números
-  que en `main` son otras features). No están en el backlog de `main`. ¿Se
-  rescatan con números nuevos o se descartan? Verlas:
-  `git show a1a3df2 a1845db -- harness/features.json`. NO se han fichado.
+- [x] **Las dos peticiones de `mcp-bbdd` que solo vivían en `dev`**
+  (`a1a3df2`, `a1845db`: regla del aviso de las columnas `_raw` y orden de
+  magnitud de `stg.presupuesto`, fichadas allí como F-057/F-058, números que en
+  `main` son otras features): **rescatadas por el humano como F-114**, ya en
+  `main` (`01193f1`). Texto original: `git show a1845db:harness/features.json`.
 - [ ] **Actualización completa del arnés 1.7.7 -> 1.7.14** (trae además la
   1.7.8-1.7.10; el instalador pregunta por `CLAUDE.md`, `CHECKPOINTS.md`,
   `init.sh`, `CONVENTIONS.md`...), en una rama, desde `arnes-base`:
