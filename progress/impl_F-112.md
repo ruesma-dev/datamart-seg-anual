@@ -3,8 +3,10 @@
 Rama `feature/F-112-cobertura-contra-main` (desde `main` fb52d96). `sdd=false`,
 rigor `estandar`. Tareas derivadas de los cinco `acceptance` (T0-T7 en
 `progress/current.md`). Commits: `3994de9` T0, `ea6f454` T1 (RED), `57c2ab7` T2,
-`2e1b4cd` T3, `472429b` T4, `f5cb73e` T5, `959c959` T6, y el del cierre.
-En `arnes-base`: `2c3a7fe` (1.7.14), commit local en `main`, sin push.
+`2e1b4cd` T3, `472429b` T4, `f5cb73e` T5, `959c959` T6, `25795cc`/`90e787e`/
+`3912100`/`48499f4` T7 (informe y tests de huecos), y el del cierre. En
+`arnes-base`: `2c3a7fe`, `fac838a`, `c5666fc`, `ab0df0f` (1.7.14), commits
+locales en `main`, sin push.
 
 ## Qué cambió
 
@@ -15,7 +17,7 @@ En `arnes-base`: `2c3a7fe` (1.7.14), commit local en `main`, sin push.
 | `harness/cobertura.py` | `--base` por defecto = `RAMA_BASE`; KO con el motivo si la base está rezagada; la línea dice contra qué midió (`diff desde <sha>, merge-base con main`) | 1, 2 |
 | `harness/rutas_sensibles.py` | mismo defecto de `--base` y mismo KO en `evaluar_puerta` | 1, 2 |
 | `harness/mutacion.py` | `--base` por defecto = `RAMA_BASE` (antes `dev` cableado) | 1 |
-| `tests/test_f112_base_de_la_puerta.py` | 16 tests offline (repo git de juguete en `tmp_path` + 2 lecturas git del propio repo) | 1, 2, 5 |
+| `tests/test_f112_base_de_la_puerta.py` | 20 tests offline (repo git de juguete en `tmp_path` + 2 lecturas git del propio repo) | 1, 2, 5 |
 | `.claude/agents/reviewer.md`, `docs/CONVENTIONS.md` | la primera pasada del reviewer es `git diff main...HEAD`; el modelo de ramas es `main` ← `feature/*`, `dev` parada y pendiente de decisión | 1, 3 |
 | `harness/features.json`, `BACKLOG.md`, `progress/current.md` | ficha `in_progress`, backlog regenerado, seguimiento | — |
 
@@ -97,7 +99,7 @@ tests/test_f112_base_de_la_puerta.py:310: AssertionError: assert 'la base «dev�
 1 failed in 0.55s
 ```
 
-VERDE tras T3 (mismo comando): `16 passed in 16.66s`. Suites vecinas del arnés
+VERDE tras T3 (mismo comando): `16 passed in 16.66s`; con los 4 de T7, `20 passed in 28.06s`. Suites vecinas del arnés
 (`test_f015_*`, `test_f020_*`, `test_mutacion_informe`, cobertura de F-006 y
 F-052): `140 passed`, sin tocar ninguna.
 
@@ -134,7 +136,7 @@ limpio con `git apply --directory=arnes-base`; `mutacion.py` a mano
 (`BASE_POR_DEFECTO` pasa a ser el último recurso); `init.sh` solo el comentario
 de `RAMA_BASE` (el defecto genérico sigue siendo `dev`); `reviewer.md` genérico;
 test `tests/test_base_de_la_puerta.py` (el mío sin el caso propio de este
-proyecto y sin citar features, regla de la 1.7.5). `harness/VERSION` → **1.7.14,
+proyecto y sin citar features, regla de la 1.7.5; 18 passed, 1 skipped). `harness/VERSION` → **1.7.14,
 2026-09-26**, y sección nueva en `GUIA_INSTALACION.md` con el caso, el AVISO del
 rojo nuevo y qué revisar al actualizar. **Por qué 1.7.14**: 1.7.11-1.7.13 son
 encargos sin entregar (`ENCARGO_*.md`); tomé el siguiente número libre y lo
@@ -182,4 +184,23 @@ Las cifras antiguas eran las de 25 ficheros y ~4.900 líneas de trabajo ajeno.
 
 ## Evidencias
 
-PENDIENTE_INIT_Y_MUTACION
+| Evidencia | Valor real |
+|---|---|
+| Tests de F-112 | 20 passed (`tests/test_f112_base_de_la_puerta.py`) |
+| Suite completa (`bash harness/init.sh`) | INIT_SUITE |
+| Cobertura de las líneas cambiadas | INIT_COBERTURA |
+| Mutación | `python -m harness.mutacion --feature F-112 --workers 3 --timeout 2400`: **27 generados, 20 evaluados (muestreo `estandar`, semilla 20260820), 18 muertos, 2 supervivientes, 0 timeouts**, 3.611,7 s, medida en HEAD `25795cc`. Detalle: `progress/mutacion_F-112.md` |
+| Supervivientes | los 2, `cobertura.py:167/168` (`[:10]` -> `[:11]` del sha en la línea de la puerta): **huecos reales**, ahora muertos por tests endurecidos (`3912100`, `48499f4`); rejugados a mano, ROJO con el mutante |
+| Tiempo de la suite | INIT_TIEMPO |
+
+Sobre la campaña: el primer intento (`--feature F-112` a secas, 4 workers por
+defecto) abortó sin informe porque la línea base limpia no cupo en sus 600 s
+con 4 suites compitiendo. Relanzada con 3 workers y `--timeout 2400` (F-108 ya
+usó `--timeout 1800`); líneas base de 518-531 s, todas verdes. El cierre de la
+1.7.8 (un timeout es un reintento) no está en este proyecto (1.7.7).
+
+Resultado real de `bash harness/init.sh` (última ejecución, HEAD INIT_HEAD):
+
+```
+INIT_SALIDA
+```
