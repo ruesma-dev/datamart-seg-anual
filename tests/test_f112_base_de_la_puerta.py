@@ -391,7 +391,8 @@ def test_f112_r5_la_puerta_de_una_rama_integrada_dice_que_midio_su_merge(
     salida = capsys.readouterr().out
     assert codigo == 0
     assert "de 2 líneas cambiadas" in salida
-    assert f"diff del merge {merge[:10]}" in salida
+    # Diez caracteres del sha, ni uno más: la línea se compara entre features.
+    assert f"diff del merge {merge[:10]}, ya integrado en main" in salida
 
 
 def test_f112_r2_el_cli_de_rutas_sensibles_sin_declaracion_no_hace_nada(
