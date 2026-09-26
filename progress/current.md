@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-26 · F-112 · IMPLEMENTADA, pendiente de review · la puerta de cobertura media contra `dev`, parada
+## 2026-09-26 · F-112 · CERRADA (`done`, APROBADO en pasada 3) · la puerta de cobertura media contra `dev`, parada · QUEDAN LAS MANUAL DEL HUMANO
 
 Implementer en `feature/F-112-cobertura-contra-main` (desde `main` fb52d96).
 `sdd=false`, rigor `estandar`. Tareas derivadas de los `acceptance`:

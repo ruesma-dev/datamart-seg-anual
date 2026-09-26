@@ -3,9 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **104 features**, 64 abiertas, 40 terminadas.
-
-En curso: **F-112**.
+Resumen: **104 features**, 63 abiertas, 41 terminadas.
 
 Bloqueadas: **F-052**.
 
@@ -14,7 +12,6 @@ Bloqueadas: **F-052**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-097 | Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master | 1 | pendiente | estandar | `feature/F-097-descompuestos-partidas` |
-| F-112 | La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa | 2 | en curso | estandar | `feature/F-112-cobertura-contra-main` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | pendiente | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 5 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 6 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
@@ -97,6 +94,7 @@ Bloqueadas: **F-052**.
 | F-095 | Retenciones desde la contabilidad, cuadradas con los efectos, por obra, y con vencimiento a contar desde el fin de obra | 2 | critico |
 | F-102 | HOTFIX 2: la obra esta dada de alta dos veces (empresa 1 y empresa 28): publicar la empresa y la ficha principal en maestro.obras, y medir la direccion sobre la ficha buena | 2 | estandar |
 | F-109 | El par (obra, codigo de partida) NO es unico en stg.partidas ni en mart.v_pbi_dim_partida: 5.203 pares repetidos en 159 obras | 2 | estandar |
+| F-112 | La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa | 2 | estandar |
 | F-005 | Postgres del datamart en Azure | 3 | critico |
 | F-068 | El MCP lee raw entero, y desde F-066 eso incluye DNI, Seguridad Social, cuentas bancarias y domicilios de 1.352 empleados | 3 | critico |
 | F-014 | Arnes generico versionado, reutilizable en cualquier proyecto | 4 | estandar |
@@ -130,12 +128,6 @@ Bloqueadas: **F-052**.
 estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-097-descompuestos-partidas`
 
 Pedida por Juan Romero por correo el 2026-09-22, «Datamart: publicar los descompuestos de las partidas (Descomposicion y Planificacion de compras)». Hoy de cada partida solo llegan medicion, precio e importe por ambito y fase o version (`stg.presupuesto`), pero no los elementos (precios simples) que la componen. Ejemplo suyo: la partida D05DF210 «Forj. reticular 35+10» de la 0726 cuesta 134,35 EUR/m2 y no se ve de que se compone (hormigon, acero, encofrado, mano de obra). ================ LO QUE SON, SEGUN EL HUMANO (2026-09-22), y manda sobre el nombre de la pestaña: en COSTE (ambito 3) existen los DOS: la pestaña «Planificacion compras» es **el descompuesto que necesitamos** (el del jefe de obra), y la pestaña «Descomposicion» es **la referencia que vino de Estudios**. En MASTER COSTE (ambito 8) solo existe la pestaña «Descomposicion», que conceptualmente es **la planificacion de compras del ABC en adelante** y **el descompuesto del cierre para Oficina Tecnica**. Juan propone llamarlos ESTUDIO, PLANIF_JO y MASTER_PLANIF_JO y publicarlos los tres, cada uno con su origen, sin mezclarlos. ================ LO QUE PIDE: una fila por linea de descompuesto con identificacion (obra, partida, ambito, fase o version, origen, orden), elemento (id, codigo, descripcion, tipo MO/material/maquinaria/subcontrata/%/auxiliar, unidad), valores (rendimiento, precio unitario, importe por unidad y, si es comodo, totales por la medicion), porcentajes con su base, anidamiento de partidas auxiliares (linea padre) y, solo en las de planificacion, proveedor, contrato y mes previsto de compra si la pestaña lo recoge. Un catalogo de elementos con su equivalencia al producto de compras para cruzar lo planificado con lo comprado. Controles: el descompuesto por unidad cuadra con el precio de la partida en `stg.presupuesto` (publicar las que no) y lista de partidas con precio y sin descompuesto (tanto alzado). ================ NADA MEDIDO TODAVIA: hay que localizar en Sigrid las tablas de cada pestaña (azure-apps/sigrid_tablas.md), si se ingieren, su volumen -el master tiene una copia por version y puede ser muy grande, con el coste de ventana que eso supone- y que significa 'del ABC en adelante' en el dato. Enlaza con F-092 (maestro de productos) y con F-038 (comparativo).
-
-### F-112 · La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa
-
-estado **en curso** · prioridad 2 · rigor `estandar` · SDD no · rama `feature/F-112-cobertura-contra-main`
-
-Decidido por el humano el 2026-09-26, prioridad 2. Hallazgo del reviewer de F-109: `harness/init.sh:34` fija `RAMA_BASE=dev` y la puerta de cobertura (`python -m harness.cobertura --base "$RAMA_BASE"`, l. 486) y la de rutas sensibles (l. 514) comparan contra esa rama. `dev` esta parada en `a1845db` (renumeracion de F-057/F-058, principios de septiembre): todo el trabajo se integra en `main`. Consecuencia: la cobertura de lineas cambiadas mide el diff `dev...HEAD`, que arrastra semanas de features ya cerradas; por eso F-110 y F-109 dieron la MISMA cifra (95,1 % de 1.106 lineas) y ninguna de esas lineas era de F-109. La puerta pasa en verde sin medir lo que dice medir. QUE HACER: (1) en este proyecto, `RAMA_BASE=main` (o calcular la base como `git merge-base HEAD main`), con un test que falle si la rama base no es ancestro reciente de HEAD o esta por detras de la rama de integracion; (2) decidir que se hace con `dev` (retirarla, o mantenerla y avisar); (3) REGLA DE PROPAGACION: portar a `arnes-base` que la puerta use el merge-base con la rama de integracion configurada, o avise en rojo cuando la base este por detras, con el modo actualizar del instalador; (4) remedir la cobertura real de las ultimas features cerradas (F-107 a F-110) contra `main` y anotar si alguna queda por debajo del umbral de su rigor.
 
 ### F-111 · Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida
 
@@ -598,6 +590,12 @@ HOTFIX pedido por el humano el 2026-09-22 a partir de la correccion de Juan Rome
 estado **terminada** · prioridad 2 · rigor `estandar` · SDD sí · rama `feature/F-109-partidas-codigo-no-unico`
 
 Fichada por el humano el 2026-09-24, prioridad 4. Hallazgo H1 del spec-author de F-108, medido en solo lectura por el MCP el 2026-09-24: `(obra_id, codigo_partida)` NO es unico en `stg.partidas` ni en `mart.v_pbi_dim_partida`: 5.203 pares repetidos (4.018 dos veces, 1.185 mas; maximo 22), 8.934 filas de mas, 159 obras, todas activas. CONTRADICE TEXTOS PUBLICADOS en el diccionario: `stg.partidas.obra_id` y `mart.v_pbi_dim_partida.obra_id` («los codigos de partida solo son unicos dentro de su obra») y `mart.fact_seguimiento_mensual.codigo_partida` («unico por obra»). RIESGO: quien una por codigo de partida dentro de una obra (Power BI, el MCP, un informe) puede duplicar importes sin aviso. Posible relacion con el colapso de capitulos en blanco de F-052; sin investigar. QUE HACER: averiguar que son las repeticiones (mismo codigo en capitulos distintos, partidas de versiones o ambitos distintos, codigos vacios, copias), decidir con el humano cual es la clave legible correcta de una partida, corregir las fichas que mienten y, si procede, publicar esa clave y declararla como clave alternativa (F-108).
+
+### F-112 · La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa
+
+estado **terminada** · prioridad 2 · rigor `estandar` · SDD no · rama `feature/F-112-cobertura-contra-main`
+
+Decidido por el humano el 2026-09-26, prioridad 2. Hallazgo del reviewer de F-109: `harness/init.sh:34` fija `RAMA_BASE=dev` y la puerta de cobertura (`python -m harness.cobertura --base "$RAMA_BASE"`, l. 486) y la de rutas sensibles (l. 514) comparan contra esa rama. `dev` esta parada en `a1845db` (renumeracion de F-057/F-058, principios de septiembre): todo el trabajo se integra en `main`. Consecuencia: la cobertura de lineas cambiadas mide el diff `dev...HEAD`, que arrastra semanas de features ya cerradas; por eso F-110 y F-109 dieron la MISMA cifra (95,1 % de 1.106 lineas) y ninguna de esas lineas era de F-109. La puerta pasa en verde sin medir lo que dice medir. QUE HACER: (1) en este proyecto, `RAMA_BASE=main` (o calcular la base como `git merge-base HEAD main`), con un test que falle si la rama base no es ancestro reciente de HEAD o esta por detras de la rama de integracion; (2) decidir que se hace con `dev` (retirarla, o mantenerla y avisar); (3) REGLA DE PROPAGACION: portar a `arnes-base` que la puerta use el merge-base con la rama de integracion configurada, o avise en rojo cuando la base este por detras, con el modo actualizar del instalador; (4) remedir la cobertura real de las ultimas features cerradas (F-107 a F-110) contra `main` y anotar si alguna queda por debajo del umbral de su rigor.
 
 ### F-005 · Postgres del datamart en Azure
 

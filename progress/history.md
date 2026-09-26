@@ -1358,3 +1358,18 @@ por la ruta), tres fichas corregidas y un test que barre todas. Ningun SQL. Los
 nombres por codigo de niveles y CI quedan en F-111. Diccionario version 35.
 Detalle: `progress/impl_F-109.md`, `progress/review_F-109.md`,
 `progress/spec_F-109.md`.
+
+## F-112 · La puerta de cobertura media contra `dev`, parada (cerrada el 2026-09-26, APROBADO en pasada 3)
+
+Hallazgo del reviewer de F-109: `RAMA_BASE=dev` hacia que la puerta de cobertura
+y la de rutas sensibles midieran un diff de semanas de trabajo ajeno (95,1 % de
+1.106 lineas identico en F-109 y F-110). Ahora `RAMA_BASE=main` es la unica
+fuente, la puerta dice contra que midio y avisa si la base queda por detras; una
+rama integrada se mide por su merge. Remedidas F-107..F-110 contra `main`:
+ninguna por debajo del umbral (F-108 al 100 % de 84 lineas; las otras sin Python
+ejecutable). Decision del humano sobre `dev`: se MANTIENE como espejo de `main`
+y la ADELANTA EL HUMANO (el lider le recuerda el comando al cerrar cada feature),
+sin tocar la regla dura de `CLAUDE.md`. Las dos peticiones de `mcp-bbdd` que
+solo vivian en `dev` son F-114. Portado a `arnes-base` 1.7.14. Pasadas 1 y 2
+rechazadas solo por documentacion. Detalle: `progress/impl_F-112.md`,
+`progress/review_F-112.md`.

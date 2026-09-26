@@ -1,127 +1,117 @@
 <!-- progress/review_F-112.md -->
-Revisión incremental desde fe83de3 (pasada 2) · delta `fe83de3..85e5c26`
+Revisión incremental desde 85e5c26 (pasada 3) · delta `85e5c26..c14c8ab`
 
 # F-112 · Review · la puerta de cobertura medía contra `dev`, parada
 
-**Veredicto: CHANGES_REQUESTED.** Solo queda un cambio de texto: las tres
-reglas nuevas sobre `dev` no dicen lo mismo sobre **quién** adelanta el espejo,
-y una choca con una regla dura de `CLAUDE.md`. Código, tests, puertas y
-mutación siguen aprobados desde la pasada 1.
+**Veredicto: APPROVED.**
 
-**Nivel de rigor:** `estandar` (declarado). Exige RED, cobertura ≥ 80 % y
-mutación sin supervivientes en `PENDIENTE`: cumplido en la pasada 1, y el delta
-no toca código (`harness/*.py`, `init.sh` y `tests/` sin cambios desde
-`fe83de3`), así que nada de lo aprobado se invalida.
+**Nivel de rigor:** `estandar` (declarado en `features.json`). Exige fase RED,
+cobertura de líneas cambiadas ≥ 80 % y campaña de mutación sin supervivientes
+en `PENDIENTE`. Todo cumplido en la pasada 1. Desde entonces ningún delta ha
+tocado código: `harness/*.py`, `harness/init.sh` y `tests/` no cambian desde
+`fe83de3`, así que la campaña medida en `25795cc` sigue valiendo (RM1).
 
-## Lo que se ejecutó en esta pasada
+## Pasada 3 · lo que se ejecutó y se leyó
 
 - `bash harness/init.sh` tal cual en `feature/F-112-cobertura-contra-main`
-  (HEAD `85e5c26`, árbol limpio): **exit 0**, `5562 passed, 203 skipped` en
-  596,53 s; `PUERTA COBERTURA: 100.0% de 69 (69/69, umbral 80%; diff desde
-  fb52d96e14, merge-base con main)`; `PUERTA TAMAÑO: impl 218/220, review
-  140/140`; `ENTORNO LISTO`.
-- Delta leído: `.claude/agents/leader.md`, `docs/CONVENTIONS.md`,
-  `progress/current.md`, `progress/impl_F-112.md` (y mi propio informe, que el
-  implementer commiteó). En `arnes-base`: el commit nuevo `2b7b373`
-  (`leader.md` genérico y la línea en `GUIA_INSTALACION.md`).
-- F-114 existe en `main` (`pending`, «Rescatar dos peticiones de `mcp-bbdd`
-  que solo vivían en la rama `dev`»): la petición del líder de no exigir el
-  rescate en esta rama está justificada.
+  (HEAD `c14c8ab`, árbol limpio): **exit 0**, `5562 passed, 203 skipped` en
+  581,86 s. `PUERTA COBERTURA: 100.0% de 69 (69/69, umbral 80%; diff desde
+  fb52d96e14, merge-base con main)`. `PUERTA TAMAÑO: impl 218/220, review
+  127/140`. `ENTORNO LISTO`.
+- Delta (`b29e259`, `2a83f04`, `c14c8ab`): solo texto, en `leader.md`,
+  `CONVENTIONS.md`, `current.md` e `impl_F-112.md`, más el commit de mi informe
+  de la pasada 2. En `arnes-base`: `aa8f85a` (`leader.md` genérico y la línea
+  de ficheros de la 1.7.14 en `GUIA_INSTALACION.md`).
 
-## Estado de los cambios de la pasada 1
+## Cambio de la pasada 2 · ¿quién adelanta `dev`?
 
-1. **Verificaciones MANUAL en `current.md`**: [x] atendido. Bloque con cuatro
-   acciones y su comando exacto (primer adelantamiento de `dev`, las dos
-   peticiones de `mcp-bbdd`, actualización 1.7.7 → 1.7.14, push de
-   `arnes-base` `2c3a7fe..2b7b373`).
-2. **Acceptance 3, decidido y escrito**: [x] atendido. Opción B del humano
-   (`dev` espejo de `main`, ninguna feature nace de ella) escrita en
-   `CONVENTIONS.md:78-83` y `leader.md:80-90`; `impl_F-112.md` la registra.
-   **Pero** abre la incoherencia del cambio 1 de abajo.
-3. **`CONVENTIONS.md`, «merge a dev»**: [x] ahora dice «merge a main».
+[x] **Atendido con la opción (a), y coherente en todos los sitios:**
+- `.claude/agents/leader.md:87-91`: «El espejo lo adelanta el HUMANO, no un
+  agente». Invoca la regla dura. El líder se lo **recuerda** en la PARADA 2 con
+  el comando exacto.
+- `docs/CONVENTIONS.md:79-84`: lo adelanta el humano y el líder se lo
+  recuerda. Casa con `:85-86`: los agentes solo hacen commit en ramas feature,
+  y el merge es del humano.
+- `CLAUDE.md:205-206` (nunca commits directos a `dev` ni a `main`): sin tocar
+  y ya sin contradicción.
+- `progress/current.md` §F-112, MANUAL: el primer adelantamiento lo hace el
+  humano, con merge y push en un mismo comando, igual que en los otros dos
+  sitios.
+- `arnes-base` `aa8f85a`: el `leader.md` genérico dice lo mismo, con
+  `<espejo>`/`<RAMA_BASE>` en vez de nombres de rama. Ahora casa con su
+  `CLAUDE.md:132-133` y su `docs/CONVENTIONS.md:48-49`. Commit local, sin push.
 
-## Checkpoints (solo lo que mueve el delta; el resto, como en la pasada 1)
+La observación de la pasada 2 también está atendida: `current.md` marca `[x]`
+las dos peticiones de `mcp-bbdd`, rescatadas como F-114 en `main` (`01193f1`).
 
-- C1 [x] `init.sh` exit 0 (arriba).
-- C2 [x] una sola `in_progress` · [x] rama correcta · [x] `current.md` añade
-  solo lo de F-112.
-- C3 [x] primera línea con ruta en los ficheros tocados · [ ] **coherencia de
-  las convenciones**: ver cambio 1.
-- C4 [x] verificaciones MANUAL listadas con comando exacto · [x] cada
-  `acceptance` con su test (tabla de la pasada 1, intacta).
-- C4 bis [x] sin cambios en el alcance medido: la campaña (`25795cc`) sigue
-  valiendo por RM1; nada que volver a medir.
+## Checkpoints
+
+- C1 [x] `init.sh` exit 0 · [x] ficheros del arnés presentes.
+- C2 [x] una sola `in_progress` (F-112) · [x] rama `feature/F-112-...` ·
+  [x] `current.md`: F-112 solo añade su sección · N/A `history.md`: F-112 aún
+  no está `done`, la entrada llega al cerrarla.
+- C3 [x] todo en `harness/`, `tests/` y documentos del arnés, sin dominio ·
+  [x] primera línea con ruta · [x] sin prints ni secretos. El único aviso de
+  ruff en lo tocado (N818, `rutas_sensibles.py:57`) ya estaba en `main` ·
+  [x] convenciones coherentes entre sí (cerrado en esta pasada) · N/A
+  semántica Sigrid: no toca el ETL.
+- C3 bis N/A: no entra ningún documento de fuera.
+- C4 [x] cada `acceptance` con test (tabla abajo) · [x] sin red ni BBDD: git
+  local en `tmp_path` y lecturas del propio repositorio · [x] no introduce
+  dobles · [x] verificaciones MANUAL en `current.md` con su comando exacto.
+- C4 bis [x] rigor declarado · [x] RED con salida real (9 rojos contra stubs
+  en `ea6f454`, y el rojo en el repositorio real «552 de los 554 ya están en
+  main») · [x] cobertura 100 % (69/69) · [x] mutación: 27 generados, 20
+  evaluados (muestreo `estandar`), 18 muertos, 2 supervivientes analizados y
+  muertos después con tests endurecidos, 0 timeouts, 0 sin veredicto ·
+  [x] campaña no reejecutada: 3.611,7 s (60 min) según el informe. Recálculo
+  puro propio: 191 líneas y 27 mutantes, coinciden · [x] RM1, RM2, RM3 y RM6 ·
+  N/A RM5, porque el rigor es `estandar` · [x] RM4 hecho sobre una copia: cada
+  superviviente pone ahora su test en rojo · [x] «Evidencias» completa.
 - C4 ter N/A: el repositorio no declara `harness/rutas_sensibles.json`.
-- C5 N/A `tasks.md` (`sdd=false`, T0-T7 `[x]` en `current.md`) · [x] sin
-  temporales · [x] `features.json` en `in_progress`, lo real hasta el cierre.
+- C5 N/A `tasks.md` (`sdd=false`); T0-T7 están `[x]` en `current.md` con
+  commits `F-112 Tn:` · [x] sin temporales · [x] `features.json` en
+  `in_progress` hasta que el líder lo cierre.
 
-## Cambios requeridos
+## Cobertura acceptance → test
 
-1. **¿Quién adelanta `dev`? Tres textos, tres respuestas, y una regla dura en
-   contra.**
-   - `.claude/agents/leader.md:87-90`: «**Paso del líder** en cada cierre…
-     `git checkout dev && git merge --no-ff main`». El líder es un agente y
-     haría un commit (de merge) en `dev`.
-   - `CLAUDE.md:205-206`, regla dura no negociable: «Nunca commits directos a
-     `dev` ni a `main`». Y `docs/CONVENTIONS.md:85-86`: «Los agentes solo hacen
-     commit local en ramas feature. Push, merge a main y PRs: siempre el
-     humano».
-   - `progress/current.md` §F-112, Verificaciones MANUAL: el **humano** hace el
-     primer adelantamiento, merge y push en el mismo comando.
-
-   El próximo líder, al cerrar una feature, o incumple un PROHIBIDO de
-   `CLAUDE.md` o se salta el paso que le manda `leader.md`: es exactamente
-   como `dev` acabó parada. Elegir UNA de estas dos y escribirla igual en los
-   tres sitios:
-   - (a) **El humano adelanta `dev`** tras cada merge a `main`: `leader.md`
-     dice que el líder se lo **recuerda** con el comando, sin ejecutarlo; es
-     coherente con «merge… siempre el humano» y no toca `CLAUDE.md`.
-   - (b) **El líder lo hace**: entonces `CLAUDE.md:205-206` y
-     `CONVENTIONS.md:85-86` llevan la excepción explícita («salvo el merge de
-     `main` en el espejo `dev`, que hace el líder al cerrar»), y esa excepción
-     la tiene que autorizar el humano, porque es una regla dura.
-
-   Lo mismo en `arnes-base` (`2b7b373`): su `leader.md` genérico dice «adelantarla
-   es un paso del líder» y su `CLAUDE.md:132-133` y `docs/CONVENTIONS.md:48-49`
-   dicen lo contrario. Corregirlo allí con la misma opción, en un commit local
-   más de la 1.7.14.
-
-## Observaciones (no bloquean)
-
-- `current.md` §F-112 dice de las dos peticiones de `mcp-bbdd` «NO se han
-  fichado»; en `main` ya son F-114. Al integrar F-112 en `main`, el líder
-  debería dejar esa línea apuntando a F-114 para que no parezcan perdidas.
-- De la pasada 1 siguen en pie, fuera de los `acceptance`: el texto del
-  diagnóstico culpa a la base cuando lo rezagado es la rama nacida de `dev`;
-  una rama nacida de otra feature sin integrar y una rama integrada por
-  fast-forward siguen sin detectarse (aquí se integra con `--no-ff`).
-  Candidatos a encargo en `arnes-base`.
-- `init.sh` se ejecutó en el árbol principal, donde está la rama: el worktree
-  de esta sesión (`.claude/worktrees/agent-a7e46bca863639aea`) no tiene la
-  rama y está bloqueado por otra sesión; ejecutarlo allí en HEAD separado
-  habría dado la puerta de cobertura en N/A. Árbol principal limpio antes y
-  después, salvo este informe.
-
-## Pasada 1 (resumen; el informe completo, en `git show 85e5c26:progress/review_F-112.md`)
-
-Revisión completa de `git diff main...HEAD` en `fe83de3`: init.sh verde
-(5562 passed). Los seis puntos del líder:
-- **Base.** `RAMA_BASE=main` es la única fuente, sin agujero en rama desde
-  `dev`, merge de `dev`, merges ajenos ni rama integrada (sonda propia en
-  repos desechables).
-- **Sigue fallando cuando debe.** Bajo el umbral da código 1
-  (`test_f015_r10_exit_1_bajo_el_umbral` y la sonda).
-- **Porte 1.7.14.** Genérico y propagado por el instalador en `-SoloDiff`.
-- **Remedición.** F-107..F-110 recalculadas: ninguna bajo el 80 %.
-- **`dev` intacta** (`a1845db`).
-- **Mutación.** Recálculo 191 líneas y 27 mutantes, coincide; los dos
-  supervivientes rehechos en copia (RM4), ahora muertos; RM1, RM2 y RM6 [x];
-  campaña no reejecutada, 3.611,7 s según el informe.
-
-| # | Acceptance | Estado |
+| # | Acceptance | Evidencia |
 |---|---|---|
-| 1 | Puertas contra `main` | [x] tests r1/r2 de `test_f112_base_de_la_puerta.py` |
-| 2 | Test que falla con base rezagada | [x] `r2_en_este_repositorio_la_base_no_esta_rezagada` (rojo real con `dev`) |
-| 3 | Decidido y escrito qué se hace con `dev` | [x] decidido (opción B); escrito con la incoherencia del cambio 1 |
-| 4 | Porte a `arnes-base` y versión | [x] 1.7.14, más `2b7b373`, que arrastra la misma incoherencia |
-| 5 | Remedición F-107..F-110 | [x] ninguna bajo el umbral |
+| 1 | Puertas contra `main` | `r1_contra_main_el_alcance_es_solo_de_la_rama`, `r2_puerta_cobertura_mide_solo_la_rama_contra_main`, `r2_sin_base_explicita_se_usa_la_de_init_sh`, `r2_este_repositorio_integra_en_main`, `r2_init_sh_pasa_la_base_configurada_a_las_dos_puertas`, `r2_puerta_rutas_sensibles_ko_con_la_base_rezagada` |
+| 2 | Test que falla con base rezagada | `r2_en_este_repositorio_la_base_no_esta_rezagada` (rojo real con `dev`), `r1_diagnostico_base_rezagada`, `r2_puerta_cobertura_ko_con_la_base_rezagada` |
+| 3 | Decidido y escrito qué se hace con `dev` | Opción B del humano (espejo, lo adelanta el humano), escrita igual en `leader.md`, `CONVENTIONS.md` y `current.md` |
+| 4 | Porte a `arnes-base` y versión | 1.7.14 (`2c3a7fe`..`aa8f85a`), `VERSION` y guía; `tests/test_base_de_la_puerta.py`; instalador `-SoloDiff` verificado |
+| 5 | Remedición F-107..F-110 | Recalculada: F-107 y F-110 sin líneas ejecutables, F-109 sin `.py` de producción, F-108 al 100 %. Ninguna bajo el 80 % |
+
+## Historial de pasadas (detalle en `git show <sha>:progress/review_F-112.md`)
+
+- **Pasada 1** (`fe83de3`, CHANGES_REQUESTED, solo documental). Código y
+  puertas aprobados:
+  - `RAMA_BASE=main` es la única fuente.
+  - Sonda propia en repositorios desechables: rama nacida de `dev` o que
+    mergea `dev` → rojo; merges ajenos y rama integrada → bien medidos; por
+    debajo del umbral → código 1.
+  - Porte genérico y propagable.
+  - Remedición recalculada y `dev` intacta.
+  - Faltaban la lista MANUAL, la decisión sobre `dev` y la línea «merge a
+    dev» de `CONVENTIONS.md`.
+- **Pasada 2** (`85e5c26`, CHANGES_REQUESTED). Lo de la pasada 1 quedó
+  atendido, pero `leader.md` mandaba al líder hacer el merge en `dev`, en
+  contra de `CLAUDE.md` y `CONVENTIONS.md`, y lo mismo en `arnes-base`.
+
+## Observaciones (no bloquean; candidatos a encargo en `arnes-base`)
+
+- El texto del diagnóstico culpa a «la base» también cuando lo rezagado es la
+  rama nacida de `dev`. El rojo es correcto; el texto se puede mejorar.
+- Siguen sin detectarse, igual que antes de F-112 y fuera de sus `acceptance`:
+  - una rama nacida de otra feature sin integrar;
+  - una rama integrada por fast-forward.
+
+  Aquí se integra con `--no-ff`.
+- `init.sh` se ejecutó en el árbol principal, que es donde está la rama. El
+  worktree de esta sesión está bloqueado, en HEAD separado, y ahí la puerta
+  habría salido N/A.
+
+**Automejora (no aplicada):** en `reviewer.md`, si la feature cambia la
+puerta que la revisa, pedir una sonda en repositorio desechable con los casos
+límite. Fue lo que en la pasada 1 separó «tests verdes» de «sin agujero».
