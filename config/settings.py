@@ -86,8 +86,12 @@ class SigridApiSettings(BaseSettings):
 # `emp` y ninguna credencial— no la copia del origen con sus 152 columnas.
 # Que `personal` sea un esquema propio es lo que permite que ese «sí a esto y
 # no a aquello» se escriba como un GRANT y no como una lista de tablas (F-087).
+#
+# F-056 añade `contabilidad` (el plan de cuentas, el mayor y los saldos por
+# cuenta y mes). Esquema propio por lo mismo: el día que haya que decir «esto sí
+# y la contabilidad no», es un GRANT.
 DEFAULT_CONSUMPTION_SCHEMAS = (
-    "mart,cierre,compras,maestro,retenciones,personal,raw,stg,aux,_meta"
+    "mart,cierre,compras,maestro,retenciones,personal,contabilidad,raw,stg,aux,_meta"
 )
 
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
