@@ -48,7 +48,7 @@ recuerda con el comando); ninguna feature nace de ella. Escrita en `docs/CONVENT
   `init.sh`, `CONVENTIONS.md`...), en una rama, desde `arnes-base`:
   `.\instalar_arnes.ps1 -Destino "C:\Users\pgris\PycharmProjects\datamart-seg-anual" -Modo actualizar -SoloDiff`
   y después `.\instalar_arnes.ps1 -Destino "C:\Users\pgris\PycharmProjects\datamart-seg-anual" -Modo actualizar`
-- [ ] **Push de `arnes-base`** (commits locales en `main`, `2c3a7fe`..`2b7b373`,
+- [ ] **Push de `arnes-base`** (commits locales en `main`, `2c3a7fe`..`aa8f85a`,
   este último con el `leader.md` genérico de la review):
   `git -C C:\Users\pgris\PycharmProjects\arnes-base push origin main`
 
