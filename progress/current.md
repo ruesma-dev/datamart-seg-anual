@@ -9,6 +9,22 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-111 · SPEC LISTA (`spec_ready`) · nombres de escalon por el ancestro real, no por codigo
+
+Spec-author en `feature/F-111-nombres-partida-por-ancestro` (desde `main`
+42d4b05, worktree aparte). Spec en `specs/F-111-nombres-partida-por-ancestro/`
+(requirements 140, design 250, 12 tareas); resumen en `progress/spec_F-111.md`.
+Medido en solo lectura el 2026-09-26: 10.560 filas de niveles con algun escalon
+con nombre ajeno (4.624 en obras con seguimiento); CI 156 filas de la dimension
+(11 del seguimiento) y 117 del detalle (0444); 0 banderas INFRA cambian, 0
+importes. Niveles pasa de 16,5 s a ~4,5 s de lectura.
+
+**Decisiones que el humano valida ANTES de T1** (`design.md` §11): D1 fundir o
+separar las fases de 0444/0517 en CI (consultar a Negocio; recomendado seguir
+fundidas en F-111); D2 nombre de un grupo fundido (recomendado `A / B`); D3
+recursivo con tope 40; D4 contraste del Arbol Presupuesto en Power BI; D5
+version del diccionario; H1 heuristica `LIKE '%CI%'` (`AVDA_FRANCIA`).
+
 ## 2026-09-26 · F-109 · CERRADA (`done`, APROBADO en pasada 1) · el codigo de partida no es unico ni dentro de su obra · QUEDA DESPLEGAR Y PUBLICAR v35
 
 Implementer en `feature/F-109-partidas-codigo-no-unico` (al dia con `main`

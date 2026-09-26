@@ -1762,7 +1762,7 @@
         "Decidido con Negocio el tratamiento de las fases de la 0444 en costes indirectos",
         "Contrastadas con el humano las etiquetas del Arbol Presupuesto de Power BI antes y despues"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 3,
