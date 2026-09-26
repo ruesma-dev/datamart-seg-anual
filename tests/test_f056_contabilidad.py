@@ -311,6 +311,138 @@ def test_f056_r3_el_step_encadena_y_cuenta(monkeypatch: pytest.MonkeyPatch) -> N
     assert resultado.error_message is None
 
 
+class _LoggerFalso:
+    """Registra lo que el step manda al log, para juzgar su instrumentacion."""
+
+    def __init__(self) -> None:
+        self.info_: list[tuple[str, dict]] = []
+        self.error_: list[tuple[str, dict]] = []
+
+    def info(self, evento: str, **datos: object) -> None:
+        self.info_.append((evento, datos))
+
+    def error(self, evento: str, **datos: object) -> None:
+        self.error_.append((evento, datos))
+
+
+class _RelojFalso:
+    """`datetime` con un `utcnow()` que avanza 1,23456 s en cada llamada."""
+
+    def __init__(self) -> None:
+        from datetime import datetime as real
+
+        self._real = real
+        self._t = real(2026, 9, 26, 3, 0, 0)
+
+    def utcnow(self):  # noqa: ANN201 - imita a datetime.utcnow
+        from datetime import timedelta
+
+        actual = self._t
+        self._t = self._t + timedelta(seconds=1.23456)
+        return actual
+
+
+def test_f056_r3_el_log_de_cada_sub_paso(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lo que se lee a las tres de la manana: filas y segundos, con dos decimales."""
+    from etl_sigrid.application.steps import build_contabilidad_step
+    from etl_sigrid.application.steps.build_contabilidad_step import BuildContabilidadStep
+
+    class _PgFalso:
+        def execute_sql_file(self, path: Path) -> None:
+            return None
+
+        def count_rows(self, schema: str, table: str) -> int:
+            return 9
+
+    registro = _LoggerFalso()
+    monkeypatch.setattr(build_contabilidad_step, "build_postgres_client", lambda _s: _PgFalso())
+    monkeypatch.setattr(build_contabilidad_step, "logger", registro)
+    monkeypatch.setattr(build_contabilidad_step, "datetime", _RelojFalso())
+    BuildContabilidadStep(SimpleNamespace()).run()
+
+    assert [(e, d["sub_step"], d["rows"]) for e, d in registro.info_] == [
+        ("contabilidad_substep_done", "setup", 0),
+        ("contabilidad_substep_done", "plan_cuentas", 9),
+        ("contabilidad_substep_done", "mayor", 9),
+        ("contabilidad_substep_done", "saldos_cuenta_mes", 9),
+    ], "setup no cuenta filas: su log dice 0, no lo que valga por defecto"
+    assert {d["duration_s"] for _, d in registro.info_} == {1.23}, "segundos con dos decimales"
+
+
+def test_f056_r3_el_log_del_fallo_lleva_la_traza(monkeypatch: pytest.MonkeyPatch) -> None:
+    from etl_sigrid.application.steps import build_contabilidad_step
+    from etl_sigrid.application.steps.build_contabilidad_step import BuildContabilidadStep
+
+    class _PgQueFalla:
+        def execute_sql_file(self, path: Path) -> None:
+            if path.name == PLAN:
+                raise RuntimeError("duplicate key value violates unique constraint")
+
+        def count_rows(self, schema: str, table: str) -> int:
+            return 1
+
+    registro = _LoggerFalso()
+    monkeypatch.setattr(build_contabilidad_step, "build_postgres_client", lambda _s: _PgQueFalla())
+    monkeypatch.setattr(build_contabilidad_step, "logger", registro)
+    monkeypatch.setattr(build_contabilidad_step, "datetime", _RelojFalso())
+    BuildContabilidadStep(SimpleNamespace()).run()
+
+    ((evento, datos),) = registro.error_
+    assert evento == "contabilidad_substep_failed"
+    assert datos["sub_step"] == "plan_cuentas"
+    assert datos["exc_info"] is True, "sin la traza, el fallo de la noche no se puede diagnosticar"
+    assert datos["duration_s"] == pytest.approx(1.23456)
+
+
+def test_f056_r3_un_sub_paso_a_medio_configurar_no_cuenta_filas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Solo esquema o solo tabla: no se cuenta (reventaria contra la base de noche)."""
+    from etl_sigrid.application.steps import build_contabilidad_step
+    from etl_sigrid.application.steps.build_contabilidad_step import (
+        BuildContabilidadStep,
+        _SubStep,
+    )
+
+    class _PgFalso:
+        def __init__(self) -> None:
+            self.contados: list[tuple[str | None, str | None]] = []
+
+        def execute_sql_file(self, path: Path) -> None:
+            return None
+
+        def count_rows(self, schema: str, table: str) -> int:
+            self.contados.append((schema, table))
+            return 1
+
+    pg = _PgFalso()
+    monkeypatch.setattr(build_contabilidad_step, "build_postgres_client", lambda _s: pg)
+    monkeypatch.setattr(
+        build_contabilidad_step,
+        "SUB_PASOS",
+        (
+            _SubStep(name="solo_esquema", sql_file=SETUP, target_schema="contabilidad"),
+            _SubStep(name="solo_tabla", sql_file=PLAN, target_table="plan_cuentas"),
+        ),
+    )
+    resultado = BuildContabilidadStep(SimpleNamespace()).run()
+    assert pg.contados == []
+    assert resultado.rows_processed == 0
+
+
+def test_f056_r3_los_sub_pasos_son_dato_inmutable() -> None:
+    """`SUB_PASOS` es dato de modulo compartido entre ejecuciones: ni se cambia
+    un campo ni se le cuelga uno nuevo por una errata (`target_tabel = ...`)."""
+    import dataclasses
+
+    from etl_sigrid.application.steps.build_contabilidad_step import SUB_PASOS
+
+    sub = SUB_PASOS[1]
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        sub.target_table = "otra"  # type: ignore[misc]
+    assert not hasattr(sub, "__dict__"), "con slots no hay __dict__ donde colgar atributos"
+
+
 def test_f056_r3_sub_pasos_y_sus_tablas() -> None:
     from etl_sigrid.application.steps import build_contabilidad_step
 
