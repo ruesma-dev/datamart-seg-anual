@@ -142,12 +142,12 @@ Escrituras contra Azure: las autoriza el humano. En orden:
 
 | Evidencia | Valor (medido) |
 |---|---|
-| Tests ejecutados | `bash harness/init.sh`: **RESUMEN_TESTS** (antes de F-056, en `main`: 5562 passed, 203 skipped). La suite propia: `tests/test_f056_contabilidad.py` 66 passed en ~2 s |
+| Tests ejecutados | `bash harness/init.sh`: **5659 passed, 207 skipped, 0 failed**, `ENTORNO LISTO` (sobre `f5b725b`; este informe se relleno despues y se relanzo `init.sh` sobre el commit final) (antes de F-056, en `main`: 5562 passed, 203 skipped). La suite propia: `tests/test_f056_contabilidad.py` 66 passed en ~2 s |
 | Skips nuevos | +4, todos N/A legitimos de `test_f006_fichas.py`: 3 × «el GROUP BY de este objeto no es derivable» (las tres tablas) y 1 × «saldos_cuenta_mes no lee directamente de raw» (lee del mayor) |
-| Cobertura de lineas cambiadas | **LINEA_COBERTURA** |
+| Cobertura de lineas cambiadas | **100,0 %** (`PUERTA COBERTURA: 100.0% de 67 líneas cambiadas cubiertas (67/67, umbral 80%, nivel critico; diff desde fe061b03e0, merge-base con main)`) |
 | Mutacion, herramienta (Python) | **12 generados, 12 muertos, 0 supervivientes** (campana completa, 2 workers, 1961,6 s, SHA `7f71b1e`) |
 | Mutacion, sistematica (SQL + propagacion) | **233 generados, 233 muertos, 0 supervivientes** (229 en la primera pasada sobre `3c67936`; los 4 supervivientes, documentales, muertos en la pasada 2 sobre `5150061` tras reforzar los tests; 2724,6 s con 4 workers). 43 los mata solo el contrato expresion a expresion: detalle en `progress/mutacion_F-056.md` |
-| Tiempo de la suite | **TIEMPO_SUITE** (con medicion de cobertura) |
+| Tiempo de la suite | **619,5 s** (`5659 passed ... in 619.49s (0:10:19)`) (con medicion de cobertura) |
 | Coste del build (R35) | NO medido: es escritura contra Azure (T22, MANUAL). Solo lectura: 126 s el SELECT de las tres tablas; estimado 4-6 min y ~1,2 GB; SKU `Standard_B2s` |
 
 Detalle de las dos campanas, con la tabla de los 233 mutantes y el analisis de
