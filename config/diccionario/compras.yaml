@@ -1292,7 +1292,10 @@ objetos:
           este coste incurrido con el planificado de `mart`.
         agregacion: no_sumable
       codigo_partida:
-        significado: Codigo jerarquico de la partida dentro de su obra.
+        significado: >-
+          Codigo jerarquico de la partida dentro de su obra. **No identifica la
+          partida**: se repite dentro de la misma obra (F-109: 5.202 codigos el
+          2026-09-25). Para cruzar con `mart` o `stg`, `partida_id`.
         nulo_significa: La partida no existe ya en el maestro de Sigrid.
       descripcion_partida:
         significado: Descripcion de la partida, tomada del maestro de Sigrid.

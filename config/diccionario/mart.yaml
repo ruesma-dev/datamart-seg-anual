@@ -118,8 +118,11 @@ objetos:
           documental de compras.
         agregacion: no_sumable
       codigo_partida: >-
-        Codigo jerarquico de la partida dentro de su obra ('01.02'). Unico por
-        obra, no entre obras.
+        Codigo jerarquico de la partida dentro de su obra ('01.02'). **NO es
+        unico ni dentro de la obra** (F-109: 5.202 codigos repetidos en 158
+        obras el 2026-09-25): el mismo codigo cuelga de varios capitulos, uno
+        por contrato, bloque, fase o raiz. Para identificar o unir una partida,
+        `partida_id`; para decir donde esta, `ruta_capitulos`.
       descripcion_partida: Descripcion corta de la partida, tal y como la escribio el jefe de obra.
       unidad_medida: >-
         Unidad de medicion de la partida (m3, m2, ud, kg...), de
@@ -714,9 +717,14 @@ objetos:
       obra_id:
         significado: >-
           Obra a la que pertenece. Una partida pertenece siempre a una sola
-          obra: los codigos de partida solo son unicos dentro de su obra.
+          obra, pero **el codigo de partida NO es unico ni dentro de ella**
+          (F-109): la partida se identifica por `partida_id`, nunca por la
+          pareja obra + codigo.
         agregacion: no_sumable
-      codigo_partida: Codigo jerarquico de la partida dentro de su obra ('01.02').
+      codigo_partida: >-
+        Codigo jerarquico de la partida dentro de su obra ('01.02'). **No
+        identifica la partida**: se repite dentro de la misma obra (F-109: 5.202
+        codigos el 2026-09-25). Se une por `partida_id`.
       descripcion_partida: Descripcion corta que escribio el jefe de obra.
       unidad_medida: Unidad de medicion (m3, m2, ud, kg...).
       categoria:
@@ -732,7 +740,13 @@ objetos:
       activa: >-
         Marca de partida vigente. Ojo: la columna equivalente de `stg.obras`
         esta cableada a TRUE; esta viene del origen.
-      partida_label: Codigo y descripcion juntos, para segmentadores. Es presentacion.
+      partida_label: >-
+        Codigo y descripcion juntos, para segmentadores. Es presentacion y **no
+        identifica la partida**: dos partidas homonimas de la misma obra
+        -mismo codigo y misma descripcion, como la misma unidad de obra
+        repetida en dos bloques- dan la misma etiqueta, y un segmentador por
+        esta columna las suma juntas. Medido el 2026-09-25: 4.127 codigos
+        repetidos comparten ademas la descripcion. Para unir, `partida_id`.
       es_hoja: >-
         **HEURISTICA, no una comprobacion de si la partida tiene hijos.** Vale
         TRUE cuando `nivel >= 2` o el `codigo_partida` lleva un punto, y nada
@@ -802,19 +816,37 @@ objetos:
         Power BI, para quitar de un visual los capitulos de primer nivel. Para
         agregar sin duplicar hay que bajar al ultimo nivel de la jerarquia de
         `stg.partidas`, no fiarse de esta columna.
-      nivel_1: Primer escalon de la ruta ("CD · COSTES DIRECTOS"), como codigo y nombre.
-      nivel_2: Segundo escalon de la ruta.
+      nivel_1: >-
+        Primer escalon de la ruta ("CD · COSTES DIRECTOS"), como codigo y
+        nombre. El codigo es el suyo, pero **el nombre se resuelve por (obra,
+        codigo)** con `MAX(descripcion_corta)`, y el codigo no es unico en la
+        obra (F-109): si dos capitulos o partidas de la misma obra comparten
+        codigo, el escalon ensena el nombre alfabeticamente mayor, que puede ser
+        el de la otra. Medido el 2026-09-25: 10.593 filas (4.657 del
+        seguimiento) ensenan al menos un escalon con el nombre de otra partida.
+        Resolver el nombre por el ancestro y no por el codigo es F-111.
+      nivel_2: >-
+        Segundo escalon de la ruta. Su nombre puede ser el de otra partida
+        homonima de la obra, igual que `nivel_1`.
       nivel_3:
-        significado: Tercer escalon de la ruta.
+        significado: >-
+          Tercer escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
       nivel_4:
-        significado: Cuarto escalon de la ruta.
+        significado: >-
+          Cuarto escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
       nivel_5:
-        significado: Quinto escalon de la ruta.
+        significado: >-
+          Quinto escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
       nivel_6:
-        significado: Sexto escalon de la ruta.
+        significado: >-
+          Sexto escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
     relaciones:
       - de: partida_id

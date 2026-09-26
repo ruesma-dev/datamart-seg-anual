@@ -71,6 +71,23 @@ sin construir esa noche.
   necesita corta-ciclos: array de visitados **más** tope de profundidad. Sin él,
   relajar el filtro de código vacío es un `WITH RECURSIVE` infinito dentro de
   una nocturna de 3 h 45.
+- **El código de partida no es único ni dentro de su obra (F-109).** Medido el
+  2026-09-25: 5.202 pares `(obra_id, codigo_partida)` repetidos, 8.933 filas de
+  más, 158 obras, y cada copia es una partida activa y distinta. Tres causas
+  explican casi todo: **un contrato o expediente por copia** (el jefe de obra
+  abre un capítulo por contrato con el cliente, `obrctr`, o por expediente,
+  `obrctrexp`, y repite dentro los códigos), **el mismo subárbol copiado bajo
+  capítulos hermanos** (vivienda tipo, bloque, parcela o fase) y **raíces
+  paralelas** (fases con raíz propia, `CD`/`CD-FII`, o una raíz duplicada); el
+  resto son erratas y copias pegadas dos veces. Ni el contrato desambigua
+  (4.437 siguen repetidos) ni `ruta_capitulos` es clave (155). **Se une y se
+  cuenta por `partida_id`, nunca por obra + código**: ese JOIN infla el coste
+  real de la 0437 de 883.460,55 € a 3.474.491,83 €. Agrupar por código es
+  válido si se quiere sumar todas las copias del concepto, y se dice; ante el
+  usuario, la partida se identifica por su ruta de capítulos. Es la regla
+  `R-PARTIDA-CODIGO-NO-UNICO`. Dos vistas resuelven aún el NOMBRE de un
+  capítulo por código (`mart.v_pbi_dim_partida_niveles` y la dimensión CI de
+  `cierre`): lo arregla F-111.
 - **`hmores.can` NO SON HORAS, Y EL CLASIFICADOR NO ES EL QUE PARECE (F-057).**
   La cantidad de una línea de parte de trabajo trae HORA, DIA, MES o UD en el
   mismo campo, y lo que lo decide es **`auxhor.medide`** (1 HORA, 2 DIA, 3 MES,

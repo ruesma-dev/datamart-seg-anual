@@ -9,6 +9,36 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-109 · CERRADA (`done`, APROBADO en pasada 1) · el codigo de partida no es unico ni dentro de su obra · QUEDA DESPLEGAR Y PUBLICAR v35
+
+Implementer en `feature/F-109-partidas-codigo-no-unico` (al dia con `main`
+1ed4d6e). Spec APROBADA por el humano el 2026-09-26 (`progress/spec_F-109.md`,
+seccion «APROBADA»): D1 (a) solo `partida_id`; **D2 con la redaccion aprobada**
+(prohibido UNIR por obra + codigo; AGRUPAR por codigo se permite declarandolo;
+ante el usuario, la ruta de capitulos); D3 documentar y fichado como F-111; **D4
+version 35** (main esta en la 34); D5 solo texto. Ningun SQL se toca. Informe
+final en `progress/impl_F-109.md`.
+
+Desviaciones respecto a la spec (justificadas):
+- **R16 / T5**: el test exige `version >= 35`, no `>= 33` (D4 aprobada: main ya
+  esta en la 34 tras F-108 y F-110).
+- **R10 / §5**: el texto de la regla es el aprobado por el humano, no el de
+  `design.md` §5: se quita «Agrupar por codigo funde partidas distintas» como
+  prohibicion y se escribe que agrupar es valido si se declara. Las cifras que
+  pide R10 (5.202, 0437, 3.474.491,83) se mantienen.
+- **Precondicion `init.sh`**: no se relanza al empezar (14-25 min); `main` estaba
+  verde en f730acf (F-110) y la rama solo lleva el merge 1ed4d6e. Se ejecuta al
+  final, tal cual.
+- **Cifra de hoy**: la consulta de `design.md` §7.1 por el MCP (solo lectura,
+  2026-09-26) da 5.203 / 8.934 / 159; las fichas citan la del 2026-09-25
+  (5.202 / 8.933 / 158) con su fecha, que es la que tiene el desglose por causas.
+- **Mutacion**: alcance vacio (solo YAML, Markdown y tests); la herramienta no
+  escribe `progress/mutacion_F-109.md` a proposito.
+
+T1-T8 y T10 hechas (commit por tarea). 23 tests de F-109 en verde. Queda T9
+(MANUAL del humano: `publicar-diccionario` v35 y reinicio del MCP) y T11
+(`init.sh`) hecha: 5.542 passed, 203 skipped en 773,54 s, ENTORNO LISTO, exit 0. Informe: `progress/impl_F-109.md`.
+
 ## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · DESPLEGADA Y VERIFICADA
 
 > **2026-09-26 ~08:30 UTC** (autorizado por el humano): imagen `r20260926-1028`
@@ -81,6 +111,32 @@ mes con movimiento en coste o venta; D3 ultimo dia del mes siguiente; D4 leer
 las consecuencias. `00_global.yaml` `version` en carrera con F-108/F-109.
 
 ## 2026-09-24 · F-108 · SPEC (historico; cerrada el 2026-09-25) · claves alternativas en el diccionario y en `check-unicidad`
+
+## 2026-09-25 · F-109 · SPEC LISTA (`spec_ready`) · el codigo de partida NO es unico dentro de su obra
+
+Spec en `specs/F-109-partidas-codigo-no-unico/`, escrita en la rama
+`feature/F-109-partidas-codigo-no-unico` (desde `main` 323910f, en un worktree
+aparte mientras F-108 sigue en el arbol principal). Ficha: `sdd: true`,
+`spec_ready`. Medido en solo lectura el 2026-09-25: 5.202 pares, 8.933 filas de
+mas, 158 obras. **Revisada el mismo dia con el analisis exhaustivo que pidio
+el humano**: siete causas excluyentes que suman el total —contrato distinto
+(637 + 175), expediente distinto (61), subarbol bajo otro capitulo (1.932),
+raices paralelas (2.360), hermanas homonimas (28), copias identicas sin
+explicar (9)—; lo que distingue las copias es el capitulo, no el contrato
+(`(obra, contrato, codigo)` repite 4.437; `(obra, ruta)` 155). **Nada que ver
+con F-052** (0 filas colapsadas) ni con la empresa (cada par, una ficha). Hoy ningun importe se duplica en el
+repositorio (todo une por `partida_id`), pero unir por `(obra, codigo)` infla la
+0437 x3,9; y los nombres de escalon de `v_pbi_dim_partida_niveles` y de la
+dimension CI salen de otra partida en 10.593 filas. Propuesta: solo texto de
+diccionario + regla dura + guardas offline; ningun SQL.
+
+**PENDIENTE DEL HUMANO: D1-D5** (`progress/spec_F-109.md` y `design.md` §8):
+D1 clave legible = ninguna, `partida_id` (recomendada); D2 regla
+`R-PARTIDA-CODIGO-NO-UNICO` si; D3 arreglar los nombres en feature aparte; D4
+version siguiente a `main` al fusionar; D5 los 2 codigos de solo espacios, solo
+texto.
+
+## 2026-09-24 · F-108 · SPEC LISTA (`spec_ready`) · claves alternativas en el diccionario y en `check-unicidad`
 
 Spec en `specs/F-108-claves-alternativas/`, escrita en la rama
 `feature/F-108-claves-alternativas` (desde `main`, en un worktree aparte

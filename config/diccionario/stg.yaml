@@ -483,6 +483,12 @@ objetos:
       traves de ellos y sus descendientes llegan. Lee `codigo_partida` y
       `capitulo_padre_id` antes de recorrer el arbol.
 
+      **El codigo de partida NO es unico ni dentro de su obra (F-109)**: el
+      mismo codigo cuelga de varios capitulos, y cada copia es una partida
+      distinta. Una partida se identifica, se une y se cuenta por `partida_id`;
+      el porque y las cifras, en `codigo_partida` y en la regla
+      `R-PARTIDA-CODIGO-NO-UNICO`.
+
       La misma informacion con etiquetas ya listas esta ademas en
       `mart.v_pbi_dim_partida`, que suele ser mas comoda para una respuesta de
       negocio; aqui esta el arbol entero, con la jerarquia y la ruta, que es lo
@@ -499,14 +505,39 @@ objetos:
         agregacion: no_sumable
       obra_id:
         significado: >-
-          Obra a la que pertenece. Los codigos de partida solo son unicos DENTRO
-          de su obra.
+          Obra a la que pertenece. Una partida pertenece a una sola obra, pero
+          **el codigo de partida NO es unico ni dentro de ella** (F-109): la
+          partida se identifica por `partida_id`, nunca por la pareja obra +
+          codigo.
         agregacion: no_sumable
       codigo_partida:
         significado: >-
           Codigo jerarquico de la partida dentro de su obra. **Nunca es NULL ni
-          vacio**: el filtro de publicacion descarta las filas con el codigo en
-          blanco.
+          cadena vacia**: el filtro de publicacion (`cod <> ''`) descarta las
+          filas con el codigo vacio. Pero ese filtro deja pasar un codigo de
+          **solo espacios**: 2 filas el 2026-09-25.
+
+          **NO es unico dentro de la obra (F-109).** Medido el 2026-09-25: 5.202
+          codigos se repiten dentro de su obra (8.933 filas de mas, 158 obras;
+          2.177 de ellos en 92 obras del seguimiento), y cada copia es una
+          partida activa y distinta de Sigrid. Las causas, en este orden: (1) un
+          contrato con el cliente (`obrctr`) o un expediente de ese contrato
+          (`obrctrexp`) por copia, porque el jefe de obra abre un capitulo por
+          contrato o lote y repite dentro los codigos (873 pares; la 0617 repite
+          161 entre la planta 1ª y la planta baja); (2) el mismo subarbol
+          copiado bajo capitulos hermanos, uno por vivienda tipo, bloque,
+          parcela o fase (1.932 pares; la 0560 por vivienda tipo, la 0404 por
+          FASE 1 a 6); (3) raices paralelas, fases con raiz propia como `CD` y
+          `CD-FII` de la 0444, o una raiz entera duplicada (2.360 pares); (4)
+          hermanas homonimas, erratas y marcadores como `N/A` (28 pares), mas 9
+          copias identicas pegadas dos veces.
+
+          **Ni el contrato lo desambigua**: `(obra, contrato, codigo)` sigue
+          repitiendo 4.437 codigos, porque lo que distingue las copias es el
+          CAPITULO. Para unir o contar partidas, `partida_id`; para decir donde
+          esta una, `ruta_capitulos`. Agrupar por codigo suma todas las copias
+          del concepto: vale si es eso lo que se quiere, y hay que decirlo
+          (`R-PARTIDA-CODIGO-NO-UNICO`).
 
           **OJO, cambio del 2026-08-31 (F-052).** Una partida sin codigo sigue
           sin llegar aqui, pero **sus descendientes SI llegan**. Antes no: el
@@ -572,6 +603,14 @@ objetos:
           en blanco (`'CD >  > 01.01'` no existe). Invariante comprobable en
           cualquier fila:
           `cardinality(string_to_array(ruta_capitulos, ' > ')) = nivel + 1`.
+
+          **CASI una clave dentro de la obra, pero no lo es (F-109).** Medido el
+          2026-09-25: `(obra_id, ruta_capitulos)` se repite en 155 pares (162
+          filas de mas, 25 obras; 38 pares en 21 obras del seguimiento): raices
+          duplicadas con el mismo codigo, hermanas homonimas o erratas, y copias
+          pegadas dos veces. Sirve para leer y navegar, y es lo que se ensena al
+          usuario para identificar una partida; no para unir: para eso,
+          `partida_id`.
       nivel:
         significado: >-
           Profundidad en el arbol de capitulos, empezando en 0 para el raiz.

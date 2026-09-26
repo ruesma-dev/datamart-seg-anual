@@ -1344,3 +1344,17 @@ informativa. Lee `mart.master_versiones_tipadas` y `stg.plan_mensual` sin tocar
 campana sistematica de 114 mutantes, 0 supervivientes; muestra del reviewer de
 12, todos muertos. Diccionario version 34. Detalle: `progress/impl_F-110.md`,
 `progress/review_F-110.md`, `progress/spec_F-110.md`.
+
+## F-109 · El par obra + codigo de partida no es unico (cerrada el 2026-09-26, APROBADO en pasada 1)
+
+Hallazgo H1 de F-108. Causas medidas y excluyentes de los 5.202 pares
+(2026-09-25): raices paralelas 2.360, subarbol copiado bajo otro capitulo de la
+misma raiz 1.932, un contrato con el cliente por copia 812, expediente 61,
+hermanas homonimas 28 y 9 sin nada que las distinga. No es la empresa ni F-052.
+Solo `partida_id` es unico; `(obra, ruta)` deja 155. Solo texto: regla dura
+`R-PARTIDA-CODIGO-NO-UNICO` con la redaccion aprobada por el humano (prohibido
+UNIR por obra + codigo; AGRUPAR por codigo permitido declarandolo; identificar
+por la ruta), tres fichas corregidas y un test que barre todas. Ningun SQL. Los
+nombres por codigo de niveles y CI quedan en F-111. Diccionario version 35.
+Detalle: `progress/impl_F-109.md`, `progress/review_F-109.md`,
+`progress/spec_F-109.md`.
