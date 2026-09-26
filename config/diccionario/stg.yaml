@@ -646,6 +646,7 @@ objetos:
       Una fila por `obra_id`, ya deduplicada. Es SUBCONJUNTO de `maestro.obras`,
       y esa diferencia es deliberada: contar aqui da menos obras.
     clave_negocio: [obra_id]
+    claves_alternativas: [[codigo_obra]]
     paso_etl: build_stg
     refresco: nocturno
     columnas:
@@ -658,6 +659,8 @@ objetos:
           de `con.cod` en crudo y ademas el build excluye las obras sin codigo.
           Aqui es unico porque la tabla se queda con una ficha por codigo; en
           `maestro.obras` NO lo es (una ficha por empresa, F-102).
+          Es la clave alternativa de la ficha (584 para 584 el 2026-09-24): la
+          vigila `check-unicidad` contra la base (F-108).
         nulo_significa: null
       nombre_obra:
         significado: >-

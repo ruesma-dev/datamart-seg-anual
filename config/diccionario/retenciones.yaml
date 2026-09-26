@@ -1276,31 +1276,64 @@ objetos:
       `retenciones.v_retencion_contable_obra`, que ya la une al saldo.
     descripcion: >-
       El fin de obra, el plazo y el vencimiento de la retencion de cada obra
-      (F-095, decisiones H1 y H2 del humano del 2026-09-22): una fila por obra
-      de `raw.obr` (922 el 2026-09-24 y el 2026-09-25). **La fecha de la factura no interviene
-      nunca**: el vencimiento es fin de obra + plazo.
+      (F-095, decisiones H1 y H2 del humano del 2026-09-22; el fin de obra lo
+      cambia F-110, decision del humano del 2026-09-25): una fila por obra de
+      `raw.obr` (922 el 2026-09-24 y el 2026-09-25). **La fecha de la factura
+      no interviene nunca**: el vencimiento es fin de obra + plazo.
 
-      `fecha_fin_obra` = el inicio del periodo de garantia (`obrctr.fecinigar`,
-      si no `obr.garfecini`); si no lo hay, el ultimo dia del mes siguiente al
-      ultimo cierre con movimiento (`fuente_fin_obra` INICIO_GARANTIA o
-      ULTIMO_CIERRE_MAS_1_MES). Medido el 2026-09-25 en el primer build con
-      `rac`: de las 922 obras, 198 con INICIO_GARANTIA y 150 con
-      ULTIMO_CIERRE_MAS_1_MES. Cobertura sobre la retencion viva de los
-      efectos (8.362.932,53 EUR): INICIO_GARANTIA 97 obras y 5.026.655,18 EUR
-      (60,1 %) y ULTIMO_CIERRE_MAS_1_MES 67 obras y 3.120.260,42 EUR (37,3 %),
-      97,4 % entre las dos. Sin ninguna quedan 15 obras con retencion viva,
-      100.351,55 EUR (1,2 %), 8 de ellas terminadas (42.647,96 EUR): su fecha
-      es NULL, no se inventa; el 1,4 % restante son efectos sin obra. La
+      `fecha_fin_obra`, en este orden y sin mas pasos: (1) el inicio del
+      periodo de garantia (`obrctr.fecinigar`, si no `obr.garfecini`); (2) si
+      no lo hay, el ultimo dia del mes siguiente al ultimo mes planificado de
+      la ULTIMA version Cuatrimestral de la obra; (3) si tampoco, NULL: no se
+      inventa. `fuente_fin_obra` INICIO_GARANTIA o
+      ULTIMO_CUATRIMESTRAL_MAS_1_MES. Ejemplo literal del humano: «el
+      cuatrimestral de junio 26 puede tener planificada la obra hasta marzo
+      28; entonces el dia a partir del que contar las retenciones seria el 30
+      de abril» (`ultimo_mes_planificado` 2028-03-01, `fecha_fin_obra`
+      2028-04-30). La version (`version_cuatrimestral`) es la de mayor numero
+      con `tipo_master` Cuatrimestral en `mart.master_versiones_tipadas`, en
+      el ambito 8 o en el 11; el mes (`ultimo_mes_planificado`) es el mayor de
+      `stg.plan_mensual` de esa version con importe distinto de 0, de coste o
+      de venta: los meses finales a cero que Sigrid arrastra con el porcentaje
+      congelado no son plan (15 de 117 obras la tienen, de 1 a 10 meses). Todo
+      se empareja por `obra_id`, la ficha de SU empresa: la UTE `31-0606` y la
+      ficha de Ruesma `1-0606` tienen cada una sus cuatrimestrales. Las dos
+      tablas son de la MISMA noche que el build.
+
+      `ultimo_cierre` es solo INFORMATIVA desde F-110: el ultimo mes del
+      cierre con movimiento, que ya no interviene en el fin de obra ni en el
+      vencimiento. Va con una noche de retraso (`build_cierre` corre despues
+      de las retenciones) y deja ver las obras que se alargaron sobre su plan:
+      18 de las 36 que toman fecha por cuatrimestral cerraron despues de su
+      ultimo mes planificado. Si la tabla del cierre estuviera vacia, esta
+      columna saldria NULL en todas; el build ya no falla por eso.
+
+      Medido el 2026-09-25 en solo lectura, sobre la retencion viva de los
+      efectos con obra (8.247.267,15 EUR, 179 obras), antes (regla de F-095)
+      -> despues (F-110): INICIO_GARANTIA 97 obras y 5.026.655,18 EUR -> igual;
+      ULTIMO_CIERRE_MAS_1_MES 67 obras y 3.120.260,42 EUR -> desaparece;
+      ULTIMO_CUATRIMESTRAL_MAS_1_MES 32 obras y 2.960.583,38 EUR; sin fecha 15
+      obras y 100.351,55 EUR -> 50 obras y 260.028,59 EUR. Se quedan sin fecha
+      35 obras que la tenian por el cierre (159.677,04 EUR): 29 terminadas,
+      casi todas cerradas antes de que hubiera cuatrimestrales, 4 en curso sin
+      cuatrimestral y 2 en estado 17. Las terminadas sin fin de obra pasan de 8
+      obras y 42.647,96 EUR a 37 y 154.037,10 EUR. En las 922 obras: 198 con
+      garantia, 36 con cuatrimestral y 688 sin fecha (antes 198, 150 y 574);
+      117 tienen cuatrimestral y 304 `ultimo_cierre`. En 15 obras en curso el
+      fin de obra se RETRASA de 1 a 19 meses frente al ultimo cierre; en otras,
+      cuya ultima cuatrimestral acaba antes de que la obra dejara de moverse,
+      se ADELANTA: `1-0692` pasa de PENDIENTE a VENCIDA (43.476,54 EUR). Sobre
+      el saldo contable de `retenciones.v_retencion_contable_obra`, 102 obras
+      y 643.734,57 EUR pasan de VENCIDA a SIN_FIN_OBRA y ninguna de VENCIDA a
+      PENDIENTE.
+
+      Historico (regla de F-095): la spec medio el 2026-09-22 un 20,9 % +
+      76,1 % = 97,0 % de lo vivo con fecha; el 2026-09-24, 24,3 % (46 obras) +
+      72,7 % (116 obras) = 97,0 %, con 17 obras y 132.544,84 EUR sin fecha; y
+      el 2026-09-25, antes de F-110, 97 obras con garantia (60,1 %), 67 con el
+      ultimo cierre (37,3 %) y 15 obras y 100.351,55 EUR sin fecha. La
       garantia sube porque en Sigrid se estan dando de alta fechas de inicio
-      de garantia. Historico: 20,9 % + 76,1 % = 97,0 % en la spec
-      (2026-09-22); 146 y 200 obras de las 922, y 24,3 % (46 obras) + 72,7 %
-      (116 obras) = 97,0 % con 17 obras y 132.544,84 EUR sin fecha, el
-      2026-09-24.
-
-      El respaldo lee `cierre.fact_cierre_mensual`, que se construye DESPUES de
-      las retenciones: va con una noche de retraso, y solo existe para las
-      obras del seguimiento. Si esa tabla estuviera vacia, el build falla en
-      vez de publicar todo sin fecha.
+      de garantia.
 
       `plazo_meses` = el plazo de retencion del contrato con el CLIENTE
       (`plaret`), si no su plazo de garantia (`plagar`), si no 12 meses fijos
@@ -1311,10 +1344,10 @@ objetos:
       retencion (3.335.767,86 EUR, 40,4 %), 12 con el de garantia
       (1.834.299,50 EUR, 22,2 %) y 86 con los 12 fijos (3.077.199,79 EUR,
       37,3 %), las mismas obras que el 2026-09-24. En las 922 obras: 144, 34 y
-      744.
+      744. F-110 no cambia el plazo.
 
       Fin real, recepcion provisional y fin previsto van en su columna, SOLO
-      informativas.
+      informativas, como `ultimo_cierre`.
     grano: Una fila por obra de `raw.obr`; `obra_id` es clave primaria.
     clave_negocio: [obra_id]
     paso_etl: build_retenciones
@@ -1346,11 +1379,29 @@ objetos:
         nulo_significa: Sigrid no tiene inicio de garantia de la obra (el caso mas comun hoy).
       ultimo_cierre:
         significado: >-
-          El ultimo mes de cierre de la obra que MOVIO algo (`ejecutado_mes`
-          distinto de 0), no la ultima fase creada: 124 de 330 obras tienen
-          fases vacias despues. Es el del cierre de la noche anterior.
+          INFORMATIVA desde F-110: no interviene en el fin de obra ni en el
+          vencimiento. El ultimo mes de cierre de la obra que MOVIO algo
+          (`ejecutado_mes` distinto de 0), no la ultima fase creada: 124 de 330
+          obras tienen fases vacias despues. Es el del cierre de la noche
+          anterior. Sirve para ver si la obra se movio despues de su ultimo mes
+          planificado.
         agregacion: no_sumable
         nulo_significa: La obra no esta en el cierre del seguimiento o nunca movio nada.
+      version_cuatrimestral:
+        significado: >-
+          La ultima version master Cuatrimestral de la obra: la de mayor numero
+          en `mart.master_versiones_tipadas`, en el ambito 8 o en el 11 (F-110).
+          Es la version de la que sale `ultimo_mes_planificado`.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene ninguna version Cuatrimestral (805 de 922 el 2026-09-25).
+      ultimo_mes_planificado:
+        significado: >-
+          Dia 1 del ultimo mes de `version_cuatrimestral` con importe
+          planificado distinto de 0 en `stg.plan_mensual`, de coste o de venta
+          (F-110). Los meses finales a cero no cuentan. Sin inicio de garantia,
+          el fin de obra es el ultimo dia del mes siguiente.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene version Cuatrimestral, o esa version no tiene ningun mes con importe.
       fecha_fin_real:
         significado: INFORMATIVA. Fin real con la regla de la cabecera de cierre. No entra en el vencimiento.
         agregacion: no_sumable
@@ -1366,13 +1417,14 @@ objetos:
       fecha_fin_obra:
         significado: >-
           EL FIN DE OBRA desde el que cuenta el vencimiento: el inicio de
-          garantia o, si no hay, el ultimo dia del mes siguiente al ultimo
-          cierre con movimiento.
+          garantia o, si no hay, el ultimo dia del mes siguiente a
+          `ultimo_mes_planificado`, el de la ultima version cuatrimestral
+          (F-110, decision del humano del 2026-09-25).
         agregacion: no_sumable
         nulo_significa: No hay ninguna de las dos, y no se inventa una fecha.
       fuente_fin_obra:
         significado: De donde sale el fin de obra.
-        valores: [INICIO_GARANTIA, ULTIMO_CIERRE_MAS_1_MES]
+        valores: [INICIO_GARANTIA, ULTIMO_CUATRIMESTRAL_MAS_1_MES]
         nulo_significa: La obra no tiene fin de obra.
       terminada_sin_fin_obra:
         significado: >-
@@ -1493,7 +1545,8 @@ objetos:
 
       `estado_vencimiento` se calcula AL CONSULTAR, contra la fecha de hoy:
       SIN_OBRA (la fila sin obra del proveedor), SIN_FIN_OBRA (la obra no tiene
-      ni inicio de garantia ni cierre con movimiento), VENCIDA o PENDIENTE.
+      ni inicio de garantia ni cuatrimestral con plan, F-110), VENCIDA o
+      PENDIENTE.
     grano: >-
       Una fila por (`proveedor_id`, `obra_id`) con saldo distinto de 0, con la
       fila sin obra del proveedor (`obra_id` NULL). Es un filtro de
@@ -1538,7 +1591,7 @@ objetos:
         nulo_significa: La obra no tiene fin de obra, o es la fila sin obra.
       fuente_fin_obra:
         significado: De donde sale el fin de obra de esa obra.
-        valores: [INICIO_GARANTIA, ULTIMO_CIERRE_MAS_1_MES]
+        valores: [INICIO_GARANTIA, ULTIMO_CUATRIMESTRAL_MAS_1_MES]
         nulo_significa: Sin fin de obra.
       plazo_meses:
         significado: Los meses que se suman al fin de obra.

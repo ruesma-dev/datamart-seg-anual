@@ -74,6 +74,16 @@ class ConsultaUnicidad:
     #: un cliente cuando la primera diga que las hay. Es la diferencia entre
     #: «hay 12 duplicados» y «estos son».
     sql_detalle: str
+    #: De qué clave es (F-108): `"negocio"` o `"alternativa"`. Por defecto la de
+    #: negocio, que es lo que construía todo el que la construye desde F-006.
+    tipo_clave: str = "negocio"
+
+    @property
+    def rotulo(self) -> str:
+        """Cómo se nombra la clave en un veredicto: «clave (c1, c2)» o
+        «clave alternativa (c1, c2)»."""
+        prefijo = "clave alternativa" if self.tipo_clave == "alternativa" else "clave"
+        return f"{prefijo} ({', '.join(self.clave)})"
 
 
 def _valida(nombre: str) -> str:
@@ -130,43 +140,64 @@ def consultas_de_unicidad(
     """
     consultas: list[ConsultaUnicidad] = []
     for ficha in sorted(dicc.fichas, key=lambda f: f.nombre):
-        if ficha.tipo == "funcion" or not ficha.clave_negocio:
+        if ficha.tipo == "funcion":
             continue
         if solo_consumo and not ficha.consumo_recomendado:
             continue
-        if _clave_garantizada_por_el_motor(ficha) is not None:
-            continue
-
-        esquema = _valida(ficha.esquema)
-        objeto = _valida(ficha.objeto)
-        clave = tuple(_valida(c) for c in ficha.clave_negocio)
-        columnas = ", ".join(clave)
-
-        consultas.append(
-            ConsultaUnicidad(
-                objeto=ficha.nombre,
-                clave=clave,
-                sql=(
-                    "SELECT count(*) AS claves_duplicadas,\n"
-                    "       COALESCE(sum(filas), 0) AS filas_implicadas\n"
-                    "FROM (\n"
-                    f"    SELECT {columnas}, count(*) AS filas\n"
-                    f"    FROM {esquema}.{objeto}\n"
-                    f"    GROUP BY {columnas}\n"
-                    "    HAVING count(*) > 1\n"
-                    ") AS duplicadas"
-                ),
-                sql_detalle=(
-                    f"SELECT {columnas}, count(*) AS filas\n"
-                    f"FROM {esquema}.{objeto}\n"
-                    f"GROUP BY {columnas}\n"
-                    "HAVING count(*) > 1\n"
-                    "ORDER BY filas DESC\n"
-                    "LIMIT 20"
-                ),
-            )
-        )
+        if ficha.clave_negocio and _clave_garantizada_por_el_motor(ficha) is None:
+            consultas.append(_consulta(ficha, ficha.clave_negocio, "negocio"))
+        # F-108: las alternativas se comprueban aunque la de negocio se salte
+        # (garantizada por el motor o inexistente): nadie más las vigila.
+        for alternativa in ficha.claves_alternativas:
+            consultas.append(_consulta(ficha, alternativa, "alternativa"))
     return consultas
+
+
+def _consulta(
+    ficha: Ficha, clave_declarada: Sequence[str], tipo_clave: str
+) -> ConsultaUnicidad:
+    """Los dos textos de una comprobación, para la clave que se le pida.
+
+    La de una clave ALTERNATIVA excluye las filas con algún NULL en la clave
+    (F-108, D1): es lo que haría el índice único que se descartó, y un NULL no
+    casa en un JOIN, así que no produce fan-out. La de NEGOCIO conserva su
+    criterio —agrupa los NULL como un valor más— y su texto, byte a byte.
+    """
+    esquema = _valida(ficha.esquema)
+    objeto = _valida(ficha.objeto)
+    clave = tuple(_valida(c) for c in clave_declarada)
+    columnas = ", ".join(clave)
+    filtro = (
+        "WHERE " + " AND ".join(f"{c} IS NOT NULL" for c in clave) + "\n"
+        if tipo_clave == "alternativa"
+        else ""
+    )
+
+    return ConsultaUnicidad(
+        objeto=ficha.nombre,
+        clave=clave,
+        sql=(
+            "SELECT count(*) AS claves_duplicadas,\n"
+            "       COALESCE(sum(filas), 0) AS filas_implicadas\n"
+            "FROM (\n"
+            f"    SELECT {columnas}, count(*) AS filas\n"
+            f"    FROM {esquema}.{objeto}\n"
+            + (f"    {filtro}" if filtro else "")
+            + f"    GROUP BY {columnas}\n"
+            "    HAVING count(*) > 1\n"
+            ") AS duplicadas"
+        ),
+        sql_detalle=(
+            f"SELECT {columnas}, count(*) AS filas\n"
+            f"FROM {esquema}.{objeto}\n"
+            f"{filtro}"
+            f"GROUP BY {columnas}\n"
+            "HAVING count(*) > 1\n"
+            "ORDER BY filas DESC\n"
+            "LIMIT 20"
+        ),
+        tipo_clave=tipo_clave,
+    )
 
 
 def objetos_saltados(
@@ -231,11 +262,26 @@ def interpretar_resultado(
     correcta»: la diferencia es la que separa una comprobación de una garantía.
     """
     clave = ", ".join(consulta.clave)
+    alternativa = consulta.tipo_clave == "alternativa"
     if claves_duplicadas == 0:
+        if alternativa:
+            return (
+                f"OK   {consulta.objeto}: los datos de hoy no contradicen la "
+                f"{consulta.rotulo}. No prueba que sea correcta; prueba que aun "
+                f"no ha colisionado"
+            )
         return (
             f"OK   {consulta.objeto}: los datos de hoy no contradicen la clave "
             f"({clave}). No prueba que sea correcta; prueba que aun no ha "
             f"colisionado"
+        )
+    if alternativa:
+        return (
+            f"KO   {consulta.objeto}: la {consulta.rotulo} NO identifica una "
+            f"fila. {claves_duplicadas} combinacion(es) se repiten, afectando a "
+            f"{filas_implicadas} filas (sin contar las que la tienen a NULL). Las "
+            f"relaciones que la usan como lado 1 (`N:1`) producirian fan-out y "
+            f"duplicarian importes. Para ver cuales son:\n{consulta.sql_detalle}"
         )
     return (
         f"KO   {consulta.objeto}: la clave declarada ({clave}) NO identifica una "
@@ -255,7 +301,7 @@ def veredicto_no_comprobado(consulta: ConsultaUnicidad, motivo: str) -> str:
     """
     return (
         f"?    {consulta.objeto}: NO COMPROBADO ({motivo}). No es un OK: la "
-        f"clave ({', '.join(consulta.clave)}) sigue sin verificar"
+        f"{consulta.rotulo} sigue sin verificar"
     )
 
 

@@ -9,6 +9,79 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · DESPLEGADA Y VERIFICADA
+
+> **2026-09-26 ~08:30 UTC** (autorizado por el humano): imagen `r20260926-1028`
+> desde `main` b40f012 (el job pasa de `r20260925-2144`); diccionario **version
+> 34** publicado (hash c1256badcee3, `check-diccionario` OK); `build-retenciones`
+> a mano SUCCESS en 94 s (`fin_obra` 31 s) y `apply-grants`; MCP reiniciado.
+> Cifras tras el build, que cuadran con la spec: en las 922, INICIO_GARANTIA 198,
+> ULTIMO_CUATRIMESTRAL_MAS_1_MES 36, sin fecha 688; sobre la viva, garantia 97 /
+> 5.025.939,36, cuatrimestral 32 / 2.961.387,80, sin fecha 50 / 260.146,94;
+> `1-0692` fin 31-03-2025, vence 31-03-2026 (VENCIDA), `ultimo_cierre` informativo
+> 01-02-2026. Estados sobre el saldo contable: PENDIENTE 795 / 5,68 M, VENCIDA
+> 1.819 / 3,94 M, SIN_FIN_OBRA 1.174 / 0,90 M, SIN_OBRA 476 / -1,74 M.
+
+Implementer en la rama `feature/F-110-fin-obra-cuatrimestral` (desde `main`
+79a4505, con F-108: el diccionario sube a la **34**). T0 hecha: F-095 `done` y la
+aprobacion D1-D6 del 2026-09-25 constan aqui abajo y en `progress/spec_F-110.md`.
+Tarea en curso y desviaciones: se anotan aqui; el informe final va en
+`progress/impl_F-110.md`.
+
+Decisiones de implementacion:
+- R12 se prueba en dos tests: `test_f110_r12_*` (las tres informativas de
+  Sigrid, verde antes de tocar el SQL, como pide T2) y
+  `test_f110_r10_ultimo_cierre_no_interviene` (el `ultimo_cierre` fuera del
+  fin, rojo antes). Asi T2 (`-k "r11 or r12 or r13"` verde antes) se cumple sin
+  rebajar R12.
+
+**Diccionario del arbol tras F-110 (version 34): 172 objetos, 1185 columnas,
+76 de consumo** (las dos columnas nuevas de `retenciones.fin_obra`). Sin
+publicar: `publicar-diccionario` es escritura contra Azure y la lanza el humano.
+
+T0-T15 y T19 hechas (commit por tarea; `azure-apps` f087516). Verificado en
+solo lectura el SELECT nuevo: 922 filas, 198/36/688 por fuente, viva 97/32/50
+obras con las cifras exactas de `design.md`. Mutacion sistematica: 114/114
+muertos (`progress/mutacion_F-110.md`). `init.sh` verde en `cab45cd` (5.519
+passed). **Quedan T16-T18, MANUAL del humano**: build-retenciones +
+apply-grants, check-*, publicar-diccionario (v34), reinicio del MCP y
+despliegue de imagen; comandos en `progress/impl_F-110.md` §Lo que falta.
+Segunda pasada de `bash harness/init.sh` en `f730acf` (con el informe ya
+commiteado): 5.519 passed, 203 skipped en 765,82 s; COBERTURA 95,1 %; TAMANO
+impl 194/220; ENTORNO LISTO, exit 0.
+
+## 2026-09-25 · F-110 · SPEC APROBADA (`spec_ready`) · fin de obra por el ultimo cuatrimestral + 1 mes
+
+**APROBADA por el humano el 2026-09-25**: D1 (A) ultima `Cuatrimestral` por
+numero; D2 ultimo mes del cuatrimestral con importe planificado (ejemplo literal:
+«el cuatrimestral de junio 26 puede tener planificada la obra hasta marzo 28;
+entonces el dia a partir del que contar las retenciones seria el 30 de abril»);
+D3 ultimo dia del mes siguiente; D4 (A); **D5 `ultimo_cierre` SE QUEDA como
+columna informativa** (no interviene); D6 aceptado. Derivado de D5 (revocable):
+se retira la guarda de `cierre` VACIA y se conserva la de existencia. Detalle en
+la seccion «APROBADA» de `progress/spec_F-110.md`. Lo de abajo es la propuesta
+tal como se presento.
+
+Spec en `specs/F-110-fin-obra-cuatrimestral/`, escrita en la rama
+`feature/F-110-fin-obra-cuatrimestral` (desde `main`, en un worktree aparte
+mientras F-108 esta en el arbol principal y F-109 en otro worktree). Resumen,
+cifras y consultas en `progress/spec_F-110.md`.
+
+Lo que el humano tiene que saber antes de aprobar (medido en solo lectura el
+2026-09-25): **ningun vencimiento pasa de VENCIDA a PENDIENTE hoy** (en las
+obras en curso lo que se mueve es la fecha, +6,6 meses de media); **35 obras
+con retencion viva (159.677,04 €) y 102 de saldo contable (643.734,57 €) se
+quedan sin fecha**, casi todas cerradas antes de que hubiera cuatrimestrales; y
+`1-0692` pasa a VENCIDA (43.476,54 €) porque su ultima cuatrimestral acaba en
+2025-02. Decisiones abiertas D1-D6 con la recomendada en `design.md`: D1 ultima
+`Cuatrimestral` por numero (o incluir Planif Inicial/ABC, +3 obras); D2 ultimo
+mes con movimiento en coste o venta; D3 ultimo dia del mes siguiente; D4 leer
+`mart.master_versiones_tipadas` + `stg.plan_mensual` sin tocar `depends_on`
+(desaparece el desfase de una noche); D5 retirar `ultimo_cierre`; D6 confirmar
+las consecuencias. `00_global.yaml` `version` en carrera con F-108/F-109.
+
+## 2026-09-24 · F-108 · SPEC (historico; cerrada el 2026-09-25) · claves alternativas en el diccionario y en `check-unicidad`
+
 ## 2026-09-25 · F-109 · SPEC LISTA (`spec_ready`) · el codigo de partida NO es unico dentro de su obra
 
 Spec en `specs/F-109-partidas-codigo-no-unico/`, escrita en la rama
@@ -2153,3 +2226,35 @@ el historial de la rama. Lo aprobado el 2026-09-23, sin decisiones abiertas:
 - Regla nueva `R-CODIGO-POR-EMPRESA`.
 
 Cifras y consultas de la medicion: `progress/spec_F-102.md`.
+
+## 2026-09-25 · F-108 · CERRADA (`done`, APROBADO) · claves alternativas · DESPLEGADA Y PUBLICADA
+
+> **2026-09-25 ~19:46 UTC**: imagen `r20260925-2144` desde `main` 79a4505 (el job
+> pasa de `r20260925-0233`); diccionario **version 33** publicado (hash
+> e11e2586f079, `check-diccionario` OK) y MCP reiniciado (sirve la v33). Sin
+> builds: F-108 no toca datos.
+
+Rama `feature/F-108-claves-alternativas` (desde `main` 323910f). Ficha a
+`in_progress`. Decisiones D1-D5 aprobadas (`progress/spec_F-108.md`).
+
+- **Desviacion acordada con el lider (D5)**: la version del diccionario sube a
+  **33**, no a 31 como dice la spec: `main` ya esta en la 32 (F-095 y sus
+  cifras). `test_f108_r19` exige `>= 33` y la cabecera `version 33 (F-108`.
+- T1 hecha: `tests/test_f108_claves_alternativas.py` en RED (58 fallan, 4 pasan:
+  los controles y las guardas de R16, que ya se cumplen por construccion).
+- T2-T7 hechas (dominio, cargador, `unicidad_sql`, comando y JSONB, seis claves
+  declaradas y version 33, relaciones de `compras` a `N:1`).
+- R23: `test_f107_r4_la_version_sube_a_30` ya exigia `>= 30` en `main` (lo
+  ajusto F-095); no se toca. `test_f102_r22` exige ahora `N:1`.
+- T8: las guardas R16 y R17 son tests de T1; pasan sin codigo nuevo.
+- T9 hecha (ARCHITECTURE + `azure-apps` commit local `ae8edd3`).
+- T10: la primera campana (`--base main`, 4 workers por defecto) salio con
+  codigo 3: «LINEA BASE SIN TERMINAR», la suite limpia no cupo en 600 s con 4
+  workers compitiendo. Se relanza como indica el propio mensaje de la
+  herramienta: `--workers 2 --timeout 1800` (linea base 9.000 s). Sin tocar
+  `harness/rigor.json`.
+- T10 hecha: 20 mutantes, 15 muertos; 4 supervivientes (recuento del resumen de
+  `check-unicidad`) cerrados con test, 1 equivalente (`ensure_ascii`).
+- T12: `bash harness/init.sh` ENTORNO LISTO (5.486 passed, cobertura 95,1 %).
+- **Queda T11 MANUAL (humano)**: `check-unicidad` y `--todos` con su `.env`,
+  y `publicar-diccionario` (version 33). Informe: `progress/impl_F-108.md`.

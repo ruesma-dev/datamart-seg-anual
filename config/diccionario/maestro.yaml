@@ -88,6 +88,7 @@ objetos:
       y esa diferencia es deliberada. Para contar obras por codigo, filtrar
       `es_ficha_principal` y decirlo.
     clave_negocio: [obra_id]
+    claves_alternativas: [[clave_obra]]
     paso_etl: build_maestros
     refresco: nocturno
     columnas:
@@ -333,6 +334,9 @@ objetos:
           va antes del primer `-` es la empresa y la clave no puede colisionar.
           Es la llave para agregar y cruzar por obra sin mezclar empresas: las
           vistas de `compras` con obra la publican con el mismo nombre.
+          Es la clave alternativa de la ficha: la vigila `check-unicidad`
+          contra la base (F-108). Por eso vale como lado 1 de las relaciones
+          `N:1` de `compras`.
       num_fichas_codigo:
         significado: >-
           Cuantas fichas tiene el `codigo_obra` de esta fila, contando todas las
@@ -427,6 +431,7 @@ objetos:
       Una fila por ficha de obra (`obra_id`): 922 el 2026-09-23, con 922
       `clave_obra` distintas y 846 principales, una por codigo.
     clave_negocio: [obra_id]
+    claves_alternativas: [[clave_obra]]
     paso_etl: build_maestros
     refresco: nocturno
     columnas:
@@ -445,6 +450,8 @@ objetos:
       clave_obra:
         significado: >-
           `<empresa>-<codigo>`, unica: 922 para 922 fichas el 2026-09-23.
+          Es la clave alternativa de la ficha: la vigila `check-unicidad`
+          contra la base (F-108).
       marcada_vigente:
         significado: >-
           Cierto si la ficha tiene fila en `raw.conext` con `cod = '15'`, la
@@ -695,6 +702,7 @@ objetos:
       CONTAR FILAS AQUI NO ES CONTAR OBRAS. La resolucion es **1:1** y sin
       ambiguedad, y la vista lo garantiza por construccion.
     clave_negocio: [centro_coste_id]
+    claves_alternativas: [[empresa, codigo_centro]]
     paso_etl: build_maestros
     refresco: nocturno
     columnas:
@@ -709,6 +717,9 @@ objetos:
           Codigo del centro tal y como se ve en Sigrid, de `con.cod`. Cuando el
           centro es una obra, es **el mismo codigo que `maestro.obras.codigo_obra`**:
           esa coincidencia, junto con la empresa, es exactamente el puente.
+          Con `empresa` forma la clave alternativa de la ficha (804 para 804
+          el 2026-09-24; el codigo solo, 655): la vigila `check-unicidad`
+          contra la base (F-108).
       nombre_centro:
         significado: Nombre legible del centro de coste, de `con.res`.
       empresa:
@@ -716,6 +727,8 @@ objetos:
           Empresa del grupo a la que pertenece el centro (`con.emp`). Forma
           parte de la clave del puente: dos empresas distintas pueden usar el
           mismo codigo.
+          Con `codigo_centro` forma la clave alternativa de la ficha: la
+          vigila `check-unicidad` contra la base (F-108).
         agregacion: no_sumable
       obra_id:
         significado: >-
@@ -853,6 +866,7 @@ objetos:
       es unico. El par (`empresa_id`, `codigo_cuenta`) tambien lo es; el codigo
       solo, no.
     clave_negocio: [cuenta_analitica_id]
+    claves_alternativas: [[empresa_id, codigo_cuenta]]
     paso_etl: build_maestros
     refresco: nocturno
     columnas:
@@ -868,6 +882,8 @@ objetos:
           Empresa de Sigrid a la que pertenece la cuenta (`con.emp`): `1` es
           Ruesma y `28` Porsan. Forma parte de la identidad legible: el mismo
           codigo existe en varias empresas.
+          Con `codigo_cuenta` forma la clave alternativa de la ficha: la
+          vigila `check-unicidad` contra la base (F-108).
         agregacion: no_sumable
       codigo_cuenta:
         significado: >-
@@ -875,6 +891,9 @@ objetos:
           centro de coste delante del punto: '00000.CIMO02'. **No es unico**: se
           repite entre empresas (14.063 codigos). Se cruza junto con
           `empresa_id`.
+          Con `empresa_id` forma la clave alternativa de la ficha (184.234
+          para 184.234 el 2026-09-24): la vigila `check-unicidad` contra la
+          base (F-108).
       descripcion_cuenta:
         significado: Descripcion legible de la cuenta (`con.res`), la que se cita al responder ("JEFE DE OBRA").
       cuenta_padre_id:

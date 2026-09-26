@@ -159,12 +159,17 @@ sin construir esa noche.
   - El vencimiento cuenta desde el **fin de obra** (decisión del humano del
     2026-09-22), nunca desde la factura: inicio de garantía
     (`obrctr.fecinigar` / `obr.garfecini`) o, si no hay, el último día del mes
-    siguiente al último cierre con movimiento de `cierre.fact_cierre_mensual`,
-    más el plazo del cliente (`plaret` → `plagar` → 12). Ese respaldo va con
-    **una noche de desfase**: `build_cierre` corre después de
-    `build_retenciones`, y si su tabla estuviera vacía el sub-paso `fin_obra`
-    falla en vez de publicar sin fechas. `retenciones.fin_obra` y
-    `retenciones.v_retencion_contable_obra`.
+    siguiente al último mes con importe planificado de la **última versión
+    cuatrimestral** de la obra (F-110, decisión del humano del 2026-09-25:
+    `mart.master_versiones_tipadas` dice qué versión y `stg.plan_mensual` qué
+    meses); si tampoco, sin fecha. Más el plazo del cliente (`plaret` →
+    `plagar` → 12). Las dos tablas son de la **misma noche**: en `run-all`,
+    `build_stg` y `build_mart` corren antes que `build_retenciones`, sin
+    declararlos en `depends_on` (si fallan, se usan las de la noche anterior).
+    El último cierre con movimiento (`cierre.fact_cierre_mensual`) se publica
+    solo como columna informativa, con **una noche de desfase** porque
+    `build_cierre` corre después, y ya no interviene en el vencimiento.
+    `retenciones.fin_obra` y `retenciones.v_retencion_contable_obra`.
 
 ## Acceso a datos
 
@@ -620,6 +625,16 @@ poder preguntarle a nadie si algo no encaja.
   publicado sin ficha, ficha sin objeto, tipo que no casa— y avisa si lo
   publicado va por detrás del repositorio. La puerta offline de
   `bash harness/init.sh` solo puede exigir ficha **o** pendiente declarado.
+- **Claves alternativas (F-108).** Además de su `clave_negocio`, una ficha
+  puede declarar `claves_alternativas: [[col, ...], ...]`: otras combinaciones
+  de columnas que TAMBIÉN identifican una fila, como `clave_obra` en
+  `maestro.obras` (cuya clave de negocio sigue siendo `obra_id`). El validador
+  del diccionario acepta una alternativa de UNA columna como lado 1 de una
+  relación —por eso las relaciones de `compras` por `clave_obra` son `N:1`—, y
+  `python main.py check-unicidad` la comprueba contra la base igual que la de
+  negocio, sin contar las filas con la clave a NULL; una rota sale con código 1.
+  Es un aviso de auditoría y no un índice único: un duplicado no tumba la
+  nocturna. Se publican dentro del `JSONB` de la ficha, sin DDL.
 
 Lo que este proyecto **expone al ecosistema** y quién lo consume está en
 `azure-apps/datamart_seg_anual.md`, y no se duplica aquí.

@@ -966,14 +966,13 @@ objetos:
     relaciones:
       - de: clave_obra
         a: maestro.obras.clave_obra
-        cardinalidad: "N:N"
+        cardinalidad: "N:1"
         porque: >-
           La ficha de obra por su clave legible (F-102): la misma union que por
           `obra_id`, pero legible. Es tambien la llave por la que agregar: por
-          `codigo_obra` se juntan fichas de empresas distintas. DE HECHO ES N:1:
-          cada `clave_obra` es unica en `maestro.obras` (922 para 922 el
-          2026-09-23) y unir no multiplica filas; se declara N:N porque la clave
-          de negocio publicada de `maestro.obras` es `obra_id`.
+          `codigo_obra` se juntan fichas de empresas distintas. `clave_obra` es
+          clave alternativa de `maestro.obras` (F-108), unica (922 para 922 el
+          2026-09-24) y vigilada por `check-unicidad`: unir no multiplica filas.
       - de: contrato_id
         a: compras.contratos.contrato_id
         cardinalidad: "1:1"
@@ -1098,14 +1097,13 @@ objetos:
     relaciones:
       - de: clave_obra
         a: maestro.obras.clave_obra
-        cardinalidad: "N:N"
+        cardinalidad: "N:1"
         porque: >-
           La ficha de obra por su clave legible (F-102): la misma union que por
           `obra_id`, pero legible. Es tambien la llave por la que agregar: por
-          `codigo_obra` se juntan fichas de empresas distintas. DE HECHO ES N:1:
-          cada `clave_obra` es unica en `maestro.obras` (922 para 922 el
-          2026-09-23) y unir no multiplica filas; se declara N:N porque la clave
-          de negocio publicada de `maestro.obras` es `obra_id`.
+          `codigo_obra` se juntan fichas de empresas distintas. `clave_obra` es
+          clave alternativa de `maestro.obras` (F-108), unica (922 para 922 el
+          2026-09-24) y vigilada por `check-unicidad`: unir no multiplica filas.
       - de: proveedor_id
         a: maestro.proveedores.proveedor_id
         cardinalidad: "N:1"
@@ -1236,14 +1234,13 @@ objetos:
     relaciones:
       - de: clave_obra
         a: maestro.obras.clave_obra
-        cardinalidad: "N:N"
+        cardinalidad: "N:1"
         porque: >-
           La ficha de obra por su clave legible (F-102): la misma union que por
           `obra_id`, pero legible. Es tambien la llave por la que agregar: por
-          `codigo_obra` se juntan fichas de empresas distintas. DE HECHO ES N:1:
-          cada `clave_obra` es unica en `maestro.obras` (922 para 922 el
-          2026-09-23) y unir no multiplica filas; se declara N:N porque la clave
-          de negocio publicada de `maestro.obras` es `obra_id`.
+          `codigo_obra` se juntan fichas de empresas distintas. `clave_obra` es
+          clave alternativa de `maestro.obras` (F-108), unica (922 para 922 el
+          2026-09-24) y vigilada por `check-unicidad`: unir no multiplica filas.
       - de: linea_id
         a: compras.albaran_lineas.linea_id
         cardinalidad: "1:1"
@@ -1348,14 +1345,13 @@ objetos:
     relaciones:
       - de: clave_obra
         a: maestro.obras.clave_obra
-        cardinalidad: "N:N"
+        cardinalidad: "N:1"
         porque: >-
           La ficha de obra por su clave legible (F-102): la misma union que por
           `obra_id`, pero legible. Es tambien la llave por la que agregar: por
-          `codigo_obra` se juntan fichas de empresas distintas. DE HECHO ES N:1:
-          cada `clave_obra` es unica en `maestro.obras` (922 para 922 el
-          2026-09-23) y unir no multiplica filas; se declara N:N porque la clave
-          de negocio publicada de `maestro.obras` es `obra_id`.
+          `codigo_obra` se juntan fichas de empresas distintas. `clave_obra` es
+          clave alternativa de `maestro.obras` (F-108), unica (922 para 922 el
+          2026-09-24) y vigilada por `check-unicidad`: unir no multiplica filas.
       - de: partida_id
         a: mart.fact_seguimiento_mensual.partida_id
         cardinalidad: "N:N"
@@ -2085,14 +2081,13 @@ objetos:
     relaciones:
       - de: clave_obra
         a: maestro.obras.clave_obra
-        cardinalidad: "N:N"
+        cardinalidad: "N:1"
         porque: >-
           La ficha de obra por su clave legible (F-102): la misma union que por
           `obra_id`, pero legible. Es tambien la llave por la que agregar: por
-          `codigo_obra` se juntan fichas de empresas distintas. DE HECHO ES N:1:
-          cada `clave_obra` es unica en `maestro.obras` (922 para 922 el
-          2026-09-23) y unir no multiplica filas; se declara N:N porque la clave
-          de negocio publicada de `maestro.obras` es `obra_id`.
+          `codigo_obra` se juntan fichas de empresas distintas. `clave_obra` es
+          clave alternativa de `maestro.obras` (F-108), unica (922 para 922 el
+          2026-09-24) y vigilada por `check-unicidad`: unir no multiplica filas.
       - de: factura_id
         a: compras.v_facturas_pago.factura_id
         cardinalidad: "N:1"

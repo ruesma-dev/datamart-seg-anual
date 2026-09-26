@@ -12,6 +12,31 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 34 (F-110, 2026-09-25): EL FIN DE OBRA POR EL ULTIMO CUATRIMESTRAL.
+# Decision del humano del 2026-09-25, que cambia H1 de F-095: sin inicio de
+# garantia, `retenciones.fin_obra.fecha_fin_obra` es el ultimo dia del mes
+# siguiente al ultimo mes con importe planificado de la ULTIMA version
+# Cuatrimestral de la obra (`mart.master_versiones_tipadas` +
+# `stg.plan_mensual`); si no la hay, NULL. `fuente_fin_obra` pasa a
+# INICIO_GARANTIA / ULTIMO_CUATRIMESTRAL_MAS_1_MES; ULTIMO_CIERRE_MAS_1_MES
+# deja de existir. Dos columnas nuevas (`version_cuatrimestral`,
+# `ultimo_mes_planificado`) y `ultimo_cierre` se queda como INFORMATIVA. Sobre
+# lo vivo: 97 / 32 / 50 obras por fuente (garantia, cuatrimestral, sin fecha).
+# `v_retencion_contable_obra` no cambia de SQL: SIN_FIN_OBRA es ahora «ni
+# inicio de garantia ni cuatrimestral con plan».
+#
+# version 33 (F-108, 2026-09-25): LAS CLAVES ALTERNATIVAS. Una ficha puede
+# declarar `claves_alternativas: [[col, ...], ...]`: otras combinaciones de
+# columnas que TAMBIEN identifican una fila. `check-unicidad` las comprueba
+# contra la base (sin contar las filas con la clave a NULL) y el validador
+# acepta una de UNA columna como lado 1 de una relacion. Declaradas:
+# `maestro.obras` y `maestro.v_obra_fichas` por `clave_obra`,
+# `personal.recursos` por `clave_recurso`, `stg.obras` por `codigo_obra`,
+# `maestro.cuentas_analiticas` por (empresa_id, codigo_cuenta) y
+# `maestro.centros_coste` por (empresa, codigo_centro). Las cinco relaciones
+# `clave_obra -> maestro.obras.clave_obra` de `compras` pasan de `N:N` a `N:1`.
+# Viajan en el JSONB `ficha` de `_meta.diccionario`, sin DDL.
+#
 # version 32 (2026-09-25, sin feature): LAS CIFRAS DE F-095 TRAS EL PRIMER BUILD.
 # Las fichas de `retenciones` que F-095 escribio antes de tener `raw.rac` se
 # remiden sobre el primer build real (2026-09-25 05:49 UTC), solo texto: saldo
@@ -344,7 +369,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 32
+version: 34
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
