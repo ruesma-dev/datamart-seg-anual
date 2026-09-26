@@ -22,8 +22,8 @@ obras. Microservicio único; se despliega como job programado en Azure.
 
 `raw` → `stg` → `mart` (+ `cierre` para cierres mensuales y planif vs real).
 Módulos adicionales: `compras`, `maestro`, `retenciones`, `personal`,
-`auxiliar`. SQL numerado `NN_nombre.sql` y ejecutado en orden dentro de cada
-capa.
+`contabilidad`, `auxiliar`. SQL numerado `NN_nombre.sql` y ejecutado en orden
+dentro de cada capa.
 
 **`personal` (F-057, 2026-09-18) es el único esquema con datos personales**
 —nombre, NIF y DNI, publicados con autorización expresa del responsable del
@@ -35,6 +35,18 @@ BI sí, datos de personal no»). El esquema propio sigue sirviendo para poder
 quitárselo a un rol concreto sin trocear permisos. El segundo motivo es que no
 bloquea: metido dentro de `build_stg`, un fallo de su SQL dejaría al `mart`
 sin construir esa noche.
+
+**`contabilidad` (F-056, 2026-09-26) es el mayor y el plan de cuentas**, y es
+esquema módulo por los mismos dos motivos: permisos por esquema y no bloquear
+(`build_contabilidad` solo depende de `ingest_raw` y nadie depende de él). Lee
+`raw` y la vista `maestro.centros_coste`, nada más. Tres tablas:
+`contabilidad.plan_cuentas` (el plan FINANCIERO como árbol, de las 38
+empresas), `contabilidad.mayor` (una fila por apunte de `raw.apu`, 2,17 M, con
+una guarda que hace fallar el paso si el recuento no es el del origen) y
+`contabilidad.saldos_cuenta_mes` (cuenta × empresa × ejercicio × mes, desde el
+mayor). El mayor se MATERIALIZA porque `raw.apu` no tiene índice por cuenta y se
+recrea cada noche: como vista, cualquier agregado de empresa o año pasaría de
+la ventana de 30 s del MCP.
 
 ## Semántica Sigrid imprescindible (fuente de bugs si se ignora)
 
@@ -187,6 +199,24 @@ sin construir esa noche.
     solo como columna informativa, con **una noche de desfase** porque
     `build_cierre` corre después, y ya no interviene en el vencimiento.
     `retenciones.fin_obra` y `retenciones.v_retencion_contable_obra`.
+- **El plan de cuentas son prefijos, dentro de la empresa (F-056).** Los grupos
+  del plan son las filas de `con.tip = 16` (1 a 4 dígitos: grupo, subgrupo,
+  cuenta, subcuenta; son la tabla `cug` de Sigrid, que no se ingiere) y las
+  cuentas auxiliares, `cua` (`con.tip = 17`, 10 dígitos, las únicas con
+  apuntes). El padre de un nodo es el grupo de su MISMA empresa cuyo código es
+  su prefijo inmediato: el 100 % de los grupos lo tiene, y el padre declarado
+  por Sigrid falta en el 22,5 % de los grupos. Sin `WITH RECURSIVE`: la
+  profundidad la fija la longitud del código. No confundir con el plan
+  ANALÍTICO de `maestro.cuentas_analiticas` (`caa`).
+- **La clase del apunte contable (F-056) no está entera en `apu.cla`.** 3 es
+  cierre, -1 apertura y 1 regularización, pero los cierres de 2020, las
+  aperturas de 2021 y 290 regularizaciones vienen con 0; por eso
+  `contabilidad.mayor.clase_asiento` combina `cla` con el concepto ('Asiento de
+  cierre…', sin distinguir mayúsculas). Una apertura sin cierre de ESA cuenta
+  el ejercicio anterior es `SALDO_INICIAL` (1.433 apuntes, 1.315 de 2008) y
+  cuenta; `CIERRE` y `APERTURA` no se suman nunca (`R-SALDO-CONTABLE`). La
+  fecha del mayor es `apu.fec` (la del asiento difiere en 297 apuntes de 2017)
+  y la obra sale solo del centro del apunte por `maestro.centros_coste`.
 
 ## Acceso a datos
 
@@ -661,12 +691,13 @@ Lo que este proyecto **expone al ecosistema** y quién lo consume está en
 Hasta el 2026-08-28 `run-all` construía `raw → stg → mart` y nada más.
 `cierre`, `compras`, `maestro` y `retenciones` se lanzaban a mano y podían
 estar desfasados semanas. F-057 añadió el quinto, `build_personal`, que nació
-ya dentro. Los once pasos de hoy, en orden:
+ya dentro, y F-056 el sexto, `build_contabilidad`. Los doce pasos de hoy, en
+orden:
 
 ```
 ingest_raw → load_excel_aux → build_stg → build_mart
            → build_maestros → build_compras → build_retenciones
-           → build_personal → build_cierre
+           → build_personal → build_contabilidad → build_cierre
            → publicar_diccionario → apply_grants
 ```
 
@@ -677,13 +708,13 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   nocturna la **destruía** cada noche y nadie la recreaba. Está declarado en
   `BuildCierreStep.depends_on`, no confiado al orden de la lista: un
   comentario se borra, el orden topológico obedece.
-- **`apply_grants` sigue siendo el último.** Los cinco build recrean vistas
+- **`apply_grants` sigue siendo el último.** Los seis build recrean vistas
   con `DROP` + `CREATE` y un `DROP` se lleva los `GRANT`. Y **no** depende de
   ellos a propósito: si `build_cierre` falla una noche, los permisos del MCP
   se reaplican igual. El precio es que un esquema puede quedarse atrás sin
   tumbar la carga, y por eso la regla dura `R-FRESCURA` del diccionario manda
   citar la frescura DEL PASO, no la del pipeline.
-- **Los cinco registran paso** en `_meta.etl_runs` con el `batch_id` de la
+- **Los seis registran paso** en `_meta.etl_runs` con el `batch_id` de la
   noche. `build-compras` y `build-retenciones` no lo hacían —ejecutaban SQL en
   línea, sin step—, así que su fecha de build no era consultable por SQL
   mientras el diccionario mandaba citarla.
@@ -693,6 +724,10 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   `stg`, no acumulan como `plan_mensual`. `build_personal` entró después y su
   coste está estimado, no medido: dos `INSERT ... SELECT` de 2.618 y 330.638
   filas, unos 60 MB, del orden de segundos frente a las 3 h 45 de ventana.
+  `build_contabilidad` (F-056) tampoco está medido en build todavía: el SELECT
+  entero de las tres tablas lee en ~2,5 min en solo lectura (2026-09-26), y con
+  la escritura y los índices se estima en 4-6 min y ~1 GB; se mide en su
+  primera ejecución.
 
 **El guardián.** `run-all` termina contrastando **lo que el SQL del
 repositorio declara crear** contra `information_schema`, y sale con código 1
