@@ -9,7 +9,19 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · QUEDAN LAS MANUAL Y EL DESPLIEGUE
+## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · DESPLEGADA Y VERIFICADA · FALTA LA LISTA BLANCA DE `mcp-bbdd`
+
+> **2026-09-26 22:19-22:40 UTC** (autorizado por el humano: «la quiero en
+> produccion ya»): imagen `r20260927-0019` desde `main` f5c6cd0 (el job pasa de
+> `r20260926-1134`); `build-contabilidad` a mano SUCCESS en **301,7 s** (R35:
+> setup 0,7 s, plan_cuentas 6,1 s / 78.974 filas, mayor 268,5 s / 2.166.701,
+> saldos_cuenta_mes 26,4 s / 400.342) y `apply-grants`. C1 641 / 2009-01-31 /
+> 2026-09-21 / 1.189.275,13; C2 5.345.557,80; C3 true; C4 0 filas.
+> `check-declarados` 176/176; `check-unicidad` las claves de `contabilidad` OK
+> (la unica rota sigue siendo la de F-051); `check-relaciones` 146 unen, 0 no
+> unen. Diccionario **version 36** (hash 30af3f7b3e31, 176 objetos, 19 reglas),
+> `check-diccionario` OK; MCP reiniciado (sirve la v36). **PENDIENTE: `mcp-bbdd`
+> debe anadir `contabilidad` a su lista blanca**: hoy el MCP no lo expone.
 
 Implementer en `feature/F-056-mayor-plan-contable` (desde `main` fe061b0).
 `sdd=true`, rigor `critico`. Spec `specs/F-056-mayor-plan-contable/`, aprobada
