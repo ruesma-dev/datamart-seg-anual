@@ -69,3 +69,14 @@ por `(obra_id, codigo_partida)`:
   se adelanta; F-056 va en paralelo).
 - **H1 (hallazgo)**: `categoria` es `LIKE '%CI%'` sobre el código de la raíz;
   `AVDA_FRANCIA`, `P1414_PISCIN` y `P1414_PCI` entran como CI. ¿Fichar feature?
+
+## APROBADA (humano, 2026-09-26)
+
+D1-D5 con la recomendacion: D1 las fases de la 0444 y la 0517 SIGUEN FUNDIDAS en
+CI (separarlas cambia importes por grupo: seria feature aparte, a consultar con
+Negocio); D2 un grupo que funde nodos de nombres distintos los muestra unidos por
+« / »; D3 consulta recursiva por `capitulo_padre_id` con tope de 40 niveles; D4 el
+humano revisa el visual Arbol Presupuesto de Power BI tras el despliegue
+(verificacion MANUAL); D5 version del diccionario = la siguiente libre de `main`
+al fusionar. El hallazgo H1 (la regla `LIKE '%CI%'`) queda pendiente de que el
+humano decida si se ficha.
