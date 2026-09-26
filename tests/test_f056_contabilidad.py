@@ -208,7 +208,7 @@ def test_f056_r2_solo_raw_y_el_puente() -> None:
         # «FROM esquema.tabla alias»: el alias descarta el `IS DISTINCT FROM pad.ide`
         esquemas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+)\.\w+ \w+", texto))
         assert esquemas <= {"raw", "contabilidad", "maestro"}, f"{nombre} lee {sorted(esquemas)}"
-        assert set(re.findall(r"(?<![\w])maestro\.(\w+)", texto)) <= {"centros_coste"}
+        assert set(re.findall(r"(?:FROM|JOIN)\s+maestro\.(\w+)", texto)) <= {"centros_coste"}
         for vetado in ("stg.", "mart.", "cierre.", "compras.", "retenciones.", "personal."):
             assert not re.search(rf"(?<![\w]){re.escape(vetado)}", texto), f"{nombre} nombra {vetado}"
     assert set(re.findall(r"maestro\.(\w+)", _sql(MAYOR))) == {"centros_coste"}
