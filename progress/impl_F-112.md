@@ -103,7 +103,12 @@ VERDE tras T3 (mismo comando): `16 passed in 16.66s`; con los 4 de T7, `20 passe
 (`test_f015_*`, `test_f020_*`, `test_mutacion_informe`, cobertura de F-006 y
 F-052): `140 passed`, sin tocar ninguna.
 
-## Qué se hace con `dev` (DECISIÓN DEL HUMANO; no se ha tocado)
+## Qué se hace con `dev` (DECIDIDO: opción B, espejo de `main`; no se ha tocado)
+
+**Decisión del humano (2026-09-26, tras la review 1): se MANTIENE como espejo**,
+adelantada por el líder en cada cierre (`git merge --no-ff main`); ninguna feature
+nace de ella. Escrita en `CONVENTIONS.md` y `leader.md`; acciones y comandos, en
+`current.md` §F-112 «Verificaciones MANUAL». Lo que sigue es la propuesta original.
 
 Estado medido hoy: `dev` = `origin/dev` = `a1845db` (2026-09-03). Le faltan 552
 commits sin merge de `main`, y tiene **2 commits que `main` no tiene**

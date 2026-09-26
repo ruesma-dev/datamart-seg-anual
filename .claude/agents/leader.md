@@ -77,9 +77,17 @@ rama `feature/F-XXX-slug` y que estás en ella (`git branch --show-current`).
 Si no existe, créala desde `main` actualizado: `git checkout main && git pull
 && git checkout -b feature/F-XXX-slug`.
 
-La rama de integración de este repositorio es **`main`**; `dev` se mantiene
-solo como espejo. El 2026-08-31 `dev` iba 97 commits por detrás de `main`:
-crear una rama desde ahí significaba empezar a trabajar sobre código viejo.
+La rama de integración de este repositorio es **`main`**, la misma que declara
+`RAMA_BASE` en `harness/init.sh` y contra la que miden las puertas. `dev` es
+un **espejo de `main`** (decisión del humano, 2026-09-26, F-112) y **ninguna
+feature nace de `dev`**: el 2026-08-31 iba 97 commits por detrás de `main`, y
+el 2026-09-26, 552; una rama nacida de ahí trabaja sobre código viejo y la
+puerta de cobertura la pone en rojo.
+
+**Paso del líder en cada cierre**, después del merge de la feature en `main`:
+adelantar el espejo con `git checkout dev && git merge --no-ff main` (no es
+fast-forward: `dev` tiene dos commits propios, `a1a3df2` y `a1845db`) y volver
+a `main`. El push de `dev` lo hace el humano.
 
 ## Al terminar la sesión
 
