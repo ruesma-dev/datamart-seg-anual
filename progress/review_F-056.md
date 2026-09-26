@@ -1,11 +1,28 @@
 <!-- progress/review_F-056.md -->
-Revisión completa (pasada 1) · `git diff main...HEAD` (merge-base `fe061b0`) hasta HEAD `a0c6919`
+Revisión incremental desde a0c6919 (pasada 2) · delta hasta HEAD `f4a9156`
 
 # F-056 · Review del reviewer
 
-**Veredicto: CHANGES_REQUESTED.** El fondo está bien y verificado contra la base; fallan
-dos cosas de papel, baratas (abajo). Ningún cambio toca código, SQL ni el alcance de la
-mutación: la pasada 2 será incremental y sin campañas.
+**Veredicto: APPROVED** (pasada 2). La pasada 1 (completa, `main...a0c6919`) fue
+CHANGES_REQUESTED por dos cosas de papel; las dos quedan cerradas (sección «Pasada 2»).
+
+## Pasada 2 (incremental desde `a0c6919`)
+
+- **Delta** (`f4a9156`): `progress/current.md`, `docs/ARCHITECTURE.md` y este informe.
+  No toca código, SQL, tests, diccionario ni el alcance de la mutación: lo aprobado en la
+  pasada 1 sigue valiendo y las campañas no se repiten (RM1: el alcance medido no cambia).
+- `bash harness/init.sh` entero: exit 0, **5659 passed, 207 skipped**, `PUERTA COBERTURA
+  [OK] 100.0 %`, `PUERTA TAMAÑO [OK]` (review 122/140), `ENTORNO LISTO`.
+- **Cambio 1, HECHO**: `current.md` §F-056 lista las siete verificaciones MANUAL con su
+  comando exacto y resultado esperado (build + `timings` + tamaños y SKU, C1, C2, C3, C4
+  con `COALESCE`, `check-*`/`apply-grants`/`publicar-diccionario` + imagen, y `mcp-bbdd`
+  con su comprobación). Coinciden con las que yo remedí en solo lectura. C4 → `[x]`.
+- **Cambio 2, RETIRADO por decisión del líder**, que es quien fijó el criterio (9): este
+  pedía no versionar nombres sacados de los DATOS de Sigrid (trabajadores, proveedores
+  particulares), no el del solicitante interno de la feature. Con esa lectura, el diff no
+  versiona ningún nombre de los datos: `[x]`. La propuesta de automejora sigue abajo,
+  reformulada.
+- No bloqueante de la pasada 1, también resuelto: `ARCHITECTURE.md` dice ya 126 s y ~1,2 GB.
 
 **Nivel de rigor:** `critico` (declarado). Exige fase RED, cobertura >= 80 %, mutación con
 0 supervivientes y las verificaciones `MANUAL (humano)` con su comando exacto.
@@ -41,7 +58,7 @@ mutación: la pasada 2 será incremental y sin campañas.
 - **(8)** Aviso de `mcp-bbdd` en `impl_F-056.md` §7 y `azure-apps`; contrastado con
   `mcp-bbdd/config/config.yaml`: `seguridad.esquemas_permitidos`, `personal` tras
   `retenciones`. **(10)** `azure-apps` `2748264` + `90d84af`, limpio, sin push.
-- **(9) Nombres de persona: FALLA** → cambio 2.
+- **(9) Nombres de persona**: en la pasada 1 lo marqué FALLA; resuelto en la pasada 2 (arriba).
 
 **Desviaciones, aceptadas las tres**: PK de saldos con `empresa_id` (el design era
 contradictorio y su PK tumbaba el build, medido); asiento por `LEFT JOIN` (R13); guarda
@@ -76,8 +93,8 @@ en la misma transacción (mejor que el design).
   `amb/fas`, `importe_origen` y `obrfasamb` N/A (no se leen); CIERRE/APERTURA resuelto
   como regla dura.
 - C3 bis: N/A — no toca `docs/referencia/`. C4 ter: N/A — sin `rutas_sensibles.json`.
-- C4: [x] R1-R36 trazables y en verde (tabla) · [x] offline · **[ ] MANUAL en
-  `current.md` con su comando exacto** (cambio 1) · [x] dobles con la firma real de
+- C4: [x] R1-R36 trazables y en verde (tabla) · [x] offline · **[x] MANUAL en
+  `current.md` con su comando exacto** (pasada 1 `[ ]`, cerrado en la 2) · [x] dobles con la firma real de
   `PostgresClient` (`execute_sql_file(path)`, `count_rows(schema, table)`).
 - C4 bis: [x] rigor · [x] RED con salida real (`60 failed, 2 passed` + trazas) · [x]
   cobertura 100 % · [x] totales verificados · [x] muertos comprobados · [x] coste por
@@ -100,23 +117,14 @@ en la misma transacción (mejor que el design).
 
 ## Cambios requeridos
 
-1. **`progress/current.md`, sección F-056, línea «T22-T24 · MANUAL»**: poner ahí cada
-   verificación MANUAL con su **comando exacto y resultado esperado** (los siete puntos
-   de `progress/impl_F-056.md` líneas 117-139: build + `timings` + tamaños, C1, C2, C3,
-   C4 con `COALESCE`, `check-*`/`apply-grants`/`publicar-diccionario`, y `mcp-bbdd`). Un
-   puntero al informe no cumple C4.
-2. **Nombre de persona** (criterio 9 del líder; precedente F-101: commit nuevo, sin
-   reescribir historia). Cambiar «Juan Romero»/«Juan» por una referencia sin nombre
-   («la captura de Sigrid del 03-09») en `specs/F-056-mayor-plan-contable/requirements.md:135`,
-   `specs/F-056-mayor-plan-contable/design.md:50` y `:155`, y `progress/spec_F-056.md:59`.
-   Vienen de la spec (ya en `main`); el diff del implementer no añade ninguno.
-
-**No bloqueante:** `docs/ARCHITECTURE.md` (coste de `run-all`) dice «~2,5 min» y «~1 GB»
-frente a 126 s y ~1,2 GB del informe; `test_f057_r25_..._trae_los_diez_esquemas`
-conserva «diez» en el nombre.
+Ninguno (pasada 2). Los de la pasada 1: el 1 está hecho; el 2 lo retiró el líder (arriba).
+No bloqueante que queda: `test_f057_r25_..._trae_los_diez_esquemas` conserva «diez» en
+el nombre. Quedan las verificaciones MANUAL de `current.md` §F-056 (T22-T24), que las
+lanza el líder tras este APROBADO: el coste del build (R35) sigue sin medir.
 
 ## Automejora (propuesta, no aplicada)
 
-Añadir a C3 un punto «sin nombres de persona del personal en specs ni `progress/`»: hoy
-solo lo sostienen el precedente F-101 y la petición del líder, y el nombre entró en
-`main` con la spec aprobada sin que ninguna puerta lo viera.
+Escribir en C3 el criterio que el líder aplicó en la pasada 2: «no se versionan nombres
+de persona sacados de los DATOS de Sigrid (trabajadores, proveedores particulares); el
+solicitante interno de una feature sí puede figurar». Hoy solo existe en el precedente
+F-101 y en la petición del líder, y en la pasada 1 lo leí más amplio de lo que era.

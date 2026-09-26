@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-26 · F-056 · EN CURSO (`in_progress`) · el mayor y el plan de cuentas como arbol
+## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · QUEDAN LAS MANUAL Y EL DESPLIEGUE
 
 Implementer en `feature/F-056-mayor-plan-contable` (desde `main` fe061b0).
 `sdd=true`, rigor `critico`. Spec `specs/F-056-mayor-plan-contable/`, aprobada
