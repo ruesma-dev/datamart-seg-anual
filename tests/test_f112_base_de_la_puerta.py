@@ -38,6 +38,7 @@ from harness.alcance import (
     alcance_de_feature,
     diagnosticar_base,
     git_en,
+    merge_que_integra,
     rama_base_configurada,
     resolver_refs,
 )
@@ -340,3 +341,62 @@ def test_f112_r5_rama_sin_commits_propios_no_busca_merge(repo: Path) -> None:
     )
 
     assert alcance.origen == "rama" and alcance.lineas == {}
+
+
+def test_f112_r5_los_merges_ajenos_anteriores_no_se_confunden_con_el_suyo(repo: Path) -> None:
+    # Entre que la rama nace y se integra, main recibe el merge de OTRA feature:
+    # ese merge no contiene la rama y no es el suyo.
+    _git(repo, "checkout", "-q", "-b", "feature/F-904-otra", "main")
+    _commit(repo, "app/otra.py", "# app/otra.py\nZ = 5\n", "F-904 T1")
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--no-ff", "feature/F-904-otra", "-m", "Merge de F-904")
+    _git(repo, "merge", "-q", "--no-ff", RAMA, "-m", "Merge de F-900")
+    suyo = _git(repo, "rev-parse", "HEAD")
+
+    assert resolver_refs("F-900", RAMA, "main", git=git_en(str(repo))) == (
+        f"{suyo}^1",
+        suyo,
+        "merge",
+    )
+
+
+def test_f112_r5_una_rama_sobre_la_linea_principal_no_la_trae_ningun_merge(
+    repo: Path,
+) -> None:
+    # Rama creada en main y sin commits; después main integra otra feature. El
+    # merge posterior la contiene, pero también su primer padre: no es «el que
+    # la integró», y la rama sigue sin nada propio que medir.
+    _git(repo, "branch", "feature/F-905-parada", "main")
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--no-ff", RAMA, "-m", "Merge de F-900")
+
+    alcance = alcance_de_feature(
+        "F-905", base="main", rama="feature/F-905-parada", raiz=str(repo)
+    )
+
+    assert alcance.origen == "rama" and alcance.lineas == {}
+    assert merge_que_integra("feature/F-905-inexistente", "main", git=git_en(str(repo))) is None
+
+
+def test_f112_r5_la_puerta_de_una_rama_integrada_dice_que_midio_su_merge(
+    repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--no-ff", RAMA, "-m", "Merge de F-900")
+    merge = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", RAMA)
+
+    codigo = cobertura.main(["--base", "main", *_entorno_de_puerta(repo)])
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "de 2 líneas cambiadas" in salida
+    assert f"diff del merge {merge[:10]}" in salida
+
+
+def test_f112_r2_el_cli_de_rutas_sensibles_sin_declaracion_no_hace_nada(
+    tmp_path: Path,
+) -> None:
+    # Sin harness/rutas_sensibles.json la puerta no existe: el CLI (con su
+    # `--base` por defecto leído de init.sh) sale en 0 sin mirar git.
+    assert rutas_sensibles.main(["--puerta", "--raiz", str(tmp_path)]) == 0
