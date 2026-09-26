@@ -204,7 +204,7 @@ con 4 suites compitiendo. Relanzada con 3 workers y `--timeout 2400` (F-108 ya
 usó `--timeout 1800`); líneas base de 518-531 s, todas verdes. El cierre de la
 1.7.8 (un timeout es un reintento) no está en este proyecto (1.7.7).
 
-Tras la review 1 (HEAD `76342b9`): exit 0, `5562 passed, 203 skipped` en 609,41 s,
+Tras la review 2 (HEAD `2a83f04`): exit 0, `5562 passed, 203 skipped` en 594,05 s,
 cobertura 100,0 % (69/69). Ejecución anterior, HEAD `01f1f7b`:
 
 ```
