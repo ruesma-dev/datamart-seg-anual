@@ -34,6 +34,7 @@ import pytest
 
 from harness import cobertura, rutas_sensibles
 from harness.alcance import (
+    RAMAS_DE_LARGA_VIDA,
     alcance_de_feature,
     diagnosticar_base,
     git_en,
@@ -303,6 +304,11 @@ def test_f112_r2_en_este_repositorio_la_base_no_esta_rezagada() -> None:
     git = git_en(str(RAIZ))
     if not git(["rev-parse", "--git-dir"]).strip():
         pytest.skip("sin git no hay historial contra el que comparar")
+    rama = git(["branch", "--show-current"]).strip()
+    if rama in RAMAS_DE_LARGA_VIDA:
+        # En una rama de integración la puerta no aplica (se declara N/A), y
+        # allí el diagnóstico compararía una rama de larga vida con otra.
+        pytest.skip(f"en '{rama}' la puerta de cobertura no aplica")
     base = rama_base_configurada(str(RAIZ))
     if not git(["rev-parse", "--verify", "--quiet", base]).strip():
         pytest.skip(f"este clon no tiene la rama base '{base}'")
