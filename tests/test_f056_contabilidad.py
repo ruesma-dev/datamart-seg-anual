@@ -1279,7 +1279,11 @@ def test_f056_r30_fichas_de_raw_corregidas() -> None:
     assert "nivel 5 frente a" not in cua
     assert "tip = 17" in cua and "tip = 16" in cua and "contabilidad.plan_cuentas" in cua
     apa = _texto_ficha(raw["apa"])
-    assert "caa" in apa and "F-061" in apa and "contabilidad.mayor" in apa
+    assert "caa" in apa and "contabilidad.mayor" in apa
+    descripcion = raw["apa"]["descripcion"]
+    assert "F-061" in descripcion and "contabilidad.mayor.apunte_id" in descripcion, (
+        "la descripcion de apa dice que va a F-061 y por donde se enlaza con el mayor (D4)"
+    )
 
 
 # ===========================================================================
@@ -1323,11 +1327,13 @@ def test_f056_r31_check_declarados_ve_el_esquema() -> None:
 def test_f056_r32_documentacion() -> None:
     arquitectura = DOC_ARQUITECTURA.read_text(encoding="utf-8")
     for termino in ("contabilidad.plan_cuentas", "contabilidad.mayor",
-                    "contabilidad.saldos_cuenta_mes", "build_contabilidad", "prefijo",
-                    "SALDO_INICIAL"):
+                    "contabilidad.saldos_cuenta_mes", "build_contabilidad",
+                    "El plan de cuentas son prefijos", "SALDO_INICIAL"):
         assert termino in arquitectura, f"ARCHITECTURE.md no dice «{termino}»"
     claude = DOC_CLAUDE.read_text(encoding="utf-8")
-    assert "`contabilidad/`" in claude, "el mapa de sql/ de CLAUDE.md gana contabilidad/"
+    assert "`personal/`, `contabilidad/`, `auxiliar/`" in claude, (
+        "la lista de capas del mapa de sql/ de CLAUDE.md gana contabilidad/"
+    )
     import main
 
     documentacion = main.run_all.__doc__ or ""
