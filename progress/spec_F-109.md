@@ -88,3 +88,18 @@ partida -> contrato/expediente debe ir por `partida_id` (en 812 pares el mismo
 codigo existe una vez por contrato); los centinelas -3/-4 de `expide` (5.258
 partidas) hay que explicarlos; y hay que ingerir `raw.obrctrexp`. Conviene que
 el lider lo anote en la ficha de F-099.
+
+## APROBADA (humano, 2026-09-26)
+
+D1-D5 con la recomendacion. **D2 con esta redaccion** (la propuso el lider tras
+explicar al humano las consecuencias y los contras de la regla, y el humano la
+aprobo): «No cruces tablas por obra + codigo de partida: usa `partida_id`.
+Agrupar por codigo es valido si se quiere sumar todas las copias del concepto
+(por ejemplo, la misma partida en todos los bloques o fases), y hay que decirlo.
+Para identificar una partida ante el usuario, ensena su ruta de capitulos.» Es
+decir: lo prohibido es UNIR por (obra, codigo); AGRUPAR por codigo se permite
+declarandolo. **D3**: los nombres por codigo de niveles y CI se fichan como
+feature aparte (F-111). **D4**: la version del diccionario es la siguiente a la
+de `main` al fusionar (hoy `main` esta en la 34, asi que F-109 sube a la 35).
+Las entradas para F-099 (enlace por `partida_id`, centinelas -3/-4 de `expide`,
+ingerir `obrctrexp`) las anota el lider en su ficha.
