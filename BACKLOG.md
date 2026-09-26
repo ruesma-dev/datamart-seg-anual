@@ -5,6 +5,8 @@
 
 Resumen: **104 features**, 64 abiertas, 40 terminadas.
 
+En curso: **F-112**.
+
 Bloqueadas: **F-052**.
 
 ## Trabajo abierto
@@ -12,7 +14,7 @@ Bloqueadas: **F-052**.
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
 | F-097 | Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master | 1 | pendiente | estandar | `feature/F-097-descompuestos-partidas` |
-| F-112 | La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa | 2 | pendiente | estandar | `feature/F-112-cobertura-contra-main` |
+| F-112 | La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa | 2 | en curso | estandar | `feature/F-112-cobertura-contra-main` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | pendiente | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 5 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 6 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
@@ -131,7 +133,7 @@ Pedida por Juan Romero por correo el 2026-09-22, «Datamart: publicar los descom
 
 ### F-112 · La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa
 
-estado **pendiente** · prioridad 2 · rigor `estandar` · SDD no · rama `feature/F-112-cobertura-contra-main`
+estado **en curso** · prioridad 2 · rigor `estandar` · SDD no · rama `feature/F-112-cobertura-contra-main`
 
 Decidido por el humano el 2026-09-26, prioridad 2. Hallazgo del reviewer de F-109: `harness/init.sh:34` fija `RAMA_BASE=dev` y la puerta de cobertura (`python -m harness.cobertura --base "$RAMA_BASE"`, l. 486) y la de rutas sensibles (l. 514) comparan contra esa rama. `dev` esta parada en `a1845db` (renumeracion de F-057/F-058, principios de septiembre): todo el trabajo se integra en `main`. Consecuencia: la cobertura de lineas cambiadas mide el diff `dev...HEAD`, que arrastra semanas de features ya cerradas; por eso F-110 y F-109 dieron la MISMA cifra (95,1 % de 1.106 lineas) y ninguna de esas lineas era de F-109. La puerta pasa en verde sin medir lo que dice medir. QUE HACER: (1) en este proyecto, `RAMA_BASE=main` (o calcular la base como `git merge-base HEAD main`), con un test que falle si la rama base no es ancestro reciente de HEAD o esta por detras de la rama de integracion; (2) decidir que se hace con `dev` (retirarla, o mantenerla y avisar); (3) REGLA DE PROPAGACION: portar a `arnes-base` que la puerta use el merge-base con la rama de integracion configurada, o avise en rojo cuando la base este por detras, con el modo actualizar del instalador; (4) remedir la cobertura real de las ultimas features cerradas (F-107 a F-110) contra `main` y anotar si alguna queda por debajo del umbral de su rigor.
 
