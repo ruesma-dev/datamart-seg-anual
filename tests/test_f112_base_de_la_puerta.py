@@ -239,7 +239,7 @@ def test_f112_r2_puerta_cobertura_mide_solo_la_rama_contra_main(
     # Y dice contra qué midió: sin eso, dos features con la misma cifra no
     # levantaban ninguna sospecha.
     base = _git(repo, "merge-base", "main", RAMA)
-    assert base[:10] in salida
+    assert f"diff desde {base[:10]}, merge-base con main" in salida
 
 
 def test_f112_r2_sin_base_explicita_se_usa_la_de_init_sh(
