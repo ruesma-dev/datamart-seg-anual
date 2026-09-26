@@ -20,8 +20,35 @@ por el humano el 2026-09-26 con D1-D8 segun la recomendacion (seccion
 - [x] T1-T21 y T25 · hechas, un commit por tarea (ver `tasks.md`). Mutacion:
   herramienta 12/12 muertos, sistematica 233/233 muertos
   (`progress/mutacion_F-056.md`). Informe: `progress/impl_F-056.md`.
-- [ ] T22-T24 · MANUAL (build, C1-C4, checks, grants, publicar) y el cambio de
-  `mcp-bbdd` (lista blanca): comandos y resultados esperados en el informe.
+- [ ] T22-T24 · verificaciones MANUAL (humano; escrituras contra Azure, tras el
+  APROBADO). En orden, con su comando exacto y lo que debe salir:
+  1. **Build y coste (T22, R35)**: `python main.py build-contabilidad` -> `SUCCESS`,
+     filas ~79.000 (plan) + ~2,17 M (mayor) + ~400.000 (saldos). Tiempo:
+     `python main.py timings --last 5` (estimado 4-6 min; la lectura sola, 126 s).
+     Tamano: `SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class WHERE relnamespace = 'contabilidad'::regnamespace AND relkind = 'r';`
+     -> ~1,2 GB en total; y `SELECT pg_size_pretty(pg_database_size(current_database()));`
+     antes y despues (27 GB de 64 el 2026-09-26). Anotar el SKU del dia (hoy `Standard_B2s`).
+  2. **C1** `SELECT count(*), min(fecha), max(fecha), sum(importe_saldo) FROM contabilidad.mayor WHERE empresa_id = 1 AND codigo_cuenta = '4308000197';`
+     -> 641 / 2009-01-31 / 2026-09-xx / 1.189.275,13 (cifras del 26-09; se remiden).
+  3. **C2** `SELECT sum(importe) FROM contabilidad.mayor m JOIN contabilidad.plan_cuentas p USING (cuenta_id) WHERE p.empresa_id = 1 AND p.codigo_cuenta LIKE '434%' AND m.ejercicio = 2026 AND m.clase_asiento <> 'CIERRE';`
+     -> 5.345.557,80 (si no hay apuntes nuevos en la 434).
+  4. **C3** `SELECT (SELECT count(*) FROM contabilidad.mayor) = (SELECT count(*) FROM raw.apu);`
+     -> `true`.
+  5. **C4** `SELECT cuenta_id FROM (SELECT COALESCE(cuenta_id, 0) cuenta_id, sum(importe_saldo) s FROM contabilidad.mayor GROUP BY 1) a FULL JOIN (SELECT cuenta_id, sum(importe_saldo) s FROM contabilidad.saldos_cuenta_mes GROUP BY 1) b USING (cuenta_id) WHERE a.s IS DISTINCT FROM b.s;`
+     -> 0 filas (el `COALESCE` por la desviacion 1: la cuenta 0 de los saldos es el NULL del mayor).
+  6. **Puertas y publicacion (T24)**: `python main.py check-declarados` -> sale 0
+     (todo lo declarado existe); `python main.py check-unicidad` -> plan: PK y las
+     dos claves alternativas sin contradiccion; `python main.py check-relaciones`
+     -> las relaciones nuevas unen; `python main.py check-diccionario` -> biyeccion
+     exacta; `python main.py apply-grants` -> la lista de esquemas incluye
+     `contabilidad`; `python main.py publicar-diccionario` -> version 36; e imagen
+     nueva del job nocturno (tag fechado) para que `run-all` lleve el paso.
+  7. **`mcp-bbdd`** (otro repositorio): en `config/config.yaml`, bajo
+     `seguridad.esquemas_permitidos`, anadir `- contabilidad` DETRAS de
+     `- personal` (su `tests/test_f015_esquema_personal.py` exige que `personal`
+     siga justo detras de `retenciones`); desplegar su imagen y reiniciar. Se
+     comprueba con `listar_tablas('contabilidad')` -> las tres tablas. Sin eso el
+     MCP rechaza el esquema «fuera del ambito».
 
 Desviaciones respecto a la spec (justificadas; el reviewer las juzga):
 

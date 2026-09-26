@@ -725,8 +725,8 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   coste está estimado, no medido: dos `INSERT ... SELECT` de 2.618 y 330.638
   filas, unos 60 MB, del orden de segundos frente a las 3 h 45 de ventana.
   `build_contabilidad` (F-056) tampoco está medido en build todavía: el SELECT
-  entero de las tres tablas lee en ~2,5 min en solo lectura (2026-09-26), y con
-  la escritura y los índices se estima en 4-6 min y ~1 GB; se mide en su
+  entero de las tres tablas lee en 126 s en solo lectura (2026-09-26), y con
+  la escritura y los índices se estima en 4-6 min y ~1,2 GB; se mide en su
   primera ejecución.
 
 **El guardián.** `run-all` termina contrastando **lo que el SQL del
