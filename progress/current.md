@@ -9,7 +9,18 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · QUEDAN DESPLIEGUE Y MANUAL
+## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · DESPLEGADA Y VERIFICADA
+
+> **2026-09-26 ~08:30 UTC** (autorizado por el humano): imagen `r20260926-1028`
+> desde `main` b40f012 (el job pasa de `r20260925-2144`); diccionario **version
+> 34** publicado (hash c1256badcee3, `check-diccionario` OK); `build-retenciones`
+> a mano SUCCESS en 94 s (`fin_obra` 31 s) y `apply-grants`; MCP reiniciado.
+> Cifras tras el build, que cuadran con la spec: en las 922, INICIO_GARANTIA 198,
+> ULTIMO_CUATRIMESTRAL_MAS_1_MES 36, sin fecha 688; sobre la viva, garantia 97 /
+> 5.025.939,36, cuatrimestral 32 / 2.961.387,80, sin fecha 50 / 260.146,94;
+> `1-0692` fin 31-03-2025, vence 31-03-2026 (VENCIDA), `ultimo_cierre` informativo
+> 01-02-2026. Estados sobre el saldo contable: PENDIENTE 795 / 5,68 M, VENCIDA
+> 1.819 / 3,94 M, SIN_FIN_OBRA 1.174 / 0,90 M, SIN_OBRA 476 / -1,74 M.
 
 Implementer en la rama `feature/F-110-fin-obra-cuatrimestral` (desde `main`
 79a4505, con F-108: el diccionario sube a la **34**). T0 hecha: F-095 `done` y la
