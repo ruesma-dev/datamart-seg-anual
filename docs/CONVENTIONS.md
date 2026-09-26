@@ -74,7 +74,10 @@ encaja: `docs/ARCHITECTURE.md`.
 
 ## Git
 
-- Ramas: `main` (estable) ← `dev` (integración) ← `feature/F-XXX-slug`.
+- Ramas: `main` (integración) ← `feature/F-XXX-slug`. Es la rama que declara
+  `RAMA_BASE` en `harness/init.sh` y contra la que miden las puertas. `dev`
+  está parada desde el 2026-09-03 (`a1845db`); qué se hace con ella lo decide
+  el humano (propuesta en `progress/impl_F-112.md`).
 - Commits: `F-XXX Tn: descripción` (tareas) o `F-XXX: descripción` (ajustes).
 - Los agentes solo hacen commit local en ramas feature. Push, merge a dev y
   PRs: siempre el humano.
