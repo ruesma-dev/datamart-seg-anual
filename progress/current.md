@@ -9,6 +9,35 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-056 · EN CURSO (`in_progress`) · el mayor y el plan de cuentas como arbol
+
+Implementer en `feature/F-056-mayor-plan-contable` (desde `main` fe061b0).
+`sdd=true`, rigor `critico`. Spec `specs/F-056-mayor-plan-contable/`, aprobada
+por el humano el 2026-09-26 con D1-D8 segun la recomendacion (seccion
+«APROBADA» de `progress/spec_F-056.md`). Diccionario: version 35 -> **36**.
+
+- [x] T0 · D1-D8 decididas y todas con la recomendacion (nada que devolver).
+- [ ] T1-T25 · ver `specs/F-056-mayor-plan-contable/tasks.md`; el avance vive
+  en `progress/impl_F-056.md`.
+
+Desviaciones respecto a la spec (justificadas; el reviewer las juzga):
+
+1. **Clave de `saldos_cuenta_mes`: `(cuenta_id, empresa_id, ejercicio, mes)`,
+   no `(cuenta_id, ejercicio, mes)`.** El design pide las dos cosas a la vez:
+   PK sin empresa y «una sola fila por empresa y mes» para los 294 apuntes sin
+   cuenta (`COALESCE(cuenta_id, 0)`). Medido en solo lectura el 2026-09-26: esos
+   apuntes caen en 2-3 empresas el mismo mes en 19 meses, asi que la PK del
+   design haria FALLAR el build la primera noche. Se cumple la frase del grano
+   metiendo la empresa en la clave; para las cuentas reales no cambia nada (la
+   empresa de la cuenta es la del asiento en el 100 %).
+2. **El asiento se une con `LEFT JOIN`, no `JOIN`.** R13 manda «una fila por
+   apunte, sin filtrar ninguna»; un `JOIN` es un filtro. Hoy es equivalente
+   (0 apuntes sin asiento, medido) y la guarda de recuento de R14 sigue en pie.
+3. La guarda `DO $$` de R14 corre en la MISMA transaccion que el `CREATE`
+   (`execute_sql_file` ejecuta el fichero entero y hace rollback si falla): si
+   salta, queda el mayor de la noche anterior, no una tabla a medias. Mejor que
+   lo que suponia el design; el paso sale `FAILED` igual.
+
 ## 2026-09-26 · F-112 · CERRADA (`done`, APROBADO en pasada 3) · la puerta de cobertura media contra `dev`, parada · QUEDAN LAS MANUAL DEL HUMANO
 
 Implementer en `feature/F-112-cobertura-contra-main` (desde `main` fb52d96).
