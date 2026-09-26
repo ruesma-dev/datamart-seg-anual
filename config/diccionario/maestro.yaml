@@ -1,7 +1,8 @@
 # config/diccionario/maestro.yaml
 #
-# Fichas del esquema `maestro`: obras, proveedores y su relacion, pensados para
-# consultarse tal cual.
+# Fichas del esquema `maestro`: obras, proveedores y su relacion, el puente
+# centro de coste -> obra y el catalogo de estados de documento, todos pensados
+# para consultarse tal cual.
 #
 # TRES COSAS ANTES DE CONSULTAR NADA:
 #
@@ -10,12 +11,22 @@
 #    (gastos generales, centros de personal) y los codigos con cinco o mas
 #    digitos. Contar obras en una o en otra da resultados distintos **a
 #    proposito**, y toda respuesta que cuente obras tiene que decir cual usa.
+#    Y desde F-102, **una fila por FICHA, no por codigo**: la obra es de UNA
+#    empresa y el mismo codigo existe una vez por empresa (922 fichas, 846
+#    codigos el 2026-09-23). Por codigo se cruza SIEMPRE con `empresa_id`, o por
+#    `clave_obra`; `es_ficha_principal` marca la ficha de Ruesma de cada codigo.
 # 2. **`importe_contratado` lleva IVA.** Es la suma del total del documento,
 #    mientras que todos los importes de `compras` son sin IVA. La diferencia
 #    entre las dos cifras no es sobrecoste ni ahorro: es el impuesto.
-# 3. **NO SE REFRESCA DE NOCHE.** Lo construye `build-maestros`, que si registra
-#    paso, asi que su fecha de build SI es consultable con
-#    `SELECT * FROM _meta.v_frescura WHERE paso = 'build_maestros'`.
+# 3. **SE REFRESCA DE NOCHE desde F-047**, dentro de `run-all`, y su fecha de
+#    build es consultable con
+#    `SELECT * FROM _meta.v_frescura WHERE paso = 'build_maestros'`. Desde F-073
+#    el paso depende ademas de `build_stg`: las dos marcas de `maestro.obras`
+#    se miden alli.
+#
+# F-107 (2026-09-24) anade `cuentas_analiticas`, el catalogo de cuentas
+# analiticas: su codigo, como el de obras y recursos, solo es unico dentro de
+# su empresa.
 #
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/maestro/`.
@@ -30,38 +41,117 @@ objetos:
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
-      El maestro de obras SIN filtrar: codigo, nombre, estado, fechas de alta y
-      baja, y el cliente. Es la vista para poner contexto a una obra; **NO** es
+      El maestro de obras SIN filtrar: codigo, nombre, estado (con su nombre ya
+      traducido), fechas de alta y baja, cliente, **direccion del emplazamiento
+      con municipio y provincia**, y las dos marcas de que datos tiene la obra
+      dentro del datamart. Es la vista para poner contexto a una obra; **NO** es
       el universo del seguimiento y **NO sirve para saber si una obra sigue
       viva**: `es_activa` vale TRUE en las 919 filas porque `fecha_baja` no se
       informa nunca (ver R-OBRA-ACTIVA). Esta descripcion prometia justo eso
       hasta que la bateria de aceptacion lo midio.
+
+      **LA OBRA ES DE UNA EMPRESA (F-102, modelo del humano del 2026-09-23).**
+      En Sigrid el mismo codigo de obra existe una vez por empresa --Ruesma (1),
+      Porsan (28), cada UTE-- y es la **misma obra vista desde cada empresa, sin
+      consolidar**: en la UTE esta su informacion y en Ruesma sus suplidos a la
+      UTE. Medido el 2026-09-23: **922 fichas para 846 codigos**, 58 codigos
+      repetidos; dentro de una empresa el codigo es unico. Por eso **por
+      `codigo_obra` se cruza SIEMPRE con `empresa_id`, o por `clave_obra`**
+      (`1-0581`, `27-0581`), que es unica: cruzar solo por el codigo devuelve
+      duplicados o coge la ficha que no es. `obra_id` sigue siendo la clave
+      tecnica. `es_ficha_principal` marca la ficha de Ruesma de cada codigo (o,
+      si el codigo no la tiene, la primera del ranking), y `obra_principal_id`
+      apunta a ella como REFERENCIA: no sirve para agregar hechos de otras
+      empresas. Las **103 fichas de la empresa 28** (Porsan) **no traen ni
+      direccion ni cliente**, ni presupuesto ni cierres: 57 son obras propias de
+      Porsan (unica ficha de su codigo) y el resto, copias de una obra de
+      Ruesma. Traer al seguimiento las demas empresas como obras propias es
+      F-106.
+
+      **LA DIRECCION SE MIDE SOBRE LA FICHA DE RUESMA**, no sobre las 922: las
+      copias de otras empresas no la traen y hundian la cifra. Medido el
+      2026-09-23 sobre las 846 fichas principales, `dir1` esta en **310 de 846**
+      (36,6 %) y escasea en las obras ANTIGUAS: codigos < 0400, **77 de 252**;
+      0400-0599, 93 de 200; 0600-0671, 61 de 74; **0672 en adelante, 49 de
+      59**; cinco o mas digitos, 29 de 240; otros, 1 de 21. De cuatro digitos
+      desde la 0672 hay 57 principales, todas de la empresa 1, y 48 tienen
+      `dir1`. Cada columna de direccion declara su cifra. `raw.condir`, las
+      direcciones de concepto, **no aporta direcciones de obra**: `condir` tiene
+      fila para **0 de 922** fichas de obra, tambien en Sigrid; no hace falta
+      volver a buscarlas ahi.
     grano: >-
-      Una fila por `obra_id`, y son TODAS las obras de Sigrid. Es superconjunto
-      de `stg.obras`, que excluye las administrativas y los codigos de cinco o
-      mas digitos: contar aqui da mas obras que contar alli, y esa diferencia es
-      deliberada.
+      Una fila por FICHA de obra (`obra_id`), y son TODAS las de Sigrid: 922 el
+      2026-09-23, de todas las empresas. `codigo_obra` NO es unico --se repite
+      una vez por empresa--; `clave_obra` si. Es superconjunto de `stg.obras`,
+      que excluye las administrativas y los codigos de cinco o mas digitos y se
+      queda con una ficha por codigo: contar aqui da mas obras que contar alli,
+      y esa diferencia es deliberada. Para contar obras por codigo, filtrar
+      `es_ficha_principal` y decirlo.
     clave_negocio: [obra_id]
+    claves_alternativas: [[clave_obra]]
     paso_etl: build_maestros
     refresco: nocturno
     columnas:
       obra_id:
         significado: >-
-          Identificador de la obra en Sigrid (`con.ide`). Es la clave universal
-          del modelo y la que une con el resto de esquemas.
+          Identificador de la FICHA de obra en Sigrid (`con.ide`). Es la clave
+          tecnica del modelo y la que une con el resto de esquemas. Cada ficha
+          es de UNA empresa (`empresa_id`): un documento de la UTE apunta a la
+          ficha de la UTE, y uno de Ruesma a la de Ruesma.
         agregacion: no_sumable
-      codigo_obra: Codigo de obra tal y como se teclea en Sigrid, de `con.cod`.
+      codigo_obra:
+        significado: >-
+          Codigo de obra tal y como se teclea en Sigrid, de `con.cod`. **No es
+          unico**: el mismo codigo existe una vez por empresa (58 codigos
+          repetidos el 2026-09-23). Se filtra o se cruza siempre junto con
+          `empresa_id`, o se usa `clave_obra`.
       nombre_obra: >-
         Nombre legible de la obra, de `con.res`. En Sigrid no existe ninguna
         columna `nom`: el nombre siempre es el resumen del concepto.
       estado_id:
         significado: >-
-          Codigo interno de estado de Sigrid, sin traducir: su catalogo **no se
-          ingiere**, asi que hay codigos sin nombre. Aun asi es **lo unico de
-          esta vista que discrimina algo**: reparte las 919 obras en once
-          valores (465 en el `25`, 226 en el `1`, 175 en el `15`, que el SQL de
-          `maestro/01_obras.sql` documenta como EN CURSO; medido el
-          2026-08-25). No mandar a `es_activa`, que vale TRUE para las 919.
+          Estado de la obra en Sigrid. **Es lo unico de esta vista que
+          discrimina algo**: reparte las 920 obras en once valores, y desde
+          F-025 es ademas una de las tres reglas que deciden que obras se
+          reconstruyen cada noche.
+
+          DONDE VIVE EL CATALOGO, corregido en F-073. Vive en la tabla
+          `conest` ("Tipos de Estados de Conceptos"), el tipo de las obras es el
+          **42** y se llega por `con.est`. Esta ficha decia que esa tabla no se
+          ingiere y **era falso**: se ingiere cada noche, y desde F-073 se
+          publica entera en `maestro.estados_documento` (193 filas). Esa es
+          ahora la fuente del nombre de un estado, y ademas la columna `estado`
+          de esta misma vista lo trae ya traducido: **no hay que traducir a
+          mano**. Lo que queda aqui es el REPARTO de obras por estado, medido el
+          2026-09-02, que es informacion de las obras y no del catalogo: `1` EN
+          ESTUDIO (226 obras), `3` PRESENTADA (0), `5`
+          PRESENTADA CON ACLARACIONES (0), `7` ADJUDICADA PROVISIONAL (0), `9`
+          ADJUDICADA DEFINITIVAMENTE (33), `11` NO PRESENTADA (2), `13` NO
+          ADJUDICADA (0), `15` EN CURSO (176), `17` PARADA (7), `19` TERMINADA
+          (2), `21` RECIBIDA PROVISIONAL (3), `23` RECIBIDA DEFINITIVAMENTE
+          (4), `25` CERRADA (465), `999` PLANTILLA (1).
+
+          OJO AL LEERLO PARA SABER SI UNA OBRA ESTA VIVA: el estado de Sigrid
+          **no es fiable por si solo**. Hay **7 obras marcadas como CERRADAS
+          (25) que siguieron cerrando fases en los ultimos 12 meses**, y F-025
+          las congela igualmente: son `0669` (2026-04), `0660` y `0689`
+          (2026-01), `0665` (2025-11), `0656` y `0683` (2025-10) y `0668`
+          (2025-09). Con la regla del codigo de seis digitos entra una octava,
+          la `180501` (2026-07), que ni siquiera llega al fact: **8 obras con
+          actividad reciente quedan congeladas, de 48 que la tienen**. Por eso
+          el criterio de F-025 son tres reglas en union y no solo el estado, y
+          por eso `_meta.v_frescura_obra` es la fuente para "de cuando es el
+          dato de esta obra". No mandar a `es_activa`, que vale TRUE para las
+          920.
+
+          MEDIDO EL 2026-09-03 con la definicion que implementa el ETL:
+          universo `raw.obr JOIN raw.con` (920 obras) y actividad =
+          `MAX(make_date(f.anio, GREATEST(f.mes,1), 1))` sobre `stg.fases`, que
+          es la consulta `SQL_ESTADO_OBRAS` que el guardian corre cada noche.
+          Una medicion anterior sobre `maestro.obras` con
+          `coalesce(fecha_fin, fecha_inicio)` daba 39 CERRADAS con actividad:
+          **esa cifra esta muerta**, no reproduce.
+        valores: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 999]
         agregacion: no_sumable
       fecha_alta:
         significado: Fecha de alta de la obra, ya tipada desde el entero de Sigrid.
@@ -108,6 +198,180 @@ objetos:
           La obra no tiene cliente —`cliente_id` = 0— o el que tiene no existe en
           `raw.con`. Este NULL si es real, lo produce el `LEFT JOIN`, asi que es
           la forma fiable de preguntar por las obras sin cliente resuelto.
+      estado:
+        significado: >-
+          El estado de la obra YA TRADUCIDO a su nombre (F-073), desde
+          `raw.conest` filtrando el tipo de documento de obra (42). **Es la
+          columna que hay que citar al responder**; `estado_id` es el codigo
+          interno del que sale. La traduccion completa, para cualquier tipo de
+          documento, esta en `maestro.estados_documento`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El `estado_id` de la obra no tiene fila en `conest` para el tipo 42.
+          Le pasa a **1 de las 921 obras** (medido el 2026-09-10), asi que un
+          NULL aqui es una rareza del origen y no un fallo del ETL.
+      dir1:
+        significado: >-
+          Primera linea de la direccion del emplazamiento de la obra, de
+          `obr.dir1`. Mismo nombre y mismo significado que en
+          `maestro.proveedores`, para que "donde esta" se escriba igual en las
+          dos. **Informada en 310 de las 846 fichas principales (36,6 %), medido
+          el 2026-09-23**, y mucho mas en las obras recientes que en las
+          antiguas (ver la descripcion de la vista). Las fichas de otra empresa
+          que copian una obra de Ruesma no la traen. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 33,1 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
+        nulo_significa: >-
+          La ficha no tiene direccion informada en Sigrid. En una obra antigua o
+          en la copia de otra empresa es lo normal, y **"no consta" es la
+          respuesta correcta**, no un hueco del ETL; antes de darlo, mirar la
+          ficha de Ruesma del codigo (`es_ficha_principal`).
+      dir2:
+        significado: >-
+          Segunda linea de la direccion (de `obr.dir2`): escalera, planta,
+          poligono. **Es la mas vacia de todas: 46 de las 846 fichas principales
+          (5,4 %), medido el 2026-09-23**, asi que no sirve para agrupar ni para
+          filtrar. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 5,1 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
+        nulo_significa: >-
+          No hay segunda linea de direccion. Lo normal: "no consta" en el 94,6 %
+          de las fichas principales.
+      codigo_postal:
+        significado: >-
+          Codigo postal del emplazamiento, de `obr.dircpo`, **tal cual lo teclea
+          Sigrid** (es texto, no numero, y puede traer ceros a la izquierda).
+          **Informado en 307 de las 846 fichas principales (36,3 %), medido el
+          2026-09-23.** Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 32,9 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene codigo postal informado; "no consta".
+      direccion_completa:
+        significado: >-
+          La direccion en una sola linea, de `obr.dir`, tal como la guarda
+          Sigrid. Es la que se cita al responder "donde esta la obra X".
+          **Informada en 276 de las 846 fichas principales (32,6 %), medido el
+          2026-09-23**, y es la que menos cobertura tiene de las cuatro de
+          direccion. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 29,5 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
+        nulo_significa: >-
+          La obra no tiene direccion informada. Antes de darla por perdida,
+          mirar `municipio`: hay obras con municipio y sin calle.
+      municipio_id:
+        significado: >-
+          Identificador del municipio en `raw.auxmun`, de `obr.munide`. **Es el
+          eje por el que hay que agrupar**, y no por el literal: el nombre puede
+          venir escrito de dos formas y el identificador no. En Sigrid el 0 es
+          "no consta", y aqui se publica como NULL.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La ficha no tiene municipio informado (548 de las 846 principales el
+          2026-09-23); "no consta".
+      municipio:
+        significado: >-
+          Nombre del municipio del emplazamiento, resuelto desde `raw.auxmun`.
+          **Informado en 298 de las 846 fichas principales (35,2 %), medido el
+          2026-09-23.** El 2026-09-10 los identificadores informados resolvian
+          todos a nombre: no habia ningun municipio colgado. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 31,9 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La ficha no tiene municipio informado. Es el caso de 548 de las 846
+          fichas principales y **"no consta" es la respuesta correcta**.
+      provincia_id:
+        significado: >-
+          Identificador de la provincia en `raw.auxpro`, de `obr.proide`. Mismo
+          criterio que `municipio_id`: se agrupa por el identificador, no por el
+          literal, y el 0 de Sigrid se publica como NULL.
+        agregacion: no_sumable
+        nulo_significa: La obra no tiene provincia informada; "no consta".
+      provincia:
+        significado: >-
+          Nombre de la provincia del emplazamiento, resuelto desde `raw.auxpro`.
+          **Informada en 309 de las 846 fichas principales (36,5 %), medido el
+          2026-09-23.** Sirve para un mapa a nivel grueso. Contando las 921 fichas de todas las empresas, como se midio el 2026-09-10 (F-073), salia el 33,2 %: esa cifra mezclaba las copias de otras empresas, que no traen direccion.
+        agregacion: no_sumable
+        nulo_significa: >-
+          La ficha no tiene provincia informada (537 de las 846 principales el
+          2026-09-23); "no consta".
+      tiene_presupuesto:
+        significado: >-
+          Booleano: la obra tiene al menos una fila en `stg.presupuesto`. **NUNCA
+          ES NULO** (se calcula con un `EXISTS`). Es la respuesta a "de esta obra,
+          que puede contar el datamart": **728 de 921 (79,0 %) el 2026-09-10**.
+          Ojo, dice si HAY presupuesto cargado, no si el presupuesto es correcto.
+        agregacion: no_sumable
+      tiene_seguimiento:
+        significado: >-
+          Booleano: la obra tiene al menos una fila en `stg.plan_mensual`.
+          **NUNCA ES NULO** (se calcula con un `EXISTS`). **368 de 921 (39,9 %)
+          el 2026-09-10.** TRAMPA MEDIDA Y DECLARADA: se mide en `stg` y es
+          **superconjunto** del hecho publicado. Hay **349** obras con filas en
+          `mart.fact_seguimiento_mensual` frente a esas 368: **19 obras de
+          diferencia, y ninguna al reves**. Asi que `tiene_seguimiento = TRUE` no
+          garantiza que haya filas en el hecho; garantiza que hay plan del que
+          construirlas. Se mide en `stg` a proposito: el DDL de `mart` dropea sus
+          tablas con CASCADE cada noche y una vista de `maestro` colgada de ahi
+          no sobreviviria (es el incidente de F-047).
+        agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de Sigrid a la que pertenece la FICHA de obra (`con.emp`), de
+          `maestro.v_obra_fichas` (F-102). `1` es Ruesma, `28` es Porsan y `12`,
+          `14`, `15`, `25`, `26`, `27`, `31` y `34` son UTE; el nombre esta en
+          `nombre_empresa`. Como la obra es de una empresa, **todo cruce o
+          filtro por `codigo_obra` va SIEMPRE con `empresa_id`**, o por
+          `clave_obra`. Medido el 2026-09-23: 782 fichas de la empresa 1, 103 de
+          la 28 y 37 repartidas en otras 17 empresas.
+        agregacion: no_sumable
+      nombre_empresa:
+        significado: >-
+          Nombre de la empresa de la ficha, de `raw.auxemp` por `numemp` =
+          `con.emp` (F-102), con un lateral `ORDER BY` + `LIMIT 1` para no
+          multiplicar filas. Es lo que se cita al responder "de que empresa es
+          esta ficha".
+        nulo_significa: >-
+          La empresa de la ficha no esta en `raw.auxemp`. No deberia pasar: las
+          38 empresas de Sigrid se ingieren enteras cada noche.
+      clave_obra:
+        significado: >-
+          **La clave legible y UNICA de la ficha de obra**: `<empresa>-<codigo>`
+          (`1-0581` es la 0581 de Ruesma, `27-0581` la de la UTE). 922 claves
+          para 922 fichas el 2026-09-23. `empresa_id` es entero, asi que lo que
+          va antes del primer `-` es la empresa y la clave no puede colisionar.
+          Es la llave para agregar y cruzar por obra sin mezclar empresas: las
+          vistas de `compras` con obra la publican con el mismo nombre.
+          Es la clave alternativa de la ficha: la vigila `check-unicidad`
+          contra la base (F-108). Por eso vale como lado 1 de las relaciones
+          `N:1` de `compras`.
+      num_fichas_codigo:
+        significado: >-
+          Cuantas fichas tiene el `codigo_obra` de esta fila, contando todas las
+          empresas. `1` es un codigo que solo existe en una empresa; mas de 1,
+          que la misma obra esta vista desde varias (134 fichas de 58 codigos el
+          2026-09-23, hasta 8 fichas en un codigo administrativo).
+        agregacion: no_sumable
+      es_ficha_principal:
+        significado: >-
+          Cierto en la **ficha de Ruesma** de cada codigo: exactamente una por
+          codigo, 846 para 846 el 2026-09-23. Se decide en
+          `maestro.v_obra_fichas` por este orden y solo este: (1) la de la
+          empresa 1; (2) marcada en `raw.conext` con `cod = '15'`; (3) mas
+          cierres; (4) modificada mas recientemente; (5) `ide` mayor, solo como
+          desempate. Si el codigo no tiene ficha de la empresa 1 --las obras
+          propias de Porsan, 0001-0005--, decide el resto del ranking: 64
+          principales son de otra empresa. **Filtrar por ella da una fila por
+          codigo** y es como se cuenta "obras" en este maestro. OJO: `stg.obras`
+          NO usa esta marca y elige otra ficha en 0581, 0606, 0671 y 0720, que
+          es F-106.
+        agregacion: no_sumable
+      obra_principal_id:
+        significado: >-
+          El `obra_id` de la ficha de Ruesma del codigo de esta fila (la de la
+          empresa 1), o el propio `obra_id` si el codigo no tiene ficha de la
+          empresa 1. Sale de la misma ventana que `es_ficha_principal`, asi que
+          las dos no pueden divergir. 59 fichas apuntan a otra el 2026-09-23.
+          **Es solo REFERENCIA de cual es la ficha de Ruesma: no sirve para
+          agregar hechos de otras empresas.** Sumar facturas o partes por ella
+          meteria lo de la UTE en la obra de Ruesma, que no se consolida; por eso
+          ninguna vista de `compras` la publica. OJO con 11 fichas de codigos
+          administrativos (`CM` 1, `CP` 4, `GG` 4, `POSTV2` 1, `VAR` 1): en otra
+          empresa son su propio centro de gastos, no la misma cosa que la ficha
+          de Ruesma a la que apuntan.
+        agregacion: no_sumable
     relaciones:
       - de: obra_id
         a: stg.obras.obra_id
@@ -115,7 +379,15 @@ objetos:
         porque: >-
           Es el universo del seguimiento, que es un SUBCONJUNTO de este. Unir
           por aqui equivale a filtrar a las obras reales; no unir deja dentro
-          las administrativas.
+          las administrativas. `stg.obras` se queda con UNA ficha por codigo, y
+          en 0581, 0606, 0671 y 0720 no es la ficha de Ruesma
+          (`es_ficha_principal`): lo resuelve F-106.
+      - de: obra_id
+        a: maestro.v_obra_fichas.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Es la definicion de las marcas de F-102 (ranking, rango y numero de
+          cierres de cada ficha). No hace falta unir: las marcas ya estan aqui.
       - de: obra_id
         a: cierre.v_pbi_cierre_cabecera.obra_id
         cardinalidad: "1:1"
@@ -126,6 +398,99 @@ objetos:
       - Cuantas obras hay dadas de alta en Sigrid
       - Quien es el cliente de la obra X
       - Que codigo tiene la obra que se llama X
+      - En que municipio o provincia esta la obra X
+      - Cuantas obras tenemos en cada provincia
+      - De que obras tiene el datamart presupuesto y de cuales tiene seguimiento
+      - De que empresa es la ficha de la obra X
+      - Cual es la ficha de Ruesma de la obra X y que otras empresas tienen ficha de ella
+
+  v_obra_fichas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Es la DEFINICION de cual es la ficha de Ruesma de cada codigo, de la que
+      leen `maestro.obras` y las vistas de `compras`. Para poner contexto a una
+      obra --nombre, empresa, direccion-- la vista es `maestro.obras`, que trae
+      las mismas marcas; esta sirve para ver POR QUE una ficha es la principal
+      (su marca de `conext`, sus cierres y su puesto en el ranking).
+
+      Una fila por ficha de obra con su empresa, su clave legible
+      (`clave_obra`, `<empresa>-<codigo>`) y el ranking que decide cual es la
+      **ficha de Ruesma** de cada codigo (F-102). Las obras son POR EMPRESA y no
+      se consolidan: el mismo codigo es la misma obra vista desde cada empresa.
+      El orden, y solo este: (1) empresa 1; (2) marcada en `raw.conext` con
+      `cod = '15'`; (3) mas cierres en `raw.obrfas`; (4) `con.tiemod` mas
+      reciente; (5) `ide` mayor, solo como desempate. **Ninguna regla elige por
+      `obra_id` menor**: falla en la 0680, donde la copia de Porsan tiene el
+      menor. Lee SOLO `raw`, se crea en `sql/maestro/00_setup.sql` y no se
+      dropea nunca, asi que `compras` la lee sin depender de `stg`. `stg.obras`
+      NO la usa: el seguimiento sigue eligiendo como hasta hoy, y difiere de
+      esta marca en 0581, 0606, 0671 y 0720 (F-106).
+    grano: >-
+      Una fila por ficha de obra (`obra_id`): 922 el 2026-09-23, con 922
+      `clave_obra` distintas y 846 principales, una por codigo.
+    clave_negocio: [obra_id]
+    claves_alternativas: [[clave_obra]]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la ficha de obra en Sigrid (`con.ide`).
+        agregacion: no_sumable
+      codigo_obra:
+        significado: >-
+          Codigo de obra, de `con.cod`. No es unico: se repite una vez por
+          empresa.
+      empresa_id:
+        significado: >-
+          Empresa de la ficha (`con.emp`). `1` Ruesma, `28` Porsan, el resto
+          UTE; el nombre esta en `maestro.obras.nombre_empresa`.
+        agregacion: no_sumable
+      clave_obra:
+        significado: >-
+          `<empresa>-<codigo>`, unica: 922 para 922 fichas el 2026-09-23.
+          Es la clave alternativa de la ficha: la vigila `check-unicidad`
+          contra la base (F-108).
+      marcada_vigente:
+        significado: >-
+          Cierto si la ficha tiene fila en `raw.conext` con `cod = '15'`, la
+          marca de Sigrid que `stg.obras` usa para deduplicar. Se evalua con
+          `EXISTS`: una ficha con dos filas no se multiplica. 124 fichas el
+          2026-09-23.
+        agregacion: no_sumable
+      num_cierres:
+        significado: >-
+          Filas de la ficha en `raw.obrfas` (sus fases o cierres). 0 si no tiene
+          ninguna, nunca NULL. 388 fichas tienen alguno el 2026-09-23.
+        agregacion: no_sumable
+      num_fichas_codigo:
+        significado: Cuantas fichas tiene su codigo, contando todas las empresas.
+        agregacion: no_sumable
+      rango_ficha:
+        significado: >-
+          Puesto de la ficha dentro de su codigo segun el ranking. `1` es la
+          principal.
+        agregacion: no_sumable
+      es_ficha_principal:
+        significado: >-
+          `rango_ficha = 1`: la ficha de Ruesma del codigo, o la primera del
+          ranking si no la tiene. Exactamente una por codigo.
+        agregacion: no_sumable
+      obra_principal_id:
+        significado: >-
+          La ficha de la empresa 1 del codigo, o la propia si el codigo no la
+          tiene. Es REFERENCIA: no sirve para agregar hechos de otras empresas.
+        agregacion: no_sumable
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "1:1"
+        porque: >-
+          Es la misma ficha; `maestro.obras` ya trae las marcas de esta vista.
+    ejemplos_preguntas:
+      - Por que la ficha principal del codigo X es la de esa empresa
+      - Que fichas tiene el codigo X, de que empresas y en que orden
 
   proveedores:
     tipo: vista
@@ -232,7 +597,10 @@ objetos:
     refresco: nocturno
     columnas:
       obra_id:
-        significado: Identificador de la obra en Sigrid.
+        significado: >-
+          Identificador de la obra en Sigrid, la del CONTRATO de compra.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 331 filas llevan la ficha de una UTE de un codigo del seguimiento y 17 una ficha fuera de el; ninguna la copia de Porsan (empresa 28). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
         agregacion: no_sumable
       codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
       nombre_obra: Nombre legible de la obra, de `con.res`.
@@ -297,7 +665,8 @@ objetos:
       - de: obra_id
         a: maestro.obras.obra_id
         cardinalidad: "N:1"
-        porque: Para el estado, las fechas y el cliente de la obra.
+        porque: >-
+          Para el estado, las fechas y el cliente de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
       - de: proveedor_id
         a: maestro.proveedores.proveedor_id
         cardinalidad: "N:1"
@@ -313,6 +682,296 @@ objetos:
     ejemplos_preguntas:
       - Con que proveedores hemos contratado en la obra X y por cuanto
       - En cuantas obras trabaja el proveedor P
+
+  centros_coste:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      EL PUENTE entre el centro de coste y la obra. En Sigrid un centro de coste
+      y una obra son **dos entidades distintas** que comparten empresa y codigo,
+      y hasta F-073 no habia forma publicada de pasar de una a otra. Todo lo que
+      el origen anota contra un centro de coste —las retenciones, y manana las
+      horas y los partes— llega sin obra: esta vista es lo que permite
+      atribuirlo.
+    grano: >-
+      Una fila por centro de coste, o sea una por `centro_coste_id`, que es
+      unico: **804 el 2026-09-10**, de las cuales **683
+      resuelven a obra** y 121 no. Esas 121 son estructura, delegacion y
+      servicios generales: salen con `obra_id` a NULL y **no se filtran**.
+      CONTAR FILAS AQUI NO ES CONTAR OBRAS. La resolucion es **1:1** y sin
+      ambiguedad, y la vista lo garantiza por construccion.
+    clave_negocio: [centro_coste_id]
+    claves_alternativas: [[empresa, codigo_centro]]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      centro_coste_id:
+        significado: >-
+          Identificador del centro de coste en Sigrid (`cen.ide`). Es el valor
+          que traen las tablas que anotan contra centro de coste, y por el que
+          se une contra ellas.
+        agregacion: no_sumable
+      codigo_centro:
+        significado: >-
+          Codigo del centro tal y como se ve en Sigrid, de `con.cod`. Cuando el
+          centro es una obra, es **el mismo codigo que `maestro.obras.codigo_obra`**:
+          esa coincidencia, junto con la empresa, es exactamente el puente.
+          Con `empresa` forma la clave alternativa de la ficha (804 para 804
+          el 2026-09-24; el codigo solo, 655): la vigila `check-unicidad`
+          contra la base (F-108).
+      nombre_centro:
+        significado: Nombre legible del centro de coste, de `con.res`.
+      empresa:
+        significado: >-
+          Empresa del grupo a la que pertenece el centro (`con.emp`). Forma
+          parte de la clave del puente: dos empresas distintas pueden usar el
+          mismo codigo.
+          Con `codigo_centro` forma la clave alternativa de la ficha: la
+          vigila `check-unicidad` contra la base (F-108).
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que corresponde el centro de coste, cuando el puente
+          resuelve. **683 de los 804 centros resuelven** (2026-09-10). SE
+          RESUELVE POR EMPRESA Y CODIGO, y no por ningun campo de relacion:
+          `cen.obride` existe, parece el puente y **esta a 0 en las 804 filas**,
+          y la aritmetica sobre el `ide` (`obride + 1`) acierta solo el 64 %.
+          Quien rehaga esto mirara `obride` primero: no sirve.
+
+          **ES LA FICHA DE LA EMPRESA DEL DOCUMENTO** --aqui, la del propio centro de coste-- (F-102): en Sigrid la obra es POR EMPRESA y el mismo codigo existe una vez por empresa --Ruesma, Porsan, cada UTE--, sin consolidar. Su empresa y su clave legible (`empresa_id`, `clave_obra`) salen de `maestro.obras` por este `obra_id`. Medido el 2026-09-23: 40 centros resuelven a la copia de Porsan (empresa 28) de una obra del seguimiento, 8 a la ficha de una UTE y 28 a una ficha fuera del seguimiento. No es un error del puente: cruza por empresa y codigo, asi que cada centro cae en la ficha de SU empresa. `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El centro de coste **no es una obra**: es estructura, delegacion o
+          servicios generales. Son 121 de 804, y su coste es real; simplemente
+          no se imputa a ninguna obra.
+      codigo_obra:
+        significado: Codigo de la obra a la que resuelve el centro, de `con.cod`.
+        nulo_significa: El centro de coste no resuelve a ninguna obra.
+      nombre_obra:
+        significado: Nombre de la obra a la que resuelve el centro, de `con.res`.
+        nulo_significa: El centro de coste no resuelve a ninguna obra.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la ficha completa de la obra a la que pertenece el centro de
+          coste. Varios centros pueden resolver a la misma obra, aunque hoy la
+          relacion medida es 1:1. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
+    ejemplos_preguntas:
+      - A que obra corresponde el centro de coste X
+      - Que centros de coste no son obra
+      - Cuantos centros de coste tienen obra detras
+
+  estados_documento:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El catalogo de estados de documento de Sigrid (`conest`), publicado
+      entero. **TRAMPA PRINCIPAL: la traduccion va por TIPO DE DOCUMENTO.** El
+      estado de un documento es un numero, y lo que ese numero significa depende
+      del tipo: el 15 es "EN CURSO" en una obra (tipo 42) y en un documento de
+      tipo 15 —la factura— significa otra cosa distinta. Traducir un estado sin
+      su tipo da una respuesta plausible y falsa.
+    grano: >-
+      Una fila por entrada del catalogo: **193 el 2026-09-10**, repartidas en 29
+      tipos de documento. El par `(tipo_documento, estado_id)` es unico —193 de
+      193 medido— y es la clave por la que se une.
+    clave_negocio: [tipo_documento, estado_id]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      estado_documento_id:
+        significado: Identificador de la fila del catalogo en Sigrid (`conest.ide`).
+        agregacion: no_sumable
+      tipo_documento:
+        significado: >-
+          Tipo de documento al que aplica el estado (`conest.tip`). Los que
+          importan hoy: **42 obra**, **44 contrato**, **15 factura**, 46
+          comparativo y 12 oferta. **Sin filtrar por este campo, la traduccion
+          es falsa.**
+        agregacion: no_sumable
+      estado_id:
+        significado: >-
+          Codigo del estado (`conest.est`). Es el valor que traen las columnas
+          `est` de los documentos —`con.est`, y por tanto
+          `maestro.obras.estado_id`—, y por el que se une **junto con el tipo**.
+        agregacion: no_sumable
+      codigo_estado:
+        significado: >-
+          Codigo corto del estado en Sigrid (`conest.cod`): `EST`, `ECU`, `TER`,
+          `CER`. Es texto y **no es el valor por el que se une**: para unir se
+          usa `estado_id`.
+      estado:
+        significado: >-
+          Nombre legible del estado (`conest.res`): EN ESTUDIO, EN CURSO,
+          TERMINADA, CERRADA. Es lo que se cita al responder.
+    relaciones:
+      - de: estado_id
+        a: maestro.obras.estado_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la traduccion del estado de la obra, y **es N:N a proposito**: aqui
+          la clave es `(tipo_documento, estado_id)`, no `estado_id` solo, asi
+          que unir por `estado_id` a secas MULTIPLICA las filas de la obra por
+          los 29 tipos de documento. Hay que **filtrar `tipo_documento = 42`
+          antes de unir**; con ese filtro la relacion pasa a ser 1:N y la union
+          es segura. Lo mas facil, de todos modos, es no unir: `maestro.obras`
+          ya publica la columna `estado` resuelta.
+    ejemplos_preguntas:
+      - Que significa el estado 15 en una obra
+      - Que estados puede tener un contrato en Sigrid
+      - Como se llama el estado con codigo X del documento de tipo Y
+
+  cuentas_analiticas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL CATALOGO DE CUENTAS ANALITICAS de Sigrid** (F-107): traduce el
+      identificador de una cuenta a su codigo y su descripcion, con su empresa,
+      su cuenta padre, su nivel y su centro de coste. Lo pidio Juan Romero el
+      2026-09-23 para reproducir el asiento de los partes: la cuenta de
+      CONTRAPARTIDA del recurso (`personal.recursos.cuenta_analitica_contrapartida_id`)
+      y la cuenta de cada tipo de hora de su ficha
+      (`personal.recursos_tipos_hora.cuenta_analitica_id`) llegan como numeros.
+      Las tres del correo, traducidas: **496869 = '00000.CIMO02' JEFE DE OBRA**,
+      **496923 = '00000.CICO01' COMBUSTIBLES-GASOIL** y **496935 =
+      '00000.CICO13' TELEFONO MOVIL**, las tres de la empresa 1, nivel 4 y
+      centro de coste 496688.
+
+      **184.234 cuentas el 2026-09-24, sin filtrar**: de alta y de baja (solo 1
+      de baja). **EL CODIGO SOLO ES UNICO DENTRO DE SU EMPRESA** (regla
+      `R-CODIGO-POR-EMPRESA`): 14.063 codigos se repiten entre empresas y
+      ninguno dentro de una, asi que por `codigo_cuenta` se cruza siempre junto
+      con `empresa_id`. Son tantas porque el prefijo del codigo es el centro de
+      coste: `00000.CIMO02` es la cuenta CIMO02 del centro 00000, y cada centro
+      repite su juego de cuentas. 146.238 son de la empresa 1 y 26.684 de la 28.
+
+      **CASAMIENTO MEDIDO en Sigrid el 2026-09-24** (solo lectura, con la misma
+      union que esta vista): las cuentas de `personal.recursos_tipos_hora`
+      --3.199 filas informadas, 50 cuentas distintas-- y las de contrapartida de
+      `personal.recursos` --1.979 recursos, 847 cuentas distintas-- estan
+      **todas** en el catalogo: 0 huerfanas, y todas de la misma empresa que su
+      recurso. La cuenta de contrapartida es ademas del mismo centro de coste
+      que `personal.recursos.centro_coste_contrapartida_id` en los 1.979.
+      Y la cuenta de CARGO de cada linea de parte
+      (`personal.partes_lineas.cuenta_analitica_id`, ampliacion de F-107):
+      310.553 de 331.003 lineas, 3.782 cuentas, 0 huerfanas; en 309.182 el
+      codigo de la cuenta empieza por el de la obra de la linea.
+    grano: >-
+      Una fila por cuenta analitica, identificada por `cuenta_analitica_id`, que
+      es unico. El par (`empresa_id`, `codigo_cuenta`) tambien lo es; el codigo
+      solo, no.
+    clave_negocio: [cuenta_analitica_id]
+    claves_alternativas: [[empresa_id, codigo_cuenta]]
+    paso_etl: build_maestros
+    refresco: nocturno
+    columnas:
+      cuenta_analitica_id:
+        significado: >-
+          Identificador de la cuenta en Sigrid (`caa.ide`, el mismo que su fila
+          de `con`). Es el valor que traen `cuenta_analitica_contrapartida_id`
+          del recurso y `cuenta_analitica_id` del tipo de hora, y por el que se
+          une.
+        agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de Sigrid a la que pertenece la cuenta (`con.emp`): `1` es
+          Ruesma y `28` Porsan. Forma parte de la identidad legible: el mismo
+          codigo existe en varias empresas.
+          Con `codigo_cuenta` forma la clave alternativa de la ficha: la
+          vigila `check-unicidad` contra la base (F-108).
+        agregacion: no_sumable
+      codigo_cuenta:
+        significado: >-
+          Codigo de la cuenta tal y como se ve en Sigrid (`con.cod`), con el
+          centro de coste delante del punto: '00000.CIMO02'. **No es unico**: se
+          repite entre empresas (14.063 codigos). Se cruza junto con
+          `empresa_id`.
+          Con `empresa_id` forma la clave alternativa de la ficha (184.234
+          para 184.234 el 2026-09-24): la vigila `check-unicidad` contra la
+          base (F-108).
+      descripcion_cuenta:
+        significado: Descripcion legible de la cuenta (`con.res`), la que se cita al responder ("JEFE DE OBRA").
+      cuenta_padre_id:
+        significado: >-
+          La cuenta padre en el arbol analitico (`caa.padide`). Casi siempre es
+          un GRUPO analitico (`cag`, no ingerido); en 4 cuentas de la empresa 18
+          es otra cuenta de este catalogo. Su codigo y descripcion van en las
+          dos columnas siguientes.
+        nulo_significa: La cuenta no tiene padre (2.476 cuentas, entre ellas las 68 de nivel 1).
+        agregacion: no_sumable
+      codigo_cuenta_padre:
+        significado: >-
+          Codigo de la cuenta padre, de `con` por `cuenta_padre_id`
+          ('00000.CIMO' para JEFE DE OBRA). El grupo analitico tambien es un
+          concepto de Sigrid, y por eso se nombra sin ingerir `cag`.
+        nulo_significa: La cuenta no tiene padre.
+      descripcion_cuenta_padre:
+        significado: Descripcion de la cuenta padre, de `con` ('MANO DE OBRA INDIRECTA', 'CONSUMOS').
+        nulo_significa: La cuenta no tiene padre.
+      nivel:
+        significado: >-
+          Nivel de la cuenta en el arbol analitico (`caa.niv`), de 1 a 5.
+          Reparto el 2026-09-24: 68 de nivel 1, 63 de nivel 2, 3.872 de nivel
+          3, 179.965 de nivel 4 y 266 de nivel 5.
+        agregacion: no_sumable
+      centro_coste_id:
+        significado: >-
+          Centro de coste de la cuenta (`caa.cenide`), informado en 181.806 de
+          184.234. Su codigo y nombre estan en `maestro.centros_coste`.
+        nulo_significa: La cuenta no declara centro de coste.
+        agregacion: no_sumable
+      partida_presupuestaria_id:
+        significado: >-
+          Partida presupuestaria de la cuenta (`caa.prpide`). **Esta vacia**:
+          vale 0 en las 184.234 filas medidas el 2026-09-24, y aqui sale a NULL.
+          Se publica porque se pidio y para que se vea cuando empiece a
+          informarse.
+        nulo_significa: La cuenta no tiene partida presupuestaria (todas, hoy).
+        agregacion: no_sumable
+      fecha_baja:
+        significado: Fecha de baja de la cuenta, la de su concepto (`con.fecbaj`) ya tipada. Solo 1 cuenta de baja el 2026-09-24.
+        nulo_significa: La cuenta sigue de alta.
+        agregacion: no_sumable
+      es_activa:
+        significado: >-
+          Cierto si la cuenta no tiene fecha de baja, como en el resto de
+          maestros. Casi todas lo son (184.233 de 184.234). Es una bandera: la
+          cuenta de baja de hoy pudo imputarse ayer.
+        agregacion: no_sumable
+    relaciones:
+      - de: centro_coste_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y el nombre del centro de coste de la cuenta. Muchas
+          cuentas por centro: cada centro repite su juego de cuentas.
+      - de: cuenta_analitica_id
+        a: personal.recursos.cuenta_analitica_contrapartida_id
+        cardinalidad: "1:N"
+        porque: >-
+          La cuenta de CONTRAPARTIDA de la ficha del recurso: 847 cuentas para
+          1.979 recursos, 0 huerfanas (2026-09-24).
+      - de: cuenta_analitica_id
+        a: personal.recursos_tipos_hora.cuenta_analitica_id
+        cardinalidad: "1:N"
+        porque: >-
+          La cuenta de cada tipo de hora de la ficha del recurso: 50 cuentas
+          para 3.199 filas, 0 huerfanas (2026-09-24).
+      - de: cuenta_analitica_id
+        a: personal.partes_lineas.cuenta_analitica_id
+        cardinalidad: "1:N"
+        porque: >-
+          La cuenta de CARGO de cada linea de parte: 3.782 cuentas para 310.553
+          lineas, 0 huerfanas (2026-09-24). Agregar las lineas antes de unir.
+    ejemplos_preguntas:
+      - Que cuenta analitica es la 496869
+      - Cual es la cuenta de contrapartida del recurso X y como se llama
+      - Que cuentas cuelgan del grupo analitico X
 
   fn_fecha:
     tipo: funcion

@@ -59,13 +59,19 @@ PASOS_NOCTURNOS = pasos_del_pipeline_nocturno()
 #: no es dependencia de ningún otro, así que puede fallar sin tumbar la noche.
 ESQUEMAS_QUE_ENTRARON = ("cierre", "compras", "maestro", "retenciones")
 
+#: El quinto, que no «entró»: `personal` nació dentro de la nocturna con F-057
+#: (2026-09-18), y con la misma propiedad a propósito — su paso no es
+#: dependencia de nadie, así que un fallo del SQL de personal no deja al `mart`
+#: sin construir.
+ESQUEMAS_QUE_NO_BLOQUEAN = ESQUEMAS_QUE_ENTRARON + ("personal",)
+
 
 # ---------------------------------------------------------------------------
 # La composición real del pipeline
 # ---------------------------------------------------------------------------
 
 
-def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cuatro() -> None:
+def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cinco() -> None:
     """Si esto cambia, cambia el veredicto de R14, y así debe ser."""
     assert PASOS_NOCTURNOS == (
         "ingest_raw",
@@ -75,12 +81,13 @@ def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cuatro() -> None:
         "build_maestros",
         "build_compras",
         "build_retenciones",
+        "build_personal",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",
     )
     for paso in ("build_cierre", "build_maestros", "build_compras",
-                 "build_retenciones"):
+                 "build_retenciones", "build_personal"):
         assert paso in PASOS_NOCTURNOS
 
 
@@ -124,14 +131,14 @@ def test_f006_r13_refresco_estatico_esta_exento_de_paso_etl() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("esquema", ESQUEMAS_QUE_ENTRARON)
+@pytest.mark.parametrize("esquema", ESQUEMAS_QUE_NO_BLOQUEAN)
 def test_f006_r14_un_paso_que_no_corre_de_noche_no_puede_ser_nocturno(
     esquema: str,
 ) -> None:
     """Es la mentira que produce respuestas de hace semanas dadas con aplomo.
 
     Se prueba con un paso INVENTADO (`build_<esquema>_a_mano`) en vez de con el
-    paso real, porque los cuatro reales ya corren de noche desde F-047. La
+    paso real, porque los cinco reales ya corren de noche. La
     dirección del error es la misma y sigue vigilada; lo que ya no se puede es
     ilustrarla con un esquema concreto del repositorio.
     """

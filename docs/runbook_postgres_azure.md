@@ -7,15 +7,17 @@ implementación de F-005 dejó el código y los scripts, no tocó Azure.
 
 > **Lo primero que hay que entender.** No se aprovisiona ningún servidor. Se
 > crea la base `sigrid_dm` **dentro de `psql-albaranes-rs9k2`**, que ya sirve a
-> `albaranes` y `partes`, **las dos en uso**. Cualquier error de alcance afecta
-> a dos aplicaciones vivas.
+> `albaranes`, `partes`, `dedicacion`, `postventa` y `facturas`, **todas en
+> uso**. Cualquier error de alcance afecta a cinco aplicaciones vivas. Eran dos
+> cuando se escribió esto: la lista crece sin avisarnos, y el 2026-09-07 una
+> base nueva tumbó la nocturna.
 
 | | |
 |---|---|
 | Servidor | `psql-albaranes-rs9k2.postgres.database.azure.com` |
 | Resource group | `rg-albaranes-dev` (`spaincentral`) — **no** es el del datamart |
 | Versión / SKU | PostgreSQL 16 · `Standard_B1ms` (1 vCPU, 2 GB RAM) |
-| Almacenamiento | 32 GB **compartidos** con `albaranes` y `partes` |
+| Almacenamiento | **64 GB** (ampliado el 2026-08-29 desde 32) **compartidos** con `albaranes`, `partes`, `dedicacion`, `postventa` y `facturas` |
 | Red | Endpoint público con reglas de firewall por IP |
 | HA / Backup | Sin HA · PITR 7 días, **de servidor entero** |
 
@@ -70,8 +72,9 @@ recuperación utilizable**. Lo que sí lo es: `sigrid_dm` es regenerable al
 
 ## 3. Puerta de espacio — antes de nada
 
-32 GB compartidos. Sigrid son ~4 GB en origen, y `raw` + `stg` + `mart` con
-índices proyecta **10-12 GB**.
+64 GB compartidos desde el 2026-08-29 (32 cuando se escribió este runbook y
+cuando se ejecutó su puerta de T13, que por eso pide 14 GB libres). Sigrid son
+~4 GB en origen, y `raw` + `stg` + `mart` con índices proyecta **10-12 GB**.
 
 ```bash
 # Fotografía previa del servidor (solo lectura). Guarda las salidas.
@@ -143,9 +146,9 @@ psql "host=<host> dbname=sigrid_dm user=<admin> sslmode=require" \
 ```
 
 Qué debe salir: `sigrid_dm` con propietario `sigrid_dm_etl`, los tres roles,
-`sigrid_dm_app` dentro de `sigrid_dm_etl`, y **los nueve esquemas** (`raw`,
+`sigrid_dm_app` dentro de `sigrid_dm_etl`, y **los diez esquemas** (`raw`,
 `stg`, `aux`, `mart`, `_meta`, `cierre`, `compras`, `maestro`,
-`retenciones`).
+`retenciones`, `personal`).
 
 **Comprobación obligatoria después**: que `albaranes` y `partes` siguen
 conectando y que el listado de reglas de firewall es **exactamente** el de
@@ -393,3 +396,21 @@ psql "host=<host> dbname=albaranes user=mcp_sigrid_dm_ro sslmode=require" \
 cinco de consumo. Se revisará al rediseñar el MCP en F-006. La lista efectiva
 es el parámetro `PG_CONSUMPTION_SCHEMAS`: estrecharla es cambiar una variable,
 no tocar código.
+
+**Con dos excepciones, y son TEMPORALES (F-068, 2026-09-07)**: `raw.emp` y
+`raw.res` traen datos personales de empleados (DNI, Seguridad Social, cuenta
+bancaria, NIF, credenciales) y el rol tiene el `SELECT` revocado sobre ellas.
+La lista es `PG_EXCLUDED_TABLES`, y la aplica el propio `apply_grants` cada
+noche: no se puede hacer a mano, porque el `GRANT ... ON ALL TABLES IN SCHEMA
+raw` de la nocturna siguiente devolvería el permiso. El humano ya decidió
+volver a concederlas cuando el MCP tenga control por usuario.
+
+Para comprobar que la revocación está puesta (cero filas es lo correcto):
+
+```sql
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'mcp_sigrid_dm_ro'
+  AND table_schema = 'raw'
+  AND table_name IN ('emp', 'res');
+```

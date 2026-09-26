@@ -55,6 +55,93 @@ infraestructura.
 > `contexto_bbdd()`, así que con el origen en base **se perdían**, y el MCP en
 > cloud habría respondido *peor* que el prototipo. Se añade una tabla, con lo
 > que el inventario pasa a **103 objetos**. Detalle en §4.4.
+>
+> **Enmienda del 2026-09-03 (F-025).** Entran `_meta.obra_build` y
+> `_meta.v_frescura_obra` y el inventario pasa a **105 objetos**. Responden una
+> pregunta que antes no existía: «¿de cuándo es el dato de ESTA obra?». Desde
+> F-025 el datamart no reconstruye las 920 obras cada noche —se rehacen 40 y
+> 880 conservan su última versión buena—, así que la frescura dejó de ser una
+> propiedad del datamart entero y pasó a serlo de cada obra.
+>
+> **Enmienda del 2026-09-06 (F-066).** La ingesta pasa de 31 a 56 tablas
+> —personal, contabilidad y la cadena entera de compras— y con ellas entran
+> 25 fichas nuevas de `raw`, así que el inventario pasa a **130 objetos**.
+> Ninguna es superficie de consumo y ninguna documenta columnas (DA-2), así
+> que la cobertura de columnas no se mueve: siguen siendo 822.
+>
+> **Enmienda del 2026-09-09 (F-074).** La ingesta pasa de 56 a 65 tablas --las
+> nueve que destapo el censo de F-072: los catalogos que traducen personal y
+> horas, el maestro de articulos y los dos desgloses de trazabilidad-- y con
+> ellas entran 9 fichas nuevas de `raw`, asi que el inventario pasa a **139
+> objetos**. Ninguna es superficie de consumo y ninguna documenta columnas
+> (DA-2), asi que la cobertura de columnas sigue sin moverse: 822.
+>
+> **Enmienda del 2026-09-10 (F-073).** Entran tres objetos de consumo
+> --`maestro.centros_coste`, `maestro.estados_documento` y
+> `compras.formas_pago`--, asi que el inventario pasa a **142 objetos**. Estos
+> si documentan columnas, y ademas `maestro.obras` gana once: la cobertura de
+> columnas pasa de 822 a **852**, y las fichas de consumo de 54 a 57.
+>
+> **Enmienda del 2026-09-14 (F-080).** Entran los cinco objetos que responden
+> la peticion de Administracion --`compras.vencimientos`,
+> `compras.v_facturas_pago`, `compras.v_control_forma_pago`,
+> `compras.documento_texto` y `compras.documento_comentarios`-- y las tres
+> tablas de `raw` que necesitan (`auxnap`, `auxban` y `rpa`), asi que el
+> inventario pasa a **150 objetos**. Los cinco de `compras` documentan
+> columnas: la cobertura de columnas pasa de 852 a **941** y las fichas de
+> consumo de 57 a **62**.
+>
+> **Enmienda del 2026-09-16 (F-084).** Entra `compras.fn_estado_documento`, la
+> traduccion del estado de un documento por la pareja (tipo, estado),
+> factorizada para que `compras.contratos` y `compras.facturas` la compartan en
+> vez de copiarla; es funcion auxiliar y no sube la superficie de consulta, que
+> se queda en **66** fichas. Con las tres columnas de estado que F-084 anade a
+> `compras.contratos`, el inventario pasa a **154 objetos** y la cobertura de
+> columnas a **972**. Por el camino quedaron sin enmienda propia F-078 (que
+> subio a 153 con las tres tablas de CP por tipologia) y F-083 (969 columnas,
+> sin objeto nuevo): esta entrada cierra la cuenta, y conviene saber que el
+> guardian `test_f006_r24_...` solo busca la cifra en el fichero, asi que el
+> 153 se lo daba por casualidad una referencia a `infra/README.md:153-170`.
+>
+> **Enmienda del 2026-09-18 (F-057).** Entra el **decimo esquema**, `personal`,
+> con cuatro objetos: `personal.recursos` --el maestro de recursos, que
+> CONTIENE DATOS PERSONALES publicados con autorizacion expresa del responsable
+> del dato: nombre, NIF y DNI--, `personal.partes_lineas` --las 330.638 lineas
+> de parte de trabajo, que son lo que ata persona, horas y obra--,
+> `personal.v_pbi_horas_obra_mes` y la funcion local `personal.fn_fecha`. El
+> inventario pasa a **158 objetos**, la cobertura de columnas a **1015** y las
+> fichas de consumo de 66 a **69** (la funcion no es de consumo). Es ademas el
+> primer esquema que entra sabiendo que hay que restringirlo: tener los datos
+> personales en un esquema propio es lo que permite darlos o quitarlos con un
+> GRANT en vez de tabla a tabla (F-087).
+>
+> **Enmienda del 2026-09-23 (F-101, hotfix de F-057).** Entran tres objetos en
+> `personal`: `personal.partes` --la cabecera del parte, con la obra de
+> CABECERA nombrada `obra_cabecera_id` porque audita y no imputa--,
+> `personal.recursos_tipos_hora` --los precios de la ficha del recurso, sin el
+> de nomina-- y la funcion local `personal.fn_fecha_serie`. El inventario pasa
+> a **161 objetos**, la cobertura de columnas a **1054** y las fichas de
+> consumo de 69 a **71**.
+>
+> **Enmienda del 2026-09-23 (F-102, hotfix: la obra es de una empresa).**
+> Entran dos objetos: `maestro.v_obra_fichas` --una fila por ficha de obra con
+> su empresa, su `clave_obra` y cual es la ficha de Ruesma de cada codigo; es
+> la definicion de la que leen `maestro.obras` y `compras`, y es de consumo
+> (F-079: el `false` es solo para lo roto o vacio)-- y `raw.auxemp`, las 38
+> empresas del grupo. El
+> inventario pasa a **163 objetos** y la cobertura de columnas a **1083**
+> (seis columnas nuevas en `maestro.obras`, dos en cada una de las cinco vistas
+> de `compras` con obra, tres en `personal.recursos` y las diez de la vista
+> nueva); las fichas de consumo recomendadas pasan de 71 a **72**.
+>
+> **Enmienda del 2026-09-24 (F-107, contrapartidas y cuentas analiticas).**
+> Entran dos objetos: `maestro.cuentas_analiticas` --el catalogo de cuentas
+> analiticas, codigo y descripcion desde `con`, padre, nivel y centro desde
+> `caa`; de consumo-- y `raw.caa`, las 184.234 cuentas de Sigrid. El
+> inventario pasa a **165 objetos** y la cobertura de columnas a **1098** (las
+> doce de la vista nueva, dos en `personal.recursos` --la contrapartida del
+> recurso-- y una en `personal.partes_lineas`, la cuenta de cargo de la
+> linea); las fichas de consumo recomendadas pasan de 72 a **73**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

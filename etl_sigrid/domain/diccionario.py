@@ -35,10 +35,17 @@ from dataclasses import dataclass, replace
 # Vocabularios cerrados
 # ---------------------------------------------------------------------------
 
-#: Los NUEVE esquemas del datamart. Los informes de exploración dicen «ocho» y
-#: se equivocan: `infra/sql/02_roles.sql` los crea uno a uno y su comentario ya
-#: dice «los nueve esquemas». Ojo a la trampa de nombres: el esquema se llama
-#: `aux` pero su carpeta de SQL es `sql/auxiliar/`.
+#: Los DIEZ esquemas del datamart. Eran nueve hasta F-057 (2026-09-18), que
+#: añadió `personal` —recursos, partes de trabajo y horas por obra— como
+#: esquema módulo propio para poder dar o quitar su acceso con un GRANT: es el
+#: único que contiene datos personales curados (nombre, NIF y DNI).
+#:
+#: Ojo a la trampa de nombres: el esquema se llama `aux` pero su carpeta de SQL
+#: es `sql/auxiliar/`.
+#:
+#: Esta tupla es lo que hace que las puertas MIREN un esquema: el validador del
+#: diccionario exige entrada propia para cada uno (R4) y `check-declarados` los
+#: recorre. Un esquema que no esté aquí se construye igual y no lo vigila nadie.
 ESQUEMAS_DEL_DATAMART = (
     "_meta",
     "aux",
@@ -46,6 +53,7 @@ ESQUEMAS_DEL_DATAMART = (
     "compras",
     "maestro",
     "mart",
+    "personal",
     "raw",
     "retenciones",
     "stg",
@@ -283,6 +291,10 @@ class Ficha:
     relaciones: tuple[Relacion, ...]
     ejemplos_preguntas: tuple[str, ...]
     motivo_no_consumo: str | None = None
+    #: F-108. Otras combinaciones de columnas que TAMBIEN identifican una fila
+    #: (`maestro.obras.clave_obra`). Las comprueba `check-unicidad` contra la
+    #: base, y una de UNA sola columna vale como lado 1 de una relacion.
+    claves_alternativas: tuple[tuple[str, ...], ...] = ()
     #: DERIVADO por `derivar_avisos` (R12). No se escribe a mano en el YAML.
     avisos: tuple[str, ...] = ()
 
@@ -390,7 +402,7 @@ def validar(
 
 
 def _validar_esquemas(dicc: Diccionario) -> list[ErrorValidacion]:
-    """R4: los NUEVE esquemas tienen entrada propia en `00_global.yaml`."""
+    """R4: los esquemas de `ESQUEMAS_DEL_DATAMART` tienen entrada propia en `00_global.yaml`."""
     errores: list[ErrorValidacion] = []
     fichero = "00_global.yaml"
 
@@ -404,7 +416,7 @@ def _validar_esquemas(dicc: Diccionario) -> list[ErrorValidacion]:
                     regla="R4",
                     detalle=(
                         f"el esquema `{esquema}` no tiene entrada en `esquemas`. "
-                        f"El diccionario debe cubrir los nueve: "
+                        f"El diccionario debe cubrir los diez: "
                         f"{_lista(ESQUEMAS_DEL_DATAMART)}"
                     ),
                 )
@@ -420,7 +432,7 @@ def _validar_esquemas(dicc: Diccionario) -> list[ErrorValidacion]:
                     objeto=None,
                     regla="R4",
                     detalle=(
-                        f"`esquemas` declara `{esquema}`, que no es uno de los nueve "
+                        f"`esquemas` declara `{esquema}`, que no es uno de los diez "
                         f"esquemas del datamart: {_lista(ESQUEMAS_DEL_DATAMART)}"
                     ),
                 )
@@ -512,7 +524,7 @@ def _validar_ficha(
             )
         )
 
-    # --- R4: la ficha pertenece a uno de los nueve esquemas -----------------
+    # --- R4: la ficha pertenece a uno de los diez esquemas ------------------
     if ficha.esquema not in ESQUEMAS_DEL_DATAMART:
         error(
             "R4",
@@ -617,6 +629,7 @@ def _validar_ficha(
 
     errores.extend(_validar_columnas(ficha))
     errores.extend(_validar_clave_negocio(ficha))
+    errores.extend(_validar_claves_alternativas(ficha))
     errores.extend(_validar_relaciones(ficha, indice, dicc.pendientes))
     errores.extend(_validar_frescura(ficha, pasos_nocturnos))
 
@@ -685,6 +698,67 @@ def _validar_clave_negocio(ficha: Ficha) -> list[ErrorValidacion]:
         for col in ficha.clave_negocio
         if col not in nombres
     ]
+
+
+def _validar_claves_alternativas(ficha: Ficha) -> list[ErrorValidacion]:
+    """F-108: cada clave alternativa es una clave de verdad de la propia ficha.
+
+    Una clave alternativa es una promesa de unicidad: el validador de relaciones
+    la acepta como lado 1 y `check-unicidad` la comprueba contra la base. Por eso
+    se exige lo mismo que a `clave_negocio` —nombrar columnas documentadas— y
+    ademas que diga algo nuevo: repetir la clave de negocio u otra alternativa
+    solo duplicaria la consulta.
+    """
+    if not ficha.claves_alternativas:
+        return []
+
+    errores: list[ErrorValidacion] = []
+
+    def error(detalle: str) -> None:
+        errores.append(
+            ErrorValidacion(
+                fichero=ficha.fichero,
+                objeto=ficha.nombre,
+                regla="R2",
+                detalle=f"`claves_alternativas`: {detalle}",
+            )
+        )
+
+    if ficha.tipo == "funcion":
+        error("una funcion no tiene filas, asi que no tiene claves que declarar")
+        return errores
+    if not ficha.columnas:
+        error(
+            "la ficha no documenta columnas, y una clave alternativa tiene que "
+            "nombrar columnas documentadas"
+        )
+        return errores
+
+    nombres = {c.nombre for c in ficha.columnas}
+    negocio = frozenset(ficha.clave_negocio)
+    vistas: list[frozenset[str]] = []
+    for clave in ficha.claves_alternativas:
+        if not clave:
+            error("hay una clave vacia: cada clave nombra al menos una columna")
+            continue
+        for col in clave:
+            if col not in nombres:
+                error(
+                    f"nombra la columna `{col}`, que no esta documentada en la "
+                    f"propia ficha"
+                )
+        conjunto = frozenset(clave)
+        if len(conjunto) != len(clave):
+            error(f"la clave {list(clave)} repite la columna")
+        elif conjunto == negocio:
+            error(
+                f"la clave {list(clave)} es la `clave_negocio`: ya se comprueba "
+                f"como tal"
+            )
+        elif conjunto in vistas:
+            error(f"la clave {list(clave)} repite otra clave alternativa de la ficha")
+        vistas.append(conjunto)
+    return errores
 
 
 def _validar_relaciones(
@@ -764,12 +838,15 @@ def _es_unica_por(ficha: Ficha, columna: str) -> bool | None:
     negocio ni columnas, como las de `raw`—, para poder aplazar el juicio en vez
     de inventárselo.
 
-    Dos formas de ser única: ser ELLA SOLA la clave de negocio, o estar marcada
-    `agregacion: clave_sustituta`. Lo segundo hace falta porque las claves
+    Tres formas de ser única: ser ELLA SOLA la clave de negocio, estar marcada
+    `agregacion: clave_sustituta`, o ser ELLA SOLA una clave alternativa
+    declarada (F-108). Lo segundo hace falta porque las claves
     sustitutas se dejan fuera de `clave_negocio` a propósito (cambian en cada
     build) y aun así identifican la fila dentro de un mismo build: es lo que
     hace legítima la relación `1:1` entre una tabla de hecho y su vista
-    aligerada.
+    aligerada. Lo tercero es `maestro.obras.clave_obra`: única sin ser la clave
+    de negocio, y vigilada por `check-unicidad` como la de negocio. Una columna
+    que solo forma parte de una alternativa COMPUESTA no es única por sí sola.
     """
     if not ficha.clave_negocio and not ficha.columnas:
         return None
@@ -778,6 +855,8 @@ def _es_unica_por(ficha: Ficha, columna: str) -> bool | None:
     for candidata in ficha.columnas:
         if candidata.nombre == columna and candidata.agregacion == "clave_sustituta":
             return True
+    if (columna,) in ficha.claves_alternativas:
+        return True
     return False
 
 
@@ -815,6 +894,14 @@ def _validar_clave_de_join(
                 )
             )
     return errores
+
+
+def _sus_claves(ficha: Ficha) -> str:
+    """Las claves de un extremo, para el mensaje de un lado 1 rechazado (F-108)."""
+    texto = f"su clave es {list(ficha.clave_negocio)}"
+    if ficha.claves_alternativas:
+        texto += f"; claves alternativas: {[list(c) for c in ficha.claves_alternativas]}"
+    return texto
 
 
 def _validar_cardinalidad(
@@ -860,7 +947,7 @@ def _validar_cardinalidad(
         problemas.append(
             (
                 f"`{ficha.nombre}` tiene varias filas por `{relacion.de}` "
-                f"(su clave es {list(ficha.clave_negocio)})",
+                f"({_sus_claves(ficha)})",
                 "izquierdo",
             )
         )
@@ -868,7 +955,7 @@ def _validar_cardinalidad(
         problemas.append(
             (
                 f"`{destino.nombre}` tiene varias filas por `{columna}` "
-                f"(su clave es {list(destino.clave_negocio)})",
+                f"({_sus_claves(destino)})",
                 "derecho",
             )
         )

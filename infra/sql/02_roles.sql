@@ -71,7 +71,7 @@ GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_app;
 GRANT CONNECT ON DATABASE sigrid_dm TO mcp_sigrid_dm_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
---    dejarlos aquí permite comprobar los nueve nada más provisionar.
+--    dejarlos aquí permite comprobar los diez nada más provisionar.
 SET ROLE sigrid_dm_etl;
 CREATE SCHEMA IF NOT EXISTS raw;
 CREATE SCHEMA IF NOT EXISTS stg;
@@ -82,6 +82,9 @@ CREATE SCHEMA IF NOT EXISTS cierre;
 CREATE SCHEMA IF NOT EXISTS compras;
 CREATE SCHEMA IF NOT EXISTS maestro;
 CREATE SCHEMA IF NOT EXISTS retenciones;
+-- F-057: el único esquema con datos personales (nombre, NIF y DNI, autorizados
+-- el 2026-09-18). Es esquema propio para poder darlo o quitarlo con un GRANT.
+CREATE SCHEMA IF NOT EXISTS personal;
 RESET ROLE;
 
 -- 5. Permisos de lectura del MCP.
@@ -93,12 +96,30 @@ RESET ROLE;
 --    ALCANCE: por decisión del humano de 2026-08-08 el MCP lee TODOS los
 --    esquemas, no solo los cinco de consumo. Se revisará al rediseñar el MCP
 --    en F-006. La lista efectiva la manda PG_CONSUMPTION_SCHEMAS.
+--
+--    OJO: este bloque concede `raw` ENTERO, y eso incluye tablas con datos
+--    personales. El punto 5 bis, justo debajo, se las quita. No se puede
+--    hacer aquí: `GRANT SELECT ON ALL TABLES IN SCHEMA` no admite excepciones.
+--
+--    LA TRANSACCIÓN QUE ABRE AQUÍ Y CIERRA AL FINAL DEL 5 BIS NO ES ADORNO.
+--    Sin `BEGIN` explícito, psql confirma cada `DO` por separado: entre el
+--    GRANT de este punto y el primer REVOKE del 5 bis los datos personales
+--    quedan legibles, y si el script muere justo ahí con ON_ERROR_STOP quedan
+--    legibles Y CONFIRMADOS, sin que nadie lo note. En PostgreSQL GRANT,
+--    REVOKE y ALTER DEFAULT PRIVILEGES son transaccionales, así que las dos
+--    mitades entran juntas o no entra ninguna. Si aun así el script se corta
+--    entre el BEGIN y el COMMIT (se cae la sesión, Ctrl-C), el servidor hace
+--    rollback y el rol se queda como estaba: se vuelve a ejecutar el fichero
+--    entero, que es reejecutable. Lo que NO se puede hacer es dar por buena
+--    una ejecución cortada y seguir.
+BEGIN;
+
 DO $$
 DECLARE
     esquema text;
 BEGIN
     FOREACH esquema IN ARRAY ARRAY[
-        'mart', 'cierre', 'compras', 'maestro', 'retenciones',
+        'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'personal',
         'raw', 'stg', 'aux', '_meta'
     ]
     LOOP
@@ -114,8 +135,118 @@ BEGIN
 END
 $$;
 
+-- 5 bis. Tablas que el MCP NO puede leer (F-068, 2026-09-07).
+--
+--    #################################################################
+--    #  ESTO ES TEMPORAL Y SU REVERSIÓN YA ESTÁ DECIDIDA             #
+--    #################################################################
+--
+--    Palabras del humano el 2026-09-07: «de momento quita el permiso. Cuando
+--    pongamos límites o guardarraíles por usuario, habrá que volver a ponerlo
+--    para algunos usuarios». No es una prohibición permanente: es un tapón
+--    mientras el MCP no sepa QUIÉN pregunta. Quien lo lea dentro de seis
+--    meses, la pregunta correcta es «¿ya hay control por usuario?».
+--
+--    F-074 (2026-09-09) añade dos más por el mismo motivo y con el mismo
+--    mecanismo: `raw.reshor` es el precio de coste por recurso y tipo de hora
+--    (8.949 filas, 2.036 con precio distinto de cero) y `raw.emphis` el
+--    histórico de contrato de 1.017 empleados (1.633 filas, de 1989 a 2026).
+--    Son datos de nómina. Las cuatro caen el mismo día que el MCP tenga
+--    control por usuario, no antes.
+--
+--    QUÉ ES CADA UNA. `raw.emp` son 1.352 empleados con DNI, número de la
+--    Seguridad Social, cuenta bancaria, domicilio, teléfonos y credenciales
+--    del portal. `raw.res` son 2.610 recursos con el NIF de la persona en
+--    `cif` y las credenciales de acceso a Sigrid. Las trajo enteras F-066, por
+--    decisión del humano del 2026-09-06; el rol de lectura del MCP lo usa
+--    cualquier cuenta del tenant.
+--
+--    LAS DOS MITADES, y las dos hacen falta:
+--      a) REVOKE sobre la tabla, DESPUÉS del GRANT del punto 5, que la alcanza
+--         (`ON ALL TABLES IN SCHEMA` no sabe saltarse una);
+--      b) quitar el ALTER DEFAULT PRIVILEGES de `raw`, que es una regla del
+--         catálogo: mientras esté puesta, cualquier tabla que nazca en `raw`
+--         es legible sin que nadie ejecute un GRANT. Dejar de emitirla no la
+--         borra; hay que emitir su REVOKE.
+--
+--    LA LISTA VIVE EN EL CÓDIGO, no aquí: `DEFAULT_EXCLUDED_TABLES` de
+--    `config/settings.py`, parametrizable con PG_EXCLUDED_TABLES. Este fichero
+--    solo cubre el arranque, porque la nocturna (`apply_grants`) es quien lo
+--    sostiene noche tras noche. Un test comprueba que las dos listas coinciden.
+--
+--    DOS VECES, Y NO ES UN DESPISTE. En PostgreSQL un REVOKE solo quita la
+--    concesión hecha por EL MISMO concedente: la ACL guarda una entrada por
+--    cada uno (`mcp=r/admin` y `mcp=r/sigrid_dm_etl` son dos). Y aquí hay dos
+--    concedentes reales: el punto 5 de este fichero concede como el
+--    ADMINISTRADOR que lo ejecuta, y la nocturna concede como `sigrid_dm_etl`
+--    (que es además el propietario, así que es el concedente de lo que nace
+--    por privilegio por defecto). Revocar solo con uno deja la tabla legible
+--    y sin ningún error a la vista: PostgreSQL avisa con un NOTICE y sigue.
+DO $$
+DECLARE
+    objeto text;
+BEGIN
+    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res', 'raw.reshor', 'raw.emphis']
+    LOOP
+        -- to_regclass devuelve NULL en vez de fallar si la tabla no existe:
+        -- este fichero se ejecuta también sobre una base recién creada, antes
+        -- de la primera ingesta.
+        IF to_regclass(objeto) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON TABLE %s FROM mcp_sigrid_dm_ro', objeto
+            );
+        END IF;
+    END LOOP;
+END
+$$;
+
+SET ROLE sigrid_dm_etl;
+DO $$
+DECLARE
+    objeto text;
+    esquema text;
+BEGIN
+    FOREACH objeto IN ARRAY ARRAY['raw.emp', 'raw.res', 'raw.reshor', 'raw.emphis']
+    LOOP
+        IF to_regclass(objeto) IS NOT NULL THEN
+            EXECUTE format(
+                'REVOKE ALL PRIVILEGES ON TABLE %s FROM mcp_sigrid_dm_ro', objeto
+            );
+        END IF;
+    END LOOP;
+
+    -- La regla de privilegios por defecto: es lo que haría legible una tabla
+    -- recreada sin que nadie ejecutase un GRANT. Se declara POR rol creador,
+    -- y el creador es este.
+    --
+    -- El esquema se DERIVA de la lista, igual que hace `grants.py`: escribir
+    -- `raw` a mano funcionaba mientras las dos exclusiones fueran de `raw`,
+    -- pero el día que PG_EXCLUDED_TABLES traiga una tabla de otro esquema la
+    -- nocturna lo resolvería y este fichero no, y el rol nacería con la regla
+    -- puesta sobre ese esquema. Y a diferencia del REVOKE de tabla, esta
+    -- regla NO necesita que la tabla exista: se declara sobre el esquema y es
+    -- justo lo que protege a la que todavía no ha nacido.
+    FOR esquema IN
+        -- El alias NO puede llamarse `objeto`: plpgsql daría «column
+        -- reference is ambiguous» contra la variable de arriba.
+        SELECT DISTINCT split_part(excluida, '.', 1)
+        FROM unnest(ARRAY['raw.emp', 'raw.res', 'raw.reshor', 'raw.emphis']) AS excluida
+    LOOP
+        IF to_regnamespace(esquema) IS NOT NULL THEN
+            EXECUTE format(
+                'ALTER DEFAULT PRIVILEGES FOR ROLE sigrid_dm_etl IN SCHEMA %I '
+                'REVOKE SELECT ON TABLES FROM mcp_sigrid_dm_ro', esquema
+            );
+        END IF;
+    END LOOP;
+END
+$$;
+RESET ROLE;
+
+COMMIT;
+
 -- 6. Comprobaciones. Deben salir: los tres roles, sigrid_dm_app dentro de
---    sigrid_dm_etl, y los nueve esquemas.
+--    sigrid_dm_etl, y los diez esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
 WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro')
@@ -130,5 +261,14 @@ WHERE g.rolname = 'sigrid_dm_etl';
 SELECT nspname AS esquema, pg_catalog.pg_get_userbyid(nspowner) AS propietario
 FROM pg_namespace
 WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
-                  'cierre', 'compras', 'maestro', 'retenciones')
+                  'cierre', 'compras', 'maestro', 'retenciones', 'personal')
 ORDER BY nspname;
+
+-- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el
+-- resultado correcto; una fila significa que el MCP las sigue leyendo.
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'mcp_sigrid_dm_ro'
+  AND table_schema = 'raw'
+  AND table_name IN ('emp', 'res')
+ORDER BY table_name, privilege_type;

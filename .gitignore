@@ -44,3 +44,16 @@ huella_*.csv
 *.xls
 *.ppt
 # <<< ARNES-BASE: fin del bloque gestionado. <<<
+
+# Listados de obras generados para revisar la ventana de F-025 (datos de negocio)
+obras_*.csv
+
+# Huellas de verificacion de F-025 (datos, evidencia local)
+huellas/
+
+# Worktrees que crea Claude Code para aislar un subagente (`isolation: worktree`).
+# No son contenido del proyecto: son un checkout desechable dentro del arbol.
+# Sin esta linea, uno olvidado deja el arbol "sucio" y la campana de mutacion
+# paralela se niega a arrancar, porque sus worktrees se crean desde HEAD y
+# exige que lo que hay en disco sea lo que hay en HEAD (F-068, 2026-09-07).
+.claude/worktrees/

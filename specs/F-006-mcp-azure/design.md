@@ -105,6 +105,15 @@ IngestRaw -> LoadExcelAux -> BuildStg -> BuildMart -> PublicarDiccionario -> App
 | 2026-08-20 (3.ª review) | `v_diccionario` proyecta **19** columnas: entra `motivo_no_consumo`, la última |
 | 2026-08-20 (4.ª review) | La puerta offline pasa a contrastar contra el SQL (agregación, clave, grano) |
 | 2026-08-22 | Entra `_meta.diccionario_contexto`: el bloque global se perdía al leer de base. Inventario a **103** objetos |
+| 2026-09-03 (F-025) | Entran `_meta.obra_build` y `_meta.v_frescura_obra`, que responden «de cuándo es el dato de ESTA obra» ahora que el datamart no reconstruye todas cada noche. Inventario a **105** objetos |
+| 2026-09-06 (F-066) | Entran las **25 tablas de `raw`** que faltaban --personal, contabilidad y la cadena de compras--, cada una con su ficha. Inventario a **130** objetos |
+| 2026-09-09 (F-074) | Entran las **9 tablas de `raw`** que destapo el censo de F-072 --catalogos de personal y horas, maestro de articulos y los dos desgloses de trazabilidad--, cada una con su ficha. Inventario a **139** objetos |
+| 2026-09-10 (F-073) | Entran `maestro.centros_coste` (el puente centro de coste -> obra), `maestro.estados_documento` y `compras.formas_pago`, mas once columnas nuevas en `maestro.obras`. Inventario a **142** objetos |
+| 2026-09-15 (F-078) | Entran `mart.master_versiones_tipadas`, `mart.master_vigente_anual` y `mart.fact_cp_tipologia`: los tres objetos de CP por tipologia dejan de ser vistas que se recalculan en cada consulta. Sus tres vistas siguen existiendo con el mismo nombre. Inventario a **153** objetos (los 150 de partida ya incluian los ocho que F-080 y F-081 anadieron sin fila propia en esta tabla) |
+| 2026-09-16 (F-084) | Entra `compras.fn_estado_documento`, la traduccion del estado de un documento por la pareja (tipo, estado), factorizada para que `compras.contratos` y `compras.facturas` la compartan en vez de copiarla. Es funcion auxiliar, no de consumo. Inventario a **154** objetos |
+| 2026-09-18 (F-057) | Entra el esquema **`personal`** --el decimo--, con `personal.recursos` (el maestro de recursos, que CONTIENE DATOS PERSONALES autorizados: nombre, NIF y DNI), `personal.partes_lineas` (las 330.638 lineas de parte de trabajo) y `personal.v_pbi_horas_obra_mes`, mas su funcion local `personal.fn_fecha`. Inventario a **158** objetos |
+| 2026-09-23 (F-101) | Hotfix de F-057: entran `personal.partes` (la cabecera del parte, con la obra de CABECERA nombrada `obra_cabecera_id` porque audita y no imputa), `personal.recursos_tipos_hora` (los precios de la ficha del recurso, sin el de nomina) y su funcion local `personal.fn_fecha_serie`. Inventario a **161** objetos |
+| 2026-09-24 (F-095) | Entran `raw.rac` (la contabilizacion de documentos, filtrada a `asiide <> 0`) y seis objetos de `retenciones` desde la contabilidad: `cuentas_proveedor`, `apuntes_contables`, `saldo_contable`, `fin_obra`, `v_cuadre_proveedor` y `v_retencion_contable_obra`. Entre medias F-102 y F-107 sumaron cuatro sin fila propia (`raw.auxemp`, `maestro.v_obra_fichas`, `raw.caa`, `maestro.cuentas_analiticas`). Inventario a **172** objetos |
 
 ## 3 · Componentes y ficheros que toca
 

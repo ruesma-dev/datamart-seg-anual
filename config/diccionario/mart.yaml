@@ -118,8 +118,11 @@ objetos:
           documental de compras.
         agregacion: no_sumable
       codigo_partida: >-
-        Codigo jerarquico de la partida dentro de su obra ('01.02'). Unico por
-        obra, no entre obras.
+        Codigo jerarquico de la partida dentro de su obra ('01.02'). **NO es
+        unico ni dentro de la obra** (F-109: 5.202 codigos repetidos en 158
+        obras el 2026-09-25): el mismo codigo cuelga de varios capitulos, uno
+        por contrato, bloque, fase o raiz. Para identificar o unir una partida,
+        `partida_id`; para decir donde esta, `ruta_capitulos`.
       descripcion_partida: Descripcion corta de la partida, tal y como la escribio el jefe de obra.
       unidad_medida: >-
         Unidad de medicion de la partida (m3, m2, ud, kg...), de
@@ -714,9 +717,14 @@ objetos:
       obra_id:
         significado: >-
           Obra a la que pertenece. Una partida pertenece siempre a una sola
-          obra: los codigos de partida solo son unicos dentro de su obra.
+          obra, pero **el codigo de partida NO es unico ni dentro de ella**
+          (F-109): la partida se identifica por `partida_id`, nunca por la
+          pareja obra + codigo.
         agregacion: no_sumable
-      codigo_partida: Codigo jerarquico de la partida dentro de su obra ('01.02').
+      codigo_partida: >-
+        Codigo jerarquico de la partida dentro de su obra ('01.02'). **No
+        identifica la partida**: se repite dentro de la misma obra (F-109: 5.202
+        codigos el 2026-09-25). Se une por `partida_id`.
       descripcion_partida: Descripcion corta que escribio el jefe de obra.
       unidad_medida: Unidad de medicion (m3, m2, ud, kg...).
       categoria:
@@ -732,7 +740,13 @@ objetos:
       activa: >-
         Marca de partida vigente. Ojo: la columna equivalente de `stg.obras`
         esta cableada a TRUE; esta viene del origen.
-      partida_label: Codigo y descripcion juntos, para segmentadores. Es presentacion.
+      partida_label: >-
+        Codigo y descripcion juntos, para segmentadores. Es presentacion y **no
+        identifica la partida**: dos partidas homonimas de la misma obra
+        -mismo codigo y misma descripcion, como la misma unidad de obra
+        repetida en dos bloques- dan la misma etiqueta, y un segmentador por
+        esta columna las suma juntas. Medido el 2026-09-25: 4.127 codigos
+        repetidos comparten ademas la descripcion. Para unir, `partida_id`.
       es_hoja: >-
         **HEURISTICA, no una comprobacion de si la partida tiene hijos.** Vale
         TRUE cuando `nivel >= 2` o el `codigo_partida` lleva un punto, y nada
@@ -802,19 +816,37 @@ objetos:
         Power BI, para quitar de un visual los capitulos de primer nivel. Para
         agregar sin duplicar hay que bajar al ultimo nivel de la jerarquia de
         `stg.partidas`, no fiarse de esta columna.
-      nivel_1: Primer escalon de la ruta ("CD · COSTES DIRECTOS"), como codigo y nombre.
-      nivel_2: Segundo escalon de la ruta.
+      nivel_1: >-
+        Primer escalon de la ruta ("CD · COSTES DIRECTOS"), como codigo y
+        nombre. El codigo es el suyo, pero **el nombre se resuelve por (obra,
+        codigo)** con `MAX(descripcion_corta)`, y el codigo no es unico en la
+        obra (F-109): si dos capitulos o partidas de la misma obra comparten
+        codigo, el escalon ensena el nombre alfabeticamente mayor, que puede ser
+        el de la otra. Medido el 2026-09-25: 10.593 filas (4.657 del
+        seguimiento) ensenan al menos un escalon con el nombre de otra partida.
+        Resolver el nombre por el ancestro y no por el codigo es F-111.
+      nivel_2: >-
+        Segundo escalon de la ruta. Su nombre puede ser el de otra partida
+        homonima de la obra, igual que `nivel_1`.
       nivel_3:
-        significado: Tercer escalon de la ruta.
+        significado: >-
+          Tercer escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
       nivel_4:
-        significado: Cuarto escalon de la ruta.
+        significado: >-
+          Cuarto escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
       nivel_5:
-        significado: Quinto escalon de la ruta.
+        significado: >-
+          Quinto escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
       nivel_6:
-        significado: Sexto escalon de la ruta.
+        significado: >-
+          Sexto escalon de la ruta. Su nombre puede ser el de otra partida
+          homonima de la obra, igual que `nivel_1`.
         nulo_significa: La rama no llega a esa profundidad.
     relaciones:
       - de: partida_id
@@ -898,14 +930,20 @@ objetos:
       - Que meses cubre el seguimiento
       - Dame los meses cerrados de 2025
 
-  v_master_versiones_tipadas:
-    tipo: vista
+  master_versiones_tipadas:
+    tipo: tabla
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
       Catalogo de las versiones master de planificacion de cada obra, con su tipo
-      DEDUCIDO del texto libre que escribio el jefe de obra. Es la vista que
-      explica por que una obra tiene o no tiene plan vigente en un mes.
+      DEDUCIDO del texto libre que escribio el jefe de obra. Es lo que explica
+      por que una obra tiene o no tiene plan vigente en un mes.
+
+      **Es una TABLA desde F-078** (2026-09-15). Antes era la vista
+      `v_master_versiones_tipadas`, que costaba 16 s por consulta porque cada
+      una barria los ambitos master de `stg.plan_mensual`. La vista sigue
+      existiendo con el mismo nombre y las mismas columnas, ahora leyendo de
+      aqui.
     grano: >-
       Una fila por (`obra_id`, `ambito_id`, `version`), que es su clave de
       negocio. Solo ambitos 8 (coste) y 11 (venta), y solo versiones con fecha
@@ -962,19 +1000,21 @@ objetos:
       - Que versiones de planificacion tiene la obra X y de que tipo son
       - Que obras solo tienen versiones de cierre mensual
 
-  v_master_vigente_anual:
-    tipo: vista
+  master_vigente_anual:
+    tipo: tabla
     capa: consumo
     consumo_recomendado: true
     descripcion: >-
       Para cada obra y ano, cual es la version master que rige: la ultima de tipo
       'Planif Inicial', 'ABC' o 'Cuatrimestral' con fecha efectiva anterior al
-      corte. El corte es el 31 de diciembre si el ano ya paso, y hoy si es el ano
-      en curso. **NUNCA SE CONSULTA SIN FILTRAR POR OBRA**: medido el
-      2026-08-25, `SELECT * ... LIMIT 5` agota los 40 s, y
-      `WHERE obra_id = ... AND anio = ...` responde en **20 s**. Un `LIMIT` no
-      la salva, porque el limite se aplica DESPUES de calcular la vista entera.
-      Ver R-COSTE-CONSULTA.
+      corte. El corte es el 31 de diciembre si el ano ya paso, y la fecha del
+      build si es el ano en curso.
+
+      **Es una TABLA desde F-078** (2026-09-15), y con eso deja de ser cierto lo
+      que decia esta ficha hasta la version 21: que no se podia consultar sin
+      filtrar por obra. Como vista agotaba los 40 s con `LIMIT 5`, porque el
+      limite se aplicaba DESPUES de calcular la vista entera sobre los 29,8 M de
+      filas de `stg.plan_mensual`. Ahora es una tabla ya calculada.
     grano: >-
       Una fila por (`obra_id`, `anio`, `ambito_id`), que es su clave de
       negocio.
@@ -1006,7 +1046,7 @@ objetos:
         valores: [ABC, Planif Inicial, Cuatrimestral]
     relaciones:
       - de: obra_id
-        a: mart.v_master_versiones_tipadas.obra_id
+        a: mart.master_versiones_tipadas.obra_id
         cardinalidad: "N:N"
         porque: >-
           Es el catalogo del que se elige, filtrando por fecha efectiva. Una
@@ -1020,22 +1060,239 @@ objetos:
       - Que version de plan rige en la obra X para 2025
       - Que obras no tienen ninguna version master vigente
 
-  v_pbi_cp_tipologia:
-    tipo: vista
+  fact_cp_tipologia:
+    tipo: tabla
     capa: consumo
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      **NO SE PUEDE CONSULTAR HOY.** Agota los 40 s con `SELECT * ... LIMIT 5` y
-      los **60 s filtrada a una sola obra** (medido el 2026-08-25), asi que no
-      hay forma de sacarle una fila dentro de la ventana util. Estaba marcada
-      como recomendada mientras no respondia nada. Ver R-COSTE-CONSULTA. Su
-      contenido sigue siendo el correcto para la pregunta; lo que falta es que
-      se pueda ejecutar, y eso pasa por materializarla.
+    consumo_recomendado: true
     descripcion: >-
       Desglose ANUAL de los Costes Proporcionales por tipologia de negocio
       (seguros, avales, levantamiento, contratacion, medio ambiente y aporte a
       gastos generales), comparando real y planificado sobre la MISMA ventana de
       meses. Solo salen las filas con algun importe distinto de cero.
+
+      **Es una TABLA desde F-078** (2026-09-15). Antes era solo la vista
+      `v_pbi_cp_tipologia`, la unica `v_pbi_` sin tabla detras, y por eso no se
+      podia consultar: 6,6 millones de unidades de coste estimado y cinco
+      recorridos de `stg.plan_mensual` en CADA consulta. Colgaba a Power BI en
+      el paso de Navegacion y mataba cualquier pregunta del MCP que la tocase.
+      La vista sigue existiendo con el mismo nombre y las mismas columnas.
+    grano: >-
+      Una fila por (`obra_id`, `anio`, `tipologia`), que es su clave de
+      negocio. El plan y el real se suman sobre la MISMA ventana
+      [enero .. mes de corte]: 12 si el ano ya paso, y el ultimo mes con cierre
+      real si es el ano en curso. Cortar el plan en el mes de calendario lo
+      dejaria siempre por delante del real.
+
+      **El "ano en curso" es el de la NOCHE DEL BUILD, no el de la consulta.**
+      Al materializar, `CURRENT_DATE` deja de evaluarse en cada consulta. Con
+      refresco nocturno la diferencia solo se nota el dia 1 de cada mes antes de
+      que corra la carga.
+    clave_negocio: [obra_id, anio, tipologia]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      anio:
+        significado: Ano al que se refiere la agregacion.
+        agregacion: no_sumable
+      tipologia:
+        significado: >-
+          Agrupacion de negocio de los CP. Se deduce del subcapitulo cuando este
+          es definitorio (CP.1 a CP.4, CP.6, CP.9, CP.12) y, si no, por el texto
+          de la descripcion. Lo que no encaja en ninguna regla va a APORTE GG.
+        valores:
+          - LEVANTAMIENTO
+          - SEGUROS
+          - AVALES
+          - CONTRATACION
+          - MEDIO AMBIENTE
+          - APORTE GG
+      orden_tipologia:
+        significado: Orden de presentacion de la tipologia. Es presentacion, no un dato.
+        agregacion: no_sumable
+      cp_real:
+        significado: >-
+          Coste proporcional real, **sumado** sobre la ventana del ano
+          [enero .. mes de corte]. "Acumulado" aqui es el total de esos meses,
+          no un acumulado a origen como el de `stg.presupuesto`: cada mes entra
+          una sola vez, asi que sumar dos anos suma meses distintos y es
+          correcto.
+        unidad: EUR
+        agregacion: suma
+      cp_planificado:
+        significado: Coste proporcional planificado en la MISMA ventana, segun la version vigente.
+        unidad: EUR
+        agregacion: suma
+      cp_desviacion:
+        significado: >-
+          Real menos planificado. Positivo significa gastado de mas frente al
+          plan.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: "N:1"
+        porque: Para poner codigo y nombre a la obra.
+      - de: obra_id
+        a: mart.master_vigente_anual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la version de plan que se usa para la columna planificada. El JOIN
+          va por `(obra_id, anio)`: por `obra_id` solo trae la version de todos
+          los anos. El ambito no es una dimension de esta union: el SQL fija
+          `ambito_id = 8` (coste) como filtro constante sobre el destino, y esta
+          tabla ni siquiera proyecta esa columna.
+    ejemplos_preguntas:
+      - Cuanto llevamos de seguros y avales en la obra X este ano
+      - Que obras se desvian mas en costes proporcionales
+
+  v_master_versiones_tipadas:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Catalogo de las versiones master de planificacion de cada obra, con su tipo
+      DEDUCIDO del texto libre que escribio el jefe de obra. Es la vista que
+      explica por que una obra tiene o no tiene plan vigente en un mes.
+
+      **Desde F-078 es el envoltorio de `mart.master_versiones_tipadas`**: mismo
+      nombre y mismas columnas de siempre, pero sin calculo en tiempo de
+      consulta. Da exactamente lo mismo consultar la vista o la tabla.
+    grano: >-
+      Una fila por (`obra_id`, `ambito_id`, `version`), que es su clave de
+      negocio. Solo ambitos 8 (coste) y 11 (venta), y solo versiones con fecha
+      efectiva resuelta.
+    clave_negocio: [obra_id, ambito_id, version]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      ambito_id:
+        significado: Ambito master del que sale la version, 8 en coste y 11 en venta.
+        agregacion: no_sumable
+      version:
+        significado: >-
+          Numero de version master. OJO: en los ambitos master el campo `fas` de
+          Sigrid es este numero de version, no un mes.
+        agregacion: no_sumable
+      version_fec_creacion:
+        significado: Fecha en que se creo la version en Sigrid.
+        agregacion: no_sumable
+      version_fec_efectiva:
+        significado: >-
+          Fecha desde la que la version rige de verdad. Coincide con la de
+          creacion salvo en las cuatrimestrales entregadas tarde, donde se
+          adelanta al periodo que representan.
+        agregacion: no_sumable
+      version_descripcion: Etiqueta legible de la version ("Version 11 (04/02/2026)").
+      version_tex: >-
+        Texto libre que escribio el jefe de obra al crear la version ("ABC",
+        "PLANIFICACION CUATRIMESTRAL FEB-26"). Es la fuente de `tipo_master`.
+      tipo_master:
+        significado: >-
+          Tipo deducido del texto, con prioridad estricta. Solo 'Planif Inicial',
+          'ABC' y 'Cuatrimestral' cuentan como master vigente: las de 'Cierre
+          mensual' NO reemplazan al plan, y una obra que solo tenga cierres en un
+          mes se queda sin planificado ese mes.
+        valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]
+    relaciones:
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: "N:1"
+        porque: Para poner codigo y nombre a la obra.
+      - de: obra_id
+        a: mart.master_versiones_tipadas.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la tabla de la que sale desde F-078. Hay muchas filas por obra en
+          las dos puntas: una version concreta se identifica con
+          `(obra_id, ambito_id, version)`, y unir solo por `obra_id` trae todas
+          las versiones de la obra.
+    ejemplos_preguntas:
+      - Que versiones de planificacion tiene la obra X y de que tipo son
+      - Que obras solo tienen versiones de cierre mensual
+
+  v_master_vigente_anual:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Para cada obra y ano, cual es la version master que rige: la ultima de tipo
+      'Planif Inicial', 'ABC' o 'Cuatrimestral' con fecha efectiva anterior al
+      corte. El corte es el 31 de diciembre si el ano ya paso, y la fecha del
+      build si es el ano en curso.
+
+      **Desde F-078 es el envoltorio de `mart.master_vigente_anual`** y YA SE
+      PUEDE CONSULTAR SIN FILTRAR POR OBRA. Hasta la version 21 esta ficha decia
+      lo contrario, y era cierto: como vista agotaba los 40 s con `LIMIT 5`,
+      porque el limite se aplicaba DESPUES de calcular la vista entera.
+    grano: >-
+      Una fila por (`obra_id`, `anio`, `ambito_id`), que es su clave de
+      negocio.
+    clave_negocio: [obra_id, anio, ambito_id]
+    paso_etl: build_mart
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: Identificador de la obra en Sigrid.
+        agregacion: no_sumable
+      anio:
+        significado: Ano para el que se resuelve la version vigente.
+        agregacion: no_sumable
+      ambito_id:
+        significado: Ambito master, 8 en coste y 11 en venta.
+        agregacion: no_sumable
+      version:
+        significado: Numero de la version master que rige ese ano.
+        agregacion: no_sumable
+      version_fec_efectiva:
+        significado: Fecha desde la que rige la version elegida.
+        agregacion: no_sumable
+      version_descripcion: Etiqueta legible de la version elegida.
+      version_tex: Texto libre original de la version elegida.
+      tipo_master:
+        significado: >-
+          Tipo de la version elegida. Aqui solo pueden aparecer los tres tipos
+          que cuentan como master vigente.
+        valores: [ABC, Planif Inicial, Cuatrimestral]
+    relaciones:
+      - de: obra_id
+        a: mart.master_vigente_anual.obra_id
+        cardinalidad: "N:N"
+        porque: >-
+          Es la tabla de la que sale desde F-078. Una version concreta se
+          identifica con `(obra_id, ambito_id, version)`: unir por `obra_id`
+          trae todas las versiones de la obra.
+      - de: obra_id
+        a: mart.v_pbi_dim_obra.obra_id
+        cardinalidad: "N:1"
+        porque: Para poner codigo y nombre a la obra.
+    ejemplos_preguntas:
+      - Que version de plan rige en la obra X para 2025
+      - Que obras no tienen ninguna version master vigente
+
+  v_pbi_cp_tipologia:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Desglose ANUAL de los Costes Proporcionales por tipologia de negocio
+      (seguros, avales, levantamiento, contratacion, medio ambiente y aporte a
+      gastos generales), comparando real y planificado sobre la MISMA ventana de
+      meses. Solo salen las filas con algun importe distinto de cero.
+
+      **Desde F-078 es el envoltorio de `mart.fact_cp_tipologia` y YA SE PUEDE
+      CONSULTAR.** Hasta la version 21 esta ficha la declaraba inconsultable, y
+      era cierto: era la unica `v_pbi_` sin tabla detras, se recalculaba entera
+      en cada consulta —6,6 millones de unidades de coste estimado— y agotaba
+      los 60 s incluso filtrada a una sola obra. Es la vista que consume el
+      informe de Power BI ("Desglose Costes Proporcionales"), y por eso conserva
+      el nombre.
     grano: >-
       Una fila por (`obra_id`, `anio`, `tipologia`), que es su clave de
       negocio. El plan y el real se suman sobre la MISMA ventana
@@ -1092,14 +1349,14 @@ objetos:
         cardinalidad: "N:1"
         porque: Para poner codigo y nombre a la obra.
       - de: obra_id
-        a: mart.v_master_vigente_anual.obra_id
+        a: mart.fact_cp_tipologia.obra_id
         cardinalidad: "N:N"
         porque: >-
-          Es la version de plan que se usa para la columna planificada. El JOIN
-          va por `(obra_id, anio)`: por `obra_id` solo trae la version de todos
-          los anos. El ambito no es una dimension de esta union: el SQL fija
-          `ambito_id = 8` (coste) como filtro constante sobre el destino, y esta
-          vista ni siquiera proyecta esa columna.
+          Es la tabla de la que sale desde F-078, columna a columna. Unir por
+          `obra_id` da fan-out en las dos puntas —hay una fila por ano y
+          tipologia—: la clave por la que hay que unir es
+          `(obra_id, anio, tipologia)`, y con ella la vista no anade ni quita
+          una sola fila.
     ejemplos_preguntas:
       - Cuanto llevamos de seguros y avales en la obra X este ano
       - Que obras se desvian mas en costes proporcionales

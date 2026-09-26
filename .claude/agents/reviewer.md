@@ -13,7 +13,9 @@ código.
 
 ## Revisión INCREMENTAL por defecto (pasadas 2 y siguientes)
 
-En la **primera** pasada revisas la feature entera (`git diff dev...HEAD`). A
+En la **primera** pasada revisas la feature entera (`git diff main...HEAD`: la
+rama que declara `RAMA_BASE` en `harness/init.sh`, la misma que miden las
+puertas; era `dev` hasta F-112 y `dev` está parada). A
 partir de la segunda, **solo el delta**: el diff entre el
 **último commit aprobado** y `HEAD` (`git diff <SHA>..HEAD`, con el SHA del
 commit que aprobaste la vez anterior). Lo ya aprobado queda dado por bueno y no

@@ -78,9 +78,63 @@ class SigridApiSettings(BaseSettings):
 # 2026-08-08 que, de momento, el MCP lee todo; se revisará al rediseñar el MCP
 # en F-006. Sigue siendo un parámetro (PG_CONSUMPTION_SCHEMAS) precisamente
 # para poder estrecharlo entonces sin tocar código.
+#
+# F-057 añade `personal`, y es el primero que se concede sabiendo exactamente
+# qué contiene: nombre, NIF y DNI, autorizados por el responsable del dato el
+# 2026-09-18. Lo que NO cambia es `DEFAULT_EXCLUDED_TABLES`: `raw.emp` y
+# `raw.res` siguen fuera. Lo que se abre es la capa CURADA —seis columnas de
+# `emp` y ninguna credencial— no la copia del origen con sus 152 columnas.
+# Que `personal` sea un esquema propio es lo que permite que ese «sí a esto y
+# no a aquello» se escriba como un GRANT y no como una lista de tablas (F-087).
 DEFAULT_CONSUMPTION_SCHEMAS = (
-    "mart,cierre,compras,maestro,retenciones,raw,stg,aux,_meta"
+    "mart,cierre,compras,maestro,retenciones,personal,raw,stg,aux,_meta"
 )
+
+# Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
+# de arriba. Formato `esquema.tabla`, separadas por comas.
+#
+# ####################################################################
+# #  ESTO ES TEMPORAL Y SU REVERSIÓN YA ESTÁ DECIDIDA (F-068)        #
+# ####################################################################
+#
+# Palabras del humano el 2026-09-07, que son la decisión completa:
+#
+#     «de momento quita el permiso. Cuando pongamos límites o
+#      guardarraíles por usuario, habrá que volver a ponerlo para
+#      algunos usuarios».
+#
+# O sea: NO es una prohibición permanente ni un juicio sobre estas dos
+# tablas. Es un tapón puesto mientras el MCP no sepa distinguir QUIÉN
+# pregunta. El día que exista control por usuario, esta lista se vacía
+# —o se queda solo para los usuarios sin permiso— sin tocar código, con
+# PG_EXCLUDED_TABLES. Quien lea esto dentro de seis meses: la pregunta
+# no es «¿se puede levantar?», es «¿ya hay control por usuario?».
+#
+# POR QUÉ hizo falta (F-066, 2026-09-06): `raw` se trae `emp` y `res`
+# ENTERAS desde Sigrid, por decisión del humano tomada con el aviso
+# delante. `raw.emp` son 1.352 empleados con DNI (1.341 filas), número
+# de la Seguridad Social (1.171), cuenta bancaria (985), domicilio,
+# teléfonos y credenciales del portal. `raw.res` son 2.610 recursos con
+# el NIF de la persona en `cif` (626 filas) y las credenciales de acceso
+# a Sigrid: la ficha de F-068 la daba por limpia y no lo está, así que
+# entra también. Y el rol `mcp_sigrid_dm_ro` lo lee cualquier cuenta del
+# tenant.
+#
+# CÓMO se sostiene: `apply_grants` corre cada noche y hace
+# `GRANT SELECT ON ALL TABLES IN SCHEMA raw`, que no sabe saltarse una
+# tabla. Por eso el mecanismo es conceder y REVOCAR después, en la misma
+# tanda, más quitar el `ALTER DEFAULT PRIVILEGES` de `raw` para que una
+# tabla recreada no nazca legible. Ver `postgres/grants.py`.
+# F-074 (2026-09-09) añade `raw.reshor` y `raw.emphis` a la misma lista y
+# por el mismo motivo: son datos de NÓMINA. `raw.reshor` es el precio de
+# coste por recurso y tipo de hora —8.949 filas, 2.036 con precio distinto
+# de cero, o sea lo que cobra cada persona—, y `raw.emphis` el histórico de
+# contrato de 1.017 empleados, de 1989 a 2026, con el tipo de contrato al
+# 100 %. Entran a `raw` porque el datamart las necesita para pasar de horas
+# a euros (F-061) y para saber quién estaba de alta cuándo; no entran al
+# alcance del MCP porque hoy no sabe quién pregunta. Mismo tapón TEMPORAL
+# y misma reversión ya decidida que `emp` y `res`.
+DEFAULT_EXCLUDED_TABLES = "raw.emp,raw.res,raw.reshor,raw.emphis"
 
 AUTH_MODES = ("password", "entra")
 
@@ -132,6 +186,13 @@ class PostgresSettings(BaseSettings):
         description="Esquemas, separados por comas, sobre los que el rol de solo "
                     "lectura recibe USAGE + SELECT.",
     )
+    excluded_tables: str = Field(
+        DEFAULT_EXCLUDED_TABLES,
+        description="Tablas 'esquema.tabla', separadas por comas, que el rol de "
+                    "solo lectura NO puede leer aunque su esquema esté en "
+                    "consumption_schemas. TEMPORAL (F-068): ver el comentario "
+                    "de DEFAULT_EXCLUDED_TABLES.",
+    )
     # --- Troceo del build de stg.plan_mensual (F-019) ----------------------
     # El 2026-08-09 ese build llenó el disco del servidor compartido (93,4 %) y
     # dejó a albaranes y partes en solo-lectura diez minutos. Estos tres valores
@@ -143,15 +204,63 @@ class PostgresSettings(BaseSettings):
                     "un tramo unitario, con aviso.",
     )
     disco_total_gb: int = Field(
-        32,
+        64,
         description="Tamaño total del disco del servidor Postgres, en GB. No se "
-                    "cablea: el servidor puede crecer sin que cambie el código.",
+                    "cablea: el servidor puede crecer sin que cambie el código. "
+                    "64 desde el 2026-08-29, que es cuando se amplió el disco "
+                    "compartido (antes 32). Este default es la ÚLTIMA RED, no la "
+                    "configuración: el valor bueno lo inyecta el job desde "
+                    "infra/env/dev.json (discoTotalGb) como PG_DISCO_TOTAL_GB, y "
+                    "los dos los ata el test "
+                    "test_f019_r8_el_disco_por_defecto_coincide_con_dev_json. "
+                    "Mientras estuvo en 32 con el disco ya ampliado, la puerta "
+                    "leía el 37 % real de ocupación como un 74 % y estaba a seis "
+                    "puntos de abortar la nocturna cada noche sin motivo.",
     )
     disco_limite_pct: float = Field(
         80.0,
         description="Ocupación por encima de la cual el build de plan_mensual "
                     "aborta ANTES de lanzar el siguiente tramo. La protección de "
                     "Azure salta hacia el 95 %; el incidente tocó el 93,4 %.",
+    )
+    # --- Ventana de negocio (F-025) ----------------------------------------
+    # La nocturna del 2026-09-02 murió por replicaTimeout en el tramo 5 de 60 y
+    # dejó stg.plan_mensual truncada al 21,6 %: el B1ms agotó sus 144 créditos
+    # de CPU y Azure lo capó al 20 % de un núcleo. Se reconstruían 920 obras
+    # cada noche cuando solo 48 habían tenido actividad en doce meses.
+    #
+    # El CRITERIO de obra congelada NO está aquí: es regla de negocio y vive en
+    # config/business_rules.yaml, para que Negocio pueda cambiarlo sin tocar el
+    # entorno de despliegue. Aquí solo están los interruptores de operación.
+    ventana_activa: bool = Field(
+        False,
+        description="Acota el build de stg.presupuesto y stg.plan_mensual a las "
+                    "obras vivas. Default FALSE (R5): mientras esté apagada, el "
+                    "comportamiento es el de hoy y se reconstruyen todas. "
+                    "Encenderla es una decisión explícita del humano.",
+    )
+    ventana_meses: int = Field(
+        12,
+        gt=0,
+        description="Meses sin actividad a partir de los cuales una obra se "
+                    "congela. Doce, decidido por el humano el 2026-09-02.",
+    )
+    ventana_dia_completa: int = Field(
+        6,
+        ge=0,
+        le=6,
+        description="Día de la reconstrucción completa semanal, en la numeración "
+                    "de date.weekday() (lunes=0). Seis = DOMINGO (DA-4): es la "
+                    "noche que puede permitirse volver a costar lo que cuesta "
+                    "hoy. De aquí sale el «hasta 6 días» de antigüedad.",
+    )
+    ventana_rescate: bool = Field(
+        False,
+        description="Con TRUE, una obra congelada cuyo origen haya cambiado se "
+                    "reconstruye en vez de solo denunciarse. Default FALSE: "
+                    "rescatarla contradiría la decisión del humano, que congela "
+                    "8 de las 48 obras con actividad reciente sabiéndolo (R3). El "
+                    "interruptor existe por si cambia de idea, sin tocar código.",
     )
 
     @field_validator("auth_mode")
@@ -195,6 +304,11 @@ class PostgresSettings(BaseSettings):
     def consumption_schema_list(self) -> list[str]:
         """`consumption_schemas` como lista, sin blancos ni entradas vacías."""
         return [s.strip() for s in self.consumption_schemas.split(",") if s.strip()]
+
+    @property
+    def excluded_table_list(self) -> list[str]:
+        """`excluded_tables` como lista, sin blancos ni entradas vacías."""
+        return [t.strip() for t in self.excluded_tables.split(",") if t.strip()]
 
     @property
     def conninfo(self) -> str:

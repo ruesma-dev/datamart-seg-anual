@@ -3,7 +3,7 @@
 # El bloque global del diccionario semantico del datamart (F-006).
 #
 # Esto es lo que el agente lee ANTES de escribir una linea de SQL. Aqui van las
-# convenciones, los nueve esquemas, las reglas duras que impiden respuestas
+# convenciones, los diez esquemas, las reglas duras que impiden respuestas
 # plausibles y falsas, los ordenes de magnitud contra los que detectar un
 # disparate, la bateria de aceptacion y la lista de lo que todavia no esta
 # documentado.
@@ -11,6 +11,149 @@
 # `pendientes` es un TRINQUETE (R27): solo baja. La constante PENDIENTES_MAX de
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
+#
+# version 35 (F-109, 2026-09-26): EL CODIGO DE PARTIDA NO ES UNICO NI DENTRO
+# DE SU OBRA. Medido el 2026-09-25: 5.202 pares `(obra_id, codigo_partida)`
+# repetidos (8.933 filas de mas, 158 obras) en `stg.partidas` y
+# `mart.v_pbi_dim_partida`, por contratos o expedientes con capitulo propio,
+# subarboles copiados por vivienda, bloque o fase, raices paralelas y erratas.
+# Tres fichas decian lo contrario y se corrigen; regla dura nueva
+# `R-PARTIDA-CODIGO-NO-UNICO` con la redaccion del humano (2026-09-26): unir por
+# obra + codigo, nunca; agrupar por codigo, declarandolo; ante el usuario, la
+# ruta de capitulos. Las fichas de niveles y de la dimension CI avisan de que
+# resuelven el NOMBRE por codigo (el arreglo es F-111). Ningun SQL cambia.
+#
+# version 34 (F-110, 2026-09-25): EL FIN DE OBRA POR EL ULTIMO CUATRIMESTRAL.
+# Decision del humano del 2026-09-25, que cambia H1 de F-095: sin inicio de
+# garantia, `retenciones.fin_obra.fecha_fin_obra` es el ultimo dia del mes
+# siguiente al ultimo mes con importe planificado de la ULTIMA version
+# Cuatrimestral de la obra (`mart.master_versiones_tipadas` +
+# `stg.plan_mensual`); si no la hay, NULL. `fuente_fin_obra` pasa a
+# INICIO_GARANTIA / ULTIMO_CUATRIMESTRAL_MAS_1_MES; ULTIMO_CIERRE_MAS_1_MES
+# deja de existir. Dos columnas nuevas (`version_cuatrimestral`,
+# `ultimo_mes_planificado`) y `ultimo_cierre` se queda como INFORMATIVA. Sobre
+# lo vivo: 97 / 32 / 50 obras por fuente (garantia, cuatrimestral, sin fecha).
+# `v_retencion_contable_obra` no cambia de SQL: SIN_FIN_OBRA es ahora «ni
+# inicio de garantia ni cuatrimestral con plan».
+#
+# version 33 (F-108, 2026-09-25): LAS CLAVES ALTERNATIVAS. Una ficha puede
+# declarar `claves_alternativas: [[col, ...], ...]`: otras combinaciones de
+# columnas que TAMBIEN identifican una fila. `check-unicidad` las comprueba
+# contra la base (sin contar las filas con la clave a NULL) y el validador
+# acepta una de UNA columna como lado 1 de una relacion. Declaradas:
+# `maestro.obras` y `maestro.v_obra_fichas` por `clave_obra`,
+# `personal.recursos` por `clave_recurso`, `stg.obras` por `codigo_obra`,
+# `maestro.cuentas_analiticas` por (empresa_id, codigo_cuenta) y
+# `maestro.centros_coste` por (empresa, codigo_centro). Las cinco relaciones
+# `clave_obra -> maestro.obras.clave_obra` de `compras` pasan de `N:N` a `N:1`.
+# Viajan en el JSONB `ficha` de `_meta.diccionario`, sin DDL.
+#
+# version 32 (2026-09-25, sin feature): LAS CIFRAS DE F-095 TRAS EL PRIMER BUILD.
+# Las fichas de `retenciones` que F-095 escribio antes de tener `raw.rac` se
+# remiden sobre el primer build real (2026-09-25 05:49 UTC), solo texto: saldo
+# contable 8.778.606,70 EUR; 49.520 apuntes; `via_obra` con obra el 93,7 % de
+# las altas y el 77,3 % de las bajas; la fila sin obra de `saldo_contable` suma
+# -1.739.408,96 EUR (NEGATIVA: sumar solo por obra da 10,52 M EUR); el cuadre
+# con los efectos 520/81/81/41/38 con su diferencia; y el fin de obra, que ya
+# cubre con garantia 97 obras y 5,03 M EUR de lo vivo porque en Sigrid se
+# estan dando de alta fechas de inicio de garantia. Las cifras de la spec
+# quedan como historicas y con su fecha.
+#
+# version 31 (F-095, 2026-09-24): LA RETENCION DE PROVEEDOR DESDE LA CONTABILIDAD.
+# El saldo vivo a proveedor lo manda la contabilidad: `retenciones.saldo_contable`
+# (por proveedor y obra, con fila sin obra; ~8,76 M EUR), sobre
+# `retenciones.apuntes_contables` (los apuntes de las cuentas `prv.cueretide`,
+# con clase CIERRE/APERTURA/SALDO_INICIAL/ALTA/BAJA y obra por cascada) y
+# `retenciones.cuentas_proveedor`. Cuadre con los efectos en
+# `retenciones.v_cuadre_proveedor`; vencimiento desde el FIN DE OBRA (inicio de
+# garantia o ultimo cierre + 1 mes, mas el plazo del cliente o 12) en
+# `retenciones.fin_obra` y `retenciones.v_retencion_contable_obra`. Entra
+# `raw.rac` filtrada a `asiide <> 0` (la ingesta pasa a 71 tablas).
+#
+# version 30 (F-107, 2026-09-24): LA CONTRAPARTIDA DEL RECURSO Y EL CATALOGO DE
+# CUENTAS ANALITICAS. `personal.recursos` gana `centro_coste_contrapartida_id` y
+# `cuenta_analitica_contrapartida_id`: el centro y la cuenta contra los que se
+# abona lo que el parte carga a la obra, que son del RECURSO y no por tipo de
+# hora (1.979 de 2.619 recursos). Entra `raw.caa` (184.234 cuentas; la ingesta
+# pasa a 70 tablas) y `maestro.cuentas_analiticas` las publica con codigo y
+# descripcion de `con`, padre, nivel y centro. Todas las cuentas usadas en
+# `personal` casan con el catalogo (0 huerfanas). `R-CODIGO-POR-EMPRESA` alcanza
+# tambien a las cuentas: 14.063 codigos se repiten entre empresas. Ampliacion
+# del mismo dia: `personal.partes_lineas` gana `cuenta_analitica_id`, la cuenta
+# de CARGO de la linea (310.553 de 331.003 lineas).
+#
+# version 29 (F-102, 2026-09-23): LA OBRA Y EL RECURSO SON DE UNA EMPRESA. En
+# Sigrid el mismo codigo existe una vez por empresa --Ruesma (1), Porsan (28),
+# cada UTE-- y es la misma obra vista desde cada una, SIN CONSOLIDAR (modelo del
+# humano). Solo se publican IDENTIFICADORES: `maestro.obras` gana `empresa_id`,
+# `nombre_empresa`, `clave_obra` ('1-0581', '27-0581', unica: 922 para 922),
+# `num_fichas_codigo`, `es_ficha_principal` (la ficha de Ruesma de cada codigo)
+# y `obra_principal_id` (referencia, NO para agregar hechos de otras empresas);
+# la definicion vive en la vista nueva `maestro.v_obra_fichas`. Las cinco vistas
+# de consumo de `compras` con obra acaban en `empresa_id` y `clave_obra`, y
+# `personal.recursos` en `empresa_id`, `nombre_empresa` y `clave_recurso`. Entra
+# `raw.auxemp` (38 empresas) y la ingesta pasa a 69 tablas. Regla nueva
+# `R-CODIGO-POR-EMPRESA`. La direccion de `maestro.obras` deja de medirse sobre
+# las 922 fichas («un tercio») y se mide sobre la de Ruesma: 310 de 846, 49 de
+# 59 desde la 0672. `stg.obras` NO cambia y difiere de la ficha de Ruesma en
+# 0581, 0606, 0671 y 0720: el seguimiento por empresa es F-106.
+#
+# version 28 (F-101, 2026-09-23): LA CABECERA DEL PARTE Y LOS PRECIOS DE LA
+# FICHA DEL RECURSO. Entran `personal.partes` (6.886 cabeceras: codigo,
+# descripcion, estado, fechas y la obra de CABECERA, que AUDITA y no imputa; el
+# codigo NO es unico, 569 repetidos) y `personal.recursos_tipos_hora` (8.968
+# filas: precio de coste y de venta de cada tipo de hora de cada recurso, los de
+# HOY, sin historico; el 56,2 % de las lineas comparables lleva otro precio).
+# `personal.partes_lineas` gana el codigo del parte y el texto de la linea. El
+# usuario que crea el parte NO esta: vive en `dbo.log`, no ingerida (F-105).
+#
+# version 27 (2026-09-23, sin feature): EL AVISO DE CLIENTE NO SE VEIA. Vivia en
+# el campo `fuente`, que el MCP no publica, y pasa al `concepto` del orden de
+# magnitud: la retencion viva de CLIENTE sale de los efectos y esta SIN
+# VERIFICAR (la contabilidad da 13,8 M EUR; se resuelve en F-104). Se remiden
+# ademas dos recuentos desfasados (25.631 y 2.238, el 2026-09-23).
+#
+# version 26 (F-094, 2026-09-22): LA RETENCION VIVA A PROVEEDOR ESTABA INFLADA
+# 4,3 VECES. `retenciones.movimientos` derivaba el estado solo de `fecrea` y
+# contaba como VIVA los efectos agrupados (su dinero ya esta en el agrupador AGR),
+# los anulados y lo ya pagado: 35,54 M€ cuando lo vivo son 8,35 M€. El estado de
+# PROVEEDOR se lee ahora de la ficha del propio efecto y gana el valor BAJA, que
+# no se suma nunca; el orden de magnitud de 34,7 M€ se sustituye por 8,35 M€. El
+# de CLIENTE no cambia y queda marcado SIN VERIFICAR. Y absorbe el resto de
+# F-045: `obra_id` de retenciones es por fin la obra de `maestro.obras` (262 de
+# 262, antes 0) y el centro de coste se publica aparte en `centro_coste_id`.
+#
+# version 25 (F-057, 2026-09-18): EL DATAMART YA SABE QUIEN HA TRABAJADO EN CADA
+# OBRA. Entra el esquema `personal` --el decimo-- con el maestro de recursos
+# (2.618 filas), las 330.638 lineas de parte de trabajo y la vista de horas por
+# obra y mes. Tres cosas que hay que leer antes de consultarlo y que estan en
+# sus fichas: (1) la cantidad de una linea NO son horas, mezcla HORA, DIA, MES y
+# UD, y en bruto suma 1.837.201,23 de nada frente a las 1.249.038,44 horas
+# reales; (2) el 71,7 % del euro esta en las lineas de MES --coste de estructura
+# de obra--, asi que las horas no son el coste de personal completo; (3)
+# `personal.recursos` CONTIENE DATOS PERSONALES (nombre, NIF y DNI), publicados
+# por decision expresa del responsable del dato ese mismo dia, y el esquema es
+# propio precisamente para poder dar o quitar ese acceso con un GRANT. Ademas,
+# `activo` es BANDERA y no filtro: filtrar por el borra el 43,2 % de las horas,
+# porque el recurso de baja de hoy trabajo ayer. `R-FRESCURA` pasa de cuatro
+# esquemas a cinco: `build_personal` tampoco es dependencia de ningun paso.
+#
+# version 13 (F-025, 2026-09-03): EL DATAMART YA NO RECONSTRUYE TODAS LAS OBRAS
+# CADA NOCHE. Las congeladas conservan la version que se construyo la ultima
+# vez que les toco. OJO CON LAS CIFRAS, corregido en la version 16 con la
+# nocturna del 2026-09-07 delante: el CRITERIO dice 40 vivas / 880 congeladas,
+# pero la CONDUCTA real de una noche es 592 rehechas / 328 congeladas, porque
+# 552 obras entran por no tener filas construidas y 512 siguen vacias despues.
+# Esas 552 se rehacen todas las noches: su dato tiene horas, no seis dias. NO SE BORRAN Y SIGUEN CONSULTABLES: el build borra solo las obras que
+# va a reinsertar, en la misma transaccion, asi que una obra congelada conserva
+# exactamente sus filas y sus importes. La ventana no cambia ni una cifra;
+# cambia DE CUANDO ES. Se anaden las fichas de `_meta.obra_build` y
+# `_meta.v_frescura_obra` -que es donde se responde "de cuando es el dato de
+# esta obra", y hay que citarla cuando la pregunta sea sobre una obra concreta-
+# y se avisa en las de `stg.plan_mensual` y `stg.presupuesto`. La ficha de
+# `maestro.obras.estado_id` deja de decir que su catalogo no se ingiere: los
+# catorce estados de `conest` (tipo 42) quedan documentados con su nombre,
+# verificados contra Sigrid el 2026-09-02.
 #
 # version 12 (F-052, 2026-08-31): un capitulo de Sigrid puede no tener codigo,
 # y eso ya no corta el arbol de partidas. La ficha de `stg.partidas` deja de
@@ -40,7 +183,204 @@
 # `R-FRESCURA` porque lo que decia -que la nocturna construye SOLO raw, stg y
 # mart- dejo de ser cierto.
 
-version: 12
+# version 15 (F-068, 2026-09-07): las fichas de `raw.emp` y `raw.res` dicen que
+# el rol de lectura del MCP ya NO las alcanza, y que esa exclusion es TEMPORAL
+# -el humano ya decidio revertirla cuando el MCP tenga control por usuario-.
+# Hasta la version 14 esas dos fichas avisaban de lo contrario: que cualquier
+# agente conectado las leia enteras.
+
+# version 18 (F-079, 2026-09-09): TODO LO EXPUESTO ES PARA CONSULTA, y `stg`
+# deja de estar desaconsejado. El esquema `stg` y sus SIETE objetos que no son
+# funciones -`plan_mensual`, `presupuesto`, `partidas`, `obras`, `fases`,
+# `version_master_vigente`, `ambitos`- pasan a `consumo_recomendado: true` y
+# pierden su `motivo_no_consumo`. Lo que decian esos motivos eran PREFERENCIAS
+# DE ENRUTADO -«capa intermedia», «para consultar partidas esta
+# `mart.v_pbi_dim_partida`»- y el efecto era el contrario del buscado: el MCP
+# tiene `stg` entre sus esquemas autorizados, asi que desaconsejarlo solo
+# conseguia que el agente no mirase donde si hay dato. El caso que lo zanja: el
+# ambito de certificacion vive en `stg.presupuesto` -que no filtra por ambito- y
+# en ningun sitio aguas abajo.
+#
+# NO SE PIERDE NINGUNA ADVERTENCIA DE CORRECCION, y eran CUATRO, no dos. Las
+# cuatro se mueven a la `descripcion` de su ficha, que es texto publicado:
+# 1. `stg.plan_mensual`: aqui conviven TODAS las versiones master y consultar
+#    sin filtrar version MULTIPLICA los importes. Llega ademas por la regla dura
+#    `R-VERSION-MASTER`, bloqueante, cuyo ambito incluye la tabla.
+# 2. `stg.obras.activa` no significa nada -constante TRUE-, y `es_activa`
+#    tampoco. Llega ademas por `R-OBRA-ACTIVA` y por el propio significado de la
+#    columna.
+# 3. `stg.version_master_vigente` resuelve la version de forma GLOBAL y no
+#    coincide con `mart`, que la elige mes a mes, en los meses pasados.
+# 4. `stg.ambitos.uso_seguimiento` esta DESFASADA: filtrar por ella da una
+#    respuesta incompleta.
+#
+# NO cambian las 11 funciones `fn_*` (una funcion no se consulta: se llama desde
+# el SQL del build) ni los 9 objetos rotos, vacios o de instrumentacion
+# (`mart.v_pbi_cp_tipologia` -que arregla F-078-,
+# `cierre.v_pbi_cierre_indirectos_detalle`, `mart.v_fact_periodificado`,
+# `aux.periodificacion_partida`, `retenciones.v_src_lineas_venta`,
+# `retenciones.v_src_lineas_compra` y los tres de `_meta`). Ahi el aviso es un
+# HECHO y no una preferencia: recomendarlos haria que el agente los consultase y
+# fallara. `raw` tampoco cambia. Las fichas de consumo pasan de 47 a 54.
+
+# version 19 (F-073, 2026-09-10): TRES OBJETOS NUEVOS Y ONCE COLUMNAS NUEVAS,
+# y ninguna se quita ni se renombra. `maestro.centros_coste` es EL PUENTE entre
+# el centro de coste y la obra, que no existia publicado y que necesitan tres
+# features: 804 centros, **683 resuelven a obra** y 121 no (estructura,
+# delegacion y servicios generales), que salen con `obra_id` a NULL porque aqui
+# no se filtra nada. `maestro.estados_documento` publica las **193 filas** de
+# `conest`, y su trampa es que la traduccion va POR TIPO DE DOCUMENTO: el mismo
+# numero significa otra cosa en una obra (42), un contrato (44) o una factura
+# (15). `compras.formas_pago` publica las **69 formas de pago** con su medio
+# resuelto, y avisa de que `plazo_formula` **no es un numero de dias**
+# (`30 450R` es un valor real del catalogo).
+#
+# `maestro.obras` gana once columnas: `estado` -el nombre, ya traducido, para
+# no tener que copiar el catalogo a mano-, la direccion del emplazamiento con el
+# MISMO vocabulario que `maestro.proveedores` (`dir1`, `dir2`, `codigo_postal`,
+# `direccion_completa`), `municipio`/`municipio_id` y `provincia`/`provincia_id`
+# como ejes de agrupacion, y las marcas `tiene_presupuesto` / `tiene_seguimiento`.
+#
+# LO QUE HAY QUE LEER ANTES DE USAR LA DIRECCION: **solo un tercio de las obras
+# la tiene informada** (dir1 33,1 %, municipio 31,9 %, provincia 33,2 %, dir2 un
+# 5,1 %), asi que para dos de cada tres obras **"no consta" es la respuesta
+# CORRECTA** y no un fallo del ETL. Cada columna declara su porcentaje medido el
+# 2026-09-10. Y `tiene_seguimiento` se mide en `stg.plan_mensual`, que es
+# SUPERCONJUNTO del hecho publicado: 368 obras con plan frente a 349 con filas
+# en `mart.fact_seguimiento_mensual`, 19 de diferencia y ninguna al reves.
+#
+# DOS AFIRMACIONES FALSAS CORREGIDAS de paso: la ficha de
+# `maestro.obras.estado_id` decia que `conest` no se ingiere (se ingiere cada
+# noche), y la cabecera de `maestro.yaml` decia que el esquema no se refresca de
+# noche, que dejo de ser cierto en F-047.
+
+# version 20 (F-081, 2026-09-11): NO CAMBIA NI UN OBJETO NI UNA COLUMNA. Sube
+# porque la ficha de `compras.formas_pago.medio_pago` decia que
+# `config/tables_sigrid.yaml` declara el nombre del medio en `auxefp.est` y que
+# eso es falso. Lo era, y F-081 **ha corregido el yaml**: ahora dice `res`, con
+# la medicion escrita al lado (`est` a NULL en 5 de las 10 filas y vacia en las
+# otras 5, remedido contra Sigrid el 2026-09-11). La ficha lo cuenta en pasado,
+# que es lo unico que cambia del contenido publicado. Se sube igual: republicar
+# un texto distinto con la etiqueta de ayer es como no republicarlo.
+
+# version 21 (F-080, 2026-09-12): CINCO OBJETOS NUEVOS EN `compras` y tres
+# tablas nuevas en `raw`, y ninguno se quita ni se renombra. Ya se puede
+# preguntar CUANDO VENCE una factura de compra, si esta pagada, con que forma de
+# pago y que se ha escrito sobre ella.
+#
+# `compras.vencimientos` son los **195.510 efectos de pago** de las facturas de
+# compra, uno por fila, con su estado LEIDO de `raw.conest` (tip 25, 10 estados)
+# y no derivado. `compras.v_facturas_pago` los resume por factura junto con su
+# forma de pago, resuelta contra la dimension de F-073.
+# `compras.v_control_forma_pago` enfrenta la forma de pago de la factura con la
+# de su contrato, sin filtrar las que cuadran. Y `compras.documento_texto` /
+# `compras.documento_comentarios` publican la pestaña «Texto»: el memo integro y
+# el memo partido en comentarios con su fecha, su hora y su autor.
+#
+# LA TRAMPA QUE HAY QUE LEER ANTES DE SUMAR NADA DE VENCIMIENTOS: **sumar los
+# importes de todos los efectos de una factura los cuenta hasta tres veces**.
+# El efecto que se dividio se queda en la tabla ANULADO junto a sus hijos, y el
+# estado no lo distingue. **89.228 de 255.148 efectos estan de baja (34,97 %)**
+# y 76.215 de los 195.510 de factura (39,0 %): se filtran con
+# `efecto_anulado = false`, que es lo que reproduce el numero de la cabecera de
+# Sigrid (verificado sobre `FR25/04222`: 92.478,49 filtrando, 288.123,92 sin
+# filtrar). Y dos avisos mas: `fecha_real` vacia **no significa «vivo»** (61,8 %
+# la tienen asi, frente a los 10.607 pagos de cartera viva de F-037), y en
+# `documento_comentarios` **`orden` 1 es el comentario MAS RECIENTE**, porque
+# Sigrid apila en descendente.
+#
+# LO QUE NO SE PUBLICA, Y POR QUE: el enlace del efecto hijo a su efecto de
+# origen. `pag.padide`, el campo que lo prometia, vale 0 en los 255.148 efectos,
+# igual que `con.serie` (de ahi que la serie se derive con `compras.fn_serie`).
+# Regla que deja esta feature: antes de diseñar sobre un campo del origen, se
+# mide su cobertura.
+#
+# `raw` gana `auxnap` (3 naturalezas de pago), `auxban` (1.690 bancos y
+# sucursales) y `rpa` (3.919 remesas de pago), y `con.tex` deja de excluirse de
+# la ingesta: es donde vive el texto de la factura (65,5 %), no en `dcf.tex`
+# (0,3 %). Se corrige de paso una afirmacion FALSA de la cabecera de
+# `compras.yaml`, que decia que el esquema no se refresca de noche y que su
+# fecha de build no es consultable: dejo de ser cierto en F-047.
+
+# version 22 (F-078, 2026-09-15): TRES OBJETOS NUEVOS, Y UNA REGLA DE COSTE QUE
+# DEJA DE SER CIERTA. `mart.v_pbi_cp_tipologia` era la unica `v_pbi_` sin tabla
+# detras: se recalculaba entera en cada consulta -6,6 millones de unidades de
+# coste estimado, cinco recorridos de `stg.plan_mensual` (29,8 M de filas, 11 GB)
+# y un `WindowAgg` sobre 11,8 M de filas intermedias-, colgaba a Power BI en el
+# paso de Navegacion y mataba cualquier pregunta del MCP que la tocase. Se
+# materializa en `mart.master_versiones_tipadas`, `mart.master_vigente_anual`
+# -calculada YA contra la anterior, que es lo que mata el `WindowAgg`- y
+# `mart.fact_cp_tipologia`. Las TRES VISTAS SE QUEDAN, con el mismo nombre y las
+# mismas columnas: el informe de Power BI no cambia ni una linea.
+#
+# LO QUE ESTO OBLIGA A CORREGIR, y es la mitad importante de esta version:
+# `R-COSTE-CONSULTA` declaraba PUBLICAMENTE que `mart.v_pbi_cp_tipologia` no se
+# podia consultar y que `mart.v_master_vigente_anual` solo filtrada por obra.
+# Era verdad y ha dejado de serlo. Un aviso de coste caduca, y dejarlo puesto
+# aparta al agente de la respuesta buena con la misma seguridad con que antes lo
+# salvaba: los tres salen del ambito de la regla, `v_pbi_cp_tipologia` pasa a
+# `consumo_recomendado: true` y pierde su `motivo_no_consumo`. La regla pasa de
+# cuatro vistas inconsultables a DOS: `mart.v_fact_periodificado` y
+# `cierre.v_pbi_cierre_indirectos_detalle`, que siguen agotando los 60 s.
+#
+# UN MATIZ NUEVO QUE ANTES NO EXISTIA: al materializar, `CURRENT_DATE` deja de
+# evaluarse en cada consulta. El "ano en curso" y el "mes de corte" de
+# `fact_cp_tipologia` son los de la NOCHE DEL BUILD, no los de quien pregunta.
+# Con refresco nocturno solo se nota el dia 1 de cada mes antes de la carga, y
+# la ficha lo dice.
+#
+# version 23 (F-083, 2026-09-16): NI UN OBJETO NUEVO. `compras.facturas` gana
+# CINCO COLUMNAS y el esquema deja de tener una sola nocion de «estado». Nace de
+# un correo de Administracion: «una cosa es el estado del efecto de pago que hay
+# dentro de una factura, y otra distinta el estado de la propia factura». Tenia
+# razon: lo unico publicado era `compras.vencimientos.estado_pago`, que es el del
+# EFECTO, asi que el circuito de aprobacion de la factura -contabilizada,
+# aprobada por jefe de obra, aprobada Administracion, retenida, rechazada- no se
+# podia consultar. Ahora `compras.facturas` publica `estado_id`, `estado_codigo`
+# y `estado`, leidos de `con.est` (la superclase, NO `dcf`) con `tip = 15` y
+# traducidos por la PAREJA (tipo, estado), que es la trampa que el propio
+# catalogo declara. Se filtra por `estado_codigo` y no por el literal: `REC` y
+# `REC_ADM` se llaman los dos «Recibida».
+#
+# Y LAS TRES FECHAS, que es la otra mitad. `fecha_factura` (`dcf.fecdoc`, la del
+# documento del proveedor) y `fecha_alta` (`con.fec`, la del alta en Sigrid) se
+# publican separadas; `fecha` NO se toca, es la de alta y se conserva por
+# compatibilidad. **Se separan en el 77,8 % de las facturas** (mediana 4 dias,
+# p95 42), asi que elegir la equivocada desplaza cualquier serie temporal de
+# compras. Las fichas de las tres se nombran unas a otras a proposito, y la de
+# `compras.vencimientos.estado_pago` devuelve el aviso en sentido contrario: la
+# confusion se puede entrar por cualquiera de las dos puertas.
+
+# version 24 (F-084, 2026-09-16): UN OBJETO NUEVO —la funcion auxiliar
+# `compras.fn_estado_documento`— y el mismo trabajo de F-083 para el CONTRATO.
+# `compras.contratos` gana `estado_id`, `estado_codigo` y `estado`, leidos de
+# `con.est` con `tip = 44` y traducidos por la PAREJA (tipo, estado). Ni una de
+# las doce columnas de siempre se toca: verificado columna a columna contra la
+# tabla viva, 0 filas que no casan de 18.978.
+#
+# LA TRADUCCION DEJA DE ESTAR COPIADA. F-083 escribio su lateral a mano dentro
+# del bloque FACTURAS; en vez de duplicarlo para CONTRATOS, los dos llaman ahora
+# a `compras.fn_estado_documento(tipo, estado)`. Lo que se gana no son lineas:
+# el tipo de documento pasa a ser argumento obligatorio, asi que la union «solo
+# por estado_id» —la que publica el literal de otro documento sin romper el
+# build— ya no se puede escribir. La guarda anti-multiplicacion vive dentro de
+# la funcion y por eso protege a las dos tablas a la vez.
+#
+# LO QUE ESTA VERSION DECLARA QUE **NO** SE PUEDE RESPONDER, y es la mitad que
+# importa. Compras pregunta por «los contratos que llevan mas de tres semanas
+# enviados sin firmar». Los ENVIADOS ya se listan: 818, de 567 proveedores y 241
+# obras. El «mas de tres semanas», NO: el datamart no guarda cuando cambio el
+# estado —la foto diaria es F-067— y `con.tiemod` es la ultima modificacion del
+# DOCUMENTO, que no es la fecha del cambio de estado, y ademas ni siquiera se
+# publica. La ficha lo dice en vez de insinuar un proxy, porque un «lleva X
+# dias» falso es peor que un «no se puede saber».
+#
+# Y UN HALLAZGO QUE AHORRA TIEMPO AL SIGUIENTE: el circuito de firma NO sirve
+# para el contrato. De las 70.346 firmas de `raw.confir` medidas el 2026-09-16
+# hay CERO de contrato; son de comparativos, facturas y obras. En el origen
+# tampoco estan, asi que el ESTADO es la unica via.
+
+version: 35
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -60,32 +400,36 @@ titulo: Datamart de seguimiento anual de obra
 reglas:
 
   - codigo: R-FRESCURA
-    titulo: Cuatro esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Cinco esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, maestro, retenciones]
+    ambito: [cierre, compras, maestro, retenciones, personal]
     regla: >-
-      Desde F-047 estos cuatro esquemas SI se construyen cada noche dentro de
-      `run-all`, y los cuatro registran paso, asi que su fecha de build siempre
-      es consultable. Lo que no cambia es que su paso NO es dependencia de
-      ningun otro: si `build_cierre`, `build_compras`, `build_maestros` o
-      `build_retenciones` falla, la noche continua y termina, y ese esquema se
-      queda con el dato de una noche anterior mientras `raw`, `stg` y `mart`
-      estan al dia. Toda respuesta que salga de ellos DEBE citar su fecha de
-      build: `SELECT * FROM _meta.v_frescura WHERE paso = 'build_cierre'` (o
-      `build_compras`, `build_maestros`, `build_retenciones`). Que el pipeline
-      sea uno solo NO significa que todo el datamart tenga la misma frescura.
+      Estos cinco esquemas SI se construyen cada noche dentro de `run-all`, y
+      los cinco registran paso, asi que su fecha de build siempre es
+      consultable. Lo que no cambia es que su paso NO es dependencia de ningun
+      otro: si `build_cierre`, `build_compras`, `build_maestros`,
+      `build_retenciones` o `build_personal` falla, la noche continua y termina,
+      y ese esquema se queda con el dato de una noche anterior mientras `raw`,
+      `stg` y `mart` estan al dia. Toda respuesta que salga de ellos DEBE citar
+      su fecha de build: `SELECT * FROM _meta.v_frescura WHERE paso =
+      'build_cierre'` (o `build_compras`, `build_maestros`,
+      `build_retenciones`, `build_personal`). Que el pipeline sea uno solo NO
+      significa que todo el datamart tenga la misma frescura.
     motivo: >-
       La composicion real esta en `main.build_pipeline_steps`, y sus pasos se
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
       `build_stg`, `build_mart`, `build_maestros`, `build_compras`,
-      `build_retenciones`, `build_cierre`, `publicar_diccionario` y
-      `apply_grants`. Hasta el 2026-08-28 los cuatro se lanzaban A MANO y podian
-      llevar semanas parados; peor aun, `mart` DESTRUIA cada noche
-      `cierre.v_pbi_planif_vs_real` —cuelga de
+      `build_retenciones`, `build_personal`, `build_cierre`,
+      `publicar_diccionario` y `apply_grants`. Hasta el 2026-08-28 cuatro de
+      ellos se lanzaban A MANO y podian llevar semanas parados; peor aun, `mart`
+      DESTRUIA cada noche `cierre.v_pbi_planif_vs_real` —cuelga de
       `mart.fact_seguimiento_categoria`, que `03_agg_categoria.sql` dropea con
-      CASCADE— y nadie la recreaba. Dar un dato de `cierre` sin fecha es dar una
-      respuesta vieja con aplomo.
+      CASCADE— y nadie la recreaba. `personal` (F-057, 2026-09-18) nacio ya
+      dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
+      un fallo del SQL de personal no puede dejar al `mart` sin construir. Dar
+      un dato de cualquiera de los cinco sin fecha es dar una respuesta vieja
+      con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -128,13 +472,74 @@ reglas:
       administrativos (0001-0005, CM, CP, GG, VAR, POSTV*, BD*, GGD, GINT, OT),
       excluye codigos con cinco o mas digitos seguidos y deduplica por el
       mecanismo de Sigrid `conext.cod = '15'`. `maestro.obras` NO filtra nada:
-      es superconjunto. Toda respuesta que cuente obras debe decir cual usa.
-      `compras` y `retenciones` tampoco filtran por `stg.obras` y pueden traer
-      obras administrativas que el seguimiento excluye.
+      es superconjunto, con una fila por FICHA (una por empresa y codigo, F-102).
+      Toda respuesta que cuente obras debe decir cual usa. `compras` y
+      `retenciones` tampoco filtran por `stg.obras` y pueden traer obras
+      administrativas que el seguimiento excluye. **`stg.obras` sigue eligiendo
+      su ficha como hasta hoy y NO usa `maestro.obras.es_ficha_principal`** (la
+      ficha de Ruesma): las dos difieren en 0581, 0606, 0671 y 0720, donde
+      `stg.obras` --y con ella `mart` y `cierre`-- se queda con la ficha de una
+      UTE o de Porsan. Lo resuelve F-106.
     motivo: >-
       Los filtros estan en `sql/stg/03_obras.sql`; `sql/maestro/01_obras.sql` no
       tiene ninguno. Contar en una o en otra da cifras distintas a proposito, y
-      dar la del maestro como "obras de la empresa" infla el numero.
+      dar la del maestro como "obras de la empresa" infla el numero. F-102
+      (2026-09-23) midio que la eleccion de `stg.obras` no es la ficha de Ruesma
+      en 0581, 0606, 0671 y 0720, y decidio no tocarla: aplicarla sacaria la 0581
+      del seguimiento. F-106 pasa el seguimiento a la ficha de Ruesma.
+
+  - codigo: R-CODIGO-POR-EMPRESA
+    titulo: El codigo de una obra o de un recurso solo es unico dentro de su empresa
+    severidad: bloqueante
+    ambito:
+      - maestro.obras
+      - maestro.v_obra_fichas
+      - stg.obras
+      - personal.partes_lineas
+      - personal.partes
+      - personal.recursos
+      - retenciones.movimientos
+      - retenciones.apuntes_contables
+      - retenciones.saldo_contable
+      - retenciones.fin_obra
+      - retenciones.v_retencion_contable_obra
+      - maestro.centros_coste
+      - compras.contratos
+      - compras.albaran_lineas
+      - compras.factura_lineas
+      - compras.fact_compras_linea
+      - maestro.cuentas_analiticas
+    regla: >-
+      En Sigrid las obras y los recursos son POR EMPRESA: el mismo codigo existe
+      una vez por empresa --Ruesma (1), Porsan (28), cada UTE-- y es la misma
+      obra, o la misma persona, vista desde cada una, SIN CONSOLIDAR. **Por
+      `codigo_obra` o `codigo_recurso` se cruza, se filtra y se agrega SIEMPRE
+      junto con `empresa_id`, o por la clave legible**: `clave_obra` en
+      `maestro.obras` y en las vistas de `compras` con obra, y `clave_recurso` en
+      `personal.recursos`, las dos con la forma `<empresa>-<codigo>` (`1-0581`,
+      `27-0581`). Cruzar solo por el codigo devuelve duplicados o coge la ficha
+      que no es. `maestro.obras.es_ficha_principal` marca la ficha de Ruesma de
+      cada codigo, y `obra_principal_id` apunta a ella solo como REFERENCIA: no
+      sirve para agregar hechos de otras empresas, porque sumaria lo de la UTE
+      en la obra de Ruesma. Los hechos (`compras`, `retenciones`, `personal`)
+      llevan el `obra_id` de la ficha de SU empresa y no se traducen. Contar
+      obras por codigo es contar `es_ficha_principal`, y hay que decirlo.
+    motivo: >-
+      Medido en solo lectura el 2026-09-23 (F-102): 922 fichas de obra para 846
+      codigos, 58 codigos repetidos y ninguno repetido dentro de una empresa;
+      922 `clave_obra` para 922 fichas. Recursos: 2.618 para 2.504 codigos, 61
+      repetidos y ninguno dentro de una empresa; 2.618 `clave_recurso` para
+      2.618 recursos (`MO/0009` tiene ficha en las empresas 1, 18, 27 y 28). En
+      `compras.fact_compras_linea`, 91.431 lineas son de una ficha de otra
+      empresa y 84.233 de ellas (31.770.036,29 EUR) tienen un codigo que tambien
+      tiene ficha de Ruesma: son las que se mezclarian agregando por codigo. En
+      `personal.partes_lineas`, 14.079 lineas (1.677.332,46 EUR) imputan a la
+      copia de Porsan de una obra del seguimiento: en la 0704 los trabajadores
+      de Porsan imputan a su propia ficha. Lo destapo Administracion el
+      2026-09-22 al medir la direccion de las obras sobre la copia equivocada.
+      Las cuentas analiticas (F-107, 2026-09-24) tambien: 184.234 cuentas, 14.063
+      codigos repetidos entre empresas y ninguno dentro de una; en
+      `maestro.cuentas_analiticas` se cruza por codigo junto con `empresa_id`.
 
   - codigo: R-PROVEEDOR-INTRAGRUPO
     titulo: El mayor proveedor de la empresa es la propia empresa
@@ -193,14 +598,11 @@ reglas:
       no cubria el sitio donde fallo.
 
   - codigo: R-COSTE-CONSULTA
-    titulo: Cuatro vistas no se pueden consultar, y una base compartida que cuidar
+    titulo: Dos vistas no se pueden consultar, y una base compartida que cuidar
     severidad: bloqueante
     ambito:
-      - mart.v_master_vigente_anual
-      - mart.v_pbi_cp_tipologia
       - mart.v_fact_periodificado
       - cierre.v_pbi_cierre_indirectos_detalle
-      - mart.v_master_versiones_tipadas
       - stg.plan_mensual
     regla: >-
       **Antes de lanzar una consulta hay que saber lo que cuesta**, porque esto
@@ -208,15 +610,17 @@ reglas:
       `partes` EN PRODUCCION**, y la ventana util son 30 s. Medido el
       2026-08-25, con `SELECT * ... LIMIT 5`:
       **(1) NO SE PUEDEN CONSULTAR, ni siquiera filtradas por obra**:
-      `mart.v_pbi_cp_tipologia`, `mart.v_fact_periodificado` y
-      `cierre.v_pbi_cierre_indirectos_detalle` agotan **mas de 60 s**. Con
-      cualquiera de las tres, la respuesta correcta es "no puedo consultarla" y
-      el motivo, no una consulta que se va a cortar.
-      **(2) SOLO FILTRADA**: `mart.v_master_vigente_anual` agota los 40 s con
-      `LIMIT 5` y responde en **20 s** con `WHERE obra_id = ... AND anio = ...`.
-      Nunca sin filtro de obra.
-      **(3) CARAS PERO VIABLES, una sola vez y agregando**:
-      `mart.v_master_versiones_tipadas` **16 s**, un `count(*)` de
+      `mart.v_fact_periodificado` y `cierre.v_pbi_cierre_indirectos_detalle`
+      agotan **mas de 60 s**. Con cualquiera de las dos, la respuesta correcta
+      es "no puedo consultarla" y el motivo, no una consulta que se va a cortar.
+      **(2) YA NO SON CARAS, y esta regla lo decia hasta la version 21**: los
+      tres objetos de CP por tipologia —`mart.v_pbi_cp_tipologia` (mas de 60 s),
+      `mart.v_master_vigente_anual` (40 s sin filtro, **20 s** filtrada por
+      obra) y `mart.v_master_versiones_tipadas` (**16 s**)— **son TABLAS desde
+      F-078** (2026-09-15) y se consultan con normalidad, sin filtro y sin
+      aviso. Apartar a un agente de una vista que ya funciona es tan danino
+      como mandarle a una que no.
+      **(3) CARAS PERO VIABLES, una sola vez y agregando**: un `count(*)` de
       `stg.plan_mensual` **25 s**, uno de `compras.fact_compras_linea` **10 s**.
       **(4) BARATAS**: `maestro.obras`, `cierre.v_pbi_cierre_resumen`,
       `compras.v_pbi_proveedor_obra` y `compras.v_pbi_partida_coste`, todas por
@@ -228,7 +632,10 @@ reglas:
       `mart.v_master_vigente_anual` —marcada como recomendada y anunciada como
       la que responde que version de plan rige en una obra— no respondia nada.
       Un agente que no sabe que es caro lanza consultas que se cortan o, peor,
-      consultas que terminan y molestan a dos aplicaciones en produccion.
+      consultas que terminan y molestan a dos aplicaciones en produccion. La
+      otra mitad de la leccion la dejo F-078: una regla de coste **caduca**, y
+      dejarla puesta cuando el objeto ya se arreglo aparta al agente de la
+      respuesta buena con la misma seguridad con que antes lo salvaba.
 
   - codigo: R-OBRA-ACTIVA
     titulo: El datamart NO sabe si una obra esta activa. Las dos columnas mienten
@@ -266,6 +673,8 @@ reglas:
     severidad: bloqueante
     ambito:
       - stg.plan_mensual
+      - mart.master_versiones_tipadas
+      - mart.master_vigente_anual
       - mart.v_master_versiones_tipadas
       - mart.v_master_vigente_anual
     regla: >-
@@ -308,7 +717,7 @@ reglas:
     regla: >-
       Antes de escribir cualquier consulta contra `raw`, seis cosas.
 
-      **1. `ide` es la clave de las 31 tablas.** Se llama igual en todas, es el
+      **1. `ide` es la clave de las 71 tablas.** Se llama igual en todas, es el
       indice primario y es unico. Un campo que acaba en `ide` —`conide`,
       `entide`, `obride`— es una referencia a el.
 
@@ -321,10 +730,10 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `auxmun` (`auxmun.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpro` (`auxpro.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
-      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxobramb`, `obrfas`, `obrfasamb`, `obrparpre`
+      **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
       no se unen a `raw.con` en ningun SQL de este repositorio, asi que para
       ellas el JOIN de los puntos 2 y 3 **no existe**; su nombre esta en su
       propio `res` o no esta.
@@ -427,6 +836,44 @@ reglas:
       La tabla se crea con `CREATE TABLE ... AS` uniendo los tres origenes
       (`sql/compras/02_fact_linea.sql`), sin PK y sin renumerar.
 
+  - codigo: R-PARTIDA-CODIGO-NO-UNICO
+    titulo: El codigo de partida NO es unico ni dentro de su obra; se une por partida_id
+    severidad: bloqueante
+    ambito:
+      - stg.partidas
+      - mart.v_pbi_dim_partida
+      - mart.v_pbi_dim_partida_niveles
+      - mart.fact_seguimiento_mensual
+      - mart.v_fact_periodificado
+      - compras.v_pbi_partida_coste
+      - cierre.v_pbi_dim_subcategoria_ci
+    regla: >-
+      No cruces tablas por obra + código de partida: usa `partida_id`. Agrupar
+      por código es válido si se quiere sumar todas las copias del concepto
+      (por ejemplo, la misma partida en todos los bloques o fases), y hay que
+      decirlo. Para identificar una partida ante el usuario, enseña su ruta de
+      capítulos.
+
+      Por qué: el mismo código cuelga de varios capítulos de la MISMA obra
+      —uno por contrato o expediente, por vivienda tipo, bloque o fase, o por
+      raíz paralela—, y cada copia es una partida distinta: 5.202 códigos
+      repetidos en 158 obras (2026-09-25). Un JOIN por `(obra_id,
+      codigo_partida)` multiplica importes: en la obra 0437 el coste real pasa
+      de 883.460,55 EUR a 3.474.491,83. Añadir el contrato no lo arregla (4.437
+      siguen repetidos) y `ruta_capitulos` tampoco es clave (155 repetidas):
+      para unir y contar partidas, solo `partida_id`.
+    motivo: >-
+      F-109, medido en solo lectura el 2026-09-25: 5.202 pares `(obra_id,
+      codigo_partida)` repetidos, 8.933 filas de mas, 158 obras (92 del
+      seguimiento), identicos en `stg.partidas` y `mart.v_pbi_dim_partida`.
+      Tres fichas de este diccionario afirmaban que el codigo identificaba la
+      partida dentro de su obra. Unir el hecho con la dimension por obra y
+      codigo infla la historia en 12.108.634,53 EUR de Coste Real (47 obras) y
+      13.145.742,76 EUR de Venta Real (53). Hoy ningun SQL del repositorio une
+      asi —todo va por `partida_id`—: el riesgo es el SQL libre del MCP, de
+      Power BI o de un informe. Redaccion decidida por el humano el
+      2026-09-26: unir por codigo, nunca; agrupar por codigo, declarandolo.
+
   - codigo: R-RETENCION-NO-JOIN-LINEAS
     titulo: Nunca unir un efecto de retencion a las lineas de su factura
     severidad: bloqueante
@@ -487,35 +934,70 @@ reglas:
 # cazar el error de retenciones en el prototipo.
 
 ordenes_de_magnitud:
-  - concepto: Retenido VIVO a proveedores, pendiente de devolver, en toda la empresa
-    valor_aproximado: 34700000
+  - concepto: >-
+      Retenido VIVO a proveedores segun la CONTABILIDAD, la cifra que manda
+      (`retenciones.saldo_contable`, suma de `saldo`)
+    valor_aproximado: 8760000
     unidad: EUR
     criterio: saldo_vivo
     fuente: >-
-      LEEME_RETENCIONES_R1.md, tabla del modelo: efectos de `pag` con
-      `retide <> 0` y `fecrea = 0`. NO es el total practicado historicamente:
-      lo ya liquidado no cuenta aqui.
-  - concepto: Retenido VIVO por clientes, pendiente de cobrar, en toda la empresa
+      Medido el 2026-09-22 en Sigrid en solo lectura (F-095, consulta B1 de
+      progress/spec_F-095.md): 8.760.524,49 EUR, el saldo de todas las cuentas
+      `prv.cueretide`; remedido el 2026-09-24 en el datamart con la regla de
+      `sql/retenciones/03_apuntes_contables.sql`: 8.775.052,87 EUR; y medido el
+      2026-09-25 en el primer build con `raw.rac` (`SUM(saldo)` de
+      `retenciones.saldo_contable`): 8.778.606,70 EUR. Es la suma de ALTA, BAJA
+      y SALDO_INICIAL; **una cifra del orden de 60 M EUR** es que se han sumado
+      los asientos de cierre o de apertura (52,12 M EUR por lado), y **una del
+      orden de 10,5 M EUR** es que se ha sumado solo por obra, dejando fuera la
+      fila sin obra, que es NEGATIVA (-1,74 M EUR el 2026-09-25). Los efectos
+      vivos dan 8,36 M EUR (8.362.932,53 el 2026-09-25): la diferencia se
+      explica proveedor a proveedor en `retenciones.v_cuadre_proveedor`.
+  - concepto: Retenido VIVO a proveedores segun los EFECTOS (el detalle; manda la contabilidad)
+    valor_aproximado: 8350000
+    unidad: EUR
+    criterio: saldo_vivo
+    fuente: >-
+      Medido el 2026-09-22 (F-094) en solo lectura con el SELECT de
+      `sql/retenciones/01_movimientos.sql`: 8.345.506,03 € en 7.752 efectos
+      de `pag` con `retide <> 0`, `fecrea = 0`, `con.fecbaj = 0` y `con.est`
+      fuera de 10 (Pagado), 14 (Agrupados) y 15 (Divididos). Hasta F-094 aqui
+      ponia 34,7 M€: salia solo de `fecrea` y contaba los agrupados junto a su
+      agrupador y lo ya pagado, 4,3 veces lo real. **Una cifra de proveedor del
+      orden de 35 M€ es ese error**: se esta sumando sin filtrar
+      `estado = 'VIVA'`. NO es el total practicado historicamente: lo ya
+      liquidado no cuenta aqui.
+  - concepto: >-
+      Retenido VIVO por clientes segun los efectos, SIN VERIFICAR: la
+      contabilidad da 13,8 M EUR y el criterio de proveedor daria 2,1 M EUR
+      (pendiente de su feature propia)
     valor_aproximado: 21900000
     unidad: EUR
     criterio: saldo_vivo
     fuente: >-
       LEEME_RETENCIONES_R1.md, misma tabla: efectos de `cob` con `retide <> 0`
-      y `fecrea = 0`.
+      y `fecrea = 0` (22,16 M€ el 2026-09-22). **SIN VERIFICAR**: F-094 midio
+      que el criterio de proveedor no vale para `cob` y que la contabilidad
+      de las cuentas de retencion de cliente da 13,81 M€; queda para una
+      feature propia. Es el orden de lo que publica el datamart, no un saldo
+      contrastado.
   - concepto: Efectos de retencion practicados a proveedores, vivos y liquidados
-    valor_aproximado: 25124
+    valor_aproximado: 25631
     unidad: filas
     criterio: total
     fuente: >-
-      LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `pag` con
-      `retide <> 0`, sin filtrar por estado.
+      Medido en la base el 2026-09-23, tras la nocturna que construyo F-094:
+      25.631 filas de `pag` con `retide <> 0`, sin filtrar por estado (7.751
+      VIVA + 2.369 LIQUIDADA + 15.511 BAJA). F-094 no borra filas, solo las
+      reclasifica. Hasta hoy aqui ponia 25.124, de LEEME_RETENCIONES_R1.md.
   - concepto: Efectos de retencion practicados por clientes, vivos y liquidados
-    valor_aproximado: 2219
+    valor_aproximado: 2238
     unidad: filas
     criterio: total
     fuente: >-
-      LEEME_RETENCIONES_R1.md, tabla del modelo: filas de `cob` con
-      `retide <> 0`, sin filtrar por estado.
+      Medido en la base el 2026-09-23: 2.238 filas de `cob` con
+      `retide <> 0`, sin filtrar por estado (2.196 VIVA + 42 LIQUIDADA).
+      Hasta hoy aqui ponia 2.219, de LEEME_RETENCIONES_R1.md.
 
   # -------------------------------------------------------------------------
   # COMPRAS, MART y CIERRE. Anadidos el 2026-08-25 por T40.
@@ -641,7 +1123,8 @@ ejes:
 # ESQUEMAS (R4)
 # ===========================================================================
 #
-# Son NUEVE. Los informes de exploracion dicen ocho y se equivocan.
+# Son los de `ESQUEMAS_DEL_DATAMART` (eran nueve hasta F-057). Los informes de
+# exploracion decian ocho y se equivocaban.
 # Ojo a la trampa de nombres: el esquema se llama `aux` y su carpeta de SQL es
 # `sql/auxiliar/`.
 
@@ -674,7 +1157,9 @@ esquemas:
       Contratos, albaranes, proformas, notas, facturas y abonos de proveedor, a
       nivel de linea y sin IVA. Responde a quien se ha comprado, cuanto se ha
       contratado, que hay albaranado sin facturar y que coste lleva cada
-      partida.
+      partida. Incluye ademas el catalogo de formas de pago
+      (`compras.formas_pago`), que es la DIMENSION: dice que formas de pago
+      existen, no con cual se pago un documento concreto.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -684,17 +1169,48 @@ esquemas:
     para_que_sirve: >-
       Un registro por efecto de retencion, en los dos sentidos: lo retenido a
       proveedores y lo que los clientes nos retienen. Con saldo vivo, fechas
-      prevista y real de liquidacion, y marca de vencida sin liquidar.
+      prevista y real de liquidacion, y marca de vencida sin liquidar. Desde
+      F-095, la retencion de PROVEEDOR desde la contabilidad: el saldo vivo que
+      MANDA es `retenciones.saldo_contable` (por proveedor y obra), cuadrado con
+      los efectos en `retenciones.v_cuadre_proveedor`, y su vencimiento desde el
+      fin de obra en `retenciones.v_retencion_contable_obra`.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_retenciones]
 
+  personal:
+    titulo: Quien ha trabajado en cada obra y cuantas horas
+    para_que_sirve: >-
+      El maestro de recursos --personas, medios y consumos imputables-- y las
+      330.638 lineas de parte de trabajo que atan persona, horas y obra, con 20
+      anos de historia. Responde "cuantas horas se han imputado a esta obra",
+      "quien ha trabajado en ella" y "cuanto cuesta su mano de obra". DOS
+      TRAMPAS antes de consultarlo: la cantidad de una linea NO son horas --
+      mezcla HORA, DIA, MES y UD, y por eso existe la vista
+      `personal.v_pbi_horas_obra_mes`, que lleva el corte cableado-- y el 71,7 %
+      del euro esta en las lineas de MES, que es el coste de estructura de obra,
+      no las horas. CONTIENE DATOS PERSONALES (nombre, NIF y DNI), publicados
+      por decision expresa del responsable del dato el 2026-09-18. Desde F-101
+      tambien la CABECERA del parte (`personal.partes`: codigo, descripcion,
+      estado; el codigo NO es unico y su obra AUDITA, no imputa) y los precios
+      de la ficha de cada recurso (`personal.recursos_tipos_hora`), que son los
+      de HOY: Sigrid no guarda historico. Desde F-107 `personal.recursos` trae
+      la CONTRAPARTIDA del recurso (centro de coste y cuenta analitica del
+      abono), que es del recurso y no por tipo de hora.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_personal]
+
   maestro:
-    titulo: Maestros de consulta directa
+    titulo: Maestros y dimensiones de consulta directa
     para_que_sirve: >-
       Obras, proveedores y la relacion proveedor-obra derivada de los contratos,
-      pensados para consultarse tal cual. `maestro.obras` es el universo SIN
-      filtrar, superconjunto de `stg.obras`.
+      mas el puente centro de coste -> obra y los catalogos de estados de
+      documento y de cuentas analiticas (`maestro.cuentas_analiticas`, F-107),
+      pensados para consultarse tal cual. `maestro.obras` es el
+      universo SIN filtrar, superconjunto de `stg.obras`, y trae la direccion
+      del emplazamiento -informada en un tercio de las obras- y las marcas de
+      que datos tiene cada obra dentro del datamart.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_maestros]
@@ -721,13 +1237,18 @@ esquemas:
     pasos_etl: []
 
   stg:
-    titulo: Capa intermedia de preparacion
+    titulo: Capa intermedia de preparacion, y tambien superficie de consulta
     para_que_sirve: >-
-      Normaliza Sigrid y explota la planificacion a nivel mensual. NO es
-      superficie de consulta: en `stg.plan_mensual` conviven todas las versiones
-      master y consultarla sin filtrar version multiplica los importes. Lo que
-      se pregunta esta aguas abajo, en `mart` y en `cierre`.
-    consumo_recomendado: false
+      Normaliza Sigrid y explota la planificacion a nivel mensual. SI se
+      consulta: aqui estan el presupuesto por partida y ambito -incluidos los
+      ambitos que `mart` no construye, la certificacion entre ellos-, el arbol
+      de partidas con su jerarquia y las fases una a una. Lo que ya esta
+      resuelto aguas abajo suele ser mas comodo en `mart` y en `cierre`, y cada
+      ficha lo dice, pero eso es navegacion y no una prohibicion. LA TRAMPA que
+      hay que respetar: en `stg.plan_mensual` conviven todas las versiones
+      master y consultarla sin filtrar version multiplica los importes (regla
+      `R-VERSION-MASTER`).
+    consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_stg]
 
@@ -787,9 +1308,12 @@ preguntas_aceptacion:
       - retenciones.movimientos
       - retenciones.v_pbi_retenciones_vivas
     respuesta_correcta: >-
-      Filtra sentido = 'PROVEEDOR'. Da `saldo_vivo` por defecto y menciona que
+      Filtra sentido = 'PROVEEDOR' y, para lo pendiente, estado = 'VIVA': las
+      filas BAJA (agrupados, divididos, anulados) no se suman nunca (F-094).
+      Da `saldo_vivo` por defecto y menciona que
       existe la otra lectura, `neto_practicado`, y que pueden divergir. NO une
-      el efecto a las lineas de su factura. Senala las filas con obra_id nulo y
+      el efecto a las lineas de su factura. La obra se filtra por `obra_id`
+      (la de `maestro.obras` desde F-094) o por `codigo_obra`. Senala las filas con obra_id nulo y
       num_obras_documento > 1, que son facturas repartidas entre varias obras.
       Cita la fecha de build de `build_retenciones`: se refresca de noche, pero
       su paso puede fallar sin tumbar el resto de la carga.
@@ -815,7 +1339,7 @@ preguntas_aceptacion:
     objetos_esperados: []
     respuesta_correcta: >-
       "El datamart no tiene tesoreria." No hay ni un objeto de cobros o pagos en
-      los nueve esquemas. Cualquier numero es incorrecto, incluida la tentacion
+      los diez esquemas. Cualquier numero es incorrecto, incluida la tentacion
       de dar el facturado como si fuera caja.
     estado: bloqueada
     bloqueada_por: F-037

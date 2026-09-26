@@ -115,6 +115,23 @@ Si no toca ninguno, es N/A.
 - [ ] Las verificaciones `MANUAL (humano)` están listadas en
       `progress/current.md` con su comando exacto, pendientes de que el
       humano las ejecute.
+- [ ] **Los dobles de test se comparan con el original, y no a ojo.** Un
+      `Fake`/`Stub` que imita una clase real y declara un método que esa clase
+      **no tiene** produce VERDE FALSO: la suite pasa entera sobre código que no
+      puede funcionar, y el fallo sale en producción. **Leyendo no se caza**: el
+      doble es coherente por su lado y el código que lo llama por el suyo, y la
+      incoherencia solo aparece al CRUZAR los dos ficheros. Por eso el arnés no
+      lo pide como lectura sino como comprobación automática sobre los dobles
+      del árbol —encontrados por barrido, nunca por una lista escrita a mano,
+      que envejece—, que exige tres cosas: (a) todo método público de un doble
+      existe en la clase imitada; (b) ningún doble acepta llamadas que el
+      original rechazaría (más posicionales, un `keyword-only` pasado por
+      posición, otro nombre en el mismo hueco); y (c) al revés, todo lo que el
+      código de producción invoca sobre esa clase existe en ella. El caso que
+      lo motiva: `datamart-seg-anual`, nocturna del 2026-09-05, muerta con
+      `AttributeError` sobre **3.308 tests en verde** por un método que se
+      añadió a tres dobles y nunca al cliente real; cuatro pasadas de reviewer
+      tampoco lo vieron.
 
 ## C4 bis — El rigor declarado se cumple
 

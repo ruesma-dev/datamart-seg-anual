@@ -658,12 +658,14 @@ def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None
         "load_excel_aux",
         "build_stg",
         "build_mart",
-        # F-047 metió los cuatro build que se lanzaban a mano. Van ANTES de
-        # publicar y de los grants: los cuatro recrean vistas con DROP +
-        # CREATE, y un DROP se lleva los GRANT que `apply_grants` concede.
+        # F-047 metió los cuatro build que se lanzaban a mano y F-057 añadió
+        # el quinto. Van ANTES de publicar y de los grants: los cinco recrean
+        # vistas con DROP + CREATE, y un DROP se lleva los GRANT que
+        # `apply_grants` concede.
         "build_maestros",
         "build_compras",
         "build_retenciones",
+        "build_personal",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",
@@ -860,9 +862,6 @@ class _PgDeCli:
         self.pasos.append((kwargs.get("step", "?"), kwargs.get("status", "?")))
         return 1
 
-    def record_run(self, *_a, **_k):
-        return 1
-
     # lo que usa el paso
     def execute_sql_file(self, path, **_k):
         self.llamadas.append(f"execute_sql_file:{path.name}")
@@ -963,7 +962,7 @@ def test_f006_da1_los_builds_manuales_no_republican_el_diccionario() -> None:
     fuente = Path(main.__file__).read_text(encoding="utf-8")
 
     for comando in ("build-cierre", "build-compras", "build-maestros",
-                    "build-retenciones"):
+                    "build-retenciones", "build-personal"):
         inicio = fuente.index(f'@cli.command("{comando}")')
         fin = fuente.index("@cli.command(", inicio + 10)
         assert "PublicarDiccionarioStep" not in fuente[inicio:fin], comando

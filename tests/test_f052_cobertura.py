@@ -481,10 +481,39 @@ def test_f052_r17_lanzado_a_mano_sale_distinto_de_0_si_hay_hallazgos(cli):
 
 
 def test_f052_r13_el_comando_sale_0_cuando_todo_esta_declarado(cli):
-    resultado = cli(PgFalso()).invoke(main.cli, ["check-cobertura"])
+    """Verde de verdad: se han mirado combinaciones y ninguna es un hallazgo.
+
+    **Este test pasaba antes con `PgFalso()` a secas, sin ninguna fila**, y por
+    eso no cazó el defecto que se arregló el 2026-09-03: el comando salía con 0
+    habiendo mirado CERO combinaciones. Ahora se le da una combinación sana, que
+    es lo que hacía falta para que el verde signifique algo.
+    """
+    pg = PgFalso(
+        invisibles=[(1442383, "0599", "TANATORIO MAJADAHONDA", 7, 19_328, 19_328)]
+    )
+
+    resultado = cli(pg).invoke(main.cli, ["check-cobertura"])
 
     assert resultado.exit_code == 0
     assert MARCADOR_KO not in resultado.output
+
+
+def test_f052_r13_sobre_CERO_combinaciones_el_comando_sale_KO(cli):  # noqa: N802
+    """**El defecto arreglado el 2026-09-03, dentro de F-025.**
+
+    No es una mejora teórica: pasó contra producción. `stg.plan_mensual` estaba
+    truncada al 21,6 % por la avería del 02-sep, las dos consultas devolvieron
+    cero filas y `check-cobertura` dijo OK. Un guardián que da verde cuando no ha
+    podido mirar es peor que no tenerlo, porque entrena a quien lo lee a
+    creerle. El propio módulo ya lo declaraba en el docstring de `Veredicto`
+    —«un veredicto verde sobre cero filas no es un verde»— y el código no lo
+    aplicaba.
+    """
+    resultado = cli(PgFalso()).invoke(main.cli, ["check-cobertura"])
+
+    assert resultado.exit_code == 1
+    assert MARCADOR_KO in resultado.output
+    assert "no se ha comprobado nada" in resultado.output
 
 
 def test_f052_r17_dentro_de_run_all_avisa_y_NO_tumba_el_job():  # noqa: N802
@@ -565,3 +594,64 @@ def test_f052_r16_una_clave_que_nadie_lee_rompe_la_carga(tmp_path):
 
     with pytest.raises(ValueError, match="claves que nadie lee"):
         cargar_excepciones(fichero)
+
+
+# ---------------------------------------------------------------------------
+# El arreglo del 2026-09-03: cero combinaciones NO es un verde
+#
+# Se anade dentro de F-025 por acuerdo del humano. La razon de que entre ahi y
+# no en una feature propia: F-025 construye su guardian con el MISMO patron
+# -`check-ventana`, marcador estable, avisa y no bloquea- y no tenia sentido
+# replicar el defecto en el guardian nuevo y dejar el viejo roto.
+# ---------------------------------------------------------------------------
+
+
+def test_f052_r16_un_veredicto_sobre_cero_filas_es_KO():  # noqa: N802
+    """**Paso de verdad contra produccion el 2026-09-02.**
+
+    `stg.plan_mensual` estaba truncada al 21,6 % por la averia, las dos
+    consultas devolvieron cero filas y el veredicto salio en verde. "No hay nada
+    malo" y "no he podido mirar" son cosas distintas y se parecen mucho en un
+    informe: confundirlas es la definicion exacta del modo de fallo que esta
+    feature existe para eliminar.
+    """
+    resultado = veredicto([], [])
+
+    assert resultado.filas_miradas == 0
+    assert resultado.no_ha_mirado_nada is True
+    assert resultado.hay_hallazgos is False, "no hay hallazgos, y aun asi es KO"
+    assert resultado.codigo == 1
+
+
+def test_f052_r16_sobre_cero_filas_SI_se_emite_el_marcador():  # noqa: N802
+    """La alerta tiene que dispararse tambien en este caso: si el guardian no
+    puede mirar, alguien tiene que enterarse. Y el marcador lo dice: `sin
+    comprobar`, no `hallazgos`."""
+    resultado = veredicto([], [])
+
+    assert MARCADOR_KO in resultado.marcador
+    assert "combinaciones_miradas=0" in resultado.marcador
+    assert "sin_comprobar=1" in resultado.marcador
+
+
+def test_f052_r16_el_informe_explica_que_no_es_un_verde():
+    texto = formatear(veredicto([], []))
+
+    assert "no se ha comprobado nada" in texto
+    assert "OK " not in texto
+
+
+def test_f052_r16_una_sola_combinacion_sana_ya_es_un_verde_de_verdad():
+    """El contraste. Con una combinacion mirada y limpia, el verde significa
+    algo y el marcador NO se emite: un marcador que aparece todas las noches
+    entrena a todo el mundo a ignorarlo."""
+    sana = FilaCobertura(
+        obra_id=1, codigo_obra="0710", nombre_obra="VIVA",
+        ambito_id=3, filas_stg=100, filas_mart=100, huerfanas=0,
+    )
+    resultado = veredicto([sana], [])
+
+    assert resultado.filas_miradas == 1
+    assert resultado.no_ha_mirado_nada is False
+    assert resultado.codigo == 0
+    assert resultado.marcador == ""

@@ -21,9 +21,10 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         del MCP. `run-all` ya lo hace al final;
                                         a mano solo hace falta tras lanzar
                                         build-cierre, build-compras,
-                                        build-maestros o build-retenciones
-                                        sueltos: recrean vistas con DROP +
-                                        CREATE y un DROP se lleva los GRANT
+                                        build-maestros, build-retenciones o
+                                        build-personal sueltos: recrean vistas
+                                        con DROP + CREATE y un DROP se lleva
+                                        los GRANT
     python main.py timings            - Tiempos por paso de _meta.etl_runs
     python main.py fingerprint-views  - Huella de las vistas de consumo a CSV
     python main.py compare-fingerprints LOCAL AZURE
@@ -39,6 +40,12 @@ Coherencia y frescura (F-024). Los dos son de SOLO LECTURA:
     python main.py check-declarados   - ¿Existe en la base todo lo que el SQL
                                         del repositorio declara crear? (F-047)
                                         Corre solo al final de run-all
+    python main.py check-cp-tipologia - ¿Materializar FactCPTipologia cambió
+                                        alguna cifra? (F-078) Enfrenta
+                                        `mart.fact_cp_tipologia` a una
+                                        fotografía congelada del cálculo que
+                                        hacía la vista antes. Sale != 0 si hay
+                                        diferencias o si la tabla está vacía
 
 Un cierre por mes en los ámbitos reales (F-042). Los tres son de SOLO LECTURA:
 
@@ -82,51 +89,61 @@ from pathlib import Path
 # Permite ejecutar `python main.py` desde la raíz del proyecto sin instalar el paquete
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import click  # noqa: E402
+import click
 
-from config.settings import get_build_info, get_settings  # noqa: E402
-from etl_sigrid.application.orchestrator import Orchestrator  # noqa: E402
+from config.settings import get_build_info, get_settings
+from etl_sigrid.application.orchestrator import Orchestrator
 from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
+from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep
+from etl_sigrid.application.steps.build_compras_step import BuildComprasStep
+from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep
+from etl_sigrid.application.steps.build_mart_step import BuildMartStep
+from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
+from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep
+from etl_sigrid.application.steps.build_stg_step import (
+    BuildStgStep,
+    sello_vigente_del_repositorio,
+)
+from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
+from etl_sigrid.application.steps.load_excel_aux_step import LoadExcelAuxStep
 from etl_sigrid.application.steps.publicar_diccionario_step import (
     PublicarDiccionarioStep,
-)  # noqa: E402
-from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep  # noqa: E402
-from etl_sigrid.application.steps.build_compras_step import BuildComprasStep  # noqa: E402
-from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep  # noqa: E402
-from etl_sigrid.application.steps.build_retenciones_step import BuildRetencionesStep  # noqa: E402
-from etl_sigrid.application.steps.build_mart_step import BuildMartStep  # noqa: E402
-from etl_sigrid.application.steps.build_stg_step import BuildStgStep  # noqa: E402
-from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep  # noqa: E402
-from etl_sigrid.application.steps.load_excel_aux_step import LoadExcelAuxStep  # noqa: E402
-from etl_sigrid.domain.coherencia import (  # noqa: E402
+)
+from etl_sigrid.domain.coherencia import (
     evaluar_coherencia_raw,
     evaluar_coherencia_stg,
     formatear_veredicto_stg,
 )
-from etl_sigrid.domain.ejecucion import Ejecucion, nueva_ejecucion  # noqa: E402
-from etl_sigrid.domain.entities import StepResult, StepStatus  # noqa: E402
-from etl_sigrid.domain.extraccion import (  # noqa: E402
+from etl_sigrid.domain.ejecucion import Ejecucion, nueva_ejecucion
+from etl_sigrid.domain.entities import StepResult, StepStatus
+from etl_sigrid.domain.extraccion import (
     comparar_cap,
     format_bench,
     resumen_bench,
 )
-from etl_sigrid.domain.perfil_carga import (  # noqa: E402
+from etl_sigrid.domain.perfil_carga import (
     format_perfil,
     perfil_de_carga,
 )
-from etl_sigrid.domain.tiemod import (  # noqa: E402
+from etl_sigrid.domain.recuentos import (
+    TOLERANCIA_DERIVA_PCT,
+    comparar_recuentos,
+    formatear as formatear_recuentos,
+)
+from etl_sigrid.domain.tiemod import (
     comparar_tiemod,
     escribir_csv_tiemod,
     format_comparacion,
     format_diagnostico,
     leer_csv_tiemod,
 )
-from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger  # noqa: E402
-from etl_sigrid.infrastructure.postgres.conninfo import (  # noqa: E402
+from etl_sigrid.domain.ventana import formatear_ventana
+from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger
+from etl_sigrid.infrastructure.postgres.conninfo import (
     make_admin_conninfo_provider,
     make_conninfo_provider,
 )
-from etl_sigrid.infrastructure.postgres.fingerprint import (  # noqa: E402
+from etl_sigrid.infrastructure.postgres.fingerprint import (
     comparar,
     construir_huella,
     escribir_csv,
@@ -134,22 +151,25 @@ from etl_sigrid.infrastructure.postgres.fingerprint import (  # noqa: E402
     mes_a_fecha,
     veredicto,
 )
-from etl_sigrid.infrastructure.postgres.frescura import (  # noqa: E402
+from etl_sigrid.infrastructure.postgres.frescura import (
     UMBRAL_FRESCURA_HORAS,
     VEREDICTO_FRESCO,
     format_estado_raw,
     format_frescura,
 )
-from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient  # noqa: E402
-from etl_sigrid.infrastructure.postgres.step_run_recorder import (  # noqa: E402
+from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+from etl_sigrid.infrastructure.postgres.step_run_recorder import (
     PostgresStepRunRecorder,
 )
-from etl_sigrid.infrastructure.postgres.timings import format_timings  # noqa: E402
-from etl_sigrid.infrastructure.sigrid.bench_extraccion import (  # noqa: E402
+from etl_sigrid.infrastructure.postgres.timings import format_timings
+from etl_sigrid.infrastructure.sigrid.bench_extraccion import (
     barrer_paginas,
     escribir_csv_bench,
 )
-from etl_sigrid.infrastructure.sigrid.sigrid_api_client import SigridApiClient  # noqa: E402
+from etl_sigrid.infrastructure.sigrid.sigrid_api_client import (
+    SigridApiClient,
+    SigridApiError,
+)
 
 #: Cap de filas por petición que documenta `azure-apps/sigrid_api.md`. El real
 #: son 20.000 (DA-6, dato del humano el 2026-08-18): la divergencia se avisa,
@@ -184,6 +204,23 @@ def _get_pg() -> PostgresClient:
         target_db=pg.db,
         auto_create_db=pg.auto_create_db,
         set_role=pg.set_role,
+    )
+
+
+def _get_api() -> SigridApiClient:
+    """Construye el cliente de `sigrid-api` con lo que declara el `.env`.
+
+    Existe por el mismo motivo que `_get_pg`: un único sitio donde se decide
+    cómo se abre la puerta a Sigrid, que es lo que permite doblarla entera en
+    un test sin tocar la red.
+    """
+    api = get_settings().sigrid_api
+    return SigridApiClient(
+        base_url=api.base_url,
+        function_key=api.function_key.get_secret_value(),
+        database=api.database,
+        page_size=api.page_size,
+        timeout_s=api.timeout_s,
     )
 
 
@@ -374,7 +411,16 @@ def load_aux() -> None:
          "veredicto se evalúa y se registra igual, como SKIPPED. NO existe "
          "en run-all.",
 )
-def stage(sin_puerta: bool) -> None:
+@click.option(
+    "--reconstruir-todo",
+    "reconstruir_todo",
+    is_flag=True,
+    default=False,
+    help="Ignora la ventana y rehace TODAS las obras esta vez (F-025). Es lo "
+         "que hace sola la noche del domingo; este flag sirve para forzarlo a "
+         "mano. Cuesta lo que costaba la nocturna entera.",
+)
+def stage(sin_puerta: bool, reconstruir_todo: bool) -> None:
     """Materializa stg.* desde raw.* (tipado, derivaciones, sin lógica de negocio).
 
     Antes de tocar nada comprueba que TODAS las tablas de raw declaradas en
@@ -387,7 +433,10 @@ def stage(sin_puerta: bool) -> None:
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(
         BuildStgStep(
-            settings, batch_id=ejecucion.batch_id, omitir_puerta=sin_puerta
+            settings,
+            batch_id=ejecucion.batch_id,
+            omitir_puerta=sin_puerta,
+            reconstruir_todo=reconstruir_todo,
         ),
         pg,
         ejecucion,
@@ -434,6 +483,7 @@ def build_pipeline_steps(
     full_refresh: bool = False,
     batch_id: str | None = None,
     pg: PostgresClient | None = None,
+    reconstruir_todo: bool = False,
 ) -> list:
     """
     Composición del pipeline de `run-all`.
@@ -449,24 +499,33 @@ def build_pipeline_steps(
     dos steps del pipeline recibe `omitir_puerta`: `run-all` no tiene vía de
     escape a propósito.
 
-    F-047 (que absorbe F-044) mete aquí los CUATRO build que se lanzaban a
-    mano. El orden dentro de la lista es legible, pero lo que lo GARANTIZA es
-    el `depends_on` de cada paso, que es lo que obedece el orden topológico.
+    F-047 (que absorbe F-044) metió aquí los CUATRO build que se lanzaban a
+    mano, y F-057 añadió el quinto (`build_personal`). El orden dentro de la
+    lista es legible, pero lo que lo GARANTIZA es el `depends_on` de cada paso,
+    que es lo que obedece el orden topológico.
     """
     pasos = [
         IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
         LoadExcelAuxStep(settings),
-        BuildStgStep(settings, batch_id=batch_id),
+        BuildStgStep(
+            settings, batch_id=batch_id, reconstruir_todo=reconstruir_todo
+        ),
         BuildMartStep(settings, batch_id=batch_id),
-        # F-047: los cuatro esquemas que se construían a mano y podían estar
-        # arbitrariamente desfasados respecto a `raw` y `stg`. `maestro`,
-        # `compras` y `retenciones` solo leen de `raw`; `cierre` lee de `stg` y
+        # F-047: los esquemas de negocio que se construían a mano y podían estar
+        # arbitrariamente desfasados respecto a `raw` y `stg`. `compras` y
+        # `retenciones` solo leen de `raw`; `maestro` lee también de `stg`
+        # desde F-073 (las dos marcas de `maestro.obras`); `cierre` lee de `stg` y
         # va DESPUÉS de `build_mart` porque `mart/03_agg_categoria.sql` dropea
         # con CASCADE la tabla de la que cuelga `cierre.v_pbi_planif_vs_real`.
         # Eso lo declara `BuildCierreStep.depends_on`, no esta posición.
         BuildMaestrosStep(settings),
         BuildComprasStep(settings),
         BuildRetencionesStep(settings),
+        # F-057: `personal` entra como QUINTO build de negocio. Lee `stg.obras`
+        # para la marca `en_seguimiento`, y eso lo declara su `depends_on`; la
+        # posición aquí es legibilidad. Nadie depende de él a propósito: si
+        # falla, la noche continúa y termina.
+        BuildPersonalStep(settings),
         BuildCierreStep(settings),
         # F-006: entre build_mart y apply_grants, y el orden NO es cosmético.
         # `apply_grants` concede SELECT ON ALL TABLES IN SCHEMA _meta, que es
@@ -493,15 +552,33 @@ def build_pipeline_steps(
 
 @cli.command("run-all")
 @click.option("--full", "full_refresh", is_flag=True, default=False)
-def run_all(full_refresh: bool) -> None:
+@click.option(
+    "--reconstruir-todo",
+    "reconstruir_todo",
+    is_flag=True,
+    default=False,
+    help="Ignora la ventana de negocio y rehace TODAS las obras (F-025). No "
+         "hace falta programarlo: la noche del domingo se dispara sola por "
+         "antiguedad registrada. Esta bandera es para forzarla a mano.",
+)
+def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
     Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
-    los cuatro build (maestros, compras, retenciones, cierre) →
+    los cinco build (maestros, compras, retenciones, personal, cierre) →
     publicar_diccionario → apply_grants.
 
-    Los cuatro esquemas que antes se construían a mano entraron aquí con F-047:
-    se quedaban desfasados semanas y, en el caso de `cierre`, la nocturna
-    llegaba a DESTRUIR una de sus vistas sin recrearla.
+    Cuatro de esos esquemas se construían antes a mano y entraron aquí con
+    F-047: se quedaban desfasados semanas y, en el caso de `cierre`, la
+    nocturna llegaba a DESTRUIR una de sus vistas sin recrearla. El quinto,
+    `personal` —recursos, partes de trabajo y horas por obra—, nació ya dentro
+    de la nocturna con F-057.
+
+    Los cinco comparten una propiedad que hay que conocer antes de leer un dato
+    suyo: **ninguno es dependencia de ningún otro paso**, así que un fallo en
+    cualquiera de ellos deja su esquema con el dato de una noche anterior
+    mientras `raw`, `stg` y `mart` están al día, y la noche termina en verde.
+    Eso es `R-FRESCURA`, y por eso toda respuesta que salga de ellos cita su
+    fecha de build.
 
     Al terminar contrasta el SQL del repositorio contra el catálogo real
     (`check-declarados`): si un build no ha creado lo que el repositorio
@@ -511,7 +588,11 @@ def run_all(full_refresh: bool) -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     steps = build_pipeline_steps(
-        settings, full_refresh, batch_id=ejecucion.batch_id, pg=pg
+        settings,
+        full_refresh,
+        batch_id=ejecucion.batch_id,
+        pg=pg,
+        reconstruir_todo=reconstruir_todo,
     )
     # El grabador deja una fila por paso en _meta.etl_runs: es lo que después
     # leen `python main.py timings` y la vista _meta.v_frescura. Si falla, el
@@ -541,6 +622,13 @@ def run_all(full_refresh: bool) -> None:
     # UNICA via por la que este hallazgo llega a una persona.
     click.echo("")
     _guardian_de_cobertura(pg)
+
+    # F-025, EL TERCER GUARDIAN. Mismo trato que el de F-052 y por el mismo
+    # motivo (DA-5): avisa y NO entra en el codigo de salida. Vigila que
+    # ninguna de las 880 obras congeladas envejezca en silencio, que es el modo
+    # de fallo que esta feature existe para eliminar.
+    click.echo("")
+    _guardian_de_ventana(pg)
 
     failed = sum(1 for r in results if r.status == StepStatus.FAILED)
     if failed or not guardian_ok:
@@ -572,7 +660,7 @@ def _guardian_de_lo_declarado(pg: PostgresClient) -> bool:
             pg.list_objetos_catalogo(list(ESQUEMAS_DEL_DATAMART)),
             cargar_pendientes_construccion(),
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         click.secho(
             f"KO   no se pudo comprobar lo declarado contra la base: {e}",
             fg="red", err=True,
@@ -714,7 +802,6 @@ def check_diccionario_cmd() -> None:
 
     Sale con codigo 1 si hay discrepancias.
     """
-    import pathlib as _pathlib
 
     from etl_sigrid.application.steps.publicar_diccionario_step import DIR_DICCIONARIO
     from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
@@ -823,6 +910,10 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     """
     Comprueba contra la base que cada `clave_negocio` declarada identifica UNA fila.
 
+    Y desde F-108 tambien cada `claves_alternativas` (`maestro.obras.clave_obra`),
+    excluyendo las filas con la clave a NULL: una alternativa rota sale con 1,
+    igual que la de negocio.
+
     Es la mitad del problema que la puerta offline no puede cubrir: sabe si la
     clave nombra columnas de mas, pero no si es demasiado CORTA. Y esa mitad se
     propaga, porque la deteccion de fan-out deriva la unicidad de la clave
@@ -852,15 +943,21 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     consultas = consultas_de_unicidad(dicc, solo_consumo=not todos)
     saltados = objetos_saltados(dicc, solo_consumo=not todos)
 
+    alternativas = sum(1 for c in consultas if c.tipo_clave == "alternativa")
+
     alcance = "TODO objeto con clave" if todos else "solo la superficie de consumo"
     click.echo(f"Comprobacion de unicidad · {alcance}")
-    click.echo(f"  {len(consultas)} objeto(s) a comprobar, {len(saltados)} saltado(s)")
+    click.echo(
+        f"  {len(consultas)} comprobacion(es) ({alternativas} de clave alternativa), "
+        f"{len(saltados)} saltado(s)"
+    )
     click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
     click.echo("")
 
     if dry_run:
         for c in consultas:
-            click.echo(f"-- {c.objeto}  clave: ({', '.join(c.clave)})")
+            etiqueta = "clave alternativa" if c.tipo_clave == "alternativa" else "clave"
+            click.echo(f"-- {c.objeto}  {etiqueta}: ({', '.join(c.clave)})")
             click.echo(c.sql + ";")
             click.echo("")
         click.echo(f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion.")
@@ -870,10 +967,18 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
     fallos = 0
     sin_comprobar = 0
     inexistentes = 0
+    # F-108: un objeto puede tener varias claves. Si no existe, se dice UNA vez
+    # y sus demas consultas ni se lanzan ni se cuentan.
+    no_existen: set[str] = set()
+    omitidas = 0
     for c in consultas:
+        if c.objeto in no_existen:
+            omitidas += 1
+            continue
         resultado = pg.comprobar_unicidad(c, timeout)
         if resultado == "NO_EXISTE":
             inexistentes += 1
+            no_existen.add(c.objeto)
             click.echo(veredicto_no_existe(c))
             continue
         if resultado is None:
@@ -887,7 +992,7 @@ def check_unicidad_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
 
     click.echo("")
     click.echo(
-        f"Resumen: {len(consultas) - fallos - sin_comprobar - inexistentes} sin "
+        f"Resumen: {len(consultas) - omitidas - fallos - sin_comprobar - inexistentes} sin "
         f"contradiccion, {fallos} con la clave rota, {sin_comprobar} sin "
         f"comprobar, {inexistentes} fichados que no existen en la base."
     )
@@ -1010,6 +1115,100 @@ def check_relaciones_cmd(todos: bool, timeout: int, dry_run: bool) -> None:
         "equivocada y coincidir. Prueba que une, que es otra cosa."
     )
     if fallos or sin_comprobar or inexistentes:
+        raise SystemExit(1)
+
+
+@cli.command("check-cp-tipologia")
+@click.option(
+    "--obra", "obra_id", type=int, default=None,
+    help="obra_id; acota la comparacion a una sola obra (mucho mas barata).",
+)
+@click.option(
+    "--timeout",
+    default=None,
+    type=int,
+    help="Segundos de SET LOCAL statement_timeout. Por defecto, 1800.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime la consulta y NO abre conexion.",
+)
+def check_cp_tipologia_cmd(obra_id: int | None, timeout: int | None, dry_run: bool) -> None:
+    """
+    Comprueba que materializar FactCPTipologia no cambio ni una cifra (F-078).
+
+    F-078 movio el calculo de `mart.v_pbi_cp_tipologia` de la vista a la tabla
+    `mart.fact_cp_tipologia`. Como la vista ahora LEE de la tabla, compararlas
+    entre si no demostraria nada. Lo que hace este comando es enfrentar la tabla
+    contra una FOTOGRAFIA CONGELADA del calculo anterior, que recalcula desde
+    `stg.plan_mensual` y `stg.partidas`, fila a fila sobre las claves
+    (obra_id, anio, tipologia) y sobre los tres importes.
+
+    Sale con codigo 1 si hay alguna diferencia, y TAMBIEN si la tabla esta
+    vacia: cero diferencias entre dos conjuntos vacios no es un OK.
+
+    OJO CON EL DIA. La logica usa CURRENT_DATE para decidir el ano en curso y el
+    mes de corte. En la tabla esa fecha quedo congelada en el build; aqui se
+    evalua ahora. Comparalo el MISMO dia en que se construyo la tabla.
+
+    OJO CON EL COSTE. La mitad izquierda es exactamente la consulta que no
+    terminaba en 60 s y que motivo la feature: cinco recorridos de
+    `stg.plan_mensual` (29,8 M de filas, 11 GB). Por eso el statement_timeout
+    por defecto es de media hora. Con `--obra` se desploma, y sirve de sonda
+    antes de lanzar la comparacion entera.
+
+    Solo lectura: la transaccion va READ ONLY con su statement_timeout, porque
+    esto corre contra un servidor compartido con `albaranes` y `partes` EN
+    PRODUCCION.
+    """
+    from etl_sigrid.infrastructure.postgres.cp_tipologia_sql import (
+        TIMEOUT_POR_CONSULTA_S,
+        diferencias_de,
+        sql_comparacion,
+        sql_recuento_tabla,
+        veredicto,
+    )
+
+    segundos = TIMEOUT_POR_CONSULTA_S if timeout is None else timeout
+    consulta = sql_comparacion(obra_id)
+    recuento = sql_recuento_tabla(obra_id)
+
+    click.echo("CP por tipologia · la vista de ANTES contra la tabla de AHORA")
+    click.echo(f"  statement_timeout = {segundos}s, transaccion READ ONLY")
+    if obra_id is not None:
+        click.echo(f"  acotado a la obra {obra_id}")
+    click.echo("")
+
+    if dry_run:
+        click.echo("-- recuento de la tabla nueva")
+        click.echo(recuento + ";")
+        click.echo("")
+        click.echo("-- comparacion")
+        click.echo(consulta + ";")
+        click.echo("")
+        click.echo("-- No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    filas_tabla = int(pg.filas_solo_lectura(recuento, segundos)[0][0])
+    diferencias = diferencias_de(pg.filas_solo_lectura(consulta, segundos))
+
+    for d in diferencias[:50]:
+        click.echo(
+            f"  obra {d.obra_id}  {d.anio}  {d.tipologia:<16}  {d.motivo}\n"
+            f"      cp_real        antes={d.cp_real_antes}  ahora={d.cp_real_ahora}\n"
+            f"      cp_planificado antes={d.cp_plan_antes}  ahora={d.cp_plan_ahora}\n"
+            f"      cp_desviacion  antes={d.cp_desv_antes}  ahora={d.cp_desv_ahora}"
+        )
+    if len(diferencias) > 50:
+        click.echo(f"  ... y {len(diferencias) - 50} diferencia(s) mas.")
+
+    resultado = veredicto(diferencias, filas_tabla)
+    click.secho(resultado, fg="green" if resultado.startswith("OK") else "red")
+
+    if not resultado.startswith("OK"):
         raise SystemExit(1)
 
 
@@ -1250,7 +1449,7 @@ def _guardian_de_cobertura(pg: PostgresClient):
             ),
             cargar_excepciones(),
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         click.secho(
             f"?    no se pudo comprobar la cobertura stg -> mart: {e}. NO es un "
             f"OK: la nocturna sigue, pero esta noche nadie ha mirado si falta "
@@ -1265,6 +1464,291 @@ def _guardian_de_cobertura(pg: PostgresClient):
     return resultado
 
 
+@cli.command("ventana-plan")
+@click.option(
+    "--reconstruir-todo",
+    "reconstruir_todo",
+    is_flag=True,
+    default=False,
+    help="Simula la noche del domingo: la reconstruccion completa.",
+)
+@click.option(
+    "--detalle",
+    is_flag=True,
+    default=False,
+    help="Lista obra a obra, con su motivo. Sin esto solo sale el resumen.",
+)
+def ventana_plan_cmd(reconstruir_todo: bool, detalle: bool) -> None:
+    """
+    Que obras se reconstruirian esta noche y cuales no, y POR QUE (F-025, T16).
+
+    DRY-RUN: solo lectura, no escribe ni una fila y no construye nada. Es la
+    forma de mirar el criterio antes de encenderlo, y de comprobar despues que
+    el conjunto sigue siendo el que dice `mediciones.md`.
+
+    EL CRITERIO LO DECIDIO EL HUMANO el 2026-09-02 y son tres reglas en UNION:
+    estado EN ESTUDIO (1), NO PRESENTADA (11) o CERRADA (25); codigo de seis
+    digitos; o sin actividad en 12 meses. Censo esperado sobre las 920 obras
+    del maestro: 880 congeladas y 40 vivas.
+
+    OJO CON LA CONTRAPARTIDA, que esta aceptada y medida: de las 48 obras CON
+    actividad en los ultimos 12 meses, 8 quedan igualmente congeladas -7
+    CERRADAS y 1 de seis digitos, la 180501-, asi que sus datos pueden llevar
+    hasta 6 dias de retraso entre reconstrucciones completas. No es un defecto:
+    es la decision del humano tomada con ese dato delante.
+
+    CIFRA CORREGIDA el 2026-09-03: antes decia 40, con un desglose -39 CERRADAS,
+    36 por el cierre de 2025-12- que NO reproduce. Salia de `maestro.obras`;
+    manda `SQL_ESTADO_OBRAS`, que es lo que ejecuta el guardian cada noche.
+
+    Lee `stg.fases` y `raw`, asi que da el plan que se ejecutaria AHORA, con lo
+    que haya construido en este momento.
+    """
+    from etl_sigrid.domain.ventana import clasificar_obras, criterio_desde_reglas
+
+    settings = get_settings()
+    pg = _get_pg()
+
+    paso = BuildStgStep(settings, reconstruir_todo=reconstruir_todo)
+    sello = sello_vigente_del_repositorio(settings)
+    completa, motivo_completa = paso._toca_completa(pg)
+    if not settings.postgres.ventana_activa:
+        completa = True
+        motivo_completa = "la ventana esta DESACTIVADA (PG_VENTANA_ACTIVA=false)"
+
+    censo = pg.fetch_censo_de_obras()
+    plan = clasificar_obras(
+        censo,
+        criterio_desde_reglas(settings.business_rules, settings.postgres.ventana_meses),
+        datetime.utcnow().date(),
+        sello,
+        completa=completa,
+        rescate=settings.postgres.ventana_rescate,
+    )
+
+    click.echo("Ventana de negocio - DRY RUN, ni una escritura")
+    click.echo(f"  ventana activa: {settings.postgres.ventana_activa}")
+    click.echo(f"  rescate:        {settings.postgres.ventana_rescate}")
+    click.echo(f"  sello del SQL:  {sello[:16]}...")
+    click.echo(f"  completa:       {completa} ({motivo_completa})")
+    click.echo("")
+    click.echo(
+        f"{len(censo)} obra(s) censadas: "
+        f"{len(plan.reconstruir)} se reconstruirian, "
+        f"{len(plan.congelar)} se quedarian con su ultima version buena."
+    )
+    click.echo("")
+    click.echo("Por motivo:")
+    for motivo, cuantas in sorted(plan.por_motivo.items()):
+        click.echo(f"  {motivo:<12} {cuantas}")
+
+    if plan.denunciadas:
+        click.echo("")
+        click.secho(
+            f"AVISO: {len(plan.denunciadas)} obra(s) congeladas cuyo ORIGEN ha "
+            f"cambiado. No se reconstruyen por su cuenta -contradiria la "
+            f"decision del humano- pero quedan nombradas:",
+            fg="yellow",
+        )
+        for decision in plan.denunciadas:
+            click.echo(f"  {decision.como_texto()}")
+
+    if detalle:
+        click.echo("")
+        for decision in plan.reconstruir + plan.congelar:
+            click.echo(decision.como_texto())
+    else:
+        click.echo("")
+        click.echo("Obra a obra, con su motivo: anade --detalle.")
+
+    if not censo:
+        click.secho(
+            "KO   el censo ha salido VACIO. Eso no es 'no hay nada que hacer': "
+            "es que no se ha podido mirar. Revisa que `raw.obr` y `raw.con` "
+            "esten cargadas.",
+            fg="red", err=True,
+        )
+        raise SystemExit(1)
+
+
+@cli.command("check-ventana")
+@click.option(
+    "--timeout",
+    default=120,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+def check_ventana_cmd(timeout: int, dry_run: bool) -> None:
+    """
+    Vigila que ninguna obra congelada envejezca EN SILENCIO (F-025, R26, R27).
+
+    Es el guardian de esta feature, y existe por la misma razon que
+    `check-cobertura` de F-052: el modo de fallo a impedir no es un numero mal
+    sumado, es UN DATO QUE ENVEJECE Y DEL QUE NADIE SE ENTERA. Con 880 obras
+    congeladas hay cuatro maneras de que eso pase y las mira las cuatro:
+
+      * FIRMA DIVERGENTE   la obra congelada ha cambiado en Sigrid. No se
+                           rescata -contradiria la decision del humano- pero se
+                           NOMBRA, y el domingo la pone al dia.
+      * CONGELADA SIN FILAS no deberia poder pasar (R18 la reconstruiria). Si
+                           pasa, la obra esta ausente del datamart.
+      * SELLO NO VIGENTE   se quedo con una version anterior del SQL, porque
+                           la noche en que cambio murio a mitad.
+      * COMPLETA VENCIDA   el domingo no corrio y el "hasta 6 dias" que el
+                           humano acepto ha dejado de ser cierto.
+
+    UN VERDE SOBRE CERO OBRAS ES UN KO. Si `_meta.obra_build` esta vacia no hay
+    nada que comprobar, y decir OK seria confundir "no hay nada malo" con "no he
+    podido mirar". Es el defecto que se le arreglo a `check-cobertura` el
+    2026-09-03; este guardian nace con el resuelto.
+
+    LANZADO A MANO sale con codigo 1 si hay algo que mirar. DENTRO DE `run-all`
+    avisa y NO tumba el job (DA-5): registra el marcador y la nocturna termina
+    en verde, asi que la unica via por la que esto se hace oir es la regla de
+    infra/97_create_alert_ventana.ps1. SIN DESPLEGARLA, EL GUARDIAN ES MUDO.
+
+    Solo lectura: transaccion READ ONLY con su statement_timeout. Las cuatro
+    consultas van sobre `_meta.obra_build`, que tiene una fila por obra, asi que
+    son baratas incluso con el servidor sin creditos.
+    """
+    from etl_sigrid.infrastructure.postgres.ventana_sql import consultas_de_ventana
+
+    settings = get_settings()
+    sello = sello_vigente_del_repositorio(settings)
+    consultas = consultas_de_ventana(sello, timeout)
+
+    click.echo("Ventana de negocio - SOLO LECTURA, transaccion READ ONLY")
+    click.echo(f"  statement_timeout = {timeout}s por consulta")
+    click.echo(f"  sello vigente     = {sello[:16]}...")
+    click.echo("")
+
+    if dry_run:
+        for consulta in consultas:
+            click.echo(f"-- {consulta.nombre}")
+            click.echo(consulta.sql + ";")
+            click.echo("")
+        click.echo(
+            f"-- {len(consultas)} consulta(s). No se ha abierto ninguna conexion."
+        )
+        return
+
+    veredicto = _veredicto_de_ventana(_get_pg(), settings, sello, timeout)
+    if veredicto is None:
+        raise SystemExit(1)
+
+    click.echo(formatear_ventana(veredicto))
+    if veredicto.codigo:
+        _emitir_marcador_de_ventana(veredicto)
+        raise SystemExit(veredicto.codigo)
+
+
+def _veredicto_de_ventana(pg, settings, sello: str, timeout: int):
+    """Ejecuta las cuatro lecturas y dicta el veredicto, o `None` si no se pudo.
+
+    Devolver `None` y no un veredicto vacio es deliberado: un veredicto vacio
+    saldria en verde, y "no se ha podido leer la base" no es "todo correcto".
+    """
+    from etl_sigrid.application.steps.build_stg_step import (
+        PASO_RECONSTRUCCION_COMPLETA,
+    )
+    from etl_sigrid.domain.ventana import (
+        DIAS_MAXIMOS_SIN_COMPLETA,
+        VeredictoVentana,
+    )
+    from etl_sigrid.infrastructure.postgres.ventana_sql import (
+        consultas_de_ventana,
+        hallazgo_completa_vencida,
+        hallazgos_de,
+    )
+
+    try:
+        por_nombre = {
+            c.nombre: pg.filas_solo_lectura(c.sql, c.timeout_s)
+            for c in consultas_de_ventana(sello, timeout)
+        }
+        ultima = pg.fetch_ultima_reconstruccion_completa(PASO_RECONSTRUCCION_COMPLETA)
+    except Exception as e:
+        click.secho(
+            f"?    no se pudo comprobar la ventana de negocio: {e}. NO es un "
+            f"OK: esta noche nadie ha mirado si una obra congelada se ha "
+            f"quedado vieja.",
+            fg="yellow", err=True,
+        )
+        return None
+
+    miradas = int(por_nombre["censo"][0][0]) if por_nombre["censo"] else 0
+    hallazgos = list(
+        hallazgos_de(
+            firma_divergente=por_nombre["firma_divergente"],
+            sin_filas=por_nombre["sin_filas"],
+            sello=por_nombre["sello"],
+        )
+    )
+
+    dias = None if ultima is None else (datetime.utcnow() - ultima).total_seconds() / 86400.0
+    if dias is None or dias >= DIAS_MAXIMOS_SIN_COMPLETA:
+        hallazgos.append(hallazgo_completa_vencida(dias, DIAS_MAXIMOS_SIN_COMPLETA))
+
+    return VeredictoVentana(
+        hallazgos=tuple(hallazgos),
+        obras_miradas=miradas,
+        dias_desde_completa=dias,
+    )
+
+
+def _emitir_marcador_de_ventana(veredicto) -> None:
+    """Escribe la linea que dispara la alerta, por consola Y por el log (R27).
+
+    Por las dos porque no se sabe cual de las dos mira la regla: en el job la
+    salida de `click` y la del logger acaban las dos en
+    `ContainerAppConsoleLogs_CL`. Misma leccion que F-052. El literal es uno solo
+    y vive en `domain/ventana.py`; lo cruza tests/test_f025_marcador.py.
+    """
+    from etl_sigrid.domain.ventana import MARCADOR_KO
+
+    click.secho(veredicto.marcador, fg="red")
+    get_logger("check-ventana").warning(
+        "ventana_ko",
+        marcador=MARCADOR_KO,
+        hallazgos=len(veredicto.hallazgos),
+        obras_miradas=veredicto.obras_miradas,
+        linea=veredicto.marcador,
+    )
+
+
+def _guardian_de_ventana(pg):
+    """La ventana al final de `run-all`. **Avisa y NO tumba el job** (DA-5).
+
+    Devuelve el veredicto, o `None` si no se pudo leer. `run-all` NO mira ese
+    valor para decidir su codigo de salida, y es una decision consciente con su
+    precio declarado: al terminar la noche en verde, la alerta de fallo
+    existente no se dispara, asi que la regla de
+    `infra/97_create_alert_ventana.ps1` pasa a ser la UNICA via por la que este
+    guardian se hace oir. **Si no se despliega, el guardian es mudo.**
+    """
+    settings = get_settings()
+    try:
+        sello = BuildStgStep(settings)._sello_vigente()
+    except Exception as e:
+        click.secho(f"?    no se pudo calcular el sello del SQL: {e}", fg="yellow", err=True)
+        return None
+
+    veredicto = _veredicto_de_ventana(pg, settings, sello, 120)
+    if veredicto is None:
+        return None
+
+    click.echo(formatear_ventana(veredicto))
+    if veredicto.codigo:
+        _emitir_marcador_de_ventana(veredicto)
+    return veredicto
+
+
 @cli.command("huella-obras")
 @click.option(
     "--out",
@@ -1275,12 +1759,13 @@ def _guardian_de_cobertura(pg: PostgresClient):
 )
 @click.option(
     "--desde",
-    type=click.Choice(["stg", "mart", "dimension", "cierre"]),
+    type=click.Choice(["stg", "mart", "dimension", "cierre", "plan_obra"]),
     default="stg",
     show_default=True,
     help="`stg` agrega stg.plan_mensual; `mart`, fact_seguimiento_categoria; "
          "`dimension`, el arbol de stg.partidas por obra; `cierre`, "
-         "cierre.fact_cierre_mensual por obra x mes x concepto.",
+         "cierre.fact_cierre_mensual por obra x mes x concepto; `plan_obra`, "
+         "filas e importe de stg.plan_mensual por obra x ambito (F-025).",
 )
 @click.option(
     "--propuesta",
@@ -1383,7 +1868,7 @@ def _cabecera_de(path: Path) -> list[str]:
 #: Las dos huellas nuevas de F-052, por el nombre con el que se piden en
 #: `--desde`. Viven aqui y no dentro del comando para que el propio comando
 #: pueda preguntar "¿es una de las nuevas?" antes de montar nada.
-_FORMATOS_AMPLIADOS = ("dimension", "cierre")
+_FORMATOS_AMPLIADOS = ("dimension", "cierre", "plan_obra")
 
 
 def _huella_ampliada_a_csv(
@@ -1589,6 +2074,104 @@ def check_coherencia() -> None:
     click.echo(formatear_veredicto_stg(veredicto_stg))
 
     if not veredicto_raw.ok or not veredicto_stg.ok:
+        sys.exit(1)
+
+
+def _contar_en_sigrid(api, source_table: str, where: str | None) -> int | None:
+    """`COUNT(*)` de una tabla de Sigrid, con su mismo filtro. `None` si falla.
+
+    Que la excepción se trague AQUÍ y no aborte el barrido es deliberado: con
+    56 tablas, parar en la primera que Sigrid rechaza deja sin mirar las 55
+    restantes. La tabla queda `sin_medir`, que **no** está conforme (R17).
+    """
+    consulta = f"SELECT COUNT(*) AS n FROM [dbo].[{source_table}]"
+    if where:
+        consulta = f"{consulta} WHERE {where}"
+    try:
+        respuesta = api.leer_sql(consulta, max_rows=1)
+    except SigridApiError as e:
+        click.secho(f"  ! {source_table}: Sigrid no contestó ({e})", fg="yellow", err=True)
+        return None
+    filas = respuesta["rows"]
+    return int(filas[0][0]) if filas else None
+
+
+def _horas_desde_ultima_ingesta(pg, paso: str = "ingest_raw") -> float | None:
+    """Horas desde la última ingesta correcta, o `None` si no se pudo saber.
+
+    Es **contexto** del informe de recuentos, no criterio: la deriva esperable
+    del origen es proporcional al tiempo transcurrido. Por eso la excepción se
+    traga entera —una `_meta.v_frescura` que no se puede leer no puede volver
+    rojo un día bueno ni verde uno malo— y por eso se usa la columna de la
+    vista tal cual, sin recalcular nada.
+    """
+    try:
+        filas = pg.fetch_frescura()
+    except Exception:  # el contexto nunca puede tumbar el veredicto
+        return None
+    return next(
+        (f.horas_desde_ultimo_ok for f in filas if f.paso == paso),
+        None,
+    )
+
+
+@cli.command("check-raw-recuentos")
+@click.option(
+    "--tolerancia-pct",
+    "tolerancia_pct",
+    type=float,
+    default=TOLERANCIA_DERIVA_PCT,
+    show_default=True,
+    help="Porcentaje de filas que Sigrid puede tener DE MÁS en una tabla sin "
+         "que cuente como fallo. Es por tabla y relativo a su tamaño. Con 0 "
+         "se exige igualdad exacta. Que Sigrid tenga filas de MENOS es alarma "
+         "siempre, y esta opción no la afecta.",
+)
+def check_raw_recuentos_cmd(tolerancia_pct: float) -> None:
+    """
+    ¿Tiene `raw` las mismas filas que Sigrid, tabla a tabla? SOLO LECTURA.
+
+    Una ingesta puede terminar «en verde» y dejar media tabla: un `COPY`
+    cortado, un timeout del balanceador, una página que no volvió. Este
+    comando manda un `COUNT(*)` por tabla declarada —con su mismo `where`— y
+    lo compara con el de `raw`.
+
+    No escribe en Sigrid ni registra la ejecución en `_meta.etl_runs`: no es un
+    paso del pipeline, es una pregunta. Fuera de `run-all` a propósito.
+
+    **La tolerancia tiene dirección.** Que Sigrid tenga filas de MÁS es la
+    deriva normal de un ERP vivo frente a una foto, y se acepta mientras no
+    pase de `--tolerancia-pct` en esa tabla. Que las tenga de MENOS es alarma
+    inmediata, sea de una fila: eso no lo hace el paso del tiempo. Una tabla
+    que falta en `raw`, o que Sigrid no pudo contar, sale con código 1 igual
+    que antes: «no he podido mirar» no es «está bien».
+    """
+    tablas = get_settings().tables_sigrid.get("tables", [])
+    pg = _get_pg()
+    sigrid: dict[str, int | None] = {}
+    raw: dict[str, int | None] = {}
+
+    with _get_api() as api:
+        for tabla in tablas:
+            origen = tabla["source_table"]
+            destino = tabla.get("target_table", origen)
+            sigrid[origen] = _contar_en_sigrid(api, origen, tabla.get("where"))
+            raw[origen] = (
+                pg.count_rows("raw", destino) if pg.table_exists("raw", destino) else None
+            )
+
+    informe = comparar_recuentos(
+        [t["source_table"] for t in tablas], sigrid, raw, tolerancia_pct=tolerancia_pct
+    )
+
+    click.secho("=== raw frente a Sigrid, tabla a tabla ===", fg="cyan", bold=True)
+    click.echo(
+        formatear_recuentos(
+            informe, horas_desde_ingesta=_horas_desde_ultima_ingesta(pg)
+        )
+    )
+
+    if not informe.ok:
         sys.exit(1)
 
 
@@ -3046,7 +3629,7 @@ def inspect_month(obra_id: int, anio_mes: str, top: int, ambito: str) -> None:
         cur.execute(sql_totales, {"obra": obra_id, "mes": anio_mes})
         tot_rows = cur.fetchall()
 
-        click.secho(f"TOTALES (todas las partidas de la obra):", bold=True)
+        click.secho("TOTALES (todas las partidas de la obra):", bold=True)
         click.echo(
             f"  {'escenario':<22}  "
             f"{'mes (Sigrid)':>16}  {'mes (raw)':>16}  {'diff':>10}     "
@@ -4447,6 +5030,44 @@ def reset_retenciones() -> None:
         "Schema retenciones eliminado. Lanza `python main.py build-retenciones`.",
         fg="green",
     )
+
+
+# =============================================================================
+# MÓDULO PERSONAL (F-057): recursos, partes de trabajo y horas por obra
+# =============================================================================
+@cli.command("build-personal")
+def build_personal() -> None:
+    """
+    Construye el schema personal desde raw.* y stg.obras.
+
+    Ejecuta en orden los SQL de sql/personal:
+      00_setup.sql               schema, funciones de fecha locales y las tablas
+      01_recursos.sql            una fila por recurso de Sigrid (2.618)
+      02_partes_lineas.sql       una fila por línea de parte de trabajo
+      03_partes.sql              una fila por cabecera de parte (F-101)
+      04_recursos_tipos_hora.sql los precios de la ficha del recurso (F-101)
+      05_views.sql               v_pbi_horas_obra_mes, solo con unidad = 'HORA'
+
+    Requiere haber ingerido antes res, con, conest, auxrestip, emp, hmo, hmores,
+    auxhor y reshor
+    (lo hacen F-066 y F-074), y haber construido `stg.obras`: de ahí sale la
+    marca `en_seguimiento`.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * `personal.partes_lineas.cantidad` NO son horas. Mezcla HORA, DIA, MES
+        y UD, y sumarla sin filtrar `unidad` da una cifra falsa. Las horas se
+        piden por `personal.v_pbi_horas_obra_mes`, que lleva el corte cableado.
+      * `personal.recursos` CONTIENE DATOS PERSONALES (nombre, NIF y DNI),
+        autorizados por el responsable del dato el 2026-09-18. El esquema es
+        propio precisamente para poder dar o quitar ese acceso con un GRANT.
+      * `activo` es una bandera, no un filtro: los recursos de baja tienen el
+        43,2 % de las horas imputadas, porque el de baja de hoy trabajó ayer.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildPersonalStep(settings), pg, ejecucion)
 
 
 @cli.command("inspect-retenciones")

@@ -18,7 +18,7 @@ saben de psycopg, solo invocan métodos limpios.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -33,11 +33,15 @@ from etl_sigrid.domain.ejecucion import MOTIVO_HUERFANA
 from etl_sigrid.domain.entities import ColumnSpec
 from etl_sigrid.domain.perfil_carga import FilaPerfil
 from etl_sigrid.domain.tiemod import COLUMNA_TIEMOD, EstadoTiemod
+from etl_sigrid.domain.ventana import ObraCensada
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.conninfo import safe_dsn
 from etl_sigrid.infrastructure.postgres.fingerprint import build_estructura_query
 from etl_sigrid.infrastructure.postgres.frescura import FilaFrescura
-from etl_sigrid.infrastructure.postgres.grants import build_readonly_grant_statements
+from etl_sigrid.infrastructure.postgres.grants import (
+    build_readonly_grant_statements,
+    partir_tabla_cualificada,
+)
 from etl_sigrid.infrastructure.postgres.timings import Timing
 
 logger = get_logger(__name__)
@@ -45,6 +49,74 @@ logger = get_logger(__name__)
 
 # Schemas del data mart
 SCHEMAS = ("raw", "aux", "stg", "mart", "_meta")
+
+# Las dos columnas que el ETL añade a cada tabla de `raw` y que NO vienen de
+# Sigrid. Quedan fuera de la comparación de esquema de `ensure_raw_table`: si
+# entraran, se leerían como columnas «sobrantes» del destino y ensuciarían el
+# log con un aviso falso por tabla y por noche.
+COLUMNAS_TECNICAS_RAW = frozenset({"_ingested_at", "_source_tiemod"})
+
+# Alias de tipos de Postgres. El catálogo devuelve el nombre canónico
+# (`character varying`) y el ETL escribe el alias corto (`VARCHAR`): sin esta
+# tabla, comparar tipos daría un falso positivo en cada columna de cada tabla.
+_ALIAS_TIPOS_PG = {
+    "character varying": "varchar",
+    "character": "char",
+    "timestamp without time zone": "timestamp",
+    "timestamp with time zone": "timestamptz",
+    "time without time zone": "time",
+    "time with time zone": "timetz",
+    "decimal": "numeric",
+    "int8": "bigint",
+    "int4": "integer",
+    "int2": "smallint",
+    "float8": "double precision",
+    "bool": "boolean",
+}
+
+# Columnas reales de una tabla, con su tipo tal y como Postgres lo escribe.
+# Se lee de `pg_attribute` y no de `information_schema.columns` porque
+# `format_type` devuelve el tipo CON su precisión —`character varying(30)`,
+# `numeric(18,4)`—, que es lo que hay que comparar.
+_SQL_COLUMNAS_REALES = """
+    SELECT a.attname, format_type(a.atttypid, a.atttypmod)
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = %s
+      AND c.relname = %s
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+    ORDER BY a.attnum
+"""
+
+
+def _tipo_normalizado(tipo: str) -> str:
+    """
+    Reduce un tipo de Postgres a una forma canónica comparable.
+
+    `VARCHAR(30)` y `character varying(30)` son el mismo tipo escrito de dos
+    maneras: el ETL usa la primera al crear la tabla y el catálogo devuelve la
+    segunda al leerla. Esta función las iguala para que el aviso de «tipo que
+    ya no casa» solo salte cuando el tipo cambia de verdad.
+    """
+    texto = " ".join(tipo.strip().lower().split())
+
+    # `partition` y no `find`: `find` obliga a comparar contra el centinela -1
+    # dos veces, y esas dos comparaciones son huecos de test que no se pueden
+    # cerrar —un tipo con `)` y sin `(` no existe—. Con `partition` el
+    # «no lo encontré» es la cadena vacía del separador y no hay centinela.
+    argumentos = ""
+    antes, abre, resto = texto.partition("(")
+    if abre:
+        dentro, cierra, cola = resto.partition(")")
+        if cierra:
+            argumentos = dentro.replace(" ", "")
+            texto = " ".join(f"{antes} {cola}".split())
+
+    base = _ALIAS_TIPOS_PG.get(texto, texto)
+    return f"{base}({argumentos})" if argumentos else base
+
 
 # Cuántas mediciones devolver cuando no hay un arranque de `ingest_raw` al que
 # anclarse. Evita volcar el histórico entero de _meta.etl_runs.
@@ -59,15 +131,32 @@ ConnInfo = str | Callable[[], str]
 # --- Troceo y puerta de disco del build de plan_mensual (F-019) -------------
 
 # Gigabyte binario: es la unidad en la que Azure declara el disco del Flexible
-# Server (32 GB) y en la que se compara `PG_DISCO_TOTAL_GB`.
+# Server (64 GB desde el 2026-08-29; 32 antes) y en la que se compara
+# `PG_DISCO_TOTAL_GB`. El tamaño no se cablea aquí: lo dice esa variable.
 BYTES_POR_GB = 1024 * 1024 * 1024
 
 # Ocupación del disco del SERVIDOR, no de nuestra base: el disco es compartido
-# con `albaranes` y `partes`, y lo que hay que vigilar es el total.
-# `pg_database_size` sobre otra base exige privilegio CONNECT; el rol del ETL
-# lo tiene (frontera medida en F-005). No cuenta WAL ni logs del servidor: ese
-# hueco lo absorbe el margen entre el límite (80 %) y la protección de Azure
-# (~95 %).
+# con otros CINCO inquilinos —`albaranes`, `partes`, `dedicacion`, `postventa`
+# y `facturas`—, y lo que hay que vigilar es el total.
+#
+# `pg_database_size` sobre otra base exige normalmente privilegio CONNECT, y
+# durante un año el rol del ETL lo tuvo sobre todas las que había (frontera
+# medida en F-005). Dejó de ser verdad sin que nadie nos avisara: el 2026-09-07
+# apareció `facturas`, con dueño propio (`facturas_owner`) y sin CONNECT para
+# nosotros, y la nocturna murió justo aquí —«permission denied for database
+# facturas»— sin llegar al tramo 1 y sin tocar una tabla; está contado en
+# progress/incidencia_nocturna_20260907.md.
+#
+# La frontera de hoy YA NO es CONNECT. El 2026-09-07 el humano concedió a
+# `sigrid_dm_etl` el rol predefinido `pg_read_all_stats`, que permite
+# `pg_database_size` sobre CUALQUIER base sin CONNECT y sin dar acceso a sus
+# datos, y que además cubre las bases que se creen en el futuro: eso es lo que
+# de verdad falló, que la lista de inquilinos crece sola. Verificado ese mismo
+# día: `pg_has_role('sigrid_dm_etl','pg_read_all_stats','member')` devuelve `t`
+# y esta consulta devuelve las nueve bases del servidor.
+#
+# No cuenta WAL ni logs del servidor: ese hueco lo absorbe el margen entre el
+# límite (80 %) y la protección de Azure (~95 %).
 SQL_OCUPACION_DISCO = "SELECT SUM(pg_database_size(datname)) FROM pg_database"
 
 # Peso de cada obra = filas de raw.obrparpre que le tocan, ponderando la rama
@@ -95,6 +184,263 @@ WHERE pp.ambito_id IN (3, 7, 8, 11)
 GROUP BY pp.obra_id
 """
 
+
+# --- La ventana de negocio (F-025) ------------------------------------------
+#
+# Las consultas van como constantes de módulo, igual que las de F-019 y F-024,
+# para que los tests estáticos lean EXACTAMENTE el SQL que se envía y no una
+# reconstrucción parecida.
+
+# EL CENSO. Una fila por obra con todo lo que hace falta para decidir sobre
+# ella. Se une a `_meta.obra_build` por la IZQUIERDA: una obra que nunca se ha
+# construido sale igual, con el registro a nulo, y entra por R18. Un INNER JOIN
+# la escondería, que es justo el silencio que esta feature elimina.
+#
+# EL UNIVERSO ES `raw.obr JOIN raw.con`, la misma definición de obra que usa
+# `maestro.obras` (`c.ide = o.ide`: la obra ES un concepto). Se replica aquí en
+# vez de leer la vista por dos razones: `maestro.obras` la construye
+# `build_maestros`, que en `run-all` va DESPUÉS de este build, y en una base
+# recién creada todavía no existe. Leyendo `raw` no hay dependencia de orden y
+# el estado es el de la ingesta de esta misma noche.
+#
+# `stg.fases` sí está recién construida cuando esto se ejecuta: `05_fases.sql`
+# va antes que `06_presupuesto.sql`, que es el primer sub-paso acotado.
+#
+# LOS DOS `EXISTS` SON BARATOS, y esa es la razón de que sean `EXISTS` y no un
+# `GROUP BY`: `idx_plan_mensual_obra_amb` e `idx_pres_obra_amb` empiezan los
+# dos por `obra_id` (verificado contra `pg_indexes` el 2026-09-02), así que
+# Postgres resuelve cada uno con una sonda de índice por obra y se para en la
+# primera fila. Contar las filas de cada obra habría costado dos barridos de
+# 29 M y 13,8 M de filas en un servidor sin créditos de CPU.
+SQL_ESTADO_OBRAS = """
+SELECT
+    c.ide                                   AS obra_id,
+    COALESCE(TRIM(c.cod), '')               AS codigo_obra,
+    c.est                                   AS estado_id,
+    ult.ultima_actividad                    AS ultima_actividad,
+    EXISTS (SELECT 1 FROM stg.plan_mensual pm WHERE pm.obra_id = c.ide)
+                                            AS tiene_plan_mensual,
+    EXISTS (SELECT 1 FROM stg.presupuesto  p WHERE p.obra_id  = c.ide)
+                                            AS tiene_presupuesto,
+    (b.obra_id IS NOT NULL)                 AS registrada,
+    b.sello_sql                             AS sello_registrado,
+    b.firma_origen                          AS firma_registrada,
+    b.firma_actual                          AS firma_actual
+FROM raw.obr o
+JOIN raw.con c ON c.ide = o.ide
+LEFT JOIN LATERAL (
+    SELECT MAX(make_date(f.anio, GREATEST(f.mes, 1), 1)) AS ultima_actividad
+    FROM stg.fases f
+    WHERE f.obra_id = c.ide
+      AND f.anio BETWEEN 1990 AND 2100
+) ult ON TRUE
+LEFT JOIN _meta.obra_build b ON b.obra_id = c.ide
+ORDER BY c.ide
+"""
+
+# LA FIRMA DEL ORIGEN, sobre `raw` (R16, §3.2 del diseño). `raw` es lo único
+# que la ingesta sigue trayendo COMPLETO cada noche (R34), y por eso es la
+# única señal posible una vez que `stg.presupuesto` deja de reconstruirse
+# entera (DA-2).
+#
+# AQUÍ SOLO SE AGREGA: el hash lo calcula `domain.ventana.firma_de_obra`. No es
+# manía de capas, es lo que hace la firma testable con fixtures y lo que la
+# pone bajo la campaña de mutación de DA-6.
+#
+# ES UNA AGREGACIÓN POR HASH, SIN VENTANAS, y eso importa: no derrama a
+# ficheros temporales, que es lo que llenó el disco compartido en F-019. Y
+# sustituye a un paso que hoy lee esta misma tabla y ADEMÁS escribe 13,8 M de
+# filas.
+#
+# LA VARIANTE BARATA (R20): no incluye `planif`, que es un texto largo en 13,8
+# M de filas y habría que detoastar entero. La laguna que deja —un cambio de
+# planificación pura que no mueva ninguna cantidad ni ningún precio— queda
+# declarada en el diccionario y la cierra la reconstrucción del domingo (R25).
+# La variante cara es `SQL_FIRMA_ORIGEN_CON_PLANIF`, aquí abajo, y la mide T2b.
+SQL_FIRMA_ORIGEN = """
+WITH pre AS (
+    SELECT pp.obride                             AS obra_id,
+           count(*)                              AS pre_filas,
+           sum(pp.can::NUMERIC)                  AS pre_suma_can,
+           sum(pp.pre::NUMERIC)                  AS pre_suma_pre,
+           sum(COALESCE(pp.impcoe::NUMERIC, 0))  AS pre_suma_impcoe,
+           max(pp.fas)                           AS pre_max_fase,
+           max(pp.ide)                           AS pre_max_ide
+    FROM raw.obrparpre pp
+    WHERE pp.obride IS NOT NULL
+    GROUP BY 1
+), par AS (
+    SELECT pa.obride    AS obra_id,
+           count(*)     AS par_filas,
+           max(pa.ide)  AS par_max_ide
+    FROM raw.obrparpar pa
+    WHERE pa.obride IS NOT NULL
+    GROUP BY 1
+), fas AS (
+    SELECT fa.obride    AS obra_id,
+           count(*)     AS fas_filas,
+           max(fa.ide)  AS fas_max_ide,
+           max(COALESCE(fa.ano, 0) * 100 + COALESCE(fa.mes, 0)) AS fas_max_periodo
+    FROM raw.obrfas fa
+    WHERE fa.obride IS NOT NULL
+    GROUP BY 1
+)
+SELECT o.ide AS obra_id,
+       pre.pre_filas, pre.pre_suma_can, pre.pre_suma_pre, pre.pre_suma_impcoe,
+       pre.pre_max_fase, pre.pre_max_ide,
+       par.par_filas, par.par_max_ide,
+       fas.fas_filas, fas.fas_max_ide, fas.fas_max_periodo
+FROM raw.obr o
+LEFT JOIN pre ON pre.obra_id = o.ide
+LEFT JOIN par ON par.obra_id = o.ide
+LEFT JOIN fas ON fas.obra_id = o.ide
+ORDER BY o.ide
+"""
+
+#: Los nombres de las columnas de agregado de `SQL_FIRMA_ORIGEN`, sin
+#: `obra_id`. Entran en el hash **por nombre** (ver `firma_de_obra`), así que
+#: esta tupla es parte del contrato: cambiarla cambia la firma de las 920 obras
+#: y provoca una reconstrucción completa la primera noche. Que sea así es lo
+#: correcto —el significado de la firma ha cambiado—, pero conviene saberlo
+#: antes de tocarla.
+COLUMNAS_FIRMA_ORIGEN = (
+    "pre_filas",
+    "pre_suma_can",
+    "pre_suma_pre",
+    "pre_suma_impcoe",
+    "pre_max_fase",
+    "pre_max_ide",
+    "par_filas",
+    "par_max_ide",
+    "fas_filas",
+    "fas_max_ide",
+    "fas_max_periodo",
+)
+
+# LA VARIANTE CARA (R20, T2b). **No se ejecuta**: vive aquí para que el humano
+# pueda medir su coste sin volver a escribir el SQL, y para que la diferencia
+# entre las dos esté a la vista en un solo sitio.
+#
+# `planif` es el texto que `08_plan_mensual.sql` explota con `unnest`, así que
+# es lo único que cierra la laguna de la variante barata. El precio es
+# detoastar un texto largo en 13,8 M de filas sobre un B1ms con techo de
+# 10 MiB/s. Si T2b lo declara asumible, sustituye a `SQL_FIRMA_ORIGEN`; si no,
+# la laguna se queda declarada y la cierra el domingo.
+SQL_FIRMA_ORIGEN_CON_PLANIF = """
+SELECT pp.obride AS obra_id,
+       count(*) AS pre_filas,
+       md5(string_agg(COALESCE(pp.planif, ''), chr(10) ORDER BY pp.ide)) AS pre_planif
+FROM raw.obrparpre pp
+WHERE pp.obride IS NOT NULL
+GROUP BY 1
+ORDER BY 1
+"""
+
+# LA ÚLTIMA RECONSTRUCCIÓN COMPLETA (R25). Sale de `_meta.etl_runs` y no de una
+# tabla nueva, para que `python main.py timings` la vea como un paso más y para
+# que sobreviva a una obra que aparezca o desaparezca del maestro, que es lo
+# que rompería derivarla de un `MIN(construido_at)` sobre `_meta.obra_build`.
+SQL_ULTIMA_COMPLETA = """
+SELECT MAX(finished_at)
+FROM _meta.etl_runs
+WHERE step = %(paso)s AND status = 'SUCCESS'
+"""
+
+# EL REGISTRO POR OBRA (R14). Upsert: una fila por obra, la última manda.
+#
+# `firma_actual` NO se toca aquí —la escribe el sub-paso de la firma, tras la
+# ingesta— y `firma_origen` se fija al valor que tenía el origen CUANDO se
+# construyó la obra. Que sean dos columnas distintas es lo que permite comparar
+# «de qué es el dato» contra «qué hay ahora en el origen»: con una sola, la
+# ingesta pisaría la referencia cada noche y la comparación no diría nada.
+SQL_REGISTRAR_OBRA = """
+INSERT INTO _meta.obra_build (
+    obra_id, codigo_obra, firma_origen, sello_sql,
+    batch_id, construido_at, filas, congelada, motivo, detalle
+)
+VALUES (
+    %(obra_id)s, %(codigo_obra)s, %(firma_origen)s, %(sello_sql)s,
+    %(batch_id)s, %(construido_at)s, %(filas)s, FALSE, %(motivo)s, %(detalle)s
+)
+ON CONFLICT (obra_id) DO UPDATE SET
+    codigo_obra   = EXCLUDED.codigo_obra,
+    firma_origen  = EXCLUDED.firma_origen,
+    sello_sql     = EXCLUDED.sello_sql,
+    batch_id      = EXCLUDED.batch_id,
+    construido_at = EXCLUDED.construido_at,
+    filas         = EXCLUDED.filas,
+    congelada     = FALSE,
+    motivo        = EXCLUDED.motivo,
+    detalle       = EXCLUDED.detalle
+"""
+
+# LA MARCA DE LA DECISIÓN SOBRE UNA OBRA CONGELADA. Se escriben el motivo y el
+# detalle, pero **NO `construido_at` ni `filas`**: esta noche no se ha
+# construido nada de esa obra, y mover su fecha sería mentir sobre la frescura,
+# que es justamente el dato por el que existe `_meta.v_frescura_obra`.
+SQL_MARCAR_CONGELADA = """
+INSERT INTO _meta.obra_build (obra_id, codigo_obra, congelada, motivo, detalle)
+VALUES (%(obra_id)s, %(codigo_obra)s, TRUE, %(motivo)s, %(detalle)s)
+ON CONFLICT (obra_id) DO UPDATE SET
+    codigo_obra = EXCLUDED.codigo_obra,
+    congelada   = TRUE,
+    motivo      = EXCLUDED.motivo,
+    detalle     = EXCLUDED.detalle
+"""
+
+# LA FIRMA DE ESTA NOCHE, escrita por el sub-paso que va tras la ingesta.
+SQL_REGISTRAR_FIRMA_ACTUAL = """
+INSERT INTO _meta.obra_build (obra_id, firma_actual, firma_actual_at)
+VALUES (%(obra_id)s, %(firma_actual)s, %(firma_actual_at)s)
+ON CONFLICT (obra_id) DO UPDATE SET
+    firma_actual    = EXCLUDED.firma_actual,
+    firma_actual_at = EXCLUDED.firma_actual_at
+"""
+
+#: Las dos tablas que la ventana acota. El nombre se valida contra esta tupla
+#: antes de interpolarlo en `SQL_OBRAS_CON_FILAS`: es la única interpolación de
+#: identificador de todo el bloque y no puede depender de la buena fe de quien
+#: llame.
+TABLAS_ACOTADAS = ("plan_mensual", "presupuesto")
+
+# OBRAS QUE HOY TIENEN FILAS. Solo se consulta en la reconstrucción completa, y
+# solo para NOMBRAR las que no están en el censo (ver `fetch_obras_con_filas`:
+# no se borran). Va por `DISTINCT` sobre el índice —del orden de 700 valores
+# distintos— y no por un `NOT IN` sobre la tabla entera, que sería un barrido
+# de 29 M de filas cada domingo.
+SQL_OBRAS_CON_FILAS = "SELECT DISTINCT obra_id FROM stg.{tabla}"
+
+# CUÁNTAS FILAS HA DEJADO CADA OBRA EN EL TRAMO (R14). Alimenta la columna
+# `filas` de `_meta.obra_build`, que es lo que permite responder «esta obra se
+# construyó y salió vacía» sin volver a barrer la tabla.
+#
+# El `WHERE` NO es decoración: sin él esto sería un `GROUP BY` sobre 29,7 M de
+# filas cada noche en un servidor sin créditos de CPU. Se cuenta SOLO lo que se
+# acaba de construir —decenas de obras—, que además es lo único de lo que se va
+# a escribir la traza. Las obras van por parámetro (`= ANY`); el nombre de tabla
+# es la segunda y última interpolación de identificador del bloque, y se valida
+# contra `TABLAS_ACOTADAS` igual que `SQL_OBRAS_CON_FILAS`.
+SQL_FILAS_POR_OBRA = """
+SELECT obra_id, COUNT(*)
+FROM stg.{tabla}
+WHERE obra_id = ANY(%(obras)s)
+GROUP BY obra_id
+"""
+
+
+def _exigir_tabla_acotada(tabla: str) -> None:
+    """Corta antes de interpolar un nombre de tabla que venga de fuera.
+
+    Lo comparten las dos consultas que interpolan identificador
+    (`SQL_OBRAS_CON_FILAS` y `SQL_FILAS_POR_OBRA`) para que la lista blanca sea
+    una sola y no dos copias que puedan divergir.
+    """
+    if tabla not in TABLAS_ACOTADAS:
+        raise ValueError(
+            f"tabla no acotada por la ventana: {tabla!r}. Las unicas son "
+            f"{', '.join(TABLAS_ACOTADAS)}, y este nombre se interpola en el "
+            f"SQL: no puede venir de fuera."
+        )
 
 # --- Coherencia ante cargas truncadas (F-024) -------------------------------
 #
@@ -475,7 +821,14 @@ class PostgresClient:
         de la metadata de Sigrid. Añade dos columnas técnicas:
             _ingested_at   TIMESTAMP   cuándo se cargó la fila en Postgres
             _source_tiemod DOUBLE PRECISION  valor de tiemod de Sigrid (NULL si no existe)
-        Si la tabla ya existe, no la toca.
+
+        Si la tabla YA existe, reconcilia su esquema: compara las columnas
+        reales con las esperadas y **añade** las que falten. Ver
+        `_reconciliar_columnas_raw` para la regla completa (solo se añade;
+        nunca se borra una columna ni se cambia un tipo).
+
+        Ambas cosas van en la MISMA transacción: o la tabla queda con el
+        esquema completo, o no cambia nada.
         """
         if not columns:
             raise ValueError(f"Sin columnas para crear raw.{target_table}")
@@ -508,12 +861,116 @@ class PostgresClient:
 
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute(ddl)
+            self._reconciliar_columnas_raw(cur, target_table, columns)
 
         logger.info(
             "raw_table_ready",
             table=f"raw.{target_table}",
             columns=len(columns),
             pk=primary_key,
+        )
+
+    def _reconciliar_columnas_raw(
+        self,
+        cur: Any,
+        target_table: str,
+        columns: list[ColumnSpec],
+    ) -> None:
+        """
+        Ajusta el esquema de una tabla `raw` que ya existía al que Sigrid trae
+        hoy. **Solo añade.** La regla, aprobada por el humano el 2026-09-08:
+
+          - Columna esperada que NO está en el destino -> `ADD COLUMN`, y una
+            línea de log por cada una: es un cambio de esquema en producción.
+          - Columna del destino que el origen ya NO trae -> **aviso y nada
+            más**. Borrar sincronizando destruiría datos ya cargados.
+          - Columna cuyo tipo ya no casa -> **aviso y nada más**. Cambiar un
+            tipo en caliente puede truncar el dato.
+
+        Por qué existe: F-066 dejó de excluir `pagfor` y `pagtex` de `dcf`,
+        pero `raw.dcf` llevaba meses creada sin ellas. `CREATE TABLE IF NOT
+        EXISTS` no hace nada sobre una tabla que ya está, así que el `COPY`
+        siguiente nombraba dos columnas inexistentes y tumbó la nocturna del
+        2026-09-07 y la del 2026-09-08 (`UndefinedColumn: column "pagtex" of
+        relation "dcf" does not exist`). En local no se ve: contra una base
+        vacía todas las tablas nacen de cero.
+
+        Se llama DENTRO de `ensure_raw_table`, es decir **antes** del TRUNCATE
+        del full-refresh: si el DDL fallara después de vaciar, la tabla
+        quedaría sin dato Y sin la columna. `ADD COLUMN` sin `DEFAULT` es
+        metadato puro en Postgres —no reescribe la tabla—, así que hacerlo
+        antes no cuesta nada ni en `apu`, con 2,1 M de filas.
+        """
+        cur.execute(_SQL_COLUMNAS_REALES, ("raw", target_table))
+        catalogo = cur.fetchall()
+        if not catalogo:
+            # La tabla no está en el catálogo: nada que reconciliar. No se
+            # inventa un ALTER a ciegas sobre algo que no se ha podido leer.
+            return
+
+        reales = {
+            nombre: tipo
+            for nombre, tipo in catalogo
+            if nombre not in COLUMNAS_TECNICAS_RAW
+        }
+        esperadas = {c.name: c for c in columns}
+
+        for nombre, spec in esperadas.items():
+            tipo_real = reales.get(nombre)
+            if tipo_real is None:
+                continue
+            if _tipo_normalizado(tipo_real) != _tipo_normalizado(spec.postgres_type):
+                logger.warning(
+                    "raw_columna_cambia_de_tipo",
+                    table=f"raw.{target_table}",
+                    column=nombre,
+                    tipo_en_destino=tipo_real,
+                    tipo_en_origen=spec.postgres_type,
+                    accion="ninguna: el ETL avisa, no altera tipos",
+                )
+
+        for nombre in sorted(set(reales) - set(esperadas)):
+            logger.warning(
+                "raw_columna_sobrante_en_destino",
+                table=f"raw.{target_table}",
+                column=nombre,
+                tipo_en_destino=reales[nombre],
+                accion="ninguna: el ETL avisa, no borra columnas",
+            )
+
+        faltantes = [c for c in columns if c.name not in reales]
+        if not faltantes:
+            return
+
+        # Todas en UNA sola sentencia: un solo bloqueo de la tabla y un cambio
+        # atómico. `dcf` necesita dos a la vez (`pagfor` y `pagtex`).
+        # Nacen NULL aunque el origen las declare NOT NULL: la tabla ya tiene
+        # filas y `ADD COLUMN ... NOT NULL` sin DEFAULT fallaría sobre ellas.
+        alter = sql.SQL("ALTER TABLE raw.{} {}").format(
+            sql.Identifier(target_table),
+            sql.SQL(", ").join(
+                sql.SQL("ADD COLUMN IF NOT EXISTS {} {} NULL").format(
+                    sql.Identifier(c.name),
+                    sql.SQL(c.postgres_type),
+                )
+                for c in faltantes
+            ),
+        )
+        cur.execute(alter)
+
+        for c in faltantes:
+            logger.info(
+                "raw_columna_anadida",
+                table=f"raw.{target_table}",
+                column=c.name,
+                tipo=c.postgres_type,
+                nullable=True,
+            )
+        logger.info(
+            "raw_tabla_reconciliada",
+            table=f"raw.{target_table}",
+            columnas_anadidas=len(faltantes),
+            columnas=[c.name for c in faltantes],
         )
 
     def table_exists(self, schema: str, table: str) -> bool:
@@ -807,6 +1264,7 @@ class PostgresClient:
         readonly_role: str,
         owner_role: str,
         schemas: Iterable[str],
+        excluded_tables: Iterable[str] = (),
     ) -> list[str]:
         """
         Reaplica los permisos de lectura y devuelve las sentencias ejecutadas.
@@ -816,6 +1274,18 @@ class PostgresClient:
         comandos aparte), así que en una base recién creada esos esquemas
         pueden no estar todavía. Intentarlo daría error y tumbaría el paso por
         algo que no es un problema.
+
+        `excluded_tables` (F-068) son tablas `esquema.tabla` que el rol NO debe
+        poder leer. El filtro por existencia alcanza SOLO al `REVOKE ... ON
+        TABLE`, que sobre una tabla que aún no se ha ingerido daría error y
+        tumbaría el paso: la lista entera se le pasa igualmente a
+        `build_readonly_grant_statements` para que el esquema conserve el
+        `ALTER DEFAULT PRIVILEGES ... REVOKE`. Esa regla vive en el catálogo y
+        no necesita que la tabla exista; es la que impide que la siguiente
+        `raw.emp` nazca legible después de un `DROP`. Filtrarla también aquí
+        desactivaba la protección justo en ese escenario (agujero cazado en la
+        revisión de F-068, 2026-09-08). Que una tabla excluida no exista se
+        avisa igual, porque lo normal es que sea una errata en la lista.
         """
         existentes = set(self.list_schemas())
         pedidos = list(schemas)
@@ -824,8 +1294,24 @@ class PostgresClient:
         if ausentes:
             logger.warning("grants_esquemas_inexistentes", schemas=ausentes)
 
+        # La validación de forma la hace `build_readonly_grant_statements`;
+        # aquí solo hace falta separar esquema y tabla para preguntar por ella.
+        excluidas = list(excluded_tables)
+        sin_tabla: list[str] = []
+        for entrada in excluidas:
+            esquema, tabla = partir_tabla_cualificada(entrada)
+            if esquema in aplicables and not self.table_exists(esquema, tabla):
+                sin_tabla.append(entrada)
+        if sin_tabla:
+            logger.warning("grants_tablas_excluidas_inexistentes", tables=sin_tabla)
+
         sentencias = build_readonly_grant_statements(
-            readonly_role, owner_role, aplicables, database=self._target_db
+            readonly_role,
+            owner_role,
+            aplicables,
+            database=self._target_db,
+            excluded_tables=excluidas,
+            missing_tables=sin_tabla,
         )
         if not sentencias:
             return []
@@ -838,6 +1324,8 @@ class PostgresClient:
             "grants_aplicados",
             role=readonly_role,
             schemas=aplicables,
+            excluded_tables=excluidas,
+            excluded_tables_missing=sin_tabla,
             statements=len(sentencias),
         )
         return sentencias
@@ -1013,6 +1501,217 @@ class PostgresClient:
             )
         return porcentaje_ocupacion(int(fila[0]), total_gb)
 
+    # ---------------------------------------------------------------------
+    # La ventana de negocio (F-025)
+    # ---------------------------------------------------------------------
+
+    def fetch_censo_de_obras(self) -> list[ObraCensada]:
+        """El censo con el que se decide qué se reconstruye esta noche (R1).
+
+        Devuelve entidades de dominio ya montadas, no tuplas: la decisión la
+        toma `domain.ventana.clasificar_obras`, que no sabe de BBDD, y traducir
+        aquí es lo que le permite no saberlo.
+
+        `tiene_filas` exige las DOS tablas. Una obra con presupuesto y sin plan
+        mensual —o al revés— está a medio construir, y media obra construida no
+        se congela: se completa.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ESTADO_OBRAS)
+            filas = list(cur.fetchall())
+
+        return [
+            ObraCensada(
+                obra_id=int(fila[0]),
+                codigo_obra=str(fila[1] or ""),
+                estado_id=int(fila[2]) if fila[2] is not None else None,
+                ultima_actividad=fila[3],
+                tiene_filas=bool(fila[4]) and bool(fila[5]),
+                registrada=bool(fila[6]),
+                sello_registrado=fila[7],
+                firma_registrada=fila[8],
+                firma_origen=fila[9],
+            )
+            for fila in filas
+        ]
+
+    def fetch_firma_origen(self) -> dict[int, dict[str, Any]]:
+        """Los agregados de `raw` por obra (R16). **Aquí no se hashea nada.**
+
+        Devuelve `{obra_id: {columna: valor}}` con las columnas declaradas en
+        `COLUMNAS_FIRMA_ORIGEN`. El hash lo calcula `domain.ventana.firma_de_obra`
+        a partir de este diccionario, y por eso los nombres de las claves son
+        parte del contrato: entran en la firma.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_FIRMA_ORIGEN)
+            filas = list(cur.fetchall())
+
+        return {
+            int(fila[0]): dict(zip(COLUMNAS_FIRMA_ORIGEN, fila[1:], strict=True))
+            for fila in filas
+        }
+
+    def fetch_ultima_reconstruccion_completa(self, paso: str) -> datetime | None:
+        """Cuándo terminó la última reconstrucción completa, o `None` (R25).
+
+        `None` significa «nunca», y quien lo reciba tiene que hacer una: es la
+        línea base, y sin ella no se puede afirmar cuántos días lleva ninguna
+        obra sin reconstruirse.
+        """
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_ULTIMA_COMPLETA, {"paso": paso})
+            fila = cur.fetchone()
+        return fila[0] if fila and fila[0] is not None else None
+
+    def fetch_obras_con_filas(self, tabla: str) -> set[int]:
+        """Las obras que hoy tienen filas en `stg.<tabla>`.
+
+        Solo lo usa la reconstrucción completa, y **solo para NOMBRAR** las
+        obras que tienen filas y no están en el censo: el borrado derivado no
+        las alcanza nunca —nadie las va a reinsertar, así que nadie las borra— y
+        sin esto se quedarían ahí sin que nadie lo supiera. Es la contrapartida
+        de haber quitado el `TRUNCATE`, y se denuncia en vez de aceptarse en
+        silencio.
+
+        **Lo que NO se hace con esta lista es borrarla.** Ver
+        `build_stg_step._denunciar_obras_sobrantes`: borrar por lo que un `JOIN`
+        del censo no vea sería destruir datos buenos en silencio, y R10 dice que
+        lo que se borra se deriva de lo que se va a escribir.
+        """
+        _exigir_tabla_acotada(tabla)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(SQL_OBRAS_CON_FILAS.format(tabla=tabla))
+            return {int(fila[0]) for fila in cur.fetchall() if fila[0] is not None}
+
+    def fetch_filas_por_obra(
+        self, tabla: str, obras: Sequence[int]
+    ) -> dict[int, int]:
+        """Cuántas filas tiene en `stg.<tabla>` cada una de esas obras (R14).
+
+        Es la pareja de `registrar_obras_construidas`: de aquí sale la columna
+        `filas` de `_meta.obra_build`, o sea, cuánto dejó construido esta noche
+        cada obra. Se pregunta SOLO por las obras que se acaban de construir
+        —decenas—, nunca por la tabla entera: un `GROUP BY` sobre los 29,7 M de
+        `plan_mensual` costaría más que el propio tramo en un `B1ms` sin
+        créditos de CPU.
+
+        **Una obra sin filas NO lleva clave en el resultado**, porque no sale
+        del `GROUP BY`. Es deliberado y quien llama ya lo espera
+        (`build_stg_step._registrar_construidas` resuelve con
+        `filas.get(obra_id, 0)`): así el diccionario dice lo que respondió la
+        base y no lo que suponemos que habría respondido. Inventar un `0` por
+        cada obra pedida sería afirmar «la miré y estaba vacía» también en el
+        caso en que la consulta ni siquiera la alcanzó.
+
+        Sin obras no se abre conexión: el sub-paso puede quedarse sin nada que
+        reconstruir (R9) y preguntarlo sería un viaje a la base para nada.
+
+        `tabla` llega del step como nombre corto del tramo y se interpola en el
+        SQL, así que se valida contra `TABLAS_ACOTADAS` antes de tocar nada.
+        """
+        _exigir_tabla_acotada(tabla)
+        if not obras:
+            return {}
+
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                SQL_FILAS_POR_OBRA.format(tabla=tabla),
+                {"obras": [int(obra) for obra in obras]},
+            )
+            return {
+                int(fila[0]): int(fila[1])
+                for fila in cur.fetchall()
+                if fila[0] is not None
+            }
+
+    def registrar_obras_construidas(self, registros: Sequence[dict]) -> int:
+        """Escribe en `_meta.obra_build` lo construido esta noche (R14).
+
+        Todos los upserts en **una transacción**: o queda registrada la tanda
+        entera o ninguna. Un registro a medias haría que la noche siguiente unas
+        obras se reconstruyeran por R18 y otras no, sin ningún criterio.
+
+        Va en llamada aparte y no dentro del SQL del tramo por una razón
+        práctica: `execute_sql_text` devuelve el `rowcount` de la ÚLTIMA
+        sentencia, y meter aquí el upsert convertiría «filas insertadas en
+        plan_mensual» en «obras registradas». Si el proceso muere entre el tramo
+        y su registro, la obra queda construida y sin registrar, y la noche
+        siguiente entra por R18: se reconstruye de más, que es el lado correcto
+        en el que fallar.
+        """
+        if not registros:
+            return 0
+        with self.connection() as conn, conn.cursor() as cur:
+            for registro in registros:
+                cur.execute(SQL_REGISTRAR_OBRA, registro)
+        return len(registros)
+
+    def marcar_obras_congeladas(self, registros: Sequence[dict]) -> int:
+        """Deja escrito por qué NO se ha reconstruido cada obra congelada.
+
+        No toca `construido_at` ni `filas`: esta noche no se ha construido nada
+        de esas obras y mover su fecha sería mentir sobre la frescura.
+        """
+        if not registros:
+            return 0
+        with self.connection() as conn, conn.cursor() as cur:
+            for registro in registros:
+                cur.execute(SQL_MARCAR_CONGELADA, registro)
+        return len(registros)
+
+    def registrar_firmas_actuales(self, firmas: Mapping[int, str]) -> int:
+        """Guarda la firma del origen de ESTA noche, por obra (R16).
+
+        La escribe el sub-paso que va tras `ingest_raw`, sobre `raw` recién
+        cargado. Es la mitad de la comparación; la otra es `firma_origen`, que
+        solo se mueve cuando la obra se reconstruye.
+        """
+        if not firmas:
+            return 0
+        ahora = datetime.utcnow()
+        with self.connection() as conn, conn.cursor() as cur:
+            for obra_id, firma in firmas.items():
+                cur.execute(
+                    SQL_REGISTRAR_FIRMA_ACTUAL,
+                    {
+                        "obra_id": int(obra_id),
+                        "firma_actual": firma,
+                        "firma_actual_at": ahora,
+                    },
+                )
+        return len(firmas)
+
+    def vacuum_analyze(self, schema: str, table: str) -> None:
+        """`VACUUM (ANALYZE)` de una tabla acotada, **fuera de transacción**.
+
+        Postgres no admite `VACUUM` dentro de una transacción, y
+        `self.connection()` devuelve una conexión que ya viene en una: por eso
+        esto abre la suya propia en `autocommit`. Es el mismo motivo por el que
+        `comprobar_unicidad` no toca el `autocommit` de una conexión ya abierta.
+
+        Hace falta porque el borrado derivado deja tuplas muertas cada noche en
+        un servidor sin créditos de CPU, donde el autovacuum llega tarde
+        (§9.1 del diseño). Quien llama decide qué hacer si falla; aquí se
+        propaga.
+        """
+        if table not in TABLAS_ACOTADAS:
+            raise ValueError(
+                f"tabla no acotada por la ventana: {table!r}. Este nombre se "
+                f"interpola en el SQL del VACUUM: no puede venir de fuera."
+            )
+        conn = self._connect(self._conninfo, autocommit=True)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    sql.SQL("VACUUM (ANALYZE) {}.{}").format(
+                        sql.Identifier(schema), sql.Identifier(table)
+                    )
+                )
+        finally:
+            conn.close()
+        logger.info("tabla_vacuum_analyze", table=f"{schema}.{table}")
+
     def execute_sql_text(self, sql_text: str) -> int:
         """Ejecuta un SQL ya compuesto y devuelve las filas afectadas.
 
@@ -1023,10 +1722,24 @@ class PostgresClient:
         El recuento sale del `rowcount` del cursor, no de un `COUNT(*)` sobre
         la tabla: un seq-scan por tramo sobre millones de filas en 1 vCPU
         sería castigo gratuito.
+
+        **Se devuelve el recuento de la ÚLTIMA sentencia, y desde F-025 eso
+        importa.** El texto de un tramo ya no es una sola sentencia: es un
+        `DELETE` de las obras del tramo seguido del `INSERT` que las reescribe.
+        `cur.execute()` con varias sentencias deja el cursor **en el primer
+        resultado** —lo dice `Cursor.nextset`: «move to the next result set if
+        execute() returned more than one»—, así que leer `rowcount` sin avanzar
+        devolvería **las filas BORRADAS en vez de las escritas**.
+
+        Y sería un error de los caros de detectar: la primera noche los dos
+        números son parecidos, así que el dato de `_meta.etl_runs` y de
+        `python main.py timings` saldría plausible y equivocado.
         """
         with self.connection() as conn, conn.cursor() as cur:
             cur.execute(sql_text)
             filas = cur.rowcount
+            while cur.nextset():
+                filas = cur.rowcount
 
         # psycopg deja rowcount en -1 cuando la sentencia no trae recuento.
         return max(int(filas), 0) if filas is not None else 0

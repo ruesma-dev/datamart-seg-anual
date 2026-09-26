@@ -78,6 +78,10 @@ def test_f047_r1_la_composicion_nocturna_es_exactamente_esta() -> None:
         "build_maestros",
         "build_compras",
         "build_retenciones",
+        # F-057 metió el quinto build de negocio, y con la misma propiedad que
+        # los cuatro de F-047: nadie lo declara en su `depends_on`, así que
+        # puede fallar sin tumbar la noche.
+        "build_personal",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",
@@ -117,13 +121,28 @@ def test_f047_r2_la_dependencia_esta_en_el_dag_y_no_en_el_orden_de_la_lista() ->
     assert orden.index("build_cierre") > orden.index("build_mart")
 
 
-def test_f047_r2_los_tres_que_solo_leen_de_raw_dependen_de_la_ingesta() -> None:
-    """`maestro`, `compras` y `retenciones` leen SOLO de `raw` (barrido del
-    diagnóstico, `progress/explore_F-047.md`): no deben depender de `stg`."""
+def test_f047_r2_los_que_solo_leen_de_raw_dependen_de_la_ingesta() -> None:
+    """`compras` y `retenciones` leen SOLO de `raw` (barrido del diagnóstico,
+    `progress/explore_F-047.md`): no deben depender de `stg`.
+
+    **`build_maestros` ERA EL TERCERO Y DEJÓ DE SERLO EN F-073** (R27): las dos
+    marcas de `maestro.obras` sondean `stg.presupuesto` y `stg.plan_mensual`, y
+    eso se declara en el DAG. Su caso vive en el test de abajo, no aquí.
+    """
     pasos = {p.name: p for p in _pasos()}
 
-    for nombre in ("build_maestros", "build_compras", "build_retenciones"):
+    for nombre in ("build_compras", "build_retenciones"):
         assert pasos[nombre].depends_on == ["ingest_raw"], nombre
+
+
+def test_f047_r2_build_maestros_declara_que_tambien_lee_de_stg() -> None:
+    """F-073, R27. No es cosmético: si `build_stg` falla, el orquestador marca
+    `build_maestros` como SKIPPED, cosa que antes no pasaba."""
+    pasos = {p.name: p for p in _pasos()}
+
+    assert pasos["build_maestros"].depends_on == ["ingest_raw", "build_stg"]
+    orden = _orden()
+    assert orden.index("build_maestros") > orden.index("build_stg")
 
 
 # ---------------------------------------------------------------------------
