@@ -376,8 +376,9 @@ def test_f109_r15_solo_dos_ficheros_agrupan_por_obra_y_codigo() -> None:
     """Trinquete: hoy los dos que resuelven NOMBRES (F-111). Si aparece otro, el
     test lo nombra; si uno deja de hacerlo, hay que sacarlo de la lista."""
     encontrados = _sql_que_agrupa(DIR_SQL)
+    errores = _comprobar_trinquete(DIR_SQL)
 
-    assert _comprobar_trinquete(DIR_SQL) == []
+    assert errores == [], "\n".join(errores)
     assert encontrados == AGRUPAN_POR_OBRA_Y_CODIGO, (
         f"la lista ha bajado: {sorted(AGRUPAN_POR_OBRA_Y_CODIGO - encontrados)} ya no "
         f"agrupa por (obra_id, codigo_partida). Sacalo de AGRUPAN_POR_OBRA_Y_CODIGO"
