@@ -9,6 +9,27 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-109 · EN IMPLEMENTACION (`in_progress`) · el codigo de partida no es unico ni dentro de su obra
+
+Implementer en `feature/F-109-partidas-codigo-no-unico` (al dia con `main`
+1ed4d6e). Spec APROBADA por el humano el 2026-09-26 (`progress/spec_F-109.md`,
+seccion «APROBADA»): D1 (a) solo `partida_id`; **D2 con la redaccion aprobada**
+(prohibido UNIR por obra + codigo; AGRUPAR por codigo se permite declarandolo;
+ante el usuario, la ruta de capitulos); D3 documentar y fichado como F-111; **D4
+version 35** (main esta en la 34); D5 solo texto. Ningun SQL se toca. Informe
+final en `progress/impl_F-109.md`.
+
+Desviaciones respecto a la spec (justificadas):
+- **R16 / T5**: el test exige `version >= 35`, no `>= 33` (D4 aprobada: main ya
+  esta en la 34 tras F-108 y F-110).
+- **R10 / §5**: el texto de la regla es el aprobado por el humano, no el de
+  `design.md` §5: se quita «Agrupar por codigo funde partidas distintas» como
+  prohibicion y se escribe que agrupar es valido si se declara. Las cifras que
+  pide R10 (5.202, 0437, 3.474.491,83) se mantienen.
+- **Precondicion `init.sh`**: no se relanza al empezar (14-25 min); `main` estaba
+  verde en f730acf (F-110) y la rama solo lleva el merge 1ed4d6e. Se ejecuta al
+  final, tal cual.
+
 ## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · DESPLEGADA Y VERIFICADA
 
 > **2026-09-26 ~08:30 UTC** (autorizado por el humano): imagen `r20260926-1028`

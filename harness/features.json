@@ -1730,7 +1730,7 @@
         "Las tres fichas del diccionario que dicen que el codigo es unico por obra dicen la verdad",
         "Medido si alguna vista o consumidor une por (obra, codigo_partida) y duplica importes hoy"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 2,
