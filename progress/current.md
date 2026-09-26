@@ -48,8 +48,8 @@ de ella. Escrita en `docs/CONVENTIONS.md` (Git) y `.claude/agents/leader.md`
   `init.sh`, `CONVENTIONS.md`...), en una rama, desde `arnes-base`:
   `.\instalar_arnes.ps1 -Destino "C:\Users\pgris\PycharmProjects\datamart-seg-anual" -Modo actualizar -SoloDiff`
   y después `.\instalar_arnes.ps1 -Destino "C:\Users\pgris\PycharmProjects\datamart-seg-anual" -Modo actualizar`
-- [ ] **Push de `arnes-base`** (commits locales en `main`, de `2c3a7fe` al del
-  `leader.md` de la review):
+- [ ] **Push de `arnes-base`** (commits locales en `main`, `2c3a7fe`..`2b7b373`,
+  este último con el `leader.md` genérico de la review):
   `git -C C:\Users\pgris\PycharmProjects\arnes-base push origin main`
 
 Desviaciones: el `init.sh` inicial no se relanza (14-25 min): `main` quedo
