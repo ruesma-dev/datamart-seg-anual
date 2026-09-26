@@ -29,6 +29,15 @@ Desviaciones respecto a la spec (justificadas):
 - **Precondicion `init.sh`**: no se relanza al empezar (14-25 min); `main` estaba
   verde en f730acf (F-110) y la rama solo lleva el merge 1ed4d6e. Se ejecuta al
   final, tal cual.
+- **Cifra de hoy**: la consulta de `design.md` §7.1 por el MCP (solo lectura,
+  2026-09-26) da 5.203 / 8.934 / 159; las fichas citan la del 2026-09-25
+  (5.202 / 8.933 / 158) con su fecha, que es la que tiene el desglose por causas.
+- **Mutacion**: alcance vacio (solo YAML, Markdown y tests); la herramienta no
+  escribe `progress/mutacion_F-109.md` a proposito.
+
+T1-T8 y T10 hechas (commit por tarea). 23 tests de F-109 en verde. Queda T9
+(MANUAL del humano: `publicar-diccionario` v35 y reinicio del MCP) y T11
+(`init.sh`) hecha: 5.542 passed, 203 skipped en 773,54 s, ENTORNO LISTO, exit 0. Informe: `progress/impl_F-109.md`.
 
 ## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · DESPLEGADA Y VERIFICADA
 
