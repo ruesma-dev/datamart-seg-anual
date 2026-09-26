@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-26 · F-109 · EN IMPLEMENTACION (`in_progress`) · el codigo de partida no es unico ni dentro de su obra
+## 2026-09-26 · F-109 · CERRADA (`done`, APROBADO en pasada 1) · el codigo de partida no es unico ni dentro de su obra · QUEDA DESPLEGAR Y PUBLICAR v35
 
 Implementer en `feature/F-109-partidas-codigo-no-unico` (al dia con `main`
 1ed4d6e). Spec APROBADA por el humano el 2026-09-26 (`progress/spec_F-109.md`,
