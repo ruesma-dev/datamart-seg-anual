@@ -13,7 +13,7 @@ Bloqueadas: **F-052**.
 |---|---|---|---|---|---|
 | F-097 | Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master | 1 | pendiente | estandar | `feature/F-097-descompuestos-partidas` |
 | F-112 | La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa | 2 | pendiente | estandar | `feature/F-112-cobertura-contra-main` |
-| F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | pendiente | estandar | `feature/F-111-nombres-partida-por-ancestro` |
+| F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 5 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
 | F-104 | La retencion de CLIENTE no esta saneada: 22,16 M EUR «vivos» de los que 19,93 M tienen fecha de baja, y la contabilidad dice 13,81 M | 6 | pendiente | estandar | `feature/F-104-retenciones-cliente` |
 | F-051 | El mes de las filas reales sale del ano/mes de obrfas y no del TEXTO del cierre, que es la regla, y rompe la clave de cierre.v_pbi_planif_vs_real | 7 | spec lista | critico | `feature/F-051-nombre-mes-real` |
@@ -137,7 +137,7 @@ Decidido por el humano el 2026-09-26, prioridad 2. Hallazgo del reviewer de F-10
 
 ### F-111 · Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida
 
-estado **pendiente** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-111-nombres-partida-por-ancestro`
+estado **spec lista** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-111-nombres-partida-por-ancestro`
 
 Decision D3 del humano sobre la spec de F-109 (2026-09-26). Medido por el spec-author de F-109 el 2026-09-25 en solo lectura: `mart.v_pbi_dim_partida_niveles` resuelve el NOMBRE de cada escalon del arbol por `(obra, codigo_partida)` con `MAX`, y como el codigo se repite dentro de la obra (5.202 pares: arboles paralelos, subcapitulos copiados bajo cada bloque o fase, un capitulo por contrato...), 10.593 filas (4.657 del seguimiento) ensenan algun escalon con el nombre de otra partida. `cierre.v_pbi_dim_subcategoria_ci` y el detalle de costes indirectos agrupan por codigo: 22 filas con nombre ajeno, y las dos fases de la 0444 caen en el mismo grupo `CI.1`. NO duplica importes: solo etiquetas. QUE HACER: resolver el nombre de cada escalon por el ANCESTRO real (`capitulo_padre_id`/ruta, por `partida_id`) y no por codigo, en `mart` y en `cierre`; decidir con Negocio si fundir las fases de la 0444 en `CI.1` es lo que quiere. Afecta a las etiquetas del Arbol Presupuesto de Power BI: contrastar antes y despues.
 
