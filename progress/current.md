@@ -44,6 +44,29 @@ T1-T8 y T10 hechas (commit por tarea). 23 tests de F-109 en verde. Queda T9
 (MANUAL del humano: `publicar-diccionario` v35 y reinicio del MCP) y T11
 (`init.sh`) hecha: 5.542 passed, 203 skipped en 773,54 s, ENTORNO LISTO, exit 0. Informe: `progress/impl_F-109.md`.
 
+## 2026-09-26 · F-056 · SPEC ESCRITA (spec-author), `spec_ready` a falta de aprobacion · el mayor y el plan de cuentas como arbol
+
+Rama `feature/F-056-mayor-plan-contable` (desde `main` 6e3fcb0). Spec en
+`specs/F-056-mayor-plan-contable/` (requirements 140/150, design 205/250, T0-T25);
+resumen, cifras y consultas de verificacion en `progress/spec_F-056.md`. Todo
+medido en SOLO LECTURA (Postgres con `default_transaction_read_only` y
+`sigrid-api` `leer_sql`), sin `.env` en el worktree.
+
+Propuesta: esquema nuevo `contabilidad`, paso `build_contabilidad` tras
+`build_personal`, tres tablas (`plan_cuentas`, `mayor`, `saldos_cuenta_mes`).
+Hallazgo que corrige a F-066 y a las fichas de `raw`: `con.tip = 16` son los
+GRUPOS del plan (= `cug`), `cua` son las auxiliares (`tip = 17`) y el arbol es de
+prefijos dentro de la empresa. Caso testigo `1-4308000197`: 641 apuntes, saldo
+1.189.275,13; la subcuenta 434 de 2026 reproduce al centimo la captura de Juan.
+
+**Decisiones que el humano tiene que validar antes de T0** (detalle en
+`design.md` §Riesgos y decisiones): D1 alcance por empresa (recomendado las 38);
+D2 materializar el mayor (recomendado tabla, ~2-5 min/noche, ~0,9 GB); D3 objetos
+de consumo (recomendado los tres, la vista por nodo a F-058); D4 `apa` fuera, a
+F-061; D5 esquema nuevo, que exige cambiar la lista blanca de `mcp-bbdd`; D6 las
+dos fechas publicadas y reformular el criterio 2 de la ficha; D7 arbol por
+prefijo sin ingerir `cug`; D8 converger `retenciones` con el mayor en otra ficha.
+
 ## 2026-09-26 · F-110 · CERRADA (`done`, APROBADO en pasada 1) · fin de obra por el ultimo cuatrimestral + 1 mes · DESPLEGADA Y VERIFICADA
 
 > **2026-09-26 ~08:30 UTC** (autorizado por el humano): imagen `r20260926-1028`
