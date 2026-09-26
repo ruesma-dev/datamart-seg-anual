@@ -473,11 +473,20 @@ objetos:
         capitulos. Vale 'CI' cuando la partida no baja de ahi.
       grupo_nombre: >-
         Nombre del grupo tal y como lo escribio el jefe de obra EN ESA OBRA. Si
-        no hay descripcion, se repite el codigo.
+        no hay descripcion, se repite el codigo. **OJO: el grupo se identifica
+        por su CODIGO**, y el nombre se resuelve por (obra, codigo) con
+        `MAX(descripcion_corta)`, pero el codigo no es unico en la obra (F-109):
+        capitulos homonimos de la misma obra se funden en una fila con un solo
+        nombre. Las dos fases de la 0444, raices `CI` y `CI-FII`, caen en el
+        mismo grupo `CI.1` (2026-09-25). Resolverlo por el ancestro es F-111.
       subcategoria_cod: >-
         Codigo de la subcategoria, del tercer escalon de la ruta. Vale
         '(sin detalle)' cuando la partida no llega a ese nivel.
-      subcategoria_nombre: Nombre de la subcategoria en esa obra concreta.
+      subcategoria_nombre: >-
+        Nombre de la subcategoria en esa obra concreta. Igual que
+        `grupo_nombre`, se identifica por su CODIGO: subcapitulos homonimos de
+        la misma obra -los de las fases `CI` y `CI-FII` de la 0444- se funden en
+        una fila con un solo nombre (F-109; arreglarlo es F-111).
       orden_grupo:
         significado: Orden alfabetico del grupo dentro de la obra. Presentacion.
         agregacion: no_sumable
