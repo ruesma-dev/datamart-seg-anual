@@ -825,6 +825,44 @@ reglas:
       La tabla se crea con `CREATE TABLE ... AS` uniendo los tres origenes
       (`sql/compras/02_fact_linea.sql`), sin PK y sin renumerar.
 
+  - codigo: R-PARTIDA-CODIGO-NO-UNICO
+    titulo: El codigo de partida NO es unico ni dentro de su obra; se une por partida_id
+    severidad: bloqueante
+    ambito:
+      - stg.partidas
+      - mart.v_pbi_dim_partida
+      - mart.v_pbi_dim_partida_niveles
+      - mart.fact_seguimiento_mensual
+      - mart.v_fact_periodificado
+      - compras.v_pbi_partida_coste
+      - cierre.v_pbi_dim_subcategoria_ci
+    regla: >-
+      No cruces tablas por obra + código de partida: usa `partida_id`. Agrupar
+      por código es válido si se quiere sumar todas las copias del concepto
+      (por ejemplo, la misma partida en todos los bloques o fases), y hay que
+      decirlo. Para identificar una partida ante el usuario, enseña su ruta de
+      capítulos.
+
+      Por qué: el mismo código cuelga de varios capítulos de la MISMA obra
+      —uno por contrato o expediente, por vivienda tipo, bloque o fase, o por
+      raíz paralela—, y cada copia es una partida distinta: 5.202 códigos
+      repetidos en 158 obras (2026-09-25). Un JOIN por `(obra_id,
+      codigo_partida)` multiplica importes: en la obra 0437 el coste real pasa
+      de 883.460,55 EUR a 3.474.491,83. Añadir el contrato no lo arregla (4.437
+      siguen repetidos) y `ruta_capitulos` tampoco es clave (155 repetidas):
+      para unir y contar partidas, solo `partida_id`.
+    motivo: >-
+      F-109, medido en solo lectura el 2026-09-25: 5.202 pares `(obra_id,
+      codigo_partida)` repetidos, 8.933 filas de mas, 158 obras (92 del
+      seguimiento), identicos en `stg.partidas` y `mart.v_pbi_dim_partida`.
+      Tres fichas de este diccionario afirmaban que el codigo identificaba la
+      partida dentro de su obra. Unir el hecho con la dimension por obra y
+      codigo infla la historia en 12.108.634,53 EUR de Coste Real (47 obras) y
+      13.145.742,76 EUR de Venta Real (53). Hoy ningun SQL del repositorio une
+      asi —todo va por `partida_id`—: el riesgo es el SQL libre del MCP, de
+      Power BI o de un informe. Redaccion decidida por el humano el
+      2026-09-26: unir por codigo, nunca; agrupar por codigo, declarandolo.
+
   - codigo: R-RETENCION-NO-JOIN-LINEAS
     titulo: Nunca unir un efecto de retencion a las lineas de su factura
     severidad: bloqueante
