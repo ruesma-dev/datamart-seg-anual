@@ -187,11 +187,11 @@ Las cifras antiguas eran las de 25 ficheros y ~4.900 líneas de trabajo ajeno.
 | Evidencia | Valor real |
 |---|---|
 | Tests de F-112 | 20 passed (`tests/test_f112_base_de_la_puerta.py`) |
-| Suite completa (`bash harness/init.sh`) | INIT_SUITE |
-| Cobertura de las líneas cambiadas | INIT_COBERTURA |
+| Suite completa (`bash harness/init.sh`) | **5.562 passed, 203 skipped**, exit 0 (`ENTORNO LISTO`) |
+| Cobertura de las líneas cambiadas | **100,0 % (69/69)**, diff desde `fb52d96e14`, merge-base con `main` (la ejecución anterior, antes de los tests de T7, dio 92,8 % 64/69) |
 | Mutación | `python -m harness.mutacion --feature F-112 --workers 3 --timeout 2400`: **27 generados, 20 evaluados (muestreo `estandar`, semilla 20260820), 18 muertos, 2 supervivientes, 0 timeouts**, 3.611,7 s, medida en HEAD `25795cc`. Detalle: `progress/mutacion_F-112.md` |
 | Supervivientes | los 2, `cobertura.py:167/168` (`[:10]` -> `[:11]` del sha en la línea de la puerta): **huecos reales**, ahora muertos por tests endurecidos (`3912100`, `48499f4`); rejugados a mano, ROJO con el mutante |
-| Tiempo de la suite | INIT_TIEMPO |
+| Tiempo de la suite | 766,01 s (0:12:46), lo que imprime pytest bajo coverage |
 
 Sobre la campaña: el primer intento (`--feature F-112` a secas, 4 workers por
 defecto) abortó sin informe porque la línea base limpia no cupo en sus 600 s
@@ -199,8 +199,14 @@ con 4 suites compitiendo. Relanzada con 3 workers y `--timeout 2400` (F-108 ya
 usó `--timeout 1800`); líneas base de 518-531 s, todas verdes. El cierre de la
 1.7.8 (un timeout es un reintento) no está en este proyecto (1.7.7).
 
-Resultado real de `bash harness/init.sh` (última ejecución, HEAD INIT_HEAD):
+Resultado real de `bash harness/init.sh` (última ejecución, HEAD `01f1f7b`):
 
 ```
-INIT_SALIDA
+[OK] Arnés v1.7.7 (2026-08-26)
+5562 passed, 203 skipped, 1484 warnings in 766.01s (0:12:46)
+[OK] pytest en verde (con medición de cobertura)
+[OK] PUERTA COBERTURA: 100.0% de 69 líneas cambiadas cubiertas (69/69, umbral 80%, nivel estandar; diff desde fb52d96e14, merge-base con main)
+[OK] PUERTA TAMAÑO: F-112 dentro de los topes (impl 206/220)
+[OK] Rama actual: feature/F-112-cobertura-contra-main
+ENTORNO LISTO. Puedes trabajar.   (exit 0; avisos previos: F-052 blocked, 233 de ruff)
 ```
