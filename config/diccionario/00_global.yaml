@@ -12,6 +12,17 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 35 (F-109, 2026-09-26): EL CODIGO DE PARTIDA NO ES UNICO NI DENTRO
+# DE SU OBRA. Medido el 2026-09-25: 5.202 pares `(obra_id, codigo_partida)`
+# repetidos (8.933 filas de mas, 158 obras) en `stg.partidas` y
+# `mart.v_pbi_dim_partida`, por contratos o expedientes con capitulo propio,
+# subarboles copiados por vivienda, bloque o fase, raices paralelas y erratas.
+# Tres fichas decian lo contrario y se corrigen; regla dura nueva
+# `R-PARTIDA-CODIGO-NO-UNICO` con la redaccion del humano (2026-09-26): unir por
+# obra + codigo, nunca; agrupar por codigo, declarandolo; ante el usuario, la
+# ruta de capitulos. Las fichas de niveles y de la dimension CI avisan de que
+# resuelven el NOMBRE por codigo (el arreglo es F-111). Ningun SQL cambia.
+#
 # version 34 (F-110, 2026-09-25): EL FIN DE OBRA POR EL ULTIMO CUATRIMESTRAL.
 # Decision del humano del 2026-09-25, que cambia H1 de F-095: sin inicio de
 # garantia, `retenciones.fin_obra.fecha_fin_obra` es el ultimo dia del mes
@@ -369,7 +380,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 34
+version: 35
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
