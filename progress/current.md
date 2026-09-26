@@ -9,6 +9,26 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-112 · EN CURSO (implementer) · la puerta de cobertura media contra `dev`, parada
+
+Implementer en `feature/F-112-cobertura-contra-main` (desde `main` fb52d96).
+`sdd=false`, rigor `estandar`. Tareas derivadas de los `acceptance`:
+
+- [ ] T1 · Fase RED: tests offline de la base de la puerta (repositorio git de
+  juguete: `dev` parada y `main` avanzada) y del alcance de una rama ya integrada.
+- [ ] T2 · `harness/alcance.py`: base configurada leida de `init.sh`,
+  diagnostico de base rezagada y merge que integro una rama cerrada.
+- [ ] T3 · `cobertura.py`, `rutas_sensibles.py` y `mutacion.py` usan la base
+  configurada y KO si mediria commits ajenos; `init.sh` pasa a `RAMA_BASE=main`.
+- [ ] T4 · Documentos del arnes (`reviewer.md`, `CONVENTIONS.md`).
+- [ ] T5 · Porte a `arnes-base` (commit local alli, sin push) y version.
+- [ ] T6 · Remedicion de F-107..F-110 contra `main` (worktrees desechables).
+- [ ] T7 · `init.sh` en verde, mutacion e informe `progress/impl_F-112.md`.
+
+Desviaciones: el `init.sh` inicial no se relanza (14-25 min): `main` quedo
+verde en 42d4b05 al cerrar F-109 y fb52d96 solo anade la ficha de F-112 y el
+registro de despliegue. Se ejecuta al final, tal cual.
+
 ## 2026-09-26 · F-109 · CERRADA (`done`, APROBADO en pasada 1) · el codigo de partida no es unico ni dentro de su obra · DESPLEGADA Y PUBLICADA
 
 > **2026-09-26 ~09:37 UTC** (autorizado por el humano): imagen `r20260926-1134`

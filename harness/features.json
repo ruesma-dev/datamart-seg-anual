@@ -1779,7 +1779,7 @@
         "Portado a `arnes-base` con el modo actualizar del instalador, y anotada la version del arnes",
         "Remedida la cobertura real de F-107 a F-110 contra `main`, con las que queden por debajo del umbral declaradas"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "sdd": false,
       "rigor": "estandar",
       "priority": 2,
