@@ -205,7 +205,8 @@ def test_f056_r1_fn_fecha_misma_forma_que_las_demas() -> None:
 def test_f056_r2_solo_raw_y_el_puente() -> None:
     for nombre in FICHEROS:
         texto = _sql(nombre)
-        esquemas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+)\.\w+", texto))
+        # «FROM esquema.tabla alias»: el alias descarta el `IS DISTINCT FROM pad.ide`
+        esquemas = set(re.findall(r"(?:FROM|JOIN)\s+(\w+)\.\w+ \w+", texto))
         assert esquemas <= {"raw", "contabilidad", "maestro"}, f"{nombre} lee {sorted(esquemas)}"
         assert set(re.findall(r"(?<![\w])maestro\.(\w+)", texto)) <= {"centros_coste"}
         for vetado in ("stg.", "mart.", "cierre.", "compras.", "retenciones.", "personal."):

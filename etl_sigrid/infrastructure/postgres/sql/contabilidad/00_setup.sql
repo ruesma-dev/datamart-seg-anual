@@ -36,4 +36,4 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 COMMENT ON FUNCTION contabilidad.fn_fecha(BIGINT) IS
-'Convierte una fecha entera de Sigrid (AAAAMMDD) a DATE. NULL para 0, NULL o invalida. Local al schema contabilidad, como las de compras, retenciones, maestro y personal.';
+'Convierte una fecha entera de Sigrid (AAAAMMDD) a DATE. NULL para 0, NULL o invalida. Local al schema contabilidad: la copia es deliberada, como en los otros esquemas modulo.';
