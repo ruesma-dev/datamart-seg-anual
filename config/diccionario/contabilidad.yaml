@@ -1,0 +1,481 @@
+# config/diccionario/contabilidad.yaml
+#
+# Fichas del esquema `contabilidad`: el plan de cuentas FINANCIERO como arbol,
+# el mayor (una fila por apunte) y los saldos por cuenta y mes. Lo construye
+# `build_contabilidad` (F-056, 2026-09-26) desde `raw.con`, `raw.cua`,
+# `raw.auxemp`, `raw.apu` y la vista `maestro.centros_coste`.
+#
+# Las cifras estan MEDIDAS el 2026-09-26 en solo lectura, sobre el SELECT
+# equivalente al build y sobre el `raw` de la nocturna de esa noche, ANTES del
+# primer build: se remiden con el primero (T22-T23 de la spec).
+#
+# LAS CUATRO COSAS QUE HAY QUE SABER ANTES DE ESCRIBIR UNA CONSULTA AQUI
+# (regla dura `R-SALDO-CONTABLE`):
+#
+# 1. **El saldo es `importe_saldo` / `saldo_acumulado`, no `SUM(importe)`.**
+#    Cada ejercicio la contabilidad CIERRA cada cuenta y la vuelve a ABRIR el
+#    ejercicio siguiente con el mismo importe. Sumar el historico de una cuenta
+#    quitando solo los CIERRE (dejando las APERTURA) cuenta cada apertura
+#    encima del movimiento que ya resume: en la cuenta `1-4308000197` da
+#    7.742.538,38 frente al saldo real de 1.189.275,13.
+# 2. **El plan es por EMPRESA** (`R-CODIGO-POR-EMPRESA`): el mismo codigo existe
+#    una vez en cada una de las 38. Se cruza por (`empresa_id`,
+#    `codigo_cuenta`) o por `clave_cuenta`, nunca por el codigo solo.
+# 3. **No es el plan ANALITICO.** `maestro.cuentas_analiticas` son las cuentas
+#    de la contabilidad analitica (`caa`), por centro de coste; esto es el plan
+#    financiero (`con` + `cua`). Contabilidad y analitica persiguen cosas
+#    distintas y no cuadran por construccion (F-063).
+# 4. **La obra solo esta donde el apunte lleva centro de coste**: el 90,3 % de
+#    los apuntes del grupo 6 (gastos), el 61,4 % del 7 y el 46,8 % del 4. Lo
+#    que no la lleva no se reparte.
+
+version: 1
+esquema: contabilidad
+
+objetos:
+
+  plan_cuentas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL PLAN DE CUENTAS FINANCIERO COMO ARBOL** (F-056): una fila por nodo
+      del plan de las 38 empresas, sin filtrar altas ni bajas. 78.974 nodos el
+      2026-09-26: **44.778 grupos** (`con.tip = 16`, codigos de 1 a 4 digitos:
+      321 grupos, 2.673 subgrupos, 15.017 cuentas y 26.767 subcuentas) y
+      **34.196 cuentas auxiliares** (`raw.cua`, `con.tip = 17`, todas de 10
+      digitos), que son las unicas imputables: solo ellas tienen apuntes.
+
+      **NO ES EL PLAN ANALITICO de `maestro.cuentas_analiticas`**: aquel son
+      las cuentas de la contabilidad analitica (`caa`), una por centro de coste
+      (184.234); esto es el plan financiero del Plan General Contable.
+
+      **EL ARBOL ES DE PREFIJOS, DENTRO DE LA EMPRESA**: el padre de un grupo
+      es el grupo de su MISMA empresa cuyo codigo es el suyo sin el ultimo
+      digito (el 100 % de los grupos de 2-4 digitos lo tiene) y el de una
+      cuenta auxiliar, el grupo de sus 4 primeros digitos. 17 auxiliares no
+      tienen ese grupo y van con padre NULL. Sigrid declara ademas un padre
+      (`cuenta_padre_declarada_id`, solo auxiliares): coincide con el prefijo
+      en 33.838, esta a 0 en 352 y **difiere en 6** (empresas 12, 17 y 18,
+      `padre_declarado_difiere`). Los grupos de 1 a 4 digitos del PGC:
+      grupo (1), subgrupo (2), cuenta (3), subcuenta (4).
+
+      **EL CODIGO SOLO ES UNICO DENTRO DE SU EMPRESA** (`R-CODIGO-POR-EMPRESA`):
+      por codigo se cruza siempre con `empresa_id`, o por `clave_cuenta`
+      ('1-4308000197'). Ejemplo: la cuenta `1-4308000197` es AHORRAMAS, S.A.,
+      Retenciones; su ruta es '4 > 43 > 430 > 4308 > 4308000197' (grupo 4
+      ACREEDORES Y DEUDORES, 43 CLIENTES, 4308 Clientes, retenciones).
+    grano: >-
+      Una fila por nodo del plan (grupo o cuenta auxiliar) de una empresa,
+      identificada por `cuenta_id`. El par (`empresa_id`, `codigo_cuenta`) y
+      `clave_cuenta` tambien son unicos; el codigo solo, no.
+    clave_negocio: [cuenta_id]
+    claves_alternativas: [[empresa_id, codigo_cuenta], [clave_cuenta]]
+    paso_etl: build_contabilidad
+    refresco: nocturno
+    columnas:
+      cuenta_id:
+        significado: >-
+          Identificador del nodo en Sigrid (`con.ide`; en las auxiliares, el
+          mismo que `cua.ide`). Es el valor de `contabilidad.mayor.cuenta_id`.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de Sigrid del nodo (`con.emp`); `1` es Ruesma. Parte de la identidad legible.
+        agregacion: no_sumable
+      empresa_nombre:
+        significado: Nombre de la empresa (`raw.auxemp.res` por `numemp`).
+      codigo_cuenta:
+        significado: >-
+          Codigo del nodo (`con.cod`): 1 a 4 digitos en los grupos, 10 en las
+          auxiliares. Repetido entre empresas: se cruza junto con `empresa_id`.
+      clave_cuenta:
+        significado: >-
+          La clave legible '<empresa>-<codigo>' ('1-4308000197'), unica. Es la
+          forma de pedir una cuenta concreta sin equivocarse de empresa.
+      nombre_cuenta:
+        significado: Nombre del nodo (`con.res`).
+      nivel:
+        significado: >-
+          Nivel en el arbol: 1 a 4 en los grupos (la longitud del codigo) y 5
+          en las cuentas auxiliares.
+        agregacion: no_sumable
+        valores: [1, 2, 3, 4, 5]
+      nombre_nivel:
+        significado: El nivel con nombre.
+        valores: [GRUPO, SUBGRUPO, CUENTA, SUBCUENTA, CUENTA_AUXILIAR]
+      es_imputable:
+        significado: >-
+          TRUE en las cuentas auxiliares (nivel 5), las unicas que reciben
+          apuntes. Los grupos solo agregan.
+      grupo_pgc:
+        significado: >-
+          El primer digito del codigo: el grupo del Plan General Contable
+          (1-5 balance, 6 gastos, 7 ingresos).
+      cuenta_padre_id:
+        significado: >-
+          El padre por PREFIJO: el grupo de la misma empresa cuyo codigo es el
+          prefijo inmediato (nivel 5: los 4 primeros digitos).
+        agregacion: no_sumable
+        nulo_significa: >-
+          Nivel 1 (no tiene padre), o una auxiliar sin grupo de su prefijo en
+          su empresa (17 el 2026-09-26).
+      cuenta_padre_declarada_id:
+        significado: >-
+          El padre que DECLARA Sigrid para la auxiliar (`cua.padide`). Coincide
+          con el de prefijo salvo en 6 cuentas: informativo, el arbol va por
+          prefijo.
+        agregacion: no_sumable
+        nulo_significa: Un grupo (niveles 1-4), o una auxiliar con `padide` a 0 (352).
+      padre_declarado_difiere:
+        significado: >-
+          TRUE si la auxiliar declara un padre distinto del de prefijo (6 el
+          2026-09-26, empresas 12, 17 y 18). FALSE en los grupos.
+      grupo_id:
+        significado: >-
+          El nodo de nivel 1 de su rama (el propio nodo si es de nivel 1). Con
+          los otros tres ancestros permite agregar el balance por cualquier
+          nivel con un GROUP BY.
+        agregacion: no_sumable
+      subgrupo_id:
+        significado: El nodo de nivel 2 de su rama (el propio si es de nivel 2).
+        agregacion: no_sumable
+        nulo_significa: El nodo es de nivel 1.
+      cuenta_3_id:
+        significado: El nodo de nivel 3 de su rama (el propio si es de nivel 3).
+        agregacion: no_sumable
+        nulo_significa: El nodo es de nivel 1 o 2.
+      subcuenta_id:
+        significado: El nodo de nivel 4 de su rama (el propio si es de nivel 4).
+        agregacion: no_sumable
+        nulo_significa: El nodo es de nivel 1 a 3, o una auxiliar sin grupo de su prefijo.
+      ruta_codigos:
+        significado: >-
+          Los codigos de la rama, de la raiz al nodo: '4 > 43 > 430 > 4308 >
+          4308000197'.
+      fecha_baja:
+        significado: Fecha de baja del nodo en Sigrid (`con.fecbaj`).
+        nulo_significa: El nodo esta de alta.
+      es_activa:
+        significado: >-
+          TRUE si el nodo no tiene baja. Es BANDERA, no filtro: una cuenta de
+          baja tiene historia en el mayor.
+    relaciones:
+      - de: cuenta_padre_id
+        a: contabilidad.plan_cuentas.cuenta_id
+        cardinalidad: "N:1"
+        porque: El padre por prefijo es otro nodo del mismo plan y de la misma empresa.
+      - de: grupo_id
+        a: contabilidad.plan_cuentas.cuenta_id
+        cardinalidad: "N:1"
+        porque: El ancestro de nivel 1, para agregar por grupo del PGC.
+      - de: subgrupo_id
+        a: contabilidad.plan_cuentas.cuenta_id
+        cardinalidad: "N:1"
+        porque: El ancestro de nivel 2.
+      - de: cuenta_3_id
+        a: contabilidad.plan_cuentas.cuenta_id
+        cardinalidad: "N:1"
+        porque: El ancestro de nivel 3.
+      - de: subcuenta_id
+        a: contabilidad.plan_cuentas.cuenta_id
+        cardinalidad: "N:1"
+        porque: El ancestro de nivel 4, que es la subcuenta de la que cuelgan las auxiliares.
+    ejemplos_preguntas:
+      - Que cuentas cuelgan de la subcuenta 4308 de la empresa 1
+      - Como se llama la cuenta 4308000197 de Ruesma y en que rama esta
+
+  mayor:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL MAYOR CONTABLE** (F-056): una fila por apunte de `raw.apu`, SIN
+      FILTRAR NINGUNO: 2.166.701 apuntes de 38 empresas desde 2008 (la empresa
+      1, Ruesma, 1.948.503: el 89,9 %). Cada apunte con su fecha, su empresa,
+      su cuenta del plan financiero, debe, haber e `importe` = debe - haber
+      (positivo = saldo deudor), la clase del asiento, el saldo, la obra y el
+      tercero. Es lo que responde "el mayor de la cuenta X".
+
+      **LA TRAMPA: CIERRE Y APERTURA** (`R-SALDO-CONTABLE`). Cada ejercicio
+      la contabilidad cierra cada cuenta y la reabre el siguiente con el mismo
+      importe (52.414 apuntes de CIERRE y 52.413 de APERTURA). El saldo es
+      `importe_saldo` (0 en CIERRE y APERTURA) y `saldo_acumulado`. Caso
+      medido: la cuenta `1-4308000197` (AHORRAMAS, S.A., Retenciones) tiene 641
+      apuntes de 2009 a 2026 y un saldo de **1.189.275,13**; sumar su historico
+      quitando solo los CIERRE da **7.742.538,38**, porque cada APERTURA se
+      suma encima del movimiento que ya resume. La apertura sin cierre previo
+      de la cuenta es SALDO_INICIAL y SI cuenta: 1.433 apuntes (1.315 de 2008,
+      lo anterior a Sigrid, y los arranques de empresas nuevas). Dentro de UN
+      ejercicio, la apertura es el saldo de partida: la subcuenta 434 de la
+      empresa 1 en 2026, sumando sus auxiliares sin los CIERRE, da
+      5.345.557,80, lo mismo que la pantalla de Sigrid del 03-09.
+
+      **UNA OPERACION DEJA VARIOS APUNTES**: la factura, otro en la remesa de
+      cobro o pago y otro en «totales». Contar apuntes no es contar
+      operaciones, y sumar el debe de todas las cuentas de un tercero cuenta
+      la misma operacion varias veces.
+
+      **CONTABILIDAD NO ES ANALITICA NI SEGUIMIENTO** (F-063): esto es lo que se
+      contabilizo en el plan financiero; el coste analitico por centro esta en
+      `raw.apa` (F-061) y el seguimiento de obra en `mart` y `cierre`. Persiguen
+      cosas distintas y no cuadran por construccion.
+
+      **LA OBRA solo sale del centro de coste del apunte** (`apu.cenide`,
+      traducido por `maestro.centros_coste`): 1.161.574 apuntes (53,6 %). Por
+      grupo del PGC: 6 (gastos) el **90,3 %** (425.520 de 471.188), 7 el
+      **61,4 %**, 4 el **46,8 %**, 5 el 24,5 %, 1 el 18,4 %, 2 el 9,6 % y 3 casi
+      nada. Lo que no lleva centro, o lleva uno que no es obra (estructura,
+      delegacion), va sin obra y NO se reparte.
+
+      **LAS DOS FECHAS**: `fecha` es la del apunte (`apu.fec`, la que usa el
+      mayor de Sigrid) y `fecha_asiento` la del asiento. Coinciden salvo en
+      **297** apuntes de 2017, que llevan el ultimo dia del mes y su asiento el
+      primero (`fecha_difiere`).
+    grano: >-
+      Una fila por apunte contable, y `apunte_id` es clave primaria: ninguna
+      union multiplica (el build falla si el recuento no es el de `raw.apu`).
+      Incluye cierres y aperturas: para sumar saldos, `importe_saldo`.
+    clave_negocio: [apunte_id]
+    paso_etl: build_contabilidad
+    refresco: nocturno
+    columnas:
+      apunte_id:
+        significado: Identificador del apunte en Sigrid (`apu.ide`). Destino de `raw.apa.apuide` (F-061).
+        agregacion: no_sumable
+      asiento_id:
+        significado: El asiento del apunte (`apu.asiide`, que es un `con.ide`).
+        agregacion: no_sumable
+      codigo_asiento:
+        significado: Numero del asiento (`con.cod` del asiento).
+      posicion:
+        significado: Posicion del apunte dentro de su asiento (`apu.pos`).
+        agregacion: no_sumable
+      fecha:
+        significado: Fecha contable del apunte (`apu.fec`). Es la que ordena el mayor.
+      fecha_asiento:
+        significado: Fecha del asiento (`con.fec` del asiento), por los dos saltos.
+        nulo_significa: El apunte no tiene asiento (0 el 2026-09-26).
+      fecha_difiere:
+        significado: TRUE si `fecha` y `fecha_asiento` no coinciden (297, todos de 2017).
+      ejercicio:
+        significado: Ano de `fecha`. Es el ejercicio contable del apunte.
+        agregacion: no_sumable
+      mes:
+        significado: Mes de `fecha` (1-12).
+        agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa del ASIENTO (`con.emp`); la de la cuenta coincide en el 100 %.
+        agregacion: no_sumable
+      cuenta_id:
+        significado: La cuenta auxiliar del apunte (`apu.cueide`), un nodo de `contabilidad.plan_cuentas`.
+        agregacion: no_sumable
+        nulo_significa: El apunte no lleva cuenta (294 apuntes, todos de importe cero).
+      codigo_cuenta:
+        significado: Codigo de la cuenta. Repetido entre empresas.
+        nulo_significa: El apunte no lleva cuenta.
+      nombre_cuenta:
+        significado: Nombre de la cuenta.
+        nulo_significa: El apunte no lleva cuenta.
+      clave_cuenta:
+        significado: La clave legible de la cuenta, '<empresa>-<codigo>'.
+        nulo_significa: El apunte no lleva cuenta.
+      concepto:
+        significado: Texto del apunte (`apu.res`). De aqui sale en parte la clase del asiento.
+      documento:
+        significado: Documento del apunte segun Sigrid (`apu.doc`). Casi nunca informado; el enlace con la factura es `raw.rac` (F-091).
+      punteo:
+        significado: Marca de punteo del apunte (`apu.pun`), tal cual.
+        agregacion: no_sumable
+      clase_origen:
+        significado: >-
+          La clase que trae Sigrid (`apu.cla`): 3 cierre, -1 apertura, 1
+          regularizacion, 0 el resto. Incompleta: los cierres de 2020, las
+          aperturas de 2021 y 290 regularizaciones vienen con 0. Para decidir,
+          `clase_asiento`.
+        agregacion: no_sumable
+      clase_asiento:
+        significado: >-
+          Que es el apunte, evaluado en este orden: CIERRE (`cla` 3 o concepto
+          'Asiento de cierre...'), SALDO_INICIAL (apertura de una cuenta sin
+          cierre el ejercicio anterior), APERTURA (el resto de aperturas),
+          REGULARIZACION (`cla` 1 o 'Asiento de regulariz...'; deja los grupos
+          6 y 7 a cero al cerrar el ejercicio) y NORMAL. El 2026-09-26: NORMAL
+          2.056.147, CIERRE 52.414, APERTURA 52.413, REGULARIZACION 4.294,
+          SALDO_INICIAL 1.433.
+        valores: [NORMAL, APERTURA, SALDO_INICIAL, CIERRE, REGULARIZACION]
+      debe:
+        significado: Debe del apunte.
+        unidad: EUR
+        agregacion: suma
+      haber:
+        significado: Haber del apunte.
+        unidad: EUR
+        agregacion: suma
+      importe:
+        significado: >-
+          Debe menos haber, CON SIGNO (positivo = saldo deudor). Sumarlo sin
+          filtrar `clase_asiento` mete los cierres y las aperturas: el saldo es
+          `importe_saldo`.
+        unidad: EUR
+        agregacion: suma
+      importe_saldo:
+        significado: >-
+          Lo que el apunte aporta al saldo: `importe` en NORMAL, REGULARIZACION y
+          SALDO_INICIAL, 0 en CIERRE y APERTURA. Es la columna que se suma.
+        unidad: EUR
+        agregacion: suma
+      saldo_acumulado:
+        significado: >-
+          Saldo de la cuenta tras el apunte: suma de `importe_saldo` de la
+          cuenta hasta el apunte inclusive, por fecha, asiento, posicion y
+          apunte. El saldo a una fecha es el del ultimo apunte hasta esa fecha.
+        unidad: EUR
+        agregacion: ultimo_valor
+      centro_coste_id:
+        significado: Centro de coste del apunte (`apu.cenide`), tal cual. No es la obra.
+        agregacion: no_sumable
+        nulo_significa: El apunte no lleva centro.
+      obra_id:
+        significado: >-
+          La obra del centro de coste del apunte, por `maestro.centros_coste`:
+          el mismo identificador que `maestro.obras.obra_id`, la ficha de su
+          empresa.
+        agregacion: no_sumable
+        nulo_significa: >-
+          El apunte no lleva centro, o su centro no es una obra (estructura,
+          delegacion). No se reparte.
+      codigo_obra:
+        significado: Codigo de la obra, sin la empresa. Repetido entre empresas.
+        nulo_significa: El apunte no tiene obra.
+      clave_obra:
+        significado: La clave legible de la obra, '<empresa>-<codigo>', la de `maestro.obras`.
+        nulo_significa: El apunte no tiene obra.
+      tercero_id:
+        significado: >-
+          El tercero del apunte (`apu.empide`): proveedor, cliente o acreedor,
+          un `con.ide`. Informado en 1.030.078 apuntes (47,5 %).
+        agregacion: no_sumable
+        nulo_significa: El apunte no lleva tercero.
+      tercero_nombre:
+        significado: Nombre del tercero (`con.res`).
+        nulo_significa: El apunte no lleva tercero.
+    relaciones:
+      - de: cuenta_id
+        a: contabilidad.plan_cuentas.cuenta_id
+        cardinalidad: "N:1"
+        porque: La cuenta del apunte en el arbol, con su rama y sus ancestros para agregar.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra (y de su empresa) del apunte.
+      - de: centro_coste_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: El centro de coste del apunte, del que sale la obra.
+    ejemplos_preguntas:
+      - Dame el mayor de la cuenta 4308000197 de Ruesma
+      - Cual es el saldo de la cuenta X a 31 de diciembre de 2025
+      - Que gastos del grupo 6 se han contabilizado en la obra X este ano
+
+  saldos_cuenta_mes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS SALDOS POR CUENTA Y MES** (F-056), construidos desde
+      `contabilidad.mayor`: una fila por cuenta, empresa, ejercicio y mes con
+      algun apunte (400.342 el 2026-09-26). El importe va partido por clase
+      --apertura (APERTURA + SALDO_INICIAL), movimiento (NORMAL),
+      regularizacion y cierre-- para que la trampa del CIERRE y la APERTURA no
+      se pueda cometer sin verla: `importe_saldo` ya los excluye y
+      `saldo_acumulado` es el saldo a fin de mes. La suma de `importe_saldo` por
+      cuenta es la del mayor. Los apuntes sin cuenta van con `cuenta_id` = 0,
+      una fila por empresa y mes, de importe cero. Para el balance o la cuenta
+      de resultados, agregar por los ancestros de `contabilidad.plan_cuentas`;
+      en los grupos 6 y 7 la REGULARIZACION deja el ejercicio a cero, asi que
+      el resultado del ejercicio se lee sin ella (`importe_movimiento`).
+    grano: >-
+      Una fila por (`cuenta_id`, `empresa_id`, `ejercicio`, `mes`) con algun
+      apunte. Los meses sin apuntes no tienen fila: el saldo de un mes sin
+      movimiento es el `saldo_acumulado` del ultimo mes con fila.
+    clave_negocio: [cuenta_id, empresa_id, ejercicio, mes]
+    paso_etl: build_contabilidad
+    refresco: nocturno
+    columnas:
+      cuenta_id:
+        significado: La cuenta auxiliar (`contabilidad.plan_cuentas.cuenta_id`), o 0 para los apuntes sin cuenta.
+        agregacion: no_sumable
+      empresa_id:
+        significado: Empresa de los apuntes (la del asiento).
+        agregacion: no_sumable
+      ejercicio:
+        significado: Ano contable de los apuntes (el de su fecha).
+        agregacion: no_sumable
+      mes:
+        significado: Mes de los apuntes dentro del ejercicio (1-12).
+        agregacion: no_sumable
+      num_apuntes:
+        significado: Apuntes de la cuenta ese mes, de todas las clases.
+        agregacion: suma
+      debe:
+        significado: Debe del mes, de todas las clases (cierres y aperturas incluidos).
+        unidad: EUR
+        agregacion: suma
+      haber:
+        significado: Haber del mes, de todas las clases (cierres y aperturas incluidos).
+        unidad: EUR
+        agregacion: suma
+      importe_apertura:
+        significado: Importe de las APERTURA y los SALDO_INICIAL del mes (en la practica, enero).
+        unidad: EUR
+        agregacion: suma
+      importe_movimiento:
+        significado: Importe de los apuntes NORMAL del mes.
+        unidad: EUR
+        agregacion: suma
+      importe_regularizacion:
+        significado: Importe de la REGULARIZACION del mes (grupos 6 y 7, al cerrar).
+        unidad: EUR
+        agregacion: suma
+      importe_cierre:
+        significado: Importe de los CIERRE del mes. No se suma al saldo.
+        unidad: EUR
+        agregacion: suma
+      importe_saldo:
+        significado: >-
+          Lo que el mes aporta al saldo: NORMAL + REGULARIZACION +
+          SALDO_INICIAL, sin CIERRE ni APERTURA. Es la columna que se suma.
+        unidad: EUR
+        agregacion: suma
+      saldo_acumulado:
+        significado: Saldo de la cuenta a fin de mes. No se suma entre meses.
+        unidad: EUR
+        agregacion: ultimo_valor
+    relaciones:
+      - de: cuenta_id
+        a: contabilidad.plan_cuentas.cuenta_id
+        cardinalidad: "N:1"
+        porque: La cuenta en el arbol, para agregar por grupo, subgrupo o subcuenta.
+    ejemplos_preguntas:
+      - Saldo de la subcuenta 434 de Ruesma mes a mes en 2026
+      - Gastos del grupo 62 por empresa y mes
+
+  fn_fecha:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de contabilidad, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Convierte una fecha de Sigrid --un entero AAAAMMDD-- en una fecha de
+      verdad, tratando el 0 como ausencia de fecha. Copia local de la de los
+      otros esquemas modulo, para no depender de ninguno.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_contabilidad
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
