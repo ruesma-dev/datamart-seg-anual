@@ -9,6 +9,53 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-26 · F-112 · CERRADA (`done`, APROBADO en pasada 3) · la puerta de cobertura media contra `dev`, parada · QUEDAN LAS MANUAL DEL HUMANO
+
+Implementer en `feature/F-112-cobertura-contra-main` (desde `main` fb52d96).
+`sdd=false`, rigor `estandar`. Tareas derivadas de los `acceptance`:
+
+- [x] T1 · Fase RED: tests offline de la base de la puerta (repositorio git de
+  juguete: `dev` parada y `main` avanzada) y del alcance de una rama ya integrada.
+- [x] T2 · `harness/alcance.py`: base configurada leida de `init.sh`,
+  diagnostico de base rezagada y merge que integro una rama cerrada.
+- [x] T3 · `cobertura.py`, `rutas_sensibles.py` y `mutacion.py` usan la base
+  configurada y KO si mediria commits ajenos; `init.sh` pasa a `RAMA_BASE=main`.
+- [x] T4 · Documentos del arnes (`reviewer.md`, `CONVENTIONS.md`).
+- [x] T5 · Porte a `arnes-base` (commit local alli, sin push) y version.
+- [x] T6 · Remedicion de F-107..F-110 contra `main` (worktrees desechables).
+- [x] T7 · `init.sh` en verde, mutacion e informe `progress/impl_F-112.md`.
+
+Decisión del humano sobre `dev` (2026-09-26): **opción B, se MANTIENE como
+espejo de `main`**, que adelanta el humano tras cada cierre (el líder se lo
+recuerda con el comando); ninguna feature nace de ella. Escrita en `docs/CONVENTIONS.md` (Git) y `.claude/agents/leader.md`
+(Ramas). Review pasada 1: CHANGES_REQUESTED solo documental
+(`progress/review_F-112.md`), atendido en esta sección y en esos dos ficheros.
+
+### Verificaciones MANUAL (humano) de F-112
+
+- [ ] **Primer adelantamiento de `dev` a `main`** (la pone al día de 552
+  commits; no es fast-forward por sus dos commits propios). Lo hace el
+  **humano** tras el cierre de F-112, merge y push; el líder solo se lo
+  recuerda con este comando en cada cierre:
+  `git checkout dev && git merge --no-ff main && git push origin dev && git checkout main`
+- [x] **Las dos peticiones de `mcp-bbdd` que solo vivían en `dev`**
+  (`a1a3df2`, `a1845db`: regla del aviso de las columnas `_raw` y orden de
+  magnitud de `stg.presupuesto`, fichadas allí como F-057/F-058, números que en
+  `main` son otras features): **rescatadas por el humano como F-114**, ya en
+  `main` (`01193f1`). Texto original: `git show a1845db:harness/features.json`.
+- [ ] **Actualización completa del arnés 1.7.7 -> 1.7.14** (trae además la
+  1.7.8-1.7.10; el instalador pregunta por `CLAUDE.md`, `CHECKPOINTS.md`,
+  `init.sh`, `CONVENTIONS.md`...), en una rama, desde `arnes-base`:
+  `.\instalar_arnes.ps1 -Destino "C:\Users\pgris\PycharmProjects\datamart-seg-anual" -Modo actualizar -SoloDiff`
+  y después `.\instalar_arnes.ps1 -Destino "C:\Users\pgris\PycharmProjects\datamart-seg-anual" -Modo actualizar`
+- [ ] **Push de `arnes-base`** (commits locales en `main`, `2c3a7fe`..`aa8f85a`,
+  este último con el `leader.md` genérico de la review):
+  `git -C C:\Users\pgris\PycharmProjects\arnes-base push origin main`
+
+Desviaciones: el `init.sh` inicial no se relanza (14-25 min): `main` quedo
+verde en 42d4b05 al cerrar F-109 y fb52d96 solo anade la ficha de F-112 y el
+registro de despliegue. Se ejecuta al final, tal cual.
+
 ## 2026-09-26 · F-109 · CERRADA (`done`, APROBADO en pasada 1) · el codigo de partida no es unico ni dentro de su obra · DESPLEGADA Y PUBLICADA
 
 > **2026-09-26 ~09:37 UTC** (autorizado por el humano): imagen `r20260926-1134`

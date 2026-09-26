@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **106 features**, 66 abiertas, 40 terminadas.
+Resumen: **106 features**, 65 abiertas, 41 terminadas.
 
 Bloqueadas: **F-052**.
 
@@ -11,7 +11,6 @@ Bloqueadas: **F-052**.
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-112 | La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa | 1 | pendiente | estandar | `feature/F-112-cobertura-contra-main` |
 | F-056 | El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066) | 2 | spec lista | critico | `feature/F-056-contabilidad` |
 | F-097 | Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master | 3 | pendiente | estandar | `feature/F-097-descompuestos-partidas` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
@@ -91,6 +90,7 @@ Bloqueadas: **F-052**.
 | F-101 | HOTFIX de F-057: la cabecera del parte, el codigo y el texto en cada linea, y los tipos de hora con sus precios de la ficha del recurso | 1 | estandar |
 | F-107 | Contrapartidas del recurso y catalogo de cuentas analiticas (correo de Juan Romero del 23-09) | 1 | estandar |
 | F-110 | Retenciones: sin inicio de garantia, el fin de obra es el ultimo mes planificado del ultimo cuatrimestral + 1 (sustituye al ultimo cierre + 1) | 1 | critico |
+| F-112 | La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa | 1 | estandar |
 | F-009 | Inventario del entorno Azure existente | 2 | documental |
 | F-042 | La clave de mart.fact_seguimiento_mensual esta rota: 8.778 combinaciones duplicadas | 2 | critico |
 | F-066 | Ingerir de Sigrid los raw que faltan: recursos, empleados y partes; la contabilidad; firmas, familias y actividades del proveedor | 2 | critico |
@@ -124,12 +124,6 @@ Bloqueadas: **F-052**.
 | F-008 | Documentación de referencia: tablas de Sigrid, landing zone de acens y sigrid-api | 21 | documental |
 
 ## Detalle
-
-### F-112 · La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa
-
-estado **pendiente** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-112-cobertura-contra-main`
-
-Decidido por el humano el 2026-09-26, prioridad 2. Hallazgo del reviewer de F-109: `harness/init.sh:34` fija `RAMA_BASE=dev` y la puerta de cobertura (`python -m harness.cobertura --base "$RAMA_BASE"`, l. 486) y la de rutas sensibles (l. 514) comparan contra esa rama. `dev` esta parada en `a1845db` (renumeracion de F-057/F-058, principios de septiembre): todo el trabajo se integra en `main`. Consecuencia: la cobertura de lineas cambiadas mide el diff `dev...HEAD`, que arrastra semanas de features ya cerradas; por eso F-110 y F-109 dieron la MISMA cifra (95,1 % de 1.106 lineas) y ninguna de esas lineas era de F-109. La puerta pasa en verde sin medir lo que dice medir. QUE HACER: (1) en este proyecto, `RAMA_BASE=main` (o calcular la base como `git merge-base HEAD main`), con un test que falle si la rama base no es ancestro reciente de HEAD o esta por detras de la rama de integracion; (2) decidir que se hace con `dev` (retirarla, o mantenerla y avisar); (3) REGLA DE PROPAGACION: portar a `arnes-base` que la puerta use el merge-base con la rama de integracion configurada, o avise en rojo cuando la base este por detras, con el modo actualizar del instalador; (4) remedir la cobertura real de las ultimas features cerradas (F-107 a F-110) contra `main` y anotar si alguna queda por debajo del umbral de su rigor.
 
 ### F-056 · El mayor y el plan de cuentas como arbol: stg y mart sobre la contabilidad (raw por F-066)
 
@@ -574,6 +568,12 @@ Pedido por el humano el 2026-09-24 para hacer YA (prioridad 1). Correo de Juan R
 estado **terminada** · prioridad 1 · rigor `critico` · SDD sí · rama `feature/F-110-fin-obra-cuatrimestral`
 
 Decidido por el humano el 2026-09-25, prioridad 1. CAMBIA LA DECISION H1 DE F-095 (2026-09-22). Regla nueva de `retenciones.fin_obra.fecha_fin_obra`, en este orden y SIN MAS PASOS: (1) el inicio del periodo de garantia (`obrctr.fecinigar`, si no `obr.garfecini`), como hoy; (2) si no lo hay, el ULTIMO MES PLANIFICADO EN LA ULTIMA VERSION CUATRIMESTRAL (master) de la obra + 1 mes; (3) si tampoco hay cuatrimestral, SIN FECHA (NULL, no se inventa). **SE ELIMINA el respaldo «ultimo cierre con movimiento + 1 mes»** (`ULTIMO_CIERRE_MAS_1_MES`, que leia `cierre.fact_cierre_mensual`): el humano lo quita porque mira hacia atras y en una obra en curso adelanta el vencimiento. El resto de F-095 no cambia: plazo `plaret` -> `plagar` -> 12 meses y vencimiento = fin de obra + plazo. POR QUE: el ultimo cierre + 1 da, en una obra viva, una fecha de hace poco; el cuatrimestral dice cuando PREVE la obra terminar. MEDIDO EL 2026-09-25 (verificaciones de F-095): sobre la retencion viva, INICIO_GARANTIA 97 obras / 5.026.655,18 EUR, ULTIMO_CIERRE_MAS_1_MES 67 / 3.120.260,42 y sin fecha 15 / 100.351,55; en las 922 obras, 198 con garantia y 150 con ultimo cierre. QUE HAY QUE MEDIR ANTES DE ESCRIBIR: cuantas obras tienen version cuatrimestral y cual es su ultimo mes planificado (las versiones master viven en `stg` —ambitos 8 y 11, `stg.version_master_vigente`, `stg.fn_master_mes_representado`—; decidir si «la ultima» es la vigente de F-042 o la de mayor fecha), cuantas de las 67 pasan a tener fecha por cuatrimestral y cuantas se quedan sin fecha, y cuanto se mueven los vencimientos (VENCIDA -> PENDIENTE). Ojo a la dependencia: si el cuatrimestral se lee de `stg`, `build_retenciones` pasa a depender de `build_stg` (hoy lee `cierre`, que va con una noche de retraso); decidirlo y escribirlo. Respetar `R-CODIGO-POR-EMPRESA`.
+
+### F-112 · La puerta de cobertura de init.sh mide contra `dev`, que esta parada desde hace semanas: no mide las lineas de la feature que se revisa
+
+estado **terminada** · prioridad 1 · rigor `estandar` · SDD no · rama `feature/F-112-cobertura-contra-main`
+
+Decidido por el humano el 2026-09-26, prioridad 2. Hallazgo del reviewer de F-109: `harness/init.sh:34` fija `RAMA_BASE=dev` y la puerta de cobertura (`python -m harness.cobertura --base "$RAMA_BASE"`, l. 486) y la de rutas sensibles (l. 514) comparan contra esa rama. `dev` esta parada en `a1845db` (renumeracion de F-057/F-058, principios de septiembre): todo el trabajo se integra en `main`. Consecuencia: la cobertura de lineas cambiadas mide el diff `dev...HEAD`, que arrastra semanas de features ya cerradas; por eso F-110 y F-109 dieron la MISMA cifra (95,1 % de 1.106 lineas) y ninguna de esas lineas era de F-109. La puerta pasa en verde sin medir lo que dice medir. QUE HACER: (1) en este proyecto, `RAMA_BASE=main` (o calcular la base como `git merge-base HEAD main`), con un test que falle si la rama base no es ancestro reciente de HEAD o esta por detras de la rama de integracion; (2) decidir que se hace con `dev` (retirarla, o mantenerla y avisar); (3) REGLA DE PROPAGACION: portar a `arnes-base` que la puerta use el merge-base con la rama de integracion configurada, o avise en rojo cuando la base este por detras, con el modo actualizar del instalador; (4) remedir la cobertura real de las ultimas features cerradas (F-107 a F-110) contra `main` y anotar si alguna queda por debajo del umbral de su rigor.
 
 ### F-009 · Inventario del entorno Azure existente
 

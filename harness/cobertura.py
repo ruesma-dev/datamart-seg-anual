@@ -21,7 +21,14 @@ import json
 import sys
 from pathlib import Path
 
-from harness.alcance import alcance_de_feature, ejecutar_git
+from harness.alcance import (
+    Alcance,
+    alcance_de_feature,
+    diagnosticar_base,
+    ejecutar_git,
+    git_en,
+    rama_base_configurada,
+)
 from harness.rigor import (
     RUTA_FEATURES,
     RUTA_RIGOR,
@@ -149,6 +156,18 @@ def coberturas_de_servicios(
     return encontradas
 
 
+def medido_contra(alcance: Alcance, base: str) -> str:
+    """Contra qué se midió, para que se vea en la propia línea de la puerta.
+
+    Sin esto, dos features distintas con la misma cifra al decimal (F-110 y
+    F-109: 95,1 % de 1.106 líneas) no levantaban ninguna sospecha (F-112).
+    """
+    desde, hasta = alcance.ref_diff
+    if alcance.origen == "merge":
+        return f"diff del merge {hasta[:10]}, ya integrado en {base}"
+    return f"diff desde {desde[:10]}, merge-base con {base}"
+
+
 def _na(motivo: str) -> int:
     print(f"{ETIQUETA}: N/A ({motivo})")
     return 0
@@ -165,7 +184,11 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m harness.cobertura",
         description="Comprueba la cobertura de las líneas cambiadas por la feature.",
     )
-    analizador.add_argument("--base", default="dev", help="Rama de integración")
+    analizador.add_argument(
+        "--base",
+        default=None,
+        help="Rama de integración (por defecto, RAMA_BASE de harness/init.sh)",
+    )
     analizador.add_argument("--config", default=str(RUTA_RIGOR))
     analizador.add_argument("--features", default=str(RUTA_FEATURES))
     analizador.add_argument("--cov", default="coverage.json")
@@ -177,8 +200,9 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as error:
         return _ko(str(error))
 
+    base = opciones.base or rama_base_configurada(opciones.raiz)
     rama = rama_actual(opciones.raiz)
-    if not rama or rama in (opciones.base, "main", "master"):
+    if not rama or rama in (base, "main", "master"):
         return _na(f"rama {rama or '(detached)'}: solo aplica en ramas de feature")
 
     feature = feature_de_rama(rama, cargar_features(opciones.features))
@@ -189,10 +213,17 @@ def main(argv: list[str] | None = None) -> int:
     if not exige(nivel, "cobertura", rigor):
         return _na(f"{feature.get('id')} es de nivel {nivel}: no exige cobertura")
 
+    # Antes de medir, que lo medido sea de la rama (F-112): contra una base
+    # rezagada la puerta atribuía a la feature semanas de trabajo ajeno e
+    # imprimía verde. Eso es un ROJO con su motivo, no una cifra.
+    motivo = diagnosticar_base(base, rama, git=git_en(opciones.raiz))
+    if motivo:
+        return _ko(motivo)
+
     try:
         alcance = alcance_de_feature(
             feature.get("id", ""),
-            base=opciones.base,
+            base=base,
             rama=rama,
             raiz=opciones.raiz,
         )
@@ -202,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     if not alcance.lineas:
         return _na(
             f"{feature.get('id')} no cambia líneas Python de producción frente a "
-            f"{opciones.base}"
+            f"{base}"
         )
 
     if not hay_coverage():
@@ -233,7 +264,8 @@ def main(argv: list[str] | None = None) -> int:
     porcentaje = 100.0 * cubiertas / totales
     resumen = (
         f"{porcentaje:.1f}% de {totales} líneas cambiadas cubiertas "
-        f"({cubiertas}/{totales}, umbral {umbral}%, nivel {nivel})"
+        f"({cubiertas}/{totales}, umbral {umbral}%, nivel {nivel}; "
+        f"{medido_contra(alcance, base)})"
     )
     if porcentaje + 1e-9 < umbral:
         return _ko(resumen)
