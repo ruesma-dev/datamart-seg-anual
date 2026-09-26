@@ -73,8 +73,9 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
   stage, build-mart, publicar-diccionario, run-all, status. `run-all` construye
-  el datamart ENTERO desde F-047: once pasos, con los cinco build de negocio
-  —maestros, compras, retenciones, personal y cierre— dentro y en ese orden.
+  el datamart ENTERO desde F-047: doce pasos, con los seis build de negocio
+  —maestros, compras, retenciones, personal, contabilidad y cierre— dentro y
+  en ese orden.
   `cierre` va después de `mart` porque `mart` destruye lo que `cierre`
   construye.
 - `config/` — `settings.py` (pydantic-settings sobre `.env`),
@@ -94,7 +95,10 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   cada step hereda de `steps/base.py`).
 - `etl_sigrid/infrastructure/postgres/` — cliente + `sql/` por capa:
   `raw` (implícito en ingesta), `stg/`, `mart/`, `cierre/`, `compras/`,
-  `maestro/`, `retenciones/`, `personal/`, `auxiliar/`. **`personal/` (F-057) es
+  `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `auxiliar/`.
+  **`contabilidad/` (F-056)** es el mayor y el plan de cuentas financiero: el
+  saldo es `importe_saldo`, nunca `SUM(importe)` (los cierres y aperturas
+  duplican). **`personal/` (F-057) es
   el único esquema con datos personales** —nombre, NIF y DNI, autorizados por el
   responsable del dato el 2026-09-18— y es esquema propio para poder darlo o
   quitarlo con un `GRANT`. Su trampa, que hay que conocer antes de sumar nada:

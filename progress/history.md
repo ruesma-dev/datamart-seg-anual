@@ -1373,3 +1373,18 @@ sin tocar la regla dura de `CLAUDE.md`. Las dos peticiones de `mcp-bbdd` que
 solo vivian en `dev` son F-114. Portado a `arnes-base` 1.7.14. Pasadas 1 y 2
 rechazadas solo por documentacion. Detalle: `progress/impl_F-112.md`,
 `progress/review_F-112.md`.
+
+## F-056 · El mayor y el plan de cuentas como arbol: esquema `contabilidad` (cerrada el 2026-09-27, APROBADO en pasada 2)
+
+Esquema nuevo `contabilidad`, sexto build de negocio (`build_contabilidad`), sobre
+los `raw` de F-066: `plan_cuentas` (44.778 grupos + 34.196 subcuentas de las 38
+empresas, arbol por prefijo dentro de la empresa), `mayor` (un apunte por fila,
+2,17 M, con fecha del apunte y del asiento, clase NORMAL/APERTURA/SALDO_INICIAL/
+CIERRE/REGULARIZACION, saldo acumulado, obra por `cenide` y tercero) y
+`saldos_cuenta_mes`. Regla dura `R-SALDO-CONTABLE` (no sumar cierres).
+Contrastado: 1-4308000197 641 apuntes y saldo 1.189.275,13; subcuenta 434 de
+2026 5.345.557,80, identico a la captura de Juan del 03-09; la regla de clases da
+0 diferencias con la de F-095. Rigor `critico`: 12/12 mutantes de Python y
+233/233 de la campana sistematica de SQL. Diccionario version 36. `apa` queda a
+F-061. `mcp-bbdd` debe anadir `contabilidad` a su lista blanca. Detalle:
+`progress/impl_F-056.md`, `progress/review_F-056.md`, `progress/mutacion_F-056.md`.

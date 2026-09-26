@@ -21,10 +21,11 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         del MCP. `run-all` ya lo hace al final;
                                         a mano solo hace falta tras lanzar
                                         build-cierre, build-compras,
-                                        build-maestros, build-retenciones o
-                                        build-personal sueltos: recrean vistas
-                                        con DROP + CREATE y un DROP se lleva
-                                        los GRANT
+                                        build-maestros, build-retenciones,
+                                        build-personal o build-contabilidad
+                                        sueltos: recrean tablas y vistas con
+                                        DROP + CREATE y un DROP se lleva los
+                                        GRANT
     python main.py timings            - Tiempos por paso de _meta.etl_runs
     python main.py fingerprint-views  - Huella de las vistas de consumo a CSV
     python main.py compare-fingerprints LOCAL AZURE
@@ -96,6 +97,7 @@ from etl_sigrid.application.orchestrator import Orchestrator
 from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep
 from etl_sigrid.application.steps.build_compras_step import BuildComprasStep
+from etl_sigrid.application.steps.build_contabilidad_step import BuildContabilidadStep
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
@@ -500,9 +502,10 @@ def build_pipeline_steps(
     escape a propósito.
 
     F-047 (que absorbe F-044) metió aquí los CUATRO build que se lanzaban a
-    mano, y F-057 añadió el quinto (`build_personal`). El orden dentro de la
-    lista es legible, pero lo que lo GARANTIZA es el `depends_on` de cada paso,
-    que es lo que obedece el orden topológico.
+    mano, F-057 añadió el quinto (`build_personal`) y F-056 el sexto
+    (`build_contabilidad`): seis build de negocio. El orden dentro de la lista
+    es legible, pero lo que lo GARANTIZA es el `depends_on` de cada paso, que
+    es lo que obedece el orden topológico.
     """
     pasos = [
         IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
@@ -526,6 +529,11 @@ def build_pipeline_steps(
         # posición aquí es legibilidad. Nadie depende de él a propósito: si
         # falla, la noche continúa y termina.
         BuildPersonalStep(settings),
+        # F-056: `contabilidad` entra como SEXTO build de negocio. Solo lee
+        # `raw` y la vista `maestro.centros_coste` (SQL puro sobre `raw`), asi
+        # que su `depends_on` es `ingest_raw`; la posicion es legibilidad. Nadie
+        # depende de el: si falla, la noche continua y termina.
+        BuildContabilidadStep(settings),
         BuildCierreStep(settings),
         # F-006: entre build_mart y apply_grants, y el orden NO es cosmético.
         # `apply_grants` concede SELECT ON ALL TABLES IN SCHEMA _meta, que es
@@ -564,16 +572,17 @@ def build_pipeline_steps(
 def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
     Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
-    los cinco build (maestros, compras, retenciones, personal, cierre) →
-    publicar_diccionario → apply_grants.
+    los seis build (maestros, compras, retenciones, personal, contabilidad,
+    cierre) → publicar_diccionario → apply_grants.
 
     Cuatro de esos esquemas se construían antes a mano y entraron aquí con
     F-047: se quedaban desfasados semanas y, en el caso de `cierre`, la
     nocturna llegaba a DESTRUIR una de sus vistas sin recrearla. El quinto,
     `personal` —recursos, partes de trabajo y horas por obra—, nació ya dentro
-    de la nocturna con F-057.
+    de la nocturna con F-057, y el sexto, `contabilidad` —el plan de cuentas,
+    el mayor y los saldos por cuenta y mes—, con F-056.
 
-    Los cinco comparten una propiedad que hay que conocer antes de leer un dato
+    Los seis comparten una propiedad que hay que conocer antes de leer un dato
     suyo: **ninguno es dependencia de ningún otro paso**, así que un fallo en
     cualquiera de ellos deja su esquema con el dato de una noche anterior
     mientras `raw`, `stg` y `mart` están al día, y la noche termina en verde.
@@ -774,9 +783,10 @@ def apply_grants() -> None:
     Reaplica los permisos de lectura del rol del MCP (PG_READONLY_ROLE).
 
     `run-all` ya lo ejecuta como último paso de la noche. A mano hace falta
-    tras lanzar `build-cierre`, `build-compras`, `build-maestros` o
-    `build-retenciones` SUELTOS: esos comandos recrean vistas con DROP +
-    CREATE y un DROP se lleva los GRANT concedidos.
+    tras lanzar `build-cierre`, `build-compras`, `build-maestros`,
+    `build-retenciones`, `build-personal` o `build-contabilidad` SUELTOS: esos
+    comandos recrean tablas y vistas con DROP + CREATE y un DROP se lleva los
+    GRANT concedidos.
     """
     settings = get_settings()
     pg = _get_pg()
@@ -5068,6 +5078,39 @@ def build_personal() -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(BuildPersonalStep(settings), pg, ejecucion)
+
+
+# =============================================================================
+# MÓDULO CONTABILIDAD (F-056): el plan de cuentas, el mayor y los saldos
+# =============================================================================
+@cli.command("build-contabilidad")
+def build_contabilidad() -> None:
+    """
+    Construye el schema contabilidad desde raw.* y maestro.centros_coste.
+
+    Ejecuta en orden los SQL de sql/contabilidad:
+      00_setup.sql              schema y contabilidad.fn_fecha
+      01_plan_cuentas.sql       el plan FINANCIERO como árbol (38 empresas)
+      02_mayor.sql              una fila por apunte de raw.apu, con la guarda
+                                que compara su recuento con el origen
+      03_saldos_cuenta_mes.sql  cuenta x ejercicio x mes, desde el mayor
+
+    Requiere haber ingerido antes con, cua, auxemp y apu (F-066). No publica
+    el diccionario: eso lo hace `run-all` o `publicar-diccionario`.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * El saldo es `importe_saldo` / `saldo_acumulado` (`R-SALDO-CONTABLE`).
+        Sumar `importe` sin filtrar `clase_asiento` mete los asientos de
+        CIERRE y APERTURA, y en el histórico de una cuenta duplica.
+      * El plan es por EMPRESA: el mismo código existe una vez en cada una, y
+        se cruza por (empresa_id, codigo_cuenta) o por `clave_cuenta`.
+      * No es el plan analítico de `maestro.cuentas_analiticas`.
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildContabilidadStep(settings), pg, ejecucion)
 
 
 @cli.command("inspect-retenciones")

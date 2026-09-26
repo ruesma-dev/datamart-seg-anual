@@ -72,7 +72,14 @@ DECLARADAS = {
     "maestro.cuentas_analiticas": (("empresa_id", "codigo_cuenta"),),
     "maestro.centros_coste": (("empresa", "codigo_centro"),),
     "stg.obras": (("codigo_obra",),),
+    # F-056 (2026-09-26): el plan de cuentas, por las dos vias de R7: el par
+    # (empresa, codigo) y la clave legible.
+    "contabilidad.plan_cuentas": (("empresa_id", "codigo_cuenta"), ("clave_cuenta",)),
 }
+
+#: Cuantas comprobaciones de clave alternativa hace `check-unicidad`: una por
+#: CLAVE, no por objeto (desde F-056 un objeto declara dos).
+NUM_ALTERNATIVAS = sum(len(claves) for claves in DECLARADAS.values())
 
 
 @lru_cache(maxsize=1)
@@ -587,7 +594,7 @@ def test_f108_r12_todo_limpio_con_alternativas_sale_con_cero(monkeypatch) -> Non
     resultado = _invocar(monkeypatch, pg)
     assert resultado.exit_code == 0, resultado.output
     alternativas = [p for p in pg.preguntadas if p[1] == "alternativa"]
-    assert len(alternativas) == len(DECLARADAS), alternativas
+    assert len(alternativas) == NUM_ALTERNATIVAS, alternativas
     assert "0 con la clave rota" in resultado.output
 
 
@@ -635,7 +642,7 @@ def test_f108_r15_el_dry_run_rotula_las_alternativas_sin_conectar(monkeypatch) -
     )
     assert "IS NOT NULL" in resultado.output
     total = len(consultas_de_unicidad(_dicc_real()))
-    assert f"{total} comprobacion(es) ({len(DECLARADAS)} de clave alternativa)" in (
+    assert f"{total} comprobacion(es) ({NUM_ALTERNATIVAS} de clave alternativa)" in (
         resultado.output
     )
 

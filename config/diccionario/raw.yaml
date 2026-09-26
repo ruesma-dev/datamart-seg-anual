@@ -1493,9 +1493,9 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      No es el plan de cuentas: es su extension. La jerarquia, el codigo y el nombre legible viven en `con` (tipo 16), y sin ese salto los numeros de cuenta de aqui no significan nada. El mayor consultable lo construye F-056.
+      Son solo las hojas del plan y sin codigo ni nombre: esos viven en `con`. El plan de cuentas entero, como arbol y con los grupos, esta en `contabilidad.plan_cuentas` (F-056).
     descripcion: >-
-      **Plan de cuentas, la parte que extiende a `con`** (34.139 filas, 16 columnas): 33.875 cuentas de nivel 5 frente a 254 de nivel 0. Mismo patron que `rec` en retenciones.
+      **Las CUENTAS AUXILIARES del plan de cuentas financiero** (34.196 filas el 2026-09-26, 16 columnas): extienden a su fila de `con`, que es de `con.tip = 17`, con codigo de 10 digitos y la unica clase de cuenta que recibe apuntes. **La jerarquia NO esta aqui**: los grupos del plan (1 a 4 digitos: grupo, subgrupo, cuenta y subcuenta) son las filas de `con.tip = 16` (44.778, la tabla `cug` de Sigrid, que no se ingiere), y el padre de cada auxiliar es el grupo de su misma empresa cuyo codigo son sus 4 primeros digitos. El `padide` de aqui es el padre DECLARADO: coincide con ese prefijo en 33.838 cuentas, esta a 0 en 352 y difiere en 6 (medido en F-056). El arbol ya resuelto, con los dos padres, esta en `contabilidad.plan_cuentas`. Mismo patron que `rec` en retenciones: extension de `con`.
 
       **El plan se parte por EMPRESA, no por ejercicio** (medido 2026-09-06): la misma cuenta aparece hasta seis veces y las seis se diferencian solo en la empresa de la fila de `con` correspondiente. No hay ningun campo de ejercicio aqui.
 
@@ -1513,9 +1513,9 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Siete columnas de importes sin fecha ni concepto legible: por si sola no responde nada. Es el puente entre el apunte y la fecha del asiento, que vive en `con`.
+      Siete columnas de importes sin fecha ni concepto legible: por si sola no responde nada. El mayor ya fechado, con la fecha del apunte y la del asiento, esta en `contabilidad.mayor` (F-056).
     descripcion: >-
-      **Asientos contables** (783.386 filas, 7 columnas). Extension del concepto de tipo 20 en `con`; medido: 0 asientos huerfanos. **La fecha del asiento no esta aqui**: es la del concepto, un entero AAAAMMDD, y para fechar un apunte hacen falta dos saltos (`apu.asiide` a esta tabla, y de aqui a `con`).
+      **Asientos contables** (783.386 filas, 7 columnas). Extension del concepto de tipo 20 en `con`; medido: 0 asientos huerfanos. **La fecha del asiento no esta aqui**: es la del concepto, un entero AAAAMMDD (`apu.asiide` -> `con.fec`). **Para fechar un apunte NO hace falta**: el propio apunte trae su fecha (`apu.fec`, informada en el 100 %), y coincide con la del asiento en todos salvo 297 apuntes de 2017, que llevan el ultimo dia del mes y su asiento el primero (medido en F-056, 2026-09-26). `contabilidad.mayor` publica las dos. `ori` no distingue cierres ni aperturas: vale 0 en 788.326 de 788.328.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `asi`, y se localiza con `grep -n "^| asi " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 
@@ -1531,11 +1531,11 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Es la tabla mas grande del datamart y esta en bruto: cuentas por indice, debe y haber sin signo de negocio, y sin el plan al lado no se puede agrupar por nada. El mayor por cuenta, ano, empresa y tercero lo construye F-056.
+      Es la tabla mas grande del datamart y esta en bruto: cuentas por indice, debe y haber sin signo de negocio, y sin el plan al lado no se puede agrupar por nada. El mayor por cuenta, ano, empresa y tercero, con la clase del asiento y el saldo, esta en `contabilidad.mayor` (F-056).
     descripcion: >-
-      **APUNTES CONTABLES** (2.154.543 filas, 36 columnas): la tabla mas grande que se ha traido nunca, por encima de `con`. Debe, haber, concepto, cuenta (`cueide`), asiento (`asiide`) y centro de coste (`cenide`).
+      **APUNTES CONTABLES** (2.166.701 filas el 2026-09-26, 36 columnas): la tabla mas grande que se ha traido nunca, por encima de `con`. Debe, haber, concepto, cuenta (`cueide`, una cuenta auxiliar de `cua`), asiento (`asiide`), centro de coste (`cenide`), tercero (`empide`) y clase (`cla`: 3 cierre, -1 apertura, 1 regularizacion; incompleta, los cierres de 2020 y las aperturas de 2021 vienen con 0).
 
-      **Dos cosas medidas el 2026-09-06 que corrigen lo que el backlog suponia.** La primera: la columna de fecha viene informada en el **100 %** de las filas, y la ficha de F-056 daba por hecho que la fecha no estaba aqui; contrastarla contra la del asiento es tarea de esa feature. La segunda: **la atribucion a obra va por `cenide`** (54 % informado) y no por `obr`, que solo tiene 142 filas con 2 obras distintas. Es la misma trampa de F-045.
+      **Lo que F-056 midio el 2026-09-26.** La fecha: `fec` viene informada en el **100 %** y **es la fecha del apunte**, la que usa el mayor de Sigrid; NO hacen falta los dos saltos por el asiento. Coincide con la del asiento salvo en 297 apuntes de 2017 (ultimo dia del mes frente al primero). **La atribucion a obra va por `cenide`** (54 % informado) y no por `obr`, que solo tiene 142 filas con 2 obras distintas: es la misma trampa de F-045. `contabilidad.mayor` publica todo eso ya resuelto, una fila por apunte.
 
       No tiene columna de ultima modificacion, asi que no admite carga incremental por columna de corte. Se trae entera, aprobado por el humano el 2026-09-06.
 
@@ -1555,9 +1555,9 @@ objetos:
     capa: origen
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Es un desglose auxiliar del apunte, no una fuente de coste por obra: su columna de obra esta a cero en las 709.403 filas. Candidata a fuente de la cuenta de resultados por centro de F-058.
+      Es el mayor ANALITICO en bruto, no el financiero: su cuenta es una cuenta analitica (`caa`), no una del plan de `cua`, y su columna de obra esta a cero en todas las filas. Sus movimientos por cuenta de contrapartida los publicara F-061.
     descripcion: >-
-      **Desglose analitico del apunte** (709.403 filas, 20 columnas): `cenide` informado en el 99,98 %, `apuide` en el 88 % y **`obride` en el 0 %**. Trae cuenta analitica, debe y haber por centro de coste. Medido: no es el puente obra-centro de coste que F-045 busca.
+      **El MAYOR ANALITICO** (709.403 filas, 20 columnas): `cenide` informado en el 99,98 %, `apuide` en el 88 % y **`obride` en el 0 %**. Trae cuenta, debe y haber por centro de coste, y **su cuenta es de la contabilidad analitica** (`caa`, el catalogo de `maestro.cuentas_analiticas`) en el 99,98 %, no del plan financiero. 629.982 filas (88 %) cuelgan de un apunte financiero por `apuide`, que es `contabilidad.mayor.apunte_id`; 83.587 cuelgan de un asiento analitico (`con.tip = 32`) sin apunte financiero (medido en F-056, 2026-09-26). No entra en `contabilidad`: es F-061. Medido tambien: no es el puente obra-centro de coste que F-045 busca.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `apa`, y se localiza con `grep -n "^| apa " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
 

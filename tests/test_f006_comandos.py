@@ -373,7 +373,7 @@ def test_f006_r28_cli_biyeccion_exacta_y_publicado_al_dia(monkeypatch) -> None:
     assert resultado.exit_code == 0, resultado.output
     assert "biyeccion exacta" in resultado.output
     assert "lo publicado ES lo del arbol" in resultado.output
-    # Diez desde F-057 (2026-09-18), que anadio `personal`. Se cuenta contra
+    # Once desde F-056 (2026-09-26), que anadio `contabilidad`. Se cuenta contra
     # la constante y no contra un literal: la lista de esquemas la fija
     # `ESQUEMAS_DEL_DATAMART`, y duplicar aqui su tamano obliga a tocar dos
     # sitios cada vez que entre un esquema.

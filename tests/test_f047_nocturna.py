@@ -80,8 +80,9 @@ def test_f047_r1_la_composicion_nocturna_es_exactamente_esta() -> None:
         "build_retenciones",
         # F-057 metió el quinto build de negocio, y con la misma propiedad que
         # los cuatro de F-047: nadie lo declara en su `depends_on`, así que
-        # puede fallar sin tumbar la noche.
+        # puede fallar sin tumbar la noche. F-056 el sexto, igual.
         "build_personal",
+        "build_contabilidad",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",

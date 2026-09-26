@@ -142,6 +142,19 @@ infraestructura.
 > doce de la vista nueva, dos en `personal.recursos` --la contrapartida del
 > recurso-- y una en `personal.partes_lineas`, la cuenta de cargo de la
 > linea); las fichas de consumo recomendadas pasan de 72 a **73**.
+>
+> **Enmienda del 2026-09-26 (F-056, el mayor y el plan de cuentas).** Entra
+> el **undecimo esquema**, `contabilidad`, con cuatro objetos:
+> `contabilidad.plan_cuentas` --el plan de cuentas FINANCIERO como arbol, por
+> prefijo y dentro de la empresa--, `contabilidad.mayor` --una fila por apunte,
+> con la clase del asiento, el saldo, la obra por el centro y el tercero--,
+> `contabilidad.saldos_cuenta_mes` y la funcion local `contabilidad.fn_fecha`.
+> Entre F-107 y esta, F-095 sumo siete objetos (`raw.rac` y seis de
+> `retenciones`) y F-095, F-109 y F-110 columnas, sin enmienda propia: el
+> guardian solo busca la cifra, y el 172 se lo daba una referencia a
+> `infra/README.md`. El inventario pasa a **176 objetos**, la cobertura de
+> columnas a **1248** y las fichas de consumo a **79** (la funcion no es de
+> consumo).
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
