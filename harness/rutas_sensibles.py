@@ -33,8 +33,10 @@ from pathlib import Path
 
 from harness.alcance import (
     EjecutorGit,
+    diagnosticar_base,
     git_en,
     parsear_diff,
+    rama_base_configurada,
     rama_de_feature,
     resolver_refs,
 )
@@ -322,6 +324,13 @@ def evaluar_puerta(
             "diff que cotejar)",
         )
 
+    # Con una base rezagada el diff arrastra ficheros de otras features: la
+    # puerta reclamaría evidencias ajenas o, peor, daría por buena una ruta
+    # que la feature sí toca. Se dice en rojo antes de mirar nada (F-112).
+    motivo = diagnosticar_base(base, rama, git=git or git_en(str(raiz)))
+    if motivo:
+        return ResultadoPuerta(1, f"PUERTA RUTAS SENSIBLES: {motivo}")
+
     ficheros = ficheros_tocados(feature, base, rama, str(raiz), git)
     lineas: list[str] = []
     peor = 0
@@ -395,7 +404,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     analizador.add_argument("--validar", action="store_true")
     analizador.add_argument("--puerta", action="store_true")
-    analizador.add_argument("--base", default="dev")
+    analizador.add_argument(
+        "--base",
+        default=None,
+        help="Rama de integración (por defecto, RAMA_BASE de harness/init.sh)",
+    )
     analizador.add_argument("--declaracion", default=str(RUTA_DECLARACION))
     analizador.add_argument("--raiz", default=".")
     opciones = analizador.parse_args(argv)
@@ -428,7 +441,7 @@ def main(argv: list[str] | None = None) -> int:
         verificaciones,
         feature=feature,
         rama=rama,
-        base=opciones.base,
+        base=opciones.base or rama_base_configurada(opciones.raiz),
         raiz=raiz,
     )
     if resultado.mensaje:
