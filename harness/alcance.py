@@ -131,6 +131,121 @@ def filtrar_produccion(lineas: dict[str, set[int]]) -> dict[str, set[int]]:
 
 # --- Resolución de referencias ----------------------------------------------
 
+#: Base que se usaba antes de que existiera `RAMA_BASE` en `harness/init.sh`.
+#: Solo es el último recurso: la base de verdad la declara cada proyecto.
+RAMA_BASE_POR_DEFECTO = "dev"
+
+#: Ramas de larga vida que se vigilan al diagnosticar la base (F-112): si los
+#: commits que la puerta mediría ya viven en alguna de ellas, no son de la
+#: rama, y la base se ha quedado por detrás de donde se integra el trabajo.
+RAMAS_DE_LARGA_VIDA: tuple[str, ...] = ("main", "master", "dev", "develop")
+
+_RAMA_BASE_EN_INIT = re.compile(
+    r"""^[ \t]*RAMA_BASE=(["']?)([^"'\s#]+)\1""", re.MULTILINE
+)
+
+
+def rama_base_configurada(raiz: str = ".") -> str:
+    """La rama de integración que declara `RAMA_BASE` en `harness/init.sh`.
+
+    Es la ÚNICA fuente de verdad de la base: el portero la pasa con `--base` a
+    las puertas, y las herramientas que se lanzan a mano (`harness.mutacion`,
+    `harness.cobertura`, `harness.rutas_sensibles`) la leen de aquí cuando no
+    se les pasa. Antes cada una traía `dev` cableado, y en un repositorio que
+    integra en `main` eso medía semanas de trabajo ajeno sin avisar (F-112).
+    Sin `init.sh` o sin la variable, `RAMA_BASE_POR_DEFECTO`.
+    """
+    guion = Path(raiz) / "harness" / "init.sh"
+    try:
+        texto = guion.read_text(encoding="utf-8")
+    except OSError:
+        return RAMA_BASE_POR_DEFECTO
+    coincidencia = _RAMA_BASE_EN_INIT.search(texto)
+    return coincidencia.group(2) if coincidencia else RAMA_BASE_POR_DEFECTO
+
+
+def _existe(ref: str, git: EjecutorGit) -> bool:
+    return bool(git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]).strip())
+
+
+def _contar(git: EjecutorGit, refs: list[str]) -> int:
+    salida = git(["rev-list", "--count", "--no-merges", *refs]).strip()
+    return int(salida) if salida.isdigit() else 0
+
+
+def diagnosticar_base(
+    base: str,
+    rama: str,
+    git: EjecutorGit | None = None,
+    vigiladas: tuple[str, ...] = RAMAS_DE_LARGA_VIDA,
+) -> str | None:
+    """¿Mediría la puerta, contra `base`, commits que no son de `rama`?
+
+    Devuelve `None` si la base es sana y, si no, el motivo listo para imprimir.
+    La puerta calcula el diff desde el merge-base de `rama` con `base`: si
+    alguno de esos commits ya vive en otra rama de larga vida, es trabajo ajeno
+    que la puerta atribuiría a la feature. Es exactamente lo que pasaba con
+    `dev` parada y el trabajo integrándose en `main` (F-112): la cobertura
+    «de la feature» era la de semanas de features cerradas, y dos features
+    distintas daban la misma cifra.
+
+    Solo cuenta commits que no son merges: un merge de integración no aporta
+    líneas propias, y en un flujo con `main` ← `dev` el merge de release no
+    debe dar un falso rojo. Fuera de un repositorio git no diagnostica nada
+    (las puertas ya declaran su N/A por su lado); una base que no existe SÍ es
+    un problema: sin ella el diff sale vacío y la puerta aprobaría en silencio.
+    """
+    git = git or git_en()
+    if not git(["rev-parse", "--git-dir"]).strip():
+        return None
+    if not _existe(base, git):
+        return (
+            f"la rama base «{base}» no existe en este repositorio: no se puede "
+            "calcular qué cambió la feature. Revisa RAMA_BASE en harness/init.sh"
+        )
+
+    propios = _contar(git, [rama, f"^{base}"])
+    ajenos: list[str] = []
+    for otra in vigiladas:
+        if otra in (base, rama) or not _existe(otra, git):
+            continue
+        repetidos = propios - _contar(git, [rama, f"^{base}", f"^{otra}"])
+        if repetidos > 0:
+            ajenos.append(f"{repetidos} de los {propios} ya están en «{otra}»")
+    if not ajenos:
+        return None
+    return (
+        f"la base «{base}» se ha quedado por detrás: de los commits que se "
+        f"medirían desde su merge-base con {rama}, {'; '.join(ajenos)} y no son "
+        "de esta rama. Pon en RAMA_BASE (harness/init.sh) la rama donde se "
+        "integra el trabajo"
+    )
+
+
+def merge_que_integra(rama: str, base: str, git: EjecutorGit | None = None) -> str | None:
+    """El commit de merge de `base` que integró `rama`, o `None`.
+
+    Recorre la línea principal de `base` (primer padre) desde lo más antiguo y
+    se queda con el primer merge que contiene la punta de `rama` y cuyo primer
+    padre no la contenía. Una rama recién creada, sin commits propios, está
+    sobre la línea principal: ningún merge la «trae» y la respuesta es `None`.
+    """
+    git = git or git_en()
+    punta = git(["rev-parse", "--verify", "--quiet", rama]).strip()
+    if not punta:
+        return None
+    candidatos = git(
+        ["rev-list", "--first-parent", "--merges", "--reverse", f"{rama}..{base}"]
+    ).split()
+    for merge in candidatos:
+        if git(["merge-base", rama, merge]).strip() != punta:
+            continue
+        if git(["merge-base", rama, f"{merge}^1"]).strip() == punta:
+            continue
+        return merge
+    return None
+
+
 
 def resolver_refs(
     feature_id: str,
@@ -140,17 +255,28 @@ def resolver_refs(
 ) -> tuple[str, str, str]:
     """Decide entre qué dos referencias se calcula el diff de la feature.
 
-    Orden: (1) la rama existe → base común con `base` frente a la rama;
-    (2) la rama ya no existe → commit de merge localizado por su mensaje, y el
-    diff va del primer padre al propio merge; (3) ni una cosa ni otra →
-    `SystemExit` explícito, sin mutar ni medir nada.
+    Orden: (1) la rama existe → base común con `base` frente a la rama, salvo
+    que la rama ya esté integrada en `base`: entonces el merge que la integró,
+    del primer padre al propio merge; (2) la rama ya no existe → commit de
+    merge localizado por su mensaje, y el diff va del primer padre al propio
+    merge; (3) ni una cosa ni otra → `SystemExit` explícito, sin mutar ni medir
+    nada.
 
     Devuelve `(ref_a, ref_b, origen)` con `origen` en {"rama", "merge"}.
     """
     git = git or git_en()
 
-    if rama and git(["rev-parse", "--verify", "--quiet", rama]).strip():
+    punta = git(["rev-parse", "--verify", "--quiet", rama]).strip() if rama else ""
+    if rama and punta:
         base_comun = git(["merge-base", base, rama]).strip() or base
+        if base_comun == punta:
+            # La rama entera ya está dentro de la base: o se integró, o aún no
+            # tiene commits propios. En el primer caso el diff base..rama sale
+            # VACÍO y la feature parecería no haber tocado nada; lo que cambió
+            # es lo que trajo el merge que la integró (F-112).
+            merge = merge_que_integra(rama, base, git=git)
+            if merge:
+                return (f"{merge}^1", merge, "merge")
         return (base_comun, rama, "rama")
 
     merge = git(
@@ -292,16 +418,3 @@ def alcance_de_feature(
         ref_diff=(ref_a, ref_b),
         lineas=filtrar_produccion(parsear_diff(texto)),
     )
-
-
-# --- F-112 · STUBS DE LA FASE RED (se sustituyen en T2) ----------------------
-
-
-def rama_base_configurada(raiz: str = ".") -> str:
-    """Stub RED: el comportamiento de antes, la base cableada."""
-    return "dev"
-
-
-def diagnosticar_base(base: str, rama: str, git: EjecutorGit | None = None) -> str | None:
-    """Stub RED: el comportamiento de antes, ningún diagnóstico."""
-    return None
