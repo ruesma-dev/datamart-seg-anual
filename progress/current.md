@@ -17,8 +17,11 @@ por el humano el 2026-09-26 con D1-D8 segun la recomendacion (seccion
 «APROBADA» de `progress/spec_F-056.md`). Diccionario: version 35 -> **36**.
 
 - [x] T0 · D1-D8 decididas y todas con la recomendacion (nada que devolver).
-- [ ] T1-T25 · ver `specs/F-056-mayor-plan-contable/tasks.md`; el avance vive
-  en `progress/impl_F-056.md`.
+- [x] T1-T21 y T25 · hechas, un commit por tarea (ver `tasks.md`). Mutacion:
+  herramienta 12/12 muertos, sistematica 233/233 muertos
+  (`progress/mutacion_F-056.md`). Informe: `progress/impl_F-056.md`.
+- [ ] T22-T24 · MANUAL (build, C1-C4, checks, grants, publicar) y el cambio de
+  `mcp-bbdd` (lista blanca): comandos y resultados esperados en el informe.
 
 Desviaciones respecto a la spec (justificadas; el reviewer las juzga):
 
