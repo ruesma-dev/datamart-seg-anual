@@ -292,3 +292,16 @@ def alcance_de_feature(
         ref_diff=(ref_a, ref_b),
         lineas=filtrar_produccion(parsear_diff(texto)),
     )
+
+
+# --- F-112 · STUBS DE LA FASE RED (se sustituyen en T2) ----------------------
+
+
+def rama_base_configurada(raiz: str = ".") -> str:
+    """Stub RED: el comportamiento de antes, la base cableada."""
+    return "dev"
+
+
+def diagnosticar_base(base: str, rama: str, git: EjecutorGit | None = None) -> str | None:
+    """Stub RED: el comportamiento de antes, ningún diagnóstico."""
+    return None
