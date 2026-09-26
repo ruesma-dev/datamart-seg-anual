@@ -864,11 +864,11 @@
         "Existe un MAYOR consultable por cuenta, ano, empresa y tercero, y responde la pregunta que hoy no se puede: el mayor de una cuenta concreta como la 4308000197",
         "El plan de cuentas se publica como ARBOL, con su jerarquia navegable, y una cuenta se puede localizar por codigo dentro de su empresa"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 23,
-      "branch": "feature/F-056-contabilidad"
+      "branch": "feature/F-056-mayor-plan-contable"
     },
     {
       "id": "F-057",
