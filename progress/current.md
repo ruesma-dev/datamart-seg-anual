@@ -38,6 +38,10 @@ Desviaciones respecto a la spec (justificadas; el reviewer las juzga):
    salta, queda el mayor de la noche anterior, no una tabla a medias. Mejor que
    lo que suponia el design; el paso sale `FAILED` igual.
 
+**Diccionario del arbol tras F-056 (version 36): 176 objetos, 1248 columnas,
+79 de consumo** (tres tablas y la funcion de `contabilidad`). Sin publicar:
+`publicar-diccionario` es escritura contra Azure y la lanza el humano.
+
 ## 2026-09-26 · F-112 · CERRADA (`done`, APROBADO en pasada 3) · la puerta de cobertura media contra `dev`, parada · QUEDAN LAS MANUAL DEL HUMANO
 
 Implementer en `feature/F-112-cobertura-contra-main` (desde `main` fb52d96).

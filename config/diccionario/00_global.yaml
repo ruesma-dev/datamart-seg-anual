@@ -3,7 +3,7 @@
 # El bloque global del diccionario semantico del datamart (F-006).
 #
 # Esto es lo que el agente lee ANTES de escribir una linea de SQL. Aqui van las
-# convenciones, los diez esquemas, las reglas duras que impiden respuestas
+# convenciones, los once esquemas, las reglas duras que impiden respuestas
 # plausibles y falsas, los ordenes de magnitud contra los que detectar un
 # disparate, la bateria de aceptacion y la lista de lo que todavia no esta
 # documentado.
@@ -11,6 +11,20 @@
 # `pendientes` es un TRINQUETE (R27): solo baja. La constante PENDIENTES_MAX de
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
+#
+# version 36 (F-056, 2026-09-26): EL MAYOR Y EL PLAN DE CUENTAS. Entra el
+# esquema `contabilidad` --el undecimo--, construido por `build_contabilidad`
+# (sexto build de negocio de `run-all`, del que no depende nadie) desde `raw` y
+# `maestro.centros_coste`: `contabilidad.plan_cuentas` (el plan FINANCIERO como
+# arbol por prefijo dentro de la empresa: 44.778 grupos de `con.tip = 16` y
+# 34.196 cuentas auxiliares de `cua`, 38 empresas), `contabilidad.mayor` (una
+# fila por apunte, 2.166.701, con la clase del asiento, el saldo, la obra por
+# el centro y el tercero) y `contabilidad.saldos_cuenta_mes` (cuenta x empresa x
+# ejercicio x mes). Regla dura nueva `R-SALDO-CONTABLE`: el saldo es
+# `importe_saldo`/`saldo_acumulado`, CIERRE y APERTURA no se suman. `R-FRESCURA`
+# y `R-CODIGO-POR-EMPRESA` alcanzan al esquema nuevo. Se corrigen las fichas de
+# `raw.cua`, `raw.asi`, `raw.apu` y `raw.apa`, que decian que la fecha del
+# apunte exigia dos saltos y que la jerarquia del plan eran las cuentas de `cua`.
 #
 # version 35 (F-109, 2026-09-26): EL CODIGO DE PARTIDA NO ES UNICO NI DENTRO
 # DE SU OBRA. Medido el 2026-09-25: 5.202 pares `(obra_id, codigo_partida)`
@@ -380,7 +394,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 35
+version: 36
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -400,36 +414,37 @@ titulo: Datamart de seguimiento anual de obra
 reglas:
 
   - codigo: R-FRESCURA
-    titulo: Cinco esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Seis esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, maestro, retenciones, personal]
+    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad]
     regla: >-
-      Estos cinco esquemas SI se construyen cada noche dentro de `run-all`, y
-      los cinco registran paso, asi que su fecha de build siempre es
+      Estos seis esquemas SI se construyen cada noche dentro de `run-all`, y
+      los seis registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
-      `build_retenciones` o `build_personal` falla, la noche continua y termina,
-      y ese esquema se queda con el dato de una noche anterior mientras `raw`,
-      `stg` y `mart` estan al dia. Toda respuesta que salga de ellos DEBE citar
-      su fecha de build: `SELECT * FROM _meta.v_frescura WHERE paso =
-      'build_cierre'` (o `build_compras`, `build_maestros`,
-      `build_retenciones`, `build_personal`). Que el pipeline sea uno solo NO
+      `build_retenciones`, `build_personal` o `build_contabilidad` falla, la
+      noche continua y termina, y ese esquema se queda con el dato de una noche
+      anterior mientras `raw`, `stg` y `mart` estan al dia. Toda respuesta que
+      salga de ellos DEBE citar su fecha de build: `SELECT * FROM
+      _meta.v_frescura WHERE paso = 'build_cierre'` (o `build_compras`,
+      `build_maestros`, `build_retenciones`, `build_personal`,
+      `build_contabilidad`). Que el pipeline sea uno solo NO
       significa que todo el datamart tenga la misma frescura.
     motivo: >-
       La composicion real esta en `main.build_pipeline_steps`, y sus pasos se
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
       `build_stg`, `build_mart`, `build_maestros`, `build_compras`,
-      `build_retenciones`, `build_personal`, `build_cierre`,
-      `publicar_diccionario` y `apply_grants`. Hasta el 2026-08-28 cuatro de
+      `build_retenciones`, `build_personal`, `build_contabilidad`,
+      `build_cierre`, `publicar_diccionario` y `apply_grants`. Hasta el 2026-08-28 cuatro de
       ellos se lanzaban A MANO y podian llevar semanas parados; peor aun, `mart`
       DESTRUIA cada noche `cierre.v_pbi_planif_vs_real` —cuelga de
       `mart.fact_seguimiento_categoria`, que `03_agg_categoria.sql` dropea con
       CASCADE— y nadie la recreaba. `personal` (F-057, 2026-09-18) nacio ya
       dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
-      un fallo del SQL de personal no puede dejar al `mart` sin construir. Dar
-      un dato de cualquiera de los cinco sin fecha es dar una respuesta vieja
-      con aplomo.
+      un fallo del SQL de personal no puede dejar al `mart` sin construir.
+      `contabilidad` (F-056, 2026-09-26), igual. Dar un dato de cualquiera de
+      los seis sin fecha es dar una respuesta vieja con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -509,6 +524,8 @@ reglas:
       - compras.factura_lineas
       - compras.fact_compras_linea
       - maestro.cuentas_analiticas
+      - contabilidad.plan_cuentas
+      - contabilidad.mayor
     regla: >-
       En Sigrid las obras y los recursos son POR EMPRESA: el mismo codigo existe
       una vez por empresa --Ruesma (1), Porsan (28), cada UTE-- y es la misma
@@ -540,6 +557,39 @@ reglas:
       Las cuentas analiticas (F-107, 2026-09-24) tambien: 184.234 cuentas, 14.063
       codigos repetidos entre empresas y ninguno dentro de una; en
       `maestro.cuentas_analiticas` se cruza por codigo junto con `empresa_id`.
+      Y el plan de cuentas financiero (F-056, 2026-09-26): 38 empresas, cada una
+      con su plan, y ningun codigo repetido dentro de una; en
+      `contabilidad.plan_cuentas` y `contabilidad.mayor` la cuenta se pide por
+      (`empresa_id`, `codigo_cuenta`) o por `clave_cuenta` ('1-4308000197').
+
+  - codigo: R-SALDO-CONTABLE
+    titulo: El saldo contable no se suma con los cierres ni las aperturas
+    severidad: bloqueante
+    ambito:
+      - contabilidad.plan_cuentas
+      - contabilidad.mayor
+      - contabilidad.saldos_cuenta_mes
+    regla: >-
+      El saldo de una cuenta es la suma de `importe_saldo` (en el mayor o en
+      `contabilidad.saldos_cuenta_mes`) y el saldo a una fecha es
+      `saldo_acumulado` del ultimo apunte o mes hasta ella. **Nunca
+      `SUM(importe)` sin filtrar `clase_asiento`**: los apuntes de CIERRE y
+      APERTURA de cada ejercicio mueven el mismo importe dos veces, y sumar el
+      historico quitando solo los CIERRE cuenta cada apertura encima del
+      movimiento que ya resume. SALDO_INICIAL (la apertura de una cuenta sin
+      cierre el ejercicio anterior) SI cuenta. En los grupos 6 y 7 la
+      REGULARIZACION de fin de ejercicio deja la cuenta a cero: el resultado de
+      un ejercicio se lee sin ella. Los grupos del plan (niveles 1-4) no tienen
+      apuntes: su saldo se agrega desde las cuentas auxiliares por los
+      ancestros de `contabilidad.plan_cuentas`, dentro de la empresa.
+    motivo: >-
+      Medido el 2026-09-26 en solo lectura: la cuenta `1-4308000197` tiene 641
+      apuntes y un saldo de 1.189.275,13; sumando todo su historico sin los
+      CIERRE salen 7.742.538,38, una cifra plausible y falsa. `apu.cla` solo
+      marca la clase a veces (los cierres de 2020, las aperturas de 2021 y 290
+      regularizaciones vienen con 0), por eso la clase se publica ya resuelta
+      en `clase_asiento`. Con la regla, la subcuenta 434 de la empresa 1 en 2026
+      da 5.345.557,80, lo mismo que la pantalla de Sigrid.
 
   - codigo: R-PROVEEDOR-INTRAGRUPO
     titulo: El mayor proveedor de la empresa es la propia empresa
@@ -1200,6 +1250,24 @@ esquemas:
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_personal]
+
+  contabilidad:
+    titulo: La contabilidad financiera, el mayor y el plan de cuentas
+    para_que_sirve: >-
+      Lo que de verdad se contabilizo, desde 2008 y en las 38 empresas: el plan
+      de cuentas FINANCIERO como arbol (`contabilidad.plan_cuentas`, por
+      prefijo y dentro de la empresa), el mayor con una fila por apunte
+      (`contabilidad.mayor`: fecha, cuenta, debe, haber, clase del asiento,
+      saldo, obra por el centro de coste y tercero) y los saldos por cuenta y
+      mes (`contabilidad.saldos_cuenta_mes`). Responde "el mayor de la cuenta
+      X", "el saldo de la subcuenta Y a fin de mes" y "que se contabilizo en la
+      obra Z". TRAMPA antes de consultarlo (`R-SALDO-CONTABLE`): el saldo es
+      `importe_saldo`, porque los asientos de CIERRE y APERTURA duplican. No es
+      el plan analitico de `maestro.cuentas_analiticas`, y la contabilidad no
+      cuadra con el seguimiento de `mart` y `cierre` por construccion.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [build_contabilidad]
 
   maestro:
     titulo: Maestros y dimensiones de consulta directa
