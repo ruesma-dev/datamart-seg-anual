@@ -71,7 +71,7 @@ GRANT CONNECT ON DATABASE sigrid_dm TO sigrid_dm_app;
 GRANT CONNECT ON DATABASE sigrid_dm TO mcp_sigrid_dm_ro;
 
 -- 4. Esquemas del datamart. Los crea también el auto-bootstrap del ETL, pero
---    dejarlos aquí permite comprobar los diez nada más provisionar.
+--    dejarlos aquí permite comprobar los once nada más provisionar.
 SET ROLE sigrid_dm_etl;
 CREATE SCHEMA IF NOT EXISTS raw;
 CREATE SCHEMA IF NOT EXISTS stg;
@@ -85,6 +85,9 @@ CREATE SCHEMA IF NOT EXISTS retenciones;
 -- F-057: el único esquema con datos personales (nombre, NIF y DNI, autorizados
 -- el 2026-09-18). Es esquema propio para poder darlo o quitarlo con un GRANT.
 CREATE SCHEMA IF NOT EXISTS personal;
+-- F-056: el plan de cuentas, el mayor y los saldos por cuenta y mes. Esquema
+-- propio por lo mismo que `personal`: su acceso se da o se quita con un GRANT.
+CREATE SCHEMA IF NOT EXISTS contabilidad;
 RESET ROLE;
 
 -- 5. Permisos de lectura del MCP.
@@ -120,7 +123,7 @@ DECLARE
 BEGIN
     FOREACH esquema IN ARRAY ARRAY[
         'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-        'raw', 'stg', 'aux', '_meta'
+        'contabilidad', 'raw', 'stg', 'aux', '_meta'
     ]
     LOOP
         EXECUTE format('GRANT USAGE ON SCHEMA %I TO mcp_sigrid_dm_ro', esquema);
@@ -246,7 +249,7 @@ RESET ROLE;
 COMMIT;
 
 -- 6. Comprobaciones. Deben salir: los tres roles, sigrid_dm_app dentro de
---    sigrid_dm_etl, y los diez esquemas.
+--    sigrid_dm_etl, y los once esquemas.
 SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole
 FROM pg_roles
 WHERE rolname IN ('sigrid_dm_etl', 'sigrid_dm_app', 'mcp_sigrid_dm_ro')
@@ -261,7 +264,8 @@ WHERE g.rolname = 'sigrid_dm_etl';
 SELECT nspname AS esquema, pg_catalog.pg_get_userbyid(nspowner) AS propietario
 FROM pg_namespace
 WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
-                  'cierre', 'compras', 'maestro', 'retenciones', 'personal')
+                  'cierre', 'compras', 'maestro', 'retenciones', 'personal',
+                  'contabilidad')
 ORDER BY nspname;
 
 -- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el

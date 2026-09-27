@@ -9,6 +9,81 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · DESPLEGADA Y VERIFICADA · FALTA LA LISTA BLANCA DE `mcp-bbdd`
+
+> **2026-09-26 22:19-22:40 UTC** (autorizado por el humano: «la quiero en
+> produccion ya»): imagen `r20260927-0019` desde `main` f5c6cd0 (el job pasa de
+> `r20260926-1134`); `build-contabilidad` a mano SUCCESS en **301,7 s** (R35:
+> setup 0,7 s, plan_cuentas 6,1 s / 78.974 filas, mayor 268,5 s / 2.166.701,
+> saldos_cuenta_mes 26,4 s / 400.342) y `apply-grants`. C1 641 / 2009-01-31 /
+> 2026-09-21 / 1.189.275,13; C2 5.345.557,80; C3 true; C4 0 filas.
+> `check-declarados` 176/176; `check-unicidad` las claves de `contabilidad` OK
+> (la unica rota sigue siendo la de F-051); `check-relaciones` 146 unen, 0 no
+> unen. Diccionario **version 36** (hash 30af3f7b3e31, 176 objetos, 19 reglas),
+> `check-diccionario` OK; MCP reiniciado (sirve la v36). **PENDIENTE: `mcp-bbdd`
+> debe anadir `contabilidad` a su lista blanca**: hoy el MCP no lo expone.
+
+Implementer en `feature/F-056-mayor-plan-contable` (desde `main` fe061b0).
+`sdd=true`, rigor `critico`. Spec `specs/F-056-mayor-plan-contable/`, aprobada
+por el humano el 2026-09-26 con D1-D8 segun la recomendacion (seccion
+«APROBADA» de `progress/spec_F-056.md`). Diccionario: version 35 -> **36**.
+
+- [x] T0 · D1-D8 decididas y todas con la recomendacion (nada que devolver).
+- [x] T1-T21 y T25 · hechas, un commit por tarea (ver `tasks.md`). Mutacion:
+  herramienta 12/12 muertos, sistematica 233/233 muertos
+  (`progress/mutacion_F-056.md`). Informe: `progress/impl_F-056.md`.
+- [ ] T22-T24 · verificaciones MANUAL (humano; escrituras contra Azure, tras el
+  APROBADO). En orden, con su comando exacto y lo que debe salir:
+  1. **Build y coste (T22, R35)**: `python main.py build-contabilidad` -> `SUCCESS`,
+     filas ~79.000 (plan) + ~2,17 M (mayor) + ~400.000 (saldos). Tiempo:
+     `python main.py timings --last 5` (estimado 4-6 min; la lectura sola, 126 s).
+     Tamano: `SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class WHERE relnamespace = 'contabilidad'::regnamespace AND relkind = 'r';`
+     -> ~1,2 GB en total; y `SELECT pg_size_pretty(pg_database_size(current_database()));`
+     antes y despues (27 GB de 64 el 2026-09-26). Anotar el SKU del dia (hoy `Standard_B2s`).
+  2. **C1** `SELECT count(*), min(fecha), max(fecha), sum(importe_saldo) FROM contabilidad.mayor WHERE empresa_id = 1 AND codigo_cuenta = '4308000197';`
+     -> 641 / 2009-01-31 / 2026-09-xx / 1.189.275,13 (cifras del 26-09; se remiden).
+  3. **C2** `SELECT sum(importe) FROM contabilidad.mayor m JOIN contabilidad.plan_cuentas p USING (cuenta_id) WHERE p.empresa_id = 1 AND p.codigo_cuenta LIKE '434%' AND m.ejercicio = 2026 AND m.clase_asiento <> 'CIERRE';`
+     -> 5.345.557,80 (si no hay apuntes nuevos en la 434).
+  4. **C3** `SELECT (SELECT count(*) FROM contabilidad.mayor) = (SELECT count(*) FROM raw.apu);`
+     -> `true`.
+  5. **C4** `SELECT cuenta_id FROM (SELECT COALESCE(cuenta_id, 0) cuenta_id, sum(importe_saldo) s FROM contabilidad.mayor GROUP BY 1) a FULL JOIN (SELECT cuenta_id, sum(importe_saldo) s FROM contabilidad.saldos_cuenta_mes GROUP BY 1) b USING (cuenta_id) WHERE a.s IS DISTINCT FROM b.s;`
+     -> 0 filas (el `COALESCE` por la desviacion 1: la cuenta 0 de los saldos es el NULL del mayor).
+  6. **Puertas y publicacion (T24)**: `python main.py check-declarados` -> sale 0
+     (todo lo declarado existe); `python main.py check-unicidad` -> plan: PK y las
+     dos claves alternativas sin contradiccion; `python main.py check-relaciones`
+     -> las relaciones nuevas unen; `python main.py check-diccionario` -> biyeccion
+     exacta; `python main.py apply-grants` -> la lista de esquemas incluye
+     `contabilidad`; `python main.py publicar-diccionario` -> version 36; e imagen
+     nueva del job nocturno (tag fechado) para que `run-all` lleve el paso.
+  7. **`mcp-bbdd`** (otro repositorio): en `config/config.yaml`, bajo
+     `seguridad.esquemas_permitidos`, anadir `- contabilidad` DETRAS de
+     `- personal` (su `tests/test_f015_esquema_personal.py` exige que `personal`
+     siga justo detras de `retenciones`); desplegar su imagen y reiniciar. Se
+     comprueba con `listar_tablas('contabilidad')` -> las tres tablas. Sin eso el
+     MCP rechaza el esquema «fuera del ambito».
+
+Desviaciones respecto a la spec (justificadas; el reviewer las juzga):
+
+1. **Clave de `saldos_cuenta_mes`: `(cuenta_id, empresa_id, ejercicio, mes)`,
+   no `(cuenta_id, ejercicio, mes)`.** El design pide las dos cosas a la vez:
+   PK sin empresa y «una sola fila por empresa y mes» para los 294 apuntes sin
+   cuenta (`COALESCE(cuenta_id, 0)`). Medido en solo lectura el 2026-09-26: esos
+   apuntes caen en 2-3 empresas el mismo mes en 19 meses, asi que la PK del
+   design haria FALLAR el build la primera noche. Se cumple la frase del grano
+   metiendo la empresa en la clave; para las cuentas reales no cambia nada (la
+   empresa de la cuenta es la del asiento en el 100 %).
+2. **El asiento se une con `LEFT JOIN`, no `JOIN`.** R13 manda «una fila por
+   apunte, sin filtrar ninguna»; un `JOIN` es un filtro. Hoy es equivalente
+   (0 apuntes sin asiento, medido) y la guarda de recuento de R14 sigue en pie.
+3. La guarda `DO $$` de R14 corre en la MISMA transaccion que el `CREATE`
+   (`execute_sql_file` ejecuta el fichero entero y hace rollback si falla): si
+   salta, queda el mayor de la noche anterior, no una tabla a medias. Mejor que
+   lo que suponia el design; el paso sale `FAILED` igual.
+
+**Diccionario del arbol tras F-056 (version 36): 176 objetos, 1248 columnas,
+79 de consumo** (tres tablas y la funcion de `contabilidad`). Sin publicar:
+`publicar-diccionario` es escritura contra Azure y la lanza el humano.
+
 ## 2026-09-26 · F-112 · CERRADA (`done`, APROBADO en pasada 3) · la puerta de cobertura media contra `dev`, parada · QUEDAN LAS MANUAL DEL HUMANO
 
 Implementer en `feature/F-112-cobertura-contra-main` (desde `main` fb52d96).

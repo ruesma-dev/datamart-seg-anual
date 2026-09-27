@@ -70,6 +70,9 @@ GRUPO_B_FUNCIONES = (
     # mismo que las otras tres: se llama desde el SQL del build, y las dos
     # tablas ya publican el estado traducido en sus columnas.
     "compras.fn_estado_documento",
+    # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
+    # `contabilidad`, por lo mismo que la de `personal`.
+    "contabilidad.fn_fecha",
     "maestro.fn_fecha",
     # F-057 (2026-09-18): la copia local de la conversion de fecha del esquema
     # `personal`. Entra por lo mismo que las demas, y la copia es deliberada:
