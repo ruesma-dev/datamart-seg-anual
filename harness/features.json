@@ -1550,7 +1550,7 @@
         "Publicado el cuadre descompuesto-precio de partida y la lista de partidas sin descompuesto",
         "Se puede responder de que se compone la partida D05DF210 de la 0726 y comparar el de Estudios con el del jefe de obra"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 3,
