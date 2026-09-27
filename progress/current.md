@@ -9,6 +9,31 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-09-27 · F-097 · SPEC LISTA · los descompuestos de las partidas · PENDIENTE DE APROBAR D1-D11
+
+Spec-author en `feature/F-097-descompuestos-partidas` (desde `main` ee4c10a).
+Spec: `specs/F-097-descompuestos-partidas/`. Mediciones con cifras y decisiones:
+`progress/spec_F-097.md`. Todo medido en solo lectura (Sigrid por `sigrid-api`,
+datamart por el MCP). Lo que el humano tiene que saber antes de aprobar:
+
+- «Descomposición» es `obrparpre.des` (texto, no se ingiere hoy) y
+  «Planificación compras» es `dncpro` (ya en `raw`). **La Descomposición de
+  COSTE no es siempre la de Estudios**: en 7.866 partidas es copia de la
+  planificación (D1).
+- «Del ABC en adelante» es medible: desde la primera versión ABC el 98,6 % del
+  master está enlazado a la planificación; antes, el 35,6 %.
+- El master entero son 2,14 GB (65-94 min de lectura): se propone traer v0 +
+  primera ABC + vigente (~105 MB) y **partir** el histórico a una F-097b (D4, D5).
+- **D05DF210 no existe en Sigrid**: la partida es la 04.02 de la 0726, cuadra a
+  134,35 con 10 líneas de Estudios y aún no tiene planificación (D11).
+- Toca la identidad de la ingesta (`source_table` → `target_table`) para
+  declarar `obrparpre` dos veces (D7): roza la puerta de F-024, con test de
+  equivalencia.
+
+Decisiones abiertas: **D1-D11** en `progress/spec_F-097.md`, cada una con su
+recomendación. Hallazgo lateral: `obrparpre` declara `incremental_column: tiemod`
+y esa columna no existe en Sigrid.
+
 ## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · DESPLEGADA Y VERIFICADA · FALTA LA LISTA BLANCA DE `mcp-bbdd`
 
 > **2026-09-26 22:19-22:40 UTC** (autorizado por el humano: «la quiero en
