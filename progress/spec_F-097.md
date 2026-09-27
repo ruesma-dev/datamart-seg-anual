@@ -119,21 +119,99 @@ Patrón SQL calibrado contra el troceado en Python (7.866 = 7.866 en ámbito 3).
   que esta feature publica. Aviso heredado de F-038: `dncpro.pre` es el precio
   adjudicado.
 
-## Hallazgo lateral (no es de esta feature)
+## (f) El master entero, incremental por versión (revisión del 2026-09-27)
 
-`tables_sigrid.yaml` declara `incremental_column: tiemod` en `obrparpre`, y la
-tabla **no tiene esa columna** en Sigrid (22 columnas, medido). Es el mismo caso
-que `com`/`comlin`/`comprv` en F-074: `_source_tiemod` a NULL. Candidata a ficha
-propia; no se toca aquí.
+Pedido por el humano al cambiar D5: el master ENTERO entra, y releerlo con
+`run-all --full` cada noche serían 65-94 min. Medido en solo lectura:
 
-## Consultas de verificación manual (T20)
+- **No hay marca de cierre utilizable.** `obrfasamb` de ámbito 8 (3.188 filas):
+  `est = 2` y `act = 1` en casi todas, `feccie` informado en 28, `estgra = 0`
+  siempre; ni `obrparpre` ni `obrfasamb` tienen `tiemod`. La vigente (`conext`
+  cod 15) no es la última: **357 versiones son posteriores a la vigente**
+  (trabajo en curso) y 555 son de obras sin vigente.
+- **Evidencia histórica por rangos de `ide`**: en 80 de 2.151 versiones
+  anteriores a la vigente hay filas con `ide` mayor que el primero de la versión
+  siguiente, es decir, insertadas después de cerrarse. Son **155 filas y las 155
+  vienen sin `des`, con `can = 0` y `pre = 0`**: partidas nuevas que Sigrid da de
+  alta en todas las versiones. Ninguna inserción tardía ha traído descompuesto a
+  una versión cerrada. Un `UPDATE` en sitio no deja rastro: no se puede
+  descartar hoy.
+- **Huella por versión** (`progress/mediciones/F-097_huella_master.sql`):
+  SQL Server 2012, así que `HASHBYTES` solo admite 8.000 bytes; la huella es
+  `CHECKSUM_AGG` de (ide, longitud, SHA-256 del primer y último tramo de 8.000,
+  can, pre). Ciega a un cambio en mitad de un `des` de más de 16.000 bytes: 9.541
+  filas (0,6 %). Tarda **24 s** para las 3.023 versiones. Toma 1: 18:25 UTC →
+  `progress/mediciones/F-097_huella_master_2026-09-27.csv`. Toma 2: 18:51 UTC,
+  **0 diferencias, 0 nuevas, 0 desaparecidas**: prueba que la huella es estable,
+  no que las versiones no cambien (domingo, 26 min). **La prueba de verdad es T0**.
+- **Conjunto de relectura nocturna**: vigente de las 123 obras = **105 MB**
+  (3,2-4,6 min); vigente de las 34 obras con versión en los últimos 12 meses, 42
+  MB; vigente + posteriores + última = 552 versiones / 440 MB (13-19 min,
+  descartado: la huella cubre las posteriores). Nuevas: 21-43 versiones al mes,
+  27-62 MB/mes (~1,3 MB/día).
+- **Reparto por origen** (D13): `MASTER_INICIAL` 169 versiones, 35.924 filas,
+  11,3 MB; `MASTER_PRE_ABC` 1.664 / 698.401 / 887 MB (172 obras);
+  `MASTER_PLANIF_JO` 1.190 / 882.136 / 1.244 MB (59 obras). Una versión con
+  `des` no tiene fila en `obrfasamb`, y hay filas con `obride = 0` (versión 26,
+  227 filas): el troceado las conserva y el cuadre las deja fuera.
+- **Primera carga**: 2,14 GB a 0,38-0,55 MB/s = 65-94 min, más ~4.700 llamadas
+  → **1,5-2 h**; troceado inicial en Postgres 20-40 min (sin medir).
+- **Noche normal**: 24 s de huella + 26 s de ámbito 3 + 3,2-4,6 min de vigentes
+  + nuevas y cambiadas → **4-6 min**; build 2-4 min.
+- **Espacio**: texto 1,0-2,2 GB (TOAST, sin medir), líneas ~4,9 M → 1,2-1,7 GB,
+  cuadre ~0,3 GB: **2,5-4,2 GB**. Disco de 27 a ~30-31 GB de 64 (47-49 %).
 
-- **C1** `SELECT origen, count(*), sum(importe_unitario) FROM descompuestos.lineas WHERE partida_id = 419079 GROUP BY 1;` → ESTUDIO 10 / 134,35; MASTER_INICIAL 10 / 134,35; sin PLANIF_JO.
+## El `tiemod` que no existe (ahora en el alcance, R29)
+
+`obrparpre` declara `incremental_column: tiemod` y la columna **no existe** en
+Sigrid (22 columnas; `_source_tiemod` a NULL, degradado en silencio en
+`ingest_raw_step.py:279`). Se corrige aquí como F-074 hizo con `com`/`comlin`/
+`comprv`. **Y no es la única**: comprobado contra `INFORMATION_SCHEMA`, de las 23
+entradas que declaran `tiemod`, **14 no lo tienen**: `cob`, `ctr`, `ctrpro`,
+`dca`, `dcapro`, `dcf`, `dcfpro`, `obr`, `obrctr`, `obrfas`, `obrfasamb`,
+`obrparpar`, `obrparpre`, `pag` (D14).
+
+## Consultas de verificación manual (T18)
+
+- **C1** `SELECT origen, count(*), sum(importe_unitario) FROM descompuestos.lineas WHERE partida_id = 419079 GROUP BY 1;` → ESTUDIO 10 / 134,35; MASTER_INICIAL 10 / 134,35 (v0); MASTER_PRE_ABC 10 / 134,35 (v1); sin PLANIF_JO.
 - **C2** `SELECT origen, estado, precio_partida, suma_descompuesto FROM descompuestos.cuadre_partida WHERE partida_id IN (419079, 377070) ORDER BY 1;` → 419079 ESTUDIO CUADRA; 377070 PLANIF_JO CUADRA 177,95 y ESTUDIO SUSTITUIDO_POR_PLANIFICACION.
-- **C3** `SELECT origen, count(*) FROM descompuestos.lineas GROUP BY 1;` → ESTUDIO ~98.000 (120.373 menos las copias), PLANIF_JO ~287.000, master ~0,3-0,4 M.
-- **C4** `python main.py check-raw-recuentos` → `obrparpre_des` sin filas de menos.
+- **C3** `SELECT origen, count(*) FROM descompuestos.lineas GROUP BY 1;` → ESTUDIO ~98.000 (120.373 menos las copias), PLANIF_JO ~287.000, las tres de master ~4,5 M en total.
+- **C4** `SELECT count(*), sum(filas) FROM descompuestos._versiones_cargadas;` → 3.023 versiones (más las nuevas desde el 27-09) y 1.616.461 filas, igual que `count(*)` de `descompuestos._des_texto WHERE ambito_id = 8`.
 
-## DECISIONES ABIERTAS (para el humano)
+## DECISIONES DEL HUMANO (2026-09-27)
+
+- **Aprobadas según la recomendación**: D1, D2, D3, D6, D8, D9, D10, D11.
+- **D5 CAMBIA**: no se parte; no hay F-097b. El master ENTERO (3.023 versiones)
+  entra en F-097.
+- **D4 se ajusta**: se ingieren todas las versiones; la v0, la primera ABC y la
+  vigente se MARCAN (flags), no se filtran.
+- **D7 queda sustituida por D12**: con el master incremental, una segunda
+  entrada del YAML la truncaría `--full`.
+- **Nuevo en el alcance**: el `tiemod` de `obrparpre` (R29).
+
+## DECISIONES NUEVAS (D12-D15, para el humano)
+
+- **D12. Vía de ingesta** (sustituye a D7). Recomendación: **paso propio
+  `ingest_descompuestos`** con estado en `descompuestos._des_texto` y
+  `_versiones_cargadas`, que `--full` no trunca, releyendo por noche: vigentes,
+  nuevas y las de huella distinta, más el ámbito 3 entero. Ventaja añadida: no
+  toca la identidad de la ingesta ni la puerta de F-024. Coste: el texto no pasa
+  por `check-raw-recuentos`; el paso cuadra el recuento de cada versión con su
+  huella y revierte si no casa.
+- **D13. Origen de las versiones entre la v0 y la primera ABC** (y de las obras
+  sin ABC): 1.664 versiones, 887 MB. Recomendación: origen propio
+  **`MASTER_PRE_ABC`**, para que no se confundan con `MASTER_PLANIF_JO`; todas
+  las versiones llevan además los flags de D4.
+- **D14. Las otras 13 tablas con `tiemod` falso.** Recomendación: ficha propia
+  (corregir el YAML y ampliar el test de F-074), fuera de F-097; aquí solo
+  `obrparpre`, como se ordenó.
+- **D15. Primera carga y presupuesto nocturno.** Recomendación: primera carga
+  MANUAL (`--sin-tope`, 1,5-2 h más el troceado) un fin de semana por la
+  mañana, mirando antes los créditos de CPU del servidor; y un tope nocturno de
+  **300 MB** releídos (`DESCOMPUESTOS_PRESUPUESTO_MB`), con el que, sin primera
+  carga, la nocturna converge sola en unas 8 noches.
+
+## DECISIONES DE LA PRIMERA VERSIÓN DE LA SPEC (D1-D11)
 
 - **D1. Qué se publica como ESTUDIO.** El dato no casa del todo con «la
   Descomposición de COSTE es la referencia de Estudios»: en 7.866 partidas es

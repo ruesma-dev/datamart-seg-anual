@@ -9,30 +9,31 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-27 · F-097 · SPEC LISTA · los descompuestos de las partidas · PENDIENTE DE APROBAR D1-D11
+## 2026-09-27 · F-097 · SPEC LISTA (revisada con las decisiones del humano) · PENDIENTE DE D12-D15 Y DE T0
 
-Spec-author en `feature/F-097-descompuestos-partidas` (desde `main` ee4c10a).
-Spec: `specs/F-097-descompuestos-partidas/`. Mediciones con cifras y decisiones:
-`progress/spec_F-097.md`. Todo medido en solo lectura (Sigrid por `sigrid-api`,
-datamart por el MCP). Lo que el humano tiene que saber antes de aprobar:
+Spec-author en `feature/F-097-descompuestos-partidas`. Spec:
+`specs/F-097-descompuestos-partidas/`. Mediciones y decisiones:
+`progress/spec_F-097.md` (sección «DECISIONES DEL HUMANO (2026-09-27)» y
+D12-D15 nuevas). Todo medido en solo lectura.
 
-- «Descomposición» es `obrparpre.des` (texto, no se ingiere hoy) y
-  «Planificación compras» es `dncpro` (ya en `raw`). **La Descomposición de
-  COSTE no es siempre la de Estudios**: en 7.866 partidas es copia de la
-  planificación (D1).
-- «Del ABC en adelante» es medible: desde la primera versión ABC el 98,6 % del
-  master está enlazado a la planificación; antes, el 35,6 %.
-- El master entero son 2,14 GB (65-94 min de lectura): se propone traer v0 +
-  primera ABC + vigente (~105 MB) y **partir** el histórico a una F-097b (D4, D5).
-- **D05DF210 no existe en Sigrid**: la partida es la 04.02 de la 0726, cuadra a
-  134,35 con 10 líneas de Estudios y aún no tiene planificación (D11).
-- Toca la identidad de la ingesta (`source_table` → `target_table`) para
-  declarar `obrparpre` dos veces (D7): roza la puerta de F-024, con test de
-  equivalencia.
-
-Decisiones abiertas: **D1-D11** en `progress/spec_F-097.md`, cada una con su
-recomendación. Hallazgo lateral: `obrparpre` declara `incremental_column: tiemod`
-y esa columna no existe en Sigrid.
+- Aplicado lo decidido: D1-D3, D6, D8-D11 como se recomendó; **D5: no se parte,
+  el master ENTERO entra** (3.023 versiones, 2,14 GB); D4: todas las versiones,
+  con v0, primera ABC y vigente marcadas; el `tiemod` de `obrparpre` entra (R29).
+- **Diseño nuevo del master: incremental por versión** con un paso propio
+  `ingest_descompuestos` y estado en el esquema `descompuestos`, que `--full` no
+  trunca. Cada noche: huella de las 3.023 versiones (24 s), ámbito 3 entero, la
+  vigente de cada obra (105 MB), las nuevas y las de huella distinta → 4-6 min.
+  Primera carga MANUAL 1,5-2 h. Espacio 2,5-4,2 GB (disco al 47-49 %).
+- **D7 queda sustituida por D12** (paso propio en vez de segunda entrada del
+  YAML): ya no se toca la identidad de la ingesta ni la puerta de F-024.
+- **Inmutabilidad de las versiones cerradas: NO demostrada del todo.** Las
+  inserciones tardías en versiones cerradas (155 filas) nunca traen `des`; un
+  `UPDATE` en sitio no se ve sin `tiemod`. Primera toma de huellas guardada en
+  `progress/mediciones/`; **T0 (segunda toma en un día laborable desde el
+  2026-10-05) BLOQUEA el incremental**: si cambia una versión cerrada, se para.
+- Decisiones nuevas: **D12** vía de ingesta, **D13** origen `MASTER_PRE_ABC`
+  para las versiones entre la v0 y la ABC, **D14** las otras 13 tablas con
+  `tiemod` falso (ficha aparte), **D15** primera carga y tope nocturno de 300 MB.
 
 ## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · DESPLEGADA Y VERIFICADA · FALTA LA LISTA BLANCA DE `mcp-bbdd`
 
