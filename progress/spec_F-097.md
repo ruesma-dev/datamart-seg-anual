@@ -189,6 +189,14 @@ entradas que declaran `tiemod`, **14 no lo tienen**: `cob`, `ctr`, `ctrpro`,
   entrada del YAML la truncaría `--full`.
 - **Nuevo en el alcance**: el `tiemod` de `obrparpre` (R29).
 
+## APROBADA POR EL HUMANO (2026-09-27)
+
+D12, D13, D14 y D15 aprobadas según la recomendación («ok» del humano). Con
+D1-D11 ya decididas, la spec queda aprobada y F-097 pasa a `in_progress`. D14
+se ficha como **F-115** (las otras 13 tablas con `tiemod` falso). Siguen
+abiertas con Negocio, sin bloquear: D8 (tipos 3 y 11) y D11 (el código
+D05DF210 con Juan).
+
 ## DECISIONES NUEVAS (D12-D15, para el humano)
 
 - **D12. Vía de ingesta** (sustituye a D7). Recomendación: **paso propio

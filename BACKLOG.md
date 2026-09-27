@@ -3,7 +3,9 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **106 features**, 64 abiertas, 42 terminadas.
+Resumen: **107 features**, 65 abiertas, 42 terminadas.
+
+En curso: **F-097**.
 
 Bloqueadas: **F-052**.
 
@@ -11,7 +13,7 @@ Bloqueadas: **F-052**.
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-097 | Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master | 3 | spec lista | estandar | `feature/F-097-descompuestos-partidas` |
+| F-097 | Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master | 3 | en curso | estandar | `feature/F-097-descompuestos-partidas` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-113 | La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto | 5 | pendiente | critico | `feature/F-113-categoria-capitulo-por-prefijo` |
 | F-114 | Rescatar dos peticiones de `mcp-bbdd` que solo vivian en la rama `dev`: la regla de las columnas `_raw` y el orden de magnitud de `stg.presupuesto` | 6 | pendiente | estandar | `feature/F-114-avisos-mcp-rescatados` |
@@ -75,6 +77,7 @@ Bloqueadas: **F-052**.
 | F-010 | Carga y mantenimiento de los Excels auxiliares en Azure | 64 | pendiente |  | `feature/F-010-carga-excels-auxiliares` |
 | F-007 | Disparo manual de la actualización desde web | 65 | pendiente |  | `feature/F-007-disparo-manual-web` |
 | F-032 | Limpieza pendiente de F-003: secretos duplicados en el vault de albaranes y rastro en el puesto | 66 | pendiente | estandar | `feature/F-032-limpieza-secretos-y-puesto` |
+| F-115 | Trece tablas declaran `incremental_column: tiemod` y la columna no existe en Sigrid | 67 | pendiente | estandar | `feature/F-115-tiemod-inexistente` |
 
 ## Terminadas
 
@@ -127,7 +130,7 @@ Bloqueadas: **F-052**.
 
 ### F-097 · Los descompuestos de las partidas: planificacion de compras del jefe de obra, descompuesto de estudios y el del master
 
-estado **spec lista** · prioridad 3 · rigor `estandar` · SDD sí · rama `feature/F-097-descompuestos-partidas`
+estado **en curso** · prioridad 3 · rigor `estandar` · SDD sí · rama `feature/F-097-descompuestos-partidas`
 
 Pedida por Juan Romero por correo el 2026-09-22, «Datamart: publicar los descompuestos de las partidas (Descomposicion y Planificacion de compras)». Hoy de cada partida solo llegan medicion, precio e importe por ambito y fase o version (`stg.presupuesto`), pero no los elementos (precios simples) que la componen. Ejemplo suyo: la partida D05DF210 «Forj. reticular 35+10» de la 0726 cuesta 134,35 EUR/m2 y no se ve de que se compone (hormigon, acero, encofrado, mano de obra). ================ LO QUE SON, SEGUN EL HUMANO (2026-09-22), y manda sobre el nombre de la pestaña: en COSTE (ambito 3) existen los DOS: la pestaña «Planificacion compras» es **el descompuesto que necesitamos** (el del jefe de obra), y la pestaña «Descomposicion» es **la referencia que vino de Estudios**. En MASTER COSTE (ambito 8) solo existe la pestaña «Descomposicion», que conceptualmente es **la planificacion de compras del ABC en adelante** y **el descompuesto del cierre para Oficina Tecnica**. Juan propone llamarlos ESTUDIO, PLANIF_JO y MASTER_PLANIF_JO y publicarlos los tres, cada uno con su origen, sin mezclarlos. ================ LO QUE PIDE: una fila por linea de descompuesto con identificacion (obra, partida, ambito, fase o version, origen, orden), elemento (id, codigo, descripcion, tipo MO/material/maquinaria/subcontrata/%/auxiliar, unidad), valores (rendimiento, precio unitario, importe por unidad y, si es comodo, totales por la medicion), porcentajes con su base, anidamiento de partidas auxiliares (linea padre) y, solo en las de planificacion, proveedor, contrato y mes previsto de compra si la pestaña lo recoge. Un catalogo de elementos con su equivalencia al producto de compras para cruzar lo planificado con lo comprado. Controles: el descompuesto por unidad cuadra con el precio de la partida en `stg.presupuesto` (publicar las que no) y lista de partidas con precio y sin descompuesto (tanto alzado). ================ NADA MEDIDO TODAVIA: hay que localizar en Sigrid las tablas de cada pestaña (azure-apps/sigrid_tablas.md), si se ingieren, su volumen -el master tiene una copia por version y puede ser muy grande, con el coste de ventana que eso supone- y que significa 'del ABC en adelante' en el dato. Enlaza con F-092 (maestro de productos) y con F-038 (comparativo).
 
@@ -508,6 +511,12 @@ Más adelante, no ahora. Botón en una app web (o sistema equivalente) para que 
 estado **pendiente** · prioridad 66 · rigor `estandar` · SDD no · rama `feature/F-032-limpieza-secretos-y-puesto`
 
 Extraido de F-023 el 2026-08-19 por decision del humano: era limpieza operativa que no aporta funcion y estaba bloqueando el cierre de F-003. Nada de esto impide que el ETL funcione ni que el datamart sea correcto; son cabos que conviene atar para no dejar rastro innecesario. DOS BLOQUES. (1) SECRETOS DUPLICADOS: retirar las copias viejas de pg-sigrid-dm-app y pg-mcp-sigrid-dm-ro en kv-albaranes-rs9k2. El job ya usa kv-datamart-seg-dev y tiene ejecuciones correctas, asi que esas copias son residuo. Es un borrado en un recurso de ALBARANES: exige OK explicito del humano por cada secreto, sin exponer valores -nunca 'secret show'- y comprobando despues que el job sigue ejecutando bien. (2) RASTRO EN EL PUESTO: la linea de hosts; las reglas de firewall del puesto en psql-albaranes-rs9k2, que el 2026-08-19 ya son TRES (datamart-puesto-pgris-2026-08-17-rango, -18 y -19, esta ultima ampliada al rango 77.211.5.0/24 porque la IP publica del puesto rota cada pocos minutos); y decidir si SIGRID_API_PAGE_SIZE=50000 se queda en los .env. NO se tocan ClientPgris ni FirewallIPAddress_2026-6-16: son de albaranes, y solo se retiran si el humano confirma que nadie mas las usa. ORDEN QUE IMPORTA (heredado de la DA-7 de F-023): las reglas de firewall del puesto son las que dan acceso al Postgres desde aqui, asi que se retiran AL FINAL de todo, cuando ya no haya trabajo que las necesite. El 2026-08-19 se vio en vivo lo que cuesta no tenerlas: media hora perdida y una regla nueva.
+
+### F-115 · Trece tablas declaran `incremental_column: tiemod` y la columna no existe en Sigrid
+
+estado **pendiente** · prioridad 67 · rigor `estandar` · SDD no · rama `feature/F-115-tiemod-inexistente`
+
+Decision D14 del humano sobre la spec de F-097 (2026-09-27), sin prioridad fijada (al final de la cola). Medido por el spec-author de F-097 contra `INFORMATION_SCHEMA` de Sigrid el 2026-09-27: de las 23 entradas de `config/tables_sigrid.yaml` que declaran `incremental_column: tiemod`, 14 no tienen esa columna: `cob`, `ctr`, `ctrpro`, `dca`, `dcapro`, `dcf`, `dcfpro`, `obr`, `obrctr`, `obrfas`, `obrfasamb`, `obrparpar`, `obrparpre` y `pag`. `obrparpre` se corrige en F-097; quedan las otras 13. La ingesta las degrada a `None` en silencio (`ingest_raw_step.py:279`) y `_source_tiemod` queda a NULL, asi que la declaracion no hace nada salvo afirmar algo falso. Hoy no rompe datos porque la nocturna corre `run-all --full`. QUE HACER: igual que F-074 con `com`/`comlin`/`comprv` y F-097 con `obrparpre`: `incremental_column: null` con el comentario de lo verificado, buscar si alguna tiene otra columna de fecha que sirva de corte, y ampliar el test de F-074 para que ninguna entrada declare una columna incremental que Sigrid no tiene. Detalle: `progress/spec_F-097.md`, seccion del `tiemod`.
 
 ### F-001 · Comando 'version' en el CLI
 
