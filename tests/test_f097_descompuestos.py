@@ -828,3 +828,32 @@ def test_f097_un_test_por_requisito() -> None:
                for n in modulo if n.startswith("test_f097_r")]
     for n in range(2, 30):
         assert any(x.startswith(f"test_f097_r{n}_") for x in nombres), f"R{n} sin test"
+
+
+@pytest.mark.parametrize(
+    ("comando", "atributo", "nombre", "stage"),
+    [("ingest-descompuestos", "IngestDescompuestosStep", "ingest_descompuestos", "ingest"),
+     ("build-descompuestos", "BuildDescompuestosStep", "build_descompuestos", "build_aux")],
+)
+def test_f097_r7_sin_la_opcion_no_hay_primera_carga(
+    monkeypatch: pytest.MonkeyPatch, comando: str, atributo: str, nombre: str, stage: str
+) -> None:
+    """Review 2, superviviente S2 (`default=True` en `--sin-tope`): el comando a
+    secas llega al paso con `sin_tope=False`, y solo con la opcion con `True`.
+    Es lo que impide lanzar sin querer la primera carga de 2,14 GB (1,5-2 h)."""
+    from click.testing import CliRunner
+
+    import main
+    from tests.test_f024_cli import PgFalso, paso_falso, settings_falsos
+
+    construcciones: list[dict] = []
+    monkeypatch.setattr(main, "get_settings", lambda: settings_falsos())
+    monkeypatch.setattr(main, "configure_logging", lambda **kwargs: None)
+    monkeypatch.setattr(main, "_get_pg", lambda: PgFalso())
+    monkeypatch.setattr(main, atributo, paso_falso(nombre, stage, construcciones=construcciones))
+
+    a_secas = CliRunner().invoke(main.cli, [comando])
+    con_opcion = CliRunner().invoke(main.cli, [comando, "--sin-tope"])
+
+    assert a_secas.exit_code == 0 and con_opcion.exit_code == 0, a_secas.output
+    assert [c["sin_tope"] for c in construcciones] == [False, True]
