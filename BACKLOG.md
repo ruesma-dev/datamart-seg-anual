@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **107 features**, 64 abiertas, 43 terminadas.
+Resumen: **108 features**, 65 abiertas, 43 terminadas.
 
 Bloqueadas: **F-052**.
 
@@ -75,6 +75,7 @@ Bloqueadas: **F-052**.
 | F-007 | Disparo manual de la actualización desde web | 65 | pendiente |  | `feature/F-007-disparo-manual-web` |
 | F-032 | Limpieza pendiente de F-003: secretos duplicados en el vault de albaranes y rastro en el puesto | 66 | pendiente | estandar | `feature/F-032-limpieza-secretos-y-puesto` |
 | F-115 | Trece tablas declaran `incremental_column: tiemod` y la columna no existe en Sigrid | 67 | pendiente | estandar | `feature/F-115-tiemod-inexistente` |
+| F-116 | Un error de Postgres al escribir UNA version del descompuesto aborta la ingesta entera de esa noche | 68 | pendiente | estandar | `feature/F-116-ingesta-descompuestos-error-por-version` |
 
 ## Terminadas
 
@@ -509,6 +510,12 @@ Extraido de F-023 el 2026-08-19 por decision del humano: era limpieza operativa 
 estado **pendiente** · prioridad 67 · rigor `estandar` · SDD no · rama `feature/F-115-tiemod-inexistente`
 
 Decision D14 del humano sobre la spec de F-097 (2026-09-27), sin prioridad fijada (al final de la cola). Medido por el spec-author de F-097 contra `INFORMATION_SCHEMA` de Sigrid el 2026-09-27: de las 23 entradas de `config/tables_sigrid.yaml` que declaran `incremental_column: tiemod`, 14 no tienen esa columna: `cob`, `ctr`, `ctrpro`, `dca`, `dcapro`, `dcf`, `dcfpro`, `obr`, `obrctr`, `obrfas`, `obrfasamb`, `obrparpar`, `obrparpre` y `pag`. `obrparpre` se corrige en F-097; quedan las otras 13. La ingesta las degrada a `None` en silencio (`ingest_raw_step.py:279`) y `_source_tiemod` queda a NULL, asi que la declaracion no hace nada salvo afirmar algo falso. Hoy no rompe datos porque la nocturna corre `run-all --full`. QUE HACER: igual que F-074 con `com`/`comlin`/`comprv` y F-097 con `obrparpre`: `incremental_column: null` con el comentario de lo verificado, buscar si alguna tiene otra columna de fecha que sirva de corte, y ampliar el test de F-074 para que ninguna entrada declare una columna incremental que Sigrid no tiene. Detalle: `progress/spec_F-097.md`, seccion del `tiemod`.
+
+### F-116 · Un error de Postgres al escribir UNA version del descompuesto aborta la ingesta entera de esa noche
+
+estado **pendiente** · prioridad 68 · rigor `estandar` · SDD no · rama `feature/F-116-ingesta-descompuestos-error-por-version`
+
+Hallazgo 3 (BAJA) de la review 1 de F-097 (2026-09-28), fichado a peticion del humano el 2026-09-29, al final de la cola. En `IngestDescompuestosStep` un error de Sigrid al leer una version o un recuento que no cuadra con la huella se registran y la ingesta sigue con las demas (R9 de F-097), pero un error de Postgres al escribir UNA version (`_fase("versiones", ...)` dentro del bucle) aborta el paso entero. Hoy es hipotetico: el caso que lo dispararia es un `ide` que cambie de version y choque con la PK de `_des_texto`. QUE HACER: tratar el error de escritura de una version como R9 (se revierte esa version, se registra en `versiones_fallidas`, se sigue y el paso sale `FAILED` al final), con test offline. Detalle: `progress/review_F-097.md` (pasada 1, hallazgo 3).
 
 ### F-001 · Comando 'version' en el CLI
 

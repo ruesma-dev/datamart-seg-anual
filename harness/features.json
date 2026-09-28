@@ -1830,6 +1830,21 @@
       "rigor": "estandar",
       "priority": 67,
       "branch": "feature/F-115-tiemod-inexistente"
+    },
+    {
+      "id": "F-116",
+      "title": "Un error de Postgres al escribir UNA version del descompuesto aborta la ingesta entera de esa noche",
+      "description": "Hallazgo 3 (BAJA) de la review 1 de F-097 (2026-09-28), fichado a peticion del humano el 2026-09-29, al final de la cola. En `IngestDescompuestosStep` un error de Sigrid al leer una version o un recuento que no cuadra con la huella se registran y la ingesta sigue con las demas (R9 de F-097), pero un error de Postgres al escribir UNA version (`_fase(\"versiones\", ...)` dentro del bucle) aborta el paso entero. Hoy es hipotetico: el caso que lo dispararia es un `ide` que cambie de version y choque con la PK de `_des_texto`. QUE HACER: tratar el error de escritura de una version como R9 (se revierte esa version, se registra en `versiones_fallidas`, se sigue y el paso sale `FAILED` al final), con test offline. Detalle: `progress/review_F-097.md` (pasada 1, hallazgo 3).",
+      "acceptance": [
+        "Un error de Postgres al escribir una version se registra, esa version se revierte y la ingesta sigue con las demas",
+        "El paso termina `FAILED` y la version fallida figura en el metadata de `_meta.etl_runs`",
+        "Test offline con doble de Postgres que lo demuestra"
+      ],
+      "status": "pending",
+      "sdd": false,
+      "rigor": "estandar",
+      "priority": 68,
+      "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
     }
   ]
 }
