@@ -9,7 +9,15 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-28 · F-097 · EN REVISIÓN (`in_progress`) · implementada, review 1 atendida · T0 a partir del 2026-10-05 bloquea la puesta en producción
+## 2026-09-28 · F-097 · CERRADA (`done`, APROBADO en pasada 3) · los descompuestos de las partidas · SIN DESPLEGAR: T0 (desde el 2026-10-05) antes de T17 y T19
+
+> **Cerrada el 2026-09-28** con APROBADO del reviewer en la pasada 3
+> (`progress/review_F-097.md`); `init.sh` en verde (5.931 passed, cobertura
+> 99,6 %). Resumen en `progress/history.md`. QUEDAN las MANUAL del humano de
+> abajo, EN ORDEN: T0 bloquea la primera carga (T17) y la imagen (T19). Rama sin
+> integrar en `main`: el merge lo hace el humano. Candidata a ficha menor
+> (hallazgo 3 de la review 1): un error de Postgres al escribir UNA versión
+> aborta la ingesta entera en vez de registrarse y seguir.
 
 > **Aprobada por el humano el 2026-09-27**: D12-D15 según la recomendación
 > («ok»). D14 fichada como **F-115**. Abiertas con Negocio, sin bloquear: D8

@@ -1,121 +1,111 @@
 <!-- progress/review_F-097.md -->
-Revisión incremental desde 7d7dc0b (pasada 2) · delta hasta HEAD `6ca684d`
+Revisión incremental desde 6ca684d (pasada 3) · delta hasta HEAD `d4f36d0`
 
 # F-097 · Review del reviewer
 
-**Veredicto (pasada 2): CHANGES_REQUESTED.** Los tres cambios de la pasada 1 están bien
-resueltos y lo he comprobado con la misma evidencia. Lo que falta es de la campaña de
-mutación: el delta toca el alcance mutado, así que por RM1 el informe de mutación ya no vale,
-y al repetirla salen **dos supervivientes nuevos, los dos huecos reales de test** y sin
-analizar. Es trabajo pequeño: dos tests y un informe que ya está generado (abajo).
+**Veredicto (pasada 3): APPROVED.** Los cuatro cambios de la pasada 2 están resueltos. El
+informe de mutación es mi campaña sobre `6ca684d` y sigue valiendo por RM1, porque el delta
+no toca código. Los tests nuevos matan de verdad S1 y S2: los apliqué a mano en una copia.
+Quedan las verificaciones MANUAL del humano (T0, T17, T18, T19). T0 bloquea la puesta en
+producción, no el cierre del código.
 
 **Nivel de rigor:** `estandar` (declarado). Exige fase RED, cobertura >= 80 % de lo
 cambiado y campaña de mutación con los supervivientes analizados. RM5 no aplica.
 
-## Pasada 2
+## Pasada 3
 
-**Delta** (`057b8d1`, `c2b1b53`, `e366d05`, `6ca684d`): `01_troceado.sql`,
-`02_lineas_coste.sql`, `domain/descompuestos.py`, `build_descompuestos_step.py`, dos
-ficheros de test, `current.md`, `impl_F-097.md` y este informe (el implementer lo commiteó).
-No cambia firmas públicas ni ficheros de sitio. Lo aprobado en la pasada 1 sigue en pie,
-salvo la validez del informe de mutación (RM1, abajo).
+**Delta** (`323b3e5`, `a110ce7`, `afc6448`, `7e4f426`, `0f23dad`, `ba9b533`, `d4f36d0`):
+dos tests en `test_f097_planificador.py` y `test_f097_descompuestos.py`, y
+`progress/mutacion_F-097.md`, `impl_F-097.md` y este informe.
+`git diff --stat 6ca684d HEAD -- etl_sigrid main.py config infra harness` sale **vacío**:
+no cambia ni una línea de producción. Lo aprobado en las pasadas 1 y 2 sigue en pie.
 
-- **Cambio 1 (rango), RESUELTO.** Los dos importes de `fn_trocear` y los de PLANIF_JO van
-  ahora con `CASE WHEN abs(ROUND(x, 2)) < 1e16 THEN ... END`, y el espejo tiene
-  `LIMITE_IMPORTE`. PostgreSQL 16 local desechable (`00`+`01` recargados): `12345678901234567`,
-  `-99999999999999999`, `1e300` y `…999.995` → importes NULL con el precio publicado;
-  `9999999999999999.99` cabe. `02_lineas_coste.sql` ejecutado sobre un `raw` de juguete con
-  un `dncpro.pre = 1e20` y un `des` de 17 cifras: termina, e importes NULL en ESTUDIO y en
-  PLANIF_JO. Desviación 9 del informe corregida.
-- **Cambio 2 (`$`), RESUELTO.** `fullmatch` en `_NUMERO` y `_ENLACE`, y también en el cod
-  de la vigente y en el sello (la misma trampa, bien visto). Mis 15 casos límite, espejo
-  frente a SQL, son **todos iguales** (antes fallaban 2 y reventaban 2): 38/37/35/29/19
-  campos, CRLF, texto largo con saltos, `12\n`, enlace `55\n`, 17 cifras, `1e300`, `1e999`,
-  los dos lados del límite, cabecera basura y `~d|`.
-- **Cambio 3, RESUELTO:** el título de la sección F-097 de `current.md`.
-- **Hallazgo 3, bien tratado:** anotado en «Review 1 atendida» de `impl_F-097.md` como
-  candidato a ficha menor y NO arreglado aquí.
-- **Fase RED del delta:** traza real en `impl_F-097.md` (8 failed, 1 passed).
-- **Mutantes del delta, uno a uno** (RM4, copia con `git archive`, suites de F-097 y el
-  barrido de dataclasses): 15 mutantes en las líneas cambiadas, 14 muertos. El que vive,
-  `descompuestos.py:179` `>=` → `>`, es **equivalente**: con |x| = 1e16 exacto la segunda
-  guarda (`:182`) devuelve NULL igual. Sin mutar: 344 passed.
-- **RM1: el delta toca el alcance** (`descompuestos.py`, `build_descompuestos_step.py`) y el
-  informe de mutación está medido en `c1bf0bf`. Repetí la campaña en HEAD con la
-  herramienta (`--salida` fuera de `progress/`, 2 workers): **178 mutantes, 20 evaluados,
-  18 muertos, 2 supervivientes**, 0 timeouts y 0 sin veredicto en 3.945,6 s; SHA
-  `6ca684d`; base 448,4 s y media 197,3 s (× 2 = 394,6 s por mutante, coherente, RM2).
-  Árbol limpio y sin worktrees de la campaña después. Informe:
-  `<scratchpad de la sesion>\revisor\mutacion_F-097_pasada2.md (copiado a progress/mutacion_F-097.md en R2-1)`.
-  - **S1 · `descompuestos.py:437`** `acumulado + pendiente.bytes > limite` → `>=`. No es
-    equivalente: un lote que llega EXACTAMENTE a `mb_por_lote` se partiría en dos. Ningún
-    test del troceado cae justo en el límite (el de la relectura sí:
-    `r6_justo_en_el_tope_cabe`).
-  - **S2 · `main.py:5140`** `--sin-tope` de `ingest-descompuestos` con `default=True`. No es
-    equivalente, y es el más serio: `python main.py ingest-descompuestos` a secas haría la
-    primera carga (2,14 GB, 1,5-2 h) sin avisar. `r25_comandos_sueltos_con_sin_tope` mira que
-    la opción exista y se pase, no su valor por defecto. Lo mismo vale para
-    `build-descompuestos`.
-- `bash harness/init.sh` entero: exit 0, **5928 passed, 219 skipped**, cobertura 99,6 %
-  (516/518), tamaño en tope (ojo: `impl_F-097.md` 214/220, el análisis va en el de mutación).
+- **Cambio 1, RESUELTO (informe de mutación).** He comparado `progress/mutacion_F-097.md`
+  con mi informe original: alcance (1.333 líneas), totales (178 / 20 / 18 / 2 / 0 / 0),
+  SHA `6ca684d251cc…`, líneas base, media, timeout, workers y muestreo son **idénticos**.
+  Solo añade la nota de procedencia y los análisis de S1 y S2, que ya no están en
+  `PENDIENTE`. RM1: el código medido es el de HEAD. RM2: 197,3 s × 2 = 394,6 s por mutante
+  frente a una base de 448,4 s, coherente. Campaña > 60 s, así que no la reejecuto: ya es mía.
+- **Cambio 2, RESUELTO (S1).** `test_f097_r21_dos_pendientes_que_llenan_el_lote_justo_van_juntas`.
+  Copia con `git archive HEAD` y `descompuestos.py:437` `>` → `>=` aplicado a mano:
+  **1 failed**. Sin mutar pasa.
+- **Cambio 3, RESUELTO (S2).** `test_f097_r7_sin_la_opcion_no_hay_primera_carga` es de
+  comportamiento: `CliRunner` más el paso doblado, a secas `False` y con la opción `True`.
+  En la copia, con `default=True` en `main.py:5140` (`ingest-descompuestos`): **1 failed,
+  1 passed**. Con `default=True` en `main.py:5169` (`build-descompuestos`): **1 failed,
+  1 passed**. Cada mutación la caza su caso. Restaurado: 3 passed.
+- **Cambio 4, RESUELTO.** El equivalente de `_redondeo` (`>=` → `>` en la primera guarda)
+  está anotado en el informe de mutación con su motivo, el mismo que di yo.
+- **Regresiones.** `bash harness/init.sh` entero: exit 0, **5931 passed, 219 skipped**,
+  cobertura 99,6 % (516/518), tamaño dentro de los topes (ojo: `impl` 219/220).
+- **Nota para el líder.** El commit local `0f23dad` (sin push) conserva, en este informe,
+  la ruta de mi scratchpad con el identificador de sesión de Claude Code. `ba9b533` ya lo
+  redacta. No es un secreto ni un ID de Azure (ni suscripción, ni tenant, ni credencial). Aun
+  así, la puerta de GUID de `init.sh` lo marcaría si volviera al árbol. Reescribir ese commit
+  antes del merge lo decides tú. Es error mío: no volveré a pegar rutas del scratchpad.
 
-### Cambios requeridos (pasada 2)
+## Pasada 2 (resumen; texto completo en `git show d4f36d0:progress/review_F-097.md`)
 
-1. `progress/mutacion_F-097.md`: sustituirlo por una campaña medida sobre el alcance
-   actual. Vale **copiar el informe de arriba** (lo generó la herramienta sobre `6ca684d`;
-   RM1 lo sigue dando por bueno mientras los commits siguientes toquen solo tests y
-   `progress/`), o relanzarla. Completar el análisis de S1 y S2 en el informe.
-2. Test de S1 en `test_f097_planificador.py`: dos pendientes cuya suma es exactamente
-   `mb_por_lote` van en UN lote.
-3. Test de S2 en `test_f097_descompuestos.py`: el `default` de `--sin-tope` es `False` en
-   `ingest-descompuestos` y en `build-descompuestos` (mejor por comportamiento: invocar el
-   comando con `CliRunner` y un paso doblado, y comprobar que llega `sin_tope=False`).
-4. Anotar en el análisis el equivalente `descompuestos.py:179` (no lo sorteó la muestra; lo
-   encontré en el delta) con su motivo, para que nadie lo persiga.
+**CHANGES_REQUESTED.** Los tres cambios de la pasada 1 quedaron resueltos, con evidencia en
+PostgreSQL 16 local. Los importes que no caben en `NUMERIC(18,2)` salen NULL en SQL y en el
+espejo, también en PLANIF_JO. `fullmatch` en el espejo. 15 casos límite, espejo frente a
+SQL, todos iguales. Título de `current.md` corregido. El hallazgo 3 quedó como candidato a
+ficha menor. Sobre el delta, 15 mutantes uno a uno: 14 muertos y 1 equivalente
+(`_redondeo`). Pero el delta tocaba el alcance, así que por RM1 repetí la campaña en
+`6ca684d`: 178 mutantes, 18 de 20 muertos. Salieron dos supervivientes reales sin analizar:
+S1 (lote justo en el límite) y S2 (`--sin-tope` con `default=True`, que lanzaría la primera
+carga a secas). Se pidieron sus tests y el informe nuevo.
 
-## Pasada 1 (resumen; el texto completo, en `git show e366d05:progress/review_F-097.md`)
+## Pasada 1 (resumen; texto completo en `git show e366d05:progress/review_F-097.md`)
 
-Revisión completa de `main...7d7dc0b`: **CHANGES_REQUESTED**. Hallazgos: (1) MEDIA,
-`fn_trocear` reventaba con un número válido grande (`numeric field overflow`) y el espejo no
-(o con `InvalidOperation`); (2) BAJA, el espejo aceptaba un `\n` final que el SQL rechaza;
-(3) BAJA, un error de Postgres al escribir una versión aborta la ingesta entera (a ficha
-menor); (4) INFO, PK de `lineas`/`cuadre_partida` sobre `(obra, partida, amb, fas)`: 0
-repetidos en Sigrid (solo lectura); (5) INFO, SQL probado por texto (convención F-056);
-(6) INFO, título de `current.md`. Los cambios 1-3 salían de 1, 2 y 6.
+Revisión completa de `main...7d7dc0b`: **CHANGES_REQUESTED**. Hallazgos:
 
-Verificado en la pasada 1 y sin tocar por el delta: el incremental (ningún `DROP`/`TRUNCATE`
-de las tablas de estado; `reemplazar_filas` en una transacción; recuento distinto → no se
-escribe y se relee la noche siguiente; tope vigente > cambiada > nueva, ámbito 3 primero,
-`--sin-tope`); orígenes y marcas (v0, primera ABC, vigente, `tipo_version` de `mart`,
-`SUSTITUIDO_POR_PLANIFICACION` solo en ESTUDIO); cuadre (hoja, `pre <> 0`, `obride <> 0`,
-tolerancia 0,01, `SIN_DESCOMPUESTO`); R29 solo en `obrparpre` (las otras 13, F-115); D3 y
-`check-declarados` (11 objetos, sin rojo propio tras la primera noche en verde);
-diccionario (master INCOMPLETO, tipos 3 y 11 PROVISIONALES, `version: 37`); sin secretos ni
-escrituras en Azure; `azure-apps` 85356e6 sin push. Mutación de la pasada 1: 175 mutantes
-recalculados, muestreo reproducido, RM1-RM4 y los 4 supervivientes reproducidos en copia.
+1. MEDIA: `fn_trocear` reventaba con un número válido pero grande.
+2. BAJA: el espejo aceptaba un `\n` final que el SQL rechaza.
+3. BAJA: un error de Postgres al escribir una versión aborta la ingesta. Va a ficha menor.
+4. INFO: las PK de `lineas` y `cuadre_partida` dan 0 repetidos en Sigrid (solo lectura).
+5. INFO: el SQL se prueba por texto (convención de F-056).
+6. INFO: el título de `current.md`.
 
-## Checkpoints (estado tras la pasada 2)
+Verificado entonces y sin tocar después:
+
+- **Incremental.** Ningún `DROP` ni `TRUNCATE` de las tablas de estado.
+  `reemplazar_filas` va en una transacción. Si el recuento no cuadra, no se escribe y la
+  versión se relee la noche siguiente.
+- **Tope.** Orden vigente > cambiada > nueva, el ámbito 3 primero, y `--sin-tope`.
+- **Orígenes y marcas.** v0, primera ABC, vigente y `tipo_version` de `mart`.
+  `SUSTITUIDO_POR_PLANIFICACION` solo en ESTUDIO.
+- **Cuadre.** Solo partidas hoja con `pre <> 0` y `obride <> 0`, tolerancia 0,01, y
+  `SIN_DESCOMPUESTO` cuando no hay líneas.
+- **R29.** Solo `obrparpre`; las otras 13 van a F-115.
+- **Pipeline.** D3 y `check-declarados`: 11 objetos y ningún rojo propio.
+- **Diccionario.** Master INCOMPLETO, tipos 3 y 11 PROVISIONALES, `version: 37`.
+- **Reglas duras.** Sin secretos ni escrituras en Azure.
+- **Campaña de `c1bf0bf`.** Verificada con RM1-RM4.
+
+## Checkpoints (estado final)
 
 - C1: [x] `init.sh` exit 0 (arriba) · [x] ficheros del arnés.
 - C2: [x] una `in_progress` · [x] rama correcta · [x] `current.md` solo añade lo de F-097 ·
   [x] `done` con resumen en `history.md` (sin cambios).
 - C3: [x] hexagonal y SQL en `sql/descompuestos/NN_*.sql` · [x] ruta en primera línea ·
-  [x] sin prints de debug, secretos ni dependencias nuevas · [x] troceado robusto (cambios
-  1-2 resueltos); ámbito/fase y versiones duplicadas de `obrfasamb`, bien.
-- C3 bis: N/A, no toca `docs/referencia/`. C4 ter: N/A, sin `rutas_sensibles.json`.
-- C4: [x] R2-R29 con test (`test_f097_un_test_por_requisito`); R1, R30, R31 MANUAL · [x]
-  sin red ni BBDD · [x] MANUAL en `current.md` con comando y resultado esperado (T0 con
-  PARAR, T17, T18 C1-C4, T19) · [x] dobles contra el original (barrido de la suite, verde).
-- C4 bis: [x] `rigor` · [x] RED con trazas (pasada 1 y delta) · [x] cobertura (arriba) ·
-  [ ] **mutación: el informe de `progress/` está medido en `c1bf0bf` y el delta toca el
-  alcance (RM1)** · [x] muertos: campaña > 60 s, recálculo + RM1-RM4, y además repetida por
-  mí en HEAD · [x] coste por mutante 394,6 s · [x] sin cabecera no válida · [ ] **RM1**
-  (ver cambio 1) · [x] RM2 · N/A RM5 (`estandar`) · [x] RM6 (no se quitó código defensivo:
-  las guardas nuevas añaden defensa) · N/A campaña manual (la automática dio 178) ·
-  [ ] **supervivientes analizados: S1 y S2 sin análisis** · [x] «Evidencias» con 2 workers.
-- C5: [x] tareas `[x]` con commit `F-097 Tn:` (y `R1-n` de la review); T0, T17, T18, T19
-  MANUAL `[ ]` a propósito (bloquean la puesta en producción, decisión del humano del
-  2026-09-28) · [x] sin temporales · [x] `features.json` en `in_progress`.
+  [x] sin prints de debug, secretos ni dependencias nuevas · [x] troceado robusto;
+  ámbito/fase y versiones duplicadas de `obrfasamb`, bien.
+- C3 bis: N/A, no toca `docs/referencia/`. C4 ter: N/A, no hay `rutas_sensibles.json`.
+- C4: [x] R2-R29 con test (lo exige `test_f097_un_test_por_requisito`); R1, R30 y R31 son
+  MANUAL · [x] sin red ni BBDD · [x] las MANUAL están en `current.md` con comando y
+  resultado esperado (T0 con PARAR, T17, T18 C1-C4, T19) · [x] dobles contrastados con el
+  original: el barrido de la suite, en verde.
+- C4 bis: [x] `rigor` · [x] fase RED con trazas en las tres rondas · [x] cobertura (arriba) ·
+  [x] mutación con totales verificados (campaña propia, `6ca684d`) · [x] muertos: la
+  campaña la ejecuté yo · [x] coste por mutante 394,6 s · [x] sin cabecera de campaña no
+  válida · [x] RM1 · [x] RM2 · N/A RM5 (`estandar`) · [x] RM6: las guardas nuevas añaden
+  defensa, no quitan · N/A campaña manual (la automática dio 178) · [x] supervivientes
+  analizados, con test que los mata · [x] «Evidencias» con 2 workers.
+- C5: [x] tareas `[x]` con commit `F-097 Tn:`, más `R1-n` y `R2-n` de las reviews. T0,
+  T17, T18 y T19 siguen `[ ]` a propósito: son MANUAL y bloquean la puesta en producción
+  (decisión del humano del 2026-09-28) · [x] sin temporales · [x] `features.json` en
+  `in_progress`.
 
 ## Cobertura requisito → test (prefijo `test_f097_`)
 
@@ -127,14 +117,16 @@ recalculados, muestreo reproducido, RM1-RM4 y los 4 supervivientes reproducidos 
 | R4 | `r4_*` (5) | R14 | `r14_*` (8) | R24 | `r24_tres_vistas_*` |
 | R5 | `r5_*` (11) | R15 | `r15_estudio_sin_*` | R25 | `r25_*` (8) |
 | R6 | `r6_*` (10) | R16 | `r16_planif_jo_*` | R26 | `r26_*` (2) |
-| R7 | `r7_*` (3) | R17 | `r17_*` (6) | R27 | `r27_*` (6) |
+| R7 | `r7_*` (4) | R17 | `r17_*` (6) | R27 | `r27_*` (6) |
 | R8 | `r8_*` (8) | R18 | `r18_identificacion_*` | R28 | `r28_documentacion` |
 | R9 | `r9_*` (3) | R19 | `r19_*` (7) | R29 | `r29_*` (4) |
 | R10 | `r10_*` (3) | R20 | `r20_clave_*` | R30-31 | MANUAL T17-T18 |
 
 ## Automejora (propuesta, no aplicada)
 
-- `reviewer.md`: si hay **espejo** Python de un SQL, contrastar ambos en casos límite en un
-  PostgreSQL local desechable (números enormes, saltos en campos). Cazó los hallazgos 1 y 2.
-- `CHECKPOINTS.md`/RM1: cuando la review pide cambios en código del alcance, recordar en
-  el propio informe de review que la campaña caduca; aquí costó una pasada más.
+- `reviewer.md`: si hay un espejo Python de un SQL, contrastar los dos en casos límite en
+  un PostgreSQL local desechable. Así salieron los hallazgos 1 y 2.
+- `CHECKPOINTS.md`, en RM1: cuando la review pide cambios en código del alcance, avisar en
+  el propio informe de review de que la campaña caduca. Aquí costó una pasada más.
+- `reviewer.md`: no escribir rutas del scratchpad en los informes, porque llevan el
+  identificador de sesión y la puerta de GUID lo trata como sospechoso.
