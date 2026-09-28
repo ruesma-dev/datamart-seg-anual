@@ -538,3 +538,48 @@ def test_f097_r21_el_tope_del_troceado_se_valida_solo_con_tope() -> None:
         planificar_troceado([_vp(1, 0, 1)], presupuesto_mb=0)
     plan = planificar_troceado([_vp(1, 0, 1)], presupuesto_mb=0, sin_tope=True)
     assert plan.lotes == (((1, 0),),)
+
+
+# ===========================================================================
+# Review 1, cambio 1 · un numero fuera de rango no tumba el build
+# ===========================================================================
+
+
+@pytest.mark.parametrize("precio", ["1e300", "12345678901234567", "-99999999999999999"])
+def test_f097_r14_importe_fuera_de_rango_es_null_sin_excepcion(precio: str) -> None:
+    """`importe_unitario` e `importe_total` son NUMERIC(18,2) en la tabla: lo que
+    no cabe (|x| >= 1e16 tras redondear) es NULL, en SQL y en el espejo, y el
+    registro se publica igual con su precio."""
+    (r,) = trocear_des(_des(f"~D|X|DESC|{precio}|1|UD|||||||||1||10||"))
+    assert r.precio == Decimal(precio)
+    assert r.importe_unitario is None and r.importe_total is None
+
+
+def test_f097_r14_el_limite_del_importe_es_1e16_tras_redondear() -> None:
+    """16 cifras enteras caben; lo que al redondear llega a 1e16, no."""
+    (cabe,) = trocear_des(_des("~D|X|D|9999999999999999.99|||||||||||1||||"))
+    assert cabe.importe_unitario == Decimal("9999999999999999.99")
+    (no_cabe,) = trocear_des(_des("~D|X|D|9999999999999999.995|||||||||||1||||"))
+    assert no_cabe.importe_unitario is None
+
+
+# ===========================================================================
+# Review 1, cambio 2 · un salto de linea pegado a un numero no lo hace numero
+# ===========================================================================
+
+
+def test_f097_r14_numero_seguido_de_salto_de_linea_es_null() -> None:
+    """En PostgreSQL `$` es fin de cadena; en Python `re.match` con `$` casaba
+    antes de un `\n` final. Con `fullmatch` el espejo dice lo mismo que el SQL."""
+    assert numero("12\n") is None
+    campos = ["~D", "X", "DESC", "12\n", "3", "UD"] + [""] * 30 + ["55\n", ""]
+    (r,) = trocear_des(_des("|".join(campos)))
+    assert r.precio is None and r.cantidad_total == Decimal("3")
+    assert r.dncpro_id is None, "un enlace `55\n` no enlaza, como en fn_trocear"
+    assert r.codigo_elemento == "X"
+
+
+def test_f097_r17_cod_de_la_vigente_con_salto_de_linea_se_rechaza() -> None:
+    reglas = {"sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15\n"}}}
+    with pytest.raises(ValueError, match="cod"):
+        cod_version_vigente(reglas)

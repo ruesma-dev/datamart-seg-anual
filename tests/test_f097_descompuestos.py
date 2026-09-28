@@ -266,8 +266,12 @@ def test_f097_r19_tipo_de_elemento_por_case() -> None:
 
 def test_f097_r19_importes_y_porcentajes() -> None:
     texto = _sql(TROCEADO)
-    assert "ROUND(c.precio * c.rendimiento, 2)::NUMERIC(18,2) AS importe_unitario" in texto
-    assert "ROUND(c.cantidad_total * c.precio, 2)::NUMERIC(18,2) AS importe_total" in texto
+    # Review 1: lo que no cabe en NUMERIC(18,2) tras redondear es NULL, no un
+    # `numeric field overflow` que tumbe el build (el espejo hace lo mismo).
+    assert ("CASE WHEN abs(ROUND(c.precio * c.rendimiento, 2)) < 1e16 "
+            "THEN ROUND(c.precio * c.rendimiento, 2)::NUMERIC(18,2) END AS importe_unitario") in texto
+    assert ("CASE WHEN abs(ROUND(c.cantidad_total * c.precio, 2)) < 1e16 "
+            "THEN ROUND(c.cantidad_total * c.precio, 2)::NUMERIC(18,2) END AS importe_total") in texto
     assert "COALESCE(c.tipo_elemento_codigo IN ('4', '13'), FALSE) AS es_porcentaje" in texto
     assert "CASE WHEN c.tipo_elemento_codigo IN ('4', '13') THEN c.rendimiento * 100 END AS porcentaje" in texto
     assert "CASE WHEN c.tipo_elemento_codigo IN ('4', '13') THEN c.precio END AS base_porcentaje" in texto
@@ -303,8 +307,10 @@ def test_f097_r16_planif_jo_desde_dncpro_de_la_obra() -> None:
 
 def test_f097_r19_planif_jo_con_sus_importes() -> None:
     planif = _bloque(COSTE, "SELECT 'PLANIF_JO'", ";")
-    assert "ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2)" in planif
-    assert "ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2)" in planif
+    assert ("CASE WHEN abs(ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2)) < 1e16 "
+            "THEN ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2) END") in planif
+    assert ("CASE WHEN abs(ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2)) < 1e16 "
+            "THEN ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2) END") in planif
     assert "'SIN_TIPO'" in planif
 
 

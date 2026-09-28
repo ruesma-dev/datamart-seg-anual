@@ -170,9 +170,12 @@ SELECT 'PLANIF_JO', o.ide, p.paride, NULL::BIGINT, 3, 0,
        NULLIF(btrim(p.cod2), ''),
        NULL::TEXT, 'SIN_TIPO', NULLIF(btrim(n.cod), ''), NULLIF(btrim(n.res), ''),
        p.canren::NUMERIC, p.pre::NUMERIC,
-       ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2),
+       -- lo que no cabe en NUMERIC(18,2) es NULL, como en fn_trocear (review 1)
+       CASE WHEN abs(ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2)) < 1e16
+           THEN ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2) END,
        p.can::NUMERIC,
-       ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2),
+       CASE WHEN abs(ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2)) < 1e16
+           THEN ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2) END,
        FALSE, NULL::NUMERIC, NULL::NUMERIC,
        p.ide, NULLIF(p.proide, 0),
        NULLIF(p.entide, 0), NULLIF(p.adjctride, 0), NULLIF(p.adjctrlin, 0),

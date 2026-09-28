@@ -22,6 +22,7 @@
 -- VALIDAR con Negocio). En los tipos 4 y 13 (porcentajes) el precio es la BASE
 -- y el rendimiento el tanto por uno (0.02 = 2 %), asi que el importe es el
 -- mismo producto que en cualquier otra linea (R19).
+-- Un importe que no cabe en NUMERIC(18,2) sale NULL: el build no se para.
 --
 -- RIESGO CONOCIDO: un `|` dentro del texto largo desplaza los campos. No se
 -- puede arreglar —el formato no escapa el separador—, pero queda a la vista:
@@ -84,8 +85,13 @@ SELECT
             ELSE 'DESCONOCIDO'
         END
     END AS tipo_elemento,
-    ROUND(c.precio * c.rendimiento, 2)::NUMERIC(18,2) AS importe_unitario,
-    ROUND(c.cantidad_total * c.precio, 2)::NUMERIC(18,2) AS importe_total,
+    -- NUMERIC(18,2): lo que tras redondear no cabe (|x| >= 1e16) es NULL, no un
+    -- `numeric field overflow` que tumbe el build (review 1; mismo tope que
+    -- `LIMITE_IMPORTE` del espejo).
+    CASE WHEN abs(ROUND(c.precio * c.rendimiento, 2)) < 1e16
+        THEN ROUND(c.precio * c.rendimiento, 2)::NUMERIC(18,2) END AS importe_unitario,
+    CASE WHEN abs(ROUND(c.cantidad_total * c.precio, 2)) < 1e16
+        THEN ROUND(c.cantidad_total * c.precio, 2)::NUMERIC(18,2) END AS importe_total,
     COALESCE(c.tipo_elemento_codigo IN ('4', '13'), FALSE) AS es_porcentaje,
     CASE WHEN c.tipo_elemento_codigo IN ('4', '13') THEN c.rendimiento * 100 END AS porcentaje,
     CASE WHEN c.tipo_elemento_codigo IN ('4', '13') THEN c.precio END AS base_porcentaje

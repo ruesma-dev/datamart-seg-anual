@@ -104,6 +104,12 @@ _INICIO_REGISTRO = re.compile(r"^~[A-Z]\|")
 _COD_VIGENTE = re.compile(r"^[0-9]+$")
 _CENTIMO = Decimal("0.01")
 
+#: Tope de un importe publicado: las columnas son NUMERIC(18,2), asi que caben
+#: 16 cifras enteras. Lo que tras redondear llega a 1e16 es NULL, igual que en
+#: `01_troceado.sql` (review 1 de F-097): un `|` que desplaza campos puede poner
+#: un numero enorme donde no toca, y eso no puede tumbar el build.
+LIMITE_IMPORTE = Decimal("1e16")
+
 
 # ---------------------------------------------------------------------------
 # El troceado (espejo del SQL)
@@ -167,7 +173,11 @@ def _texto(campos: Sequence[str], posicion: int) -> str | None:
 
 
 def _redondeo(valor: Decimal | None) -> Decimal | None:
-    return None if valor is None else valor.quantize(_CENTIMO, rounding=ROUND_HALF_UP)
+    """`ROUND(x, 2)`, o NULL si no cabe en NUMERIC(18,2) (sin `InvalidOperation`)."""
+    if valor is None or abs(valor) >= LIMITE_IMPORTE:
+        return None
+    redondeado = valor.quantize(_CENTIMO, rounding=ROUND_HALF_UP)
+    return None if abs(redondeado) >= LIMITE_IMPORTE else redondeado
 
 
 def _producto(a: Decimal | None, b: Decimal | None) -> Decimal | None:
