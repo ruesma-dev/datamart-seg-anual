@@ -46,7 +46,7 @@ salvo la validez del informe de mutación (RM1, abajo).
   18 muertos, 2 supervivientes**, 0 timeouts y 0 sin veredicto en 3.945,6 s; SHA
   `6ca684d`; base 448,4 s y media 197,3 s (× 2 = 394,6 s por mutante, coherente, RM2).
   Árbol limpio y sin worktrees de la campaña después. Informe:
-  `C:\Users\pgris\AppData\Local\Temp\claude\C--Users-pgris-PycharmProjects-datamart-seg-anual\d6ccf4cc-34dd-4791-94d5-fc7f403b4c5e\scratchpad\revisor\mutacion_F-097_pasada2.md`.
+  `<scratchpad de la sesion>\revisor\mutacion_F-097_pasada2.md (copiado a progress/mutacion_F-097.md en R2-1)`.
   - **S1 · `descompuestos.py:437`** `acumulado + pendiente.bytes > limite` → `>=`. No es
     equivalente: un lote que llega EXACTAMENTE a `mb_por_lote` se partiría en dos. Ningún
     test del troceado cae justo en el límite (el de la relectura sí:
