@@ -421,7 +421,8 @@ def test_f097_r13_un_pipe_de_mas_desplaza_y_se_ve() -> None:
     ("texto", "esperado"),
     [("10.5", Decimal("10.5")), (" 3 ", Decimal("3")), ("-0.345", Decimal("-0.345")),
      ("1e3", Decimal("1E+3")), (".5", Decimal("0.5")), ("7.", Decimal("7")),
-     ("", None), (None, None), ("abc", None), ("1,5", None), ("1.2.3", None), ("--1", None)],
+     ("", None), (None, None), ("abc", None), ("1,5", None), ("1.2.3", None), ("--1", None),
+     ("1e9999", None)],
 )
 def test_f097_r14_numero(texto: str | None, esperado: Decimal | None) -> None:
     assert numero(texto) == esperado

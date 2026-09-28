@@ -93,7 +93,9 @@ TIPOS_PORCENTAJE = ("4", "13")
 
 #: Lo que es un numero en un campo del `des`. El MISMO patron que usa
 #: `descompuestos.fn_num` en el SQL (lo fija un test): lo que no casa es NULL.
-PATRON_NUMERO = r"^[-+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]+)?$"
+#: El exponente va acotado a tres cifras: `1e99999` no cabe en un NUMERIC y
+#: tumbaria el build en vez de salir NULL.
+PATRON_NUMERO = r"^[-+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]{1,3})?$"
 _NUMERO = re.compile(PATRON_NUMERO)
 _ENLACE = re.compile(r"^[0-9]{1,18}$")
 _SEPARADOR_REGISTROS = re.compile(r"\n(?=~[A-Z]\|)")
