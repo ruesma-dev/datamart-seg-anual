@@ -231,7 +231,8 @@ def test_f097_r2_las_columnas_del_texto(monkeypatch: pytest.MonkeyPatch) -> None
     ]
     api, pg = _escenario(), _PgFalso()
     _ejecutar(monkeypatch, api, pg)
-    fila = _de_versiones(pg)[0]["filas"][0]
+    (v0,) = [r for r in _de_versiones(pg) if r["filtro"]["fase_num"] == 0]
+    fila = v0["filas"][0]
     assert fila == {
         "presupuesto_id": 5001, "obra_id": 7, "partida_id": 6001, "ambito_id": 8,
         "fase_num": 0, "cantidad": 2.5, "precio": 10.25, "haydes": 1,

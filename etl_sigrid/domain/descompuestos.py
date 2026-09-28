@@ -56,7 +56,8 @@ ESTADOS_CUADRE = ("CUADRA", "NO_CUADRA", "SIN_DESCOMPUESTO", "SUSTITUIDO_POR_PLA
 MOTIVO_VIGENTE = "vigente"
 MOTIVO_CAMBIADA = "cambiada"
 MOTIVO_NUEVA = "nueva"
-_PRIORIDAD = {MOTIVO_VIGENTE: 0, MOTIVO_CAMBIADA: 1, MOTIVO_NUEVA: 2}
+ORDEN_DE_MOTIVOS = (MOTIVO_VIGENTE, MOTIVO_CAMBIADA, MOTIVO_NUEVA)
+_PRIORIDAD = {motivo: n for n, motivo in enumerate(ORDEN_DE_MOTIVOS)}
 
 #: Posicion (base 0) de cada campo dentro de un registro del `des` (R13).
 POSICIONES = {
