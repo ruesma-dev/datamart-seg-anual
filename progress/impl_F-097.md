@@ -209,3 +209,6 @@ UNA versión aborta la ingesta en vez de registrarse y seguir, como R9) NO se
 arregla aquí: **candidato a ficha menor** (hipotético: un `ide` que cambie de
 versión chocaría con la PK de `_des_texto`). Los hallazgos 4-6 son INFO; el 6
 es el cambio 3.
+
+`bash harness/init.sh` tras la review 1 (sobre `e366d05`): **ENTORNO LISTO, exit 0**;
+5.928 passed, 219 skipped, 0 failed (11 min 39 s); cobertura 99,6 % (516/518).
