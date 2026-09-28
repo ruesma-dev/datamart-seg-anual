@@ -168,10 +168,12 @@ def test_f097_r5_una_version_repetida_en_la_huella_no_se_planifica() -> None:
 
 def test_f097_r5_las_dataclasses_son_inmutables() -> None:
     v = _vs(1, 0)
-    for objeto in (v, _vc(v), Relectura(version=v, motivo=MOTIVO_NUEVA),
-                   PlanRelectura(releer=(), aplazadas=(), borrar=())):
+    casos = [(v, "obra_id"), (_vc(v), "huella"), (Relectura(version=v, motivo=MOTIVO_NUEVA), "motivo"),
+             (PlanRelectura(releer=(), aplazadas=(), borrar=()), "borrar"),
+             (VersionPendiente(obra_id=1, fase_num=0, bytes=1, es_vigente=False), "bytes")]
+    for objeto, campo in casos:
         with pytest.raises(dataclasses.FrozenInstanceError):
-            objeto.obra_id = 3  # type: ignore[attr-defined, misc]
+            setattr(objeto, campo, 3)
         assert not hasattr(objeto, "__dict__")
 
 
@@ -404,7 +406,9 @@ def test_f097_r13_un_pipe_de_mas_desplaza_y_se_ve() -> None:
     (r,) = trocear_des(_des(desplazado))
     assert r.rendimiento is None and r.importe_unitario is None
     assert r.tipo_elemento == TIPO_SIN_TIPO and r.naturaleza == "8"
-    (s,) = trocear_des(_des("~D|X|DESC|1||UD||||||||||1||ZZ||"))
+    campos = ["~D", "X", "DESC", "1", "", "UD"] + [""] * 8 + ["1", "", "ZZ", "", ""]
+    assert campos[16] == "ZZ"
+    (s,) = trocear_des(_des("|".join(campos)))
     assert s.tipo_elemento == TIPO_DESCONOCIDO, "un tipo que no es de la lista se ve"
 
 
