@@ -921,7 +921,7 @@ def test_f057_r25_run_all_declara_sus_build() -> None:
     """PROPAGACION 5/12. El docstring que contaba cuatro.
 
     Un comentario falso es peor que ninguno: quien lea `run-all` tiene que ver
-    los build de negocio, y que `personal` es uno de ellos. Son SEIS desde
+    los build de negocio, y que `personal` es uno de ellos. Eran SEIS desde
     F-056, que anadio `contabilidad`.
     """
     import main
@@ -930,7 +930,9 @@ def test_f057_r25_run_all_declara_sus_build() -> None:
 
     assert "cuatro build" not in documentacion
     assert "cinco build" not in documentacion
-    assert "seis build" in documentacion
+    assert "seis build" not in documentacion
+    # Siete desde F-097, que anadio `descompuestos`.
+    assert "siete build" in documentacion
     assert "personal" in documentacion
 
 
@@ -1010,8 +1012,9 @@ def test_f057_r25_personal_en_esquemas_del_datamart() -> None:
     from etl_sigrid.domain.diccionario import ESQUEMAS_DEL_DATAMART
 
     assert "personal" in ESQUEMAS_DEL_DATAMART
-    # Once desde F-056, que anadio `contabilidad`.
-    assert len(ESQUEMAS_DEL_DATAMART) == 11
+    # Once desde F-056, que anadio `contabilidad`; doce desde F-097
+    # (`descompuestos`).
+    assert len(ESQUEMAS_DEL_DATAMART) == 12
 
 
 def test_f057_r25_el_fichero_de_provision_trae_los_diez_esquemas() -> None:

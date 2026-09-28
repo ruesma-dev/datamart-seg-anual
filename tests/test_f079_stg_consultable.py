@@ -73,6 +73,11 @@ GRUPO_B_FUNCIONES = (
     # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
     # `contabilidad`, por lo mismo que la de `personal`.
     "contabilidad.fn_fecha",
+    # F-097 (2026-09-28): las tres funciones locales del build de
+    # `descompuestos`: el troceado del texto y las dos conversiones.
+    "descompuestos.fn_fecha",
+    "descompuestos.fn_num",
+    "descompuestos.fn_trocear",
     "maestro.fn_fecha",
     # F-057 (2026-09-18): la copia local de la conversion de fecha del esquema
     # `personal`. Entra por lo mismo que las demas, y la copia es deliberada:
@@ -109,6 +114,14 @@ GRUPO_D_F095 = {
     "retenciones.cuentas_proveedor": "no trae importes",
     "retenciones.apuntes_contables": "sumar sin filtrar la clase multiplica el saldo",
     "retenciones.fin_obra": "la pregunta la responde v_retencion_contable_obra",
+}
+
+#: GRUPO E · el ESTADO del incremental de F-097, fuera de la superficie por
+#: diseno: es el texto crudo de Sigrid y su control, y la pregunta se responde
+#: desde `descompuestos.lineas`. Cada una con el HECHO que lo justifica.
+GRUPO_E_F097 = {
+    "descompuestos._des_texto": "el texto crudo sin trocear",
+    "descompuestos._versiones_cargadas": "el control del incremental",
 }
 
 
@@ -388,7 +401,9 @@ def test_f079_r3_el_inventario_de_lo_que_no_se_toca_esta_completo() -> None:
         if not f.consumo_recomendado and f.esquema != "raw"
     }
 
-    inventario = set(GRUPO_B_FUNCIONES) | set(GRUPO_C) | set(GRUPO_D_F095)
+    inventario = (
+        set(GRUPO_B_FUNCIONES) | set(GRUPO_C) | set(GRUPO_D_F095) | set(GRUPO_E_F097)
+    )
     assert fuera == inventario, (
         f"sin inventariar: {sorted(fuera - inventario)}; "
         f"inventariado y ya no está: "

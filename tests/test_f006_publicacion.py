@@ -667,6 +667,9 @@ def test_f006_r20_pipeline_publicar_va_entre_build_mart_y_apply_grants() -> None
         "build_retenciones",
         "build_personal",
         "build_contabilidad",
+        # F-097: el septimo build, con su ingesta delante.
+        "ingest_descompuestos",
+        "build_descompuestos",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",
@@ -963,7 +966,8 @@ def test_f006_da1_los_builds_manuales_no_republican_el_diccionario() -> None:
     fuente = Path(main.__file__).read_text(encoding="utf-8")
 
     for comando in ("build-cierre", "build-compras", "build-maestros",
-                    "build-retenciones", "build-personal", "build-contabilidad"):
+                    "build-retenciones", "build-personal", "build-contabilidad",
+                    "build-descompuestos"):
         inicio = fuente.index(f'@cli.command("{comando}")')
         fin = fuente.index("@cli.command(", inicio + 10)
         assert "PublicarDiccionarioStep" not in fuente[inicio:fin], comando

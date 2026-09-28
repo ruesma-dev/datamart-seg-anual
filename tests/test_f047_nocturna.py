@@ -83,6 +83,10 @@ def test_f047_r1_la_composicion_nocturna_es_exactamente_esta() -> None:
         # puede fallar sin tumbar la noche. F-056 el sexto, igual.
         "build_personal",
         "build_contabilidad",
+        # F-097: el septimo, con su propia ingesta delante. Nadie depende de
+        # ninguno de los dos.
+        "ingest_descompuestos",
+        "build_descompuestos",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",
