@@ -216,3 +216,4 @@ es el cambio 3.
 ## Review 2 atendida (detalle en `progress/mutacion_F-097.md`)
 
 R2-1 `afc6448`: informe de mutación = campaña del reviewer en `6ca684d` (el código del alcance no cambia desde entonces), con S1 y S2 analizados; R2-2 `323b3e5` y R2-3 `a110ce7`: tests de S1 (lote justo) y S2 (`sin_tope=False` sin la opción, `CliRunner`), que PASAN contra el código (cubren mutantes, no bugs) y FALLAN con cada mutante aplicado a mano en una copia (`assert [True, True] == [False, True]`, `assert (((1, 0),), ((1, 1),)) == ...`); R2-4 `7e4f426` (commit vacío: la nota vive en el informe de R2-1): el equivalente de `_redondeo`. Tests de F-097: 189 passed.
+`init.sh` final (`ba9b533`): ENTORNO LISTO, exit 0, 5.931 passed, cobertura 99,6 %. Un primer intento dio `[KO]`: la ruta del scratchpad de la review traía el id de sesión (GUID para la puerta de F-003); redactado en `ba9b533`, pero sigue en el commit local `0f23dad` (sin push): el líder decide si reescribirlo.
