@@ -120,9 +120,9 @@ def sello_de_troceado(directorio: Path = DIRECTORIO_SQL) -> str:
 
 
 def _validar_sello_y_cod(sello: str, cod: str) -> None:
-    if not isinstance(sello, str) or not _SELLO.match(sello):
+    if not isinstance(sello, str) or not _SELLO.fullmatch(sello):
         raise ValueError(f"el sello de troceado tiene que ser 16 hex y es {sello!r}")
-    if not isinstance(cod, str) or not _COD.match(cod):
+    if not isinstance(cod, str) or not _COD.fullmatch(cod):
         raise ValueError(f"el cod de la vigente tiene que ser solo digitos y es {cod!r}")
 
 

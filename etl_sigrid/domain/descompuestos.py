@@ -95,7 +95,9 @@ TIPOS_PORCENTAJE = ("4", "13")
 #: Lo que es un numero en un campo del `des`. El MISMO patron que usa
 #: `descompuestos.fn_num` en el SQL (lo fija un test): lo que no casa es NULL.
 #: El exponente va acotado a tres cifras: `1e99999` no cabe en un NUMERIC y
-#: tumbaria el build en vez de salir NULL.
+#: tumbaria el build en vez de salir NULL. Se aplica con `fullmatch`: en Python
+#: `$` casa antes de un salto de linea final y en PostgreSQL no (review 1 de
+#: F-097).
 PATRON_NUMERO = r"^[-+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]{1,3})?$"
 _NUMERO = re.compile(PATRON_NUMERO)
 _ENLACE = re.compile(r"^[0-9]{1,18}$")
@@ -150,7 +152,7 @@ def numero(texto: str | None) -> Decimal | None:
     if texto is None:
         return None
     limpio = texto.strip(" ")
-    if not _NUMERO.match(limpio):
+    if not _NUMERO.fullmatch(limpio):
         return None
     try:
         return Decimal(limpio)
@@ -186,7 +188,7 @@ def _producto(a: Decimal | None, b: Decimal | None) -> Decimal | None:
 
 def _enlace(campos: Sequence[str]) -> int | None:
     crudo = campos[POSICIONES["dncpro_id"]] if len(campos) > POSICIONES["dncpro_id"] else ""
-    if not _ENLACE.match(crudo):
+    if not _ENLACE.fullmatch(crudo):
         return None
     return int(crudo) or None
 
@@ -242,7 +244,7 @@ def cod_version_vigente(business_rules: Mapping) -> str:
     cod = business_rules.get("sigrid", {}).get("campos_extendidos", {}).get(
         "cod_version_master_vigente"
     )
-    if not isinstance(cod, str) or not _COD_VIGENTE.match(cod):
+    if not isinstance(cod, str) or not _COD_VIGENTE.fullmatch(cod):
         raise ValueError(
             f"cod_version_master_vigente tiene que ser solo digitos y es {cod!r}"
         )
