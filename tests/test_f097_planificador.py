@@ -583,3 +583,10 @@ def test_f097_r17_cod_de_la_vigente_con_salto_de_linea_se_rechaza() -> None:
     reglas = {"sigrid": {"campos_extendidos": {"cod_version_master_vigente": "15\n"}}}
     with pytest.raises(ValueError, match="cod"):
         cod_version_vigente(reglas)
+
+
+def test_f097_r21_dos_pendientes_que_llenan_el_lote_justo_van_juntas() -> None:
+    """Review 2, superviviente S1 (`> limite` -> `>=`): un lote que llega
+    EXACTAMENTE a `mb_por_lote` no se parte en dos."""
+    plan = planificar_troceado([_vp(1, 0, 0.5), _vp(1, 1, 0.5)], presupuesto_mb=300, mb_por_lote=1)
+    assert plan.lotes == (((1, 0), (1, 1)),)
