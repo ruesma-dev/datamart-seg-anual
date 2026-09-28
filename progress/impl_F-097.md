@@ -166,8 +166,8 @@ base no cabía en sus 600 s con cuatro suites compitiendo; con 2, 439 s.
 | Tests ejecutados (T15, `bash harness/init.sh`) | **5.914 passed, 219 skipped, 0 failed** |
 | Tests de F-097 | **180 passed** en los cuatro `tests/test_f097_*.py` tras T16 (88 del dominio) |
 | Cobertura de las líneas cambiadas | **99,2 %** (510 de 514; `PUERTA COBERTURA` de `init.sh`, umbral 80 %) |
-| Mutantes | 175 generados, 20 evaluados, 16 muertos, 4 supervivientes (los 4, con test nuevo) |
-| Workers de la campaña | **2** (tiempo total 4.186,9 s; media 209,3 s × 2 = 418,6 s por mutante, frente a una línea base de 439 s) |
+| Mutantes | **Vigente (review 2, `6ca684d`)**: 178 generados, 20 evaluados, 18 muertos, 2 supervivientes con test nuevo. La de T16 (`c1bf0bf`, 16/20) caducó con la review 1 |
+| Workers de la campaña | **2** (vigente: 3.945,6 s; media 197,3 s × 2 = 394,6 s por mutante, línea base 448,4 s) |
 | Tiempo de la suite | 18 min 31 s con cobertura (1.111 s, `init.sh`) |
 | `bash harness/init.sh` final (T20, sobre `46a8762`) | **ENTORNO LISTO, exit 0**: 5.922 passed, 219 skipped, 0 failed en 16 min 0 s; cobertura **99,6 %** (512/514); tamaño impl 170/220 |
 
@@ -212,3 +212,7 @@ es el cambio 3.
 
 `bash harness/init.sh` tras la review 1 (sobre `e366d05`): **ENTORNO LISTO, exit 0**;
 5.928 passed, 219 skipped, 0 failed (11 min 39 s); cobertura 99,6 % (516/518).
+
+## Review 2 atendida (detalle en `progress/mutacion_F-097.md`)
+
+R2-1 `afc6448`: informe de mutación = campaña del reviewer en `6ca684d` (el código del alcance no cambia desde entonces), con S1 y S2 analizados; R2-2 `323b3e5` y R2-3 `a110ce7`: tests de S1 (lote justo) y S2 (`sin_tope=False` sin la opción, `CliRunner`), que PASAN contra el código (cubren mutantes, no bugs) y FALLAN con cada mutante aplicado a mano en una copia (`assert [True, True] == [False, True]`, `assert (((1, 0),), ((1, 1),)) == ...`); R2-4 `7e4f426` (commit vacío: la nota vive en el informe de R2-1): el equivalente de `_redondeo`. Tests de F-097: 189 passed.
