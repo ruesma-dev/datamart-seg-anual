@@ -5,8 +5,12 @@ Rama `feature/F-097-descompuestos-partidas`. Rigor `estandar`: fase RED
 obligatoria, cobertura >= 80 % de líneas cambiadas y campaña de mutación
 muestreada (20 mutantes, semilla fija). Un commit por tarea (`F-097 Tn: ...`), en
 español. D1-D11 aprobadas (D4 y D5 cambiadas) y D12-D15 en `progress/spec_F-097.md`:
-**no se empieza sin D12-D15 cerradas**, y el incremental (T4, T5, T7 y T9) **no se empieza
-sin T0 superada**.
+**no se empieza sin D12-D15 cerradas**. **Cambio de orden confirmado por el humano en la
+PARADA 1 (2026-09-28): T0 ya NO bloquea el código** —T4, T5, T7 y T9 se implementan ya,
+porque el diseño relee toda versión de huella distinta y T0 mide el coste nocturno, no la
+corrección—; **T0 bloquea la PUESTA EN PRODUCCIÓN**: ni primera carga (T17) ni imagen nueva
+del job (T19) hasta que T0 salga bien. Si T0 enseña versiones cerradas que cambian, se para
+y se vuelve al humano.
 
 - [ ] T0: BLOQUEANTE, solo lectura, un día laborable a partir del 2026-10-05 (ideal: tras los cierres de mitad de mes): segunda toma con `progress/mediciones/F-097_huella_master.sql` por `SigridApiClient.leer_sql` y comparación con `F-097_huella_master_2026-09-27.csv`, versión a versión; anotar cuántas cambian por grupo (anterior a la vigente y no última / vigente / posterior / nueva). Si cambia alguna del primer grupo: PARAR y volver al humano.  |  Verificación: MANUAL (humano o implementer) — tabla de resultados en `progress/impl_F-097.md`
 - [ ] T1: Comprobar que D12-D15 están decididas en `progress/current.md`; si alguna no sigue la recomendación, devolver la spec.  |  Verificación: anotación en `progress/impl_F-097.md`

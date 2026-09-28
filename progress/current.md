@@ -23,6 +23,13 @@
 > y se vuelve al humano. Motivo: el diseño relee toda versión de huella
 > distinta, así que T0 mide el coste nocturno, no la corrección.
 
+### Implementer (2026-09-28) · informe en `progress/impl_F-097.md`
+
+Rama `feature/F-097-descompuestos-partidas`. Alcance: T1-T16 y T20. T0, T17,
+T18 y T19 son MANUAL del humano (lista con su comando al final de esta sección
+cuando se cierre el trabajo). Tarea en curso y casillas: se actualizan aquí.
+
+- [x] T1 · D12-D15 decididas según la recomendación (nada que devolver).
 
 Spec-author en `feature/F-097-descompuestos-partidas`. Spec:
 `specs/F-097-descompuestos-partidas/`. Mediciones y decisiones:
