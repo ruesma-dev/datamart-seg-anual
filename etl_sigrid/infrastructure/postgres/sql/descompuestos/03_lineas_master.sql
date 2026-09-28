@@ -162,6 +162,10 @@ WHERE d.ambito_id = 8;
 
 -- El cuadre de cada partida HOJA con precio de las versiones del lote. Las
 -- filas con `obride = 0` quedan fuera (no son de ninguna obra).
+INSERT INTO descompuestos.cuadre_partida (
+    origen, obra_id, partida_id, ambito_id, fase_num, presupuesto_id,
+    precio_partida, suma_descompuesto, diferencia, num_lineas, estado
+)
 WITH h AS (
     SELECT
         pp.ide AS presupuesto_id,
@@ -182,10 +186,6 @@ s AS (
     JOIN _lote l ON l.obra_id = li.obra_id AND l.fase_num = li.fase_num
     WHERE li.ambito_id = 8
     GROUP BY li.obra_id, li.partida_id, li.fase_num
-)
-INSERT INTO descompuestos.cuadre_partida (
-    origen, obra_id, partida_id, ambito_id, fase_num, presupuesto_id,
-    precio_partida, suma_descompuesto, diferencia, num_lineas, estado
 )
 SELECT a.origen, h.obra_id, h.partida_id, 8, h.fase_num, h.presupuesto_id,
        h.precio_partida,
