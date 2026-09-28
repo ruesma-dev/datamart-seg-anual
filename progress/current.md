@@ -9,7 +9,7 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
-## 2026-09-27 · F-097 · EN CURSO (`in_progress`) · spec APROBADA · PARADA 1 pendiente · T0 a partir del 2026-10-05
+## 2026-09-28 · F-097 · EN REVISIÓN (`in_progress`) · implementada, review 1 atendida · T0 a partir del 2026-10-05 bloquea la puesta en producción
 
 > **Aprobada por el humano el 2026-09-27**: D12-D15 según la recomendación
 > («ok»). D14 fichada como **F-115**. Abiertas con Negocio, sin bloquear: D8

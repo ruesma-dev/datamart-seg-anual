@@ -95,8 +95,10 @@ hecho comando (solo lectura), para que el humano no tenga que componerlo.
 8. Tamaño de lote del build = 300 MB (`MB_POR_LOTE`, no fijado en el design): una
    noche normal es un lote; la primera carga, ~8. Un error de Sigrid al leer UNA
    versión se trata como R9 (se registra, se sigue, `FAILED` al final).
-9. `PATRON_NUMERO`/`fn_num` acotan el exponente a 3 cifras: `1e9999` no cabe en
-   `NUMERIC` y reventaría el build (R14 pide NULL).
+9. `PATRON_NUMERO`/`fn_num` acotan el exponente a 3 cifras (`1e9999` sería un
+   literal de 10.000 cifras). **Eso NO bastaba** (review 1): un número válido que
+   no cabe en las columnas `NUMERIC(18,2)` de los importes tumbaba el build; desde
+   R1-1 un importe con |x| >= 1e16 tras redondear sale NULL en SQL y en el espejo.
 10. `infra/sql/02_roles.sql` gana `descompuestos` en sus tres listas: lo exige el
     test cerrado de F-057 (reaprovisionamiento del servidor). No se ejecuta.
 11. Erratas de mis propios tests corregidas en su tarea (T4, T7, T10), dichas
@@ -177,3 +179,33 @@ producción), **T17** (primera carga), **T18** (C1-C4 y la noche siguiente) y
 **T19** (puertas, `apply-grants`, `publicar-diccionario` v37, imagen nueva y la
 lista blanca de `mcp-bbdd`). Abiertas con Negocio: D8 (tipos 3 y 11, publicados
 como PROVISIONALES) y D11 (el código D05DF210). Sin push en ningún repositorio.
+
+## Review 1 atendida (`progress/review_F-097.md`, CHANGES_REQUESTED)
+
+**Fase RED** de los tests nuevos, antes del arreglo (`python -m pytest tests/test_f097_planificador.py tests/test_f097_descompuestos.py -q -k "fuera_de_rango or limite_del_importe or r19_importes_y or r19_planif or salto_de_linea"`):
+
+```
+FAILED test_f097_r14_importe_fuera_de_rango_es_null_sin_excepcion[1e300]   E decimal.InvalidOperation
+FAILED test_f097_r14_importe_fuera_de_rango_es_null_sin_excepcion[12345678901234567]
+       E assert (Decimal('12345678901234567.00') is None)
+FAILED test_f097_r14_importe_fuera_de_rango_es_null_sin_excepcion[-99999999999999999]
+FAILED test_f097_r14_el_limite_del_importe_es_1e16_tras_redondear  E assert Decimal('10000000000000000.00') is None
+FAILED test_f097_r14_numero_seguido_de_salto_de_linea_es_null      E assert Decimal('12') is None
+FAILED test_f097_r17_cod_de_la_vigente_con_salto_de_linea_se_rechaza  E Failed: DID NOT RAISE ValueError
+FAILED test_f097_r19_importes_y_porcentajes / test_f097_r19_planif_jo_con_sus_importes (texto del SQL)
+8 failed, 1 passed
+```
+
+| Cambio | Commit | Qué | Verificación real |
+|---|---|---|---|
+| 1 · rango | `057b8d1` R1-1 | `01_troceado.sql`: `CASE WHEN abs(ROUND(x, 2)) < 1e16 THEN ROUND(x, 2)::NUMERIC(18,2) END` en los dos importes; el mismo patrón en PLANIF_JO (`02`, misma clase de fallo con los `float` de `dncpro`); espejo con `LIMITE_IMPORTE` y sin `InvalidOperation`. `00_setup.sql` no cambia: `fn_num` sigue devolviendo el número (el precio se publica); lo que no cabe es el importe | PostgreSQL 16 local desechable: `1e300`, 17 cifras, `-99999999999999999`, `1e999` y `.995` que redondea a 1e16 -> importes NULL; 16 cifras + 2 decimales -> caben; SQL y espejo iguales en los 11 casos límite |
+| 2 · `$` | `c2b1b53` R1-2 | `_NUMERO` y `_ENLACE` con `fullmatch`; también el cod de la vigente y el sello del build (misma trampa) | Los casos `12
+` y enlace `55
+`, iguales a SQL (NULL); 14 casos de la suite y 2.700 filas reales de Sigrid (solo lectura), 0 diferencias |
+| 3 · título | R1-3 | Sección F-097 de `current.md`: «EN REVISIÓN», no «PARADA 1 pendiente» | Lectura |
+
+Tests de F-097: **186 passed**. El hallazgo 3 (un error de Postgres al escribir
+UNA versión aborta la ingesta en vez de registrarse y seguir, como R9) NO se
+arregla aquí: **candidato a ficha menor** (hipotético: un `ide` que cambie de
+versión chocaría con la PK de `_des_texto`). Los hallazgos 4-6 son INFO; el 6
+es el cambio 3.
