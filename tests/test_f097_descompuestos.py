@@ -685,7 +685,8 @@ def test_f097_r25_comandos_en_la_lista_de_f024() -> None:
 def test_f097_r26_solo_raw() -> None:
     for nombre in FICHEROS:
         texto = _sql(nombre)
-        esquemas = set(re.findall(r"(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+(\w+)\.\w+", texto))
+        # `IS DISTINCT FROM a.col` no es una lectura: el lookbehind lo descarta
+        esquemas = set(re.findall(r"(?<!DISTINCT )(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+(\w+)\.\w+", texto))
         assert esquemas <= {"raw", "descompuestos"}, f"{nombre} usa {sorted(esquemas)}"
         for vetado in ("stg.", "mart.", "cierre.", "compras.", "maestro.", "contabilidad."):
             assert not re.search(rf"(?<![\w]){re.escape(vetado)}", texto), f"{nombre} nombra {vetado}"
