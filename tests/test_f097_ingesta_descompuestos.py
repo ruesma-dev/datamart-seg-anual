@@ -284,7 +284,7 @@ def test_f097_r4_una_sola_consulta_de_huella(monkeypatch: pytest.MonkeyPatch) ->
     _ejecutar(monkeypatch, api, pg, settings=_settings(page_size=4321))
     huellas = [c for c in api.llamadas if "CHECKSUM_AGG" in c[0]]
     assert len(huellas) == 1
-    sql, params, maximo = huellas[0]
+    _sql, params, maximo = huellas[0]
     assert params == ["15"], "el cod de la vigente viene de business_rules"
     assert maximo == 4321
     assert api.llamadas[0] is huellas[0], "la huella se pide la primera"

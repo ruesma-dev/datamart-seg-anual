@@ -47,3 +47,100 @@ test_f097_r29_obrparpre_no_declara_tiemod
 E   AssertionError: obrparpre no tiene tiemod en Sigrid (22 columnas, medido el 2026-09-27)
     assert 'tiemod' is None
 ```
+
+## T3-T14 · Qué se hizo (un commit por tarea: `git log --oneline main..HEAD`)
+
+| Tarea | Ficheros | Qué |
+|---|---|---|
+| T3 | `config/tables_sigrid.yaml` | `obrparpre`: `incremental_column: null` con lo medido (R29) |
+| T4 | `etl_sigrid/domain/descompuestos.py` | `planificar_relectura` (R5-R7), `planificar_troceado` (R21), `trocear_des` (espejo del SQL, R13/R14/R19), `cod_version_vigente` |
+| T5 | `postgres_client.py` | `reemplazar_filas` + `FilaControl`: `DELETE` + `COPY` + UPSERT/DELETE del control en UNA transacción (R8) |
+| T6 | `sql/descompuestos/00_setup.sql` | esquema, `_des_texto`, `_versiones_cargadas` (sin `DROP`), `fn_num`, `fn_fecha` |
+| T7 | `steps/ingest_descompuestos_step.py` | huella en una consulta, ámbito 3 entero, plan, versión a versión con recuento contra la huella (R2-R4, R8-R11) |
+| T8 | `01_troceado.sql`, `02_lineas_coste.sql` | `fn_trocear` (una definición); `lineas` y `cuadre_partida` (DDL); ESTUDIO y PLANIF_JO |
+| T9 | `03_lineas_master.sql` | lote por marcador, origen y flags, cuadre del lote, borrado de lo que ya no está, sincronización barata de flags, sello |
+| T10 | `04_elementos.sql`, `05_cuadre.sql`, `06_views.sql` | catálogo con producto (dos vías), cuadre del ámbito 3, tres vistas |
+| T11 | `steps/build_descompuestos_step.py`, `main.py` | paso por lotes; `ingest-descompuestos` y `build-descompuestos` con `--sin-tope`; los dos pasos tras `build_contabilidad` |
+| T12 | `settings.py`, `diccionario.py`, `.env.example`, `infra/sql/02_roles.sql`, 9 tests | `DescompuestosSettings` (300, > 0); doce esquemas; listas cerradas |
+| T13 | `config/diccionario/*`, design de F-006, `current.md` | 11 fichas, `R-DESCOMPUESTO-ORIGEN`, `R-FRESCURA` a siete, `R-SIGRID-CON` punto 3, version 37; 187 objetos / 1401 columnas / 85 de consumo |
+| T14 | `docs/ARCHITECTURE.md`, `CLAUDE.md`, `azure-apps` (85356e6) | pestañas, formato, incremental, primera carga, corrupción, `tiemod` |
+
+Además `progress/mediciones/F-097_comparar_huellas.py`: el procedimiento de T0
+hecho comando (solo lectura), para que el humano no tenga que componerlo.
+
+## Desviaciones respecto a la spec (justificadas; las juzga el reviewer)
+
+1. **La clave de `descompuestos.lineas` lleva `obra_id`** (R20 dice origen,
+   partida, ámbito, fase, orden). Medido en solo lectura el 2026-09-28: las 227
+   filas con `obride = 0` de la versión 26 del master repiten partida con OTRA
+   obra, las 227 (`SELECT ... WHERE p.obride = 0`: 227 filas, 227 choques). Con
+   la clave de la spec el build fallaría al cargarlas; la spec pide conservarlas
+   en el troceado. `cuadre_partida` mantiene la clave de la spec (deja fuera
+   `obride = 0`, como pide).
+2. **`_versiones_cargadas` gana `atributos_troceado`** (md5 del origen y los
+   flags que llevan sus líneas). Es lo que hace «barato» el UPDATE de flags del
+   design: sin ella había que recorrer ~4,5 M líneas cada noche.
+3. **El cuadre del master lo escribe `03`**, en la misma transacción que las
+   líneas del lote (R8: «sus líneas y su cuadre»); `05` hace solo el ámbito 3.
+   El DDL de `cuadre_partida` va en `02` porque `03` lo escribe antes que `05`.
+4. `reemplazar_filas(schema, tabla, filtro, columnas, filas, control)`: la firma
+   del design no traía `columnas`, sin las que no hay `COPY`.
+5. La ingesta NO lee de Sigrid la primera ABC (design, paso 1): no la usa; el
+   origen lo decide el build desde `raw.obrfasamb` (R26). La vigente sí: la
+   necesita el plan (Sigrid) y los flags (`raw.conext`).
+6. Las tablas `_` llevan **ficha con `consumo_recomendado: false`**, no
+   pendiente: el trinquete de `pendientes` está en 0 y solo baja.
+7. `es_ultima` = la mayor versión del master de la obra entre `obrfasamb` y las
+   cargadas; `precio_partida` = `pre` redondeado a 2 (como lo muestra Sigrid).
+8. Tamaño de lote del build = 300 MB (`MB_POR_LOTE`, no fijado en el design): una
+   noche normal es un lote; la primera carga, ~8. Un error de Sigrid al leer UNA
+   versión se trata como R9 (se registra, se sigue, `FAILED` al final).
+9. `PATRON_NUMERO`/`fn_num` acotan el exponente a 3 cifras: `1e9999` no cabe en
+   `NUMERIC` y reventaría el build (R14 pide NULL).
+10. `infra/sql/02_roles.sql` gana `descompuestos` en sus tres listas: lo exige el
+    test cerrado de F-057 (reaprovisionamiento del servidor). No se ejecuta.
+11. Erratas de mis propios tests corregidas en su tarea (T4, T7, T10), dichas
+    en cada commit; ninguna cambia un requisito.
+
+## Riesgos que quedan a la vista
+
+- **Una sola versión que no cuadra salta el build esa noche** (R9 manda
+  `FAILED`; R25, `build_descompuestos` depende de la ingesta). Queda lo de la
+  noche anterior; `R-FRESCURA` lo avisa. Literal de la spec, no se ha tocado.
+- **Primera noche desplegada sin primera carga y con la ingesta `FAILED`**:
+  `check-declarados` sale 1 (las tablas del build no existen). T17 va antes.
+- El cuadre de cada lote hace una lectura secuencial de `raw.obrparpre`
+  (13,7 M filas, sin índice en `raw`): una por lote, ~1 por noche, ~8 en la
+  primera carga. **Sin medir contra Azure** (T17/T18).
+
+## Verificaciones hechas, con su resultado real (2026-09-28)
+
+Además de la suite offline (Evidencias), tres contrastes que un test sin base no
+puede dar. **Sigrid: solo `SELECT` por `leer_sql`. Escrituras: SOLO en un
+PostgreSQL 16 local desechable** (`initdb` en el scratchpad, puerto 55433),
+nunca en Azure: los scripts sustituyen `build_postgres_client` por un cliente
+cableado a `localhost`.
+
+1. **La consulta de huella del paso contra Sigrid**: 3.023 versiones, las 3.023
+   iguales a la toma del 2026-09-27, 0 nuevas, 0 desaparecidas, 26,8 s; 2.043,2
+   MiB de master. Lectura paginada de la 0726 v1: 1.305 filas = su huella.
+2. **Espejo Python ↔ SQL** (`trocear_des` frente a `fn_trocear`): 0 diferencias
+   en 2.700 filas reales de Sigrid (8.582 registros, 3.798 enlazados; ámbito 3 y
+   dos versiones de la 0695) y en los 14 casos sintéticos de la suite.
+3. **De extremo a extremo con los pasos reales**: `IngestDescompuestosStep`
+   (tope 25 MB) leyó de Sigrid el ámbito 3 entero, **42.958 filas** (la cifra de
+   la spec), y la vigente de una obra; aplazó 3.022 versiones (2.039,9 MB);
+   SUCCESS en 78,9 s. `BuildDescompuestosStep` sobre ese texto y un `raw` de
+   juguete: SUCCESS en 6,8 s; **ESTUDIO 97.915 líneas** (spec: ~98.000), **7.866
+   partidas sustituidas** (spec: 7.866), tipos idénticos a los de la spec (MANO_OBRA
+   29.339, MATERIAL 19.451, PORCENTAJE 4.007, OTROS 3.578, MAQUINARIA 3.400,
+   MEDIOS_AUXILIARES 1.322, SUBCONTRATA 373), 0 DESCONOCIDO, y la **419079: 10
+   líneas ESTUDIO que suman 134,35** (C1, parte ESTUDIO). El cuadre y PLANIF_JO
+   sobre el `raw` de juguete: los siete escenarios de la tabla de estados (CUADRA,
+   NO_CUADRA, SIN_DESCOMPUESTO, SUSTITUIDO, capítulo y precio 0 fuera).
+4. El `03` con lote vacío tras mover la vigente, meter una ABC en la v0 y borrar
+   una versión: flags y origen actualizados solo donde cambiaron, líneas y cuadre
+   de la borrada fuera. Todos los ficheros, dos veces seguidas: idempotentes.
+
+Lo que NO se ha podido verificar aquí: tiempos y espacio en Azure, el `raw` real
+en el build (PLANIF_JO, cuadre, flags) y la noche siguiente. Es T17-T18.

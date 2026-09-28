@@ -25,11 +25,67 @@
 
 ### Implementer (2026-09-28) · informe en `progress/impl_F-097.md`
 
-Rama `feature/F-097-descompuestos-partidas`. Alcance: T1-T16 y T20. T0, T17,
-T18 y T19 son MANUAL del humano (lista con su comando al final de esta sección
-cuando se cierre el trabajo). Tarea en curso y casillas: se actualizan aquí.
+Rama `feature/F-097-descompuestos-partidas`. Alcance: T1-T16 y T20, un commit
+por tarea. T0, T17, T18 y T19 son MANUAL del humano (abajo, con su comando).
 
 - [x] T1 · D12-D15 decididas según la recomendación (nada que devolver).
+- [x] T2 · fase RED (cuatro ficheros `tests/test_f097_*.py`, trazas en el informe).
+- [x] T3 · `obrparpre` con `incremental_column: null` (R29).
+- [x] T4 · dominio `etl_sigrid/domain/descompuestos.py` (planificadores y espejo del troceado).
+- [x] T5 · `PostgresClient.reemplazar_filas` y `FilaControl`.
+- [x] T6 · `00_setup.sql`.
+- [x] T7 · `IngestDescompuestosStep`.
+- [x] T8 · `01_troceado.sql` y `02_lineas_coste.sql`.
+- [x] T9 · `03_lineas_master.sql`.
+- [x] T10 · `04_elementos.sql`, `05_cuadre.sql`, `06_views.sql`.
+- [x] T11 · `BuildDescompuestosStep`, comandos y pipeline.
+- [x] T12 · settings, esquemas, `.env.example` y listas cerradas de otros tests.
+- [x] T13 · diccionario (version 37, `R-DESCOMPUESTO-ORIGEN`).
+- [x] T14 · `ARCHITECTURE.md`, `CLAUDE.md` y `azure-apps` (commit local 85356e6, sin push).
+- [x] T15 · fase VERDE: 5.914 passed, cobertura 99,2 % de 514 líneas cambiadas.
+- [ ] T16 · campaña de mutación muestreada.
+- [ ] T20 · `bash harness/init.sh` en verde.
+
+Desviaciones menores y justificadas: en `progress/impl_F-097.md` (las juzga el
+reviewer). La más visible: la clave de `descompuestos.lineas` lleva `obra_id`
+(227 filas con `obride = 0` repiten partida con otra obra; medido).
+
+#### Verificaciones MANUAL (humano), EN ORDEN. T0 bloquea la puesta en producción
+
+1. **T0 · segunda toma de huellas** (solo lectura; un día laborable desde el
+   2026-10-05, mejor tras los cierres de mitad de mes):
+   `python progress/mediciones/F-097_comparar_huellas.py`
+   -> imprime, por grupo (1 anterior a la vigente y no última / 2 vigente / 3
+   posterior / 4 nueva / 5 obra sin vigente), cuántas versiones hay y cuántas
+   cambian respecto a la toma del 2026-09-27. **Si el grupo 1 tiene alguna que
+   cambia, el script dice PARAR: volver al humano** antes de T17. Anotar la
+   tabla en `progress/impl_F-097.md`. (Informativo, no es T0: el 2026-09-28 la
+   consulta del paso devolvió las 3.023 versiones iguales a la toma 1.)
+2. **T17 · primera carga, fuera de la nocturna y del horario de oficina**
+   (escritura contra Azure; mirar antes los créditos de CPU):
+   `SELECT pg_size_pretty(pg_database_size(current_database()));` (antes), luego
+   `python main.py ingest-descompuestos --sin-tope` -> `SUCCESS`, metadata con
+   `versiones_releidas` ~3.023 y `versiones_fallidas` vacía (estimado 1,5-2 h);
+   `python main.py build-descompuestos --sin-tope` -> `SUCCESS` (20-40 min sin
+   medir); `python main.py timings --last 5`;
+   `SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class WHERE relnamespace = 'descompuestos'::regnamespace AND relkind = 'r';`
+   -> 2,5-4,2 GB en total; y el tamaño de la base, después.
+3. **T18 · casos testigo y la noche siguiente**: C1-C4 de `progress/spec_F-097.md`
+   (C1 `partida_id` 419079 -> ESTUDIO 10 / 134,35 y las mismas 10 en
+   MASTER_INICIAL y MASTER_PRE_ABC; C2 377070 PLANIF_JO CUADRA 177,95 y ESTUDIO
+   SUSTITUIDO_POR_PLANIFICACION; C3 ESTUDIO ~98.000, PLANIF_JO ~287.000; C4
+   3.023 versiones y 1.616.461 filas). La noche siguiente:
+   `python main.py timings --last 20` -> minutos de `ingest_descompuestos`
+   (estimado 4-6) y `build_descompuestos`, y el `metadata` de la fila de
+   `_meta.etl_runs` (releídas por motivo, aplazadas, MB).
+4. **T19 · puertas, permisos, diccionario e imagen** (escrituras contra Azure):
+   `python main.py check-declarados` (sale 0); `python main.py check-unicidad`
+   (las claves de `descompuestos` sin contradicción); `python main.py
+   check-relaciones`; `python main.py check-diccionario` (biyección exacta);
+   `python main.py apply-grants` (la lista incluye `descompuestos`);
+   `python main.py publicar-diccionario` (version 37); imagen nueva del job
+   (tag fechado) para que `run-all` lleve los dos pasos; y en `mcp-bbdd`,
+   `descompuestos` en `seguridad.esquemas_permitidos` de su `config/config.yaml`.
 
 **Diccionario del árbol tras F-097 (version 37): 187 objetos, 1401 columnas,
 85 de consumo** (once objetos nuevos en `descompuestos`: seis de consumo, las
