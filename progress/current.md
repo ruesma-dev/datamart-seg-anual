@@ -15,6 +15,13 @@
 > («ok»). D14 fichada como **F-115**. Abiertas con Negocio, sin bloquear: D8
 > (tipos 3 y 11) y D11 (D05DF210). El líder enseña la propuesta de
 > implementación (PARADA 1) antes de lanzar el implementer.
+>
+> **PARADA 1 confirmada por el humano el 2026-09-28**, con un cambio de orden:
+> **T0 ya NO bloquea el código** (T4, T5, T7 y T9 se implementan ya); bloquea la
+> PUESTA EN PRODUCCIÓN: ni primera carga (T17) ni imagen nueva del job (T19)
+> hasta que T0 salga bien. Si T0 enseña versiones cerradas que cambian, se para
+> y se vuelve al humano. Motivo: el diseño relee toda versión de huella
+> distinta, así que T0 mide el coste nocturno, no la corrección.
 
 
 Spec-author en `feature/F-097-descompuestos-partidas`. Spec:
