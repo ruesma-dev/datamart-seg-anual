@@ -31,6 +31,11 @@ cuando se cierre el trabajo). Tarea en curso y casillas: se actualizan aquí.
 
 - [x] T1 · D12-D15 decididas según la recomendación (nada que devolver).
 
+**Diccionario del árbol tras F-097 (version 37): 187 objetos, 1401 columnas,
+85 de consumo** (once objetos nuevos en `descompuestos`: seis de consumo, las
+dos tablas de estado y tres funciones). Sin publicar: `publicar-diccionario` es
+escritura contra Azure y la lanza el humano (T19).
+
 Spec-author en `feature/F-097-descompuestos-partidas`. Spec:
 `specs/F-097-descompuestos-partidas/`. Mediciones y decisiones:
 `progress/spec_F-097.md` (sección «DECISIONES DEL HUMANO (2026-09-27)» y

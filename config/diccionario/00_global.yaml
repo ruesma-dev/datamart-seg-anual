@@ -3,7 +3,7 @@
 # El bloque global del diccionario semantico del datamart (F-006).
 #
 # Esto es lo que el agente lee ANTES de escribir una linea de SQL. Aqui van las
-# convenciones, los once esquemas, las reglas duras que impiden respuestas
+# convenciones, los doce esquemas, las reglas duras que impiden respuestas
 # plausibles y falsas, los ordenes de magnitud contra los que detectar un
 # disparate, la bateria de aceptacion y la lista de lo que todavia no esta
 # documentado.
@@ -11,6 +11,20 @@
 # `pendientes` es un TRINQUETE (R27): solo baja. La constante PENDIENTES_MAX de
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
+#
+# version 37 (F-097, 2026-09-28): LOS DESCOMPUESTOS DE LAS PARTIDAS. Entra el
+# esquema `descompuestos` --el duodecimo--, con DOS pasos de la nocturna:
+# `ingest_descompuestos` trae de Sigrid el texto `obrparpre.des` de forma
+# INCREMENTAL por version del master (estado en `descompuestos._des_texto` y
+# `_versiones_cargadas`, que `--full` no trunca) y `build_descompuestos` lo
+# trocea: `descompuestos.lineas` (una fila por linea, con ORIGEN: ESTUDIO,
+# PLANIF_JO, MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO),
+# `descompuestos.cuadre_partida` (descompuesto frente al precio de la partida),
+# `descompuestos.elementos` (catalogo por obra con su producto) y tres vistas
+# `v_pbi_*` con el origen cableado. Regla dura nueva `R-DESCOMPUESTO-ORIGEN`:
+# nunca se mezclan origenes y el master se filtra por version. `R-FRESCURA`
+# alcanza al esquema nuevo. El master sale INCOMPLETO hasta la primera carga
+# (MANUAL); los tipos 3 y 11 son PROVISIONALES (D8).
 #
 # version 36 (F-056, 2026-09-26): EL MAYOR Y EL PLAN DE CUENTAS. Entra el
 # esquema `contabilidad` --el undecimo--, construido por `build_contabilidad`
@@ -394,7 +408,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 36
+version: 37
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -414,28 +428,30 @@ titulo: Datamart de seguimiento anual de obra
 reglas:
 
   - codigo: R-FRESCURA
-    titulo: Seis esquemas pueden quedarse atras sin tumbar la noche
+    titulo: Siete esquemas pueden quedarse atras sin tumbar la noche
     severidad: bloqueante
-    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad]
+    ambito: [cierre, compras, maestro, retenciones, personal, contabilidad, descompuestos]
     regla: >-
-      Estos seis esquemas SI se construyen cada noche dentro de `run-all`, y
-      los seis registran paso, asi que su fecha de build siempre es
+      Estos siete esquemas SI se construyen cada noche dentro de `run-all`, y
+      los siete registran paso, asi que su fecha de build siempre es
       consultable. Lo que no cambia es que su paso NO es dependencia de ningun
       otro: si `build_cierre`, `build_compras`, `build_maestros`,
-      `build_retenciones`, `build_personal` o `build_contabilidad` falla, la
-      noche continua y termina, y ese esquema se queda con el dato de una noche
-      anterior mientras `raw`, `stg` y `mart` estan al dia. Toda respuesta que
-      salga de ellos DEBE citar su fecha de build: `SELECT * FROM
+      `build_retenciones`, `build_personal`, `build_contabilidad` o
+      `build_descompuestos` falla (o su ingesta `ingest_descompuestos`, que lo
+      salta), la noche continua y termina, y ese esquema se queda con el dato
+      de una noche anterior mientras `raw`, `stg` y `mart` estan al dia. Toda
+      respuesta que salga de ellos DEBE citar su fecha de build: `SELECT * FROM
       _meta.v_frescura WHERE paso = 'build_cierre'` (o `build_compras`,
       `build_maestros`, `build_retenciones`, `build_personal`,
-      `build_contabilidad`). Que el pipeline sea uno solo NO
-      significa que todo el datamart tenga la misma frescura.
+      `build_contabilidad`, `build_descompuestos`). Que el pipeline sea uno
+      solo NO significa que todo el datamart tenga la misma frescura.
     motivo: >-
       La composicion real esta en `main.build_pipeline_steps`, y sus pasos se
       llaman —con el mismo nombre que tienen en `_meta.v_frescura.paso`, que es
       donde se consulta su frescura— `ingest_raw`, `load_excel_aux`,
       `build_stg`, `build_mart`, `build_maestros`, `build_compras`,
       `build_retenciones`, `build_personal`, `build_contabilidad`,
+      `ingest_descompuestos`, `build_descompuestos`,
       `build_cierre`, `publicar_diccionario` y `apply_grants`. Hasta el 2026-08-28 cuatro de
       ellos se lanzaban A MANO y podian llevar semanas parados; peor aun, `mart`
       DESTRUIA cada noche `cierre.v_pbi_planif_vs_real` —cuelga de
@@ -443,8 +459,9 @@ reglas:
       CASCADE— y nadie la recreaba. `personal` (F-057, 2026-09-18) nacio ya
       dentro de la nocturna y con la misma propiedad, y esta vez a proposito:
       un fallo del SQL de personal no puede dejar al `mart` sin construir.
-      `contabilidad` (F-056, 2026-09-26), igual. Dar un dato de cualquiera de
-      los seis sin fecha es dar una respuesta vieja con aplomo.
+      `contabilidad` (F-056, 2026-09-26) y `descompuestos` (F-097,
+      2026-09-28), igual. Dar un dato de cualquiera de los siete sin fecha es
+      dar una respuesta vieja con aplomo.
 
   - codigo: R-IMPORTE-MES
     titulo: importe_mes no se suma entre meses; importe_origen ya es acumulado
@@ -590,6 +607,34 @@ reglas:
       regularizaciones vienen con 0), por eso la clase se publica ya resuelta
       en `clase_asiento`. Con la regla, la subcuenta 434 de la empresa 1 en 2026
       da 5.345.557,80, lo mismo que la pantalla de Sigrid.
+
+  - codigo: R-DESCOMPUESTO-ORIGEN
+    titulo: Los descompuestos no se mezclan entre origenes ni entre versiones
+    severidad: bloqueante
+    ambito:
+      - descompuestos.lineas
+      - descompuestos.cuadre_partida
+      - descompuestos.elementos
+      - descompuestos.v_pbi_master_planif_jo
+    regla: >-
+      Toda consulta sobre `descompuestos.lineas` o `descompuestos.cuadre_partida`
+      filtra o agrupa por `origen`: ESTUDIO (la referencia que vino de
+      Estudios), PLANIF_JO (la planificacion de compras del jefe de obra) y los
+      tres del master (MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO) son
+      cosas distintas, y sumarlos da un descompuesto que no existe. En el
+      master, ademas, hay una copia POR VERSION: se filtra por `fase_num` (una
+      version concreta) o por `es_vigente`; sin filtrar, cada linea cuenta
+      tantas veces como versiones tenga la obra. Para comparar Estudios con el
+      jefe de obra se ponen los dos origenes LADO A LADO por partida, nunca se
+      suman. Las vistas `v_pbi_*` ya llevan el origen cableado.
+    motivo: >-
+      Medido el 2026-09-27: la «Descomposicion» de COSTE se reescribe con la
+      planificacion (7.866 de 42.958 partidas son copia de su `dncpro`), el
+      master tiene 3.023 versiones con una copia del descompuesto cada una
+      (mediana 14 por obra, hasta 46) y la misma partida vale distinto en cada
+      origen: la 03.05.02 de la 0695 son 112,55 en la version 1 del master,
+      118,61 en la ABC y 177,95 en la planificacion. Sumar origenes o versiones
+      da una cifra plausible y falsa.
 
   - codigo: R-PROVEEDOR-INTRAGRUPO
     titulo: El mayor proveedor de la empresa es la propia empresa
@@ -780,7 +825,7 @@ reglas:
       alta— **y es de donde el datamart los toma para esas diez**. Pero **no
       asumas que un campo esta en `con` solo porque exista alli**: hay tablas
       cuyos campos propios el ETL lee **sin pasar por `con`**, y estas son, con
-      el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
+      el campo exacto: `apu` (`apu.fec`, `apu.res`); `auxban` (`auxban.res`); `auxefp` (`auxefp.res`); `auxemp` (`auxemp.res`); `auxhor` (`auxhor.cod`, `auxhor.res`); `auxrestip` (`auxrestip.res`); `auxmun` (`auxmun.res`); `auxnap` (`auxnap.res`); `auxobramb` (`auxobramb.cod`, `auxobramb.res`); `auxobrcla` (`auxobrcla.res`); `auxobrtip` (`auxobrtip.res`); `auxpag` (`auxpag.cod`, `auxpag.res`); `auxpro` (`auxpro.res`); `auxpronat` (`auxpronat.cod`, `auxpronat.res`); `conest` (`conest.cod`, `conest.res`); `conext` (`conext.cod`); `ctrpro` (`ctrpro.res`); `dcapro` (`dcapro.res`); `dcfpro` (`dcfpro.res`); `dncpro` (`dncpro.fec`, `dncpro.res`); `obrfas` (`obrfas.res`); `obrfasamb` (`obrfasamb.fec`, `obrfasamb.res`); `hmores` (`hmores.fec`); `obrparpar` (`obrparpar.cod`, `obrparpar.res`); `prv` (`prv.cif`, `prv.raz`); `res` (`res.cif`). Ahi el valor bueno es el de la tabla, no el de
       `con`.
 
       **4. Y hay tablas que no cuelgan de `con` en absoluto**: `auxhor`, `auxobramb`, `hmores`, `obrfas`, `obrfasamb`, `obrparpre`, `reshor`
@@ -1268,6 +1313,25 @@ esquemas:
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_contabilidad]
+
+  descompuestos:
+    titulo: De que se compone cada partida, por origen
+    para_que_sirve: >-
+      Los descompuestos de las partidas --los elementos o precios simples que
+      las componen: hormigon, acero, mano de obra, medios auxiliares-- con su
+      ORIGEN separado: la referencia de Estudios (ESTUDIO), la planificacion de
+      compras del jefe de obra (PLANIF_JO, con proveedor y contrato) y cada
+      version del master (MASTER_INICIAL, MASTER_PRE_ABC y MASTER_PLANIF_JO,
+      desde la primera ABC). Responde "de que se compone la partida X",
+      "compara Estudios con la planificacion del jefe de obra" y "que partidas
+      no cuadran con su descompuesto" (`descompuestos.cuadre_partida`). TRAMPA
+      antes de consultarlo (`R-DESCOMPUESTO-ORIGEN`): los origenes no se suman
+      ni se mezclan, y el master tiene una copia por version que se filtra por
+      `fase_num` o `es_vigente`. El master esta INCOMPLETO hasta la primera
+      carga (MANUAL): `descompuestos._versiones_cargadas` dice que versiones hay.
+    consumo_recomendado: true
+    refresco: nocturno
+    pasos_etl: [ingest_descompuestos, build_descompuestos]
 
   maestro:
     titulo: Maestros y dimensiones de consulta directa

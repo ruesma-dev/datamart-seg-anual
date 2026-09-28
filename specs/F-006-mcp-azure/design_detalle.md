@@ -155,6 +155,16 @@ infraestructura.
 > `infra/README.md`. El inventario pasa a **176 objetos**, la cobertura de
 > columnas a **1248** y las fichas de consumo a **79** (la funcion no es de
 > consumo).
+>
+> **Enmienda del 2026-09-28 (F-097, los descompuestos de las partidas).** Entra
+> el **duodecimo esquema**, `descompuestos`, con once objetos: `lineas` --una
+> fila por linea de descompuesto con su ORIGEN (ESTUDIO, PLANIF_JO y los tres
+> del master)--, `cuadre_partida`, `elementos`, las tres vistas `v_pbi_*` con
+> el origen cableado, las dos tablas de ESTADO del incremental del master
+> (`_des_texto` y `_versiones_cargadas`, que `--full` no trunca, sin consumo
+> recomendado) y tres funciones locales (`fn_trocear`, `fn_num`, `fn_fecha`).
+> El inventario pasa a **187 objetos**, la cobertura de columnas a **1401** y
+> las fichas de consumo a **85** (ni las funciones ni el estado son de consumo).
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,
