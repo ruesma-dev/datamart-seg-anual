@@ -162,9 +162,18 @@ base no cabía en sus 600 s con cuatro suites compitiendo; con 2, 439 s.
 | Evidencia | Valor medido |
 |---|---|
 | Tests ejecutados (T15, `bash harness/init.sh`) | **5.914 passed, 219 skipped, 0 failed** |
-| Tests de F-097 | 177 en los cuatro `tests/test_f097_*.py` tras T16 (88 del dominio) |
+| Tests de F-097 | **180 passed** en los cuatro `tests/test_f097_*.py` tras T16 (88 del dominio) |
 | Cobertura de las líneas cambiadas | **99,2 %** (510 de 514; `PUERTA COBERTURA` de `init.sh`, umbral 80 %) |
 | Mutantes | 175 generados, 20 evaluados, 16 muertos, 4 supervivientes (los 4, con test nuevo) |
 | Workers de la campaña | **2** (tiempo total 4.186,9 s; media 209,3 s × 2 = 418,6 s por mutante, frente a una línea base de 439 s) |
 | Tiempo de la suite | 18 min 31 s con cobertura (1.111 s, `init.sh`) |
-| `bash harness/init.sh` final (T20) | ver la línea de abajo |
+| `bash harness/init.sh` final (T20, sobre `46a8762`) | **ENTORNO LISTO, exit 0**: 5.922 passed, 219 skipped, 0 failed en 16 min 0 s; cobertura **99,6 %** (512/514); tamaño impl 170/220 |
+
+## Qué queda fuera y qué falta para cerrar
+
+Fuera de esta sesión (MANUAL del humano, con su comando en `progress/current.md`):
+**T0** (segunda toma de huellas desde el 2026-10-05; bloquea la puesta en
+producción), **T17** (primera carga), **T18** (C1-C4 y la noche siguiente) y
+**T19** (puertas, `apply-grants`, `publicar-diccionario` v37, imagen nueva y la
+lista blanca de `mcp-bbdd`). Abiertas con Negocio: D8 (tipos 3 y 11, publicados
+como PROVISIONALES) y D11 (el código D05DF210). Sin push en ningún repositorio.

@@ -44,7 +44,7 @@ por tarea. T0, T17, T18 y T19 son MANUAL del humano (abajo, con su comando).
 - [x] T14 · `ARCHITECTURE.md`, `CLAUDE.md` y `azure-apps` (commit local 85356e6, sin push).
 - [x] T15 · fase VERDE: 5.914 passed, cobertura 99,2 % de 514 líneas cambiadas.
 - [x] T16 · mutación: 20 evaluados, 16 muertos, 4 supervivientes con test nuevo.
-- [ ] T20 · `bash harness/init.sh` en verde.
+- [x] T20 · `bash harness/init.sh` en verde (5.922 passed, cobertura 99,6 %).
 
 Desviaciones menores y justificadas: en `progress/impl_F-097.md` (las juzga el
 reviewer). La más visible: la clave de `descompuestos.lineas` lleva `obra_id`
