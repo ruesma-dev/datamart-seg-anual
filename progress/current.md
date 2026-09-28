@@ -43,7 +43,7 @@ por tarea. T0, T17, T18 y T19 son MANUAL del humano (abajo, con su comando).
 - [x] T13 · diccionario (version 37, `R-DESCOMPUESTO-ORIGEN`).
 - [x] T14 · `ARCHITECTURE.md`, `CLAUDE.md` y `azure-apps` (commit local 85356e6, sin push).
 - [x] T15 · fase VERDE: 5.914 passed, cobertura 99,2 % de 514 líneas cambiadas.
-- [ ] T16 · campaña de mutación muestreada.
+- [x] T16 · mutación: 20 evaluados, 16 muertos, 4 supervivientes con test nuevo.
 - [ ] T20 · `bash harness/init.sh` en verde.
 
 Desviaciones menores y justificadas: en `progress/impl_F-097.md` (las juzga el

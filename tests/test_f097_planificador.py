@@ -496,3 +496,45 @@ def test_f097_r17_cod_de_la_vigente_solo_digitos(cod: object) -> None:
     reglas = {"sigrid": {"campos_extendidos": {"cod_version_master_vigente": cod}}}
     with pytest.raises(ValueError, match="cod"):
         cod_version_vigente(reglas)
+
+
+# ===========================================================================
+# Los cuatro supervivientes de la campana de mutacion (progress/mutacion_F-097.md)
+# ===========================================================================
+
+
+@pytest.mark.parametrize("n_campos", [15, 16, 17, 18])
+def test_f097_r13_registro_cortado_justo_en_una_posicion(n_campos: int) -> None:
+    """Un registro con EXACTAMENTE tantos campos como la posicion que se pide
+    (17 campos: el 17 no existe) es NULL, no un `IndexError` que tumbe el build.
+    Mata `posicion >= len(campos)` -> `>`."""
+    campos = ["~D", "X", "DESC", "2", "", "UD"] + [""] * 8 + ["0.5", "", "8", "NAT"]
+    (r,) = trocear_des(_des("|".join(campos[:n_campos])))
+    assert r.codigo_elemento == "X"
+    assert r.naturaleza == ("NAT" if n_campos > 17 else None)
+    assert r.tipo_elemento_codigo == ("8" if n_campos > 16 else None)
+    assert r.rendimiento == (Decimal("0.5") if n_campos > 14 else None)
+
+
+@pytest.mark.parametrize(("n_campos", "enlace"), [(36, None), (37, 99)])
+def test_f097_r13_registro_de_36_campos_no_tiene_enlace(n_campos: int, enlace: int | None) -> None:
+    """36 campos (0..35): el 36 no existe y el registro no esta enlazado; con 37
+    si. Mata `len(campos) > 36` -> `>=`."""
+    campos = ["~D", "X"] + [""] * 34 + ["99"]
+    (r,) = trocear_des(_des("|".join(campos[:n_campos])))
+    assert r.dncpro_id == enlace
+
+
+def test_f097_r21_un_lote_de_menos_de_un_mb_vale() -> None:
+    """Mata `mb_por_lote <= 0` -> `<= 1`: medio MB es un lote legitimo."""
+    plan = planificar_troceado([_vp(1, 0, 0.3), _vp(1, 1, 0.3)], presupuesto_mb=300, mb_por_lote=0.5)
+    assert plan.lotes == (((1, 0),), ((1, 1),))
+
+
+def test_f097_r21_el_tope_del_troceado_se_valida_solo_con_tope() -> None:
+    """Mata `not sin_tope and presupuesto <= 0` -> `sin_tope and ...`: sin tope
+    el presupuesto no se mira; con tope, uno no positivo se rechaza."""
+    with pytest.raises(ValueError, match="presupuesto"):
+        planificar_troceado([_vp(1, 0, 1)], presupuesto_mb=0)
+    plan = planificar_troceado([_vp(1, 0, 1)], presupuesto_mb=0, sin_tope=True)
+    assert plan.lotes == (((1, 0),),)

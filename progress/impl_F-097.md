@@ -144,3 +144,27 @@ cableado a `localhost`.
 
 Lo que NO se ha podido verificar aquí: tiempos y espacio en Azure, el `raw` real
 en el build (PLANIF_JO, cuadre, flags) y la noche siguiente. Es T17-T18.
+
+## T16 · Campaña de mutación (`progress/mutacion_F-097.md`)
+
+`python -m harness.mutacion --feature F-097 --base main --workers 2`, sobre el
+SHA `c1bf0bf`: 175 mutantes generados en 1.321 líneas de producción, 20
+evaluados (muestreo del nivel `estandar`, semilla 20260820), **16 muertos y 4
+supervivientes**, 0 timeouts, 0 sin veredicto. Los cuatro eran huecos reales del
+dominio (registros cortados justo en una posición, uno de exactamente 36 campos,
+un lote de menos de 1 MB y el tope del troceado a 0): cuatro tests nuevos que,
+reproducidos sobre una copia aislada, matan cada mutación (análisis en el
+informe de mutación). Un primer intento con 4 workers se abortó solo: la línea
+base no cabía en sus 600 s con cuatro suites compitiendo; con 2, 439 s.
+
+## Evidencias
+
+| Evidencia | Valor medido |
+|---|---|
+| Tests ejecutados (T15, `bash harness/init.sh`) | **5.914 passed, 219 skipped, 0 failed** |
+| Tests de F-097 | 177 en los cuatro `tests/test_f097_*.py` tras T16 (88 del dominio) |
+| Cobertura de las líneas cambiadas | **99,2 %** (510 de 514; `PUERTA COBERTURA` de `init.sh`, umbral 80 %) |
+| Mutantes | 175 generados, 20 evaluados, 16 muertos, 4 supervivientes (los 4, con test nuevo) |
+| Workers de la campaña | **2** (tiempo total 4.186,9 s; media 209,3 s × 2 = 418,6 s por mutante, frente a una línea base de 439 s) |
+| Tiempo de la suite | 18 min 31 s con cobertura (1.111 s, `init.sh`) |
+| `bash harness/init.sh` final (T20) | ver la línea de abajo |
