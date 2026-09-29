@@ -279,3 +279,137 @@ $$;
 
 COMMENT ON FUNCTION stg.fn_master_fecha_efectiva(TEXT, TEXT, DATE) IS
 'Devuelve la fecha efectiva de una versión master. Igual a fec_creacion excepto cuando hay doble evidencia de que la cuatrimestral fue entregada tarde (mes de creación no oficial y texto que parsea un mes distinto).';
+
+-- ---------------------------------------------------------------------------
+-- fn_parse_mes_texto (F-118, F-051 absorbida)
+--
+-- El mes que nombra el TEXTO de una fase real (`stg.fases.nombre_mes`, que es
+-- `raw.obrfas.res`). Parte del parser de `cierre.fn_parse_mes_fase` con tres
+-- cambios, y NO lo sustituye: aquel decide también el mes de las versiones
+-- master de cierre, que F-118 no toca (R5).
+--
+--   1. Punto de millar en un año suelto: «Abril 2.013» → 2013 (R4).
+--   2. Letras y cifras pegadas se separan: «AGOSTO17» → «AGOSTO 17» (R4).
+--   3. Se recorren TODOS los tokens: cada nombre de mes sustituye al anterior
+--      y cada año también, así que un rango se lee por su ÚLTIMO mes (R3):
+--      «Enero 2020-Abril 2020» → 2020-04; «DICIEMBRE 09 A FEBRERO 2010» →
+--      2010-02; «SEPTIEMBRE-DICIEMBRE» → NULL (no hay año).
+--
+-- Reglas del año: cuatro cifras 2000-2099; dos cifras justo detrás de un
+-- nombre de mes («Mayo-17», «DICIEMBRE-13»); dos cifras 20-99 si aún no hay
+-- año (lo que ya hacía `cierre`). Un 1-12 sin mes todavía es el mes.
+--
+-- Es, token a token, el oráculo `etl_sigrid/domain/mes_fase.py`
+-- (`parse_mes_fase`): `tests/test_f118_sql.py` comprueba que los patrones y los
+-- prefijos son los mismos y `python main.py check-mes-fase` compara los dos
+-- lados contra todas las fases de la base.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION stg.fn_parse_mes_texto(texto TEXT)
+RETURNS DATE
+LANGUAGE plpgsql IMMUTABLE
+AS $$
+DECLARE
+    s        TEXT;
+    tok      TEXT;
+    mes_int  INT := NULL;
+    anio_int INT := NULL;
+    mes_tok  INT;
+    tras_mes BOOLEAN := FALSE;
+    tmp      INT;
+BEGIN
+    IF texto IS NULL THEN RETURN NULL; END IF;
+    -- Mayúsculas y sin tildes; las minúsculas acentuadas se traducen también
+    -- por si el servidor no las pasa a mayúsculas (locale C).
+    s := translate(UPPER(texto), 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNAEIOUUN');
+    s := regexp_replace(s, '(?<![0-9.])([0-9])\.([0-9]{3})(?![0-9])', '\1\2', 'g');
+    s := regexp_replace(s, '([A-Z])([0-9])', '\1 \2', 'g');
+    s := regexp_replace(s, '([0-9])([A-Z])', '\1 \2', 'g');
+    s := TRIM(regexp_replace(s, '[^A-Z0-9]+', ' ', 'g'));
+    IF s = '' THEN RETURN NULL; END IF;
+
+    FOREACH tok IN ARRAY string_to_array(s, ' ') LOOP
+        mes_tok := NULL;
+        IF tok = 'SEP' OR tok LIKE 'SEPT%' OR tok LIKE 'SET%' THEN
+            mes_tok := 9;
+        ELSE
+            CASE
+                WHEN tok LIKE 'ENE%' THEN mes_tok := 1;
+                WHEN tok LIKE 'FEB%' THEN mes_tok := 2;
+                WHEN tok LIKE 'MAR%' THEN mes_tok := 3;
+                WHEN tok LIKE 'ABR%' THEN mes_tok := 4;
+                WHEN tok LIKE 'MAY%' THEN mes_tok := 5;
+                WHEN tok LIKE 'JUN%' THEN mes_tok := 6;
+                WHEN tok LIKE 'JUL%' THEN mes_tok := 7;
+                WHEN tok LIKE 'AGO%' THEN mes_tok := 8;
+                WHEN tok LIKE 'OCT%' THEN mes_tok := 10;
+                WHEN tok LIKE 'NOV%' THEN mes_tok := 11;
+                WHEN tok LIKE 'DIC%' THEN mes_tok := 12;
+                ELSE NULL;
+            END CASE;
+        END IF;
+
+        IF mes_tok IS NOT NULL THEN
+            mes_int  := mes_tok;
+            tras_mes := TRUE;
+            CONTINUE;
+        END IF;
+
+        -- Más de cuatro cifras no es mes ni año (y no cabría en un INT).
+        IF tok ~ '^[0-9]+$' AND length(tok) <= 4 THEN
+            tmp := tok::INT;
+            IF length(tok) = 4 AND tmp BETWEEN 2000 AND 2099 THEN
+                anio_int := tmp;
+            ELSIF length(tok) = 2 AND tras_mes THEN
+                anio_int := 2000 + tmp;
+            ELSIF length(tok) = 2 AND tmp >= 20 AND anio_int IS NULL THEN
+                anio_int := 2000 + tmp;
+            ELSIF length(tok) <= 2 AND tmp BETWEEN 1 AND 12 AND mes_int IS NULL THEN
+                mes_int := tmp;
+            END IF;
+        END IF;
+        tras_mes := FALSE;
+    END LOOP;
+
+    IF mes_int IS NULL OR anio_int IS NULL THEN RETURN NULL; END IF;
+    RETURN make_date(anio_int, mes_int, 1);
+END;
+$$;
+
+COMMENT ON FUNCTION stg.fn_parse_mes_texto(TEXT) IS
+'F-118: primer día del mes que nombra el texto de una fase real (obrfas.res). Lee rangos por su último mes, años de dos cifras tras el mes y el punto de millar. NULL si no hay mes y año. No es el parser de las versiones master (cierre.fn_parse_mes_fase).';
+
+
+-- ---------------------------------------------------------------------------
+-- fn_mes_de_fase (F-118, F-051 absorbida)
+--
+-- El mes de una fase real, en cascada (decisión del humano del 2026-09-22):
+--   1. el mes del TEXTO, si se lee (R2: manda aunque discrepe de las fechas,
+--      también en fases de un solo mes y aunque caiga fuera de ellas);
+--   2. si no, el mes de la fecha FIN (D5: la fase termina donde termina);
+--   3. si no, el de la fecha de INICIO;
+--   4. si no, el `ano`/`mes` que archiva `raw.obrfas`.
+--
+-- Es la ÚNICA implementación de la regla: `cierre.fn_mes_de_fase` la envuelve
+-- y `stg.plan_mensual.anio_mes` la aplica una vez, así que `mart` y `cierre`
+-- leen el mes sin recalcularlo (R16).
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION stg.fn_mes_de_fase(
+    fecha_inicio  DATE,
+    nombre_mes    TEXT,
+    fecha_fin     DATE DEFAULT NULL,
+    mes_archivado DATE DEFAULT NULL
+) RETURNS DATE
+LANGUAGE plpgsql IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        stg.fn_parse_mes_texto(nombre_mes),
+        date_trunc('month', fecha_fin)::DATE,
+        date_trunc('month', fecha_inicio)::DATE,
+        date_trunc('month', mes_archivado)::DATE
+    );
+END;
+$$;
+
+COMMENT ON FUNCTION stg.fn_mes_de_fase(DATE, TEXT, DATE, DATE) IS
+'F-118: mes de una fase real. Manda el texto (stg.fn_parse_mes_texto); si no se lee, el mes de la fecha fin, luego el de la de inicio y por último el ano/mes archivado. Es el anio_mes de las filas reales de stg.plan_mensual.';
