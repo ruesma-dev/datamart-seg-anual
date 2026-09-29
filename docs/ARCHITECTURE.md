@@ -22,8 +22,8 @@ obras. Microservicio único; se despliega como job programado en Azure.
 
 `raw` → `stg` → `mart` (+ `cierre` para cierres mensuales y planif vs real).
 Módulos adicionales: `compras`, `maestro`, `retenciones`, `personal`,
-`contabilidad`, `auxiliar`. SQL numerado `NN_nombre.sql` y ejecutado en orden
-dentro de cada capa.
+`contabilidad`, `descompuestos`, `auxiliar`. SQL numerado `NN_nombre.sql` y
+ejecutado en orden dentro de cada capa.
 
 **`personal` (F-057, 2026-09-18) es el único esquema con datos personales**
 —nombre, NIF y DNI, publicados con autorización expresa del responsable del
@@ -47,6 +47,10 @@ una guarda que hace fallar el paso si el recuento no es el del origen) y
 mayor). El mayor se MATERIALIZA porque `raw.apu` no tiene índice por cuenta y se
 recrea cada noche: como vista, cualquier agregado de empresa o año pasaría de
 la ventana de 30 s del MCP.
+
+**`descompuestos` (F-097, 2026-09-28) es de qué se compone cada partida**, por
+ORIGEN, y es el primer esquema del datamart que NO se reconstruye de cero:
+ver «Los descompuestos: el primer esquema incremental», más abajo.
 
 ## Semántica Sigrid imprescindible (fuente de bugs si se ignora)
 
@@ -686,18 +690,92 @@ poder preguntarle a nadie si algo no encaja.
 Lo que este proyecto **expone al ecosistema** y quién lo consume está en
 `azure-apps/datamart_seg_anual.md`, y no se duplica aquí.
 
+### Los descompuestos: el primer esquema incremental (F-097)
+
+**Qué es cada pestaña de Sigrid, en el dato.** En la partida hay dos pestañas
+en COSTE (ámbito 3) y una en MASTER COSTE (ámbito 8):
+
+| Pestaña | Tabla de Sigrid | Origen publicado en `descompuestos.lineas` |
+|---|---|---|
+| COSTE «Descomposición» | `obrparpre.des`, ámbito 3 fase 0 | `ESTUDIO` (la referencia de Estudios) |
+| COSTE «Planificación compras» | `dncpro` de la necesidad de la obra (`obr.dncide`) | `PLANIF_JO` (la del jefe de obra) |
+| MASTER COSTE «Descomposición» | `obrparpre.des`, ámbito 8, una copia por versión | `MASTER_INICIAL` (v0), `MASTER_PRE_ABC`, `MASTER_PLANIF_JO` (desde la primera ABC) |
+
+No hay tabla de líneas de descompuesto: el de Estudios y el del master son
+TEXTO. **El formato del `des`**: registros que empiezan por `~D|`, separados
+por salto de línea, con campos separados por `|` (19 a 38 campos). Posiciones
+base 0: 1 código, 2 descripción, 3 precio, 4 cantidad total, 5 unidad, 7 código
+alternativo (= `dncpro.cod2`), 11 código de naturaleza, 14 rendimiento, 16 tipo,
+17 naturaleza, 36 enlace a `dncpro.ide`. El texto largo del campo 9 puede traer
+saltos de línea dentro, así que se parte por «salto seguido de `~<letra>|`» y
+nunca por cualquier salto. **La «Descomposición» de COSTE se reescribe con la
+planificación**: si un registro trae el campo 36, esa partida ya no es Estudios
+(7.866 de 42.958), no sale como `ESTUDIO` y el cuadre la marca
+`SUSTITUIDO_POR_PLANIFICACION`. El troceado es UNA función SQL
+(`descompuestos.fn_trocear`) con su espejo en Python
+(`domain/descompuestos.trocear_des`) para probarlo sin base; contrastados en
+2.700 filas reales de Sigrid el 2026-09-28, sin una diferencia.
+
+**Por qué no va en `tables_sigrid.yaml`.** El master son 3.023 versiones y
+2,14 GB de texto. La nocturna es `run-all --full`, que trunca `raw`: una entrada
+del YAML releería los 2,14 GB cada noche (65-94 min). Así que el texto vive en
+el propio esquema —`descompuestos._des_texto` y el control
+`descompuestos._versiones_cargadas`—, que nada trunca, y lo mantiene un paso
+propio, `ingest_descompuestos`, INCREMENTAL por versión:
+
+1. **La huella de todas las versiones en una consulta** (24-27 s): por
+   (obra, versión) filas, bytes y un `CHECKSUM_AGG` del texto (SQL Server 2012:
+   `HASHBYTES` solo admite 8.000 bytes, así que es el primer y el último tramo
+   más la longitud, `can` y `pre`).
+2. **El ámbito 3 entero** cada noche (21,5 MB), en una sustitución.
+3. **Releer**: las versiones no cargadas, **la vigente de cada obra siempre**
+   (la huella es ciega a un cambio en mitad de un `des` de más de 16.000
+   bytes) y las de huella distinta; **borrar** las que Sigrid ya no tiene.
+   Todo dentro de un tope de 300 MB por noche (`DESCOMPUESTOS_PRESUPUESTO_MB`),
+   del que el ámbito 3 consume primero; lo que no cabe, a la noche siguiente.
+4. **Cada versión en UNA transacción** (`PostgresClient.reemplazar_filas`:
+   `DELETE` + `COPY` + fila de control), leída por el índice `oaf` de Sigrid y
+   paginada de 1.000 en 1.000. Si el recuento no es el de su huella, no se
+   escribe —queda la copia anterior— y el paso termina `FAILED` al final, lo
+   que salta `build_descompuestos` esa noche.
+
+`build_descompuestos` trocea después solo las versiones cuyo **sello** (el hash
+de `01_troceado.sql` y `03_lineas_master.sql`) no es el vigente —las releídas
+esta noche, o todas si cambia el SQL—, por lotes de hasta 300 MB, cada lote una
+transacción con sus líneas y su cuadre. Los flags de versión (`es_vigente`,
+`es_ultima`, la primera ABC) cambian sin que cambie el texto: se actualizan
+solo en las versiones cuya huella de atributos no es la aplicada. ESTUDIO,
+PLANIF_JO, `descompuestos.elementos` y el cuadre del ámbito 3 se rehacen
+enteros cada noche.
+
+**La primera carga es MANUAL** (`python main.py ingest-descompuestos
+--sin-tope` y `build-descompuestos --sin-tope`, 1,5-2 h de lectura y un
+troceado de 20-40 min sin medir), fuera de la nocturna y mirando antes los
+créditos de CPU del servidor. Sin ella la nocturna converge sola a 300 MB por
+noche (unas 8 noches) y, mientras tanto, el master de `descompuestos.lineas`
+está INCOMPLETO. **Si el estado se corrompe**: vaciar
+`descompuestos._versiones_cargadas` y relanzar la primera carga. Espacio
+estimado: 2,5-4,2 GB (27 de 64 GB el 2026-09-26).
+
+**`obrparpre` no tiene `tiemod`**: 22 columnas en Sigrid, ninguna es `tiemod`
+(medido el 2026-09-27). La entrada del YAML lo declaraba y la ingesta lo
+degradaba a NULL en silencio; desde F-097 declara `incremental_column: null`.
+Otras 13 entradas tienen el mismo defecto (F-115).
+
 ### La nocturna construye TODO el datamart, y lo demuestra (F-047)
 
 Hasta el 2026-08-28 `run-all` construía `raw → stg → mart` y nada más.
 `cierre`, `compras`, `maestro` y `retenciones` se lanzaban a mano y podían
 estar desfasados semanas. F-057 añadió el quinto, `build_personal`, que nació
-ya dentro, y F-056 el sexto, `build_contabilidad`. Los doce pasos de hoy, en
-orden:
+ya dentro, F-056 el sexto, `build_contabilidad`, y F-097 el séptimo,
+`build_descompuestos`, con su propia ingesta `ingest_descompuestos` delante. Los
+catorce pasos de hoy, en orden:
 
 ```
 ingest_raw → load_excel_aux → build_stg → build_mart
            → build_maestros → build_compras → build_retenciones
-           → build_personal → build_contabilidad → build_cierre
+           → build_personal → build_contabilidad
+           → ingest_descompuestos → build_descompuestos → build_cierre
            → publicar_diccionario → apply_grants
 ```
 
@@ -708,13 +786,13 @@ ingest_raw → load_excel_aux → build_stg → build_mart
   nocturna la **destruía** cada noche y nadie la recreaba. Está declarado en
   `BuildCierreStep.depends_on`, no confiado al orden de la lista: un
   comentario se borra, el orden topológico obedece.
-- **`apply_grants` sigue siendo el último.** Los seis build recrean vistas
+- **`apply_grants` sigue siendo el último.** Los siete build recrean vistas
   con `DROP` + `CREATE` y un `DROP` se lleva los `GRANT`. Y **no** depende de
   ellos a propósito: si `build_cierre` falla una noche, los permisos del MCP
   se reaplican igual. El precio es que un esquema puede quedarse atrás sin
   tumbar la carga, y por eso la regla dura `R-FRESCURA` del diccionario manda
   citar la frescura DEL PASO, no la del pipeline.
-- **Los seis registran paso** en `_meta.etl_runs` con el `batch_id` de la
+- **Los siete registran paso** en `_meta.etl_runs` con el `batch_id` de la
   noche. `build-compras` y `build-retenciones` no lo hacían —ejecutaban SQL en
   línea, sin step—, así que su fecha de build no era consultable por SQL
   mientras el diccionario mandaba citarla.

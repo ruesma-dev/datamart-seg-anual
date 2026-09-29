@@ -73,9 +73,11 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
 
 - `main.py` — CLI (click). Comandos: check-api, check-pg, bootstrap, ingest,
   stage, build-mart, publicar-diccionario, run-all, status. `run-all` construye
-  el datamart ENTERO desde F-047: doce pasos, con los seis build de negocio
-  —maestros, compras, retenciones, personal, contabilidad y cierre— dentro y
-  en ese orden.
+  el datamart ENTERO desde F-047: catorce pasos, con los siete build de
+  negocio —maestros, compras, retenciones, personal, contabilidad,
+  descompuestos (con su ingesta `ingest_descompuestos` delante) y cierre—
+  dentro y en ese orden. `ingest-descompuestos` y `build-descompuestos` sueltos
+  llevan `--sin-tope` para la primera carga, que es MANUAL.
   `cierre` va después de `mart` porque `mart` destruye lo que `cierre`
   construye.
 - `config/` — `settings.py` (pydantic-settings sobre `.env`),
@@ -95,8 +97,12 @@ confirmación cubre el plan que se enseñó, no lo que apareció después.
   cada step hereda de `steps/base.py`).
 - `etl_sigrid/infrastructure/postgres/` — cliente + `sql/` por capa:
   `raw` (implícito en ingesta), `stg/`, `mart/`, `cierre/`, `compras/`,
-  `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `auxiliar/`.
-  **`contabilidad/` (F-056)** es el mayor y el plan de cuentas financiero: el
+  `maestro/`, `retenciones/`, `personal/`, `contabilidad/`, `auxiliar/`,
+  `descompuestos/`. **`descompuestos/` (F-097)** son de qué se compone cada
+  partida, con su ORIGEN (ESTUDIO, PLANIF_JO y cada versión del master), y es
+  el primer esquema INCREMENTAL: su texto lo trae `ingest_descompuestos` a
+  tablas propias que `--full` no trunca (nunca `DROP` ni `TRUNCATE` de
+  `_des_texto` ni `_versiones_cargadas`). **`contabilidad/` (F-056)** es el mayor y el plan de cuentas financiero: el
   saldo es `importe_saldo`, nunca `SUM(importe)` (los cierres y aperturas
   duplican). **`personal/` (F-057) es
   el único esquema con datos personales** —nombre, NIF y DNI, autorizados por el

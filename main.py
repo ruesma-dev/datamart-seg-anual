@@ -22,8 +22,9 @@ Operación del datamart en Azure (F-005, ver docs/runbook_postgres_azure.md):
                                         a mano solo hace falta tras lanzar
                                         build-cierre, build-compras,
                                         build-maestros, build-retenciones,
-                                        build-personal o build-contabilidad
-                                        sueltos: recrean tablas y vistas con
+                                        build-personal, build-contabilidad o
+                                        build-descompuestos sueltos: recrean
+                                        tablas y vistas con
                                         DROP + CREATE y un DROP se lleva los
                                         GRANT
     python main.py timings            - Tiempos por paso de _meta.etl_runs
@@ -98,6 +99,7 @@ from etl_sigrid.application.steps.apply_grants_step import ApplyGrantsStep
 from etl_sigrid.application.steps.build_cierre_step import BuildCierreStep
 from etl_sigrid.application.steps.build_compras_step import BuildComprasStep
 from etl_sigrid.application.steps.build_contabilidad_step import BuildContabilidadStep
+from etl_sigrid.application.steps.build_descompuestos_step import BuildDescompuestosStep
 from etl_sigrid.application.steps.build_maestros_step import BuildMaestrosStep
 from etl_sigrid.application.steps.build_mart_step import BuildMartStep
 from etl_sigrid.application.steps.build_personal_step import BuildPersonalStep
@@ -105,6 +107,9 @@ from etl_sigrid.application.steps.build_retenciones_step import BuildRetenciones
 from etl_sigrid.application.steps.build_stg_step import (
     BuildStgStep,
     sello_vigente_del_repositorio,
+)
+from etl_sigrid.application.steps.ingest_descompuestos_step import (
+    IngestDescompuestosStep,
 )
 from etl_sigrid.application.steps.ingest_raw_step import IngestRawStep
 from etl_sigrid.application.steps.load_excel_aux_step import LoadExcelAuxStep
@@ -502,10 +507,11 @@ def build_pipeline_steps(
     escape a propósito.
 
     F-047 (que absorbe F-044) metió aquí los CUATRO build que se lanzaban a
-    mano, F-057 añadió el quinto (`build_personal`) y F-056 el sexto
-    (`build_contabilidad`): seis build de negocio. El orden dentro de la lista
-    es legible, pero lo que lo GARANTIZA es el `depends_on` de cada paso, que
-    es lo que obedece el orden topológico.
+    mano, F-057 añadió el quinto (`build_personal`), F-056 el sexto
+    (`build_contabilidad`) y F-097 el séptimo (`build_descompuestos`, con su
+    propia ingesta `ingest_descompuestos` delante): siete build de negocio. El
+    orden dentro de la lista es legible, pero lo que lo GARANTIZA es el
+    `depends_on` de cada paso, que es lo que obedece el orden topológico.
     """
     pasos = [
         IngestRawStep(settings, full_refresh=full_refresh, batch_id=batch_id),
@@ -534,6 +540,14 @@ def build_pipeline_steps(
         # que su `depends_on` es `ingest_raw`; la posicion es legibilidad. Nadie
         # depende de el: si falla, la noche continua y termina.
         BuildContabilidadStep(settings),
+        # F-097: los descompuestos de las partidas, el SEPTIMO build de negocio,
+        # con su propia ingesta delante. `ingest_descompuestos` trae de Sigrid el
+        # texto `des` de forma INCREMENTAL por version, a tablas del esquema
+        # `descompuestos` que `--full` no trunca (D12): por eso no esta en
+        # `tables_sigrid.yaml`. `build_descompuestos` depende de las dos
+        # ingestas; nadie depende de el. Van aqui por legibilidad.
+        IngestDescompuestosStep(settings, batch_id=batch_id),
+        BuildDescompuestosStep(settings),
         BuildCierreStep(settings),
         # F-006: entre build_mart y apply_grants, y el orden NO es cosmético.
         # `apply_grants` concede SELECT ON ALL TABLES IN SCHEMA _meta, que es
@@ -572,17 +586,19 @@ def build_pipeline_steps(
 def run_all(full_refresh: bool, reconstruir_todo: bool) -> None:
     """
     Ejecuta el pipeline completo: ingest → load_aux → stage → build_mart →
-    los seis build (maestros, compras, retenciones, personal, contabilidad,
-    cierre) → publicar_diccionario → apply_grants.
+    los siete build (maestros, compras, retenciones, personal, contabilidad,
+    descompuestos —con su ingesta `ingest_descompuestos` delante— y cierre) →
+    publicar_diccionario → apply_grants.
 
     Cuatro de esos esquemas se construían antes a mano y entraron aquí con
     F-047: se quedaban desfasados semanas y, en el caso de `cierre`, la
     nocturna llegaba a DESTRUIR una de sus vistas sin recrearla. El quinto,
     `personal` —recursos, partes de trabajo y horas por obra—, nació ya dentro
-    de la nocturna con F-057, y el sexto, `contabilidad` —el plan de cuentas,
-    el mayor y los saldos por cuenta y mes—, con F-056.
+    de la nocturna con F-057, el sexto, `contabilidad` —el plan de cuentas,
+    el mayor y los saldos por cuenta y mes—, con F-056, y el séptimo,
+    `descompuestos` —de qué se compone cada partida, por origen—, con F-097.
 
-    Los seis comparten una propiedad que hay que conocer antes de leer un dato
+    Los siete comparten una propiedad que hay que conocer antes de leer un dato
     suyo: **ninguno es dependencia de ningún otro paso**, así que un fallo en
     cualquiera de ellos deja su esquema con el dato de una noche anterior
     mientras `raw`, `stg` y `mart` están al día, y la noche termina en verde.
@@ -784,9 +800,9 @@ def apply_grants() -> None:
 
     `run-all` ya lo ejecuta como último paso de la noche. A mano hace falta
     tras lanzar `build-cierre`, `build-compras`, `build-maestros`,
-    `build-retenciones`, `build-personal` o `build-contabilidad` SUELTOS: esos
-    comandos recrean tablas y vistas con DROP + CREATE y un DROP se lleva los
-    GRANT concedidos.
+    `build-retenciones`, `build-personal`, `build-contabilidad` o
+    `build-descompuestos` SUELTOS: esos comandos recrean tablas y vistas con
+    DROP + CREATE y un DROP se lleva los GRANT concedidos.
     """
     settings = get_settings()
     pg = _get_pg()
@@ -5111,6 +5127,70 @@ def build_contabilidad() -> None:
     pg = _get_pg()
     ejecucion = _arrancar_ejecucion(pg)
     _ejecutar_paso(BuildContabilidadStep(settings), pg, ejecucion)
+
+
+# =============================================================================
+# MÓDULO DESCOMPUESTOS (F-097): de qué se compone cada partida, por origen
+# =============================================================================
+@cli.command("ingest-descompuestos")
+@click.option(
+    "--sin-tope",
+    "sin_tope",
+    is_flag=True,
+    default=False,
+    help="Ignora DESCOMPUESTOS_PRESUPUESTO_MB y relee todo lo pendiente. Es la "
+         "PRIMERA CARGA (1,5-2 h, 2,14 GB de texto): MANUAL, fuera de la "
+         "nocturna y mirando antes los creditos de CPU del servidor (D15).",
+)
+def ingest_descompuestos(sin_tope: bool) -> None:
+    """
+    Trae de Sigrid el texto de los descompuestos (obrparpre.des) al esquema
+    descompuestos, de forma INCREMENTAL por version del master.
+
+    Cada vez: la huella de todas las versiones en una consulta, el ambito 3
+    entero, y las versiones nuevas, vigentes o de huella distinta hasta el tope
+    de MB (DESCOMPUESTOS_PRESUPUESTO_MB, 300). Lo que no cabe se deja para la
+    siguiente. Una version cuyo recuento no casa con su huella no se escribe y
+    el comando sale 1 al final. Solo lee de Sigrid (SELECT).
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(IngestDescompuestosStep(
+        settings, sin_tope=sin_tope, batch_id=ejecucion.batch_id
+    ), pg, ejecucion)
+
+
+@cli.command("build-descompuestos")
+@click.option(
+    "--sin-tope",
+    "sin_tope",
+    is_flag=True,
+    default=False,
+    help="Trocea todas las versiones pendientes sin mirar el tope de MB. Tras la "
+         "primera carga (20-40 min estimados, sin medir).",
+)
+def build_descompuestos(sin_tope: bool) -> None:
+    """
+    Construye el schema descompuestos desde descompuestos._des_texto y raw.*.
+
+    Ejecuta en orden los SQL de sql/descompuestos: setup, troceado, lineas de
+    coste (ESTUDIO y PLANIF_JO), lineas del master por lotes de versiones,
+    catalogo de elementos, cuadre y las tres vistas v_pbi_*. No publica el
+    diccionario: eso lo hace `run-all` o `publicar-diccionario`.
+
+    LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
+
+      * Nunca se suman origenes distintos (`R-DESCOMPUESTO-ORIGEN`): ESTUDIO
+        es la referencia de Estudios, PLANIF_JO la planificacion del jefe de
+        obra y MASTER_* cada version del master, que se filtra por fase_num.
+      * Sin la primera carga el master sale INCOMPLETO: la nocturna lo
+        completa sola a 300 MB por noche (unas 8 noches).
+    """
+    settings = get_settings()
+    pg = _get_pg()
+    ejecucion = _arrancar_ejecucion(pg)
+    _ejecutar_paso(BuildDescompuestosStep(settings, sin_tope=sin_tope), pg, ejecucion)
 
 
 @cli.command("inspect-retenciones")

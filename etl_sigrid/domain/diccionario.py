@@ -35,12 +35,13 @@ from dataclasses import dataclass, replace
 # Vocabularios cerrados
 # ---------------------------------------------------------------------------
 
-#: Los ONCE esquemas del datamart. Eran nueve hasta F-057 (2026-09-18), que
+#: Los DOCE esquemas del datamart. Eran nueve hasta F-057 (2026-09-18), que
 #: añadió `personal` —recursos, partes de trabajo y horas por obra— como
 #: esquema módulo propio para poder dar o quitar su acceso con un GRANT: es el
 #: único que contiene datos personales curados (nombre, NIF y DNI). F-056
 #: (2026-09-26) añadió el undécimo, `contabilidad`: el plan de cuentas como
-#: árbol, el mayor y los saldos por cuenta y mes.
+#: árbol, el mayor y los saldos por cuenta y mes. F-097 (2026-09-28) añadió
+#: el duodécimo, `descompuestos`: de qué se compone cada partida, por origen.
 #:
 #: Ojo a la trampa de nombres: el esquema se llama `aux` pero su carpeta de SQL
 #: es `sql/auxiliar/`.
@@ -54,6 +55,7 @@ ESQUEMAS_DEL_DATAMART = (
     "cierre",
     "compras",
     "contabilidad",
+    "descompuestos",
     "maestro",
     "mart",
     "personal",

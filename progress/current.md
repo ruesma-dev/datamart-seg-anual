@@ -51,6 +51,121 @@
 > excepciones declaradas, 56 combinaciones miradas, **56 cubiertas**, obras
 > invisibles: ninguna, filas huérfanas: ninguna. Falta el reviewer.
 
+## 2026-09-28 · F-097 · CERRADA (`done`, APROBADO en pasada 3) · los descompuestos de las partidas · SIN DESPLEGAR: T0 (desde el 2026-10-05) antes de T17 y T19
+
+> **Cerrada el 2026-09-28** con APROBADO del reviewer en la pasada 3
+> (`progress/review_F-097.md`); `init.sh` en verde (5.931 passed, cobertura
+> 99,6 %). Resumen en `progress/history.md`. QUEDAN las MANUAL del humano de
+> abajo, EN ORDEN: T0 bloquea la primera carga (T17) y la imagen (T19). Rama sin
+> integrar en `main`: el merge lo hace el humano. Candidata a ficha menor
+> (hallazgo 3 de la review 1): un error de Postgres al escribir UNA versión
+> aborta la ingesta entera en vez de registrarse y seguir.
+
+> **Aprobada por el humano el 2026-09-27**: D12-D15 según la recomendación
+> («ok»). D14 fichada como **F-115**. Abiertas con Negocio, sin bloquear: D8
+> (tipos 3 y 11) y D11 (D05DF210). El líder enseña la propuesta de
+> implementación (PARADA 1) antes de lanzar el implementer.
+>
+> **PARADA 1 confirmada por el humano el 2026-09-28**, con un cambio de orden:
+> **T0 ya NO bloquea el código** (T4, T5, T7 y T9 se implementan ya); bloquea la
+> PUESTA EN PRODUCCIÓN: ni primera carga (T17) ni imagen nueva del job (T19)
+> hasta que T0 salga bien. Si T0 enseña versiones cerradas que cambian, se para
+> y se vuelve al humano. Motivo: el diseño relee toda versión de huella
+> distinta, así que T0 mide el coste nocturno, no la corrección.
+
+### Implementer (2026-09-28) · informe en `progress/impl_F-097.md`
+
+Rama `feature/F-097-descompuestos-partidas`. Alcance: T1-T16 y T20, un commit
+por tarea. T0, T17, T18 y T19 son MANUAL del humano (abajo, con su comando).
+
+- [x] T1 · D12-D15 decididas según la recomendación (nada que devolver).
+- [x] T2 · fase RED (cuatro ficheros `tests/test_f097_*.py`, trazas en el informe).
+- [x] T3 · `obrparpre` con `incremental_column: null` (R29).
+- [x] T4 · dominio `etl_sigrid/domain/descompuestos.py` (planificadores y espejo del troceado).
+- [x] T5 · `PostgresClient.reemplazar_filas` y `FilaControl`.
+- [x] T6 · `00_setup.sql`.
+- [x] T7 · `IngestDescompuestosStep`.
+- [x] T8 · `01_troceado.sql` y `02_lineas_coste.sql`.
+- [x] T9 · `03_lineas_master.sql`.
+- [x] T10 · `04_elementos.sql`, `05_cuadre.sql`, `06_views.sql`.
+- [x] T11 · `BuildDescompuestosStep`, comandos y pipeline.
+- [x] T12 · settings, esquemas, `.env.example` y listas cerradas de otros tests.
+- [x] T13 · diccionario (version 37, `R-DESCOMPUESTO-ORIGEN`).
+- [x] T14 · `ARCHITECTURE.md`, `CLAUDE.md` y `azure-apps` (commit local 85356e6, sin push).
+- [x] T15 · fase VERDE: 5.914 passed, cobertura 99,2 % de 514 líneas cambiadas.
+- [x] T16 · mutación: 20 evaluados, 16 muertos, 4 supervivientes con test nuevo.
+- [x] T20 · `bash harness/init.sh` en verde (5.922 passed, cobertura 99,6 %).
+
+Desviaciones menores y justificadas: en `progress/impl_F-097.md` (las juzga el
+reviewer). La más visible: la clave de `descompuestos.lineas` lleva `obra_id`
+(227 filas con `obride = 0` repiten partida con otra obra; medido).
+
+#### Verificaciones MANUAL (humano), EN ORDEN. T0 bloquea la puesta en producción
+
+1. **T0 · segunda toma de huellas** (solo lectura; un día laborable desde el
+   2026-10-05, mejor tras los cierres de mitad de mes):
+   `python progress/mediciones/F-097_comparar_huellas.py`
+   -> imprime, por grupo (1 anterior a la vigente y no última / 2 vigente / 3
+   posterior / 4 nueva / 5 obra sin vigente), cuántas versiones hay y cuántas
+   cambian respecto a la toma del 2026-09-27. **Si el grupo 1 tiene alguna que
+   cambia, el script dice PARAR: volver al humano** antes de T17. Anotar la
+   tabla en `progress/impl_F-097.md`. (Informativo, no es T0: el 2026-09-28 la
+   consulta del paso devolvió las 3.023 versiones iguales a la toma 1.)
+2. **T17 · primera carga, fuera de la nocturna y del horario de oficina**
+   (escritura contra Azure; mirar antes los créditos de CPU):
+   `SELECT pg_size_pretty(pg_database_size(current_database()));` (antes), luego
+   `python main.py ingest-descompuestos --sin-tope` -> `SUCCESS`, metadata con
+   `versiones_releidas` ~3.023 y `versiones_fallidas` vacía (estimado 1,5-2 h);
+   `python main.py build-descompuestos --sin-tope` -> `SUCCESS` (20-40 min sin
+   medir); `python main.py timings --last 5`;
+   `SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class WHERE relnamespace = 'descompuestos'::regnamespace AND relkind = 'r';`
+   -> 2,5-4,2 GB en total; y el tamaño de la base, después.
+3. **T18 · casos testigo y la noche siguiente**: C1-C4 de `progress/spec_F-097.md`
+   (C1 `partida_id` 419079 -> ESTUDIO 10 / 134,35 y las mismas 10 en
+   MASTER_INICIAL y MASTER_PRE_ABC; C2 377070 PLANIF_JO CUADRA 177,95 y ESTUDIO
+   SUSTITUIDO_POR_PLANIFICACION; C3 ESTUDIO ~98.000, PLANIF_JO ~287.000; C4
+   3.023 versiones y 1.616.461 filas). La noche siguiente:
+   `python main.py timings --last 20` -> minutos de `ingest_descompuestos`
+   (estimado 4-6) y `build_descompuestos`, y el `metadata` de la fila de
+   `_meta.etl_runs` (releídas por motivo, aplazadas, MB).
+4. **T19 · puertas, permisos, diccionario e imagen** (escrituras contra Azure):
+   `python main.py check-declarados` (sale 0); `python main.py check-unicidad`
+   (las claves de `descompuestos` sin contradicción); `python main.py
+   check-relaciones`; `python main.py check-diccionario` (biyección exacta);
+   `python main.py apply-grants` (la lista incluye `descompuestos`);
+   `python main.py publicar-diccionario` (version 37); imagen nueva del job
+   (tag fechado) para que `run-all` lleve los dos pasos; y en `mcp-bbdd`,
+   `descompuestos` en `seguridad.esquemas_permitidos` de su `config/config.yaml`.
+
+**Diccionario del árbol tras F-097 (version 37): 187 objetos, 1401 columnas,
+85 de consumo** (once objetos nuevos en `descompuestos`: seis de consumo, las
+dos tablas de estado y tres funciones). Sin publicar: `publicar-diccionario` es
+escritura contra Azure y la lanza el humano (T19).
+
+Spec-author en `feature/F-097-descompuestos-partidas`. Spec:
+`specs/F-097-descompuestos-partidas/`. Mediciones y decisiones:
+`progress/spec_F-097.md` (sección «DECISIONES DEL HUMANO (2026-09-27)» y
+D12-D15 nuevas). Todo medido en solo lectura.
+
+- Aplicado lo decidido: D1-D3, D6, D8-D11 como se recomendó; **D5: no se parte,
+  el master ENTERO entra** (3.023 versiones, 2,14 GB); D4: todas las versiones,
+  con v0, primera ABC y vigente marcadas; el `tiemod` de `obrparpre` entra (R29).
+- **Diseño nuevo del master: incremental por versión** con un paso propio
+  `ingest_descompuestos` y estado en el esquema `descompuestos`, que `--full` no
+  trunca. Cada noche: huella de las 3.023 versiones (24 s), ámbito 3 entero, la
+  vigente de cada obra (105 MB), las nuevas y las de huella distinta → 4-6 min.
+  Primera carga MANUAL 1,5-2 h. Espacio 2,5-4,2 GB (disco al 47-49 %).
+- **D7 queda sustituida por D12** (paso propio en vez de segunda entrada del
+  YAML): ya no se toca la identidad de la ingesta ni la puerta de F-024.
+- **Inmutabilidad de las versiones cerradas: NO demostrada del todo.** Las
+  inserciones tardías en versiones cerradas (155 filas) nunca traen `des`; un
+  `UPDATE` en sitio no se ve sin `tiemod`. Primera toma de huellas guardada en
+  `progress/mediciones/`; **T0 (segunda toma en un día laborable desde el
+  2026-10-05) BLOQUEA el incremental**: si cambia una versión cerrada, se para.
+- Decisiones nuevas: **D12** vía de ingesta, **D13** origen `MASTER_PRE_ABC`
+  para las versiones entre la v0 y la ABC, **D14** las otras 13 tablas con
+  `tiemod` falso (ficha aparte), **D15** primera carga y tope nocturno de 300 MB.
+
 ## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · DESPLEGADA Y VERIFICADA · FALTA LA LISTA BLANCA DE `mcp-bbdd`
 
 > **2026-09-26 22:19-22:40 UTC** (autorizado por el humano: «la quiero en

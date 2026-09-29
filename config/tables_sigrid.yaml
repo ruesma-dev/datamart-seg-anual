@@ -65,7 +65,15 @@ tables:
   - source_table: obrparpre
     target_table: obrparpre
     id_column: ide
-    incremental_column: tiemod
+    # `obrparpre` NO TIENE `tiemod` (F-097, R29). MEDIDO contra
+    # INFORMATION_SCHEMA de Sigrid el 2026-09-27: 22 columnas y ninguna es
+    # `tiemod`. Hasta F-097 se declaraba aqui y la ingesta lo degradaba a `None`
+    # en silencio (`ingest_raw_step.py:279`, al elegir `tiemod_col`), asi que
+    # `raw.obrparpre._source_tiemod` quedaba a NULL: la declaracion no hacia
+    # nada salvo afirmar algo falso. Mismo arreglo que F-074 con `com`,
+    # `comlin` y `comprv`. Las otras 13 entradas con el mismo defecto son F-115.
+    # Hoy no rompe datos: la nocturna es `run-all --full` y trunca la tabla.
+    incremental_column: null
     where: null
     exclude_columns:
       - tex    # descripción larga

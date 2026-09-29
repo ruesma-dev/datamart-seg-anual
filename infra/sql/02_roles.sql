@@ -88,6 +88,8 @@ CREATE SCHEMA IF NOT EXISTS personal;
 -- F-056: el plan de cuentas, el mayor y los saldos por cuenta y mes. Esquema
 -- propio por lo mismo que `personal`: su acceso se da o se quita con un GRANT.
 CREATE SCHEMA IF NOT EXISTS contabilidad;
+-- F-097: los descompuestos de las partidas. Esquema propio por lo mismo.
+CREATE SCHEMA IF NOT EXISTS descompuestos;
 RESET ROLE;
 
 -- 5. Permisos de lectura del MCP.
@@ -123,7 +125,7 @@ DECLARE
 BEGIN
     FOREACH esquema IN ARRAY ARRAY[
         'mart', 'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-        'contabilidad', 'raw', 'stg', 'aux', '_meta'
+        'contabilidad', 'descompuestos', 'raw', 'stg', 'aux', '_meta'
     ]
     LOOP
         EXECUTE format('GRANT USAGE ON SCHEMA %I TO mcp_sigrid_dm_ro', esquema);
@@ -265,7 +267,7 @@ SELECT nspname AS esquema, pg_catalog.pg_get_userbyid(nspowner) AS propietario
 FROM pg_namespace
 WHERE nspname IN ('raw', 'stg', 'aux', 'mart', '_meta',
                   'cierre', 'compras', 'maestro', 'retenciones', 'personal',
-                  'contabilidad')
+                  'contabilidad', 'descompuestos')
 ORDER BY nspname;
 
 -- F-068: las tablas excluidas NO deben aparecer aquí. CERO filas es el

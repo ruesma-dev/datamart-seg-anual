@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -1798,6 +1799,64 @@ class PostgresClient:
 
         return rows_written
 
+    def reemplazar_filas(
+        self,
+        schema: str,
+        tabla: str,
+        filtro: Mapping[str, Any],
+        columnas: Sequence[str],
+        filas: Iterable[Mapping[str, Any]],
+        control: FilaControl | None = None,
+    ) -> int:
+        """Sustituye un trozo de una tabla en UNA sola transaccion (F-097, R8).
+
+        `DELETE` de las filas que casan con `filtro`, `COPY` de `filas` y, si se
+        da, la fila de `control` (un `UPSERT` por su clave, o su `DELETE` si
+        `control.valores` es `None`). Las tres cosas van por la MISMA conexion
+        y con un solo `commit`, que es lo que `copy_rows` no puede dar: abre una
+        conexion por llamada. Si algo falla, `connection()` hace `rollback` y
+        queda lo que habia: nunca dos copias ni media version.
+
+        Un `filtro` vacio se rechaza ANTES de abrir la conexion: seria un
+        `DELETE` sin `WHERE` sobre la tabla entera.
+
+        Devuelve el numero de filas copiadas.
+        """
+        if not filtro:
+            raise ValueError(
+                f"reemplazar_filas sobre {schema}.{tabla} sin filtro: seria un "
+                f"DELETE de la tabla entera"
+            )
+        if not columnas:
+            raise ValueError("Lista de columnas vacia")
+
+        borrado = sql.SQL("DELETE FROM {}.{} WHERE {}").format(
+            sql.Identifier(schema),
+            sql.Identifier(tabla),
+            _igualdades(filtro),
+        )
+        copia = sql.SQL(
+            "COPY {}.{} ({}) FROM STDIN WITH (FORMAT text, NULL '\\N')"
+        ).format(
+            sql.Identifier(schema),
+            sql.Identifier(tabla),
+            sql.SQL(", ").join(sql.Identifier(c) for c in columnas),
+        )
+
+        escritas = 0
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(borrado, list(filtro.values()))
+            with cur.copy(copia) as copy:
+                for fila in filas:
+                    copy.write(
+                        "\t".join(_pg_text_format(fila.get(c)) for c in columnas) + "\n"
+                    )
+                    escritas += 1
+            if control is not None:
+                sentencia, parametros = _sentencia_de_control(control)
+                cur.execute(sentencia, parametros)
+        return escritas
+
     # ---------------------------------------------------------------------
     # Tracking de runs (_meta.etl_runs)
     # ---------------------------------------------------------------------
@@ -2119,6 +2178,59 @@ class PostgresClient:
                 """,
                 (datetime.utcnow(), status, rows_processed, error_message, run_id),
             )
+
+
+# -------------------------------------------------------------------------
+# La fila de control de una sustitucion (F-097)
+# -------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FilaControl:
+    """La fila que acompana a una sustitucion de `reemplazar_filas`.
+
+    `clave` son las columnas que la identifican (y el `ON CONFLICT`); `valores`,
+    el resto. Con `valores = None` la fila se BORRA: es lo que hace la ingesta
+    de los descompuestos con una version que Sigrid ya no tiene.
+    """
+
+    schema: str
+    tabla: str
+    clave: Mapping[str, Any]
+    valores: Mapping[str, Any] | None
+
+
+def _igualdades(columnas: Mapping[str, Any]) -> sql.Composed:
+    """`"a" = %s AND "b" = %s`, en el orden del mapa."""
+    return sql.SQL(" AND ").join(
+        sql.SQL("{} = %s").format(sql.Identifier(c)) for c in columnas
+    )
+
+
+def _sentencia_de_control(control: FilaControl) -> tuple[sql.Composed, list[Any]]:
+    """El `UPSERT` de la fila de control, o su `DELETE` si no trae valores."""
+    tabla = sql.SQL("{}.{}").format(
+        sql.Identifier(control.schema), sql.Identifier(control.tabla)
+    )
+    if control.valores is None:
+        return (
+            sql.SQL("DELETE FROM {} WHERE {}").format(tabla, _igualdades(control.clave)),
+            list(control.clave.values()),
+        )
+    columnas = [*control.clave, *control.valores]
+    sentencia = sql.SQL(
+        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
+    ).format(
+        tabla,
+        sql.SQL(", ").join(sql.Identifier(c) for c in columnas),
+        sql.SQL(", ").join(sql.Placeholder() for _ in columnas),
+        sql.SQL(", ").join(sql.Identifier(c) for c in control.clave),
+        sql.SQL(", ").join(
+            sql.SQL("{} = EXCLUDED.{}").format(sql.Identifier(c), sql.Identifier(c))
+            for c in control.valores
+        ),
+    )
+    return sentencia, [*control.clave.values(), *control.valores.values()]
 
 
 # -------------------------------------------------------------------------
