@@ -88,12 +88,16 @@ MARCADOR_FILTRO_PRESUPUESTO = "/*F025_FILTRO_OBRAS*/"
 FILTROS_EN_PRESUPUESTO = 1
 
 # Los ficheros cuyo texto entra en el SELLO del SQL (R17). Si cambia cualquiera
-# de los dos, esa noche se reconstruyen TODAS las obras: sin esto, un arreglo
+# de ellos, esa noche se reconstruyen TODAS las obras: sin esto, un arreglo
 # como el de F-052 solo alcanzaría a las 40 obras vivas y las otras 880
 # seguirían publicando lo de antes, en silencio.
 #
+# `00_functions.sql` entra con F-118 (R28): `stg.fn_mes_de_fase` decide el mes
+# de cada fila real de `plan_mensual`, así que cambiar la regla del mes cambia
+# lo publicado igual que cambiar `08_plan_mensual.sql`.
+#
 # El orden es significativo (entra en el hash) y es el de ejecución.
-FICHEROS_DEL_SELLO = ("06_presupuesto.sql", "08_plan_mensual.sql")
+FICHEROS_DEL_SELLO = ("00_functions.sql", "06_presupuesto.sql", "08_plan_mensual.sql")
 
 # El sub-paso que compone el plan de la noche. Como la puerta de F-024, se
 # registra en `_meta.etl_runs` para que aparezca en `timings` con su duración y

@@ -217,6 +217,7 @@ def test_f025_r17_el_sello_del_sql_REAL_del_repositorio_se_calcula() -> None:  #
         for nombre in FICHEROS_DEL_SELLO
     ]
 
-    assert len(textos) == 2
+    # F-118 (R28): 00_functions.sql, 06_presupuesto.sql y 08_plan_mensual.sql.
+    assert len(textos) == 3
     assert all(texto.strip() for texto in textos)
     assert len(sello_sql(textos, {"cod": "15"})) == 64

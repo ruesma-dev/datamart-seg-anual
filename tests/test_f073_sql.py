@@ -616,8 +616,12 @@ HASH_01_DOCUMENTOS = "5cc72676ef3919ef58b979537307a117c37c75d9b9440c88d312ec9e09
 
 #: Los dos ficheros del SELLO. Tocar una coma fuerza la reconstrucción completa
 #: de las 921 obras la noche siguiente (R25).
+#:
+#: **08 RECALCULADO POR F-118 el 2026-09-30**: la rama de reales pasa a la serie
+#: densa (mes del texto, relleno y deshacer) y es ESA feature la que fuerza la
+#: reconstrucción completa, a propósito (F-118 R28). F-073 sigue sin tocarlo.
 HASH_06_PRESUPUESTO = "4d89e4b03b99738ace601092cf07764663a9fbc1a1e9761bcca1d0242178270d"
-HASH_08_PLAN_MENSUAL = "86f388ed3962932970aae234a55dcdd3730a9f47b83ebbd00f4188556e966361"
+HASH_08_PLAN_MENSUAL = "d60d19564717dbeacafbcc44f436f33686929ccbc91458b8853c0f97450360f9"
 
 
 def _hash(ruta: Path) -> str:
