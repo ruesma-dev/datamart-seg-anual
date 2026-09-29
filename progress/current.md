@@ -10,7 +10,17 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-09-29 · F-052 · EN CURSO (`in_progress`) · cierre: `main` integrada en su rama; falta `check-cobertura` en verde y el reviewer
+## 2026-09-29 · F-052 · CERRADA (`done`, APROBADO) · la 0599 vuelve al datamart y `check-cobertura` en verde · SIN INTEGRAR NI DESPLEGAR
+
+> **Cerrada el 2026-09-29** con APROBADO del reviewer
+> (`progress/review_F-052_cierre.md`). Resumen en `progress/history.md`.
+> QUEDA DEL HUMANO: (1) decidir las observaciones 1 y 3 del review (retirar la
+> excepción de la 0720, que ya publica, y qué hacer con las tres de ciclo que no
+> tapan nada; purgar de la historia LOCAL los `obras_*.csv` del commit `16bf645`
+> ANTES del merge y el push); (2) merge a `main`; (3) imagen nueva del job: la
+> nocturna corre con las 10 excepciones de `main` y la alerta de cobertura está
+> disparada desde el 20-09 (se disparó el 03, 07 y 20-09); MANUAL: confirmar que
+> el correo de la alerta llegó al buzón.
 
 > PARADA 1 confirmada por el humano el 2026-09-29. El líder integró `main` en
 > `feature/F-052-partidas-huerfanas` (merge, sin rebase: la rama está en el
@@ -32,7 +42,7 @@
 > con las 10 excepciones de `main`: 56 combinaciones, 35 cubiertas, 20 obras
 > invisibles (43 combinaciones), 294 filas huérfanas (13). La **0599 ya no
 > aparece**. Lo que falta: `init.sh` y `check-cobertura --timeout 900` en esta
-> rama (con sus 21 excepciones; esperado código 0) y el reviewer. Si aparece
+> rama (con sus 23 excepciones; esperado código 0) y el reviewer. Si aparece
 > algo no declarado, NO se declara sin el humano.
 >
 > **Hecho el 2026-09-29 en la rama, tras el merge `28bf449`:** `bash
@@ -1354,7 +1364,7 @@ durante nueve dias.
 **F-025, F-068, F-066 y F-072 estan CERRADAS**, y **F-071 esta RETIRADA** (ver
 su seccion abajo: no se borra nada). El censo de F-072 quedo `done` en
 `e52c5f9`, y **su primer descendiente, F-074, esta en curso**. Lo abierto es el
-backlog, mas F-052, que sigue `blocked` y ya no espera a nadie.
+backlog, mas F-052, que sigue `blocked` y ya no espera a nadie (cerrada el 2026-09-29).
 
 | Prioridad | Feature | Estado | Que es |
 |---|---|---|---|
@@ -1394,8 +1404,8 @@ estimados sobre los 25 GB actuales (disco de 64 GB, +0,6 %) y **+3 a 6 min** de
 ventana sobre las 3 h 45 de hoy. El 95 % de eso son `dcaprodes` (850.985) y
 `ctrprodes` (424.475).
 
-**F-052 sigue `blocked`** y su desbloqueo ya no depende de F-025. Ver su seccion
-abajo: es volver a su rama y relanzar `check-cobertura` alli.
+**F-052 sigue `blocked`** y su desbloqueo ya no depende de F-025 (cerrada el
+2026-09-29 volviendo a su rama y relanzando `check-cobertura` alli).
 
 ## LO QUE LAS TRES FEATURES CERRADAS DEJAN VIVO
 
@@ -1583,24 +1593,6 @@ saldo de creditos**; eso habria que medirlo antes de fiarse.
 asi que estaba a menos de seis puntos de tumbar la nocturna cada noche sin que
 nada estuviera mal. Detalle en `progress/impl_disco_64gb.md` y
 `progress/incidencia_nocturna_20260907.md`.
-
-## F-052 · SIGUE BLOQUEADA, y el motivo REAL no era el que se penso
-
-Su unico pendiente es certificar `check-cobertura` en verde. Lanzado el 04 sobre
-`stg` ya completa: **58 combinaciones miradas, 37 cubiertas** —antes decia CERO,
-asi que **el guardian ya no miente**, que era el bloqueo de verdad— pero sale
-**KO** con 20 obras invisibles y 294 filas huerfanas.
-
-**Y eso tiene explicacion, comprobada:** el `check-cobertura` se lanzo desde la
-rama de F-025, que **NO contiene los cinco commits de cierre de F-052**
-(`ec516bd`..`fa2312c`, que viven solo en `feature/F-052-partidas-huerfanas`).
-El fichero de excepciones de esa rama es el viejo: **10 entradas y con los
-`tipo` sin corregir**. En la rama de F-052 estan las 23 y los tipos arreglados.
-
-**Como se cierra F-052:** volver a su rama, relanzar `check-cobertura
---timeout 900` **alli**, y si da codigo 0, al reviewer y a `done`. **No se
-mezclan las dos ramas** sin decidirlo. Ojo con F-071 y F-053, que tocan
-`stg.obras` y su desempate `rn=1`.
 
 ## F-072 · CERRADA · el censo semantico de las 31 tablas que nadie consume
 

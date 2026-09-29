@@ -75,7 +75,7 @@ from etl_sigrid.infrastructure.postgres.cobertura_sql import (
 #: código de seis dígitos que ningún patrón por nombre cubría.
 #:
 #: De las 13, **8 las cierra F-117** y **2 las cierra F-052**: el trinquete
-#: vuelve a bajar a 13 en cuanto F-117 conteste si esas cuatro obras están
+#: vuelve a bajar a 15 (23 - 8) en cuanto F-117 conteste si esas cuatro obras están
 #: ciegas en master por diseño o por otro agujero.
 EXCEPCIONES_MAX = 23
 
