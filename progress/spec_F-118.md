@@ -182,6 +182,10 @@ porque ahora sí cambian a propósito las series rotas. **Se añade:** `es_desha
 (D4) al lado de `es_relleno`, sin tocar D8 de F-051. El relleno y el deshacer
 conviven: en un mes de relleno la ausencia arrastra; en un cierre, deshace.
 
+## D10, D11 y PARADA 1 APROBADAS (2026-09-29, «apruebo»)
+
+D10 (con coeficientes NULL si el final sale de la fase 0) y D11 (el fact, `v_pbi_cierre_resumen` y la cabecera; no `mart`) según la recomendación, y la propuesta de implementación del líder: bloques A-F con un implementer, sin campaña de mutación por la exención heredada de F-051 D7. F-118 pasa a `in_progress`. El implementer arranca DESPUÉS del despliegue de F-097/F-052 de esta tarde (comparten directorio y `.env`).
+
 ## APROBADA POR EL HUMANO (2026-09-29), con D6 cambiada
 
 - **D1, D2, D3, D4, D5, D7, D8 y D9: aprobadas según la recomendación.** Con D2,
