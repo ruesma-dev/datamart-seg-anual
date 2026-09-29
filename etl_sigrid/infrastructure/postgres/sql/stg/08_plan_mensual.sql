@@ -611,8 +611,8 @@ reales_generador AS (
     FROM reales_con_lag l
     WINDOW gen AS (PARTITION BY obra_id, partida_id, ambito_id, mes_generador)
 ),
--- Lo que se publica: (a) las filas de Sigrid; (b) el relleno con acumulado
--- distinto de 0 o con fila que se mueve en su fase generadora (D3); (c) el
+-- Lo que se publica: (a) las filas de Sigrid; (b) el relleno cuyo acumulado
+-- no es 0 o que se mueve con fila en su fase generadora (D3); (c) el
 -- cierre sin fila que mueve algo: la fila de deshacer, una sola (R29, R32). Lo
 -- que se descarta tiene movimiento 0, así que la suma no cambia (R21).
 reales_final AS (
