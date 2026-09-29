@@ -32,11 +32,22 @@ infraestructura, sin logging.
 El parser de `cierre` (`cierre.fn_parse_mes_fase`) NO cambia: decide también el
 mes de las versiones master de cierre, y R3 le cambiaría textos como «CIERRE
 ENERO-FEBRERO 25» que F-118 no mide (R5).
+
+## El relleno (R10-R14)
+
+Una fase de **rango** (el mes de su fecha fin es posterior al de su fecha de
+inicio) cuyo texto cae después de su primer mes lleva todo su dinero al mes del
+texto; los meses desde el de inicio hasta el anterior al del texto reciben filas
+de **relleno**: movimiento 0 y el acumulado arrastrado. `meses_relleno` dice qué
+meses rellena cada fase; qué partidas y con qué importe lo decide
+`etl_sigrid.domain.serie_real`.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
 
 #: Prefijos de los nombres de mes, en el orden y con la misma forma que el
@@ -135,3 +146,73 @@ def mes_de_fase(
         if candidato is not None:
             return candidato
     return None
+
+
+# ---------------------------------------------------------------------------
+# El relleno de las fases de rango (R10, R11, R14)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FaseReal:
+    """Una fase VIGENTE de una (obra, ámbito) real, ya con el mes de su texto.
+
+    `anio_mes` es `mes_de_fase(...)`; las fechas son las de `stg.fases`, y de
+    ellas sale si la fase es de rango.
+    """
+
+    numero_fase: int
+    anio_mes: date
+    fecha_inicio: date | None
+    fecha_fin: date | None
+
+
+def _mes_siguiente(mes: date) -> date:
+    return date(mes.year + mes.month // 12, mes.month % 12 + 1, 1)
+
+
+def meses_relleno(fases: Sequence[FaseReal]) -> dict[int, tuple[date, ...]]:
+    """Los meses que rellena cada fase vigente de UNA (obra, ámbito).
+
+    - R10: solo las fases de rango cuyo mes del texto es posterior al de su
+      fecha de inicio, desde ese mes hasta el anterior al del texto.
+    - R11 (D1 de F-051): nunca un mes que ya tiene cierre vigente propio, valga
+      lo que valga.
+    - R14: nada después del mes del texto.
+    - Dos fases de rango solapadas que quieren el mismo mes: lo rellena la de
+      mes del texto más cercano (la que cierra antes). Así ningún mes se
+      repite y la serie de cada partida tiene una sola fila por mes.
+
+    Las fases deben ser las VIGENTES (R8, F-042 sobre el mes del texto): una
+    fase que pierde su mes no rellena nada. Dos del mismo mes son un error de
+    quien llama, y se levanta `ValueError`.
+    """
+    ocupados: dict[date, int] = {}
+    for fase in fases:
+        if fase.anio_mes in ocupados:
+            raise ValueError(
+                f"las fases {ocupados[fase.anio_mes]} y {fase.numero_fase} tienen "
+                f"el mismo mes {fase.anio_mes:%Y-%m}: aplica antes la regla de "
+                f"F-042 (R8), solo rellenan las vigentes"
+            )
+        ocupados[fase.anio_mes] = fase.numero_fase
+
+    duenio: dict[date, FaseReal] = {}
+    for fase in fases:
+        if fase.fecha_inicio is None or fase.fecha_fin is None:
+            continue
+        inicio = _primero_de_mes(fase.fecha_inicio)
+        if _primero_de_mes(fase.fecha_fin) <= inicio or fase.anio_mes <= inicio:
+            continue
+        mes = inicio
+        while mes < fase.anio_mes:
+            if mes not in ocupados:
+                actual = duenio.get(mes)
+                if actual is None or fase.anio_mes < actual.anio_mes:
+                    duenio[mes] = fase
+            mes = _mes_siguiente(mes)
+
+    resultado: dict[int, list[date]] = {}
+    for mes in sorted(duenio):
+        resultado.setdefault(duenio[mes].numero_fase, []).append(mes)
+    return {fase: tuple(meses) for fase, meses in resultado.items()}
