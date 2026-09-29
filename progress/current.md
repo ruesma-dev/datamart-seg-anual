@@ -12,6 +12,23 @@
 
 
 
+## 2026-09-29 · F-118 · SPEC LISTA (con F-051 absorbida), a la espera de D1–D9
+
+Spec en `specs/F-118-cruce-cierre-agosto/` (requirements, design, tasks) y
+mediciones en `progress/spec_F-118.md`, todo en solo lectura sobre el build del
+29-09. Las dos cifras de Juan remedidas al céntimo (0709 agosto 377.492,30 en
+`cierre` frente a 319.492,30 en `stg`/`mart`; las 12 obras con coeficientes y la
+0702 en −790.718,46 sin ellos). **Fallo 1 y F-103 son la misma causa** (el
+movimiento real se calcula sobre una serie con huecos) y F-051 vive en el mismo
+sitio: los arregla una sola construcción, la **serie densa**. El fallo 2 es otro
+mecanismo, en bloque de tareas propio. **Decide el humano** (D1–D9 en
+`progress/spec_F-118.md` §8): sustituir R9/R21 de F-051 (D1), unir F-103 (D2),
+fase sin filas del ámbito (D3), `es_deshacer` (D4), arrastre en `cierre` (D5),
+**coeficientes A o B con Negocio** (D6, recomendada A), contraste con la hoja de
+cierre de Juan sin versionarla (D7), partir el fallo 2 si D6 se retrasa (D8) y
+casos para Juan (D9). `features.json` sin tocar: F-118 sigue `pending` hasta la
+aprobación.
+
 ## 2026-09-29 · DECISIÓN DEL HUMANO: F-097 se despliega ESTA TARDE, junto con F-052, cuando el humano avise
 
 **T0 deja de bloquear** (decisión del humano, 2026-09-29): el diseño relee toda

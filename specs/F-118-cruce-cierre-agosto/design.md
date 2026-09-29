@@ -220,7 +220,7 @@ esperada (`progress/spec_F-118.md` §6); (5) `check-unicidad`, `check-cierres`
 - **Tests de F-042 que fijaban el defecto**: se reescriben, no se borran sin
   sustituto; el reviewer lo comprueba uno a uno.
 
-## 11 · Decisiones abiertas (recomendación; detalle y cifras en `progress/spec_F-118.md` §7)
+## 11 · Decisiones abiertas (recomendación; detalle y cifras en `progress/spec_F-118.md` §8)
 
 - **D1** Sustituir F-051 R9 y R21 por la serie densa y el invariante contra el acumulado real. **Sí.**
 - **D2** Unir F-103: misma causa, la arregla la serie densa sin código extra. **Sí.**
