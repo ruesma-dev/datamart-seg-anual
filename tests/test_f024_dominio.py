@@ -48,8 +48,48 @@ FORMA_BATCH = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{6}$")
 # ---------------------------------------------------------------------------
 
 
+#: Cuántos `batch_id` se generan de golpe para mirar la aleatoriedad del sufijo.
+TAMANO_DEL_LOTE = 500
+
+#: Cuántas repeticiones se toleran en ese lote. Ver el cálculo del docstring de
+#: `test_f024_r1_batch_id_tiene_forma_y_es_unico`: con 3 tolerancias el test
+#: falla por azar una vez cada ~7.700 millones de pasadas.
+COLISIONES_TOLERADAS = 3
+
+
 def test_f024_r1_batch_id_tiene_forma_y_es_unico() -> None:
-    """Forma `YYYYMMDDTHHMMSSZ-xxxxxx` y sin colisiones dentro del proceso."""
+    """Forma `YYYYMMDDTHHMMSSZ-xxxxxx` y sufijo con un espacio grande de verdad.
+
+    REESCRITO EL 2026-09-06, y el motivo importa. La versión anterior generaba
+    500 `batch_id` en el mismo segundo y exigía **los 500 distintos**. Eso es
+    una propiedad que el código NO promete: el sufijo son 6 hexadecimales
+    —16.777.216 valores— sacados de `secrets`, sin registro de los ya
+    emitidos, así que las repeticiones son posibles por construcción. Por la
+    paradoja del cumpleaños, con n = 500 y N = 16.777.216:
+
+        P(al menos una colisión) ≈ 1 - exp(-n² / 2N)
+                                 = 1 - exp(-500² / 33.554.432)
+                                 ≈ 0,74 %
+
+    Medido: **0,833 % de fallo en 3.000 repeticiones**, que casa con la
+    cuenta. Un test que falla ~1 de cada 130 pasadas no detecta ningún
+    defecto: invalida campañas de mutación ajenas (le pasó a F-066, que corre
+    la suite 23 veces seguidas) y enseña a ignorar los rojos. **El defecto
+    estaba en el test, no en el `batch_id`**, así que `etl_sigrid/domain/`
+    no se toca.
+
+    Lo que R1 sí garantiza, y es lo que se comprueba aquí:
+
+    1. la **forma** exacta del identificador, y que la cumplen los 500;
+    2. que el sufijo tiene **espacio de sobra**: prácticamente todos distintos
+       (se toleran hasta 3 repeticiones, cuando lo esperado son 0,0074, con lo
+       que el fallo por azar baja a ~1,3e-10 por pasada) y con los 16 dígitos
+       hexadecimales apareciendo, o sea aleatoriedad real y no un contador.
+
+    La unicidad como invariante dura la vigila
+    `test_f024_r1_batch_id_ordena_cronologicamente` sobre instantes distintos,
+    que sí es determinista.
+    """
     ejecucion = nueva_ejecucion()
 
     assert FORMA_BATCH.match(ejecucion.batch_id), (
@@ -58,8 +98,25 @@ def test_f024_r1_batch_id_tiene_forma_y_es_unico() -> None:
 
     # 500 en el mismo segundo: el sufijo es lo único que las distingue, así que
     # esto comprueba de verdad que hay aleatoriedad y cuánta.
-    lote = {nueva_ejecucion().batch_id for _ in range(500)}
-    assert len(lote) == 500, "hay batch_id repetidos dentro del mismo proceso"
+    lote = [nueva_ejecucion().batch_id for _ in range(TAMANO_DEL_LOTE)]
+
+    fuera_de_forma = [b for b in lote if not FORMA_BATCH.match(b)]
+    assert not fuera_de_forma, f"batch_id fuera de forma: {fuera_de_forma[:3]}"
+
+    distintos = len(set(lote))
+    assert distintos >= TAMANO_DEL_LOTE - COLISIONES_TOLERADAS, (
+        f"solo {distintos} de {TAMANO_DEL_LOTE} `batch_id` distintos: eso ya no "
+        f"es la colisión ocasional que predice el cumpleaños (0,0074 esperadas), "
+        f"es que el sufijo ha dejado de ser aleatorio"
+    )
+
+    # Y que la aleatoriedad cubre el alfabeto entero: un sufijo de seis ceros
+    # incrementales pasaría las dos comprobaciones de arriba y no sería tal.
+    vistos = {c for b in lote for c in b.split("-")[1]}
+    assert vistos == set("0123456789abcdef"), (
+        f"el sufijo no usa los 16 hexadecimales en {TAMANO_DEL_LOTE} muestras: "
+        f"{sorted(vistos)}"
+    )
 
 
 def test_f024_r1_el_sufijo_aleatorio_mide_seis_hexadecimales() -> None:

@@ -112,7 +112,26 @@ FORMATO_CIERRE = FormatoHuella(
     proposito="el CIERRE por obra x mes x concepto, que es lo que Negocio lee",
 )
 
-FORMATOS = (FORMATO_DIMENSION, FORMATO_CIERRE)
+#: **Huella 5** (F-025, R22). Filas y `sum(importe_origen)` por **obra x
+#: ambito** de `stg.plan_mensual` COMPLETA. Es la que demuestra, obra a obra,
+#: que lo congelado no se ha movido, que es literalmente lo que pidio el humano:
+#: «que no se reconstruyan, pero que no se borren».
+#:
+#: Las otras cuatro comparan el resultado publicado; esta compara **la tabla que
+#: la ventana deja de reconstruir**, que es donde el dano seria directo. Si una
+#: obra congelada perdiera filas o importes, aqui se veria aunque `mart` y
+#: `cierre` salieran idénticos por casualidad.
+FORMATO_PLAN_OBRA = FormatoHuella(
+    nombre="plan_obra",
+    cabecera=("obra_id", "codigo_obra", "ambito_id", "filas", "importe_origen"),
+    columnas_clave=("obra_id", "ambito_id"),
+    proposito=(
+        "las filas y el importe de stg.plan_mensual por obra x ambito: demuestra "
+        "obra a obra que lo congelado no se ha movido"
+    ),
+)
+
+FORMATOS = (FORMATO_DIMENSION, FORMATO_CIERRE, FORMATO_PLAN_OBRA)
 
 
 def formato_de(cabecera: Sequence[str]) -> FormatoHuella | None:

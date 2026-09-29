@@ -11,15 +11,23 @@ Flujo:
         03_obras.sql                   - TRUNCATE + INSERT stg.obras
         04_partidas.sql                - TRUNCATE + INSERT stg.partidas
         05_fases.sql                   - TRUNCATE + INSERT stg.fases
-        06_presupuesto.sql             - TRUNCATE + INSERT stg.presupuesto (el grande)
+        06_presupuesto.sql             - DELETE derivado + INSERT, acotado a las
+                                         obras vivas (F-025). El grande.
         07_version_master_vigente.sql  - TRUNCATE + INSERT (parametrizado con cod=15)
 
+        08_plan_mensual.sql            - por tramos (F-019) y acotado (F-025)
+
 Cada sub-step se registra en _meta.etl_runs con su tiempo y filas procesadas.
+
+F-025 metio en medio el sub-paso `plan_ventana`, que decide que obras se
+reconstruyen esta noche y cuales conservan su ultima version buena. Va
+despues de `05_fases.sql` porque la regla de actividad se mide sobre
+`stg.fases`, y antes de `06_presupuesto.sql`, que es el primer acotado.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -33,9 +41,20 @@ from etl_sigrid.domain.coherencia import (
 )
 from etl_sigrid.domain.entities import StepResult, StepStatus
 from etl_sigrid.domain.tramos import planificar_tramos, tramos_sobredimensionados
+from etl_sigrid.domain.ventana import (
+    MOTIVO_COMPLETA,
+    Plan,
+    clasificar_obras,
+    criterio_desde_reglas,
+    sello_sql,
+    toca_reconstruccion_completa,
+)
 from etl_sigrid.infrastructure.logging_config import get_logger
 from etl_sigrid.infrastructure.postgres.client_factory import build_postgres_client
-from etl_sigrid.infrastructure.postgres.postgres_client import PostgresClient
+from etl_sigrid.infrastructure.postgres.postgres_client import (
+    TABLAS_ACOTADAS,
+    PostgresClient,
+)
 
 logger = get_logger(__name__)
 
@@ -57,6 +76,40 @@ MARCADOR_FILTRO_OBRAS = "/*F019_FILTRO_OBRAS*/"
 # Filtrar solo una duplicaría las filas de la otra en cada tramo.
 RAMAS_CON_FILTRO = 2
 
+# --- Ventana de negocio (F-025) --------------------------------------------
+# El marcador equivalente en `06_presupuesto.sql`, que con DA-2 pasa también a
+# construirse solo para las obras vivas. Se llama distinto que el de F-019 a
+# propósito: son dos ficheros con dos formas de filtrar (aquí una sola pasada,
+# allí sesenta tramos), y un nombre común invitaría a sustituirlos con el mismo
+# código sin mirar cuántas veces aparece cada uno.
+MARCADOR_FILTRO_PRESUPUESTO = "/*F025_FILTRO_OBRAS*/"
+
+# `06_presupuesto.sql` no tiene ramas: su `WHERE` es uno solo.
+FILTROS_EN_PRESUPUESTO = 1
+
+# Los ficheros cuyo texto entra en el SELLO del SQL (R17). Si cambia cualquiera
+# de los dos, esa noche se reconstruyen TODAS las obras: sin esto, un arreglo
+# como el de F-052 solo alcanzaría a las 40 obras vivas y las otras 880
+# seguirían publicando lo de antes, en silencio.
+#
+# El orden es significativo (entra en el hash) y es el de ejecución.
+FICHEROS_DEL_SELLO = ("06_presupuesto.sql", "08_plan_mensual.sql")
+
+# El sub-paso que compone el plan de la noche. Como la puerta de F-024, se
+# registra en `_meta.etl_runs` para que aparezca en `timings` con su duración y
+# para que quede escrito qué se decidió esa noche.
+PASO_PLAN_VENTANA = "build_stg.plan_ventana"
+
+# EL HITO DE LA RECONSTRUCCIÓN COMPLETA (R25, DA-4). Se escribe en
+# `_meta.etl_runs` **solo cuando la noche completa TERMINA BIEN**, y de ahí lo
+# lee `toca_reconstruccion_completa` la noche siguiente.
+#
+# Vive en `_meta.etl_runs` y no en una tabla nueva por dos razones: `python
+# main.py timings` lo ve como un paso más, y sobrevive a una obra que aparezca
+# o desaparezca del maestro, que es lo que rompería derivar la fecha de un
+# `MIN(construido_at)` sobre `_meta.obra_build`.
+PASO_RECONSTRUCCION_COMPLETA = "build_stg.reconstruccion_completa"
+
 # --- Puerta de coherencia de raw (F-024) ------------------------------------
 # La puerta se registra como sub-paso para que aparezca en `timings` con su
 # duración (que debe ser de milisegundos: dos SELECT sobre `_meta`) y para que
@@ -65,11 +118,17 @@ PASO_PUERTA_RAW = "build_stg.puerta_raw"
 
 
 class PlanMensualAbortado(RuntimeError):  # noqa: N818 — nombres en español
-    """El build por tramos se paró a propósito y dejó la tabla vacía.
+    """El build por tramos se paró a propósito.
 
     Se distingue de cualquier otro error para que quede claro, al leer el
-    fallo, que la parada fue una decisión del guardián de disco (o la limpieza
-    tras el fallo de un tramo) y no un error inesperado.
+    fallo, que la parada fue una decisión del guardián de disco (o el fallo de
+    un tramo) y no un error inesperado.
+
+    **Desde F-025 ya NO vacía la tabla.** Hasta entonces sí, porque una tabla a
+    medias era indistinguible de una completa; con el borrado derivado lo que
+    queda tras un fallo son obras enteras con su última versión buena, y
+    vaciarlas destruiría lo congelado. El nombre se conserva porque es el que
+    citan los tests y los logs de F-019.
     """
 
 
@@ -93,6 +152,42 @@ def componer_sql_tramo(sql_texto: str, obras: Sequence[int]) -> str:
     3. El marcador tiene que aparecer una vez por rama. Si alguien lo borra al
        editar el fichero, esto falla ANTES de enviar nada a la BBDD, en vez de
        ejecutar el build entero sin filtro, que es justo el incidente.
+
+    Las dos primeras las hace ahora `_lista_de_obras`, porque F-025 las
+    necesita también para el borrado derivado y dos copias de un blindaje
+    divergen.
+    """
+    apariciones = sql_texto.count(MARCADOR_FILTRO_OBRAS)
+    if apariciones != RAMAS_CON_FILTRO:
+        raise ValueError(
+            f"El SQL de plan_mensual debe contener el marcador "
+            f"{MARCADOR_FILTRO_OBRAS} exactamente {RAMAS_CON_FILTRO} veces "
+            f"(una por rama) y aparece {apariciones}. Sin las dos "
+            f"sustituciones el build se ejecutaría sin filtrar por tramo, o "
+            f"filtrando solo una rama y duplicando la otra: no se ejecuta."
+        )
+
+    lista = _lista_de_obras(obras)
+    filtrado = sql_texto.replace(MARCADOR_FILTRO_OBRAS, f"ARRAY[{lista}]::BIGINT[]")
+
+    # EL BORRADO DERIVADO (F-025, R10). Va DELANTE del INSERT y en el mismo
+    # texto, así que las dos sentencias comparten transacción: `execute_sql_text`
+    # abre una conexión por llamada. Si el proceso muere entre las dos, la
+    # transacción no llega a confirmarse y no se ha perdido nada.
+    #
+    # Y va compuesto con LA MISMA lista de obras, no con otra: el conjunto que
+    # se borra ES el que se va a escribir, así que es imposible borrar una obra
+    # que luego no se reinserte.
+    return componer_borrado_derivado("plan_mensual", obras) + "\n" + filtrado
+
+
+def _lista_de_obras(obras: Sequence[int]) -> str:
+    """Valida y rinde las obras como lista para un `ARRAY[...]` (R7).
+
+    La composición del SQL es TEXTUAL —los comentarios de `08_plan_mensual.sql`
+    están llenos de porcentajes literales y psycopg los tomaría por marcadores
+    de parámetro—, así que la entrada se blinda aquí, en un solo sitio, y lo
+    usan tanto el filtro del tramo como el borrado derivado.
     """
     if not obras:
         raise ValueError(
@@ -110,18 +205,90 @@ def componer_sql_tramo(sql_texto: str, obras: Sequence[int]) -> str:
                 f"compone SQL con nada que no sea un entero validado."
             )
 
-    apariciones = sql_texto.count(MARCADOR_FILTRO_OBRAS)
-    if apariciones != RAMAS_CON_FILTRO:
+    return ", ".join(str(obra) for obra in obras)
+
+
+def componer_borrado_derivado(tabla: str, obras: Sequence[int]) -> str:
+    """El `DELETE` de las obras que se van a reinsertar (F-025, R10).
+
+    **Es el corazón de la feature.** El `TRUNCATE` global que había antes
+    borraba las 920 obras para reescribirlas todas; con la ventana encendida
+    habría borrado 920 y reescrito 40. Aquí lo que se borra se **deriva** de lo
+    que se va a escribir, y de ahí salen tres propiedades:
+
+    1. **Autoconsistencia.** No hay dos listas que puedan desincronizarse: es la
+       misma lista, compuesta una vez.
+    2. **Cada tramo es atómico e idempotente.** Si el proceso muere, las obras
+       hechas están al día y las demás conservan el dato de anoche: la tabla
+       queda COHERENTE, no truncada.
+    3. **Repara la avería del 02-sep**, que dejó `stg.plan_mensual` al 21,6 %.
+       Vale por sí solo aunque el acotado no ahorrase nada.
+
+    Va **por índice**: `idx_plan_mensual_obra_amb` e `idx_pres_obra_amb`
+    empiezan los dos por `obra_id` (verificado contra `pg_indexes` el
+    2026-09-02), así que no barre la tabla.
+    """
+    if tabla not in TABLAS_ACOTADAS:
         raise ValueError(
-            f"El SQL de plan_mensual debe contener el marcador "
-            f"{MARCADOR_FILTRO_OBRAS} exactamente {RAMAS_CON_FILTRO} veces "
-            f"(una por rama) y aparece {apariciones}. Sin las dos "
-            f"sustituciones el build se ejecutaría sin filtrar por tramo, o "
-            f"filtrando solo una rama y duplicando la otra: no se ejecuta."
+            f"tabla no acotada por la ventana: {tabla!r}. Las únicas son "
+            f"{', '.join(TABLAS_ACOTADAS)}, y este nombre se interpola en el "
+            f"SQL: no puede venir de fuera."
+        )
+    return (
+        f"DELETE FROM stg.{tabla} "
+        f"WHERE obra_id = ANY (ARRAY[{_lista_de_obras(obras)}]::BIGINT[]);"
+    )
+
+
+def componer_sql_presupuesto(sql_texto: str, obras: Sequence[int]) -> str:
+    """`06_presupuesto.sql` acotado a las obras vivas (DA-2, R6, T11b).
+
+    De **una sola pasada**, sin tramos: este fichero no tiene ventanas ni
+    explosión de filas, así que su pico de temporales es proporcional al volumen
+    filtrado y no hace falta trocearlo.
+
+    El marcador aparece **una sola vez** —su `WHERE` es uno solo, a diferencia
+    de las dos ramas de `08_plan_mensual.sql`— y se comprueba antes de enviar
+    nada: si alguien lo borra al editar el fichero, esto falla aquí en vez de
+    reconstruir las 920 obras en un servidor sin créditos de CPU.
+    """
+    apariciones = sql_texto.count(MARCADOR_FILTRO_PRESUPUESTO)
+    if apariciones != FILTROS_EN_PRESUPUESTO:
+        raise ValueError(
+            f"El SQL de presupuesto debe contener el marcador "
+            f"{MARCADOR_FILTRO_PRESUPUESTO} exactamente {FILTROS_EN_PRESUPUESTO} "
+            f"vez y aparece {apariciones}. Sin la sustitución se ejecutaría sin "
+            f"filtrar, reconstruyendo las 920 obras: no se ejecuta."
         )
 
-    lista = ", ".join(str(obra) for obra in obras)
-    return sql_texto.replace(MARCADOR_FILTRO_OBRAS, f"ARRAY[{lista}]::BIGINT[]")
+    lista = _lista_de_obras(obras)
+    filtrado = sql_texto.replace(
+        MARCADOR_FILTRO_PRESUPUESTO, f"ARRAY[{lista}]::BIGINT[]"
+    )
+    return componer_borrado_derivado("presupuesto", obras) + "\n" + filtrado
+
+
+def sello_vigente_del_repositorio(settings) -> str:
+    """`sha256` del SQL del build y de sus parámetros (R17).
+
+    Es **función de módulo y no método** a propósito: la necesitan el step, el
+    comando `ventana-plan` y el guardián `check-ventana`, y los dos últimos no
+    tienen por qué instanciar un step —que abre cliente y arrastra estado— solo
+    para leer dos ficheros y hacer un hash. Además, así el guardián sigue
+    funcionando en los tests que sustituyen `BuildStgStep` por un doble.
+    """
+    textos = [
+        (DIRECTORIO_SQL_STG / nombre).read_text(encoding="utf-8")
+        for nombre in FICHEROS_DEL_SELLO
+    ]
+    return sello_sql(
+        textos,
+        {
+            "cod_version_master_vigente": settings.business_rules["sigrid"][
+                "campos_extendidos"
+            ]["cod_version_master_vigente"],
+        },
+    )
 
 
 @dataclass(slots=True, frozen=True)
@@ -136,6 +303,11 @@ class _SubStep:
     # Sub-paso que NO se ejecuta de una pasada, sino tramo a tramo con puerta
     # de disco entre medias (F-019). Hoy solo lo es `build_plan_mensual`.
     por_tramos: bool = False
+    # Sub-paso que compone el plan de la ventana (F-025). No ejecuta SQL de
+    # construcción: decide qué obras entran en los dos que vienen detrás.
+    es_plan_ventana: bool = False
+    # Sub-paso acotado a las obras del plan, de una sola pasada (F-025, DA-2).
+    acotado: bool = False
 
 
 class BuildStgStep(PipelineStep):
@@ -146,10 +318,22 @@ class BuildStgStep(PipelineStep):
         settings: Settings,
         batch_id: str | None = None,
         omitir_puerta: bool = False,
+        reconstruir_todo: bool = False,
     ) -> None:
         self._settings = settings
         self._batch_id = batch_id
         self._omitir_puerta = omitir_puerta
+        # F-025: fuerza la reconstrucción completa esta noche, se mire el
+        # calendario o no. Lo enciende `--reconstruir-todo` y lo enciende solo
+        # el domingo (R25).
+        self._reconstruir_todo = reconstruir_todo
+        # El plan de la noche, compuesto por el sub-paso `plan_ventana` y leído
+        # por los dos sub-pasos acotados que vienen detrás.
+        self._plan: Plan | None = None
+        # Firma del origen de esta noche por obra, para registrarla al
+        # reconstruir. Sale del censo, que ya la trae.
+        self._firmas: dict[int, str | None] = {}
+        self._codigos: dict[int, str] = {}
 
     @property
     def name(self) -> str:
@@ -206,7 +390,19 @@ class BuildStgStep(PipelineStep):
             _SubStep("build_obras",       "03_obras.sql",       "stg", "obras"),
             _SubStep("build_partidas",    "04_partidas.sql",    "stg", "partidas"),
             _SubStep("build_fases",       "05_fases.sql",       "stg", "fases"),
-            _SubStep("build_presupuesto", "06_presupuesto.sql", "stg", "presupuesto"),
+            # F-025. Va AQUÍ y no antes por una razón concreta: la regla de
+            # actividad se mide sobre `stg.fases`, y componer el plan antes de
+            # `05_fases.sql` lo calcularía con las fases de anoche. Y va antes
+            # de `06_presupuesto.sql`, que es el primer sub-paso acotado.
+            #
+            # Tiene su propia fila en `_meta.etl_runs`, como la puerta de
+            # F-024: aparece en `timings` con su duración y deja constancia
+            # escrita de qué se decidió esa noche.
+            _SubStep("plan_ventana", "", es_plan_ventana=True),
+            _SubStep(
+                "build_presupuesto", "06_presupuesto.sql", "stg", "presupuesto",
+                acotado=True,
+            ),
             _SubStep(
                 "build_version_master_vigente",
                 "07_version_master_vigente.sql",
@@ -234,8 +430,12 @@ class BuildStgStep(PipelineStep):
 
             t0 = datetime.utcnow()
             try:
-                if sub.por_tramos:
+                if sub.es_plan_ventana:
+                    self._componer_plan(pg)
+                elif sub.por_tramos:
                     self._build_plan_mensual_por_tramos(pg, sql_path)
+                elif sub.acotado:
+                    self._build_presupuesto_acotado(pg, sql_path)
                 else:
                     pg.execute_sql_file(sql_path, params=sub.params)
 
@@ -269,6 +469,18 @@ class BuildStgStep(PipelineStep):
                 result.metadata = {"table_stats": table_stats, "failed_at": sub.name}
                 return result
 
+        # F-025, R25. El hito de la reconstrucción completa se escribe AQUÍ, y
+        # solo aquí: cuando la noche completa ha terminado bien de principio a
+        # fin. Registrarlo antes —al decidir que tocaba— dejaría las 880 obras
+        # congeladas una semana más creyendo que ya se habían puesto al día,
+        # que es exactamente el silencio que esta feature elimina.
+        self._registrar_hito_de_completa(pg)
+
+        # F-025, T14. El VACUUM va al final del step y FUERA de la lista de
+        # sub-pasos: es higiene, no construcción, y su fallo no puede tumbar la
+        # noche. Ver `_higiene_de_las_tablas_acotadas`.
+        self._higiene_de_las_tablas_acotadas(pg)
+
         result.status = StepStatus.SUCCESS
         result.rows_processed = total_rows
         result.finished_at = datetime.utcnow()
@@ -277,8 +489,301 @@ class BuildStgStep(PipelineStep):
             # De qué carga de raw salió este stg. Es lo que permite, tres días
             # después, saber si el cuadro que no cuadra viene de aquí.
             "raw_batch_id": veredicto.batch_id,
+            # F-025, R30. Sin estos dos números no se puede medir el ahorro, y
+            # medir el ahorro es el criterio por el que existe esta feature.
+            "obras_reconstruidas": len(self._plan.reconstruir) if self._plan else 0,
+            "obras_congeladas": len(self._plan.congelar) if self._plan else 0,
+            "reconstruccion_completa": bool(self._plan and self._plan.completa),
         }
         return result
+
+    # ---------------------------------------------------------------------
+    # La ventana de negocio (F-025)
+    # ---------------------------------------------------------------------
+
+    def _componer_plan(self, pg: PostgresClient) -> None:
+        """Decide qué obras se reconstruyen esta noche y lo deja escrito (R1).
+
+        Tres cosas se resuelven aquí y ninguna en el dominio, que no sabe de
+        BBDD ni de reloj:
+
+        1. **El sello del SQL vigente** (R17), leyendo los ficheros del disco.
+        2. **Si toca reconstrucción completa** (R25), mirando el registro. El
+           `--reconstruir-todo` del humano manda por encima del calendario.
+        3. **El censo**, que es la única consulta.
+
+        Con la ventana APAGADA (`PG_VENTANA_ACTIVA=false`, el default de R5) el
+        plan es «todas las obras»: el contenido publicado es exactamente el de
+        hoy. Lo que no vuelve es el `TRUNCATE`, porque borrar y reescribir
+        todas las obras deja el mismo resultado y además sobrevive a un tramo
+        que falle.
+        """
+        opciones = self._settings.postgres
+        censo = pg.fetch_censo_de_obras()
+
+        self._firmas = {o.obra_id: o.firma_origen for o in censo}
+        self._codigos = {o.obra_id: o.codigo_obra for o in censo}
+
+        sello = self._sello_vigente()
+        completa, motivo_completa = self._toca_completa(pg)
+
+        if not opciones.ventana_activa:
+            # R5: mientras la ventana esté apagada, se reconstruye todo. Se
+            # marca como `completa` para que el registro diga la verdad sobre
+            # por qué entró cada obra, y para que el hito quede escrito.
+            completa = True
+            motivo_completa = "la ventana esta desactivada (PG_VENTANA_ACTIVA=false)"
+
+        plan = clasificar_obras(
+            censo,
+            criterio_desde_reglas(
+                self._settings.business_rules, opciones.ventana_meses
+            ),
+            datetime.utcnow().date(),
+            sello,
+            completa=completa,
+            rescate=opciones.ventana_rescate,
+        )
+        self._plan = plan
+
+        logger.info(
+            "ventana_plan",
+            ventana_activa=opciones.ventana_activa,
+            completa=completa,
+            motivo_completa=motivo_completa,
+            obras_a_reconstruir=len(plan.reconstruir),
+            obras_congeladas=len(plan.congelar),
+            por_motivo=plan.por_motivo,
+            denunciadas=[d.codigo_obra for d in plan.denunciadas],
+            sello=sello[:8],
+        )
+
+        # Las obras congeladas cuyo origen ha cambiado se NOMBRAN aquí mismo,
+        # además de en el guardián: la denuncia no puede depender de que
+        # alguien despliegue una regla de alerta (§3.1, R26).
+        for decision in plan.denunciadas:
+            logger.warning(
+                "ventana_obra_congelada_con_origen_cambiado",
+                obra_id=decision.obra_id,
+                codigo_obra=decision.codigo_obra,
+                motivo=decision.detalle,
+            )
+
+        # El motivo de cada obra congelada se escribe AHORA y no al final: si
+        # el build muere a mitad, queda constancia de qué se decidió. No se
+        # tocan `construido_at` ni `filas`, que siguen siendo los de su última
+        # construcción buena.
+        pg.marcar_obras_congeladas(
+            [
+                {
+                    "obra_id": d.obra_id,
+                    "codigo_obra": d.codigo_obra,
+                    "motivo": d.motivo,
+                    "detalle": d.detalle,
+                }
+                for d in plan.congelar
+            ]
+        )
+
+    def _sello_vigente(self) -> str:
+        """`sha256` del SQL del build y de sus parámetros (R17)."""
+        return sello_vigente_del_repositorio(self._settings)
+
+    def _toca_completa(self, pg: PostgresClient) -> tuple[bool, str]:
+        """Si esta noche toca rehacerlo todo, y por qué (R25, DA-4)."""
+        if self._reconstruir_todo:
+            return True, "--reconstruir-todo"
+
+        return toca_reconstruccion_completa(
+            pg.fetch_ultima_reconstruccion_completa(PASO_RECONSTRUCCION_COMPLETA),
+            datetime.utcnow(),
+            self._settings.postgres.ventana_dia_completa,
+        )
+
+    def _obras_a_reconstruir(self) -> tuple[int, ...]:
+        """Las obras del plan. Sin plan, ninguna: el sub-paso no toca la tabla.
+
+        Que esto devuelva una tupla vacía en vez de reventar es lo que hace
+        posible R9, y que no devuelva «todas» es deliberado: ante la duda, no
+        se escribe.
+        """
+        return self._plan.obras_a_reconstruir if self._plan else ()
+
+    def _registrar_construidas(
+        self, pg: PostgresClient, obras: Sequence[int], tabla: str
+    ) -> None:
+        """Anota en `_meta.obra_build` de qué ejecución viene cada obra (R14).
+
+        Va en llamada aparte y no dentro del SQL del tramo porque
+        `execute_sql_text` devuelve el `rowcount` de la ÚLTIMA sentencia, y
+        meter aquí el upsert convertiría «filas insertadas» en «obras
+        registradas». Si el proceso muere entre el tramo y su registro, la obra
+        queda construida y sin registrar, y la noche siguiente entra por R18:
+        se reconstruye de más, que es el lado correcto en el que fallar.
+        """
+        if not self._plan or not obras:
+            return
+
+        por_obra = {d.obra_id: d for d in self._plan.reconstruir}
+        filas = pg.fetch_filas_por_obra(tabla, obras)
+        ahora = datetime.utcnow()
+
+        pg.registrar_obras_construidas(
+            [
+                {
+                    "obra_id": obra_id,
+                    "codigo_obra": self._codigos.get(obra_id, ""),
+                    # La firma que tenía el origen CUANDO se construyó, que es
+                    # lo que hace que la comparación de mañana signifique algo.
+                    "firma_origen": self._firmas.get(obra_id),
+                    "sello_sql": self._plan.sello_vigente,
+                    "batch_id": self._batch_id,
+                    "construido_at": ahora,
+                    "filas": filas.get(obra_id, 0),
+                    "motivo": por_obra[obra_id].motivo,
+                    "detalle": por_obra[obra_id].detalle,
+                }
+                for obra_id in obras
+                if obra_id in por_obra
+            ]
+        )
+
+    def _registrar_hito_de_completa(self, pg: PostgresClient) -> None:
+        """Deja constancia de que esta noche se reconstruyó TODO (R25).
+
+        Solo si el plan era completo y el step ha llegado hasta aquí, que es lo
+        que significa «terminó bien». De esta fila sale la respuesta a «¿cuánto
+        hace que no se rehace todo?», y de ahí el «hasta 6 días» de R3.
+        """
+        if not (self._plan and self._plan.completa):
+            return
+
+        ahora = datetime.utcnow()
+        pg.record_run_completed(
+            stage="stage",
+            step=PASO_RECONSTRUCCION_COMPLETA,
+            started_at=ahora,
+            finished_at=ahora,
+            status=StepStatus.SUCCESS.value,
+            rows_processed=len(self._plan.reconstruir),
+            metadata={"motivo": MOTIVO_COMPLETA, "obras": len(self._plan.reconstruir)},
+            batch_id=self._batch_id,
+        )
+        logger.info(
+            "ventana_reconstruccion_completa_registrada",
+            obras=len(self._plan.reconstruir),
+        )
+
+    def _higiene_de_las_tablas_acotadas(self, pg: PostgresClient) -> None:
+        """`VACUUM (ANALYZE)` de las dos tablas acotadas (T14, §9.1).
+
+        **Avisa y no tumba.** El borrado derivado deja tuplas muertas cada
+        noche en un `B1ms` sin créditos, donde el autovacuum llega tarde; pero
+        el `VACUUM` es higiene, no producto, y tumbar el step por él dejaría al
+        negocio sin datamart una noche entera por no haber podido limpiar
+        tuplas muertas.
+
+        Si esto falla de forma sostenida, lo que hay que mirar es el bloat
+        (T33) y, si crece, el particionado (§2c). El aviso queda en el log
+        para que se pueda ver.
+        """
+        for tabla in TABLAS_ACOTADAS:
+            try:
+                pg.vacuum_analyze("stg", tabla)
+            except Exception as error:
+                logger.warning(
+                    "vacuum_fallido",
+                    tabla=f"stg.{tabla}",
+                    error=str(error),
+                    nota=(
+                        "el VACUUM es higiene, no producto: la noche sigue. "
+                        "Si se repite, mirar el bloat (T33 de F-025)."
+                    ),
+                )
+
+    def _build_presupuesto_acotado(
+        self, pg: PostgresClient, sql_path: Path
+    ) -> int:
+        """`stg.presupuesto` solo para las obras vivas (DA-2, R6, R9, R10).
+
+        De **una sola pasada**: este fichero no tiene ventanas ni explosión de
+        filas, así que su pico de temporales es proporcional al volumen
+        filtrado y no necesita los tramos de `08_plan_mensual.sql`.
+
+        Si el conjunto queda vacío **no se ejecuta nada y no se toca la tabla**
+        (R9). Un `DELETE` con una lista vacía no borraría nada, pero componerlo
+        significaría que el planificador está roto y prefiero que se note.
+        """
+        obras = self._obras_a_reconstruir()
+        if not obras:
+            logger.info(
+                "presupuesto_sin_obras_que_reconstruir",
+                nota="ninguna obra entra esta noche: la tabla no se toca (R9)",
+            )
+            return 0
+
+        filas = pg.execute_sql_text(
+            componer_sql_presupuesto(
+                sql_path.read_text(encoding="utf-8"), list(obras)
+            )
+        )
+        logger.info("presupuesto_acotado", obras=len(obras), filas=filas)
+
+        if self._plan and self._plan.completa:
+            self._denunciar_obras_sobrantes(pg, "presupuesto", obras)
+
+        self._registrar_construidas(pg, obras, "presupuesto")
+        return filas
+
+    def _denunciar_obras_sobrantes(
+        self, pg: PostgresClient, tabla: str, obras: Sequence[int]
+    ) -> None:
+        """Nombra las obras que tienen filas y **no están en el conjunto**.
+
+        Es la contrapartida de haber quitado el `TRUNCATE`: el borrado derivado
+        solo alcanza a las obras que se van a reescribir, así que una obra que
+        desapareciera de Sigrid conservaría sus filas para siempre. Sin esto,
+        nadie lo sabría.
+
+        **NO LAS BORRA, Y ESO ES UNA DECISIÓN.** La primera versión sí lo hacía,
+        en la reconstrucción completa, con el argumento de que esa noche el
+        conjunto es el universo entero y lo que no está en él sobra. El
+        argumento se cae en cuanto se mira de dónde sale el universo: del censo,
+        que es `raw.obr JOIN raw.con`. Si ese `JOIN` dejara fuera una sola obra
+        que sí tiene filas —hoy son 920 y `maestro.obras` da las mismas 920,
+        pero es la clase de suposición que costó F-052—, borrarlas sería
+        **destruir datos buenos en silencio**.
+
+        Y R10 es más estricto que aquella red: *«lo que se borra se deriva de lo
+        que se va a escribir»*. Borrar obras que nadie va a reescribir lo
+        contradice, aunque sea con buena intención. Así que se aplica la misma
+        regla que a la firma del origen (§3.1): **se nombra y decide una
+        persona.** El precio, declarado: una obra retirada de Sigrid conserva
+        sus filas hasta que alguien las borre a mano.
+
+        **Solo en la reconstrucción completa**, que es la única noche en la que
+        «no está en el conjunto» significa algo: en una noche acotada significa
+        «está congelada», que es lo contrario.
+
+        Lo normal es que no denuncie nada. Es una red, no un paso del pipeline.
+        """
+        vivas = set(obras)
+        sobrantes = sorted(pg.fetch_obras_con_filas(tabla) - vivas)
+        if not sobrantes:
+            return
+
+        logger.warning(
+            "ventana_obras_sobrantes",
+            tabla=f"stg.{tabla}",
+            obras=sobrantes,
+            nota=(
+                "tienen filas construidas y NO estan en el censo de esta noche. "
+                "NO se borran: el censo sale de raw.obr JOIN raw.con y borrar "
+                "por lo que ese JOIN no vea seria destruir datos buenos en "
+                "silencio. Comprobar si esas obras siguen en Sigrid y, si no, "
+                "borrarlas a mano."
+            ),
+        )
 
     # ---------------------------------------------------------------------
     # Puerta de coherencia de raw (F-024, R10-R12)
@@ -352,25 +857,50 @@ class BuildStgStep(PipelineStep):
 
         Secuencia, y el porqué de cada paso:
 
-        1. **Pesos por obra** y **plan de tramos** (dominio puro). Las obras
-           que no caben ni solas se avisan; no abortan (es el mínimo físico).
-        2. **Vaciado inicial**, una sola vez: el fichero SQL ya no lo hace,
-           porque hacerlo por tramo dejaría solo el último.
-        3. **Por cada tramo**: puerta de disco → SQL compuesto con sus obras →
-           una transacción → registro en `_meta.etl_runs` y log estructurado.
-        4. **Ante límite superado, medición imposible o tramo fallido**: se
-           vacía la tabla y se propaga. Ni ese tramo ni los siguientes.
+        1. **Pesos por obra**, **acotados a las obras del plan** (F-025), y
+           **plan de tramos** (dominio puro). Las obras que no caben ni solas
+           se avisan; no abortan (es el mínimo físico).
+        2. **Por cada tramo**: puerta de disco → `DELETE` de sus obras +
+           `INSERT` en la MISMA transacción → registro en `_meta.obra_build` y
+           en `_meta.etl_runs`.
+        3. **Ante límite superado, medición imposible o tramo fallido**: se
+           para y se propaga, **sin vaciar nada**. Ni ese tramo ni los
+           siguientes.
 
-        Que la tabla quede VACÍA al abortar es deliberado: una tabla a medias
-        es indistinguible de una completa para quien la lea, y `build_mart`
-        vendría detrás a construir sobre datos parciales.
+        **El vaciado inicial ha desaparecido (F-025, R10, R13), y es el cambio
+        de fondo de esta feature.** Antes se lanzaba un `TRUNCATE` global antes
+        del primer tramo, y con la ventana encendida eso habría borrado las 920
+        obras para reescribir 40. Ahora cada tramo borra **exactamente** las
+        obras que va a reinsertar, en su misma transacción.
+
+        Eso cambia también la invariante del aborto. La de F-019 era «al
+        abortar, la tabla queda VACÍA», porque una tabla a medias era
+        indistinguible de una completa. Ya no aplica: lo que queda tras un
+        fallo no es media tabla, son **obras enteras con su última versión
+        buena**, y vaciarlas destruiría lo congelado, que es justo lo que el
+        humano prohibió. Quien vigila que `build_mart` no construya sobre un
+        stage a medias es la puerta de F-024, que no se toca.
         """
         max_filas = self._settings.postgres.tramo_max_filas
         total_gb = self._settings.postgres.disco_total_gb
         limite_pct = self._settings.postgres.disco_limite_pct
 
+        obras_del_plan = set(self._obras_a_reconstruir())
+        if not obras_del_plan:
+            # R9: sin obras que reconstruir el sub-paso termina en SUCCESS sin
+            # ejecutar tramos y **sin tocar la tabla**.
+            logger.info(
+                "plan_mensual_sin_obras_que_reconstruir",
+                nota="ninguna obra entra esta noche: la tabla no se toca (R9)",
+            )
+            return 0
+
         sql_plantilla = sql_path.read_text(encoding="utf-8")
-        pesos_por_obra = pg.fetch_pesos_plan_mensual()
+        pesos_por_obra = {
+            obra_id: peso
+            for obra_id, peso in pg.fetch_pesos_plan_mensual().items()
+            if obra_id in obras_del_plan
+        }
         tramos = planificar_tramos(pesos_por_obra, max_filas)
 
         for tramo in tramos_sobredimensionados(tramos, max_filas):
@@ -382,7 +912,11 @@ class BuildStgStep(PipelineStep):
                 max_filas=max_filas,
             )
 
-        pg.truncate_table("stg", "plan_mensual")
+        if self._plan and self._plan.completa:
+            self._denunciar_obras_sobrantes(
+                pg, "plan_mensual", sorted(pesos_por_obra)
+            )
+
         logger.info(
             "plan_mensual_plan_de_tramos",
             tramos=len(tramos),
@@ -393,6 +927,10 @@ class BuildStgStep(PipelineStep):
 
         total = len(tramos)
         filas_totales = 0
+        # Las obras que ya han quedado reconstruidas. Es lo que permite decir,
+        # cuando un tramo falla, QUÉ obras se han quedado con el dato de anoche
+        # (R13) en vez de solo que la noche falló.
+        hechas: list[int] = []
 
         for tramo in tramos:
             etiqueta = f"{tramo.indice}/{total}"
@@ -412,7 +950,7 @@ class BuildStgStep(PipelineStep):
                     f"{etiqueta}: {error}. No se ejecuta a ciegas."
                 )
                 pg.record_run_end(run_id, "FAILED", error_message=motivo)
-                self._abortar_plan_mensual(pg, motivo)
+                self._abortar_plan_mensual(motivo, hechas, pesos_por_obra)
 
             if ocupacion_pct > limite_pct:
                 motivo = (
@@ -421,7 +959,7 @@ class BuildStgStep(PipelineStep):
                     f"servidor es compartido y el build para aquí."
                 )
                 pg.record_run_end(run_id, "FAILED", error_message=motivo)
-                self._abortar_plan_mensual(pg, motivo)
+                self._abortar_plan_mensual(motivo, hechas, pesos_por_obra)
 
             # --- El tramo, en su propia transacción (R11) ---
             try:
@@ -431,9 +969,15 @@ class BuildStgStep(PipelineStep):
             except Exception as error:
                 motivo = f"falló el tramo {etiqueta}: {error}"
                 pg.record_run_end(run_id, "FAILED", error_message=motivo)
-                self._abortar_plan_mensual(pg, motivo)
+                self._abortar_plan_mensual(motivo, hechas, pesos_por_obra)
 
             filas_totales += filas
+            hechas.extend(tramo.obras)
+            # El registro va DESPUÉS del tramo confirmado y antes del
+            # siguiente: si la noche muere aquí, lo hecho está anotado y lo que
+            # falta se reconstruye mañana.
+            self._registrar_construidas(pg, tramo.obras, "plan_mensual")
+
             pg.record_run_end(run_id, "SUCCESS", rows_processed=filas)
             logger.info(
                 "plan_mensual_tramo",
@@ -447,10 +991,41 @@ class BuildStgStep(PipelineStep):
 
         return filas_totales
 
-    def _abortar_plan_mensual(self, pg: PostgresClient, motivo: str) -> None:
-        """Vacía `stg.plan_mensual` y propaga. Nunca vuelve."""
-        pg.truncate_table("stg", "plan_mensual")
-        logger.error("plan_mensual_abortado", motivo=motivo)
+    def _abortar_plan_mensual(
+        self,
+        motivo: str,
+        hechas: Sequence[int],
+        del_plan: Iterable[int],
+    ) -> None:
+        """Para el build **sin vaciar nada** y propaga. Nunca vuelve (R13).
+
+        **Ya no trunca**, y ese es el cambio de invariante de F-025. El aborto
+        de F-019 hacía `TRUNCATE` + FAILED porque una tabla a medias era
+        indistinguible de una completa; con el borrado derivado lo que queda no
+        es media tabla, son obras enteras con su última versión buena, y
+        vaciarlas destruiría lo congelado.
+
+        Es, además, la reparación de la avería del 2026-09-02: aquella noche
+        habría terminado con cinco obras al día y el resto con el dato de
+        anoche —coherente— en vez de con `stg.plan_mensual` al 21,6 %
+        —truncada—.
+
+        Se registra **qué obras se han quedado sin reconstruir**, que es lo que
+        R13 exige y lo que convierte «la noche falló» en «estas obras llevan el
+        dato de ayer».
+        """
+        pendientes = sorted(set(del_plan) - set(hechas))
+        logger.error(
+            "plan_mensual_abortado",
+            motivo=motivo,
+            obras_reconstruidas=len(hechas),
+            obras_sin_reconstruir=pendientes,
+            nota=(
+                "la tabla NO se vacia: cada obra conserva su ultima version "
+                "buena. Quien impide que build_mart construya sobre un stage a "
+                "medias es la puerta de F-024."
+            ),
+        )
         raise PlanMensualAbortado(motivo)
 
     # ---------------------------------------------------------------------

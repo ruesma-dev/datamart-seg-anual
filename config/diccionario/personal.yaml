@@ -1,0 +1,998 @@
+# config/diccionario/personal.yaml
+#
+# Fichas del esquema `personal`: quien ha trabajado en cada obra y cuantas
+# horas. Lo construye `build_personal` (F-057, 2026-09-18) y todas las cifras
+# de aqui estan MEDIDAS contra Sigrid vivo ese dia.
+#
+# LAS TRES COSAS QUE HAY QUE SABER ANTES DE ESCRIBIR UNA CONSULTA AQUI:
+#
+# 1. **`partes_lineas.cantidad` NO son horas.** Mezcla HORA, DIA, MES y UD en
+#    la misma columna. `SUM(cantidad)` sin filtrar `unidad` da 1.837.201,23
+#    sumando horas de albanil con meses de jefe de obra, dias de vacaciones y
+#    kilometros. Las horas de verdad son 1.249.038,44 y se piden por
+#    `v_pbi_horas_obra_mes`, que lleva el corte cableado. Y ojo al reverso: el
+#    **71,7 % del euro esta en las lineas de MES**, asi que las horas tampoco
+#    son el coste de personal completo.
+#
+# 2. **`recursos` CONTIENE DATOS PERSONALES**: nombre, NIF y DNI. No es un
+#    descuido: lo autorizo expresamente el responsable del dato el 2026-09-18.
+#    Lo que no sube es el resto de la ficha de empleado --Seguridad Social,
+#    banco, domicilio, nacimiento, sexo, estado civil, contacto, credenciales--.
+#
+# 3. **`recursos` no es el maestro de personal.** De sus 2.618 filas solo 1.354
+#    son personas; 1.158 son consumos imputables (movil, gasoil, kilometros) y
+#    106 son medios (vehiculos, casetas, gruas). Contar filas de aqui como
+#    plantilla cuenta como personas cosas que no lo son: hay que cortar por
+#    `clase = 'PERSONA'`.
+#
+# Y una que se paga cara si se ignora: **`activo` es una BANDERA, no un
+# filtro.** Filtrar el hecho por recursos activos borra 539.774,87 de las
+# 1.249.038,44 horas imputadas (43,2 %), de 287 de los 445 recursos que han
+# imputado horas. El recurso de baja de hoy trabajo ayer.
+#
+# F-101 (2026-09-23, hotfix pedido por Juan Romero) anade la CABECERA del parte
+# (`partes`), el codigo y el texto del parte en cada linea y los PRECIOS DE LA
+# FICHA del recurso (`recursos_tipos_hora`). Dos trampas nuevas: el codigo del
+# parte NO es unico (569 codigos repetidos) y la obra de la cabecera AUDITA, no
+# imputa. Y una ausencia declarada: el usuario que crea el parte no esta (F-105).
+#
+# F-107 (2026-09-24, Juan Romero): `recursos` gana la CONTRAPARTIDA de la ficha
+# del recurso --centro de coste y cuenta analitica del abono--, que es del
+# RECURSO y no por tipo de hora; y `partes_lineas` la cuenta de CARGO de cada
+# linea (ampliacion decidida por el humano el mismo dia). Las cuentas se
+# traducen en `maestro.cuentas_analiticas`.
+#
+# Nombres y granos verificados contra el SQL de
+# `etl_sigrid/infrastructure/postgres/sql/personal/`.
+
+version: 2
+esquema: personal
+
+objetos:
+
+  recursos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El maestro de RECURSOS de Sigrid (2.618 filas el 2026-09-18): quien o que
+      puede imputar horas y coste a una obra. **No es el maestro de personal**:
+      solo 1.354 filas son personas, 1.158 son consumos imputables --movil,
+      caja de obra, gasoil, kilometros-- y 106 son medios --vehiculos, casetas,
+      gruas--. Para hablar de plantilla hay que cortar por `clase = 'PERSONA'`.
+
+      **CONTIENE DATOS PERSONALES: nombre, NIF y DNI.** Se publican por decision
+      expresa del responsable del dato el **2026-09-18** («el dni puede salir,
+      no es un problema»), no por descuido. Lo que NO sube es el resto de la
+      ficha de empleado de Sigrid: ni numero de la Seguridad Social, ni cuenta
+      bancaria, ni domicilio, ni fecha de nacimiento, ni sexo, ni estado civil,
+      ni contacto, ni credenciales. Que este esquema sea propio es justamente lo
+      que permite dar o quitar el acceso a estos datos con un GRANT, en vez de
+      tabla a tabla.
+
+      **`activo` es una BANDERA y no un filtro**, y es la trampa con mas dinero
+      detras de todo el esquema: filtrar el hecho por recursos activos borra
+      **539.774,87 de las 1.249.038,44 horas imputadas (43,2 %)**, de 287 de los
+      445 recursos que han imputado horas. El recurso de baja de hoy trabajo
+      ayer, y sus horas siguen siendo coste de esa obra.
+
+      El empleado es un ATRIBUTO OPCIONAL, nunca el eje: la relacion recurso a
+      empleado no es 1:1 en ninguna direccion --824 de 2.618 recursos casan con
+      empleado (31,5 %), 805 de 1.354 empleados casan con recurso, 24 empleados
+      no tienen recurso-- asi que `empleado_id`, `dni` y el nombre estructurado
+      vienen a nulo en el 68,5 % de las filas.
+
+      **EL RECURSO ES DE UNA EMPRESA (F-102).** En Sigrid el mismo codigo de
+      recurso existe una vez por empresa --Ruesma (1), Porsan (28), cada UTE--,
+      y una persona puede tener **una ficha por empresa**: `MO/0009` tiene
+      cuatro, en las empresas 1, 18, 27 y 28. Medido el 2026-09-23: 2.618
+      recursos para 2.504 codigos, **61 codigos repetidos y ninguno repetido
+      dentro de una empresa**; 2.499 recursos son de la empresa 1 y 119 de otras
+      siete. Por eso la clave legible y unica es **`clave_recurso`**
+      (`<empresa>-<codigo>`, 2.618 claves para 2.618 recursos), y por
+      `codigo_recurso` se cruza siempre junto con `empresa_id` (regla
+      `R-CODIGO-POR-EMPRESA`). **No se publica ninguna marca de «misma persona
+      en otra empresa»** (decision del humano): 13 de las 91 personas de fuera
+      de la empresa 1 comparten NIF con una de la 1, y juntarlas es una decision
+      de negocio que el datamart no toma. Las lineas de parte de recursos de
+      otras empresas son 26.426 (3.226.523,83 EUR).
+
+      **LA CONTRAPARTIDA ES DEL RECURSO, NO POR TIPO DE HORA (F-107).** Cada
+      parte CARGA a la obra el coste de la linea; la ficha del recurso declara
+      contra que centro de coste y que cuenta analitica se ABONA, que es lo que
+      descarga los partes contra el coste real de nomina. Sin ella se tiene el
+      cargo pero no el abono, y el asiento no se puede reproducir. La
+      contrapartida esta en `centro_coste_contrapartida_id` y
+      `cuenta_analitica_contrapartida_id`, y sale de la ficha del recurso: la de
+      tipos de hora (`personal.recursos_tipos_hora`) no tiene contrapartida,
+      solo la cuenta de cada tipo de hora. Medido en Sigrid el 2026-09-24:
+      informada en **1.979 de 2.619 recursos**, siempre las dos juntas; 8
+      centros y 847 cuentas distintas, todas en el catalogo
+      (`maestro.centros_coste`, `maestro.cuentas_analiticas`) y todas de la
+      misma empresa que el recurso. La cuenta del CARGO no esta en esta tabla:
+      va en cada linea de parte (`personal.partes_lineas.cuenta_analitica_id`).
+    grano: >-
+      Una fila por recurso de Sigrid, identificada por `recurso_id`. Estan las
+      2.618, de alta y de baja: aqui no se filtra ninguna.
+    clave_negocio: [recurso_id]
+    claves_alternativas: [[clave_recurso]]
+    paso_etl: build_personal
+    refresco: nocturno
+
+    columnas:
+      recurso_id:
+        significado: >-
+          Identificador del recurso en Sigrid. Es el mismo que el del concepto
+          del que cuelga, y la clave por la que se une con las lineas de parte.
+        agregacion: no_sumable
+      codigo_recurso:
+        significado: >-
+          Codigo del recurso tal y como se teclea en Sigrid, tomado del
+          concepto. En las personas de alta va codificado "Apellidos, Nombre".
+          **No es unico**: se repite una vez por empresa (61 codigos el
+          2026-09-23, F-102). Se cruza junto con `empresa_id`, o se usa
+          `clave_recurso`.
+      nombre_recurso:
+        significado: >-
+          Nombre legible del recurso. **En las personas ES EL NOMBRE DE UNA
+          PERSONA**, o sea un dato personal; en los consumos y los medios es una
+          descripcion ("GASOIL", "GRUA TORRE"). Sale del concepto, en crudo.
+      clase:
+        significado: >-
+          Que es este recurso, y es el corte que hay que dar antes de hablar de
+          plantilla o de mano de obra. Lo decide la clase del recurso en Sigrid,
+          NO su tipo: hay un JEFE DE GRUPO catalogado como CONSUMO y un CONSUMOS
+          TELEFONO MOVIL catalogado como MEDIO, asi que el tipo describe pero no
+          clasifica. Reparto medido: 1.354 PERSONA, 1.158 CONSUMO, 106 MEDIO.
+        valores: [PERSONA, CONSUMO, MEDIO, OTRO]
+      tipo_recurso_id:
+        significado: >-
+          Clasificacion del recurso en el catalogo de tipos de Sigrid. Nulo en
+          540 filas: 492 personas y 48 medios no tienen tipo asignado.
+        nulo_significa: El recurso no tiene tipo asignado en Sigrid.
+        agregacion: no_sumable
+      tipo_recurso:
+        significado: >-
+          Literal del tipo de recurso, ya resuelto para no tener que unir
+          ("OFIC. 1a ALBANIL", "GRUAS", "PEON ORDINARIO"). Es DESCRIPTIVO: para
+          saber si un recurso es una persona se mira `clase`, no esto.
+        nulo_significa: El recurso no tiene tipo asignado en Sigrid.
+      activo:
+        significado: >-
+          El criterio de negocio de Juan Romero («los recursos en rojo estan de
+          baja»), traducido a la baja del CONCEPTO del recurso. Medido: 1.722 de
+          baja y 896 de alta; entre las personas, 1.034 de baja y 320 de alta.
+          **ES UNA BANDERA, NO UN FILTRO**: filtrar el hecho por aqui borra
+          539.774,87 de las 1.249.038,44 horas imputadas, el 43,2 %, porque el
+          recurso de baja de hoy trabajo ayer. Sirve para responder "quien esta
+          hoy de alta", nunca para acotar una suma historica.
+        agregacion: no_sumable
+      fecha_baja:
+        significado: >-
+          Fecha en la que el recurso se dio de baja, ya tipada. Es la del
+          concepto: el recurso no tiene fecha de baja propia en Sigrid.
+        nulo_significa: El recurso sigue de alta.
+        agregacion: no_sumable
+      nif:
+        significado: >-
+          **DATO PERSONAL (autorizado el 2026-09-18).** NIF del recurso tal y
+          como esta en Sigrid, informado en 629 de las 1.354 personas.
+        nulo_significa: El recurso no tiene NIF informado, o no es una persona.
+      empleado_id:
+        significado: >-
+          Ficha de empleado asociada al recurso, cuando la hay. Solo 824 de los
+          2.618 recursos la tienen (31,5 %). **No es el eje del esquema y no se
+          puede usar como filtro**: hacerlo dejaria fuera a 530 recursos que si
+          son personas y a los 1.264 que no lo son.
+        nulo_significa: El recurso no tiene ficha de empleado (68,5 % de las filas).
+        agregacion: no_sumable
+      dni:
+        significado: >-
+          **DATO PERSONAL (autorizado el 2026-09-18).** DNI del empleado
+          asociado, informado en el 99,2 % de los que tienen ficha.
+        nulo_significa: El recurso no tiene ficha de empleado.
+      nombre_pila:
+        significado: >-
+          **DATO PERSONAL.** Nombre de pila del empleado, ya separado del
+          apellido, que es lo que no da el nombre del recurso.
+        nulo_significa: El recurso no tiene ficha de empleado.
+      apellido1:
+        significado: >-
+          **DATO PERSONAL.** Primer apellido del empleado asociado.
+        nulo_significa: El recurso no tiene ficha de empleado.
+      apellido2:
+        significado: >-
+          **DATO PERSONAL.** Segundo apellido del empleado asociado.
+        nulo_significa: El recurso no tiene ficha de empleado, o no lo tiene.
+      es_externo:
+        significado: >-
+          Si el recurso pertenece a un proveedor y no a la casa. Medido: 459 de
+          las 1.354 personas son externas, repartidas entre 85 proveedores. Es
+          el corte para separar mano de obra propia de subcontratada.
+        agregacion: no_sumable
+      proveedor_id:
+        significado: >-
+          Proveedor del que viene el recurso externo. Se une con el maestro de
+          proveedores para ponerle nombre.
+        nulo_significa: El recurso no es externo.
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+      empresa_id:
+        significado: >-
+          Empresa de Sigrid a la que pertenece la ficha del recurso (`con.emp`,
+          F-102). `1` es Ruesma, `28` Porsan y el resto UTE u otras empresas del
+          grupo; el nombre esta en `nombre_empresa`. Una persona puede tener una
+          ficha por empresa, cada una con su `recurso_id`.
+        agregacion: no_sumable
+      nombre_empresa:
+        significado: >-
+          Nombre de la empresa del recurso, de `raw.auxemp` por `numemp` =
+          `con.emp` (F-102), en un lateral con `ORDER BY` + `LIMIT 1` que no
+          multiplica filas.
+        nulo_significa: >-
+          La empresa del recurso no esta en `raw.auxemp`. No deberia pasar: las
+          38 empresas se ingieren enteras cada noche.
+      clave_recurso:
+        significado: >-
+          **La clave legible y UNICA del recurso**: `<empresa>-<codigo>`
+          (`1-MO/0009` y `28-MO/0009` son dos fichas de la misma persona en dos
+          empresas). 2.618 claves para 2.618 recursos el 2026-09-23. `empresa_id`
+          es entero, asi que lo que va antes del primer `-` es la empresa y la
+          clave no colisiona aunque el codigo lleve guiones.
+          Es la clave alternativa de la ficha: la vigila `check-unicidad`
+          contra la base (F-108).
+      centro_coste_contrapartida_id:
+        significado: >-
+          Centro de coste de CONTRAPARTIDA de la ficha del recurso (F-107): el
+          centro contra el que se abona lo que sus partes cargan a la obra. Es
+          del recurso, no del tipo de hora. **No es la obra ni sirve para
+          atribuir obra**: medido el 2026-09-24, solo hay 8 centros distintos y
+          1.875 de los 1.979 recursos con contrapartida apuntan al 'CP' CENTRO
+          PERSONAL de la empresa 1 (el resto: CENTRO MAQUINARIA, GASTOS
+          GENERALES y el centro de personal de cuatro UTE). Su codigo y nombre
+          se leen en `maestro.centros_coste`.
+        nulo_significa: >-
+          La ficha del recurso no declara contrapartida (640 de 2.619 recursos
+          el 2026-09-24). Si falta el centro falta tambien la cuenta.
+        agregacion: no_sumable
+      cuenta_analitica_contrapartida_id:
+        significado: >-
+          Cuenta analitica de CONTRAPARTIDA de la ficha del recurso (F-107): la
+          cuenta contra la que se abona lo que sus partes cargan a la obra. Es
+          del recurso, no del tipo de hora. 847 cuentas distintas el 2026-09-24,
+          todas en `maestro.cuentas_analiticas` (0 huerfanas), de la misma
+          empresa que el recurso y del mismo centro que
+          `centro_coste_contrapartida_id`. Su codigo y descripcion se leen alli:
+          por ejemplo, 496869 es '00000.CIMO02' JEFE DE OBRA.
+        nulo_significa: >-
+          La ficha del recurso no declara contrapartida (640 de 2.619 recursos
+          el 2026-09-24).
+        agregacion: no_sumable
+
+    relaciones:
+      - de: recurso_id
+        a: personal.partes_lineas.recurso_id
+        cardinalidad: "1:N"
+        porque: >-
+          Es el camino para responder quien ha trabajado en una obra y cuanto ha
+          imputado. Hay muchas lineas por recurso, asi que se agrega el lado del
+          hecho antes de unir, y **filtrando la unidad**: sumar sin ese filtro
+          mezcla horas con meses.
+      - de: proveedor_id
+        a: maestro.proveedores.proveedor_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para poner nombre al proveedor del que viene un recurso externo. Solo
+          aplica a las 459 personas externas.
+      - de: recurso_id
+        a: personal.recursos_tipos_hora.recurso_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para ver los tipos de hora configurados en la ficha del recurso y su
+          precio de coste y de venta: los precios de HOY, sin historico.
+      - de: centro_coste_contrapartida_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y el nombre del centro de coste de contrapartida (F-107).
+          Muchos recursos comparten centro: 1.875 apuntan al CENTRO PERSONAL.
+          No resuelve a obra, y no hay que usarlo para atribuir obra.
+      - de: cuenta_analitica_contrapartida_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y la descripcion de la cuenta analitica de
+          contrapartida (F-107): lo que Juan Romero necesita para reproducir el
+          abono del asiento. 847 cuentas para 1.979 recursos, 0 huerfanas.
+
+    ejemplos_preguntas:
+      - Que recursos son personas y cuantos estan hoy de alta
+      - Que parte de la mano de obra de la empresa es externa y de que proveedores
+      - Como se llama y que DNI tiene el recurso que imputo estas horas
+
+  partes_lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL HECHO**: una fila por linea de parte de trabajo (330.638 el
+      2026-09-18), con su recurso, su obra, su partida, su fecha, su cantidad y
+      su importe. Es lo que ata persona, horas y obra, y cubre 20 anos de
+      historia (2002-2026).
+
+      **LA TRAMPA, y es la razon de ser de la columna `unidad`**: `cantidad` no
+      son horas. El mismo campo trae HORA, DIA, MES y UD segun el tipo de hora
+      de la linea. Reparto medido: 241.004 lineas en HORA (1.249.038,44 h,
+      24,84 M EUR), 36.034 en MES (18.009,38 meses, **70,46 M EUR**), 43.867 en
+      UD (565.927,95 ud, 2,98 M EUR) y 9.723 en DIA (4.225,46 dias, 1.809,20
+      EUR). Sumar sin filtrar da 1.837.201,23 de nada.
+
+      **Y el reverso, que se olvida**: las horas NO son el coste de personal
+      completo. El **71,7 % del euro esta en las lineas de MES**, que es donde
+      vive el coste de estructura de obra --MES JEFE DE OBRA solo son 18,80 M
+      EUR--. Para horas, `v_pbi_horas_obra_mes`; para el euro total de personal
+      de una obra, esta tabla sin filtrar unidad.
+
+      **La obra sale de la LINEA, no de la cabecera del parte**: en 615 lineas
+      de 14 partes (medido el 2026-09-23) las dos discrepan y manda la linea,
+      que es ademas la que lleva la partida. La cabecera
+      completa --codigo, descripcion, estado y su obra, que AUDITA-- esta en
+      `personal.partes`; aqui solo baja el codigo del parte. La atribucion por centro de coste --la trampa de `apu`, que F-045
+      tiene abierta-- **no aplica aqui**: el parte trae la obra.
+
+      **No se filtra el universo de obra**: se marca en `en_seguimiento`. Medido:
+      523 obras del seguimiento (318.892 lineas, 1.226.158,60 h, 93,24 M EUR =
+      94,9 % del euro), 12 obras administrativas (10.373 lineas, 4,93 M EUR) y
+      1.373 lineas sin obra.
+
+      **Defectos de calidad medidos en origen, que se publican sin corregir**:
+      5 lineas con la fecha a cero, una con fecha del ano **3103**, 6 con el ano
+      fuera de 1990-2030 y 5 con el mes fuera de 1-12.
+    grano: >-
+      Una fila por linea de parte de trabajo, identificada por `linea_id`. Estan
+      las 330.638: no se filtra ni la obra, ni el recurso de baja, ni el importe
+      negativo.
+    clave_negocio: [linea_id]
+    paso_etl: build_personal
+    refresco: nocturno
+
+    columnas:
+      linea_id:
+        significado: Identificador de la linea de parte en Sigrid. Clave primaria.
+        agregacion: no_sumable
+      parte_id:
+        significado: >-
+          Cabecera del parte de trabajo de la que cuelga la linea, en
+          `personal.partes`. Informada en el 100 % de las filas y es la clave
+          para agrupar por parte. **La cabecera no aporta la obra**: cuando las
+          dos discrepan manda la linea.
+        nulo_significa: La linea no tiene cabecera informada (no ocurre hoy).
+        agregacion: no_sumable
+      codigo_parte:
+        significado: >-
+          Codigo del parte tal y como aparece en Sigrid ("PT26/00336"), traido a
+          la linea para no tener que unir la cabecera (F-101). **NO es unico**:
+          569 codigos se repiten en 1.197 partes, asi que para agrupar o contar
+          partes se usa `parte_id`, nunca el codigo.
+        nulo_significa: >-
+          La linea no tiene cabecera informada en Sigrid (0 de 330.941 lineas el
+          2026-09-23).
+      recurso_id:
+        significado: >-
+          Recurso que imputo la linea. Informado en 330.628 de 330.638 filas. Es
+          el eje del esquema: por aqui se llega al nombre, a la clase y a si es
+          externo.
+        nulo_significa: La linea no tiene recurso informado (10 filas).
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra a la que se imputa la linea, tomada de la **LINEA** y no de la
+          cabecera del parte. Informada en 329.265 de 330.638 filas (99,58 %)
+          sobre 536 obras.
+        nulo_significa: La linea no tiene obra informada (1.373 filas).
+        agregacion: no_sumable
+      en_seguimiento:
+        significado: >-
+          Si la obra de la linea entra en el universo del seguimiento. Es una
+          MARCA y no un filtro: las lineas de obras administrativas se publican
+          igual. Cierto en 318.892 lineas, de 523 obras.
+        agregacion: no_sumable
+      partida_id:
+        significado: >-
+          Partida de obra a la que se imputa la linea, informada en 302.575
+          filas (91,5 %). Las 302.575 existen en el arbol de partidas y son de
+          la MISMA obra de la linea: cero inconsistencias medidas.
+        nulo_significa: La linea no se imputo a ninguna partida.
+        agregacion: no_sumable
+      fecha:
+        significado: >-
+          Fecha de la imputacion, ya tipada. **Hay basura en origen y no se
+          corrige**: una linea tiene fecha del ano **3103** y 6 tienen el ano
+          fuera de 1990-2030. Para agregar por periodo es mas seguro usar `anio`
+          y `mes`, que es lo que Sigrid usa para cuadrar el parte.
+        nulo_significa: >-
+          La linea venia con la fecha a cero en origen (5 filas). No se
+          inventa ninguna fecha para taparlo.
+        agregacion: no_sumable
+      anio:
+        significado: >-
+          Ano de imputacion declarado en la linea. 5 lineas lo traen fuera de
+          1990-2030.
+        agregacion: no_sumable
+      mes:
+        significado: >-
+          Mes de imputacion declarado en la linea. 5 lineas lo traen fuera de
+          1-12, asi que un filtro por mes puede dejarlas fuera sin avisar.
+        agregacion: no_sumable
+      tipo_hora_id:
+        significado: >-
+          Concepto de hora de la linea, del catalogo de Sigrid. Es lo que fija
+          la unidad de `cantidad`.
+        nulo_significa: La linea no declara concepto de hora.
+        agregacion: no_sumable
+      tipo_hora:
+        significado: >-
+          Literal del concepto de hora, ya resuelto ("HORA ORDINARIA", "MES JEFE
+          DE OBRA", "KILOMETROS"). El catalogo **mezcla horas de verdad con
+          conceptos que no lo son**, y es la lectura humana de por que dos
+          lineas con la misma `cantidad` no son comparables.
+        nulo_significa: El concepto de hora de la linea no esta en el catalogo (10 filas).
+      unidad:
+        significado: >-
+          **LA COLUMNA QUE EVITA LA CIFRA FALSA.** Que mide `cantidad` en esta
+          linea. Sale de la unidad de medida del concepto de hora. DESCONOCIDA
+          significa que el concepto de la linea no esta en el catalogo, o que
+          Sigrid ha estrenado una unidad que este ETL no traduce todavia: en los
+          dos casos hay que excluirla de cualquier suma, no darla por horas.
+        valores: [HORA, DIA, MES, UD, DESCONOCIDA]
+      cantidad:
+        significado: >-
+          Lo imputado por la linea, **en la unidad que diga `unidad` y no en
+          horas**. NUNCA se suma sin filtrar `unidad`: en bruto da 1.837.201,23,
+          que mezcla horas de albanil con meses de jefe de obra, dias de
+          vacaciones y kilometros. Con el filtro de HORA salen 1.249.038,44
+          horas, que es la cifra buena.
+        agregacion: suma
+      precio:
+        significado: >-
+          Precio de coste unitario aplicado a la linea, en la unidad de
+          `unidad`. No se promedia entre lineas de unidades distintas.
+        unidad: EUR
+        agregacion: no_sumable
+      importe:
+        significado: >-
+          Coste de la linea, **con su signo**. 11.036 lineas valen 0 y 9.119 son
+          negativas: son correcciones, y restan de verdad. A diferencia de
+          `cantidad`, esto SI se puede sumar entre unidades distintas, porque
+          todas son euros: 98.275.191,12 EUR en total.
+        unidad: EUR
+        agregacion: suma
+      texto_linea:
+        significado: >-
+          El comentario de la linea del parte tal y como se teclea en Sigrid
+          (F-101). Es **texto libre y puede llevar nombres de persona** --se ha
+          medido un nombre y dos apellidos en uno--. **No vive solo aqui**: el
+          mismo texto esta en la tabla de origen `raw.hmores`, que el rol de
+          consulta tambien puede leer, asi que retirar el acceso a este esquema
+          no lo retira de alli (exposicion aceptada por el responsable del dato
+          el 2026-09-23). Informado en 13.390 de 330.941 lineas (4,05 %), de
+          2.306 partes; maximo 318 caracteres.
+        nulo_significa: La linea no lleva comentario (el 95,95 % de ellas).
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+      cuenta_analitica_id:
+        significado: >-
+          La cuenta analitica de CARGO de la linea (F-107): contra que cuenta se
+          imputa el coste en la obra. Sale de la propia linea del parte en
+          Sigrid. Medido en solo lectura el 2026-09-24: informada en 310.553 de
+          331.003 lineas (93,8 %), 3.782 cuentas distintas, 0 huerfanas contra
+          el catalogo y todas de la misma empresa que el recurso. En 309.182
+          lineas el codigo de la cuenta empieza por el codigo de la obra de la
+          linea (codigo de obra, punto, cuenta): es la cuenta del centro de la
+          obra. **No es la
+          contrapartida**: el abono va contra la cuenta de la ficha del recurso
+          (`personal.recursos.cuenta_analitica_contrapartida_id`), y solo 45
+          lineas llevan esa misma cuenta. Su codigo y descripcion estan en
+          `maestro.cuentas_analiticas`.
+        nulo_significa: >-
+          La linea no lleva cuenta analitica (20.450 lineas, 4,62 M EUR de los
+          98,33 M EUR del total el 2026-09-24).
+        agregacion: no_sumable
+
+    relaciones:
+      - de: cuenta_analitica_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y la descripcion de la cuenta de CARGO de la linea
+          (F-107): 3.782 cuentas para 310.553 lineas, 0 huerfanas el
+          2026-09-24. Junto con la contrapartida del recurso, es el asiento
+          completo del parte.
+      - de: parte_id
+        a: personal.partes.parte_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para la cabecera del parte: descripcion, estado, fecha de modificacion
+          y la obra de CABECERA, que sirve para auditar y no para imputar. Hay
+          muchas lineas por parte.
+      - de: recurso_id
+        a: personal.recursos.recurso_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para saber QUIEN imputo: su nombre, si es una persona o un consumo, si
+          esta de alta y si es externo. Es la union basica de este esquema.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo, el nombre, el estado y el cliente de la obra. El
+          maestro es el universo COMPLETO: incluye las 12 obras administrativas
+          que `en_seguimiento` marca como fuera del seguimiento.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para comparar la mano de obra imputada con lo presupuestado en esa
+          misma partida. Medido: las 302.575 lineas con partida enganchan, y la
+          partida es siempre de la misma obra de la linea.
+
+    ejemplos_preguntas:
+      - Cuanto coste de personal lleva la obra X, contando meses y horas
+      - Quien ha trabajado en la obra X y cuanto ha imputado cada uno
+      - Que partidas de la obra X llevan mano de obra imputada
+      - Que lineas del parte PT26/00336 llevan comentario y que dicen
+
+  v_pbi_horas_obra_mes:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LAS HORAS, y solo las horas.** Horas imputadas por obra, ano, mes y tipo
+      de recurso, construida SOLO con las lineas de unidad HORA: 1.249.038,44
+      horas sobre 369 obras y 445 recursos, todos personas.
+
+      El corte va **cableado en la vista** a proposito: es lo que hace que la
+      trampa de la unidad no se pueda cometer desde aqui. Quien pregunte "cuantas
+      horas se han imputado a la obra X" tiene su respuesta sin tener que saber
+      que `cantidad` mezcla cuatro unidades.
+
+      **LO QUE ESTA VISTA NO RESPONDE, y hay que decirlo al citarla**: no es el
+      coste de personal completo de una obra. El 71,7 % del euro esta en las
+      lineas de MES --el coste de estructura-- y aqui no entran, asi que su
+      `importe` es solo el de las horas. Para el euro total de personal, la
+      tabla `personal.partes_lineas` sin filtrar unidad.
+
+      **No lleva nombre ni DNI.** No por privacidad --estan autorizados y viven
+      en `personal.recursos`-- sino porque esto es un agregado: el nombre a este
+      grano solo produce filas de una persona disfrazadas de agregado. Quien
+      necesite saber quien trabajo en una obra cruza las dos tablas.
+    grano: >-
+      Una fila por combinacion de `obra_id`, `anio`, `mes`, `tipo_recurso` y
+      `es_externo`, contando solo lineas de unidad HORA.
+    clave_negocio: [obra_id, anio, mes, tipo_recurso, es_externo]
+    paso_etl: build_personal
+    refresco: nocturno
+
+    columnas:
+      obra_id:
+        significado: >-
+          Obra a la que se imputaron las horas, la de la linea del parte.
+        nulo_significa: Las lineas del grupo no tenian obra informada.
+        agregacion: no_sumable
+      codigo_obra:
+        significado: Codigo de obra tal y como se teclea en Sigrid, ya resuelto.
+        nulo_significa: Las lineas del grupo no tenian obra informada.
+      nombre_obra:
+        significado: Nombre legible de la obra, ya resuelto para no tener que unir.
+        nulo_significa: Las lineas del grupo no tenian obra informada.
+      anio:
+        significado: Ano de imputacion, tal y como lo declara la linea del parte.
+        agregacion: no_sumable
+      mes:
+        significado: Mes de imputacion, tal y como lo declara la linea del parte.
+        agregacion: no_sumable
+      tipo_recurso:
+        significado: >-
+          Oficio o categoria del recurso que imputo las horas ("OFIC. 1a
+          ALBANIL", "PEON ORDINARIO"). Es el eje por el que se lee en que se ha
+          ido la mano de obra de una obra.
+        nulo_significa: El recurso no tiene tipo asignado en Sigrid.
+      es_externo:
+        significado: >-
+          Si las horas las puso personal propio o de un proveedor. Es el corte
+          para separar mano de obra propia de subcontratada.
+        agregacion: no_sumable
+      recursos:
+        significado: >-
+          Cuantas personas distintas imputaron horas en ese grupo. **No se suma
+          entre filas**: la misma persona aparece en varios meses y sumarlas la
+          contaria varias veces.
+        agregacion: no_sumable
+      horas:
+        significado: >-
+          Horas imputadas, ya filtradas a unidad HORA. Esta si se suma entre
+          filas: todas son horas de verdad.
+        unidad: h
+        agregacion: suma
+      importe:
+        significado: >-
+          Coste de esas horas, con su signo. **No es el coste de personal de la
+          obra**: deja fuera el 71,7 % del euro, que esta en las lineas de MES.
+        unidad: EUR
+        agregacion: suma
+
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el estado, el cliente y las fechas de la obra, que aqui no vienen.
+
+    ejemplos_preguntas:
+      - Cuantas horas se imputaron a la obra X en 2026 y de que oficios
+      - Que obras llevan mas horas de mano de obra subcontratada este ano
+      - Como evolucionan mes a mes las horas de la obra X
+
+  fn_fecha:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de personal, usada solo dentro del SQL que
+      construye el esquema.
+    descripcion: >-
+      Convierte una fecha de Sigrid --un entero con formato YYYYMMDD-- en una
+      fecha de verdad, tratando el 0 y las invalidas como ausencia de fecha. Es
+      una copia local de la misma funcion que tienen `stg`, `compras`,
+      `retenciones` y `maestro`, y la copia es deliberada: asi el esquema
+      `personal` se puede construir sin depender de que exista ningun otro.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_personal
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  partes:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LA CABECERA del parte de trabajo** (F-101): una fila por parte, 6.886 el
+      2026-09-23, con su codigo tal y como aparece en Sigrid, su descripcion, su
+      fecha, su estado y la obra y el centro de coste de CABECERA. Las horas y
+      el coste NO estan aqui: estan en `personal.partes_lineas`, que cuelga de
+      esta tabla por `parte_id`.
+
+      **EL CODIGO NO ES CLAVE.** Hay 6.258 codigos para 6.886 partes: 569
+      codigos se repiten y afectan a 1.197 partes. Contar partes o unir por
+      `codigo_parte` cuenta de mas o mezcla partes distintos; la clave es
+      `parte_id`.
+
+      **LA OBRA DE CABECERA AUDITA, NO IMPUTA** (patron F-093). La obra a la que
+      va el coste es la de la LINEA (`personal.partes_lineas.obra_id`), y en 615
+      lineas de 14 partes no coincide con la de su cabecera. Por eso aqui se
+      llama `obra_cabecera_id` y no `obra_id`: sumar coste por la obra de la
+      cabecera atribuye esas lineas a la obra equivocada. Para ver donde
+      discrepan, `lineas_en_otra_obra > 0`.
+
+      **No se filtra ni se corrige nada**: estan los 218 partes de baja (con
+      `activo` a falso), y el ano y el mes se publican tal cual, con sus
+      defectos de origen declarados en cada columna.
+
+      **LO QUE NO ESTA, y donde vive**: el usuario que crea el parte. No existe
+      en la cabecera de Sigrid (ni en el concepto ni en las propiedades del
+      parte hay ninguna columna de usuario): esta en la tabla de auditoria
+      `dbo.log` de Sigrid (8.472.098 filas, 35.684 de partes), que NO se ingiere.
+      Traerla es una feature propia, F-105, con su coste de ventana y su
+      conversacion sobre datos personales. Tampoco hay fecha de cierre ni clase
+      del parte: en Sigrid valen 0 en los 6.886.
+    grano: >-
+      Una fila por cabecera de parte de trabajo, identificada por `parte_id`.
+      Estan todas, de alta y de baja, con lineas o sin ellas.
+    clave_negocio: [parte_id]
+    paso_etl: build_personal
+    refresco: nocturno
+
+    columnas:
+      parte_id:
+        significado: >-
+          Identificador del parte en Sigrid y clave de esta tabla. Es por donde
+          se une con sus lineas (`personal.partes_lineas.parte_id`).
+        agregacion: no_sumable
+      codigo_parte:
+        significado: >-
+          Codigo del parte tal y como aparece en Sigrid ("PT26/00336"),
+          informado en los 6.886. **NO es unico: 569 codigos se repiten en 1.197
+          partes**, asi que para contar, agrupar o unir partes se usa
+          `parte_id`, nunca el codigo.
+      descripcion:
+        significado: >-
+          Descripcion u observaciones del parte, la que se teclea en su
+          cabecera en Sigrid. Informada en 6.883 de 6.886.
+        nulo_significa: El parte no tiene descripcion (3 partes).
+      fecha:
+        significado: >-
+          Fecha del parte, ya tipada. Informada en 6.885 de 6.886, todas dentro
+          de 1990-2030; el parte que falta la trae a 0 en origen.
+        nulo_significa: El parte venia con la fecha a 0 en Sigrid (1 parte). No se inventa ninguna.
+        agregacion: no_sumable
+      anio:
+        significado: >-
+          Ano del parte, tal y como lo declara su cabecera. **27 partes lo traen
+          fuera de 1990-2030** y no se corrige: 21 valen 0 y los demas son
+          erratas de tecleo (de dos a seis cifras, como 11226 o 201831). Para
+          agregar por periodo, filtrar el rango.
+        agregacion: no_sumable
+      mes:
+        significado: >-
+          Mes del parte, tal y como lo declara su cabecera. 2 partes lo traen
+          fuera de 1-12, asi que un filtro por mes puede dejarlos fuera sin
+          avisar.
+        agregacion: no_sumable
+      obra_cabecera_id:
+        significado: >-
+          Obra de la CABECERA del parte, informada en 6.845 partes sobre 539
+          obras. **Sirve para auditar, no imputa coste**: la obra que imputa es
+          la de cada linea (`personal.partes_lineas.obra_id`), y en 615 lineas
+          de 14 partes no coinciden. No se suma coste por esta columna.
+        nulo_significa: El parte no declara obra en su cabecera (41 partes).
+        agregacion: no_sumable
+      centro_coste_cabecera_id:
+        significado: >-
+          Centro de coste de la CABECERA del parte, informado en 6.839. Como la
+          obra de cabecera, sirve para auditar y no para atribuir: el centro de
+          coste y la obra son entidades distintas en Sigrid, y el puente entre
+          las dos es `maestro.centros_coste`.
+        nulo_significa: El parte no declara centro de coste en su cabecera (47 partes).
+        agregacion: no_sumable
+      estado_id:
+        significado: >-
+          Estado del parte en Sigrid, del catalogo de estados de su tipo de
+          documento. Hoy solo aparecen tres: 1, 3 y 10.
+        agregacion: no_sumable
+      estado:
+        significado: >-
+          Nombre del estado del parte, ya traducido. Reparto medido el
+          2026-09-23: En registro 647, Cerrado 541, Imputado 5.698.
+        valores: [En registro, Cerrado, Imputado]
+        nulo_significa: El estado del parte no esta en el catalogo de su tipo de documento.
+      activo:
+        significado: >-
+          Si el parte esta de alta, con el mismo criterio que
+          `personal.recursos`: la baja del concepto en Sigrid. 218 partes estan
+          de baja. **Es una BANDERA, no un filtro**: aqui no se quita ninguno.
+        agregacion: no_sumable
+      fecha_baja:
+        significado: Fecha en la que el parte se dio de baja en Sigrid, ya tipada.
+        nulo_significa: El parte sigue de alta.
+        agregacion: no_sumable
+      fecha_modificacion:
+        significado: >-
+          Ultima modificacion del parte en Sigrid (solo el dia, sin la hora),
+          informada en 6.885. Sale de una fecha serie con epoca 1899-12-30
+          verificada contra el propio dato.
+        nulo_significa: Sigrid no registra modificacion del parte.
+        agregacion: no_sumable
+      num_lineas:
+        significado: >-
+          Cuantas lineas tiene el parte. 6.873 partes tienen al menos una; los
+          13 restantes valen 0.
+        agregacion: suma
+      lineas_en_otra_obra:
+        significado: >-
+          Cuantas lineas del parte imputan a una obra DISTINTA de la de su
+          cabecera (las dos informadas). Medido: 615 lineas en 14 partes.
+          `WHERE lineas_en_otra_obra > 0` contesta "en cuantos partes discrepan"
+          sin escribir un JOIN.
+        agregacion: suma
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+
+    relaciones:
+      - de: parte_id
+        a: personal.partes_lineas.parte_id
+        cardinalidad: "1:N"
+        porque: >-
+          Las horas, el coste y la obra que IMPUTA estan en las lineas. Hay
+          muchas lineas por parte: se agrega el lado de las lineas antes de unir.
+      - de: obra_cabecera_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y el nombre de la obra de CABECERA, con la que auditar
+          el parte. Casa en 537 de sus 539 valores: dos obras de cabecera no son
+          obras del maestro.
+      - de: centro_coste_cabecera_id
+        a: maestro.centros_coste.centro_coste_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el nombre del centro de coste de cabecera y su obra asociada.
+          Casa en los 537 centros distintos medidos.
+
+    ejemplos_preguntas:
+      - Que descripcion y que estado tiene el parte PT26/00336
+      - En cuantos partes la obra de la cabecera no coincide con la de sus lineas
+      - Cuantos partes siguen en registro sin imputar en la obra X
+
+  recursos_tipos_hora:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS PRECIOS DE LA FICHA del recurso** (F-101): que tipos de hora tiene
+      definidos cada recurso --laborable, extra, festiva, mes de jefe de obra,
+      vacaciones...--, a que precio de coste y de venta, en que unidad y cual es
+      su tipo por defecto. 8.968 filas el 2026-09-23, de 2.064 recursos y 58
+      tipos de hora. Es lo CONFIGURADO; lo IMPUTADO esta en
+      `personal.partes_lineas`.
+
+      **SON LOS PRECIOS DE HOY: Sigrid no guarda historico aqui.** La tabla de
+      origen no tiene ninguna fecha ni marca de modificacion, asi que no hay
+      vigencia: un precio que cambio el mes pasado aparece solo con su valor
+      actual. Por eso **el precio de la ficha y el imputado no coinciden**: de
+      279.034 lineas de parte comparables (mismo recurso y tipo de hora, con
+      precio en los dos lados), **156.819 (56,2 %) llevan un precio distinto**
+      del configurado hoy. Es la forma de detectar desfases tras una subida o un
+      cambio de categoria, pero la fecha del cambio no esta aqui: sale de las
+      lineas.
+
+      **LA CLAVE ES `reshor_id`, NO EL PAR (recurso, tipo de hora).** Hay 17
+      pares repetidos: 16 con el mismo precio y uno --recurso 947513, tipo de
+      hora 27-- con dos precios distintos. Unir las lineas de parte por el par
+      duplica esas lineas.
+
+      **Lo que no se publica**: el precio de NOMINA, por decision expresa del
+      responsable del dato del 2026-09-22 (solo 2 filas lo tienen distinto de
+      0, y podrian ser nomina real); ni la cuenta ni el proyecto de la ficha,
+      que valen 0 en todas las filas. La cuenta analitica si esta, informada en
+      3.198 filas, y se traduce en `maestro.cuentas_analiticas` (F-107).
+
+      **Aqui NO esta la contrapartida** (F-107): el centro de coste y la cuenta
+      contra los que se abona lo imputado son del RECURSO, no del tipo de hora,
+      y se publican en `personal.recursos`
+      (`centro_coste_contrapartida_id`, `cuenta_analitica_contrapartida_id`).
+    grano: >-
+      Una fila por tipo de hora definido en la ficha de un recurso, identificada
+      por `reshor_id`. El par (recurso, tipo de hora) se repite 17 veces.
+    clave_negocio: [reshor_id]
+    paso_etl: build_personal
+    refresco: nocturno
+
+    columnas:
+      reshor_id:
+        significado: >-
+          Identificador de la fila de la ficha en Sigrid y clave de esta tabla.
+          Existe porque el par (recurso, tipo de hora) no es unico.
+        agregacion: no_sumable
+      recurso_id:
+        significado: >-
+          Recurso al que pertenece el tipo de hora. Une con
+          `personal.recursos` y, junto con `tipo_hora_id`, con las lineas de
+          parte. Informado en todas las filas.
+        agregacion: no_sumable
+      tipo_hora_id:
+        significado: >-
+          Tipo de hora del catalogo de Sigrid, el mismo que
+          `personal.partes_lineas.tipo_hora_id`.
+        nulo_significa: La fila no declara tipo de hora.
+        agregacion: no_sumable
+      codigo_tipo_hora:
+        significado: Codigo corto del tipo de hora en el catalogo de Sigrid.
+        nulo_significa: El tipo de hora no esta en el catalogo (3 filas).
+      tipo_hora:
+        significado: >-
+          Nombre del tipo de hora ("HORA ORDINARIA", "MES JEFE DE OBRA"). El
+          catalogo mezcla horas de verdad con conceptos que no lo son.
+        nulo_significa: El tipo de hora no esta en el catalogo (3 filas).
+      unidad:
+        significado: >-
+          En que unidad va el precio: HORA, DIA, MES o UD. Sale de la misma
+          traduccion que `personal.partes_lineas.unidad`, asi que las dos se
+          pueden comparar. De los 60 tipos del catalogo, 18 son HORA, 8 DIA, 18
+          MES y 16 UD. DESCONOCIDA si el tipo no esta en el catalogo (3 filas).
+        valores: [HORA, DIA, MES, UD, DESCONOCIDA]
+      precio_coste:
+        significado: >-
+          Precio de coste configurado HOY para ese recurso y tipo de hora, en la
+          unidad de `unidad`. Es el que el parte propone al imputar. Distinto de
+          0 en 2.037 filas. **No es historico**: no dice desde cuando vale esto.
+        unidad: EUR
+        agregacion: no_sumable
+      precio_venta:
+        significado: >-
+          Precio de venta configurado para ese recurso y tipo de hora. **Casi no
+          esta informado: tiene valor en 3 de 8.968 filas** (2026-09-23); en las
+          demas vale 0, que aqui significa "sin precio de venta", no "gratis".
+        unidad: EUR
+        agregacion: no_sumable
+      cantidad_defecto:
+        significado: >-
+          Cantidad que el parte propone por defecto para ese tipo de hora, en su
+          unidad. Distinta de 0 en 1.614 filas.
+        agregacion: no_sumable
+      cuenta_analitica_id:
+        significado: >-
+          Cuenta analitica asociada a ese tipo de hora en la ficha del recurso.
+          Informada en 3.198 filas (3.199 en Sigrid el 2026-09-24, 50 cuentas
+          distintas, 0 huerfanas). Su codigo y descripcion estan en
+          `maestro.cuentas_analiticas`. No es la contrapartida: esa es del
+          recurso (`personal.recursos.cuenta_analitica_contrapartida_id`).
+        nulo_significa: La ficha no asocia cuenta analitica a ese tipo de hora.
+        agregacion: no_sumable
+      es_por_defecto:
+        significado: >-
+          Cierto en la fila del tipo de hora que el recurso tiene marcado POR
+          DEFECTO en su ficha (2.032 filas). El defecto esta declarado en 2.035
+          de 2.618 recursos; en **4 recursos** ese tipo por defecto no tiene
+          fila en esta tabla, asi que ninguna de sus filas lo marca y el dato no
+          se ve aqui.
+        agregacion: no_sumable
+      orden:
+        significado: Posicion del tipo de hora en la ficha del recurso, tal y como la muestra Sigrid.
+        agregacion: no_sumable
+      tipo_hora_de_baja:
+        significado: >-
+          Si el tipo de hora esta dado de baja en el catalogo. Un precio de un
+          tipo de baja sigue en la ficha pero ya no se deberia imputar.
+        nulo_significa: El tipo de hora no esta en el catalogo (3 filas).
+        agregacion: no_sumable
+      _built_at:
+        significado: Instante de construccion de la fila. Instrumentacion, no negocio.
+        agregacion: no_sumable
+
+    relaciones:
+      - de: recurso_id
+        a: personal.recursos.recurso_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el nombre, la clase y si el recurso esta de alta. Hay muchas
+          filas por recurso, una por tipo de hora.
+      - de: recurso_id
+        a: personal.partes_lineas.recurso_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para comparar el precio configurado con el imputado se une por
+          `(recurso_id, tipo_hora_id)`, nunca solo por el recurso. Aun asi el par
+          se repite 17 veces aqui: agregar o elegir una fila por par antes de
+          unir, o las lineas de esos recursos salen duplicadas.
+      - de: cuenta_analitica_id
+        a: maestro.cuentas_analiticas.cuenta_analitica_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el codigo y la descripcion de la cuenta analitica del tipo de
+          hora (F-107). 50 cuentas para 3.199 filas informadas, 0 huerfanas el
+          2026-09-24.
+
+    ejemplos_preguntas:
+      - Que precio de coste tiene configurado hoy el recurso X para cada tipo de hora
+      - Que lineas de parte llevan un precio distinto del de la ficha del recurso
+      - Cual es el tipo de hora por defecto de cada persona de alta
+
+  fn_fecha_serie:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de personal (F-101), usada solo dentro del SQL
+      que construye la cabecera de los partes.
+    descripcion: >-
+      Convierte una FECHA SERIE de Sigrid --dias desde una epoca, con la hora en
+      la parte decimal, que es como viene la ultima modificacion de un
+      documento-- en una fecha, descartando la hora; el 0, el nulo y lo invalido
+      salen nulos. La epoca 1899-12-30 esta VERIFICADA, no supuesta: la ultima
+      modificacion global de Sigrid, 46287,88, da 2026-09-22, el dia en que se
+      midio; y el parte mas antiguo, 39784,75, da 2008-11-21 con fecha de parte
+      2008-11-30. Copia local al esquema, como `fn_fecha`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_personal
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

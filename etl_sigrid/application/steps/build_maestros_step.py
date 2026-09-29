@@ -3,15 +3,35 @@
 Step que materializa el schema `maestro` (catálogos para consulta externa).
 
 Encadena los archivos SQL en orden:
-    00_setup.sql            - schema maestro + helper de fecha (idempotente)
-    01_obras.sql            - vista maestro.obras (código, nombre, cliente)
-    02_proveedores.sql      - vista maestro.proveedores (global, con CIF y dir.)
-    03_proveedores_obra.sql - vista maestro.proveedores_obra (vía ctr)
+    00_setup.sql             - schema maestro + helper de fecha (idempotente)
+    01_obras.sql             - vista maestro.obras (código, nombre, cliente,
+                               dirección, municipio/provincia, estado con su
+                               nombre y las dos marcas de datos)
+    02_proveedores.sql       - vista maestro.proveedores (global, CIF y dir.)
+    03_proveedores_obra.sql  - vista maestro.proveedores_obra (vía ctr)
+    04_centros_coste.sql     - vista maestro.centros_coste (puente centro→obra)
+    05_estados_documento.sql - vista maestro.estados_documento (desde conest)
+    06_cuentas_analiticas.sql - vista maestro.cuentas_analiticas (caa + con,
+                               F-107). La ULTIMA a proposito: lee `raw.caa`,
+                               y si un build a mano llega antes que la primera
+                               ingesta con esta version, falla solo ella.
 
-INDEPENDIENTE del seguimiento/cierre. Solo lee de raw.* (con, obr, prv, ctr,
-condir, auxpro, auxmun). Requiere únicamente que la ingesta (raw) esté hecha;
-no necesita stage ni mart. Por eso se ejecuta como comando aparte
-(`python main.py build-maestros`) y NO forma parte de run-all.
+DE DÓNDE LEE, Y LAS DOS AFIRMACIONES QUE ESTE DOCSTRING TENÍA Y ERAN FALSAS.
+Afirmaba dos cosas: que este paso se alimentaba únicamente de `raw`, y que
+quedaba fuera de la carga nocturna. Lo segundo dejó de ser
+cierto en F-047, que metió los cuatro esquemas de negocio en la carga nocturna;
+lo primero, en F-073, que publica en `maestro.obras` las marcas
+`tiene_presupuesto` y `tiene_seguimiento` sondando `stg.presupuesto` y
+`stg.plan_mensual`. Por eso `depends_on` incluye ahora `build_stg`.
+
+POR QUÉ LAS MARCAS LEEN DE `stg` Y NO DE LA CAPA DE HECHOS (F-073, DA-1): el
+DDL de `mart` dropea sus tablas con CASCADE cada noche, así que una vista de
+`maestro` colgada de ahí la destruiría la nocturna siguiente —el incidente
+literal de F-047 con `cierre.v_pbi_planif_vs_real`—. Las dos tablas de `stg`
+se crean con `CREATE TABLE IF NOT EXISTS` y no se dropean nunca.
+
+Sigue pudiendo ejecutarse como comando aparte (`python main.py
+build-maestros`), y además corre dentro de `run-all`.
 """
 
 from __future__ import annotations
@@ -37,8 +57,58 @@ class _SubStep:
     target_table: str | None = None
 
 
+#: Los siete ficheros SQL, EN ORDEN, y de qué vista se cuentan filas.
+#:
+#: Vive fuera de `run()` a propósito, igual que en `build_compras_step.py`: es
+#: DATO, no lógica, y así se puede comprobar sin ejecutar el step que cada
+#: fichero de la carpeta está declarado. Un `.sql` que nadie encadena no se
+#: ejecuta solo, y el diccionario lo declara igual: esa es la discrepancia que
+#: `check-diccionario` destapó el 2026-09-09.
+SUB_PASOS: tuple[_SubStep, ...] = (
+    _SubStep(name="setup", sql_file="00_setup.sql"),
+    _SubStep(
+        name="obras",
+        sql_file="01_obras.sql",
+        target_schema="maestro",
+        target_table="obras",
+    ),
+    _SubStep(
+        name="proveedores",
+        sql_file="02_proveedores.sql",
+        target_schema="maestro",
+        target_table="proveedores",
+    ),
+    _SubStep(
+        name="proveedores_obra",
+        sql_file="03_proveedores_obra.sql",
+        target_schema="maestro",
+        target_table="proveedores_obra",
+    ),
+    _SubStep(
+        name="centros_coste",
+        sql_file="04_centros_coste.sql",
+        target_schema="maestro",
+        target_table="centros_coste",
+    ),
+    _SubStep(
+        name="estados_documento",
+        sql_file="05_estados_documento.sql",
+        target_schema="maestro",
+        target_table="estados_documento",
+    ),
+    _SubStep(
+        name="cuentas_analiticas",
+        sql_file="06_cuentas_analiticas.sql",
+        target_schema="maestro",
+        target_table="cuentas_analiticas",
+    ),
+)
+
+
 class BuildMaestrosStep(PipelineStep):
-    """Construye el schema `maestro` (obras / proveedores / proveedores-obra)."""
+    """Construye el schema `maestro`: obras, proveedores, el puente de
+    centros de coste y los catálogos de estados de documento y de cuentas
+    analíticas."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -53,8 +123,12 @@ class BuildMaestrosStep(PipelineStep):
 
     @property
     def depends_on(self) -> list[str]:
-        # Solo necesita raw.* (la ingesta). No depende de stage ni mart.
-        return ["ingest_raw"]
+        # `raw` por todo lo demás y `stg` por las dos marcas de `maestro.obras`
+        # (F-073, R27). Coste declarado: si `build_stg` falla, el orquestador
+        # marca este paso como SKIPPED, cosa que antes no pasaba. Es asumible
+        # porque los objetos de `maestro` son VISTAS: saltarlas una noche
+        # deja exactamente la definición de ayer, que es idéntica.
+        return ["ingest_raw", "build_stg"]
 
     def run(self) -> StepResult:
         result = self._new_result()
@@ -65,30 +139,8 @@ class BuildMaestrosStep(PipelineStep):
             / "infrastructure" / "postgres" / "sql" / "maestro"
         )
 
-        sub_steps: list[_SubStep] = [
-            _SubStep(name="setup", sql_file="00_setup.sql"),
-            _SubStep(
-                name="obras",
-                sql_file="01_obras.sql",
-                target_schema="maestro",
-                target_table="obras",
-            ),
-            _SubStep(
-                name="proveedores",
-                sql_file="02_proveedores.sql",
-                target_schema="maestro",
-                target_table="proveedores",
-            ),
-            _SubStep(
-                name="proveedores_obra",
-                sql_file="03_proveedores_obra.sql",
-                target_schema="maestro",
-                target_table="proveedores_obra",
-            ),
-        ]
-
         total_rows = 0
-        for sub in sub_steps:
+        for sub in SUB_PASOS:
             sql_path = sql_dir / sub.sql_file
             if not sql_path.exists():
                 result.status = StepStatus.FAILED

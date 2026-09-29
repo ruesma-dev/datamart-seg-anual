@@ -89,6 +89,7 @@ CLAVES_FICHA = frozenset(
         "descripcion",
         "grano",
         "clave_negocio",
+        "claves_alternativas",
         "paso_etl",
         "refresco",
         "columnas",
@@ -139,6 +140,43 @@ def _tupla(valor: object) -> tuple[str, ...]:
     if isinstance(valor, (list, tuple)):
         return tuple(_texto(v) for v in valor)
     return (_texto(valor),)
+
+
+def _claves_alternativas(
+    fichero: str, nombre: str, valor: object, errores: list[ErrorValidacion]
+) -> tuple[tuple[str, ...], ...]:
+    """`claves_alternativas` del YAML (F-108): una lista de claves, cada una una
+    lista NO vacia de columnas.
+
+    No reutiliza `_tupla` a proposito: `_tupla` convierte un escalar en una
+    lista de uno, y aqui la forma plana `[clave_obra]` es justo lo ambiguo
+    —¿una clave compuesta o dos simples?—. No se adivina: se denuncia con la
+    forma correcta delante.
+    """
+    if valor is None:
+        return ()
+    bien_formada = (
+        isinstance(valor, list)
+        and bool(valor)
+        and all(
+            isinstance(clave, list)
+            and bool(clave)
+            and all(isinstance(col, str) and col for col in clave)
+            for clave in valor
+        )
+    )
+    if not bien_formada:
+        errores.append(
+            _error(
+                fichero,
+                f"`claves_alternativas` de `{nombre}` es una lista de claves, cada "
+                f"una una lista de columnas: `[[clave_obra]]` para una clave de una "
+                f"columna, `[[empresa_id, codigo_cuenta]]` para una compuesta",
+                objeto=nombre,
+            )
+        )
+        return ()
+    return tuple(tuple(clave) for clave in valor)  # type: ignore[union-attr]
 
 
 def _claves_desconocidas(
@@ -360,6 +398,9 @@ def _cargar_ficha(
         descripcion=_texto(cuerpo.get("descripcion")),
         grano=cuerpo.get("grano") if cuerpo.get("grano") is None else _texto(cuerpo.get("grano")),
         clave_negocio=_tupla(cuerpo.get("clave_negocio")),
+        claves_alternativas=_claves_alternativas(
+            fichero, nombre, cuerpo.get("claves_alternativas"), errores
+        ),
         paso_etl=None if cuerpo.get("paso_etl") is None else _texto(cuerpo.get("paso_etl")),
         refresco=_texto(cuerpo.get("refresco")),
         columnas=_cargar_columnas(fichero, nombre, cuerpo.get("columnas"), errores),

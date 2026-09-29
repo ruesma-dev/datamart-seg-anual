@@ -49,6 +49,13 @@ STEPS_POR_COMANDO = {
     "build-retenciones": (
         "BuildRetencionesStep", "build_retenciones", "build_retenciones",
     ),
+    # F-057: el quinto build de negocio. Su `stage` es `build_aux` y no su
+    # propio nombre --a diferencia de los cuatro de arriba--, asi que el doble
+    # tiene que declararlo tal cual: el paso falso publica el stage que se le
+    # da, y con el equivocado `run-all` registraria una etapa que no existe.
+    "build-personal": ("BuildPersonalStep", "build_personal", "build_aux"),
+    # F-056: el sexto, con el mismo `stage` que `personal` (`build_aux`).
+    "build-contabilidad": ("BuildContabilidadStep", "build_contabilidad", "build_aux"),
     "apply-grants": ("ApplyGrantsStep", "apply_grants", "apply_grants"),
 }
 

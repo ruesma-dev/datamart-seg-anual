@@ -132,15 +132,18 @@ def _ficha_json(ficha: Ficha) -> str:
         for relacion in ficha.relaciones
     ]
 
-    return json.dumps(
-        {
-            "columnas": columnas,
-            "relaciones": relaciones,
-            "ejemplos_preguntas": list(ficha.ejemplos_preguntas),
-        },
-        sort_keys=True,
-        ensure_ascii=False,
-    )
+    cuerpo_ficha: dict[str, object] = {
+        "columnas": columnas,
+        "relaciones": relaciones,
+        "ejemplos_preguntas": list(ficha.ejemplos_preguntas),
+    }
+    # F-108: solo si las hay, como el resto de claves opcionales. El MCP lee el
+    # JSONB con `.get` y la ignora sin romperse hasta que decida servirla.
+    if ficha.claves_alternativas:
+        cuerpo_ficha["claves_alternativas"] = [
+            list(clave) for clave in ficha.claves_alternativas
+        ]
+    return json.dumps(cuerpo_ficha, sort_keys=True, ensure_ascii=False)
 
 
 def filas_diccionario(dicc: Diccionario) -> list[tuple]:

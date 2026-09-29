@@ -31,8 +31,14 @@ RUTAS_PYTHON="main.py config etl_sigrid scripts tests harness"
 COMANDO_TESTS=""         # no aplica: la suite es pytest sobre tests/
 LINT_BLOQUEA=0           # ruff avisa pero no tumba: hay deuda previa en el
                          # repositorio y ponerlo en 1 impediría cerrar nada
-RAMA_BASE=dev            # rama de integración contra la que se calcula el
-                         # diff de la feature (puerta de cobertura y mutación)
+RAMA_BASE=main           # rama donde se INTEGRA el trabajo. Las puertas miden
+                         # el diff desde el merge-base de la rama con ella, y
+                         # se ponen en rojo si ese diff trae commits que ya
+                         # viven en otra rama de larga vida (base rezagada).
+                         # Era `dev` hasta F-112: `dev` está parada desde el
+                         # 2026-09-03 (a1845db) y todo se integra en `main`;
+                         # la cobertura «de la feature» medía semanas ajenas.
+                         # `harness.mutacion` y compañía la leen de aquí.
 COMPROBACIONES_EXTRA=0   # sin comprobaciones extra en la sección 9
 
 # Modo ligero (para hooks): con ARNES_SALTAR_SUITES=1 el portero salta las

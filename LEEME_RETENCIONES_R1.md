@@ -21,6 +21,15 @@ Una retención de garantía es un EFECTO con `retide` <> 0:
 | Se la practicamos a un PROVEEDOR | `pag` | factura compra (tip 15) | 25.124 efectos · **34,7 M€ vivos** |
 | Nos la practica un CLIENTE | `cob` | factura venta (tip 11) | 2.219 efectos · **21,9 M€ vivos** |
 
+> **CORREGIDO POR F-094 (2026-09-22): los 34,7 M€ vivos a proveedor eran
+> FALSOS**, inflados 4,3 veces. «`fecrea` = 0 → VIVA» no basta en `pag`: cuenta
+> como vivos los efectos agrupados (`con.est = 14`, su dinero ya está en el
+> agrupador AGR), los anulados (`con.fecbaj <> 0`) y los ya pagados sin fecha
+> (`con.est = 10`). Con el criterio de F-094 lo vivo a proveedor son
+> **8,35 M€ (7.752 efectos)**; el criterio vigente está en la cabecera de
+> `sql/retenciones/01_movimientos.sql`. La cifra de CLIENTE no se ha tocado y
+> está sin verificar. Esta tabla se deja como estaba, como registro histórico.
+
 - `tot` = importe retenido (puede ser negativo: ajustes)
 - `fecven` = fecha prevista de devolución
 - `fecrea` = 0 → VIVA; <> 0 → ya liquidada en esa fecha

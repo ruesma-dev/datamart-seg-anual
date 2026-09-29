@@ -5,9 +5,10 @@ Planificador de tramos del build de `stg.plan_mensual` (F-019).
 Por qué existe: el build de `stg.plan_mensual` explota `raw.obrparpre` con
 `CROSS JOIN LATERAL unnest(...)` y encadena cinco ventanas. En el
 `Standard_B1ms` de Azure (2 GB de RAM) esos sorts derraman a ficheros
-temporales sobre un disco de 32 GB **compartido con `albaranes` y `partes` en
-producción**: el 2026-08-09 llegaron a llenarlo al 93,4 % y el servidor quedó
-en solo-lectura diez minutos.
+temporales sobre un disco **compartido con otras cinco bases en producción**
+(`albaranes`, `partes`, `dedicacion`, `postventa` y `facturas`): el 2026-08-09
+llegaron a llenarlo al 93,4 % —eran 32 GB entonces; se amplió a 64 el
+2026-08-29— y el servidor quedó en solo-lectura diez minutos.
 
 La observación que hace posible el troceo es estructural, no casual: **ninguna
 ventana del SQL cruza obras** (todas particionan por `presupuesto_id` o por

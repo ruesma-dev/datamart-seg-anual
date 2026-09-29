@@ -13,11 +13,18 @@
 -- Se exponen DOS lecturas en paralelo porque conviven dos mecanismos:
 --   a) `saldo_vivo`      = suma de los efectos con estado VIVA (fecrea = 0).
 --      Es la lectura principal: lo que Sigrid considera aún no liquidado.
---   b) `neto_practicado` = suma de TODOS los efectos (cargos menos abonos).
---      Útil si parte de las devoluciones se registran como efecto negativo
---      en lugar de marcarse con fecrea.
+--   b) `neto_practicado` = suma de los efectos VIVA y LIQUIDADA (cargos menos
+--      abonos). Útil si parte de las devoluciones se registran como efecto
+--      negativo en lugar de marcarse con fecrea.
 -- Si ambas cifras divergen mucho para una entidad, conviene mirar el detalle:
 -- indica que esa retención se liquidó por el otro mecanismo.
+--
+-- BAJA (F-094, solo PROVEEDOR) NO SUMA EN NINGUNA LECTURA: es el efecto
+-- agrupado, dividido o anulado, y su dinero ya está en el efecto que lo
+-- sustituye (el agrupador AGR). Sumarlo es contar el mismo euro dos veces:
+-- era lo que inflaba el saldo vivo a proveedor de 8,35 a 35,54 M€. Se ve aparte
+-- en `num_bajas` / `importe_baja`, para que num_movimientos = vivas +
+-- liquidadas + bajas cuadre a la vista.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -35,22 +42,26 @@ SELECT
     SUM(importe) FILTER (WHERE estado = 'LIQUIDADA')        AS importe_liquidado,
     COUNT(*)     FILTER (WHERE estado = 'VIVA')             AS num_vivas,
     COUNT(*)     FILTER (WHERE estado = 'LIQUIDADA')        AS num_liquidadas,
-    -- Lectura (b): por signo
-    SUM(importe) FILTER (WHERE importe > 0)                 AS total_cargos,
-    SUM(-importe) FILTER (WHERE importe < 0)                AS total_abonos,
-    SUM(importe)                                            AS neto_practicado,
+    -- Lectura (b): por signo, sin BAJA (su dinero cuenta en otro efecto)
+    SUM(importe) FILTER (WHERE importe > 0 AND estado <> 'BAJA') AS total_cargos,
+    SUM(-importe) FILTER (WHERE importe < 0 AND estado <> 'BAJA') AS total_abonos,
+    SUM(importe) FILTER (WHERE estado <> 'BAJA')            AS neto_practicado,
     -- Vencidas
     SUM(importe) FILTER (WHERE vencida_sin_liquidar)        AS importe_vencido,
     COUNT(*)     FILTER (WHERE vencida_sin_liquidar)        AS num_vencidas,
     MIN(fecha_prevista_devolucion)                          AS primera_devolucion_prevista,
-    MAX(fecha_prevista_devolucion)                          AS ultima_devolucion_prevista
+    MAX(fecha_prevista_devolucion)                          AS ultima_devolucion_prevista,
+    -- F-094: efectos sustituidos por otro; al final para no mover columnas
+    COUNT(*)     FILTER (WHERE estado = 'BAJA')             AS num_bajas,
+    SUM(importe) FILTER (WHERE estado = 'BAJA')             AS importe_baja
 FROM retenciones.movimientos
 WHERE entidad_id IS NOT NULL
 GROUP BY sentido, entidad_id, entidad_nombre, entidad_cif;
 
 COMMENT ON VIEW retenciones.v_pbi_retencion_entidad IS
 'Saldo de retenciones por proveedor (sentido PROVEEDOR) o cliente (CLIENTE). '
-'saldo_vivo = aún retenido. importe_vencido = ya debería haberse liquidado.';
+'saldo_vivo = aún retenido. importe_vencido = ya debería haberse liquidado. '
+'BAJA (F-094) no suma en saldo_vivo, importe_liquidado ni neto_practicado.';
 
 
 -- ---------------------------------------------------------------------------
@@ -90,7 +101,8 @@ GROUP BY obra_id, codigo_obra, nombre_obra;
 
 COMMENT ON VIEW retenciones.v_pbi_retencion_obra IS
 'Retenciones por obra en ambos sentidos. posicion_neta > 0 significa que en '
-'esa obra retenemos a proveedores más de lo que el cliente nos retiene.';
+'esa obra retenemos a proveedores más de lo que el cliente nos retiene. '
+'obra_id es la obra de maestro.obras desde F-094 (antes, el centro de coste).';
 
 
 -- ---------------------------------------------------------------------------
@@ -147,7 +159,8 @@ FROM retenciones.movimientos
 WHERE vencida_sin_liquidar = TRUE;
 
 COMMENT ON VIEW retenciones.v_pbi_retenciones_vencidas IS
-'Retenciones cuya fecha prevista de devolución ya pasó y siguen vivas. '
+'Retenciones cuya fecha prevista de devolución ya pasó y siguen vivas '
+'(estado VIVA: una BAJA o una LIQUIDADA nunca está vencida). '
 'sentido CLIENTE = reclamar cobro; sentido PROVEEDOR = pendiente de liberar.';
 
 
@@ -166,8 +179,11 @@ SELECT
     COUNT(*)     FILTER (WHERE estado = 'LIQUIDADA')    AS num_liquidadas,
     SUM(importe) FILTER (WHERE vencida_sin_liquidar)    AS importe_vencido,
     COUNT(*)     FILTER (WHERE vencida_sin_liquidar)    AS num_vencidas,
-    SUM(importe)                                        AS neto_practicado,
-    COUNT(*) FILTER (WHERE obra_id IS NULL)             AS sin_obra_asignada
+    SUM(importe) FILTER (WHERE estado <> 'BAJA')        AS neto_practicado,
+    COUNT(*) FILTER (WHERE obra_id IS NULL)             AS sin_obra_asignada,
+    -- F-094: efectos sustituidos por otro; al final para no mover columnas
+    COUNT(*)     FILTER (WHERE estado = 'BAJA')         AS num_bajas,
+    SUM(importe) FILTER (WHERE estado = 'BAJA')         AS importe_baja
 FROM retenciones.movimientos
 GROUP BY sentido;
 

@@ -21,7 +21,8 @@ Los scripts están completos y probados como texto, pero **no se han ejecutado
 contra Azure**. Hay dos cosas que deben cerrarse antes de llegar al job:
 
 1. **El disco del servidor de Postgres (incidente del 2026-08-09).** Una carga
-   completa llenó el disco de 32 GB del servidor compartido y lo dejó en solo
+   completa llenó el disco del servidor compartido —32 GB entonces; ampliado a
+   64 el 2026-08-29— y lo dejó en solo
    lectura diez minutos, afectando a otras dos aplicaciones en producción. El
    job nocturno ejecuta **esa misma carga**. Qué hacer ya está decidido —la
    opción B, trocear el build—, así que lo que falta no es decidir: es
@@ -108,6 +109,7 @@ repetirlos no rompe nada. Se ejecutan desde la raíz del repositorio.
 | 10 | `90_create_alert.ps1` | Grupo de acción (reutiliza el que haya) y alerta de fallo. | Sí |
 | 11 | `95_create_alert_frescura.ps1` | Alerta de **frescura** (F-024): avisa si pasan más de `frescuraUmbralHoras` sin que el job complete un `build_mart`. Exige `az extension add --name scheduled-query` una vez por puesto. | Sí |
 | 12 | `96_create_alert_cobertura.ps1` | Alerta de **cobertura** (F-052): avisa cuando una noche publica una obra que entra en `stg` y no sale en `mart`. Dispara por **presencia** del marcador `[F052-COBERTURA-KO]`, al revés que la de frescura. **Sin desplegarla el guardián es mudo**: `check-cobertura` no tumba el job. | Sí |
+| 13 | `97_create_alert_ventana.ps1` | Alerta de **ventana de negocio** (F-025): avisa cuando una obra congelada se queda vieja —su origen cambió, no tiene filas, su sello de SQL no es el vigente o la reconstrucción completa está vencida—. Dispara por **presencia** del marcador `[F025-VENTANA-KO]`. **Sin desplegarla el guardián es mudo**: `check-ventana` no tumba el job. | Sí |
 
 Entre medias hay **tres** pasos **que no son scripts** y que hace el humano:
 cargar la clave de la API en el vault (después del 6), autorizar la regla de
@@ -269,6 +271,41 @@ Si algún nombre de columna no coincide, comprueba el esquema real con
 `ContainerAppConsoleLogs_CL | getschema` y **corrige este README**; no
 improvises otra vía.
 
+### Acotar a UNA ejecución concreta (añadido el 2026-09-05)
+
+`ContainerJobName_s` sirve para ver los logs del job, pero mezcla todas sus
+ejecuciones. Para leer **una sola** —por ejemplo la que falló anoche— el filtro
+que funciona es **`ContainerGroupName_s startswith '<nombre de la ejecución>'`**:
+
+```powershell
+$ws = az monitor log-analytics workspace show -g rg-datamart-seg-dev -n log-datamart-seg-dev --query customerId -o tsv
+az monitor log-analytics query -w $ws --analytics-query "ContainerAppConsoleLogs_CL | where ContainerGroupName_s startswith 'caj-datamart-seg-dev-29809560' | where Log_s has_any ('ERROR','Traceback','FAILED') | project TimeGenerated, Log_s | order by TimeGenerated asc" -o tsv
+```
+
+**Y NO uses `az containerapp job logs show --execution <nombre>` para una
+ejecución pasada**: en cuanto termina y sus réplicas se reciclan responde
+`ERROR: No replicas found for execution`, que parece un fallo de permisos o de
+nombre y no lo es. Para una ejecución terminada, la única vía es Log Analytics.
+El nombre de la ejecución sale de:
+
+```powershell
+az containerapp job execution list -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "[0:3].{nombre:name, estado:properties.status, arranque:properties.startTime, imagen:properties.template.containers[0].image}" -o yaml
+```
+
+## Consultar los créditos de CPU del Postgres (añadido el 2026-09-05)
+
+El servidor es Burstable: si se queda sin créditos, Azure lo capa al 20 % y la
+nocturna no termina. **El tope del `B1ms` son 288 créditos, no 144** (ver
+`progress/current.md`); se ha llegado a ver 300.
+
+**Pídelos con `--interval PT1M` y una ventana de menos de una hora.** Con
+`PT15M` la API devuelve los **primeros** puntos del rango, no los últimos, y
+parece que la métrica lleva medio día de retraso: no es verdad, llega al minuto.
+
+```bash
+az monitor metrics list --resource psql-albaranes-rs9k2 --resource-group rg-albaranes-dev   --resource-type Microsoft.DBforPostgreSQL/flexibleServers   --metric cpu_credits_remaining --interval PT1M --aggregation Average   --start-time $(date -u -d '-50 minutes' +%Y-%m-%dT%H:%M:%SZ) -o tsv
+```
+
 Para saber qué build corrió, una ejecución puntual con el comando cambiado (no
 altera la programada):
 
@@ -388,6 +425,7 @@ Crear la regla (idempotente) y probarla **de extremo a extremo**, que es lo
 
 ```powershell
 powershell -NoProfile -File infra/96_create_alert_cobertura.ps1
+powershell -NoProfile -File infra/97_create_alert_ventana.ps1
 
 # 1. Añadir el buzón al grupo de acción, si no está ya (paso del humano):
 powershell -NoProfile -File infra/90_create_alert.ps1 -AlertEmail <buzon>

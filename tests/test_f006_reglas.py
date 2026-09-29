@@ -617,12 +617,13 @@ def test_f006_r10_la_cifra_absurda_de_compras_llega_avisada() -> None:
 
 
 def test_f006_r10_las_cifras_de_retencion_son_de_saldo_vivo_y_lo_dicen() -> None:
-    """34,7 M€ y 21,9 M€ son saldo VIVO, no el total practicado nunca."""
+    """8,35 M€ y 21,9 M€ son saldo VIVO, no el total practicado nunca (F-094:
+    la de proveedor era 34,7 M€, inflada 4,3 veces)."""
     por_concepto = {
         o["concepto"]: o for o in _diccionario_real().global_raw["ordenes_de_magnitud"]
     }
 
-    vivos = [o for o in por_concepto.values() if o["valor_aproximado"] in (34700000, 21900000)]
+    vivos = [o for o in por_concepto.values() if o["valor_aproximado"] in (8350000, 21900000)]
 
     assert len(vivos) == 2
     for orden in vivos:
@@ -763,6 +764,17 @@ def _se_reconstruye(nombre: str) -> bool:
                    re.IGNORECASE),
         re.compile(rf"TRUNCATE[^\n;]*\b{esquema}\.{objeto}\b", re.IGNORECASE),
         re.compile(rf"truncate_table\(\s*[\"']{esquema}[\"']\s*,\s*[\"']{objeto}[\"']"),
+        # F-025. `stg.plan_mensual` y `stg.presupuesto` ya NO se truncan: cada
+        # noche se borran y se reinsertan las obras que se reconstruyen, en la
+        # misma transaccion (borrado derivado). Su clave sustituta se sigue
+        # reasignando, pero **solo para esas obras**: las 880 congeladas
+        # conservan la suya. La regla sigue siendo cierta para ellas, y esa
+        # precision esta escrita en las fichas de las dos tablas.
+        re.compile(
+            rf"componer_borrado_derivado\(\s*[\"']{objeto}[\"']"
+            if esquema == "stg"
+            else r"(?!x)x"
+        ),
     )
     for fuente in fuentes:
         texto = fuente.read_text(encoding="utf-8")
@@ -791,7 +803,11 @@ def test_f006_r9_el_ambito_de_clave_sustituta_solo_lleva_lo_que_se_reconstruye()
 def test_f006_r9_el_control_del_detector_de_reconstruccion() -> None:
     """Si el detector diera siempre True, el test de arriba pasaría en falso."""
     assert _se_reconstruye("mart.fact_seguimiento_mensual") is True
-    assert _se_reconstruye("stg.plan_mensual") is True, "se trunca desde Python"
+    assert _se_reconstruye("stg.plan_mensual") is True, (
+        "desde F-025 ya no se trunca: se borra e inserta POR OBRA, y su clave "
+        "sustituta se reasigna solo para las obras que se reconstruyen"
+    )
+    assert _se_reconstruye("stg.presupuesto") is True
     assert _se_reconstruye("aux.periodificacion_partida") is False
 
 

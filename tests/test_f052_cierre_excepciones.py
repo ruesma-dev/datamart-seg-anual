@@ -59,7 +59,7 @@ LINEA_BASE_2026_09_02 = (
     (1612629, "0613", "COLEGIO RICHMOND PARK (MADRID)", (3, 7, 8, 11), False, True),
     (1661978, "0618", "AMPL. COLEGIO INTERNACIONAL SOTOGRANDE(CADIZ)", (3, 8, 11), False, True),
     # --- Las cuatro obras ciegas SOLO en los ámbitos master (8 y 11). Tienen
-    # ficha y publican en los ámbitos reales: pendientes de investigar (F-055).
+    # ficha y publican en los ámbitos reales: pendientes de investigar (F-117).
     (1286520, "0578", "12 VIVIENDAS C/CANILLAS (MADRID)", (8, 11), True, False),
     (1314512, "0585", "REF. Y AMPLIACIÓN COLEGIO MAYOR ALCOR (MADRID)", (8, 11), True, False),
     (2153966, "0670", "CAMPO FUTBOL COLEGIO SANTILLANA (MADRID)", (8, 11), True, False),

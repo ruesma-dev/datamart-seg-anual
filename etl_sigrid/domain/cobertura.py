@@ -169,9 +169,28 @@ class Veredicto:
         return bool(self.obras_invisibles or self.filas_huerfanas)
 
     @property
+    def no_ha_mirado_nada(self) -> bool:
+        """Cero combinaciones miradas. **Es un KO, no un OK.**
+
+        Arreglado el **2026-09-03** (dentro de F-025, por acuerdo del humano),
+        y no es una mejora teórica: **acaba de pasar contra producción**. Las
+        dos consultas devolvieron cero filas porque `stg.plan_mensual` estaba
+        truncada al 21,6 % por la avería del 02-sep, y `check-cobertura` dijo
+        OK. Un guardián que da verde cuando no ha podido mirar es peor que no
+        tenerlo: entrena a quien lo lee a creerle.
+
+        La distinción es exactamente la que este fichero ya declaraba en el
+        docstring de `Veredicto` —«un veredicto verde sobre cero filas no es un
+        verde: es que no se ha comprobado nada»— y que el código no aplicaba.
+        Faltaba justo esta línea.
+        """
+        return self.filas_miradas == 0
+
+    @property
     def codigo(self) -> int:
-        """Distinto de 0 si algo cae **fuera de lo declarado** (R16)."""
-        return 1 if self.hay_hallazgos else 0
+        """Distinto de 0 si algo cae **fuera de lo declarado** (R16), **o si no
+        se ha llegado a mirar nada**."""
+        return 1 if (self.hay_hallazgos or self.no_ha_mirado_nada) else 0
 
     @property
     def obras_invisibles_distintas(self) -> int:
@@ -188,8 +207,10 @@ class Veredicto:
         **En verde no se emite.** Un marcador que aparece todas las noches
         entrena a todo el mundo a ignorarlo, y entonces la alerta ya no vale.
         """
-        if not self.hay_hallazgos:
+        if not self.codigo:
             return ""
+        if self.no_ha_mirado_nada:
+            return f"{MARCADOR_KO} combinaciones_miradas=0 sin_comprobar=1"
         return (
             f"{MARCADOR_KO} obras_invisibles={self.obras_invisibles_distintas} "
             f"filas_huerfanas={self.total_huerfanas}"
@@ -252,7 +273,17 @@ def formatear(resultado: Veredicto) -> str:
         "",
     ]
 
-    if resultado.hay_hallazgos:
+    if resultado.no_ha_mirado_nada:
+        lineas.append(resultado.marcador)
+        lineas.append(
+            "KO   no se ha mirado NI UNA combinacion (obra x ambito). Esto NO "
+            "es un verde: es que no se ha comprobado nada, y las dos cosas se "
+            "parecen mucho en un informe. Paso de verdad el 2026-09-02, con "
+            "stg.plan_mensual truncada al 21,6 % por la averia: las dos "
+            "consultas devolvieron cero filas y esto decia OK. Revisa que "
+            "`stg` este construido antes de creerte nada."
+        )
+    elif resultado.hay_hallazgos:
         lineas.append(resultado.marcador)
         lineas.append(
             "KO   hay cobertura sin declarar. Lanzado a mano esto sale con "

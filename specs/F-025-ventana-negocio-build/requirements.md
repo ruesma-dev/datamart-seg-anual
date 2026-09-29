@@ -1,360 +1,150 @@
 <!-- specs/F-025-ventana-negocio-build/requirements.md -->
-# F-025 · Acotar el build por ventana de negocio — Requisitos (EARS)
-
-> Rama prevista: `feature/F-025-ventana-negocio-build`. Rigor: **crítico**.
-> No por defecto heredado, sino porque esta feature **cambia qué datos ve
-> Power BI**: la misma razón por la que F-019 exigió prueba de equivalencia.
-
-## 0 · De dónde viene esta feature
-
-### 0.1 · Procedencia: el bloque C de F-011
-
-Esta feature **no es nueva**: es el **bloque C de F-011** («Ventana de negocio
-y build»), extraído el **2026-08-18** por decisión del humano. F-011 tenía
-siete decisiones abiertas; el humano cerró seis y dejó **DA-1 —qué es una
-«obra abierta»— sin decidir**, y ordenó sacar de F-011 todo lo que dependiera
-de ella.
-
-Lo que llega aquí desde `specs/F-011-carga-incremental/`:
-
-| Venía de F-011 | Aquí es |
-|---|---|
-| R20 · `perfil-ventana` informa el peso de la ventana | **R1, R2, R4** |
-| R21 · sin predicado declarado, `perfil-ventana` falla y lo dice | **R3** |
-| El bloque `ventana:` de `config/business_rules.yaml` | **R3, R6** |
-| `fetch_peso_ventana` en `postgres_client.py` | **R1** (diseño en `design.md` §3) |
-| DA-1 · ¿qué es una obra abierta? | **DA-1, y sigue ABIERTA** |
-| R22 de F-011 · «F-011 no acota el build» | La contrapartida positiva: **R8–R12** |
-
-F-011 conserva R22 como barrera: mientras esta feature no exista en verde,
-ninguna rama de F-011 puede tocar el SQL de `stg` ni de `mart`.
-
-### 0.2 · Por qué esta feature va por delante del bloque B de F-011
-
-El humano lo dejó escrito al cerrar DA-5 de F-011: **F-025 tiene prioridad
-sobre el bloque B de F-011 si los números de la medición lo confirman.** Los
-números de partida (carga completa en Azure del 2026-08-18,
-`caj-datamart-seg-dev-6a95hln`, 165 min):
-
-| Paso | Duración | % del total |
-|---|---|---|
-| `ingest_raw` | 33 min | 20 % |
-| **`build_stg`** | **111 min** | **67 %** |
-| `build_mart` | 21 min | 13 % |
-
-Y dentro de `build_stg`, el desglose real medido en Azure (T12 de F-019):
-**`build_plan_mensual` se lleva ~100 min de los 111**, repartidos en **60
-tramos** (máximo 293 s el tramo 2), sobre 29,4 M de filas de salida.
-`build_presupuesto` son otros ~23 min. En `build_mart`, `build_fact` son
-~19 de los 21 min.
-
-Traducido: **la ingesta entera (33 min) cuesta menos de un tercio de lo que
-cuesta `build_plan_mensual`**. Si el 70 % de las filas pertenece a obras que
-llevan años cerradas y se recalculan enteras cada noche, ahí está el dinero.
-**Cuánto exactamente es lo que mide el bloque A de esta spec, y sin ese número
-no se toca el build.**
-
-### 0.3 · Relación con F-019: el build por tramos NO se toca sin prueba
-
-F-019 (cerrada) reescribió el build de `stg.plan_mensual` **por tramos de
-obras** para que cupiera en el `Standard_B1ms` de 2 GB tras el incidente del
-2026-08-09, en el que el disco compartido de 32 GB llegó al 93,4 % y puso el
-servidor en solo-lectura diez minutos, afectando potencialmente a `albaranes`
-y `partes`.
-
-Dos hechos de F-019 que **mandan sobre el diseño de esta feature**:
-
-1. **El corte legítimo es por obra, no por mes ni por ejercicio.** Ninguna
-   ventana del SQL de `08_plan_mensual.sql` cruza obras (particionan por
-   `presupuesto_id` o por `(obra_id, partida_id, ambito_id)`), y por eso N
-   pasadas con filtros de obra disjuntos dan exactamente las mismas filas. En
-   cambio **el `ffill` y el `LAG` necesitan la serie mensual completa de la
-   obra**: cortar por «ejercicio en curso» rompería el cálculo. La ventana de
-   negocio, por tanto, **solo puede ser un conjunto de obras**.
-2. **El troceo ya está construido y probado**, con su marcador
-   `/*F019_FILTRO_OBRAS*/` en las dos ramas del SQL, su planificador puro
-   `etl_sigrid/domain/tramos.py` y su puerta de disco. Esta feature **se
-   apoya en él y no lo modifica**: la ventana decide *qué obras entran*, el
-   planificador sigue decidiendo *cómo se empaquetan*.
-
-Cualquier cambio que rozara el troceo exigiría rehacer la prueba de
-equivalencia de F-019 desde cero. No se hace.
-
-### 0.4 · Lo que esta feature NO puede romper
-
-- **La coherencia de `raw` de F-024**: la puerta que exige mismo `batch_id` y
-  todas las tablas en `SUCCESS` sigue igual (R16).
-- **La huella de las vistas de consumo**: `mart.v_pbi_*`, `mart.v_fact_*`,
-  `mart.v_master_*` y `cierre.v_pbi_*` son lo que consume Power BI. La prueba
-  de equivalencia de R12 usa el mismo instrumento que F-019
-  (`fingerprint-views` / `compare-fingerprints`).
-- **El techo de disco del servidor compartido**: la puerta de ocupación de
-  F-019 sigue armada y esta feature **no puede subir el pico** (R11).
-
----
-
-## Bloque A · Medir el peso de la ventana (se implementa siempre)
-
-> Este bloque **no depende de DA-1**. Es al revés: existe para que Negocio
-> decida DA-1 con números delante. Por eso mide **candidatos**, en plural.
-
-**R1.** CUANDO el usuario ejecuta `python main.py perfil-ventana`, el sistema
-debe informar, en **solo lectura** sobre el datamart, y **para cada predicado
-candidato** declarado en `config/business_rules.yaml` bajo `ventana.candidatos`:
-número de obras dentro y fuera de la ventana, y el porcentaje de filas de
-`stg.plan_mensual`, de `mart.fact_seguimiento_mensual` y de `raw.obrparpre`
-que pertenecen a obras **dentro**.
-
-**R2.** CUANDO `perfil-ventana` termina, el sistema debe estimar, por
-candidato, el **ahorro en minutos**: el tiempo de `build_stg.build_plan_mensual`
-(sumando sus filas `tramo_NN` de `_meta.etl_runs`) y el de
-`build_mart.build_fact` atribuibles a las obras que quedan **fuera**,
-prorrateados por el peso por obra que ya calcula
-`SQL_PESOS_PLAN_MENSUAL`. Ese número, y no una intuición, es lo que decide si
-el bloque B se implementa.
-
-**R3.** SI `config/business_rules.yaml` no declara ningún candidato en
-`ventana.candidatos`, ENTONCES `perfil-ventana` debe fallar con un mensaje que
-diga que es una **decisión de Negocio pendiente (DA-1)** y **no** inventar un
-criterio por defecto.
-
-**R4.** CUANDO `perfil-ventana` se ejecuta con `--detalle` (y opcionalmente
-`--out <csv>`), el sistema debe listar las obras que cada candidato deja
-**fuera**, con su código y su descripción (`con.res`; recordar que `con.nom`
-no existe), para que Negocio pueda mirar nombres concretos antes de firmar
-DA-1.
-
-**R5.** El sistema debe dejar el resultado de R1–R4 escrito en
-`progress/ventana_F-025.md`, con la fecha, el `batch_id` de la carga medida y
-una **recomendación** de qué candidato adoptar. MIENTRAS ese informe no exista
-y **Negocio no haya firmado DA-1 sobre él**, ningún requisito del bloque B
-puede darse por iniciado.
-
-> Verificación de R5: **puerta de proceso**, no de código. El reviewer
-> comprueba que el fichero existe, que sus números salen de `_meta.etl_runs` y
-> de consultas al datamart —no de estimaciones— y que la firma de DA-1 está en
-> `progress/current.md`.
-
----
-
-## Bloque B · Acotar el refresco del build (solo tras la puerta de R5)
-
-**R6.** El predicado de la ventana vigente debe declararse en
-`config/business_rules.yaml` bajo `ventana.vigente`, como **SQL que devuelva
-un conjunto de `obra_id`**. Cambiar la definición de «obra abierta» no debe
-exigir tocar ni código Python ni ningún fichero `.sql`.
-
-**R7.** MIENTRAS la ventana no se active explícitamente (`VENTANA_ACTIVA` a
-falso, que es el valor por defecto), el build debe comportarse **exactamente
-como hoy**: reconstrucción completa de `stg.plan_mensual` y de
-`mart.fact_seguimiento_mensual`. La feature entra **apagada**.
-
-**R8.** DONDE la ventana esté activa, `build_stg` debe recalcular
-`stg.plan_mensual` **solo para las obras dentro de la ventana** y **conservar
-intactas** las filas de las obras que quedan fuera.
-
-> Este es el corazón de la feature y merece decirse en voz alta: **se acota el
-> refresco, no el contenido.** Power BI sigue viendo el histórico completo; lo
-> que se deja de hacer es recalcular cada noche lo que no ha cambiado. La
-> alternativa —que fuera de la ventana el dato deje de existir— es DA-2, y no
-> es la recomendada.
-
-**R9.** DONDE la ventana esté activa, `build_mart` debe rehacer
-`mart.fact_seguimiento_mensual` **solo para las obras dentro de la ventana**,
-conservando las filas del resto, y `mart.agg_categoria` debe quedar coherente
-con el hecho resultante.
-
-**R10.** El troceo por tramos de F-019 **no cambia**. La ventana solo decide
-qué obras se le pasan al planificador; `etl_sigrid/domain/tramos.py`
-(`planificar_tramos`, `Tramo`, `tramos_sobredimensionados`) **no se modifica**,
-y el marcador `/*F019_FILTRO_OBRAS*/` sigue siendo el único punto de inyección
-de obras en el SQL.
-
-**R11.** MIENTRAS la ventana esté activa, la ocupación de disco debe seguir
-vigilada por la misma puerta de F-019 (`PG_DISCO_LIMITE_PCT`, 80 % por
-defecto, sobre `PG_DISCO_TOTAL_GB`), y el **pico de ocupación de un build
-acotado no puede superar el de un build completo**.
-
-**R12.** CUANDO un build acotado termina, la huella de las vistas de consumo
-debe ser **idéntica** a la de un build completo ejecutado sobre el mismo
-`raw`, en los bloques `estructura` y `cerrado` de `fingerprint-views`.
-Cualquier diferencia es **FALLO**: se marca la feature `blocked` y no se
-racionaliza (precedente de F-019 T11).
-
-> El bloque `vivo` de la huella puede diferir sin ser fallo: incluye
-> `mart.v_pbi_dim_fecha`, que se genera con `CURRENT_DATE`. Eso ya está
-> contemplado en `fingerprint.py` y no se toca.
-
-**R13.** SI el predicado vigente devuelve **cero obras**, o deja fuera más del
-`VENTANA_MAX_PCT_FUERA` por ciento de las obras, ENTONCES el build debe
-**abortar antes de borrar o modificar una sola fila**, con el mismo patrón de
-aborto que ya usa el plan por tramos (`PlanMensualAbortado`).
-
-> Es la red contra un predicado mal escrito. Un `WHERE` que no case ningún
-> `obra_id` no debe vaciar el datamart en silencio a las 02:00.
-
-**R14.** CUANDO el build corre acotado, el sistema debe registrar en el
-`metadata` de sus filas de `_meta.etl_runs`: el nombre del predicado aplicado,
-el número de obras dentro, el número de obras recalculadas y el número de
-filas conservadas sin recalcular.
-
-**R15.** SI se ejecuta `run-all --full` o `stage --full`, ENTONCES el build
-debe reconstruirse **completo desde cero** aunque la ventana esté activa; y el
-sistema debe hacer esa reconstrucción completa **al menos una vez por semana**,
-el mismo día que la recarga completa de la ingesta (**domingo**, DA-2 de
-F-011), para que un cambio en una obra fuera de la ventana no pueda quedar
-invisible más de siete días.
-
-**R16.** MIENTRAS exista la ventana, la puerta de coherencia de `raw` de F-024
-debe seguir exigiendo exactamente lo mismo que hoy: todas las tablas
-declaradas, mismo `batch_id`, todas en `SUCCESS`. Un build acotado **no** es
-excusa para relajarla.
-
-**R17.** CUANDO una obra entra en la ventana o sale de ella entre dos cargas,
-sus filas deben quedar consistentes: ni duplicadas ni huérfanas. En concreto,
-el borrado y la reinserción de una obra deben ocurrir **dentro de la misma
-transacción del tramo**, como ya hace F-019.
-
-**R18.** El sistema **no** debe cambiar el significado de `stg.obras.activa`
-—hoy cableado a `TRUE` para todas las obras en `sql/stg/03_obras.sql`— sin una
-decisión explícita registrada. Si la ventana pasara a rellenar ese flag,
-cambiaría lo que ve Power BI en `mart.v_pbi_dim_obra` (DA-5).
-
----
-
-## Requisitos transversales
-
-**R19.** Los comandos nuevos de solo lectura (`perfil-ventana`) **no** deben
-generar `batch_id` ni escribir filas en `_meta.etl_runs`, igual que
-`timings`, `status` o `fingerprint-views`.
-
-**R20.** El sistema no debe leer ni escribir nada en Sigrid dentro de esta
-feature: todo ocurre dentro del datamart. Si el predicado de DA-1 necesitara
-una tabla de Sigrid que hoy **no se ingiere** —caso de `auxobrcts`, el
-catálogo de situaciones de contrato al que apunta `obrctr.sitide`—, ENTONCES
-debe declararse en `config/tables_sigrid.yaml` como una tabla más y ingerirse
-por el camino normal, no consultarse al vuelo.
-
-**R21.** SI un comando nuevo necesita credenciales, ENTONCES debe obtenerlas
-de `config/settings.py` como el resto: ni un secreto en la spec, ni en el
-código, ni en los tests, ni en `progress/`.
-
----
-
-## Trazabilidad requisito → test
-
-Todos los tests viven en `tests/` y **ninguno abre red ni BBDD**: el
-`PostgresClient` va mockeado y los cálculos son funciones puras sobre
-fixtures. Lo que no se puede probar así está marcado `MANUAL (humano)` y su
-comando exacto está en `tasks.md`.
-
-| Req | Test (fichero::nombre) | Sin red/BBDD |
-|---|---|---|
-| R1 | `test_f025_ventana.py::test_f025_r1_peso_por_candidato` | sí |
-| R2 | `test_f025_ventana.py::test_f025_r2_ahorro_estimado_por_candidato` | sí (función pura sobre filas de `_meta.etl_runs` de fixture) |
-| R3 | `test_f025_ventana.py::test_f025_r3_sin_candidatos_falla_y_lo_dice` | sí |
-| R4 | `test_f025_ventana.py::test_f025_r4_detalle_lista_obras_fuera` | sí |
-| R5 | **MANUAL (humano)** · el reviewer comprueba `progress/ventana_F-025.md` y la firma de DA-1 | n/a |
-| R6 | `test_f025_config.py::test_f025_r6_predicado_vigente_se_lee_del_yaml` | sí |
-| R7 | `test_f025_apagado.py::test_f025_r7_sin_ventana_el_build_es_el_de_hoy` | sí |
-| R8 | `test_f025_build.py::test_f025_r8_solo_se_recalculan_las_obras_dentro` | sí (SQL compuesto + cliente mockeado) |
-| R9 | `test_f025_build.py::test_f025_r9_mart_acotado_conserva_el_resto` | sí |
-| R10 | `test_f025_build.py::test_f025_r10_tramos_py_no_cambia` + `pytest tests/test_f019_*.py` sin modificar | sí |
-| R11 | `test_f025_build.py::test_f025_r11_puerta_de_disco_sigue_armada` | sí |
-| R12 | **MANUAL (humano)** · `fingerprint-views` + `compare-fingerprints` (comando exacto en `tasks.md`) | no |
-| R13 | `test_f025_guardias.py::test_f025_r13_predicado_vacio_o_excesivo_aborta` | sí |
-| R14 | `test_f025_build.py::test_f025_r14_metadata_de_la_ventana` | sí |
-| R15 | `test_f025_guardias.py::test_f025_r15_full_reconstruye_todo` | sí |
-| R16 | `test_f025_guardias.py::test_f025_r16_la_puerta_de_raw_no_cambia` | sí |
-| R17 | `test_f025_build.py::test_f025_r17_borrado_y_alta_en_la_misma_transaccion` | sí |
-| R18 | `test_f025_alcance.py::test_f025_r18_obras_activa_sigue_cableada_a_true` | sí (lee el `.sql`) |
-| R19 | `test_f025_ventana.py::test_f025_r19_perfil_ventana_no_escribe_en_meta` | sí |
-| R20 | `test_f025_alcance.py::test_f025_r20_sin_lecturas_a_sigrid` | sí (barrido de imports) |
-| R21 | `test_f025_alcance.py::test_f025_r21_sin_secretos_en_lo_nuevo` | sí |
-
-**Verificaciones MANUAL (humano)**: R5 (informe firmado por Negocio), R12 (la
-prueba de equivalencia contra Azure), y la primera noche real con la ventana
-activa contrastada con un `run-all --full` inmediatamente posterior.
-
----
-
-## Decisiones abiertas (NO las cierra el spec-author)
-
-### DA-1 · ¿Qué es una «obra abierta»? — **LA PRIMERA, Y SIGUE ABIERTA**
-
-Es la decisión que hizo que esta feature exista. El humano la dejó **sin
-decidir el 2026-08-18** y es de **Negocio**, no técnica: de ella depende qué
-obras dejan de recalcularse cada noche.
-
-Lo que el código y el diccionario de Sigrid ofrecen hoy, con nombres exactos:
-
-| Candidato | Fuente | Qué implica |
-|---|---|---|
-| **(a) Sin fecha real de fin** | `raw.obrctr.fecreafin` (Fecha real fin obra), con `raw.obr.fecfinrea` como respaldo | Es la **definición de facto que ya usa el proyecto**: `sql/cierre/05_views_cabecera.sql` agrega las fechas de `obrctr` y su comentario dice literalmente «Fin real: obrctr → obr (las obras vivas no lo tendrán)». Barata y ya probada. |
-| **(b) Con movimiento reciente** | albaranes / facturas / partes de los últimos N meses | Más fiel a «viva de verdad», pero necesita definir N y cruzar varias tablas. |
-| **(c) Situación explícita del contrato** | `raw.obrctr.sitide` → catálogo `auxobrcts` | El estado que Sigrid mantiene de verdad. **`auxobrcts` NO está declarada hoy en `config/tables_sigrid.yaml`**: adoptarla exige ingerirla (R20). |
-| **(d) Fecha de cierre** | `raw.obr.fecfincie` (Fecha fin cierre), `obr.fecciepre` | Alineado con el módulo `cierre`; hay que verificar cómo está mantenido en Ruesma. |
-
-**Recomendación del spec-author**: **(a) como definición primaria**, por ser
-la que el proyecto ya usa y la que no exige ingerir nada nuevo, **+ (b) con
-N = 12 meses como red** para no congelar una obra que sigue moviéndose aunque
-tenga fecha de fin puesta. Ambas declaradas como predicado SQL en
-`config/business_rules.yaml`, de modo que cambiarlas no toque código. **Y con
-los tres candidatos medidos por el bloque A antes de firmar**: puede que la
-diferencia entre (a) y (c) sean cuatro obras y la discusión sobre cuál elegir
-valga menos que la medición.
-
-**Requiere confirmación de Negocio.** Recordar que las fechas de Sigrid son
-enteros `YYYYMMDD` con `0` en lugar de NULL, y que el proyecto ya tiene
-`stg.fn_sigrid_date_to_date` para eso.
-
-### DA-2 · ¿La ventana acota el REFRESCO o el CONTENIDO?
-
-(a) **Refresco**: se deja de recalcular lo cerrado, pero el dato sigue en el
-datamart y Power BI ve el histórico completo. (b) **Contenido**: fuera de la
-ventana el dato no existe; el datamart adelgaza y el build es aún más barato,
-pero **Power BI pierde informes**. **Recomendación: (a)**, y toda esta spec
-está escrita sobre esa hipótesis (R8, R9, R12). Con (a) la equivalencia es
-demostrable con el instrumento que ya existe; con (b) no hay equivalencia que
-demostrar, solo una pérdida que Negocio tendría que aceptar por escrito.
-
-### DA-3 · ¿Cómo se sustituyen las filas de una obra recalculada?
-
-(a) `DELETE FROM stg.plan_mensual WHERE obra_id = ANY(...)` + `INSERT`, dentro
-de la transacción del tramo, con índice por `obra_id`. (b) Construir en una
-tabla nueva y copiar las filas conservadas. **Recomendación: (a)**, porque (b)
-copia ~24 M de filas cada noche y **duplica temporalmente la ocupación de
-disco** justo en el servidor donde ya hubo un incidente. El riesgo de (a) es
-el *bloat* y el WAL del borrado repetido: hay que **medirlo** en el bloque A y
-vigilarlo con la puerta de disco de F-019 (R11).
-
-### DA-4 · ¿Se acota también `build_presupuesto` (~23 min)?
-
-`stg.presupuesto` (13,76 M filas) es la entrada de `plan_mensual`. Acotarlo
-multiplica el ahorro, pero añade una dependencia más entre sub-pasos.
-**Recomendación**: **no en la primera entrega**. Primero `plan_mensual` (~100
-min) y `fact` (~19 min), que son el 80 % del problema; `presupuesto` se
-reevalúa con los números reales de la primera noche acotada.
-
-### DA-5 · ¿`stg.obras.activa` pasa a reflejar la ventana?
-
-Hoy es un `TRUE` literal en `sql/stg/03_obras.sql` y llega a Power BI por
-`mart.v_pbi_dim_obra`. Rellenarlo con el predicado de la ventana sería
-gratis técnicamente y **cambiaría un dato que alguien puede estar filtrando**.
-**Recomendación**: **no tocarlo** en esta feature (R18) y, si Negocio lo
-quiere, hacerlo en un cambio propio con su aviso.
-
-### DA-6 · Cadencia de la reconstrucción completa del build
-
-**Recomendación**: **el mismo domingo** que la recarga completa de la ingesta
-(DA-2 de F-011), y por la misma razón: un solo día «caro» a la semana, en la
-ventana que se comparte con `albaranes` y `partes`. Queda por confirmar que
-las dos cosas caben la misma noche —una completa de ingesta (33 min) más un
-build completo (~132 min) son ~2 h 45— o si conviene separarlas.
-
-### DA-7 · Prioridad frente al bloque B de F-011
-
-El humano ya dijo que **F-025 va por encima del bloque B de F-011 si los
-números lo confirman**. Lo que queda es confirmarlo: si el bloque A de esta
-spec (R2) demuestra un ahorro claramente mayor que los 33 min que como mucho
-puede ahorrar la ingesta, esta feature se implementa antes.
+# F-025 · Requisitos · Las obras cerradas no se reconstruyen cada noche
+
+> Reemplaza la spec del 2026-08-28 (commit `1f01718`). Mediciones y consultas:
+> **`mediciones.md`**; decisiones del humano: **`decisiones.md`**, cerradas el
+> **2026-09-02**.
+
+**No es una mejora de rendimiento: es la reparación de una avería.** La nocturna
+del **2026-09-02 murió** por `replicaTimeout` en el tramo **5 de 60** y dejó
+`stg.plan_mensual` **truncada al 21,6 %** (6.436.281 de 29.762.403 filas). Cada
+tramo pasó de **1,57 min** —media de 15 noches— a **40,77**: el `Standard_B1ms`
+**agotó sus 144 créditos de CPU a las 04:15 UTC** y Azure lo capó al 20 % de un
+núcleo. Solo la puerta de F-024 evitó que `mart` construyera encima. Y se
+reconstruyen **todas** las obras cada noche cuando solo **48 de 920** han tenido
+actividad en los últimos 12 meses.
+
+**Las dos frases del humano del 2026-09-02**, que cierran el principio de DA-1 y
+acotan la feature: *«las obras que estén cerradas no se actualizan»* y *«que no se
+reconstruyan, pero que **no se borren**, y que la información esté
+**consultable**»*. **Rigor `critico`**: fase RED, cobertura de las líneas cambiadas
+y mutación sin supervivientes, salvo exención escrita a cambio de la revisión de
+datos ampliada, como en F-052.
+
+## 1 · El criterio de obra congelada
+
+- **R1.** El sistema debe clasificar cada obra en **RECONSTRUIR** o **CONGELAR**
+  con una función **pura**, sin conexión, y dejar escrito **el motivo** de cada una.
+- **R2.** *(Decisión del humano, 2026-09-02.)* Se congela toda obra que cumpla **al
+  menos una** de estas tres, en unión: (1) su estado es **EN ESTUDIO (1), NO
+  PRESENTADA (11) o CERRADA (25)**; (2) `codigo_obra ~ '^[0-9]{6}$'`; (3) sin
+  actividad en 12 meses. Censo del universo del código (`raw.obr ⨝ raw.con`, **920**):
+  **880 congeladas, 40 vivas** (**38** al fact); por regla, 693 / **226** / 872.
+- **R3.** *(Contrapartida aceptada por el humano. **CIFRA CORREGIDA el 2026-09-03**;
+  porqué y fuentes, en el aviso de DA-1 y en `mediciones.md` §2.)* De las **48 obras
+  con actividad en 12 meses, 8 quedan congeladas** —**7** CERRADAS (25) y **1** de
+  seis dígitos, la `180501`—, con **hasta 6 días de antigüedad**. El sistema **no
+  debe** rescatarlas: debe **nombrarlas** (R26) y esperar al domingo (R25). El 40 que
+  se le presentó salía de `maestro.obras` y **no reproduce**: manda `SQL_ESTADO_OBRAS`.
+- **R4.** El catálogo de estados **está verificado** (2026-09-02): vive en
+  `conest`, tipo **42**, y se llega por `con.est`. El sistema debe publicarlo en el
+  diccionario para que deje de haber códigos sin nombre.
+- **R5.** MIENTRAS la ventana esté desactivada, el comportamiento debe ser **el de
+  hoy**: activarla es un interruptor explícito.
+
+## 2 · Qué se acota y qué no
+
+- **R6.** Se acotan **`build_plan_mensual`** (`08_plan_mensual.sql`; 94 de los
+  110,7 min de `build_stg`) y, por decisión del humano, **`build_presupuesto`**
+  (`06_presupuesto.sql`, 13,8 M filas). Los dos con el mismo mecanismo.
+- **R7.** El resto de `stg` (`00`–`05`, `07`) y los cuatro build de negocio se
+  siguen ejecutando **enteros**, desde `stg.presupuesto` y `stg.plan_mensual`
+  completas: su contenido no puede cambiar por esta feature.
+- **R8.** El mecanismo de troceado de F-019 **se reutiliza** —marcador
+  `/*F019_FILTRO_OBRAS*/`, planificador de tramos, puerta de disco, una transacción
+  por tramo—. En `06_presupuesto.sql` se añade un marcador equivalente; su
+  `DISTINCT ON` ya particiona por obra, así que el corte es igual de seguro.
+- **R9.** SI el conjunto a reconstruir queda vacío, ENTONCES el sub-paso termina en
+  SUCCESS sin ejecutar tramos y **sin tocar la tabla**.
+
+## 3 · No se borra nada, y todo sigue consultable
+
+> El `TRUNCATE` de `plan_mensual` está **fuera del troceado** y el de
+> `06_presupuesto.sql`, dentro. Con ellos, «no reconstruir» significa **borrar**: una
+> nocturna acotada e ingenua dejaría 40 obras y ninguna de las otras 880.
+
+- **R10.** El build acotado **no debe ejecutar `TRUNCATE`** sobre `stg.plan_mensual`
+  ni sobre `stg.presupuesto`: lo que se borra se **deriva de lo que se va a
+  escribir**, y cada tramo borra sus obras y las reinserta en la **misma
+  transacción**. Así es imposible borrar una obra que luego no se reescriba.
+- **R11.** CUANDO termina un build acotado, toda obra congelada conserva el **mismo
+  número de filas por (obra, ámbito)** e importes **idénticos al céntimo**.
+- **R12.** Una consulta de negocio sobre una obra congelada debe devolver
+  **exactamente lo mismo** que antes. Caso obligatorio: la **0599** en
+  `cierre.v_pbi_cierre_resumen`, DIRECTOS **2.624.793 €** y margen **1,8 %**.
+- **R13.** SI un tramo falla, ENTONCES **no** se vacía la tabla: el aborto de F-019
+  (`TRUNCATE` + FAILED) destruiría lo congelado. El build para, cada obra queda con su
+  última versión buena y se registra cuáles faltan.
+- **R14.** El sistema debe registrar **por obra** de qué ejecución viene lo
+  construido —`batch_id`, instante, filas, firma y sello—, **consultable por SQL**.
+- **R15.** La superficie de consumo **no cambia**: ni una columna, ni una vista, ni un
+  `DROP`; quien consulta no debe notar la diferencia.
+
+## 4 · La exclusión tiene que ser correcta, no confiada
+
+- **R16.** El sistema debe calcular por obra una **firma del origen** sobre **`raw`**
+  —lo único que la ingesta sigue trayendo completo— y **denunciar** toda obra
+  congelada cuya firma cambie. No la reconstruye —contradiría R3—: la rehace el
+  domingo (R25), o el humano a mano.
+- **R17.** El sistema debe calcular un **sello del SQL** (hash de
+  `08_plan_mensual.sql` y de los parámetros del build). SI cambia, ENTONCES **todas**
+  las obras se reconstruyen esa noche: sin esto, un arreglo como el de F-052 solo
+  alcanzaría a las obras vivas.
+- **R18.** SI una obra congelada no tiene filas en `stg.plan_mensual` o
+  `stg.presupuesto`, o el registro no la cubre, ENTONCES se reconstruye: no se congela
+  lo que no está construido, y eso es completar, no actualizar.
+- **R20.** El **coste** de la firma debe medirse antes de fijarla (T2b): si incluir
+  `raw.obrparpre.planif` —texto largo de 13,8 M filas— resulta prohibitivo, la firma
+  se queda en los agregados numéricos y la laguna se declara. La cierra R25.
+
+## 5 · La prueba de equivalencia, con tolerancia cero
+
+- **R21.** *(BLOQUEANTE.)* Sobre el **mismo `raw`**, las **cuatro huellas** de F-052
+  —`stg`, `mart`, `dimension`, `cierre`— antes y después deben salir **idénticas**:
+  `comparar-huellas` **sin `--obras-esperadas`**, cero diferencias.
+- **R22.** Debe añadirse una **quinta huella**: filas y suma de `importe_origen` por
+  **obra × ámbito** de `stg.plan_mensual` completa, que demuestra R11 obra a obra.
+- **R23.** El recuento de `stg.plan_mensual` tras el primer build acotado debe
+  coincidir con el de la última noche buena (**29.762.403**) salvo lo reconstruido.
+- **R24.** `check-unicidad`, `check-cierres`, `check-cobertura` y `check-declarados`: mismo veredicto que antes.
+
+## 6 · La red de seguridad (sin ella no se cierra)
+
+- **R25.** *(Decisión del humano.)* Debe existir una **reconstrucción completa
+  semanal, los DOMINGOS**, que ignore la ventana y rehaga todas las obras, disparada
+  desde `run-all` por antigüedad registrada y **no** por un cron nuevo (de ahí el
+  «hasta 6 días» de R3).
+- **R26.** Debe existir un **guardián de solo lectura** que denuncie, nombrando obra:
+  firma distinta de la registrada, congelada sin filas, sello no vigente y
+  reconstrucción completa vencida.
+- **R27.** El guardián corre al final de `run-all`, **avisa y no bloquea**, escribe
+  una línea con **marcador estable y buscable** y a mano sale con código distinto de
+  0. Un test debe cruzar el marcador del código con el del `.ps1`.
+- **R28.** El modo de fallo a impedir es el de F-052: **un dato que envejece y del
+  que nadie se entera**. Ninguna obra queda congelada en silencio: o la reconstrucción
+  del domingo la alcanza, o el guardián la nombra.
+
+## 7 · El efecto medible
+
+- **R29.** *(Aceptación.)* La nocturna acotada debe terminar **sin dejar los créditos
+  de CPU a cero**: crédito restante mayor que cero, métrica de Azure, MANUAL.
+- **R30.** Los sub-pasos acotados deben registrar en `_meta.etl_runs` cuántas obras
+  reconstruyeron y cuántas congelaron; el ahorro se **mide antes de implementar** (T2).
+
+## 8 · Documentación y límites
+
+- **R31.** Ficha para todo objeto nuevo y actualización de las de `stg.plan_mensual`
+  y `stg.presupuesto` (**no todas sus filas se construyen cada noche**) y de
+  `maestro.obras.estado_id`, que hoy dice que su catálogo no se ingiere: los catorce
+  estados de `conest` se documentan con su nombre (R4).
+- **R32.** `docs/ARCHITECTURE.md` debe explicar la ventana junto al troceado de F-019
+  y la coherencia de F-024, con el cambio de invariante de R13; y
+  `azure-apps/datamart_seg_anual.md`, el cambio de frescura.
+- **R33.** No se acota `build_mart` ni `build_cierre` (13 % del tiempo): su
+  reconstrucción íntegra desde un `stg` completo es lo que hace trivial R21. Si el
+  ahorro no basta, es otra feature.
+- **R34.** No se acota la ingesta —F-011 midió que no compensa y que `tiemod` no
+  existe en 24 de las 31 tablas, `obrparpre` incluida—, y por eso `raw` sigue completo
+  cada noche, que es lo que hace posible R16. Tampoco se tocan la deduplicación de
+  obras, el árbol de partidas, el literal `stg.obras.activa` ni el tamaño del
+  servidor, que afecta a `albaranes` y `partes` y lo decide el humano.

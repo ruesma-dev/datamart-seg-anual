@@ -621,9 +621,14 @@ def test_f003_r8_el_job_no_sobrescribe_el_comando_de_la_imagen() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_f003_r9_cron_del_entorno_dev_es_0_2() -> None:
-    """`0 2 * * *` UTC, y escrito una sola vez."""
-    assert _config("dev")["cron"] == "0 2 * * *"
+def test_f003_r9_cron_del_entorno_dev_es_medianoche() -> None:
+    """`0 0 * * *` UTC, y escrito una sola vez.
+
+    Fue `0 2 * * *` hasta el 2026-09-06, cuando el humano lo adelanto a
+    medianoche: la carga completa dura ~4 h 50 y arrancando a las 02:00 el
+    dato nuevo no estaba listo hasta bien entrada la manana.
+    """
+    assert _config("dev")["cron"] == "0 0 * * *"
 
     for script in _ps1():
         assert not re.search(r"\d+\s+\d+\s+\*\s+\*\s+\*", _script(script.name)), (

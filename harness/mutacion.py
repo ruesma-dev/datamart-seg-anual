@@ -50,6 +50,7 @@ from harness.alcance import (
     Alcance,
     alcance_de_feature,
     alcance_de_ficheros,
+    rama_base_configurada,
 )
 from harness.rigor import (
     RUTA_RIGOR,
@@ -1792,7 +1793,11 @@ def _analizar_argumentos(argv: list[str] | None) -> argparse.Namespace:
     analizador.add_argument(
         "--feature", default=None, help="Identificador de la feature, p. ej. F-XXX"
     )
-    analizador.add_argument("--base", default="dev", help="Rama de integración")
+    analizador.add_argument(
+        "--base",
+        default=None,
+        help="Rama de integración (por defecto, RAMA_BASE de harness/init.sh)",
+    )
     analizador.add_argument("--rama", default=None, help="Rama de la feature")
     analizador.add_argument("--raiz", default=".", help="Raíz del repositorio a mutar")
     analizador.add_argument(
@@ -2141,7 +2146,7 @@ def main(argv: list[str] | None = None, ejecutor: object | None = None) -> int:
         else:
             alcance = alcance_de_feature(
                 opciones.feature,
-                base=opciones.base,
+                base=opciones.base or rama_base_configurada(opciones.raiz),
                 rama=opciones.rama,
                 raiz=opciones.raiz,
             )

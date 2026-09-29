@@ -8,8 +8,30 @@ Encadena los archivos SQL en orden:
                           dinámico según lo que exista en `raw`)
     01_movimientos.sql  - un registro por efecto de retención (ambos sentidos)
     02_views.sql        - vistas de saldo por entidad, obra, vivas y vencidas
+    03_apuntes_contables.sql - F-095: cuentas de retencion de proveedor y sus
+                          apuntes contables, con clase y obra
+    04_saldo_contable.sql    - F-095: saldo contable por proveedor y obra, la
+                          fuente que manda para el saldo vivo
+    05_fin_obra.sql     - F-095/F-110: fin de obra, plazo y vencimiento por obra
+    06_views_contables.sql   - F-095: cuadre contabilidad-efectos y retencion
+                          contable por obra con su vencimiento
 
-Solo lee de `raw.*` (cob, pag, rec). No necesita `stg` ni `mart`.
+Lee de `raw.*` (cob, pag, rec, prv, con, apu, rac, obr, obrctr) y de la vista
+`maestro.centros_coste`. El sub-paso `fin_obra` lee ademas tres tablas de
+otros pasos:
+
+- desde F-110, `mart.master_versiones_tipadas` (que version es la ultima
+  Cuatrimestral) y `stg.plan_mensual` (su ultimo mes con importe planificado):
+  sin inicio de garantia, el fin de obra es ese mes + 1. Son de la MISMA noche,
+  porque en `run-all` `build_stg` y `build_mart` corren antes;
+- desde F-095, `cierre.fact_cierre_mensual`, de la noche anterior
+  (`build_cierre` corre despues), solo para la columna informativa
+  `ultimo_cierre`: desde F-110 no interviene en el fin de obra, y una tabla del
+  cierre vacia ya no hace fallar el paso.
+
+Si falta la tabla de versiones, no tiene ninguna Cuatrimestral, el plan no
+tiene filas de los ambitos 8 u 11 o no existe la tabla del cierre, el sub-paso
+`fin_obra` falla con su nombre antes de dropear nada (R14 de F-110).
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). Igual que `compras`:
 `build-retenciones` ejecutaba su SQL en línea, sin step, así que **no dejaba
@@ -40,7 +62,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los tres ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` por lo mismo que en `build_compras_step`: es DATO, y
 #: sustituirla en un test es lo único que permite ejercitar el guardián de
@@ -59,6 +81,26 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="movimientos",
     ),
     _SubStep(name="views", sql_file="02_views.sql"),
+    # F-095: la retencion desde la contabilidad, en el mismo paso (D1)
+    _SubStep(
+        name="apuntes",
+        sql_file="03_apuntes_contables.sql",
+        target_schema="retenciones",
+        target_table="apuntes_contables",
+    ),
+    _SubStep(
+        name="saldo",
+        sql_file="04_saldo_contable.sql",
+        target_schema="retenciones",
+        target_table="saldo_contable",
+    ),
+    _SubStep(
+        name="fin_obra",
+        sql_file="05_fin_obra.sql",
+        target_schema="retenciones",
+        target_table="fin_obra",
+    ),
+    _SubStep(name="views_contables", sql_file="06_views_contables.sql"),
 )
 
 
@@ -78,7 +120,25 @@ class BuildRetencionesStep(PipelineStep):
 
     @property
     def depends_on(self) -> list[str]:
-        # Solo necesita raw.* (la ingesta). No depende de stage ni mart.
+        # Necesita raw.* (la ingesta) y, desde F-094, la VISTA
+        # `maestro.centros_coste` para traducir centro de coste -> obra. Esa
+        # vista es SQL puro sobre `raw` y existe desde F-073; `build_maestros`
+        # corre antes por su posición en `build_pipeline_steps`. NO se declara
+        # aquí a propósito: `build_maestros` depende de `build_stg`, y
+        # declararlo haría que un fallo de `stg` dejara sin construir las
+        # retenciones, que hoy sobreviven a eso.
+        #
+        # F-095 (D7): tampoco se declara `build_cierre`, aunque `05_fin_obra.sql`
+        # lee `cierre.fact_cierre_mensual`: usa el cierre de la noche anterior.
+        # Desde F-110 esa lectura es solo informativa (`ultimo_cierre`) y una
+        # tabla vacia ya no hace fallar el sub-paso.
+        #
+        # F-110 (D4): `05_fin_obra.sql` lee `mart.master_versiones_tipadas` y
+        # `stg.plan_mensual` para el fin de obra. Tampoco se declaran
+        # `build_stg` ni `build_mart`: en `build_pipeline_steps` corren antes
+        # (misma noche; lo fija `test_f110_r16_orden_topologico`), y si fallan,
+        # las retenciones se construyen con sus tablas de la noche anterior en
+        # vez de quedarse sin construir.
         return ["ingest_raw"]
 
     def run(self) -> StepResult:

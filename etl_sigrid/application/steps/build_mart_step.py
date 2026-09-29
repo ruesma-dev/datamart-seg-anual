@@ -13,8 +13,9 @@ Flujo:
         05_views_powerbi.sql             - Vistas v_pbi_* consumidas por Power BI
         05b_view_dim_partida_niveles.sql - Vista mart.v_pbi_dim_partida_niveles
                                            (DimPartida + nivel_1..6 para el visual árbol)
-        06_views_cp_tipologia.sql        - Vistas para el detalle anual CP por tipología
-                                           (helpers + v_pbi_cp_tipologia)
+        06_cp_tipologia.sql              - Detalle anual CP por tipología: las
+                                           TRES TABLAS (F-078) y las tres vistas
+                                           que las envuelven
 
 Cada sub-step se registra en logs con tiempo y filas procesadas.
 
@@ -57,6 +58,59 @@ class _SubStep:
     sql_file: str
     target_schema: str | None = None
     target_table: str | None = None
+
+
+#: Los siete ficheros SQL de `mart`, EN ORDEN, y de qué tabla se cuentan filas.
+#:
+#: Vive fuera de `run()` a propósito, igual que en `build_compras_step`: es
+#: DATO, no lógica. Así se puede leer —y comprobar— sin abrir una conexión, que
+#: es justo lo que `tests/test_f078_sql.py` necesitaba para verificar que el
+#: sub-paso nuevo cuenta sus filas.
+SUB_PASOS: tuple[_SubStep, ...] = (
+    _SubStep(name="ddl", sql_file="01_ddl.sql"),
+    _SubStep(
+        name="build_fact",
+        sql_file="02_build_fact.sql",
+        target_schema="mart",
+        target_table="fact_seguimiento_mensual",
+    ),
+    _SubStep(
+        name="agg_categoria",
+        sql_file="03_agg_categoria.sql",
+        target_schema="mart",
+        target_table="fact_seguimiento_categoria",
+    ),
+    _SubStep(
+        name="view_periodificado",
+        sql_file="04_view_periodificado.sql",
+        # No es tabla; no cuenta filas
+    ),
+    _SubStep(
+        name="views_powerbi",
+        sql_file="05_views_powerbi.sql",
+        # Vistas, no cuenta filas
+    ),
+    _SubStep(
+        name="dim_partida_niveles",
+        sql_file="05b_view_dim_partida_niveles.sql",
+        # Vista (DimPartida + nivel_1..6 para el visual árbol), no cuenta filas
+    ),
+    # F-078: deja de ser un fichero de solo vistas. Construye TRES TABLAS
+    # —`master_versiones_tipadas`, `master_vigente_anual` y `fact_cp_tipologia`—
+    # y las tres vistas que las envuelven con el nombre de siempre.
+    #
+    # Cuenta el HECHO y no los dos helpers, por el mismo motivo por el que el
+    # sub-paso `texto` de `compras` cuenta los comentarios y no el memo: sin
+    # versiones vigentes no hay filas de hecho, así que un cero aquí delata
+    # también a los helpers. Va el ÚLTIMO porque es el sub-paso más caro y
+    # adelantarlo retrasaría el hecho central del datamart.
+    _SubStep(
+        name="cp_tipologia",
+        sql_file="06_cp_tipologia.sql",
+        target_schema="mart",
+        target_table="fact_cp_tipologia",
+    ),
+)
 
 
 class BuildMartStep(PipelineStep):
@@ -102,44 +156,8 @@ class BuildMartStep(PipelineStep):
 
         sql_dir = Path(__file__).resolve().parents[2] / "infrastructure" / "postgres" / "sql" / "mart"
 
-        sub_steps: list[_SubStep] = [
-            _SubStep(name="ddl", sql_file="01_ddl.sql"),
-            _SubStep(
-                name="build_fact",
-                sql_file="02_build_fact.sql",
-                target_schema="mart",
-                target_table="fact_seguimiento_mensual",
-            ),
-            _SubStep(
-                name="agg_categoria",
-                sql_file="03_agg_categoria.sql",
-                target_schema="mart",
-                target_table="fact_seguimiento_categoria",
-            ),
-            _SubStep(
-                name="view_periodificado",
-                sql_file="04_view_periodificado.sql",
-                # No es tabla; no cuenta filas
-            ),
-            _SubStep(
-                name="views_powerbi",
-                sql_file="05_views_powerbi.sql",
-                # Vistas, no cuenta filas
-            ),
-            _SubStep(
-                name="dim_partida_niveles",
-                sql_file="05b_view_dim_partida_niveles.sql",
-                # Vista (DimPartida + nivel_1..6 para el visual árbol), no cuenta filas
-            ),
-            _SubStep(
-                name="views_cp_tipologia",
-                sql_file="06_views_cp_tipologia.sql",
-                # Vistas (helpers + v_pbi_cp_tipologia), no cuenta filas
-            ),
-        ]
-
         total_rows = 0
-        for sub in sub_steps:
+        for sub in SUB_PASOS:
             sql_path = sql_dir / sub.sql_file
             if not sql_path.exists():
                 result.status = StepStatus.FAILED

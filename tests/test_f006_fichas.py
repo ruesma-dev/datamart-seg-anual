@@ -1266,7 +1266,7 @@ def test_f006_r2_el_diccionario_declara_el_coste_de_consultar() -> None:
 
     Ni un `[LENTO]`, ni un «filtra siempre por obra». La batería se chocó cinco
     veces con el `statement_timeout` de 30 s, y `mart.v_master_vigente_anual`
-    —marcada como recomendada— agota el tiempo **con `LIMIT 5`**.
+    —marcada como recomendada— agotaba el tiempo **con `LIMIT 5`**.
 
     El coste viaja por el canal que ya existe: una regla dura cuyo ámbito son
     los objetos caros, que `derivar_avisos` cuelga de cada ficha afectada. Así
@@ -1277,15 +1277,13 @@ def test_f006_r2_el_diccionario_declara_el_coste_de_consultar() -> None:
 
     assert regla is not None, "el diccionario sigue sin decir lo que cuesta consultar"
     assert regla.severidad == "bloqueante"
-    for medido in ("60 s", "20 s", "16 s"):
+    for medido in ("60 s", "25 s", "10 s"):
         assert medido in regla.regla, f"falta la cifra medida {medido}"
 
     from etl_sigrid.domain.diccionario import derivar_avisos
 
     derivado = derivar_avisos(dicc)
     caras = (
-        "mart.v_master_vigente_anual",
-        "mart.v_pbi_cp_tipologia",
         "mart.v_fact_periodificado",
         "cierre.v_pbi_cierre_indirectos_detalle",
     )
@@ -1296,24 +1294,51 @@ def test_f006_r2_el_diccionario_declara_el_coste_de_consultar() -> None:
         )
 
 
+#: F-078 (2026-09-15) materializó los tres objetos de CP por tipología. Un aviso
+#: de coste que era cierto y deja de serlo **se retira**: seguir apartando al
+#: agente de una vista que ya funciona hace el mismo daño que mandarle a una que
+#: no. Es la otra mitad de la lección de `R-COSTE-CONSULTA`.
+YA_NO_SON_CARAS = (
+    "mart.v_pbi_cp_tipologia",
+    "mart.v_master_vigente_anual",
+    "mart.v_master_versiones_tipadas",
+)
+
+
+@pytest.mark.parametrize("nombre", YA_NO_SON_CARAS)
+def test_f006_r2_el_aviso_de_coste_no_sobrevive_al_arreglo(nombre: str) -> None:
+    """Materializado el objeto, ni la regla lo nombra en su ámbito ni la ficha
+    hereda el aviso."""
+    from etl_sigrid.domain.diccionario import derivar_avisos
+
+    dicc = _diccionario()
+    regla = next(r for r in dicc.reglas if r.codigo == "R-COSTE-CONSULTA")
+
+    assert nombre not in regla.ambito, (
+        f"{nombre} ya es una tabla y la regla lo sigue declarando caro"
+    )
+    assert "R-COSTE-CONSULTA" not in derivar_avisos(dicc).por_nombre[nombre].avisos
+
+
 def test_f006_r2_una_vista_que_no_se_puede_ejecutar_no_es_superficie_de_consumo() -> None:
     """Estaban marcadas `consumo_recomendado: true` sin devolver una sola fila.
 
-    Las dos agotan 40 s con `LIMIT 5` y 60 s filtradas a una obra. Recomendar
-    para consulta algo que no se puede consultar es la misma clase de defecto
-    que una relación que no une: el agente lo intenta y se queda sin respuesta.
+    Recomendar para consulta algo que no se puede consultar es la misma clase de
+    defecto que una relación que no une: el agente lo intenta y se queda sin
+    respuesta. Eran dos; desde F-078 queda una, porque
+    `mart.v_pbi_cp_tipologia` ya se ejecuta.
     """
     dicc = _diccionario()
 
-    for objeto in ("mart.v_pbi_cp_tipologia", "cierre.v_pbi_cierre_indirectos_detalle"):
+    for objeto in ("cierre.v_pbi_cierre_indirectos_detalle",):
         ficha = dicc.por_nombre[objeto]
         assert not ficha.consumo_recomendado, f"{objeto} no se puede ejecutar"
         assert "NO SE PUEDE CONSULTAR" in (ficha.motivo_no_consumo or "")
 
-    # La que sí sirve filtrada conserva su sitio, pero lo dice en la ficha.
+    # La que estuvo un mes limitada a consultas por obra vuelve entera.
     vigente = dicc.por_nombre["mart.v_master_vigente_anual"]
     assert vigente.consumo_recomendado
-    assert contiene(vigente.descripcion, "NUNCA SE CONSULTA SIN FILTRAR POR OBRA")
+    assert contiene(vigente.descripcion, "YA SE PUEDE CONSULTAR SIN FILTRAR POR OBRA")
 
 
 def test_f006_r2_ninguna_ficha_recomienda_es_activa_para_saber_si_una_obra_vive() -> None:
@@ -1434,17 +1459,25 @@ def test_f006_r2_retenciones_avisa_de_que_su_obra_id_no_es_la_obra() -> None:
     Lo que se exige ahora no es una redacción sino los tres hechos que evitan
     el JOIN vacío: que NO es la obra, cuánto casa de verdad, y por dónde se
     cruza.
+
+    F-094 (2026-09-22) ARREGLA EL DATO, y este test cambia con él: `obra_id`
+    pasa a ser la obra de verdad (traducida por `maestro.centros_coste`) y el
+    centro de coste se publica aparte, en `centro_coste_id`. Los tres hechos
+    se siguen exigiendo, cada uno en la columna donde ahora es cierto.
     """
     columnas = {
         c.nombre: c
         for c in _diccionario().por_nombre["retenciones.movimientos"].columnas
     }
 
+    centro = columnas["centro_coste_id"]
+    assert contiene(centro.significado, "NO es la obra")
+    assert contiene(centro.significado, "0 de 261"), "el defecto de antes, con su cifra"
+    assert "maestro.centros_coste" in centro.significado, "por donde se traduce"
+
     obra = columnas["obra_id"]
-    assert contiene(obra.significado, "CENTRO DE COSTE")
-    assert contiene(obra.significado, "NO es el identificador de la obra")
-    assert contiene(obra.significado, "0 de 261"), "la cifra medida, no una impresion"
-    assert "centro_coste_ide" in obra.significado, "por donde SI se cruza"
+    assert "maestro.obras.obra_id" in obra.significado
+    assert contiene(obra.significado, "262 de 262"), "la cifra medida, no una impresion"
     assert "98" not in obra.significado, (
         "la afirmacion del 98 % era falsa: no puede volver por la puerta de atras"
     )

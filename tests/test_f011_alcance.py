@@ -171,24 +171,39 @@ def test_f011_r22_tampoco_se_toca_el_troceado_de_f019() -> None:
         )
 
 
-def test_f011_r22_sin_bloque_ventana_ni_perfil_ventana() -> None:
-    """Nada de la ventana de negocio existe todavía: eso es F-025."""
+def test_f011_r22_la_ventana_de_negocio_la_trajo_F025_y_no_F011() -> None:  # noqa: N802
+    """El bloque `ventana:` **ya existe**, y lo trajo F-025 el 2026-09-03.
+
+    Este test decía lo contrario —«nada de la ventana existe todavía»— y era
+    correcto entonces: el criterio dependía de DA-1, que el humano no había
+    decidido, y F-011 tenía prohibido adelantarlo. Se invierte en vez de
+    borrarse porque lo que protege sigue siendo válido: que la ventana **no es
+    de F-011**. Si alguien reabre F-011 y vuelve a meter aquí lógica de la
+    ventana, esto lo dirá.
+
+    `perfil-ventana` y `fetch_peso_ventana` siguen sin existir, y eso no ha
+    cambiado: eran los nombres que F-011 había esbozado, y F-025 resolvió el
+    problema con otro diseño —`ventana-plan` y `fetch_censo_de_obras`—.
+    """
     reglas = yaml.safe_load(
         (REPO / "config" / "business_rules.yaml").read_text(encoding="utf-8")
     )
-    assert "ventana" not in (reglas or {}), (
-        "config/business_rules.yaml tiene un bloque `ventana:`: es de F-025 y "
-        "depende de DA-1, que sigue sin decidir."
+    assert "ventana" in (reglas or {}), (
+        "el bloque `ventana:` de config/business_rules.yaml es donde vive el "
+        "criterio de obra congelada desde F-025"
     )
 
+    assert "ventana-plan" in main.cli.commands
     assert "perfil-ventana" not in main.cli.commands, (
-        "el comando `perfil-ventana` es de F-025, no de F-011"
+        "`perfil-ventana` era el nombre que esbozó F-011; F-025 lo resolvió con "
+        "`ventana-plan`, que es dry-run y de solo lectura"
     )
 
-    # Y `fetch_peso_ventana` no está en ninguna parte del código.
     for fuente in (REPO / "etl_sigrid").rglob("*.py"):
         assert "fetch_peso_ventana" not in fuente.read_text(encoding="utf-8"), (
-            f"{fuente} define o usa fetch_peso_ventana, que es de F-025"
+            f"{fuente} usa fetch_peso_ventana, que F-025 no llegó a necesitar: "
+            f"el censo sale de `fetch_censo_de_obras` y los pesos de la consulta "
+            f"que la nocturna ya ejecutaba"
         )
 
 

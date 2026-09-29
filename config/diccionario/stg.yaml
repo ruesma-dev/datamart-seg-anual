@@ -3,9 +3,19 @@
 # Fichas del esquema `stg`: la capa intermedia que normaliza Sigrid y explota la
 # planificacion a nivel mensual.
 #
-# **NINGUNO DE ESTOS OBJETOS ES SUPERFICIE DE CONSULTA**, y no es una
-# recomendacion de estilo: aqui es donde estan las trampas que producen numeros
-# falsos con mas facilidad de todo el datamart.
+# **TODOS ESTOS OBJETOS SON SUPERFICIE DE CONSULTA** desde F-079 (2026-09-09).
+# Hasta entonces esta cabecera decia lo contrario -«ninguno es superficie de
+# consulta»- y las siete fichas llevaban `motivo_no_consumo`. Eran PREFERENCIAS
+# DE ENRUTADO («capa intermedia», «para partidas esta `mart.v_pbi_dim_partida`»)
+# y el efecto era el contrario del buscado: el MCP tiene `stg` entre sus
+# esquemas autorizados, asi que desaconsejarlo solo conseguia que el agente no
+# mirase donde si hay dato. El caso que lo zanja: el ambito de certificacion
+# esta en `stg.presupuesto` y en ningun sitio aguas abajo.
+#
+# **LO QUE NO CAMBIA SON LAS TRAMPAS.** Aqui estan las que producen numeros
+# falsos con mas facilidad de todo el datamart, y ahora viven en la
+# `descripcion` de su ficha -que es texto publicado- en vez de en un campo que
+# el agente lee como «no mires aqui»:
 #
 # 1. **En `stg.plan_mensual` conviven TODAS las versiones master.** Filtrar solo
 #    por obra y ambito multiplica los importes por el numero de versiones de esa
@@ -20,9 +30,13 @@
 # 5. **`stg.ambitos.uso_seguimiento` esta DESFASADO**: marca solo los ambitos 8 y
 #    11, y `mart` ya construye tambien los reales 3 y 7.
 #
-# Lo que se pregunta esta en `mart` y en `cierre`. Estas fichas existen para que
-# un agente entienda de donde sale aquello, y para que sepa por que NO debe
-# consultar esto directamente.
+# Buena parte de lo que se pregunta esta ademas en `mart` y en `cierre`, ya
+# resuelto y mas comodo, y cada ficha lo dice. Pero eso es NAVEGACION, no una
+# prohibicion: lo que solo esta aqui, aqui se consulta.
+#
+# Las funciones `fn_*` de este fichero si siguen fuera de la superficie de
+# consulta, y por un motivo distinto: una funcion no se consulta, se llama desde
+# el SQL del build.
 #
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/stg/`.
@@ -35,23 +49,54 @@ objetos:
   plan_mensual:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Es el objeto mas peligroso del datamart. Aqui conviven TODAS las versiones
-      master de cada obra, asi que una consulta por obra y ambito sin filtrar
-      version multiplica los importes por el numero de versiones. La eleccion de
-      la version vigente solo esta hecha aguas abajo: para planificacion hay que
-      ir a `mart.fact_seguimiento_mensual`, que ya la resuelve mes a mes.
+    consumo_recomendado: true
     descripcion: >-
       El nucleo temporal del datamart: la explosion MENSUAL del presupuesto, con
       una fila por cada mes en el que una partida tiene importe, para los cuatro
       ambitos que usa el seguimiento. De aqui salen `mart` y `cierre`.
+
+      **ES EL OBJETO MAS PELIGROSO DEL DATAMART, Y ESTO NO ES UNA PREFERENCIA DE
+      ENRUTADO SINO UNA ADVERTENCIA DE CORRECCION:** aqui conviven TODAS las
+      versiones master de cada obra, asi que una consulta por obra y ambito sin
+      filtrar version multiplica los importes por el numero de versiones. La
+      eleccion de la version vigente solo esta hecha aguas abajo: para
+      planificacion ya resuelta, mes a mes, esta
+      `mart.fact_seguimiento_mensual`. Es la regla dura `R-VERSION-MASTER`, de
+      severidad bloqueante, y consultar aqui sin filtrar version da cifras
+      infladas, no aproximadas.
     grano: >-
       Una fila por (`obra_id`, `partida_id`, `ambito_id`, `version`,
       `anio_mes`), que es su clave de negocio y son CINCO columnas. Omitir
       `version` es exactamente lo que multiplica los importes. Es la tabla mas
       grande del datamart, del orden de decenas de millones de filas, y por eso
       su build va troceado por lotes de obras.
+
+      **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
+      2026-09-03).** El datamart dejo de rehacer las 920 obras cada noche: las
+      congeladas conservan la version que se construyo la ultima vez que les
+      toco. **El CRITERIO y la CONDUCTA son dos cifras distintas, y las dos son ciertas.** El criterio dice **40 vivas / 880 congeladas**: a cuantas obras del maestro les toca por actividad. La conducta real de una noche, medida el 2026-09-07 en la ejecucion acotada `swtg78p`, es **592 rehechas / 328 congeladas**. De las 592, solo **40 son obras vivas**; las otras **552 entran porque no tienen filas construidas**, y **512 siguen vacias despues** -son fichas del maestro crudo sin presupuesto ni planificacion: plantillas y codigos repetidos-. **CONSECUENCIA AL CITAR FRESCURA: esas 552 se rehacen TODAS las noches, asi que su dato tiene horas, no seis dias.** El 'hasta 6 dias' vale para las 328 congeladas de verdad. Quien cite frescura por obra debe mirar `_meta.v_frescura_obra`, no suponerlo. Arreglar el dato en si es F-071.
+      NO SE BORRAN Y SIGUEN CONSULTABLES. NO SE BORRAN Y SIGUEN
+      CONSULTABLES: cada tramo borra solo las obras que va a reinsertar, en su
+      misma transaccion, asi que una obra congelada conserva exactamente sus
+      filas y sus importes. La ventana **no cambia ni una cifra**; cambia de
+      cuando es.
+
+      DE CUANDO ES EL DATO DE UNA OBRA lo dice `_meta.v_frescura_obra`
+      (`construido_at`, `congelada`, `motivo`). **Citala siempre que la
+      pregunta sea sobre una obra concreta y la frescura importe.** Una obra
+      congelada puede llevar hasta 6 dias de retraso: todas se rehacen enteras
+      los domingos.
+
+      QUE OBRA SE CONGELA lo decide `config/business_rules.yaml`, bloque
+      `ventana:`, con tres reglas en union: estado 1, 11 o 25; codigo de seis
+      digitos; o sin actividad en 12 meses. El censo: 920 obras, 880 congeladas
+      y 40 vivas. De las 48 obras CON actividad reciente hay 8 que quedan
+      congeladas igualmente -7 CERRADAS y 1 de seis digitos-, y es una decision
+      de negocio tomada con ese dato delante, no un defecto.
+
+      Y `plan_id`, su clave sustituta, **ya solo se reasigna en las obras que se
+      reconstruyen**: la de una obra congelada es estable entre noches. Sigue
+      sin ser un identificador de negocio.
 
       **UN SOLO CIERRE POR MES EN LOS AMBITOS REALES (3 y 7).** Veintidos obras
       tienen dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes`
@@ -243,16 +288,28 @@ objetos:
   presupuesto:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Es capa intermedia y exige aplicar a mano dos reglas que aguas abajo ya
-      estan resueltas: elegir la columna de importe segun el ambito y filtrar la
-      fase correcta. Se documenta porque es **la fuente buena para "cual es el
-      presupuesto de la obra"**, que no se responde sumando `stg.plan_mensual`.
+    consumo_recomendado: true
     descripcion: >-
       El presupuesto por partida y ambito, con su cantidad, su precio y su
       importe, sin distribucion mensual propia. La explosion a meses vive en
       `stg.plan_mensual`.
+
+      **Es la fuente buena para "cual es el presupuesto de la obra"**, que no se
+      responde sumando `stg.plan_mensual`. Y es la unica via para los ambitos
+      que `mart` no construye -la certificacion entre ellos-, porque aqui no se
+      filtra por ambito: estan todos los que Sigrid da de alta. A cambio hay que
+      aplicar a mano dos reglas que aguas abajo ya estan resueltas: elegir la
+      columna de importe segun el ambito y filtrar la fase correcta.
+
+      **NO TODAS SUS FILAS SE RECONSTRUYEN CADA NOCHE (F-025, desde el
+      2026-09-03)**, igual que `stg.plan_mensual` y por la misma decision: se
+      rehacen solo las obras que lo necesitan y las congeladas conservan la
+      version que
+      se construyo la ultima vez que les toco. **No se borran y siguen
+      consultables**: el build borra solo las obras que va a reinsertar, en la
+      misma transaccion. De cuando es el dato de cada obra lo dice
+      `_meta.v_frescura_obra`, y una obra congelada puede llevar hasta 6 dias de
+      retraso -todas se rehacen enteras los domingos-.
 
       **Dos trampas antes de escribir nada, y las dos multiplican importes.**
 
@@ -414,11 +471,7 @@ objetos:
   partidas:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Capa intermedia. Para consultar partidas esta `mart.v_pbi_dim_partida`, que
-      es la misma informacion con etiquetas listas y forma parte de la superficie
-      de consumo.
+    consumo_recomendado: true
     descripcion: >-
       El arbol de partidas de cada obra, reconstruido: cada fila sabe de que
       capitulo cuelga, cual es su capitulo raiz, su ruta completa y su nivel. En
@@ -429,6 +482,17 @@ objetos:
       Esos no se publican, pero desde F-052 (2026-08-31) el recorrido SI baja a
       traves de ellos y sus descendientes llegan. Lee `codigo_partida` y
       `capitulo_padre_id` antes de recorrer el arbol.
+
+      **El codigo de partida NO es unico ni dentro de su obra (F-109)**: el
+      mismo codigo cuelga de varios capitulos, y cada copia es una partida
+      distinta. Una partida se identifica, se une y se cuenta por `partida_id`;
+      el porque y las cifras, en `codigo_partida` y en la regla
+      `R-PARTIDA-CODIGO-NO-UNICO`.
+
+      La misma informacion con etiquetas ya listas esta ademas en
+      `mart.v_pbi_dim_partida`, que suele ser mas comoda para una respuesta de
+      negocio; aqui esta el arbol entero, con la jerarquia y la ruta, que es lo
+      que `mart` no da.
     grano: >-
       Una fila por `partida_id`: una partida de detalle o un capitulo de
       cualquier nivel de una obra.
@@ -441,14 +505,39 @@ objetos:
         agregacion: no_sumable
       obra_id:
         significado: >-
-          Obra a la que pertenece. Los codigos de partida solo son unicos DENTRO
-          de su obra.
+          Obra a la que pertenece. Una partida pertenece a una sola obra, pero
+          **el codigo de partida NO es unico ni dentro de ella** (F-109): la
+          partida se identifica por `partida_id`, nunca por la pareja obra +
+          codigo.
         agregacion: no_sumable
       codigo_partida:
         significado: >-
           Codigo jerarquico de la partida dentro de su obra. **Nunca es NULL ni
-          vacio**: el filtro de publicacion descarta las filas con el codigo en
-          blanco.
+          cadena vacia**: el filtro de publicacion (`cod <> ''`) descarta las
+          filas con el codigo vacio. Pero ese filtro deja pasar un codigo de
+          **solo espacios**: 2 filas el 2026-09-25.
+
+          **NO es unico dentro de la obra (F-109).** Medido el 2026-09-25: 5.202
+          codigos se repiten dentro de su obra (8.933 filas de mas, 158 obras;
+          2.177 de ellos en 92 obras del seguimiento), y cada copia es una
+          partida activa y distinta de Sigrid. Las causas, en este orden: (1) un
+          contrato con el cliente (`obrctr`) o un expediente de ese contrato
+          (`obrctrexp`) por copia, porque el jefe de obra abre un capitulo por
+          contrato o lote y repite dentro los codigos (873 pares; la 0617 repite
+          161 entre la planta 1ª y la planta baja); (2) el mismo subarbol
+          copiado bajo capitulos hermanos, uno por vivienda tipo, bloque,
+          parcela o fase (1.932 pares; la 0560 por vivienda tipo, la 0404 por
+          FASE 1 a 6); (3) raices paralelas, fases con raiz propia como `CD` y
+          `CD-FII` de la 0444, o una raiz entera duplicada (2.360 pares); (4)
+          hermanas homonimas, erratas y marcadores como `N/A` (28 pares), mas 9
+          copias identicas pegadas dos veces.
+
+          **Ni el contrato lo desambigua**: `(obra, contrato, codigo)` sigue
+          repitiendo 4.437 codigos, porque lo que distingue las copias es el
+          CAPITULO. Para unir o contar partidas, `partida_id`; para decir donde
+          esta una, `ruta_capitulos`. Agrupar por codigo suma todas las copias
+          del concepto: vale si es eso lo que se quiere, y hay que decirlo
+          (`R-PARTIDA-CODIGO-NO-UNICO`).
 
           **OJO, cambio del 2026-08-31 (F-052).** Una partida sin codigo sigue
           sin llegar aqui, pero **sus descendientes SI llegan**. Antes no: el
@@ -514,6 +603,14 @@ objetos:
           en blanco (`'CD >  > 01.01'` no existe). Invariante comprobable en
           cualquier fila:
           `cardinality(string_to_array(ruta_capitulos, ' > ')) = nivel + 1`.
+
+          **CASI una clave dentro de la obra, pero no lo es (F-109).** Medido el
+          2026-09-25: `(obra_id, ruta_capitulos)` se repite en 155 pares (162
+          filas de mas, 25 obras; 38 pares en 21 obras del seguimiento): raices
+          duplicadas con el mismo codigo, hermanas homonimas o erratas, y copias
+          pegadas dos veces. Sirve para leer y navegar, y es lo que se ensena al
+          usuario para identificar una partida; no para unir: para eso,
+          `partida_id`.
       nivel:
         significado: >-
           Profundidad en el arbol de capitulos, empezando en 0 para el raiz.
@@ -550,22 +647,45 @@ objetos:
   obras:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Capa intermedia, y ademas su columna `activa` no significa nada. Para
-      consultar obras estan `maestro.obras` —el universo completo, con estado y
-      cliente— y `mart.v_pbi_dim_obra` —el universo del seguimiento, con
-      etiquetas—.
+    consumo_recomendado: true
     descripcion: >-
       El universo del SEGUIMIENTO: las obras reales, sin las administrativas.
       Excluye una lista cerrada de codigos de gestion, excluye los codigos con
       cinco o mas digitos seguidos —el numero de obra de Ruesma es de cuatro— y
       deduplica los codigos repetidos por el mecanismo de Sigrid que marca cual
       es la ficha vigente.
+
+      **ADVERTENCIA DE CORRECCION: su columna `activa` no significa nada.** La
+      escribe el SQL como una constante `TRUE`, asi que vale TRUE tambien en las
+      obras cerradas hace anos, y la gemela `maestro.obras.es_activa` tampoco
+      sirve. El datamart NO sabe si una obra esta activa: es la regla dura
+      `R-OBRA-ACTIVA`, y no hay ninguna columna que responda esa pregunta.
+
+      El universo completo, con estado y cliente, esta en `maestro.obras`; el
+      del seguimiento con etiquetas listas, en `mart.v_pbi_dim_obra`.
+
+      **UNA FICHA POR CODIGO, Y NO SIEMPRE LA DE RUESMA (F-102).** En Sigrid la
+      obra es POR EMPRESA: el mismo codigo existe una vez por empresa --Ruesma,
+      Porsan, cada UTE-- y es la misma obra vista desde cada una, sin
+      consolidar. Esta tabla sigue eligiendo UNA ficha por codigo como hasta hoy
+      --marca de `raw.conext` con `cod = '15'`, despues la modificada mas
+      recientemente y despues el `ide` mayor--, sin mirar la empresa. F-102 NO
+      la cambia: publica en `maestro.obras` la marca `es_ficha_principal` (la
+      ficha de la empresa 1), y las dos eligen distinto en **cuatro codigos**,
+      medido el 2026-09-23: **0581** (aqui la ficha de la UTE 27, con 20 cierres
+      y todo el seguimiento; la de Ruesma no tiene cierres), **0606** (aqui la de
+      la UTE 31, con 24 cierres; la de Ruesma tiene 15), **0671** (aqui la de la
+      UTE 34) y **0720** (aqui la copia vacia de Porsan, 28, sin cierres ni plan;
+      la de Ruesma tiene 2 cierres y 142 filas de plan). Aplicar la marca aqui
+      sacaria la 0581 del `mart` y del `cierre` y reduciria la 0606, asi que se
+      deja como esta: pasar el seguimiento a la ficha de Ruesma y traer las
+      demas empresas como obras propias es **F-106**. Hasta entonces, el
+      `obra_id` de estas cuatro no es el de `es_ficha_principal`.
     grano: >-
       Una fila por `obra_id`, ya deduplicada. Es SUBCONJUNTO de `maestro.obras`,
       y esa diferencia es deliberada: contar aqui da menos obras.
     clave_negocio: [obra_id]
+    claves_alternativas: [[codigo_obra]]
     paso_etl: build_stg
     refresco: nocturno
     columnas:
@@ -576,6 +696,10 @@ objetos:
         significado: >-
           Codigo de obra tal y como se teclea en Sigrid. **Nunca es NULL**: sale
           de `con.cod` en crudo y ademas el build excluye las obras sin codigo.
+          Aqui es unico porque la tabla se queda con una ficha por codigo; en
+          `maestro.obras` NO lo es (una ficha por empresa, F-102).
+          Es la clave alternativa de la ficha (584 para 584 el 2026-09-24): la
+          vigila `check-unicidad` contra la base (F-108).
         nulo_significa: null
       nombre_obra:
         significado: >-
@@ -606,14 +730,16 @@ objetos:
   fases:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Capa intermedia. Lo que un usuario pregunta sobre plazos esta en
-      `cierre.v_pbi_cierre_cabecera`, con las fechas ya resueltas en cascada.
+    consumo_recomendado: true
     descripcion: >-
       Las fases de cada obra con sus fechas ya tipadas y su plazo. En los ambitos
       reales una fase ES un mes de cierre, y de ahi salen el mes canonico del
       cierre y el ancla temporal de la explosion mensual.
+
+      Las fechas de plazo ya resueltas en cascada estan ademas en
+      `cierre.v_pbi_cierre_cabecera`, que es lo comodo para una pregunta de
+      plazos; aqui estan las fases una a una, sin resolver, que es lo que
+      permite ver el detalle mes a mes.
     grano: >-
       Una fila por (`obra_id`, `numero_fase`), cada una identificada por
       `fase_id`, que es la clave primaria y viene de Sigrid. Se declara esa como
@@ -701,17 +827,19 @@ objetos:
   version_master_vigente:
     tipo: tabla
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Resuelve la version vigente de forma GLOBAL, una por obra, y eso no es lo
-      que usa el seguimiento: `mart` elige la vigente MES A MES, que es distinto
-      y mas fino. Consultar esta tabla para saber "que plan rige" da una
-      respuesta que no coincide con la de `mart` en los meses anteriores a la
-      ultima version.
+    consumo_recomendado: true
     descripcion: >-
       La version master que Sigrid marca como vigente para cada obra, resuelta
       por el mecanismo propio de Sigrid para senalar la ficha en vigor. Es una
       foto global, sin dimension temporal.
+
+      **ADVERTENCIA DE CORRECCION: resuelve la version vigente de forma GLOBAL,
+      una por obra, y eso no es lo que usa el seguimiento.**
+      `mart.fact_seguimiento_mensual` elige la vigente MES A MES, que es
+      distinto y mas fino. Consultar esta tabla para saber "que plan rige" da
+      una respuesta que no coincide con la de `mart` en los meses anteriores a
+      la ultima version. Aqui se responde cual rige HOY; que version rigio en un
+      mes pasado se responde en `mart`.
     grano: Una fila por `obra_id`. Es la clave primaria de la tabla.
     clave_negocio: [obra_id]
     paso_etl: build_stg
@@ -744,18 +872,20 @@ objetos:
   ambitos:
     tipo: vista
     capa: preparacion
-    consumo_recomendado: false
-    motivo_no_consumo: >-
-      Es un catalogo de apoyo del build, y ademas su columna `uso_seguimiento`
-      esta desfasada: consultarla para saber que ambitos usa el seguimiento da
-      una respuesta incompleta. Para los escenarios del seguimiento esta
-      `mart.v_pbi_dim_escenario`, que si esta al dia.
+    consumo_recomendado: true
     descripcion: >-
       La clasificacion de los ambitos de Sigrid: que es cada uno y que papel
       juega en el seguimiento. El tipo se deduce de la DESCRIPCION del ambito y
       no de su codigo, porque en Sigrid los dos no siempre concuerdan: hay un
       ambito cuyo codigo dice produccion y cuya descripcion dice venta, y manda
       la descripcion.
+
+      **ADVERTENCIA DE CORRECCION: su columna `uso_seguimiento` esta
+      DESFASADA.** Marca solo los ambitos 8 y 11, que eran los unicos de la
+      primera iteracion, y hoy `mart` construye tambien los REALES 3 y 7, asi
+      que filtrar por ella para saber que alimenta el seguimiento da una
+      respuesta INCOMPLETA. Los escenarios del seguimiento, al dia, estan en
+      `mart.v_pbi_dim_escenario`.
     grano: Una fila por `ambito_id`, uno por cada ambito dado de alta en Sigrid.
     clave_negocio: [ambito_id]
     paso_etl: build_stg

@@ -14,6 +14,13 @@ tumbe el pipeline nocturno:
     que ni siquiera abre conexión;
   - si el rol está configurado pero no existe en el servidor, se avisa en el
     log y se termina en SUCCESS.
+
+Desde F-068 este paso hace además lo contrario para unas pocas tablas: revoca
+la lectura de `PG_EXCLUDED_TABLES` (hoy `raw.emp` y `raw.res`, datos personales
+de empleados) después de conceder su esquema. Es TEMPORAL —el humano ya decidió
+levantarlo cuando el MCP tenga control por usuario— y vive aquí precisamente
+porque este paso corre cada noche: hecho a mano contra la base, el propio
+`GRANT SELECT ON ALL TABLES IN SCHEMA raw` de este paso lo desharía.
 """
 
 from __future__ import annotations
@@ -67,6 +74,15 @@ class ApplyGrantsStep(PipelineStep):
             result.finished_at = datetime.utcnow()
             return result
 
+        # F-068, y es TEMPORAL: `raw.emp` y `raw.res` traen datos personales de
+        # empleados y el MCP no sabe todavía quién pregunta. El REVOKE viaja
+        # AQUÍ, dentro del paso que corre cada noche, y no como una orden
+        # suelta contra la base: una revocación a mano la deshace la primera
+        # nocturna que pase, porque este paso hace `GRANT SELECT ON ALL TABLES
+        # IN SCHEMA raw`. El porqué y la condición de reversión, en
+        # `config/settings.py` (DEFAULT_EXCLUDED_TABLES).
+        excluidas = list(pg_settings.excluded_table_list)
+
         pg = self._client or build_postgres_client(self._settings)
 
         try:
@@ -86,6 +102,7 @@ class ApplyGrantsStep(PipelineStep):
                 readonly_role=rol,
                 owner_role=(pg_settings.set_role or "").strip(),
                 schemas=pg_settings.consumption_schema_list,
+                excluded_tables=excluidas,
             )
         except Exception as e:  # el resto del pipeline ya ha terminado bien
             logger.error("apply_grants_fallido", role=rol, error=str(e))
@@ -97,5 +114,6 @@ class ApplyGrantsStep(PipelineStep):
         result.status = StepStatus.SUCCESS
         result.rows_processed = len(sentencias)
         result.metadata["esquemas"] = pg_settings.consumption_schema_list
+        result.metadata["tablas_excluidas"] = excluidas
         result.finished_at = datetime.utcnow()
         return result
