@@ -233,24 +233,27 @@ def sql_huella_propuesta(sql_plan_mensual: str, obras: Sequence[int]) -> str:
         )
     bloque = bloque.replace(MARCADOR_FILTRO_OBRAS, filtro_de_tramo(obras))
 
+    # F-118: la rama de reales termina en `reales_final`, que es lo que lee el
+    # INSERT (filas de Sigrid, relleno y deshacer). Leer una CTE anterior daría
+    # la huella de una serie que el build no publica.
     return (
         f"WITH{bloque}\n"
-        "SELECT rc.obra_id,\n"
+        "SELECT rf.obra_id,\n"
         "       o.codigo_obra,\n"
-        "       rc.ambito_id,\n"
-        "       rc.anio_mes AS periodo,\n"
+        "       rf.ambito_id,\n"
+        "       rf.anio_mes AS periodo,\n"
         "       count(*) AS filas,\n"
-        f"       {_versiones('rc.mes_fase_num')} AS versiones,\n"
+        f"       {_versiones('rf.mes_fase_num')} AS versiones,\n"
         # Los mismos redondeos que el INSERT del build: si la huella redondeara
         # distinto, inventaria diferencias de centimos que el build no tiene.
-        "       COALESCE(SUM(ROUND(rc.importe_mes_round::NUMERIC, 2)), 0)\n"
+        "       COALESCE(SUM(ROUND(rf.importe_mes_round::NUMERIC, 2)), 0)\n"
         "           AS importe_mes,\n"
-        "       COALESCE(SUM(ROUND(rc.importe_origen_round::NUMERIC, 2)), 0)\n"
+        "       COALESCE(SUM(ROUND(rf.importe_origen_round::NUMERIC, 2)), 0)\n"
         "           AS importe_origen\n"
-        "FROM reales_con_lag rc\n"
-        "JOIN stg.obras    o ON o.obra_id    = rc.obra_id\n"
-        "JOIN stg.partidas p ON p.partida_id = rc.partida_id\n"
-        "GROUP BY rc.obra_id, o.codigo_obra, rc.ambito_id, rc.anio_mes\n"
+        "FROM reales_final rf\n"
+        "JOIN stg.obras    o ON o.obra_id    = rf.obra_id\n"
+        "JOIN stg.partidas p ON p.partida_id = rf.partida_id\n"
+        "GROUP BY rf.obra_id, o.codigo_obra, rf.ambito_id, rf.anio_mes\n"
         "ORDER BY 1, 3, 4"
     )
 
