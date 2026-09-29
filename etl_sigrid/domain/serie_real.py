@@ -37,7 +37,8 @@ meses del ámbito sin huecos:
 
 El movimiento es la diferencia con el mes anterior de la serie; el primero, el
 acumulado entero (R9). Se publican las filas de Sigrid, las de relleno con
-acumulado distinto de 0 o con movimiento en su fase generadora (D3 de F-051) y
+acumulado distinto de 0 o con fila de Sigrid que se mueve en su fase generadora
+(D3 de F-051) y
 las de deshacer que mueven algo (R32: una sola, la que lleva el acumulado a 0).
 
 Invariante por construcción (R21): la suma de los movimientos publicados es el
@@ -132,7 +133,11 @@ def serie_densa(
         acumulado, movimiento = acumulados[mes], movimientos[mes]
         if mes in relleno:
             generador = relleno[mes]
-            if acumulado != 0 or movimientos.get(generador, _CERO) != 0:
+            # D3 de F-051: acumulado arrastrado distinto de 0, o la partida
+            # tiene fila de Sigrid con movimiento en el cierre que lo genera.
+            # Un deshacer en ese cierre no cuenta: la partida no está en él.
+            mueve_en_su_fase = generador in filas and movimientos[generador] != 0
+            if acumulado != 0 or mueve_en_su_fase:
                 publicadas.append(FilaSerie(mes, acumulado, movimiento, True, False))
         elif mes in filas:
             publicadas.append(FilaSerie(mes, acumulado, movimiento, False, False))

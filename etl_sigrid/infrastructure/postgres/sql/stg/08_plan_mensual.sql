@@ -85,34 +85,51 @@
 -- ===========================================================================
 -- BRANCH B: REALES (amb=3 coste real, amb=7 venta real)
 -- ===========================================================================
--- UN SOLO CIERRE POR MES (F-042, decisión de Negocio del 2026-08-28)
+-- EL MES DE UN CIERRE REAL LO DA SU TEXTO (F-051, absorbida en F-118)
 --
--- Veintidós obras tienen dos fases que Sigrid guarda con el mismo año y el
--- mismo mes (dos cierres de quincena, o una fase plurimensual archivada en su
--- mes de arranque). Al proyectarlas al mismo `anio_mes` salían dos filas
--- indistinguibles: 8.778 claves duplicadas en mart.fact_seguimiento_mensual y
--- 30.425.881,56 € de acumulado a origen contados dos veces.
+-- `anio_mes` de cada fila real es `stg.fn_mes_de_fase` sobre la fase: manda el
+-- texto que escribe el jefe de obra («Agosto 2026», «Enero 2020-Abril 2020» →
+-- abril); si no se lee, la fecha fin, la de inicio y el `ano`/`mes` archivado,
+-- por ese orden (decisión del humano del 2026-09-22). `mart` y `cierre` leen
+-- este mes sin recalcularlo, así que las tres capas coinciden por construcción.
 --
--- La regla: manda el cierre de mayor `mes_fase_num` del mes ENTRE LOS QUE NO
--- TIENEN EL ACUMULADO A CERO. El matiz del cero no es cosmético: la obra 0606
--- PUY DU FOU tiene su fase 16 de feb-2021 entera a cero y quedarse con ella
--- publicaría 0 € donde hay 9.053.263,61 € buenos en la fase 14.
---
--- Y NO BASTA CON DESCARTAR LA FILA: `importe_mes` de los reales lo calcula
--- este fichero como `importe_origen - LAG(importe_origen)`, y solo si la fase
--- anterior es la INMEDIATAMENTE CONSECUTIVA. Descartar la fase 20 de la 0499
--- sin más dejaría a la 21 sin LAG consecutivo y el movimiento de feb-2018
--- pasaría de 975.249,98 € a 5.688.073,92 €. Por eso se renumera el orden
--- INTERNO (`orden_fase`), que es lo único que mira el LAG.
---
--- El desplazamiento cuenta SOLO descartes, nunca `dense_rank()`: cerrar todos
--- los huecos movería también los que Sigrid ya trae, y con ellos el
--- `importe_mes` de obras que hoy están bien.
---
--- `version` sigue siendo `mes_fase_num`, el número ORIGINAL de Sigrid, con los
--- huecos que deja la regla: seis JOIN de `cierre/` cruzan `pm.version` contra
--- `stg.fases.numero_fase`. La fase descartada sigue existiendo en `raw` y en
+-- UN SOLO CIERRE POR MES (F-042, decisión de Negocio del 2026-08-28), sobre el
+-- mes del texto: si dos fases de una obra y ámbito caen en el mismo mes, manda
+-- la de mayor `mes_fase_num` ENTRE LAS QUE NO TIENEN EL ACUMULADO A CERO. El
+-- matiz del cero no es cosmético: la obra 0606 PUY DU FOU tiene su fase 16 de
+-- feb-2021 entera a cero y quedarse con ella publicaría 0 € donde hay
+-- 9.053.263,61 € buenos en la fase 14. La perdedora sigue en `raw` y en
 -- `stg.fases`; lo que no tiene es fila en `plan_mensual`.
+--
+-- RELLENO (F-051): una fase de RANGO (mes de su fecha fin posterior al de su
+-- fecha de inicio) cuyo texto cae después de su primer mes lleva todo el
+-- dinero al mes del texto, y los meses desde el de inicio hasta el anterior al
+-- del texto reciben filas de relleno: movimiento 0 y el acumulado del cierre
+-- anterior. Nunca en un mes con cierre vigente propio, nunca después del mes del
+-- texto, y un mes que quieren dos fases lo rellena la que cierra antes.
+--
+-- LA SERIE REAL ES DENSA (F-118): `importe_mes` es el acumulado del mes menos
+-- el del mes anterior DE LA SERIE DE LA PARTIDA, y esa serie no tiene huecos.
+-- Antes solo se restaba si la fila anterior era de la fase consecutiva y, si
+-- no, se publicaba el acumulado entero; eso rompía dos casos:
+--   - la partida que DESAPARECE de un cierre (correo de Juan Romero del
+--     2026-09-29): la 0709, partida 417031, tenía −58.000 en julio, ninguna
+--     fila en agosto y 0 en septiembre; agosto salía 319.492,30 € donde el
+--     cierre da 377.492,30 €;
+--   - el número de fase que Sigrid SE SALTA (F-103, absorbida): la 0371 pasa de
+--     la f27 a la f29 y la f29 publicaba +4.293.905,89 € en vez de −441.229,31.
+-- Ahora, desde el alta de la partida, cada mes del ámbito tiene su valor. En un
+-- cierre, la fila de Sigrid o, si ya no está, acumulado 0: la partida se
+-- DESHACE (se anula el acumulado anterior) en una fila marcada `es_deshacer`, y
+-- si vuelve se calcula contra ese 0. En un relleno, el acumulado anterior. Una
+-- fase de la obra sin ninguna fila de ese ámbito no es cierre de ese ámbito y
+-- no deshace nada (Sigrid no abrió esa fase de venta en 11 obras de 2010-2020).
+-- La suma de `importe_mes` de cada partida es así el acumulado del último cierre
+-- del ámbito, sin excepciones (R21), que es lo que ya calcula `cierre`.
+--
+-- `version` sigue siendo el número ORIGINAL de la fase de Sigrid (la generadora
+-- en el relleno, la del cierre donde falta en el deshacer): seis JOIN de
+-- `cierre/` cruzan `pm.version` contra `stg.fases.numero_fase`.
 --
 -- ===========================================================================
 -- EJECUCIÓN POR TRAMOS DE OBRAS (F-019, incidente del 2026-08-09)
@@ -126,17 +143,12 @@
 --
 -- El corte es por obra porque NINGUNA ventana de este fichero cruza obras:
 -- todas particionan por presupuesto_id (que pertenece a una única obra) o por
--- una lista que EMPIEZA por obra_id — (obra_id, partida_id, ambito_id) en el
--- LAG de los reales y (obra_id, ambito_id) en el desplazamiento de F-042. Por
--- eso el resultado por tramos es, por construcción, idéntico al de una pasada
--- única.
---
--- F-042 no necesita marcador nuevo, y esto no es una intuición: las tres CTE
--- que añade agregan y ordenan dentro de una obra, así que un tramo no puede
--- ver ni descartar el cierre de otra. `build_stg_step.py` sigue con el único
--- marcador de F-019 y sin una línea de cambio. Quien añada una ventana a este
--- fichero tiene que respetar la misma condición: lo comprueba
--- `tests/test_f042_sql.py::test_f042_ninguna_ventana_del_fichero_cruza_obras`,
+-- una lista que EMPIEZA por obra_id: (obra_id, partida_id, ambito_id, ...) en
+-- la serie de los reales. Los `DISTINCT ON` y el `NOT EXISTS` del relleno
+-- también son por (obra, ámbito). Por eso el resultado por tramos es, por
+-- construcción, idéntico al de una pasada única, sin marcador nuevo. Quien
+-- añada una ventana a este fichero tiene que respetar la misma condición: lo
+-- comprueba `tests/test_f042_sql.py::test_f042_ninguna_ventana_del_fichero_cruza_obras`,
 -- que lee TODOS los `PARTITION BY` del fichero, no una lista escrita a mano.
 --
 -- El filtro va en las DOS ramas. Filtrar solo una duplicaría las filas de la
@@ -347,10 +359,6 @@ reales_base AS (
         pp.fase_num                                AS mes_fase_num,
         pp.cantidad,
         pp.precio,
-        pp.dec_cantidades,
-        pp.dec_precios,
-        pp.dec_importes,
-        ROUND(pp.precio::NUMERIC, pp.dec_precios)  AS precio_redondeado,
         -- importe a origen con decimales propios de la obra:
         --   redondea can a decc y pre a decp antes de multiplicar; resultado a deci
         -- cantidad SIN redondear (partidas % necesitan precisión completa);
@@ -361,8 +369,11 @@ reales_base AS (
         )                                          AS importe_origen_round,
         ROUND((pp.cantidad * pp.precio)::NUMERIC, 2)                     AS importe_origen_raw,
         op.totinc                                  AS total_incurrido_raw,
-        f.nombre_mes                               AS res_descripcion,
-        make_date(f.anio, f.mes, 1)                AS anio_mes
+        f.fecha_inicio,
+        f.fecha_fin,
+        f.nombre_mes,
+        f.anio,
+        f.mes
     FROM stg.presupuesto pp
     JOIN raw.obrparpre op ON op.ide = pp.presupuesto_id
     JOIN stg.fases     f
@@ -374,87 +385,262 @@ reales_base AS (
       AND f.anio IS NOT NULL
       AND f.mes  IS NOT NULL
 ),
--- F-042: un cierre por mes. Una fila por (obra, ámbito, fase): miles, no
--- millones. `COALESCE` porque una fase sin ningún importe daría SUM = NULL, y
--- `NULL <> 0` no es cierto: en el ORDER BY de abajo los nulos van PRIMERO y esa
--- fase sin dato ganaría el mes.
+-- Una fila por (obra, ámbito, fase): miles, no millones. Aquí se decide el mes,
+-- una llamada por fase y no por partida. `COALESCE` porque una fase sin ningún
+-- importe daría SUM = NULL, y `NULL <> 0` no es cierto: en el ORDER BY de
+-- `reales_vigente` los nulos van PRIMERO y esa fase sin dato ganaría el mes.
 reales_cierres AS (
-    SELECT obra_id, ambito_id, anio_mes, mes_fase_num,
-           COALESCE(SUM(importe_origen_round), 0) AS acumulado
-    FROM reales_base
-    GROUP BY obra_id, ambito_id, anio_mes, mes_fase_num
+    SELECT
+        f.obra_id, f.ambito_id, f.mes_fase_num, f.acumulado,
+        f.nombre_mes                               AS res_descripcion,
+        stg.fn_mes_de_fase(f.fecha_inicio, f.nombre_mes, f.fecha_fin,
+                           make_date(f.anio, f.mes, 1)) AS anio_mes,
+        date_trunc('month', f.fecha_inicio)::DATE  AS mes_ini_fase,
+        COALESCE(date_trunc('month', f.fecha_fin)
+                 > date_trunc('month', f.fecha_inicio), FALSE) AS es_rango
+    FROM (
+        SELECT obra_id, ambito_id, mes_fase_num,
+               fecha_inicio, fecha_fin, nombre_mes, anio, mes,
+               COALESCE(SUM(importe_origen_round), 0) AS acumulado
+        FROM reales_base
+        GROUP BY obra_id, ambito_id, mes_fase_num,
+                 fecha_inicio, fecha_fin, nombre_mes, anio, mes
+    ) f
 ),
--- R1 + R2 + R4 + R11: manda el más moderno DE ENTRE LOS QUE NO ESTÁN A CERO.
--- El orden de las dos claves ES la regla: invertirlas deja a PUY DU FOU
--- publicando 0 € en feb-2021. Si todos los del mes están a cero, gana el mayor,
--- que es lo que hace el segundo criterio cuando el primero empata.
+-- F-042 sobre el mes del texto (R8): manda el más moderno DE ENTRE LOS QUE NO
+-- ESTÁN A CERO. El orden de las dos claves ES la regla: invertirlas deja a PUY
+-- DU FOU publicando 0 € en feb-2021. Si todos los del mes están a cero, gana el
+-- mayor, que es lo que hace el segundo criterio cuando el primero empata.
 reales_vigente AS (
     SELECT DISTINCT ON (obra_id, ambito_id, anio_mes)
-           obra_id, ambito_id, anio_mes, mes_fase_num
+           obra_id, ambito_id, anio_mes, mes_fase_num,
+           res_descripcion, mes_ini_fase, es_rango
     FROM reales_cierres
+    WHERE anio_mes IS NOT NULL
     ORDER BY obra_id, ambito_id, anio_mes,
              (acumulado <> 0) DESC, mes_fase_num DESC
 ),
--- R5 + R6: desplaza SOLO por los descartes que quedan por debajo; los huecos
--- que ya traía Sigrid se respetan. La ventana particiona por (obra, ámbito), o
--- sea que no cruza obras: el troceo por tramos de F-019 sigue siendo válido por
--- el mismo argumento estructural y sin marcador nuevo.
-reales_orden AS (
-    SELECT c.obra_id, c.ambito_id, c.mes_fase_num,
-           (v.mes_fase_num IS NOT NULL) AS vive,
-           c.mes_fase_num - COALESCE(SUM(CASE WHEN v.mes_fase_num IS NULL THEN 1 ELSE 0 END)
-               OVER (PARTITION BY c.obra_id, c.ambito_id ORDER BY c.mes_fase_num
-                     ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS orden_fase
-    FROM reales_cierres c
-    LEFT JOIN reales_vigente v USING (obra_id, ambito_id, mes_fase_num)
+-- Los meses de relleno (F-051 R10, R11, R14): de cada fase vigente de rango,
+-- desde su primer mes hasta el anterior al del texto, sin pisar un mes con
+-- cierre vigente propio. Si dos fases quieren el mismo mes, lo rellena la de
+-- mes del texto más cercano (la que cierra antes): un mes, una fila.
+reales_relleno AS (
+    SELECT DISTINCT ON (v.obra_id, v.ambito_id, gs.mes)
+           v.obra_id, v.ambito_id, gs.mes::DATE AS anio_mes,
+           v.anio_mes AS mes_generador, v.mes_fase_num, v.res_descripcion
+    FROM reales_vigente v
+    CROSS JOIN LATERAL generate_series(
+        v.mes_ini_fase::TIMESTAMP,
+        (v.anio_mes - INTERVAL '1 month')::TIMESTAMP,
+        INTERVAL '1 month'
+    ) AS gs(mes)
+    WHERE v.es_rango
+      AND v.anio_mes > v.mes_ini_fase
+      AND NOT EXISTS (
+          SELECT 1 FROM reales_vigente o
+          WHERE o.obra_id   = v.obra_id
+            AND o.ambito_id = v.ambito_id
+            AND o.anio_mes  = gs.mes::DATE
+      )
+    ORDER BY v.obra_id, v.ambito_id, gs.mes, v.anio_mes
 ),
+-- Los meses de cada (obra, ámbito): sus cierres vigentes y sus meses de
+-- relleno. Una fase sin filas del ámbito no está aquí (R34): no es cierre de
+-- ese ámbito. `mes_generador` es el mes del cierre que genera el relleno (el
+-- propio mes en un cierre).
+reales_meses AS (
+    SELECT obra_id, ambito_id, anio_mes, anio_mes AS mes_generador,
+           mes_fase_num, res_descripcion, FALSE AS es_relleno
+    FROM reales_vigente
+    UNION ALL
+    SELECT obra_id, ambito_id, anio_mes, mes_generador,
+           mes_fase_num, res_descripcion, TRUE
+    FROM reales_relleno
+),
+-- Cada cierre vigente con el primer mes que genera: el suyo o el primero de su
+-- relleno. Es el alta de una partida que nace en él (D3 de F-051).
+reales_vigente_alta AS (
+    SELECT obra_id, ambito_id, mes_fase_num, mes_generador AS anio_mes,
+           MIN(anio_mes) AS mes_alta_cierre
+    FROM reales_meses
+    GROUP BY obra_id, ambito_id, mes_fase_num, mes_generador
+),
+-- Las filas de Sigrid de los cierres que viven, ya en el mes de su texto.
+reales_filas AS (
+    SELECT b.presupuesto_id, b.obra_id, b.partida_id, b.ambito_id, v.anio_mes,
+           v.mes_alta_cierre,
+           b.cantidad, b.precio,
+           b.importe_origen_round, b.importe_origen_raw, b.total_incurrido_raw
+    FROM reales_base b
+    JOIN reales_vigente_alta v
+        ON v.obra_id      = b.obra_id
+       AND v.ambito_id    = b.ambito_id
+       AND v.mes_fase_num = b.mes_fase_num
+),
+-- El alta de cada partida: su primer cierre con fila de Sigrid o, si nace en
+-- una fase de rango, el primer mes de su relleno. Sin JOIN: sale de las filas.
+reales_alta AS (
+    SELECT obra_id, ambito_id, partida_id, MIN(mes_alta_cierre) AS mes_alta
+    FROM reales_filas
+    GROUP BY obra_id, ambito_id, partida_id
+),
+-- La rejilla: cada partida en cada mes de su (obra, ámbito) desde su alta.
+-- Es un JOIN entre dos conjuntos pequeños (partidas y meses del tramo).
+reales_rejilla AS (
+    SELECT a.obra_id, a.ambito_id, a.partida_id,
+           m.anio_mes, m.mes_generador, m.mes_fase_num, m.res_descripcion,
+           m.es_relleno
+    FROM reales_alta a
+    JOIN reales_meses m
+        ON m.obra_id   = a.obra_id
+       AND m.ambito_id = a.ambito_id
+       AND m.anio_mes >= a.mes_alta
+),
+-- La serie sin huecos: la rejilla con la fila de Sigrid de cada mes cuando la
+-- hay. Se une con UNION ALL y GROUP BY, no con un LEFT JOIN: el optimizador no
+-- tiene estadísticas de estas CTE y un JOIN mal estimado se convertía en un
+-- bucle anidado sobre millones de filas (medido en local: 28 s para 11.000).
+reales_esqueleto AS (
+    SELECT obra_id, ambito_id, partida_id, anio_mes,
+           MAX(mes_generador)                    AS mes_generador,
+           MAX(mes_fase_num)                     AS mes_fase_num,
+           MAX(res_descripcion)                  AS res_descripcion,
+           bool_or(es_relleno)                   AS es_relleno,
+           (COUNT(presupuesto_id) > 0)           AS tiene_fila,
+           MAX(presupuesto_id)                   AS presupuesto_id,
+           MAX(precio)                           AS precio,
+           MAX(cantidad)                         AS cantidad,
+           MAX(importe_origen_round)             AS importe_origen_round,
+           MAX(importe_origen_raw)               AS importe_origen_raw,
+           MAX(total_incurrido_raw)              AS total_incurrido_raw
+    FROM (
+        SELECT obra_id, ambito_id, partida_id, anio_mes,
+               mes_generador, mes_fase_num, res_descripcion, es_relleno,
+               NULL::BIGINT AS presupuesto_id, NULL::NUMERIC AS precio,
+               NULL::NUMERIC AS cantidad, NULL::NUMERIC AS importe_origen_round,
+               NULL::NUMERIC AS importe_origen_raw, NULL::NUMERIC AS total_incurrido_raw
+        FROM reales_rejilla
+        UNION ALL
+        SELECT obra_id, ambito_id, partida_id, anio_mes,
+               NULL::DATE, NULL::INTEGER, NULL::TEXT, NULL::BOOLEAN,
+               presupuesto_id, precio,
+               cantidad, importe_origen_round,
+               importe_origen_raw, total_incurrido_raw
+        FROM reales_filas
+    ) u
+    GROUP BY obra_id, ambito_id, partida_id, anio_mes
+),
+-- El acumulado de cada hueco, primera mitad. En un cierre: la fila de Sigrid
+-- o, si la partida ya no está, 0 (se deshace, R29-R30). En un relleno, NULL
+-- aquí y el arrastre abajo. `grupo_cierre` numera los cierres de la serie:
+-- cada relleno comparte grupo con el último cierre anterior (el truco de la
+-- rama master, `COUNT(x) OVER` + `MAX() OVER (..., grupo)`), y el grupo 0 son
+-- los rellenos anteriores a todo cierre de la partida. `grupo_fila` hace lo
+-- mismo con las filas de Sigrid, para dar al deshacer la última de ellas (R31).
+reales_grupos AS (
+    SELECT
+        obra_id, ambito_id, partida_id, anio_mes, mes_generador,
+        mes_fase_num, res_descripcion, es_relleno, tiene_fila,
+        presupuesto_id, precio,
+        CASE WHEN es_relleno THEN NULL WHEN tiene_fila THEN importe_origen_round ELSE 0 END
+            AS c_importe_origen_round,
+        CASE WHEN es_relleno THEN NULL WHEN tiene_fila THEN importe_origen_raw ELSE 0 END
+            AS c_importe_origen_raw,
+        CASE WHEN es_relleno THEN NULL WHEN tiene_fila THEN cantidad ELSE 0 END
+            AS c_cantidad,
+        CASE WHEN es_relleno THEN NULL WHEN tiene_fila THEN total_incurrido_raw ELSE 0 END
+            AS c_total_incurrido_raw,
+        COUNT(CASE WHEN NOT es_relleno THEN 1 END) OVER w AS grupo_cierre,
+        COUNT(presupuesto_id) OVER w                      AS grupo_fila
+    FROM reales_esqueleto
+    WINDOW w AS (PARTITION BY obra_id, partida_id, ambito_id ORDER BY anio_mes ROWS UNBOUNDED PRECEDING)
+),
+-- El acumulado de cada hueco, segunda mitad: el relleno arrastra el del último
+-- cierre, ya deshecho si lo estaba (R33); sin cierre anterior, 0 (F-051 R12).
+reales_serie AS (
+    SELECT
+        obra_id, ambito_id, partida_id, anio_mes, mes_generador,
+        mes_fase_num, res_descripcion, es_relleno, tiene_fila,
+        presupuesto_id, precio,
+        CASE WHEN NOT es_relleno THEN c_importe_origen_round
+             WHEN grupo_cierre = 0 THEN 0
+             ELSE MAX(c_importe_origen_round) OVER g END  AS importe_origen_round,
+        CASE WHEN NOT es_relleno THEN c_importe_origen_raw
+             WHEN grupo_cierre = 0 THEN 0
+             ELSE MAX(c_importe_origen_raw) OVER g END    AS importe_origen_raw,
+        CASE WHEN NOT es_relleno THEN c_cantidad
+             WHEN grupo_cierre = 0 THEN 0
+             ELSE MAX(c_cantidad) OVER g END              AS cantidad,
+        CASE WHEN NOT es_relleno THEN c_total_incurrido_raw
+             WHEN grupo_cierre = 0 THEN 0
+             ELSE MAX(c_total_incurrido_raw) OVER g END   AS total_incurrido_raw,
+        MAX(presupuesto_id) OVER f                         AS presupuesto_previo,
+        MAX(precio) OVER f                                 AS precio_previo
+    FROM reales_grupos
+    WINDOW g AS (PARTITION BY obra_id, partida_id, ambito_id, grupo_cierre),
+           f AS (PARTITION BY obra_id, partida_id, ambito_id, grupo_fila)
+),
+-- El movimiento (R9): diferencia con el mes anterior DE LA SERIE, que ya no
+-- tiene huecos. El primero, el acumulado entero. Sin comprobar si la fase
+-- anterior es la consecutiva: esa comprobación era el defecto.
 reales_con_lag AS (
     SELECT
-        presupuesto_id, obra_id, partida_id, ambito_id,
-        mes_fase_num,
-        cantidad,
-        precio,
-        dec_cantidades,
-        dec_precios,
-        dec_importes,
-        precio_redondeado,
-        importe_origen_round,
-        importe_origen_raw,
-        total_incurrido_raw,
-        res_descripcion,
-        anio_mes,
-        -- F-042: los cuatro CASE miran `orden_fase`, el orden INTERNO ya
-        -- desplazado por los descartes, no el número de fase de Sigrid. Es lo
-        -- que devuelve el LAG a ser consecutivo cuando se descarta un cierre.
-        CASE
-            WHEN LAG(orden_fase) OVER w = orden_fase - 1
-            THEN cantidad - COALESCE(LAG(cantidad) OVER w, 0)
-            ELSE cantidad
-        END AS cantidad_mes,
-        CASE
-            WHEN LAG(orden_fase) OVER w = orden_fase - 1
-            THEN importe_origen_round - COALESCE(LAG(importe_origen_round) OVER w, 0)
-            ELSE importe_origen_round
-        END AS importe_mes_round,
-        CASE
-            WHEN LAG(orden_fase) OVER w = orden_fase - 1
-            THEN importe_origen_raw - COALESCE(LAG(importe_origen_raw) OVER w, 0)
-            ELSE importe_origen_raw
-        END AS importe_mes_raw,
-        CASE
-            WHEN LAG(orden_fase) OVER w = orden_fase - 1
-            THEN total_incurrido_raw - COALESCE(LAG(total_incurrido_raw) OVER w, 0)
-            ELSE total_incurrido_raw
-        END AS total_incurrido_mes_calc
-    -- El JOIN va con USING para que `obra_id`, `ambito_id` y `mes_fase_num`
-    -- queden como columnas fusionadas y el resto del bloque siga sin cualificar.
-    FROM reales_base
-    JOIN reales_orden o USING (obra_id, ambito_id, mes_fase_num)
-    WHERE o.vive
+        obra_id, ambito_id, partida_id, anio_mes, mes_generador,
+        mes_fase_num, res_descripcion, es_relleno, tiene_fila,
+        presupuesto_id, precio, presupuesto_previo, precio_previo,
+        importe_origen_round, importe_origen_raw, cantidad, total_incurrido_raw,
+        cantidad - COALESCE(LAG(cantidad) OVER w, 0)                         AS cantidad_mes,
+        importe_origen_round - COALESCE(LAG(importe_origen_round) OVER w, 0) AS importe_mes_round,
+        importe_origen_raw - COALESCE(LAG(importe_origen_raw) OVER w, 0)     AS importe_mes_raw,
+        total_incurrido_raw - COALESCE(LAG(total_incurrido_raw) OVER w, 0)   AS total_incurrido_mes_calc
+    FROM reales_serie
     WINDOW w AS (
         PARTITION BY obra_id, partida_id, ambito_id
-        ORDER BY orden_fase
+        ORDER BY anio_mes
     )
+),
+-- Lo que la partida mueve con fila de Sigrid en el cierre que genera cada
+-- relleno (D3 de F-051; un deshacer ahí no cuenta: la partida no está en esa
+-- fase) y esa fila, que da presupuesto y precio al relleno.
+reales_generador AS (
+    SELECT
+        l.*,
+        MAX(CASE WHEN tiene_fila THEN importe_mes_round END) OVER gen     AS mov_generador,
+        MAX(CASE WHEN tiene_fila THEN presupuesto_id END) OVER gen        AS presupuesto_generador,
+        MAX(CASE WHEN tiene_fila THEN precio END) OVER gen                AS precio_generador
+    FROM reales_con_lag l
+    WINDOW gen AS (PARTITION BY obra_id, partida_id, ambito_id, mes_generador)
+),
+-- Lo que se publica: (a) las filas de Sigrid; (b) el relleno con acumulado
+-- distinto de 0 o con fila que se mueve en su fase generadora (D3); (c) el
+-- cierre sin fila que mueve algo: la fila de deshacer, una sola (R29, R32). Lo
+-- que se descarta tiene movimiento 0, así que la suma no cambia (R21).
+reales_final AS (
+    SELECT
+        CASE WHEN es_relleno THEN COALESCE(presupuesto_generador, presupuesto_previo)
+             ELSE presupuesto_previo END           AS presupuesto_id,
+        obra_id, partida_id, ambito_id,
+        mes_fase_num,
+        res_descripcion,
+        anio_mes,
+        CASE WHEN es_relleno THEN COALESCE(precio_generador, precio_previo)
+             ELSE precio_previo END                AS precio,
+        cantidad,
+        cantidad_mes,
+        importe_origen_round,
+        importe_mes_round,
+        importe_origen_raw,
+        importe_mes_raw,
+        total_incurrido_raw,
+        total_incurrido_mes_calc,
+        es_relleno,
+        (NOT es_relleno AND NOT tiene_fila)        AS es_deshacer
+    FROM reales_generador
+    WHERE tiene_fila
+       OR (es_relleno AND (importe_origen_round <> 0 OR COALESCE(mov_generador, 0) <> 0))
+       OR (NOT es_relleno AND NOT tiene_fila AND (
+               importe_mes_round <> 0 OR importe_mes_raw <> 0
+            OR cantidad_mes <> 0 OR total_incurrido_mes_calc <> 0))
 )
 /*F042_FIN_REALES*/
 
@@ -469,7 +655,8 @@ INSERT INTO stg.plan_mensual (
     precio_unitario, can_mes, can_origen,
     importe_mes, importe_origen,
     importe_mes_raw, importe_origen_raw,
-    total_incurrido, total_incurrido_mes
+    total_incurrido, total_incurrido_mes,
+    es_relleno, es_deshacer
 )
 -- ---- master ----
 SELECT
@@ -501,7 +688,9 @@ SELECT
     ROUND((cantidad * pct_mes * precio)::NUMERIC, 2)                           AS importe_mes_raw,
     ROUND((cantidad * pct_acumulado * precio)::NUMERIC, 2)                     AS importe_origen_raw,
     NULL::NUMERIC                                             AS total_incurrido,
-    NULL::NUMERIC                                             AS total_incurrido_mes
+    NULL::NUMERIC                                             AS total_incurrido_mes,
+    NULL::BOOLEAN                                             AS es_relleno,
+    NULL::BOOLEAN                                             AS es_deshacer
 FROM master_con_pct_mes
 -- Conservar:
 --   - filas con pct_acumulado > 0 (partida activa en ese mes)
@@ -536,5 +725,7 @@ SELECT
     ROUND(importe_mes_raw::NUMERIC, 2)                        AS importe_mes_raw,
     ROUND(importe_origen_raw::NUMERIC, 2)                     AS importe_origen_raw,
     ROUND(total_incurrido_raw::NUMERIC, 2)                    AS total_incurrido,
-    ROUND(total_incurrido_mes_calc::NUMERIC, 2)               AS total_incurrido_mes
-FROM reales_con_lag;
+    ROUND(total_incurrido_mes_calc::NUMERIC, 2)               AS total_incurrido_mes,
+    es_relleno,
+    es_deshacer
+FROM reales_final;

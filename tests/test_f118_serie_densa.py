@@ -197,6 +197,25 @@ def test_f118_r13_la_partida_que_nace_en_una_fase_de_rango_lleva_su_relleno() ->
     ]
 
 
+def test_f118_r13_un_deshacer_en_la_fase_generadora_no_publica_relleno_a_cero() -> None:
+    """Fases solapadas: el relleno de enero lo genera la fase de junio, pero
+    entre medias está el cierre de marzo. La partida entra en marzo y falta en
+    junio: se deshace en junio. Enero valdría 0 y la partida no está en la fase
+    que lo genera, así que no se publica (y no tendría fila de la que tomar
+    presupuesto y precio)."""
+    filas = serie_densa(
+        {_m(2024, 3): _d(40)},
+        [_m(2024, 3), _m(2024, 6)],
+        {_m(2024, 1): _m(2024, 6), _m(2024, 4): _m(2024, 6), _m(2024, 5): _m(2024, 6)},
+    )
+    assert _movimientos(filas) == [
+        (_m(2024, 3), _d(40), _d(40), "sigrid"),
+        (_m(2024, 4), _d(40), _d(0), "relleno"),
+        (_m(2024, 5), _d(40), _d(0), "relleno"),
+        (_m(2024, 6), _d(0), _d(-40), "deshacer"),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # R34 y F-103 · la serie no mira el número de fase
 # ---------------------------------------------------------------------------

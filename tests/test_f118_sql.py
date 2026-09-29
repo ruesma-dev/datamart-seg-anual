@@ -193,14 +193,17 @@ CTE_DE_LA_SERIE = (
     "reales_base",
     "reales_cierres",
     "reales_vigente",
-    "reales_filas",
     "reales_relleno",
     "reales_meses",
+    "reales_vigente_alta",
+    "reales_filas",
     "reales_alta",
+    "reales_rejilla",
     "reales_esqueleto",
     "reales_grupos",
     "reales_serie",
     "reales_con_lag",
+    "reales_generador",
     "reales_final",
 )
 
