@@ -1,0 +1,699 @@
+# config/diccionario/descompuestos.yaml
+#
+# Fichas del esquema `descompuestos` (F-097, 2026-09-28): de que se compone cada
+# partida —los elementos o precios simples: hormigon, acero, mano de obra...—,
+# con su ORIGEN separado. Lo construyen DOS pasos de la nocturna:
+# `ingest_descompuestos` trae de Sigrid el texto `obrparpre.des` (el ambito 3
+# entero cada noche; el master, version a version por huella) a las dos tablas
+# de estado `_des_texto` y `_versiones_cargadas`, y `build_descompuestos` lo
+# trocea y publica desde ahi y desde `raw`.
+#
+# Las cifras estan MEDIDAS el 2026-09-27 y el 2026-09-28 en solo lectura contra
+# Sigrid, ANTES del primer build: se remiden con la primera carga (T17-T18).
+#
+# LAS CINCO COSAS QUE HAY QUE SABER ANTES DE ESCRIBIR UNA CONSULTA AQUI
+# (regla dura `R-DESCOMPUESTO-ORIGEN`):
+#
+# 1. **Nunca se suman ni se mezclan origenes.** ESTUDIO es la referencia que
+#    vino de Estudios (la «Descomposicion» de COSTE); PLANIF_JO la planificacion
+#    de compras del jefe de obra (la «Planificacion compras» de COSTE, tabla
+#    `dncpro`); MASTER_* es la «Descomposicion» de MASTER COSTE, una copia POR
+#    VERSION. Se filtra siempre por `origen`, o se usan las vistas `v_pbi_*`.
+# 2. **El master tiene una copia por version**: sin filtrar `fase_num` (o
+#    `es_vigente`) se cuenta cada linea tantas veces como versiones tenga la obra.
+# 3. **La «Descomposicion» de COSTE se reescribe con la planificacion**: en
+#    7.866 de las 42.958 partidas con descompuesto en el ambito 3 ese texto es
+#    copia de su planificacion (campo 36 = `dncpro.ide`). Esas NO se publican
+#    como ESTUDIO: el cuadre las marca SUSTITUIDO_POR_PLANIFICACION y su Estudios
+#    original, si existe, esta en la version 0 del master (MASTER_INICIAL).
+# 4. **Sin la primera carga el master esta INCOMPLETO.** La primera carga
+#    (`ingest-descompuestos --sin-tope`, MANUAL, 1,5-2 h) trae las 3.023
+#    versiones; sin ella la nocturna lo completa sola a 300 MB por noche, en
+#    unas 8 noches. Mientras tanto faltan versiones: `_versiones_cargadas` dice
+#    cuales hay.
+# 5. **Los tipos 3 (OTROS) y 11 (SUBCONTRATA) son PROVISIONALES** (D8): la
+#    traduccion esta sin validar con Negocio.
+
+version: 1
+esquema: descompuestos
+
+objetos:
+
+  lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **UNA FILA POR LINEA DEL DESCOMPUESTO DE CADA PARTIDA, CON SU ORIGEN**
+      (F-097). Cinco origenes, que son tres pestanas de Sigrid y NO se mezclan
+      (`R-DESCOMPUESTO-ORIGEN`): ESTUDIO (la «Descomposicion» del ambito 3 fase
+      0, solo de las partidas sin ningun registro enlazado a la planificacion:
+      la referencia de Estudios, ~98.000 lineas estimadas), PLANIF_JO (la
+      «Planificacion compras»: las lineas de `dncpro` de la necesidad de la
+      obra, ~287.000, con proveedor recomendado, contrato y linea adjudicados y
+      fecha maxima; su `precio` es el ADJUDICADO, aviso de F-038) y los tres del
+      master, una copia POR VERSION (~4,5 M lineas): MASTER_INICIAL la version 0
+      (169 versiones, «CIERRE INICIAL_ESTUDIO»), MASTER_PRE_ABC las versiones
+      anteriores a la primera ABC (1.664) y MASTER_PLANIF_JO desde la primera
+      ABC (1.190), donde el 98,6 % de las partidas ya es la planificacion del
+      jefe de obra.
+
+      **EL MASTER ESTA INCOMPLETO HASTA LA PRIMERA CARGA**, que es MANUAL: sin
+      la primera carga la nocturna lo completa sola a 300 MB por noche (unas 8
+      noches). Que versiones hay lo dice `descompuestos._versiones_cargadas`.
+
+      **LOS TIPOS 3 (OTROS) Y 11 (SUBCONTRATA) SON PROVISIONALES** (D8): la
+      traduccion del campo 16 esta sin validar con Negocio.
+
+      **EJEMPLO**: la partida 04.02 «FORJ. RETICULAR 35+10» de la 0726
+      (`partida_id` 419079, la D05DF210 de Juan) tiene 10 lineas ESTUDIO cuya
+      suma de `importe_unitario` es 134,35 = su precio; las mismas 10 en
+      MASTER_INICIAL (version 0) y en MASTER_PRE_ABC (version 1), y ninguna en
+      PLANIF_JO: el jefe de obra aun no la ha planificado.
+
+      Las 227 filas de Sigrid con `obride = 0` (version 26) se conservan con
+      `obra_id` 0: no son de ninguna obra y el cuadre las deja fuera. Un `|`
+      dentro del texto largo de un registro desplaza sus campos: queda a la
+      vista como linea sin rendimiento ni importe.
+    grano: >-
+      Una fila por linea de descompuesto: (origen, obra_id, partida_id,
+      ambito_id, fase_num, orden). En el master `fase_num` es la VERSION, asi
+      que la misma linea existe una vez por version de la obra.
+    clave_negocio: [origen, obra_id, partida_id, ambito_id, fase_num, orden]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      origen:
+        significado: >-
+          De donde sale la linea. Nunca se suman origenes distintos
+          (`R-DESCOMPUESTO-ORIGEN`).
+        valores: [ESTUDIO, PLANIF_JO, MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO]
+      obra_id:
+        significado: >-
+          La obra, con el mismo identificador que `maestro.obras.obra_id`. 0 en
+          las 227 filas huerfanas de la version 26 del master.
+        agregacion: no_sumable
+      partida_id:
+        significado: >-
+          La partida (`obrparpar.ide`), la de `stg.partidas.partida_id`. Se
+          identifica por aqui y no por codigo: el codigo se repite (F-109).
+        agregacion: no_sumable
+      presupuesto_id:
+        significado: >-
+          La fila de `obrparpre` de la que sale el descompuesto (partida x
+          ambito x fase).
+        agregacion: no_sumable
+        nulo_significa: Linea de PLANIF_JO, que no sale de `obrparpre` sino de `dncpro`.
+      ambito_id:
+        significado: >-
+          El ambito de Sigrid: 3 (COSTE) en ESTUDIO y PLANIF_JO, 8 (MASTER
+          COSTE) en los MASTER_*.
+        valores: [3, 8]
+        agregacion: no_sumable
+      fase_num:
+        significado: >-
+          La fase: 0 en el ambito 3; en el master, la VERSION. Filtrar por ella
+          (o por `es_vigente`) es obligatorio al sumar master.
+        agregacion: no_sumable
+      orden:
+        significado: >-
+          Posicion de la linea dentro del descompuesto, desde 1: el orden del
+          texto en ESTUDIO y master, y `pos, ide` de `dncpro` en PLANIF_JO.
+        agregacion: no_sumable
+      codigo_elemento:
+        significado: >-
+          Codigo del elemento (campo 1). En Estudios es LIBRE por obra; en la
+          planificacion es el codigo del producto de compras.
+        nulo_significa: El registro no trae codigo.
+      descripcion:
+        significado: Descripcion del elemento (campo 2; `dncpro.res` en PLANIF_JO).
+      unidad:
+        significado: Unidad del elemento (campo 5; `dncpro.unimed`).
+      codigo_alternativo:
+        significado: >-
+          Codigo alternativo (campo 7), que en las lineas sincronizadas con la
+          planificacion es `dncpro.cod2`: el codigo de la partida.
+      tipo_elemento_codigo:
+        significado: El tipo de elemento tal cual lo guarda Sigrid (campo 16).
+        nulo_significa: >-
+          Sin tipo: es lo normal en las lineas copiadas de la planificacion y en
+          todas las de PLANIF_JO, que se clasifican por naturaleza.
+      tipo_elemento:
+        significado: >-
+          El tipo traducido (D8): 8 MANO_OBRA, 9 MAQUINARIA, 10 MATERIAL, 4
+          PORCENTAJE, 13 MEDIOS_AUXILIARES y, PROVISIONALES sin validar con
+          Negocio, 3 OTROS y 11 SUBCONTRATA. Vacio SIN_TIPO; cualquier otro,
+          DESCONOCIDO.
+        valores: [MANO_OBRA, MAQUINARIA, MATERIAL, SUBCONTRATA, OTROS, PORCENTAJE, MEDIOS_AUXILIARES, SIN_TIPO, DESCONOCIDO]
+      naturaleza_codigo:
+        significado: >-
+          Codigo de la naturaleza del elemento (campo 11; en PLANIF_JO,
+          `auxpronat.cod` de `dncpro.natide`).
+      naturaleza:
+        significado: >-
+          Nombre de la naturaleza (campo 17; en PLANIF_JO, `auxpronat.res`):
+          'HORMIGONES Y MORTEROS PREPARADOS EN CENTRAL', 'CARPINTERIA DE MADERA'.
+      rendimiento:
+        significado: >-
+          Cantidad del elemento por UNIDAD de partida (campo 14; `dncpro.canren`).
+          En los porcentajes es el tanto por uno (0.02 = 2 %).
+        agregacion: no_sumable
+      precio:
+        significado: >-
+          Precio del elemento (campo 3). En PLANIF_JO es `dncpro.pre`, el precio
+          ADJUDICADO (F-038). En los porcentajes es la BASE.
+        unidad: EUR
+        agregacion: no_sumable
+      importe_unitario:
+        significado: >-
+          `ROUND(precio x rendimiento, 2)`: lo que aporta el elemento a UNA
+          unidad de partida. Sumado dentro de (origen, partida, ambito, fase) es
+          el precio por descompuesto que compara `cuadre_partida`.
+        unidad: EUR
+        agregacion: suma
+      cantidad_total:
+        significado: >-
+          Cantidad total del elemento para la medicion de la partida (campo 4;
+          `dncpro.can`). Mezcla unidades: no se suma entre elementos.
+        agregacion: no_sumable
+      importe_total:
+        significado: '`ROUND(cantidad_total x precio, 2)`: el importe del elemento para toda la medicion.'
+        unidad: EUR
+        agregacion: suma
+      es_porcentaje:
+        significado: TRUE en los tipos 4 y 13, cuyo precio es una base y su rendimiento un tanto por uno.
+      porcentaje:
+        significado: 'El porcentaje en tanto por cien (`rendimiento x 100`): 2 = 2 %.'
+        agregacion: no_sumable
+        nulo_significa: La linea no es un porcentaje.
+      base_porcentaje:
+        significado: La base sobre la que se aplica el porcentaje (el `precio` de la linea).
+        unidad: EUR
+        agregacion: no_sumable
+        nulo_significa: La linea no es un porcentaje.
+      dncpro_id:
+        significado: >-
+          La linea de necesidad de compra (`dncpro.ide`): en PLANIF_JO la propia
+          linea; en el master, el enlace del campo 36. Es la llave hacia el
+          comparativo y el contrato (F-038).
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de la planificacion (siempre en ESTUDIO).
+      producto_id:
+        significado: >-
+          El producto de compras (`pro.ide`) de la linea de necesidad enlazada.
+          F-092 le pondra nombre.
+        agregacion: no_sumable
+        nulo_significa: Sin enlace a la planificacion, o la linea de necesidad no lleva producto.
+      proveedor_recomendado_id:
+        significado: Proveedor recomendado de la linea de planificacion (`dncpro.entide`). Solo PLANIF_JO.
+        agregacion: no_sumable
+        nulo_significa: Sin proveedor recomendado, o la linea no es de PLANIF_JO.
+      contrato_id:
+        significado: Contrato adjudicado (`dncpro.adjctride`). Solo PLANIF_JO.
+        agregacion: no_sumable
+        nulo_significa: Sin adjudicar, o la linea no es de PLANIF_JO.
+      contrato_linea_id:
+        significado: Linea del contrato adjudicado (`dncpro.adjctrlin`, una `ctrpro.ide`). Solo PLANIF_JO.
+        agregacion: no_sumable
+        nulo_significa: Sin adjudicar, o la linea no es de PLANIF_JO.
+      fecha_maxima:
+        significado: >-
+          Fecha maxima de la linea de planificacion (`dncpro.fec`). Informada en
+          5 lineas: el mes previsto de compra no existe en la practica (D10).
+        nulo_significa: Sin fecha, casi siempre.
+      grupo_planificacion_id:
+        significado: Grupo de planificacion de compra (`dncpro.gpcide`). Solo PLANIF_JO.
+        agregacion: no_sumable
+      nivel:
+        significado: >-
+          Nivel de la linea en la planificacion (`dncpro.niv`). Se publica tal
+          cual: no hay partidas auxiliares anidadas en el dato (D6).
+        agregacion: no_sumable
+      es_nivel_padre:
+        significado: La linea de planificacion es un nivel padre (`dncpro.nivpad`). Solo PLANIF_JO.
+      es_version_inicial:
+        significado: TRUE en la version 0 del master. Solo MASTER_*.
+      es_primera_abc:
+        significado: >-
+          TRUE en la primera version cuyo texto contiene «ABC» (la regla de
+          mart), desde la que el origen es MASTER_PLANIF_JO. Solo MASTER_*.
+      es_vigente:
+        significado: >-
+          TRUE en la version vigente del master de la obra (`conext`, cod de
+          `business_rules.yaml`). Se recalcula cada noche. Solo MASTER_*.
+      es_ultima:
+        significado: TRUE en la mayor version del master de la obra. Solo MASTER_*.
+      tipo_version:
+        significado: >-
+          El tipo de la version por su texto, con la regla de
+          `mart.v_master_versiones_tipadas`. Solo MASTER_*.
+        valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]
+      texto_version:
+        significado: >-
+          El texto de la version (`obrfasamb.tex`), por ejemplo 'CIERRE
+          DICIEMBRE-25/ ABC'. Solo MASTER_*.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra del descompuesto.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: La partida en su arbol de capitulos, con su codigo y su ruta.
+    ejemplos_preguntas:
+      - De que se compone la partida 04.02 forjado reticular de la 0726
+      - Compara el descompuesto de Estudios con la planificacion del jefe de obra en la partida X
+      - Que lineas del master vigente de la obra X son mano de obra
+
+  cuadre_partida:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL CUADRE DESCOMPUESTO-PRECIO DE CADA PARTIDA** (F-097): una fila por
+      (origen, partida hoja con precio distinto de 0, ambito, fase), con la
+      suma de `importe_unitario` de sus lineas frente al precio de la partida
+      (`obrparpre.pre` redondeado a 2) y su estado: CUADRA (diferencia de 0,01
+      o menos), NO_CUADRA, SIN_DESCOMPUESTO o SUSTITUIDO_POR_PLANIFICACION (solo
+      ESTUDIO: su «Descomposicion» es copia de la planificacion). Las del
+      ambito 3 salen DOS veces, como ESTUDIO y como PLANIF_JO; una partida con
+      las dos en SIN_DESCOMPUESTO es un tanto alzado (49.204 en 672 obras,
+      medido el 2026-09-27). Cuadran el 36,3 % de las ESTUDIO con precio
+      (12.967 de 35.710) y el 76,8 % de las PLANIF_JO (71.643 de 93.320).
+      Ejemplo: la 03.05.02 de la 0695 (`partida_id` 377070), PLANIF_JO CUADRA
+      en 177,95 y ESTUDIO SUSTITUIDO_POR_PLANIFICACION.
+
+      **EL MASTER ESTA INCOMPLETO HASTA LA PRIMERA CARGA**: sus filas estan solo
+      para las versiones cargadas (`descompuestos._versiones_cargadas`), y sin
+      la primera carga la nocturna tarda unas 8 noches en tenerlas todas.
+    grano: >-
+      Una fila por (origen, partida_id, ambito_id, fase_num) de cada partida
+      hoja con precio: dos por partida en el ambito 3 y una por partida y
+      version en el master.
+    clave_negocio: [origen, partida_id, ambito_id, fase_num]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      origen:
+        significado: El origen de las lineas que se suman. Nunca se comparan filas de origenes distintos como si fueran la misma cosa.
+        valores: [ESTUDIO, PLANIF_JO, MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO]
+      obra_id:
+        significado: La obra, la de `maestro.obras.obra_id`.
+        agregacion: no_sumable
+      partida_id:
+        significado: La partida hoja (sin hijos en `obrparpar`), la de `stg.partidas.partida_id`.
+        agregacion: no_sumable
+      ambito_id:
+        significado: 3 (COSTE) en ESTUDIO y PLANIF_JO, 8 (MASTER COSTE) en los MASTER_*.
+        valores: [3, 8]
+        agregacion: no_sumable
+      fase_num:
+        significado: La fase; en el master, la VERSION.
+        agregacion: no_sumable
+      presupuesto_id:
+        significado: La fila de `obrparpre` de la partida en ese ambito y fase.
+        agregacion: no_sumable
+      precio_partida:
+        significado: El precio de la partida en Sigrid (`obrparpre.pre`), redondeado a 2 decimales como lo muestra Sigrid.
+        unidad: EUR
+        agregacion: no_sumable
+      suma_descompuesto:
+        significado: La suma de `importe_unitario` de las lineas de ese origen para la partida (0 si no hay).
+        unidad: EUR
+        agregacion: no_sumable
+      diferencia:
+        significado: '`precio_partida - suma_descompuesto`: positiva si el descompuesto no llega al precio.'
+        unidad: EUR
+        agregacion: no_sumable
+      num_lineas:
+        significado: Cuantas lineas de ese origen tiene la partida en ese ambito y fase.
+        agregacion: no_sumable
+      estado:
+        significado: >-
+          CUADRA si la diferencia es de 0,01 o menos; NO_CUADRA si no;
+          SIN_DESCOMPUESTO si no hay lineas; SUSTITUIDO_POR_PLANIFICACION (solo
+          ESTUDIO) si la «Descomposicion» es copia de la planificacion.
+        valores: [CUADRA, NO_CUADRA, SIN_DESCOMPUESTO, SUSTITUIDO_POR_PLANIFICACION]
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: La partida en su arbol de capitulos.
+    ejemplos_preguntas:
+      - Que partidas de la obra X no cuadran con su descompuesto
+      - Que partidas con precio no tienen ni descompuesto ni planificacion en la obra X
+
+  elementos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **EL CATALOGO DE ELEMENTOS DE DESCOMPUESTO, POR OBRA** (F-097, D9): una
+      fila por (obra, codigo de elemento), con la descripcion y la unidad mas
+      frecuentes, el tipo, cuantas lineas tiene en cada origen y el PRODUCTO de
+      compras cuando se conoce. El grano es la obra porque los codigos de
+      Estudios son LIBRES por obra: 31.726 codigos distintos en el ambito 3 y
+      solo 253 son codigos de producto (2026-09-27). `via_producto` dice como se
+      encontro el producto: por el enlace a la planificacion (fiable) o por
+      coincidir el codigo con un producto de la MISMA empresa que la obra.
+    grano: Una fila por (obra_id, codigo_elemento).
+    clave_negocio: [obra_id, codigo_elemento]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      obra_id:
+        significado: La obra, la de `maestro.obras.obra_id`.
+        agregacion: no_sumable
+      codigo_elemento:
+        significado: El codigo del elemento, tal cual en `descompuestos.lineas`.
+      descripcion:
+        significado: La descripcion mas frecuente del codigo en la obra.
+      unidad:
+        significado: La unidad mas frecuente del codigo en la obra.
+      tipo_elemento:
+        significado: El tipo mas frecuente sin contar SIN_TIPO (D8; 3 y 11 provisionales).
+        valores: [MANO_OBRA, MAQUINARIA, MATERIAL, SUBCONTRATA, OTROS, PORCENTAJE, MEDIOS_AUXILIARES, SIN_TIPO, DESCONOCIDO]
+      num_lineas:
+        significado: Lineas del codigo en la obra, en todos los origenes y versiones.
+        agregacion: no_sumable
+      lineas_estudio:
+        significado: Lineas del codigo en la obra con origen ESTUDIO.
+        agregacion: no_sumable
+      lineas_planif_jo:
+        significado: Lineas del codigo en la obra con origen PLANIF_JO.
+        agregacion: no_sumable
+      lineas_master_inicial:
+        significado: Lineas del codigo en la obra con origen MASTER_INICIAL.
+        agregacion: no_sumable
+      lineas_master_pre_abc:
+        significado: Lineas del codigo en la obra con origen MASTER_PRE_ABC (todas sus versiones).
+        agregacion: no_sumable
+      lineas_master_planif_jo:
+        significado: Lineas del codigo en la obra con origen MASTER_PLANIF_JO (todas sus versiones).
+        agregacion: no_sumable
+      producto_id:
+        significado: El producto de compras (`pro.ide`) del elemento, cuando se conoce.
+        agregacion: no_sumable
+        nulo_significa: Codigo libre de Estudios que no es de ningun producto de la empresa.
+      via_producto:
+        significado: >-
+          Como se encontro el producto: ENLACE_PLANIFICACION (el de sus lineas
+          enlazadas a `dncpro`) o CODIGO_PRODUCTO_EMPRESA (un producto de la
+          empresa de la obra con ese codigo).
+        valores: [ENLACE_PLANIFICACION, CODIGO_PRODUCTO_EMPRESA]
+        nulo_significa: Sin producto.
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+    ejemplos_preguntas:
+      - Que elementos de la obra X tienen producto de compras
+      - Cuantos codigos de Estudios de la obra X no son productos
+
+  v_pbi_estudio:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las lineas de origen ESTUDIO de `descompuestos.lineas`, con el origen
+      CABLEADO: la referencia que vino de Estudios (ambito 3 fase 0), solo de
+      las partidas cuya «Descomposicion» no es copia de la planificacion. Para
+      Power BI y para no mezclar origenes sin acordarse del filtro.
+    grano: Una fila por linea de ESTUDIO (obra_id, partida_id, orden).
+    clave_negocio: [obra_id, partida_id, orden]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      obra_id: {significado: 'La obra, la de `maestro.obras.obra_id`.', agregacion: no_sumable}
+      partida_id: {significado: 'La partida, la de `stg.partidas.partida_id`.', agregacion: no_sumable}
+      presupuesto_id: {significado: 'La fila de `obrparpre` del descompuesto.', agregacion: no_sumable}
+      orden: {significado: 'Posicion de la linea en el descompuesto, desde 1.', agregacion: no_sumable}
+      codigo_elemento: {significado: 'Codigo del elemento, libre por obra en Estudios.'}
+      descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
+      unidad: {significado: 'Unidad del elemento en el descompuesto.'}
+      codigo_alternativo: {significado: 'Codigo alternativo del elemento (campo 7).'}
+      tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
+      tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
+      naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
+      naturaleza: {significado: 'Nombre de la naturaleza del elemento (campo 17).'}
+      rendimiento: {significado: 'Cantidad por unidad de partida (tanto por uno en los porcentajes).', agregacion: no_sumable}
+      precio: {significado: 'Precio del elemento; la base en los porcentajes.', unidad: EUR, agregacion: no_sumable}
+      importe_unitario: {significado: 'ROUND(precio x rendimiento, 2); suma por partida = su precio si cuadra.', unidad: EUR, agregacion: suma}
+      cantidad_total: {significado: 'Cantidad total del elemento para la medicion; mezcla unidades.', agregacion: no_sumable}
+      importe_total: {significado: 'ROUND(cantidad_total x precio, 2): importe para toda la medicion.', unidad: EUR, agregacion: suma}
+      es_porcentaje: {significado: 'TRUE en los tipos 4 y 13 (porcentajes).'}
+      porcentaje: {significado: 'Porcentaje en tanto por cien (2 = 2 %).', agregacion: no_sumable}
+      base_porcentaje: {significado: 'Base sobre la que se aplica el porcentaje.', unidad: EUR, agregacion: no_sumable}
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: La partida en su arbol de capitulos.
+    ejemplos_preguntas:
+      - Cual es el descompuesto de Estudios de la partida X
+
+  v_pbi_planif_jo:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las lineas de origen PLANIF_JO de `descompuestos.lineas`, con el origen
+      CABLEADO: la planificacion de compras del jefe de obra (`dncpro` de la
+      necesidad de la obra), con proveedor recomendado, contrato y linea
+      adjudicados y fecha maxima. Su `precio` es el ADJUDICADO (F-038).
+    grano: Una fila por linea de PLANIF_JO (obra_id, partida_id, orden).
+    clave_negocio: [obra_id, partida_id, orden]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      obra_id: {significado: 'La obra, la de `maestro.obras.obra_id`.', agregacion: no_sumable}
+      partida_id: {significado: 'La partida, la de `stg.partidas.partida_id`.', agregacion: no_sumable}
+      orden: {significado: 'Posicion de la linea en la pestana (por pos e ide), desde 1.', agregacion: no_sumable}
+      codigo_elemento: {significado: 'Codigo del producto de compras de la linea (`con.cod`).'}
+      descripcion: {significado: 'Descripcion de la linea de planificacion (`dncpro.res`).'}
+      unidad: {significado: 'Unidad de la linea de planificacion (`dncpro.unimed`).'}
+      codigo_alternativo: {significado: 'Codigo alternativo de la linea (`dncpro.cod2`).'}
+      naturaleza_codigo: {significado: 'Codigo de la naturaleza del producto (`auxpronat.cod`).'}
+      naturaleza: {significado: 'Nombre de la naturaleza del producto (`auxpronat.res`).'}
+      rendimiento: {significado: 'Cantidad por unidad de partida (`dncpro.canren`).', agregacion: no_sumable}
+      precio: {significado: 'Precio ADJUDICADO de la linea (`dncpro.pre`, F-038).', unidad: EUR, agregacion: no_sumable}
+      importe_unitario: {significado: 'ROUND(precio x rendimiento, 2); suma por partida frente a su precio.', unidad: EUR, agregacion: suma}
+      cantidad_total: {significado: 'Cantidad total de la linea (`dncpro.can`); mezcla unidades.', agregacion: no_sumable}
+      importe_total: {significado: 'ROUND(cantidad_total x precio, 2): importe de toda la linea.', unidad: EUR, agregacion: suma}
+      dncpro_id: {significado: 'La linea de necesidad (`dncpro.ide`), llave hacia comparativo y contrato.', agregacion: no_sumable}
+      producto_id: {significado: 'El producto de compras (`pro.ide`) de la linea.', agregacion: no_sumable}
+      proveedor_recomendado_id: {significado: 'Proveedor recomendado de la linea (`dncpro.entide`).', agregacion: no_sumable}
+      contrato_id: {significado: 'Contrato adjudicado a la linea (`dncpro.adjctride`).', agregacion: no_sumable}
+      contrato_linea_id: {significado: 'Linea del contrato adjudicado (`dncpro.adjctrlin`).', agregacion: no_sumable}
+      fecha_maxima: {significado: 'Fecha maxima de la linea; informada en 5 lineas (D10).'}
+      grupo_planificacion_id: {significado: 'Grupo de planificacion de compra (`dncpro.gpcide`).', agregacion: no_sumable}
+      nivel: {significado: 'Nivel de la linea en la planificacion (`dncpro.niv`).', agregacion: no_sumable}
+      es_nivel_padre: {significado: 'La linea es un nivel padre (`dncpro.nivpad`).'}
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: La partida en su arbol de capitulos.
+    ejemplos_preguntas:
+      - Que ha planificado comprar el jefe de obra para la partida X y a que proveedor
+
+  v_pbi_master_planif_jo:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las lineas de origen MASTER_PLANIF_JO de `descompuestos.lineas`, con el
+      origen CABLEADO: el descompuesto del master desde la primera version ABC,
+      que es la planificacion de compras del jefe de obra y el descompuesto del
+      cierre para Oficina Tecnica. TODAS sus versiones, con sus marcas: para ver
+      una se filtra `es_vigente` o `fase_num`; sin filtrar, cada linea cuenta
+      una vez por version. INCOMPLETO hasta la primera carga del master.
+    grano: Una fila por linea de MASTER_PLANIF_JO y version (obra_id, partida_id, fase_num, orden).
+    clave_negocio: [obra_id, partida_id, fase_num, orden]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      obra_id: {significado: 'La obra, la de `maestro.obras.obra_id`.', agregacion: no_sumable}
+      partida_id: {significado: 'La partida, la de `stg.partidas.partida_id`.', agregacion: no_sumable}
+      presupuesto_id: {significado: 'La fila de `obrparpre` del descompuesto de la version.', agregacion: no_sumable}
+      fase_num: {significado: 'La VERSION del master: filtrarla al sumar.', agregacion: no_sumable}
+      orden: {significado: 'Posicion de la linea en el descompuesto, desde 1.', agregacion: no_sumable}
+      codigo_elemento: {significado: 'Codigo del elemento (el del producto si viene de la planificacion).'}
+      descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
+      unidad: {significado: 'Unidad del elemento en el descompuesto.'}
+      codigo_alternativo: {significado: 'Codigo alternativo (= `dncpro.cod2` si esta enlazada).'}
+      tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
+      tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
+      naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
+      naturaleza: {significado: 'Nombre de la naturaleza del elemento (campo 17).'}
+      rendimiento: {significado: 'Cantidad por unidad de partida (tanto por uno en porcentajes).', agregacion: no_sumable}
+      precio: {significado: 'Precio del elemento en la version; la base en porcentajes.', unidad: EUR, agregacion: no_sumable}
+      importe_unitario: {significado: 'ROUND(precio x rendimiento, 2), sumable dentro de partida y version.', unidad: EUR, agregacion: suma}
+      cantidad_total: {significado: 'Cantidad total del elemento para la medicion; mezcla unidades.', agregacion: no_sumable}
+      importe_total: {significado: 'ROUND(cantidad_total x precio, 2), sumable dentro de una version.', unidad: EUR, agregacion: suma}
+      es_porcentaje: {significado: 'TRUE en los tipos 4 y 13 (porcentajes).'}
+      porcentaje: {significado: 'Porcentaje en tanto por cien (2 = 2 %).', agregacion: no_sumable}
+      base_porcentaje: {significado: 'Base sobre la que se aplica el porcentaje.', unidad: EUR, agregacion: no_sumable}
+      dncpro_id: {significado: 'La linea de necesidad enlazada (campo 36), llave hacia el contrato.', agregacion: no_sumable}
+      producto_id: {significado: 'El producto de compras de la linea de necesidad enlazada.', agregacion: no_sumable}
+      es_primera_abc: {significado: 'TRUE en la primera version ABC de la obra.'}
+      es_vigente: {significado: 'TRUE en la version vigente del master (conext).'}
+      es_ultima: {significado: 'TRUE en la mayor version del master de la obra.'}
+      tipo_version: {significado: 'Tipo de la version por su texto, la regla de mart.', valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]}
+      texto_version: {significado: 'El texto de la version (`obrfasamb.tex`).'}
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: La partida en su arbol de capitulos.
+    ejemplos_preguntas:
+      - Cual es el descompuesto de la partida X en el master vigente de la obra Y
+
+  _des_texto:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el ESTADO del incremental: el texto crudo de Sigrid, sin trocear. Lo
+      que significa esta en `descompuestos.lineas`; aqui solo hay registros
+      `~D|...` pegados.
+    descripcion: >-
+      El texto `des` de `obrparpre` (la «Descomposicion» de Sigrid), una fila
+      por fila con descompuesto: el ambito 3 fase 0 entero (42.958 filas,
+      21,5 MB) y las versiones del master ya cargadas (1.616.461 filas y 2,14
+      GB cuando esten las 3.023). Lo escribe `ingest_descompuestos`, version a
+      version y en una transaccion con su fila de `_versiones_cargadas`; NUNCA
+      se trunca (`--full` no la toca): es la primera tabla del datamart que no
+      se reconstruye de cero.
+    grano: Una fila por fila de `obrparpre` con descompuesto, `presupuesto_id` (partida x ambito x fase).
+    clave_negocio: [presupuesto_id]
+    paso_etl: ingest_descompuestos
+    refresco: nocturno
+    columnas:
+      presupuesto_id: {significado: 'La fila de `obrparpre` (`obrparpre.ide`).', agregacion: no_sumable}
+      obra_id: {significado: 'La obra (`obrparpre.obride`); 0 en las 227 filas huerfanas.', agregacion: no_sumable}
+      partida_id: {significado: 'La partida (`obrparpre.paride`).', agregacion: no_sumable}
+      ambito_id: {significado: '3 (ambito 3 fase 0) u 8 (master).', valores: [3, 8], agregacion: no_sumable}
+      fase_num: {significado: 'La fase; en el master, la version.', agregacion: no_sumable}
+      cantidad: {significado: 'La medicion de la partida (`obrparpre.can`) al cargar.', agregacion: no_sumable}
+      precio: {significado: 'El precio de la partida (`obrparpre.pre`) al cargar.', unidad: EUR, agregacion: no_sumable}
+      haydes: {significado: 'La marca de Sigrid de que hay descompuesto (`obrparpre.haydes`).'}
+      des: {significado: 'El texto del descompuesto, registros `~D|...` separados por salto de linea.'}
+      batch_id: {significado: 'La ejecucion que cargo la fila, como en `_meta.etl_runs.batch_id`.'}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  _versiones_cargadas:
+    tipo: tabla
+    capa: preparacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es el ESTADO del incremental del master. Para saber si el master de una
+      obra esta completo sirve, pero las preguntas de negocio van a
+      `descompuestos.lineas`.
+    descripcion: >-
+      Una fila por version del master (ambito 8) ya cargada en `_des_texto`: la
+      huella que tenia en Sigrid al cargarla (filas, bytes y un CHECKSUM del
+      texto), de que ejecucion viene y con que SQL se troceo. Cada noche
+      `ingest_descompuestos` compara esta huella con la de Sigrid y relee las
+      versiones nuevas, la vigente de cada obra y las de huella distinta, hasta
+      300 MB. Mientras no esten las 3.023 versiones, el master de
+      `descompuestos.lineas` esta INCOMPLETO. Si se corrompe: vaciarla y lanzar
+      `ingest-descompuestos --sin-tope`.
+    grano: Una fila por version del master cargada (obra_id, fase_num).
+    clave_negocio: [obra_id, fase_num]
+    paso_etl: ingest_descompuestos
+    refresco: nocturno
+    columnas:
+      obra_id: {significado: 'La obra de la version (`obrparpre.obride`).', agregacion: no_sumable}
+      fase_num: {significado: 'La version del master (`obrparpre.fas`).', agregacion: no_sumable}
+      filas: {significado: 'Filas con descompuesto de la version en Sigrid al cargarla.', agregacion: suma}
+      bytes: {significado: 'Bytes de texto de la version en Sigrid al cargarla (DATALENGTH).', agregacion: suma}
+      huella: {significado: 'CHECKSUM_AGG del texto, la medicion y el precio de la version al cargarla.', agregacion: no_sumable}
+      batch_id: {significado: 'La ejecucion que cargo la version, como en `_meta.etl_runs.batch_id`.'}
+      cargada_at: {significado: 'Cuando se cargo la version, en UTC sin zona como todo `_meta`.'}
+      sello_troceado: {significado: 'El sello del SQL con que se troceo la version (R11).', nulo_significa: 'Releida y pendiente de trocear.'}
+      troceada_at: {significado: 'Cuando se troceo por ultima vez, en UTC sin zona.', nulo_significa: 'Nunca se ha troceado.'}
+      atributos_troceado: {significado: 'Huella del origen y las marcas que llevan sus lineas; si cambia, se actualizan.'}
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra de la version.
+    ejemplos_preguntas: []
+
+  fn_trocear:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de descompuestos: trocea el texto crudo. Lo
+      troceado ya esta en `descompuestos.lineas`.
+    descripcion: >-
+      Parte el texto `des` en una fila por registro `~D|` (por salto de linea
+      seguido de `~<letra>|`, nunca por cualquier salto) y mapea cada campo por
+      su posicion, con el tipo traducido y los importes. Una sola definicion
+      para el ambito 3 y el master; su texto forma el sello del troceado.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_num:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de descompuestos, usada solo dentro del SQL
+      que construye el esquema.
+    descripcion: >-
+      Convierte un campo del texto `des` en numero; lo que no es un numero
+      (vacio, texto, coma decimal, un exponente de mas de tres cifras) es NULL,
+      para que el build no falle por un registro mal escrito.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_fecha:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de descompuestos, usada solo dentro del SQL
+      que construye el esquema.
+    descripcion: >-
+      Convierte una fecha de Sigrid --un entero AAAAMMDD-- en una fecha de
+      verdad, tratando el 0 como ausencia de fecha. Copia local de la de los
+      otros esquemas modulo, para no depender de ninguno.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

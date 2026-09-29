@@ -1255,7 +1255,7 @@ def test_f056_r28_las_advertencias_con_cifra() -> None:
 
 def test_f056_r29_global_esquema_regla_y_version() -> None:
     glob = _yaml("00_global.yaml")
-    assert glob["version"] == 36
+    assert glob["version"] >= 36, "F-097 la subio a 37"
     esquema = glob["esquemas"]["contabilidad"]
     assert esquema["pasos_etl"] == ["build_contabilidad"]
     assert esquema["refresco"] == "nocturno" and esquema["consumo_recomendado"] is True
@@ -1337,8 +1337,9 @@ def test_f056_r32_documentacion() -> None:
     import main
 
     documentacion = main.run_all.__doc__ or ""
-    assert "seis build" in documentacion and "contabilidad" in documentacion
-    assert "seis build" in (main.build_pipeline_steps.__doc__ or "") or "sexto" in (
+    # Siete desde F-097, que anadio `descompuestos`.
+    assert "siete build" in documentacion and "contabilidad" in documentacion
+    assert "siete build" in (main.build_pipeline_steps.__doc__ or "") or "sexto" in (
         main.build_pipeline_steps.__doc__ or ""
     )
     if not DOC_AZURE_APPS.exists():

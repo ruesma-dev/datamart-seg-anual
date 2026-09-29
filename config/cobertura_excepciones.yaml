@@ -30,6 +30,26 @@
 # psql-albaranes-rs9k2, 2026-08-31). Un tope inventado seria peor que ninguno:
 # de mas, tapa; de menos, alarma falsa. T15 -manual, del humano- fija la linea
 # base real y ahi se podra afinar.
+#
+# -----------------------------------------------------------------------------
+# POR QUE SE DECLARA TODO EL RESIDUO. DECISION DEL HUMANO, 2026-09-02.
+# -----------------------------------------------------------------------------
+# Cerrada la fase 2 de F-052 el guardian seguia en rojo por 20 obras invisibles
+# y 294 filas huerfanas que ya estaban medidas y entendidas. Habia dos salidas:
+# dejarlo rojo con la linea base escrita, o declararlas. EL HUMANO ELIGIO
+# DECLARARLAS, y este es su motivo, que es el mismo por el que este fichero
+# existe:
+#
+#   un guardian que nace en rojo permanente manda un correo cada noche que no
+#   significa nada, y en dos semanas no lo mira nadie; con todo declarado, el
+#   dia que aparezca una obra invisible NUEVA el correo significara algo.
+#
+# La contrapartida esta asumida y hay que decirla: cada linea de aqui abajo es
+# una alarma que se apaga. Por eso ninguna entra sin motivo medido y sin quien
+# la cierra, y por eso las cuatro obras ciegas SOLO en master van acotadas con
+# `ambito_id` en vez de en general: si manana una de ellas desapareciera del
+# ambito 3 -coste real, dinero- eso seria un agujero nuevo y el guardian tiene
+# que gritar.
 
 excepciones:
 
@@ -75,22 +95,30 @@ excepciones:
   # stg.obras, su codigo solo se puede recuperar de raw y no siempre esta.
 
   - patron_nombre: "OBRA PRUEBA"
-    tipo: filas_huerfanas
+    tipo: ambas
     motivo: >-
-      Obra de prueba, excluida a proposito de stg.obras por la lista negra de
-      stg/03_obras.sql. Descarte correcto, no un defecto.
+      Obra de prueba, excluida a proposito de stg.obras: su codigo son seis
+      digitos seguidos (170705, 180501, 221101...) y stg/03_obras.sql:113 los
+      descarta con `con.cod !~ '[0-9]{5,}'`. Descarte correcto, no un defecto.
+      TIPO `ambas` DESDE EL 2026-09-02: al no tener ficha en stg.obras es las
+      dos cosas a la vez -todas sus filas de plan_mensual son huerfanas Y no
+      publica una sola fila en el fact-, y declarada solo `filas_huerfanas`
+      tapaba la mitad. Salian las 15 como obra invisible.
 
   - patron_nombre: "POSTVENTA"
-    tipo: filas_huerfanas
+    tipo: ambas
     motivo: >-
       Papelera de postventa, excluida a proposito de stg.obras (codigos POSTV y
-      POSTV2 de la lista negra de stg/03_obras.sql). Descarte correcto.
+      POSTV2 de la lista negra de stg/03_obras.sql:107). Descarte correcto.
+      TIPO `ambas` DESDE EL 2026-09-02, por el mismo motivo que OBRA PRUEBA: sin
+      ficha en stg.obras es obra invisible ADEMAS de traer filas huerfanas.
 
   - codigo_obra: "VAR"
-    tipo: filas_huerfanas
+    tipo: ambas
     motivo: >-
       Papelera de varios, excluida a proposito de stg.obras por la lista negra
-      de stg/03_obras.sql. Descarte correcto.
+      de stg/03_obras.sql:107. Descarte correcto. TIPO `ambas` DESDE EL
+      2026-09-02: sin ficha en stg.obras es obra invisible ademas de huerfana.
 
   # -------------------------------------------------------------------------
   # 3. Las obras que dependen de F-053 (R24, DA-7)
@@ -126,9 +154,146 @@ excepciones:
     feature: F-053
 
   - codigo_obra: "0606"
-    tipo: filas_huerfanas
+    tipo: ambas
     motivo: >-
       PUY DU FOU. Caso APARTE, no confundir con los tres de arriba: aqui el ide
       ganador SI publica y el perdido arrastra 1.811.434,92 / 1.890.560,92 EUR.
-      Elegir cual es el bueno es una decision de negocio, y va en F-053.
+      Elegir cual es el bueno es una decision de negocio, y va en F-053. TIPO
+      `ambas` DESDE EL 2026-09-02: el ide PERDIDO no esta en stg.obras, asi que
+      se manifiesta como OBRA INVISIBLE en los cuatro ambitos ademas de traer
+      huerfanas. Declarada solo `filas_huerfanas` tapaba unicamente la mitad
+      que nadie veia, y la 0606 salia en rojo en los cuatro ambitos.
     feature: F-053
+
+  # -------------------------------------------------------------------------
+  # 4. El residuo de la propia F-052, medido y CERRADO por ella (2026-09-02)
+  # -------------------------------------------------------------------------
+  # 0613 y 0618 son dos de las SEIS obras que F-052 toco. Tras el arreglo del
+  # arbol de partidas conservan 150 + 76 = 226 filas huerfanas, que son
+  # EXACTAMENTE las "226 filas de 183.756, a 0,00 EUR" que la spec anticipo
+  # como movimiento maximo fuera de la 0599 (design.md, DA-2). No es un cabo
+  # suelto: es el residuo previsto, medido y a cero euros.
+  #
+  # OJO, ESTO CORRIGE UN ERROR DEL ACTA: progress/current.md llego a decir que
+  # ninguna de las 294 huerfanas era de F-052. Era falso, y lo cazo el reviewer.
+
+  - codigo_obra: "0613"
+    tipo: filas_huerfanas
+    motivo: >-
+      COLEGIO RICHMOND PARK. 150 filas huerfanas en los ambitos 3, 7, 8 y 11,
+      medidas el 2026-09-02 con la base ya reconstruida. Son parte de las 226
+      filas a 0,00 EUR que DA-2 admitio como movimiento maximo fuera de la 0599:
+      partidas cuya cadena no llega a raiz publicable ni con el arbol nuevo.
+      Residuo CERRADO POR F-052, no trabajo pendiente.
+    feature: F-052
+
+  - codigo_obra: "0618"
+    tipo: filas_huerfanas
+    motivo: >-
+      AMPL. COLEGIO INTERNACIONAL SOTOGRANDE. 76 filas huerfanas en los ambitos
+      3, 8 y 11, medidas el 2026-09-02. La otra mitad de las 226 filas a 0,00
+      EUR previstas por DA-2. Residuo CERRADO POR F-052.
+    feature: F-052
+
+  # -------------------------------------------------------------------------
+  # 5. Las cuatro obras ciegas SOLO en los ambitos master (8 y 11)
+  # -------------------------------------------------------------------------
+  # PENDIENTES DE INVESTIGAR, y esto es una PREGUNTA ABIERTA, no un diagnostico:
+  # las cuatro publican con normalidad en los ambitos reales (3 y 7) y no tienen
+  # ni una fila en el fact para 8 ni para 11. Puede ser LEGITIMO -una obra sin
+  # version master vigente no tiene filas ahi por diseno, y por eso R14 compara
+  # presencia y no conteo- o puede ser otro agujero como el de la 0599. NO SE
+  # SUPONE: lo mira F-117.
+  #
+  # Van con ambito_id a proposito, dos entradas por obra. Sin acotar taparian
+  # tambien el ambito 3, que es coste real, que es dinero.
+
+  - codigo_obra: "0578"
+    tipo: obra_invisible
+    ambito_id: 8
+    motivo: >-
+      12 VIVIENDAS C/CANILLAS (MADRID). Cero filas en el fact para el ambito
+      master de coste, medido el 2026-09-02. Publica en los ambitos reales.
+      Pendiente de investigar si es la version master vigente o un agujero.
+    feature: F-117
+
+  - codigo_obra: "0578"
+    tipo: obra_invisible
+    ambito_id: 11
+    motivo: >-
+      12 VIVIENDAS C/CANILLAS (MADRID). Lo mismo en el ambito master de venta.
+    feature: F-117
+
+  - codigo_obra: "0585"
+    tipo: obra_invisible
+    ambito_id: 8
+    motivo: >-
+      REF. Y AMPLIACION COLEGIO MAYOR ALCOR (MADRID). Cero filas en el fact para
+      el ambito master de coste, medido el 2026-09-02. Publica en los reales.
+    feature: F-117
+
+  - codigo_obra: "0585"
+    tipo: obra_invisible
+    ambito_id: 11
+    motivo: >-
+      REF. Y AMPLIACION COLEGIO MAYOR ALCOR (MADRID). Lo mismo en master venta.
+    feature: F-117
+
+  - codigo_obra: "0670"
+    tipo: obra_invisible
+    ambito_id: 8
+    motivo: >-
+      CAMPO FUTBOL COLEGIO SANTILLANA (MADRID). Cero filas en el fact para el
+      ambito master de coste, medido el 2026-09-02. Publica en los reales.
+    feature: F-117
+
+  - codigo_obra: "0670"
+    tipo: obra_invisible
+    ambito_id: 11
+    motivo: >-
+      CAMPO FUTBOL COLEGIO SANTILLANA (MADRID). Lo mismo en master venta.
+    feature: F-117
+
+  - codigo_obra: "0687"
+    tipo: obra_invisible
+    ambito_id: 8
+    motivo: >-
+      CENTRO PRIMERA ACOGIDA DE MENORES LA CANTUENA. Cero filas en el fact para
+      el ambito master de coste, medido el 2026-09-02.
+    feature: F-117
+
+  - codigo_obra: "0687"
+    tipo: obra_invisible
+    ambito_id: 11
+    motivo: >-
+      CENTRO PRIMERA ACOGIDA DE MENORES LA CANTUENA. Lo mismo en master venta.
+    feature: F-117
+
+  # -------------------------------------------------------------------------
+  # 6. Las tres papeleras de codigo de SEIS DIGITOS
+  # -------------------------------------------------------------------------
+  # Mismo grupo que el 2 y misma regla que las excluye -la de los cinco digitos
+  # seguidos de stg/03_obras.sql:113-, pero no las tapaba ningun patron por
+  # nombre. Son las 12 + 6 + 50 filas huerfanas que quedaban sin declarar el
+  # 2026-09-02. Se declaran por CODIGO y no por nombre a proposito: "CANILLAS"
+  # como patron tambien casaria con la 0578, que es una obra de verdad.
+
+  - codigo_obra: "150414"
+    tipo: ambas
+    motivo: >-
+      REESTRUCTURACION MERCADO PROSPERIDAD. Codigo de seis digitos, excluida de
+      stg.obras por la regla de los cinco digitos seguidos de
+      stg/03_obras.sql:113. 12 filas huerfanas el 2026-09-02. Descarte correcto
+      por diseno.
+
+  - codigo_obra: "150703"
+    tipo: ambas
+    motivo: >-
+      OBRA FORMACION. Codigo de seis digitos, excluida de stg.obras por la misma
+      regla. 6 filas huerfanas el 2026-09-02. Descarte correcto por diseno.
+
+  - codigo_obra: "181001"
+    tipo: ambas
+    motivo: >-
+      OBRA CANILLAS. Codigo de seis digitos, excluida de stg.obras por la misma
+      regla. 50 filas huerfanas el 2026-09-02. Descarte correcto por diseno.

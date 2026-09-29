@@ -1388,3 +1388,47 @@ Contrastado: 1-4308000197 641 apuntes y saldo 1.189.275,13; subcuenta 434 de
 233/233 de la campana sistematica de SQL. Diccionario version 36. `apa` queda a
 F-061. `mcp-bbdd` debe anadir `contabilidad` a su lista blanca. Detalle:
 `progress/impl_F-056.md`, `progress/review_F-056.md`, `progress/mutacion_F-056.md`.
+
+## F-097 · Los descompuestos de las partidas: esquema `descompuestos` (cerrada el 2026-09-28, APROBADO en pasada 3)
+
+Pedida por Juan Romero el 2026-09-22. Esquema nuevo `descompuestos`, el primero
+INCREMENTAL: `ingest_descompuestos` trae el texto `des` de `obrparpre` (excluido
+hasta hoy) a tablas de estado propias que `--full` no trunca, y
+`build_descompuestos` lo trocea en líneas (`fn_trocear`, con espejo en Python).
+Cinco orígenes que no se mezclan (`R-DESCOMPUESTO-ORIGEN`): ESTUDIO (ámbito 3
+fase 0; las 7.866 partidas sobrescritas por la planificación salen como
+`SUSTITUIDO_POR_PLANIFICACION`), PLANIF_JO (`dncpro`), MASTER_INICIAL (v0),
+MASTER_PRE_ABC y MASTER_PLANIF_JO (desde la primera ABC); todas las versiones del
+master (3.023, 2,14 GB), con v0, primera ABC y vigente marcadas. Cada noche: huella
+de las 3.023 versiones y relectura de nuevas, vigentes y las de huella distinta,
+con tope de 300 MB (`--sin-tope` para la primera carga, MANUAL). Catálogo de
+elementos con producto, cuadre descompuesto-precio y partidas sin descompuesto.
+Medido: D05DF210 no existe en Sigrid, es la 04.02 de la 0726 (10 líneas de ESTUDIO
+que suman 134,35); `obrparpre` sin `tiemod` corregido (R29), las otras 13 tablas
+a F-115. Decisiones del humano: no partir la feature y traer el master entero; T0
+(inmutabilidad de versiones cerradas) bloquea la puesta en producción, no el
+código. Review 1: números fuera de rango y `
+` final en el espejo; review 2:
+dos supervivientes de mutación sin test (lote justo en el tope y el default de
+`--sin-tope`). Diccionario version 37 (187 objetos). Sin desplegar. Detalle:
+`progress/spec_F-097.md`, `progress/impl_F-097.md`, `progress/review_F-097.md`,
+`progress/mutacion_F-097.md`.
+
+## F-052 · La obra 0599 no estaba en el datamart: el arbol de partidas roto y el guardian de cobertura (cerrada el 2026-09-29, APROBADO)
+
+El arreglo (fase 2, 2026-09-01) llevo la 0599 al datamart: sus 104.366 filas de
+presupuesto sin ficha de partida se caian por un recorrido del arbol que solo
+arrancaba en las raices y un `INNER JOIN` que las borraba en silencio. Cierre de
+2022-12: beneficio de 2.697.396 EUR (66,3 %) a 72.603 EUR (1,8 %), exacto a lo
+predicho; la 0628 de control, sin moverse. Deja el guardian `check-cobertura`
+(lo que entra en `stg` sale en `mart`, salvo lo declarado en
+`config/cobertura_excepciones.yaml`) y su alerta. Estuvo `blocked` desde el
+2026-09-02: los siete commits de cierre se quedaron en su rama y la nocturna
+seguia con las 10 excepciones viejas. Cerrada integrando `main` en la rama
+(merge `28bf449`; la F-055 de la rama, «cuatro obras ciegas en master», pasa a
+**F-117** porque en `main` F-055 es otra) y con `check-cobertura` en codigo 0: 23
+excepciones, 56 de 56 combinaciones cubiertas. La 0599 en `mart`: 21.051 /
+18.266 / 9.999 / 8.999 filas en los ambitos 3/7/8/11. Pendiente del humano:
+retirar la excepcion de la 0720 (ya publica) y decidir las tres de ciclo que no
+tapan nada; purgar los `obras_*.csv` de la historia local antes del push; merge e
+imagen nueva. Detalle: `progress/impl_F-052*.md`, `progress/review_F-052*.md`.

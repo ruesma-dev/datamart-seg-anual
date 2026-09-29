@@ -268,21 +268,22 @@ def test_f006_r3_con_motivo_escrito_la_ficha_sin_columnas_es_valida() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_f006_r4_son_once_esquemas_y_estos() -> None:
+def test_f006_r4_son_doce_esquemas_y_estos() -> None:
     """Los informes de exploración dicen ocho. Eran NUEVE (requirements §0.5),
-    DIEZ desde F-057 (2026-09-18), que añadió `personal`, y son ONCE desde
-    F-056 (2026-09-26), que añadió `contabilidad`.
+    DIEZ desde F-057 (2026-09-18), que añadió `personal`, ONCE desde F-056
+    (2026-09-26), que añadió `contabilidad`, y son DOCE desde F-097
+    (2026-09-28), que añadió `descompuestos`.
 
     Se enumeran uno a uno a propósito: esta tupla es lo que hace que el
     validador exija ficha de esquema y que `check-declarados` mire la carpeta,
     así que un esquema que entre o salga tiene que hacerlo por aquí y no en
     silencio.
     """
-    assert len(ESQUEMAS_DEL_DATAMART) == 11
+    assert len(ESQUEMAS_DEL_DATAMART) == 12
     assert set(ESQUEMAS_DEL_DATAMART) == {
         "_meta", "raw", "stg", "aux", "mart",
         "cierre", "compras", "maestro", "retenciones", "personal",
-        "contabilidad",
+        "contabilidad", "descompuestos",
     }
 
 

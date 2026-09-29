@@ -90,8 +90,13 @@ class SigridApiSettings(BaseSettings):
 # F-056 añade `contabilidad` (el plan de cuentas, el mayor y los saldos por
 # cuenta y mes). Esquema propio por lo mismo: el día que haya que decir «esto sí
 # y la contabilidad no», es un GRANT.
+#
+# F-097 añade `descompuestos` (de qué se compone cada partida, por origen). Con
+# él entran sus dos tablas de ESTADO (`_des_texto`, `_versiones_cargadas`), que
+# su ficha marca como no recomendadas para consumo.
 DEFAULT_CONSUMPTION_SCHEMAS = (
-    "mart,cierre,compras,maestro,retenciones,personal,contabilidad,raw,stg,aux,_meta"
+    "mart,cierre,compras,maestro,retenciones,personal,contabilidad,descompuestos,"
+    "raw,stg,aux,_meta"
 )
 
 # Tablas que el rol del MCP NO puede leer, aunque su esquema esté en la lista
@@ -371,6 +376,27 @@ class AuxExcelSettings(BaseSettings):
         )
 
 
+class DescompuestosSettings(BaseSettings):
+    """Los descompuestos de las partidas (F-097): el tope de MB por noche.
+
+    `ingest_descompuestos` relee de Sigrid, cada noche, como mucho estos MB de
+    texto `des` (el ambito 3 primero, luego la vigente de cada obra y las
+    versiones de huella distinta, luego las nuevas); `build_descompuestos`
+    retrocea como mucho lo mismo. Lo que no cabe se deja para la noche
+    siguiente. `--sin-tope` lo ignora: es la primera carga, MANUAL (D15).
+    """
+
+    model_config = SettingsConfigDict(env_prefix="DESCOMPUESTOS_", env_file=".env", extra="ignore")
+
+    presupuesto_mb: float = Field(
+        300,
+        gt=0,
+        description="MB de texto des que se releen y retrocean por noche (D15). "
+                    "Con 300, sin la primera carga, el master se completa solo en "
+                    "unas 8 noches.",
+    )
+
+
 class LoggingSettings(BaseSettings):
     """Configuración de logging structlog."""
 
@@ -387,6 +413,7 @@ class Settings:
         self.sigrid_api = SigridApiSettings()
         self.postgres = PostgresSettings()
         self.aux_excel = AuxExcelSettings()
+        self.descompuestos = DescompuestosSettings()
         self.logging = LoggingSettings()
 
         config_dir = Path(__file__).resolve().parent

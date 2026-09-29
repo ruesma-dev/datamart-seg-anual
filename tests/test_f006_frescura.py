@@ -63,7 +63,7 @@ ESQUEMAS_QUE_ENTRARON = ("cierre", "compras", "maestro", "retenciones")
 #: (2026-09-18), y con la misma propiedad a propósito — su paso no es
 #: dependencia de nadie, así que un fallo del SQL de personal no deja al `mart`
 #: sin construir.
-ESQUEMAS_QUE_NO_BLOQUEAN = ESQUEMAS_QUE_ENTRARON + ("personal", "contabilidad")
+ESQUEMAS_QUE_NO_BLOQUEAN = ESQUEMAS_QUE_ENTRARON + ("personal", "contabilidad", "descompuestos")
 
 
 # ---------------------------------------------------------------------------
@@ -83,12 +83,16 @@ def test_f006_r14_el_pipeline_nocturno_es_este_e_incluye_los_cinco() -> None:
         "build_retenciones",
         "build_personal",
         "build_contabilidad",
+        # F-097: los descompuestos, con su propia ingesta delante.
+        "ingest_descompuestos",
+        "build_descompuestos",
         "build_cierre",
         "publicar_diccionario",
         "apply_grants",
     )
     for paso in ("build_cierre", "build_maestros", "build_compras",
-                 "build_retenciones", "build_personal", "build_contabilidad"):
+                 "build_retenciones", "build_personal", "build_contabilidad",
+                 "build_descompuestos"):
         assert paso in PASOS_NOCTURNOS
 
 
