@@ -559,7 +559,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 34,
+      "priority": 2,
       "branch": "feature/F-037-tesoreria"
     },
     {
@@ -793,7 +793,7 @@
         "Existe una comprobacion que contrasta lo que entra en stg con lo que sale en mart, y falla si se vuelve a caer una obra",
         "Si la causa esta en la configuracion de Sigrid, llevada a quien lo administra: no se toca desde aqui"
       ],
-      "status": "blocked",
+      "status": "done",
       "sdd": true,
       "rigor": "critico",
       "priority": 42,
@@ -1815,6 +1815,56 @@
       "rigor": "estandar",
       "priority": 6,
       "branch": "feature/F-114-avisos-mcp-rescatados"
+    },
+    {
+      "id": "F-117",
+      "title": "Cuatro obras no publican ni una fila en los ambitos master: 0578, 0585, 0670 y 0687",
+      "description": "RENUMERADA el 2026-09-29 al integrar main en la rama de F-052: se ficho como F-055 el 2026-09-02 en esa rama, que nunca llego a main, y en main F-055 es otra feature (los ejes del proveedor). Las ocho excepciones de `config/cobertura_excepciones.yaml` que antes decian `feature: F-055` dicen ahora F-117. Prioridad original del humano: 4 (sobre el backlog del 2026-09-02); aqui queda al final de la cola hasta que el humano la recoloque. ================ Fichada el 2026-09-02 al cerrar F-052, y ES UNA PREGUNTA ABIERTA, NO UN DIAGNOSTICO. `check-cobertura` -el guardian que F-052 construyo- las denuncia como OBRA INVISIBLE en los dos ambitos master y solo en ellos: 0578 12 VIVIENDAS C/CANILLAS, 0585 REF. Y AMPLIACION COLEGIO MAYOR ALCOR, 0670 CAMPO FUTBOL COLEGIO SANTILLANA y 0687 CENTRO PRIMERA ACOGIDA DE MENORES LA CANTUENA. Las cuatro tienen ficha en stg.obras, publican con normalidad en los ambitos reales 3 (coste) y 7 (venta), y tienen CERO filas en mart.fact_seguimiento_mensual para el 8 (master coste) y el 11 (master venta). Medido el 2026-09-02 contra la base ya reconstruida, en solo lectura. HAY DOS EXPLICACIONES Y NO SE SABE CUAL ES: (a) ES LEGITIMO, porque el build de planificado no es un JOIN puro -`master_proyectado` elige la version vigente de cada mes- y una obra sin version master vigente no tiene filas ahi POR DISENO; esa es justamente la razon por la que R14 de F-052 compara PRESENCIA y no conteo. (b) ES OTRO AGUJERO, hermano del de la 0599: algo del build las descarta en silencio y nadie se entera, que es el modo de fallo que F-052 existe para eliminar. NO SE SUPONE NINGUNA DE LAS DOS: la feature es contestar cual, con el dato delante, y el resultado 'no habia nada que arreglar' es un resultado valido y ademas el mas probable. POR QUE NO SE DEJO EN F-052: porque F-052 tenia una causa identificada -el filtro `AND h.cod <> ''` del arbol de partidas- y mezclar dos causas en la misma verificacion antes/despues impide saber cual movio que; es el mismo criterio con el que se separo F-053. LO QUE HAY QUE DESHACER AL CERRARLA: las OCHO excepciones que hoy tapan estas cuatro obras en `config/cobertura_excepciones.yaml` -dos por obra, acotadas con `ambito_id` a 8 y 11 para no tapar tambien el ambito 3, que es dinero-. Estan declaradas con `feature: F-055` y son 8 de las 13 que subieron EXCEPCIONES_MAX de 10 a 23 el 2026-09-02: cerrar esta feature baja el trinquete a 15. PISTA POR DONDE EMPEZAR: `stg.version_master_vigente` y el campo extendido cod 15 (`cod_version_master_vigente` de business_rules.yaml), que es de donde el build saca que version manda.",
+      "acceptance": [
+        "Contestado con el dato delante, obra a obra, si las cuatro estan ciegas en los ambitos 8 y 11 POR DISENO -sin version master vigente- o por un descarte del build. Escrito cual de las dos y por que",
+        "Si es por diseno: queda documentado en el diccionario que una obra sin version master vigente no publica en los ambitos master, para que la proxima vez no haya que investigarlo otra vez",
+        "Si es un agujero: arreglado, y verificado con las cuatro huellas antes/despues de F-052 con `--obras-esperadas` acotado a estas obras",
+        "Medido cuantas obras MAS estan en la misma situacion: las cuatro salieron de un veredicto de un dia concreto, no de un censo",
+        "Retiradas de `config/cobertura_excepciones.yaml` las ocho excepciones marcadas `feature: F-117` y bajado EXCEPCIONES_MAX de 23 a 15 en tests/test_f052_cobertura.py. El trinquete SOLO BAJA",
+        "`python main.py check-cobertura --timeout 900` sigue saliendo en codigo 0"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 69,
+      "branch": "feature/F-117-obras-ciegas-en-master"
+    },
+    {
+      "id": "F-118",
+      "title": "Dos fallos del cruce del cierre de agosto (correo de Juan Romero, 2026-09-29): una partida que desaparece de una fase real no se deshace en la serie mensual, y la venta final del cierre lleva coeficientes que el ejecutado no",
+      "description": "Pedida por el humano el 2026-09-29 con prioridad 1, a partir del correo de Juan Romero de ese dia, asunto «Datamart Sigrid: dos fallos detectados en el cruce del cierre de agosto» (importancia alta). Juan cruzo el cierre de agosto (Cuadro de Mando, Resultados Obras y Resumen de Planificaciones) contra el datamart construido el 29-09; los dos fallos NO estan en Sigrid, estan en como se construyen las tablas. Cifras del correo, a remedir en solo lectura antes de disenar. ================ FALLO 1 · UNA PARTIDA QUE DESAPARECE DE UNA FASE REAL NO SE DESHACE EN LA SERIE MENSUAL. Caso: obra 0709, partida 27.01 «AJUSTE VENTA» (partida_id 417031), ambito 7 (venta real). En Sigrid: -58.000 EUR en la fase de julio (fase 11), no aparece en la de agosto (fase 12) y vuelve a estar a 0 en septiembre (fase 13). `cierre.fact_cierre_mensual` lo hace bien: agosto venta a origen 2.445.706,51 EUR y 377.492,30 EUR en el mes, que cuadra con la hoja de cierre. `stg.plan_mensual` (y por tanto `mart`) no genera fila de agosto para esa partida, asi que no deshace los -58.000: da 319.492,30 EUR en agosto; en septiembre la fila existe con 0 pero el importe del mes sale 0 en vez de +58.000. La suma de los importes mensuales de la partida queda en -58.000 cuando su acumulado real es 0, y el 2026 de la obra en el seguimiento mensual queda 58.000 EUR por debajo del cierre. PROPUESTA DE JUAN: cuando una partida deja de aparecer en una fase real (o aparece con cantidad 0), generar en ese mes el movimiento que deshace su acumulado anterior; y revisar cuantas obras mas estan asi. OJO CON EL LENGUAJE: Juan dice que el nunca habria usado el concepto «estorno»; en fichas del diccionario y textos para Negocio, hablar de deshacer o anular el acumulado anterior. Familia de F-103 (huecos de numeracion de fases que publican el acumulado como movimiento) y de F-051: la spec decide si comparten arreglo. ================ FALLO 2 · LA VENTA FINAL DEL CIERRE SALE CON COEFICIENTES Y EL EJECUTADO SIN ELLOS. En `cierre.fact_cierre_mensual` (y en la cabecera, como presupuesto vigente) la venta FINAL se toma del master con `importe_oficial` (con coeficientes), mientras que el ejecutado viene de la venta real, que no los lleva: la prevision de venta y de beneficio final sale inflada. Cierre de agosto de 2026, venta final con coeficientes frente a master sin ellos: 0672 (v39) +1.583.176,14; 0676-B (v25) +4.104.314,08; 0681 (v37) +1.247.267,13; 0694 (v28) +1.265.312,15; 0697 (v15) +381.051,21; 0698 (v23) +336.064,95; 0702 (v19) +2.486.290,33; 0709 (v14) +562.793,71; 0710 (v11) +1.734.427,02; 0712 (v11) +529.435,61; 0713 (v11) +2.910.624,85; 0722 (v6) +232.867,36. Caso mas claro, 0702: el datamart da +1.695.572 EUR de beneficio final cuando la hoja de cierre y el propio master (venta 9.658.390,84, coste 10.449.109,30) preven -790.718. PROPUESTA DE JUAN: usar para la venta final la misma base que el ejecutado (`importe` sin coeficientes) o, si el criterio debe ser con coeficientes, aplicarlo tambien a lo ejecutado. Juan revisara en Sigrid por que esos masters llevan coeficientes que la venta real no tiene: EL CRITERIO LO DECIDEN EL HUMANO Y NEGOCIO, la spec lo deja como decision con las cifras de las dos opciones. RIESGO: mueve la venta y el beneficio final publicados en el cierre y en Power BI; contrastar antes y despues obra a obra (huella de cierre, como en F-042) y contra la hoja de cierre de agosto.",
+      "acceptance": [
+        "Remedidos en solo lectura los dos casos del correo (0709 partida 417031 y las 12 obras de la tabla) y medido cuantas obras y partidas mas estan en cada situacion",
+        "Una partida que deja de aparecer en una fase real, o aparece con cantidad 0, genera en ese mes el movimiento que deshace su acumulado anterior: la suma mensual de la partida cuadra con su acumulado real y el mes de la 0709 en agosto da 377.492,30 EUR como el cierre",
+        "La venta final del cierre y el ejecutado se expresan en la misma base, segun el criterio que decidan el humano y Negocio, y la 0702 da el beneficio final que prevé su master",
+        "Contrastado antes y despues obra a obra en mart y cierre, y cuadrado contra la hoja de cierre de agosto que uso Juan",
+        "Fichas del diccionario actualizadas en el mismo trabajo, sin la palabra «estorno»"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "critico",
+      "priority": 1,
+      "branch": "feature/F-118-cruce-cierre-agosto"
+    },
+    {
+      "id": "F-119",
+      "title": "La cartera de obra: lo contratado que queda por ejecutar, por obra y en total",
+      "description": "Pedida por el humano el 2026-09-29 con prioridad MEDIA (30), al aclarar que «la cartera» de cobros y pagos es F-037 (tesoreria, subida a prioridad 2 ese mismo dia) y que esta es OTRA: la CARTERA DE OBRA, la contratacion pendiente de ejecutar (lo que queda por producir de lo contratado con el cliente). No estaba fichada. NADA MEDIDO TODAVIA. QUE HACER: (1) acordar con el humano y Negocio la definicion exacta (contratado vigente con o sin ampliaciones y modificados, ejecutado a origen de la venta real o certificado, con o sin coeficientes: ver el fallo 2 de F-118, que va antes) y a que fecha de corte; (2) localizar de donde sale lo contratado: los expedientes con el cliente de F-099 (importe adjudicado) o el master vigente, y contrastar las dos fuentes; (3) publicar la cartera por obra y mes y el total de la empresa, con su ficha en el diccionario. Enlaza con F-099 (expedientes), F-076 (certificacion al cliente) y F-106 (obras por empresa: la cartera de una UTE no se suma a la de Ruesma sin decidirlo).",
+      "acceptance": [
+        "Definicion de cartera de obra acordada con el humano y Negocio y escrita, con su fecha de corte",
+        "Medida en solo lectura la fuente de lo contratado y contrastada contra la cartera que Negocio ya maneja",
+        "Publicada la cartera por obra y mes y el total, con ficha en el diccionario y sin mezclar empresas"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 30,
+      "branch": "feature/F-119-cartera-de-obra"
     }
   ]
 }
