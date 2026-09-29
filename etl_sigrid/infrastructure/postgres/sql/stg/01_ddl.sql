@@ -222,6 +222,9 @@ CREATE TABLE IF NOT EXISTS stg.plan_mensual (
     importe_origen_raw   NUMERIC(18,2) NULL,
     total_incurrido      NUMERIC(18,2) NULL,
     total_incurrido_mes  NUMERIC(18,2) NULL,
+    -- F-118: marcas de las filas reales que Sigrid NO guarda (NULL en master).
+    es_relleno           BOOLEAN      NULL,            -- mes anterior al del texto de una fase de rango: movimiento 0, acumulado arrastrado
+    es_deshacer          BOOLEAN      NULL,            -- cierre donde la partida ya no está: acumulado 0, deshace el anterior
     _built_at            TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_plan_mensual_obra_amb        ON stg.plan_mensual (obra_id, ambito_id);
@@ -273,5 +276,25 @@ BEGIN
     ) THEN
         ALTER TABLE stg.plan_mensual ADD COLUMN version_fec_efectiva DATE NULL;
         RAISE NOTICE 'Añadida columna stg.plan_mensual.version_fec_efectiva';
+    END IF;
+
+    -- es_relleno y es_deshacer (F-118, F-051 absorbida): la serie real densa
+    -- publica filas que Sigrid no guarda y las marca. NULL en las master.
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg' AND table_name = 'plan_mensual'
+          AND column_name = 'es_relleno'
+    ) THEN
+        ALTER TABLE stg.plan_mensual ADD COLUMN es_relleno BOOLEAN NULL;
+        RAISE NOTICE 'Añadida columna stg.plan_mensual.es_relleno';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'stg' AND table_name = 'plan_mensual'
+          AND column_name = 'es_deshacer'
+    ) THEN
+        ALTER TABLE stg.plan_mensual ADD COLUMN es_deshacer BOOLEAN NULL;
+        RAISE NOTICE 'Añadida columna stg.plan_mensual.es_deshacer';
     END IF;
 END $$;
