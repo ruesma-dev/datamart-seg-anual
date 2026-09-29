@@ -2,8 +2,8 @@
 # F-118 · Resumen de la spec y mediciones
 
 Fecha: 2026-09-29 · spec-author · rama `feature/F-118-cruce-cierre-agosto`.
-Spec: `specs/F-118-cruce-cierre-agosto/` (requirements 131, design 233, 31
-tareas). **F-051 absorbida** por decisión del humano del mismo día. Todo lo
+Spec: `specs/F-118-cruce-cierre-agosto/` (requirements 147, design 250, 32
+tareas; ajustada a la aprobación del 29-09). **F-051 absorbida** por decisión del humano del mismo día. Todo lo
 medido es **solo lectura**: Postgres del `.env` (Azure, `sigrid_dm`) en
 transacción `READ ONLY`, build nocturno del **2026-09-29** (`build_cierre` 04:10
 UTC, el mismo que usó Juan), y `sigrid-api` con `SigridApiClient.leer_sql`. Ni un
@@ -14,8 +14,9 @@ build, ni una escritura.
 El fallo 1 y F-103 son **la misma causa** (el movimiento real se calcula sobre
 una serie con huecos); F-051 es otra causa (el mes) en **el mismo sitio**; los
 tres se arreglan con **una** construcción: la serie densa (design §5). El fallo 2
-es otro mecanismo (qué columna suma el cierre) y su criterio lo deciden el humano
-y Negocio: recomendación **A**, sin coeficientes.
+es otro mecanismo (qué columna suma el cierre). **Decidido por el humano el
+29-09 (D6):** cierre, beneficio y análisis sin coeficientes; la venta con
+coeficientes se publica además, en columnas propias. F-103 queda absorbida (D2).
 
 ## 1 · Fallo 1 · la 0709 remedida (coincide con Juan al céntimo)
 
@@ -137,12 +138,35 @@ versión master del mes (`importe_oficial/importe`, 1 si no está): en las obras
 terminadas (0672, 0681, 0698) el ejecutado B iguala la venta final, así que es
 coherente, pero inventa un dato que Sigrid no guarda en la venta real.
 
-## 6 · Listas esperadas para `comparar-huellas` (R44)
+## 5 bis · ¿A qué contrato pertenece cada coeficiente? (medido tras D6, solo lectura)
+
+- **El contrato de la partida, sí:** `raw.obrparpar.ctride`. De las 8.082
+  partidas con coeficiente en las versiones master de agosto de 2026 (12 obras),
+  8.063 lo tienen (99,8 %); `expide` está a 0 en todas.
+- **Varios coeficientes por obra, uno por contrato** (confirma al humano):
+  0676-B CONT MADERA 1,0700, F.2 S MADERA 1,2379, MAD MED AUX 1,0000; 0702
+  CONT_PPAL y CONT_OC 1,2600, CONT_SEG 1,0000; 0681 CONT_PPAL y CONT_OC 1,1900,
+  CONT_SEG y CONT_TPL 1,0000. Las partidas sin contrato de 0702 y 0709 también
+  llevan coeficiente (1,26 y 1,19).
+- **El coeficiente en sí, no:** buscado por tres vías, en `raw` y en Sigrid por
+  `sigrid-api` (`sys.columns` de todas las tablas `obr*` con `coe`): `obrctr.coeind,
+  coegen, coeben, coebaj, coe1–4` a 0 en los contratos de 0676-B, 0702, 0709 y
+  0710; `obrctrexp` (75 filas en Sigrid, ninguna de 0702) no tiene columnas de
+  coeficiente; `obrfasamb.coeficpor/coeficval/coeind` a 0 en 0702 (7 y 11);
+  `obrcal` sin filas de 0702. Solo existe **aplicado**, en `obrparpre.impcoe`.
+- Dato al margen: `obrctr.impadj` del CONT_PPAL de la 0702 (9.502.429,05) casa con
+  su venta master SIN coeficientes (9.502.344,19): lo adjudicado está en la base
+  sin coeficientes.
+- **Conclusión:** se publica la venta con coeficientes tal cual del master, por
+  obra, y el desglose por contrato y la definición del coeficiente quedan para
+  F-099 (que puede sumar `impcoe` por `ctride` sin inventar nada).
+
+## 6 · Listas esperadas para `comparar-huellas` (R45)
 
 - `stg`/`mart`, ámbitos 3 y 7: obras de F-051 (`check-mes-fase --obras-esperadas`)
-  ∪ las 32 del §2 ∪ F-103 (0371, 0404, 0455, 0562, 0606; si D2) ∪ las 11 del §3.
-- `cierre`: obras de F-051 ∪ las 22+1 del §4 (si D5) ∪ las 42 del §5 (si D6 = A;
-  con B, las mismas 42 en el ejecutado). El fallo 1 y F-103 **no cambian
+  ∪ las 32 del §2 ∪ F-103 (0371, 0404, 0455, 0562, 0606) ∪ las 11 del §3.
+- `cierre`: obras de F-051 ∪ las 22+1 del §4 (D5) ∪ las 42 del §5 (D6: venta final sin
+  coeficientes). El fallo 1 y F-103 **no cambian
   `cierre`** por construcción (suma acumulados).
 - Ámbitos 8 y 11: ninguna.
 
@@ -190,8 +214,10 @@ conviven: en un mes de relleno la ausencia arrastra; en un cierre, deshace.
 - **D5 · Arrastrar en `cierre`** el ejecutado de un concepto sin filas en el mes
   (22 obras de venta y 1 de generales, ≤ 2020). **Sí**, aquí: sin ello `mart` y
   `cierre` no cuadran en esas obras. Alternativa: ficha aparte.
-- **D6 · Coeficientes, A o B: lo deciden el humano y Negocio.** Recomendación
-  **A**: la venta real no lleva coeficientes en Sigrid (0 de 1,82 M filas), `mart`
+- **D6 · RESUELTA el 2026-09-29 por el humano** (ver la sección de aprobación):
+  sin coeficientes para cierre, beneficio y análisis, y la venta con
+  coeficientes publicada además en columnas propias (R39–R44). La recomendación
+  era **A**: la venta real no lleva coeficientes en Sigrid (0 de 1,82 M filas), `mart`
   ya planifica sin ellos, la hoja de cierre de Juan prevé −790.718 en la 0702
   (= A), y B exige inventar un coeficiente por partida. Juan revisa en Sigrid por
   qué esos masters los llevan (F-099 publicará los expedientes).
@@ -199,12 +225,20 @@ conviven: en un mes de relleno la ausencia arrastra; en un cierre, deshace.
   con las listas del §6, `--propuesta` antes de desplegar y la hoja de cierre de
   agosto de Juan para las 12 obras y la 0709. **La hoja no se versiona** (resultados
   de obra): el humano la pide y el resultado va a `impl_F-118.md`.
-- **D8 · Partir el fallo 2** si D6 no está decidida al acabar el bloque D de
-  tareas: el bloque E pasa a una feature propia sin bloquear lo demás. **Sí.**
+- **D8 · SIN EFECTO** (2026-09-29): D6 está decidida y el fallo 2 va en esta
+  feature, bloque E de tareas.
 - **D9 · Casos para Juan:** 0606 PUY DU FOU pasa a publicar en `mart` −9.053.263,61
   de coste y −9.188.957,62 de venta en sep-2021 (hoy ya en `cierre`), y las cinco
   desapariciones masivas (0419, 0465, 0599, 0616, 0658). **Aplicar la regla**, que
   es la de Juan, y pasarle la lista antes de desplegar (T27).
+
+- **D10 (nueva) · Venta con coeficientes cuando el final sale de la fase 0.**
+  NULL, no copia de la sin coeficientes: la venta real no los guarda, y copiarla
+  diría que las dos son iguales. **Recomendado NULL**, explicado en la ficha.
+- **D11 (nueva) · Dónde se publica la venta con coeficientes.** En el fact
+  (`final_importe_con_coeficientes`), en `v_pbi_cierre_resumen` (fila VENTA) y en
+  la cabecera (presupuesto inicial y vigente), porque es donde la lee Power BI; no
+  en `mart` (planifica sin coeficientes y así sigue). **Recomendado.**
 
 ## 9 · Hallazgos al margen
 

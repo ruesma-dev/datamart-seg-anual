@@ -1,15 +1,17 @@
 <!-- specs/F-118-cruce-cierre-agosto/requirements.md -->
-# F-118 · Requisitos · La serie mensual real, bien construida, y la venta final en la misma base que el ejecutado
+# F-118 · Requisitos · La serie mensual real, bien construida, y la venta final sin coeficientes (con la otra aparte)
 
 **Origen.** Correo de Juan Romero del 2026-09-29 (dos fallos del cruce del
-cierre de agosto) y **F-051 absorbida** por decisión del humano del mismo día.
-Cifras remedidas en solo lectura (build del 29-09): `progress/spec_F-118.md`.
-Decisiones abiertas **D1–D9**: `design.md` §10. Las **D1–D9 de F-051** siguen
-decididas y no se reabren (`specs/F-051-nombre-mes-real/design.md` §10).
+cierre de agosto), **F-051 y F-103 absorbidas** por decisión del humano del mismo
+día. Cifras en solo lectura (build del 29-09): `progress/spec_F-118.md`.
+**Aprobada el 2026-09-29**: D1–D9 según recomendación salvo D6, que fija el
+humano (sin coeficientes para cierre y beneficio; con coeficientes aparte) y deja
+D8 sin efecto; D10–D11 nuevas, `design.md` §11. Las D1–D9 **de F-051** no se
+reabren (`specs/F-051-nombre-mes-real/design.md` §10).
 
 **Trazabilidad.** `[F-051 Rn]` = requisito de F-051 con su número;
-`[Juan-1]`, `[Juan-2]` = fallo 1 y 2 del correo; `[F-103]` = si el humano la une
-(D2). Los números R1–R28 son los de F-051 para no romper su rastro; R9 y R21 se
+`[Juan-1]`, `[Juan-2]` = fallo 1 y 2 del correo; `[F-103]` = F-103 absorbida
+(D2); `[D6]` = criterio del humano del 29-09. Los números R1–R28 son los de F-051 para no romper su rastro; R9 y R21 se
 **sustituyen** (D1). R29 en adelante son nuevos.
 
 **Glosario.** *Cierre del ámbito* = fase real vigente (tras F-042) con al menos
@@ -75,57 +77,71 @@ partida en el último cierre del ámbito de la obra (0 si ya no está). `[Juan-1
 `stg` y `mart` debe dar **377.492,30 €**, la de septiembre **0,00 €**, y la
 partida 417031 (27.01 AJUSTE VENTA) debe sumar 0 en sus `importe_mes`. `[Juan-1]`
 
-**R36.** DONDE se una F-103 (D2), 0371 f29 debe publicar −441.229,31 € de coste
-en `mart`, igual que `cierre`. `[F-103]`
+**R36.** CUANDO Sigrid salta un número de fase (0371 f27→f29, 0404, 0455, 0562,
+0606), la fase siguiente debe publicar la diferencia con la anterior existente,
+no el acumulado: 0371 f29 da −441.229,31 € de coste en `mart`, igual que
+`cierre`, y solo cambian esas cinco obras por este motivo. `[F-103]`
 
 **R37.** `check-cierres` debe comprobar R21 en TODAS las series, sin apartar
 ninguna por «hueco de origen», contra el acumulado del último cierre de la obra
 y no contra la última fila de la partida. `[Juan-1]`
 
-**R38.** DONDE el humano elija arrastrar en `cierre` (D5), SI un concepto de
+**R38.** SI un concepto de
 una obra no tiene filas en un mes que sí tiene cierre de otro concepto,
 ENTONCES su `ejecutado_origen` debe ser el del mes anterior, no 0. `[Juan-1]`
 
-## C · La venta final en la misma base que el ejecutado (fallo 2)
+## C · La venta final sin coeficientes, y la otra aparte (fallo 2, D6)
 
 **R39.** La venta FINAL de `cierre.fact_cierre_mensual` (rama master y respaldo
-de fase 0) y el ejecutado de venta deben expresarse en la misma base, según el
-criterio que decidan el humano y Negocio (D6): (A) sin coeficientes, o (B) con
-coeficientes también en el ejecutado. `[Juan-2]`
+de fase 0) debe salir de `importe`, SIN coeficientes, como el ejecutado; y con
+ella `pendiente_importe`, `variacion_importe`, los % y el beneficio. `[Juan-2] [D6]`
 
-**R40.** DONDE se elija (A), la venta final debe salir de `importe` y la 0702 en
-agosto de 2026 debe dar venta final 9.658.390,84 €, coste final 10.449.109,30 € y
-beneficio final **−790.718,46 €**. `[Juan-2]`
+**R40.** CUANDO se construye el cierre de agosto de 2026, la 0702 debe dar venta
+final 9.658.390,84 €, coste final 10.449.109,30 € y beneficio final
+**−790.718,46 €**, y las otras 11 obras del correo sus cifras sin coeficientes
+de `progress/spec_F-118.md` §5. `[Juan-2] [D6]`
 
-**R41.** DONDE se elija (B), el ejecutado de venta debe llevar, partida a
-partida, el coeficiente `importe_oficial / importe` de la versión master que
-fija la venta final de ese mes (1 si la partida no está o su importe es 0), y la
-0702 debe dar un ejecutado de 3.643.832,04 € en agosto de 2026. `[Juan-2]`
+**R41.** El sistema debe publicar ADEMÁS la venta final CON coeficientes, en la
+columna propia `final_importe_con_coeficientes` de `cierre.fact_cierre_mensual`
+(suma de `importe_oficial` del mismo master), solo en el concepto VENTA con
+`final_fuente = 'master'` y NULL en el resto (D10). `[D6]`
 
-**R42.** `cierre.v_pbi_cierre_cabecera` (presupuesto inicial y vigente,
-modificados) y las vistas que usan `final_importe` (resumen, detalle de
-indirectos) deben heredar la base elegida sin cálculo propio. `[Juan-2]`
+**R42.** `cierre.v_pbi_cierre_cabecera` debe publicar el presupuesto inicial y
+vigente de venta, y los modificados, SIN coeficientes en sus columnas de hoy, y
+CON coeficientes en `presupuesto_inicial_venta_con_coeficientes` y
+`presupuesto_vigente_venta_con_coeficientes`; `v_pbi_cierre_resumen` pasa la
+columna de R41 en su fila VENTA (NULL en las demás) (D11). `[D6]`
 
-**R43.** `stg.presupuesto.importe_oficial` debe seguir publicándose tal cual: el
-dato de Sigrid no cambia, cambia qué columna usa el cierre. `[Juan-2]`
+**R43.** Ninguna columna CON coeficientes debe entrar en un beneficio, un
+pendiente, un % ni una resta con el ejecutado o el coste, y no se publica
+ejecutado ni pendiente con coeficientes: la venta real no los guarda (0 de
+1,82 M filas en Sigrid). Un test lo fija sobre el SQL de `cierre`. `[D6]`
+
+**R44.** El sistema no debe inventar el coeficiente ni el contrato: la venta con
+coeficientes sale tal cual del master (`impcoe`), y el desglose por contrato con
+el cliente es de F-099. `stg.presupuesto.importe_oficial` se publica igual que
+hoy. `[D6]`
 
 ## D · Contraste
 
-**R44.** El sistema debe contrastarse antes y después obra a obra con las
+**R45.** El sistema debe contrastarse antes y después obra a obra con las
 huellas `stg`, `mart` y `cierre` sobre el mismo `raw`, y `comparar-huellas` debe
 fallar fuera de la lista de obras esperadas que declara `progress/spec_F-118.md`.
 
-**R45.** CUANDO se despliegue, el cierre de agosto de 2026 de las 12 obras del
+**R46.** CUANDO se despliegue, el cierre de agosto de 2026 de las 12 obras del
 correo y de la 0709 debe cuadrar con la hoja de cierre de agosto de Juan, obra a
 obra en venta, coste y beneficio a origen, del mes y final (MANUAL, D7).
 
-**R46.** El diccionario (`stg`, `mart`, `cierre`, `00_global`) debe decir cómo se
-construye la serie, qué es una fila de deshacer y en qué base va la venta final,
+**R47.** El diccionario (`stg`, `mart`, `cierre`, `00_global`) debe decir cómo se
+construye la serie y qué es una fila de deshacer; que para cierres, beneficio y
+análisis se usa la venta SIN coeficientes y la CON coeficientes es lo que se
+factura al cliente (regla dura nueva, `R-VENTA-COEFICIENTES`, que prohíbe
+mezclarlas y dice que no hay ejecutado con coeficientes),
 sin la palabra «estorno» en ningún texto nuevo o modificado; sube `version`.
 
 ## E · Lo que NO hace
 
 - No corrige nada en Sigrid: por qué esos masters llevan coeficientes lo mira Juan.
-- No publica los coeficientes por separado ni los expedientes: es F-099.
+- No publica los coeficientes por separado, por contrato ni los expedientes: es F-099.
 - No toca la rama master de `08_plan_mensual.sql` (el tope del 250 % es F-096).
 - No reparte con compras ni partes, y no cambia la frontera de fases de F-051.

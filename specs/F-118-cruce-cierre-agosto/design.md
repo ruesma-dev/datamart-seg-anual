@@ -1,5 +1,5 @@
 <!-- specs/F-118-cruce-cierre-agosto/design.md -->
-# F-118 · Diseño · Una sola construcción de la serie real, y la venta final en la base del ejecutado
+# F-118 · Diseño · Una sola construcción de la serie real, y la venta final sin coeficientes (con la otra aparte)
 
 Cifras, listas y consultas: `progress/spec_F-118.md`. Lo heredado de F-051 se
 enlaza a `specs/F-051-nombre-mes-real/design.md` (§n) en vez de copiarse.
@@ -35,7 +35,8 @@ rotas de `stg.plan_mensual` caen en tres grupos, y los tres los arregla la
 serie densa sin una línea específica: **fallo 1** (32 obras de `stg.obras`),
 **F-103** (0371, 0404, 0455, 0562, 0606) y **venta sin cierre del ámbito** (11
 obras, D3). Ninguna obra con la serie bien cambia (R23): el temor de F-042 a
-«mover obras que hoy están bien» no se cumple en el dato. D2 decide la unión.
+«mover obras que hoy están bien» no se cumple en el dato. **F-103 queda
+absorbida** (D2): sus requisitos van con la marca `[F-103]` (R9, R21, R36).
 
 **El arreglo único:** la rama de reales pasa a construir una **serie densa** por
 (obra, ámbito, partida) sobre un esqueleto de meses —los cierres vigentes del
@@ -45,8 +46,13 @@ arrastre, R33) y calcula `importe_mes` como diferencia con el mes anterior **de
 la serie**, que ya no puede tener huecos (R9). Es lo que hace `cierre`, a grano
 de partida.
 
-**El fallo 2 es otro mecanismo** (qué columna suma el cierre para la venta
-final) y otro fichero; va en su bloque de tareas, desacoplado (D8).
+**El fallo 2 es otro mecanismo** (qué columna suma el cierre) y va en su bloque
+de tareas. D6: cierre, beneficio y análisis SIN coeficientes; la venta CON ellos
+(lo facturable) se publica además, aparte. **El coeficiente es del contrato y hoy
+no se puede reconstruir** (`progress/spec_F-118.md` §5 bis): el contrato de la
+partida está (`obrparpar.ctride`, 99,8 %), pero el coeficiente no vive en ninguna
+tabla (`obrctr.coe*` y `obrfasamb.coefic*` a 0, `obrctrexp` sin él): solo existe
+aplicado en `impcoe`. Se publica tal cual; el desglose por contrato es F-099.
 
 Límite de microservicio: todo es del datamart. No toca Sigrid, `sigrid-api`,
 ni el documento de `azure-apps/` (no cambia nada expuesto ni consumido).
@@ -59,7 +65,9 @@ ni el documento de `azure-apps/` (no cambia nada expuesto ni consumido).
 | `sql/stg/01_ddl.sql` | `es_relleno` (F-051) y `es_deshacer BOOLEAN NULL` en `stg.plan_mensual`, en el bloque `DO` idempotente. |
 | `sql/stg/08_plan_mensual.sql` | Rama de reales: §5. Rama master: **ni una línea**. Cabecera: sección F-118 que sustituye la explicación del `LAG` por `orden_fase` y dice qué es deshacer. |
 | `sql/mart/01_ddl.sql`, `02_build_fact.sql`, `05_views_powerbi.sql` | Lo de F-051 (§2 de su diseño) más `es_deshacer` en ramas 1–2 (`pm.es_deshacer`) y `NULL::BOOLEAN` en 3–4; `v_pbi_fact` la publica. |
-| `sql/cierre/00_setup.sql`, `01_ddl_fact.sql`, `04_views_detalle.sql`, `06_views_planif_vs_real.sql` | Lo de F-051 (§2 y §6 de su diseño), sin cambios. |
+| `sql/cierre/00_setup.sql`, `04_views_detalle.sql`, `06_views_planif_vs_real.sql` | Lo de F-051 (§2 y §6 de su diseño), sin cambios. |
+| `sql/cierre/01_ddl_fact.sql` | Lo de F-051 más `final_importe_con_coeficientes NUMERIC(18,2) NULL`. |
+| `sql/cierre/03_views.sql`, `05_views_cabecera.sql` | §6: la columna nueva en `v_pbi_cierre_resumen` (fila VENTA) y las dos de presupuesto en la cabecera. |
 | `sql/cierre/02_build_fact.sql` | Lo de F-051 (CTE A/B leen `pm.anio_mes`) **más** §6 de este diseño (R38 y fallo 2). |
 | `application/steps/build_stg_step.py` | `FICHEROS_DEL_SELLO` += `00_functions.sql` (F-051 R28). |
 | `infrastructure/postgres/huella_obras.py` | `sql_huella_propuesta` lee `reales_final` (`importe_mes`, `importe_origen` ya redondeados). |
@@ -78,7 +86,6 @@ ni el documento de `azure-apps/` (no cambia nada expuesto ni consumido).
   -> list[FilaSerie]` con `FilaSerie(mes, acumulado, movimiento, es_relleno,
   es_deshacer)`. Aplica R9, R29–R34 y D3 de F-051. Es contra lo que se contrasta
   el SQL.
-- `etl_sigrid/domain/coeficientes.py` (solo si D6 = B) — `ejecutado_con_coeficientes`.
 - `tests/test_f118_regla_mes.py`, `test_f118_serie_densa.py`, `test_f118_invariante.py`
   (semilla fija, sin `hypothesis`), `test_f118_sql.py`, `test_f118_check.py`,
   `test_f118_coeficientes.py`.
@@ -142,19 +149,25 @@ inversiones fase/mes en todo el histórico, ambas anteriores a 2020
 ## 6 · `cierre/02_build_fact.sql`
 
 - **F-051**: CTE A/B leen `pm.anio_mes` y `bool_and(pm.es_relleno)` (su §2).
-- **R38 (si D5 = arrastrar)**: en `combinado`, `ejecutado_origen` de un concepto
-  sin filas ese mes = el del último mes con filas (ventana por obra y concepto),
-  no `COALESCE(..., 0)`. Hoy 22 obras de venta (≤ 2020) publican un mes con la
-  venta a origen a 0 y su rebote.
-- **Fallo 2 (D6)**. Opción A: `final_master` VENTA y `final_fase0` VENTA suman
-  `pres.importe` (hoy `importe_oficial`), y la cabecera de la sección cambia de
-  «Tanda 1.7» a F-118 con el motivo. Opción B: `ejecutado_concepto` VENTA
-  multiplica `pm.importe_origen` por `importe_oficial/importe` de la partida en
-  la versión master de ese mes (`master_vigente_por_mes`, 1 si no está); la
-  venta final no cambia. En las dos, `final_fase0` es inocua hoy (amb 7 nunca
-  lleva coeficientes) pero se alinea para que no diverja mañana.
-- Nada más: `v_pbi_cierre_cabecera`, `v_pbi_cierre_resumen` y
-  `v_pbi_cierre_indirectos_detalle` leen `final_importe` y heredan (R42).
+- **R38 (D5)**: en `combinado`, `ejecutado_origen` de un concepto sin filas ese
+  mes = el del último mes con filas (ventana por obra y concepto), no
+  `COALESCE(..., 0)`. Hoy 22 obras de venta (≤ 2020) publican un mes con la venta
+  a origen a 0 y su rebote.
+- **Fallo 2 (D6)**: `final_master` VENTA y `final_fase0` VENTA suman
+  `pres.importe` (hoy `importe_oficial`); de ahí salen, sin tocar nada más,
+  pendiente, variación, % y beneficio (R39). `final_master` VENTA calcula además
+  `SUM(pres.importe_oficial)` y lo lleva hasta `final_importe_con_coeficientes`
+  (R41): NULL en INDIRECTOS, DIRECTOS y GENERALES (el coste no tiene
+  coeficientes) y NULL con `final_fuente = 'fase_0'` o `'sin_dato'` (D10: la venta
+  real no los guarda, y copiar la sin coeficientes diría que son iguales). La
+  cabecera de la sección cambia de «Tanda 1.7» a F-118 con el motivo.
+- `03_views.sql`: `v_pbi_cierre_resumen` pasa `final_importe_con_coeficientes` en
+  la fila VENTA y NULL en GASTOS y BENEFICIO; **no** entra en `gastos`, `beneficio`
+  ni en ningún `%` (R43). `05_views_cabecera.sql`: `venta_meses` arrastra la
+  columna y la cabecera publica `presupuesto_inicial_venta_con_coeficientes` y
+  `presupuesto_vigente_venta_con_coeficientes` (R42, D11); `modificados_aprobados`
+  sigue sin coeficientes.
+- `v_pbi_cierre_indirectos_detalle` hereda la base sin coeficientes.
 
 ## 7 · `check-cierres`: el telescopio sin apartados (R37)
 
@@ -169,10 +182,16 @@ el build: **0 rotas** sobre todas las series reales.
 Lo de F-051 (§7 de su diseño) más: `stg.plan_mensual.importe_mes` (diferencia
 con el mes anterior de la serie de la partida; una partida que sale de un cierre
 se deshace en ese mes), `es_deshacer` en `stg`, `mart.fact_seguimiento_mensual`
-y `v_pbi_fact`; `cierre.fact_cierre_mensual.final_importe` y la cabecera (base
-de la venta final según D6); la regla global de `00_global.yaml` que hoy dice
-«`importe_oficial` para venta» (`:1550`) y `stg.presupuesto.importe_oficial`
-(`stg.yaml:361, :406`), que deja de ser «lo que usa el cierre» si D6 = A. Ninguna
+y `v_pbi_fact`. Venta con y sin coeficientes: fichas de `final_importe`,
+`final_importe_con_coeficientes`, las dos columnas nuevas de la cabecera y la de
+`v_pbi_cierre_resumen` («sin coeficientes: cierres, beneficio y análisis; con
+coeficientes: lo que se factura al cliente; no hay ejecutado con coeficientes
+porque la venta real no los guarda; el desglose por contrato es F-099»); en
+`stg.yaml:361, :406`, `importe_oficial` deja de ser «lo que usa el cierre»; en
+`00_global.yaml`, la regla que hoy manda usar `importe_oficial` para venta
+(`:1550`) se invierte, y se añade la regla dura **`R-VENTA-COEFICIENTES`**:
+nunca sumar, restar ni comparar una venta con coeficientes con el ejecutado, el
+coste u otra venta sin ellos. Ninguna
 ficha nueva ni modificada dice «estorno» (test). Sube `version`. Sin pendientes.
 
 ## 9 · Verificación
@@ -183,7 +202,7 @@ cierre; relleno tras un deshacer; fase sin filas del ámbito; hueco de F-103);
 invariante R21 con series generadas; SQL estructural: sin `orden_fase` ni `CASE`
 de consecutividad en la rama, `reales_final` dentro de los marcadores, un solo
 marcador de tramo, `es_deshacer` en `stg`/`mart`/`v_pbi_fact`, la columna de la
-venta final según D6, `sql_telescopio` sin `con_hueco`; «estorno» ausente de lo
+venta final (`importe`) y la con coeficientes fuera de todo beneficio, pendiente y %, `sql_telescopio` sin `con_hueco`; «estorno» ausente de lo
 tocado del diccionario.
 
 **Contra la base (MANUAL, humano)**, protocolo de F-042/F-052 sobre el MISMO
@@ -191,7 +210,7 @@ tocado del diccionario.
 `stg` (escritura aditiva) y `huella-obras --propuesta`; (3) desplegar y
 reconstrucción completa; (4) huellas DESPUÉS y `comparar-huellas` con la lista
 esperada (`progress/spec_F-118.md` §6); (5) `check-unicidad`, `check-cierres`
-(0 rotas), `check-mes-fase`, testigos; (6) hoja de cierre de agosto (R45, D7).
+(0 rotas), `check-mes-fase`, testigos; (6) hoja de cierre de agosto (R46, D7).
 
 ### Testigos nuevos (los de F-051 están en su §8)
 
@@ -202,32 +221,30 @@ esperada (`progress/spec_F-118.md` §6); (5) `check-unicidad`, `check-cierres`
 | 0371 coste f29 (D2) | +4.293.905,89 | −441.229,31 (= `cierre`) |
 | 0606 coste / venta sep-21 (D9) | 0 / 0 | −9.053.263,61 / −9.188.957,62 (= `cierre`) |
 | 0247 venta f10 (D3) | acumulado entero | f10 − f8 |
-| 0702 ago-26, D6 = A | venta final 12.144.681,17; benef. +1.695.571,87 | 9.658.390,84; −790.718,46 |
-| 0702 ago-26, D6 = B | ejecutado venta 2.910.579,09 | 3.643.832,04; final sin cambio |
+| 0702 ago-26 (D6) | venta final 12.144.681,17; benef. +1.695.571,87 | 9.658.390,84; −790.718,46; con coef. 12.144.681,17 aparte |
+| 0676-B ago-26 (D6) | venta final 23.429.009,21 | 19.324.695,13; con coef. 23.429.009,21 (1,07 y 1,24 por contrato) |
 
 ## 10 · Riesgos
 
-- **Reconstrucción completa** (`08` y `00_functions.sql` en el sello): 920 obras
-  esa noche, con la huella ANTES tomada; créditos de CPU del servidor compartido.
-- **Volumen**: relleno ~1,34 M filas (F-051); deshacer, 495 filas. Disco de 64 GB.
-- **Rendimiento**: el esqueleto añade un `JOIN` y dos ventanas por tramo; se mide
-  el tramo más pesado con `--propuesta` antes de desplegar.
+- **Reconstrucción completa** (sello): 920 obras esa noche, con la huella ANTES
+  tomada. **Volumen**: relleno ~1,34 M filas; deshacer, 495. **Rendimiento**: un
+  `JOIN` y dos ventanas más por tramo; se mide con `--propuesta` antes.
 - **Meses cerrados que cambian en Power BI**: los de F-051 (~500 cierres de 255
-  obras) más el fallo 1 (desde 2024: 0658, 0660, 0662, 0674, 0696, 0709) y, con
-  D6 = A, la venta y el beneficio final de 42 obras (511 filas mes, 2021-2026) y
+  obras) más el fallo 1 (desde 2024: 0658, 0660, 0662, 0674, 0696, 0709) y, por
+  D6, la venta y el beneficio final de 42 obras (511 filas mes, 2021-2026) y
   el presupuesto vigente de 41 en la cabecera. Aviso a Juan antes, con la lista.
 - **F-096** toca la rama master del mismo fichero: primero F-118, F-096 rebasa.
 - **Tests de F-042 que fijaban el defecto**: se reescriben, no se borran sin
   sustituto; el reviewer lo comprueba uno a uno.
 
-## 11 · Decisiones abiertas (recomendación; detalle y cifras en `progress/spec_F-118.md` §8)
+## 11 · Decisiones (aprobadas el 2026-09-29; detalle en `progress/spec_F-118.md` §8)
 
-- **D1** Sustituir F-051 R9 y R21 por la serie densa y el invariante contra el acumulado real. **Sí.**
-- **D2** Unir F-103: misma causa, la arregla la serie densa sin código extra. **Sí.**
-- **D3** Fase sin filas del ámbito (11 obras de venta, 2010-2020): no es cierre del ámbito. **Sí** (R34).
-- **D4** Marcar las filas de deshacer con `es_deshacer`. **Sí.**
-- **D5** Arrastrar en `cierre` el concepto sin filas del mes (22 obras, ≤ 2020). **Sí**, en esta feature.
-- **D6** Coeficientes, A o B: **lo deciden el humano y Negocio.** Recomendación **A**.
-- **D7** Contraste: huellas + hoja de cierre de agosto de Juan, fuera del repositorio. **Sí.**
-- **D8** Si D6 no está decidida al acabar el bloque B, el fallo 2 se parte a feature propia. **Sí.**
-- **D9** 0606 y las desapariciones masivas (0419, 0465, 0599, 0616, 0658): aplicar la regla y listarlas a Juan. **Sí.**
+- **D1–D5, D7, D9**: aprobadas según la recomendación (R9/R21 sustituidos; F-103
+  absorbida; fase sin filas del ámbito no es cierre; `es_deshacer`; arrastre en
+  `cierre`; contraste con la hoja de Juan fuera del repositorio; casos a Juan).
+- **D6**: criterio del humano, sin coeficientes para cierre, beneficio y análisis;
+  con coeficientes publicada aparte (R39–R44). **D8**: sin efecto.
+- **D10 (nueva)** `final_importe_con_coeficientes` con respaldo de fase 0: NULL,
+  no copia de la sin coeficientes. **Recomendado.**
+- **D11 (nueva)** Publicar la venta con coeficientes también en la cabecera y en
+  el resumen, no solo en el fact: es donde la lee Power BI. **Recomendado.**
