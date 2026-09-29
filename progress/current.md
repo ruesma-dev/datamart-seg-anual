@@ -12,6 +12,38 @@
 
 
 
+
+## 2026-09-29 · F-097 y F-052 DESPLEGADAS (autorizado por el humano: «despleguemos de todos modos»)
+
+- **Primera carga de F-097 (T17)**: `ingest-descompuestos --sin-tope` SUCCESS
+  (tras un primer intento cortado a los 48 min por pérdida de red del puesto,
+  con 35 versiones ya guardadas, y otro muerto al reiniciarse la sesión; el
+  tercero, como proceso independiente): 3.025 versiones, 1.660.712 filas,
+  2.064 MB leídos, 36,7 min, 0 fallidas y 0 aplazadas. `build-descompuestos
+  --sin-tope` SUCCESS: 7.306.032 filas, 916,9 s, 7 lotes del master de 97-120 s.
+- **Testigos (T18)**: C1 419079 ESTUDIO / MASTER_INICIAL / MASTER_PRE_ABC 10
+  líneas y 134,35 cada uno, PLANIF_JO SIN_DESCOMPUESTO; C2 377070 PLANIF_JO CUADRA
+  177,95, ESTUDIO SUSTITUIDO_POR_PLANIFICACION, master de 112,55 (v1) a 118,61
+  (ABC) y 177,95; C3 ESTUDIO 99.049, PLANIF_JO 287.460, MASTER_PRE_ABC 1.794.624,
+  MASTER_PLANIF_JO 2.497.224, MASTER_INICIAL 107.061; C4 3.025 versiones.
+  Tamaño: `lineas` 1.786 MB, `_des_texto` 1.619, `cuadre_partida` 458,
+  `elementos` 10; la base de 27 a **31 GB** (de 64). SKU `Standard_B2s`.
+- **T19**: `check-declarados` 187/187 OK; `check-relaciones` las de
+  `descompuestos` unen (sale 1 por 4 timeouts de 30 s y 6 coberturas escasas de
+  otros esquemas, previos); `check-unicidad --timeout 300` las 6 claves de
+  `descompuestos` OK (la única rota, `cierre.v_pbi_planif_vs_real`, es la de
+  F-051, ahora F-118); `apply-grants` incluye `descompuestos`;
+  `publicar-diccionario` **v37** (hash dfa820e7fe71, 187 objetos, 1.401 columnas,
+  20 reglas), `check-diccionario` OK; imagen **`r20260929-2029`** (desde `main`
+  f11a2be, lleva F-052 y F-097) aplicada al job con `85_update_job.ps1`.
+- **MCP**: revisión `ca-mcp-bbdd-dev--0000013` reiniciada a las 20:57 UTC;
+  `contexto_bbdd` sirve la **versión 37**. **PENDIENTE en `mcp-bbdd`**:
+  `descompuestos` en `seguridad`/`servidor.esquemas_permitidos` (hoy el MCP lo
+  rechaza: «no está autorizado»), con su test y despliegue; lo hace el humano en
+  ese repositorio.
+- A vigilar: la nocturna del 30-09 es la primera con los dos pasos (tiempos de
+  `ingest_descompuestos` y `build_descompuestos` en `timings`) y con las 23
+  excepciones de cobertura (la alerta debería callar).
 ## 2026-09-29 · DECISIÓN DEL HUMANO: F-097 se despliega ESTA TARDE, junto con F-052, cuando el humano avise
 
 **T0 deja de bloquear** (decisión del humano, 2026-09-29): el diseño relee toda
