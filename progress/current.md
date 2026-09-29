@@ -10,7 +10,29 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-09-29 · F-052 · CERRADA (`done`, APROBADO) · la 0599 vuelve al datamart y `check-cobertura` en verde · SIN INTEGRAR NI DESPLEGAR
+
+## 2026-09-29 · AVISO DE DESPLIEGUE: la imagen de F-052 se construye desde `5890b0f`, NO desde `main`
+
+El líder integró F-052 (`5890b0f`) y F-097 (`c6db1f9`) en `main` el 2026-09-29,
+a petición del humano. Antes purgó de la historia LOCAL de la rama de F-052 los
+tres `obras_*.csv` (nombres de 920 obras) que entraron por error en `16bf645`;
+copia en la rama local `backup/F-052-antes-de-purgar-csv`, que **no se sube**.
+
+**`70_build_image.ps1` construye desde la carpeta de trabajo (`acr build`).** Una
+imagen hecha desde `main` lleva ya los dos pasos de F-097 en `run-all`, y la
+nocturna empezaría a cargar descompuestos (300 MB por noche) antes de T0, contra
+la decisión del humano del 2026-09-28. Por eso la imagen de F-052 se construye
+desde el merge de F-052:
+
+    git checkout 5890b0f
+    powershell -NoProfile -File infra/70_build_image.ps1
+    git checkout main
+    powershell -NoProfile -File infra/85_update_job.ps1 -Tag <tag que imprima 70>
+
+**Ninguna imagen desde `main` hasta que T0 de F-097 salga bien y se haga su
+primera carga (T17).** Si antes hace falta desplegar otra cosa, se construye
+desde un commit sin F-097 o se vuelve al humano.
+## 2026-09-29 · F-052 · CERRADA (`done`, APROBADO) · la 0599 vuelve al datamart y `check-cobertura` en verde · EN `main` (5890b0f) · FALTA LA IMAGEN
 
 > **Cerrada el 2026-09-29** con APROBADO del reviewer
 > (`progress/review_F-052_cierre.md`). Resumen en `progress/history.md`.
@@ -51,7 +73,7 @@
 > excepciones declaradas, 56 combinaciones miradas, **56 cubiertas**, obras
 > invisibles: ninguna, filas huérfanas: ninguna. Falta el reviewer.
 
-## 2026-09-28 · F-097 · CERRADA (`done`, APROBADO en pasada 3) · los descompuestos de las partidas · SIN DESPLEGAR: T0 (desde el 2026-10-05) antes de T17 y T19
+## 2026-09-28 · F-097 · CERRADA (`done`, APROBADO en pasada 3) · los descompuestos de las partidas · EN `main` (c6db1f9) · SIN DESPLEGAR: T0 (desde el 2026-10-05) antes de T17 y T19
 
 > **Cerrada el 2026-09-28** con APROBADO del reviewer en la pasada 3
 > (`progress/review_F-097.md`); `init.sh` en verde (5.931 passed, cobertura
