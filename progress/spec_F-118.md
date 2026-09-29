@@ -158,6 +158,21 @@ porque ahora sí cambian a propósito las series rotas. **Se añade:** `es_desha
 (D4) al lado de `es_relleno`, sin tocar D8 de F-051. El relleno y el deshacer
 conviven: en un mes de relleno la ausencia arrastra; en un cierre, deshace.
 
+## APROBADA POR EL HUMANO (2026-09-29), con D6 cambiada
+
+- **D1, D2, D3, D4, D5, D7, D8 y D9: aprobadas según la recomendación.** Con D2,
+  **F-103 queda absorbida** (el líder la retira de `features.json`, como F-051).
+- **D6, criterio del humano (manda sobre A/B):** «los coeficientes son por
+  contrato de cliente, y puede haber varios en cada obra. Hay una venta sin
+  coeficientes y otra con ellos. Usamos la sin coeficientes para el beneficio,
+  pero hay que guardar la venta total también. Ambos datos los quiero, solo que
+  en general para cierres y análisis usamos la sin coeficientes (para lo que
+  facturamos es otra cosa).» Es decir: el beneficio, los cierres y el análisis
+  van SIN coeficientes (la A), y la venta CON coeficientes se publica ADEMÁS, en
+  columnas propias y con nombre inequívoco, nunca mezclada con la otra; el
+  coeficiente pertenece al contrato con el cliente (varios por obra), no a la
+  obra.
+
 ## 8 · Decisiones abiertas (recomendación)
 
 - **D1 · Sustituir F-051 R9 y R21** por la serie densa y el invariante contra el
