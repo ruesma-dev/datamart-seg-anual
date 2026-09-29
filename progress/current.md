@@ -34,6 +34,12 @@
 > aparece**. Lo que falta: `init.sh` y `check-cobertura --timeout 900` en esta
 > rama (con sus 21 excepciones; esperado código 0) y el reviewer. Si aparece
 > algo no declarado, NO se declara sin el humano.
+>
+> **Hecho el 2026-09-29 en la rama, tras el merge `28bf449`:** `bash
+> harness/init.sh` en verde (5.666 passed, 207 skipped) y `python main.py
+> check-cobertura --timeout 900` (solo lectura) **OK, código 0**: 23
+> excepciones declaradas, 56 combinaciones miradas, **56 cubiertas**, obras
+> invisibles: ninguna, filas huérfanas: ninguna. Falta el reviewer.
 
 ## 2026-09-27 · F-056 · CERRADA (`done`, APROBADO en pasada 2) · el mayor y el plan de cuentas como arbol · DESPLEGADA Y VERIFICADA · FALTA LA LISTA BLANCA DE `mcp-bbdd`
 
