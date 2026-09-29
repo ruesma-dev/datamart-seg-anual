@@ -15,10 +15,17 @@ que la spec cita por obra y fase. Dominio puro: ni red ni BBDD.
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
-from etl_sigrid.domain.mes_fase import mes_de_fase, parse_mes_fase
+from etl_sigrid.domain.cierres import Cierre, plan_de_cierres
+from etl_sigrid.domain.mes_fase import (
+    FaseReal,
+    mes_de_fase,
+    meses_relleno,
+    parse_mes_fase,
+)
 
 # ---------------------------------------------------------------------------
 # R2-R4 · el parser del texto
@@ -149,3 +156,136 @@ def test_f118_r7_una_fase_normal_da_su_mes() -> None:
     assert mes_de_fase(
         date(2026, 8, 1), "Agosto 2026", date(2026, 8, 31), date(2026, 8, 1)
     ) == date(2026, 8, 1)
+
+
+# ---------------------------------------------------------------------------
+# R10-R14 · el relleno de las fases de rango (F-051 T3)
+# ---------------------------------------------------------------------------
+
+def _m(anio: int, mes: int) -> date:
+    return date(anio, mes, 1)
+
+
+def test_f118_r10_relleno_desde_el_mes_de_inicio_hasta_el_anterior_al_texto() -> None:
+    """0650 f20 «JUNIO 24», del 01-02 al 30-06-2024: relleno feb-may."""
+    fases = [
+        FaseReal(19, _m(2024, 1), date(2024, 1, 1), date(2024, 1, 31)),
+        FaseReal(20, _m(2024, 6), date(2024, 2, 1), date(2024, 6, 30)),
+    ]
+    assert meses_relleno(fases) == {
+        20: (_m(2024, 2), _m(2024, 3), _m(2024, 4), _m(2024, 5)),
+    }
+
+
+def test_f118_r11_el_relleno_no_pisa_un_mes_con_cierre_propio() -> None:
+    """Un cierre vigente de otra fase en julio (aunque valga 0) no se rellena."""
+    fases = [
+        FaseReal(27, _m(2025, 7), date(2025, 7, 1), date(2025, 7, 31)),
+        FaseReal(28, _m(2025, 12), date(2025, 5, 1), date(2025, 12, 31)),
+    ]
+    assert meses_relleno(fases) == {
+        28: (_m(2025, 5), _m(2025, 6), _m(2025, 8), _m(2025, 9), _m(2025, 10),
+             _m(2025, 11)),
+    }
+
+
+def test_f118_r14_texto_en_el_primer_mes_no_rellena_nada() -> None:
+    fases = [FaseReal(3, _m(2024, 6), date(2024, 6, 16), date(2024, 8, 15))]
+    assert meses_relleno(fases) == {}
+
+
+def test_f118_r14_texto_intermedio_rellena_hasta_el_texto_y_nada_despues() -> None:
+    fases = [FaseReal(3, _m(2024, 7), date(2024, 6, 1), date(2024, 9, 30))]
+    assert meses_relleno(fases) == {3: (_m(2024, 6),)}
+
+
+def test_f118_r10_una_fase_de_un_mes_no_rellena() -> None:
+    """0440 f3: el texto la lleva a mayo, pero sus fechas son de un solo mes."""
+    fases = [FaseReal(3, _m(2015, 5), date(2015, 3, 1), date(2015, 3, 31))]
+    assert meses_relleno(fases) == {}
+
+
+def test_f118_r10_texto_antes_de_las_fechas_no_rellena() -> None:
+    """0337 f1 «Marzo 2011», de oct-2011 a mar-2012: manda el texto, sin relleno."""
+    fases = [FaseReal(1, _m(2011, 3), date(2011, 10, 1), date(2012, 3, 31))]
+    assert meses_relleno(fases) == {}
+
+
+def test_f118_r10_sin_fecha_fin_no_hay_rango() -> None:
+    fases = [FaseReal(4, _m(2012, 6), date(2012, 1, 1), None)]
+    assert meses_relleno(fases) == {}
+
+
+def test_f118_r3_r10_0571_dos_fases_de_rango_seguidas() -> None:
+    """0571: f21 «Enero 2020-Abril 2020» (ene-abr) y f22 «Agosto 2020» (may-ago)."""
+    fases = [
+        FaseReal(21, _m(2020, 4), date(2020, 1, 1), date(2020, 4, 30)),
+        FaseReal(22, _m(2020, 8), date(2020, 5, 1), date(2020, 8, 31)),
+    ]
+    assert meses_relleno(fases) == {
+        21: (_m(2020, 1), _m(2020, 2), _m(2020, 3)),
+        22: (_m(2020, 5), _m(2020, 6), _m(2020, 7)),
+    }
+
+
+def test_f118_r11_ningun_mes_de_relleno_se_repite_entre_dos_fases() -> None:
+    """Dos fases de rango solapadas: el mes lo rellena la de texto más cercano.
+
+    f5 «Marzo» (ene-mar) y f6 «Junio» (feb-jun) quieren las dos febrero. Lo
+    genera f5, cuyo cierre es el siguiente; f6 se queda con abril y mayo.
+    """
+    fases = [
+        FaseReal(5, _m(2019, 3), date(2019, 1, 1), date(2019, 3, 31)),
+        FaseReal(6, _m(2019, 6), date(2019, 2, 1), date(2019, 6, 30)),
+    ]
+    relleno = meses_relleno(fases)
+    assert relleno == {
+        5: (_m(2019, 1), _m(2019, 2)),
+        6: (_m(2019, 4), _m(2019, 5)),
+    }
+    todos = [mes for meses in relleno.values() for mes in meses]
+    assert len(todos) == len(set(todos))
+
+
+def _vigentes(fases: list[FaseReal], acumulados: dict[int, int]) -> list[FaseReal]:
+    plan = plan_de_cierres(
+        [Cierre(f.numero_fase, f.anio_mes, Decimal(acumulados[f.numero_fase]))
+         for f in fases]
+    )
+    vivas = set(plan.vigente_por_mes.values())
+    return [f for f in fases if f.numero_fase in vivas]
+
+
+def test_f118_r8_r11_la_fase_que_pierde_el_mes_no_genera_relleno() -> None:
+    """R8 (F-042 sobre el mes del texto) antes que R10: la perdedora no rellena.
+
+    f5 de rango (ene-mar) y f6 de un mes comparten «Marzo». Con las dos a
+    distinto de cero manda f6, que no es de rango: enero y febrero no se
+    rellenan.
+    """
+    fases = [
+        FaseReal(5, _m(2019, 3), date(2019, 1, 1), date(2019, 3, 31)),
+        FaseReal(6, _m(2019, 3), date(2019, 3, 1), date(2019, 3, 31)),
+    ]
+    assert meses_relleno(_vigentes(fases, {5: 100, 6: 200})) == {}
+
+
+def test_f118_r8_r11_si_la_de_rango_gana_el_mes_rellena_lo_suyo() -> None:
+    """Misma pareja con f6 a cero: manda f5 y rellena enero y febrero."""
+    fases = [
+        FaseReal(5, _m(2019, 3), date(2019, 1, 1), date(2019, 3, 31)),
+        FaseReal(6, _m(2019, 3), date(2019, 3, 1), date(2019, 3, 31)),
+    ]
+    assert meses_relleno(_vigentes(fases, {5: 100, 6: 0})) == {
+        5: (_m(2019, 1), _m(2019, 2)),
+    }
+
+
+def test_f118_r11_meses_relleno_rechaza_dos_fases_con_el_mismo_mes() -> None:
+    """Recibir dos vigentes del mismo mes es un error de quien llama (R8 antes)."""
+    fases = [
+        FaseReal(5, _m(2019, 3), date(2019, 1, 1), date(2019, 3, 31)),
+        FaseReal(6, _m(2019, 3), date(2019, 3, 1), date(2019, 3, 31)),
+    ]
+    with pytest.raises(ValueError, match="mismo mes"):
+        meses_relleno(fases)
