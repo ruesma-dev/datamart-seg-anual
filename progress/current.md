@@ -11,6 +11,19 @@
 
 
 
+
+## 2026-09-29 · DECISIÓN DEL HUMANO: F-097 se despliega ESTA TARDE, junto con F-052, cuando el humano avise
+
+**T0 deja de bloquear** (decisión del humano, 2026-09-29): el diseño relee toda
+versión de huella distinta, así que T0 solo mide el coste nocturno; queda como
+medición informativa. El líder **espera el aviso del humano** y entonces, con su
+autorización expresa para estas escrituras contra Azure, en este orden:
+(1) primera carga T17 (`ingest-descompuestos --sin-tope`, `build-descompuestos
+--sin-tope`; tamaño de la base antes y después, créditos de CPU mirados antes);
+(2) casos testigo T18; (3) T19: puertas, `apply-grants`, `publicar-diccionario`
+(v37) e **imagen desde `main`** (lleva F-052 y F-097: el aviso de abajo sobre
+`5890b0f` queda sin efecto); (4) `mcp-bbdd`: `descompuestos` en su lista blanca,
+despliegue y reinicio del MCP. La primera carga va ANTES de la imagen.
 ## 2026-09-29 · AVISO DE DESPLIEGUE: la imagen de F-052 se construye desde `5890b0f`, NO desde `main`
 
 El líder integró F-052 (`5890b0f`) y F-097 (`c6db1f9`) en `main` el 2026-09-29,
