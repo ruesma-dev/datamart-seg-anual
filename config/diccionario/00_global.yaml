@@ -12,6 +12,22 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 38 (F-118, 2026-09-30): LA SERIE REAL DENSA Y LA VENTA SIN
+# COEFICIENTES (correo de Juan Romero del 2026-09-29; F-051 y F-103 absorbidas).
+# Tres cambios de significado. (1) El mes de las filas reales es el del TEXTO
+# de la fase (`stg.fn_mes_de_fase`, nueva, con `stg.fn_parse_mes_texto`), con
+# filas de RELLENO (`es_relleno`) en los meses anteriores de una fase de rango;
+# `mart` y `cierre` lo leen de `stg` y `nombre_mes` sale de `anio_mes`. (2) La
+# serie real de cada partida es DENSA: la que sale de un cierre se DESHACE en el
+# (`es_deshacer`, se anula el acumulado anterior) y el movimiento resta el mes
+# anterior de la serie, asi que `SUM(importe_mes)` es el acumulado del ultimo
+# cierre sin excepciones. (3) La venta final del cierre va SIN coeficientes
+# (`importe`), y la venta con coeficientes, lo que se factura, se publica aparte:
+# `cierre.fact_cierre_mensual.final_importe_con_coeficientes`, su columna en
+# `v_pbi_cierre_resumen` y dos en `v_pbi_cierre_cabecera`. Regla dura nueva
+# `R-VENTA-COEFICIENTES`; la P10 deja de mandar `importe_oficial` para la venta.
+# `v_pbi_planif_vs_real` pasa a una fila por clave.
+#
 # version 37 (F-097, 2026-09-28): LOS DESCOMPUESTOS DE LAS PARTIDAS. Entra el
 # esquema `descompuestos` --el duodecimo--, con DOS pasos de la nocturna:
 # `ingest_descompuestos` trae de Sigrid el texto `obrparpre.des` de forma
@@ -408,7 +424,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 37
+version: 38
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -491,6 +507,38 @@ reglas:
       esquemas precisamente porque el bug ocurrio en `cierre` y la regla se
       redacto mirando a `mart`. El numero salia grande pero creible, que es
       exactamente lo peligroso.
+
+  - codigo: R-VENTA-COEFICIENTES
+    titulo: La venta con coeficientes no se mezcla con la venta sin ellos, el ejecutado ni el coste
+    severidad: bloqueante
+    ambito:
+      - stg.presupuesto
+      - cierre.fact_cierre_mensual
+      - cierre.v_pbi_cierre_resumen
+      - cierre.v_pbi_cierre_cabecera
+    regla: >-
+      Hay DOS ventas. La SIN coeficientes (`stg.presupuesto.importe`,
+      `cierre.*.final_importe`, `presupuesto_inicial_venta`,
+      `presupuesto_vigente_venta`) es la que se usa para cierres, beneficio y
+      analisis, y es la unica comparable con el ejecutado y con el coste. La CON
+      coeficientes (`stg.presupuesto.importe_oficial`,
+      `final_importe_con_coeficientes`, las columnas `_con_coeficientes` de la
+      cabecera) es lo que se factura al cliente. NUNCA se suma, resta ni
+      compara una venta con coeficientes con el ejecutado, con el coste o con
+      una venta sin ellos: ni un beneficio, ni un pendiente, ni un %, ni unos
+      modificados. Y NO HAY EJECUTADO CON COEFICIENTES: la venta real no los
+      guarda, asi que un «ejecutado con coeficientes» seria inventado.
+    motivo: >-
+      Hasta F-118 el cierre sumaba la venta final con coeficientes
+      (`importe_oficial`, el `impcoe` de Sigrid) y le restaba un ejecutado y un
+      coste que no los llevan: en el cierre de agosto de 2026 la 0702 daba
+      +1.695.571,87 EUR de beneficio final donde son -790.718,46, y 42 obras
+      tenian la venta final inflada (511 filas-mes, 2021-2026). Decision del
+      humano del 2026-09-29: sin coeficientes para cierres y analisis, y la otra
+      aparte. El coeficiente es del CONTRATO con el cliente (varios por obra:
+      1,07 y 1,24 en la 0676-B; 1,26 y 1,00 en la 0702) y no vive en ninguna
+      tabla de Sigrid: solo aplicado, en `impcoe`, y solo en los master de venta
+      y certificacion. El desglose por contrato es F-099.
 
   - codigo: R-UNIVERSO-OBRA
     titulo: Hay dos universos de obra y no cuentan lo mismo
@@ -1546,10 +1594,12 @@ preguntas_aceptacion:
       - stg.presupuesto
     respuesta_correcta: >-
       Usa el importe TOTAL sin distribucion mensual, no la suma de
-      `plan_mensual`. Para coste (ambitos 3 y 8) `importe`; para venta (ambitos
-      7 y 11) `importe_oficial`, que lleva los coeficientes que Sigrid aplica
-      solo en venta. Filtra la fase correcta.
-    reglas_implicadas: [R-FAS-AMBIGUO, R-VERSION-MASTER]
+      `plan_mensual`, y `importe` en coste y en venta: es el presupuesto SIN
+      coeficientes, el que se compara con el ejecutado y el coste (F-118).
+      `importe_oficial` es la venta CON los coeficientes del contrato, lo que se
+      factura; darla solo si se pide eso, y decirlo, sin mezclarla con la otra.
+      Filtra la fase correcta.
+    reglas_implicadas: [R-FAS-AMBIGUO, R-VERSION-MASTER, R-VENTA-COEFICIENTES]
     estado: respondible
     es_trampa: true
 

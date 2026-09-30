@@ -285,7 +285,7 @@ def test_f006_r17_filas_la_ficha_de_mart_llega_completa() -> None:
     )
     assert motivo is None
     assert clave == ["obra_id", "partida_id", "anio_mes", "escenario"]
-    assert n_columnas == 34
+    assert n_columnas == 36  # F-118: + es_relleno, es_deshacer
     assert "R-IMPORTE-MES" in avisos and "R-CLAVE-SUSTITUTA" in avisos
 
 
@@ -317,7 +317,7 @@ def test_f006_r22_filas_la_ficha_jsonb_es_determinista_y_completa() -> None:
 
     assert set(ficha) == {"columnas", "relaciones", "ejemplos_preguntas"}
     assert list(ficha) == sorted(ficha)
-    assert len(ficha["columnas"]) == 34
+    assert len(ficha["columnas"]) == 36  # F-118: + es_relleno, es_deshacer
     assert ficha["columnas"][0]["nombre"] == "fact_id", "se conserva el orden del YAML"
     importe_mes = next(c for c in ficha["columnas"] if c["nombre"] == "importe_mes")
     assert importe_mes["agregacion"] == "suma_solo_dentro_del_mes"

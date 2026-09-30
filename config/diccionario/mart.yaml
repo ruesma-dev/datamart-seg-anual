@@ -75,10 +75,11 @@ objetos:
         `importe_mes_raw`, `can_mes` y `total_incurrido_mes` **telescopean**
         —cada fila trae la diferencia con la anterior—. Medido:
         `SUM(importe_mes)` iguala al ultimo `importe_origen` en **200 de 200**
-        series. Que siga cumpliendose es la razon por la que el arreglo
-        **renumera el orden interno** en vez de limitarse a borrar la fila
-        sobrante: sin renumerar, el `LAG` dejaria de ser consecutivo y el
-        movimiento del mes se dispararia.
+        series. Desde F-118 se cumple en TODAS las series reales, sin
+        excepcion: la serie de cada partida es densa (la que desaparece de un
+        cierre se deshace en el, y un hueco de numeracion de Sigrid resta la
+        fase anterior existente), y `SUM(importe_mes)` es el acumulado de la
+        partida en el ultimo cierre de su obra y ambito (0 si ya no esta).
       - **Las medidas ACUMULADAS A ORIGEN no se suman NUNCA**: `importe_origen`,
         `importe_origen_raw`, `can_origen` y `total_incurrido` traen el llevado
         hasta ese mes. Son `ultimo_valor` por naturaleza, con duplicado o sin
@@ -89,6 +90,13 @@ objetos:
       (COSTE o VENTA) y naturaleza (REAL o PLANIFICADO): hasta cuatro filas por
       celda. Los meses futuros solo tienen los dos escenarios planificados; los
       meses pasados de una obra que arranco sin master, solo los dos reales.
+
+      **EL MES DE LAS FILAS REALES (F-118, F-051 absorbida).** Es el de
+      `stg.plan_mensual`: el del TEXTO de la fase, no el `ano`/`mes` que archiva
+      Sigrid, con filas de RELLENO (`es_relleno`) en los meses anteriores de una
+      fase de rango y filas de DESHACER (`es_deshacer`) donde una partida sale
+      de un cierre. `nombre_mes` sale de `anio_mes` en los cuatro escenarios y
+      el texto de la fase queda en `version_descripcion`.
     clave_negocio: [obra_id, partida_id, anio_mes, escenario]
     paso_etl: build_mart
     refresco: nocturno
@@ -148,8 +156,11 @@ objetos:
         significado: Numero de mes (1-12) de `anio_mes`.
         agregacion: no_sumable
       nombre_mes: >-
-        Etiqueta del mes en castellano con su ano ("Octubre 2025"). Se genera
-        sin depender del locale del servidor.
+        Etiqueta del mes en castellano con su ano ("Octubre 2025"), derivada de
+        `anio_mes` en los CUATRO escenarios (F-118) sin depender del locale del
+        servidor. Hasta F-118 las filas reales traian aqui el texto libre de la
+        fase («JUNIO 24»), que partia en dos cualquier agrupacion por esta
+        columna; ese texto esta ahora en `version_descripcion`.
       escenario:
         significado: >-
           El cruce de magnitud y naturaleza, y la columna por la que de verdad
@@ -212,7 +223,9 @@ objetos:
         agregacion: no_sumable
       version_descripcion: >-
         Etiqueta legible de la version en las filas planificadas ("Version 11
-        (04/02/2026)"); en las filas reales, la etiqueta del mes.
+        (04/02/2026)"); en las filas reales, el TEXTO de la fase tal y como lo
+        escribio el jefe de obra («Agosto 2026», «Enero 2020-Abril 2020»), que
+        puede no ser el nombre del mes (F-118).
       version_tex:
         significado: >-
           Texto libre que escribio el jefe de obra al crear la version master
@@ -245,6 +258,23 @@ objetos:
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
         nulo_significa: La fila no es de coste real.
+      es_relleno:
+        significado: >-
+          TRUE en una fila REAL de RELLENO (F-118, F-051 absorbida): un mes
+          anterior al del texto de una fase de rango, con `importe_mes` 0 y el
+          acumulado del cierre anterior. Viene de `stg.plan_mensual.es_relleno`.
+          Sin la marca, un relleno no se distingue de un mes sin actividad.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+        nulo_significa: La fila es PLANIFICADA.
+      es_deshacer:
+        significado: >-
+          TRUE en una fila REAL de DESHACER (F-118): la partida ya no esta en
+          ese cierre, su acumulado pasa a 0 y `importe_mes` anula el que traia.
+          Sigrid no guarda esa fila; viene de `stg.plan_mensual.es_deshacer`.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+        nulo_significa: La fila es PLANIFICADA.
       _built_at:
         significado: >-
           Instante en que se construyo la fila. Instrumentacion del ETL, no
@@ -525,7 +555,9 @@ objetos:
         significado: Numero de la version master vigente del planificado.
         nulo_significa: La fila es REAL.
         agregacion: no_sumable
-      version_descripcion: Etiqueta legible de la version, o del mes en las filas reales.
+      version_descripcion: >-
+        Etiqueta legible de la version en las filas planificadas; en las reales,
+        el texto de la fase (F-118), que puede no ser el nombre del mes.
       tipo_master:
         significado: >-
           Clasificacion de la version master. Solo 'Planif Inicial', 'ABC' y
@@ -540,6 +572,23 @@ objetos:
         significado: Incurrido del mes calculado por Sigrid. Solo en coste real.
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
+      es_relleno:
+        significado: >-
+          TRUE en una fila REAL de RELLENO (F-118, F-051 absorbida): un mes
+          anterior al del texto de una fase de rango, con `importe_mes` 0 y el
+          acumulado del cierre anterior. Viene de `stg.plan_mensual.es_relleno`.
+          Sin la marca, un relleno no se distingue de un mes sin actividad.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+        nulo_significa: La fila es PLANIFICADA.
+      es_deshacer:
+        significado: >-
+          TRUE en una fila REAL de DESHACER (F-118): la partida ya no esta en
+          ese cierre, su acumulado pasa a 0 y `importe_mes` anula el que traia.
+          Sigrid no guarda esa fila; viene de `stg.plan_mensual.es_deshacer`.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+        nulo_significa: La fila es PLANIFICADA.
     relaciones:
       - de: fact_id
         a: mart.fact_seguimiento_mensual.fact_id
@@ -1475,7 +1524,9 @@ objetos:
         significado: Numero de la version master del planificado.
         nulo_significa: La fila es REAL.
         agregacion: no_sumable
-      version_descripcion: Etiqueta legible de la version, o del mes en las filas reales.
+      version_descripcion: >-
+        Etiqueta legible de la version en las filas planificadas; en las reales,
+        el texto de la fase (F-118), que puede no ser el nombre del mes.
       version_tex:
         significado: Texto libre de la version master.
         nulo_significa: La fila es REAL.

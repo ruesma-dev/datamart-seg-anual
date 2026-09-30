@@ -12,6 +12,80 @@
 
 
 
+## 2026-09-30 · F-118 · IMPLEMENTACIÓN (implementer) · bloques A-F en la rama, MANUAL pendientes
+
+Rama `feature/F-118-cruce-cierre-agosto`. Informe: `progress/impl_F-118.md`.
+Tareas de `specs/F-118-cruce-cierre-agosto/tasks.md`, en orden:
+
+- [x] T1-T4 · El mes (F-051) en dominio puro: `etl_sigrid/domain/mes_fase.py`.
+- [x] T5-T7 · La serie densa en dominio puro: `etl_sigrid/domain/serie_real.py`
+  e invariante con 400 casos generados.
+- [x] T8-T15 · SQL de `stg` (funciones del mes, `es_relleno`/`es_deshacer`, la
+  rama de reales reescrita), tests de F-042 reescritos, sello, huella y
+  `check-cierres` sin apartados.
+- [x] T16-T19 · `mart`, `cierre` y `v_pbi_planif_vs_real`.
+- [x] T20-T22 · La venta final sin coeficientes y la otra aparte.
+- [x] T23-T25 · `check-mes-fase`, diccionario (version 38) y `ARCHITECTURE.md`.
+- [ ] T26-T31 · MANUAL (humano), abajo, en este orden.
+- [x] T32 · `bash harness/init.sh` en verde (resultado en el informe).
+
+**Diccionario del árbol tras F-118 (version 38): 189 objetos, 1412 columnas,
+85 de consumo** (dos funciones nuevas de `stg`; once columnas nuevas:
+`es_relleno`/`es_deshacer` en `stg.plan_mensual`, `mart.fact_seguimiento_mensual`
+y `mart.v_pbi_fact`; `final_importe_con_coeficientes` y `es_relleno` en
+`cierre.fact_cierre_mensual`; `final_importe_con_coeficientes` en
+`v_pbi_cierre_resumen`; y las dos `presupuesto_*_venta_con_coeficientes` de la
+cabecera). Sin publicar: es escritura contra Azure (T31).
+
+### Verificaciones MANUAL (humano), en orden, con lo que debe salir
+
+Todas sobre el MISMO `raw`, sin ingesta entre medias. Las de solo lectura
+pueden ir con el `.env` del puesto; las escrituras, solo con autorización.
+
+1. **T26 · Huellas ANTES** (solo lectura, base actual, ANTES de crear nada):
+   `python main.py huella-obras --desde stg --out huella_f118_stg_antes.csv`,
+   `python main.py huella-obras --desde mart --out huella_f118_mart_antes.csv`,
+   `python main.py huella-obras --desde cierre --out huella_f118_cierre_antes.csv`.
+   Debe salir: los tres CSV con los cuatro ámbitos; ningún error.
+2. **T27 · Funciones de `stg` y propuesta** (escritura ADITIVA, la autoriza el
+   humano): ejecutar SOLO los dos `CREATE OR REPLACE FUNCTION` del final de
+   `etl_sigrid/infrastructure/postgres/sql/stg/00_functions.sql`
+   (`stg.fn_parse_mes_texto` y `stg.fn_mes_de_fase`) y
+   `python main.py huella-obras --desde stg --propuesta --out huella_f118_stg_propuesta.csv`.
+   Debe salir: en la 0709, venta de 2026-08 = **377.492,30** y 2026-09 = **0,00**
+   (sonda de solo lectura de la implementación, con el parser de `cierre` en
+   lugar de la función: 377.492,30 / 0,00); en la 0371, coste de **2015-05** (mes
+   del texto de su f29) = **-441.229,31**. Medir el tiempo del tramo más pesado
+   (en local la rama tarda ~3,5x la de antes con el doble de filas sintéticas).
+3. **T28 · Aviso a Juan Romero** antes de desplegar, con `progress/spec_F-118.md`
+   §2 y §8 D9: meses cerrados que cambian, desapariciones masivas (0419, 0465,
+   0599, 0616, 0658), la 0606 y la venta final que pasa a sin coeficientes en
+   42 obras con la otra en columna aparte. **Corrección al testigo de la 0606**:
+   con el mes del texto (F-051 D2) su f16 «todo a cero» vive en **mayo de 2021**,
+   así que los -9.053.263,61 de coste y -9.188.957,62 de venta caen en 2021-05,
+   no en 2021-09 como dice `design.md` §9 (sonda de solo lectura; `cierre`
+   también los pondrá en mayo).
+4. **T29 · Desplegar y reconstrucción completa** (imagen desde la rama o desde
+   `main` tras el merge; el sello cambia y rehace las 920 obras): huellas
+   DESPUÉS (`--desde stg|mart|cierre`) y `python main.py comparar-huellas ANTES
+   DESPUES --obras-esperadas <lista>` con la lista de `progress/spec_F-118.md` §6
+   (las de F-051 salen de `python main.py check-mes-fase --obras-esperadas
+   esperadas_f051.txt`). Luego `python main.py check-unicidad` (la vista
+   `cierre.v_pbi_planif_vs_real` en OK; el fact con `--timeout 300`),
+   `python main.py check-cierres` (**0 discrepancias y 0 series rotas**),
+   `python main.py check-mes-fase` (0 discrepancias, 0 claves repetidas, 0
+   rellenos que mueven, 0 deshaceres quietos, 0 meses mixtos) y los testigos
+   de `design.md` §9 y de F-051 §8. Resultados a `progress/impl_F-118.md`.
+5. **T30 · Hoja de cierre de agosto de Juan** (sin versionarla): las 12 obras
+   del correo y la 0709, venta, coste y beneficio a origen, del mes y final,
+   con y sin coeficientes; la 0702 debe dar venta final **9.658.390,84**, coste
+   final **10.449.109,30**, beneficio final **-790.718,46** y con coeficientes
+   **12.144.681,17** aparte. Tabla obra a obra al informe.
+6. **T31 · Publicar** (escritura contra Azure): `python main.py
+   publicar-diccionario` (version 38) y `python main.py apply-grants`; después
+   `python main.py check-diccionario` sin diferencias.
+
+
 ## 2026-09-29 · F-118 · SPEC LISTA (con F-051 absorbida), a la espera de D1–D9
 
 Spec en `specs/F-118-cruce-cierre-agosto/` (requirements, design, tasks) y

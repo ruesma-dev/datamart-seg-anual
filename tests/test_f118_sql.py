@@ -21,6 +21,7 @@ from functools import cache
 from pathlib import Path
 
 import pytest
+import yaml
 
 from etl_sigrid.application.steps.build_stg_step import (
     DIRECTORIO_SQL_STG,
@@ -463,3 +464,118 @@ def test_f118_r18_vista_nombre_mes_sale_de_anio_mes_en_la_select_final() -> None
     assert "[EXTRACT(MONTH FROM anio_mes)::INT]" in final
     # Ninguna CTE arrastra nombre_mes.
     assert "nombre_mes" not in texto[: texto.rindex("SELECT")]
+
+
+# ---------------------------------------------------------------------------
+# El diccionario (R27, R47)
+# ---------------------------------------------------------------------------
+
+_DICC = Path(__file__).resolve().parents[1] / "config" / "diccionario"
+
+
+@cache
+def _dicc(nombre: str) -> dict:
+    return yaml.safe_load((_DICC / nombre).read_text(encoding="utf-8"))
+
+
+def _texto(valor) -> str:
+    """Todo el texto de una ficha o columna, sea cadena o diccionario."""
+    if isinstance(valor, dict):
+        return " ".join(_texto(v) for v in valor.values())
+    if isinstance(valor, list):
+        return " ".join(_texto(v) for v in valor)
+    return "" if valor is None else str(valor)
+
+
+#: Lo que F-118 escribe o reescribe en el diccionario: (fichero, objeto, columna).
+TOCADO = (
+    ("stg.yaml", "plan_mensual", None),
+    ("stg.yaml", "plan_mensual", "version"),
+    ("stg.yaml", "plan_mensual", "version_descripcion"),
+    ("stg.yaml", "plan_mensual", "anio_mes"),
+    ("stg.yaml", "plan_mensual", "importe_mes"),
+    ("stg.yaml", "plan_mensual", "es_relleno"),
+    ("stg.yaml", "plan_mensual", "es_deshacer"),
+    ("stg.yaml", "presupuesto", "ambito_id"),
+    ("stg.yaml", "presupuesto", "importe"),
+    ("stg.yaml", "presupuesto", "importe_oficial"),
+    ("stg.yaml", "fases", "nombre_mes"),
+    ("stg.yaml", "fn_parse_mes_texto", None),
+    ("stg.yaml", "fn_mes_de_fase", None),
+    ("mart.yaml", "fact_seguimiento_mensual", "nombre_mes"),
+    ("mart.yaml", "fact_seguimiento_mensual", "version_descripcion"),
+    ("mart.yaml", "fact_seguimiento_mensual", "es_relleno"),
+    ("mart.yaml", "fact_seguimiento_mensual", "es_deshacer"),
+    ("mart.yaml", "v_pbi_fact", "es_relleno"),
+    ("mart.yaml", "v_pbi_fact", "es_deshacer"),
+    ("cierre.yaml", "fact_cierre_mensual", None),
+    ("cierre.yaml", "fact_cierre_mensual", "anio_mes"),
+    ("cierre.yaml", "fact_cierre_mensual", "ejecutado_origen"),
+    ("cierre.yaml", "fact_cierre_mensual", "final_importe"),
+    ("cierre.yaml", "fact_cierre_mensual", "final_importe_con_coeficientes"),
+    ("cierre.yaml", "fact_cierre_mensual", "es_relleno"),
+    ("cierre.yaml", "v_pbi_cierre_resumen", "final_importe"),
+    ("cierre.yaml", "v_pbi_cierre_resumen", "final_importe_con_coeficientes"),
+    ("cierre.yaml", "v_pbi_cierre_cabecera", "presupuesto_inicial_venta_con_coeficientes"),
+    ("cierre.yaml", "v_pbi_cierre_cabecera", "presupuesto_vigente_venta_con_coeficientes"),
+    ("cierre.yaml", "v_pbi_planif_vs_real", None),
+    ("cierre.yaml", "fn_mes_de_fase", None),
+)
+
+
+def _ficha(fichero: str, objeto: str, columna: str | None):
+    """La columna, o del objeto solo su `descripcion` y su `grano` (las
+    columnas que F-118 no toca pueden conservar su texto de antes)."""
+    ficha = _dicc(fichero)["objetos"][objeto]
+    if columna is None:
+        return {"descripcion": ficha.get("descripcion"), "grano": ficha.get("grano")}
+    return ficha["columnas"][columna]
+
+
+@pytest.mark.parametrize(("fichero", "objeto", "columna"), TOCADO)
+def test_f118_r47_diccionario_la_ficha_existe_y_no_dice_estorno(fichero, objeto, columna) -> None:
+    """Lenguaje de F-118: «deshacer», nunca «estorno», en lo nuevo o tocado."""
+    texto = _texto(_ficha(fichero, objeto, columna))
+    assert texto.strip()
+    assert "estorno" not in texto.lower(), (fichero, objeto, columna)
+
+
+def test_f118_r47_diccionario_sube_de_version() -> None:
+    assert _dicc("00_global.yaml")["version"] >= 38
+
+
+def test_f118_r47_diccionario_regla_dura_de_la_venta_con_coeficientes() -> None:
+    reglas = {r["codigo"]: r for r in _dicc("00_global.yaml")["reglas"]}
+    regla = reglas["R-VENTA-COEFICIENTES"]
+    assert regla["severidad"] == "bloqueante"
+    assert set(regla["ambito"]) >= {
+        "stg.presupuesto",
+        "cierre.fact_cierre_mensual",
+        "cierre.v_pbi_cierre_resumen",
+        "cierre.v_pbi_cierre_cabecera",
+    }
+    texto = regla["regla"] + regla["motivo"]
+    for termino in ("NUNCA", "NO HAY EJECUTADO CON COEFICIENTES", "factura", "F-099",
+                    "-790.718,46"):
+        assert termino in texto, termino
+    assert "estorno" not in texto.lower()
+
+
+def test_f118_r47_diccionario_la_p10_ya_no_manda_la_venta_con_coeficientes() -> None:
+    p10 = next(p for p in _dicc("00_global.yaml")["preguntas_aceptacion"] if p["id"] == "P10")
+    assert "para venta (ambitos\n      7 y 11) `importe_oficial`" not in p10["respuesta_correcta"]
+    assert "SIN" in p10["respuesta_correcta"]
+    assert "R-VENTA-COEFICIENTES" in p10["reglas_implicadas"]
+
+
+def test_f118_r47_diccionario_importe_oficial_es_lo_que_se_factura() -> None:
+    texto = _texto(_ficha("stg.yaml", "presupuesto", "importe_oficial"))
+    assert "Es\n          la columna de VENTA" not in texto and "columna de VENTA" not in texto
+    assert "SE FACTURA" in texto and "R-VENTA-COEFICIENTES" in texto
+
+
+def test_f118_r47_diccionario_la_serie_densa_esta_explicada() -> None:
+    plan = _texto(_ficha("stg.yaml", "plan_mensual", None))
+    for termino in ("DENSA", "DESHACE", "RELLENO", "377.492,30", "-441.229,31"):
+        assert termino in plan, termino
+    assert "ultimo cierre" in _texto(_ficha("stg.yaml", "plan_mensual", "importe_mes"))
