@@ -1432,3 +1432,24 @@ excepciones, 56 de 56 combinaciones cubiertas. La 0599 en `mart`: 21.051 /
 retirar la excepcion de la 0720 (ya publica) y decidir las tres de ciclo que no
 tapan nada; purgar los `obras_*.csv` de la historia local antes del push; merge e
 imagen nueva. Detalle: `progress/impl_F-052*.md`, `progress/review_F-052*.md`.
+
+## F-118 · La serie mensual real densa y la venta final del cierre sin coeficientes (cerrada el 2026-09-30, APROBADO en pasada 1)
+
+Nace del correo de Juan Romero del 2026-09-29 (dos fallos del cruce del cierre de
+agosto) y absorbe **F-051** (el mes de las filas reales sale del texto del cierre)
+y **F-103** (huecos de numeracion de fases), por decision del humano: son el mismo
+sitio y, el fallo 1 y F-103, la misma causa. `stg.plan_mensual` construye la serie
+real DENSA (una fila por partida y cierre del ambito, aunque Sigrid no la tenga):
+la partida que desaparece de un cierre DESHACE su acumulado ese mes (`es_deshacer`)
+y el movimiento ya no depende de que la fase anterior sea consecutiva; el mes lo da
+el texto del cierre (`stg.fn_mes_de_fase`) con relleno a cero (`es_relleno`); la
+vista `cierre.v_pbi_planif_vs_real` queda blindada. La venta final, el pendiente,
+la variacion, los % y el beneficio del cierre van SIN coeficientes; la venta CON
+coeficientes (que es por contrato con el cliente) se publica aparte
+(`final_importe_con_coeficientes` y dos columnas de presupuesto en la cabecera),
+regla `R-VENTA-COEFICIENTES`. Contrastado en solo lectura por el reviewer: 0709
+agosto 377.492,30 (hoy `stg` publica 319.492,30), 0371 mayo-2015 -441.229,31 (hoy
++4,29 M), 0702 beneficio final -790.718,46 (hoy +1,7 M). Rigor critico, mutacion
+exenta por F-051 D7 (huellas e invariante). Diccionario v38. Sin desplegar: T26-T31
+del humano, con T26 (huellas antes) y T28 (aviso a Juan) antes de cualquier imagen.
+Detalle: `progress/spec_F-118.md`, `progress/impl_F-118.md`, `progress/review_F-118.md`.

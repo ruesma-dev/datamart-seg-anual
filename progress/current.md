@@ -12,7 +12,18 @@
 
 
 
-## 2026-09-30 · F-118 · IMPLEMENTACIÓN (implementer) · bloques A-F en la rama, MANUAL pendientes
+## 2026-09-30 · F-118 · CERRADA (`done`, APROBADO en pasada 1) · serie real densa (F-051 y F-103 dentro) y venta final sin coeficientes · SIN DESPLEGAR: T26-T31 del humano
+
+> **Cerrada el 2026-09-30** con APROBADO del reviewer (`progress/review_F-118.md`),
+> `init.sh` en verde (6.149 passed, cobertura 97,9 %). Resumen en
+> `progress/history.md`. Correcciones del review aplicadas por el líder abajo:
+> **O1** (el esperado de septiembre de la 0709 había caducado), **O3** (resuelto:
+> de `cierre.fn_mes_de_fase` solo dependen `v_pbi_cierre_generales_detalle` y
+> `v_pbi_cierre_indirectos_detalle`, que el mismo build recrea; medido en
+> `pg_depend` el 2026-09-30, solo lectura), **O4** y **O7** (avisos en T28/T29).
+> O2, O5 y O6 quedan como observaciones menores. **Nada de F-118 se despliega
+> antes de T26 (huellas ANTES) y T28 (aviso a Juan)**: una imagen construida
+> desde `main` tras el merge ya lleva F-118.
 
 Rama `feature/F-118-cruce-cierre-agosto`. Informe: `progress/impl_F-118.md`.
 Tareas de `specs/F-118-cruce-cierre-agosto/tasks.md`, en orden:
@@ -52,12 +63,15 @@ pueden ir con el `.env` del puesto; las escrituras, solo con autorización.
    `etl_sigrid/infrastructure/postgres/sql/stg/00_functions.sql`
    (`stg.fn_parse_mes_texto` y `stg.fn_mes_de_fase`) y
    `python main.py huella-obras --desde stg --propuesta --out huella_f118_stg_propuesta.csv`.
-   Debe salir: en la 0709, venta de 2026-08 = **377.492,30** y 2026-09 = **0,00**
-   (sonda de solo lectura de la implementación, con el parser de `cierre` en
-   lugar de la función: 377.492,30 / 0,00); en la 0371, coste de **2015-05** (mes
+   Debe salir: en la 0709, venta de 2026-08 = **377.492,30** y 2026-09 =
+   **la de `cierre` en el mismo build** (el 0,00 del spec era la sonda del build
+   del 29-09 y CADUCÓ: el `stg` del 30-09 trae la f13 con datos y septiembre da
+   **273.204,78**, review O1); la partida 417031, −58.000 / +58.000 / 0; en la 0371, coste de **2015-05** (mes
    del texto de su f29) = **-441.229,31**. Medir el tiempo del tramo más pesado
    (en local la rama tarda ~3,5x la de antes con el doble de filas sintéticas).
-3. **T28 · Aviso a Juan Romero** antes de desplegar, con `progress/spec_F-118.md`
+3. **T28 · Aviso a Juan Romero** antes de desplegar (añadir, review O7: la 0371
+   f31 «DICIEMBRE-18», con fechas de 2015-08 a 2018-12, pasa a **2018-12** con la
+   regla del texto: ~40 meses de relleno para ~890 partidas), con `progress/spec_F-118.md`
    §2 y §8 D9: meses cerrados que cambian, desapariciones masivas (0419, 0465,
    0599, 0616, 0658), la 0606 y la venta final que pasa a sin coeficientes en
    42 obras con la otra en columna aparte. **Corrección al testigo de la 0606**:
@@ -74,7 +88,9 @@ pueden ir con el `.env` del puesto; las escrituras, solo con autorización.
    `cierre.v_pbi_planif_vs_real` en OK; el fact con `--timeout 300`),
    `python main.py check-cierres` (**0 discrepancias y 0 series rotas**),
    `python main.py check-mes-fase` (0 discrepancias, 0 claves repetidas, 0
-   rellenos que mueven, 0 deshaceres quietos, 0 meses mixtos) y los testigos
+   rellenos que mueven, 0 deshaceres quietos, 0 meses mixtos) (review O4: un
+   «deshacer quieto» de céntimos fraccionarios puede ser falso positivo del
+   redondeo de la herramienta, no del dato: mirarlo antes de dar KO) y los testigos
    de `design.md` §9 y de F-051 §8. Resultados a `progress/impl_F-118.md`.
 5. **T30 · Hoja de cierre de agosto de Juan** (sin versionarla): las 12 obras
    del correo y la 0709, venta, coste y beneficio a origen, del mes y final,
