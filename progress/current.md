@@ -53,6 +53,10 @@ cabecera). Sin publicar: es escritura contra Azure (T31).
 Todas sobre el MISMO `raw`, sin ingesta entre medias. Las de solo lectura
 pueden ir con el `.env` del puesto; las escrituras, solo con autorización.
 
+**T26 y T27 HECHAS el 2026-09-30** (detalle en `progress/impl_F-118.md`, «T26 y
+T27»): en `stg`, acumulado final 0 diferencias en 902 pares, suma de movimientos
+solo en 44 obras explicadas, 0 obras movidas sin explicación, master 0 cambios.
+
 1. **T26 · Huellas ANTES** (solo lectura, base actual, ANTES de crear nada):
    `python main.py huella-obras --desde stg --out huella_f118_stg_antes.csv`,
    `python main.py huella-obras --desde mart --out huella_f118_mart_antes.csv`,

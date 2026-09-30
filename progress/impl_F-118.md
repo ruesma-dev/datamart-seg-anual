@@ -190,3 +190,29 @@ corría (medía un árbol y juzgaba otro); no es un rojo del árbol de partida.
 - No cambia `azure-apps/datamart_seg_anual.md` (no lista columnas) ni
   `arnes-base` (nada del arnés). F-099 (coeficientes por contrato) y F-096
   (rama master) quedan fuera, como dice la spec.
+
+## T26 y T27 · la prueba de no-regresión de `stg` (líder, 2026-09-30, mismo `raw`)
+
+Huellas sobre el `raw` de la nocturna del 30-09 (terminó 04:27 UTC), sin ingesta
+entre medias. T26 (09:06, solo lectura): `stg` 12.520 celdas / 350 obras, `mart`
+24.994 / 350, `cierre` 17.080 filas / 331. T27: las dos funciones de `stg` creadas
+por el humano (13:02; la ejecución del líder la bloqueó el permiso de escritura en
+recurso compartido; antes, la IP nueva del puesto, 95.124.168.233, fuera del
+firewall, regla `puesto-pgris-2026-09-30` añadida por el humano) y la huella
+`--propuesta` (13:22, solo lectura): 17.530 celdas / 350 obras.
+
+Resultado, por (obra, ámbito), 902 pares, ninguno solo en un lado:
+- **Ámbitos master 8 y 11: 0 cambios** (`comparar-huellas`).
+- **Acumulado a origen del último periodo: 0 diferencias** en los 902 pares.
+- **Suma de los movimientos: cambia en 44 obras, TODAS explicadas**: las 32 del
+  fallo 1 (spec §2), 0371, 0404, 0562 y 0606 (F-103; la 0455 solo redistribuye)
+  y las 11 fases sin venta (spec §3). **0 obras no explicadas.**
+- **Obras que se mueven: 300** (`comparar-huellas` sin lista). Las 256 restantes
+  solo redistribuyen entre meses: 253 por el mes del texto (F-051: 623 fases de
+  303 obras con otro mes) y 3 (0607, 0680, 0700) solo por relleno: filas nuevas
+  con movimiento 0 y el acumulado arrastrado. **0 obras movidas sin explicación.**
+
+Conclusión: en `stg`, solo cambian las obras que tienen que cambiar, y en las que
+cambian no se altera el total de Sigrid. `mart` y `cierre` se prueban en T29, con
+un ANTES nuevo sacado justo antes de reconstruir (esta huella ANTES solo vale
+sobre este `raw`). Ficheros en el scratchpad (no se versionan).
