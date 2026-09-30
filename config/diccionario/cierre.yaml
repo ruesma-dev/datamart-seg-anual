@@ -11,8 +11,13 @@
 #
 # 2. El mes al que pertenece un cierre lo decide el TEXTO de la fase o de la
 #    version, no su fecha. Si texto y fecha discrepan, manda el texto: es la
-#    regla que dictó el jefe de obra y esta implementada en
-#    `cierre.fn_mes_de_fase`.
+#    regla que dictó el jefe de obra. Desde F-118 el mes de las fases reales lo
+#    decide `stg` (`stg.fn_mes_de_fase`) y `cierre` lo lee de
+#    `stg.plan_mensual.anio_mes`; `cierre.fn_mes_de_fase` la envuelve.
+#
+# 3. La venta del cierre va SIN coeficientes (F-118): la venta con coeficientes,
+#    lo que se factura, esta aparte en `final_importe_con_coeficientes` y en las
+#    columnas `_con_coeficientes` de la cabecera, y no se mezcla con la otra.
 #
 # Nombres y granos verificados contra el SQL de
 # `etl_sigrid/infrastructure/postgres/sql/cierre/`.
@@ -43,6 +48,22 @@ objetos:
       a ~2,62 M EUR y el margen de la obra, del **66,3 % al 1,8 %**. Arrastra a
       `v_pbi_cierre_resumen`, `v_pbi_cierre_cabecera` y `v_pbi_planif_vs_real`.
       Ninguna otra obra cambia.
+
+      **LA VENTA FINAL VA SIN COEFICIENTES (F-118, correo de Juan Romero del
+      2026-09-29).** `final_importe` de la VENTA suma `importe` de la version
+      master de cierre, como el ejecutado y el coste; hasta F-118 sumaba
+      `importe_oficial`, con los coeficientes del contrato, y el beneficio final
+      salia inflado (la 0702 en agosto de 2026: +1.695.571,87 EUR donde son
+      -790.718,46 sin coeficientes). Cambia la venta y el beneficio final de 42
+      obras (511 filas-mes, 2021-2026). La venta CON coeficientes, que es lo que
+      se factura, esta aparte en `final_importe_con_coeficientes`.
+
+      **EL MES ES EL DE `stg` (F-118, F-051 absorbida).** El ejecutado se agrupa
+      por `stg.plan_mensual.anio_mes` (el mes del texto de la fase, con su
+      relleno), el mismo que publica `mart`; `es_relleno` marca los meses de
+      relleno. Un concepto sin filas en un mes que si tiene cierre de otro
+      concepto conserva el ejecutado a origen de su fila anterior (antes caia a
+      0 y rebotaba en veintidos obras de venta, todas anteriores a 2021).
     grano: >-
       Una fila por (`obra_id`, `anio_mes`, `concepto`), que es su clave de
       negocio, con cuatro conceptos base: VENTA, INDIRECTOS, DIRECTOS y
@@ -65,8 +86,10 @@ objetos:
       nombre_obra: Nombre legible de la obra, de `con.res`.
       anio_mes:
         significado: >-
-          Mes de cierre, como fecha del dia 1. Es el mes CANONICO de la fase, y
-          si el texto de la fase discrepa de su fecha, manda el texto.
+          Mes de cierre, como fecha del dia 1. Es `stg.plan_mensual.anio_mes`,
+          sin recalcular (F-118): el mes del TEXTO de la fase, que manda aunque
+          discrepe de sus fechas, o un mes de relleno de una fase de rango
+          (`es_relleno`). Es el mismo mes que publica `mart`.
         agregacion: no_sumable
       anio:
         significado: Ano del mes de cierre.
@@ -90,7 +113,9 @@ objetos:
       ejecutado_origen:
         significado: >-
           Lo ejecutado ACUMULADO desde el inicio de la obra hasta ese mes, en
-          ese concepto. Es un acumulado: no se suma entre meses.
+          ese concepto. Es un acumulado: no se suma entre meses. Si el concepto
+          no tiene filas ese mes (el mes es cierre de otro concepto), conserva
+          el de la fila anterior de ese concepto (F-118), no cae a 0.
         unidad: EUR
         agregacion: ultimo_valor
       ejecutado_anterior:
@@ -110,6 +135,9 @@ objetos:
         significado: >-
           Prevision de como acabara la obra en ese concepto, segun la version
           master de cierre de ese mes. Es una foto del momento, no un acumulado.
+          **SIN coeficientes en los cuatro conceptos, venta incluida (F-118)**:
+          es la base del beneficio, el pendiente, la variacion y los %. La venta
+          con coeficientes esta en `final_importe_con_coeficientes`.
         unidad: EUR
         agregacion: ultimo_valor
       final_anterior:
@@ -139,6 +167,26 @@ objetos:
         nulo_significa: >-
           Es la primera fila de esa obra y ese concepto: no hay ninguna
           anterior con la que comparar.
+      final_importe_con_coeficientes:
+        significado: >-
+          La venta final CON los coeficientes del contrato con el cliente
+          (F-118, D6): suma de `importe_oficial` (el `impcoe` de Sigrid) de la
+          misma version master de cierre que `final_importe`. Es LO QUE SE
+          FACTURA, no la base del cierre: el beneficio, el pendiente, la
+          variacion y los % salen de `final_importe`, sin coeficientes, y esta
+          columna no entra en ninguno de ellos ni se suma, resta o compara con
+          el ejecutado, el coste u otra venta sin coeficientes
+          (`R-VENTA-COEFICIENTES`). No hay ejecutado con coeficientes: la venta
+          real no los guarda (0 de 1,82 M filas en Sigrid). El coeficiente es
+          del CONTRATO, puede haber varios por obra (0676-B: 1,07 y 1,24) y no
+          vive en ninguna tabla; el desglose por contrato es F-099.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: >-
+          El concepto no es VENTA (el coste no tiene coeficientes), o la venta
+          final no sale de una version master (`final_fuente` 'fase_0' o
+          'sin_dato'): la venta real no guarda coeficientes y copiar la de sin
+          coeficientes diria que las dos son iguales (D10).
       final_fuente:
         significado: >-
           De donde sale la prevision final, y es importante para saber cuanto
@@ -172,6 +220,16 @@ objetos:
       fase_nombre_mes: >-
         Nombre del mes escrito en la fase ("Septiembre 2023"). Manda sobre la
         fecha cuando las dos existen y no coinciden.
+      es_relleno:
+        significado: >-
+          TRUE si el mes es de RELLENO para ese concepto (F-118, F-051
+          absorbida): anterior al mes del texto de una fase de rango, con el
+          ejecutado a origen del cierre anterior; FALSE si es un cierre.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+        nulo_significa: >-
+          El concepto no tiene filas ese mes: su ejecutado arrastra el de la
+          fila anterior de ese concepto.
       _built_at:
         significado: >-
           Instante en que se construyo la fila. Instrumentacion del ETL; para la
@@ -266,7 +324,11 @@ objetos:
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
       final_importe:
-        significado: Prevision de cierre de la obra en ese concepto.
+        significado: >-
+          Prevision de cierre de la obra en ese concepto, SIN coeficientes
+          tambien en la VENTA (F-118): de ella salen el BENEFICIO, el pendiente
+          y los %. La venta con coeficientes va en
+          `final_importe_con_coeficientes`.
         unidad: EUR
         agregacion: ultimo_valor
       final_anterior:
@@ -356,6 +418,20 @@ objetos:
       fase_nombre_mes:
         significado: Nombre del mes escrito en la fase.
         nulo_significa: La fila es derivada.
+      final_importe_con_coeficientes:
+        significado: >-
+          La venta final CON los coeficientes del contrato con el cliente, solo
+          en la fila VENTA (F-118, D11): lo que se factura. Viene tal cual de
+          `cierre.fact_cierre_mensual`. No entra en GASTOS, en BENEFICIO ni en
+          ningun %: para cierres, beneficio y analisis se usa `final_importe`,
+          sin coeficientes (`R-VENTA-COEFICIENTES`). No hay ejecutado con
+          coeficientes: la venta real no los guarda. El desglose por contrato
+          es F-099.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: >-
+          La fila no es VENTA (GASTOS, BENEFICIO y los costes no tienen venta
+          con coeficientes), o la venta final no sale de una version master.
 
     relaciones:
       - de: obra_id
@@ -881,14 +957,16 @@ objetos:
         nulo_significa: La obra no tiene director asignado.
       presupuesto_inicial_venta:
         significado: >-
-          Venta prevista en el PRIMER cierre con version master de la obra. Es la
-          referencia de partida.
+          Venta prevista en el PRIMER cierre con version master de la obra, SIN
+          coeficientes (F-118). Es la referencia de partida.
         unidad: EUR
         agregacion: ultimo_valor
         nulo_significa: La obra no tiene ningun cierre con version master.
       version_inicial: Texto de la version master de la que sale el presupuesto inicial.
       presupuesto_vigente_venta:
-        significado: Venta prevista en el ULTIMO cierre con version master de la obra.
+        significado: >-
+          Venta prevista en el ULTIMO cierre con version master de la obra, SIN
+          coeficientes (F-118).
         unidad: EUR
         agregacion: ultimo_valor
         nulo_significa: La obra no tiene ningun cierre con version master.
@@ -904,9 +982,28 @@ objetos:
       modificados_aprobados:
         significado: >-
           Diferencia entre el presupuesto vigente y el inicial, es decir cuanto ha
-          crecido la obra por modificados.
+          crecido la obra por modificados. Sin coeficientes, como los dos
+          presupuestos que resta.
         unidad: EUR
         agregacion: ultimo_valor
+      presupuesto_inicial_venta_con_coeficientes:
+        significado: >-
+          El presupuesto inicial de venta CON los coeficientes del contrato con
+          el cliente (F-118, D11): lo que se factura. Sale del mismo primer
+          cierre master que `presupuesto_inicial_venta`. No se resta ni se
+          compara con los presupuestos sin coeficientes (`R-VENTA-COEFICIENTES`).
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La obra no tiene ningun cierre con version master.
+      presupuesto_vigente_venta_con_coeficientes:
+        significado: >-
+          El presupuesto vigente de venta CON los coeficientes del contrato con
+          el cliente (F-118, D11), del mismo ultimo cierre master que
+          `presupuesto_vigente_venta`. Lo que se factura; no entra en
+          `modificados_aprobados` ni se mezcla con los de sin coeficientes.
+        unidad: EUR
+        agregacion: ultimo_valor
+        nulo_significa: La obra no tiene ningun cierre con version master.
     relaciones:
       - de: obra_id
         a: cierre.fact_cierre_mensual.obra_id
@@ -947,10 +1044,15 @@ objetos:
       buen recordatorio de que **el defecto de una tabla no se hereda entero: se
       hereda columna a columna**.
 
-      Lo que si le afecta, y no lo arregla F-042: en las 8 obras cuya fase
-      abarca varios meses pero Sigrid archiva en su mes de arranque, esta vista
-      compara el planificado de un mes contra un real que lleva dentro el
-      trabajo de dos o tres. La causa esta en el origen y esta fichada aparte.
+      **Una fila por clave, por construccion (F-118, F-051 absorbida).** Hasta
+      F-118 agrupaba tambien por `nombre_mes`, que en las filas reales era el
+      texto libre de la fase: el mismo (obra, mes) salia partido en varias filas
+      y el BENEFICIO se cruzaba entre ellas (la 0571 lo publicaba ocho veces en
+      2020-05; 204 claves repetidas en `check-unicidad`). Ahora agrupa por
+      (`obra_id`, `anio_mes`, `categoria`, `concepto`), une el beneficio al
+      mismo grano y deriva `nombre_mes` de `anio_mes`. Y el real de una fase que
+      abarca varios meses cae en el mes de su TEXTO, con relleno a 0 en los
+      anteriores, en vez de en su mes de arranque.
     clave_negocio: [obra_id, anio_mes, concepto_cuadro]
     paso_etl: build_cierre
     refresco: nocturno
@@ -1052,14 +1154,16 @@ objetos:
     capa: operacion
     consumo_recomendado: false
     motivo_no_consumo: >-
-      Funcion auxiliar del build de cierre. Se documenta porque explica una regla
-      de negocio que sorprende a cualquiera que mire los datos.
+      Funcion auxiliar. Se documenta porque explica una regla de negocio que
+      sorprende a cualquiera que mire los datos.
     descripcion: >-
-      Decide a que mes pertenece una fase de obra. Si el nombre escrito en la
-      fase y su fecha de inicio apuntan al mismo mes, devuelve ese mes. **Si
-      discrepan, MANDA EL TEXTO**: es la regla que dicto el jefe de obra, porque
-      la fecha se teclea mal con mas frecuencia que el nombre. Si solo hay uno de
-      los dos, usa ese.
+      Decide a que mes pertenece una fase de obra. Desde F-118 es un ENVOLTORIO
+      de `stg.fn_mes_de_fase` (fecha de inicio, texto, fecha fin y mes
+      archivado): la regla vive una sola vez, en `stg`. **Manda el texto** de la
+      fase aunque discrepe de las fechas; un rango se lee por su ultimo mes; si
+      el texto no se entiende, la fecha fin, la de inicio y el `ano`/`mes`
+      archivado. El build de `cierre` ya no la llama: lee
+      `stg.plan_mensual.anio_mes`, que es este mismo mes.
     grano: null
     clave_negocio: []
     paso_etl: build_cierre

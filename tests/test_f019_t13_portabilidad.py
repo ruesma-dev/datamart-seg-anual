@@ -40,7 +40,10 @@ MESES_ESPERADOS = [
 DERIVACIONES_DE_MES = {
     "infrastructure/postgres/sql/cierre/02_build_fact.sql": 1,
     "infrastructure/postgres/sql/cierre/04_views_detalle.sql": 2,
-    "infrastructure/postgres/sql/mart/02_build_fact.sql": 2,
+    # F-118 (F-051): la vista deriva nombre_mes de anio_mes (R18).
+    "infrastructure/postgres/sql/cierre/06_views_planif_vs_real.sql": 1,
+    # F-118 (F-051): las ramas reales también, con el mismo ARRAY (R17).
+    "infrastructure/postgres/sql/mart/02_build_fact.sql": 4,
     "infrastructure/postgres/sql/mart/04_view_periodificado.sql": 1,
     "infrastructure/postgres/sql/mart/05_views_powerbi.sql": 2,
 }

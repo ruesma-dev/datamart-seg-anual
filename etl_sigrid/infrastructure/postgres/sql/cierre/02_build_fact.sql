@@ -1,40 +1,44 @@
 -- etl_sigrid/infrastructure/postgres/sql/cierre/02_build_fact.sql
 --
 -- =========================================================================
--- Carga cierre.fact_cierre_mensual (Tanda 1.7 — impcoe SOLO en venta)
+-- Carga cierre.fact_cierre_mensual (F-118: la venta final SIN coeficientes)
 -- =========================================================================
 --
--- BUG TANDA 1.4: el FINAL del master se calculaba como
--- SUM(stg.plan_mensual.importe_origen), pero plan_mensual distribuye el
--- master en filas mensuales con importe_origen ACUMULADO por mes. Al sumar
--- TODOS los meses, obtenía un múltiplo (≈9x) del importe real.
+-- F-118 (correo de Juan Romero del 2026-09-29, decisión del humano D6): el
+-- FINAL de la venta se suma con `stg.presupuesto.importe`, SIN coeficientes,
+-- como el ejecutado y como el coste. Hasta F-118 sumaba `importe_oficial` (el
+-- `impcoe` de Sigrid, con los coeficientes del contrato con el cliente: 1,19 en
+-- casi todas, 1,2574 en la 0702) y restaba contra él un ejecutado que no los
+-- lleva: el cierre de agosto de 2026 daba a la 0702 un beneficio final de
+-- +1.695.571,87 € donde la hoja de cierre de Juan prevé −790.718,46 €.
+-- De `final_importe` salen, sin tocar nada más, el pendiente, la variación, los
+-- % y el beneficio (R39). La venta CON coeficientes, que es lo que se factura,
+-- se publica ADEMÁS en `final_importe_con_coeficientes` (R41): suma de
+-- `importe_oficial` del mismo master, solo en VENTA con fuente master; NULL en
+-- el coste y con respaldo de fase 0, porque la venta real no guarda
+-- coeficientes (D10). No entra en ningún cálculo (R43). El coeficiente es del
+-- contrato y no se reconstruye: el desglose por contrato es F-099 (R44).
 --
--- FIX TANDA 1.5: para FINAL leer directamente stg.presupuesto, que tiene
--- UNA fila por (obra × partida × ámbito × versión) con `importe = can × pre`
--- (importe total sin distribución), idéntico a lo que Sigrid muestra en
--- pantalla.
---
--- FIX TANDA 1.6: Sigrid aplica coeficientes en el ámbito VENTA. El campo
--- raw.obrparpre.impcoe es el importe oficial con coeficientes aplicados;
--- stg.presupuesto.importe_oficial = COALESCE(impcoe, can*pre) lo encapsula.
---
--- FIX TANDA 1.7: importe_oficial SOLO se aplica a VENTA (amb 7 y 11), que
--- es el único ámbito con coeficientes. Para COSTE (amb 3 y 8) seguimos
--- usando stg.presupuesto.importe (= ROUND(can*pre, 2)) para mantener
--- consistencia con la planificación valorada del mart.
+-- Historia de la fuente del FINAL:
+--   Tanda 1.4: sumaba stg.plan_mensual.importe_origen de TODOS los meses del
+--     master (acumulado por mes): un múltiplo (≈9x) del importe real.
+--   Tanda 1.5: lee stg.presupuesto, UNA fila por (obra × partida × ámbito ×
+--     versión) con `importe = can × pre`.
+--   Tanda 1.6-1.7: la venta pasó a `importe_oficial` (con coeficientes) para
+--     cuadrar con la pantalla de Sigrid; F-118 lo deshace (arriba).
 --
 -- Las versiones master CIERRE (texto, fec_creacion) siguen viniendo de
 -- stg.plan_mensual (que las clasifica con version_tex y version_fec_creacion),
 -- pero los importes los sacamos de stg.presupuesto.
 --
--- EJECUTADO sigue desde stg.plan_mensual amb 3/7 fas>=1: ahí cada (partida,
--- versión=fase) tiene UNA fila con importe_origen correcto (no distribuido).
+-- EJECUTADO desde stg.plan_mensual amb 3/7 fas>=1, en el mes de `stg` (F-118).
 --
 -- =========================================================================
 -- Mapping concepto → fuentes:
 --   VENTA      ← ejec: plan_mensual amb=7  fas>=1
---                final master: pres.importe_oficial amb=11 fase=<v_cierre>
---                fb fase 0:    pres.importe_oficial amb=7  fase=0
+--                final master: pres.importe         amb=11 fase=<v_cierre>
+--                  (con coeficientes, aparte: pres.importe_oficial)
+--                fb fase 0:    pres.importe         amb=7  fase=0
 --   INDIRECTOS ← ejec: plan_mensual amb=3  fas>=1 cat=CI
 --                final master: pres.importe         amb=8  fase=<v_cierre>  cat=CI
 --                fb fase 0:    pres.importe         amb=3  fase=0           cat=CI
@@ -50,84 +54,83 @@ INSERT INTO cierre.fact_cierre_mensual (
     concepto, orden_concepto,
     ejecutado_origen, ejecutado_anterior, ejecutado_mes,
     final_importe, final_anterior, pendiente_importe, variacion_importe,
+    final_importe_con_coeficientes,
     final_fuente, final_version_master, final_version_tex,
-    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes
+    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes,
+    es_relleno
 )
 WITH
 -- =========================================================================
--- A) Fases con mes canónico (excluye fas=0)
+-- A) EJECUTADO ORIGEN por (obra × mes × concepto)
+--    Fuente: stg.plan_mensual amb 3/7, donde cada (partida, mes) tiene su
+--    acumulado a origen.
+--
+--    F-118 (F-051 absorbida): el mes es `pm.anio_mes`, el que decide `stg`
+--    con el TEXTO de la fase y su relleno. `cierre` ya no lo recalcula con
+--    `fn_mes_de_fase`: las tres capas publican el mismo mes por construcción
+--    (R16). Un mes de relleno suma el acumulado arrastrado (`es_relleno`); una
+--    fila de deshacer suma 0, que es justo lo que la partida vale ese mes.
 -- =========================================================================
-fases_con_mes AS (
+ejecutado_base AS (
     SELECT
-        f.fase_id, f.obra_id, f.numero_fase,
-        f.fecha_inicio, f.nombre_mes,
-        cierre.fn_mes_de_fase(f.fecha_inicio, f.nombre_mes) AS mes_canonico
-    FROM stg.fases f
-    WHERE f.numero_fase >= 1
+        pm.obra_id, pm.anio_mes AS mes_cierre, 'VENTA'::VARCHAR AS concepto,
+        SUM(pm.importe_origen)::NUMERIC(18,2) AS ejecutado_origen,
+        MAX(pm.version)                       AS fase_numero,
+        bool_and(pm.es_relleno)               AS es_relleno
+    FROM stg.plan_mensual pm
+    WHERE pm.ambito_id = 7
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
+
+    UNION ALL
+    SELECT
+        pm.obra_id, pm.anio_mes, 'INDIRECTOS'::VARCHAR,
+        SUM(pm.importe_origen)::NUMERIC(18,2),
+        MAX(pm.version), bool_and(pm.es_relleno)
+    FROM stg.plan_mensual pm
+    JOIN stg.partidas p ON p.partida_id = pm.partida_id
+    WHERE pm.ambito_id = 3 AND p.categoria = 'CI'
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
+
+    UNION ALL
+    SELECT
+        pm.obra_id, pm.anio_mes, 'DIRECTOS'::VARCHAR,
+        SUM(pm.importe_origen)::NUMERIC(18,2),
+        MAX(pm.version), bool_and(pm.es_relleno)
+    FROM stg.plan_mensual pm
+    JOIN stg.partidas p ON p.partida_id = pm.partida_id
+    WHERE pm.ambito_id = 3 AND p.categoria = 'CD'
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
+
+    UNION ALL
+    SELECT
+        pm.obra_id, pm.anio_mes, 'GENERALES'::VARCHAR,
+        SUM(pm.importe_origen)::NUMERIC(18,2),
+        MAX(pm.version), bool_and(pm.es_relleno)
+    FROM stg.plan_mensual pm
+    JOIN stg.partidas p ON p.partida_id = pm.partida_id
+    WHERE pm.ambito_id = 3 AND p.categoria = 'CP'
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
 ),
 
 -- =========================================================================
--- B) EJECUTADO ORIGEN por (obra × mes × concepto)
---    Fuente: stg.plan_mensual amb 3/7. En este ámbito cada fila por
---    (obra, partida, fase) ya tiene importe_origen correcto.
---    (Esta parte NO ha cambiado vs Tanda 1.4 — funcionaba bien.)
+-- B) La fase del mes, para la trazabilidad: la vigente de ese cierre o, en un
+--    mes de relleno, la que lo genera (es la `version` de sus filas).
 -- =========================================================================
 ejecutado_concepto AS (
     SELECT
-        fm.obra_id, fm.mes_canonico AS mes_cierre, 'VENTA'::VARCHAR AS concepto,
-        SUM(pm.importe_origen)::NUMERIC(18,2) AS ejecutado_origen,
-        MAX(fm.fase_id)        AS fase_id,
-        MAX(fm.numero_fase)    AS fase_numero,
-        MAX(fm.fecha_inicio)   AS fase_fecha_inicio,
-        MAX(fm.nombre_mes)     AS fase_nombre_mes
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    WHERE pm.ambito_id = 7
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
-
-    UNION ALL
-    SELECT
-        fm.obra_id, fm.mes_canonico, 'INDIRECTOS'::VARCHAR,
-        SUM(pm.importe_origen)::NUMERIC(18,2),
-        MAX(fm.fase_id), MAX(fm.numero_fase),
-        MAX(fm.fecha_inicio), MAX(fm.nombre_mes)
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    JOIN stg.partidas p ON p.partida_id = pm.partida_id
-    WHERE pm.ambito_id = 3 AND p.categoria = 'CI'
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
-
-    UNION ALL
-    SELECT
-        fm.obra_id, fm.mes_canonico, 'DIRECTOS'::VARCHAR,
-        SUM(pm.importe_origen)::NUMERIC(18,2),
-        MAX(fm.fase_id), MAX(fm.numero_fase),
-        MAX(fm.fecha_inicio), MAX(fm.nombre_mes)
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    JOIN stg.partidas p ON p.partida_id = pm.partida_id
-    WHERE pm.ambito_id = 3 AND p.categoria = 'CD'
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
-
-    UNION ALL
-    SELECT
-        fm.obra_id, fm.mes_canonico, 'GENERALES'::VARCHAR,
-        SUM(pm.importe_origen)::NUMERIC(18,2),
-        MAX(fm.fase_id), MAX(fm.numero_fase),
-        MAX(fm.fecha_inicio), MAX(fm.nombre_mes)
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    JOIN stg.partidas p ON p.partida_id = pm.partida_id
-    WHERE pm.ambito_id = 3 AND p.categoria = 'CP'
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
+        e.obra_id, e.mes_cierre, e.concepto, e.ejecutado_origen, e.es_relleno,
+        f.fase_id,
+        e.fase_numero,
+        f.fecha_inicio AS fase_fecha_inicio,
+        f.nombre_mes   AS fase_nombre_mes
+    FROM ejecutado_base e
+    LEFT JOIN stg.fases f
+        ON f.obra_id     = e.obra_id
+       AND f.numero_fase = e.fase_numero
 ),
 
 -- =========================================================================
@@ -175,16 +178,12 @@ master_vigente_por_mes AS (
 --    UNA fila por (obra, partida, amb, fase_num) con `importe = can × pre`
 --    TOTAL, sin distribución mensual.
 --
---    Columna de importe usada:
---      - VENTA (amb=11): pres.importe_oficial
---          → COALESCE(impcoe Sigrid, can*pre).
---          → impcoe lleva los coeficientes que aplica Sigrid en venta.
---          → Cuadra exactamente con la pantalla Sigrid master venta.
---      - INDIRECTOS/DIRECTOS/GENERALES (amb=8): pres.importe
---          → = ROUND(can*pre, 2). Coste no lleva coeficientes en Sigrid,
---            así que importe_oficial sería igual a importe en el 99% de
---            registros. Mantenemos importe para consistencia con
---            mart/plan_mensual.
+--    Columna de importe usada (F-118, D6): `pres.importe` en los cuatro
+--    conceptos, SIN coeficientes, como el ejecutado. En VENTA se suma además
+--    `pres.importe_oficial` (COALESCE(impcoe, can*pre): con los coeficientes
+--    del contrato, lo que muestra la pantalla master de venta de Sigrid) en
+--    `final_importe_con_coeficientes`, que no entra en ningún cálculo. El
+--    coste no tiene coeficientes: NULL.
 --
 --    El campo `fase_num` de stg.presupuesto corresponde a la VERSIÓN del
 --    master en amb 8/11 (NO a un mes). Esto es histórico del modelado de
@@ -195,7 +194,8 @@ final_master AS (
     -- VENTA (amb=11), todas las categorías
     SELECT
         mv.obra_id, mv.mes_master AS mes_cierre, 'VENTA'::VARCHAR AS concepto,
-        SUM(pres.importe_oficial)::NUMERIC(18,2) AS final_importe,
+        SUM(pres.importe)::NUMERIC(18,2) AS final_importe,
+        SUM(pres.importe_oficial)::NUMERIC(18,2) AS final_importe_con_coeficientes,
         mv.version     AS final_version_master,
         mv.version_tex AS final_version_tex
     FROM master_vigente_por_mes mv
@@ -211,6 +211,7 @@ final_master AS (
     SELECT
         mv.obra_id, mv.mes_master, 'INDIRECTOS'::VARCHAR,
         SUM(pres.importe)::NUMERIC(18,2),
+        NULL::NUMERIC(18,2),
         mv.version, mv.version_tex
     FROM master_vigente_por_mes mv
     JOIN stg.presupuesto pres
@@ -225,6 +226,7 @@ final_master AS (
     SELECT
         mv.obra_id, mv.mes_master, 'DIRECTOS'::VARCHAR,
         SUM(pres.importe)::NUMERIC(18,2),
+        NULL::NUMERIC(18,2),
         mv.version, mv.version_tex
     FROM master_vigente_por_mes mv
     JOIN stg.presupuesto pres
@@ -239,6 +241,7 @@ final_master AS (
     SELECT
         mv.obra_id, mv.mes_master, 'GENERALES'::VARCHAR,
         SUM(pres.importe)::NUMERIC(18,2),
+        NULL::NUMERIC(18,2),
         mv.version, mv.version_tex
     FROM master_vigente_por_mes mv
     JOIN stg.presupuesto pres
@@ -252,14 +255,14 @@ final_master AS (
 -- =========================================================================
 -- E) FALLBACK fase 0 (Previsto) — para mes en curso sin master CIERRE
 --    Fuente: stg.presupuesto amb 3/7 fas=0 ("Previsto" vivo).
---    Columna de importe:
---      - VENTA (amb=7): pres.importe_oficial (con coeficientes)
---      - INDIRECTOS/DIRECTOS/GENERALES (amb=3): pres.importe (sin coef.)
+--    Columna de importe: pres.importe, SIN coeficientes, en los cuatro
+--    conceptos (F-118). Sin venta con coeficientes: la venta real no los
+--    guarda, y copiar la sin coeficientes diría que son iguales (D10).
 -- =========================================================================
 final_fase0 AS (
     -- VENTA fase 0 (amb=7)
     SELECT pres.obra_id, 'VENTA'::VARCHAR AS concepto,
-           SUM(pres.importe_oficial)::NUMERIC(18,2) AS final_importe
+           SUM(pres.importe)::NUMERIC(18,2) AS final_importe
       FROM stg.presupuesto pres
      WHERE pres.ambito_id = 7 AND pres.fase_num = 0
      GROUP BY pres.obra_id
@@ -327,7 +330,9 @@ combinado AS (
               [EXTRACT(MONTH FROM g.anio_mes)::INT]
             || ' ' || EXTRACT(YEAR FROM g.anio_mes)::INT AS nombre_mes,
         g.concepto, g.orden_concepto,
-        COALESCE(e.ejecutado_origen, 0)::NUMERIC(18,2) AS ejecutado_origen,
+        -- NULL si el concepto no tiene filas ese mes: lo resuelve `arrastrado`.
+        e.ejecutado_origen                   AS ejecutado_propio,
+        e.es_relleno,
         COALESCE(fm.final_importe, ff.final_importe, 0)::NUMERIC(18,2) AS final_importe,
         CASE
             WHEN fm.final_importe IS NOT NULL THEN 'master'
@@ -336,6 +341,8 @@ combinado AS (
         END                                  AS final_fuente,
         fm.final_version_master,
         fm.final_version_tex,
+        -- Solo con fuente master (D10): sin fila en final_master, NULL.
+        fm.final_importe_con_coeficientes,
         e.fase_id, e.fase_numero, e.fase_fecha_inicio, e.fase_nombre_mes
     FROM grid g
     LEFT JOIN ejecutado_concepto e
@@ -350,12 +357,34 @@ combinado AS (
         ON ff.obra_id  = g.obra_id
        AND ff.concepto = g.concepto
 ),
+-- R38 (D5 de F-118): un concepto sin filas en un mes que sí tiene cierre de
+-- otro concepto (la obra cerró coste y no abrió la fase de venta, o su venta
+-- terminó antes) conserva el ejecutado a origen del último mes con filas. Antes
+-- caía a 0 y rebotaba al mes siguiente: 22 obras de venta publicaban un mes con
+-- la venta a origen a cero. Sin mes anterior con filas, 0.
+con_grupo AS (
+    SELECT
+        c.*,
+        COUNT(ejecutado_propio) OVER (
+            PARTITION BY obra_id, concepto ORDER BY anio_mes
+            ROWS UNBOUNDED PRECEDING
+        ) AS grupo_ejecutado
+    FROM combinado c
+),
+arrastrado AS (
+    SELECT
+        c.*,
+        COALESCE(MAX(ejecutado_propio) OVER (
+            PARTITION BY obra_id, concepto, grupo_ejecutado
+        ), 0)::NUMERIC(18,2) AS ejecutado_origen
+    FROM con_grupo c
+),
 con_lag AS (
     SELECT
         c.*,
         LAG(c.ejecutado_origen) OVER w AS ejecutado_anterior_lag,
         LAG(c.final_importe)    OVER w AS final_anterior_lag
-    FROM combinado c
+    FROM arrastrado c
     WINDOW w AS (PARTITION BY c.obra_id, c.concepto ORDER BY c.anio_mes)
 )
 SELECT
@@ -370,6 +399,8 @@ SELECT
     (final_importe - ejecutado_origen)::NUMERIC(18,2)   AS pendiente_importe,
     CASE WHEN final_anterior_lag IS NULL THEN NULL
          ELSE (final_importe - final_anterior_lag)::NUMERIC(18,2) END AS variacion_importe,
+    final_importe_con_coeficientes,
     final_fuente, final_version_master, final_version_tex,
-    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes
+    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes,
+    es_relleno
 FROM con_lag;

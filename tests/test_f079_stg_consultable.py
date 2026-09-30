@@ -60,6 +60,10 @@ GRUPO_A = (
 GRUPO_B_FUNCIONES = (
     "cierre.fn_parse_mes_fase",
     "cierre.fn_mes_de_fase",
+    # F-118 (2026-09-30): el mes de las filas reales, una vez y en `stg`. Se
+    # llaman desde `08_plan_mensual.sql`; `cierre.fn_mes_de_fase` las envuelve.
+    "stg.fn_parse_mes_texto",
+    "stg.fn_mes_de_fase",
     "cierre.fn_mes_de_version_master",
     "compras.fn_tipo_documento",
     "compras.fn_serie",

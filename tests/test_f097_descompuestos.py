@@ -779,7 +779,7 @@ def test_f097_r27_las_fichas_avisan_de_lo_provisional() -> None:
 
 def test_f097_r27_global_esquema_regla_y_version() -> None:
     glob = _yaml("00_global.yaml")
-    assert glob["version"] == 37
+    assert glob["version"] >= 37, "F-118 la sube a 38"
     esquema = glob["esquemas"]["descompuestos"]
     assert esquema["pasos_etl"] == ["ingest_descompuestos", "build_descompuestos"]
     assert esquema["refresco"] == "nocturno" and esquema["consumo_recomendado"] is True

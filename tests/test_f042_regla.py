@@ -46,6 +46,7 @@ from decimal import Decimal
 import pytest
 
 from etl_sigrid.domain.cierres import Cierre, plan_de_cierres
+from etl_sigrid.domain.serie_real import serie_densa
 
 # El acumulado de una fase que la línea base no cuantifica. Positivo y distinto
 # de los demás para que un test que se apoyara en su VALOR fallara a la vista.
@@ -670,9 +671,9 @@ def test_f042_r16_el_telescopio_se_cumple_tras_renumerar():
     SQL particiona por (obra, **partida**, ámbito). A grano de partida la
     propiedad NO es universal: una partida puede faltar en una fase que sí
     sobrevive, y entonces publica el acumulado entero y no telescopea —pasa en la
-    0471—. Quien clasifica eso contra la base es
-    `domain.cierres.hay_hueco_de_origen`, y por eso ningún test de aquí puede
-    cazar ese caso.
+    0471—. F-118 lo resolvió con la serie densa (la partida se deshace en la
+    fase donde falta) y lo prueba `tests/test_f118_serie_densa.py`; el antiguo
+    `domain.cierres.hay_hueco_de_origen`, que apartaba esas series, se retiró.
     """
     plan = plan_de_cierres(_CIERRES_0499)
     movimientos = _movimientos(plan, _0499)
@@ -680,27 +681,27 @@ def test_f042_r16_el_telescopio_se_cumple_tras_renumerar():
     assert sum(movimientos.values()) == _0499[22]
 
 
-def test_f042_r6_con_un_hueco_de_origen_el_telescopio_suma_por_tramos():
-    """El caso honesto: con un hueco que NO crea la regla, `SUM(importe_mes)` no
-    es el último acumulado, y **tampoco lo era antes** de esta feature.
-
-    La serie 1, 2, 4 se parte en dos tramos consecutivos —(1, 2) y (4)— y la suma
-    de movimientos es el acumulado del último de cada tramo. Lo que R16 exige es
-    que la feature no cambie esto, no que lo arregle: arreglarlo sería
-    `dense_rank()`, y eso movería obras que hoy están bien.
+def test_f042_r6_con_un_hueco_de_origen_la_serie_densa_telescopea():
+    """Hasta F-118 este test fijaba el DEFECTO: con un hueco que no crea la
+    regla (fases 1, 2 y 4), la 4 publicaba el acumulado entero y la suma de
+    movimientos era 200 + 400. Era el hueco de numeración de F-103, y F-118 lo
+    absorbe: la serie densa no mira el número de fase, así que la 4 resta a la 2
+    y la suma es el último acumulado. El `dense_rank()` que F-042 temía no hace
+    falta: las obras con la serie bien no cambian (lo prueba el invariante de
+    `tests/test_f118_invariante.py`).
     """
     acumulados = {
         1: Decimal("100.00"),
         2: Decimal("200.00"),
         4: Decimal("400.00"),
     }
-    plan = plan_de_cierres(
-        [Cierre(n, date(2016, n, 1), a) for n, a in acumulados.items()]
-    )
-    movimientos = _movimientos(plan, acumulados)
+    filas = {date(2016, n, 1): a for n, a in acumulados.items()}
+    serie = serie_densa(filas, sorted(filas))
 
-    assert sum(movimientos.values()) == acumulados[2] + acumulados[4]
-    assert sum(movimientos.values()) != acumulados[4]
+    assert [f.movimiento for f in serie] == [
+        Decimal("100.00"), Decimal("100.00"), Decimal("200.00")
+    ]
+    assert sum(f.movimiento for f in serie) == acumulados[4]
 
 
 # ---------------------------------------------------------------------------

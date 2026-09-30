@@ -165,6 +165,17 @@ infraestructura.
 > recomendado) y tres funciones locales (`fn_trocear`, `fn_num`, `fn_fecha`).
 > El inventario pasa a **187 objetos**, la cobertura de columnas a **1401** y
 > las fichas de consumo a **85** (ni las funciones ni el estado son de consumo).
+>
+> **Enmienda del 2026-09-30 (F-118, la serie real densa y la venta sin
+> coeficientes).** Entran dos funciones de `stg`, `fn_parse_mes_texto` y
+> `fn_mes_de_fase` (el mes de las filas reales lo da el texto de la fase, una
+> sola vez), y once columnas: `es_relleno` y `es_deshacer` en
+> `stg.plan_mensual`, `mart.fact_seguimiento_mensual` y `mart.v_pbi_fact`;
+> `final_importe_con_coeficientes` y `es_relleno` en
+> `cierre.fact_cierre_mensual`; `final_importe_con_coeficientes` en
+> `v_pbi_cierre_resumen`, y las dos `presupuesto_*_venta_con_coeficientes` de la
+> cabecera. El inventario pasa a **189 objetos**, la cobertura de columnas a
+> **1412** y las fichas de consumo siguen en **85**.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

@@ -439,9 +439,12 @@ def test_f042_r22_la_propuesta_reutiliza_el_texto_del_fichero_del_build():
     bloque = bloque_de_reales(SQL_PLAN_MENSUAL)
     texto = sql_huella_propuesta(SQL_PLAN_MENSUAL, (584748,))
 
-    for cte in ("reales_cierres AS (", "reales_vigente AS (", "reales_orden AS ("):
+    # F-118: la serie densa sustituye a `reales_orden` y al `CASE` del LAG por
+    # `orden_fase`; la huella lee `reales_final`, lo mismo que el INSERT.
+    for cte in ("reales_cierres AS (", "reales_vigente AS (", "reales_final AS ("):
         assert cte in bloque and cte in texto
-    assert "LAG(orden_fase) OVER w = orden_fase - 1" in texto
+    assert "COALESCE(LAG(importe_origen_round) OVER w, 0)" in texto
+    assert "FROM reales_final rf" in texto
     assert texto.startswith("WITH")
 
 
@@ -774,8 +777,8 @@ def test_f042_r22_la_propuesta_lee_el_sql_del_build_de_verdad(
 
     assert resultado.exit_code == 0, resultado.output
     assert "sin materializar" in resultado.output
-    assert any("reales_con_lag" in c for c in pg.consultas)
-    assert any("LAG(orden_fase) OVER w = orden_fase - 1" in c for c in pg.consultas)
+    assert any("FROM reales_final rf" in c for c in pg.consultas)
+    assert any("COALESCE(LAG(importe_origen_round) OVER w, 0)" in c for c in pg.consultas)
 
 
 def test_f042_r22_un_bloque_de_reales_sin_marcador_de_tramo_se_rechaza():

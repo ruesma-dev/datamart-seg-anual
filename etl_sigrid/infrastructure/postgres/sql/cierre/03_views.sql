@@ -14,6 +14,12 @@
 --
 -- El presupuesto_aprobado_venta viene de cierre.v_pbi_cierre_cabecera
 -- (que por defecto = presupuesto_inicial_venta).
+--
+-- F-118 (D6, D11): todo lo de arriba va SIN coeficientes. La venta final CON
+-- los coeficientes del contrato (lo que se factura) se publica además en la
+-- última columna, `final_importe_con_coeficientes`: solo en la fila VENTA (y
+-- solo si el final sale del master), NULL en GASTOS y BENEFICIO. No entra en
+-- `gastos`, ni en `beneficio`, ni en ningún % (R43).
 
 DROP VIEW IF EXISTS cierre.v_pbi_cierre_resumen CASCADE;
 DROP VIEW IF EXISTS cierre.v_pbi_dim_concepto   CASCADE;
@@ -44,7 +50,8 @@ base AS (
         ejecutado_origen, ejecutado_anterior, ejecutado_mes,
         final_importe, final_anterior, pendiente_importe, variacion_importe,
         final_fuente, final_version_master, final_version_tex,
-        fase_numero, fase_nombre_mes
+        fase_numero, fase_nombre_mes,
+        final_importe_con_coeficientes
     FROM cierre.fact_cierre_mensual
 ),
 
@@ -71,7 +78,8 @@ gastos AS (
         NULL::INT          AS final_version_master,
         NULL::TEXT         AS final_version_tex,
         NULL::INT          AS fase_numero,
-        NULL::VARCHAR(48)  AS fase_nombre_mes
+        NULL::VARCHAR(48)  AS fase_nombre_mes,
+        NULL::NUMERIC(18,2) AS final_importe_con_coeficientes
     FROM base
     WHERE concepto IN ('INDIRECTOS', 'DIRECTOS', 'GENERALES')
     GROUP BY obra_id, codigo_obra, nombre_obra, anio_mes, anio, mes, nombre_mes
@@ -100,7 +108,8 @@ beneficio AS (
         NULL::INT          AS final_version_master,
         NULL::TEXT         AS final_version_tex,
         NULL::INT          AS fase_numero,
-        NULL::VARCHAR(48)  AS fase_nombre_mes
+        NULL::VARCHAR(48)  AS fase_nombre_mes,
+        NULL::NUMERIC(18,2) AS final_importe_con_coeficientes
     FROM base v
     JOIN gastos g
         ON g.obra_id  = v.obra_id
@@ -207,7 +216,9 @@ SELECT
 
     -- Trazabilidad
     t.final_fuente, t.final_version_master, t.final_version_tex,
-    t.fase_numero, t.fase_nombre_mes
+    t.fase_numero, t.fase_nombre_mes,
+    -- F-118: la venta final CON coeficientes, aparte (solo fila VENTA).
+    t.final_importe_con_coeficientes
 FROM todos t
 LEFT JOIN venta_por_mes     v ON v.obra_id = t.obra_id AND v.anio_mes = t.anio_mes
 LEFT JOIN aprobado_por_obra a ON a.obra_id = t.obra_id;
@@ -215,4 +226,6 @@ LEFT JOIN aprobado_por_obra a ON a.obra_id = t.obra_id;
 COMMENT ON VIEW cierre.v_pbi_cierre_resumen IS
 'Cierre mensual de obra (Tanda 4). Porcentajes según Excel CONTROL DE GESTIÓN: '
 'cada columna usa la VENTA de la misma columna como divisor; VENTA FINAL '
-'usa presupuesto_aprobado_venta de la cabecera.';
+'usa presupuesto_aprobado_venta de la cabecera. Todo SIN coeficientes; la '
+'venta final con coeficientes va aparte en final_importe_con_coeficientes, '
+'solo en la fila VENTA (F-118).';
