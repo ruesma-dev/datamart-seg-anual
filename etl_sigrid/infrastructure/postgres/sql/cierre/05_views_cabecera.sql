@@ -14,6 +14,13 @@
 --                      con master en el cierre.
 --   - FIN PREVISTO: ídem, último mes con master en el cierre.
 --
+--
+-- F-118 (D6, D11): el presupuesto inicial y vigente de venta, y con ellos los
+-- modificados, salen del FINAL del cierre, que va SIN coeficientes. El mismo
+-- presupuesto CON los coeficientes del contrato (lo que se factura) se publica
+-- además en `presupuesto_inicial_venta_con_coeficientes` y
+-- `presupuesto_vigente_venta_con_coeficientes`, al final. Nunca se restan entre
+-- sí ni con las otras: `modificados_aprobados` sigue siendo sin coeficientes.
 -- =========================================================================
 
 DROP VIEW IF EXISTS cierre.v_pbi_cierre_cabecera CASCADE;
@@ -45,6 +52,7 @@ fechas_obrctr AS (
 venta_meses AS (
     SELECT
         obra_id, anio_mes, final_importe,
+        final_importe_con_coeficientes,
         final_version_tex,
         ROW_NUMBER() OVER (PARTITION BY obra_id ORDER BY anio_mes ASC)  AS rn_asc,
         ROW_NUMBER() OVER (PARTITION BY obra_id ORDER BY anio_mes DESC) AS rn_desc
@@ -54,12 +62,14 @@ venta_meses AS (
 ),
 venta_inicial AS (
     SELECT obra_id, final_importe AS presupuesto_inicial_venta,
+           final_importe_con_coeficientes AS presupuesto_inicial_venta_con_coeficientes,
            final_version_tex      AS version_inicial,
            anio_mes               AS mes_inicial
     FROM venta_meses WHERE rn_asc = 1
 ),
 venta_vigente AS (
     SELECT obra_id, final_importe AS presupuesto_vigente_venta,
+           final_importe_con_coeficientes AS presupuesto_vigente_venta_con_coeficientes,
            final_version_tex      AS version_vigente,
            anio_mes               AS mes_vigente
     FROM venta_meses WHERE rn_desc = 1
@@ -166,7 +176,10 @@ SELECT
     vv.version_vigente,
     vi.presupuesto_inicial_venta                               AS presupuesto_aprobado_venta,
     (COALESCE(vv.presupuesto_vigente_venta, 0)
-     - COALESCE(vi.presupuesto_inicial_venta, 0))::NUMERIC(18,2) AS modificados_aprobados
+     - COALESCE(vi.presupuesto_inicial_venta, 0))::NUMERIC(18,2) AS modificados_aprobados,
+    -- F-118: el mismo presupuesto CON coeficientes, aparte (lo que se factura).
+    vi.presupuesto_inicial_venta_con_coeficientes,
+    vv.presupuesto_vigente_venta_con_coeficientes
 FROM stg.obras o
 LEFT JOIN raw.obr   obr ON obr.ide   = o.obra_id
 LEFT JOIN raw.con   cli ON cli.ide   = obr.entide
@@ -185,4 +198,5 @@ COMMENT ON VIEW cierre.v_pbi_cierre_cabecera IS
 'cae a fecreafir si no hay fecreaadj; inicio/fin previstos caen al primer/último '
 'mes con master del cierre cuando obrctr y obr están vacíos. Cliente y técnico '
 'salen de con.res via FK. Tanda 3.1: centro de coste, tipo y clase de obra ahora '
-'muestran texto via JOIN con cen/auxobrtip/auxobrcla. Presupuesto aprobado = inicial.';
+'muestran texto via JOIN con cen/auxobrtip/auxobrcla. Presupuesto aprobado = inicial. '
+'Presupuestos de venta SIN coeficientes; con coeficientes, en sus columnas _con_coeficientes (F-118).';

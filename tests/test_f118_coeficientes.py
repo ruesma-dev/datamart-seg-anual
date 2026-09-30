@@ -142,7 +142,8 @@ def test_f118_r43_ninguna_columna_con_coeficientes_se_opera(relativo: str) -> No
             continue
         if "SUM(pres.importe_oficial)::NUMERIC(18,2) AS final_importe_con_coeficientes" in linea:
             continue
-        limpia = re.sub(r"::NUMERIC\(18,2\)", "", linea)
+        # Fuera los literales de texto (COMMENT ON ... 'F-118') y los casts.
+        limpia = re.sub(r"'[^']*'", "''", re.sub(r"::NUMERIC\(18,2\)", "", linea))
         assert not _OPERADOR.search(limpia), f"{relativo}: {linea.strip()}"
 
 
@@ -157,7 +158,10 @@ def test_f118_r43_el_resumen_no_mete_la_con_coeficientes_en_gastos_ni_beneficio(
 
 def test_f118_r43_los_porcentajes_no_usan_la_con_coeficientes() -> None:
     vistas = _leer("cierre/03_views.sql")
-    for bloque in re.findall(r"CASE.*?END\s+AS \w+_pct", vistas, re.DOTALL):
+    final = vistas[vistas.rindex("SELECT") :]
+    bloques = re.findall(r"\n    CASE.*?END\s+AS \w+_pct", final, re.DOTALL)
+    assert len(bloques) == 6, len(bloques)
+    for bloque in bloques:
         assert "con_coeficientes" not in bloque
 
 
