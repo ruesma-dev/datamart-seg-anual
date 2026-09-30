@@ -1264,8 +1264,10 @@ def check_cierres_cmd(obras: str | None, timeout: int, dry_run: bool) -> None:
 
     Obra a obra y ambito a ambito, comprueba tres cosas: que cada mes de los
     ambitos reales publique UN solo cierre, que sea el que la regla elige —el
-    mas moderno con acumulado distinto de cero— y que el telescopio
-    `SUM(importe_mes) = ultimo importe_origen` se siga cumpliendo.
+    mas moderno con acumulado distinto de cero, sobre el mes del TEXTO de la
+    fase (F-118)— y que el telescopio `SUM(importe_mes)` = acumulado de la
+    partida en el ultimo cierre de su obra y ambito se cumpla en TODAS las
+    series, sin apartar ninguna (F-118 R37).
 
     Lo que le da valor es que los dos lados son INDEPENDIENTES: los candidatos
     se recomponen desde `stg.presupuesto` y `stg.fases`, que es de donde sale
@@ -1291,7 +1293,7 @@ def check_cierres_cmd(obras: str | None, timeout: int, dry_run: bool) -> None:
     consultas = {
         "candidatos (stg.presupuesto ⨝ stg.fases)": sql_cierres_candidatos(lista),
         "publicado (stg.plan_mensual)": sql_cierres_publicados(lista),
-        "telescopio (R16)": sql_telescopio(lista),
+        "telescopio (F-118 R37)": sql_telescopio(lista),
     }
 
     alcance = f"{len(lista)} obra(s)" if lista else "todas las obras"
@@ -1321,11 +1323,11 @@ def check_cierres_cmd(obras: str | None, timeout: int, dry_run: bool) -> None:
     click.echo("")
 
     filas = pg.filas_solo_lectura(sql_telescopio(lista), timeout)
-    comprobadas, rotas, con_hueco = (filas[0] if filas else (0, 0, 0))
+    comprobadas, rotas = (filas[0] if filas else (0, 0))
     click.echo(
-        f"Telescopio (R16): {comprobadas} serie(s) consecutiva(s) comprobada(s), "
-        f"{rotas} sin cuadrar, {con_hueco} apartada(s) por tener un hueco de "
-        f"origen que la regla NO creo (esas nunca telescopearon)."
+        f"Telescopio (F-118 R37): {comprobadas} serie(s) comprobada(s), "
+        f"{rotas} sin cuadrar contra el acumulado del ultimo cierre de su obra "
+        f"y ambito. Ninguna se aparta."
     )
     if rotas:
         click.secho(
