@@ -29,6 +29,13 @@ CREATE TABLE cierre.fact_cierre_mensual (
     final_anterior         NUMERIC(18,2),
     pendiente_importe      NUMERIC(18,2) NOT NULL DEFAULT 0,
     variacion_importe      NUMERIC(18,2),
+    -- F-118 (D6, D10): la venta final CON los coeficientes del contrato con el
+    -- cliente (suma de `importe_oficial` = `impcoe` del mismo master). Es lo que
+    -- se factura; el cierre, el beneficio, el pendiente y los % van con
+    -- `final_importe`, SIN coeficientes. Solo en VENTA con final_fuente =
+    -- 'master'; NULL en el coste y con respaldo de fase 0 (la venta real no
+    -- guarda coeficientes). Nunca se suma ni se resta con otra columna.
+    final_importe_con_coeficientes NUMERIC(18,2) NULL,
     -- Trazabilidad del origen del FINAL
     final_fuente           VARCHAR(16)  NOT NULL DEFAULT 'sin_dato',
                                                        -- 'master'  → versión master CIERRE del mes
@@ -59,7 +66,8 @@ COMMENT ON TABLE cierre.fact_cierre_mensual IS
 'derivados en cierre.v_pbi_cierre_resumen. '
 'EJECUTADO viene de stg.plan_mensual amb 3/7 fas>=1 (incurrido a origen). '
 'FINAL viene de la versión master CIERRE del mes (amb 8/11) elegida por '
-'cierre.fn_mes_de_version_master sobre el texto. Si no hay master para ese '
+'cierre.fn_mes_de_version_master sobre el texto, SIN coeficientes (F-118); la '
+'venta con coeficientes va aparte en final_importe_con_coeficientes. Si no hay master para ese '
 'mes (mes en curso), fallback a stg.plan_mensual amb 3/7 fas=0 (Previsto).';
 
 COMMENT ON COLUMN cierre.fact_cierre_mensual.final_fuente IS

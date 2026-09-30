@@ -1,40 +1,44 @@
 -- etl_sigrid/infrastructure/postgres/sql/cierre/02_build_fact.sql
 --
 -- =========================================================================
--- Carga cierre.fact_cierre_mensual (Tanda 1.7 — impcoe SOLO en venta)
+-- Carga cierre.fact_cierre_mensual (F-118: la venta final SIN coeficientes)
 -- =========================================================================
 --
--- BUG TANDA 1.4: el FINAL del master se calculaba como
--- SUM(stg.plan_mensual.importe_origen), pero plan_mensual distribuye el
--- master en filas mensuales con importe_origen ACUMULADO por mes. Al sumar
--- TODOS los meses, obtenía un múltiplo (≈9x) del importe real.
+-- F-118 (correo de Juan Romero del 2026-09-29, decisión del humano D6): el
+-- FINAL de la venta se suma con `stg.presupuesto.importe`, SIN coeficientes,
+-- como el ejecutado y como el coste. Hasta F-118 sumaba `importe_oficial` (el
+-- `impcoe` de Sigrid, con los coeficientes del contrato con el cliente: 1,19 en
+-- casi todas, 1,2574 en la 0702) y restaba contra él un ejecutado que no los
+-- lleva: el cierre de agosto de 2026 daba a la 0702 un beneficio final de
+-- +1.695.571,87 € donde la hoja de cierre de Juan prevé −790.718,46 €.
+-- De `final_importe` salen, sin tocar nada más, el pendiente, la variación, los
+-- % y el beneficio (R39). La venta CON coeficientes, que es lo que se factura,
+-- se publica ADEMÁS en `final_importe_con_coeficientes` (R41): suma de
+-- `importe_oficial` del mismo master, solo en VENTA con fuente master; NULL en
+-- el coste y con respaldo de fase 0, porque la venta real no guarda
+-- coeficientes (D10). No entra en ningún cálculo (R43). El coeficiente es del
+-- contrato y no se reconstruye: el desglose por contrato es F-099 (R44).
 --
--- FIX TANDA 1.5: para FINAL leer directamente stg.presupuesto, que tiene
--- UNA fila por (obra × partida × ámbito × versión) con `importe = can × pre`
--- (importe total sin distribución), idéntico a lo que Sigrid muestra en
--- pantalla.
---
--- FIX TANDA 1.6: Sigrid aplica coeficientes en el ámbito VENTA. El campo
--- raw.obrparpre.impcoe es el importe oficial con coeficientes aplicados;
--- stg.presupuesto.importe_oficial = COALESCE(impcoe, can*pre) lo encapsula.
---
--- FIX TANDA 1.7: importe_oficial SOLO se aplica a VENTA (amb 7 y 11), que
--- es el único ámbito con coeficientes. Para COSTE (amb 3 y 8) seguimos
--- usando stg.presupuesto.importe (= ROUND(can*pre, 2)) para mantener
--- consistencia con la planificación valorada del mart.
+-- Historia de la fuente del FINAL:
+--   Tanda 1.4: sumaba stg.plan_mensual.importe_origen de TODOS los meses del
+--     master (acumulado por mes): un múltiplo (≈9x) del importe real.
+--   Tanda 1.5: lee stg.presupuesto, UNA fila por (obra × partida × ámbito ×
+--     versión) con `importe = can × pre`.
+--   Tanda 1.6-1.7: la venta pasó a `importe_oficial` (con coeficientes) para
+--     cuadrar con la pantalla de Sigrid; F-118 lo deshace (arriba).
 --
 -- Las versiones master CIERRE (texto, fec_creacion) siguen viniendo de
 -- stg.plan_mensual (que las clasifica con version_tex y version_fec_creacion),
 -- pero los importes los sacamos de stg.presupuesto.
 --
--- EJECUTADO sigue desde stg.plan_mensual amb 3/7 fas>=1: ahí cada (partida,
--- versión=fase) tiene UNA fila con importe_origen correcto (no distribuido).
+-- EJECUTADO desde stg.plan_mensual amb 3/7 fas>=1, en el mes de `stg` (F-118).
 --
 -- =========================================================================
 -- Mapping concepto → fuentes:
 --   VENTA      ← ejec: plan_mensual amb=7  fas>=1
---                final master: pres.importe_oficial amb=11 fase=<v_cierre>
---                fb fase 0:    pres.importe_oficial amb=7  fase=0
+--                final master: pres.importe         amb=11 fase=<v_cierre>
+--                  (con coeficientes, aparte: pres.importe_oficial)
+--                fb fase 0:    pres.importe         amb=7  fase=0
 --   INDIRECTOS ← ejec: plan_mensual amb=3  fas>=1 cat=CI
 --                final master: pres.importe         amb=8  fase=<v_cierre>  cat=CI
 --                fb fase 0:    pres.importe         amb=3  fase=0           cat=CI
@@ -50,6 +54,7 @@ INSERT INTO cierre.fact_cierre_mensual (
     concepto, orden_concepto,
     ejecutado_origen, ejecutado_anterior, ejecutado_mes,
     final_importe, final_anterior, pendiente_importe, variacion_importe,
+    final_importe_con_coeficientes,
     final_fuente, final_version_master, final_version_tex,
     fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes,
     es_relleno
@@ -173,16 +178,12 @@ master_vigente_por_mes AS (
 --    UNA fila por (obra, partida, amb, fase_num) con `importe = can × pre`
 --    TOTAL, sin distribución mensual.
 --
---    Columna de importe usada:
---      - VENTA (amb=11): pres.importe_oficial
---          → COALESCE(impcoe Sigrid, can*pre).
---          → impcoe lleva los coeficientes que aplica Sigrid en venta.
---          → Cuadra exactamente con la pantalla Sigrid master venta.
---      - INDIRECTOS/DIRECTOS/GENERALES (amb=8): pres.importe
---          → = ROUND(can*pre, 2). Coste no lleva coeficientes en Sigrid,
---            así que importe_oficial sería igual a importe en el 99% de
---            registros. Mantenemos importe para consistencia con
---            mart/plan_mensual.
+--    Columna de importe usada (F-118, D6): `pres.importe` en los cuatro
+--    conceptos, SIN coeficientes, como el ejecutado. En VENTA se suma además
+--    `pres.importe_oficial` (COALESCE(impcoe, can*pre): con los coeficientes
+--    del contrato, lo que muestra la pantalla master de venta de Sigrid) en
+--    `final_importe_con_coeficientes`, que no entra en ningún cálculo. El
+--    coste no tiene coeficientes: NULL.
 --
 --    El campo `fase_num` de stg.presupuesto corresponde a la VERSIÓN del
 --    master en amb 8/11 (NO a un mes). Esto es histórico del modelado de
@@ -193,7 +194,8 @@ final_master AS (
     -- VENTA (amb=11), todas las categorías
     SELECT
         mv.obra_id, mv.mes_master AS mes_cierre, 'VENTA'::VARCHAR AS concepto,
-        SUM(pres.importe_oficial)::NUMERIC(18,2) AS final_importe,
+        SUM(pres.importe)::NUMERIC(18,2) AS final_importe,
+        SUM(pres.importe_oficial)::NUMERIC(18,2) AS final_importe_con_coeficientes,
         mv.version     AS final_version_master,
         mv.version_tex AS final_version_tex
     FROM master_vigente_por_mes mv
@@ -209,6 +211,7 @@ final_master AS (
     SELECT
         mv.obra_id, mv.mes_master, 'INDIRECTOS'::VARCHAR,
         SUM(pres.importe)::NUMERIC(18,2),
+        NULL::NUMERIC(18,2),
         mv.version, mv.version_tex
     FROM master_vigente_por_mes mv
     JOIN stg.presupuesto pres
@@ -223,6 +226,7 @@ final_master AS (
     SELECT
         mv.obra_id, mv.mes_master, 'DIRECTOS'::VARCHAR,
         SUM(pres.importe)::NUMERIC(18,2),
+        NULL::NUMERIC(18,2),
         mv.version, mv.version_tex
     FROM master_vigente_por_mes mv
     JOIN stg.presupuesto pres
@@ -237,6 +241,7 @@ final_master AS (
     SELECT
         mv.obra_id, mv.mes_master, 'GENERALES'::VARCHAR,
         SUM(pres.importe)::NUMERIC(18,2),
+        NULL::NUMERIC(18,2),
         mv.version, mv.version_tex
     FROM master_vigente_por_mes mv
     JOIN stg.presupuesto pres
@@ -250,14 +255,14 @@ final_master AS (
 -- =========================================================================
 -- E) FALLBACK fase 0 (Previsto) — para mes en curso sin master CIERRE
 --    Fuente: stg.presupuesto amb 3/7 fas=0 ("Previsto" vivo).
---    Columna de importe:
---      - VENTA (amb=7): pres.importe_oficial (con coeficientes)
---      - INDIRECTOS/DIRECTOS/GENERALES (amb=3): pres.importe (sin coef.)
+--    Columna de importe: pres.importe, SIN coeficientes, en los cuatro
+--    conceptos (F-118). Sin venta con coeficientes: la venta real no los
+--    guarda, y copiar la sin coeficientes diría que son iguales (D10).
 -- =========================================================================
 final_fase0 AS (
     -- VENTA fase 0 (amb=7)
     SELECT pres.obra_id, 'VENTA'::VARCHAR AS concepto,
-           SUM(pres.importe_oficial)::NUMERIC(18,2) AS final_importe
+           SUM(pres.importe)::NUMERIC(18,2) AS final_importe
       FROM stg.presupuesto pres
      WHERE pres.ambito_id = 7 AND pres.fase_num = 0
      GROUP BY pres.obra_id
@@ -336,6 +341,8 @@ combinado AS (
         END                                  AS final_fuente,
         fm.final_version_master,
         fm.final_version_tex,
+        -- Solo con fuente master (D10): sin fila en final_master, NULL.
+        fm.final_importe_con_coeficientes,
         e.fase_id, e.fase_numero, e.fase_fecha_inicio, e.fase_nombre_mes
     FROM grid g
     LEFT JOIN ejecutado_concepto e
@@ -392,6 +399,7 @@ SELECT
     (final_importe - ejecutado_origen)::NUMERIC(18,2)   AS pendiente_importe,
     CASE WHEN final_anterior_lag IS NULL THEN NULL
          ELSE (final_importe - final_anterior_lag)::NUMERIC(18,2) END AS variacion_importe,
+    final_importe_con_coeficientes,
     final_fuente, final_version_master, final_version_tex,
     fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes,
     es_relleno
