@@ -59,16 +59,59 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
 - Master (amb 8/11): `fas` = número de VERSIÓN; planif explosionada.
 - Reales (amb 3/7): `fas` = MES; fas=0 = Previsto (foto viva),
   fas=1..N cierres mensuales; planif NO explosionada;
-  importe del mes = diferencia con la fase anterior.
+  importe del mes = diferencia con el mes anterior de la serie de la partida
+  (ver «La serie real es densa», F-118).
+- **EL MES DE UN CIERRE REAL LO DA SU TEXTO (F-051, absorbida en F-118).** El
+  mes de cada fila real de `stg.plan_mensual` es `stg.fn_mes_de_fase`: manda el
+  texto de la fase (`obrfas.res`, «Agosto 2026»), aunque discrepe de las fechas
+  o caiga fuera de ellas; un rango («Enero 2020-Abril 2020») se lee por su
+  ÚLTIMO mes; «Mayo-17», «AGOSTO17» y «Abril 2.013» se leen como mes y año; si
+  el texto no se entiende, manda el mes de la fecha fin, luego el de inicio y
+  por último el `ano`/`mes` que archiva Sigrid. La regla vive UNA vez, en `stg`:
+  `mart` y `cierre` leen `anio_mes` sin recalcularlo (`cierre.fn_mes_de_fase`
+  la envuelve) y el oráculo `domain/mes_fase.py` la repite token a token para
+  `check-mes-fase`. Una fase de RANGO (fecha fin en un mes posterior a su
+  inicio) lleva todo su dinero al mes del texto, y los meses desde su inicio
+  hasta el anterior al texto reciben filas de RELLENO (`es_relleno`, movimiento
+  0, acumulado del cierre anterior), nunca en un mes con cierre propio ni
+  después del texto. El parser de las versiones master
+  (`cierre.fn_parse_mes_fase`) no cambia.
 - **DOS CIERRES EN UN MISMO MES: manda el moderno (F-042).** 22 obras tienen
-  dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes`. `stg`
-  conserva **una sola**: la de `fas` más alto **entre las que tienen el
-  acumulado distinto de cero** (si todas están a cero, la más alta). El cierre
-  descartado sigue en `raw` y en `stg.fases`; lo que no tiene es fila en
-  `stg.plan_mensual`. Dentro del build se renumera un orden interno —solo por
-  los descartes, nunca con `dense_rank()`— para que el `LAG` de `importe_mes`
-  siga viendo el cierre inmediatamente anterior; ese orden **no se publica**, y
-  `version` conserva el número de fase original, con huecos en 9 obras.
+  dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes` (21 sobre el
+  mes del texto). `stg` conserva **una sola**: la de `fas` más alto **entre las
+  que tienen el acumulado distinto de cero** (si todas están a cero, la más
+  alta). El cierre descartado sigue en `raw` y en `stg.fases`; lo que no tiene
+  es fila en `stg.plan_mensual`. `version` conserva el número de fase original,
+  con huecos. (F-042 renumeraba un orden interno para el `LAG`; F-118 lo retira:
+  la serie densa ya no mira el número de fase.)
+- **LA SERIE REAL ES DENSA: LO QUE DESAPARECE SE DESHACE (F-118, F-103
+  absorbida).** `importe_mes` de una fila real es su acumulado menos el del mes
+  anterior DE LA SERIE DE LA PARTIDA, que recorre sin huecos todos los meses
+  del ámbito desde su alta: en un cierre, la fila de Sigrid o, si la partida ya
+  no está, acumulado 0 en una fila de DESHACER (`es_deshacer`: anula el
+  acumulado anterior, una sola por salida) y, si vuelve, resta contra ese 0;
+  en un relleno, el acumulado anterior. Antes se restaba solo si la fila
+  anterior era de la fase consecutiva y si no se publicaba el acumulado entero:
+  la 0709 daba 319.492,30 € de venta en agosto de 2026 donde el cierre da
+  377.492,30, y el número de fase que Sigrid se salta (0371 f27→f29, 0404,
+  0455, 0562, 0606) publicaba el acumulado entero. Una fase de la obra sin
+  ninguna fila de un ámbito NO es cierre de ese ámbito (Sigrid no abrió esa
+  fase de venta en 11 obras de 2010-2020): no deshace nada. Invariante:
+  `SUM(importe_mes)` de una partida = su acumulado en el último cierre del
+  ámbito de la obra (0 si salió), en TODAS las series; lo comprueba
+  `check-cierres` sin apartar ninguna, y `domain/serie_real.py` es el oráculo.
+  En `cierre`, un concepto sin filas en un mes con cierre de otro concepto
+  conserva el ejecutado a origen del mes anterior.
+- **LA VENTA DEL CIERRE VA SIN COEFICIENTES (F-118, D6).** `impcoe`
+  (`stg.presupuesto.importe_oficial`) es la venta con los coeficientes del
+  contrato con el cliente, y solo existe en los master de venta (11) y de
+  certificación (9): la venta real no los guarda. El cierre, el beneficio y el
+  análisis usan `importe`, sin coeficientes, como el ejecutado y el coste; la
+  venta con coeficientes, lo que se factura, se publica aparte
+  (`final_importe_con_coeficientes` y las columnas `_con_coeficientes` de la
+  cabecera) y nunca se mezcla (regla dura `R-VENTA-COEFICIENTES`). El
+  coeficiente es del CONTRATO, no de la obra, y no vive en ninguna tabla: el
+  desglose por contrato es F-099.
 - **UN CAPÍTULO PUEDE NO TENER CÓDIGO, Y ESO NO PUEDE CORTAR EL ÁRBOL
   (F-052).** En `raw.obrparpar` hay capítulos cuyo `cod` es la **cadena vacía**
   —no NULL: `length(cod) = 0`—, típicamente porque alguien montó el árbol por
