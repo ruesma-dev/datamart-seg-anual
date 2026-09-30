@@ -48,10 +48,10 @@ def _suma(filas: list[FilaSerie]) -> Decimal:
 
 
 def test_f118_r29_r35_0709_417031_se_deshace_en_agosto_y_suma_cero() -> None:
-    """f11 jul −58.000, sin fila en f12 (ago), f13 sep a 0.
+    """f11 jul -58.000, sin fila en f12 (ago), f13 sep a 0.
 
-    Hoy `stg` publica −58.000 y 0 (suma −58.000, acumulado real 0). Con la
-    serie densa: −58.000 en julio, +58.000 en agosto (deshacer) y 0 en
+    Hoy `stg` publica -58.000 y 0 (suma -58.000, acumulado real 0). Con la
+    serie densa: -58.000 en julio, +58.000 en agosto (deshacer) y 0 en
     septiembre.
     """
     filas = serie_densa(
@@ -242,7 +242,7 @@ def test_f118_r36_hueco_de_numeracion_de_sigrid_publica_la_diferencia() -> None:
 
     Acumulados de la obra (coste) en f27 y f29: 4.735.135,20 y 4.293.905,89.
     Hoy `stg` publica el acumulado entero (+4.293.905,89); con la serie densa,
-    −441.229,31, lo mismo que `cierre`.
+    -441.229,31, lo mismo que `cierre`.
     """
     filas = serie_densa(
         {_m(2015, 1): _d("4735135.20"), _m(2015, 2): _d("4293905.89")},

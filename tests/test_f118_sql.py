@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -35,7 +35,7 @@ MARCADOR_FIN_REALES = "/*F042_FIN_REALES*/"
 SQL = DIRECTORIO_SQL_STG.parent
 
 
-@lru_cache(maxsize=None)
+@cache
 def _leer(relativo: str) -> str:
     return (SQL / relativo).read_bytes().decode("utf-8").replace("\r\n", "\n")
 

@@ -23,11 +23,22 @@ import pytest
 from click.testing import CliRunner
 
 import main
+from etl_sigrid.domain.mes_fase import (
+    FaseLeida,
+    inversiones_fase_mes,
+    obras_esperadas_por_el_mes,
+)
 from etl_sigrid.infrastructure.postgres.cierres_sql import (
+    PALABRAS_DE_ESCRITURA,
     sql_cierres_candidatos,
     sql_cierres_publicados,
     sql_telescopio,
     sql_telescopio_detalle,
+)
+from etl_sigrid.infrastructure.postgres.mes_fase_sql import (
+    sql_claves_repetidas,
+    sql_fases,
+    sql_marcas,
 )
 
 # ---------------------------------------------------------------------------
@@ -132,3 +143,123 @@ def test_f118_r8_check_cierres_publicados_sin_relleno() -> None:
     """Un mes de relleno no es un cierre: lleva la versión de la fase que lo
     genera, y contado como cierre saldría como «publicado sin candidato»."""
     assert "COALESCE(es_relleno, FALSE) = FALSE" in sql_cierres_publicados()
+
+
+# ---------------------------------------------------------------------------
+# R25 · check-mes-fase: el SQL del mes contra el oráculo, fase a fase (T23)
+# ---------------------------------------------------------------------------
+
+#: (obra_id, codigo, fase, inicio, texto, fin, archivado, mes_sql)
+FASE_NORMAL = (1, "0709", 12, date(2026, 8, 1), "Agosto 2026", date(2026, 8, 31),
+               date(2026, 8, 1), date(2026, 8, 1))
+FASE_TEXTO = (2, "0673", 8, date(2024, 3, 1), "Diciembre-24", date(2024, 3, 31),
+              date(2024, 3, 1), date(2024, 12, 1))
+FASE_RANGO = (3, "0650", 20, date(2024, 2, 1), "JUNIO 24", date(2024, 6, 30),
+              date(2024, 6, 1), date(2024, 6, 1))
+
+
+class PgMesFalso:
+    def __init__(self, fases, repetidas=0, marcas=(0, 0, 0)) -> None:
+        self._fases = list(fases)
+        self._repetidas = repetidas
+        self._marcas = marcas
+        self.consultas: list[str] = []
+
+    def filas_solo_lectura(self, sql_text: str, timeout_s: int) -> list[tuple]:
+        self.consultas.append(sql_text)
+        if "FROM stg.fases" in sql_text:
+            return self._fases
+        if "HAVING count(*) > 1" in sql_text:
+            return [(self._repetidas,)]
+        return [self._marcas]
+
+    def __getattr__(self, nombre: str):
+        raise AssertionError(f"`check-mes-fase` es de solo lectura (pg.{nombre})")
+
+
+def _check_mes(monkeypatch, pg, *args):
+    monkeypatch.setattr(main, "_get_pg", lambda: pg)
+    return CliRunner().invoke(main.cli, ["check-mes-fase", *args])
+
+
+@pytest.mark.parametrize("constructor", (sql_fases, sql_claves_repetidas, sql_marcas))
+def test_f118_r25_check_mes_fase_las_consultas_no_escriben(constructor) -> None:
+    texto = constructor(obras=(1, 2)).upper()
+    for palabra in PALABRAS_DE_ESCRITURA:
+        assert not re.search(rf"\b{palabra}\b", texto), palabra
+    with pytest.raises(ValueError):
+        constructor(obras=("1; DROP TABLE stg.fases",))
+
+
+def test_f118_r25_check_mes_fase_usa_la_funcion_de_stg() -> None:
+    assert re.search(
+        r"stg\.fn_mes_de_fase\(f\.fecha_inicio, f\.nombre_mes, f\.fecha_fin", sql_fases()
+    )
+
+
+def test_f118_r25_check_mes_fase_sale_0_si_sql_y_oraculo_coinciden(monkeypatch) -> None:
+    pg = PgMesFalso([FASE_NORMAL, FASE_TEXTO, FASE_RANGO])
+    resultado = _check_mes(monkeypatch, pg)
+    assert resultado.exit_code == 0, resultado.output
+    assert "3 fase(s)" in resultado.output
+    assert "0 discrepancia(s)" in resultado.output
+
+
+def test_f118_r25_check_mes_fase_falla_y_nombra_la_fase_que_discrepa(monkeypatch) -> None:
+    mala = (*FASE_TEXTO[:7], date(2024, 3, 1))  # el SQL se quedó con el archivado
+    resultado = _check_mes(monkeypatch, PgMesFalso([FASE_NORMAL, mala]))
+    assert resultado.exit_code != 0
+    assert "0673" in resultado.output and "f8" in resultado.output
+    assert "2024-12" in resultado.output
+
+
+def test_f118_r21_check_mes_fase_falla_con_claves_repetidas(monkeypatch) -> None:
+    resultado = _check_mes(monkeypatch, PgMesFalso([FASE_NORMAL], repetidas=4))
+    assert resultado.exit_code != 0
+    assert "4 clave(s)" in resultado.output
+
+
+@pytest.mark.parametrize(
+    ("marcas", "texto"),
+    (
+        ((2, 0, 0), "2 fila(s) de relleno con movimiento"),
+        ((0, 3, 0), "3 fila(s) de deshacer sin movimiento"),
+        ((0, 0, 5), "5 mes(es) que mezclan relleno y cierre"),
+    ),
+)
+def test_f118_r29_r33_check_mes_fase_vigila_las_marcas(monkeypatch, marcas, texto) -> None:
+    resultado = _check_mes(monkeypatch, PgMesFalso([FASE_NORMAL], marcas=marcas))
+    assert resultado.exit_code != 0
+    assert texto in resultado.output
+
+
+def test_f118_r45_check_mes_fase_escribe_las_obras_esperadas(monkeypatch, tmp_path) -> None:
+    salida = tmp_path / "esperadas.txt"
+    pg = PgMesFalso([FASE_NORMAL, FASE_TEXTO, FASE_RANGO])
+    resultado = _check_mes(monkeypatch, pg, "--obras-esperadas", str(salida))
+    assert resultado.exit_code == 0, resultado.output
+    assert salida.read_text(encoding="utf-8").strip() == "0650,0673"
+
+
+def test_f118_r25_check_mes_fase_dry_run_no_abre_conexion(monkeypatch) -> None:
+    class PgQueEstalla:
+        def __getattr__(self, nombre: str):
+            raise AssertionError(f"--dry-run no puede tocar la base (pg.{nombre})")
+
+    resultado = _check_mes(monkeypatch, PgQueEstalla(), "--dry-run")
+    assert resultado.exit_code == 0, resultado.output
+    assert "stg.fn_mes_de_fase" in resultado.output
+
+
+def test_f118_r25_check_mes_fase_obras_esperadas_dominio() -> None:
+    fases = [FaseLeida(*f) for f in (FASE_NORMAL, FASE_TEXTO, FASE_RANGO)]
+    assert obras_esperadas_por_el_mes(fases) == ["0650", "0673"]
+
+
+def test_f118_r25_check_mes_fase_lista_las_inversiones_para_juan() -> None:
+    """Una fase posterior cuyo texto cae en un mes anterior: caso para Juan."""
+    antes = FaseLeida(9, "0444", 20, date(2017, 11, 1), "Noviembre 2017",
+                      date(2017, 11, 30), date(2017, 11, 1), date(2017, 11, 1))
+    despues = FaseLeida(9, "0444", 21, date(2017, 12, 1), "Mayo-17",
+                        date(2017, 5, 31), date(2017, 12, 1), date(2017, 5, 1))
+    assert inversiones_fase_mes([despues, antes]) == [(antes, despues)]

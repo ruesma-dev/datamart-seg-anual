@@ -11,12 +11,12 @@ la partida era de la fase inmediatamente anterior; si no, publicaba el
 acumulado entero. Dos huecos rompían así la suma:
 
 - **la partida que desaparece de un cierre** (fallo 1 del correo de Juan Romero
-  del 2026-09-29): la 0709, partida 417031, tiene −58.000 en julio, ninguna
-  fila en agosto y 0 en septiembre. En agosto nadie deshacía los −58.000 y en
+  del 2026-09-29): la 0709, partida 417031, tiene -58.000 en julio, ninguna
+  fila en agosto y 0 en septiembre. En agosto nadie deshacía los -58.000 y en
   septiembre se publicaba el acumulado (0) en vez de +58.000;
 - **el número de fase que Sigrid se salta** (F-103): la 0371 pasa de la f27 a
   la f29 y la f29 publicaba el acumulado entero (+4,29 M€) en vez de la
-  diferencia (−441.229,31).
+  diferencia (-441.229,31).
 
 `cierre` acertaba porque suma acumulados por (obra, mes, concepto) y resta
 meses: la partida ausente no suma. La serie densa hace lo mismo a grano de

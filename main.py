@@ -57,6 +57,10 @@ Un cierre por mes en los ámbitos reales (F-042). Los tres son de SOLO LECTURA:
                                         que recompone los candidatos desde
                                         `stg.presupuesto` y no desde la tabla
                                         que audita. Sale != 0 si discrepan
+    python main.py check-mes-fase     - ¿Da `stg.fn_mes_de_fase` el mismo mes
+                                        que el oraculo en todas las fases, sin
+                                        claves repetidas y con el relleno y el
+                                        deshacer donde tocan? (F-118)
     python main.py huella-obras       - Huella de obra x ambito x mes a CSV,
                                         fuera de la base. Con --propuesta
                                         reejecuta la rama de reales YA
@@ -1337,6 +1341,140 @@ def check_cierres_cmd(obras: str | None, timeout: int, dry_run: bool) -> None:
         )
 
     if discrepancias or rotas:
+        raise SystemExit(1)
+
+
+@cli.command("check-mes-fase")
+@click.option(
+    "--obras",
+    "obras",
+    type=str,
+    default=None,
+    help="obra_id separados por comas. Sin esto, todas las obras.",
+)
+@click.option(
+    "--timeout",
+    default=300,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Imprime las consultas y NO abre conexion.",
+)
+@click.option(
+    "--obras-esperadas",
+    "salida_esperadas",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Escribe aqui los codigos de obra que el mes del texto o el relleno "
+    "mueven, separados por comas (para comparar-huellas --obras-esperadas).",
+)
+def check_mes_fase_cmd(
+    obras: str | None, timeout: int, dry_run: bool, salida_esperadas: Path | None
+) -> None:
+    """
+    Contrasta el mes de las filas reales contra la regla (F-118, F-051 R25).
+
+    Tres comprobaciones, las tres de SOLO LECTURA:
+
+    1. `stg.fn_mes_de_fase` en la base y el oraculo `domain/mes_fase.py` dan el
+       mismo mes en TODAS las fases (manda el texto; si no se lee, la fecha fin,
+       la de inicio y el ano/mes archivado).
+    2. Ninguna (obra, ambito, partida, mes) real repetida en `stg.plan_mensual`.
+    3. El relleno siempre con movimiento 0, el deshacer siempre con movimiento,
+       y ningun mes que mezcle relleno y cierre.
+
+    Informa ademas, sin fallar, de las fases cuyo mes del texto va hacia atras
+    respecto a la fase anterior (casos para Juan Romero). Sale distinto de 0 si
+    falla cualquiera de las tres comprobaciones.
+    """
+    from etl_sigrid.domain.mes_fase import (
+        FaseLeida,
+        discrepancias_de_mes,
+        inversiones_fase_mes,
+        obras_esperadas_por_el_mes,
+    )
+    from etl_sigrid.infrastructure.postgres.mes_fase_sql import (
+        sql_claves_repetidas,
+        sql_fases,
+        sql_marcas,
+    )
+
+    lista = (
+        [int(o.strip()) for o in obras.split(",") if o.strip()] if obras else None
+    )
+    consultas = {
+        "fases (stg.fn_mes_de_fase)": sql_fases(lista),
+        "claves repetidas (stg.plan_mensual)": sql_claves_repetidas(lista),
+        "relleno y deshacer (stg.plan_mensual)": sql_marcas(lista),
+    }
+    alcance = f"{len(lista)} obra(s)" if lista else "todas las obras"
+    click.echo(f"El mes de las filas reales · {alcance}, ambitos 3 y 7")
+    click.echo(f"  statement_timeout = {timeout}s por consulta, transaccion READ ONLY")
+    click.echo("")
+
+    if dry_run:
+        for nombre, texto in consultas.items():
+            click.echo(f"-- {nombre}")
+            click.echo(texto + ";")
+            click.echo("")
+        click.echo("-- 3 consulta(s). No se ha abierto ninguna conexion.")
+        return
+
+    pg = _get_pg()
+    fases = [FaseLeida(*fila) for fila in pg.filas_solo_lectura(sql_fases(lista), timeout)]
+    malas = discrepancias_de_mes(fases)
+    click.echo(
+        f"{len(fases)} fase(s) contrastada(s) contra el oraculo: "
+        f"{len(malas)} discrepancia(s)."
+    )
+    def _mes(fecha) -> str:
+        return f"{fecha:%Y-%m}" if fecha else "sin mes"
+
+    for fase in malas[:50]:
+        click.echo(
+            f"KO   obra {fase.codigo_obra or fase.obra_id} · f{fase.numero_fase} "
+            f"«{fase.nombre_mes}»: la base da {_mes(fase.mes_sql)} y la regla "
+            f"{_mes(fase.mes_oraculo)}"
+        )
+
+    repetidas = pg.filas_solo_lectura(sql_claves_repetidas(lista), timeout)[0][0]
+    click.echo(f"{repetidas} clave(s) (obra, ambito, partida, mes) repetida(s).")
+
+    relleno_mueve, deshacer_quieto, mixtos = pg.filas_solo_lectura(
+        sql_marcas(lista), timeout
+    )[0]
+    click.echo(f"{relleno_mueve} fila(s) de relleno con movimiento.")
+    click.echo(f"{deshacer_quieto} fila(s) de deshacer sin movimiento.")
+    click.echo(f"{mixtos} mes(es) que mezclan relleno y cierre.")
+
+    inversiones = inversiones_fase_mes(fases)
+    if inversiones:
+        click.echo("")
+        click.echo(
+            f"{len(inversiones)} inversion(es) fase/mes (para Juan Romero; no es un "
+            f"error del ETL, manda el texto):"
+        )
+        for anterior, siguiente in inversiones:
+            click.echo(
+                f"     obra {siguiente.codigo_obra or siguiente.obra_id}: "
+                f"f{anterior.numero_fase} {anterior.mes_oraculo:%Y-%m} -> "
+                f"f{siguiente.numero_fase} {siguiente.mes_oraculo:%Y-%m}"
+            )
+
+    if salida_esperadas is not None:
+        esperadas = obras_esperadas_por_el_mes(fases)
+        salida_esperadas.write_text(",".join(esperadas) + "\n", encoding="utf-8")
+        click.echo("")
+        click.echo(
+            f"{len(esperadas)} obra(s) que el mes del texto o el relleno mueven, "
+            f"en {salida_esperadas}"
+        )
+
+    if malas or repetidas or relleno_mueve or deshacer_quieto or mixtos:
         raise SystemExit(1)
 
 

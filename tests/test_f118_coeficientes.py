@@ -16,7 +16,7 @@ Aserciones sobre el TEXTO del SQL de `cierre`, sin conexión.
 from __future__ import annotations
 
 import re
-from functools import lru_cache
+from functools import cache
 
 import pytest
 
@@ -25,7 +25,7 @@ from etl_sigrid.application.steps.build_stg_step import DIRECTORIO_SQL_STG
 SQL = DIRECTORIO_SQL_STG.parent
 
 
-@lru_cache(maxsize=None)
+@cache
 def _leer(relativo: str) -> str:
     texto = (SQL / relativo).read_bytes().decode("utf-8").replace("\r\n", "\n")
     return "\n".join(

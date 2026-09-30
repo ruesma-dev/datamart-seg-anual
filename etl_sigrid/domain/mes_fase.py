@@ -49,6 +49,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from itertools import pairwise
 
 #: Prefijos de los nombres de mes, en el orden y con la misma forma que el
 #: `CASE` de `stg.fn_parse_mes_texto`. Septiembre es el único con dos grafías.
@@ -108,9 +109,9 @@ def parse_mes_fase(texto: str | None) -> date | None:
             valor = int(token)
             if len(token) == 4 and 2000 <= valor <= 2099:
                 anio = valor
-            elif len(token) == 2 and tras_mes:
-                anio = 2000 + valor
-            elif len(token) == 2 and valor >= 20 and anio is None:
+            elif len(token) == 2 and (tras_mes or (valor >= 20 and anio is None)):
+                # Dos cifras justo detrás de un mes, o 20-99 sin año todavía
+                # (en el SQL son dos ramas del IF; el resultado es el mismo).
                 anio = 2000 + valor
             elif len(token) <= 2 and 1 <= valor <= 12 and mes is None:
                 mes = valor
@@ -216,3 +217,78 @@ def meses_relleno(fases: Sequence[FaseReal]) -> dict[int, tuple[date, ...]]:
     for mes in sorted(duenio):
         resultado.setdefault(duenio[mes].numero_fase, []).append(mes)
     return {fase: tuple(meses) for fase, meses in resultado.items()}
+
+
+# ---------------------------------------------------------------------------
+# El contraste de `check-mes-fase` (R25): el SQL contra este oráculo
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FaseLeida:
+    """Una fase de `stg.fases` tal y como la lee `check-mes-fase`, con el mes
+    que le da `stg.fn_mes_de_fase` en la base (`mes_sql`)."""
+
+    obra_id: int
+    codigo_obra: str | None
+    numero_fase: int
+    fecha_inicio: date | None
+    nombre_mes: str | None
+    fecha_fin: date | None
+    mes_archivado: date | None
+    mes_sql: date | None
+
+    @property
+    def mes_oraculo(self) -> date | None:
+        return mes_de_fase(
+            self.fecha_inicio, self.nombre_mes, self.fecha_fin, self.mes_archivado
+        )
+
+    @property
+    def rellena(self) -> bool:
+        """Fase de rango cuyo mes del texto cae después de su primer mes (R10)."""
+        if self.fecha_inicio is None or self.fecha_fin is None:
+            return False
+        inicio = _primero_de_mes(self.fecha_inicio)
+        mes = self.mes_oraculo
+        return _primero_de_mes(self.fecha_fin) > inicio and mes is not None and mes > inicio
+
+
+def discrepancias_de_mes(fases: Sequence[FaseLeida]) -> list[FaseLeida]:
+    """Las fases en que el SQL y el oráculo dan meses distintos (R25)."""
+    return [f for f in fases if f.mes_sql != f.mes_oraculo]
+
+
+def obras_esperadas_por_el_mes(fases: Sequence[FaseLeida]) -> list[str]:
+    """Códigos de las obras que el mes del texto o el relleno mueven (F-051).
+
+    Son las que pueden cambiar en `stg` y `mart` por esta parte de F-118: alguna
+    fase cuyo mes del texto no es el archivado, o alguna fase que rellena. Las
+    del fallo 1, F-103 y R34 se añaden a mano desde `progress/spec_F-118.md` §6.
+    """
+    return sorted(
+        {
+            f.codigo_obra
+            for f in fases
+            if f.codigo_obra and (f.mes_oraculo != _primero_de_mes(f.mes_archivado) or f.rellena)
+        }
+    )
+
+
+def inversiones_fase_mes(fases: Sequence[FaseLeida]) -> list[tuple[FaseLeida, FaseLeida]]:
+    """Pares de fases consecutivas de una obra cuyo mes del texto va hacia atrás.
+
+    No son un error del ETL (manda el texto) sino un caso para Juan Romero: la
+    fase posterior cae en un mes anterior al de la anterior.
+    """
+    por_obra: dict[int, list[FaseLeida]] = {}
+    for fase in fases:
+        por_obra.setdefault(fase.obra_id, []).append(fase)
+    pares = []
+    for lista in por_obra.values():
+        ordenadas = sorted(lista, key=lambda f: f.numero_fase)
+        for anterior, siguiente in pairwise(ordenadas):
+            a, s = anterior.mes_oraculo, siguiente.mes_oraculo
+            if a is not None and s is not None and s < a:
+                pares.append((anterior, siguiente))
+    return pares
