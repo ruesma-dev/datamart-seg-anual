@@ -171,12 +171,12 @@ porque la función aún no existe allí):
 
 | Evidencia | Valor |
 |---|---|
-| Tests | PENDIENTE_TESTS |
-| Tests de F-118 | 169 en `test_f118_*` (+ los reescritos de F-042) |
-| Cobertura de las líneas cambiadas | PENDIENTE_COBERTURA |
+| Tests | 6.149 passed, 219 skipped, 0 failed (suite entera, `init.sh`) |
+| Tests de F-118 | 205 en `test_f118_*` (+ los reescritos de F-042) |
+| Cobertura de las líneas cambiadas | **97,9 %** (237/242, umbral 80 %, nivel critico; diff desde 94e8fc2b68) |
 | Mutación | N/A: exención heredada de F-051 D7 (como F-042), sustituida por huellas (T26-T29) e invariante R21 (T7, más el contraste local de 4 semillas). Sin campaña, sin workers |
-| Tiempo de la suite | PENDIENTE_TIEMPO |
-| `bash harness/init.sh` | PENDIENTE_INIT |
+| Tiempo de la suite | 700,66 s con cobertura (`init.sh`); 381,77 s sin ella |
+| `bash harness/init.sh` | **exit 0**: pytest en verde, PUERTA COBERTURA OK, PUERTA TAMAÑO OK (impl 192/220), ruff 234 avisos previos (no bloquea), sobre c31ce51 |
 
 Nota: la primera `init.sh` (precondición) dio pytest en verde (5.938 passed) y
 su puerta de cobertura en KO 0/154 porque los commits T1-T4 entraron mientras

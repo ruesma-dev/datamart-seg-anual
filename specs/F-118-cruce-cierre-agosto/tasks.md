@@ -51,4 +51,4 @@ Rama `feature/F-118-cruce-cierre-agosto` (la de F-051 no se usa). Un commit por 
 - [ ] T29: Desplegar y reconstrucción completa; huellas DESPUÉS y `comparar-huellas` con la lista esperada de `progress/spec_F-118.md` §6; `check-unicidad` (vista en OK; fact con `--timeout 300`), `check-cierres` (0 series rotas), `check-mes-fase` y los testigos de design §9 y de F-051 §8 | Verificación: MANUAL (humano), resultados en `progress/impl_F-118.md`
 - [ ] T30: Cuadrar el cierre de agosto de 2026 de las 12 obras del correo y la 0709 contra la hoja de cierre de agosto de Juan (R46, D7), con y sin coeficientes, sin versionar la hoja | Verificación: MANUAL (humano), tabla obra a obra en `progress/impl_F-118.md`
 - [ ] T31: `publicar-diccionario` y `apply-grants` contra Azure tras el despliegue | Verificación: MANUAL (humano), `python main.py check-diccionario` sin diferencias
-- [ ] T32: Ejecutar `bash harness/init.sh` en verde | Verificación: `bash harness/init.sh` sale con código 0
+- [x] T32: Ejecutar `bash harness/init.sh` en verde | Verificación: `bash harness/init.sh` sale con código 0
