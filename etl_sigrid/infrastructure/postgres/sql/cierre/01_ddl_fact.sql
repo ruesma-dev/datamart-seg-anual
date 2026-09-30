@@ -41,6 +41,11 @@ CREATE TABLE cierre.fact_cierre_mensual (
     fase_numero            INTEGER,
     fase_fecha_inicio      DATE,
     fase_nombre_mes        VARCHAR(48),
+    -- F-118 (F-051): TRUE si el mes es de RELLENO para ese concepto (anterior al
+    -- mes del texto de una fase de rango: el ejecutado arrastra el del cierre
+    -- anterior), FALSE si es un cierre, NULL si el concepto no tiene filas ese
+    -- mes (su ejecutado arrastra el del mes anterior, R38).
+    es_relleno             BOOLEAN,
     _built_at              TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_cierre_fact_obra_mes      ON cierre.fact_cierre_mensual (obra_id, anio_mes);

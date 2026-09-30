@@ -122,14 +122,6 @@ nombres_por_obra AS (
     WHERE codigo_partida IS NOT NULL
     GROUP BY obra_id, codigo_partida
 ),
-fases_con_mes AS (
-    SELECT
-        f.fase_id, f.obra_id, f.numero_fase, f.fecha_inicio, f.nombre_mes,
-        cierre.fn_mes_de_fase(f.fecha_inicio, f.nombre_mes) AS mes_canonico
-      FROM stg.fases f
-     WHERE f.numero_fase >= 1
-),
-
 -- A) Partidas CI clasificadas (grupo, subcategoría)
 partidas_ci AS (
     SELECT
@@ -141,21 +133,21 @@ partidas_ci AS (
 ),
 
 -- B) Agregado base (ejecutado a origen) por (obra × mes × grupo × subcategoría)
+--    F-118 (F-051): el mes es `pm.anio_mes`, el de `stg` (texto de la fase y
+--    relleno), el mismo que `cierre.fact_cierre_mensual` (R16).
 agregado AS (
     SELECT
-        fm.obra_id,
-        fm.mes_canonico                       AS anio_mes,
+        pm.obra_id,
+        pm.anio_mes,
         pci.grupo_cod,
         pci.subcategoria_cod,
         SUM(pm.importe_origen)::NUMERIC(18,2) AS ejecutado_origen
     FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
     JOIN partidas_ci pci
         ON pci.partida_id = pm.partida_id
     WHERE pm.ambito_id = 3
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico, pci.grupo_cod, pci.subcategoria_cod
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes, pci.grupo_cod, pci.subcategoria_cod
 ),
 
 -- C) VENTA por (obra × mes) — para el ratio de periodificación
@@ -502,29 +494,21 @@ COMMENT ON VIEW cierre.v_pbi_cierre_indirectos_detalle IS
 -- =========================================================================
 CREATE VIEW cierre.v_pbi_cierre_generales_detalle AS
 WITH
-fases_con_mes AS (
-    SELECT
-        f.fase_id, f.obra_id, f.numero_fase, f.fecha_inicio, f.nombre_mes,
-        cierre.fn_mes_de_fase(f.fecha_inicio, f.nombre_mes) AS mes_canonico
-      FROM stg.fases f
-     WHERE f.numero_fase >= 1
-),
+-- F-118 (F-051): el mes es `pm.anio_mes`, el de `stg`, como en el fact (R16).
 detalle_partida AS (
     SELECT
-        fm.obra_id,
-        fm.mes_canonico                       AS anio_mes,
+        pm.obra_id,
+        pm.anio_mes,
         pm.partida_id,
         p.descripcion_corta,
         p.ruta_capitulos,
         SUM(pm.importe_origen)::NUMERIC(18,2) AS ejecutado_origen
     FROM stg.plan_mensual pm
-    JOIN fases_con_mes  fm ON fm.obra_id = pm.obra_id
-                          AND fm.numero_fase = pm.version
     JOIN stg.partidas   p  ON p.partida_id = pm.partida_id
     WHERE pm.ambito_id = 3
       AND p.categoria  = 'CP'
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico, pm.partida_id,
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes, pm.partida_id,
              p.descripcion_corta, p.ruta_capitulos
 ),
 con_tipologia AS (

@@ -51,83 +51,81 @@ INSERT INTO cierre.fact_cierre_mensual (
     ejecutado_origen, ejecutado_anterior, ejecutado_mes,
     final_importe, final_anterior, pendiente_importe, variacion_importe,
     final_fuente, final_version_master, final_version_tex,
-    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes
+    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes,
+    es_relleno
 )
 WITH
 -- =========================================================================
--- A) Fases con mes canónico (excluye fas=0)
+-- A) EJECUTADO ORIGEN por (obra × mes × concepto)
+--    Fuente: stg.plan_mensual amb 3/7, donde cada (partida, mes) tiene su
+--    acumulado a origen.
+--
+--    F-118 (F-051 absorbida): el mes es `pm.anio_mes`, el que decide `stg`
+--    con el TEXTO de la fase y su relleno. `cierre` ya no lo recalcula con
+--    `fn_mes_de_fase`: las tres capas publican el mismo mes por construcción
+--    (R16). Un mes de relleno suma el acumulado arrastrado (`es_relleno`); una
+--    fila de deshacer suma 0, que es justo lo que la partida vale ese mes.
 -- =========================================================================
-fases_con_mes AS (
+ejecutado_base AS (
     SELECT
-        f.fase_id, f.obra_id, f.numero_fase,
-        f.fecha_inicio, f.nombre_mes,
-        cierre.fn_mes_de_fase(f.fecha_inicio, f.nombre_mes) AS mes_canonico
-    FROM stg.fases f
-    WHERE f.numero_fase >= 1
+        pm.obra_id, pm.anio_mes AS mes_cierre, 'VENTA'::VARCHAR AS concepto,
+        SUM(pm.importe_origen)::NUMERIC(18,2) AS ejecutado_origen,
+        MAX(pm.version)                       AS fase_numero,
+        bool_and(pm.es_relleno)               AS es_relleno
+    FROM stg.plan_mensual pm
+    WHERE pm.ambito_id = 7
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
+
+    UNION ALL
+    SELECT
+        pm.obra_id, pm.anio_mes, 'INDIRECTOS'::VARCHAR,
+        SUM(pm.importe_origen)::NUMERIC(18,2),
+        MAX(pm.version), bool_and(pm.es_relleno)
+    FROM stg.plan_mensual pm
+    JOIN stg.partidas p ON p.partida_id = pm.partida_id
+    WHERE pm.ambito_id = 3 AND p.categoria = 'CI'
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
+
+    UNION ALL
+    SELECT
+        pm.obra_id, pm.anio_mes, 'DIRECTOS'::VARCHAR,
+        SUM(pm.importe_origen)::NUMERIC(18,2),
+        MAX(pm.version), bool_and(pm.es_relleno)
+    FROM stg.plan_mensual pm
+    JOIN stg.partidas p ON p.partida_id = pm.partida_id
+    WHERE pm.ambito_id = 3 AND p.categoria = 'CD'
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
+
+    UNION ALL
+    SELECT
+        pm.obra_id, pm.anio_mes, 'GENERALES'::VARCHAR,
+        SUM(pm.importe_origen)::NUMERIC(18,2),
+        MAX(pm.version), bool_and(pm.es_relleno)
+    FROM stg.plan_mensual pm
+    JOIN stg.partidas p ON p.partida_id = pm.partida_id
+    WHERE pm.ambito_id = 3 AND p.categoria = 'CP'
+      AND pm.version >= 1
+    GROUP BY pm.obra_id, pm.anio_mes
 ),
 
 -- =========================================================================
--- B) EJECUTADO ORIGEN por (obra × mes × concepto)
---    Fuente: stg.plan_mensual amb 3/7. En este ámbito cada fila por
---    (obra, partida, fase) ya tiene importe_origen correcto.
---    (Esta parte NO ha cambiado vs Tanda 1.4 — funcionaba bien.)
+-- B) La fase del mes, para la trazabilidad: la vigente de ese cierre o, en un
+--    mes de relleno, la que lo genera (es la `version` de sus filas).
 -- =========================================================================
 ejecutado_concepto AS (
     SELECT
-        fm.obra_id, fm.mes_canonico AS mes_cierre, 'VENTA'::VARCHAR AS concepto,
-        SUM(pm.importe_origen)::NUMERIC(18,2) AS ejecutado_origen,
-        MAX(fm.fase_id)        AS fase_id,
-        MAX(fm.numero_fase)    AS fase_numero,
-        MAX(fm.fecha_inicio)   AS fase_fecha_inicio,
-        MAX(fm.nombre_mes)     AS fase_nombre_mes
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    WHERE pm.ambito_id = 7
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
-
-    UNION ALL
-    SELECT
-        fm.obra_id, fm.mes_canonico, 'INDIRECTOS'::VARCHAR,
-        SUM(pm.importe_origen)::NUMERIC(18,2),
-        MAX(fm.fase_id), MAX(fm.numero_fase),
-        MAX(fm.fecha_inicio), MAX(fm.nombre_mes)
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    JOIN stg.partidas p ON p.partida_id = pm.partida_id
-    WHERE pm.ambito_id = 3 AND p.categoria = 'CI'
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
-
-    UNION ALL
-    SELECT
-        fm.obra_id, fm.mes_canonico, 'DIRECTOS'::VARCHAR,
-        SUM(pm.importe_origen)::NUMERIC(18,2),
-        MAX(fm.fase_id), MAX(fm.numero_fase),
-        MAX(fm.fecha_inicio), MAX(fm.nombre_mes)
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    JOIN stg.partidas p ON p.partida_id = pm.partida_id
-    WHERE pm.ambito_id = 3 AND p.categoria = 'CD'
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
-
-    UNION ALL
-    SELECT
-        fm.obra_id, fm.mes_canonico, 'GENERALES'::VARCHAR,
-        SUM(pm.importe_origen)::NUMERIC(18,2),
-        MAX(fm.fase_id), MAX(fm.numero_fase),
-        MAX(fm.fecha_inicio), MAX(fm.nombre_mes)
-    FROM stg.plan_mensual pm
-    JOIN fases_con_mes fm
-        ON fm.obra_id = pm.obra_id AND fm.numero_fase = pm.version
-    JOIN stg.partidas p ON p.partida_id = pm.partida_id
-    WHERE pm.ambito_id = 3 AND p.categoria = 'CP'
-      AND fm.mes_canonico IS NOT NULL
-    GROUP BY fm.obra_id, fm.mes_canonico
+        e.obra_id, e.mes_cierre, e.concepto, e.ejecutado_origen, e.es_relleno,
+        f.fase_id,
+        e.fase_numero,
+        f.fecha_inicio AS fase_fecha_inicio,
+        f.nombre_mes   AS fase_nombre_mes
+    FROM ejecutado_base e
+    LEFT JOIN stg.fases f
+        ON f.obra_id     = e.obra_id
+       AND f.numero_fase = e.fase_numero
 ),
 
 -- =========================================================================
@@ -327,7 +325,9 @@ combinado AS (
               [EXTRACT(MONTH FROM g.anio_mes)::INT]
             || ' ' || EXTRACT(YEAR FROM g.anio_mes)::INT AS nombre_mes,
         g.concepto, g.orden_concepto,
-        COALESCE(e.ejecutado_origen, 0)::NUMERIC(18,2) AS ejecutado_origen,
+        -- NULL si el concepto no tiene filas ese mes: lo resuelve `arrastrado`.
+        e.ejecutado_origen                   AS ejecutado_propio,
+        e.es_relleno,
         COALESCE(fm.final_importe, ff.final_importe, 0)::NUMERIC(18,2) AS final_importe,
         CASE
             WHEN fm.final_importe IS NOT NULL THEN 'master'
@@ -350,12 +350,34 @@ combinado AS (
         ON ff.obra_id  = g.obra_id
        AND ff.concepto = g.concepto
 ),
+-- R38 (D5 de F-118): un concepto sin filas en un mes que sí tiene cierre de
+-- otro concepto (la obra cerró coste y no abrió la fase de venta, o su venta
+-- terminó antes) conserva el ejecutado a origen del último mes con filas. Antes
+-- caía a 0 y rebotaba al mes siguiente: 22 obras de venta publicaban un mes con
+-- la venta a origen a cero. Sin mes anterior con filas, 0.
+con_grupo AS (
+    SELECT
+        c.*,
+        COUNT(ejecutado_propio) OVER (
+            PARTITION BY obra_id, concepto ORDER BY anio_mes
+            ROWS UNBOUNDED PRECEDING
+        ) AS grupo_ejecutado
+    FROM combinado c
+),
+arrastrado AS (
+    SELECT
+        c.*,
+        COALESCE(MAX(ejecutado_propio) OVER (
+            PARTITION BY obra_id, concepto, grupo_ejecutado
+        ), 0)::NUMERIC(18,2) AS ejecutado_origen
+    FROM con_grupo c
+),
 con_lag AS (
     SELECT
         c.*,
         LAG(c.ejecutado_origen) OVER w AS ejecutado_anterior_lag,
         LAG(c.final_importe)    OVER w AS final_anterior_lag
-    FROM combinado c
+    FROM arrastrado c
     WINDOW w AS (PARTITION BY c.obra_id, c.concepto ORDER BY c.anio_mes)
 )
 SELECT
@@ -371,5 +393,6 @@ SELECT
     CASE WHEN final_anterior_lag IS NULL THEN NULL
          ELSE (final_importe - final_anterior_lag)::NUMERIC(18,2) END AS variacion_importe,
     final_fuente, final_version_master, final_version_tex,
-    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes
+    fase_id, fase_numero, fase_fecha_inicio, fase_nombre_mes,
+    es_relleno
 FROM con_lag;
