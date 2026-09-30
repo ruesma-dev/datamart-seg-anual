@@ -322,3 +322,144 @@ def test_f118_r28_sello_incluye_las_funciones_de_stg() -> None:
     )
     for nombre in FICHEROS_DEL_SELLO:
         assert Path(DIRECTORIO_SQL_STG / nombre).is_file()
+
+
+# ---------------------------------------------------------------------------
+# `mart` (R15, R17)
+# ---------------------------------------------------------------------------
+
+_ARRAY_MESES = re.compile(r"\(ARRAY\['Enero',.*?'Diciembre'\]\)", re.DOTALL)
+
+
+def _rama_mart(nombre: str) -> str:
+    texto = _leer("mart/02_build_fact.sql")
+    marcas = {
+        "coste_real": ("-- ---- 1) COSTE REAL ----", "-- ---- 2) VENTA REAL ----"),
+        "venta_real": ("-- ---- 2) VENTA REAL ----", "-- ---- 3) COSTE PLANIFICADO ----"),
+        "coste_plan": ("-- ---- 3) COSTE PLANIFICADO ----", "-- ---- 4) VENTA PLANIFICADA ----"),
+        "venta_plan": ("-- ---- 4) VENTA PLANIFICADA ----", ";"),
+    }
+    inicio, fin = marcas[nombre]
+    return _entre(texto, inicio, fin)
+
+
+@pytest.mark.parametrize("rama", ("coste_real", "venta_real"))
+def test_f118_r17_mart_las_ramas_reales_derivan_nombre_mes_de_anio_mes(rama: str) -> None:
+    """El texto de la fase ya no es el nombre del mes: va a `version_descripcion`."""
+    cuerpo = _rama_mart(rama)
+    assert _ARRAY_MESES.search(cuerpo), cuerpo
+    assert "[EXTRACT(MONTH FROM pm.anio_mes)::INT]" in cuerpo
+    assert re.search(r"pm\.version_descripcion,\s*'(Coste|Venta) Real'", cuerpo) is None
+    assert "pm.version_descripcion, NULL::TEXT" in cuerpo
+
+
+@pytest.mark.parametrize("rama", ("coste_real", "venta_real"))
+def test_f118_r15_mart_las_ramas_reales_publican_las_dos_marcas(rama: str) -> None:
+    cuerpo = _rama_mart(rama)
+    assert "pm.es_relleno" in cuerpo and "pm.es_deshacer" in cuerpo
+
+
+@pytest.mark.parametrize("rama", ("coste_plan", "venta_plan"))
+def test_f118_r15_mart_las_ramas_planificadas_publican_null(rama: str) -> None:
+    assert _rama_mart(rama).count("NULL::BOOLEAN") == 2
+
+
+@pytest.mark.parametrize("columna", ("es_relleno", "es_deshacer"))
+def test_f118_r15_mart_ddl_y_v_pbi_fact_publican_la_columna(columna: str) -> None:
+    ddl = _leer("mart/01_ddl.sql")
+    assert re.search(rf"\b{columna}\s+BOOLEAN", ddl), columna
+    insert = _entre(_leer("mart/02_build_fact.sql"), "INSERT INTO", "-- ---- 1)")
+    assert columna in insert
+    vista = _entre(_leer("mart/05_views_powerbi.sql"), "CREATE VIEW mart.v_pbi_fact AS", ";")
+    assert re.search(rf"\b{columna}\b", vista), vista
+
+
+# ---------------------------------------------------------------------------
+# `cierre` (R1, R15, R16, R38)
+# ---------------------------------------------------------------------------
+
+
+def test_f118_r1_cierre_fn_mes_de_fase_envuelve_la_de_stg() -> None:
+    setup = _leer("cierre/00_setup.sql")
+    funcion = _funcion(setup, "cierre.fn_mes_de_fase")
+    assert "stg.fn_mes_de_fase(fecha_inicio, nombre_mes, fecha_fin, mes_archivado)" in funcion
+    assert re.search(r"fecha_fin\s+DATE\s+DEFAULT\s+NULL", funcion)
+    # La firma de dos argumentos se borra: convivir con la de cuatro con
+    # DEFAULT haría ambigua cualquier llamada de dos argumentos.
+    assert "DROP FUNCTION IF EXISTS cierre.fn_mes_de_fase(DATE, TEXT)" in setup
+
+
+@pytest.mark.parametrize(
+    "relativo", ("cierre/02_build_fact.sql", "cierre/04_views_detalle.sql")
+)
+def test_f118_r16_cierre_no_recalcula_el_mes_y_agrupa_por_pm_anio_mes(relativo: str) -> None:
+    texto = _sin_comentarios(_leer(relativo))
+    assert "fn_mes_de_fase(" not in texto
+    assert "mes_canonico" not in texto
+    assert re.search(r"GROUP BY pm\.obra_id, pm\.anio_mes", texto), relativo
+
+
+def test_f118_r15_cierre_publica_es_relleno() -> None:
+    ddl = _entre(_leer("cierre/01_ddl_fact.sql"), "CREATE TABLE cierre.fact_cierre_mensual (", ");")
+    assert re.search(r"\bes_relleno\s+BOOLEAN", ddl)
+    build = _sin_comentarios(_leer("cierre/02_build_fact.sql"))
+    assert build.count("bool_and(pm.es_relleno)") == 4
+    assert re.search(r"INSERT INTO cierre\.fact_cierre_mensual \([^;]*es_relleno", build)
+
+
+def test_f118_r38_cierre_arrastra_el_ejecutado_de_un_concepto_sin_filas() -> None:
+    """Un concepto sin filas en un mes con cierre de otro concepto conserva el
+    ejecutado del mes anterior (D5), no cae a 0 para rebotar al siguiente."""
+    build = _sin_comentarios(_leer("cierre/02_build_fact.sql"))
+    assert "COALESCE(e.ejecutado_origen, 0)" not in build
+    assert re.search(
+        r"COUNT\(ejecutado_propio\) OVER \(\s*PARTITION BY obra_id, concepto ORDER BY anio_mes",
+        build,
+    ), build
+    assert re.search(
+        r"MAX\(ejecutado_propio\) OVER \(\s*PARTITION BY obra_id, concepto, grupo_ejecutado\s*\)",
+        build,
+    ), build
+
+
+# ---------------------------------------------------------------------------
+# `cierre.v_pbi_planif_vs_real`, blindada (R18, R19)
+# ---------------------------------------------------------------------------
+
+
+def _vista() -> str:
+    return _sin_comentarios(_leer("cierre/06_views_planif_vs_real.sql"))
+
+
+def test_f118_r18_vista_ningun_group_by_ni_join_usa_nombre_mes() -> None:
+    texto = _vista()
+    for grupo in re.findall(r"GROUP BY[^\n]*(?:\n\s+[^\n]*)*?\n\)", texto):
+        assert "nombre_mes" not in grupo, grupo
+    for union in re.findall(r"\bON\b[^\n]*(?:\n\s+AND[^\n]*)*", texto):
+        assert "nombre_mes" not in union, union
+
+
+def test_f118_r18_vista_base_agrupa_por_obra_mes_categoria_concepto() -> None:
+    base = _entre(_vista(), "base AS (", "producc AS (")
+    assert re.search(
+        r"GROUP BY f\.obra_id, f\.anio_mes, f\.categoria, f\.concepto\s*\)", base
+    ), base
+
+
+def test_f118_r19_vista_beneficio_une_al_mismo_grano_que_agregan() -> None:
+    texto = _vista()
+    for cte, fin in (("producc AS (", "costes AS ("), ("total_costes AS (", "beneficio AS (")):
+        assert re.search(r"GROUP BY obra_id, anio_mes\s*\)", _entre(texto, cte, fin)), cte
+    beneficio = _entre(texto, "beneficio AS (", "todos AS (")
+    assert re.search(
+        r"ON tc\.obra_id\s+= p\.obra_id\s+AND tc\.anio_mes = p\.anio_mes\s*\)", beneficio
+    ), beneficio
+
+
+def test_f118_r18_vista_nombre_mes_sale_de_anio_mes_en_la_select_final() -> None:
+    texto = _vista()
+    final = texto[texto.rindex("SELECT") :]
+    assert _ARRAY_MESES.search(final), final
+    assert "[EXTRACT(MONTH FROM anio_mes)::INT]" in final
+    # Ninguna CTE arrastra nombre_mes.
+    assert "nombre_mes" not in texto[: texto.rindex("SELECT")]
