@@ -268,8 +268,8 @@ def test_f097_r19_importes_y_porcentajes() -> None:
     texto = _sql(TROCEADO)
     # Review 1: lo que no cabe en NUMERIC(18,2) tras redondear es NULL, no un
     # `numeric field overflow` que tumbe el build (el espejo hace lo mismo).
-    assert ("CASE WHEN abs(ROUND(c.precio * c.rendimiento, 2)) < 1e16 "
-            "THEN ROUND(c.precio * c.rendimiento, 2)::NUMERIC(18,2) END AS importe_unitario") in texto
+    assert ("CASE WHEN abs(ROUND(c.precio * c.factor * c.rendimiento, 2)) < 1e16 "
+            "THEN ROUND(c.precio * c.factor * c.rendimiento, 2)::NUMERIC(18,2) END AS importe_unitario") in texto
     assert ("CASE WHEN abs(ROUND(c.cantidad_total * c.precio, 2)) < 1e16 "
             "THEN ROUND(c.cantidad_total * c.precio, 2)::NUMERIC(18,2) END AS importe_total") in texto
     assert "COALESCE(c.tipo_elemento_codigo IN ('4', '13'), FALSE) AS es_porcentaje" in texto
