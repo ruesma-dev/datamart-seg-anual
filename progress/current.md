@@ -12,7 +12,7 @@
 
 
 
-## 2026-10-01 · F-120 · EN IMPLEMENTACIÓN (spec aprobada, PARADA 1 confirmada) · el factor del descompuesto
+## 2026-10-02 · F-120 · IMPLEMENTADA, PENDIENTE DE REVIEW (T1-T13 y T19; quedan T14-T18 del humano) · el factor del descompuesto
 
 Implementer en curso; informe en `progress/impl_F-120.md`. D7 reescrita y los
 dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`).
@@ -20,7 +20,7 @@ dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`)
 - [x] T1 decisiones anotadas en el informe
 - [x] T2 fase RED · [x] T3 dominio · [x] T4 `01` · [x] T5 `02` · [x] T6 `03`+`06`
 - [x] T7 sello · [x] T8 contraste SQL/espejo · [x] T9 build local · [x] T10 diccionario
-- [x] T11 docs · [x] T12 azure-apps · [x] T13 mutación · [ ] T19 `init.sh`
+- [x] T11 docs · [x] T12 azure-apps · [x] T13 mutación · [x] T19 `init.sh`
 - T14-T18: MANUAL del humano (Azure), abajo con su comando cuando el código esté.
 
 **Diccionario del árbol tras F-120 (version 39): 189 objetos, 1416 columnas,

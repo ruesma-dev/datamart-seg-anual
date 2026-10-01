@@ -183,3 +183,28 @@ x 2 workers = 484,6 s por mutante. El superviviente (`PRECISION_PRODUCTO` 60 ->
 61) es **equivalente justificado**: análisis en el informe de mutación. Un primer
 intento con 4 workers salió «CAMPAÑA NO VÁLIDA» (la línea base de cierre agotó
 sus 600 s con cuatro suites compitiendo; mismos 8/1): se descartó y no se usa.
+
+## Qué queda fuera y qué falta para cerrar
+
+- **MANUAL (humano), T14-T18**, con su comando exacto en `progress/current.md`
+  y en su ORDEN: imagen (T14) -> foto del cuadre (T15) -> `build-descompuestos
+  --sin-tope` + `apply-grants` (T16) -> la 400854 v6 y la foto de después (T17,
+  R28-R29) -> `publicar-diccionario` v39 (T18). Sin push en ningún repositorio.
+- Fuera de alcance: F-122 (campo 14 vacío con precio, ~95.000 líneas, y las
+  ~310 partidas que dejan de cuadrar). Para el líder: el `acceptance` 5 de
+  `features.json` aún dice lo de MASTER_INICIAL (ver T1).
+- Nota de entorno: el scratchpad tenía un PostgreSQL de otra sesión en
+  `pgdata`, levantado; lo paré para usar el puerto 55433 con uno nuevo
+  (`pg120`), que también quedó parado al terminar.
+
+## Evidencias
+
+| Evidencia | Valor medido |
+|---|---|
+| Tests de la feature | **292 passed** (`test_f120_factor.py`, 103, y los cuatro `test_f097_*.py`), 2,3 s |
+| Tests ejecutados (T19, `bash harness/init.sh`) | **6.252 passed, 219 skipped, 0 failed** |
+| Cobertura de las líneas cambiadas | **100,0 %** (29 de 29; `PUERTA COBERTURA`, umbral 80 %) |
+| Mutantes | **9 generados, 9 evaluados, 8 muertos, 1 superviviente** (equivalente justificado); SHA `68e1223` |
+| Workers de la campaña | **2** (2.180,6 s; media 242,3 s x 2 = 484,6 s por mutante; línea base 370,5-373,1 s) |
+| Tiempo de la suite | 11 min 22 s con cobertura (682,4 s, `init.sh`) |
+| `bash harness/init.sh` final (T19) | **ENTORNO LISTO, exit 0**; tamaño impl 210/220 (medido sobre `5487cc2` + este informe) |
