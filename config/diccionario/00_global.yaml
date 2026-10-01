@@ -1386,8 +1386,9 @@ esquemas:
       no cuadran con su descompuesto" (`descompuestos.cuadre_partida`). TRAMPA
       antes de consultarlo (`R-DESCOMPUESTO-ORIGEN`): los origenes no se suman
       ni se mezclan, y el master tiene una copia por version que se filtra por
-      `fase_num` o `es_vigente`. El master esta INCOMPLETO hasta la primera
-      carga (MANUAL): `descompuestos._versiones_cargadas` dice que versiones hay.
+      `fase_num` o `es_vigente`. La primera carga del master se hizo el
+      2026-09-29, con las 3.025 versiones; que version esta cargada lo dice
+      `descompuestos._versiones_cargadas`.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [ingest_descompuestos, build_descompuestos]

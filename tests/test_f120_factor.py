@@ -518,6 +518,15 @@ def test_f120_r25_sin_el_aviso_caducado_de_la_primera_carga() -> None:
     for objeto in ("lineas", "cuadre_partida"):
         texto = _texto_ficha(objeto)
         assert "2026-09-29" in texto and "_versiones_cargadas" in texto, objeto
+    # Review 1: el aviso vivia tambien en `esquemas.descompuestos` de
+    # `00_global.yaml`, que es lo primero que lee el MCP. Se busca en el
+    # CONTENIDO publicado de TODOS los YAML (sin comentarios: la historia de
+    # versiones de la cabecera se queda como esta).
+    for ruta in sorted(DIR_DICCIONARIO.glob("*.yaml")):
+        publicado = yaml.safe_dump(_yaml(ruta.name), allow_unicode=True, width=10_000)
+        assert not re.search(r"INCOMPLETO\s+hasta\s+la\s+primera\s+carga", publicado, re.IGNORECASE), ruta.name
+    esquema = _yaml("00_global.yaml")["esquemas"]["descompuestos"]["para_que_sirve"]
+    assert "2026-09-29" in esquema and "_versiones_cargadas" in esquema
 
 
 def test_f120_r26_version_del_diccionario() -> None:
