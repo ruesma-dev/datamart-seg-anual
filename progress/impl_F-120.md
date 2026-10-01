@@ -151,3 +151,24 @@ vistas de F-097. Cuadre del master en la muestra: MASTER_PLANIF_JO NO_CUADRA
 script cargó `_des_texto` después del `02` de `main`, así que el «antes» de
 ESTUDIO salió vacío; tras el build, 20.682 NO_CUADRA, en línea con los 20.687
 de producción: su causa es otra, §4 de la spec.)
+
+## T10-T12 · Diccionario, documentación y `azure-apps`
+
+- **T10** `descompuestos.yaml`: `factor` (último) en `lineas` y en las tres
+  vistas; `rendimiento` «sin el factor», `importe_unitario` = factor x
+  rendimiento x precio, `cantidad_total` «ya lleva el factor»; el FACTOR
+  explicado con su ejemplo (añadido 1); la nota de ESTUDIO de D7 REESCRITA en
+  `lineas`, `v_pbi_estudio` y `cuadre_partida` (texto aprobado, con la 0713 y la
+  0726); fuera todo «INCOMPLETO» (añadido 2: `lineas`, `cuadre_partida`,
+  `_versiones_cargadas`, `v_pbi_master_planif_jo` y la cabecera), con la fecha de
+  la primera carga y cómo saber qué versión está. `fn_trocear` describe el factor
+  y el sello. `00_global.yaml`: versión **39** con su entrada de historia.
+  Árbol: 189 objetos, 1.416 columnas, 85 de consumo (anotado en `current.md`,
+  lo exige `test_f006_los_recuentos_de_current_son_los_de_hoy`). F-006: 2.090
+  passed, 216 skipped.
+- **T11** `ARCHITECTURE.md`: campo 14 «factor x rendimiento», `00_setup.sql` en el
+  sello, la duración medida de la primera carga y el orden de despliegue.
+  `main.py`: ayuda de `--sin-tope` con 916,9 s medidos (fuera «sin medir») y la
+  docstring de `build-descompuestos` con el factor.
+- **T12** `azure-apps/datamart_seg_anual.md`: un párrafo con la columna `factor`,
+  commit `20be0ce` en `azure-apps` (rama `master`, sin push).
