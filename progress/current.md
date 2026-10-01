@@ -12,6 +12,27 @@
 
 
 
+## 2026-10-01 · F-120 · SPEC LISTA · el factor del descompuesto · pendiente de aprobación (PARADA 1)
+
+Spec en `specs/F-120-factor-descompuesto/` (requirements 113, design 201, 19
+tareas); mediciones y decisiones en `progress/spec_F-120.md`. Todo en solo
+lectura, el master recorrido por trozos tras la nocturna. Lo esencial: el campo
+14 es «factor x rendimiento» (0 casos al revés contra `dncpro`); la 400854 v6
+cuadra al céntimo (249,41); se prevén ~91.000 partidas-versión del master y
+6.920 de PLANIF_JO de NO_CUADRA a CUADRA. **PLANIF_JO tenía el mismo defecto**
+(`dncpro.faccan` sin aplicar) y entra. **El retroceo no necesita mecanismo
+nuevo**: el sello de F-097 cambia solo; el humano lo fuerza con
+`build-descompuestos --sin-tope` DESPUÉS de desplegar la imagen (al revés, la
+imagen vieja falla y retrocea hacia atrás).
+
+**Decisiones para el humano** (recomendación en `progress/spec_F-120.md` §6):
+D1 `factor` = 1 con número, NULL con campo vacío o raro · D2 los 15 raros, NULL ·
+D3 retroceo por sello + `--sin-tope` manual · D4 `00_setup.sql` en el sello ·
+D5 PLANIF_JO dentro (`factip`/`faccan`, factor 0 literal) · D6 porcentaje sin
+factor, importe con él · D7 aviso de ESTUDIO en tres fichas · D8 columna al final
+· D9 el `acceptance` dice 7 líneas y son 9 · D10 feature nueva para el campo 14
+vacío (al menos ~95.000 líneas) y las 310 partidas que dejan de cuadrar.
+
 ## 2026-09-30 · F-118 · CERRADA (`done`, APROBADO en pasada 1) · serie real densa (F-051 y F-103 dentro) y venta final sin coeficientes · SIN DESPLEGAR: T26-T31 del humano
 
 > **Cerrada el 2026-09-30** con APROBADO del reviewer (`progress/review_F-118.md`),
