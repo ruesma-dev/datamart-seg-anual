@@ -1873,7 +1873,7 @@
         "Retroceadas todas las versiones ya cargadas sin releer Sigrid, y el cuadre recalculado: medido cuantas partidas pasan de NO_CUADRA a CUADRA",
         "La ficha de ESTUDIO avisa de que sus cantidades siguen la medicion actual y de que la foto fija de Estudios es MASTER_INICIAL"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
