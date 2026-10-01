@@ -619,10 +619,10 @@ def test_f097_r11_sello_del_sql_de_troceado(tmp_path: Path) -> None:
         sello_de_troceado,
     )
 
-    assert FICHEROS_DEL_SELLO == (TROCEADO, MASTER)
+    assert FICHEROS_DEL_SELLO == (SETUP, TROCEADO, MASTER), "00 entra con F-120"
     real = sello_de_troceado()
     assert re.fullmatch(r"[0-9a-f]{16}", real)
-    for nombre in (TROCEADO, MASTER, COSTE):
+    for nombre in (SETUP, TROCEADO, MASTER, COSTE):
         (tmp_path / nombre).write_text(_crudo(nombre), encoding="utf-8")
     assert sello_de_troceado(tmp_path) == real
     (tmp_path / COSTE).write_text("otra cosa", encoding="utf-8")

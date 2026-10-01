@@ -19,7 +19,7 @@ dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`)
 
 - [x] T1 decisiones anotadas en el informe
 - [x] T2 fase RED · [x] T3 dominio · [x] T4 `01` · [x] T5 `02` · [x] T6 `03`+`06`
-- [ ] T7 sello · [ ] T8 contraste SQL/espejo · [ ] T9 build local · [ ] T10 diccionario
+- [x] T7 sello · [ ] T8 contraste SQL/espejo · [ ] T9 build local · [ ] T10 diccionario
 - [ ] T11 docs · [ ] T12 azure-apps · [ ] T13 mutación · [ ] T19 `init.sh`
 - T14-T18: MANUAL del humano (Azure), abajo con su comando cuando el código esté.
 
