@@ -69,3 +69,56 @@ linea 13: None None
 con factor sin importe: 9
 suma importe_unitario: 190.69 (precio de la partida 249.41)
 ```
+
+## T3-T7 · Código (un commit por tarea)
+
+- **T3** `domain/descompuestos.py`: `_CUERPO_NUMERO` (`PATRON_NUMERO` conserva
+  su texto exacto), `PATRON_FACTOR_RENDIMIENTO`, `factor_rendimiento()`,
+  `POSICIONES["factor_rendimiento"]` (la 14), `RegistroDes.factor` y
+  `_producto(*valores)` a 60 cifras (`PRECISION_PRODUCTO`, R11).
+- **T4** `01_troceado.sql`: `DROP FUNCTION IF EXISTS` + `CREATE`, `factor` al
+  final del `RETURNS TABLE`, una capa `f` que lee el campo 14 como texto y la
+  `c` que lo parte con `fn_num` y el patrón literal; `importe_unitario` con
+  `c.factor`. Cabecera: formato, el `DROP` y el orden de despliegue.
+- **T5** `02_lineas_coste.sql`: `factor NUMERIC` al final del DDL + `ALTER TABLE
+  ... ADD COLUMN IF NOT EXISTS factor NUMERIC` (sin `DEFAULT`); ESTUDIO con
+  `t.factor`; PLANIF_JO con `CROSS JOIN LATERAL (SELECT CASE p.factip WHEN 1
+  THEN p.faccan::NUMERIC WHEN 0 THEN 1::NUMERIC END AS factor) f` (sin `ELSE`:
+  el 646 da NULL). Medido en `raw.dncpro` (solo lectura): `factip` 0 en
+  246.673 líneas, 1 en 42.096, 646 en 1, ningún NULL.
+- **T6** `03` inserta `t.factor`; `06` lo pone el último en las tres vistas.
+- **T7** `FICHEROS_DEL_SELLO = ("00_setup.sql", "01_troceado.sql",
+  "03_lineas_master.sql")`. Sello tras T7: `7cad480aee614b2a` (el de
+  producción era `99f827a11969d59f`; cambiará con cualquier edición posterior
+  de esos tres ficheros: el que vale es el que imprime el paso en T16).
+
+Tests de F-097 que cambian con la spec (no son regresiones): `COLUMNAS_LINEAS`
++ `factor`; las dos aserciones de `importe_unitario` (01 y PLANIF_JO); el sello
+con `00`; `POSICIONES` con `factor_rendimiento`; y (T10) el aviso de
+«INCOMPLETO», que el añadido 2 retira. **Desviación menor**: la verificación de
+T3 pide `test_f097_*.py` en verde, pero `test_f097_r13_las_posiciones_son_las_del_dominio`
+compara `POSICIONES` con el SQL y no podía pasar hasta T4 (el diseño renombra
+la clave en el dominio y el alias en el SQL). Quedó verde en T4. Un test mío
+corregido tras la RED: en `r19` la cadena esperada del `SELECT` estaba mal
+escrita (`c.base_porcentaje` en vez de `END AS base_porcentaje`).
+
+## T8 · Contraste SQL frente a espejo (PostgreSQL 16 local y desechable)
+
+`initdb` en el scratchpad, puerto 55433; nunca Azure. Muestra copiada de
+`descompuestos._des_texto` de Azure en **solo lectura** (`BEGIN READ ONLY` +
+`statement_timeout` 150 s, 8 consultas, la más lenta 27,9 s): el ámbito 3 entero,
+la 0713 entera (10 versiones del master) y, del master de otras obras, los dos
+raros, 150 filas con factor negativo, 100 con factor 0 y los tres extremos de §2.
+
+```
+filas de _des_texto: 62614 (43389 del ambito 3, 19624 de la 0713)
+registros troceados: 171869 (Python) / 171869 (SQL); SQL en 16.3 s
+formas del campo 14 en la muestra: {'numero': 132466, 'vacio': 33080, 'a x b': 5206,
+  'a x -b': 254, 'factor 0': 330, 'a x (rend. vacio)': 106, 'raro': 7, 'factor negativo': 420}
+filas con alguna diferencia: 0 | diferencias por columna: {}
+```
+
+**0 diferencias**, las 19 columnas de `RegistroDes` (con `factor`). Los raros
+de la muestra: `0678.CDMA15` (2) y `1963589xF321886` (5). La 400854 v6 en el SQL
+local: 19 líneas, **suma 249,41 = precio**, línea 13 = 1,24, y las 9 de forma
+factor con factor y rendimiento (8 con factor distinto de 1).
