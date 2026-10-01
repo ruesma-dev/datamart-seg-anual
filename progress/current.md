@@ -12,7 +12,18 @@
 
 
 
-## 2026-10-01 · F-120 · SPEC LISTA · el factor del descompuesto · pendiente de aprobación (PARADA 1)
+## 2026-10-01 · F-120 · EN IMPLEMENTACIÓN (spec aprobada, PARADA 1 confirmada) · el factor del descompuesto
+
+Implementer en curso; informe en `progress/impl_F-120.md`. D7 reescrita y los
+dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`).
+
+- [x] T1 decisiones anotadas en el informe
+- [ ] T2 fase RED · [ ] T3 dominio · [ ] T4 `01` · [ ] T5 `02` · [ ] T6 `03`+`06`
+- [ ] T7 sello · [ ] T8 contraste SQL/espejo · [ ] T9 build local · [ ] T10 diccionario
+- [ ] T11 docs · [ ] T12 azure-apps · [ ] T13 mutación · [ ] T19 `init.sh`
+- T14-T18: MANUAL del humano (Azure), abajo con su comando cuando el código esté.
+
+### Antecedentes (spec lista, 2026-10-01)
 
 Spec en `specs/F-120-factor-descompuesto/` (requirements 113, design 201, 19
 tareas); mediciones y decisiones en `progress/spec_F-120.md`. Todo en solo
