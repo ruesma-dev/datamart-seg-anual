@@ -3,12 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **109 features**, 64 abiertas, 45 terminadas.
+Resumen: **110 features**, 65 abiertas, 45 terminadas.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
+| F-120 | El factor del descompuesto: Sigrid guarda el rendimiento como «factor x rendimiento» y el troceado deja vacios el rendimiento y el importe unitario en ~461.000 lineas del master | 1 | pendiente | estandar | `feature/F-120-factor-descompuesto` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 2 | pendiente | critico | `feature/F-037-tesoreria` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-113 | La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto | 5 | pendiente | critico | `feature/F-113-categoria-capitulo-por-prefijo` |
@@ -125,6 +126,12 @@ Resumen: **109 features**, 64 abiertas, 45 terminadas.
 | F-052 | La obra 0599 no esta en el datamart: 104.366 filas de presupuesto se caen por un arbol de partidas roto | 42 | critico |
 
 ## Detalle
+
+### F-120 · El factor del descompuesto: Sigrid guarda el rendimiento como «factor x rendimiento» y el troceado deja vacios el rendimiento y el importe unitario en ~461.000 lineas del master
+
+estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-120-factor-descompuesto`
+
+Fichada por el humano el 2026-10-01 con prioridad 1, a partir de los correos de Elena Diaz (Control de Costes) del 30-09 y 01-10 en el hilo «PLANIFICADO CAPITULO ESTRUCTURAS DAVID LLOYD» (obra 0713), donde revisa la herramienta de descompuestos de Juan Romero: «no siempre guarda los rendimientos y esto coincide cuando tiene un factor, no se si se puede sacar la columna factor». MEDIDO POR EL LIDER EL 2026-10-01 (solo lectura): en el texto `des` de Sigrid el campo 14 (base 0) del registro `~D|`, que F-097 lee como rendimiento, NO siempre es un numero: cuando la linea tiene FACTOR viene como `<factor>x<rendimiento>` (0713 partida 400854, master v6: `1.00021x1`, `1x0.45`, `1.22x0.003`). `fn_trocear` y su espejo `domain/descompuestos.trocear_des` solo aceptan un numero, asi que esas lineas salen con `rendimiento` e `importe_unitario` NULL; `cantidad_total` (campo 4) e `importe_total` si estan bien. Comprobado contra la pantalla de Sigrid: precio unitario = factor x rendimiento x precio (1,22 x 0,003 x 339,39 = 1,24). ALCANCE en `descompuestos.lineas` (lineas con rendimiento NULL y cantidad y precio informados): MASTER_PLANIF_JO 307.031 de 2.497.224 (5.672 partidas, 53 obras); MASTER_PRE_ABC 153.958 (4.699 partidas, 110 obras); MASTER_INICIAL 240 (104 partidas, 13 obras); ESTUDIO 32 (14 partidas, 4 obras); PLANIF_JO 0 (dncpro trae columnas propias). EFECTO EN EL CUADRE: `cuadre_partida` suma `importe_unitario`, asi que las partidas afectadas salen NO_CUADRA sin serlo (hoy 96.307 NO_CUADRA en MASTER_PLANIF_JO y 62.155 en MASTER_PRE_ABC; cuantas por esto, a medir). QUE HACER: (1) medir en `_des_texto` todas las formas reales del campo 14 (numero, `a x b`, otras expresiones, separador decimal, signos) antes de disenar; (2) publicar el FACTOR en columna propia (`factor`, 1 si no hay) y el rendimiento limpio; `importe_unitario` = factor x rendimiento x precio redondeado como hoy; (3) misma regla en `fn_trocear` y en el espejo Python, con tests de las formas medidas; (4) volver a trocear TODAS las versiones ya cargadas (el incremental de F-097 no relee lo que no cambia en Sigrid: hace falta un modo de retroceo forzado o equivalente, sin releer Sigrid) y recalcular el cuadre; (5) ficha del diccionario con la columna nueva. SEGUNDO HALLAZGO DEL MISMO HILO (no es fallo del dato, va a la ficha del diccionario): la columna «Estudios» de la herramienta de Juan usa el origen ESTUDIO, cuyo descompuesto conserva los precios de Estudios pero cuyas CANTIDADES Sigrid actualiza a la medicion actual del ambito 3 (0713 partida 400857 HORMIGON EN ESCALERAS: 207,20 x 25,95 = 5.376,84 frente al cierre inicial 207,20 x 24,03 = 4.979,02). La foto fija de Estudios es MASTER_INICIAL; la ficha de ESTUDIO debe decirlo para que nadie lo use como importe de Estudios.
 
 ### F-037 · Esquema tesoreria: el flujo de caja que hoy se tira
 

@@ -1861,6 +1861,23 @@
       "rigor": "estandar",
       "priority": 68,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
+    },
+    {
+      "id": "F-120",
+      "title": "El factor del descompuesto: Sigrid guarda el rendimiento como «factor x rendimiento» y el troceado deja vacios el rendimiento y el importe unitario en ~461.000 lineas del master",
+      "description": "Fichada por el humano el 2026-10-01 con prioridad 1, a partir de los correos de Elena Diaz (Control de Costes) del 30-09 y 01-10 en el hilo «PLANIFICADO CAPITULO ESTRUCTURAS DAVID LLOYD» (obra 0713), donde revisa la herramienta de descompuestos de Juan Romero: «no siempre guarda los rendimientos y esto coincide cuando tiene un factor, no se si se puede sacar la columna factor». MEDIDO POR EL LIDER EL 2026-10-01 (solo lectura): en el texto `des` de Sigrid el campo 14 (base 0) del registro `~D|`, que F-097 lee como rendimiento, NO siempre es un numero: cuando la linea tiene FACTOR viene como `<factor>x<rendimiento>` (0713 partida 400854, master v6: `1.00021x1`, `1x0.45`, `1.22x0.003`). `fn_trocear` y su espejo `domain/descompuestos.trocear_des` solo aceptan un numero, asi que esas lineas salen con `rendimiento` e `importe_unitario` NULL; `cantidad_total` (campo 4) e `importe_total` si estan bien. Comprobado contra la pantalla de Sigrid: precio unitario = factor x rendimiento x precio (1,22 x 0,003 x 339,39 = 1,24). ALCANCE en `descompuestos.lineas` (lineas con rendimiento NULL y cantidad y precio informados): MASTER_PLANIF_JO 307.031 de 2.497.224 (5.672 partidas, 53 obras); MASTER_PRE_ABC 153.958 (4.699 partidas, 110 obras); MASTER_INICIAL 240 (104 partidas, 13 obras); ESTUDIO 32 (14 partidas, 4 obras); PLANIF_JO 0 (dncpro trae columnas propias). EFECTO EN EL CUADRE: `cuadre_partida` suma `importe_unitario`, asi que las partidas afectadas salen NO_CUADRA sin serlo (hoy 96.307 NO_CUADRA en MASTER_PLANIF_JO y 62.155 en MASTER_PRE_ABC; cuantas por esto, a medir). QUE HACER: (1) medir en `_des_texto` todas las formas reales del campo 14 (numero, `a x b`, otras expresiones, separador decimal, signos) antes de disenar; (2) publicar el FACTOR en columna propia (`factor`, 1 si no hay) y el rendimiento limpio; `importe_unitario` = factor x rendimiento x precio redondeado como hoy; (3) misma regla en `fn_trocear` y en el espejo Python, con tests de las formas medidas; (4) volver a trocear TODAS las versiones ya cargadas (el incremental de F-097 no relee lo que no cambia en Sigrid: hace falta un modo de retroceo forzado o equivalente, sin releer Sigrid) y recalcular el cuadre; (5) ficha del diccionario con la columna nueva. SEGUNDO HALLAZGO DEL MISMO HILO (no es fallo del dato, va a la ficha del diccionario): la columna «Estudios» de la herramienta de Juan usa el origen ESTUDIO, cuyo descompuesto conserva los precios de Estudios pero cuyas CANTIDADES Sigrid actualiza a la medicion actual del ambito 3 (0713 partida 400857 HORMIGON EN ESCALERAS: 207,20 x 25,95 = 5.376,84 frente al cierre inicial 207,20 x 24,03 = 4.979,02). La foto fija de Estudios es MASTER_INICIAL; la ficha de ESTUDIO debe decirlo para que nadie lo use como importe de Estudios.",
+      "acceptance": [
+        "Medidas en `_des_texto` todas las formas del campo de rendimiento, con su recuento, y cada una con su tratamiento decidido",
+        "`descompuestos.lineas` publica `factor` y el rendimiento limpio; `importe_unitario` = factor x rendimiento x precio; en la 0713 partida 400854 v6 las 7 lineas con factor tienen rendimiento e importe unitario y coinciden con la pantalla de Sigrid",
+        "El SQL y el espejo Python dan lo mismo en las formas medidas (tests offline)",
+        "Retroceadas todas las versiones ya cargadas sin releer Sigrid, y el cuadre recalculado: medido cuantas partidas pasan de NO_CUADRA a CUADRA",
+        "La ficha de ESTUDIO avisa de que sus cantidades siguen la medicion actual y de que la foto fija de Estudios es MASTER_INICIAL"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-120-factor-descompuesto"
     }
   ]
 }
