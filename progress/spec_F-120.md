@@ -124,6 +124,39 @@ tolerancia de 0,01. PLANIF_JO, con `factor = faccan` si `factip = 1`.
   tuplas muertas en `lineas` hasta que pase el autovacuum. Cabe en disco.
 - Por la nocturna sola: 300 MB por noche, **~7 noches** con el master mezclado.
 
+## APROBADA POR EL HUMANO (2026-10-01), con D7 reescrita y dos añadidos
+
+- **D1-D6 y D8: según la recomendación.** **D9:** el criterio pasa a «las 9 líneas
+  con factor» de la 400854 v6. **D10:** fuera de alcance, fichada como **F-122**.
+- **D7, REESCRITA por el líder y aprobada por el humano** (lo de «la foto fija de
+  Estudios es MASTER_INICIAL» es FALSO en general: en la 0713 la versión 0 del
+  master no tiene descompuesto). La nota que llevan las fichas de `lineas`,
+  `v_pbi_estudio` y `cuadre_partida` dice, en sustancia:
+  > ESTUDIO es la «Descomposición» del ámbito 3 fase 0, el único sitio de COSTE con
+  > descompuesto: tiene los **rendimientos y precios unitarios de Estudios**, pero su
+  > `cantidad_total` e `importe_total` siguen la **medición ACTUAL** de la partida
+  > (Sigrid los recalcula). El **importe de Estudios** de una partida es **medición ×
+  > precio del master versión 0** (`stg.presupuesto`, ámbito 8, fase 0), no la suma
+  > de `importe_total`. Lo que sí vale de ESTUDIO es el **descompuesto por unidad**
+  > (suma de `importe_unitario`), que coincide con el precio de la versión 0.
+  > MASTER_INICIAL solo existe donde la versión 0 guarda descompuesto.
+  Con los dos ejemplos medidos: 0713 02.01.01.04 HORMIGÓN EN ESCALERAS (medición
+  24,03 en la v0 frente a 25,95 hoy; por unidad 207,20 = precio v0; importe de
+  Estudios 4.979,02 frente a 5.376,84 de sumar líneas; sin MASTER_INICIAL) y 0726
+  04.02 FORJ. RETICULAR 35+10 (medición sin cambios 3.926,79; por unidad 134,35 =
+  precio v0; 527.564,24 frente a 527.584,96 por redondeo de líneas; MASTER_INICIAL
+  con las mismas 10 líneas).
+- **Añadido 1 (humano): el FACTOR explicado en las fichas.** Qué es (el FACTOR de
+  la pantalla de Descomposición de Sigrid), cómo viene (`factor x rendimiento` en el
+  campo 14), que `importe_unitario = factor x rendimiento x precio`, que `factor`
+  vale 1 si la línea no tiene, que en PLANIF_JO sale de `dncpro.faccan` y que las
+  ~95.000 líneas con el campo vacío siguen sin rendimiento (F-122). Ejemplo: 0713
+  400854 v6, «DESPLAZAMIENTO BOMBA DE 62 MT» 1,22 x 0,003 x 339,39 = 1,24 €/m².
+- **Añadido 2 (líder, aprobado): quitar el aviso caducado** «EL MASTER ESTÁ
+  INCOMPLETO HASTA LA PRIMERA CARGA» de las fichas de `lineas`, `cuadre_partida`,
+  `_versiones_cargadas` y `v_pbi_master_planif_jo`: la primera carga se hizo el
+  2026-09-29 (3.025 versiones). Se deja dicho cómo saber si una versión está.
+
 ## 6 · Decisiones abiertas (recomendación en negrita)
 
 - **D1 · La columna `factor`.** Nombre `factor`, `NUMERIC`. **1 si el campo 14 es
