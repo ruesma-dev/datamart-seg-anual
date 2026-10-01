@@ -172,3 +172,14 @@ de producción: su causa es otra, §4 de la spec.)
   docstring de `build-descompuestos` con el factor.
 - **T12** `azure-apps/datamart_seg_anual.md`: un párrafo con la columna `factor`,
   commit `20be0ce` en `azure-apps` (rama `master`, sin push).
+
+## T13 · Campaña de mutación (`progress/mutacion_F-120.md`)
+
+`python -m harness.mutacion --feature F-120 --base main --workers 2` sobre
+`68e1223`: alcance 83 líneas (3 ficheros), **9 mutantes generados y evaluados**
+(menos que el tope de 20: no hubo muestreo), **8 muertos, 1 superviviente**, 0
+timeouts, 0 sin veredicto, 2.180,6 s; línea base 370,5 / 373,1 s, media 242,3 s
+x 2 workers = 484,6 s por mutante. El superviviente (`PRECISION_PRODUCTO` 60 ->
+61) es **equivalente justificado**: análisis en el informe de mutación. Un primer
+intento con 4 workers salió «CAMPAÑA NO VÁLIDA» (la línea base de cierre agotó
+sus 600 s con cuatro suites compitiendo; mismos 8/1): se descartó y no se usa.
