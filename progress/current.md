@@ -82,7 +82,7 @@ factor, importe con él · D7 aviso de ESTUDIO en tres fichas · D8 columna al f
 · D9 el `acceptance` dice 7 líneas y son 9 · D10 feature nueva para el campo 14
 vacío (al menos ~95.000 líneas) y las 310 partidas que dejan de cuadrar.
 
-## 2026-09-30 · F-118 · CERRADA (`done`, APROBADO en pasada 1) · serie real densa (F-051 y F-103 dentro) y venta final sin coeficientes · SIN DESPLEGAR: T26-T31 del humano
+## 2026-09-30 · F-118 · CERRADA (`done`, APROBADO en pasada 1) · serie real densa (F-051 y F-103 dentro) y venta final sin coeficientes · DESPLEGADA (`r20260930-1715`) Y VERIFICADA el 01-10 (ver `impl_F-118.md`); pendiente solo T30
 
 > **Cerrada el 2026-09-30** con APROBADO del reviewer (`progress/review_F-118.md`),
 > `init.sh` en verde (6.149 passed, cobertura 97,9 %). Resumen en

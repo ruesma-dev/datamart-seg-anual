@@ -1871,7 +1871,7 @@
         "`descompuestos.lineas` publica `factor` y el rendimiento limpio; `importe_unitario` = factor x rendimiento x precio; en la 0713 partida 400854 v6 las 9 lineas con factor tienen rendimiento e importe unitario y coinciden con la pantalla de Sigrid",
         "El SQL y el espejo Python dan lo mismo en las formas medidas (tests offline)",
         "Retroceadas todas las versiones ya cargadas sin releer Sigrid, y el cuadre recalculado: medido cuantas partidas pasan de NO_CUADRA a CUADRA",
-        "La ficha de ESTUDIO avisa de que sus cantidades siguen la medicion actual y de que la foto fija de Estudios es MASTER_INICIAL"
+        "La ficha de ESTUDIO avisa de que sus cantidades siguen la medicion actual, de que el importe de Estudios es medicion x precio del master v0 (lo que vale de ESTUDIO es el descompuesto por unidad) y de que MASTER_INICIAL solo existe donde la v0 guarda descompuesto"
       ],
       "status": "in_progress",
       "sdd": true,

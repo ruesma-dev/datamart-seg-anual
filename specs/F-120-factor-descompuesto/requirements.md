@@ -98,8 +98,11 @@ siguen la recomendación de esa decisión; si el humano decide otra cosa, cambia
 - **R25.** [D7] La ficha de `lineas` (origen ESTUDIO), la de `v_pbi_estudio` y la
   de `cuadre_partida` deben avisar de que en ESTUDIO los precios son los de
   Estudios pero `cantidad_total` e `importe_total` siguen la medición ACTUAL del
-  ámbito 3, y de que la foto fija de Estudios es MASTER_INICIAL (0713, partida
-  400857: 207,20 x 25,95 = 5.376,84 frente a 207,20 x 24,03 = 4.979,02).
+  ámbito 3; de que el importe de Estudios es medición x precio del master v0 y lo
+  que vale de ESTUDIO es el descompuesto por unidad; y de que MASTER_INICIAL solo
+  existe donde la v0 guarda descompuesto (0713, partida 400857: 207,20 x 25,95 =
+  5.376,84 frente a 207,20 x 24,03 = 4.979,02, sin MASTER_INICIAL). D7 reescrita
+  y aprobada por el humano el 2026-10-01 (`progress/spec_F-120.md`).
 - **R26.** `version` de `config/diccionario/00_global.yaml` debe subir en uno.
 - **R27.** `docs/ARCHITECTURE.md` (formato del `des` y ficheros del sello) y
   `azure-apps/datamart_seg_anual.md` (la columna nueva) deben decirlo.
