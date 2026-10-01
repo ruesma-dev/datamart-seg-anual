@@ -12,6 +12,17 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 39 (F-120, 2026-10-01): EL FACTOR DEL DESCOMPUESTO (correos de Elena
+# Diaz, Control de Costes, del 30-09 y el 01-10). El campo 14 del texto `des` es
+# «factor x rendimiento» cuando la linea tiene FACTOR (`1.22x0.003`) y F-097 lo
+# dejaba sin rendimiento ni importe unitario: `descompuestos.lineas` y las tres
+# vistas `v_pbi_*` publican `factor` (1 sin factor, NULL sin campo) al final,
+# `rendimiento` limpio e `importe_unitario` = factor x rendimiento x precio;
+# PLANIF_JO aplica `dncpro.faccan`. Las fichas de ESTUDIO dicen que sus
+# cantidades siguen la medicion ACTUAL y que el importe de Estudios es medicion
+# x precio de la version 0; se retira el aviso caducado de «master incompleto
+# hasta la primera carga» (hecha el 2026-09-29).
+#
 # version 38 (F-118, 2026-09-30): LA SERIE REAL DENSA Y LA VENTA SIN
 # COEFICIENTES (correo de Juan Romero del 2026-09-29; F-051 y F-103 absorbidas).
 # Tres cambios de significado. (1) El mes de las filas reales es el del TEXTO
@@ -424,7 +435,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 38
+version: 39
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

@@ -771,9 +771,12 @@ def test_f097_r27_las_fichas_avisan_de_lo_provisional() -> None:
     assert "PROVISIONAL" in lineas and "D8" in lineas, "tipos 3 y 11 sin validar con Negocio"
     cabecera = (DIR_DICCIONARIO / "descompuestos.yaml").read_text(encoding="utf-8")
     for texto in (lineas, _texto_ficha(_ficha("cuadre_partida"))):
-        assert "INCOMPLETO" in texto and "primera carga" in texto, (
-            "sin la primera carga el master sale incompleto: la ficha lo avisa"
+        # F-120 (anadido 2): la primera carga se hizo el 2026-09-29 y el aviso
+        # de «master INCOMPLETO» caduco; la ficha dice como saber que version esta.
+        assert "INCOMPLETO" not in texto and "primera carga" in texto.lower(), (
+            "la ficha dice que la primera carga ya esta hecha"
         )
+        assert "_versiones_cargadas" in texto
     assert "R-DESCOMPUESTO-ORIGEN" in cabecera
     assert "134,35" in lineas and "419079" in lineas, "el caso de Juan, con su cifra"
 
