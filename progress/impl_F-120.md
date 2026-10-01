@@ -193,9 +193,8 @@ sus 600 s con cuatro suites compitiendo; mismos 8/1): se descartó y no se usa.
 - Fuera de alcance: F-122 (campo 14 vacío con precio, ~95.000 líneas, y las
   ~310 partidas que dejan de cuadrar). Para el líder: el `acceptance` 5 de
   `features.json` aún dice lo de MASTER_INICIAL (ver T1).
-- Nota de entorno: el scratchpad tenía un PostgreSQL de otra sesión en
-  `pgdata`, levantado; lo paré para usar el puerto 55433 con uno nuevo
-  (`pg120`), que también quedó parado al terminar.
+- Entorno: paré un PostgreSQL de otra sesión que ocupaba el 55433 en el
+  scratchpad; el mío (`pg120`) también quedó parado.
 
 ## Evidencias
 
@@ -208,3 +207,13 @@ sus 600 s con cuatro suites compitiendo; mismos 8/1): se descartó y no se usa.
 | Workers de la campaña | **2** (2.180,6 s; media 242,3 s x 2 = 484,6 s por mutante; línea base 370,5-373,1 s) |
 | Tiempo de la suite | 11 min 22 s con cobertura (682,4 s, `init.sh`) |
 | `bash harness/init.sh` final (T19) | **ENTORNO LISTO, exit 0**; tamaño impl 210/220 (medido sobre `5487cc2` + este informe) |
+
+## Review 1 atendida (`progress/review_F-120.md`)
+
+R1-1 `4d935a7`: `esquemas.descompuestos.para_que_sirve` de `00_global.yaml` ya
+no dice «INCOMPLETO hasta la primera carga» (carga del 2026-09-29, 3.025
+versiones, `_versiones_cargadas`). El test `r25_sin_el_aviso_caducado` busca ahora
+en el contenido de TODOS los YAML; RED antes del arreglo: `AssertionError:
+00_global.yaml`, 1 failed; después 161 passed (F-120 + F-097) y F-006 2.090
+passed. Sello sin cambios (`7cad480aee614b2a`). R1-2 `8b87306`: el «Sin ella» de
+`ARCHITECTURE.md` dice ya que es la primera carga. `init.sh`: ENTORNO LISTO, exit 0, 6.252 passed, cobertura 100 % (29/29), impl 219/220.
