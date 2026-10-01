@@ -216,3 +216,39 @@ Conclusión: en `stg`, solo cambian las obras que tienen que cambiar, y en las q
 cambian no se altera el total de Sigrid. `mart` y `cierre` se prueban en T29, con
 un ANTES nuevo sacado justo antes de reconstruir (esta huella ANTES solo vale
 sobre este `raw`). Ficheros en el scratchpad (no se versionan).
+
+## T29 · despliegue y comparación ANTES/DESPUÉS en las tres capas (líder, 2026-10-01)
+
+Imagen `r20260930-1715` (desde `main` 4e0ae9f, con F-118). Reconstrucción SIN
+ingesta, como ejecución puntual del job (`--yaml` con la plantilla del job y el
+comando `stage --reconstruir-todo && build-mart && build-cierre`; lanzada por el
+humano a las 00:11 hora local, Succeeded a las 05:10; `stg` 128,5 min de
+`plan_mensual` en 61 tramos). Nocturna del 01-10 retrasada por el humano de las
+00:00 a las 03:00 UTC y luego por el líder a las 04:00 UTC para que no se
+solapara; **hay que devolverla a `0 0 * * *`**. Huellas DESPUÉS sobre el mismo
+`raw` que el ANTES de T26.
+
+- **`stg`**: DESPUÉS = propuesta de T27 celda a celda (17.530, 0 diferencias):
+  vale todo lo de T27 (acumulado final 0 cambios, suma solo en las 44 obras
+  explicadas, master 0 cambios).
+- **`mart`**: acumulado final 0 diferencias en 894 pares obra-ámbito y 1.824
+  obra-ámbito-categoría; suma de movimientos distinta solo en las mismas 44;
+  ninguna obra movida en `mart` que no se moviera en `stg`; master 0 cambios.
+- **`cierre`** (17.080 → 27.100 filas; 274 obras se mueven):
+  - final VENTA distinto en **exactamente 42 obras** (507 filas-mes); DIRECTOS,
+    INDIRECTOS y GENERALES: 0 obras. 0702 ago-26: 12.144.681,17 → **9.658.390,84**,
+    ejecutado igual (2.910.579,09); 0709 3.524.865,37 → 2.962.071,66; 0672
+    10.087.950,79 → 8.504.774,65. 25 filas suben al quitar coeficientes: obras
+    con coeficiente < 1 (0660, 0,9669 desde su v3, una baja) y 6 céntimos de
+    redondeo en la 0628.
+  - ejecutado a origen final y suma del ejecutado mensual distintos solo en 11
+    obras de VENTA (0241, 0256, 0272, 0286, 0287, 0342, 0427, 0458, 0466, 0467,
+    0562): antes publicaban 0 en su último mes; ahora arrastran (D5, R38).
+  - 52 filas desaparecen, de 12 obras, todas del grupo del mes del texto.
+- `check-unicidad --timeout 300`: **`cierre.v_pbi_planif_vs_real` OK** (antes
+  204 combinaciones repetidas), 0 claves rotas, 2 sin comprobar (timeout).
+- `check-cierres` y `check-mes-fase`: cortados por timeout al ir los tres en
+  paralelo; se repiten tras la nocturna, uno a uno.
+- T30 (hoja de cierre de Juan): no se ha hecho; las cifras de su correo cuadran
+  (0702 venta 9.658.390,84 y beneficio −790.718,46). T28 (aviso a Juan): el
+  humano decidió no avisar.
