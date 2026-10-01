@@ -18,7 +18,7 @@ Implementer en curso; informe en `progress/impl_F-120.md`. D7 reescrita y los
 dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`).
 
 - [x] T1 decisiones anotadas en el informe
-- [ ] T2 fase RED · [ ] T3 dominio · [ ] T4 `01` · [ ] T5 `02` · [ ] T6 `03`+`06`
+- [x] T2 fase RED · [x] T3 dominio · [ ] T4 `01` · [ ] T5 `02` · [ ] T6 `03`+`06`
 - [ ] T7 sello · [ ] T8 contraste SQL/espejo · [ ] T9 build local · [ ] T10 diccionario
 - [ ] T11 docs · [ ] T12 azure-apps · [ ] T13 mutación · [ ] T19 `init.sh`
 - T14-T18: MANUAL del humano (Azure), abajo con su comando cuando el código esté.

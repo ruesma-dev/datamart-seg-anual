@@ -15,8 +15,9 @@ Tres piezas:
    tope de MB por noche, con lo que no cabe aplazado a la siguiente.
 2. **Que versiones se retrocean en el build** (`planificar_troceado`, R21), con
    el mismo tope y partidas en lotes.
-3. **El troceado del texto `des`** (`trocear_des`, R13, R14, R19): el ESPEJO en
-   Python de `sql/descompuestos/01_troceado.sql`, que es quien trocea de verdad.
+3. **El troceado del texto `des`** (`trocear_des`, R13, R14, R19; el factor,
+   F-120): el ESPEJO en Python de `sql/descompuestos/01_troceado.sql`, que es
+   quien trocea de verdad.
    Existe para probar la regla sin base de datos (precedente de F-052,
    `arbol_partidas.py`); que el SQL use las mismas posiciones lo fija un test
    contra `POSICIONES`.
@@ -25,6 +26,12 @@ El formato del `des` (medido el 2026-09-27 y el 2026-09-28): registros que
 empiezan por `~D|`, separados por salto de linea, con campos separados por `|`.
 El texto largo del campo 9 puede traer saltos de linea dentro, por eso se parte
 por «salto seguido de `~<letra>|`» y no por cualquier salto. Posiciones base 0.
+
+El campo 14 NO es el rendimiento a secas (F-120, medido el 2026-10-01 en los
+4,5 M registros): es un numero cuando la linea no tiene factor y
+`<factor>x<rendimiento>` cuando lo tiene (`1.22x0.003`; el orden, comprobado
+contra `dncpro.faccan` y `dncpro.canren`). El importe unitario es
+factor x rendimiento x precio; la cantidad total (campo 4) ya lleva el factor.
 """
 
 from __future__ import annotations
@@ -32,7 +39,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 
 # ---------------------------------------------------------------------------
 # Vocabulario
@@ -68,7 +75,8 @@ POSICIONES = {
     "unidad": 5,
     "codigo_alternativo": 7,
     "naturaleza_codigo": 11,
-    "rendimiento": 14,
+    # «factor x rendimiento» o un numero (F-120): lo parte `factor_rendimiento`
+    "factor_rendimiento": 14,
     "tipo_elemento_codigo": 16,
     "naturaleza": 17,
     "dncpro_id": 36,
@@ -98,8 +106,18 @@ TIPOS_PORCENTAJE = ("4", "13")
 #: tumbaria el build en vez de salir NULL. Se aplica con `fullmatch`: en Python
 #: `$` casa antes de un salto de linea final y en PostgreSQL no (review 1 de
 #: F-097).
-PATRON_NUMERO = r"^[-+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]{1,3})?$"
+_CUERPO_NUMERO = r"[-+]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]{1,3})?"
+PATRON_NUMERO = rf"^{_CUERPO_NUMERO}$"
+
+#: La forma factor del campo 14 (F-120): `<numero>x<numero>` o `<numero>x`
+#: (rendimiento vacio), con `x` minuscula y sin blancos dentro. El MISMO texto va
+#: literal en `01_troceado.sql` (lo fija un test); cada lado se convierte con
+#: `numero`, que es `fn_num`. Medido: ninguna `X` mayuscula, coma decimal, blanco
+#: interno ni tres factores; lo que no casa (15 registros en 4,5 M) es NULL.
+PATRON_FACTOR_RENDIMIENTO = rf"^{_CUERPO_NUMERO}x({_CUERPO_NUMERO})?$"
+
 _NUMERO = re.compile(PATRON_NUMERO)
+_FACTOR_RENDIMIENTO = re.compile(PATRON_FACTOR_RENDIMIENTO)
 _ENLACE = re.compile(r"^[0-9]{1,18}$")
 _SEPARADOR_REGISTROS = re.compile(r"\n(?=~[A-Z]\|)")
 _INICIO_REGISTRO = re.compile(r"^~[A-Z]\|")
@@ -111,6 +129,12 @@ _CENTIMO = Decimal("0.01")
 #: `01_troceado.sql` (review 1 de F-097): un `|` que desplaza campos puede poner
 #: un numero enorme donde no toca, y eso no puede tumbar el build.
 LIMITE_IMPORTE = Decimal("1e16")
+
+#: Cifras con que el espejo multiplica (F-120, R11). PostgreSQL multiplica
+#: NUMERIC de forma EXACTA; el contexto por defecto de Python (28 cifras)
+#: redondearia el producto de tres numeros largos antes de `ROUND(x, 2)` y un
+#: importe en el filo del medio centimo saldria distinto que en el SQL.
+PRECISION_PRODUCTO = 60
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +155,7 @@ class RegistroDes:
     codigo_alternativo: str | None
     naturaleza_codigo: str | None
     rendimiento: Decimal | None
+    factor: Decimal | None
     tipo_elemento_codigo: str | None
     naturaleza: str | None
     dncpro_id: int | None
@@ -160,6 +185,24 @@ def numero(texto: str | None) -> Decimal | None:
         return None
 
 
+def factor_rendimiento(texto: str | None) -> tuple[Decimal | None, Decimal | None]:
+    """`(factor, rendimiento)` del campo 14 (F-120, R1-R5, R9).
+
+    Un numero es `(1, numero)`; `a x b` es `(a, b)` y `a x` es `(a, None)`, cada
+    lado con su signo; vacio o raro es `(None, None)`. Un factor 0 es un factor.
+    """
+    if texto is None:
+        return None, None
+    limpio = texto.strip(" ")
+    solo = numero(limpio)
+    if solo is not None:
+        return Decimal(1), solo
+    if not _FACTOR_RENDIMIENTO.fullmatch(limpio):
+        return None, None
+    factor, _, rendimiento = limpio.partition("x")
+    return numero(factor), numero(rendimiento)
+
+
 def tipo_elemento(codigo: str | None) -> str:
     """La traduccion del campo 16 (D8): vacio es SIN_TIPO y lo raro DESCONOCIDO."""
     if codigo is None or codigo == "":
@@ -182,8 +225,16 @@ def _redondeo(valor: Decimal | None) -> Decimal | None:
     return None if abs(redondeado) >= LIMITE_IMPORTE else redondeado
 
 
-def _producto(a: Decimal | None, b: Decimal | None) -> Decimal | None:
-    return None if a is None or b is None else a * b
+def _producto(*valores: Decimal | None) -> Decimal | None:
+    """El producto EXACTO como el NUMERIC de PostgreSQL (R11), o NULL si falta uno."""
+    if any(v is None for v in valores):
+        return None
+    with localcontext() as contexto:
+        contexto.prec = PRECISION_PRODUCTO
+        resultado = Decimal(1)
+        for valor in valores:
+            resultado *= valor
+    return resultado
 
 
 def _enlace(campos: Sequence[str]) -> int | None:
@@ -204,7 +255,9 @@ def trocear_des(des: str | None) -> tuple[RegistroDes, ...]:
         campos = trozo.rstrip("\n").split("|")
         precio = numero(_texto(campos, POSICIONES["precio"]))
         cantidad = numero(_texto(campos, POSICIONES["cantidad_total"]))
-        rendimiento = numero(_texto(campos, POSICIONES["rendimiento"]))
+        factor, rendimiento = factor_rendimiento(
+            _texto(campos, POSICIONES["factor_rendimiento"])
+        )
         codigo_tipo = _texto(campos, POSICIONES["tipo_elemento_codigo"])
         es_porcentaje = codigo_tipo in TIPOS_PORCENTAJE
         registros.append(
@@ -218,13 +271,16 @@ def trocear_des(des: str | None) -> tuple[RegistroDes, ...]:
                 codigo_alternativo=_texto(campos, POSICIONES["codigo_alternativo"]),
                 naturaleza_codigo=_texto(campos, POSICIONES["naturaleza_codigo"]),
                 rendimiento=rendimiento,
+                factor=factor,
                 tipo_elemento_codigo=codigo_tipo,
                 naturaleza=_texto(campos, POSICIONES["naturaleza"]),
                 dncpro_id=_enlace(campos),
                 tipo_elemento=tipo_elemento(codigo_tipo),
-                importe_unitario=_redondeo(_producto(precio, rendimiento)),
+                # El campo 4 ya lleva el factor: importe_total no lo repite (R7)
+                importe_unitario=_redondeo(_producto(precio, factor, rendimiento)),
                 importe_total=_redondeo(_producto(cantidad, precio)),
                 es_porcentaje=es_porcentaje,
+                # el porcentaje, sin el factor (D6); el importe, con el
                 porcentaje=(
                     _producto(rendimiento, Decimal(100)) if es_porcentaje else None
                 ),
