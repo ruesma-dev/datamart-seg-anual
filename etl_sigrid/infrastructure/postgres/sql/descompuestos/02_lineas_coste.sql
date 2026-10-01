@@ -35,6 +35,16 @@
 --
 -- Los dos se reconstruyen ENTEROS cada noche (R21): 120.373 registros y
 -- ~287.000 lineas, segundos.
+--
+-- EL FACTOR (F-120). `lineas.factor` es el FACTOR de la Descomposicion de
+-- Sigrid: 1 si la linea no tiene, NULL si no hay campo. ESTUDIO lo trae de
+-- `fn_trocear` (el campo 14 es «factor x rendimiento»); PLANIF_JO, de
+-- `dncpro`, que lo guarda aparte: `factip` 1 -> `faccan`, 0 -> 1, cualquier
+-- otro (un 646 medido) -> NULL y sin importe unitario. `canren` es el
+-- rendimiento limpio y `can` ya lleva el factor, asi que solo cambia el
+-- importe unitario. La columna va AL FINAL (D8): la tabla persiste entre
+-- noches y en una base que ya la tiene la anade el `ALTER TABLE`, que es solo
+-- catalogo; sin DEFAULT, las filas del master aun no retroceadas quedan NULL.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS descompuestos.lineas (
@@ -76,9 +86,13 @@ CREATE TABLE IF NOT EXISTS descompuestos.lineas (
     es_ultima                 BOOLEAN,
     tipo_version              TEXT,
     texto_version             TEXT,
+    factor                    NUMERIC,
     CONSTRAINT ck_lineas_origen CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_INICIAL', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')),
     CONSTRAINT pk_lineas PRIMARY KEY (origen, obra_id, partida_id, ambito_id, fase_num, orden)
 );
+
+-- La tabla de F-097 no tenia `factor`: se anade sin DROP (F-120, R17).
+ALTER TABLE descompuestos.lineas ADD COLUMN IF NOT EXISTS factor NUMERIC;
 
 CREATE INDEX IF NOT EXISTS ix_lineas_version ON descompuestos.lineas (obra_id, ambito_id, fase_num);
 CREATE INDEX IF NOT EXISTS ix_lineas_partida ON descompuestos.lineas (partida_id);
@@ -135,7 +149,7 @@ INSERT INTO descompuestos.lineas (
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
     proveedor_recomendado_id, contrato_id, contrato_linea_id, fecha_maxima,
     grupo_planificacion_id, nivel, es_nivel_padre, es_version_inicial,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
 )
 SELECT 'ESTUDIO', t.obra_id, t.partida_id, t.presupuesto_id, t.ambito_id, t.fase_num, t.orden,
        t.codigo_elemento, t.descripcion, t.unidad, t.codigo_alternativo,
@@ -146,7 +160,8 @@ SELECT 'ESTUDIO', t.obra_id, t.partida_id, t.presupuesto_id, t.ambito_id, t.fase
        NULL::BIGINT, NULL::BIGINT,
        NULL::BIGINT, NULL::BIGINT, NULL::BIGINT, NULL::DATE,
        NULL::BIGINT, NULL::INTEGER, NULL::BOOLEAN, NULL::BOOLEAN,
-       NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::TEXT, NULL::TEXT
+       NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::TEXT, NULL::TEXT,
+       t.factor
 FROM troceado t
 WHERE NOT EXISTS (SELECT 1 FROM enlazadas e WHERE e.presupuesto_id = t.presupuesto_id);
 
@@ -162,7 +177,7 @@ INSERT INTO descompuestos.lineas (
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
     proveedor_recomendado_id, contrato_id, contrato_linea_id, fecha_maxima,
     grupo_planificacion_id, nivel, es_nivel_padre, es_version_inicial,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
 )
 SELECT 'PLANIF_JO', o.ide, p.paride, NULL::BIGINT, 3, 0,
        (row_number() OVER (PARTITION BY o.ide, p.paride ORDER BY p.pos, p.ide))::INTEGER,
@@ -170,9 +185,10 @@ SELECT 'PLANIF_JO', o.ide, p.paride, NULL::BIGINT, 3, 0,
        NULLIF(btrim(p.cod2), ''),
        NULL::TEXT, 'SIN_TIPO', NULLIF(btrim(n.cod), ''), NULLIF(btrim(n.res), ''),
        p.canren::NUMERIC, p.pre::NUMERIC,
-       -- lo que no cabe en NUMERIC(18,2) es NULL, como en fn_trocear (review 1)
-       CASE WHEN abs(ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2)) < 1e16
-           THEN ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2) END,
+       -- lo que no cabe en NUMERIC(18,2) es NULL, como en fn_trocear (review
+       -- 1); con el factor de `dncpro` (F-120)
+       CASE WHEN abs(ROUND(p.pre::NUMERIC * f.factor * p.canren::NUMERIC, 2)) < 1e16
+           THEN ROUND(p.pre::NUMERIC * f.factor * p.canren::NUMERIC, 2) END,
        p.can::NUMERIC,
        CASE WHEN abs(ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2)) < 1e16
            THEN ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2) END,
@@ -181,9 +197,13 @@ SELECT 'PLANIF_JO', o.ide, p.paride, NULL::BIGINT, 3, 0,
        NULLIF(p.entide, 0), NULLIF(p.adjctride, 0), NULLIF(p.adjctrlin, 0),
        descompuestos.fn_fecha(p.fec),
        NULLIF(p.gpcide, 0), p.niv, COALESCE(p.nivpad, 0) <> 0,
-       NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::TEXT, NULL::TEXT
+       NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::TEXT, NULL::TEXT,
+       f.factor
 FROM raw.obr o
 JOIN raw.dncpro p ON p.dncide = o.dncide
 LEFT JOIN raw.con c ON c.ide = p.proide
 LEFT JOIN raw.auxpronat n ON n.ide = p.natide
+-- El factor de la linea (F-120, D5): sin ELSE, un `factip` raro es NULL.
+CROSS JOIN LATERAL (SELECT CASE p.factip WHEN 1 THEN p.faccan::NUMERIC
+                                          WHEN 0 THEN 1::NUMERIC END AS factor) f
 WHERE COALESCE(o.dncide, 0) <> 0 AND COALESCE(p.paride, 0) <> 0;

@@ -60,6 +60,7 @@ COLUMNAS_LINEAS = [
     "proveedor_recomendado_id", "contrato_id", "contrato_linea_id", "fecha_maxima",
     "grupo_planificacion_id", "nivel", "es_nivel_padre", "es_version_inicial",
     "es_primera_abc", "es_vigente", "es_ultima", "tipo_version", "texto_version",
+    "factor",  # F-120, al final (D8)
 ]
 
 COLUMNAS_CUADRE = [
@@ -307,8 +308,8 @@ def test_f097_r16_planif_jo_desde_dncpro_de_la_obra() -> None:
 
 def test_f097_r19_planif_jo_con_sus_importes() -> None:
     planif = _bloque(COSTE, "SELECT 'PLANIF_JO'", ";")
-    assert ("CASE WHEN abs(ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2)) < 1e16 "
-            "THEN ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2) END") in planif
+    assert ("CASE WHEN abs(ROUND(p.pre::NUMERIC * f.factor * p.canren::NUMERIC, 2)) < 1e16 "
+            "THEN ROUND(p.pre::NUMERIC * f.factor * p.canren::NUMERIC, 2) END") in planif, "F-120"
     assert ("CASE WHEN abs(ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2)) < 1e16 "
             "THEN ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2) END") in planif
     assert "'SIN_TIPO'" in planif
