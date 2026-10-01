@@ -1878,6 +1878,22 @@
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-120-factor-descompuesto"
+    },
+    {
+      "id": "F-121",
+      "title": "El recurso principal de cada recurso auxiliar (campo extendido «Recurso asociado» de Sigrid): a que trabajador va cada vehiculo",
+      "description": "Pedida por el humano el 2026-10-01 con prioridad 5, a partir del correo de Juan Romero de ese dia, «Sigrid – Nuevo campo extendido \"Recurso asociado\" en recursos auxiliares». Control de Costes ha creado en Sigrid un campo extendido en la ficha de recurso que asocia a cada RECURSO AUXILIAR su RECURSO PRINCIPAL (un padre con varios hijos: por ejemplo, a cada vehiculo el trabajador que lo usa; el 5409NPZ lleva asociado a MO/0192 LOPEZ GOMEZ, JOSE FRANCISCO). Como se guarda, segun Juan: tabla `conext` enlazada con el recurso por `conide = con.ide`; codigo del campo `cod = '5'` (TEXTO, no numero) con `camtab = 'res'`; el valor es el ide del recurso principal en `valn`, que se resuelve con `con.ide = conext.valn`. MEDIDO POR EL LIDER EL 2026-10-01 (solo lectura): `raw.conext` se ingiere entera cada noche (sin filtro, `incremental_column` null), pero hoy tiene 0 filas con `cod = '5'` y `camtab = 'res'`: el campo se creo despues de la ingesta del 01-10 y llegara con la nocturna siguiente sin tocar la ingesta. QUE HACER: (1) medir, con el dato ya ingerido, cuantos recursos auxiliares tienen recurso principal, de que tipos son padre e hijos, si hay valores que no resuelven a un recurso, ciclos o cadenas de mas de un nivel, y si un auxiliar puede tener mas de un principal en el tiempo (el campo extendido no guarda historia: decidir si basta con el valor actual); (2) publicar en el esquema `personal` (F-057), junto a los recursos, el recurso principal de cada auxiliar con su codigo y nombre; (3) acordar con Juan para que lo quiere (por ejemplo, imputar el coste de los partes del vehiculo al trabajador asociado, o controlar que el vehiculo se imputa a la misma obra que su trabajador) y publicarlo en la forma que sirva a esa pregunta; (4) ficha del diccionario. OJO: `personal` es el esquema con datos personales (nombre, NIF, DNI), autorizado por el responsable del dato; el principal es un trabajador con nombre, asi que va ahi y no en un esquema sin esa autorizacion.",
+      "acceptance": [
+        "Medido con el dato ingerido cuantos auxiliares tienen recurso principal, que tipos son, cuantos no resuelven y si hay cadenas o ciclos",
+        "Publicado en `personal` el recurso principal de cada recurso auxiliar (id, codigo y nombre), con su ficha en el diccionario",
+        "Acordado con Juan Romero para que lo quiere usar y publicado en la forma que responde a esa pregunta",
+        "Comprobado el ejemplo del correo: el 5409NPZ tiene como principal a MO/0192"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 5,
+      "branch": "feature/F-121-recurso-principal-auxiliar"
     }
   ]
 }
