@@ -122,3 +122,32 @@ filas con alguna diferencia: 0 | diferencias por columna: {}
 de la muestra: `0678.CDMA15` (2) y `1963589xF321886` (5). La 400854 v6 en el SQL
 local: 19 líneas, **suma 249,41 = precio**, línea 13 = 1,24, y las 9 de forma
 factor con factor y rendimiento (8 con factor distinto de 1).
+
+## T9 · El build de la rama sobre un estado de F-097 (mismo PostgreSQL local)
+
+Base nueva `prueba_f120b`: `raw` de juguete (`obrparpre` = las 62.614 filas de la
+muestra, `obrparpar` vacío, `obrfasamb`/`conext` sintéticos para las 93
+versiones, y 6 líneas de `dncpro` en la 400854 con `factip` 1, 0, 646, factor 0
+y factor -1). Primero **el estado de F-097 con los SQL de `main`** (`git show
+main:...`): `lineas` SIN `factor`, `fn_trocear` viejo, sello `99f827a11969d59f`.
+Después `BuildDescompuestosStep` de la rama (`--sin-tope`), dos veces:
+
+```
+ESTADO F-097 (main): 400854 v6 [('NO_CUADRA', 249.41, 190.69)] | columna factor en lineas: 0 | versiones: 93
+BUILD 1: SUCCESS 285704 27.1 s {"sello_troceado": "7cad480aee614b2a", "versiones_troceadas": 93, "lotes": 1}
+  400854_v6: CUADRA 249.41 249.41 19 lineas | 9 con factor, rendimiento e importe
+  ultima columna: lineas, v_pbi_estudio, v_pbi_planif_jo, v_pbi_master_planif_jo -> factor
+  _des_texto igual: true | filas/bytes/huella/batch_id/cargada_at de _versiones_cargadas iguales: true
+  PLANIF_JO (factor, rend., precio, imp. unit.): 1.00021 1 34.2 34.21 | 1 0.44 119 52.36 | NULL 1 2 NULL (646)
+                                                0 1 5 0.00 | -1 1 10 -10.00 | 1.22 0.003 339.39 1.24
+BUILD 2: SUCCESS 285704 20.4 s {"versiones_troceadas": 0, "lotes": 0}
+  md5 de lineas y de cuadre_partida IDENTICOS a los del build 1
+```
+
+El `ALTER TABLE` funciona sobre la `lineas` de F-097, el `DROP FUNCTION` sobre
+el `fn_trocear` viejo y `CREATE OR REPLACE VIEW` añade `factor` al final de las
+vistas de F-097. Cuadre del master en la muestra: MASTER_PLANIF_JO NO_CUADRA
+525 -> 3, MASTER_PRE_ABC 81 -> 0. (ESTUDIO no es comparable en esa foto: el
+script cargó `_des_texto` después del `02` de `main`, así que el «antes» de
+ESTUDIO salió vacío; tras el build, 20.682 NO_CUADRA, en línea con los 20.687
+de producción: su causa es otra, §4 de la spec.)
