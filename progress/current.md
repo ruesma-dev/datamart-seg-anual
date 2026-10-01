@@ -14,7 +14,7 @@
 
 ## 2026-10-02 · F-120 · IMPLEMENTADA, PENDIENTE DE REVIEW (T1-T13 y T19; quedan T14-T18 del humano) · el factor del descompuesto
 
-Implementer en curso; informe en `progress/impl_F-120.md`. D7 reescrita y los
+Implementación entregada; informe en `progress/impl_F-120.md`. D7 reescrita y los
 dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`).
 
 - [x] T1 decisiones anotadas en el informe
