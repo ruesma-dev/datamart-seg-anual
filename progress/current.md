@@ -20,7 +20,7 @@ dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`)
 - [x] T1 decisiones anotadas en el informe
 - [x] T2 fase RED · [x] T3 dominio · [x] T4 `01` · [x] T5 `02` · [x] T6 `03`+`06`
 - [x] T7 sello · [x] T8 contraste SQL/espejo · [x] T9 build local · [x] T10 diccionario
-- [ ] T11 docs · [ ] T12 azure-apps · [ ] T13 mutación · [ ] T19 `init.sh`
+- [x] T11 docs · [ ] T12 azure-apps · [ ] T13 mutación · [ ] T19 `init.sh`
 - T14-T18: MANUAL del humano (Azure), abajo con su comando cuando el código esté.
 
 **Diccionario del árbol tras F-120 (version 39): 189 objetos, 1416 columnas,
