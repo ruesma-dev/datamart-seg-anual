@@ -806,9 +806,10 @@ cambio del SQL del sello retrocea TODO lo cargado sin releer Sigrid: F-120 lo
 hace de una vez con `build-descompuestos --sin-tope` + `apply-grants`, y
 **siempre después de desplegar la imagen** (al revés, la imagen vieja ve otro
 sello, retrocea hacia atrás y su `CREATE OR REPLACE FUNCTION fn_trocear` falla
-contra la función nueva). Sin ella la nocturna converge sola a 300 MB por
-noche (unas 8 noches) y, mientras tanto, el master de `descompuestos.lineas`
-está INCOMPLETO. **Si el estado se corrompe**: vaciar
+contra la función nueva). Sin la primera carga, la nocturna completaría el
+master sola a 300 MB por noche (unas 8 noches) y, mientras tanto, el master de
+`descompuestos.lineas` estaría INCOMPLETO; en producción la primera carga se
+hizo el 2026-09-29. **Si el estado se corrompe**: vaciar
 `descompuestos._versiones_cargadas` y relanzar la primera carga. Espacio
 estimado: 2,5-4,2 GB (27 de 64 GB el 2026-09-26).
 
