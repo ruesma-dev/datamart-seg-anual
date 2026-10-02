@@ -12,6 +12,30 @@
 
 
 
+## 2026-10-02 · F-123 · FICHADA, spec-author lanzado · la regla de orígenes del descompuesto
+
+Rama `feature/F-123-descompuestos-regla-origenes` (desde `main` d4f58ea).
+`init.sh` en verde antes de empezar (6.251 passed). Es el «vamos a modificar la
+lectura de descompuestos» del cierre de sesión. **Dictado por el humano el
+2026-10-02** (PARADA 1 de dirección confirmada; la spec vuelve a él):
+
+- Cada master coste (cuatrimestrales incluidos) con su descompuesto y las
+  mediciones de esa versión: ya es así, medido.
+- Estudios = master 0, con origen **`MASTER_ESTUDIO`** (sustituye a
+  `MASTER_INICIAL`). **Si el master 0 no tiene descompuesto, se hace lo de hoy**
+  (la «Descomposición» de coste fase 0); **si tampoco hay ahí, se informa de que
+  no existe.**
+- Coste fase 0 es la **fase viva** (el jefe de obra la evoluciona día a día): su
+  descompuesto es `PLANIF_JO`, la «Descomposición» se ignora para esa fase. El
+  diccionario tiene que explicar la fase viva.
+- El texto del ámbito 3 de `_des_texto` **no se borra** y se sigue ingiriendo.
+- `MASTER_PRE_ABC` y `MASTER_PLANIF_JO` no se tocan (el humano no contestó a
+  esa decisión: se aplica la recomendación; revocable).
+
+Medido el 02-10 (solo lectura, MCP): 35.523 partidas con `ESTUDIO` hoy, 25.799
+con descompuesto en el master 0 y 9.724 sin él (45 obras de 174; 33 sin master
+cargado). Abierto para la spec: respaldo por obra o por partida, con qué origen
+o marca, cómo se informa el «no existe» y si hay que retrocear.
 
 ## 2026-10-02 · ESTADO AL CERRAR LA SESIÓN (leer primero)
 
