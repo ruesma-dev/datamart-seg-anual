@@ -217,3 +217,28 @@ en el contenido de TODOS los YAML; RED antes del arreglo: `AssertionError:
 00_global.yaml`, 1 failed; después 161 passed (F-120 + F-097) y F-006 2.090
 passed. Sello sin cambios (`7cad480aee614b2a`). R1-2 `8b87306`: el «Sin ella» de
 `ARCHITECTURE.md` dice ya que es la primera carga. `init.sh`: ENTORNO LISTO, exit 0, 6.252 passed, cobertura 100 % (29/29), impl 219/220.
+
+## T14-T18 · DESPLEGADA el 2026-10-02 (líder, autorizado por el humano)
+
+- **T14:** merge `fe676dc` en `main`; imagen **`r20261002-0835`** (desde `main`
+  fe676dc) aplicada al job con `85_update_job.ps1`. La nocturna del 02-10 ya había
+  terminado (Succeeded, 06:18 hora local), así que no se pisaron.
+- **T15 · foto ANTES** (solo lectura, 08:38): sello `99f827a11969d59f` en las 3.025
+  versiones; `lineas` sin `factor`. NO_CUADRA: MASTER_PLANIF_JO 96.307,
+  MASTER_PRE_ABC 62.155, MASTER_INICIAL 781, PLANIF_JO 21.682, ESTUDIO 20.791.
+- **T16:** `build-descompuestos --sin-tope` SUCCESS (7.307.572 filas, 1.619 s, 7
+  lotes del master de 128-231 s) y `apply-grants` SUCCESS, desde el mismo commit
+  de la imagen.
+- **T17 · comprobación y foto DESPUÉS** (solo lectura): sello **`7cad480aee614b2a`
+  en las 3.025 versiones** (0 pendientes). 0713, 400854, v6: 19 líneas, 0 sin
+  rendimiento, 8 con factor distinto de 1, **suma 249,41 = precio, CUADRA**;
+  «DESPLAZAMIENTO BOMBA» 1,22 x 0,003 x 339,39 = **1,24**. NO_CUADRA:
+  MASTER_PLANIF_JO **12.301** (-84.006), MASTER_PRE_ABC **11.812** (-50.343),
+  MASTER_INICIAL 675 (-106), PLANIF_JO **14.776** (-6.906; previsto 6.920),
+  ESTUDIO 20.786 (-5). Más de lo previsto en el master (91.000), porque la
+  previsión se midió sobre la última versión de cada obra. Líneas con precio y
+  cantidad y sin rendimiento: de ~461.000 a **22** (MASTER_PLANIF_JO).
+- **T18:** `publicar-diccionario` **v39** (hash fffb5d90da2a, 189 objetos, 1.416
+  columnas, 21 reglas), `check-diccionario` OK; MCP reiniciado (revisión
+  0000014) y `contexto_bbdd` sirve la v39 sin el aviso de «master incompleto».
+- Pendiente: avisar a Juan y Elena para que Juan regenere su herramienta.

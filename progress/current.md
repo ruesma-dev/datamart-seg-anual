@@ -12,7 +12,7 @@
 
 
 
-## 2026-10-02 · F-120 · CERRADA (`done`, APROBADO en pasada 2) · el factor del descompuesto · SIN DESPLEGAR: T14-T18 del humano, IMAGEN ANTES QUE EL RETROCEO
+## 2026-10-02 · F-120 · CERRADA (`done`, APROBADO en pasada 2) · el factor del descompuesto · DESPLEGADA el 02-10 (`r20261002-0835`), retroceada y verificada, diccionario v39 (ver `impl_F-120.md`)
 
 > **Cerrada el 2026-10-02** con APROBADO del reviewer (`progress/review_F-120.md`),
 > `init.sh` en verde (6.252 passed, cobertura 100 %). Resumen en `progress/history.md`.
