@@ -14,14 +14,16 @@
 
 ## 2026-10-02 · F-123 · SPEC APROBADA (`in_progress`), PARADA 1 enseñada · la regla de orígenes del descompuesto
 
-> **IMPLEMENTACIÓN EN CURSO (implementer, 2026-10-02).** `init.sh` en verde antes de
-> empezar (6.252 passed). Hechas T1-T8, un commit por tarea: RED con 21 de 27 tests
-> en rojo; dominio, 02 (migración `DO` + `ESTUDIO` solo sin master 0), 03 (sello
-> nuevo `5c3fb64e292fa14d`), 04, 05, 06 (`v_pbi_master_estudio`) y tests de F-097 y
-> F-120 al día. T8 en PostgreSQL 16 local con muestra copiada en solo lectura: build
-> SUCCESS dos veces, migración una vez, previsión de la spec §3 EXACTA (ESTUDIO
-> 11.783 / 44 / 6.544; cuadre 51.206). Sin desviaciones de la spec. Siguen T9-T12 y
-> T19; T13-T18 son MANUAL del humano. Detalle: `progress/impl_F-123.md`.
+> **IMPLEMENTACIÓN TERMINADA (implementer, 2026-10-02), pendiente del reviewer.**
+> T1-T12 y T19 hechas, un commit por tarea: RED con 21 de 27 tests en rojo; dominio,
+> 02 (migración `DO` + `ESTUDIO` solo sin master 0), 03 (sello nuevo
+> `5c3fb64e292fa14d`), 04, 05, 06 (`v_pbi_master_estudio`), tests de F-097/F-120,
+> diccionario v40, ARCHITECTURE, ayuda de `main.py` y `azure-apps` (commit
+> `2288386`, sin push). T8 en PostgreSQL 16 local: build SUCCESS dos veces,
+> migración una vez, previsión de la spec §3 EXACTA. Mutación: el arnés genera 0
+> (solo cadenas); campaña manual sobre el SQL 21/21 muertos. `init.sh` en verde
+> (6.285 passed). Sin desviaciones de la spec. T13-T18 MANUAL del humano, con su
+> comando en `progress/impl_F-123.md`.
 
 **Diccionario del árbol tras F-123 (version 40): 190 objetos, 1437 columnas,
 86 de consumo** (la ficha nueva `descompuestos.v_pbi_master_estudio`, 21

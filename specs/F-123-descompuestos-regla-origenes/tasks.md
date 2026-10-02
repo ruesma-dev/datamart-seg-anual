@@ -21,4 +21,4 @@ Rama `feature/F-123-descompuestos-regla-origenes`. Rigor `estandar`: fase RED ob
 - [ ] T16: MANUAL (humano): fuera de la nocturna y mirando los créditos de CPU, `python main.py build-descompuestos --sin-tope` y `python main.py apply-grants`, desde el MISMO commit de la imagen.  |  Verificación: MANUAL (humano) — SUCCESS, `versiones_troceadas` = las cargadas (3.025 el 02-10), sello y duración en el informe
 - [ ] T17: MANUAL (humano), solo lectura: repetir T14 y comparar con `spec_F-123.md` §3; 0 filas `MASTER_INICIAL`; testigos de R23 (0726 / 419079 y 0713); la consulta de R24 por `psql` (`spec_F-123.md` §4).  |  Verificación: MANUAL (humano) — cifras en `progress/impl_F-123.md`
 - [ ] T18: MANUAL (humano): `python main.py publicar-diccionario` contra Azure (versión 40) y reiniciar el MCP.  |  Verificación: MANUAL (humano) — `_meta.diccionario_publicacion` con la versión 40 y el MCP sirviendo la regla nueva
-- [ ] T19: Ejecutar `bash harness/init.sh` en verde.  |  Verificación: `bash harness/init.sh` termina en verde
+- [x] T19: Ejecutar `bash harness/init.sh` en verde.  |  Verificación: `bash harness/init.sh` termina en verde

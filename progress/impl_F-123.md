@@ -154,4 +154,65 @@ y dicha por escrito: **campaña manual de 21 mutantes sobre cada línea de SQL
 cambiada y la tupla del dominio: 21 muertos, 0 supervivientes, 241 s**. Detalle,
 tabla y límites en `progress/mutacion_F-123.md`.
 
-<!-- T19 en adelante -->
+## T19 · `bash harness/init.sh` (HEAD `e293c34`)
+
+`6285 passed, 221 skipped, 1682 warnings in 2378.23s (0:39:38)` ·
+`PUERTA COBERTURA: 100.0% de 1 líneas cambiadas cubiertas (1/1, umbral 80%)` ·
+`PUERTA TAMAÑO: ... impl 157/220` · **`ENTORNO LISTO`**, exit 0.
+
+## Desviaciones y decisiones
+
+Ninguna desviación de la spec. Menores: una guarda `IF` por tabla en el `DO`;
+los nombres de los tests esquivan los `-k` de las otras tareas; T12 manual.
+Fuera de alcance (spec): medición de Estudios en `ESTUDIO`, «fase viva» en
+`stg`/`mart`/`cierre`, fase 0 de venta y F-122.
+
+## MANUAL del humano (T13-T18), EN ESTE ORDEN
+
+- **T13** · Aviso a Juan Romero y Elena Díaz ANTES de desplegar, con el texto de
+  `progress/spec_F-123.md` §5. Anotarlo en `current.md`.
+- **T14** · Solo lectura, antes: `SELECT origen, count(*), count(DISTINCT
+  obra_id), count(DISTINCT (obra_id, partida_id)) FROM descompuestos.lineas GROUP
+  BY 1` y `SELECT origen, estado, count(*) FROM descompuestos.cuadre_partida
+  GROUP BY 1, 2`. (Lo he leído hoy para T8, en solo lectura: ESTUDIO 99.049 /
+  174 / 35.523, MASTER_INICIAL 107.061 / 170 / 36.355, PLANIF_JO 288.960 / 246 /
+  111.392, igual que spec §2; T14 sigue siendo del humano, el día del despliegue.)
+- **T15** · Merge a `main`, imagen con tag fechado y job apuntando a ella;
+  comprobar ANTES de seguir: `az containerapp job show -g rg-datamart-seg-dev -n
+  caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
+  La imagen vieja contra el `CHECK` nuevo FALLA (visto en T8).
+- **T16** · Fuera de la nocturna, mirando los créditos de CPU, desde el MISMO
+  commit: `python main.py build-descompuestos --sin-tope` y `python main.py
+  apply-grants`. Debe salir SUCCESS, `versiones_troceadas` = las cargadas (3.025
+  el 02-10) y `sello_troceado` **`5c3fb64e292fa14d`** si `00`/`01`/`03` llegan a
+  `main` sin cambios (F-120 tardó 1.619 s).
+- **T17** · Solo lectura, después: repetir T14. Debe dar (spec §3, confirmado
+  en T8 para el ámbito 3): `ESTUDIO` 11.783 / 44 / 6.544; `MASTER_ESTUDIO`
+  107.061 / 170 / 36.355; 0 filas `MASTER_INICIAL`; cuadre `ESTUDIO` 2.710 /
+  2.654 / 45.739 / 103; cuadre `MASTER_ESTUDIO` = el de `MASTER_INICIAL` de antes
+  (34.174 / 675 / 54.299); `PLANIF_JO` y el resto del master iguales. Testigos:
+  `SELECT origen, fase_num, count(*), sum(importe_unitario) FROM
+  descompuestos.lineas WHERE obra_id = 2817778 AND partida_id = 419079 GROUP BY
+  1, 2` -> `MASTER_ESTUDIO` 0 10 134,35 y `MASTER_PRE_ABC` 1 10 134,35, sin
+  `ESTUDIO`; `SELECT origen, count(*), count(DISTINCT partida_id) FROM
+  descompuestos.lineas WHERE obra_id = 2645007 AND origen IN ('ESTUDIO',
+  'MASTER_ESTUDIO') GROUP BY 1` -> solo `ESTUDIO` 1.774 687; R11: `SELECT
+  count(*) FROM (SELECT obra_id, partida_id FROM descompuestos.lineas WHERE
+  origen IN ('MASTER_ESTUDIO', 'ESTUDIO') GROUP BY 1, 2 HAVING count(DISTINCT
+  origen) = 2) x` -> 0. Y la consulta de R24 por `psql` (spec §4).
+- **T18** · `python main.py publicar-diccionario` contra Azure (versión 40) y
+  reiniciar el MCP; comprobar `_meta.diccionario_publicacion` con la versión 40.
+
+## Evidencias
+
+| Evidencia | Valor real |
+|---|---|
+| Tests ejecutados (`init.sh`, T19) | **6.285 passed, 221 skipped, 0 failed** (precondición: 6.252) |
+| Tests nuevos de F-123 | 27 (`tests/test_f123_origenes.py`), 21 en rojo en la fase RED |
+| Cobertura de líneas cambiadas | **100,0 % (1/1)**, `PUERTA COBERTURA` |
+| Mutación del arnés | **0 mutantes generados** (solo cadenas y docstrings; sin informe del arnés) |
+| Mutación manual sobre el SQL | **21 generados, 21 muertos, 0 supervivientes**, 241 s (`progress/mutacion_F-123.md`) |
+| Tiempo de la suite | **2.378,23 s** (39 min 38 s) |
+| Contraste T8 (PG 16 local) | build 1 SUCCESS 64,8 s, build 2 SUCCESS 8,9 s; previsión §3 exacta; R11 = 0 |
+
+Falta para cerrar: review contra `CHECKPOINTS.md` y las MANUAL T13-T18.
