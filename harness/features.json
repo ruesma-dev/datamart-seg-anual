@@ -1925,7 +1925,7 @@
         "Medido antes y despues por origen, testigos 0726 (partida 419079 en MASTER_ESTUDIO y sin ESTUDIO) y 0713 (sigue en ESTUDIO) comprobados, y la coincidencia importe-presupuesto del master medida por tipo_version",
         "`azure-apps/datamart_seg_anual.md` y `ARCHITECTURE.md` actualizados en el mismo trabajo"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,

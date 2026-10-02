@@ -12,7 +12,12 @@
 
 
 
-## 2026-10-02 · F-123 · SPEC LISTA (`spec_ready`), a la espera de D1-D8 · la regla de orígenes del descompuesto
+## 2026-10-02 · F-123 · SPEC APROBADA (`in_progress`), PARADA 1 enseñada · la regla de orígenes del descompuesto
+
+> **Spec v2 APROBADA por el humano el 2026-10-02** («si»), con D1 (fase viva dentro de
+> `R-DESCOMPUESTO-ORIGEN`) y D2 (`v_pbi_estudio` igual + `v_pbi_master_estudio` nueva)
+> según la recomendación. La v1 (respaldo, `estudios_partida`, D1-D8) la rechazó por
+> complicada. Plan de implementación enseñado; el implementer espera su confirmación.
 
 > Spec en `specs/F-123-descompuestos-regla-origenes/` (29 requisitos, T1-T22);
 > mediciones y decisiones D1-D8 con su recomendación en `progress/spec_F-123.md`.

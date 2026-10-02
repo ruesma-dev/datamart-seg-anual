@@ -5,11 +5,13 @@
 
 Resumen: **113 features**, 67 abiertas, 46 terminadas.
 
+En curso: **F-123**.
+
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
-| F-123 | La regla de Estudios del descompuesto: el master 0 es Estudios (MASTER_ESTUDIO) y ESTUDIO solo donde no hay master 0 | 1 | spec lista | estandar | `feature/F-123-descompuestos-regla-origenes` |
+| F-123 | La regla de Estudios del descompuesto: el master 0 es Estudios (MASTER_ESTUDIO) y ESTUDIO solo donde no hay master 0 | 1 | en curso | estandar | `feature/F-123-descompuestos-regla-origenes` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 2 | pendiente | critico | `feature/F-037-tesoreria` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-113 | La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto | 5 | pendiente | critico | `feature/F-113-categoria-capitulo-por-prefijo` |
@@ -132,7 +134,7 @@ Resumen: **113 features**, 67 abiertas, 46 terminadas.
 
 ### F-123 · La regla de Estudios del descompuesto: el master 0 es Estudios (MASTER_ESTUDIO) y ESTUDIO solo donde no hay master 0
 
-estado **spec lista** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-123-descompuestos-regla-origenes`
+estado **en curso** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-123-descompuestos-regla-origenes`
 
 Cambio de la regla de F-097/F-120 decidido por el humano el 2026-10-02: «cambiar la regla de estudios cuando haya descompuesto en el master inicial, que es casi siempre. En la fase 0 el descompuesto es la planificacion de compras». (a) POR OBRA: si la obra tiene master 0 (ambito 8, version 0) con descompuesto, Estudios de toda la obra es ese master 0, y el origen MASTER_INICIAL pasa a llamarse MASTER_ESTUDIO (lineas, cuadre, CHECK, `elementos.lineas_master_estudio`, diccionario). (b) Si no lo tiene (44 obras: 11 con master sin version 0 con descompuesto, la 0713 entre ellas, y 33 sin master), se hace lo de hoy: origen ESTUDIO, misma regla y mismo nombre; si tampoco hay ahi, el cuadre ya lo dice con SIN_DESCOMPUESTO. (c) En las obras con master 0 la «Descomposicion» de coste fase 0 deja de publicarse como ESTUDIO (lineas y cuadre); sus ~2.020 partidas sin descompuesto en el master 0 (1.758 que no existen en el) se quedan sin Estudios: no lo tenian. (d) Coste fase 0 es la FASE VIVA (el presupuesto que el jefe de obra evoluciona dia a dia) y su descompuesto es PLANIF_JO: ya es asi. (e) MASTER_PRE_ABC, MASTER_PLANIF_JO y PLANIF_JO no se tocan; `_des_texto` no se borra y la ingesta no cambia. Vista nueva `v_pbi_master_estudio` con las columnas de `v_pbi_estudio`, que sigue siendo solo ESTUDIO. (f) Alcance: solo el esquema `descompuestos`; ningun SQL fuera de `sql/descompuestos/` lo lee, asi que stg, mart y cierre no cambian. El sello de troceado cambia: despliegue como F-120 (imagen primero, luego `build-descompuestos --sin-tope` + `apply-grants`), con aviso previo a Juan Romero y Elena Diaz. Segunda version de la spec: la primera (ESTUDIO_RESPALDO, `estudios_partida`, motivos de NO_EXISTE) la rechazo el humano por complicada.
 
