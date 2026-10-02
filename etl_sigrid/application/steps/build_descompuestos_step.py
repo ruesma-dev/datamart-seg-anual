@@ -16,8 +16,9 @@ Encadena los SQL de `sql/descompuestos/` en orden:
 
 **El master es incremental (R21).** Solo se retrocean las versiones cuyo sello
 de troceado no es el del SQL vigente: las que la ingesta releyo esta noche
-(les pone el sello a NULL) y todas si cambia `01_troceado.sql` o
-`03_lineas_master.sql` (el sello es el hash de los dos). Van por orden
+(les pone el sello a NULL) y todas si cambia `00_setup.sql`, `01_troceado.sql`
+o `03_lineas_master.sql` (el sello es el hash de los tres; `00` entra con F-120
+porque `fn_num` decide el rendimiento y el factor). Van por orden
 —vigentes primero—, recortadas por el mismo tope de MB que la ingesta
 (`DESCOMPUESTOS_PRESUPUESTO_MB`; `--sin-tope` lo ignora) y en lotes de
 `MB_POR_LOTE`, cada lote UNA transaccion: el fichero 03 con sus marcadores
@@ -59,9 +60,12 @@ DIRECTORIO_SQL = (
 )
 
 #: Los ficheros cuyo texto forma el SELLO del troceado (R11). Si cambia
-#: cualquiera de los dos, esa noche se retrocean TODAS las versiones (dentro del
-#: tope). El orden entra en el hash.
-FICHEROS_DEL_SELLO = ("01_troceado.sql", "03_lineas_master.sql")
+#: cualquiera de los tres, esa noche se retrocean TODAS las versiones (dentro
+#: del tope; de una vez con `--sin-tope`). El orden entra en el hash.
+#: `00_setup.sql` entra con F-120 (R21): define `fn_num`, que convierte el
+#: precio, la cantidad y cada lado del «factor x rendimiento»; antes, cambiarla
+#: no retroceaba nada. Mismo arreglo que F-118 hizo con el sello de `stg`.
+FICHEROS_DEL_SELLO = ("00_setup.sql", "01_troceado.sql", "03_lineas_master.sql")
 
 #: Los marcadores de `03_lineas_master.sql`, cada uno UNA vez.
 MARCADOR_LOTE = "/*F097_LOTE*/"

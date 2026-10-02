@@ -12,7 +12,83 @@
 
 
 
-## 2026-09-30 · F-118 · CERRADA (`done`, APROBADO en pasada 1) · serie real densa (F-051 y F-103 dentro) y venta final sin coeficientes · SIN DESPLEGAR: T26-T31 del humano
+## 2026-10-02 · F-120 · CERRADA (`done`, APROBADO en pasada 2) · el factor del descompuesto · SIN DESPLEGAR: T14-T18 del humano, IMAGEN ANTES QUE EL RETROCEO
+
+> **Cerrada el 2026-10-02** con APROBADO del reviewer (`progress/review_F-120.md`),
+> `init.sh` en verde (6.252 passed, cobertura 100 %). Resumen en `progress/history.md`.
+> **OJO con la nocturna:** el diccionario v39 solo llega con la imagen nueva; la
+> nocturna lo publica sola al final de `run-all`, así que puede salir antes de T16
+> (las fichas ya avisan de «versión aún no retroceada»).
+
+Implementación entregada; informe en `progress/impl_F-120.md`. D7 reescrita y los
+dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`).
+
+- [x] T1 decisiones anotadas en el informe
+- [x] T2 fase RED · [x] T3 dominio · [x] T4 `01` · [x] T5 `02` · [x] T6 `03`+`06`
+- [x] T7 sello · [x] T8 contraste SQL/espejo · [x] T9 build local · [x] T10 diccionario
+- [x] T11 docs · [x] T12 azure-apps · [x] T13 mutación · [x] T19 `init.sh`
+- T14-T18: MANUAL del humano (Azure), abajo con su comando cuando el código esté.
+
+**Diccionario del árbol tras F-120 (version 39): 189 objetos, 1416 columnas,
+85 de consumo** (cuatro columnas nuevas: `factor` en `descompuestos.lineas` y
+en las tres vistas `v_pbi_*`).
+
+**VERIFICACIONES MANUAL (humano) de F-120, pendientes. ORDEN OBLIGATORIO: primero
+la imagen (T14), después el retroceo (T16). Al revés, la imagen vieja ve otro
+sello, retrocea hacia atrás y su `CREATE OR REPLACE FUNCTION fn_trocear` falla
+contra la función nueva (otro `RETURNS TABLE`): `build_descompuestos` FAILED.**
+
+- [ ] **T14 · Imagen** (escritura en Azure): merge de la rama a `main` y, desde
+  ese commit, `powershell -NoProfile -File infra\70_build_image.ps1`, luego
+  `powershell -NoProfile -File infra\85_update_job.ps1 -Tag <tag que imprima 70>`
+  y `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev
+  --query "properties.template.containers[0].image" -o tsv`. Debe salir el tag
+  nuevo. **No seguir sin verlo.**
+- [ ] **T15 · Foto del cuadre ANTES** (solo lectura): `SELECT origen, estado,
+  count(*) FROM descompuestos.cuadre_partida GROUP BY 1, 2 ORDER BY 1, 2;`
+  Guardar la tabla en `progress/impl_F-120.md`.
+- [ ] **T16 · Retroceo** (escritura en Azure, fuera de la nocturna y mirando los
+  créditos de CPU), desde el MISMO commit de la imagen: `python main.py
+  build-descompuestos --sin-tope` y después `python main.py apply-grants`. Debe
+  salir SUCCESS con `versiones_troceadas` = 3.025 (o las cargadas ese día) y
+  `sello_troceado` = `7cad480aee614b2a` (el del árbol al cerrar T7-T11; si se
+  toca `00`, `01` o `03` después, el que imprima el paso). Estimado 20-30 min.
+- [ ] **T17 · Comprobación** (solo lectura): la 0713 (obra 2645007), partida
+  400854, versión 6: `SELECT orden, factor, rendimiento, precio, importe_unitario
+  FROM descompuestos.lineas WHERE obra_id = 2645007 AND partida_id = 400854 AND
+  ambito_id = 8 AND fase_num = 6 ORDER BY orden;` -> 19 líneas, las 9 con forma
+  factor (órdenes 2-6, 12-14 y 16) con `factor`, `rendimiento` e importe (la 13:
+  1,22 / 0,003 / 1,24); su cuadre `CUADRA` con suma 249,41. Repetir la foto de
+  T15 y compararla con la previsión de `progress/spec_F-120.md` §4 (MASTER_PLANIF_JO
+  ~54.024 a CUADRA, MASTER_PRE_ABC ~37.024, MASTER_INICIAL ~86, ESTUDIO ~5,
+  PLANIF_JO ~6.920). Y `SELECT count(*) FROM descompuestos._versiones_cargadas
+  WHERE sello_troceado IS DISTINCT FROM '7cad480aee614b2a';` = 0.
+- [ ] **T18 · Diccionario** (escritura en Azure): `python main.py
+  publicar-diccionario`. Debe salir la versión 39 en
+  `_meta.diccionario_publicacion`; después `python main.py check-diccionario`.
+
+### Antecedentes (spec lista, 2026-10-01)
+
+Spec en `specs/F-120-factor-descompuesto/` (requirements 113, design 201, 19
+tareas); mediciones y decisiones en `progress/spec_F-120.md`. Todo en solo
+lectura, el master recorrido por trozos tras la nocturna. Lo esencial: el campo
+14 es «factor x rendimiento» (0 casos al revés contra `dncpro`); la 400854 v6
+cuadra al céntimo (249,41); se prevén ~91.000 partidas-versión del master y
+6.920 de PLANIF_JO de NO_CUADRA a CUADRA. **PLANIF_JO tenía el mismo defecto**
+(`dncpro.faccan` sin aplicar) y entra. **El retroceo no necesita mecanismo
+nuevo**: el sello de F-097 cambia solo; el humano lo fuerza con
+`build-descompuestos --sin-tope` DESPUÉS de desplegar la imagen (al revés, la
+imagen vieja falla y retrocea hacia atrás).
+
+**Decisiones para el humano** (recomendación en `progress/spec_F-120.md` §6):
+D1 `factor` = 1 con número, NULL con campo vacío o raro · D2 los 15 raros, NULL ·
+D3 retroceo por sello + `--sin-tope` manual · D4 `00_setup.sql` en el sello ·
+D5 PLANIF_JO dentro (`factip`/`faccan`, factor 0 literal) · D6 porcentaje sin
+factor, importe con él · D7 aviso de ESTUDIO en tres fichas · D8 columna al final
+· D9 el `acceptance` dice 7 líneas y son 9 · D10 feature nueva para el campo 14
+vacío (al menos ~95.000 líneas) y las 310 partidas que dejan de cuadrar.
+
+## 2026-09-30 · F-118 · CERRADA (`done`, APROBADO en pasada 1) · serie real densa (F-051 y F-103 dentro) y venta final sin coeficientes · DESPLEGADA (`r20260930-1715`) Y VERIFICADA el 01-10 (ver `impl_F-118.md`); pendiente solo T30
 
 > **Cerrada el 2026-09-30** con APROBADO del reviewer (`progress/review_F-118.md`),
 > `init.sh` en verde (6.149 passed, cobertura 97,9 %). Resumen en

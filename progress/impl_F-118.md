@@ -252,3 +252,15 @@ solapara; **hay que devolverla a `0 0 * * *`**. Huellas DESPUÉS sobre el mismo
 - T30 (hoja de cierre de Juan): no se ha hecho; las cifras de su correo cuadran
   (0702 venta 9.658.390,84 y beneficio −790.718,46). T28 (aviso a Juan): el
   humano decidió no avisar.
+
+## Tras la primera nocturna con F-118 (01-10, `r20260930-1715`, Succeeded 10:36)
+
+Repetidas una a una y con `--timeout 900`, sobre los datos de esa nocturna:
+- `check-cierres`: 8.620 cierres candidatos en 681 pares obra/ámbito, **0
+  discrepancias**; telescopio (R37) **274.417 series, 0 sin cuadrar** contra el
+  acumulado del último cierre.
+- `check-mes-fase`: 4.591 fases contra el oráculo, **0 discrepancias**; 0 claves
+  repetidas, 0 rellenos con movimiento, 0 deshaceres quietos, 0 meses mixtos.
+- Diccionario **v38** publicado por la propia nocturna (08:33 UTC) y MCP
+  reiniciado (revisión 0000014, que ya expone `descompuestos`).
+F-118 queda verificada en producción; pendiente solo T30 (hoja de cierre de Juan).

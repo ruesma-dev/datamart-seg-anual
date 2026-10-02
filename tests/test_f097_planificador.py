@@ -392,7 +392,7 @@ def test_f097_r13_posiciones_son_las_de_la_spec() -> None:
     assert POSICIONES == {
         "codigo_elemento": 1, "descripcion": 2, "precio": 3, "cantidad_total": 4,
         "unidad": 5, "codigo_alternativo": 7, "naturaleza_codigo": 11,
-        "rendimiento": 14, "tipo_elemento_codigo": 16, "naturaleza": 17,
+        "factor_rendimiento": 14, "tipo_elemento_codigo": 16, "naturaleza": 17,
         "dncpro_id": 36,
     }
 

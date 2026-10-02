@@ -748,10 +748,16 @@ No hay tabla de líneas de descompuesto: el de Estudios y el del master son
 TEXTO. **El formato del `des`**: registros que empiezan por `~D|`, separados
 por salto de línea, con campos separados por `|` (19 a 38 campos). Posiciones
 base 0: 1 código, 2 descripción, 3 precio, 4 cantidad total, 5 unidad, 7 código
-alternativo (= `dncpro.cod2`), 11 código de naturaleza, 14 rendimiento, 16 tipo,
-17 naturaleza, 36 enlace a `dncpro.ide`. El texto largo del campo 9 puede traer
-saltos de línea dentro, así que se parte por «salto seguido de `~<letra>|`» y
-nunca por cualquier salto. **La «Descomposición» de COSTE se reescribe con la
+alternativo (= `dncpro.cod2`), 11 código de naturaleza, 14 «factor x rendimiento»,
+16 tipo, 17 naturaleza, 36 enlace a `dncpro.ide`. El texto largo del campo 9
+puede traer saltos de línea dentro, así que se parte por «salto seguido de
+`~<letra>|`» y nunca por cualquier salto. **El campo 14 no es el rendimiento a
+secas** (F-120, medido el 2026-10-01 en 4,5 M registros): es un número cuando la
+línea no tiene FACTOR y `<factor>x<rendimiento>` cuando lo tiene (`1.22x0.003`,
+`0.99765x-0.15`, `-23.05x`; el orden, comprobado contra `dncpro.faccan` y
+`canren`). Se publica `factor` (1 sin factor, NULL sin campo) y el rendimiento
+limpio, e `importe_unitario` = factor x rendimiento x precio; `cantidad_total`
+(campo 4) ya lleva el factor. PLANIF_JO lo toma de `dncpro.factip`/`faccan`. **La «Descomposición» de COSTE se reescribe con la
 planificación**: si un registro trae el campo 36, esa partida ya no es Estudios
 (7.866 de 42.958), no sale como `ESTUDIO` y el cuadre la marca
 `SUSTITUIDO_POR_PLANIFICACION`. El troceado es UNA función SQL
@@ -783,7 +789,8 @@ propio, `ingest_descompuestos`, INCREMENTAL por versión:
    que salta `build_descompuestos` esa noche.
 
 `build_descompuestos` trocea después solo las versiones cuyo **sello** (el hash
-de `01_troceado.sql` y `03_lineas_master.sql`) no es el vigente —las releídas
+de `00_setup.sql`, `01_troceado.sql` y `03_lineas_master.sql`; `00` entra con
+F-120 porque `fn_num` decide el rendimiento) no es el vigente —las releídas
 esta noche, o todas si cambia el SQL—, por lotes de hasta 300 MB, cada lote una
 transacción con sus líneas y su cuadre. Los flags de versión (`es_vigente`,
 `es_ultima`, la primera ABC) cambian sin que cambie el texto: se actualizan
@@ -792,11 +799,17 @@ PLANIF_JO, `descompuestos.elementos` y el cuadre del ámbito 3 se rehacen
 enteros cada noche.
 
 **La primera carga es MANUAL** (`python main.py ingest-descompuestos
---sin-tope` y `build-descompuestos --sin-tope`, 1,5-2 h de lectura y un
-troceado de 20-40 min sin medir), fuera de la nocturna y mirando antes los
-créditos de CPU del servidor. Sin ella la nocturna converge sola a 300 MB por
-noche (unas 8 noches) y, mientras tanto, el master de `descompuestos.lineas`
-está INCOMPLETO. **Si el estado se corrompe**: vaciar
+--sin-tope` y `build-descompuestos --sin-tope`, 1,5-2 h de lectura; el troceado
+de la del 2026-09-29 tardó 916,9 s en 7 lotes, 15 min 17 s el paso entero),
+fuera de la nocturna y mirando antes los créditos de CPU del servidor. Un
+cambio del SQL del sello retrocea TODO lo cargado sin releer Sigrid: F-120 lo
+hace de una vez con `build-descompuestos --sin-tope` + `apply-grants`, y
+**siempre después de desplegar la imagen** (al revés, la imagen vieja ve otro
+sello, retrocea hacia atrás y su `CREATE OR REPLACE FUNCTION fn_trocear` falla
+contra la función nueva). Sin la primera carga, la nocturna completaría el
+master sola a 300 MB por noche (unas 8 noches) y, mientras tanto, el master de
+`descompuestos.lineas` estaría INCOMPLETO; en producción la primera carga se
+hizo el 2026-09-29. **Si el estado se corrompe**: vaciar
 `descompuestos._versiones_cargadas` y relanzar la primera carga. Espacio
 estimado: 2,5-4,2 GB (27 de 64 GB el 2026-09-26).
 

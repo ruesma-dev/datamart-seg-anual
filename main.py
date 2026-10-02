@@ -5307,8 +5307,10 @@ def ingest_descompuestos(sin_tope: bool) -> None:
     "sin_tope",
     is_flag=True,
     default=False,
-    help="Trocea todas las versiones pendientes sin mirar el tope de MB. Tras la "
-         "primera carga (20-40 min estimados, sin medir).",
+    help="Trocea todas las versiones pendientes sin mirar el tope de MB. La "
+         "primera carga (2026-09-29) troceo 3.025 versiones en 916,9 s (7 lotes, "
+         "15 min 17 s el paso entero); el retroceo completo de F-120, con el "
+         "DELETE de lo anterior, 20-30 min estimados. Despues, apply-grants.",
 )
 def build_descompuestos(sin_tope: bool) -> None:
     """
@@ -5325,7 +5327,11 @@ def build_descompuestos(sin_tope: bool) -> None:
         es la referencia de Estudios, PLANIF_JO la planificacion del jefe de
         obra y MASTER_* cada version del master, que se filtra por fase_num.
       * Sin la primera carga el master sale INCOMPLETO: la nocturna lo
-        completa sola a 300 MB por noche (unas 8 noches).
+        completa sola a 300 MB por noche (unas 8 noches). En produccion se
+        hizo el 2026-09-29.
+      * El importe unitario lleva el FACTOR de la linea (F-120): el campo 14
+        del texto es «factor x rendimiento». Si cambia el SQL del sello, esto
+        retrocea TODO lo cargado: siempre DESPUES de desplegar la imagen.
     """
     settings = get_settings()
     pg = _get_pg()

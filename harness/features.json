@@ -1861,6 +1861,54 @@
       "rigor": "estandar",
       "priority": 68,
       "branch": "feature/F-116-ingesta-descompuestos-error-por-version"
+    },
+    {
+      "id": "F-120",
+      "title": "El factor del descompuesto: Sigrid guarda el rendimiento como «factor x rendimiento» y el troceado deja vacios el rendimiento y el importe unitario en ~461.000 lineas del master",
+      "description": "Fichada por el humano el 2026-10-01 con prioridad 1, a partir de los correos de Elena Diaz (Control de Costes) del 30-09 y 01-10 en el hilo «PLANIFICADO CAPITULO ESTRUCTURAS DAVID LLOYD» (obra 0713), donde revisa la herramienta de descompuestos de Juan Romero: «no siempre guarda los rendimientos y esto coincide cuando tiene un factor, no se si se puede sacar la columna factor». MEDIDO POR EL LIDER EL 2026-10-01 (solo lectura): en el texto `des` de Sigrid el campo 14 (base 0) del registro `~D|`, que F-097 lee como rendimiento, NO siempre es un numero: cuando la linea tiene FACTOR viene como `<factor>x<rendimiento>` (0713 partida 400854, master v6: `1.00021x1`, `1x0.45`, `1.22x0.003`). `fn_trocear` y su espejo `domain/descompuestos.trocear_des` solo aceptan un numero, asi que esas lineas salen con `rendimiento` e `importe_unitario` NULL; `cantidad_total` (campo 4) e `importe_total` si estan bien. Comprobado contra la pantalla de Sigrid: precio unitario = factor x rendimiento x precio (1,22 x 0,003 x 339,39 = 1,24). ALCANCE en `descompuestos.lineas` (lineas con rendimiento NULL y cantidad y precio informados): MASTER_PLANIF_JO 307.031 de 2.497.224 (5.672 partidas, 53 obras); MASTER_PRE_ABC 153.958 (4.699 partidas, 110 obras); MASTER_INICIAL 240 (104 partidas, 13 obras); ESTUDIO 32 (14 partidas, 4 obras); PLANIF_JO 0 (dncpro trae columnas propias). EFECTO EN EL CUADRE: `cuadre_partida` suma `importe_unitario`, asi que las partidas afectadas salen NO_CUADRA sin serlo (hoy 96.307 NO_CUADRA en MASTER_PLANIF_JO y 62.155 en MASTER_PRE_ABC; cuantas por esto, a medir). QUE HACER: (1) medir en `_des_texto` todas las formas reales del campo 14 (numero, `a x b`, otras expresiones, separador decimal, signos) antes de disenar; (2) publicar el FACTOR en columna propia (`factor`, 1 si no hay) y el rendimiento limpio; `importe_unitario` = factor x rendimiento x precio redondeado como hoy; (3) misma regla en `fn_trocear` y en el espejo Python, con tests de las formas medidas; (4) volver a trocear TODAS las versiones ya cargadas (el incremental de F-097 no relee lo que no cambia en Sigrid: hace falta un modo de retroceo forzado o equivalente, sin releer Sigrid) y recalcular el cuadre; (5) ficha del diccionario con la columna nueva. SEGUNDO HALLAZGO DEL MISMO HILO (no es fallo del dato, va a la ficha del diccionario): la columna «Estudios» de la herramienta de Juan usa el origen ESTUDIO, cuyo descompuesto conserva los precios de Estudios pero cuyas CANTIDADES Sigrid actualiza a la medicion actual del ambito 3 (0713 partida 400857 HORMIGON EN ESCALERAS: 207,20 x 25,95 = 5.376,84 frente al cierre inicial 207,20 x 24,03 = 4.979,02). La foto fija de Estudios es MASTER_INICIAL; la ficha de ESTUDIO debe decirlo para que nadie lo use como importe de Estudios.",
+      "acceptance": [
+        "Medidas en `_des_texto` todas las formas del campo de rendimiento, con su recuento, y cada una con su tratamiento decidido",
+        "`descompuestos.lineas` publica `factor` y el rendimiento limpio; `importe_unitario` = factor x rendimiento x precio; en la 0713 partida 400854 v6 las 9 lineas con factor tienen rendimiento e importe unitario y coinciden con la pantalla de Sigrid",
+        "El SQL y el espejo Python dan lo mismo en las formas medidas (tests offline)",
+        "Retroceadas todas las versiones ya cargadas sin releer Sigrid, y el cuadre recalculado: medido cuantas partidas pasan de NO_CUADRA a CUADRA",
+        "La ficha de ESTUDIO avisa de que sus cantidades siguen la medicion actual, de que el importe de Estudios es medicion x precio del master v0 (lo que vale de ESTUDIO es el descompuesto por unidad) y de que MASTER_INICIAL solo existe donde la v0 guarda descompuesto"
+      ],
+      "status": "done",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-120-factor-descompuesto"
+    },
+    {
+      "id": "F-121",
+      "title": "El recurso principal de cada recurso auxiliar (campo extendido «Recurso asociado» de Sigrid): a que trabajador va cada vehiculo",
+      "description": "Pedida por el humano el 2026-10-01 con prioridad 5, a partir del correo de Juan Romero de ese dia, «Sigrid – Nuevo campo extendido \"Recurso asociado\" en recursos auxiliares». Control de Costes ha creado en Sigrid un campo extendido en la ficha de recurso que asocia a cada RECURSO AUXILIAR su RECURSO PRINCIPAL (un padre con varios hijos: por ejemplo, a cada vehiculo el trabajador que lo usa; el 5409NPZ lleva asociado a MO/0192 LOPEZ GOMEZ, JOSE FRANCISCO). Como se guarda, segun Juan: tabla `conext` enlazada con el recurso por `conide = con.ide`; codigo del campo `cod = '5'` (TEXTO, no numero) con `camtab = 'res'`; el valor es el ide del recurso principal en `valn`, que se resuelve con `con.ide = conext.valn`. MEDIDO POR EL LIDER EL 2026-10-01 (solo lectura): `raw.conext` se ingiere entera cada noche (sin filtro, `incremental_column` null), pero hoy tiene 0 filas con `cod = '5'` y `camtab = 'res'`: el campo se creo despues de la ingesta del 01-10 y llegara con la nocturna siguiente sin tocar la ingesta. QUE HACER: (1) medir, con el dato ya ingerido, cuantos recursos auxiliares tienen recurso principal, de que tipos son padre e hijos, si hay valores que no resuelven a un recurso, ciclos o cadenas de mas de un nivel, y si un auxiliar puede tener mas de un principal en el tiempo (el campo extendido no guarda historia: decidir si basta con el valor actual); (2) publicar en el esquema `personal` (F-057), junto a los recursos, el recurso principal de cada auxiliar con su codigo y nombre; (3) acordar con Juan para que lo quiere (por ejemplo, imputar el coste de los partes del vehiculo al trabajador asociado, o controlar que el vehiculo se imputa a la misma obra que su trabajador) y publicarlo en la forma que sirva a esa pregunta; (4) ficha del diccionario. OJO: `personal` es el esquema con datos personales (nombre, NIF, DNI), autorizado por el responsable del dato; el principal es un trabajador con nombre, asi que va ahi y no en un esquema sin esa autorizacion.",
+      "acceptance": [
+        "Medido con el dato ingerido cuantos auxiliares tienen recurso principal, que tipos son, cuantos no resuelven y si hay cadenas o ciclos",
+        "Publicado en `personal` el recurso principal de cada recurso auxiliar (id, codigo y nombre), con su ficha en el diccionario",
+        "Acordado con Juan Romero para que lo quiere usar y publicado en la forma que responde a esa pregunta",
+        "Comprobado el ejemplo del correo: el 5409NPZ tiene como principal a MO/0192"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 5,
+      "branch": "feature/F-121-recurso-principal-auxiliar"
+    },
+    {
+      "id": "F-122",
+      "title": "Lineas de descompuesto con precio y sin rendimiento ni cantidad: ~95.000 lineas con el campo 14 vacio, y las 310 partidas que dejan de cuadrar con F-120",
+      "description": "D10 de la spec de F-120, fichada por decision del humano el 2026-10-01. Medido por el spec-author de F-120 (progress/spec_F-120.md §2 y §4): al menos ~95.000 lineas entre los cuatro origenes del texto `des` tienen el campo 14 VACIO con precio (y a veces cantidad) distinto de 0, y 310 partidas pasan de CUADRA a NO_CUADRA al aplicar el factor (265 en una sola obra). Caso visto por el lider el 2026-10-01: 0713 partida 02.01.01.03 FORJADO RETICULAR CASETON, master v8: «INCREMENTO POR FLUIDO» e «INCREMENTO ARIDO 15» con precio 3 y sin cantidad ni rendimiento; las lineas suman 119,31 €/m2 frente a los 121,68 de la partida, en las 10 versiones. Otro ejemplo, ambito 3 partida 214971: `0.8 x 2309.95` sin rendimiento ni tipo, entre bloques separados por registros vacios. HIPOTESIS: lineas de detalle ANIDADAS o calculadas por Sigrid en pantalla y no guardadas. QUE HACER: mirar esos casos en la pantalla de Descomposicion de Sigrid con Control de Costes (Elena Diaz) ANTES de disenar; medir formas y volumen; decidir si se reconstruye el valor (por ejemplo, heredando el rendimiento de la linea a la que acompanan) o se deja marcado como linea sin valor; publicarlo en `descompuestos` y su ficha.",
+      "acceptance": [
+        "Vistos en la pantalla de Sigrid, con Control de Costes, los casos tipo (0713 02.01.01.03 v8 y la 214971) y escrito que son",
+        "Medidas todas las formas y su volumen, y decidido por el humano el tratamiento de cada una",
+        "Publicado segun lo decidido, con su ficha, y medido cuantas partidas cambian de estado de cuadre"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 10,
+      "branch": "feature/F-122-lineas-sin-rendimiento"
     }
   ]
 }
