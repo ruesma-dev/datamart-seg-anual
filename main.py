@@ -5318,20 +5318,23 @@ def build_descompuestos(sin_tope: bool) -> None:
 
     Ejecuta en orden los SQL de sql/descompuestos: setup, troceado, lineas de
     coste (ESTUDIO y PLANIF_JO), lineas del master por lotes de versiones,
-    catalogo de elementos, cuadre y las tres vistas v_pbi_*. No publica el
+    catalogo de elementos, cuadre y las cuatro vistas v_pbi_*. No publica el
     diccionario: eso lo hace `run-all` o `publicar-diccionario`.
 
     LO QUE HAY QUE SABER ANTES DE CONSULTAR LO QUE ESTO CONSTRUYE:
 
-      * Nunca se suman origenes distintos (`R-DESCOMPUESTO-ORIGEN`): ESTUDIO
-        es la referencia de Estudios, PLANIF_JO la planificacion del jefe de
-        obra y MASTER_* cada version del master, que se filtra por fase_num.
+      * Nunca se suman origenes distintos (`R-DESCOMPUESTO-ORIGEN`): Estudios
+        es MASTER_ESTUDIO (la version 0) en las obras con master 0 y ESTUDIO
+        solo en las obras sin master 0 (F-123); PLANIF_JO la planificacion del
+        jefe de obra (la fase viva) y MASTER_* cada version del master, que se
+        filtra por fase_num.
       * Sin la primera carga el master sale INCOMPLETO: la nocturna lo
         completa sola a 300 MB por noche (unas 8 noches). En produccion se
         hizo el 2026-09-29.
       * El importe unitario lleva el FACTOR de la linea (F-120): el campo 14
         del texto es «factor x rendimiento». Si cambia el SQL del sello, esto
-        retrocea TODO lo cargado: siempre DESPUES de desplegar la imagen.
+        retrocea TODO lo cargado: siempre DESPUES de desplegar la imagen
+        (F-123: la imagen vieja contra el CHECK nuevo falla).
     """
     settings = get_settings()
     pg = _get_pg()
