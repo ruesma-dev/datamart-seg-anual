@@ -12,7 +12,11 @@
 
 
 
-## 2026-10-02 · F-123 · IMPLEMENTADA (`in_progress`), en review · la regla de orígenes del descompuesto
+## 2026-10-03 · F-123 · CERRADA (`done`, APROBADO en pasada 2) · la regla de orígenes del descompuesto · SIN DESPLEGAR: quedan T13-T18 del humano
+
+> **Cerrada el 2026-10-03** con APROBADO del reviewer (`progress/review_F-123.md`),
+> `init.sh` en verde (6.285 passed, relanzado por el reviewer). Resumen en
+> `progress/history.md`. Rama sin integrar en `main`: el merge lo hace el humano (T15).
 
 > **IMPLEMENTACIÓN TERMINADA (implementer, 2026-10-02); review 1 CHANGES_REQUESTED
 > solo de papeleo, atendida el 2026-10-03.** Rama
@@ -83,8 +87,8 @@ nocturna, otra vez a las 00:00 UTC):
   coeficientes) y F-120 (el factor del descompuesto, retroceado y verificado).
 
 **Lo siguiente, dicho por el humano al cerrar:** «vamos a modificar esta parte
-de la lectura de descompuestos». Sin detalle todavía: la próxima sesión empieza
-preguntándole QUÉ quiere cambiar. Contexto que ya está medido y aplica:
+de la lectura de descompuestos». **HECHO como F-123 (2026-10-03, arriba)**: lo
+de ESTUDIO de esta lista queda sustituido por su regla. Contexto que ya está medido y aplica:
 - ESTUDIO (COSTE fase 0) tiene precios y rendimientos de Estudios pero cantidades
   a la medición VIVA; el importe de Estudios es medición x precio del master v0;
   MASTER_INICIAL solo existe donde la v0 guarda descompuesto (0713 no, 0726 sí).
