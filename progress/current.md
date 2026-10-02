@@ -41,31 +41,27 @@ con descompuesto en el master 0 y 9.724 sin él (45 obras de 174; 33 sin master
 cargado). Abierto para la spec: respaldo por obra o por partida, con qué origen
 o marca, cómo se informa el «no existe» y si hay que retrocear.
 
-**Spec ESCRITA (spec-author, 2026-10-02), pendiente de PARADA 1 con el humano.**
-`specs/F-123-descompuestos-regla-origenes/` (requirements 142 líneas, design 248,
-tasks T1-T22); mediciones y decisiones en `progress/spec_F-123.md`. `init.sh` no
-se relanzó (la entrega solo añade Markdown; `harness.tamano` en verde). Estado en
-`features.json` sin tocar: lo mueve el líder.
+**Spec v1 RECHAZADA por el humano (complicada) y REESCRITA (spec-author,
+2026-10-02) con la regla simple**, pendiente de PARADA 1:
+`specs/F-123-descompuestos-regla-origenes/` (requirements R1-R24, 110 líneas;
+design 215; tasks T1-T19); resumen, mediciones (las de la v1, sin remedir) y
+texto del aviso en `progress/spec_F-123.md`. Por obra: con master 0 con
+descompuesto (170 obras) Estudios es `MASTER_ESTUDIO` (antes `MASTER_INICIAL`)
+y no se publica `ESTUDIO`; sin él (44 obras, 0713) `ESTUDIO` como hoy. Vista
+nueva `v_pbi_master_estudio`; `elementos.lineas_master_inicial` ->
+`lineas_master_estudio`; diccionario v40. Fuera: `ESTUDIO_RESPALDO`,
+`estudios_partida`, motivos de `NO_EXISTE`. `features.json` (descripción y
+`acceptance`) ajustado, sigue en `spec_ready`; `BACKLOG.md` regenerado.
 
 Decisiones que tiene que validar el humano (recomendación entre paréntesis):
-- **D1** respaldo por obra o por partida (por OBRA: 44 obras, 6.544 partidas; por
-  partida añade 2.020, de las que 1.758 no existen en el master 0).
-- **D2** origen del respaldo (`ESTUDIO_RESPALDO`; `ESTUDIO` desaparece;
-  `SUSTITUIDO_POR_PLANIFICACION` se conserva solo ahí).
-- **D3** cómo se informa el «no existe» (tabla nueva
-  `descompuestos.estudios_partida` con `via_estudios` y `motivo_no_existe`).
-- **D4** Power BI (`v_pbi_estudio` = Estudios resuelto, con `origen` al final;
-  `elementos` renombra dos columnas).
-- **D5** despliegue (el sello cambia sin remedio; imagen y después
-  `build-descompuestos --sin-tope` + `apply-grants`, ~27 min; o dejarlo a la
-  nocturna 8-11 noches).
-- **D6** diccionario v40 y texto de `R-FASE-VIVA`. **D7** texto del aviso a Juan
-  Romero. **D8** si vale que las 2.020 partidas de D1 dejen de publicarse.
+- **D1** dónde se explica la fase viva (dentro de `R-DESCOMPUESTO-ORIGEN`, sin
+  regla nueva ni tocar `R-FAS-AMBIGUO`/`stg.yaml`).
+- **D2** columnas de `v_pbi_master_estudio` (las 21 de `v_pbi_estudio`, para
+  unirlas sin más).
 
-Dos cosas que el líder debe saber: mis recuentos difieren algo de los suyos
-(26.959 partidas con master 0 y 44 obras sin él, frente a 25.799 y 45: yo cuento
-por líneas, ver `spec_F-123.md` §2), y la medición de R29 para el master ENTERO
-no cabe en el tiempo del MCP: queda como T20 manual por `psql`.
+Precisión de cifras: son 44 obras sin master 0 (11 con master sin versión 0 con
+descompuesto, la 0713 entre ellas, y 33 sin ningún master), no 33 con la 0713
+dentro.
 
 ## 2026-10-02 · ESTADO AL CERRAR LA SESIÓN (leer primero)
 
