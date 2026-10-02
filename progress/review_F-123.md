@@ -1,91 +1,109 @@
 <!-- progress/review_F-123.md -->
-Revisión completa (pasada 1) · `main...5f59062` (merge-base `d4f58ea`)
+Revisión incremental desde 5f59062 (pasada 2) · la pasada 1 fue completa sobre `main...5f59062`
 
 # F-123 · Review · la regla de orígenes del descompuesto
 
-**Veredicto (pasada 1): CHANGES_REQUESTED.** El código, el SQL, la migración y la
-documentación están bien y hacen lo que dictó el humano. Falla papeleo que
-`CHECKPOINTS.md` exige de forma explícita: la tabla de la campaña MANUAL de
-mutación no es reproducible desde el propio informe (C4 bis), y `current.md` no
-lista las MANUAL con su comando y arrastra frases caducadas de la spec (C2, C4).
-Son dos arreglos de documentación: ni código ni mediciones caras.
+**Veredicto (pasada 2): APPROVED.** Los dos cambios requeridos están hechos y las
+dos observaciones que pidió el líder (bloqueo en T16, sin vuelta atrás en T15)
+constan en `current.md` y en `impl_F-123.md`. No hay regresiones.
 
 **Nivel de rigor:** `estandar` (declarado). Exige fase RED, cobertura >= 80 % de
 lo cambiado y mutación con supervivientes analizados. RM5, N/A por nivel.
 
-## Lo verificado por mí (sin escrituras en Azure)
+## Pasada 2 (delta `5f59062..3b9c3cd`)
 
-- **RED reproducida**: `git archive ee8fa3b` en el scratchpad -> `20 failed, 6
-  passed, 1 skipped` (el de `azure-apps` se salta fuera del árbol; dentro son
-  los 21 rojos de la traza).
-- **«Obra con master 0» es el MISMO predicado en los tres sitios**: `NOT EXISTS
-  (_versiones_cargadas v WHERE v.obra_id = … AND v.fase_num = 0)` en el `INSERT`
-  de `ESTUDIO` de `02` y en el `WHERE` de `05`; `03` solo publica `MASTER_ESTUDIO`
-  para filas de esa tabla con `fase_num = 0` (`_atributos`) y su paso 4 borra las
-  líneas de versiones ya no cargadas. `_versiones_cargadas` es solo ámbito 8 (PK
-  `obra_id, fase_num`). R11 se cumple por construcción; el único transitorio
-  (versión 0 aplazada por el tope) está declarado en design §8.
-- **Migración (02)**: un solo `DO` tras los `CREATE` y antes del primer
-  `DELETE`/`INSERT`; guarda por tabla sobre `pg_get_constraintdef`; orden `DROP
-  CONSTRAINT -> UPDATE -> ADD CONSTRAINT` correcto; sin `DROP`/`TRUNCATE` de
-  tablas ni choque de PK. **Misma transacción**: `execute_sql_file` manda el
-  fichero entero en un `cur.execute` sobre `connection()` (`autocommit=False`,
-  `commit()` al salir, `rollback()` si falla: `postgres_client.py:666-684`,
-  `:1454`). Después, la guarda es un `SELECT` de catálogo: no toma
-  `AccessExclusiveLock` cada noche (a diferencia del `ADD COLUMN` de F-120).
-- **T8**: `t8/t8_sin_tope.log` del scratchpad dice lo que el informe (build 2 con
-  0 versiones y los mismos oid de `CHECK`, R11 = 0, testigos 0726/0713, md5 de lo
-  intocado iguales, `CheckViolation` con el 03 de `main`).
-- **Sello** en HEAD: `sello_de_troceado()` = `5c3fb64e292fa14d`.
-- **Mutación del arnés**: `alcance_de_feature("F-123")` -> 3 ficheros, 16
-  líneas; `generar_mutantes` -> **0**. **Control** sin la exclusión de alcance:
-  39 / 92 / 978 mutantes. El cero es legítimo (cadenas y docstrings).
-- **Campaña manual, tres filas reproducidas** en una copia (`git archive HEAD`)
-  con los textos exactos de `t8/mutacion_sql.py` y SIN `-x`: base `280 passed, 3
-  skipped`; M04 -> 2 fallos (`r15[lineas]`, `r16`); M08 -> 1 (`r9_r11`); M17 ->
-  2 (`r10`, F-097 `r23`); base intacta al restaurar. Muertos reales.
-- **Tests reescritos de F-097/F-120**: ninguna aserción se pierde sin sustituta.
-  F-097 `r12`, `r17`, `r21` cambian el literal; `r23` GANA la del `WHERE` de 05;
-  `r24` pasa a 4 vistas. F-120 `r25` cambia «MASTER_INICIAL solo existe…» por
-  «sin master 0» + `MASTER_ESTUDIO` y endurece la negativa; `r26` baja a `>= 39`,
-  pero `test_f123_r18` fija `== 40`.
-- **Diccionario v40**: `R-DESCOMPUESTO-ORIGEN` con la fase viva y la regla (D1),
-  `v_pbi_master_estudio` en `ambito` y con ficha de 21 columnas (D2), el aviso
-  «medición ACTUAL» solo para obras sin master 0. `MASTER_INICIAL` sobrevive solo
-  en la cabecera comentada de `00_global.yaml` y dentro del `DO`.
-- **`azure-apps` `2288386`**: orígenes, vista nueva, lo que rompe y el orden del
-  despliegue. Local, sin push.
+Un commit, `3b9c3cd` («F-123: correcciones de la review 1»), que solo toca
+`progress/current.md`, `progress/impl_F-123.md` y `progress/mutacion_F-123.md`
+(`git diff 5f59062 3b9c3cd --stat -- etl_sigrid main.py tests config` vacío).
+**Ni código, ni SQL, ni tests, ni diccionario**: el alcance de mutación, la
+cobertura y el sello (`5c3fb64e292fa14d`) no cambian, y nada de lo aprobado en la
+pasada 1 queda invalidado.
 
-## Checkpoints
+- **Cambio 1, hecho.** `mutacion_F-123.md` trae ahora una fila por mutante con
+  `fichero:línea`, el texto EXACTO original -> mutado (`⏎` = salto de línea;
+  «línea borrada» en M04 y M11), el nº de fallos SIN `-x` y los tests que caen;
+  la fila «SHA de HEAD medido» con el SHA completo
+  (`8d49a5f93edde44217bdbaa162c8cf4c0a7927d3`), la base en segundos (5,7 / 3,3
+  s), el tiempo (96 s) y «Workers: 1». «Evidencias» de `impl_F-123.md`: 96 s y
+  **1 worker**.
+  - **Comprobado**: las líneas citadas existen tal cual en HEAD (M03/M04/M10 en
+    `02:147-151`, M13 `03:131`, M16-M18 `05:75-77`, M21 `descompuestos.py:58`).
+  - **Reproducidas al pie de la letra cinco filas** con los pares del informe,
+    en una copia (`git archive HEAD`) y sin `-x`: **M04 2, M08 1, M13 2, M17 2,
+    M21 4 fallos**, y los MISMOS tests que nombra cada fila; base `280 passed, 3
+    skipped` antes y después. Coinciden las cinco.
+  - RM1: el SHA medido no es HEAD, pero todo lo posterior (`e293c34`, `5f59062`,
+    `3b9c3cd`) solo toca `progress/` y `tasks.md`: alcance idéntico.
+  - RM2: 21 × 4,6 s ≈ 96 s; 1 worker; media frente a base 5,7 s, coherente
+    (cada mutante corre la batería entera sin `-x`). > 60 s: recálculo puro más
+    las cinco filas, sin reejecutar la campaña entera.
+  - El `git worktree` que dice haber usado no ha quedado colgado (`git worktree
+    list` sin entradas suyas).
+- **Cambio 2, hecho.** La sección F-123 de `current.md` dice «IMPLEMENTADA
+  (`in_progress`), en review», sin las frases caducadas («T1-T22», «No se
+  implementa…», «pendiente de PARADA 1», «sigue en `spec_ready`», «Abierto para
+  la spec…»); lo que vale de historia queda en un párrafo marcado «Historia
+  (caducada, no es el estado)». Y lista T13-T18 EN ORDEN con su comando exacto y
+  lo que debe salir, como F-120: aviso, foto de antes (las dos `SELECT`), imagen
+  y comprobación del tag (`az containerapp job show … -o tsv`), `build-
+  descompuestos --sin-tope` + `apply-grants` desde el mismo commit, foto de
+  después con testigos y R24, `publicar-diccionario` + reinicio del MCP.
+- **Observación del bloqueo (T16), añadida** en `current.md` (punto 4) y en
+  `impl_F-123.md` T16: `AccessExclusiveLock` sobre `lineas` (~4,7 M filas,
+  validadas por el `ADD CONSTRAINT`) y `cuadre_partida` hasta el commit de `02`;
+  el MCP y Power BI esperan; después, solo un `SELECT` de catálogo.
+- **Observación de la vuelta atrás (T15), añadida** en `current.md` (punto 3) y
+  en `impl_F-123.md` T15: tras la migración, volver a la imagen anterior exige
+  revertir los dos `CHECK` (y las filas `MASTER_ESTUDIO`); si no, `CheckViolation`.
+- **`bash harness/init.sh`** relanzado (el protocolo lo pide en cada pasada):
+  exit 0, `ENTORNO LISTO`, **6.285 passed, 221 skipped** (38 min), `COBERTURA [OK] 100 %` (1/1), `TAMAÑO [OK]`.
 
-**C1** [x] init.sh exit 0 (abajo) · [x] ficheros del arnés.
-**C2** [x] una sola `in_progress` · [x] rama de la feature · [ ] la sección F-123
-de `current.md` se contradice: «IMPLEMENTACIÓN TERMINADA» arriba y, debajo, «29
-requisitos, T1-T22», «No se implementa hasta que el humano la apruebe»,
-«pendiente de PARADA 1», «sigue en `spec_ready`» (cambio 2) · [x] `history.md`.
+## Pasada 1, resumen (detalle en `git show 909f14b:progress/review_F-123.md`)
+
+Veredicto CHANGES_REQUESTED solo de papeleo: (1) la tabla de la campaña MANUAL
+sin línea, texto exacto ni nº de fallos, SHA corto y sin workers; (2)
+`current.md` sin las MANUAL con su comando y con frases caducadas. Todo lo demás
+quedó verificado entonces, sin escrituras en Azure:
+- **RED reproducida** (`git archive ee8fa3b`: 20 failed, 6 passed, 1 skipped).
+- **«Obra con master 0» es el MISMO predicado** en `02` (`INSERT` de `ESTUDIO`),
+  `05` (`WHERE` del cuadre) y lo que publica `03` (`_versiones_cargadas` con
+  `fase_num = 0`, solo ámbito 8; su paso 4 borra versiones descargadas): R11 por
+  construcción.
+- **Migración**: un `DO` antes del primer `DELETE`/`INSERT`, guarda por tabla,
+  `DROP CONSTRAINT -> UPDATE -> ADD CONSTRAINT`, sin `DROP`/`TRUNCATE` ni choque
+  de PK, idempotente; **misma transacción** que el resto de `02`
+  (`execute_sql_file` en un `cur.execute` con `autocommit=False`).
+- **T8** (logs del PG16 local), **sello**, **mutación del arnés** (0, con control
+  39 / 92 / 978) y **tests de F-097/F-120** sin aserciones perdidas.
+- **Diccionario v40** (D1, D2, aviso de medición actual solo sin master 0) y
+  **`azure-apps` `2288386`** (local, sin push).
+
+## Checkpoints (estado tras la pasada 2)
+
+**C1** [x] init.sh exit 0 (arriba) · [x] ficheros del arnés.
+**C2** [x] una sola `in_progress` · [x] rama de la feature · [x] la sección F-123
+de `current.md` describe el estado real; la historia, marcada como tal (las
+secciones antiguas del fichero son deuda previa que F-123 no amplía) · [x]
+`history.md` sin cambios necesarios.
 **C3** [x] hexagonal (dominio con stdlib, SQL en `sql/descompuestos/NN_*`) · [x]
 primera línea con ruta · [x] sin `print`, TODOs, secretos ni dependencias · [x]
 semántica: no mezcla ámbitos (ámbito 8 v0 frente a ámbito 3 fase 0) ni orígenes.
 **C3 bis** N/A: no toca `docs/referencia/`.
 **C4** [x] R1-R21 con `test_f123_rN_*` en verde (R22-R24 son MANUAL) · [x] sin
-red ni BBDD · [ ] T13-T18 NO están en `current.md` con su comando: remite a
-`impl_F-123.md` (F-120 sí las listó) (cambio 2) · [x] no añade dobles.
+red ni BBDD · [x] T13-T18 en `current.md` con su comando, lo que debe salir y el
+ORDEN (imagen antes del build, con el porqué) · [x] no añade dobles.
 **C4 bis** [x] rigor declarado · [x] RED con traza real, reproducida · [x]
 cobertura `[OK] 100 %` (1/1; el SQL no lo mide la puerta) · [x] alcance y nº de
-mutantes recalculados (0, con control) · [x] > 60 s (241 s): no se reejecuta
-entera, sí tres filas · [x] coste por mutante 241 × 1 / 21 = 11,5 s, base 4-8 s
-medida por mí: coherente · [x] sin «CAMPAÑA NO VÁLIDA» · [ ] RM1: SHA corto
-`8d49a5f`, no el completo (lo medido sí es lo revisado: `e293c34` y `5f59062`
-solo tocan `progress/` y `tasks.md`) (cambio 1) · [x] RM2: 21 × 11,5 ≈ 241 · N/A
-RM5: nivel `estandar` · [x] RM6: ninguna guarda quitada · [ ] **campaña MANUAL**:
-la tabla no trae línea, ni texto exacto original -> mutado, ni nº de fallos;
-describe con palabras («sin el UPDATE…», «sin `factor`») y los textos exactos
-solo viven en un script del scratchpad, sin versionar (cambio 1) · [x] 0
-supervivientes · [ ] «Evidencias» sin el nº de workers (cambio 1) · [x] ningún
-N/A sin motivo.
+mutantes del arnés recalculados (0, con control) · [x] > 60 s (96 s): recálculo
+más cinco filas reproducidas · [x] coste por mutante 96 × 1 / 21 = 4,6 s · [x]
+sin «CAMPAÑA NO VÁLIDA» · [x] RM1: SHA completo, y lo posterior no toca el
+alcance · [x] RM2 coherente · N/A RM5: nivel `estandar` · [x] RM6: ninguna
+guarda quitada · [x] campaña MANUAL con línea, texto exacto y nº de fallos, dos
+o más filas reproducidas (cinco) · [x] 0 supervivientes · [x] «Evidencias» con
+los cuatro números y 1 worker · [x] ningún N/A sin motivo.
 **C4 ter** N/A: no existe `harness/rutas_sensibles.json`.
-**C5** [x] T1-T12 y T19 `[x]` con su commit `F-123 Tn:` (T13-T18 son MANUAL) ·
-[x] árbol limpio · [x] `features.json` coherente (`in_progress`).
+**C5** [x] T1-T12 y T19 `[x]` con su commit `F-123 Tn:` (T13-T18 son MANUAL), y la
+corrección en `3b9c3cd` · [x] árbol limpio · [x] `features.json` coherente.
 
 ## Cobertura requisito -> test (`tests/test_f123_origenes.py`)
 
@@ -102,38 +120,17 @@ N/A sin motivo.
 | R9, R11 | `r9_r11_estudio_excluye_*` | R20 | `r20_*` (2), F-120 `r25` (x3) |
 | R10 | `r10_cuadre_*`, F-097 `r23` | R21 | `r21_docs_*` (3) |
 
-R22-R24: MANUAL del humano (T14, T17), con su consulta en `impl_F-123.md`.
+R22-R24: MANUAL del humano (T14, T17), con su consulta en `current.md` e `impl`.
 
 ## Cambios requeridos
 
-1. **`progress/mutacion_F-123.md`, tabla (líneas 38-60).** Una fila por mutante
-   con `fichero:línea`, el **texto exacto original -> mutado** (los pares de
-   `MUTANTES` en `t8/mutacion_sql.py`) y el **nº de fallos** de la suite SIN `-x`
-   (mis tres: M04 2, M08 1, M17 2). Añadir la fila «SHA de HEAD medido» con el
-   SHA completo (`8d49a5f93edde44217bdbaa162c8cf4c0a7927d3`) y la línea base en
-   segundos. En «Evidencias» de `progress/impl_F-123.md` (líneas 206-216), el nº
-   de workers (1, en serie); el tope de `impl` es 220 y va por 218.
-2. **`progress/current.md`, sección F-123 (líneas 15-84).** (a) T13-T18 con su
-   comando exacto y lo que debe salir, EN ORDEN (aviso; foto; imagen y tag del
-   job; `build-descompuestos --sin-tope` + `apply-grants` desde el mismo commit;
-   foto de después, testigos y R24; `publicar-diccionario` + reinicio del MCP),
-   como F-120. (b) Quitar o marcar como historia las frases caducadas de C2 y el
-   «Abierto para la spec: respaldo por obra o por partida…».
-
-## Observaciones (no bloquean)
-
-- **Bloqueo en la migración**: la primera vez toma `AccessExclusiveLock` sobre
-  `lineas` (~4,7 M filas, que el `ADD CONSTRAINT` valida) y `cuadre_partida`
-  hasta el `commit` de TODO `02`: el MCP y Power BI esperan. Es una vez y T16 va
-  fuera de la nocturna; merece una línea en T16 (o `NOT VALID` + `VALIDATE`).
-- **Sin vuelta atrás de imagen**: tras la migración, la imagen anterior falla
-  (`CheckViolation`, visto en T8) hasta revertir los `CHECK`. Decirlo en T15.
-- **`azure-apps`** dice aún «sin desplegar» de F-097 y F-120: para el líder.
-
-## init.sh
-
-Relanzado en `5f59062`: exit 0, `ENTORNO LISTO`, **6.285 passed, 221 skipped** (15 min 53 s), `PUERTA COBERTURA [OK] 100,0 %` (1/1), `PUERTA TAMAÑO [OK]`.
+Ninguno. Para cerrar faltan las MANUAL del humano, T13-T18, en su orden: aviso,
+foto de antes, imagen y tag del job, `build-descompuestos --sin-tope` +
+`apply-grants`, foto de después con testigos y R24, y el diccionario v40 con el
+reinicio del MCP. Sigue abierto, para el líder y fuera de F-123: `azure-apps`
+dice aún «sin desplegar» de F-097 y F-120.
 
 **Automejora (propuesta, no aplicada):** si la mutación del arnés da 0 y se hace
 una campaña MANUAL, versionar su script en `progress/` o copiar sus pares al
-informe: hoy la evidencia reproducible vivía solo en el scratchpad de una sesión.
+informe (lo que hizo `3b9c3cd`): la evidencia reproducible vivía solo en el
+scratchpad de una sesión.
