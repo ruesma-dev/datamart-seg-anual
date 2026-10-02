@@ -12,6 +12,45 @@
 
 
 
+
+## 2026-10-02 · ESTADO AL CERRAR LA SESIÓN (leer primero)
+
+**En producción** (imagen del job `r20261002-0835`, desde `main` fe676dc;
+diccionario **v39**; MCP revisión 0000014, reiniciado y sirviendo la v39; la
+nocturna, otra vez a las 00:00 UTC):
+- F-052 (cobertura, 23 excepciones), F-097 (descompuestos, 3.025 versiones
+  cargadas), F-118 (serie real densa con F-051 y F-103, venta final sin
+  coeficientes) y F-120 (el factor del descompuesto, retroceado y verificado).
+
+**Lo siguiente, dicho por el humano al cerrar:** «vamos a modificar esta parte
+de la lectura de descompuestos». Sin detalle todavía: la próxima sesión empieza
+preguntándole QUÉ quiere cambiar. Contexto que ya está medido y aplica:
+- ESTUDIO (COSTE fase 0) tiene precios y rendimientos de Estudios pero cantidades
+  a la medición VIVA; el importe de Estudios es medición x precio del master v0;
+  MASTER_INICIAL solo existe donde la v0 guarda descompuesto (0713 no, 0726 sí).
+  El humano decidió NO meter en F-120 la medición de Estudios en las líneas.
+- La herramienta de Juan Romero (capítulo 02.01 de la 0713) es una FOTO incrustada
+  del 30-09: toma totales de medición x precio (`stg.presupuesto`) y líneas de
+  `descompuestos.lineas`; cuadra al céntimo con el datamart; hay que regenerarla
+  para ver los rendimientos con factor.
+- **F-122** (pendiente, prioridad 10): ~95.000 líneas con el campo 14 vacío y 310
+  partidas que dejan de cuadrar (caso 0713 02.01.01.03, «INCREMENTO POR FLUIDO»).
+
+**Pendiente del humano:**
+- `git push origin main` (67 commits por delante) y el espejo:
+  `git checkout dev && git merge --no-ff main && git push origin dev && git checkout main`
+- Avisar a Juan Romero y Elena Díaz de que los rendimientos con factor ya están
+  (el líder ofreció mandar el correo; sin respuesta). Y corregirles lo de
+  `MASTER_INICIAL` del correo del 01-10 (en la 0713 la v0 no tiene descompuesto).
+- F-118 T30: cuadrar con la hoja de cierre de agosto de Juan.
+- Decisiones sin contestar: retirar la excepción de cobertura de la 0720 (ya
+  publica) y las tres de ciclo; prioridad de F-117; D8 y D11 de F-097 con Negocio.
+- Borrar cuando quiera la rama local `backup/F-052-antes-de-purgar-csv` y
+  `refs/original/...` (NO subirlas: llevan los CSV de obras).
+
+**Cola:** F-037 tesorería (2) · F-111 spec lista, falta aprobarla (4) · F-113 (5)
+· F-121 recurso principal de los auxiliares (5; el dato llega a `raw.conext` desde
+la nocturna del 02-10) · F-114 (6) · F-106 (7) · F-104 (8) · F-122 (10).
 ## 2026-10-02 · F-120 · CERRADA (`done`, APROBADO en pasada 2) · el factor del descompuesto · DESPLEGADA el 02-10 (`r20261002-0835`), retroceada y verificada, diccionario v39 (ver `impl_F-120.md`)
 
 > **Cerrada el 2026-10-02** con APROBADO del reviewer (`progress/review_F-120.md`),
