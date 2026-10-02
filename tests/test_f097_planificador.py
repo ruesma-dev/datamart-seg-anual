@@ -482,7 +482,8 @@ def test_f097_r19_el_diccionario_de_tipos_es_el_de_d8() -> None:
 
 
 def test_f097_r12_los_cinco_origenes() -> None:
-    assert ORIGENES == ("ESTUDIO", "PLANIF_JO", "MASTER_INICIAL", "MASTER_PRE_ABC", "MASTER_PLANIF_JO")
+    """F-123: el master 0 es Estudios y se llama MASTER_ESTUDIO (antes MASTER_INICIAL)."""
+    assert ORIGENES == ("ESTUDIO", "PLANIF_JO", "MASTER_ESTUDIO", "MASTER_PRE_ABC", "MASTER_PLANIF_JO")
 
 
 def test_f097_r17_cod_de_la_vigente_desde_business_rules() -> None:
