@@ -78,6 +78,21 @@ def _entre(texto: str, inicio: str, fin: str) -> str:
     return texto[desde : texto.index(fin, desde)]
 
 
+#: F-118 añade al SELECT del master las dos marcas de las filas reales, a NULL
+#: (el INSERT es uno y la rama master tiene que dar las mismas columnas). Es la
+#: ÚNICA diferencia permitida: se quitan antes de calcular el hash, así que
+#: cualquier otro cambio de la rama master lo sigue cazando el hash de antes.
+_MARCAS_F118 = (
+    ",\n    NULL::BOOLEAN                                             AS es_relleno,"
+    "\n    NULL::BOOLEAN                                             AS es_deshacer"
+)
+
+
+def _sin_marcas_de_f118(bloque: str) -> str:
+    assert bloque.count(_MARCAS_F118) <= 1
+    return bloque.replace(_MARCAS_F118, "")
+
+
 @lru_cache(maxsize=1)
 def _reales_con_lag() -> str:
     return _entre(_sql(), "reales_con_lag AS (", MARCADOR_FIN_REALES)
@@ -121,7 +136,7 @@ def test_f042_r9_la_rama_master_no_cambia_ni_un_byte(nombre, inicio, fin, espera
     después ahí es cero cambios (R24). Este hash es el argumento estructural que
     lo respalda: la rama que los produce es la misma.
     """
-    bloque = _entre(_sql(), inicio, fin)
+    bloque = _sin_marcas_de_f118(_entre(_sql(), inicio, fin))
     real = hashlib.sha256(bloque.encode("utf-8")).hexdigest()
 
     assert real == esperado, (
@@ -142,8 +157,11 @@ def test_f042_r9_el_bloque_de_reales_no_menciona_ninguna_cte_del_master():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cte", ("reales_cierres", "reales_vigente", "reales_orden"))
-def test_f042_r1_existen_las_tres_cte_de_la_regla(cte: str):
+@pytest.mark.parametrize("cte", ("reales_cierres", "reales_vigente"))
+def test_f042_r1_existen_las_cte_de_la_regla(cte: str):
+    """F-118: `reales_orden` ya no existe. Solo aportaba `vive` y el orden del
+    `LAG`; la serie densa ordena por mes y lee los vigentes por JOIN
+    (`test_f118_sql.py::test_f118_r9_stg_sin_orden_fase_ni_case_de_consecutividad`)."""
     assert f"{cte} AS (" in _sql(), f"falta la CTE {cte}"
 
 
@@ -153,7 +171,7 @@ def test_f042_r1_el_vigente_prefiere_el_acumulado_con_dato_y_luego_el_mas_modern
     Si se invirtieran los dos criterios, 0606 · PUY DU FOU pasaría a publicar
     cero en febrero de 2021. El orden de las dos claves ES la regla.
     """
-    vigente = _entre(_sql(), "reales_vigente AS (", "reales_orden AS (")
+    vigente = _entre(_sql(), "reales_vigente AS (", "reales_relleno AS (")
 
     assert "DISTINCT ON (obra_id, ambito_id, anio_mes)" in vigente
     assert re.search(
@@ -173,56 +191,75 @@ def test_f042_r11_el_acumulado_del_mes_no_puede_ser_nulo():
     assert "COALESCE(SUM(importe_origen_round), 0)" in cierres
 
 
-def test_f042_r5_el_orden_se_desplaza_por_descartes_y_nunca_con_dense_rank():
-    """El desplazamiento cuenta los descartes ANTERIORES, con la ventana acotada
-    a `ROWS ... AND 1 PRECEDING`. `dense_rank()` cerraría también los huecos que
-    Sigrid ya trae (R6) y movería obras que hoy están bien."""
-    orden = _entre(_sql(), "reales_orden AS (", MARCADOR_FIN_REALES)
+def test_f042_r5_sin_dense_rank_ni_desplazamiento_de_fases():
+    """F-118 sustituye el desplazamiento de F-042 por la serie densa.
 
-    assert "ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING" in orden
-    # Sin los comentarios: la cabecera del fichero EXPLICA por qué no se usa
-    # `dense_rank()`, y esa explicación no puede hacer fallar al detector.
-    assert "dense_rank" not in _sin_comentarios(_sql()).lower()
+    F-042 renumeraba `orden_fase` descontando descartes para que el `LAG`
+    volviera a ser consecutivo, y NUNCA con `dense_rank()`, que habría cerrado
+    también los huecos de Sigrid. F-118 deja de mirar el número de fase: el
+    movimiento es la diferencia con el mes anterior de la serie de la partida,
+    sin huecos, y un hueco de Sigrid ya no publica el acumulado entero (F-103
+    absorbida). Sustitutos: `test_f118_sql.py::
+    test_f118_r9_stg_el_movimiento_es_la_diferencia_con_el_mes_anterior` y el
+    invariante de `test_f118_invariante.py`.
+    """
+    sin_comentarios = _sin_comentarios(_sql())
+    assert "dense_rank" not in sin_comentarios.lower()
+    assert "orden_fase" not in sin_comentarios
+    assert "ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING" not in sin_comentarios
 
 
-def test_f042_r5_la_ventana_del_desplazamiento_particiona_por_obra_y_ambito():
-    """Ninguna ventana nueva cruza obras: es la condición que hace válido el
-    troceo por tramos de F-019 sin marcador nuevo."""
-    orden = _entre(_sql(), "reales_orden AS (", MARCADOR_FIN_REALES)
-
-    assert "PARTITION BY c.obra_id, c.ambito_id ORDER BY c.mes_fase_num" in orden
+def test_f042_r5_el_relleno_y_los_vigentes_se_deciden_por_obra_y_ambito():
+    """Lo que antes garantizaba la ventana del desplazamiento (no cruzar obras)
+    lo hacen ahora el `DISTINCT ON` de los vigentes y el del relleno."""
+    assert "DISTINCT ON (obra_id, ambito_id, anio_mes)" in _entre(
+        _sql(), "reales_vigente AS (", "reales_relleno AS ("
+    )
+    assert "DISTINCT ON (v.obra_id, v.ambito_id, gs.mes)" in _entre(
+        _sql(), "reales_relleno AS (", "reales_meses AS ("
+    )
 
 
 # ---------------------------------------------------------------------------
-# R5 · el LAG mira `orden_fase`, no `mes_fase_num`
+# R5 · el movimiento: la diferencia con el mes anterior de la serie (F-118)
 # ---------------------------------------------------------------------------
 
 
-def test_f042_r5_los_cuatro_case_del_lag_comparan_orden_fase():
-    """Los cuatro: `can_mes`, `importe_mes_round`, `importe_mes_raw` y
-    `total_incurrido_mes_calc`. Dejar uno con `mes_fase_num` daría una columna
-    coherente y tres rotas, que es peor que romperlas todas."""
+def test_f042_r5_los_cuatro_movimientos_restan_el_mes_anterior_de_la_serie():
+    """Los cuatro: `cantidad_mes`, `importe_mes_round`, `importe_mes_raw` y
+    `total_incurrido_mes_calc`. Antes eran cuatro `CASE WHEN LAG(orden_fase)
+    OVER w = orden_fase - 1` que publicaban el acumulado entero si la fila
+    anterior no era consecutiva: ese `CASE` era el defecto del fallo 1 de F-118.
+    Ahora ninguno lo tiene y ninguno mira el número de fase."""
     bloque = _reales_con_lag()
 
-    assert bloque.count("LAG(orden_fase) OVER w = orden_fase - 1") == 4
+    assert bloque.count("COALESCE(LAG(") == 4
+    assert "LAG(orden_fase)" not in bloque
     assert "LAG(mes_fase_num) OVER w" not in bloque
+    assert not re.search(r"CASE\s+WHEN\s+LAG", bloque)
 
 
-def test_f042_r5_la_ventana_del_lag_ordena_por_orden_fase():
+def test_f042_r5_la_ventana_del_lag_ordena_por_mes():
+    """F-118: por `anio_mes`, no por `orden_fase`. El mes es único por (obra,
+    ámbito) tras F-042 sobre el mes del texto, y la serie no tiene huecos."""
     bloque = _reales_con_lag()
 
     assert re.search(
         r"WINDOW w AS \(\s*\n\s*PARTITION BY obra_id, partida_id, ambito_id\s*\n"
-        r"\s*ORDER BY orden_fase\s*\n\s*\)",
+        r"\s*ORDER BY anio_mes\s*\n\s*\)",
         bloque,
     ), bloque
 
 
-def test_f042_r1_reales_con_lag_lee_solo_los_cierres_que_viven():
-    bloque = _reales_con_lag()
+def test_f042_r1_las_filas_de_sigrid_son_solo_las_de_los_cierres_que_viven():
+    """Antes `reales_con_lag` filtraba `WHERE o.vive`; ahora las filas de Sigrid
+    entran por JOIN con los cierres vigentes (`reales_vigente_alta`), así que una
+    fase descartada no aporta ninguna fila a la serie."""
+    filas = _entre(_sql(), "reales_filas AS (", "reales_alta AS (")
 
-    assert "reales_orden" in bloque
-    assert re.search(r"WHERE\s+o\.vive", bloque), bloque
+    assert "FROM reales_base b" in filas
+    assert "JOIN reales_vigente_alta v" in filas
+    assert "v.mes_fase_num = b.mes_fase_num" in filas
 
 
 # ---------------------------------------------------------------------------
@@ -313,8 +350,8 @@ def test_f042_r22_los_marcadores_delimitan_el_bloque_de_reales():
         "reales_base",
         "reales_cierres",
         "reales_vigente",
-        "reales_orden",
         "reales_con_lag",
+        "reales_final",
     ):
         assert f"{cte} AS (" in bloque, f"{cte} fuera del bloque reutilizable"
 

@@ -30,7 +30,9 @@
 --      ultima. La vigente es MAX(`conext.valn`) del cod configurado; la ultima,
 --      la mayor fase del master de la obra.
 --   3. Borra las lineas y el cuadre del lote, y los reinserta: lineas por
---      `descompuestos.fn_trocear`, con el producto por el enlace a `dncpro`;
+--      `descompuestos.fn_trocear`, con el producto por el enlace a `dncpro` y
+--      el factor del campo 14 (F-120: del propio texto de la version, NUNCA de
+--      `dncpro`, que es el estado actual y no la foto de la version);
 --      cuadre de cada partida hoja con precio de la version (R23).
 --   4. Borra las lineas y el cuadre de las versiones que ya no estan cargadas
 --      (la ingesta las borro porque Sigrid ya no las tiene).
@@ -141,7 +143,7 @@ INSERT INTO descompuestos.lineas (
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
     proveedor_recomendado_id, contrato_id, contrato_linea_id, fecha_maxima,
     grupo_planificacion_id, nivel, es_nivel_padre, es_version_inicial,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
 )
 SELECT a.origen, d.obra_id, d.partida_id, d.presupuesto_id, d.ambito_id, d.fase_num, t.orden,
        t.codigo_elemento, t.descripcion, t.unidad, t.codigo_alternativo,
@@ -152,7 +154,7 @@ SELECT a.origen, d.obra_id, d.partida_id, d.presupuesto_id, d.ambito_id, d.fase_
        NULL::BIGINT, NULL::BIGINT, NULL::BIGINT, NULL::DATE,
        NULL::BIGINT, NULL::INTEGER, NULL::BOOLEAN,
        a.es_version_inicial, a.es_primera_abc, a.es_vigente, a.es_ultima,
-       a.tipo_version, a.texto_version
+       a.tipo_version, a.texto_version, t.factor
 FROM descompuestos._des_texto d
 JOIN _lote l ON l.obra_id = d.obra_id AND l.fase_num = d.fase_num
 JOIN _atributos a ON a.obra_id = d.obra_id AND a.fase_num = d.fase_num

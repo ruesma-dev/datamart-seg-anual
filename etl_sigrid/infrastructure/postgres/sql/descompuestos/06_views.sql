@@ -16,6 +16,9 @@
 --   v_pbi_master_planif_jo  MASTER_PLANIF_JO: el master desde la primera ABC,
 --                           TODAS sus versiones con sus marcas (se filtra por
 --                           `es_vigente` o por `fase_num` para ver una).
+--
+-- `factor` (F-120) va la ULTIMA en las tres (D8): `CREATE OR REPLACE VIEW`
+-- solo admite columnas nuevas al final.
 -- ============================================================================
 
 CREATE OR REPLACE VIEW descompuestos.v_pbi_estudio AS
@@ -24,7 +27,7 @@ SELECT
     codigo_elemento, descripcion, unidad, codigo_alternativo,
     tipo_elemento_codigo, tipo_elemento, naturaleza_codigo, naturaleza,
     rendimiento, precio, importe_unitario, cantidad_total, importe_total,
-    es_porcentaje, porcentaje, base_porcentaje
+    es_porcentaje, porcentaje, base_porcentaje, factor
 FROM descompuestos.lineas WHERE origen = 'ESTUDIO';
 
 CREATE OR REPLACE VIEW descompuestos.v_pbi_planif_jo AS
@@ -34,7 +37,8 @@ SELECT
     naturaleza_codigo, naturaleza,
     rendimiento, precio, importe_unitario, cantidad_total, importe_total,
     dncpro_id, producto_id, proveedor_recomendado_id, contrato_id,
-    contrato_linea_id, fecha_maxima, grupo_planificacion_id, nivel, es_nivel_padre
+    contrato_linea_id, fecha_maxima, grupo_planificacion_id, nivel, es_nivel_padre,
+    factor
 FROM descompuestos.lineas WHERE origen = 'PLANIF_JO';
 
 CREATE OR REPLACE VIEW descompuestos.v_pbi_master_planif_jo AS
@@ -44,5 +48,5 @@ SELECT
     tipo_elemento_codigo, tipo_elemento, naturaleza_codigo, naturaleza,
     rendimiento, precio, importe_unitario, cantidad_total, importe_total,
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
 FROM descompuestos.lineas WHERE origen = 'MASTER_PLANIF_JO';

@@ -13,7 +13,14 @@ cierre más moderno**, con el matiz confirmado el 2026-08-29 de que un cierre co
 el acumulado a **cero** no puede desbancar a otro que sí tiene dato (si no,
 0606 · PUY DU FOU pasaría a publicar cero en febrero de 2021).
 
-## Por qué no basta con descartar la fila
+## Por qué no basta con descartar la fila (hasta F-118)
+
+**Nota de F-118.** Lo que sigue explica el `orden_fase` de F-042, que F-118
+retiró del SQL: la serie real densa ya no mira el número de fase, así que el
+movimiento se calcula contra el mes anterior de la serie de la partida y un
+descarte (o un hueco de Sigrid) no puede publicar el acumulado entero.
+`PlanCierres.orden` se conserva como documentación de la regla de F-042; el
+contraste de `check-cierres` solo usa `vigente_por_mes`.
 
 `importe_mes` de los reales **no viene de Sigrid**: lo calcula el ETL como
 `importe_origen - LAG(importe_origen)`, y **solo** si la fase anterior es la
@@ -45,7 +52,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from itertools import pairwise
 from types import MappingProxyType
 
 #: Lo que devuelve `SUM(importe_origen_round)` cuando el grupo no tiene ni un
@@ -264,44 +270,3 @@ def _motivo(publicado: tuple[int, ...], esperado: tuple[int, ...]) -> str:
         f"manda el cierre {publicado[0]} y deberia mandar el {esperado[0]}: "
         f"un solo cierre por mes, si, pero el que no era"
     )
-
-
-def orden_de_los_publicados(
-    publicadas: Sequence[int], descartadas: Sequence[int]
-) -> dict[int, int]:
-    """`numero_fase -> orden_fase` para las fases que SÍ tienen fila publicada.
-
-    Misma aritmética que `plan_de_cierres` y que la CTE `reales_orden`: cada
-    fase baja tantas posiciones como descartes queden por debajo. La diferencia
-    es el alcance: aquí `publicadas` puede ser un SUBCONJUNTO de las fases de la
-    obra —las de UNA partida—, mientras `descartadas` es de la (obra, ámbito)
-    entera, que es exactamente como lo calcula el SQL.
-    """
-    return {
-        fase: fase - sum(1 for d in descartadas if d < fase)
-        for fase in sorted(publicadas)
-    }
-
-
-def hay_hueco_de_origen(
-    publicadas: Sequence[int], descartadas: Sequence[int]
-) -> bool:
-    """¿La serie de una partida salta un escalón que los descartes NO explican?
-
-    **Por qué existe, y es un defecto que casi se publica.** La comprobación del
-    telescopio (R16) contra la base clasificaba una serie como «hueco de origen»
-    mirando si `version` era consecutiva. Pero `version` es el número ORIGINAL de
-    Sigrid (R7) y **lleva justamente los huecos que esta feature crea**: tras el
-    build, la 0499 publica 17, 19, 21, 22, así que se habría apartado por
-    «hueco» y habría quedado **fuera** del recuento de series rotas. La única
-    comprobación de R16 contra la base iba a excusar precisamente las 9 obras que
-    hay que vigilar, y a devolver un «0 series rotas» que no las había mirado.
-
-    Un hueco de verdad es el que queda **después** de descontar los descartes: la
-    partida no tiene fila en una fase que sí existe y sí sobrevive. Ahí
-    `importe_mes` publica el acumulado entero y la serie no telescopea — y
-    tampoco telescopeaba antes de F-042.
-    """
-    orden = orden_de_los_publicados(publicadas, descartadas)
-    posiciones = [orden[f] for f in sorted(orden)]
-    return any(b != a + 1 for a, b in pairwise(posiciones))

@@ -55,7 +55,7 @@ CREATE TABLE mart.fact_seguimiento_mensual (
     anio_mes             DATE         NOT NULL,
     anio                 INTEGER      NOT NULL,
     mes                  INTEGER      NOT NULL,
-    nombre_mes           VARCHAR(48),       -- "Octubre 2025"
+    nombre_mes           VARCHAR(48),       -- "Octubre 2025": sale de anio_mes en los cuatro escenarios (F-118)
     -- Dimensión escenario
     escenario            VARCHAR(32)  NOT NULL,  -- "Coste Real" / "Venta Real" / "Coste Planificado" / "Venta Planificada"
     tipo_dato            VARCHAR(16)  NOT NULL,  -- "REAL" / "PLANIFICADO"
@@ -83,6 +83,11 @@ CREATE TABLE mart.fact_seguimiento_mensual (
     -- Capturamos ambas vistas: total a origen y parcial del mes.
     total_incurrido      NUMERIC(18,2),    -- a origen (solo amb=3, columna "Imp. Incurrido" en Sigrid)
     total_incurrido_mes  NUMERIC(18,2),    -- del mes (solo amb=3, columna "Imp. Incurrido Parcial" en Sigrid)
+    -- F-118: filas reales que Sigrid NO guarda (NULL en planificado). Relleno:
+    -- mes anterior al del texto de una fase de rango, movimiento 0. Deshacer:
+    -- cierre donde la partida ya no está, acumulado 0.
+    es_relleno           BOOLEAN,
+    es_deshacer          BOOLEAN,
     _built_at            TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_fact_obra_mes        ON mart.fact_seguimiento_mensual (obra_id, anio_mes);

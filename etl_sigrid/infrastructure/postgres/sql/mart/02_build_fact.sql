@@ -207,7 +207,8 @@ INSERT INTO mart.fact_seguimiento_mensual (
     importe_mes_raw, importe_origen_raw,
     can_mes, can_origen, precio_unitario,
     version_master, version_descripcion, version_tex, version_fec_creacion, tipo_master,
-    total_incurrido, total_incurrido_mes
+    total_incurrido, total_incurrido_mes,
+    es_relleno, es_deshacer
 )
 
 -- ---- 1) COSTE REAL ----
@@ -218,7 +219,12 @@ SELECT
     pm.anio_mes,
     EXTRACT(YEAR  FROM pm.anio_mes)::INT,
     EXTRACT(MONTH FROM pm.anio_mes)::INT,
-    pm.version_descripcion,
+    -- F-118 (F-051): el nombre del mes sale de anio_mes, como en las ramas
+    -- planificadas y SIN locale; el texto de la fase va a version_descripcion.
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM pm.anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM pm.anio_mes)::INT AS nombre_mes,
     'Coste Real'::VARCHAR  AS escenario,
     'REAL'::VARCHAR        AS tipo_dato,
     'COSTE'::VARCHAR       AS concepto,
@@ -227,7 +233,8 @@ SELECT
     pm.importe_mes_raw, pm.importe_origen_raw,
     pm.can_mes, pm.can_origen, pm.precio_unitario,
     NULL::INT, pm.version_descripcion, NULL::TEXT, NULL::DATE, NULL::VARCHAR,
-    pm.total_incurrido, pm.total_incurrido_mes
+    pm.total_incurrido, pm.total_incurrido_mes,
+    pm.es_relleno, pm.es_deshacer
 FROM stg.plan_mensual pm
 JOIN stg.obras    o ON o.obra_id    = pm.obra_id
 JOIN stg.partidas p ON p.partida_id = pm.partida_id
@@ -243,7 +250,12 @@ SELECT
     pm.anio_mes,
     EXTRACT(YEAR  FROM pm.anio_mes)::INT,
     EXTRACT(MONTH FROM pm.anio_mes)::INT,
-    pm.version_descripcion,
+    -- F-118 (F-051): el nombre del mes sale de anio_mes, como en las ramas
+    -- planificadas y SIN locale; el texto de la fase va a version_descripcion.
+    (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+          [EXTRACT(MONTH FROM pm.anio_mes)::INT]
+        || ' ' || EXTRACT(YEAR FROM pm.anio_mes)::INT AS nombre_mes,
     'Venta Real'::VARCHAR  AS escenario,
     'REAL'::VARCHAR        AS tipo_dato,
     'VENTA'::VARCHAR       AS concepto,
@@ -252,7 +264,8 @@ SELECT
     pm.importe_mes_raw, pm.importe_origen_raw,
     pm.can_mes, pm.can_origen, pm.precio_unitario,
     NULL::INT, pm.version_descripcion, NULL::TEXT, NULL::DATE, NULL::VARCHAR,
-    pm.total_incurrido, pm.total_incurrido_mes
+    pm.total_incurrido, pm.total_incurrido_mes,
+    pm.es_relleno, pm.es_deshacer
 FROM stg.plan_mensual pm
 JOIN stg.obras    o ON o.obra_id    = pm.obra_id
 JOIN stg.partidas p ON p.partida_id = pm.partida_id
@@ -282,7 +295,8 @@ SELECT
     mp.can_mes, mp.can_origen, mp.precio_unitario,
     mp.version, mp.version_descripcion, mp.version_tex, mp.version_fec_creacion,
     mp.tipo_master,
-    NULL::NUMERIC(18,2), NULL::NUMERIC(18,2)
+    NULL::NUMERIC(18,2), NULL::NUMERIC(18,2),
+    NULL::BOOLEAN, NULL::BOOLEAN
 FROM master_proyectado mp
 JOIN stg.obras    o ON o.obra_id    = mp.obra_id
 JOIN stg.partidas p ON p.partida_id = mp.partida_id
@@ -312,7 +326,8 @@ SELECT
     mp.can_mes, mp.can_origen, mp.precio_unitario,
     mp.version, mp.version_descripcion, mp.version_tex, mp.version_fec_creacion,
     mp.tipo_master,
-    NULL::NUMERIC(18,2), NULL::NUMERIC(18,2)
+    NULL::NUMERIC(18,2), NULL::NUMERIC(18,2),
+    NULL::BOOLEAN, NULL::BOOLEAN
 FROM master_proyectado mp
 JOIN stg.obras    o ON o.obra_id    = mp.obra_id
 JOIN stg.partidas p ON p.partida_id = mp.partida_id

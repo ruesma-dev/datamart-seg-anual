@@ -163,7 +163,10 @@ SELECT
     tipo_master,
     -- Incurrido (solo coste real)
     total_incurrido,
-    total_incurrido_mes
+    total_incurrido_mes,
+    -- F-118: filas reales que Sigrid no guarda (NULL en planificado)
+    es_relleno,
+    es_deshacer
 FROM mart.fact_seguimiento_mensual;
 
 COMMENT ON VIEW mart.v_pbi_fact IS

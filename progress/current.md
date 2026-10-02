@@ -11,6 +11,238 @@
 
 
 
+
+## 2026-10-02 · F-120 · CERRADA (`done`, APROBADO en pasada 2) · el factor del descompuesto · DESPLEGADA el 02-10 (`r20261002-0835`), retroceada y verificada, diccionario v39 (ver `impl_F-120.md`)
+
+> **Cerrada el 2026-10-02** con APROBADO del reviewer (`progress/review_F-120.md`),
+> `init.sh` en verde (6.252 passed, cobertura 100 %). Resumen en `progress/history.md`.
+> **OJO con la nocturna:** el diccionario v39 solo llega con la imagen nueva; la
+> nocturna lo publica sola al final de `run-all`, así que puede salir antes de T16
+> (las fichas ya avisan de «versión aún no retroceada»).
+
+Implementación entregada; informe en `progress/impl_F-120.md`. D7 reescrita y los
+dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`).
+
+- [x] T1 decisiones anotadas en el informe
+- [x] T2 fase RED · [x] T3 dominio · [x] T4 `01` · [x] T5 `02` · [x] T6 `03`+`06`
+- [x] T7 sello · [x] T8 contraste SQL/espejo · [x] T9 build local · [x] T10 diccionario
+- [x] T11 docs · [x] T12 azure-apps · [x] T13 mutación · [x] T19 `init.sh`
+- T14-T18: MANUAL del humano (Azure), abajo con su comando cuando el código esté.
+
+**Diccionario del árbol tras F-120 (version 39): 189 objetos, 1416 columnas,
+85 de consumo** (cuatro columnas nuevas: `factor` en `descompuestos.lineas` y
+en las tres vistas `v_pbi_*`).
+
+**VERIFICACIONES MANUAL (humano) de F-120, pendientes. ORDEN OBLIGATORIO: primero
+la imagen (T14), después el retroceo (T16). Al revés, la imagen vieja ve otro
+sello, retrocea hacia atrás y su `CREATE OR REPLACE FUNCTION fn_trocear` falla
+contra la función nueva (otro `RETURNS TABLE`): `build_descompuestos` FAILED.**
+
+- [ ] **T14 · Imagen** (escritura en Azure): merge de la rama a `main` y, desde
+  ese commit, `powershell -NoProfile -File infra\70_build_image.ps1`, luego
+  `powershell -NoProfile -File infra\85_update_job.ps1 -Tag <tag que imprima 70>`
+  y `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev
+  --query "properties.template.containers[0].image" -o tsv`. Debe salir el tag
+  nuevo. **No seguir sin verlo.**
+- [ ] **T15 · Foto del cuadre ANTES** (solo lectura): `SELECT origen, estado,
+  count(*) FROM descompuestos.cuadre_partida GROUP BY 1, 2 ORDER BY 1, 2;`
+  Guardar la tabla en `progress/impl_F-120.md`.
+- [ ] **T16 · Retroceo** (escritura en Azure, fuera de la nocturna y mirando los
+  créditos de CPU), desde el MISMO commit de la imagen: `python main.py
+  build-descompuestos --sin-tope` y después `python main.py apply-grants`. Debe
+  salir SUCCESS con `versiones_troceadas` = 3.025 (o las cargadas ese día) y
+  `sello_troceado` = `7cad480aee614b2a` (el del árbol al cerrar T7-T11; si se
+  toca `00`, `01` o `03` después, el que imprima el paso). Estimado 20-30 min.
+- [ ] **T17 · Comprobación** (solo lectura): la 0713 (obra 2645007), partida
+  400854, versión 6: `SELECT orden, factor, rendimiento, precio, importe_unitario
+  FROM descompuestos.lineas WHERE obra_id = 2645007 AND partida_id = 400854 AND
+  ambito_id = 8 AND fase_num = 6 ORDER BY orden;` -> 19 líneas, las 9 con forma
+  factor (órdenes 2-6, 12-14 y 16) con `factor`, `rendimiento` e importe (la 13:
+  1,22 / 0,003 / 1,24); su cuadre `CUADRA` con suma 249,41. Repetir la foto de
+  T15 y compararla con la previsión de `progress/spec_F-120.md` §4 (MASTER_PLANIF_JO
+  ~54.024 a CUADRA, MASTER_PRE_ABC ~37.024, MASTER_INICIAL ~86, ESTUDIO ~5,
+  PLANIF_JO ~6.920). Y `SELECT count(*) FROM descompuestos._versiones_cargadas
+  WHERE sello_troceado IS DISTINCT FROM '7cad480aee614b2a';` = 0.
+- [ ] **T18 · Diccionario** (escritura en Azure): `python main.py
+  publicar-diccionario`. Debe salir la versión 39 en
+  `_meta.diccionario_publicacion`; después `python main.py check-diccionario`.
+
+### Antecedentes (spec lista, 2026-10-01)
+
+Spec en `specs/F-120-factor-descompuesto/` (requirements 113, design 201, 19
+tareas); mediciones y decisiones en `progress/spec_F-120.md`. Todo en solo
+lectura, el master recorrido por trozos tras la nocturna. Lo esencial: el campo
+14 es «factor x rendimiento» (0 casos al revés contra `dncpro`); la 400854 v6
+cuadra al céntimo (249,41); se prevén ~91.000 partidas-versión del master y
+6.920 de PLANIF_JO de NO_CUADRA a CUADRA. **PLANIF_JO tenía el mismo defecto**
+(`dncpro.faccan` sin aplicar) y entra. **El retroceo no necesita mecanismo
+nuevo**: el sello de F-097 cambia solo; el humano lo fuerza con
+`build-descompuestos --sin-tope` DESPUÉS de desplegar la imagen (al revés, la
+imagen vieja falla y retrocea hacia atrás).
+
+**Decisiones para el humano** (recomendación en `progress/spec_F-120.md` §6):
+D1 `factor` = 1 con número, NULL con campo vacío o raro · D2 los 15 raros, NULL ·
+D3 retroceo por sello + `--sin-tope` manual · D4 `00_setup.sql` en el sello ·
+D5 PLANIF_JO dentro (`factip`/`faccan`, factor 0 literal) · D6 porcentaje sin
+factor, importe con él · D7 aviso de ESTUDIO en tres fichas · D8 columna al final
+· D9 el `acceptance` dice 7 líneas y son 9 · D10 feature nueva para el campo 14
+vacío (al menos ~95.000 líneas) y las 310 partidas que dejan de cuadrar.
+
+## 2026-09-30 · F-118 · CERRADA (`done`, APROBADO en pasada 1) · serie real densa (F-051 y F-103 dentro) y venta final sin coeficientes · DESPLEGADA (`r20260930-1715`) Y VERIFICADA el 01-10 (ver `impl_F-118.md`); pendiente solo T30
+
+> **Cerrada el 2026-09-30** con APROBADO del reviewer (`progress/review_F-118.md`),
+> `init.sh` en verde (6.149 passed, cobertura 97,9 %). Resumen en
+> `progress/history.md`. Correcciones del review aplicadas por el líder abajo:
+> **O1** (el esperado de septiembre de la 0709 había caducado), **O3** (resuelto:
+> de `cierre.fn_mes_de_fase` solo dependen `v_pbi_cierre_generales_detalle` y
+> `v_pbi_cierre_indirectos_detalle`, que el mismo build recrea; medido en
+> `pg_depend` el 2026-09-30, solo lectura), **O4** y **O7** (avisos en T28/T29).
+> O2, O5 y O6 quedan como observaciones menores. **Nada de F-118 se despliega
+> antes de T26 (huellas ANTES) y T28 (aviso a Juan)**: una imagen construida
+> desde `main` tras el merge ya lleva F-118.
+
+Rama `feature/F-118-cruce-cierre-agosto`. Informe: `progress/impl_F-118.md`.
+Tareas de `specs/F-118-cruce-cierre-agosto/tasks.md`, en orden:
+
+- [x] T1-T4 · El mes (F-051) en dominio puro: `etl_sigrid/domain/mes_fase.py`.
+- [x] T5-T7 · La serie densa en dominio puro: `etl_sigrid/domain/serie_real.py`
+  e invariante con 400 casos generados.
+- [x] T8-T15 · SQL de `stg` (funciones del mes, `es_relleno`/`es_deshacer`, la
+  rama de reales reescrita), tests de F-042 reescritos, sello, huella y
+  `check-cierres` sin apartados.
+- [x] T16-T19 · `mart`, `cierre` y `v_pbi_planif_vs_real`.
+- [x] T20-T22 · La venta final sin coeficientes y la otra aparte.
+- [x] T23-T25 · `check-mes-fase`, diccionario (version 38) y `ARCHITECTURE.md`.
+- [ ] T26-T31 · MANUAL (humano), abajo, en este orden.
+- [x] T32 · `bash harness/init.sh` en verde (resultado en el informe).
+
+**Diccionario del árbol tras F-118 (version 38): 189 objetos, 1412 columnas,
+85 de consumo** (dos funciones nuevas de `stg`; once columnas nuevas:
+`es_relleno`/`es_deshacer` en `stg.plan_mensual`, `mart.fact_seguimiento_mensual`
+y `mart.v_pbi_fact`; `final_importe_con_coeficientes` y `es_relleno` en
+`cierre.fact_cierre_mensual`; `final_importe_con_coeficientes` en
+`v_pbi_cierre_resumen`; y las dos `presupuesto_*_venta_con_coeficientes` de la
+cabecera). Sin publicar: es escritura contra Azure (T31).
+
+### Verificaciones MANUAL (humano), en orden, con lo que debe salir
+
+Todas sobre el MISMO `raw`, sin ingesta entre medias. Las de solo lectura
+pueden ir con el `.env` del puesto; las escrituras, solo con autorización.
+
+**T26 y T27 HECHAS el 2026-09-30** (detalle en `progress/impl_F-118.md`, «T26 y
+T27»): en `stg`, acumulado final 0 diferencias en 902 pares, suma de movimientos
+solo en 44 obras explicadas, 0 obras movidas sin explicación, master 0 cambios.
+
+1. **T26 · Huellas ANTES** (solo lectura, base actual, ANTES de crear nada):
+   `python main.py huella-obras --desde stg --out huella_f118_stg_antes.csv`,
+   `python main.py huella-obras --desde mart --out huella_f118_mart_antes.csv`,
+   `python main.py huella-obras --desde cierre --out huella_f118_cierre_antes.csv`.
+   Debe salir: los tres CSV con los cuatro ámbitos; ningún error.
+2. **T27 · Funciones de `stg` y propuesta** (escritura ADITIVA, la autoriza el
+   humano): ejecutar SOLO los dos `CREATE OR REPLACE FUNCTION` del final de
+   `etl_sigrid/infrastructure/postgres/sql/stg/00_functions.sql`
+   (`stg.fn_parse_mes_texto` y `stg.fn_mes_de_fase`) y
+   `python main.py huella-obras --desde stg --propuesta --out huella_f118_stg_propuesta.csv`.
+   Debe salir: en la 0709, venta de 2026-08 = **377.492,30** y 2026-09 =
+   **la de `cierre` en el mismo build** (el 0,00 del spec era la sonda del build
+   del 29-09 y CADUCÓ: el `stg` del 30-09 trae la f13 con datos y septiembre da
+   **273.204,78**, review O1); la partida 417031, −58.000 / +58.000 / 0; en la 0371, coste de **2015-05** (mes
+   del texto de su f29) = **-441.229,31**. Medir el tiempo del tramo más pesado
+   (en local la rama tarda ~3,5x la de antes con el doble de filas sintéticas).
+3. **T28 · Aviso a Juan Romero** antes de desplegar (añadir, review O7: la 0371
+   f31 «DICIEMBRE-18», con fechas de 2015-08 a 2018-12, pasa a **2018-12** con la
+   regla del texto: ~40 meses de relleno para ~890 partidas), con `progress/spec_F-118.md`
+   §2 y §8 D9: meses cerrados que cambian, desapariciones masivas (0419, 0465,
+   0599, 0616, 0658), la 0606 y la venta final que pasa a sin coeficientes en
+   42 obras con la otra en columna aparte. **Corrección al testigo de la 0606**:
+   con el mes del texto (F-051 D2) su f16 «todo a cero» vive en **mayo de 2021**,
+   así que los -9.053.263,61 de coste y -9.188.957,62 de venta caen en 2021-05,
+   no en 2021-09 como dice `design.md` §9 (sonda de solo lectura; `cierre`
+   también los pondrá en mayo).
+4. **T29 · Desplegar y reconstrucción completa** (imagen desde la rama o desde
+   `main` tras el merge; el sello cambia y rehace las 920 obras): huellas
+   DESPUÉS (`--desde stg|mart|cierre`) y `python main.py comparar-huellas ANTES
+   DESPUES --obras-esperadas <lista>` con la lista de `progress/spec_F-118.md` §6
+   (las de F-051 salen de `python main.py check-mes-fase --obras-esperadas
+   esperadas_f051.txt`). Luego `python main.py check-unicidad` (la vista
+   `cierre.v_pbi_planif_vs_real` en OK; el fact con `--timeout 300`),
+   `python main.py check-cierres` (**0 discrepancias y 0 series rotas**),
+   `python main.py check-mes-fase` (0 discrepancias, 0 claves repetidas, 0
+   rellenos que mueven, 0 deshaceres quietos, 0 meses mixtos) (review O4: un
+   «deshacer quieto» de céntimos fraccionarios puede ser falso positivo del
+   redondeo de la herramienta, no del dato: mirarlo antes de dar KO) y los testigos
+   de `design.md` §9 y de F-051 §8. Resultados a `progress/impl_F-118.md`.
+5. **T30 · Hoja de cierre de agosto de Juan** (sin versionarla): las 12 obras
+   del correo y la 0709, venta, coste y beneficio a origen, del mes y final,
+   con y sin coeficientes; la 0702 debe dar venta final **9.658.390,84**, coste
+   final **10.449.109,30**, beneficio final **-790.718,46** y con coeficientes
+   **12.144.681,17** aparte. Tabla obra a obra al informe.
+6. **T31 · Publicar** (escritura contra Azure): `python main.py
+   publicar-diccionario` (version 38) y `python main.py apply-grants`; después
+   `python main.py check-diccionario` sin diferencias.
+
+
+## 2026-09-29 · F-118 · SPEC LISTA (con F-051 absorbida), a la espera de D1–D9
+
+Spec en `specs/F-118-cruce-cierre-agosto/` (requirements, design, tasks) y
+mediciones en `progress/spec_F-118.md`, todo en solo lectura sobre el build del
+29-09. Las dos cifras de Juan remedidas al céntimo (0709 agosto 377.492,30 en
+`cierre` frente a 319.492,30 en `stg`/`mart`; las 12 obras con coeficientes y la
+0702 en −790.718,46 sin ellos). **Fallo 1 y F-103 son la misma causa** (el
+movimiento real se calcula sobre una serie con huecos) y F-051 vive en el mismo
+sitio: los arregla una sola construcción, la **serie densa**. El fallo 2 es otro
+mecanismo, en bloque de tareas propio. **Decide el humano** (D1–D9 en
+`progress/spec_F-118.md` §8): sustituir R9/R21 de F-051 (D1), unir F-103 (D2),
+fase sin filas del ámbito (D3), `es_deshacer` (D4), arrastre en `cierre` (D5),
+**coeficientes A o B con Negocio** (D6, recomendada A), contraste con la hoja de
+cierre de Juan sin versionarla (D7), partir el fallo 2 si D6 se retrasa (D8) y
+casos para Juan (D9). `features.json` sin tocar: F-118 sigue `pending` hasta la
+aprobación.
+
+
+## 2026-09-29 · F-097 y F-052 DESPLEGADAS (autorizado por el humano: «despleguemos de todos modos»)
+
+- **Primera carga de F-097 (T17)**: `ingest-descompuestos --sin-tope` SUCCESS
+  (tras un primer intento cortado a los 48 min por pérdida de red del puesto,
+  con 35 versiones ya guardadas, y otro muerto al reiniciarse la sesión; el
+  tercero, como proceso independiente): 3.025 versiones, 1.660.712 filas,
+  2.064 MB leídos, 36,7 min, 0 fallidas y 0 aplazadas. `build-descompuestos
+  --sin-tope` SUCCESS: 7.306.032 filas, 916,9 s, 7 lotes del master de 97-120 s.
+- **Testigos (T18)**: C1 419079 ESTUDIO / MASTER_INICIAL / MASTER_PRE_ABC 10
+  líneas y 134,35 cada uno, PLANIF_JO SIN_DESCOMPUESTO; C2 377070 PLANIF_JO CUADRA
+  177,95, ESTUDIO SUSTITUIDO_POR_PLANIFICACION, master de 112,55 (v1) a 118,61
+  (ABC) y 177,95; C3 ESTUDIO 99.049, PLANIF_JO 287.460, MASTER_PRE_ABC 1.794.624,
+  MASTER_PLANIF_JO 2.497.224, MASTER_INICIAL 107.061; C4 3.025 versiones.
+  Tamaño: `lineas` 1.786 MB, `_des_texto` 1.619, `cuadre_partida` 458,
+  `elementos` 10; la base de 27 a **31 GB** (de 64). SKU `Standard_B2s`.
+- **T19**: `check-declarados` 187/187 OK; `check-relaciones` las de
+  `descompuestos` unen (sale 1 por 4 timeouts de 30 s y 6 coberturas escasas de
+  otros esquemas, previos); `check-unicidad --timeout 300` las 6 claves de
+  `descompuestos` OK (la única rota, `cierre.v_pbi_planif_vs_real`, es la de
+  F-051, ahora F-118); `apply-grants` incluye `descompuestos`;
+  `publicar-diccionario` **v37** (hash dfa820e7fe71, 187 objetos, 1.401 columnas,
+  20 reglas), `check-diccionario` OK; imagen **`r20260929-2029`** (desde `main`
+  f11a2be, lleva F-052 y F-097) aplicada al job con `85_update_job.ps1`.
+- **MCP**: revisión `ca-mcp-bbdd-dev--0000013` reiniciada a las 20:57 UTC;
+  `contexto_bbdd` sirve la **versión 37**. **PENDIENTE en `mcp-bbdd`**:
+  `descompuestos` en `seguridad`/`servidor.esquemas_permitidos` (hoy el MCP lo
+  rechaza: «no está autorizado»), con su test y despliegue; lo hace el humano en
+  ese repositorio.
+- A vigilar: la nocturna del 30-09 es la primera con los dos pasos (tiempos de
+  `ingest_descompuestos` y `build_descompuestos` en `timings`) y con las 23
+  excepciones de cobertura (la alerta debería callar).
+## 2026-09-29 · DECISIÓN DEL HUMANO: F-097 se despliega ESTA TARDE, junto con F-052, cuando el humano avise
+
+**T0 deja de bloquear** (decisión del humano, 2026-09-29): el diseño relee toda
+versión de huella distinta, así que T0 solo mide el coste nocturno; queda como
+medición informativa. El líder **espera el aviso del humano** y entonces, con su
+autorización expresa para estas escrituras contra Azure, en este orden:
+(1) primera carga T17 (`ingest-descompuestos --sin-tope`, `build-descompuestos
+--sin-tope`; tamaño de la base antes y después, créditos de CPU mirados antes);
+(2) casos testigo T18; (3) T19: puertas, `apply-grants`, `publicar-diccionario`
+(v37) e **imagen desde `main`** (lleva F-052 y F-097: el aviso de abajo sobre
+`5890b0f` queda sin efecto); (4) `mcp-bbdd`: `descompuestos` en su lista blanca,
+despliegue y reinicio del MCP. La primera carga va ANTES de la imagen.
 ## 2026-09-29 · AVISO DE DESPLIEGUE: la imagen de F-052 se construye desde `5890b0f`, NO desde `main`
 
 El líder integró F-052 (`5890b0f`) y F-097 (`c6db1f9`) en `main` el 2026-09-29,

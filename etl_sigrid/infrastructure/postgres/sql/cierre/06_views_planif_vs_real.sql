@@ -26,6 +26,25 @@
 --
 -- =========================================================================
 
+-- =========================================================================
+-- F-118 (F-051 absorbida) · EL GRANO DE LA VISTA, BLINDADO
+-- =========================================================================
+-- Hasta F-118 la vista agrupaba también por `nombre_mes`, que en las filas
+-- reales de `mart` era el TEXTO libre de la fase («JUNIO 24», «Enero
+-- 2020-Abril 2020») y en las planificadas el nombre del mes: el mismo (obra,
+-- mes) salía partido en varias filas y el `JOIN` de `beneficio` las cruzaba
+-- entre sí (la 0571 publicaba BENEFICIO ocho veces en 2020-05; 204
+-- combinaciones repetidas en `check-unicidad`). Ahora:
+--   - `base` agrupa por (obra_id, anio_mes, categoria, concepto) y saca
+--     `codigo_obra`, `nombre_obra`, `anio` y `mes` con MAX(): son función de
+--     esa clave;
+--   - `producc` y `total_costes` agregan por (obra_id, anio_mes) y `beneficio`
+--     los une por ese mismo grano;
+--   - `nombre_mes` se deriva en la SELECT final de `anio_mes`, sin locale.
+-- Las columnas y su orden no cambian: Power BI solo deja de ver filas
+-- repetidas.
+-- =========================================================================
+
 DROP VIEW IF EXISTS cierre.v_pbi_planif_vs_real CASCADE;
 
 CREATE VIEW cierre.v_pbi_planif_vs_real AS
@@ -34,35 +53,39 @@ WITH
 base AS (
     SELECT
         f.obra_id,
-        f.codigo_obra,
-        f.nombre_obra,
+        MAX(f.codigo_obra)                 AS codigo_obra,
+        MAX(f.nombre_obra)                 AS nombre_obra,
         f.anio_mes,
-        f.anio, f.mes, f.nombre_mes,
+        MAX(f.anio)                        AS anio,
+        MAX(f.mes)                         AS mes,
         f.categoria,                       -- CD / CI / CP
         f.concepto,                        -- COSTE / VENTA
         SUM(CASE WHEN f.tipo_dato = 'PLANIFICADO' THEN f.importe_mes ELSE 0 END)::NUMERIC(18,2) AS planif_mes,
         SUM(CASE WHEN f.tipo_dato = 'REAL'        THEN f.importe_mes ELSE 0 END)::NUMERIC(18,2) AS real_mes
     FROM mart.fact_seguimiento_categoria f
-    GROUP BY f.obra_id, f.codigo_obra, f.nombre_obra,
-             f.anio_mes, f.anio, f.mes, f.nombre_mes,
-             f.categoria, f.concepto
+    GROUP BY f.obra_id, f.anio_mes, f.categoria, f.concepto
 ),
 
 -- Cada uno de los 6 renglones del cuadro
 producc AS (
     SELECT
-        obra_id, codigo_obra, nombre_obra, anio_mes, anio, mes, nombre_mes,
+        obra_id,
+        MAX(codigo_obra)           AS codigo_obra,
+        MAX(nombre_obra)           AS nombre_obra,
+        anio_mes,
+        MAX(anio)                  AS anio,
+        MAX(mes)                   AS mes,
         'PRODUCCIÓN'::VARCHAR     AS concepto_cuadro,
         1::INT                     AS orden_concepto,
         SUM(planif_mes)::NUMERIC(18,2) AS planificado,
         SUM(real_mes)::NUMERIC(18,2)   AS real
     FROM base
     WHERE concepto = 'VENTA'
-    GROUP BY obra_id, codigo_obra, nombre_obra, anio_mes, anio, mes, nombre_mes
+    GROUP BY obra_id, anio_mes
 ),
 costes AS (
     SELECT
-        obra_id, codigo_obra, nombre_obra, anio_mes, anio, mes, nombre_mes,
+        obra_id, codigo_obra, nombre_obra, anio_mes, anio, mes,
         CASE categoria
             WHEN 'CD' THEN 'COSTES DIRECTOS'
             WHEN 'CI' THEN 'COSTES INDIRECTOS'
@@ -83,18 +106,23 @@ costes AS (
 ),
 total_costes AS (
     SELECT
-        obra_id, codigo_obra, nombre_obra, anio_mes, anio, mes, nombre_mes,
+        obra_id,
+        MAX(codigo_obra)           AS codigo_obra,
+        MAX(nombre_obra)           AS nombre_obra,
+        anio_mes,
+        MAX(anio)                  AS anio,
+        MAX(mes)                   AS mes,
         'TOTAL COSTES'::VARCHAR    AS concepto_cuadro,
         5::INT                      AS orden_concepto,
         SUM(planificado)::NUMERIC(18,2) AS planificado,
         SUM(real)::NUMERIC(18,2)        AS real
     FROM costes
-    GROUP BY obra_id, codigo_obra, nombre_obra, anio_mes, anio, mes, nombre_mes
+    GROUP BY obra_id, anio_mes
 ),
 beneficio AS (
     SELECT
         p.obra_id, p.codigo_obra, p.nombre_obra, p.anio_mes,
-        p.anio, p.mes, p.nombre_mes,
+        p.anio, p.mes,
         'BENEFICIO'::VARCHAR       AS concepto_cuadro,
         6::INT                      AS orden_concepto,
         (p.planificado - tc.planificado)::NUMERIC(18,2) AS planificado,
@@ -112,7 +140,12 @@ todos AS (
 )
 SELECT
     obra_id, codigo_obra, nombre_obra,
-    anio_mes, anio, mes, nombre_mes,
+    anio_mes, anio, mes,
+    -- Nombre del mes SIN locale, derivado de anio_mes (R18).
+    ((ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+            'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])
+           [EXTRACT(MONTH FROM anio_mes)::INT]
+         || ' ' || EXTRACT(YEAR FROM anio_mes)::INT)::VARCHAR(48) AS nombre_mes,
     concepto_cuadro, orden_concepto,
     planificado,
     real,
@@ -126,4 +159,5 @@ COMMENT ON VIEW cierre.v_pbi_planif_vs_real IS
 'Cuadro PLANIFICADO vs REAL por (obra × mes × concepto). Importes del mes '
 '(parcial, no a origen) desde mart.fact_seguimiento_categoria. 6 conceptos: '
 'PRODUCCIÓN, COSTES DIRECTOS, INDIRECTOS, PROPORCIONALES, TOTAL COSTES, BENEFICIO. '
-'Diferencia = Real - Planificado. Desviación % = Diferencia / Planificado.';
+'Diferencia = Real - Planificado. Desviación % = Diferencia / Planificado. '
+'Grano (obra_id, anio_mes, concepto_cuadro): una fila (F-118).';

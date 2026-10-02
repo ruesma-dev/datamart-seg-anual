@@ -59,16 +59,59 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
 - Master (amb 8/11): `fas` = número de VERSIÓN; planif explosionada.
 - Reales (amb 3/7): `fas` = MES; fas=0 = Previsto (foto viva),
   fas=1..N cierres mensuales; planif NO explosionada;
-  importe del mes = diferencia con la fase anterior.
+  importe del mes = diferencia con el mes anterior de la serie de la partida
+  (ver «La serie real es densa», F-118).
+- **EL MES DE UN CIERRE REAL LO DA SU TEXTO (F-051, absorbida en F-118).** El
+  mes de cada fila real de `stg.plan_mensual` es `stg.fn_mes_de_fase`: manda el
+  texto de la fase (`obrfas.res`, «Agosto 2026»), aunque discrepe de las fechas
+  o caiga fuera de ellas; un rango («Enero 2020-Abril 2020») se lee por su
+  ÚLTIMO mes; «Mayo-17», «AGOSTO17» y «Abril 2.013» se leen como mes y año; si
+  el texto no se entiende, manda el mes de la fecha fin, luego el de inicio y
+  por último el `ano`/`mes` que archiva Sigrid. La regla vive UNA vez, en `stg`:
+  `mart` y `cierre` leen `anio_mes` sin recalcularlo (`cierre.fn_mes_de_fase`
+  la envuelve) y el oráculo `domain/mes_fase.py` la repite token a token para
+  `check-mes-fase`. Una fase de RANGO (fecha fin en un mes posterior a su
+  inicio) lleva todo su dinero al mes del texto, y los meses desde su inicio
+  hasta el anterior al texto reciben filas de RELLENO (`es_relleno`, movimiento
+  0, acumulado del cierre anterior), nunca en un mes con cierre propio ni
+  después del texto. El parser de las versiones master
+  (`cierre.fn_parse_mes_fase`) no cambia.
 - **DOS CIERRES EN UN MISMO MES: manda el moderno (F-042).** 22 obras tienen
-  dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes`. `stg`
-  conserva **una sola**: la de `fas` más alto **entre las que tienen el
-  acumulado distinto de cero** (si todas están a cero, la más alta). El cierre
-  descartado sigue en `raw` y en `stg.fases`; lo que no tiene es fila en
-  `stg.plan_mensual`. Dentro del build se renumera un orden interno —solo por
-  los descartes, nunca con `dense_rank()`— para que el `LAG` de `importe_mes`
-  siga viendo el cierre inmediatamente anterior; ese orden **no se publica**, y
-  `version` conserva el número de fase original, con huecos en 9 obras.
+  dos fases que Sigrid guarda con el mismo `ano` y el mismo `mes` (21 sobre el
+  mes del texto). `stg` conserva **una sola**: la de `fas` más alto **entre las
+  que tienen el acumulado distinto de cero** (si todas están a cero, la más
+  alta). El cierre descartado sigue en `raw` y en `stg.fases`; lo que no tiene
+  es fila en `stg.plan_mensual`. `version` conserva el número de fase original,
+  con huecos. (F-042 renumeraba un orden interno para el `LAG`; F-118 lo retira:
+  la serie densa ya no mira el número de fase.)
+- **LA SERIE REAL ES DENSA: LO QUE DESAPARECE SE DESHACE (F-118, F-103
+  absorbida).** `importe_mes` de una fila real es su acumulado menos el del mes
+  anterior DE LA SERIE DE LA PARTIDA, que recorre sin huecos todos los meses
+  del ámbito desde su alta: en un cierre, la fila de Sigrid o, si la partida ya
+  no está, acumulado 0 en una fila de DESHACER (`es_deshacer`: anula el
+  acumulado anterior, una sola por salida) y, si vuelve, resta contra ese 0;
+  en un relleno, el acumulado anterior. Antes se restaba solo si la fila
+  anterior era de la fase consecutiva y si no se publicaba el acumulado entero:
+  la 0709 daba 319.492,30 € de venta en agosto de 2026 donde el cierre da
+  377.492,30, y el número de fase que Sigrid se salta (0371 f27→f29, 0404,
+  0455, 0562, 0606) publicaba el acumulado entero. Una fase de la obra sin
+  ninguna fila de un ámbito NO es cierre de ese ámbito (Sigrid no abrió esa
+  fase de venta en 11 obras de 2010-2020): no deshace nada. Invariante:
+  `SUM(importe_mes)` de una partida = su acumulado en el último cierre del
+  ámbito de la obra (0 si salió), en TODAS las series; lo comprueba
+  `check-cierres` sin apartar ninguna, y `domain/serie_real.py` es el oráculo.
+  En `cierre`, un concepto sin filas en un mes con cierre de otro concepto
+  conserva el ejecutado a origen del mes anterior.
+- **LA VENTA DEL CIERRE VA SIN COEFICIENTES (F-118, D6).** `impcoe`
+  (`stg.presupuesto.importe_oficial`) es la venta con los coeficientes del
+  contrato con el cliente, y solo existe en los master de venta (11) y de
+  certificación (9): la venta real no los guarda. El cierre, el beneficio y el
+  análisis usan `importe`, sin coeficientes, como el ejecutado y el coste; la
+  venta con coeficientes, lo que se factura, se publica aparte
+  (`final_importe_con_coeficientes` y las columnas `_con_coeficientes` de la
+  cabecera) y nunca se mezcla (regla dura `R-VENTA-COEFICIENTES`). El
+  coeficiente es del CONTRATO, no de la obra, y no vive en ninguna tabla: el
+  desglose por contrato es F-099.
 - **UN CAPÍTULO PUEDE NO TENER CÓDIGO, Y ESO NO PUEDE CORTAR EL ÁRBOL
   (F-052).** En `raw.obrparpar` hay capítulos cuyo `cod` es la **cadena vacía**
   —no NULL: `length(cod) = 0`—, típicamente porque alguien montó el árbol por
@@ -705,10 +748,16 @@ No hay tabla de líneas de descompuesto: el de Estudios y el del master son
 TEXTO. **El formato del `des`**: registros que empiezan por `~D|`, separados
 por salto de línea, con campos separados por `|` (19 a 38 campos). Posiciones
 base 0: 1 código, 2 descripción, 3 precio, 4 cantidad total, 5 unidad, 7 código
-alternativo (= `dncpro.cod2`), 11 código de naturaleza, 14 rendimiento, 16 tipo,
-17 naturaleza, 36 enlace a `dncpro.ide`. El texto largo del campo 9 puede traer
-saltos de línea dentro, así que se parte por «salto seguido de `~<letra>|`» y
-nunca por cualquier salto. **La «Descomposición» de COSTE se reescribe con la
+alternativo (= `dncpro.cod2`), 11 código de naturaleza, 14 «factor x rendimiento»,
+16 tipo, 17 naturaleza, 36 enlace a `dncpro.ide`. El texto largo del campo 9
+puede traer saltos de línea dentro, así que se parte por «salto seguido de
+`~<letra>|`» y nunca por cualquier salto. **El campo 14 no es el rendimiento a
+secas** (F-120, medido el 2026-10-01 en 4,5 M registros): es un número cuando la
+línea no tiene FACTOR y `<factor>x<rendimiento>` cuando lo tiene (`1.22x0.003`,
+`0.99765x-0.15`, `-23.05x`; el orden, comprobado contra `dncpro.faccan` y
+`canren`). Se publica `factor` (1 sin factor, NULL sin campo) y el rendimiento
+limpio, e `importe_unitario` = factor x rendimiento x precio; `cantidad_total`
+(campo 4) ya lleva el factor. PLANIF_JO lo toma de `dncpro.factip`/`faccan`. **La «Descomposición» de COSTE se reescribe con la
 planificación**: si un registro trae el campo 36, esa partida ya no es Estudios
 (7.866 de 42.958), no sale como `ESTUDIO` y el cuadre la marca
 `SUSTITUIDO_POR_PLANIFICACION`. El troceado es UNA función SQL
@@ -740,7 +789,8 @@ propio, `ingest_descompuestos`, INCREMENTAL por versión:
    que salta `build_descompuestos` esa noche.
 
 `build_descompuestos` trocea después solo las versiones cuyo **sello** (el hash
-de `01_troceado.sql` y `03_lineas_master.sql`) no es el vigente —las releídas
+de `00_setup.sql`, `01_troceado.sql` y `03_lineas_master.sql`; `00` entra con
+F-120 porque `fn_num` decide el rendimiento) no es el vigente —las releídas
 esta noche, o todas si cambia el SQL—, por lotes de hasta 300 MB, cada lote una
 transacción con sus líneas y su cuadre. Los flags de versión (`es_vigente`,
 `es_ultima`, la primera ABC) cambian sin que cambie el texto: se actualizan
@@ -749,11 +799,17 @@ PLANIF_JO, `descompuestos.elementos` y el cuadre del ámbito 3 se rehacen
 enteros cada noche.
 
 **La primera carga es MANUAL** (`python main.py ingest-descompuestos
---sin-tope` y `build-descompuestos --sin-tope`, 1,5-2 h de lectura y un
-troceado de 20-40 min sin medir), fuera de la nocturna y mirando antes los
-créditos de CPU del servidor. Sin ella la nocturna converge sola a 300 MB por
-noche (unas 8 noches) y, mientras tanto, el master de `descompuestos.lineas`
-está INCOMPLETO. **Si el estado se corrompe**: vaciar
+--sin-tope` y `build-descompuestos --sin-tope`, 1,5-2 h de lectura; el troceado
+de la del 2026-09-29 tardó 916,9 s en 7 lotes, 15 min 17 s el paso entero),
+fuera de la nocturna y mirando antes los créditos de CPU del servidor. Un
+cambio del SQL del sello retrocea TODO lo cargado sin releer Sigrid: F-120 lo
+hace de una vez con `build-descompuestos --sin-tope` + `apply-grants`, y
+**siempre después de desplegar la imagen** (al revés, la imagen vieja ve otro
+sello, retrocea hacia atrás y su `CREATE OR REPLACE FUNCTION fn_trocear` falla
+contra la función nueva). Sin la primera carga, la nocturna completaría el
+master sola a 300 MB por noche (unas 8 noches) y, mientras tanto, el master de
+`descompuestos.lineas` estaría INCOMPLETO; en producción la primera carga se
+hizo el 2026-09-29. **Si el estado se corrompe**: vaciar
 `descompuestos._versiones_cargadas` y relanzar la primera carga. Espacio
 estimado: 2,5-4,2 GB (27 de 64 GB el 2026-09-26).
 

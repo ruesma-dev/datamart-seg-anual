@@ -114,6 +114,40 @@ objetos:
 
       Los ambitos MASTER (8 y 11) no estan afectados ni se tocan: alli `fas` es
       el numero de version, no el mes, y nunca hubo dos por mes.
+
+      **EL MES DE UNA FILA REAL ES EL DEL TEXTO DE SU FASE (F-118, con F-051
+      absorbida).** En los ambitos 3 y 7, `anio_mes` es `stg.fn_mes_de_fase`:
+      manda el texto que escribio el jefe de obra («Agosto 2026»; un rango como
+      «Enero 2020-Abril 2020» se lee por su ultimo mes); si no se entiende, el
+      mes de la fecha fin, luego el de inicio y por ultimo el `ano`/`mes` que
+      archiva Sigrid. La regla de un cierre por mes se aplica sobre ESE mes.
+      `mart` y `cierre` leen este `anio_mes` sin recalcularlo, asi que las tres
+      capas publican el mismo mes.
+
+      **FILAS QUE SIGRID NO GUARDA, Y ESTAN MARCADAS.** (1) RELLENO
+      (`es_relleno`): una fase de RANGO -el mes de su fecha fin es posterior al
+      de su fecha de inicio- lleva todo el dinero al mes de su texto, y los meses
+      desde el de inicio hasta el anterior al del texto reciben una fila por
+      partida con movimiento 0 y el acumulado del cierre anterior; nunca en un
+      mes que ya tiene cierre propio ni despues del mes del texto. (2) DESHACER
+      (`es_deshacer`): una partida que tenia acumulado y ya no esta en el
+      cierre siguiente de su ambito recibe en ese mes una fila con acumulado 0
+      que anula el acumulado anterior. Ninguna de las dos cambia la suma de lo
+      que ya estaba bien: el relleno mueve 0 y el deshacer mueve justo lo que
+      faltaba por anular.
+
+      **LA SERIE REAL ES DENSA (F-118).** `importe_mes` de una fila real es su
+      acumulado menos el del mes anterior DE LA SERIE DE LA PARTIDA, que no tiene
+      huecos. Hasta F-118 solo se restaba si la fila anterior era de la fase
+      consecutiva, y si no se publicaba el acumulado entero: la 0709 daba en
+      agosto de 2026 una venta de 319.492,30 EUR donde el cierre da 377.492,30
+      (una partida de -58.000 que desaparecio sin deshacerse), y la 0371, cuya
+      fase 28 no existe en Sigrid, publicaba +4.293.905,89 EUR de coste en su
+      fase 29 donde el cierre da -441.229,31. Ahora, para toda partida, la suma
+      de `importe_mes` es su acumulado en el ultimo cierre del ambito de la obra
+      (0 si ya no esta), sin excepciones, y `python main.py check-cierres` lo
+      comprueba en todas las series. Una fase de la obra sin ninguna fila de un
+      ambito NO es cierre de ese ambito: no deshace nada.
     clave_negocio: [obra_id, partida_id, ambito_id, version, anio_mes]
     paso_etl: build_stg
     refresco: nocturno
@@ -157,12 +191,18 @@ objetos:
           quien mire el dato tiene que poder contrastarlo contra Sigrid; y un
           numero renumerado no existe en ningun sitio salvo aqui.
 
-          El ETL SI usa internamente un orden renumerado para calcular
-          `importe_mes`, pero **no se publica en ninguna columna**: vive dentro
-          del build y muere ahi.
+          Desde F-118 el ETL ya no usa el numero de fase para calcular
+          `importe_mes`: el movimiento es la diferencia con el mes anterior de la
+          serie de la partida. En una fila de RELLENO es el numero de la fase que
+          la genera (la de rango, cuyo mes del texto es posterior); en una de
+          DESHACER, el de la fase del cierre donde la partida ya no esta.
         agregacion: no_sumable
       version_descripcion:
-        significado: Etiqueta legible de la version master, o del mes en los ambitos reales.
+        significado: >-
+          Etiqueta legible de la version master o, en los ambitos reales, el
+          TEXTO de la fase tal y como lo escribio el jefe de obra («Agosto 2026»,
+          «Enero 2020-Abril 2020»). En una fila de relleno, el texto de la fase
+          que la genera. No es el nombre del mes: ese sale de `anio_mes`.
         nulo_significa: La fase no tiene descripcion en Sigrid.
       version_tex:
         significado: >-
@@ -185,7 +225,14 @@ objetos:
         agregacion: no_sumable
         nulo_significa: No se pudo resolver, tipico de los ambitos reales.
       anio_mes:
-        significado: Mes al que se imputa la fila, como fecha del dia 1.
+        significado: >-
+          Mes al que se imputa la fila, como fecha del dia 1. En los MASTER, el
+          mes de la explosion de la planificacion. En los REALES (3 y 7), el mes
+          del TEXTO de la fase (`stg.fn_mes_de_fase`): manda el texto aunque
+          discrepe de las fechas; un rango se lee por su ultimo mes; si el texto
+          no se entiende, la fecha fin, la de inicio y el `ano`/`mes` archivado.
+          En una fila de relleno, uno de los meses anteriores al del texto de su
+          fase. Es unico por (obra, ambito, partida) en los reales.
         agregacion: no_sumable
       posicion_mes:
         significado: >-
@@ -223,7 +270,14 @@ objetos:
         significado: Cantidad acumulada desde el inicio hasta ese mes.
         agregacion: ultimo_valor
       importe_mes:
-        significado: Importe imputado A ESE MES concreto, ya desacumulado.
+        significado: >-
+          Importe imputado A ESE MES concreto, ya desacumulado. En los ambitos
+          REALES es el acumulado del mes menos el del mes anterior de la serie
+          de la partida, que no tiene huecos (F-118): una partida que sale de un
+          cierre se deshace en ese mes (fila `es_deshacer`, que anula el
+          acumulado anterior) y, si vuelve, resta contra ese 0. Por eso la suma
+          de una partida es su acumulado en el ultimo cierre de la obra. En el
+          relleno vale 0.
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
       importe_origen:
@@ -258,6 +312,27 @@ objetos:
         unidad: EUR
         agregacion: suma_solo_dentro_del_mes
         nulo_significa: La fila no es de coste real.
+      es_relleno:
+        significado: >-
+          TRUE en las filas de RELLENO (F-118, F-051 absorbida): un mes anterior
+          al del texto de una fase de rango, con movimiento 0 y el acumulado del
+          cierre anterior de la partida. Sigrid no las guarda; sin la marca, un
+          relleno no se distingue de un mes sin actividad. Solo se publican las
+          partidas con acumulado distinto de 0 o que se mueven en la fase que las
+          genera. FALSE en las demas filas reales.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+        nulo_significa: La fila es de un ambito MASTER (8 u 11).
+      es_deshacer:
+        significado: >-
+          TRUE en las filas de DESHACER (F-118): la partida tenia acumulado y ya
+          no esta en este cierre de su ambito, asi que la fila lleva acumulado 0
+          y un `importe_mes` que anula el acumulado anterior. Hay una sola por
+          salida: mientras la partida siga ausente no hay mas filas suyas. Sigrid
+          no la guarda. FALSE en las demas filas reales.
+        valores: ["true", "false"]
+        agregacion: no_sumable
+        nulo_significa: La fila es de un ambito MASTER (8 u 11).
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
         agregacion: no_sumable
@@ -357,9 +432,11 @@ objetos:
         agregacion: no_sumable
       ambito_id:
         significado: >-
-          Ambito de Sigrid. Decide cual de las dos columnas de importe hay que
-          usar: `importe` para coste (3 y 8) e `importe_oficial` para venta
-          (7 y 11).
+          Ambito de Sigrid. Para cierres, beneficio y analisis se usa `importe`
+          en los cuatro ambitos, venta incluida (F-118): es la venta SIN
+          coeficientes, la misma base que el coste y el ejecutado.
+          `importe_oficial` solo difiere en los master de venta y de
+          certificacion, y es lo que se factura (regla `R-VENTA-COEFICIENTES`).
         agregacion: no_sumable
       fase_num:
         significado: >-
@@ -390,7 +467,9 @@ objetos:
       importe:
         significado: >-
           Importe total de la partida, redondeado con los decimales que la obra
-          tenga configurados. **Es la columna de COSTE** (ambitos 3 y 8).
+          tenga configurados, SIN coeficientes. **Es la columna del coste y de
+          la venta** para cierres, beneficio y analisis (F-118): el cierre suma
+          esta tambien en la venta final.
 
           **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
           Sumar por obra o por partida con la fase fija es correcto, y es lo
@@ -405,10 +484,16 @@ objetos:
         agregacion: suma_solo_dentro_del_mes
       importe_oficial:
         significado: >-
-          El importe con los coeficientes que Sigrid aplica SOLO EN VENTA. **Es
-          la columna de VENTA** (ambitos 7 y 11). Cuando no hay coeficiente vale
-          lo mismo que `importe`, y por eso confundirlas pasa desapercibido en
-          coste y falsea la venta.
+          La venta CON los coeficientes del contrato con el cliente
+          (`COALESCE(NULLIF(impcoe, 0), importe)`): es LO QUE SE FACTURA, no la
+          base del cierre. Solo difiere de `importe` en los master de venta (11)
+          y de certificacion (9): 0 filas en la venta y el coste reales. Desde
+          F-118 el cierre, el beneficio y el analisis usan `importe`; esta solo
+          llega a `cierre.fact_cierre_mensual.final_importe_con_coeficientes`, y
+          nunca se suma, resta ni compara con una venta sin coeficientes, el
+          ejecutado o el coste (`R-VENTA-COEFICIENTES`). El coeficiente es del
+          CONTRATO (puede haber varios por obra: 1,07 y 1,24 en la 0676-B) y no
+          vive en ninguna tabla; el desglose por contrato es F-099.
 
           **Sumable dentro de UNA fase, nunca a traves de `fase_num`.**
           Sumar por obra o por partida con la fase fija es correcto, y es lo
@@ -802,9 +887,12 @@ objetos:
         nulo_significa: null
       nombre_mes:
         significado: >-
-          Nombre del mes escrito en la fase. **Manda sobre la fecha** cuando las
-          dos existen y no coinciden: es la regla que dicto el jefe de obra y la
-          que implementa `cierre.fn_mes_de_fase`.
+          Texto de la fase (`obrfas.res`) tal y como lo escribe el jefe de obra.
+          **Manda sobre la fecha** cuando las dos existen y no coinciden: es el
+          mes de las filas reales (`stg.fn_mes_de_fase`, F-118). Un rango
+          («Enero 2020-Abril 2020») se lee por su ULTIMO mes; «AGOSTO17»,
+          «Mayo-17» y «Abril 2.013» se leen como mes y ano; si no hay mes y ano
+          («LEVANTAMIENTO», «POSTVENTA 2009»), manda la fecha fin.
         nulo_significa: La fase no tiene nombre.
       _built_at:
         significado: Instante de construccion de la fila. Instrumentacion, no negocio.
@@ -993,6 +1081,55 @@ objetos:
       mes, tanto si el mes viene escrito entero como abreviado. Devuelve nulo
       para las versiones de CIERRE, que no se procesan por esta via. Es la
       entrada de `stg.fn_master_fecha_efectiva`.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_parse_mes_texto:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build, usada solo dentro del SQL que construye `stg`.
+      Se documenta porque decide el mes de toda fila real del datamart.
+    descripcion: >-
+      Lee el mes que nombra el TEXTO de una fase real y devuelve su primer dia,
+      o nulo si no hay mes y ano. Recorre todas las palabras: un rango se lee
+      por su ULTIMO mes («Enero 2020-Abril 2020» es abril de 2020, «DICIEMBRE 09
+      A FEBRERO 2010» es febrero de 2010); un ano de dos cifras justo detras del
+      mes es de este siglo («Mayo-17», «AGOSTO17»); el punto de millar de un ano
+      se ignora («Abril 2.013»). No es el parser de las versiones master, que
+      sigue siendo `cierre.fn_parse_mes_fase`. La misma regla, token a token,
+      esta en `etl_sigrid/domain/mes_fase.py`, y `check-mes-fase` compara las
+      dos en todas las fases.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_stg
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_mes_de_fase:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build, usada solo dentro del SQL que construye `stg`.
+      Se documenta porque explica por que el mes de un cierre real puede no
+      coincidir con sus fechas.
+    descripcion: >-
+      El mes de una fase real, en cascada: el del TEXTO si se lee
+      (`stg.fn_parse_mes_texto`), aunque discrepe de las fechas o caiga fuera
+      de ellas; si no, el de la fecha FIN; si no, el de la de inicio; y en
+      ultimo lugar el `ano`/`mes` que archiva `raw.obrfas`. Es la UNICA
+      implementacion de la regla (decision del humano del 2026-09-22):
+      `stg.plan_mensual.anio_mes` la aplica una vez y `cierre.fn_mes_de_fase`
+      la envuelve.
     grano: null
     clave_negocio: []
     paso_etl: build_stg

@@ -98,31 +98,30 @@ $$;
 
 
 -- ===========================================================================
--- fn_mes_de_fase(fecha_inicio, nombre_mes):
---   Mes canónico de una fase de obrfas. Si texto y fecha coinciden → fecha
---   (idempotente). Si NO coinciden → manda TEXTO. Si solo uno → ese.
+-- fn_mes_de_fase(fecha_inicio, nombre_mes, fecha_fin, mes_archivado)  (F-118)
+--   Envoltorio de `stg.fn_mes_de_fase`: la regla del mes de una fase real vive
+--   UNA sola vez, en `stg` (F-051 R1, absorbida en F-118). Manda el texto de la
+--   fase; si no se lee, la fecha fin, la de inicio y el ano/mes archivado.
+--   `cierre` ya no la usa para agrupar: lee `stg.plan_mensual.anio_mes`, que es
+--   este mismo mes (R16). Se conserva para quien la consulte a mano.
+--
+--   La firma antigua de dos argumentos se borra: convivir con la de cuatro con
+--   DEFAULT haría ambigua cualquier llamada de dos. CASCADE porque las vistas
+--   de detalle de este esquema la usaban hasta F-118; `04_views_detalle.sql`
+--   las recrea en este mismo build, ya sin ella.
 -- ===========================================================================
+DROP FUNCTION IF EXISTS cierre.fn_mes_de_fase(DATE, TEXT) CASCADE;
+
 CREATE OR REPLACE FUNCTION cierre.fn_mes_de_fase(
-    fecha_inicio DATE,
-    nombre_mes   TEXT
+    fecha_inicio  DATE,
+    nombre_mes    TEXT,
+    fecha_fin     DATE DEFAULT NULL,
+    mes_archivado DATE DEFAULT NULL
 )
 RETURNS DATE
-LANGUAGE plpgsql IMMUTABLE
+LANGUAGE sql IMMUTABLE
 AS $$
-DECLARE
-    mes_texto DATE;
-    mes_fecha DATE;
-BEGIN
-    mes_texto := cierre.fn_parse_mes_fase(nombre_mes);
-    mes_fecha := CASE WHEN fecha_inicio IS NULL THEN NULL
-                      ELSE date_trunc('month', fecha_inicio)::DATE END;
-    IF mes_texto IS NOT NULL AND mes_fecha IS NOT NULL THEN
-        IF mes_texto = mes_fecha THEN RETURN mes_fecha; ELSE RETURN mes_texto; END IF;
-    ELSIF mes_texto IS NOT NULL THEN RETURN mes_texto;
-    ELSIF mes_fecha IS NOT NULL THEN RETURN mes_fecha;
-    ELSE RETURN NULL;
-    END IF;
-END;
+    SELECT stg.fn_mes_de_fase(fecha_inicio, nombre_mes, fecha_fin, mes_archivado)
 $$;
 
 

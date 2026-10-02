@@ -60,6 +60,7 @@ COLUMNAS_LINEAS = [
     "proveedor_recomendado_id", "contrato_id", "contrato_linea_id", "fecha_maxima",
     "grupo_planificacion_id", "nivel", "es_nivel_padre", "es_version_inicial",
     "es_primera_abc", "es_vigente", "es_ultima", "tipo_version", "texto_version",
+    "factor",  # F-120, al final (D8)
 ]
 
 COLUMNAS_CUADRE = [
@@ -268,8 +269,8 @@ def test_f097_r19_importes_y_porcentajes() -> None:
     texto = _sql(TROCEADO)
     # Review 1: lo que no cabe en NUMERIC(18,2) tras redondear es NULL, no un
     # `numeric field overflow` que tumbe el build (el espejo hace lo mismo).
-    assert ("CASE WHEN abs(ROUND(c.precio * c.rendimiento, 2)) < 1e16 "
-            "THEN ROUND(c.precio * c.rendimiento, 2)::NUMERIC(18,2) END AS importe_unitario") in texto
+    assert ("CASE WHEN abs(ROUND(c.precio * c.factor * c.rendimiento, 2)) < 1e16 "
+            "THEN ROUND(c.precio * c.factor * c.rendimiento, 2)::NUMERIC(18,2) END AS importe_unitario") in texto
     assert ("CASE WHEN abs(ROUND(c.cantidad_total * c.precio, 2)) < 1e16 "
             "THEN ROUND(c.cantidad_total * c.precio, 2)::NUMERIC(18,2) END AS importe_total") in texto
     assert "COALESCE(c.tipo_elemento_codigo IN ('4', '13'), FALSE) AS es_porcentaje" in texto
@@ -307,8 +308,8 @@ def test_f097_r16_planif_jo_desde_dncpro_de_la_obra() -> None:
 
 def test_f097_r19_planif_jo_con_sus_importes() -> None:
     planif = _bloque(COSTE, "SELECT 'PLANIF_JO'", ";")
-    assert ("CASE WHEN abs(ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2)) < 1e16 "
-            "THEN ROUND(p.pre::NUMERIC * p.canren::NUMERIC, 2) END") in planif
+    assert ("CASE WHEN abs(ROUND(p.pre::NUMERIC * f.factor * p.canren::NUMERIC, 2)) < 1e16 "
+            "THEN ROUND(p.pre::NUMERIC * f.factor * p.canren::NUMERIC, 2) END") in planif, "F-120"
     assert ("CASE WHEN abs(ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2)) < 1e16 "
             "THEN ROUND(p.can::NUMERIC * p.pre::NUMERIC, 2) END") in planif
     assert "'SIN_TIPO'" in planif
@@ -618,10 +619,10 @@ def test_f097_r11_sello_del_sql_de_troceado(tmp_path: Path) -> None:
         sello_de_troceado,
     )
 
-    assert FICHEROS_DEL_SELLO == (TROCEADO, MASTER)
+    assert FICHEROS_DEL_SELLO == (SETUP, TROCEADO, MASTER), "00 entra con F-120"
     real = sello_de_troceado()
     assert re.fullmatch(r"[0-9a-f]{16}", real)
-    for nombre in (TROCEADO, MASTER, COSTE):
+    for nombre in (SETUP, TROCEADO, MASTER, COSTE):
         (tmp_path / nombre).write_text(_crudo(nombre), encoding="utf-8")
     assert sello_de_troceado(tmp_path) == real
     (tmp_path / COSTE).write_text("otra cosa", encoding="utf-8")
@@ -770,16 +771,19 @@ def test_f097_r27_las_fichas_avisan_de_lo_provisional() -> None:
     assert "PROVISIONAL" in lineas and "D8" in lineas, "tipos 3 y 11 sin validar con Negocio"
     cabecera = (DIR_DICCIONARIO / "descompuestos.yaml").read_text(encoding="utf-8")
     for texto in (lineas, _texto_ficha(_ficha("cuadre_partida"))):
-        assert "INCOMPLETO" in texto and "primera carga" in texto, (
-            "sin la primera carga el master sale incompleto: la ficha lo avisa"
+        # F-120 (anadido 2): la primera carga se hizo el 2026-09-29 y el aviso
+        # de «master INCOMPLETO» caduco; la ficha dice como saber que version esta.
+        assert "INCOMPLETO" not in texto and "primera carga" in texto.lower(), (
+            "la ficha dice que la primera carga ya esta hecha"
         )
+        assert "_versiones_cargadas" in texto
     assert "R-DESCOMPUESTO-ORIGEN" in cabecera
     assert "134,35" in lineas and "419079" in lineas, "el caso de Juan, con su cifra"
 
 
 def test_f097_r27_global_esquema_regla_y_version() -> None:
     glob = _yaml("00_global.yaml")
-    assert glob["version"] == 37
+    assert glob["version"] >= 37, "F-118 la sube a 38"
     esquema = glob["esquemas"]["descompuestos"]
     assert esquema["pasos_etl"] == ["ingest_descompuestos", "build_descompuestos"]
     assert esquema["refresco"] == "nocturno" and esquema["consumo_recomendado"] is True

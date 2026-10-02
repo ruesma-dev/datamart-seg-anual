@@ -26,13 +26,16 @@
 #    copia de su planificacion (campo 36 = `dncpro.ide`). Esas NO se publican
 #    como ESTUDIO: el cuadre las marca SUSTITUIDO_POR_PLANIFICACION y su Estudios
 #    original, si existe, esta en la version 0 del master (MASTER_INICIAL).
-# 4. **Sin la primera carga el master esta INCOMPLETO.** La primera carga
-#    (`ingest-descompuestos --sin-tope`, MANUAL, 1,5-2 h) trae las 3.023
-#    versiones; sin ella la nocturna lo completa sola a 300 MB por noche, en
-#    unas 8 noches. Mientras tanto faltan versiones: `_versiones_cargadas` dice
-#    cuales hay.
+# 4. **La primera carga del master se hizo el 2026-09-29** (3.025 versiones).
+#    Si una version esta cargada lo dice `_versiones_cargadas`; la nocturna
+#    relee cada noche las nuevas, la vigente de cada obra y las cambiadas.
 # 5. **Los tipos 3 (OTROS) y 11 (SUBCONTRATA) son PROVISIONALES** (D8): la
 #    traduccion esta sin validar con Negocio.
+# 6. **El FACTOR** (F-120): `importe_unitario` = factor x rendimiento x precio;
+#    `factor` vale 1 en las lineas sin factor y `cantidad_total` ya lo lleva.
+# 7. **ESTUDIO tiene precios de Estudios pero medicion ACTUAL**: el importe de
+#    Estudios es medicion x precio de la version 0 del master, no la suma de
+#    `importe_total` de ESTUDIO.
 
 version: 1
 esquema: descompuestos
@@ -58,9 +61,40 @@ objetos:
       ABC (1.190), donde el 98,6 % de las partidas ya es la planificacion del
       jefe de obra.
 
-      **EL MASTER ESTA INCOMPLETO HASTA LA PRIMERA CARGA**, que es MANUAL: sin
-      la primera carga la nocturna lo completa sola a 300 MB por noche (unas 8
-      noches). Que versiones hay lo dice `descompuestos._versiones_cargadas`.
+      **LA PRIMERA CARGA DEL MASTER SE HIZO EL 2026-09-29** (3.025 versiones).
+      Si una version esta cargada lo dice `descompuestos._versiones_cargadas`
+      (una fila por obra y version); la nocturna relee cada noche las nuevas, la
+      vigente de cada obra y las de huella distinta.
+
+      **EL FACTOR** (F-120). Es el FACTOR de la pantalla de Descomposicion de
+      Sigrid: un multiplicador del rendimiento de la linea. En el texto de
+      Sigrid el campo del rendimiento viene como `factor x rendimiento`
+      (`1.22x0.003`) cuando la linea tiene factor y como un numero cuando no. Se
+      publica separado: `factor` (1 si la linea no tiene) y `rendimiento`
+      limpio, e `importe_unitario` = factor x rendimiento x precio;
+      `cantidad_total` ya lleva el factor. En PLANIF_JO el factor sale de
+      `dncpro.faccan` (cuando `dncpro.factip` = 1). EJEMPLO: 0713, partida
+      400854, version 6, «DESPLAZAMIENTO BOMBA DE 62 MT»: 1,22 x 0,003 x 339,39 =
+      1,24 EUR/m2, y las 19 lineas de la partida suman 249,41 = su precio. Las
+      ~95.000 lineas con el campo del rendimiento VACIO y precio siguen sin
+      rendimiento ni importe unitario: es otra causa (F-122).
+
+      **ESTUDIO: PRECIOS DE ESTUDIOS, MEDICION ACTUAL.** ESTUDIO es la
+      «Descomposicion» del ambito 3 fase 0, el unico sitio de COSTE con
+      descompuesto: tiene los rendimientos y precios unitarios de Estudios, pero
+      su `cantidad_total` e `importe_total` siguen la medicion ACTUAL de la
+      partida (Sigrid los recalcula). El importe de Estudios de una partida es
+      medicion x precio del master version 0 (`stg.presupuesto`, ambito 8, fase
+      0), NO la suma de `importe_total`. Lo que si vale de ESTUDIO es el
+      descompuesto por unidad (suma de `importe_unitario`), que coincide con el
+      precio de la version 0. MASTER_INICIAL solo existe donde la version 0
+      guarda descompuesto. Ejemplos: 0713 02.01.01.04 HORMIGON EN ESCALERAS,
+      medicion 24,03 en la version 0 y 25,95 hoy, por unidad 207,20 = precio de
+      la version 0: importe de Estudios 4.979,02 frente a 5.376,84 de sumar
+      lineas, y sin MASTER_INICIAL; 0726 04.02 FORJ. RETICULAR 35+10, medicion
+      sin cambios 3.926,79, por unidad 134,35 = precio de la version 0:
+      527.564,24 frente a 527.584,96 (redondeo de lineas), con MASTER_INICIAL de
+      las mismas 10 lineas.
 
       **LOS TIPOS 3 (OTROS) Y 11 (SUBCONTRATA) SON PROVISIONALES** (D8): la
       traduccion del campo 16 esta sin validar con Negocio.
@@ -155,9 +189,13 @@ objetos:
           'HORMIGONES Y MORTEROS PREPARADOS EN CENTRAL', 'CARPINTERIA DE MADERA'.
       rendimiento:
         significado: >-
-          Cantidad del elemento por UNIDAD de partida (campo 14; `dncpro.canren`).
-          En los porcentajes es el tanto por uno (0.02 = 2 %).
+          Cantidad del elemento por UNIDAD de partida, sin el factor (el campo 14
+          partido, F-120; `dncpro.canren` en PLANIF_JO). En los porcentajes es el
+          tanto por uno (0.02 = 2 %).
         agregacion: no_sumable
+        nulo_significa: >-
+          El campo 14 esta vacio (las ~95.000 lineas de F-122), no es un numero
+          ni la forma factor, o es `a x` sin rendimiento.
       precio:
         significado: >-
           Precio del elemento (campo 3). En PLANIF_JO es `dncpro.pre`, el precio
@@ -166,24 +204,27 @@ objetos:
         agregacion: no_sumable
       importe_unitario:
         significado: >-
-          `ROUND(precio x rendimiento, 2)`: lo que aporta el elemento a UNA
-          unidad de partida. Sumado dentro de (origen, partida, ambito, fase) es
-          el precio por descompuesto que compara `cuadre_partida`.
+          `ROUND(factor x rendimiento x precio, 2)` (F-120): lo que aporta el
+          elemento a UNA unidad de partida. Sumado dentro de (origen, partida,
+          ambito, fase) es el precio por descompuesto que compara
+          `cuadre_partida`. NULL si falta el factor, el rendimiento o el precio.
         unidad: EUR
         agregacion: suma
       cantidad_total:
         significado: >-
           Cantidad total del elemento para la medicion de la partida (campo 4;
-          `dncpro.can`). Mezcla unidades: no se suma entre elementos.
+          `dncpro.can`): ya lleva el factor (1091,5 x 1,00021 x 1 = 1091,729).
+          Mezcla unidades: no se suma entre elementos. En ESTUDIO sigue la
+          medicion ACTUAL, no la de Estudios.
         agregacion: no_sumable
       importe_total:
-        significado: '`ROUND(cantidad_total x precio, 2)`: el importe del elemento para toda la medicion.'
+        significado: '`ROUND(cantidad_total x precio, 2)`: el importe del elemento para toda la medicion, sin volver a aplicar el factor (la cantidad ya lo lleva). En ESTUDIO, a la medicion ACTUAL.'
         unidad: EUR
         agregacion: suma
       es_porcentaje:
         significado: TRUE en los tipos 4 y 13, cuyo precio es una base y su rendimiento un tanto por uno.
       porcentaje:
-        significado: 'El porcentaje en tanto por cien (`rendimiento x 100`): 2 = 2 %.'
+        significado: 'El porcentaje en tanto por cien (`rendimiento x 100`, sin el factor; el importe si lo lleva): 2 = 2 %.'
         agregacion: no_sumable
         nulo_significa: La linea no es un porcentaje.
       base_porcentaje:
@@ -252,6 +293,18 @@ objetos:
         significado: >-
           El texto de la version (`obrfasamb.tex`), por ejemplo 'CIERRE
           DICIEMBRE-25/ ABC'. Solo MASTER_*.
+      factor:
+        significado: >-
+          El FACTOR de la linea en la pantalla de Descomposicion de Sigrid
+          (F-120): multiplica al rendimiento. Viene en el campo 14 como `factor x
+          rendimiento` (`1.22x0.003`); vale 1 si la linea no tiene factor.
+          `importe_unitario` = factor x rendimiento x precio. En PLANIF_JO es
+          `dncpro.faccan` cuando `dncpro.factip` = 1 (1 si es 0). Puede ser 0
+          (importe 0) o negativo. Va la ultima columna (D8).
+        agregacion: no_sumable
+        nulo_significa: >-
+          Sin campo 14 (vacio) o con una forma rara, un `dncpro.factip` que no es
+          0 ni 1, o una version del master aun no retroceada con F-120.
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -282,11 +335,32 @@ objetos:
       medido el 2026-09-27). Cuadran el 36,3 % de las ESTUDIO con precio
       (12.967 de 35.710) y el 76,8 % de las PLANIF_JO (71.643 de 93.320).
       Ejemplo: la 03.05.02 de la 0695 (`partida_id` 377070), PLANIF_JO CUADRA
-      en 177,95 y ESTUDIO SUSTITUIDO_POR_PLANIFICACION.
+      en 177,95 y ESTUDIO SUSTITUIDO_POR_PLANIFICACION. Desde F-120 la suma
+      lleva el FACTOR de cada linea (antes las lineas con factor no tenian
+      importe unitario y su partida salia NO_CUADRA sin serlo): la 400854 de la
+      0713, version 6, CUADRA en 249,41.
 
-      **EL MASTER ESTA INCOMPLETO HASTA LA PRIMERA CARGA**: sus filas estan solo
-      para las versiones cargadas (`descompuestos._versiones_cargadas`), y sin
-      la primera carga la nocturna tarda unas 8 noches en tenerlas todas.
+      **LA PRIMERA CARGA DEL MASTER SE HIZO EL 2026-09-29**: hay filas del
+      master para cada version cargada, y cuales lo estan lo dice
+      `descompuestos._versiones_cargadas`.
+
+      **ESTUDIO: PRECIOS DE ESTUDIOS, MEDICION ACTUAL.** El cuadre de ESTUDIO
+      compara bien, por unidad; sus importes no son los de Estudios. ESTUDIO es la
+      «Descomposicion» del ambito 3 fase 0, el unico sitio de COSTE con
+      descompuesto: tiene los rendimientos y precios unitarios de Estudios, pero
+      su `cantidad_total` e `importe_total` siguen la medicion ACTUAL de la
+      partida (Sigrid los recalcula). El importe de Estudios de una partida es
+      medicion x precio del master version 0 (`stg.presupuesto`, ambito 8, fase
+      0), NO la suma de `importe_total`. Lo que si vale de ESTUDIO es el
+      descompuesto por unidad (suma de `importe_unitario`), que coincide con el
+      precio de la version 0. MASTER_INICIAL solo existe donde la version 0
+      guarda descompuesto. Ejemplos: 0713 02.01.01.04 HORMIGON EN ESCALERAS,
+      medicion 24,03 en la version 0 y 25,95 hoy, por unidad 207,20 = precio de
+      la version 0: importe de Estudios 4.979,02 frente a 5.376,84 de sumar
+      lineas, y sin MASTER_INICIAL; 0726 04.02 FORJ. RETICULAR 35+10, medicion
+      sin cambios 3.926,79, por unidad 134,35 = precio de la version 0:
+      527.564,24 frente a 527.584,96 (redondeo de lineas), con MASTER_INICIAL de
+      las mismas 10 lineas.
     grano: >-
       Una fila por (origen, partida_id, ambito_id, fase_num) de cada partida
       hoja con precio: dos por partida en el ambito 3 y una por partida y
@@ -425,6 +499,23 @@ objetos:
       CABLEADO: la referencia que vino de Estudios (ambito 3 fase 0), solo de
       las partidas cuya «Descomposicion» no es copia de la planificacion. Para
       Power BI y para no mezclar origenes sin acordarse del filtro.
+
+      **ESTUDIO: PRECIOS DE ESTUDIOS, MEDICION ACTUAL.** ESTUDIO es la
+      «Descomposicion» del ambito 3 fase 0, el unico sitio de COSTE con
+      descompuesto: tiene los rendimientos y precios unitarios de Estudios, pero
+      su `cantidad_total` e `importe_total` siguen la medicion ACTUAL de la
+      partida (Sigrid los recalcula). El importe de Estudios de una partida es
+      medicion x precio del master version 0 (`stg.presupuesto`, ambito 8, fase
+      0), NO la suma de `importe_total`. Lo que si vale de ESTUDIO es el
+      descompuesto por unidad (suma de `importe_unitario`), que coincide con el
+      precio de la version 0. MASTER_INICIAL solo existe donde la version 0
+      guarda descompuesto. Ejemplos: 0713 02.01.01.04 HORMIGON EN ESCALERAS,
+      medicion 24,03 en la version 0 y 25,95 hoy, por unidad 207,20 = precio de
+      la version 0: importe de Estudios 4.979,02 frente a 5.376,84 de sumar
+      lineas, y sin MASTER_INICIAL; 0726 04.02 FORJ. RETICULAR 35+10, medicion
+      sin cambios 3.926,79, por unidad 134,35 = precio de la version 0:
+      527.564,24 frente a 527.584,96 (redondeo de lineas), con MASTER_INICIAL de
+      las mismas 10 lineas.
     grano: Una fila por linea de ESTUDIO (obra_id, partida_id, orden).
     clave_negocio: [obra_id, partida_id, orden]
     paso_etl: build_descompuestos
@@ -442,14 +533,15 @@ objetos:
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
       naturaleza: {significado: 'Nombre de la naturaleza del elemento (campo 17).'}
-      rendimiento: {significado: 'Cantidad por unidad de partida (tanto por uno en los porcentajes).', agregacion: no_sumable}
+      rendimiento: {significado: 'Cantidad por unidad de partida, sin el factor (tanto por uno en los porcentajes).', agregacion: no_sumable}
       precio: {significado: 'Precio del elemento; la base en los porcentajes.', unidad: EUR, agregacion: no_sumable}
-      importe_unitario: {significado: 'ROUND(precio x rendimiento, 2); suma por partida = su precio si cuadra.', unidad: EUR, agregacion: suma}
-      cantidad_total: {significado: 'Cantidad total del elemento para la medicion; mezcla unidades.', agregacion: no_sumable}
-      importe_total: {significado: 'ROUND(cantidad_total x precio, 2): importe para toda la medicion.', unidad: EUR, agregacion: suma}
+      importe_unitario: {significado: 'ROUND(factor x rendimiento x precio, 2); suma por partida = su precio si cuadra.', unidad: EUR, agregacion: suma}
+      cantidad_total: {significado: 'Cantidad total del elemento a la medicion ACTUAL (ya lleva el factor); mezcla unidades.', agregacion: no_sumable}
+      importe_total: {significado: 'ROUND(cantidad_total x precio, 2) a la medicion ACTUAL: NO es el importe de Estudios.', unidad: EUR, agregacion: suma}
       es_porcentaje: {significado: 'TRUE en los tipos 4 y 13 (porcentajes).'}
-      porcentaje: {significado: 'Porcentaje en tanto por cien (2 = 2 %).', agregacion: no_sumable}
+      porcentaje: {significado: 'Porcentaje en tanto por cien (2 = 2 %), sin el factor.', agregacion: no_sumable}
       base_porcentaje: {significado: 'Base sobre la que se aplica el porcentaje.', unidad: EUR, agregacion: no_sumable}
+      factor: {significado: 'El FACTOR de la linea (campo 14 `factor x rendimiento`, F-120); 1 si no tiene.', agregacion: no_sumable, nulo_significa: 'Campo 14 vacio o raro.'}
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -485,9 +577,9 @@ objetos:
       codigo_alternativo: {significado: 'Codigo alternativo de la linea (`dncpro.cod2`).'}
       naturaleza_codigo: {significado: 'Codigo de la naturaleza del producto (`auxpronat.cod`).'}
       naturaleza: {significado: 'Nombre de la naturaleza del producto (`auxpronat.res`).'}
-      rendimiento: {significado: 'Cantidad por unidad de partida (`dncpro.canren`).', agregacion: no_sumable}
+      rendimiento: {significado: 'Cantidad por unidad de partida, sin el factor (`dncpro.canren`).', agregacion: no_sumable}
       precio: {significado: 'Precio ADJUDICADO de la linea (`dncpro.pre`, F-038).', unidad: EUR, agregacion: no_sumable}
-      importe_unitario: {significado: 'ROUND(precio x rendimiento, 2); suma por partida frente a su precio.', unidad: EUR, agregacion: suma}
+      importe_unitario: {significado: 'ROUND(factor x rendimiento x precio, 2); suma por partida frente a su precio.', unidad: EUR, agregacion: suma}
       cantidad_total: {significado: 'Cantidad total de la linea (`dncpro.can`); mezcla unidades.', agregacion: no_sumable}
       importe_total: {significado: 'ROUND(cantidad_total x precio, 2): importe de toda la linea.', unidad: EUR, agregacion: suma}
       dncpro_id: {significado: 'La linea de necesidad (`dncpro.ide`), llave hacia comparativo y contrato.', agregacion: no_sumable}
@@ -499,6 +591,7 @@ objetos:
       grupo_planificacion_id: {significado: 'Grupo de planificacion de compra (`dncpro.gpcide`).', agregacion: no_sumable}
       nivel: {significado: 'Nivel de la linea en la planificacion (`dncpro.niv`).', agregacion: no_sumable}
       es_nivel_padre: {significado: 'La linea es un nivel padre (`dncpro.nivpad`).'}
+      factor: {significado: 'El FACTOR de la linea (F-120): `dncpro.faccan` si `dncpro.factip` = 1, 1 si es 0. Lo lleva el importe unitario, no la cantidad.', agregacion: no_sumable, nulo_significa: 'Un `dncpro.factip` que no es 0 ni 1 (hay uno, 646): sin importe unitario.'}
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -521,7 +614,8 @@ objetos:
       que es la planificacion de compras del jefe de obra y el descompuesto del
       cierre para Oficina Tecnica. TODAS sus versiones, con sus marcas: para ver
       una se filtra `es_vigente` o `fase_num`; sin filtrar, cada linea cuenta
-      una vez por version. INCOMPLETO hasta la primera carga del master.
+      una vez por version. El factor de cada linea es el del texto de ESA
+      version (F-120), no el de la planificacion de hoy.
     grano: Una fila por linea de MASTER_PLANIF_JO y version (obra_id, partida_id, fase_num, orden).
     clave_negocio: [obra_id, partida_id, fase_num, orden]
     paso_etl: build_descompuestos
@@ -540,9 +634,9 @@ objetos:
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
       naturaleza: {significado: 'Nombre de la naturaleza del elemento (campo 17).'}
-      rendimiento: {significado: 'Cantidad por unidad de partida (tanto por uno en porcentajes).', agregacion: no_sumable}
+      rendimiento: {significado: 'Cantidad por unidad de partida, sin el factor (tanto por uno en porcentajes).', agregacion: no_sumable}
       precio: {significado: 'Precio del elemento en la version; la base en porcentajes.', unidad: EUR, agregacion: no_sumable}
-      importe_unitario: {significado: 'ROUND(precio x rendimiento, 2), sumable dentro de partida y version.', unidad: EUR, agregacion: suma}
+      importe_unitario: {significado: 'ROUND(factor x rendimiento x precio, 2), sumable dentro de partida y version.', unidad: EUR, agregacion: suma}
       cantidad_total: {significado: 'Cantidad total del elemento para la medicion; mezcla unidades.', agregacion: no_sumable}
       importe_total: {significado: 'ROUND(cantidad_total x precio, 2), sumable dentro de una version.', unidad: EUR, agregacion: suma}
       es_porcentaje: {significado: 'TRUE en los tipos 4 y 13 (porcentajes).'}
@@ -555,6 +649,7 @@ objetos:
       es_ultima: {significado: 'TRUE en la mayor version del master de la obra.'}
       tipo_version: {significado: 'Tipo de la version por su texto, la regla de mart.', valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]}
       texto_version: {significado: 'El texto de la version (`obrfasamb.tex`).'}
+      factor: {significado: 'El FACTOR de la linea en la version (campo 14 `factor x rendimiento`, F-120); 1 si no tiene.', agregacion: no_sumable, nulo_significa: 'Campo 14 vacio o raro, o version aun no retroceada con F-120.'}
     relaciones:
       - de: obra_id
         a: maestro.obras.obra_id
@@ -615,9 +710,9 @@ objetos:
       texto), de que ejecucion viene y con que SQL se troceo. Cada noche
       `ingest_descompuestos` compara esta huella con la de Sigrid y relee las
       versiones nuevas, la vigente de cada obra y las de huella distinta, hasta
-      300 MB. Mientras no esten las 3.023 versiones, el master de
-      `descompuestos.lineas` esta INCOMPLETO. Si se corrompe: vaciarla y lanzar
-      `ingest-descompuestos --sin-tope`.
+      300 MB. La primera carga se hizo el 2026-09-29 (3.025 versiones): si una
+      version del master esta en `descompuestos.lineas`, aqui esta su fila. Si se
+      corrompe: vaciarla y lanzar `ingest-descompuestos --sin-tope`.
     grano: Una fila por version del master cargada (obra_id, fase_num).
     clave_negocio: [obra_id, fase_num]
     paso_etl: ingest_descompuestos
@@ -650,8 +745,11 @@ objetos:
     descripcion: >-
       Parte el texto `des` en una fila por registro `~D|` (por salto de linea
       seguido de `~<letra>|`, nunca por cualquier salto) y mapea cada campo por
-      su posicion, con el tipo traducido y los importes. Una sola definicion
-      para el ambito 3 y el master; su texto forma el sello del troceado.
+      su posicion, con el tipo traducido y los importes. El campo 14 es
+      `factor x rendimiento` (F-120): lo parte en `factor` y `rendimiento`, y el
+      importe unitario lleva el factor. Una sola definicion para el ambito 3 y
+      el master; su texto, el de `00_setup.sql` y el de `03_lineas_master.sql`
+      forman el sello del troceado.
     grano: null
     clave_negocio: []
     paso_etl: build_descompuestos
