@@ -23,6 +23,10 @@
 > 11.783 / 44 / 6.544; cuadre 51.206). Sin desviaciones de la spec. Siguen T9-T12 y
 > T19; T13-T18 son MANUAL del humano. Detalle: `progress/impl_F-123.md`.
 
+**Diccionario del árbol tras F-123 (version 40): 190 objetos, 1437 columnas,
+86 de consumo** (la ficha nueva `descompuestos.v_pbi_master_estudio`, 21
+columnas; `elementos.lineas_master_inicial` pasa a `lineas_master_estudio`).
+
 > **Spec v2 APROBADA por el humano el 2026-10-02** («si»), con D1 (fase viva dentro de
 > `R-DESCOMPUESTO-ORIGEN`) y D2 (`v_pbi_estudio` igual + `v_pbi_master_estudio` nueva)
 > según la recomendación. La v1 (respaldo, `estudios_partida`, D1-D8) la rechazó por
