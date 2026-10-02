@@ -1873,7 +1873,7 @@
         "Retroceadas todas las versiones ya cargadas sin releer Sigrid, y el cuadre recalculado: medido cuantas partidas pasan de NO_CUADRA a CUADRA",
         "La ficha de ESTUDIO avisa de que sus cantidades siguen la medicion actual, de que el importe de Estudios es medicion x precio del master v0 (lo que vale de ESTUDIO es el descompuesto por unidad) y de que MASTER_INICIAL solo existe donde la v0 guarda descompuesto"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,

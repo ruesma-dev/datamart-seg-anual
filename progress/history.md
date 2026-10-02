@@ -1453,3 +1453,23 @@ agosto 377.492,30 (hoy `stg` publica 319.492,30), 0371 mayo-2015 -441.229,31 (ho
 exenta por F-051 D7 (huellas e invariante). Diccionario v38. Sin desplegar: T26-T31
 del humano, con T26 (huellas antes) y T28 (aviso a Juan) antes de cualquier imagen.
 Detalle: `progress/spec_F-118.md`, `progress/impl_F-118.md`, `progress/review_F-118.md`.
+
+## F-120 · El factor del descompuesto (cerrada el 2026-10-02, APROBADO en pasada 2)
+
+Nace de los correos de Elena Diaz del 30-09 y 01-10 (obra 0713, David Lloyd):
+cuando una linea de descompuesto lleva FACTOR, Sigrid guarda el campo 14 como
+`factor x rendimiento` y el troceado de F-097 dejaba vacios el rendimiento y el
+importe unitario (cantidad e importe total si estaban bien). Ahora `fn_trocear` y
+su espejo Python lo parten: columna `factor` nueva en `descompuestos.lineas` y en
+las tres vistas, `importe_unitario = factor x rendimiento x precio`, y PLANIF_JO
+aplica tambien `dncpro.faccan` (nunca se aplicaba). `00_setup.sql` entra en el
+sello, asi que las 3.025 versiones quedan para volver a trocear. Contraste SQL
+frente a espejo: 506 registros, 0 diferencias; la 0713 400854 v6 da 9 lineas con
+factor y 249,41 por unidad, el precio de la partida. Prevision: ~91.000
+partidas-version del master pasan a CUADRA. Diccionario v39: el factor explicado,
+la nota de ESTUDIO reescrita por el humano (el descompuesto por unidad sale de la
+fase 0 de COSTE; la medicion y el importe de Estudios, del master v0; MASTER_INICIAL
+solo donde la v0 guarda descompuesto) y fuera el aviso caducado de «master
+incompleto». Fuera: F-122 (lineas con el campo vacio y 310 partidas que dejan de
+cuadrar). Sin desplegar: imagen ANTES del retroceo. Detalle: `progress/spec_F-120.md`,
+`progress/impl_F-120.md`, `progress/review_F-120.md`, `progress/mutacion_F-120.md`.

@@ -12,7 +12,13 @@
 
 
 
-## 2026-10-02 · F-120 · IMPLEMENTADA, PENDIENTE DE REVIEW (T1-T13 y T19; quedan T14-T18 del humano) · el factor del descompuesto
+## 2026-10-02 · F-120 · CERRADA (`done`, APROBADO en pasada 2) · el factor del descompuesto · SIN DESPLEGAR: T14-T18 del humano, IMAGEN ANTES QUE EL RETROCEO
+
+> **Cerrada el 2026-10-02** con APROBADO del reviewer (`progress/review_F-120.md`),
+> `init.sh` en verde (6.252 passed, cobertura 100 %). Resumen en `progress/history.md`.
+> **OJO con la nocturna:** el diccionario v39 solo llega con la imagen nueva; la
+> nocturna lo publica sola al final de `run-all`, así que puede salir antes de T16
+> (las fichas ya avisan de «versión aún no retroceada»).
 
 Implementación entregada; informe en `progress/impl_F-120.md`. D7 reescrita y los
 dos añadidos aprobados (sección «APROBADA POR EL HUMANO» de `spec_F-120.md`).
