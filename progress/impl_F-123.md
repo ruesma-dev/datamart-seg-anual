@@ -140,25 +140,22 @@ IMAGEN VIEJA tras el codigo nuevo (03 de main, 0726 v0): CheckViolation ... "ck_
   imagen vieja falla contra el `CHECK` nuevo).
 - **T11** (`8d49a5f` aquí; **`2288386` en `azure-apps`**, rama `master`, sin
   push). `datamart_seg_anual.md`: orígenes, `v_pbi_master_estudio` y un párrafo
-  F-123 con lo que rompe a los consumidores y el orden del despliegue. **Aviso
-  para el líder**: ese documento dice aún «sin desplegar» de F-097 y F-120, que
-  según `current.md` están en producción desde la imagen `r20261002-0835`; no lo
-  he tocado porque no es de esta feature y no lo he verificado.
+  F-123 con lo que rompe y el orden del despliegue. Para el líder: dice aún
+  «sin desplegar» de F-097 y F-120 (no es de esta feature; no lo toqué).
 
 ## T12 · Mutación
 
-`python -m harness.mutacion --feature F-123` genera **CERO mutantes** y no
-escribe informe: las 16 líneas Python del alcance son cadenas y docstrings; la
-lógica de F-123 es SQL, que el arnés no muta. Evidencia aportada de otra forma
-y dicha por escrito: **campaña manual de 21 mutantes sobre cada línea de SQL
-cambiada y la tupla del dominio: 21 muertos, 0 supervivientes, 241 s**. Detalle,
-tabla y límites en `progress/mutacion_F-123.md`.
+`python -m harness.mutacion --feature F-123` genera **CERO mutantes** (las 16
+líneas Python son cadenas y docstrings; la lógica es SQL, que no muta). Campaña
+MANUAL de 21 mutantes sobre cada línea de SQL cambiada y la tupla del dominio:
+**21 muertos, 0 supervivientes**; sin `-x`, 1 worker, 96 s (base 5,7 s), HEAD
+`8d49a5f93edde44217bdbaa162c8cf4c0a7927d3`. Pares exactos original -> mutado,
+`fichero:línea` y nº de fallos de cada uno en `progress/mutacion_F-123.md`.
 
 ## T19 · `bash harness/init.sh` (HEAD `e293c34`)
 
-`6285 passed, 221 skipped, 1682 warnings in 2378.23s (0:39:38)` ·
-`PUERTA COBERTURA: 100.0% de 1 líneas cambiadas cubiertas (1/1, umbral 80%)` ·
-`PUERTA TAMAÑO: ... impl 157/220` · **`ENTORNO LISTO`**, exit 0.
+`6285 passed, 221 skipped, 1682 warnings in 2378.23s (0:39:38)` · `PUERTA
+COBERTURA: 100.0% de 1 líneas cambiadas (1/1)` · **`ENTORNO LISTO`**, exit 0.
 
 ## Desviaciones y decisiones
 
@@ -174,18 +171,21 @@ Fuera de alcance (spec): medición de Estudios en `ESTUDIO`, «fase viva» en
 - **T14** · Solo lectura, antes: `SELECT origen, count(*), count(DISTINCT
   obra_id), count(DISTINCT (obra_id, partida_id)) FROM descompuestos.lineas GROUP
   BY 1` y `SELECT origen, estado, count(*) FROM descompuestos.cuadre_partida
-  GROUP BY 1, 2`. (Lo he leído hoy para T8, en solo lectura: ESTUDIO 99.049 /
-  174 / 35.523, MASTER_INICIAL 107.061 / 170 / 36.355, PLANIF_JO 288.960 / 246 /
-  111.392, igual que spec §2; T14 sigue siendo del humano, el día del despliegue.)
+  GROUP BY 1, 2`. (Leído el 02-10 para T8: igual que spec §2.)
 - **T15** · Merge a `main`, imagen con tag fechado y job apuntando a ella;
   comprobar ANTES de seguir: `az containerapp job show -g rg-datamart-seg-dev -n
   caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
-  La imagen vieja contra el `CHECK` nuevo FALLA (visto en T8).
+  La imagen vieja contra el `CHECK` nuevo FALLA (visto en T8). **Sin vuelta
+  atrás**: tras la migración, volver a la imagen anterior exige revertir antes
+  los dos `CHECK` (y las filas `MASTER_ESTUDIO`); si no, `CheckViolation`.
 - **T16** · Fuera de la nocturna, mirando los créditos de CPU, desde el MISMO
   commit: `python main.py build-descompuestos --sin-tope` y `python main.py
   apply-grants`. Debe salir SUCCESS, `versiones_troceadas` = las cargadas (3.025
   el 02-10) y `sello_troceado` **`5c3fb64e292fa14d`** si `00`/`01`/`03` llegan a
-  `main` sin cambios (F-120 tardó 1.619 s).
+  `main` sin cambios (F-120 tardó 1.619 s). La primera vez la migración de `02`
+  toma `AccessExclusiveLock` sobre `lineas` (~4,7 M filas, que el `ADD
+  CONSTRAINT` valida) y `cuadre_partida` hasta el commit de `02`: el MCP y Power
+  BI esperan; por eso va fuera de la nocturna (después, solo un `SELECT`).
 - **T17** · Solo lectura, después: repetir T14. Debe dar (spec §3, confirmado
   en T8 para el ámbito 3): `ESTUDIO` 11.783 / 44 / 6.544; `MASTER_ESTUDIO`
   107.061 / 170 / 36.355; 0 filas `MASTER_INICIAL`; cuadre `ESTUDIO` 2.710 /
@@ -211,8 +211,9 @@ Fuera de alcance (spec): medición de Estudios en `ESTUDIO`, «fase viva» en
 | Tests nuevos de F-123 | 27 (`tests/test_f123_origenes.py`), 21 en rojo en la fase RED |
 | Cobertura de líneas cambiadas | **100,0 % (1/1)**, `PUERTA COBERTURA` |
 | Mutación del arnés | **0 mutantes generados** (solo cadenas y docstrings; sin informe del arnés) |
-| Mutación manual sobre el SQL | **21 generados, 21 muertos, 0 supervivientes**, 241 s (`progress/mutacion_F-123.md`) |
+| Mutación manual sobre el SQL | **21 generados, 21 muertos, 0 supervivientes**; 96 s, **1 worker** (`progress/mutacion_F-123.md`) |
 | Tiempo de la suite | **2.378,23 s** (39 min 38 s) |
 | Contraste T8 (PG 16 local) | build 1 SUCCESS 64,8 s, build 2 SUCCESS 8,9 s; previsión §3 exacta; R11 = 0 |
 
-Falta para cerrar: review contra `CHECKPOINTS.md` y las MANUAL T13-T18.
+Review 1 (CHANGES_REQUESTED, solo papeleo): atendidos en `mutacion_F-123.md`,
+`current.md`, T15 y T16. Falta: review 2 y las MANUAL T13-T18.

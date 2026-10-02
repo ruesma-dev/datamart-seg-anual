@@ -12,76 +12,66 @@
 
 
 
-## 2026-10-02 · F-123 · SPEC APROBADA (`in_progress`), PARADA 1 enseñada · la regla de orígenes del descompuesto
+## 2026-10-02 · F-123 · IMPLEMENTADA (`in_progress`), en review · la regla de orígenes del descompuesto
 
-> **IMPLEMENTACIÓN TERMINADA (implementer, 2026-10-02), pendiente del reviewer.**
-> T1-T12 y T19 hechas, un commit por tarea: RED con 21 de 27 tests en rojo; dominio,
-> 02 (migración `DO` + `ESTUDIO` solo sin master 0), 03 (sello nuevo
-> `5c3fb64e292fa14d`), 04, 05, 06 (`v_pbi_master_estudio`), tests de F-097/F-120,
-> diccionario v40, ARCHITECTURE, ayuda de `main.py` y `azure-apps` (commit
-> `2288386`, sin push). T8 en PostgreSQL 16 local: build SUCCESS dos veces,
-> migración una vez, previsión de la spec §3 EXACTA. Mutación: el arnés genera 0
-> (solo cadenas); campaña manual sobre el SQL 21/21 muertos. `init.sh` en verde
-> (6.285 passed). Sin desviaciones de la spec. T13-T18 MANUAL del humano, con su
-> comando en `progress/impl_F-123.md`.
+> **IMPLEMENTACIÓN TERMINADA (implementer, 2026-10-02); review 1 CHANGES_REQUESTED
+> solo de papeleo, atendida el 2026-10-03.** Rama
+> `feature/F-123-descompuestos-regla-origenes` (desde `main` d4f58ea). T1-T12 y T19
+> hechas, un commit por tarea: dominio, 02 (migración `DO` + `ESTUDIO` solo sin
+> master 0), 03 (sello nuevo `5c3fb64e292fa14d`), 04, 05, 06 (`v_pbi_master_estudio`),
+> tests de F-097/F-120, diccionario v40, ARCHITECTURE, ayuda de `main.py` y
+> `azure-apps` (commit `2288386`, sin push). T8 en PostgreSQL 16 local: build SUCCESS
+> dos veces, migración una vez, previsión de la spec §3 EXACTA. Mutación: el arnés
+> genera 0 (solo cadenas); campaña manual sobre el SQL 21/21 muertos
+> (`progress/mutacion_F-123.md`). `init.sh` en verde (6.285 passed). Sin desviaciones
+> de la spec. Detalle: `progress/impl_F-123.md`.
 
 **Diccionario del árbol tras F-123 (version 40): 190 objetos, 1437 columnas,
 86 de consumo** (la ficha nueva `descompuestos.v_pbi_master_estudio`, 21
 columnas; `elementos.lineas_master_inicial` pasa a `lineas_master_estudio`).
 
-> **Spec v2 APROBADA por el humano el 2026-10-02** («si»), con D1 (fase viva dentro de
-> `R-DESCOMPUESTO-ORIGEN`) y D2 (`v_pbi_estudio` igual + `v_pbi_master_estudio` nueva)
-> según la recomendación. La v1 (respaldo, `estudios_partida`, D1-D8) la rechazó por
-> complicada. Plan de implementación enseñado; el implementer espera su confirmación.
+**VERIFICACIONES MANUAL (humano) de F-123, pendientes. ORDEN OBLIGATORIO** (lo que
+escribe contra Azure lo autoriza el humano):
 
-> Spec en `specs/F-123-descompuestos-regla-origenes/` (29 requisitos, T1-T22);
-> mediciones y decisiones D1-D8 con su recomendación en `progress/spec_F-123.md`.
-> **No se implementa hasta que el humano la apruebe.**
+1. **T13 · Aviso** a Juan Romero y Elena Díaz ANTES de desplegar, con el texto de
+   `progress/spec_F-123.md` §5. Anotar aquí que se envió.
+2. **T14 · Foto de antes** (solo lectura): `SELECT origen, count(*),
+   count(DISTINCT obra_id), count(DISTINCT (obra_id, partida_id)) FROM
+   descompuestos.lineas GROUP BY 1` y `SELECT origen, estado, count(*) FROM
+   descompuestos.cuadre_partida GROUP BY 1, 2`. Debe salir lo de `spec_F-123.md`
+   §2 (ESTUDIO 99.049 / 174 / 35.523; MASTER_INICIAL 107.061 / 170 / 36.355).
+3. **T15 · Imagen**: merge a `main`, imagen con tag fechado y job apuntando a
+   ella; comprobarlo ANTES de seguir: `az containerapp job show -g
+   rg-datamart-seg-dev -n caj-datamart-seg-dev --query
+   "properties.template.containers[0].image" -o tsv` -> el tag nuevo. La imagen
+   vieja contra el `CHECK` nuevo falla, y tras la migración no hay vuelta atrás
+   a la imagen anterior sin revertir los `CHECK`.
+4. **T16 · Build** fuera de la nocturna, mirando los créditos de CPU, desde el
+   MISMO commit de la imagen: `python main.py build-descompuestos --sin-tope` y
+   `python main.py apply-grants`. Debe salir SUCCESS, `versiones_troceadas` = las
+   cargadas (3.025 el 02-10), `sello_troceado` `5c3fb64e292fa14d`. La primera
+   migración bloquea `lineas` y `cuadre_partida` hasta el commit de `02` (el MCP y
+   Power BI esperan).
+5. **T17 · Foto de después** (solo lectura): repetir T14 -> `ESTUDIO` 11.783 / 44
+   / 6.544, `MASTER_ESTUDIO` 107.061 / 170 / 36.355, 0 `MASTER_INICIAL`, cuadre
+   `ESTUDIO` 2.710 / 2.654 / 45.739 / 103 y `MASTER_ESTUDIO` 34.174 / 675 /
+   54.299. Testigos: 0726 / 419079 con 10 líneas `MASTER_ESTUDIO` que suman 134,35
+   y ninguna `ESTUDIO`; 0713 con 1.774 líneas / 687 partidas `ESTUDIO` y ninguna
+   `MASTER_ESTUDIO`; 0 parejas con los dos orígenes (consultas exactas en
+   `impl_F-123.md`, T17). R24: la consulta de `spec_F-123.md` §4 por `psql`.
+6. **T18 · Diccionario**: `python main.py publicar-diccionario` (versión 40) y
+   reiniciar el MCP; `_meta.diccionario_publicacion` con la versión 40 y el MCP
+   sirviendo la regla nueva.
 
-Rama `feature/F-123-descompuestos-regla-origenes` (desde `main` d4f58ea).
-`init.sh` en verde antes de empezar (6.251 passed). Es el «vamos a modificar la
-lectura de descompuestos» del cierre de sesión. **Dictado por el humano el
-2026-10-02** (PARADA 1 de dirección confirmada; la spec vuelve a él):
-
-- Cada master coste (cuatrimestrales incluidos) con su descompuesto y las
-  mediciones de esa versión: ya es así, medido.
-- Estudios = master 0, con origen **`MASTER_ESTUDIO`** (sustituye a
-  `MASTER_INICIAL`). **Si el master 0 no tiene descompuesto, se hace lo de hoy**
-  (la «Descomposición» de coste fase 0); **si tampoco hay ahí, se informa de que
-  no existe.**
-- Coste fase 0 es la **fase viva** (el jefe de obra la evoluciona día a día): su
-  descompuesto es `PLANIF_JO`, la «Descomposición» se ignora para esa fase. El
-  diccionario tiene que explicar la fase viva.
-- El texto del ámbito 3 de `_des_texto` **no se borra** y se sigue ingiriendo.
-- `MASTER_PRE_ABC` y `MASTER_PLANIF_JO` no se tocan (el humano no contestó a
-  esa decisión: se aplica la recomendación; revocable).
-
-Medido el 02-10 (solo lectura, MCP): 35.523 partidas con `ESTUDIO` hoy, 25.799
-con descompuesto en el master 0 y 9.724 sin él (45 obras de 174; 33 sin master
-cargado). Abierto para la spec: respaldo por obra o por partida, con qué origen
-o marca, cómo se informa el «no existe» y si hay que retrocear.
-
-**Spec v1 RECHAZADA por el humano (complicada) y REESCRITA (spec-author,
-2026-10-02) con la regla simple**, pendiente de PARADA 1:
-`specs/F-123-descompuestos-regla-origenes/` (requirements R1-R24, 110 líneas;
-design 215; tasks T1-T19); resumen, mediciones (las de la v1, sin remedir) y
-texto del aviso en `progress/spec_F-123.md`. Por obra: con master 0 con
-descompuesto (170 obras) Estudios es `MASTER_ESTUDIO` (antes `MASTER_INICIAL`)
-y no se publica `ESTUDIO`; sin él (44 obras, 0713) `ESTUDIO` como hoy. Vista
-nueva `v_pbi_master_estudio`; `elementos.lineas_master_inicial` ->
-`lineas_master_estudio`; diccionario v40. Fuera: `ESTUDIO_RESPALDO`,
-`estudios_partida`, motivos de `NO_EXISTE`. `features.json` (descripción y
-`acceptance`) ajustado, sigue en `spec_ready`; `BACKLOG.md` regenerado.
-
-Decisiones que tiene que validar el humano (recomendación entre paréntesis):
-- **D1** dónde se explica la fase viva (dentro de `R-DESCOMPUESTO-ORIGEN`, sin
-  regla nueva ni tocar `R-FAS-AMBIGUO`/`stg.yaml`).
-- **D2** columnas de `v_pbi_master_estudio` (las 21 de `v_pbi_estudio`, para
-  unirlas sin más).
-
-Precisión de cifras: son 44 obras sin master 0 (11 con master sin versión 0 con
-descompuesto, la 0713 entre ellas, y 33 sin ningún master), no 33 con la 0713
-dentro.
+*Historia (caducada, no es el estado):* el humano dictó la regla el 2026-10-02
+(Estudios = master 0 como `MASTER_ESTUDIO`; la fase viva, coste fase 0, tiene por
+descompuesto `PLANIF_JO`; el texto del ámbito 3 no se borra; `MASTER_PRE_ABC` y
+`MASTER_PLANIF_JO` no se tocan). La spec v1 (respaldo `ESTUDIO_RESPALDO`,
+`estudios_partida`, motivos de «no existe») la rechazó por complicada; la v2
+(R1-R24, T1-T19) la aprobó el mismo día con D1 (fase viva dentro de
+`R-DESCOMPUESTO-ORIGEN`) y D2 (`v_pbi_master_estudio` con las 21 columnas de
+`v_pbi_estudio`). Son 44 obras sin master 0 (11 con master sin versión 0 con
+descompuesto, la 0713 entre ellas, y 33 sin ningún master).
 
 ## 2026-10-02 · ESTADO AL CERRAR LA SESIÓN (leer primero)
 
