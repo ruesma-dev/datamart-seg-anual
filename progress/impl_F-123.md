@@ -114,4 +114,44 @@ IMAGEN VIEJA tras el codigo nuevo (03 de main, 0726 v0): CheckViolation ... "ck_
   `ESTUDIO` y su cuadre sí, porque el ámbito 3, `obrparpre` del ámbito 3 y
   `_versiones_cargadas` están enteros. Scripts y logs: `t8/` del scratchpad.
 
-<!-- T9 en adelante -->
+## T9-T11 · Diccionario, documentación y `azure-apps`
+
+- **T9** (`41170ec`). `00_global.yaml`: `version` 40 con su entrada en la
+  cabecera; `R-DESCOMPUESTO-ORIGEN` (D1, sin regla nueva) explica la FASE VIVA
+  (coste fase 0, el presupuesto que el jefe de obra evoluciona día a día; su
+  descompuesto es PLANIF_JO) y la regla de Estudios (MASTER_ESTUDIO en las obras
+  con master 0, ESTUDIO solo en las que no; juntas, las dos vistas; «no existe»
+  = SIN_DESCOMPUESTO), con la medición del 2026-10-02 en `motivo` y
+  `v_pbi_master_estudio` en `ambito`; `esquemas.descompuestos` reescrito.
+  `descompuestos.yaml`: cabecera (puntos 1, 3 y 7), fichas `lineas`,
+  `cuadre_partida`, `elementos` (`lineas_master_estudio`), `v_pbi_estudio` y la
+  nueva `v_pbi_master_estudio` (21 columnas, clave `obra_id, partida_id, orden`).
+  El aviso de F-120 («precios de Estudios, medición ACTUAL») queda solo para
+  las obras sin master 0; el ejemplo 0726 pasa a MASTER_ESTUDIO y el 0713 sigue
+  en ESTUDIO. Sale el ejemplo 377070 «ESTUDIO SUSTITUIDO» y el 36,3 % de
+  ESTUDIO que cuadraba: medían la regla vieja. `MASTER_INICIAL` solo queda en la
+  historia de la cabecera de `00_global.yaml` (versión 37), que no se publica.
+  Recuento del árbol: **190 objetos, 1437 columnas, 86 de consumo** (anotado en
+  `current.md`, lo exige `test_f006_los_recuentos_de_current_son_los_de_hoy`).
+- **T10** (`d158fc0`). `docs/ARCHITECTURE.md`: tabla de pestañas con
+  `MASTER_ESTUDIO` y párrafo «La regla de Estudios (F-123)» (fase viva, por obra
+  contra `_versiones_cargadas`, las dos vistas, la migración y el sello).
+  `main.py`: ayuda de `build-descompuestos` («cuatro vistas», la regla, y que la
+  imagen vieja falla contra el `CHECK` nuevo).
+- **T11** (`8d49a5f` aquí; **`2288386` en `azure-apps`**, rama `master`, sin
+  push). `datamart_seg_anual.md`: orígenes, `v_pbi_master_estudio` y un párrafo
+  F-123 con lo que rompe a los consumidores y el orden del despliegue. **Aviso
+  para el líder**: ese documento dice aún «sin desplegar» de F-097 y F-120, que
+  según `current.md` están en producción desde la imagen `r20261002-0835`; no lo
+  he tocado porque no es de esta feature y no lo he verificado.
+
+## T12 · Mutación
+
+`python -m harness.mutacion --feature F-123` genera **CERO mutantes** y no
+escribe informe: las 16 líneas Python del alcance son cadenas y docstrings; la
+lógica de F-123 es SQL, que el arnés no muta. Evidencia aportada de otra forma
+y dicha por escrito: **campaña manual de 21 mutantes sobre cada línea de SQL
+cambiada y la tupla del dominio: 21 muertos, 0 supervivientes, 241 s**. Detalle,
+tabla y límites en `progress/mutacion_F-123.md`.
+
+<!-- T19 en adelante -->
