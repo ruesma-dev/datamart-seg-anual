@@ -1924,7 +1924,7 @@
         "Medido antes y despues cuantas partidas y obras tienen Estudios por cada via, y los testigos 0713 y 0726 comprobados",
         "`azure-apps/datamart_seg_anual.md`, `ARCHITECTURE.md` y `CLAUDE.md` actualizados en el mismo trabajo"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,

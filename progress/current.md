@@ -12,7 +12,11 @@
 
 
 
-## 2026-10-02 · F-123 · FICHADA, spec-author lanzado · la regla de orígenes del descompuesto
+## 2026-10-02 · F-123 · SPEC LISTA (`spec_ready`), a la espera de D1-D8 · la regla de orígenes del descompuesto
+
+> Spec en `specs/F-123-descompuestos-regla-origenes/` (29 requisitos, T1-T22);
+> mediciones y decisiones D1-D8 con su recomendación en `progress/spec_F-123.md`.
+> **No se implementa hasta que el humano la apruebe.**
 
 Rama `feature/F-123-descompuestos-regla-origenes` (desde `main` d4f58ea).
 `init.sh` en verde antes de empezar (6.251 passed). Es el «vamos a modificar la
