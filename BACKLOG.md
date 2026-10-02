@@ -3,12 +3,13 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **112 features**, 66 abiertas, 46 terminadas.
+Resumen: **113 features**, 67 abiertas, 46 terminadas.
 
 ## Trabajo abierto
 
 | # | Feature | Prioridad | Estado | Rigor | Rama |
 |---|---|---|---|---|---|
+| F-123 | La regla de origenes del descompuesto: Estudios es el master 0 (MASTER_ESTUDIO) y la fase viva de coste se descompone con la planificacion de obra | 1 | pendiente | estandar | `feature/F-123-descompuestos-regla-origenes` |
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 2 | pendiente | critico | `feature/F-037-tesoreria` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
 | F-113 | La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto | 5 | pendiente | critico | `feature/F-113-categoria-capitulo-por-prefijo` |
@@ -128,6 +129,12 @@ Resumen: **112 features**, 66 abiertas, 46 terminadas.
 | F-052 | La obra 0599 no esta en el datamart: 104.366 filas de presupuesto se caen por un arbol de partidas roto | 42 | critico |
 
 ## Detalle
+
+### F-123 · La regla de origenes del descompuesto: Estudios es el master 0 (MASTER_ESTUDIO) y la fase viva de coste se descompone con la planificacion de obra
+
+estado **pendiente** · prioridad 1 · rigor `estandar` · SDD sí · rama `feature/F-123-descompuestos-regla-origenes`
+
+Correccion de la regla de F-097/F-120, dictada por el humano el 2026-10-02. (a) Cada version del MASTER COSTE, cuatrimestrales incluidos, trae su descompuesto con las mediciones de ESA version: ya es asi (medido el 02-10 en 0713 y 0726: el importe de las lineas coincide con el presupuesto de la version en mas del 98 % de las partidas que cuadran). (b) ESTUDIOS son los datos del master 0: el origen se llama MASTER_ESTUDIO y sustituye a MASTER_INICIAL. Si el master 0 no tiene descompuesto, se hace lo que se hace hoy (la «Descomposicion» de coste fase 0 de las partidas sin enlace a la planificacion); y si tampoco hay en la fase 0, se INFORMA de que no existe. Medido el 02-10: de las 35.523 partidas con ESTUDIO hoy, 25.799 tienen descompuesto en el master 0 y 9.724 no (45 obras de 174; 33 sin ningun master cargado; la 0713 entre ellas). (c) COSTE fase 0 es la FASE VIVA: la que el jefe de obra va evolucionando dia a dia. Su «Descomposicion» se ignora como descompuesto de esa fase; el descompuesto de la fase viva es la planificacion de obra (PLANIF_JO, `dncpro`). El diccionario tiene que explicar que es la fase viva: hoy solo dice «Previsto vivo». (d) El texto del ambito 3 ya cargado en `_des_texto` NO se borra y se sigue ingiriendo (lo necesita el respaldo de b). (e) MASTER_PRE_ABC y MASTER_PLANIF_JO no se tocan. ABIERTO para la spec: si el respaldo de (b) se decide por obra o por partida, con que origen o marca se publica para que no se confunda con el master 0, como se informa el «no existe», y si el despliegue obliga a retrocear las 3.025 versiones o basta el cambio barato de origen. Avisar a Juan Romero antes de desplegar: su herramienta lee `descompuestos.lineas` por origen.
 
 ### F-037 · Esquema tesoreria: el flujo de caja que hoy se tira
 
