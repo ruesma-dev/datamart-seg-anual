@@ -354,7 +354,7 @@ def test_f123_r17_el_sello_cambia_sin_releer() -> None:
 
 
 def test_f123_r18_diccionario_version_40() -> None:
-    assert _yaml("00_global.yaml")["version"] == 40
+    assert _yaml("00_global.yaml")["version"] >= 40, "F-113 la sube a 41"
 
 
 def test_f123_r19_diccionario_la_regla_explica_la_fase_viva() -> None:

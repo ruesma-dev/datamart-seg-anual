@@ -481,12 +481,15 @@ raíz** a cada partida hoja.
 
 Columnas clave:
 - `capitulo_raiz_id`, `capitulo_raiz_cod`: ID y código del capítulo raíz
-- `categoria`: CD / CI / CP / OTRO (derivado del código del raíz)
+- `categoria`: CD / CI / CP / OTRO, la del capítulo CD/CI/CP más cercano
+  (raíz por prefijo, intermedio por código exacto; ver §6.3)
 - `ruta_capitulos`: ej `"CD > 01 > 01.02"` para trazabilidad
 - `nivel`: profundidad (0 = raíz, 1, 2, 3...)
 
-La asignación de categoría usa heurística sobre el código del raíz porque
-`auxobrtca` en Ruesma no clasifica por contabilidad sino por tipo de trabajo.
+La categoría la deduce el ETL de los códigos de capítulo porque Sigrid no la
+trae: `obrparpar.tcaide` vale 0 en las 395.226 filas y `auxobrtca` en Ruesma son
+tres oficios (instalaciones, demoliciones, carpintería), no CD/CI/CP (medido el
+2026-10-03, F-113).
 
 #### 5.3.2 `stg.plan_mensual`
 
@@ -603,18 +606,29 @@ La regla 3 captura los dos formatos que usa el JO de Ruesma:
 
 ### 6.3 Categoría CD/CI/CP
 
-Se asigna usando el código del capítulo raíz del árbol:
+Manda el capítulo CD/CI/CP **más cercano** a la partida (F-113, 2026-10-03).
+El árbol de `stg/04_partidas.sql` la calcula al bajar desde la raíz:
 
 ```
-LIKE '%CD%'                                          → CD
-LIKE '%CI%'                                          → CI
-LIKE '%CP%'                                          → CP
-numérico puro (01, 02...) salvo 34 y 99              → CD (defensiva)
-resto                                                → OTRO
+raíz (nivel 0):  UPPER(cod) empieza por CD → CD | por CI → CI | por CP → CP
+                 si no: numérico puro (^[0-9]+$) salvo 34 y 99 → CD
+                 resto → OTRO
+intermedio:      UPPER(cod sin '.' ni ' ') es exactamente CD, CI o CP → esa
+                 si no → la del padre (también el capítulo sin código)
 ```
 
-La regla "numérico puro = CD" es defensiva: si una obra organiza partidas
-directamente bajo un raíz numérico sin un raíz "CD" explícito, se asume CD.
+Así `CD > CI > CI.01` es CI, `99 > CI` es CI y `CD > C.I. > 01` es CI.
+
+- **Prefijo en la raíz**: las 15 variantes reales (`CD-FII`, `CI.F2`, `CIPD`,
+  `CP.00`...) son capítulos CD/CI/CP. Antes se buscaban las letras en cualquier
+  posición y `AVDA_FRANCIA`, `P1414_PCI` y `P1414_PISCIN` salían CI.
+- **Código exacto en los intermedios**: `CI10`, `CPI8001` o `CP110` son partidas
+  de catálogo bajo raíces CD (582 medidas); con prefijo pasarían a CI/CP.
+- **Numérico puro = CD** es defensiva: una obra que organiza partidas bajo un
+  raíz numérico sin un raíz "CD" explícito se asume CD.
+- Las raíces sin capítulo reconocible (`PD`, `MP`, `LEV`...) quedan en OTRO.
+
+La misma regla, en Python puro, está en `etl_sigrid/domain/categoria_partida.py`.
 
 ### 6.4 Propagación coste→venta del `tex`
 

@@ -25,8 +25,10 @@
 #    capa: `fase_num` en `stg.presupuesto`, `version` en `stg.plan_mensual`,
 #    `fasnum` en `raw.obrfas`.
 # 3. **`stg.obras.activa` esta cableada a TRUE** y no significa nada.
-# 4. **`stg.partidas.categoria` es una HEURISTICA** sobre el codigo del capitulo
-#    raiz, no una taxonomia de Sigrid.
+# 4. **`stg.partidas.categoria` es una REGLA del ETL sobre los codigos de
+#    capitulo**, no una taxonomia de Sigrid (que no la trae): manda el capitulo
+#    CD/CI/CP mas cercano, la raiz por prefijo y el intermedio por codigo exacto
+#    (F-113). Filtrar por `capitulo_raiz_cod` no equivale a filtrar por ella.
 # 5. **`stg.ambitos.uso_seguimiento` esta DESFASADO**: marca solo los ambitos 8 y
 #    11, y `mart` ya construye tambien los reales 3 y 7.
 #
@@ -664,16 +666,35 @@ objetos:
         agregacion: no_sumable
       capitulo_raiz_cod:
         significado: >-
-          Codigo del capitulo raiz. Es la ENTRADA de la heuristica que decide la
-          categoria.
+          Codigo del capitulo raiz. **Informativo**: desde F-113 la categoria
+          puede venir de un capitulo intermedio (`CD > CI > ...` es CI), asi que
+          filtrar por `capitulo_raiz_cod` NO equivale a filtrar por `categoria`.
         nulo_significa: null
       categoria:
         significado: >-
-          Clasificacion del coste. **Es una HEURISTICA sobre el codigo del
-          capitulo raiz, no una taxonomia de Sigrid**: el catalogo oficial de
-          tipos de capitulo esta ingerido en `raw.auxobrtca` y ningun SQL lo usa
-          todavia. Una obra cuyo jefe no siga la convencion de codigos se
-          clasifica mal y nada lo delata.
+          Clasificacion del coste: **la del capitulo CD/CI/CP MAS CERCANO a la
+          partida** (F-113, 2026-10-03). La calcula el arbol de
+          `stg/04_partidas.sql` al bajar de la raiz:
+
+          * la **raiz**, por el PREFIJO de su codigo en mayusculas: `CD...` ->
+            CD, `CI...` -> CI, `CP...` -> CP (cubre las variantes reales
+            `CD-FII`, `CI.F2`, `CIPD`, `CP.00`...). Si no empieza por ninguno:
+            numerica pura distinta de `34` y `99` -> CD; el resto -> OTRO;
+          * un capitulo **intermedio** cuyo codigo, en mayusculas y sin puntos
+            ni espacios, es EXACTAMENTE `CD`, `CI` o `CP` (`C.I.` cuenta) impone
+            esa categoria a todo su subarbol: `CD > CI > CI.01` es CI y
+            `99 > CI` es CI. Cualquier otro intermedio hereda la del padre.
+
+          En los intermedios no vale el prefijo: `CI10`, `CPI8001` o `CP110`
+          son partidas de catalogo bajo raices CD (582 medidas) y siguen en CD.
+          Antes de F-113 se buscaban las letras en cualquier posicion del
+          codigo raiz y `AVDA_FRANCIA` o `P1414_PISCIN` salian CI.
+
+          **No es una taxonomia de Sigrid**, que no la trae: `obrparpar.tcaide`
+          vale 0 en las 395.226 filas medidas y `raw.auxobrtca` son tres oficios.
+          Una obra cuyo jefe no siga la convencion de codigos se clasifica por
+          esta regla y nada lo delata; las raices sin capitulo reconocible
+          (`PD` promocion delegada, `MP` modificaciones...) quedan en OTRO.
         valores: [CD, CI, CP, OTRO]
       ruta_capitulos:
         significado: >-

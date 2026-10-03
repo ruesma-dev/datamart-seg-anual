@@ -12,6 +12,61 @@
 
 
 
+## 2026-10-03 · F-113 · CERRADA (`done`, APROBADO en pasada 2) · la categoría CD/CI/CP por el capítulo · SIN DESPLEGAR: quedan T9-T12 del humano
+
+> **Cerrada el 2026-10-03** con APROBADO del reviewer (`progress/review_F-113.md`; la
+> pasada 1 pidió solo tests de R14/R15), `init.sh` en verde (6.423 passed). Resumen
+> en `progress/history.md`. Rama sin integrar en `main`.
+
+Spec aprobada por el humano el 2026-10-03 (D1 = A, D2 = ligero: T13-T15 fuera).
+Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
+Implementación terminada (T1-T8), pendiente del reviewer. Límite del humano: las raíces que hoy quedan en OTRO (`PD`, `MP`, `LEV`,
+posventas, `GG`, `MC`...) no se tocan; T5 lo comprueba partida a partida.
+
+**Estado real (implementer):** T1-T8 hechas y correcciones de la review 1 (tests R14/R15); `init.sh` verde (6.423 passed, cobertura 29/29). T5 (solo
+lectura contra Azure, 11,5 s): la tabla de `spec_F-113.md` §2 sale **exacta**
+(A 490 partidas / 7 obras; B 253 / 2), 0 cambios en las otras diez columnas, 0
+partidas de raíces `PD`/`MP`/`LEV`/`GG`/`MC`/`POS…` que cambien. T7: arnés 1/1
+muerto; manual 47/47 muertos (SQL y dominio). Diccionario a **v41**.
+Desviaciones (justificadas en `impl_F-113.md`): recuento 14 → 15 en un test de
+F-052 (consecuencia de R7) y `== 40` → `>= 40` en el test de versión de F-123.
+
+**MANUAL del humano, en orden** (detalle y resultado esperado en
+`progress/impl_F-113.md`, «Verificaciones MANUAL»):
+1. **T9** · merge a `main`; imagen con tag fechado desde `main`
+   (`powershell -NoProfile -File infra/70_build_image.ps1`) y job a ella
+   (`powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm`);
+   comprobar con `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
+2. **T10** · nocturna de las 00:00 UTC con la imagen nueva; `python main.py status`
+   con `run-all` SUCCESS.
+3. **T11** · `python main.py publicar-diccionario` (v41), reiniciar el MCP y
+   `python main.py check-diccionario` OK.
+4. **T12** · solo lectura: las consultas de `progress/spec_F-113.md` §4 contra la
+   previsión de T5 (por obra, recuento global, 229 en el cierre, 0462 en `mart`);
+   resultado aquí.
+
+### Antes: SPEC ESCRITA, pendiente de aprobación del humano
+
+Spec-author: `specs/F-113-categoria-capitulo-por-prefijo/` (requirements 95/150,
+design 183/250, 15 tareas) y mediciones en `progress/spec_F-113.md`. Rama
+`feature/F-113-categoria-capitulo-por-prefijo` desde `main` 1bc205e. Ficha sin
+cambiar de `status` (`pending`); `acceptance` ajustados a la medición.
+
+- Fallo de hoy: 3 raíces (`AVDA_FRANCIA`, `P1414_PCI`, `P1414_PISCIN`), 253
+  partidas, 2 obras fuera del seguimiento, 0 EUR. A y B lo arreglan igual.
+  Sigrid no trae marca (`obrparpar.tcaide` = 0 en todas las filas).
+- A = B + capítulo intermedio de código EXACTO `CD`/`CI`/`CP` manda en su
+  subárbol: +237 partidas, 4 obras del seguimiento; 8.121 EUR de coste (229,
+  cierre 2011) y 25.002 EUR de venta (0462, solo `mart`).
+
+**Decisiones que necesita el humano** (`progress/spec_F-113.md` §5):
+- **D1 · A o B.** Recomendada A (su criterio).
+- **D2 · Contraste.** Recomendado el ligero (propuesta en solo lectura antes +
+  comprobación dirigida tras la nocturna); el completo de F-042 (job puntual
+  sin ingesta, ~3 h) queda en T13-T15 por si lo prefiere.
+- Hallazgo H1 (fuera de alcance): 11,6 M EUR de coste real del seguimiento en
+  OTRO (raíz `PD` promoción delegada, `MP` de 0644). ¿Fichar?
+
 ## 2026-10-03 · F-123 · CERRADA (`done`, APROBADO en pasada 2) · la regla de orígenes del descompuesto · DESPLEGADA, RETROCEADA Y VERIFICADA el 2026-10-03 (solo queda T13, el aviso)
 
 > **T16-T17 hechas el 2026-10-03.** El humano lanzó `build-descompuestos --sin-tope`

@@ -204,8 +204,10 @@ objetos:
       las dos cosas, y `compras.v_*` ya cruza partida con compra.
     descripcion: >-
       **Obras: Partidas.** El arbol de capitulos y partidas de cada obra. Es
-      de donde sale `stg.partidas`, incluida la heuristica de categoria
-      sobre el codigo del capitulo raiz.
+      de donde sale `stg.partidas`, incluida su `categoria`, que el ETL deduce
+      de los CODIGOS de capitulo (el CD/CI/CP mas cercano) porque esta tabla no
+      la trae: su columna `tcaide` vale 0 en las 395.226 filas (medido el
+      2026-10-03).
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
@@ -564,22 +566,19 @@ objetos:
       **Ningun SQL del datamart la lee.** No hay nada aguas abajo construido
       sobre ella.
     descripcion: >-
-      **Obras: Tipos de capitulos.** El catalogo OFICIAL de tipos de
-      capitulo de Sigrid, y **el datamart no lo usa**:
-      `stg.partidas.categoria` clasifica las partidas con una HEURISTICA
-      sobre el codigo del capitulo raiz en vez de con esta tabla. Que el
-      catalogo bueno este ingerido y sin usar es lo que hace creer que la
-      clasificacion viene de Sigrid cuando la deduce el ETL; una obra que no
-      siga la convencion de codigos se clasifica mal y nada lo delata.
-
-      La relacion **existe en el dato y nadie la recorre**: `raw.obrparpar`
-      trae la columna `tcaide`, que apunta aqui, y ningun SQL la menciona.
+      **Obras: Tipos de capitulos.** Un catalogo de Sigrid que en Ruesma
+      **no es CD/CI/CP**: son tres OFICIOS (instalaciones, demoliciones,
+      carpinteria). Y aunque lo fuera no serviria: `raw.obrparpar.tcaide`, la
+      columna que apuntaria aqui, vale 0 en las 395.226 filas (medido el
+      2026-10-03, F-113). Por eso `stg.partidas.categoria` no sale de esta
+      tabla sino de una regla del ETL sobre los codigos de capitulo (el
+      capitulo CD/CI/CP mas cercano; ver su ficha), y ningun SQL la lee.
 
       **Ojo antes de darla por sobrante**: aunque no se consulte,
       `build_stg` comprueba al arrancar que esta tabla tenga `ide`, `cod` y
       `res`, y aborta si faltan. Dejar de ingerirla romperia el paso.
 
-      Es deuda conocida, no un descuido de esta ficha.
+      No es deuda: medido, no hay nada que usar en ella para la categoria.
 
       **Que significa cada columna**: esta ficha no las documenta (DA-2), y
       el diccionario completo de campos, tipos e indices esta en
