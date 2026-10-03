@@ -12,14 +12,14 @@
 
 
 
-## 2026-10-03 · F-113 · EN IMPLEMENTACIÓN (implementer) · D1 = A, D2 = contraste ligero
+## 2026-10-03 · F-113 · IMPLEMENTADA (T1-T8), pendiente de review · D1 = A, D2 = contraste ligero
 
 Spec aprobada por el humano el 2026-10-03 (D1 = A, D2 = ligero: T13-T15 fuera).
 Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
-T8. Límite del humano: las raíces que hoy quedan en OTRO (`PD`, `MP`, `LEV`,
+Implementación terminada (T1-T8), pendiente del reviewer. Límite del humano: las raíces que hoy quedan en OTRO (`PD`, `MP`, `LEV`,
 posventas, `GG`, `MC`...) no se tocan; T5 lo comprueba partida a partida.
 
-**Estado real (implementer):** T1-T7 hechas, un commit por tarea. T5 (solo
+**Estado real (implementer):** T1-T8 hechas, un commit por tarea; `init.sh` verde (6.406 passed, cobertura 29/29). T5 (solo
 lectura contra Azure, 11,5 s): la tabla de `spec_F-113.md` §2 sale **exacta**
 (A 490 partidas / 7 obras; B 253 / 2), 0 cambios en las otras diez columnas, 0
 partidas de raíces `PD`/`MP`/`LEV`/`GG`/`MC`/`POS…` que cambien. T7: arnés 1/1
