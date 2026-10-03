@@ -113,3 +113,22 @@ nota de versión), `config/tables_sigrid.yaml` (comentario de `auxobrtca`) y
 `README.md` §5.3.1 y §6.3. `pytest tests/ -k "f006"` → **2097 passed, 218
 skipped en 169 s**; `grep -n -i "heuristica" config/diccionario/*.yaml` deja solo
 menciones ajenas a la categoría (oficio en `compras`/`stg.v_*`, `es_hoja`, P3).
+
+## T7 · Mutación (rigor crítico: 0 supervivientes) → `progress/mutacion_F-113.md`
+
+- **Arnés** (`python -m harness.mutacion --feature F-113`, SHA `140758b`, 1 worker
+  efectivo): 104 líneas de producción en alcance (`categoria_partida.py` 83,
+  `arbol_partidas.py` 21) y **1 mutante generado, 1 muerto, 0 supervivientes**
+  (`and` → `or` en la regla numérica), 1.349 s con una línea base de 465 s. Su
+  juego de operadores no ve el resto (tuplas, `startswith`, `in`, retornos).
+- La primera tentativa (SHA `9d7c13c`) abortó con **línea base en rojo**:
+  `test_f123_r18_diccionario_version_40` fijaba `version == 40` y T6 la sube a
+  41. Arreglado en `140758b` como hizo F-123 con el de F-120 (`e138fcb`):
+  `>= 40, "F-113 la sube a 41"`. Ver «Desviaciones».
+- **Manual** (script versionado `progress/mediciones/F-113_mutacion_sql.py`,
+  SHA `8ecea16`, 1 worker, en serie, sin `-x`): **47 generados, 47 muertos, 0
+  supervivientes** en 323 s — M01-M27 sobre `04_partidas.sql` (el CASE de la
+  raíz, el de la recursiva y el INSERT) y D01-D20 sobre el dominio. Tabla con
+  `fichero:línea`, texto exacto original → mutado y nº de fallos en el informe.
+  M08 y M09 (orden de `WHEN` excluyentes) son **equivalentes**; los mata el test
+  textual que exige el orden del dominio (falso positivo, no falso verde).
