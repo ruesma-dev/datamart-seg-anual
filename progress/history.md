@@ -1473,3 +1473,39 @@ solo donde la v0 guarda descompuesto) y fuera el aviso caducado de «master
 incompleto». Fuera: F-122 (lineas con el campo vacio y 310 partidas que dejan de
 cuadrar). Sin desplegar: imagen ANTES del retroceo. Detalle: `progress/spec_F-120.md`,
 `progress/impl_F-120.md`, `progress/review_F-120.md`, `progress/mutacion_F-120.md`.
+
+---
+
+## F-123 · La regla de orígenes del descompuesto: Estudios es el master 0 y la fase viva se descompone con la planificación · 2026-10-03
+
+Rama `feature/F-123-descompuestos-regla-origenes` (desde `main` d4f58ea). `sdd=true`,
+rigor `estandar`. APROBADA en pasada 2 (`progress/review_F-123.md`; la 1 pidió solo
+papeleo). Spec en `specs/F-123-descompuestos-regla-origenes/`, mediciones en
+`progress/spec_F-123.md`, informe en `progress/impl_F-123.md`.
+
+Regla dictada por el humano el 2026-10-02: POR OBRA, si el master 0 tiene
+descompuesto, Estudios de la obra es el master 0, con origen `MASTER_ESTUDIO`
+(antes `MASTER_INICIAL`) y la medición de Estudios; si no (44 obras: 11 con master
+sin versión 0 con descompuesto, la 0713 entre ellas, y 33 sin master), `ESTUDIO`
+como antes (la «Descomposición» de coste fase 0). Coste fase 0 es la FASE VIVA y su
+descompuesto es `PLANIF_JO`. Solo cambia el esquema `descompuestos`: ni `stg`, ni
+`mart`, ni `cierre`, ni la ingesta (`_des_texto` se conserva). La spec v1
+(`ESTUDIO_RESPALDO`, `estudios_partida`) la rechazó el humano por complicada.
+
+Cambios: `02` (migración `DO` idempotente de los `CHECK` y `ESTUDIO` solo sin master
+0), `03` (`MASTER_ESTUDIO`; sello `5c3fb64e292fa14d`), `04`
+(`lineas_master_estudio`), `05` (fila `ESTUDIO` del cuadre solo sin master 0), `06`
+(vista nueva `v_pbi_master_estudio`, mismas 21 columnas que `v_pbi_estudio`),
+diccionario v40 (la fase viva dentro de `R-DESCOMPUESTO-ORIGEN`; 190 objetos),
+ARCHITECTURE, ayuda de `main.py` y `azure-apps` (`2288386`, local).
+
+Verificado: contraste en PostgreSQL 16 local (build dos veces, migración una, la
+previsión de la spec exacta: `ESTUDIO` 11.783 líneas / 44 obras / 6.544 partidas,
+`MASTER_ESTUDIO` 107.061 / 170 / 36.355); mutación del arnés 0 mutantes (solo
+cadenas), campaña manual 21/21 muertos; `init.sh` 6.285 passed.
+
+QUEDA del humano, en orden: T13 aviso a Juan Romero y Elena Díaz, T14 foto de antes,
+T15 merge e imagen, T16 `build-descompuestos --sin-tope` + `apply-grants` (la
+primera migración bloquea `lineas` y `cuadre_partida`; tras ella no hay vuelta a la
+imagen anterior), T17 foto de después y testigos, T18 diccionario v40 y reinicio
+del MCP. Comandos en `progress/current.md`.

@@ -19,7 +19,9 @@
 --                            que la obra con ese codigo (`con.cod`): los codigos
 --                            de producto se repiten una vez por empresa.
 --
--- Se rehace entero cada noche (DROP + CREATE): es un derivado de `lineas`.
+-- Se rehace entero cada noche (DROP + CREATE): es un derivado de `lineas`. Por
+-- eso el renombrado de F-123 (`lineas_master_estudio`, la columna del master 0,
+-- en el mismo sitio) no necesita migracion.
 -- ============================================================================
 
 DROP TABLE IF EXISTS descompuestos.elementos;
@@ -35,7 +37,7 @@ WITH agregado AS (
         COUNT(*) AS num_lineas,
         COUNT(*) FILTER (WHERE origen = 'ESTUDIO') AS lineas_estudio,
         COUNT(*) FILTER (WHERE origen = 'PLANIF_JO') AS lineas_planif_jo,
-        COUNT(*) FILTER (WHERE origen = 'MASTER_INICIAL') AS lineas_master_inicial,
+        COUNT(*) FILTER (WHERE origen = 'MASTER_ESTUDIO') AS lineas_master_estudio,
         COUNT(*) FILTER (WHERE origen = 'MASTER_PRE_ABC') AS lineas_master_pre_abc,
         COUNT(*) FILTER (WHERE origen = 'MASTER_PLANIF_JO') AS lineas_master_planif_jo,
         mode() WITHIN GROUP (ORDER BY producto_id) AS producto_enlazado
@@ -58,7 +60,7 @@ SELECT
     a.num_lineas::INTEGER AS num_lineas,
     a.lineas_estudio::INTEGER AS lineas_estudio,
     a.lineas_planif_jo::INTEGER AS lineas_planif_jo,
-    a.lineas_master_inicial::INTEGER AS lineas_master_inicial,
+    a.lineas_master_estudio::INTEGER AS lineas_master_estudio,
     a.lineas_master_pre_abc::INTEGER AS lineas_master_pre_abc,
     a.lineas_master_planif_jo::INTEGER AS lineas_master_planif_jo,
     COALESCE(a.producto_enlazado, pe.producto_id) AS producto_id,

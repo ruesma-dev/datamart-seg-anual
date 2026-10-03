@@ -70,7 +70,7 @@ COLUMNAS_CUADRE = [
 
 COLUMNAS_ELEMENTOS = [
     "obra_id", "codigo_elemento", "descripcion", "unidad", "tipo_elemento",
-    "num_lineas", "lineas_estudio", "lineas_planif_jo", "lineas_master_inicial",
+    "num_lineas", "lineas_estudio", "lineas_planif_jo", "lineas_master_estudio",  # F-123
     "lineas_master_pre_abc", "lineas_master_planif_jo", "producto_id", "via_producto",
 ]
 
@@ -88,6 +88,7 @@ VISTAS_POR_ORIGEN = {
     "v_pbi_estudio": "ESTUDIO",
     "v_pbi_planif_jo": "PLANIF_JO",
     "v_pbi_master_planif_jo": "MASTER_PLANIF_JO",
+    "v_pbi_master_estudio": "MASTER_ESTUDIO",  # F-123
 }
 
 
@@ -322,7 +323,8 @@ def test_f097_r19_planif_jo_con_sus_importes() -> None:
 
 def test_f097_r17_origen_de_cada_version() -> None:
     atributos = _bloque(MASTER, "CREATE TEMP TABLE _atributos", ";")
-    assert ("CASE WHEN v.fase_num = 0 THEN 'MASTER_INICIAL' WHEN abc.fase_abc IS NOT NULL "
+    # F-123: el master 0 es Estudios y se llama MASTER_ESTUDIO
+    assert ("CASE WHEN v.fase_num = 0 THEN 'MASTER_ESTUDIO' WHEN abc.fase_abc IS NOT NULL "
             "AND v.fase_num >= abc.fase_abc THEN 'MASTER_PLANIF_JO' ELSE 'MASTER_PRE_ABC' END "
             "AS origen") in atributos
     assert "WHERE amb = 8 AND UPPER(tex) LIKE '%ABC%'" in atributos, "la regla de mart"
@@ -359,7 +361,7 @@ def test_f097_r21_el_lote_por_marcador_una_vez() -> None:
 
 def test_f097_r21_borra_e_inserta_lineas_y_cuadre_del_lote() -> None:
     texto = _sql(MASTER)
-    origenes = "('MASTER_INICIAL', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')"
+    origenes = "('MASTER_ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')"  # F-123
     assert (f"DELETE FROM descompuestos.lineas l USING _lote t WHERE l.ambito_id = 8 AND "
             f"l.obra_id = t.obra_id AND l.fase_num = t.fase_num AND l.origen IN {origenes};") in texto
     assert ("DELETE FROM descompuestos.cuadre_partida q USING _lote t WHERE q.ambito_id = 8 AND "
@@ -444,15 +446,19 @@ def test_f097_r23_estudio_sustituido_por_la_planificacion() -> None:
     assert "DELETE FROM descompuestos.cuadre_partida WHERE origen IN ('ESTUDIO', 'PLANIF_JO');" in texto
     assert "WHEN o.origen = 'ESTUDIO' AND su.partida_id IS NOT NULL THEN 'SUSTITUIDO_POR_PLANIFICACION'" in texto
     assert "CROSS JOIN (VALUES ('ESTUDIO'), ('PLANIF_JO')) o(origen)" in texto
+    # F-123: la fila ESTUDIO solo en las obras sin master 0; PLANIF_JO, siempre
+    assert ("WHERE o.origen = 'PLANIF_JO' OR NOT EXISTS (SELECT 1 FROM descompuestos._versiones_cargadas v "
+            "WHERE v.obra_id = h.obra_id AND v.fase_num = 0);") in texto
     assert "pp.amb = 3 AND pp.fas = 0" in texto
 
 
-def test_f097_r24_tres_vistas_cada_una_con_su_origen() -> None:
+def test_f097_r24_cada_vista_con_su_origen() -> None:
+    """Tres vistas de F-097 y la cuarta de F-123 (`v_pbi_master_estudio`)."""
     texto = _sql(VISTAS)
     for vista, origen in VISTAS_POR_ORIGEN.items():
         cuerpo = _bloque(VISTAS, f"CREATE OR REPLACE VIEW descompuestos.{vista} AS", ";")
         assert f"FROM descompuestos.lineas WHERE origen = '{origen}'" in cuerpo, vista
-    assert texto.count("CREATE OR REPLACE VIEW") == 3
+    assert texto.count("CREATE OR REPLACE VIEW") == len(VISTAS_POR_ORIGEN) == 4
 
 
 # ===========================================================================

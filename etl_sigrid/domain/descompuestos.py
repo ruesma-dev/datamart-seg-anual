@@ -53,8 +53,9 @@ MB = 1024 * 1024
 #: solo lote y la primera carga entera (2,14 GB) unos ocho.
 MB_POR_LOTE = 300
 
-#: Los cinco origenes de una linea (D2, D13). El orden es el de la ficha.
-ORIGENES = ("ESTUDIO", "PLANIF_JO", "MASTER_INICIAL", "MASTER_PRE_ABC", "MASTER_PLANIF_JO")
+#: Los cinco origenes de una linea (D2, D13). El orden es el de la ficha. La
+#: version 0 del master es Estudios y se llama MASTER_ESTUDIO (F-123).
+ORIGENES = ("ESTUDIO", "PLANIF_JO", "MASTER_ESTUDIO", "MASTER_PRE_ABC", "MASTER_PLANIF_JO")
 
 #: Los estados del cuadre descompuesto-precio de la partida (R23).
 ESTADOS_CUADRE = ("CUADRA", "NO_CUADRA", "SIN_DESCOMPUESTO", "SUSTITUIDO_POR_PLANIFICACION")

@@ -12,6 +12,16 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 40 (F-123, 2026-10-02): ESTUDIOS ES EL MASTER 0 (decision del humano
+# del 2026-10-02). En `descompuestos`, la version 0 del master pasa a llamarse
+# MASTER_ESTUDIO (antes llevaba el nombre de F-097, que ya no existe) y
+# `elementos.lineas_master_inicial` pasa a `lineas_master_estudio`; ESTUDIO (la
+# «Descomposicion» de coste fase 0) solo se publica en las obras sin master 0;
+# vista nueva `descompuestos.v_pbi_master_estudio`, con las columnas de
+# `v_pbi_estudio` (juntas son Estudios entero). `R-DESCOMPUESTO-ORIGEN` explica
+# la FASE VIVA (coste fase 0, el presupuesto que el jefe de obra evoluciona dia
+# a dia; su descompuesto es PLANIF_JO) y la regla de Estudios, sin regla nueva.
+#
 # version 39 (F-120, 2026-10-01): EL FACTOR DEL DESCOMPUESTO (correos de Elena
 # Diaz, Control de Costes, del 30-09 y el 01-10). El campo 14 del texto `des` es
 # «factor x rendimiento» cuando la linea tiene FACTOR (`1.22x0.003`) y F-097 lo
@@ -435,7 +445,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 39
+version: 40
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -675,17 +685,29 @@ reglas:
       - descompuestos.cuadre_partida
       - descompuestos.elementos
       - descompuestos.v_pbi_master_planif_jo
+      - descompuestos.v_pbi_master_estudio
     regla: >-
       Toda consulta sobre `descompuestos.lineas` o `descompuestos.cuadre_partida`
-      filtra o agrupa por `origen`: ESTUDIO (la referencia que vino de
-      Estudios), PLANIF_JO (la planificacion de compras del jefe de obra) y los
-      tres del master (MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO) son
-      cosas distintas, y sumarlos da un descompuesto que no existe. En el
-      master, ademas, hay una copia POR VERSION: se filtra por `fase_num` (una
-      version concreta) o por `es_vigente`; sin filtrar, cada linea cuenta
-      tantas veces como versiones tenga la obra. Para comparar Estudios con el
-      jefe de obra se ponen los dos origenes LADO A LADO por partida, nunca se
-      suman. Las vistas `v_pbi_*` ya llevan el origen cableado.
+      filtra o agrupa por `origen`: ESTUDIO y MASTER_ESTUDIO (Estudios),
+      PLANIF_JO (la planificacion de compras del jefe de obra) y los otros dos
+      del master (MASTER_PRE_ABC, MASTER_PLANIF_JO) son cosas distintas, y
+      sumarlos da un descompuesto que no existe. LA FASE VIVA: coste fase 0
+      (ambito 3, `fase_num` 0) es el presupuesto de coste que el jefe de obra
+      evoluciona dia a dia, sin historia; su descompuesto es la planificacion de
+      compras (PLANIF_JO), y su «Descomposicion» ya no es Estudios. ESTUDIOS ES
+      EL MASTER 0 (F-123): en las obras con version 0 del master con
+      descompuesto, Estudios es MASTER_ESTUDIO (esa version, con la medicion de
+      Estudios) y no se publica ESTUDIO; solo en las obras sin master 0 se
+      publica ESTUDIO, la «Descomposicion» de la fase viva, con precios de
+      Estudios y medicion actual. Cada obra esta en uno solo de los dos:
+      Estudios entero son `v_pbi_master_estudio` y `v_pbi_estudio` juntas. Si
+      una partida no tiene descompuesto de Estudios, el cuadre de su origen de
+      Estudios dice SIN_DESCOMPUESTO. En el master, ademas, hay una copia POR
+      VERSION: se filtra por `fase_num` (una version concreta) o por
+      `es_vigente`; sin filtrar, cada linea cuenta tantas veces como versiones
+      tenga la obra. Para comparar Estudios con el jefe de obra se ponen los
+      dos origenes LADO A LADO por partida, nunca se suman. Las vistas
+      `v_pbi_*` ya llevan el origen cableado.
     motivo: >-
       Medido el 2026-09-27: la «Descomposicion» de COSTE se reescribe con la
       planificacion (7.866 de 42.958 partidas son copia de su `dncpro`), el
@@ -693,7 +715,11 @@ reglas:
       (mediana 14 por obra, hasta 46) y la misma partida vale distinto en cada
       origen: la 03.05.02 de la 0695 son 112,55 en la version 1 del master,
       118,61 en la ABC y 177,95 en la planificacion. Sumar origenes o versiones
-      da una cifra plausible y falsa.
+      da una cifra plausible y falsa. Medido el 2026-10-02 (F-123): donde hay
+      master 0, la «Descomposicion» de la fase viva tenia las mismas lineas y la
+      misma suma por unidad que la version 0 en 26.833 de 26.959 partidas, y
+      era NO_CUADRA en 18.132 de 24.855 (su precio ya se habia movido), frente
+      al master 0, que cuadra en 34.174 de 34.849: la fase viva no es Estudios.
 
   - codigo: R-PROVEEDOR-INTRAGRUPO
     titulo: El mayor proveedor de la empresa es la propia empresa
@@ -1378,10 +1404,13 @@ esquemas:
     para_que_sirve: >-
       Los descompuestos de las partidas --los elementos o precios simples que
       las componen: hormigon, acero, mano de obra, medios auxiliares-- con su
-      ORIGEN separado: la referencia de Estudios (ESTUDIO), la planificacion de
-      compras del jefe de obra (PLANIF_JO, con proveedor y contrato) y cada
-      version del master (MASTER_INICIAL, MASTER_PRE_ABC y MASTER_PLANIF_JO,
-      desde la primera ABC). Responde "de que se compone la partida X",
+      ORIGEN separado: Estudios (MASTER_ESTUDIO, la version 0 del master, en
+      las obras con master 0; ESTUDIO, la «Descomposicion» de coste fase 0,
+      solo en las obras sin master 0: juntas, `v_pbi_master_estudio` y
+      `v_pbi_estudio`), la planificacion de compras del jefe de obra (PLANIF_JO,
+      con proveedor y contrato: el descompuesto de la fase viva) y las demas
+      versiones del master (MASTER_PRE_ABC y MASTER_PLANIF_JO, desde la primera
+      ABC). Responde "de que se compone la partida X",
       "compara Estudios con la planificacion del jefe de obra" y "que partidas
       no cuadran con su descompuesto" (`descompuestos.cuadre_partida`). TRAMPA
       antes de consultarlo (`R-DESCOMPUESTO-ORIGEN`): los origenes no se suman

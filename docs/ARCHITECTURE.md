@@ -740,9 +740,25 @@ en COSTE (ámbito 3) y una en MASTER COSTE (ámbito 8):
 
 | Pestaña | Tabla de Sigrid | Origen publicado en `descompuestos.lineas` |
 |---|---|---|
-| COSTE «Descomposición» | `obrparpre.des`, ámbito 3 fase 0 | `ESTUDIO` (la referencia de Estudios) |
+| COSTE «Descomposición» | `obrparpre.des`, ámbito 3 fase 0 | `ESTUDIO` (Estudios, solo en las obras sin master 0) |
 | COSTE «Planificación compras» | `dncpro` de la necesidad de la obra (`obr.dncide`) | `PLANIF_JO` (la del jefe de obra) |
-| MASTER COSTE «Descomposición» | `obrparpre.des`, ámbito 8, una copia por versión | `MASTER_INICIAL` (v0), `MASTER_PRE_ABC`, `MASTER_PLANIF_JO` (desde la primera ABC) |
+| MASTER COSTE «Descomposición» | `obrparpre.des`, ámbito 8, una copia por versión | `MASTER_ESTUDIO` (v0: Estudios donde hay master 0), `MASTER_PRE_ABC`, `MASTER_PLANIF_JO` (desde la primera ABC) |
+
+**La regla de Estudios (F-123, decidida por el humano el 2026-10-02).** Coste
+fase 0 es la **fase viva**: el presupuesto de coste que el jefe de obra
+evoluciona día a día, sin historia; su descompuesto es la planificación de
+compras (`PLANIF_JO`), y su «Descomposición» ya no es Estudios (donde hay master
+0 repetía la versión 0 en el 99,5 % de las partidas, o ya no cuadraba con su
+precio). Así que **Estudios es el master 0**: en las obras con versión 0 del
+master con descompuesto (fila con `fase_num = 0` en `_versiones_cargadas`, 170
+el 2026-10-02) se publica `MASTER_ESTUDIO` y NO `ESTUDIO`; solo en las obras sin
+master 0 (44) se publica `ESTUDIO` como antes. Se decide por obra y contra
+`_versiones_cargadas`, no contra `lineas`, porque `02` corre antes que `03`.
+Consumo: `v_pbi_estudio` (solo `ESTUDIO`) y `v_pbi_master_estudio`
+(`MASTER_ESTUDIO`), con las mismas 21 columnas: juntas son Estudios entero. El
+cambio de nombre del master 0 lo migra un bloque `DO` de `02_lineas_coste.sql`
+(cambia los dos `CHECK` y las filas ya cargadas, una sola vez, sin `DROP` de
+las tablas); y como el literal vive en `03`, cambia el sello y retrocea todo.
 
 No hay tabla de líneas de descompuesto: el de Estudios y el del master son
 TEXTO. **El formato del `des`**: registros que empiezan por `~D|`, separados
