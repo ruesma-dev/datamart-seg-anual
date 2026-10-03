@@ -59,3 +59,5 @@ FAILED tests/test_f113_sql.py::test_f113_r16_la_cabecera_explica_la_regla_y_el_p
 
 El que pasa es `test_f113_r7_el_tope_y_el_corta_ciclos_no_cambian` (guarda de no
 regresión de F-052, verde antes y después a propósito).
+
+Tras T4: `pytest tests/test_f113_sql.py tests/test_f052_sql.py tests/test_f006_stg_trampas.py tests/test_f113_categoria.py tests/test_f052_arbol.py` → **226 passed in 6,65 s**.

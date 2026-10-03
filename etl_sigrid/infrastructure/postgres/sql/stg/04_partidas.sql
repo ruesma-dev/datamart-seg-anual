@@ -18,16 +18,41 @@
 -- Usamos un CTE recursivo arbol_partidas que:
 --   1. Arranca con las partidas raíz (padide=0 o NULL).
 --   2. Desciende nivel a nivel, propagando el (capitulo_raiz_id, capitulo_raiz_cod)
---      hasta las partidas hoja.
+--      y la `categoria` hasta las partidas hoja.
 --   3. Construye `ruta_capitulos` concatenando códigos como "CD > 01 > 01.02".
 --
--- CATEGORIA: normalizamos el código del capítulo raíz a uno de:
---   "CD"  si el código del raíz contiene 'CD' o si la primera parte del
---         código de partida es numérica pura (los capítulos numéricos típicos
---         son CD: 01, 02, 03... salvo el 34 que es OC).
---   "CI"  si contiene 'CI'.
---   "CP"  si contiene 'CP'.
---   "OTRO" para el resto.
+-- ===========================================================================
+-- CATEGORIA: LA DEL CAPÍTULO CD / CI / CP MÁS CERCANO (F-113)
+-- ===========================================================================
+-- Se calcula DENTRO del recursivo, en sus dos ramas, como una columna más:
+--
+--   raíz (nivel 0):  UPPER(cod) empieza por CD -> CD | por CI -> CI | por CP -> CP
+--                    si no: numérica pura (^[0-9]+$) y no '34'/'99' -> CD
+--                    resto -> OTRO
+--   intermedio:      UPPER(cod sin '.' ni ' ') es exactamente CD, CI o CP -> esa
+--                    si no -> la del padre (también el colapsado, cod = '')
+--
+-- Como el recorrido baja de la raíz y cada nodo sobrescribe o arrastra, el
+-- capítulo CD/CI/CP MÁS CERCANO a la partida manda: `CD > CI > CI.01` es CI,
+-- `99 > CI` es CI, `CD > C.I. > 01` es CI. Es el criterio del humano (2026-09-26:
+-- «medirlo por el PADRE»), opción A aprobada el 2026-10-03.
+--
+-- POR QUÉ PREFIJO EN LA RAÍZ: las 15 variantes de raíz medidas (CD-FII, CI.F2,
+-- CIPD, CP.00...) son todas capítulos CD/CI/CP por su descripción. Antes de
+-- F-113 se buscaban las letras EN CUALQUIER POSICIÓN del código raíz (un LIKE
+-- con comodín delante), y AVDA_FRANCIA, P1414_PCI y P1414_PISCIN caían en coste
+-- indirecto: 253 partidas de dos obras.
+--
+-- POR QUÉ CÓDIGO EXACTO, Y NO PREFIJO, EN LOS INTERMEDIOS: bajo raíces CD hay
+-- 391 nodos CI... y 191 CP... que son partidas de CATÁLOGO (CI10 acero AEH-500,
+-- CPI8001 pilote CPI-8, CI-0036 excavación, CP110 puerta). Con prefijo, 582
+-- partidas de coste directo pasarían a CI/CP. Los 16 intermedios de código
+-- exacto medidos son todos «COSTES DIRECTOS / INDIRECTOS / PROPORCIONALES».
+--
+-- Sigrid no trae una marca mejor: obrparpar.tcaide vale 0 en todas las filas y
+-- auxobrtca son tres oficios (medido el 2026-10-03). La misma regla, en Python
+-- puro, está en etl_sigrid/domain/categoria_partida.py; tests/test_f113_sql.py
+-- cruza los literales de los dos sitios.
 --
 -- ===========================================================================
 -- EL CÓDIGO VACÍO DECIDE QUÉ SE PUBLICA, NO POR DÓNDE SE DESCIENDE (F-052)
@@ -110,7 +135,13 @@ arbol_partidas AS (
         (p.cod <> '')                    AS publicable,
         NULL::BIGINT                     AS padre_publicado_id,
         ARRAY[p.ide]::BIGINT[]           AS visitados,
-        0                                AS nivel_bruto
+        0                                AS nivel_bruto,
+        -- F-113: la raíz, por PREFIJO de su código.
+        (CASE WHEN UPPER(p.cod) LIKE 'CD%' THEN 'CD'
+              WHEN UPPER(p.cod) LIKE 'CI%' THEN 'CI'
+              WHEN UPPER(p.cod) LIKE 'CP%' THEN 'CP'
+              WHEN p.cod ~ '^[0-9]+$' AND p.cod NOT IN ('34', '99') THEN 'CD'
+              ELSE 'OTRO' END)::TEXT     AS categoria
     FROM raw.obrparpar p
     WHERE COALESCE(p.padide, 0) = 0      -- raíces
       AND p.cod IS NOT NULL
@@ -137,35 +168,18 @@ arbol_partidas AS (
         CASE WHEN a.publicable THEN a.partida_id
              ELSE a.padre_publicado_id END            AS padre_publicado_id,
         a.visitados || h.ide             AS visitados,
-        a.nivel_bruto + 1                AS nivel_bruto
+        a.nivel_bruto + 1                AS nivel_bruto,
+        -- F-113: el intermedio de código EXACTO CD/CI/CP manda sobre su
+        -- subárbol; cualquier otro (también el colapsado) hereda del padre.
+        (CASE WHEN UPPER(REPLACE(REPLACE(h.cod, '.', ''), ' ', ''))
+                   IN ('CD', 'CI', 'CP')
+              THEN UPPER(REPLACE(REPLACE(h.cod, '.', ''), ' ', ''))
+              ELSE a.categoria END)::TEXT AS categoria
     FROM raw.obrparpar h
     JOIN arbol_partidas a ON a.partida_id = h.padide
     WHERE h.cod IS NOT NULL
       AND NOT (h.ide = ANY (a.visitados))   -- corta-ciclos exacto (DA-3 a)
       AND a.nivel_bruto < 40                -- tope de respaldo (DA-3 b)
-),
--- Paso 3: ya tenemos el árbol completo. Asignamos categoría.
-arbol_categorizado AS (
-    SELECT
-        ap.*,
-        CASE
-            -- Si el código raíz contiene 'CD' (también vale 'CD '): Costes Directos
-            WHEN UPPER(COALESCE(ap.capitulo_raiz_cod, '')) LIKE '%CD%'  THEN 'CD'
-            WHEN UPPER(COALESCE(ap.capitulo_raiz_cod, '')) LIKE '%CI%'  THEN 'CI'
-            WHEN UPPER(COALESCE(ap.capitulo_raiz_cod, '')) LIKE '%CP%'  THEN 'CP'
-            -- Si el código raíz es numérico puro (01, 02, ..., 34), suele ser CD.
-            -- Excepto "34" que en Ruesma es "OC" (Orden de Cambio), lo dejamos OTRO.
-            -- Heurística: para capítulos raíz numéricos que NO sean 34, los
-            -- consideramos CD (es la práctica habitual en Sigrid: el JO crea
-            -- capítulos numéricos colgando de un CD raíz).
-            -- NOTA: si el JO de Ruesma tiene un raíz literal "CD COSTES DIRECTOS"
-            -- la primera regla lo captura. Esta segunda es defensiva.
-            WHEN ap.capitulo_raiz_cod ~ '^[0-9]+$'
-              AND ap.capitulo_raiz_cod NOT IN ('34', '99')
-                THEN 'CD'
-            ELSE 'OTRO'
-        END AS categoria
-    FROM arbol_partidas ap
 )
 INSERT INTO stg.partidas (
     partida_id, obra_id, codigo_partida, capitulo_padre_id, descripcion_corta,
@@ -186,6 +200,6 @@ SELECT
     ruta_capitulos,
     nivel,
     CASE WHEN tipdes_raw = 0 THEN TRUE ELSE FALSE END AS activa
-FROM arbol_categorizado
+FROM arbol_partidas
 -- Aquí, y sólo aquí, decide el código vacío: qué se publica (R2).
 WHERE publicable;
