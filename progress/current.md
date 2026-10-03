@@ -44,6 +44,15 @@ escribe contra Azure lo autoriza el humano):
    descompuestos.lineas GROUP BY 1` y `SELECT origen, estado, count(*) FROM
    descompuestos.cuadre_partida GROUP BY 1, 2`. Debe salir lo de `spec_F-123.md`
    §2 (ESTUDIO 99.049 / 174 / 35.523; MASTER_INICIAL 107.061 / 170 / 36.355).
+   **HECHA por el líder el 2026-10-03 07:40 UTC** (MCP, solo lectura, tras la
+   nocturna del 03): líneas / obras / partidas: ESTUDIO 99.049 / 174 / 35.523;
+   MASTER_INICIAL 107.061 / 170 / 36.355; MASTER_PLANIF_JO 2.497.224 / 59 /
+   45.233; MASTER_PRE_ABC 1.794.646 / 173 / 76.931; PLANIF_JO 289.359 / 246 /
+   111.481. Cuadre (CUADRA / NO_CUADRA / SIN_DESC / SUSTITUIDO): ESTUDIO 9.423 /
+   20.797 / 113.443 / 5.923; MASTER_INICIAL 34.174 / 675 / 54.299;
+   MASTER_PLANIF_JO 792.922 / 12.301 / 246.232; MASTER_PRE_ABC 635.335 / 11.812 /
+   368.266; PLANIF_JO 79.782 / 14.774 / 55.030. **T13 (aviso) NO hecho**: el
+   humano ordenó desplegar sin esperar.
 3. **T15 · Imagen**: merge a `main`, imagen con tag fechado y job apuntando a
    ella; comprobarlo ANTES de seguir: `az containerapp job show -g
    rg-datamart-seg-dev -n caj-datamart-seg-dev --query
