@@ -12,7 +12,19 @@
 
 
 
-## 2026-10-03 · F-123 · CERRADA (`done`, APROBADO en pasada 2) · la regla de orígenes del descompuesto · IMAGEN DESPLEGADA, FALTA EL BUILD (T16-T17)
+## 2026-10-03 · F-123 · CERRADA (`done`, APROBADO en pasada 2) · la regla de orígenes del descompuesto · DESPLEGADA, RETROCEADA Y VERIFICADA el 2026-10-03 (solo queda T13, el aviso)
+
+> **T16-T17 hechas el 2026-10-03.** El humano lanzó `build-descompuestos --sin-tope`
+> (08:10-08:36 UTC, 1.564 s, SUCCESS, 3.026 versiones troceadas, 7 lotes, 0 aplazadas,
+> sello `5c3fb64e292fa14d`) y `apply-grants` (SUCCESS, incluye `descompuestos`). El
+> líder verificó en solo lectura: `ESTUDIO` 11.783 / 44 / 6.544, `MASTER_ESTUDIO`
+> 107.061 / 170 / 36.355, 0 `MASTER_INICIAL`, el resto igual que la foto de antes;
+> cuadre `ESTUDIO` 2.710 / 2.654 / 45.739 / 103 y `MASTER_ESTUDIO` 34.174 / 675 /
+> 54.299: la previsión de la spec EXACTA. 0 obras con los dos orígenes; 0726/419079
+> 10 líneas `MASTER_ESTUDIO` que suman 134,35 y 0 `ESTUDIO`; 0713 1.774 líneas / 687
+> partidas `ESTUDIO` y 0 `MASTER_ESTUDIO`; 0 versiones con otro sello;
+> `v_pbi_master_estudio` 107.061 filas. `check-diccionario` OK (190/190, v40). R24
+> por `psql` sin hacer (informativa).
 
 > **Desplegado por el líder el 2026-10-03, por orden del humano** («mergea, haz
 > commit... despliega, reinicia MCP, y modifica diccionario. después lanzamos
