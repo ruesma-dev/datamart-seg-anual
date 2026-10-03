@@ -62,6 +62,27 @@ regresión de F-052, verde antes y después a propósito).
 
 Tras T4: `pytest tests/test_f113_sql.py tests/test_f052_sql.py tests/test_f006_stg_trampas.py tests/test_f113_categoria.py tests/test_f052_arbol.py` → **226 passed in 6,65 s**.
 
+### Review 1 · R14-R15 (`tests/test_f113_docs.py`, 17 casos) contra la documentación de `main`
+
+Worktree desechable `git worktree add --detach <tmp>/wt main` (`1bc205e`), con
+solo el test nuevo copiado dentro; el árbol real no se toca. Borrado al terminar.
+
+```
+$ python -m pytest tests/test_f113_docs.py -q -p no:cacheprovider --tb=line   # en <wt-main>
+E   assert 40 >= 41
+E   AssertionError: stg.partidas.categoria sigue diciendo HEURISTICA
+E   AssertionError: assert 'informativo' in 'codigo del capitulo raiz. es la entrada de la heuristica que decide la categoria.'
+E   AssertionError: mart.fact_seguimiento_mensual.categoria sigue diciendo heuristica   (y las otras 5 de mart)
+E   AssertionError: assert 'catalogo oficial' not in '**obras: ti... sobre ella.'
+E   AssertionError: §6.3 sigue enseñando la regla vieja
+E   AssertionError: assert 'sin depende... heurísticas' not in '- source_ta...ítulo raíz. '
+17 failed in 0.51s
+```
+
+En la rama: **17 passed in 0,30 s**. Y el docstring caducado de
+`tests/test_f052_arbol.py:183` («ENTRADA de la heurística») dice ya que
+`capitulo_raiz_cod` es informativo desde F-113.
+
 ## T5 · Contraste de la propuesta en SOLO LECTURA contra Azure (R12)
 
 2026-10-03 11:30 UTC, tras la nocturna. Script en el scratchpad (`f113_t5_contraste.py`,
@@ -91,18 +112,10 @@ antes de consultar (salió `on`) y termina con `ROLLBACK`. **11,5 s** de consult
 | 1734235 (sin código) | no | `CD > CI`, `CD > CP` | 99 + 13 | = | CD → CI / CP |
 
 **Igual a la tabla de `progress/spec_F-113.md` §2, celda a celda.** Previsión de
-`SELECT categoria, count(*) FROM stg.partidas GROUP BY 1` para T12:
-
-| Categoría | Hoy | Tras F-113 (A) |
-|---|---|---|
-| CD | 287.867 | **287.734** |
-| CI | 64.336 | **64.307** |
-| CP | 8.408 | **8.421** |
-| OTRO | 34.596 | **34.745** |
-
-(Cuadra: CI −253 +224, OTRO +253 −104, CD −133, CP +13.) Si la ingesta de la
-noche del despliegue trae partidas nuevas, los totales se moverán con ellas; las
-siete obras de la tabla, no.
+`SELECT categoria, count(*) FROM stg.partidas GROUP BY 1` para T12 (hoy → A):
+CD 287.867 → **287.734**; CI 64.336 → **64.307**; CP 8.408 → **8.421**; OTRO
+34.596 → **34.745** (cuadra: CI −253 +224, OTRO +253 −104, CD −133, CP +13).
+Partidas nuevas de la ingesta moverían los totales; las siete obras, no.
 
 ## T6 · Documentación (R14-R15)
 
@@ -121,10 +134,7 @@ menciones ajenas a la categoría (oficio en `compras`/`stg.v_*`, `es_hoja`, P3).
   `arbol_partidas.py` 21) y **1 mutante generado, 1 muerto, 0 supervivientes**
   (`and` → `or` en la regla numérica), 1.349 s con una línea base de 465 s. Su
   juego de operadores no ve el resto (tuplas, `startswith`, `in`, retornos).
-- La primera tentativa (SHA `9d7c13c`) abortó con **línea base en rojo**:
-  `test_f123_r18_diccionario_version_40` fijaba `version == 40` y T6 la sube a
-  41. Arreglado en `140758b` como hizo F-123 con el de F-120 (`e138fcb`):
-  `>= 40, "F-113 la sube a 41"`. Ver «Desviaciones».
+- La 1ª tentativa (`9d7c13c`) abortó con línea base roja: ver «Desviaciones» 2.
 - **Manual** (script versionado `progress/mediciones/F-113_mutacion_sql.py`,
   SHA `8ecea16`, 1 worker, en serie, sin `-x`): **47 generados, 47 muertos, 0
   supervivientes** en 323 s — M01-M27 sobre `04_partidas.sql` (el CASE de la
@@ -136,7 +146,7 @@ menciones ajenas a la categoría (oficio en `compras`/`stg.v_*`, `es_hoja`, P3).
 ## Ficheros tocados
 
 - Nuevos: `etl_sigrid/domain/categoria_partida.py` (regla, constantes),
-  `tests/test_f113_categoria.py` (110 casos), `tests/test_f113_sql.py` (11),
+  `tests/test_f113_categoria.py` (110 casos), `tests/test_f113_sql.py` (11), `tests/test_f113_docs.py` (17, review 1),
   `progress/mediciones/F-113_mutacion_sql.py`, `progress/mutacion_F-113.md`.
 - `sql/stg/04_partidas.sql`: `categoria` como 15ª columna de las dos ramas del
   recursivo, fuera `arbol_categorizado`, cabecera reescrita (R16).
@@ -169,11 +179,10 @@ menciones ajenas a la categoría (oficio en `compras`/`stg.v_*`, `es_hoja`, P3).
 
 ## Fuera del alcance
 
-T13-T15 (D2 = contraste ligero). Las raíces OTRO (`PD`, `MP`, `LEV`, `GG`,
-`MC`, posventas): no se tocan, y T5 mide 0 partidas de ellas que cambien
-(hallazgo H1 de la spec, sin fichar). La dimensión CI del cierre de 0462, 0500
-y 229 enseñará como grupo el segundo escalón (`CI`, `C.I.`): declarado en la
-spec (§6), materia de F-111, que deberá remedir su dimensión CI.
+T13-T15 (D2 = ligero). Raíces OTRO (`PD`, `MP`, `LEV`, `GG`, `MC`, posventas):
+no se tocan; T5 mide 0 partidas suyas que cambien (H1 de la spec, sin fichar).
+Dimensión CI del cierre de 0462/0500/229 con el segundo escalón como grupo:
+declarado (spec §6), materia de F-111, que remedirá su dimensión CI.
 
 ## Verificaciones MANUAL pendientes (humano), en orden
 
@@ -206,6 +215,6 @@ previa, ninguno en los ficheros de F-113: `ruff check` sobre ellos, «All checks
 | Mutación, arnés | 1 generado, 1 muerto, **0 supervivientes** (SHA `140758b`) |
 | Mutación, manual SQL + dominio | 47 generados, 47 muertos, **0 supervivientes** (SHA `8ecea16`, 1 worker) |
 | Tiempo de la suite | **1.498,98 s** (24 min 59 s) |
-| Tests propios de F-113 | 121 (`test_f113_categoria.py` 110, `test_f113_sql.py` 11), 0,7 s |
+| Tests propios de F-113 | 138 (`test_f113_categoria.py` 110, `_sql.py` 11, `_docs.py` 17), < 1 s |
 | Contraste T5 (Azure, solo lectura) | tabla de la spec exacta; 0 diferencias en otras columnas |
 | Puerta de tamaño | impl dentro del tope de 220 (195 antes de esta sección) |

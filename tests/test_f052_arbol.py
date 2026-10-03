@@ -180,8 +180,10 @@ def test_f052_r3_el_nivel_cuenta_solo_ancestros_publicados():
 
 
 def test_f052_r3_la_raiz_se_hereda_a_traves_del_nodo_colapsado():
-    """`capitulo_raiz_cod` es la ENTRADA de la heurística de categoría: si no
-    bajara por el nodo vacío, las 1.323 partidas quedarían sin categoría."""
+    """La raíz (`capitulo_raiz_id`, `capitulo_raiz_cod`) baja a través del nodo
+    vacío: sin eso las 1.323 partidas quedarían sin raíz. Desde F-113
+    `capitulo_raiz_cod` es informativo; la categoría viaja aparte por el
+    recorrido (`tests/test_f113_categoria.py`)."""
     publicadas = _publicadas_por_id(_arbol_completo())
 
     for ide in (280400, 280401, 280500, 280600):
