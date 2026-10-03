@@ -61,3 +61,45 @@ El que pasa es `test_f113_r7_el_tope_y_el_corta_ciclos_no_cambian` (guarda de no
 regresión de F-052, verde antes y después a propósito).
 
 Tras T4: `pytest tests/test_f113_sql.py tests/test_f052_sql.py tests/test_f006_stg_trampas.py tests/test_f113_categoria.py tests/test_f052_arbol.py` → **226 passed in 6,65 s**.
+
+## T5 · Contraste de la propuesta en SOLO LECTURA contra Azure (R12)
+
+2026-10-03 11:30 UTC, tras la nocturna. Script en el scratchpad (`f113_t5_contraste.py`,
+fuera del repo): recorta de `04_partidas.sql` **tal cual** el texto entre
+`WITH RECURSIVE` y el `INSERT` (sin `TRUNCATE` ni `INSERT`; lo comprueba con un
+`assert`), lo cierra con `SELECT … FROM arbol_partidas WHERE publicable` y lo
+cruza con `FULL JOIN stg.partidas` por `partida_id`. Conexión con
+`conn.read_only = True`; el script exige `SHOW transaction_read_only = on`
+antes de consultar (salió `on`) y termina con `ROLLBACK`. **11,5 s** de consulta.
+
+| Comprobación | Resultado |
+|---|---|
+| Filas propuesta / `stg.partidas` | 395.207 / 395.207; 0 solo en una de las dos |
+| Otras columnas distintas (`obra_id`, `codigo_partida`, `capitulo_padre_id`, `descripcion_corta`, `unidad_medida`, `capitulo_raiz_id`, `capitulo_raiz_cod`, `ruta_capitulos`, `nivel`, `activa`) | **0 en las diez** |
+| Cambian con A / con B (raíz de la propia propuesta) | **490 partidas, 7 obras / 253, 2** |
+| Raíces hoy en OTRO que cambian | solo `99` (0229) y `TN` (229), las de la spec |
+| Partidas con raíz `PD…`, `MP…`, `LEV…`, `GG…`, `MC…`, `POS…` que cambian | **0** (límite del humano respetado) |
+
+| Obra | Seg | Capítulo que decide | Partidas | Hoy → B | Hoy → A |
+|---|---|---|---|---|---|
+| 596085 (sin código) | no | raíz `AVDA_FRANCIA` | 221 | CI → OTRO | CI → OTRO |
+| 998691 (sin código) | no | raíces `P1414_PCI`, `P1414_PISCIN` | 32 | CI → OTRO | CI → OTRO |
+| 0229 (537441) | sí | `99 > CI` | 95 | = | OTRO → CI |
+| 229 (546432) | sí | `TN > CI` | 9 | = | OTRO → CI |
+| 0462 (950302) | sí | `CD > C.I.` | 10 | = | CD → CI |
+| 0500 (1025342) | sí | `CD > CI` | 11 | = | CD → CI |
+| 1734235 (sin código) | no | `CD > CI`, `CD > CP` | 99 + 13 | = | CD → CI / CP |
+
+**Igual a la tabla de `progress/spec_F-113.md` §2, celda a celda.** Previsión de
+`SELECT categoria, count(*) FROM stg.partidas GROUP BY 1` para T12:
+
+| Categoría | Hoy | Tras F-113 (A) |
+|---|---|---|
+| CD | 287.867 | **287.734** |
+| CI | 64.336 | **64.307** |
+| CP | 8.408 | **8.421** |
+| OTRO | 34.596 | **34.745** |
+
+(Cuadra: CI −253 +224, OTRO +253 −104, CD −133, CP +13.) Si la ingesta de la
+noche del despliegue trae partidas nuevas, los totales se moverán con ellas; las
+siete obras de la tabla, no.
