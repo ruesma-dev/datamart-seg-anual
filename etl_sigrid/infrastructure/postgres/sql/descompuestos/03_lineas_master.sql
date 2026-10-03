@@ -21,7 +21,8 @@
 -- QUE HACE, EN ORDEN:
 --   1. `_lote`: las versiones cargadas de este lote.
 --   2. `_atributos`: el ORIGEN y los flags de TODAS las versiones cargadas
---      (R17). MASTER_INICIAL la version 0; MASTER_PLANIF_JO desde la primera
+--      (R17). MASTER_ESTUDIO la version 0 (F-123: el master 0 es Estudios,
+--      con la medicion de Estudios); MASTER_PLANIF_JO desde la primera
 --      version cuyo `obrfasamb.tex` contiene «ABC» (la regla de mart); el resto,
 --      MASTER_PRE_ABC (D13). `tipo_version` es la regla de `mart/02_build_fact.sql`
 --      copiada literal. El texto de la version sale de `obrfasamb` SIN
@@ -85,7 +86,7 @@ atributos AS (
     SELECT
         v.obra_id,
         v.fase_num,
-        CASE WHEN v.fase_num = 0 THEN 'MASTER_INICIAL'
+        CASE WHEN v.fase_num = 0 THEN 'MASTER_ESTUDIO'
              WHEN abc.fase_abc IS NOT NULL AND v.fase_num >= abc.fase_abc THEN 'MASTER_PLANIF_JO'
              ELSE 'MASTER_PRE_ABC' END AS origen,
         (v.fase_num = 0) AS es_version_inicial,
@@ -127,7 +128,7 @@ USING _lote t
 WHERE l.ambito_id = 8
   AND l.obra_id = t.obra_id
   AND l.fase_num = t.fase_num
-  AND l.origen IN ('MASTER_INICIAL', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO');
+  AND l.origen IN ('MASTER_ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO');
 
 DELETE FROM descompuestos.cuadre_partida q
 USING _lote t

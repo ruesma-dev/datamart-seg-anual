@@ -502,13 +502,15 @@ def test_f120_r24_el_factor_explicado_con_su_ejemplo() -> None:
 @pytest.mark.parametrize("objeto", ["lineas", "v_pbi_estudio", "cuadre_partida"])
 def test_f120_r25_estudio_sigue_la_medicion_actual(objeto: str) -> None:
     """D7 reescrita y aprobada (2026-10-01): precios de Estudios, medicion ACTUAL;
-    el importe de Estudios es medicion x precio de la version 0; MASTER_INICIAL
-    solo existe donde la version 0 guarda descompuesto."""
+    el importe de Estudios es medicion x precio de la version 0. F-123 lo deja
+    solo para las obras SIN master 0 (el ejemplo 0713 sigue en ESTUDIO) y el
+    ejemplo 0726 pasa a MASTER_ESTUDIO, que es Estudios donde hay master 0."""
     texto = _texto_ficha(objeto)
     for termino in ("medicion ACTUAL", "version 0", "4.979,02", "5.376,84", "0726", "527.564,24",
-                    "134,35", "MASTER_INICIAL solo existe donde la version 0 guarda descompuesto"):
+                    "134,35", "sin master 0", "MASTER_ESTUDIO"):
         assert termino in texto, f"{objeto}: falta «{termino}»"
-    assert "foto fija de Estudios es MASTER_INICIAL" not in texto, "D7 original: es falso en general"
+    assert "MASTER_INICIAL" not in texto, "F-123: el master 0 se llama MASTER_ESTUDIO"
+    assert "foto fija de Estudios es" not in texto, "D7 original: es falso en general"
 
 
 def test_f120_r25_sin_el_aviso_caducado_de_la_primera_carga() -> None:
@@ -530,7 +532,7 @@ def test_f120_r25_sin_el_aviso_caducado_de_la_primera_carga() -> None:
 
 
 def test_f120_r26_version_del_diccionario() -> None:
-    assert _yaml("00_global.yaml")["version"] == 39
+    assert _yaml("00_global.yaml")["version"] >= 39, "F-123 la sube a 40"
 
 
 # ===========================================================================

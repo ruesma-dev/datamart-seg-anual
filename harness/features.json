@@ -1909,6 +1909,27 @@
       "rigor": "estandar",
       "priority": 10,
       "branch": "feature/F-122-lineas-sin-rendimiento"
+    },
+    {
+      "id": "F-123",
+      "title": "La regla de Estudios del descompuesto: el master 0 es Estudios (MASTER_ESTUDIO) y ESTUDIO solo donde no hay master 0",
+      "description": "Cambio de la regla de F-097/F-120 decidido por el humano el 2026-10-02: «cambiar la regla de estudios cuando haya descompuesto en el master inicial, que es casi siempre. En la fase 0 el descompuesto es la planificacion de compras». (a) POR OBRA: si la obra tiene master 0 (ambito 8, version 0) con descompuesto, Estudios de toda la obra es ese master 0, y el origen MASTER_INICIAL pasa a llamarse MASTER_ESTUDIO (lineas, cuadre, CHECK, `elementos.lineas_master_estudio`, diccionario). (b) Si no lo tiene (44 obras: 11 con master sin version 0 con descompuesto, la 0713 entre ellas, y 33 sin master), se hace lo de hoy: origen ESTUDIO, misma regla y mismo nombre; si tampoco hay ahi, el cuadre ya lo dice con SIN_DESCOMPUESTO. (c) En las obras con master 0 la «Descomposicion» de coste fase 0 deja de publicarse como ESTUDIO (lineas y cuadre); sus ~2.020 partidas sin descompuesto en el master 0 (1.758 que no existen en el) se quedan sin Estudios: no lo tenian. (d) Coste fase 0 es la FASE VIVA (el presupuesto que el jefe de obra evoluciona dia a dia) y su descompuesto es PLANIF_JO: ya es asi. (e) MASTER_PRE_ABC, MASTER_PLANIF_JO y PLANIF_JO no se tocan; `_des_texto` no se borra y la ingesta no cambia. Vista nueva `v_pbi_master_estudio` con las columnas de `v_pbi_estudio`, que sigue siendo solo ESTUDIO. (f) Alcance: solo el esquema `descompuestos`; ningun SQL fuera de `sql/descompuestos/` lo lee, asi que stg, mart y cierre no cambian. El sello de troceado cambia: despliegue como F-120 (imagen primero, luego `build-descompuestos --sin-tope` + `apply-grants`), con aviso previo a Juan Romero y Elena Diaz. Segunda version de la spec: la primera (ESTUDIO_RESPALDO, `estudios_partida`, motivos de NO_EXISTE) la rechazo el humano por complicada.",
+      "acceptance": [
+        "El master 0 se publica con origen MASTER_ESTUDIO; MASTER_INICIAL deja de existir en lineas, cuadre, CHECK, dominio, vistas, diccionario y docs (solo queda en el bloque de migracion), y `elementos.lineas_master_inicial` pasa a `lineas_master_estudio`",
+        "En las obras con master 0 no se publica ninguna linea ni fila de cuadre ESTUDIO; en las obras sin master 0, ESTUDIO sale exactamente como hoy (con SUSTITUIDO_POR_PLANIFICACION)",
+        "Ninguna pareja (obra, partida) tiene a la vez MASTER_ESTUDIO y ESTUDIO",
+        "PLANIF_JO, MASTER_PRE_ABC, MASTER_PLANIF_JO, `v_pbi_estudio`, `v_pbi_planif_jo`, `v_pbi_master_planif_jo`, la ingesta y `_des_texto` no cambian; stg, mart y cierre tampoco",
+        "Existe `descompuestos.v_pbi_master_estudio` con las mismas columnas que `v_pbi_estudio`",
+        "La migracion pasa MASTER_INICIAL a MASTER_ESTUDIO y cambia los dos CHECK sin DROP ni TRUNCATE de las tablas, y es idempotente",
+        "El diccionario (version 40) explica la fase viva y la regla de Estudios en R-DESCOMPUESTO-ORIGEN y en las fichas de `descompuestos`; el aviso «precios de Estudios, medicion actual» queda solo para las obras sin master 0",
+        "Medido antes y despues por origen, testigos 0726 (partida 419079 en MASTER_ESTUDIO y sin ESTUDIO) y 0713 (sigue en ESTUDIO) comprobados, y la coincidencia importe-presupuesto del master medida por tipo_version",
+        "`azure-apps/datamart_seg_anual.md` y `ARCHITECTURE.md` actualizados en el mismo trabajo"
+      ],
+      "status": "done",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 1,
+      "branch": "feature/F-123-descompuestos-regla-origenes"
     }
   ]
 }

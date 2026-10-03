@@ -11,8 +11,10 @@
 -- reconstruye cada noche solo lo del ambito 3 fase 0.
 --
 -- UNA FILA POR PARTIDA HOJA CON PRECIO Y POR ORIGEN: cada partida del ambito 3
--- fase 0 sin hijos en `obrparpar` y con `pre <> 0` sale DOS veces, una como
--- ESTUDIO y otra como PLANIF_JO. El estado:
+-- fase 0 sin hijos en `obrparpar` y con `pre <> 0` sale como PLANIF_JO y,
+-- SOLO EN LAS OBRAS SIN MASTER 0 (F-123: sin version 0 en
+-- `_versiones_cargadas`), tambien como ESTUDIO. Donde hay master 0, Estudios
+-- es MASTER_ESTUDIO y su cuadre lo escribe 03. El estado:
 --
 --   SUSTITUIDO_POR_PLANIFICACION  (solo ESTUDIO) su «Descomposicion» tiene
 --                                 algun registro enlazado a `dncpro`: ya no es
@@ -69,4 +71,7 @@ SELECT o.origen, h.obra_id, h.partida_id, 3, 0, h.presupuesto_id,
 FROM h
 CROSS JOIN (VALUES ('ESTUDIO'), ('PLANIF_JO')) o(origen)
 LEFT JOIN s ON s.origen = o.origen AND s.obra_id = h.obra_id AND s.partida_id = h.partida_id
-LEFT JOIN su ON su.obra_id = h.obra_id AND su.partida_id = h.partida_id;
+LEFT JOIN su ON su.obra_id = h.obra_id AND su.partida_id = h.partida_id
+WHERE o.origen = 'PLANIF_JO'
+   OR NOT EXISTS (SELECT 1 FROM descompuestos._versiones_cargadas v
+                  WHERE v.obra_id = h.obra_id AND v.fase_num = 0);

@@ -14,18 +14,20 @@
 # LAS CINCO COSAS QUE HAY QUE SABER ANTES DE ESCRIBIR UNA CONSULTA AQUI
 # (regla dura `R-DESCOMPUESTO-ORIGEN`):
 #
-# 1. **Nunca se suman ni se mezclan origenes.** ESTUDIO es la referencia que
-#    vino de Estudios (la «Descomposicion» de COSTE); PLANIF_JO la planificacion
-#    de compras del jefe de obra (la «Planificacion compras» de COSTE, tabla
-#    `dncpro`); MASTER_* es la «Descomposicion» de MASTER COSTE, una copia POR
-#    VERSION. Se filtra siempre por `origen`, o se usan las vistas `v_pbi_*`.
+# 1. **Nunca se suman ni se mezclan origenes.** Estudios es MASTER_ESTUDIO (la
+#    version 0 del master) donde hay master 0 y ESTUDIO (la «Descomposicion» de
+#    COSTE) solo donde no lo hay (F-123); PLANIF_JO la planificacion de compras
+#    del jefe de obra (la «Planificacion compras» de COSTE, tabla `dncpro`), el
+#    descompuesto de la FASE VIVA; MASTER_* es la «Descomposicion» de MASTER
+#    COSTE, una copia POR VERSION. Se filtra siempre por `origen`, o se usan las
+#    vistas `v_pbi_*`.
 # 2. **El master tiene una copia por version**: sin filtrar `fase_num` (o
 #    `es_vigente`) se cuenta cada linea tantas veces como versiones tenga la obra.
 # 3. **La «Descomposicion» de COSTE se reescribe con la planificacion**: en
 #    7.866 de las 42.958 partidas con descompuesto en el ambito 3 ese texto es
 #    copia de su planificacion (campo 36 = `dncpro.ide`). Esas NO se publican
-#    como ESTUDIO: el cuadre las marca SUSTITUIDO_POR_PLANIFICACION y su Estudios
-#    original, si existe, esta en la version 0 del master (MASTER_INICIAL).
+#    como ESTUDIO: el cuadre las marca SUSTITUIDO_POR_PLANIFICACION. Es una de
+#    las razones de F-123: donde hay master 0, Estudios es MASTER_ESTUDIO.
 # 4. **La primera carga del master se hizo el 2026-09-29** (3.025 versiones).
 #    Si una version esta cargada lo dice `_versiones_cargadas`; la nocturna
 #    relee cada noche las nuevas, la vigente de cada obra y las cambiadas.
@@ -33,9 +35,11 @@
 #    traduccion esta sin validar con Negocio.
 # 6. **El FACTOR** (F-120): `importe_unitario` = factor x rendimiento x precio;
 #    `factor` vale 1 en las lineas sin factor y `cantidad_total` ya lo lleva.
-# 7. **ESTUDIO tiene precios de Estudios pero medicion ACTUAL**: el importe de
-#    Estudios es medicion x precio de la version 0 del master, no la suma de
-#    `importe_total` de ESTUDIO.
+# 7. **Estudios es el master 0** (F-123): MASTER_ESTUDIO en las obras con
+#    version 0 del master con descompuesto, con la medicion de Estudios; en las
+#    obras sin master 0, ESTUDIO, con precios de Estudios pero medicion ACTUAL
+#    (su importe de Estudios es medicion x precio de la version 0, no la suma de
+#    `importe_total`). Estudios entero: `v_pbi_master_estudio` + `v_pbi_estudio`.
 
 version: 1
 esquema: descompuestos
@@ -50,14 +54,16 @@ objetos:
       **UNA FILA POR LINEA DEL DESCOMPUESTO DE CADA PARTIDA, CON SU ORIGEN**
       (F-097). Cinco origenes, que son tres pestanas de Sigrid y NO se mezclan
       (`R-DESCOMPUESTO-ORIGEN`): ESTUDIO (la «Descomposicion» del ambito 3 fase
-      0, solo de las partidas sin ningun registro enlazado a la planificacion:
-      la referencia de Estudios, ~98.000 lineas estimadas), PLANIF_JO (la
-      «Planificacion compras»: las lineas de `dncpro` de la necesidad de la
-      obra, ~287.000, con proveedor recomendado, contrato y linea adjudicados y
-      fecha maxima; su `precio` es el ADJUDICADO, aviso de F-038) y los tres del
-      master, una copia POR VERSION (~4,5 M lineas): MASTER_INICIAL la version 0
-      (169 versiones, «CIERRE INICIAL_ESTUDIO»), MASTER_PRE_ABC las versiones
-      anteriores a la primera ABC (1.664) y MASTER_PLANIF_JO desde la primera
+      0, la FASE VIVA, SOLO en las obras sin master 0 y solo de las partidas sin
+      ningun registro enlazado a la planificacion: Estudios donde no hay master
+      0, ~11.800 lineas en 44 obras previstas), PLANIF_JO (la «Planificacion
+      compras», el descompuesto de la fase viva: las lineas de `dncpro` de la
+      necesidad de la obra, ~289.000, con proveedor recomendado, contrato y
+      linea adjudicados y fecha maxima; su `precio` es el ADJUDICADO, aviso de
+      F-038) y los tres del master, una copia POR VERSION (~4,5 M lineas):
+      MASTER_ESTUDIO la version 0 (170 obras el 2026-10-02, «CIERRE
+      INICIAL_ESTUDIO»), que ES Estudios (F-123), MASTER_PRE_ABC las versiones
+      anteriores a la primera ABC (1.665) y MASTER_PLANIF_JO desde la primera
       ABC (1.190), donde el 98,6 % de las partidas ya es la planificacion del
       jefe de obra.
 
@@ -79,31 +85,30 @@ objetos:
       ~95.000 lineas con el campo del rendimiento VACIO y precio siguen sin
       rendimiento ni importe unitario: es otra causa (F-122).
 
-      **ESTUDIO: PRECIOS DE ESTUDIOS, MEDICION ACTUAL.** ESTUDIO es la
-      «Descomposicion» del ambito 3 fase 0, el unico sitio de COSTE con
-      descompuesto: tiene los rendimientos y precios unitarios de Estudios, pero
-      su `cantidad_total` e `importe_total` siguen la medicion ACTUAL de la
-      partida (Sigrid los recalcula). El importe de Estudios de una partida es
-      medicion x precio del master version 0 (`stg.presupuesto`, ambito 8, fase
-      0), NO la suma de `importe_total`. Lo que si vale de ESTUDIO es el
-      descompuesto por unidad (suma de `importe_unitario`), que coincide con el
-      precio de la version 0. MASTER_INICIAL solo existe donde la version 0
-      guarda descompuesto. Ejemplos: 0713 02.01.01.04 HORMIGON EN ESCALERAS,
-      medicion 24,03 en la version 0 y 25,95 hoy, por unidad 207,20 = precio de
-      la version 0: importe de Estudios 4.979,02 frente a 5.376,84 de sumar
-      lineas, y sin MASTER_INICIAL; 0726 04.02 FORJ. RETICULAR 35+10, medicion
-      sin cambios 3.926,79, por unidad 134,35 = precio de la version 0:
-      527.564,24 frente a 527.584,96 (redondeo de lineas), con MASTER_INICIAL de
-      las mismas 10 lineas.
+      **ESTUDIOS ES EL MASTER 0** (F-123). En las obras con version 0 del
+      master con descompuesto (170 el 2026-10-02), Estudios es MASTER_ESTUDIO,
+      con la medicion de Estudios, y no se publica ESTUDIO: alli ESTUDIO
+      repetia las lineas de la version 0 en el 99,5 % de las partidas que
+      tenian las dos (medido el 2026-10-02). En las obras sin master 0 (44, la
+      0713 entre ellas) Estudios es ESTUDIO, con precios de Estudios pero
+      medicion ACTUAL: su importe de Estudios es medicion x precio de la version
+      0 (`stg.presupuesto`, ambito 8, fase 0), no la suma de `importe_total`.
+      Ejemplos: 0713 02.01.01.04 HORMIGON EN ESCALERAS (sin master 0), medicion
+      24,03 en la version 0 y 25,95 hoy, por unidad 207,20: importe de Estudios
+      4.979,02 frente a 5.376,84 de sumar lineas ESTUDIO; 0726 04.02 FORJ.
+      RETICULAR 35+10, 10 lineas MASTER_ESTUDIO que suman 134,35 por unidad =
+      precio de la version 0, a la medicion de Estudios 3.926,79: 527.564,24, y
+      ninguna ESTUDIO.
 
       **LOS TIPOS 3 (OTROS) Y 11 (SUBCONTRATA) SON PROVISIONALES** (D8): la
       traduccion del campo 16 esta sin validar con Negocio.
 
       **EJEMPLO**: la partida 04.02 «FORJ. RETICULAR 35+10» de la 0726
-      (`partida_id` 419079, la D05DF210 de Juan) tiene 10 lineas ESTUDIO cuya
-      suma de `importe_unitario` es 134,35 = su precio; las mismas 10 en
-      MASTER_INICIAL (version 0) y en MASTER_PRE_ABC (version 1), y ninguna en
-      PLANIF_JO: el jefe de obra aun no la ha planificado.
+      (`partida_id` 419079, la D05DF210 de Juan) tiene 10 lineas MASTER_ESTUDIO
+      (version 0) cuya suma de `importe_unitario` es 134,35 = su precio; las
+      mismas 10 en MASTER_PRE_ABC (version 1); ninguna ESTUDIO (la obra tiene
+      master 0) y ninguna en PLANIF_JO: el jefe de obra aun no la ha
+      planificado.
 
       Las 227 filas de Sigrid con `obride = 0` (version 26) se conservan con
       `obra_id` 0: no son de ninguna obra y el cuadre las deja fuera. Un `|`
@@ -120,8 +125,9 @@ objetos:
       origen:
         significado: >-
           De donde sale la linea. Nunca se suman origenes distintos
-          (`R-DESCOMPUESTO-ORIGEN`).
-        valores: [ESTUDIO, PLANIF_JO, MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO]
+          (`R-DESCOMPUESTO-ORIGEN`). Estudios es MASTER_ESTUDIO en las obras
+          con master 0 y ESTUDIO en las demas: una obra nunca tiene los dos.
+        valores: [ESTUDIO, PLANIF_JO, MASTER_ESTUDIO, MASTER_PRE_ABC, MASTER_PLANIF_JO]
       obra_id:
         significado: >-
           La obra, con el mismo identificador que `maestro.obras.obra_id`. 0 en
@@ -330,12 +336,16 @@ objetos:
       (`obrparpre.pre` redondeado a 2) y su estado: CUADRA (diferencia de 0,01
       o menos), NO_CUADRA, SIN_DESCOMPUESTO o SUSTITUIDO_POR_PLANIFICACION (solo
       ESTUDIO: su «Descomposicion» es copia de la planificacion). Las del
-      ambito 3 salen DOS veces, como ESTUDIO y como PLANIF_JO; una partida con
-      las dos en SIN_DESCOMPUESTO es un tanto alzado (49.204 en 672 obras,
-      medido el 2026-09-27). Cuadran el 36,3 % de las ESTUDIO con precio
-      (12.967 de 35.710) y el 76,8 % de las PLANIF_JO (71.643 de 93.320).
-      Ejemplo: la 03.05.02 de la 0695 (`partida_id` 377070), PLANIF_JO CUADRA
-      en 177,95 y ESTUDIO SUSTITUIDO_POR_PLANIFICACION. Desde F-120 la suma
+      ambito 3 salen como PLANIF_JO y, SOLO en las obras sin master 0 (F-123),
+      tambien como ESTUDIO: donde hay master 0, el cuadre de Estudios es el de
+      MASTER_ESTUDIO (version 0). «No existe» no tiene estado propio: una
+      partida sin descompuesto de Estudios sale SIN_DESCOMPUESTO en su origen de
+      Estudios (MASTER_ESTUDIO o ESTUDIO); con PLANIF_JO tambien en
+      SIN_DESCOMPUESTO, es un tanto alzado. En F-097 (2026-09-27, antes de
+      F-123) cuadraban el 76,8 % de las PLANIF_JO con precio (71.643 de 93.320);
+      el master 0 cuadra en 34.174 de 34.849 partidas (2026-10-02). Ejemplo: la
+      03.05.02 de la 0695 (`partida_id` 377070), PLANIF_JO CUADRA en 177,95.
+      Desde F-120 la suma
       lleva el FACTOR de cada linea (antes las lineas con factor no tenian
       importe unitario y su partida salia NO_CUADRA sin serlo): la 400854 de la
       0713, version 6, CUADRA en 249,41.
@@ -344,34 +354,27 @@ objetos:
       master para cada version cargada, y cuales lo estan lo dice
       `descompuestos._versiones_cargadas`.
 
-      **ESTUDIO: PRECIOS DE ESTUDIOS, MEDICION ACTUAL.** El cuadre de ESTUDIO
-      compara bien, por unidad; sus importes no son los de Estudios. ESTUDIO es la
-      «Descomposicion» del ambito 3 fase 0, el unico sitio de COSTE con
-      descompuesto: tiene los rendimientos y precios unitarios de Estudios, pero
-      su `cantidad_total` e `importe_total` siguen la medicion ACTUAL de la
-      partida (Sigrid los recalcula). El importe de Estudios de una partida es
-      medicion x precio del master version 0 (`stg.presupuesto`, ambito 8, fase
-      0), NO la suma de `importe_total`. Lo que si vale de ESTUDIO es el
-      descompuesto por unidad (suma de `importe_unitario`), que coincide con el
-      precio de la version 0. MASTER_INICIAL solo existe donde la version 0
-      guarda descompuesto. Ejemplos: 0713 02.01.01.04 HORMIGON EN ESCALERAS,
-      medicion 24,03 en la version 0 y 25,95 hoy, por unidad 207,20 = precio de
-      la version 0: importe de Estudios 4.979,02 frente a 5.376,84 de sumar
-      lineas, y sin MASTER_INICIAL; 0726 04.02 FORJ. RETICULAR 35+10, medicion
-      sin cambios 3.926,79, por unidad 134,35 = precio de la version 0:
-      527.564,24 frente a 527.584,96 (redondeo de lineas), con MASTER_INICIAL de
-      las mismas 10 lineas.
+      **ESTUDIOS ES EL MASTER 0** (F-123). En las obras con version 0 del
+      master con descompuesto, Estudios es MASTER_ESTUDIO, con la medicion de
+      Estudios. En las obras sin master 0 es ESTUDIO, que compara bien por
+      unidad pero tiene medicion ACTUAL: su importe de Estudios es medicion x
+      precio de la version 0, no la suma de `importe_total`. Ejemplos: 0713
+      02.01.01.04 HORMIGON EN ESCALERAS (sin master 0), por unidad 207,20:
+      importe de Estudios 4.979,02 frente a 5.376,84 de sumar lineas ESTUDIO;
+      0726 04.02 FORJ. RETICULAR 35+10, MASTER_ESTUDIO CUADRA en 134,35 = precio
+      de la version 0, a la medicion de Estudios 3.926,79: 527.564,24, y sin
+      fila ESTUDIO.
     grano: >-
       Una fila por (origen, partida_id, ambito_id, fase_num) de cada partida
-      hoja con precio: dos por partida en el ambito 3 y una por partida y
-      version en el master.
+      hoja con precio: en el ambito 3, PLANIF_JO siempre y ESTUDIO solo en las
+      obras sin master 0; en el master, una por partida y version.
     clave_negocio: [origen, partida_id, ambito_id, fase_num]
     paso_etl: build_descompuestos
     refresco: nocturno
     columnas:
       origen:
-        significado: El origen de las lineas que se suman. Nunca se comparan filas de origenes distintos como si fueran la misma cosa.
-        valores: [ESTUDIO, PLANIF_JO, MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO]
+        significado: El origen de las lineas que se suman. Nunca se comparan filas de origenes distintos como si fueran la misma cosa. Estudios es MASTER_ESTUDIO (obras con master 0) o ESTUDIO (obras sin master 0).
+        valores: [ESTUDIO, PLANIF_JO, MASTER_ESTUDIO, MASTER_PRE_ABC, MASTER_PLANIF_JO]
       obra_id:
         significado: La obra, la de `maestro.obras.obra_id`.
         agregacion: no_sumable
@@ -456,13 +459,16 @@ objetos:
         significado: Lineas del codigo en la obra, en todos los origenes y versiones.
         agregacion: no_sumable
       lineas_estudio:
-        significado: Lineas del codigo en la obra con origen ESTUDIO.
+        significado: Lineas del codigo en la obra con origen ESTUDIO (solo hay en las obras sin master 0).
         agregacion: no_sumable
       lineas_planif_jo:
         significado: Lineas del codigo en la obra con origen PLANIF_JO.
         agregacion: no_sumable
-      lineas_master_inicial:
-        significado: Lineas del codigo en la obra con origen MASTER_INICIAL.
+      lineas_master_estudio:
+        significado: >-
+          Lineas del codigo en la obra con origen MASTER_ESTUDIO, la version 0
+          del master: Estudios en las obras con master 0. Hasta F-123 se
+          llamaba `lineas_master_inicial`.
         agregacion: no_sumable
       lineas_master_pre_abc:
         significado: Lineas del codigo en la obra con origen MASTER_PRE_ABC (todas sus versiones).
@@ -496,26 +502,24 @@ objetos:
     consumo_recomendado: true
     descripcion: >-
       Las lineas de origen ESTUDIO de `descompuestos.lineas`, con el origen
-      CABLEADO: la referencia que vino de Estudios (ambito 3 fase 0), solo de
-      las partidas cuya «Descomposicion» no es copia de la planificacion. Para
-      Power BI y para no mezclar origenes sin acordarse del filtro.
+      CABLEADO: Estudios en las obras SIN master 0 (F-123), la «Descomposicion»
+      del ambito 3 fase 0 (la fase viva), solo de las partidas cuya
+      «Descomposicion» no es copia de la planificacion. En las obras con master
+      0, Estudios esta en `v_pbi_master_estudio`, con las MISMAS columnas: juntas
+      son Estudios entero y cada obra esta en una sola. Para Power BI y para no
+      mezclar origenes sin acordarse del filtro.
 
-      **ESTUDIO: PRECIOS DE ESTUDIOS, MEDICION ACTUAL.** ESTUDIO es la
-      «Descomposicion» del ambito 3 fase 0, el unico sitio de COSTE con
-      descompuesto: tiene los rendimientos y precios unitarios de Estudios, pero
-      su `cantidad_total` e `importe_total` siguen la medicion ACTUAL de la
-      partida (Sigrid los recalcula). El importe de Estudios de una partida es
-      medicion x precio del master version 0 (`stg.presupuesto`, ambito 8, fase
-      0), NO la suma de `importe_total`. Lo que si vale de ESTUDIO es el
-      descompuesto por unidad (suma de `importe_unitario`), que coincide con el
-      precio de la version 0. MASTER_INICIAL solo existe donde la version 0
-      guarda descompuesto. Ejemplos: 0713 02.01.01.04 HORMIGON EN ESCALERAS,
-      medicion 24,03 en la version 0 y 25,95 hoy, por unidad 207,20 = precio de
-      la version 0: importe de Estudios 4.979,02 frente a 5.376,84 de sumar
-      lineas, y sin MASTER_INICIAL; 0726 04.02 FORJ. RETICULAR 35+10, medicion
-      sin cambios 3.926,79, por unidad 134,35 = precio de la version 0:
-      527.564,24 frente a 527.584,96 (redondeo de lineas), con MASTER_INICIAL de
-      las mismas 10 lineas.
+      **ESTUDIOS ES EL MASTER 0** (F-123). Donde hay version 0 del master con
+      descompuesto, Estudios es MASTER_ESTUDIO, con la medicion de Estudios, y
+      esta vista no tiene filas de esa obra. En las obras sin master 0, ESTUDIO
+      tiene precios de Estudios pero medicion ACTUAL: su importe de Estudios es
+      medicion x precio de la version 0 (`stg.presupuesto`, ambito 8, fase 0),
+      no la suma de `importe_total`. Ejemplos: 0713 02.01.01.04 HORMIGON EN
+      ESCALERAS (sin master 0), medicion 24,03 en la version 0 y 25,95 hoy, por
+      unidad 207,20: importe de Estudios 4.979,02 frente a 5.376,84 de sumar
+      lineas; 0726 04.02 FORJ. RETICULAR 35+10: sus 10 lineas, 134,35 por unidad
+      y 527.564,24 a la medicion de Estudios 3.926,79, estan en
+      MASTER_ESTUDIO, no aqui.
     grano: Una fila por linea de ESTUDIO (obra_id, partida_id, orden).
     clave_negocio: [obra_id, partida_id, orden]
     paso_etl: build_descompuestos
@@ -661,6 +665,58 @@ objetos:
         porque: La partida en su arbol de capitulos.
     ejemplos_preguntas:
       - Cual es el descompuesto de la partida X en el master vigente de la obra Y
+
+  v_pbi_master_estudio:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las lineas de origen MASTER_ESTUDIO de `descompuestos.lineas`, con el
+      origen CABLEADO (F-123): Estudios en las obras CON master 0, la version 0
+      del master con su descompuesto y la medicion de Estudios («CIERRE
+      INICIAL_ESTUDIO»). Tiene las MISMAS columnas y en el mismo orden que
+      `v_pbi_estudio`, que publica Estudios en las obras sin master 0: juntas
+      (UNION ALL) son Estudios entero, y cada obra esta en una sola de las dos.
+      Una sola version por obra, asi que no hace falta filtrar `fase_num`.
+      Ejemplo: la 04.02 FORJ. RETICULAR 35+10 de la 0726 (`partida_id` 419079),
+      10 lineas que suman 134,35 por unidad = el precio de la version 0.
+    grano: Una fila por linea de MASTER_ESTUDIO (obra_id, partida_id, orden).
+    clave_negocio: [obra_id, partida_id, orden]
+    paso_etl: build_descompuestos
+    refresco: nocturno
+    columnas:
+      obra_id: {significado: 'La obra, la de `maestro.obras.obra_id`.', agregacion: no_sumable}
+      partida_id: {significado: 'La partida, la de `stg.partidas.partida_id`.', agregacion: no_sumable}
+      presupuesto_id: {significado: 'La fila de `obrparpre` del descompuesto de la version 0.', agregacion: no_sumable}
+      orden: {significado: 'Posicion de la linea en el descompuesto, desde 1.', agregacion: no_sumable}
+      codigo_elemento: {significado: 'Codigo del elemento, libre por obra en Estudios.'}
+      descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
+      unidad: {significado: 'Unidad del elemento en el descompuesto.'}
+      codigo_alternativo: {significado: 'Codigo alternativo del elemento (campo 7).'}
+      tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
+      tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
+      naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
+      naturaleza: {significado: 'Nombre de la naturaleza del elemento (campo 17).'}
+      rendimiento: {significado: 'Cantidad por unidad de partida, sin el factor (tanto por uno en los porcentajes).', agregacion: no_sumable}
+      precio: {significado: 'Precio del elemento en la version 0; la base en los porcentajes.', unidad: EUR, agregacion: no_sumable}
+      importe_unitario: {significado: 'ROUND(factor x rendimiento x precio, 2); suma por partida = su precio de la version 0 si cuadra.', unidad: EUR, agregacion: suma}
+      cantidad_total: {significado: 'Cantidad total del elemento a la medicion de Estudios (la de la version 0; ya lleva el factor); mezcla unidades.', agregacion: no_sumable}
+      importe_total: {significado: 'ROUND(cantidad_total x precio, 2) a la medicion de Estudios de la version 0.', unidad: EUR, agregacion: suma}
+      es_porcentaje: {significado: 'TRUE en los tipos 4 y 13 (porcentajes).'}
+      porcentaje: {significado: 'Porcentaje en tanto por cien (2 = 2 %), sin el factor.', agregacion: no_sumable}
+      base_porcentaje: {significado: 'Base sobre la que se aplica el porcentaje.', unidad: EUR, agregacion: no_sumable}
+      factor: {significado: 'El FACTOR de la linea en la version 0 (campo 14 `factor x rendimiento`, F-120); 1 si no tiene.', agregacion: no_sumable, nulo_significa: 'Campo 14 vacio o raro.'}
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: La ficha de la obra.
+      - de: partida_id
+        a: stg.partidas.partida_id
+        cardinalidad: "N:1"
+        porque: La partida en su arbol de capitulos.
+    ejemplos_preguntas:
+      - Cual es el descompuesto de Estudios de la partida X de una obra con master 0
 
   _des_texto:
     tipo: tabla

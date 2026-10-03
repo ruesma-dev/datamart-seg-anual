@@ -2,17 +2,19 @@
 """
 Step que construye el esquema `descompuestos` (F-097): trocea el texto que dejo
 `ingest_descompuestos` en `descompuestos._des_texto` y publica las lineas, el
-catalogo de elementos, el cuadre y las tres vistas de Power BI.
+catalogo de elementos, el cuadre y las cuatro vistas de Power BI.
 
 Encadena los SQL de `sql/descompuestos/` en orden:
 
     00_setup.sql           esquema, estado del incremental, fn_num, fn_fecha
     01_troceado.sql        descompuestos.fn_trocear (UNA definicion)
-    02_lineas_coste.sql    lineas y cuadre (DDL) + ESTUDIO y PLANIF_JO enteros
+    02_lineas_coste.sql    lineas y cuadre (DDL, migracion de F-123) + ESTUDIO
+                           (solo obras sin master 0) y PLANIF_JO enteros
     03_lineas_master.sql   el MASTER por lotes de versiones (ver abajo)
     04_elementos.sql       el catalogo de elementos (DROP + CREATE)
     05_cuadre.sql          el cuadre del ambito 3 (ESTUDIO y PLANIF_JO)
-    06_views.sql           v_pbi_estudio, v_pbi_planif_jo, v_pbi_master_planif_jo
+    06_views.sql           v_pbi_estudio, v_pbi_planif_jo, v_pbi_master_planif_jo,
+                           v_pbi_master_estudio (F-123)
 
 **El master es incremental (R21).** Solo se retrocean las versiones cuyo sello
 de troceado no es el del SQL vigente: las que la ingesta releyo esta noche

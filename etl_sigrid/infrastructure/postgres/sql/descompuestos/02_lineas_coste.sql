@@ -18,14 +18,18 @@
 -- descompuesto, en otra obra: medido en solo lectura, las 227 chocan. El
 -- troceado las conserva (lo pide la spec) y el cuadre las deja fuera.
 --
--- LOS DOS ORIGENES DE COSTE, que son las dos pestanas del ambito 3:
+-- LOS DOS ORIGENES DE COSTE, que son las dos pestanas del ambito 3. Coste
+-- fase 0 es la FASE VIVA: el presupuesto de coste que el jefe de obra
+-- evoluciona dia a dia; su descompuesto es la planificacion de compras.
 --
---   ESTUDIO    la «Descomposicion» (ambito 3 fase 0), SOLO de las partidas SIN
---              ningun registro enlazado a la planificacion (D1): en 7.866 de
---              las 42.958 partidas con `des` ese texto es copia de su `dncpro`
---              y ya no es Estudios. Esas salen en el cuadre como
---              SUSTITUIDO_POR_PLANIFICACION (05) y su Estudios original, si
---              existe, esta en la version 0 del master (MASTER_INICIAL).
+--   ESTUDIO    la «Descomposicion» (ambito 3 fase 0), SOLO en las obras SIN
+--              master 0 (F-123: sin version 0 cargada en
+--              `_versiones_cargadas`; donde la hay, Estudios es MASTER_ESTUDIO
+--              y lo publica 03) y SOLO de las partidas SIN ningun registro
+--              enlazado a la planificacion (D1): en 7.866 de las 42.958
+--              partidas con `des` ese texto es copia de su `dncpro` y ya no es
+--              Estudios. Esas salen en el cuadre como
+--              SUSTITUIDO_POR_PLANIFICACION (05).
 --   PLANIF_JO  la «Planificacion compras»: las lineas de `dncpro` de la
 --              necesidad de la obra (`obr.dncide`), con partida, en el orden de
 --              la pestana (`pos`, `ide`), y con lo que solo ella tiene:
@@ -45,6 +49,15 @@
 -- importe unitario. La columna va AL FINAL (D8): la tabla persiste entre
 -- noches y en una base que ya la tiene la anade el `ALTER TABLE`, que es solo
 -- catalogo; sin DEFAULT, las filas del master aun no retroceadas quedan NULL.
+--
+-- EL CAMBIO DE NOMBRE DEL MASTER 0 (F-123). Las dos tablas persisten y
+-- `CREATE TABLE IF NOT EXISTS` no cambia un `CHECK` ya instalado: el bloque
+-- `DO` de detras de los `CREATE`, antes de cualquier `DELETE` o `INSERT`,
+-- traduce el origen de F-097 del master 0 a MASTER_ESTUDIO y cambia los dos
+-- `CHECK`, sin `DROP` ni `TRUNCATE` de las tablas. Solo actua la primera vez:
+-- despues el `CHECK` ya no nombra el origen viejo. El `UPDATE` hace falta aunque
+-- el sello retrocee: sin el, el `ADD CONSTRAINT` fallaria sobre las versiones
+-- aun no retroceadas.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS descompuestos.lineas (
@@ -87,7 +100,7 @@ CREATE TABLE IF NOT EXISTS descompuestos.lineas (
     tipo_version              TEXT,
     texto_version             TEXT,
     factor                    NUMERIC,
-    CONSTRAINT ck_lineas_origen CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_INICIAL', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')),
+    CONSTRAINT ck_lineas_origen CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')),
     CONSTRAINT pk_lineas PRIMARY KEY (origen, obra_id, partida_id, ambito_id, fase_num, orden)
 );
 
@@ -98,7 +111,7 @@ CREATE INDEX IF NOT EXISTS ix_lineas_version ON descompuestos.lineas (obra_id, a
 CREATE INDEX IF NOT EXISTS ix_lineas_partida ON descompuestos.lineas (partida_id);
 
 COMMENT ON TABLE descompuestos.lineas IS
-'F-097. Una fila por linea de descompuesto de cada partida, con su origen (ESTUDIO, PLANIF_JO, MASTER_INICIAL, MASTER_PRE_ABC, MASTER_PLANIF_JO). Nunca se suman origenes distintos: R-DESCOMPUESTO-ORIGEN.';
+'F-097. Una fila por linea de descompuesto de cada partida, con su origen (ESTUDIO, PLANIF_JO, MASTER_ESTUDIO, MASTER_PRE_ABC, MASTER_PLANIF_JO). Nunca se suman origenes distintos: R-DESCOMPUESTO-ORIGEN.';
 
 CREATE TABLE IF NOT EXISTS descompuestos.cuadre_partida (
     origen             TEXT NOT NULL,
@@ -112,7 +125,7 @@ CREATE TABLE IF NOT EXISTS descompuestos.cuadre_partida (
     diferencia         NUMERIC(18,2),
     num_lineas         INTEGER NOT NULL,
     estado             TEXT NOT NULL,
-    CONSTRAINT ck_cuadre_origen CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_INICIAL', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')),
+    CONSTRAINT ck_cuadre_origen CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')),
     CONSTRAINT ck_cuadre_estado CHECK (estado IN ('CUADRA', 'NO_CUADRA', 'SIN_DESCOMPUESTO', 'SUSTITUIDO_POR_PLANIFICACION')),
     CONSTRAINT pk_cuadre_partida PRIMARY KEY (origen, partida_id, ambito_id, fase_num)
 );
@@ -123,13 +136,43 @@ COMMENT ON TABLE descompuestos.cuadre_partida IS
 'F-097. Una fila por (origen, partida hoja con precio, ambito, fase): la suma del descompuesto por unidad frente al precio de la partida, y su estado.';
 
 -- ---------------------------------------------------------------------------
+-- F-123: la migracion del nombre del master 0 (R15, R16), una vez por tabla.
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+    -- El unico sitio del SQL donde sigue escrito el origen de F-097: solo
+    -- actua si el `CHECK` instalado aun lo admite (MASTER_INICIAL).
+    IF EXISTS (SELECT 1 FROM pg_constraint
+               WHERE conname = 'ck_lineas_origen'
+                 AND conrelid = 'descompuestos.lineas'::regclass
+                 AND pg_get_constraintdef(oid) LIKE '%MASTER_INICIAL%') THEN
+        ALTER TABLE descompuestos.lineas DROP CONSTRAINT ck_lineas_origen;
+        UPDATE descompuestos.lineas SET origen = 'MASTER_ESTUDIO' WHERE origen = 'MASTER_INICIAL';
+        ALTER TABLE descompuestos.lineas ADD CONSTRAINT ck_lineas_origen
+            CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO'));
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint
+               WHERE conname = 'ck_cuadre_origen'
+                 AND conrelid = 'descompuestos.cuadre_partida'::regclass
+                 AND pg_get_constraintdef(oid) LIKE '%MASTER_INICIAL%') THEN
+        ALTER TABLE descompuestos.cuadre_partida DROP CONSTRAINT ck_cuadre_origen;
+        UPDATE descompuestos.cuadre_partida SET origen = 'MASTER_ESTUDIO' WHERE origen = 'MASTER_INICIAL';
+        ALTER TABLE descompuestos.cuadre_partida ADD CONSTRAINT ck_cuadre_origen
+            CHECK (origen IN ('ESTUDIO', 'PLANIF_JO', 'MASTER_ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO'));
+    END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
 -- ESTUDIO y PLANIF_JO se reconstruyen enteros: fuera lo de anoche.
 -- ---------------------------------------------------------------------------
 DELETE FROM descompuestos.lineas WHERE origen IN ('ESTUDIO', 'PLANIF_JO');
 
 -- ESTUDIO (R15): el ambito 3 fase 0 de las partidas sin un solo registro
 -- enlazado. `enlazadas` son las filas de `obrparpre` cuya «Descomposicion» ya
--- es la planificacion del jefe de obra.
+-- es la planificacion del jefe de obra. F-123: solo en las obras SIN master 0,
+-- decidido contra `_versiones_cargadas` y no contra `lineas` porque 02 corre
+-- ANTES que 03 (una version 0 cargada esta noche aun no tendria lineas). Asi
+-- ninguna partida tiene a la vez MASTER_ESTUDIO y ESTUDIO.
 WITH troceado AS (
     SELECT d.presupuesto_id, d.obra_id, d.partida_id, d.ambito_id, d.fase_num, t.*
     FROM descompuestos._des_texto d
@@ -163,7 +206,9 @@ SELECT 'ESTUDIO', t.obra_id, t.partida_id, t.presupuesto_id, t.ambito_id, t.fase
        NULL::BOOLEAN, NULL::BOOLEAN, NULL::BOOLEAN, NULL::TEXT, NULL::TEXT,
        t.factor
 FROM troceado t
-WHERE NOT EXISTS (SELECT 1 FROM enlazadas e WHERE e.presupuesto_id = t.presupuesto_id);
+WHERE NOT EXISTS (SELECT 1 FROM enlazadas e WHERE e.presupuesto_id = t.presupuesto_id)
+  AND NOT EXISTS (SELECT 1 FROM descompuestos._versiones_cargadas v
+                  WHERE v.obra_id = t.obra_id AND v.fase_num = 0);
 
 -- PLANIF_JO (R16): `dncpro` de la necesidad de la obra, con partida. Se
 -- publica con ambito 3 y fase 0 (en `dncpro`, `ambide` y `fas` estan siempre a
