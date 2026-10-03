@@ -585,7 +585,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 17,
+      "priority": 1,
       "branch": "feature/F-038-comparativos"
     },
     {
@@ -1020,7 +1020,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "critico",
-      "priority": 30,
+      "priority": 2,
       "branch": "feature/F-067-compras-seguimiento-mcp"
     },
     {
@@ -1335,7 +1335,7 @@
       "status": "pending",
       "sdd": true,
       "rigor": "estandar",
-      "priority": 20,
+      "priority": 3,
       "branch": "feature/F-085-quien-aprobo-que-y-cuando"
     },
     {
