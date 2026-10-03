@@ -1930,21 +1930,6 @@
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-123-descompuestos-regla-origenes"
-    },
-    {
-      "id": "F-124",
-      "title": "Los capitulos raiz que quedan en OTRO (PROMOCION DELEGADA, MODIFICACIONES PROYECTO...): su coste no entra en el cierre y su venta si",
-      "description": "Hallazgo H1 del spec-author de F-113 (2026-10-03), remedido por el lider ese dia en solo lectura. Las partidas cuyo capitulo raiz no es CD/CI/CP ni numerico quedan con categoria OTRO. ESTAN cargadas en el datamart: `stg.partidas`, `mart.fact_seguimiento_mensual` y `mart.fact_seguimiento_categoria` (categoria OTRO). Pero el cierre (`cierre/02_build_fact.sql`) suma la VENTA de todas las partidas y el COSTE solo de CD, CI y CP: el coste de OTRO no entra y el beneficio del cierre sale inflado en esas obras. Casos medidos (coste real fuera del cierre / venta real que si entra): 0655 PD 6,09 M / 9,34 M (cierre 2025-12: coste 21,45 M frente a 27,55 M de mart, beneficio 10,98 M); 0644 MP 2,61 M / 2,05 M (beneficio 3,07 M); 0631 PD 1,12 M; 0601 PD 0,88 M; 0584 PD 0,79 M. Menores: LEV levantamientos (14 obras, 43.000), posventas (~40.000), y raices solo de venta (GG 0644 y 0628 0,92 M, MC 0,23 M, GG1, MCMP). DECISION DEL HUMANO (2026-10-03): «hay que dejarlos de momento con su esquema, sin entrar a si son CD o CI. lo veremos mas adelante». Nada cambia hasta que el humano decida que son PD y MP para la empresa (coste de obra: entran al cierre, en DIRECTOS o en un concepto propio; o gestion aparte: tambien sale su venta). F-113 no los toca.",
-      "acceptance": [
-        "Decidido por el humano (y Negocio) que son PD, MP y el resto de raices OTRO con importe, y como entran en el cierre",
-        "Aplicado en el cierre de forma que venta y coste de una misma raiz entren o salgan juntos, contrastado obra a obra antes y despues",
-        "Fichas del diccionario del cierre y de la categoria actualizadas en el mismo trabajo"
-      ],
-      "status": "pending",
-      "sdd": true,
-      "rigor": "critico",
-      "priority": 40,
-      "branch": "feature/F-124-raices-otro-en-cierre"
     }
   ]
 }

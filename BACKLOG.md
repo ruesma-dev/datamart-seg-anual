@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **114 features**, 67 abiertas, 47 terminadas.
+Resumen: **113 features**, 66 abiertas, 47 terminadas.
 
 En curso: **F-113**.
 
@@ -49,7 +49,6 @@ En curso: **F-113**.
 | F-058 | Estados financieros y cuenta de resultados por obra: el mart que se monta encima de la contabilidad | 38 | pendiente | critico | `feature/F-058-estados-financieros` |
 | F-048 | El guardian de secretos exime por el primer caracter y deja pasar contrasenas que empiezan por simbolo | 39 | pendiente | estandar | `feature/F-048-guardian-secretos-poroso` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 40 | pendiente | critico | `feature/F-040-ingresos` |
-| F-124 | Los capitulos raiz que quedan en OTRO (PROMOCION DELEGADA, MODIFICACIONES PROYECTO...): su coste no entra en el cierre y su venta si | 40 | pendiente | critico | `feature/F-124-raices-otro-en-cierre` |
 | F-049 | El informe de mutacion deja el sello PENDIENTE puesto despues de resolverse | 41 | pendiente | estandar | `feature/F-049-sello-pendiente-mutacion` |
 | F-054 | El diccionario explica el esquema pero no el negocio: la IA no sabe que es el incurrido ni como se hace un flujo de caja en Ruesma | 43 | pendiente | documental | `feature/F-054-conocimiento-de-negocio` |
 | F-029 | La campaña de mutación no se puede creer: la vía paralela regala muertos y una interrupción deja el árbol mutado | 44 | pendiente | critico | `feature/F-029-mutacion-fiable` |
@@ -360,12 +359,6 @@ Nace el 2026-08-27 del hallazgo del reviewer en la 21a pasada de F-006, y NO es 
 estado **pendiente** · prioridad 40 · rigor `critico` · SDD sí · rama `feature/F-040-ingresos`
 
 Nacida el 2026-08-20 del analisis de dominio de F-006. Es el hueco caro y estructural del datamart: el lado del dinero que entra esta practicamente ausente, y sin el no hay flujo de caja completo ni analisis de cliente. Tres bloques. (1) VENTAS: dvf y dvfpro -facturas de venta y sus lineas, que llevan paride- no se ingieren; hay un config/tables_sigrid_venta_snippet.yaml preparado y sin integrar desde hace tiempo. Su ausencia deja ademas muerta la vista retenciones.v_src_lineas_venta, que existe vacia por diseno, y por eso las retenciones de cliente no tienen respaldo de atribucion a obra ni CIF. (2) CERTIFICACIONES a cliente: cer, cerpro -lineas con paride- y obrcer -con prorea, cerobr, cerrev, ceraac- son el eslabon que falta entre la produccion y el cobro; hoy tenemos la produccion como importe y el efecto de cobro, pero nada en medio. (3) CLIENTES: la tabla cli no se ingiere. Solo conocemos el nombre del cliente via con.res desde obr.entide, asi que no se puede responder ni quienes son nuestros diez mayores clientes ni nada que exija su CIF o su clasificacion. Depende de la capacidad del ETL: son tablas grandes y F-035 esta midiendo el tiempo de carga; la spec debe estimar el impacto en la ventana nocturna antes de comprometerse.
-
-### F-124 · Los capitulos raiz que quedan en OTRO (PROMOCION DELEGADA, MODIFICACIONES PROYECTO...): su coste no entra en el cierre y su venta si
-
-estado **pendiente** · prioridad 40 · rigor `critico` · SDD sí · rama `feature/F-124-raices-otro-en-cierre`
-
-Hallazgo H1 del spec-author de F-113 (2026-10-03), remedido por el lider ese dia en solo lectura. Las partidas cuyo capitulo raiz no es CD/CI/CP ni numerico quedan con categoria OTRO. ESTAN cargadas en el datamart: `stg.partidas`, `mart.fact_seguimiento_mensual` y `mart.fact_seguimiento_categoria` (categoria OTRO). Pero el cierre (`cierre/02_build_fact.sql`) suma la VENTA de todas las partidas y el COSTE solo de CD, CI y CP: el coste de OTRO no entra y el beneficio del cierre sale inflado en esas obras. Casos medidos (coste real fuera del cierre / venta real que si entra): 0655 PD 6,09 M / 9,34 M (cierre 2025-12: coste 21,45 M frente a 27,55 M de mart, beneficio 10,98 M); 0644 MP 2,61 M / 2,05 M (beneficio 3,07 M); 0631 PD 1,12 M; 0601 PD 0,88 M; 0584 PD 0,79 M. Menores: LEV levantamientos (14 obras, 43.000), posventas (~40.000), y raices solo de venta (GG 0644 y 0628 0,92 M, MC 0,23 M, GG1, MCMP). DECISION DEL HUMANO (2026-10-03): «hay que dejarlos de momento con su esquema, sin entrar a si son CD o CI. lo veremos mas adelante». Nada cambia hasta que el humano decida que son PD y MP para la empresa (coste de obra: entran al cierre, en DIRECTOS o en un concepto propio; o gestion aparte: tambien sale su venta). F-113 no los toca.
 
 ### F-049 · El informe de mutacion deja el sello PENDIENTE puesto despues de resolverse
 
