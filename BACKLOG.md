@@ -3,9 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **113 features**, 66 abiertas, 47 terminadas.
-
-En curso: **F-113**.
+Resumen: **113 features**, 65 abiertas, 48 terminadas.
 
 ## Trabajo abierto
 
@@ -13,7 +11,6 @@ En curso: **F-113**.
 |---|---|---|---|---|---|
 | F-037 | Esquema tesoreria: el flujo de caja que hoy se tira | 2 | pendiente | critico | `feature/F-037-tesoreria` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
-| F-113 | La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto | 5 | en curso | critico | `feature/F-113-categoria-capitulo-por-prefijo` |
 | F-121 | El recurso principal de cada recurso auxiliar (campo extendido «Recurso asociado» de Sigrid): a que trabajador va cada vehiculo | 5 | pendiente | estandar | `feature/F-121-recurso-principal-auxiliar` |
 | F-114 | Rescatar dos peticiones de `mcp-bbdd` que solo vivian en la rama `dev`: la regla de las columnas `_raw` y el orden de magnitud de `stg.presupuesto` | 6 | pendiente | estandar | `feature/F-114-avisos-mcp-rescatados` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 7 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
@@ -111,6 +108,7 @@ En curso: **F-113**.
 | F-094 | Retenciones infladas 4,3 veces: el estado VIVA sale solo de fecrea y cuenta los agrupados dos veces y lo ya pagado | 4 | estandar |
 | F-108 | `check-unicidad` vigila tambien las claves alternativas: `clave_obra` y `clave_recurso` (desviacion 6 de F-102) | 4 | estandar |
 | F-004 | Ejecutar el ETL en Azure sin dependencias locales | 5 | estandar |
+| F-113 | La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto | 5 | critico |
 | F-015 | Verificar que los tests son de verdad: mutacion, fase RED, cobertura y niveles de rigor | 6 | estandar |
 | F-073 | Construir con lo que el censo encuentre: tablas procesadas nuevas y enriquecimiento de las actuales | 6 | estandar |
 | F-074 | La ingesta que destapa el censo: 9 tablas que faltan, una carga incremental falsa y un campo excluido que hacia falta | 6 | estandar |
@@ -143,12 +141,6 @@ Nacida el 2026-08-20 del analisis de dominio de F-006. Hacer el flujo de caja de
 estado **spec lista** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-111-nombres-partida-por-ancestro`
 
 Decision D3 del humano sobre la spec de F-109 (2026-09-26). Medido por el spec-author de F-109 el 2026-09-25 en solo lectura: `mart.v_pbi_dim_partida_niveles` resuelve el NOMBRE de cada escalon del arbol por `(obra, codigo_partida)` con `MAX`, y como el codigo se repite dentro de la obra (5.202 pares: arboles paralelos, subcapitulos copiados bajo cada bloque o fase, un capitulo por contrato...), 10.593 filas (4.657 del seguimiento) ensenan algun escalon con el nombre de otra partida. `cierre.v_pbi_dim_subcategoria_ci` y el detalle de costes indirectos agrupan por codigo: 22 filas con nombre ajeno, y las dos fases de la 0444 caen en el mismo grupo `CI.1`. NO duplica importes: solo etiquetas. QUE HACER: resolver el nombre de cada escalon por el ANCESTRO real (`capitulo_padre_id`/ruta, por `partida_id`) y no por codigo, en `mart` y en `cierre`; decidir con Negocio si fundir las fases de la 0444 en `CI.1` es lo que quiere. Afecta a las etiquetas del Arbol Presupuesto de Power BI: contrastar antes y despues.
-
-### F-113 · La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto
-
-estado **en curso** · prioridad 5 · rigor `critico` · SDD sí · rama `feature/F-113-categoria-capitulo-por-prefijo`
-
-Hallazgo H1 del spec-author de F-111 (2026-09-26); fichada por el humano ese dia, prioridad 5. La categoria de una partida (CD/CI/CP/OTRO) se decide en `etl_sigrid/infrastructure/postgres/sql/stg/04_partidas.sql` (CTE `arbol_categorizado`) por el codigo del CAPITULO RAIZ con `UPPER(capitulo_raiz_cod) LIKE '%CD%'`, luego `'%CI%'`, luego `'%CP%'`. Un `LIKE` con comodines a los dos lados casa letras sueltas dentro de cualquier codigo: `AVDA_FRANCIA` y `P1414_PISCIN`/`PCI` (piscina) contienen «CI» y sus partidas quedan como COSTE INDIRECTO. Y el orden de los `WHEN` hace que un codigo con «CD» y «CI» caiga en CD. RIESGO: mueve coste entre directo e indirecto en el seguimiento, y con ello los margenes y el cuadro de cierre. QUE HACER: (1) medir en solo lectura TODOS los capitulos raiz cuya categoria depende de un `LIKE` que no es el prefijo real, cuantas partidas y cuanto coste y venta real y planificado arrastran, en cuantas obras del seguimiento; (2) proponer una regla correcta (prefijo exacto o lista cerrada de raices, contrastada con como nombra Ruesma sus capitulos) y dejar la decision al humano; (3) contrastar el efecto en `mart` y `cierre` antes y despues (categorias CD/CI del cuadro, beneficio) con `huella-obras` como en F-042. Relacion: F-111 corrige NOMBRES en la dimension CI; esta corrige la CATEGORIA. ================ CRITERIO DEL HUMANO (2026-09-26): «el CI o CD deberiamos medirlo por el PADRE». La categoria de una partida se HEREDA de su capitulo ancestro (subiendo por `capitulo_padre_id` hasta el capitulo que es CD, CI o CP), no se adivina por letras dentro del codigo de la raiz. La spec debe definir como se reconoce ese capitulo ancestro (codigo exacto `CD`/`CI`/`CP` y sus variantes reales medidas, p. ej. `CD-FII`; o la marca que Sigrid tenga para ello, si existe) y que pasa con las ramas sin ancestro reconocible (`OTRO`, declarado). Reutiliza la subida por padre de F-111 (`capitulo_padre_id`, tope de 40 niveles). ALTERNATIVA DEL HUMANO (mismo dia): «o poner una regla que EMPIECE por CI / CD, no solo que contenga» (`LIKE 'CD%'` en vez de `LIKE '%CD%'`). La spec mide las DOS opciones —(A) heredar la categoria del capitulo padre/ancestro; (B) prefijo del codigo del capitulo raiz— con sus cifras (capitulos, partidas, obras e importes que cambian respecto a hoy y entre si, incluidas variantes como `CD-FII` y raices numericas) y deja la eleccion al humano.
 
 ### F-121 · El recurso principal de cada recurso auxiliar (campo extendido «Recurso asociado» de Sigrid): a que trabajador va cada vehiculo
 
@@ -701,6 +693,12 @@ Decidido por el humano el 2026-09-24 (opcion B), prioridad 2, detras de F-107. S
 estado **terminada** · prioridad 5 · rigor `estandar` · SDD sí · rama `feature/F-004-etl-sin-dependencias-locales`
 
 CORREGIDO 2026-08-08 tras la spec: la premisa anterior era falsa. LoadExcelAuxStep NO lee hoy ficheros locales: es un stub que devuelve SKIPPED, y las variables AUX_EXCEL_* existen en config/settings.py pero nadie las lee, asi que el pipeline no esta roto hoy en un contenedor por este motivo. La feature construye la CAPACIDAD de lectura: que el step resuelva los tres Excels auxiliares indistintamente desde ruta local o desde Azure Blob Storage con identidad gestionada, los abra y valide que son legibles. NO los carga a aux.*: las tablas destino no existen y el esquema de los ficheros no esta en el repositorio (ver DA-4.1). Incluye auditar el resto de steps en busca de dependencias del sistema de ficheros local.
+
+### F-113 · La clasificacion de capitulos en costes directos/indirectos busca «CI» en cualquier parte del codigo: `AVDA_FRANCIA` o `P1414_PISCIN` pasan a coste indirecto
+
+estado **terminada** · prioridad 5 · rigor `critico` · SDD sí · rama `feature/F-113-categoria-capitulo-por-prefijo`
+
+Hallazgo H1 del spec-author de F-111 (2026-09-26); fichada por el humano ese dia, prioridad 5. La categoria de una partida (CD/CI/CP/OTRO) se decide en `etl_sigrid/infrastructure/postgres/sql/stg/04_partidas.sql` (CTE `arbol_categorizado`) por el codigo del CAPITULO RAIZ con `UPPER(capitulo_raiz_cod) LIKE '%CD%'`, luego `'%CI%'`, luego `'%CP%'`. Un `LIKE` con comodines a los dos lados casa letras sueltas dentro de cualquier codigo: `AVDA_FRANCIA` y `P1414_PISCIN`/`PCI` (piscina) contienen «CI» y sus partidas quedan como COSTE INDIRECTO. Y el orden de los `WHEN` hace que un codigo con «CD» y «CI» caiga en CD. RIESGO: mueve coste entre directo e indirecto en el seguimiento, y con ello los margenes y el cuadro de cierre. QUE HACER: (1) medir en solo lectura TODOS los capitulos raiz cuya categoria depende de un `LIKE` que no es el prefijo real, cuantas partidas y cuanto coste y venta real y planificado arrastran, en cuantas obras del seguimiento; (2) proponer una regla correcta (prefijo exacto o lista cerrada de raices, contrastada con como nombra Ruesma sus capitulos) y dejar la decision al humano; (3) contrastar el efecto en `mart` y `cierre` antes y despues (categorias CD/CI del cuadro, beneficio) con `huella-obras` como en F-042. Relacion: F-111 corrige NOMBRES en la dimension CI; esta corrige la CATEGORIA. ================ CRITERIO DEL HUMANO (2026-09-26): «el CI o CD deberiamos medirlo por el PADRE». La categoria de una partida se HEREDA de su capitulo ancestro (subiendo por `capitulo_padre_id` hasta el capitulo que es CD, CI o CP), no se adivina por letras dentro del codigo de la raiz. La spec debe definir como se reconoce ese capitulo ancestro (codigo exacto `CD`/`CI`/`CP` y sus variantes reales medidas, p. ej. `CD-FII`; o la marca que Sigrid tenga para ello, si existe) y que pasa con las ramas sin ancestro reconocible (`OTRO`, declarado). Reutiliza la subida por padre de F-111 (`capitulo_padre_id`, tope de 40 niveles). ALTERNATIVA DEL HUMANO (mismo dia): «o poner una regla que EMPIECE por CI / CD, no solo que contenga» (`LIKE 'CD%'` en vez de `LIKE '%CD%'`). La spec mide las DOS opciones —(A) heredar la categoria del capitulo padre/ancestro; (B) prefijo del codigo del capitulo raiz— con sus cifras (capitulos, partidas, obras e importes que cambian respecto a hoy y entre si, incluidas variantes como `CD-FII` y raices numericas) y deja la eleccion al humano.
 
 ### F-015 · Verificar que los tests son de verdad: mutacion, fase RED, cobertura y niveles de rigor
 

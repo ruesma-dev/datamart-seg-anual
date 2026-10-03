@@ -12,7 +12,11 @@
 
 
 
-## 2026-10-03 · F-113 · IMPLEMENTADA (T1-T8), pendiente de review · D1 = A, D2 = contraste ligero
+## 2026-10-03 · F-113 · CERRADA (`done`, APROBADO en pasada 2) · la categoría CD/CI/CP por el capítulo · SIN DESPLEGAR: quedan T9-T12 del humano
+
+> **Cerrada el 2026-10-03** con APROBADO del reviewer (`progress/review_F-113.md`; la
+> pasada 1 pidió solo tests de R14/R15), `init.sh` en verde (6.423 passed). Resumen
+> en `progress/history.md`. Rama sin integrar en `main`.
 
 Spec aprobada por el humano el 2026-10-03 (D1 = A, D2 = ligero: T13-T15 fuera).
 Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
