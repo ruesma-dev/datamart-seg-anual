@@ -2,7 +2,7 @@
 
 Rama `feature/F-113-categoria-capitulo-por-prefijo`. Un commit por tarea (`F-113 Tn: …`). [B] = cambia si el humano elige la opción B (ver `design.md`).
 
-- [ ] T1: Tests de dominio `tests/test_f113_categoria.py` (R1-R6, R9) con los códigos medidos; fase RED pegada en `progress/impl_F-113.md`  |  Verificación: `pytest tests/test_f113_categoria.py` falla por import/atributo inexistente
+- [x] T1: Tests de dominio `tests/test_f113_categoria.py` (R1-R6, R9) con los códigos medidos; fase RED pegada en `progress/impl_F-113.md`  |  Verificación: `pytest tests/test_f113_categoria.py` falla por import/atributo inexistente
 - [ ] T2: `etl_sigrid/domain/categoria_partida.py` y `categoria` en `Partida`/`_Paso` de `domain/arbol_partidas.py` [B: `categoria_heredada` devuelve la del padre]  |  Verificación: `pytest tests/test_f113_categoria.py tests/test_f052_arbol.py` en verde
 - [ ] T3: Tests textuales `tests/test_f113_sql.py` (R7, R10, R11); fase RED pegada  |  Verificación: `pytest tests/test_f113_sql.py` falla contra el SQL de `main`
 - [ ] T4: `sql/stg/04_partidas.sql` (columna `categoria` en las dos ramas, fuera `arbol_categorizado`, cabecera R16) y `_rama_recursiva()` de `tests/test_f052_sql.py`  |  Verificación: `pytest tests/test_f113_sql.py tests/test_f052_sql.py tests/test_f006_stg_trampas.py` en verde
