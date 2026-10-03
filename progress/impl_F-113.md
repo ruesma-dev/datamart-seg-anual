@@ -132,3 +132,64 @@ menciones ajenas a la categoría (oficio en `compras`/`stg.v_*`, `es_hoja`, P3).
   `fichero:línea`, texto exacto original → mutado y nº de fallos en el informe.
   M08 y M09 (orden de `WHEN` excluyentes) son **equivalentes**; los mata el test
   textual que exige el orden del dominio (falso positivo, no falso verde).
+
+## Ficheros tocados
+
+- Nuevos: `etl_sigrid/domain/categoria_partida.py` (regla, constantes),
+  `tests/test_f113_categoria.py` (110 casos), `tests/test_f113_sql.py` (11),
+  `progress/mediciones/F-113_mutacion_sql.py`, `progress/mutacion_F-113.md`.
+- `sql/stg/04_partidas.sql`: `categoria` como 15ª columna de las dos ramas del
+  recursivo, fuera `arbol_categorizado`, cabecera reescrita (R16).
+- `domain/arbol_partidas.py`: `categoria` en `Partida` (último campo) y `_Paso`.
+- `tests/test_f052_sql.py` (`_rama_recursiva()` corta en el `INSERT`; 14 → 15
+  columnas) y `tests/test_f123_origenes.py` (`== 40` → `>= 40`).
+- Documentación: `config/diccionario/{stg,mart,raw,00_global}.yaml` (v41),
+  `config/tables_sigrid.yaml`, `README.md` §5.3.1 y §6.3.
+
+## Decisiones de diseño
+
+- Constante extra `CATEGORIA_DE_RAIZ_NUMERICA = "CD"` (el diseño no la listaba):
+  así el test textual cruza también el `THEN 'CD'` de la regla numérica.
+- Los tests del SQL **construyen** el `CASE` esperado desde las tuplas del
+  dominio, en su orden: si una orilla cambia sin la otra, cae (R10).
+- La categoría la decide el **propio nodo** si su código es exacto, también una
+  hoja (no solo los capítulos): es lo que dice R4 y lo que midió la spec.
+
+## Desviaciones respecto a la spec (justificadas)
+
+1. **`tests/test_f052_sql.py`: además de `_rama_recursiva()`, el recuento 14 →
+   15** de `test_f052_las_dos_ramas_...`. El diseño decía «nada más cambia en los
+   tests de F-052», pero R7 añade una columna a las dos ramas y ese test cuenta
+   las columnas: es consecuencia directa de R7, no una decisión nueva.
+2. **`tests/test_f123_origenes.py`: `== 40` → `>= 40`.** R14 sube la `version`
+   a 41 y el test de F-123 la fijaba exacta (rompía la línea base de la
+   mutación). Mismo arreglo que F-123 hizo al de F-120 (`e138fcb`).
+3. **Campaña manual también sobre el dominio** (D01-D20): el arnés genera un
+   solo mutante en 104 líneas; con rigor crítico eso no es evidencia suficiente.
+
+## Fuera del alcance
+
+T13-T15 (D2 = contraste ligero). Las raíces OTRO (`PD`, `MP`, `LEV`, `GG`,
+`MC`, posventas): no se tocan, y T5 mide 0 partidas de ellas que cambien
+(hallazgo H1 de la spec, sin fichar). La dimensión CI del cierre de 0462, 0500
+y 229 enseñará como grupo el segundo escalón (`CI`, `C.I.`): declarado en la
+spec (§6), materia de F-111, que deberá remedir su dimensión CI.
+
+## Verificaciones MANUAL pendientes (humano), en orden
+
+- **T9** · merge a `main`, imagen con tag fechado desde `main`
+  (`infra/70_build_image.ps1`) y job apuntando a ella (`infra/85_update_job.ps1
+  -Tag rYYYYMMDD-HHmm`). Debe salir el tag nuevo en
+  `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
+- **T10** · dejar correr la nocturna (00:00 UTC); `python main.py status` con
+  `run-all` SUCCESS de esa noche.
+- **T11** · `python main.py publicar-diccionario` (debe publicar la **v41**),
+  reiniciar el MCP y `python main.py check-diccionario` OK.
+- **T12** · solo lectura, las consultas de `progress/spec_F-113.md` §4. Debe
+  salir: por obra, la tabla de T5 (0229: 95 CI; 229: 9 CI; 0462: 10 CI; 0500:
+  11 CI; 596085 y 998691: 0 CI; 1734235: 99 CI y 13 CP más los que ya lo eran);
+  0 partidas CI con raíz `AVDA_FRANCIA`/`P1414_PCI`/`P1414_PISCIN`; recuento
+  global ≈ CD 287.734 / CI 64.307 / CP 8.421 / OTRO 34.745 (salvo partidas
+  nuevas de esa ingesta); 229 en `cierre.fact_cierre_mensual` 2011-01..03 con
+  INDIRECTOS hasta +8.121 EUR y BENEFICIO lo mismo a la baja; 0462 en
+  `mart.fact_seguimiento_categoria` con 25.002 EUR de Venta Real en CI (antes CD).

@@ -19,6 +19,28 @@ Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
 T8. Límite del humano: las raíces que hoy quedan en OTRO (`PD`, `MP`, `LEV`,
 posventas, `GG`, `MC`...) no se tocan; T5 lo comprueba partida a partida.
 
+**Estado real (implementer):** T1-T7 hechas, un commit por tarea. T5 (solo
+lectura contra Azure, 11,5 s): la tabla de `spec_F-113.md` §2 sale **exacta**
+(A 490 partidas / 7 obras; B 253 / 2), 0 cambios en las otras diez columnas, 0
+partidas de raíces `PD`/`MP`/`LEV`/`GG`/`MC`/`POS…` que cambien. T7: arnés 1/1
+muerto; manual 47/47 muertos (SQL y dominio). Diccionario a **v41**.
+Desviaciones (justificadas en `impl_F-113.md`): recuento 14 → 15 en un test de
+F-052 (consecuencia de R7) y `== 40` → `>= 40` en el test de versión de F-123.
+
+**MANUAL del humano, en orden** (detalle y resultado esperado en
+`progress/impl_F-113.md`, «Verificaciones MANUAL»):
+1. **T9** · merge a `main`; imagen con tag fechado desde `main`
+   (`powershell -NoProfile -File infra/70_build_image.ps1`) y job a ella
+   (`powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm`);
+   comprobar con `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`.
+2. **T10** · nocturna de las 00:00 UTC con la imagen nueva; `python main.py status`
+   con `run-all` SUCCESS.
+3. **T11** · `python main.py publicar-diccionario` (v41), reiniciar el MCP y
+   `python main.py check-diccionario` OK.
+4. **T12** · solo lectura: las consultas de `progress/spec_F-113.md` §4 contra la
+   previsión de T5 (por obra, recuento global, 229 en el cierre, 0462 en `mart`);
+   resultado aquí.
+
 ### Antes: SPEC ESCRITA, pendiente de aprobación del humano
 
 Spec-author: `specs/F-113-categoria-capitulo-por-prefijo/` (requirements 95/150,
