@@ -1,10 +1,12 @@
 # progress/mediciones/F-113_mutacion_sql.py
 """
-F-113 · T7: campaña de mutación MANUAL sobre el SQL de la categoría.
+F-113 · T7: campaña de mutación MANUAL sobre el SQL y el dominio de la categoría.
 
-`python -m harness.mutacion` solo muta Python (el dominio); la lógica de F-113
-vive también en `sql/stg/04_partidas.sql`, así que sus mutantes se escriben a
-mano aquí (lo pidió el reviewer de F-123: el script, versionado en `progress/`).
+`python -m harness.mutacion` solo muta Python, y sobre el dominio de F-113 su
+juego de operadores genera UN mutante en 104 líneas. La lógica vive además en
+`sql/stg/04_partidas.sql`, que el arnés no muta. Así que los mutantes se
+escriben a mano aquí: M01-M27 sobre el SQL y D01-D20 sobre el dominio (lo pidió
+el reviewer de F-123: el script, versionado en `progress/`).
 
 Método, por cada mutante y EN SERIE (1 worker):
 
@@ -33,10 +35,15 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 SQL = "etl_sigrid/infrastructure/postgres/sql/stg/04_partidas.sql"
+CATEGORIA = "etl_sigrid/domain/categoria_partida.py"
+ARBOL = "etl_sigrid/domain/arbol_partidas.py"
+#: Los que leen el SQL o ejecutan el dominio. Los mismos para cada mutante.
 TESTS = (
     "tests/test_f113_sql.py",
     "tests/test_f052_sql.py",
     "tests/test_f006_stg_trampas.py",
+    "tests/test_f113_categoria.py",
+    "tests/test_f052_arbol.py",
 )
 
 R1 = "WHEN UPPER(p.cod) LIKE 'CD%' THEN 'CD'"
@@ -79,6 +86,30 @@ MUTANTES: list[tuple[str, str, str, str]] = [
     ("M27", "    categoria,\n    ruta_capitulos,\n    nivel,", "    'OTRO' AS categoria,\n    ruta_capitulos,\n    nivel,", "el INSERT no copia la categoría del recursivo"),
 ]
 
+#: Los del dominio: (id, fichero, original, mutado, qué simula).
+MUTANTES_DOMINIO: list[tuple[str, str, str, str, str]] = [
+    ("D01", CATEGORIA, 'CATEGORIAS_DE_CAPITULO: tuple[str, ...] = ("CD", "CI", "CP")', 'CATEGORIAS_DE_CAPITULO: tuple[str, ...] = ("CD", "CI")', "fuera CP de las categorías"),
+    ("D02", CATEGORIA, 'RAICES_NUMERICAS_FUERA: tuple[str, ...] = ("34", "99")', 'RAICES_NUMERICAS_FUERA: tuple[str, ...] = ("34",)', "fuera el 99"),
+    ("D03", CATEGORIA, 'CATEGORIA_DE_RAIZ_NUMERICA = "CD"', 'CATEGORIA_DE_RAIZ_NUMERICA = "CI"', "numérica -> CI"),
+    ("D04", CATEGORIA, 'CARACTERES_IGNORADOS_EN_INTERMEDIO: tuple[str, ...] = (".", " ")', 'CARACTERES_IGNORADOS_EN_INTERMEDIO: tuple[str, ...] = (".",)', "no se quitan espacios"),
+    ("D05", CATEGORIA, 'OTRO = "OTRO"', 'OTRO = "OTROS"', "otro literal de OTRO"),
+    ("D06", CATEGORIA, '_NUMERICO_PURO = re.compile(r"[0-9]+")', '_NUMERICO_PURO = re.compile(r"[0-9]*")', "la cadena vacía cuenta como numérica"),
+    ("D07", CATEGORIA, "mayusculas = cod.upper()", "mayusculas = cod", "sin mayúsculas en la raíz"),
+    ("D08", CATEGORIA, "if mayusculas.startswith(categoria):", "if categoria in mayusculas:", "vuelve el defecto: letras en cualquier posición"),
+    ("D09", CATEGORIA, "if _NUMERICO_PURO.fullmatch(cod) and", "if _NUMERICO_PURO.match(cod) and", "numérica solo al principio (match)"),
+    ("D10", CATEGORIA, "and cod not in RAICES_NUMERICAS_FUERA:", "and cod in RAICES_NUMERICAS_FUERA:", "not in -> in"),
+    ("D11", CATEGORIA, "return CATEGORIA_DE_RAIZ_NUMERICA", "return OTRO", "numérica -> OTRO"),
+    ("D12", CATEGORIA, "            return categoria\n    if _NUMERICO", "            return OTRO\n    if _NUMERICO", "el prefijo devuelve OTRO"),
+    ("D13", CATEGORIA, 'limpio = limpio.replace(caracter, "")', 'limpio = limpio.replace(caracter, "_")', "el carácter ignorado se sustituye en vez de quitarse"),
+    ("D14", CATEGORIA, "    limpio = limpio.upper()\n", "", "sin mayúsculas en el intermedio"),
+    ("D15", CATEGORIA, "if limpio in CATEGORIAS_DE_CAPITULO:", "if limpio.startswith(CATEGORIAS_DE_CAPITULO):", "prefijo en los intermedios"),
+    ("D16", CATEGORIA, "        return limpio\n", "        return categoria_padre\n", "el intermedio exacto no manda"),
+    ("D17", CATEGORIA, "    return categoria_padre\n", "    return OTRO\n", "el intermedio no hereda"),
+    ("D18", ARBOL, "categoria = categoria_de_raiz(cod)", 'categoria = "CD"', "la raíz no se clasifica"),
+    ("D19", ARBOL, "categoria = categoria_heredada(hijo.cod, paso.categoria)", "categoria = paso.categoria", "el árbol ignora el intermedio exacto"),
+    ("D20", ARBOL, "visitados=paso.visitados | {hijo.ide},\n                        categoria=categoria,", "visitados=paso.visitados | {hijo.ide},\n                        categoria=paso.categoria,", "el paso no arrastra la del intermedio a sus hijos"),
+]
+
 
 def _git(*args: str, cwd: Path = RAIZ) -> str:
     return subprocess.run(
@@ -107,10 +138,6 @@ def main() -> None:
     arbol = temporal / "wt"
     _git("worktree", "add", "--detach", str(arbol), sha)
     try:
-        ruta = arbol / SQL
-        original = ruta.read_bytes()
-        texto = original.decode("utf-8")
-
         n, _, s, resumen = _pytest(arbol)
         print(f"SHA {sha} · worktree {arbol} · 1 worker")
         print(f"Línea base ANTES: {resumen} ({s:.1f} s)")
@@ -118,7 +145,11 @@ def main() -> None:
 
         filas = []
         t_total = time.monotonic()
-        for ident, orig, mut, que in MUTANTES:
+        todos = [(i, SQL, o, m, q) for i, o, m, q in MUTANTES] + MUTANTES_DOMINIO
+        for ident, fichero, orig, mut, que in todos:
+            ruta = arbol / fichero
+            original = ruta.read_bytes()
+            texto = original.decode("utf-8")
             assert texto.count(orig) == 1, f"{ident}: el original aparece {texto.count(orig)} veces"
             linea = texto[: texto.index(orig)].count("\n") + 1
             ruta.write_bytes(texto.replace(orig, mut).encode("utf-8"))
@@ -128,7 +159,7 @@ def main() -> None:
                 ruta.write_bytes(original)
             assert ruta.read_bytes() == original
             nombres = sorted({c.split("::")[-1] for c in caidos})
-            filas.append((ident, linea, orig, mut, n, nombres, que, s))
+            filas.append((ident, f"{Path(fichero).name}:{linea}", orig, mut, n, nombres, que, s))
             estado = "MUERTO" if n else "SUPERVIVIENTE"
             print(f"{ident} {estado} fallos={n} ({s:.1f} s) {que}", flush=True)
         total = time.monotonic() - t_total
@@ -145,7 +176,7 @@ def main() -> None:
         print("|---|---|---|---|---|---|---|")
         for ident, linea, orig, mut, n, nombres, que, _ in filas:
             print(
-                f"| {ident} | `04_partidas.sql:{linea}` | {celda(orig)} | {celda(mut)} | {n} "
+                f"| {ident} | `{linea}` | {celda(orig)} | {celda(mut)} | {n} "
                 f"| {que} | {', '.join(nombres)} |"
             )
         vivos = [f[0] for f in filas if f[4] == 0]
