@@ -12,7 +12,19 @@
 
 
 
-## 2026-10-03 · F-123 · CERRADA (`done`, APROBADO en pasada 2) · la regla de orígenes del descompuesto · SIN DESPLEGAR: quedan T13-T18 del humano
+## 2026-10-03 · F-123 · CERRADA (`done`, APROBADO en pasada 2) · la regla de orígenes del descompuesto · IMAGEN DESPLEGADA, FALTA EL BUILD (T16-T17)
+
+> **Desplegado por el líder el 2026-10-03, por orden del humano** («mergea, haz
+> commit... despliega, reinicia MCP, y modifica diccionario. después lanzamos
+> build»): merge a `main` `bc2e658`; T14 hecha (abajo); **T15** imagen
+> `r20261003-0942` desde `main` bc2e658, job comprobado con `az containerapp job
+> show` -> `r20261003-0942`; **T18** `publicar-diccionario` **v40** (hash
+> e1117fc3aaef, 190 objetos, 1.437 columnas, 21 reglas) a las 07:42 UTC y MCP
+> reiniciado (revisión `ca-mcp-bbdd-dev--0000014`), sirviendo la v40. **T13 sin
+> hacer.** HASTA EL BUILD: el diccionario dice `MASTER_ESTUDIO` y la base aún tiene
+> `MASTER_INICIAL`; `check-diccionario` dará `v_pbi_master_estudio` y
+> `lineas_master_estudio` como fichados sin objeto hasta T16. Si no se lanza a
+> mano, la nocturna (00:00 UTC) hará la migración y retroceará con tope.
 
 > **Cerrada el 2026-10-03** con APROBADO del reviewer (`progress/review_F-123.md`),
 > `init.sh` en verde (6.285 passed, relanzado por el reviewer). Resumen en
