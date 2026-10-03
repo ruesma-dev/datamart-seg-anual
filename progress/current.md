@@ -16,7 +16,15 @@
 
 > **Cerrada el 2026-10-03** con APROBADO del reviewer (`progress/review_F-113.md`; la
 > pasada 1 pidió solo tests de R14/R15), `init.sh` en verde (6.423 passed). Resumen
-> en `progress/history.md`. Rama sin integrar en `main`.
+> en `progress/history.md`.
+>
+> **T9 HECHA por el líder el 2026-10-03, por orden del humano**: merge a `main`
+> `f16c863` (subida, y `dev` al día); imagen `r20261004-0031` desde `main`, job
+> comprobado a las 22:36 UTC con `az containerapp job show` -> `r20261004-0031`.
+> **Diccionario y MCP NO se tocaron a mano**: la nocturna publica el diccionario al
+> final de `run-all` con el de su imagen, así que la del 04-10 (00:00 UTC) aplica
+> F-113 y publica la v41 ella sola. Queda: T10 comprobar la nocturna, reiniciar el
+> MCP (T11) y T12.
 
 Spec aprobada por el humano el 2026-10-03 (D1 = A, D2 = ligero: T13-T15 fuera).
 Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
