@@ -1761,7 +1761,7 @@
         "Contrastado el efecto antes y despues, obra a obra: antes, la propuesta en solo lectura reproduce la tabla de transiciones de la spec y 0 cambios fuera de esas obras; despues, en `mart` y `cierre` solo cambian las obras previstas (A: cierre de 229 INDIRECTOS/BENEFICIO hasta 8.121 EUR; B: ningun importe)",
         "Fichas del diccionario que explican la categoria (stg, mart, raw: `obrparpar` y `auxobrtca`, con `tcaide` = 0 medido) y README actualizados en el mismo trabajo"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 5,
