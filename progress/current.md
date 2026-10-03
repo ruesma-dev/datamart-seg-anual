@@ -19,7 +19,7 @@ Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
 Implementación terminada (T1-T8), pendiente del reviewer. Límite del humano: las raíces que hoy quedan en OTRO (`PD`, `MP`, `LEV`,
 posventas, `GG`, `MC`...) no se tocan; T5 lo comprueba partida a partida.
 
-**Estado real (implementer):** T1-T8 hechas, un commit por tarea; `init.sh` verde (6.406 passed, cobertura 29/29). T5 (solo
+**Estado real (implementer):** T1-T8 hechas y correcciones de la review 1 (tests R14/R15); `init.sh` verde (6.423 passed, cobertura 29/29). T5 (solo
 lectura contra Azure, 11,5 s): la tabla de `spec_F-113.md` §2 sale **exacta**
 (A 490 partidas / 7 obras; B 253 / 2), 0 cambios en las otras diez columnas, 0
 partidas de raíces `PD`/`MP`/`LEV`/`GG`/`MC`/`POS…` que cambien. T7: arnés 1/1

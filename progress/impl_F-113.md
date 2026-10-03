@@ -203,18 +203,18 @@ declarado (spec §6), materia de F-111, que remedirá su dimensión CI.
   INDIRECTOS hasta +8.121 EUR y BENEFICIO lo mismo a la baja; 0462 en
   `mart.fact_seguimiento_categoria` con 25.002 EUR de Venta Real en CI (antes CD).
 
-## T8 y Evidencias (medidas, 2026-10-03, HEAD `1757f33`)
+## T8 y Evidencias (medidas, 2026-10-03; tras la review 1, HEAD `410b081`)
 
 `bash harness/init.sh` → **ENTORNO LISTO, código 0** (ruff: 236 avisos de deuda
 previa, ninguno en los ficheros de F-113: `ruff check` sobre ellos, «All checks passed»).
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados | **6.406 passed, 221 skipped**, 0 fallos (suite completa con cobertura) |
+| Tests ejecutados | **6.423 passed, 221 skipped**, 0 fallos (antes de la review: 6.406) |
 | Cobertura de líneas cambiadas | **100,0 %** (29/29, umbral 80 %, nivel crítico) |
 | Mutación, arnés | 1 generado, 1 muerto, **0 supervivientes** (SHA `140758b`) |
 | Mutación, manual SQL + dominio | 47 generados, 47 muertos, **0 supervivientes** (SHA `8ecea16`, 1 worker) |
-| Tiempo de la suite | **1.498,98 s** (24 min 59 s) |
+| Tiempo de la suite | **711,36 s** (11 min 51 s; en T8, 1.498,98 s) |
 | Tests propios de F-113 | 138 (`test_f113_categoria.py` 110, `_sql.py` 11, `_docs.py` 17), < 1 s |
 | Contraste T5 (Azure, solo lectura) | tabla de la spec exacta; 0 diferencias en otras columnas |
-| Puerta de tamaño | impl dentro del tope de 220 (195 antes de esta sección) |
+| Puertas de `init.sh` | cobertura 29/29; tamaño impl 220/220; ENTORNO LISTO, código 0 |
