@@ -164,10 +164,12 @@ tables:
     incremental_column: null   # catálogo estable, refresco completo
     where: null
     exclude_columns: []
-    # Catálogo de "tipos de capítulo" (CD/CI/CP/...) referenciado por
-    # obrparpar.tcaide. Nos permite clasificar categorías de partida
-    # directamente desde Sigrid sin depender de heurísticas sobre el
-    # código del capítulo raíz.
+    # Catálogo de "tipos de capítulo" de Sigrid. En Ruesma NO es CD/CI/CP:
+    # son tres oficios (instalaciones, demoliciones, carpintería), y
+    # obrparpar.tcaide, que apuntaría aquí, vale 0 en todas las filas
+    # (medido el 2026-10-03, F-113). La categoría CD/CI/CP sale de los
+    # códigos de capítulo (stg/04_partidas.sql). Se ingiere porque build_stg
+    # comprueba al arrancar que tenga ide, cod y res.
 
   # ===========================================================================
   # MAESTROS para consulta externa: direcciones de obra y proveedores.

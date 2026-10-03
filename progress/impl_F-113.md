@@ -103,3 +103,13 @@ antes de consultar (salió `on`) y termina con `ROLLBACK`. **11,5 s** de consult
 (Cuadra: CI −253 +224, OTRO +253 −104, CD −133, CP +13.) Si la ingesta de la
 noche del despliegue trae partidas nuevas, los totales se moverán con ellas; las
 siete obras de la tabla, no.
+
+## T6 · Documentación (R14-R15)
+
+`stg.yaml` (nota 4 de cabecera, `partidas.capitulo_raiz_cod` y `partidas.categoria`),
+`mart.yaml` (las seis `categoria`), `raw.yaml` (`obrparpar` y `auxobrtca`, con
+`tcaide` = 0 y los tres oficios), `00_global.yaml` (`version` 40 → **41**, con su
+nota de versión), `config/tables_sigrid.yaml` (comentario de `auxobrtca`) y
+`README.md` §5.3.1 y §6.3. `pytest tests/ -k "f006"` → **2097 passed, 218
+skipped en 169 s**; `grep -n -i "heuristica" config/diccionario/*.yaml` deja solo
+menciones ajenas a la categoría (oficio en `compras`/`stg.v_*`, `es_hoja`, P3).

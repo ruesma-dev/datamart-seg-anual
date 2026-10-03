@@ -16,7 +16,7 @@
 
 Spec aprobada por el humano el 2026-10-03 (D1 = A, D2 = ligero: T13-T15 fuera).
 Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
-T6. Límite del humano: las raíces que hoy quedan en OTRO (`PD`, `MP`, `LEV`,
+T7. Límite del humano: las raíces que hoy quedan en OTRO (`PD`, `MP`, `LEV`,
 posventas, `GG`, `MC`...) no se tocan; T5 lo comprueba partida a partida.
 
 ### Antes: SPEC ESCRITA, pendiente de aprobación del humano
