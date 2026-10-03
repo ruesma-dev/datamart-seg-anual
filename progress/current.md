@@ -12,6 +12,28 @@
 
 
 
+## 2026-10-03 · F-113 · SPEC ESCRITA, pendiente de aprobación del humano
+
+Spec-author: `specs/F-113-categoria-capitulo-por-prefijo/` (requirements 95/150,
+design 183/250, 15 tareas) y mediciones en `progress/spec_F-113.md`. Rama
+`feature/F-113-categoria-capitulo-por-prefijo` desde `main` 1bc205e. Ficha sin
+cambiar de `status` (`pending`); `acceptance` ajustados a la medición.
+
+- Fallo de hoy: 3 raíces (`AVDA_FRANCIA`, `P1414_PCI`, `P1414_PISCIN`), 253
+  partidas, 2 obras fuera del seguimiento, 0 EUR. A y B lo arreglan igual.
+  Sigrid no trae marca (`obrparpar.tcaide` = 0 en todas las filas).
+- A = B + capítulo intermedio de código EXACTO `CD`/`CI`/`CP` manda en su
+  subárbol: +237 partidas, 4 obras del seguimiento; 8.121 EUR de coste (229,
+  cierre 2011) y 25.002 EUR de venta (0462, solo `mart`).
+
+**Decisiones que necesita el humano** (`progress/spec_F-113.md` §5):
+- **D1 · A o B.** Recomendada A (su criterio).
+- **D2 · Contraste.** Recomendado el ligero (propuesta en solo lectura antes +
+  comprobación dirigida tras la nocturna); el completo de F-042 (job puntual
+  sin ingesta, ~3 h) queda en T13-T15 por si lo prefiere.
+- Hallazgo H1 (fuera de alcance): 11,6 M EUR de coste real del seguimiento en
+  OTRO (raíz `PD` promoción delegada, `MP` de 0644). ¿Fichar?
+
 ## 2026-10-03 · F-123 · CERRADA (`done`, APROBADO en pasada 2) · la regla de orígenes del descompuesto · DESPLEGADA, RETROCEADA Y VERIFICADA el 2026-10-03 (solo queda T13, el aviso)
 
 > **T16-T17 hechas el 2026-10-03.** El humano lanzó `build-descompuestos --sin-tope`
