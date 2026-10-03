@@ -42,16 +42,21 @@ habría vuelto a desaparecer sin dejar rastro, que es exactamente el modo de
 fallo que esta feature existe para eliminar. Hoy mide **cero casos** (causas (a)
 y (c) del informe de exploración), y ese cero es un dato, no un descuido.
 
-**La categoría NO se calcula aquí.** Es una heurística sobre
-`capitulo_raiz_cod` que vive en el SQL y que esta feature no toca; duplicarla
-crearía una segunda fuente de verdad para algo que nadie ha pedido mover. Lo que
-sí viaja es `capitulo_raiz_cod`, que es su entrada.
+## La categoría (F-113)
+
+Desde F-113 la categoría CD/CI/CP/OTRO **sí** viaja por el recorrido, igual que
+en el SQL: la raíz la saca de su código por prefijo (`categoria_de_raiz`) y cada
+hijo la hereda salvo que su código sea exactamente `CD`/`CI`/`CP`
+(`categoria_heredada`); el nodo colapsado, con `cod = ''`, la arrastra sin
+cambiarla. La regla y su porqué viven en `domain/categoria_partida.py`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+
+from etl_sigrid.domain.categoria_partida import categoria_de_raiz, categoria_heredada
 
 #: Tope duro de saltos del recorrido, como respaldo del array de visitados
 #: (DA-3). La profundidad real máxima medida el 2026-08-31 es de **7 niveles,
@@ -105,6 +110,8 @@ class Partida:
     #: `len(ruta.split(' > ')) == nivel + 1` del que vive
     #: `mart.v_pbi_dim_partida_niveles`.
     nivel: int
+    #: CD/CI/CP/OTRO, del capítulo CD/CI/CP más cercano (F-113).
+    categoria: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +145,7 @@ class _Paso:
     """El estado que el recorrido arrastra al bajar un nivel.
 
     Es literalmente lo que propagan las columnas del CTE: `publicable`,
-    `padre_publicado_id`, `visitados` y `nivel_bruto`.
+    `padre_publicado_id`, `visitados`, `nivel_bruto` y `categoria` (F-113).
     """
 
     ide: int
@@ -153,6 +160,7 @@ class _Paso:
     #: ciclo de nodos sin código no haría avanzar `nivel` nunca.
     nivel_bruto: int
     visitados: frozenset[int]
+    categoria: str
 
 
 def _hay_ciclo(nodo: Nodo, por_ide: dict[int, Nodo]) -> bool:
@@ -207,6 +215,7 @@ def construir_arbol(nodos: Iterable[Nodo]) -> Arbol:
             continue
         alcanzados.add(nodo.ide)
         cod = nodo.cod or ""
+        categoria = categoria_de_raiz(cod)
         frontera.append(
             _Paso(
                 ide=nodo.ide,
@@ -218,6 +227,7 @@ def construir_arbol(nodos: Iterable[Nodo]) -> Arbol:
                 nivel=0,
                 nivel_bruto=0,
                 visitados=frozenset({nodo.ide}),
+                categoria=categoria,
             )
         )
         publicadas.append(
@@ -230,6 +240,7 @@ def construir_arbol(nodos: Iterable[Nodo]) -> Arbol:
                 capitulo_raiz_cod=cod,
                 ruta_capitulos=cod,
                 nivel=0,
+                categoria=categoria,
             )
         )
 
@@ -248,6 +259,9 @@ def construir_arbol(nodos: Iterable[Nodo]) -> Arbol:
                 padre_publicado = (
                     paso.ide if paso.publicable else paso.padre_publicado_id
                 )
+                # F-113: el código exacto CD/CI/CP manda; si no —también el
+                # colapsado, cuyo `cod` es ''—, la del padre.
+                categoria = categoria_heredada(hijo.cod, paso.categoria)
 
                 if hijo.publicable:
                     ruta = paso.ruta_capitulos + SEPARADOR_DE_RUTA + hijo.cod
@@ -262,6 +276,7 @@ def construir_arbol(nodos: Iterable[Nodo]) -> Arbol:
                             capitulo_raiz_cod=paso.capitulo_raiz_cod,
                             ruta_capitulos=ruta,
                             nivel=nivel,
+                            categoria=categoria,
                         )
                     )
                 else:
@@ -282,6 +297,7 @@ def construir_arbol(nodos: Iterable[Nodo]) -> Arbol:
                         nivel=nivel,
                         nivel_bruto=paso.nivel_bruto + 1,
                         visitados=paso.visitados | {hijo.ide},
+                        categoria=categoria,
                     )
                 )
         frontera = siguiente
