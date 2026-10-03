@@ -12,6 +12,16 @@
 # tests/test_f006_cobertura.py vale exactamente lo que hay aqui, y al cerrar
 # F-006 esta lista queda vacia.
 #
+# version 41 (F-113, 2026-10-03): LA CATEGORIA SALE DEL CAPITULO, NO DE LETRAS
+# SUELTAS. `stg.partidas.categoria` (y las seis `categoria` de `mart` que la
+# copian) es la del capitulo CD/CI/CP MAS CERCANO: la raiz por prefijo de su
+# codigo y un intermedio solo si su codigo es exactamente CD/CI/CP (sin puntos
+# ni espacios). Antes se buscaban las letras en cualquier posicion de la raiz
+# (`AVDA_FRANCIA` era CI). `capitulo_raiz_cod` pasa a ser informativo, y
+# `raw.auxobrtca`/`raw.obrparpar` dejan de prometer un catalogo CD/CI/CP que no
+# existe: `tcaide` = 0 en todas las filas y `auxobrtca` son tres oficios. Sin
+# objetos ni columnas nuevos.
+#
 # version 40 (F-123, 2026-10-02): ESTUDIOS ES EL MASTER 0 (decision del humano
 # del 2026-10-02). En `descompuestos`, la version 0 del master pasa a llamarse
 # MASTER_ESTUDIO (antes llevaba el nombre de F-097, que ya no existe) y
@@ -445,7 +455,7 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 40
+version: 41
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 

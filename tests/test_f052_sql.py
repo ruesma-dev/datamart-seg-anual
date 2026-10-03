@@ -44,10 +44,15 @@ def _rama_raiz() -> str:
 
 
 def _rama_recursiva() -> str:
-    """Del `UNION ALL` hasta el CTE que categoriza: es la que se relaja."""
+    """Del `UNION ALL` hasta el `INSERT`: es la que se relaja.
+
+    Hasta F-113 cortaba en el CTE `arbol_categorizado`, que categorizaba por la
+    raíz; F-113 lo quita y calcula la categoría dentro del recursivo, así que la
+    rama recursiva termina donde empieza el `INSERT`.
+    """
     texto = _sql()
     return texto[
-        texto.index("UNION ALL") : texto.index("arbol_categorizado AS (")
+        texto.index("UNION ALL") : texto.index("INSERT INTO stg.partidas")
     ]
 
 
@@ -333,7 +338,8 @@ def test_f052_las_dos_ramas_del_recursivo_proyectan_lo_mismo_y_en_el_mismo_orden
         f"  raiz:      {de_la_raiz}\n"
         f"  recursiva: {de_la_recursiva}"
     )
-    # Y son las catorce que el INSERT y el colapso necesitan.
-    assert len(de_la_raiz) == 14
+    # Y son las catorce que el INSERT y el colapso necesitan, más la
+    # `categoria` que F-113 calcula dentro del recursivo.
+    assert len(de_la_raiz) == 15
     for nueva in ("publicable", "padre_publicado_id", "visitados", "nivel_bruto"):
         assert nueva in de_la_raiz

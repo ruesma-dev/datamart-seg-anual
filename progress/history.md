@@ -1509,3 +1509,34 @@ T15 merge e imagen, T16 `build-descompuestos --sin-tope` + `apply-grants` (la
 primera migración bloquea `lineas` y `cuadre_partida`; tras ella no hay vuelta a la
 imagen anterior), T17 foto de después y testigos, T18 diccionario v40 y reinicio
 del MCP. Comandos en `progress/current.md`.
+
+---
+
+## F-113 · La categoría CD/CI/CP sale del capítulo, no de letras sueltas del código · 2026-10-03
+
+Rama `feature/F-113-categoria-capitulo-por-prefijo` (desde `main` 1bc205e). `sdd=true`,
+rigor `critico`. APROBADA en pasada 2 (`progress/review_F-113.md`; la 1 pidió tests
+para R14/R15). Spec en `specs/F-113-categoria-capitulo-por-prefijo/`, mediciones en
+`progress/spec_F-113.md`, informe en `progress/impl_F-113.md`.
+
+Antes, `stg/04_partidas.sql` decidía la categoría con `LIKE '%CD%'`/`'%CI%'`/`'%CP%'`
+sobre el código raíz: `AVDA_FRANCIA`, `P1414_PCI` y `P1414_PISCIN` caían en CI. El
+humano eligió la opción A: la raíz cuenta por PREFIJO y un capítulo intermedio con
+código EXACTO `CD`, `CI`, `CP` o `C.I.` manda en su subárbol (el más cercano manda);
+los intermedios por prefijo (`CI10`, `CPI8001`, `CP110` bajo CD) no cuentan. La
+categoría se calcula dentro del recursivo (fuera `arbol_categorizado`), con el mismo
+algoritmo en el dominio (`etl_sigrid/domain/categoria_partida.py`). Diccionario v41.
+
+Efecto (contraste en solo lectura contra Azure, repetido por el reviewer): 490
+partidas en 7 obras, 0 cambios en las demás columnas. En el seguimiento: 0229 y 229
+de OTRO a CI (229: 8.121 EUR de coste real, cierres 2011-01..03, beneficio baja),
+0462 y 0500 de CD a CI (0462: 25.002 EUR de venta real, solo `mart`). Las raíces en
+OTRO (`PD`, `MP`, `LEV`, posventas, `GG`, `MC`) NO se tocan: decisión del humano,
+«dejarlos de momento con su esquema»; su coste no entra en el cierre y su venta sí
+(0655 PD 6,09 M; 0644 MP 2,61 M), pendiente de que el humano decida.
+
+Verificado: dominio y SQL dan 0 categorías distintas sobre las 395.207 partidas
+reales; mutación arnés 1/1 y manual 47/47 muertos; `init.sh` 6.423 passed.
+
+QUEDA del humano: T9 merge e imagen, T10 nocturna, T11 diccionario v41 y MCP, T12
+comprobación dirigida. Comandos en `progress/current.md`.

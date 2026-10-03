@@ -137,8 +137,14 @@ objetos:
         `obrparpar.unimed`.
       categoria:
         significado: >-
-          Clasificacion del coste. Se DERIVA por heuristica del codigo del
-          capitulo raiz, no de un catalogo: no es una taxonomia oficial.
+          Clasificacion del coste, la del capitulo CD/CI/CP MAS CERCANO a
+          la partida (F-113): la raiz por PREFIJO de su codigo (`CD...`,
+          `CI...`, `CP...`), y un capitulo intermedio solo si su codigo, sin
+          puntos ni espacios, es EXACTAMENTE `CD`, `CI` o `CP` (`C.I.` cuenta),
+          que entonces manda sobre su subarbol. Sin capitulo reconocible: raiz
+          numerica pura distinta de 34 y 99 -> CD; el resto -> OTRO. No es una
+          taxonomia de Sigrid, que no la trae. Detalle en
+          `stg.partidas.categoria`.
         valores: [CD, CI, CP, OTRO]
       capitulo_raiz_cod: Codigo del capitulo raiz del que cuelga la partida. Informativo.
       ruta_capitulos: >-
@@ -394,8 +400,9 @@ objetos:
       nombre_mes: Etiqueta del mes en castellano con su ano ("Octubre 2025").
       categoria:
         significado: >-
-          Clasificacion del coste, derivada por heuristica del codigo del
-          capitulo raiz. CD son costes directos, CI indirectos, CP
+          Clasificacion del coste, la del capitulo CD/CI/CP mas cercano a la
+          partida (raiz por prefijo, intermedio por codigo exacto; detalle en
+          `stg.partidas.categoria`). CD son costes directos, CI indirectos, CP
           proporcionales.
         valores: [CD, CI, CP, OTRO]
       escenario:
@@ -665,7 +672,9 @@ objetos:
         significado: Mes de imputacion, como fecha del dia 1.
         agregacion: no_sumable
       categoria:
-        significado: Clasificacion del coste, derivada por heuristica del capitulo raiz.
+        significado: >-
+          Clasificacion del coste, derivada del capitulo CD/CI/CP mas cercano
+          (raiz por prefijo, intermedio por codigo exacto).
         valores: [CD, CI, CP, OTRO]
       escenario:
         significado: Cruce de magnitud y naturaleza.
@@ -778,8 +787,14 @@ objetos:
       unidad_medida: Unidad de medicion (m3, m2, ud, kg...).
       categoria:
         significado: >-
-          Clasificacion del coste, DERIVADA por heuristica del codigo del
-          capitulo raiz. No es una taxonomia oficial de Sigrid.
+          Clasificacion del coste, la del capitulo CD/CI/CP MAS CERCANO a
+          la partida (F-113): la raiz por PREFIJO de su codigo (`CD...`,
+          `CI...`, `CP...`), y un capitulo intermedio solo si su codigo, sin
+          puntos ni espacios, es EXACTAMENTE `CD`, `CI` o `CP` (`C.I.` cuenta),
+          que entonces manda sobre su subarbol. Sin capitulo reconocible: raiz
+          numerica pura distinta de 34 y 99 -> CD; el resto -> OTRO. No es una
+          taxonomia de Sigrid, que no la trae. Detalle en
+          `stg.partidas.categoria`.
         valores: [CD, CI, CP, OTRO]
       capitulo_raiz_cod: Codigo del capitulo raiz del que cuelga la partida.
       ruta_capitulos: Camino de capitulos hasta la partida, separado por ' > '.
@@ -845,7 +860,9 @@ objetos:
       descripcion_partida: Descripcion corta de la partida.
       unidad_medida: Unidad de medicion de la partida.
       categoria:
-        significado: Clasificacion del coste, derivada por heuristica del capitulo raiz.
+        significado: >-
+          Clasificacion del coste, derivada del capitulo CD/CI/CP mas cercano
+          (raiz por prefijo, intermedio por codigo exacto).
         valores: [CD, CI, CP, OTRO]
       capitulo_raiz_cod: Codigo del capitulo raiz.
       ruta_capitulos: Camino de capitulos separado por ' > '. Es la fuente de los niveles.
@@ -1461,7 +1478,9 @@ objetos:
       descripcion_partida: Descripcion corta de la partida.
       unidad_medida: Unidad de medicion de la partida.
       categoria:
-        significado: Clasificacion del coste, derivada del capitulo raiz.
+        significado: >-
+          Clasificacion del coste, derivada del capitulo CD/CI/CP mas cercano
+          (raiz por prefijo, intermedio por codigo exacto).
         valores: [CD, CI, CP, OTRO]
       capitulo_raiz_cod: Codigo del capitulo raiz.
       ruta_capitulos: Camino de capitulos separado por ' > '.
