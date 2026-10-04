@@ -10,7 +10,49 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-04 · F-038 · `spec_ready` · Fase 1 APROBADA; Fase 2 con D4 abierta · el comparativo de ofertas
+## 2026-10-04 · F-038 · `in_progress` · Fase 1 IMPLEMENTADA (a review); Fase 2 con D4 abierta · el comparativo de ofertas
+
+### Implementer · Fase 1 (T1-T10), 2026-10-04
+
+Informe: `progress/impl_F-038.md`. T1-T9 hechas con un commit cada una (T9 en
+dos); T10 = `bash harness/init.sh`. Fase 2 (T11-T19, T25) FUERA. Decisiones y
+desviaciones (justificadas en el informe, §2):
+- `aprobado_por` lleva la MISMA condición que `fecha_aprobacion` (circuito
+  cerrado): R23 solo condiciona la fecha, pero publicar como «aprobó» a quien
+  firmó el último paso de un rechazado es una cifra plausible y falsa.
+- Tests de otras features tocados por necesidad: `test_f073_pipeline.py` y
+  `test_f080_pipeline.py` (lista completa de ficheros de `build_compras`),
+  `test_f006_reglas.py` (P1-P22; P5 respondible: 18/2/2) y la enmienda del
+  recuento de objetos (194) en `specs/F-006-mcp-azure/design_detalle.md`.
+- Patrón FASE_0 afinado a `FASE ?0( |$)|PLANIFICACION 0$` («FASE 05» no es fase 0).
+
+**Diccionario del árbol tras F-038 Fase 1 (version 42): 194 objetos, 1492
+columnas, 88 de consumo** (dos tablas y dos funciones nuevas en `compras`).
+
+**MANUAL del humano, EN ORDEN, tras el APROBADO del reviewer** (nadie más los ejecuta):
+1. **T20** · merge a `main`; imagen desde `main`:
+   `powershell -NoProfile -File infra/70_build_image.ps1`, luego
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm` y
+   `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`
+   → debe salir el tag nuevo.
+2. **T21** · dejar correr la nocturna (00:00 UTC; publica la v42 del diccionario
+   ella sola). `python main.py status` → `run-all` SUCCESS;
+   `python main.py timings --last 1` → `build_compras` como mucho ~1 min más
+   que la noche anterior. Si falla en el sub-paso `comparativos` con
+   «F-038 R21», un comparativo tiene dos contratos: parar y avisar.
+3. **T22** · (solo lectura) `python main.py check-declarados`,
+   `python main.py check-unicidad`, `python main.py check-relaciones` y
+   `python main.py check-diccionario` → los cuatro con código 0.
+4. **T23** · (solo lectura) `SELECT count(*), count(contrato_id), sum(ahorro_concurso), count(ahorro_concurso), count(*) FILTER (WHERE adjudicado_atipico) FROM compras.comparativos;`
+   → ≈ recuento de `raw.com` (20.378), ≈ 18.600, ≈ 72,7 M€, ≈ 6.900, ≈ 52; y
+   `SELECT familia_ficticia, count(*) FROM compras.comparativo_ofertas GROUP BY 1;`
+   → ≈ 32.900 ficticias (no NULL). Resultado aquí; una desviación > 5 % se para y se avisa.
+5. **T24** · reiniciar el MCP y preguntarle, sin explicarle nada: comparativos
+   por actividad; ahorro del concurso; quién aprobó el comparativo X y cuándo;
+   ¿acabó en contrato el comparativo X? → las cuatro usan `compras.comparativos`
+   y citan la frescura de `build_compras`.
+
+### Spec (spec-author)
 
 > **Aprobado por el humano el 2026-10-04**: D1 (dos fases), D3 (firmas por
 > escalón aquí, Fase 2) y la Fase 1 tal cual. **D2 corregida por el humano**: la

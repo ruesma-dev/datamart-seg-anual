@@ -22,7 +22,7 @@ import pytest
 import yaml
 
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
-from tests._texto import normalizado
+from tests._texto import contiene, normalizado
 from tests.test_f038_sql import COLUMNAS_COMPARATIVOS, COLUMNAS_OFERTAS
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -216,13 +216,14 @@ def test_f038_r22_contratos_comparativo_id_remite_al_objeto_nuevo() -> None:
     texto = normalizado(columna.significado)
     assert "ctr.comide" in texto and "56 %" in texto
     assert "compras.comparativos.contrato_id" in texto
-    assert "No esta modelado" not in texto and "NO esta modelado" not in texto
+    assert not contiene(texto, "No esta modelado")
+    assert not contiene(texto, "NO esta modelado")
 
 
 def test_f038_r22_albaranes_comparativo_id_ya_no_dice_no_modelado() -> None:
     columna = _columna("compras.albaranes", "comparativo_id")
-    assert "No esta modelado" not in columna.significado
-    assert "compras.comparativos" in normalizado(columna.significado)
+    assert not contiene(columna.significado, "No esta modelado")
+    assert contiene(columna.significado, "compras.comparativos")
 
 
 # ===========================================================================
