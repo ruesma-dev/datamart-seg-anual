@@ -11,9 +11,9 @@ cual; Fase 2 = R25-R36) y **D3** firmas por escalón aquí, en Fase 2. **D2
 cambia**: la base del objetivo es el **descompuesto** (`descompuestos.lineas`) de
 la **primera ABC** del master y, si la obra no tiene ABC, el de **Estudios**
 (`MASTER_ESTUDIO` o `ESTUDIO`). **D4 decidida el 2026-10-04**: la primera ABC si
-casa; si no, una versión ANTERIOR que case; nunca una posterior; si ninguna,
-la de la regla marcada «no casa». Casan 46.052 de 83.329 líneas (55,3 %); 12.351
-solo casarían con una posterior. Ejemplos: `progress/explore_F-038_ejemplos_objetivo.md`.
+casa; si no, la ANTERIOR más reciente que case; nunca una posterior; en obras
+sin ABC, solo Estudios; si no casa, la de la regla marcada «no casa». Casan
+24.263 de 83.329 líneas (29,1 %). Ejemplos: `progress/explore_F-038_ejemplos_objetivo.md`.
 
 ## Fase 1 · El comparativo y sus ofertas
 
@@ -122,13 +122,13 @@ solo casarían con una posterior. Ejemplos: `progress/explore_F-038_ejemplos_obj
   cumpla `precio × (1 − %)` con la tolerancia del dominio.
 - R30. La línea debe publicar `precio_base`, `origen_base` (origen y versión
   usados) y `casa_base`, con D4: la ABC si casa; si no, la versión anterior a la
-  ABC más reciente que case (Estudios en obras sin ABC); nunca una posterior; si
-  ninguna casa, la de la regla con `casa_base` falso. Sin descompuesto: NULL.
+  ABC más reciente que case; nunca una posterior; sin ABC, solo Estudios; si no
+  casa, la de la regla con `casa_base` falso. Sin descompuesto: NULL.
 - R31. El sistema debe publicar `compras.comparativo_objetivo`, una fila por
   comparativo con oferta OBJETIVO (`comparativo_id` PK): la oferta más reciente
   (`con.fec`, luego `ide`), su importe, su porcentaje (si es único), `base_regla`
   y el % de su importe cuyas líneas casan con la base; la ficha da las cifras de
-  D4 (55,3 % casan) y dice que la tabla lee `descompuestos` de la noche anterior.
+  D4 (29,1 % casan) y dice que la tabla lee `descompuestos` de la noche anterior.
 - R32. Ninguna oferta ficticia debe contar en el número de ofertantes, la
   mínima ni el ahorro (test sobre el SQL).
 - R33. El sistema debe publicar `compras.comparativo_firmas`, una fila por

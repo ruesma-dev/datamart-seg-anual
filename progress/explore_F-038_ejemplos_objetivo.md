@@ -24,10 +24,12 @@ El elemento se busca en `descompuestos.lineas` de la misma obra y partida
 | | con ninguna | 11.160 |
 | sin descompuesto en la partida | — | 3 |
 
-Con la regla: **46.052 líneas casan (55,3 %)**; 37.277 se publican con la base de
-la regla marcada «no casa», y de ellas **12.351 casarían con una posterior**. En
-las obras sin ABC todas las versiones son «anteriores» a una ABC que no existe:
-los 21.789 cuentan como «anterior» en esa lectura (a confirmar, abajo).
+Con la regla: **24.263 líneas casan (29,1 %)** (ABC 11.409 + anterior 5.468 +
+Estudios 7.386); **59.066** se publican con la base de la regla marcada «no
+casa»: entre ellas, 12.351 que casarían con una posterior y 21.789 de obras sin
+ABC que casarían con otra versión del master. **Decidido por el humano el
+2026-10-04**: en una obra sin ABC la base es Estudios y, si no casa, «no casa»;
+no se busca en otras versiones («dependerá de Negocio cambiarlo»).
 
 En obras **≥ 0700** (todas con ABC): ABC 2.947 líneas (12 obras), anterior 440
 (10 obras), solo posterior 1.888 (9 obras), ninguna 1.305. Hay ejemplos de sobra.
@@ -95,9 +97,3 @@ HA-25/B/20/IIa #150x150x6 mm e=10 cm · OBJETIVO · **2,9533** · `dto` 7,71 %.
 - Posterior v6 «CIERRE FEBRERO-26» (20-03-2026, dos días después del alta del
   comparativo), «mallazo 20x20x6 s/ planos»: 3,20 × 0,9229 = **2,9533** → casa;
   desde v7 baja a 1,47 (no casa).
-
-## Pendiente de confirmar con el humano
-
-- **Obras sin ABC** (41.697 líneas): la regla dice Estudios. Si Estudios no casa,
-  ¿vale «una anterior» = cualquier versión del master (todas lo son)? En esa
-  lectura casan 21.789 más; si no, se publican como «no casa».

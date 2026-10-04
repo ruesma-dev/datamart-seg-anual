@@ -179,8 +179,9 @@ rechazo): «la firma del jefe de grupo» no es una columna, son varias filas.
 **DECIDIDA el 2026-10-04 · D4** (humano: «la del ABC si casa, y si no una
 anterior. De momento nunca posterior, aunque lo veré con Negocio»): base = la
 **primera ABC si casa**; si no, una versión **ANTERIOR** a la ABC que case
-(Estudios en las obras sin ABC); **nunca una posterior**; si ninguna casa, se
-publica la de la regla con `casa_base` = falso. Recuento sobre las 83.329 líneas
+(la más reciente); **nunca una posterior**; en las obras sin ABC, Estudios y
+nada más (humano, 2026-10-04: «en ese caso no casa; dependerá de Negocio
+cambiarlo»); si no casa, se publica la de la regla con `casa_base` = falso. Recuento sobre las 83.329 líneas
 OBJETIVO con `dto` (detalle y seis ejemplos en
 `progress/explore_F-038_ejemplos_objetivo.md`):
 
@@ -189,15 +190,16 @@ OBJETIVO con `dto` (detalle y seis ejemplos en
 | casa con la ABC | 11.409 |
 | no con la ABC, sí con una anterior | 5.468 |
 | obra sin ABC: casa con Estudios | 7.386 |
-| obra sin ABC: no con Estudios, sí con otra versión del master | 21.789 |
+| obra sin ABC: no con Estudios, sí con otra versión del master (se publica «no casa») | 21.789 |
 | **solo con una posterior** (se publica «no casa») | **12.351** |
 | solo con `PLANIF_JO` de hoy | 2.461 |
 | con ninguna (o sin descompuesto) | 22.465 |
 
-Casan con la regla **46.052 (55,3 %)**. Dos cosas para Negocio: (1) las fechas
+Casan con la regla **24.263 (29,1 %)**: 11.409 ABC + 5.468 anterior + 7.386
+Estudios; las otras **59.066** se publican «no casa». Para Negocio: las fechas
 de las versiones apuntan a que la base es **la versión vigente al hacer el
-comparativo** (ejemplos B1, B2 y C1); (2) en las obras sin ABC, los 21.789
-dependen de leer «una anterior» como cualquier versión del master: a confirmar.
+comparativo** (ejemplos B1, B2 y C1); con esa regla casarían también buena parte
+de las 12.351 «solo posterior» y de las 21.789 de obras sin ABC.
 
 **Nota de diseño (no es decisión)**: `build_compras` corre antes que
 `build_descompuestos`, así que la Fase 2 lee el descompuesto de la noche
