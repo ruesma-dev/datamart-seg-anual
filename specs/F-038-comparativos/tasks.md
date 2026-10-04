@@ -10,7 +10,7 @@ la base es MANUAL del humano. **D1 aprobado (2026-10-04): dos fases.** Fase 2
 
 ## Fase 1 · comparativo, ofertas, importes, ahorro, contrato, aprobación
 
-- [ ] T1: `etl_sigrid/domain/comparativos.py` (Fase 1: `CIF_FALSOS`, `PATRONES_FAMILIA`, `EXCLUSIONES`, umbrales, `normalizar_nombre`, `familia_ficticia`, `es_adjudicado_atipico`) con `tests/test_f038_dominio.py` y las fixtures medidas de design §3 (R8-R11, R16)  |  Verificación: `python -m pytest tests/test_f038_dominio.py -q` (RED antes, traza en el informe)
+- [x] T1: `etl_sigrid/domain/comparativos.py` (Fase 1: `CIF_FALSOS`, `PATRONES_FAMILIA`, `EXCLUSIONES`, umbrales, `normalizar_nombre`, `familia_ficticia`, `es_adjudicado_atipico`) con `tests/test_f038_dominio.py` y las fixtures medidas de design §3 (R8-R11, R16)  |  Verificación: `python -m pytest tests/test_f038_dominio.py -q` (RED antes, traza en el informe)
 - [ ] T2: `compras.fn_normalizar_nombre` y `compras.fn_familia_ficticia` al final de `sql/compras/00_setup.sql`; test de que sus literales son los del dominio (R11)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k "setup or literales"`
 - [ ] T3: `sql/compras/08_comparativos.sql`, parte 1: cabecera, guarda `RAISE EXCEPTION` de dos contratos (R21) y `compras.comparativo_ofertas` con las columnas de design §4 (R2-R4, R8, R12, R15)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k "ofertas or guarda or prvide or totdoc"`
 - [ ] T4: `08_comparativos.sql`, parte 2: `compras.comparativos` con sus cuatro agregados y columnas de design §4 (R1, R4-R7, R13-R20, R23)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q`
