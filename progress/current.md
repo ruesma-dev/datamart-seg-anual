@@ -10,6 +10,30 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-04 · F-038 · SPEC ESCRITA, pendiente de aprobación del humano · el comparativo de ofertas
+
+Spec-author: `specs/F-038-comparativos/` (requirements 149/150, design 249/250,
+25 tareas) y mediciones nuevas en `progress/spec_F-038.md`. Rama
+`feature/F-038-comparativos` desde `main`. Solo lecturas (Sigrid por
+`sigrid-api`; Postgres de Azure, tamaños y una consulta cronometrada). Estado de
+la feature sin tocar (`pending`); acceptance **3 y 4 ajustados** porque la
+medición los contradice (ver abajo).
+
+**Lo que cambia la medición** (detalle y cifras en `progress/spec_F-038.md` §1-§3):
+- El «no cuadran» de las cuatro magnitudes era sobre todo el **IVA** (`dco.totdoc`
+  lleva IVA; se publica `dco.totbas`). Sin IVA, la ganadora cuadra con sus líneas
+  en el 99,6 % y con el adjudicado en el 89,8 %.
+- El adjudicado no tiene dos atípicos sino **52 que suman 602,5 M€ de 1.246,2**.
+- El ahorro del concurso con solo ofertas reales: **6.904 comparativos, 72,7 M€**
+  (no 15.597 / 186,5: metían las ficticias y el IVA).
+- Ficticia: el CIF falso solo cubre el 30 %; criterio = CIF falso o (CIF vacío y
+  nombre de familia): 32.896 ofertas, el 45 % del ofertado.
+
+**Decisiones abiertas para el humano** (recomendación en `requirements.md`):
+- **D1** · ¿Una entrega o dos fases? Recomendado: dos (Fase 1 sin dependencias).
+- **D2** · ¿Qué cuenta como «ABC» en la regla del objetivo? Recomendado: las
+  cuatro familias de planificación (el literal «ABC» solo está en 283 comparativos).
+- **D3** · ¿Firmas por escalón aquí (Fase 2) o en F-085? Recomendado: aquí.
 
 
 ## 2026-10-03 · F-113 · CERRADA (`done`, APROBADO en pasada 2) · la categoría CD/CI/CP por el capítulo · SIN DESPLEGAR: quedan T9-T12 del humano
