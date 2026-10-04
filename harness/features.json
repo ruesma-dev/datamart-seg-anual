@@ -599,7 +599,7 @@
         "Cada vista nueva queda documentada en el diccionario semantico de F-006",
         "retenciones.v_pbi_retencion_obra_entidad expone saldo_vivo y neto_practicado, no solo importe: hoy esas dos metricas solo viven en vistas que ya han perdido el eje de obra"
       ],
-      "status": "spec_ready",
+      "status": "pending",
       "sdd": false,
       "rigor": "estandar",
       "priority": 37,

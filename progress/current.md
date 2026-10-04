@@ -10,7 +10,7 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-04 · F-038 · `in_progress` · Fase 1 IMPLEMENTADA (a review); Fase 2 con D4 abierta · el comparativo de ofertas
+## 2026-10-04 · F-038 · `in_progress` · Fase 1 IMPLEMENTADA (review 1: solo papeleo, atendido); Fase 2 con spec cerrada (D4 decidida), sin implementar · el comparativo de ofertas
 
 ### Implementer · Fase 1 (T1-T10), 2026-10-04
 
@@ -61,9 +61,10 @@ columnas, 88 de consumo** (dos tablas y dos funciones nuevas en `compras`).
 > base del objetivo es el descompuesto de la primera ABC o, si no hay, el de
 > Estudios. Remedido: esa regla reproduce el objetivo en el **22,6 %** de las
 > líneas (cualquier versión del descompuesto, 73,0 %; la 0696 de la captura sí
-> casa con la ABC v3). **Abierta D4**: qué base publicar cuando no casa
-> (recomendado: la de la regla si casa, si no la versión que casa, con nombre).
-> La Fase 1 puede implementarse ya; la Fase 2 espera a D4. Detalle:
+> casa con la ABC v3). **D4 DECIDIDA por el humano el 2026-10-04**: la ABC si casa; si no, una
+> versión ANTERIOR que case (la más reciente); nunca posterior; en obras sin ABC,
+> solo Estudios; si no casa, «no casa» (24.263 de 83.329 líneas casan). Negocio
+> puede ampliarla. La Fase 2 espera a que el humano la abra. Detalle:
 > `progress/spec_F-038.md` §3 y §7.
 
 Spec-author: `specs/F-038-comparativos/` (requirements 149/150, design 249/250,

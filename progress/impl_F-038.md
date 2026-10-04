@@ -147,7 +147,7 @@ Copiadas con su comando exacto en `progress/current.md` (sección F-038):
 ## 6 · Fuera de alcance / lo que falta
 
 - Fase 2 entera (objetivo, líneas de los dos lados, firmas por escalón): D4
-  sigue abierta.
+  decidida el 2026-10-04; espera a que el humano la abra.
 - `ingest` nueva, `compras.contratos` sin cambios de columnas (R22 es solo ficha).
 - Para cerrar: review, y después T20-T24 del humano.
 
