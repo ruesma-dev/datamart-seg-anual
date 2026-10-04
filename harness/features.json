@@ -576,7 +576,7 @@
         "Las ofertas se publican TODAS, una fila por oferta, con su proveedor, su importe y su estado, y las FICTICIAS de planificacion (OBJETIVO, OFICINA TECNICA, CUATRIMESTRAL, FASE 0, PLANIFICACION) quedan MARCADAS como tales: una oferta ficticia contada como real estropea el numero de ofertantes, la oferta mas barata y el ahorro del concurso",
         "El criterio para distinguir la oferta ficticia esta decidido y medido -por CIF falso, por nombre o por los dos- sabiendo que los nombres NO estan normalizados (tilde, guion, asteriscos) y que el mismo codigo de entidad aparece con razones sociales distintas",
         "Se publica el COSTE OBJETIVO con su porcentaje, parseado desde `dcopro.dto`, que es TEXTO con simbolo y coma decimal espanola ('15%', '10,08%'): el parseo vive en UN solo sitio y tiene test, y la ficha declara que tratarlo como numero revienta la consulta",
-        "El objeto declara SOBRE QUE BASE se calculo el objetivo -ABC, o Oficina Tecnica si no hay ABC-, porque esa base cambia con el tiempo y publicar solo el resultado lo haria ilegible",
+        "El objeto declara SOBRE QUE BASE se calculo el objetivo -el DESCOMPUESTO de la primera ABC, o el de Estudios (Oficina Tecnica) si no hay ABC, el que publica el esquema descompuestos: aclarado por el humano el 2026-10-04-, porque esa base cambia con el tiempo y publicar solo el resultado lo haria ilegible; y declara con cifras en cuantas lineas esa base reproduce el objetivo (22,6 % medido el 2026-10-04, ver D4 en progress/spec_F-038.md)",
         "El enlace COMPARATIVO -> CONTRATO usa comlin.ctride (91,5 %) y no ctr.comide (56,4 %), con su codigo y su fecha; y se decide y ejecuta que pasa con compras.contratos.comparativo_id, que hoy publica la via pobre y responde NO en unos 7.100 casos en que la respuesta es SI",
         "La ficha del diccionario declara las dos trampas de dbo.log (log.ide NO es el ide del documento; log.res NO es la actividad) y que las siete fechas de com y los cinco campos a 0 estan VACIOS en origen, para que nadie los busque",
         "Se responde por el MCP, sin explicarle nada: cuantos comparativos hay por actividad, cuanto se ahorro en el concurso, quien aprobo un comparativo y cuando, y si un comparativo acabo en contrato",
@@ -599,7 +599,7 @@
         "Cada vista nueva queda documentada en el diccionario semantico de F-006",
         "retenciones.v_pbi_retencion_obra_entidad expone saldo_vivo y neto_practicado, no solo importe: hoy esas dos metricas solo viven en vistas que ya han perdido el eje de obra"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": false,
       "rigor": "estandar",
       "priority": 37,

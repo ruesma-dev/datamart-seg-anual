@@ -83,27 +83,50 @@ ficticias, 1.298,8 M€ sin IVA, el 45 % del ofertado total**. Ganadoras fictici
 **4** (0,1 M€). Los 200 nombres medidos (con recuento) están en la consulta
 `t4` de esta sesión; los casos de los tests salen de ahí.
 
-## 3 · Coste objetivo: dónde está el % y sobre qué base
+## 3 · Coste objetivo: el % y su base en el descompuesto (REHECHO el 2026-10-04)
 
-- **`dcopro.dto`** informado en 95.808 de 794.946 líneas; formato **siempre**
-  `-?dígitos(,dígitos)?%` (0 casos raros: ni `+`, ni punto, ni doble `%`), con
-  **negativos** (−99,57 %, −168 %…: recargos). Gramática POSIX:
-  `^-?[0-9]+(,[0-9]+)?%$`.
-- Por familia: OBJETIVO 83.605 de 143.475 líneas con `dto`; REAL 8.457; OFICINA
-  TÉCNICA 1.562; el resto residual.
-- **Ofertas OBJETIVO: 12.259** en 11.420 comparativos (1.126 con dos o tres:
-  «OBJETIVO INICIAL», «REVISADO»). **7.399 con un único %** (2.235 de ellas con
-  alguna línea sin `dto`), **48 con varios** y **4.813 sin ninguno** (objetivo
-  tecleado a mano, sin % que publicar).
-- **La base se puede OBSERVAR, no solo suponer**: de las 83.605 líneas objetivo
-  con `dto`, **73.052 (87,4 %)** tienen en el mismo `comlinide` una oferta
-  ficticia cuyo `pre × (1 − dto)` es su precio: solo planificación 22.211, solo
-  OFICINA TÉCNICA 32.101, **las dos a la vez 18.740** (precios idénticos). El
-  12,6 % restante no tiene base reconstruible.
-- Familias presentes en los comparativos con objetivo (11.144): con ABC literal
-  solo **283**; con OT y planificación 4.239; solo OT 3.273; solo planificación
-  2.685; ninguna 664. **«ABC» como nombre de entidad apenas existe**: el ABC vive
-  en las ofertas PLANIFICACIÓN/PLANIFICADO/CUATRIMESTRAL/FASE 0. → Decisión D2.
+**Corrección del humano (2026-10-04)**: la base del objetivo NO son las ofertas
+ficticias de planificación, sino **el descompuesto de la primera ABC y, si no hay
+ABC, el de Estudios**, el que ya publica `descompuestos` (F-097, F-120, F-123).
+Lo que había aquí sobre «familia base» por ofertas hermanas queda retirado.
+
+- **`dcopro.dto`** (sin cambios): 95.808 de 794.946 líneas; formato siempre
+  `^-?[0-9]+(,[0-9]+)?%$`, con negativos. `tot = can × pre`: el precio ya es neto.
+- **Ofertas OBJETIVO**: 12.259 en 11.420 comparativos (1.126 con dos o tres);
+  7.399 con un único %, 48 con varios, 4.813 sin ninguno. **Líneas OBJETIVO con
+  %: 83.329**, en 7.401 comparativos y 154 obras.
+
+**El enlace línea de comparativo → descompuesto** (Postgres, sesión `READ ONLY`):
+- Por **partida** (`comlin.dncproide` → `dncpro.paride`, obra de `com.obride`):
+  83.326 de 83.329 líneas tienen descompuesto en su partida (algún origen).
+- Por **`dncpro_id`** (campo 36): sirve en el master desde la ABC
+  (`MASTER_PLANIF_JO`: 2,47 M de 2,50 M líneas lo llevan) pero **no en Estudios**
+  (`MASTER_ESTUDIO` 2.112 de 107.061; `ESTUDIO` 0). De las 24.994 líneas objetivo
+  con primera ABC en su partida, 17.226 encuentran su `dncpro_id`.
+- Por **producto**: no identifica el elemento (la 0696 usa el mismo producto
+  571020 para un vallado de 69,70 y una malla de 28,97).
+- Solo **59 obras** tienen primera ABC (`es_primera_abc`, 58.799 líneas); 170
+  tienen master 0 y 44 solo `ESTUDIO`.
+
+**¿Es el objetivo = base × (1 − dto)?** (tolerancia 0,011 € + 0,2 %):
+
+| regla probada | líneas que casan de 83.329 |
+|---|---|
+| la del humano, hoy: primera ABC si la obra la tiene (41.629 líneas), si no Estudios (39.810; 1.890 sin ninguno) | 11.409 + 7.386 = **18.795 (22,6 %)** |
+| la misma, a la fecha del comparativo (ABC creada antes que él: 33.128) | 8.322 + 9.551 = **17.873 (21,4 %)** |
+| la versión del master vigente a la fecha del comparativo | 19.319 de 60.148 con versión |
+| **cualquier versión del descompuesto de su partida** | **60.864 (73,0 %)**: pre-ABC 39.313, post-ABC 25.032, Estudios 14.094, PLANIF_JO de hoy 25.990 (se solapan) |
+| (referencia) una oferta ficticia hermana del comparativo, medida antes | 73.052 (87,4 %) |
+
+**Caso de la captura (0696, comparativo 2754136, oferta 2754139, 94.853,91 €
+SIN IVA = `totbas`)**: líneas 939265 y 952250 a 66,215 = **69,70 × 0,95**, el
+precio de la **primera ABC (v3)**; la primera por su `dncpro_id`, la segunda solo
+por la partida (su `dncpro` es otro, 338098, nacido en la v26). La 962172 (26,60
+= 28,00 × 0,95) no tiene línea en la ABC ni en Estudios: su 28,00 no está en el
+descompuesto (las versiones tienen 28,97). **La captura confirma la regla del
+humano, pero la medición dice que en general la reproduce solo en 1 de cada 4-5
+líneas**: o la base es otra versión del master (la del momento), o el precio se
+ajusta a mano. → D4.
 
 ## 4 · Enlace comparativo → contrato
 
@@ -140,24 +163,36 @@ rechazo): «la firma del jefe de grupo» no es una columna, son varias filas.
   (línea 165). No hay que cambiar nada allí; solo **reiniciarlo** tras publicar el
   diccionario (cachea las fichas).
 
-## 7 · Decisiones para el humano (con recomendación)
+## 7 · Decisiones
 
-- **D1 · ¿Una entrega o dos?** Recomiendo **dos fases**. Fase 1: comparativo y
-  ofertas con las cuatro magnitudes, el ahorro, las ficticias marcadas, el
-  contrato, estado, actividad y fecha de aprobación (acceptance 2, 3, 4, 6, 7, 8,
-  11, 12, 13 salvo el escalón). Fase 2: coste objetivo con su % y su base, las
-  líneas de los dos lados (precio unitario de cada proveedor) y las firmas por
-  escalón (acceptance 5, 9, 10). La Fase 1 no depende de D2 ni de D3.
-- **D2 · ¿Qué es «ABC» en «el objetivo sobre el ABC; si no hay, sobre OT»?**
-  Recomiendo: **cualquier oferta de planificación** (ABC, PLANIFICACIÓN,
-  CUATRIMESTRAL, FASE 0), porque «ABC» literal solo está en 283 comparativos. La
-  base se publica **observada** (la familia cuya oferta × (1 − %) da el
-  objetivo) y la regla solo desempata cuando las dos casan (18.740 líneas).
-- **D3 · ¿Las firmas por escalón aquí o en F-085?** Recomiendo **aquí, en Fase
-  2**, como proyección fiel de `confir` tip 46 (una fila por firma, 66 k), que
-  F-085 consumirá o absorberá al unificar familias. Si se dejan a F-085, el
-  acceptance 5 pasa allí salvo la fecha de aprobación y quién cerró el circuito.
+**APROBADO por el humano el 2026-10-04** («todo ok, excepto el objetivo»):
+- **D1 · dos fases.** Fase 1 (R1-R24) aprobada tal cual: comparativo y ofertas
+  con las cuatro magnitudes, ahorro, ficticias, contrato, estado, actividad y
+  fecha de aprobación. Fase 2 (R25-R36): objetivo, líneas de los dos lados y
+  firmas por escalón.
+- **D3 · firmas por escalón aquí, en la Fase 2** (`compras.comparativo_firmas`).
+- **D2 · la base del objetivo**: la cambia el humano. Ya no son las ofertas
+  ficticias: es el descompuesto de la **primera ABC** y, si no hay ABC, el de
+  **Estudios** (`MASTER_ESTUDIO`, o `ESTUDIO` en las obras sin master 0). La
+  recomendación anterior («cualquier oferta de planificación») queda retirada.
+
+**ABIERTA · D4 · qué base publicar cuando la regla no reproduce el objetivo**
+(cifras en §3). Con la regla tal cual, base × (1 − %) da el precio objetivo en
+el 22,6 % de las líneas; con cualquier versión del descompuesto, en el 73,0 %.
+- (a) Publicar SIEMPRE la base de la regla (ABC o Estudios) con `casa_base`:
+  fiel a la regla; en ~77 % de las líneas dirá «no casa».
+- (b) Publicar la de la regla si casa y, si no, la versión del descompuesto que
+  casa, con su nombre (`origen_base`), y `base_regla` siempre visible.
+  **Recomendado (b)**: publicar como base un precio que no produce el objetivo
+  es una cifra plausible y falsa. Antes de decidir, conviene preguntar a Elena
+  Díaz (Control de Costes) de qué versión se toma el precio cuando se lanza el
+  comparativo: la medición apunta a «la del momento», no a la primera ABC.
+
+**Nota de diseño (no es decisión)**: `build_compras` corre antes que
+`build_descompuestos`, así que la Fase 2 lee el descompuesto de la noche
+anterior; la primera ABC y el master 0 son versiones congeladas, y el desfase
+no cambia la base.
 
 Ya decidido y NO se reabre: las cuatro magnitudes con nombre propio, todas las
-ofertas con las ficticias marcadas, la regla ABC→OT. Decidido en la spec por
-regla del datamart: los importes son **sin IVA** (`dco.totbas`, no `totdoc`).
+ofertas con las ficticias marcadas. Decidido en la spec por regla del datamart:
+los importes son **sin IVA** (`dco.totbas`, no `totdoc`).

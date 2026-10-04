@@ -9,8 +9,10 @@ Módulo `compras` (`docs/ARCHITECTURE.md`, «Capas PostgreSQL»): `build_compras
 lee `raw.*`, depende solo de `ingest_raw` y no bloquea a nadie. F-038 añade dos
 ficheros SQL al final de su lista. Lee además dos cosas ya construidas por el
 propio paso o por patrón existente: `compras.contrato_lineas` (01) y
-`maestro.v_obra_fichas` (como hace `03_views.sql`). **Sin ingesta nueva**: todas
-las tablas están en `raw`. Dentro del límite del servicio: es modelado de datos
+`maestro.v_obra_fichas` (como hace `03_views.sql`); en Fase 2,
+`descompuestos.lineas` **de la noche anterior** (`build_descompuestos` corre
+después de `build_compras`; la primera ABC y el master 0 son versiones
+congeladas, así que el desfase no cambia la base). **Sin ingesta nueva**. Dentro del límite del servicio: es modelado de datos
 de Sigrid ya ingeridos; nada de otro dominio ni de otro proyecto.
 
 ## 2 · Ficheros
@@ -19,7 +21,7 @@ de Sigrid ya ingeridos; nada de otro dominio ni de otro proyecto.
 
 | Ruta | Fase | Qué |
 |---|---|---|
-| `etl_sigrid/domain/comparativos.py` | 1 (+2) | Literales y oráculo: familias ficticias, CIF falsos, exclusiones, umbrales del atípico; en Fase 2, patrón de `dto`, tolerancia y familias de planificación |
+| `etl_sigrid/domain/comparativos.py` | 1 (+2) | Literales y oráculo: familias ficticias, CIF falsos, exclusiones, umbrales del atípico; en Fase 2, patrón de `dto`, tolerancia y regla de la base |
 | `etl_sigrid/infrastructure/postgres/sql/compras/08_comparativos.sql` | 1 | `compras.comparativo_ofertas` y `compras.comparativos` |
 | `etl_sigrid/infrastructure/postgres/sql/compras/09_comparativos_detalle.sql` | 2 | `comparativo_lineas`, `comparativo_oferta_lineas`, `comparativo_objetivo`, `comparativo_firmas` |
 | `tests/test_f038_dominio.py` | 1 (+2) | Oráculo puro con los nombres y textos medidos |
@@ -38,10 +40,9 @@ de Sigrid ya ingeridos; nada de otro dominio ni de otro proyecto.
 | `docs/ARCHITECTURE.md` | Un párrafo en «Semántica Sigrid»: ficticias, sin IVA (`totbas`), atípicos |
 | `C:\Users\pgris\PycharmProjects\azure-apps\datamart_seg_anual.md` | Los objetos nuevos de `compras` (otro repositorio: commit propio allí) |
 
-**NO se tocan**: `sql/compras/01_documentos.sql` (`compras.contratos` no cambia
-de columnas: R22 es solo de ficha), `config/tables_sigrid.yaml`, `maestro`,
-`stg`, `mart`, `cierre`, `mcp-bbdd` (`compras` ya está en su lista blanca),
-`.env`.
+**NO se tocan**: `sql/compras/01_documentos.sql` (R22 es solo de ficha),
+`config/tables_sigrid.yaml`, `sql/descompuestos/`, `maestro`, `stg`, `mart`,
+`cierre`, `mcp-bbdd` (`compras` ya está en su lista blanca), `.env`.
 
 ## 3 · Dominio: `etl_sigrid/domain/comparativos.py`
 
@@ -60,11 +61,10 @@ def familia_ficticia(cif: str | None, nombre: str | None) -> str | None   # None
 def es_adjudicado_atipico(adjudicado: Decimal, mayor_oferta: Decimal | None) -> bool | None
 # Fase 2
 PATRON_DTO: str = r'^-?[0-9]+(,[0-9]+)?%$'
-FAMILIAS_PLANIFICACION: frozenset[str]   # D2; recomendado {ABC, PLANIFICACION, CUATRIMESTRAL, FASE_0}
 TOLERANCIA_ABS = Decimal('0.011'); TOLERANCIA_REL = Decimal('0.002')
 def parse_porcentaje_dto(texto: str | None) -> Decimal | None
 def casa_con_base(precio: Decimal, precio_base: Decimal, pct: Decimal) -> bool
-def base_de_regla(familias_que_casan: set[str]) -> str | None     # planificación > OT
+def base_regla(obra_tiene_primera_abc: bool) -> str     # 'ABC' o 'ESTUDIOS' (D2 del humano)
 ```
 
 - `normalizar_nombre`: mayúsculas; `ÁÉÍÓÚÜÑ` → `AEIOUUN`; todo lo que no sea
@@ -165,18 +165,20 @@ Columnas, en este orden: `comparativo_id` (PK), `codigo_comparativo`,
   `descripcion`, `unidad_medida`, `cantidad`, `precio`,
   `importe_ofertado_linea` (`tot`), `descuento_texto` (`dto` literal),
   `porcentaje_descuento` (`compras.fn_porcentaje_dto(dto)`), `es_ficticia` y
-  `familia_ficticia` (de su oferta), `familia_base` (R29: `LEFT JOIN LATERAL`
-  sobre las líneas hermanas del mismo `comlinide` de ofertas ficticias no
-  OBJETIVO que cumplan la tolerancia; desempate por `FAMILIAS_PLANIFICACION`,
-  luego OFICINA_TECNICA). Índices: `oferta_id`, `comparativo_linea_id`.
+  `familia_ficticia` (de su oferta) y, solo en líneas OBJETIVO con %, la base
+  (R29-R30): `base_regla`, `precio_base`, `origen_base` (p. ej. `ABC v3`,
+  `MASTER_ESTUDIO v0`, o la versión que casa si D4 = b) y `casa_base`. Se busca
+  con `LEFT JOIN LATERAL` sobre `descompuestos.lineas` filtrado por `obra_id`
+  y `partida_id` (índices `ix_lineas_version` e `ix_lineas_partida`): primero el
+  `dncpro_id` de la línea del comparativo, luego el precio que cumple la
+  tolerancia. Índices: `oferta_id`, `comparativo_linea_id`.
 - **`compras.comparativo_objetivo`** (PK `comparativo_id`): `oferta_objetivo_id`
   (la OBJETIVO más reciente por `fecha_oferta`, luego `oferta_id` DESC),
   `n_ofertas_objetivo`, `importe_objetivo` (su documento),
-  `porcentaje_objetivo` (si sus líneas con % tienen uno solo),
-  `base_objetivo_familia` (la `familia_base` con más importe en sus líneas),
-  `base_objetivo` (`ABC` si esa familia ∈ `FAMILIAS_PLANIFICACION`;
-  `OFICINA_TECNICA` si es OT; NULL si no hay base).
-- **`compras.comparativo_firmas`** (D3; `raw.confir` con `conide` en
+  `porcentaje_objetivo` (si sus líneas con % tienen uno solo), `base_regla`
+  (`ABC`/`ESTUDIOS` de la obra) y `pct_importe_casa_base` (parte del importe de
+  sus líneas con % cuya base casa).
+- **`compras.comparativo_firmas`** (`raw.confir` con `conide` en
   `raw.com`; PK `firma_id`): `comparativo_id`, `circuito` (`cod`), `escalon`
   (`rol`), `usuario`, `fecha` (`fn_sigrid_date(fec)`), `hora` (`hor`),
   `pendiente` (`fir = 0`), `firma_digital_valida` (`firok = 1`),
@@ -205,7 +207,8 @@ columna (`agregacion` y `nulo_significa` donde aplique):
   `comparativos.contrato_id` → `compras.contratos.contrato_id` N:1;
   `compras.contratos.comparativo_id` y `compras.albaranes.comparativo_id` →
   `comparativos` N:1; `comparativos.obra_id` → `maestro.obras.obra_id` N:1.
-- Fase 2: fichas de los cuatro objetos; `dto` texto y negativo; base observada.
+- Fase 2: fichas de los cuatro objetos; `dto` texto y negativo; la base y su
+  cobertura medida (D4: 22,6 % con la regla, 73,0 % con cualquier versión).
 - `00_global.yaml`: `version` +1; P5 a `respondible` (sin `bloqueada_por`);
   preguntas nuevas: comparativos por actividad, ahorro del concurso, quién
   aprobó el comparativo X y cuándo, ¿acabó en contrato el comparativo X?
@@ -219,7 +222,7 @@ columna (`agregacion` y `nulo_significa` donde aplique):
   contiene `prvide` ni `totdoc` ni `ctr.comide`; usa `fn_estado_documento(46` y
   `(12`; usa `ctride`; existe la guarda `RAISE EXCEPTION`; el `MIN/MAX` del
   ahorro lleva `NOT es_ficticia`; ninguna columna proyectada se llama
-  `importe`; las listas de columnas son exactamente las de §4/§5.
+  `importe`; columnas = §4/§5; `09` filtra `origen` y `es_primera_abc`.
 - `test_f038_diccionario.py`: ficha por objeto con su `clave_negocio`; ninguna
   columna `importe`; frases obligatorias de §6 presentes; relaciones válidas.
 - `test_f047_steps.py`: la lista de ficheros de `build_compras`.
@@ -229,21 +232,18 @@ columna (`agregacion` y `nulo_significa` donde aplique):
 
 ## 8 · Coste y riesgos
 
-- **Coste**: Fase 1 < 1 min y < 30 MB; Fase 2 +1-2 min y ~150 MB (~787 k líneas
-  de oferta). Sin ingesta nueva. Lo mide la primera nocturna (`python main.py
-  timings`).
+- **Coste**: Fase 1 < 1 min y < 30 MB; Fase 2 +2-3 min y ~150 MB (`timings`).
 - **El atípico es un corte, no una lista de ids**: una lista de comparativos se
   queda vieja la noche que entra otro; el corte 10×/100.000 € es estable (con 3×
   salen 65 en vez de 52).
-- **No se elige ganadora cuando hay dos** (1 caso): elegir sería inventar.
-- **Las ficticias se marcan, no se borran**: el humano pidió todas las ofertas.
 - **Nombres nuevos de ficticia**: una entidad ficticia con nombre nuevo y CIF
   vacío entraría como real. Mitigación: la ficha da la consulta de control
   (ofertas con CIF vacío por nombre) y el dominio es el único sitio que cambiar.
+- **La base del objetivo lee `descompuestos`**, otro esquema y otro paso:
+  primer SQL fuera de `sql/descompuestos/` que lo lee (F-123 R1 lo daba por
+  hecho). Si `build_descompuestos` falla, la base se queda con la de otra noche.
 - **`maestro.v_obra_fichas`** es de `build_maestros`, que corre antes en
   `run-all`; si falta, el `CREATE` falla como ya fallaría `03_views.sql`.
-- **Descartado**: `comprv.prvide` (18 %); `ctr.comide` como enlace (56 %);
-  `dco.totdoc` (con IVA); solo CIF falso (30 % de las ficticias); por entidad
-  (la misma firma con familias distintas); el presupuesto de partida como
-  «planificado» (no sumable, ×25); vistas `v_pbi_*` por actividad (son F-067);
-  `dbo.log` (no hace falta: `confir` cubre el comparativo con fecha).
+- **Descartado**: `comprv.prvide` (18 %); `ctr.comide` (56 %); `dco.totdoc`
+  (IVA); solo CIF falso (30 %); por entidad; presupuesto de partida como
+  «planificado» (×25); vistas por actividad (F-067); `dbo.log` (F-085).

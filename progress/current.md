@@ -10,7 +10,17 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-04 · F-038 · SPEC ESCRITA, pendiente de aprobación del humano · el comparativo de ofertas
+## 2026-10-04 · F-038 · `spec_ready` · Fase 1 APROBADA; Fase 2 con D4 abierta · el comparativo de ofertas
+
+> **Aprobado por el humano el 2026-10-04**: D1 (dos fases), D3 (firmas por
+> escalón aquí, Fase 2) y la Fase 1 tal cual. **D2 corregida por el humano**: la
+> base del objetivo es el descompuesto de la primera ABC o, si no hay, el de
+> Estudios. Remedido: esa regla reproduce el objetivo en el **22,6 %** de las
+> líneas (cualquier versión del descompuesto, 73,0 %; la 0696 de la captura sí
+> casa con la ABC v3). **Abierta D4**: qué base publicar cuando no casa
+> (recomendado: la de la regla si casa, si no la versión que casa, con nombre).
+> La Fase 1 puede implementarse ya; la Fase 2 espera a D4. Detalle:
+> `progress/spec_F-038.md` §3 y §7.
 
 Spec-author: `specs/F-038-comparativos/` (requirements 149/150, design 249/250,
 25 tareas) y mediciones nuevas en `progress/spec_F-038.md`. Rama
@@ -29,11 +39,7 @@ medición los contradice (ver abajo).
 - Ficticia: el CIF falso solo cubre el 30 %; criterio = CIF falso o (CIF vacío y
   nombre de familia): 32.896 ofertas, el 45 % del ofertado.
 
-**Decisiones abiertas para el humano** (recomendación en `requirements.md`):
-- **D1** · ¿Una entrega o dos fases? Recomendado: dos (Fase 1 sin dependencias).
-- **D2** · ¿Qué cuenta como «ABC» en la regla del objetivo? Recomendado: las
-  cuatro familias de planificación (el literal «ABC» solo está en 283 comparativos).
-- **D3** · ¿Firmas por escalón aquí (Fase 2) o en F-085? Recomendado: aquí.
+**Decisiones** (primera ronda, ya contestadas arriba): D1, D2 y D3. Sigue abierta D4.
 
 
 ## 2026-10-03 · F-113 · CERRADA (`done`, APROBADO en pasada 2) · la categoría CD/CI/CP por el capítulo · SIN DESPLEGAR: quedan T9-T12 del humano

@@ -5,8 +5,8 @@ Rama `feature/F-038-comparativos`. Un commit por tarea (`F-038 Tn: ...`), `git a
 de ficheros concretos. Rigor `estandar`: fase RED con traza en
 `progress/impl_F-038.md` para los requisitos que lista `design.md` §7. Ningún
 agente ejecuta SQL contra la base: los tests leen el TEXTO del SQL; lo que exige
-la base es MANUAL del humano. **Fase 2 (T11-T19) solo si D1 = una entrega o
-cuando el humano la abra; T15 solo si D3 = aquí.**
+la base es MANUAL del humano. **D1 aprobado (2026-10-04): dos fases.** Fase 2
+(T11-T19) cuando el humano la abra y con D4 decidida; D3 aprobado (T15 entra).
 
 ## Fase 1 · comparativo, ofertas, importes, ahorro, contrato, aprobación
 
@@ -23,11 +23,11 @@ cuando el humano la abra; T15 solo si D3 = aquí.**
 
 ## Fase 2 · objetivo, líneas de los dos lados, firmas
 
-- [ ] T11: Dominio Fase 2: `PATRON_DTO`, `parse_porcentaje_dto`, `TOLERANCIA_*`, `casa_con_base`, `FAMILIAS_PLANIFICACION` (según D2) y `base_de_regla`, con tests de los `dto` medidos (R27, R29)  |  Verificación: `python -m pytest tests/test_f038_dominio.py -q`
+- [ ] T11: Dominio Fase 2: `PATRON_DTO`, `parse_porcentaje_dto`, `TOLERANCIA_*`, `casa_con_base` y `base_regla` (ABC si la obra tiene primera ABC, si no ESTUDIOS), con tests de los `dto` medidos y de las tres líneas de la 0696 (R27, R29)  |  Verificación: `python -m pytest tests/test_f038_dominio.py -q`
 - [ ] T12: `compras.fn_porcentaje_dto` en `00_setup.sql` con el patrón del dominio, sin `EXCEPTION` (R27)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k dto`
-- [ ] T13: `sql/compras/09_comparativos_detalle.sql`: `comparativo_lineas` y `comparativo_oferta_lineas` con `familia_base` (R25, R26, R29, R32)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k "lineas or base"`
-- [ ] T14: `09`: `compras.comparativo_objetivo` (R30, R31)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k objetivo`
-- [ ] T15: SOLO SI D3 = aquí · `09`: `compras.comparativo_firmas` (R33)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k firmas`
+- [ ] T13: `sql/compras/09_comparativos_detalle.sql`: `comparativo_lineas` y `comparativo_oferta_lineas` con la base del descompuesto según D4 (R25, R26, R29, R30, R32)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k "lineas or base"`
+- [ ] T14: `09`: `compras.comparativo_objetivo` (R31)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k objetivo`
+- [ ] T15: `09`: `compras.comparativo_firmas` (R33)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k firmas`
 - [ ] T16: `SUB_PASOS` + `09` (cuenta `comparativo_oferta_lineas`) y `tests/test_f047_steps.py`  |  Verificación: `python -m pytest tests/test_f047_steps.py -q`
 - [ ] T17: Fichas de Fase 2 (R28, R34, R35) y `version` +1  |  Verificación: `python -m pytest tests/test_f038_diccionario.py tests/test_f006_fichas.py -q`
 - [ ] T18: `azure-apps/datamart_seg_anual.md` con los objetos de Fase 2; commit en ese repositorio  |  Verificación: `git -C C:/Users/pgris/PycharmProjects/azure-apps log -1 --stat`
@@ -40,4 +40,4 @@ cuando el humano la abra; T15 solo si D3 = aquí.**
 - [ ] T22: MANUAL (humano, solo lectura) · Puertas contra la base  |  Verificación: MANUAL (humano): `python main.py check-declarados`, `python main.py check-unicidad`, `python main.py check-relaciones` y `python main.py check-diccionario`, los cuatro con código 0
 - [ ] T23: MANUAL (humano, solo lectura) · Cifras contra la previsión de `progress/spec_F-038.md`: `SELECT count(*), count(contrato_id), sum(ahorro_concurso), count(ahorro_concurso), count(*) FILTER (WHERE adjudicado_atipico) FROM compras.comparativos;` (≈ recuento de `raw.com`, ≈ 18.600, ≈ 72,7 M€, ≈ 6.900, ≈ 52) y `SELECT familia_ficticia, count(*) FROM compras.comparativo_ofertas GROUP BY 1;` (≈ 32.900 ficticias)  |  Verificación: MANUAL (humano): resultado en `progress/current.md`; una desviación > 5 % se para y se avisa
 - [ ] T24: MANUAL (humano) · Reiniciar el MCP y hacerle, sin explicarle nada, las cuatro preguntas del acceptance 13 (comparativos por actividad; ahorro del concurso; quién aprobó el comparativo X y cuándo; ¿acabó en contrato el comparativo X?)  |  Verificación: MANUAL (humano): las cuatro respuestas usan `compras.comparativos` y citan la frescura de `build_compras`
-- [ ] T25: SOLO Fase 2 · MANUAL (humano, solo lectura) · El caso de la captura de Elena Díaz (obra 0696): `compras.comparativo_objetivo` da 94.853,91 €, 5 % y base `ABC` con familia CUATRIMESTRAL  |  Verificación: MANUAL (humano): `SELECT o.* FROM compras.comparativo_objetivo o JOIN compras.comparativos c USING (comparativo_id) WHERE c.codigo_obra = '0696' AND o.importe_objetivo BETWEEN 94853 AND 94854;`
+- [ ] T25: SOLO Fase 2 · MANUAL (humano, solo lectura) · El caso de la captura de Elena Díaz (obra 0696): `compras.comparativo_objetivo` da 94.853,91 €, 5 % y `base_regla` = ABC; sus líneas 939265 y 952250 casan con la ABC v3 (69,70 × 0,95 = 66,215) y la 962172 (26,60, base 28,00) no tiene base ni en la ABC ni en Estudios  |  Verificación: MANUAL (humano): `SELECT o.* FROM compras.comparativo_objetivo o JOIN compras.comparativos c USING (comparativo_id) WHERE c.comparativo_id = 2754136;` y `SELECT linea_oferta_id, precio, porcentaje_descuento, precio_base, origen_base, casa_base FROM compras.comparativo_oferta_lineas WHERE oferta_id = 2754139;`

@@ -42,7 +42,7 @@ Resumen: **113 features**, 65 abiertas, 48 terminadas.
 | F-041 | La campana de mutacion miente: timeouts, bytecode y worktrees | 33 | pendiente | critico | `feature/F-041-mutacion-fiable` |
 | F-043 | Un ID de suscripcion de Azure esta versionado y subido a GitHub | 35 | pendiente | estandar | `feature/F-043-secreto-versionado` |
 | F-046 | El diccionario obliga a contrastar todo desglose contra su total publicado | 36 | pendiente | estandar | `feature/F-046-contraste-desgloses` |
-| F-039 | Vistas puente que faltan para las preguntas de negocio | 37 | pendiente | estandar | `feature/F-039-vistas-puente` |
+| F-039 | Vistas puente que faltan para las preguntas de negocio | 37 | spec lista | estandar | `feature/F-039-vistas-puente` |
 | F-058 | Estados financieros y cuenta de resultados por obra: el mart que se monta encima de la contabilidad | 38 | pendiente | critico | `feature/F-058-estados-financieros` |
 | F-048 | El guardian de secretos exime por el primer caracter y deja pasar contrasenas que empiezan por simbolo | 39 | pendiente | estandar | `feature/F-048-guardian-secretos-poroso` |
 | F-040 | El lado de ingresos: ventas, certificaciones y clientes | 40 | pendiente | critico | `feature/F-040-ingresos` |
@@ -330,7 +330,7 @@ Nacida el 2026-08-25 de la primera prueba del MCP en Claude Escritorio contra el
 
 ### F-039 · Vistas puente que faltan para las preguntas de negocio
 
-estado **pendiente** · prioridad 37 · rigor `estandar` · SDD no · rama `feature/F-039-vistas-puente`
+estado **spec lista** · prioridad 37 · rigor `estandar` · SDD no · rama `feature/F-039-vistas-puente`
 
 Nacida el 2026-08-20 del analisis de dominio de F-006. Tres preguntas que el datamart puede responder pero obligan a escribir SQL de agregacion no evidente, justo lo que hace fallar a un agente. (1) Que retenciones tengo de los proveedores de una obra: las dos vistas agregadas existentes cortan por un solo eje cada una -v_pbi_retencion_obra pierde el proveedor, v_pbi_retencion_entidad pierde la obra-; falta retenciones.v_pbi_retencion_obra_entidad. (2) Que proveedores han facturado mas: v_pbi_proveedor_obra esta agrupada por obra y ano, asi que el ranking global exige agregar sin perder las filas con obra_id NULL -facturas de estructura y generales-; falta una vista proveedor x periodo con grano mensual. (3) EL EJE MAS VALIOSO Y HOY INEXPLOTADO: partida_id une el mundo del seguimiento -stg.partidas, plan_mensual, mart.fact_seguimiento_mensual- con el mundo documental -compras.v_pbi_partida_coste-, y permite comparar coste PLANIFICADO de una partida con coste INCURRIDO documental de esa partida. Ninguna vista lo hace. Aviso para la implementacion: compras y retenciones no filtran por stg.obras, asi que pueden traer obras administrativas que el seguimiento excluye; las vistas nuevas deben decidir y documentar que universo de obra usan. AMPLIADO el 2026-08-25 al probar el MCP contra Azure desde Claude Escritorio: el cruce obra x proveedor SI se puede hacer sobre retenciones.movimientos (trae obra_id, codigo_obra, entidad_id y entidad_nombre en la misma fila), pero las metricas que el diccionario manda usar -saldo_vivo y neto_practicado- NO estan en esa tabla: solo existen en v_pbi_retencion_entidad y v_pbi_retencion_resumen, que ya vienen agregadas y han perdido la obra. Es decir: por obra tienes importe, y por metrica correcta pierdes la obra. La vista cruzada tiene que traer las dos.
 

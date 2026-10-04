@@ -1,21 +1,23 @@
 <!-- specs/F-038-comparativos/requirements.md -->
 # F-038 · Requisitos · El comparativo de ofertas al completo
 
-Mediciones y porqués: `progress/spec_F-038.md` (2026-10-04), sobre
-`progress/explore_F-038_comparativos.md` y `progress/explore_coste_objetivo.md`.
-Esta spec **no vuelve a abrir** lo cerrado por el humano: las cuatro magnitudes
-con nombre propio, todas las ofertas con las ficticias marcadas y la regla «el
-objetivo sobre el ABC; si no hay ABC, sobre Oficina Técnica».
+Mediciones y porqués: `progress/spec_F-038.md`. No se reabre lo cerrado por el
+humano: las cuatro magnitudes con nombre propio y todas las ofertas.
 
-## Decisiones que pide al humano (detalle en `progress/spec_F-038.md` §7)
+## Decisiones (detalle y cifras en `progress/spec_F-038.md` §3 y §7)
 
-- **D1 · Fases.** Recomendado: **dos**. Fase 1 = R1-R24 (comparativo, ofertas,
-  importes, ahorro, contrato, aprobación). Fase 2 = R25-R36 (objetivo, líneas de
-  los dos lados, firmas por escalón). Alternativa: todo en una entrega.
-- **D2 · Qué cuenta como «ABC».** Recomendado: las cuatro familias de
-  planificación (ABC, PLANIFICACION, CUATRIMESTRAL, FASE_0). Solo afecta a Fase 2.
-- **D3 · Firmas por escalón.** Recomendado: aquí, en Fase 2 (R33-R34). Si van a
-  F-085, R33-R34 salen de esta spec y el acceptance 5 se reparte.
+Aprobado por el humano el 2026-10-04: **D1** dos fases (Fase 1 = R1-R24, tal
+cual; Fase 2 = R25-R36) y **D3** firmas por escalón aquí, en Fase 2. **D2
+cambia**: la base del objetivo es el **descompuesto** (`descompuestos.lineas`) de
+la **primera ABC** del master y, si la obra no tiene ABC, el de **Estudios**
+(`MASTER_ESTUDIO` o `ESTUDIO`). Queda abierta:
+
+- **D4 · Qué base publicar cuando la regla no reproduce el objetivo.** Medido:
+  con la regla tal cual, base × (1 − %) da el precio objetivo en el **22,6 %**
+  de las 83.329 líneas con %; con cualquier versión del descompuesto, en el
+  **73,0 %**. (a) Publicar la base de la regla y marcar si casa (`casa_base`);
+  (b) la de la regla si casa y, si no, la versión del descompuesto que casa,
+  con su nombre. **Recomendado: (b)**, con `base_regla` siempre visible.
 
 ## Fase 1 · El comparativo y sus ofertas
 
@@ -114,36 +116,33 @@ objetivo sobre el ABC; si no hay ABC, sobre Oficina Técnica».
 - R27. `porcentaje_descuento` debe salir de UNA función SQL cuyo patrón
   (`^-?[0-9]+(,[0-9]+)?%$`) vive en el dominio con su oráculo y tests; SI el
   texto no casa, ENTONCES NULL, nunca un error ni un cero.
-- R28. La ficha debe declarar que `dto` es texto con coma decimal y que tratarlo
-  como número revienta; que el precio ya es neto (`tot = can × pre`); y que hay
-  descuentos negativos (recargos).
-- R29. CUANDO una línea OBJETIVO tenga porcentaje, el sistema debe publicar
-  `familia_base` = familia de la oferta ficticia que, en el mismo `comlinide`,
-  da su precio con `pre × (1 − %)` (tolerancia del dominio); si casan una de
-  planificación (D2) y OFICINA_TECNICA, gana la de planificación; si no casa
-  ninguna, NULL.
-- R30. El sistema debe publicar `compras.comparativo_objetivo`, una fila por
-  comparativo con oferta OBJETIVO (`comparativo_id` PK), con
-  `oferta_objetivo_id`, `importe_objetivo` y `porcentaje_objetivo` de la más
-  reciente (`con.fec`, luego `ide`); el porcentaje solo si es único en ella.
-- R31. Esa fila debe publicar `base_objetivo` (`ABC` u `OFICINA_TECNICA` según
-  D2) y `base_objetivo_familia` (la observada mayoritaria por importe); NULL si
-  no se puede reconstruir, y la ficha dice por qué (12,6 % de líneas).
+- R28. La ficha debe declarar que `dto` es texto con coma decimal (tratarlo como
+  número revienta), que el precio ya es neto y que hay % negativos (recargos).
+- R29. CUANDO una línea OBJETIVO tenga porcentaje, el sistema debe buscar su
+  base en `descompuestos.lineas` de su obra (`com.obride`) y partida
+  (`dncpro.paride` de su `comlin`): `base_regla` = `ABC` si la obra tiene primera
+  ABC (`es_primera_abc`), si no `ESTUDIOS` (`MASTER_ESTUDIO`/`ESTUDIO`); dentro
+  de la partida, el elemento es el de igual `dncpro_id` y, si no lo hay, el que
+  cumpla `precio × (1 − %)` con la tolerancia del dominio.
+- R30. La línea debe publicar `precio_base`, `origen_base` (origen y versión
+  del descompuesto usado) y `casa_base` (si base × (1 − %) da el precio); según
+  D4, la base de la regla siempre (a) o, si no casa, la versión que casa (b).
+  Sin descompuesto en la partida: todo NULL.
+- R31. El sistema debe publicar `compras.comparativo_objetivo`, una fila por
+  comparativo con oferta OBJETIVO (`comparativo_id` PK): la oferta más reciente
+  (`con.fec`, luego `ide`), su importe, su porcentaje (si es único), `base_regla`
+  y el % de su importe cuyas líneas casan con la base; la ficha da las cifras de
+  D4 y dice que la tabla lee `descompuestos` de la noche anterior.
 - R32. Ninguna oferta ficticia debe contar en el número de ofertantes, la
   mínima ni el ahorro (test sobre el SQL).
-- R33. (D3) El sistema debe publicar `compras.comparativo_firmas`, una fila por
+- R33. El sistema debe publicar `compras.comparativo_firmas`, una fila por
   `raw.confir` de un comparativo, con circuito (`cod`), escalón (`rol`),
   usuario, fecha, `pendiente` (`fir = 0`) y `firma_digital_valida` (`firok`).
-- R34. (D3) La ficha debe declarar que un escalón se repite tras un rechazo
+- R34. La ficha debe declarar que un escalón se repite tras un rechazo
   (5.375 comparativos), que `ord` = 0 siempre, y que el circuito entre familias
   es F-085.
 - R35. Cada objeto de Fase 2 debe tener ficha con grano, clave y relaciones.
-- R36. `check-unicidad`, `check-relaciones`, `check-declarados` y
-  `check-diccionario` deben pasar contra la base tras la nocturna (MANUAL).
+- R36. Las cuatro puertas `check-*` deben pasar tras la nocturna (MANUAL).
 
-## Fuera de alcance
-
-Vistas por actividad y por proveedor adjudicatario (F-067). Circuito de firma
-entre familias, `deffir`, `puntot`/`pun`/`totimp` y `dbo.log` (F-085). El
-«planificado» de Aguado por presupuesto de partida (no sumable, medido).
-`comlinpar` (0 filas). Nada de ingesta: todo está en `raw`.
+**Fuera de alcance**: vistas por actividad y proveedor (F-067); circuito entre
+familias, `deffir` y `dbo.log` (F-085); `comlinpar` (0 filas); ingesta nueva.
