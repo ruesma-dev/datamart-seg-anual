@@ -167,11 +167,12 @@ Columnas, en este orden: `comparativo_id` (PK), `codigo_comparativo`,
   `porcentaje_descuento` (`compras.fn_porcentaje_dto(dto)`), `es_ficticia` y
   `familia_ficticia` (de su oferta) y, solo en líneas OBJETIVO con %, la base
   (R29-R30): `base_regla`, `precio_base`, `origen_base` (p. ej. `ABC v3`,
-  `MASTER_ESTUDIO v0`, o la versión que casa si D4 = b) y `casa_base`. Se busca
-  con `LEFT JOIN LATERAL` sobre `descompuestos.lineas` filtrado por `obra_id`
-  y `partida_id` (índices `ix_lineas_version` e `ix_lineas_partida`): primero el
-  `dncpro_id` de la línea del comparativo, luego el precio que cumple la
-  tolerancia. Índices: `oferta_id`, `comparativo_linea_id`.
+  `MASTER_PRE_ABC v2`, `MASTER_ESTUDIO v0`) y `casa_base`. `LEFT JOIN LATERAL`
+  sobre `descompuestos.lineas` por `obra_id` y `partida_id` (índices
+  `ix_lineas_version`, `ix_lineas_partida`), D4 en este orden: la primera ABC
+  que case; la versión con `fase_num` < ABC (o Estudios sin ABC) que case, la
+  más reciente; si ninguna, la de la regla (por `dncpro_id`) y `casa_base`
+  falso. **Nunca `fase_num` > ABC** (test). Índices: `oferta_id`, `comparativo_linea_id`.
 - **`compras.comparativo_objetivo`** (PK `comparativo_id`): `oferta_objetivo_id`
   (la OBJETIVO más reciente por `fecha_oferta`, luego `oferta_id` DESC),
   `n_ofertas_objetivo`, `importe_objetivo` (su documento),
@@ -208,7 +209,7 @@ columna (`agregacion` y `nulo_significa` donde aplique):
   `compras.contratos.comparativo_id` y `compras.albaranes.comparativo_id` →
   `comparativos` N:1; `comparativos.obra_id` → `maestro.obras.obra_id` N:1.
 - Fase 2: fichas de los cuatro objetos; `dto` texto y negativo; la base y su
-  cobertura medida (D4: 22,6 % con la regla, 73,0 % con cualquier versión).
+  cobertura de D4 (55,3 % casan; 12.351 líneas solo con una posterior).
 - `00_global.yaml`: `version` +1; P5 a `respondible` (sin `bloqueada_por`);
   preguntas nuevas: comparativos por actividad, ahorro del concurso, quién
   aprobó el comparativo X y cuándo, ¿acabó en contrato el comparativo X?

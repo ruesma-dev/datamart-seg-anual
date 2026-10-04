@@ -10,14 +10,10 @@ Aprobado por el humano el 2026-10-04: **D1** dos fases (Fase 1 = R1-R24, tal
 cual; Fase 2 = R25-R36) y **D3** firmas por escalón aquí, en Fase 2. **D2
 cambia**: la base del objetivo es el **descompuesto** (`descompuestos.lineas`) de
 la **primera ABC** del master y, si la obra no tiene ABC, el de **Estudios**
-(`MASTER_ESTUDIO` o `ESTUDIO`). Queda abierta:
-
-- **D4 · Qué base publicar cuando la regla no reproduce el objetivo.** Medido:
-  con la regla tal cual, base × (1 − %) da el precio objetivo en el **22,6 %**
-  de las 83.329 líneas con %; con cualquier versión del descompuesto, en el
-  **73,0 %**. (a) Publicar la base de la regla y marcar si casa (`casa_base`);
-  (b) la de la regla si casa y, si no, la versión del descompuesto que casa,
-  con su nombre. **Recomendado: (b)**, con `base_regla` siempre visible.
+(`MASTER_ESTUDIO` o `ESTUDIO`). **D4 decidida el 2026-10-04**: la primera ABC si
+casa; si no, una versión ANTERIOR que case; nunca una posterior; si ninguna,
+la de la regla marcada «no casa». Casan 46.052 de 83.329 líneas (55,3 %); 12.351
+solo casarían con una posterior. Ejemplos: `progress/explore_F-038_ejemplos_objetivo.md`.
 
 ## Fase 1 · El comparativo y sus ofertas
 
@@ -125,14 +121,14 @@ la **primera ABC** del master y, si la obra no tiene ABC, el de **Estudios**
   de la partida, el elemento es el de igual `dncpro_id` y, si no lo hay, el que
   cumpla `precio × (1 − %)` con la tolerancia del dominio.
 - R30. La línea debe publicar `precio_base`, `origen_base` (origen y versión
-  del descompuesto usado) y `casa_base` (si base × (1 − %) da el precio); según
-  D4, la base de la regla siempre (a) o, si no casa, la versión que casa (b).
-  Sin descompuesto en la partida: todo NULL.
+  usados) y `casa_base`, con D4: la ABC si casa; si no, la versión anterior a la
+  ABC más reciente que case (Estudios en obras sin ABC); nunca una posterior; si
+  ninguna casa, la de la regla con `casa_base` falso. Sin descompuesto: NULL.
 - R31. El sistema debe publicar `compras.comparativo_objetivo`, una fila por
   comparativo con oferta OBJETIVO (`comparativo_id` PK): la oferta más reciente
   (`con.fec`, luego `ide`), su importe, su porcentaje (si es único), `base_regla`
   y el % de su importe cuyas líneas casan con la base; la ficha da las cifras de
-  D4 y dice que la tabla lee `descompuestos` de la noche anterior.
+  D4 (55,3 % casan) y dice que la tabla lee `descompuestos` de la noche anterior.
 - R32. Ninguna oferta ficticia debe contar en el número de ofertantes, la
   mínima ni el ahorro (test sobre el SQL).
 - R33. El sistema debe publicar `compras.comparativo_firmas`, una fila por

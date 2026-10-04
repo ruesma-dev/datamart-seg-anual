@@ -176,17 +176,28 @@ rechazo): «la firma del jefe de grupo» no es una columna, son varias filas.
   **Estudios** (`MASTER_ESTUDIO`, o `ESTUDIO` en las obras sin master 0). La
   recomendación anterior («cualquier oferta de planificación») queda retirada.
 
-**ABIERTA · D4 · qué base publicar cuando la regla no reproduce el objetivo**
-(cifras en §3). Con la regla tal cual, base × (1 − %) da el precio objetivo en
-el 22,6 % de las líneas; con cualquier versión del descompuesto, en el 73,0 %.
-- (a) Publicar SIEMPRE la base de la regla (ABC o Estudios) con `casa_base`:
-  fiel a la regla; en ~77 % de las líneas dirá «no casa».
-- (b) Publicar la de la regla si casa y, si no, la versión del descompuesto que
-  casa, con su nombre (`origen_base`), y `base_regla` siempre visible.
-  **Recomendado (b)**: publicar como base un precio que no produce el objetivo
-  es una cifra plausible y falsa. Antes de decidir, conviene preguntar a Elena
-  Díaz (Control de Costes) de qué versión se toma el precio cuando se lanza el
-  comparativo: la medición apunta a «la del momento», no a la primera ABC.
+**DECIDIDA el 2026-10-04 · D4** (humano: «la del ABC si casa, y si no una
+anterior. De momento nunca posterior, aunque lo veré con Negocio»): base = la
+**primera ABC si casa**; si no, una versión **ANTERIOR** a la ABC que case
+(Estudios en las obras sin ABC); **nunca una posterior**; si ninguna casa, se
+publica la de la regla con `casa_base` = falso. Recuento sobre las 83.329 líneas
+OBJETIVO con `dto` (detalle y seis ejemplos en
+`progress/explore_F-038_ejemplos_objetivo.md`):
+
+| | líneas |
+|---|---|
+| casa con la ABC | 11.409 |
+| no con la ABC, sí con una anterior | 5.468 |
+| obra sin ABC: casa con Estudios | 7.386 |
+| obra sin ABC: no con Estudios, sí con otra versión del master | 21.789 |
+| **solo con una posterior** (se publica «no casa») | **12.351** |
+| solo con `PLANIF_JO` de hoy | 2.461 |
+| con ninguna (o sin descompuesto) | 22.465 |
+
+Casan con la regla **46.052 (55,3 %)**. Dos cosas para Negocio: (1) las fechas
+de las versiones apuntan a que la base es **la versión vigente al hacer el
+comparativo** (ejemplos B1, B2 y C1); (2) en las obras sin ABC, los 21.789
+dependen de leer «una anterior» como cualquier versión del master: a confirmar.
 
 **Nota de diseño (no es decisión)**: `build_compras` corre antes que
 `build_descompuestos`, así que la Fase 2 lee el descompuesto de la noche
