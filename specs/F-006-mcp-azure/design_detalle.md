@@ -176,6 +176,12 @@ infraestructura.
 > `v_pbi_cierre_resumen`, y las dos `presupuesto_*_venta_con_coeficientes` de la
 > cabecera. El inventario pasa a **189 objetos**, la cobertura de columnas a
 > **1412** y las fichas de consumo siguen en **85**.
+>
+> **Enmienda del 2026-10-04 (F-038, el comparativo de ofertas, Fase 1).**
+> Entran dos tablas de `compras`, `comparativos` y `comparativo_ofertas`, y dos
+> funciones auxiliares, `fn_normalizar_nombre` y `fn_familia_ficticia`. El
+> inventario pasa a **194 objetos**, las columnas descritas fuera de `raw` de
+> 1437 a **1492** (36 + 19) y las fichas de consumo suben en dos.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

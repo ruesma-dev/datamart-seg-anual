@@ -455,7 +455,14 @@
 # hay CERO de contrato; son de comparativos, facturas y obras. En el origen
 # tampoco estan, asi que el ESTADO es la unica via.
 
-version: 41
+# version 42 (F-038, 2026-10-04): EL COMPARATIVO DE OFERTAS, Fase 1. Dos tablas
+# nuevas en `compras` --`comparativos` y `comparativo_ofertas`-- y dos funciones
+# auxiliares. Las cuatro magnitudes de importe con su nombre y ninguna `importe`
+# a secas, las ofertas ficticias marcadas, el ahorro del concurso solo con
+# ofertas reales, el adjudicado atipico marcado y el contrato por las lineas del
+# comparativo. P5 pasa a respondible y entran P19-P22.
+
+version: 42
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1349,7 +1356,9 @@ esquemas:
       contratado, que hay albaranado sin facturar y que coste lleva cada
       partida. Incluye ademas el catalogo de formas de pago
       (`compras.formas_pago`), que es la DIMENSION: dice que formas de pago
-      existen, no con cual se pago un documento concreto.
+      existen, no con cual se pago un documento concreto. Y desde F-038 el
+      comparativo de ofertas (`compras.comparativos`) con todas sus ofertas
+      (`compras.comparativo_ofertas`), las ficticias marcadas.
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -1580,13 +1589,18 @@ preguntas_aceptacion:
     objetos_esperados:
       - compras.v_pbi_contrato_consumo
       - compras.v_pbi_albaranes_sin_facturar
+      - compras.comparativos
     respuesta_correcta: >-
       Contrato y albaran se responden. Solo ALBARAN y PROFORMA cuentan como
       pendientes de facturar, y la sobrefacturacion conserva signo negativo.
-      **El comparativo no existe como objeto** y hay que decirlo: `raw.com`,
-      `raw.comlin` y `raw.comprv` estan ingeridos pero ningun SQL los lee.
-    estado: parcial
-    bloqueada_por: F-038
+      Los comparativos salen de `compras.comparativos` filtrando su `obra_id`,
+      con los cuatro importes por su nombre y sin llamar a ninguno «el»
+      importe: el contratado (`importe_contratado`) se repite en los
+      comparativos que comparten contrato y no se suma entre ellos, y el
+      adjudicado se da con y sin `adjudicado_atipico`. Todo SIN IVA. Cita la
+      fecha de build de `build_compras`.
+    reglas_implicadas: [R-COMPRAS-SIN-IVA, R-FRESCURA]
+    estado: respondible
 
   - id: P6
     pregunta: Cual es la planificacion mensual de la obra X
@@ -1754,6 +1768,62 @@ preguntas_aceptacion:
       mensual', que no reemplazan al plan. Y que un mes sin fila de la version
       vigente da importes 0 sin dejar por ello de ser la vigente.
     reglas_implicadas: [R-VERSION-MASTER]
+    estado: respondible
+
+  # P19-P22 (F-038, acceptance 13): las cuatro que el MCP tiene que responder
+  # sin que nadie le explique nada.
+  - id: P19
+    pregunta: Cuantos comparativos hay por actividad
+    objetos_esperados:
+      - compras.comparativos
+    respuesta_correcta: >-
+      Agrupa `compras.comparativos` por `actividad` (o `actividad_id`), que es
+      la actividad de verdad (`com.natide`), y NO por `nombre_comparativo`, que
+      es texto libre. Cuenta aparte los que tienen la actividad a NULL. No
+      confunde la actividad con el texto de `dbo.log`. Cita la fecha de build
+      de `build_compras`.
+    reglas_implicadas: [R-FRESCURA]
+    estado: respondible
+
+  - id: P20
+    pregunta: Cuanto se ahorro en el concurso de los comparativos de la obra X
+    objetos_esperados:
+      - compras.comparativos
+    respuesta_correcta: >-
+      Suma `ahorro_concurso`: la oferta REAL mas cara menos la mas barata, SIN
+      IVA, solo en los comparativos con dos o mas ofertas reales con importe.
+      No recalcula el ahorro con las ofertas de `compras.comparativo_ofertas`
+      sin quitar las ficticias (OBJETIVO, OFICINA TECNICA, PLANIFICACION). Dice
+      en cuantos comparativos hubo concurso que medir. Cita la fecha de build
+      de `build_compras`.
+    reglas_implicadas: [R-COMPRAS-SIN-IVA, R-FRESCURA]
+    estado: respondible
+
+  - id: P21
+    pregunta: Quien aprobo el comparativo X y cuando
+    objetos_esperados:
+      - compras.comparativos
+    respuesta_correcta: >-
+      Busca el comparativo por `codigo_comparativo` y da `aprobado_por` y
+      `fecha_aprobacion`, con su `estado`. Si estan a NULL dice que el
+      comparativo no esta en un estado final de firma y que esa fecha NO
+      EXISTE, en vez de inventarla con `fecha_alta`; si hay firmas pendientes
+      (`n_firmas_pendientes`), lo dice. Cita la fecha de build de
+      `build_compras`.
+    reglas_implicadas: [R-FRESCURA]
+    estado: respondible
+
+  - id: P22
+    pregunta: Acabo en contrato el comparativo X
+    objetos_esperados:
+      - compras.comparativos
+    respuesta_correcta: >-
+      Usa `compras.comparativos.contrato_id` --con `codigo_contrato` y
+      `fecha_contrato`--, que lee las lineas del comparativo. NO usa
+      `compras.contratos.comparativo_id`, que es la cabecera del contrato y
+      solo cubre el 56 %: con ella responderia NO en miles de casos en que es
+      SI. Cita la fecha de build de `build_compras`.
+    reglas_implicadas: [R-FRESCURA]
     estado: respondible
 
 pendientes: []
