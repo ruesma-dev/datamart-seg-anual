@@ -1,17 +1,29 @@
 <!-- progress/review_F-038.md -->
-Revisión completa (pasada 1): Fase 1 (T1-T10), `main...HEAD` = `4dfe8c7..7a01c15`
+Revisión incremental desde 7a01c15 (pasada 2): delta `7a01c15..9e21857`; la pasada 1 revisó entera `4dfe8c7..7a01c15`
 
 # F-038 · Review · Fase 1 · el comparativo de ofertas
 
-**Veredicto: CHANGES_REQUESTED**, por UN cambio ajeno al código: la rama pasa
-**F-039** de `pending` a `spec_ready` sin decisión de nadie (cambio 1). El código
-de la Fase 1 (SQL, dominio, diccionario, tests, mutación, MANUAL) lo aprobaría
-tal cual: la pasada 2 solo tiene que mirar ese delta.
+**Veredicto: APPROVED** (pasada 2). La pasada 1 pidió un solo cambio, ajeno al
+código: F-039 había pasado a `spec_ready` sin decisión de nadie. Hecho.
 
-**Rigor:** `estandar`, declarado. Exige fase RED en los centrales, cobertura de
-lo cambiado ≥ 80 % y mutación con los supervivientes analizados.
+## Pasada 2 · delta `7a01c15..9e21857`
 
-## Lo verificado por mí (no copiado del informe)
+- **Ficheros**: `features.json`, `BACKLOG.md`, `current.md`, `impl_F-038.md` y
+  este informe. No toca `etl_sigrid/`, `tests/`, `config/` ni `specs/`: lo
+  aprobado y la mutación siguen valiendo (RM1).
+- **Cambio 1, hecho.** F-039 vuelve a `pending`, y `BACKLOG.md` lo refleja en
+  la tabla y en la ficha. Frente a `main`, `features.json` ya solo cambia F-038
+  (`in_progress`) y las prioridades del humano (`03dfcbc`). La nota sobre D4
+  también está corregida: `current.md` e `impl` §6 la dan por decidida.
+- **`bash harness/init.sh`** sobre `9e21857`: 6.614 passed, 223 skipped,
+  cobertura `[OK]` 32/32. El primer intento salió KO solo en `PUERTA TAMAÑO`,
+  por este informe a medio editar (141 > 140). Lo recorté y lo relancé:
+  **ENTORNO LISTO, exit 0** (6.614 passed, 741 s; tamaño 139/140).
+
+**Rigor:** `estandar`, declarado. Exige fase RED en los requisitos centrales,
+cobertura de lo cambiado ≥ 80 % y mutación con los supervivientes analizados.
+
+## Pasada 1 · lo verificado por mí (sigue valiendo: el delta no lo toca)
 
 - **`bash harness/init.sh`** sobre `7a01c15`: **6.614 passed, 223 skipped**
   (1.008 s), `PUERTA COBERTURA [OK]` 100 % de 32/32 líneas. Primera ejecución
@@ -92,7 +104,8 @@ analizado · [x] «Evidencias» con los cuatro números y los workers · [x] nin
 N/A sin motivo.
 **C4 ter** N/A: no existe `harness/rutas_sensibles.json`.
 **C5** [x] T1-T10 `[x]` con commits `F-038 T1`…`T10` (T9 en dos) · [x] árbol
-limpio · [ ] **`features.json` no refleja el estado real**: cambio 1.
+limpio · [x] `features.json` refleja el estado real. En la pasada 1 estaba en
+`[ ]` (F-039); se corrigió en la pasada 2.
 
 ## Cobertura requisito → test (`tests/test_f038_*.py`)
 
@@ -113,24 +126,14 @@ limpio · [ ] **`features.json` no refleja el estado real**: cambio 1.
 
 ## Cambios requeridos
 
-1. **`harness/features.json`, entrada F-039: `"status": "spec_ready"` →
-   `"pending"`.** Entró en `44133de`, un commit del spec-author de F-038 cuyo
-   mensaje no lo nombra; no hay decisión del humano en `progress/`,
-   `history.md` ni en ningún commit. F-039 es `sdd=false` y no tiene spec. Si
-   se mergea, `BACKLOG.md` la anuncia «spec lista» y el líder la pondría por
-   delante de las `pending`, F-067 (prioridad 2 del humano) incluida. Si el
-   humano sí lo decidió, basta con anotarlo en `current.md`. Después,
-   `bash harness/init.sh` regenera `BACKLOG.md`.
+Ninguno. El de la pasada 1 (F-039 a `pending`, entró en `44133de` sin
+decisión del humano) está hecho en `9e21857`. Faltan T20-T24 del humano.
 
 ## Para el humano y el líder (no bloquea)
 
-- `current.md` (cabecera de F-038 y bloque «Spec») e `impl_F-038.md` §6 aún
-  dicen «D4 abierta»; se decidió en `e9a44c3`/`f1c9c0d`. Corríjase en el mismo
-  commit del cambio 1.
 - Lo que no puede probar ningún test: que el SQL corra en Postgres (tipos de
   `confir.hor`, `dco.totbas`) y sus cifras. Eso es T21-T23; mi lectura previa
   ya cuadra con dos de ellas (32.896 ficticias, 0 casos de la guarda).
-- **Automejora (propuesta, no aplicada)**, en `CHECKPOINTS.md` C5: «el diff de
-  `harness/features.json` solo toca la entrada de la feature, o cada otra
-  entrada tocada cita la decisión del humano». Hoy nada lo vigila y un cambio
-  colateral de estado pasa inadvertido entre commits de spec.
+- **Automejora (propuesta, no aplicada)** para C5 de `CHECKPOINTS.md`: «el
+  diff de `features.json` solo toca la entrada de la feature, salvo decisión
+  citada del humano». Hoy nadie lo vigila (caso F-039).
