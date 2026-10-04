@@ -98,8 +98,17 @@ medición los contradice (ver abajo).
 > comprobado a las 22:36 UTC con `az containerapp job show` -> `r20261004-0031`.
 > **Diccionario y MCP NO se tocaron a mano**: la nocturna publica el diccionario al
 > final de `run-all` con el de su imagen, así que la del 04-10 (00:00 UTC) aplica
-> F-113 y publica la v41 ella sola. Queda: T10 comprobar la nocturna, reiniciar el
-> MCP (T11) y T12.
+> F-113 y publica la v41 ella sola.
+>
+> **T10-T12 HECHAS por el líder el 2026-10-04 ~17:50 UTC.** Nocturna del 04-10:
+> `build_mart` y `build_cierre` SUCCESS, `publicar_diccionario` **v41** (06:22 UTC)
+> y `apply_grants` SUCCESS. MCP reiniciado (`ca-mcp-bbdd-dev--0000014`).
+> `check-diccionario` desde `main` (worktree desechable): 190/190 y lo publicado
+> es lo del árbol (v41, hash 2a41e083e421). T12 (solo lectura): global CD 287.734 /
+> CI 64.307 / CP 8.421 / OTRO 34.745 = la previsión EXACTA; 0 partidas de
+> `AVDA_FRANCIA`/`P1414_*` en CI; 0 partidas de raíces `PD`/`MP`/`LEV`/`GG`/`MC`/
+> posventa fuera de OTRO; 0462 Venta Real en CI 25.002; 229 INDIRECTOS 2011 8.121.
+> **F-113 cerrada del todo.**
 
 Spec aprobada por el humano el 2026-10-03 (D1 = A, D2 = ligero: T13-T15 fuera).
 Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:
