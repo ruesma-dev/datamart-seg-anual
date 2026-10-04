@@ -14,8 +14,10 @@
 
 ### Implementer · Fase 1 (T1-T10), 2026-10-04
 
-Informe: `progress/impl_F-038.md`. T1-T9 hechas con un commit cada una (T9 en
-dos); T10 = `bash harness/init.sh`. Fase 2 (T11-T19, T25) FUERA. Decisiones y
+Informe: `progress/impl_F-038.md`. T1-T10 hechas con un commit cada una (T9 en
+dos). `bash harness/init.sh`: ENTORNO LISTO (6614 passed; cobertura 32/32
+líneas cambiadas). Mutación: 13/14 muertos y el superviviente cazado con test
+nuevo; SQL manual 24/24. Pendiente: REVIEW. Fase 2 (T11-T19, T25) FUERA. Decisiones y
 desviaciones (justificadas en el informe, §2):
 - `aprobado_por` lleva la MISMA condición que `fecha_aprobacion` (circuito
   cerrado): R23 solo condiciona la fecha, pero publicar como «aprobó» a quien

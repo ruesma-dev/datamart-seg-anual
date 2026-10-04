@@ -155,9 +155,9 @@ Copiadas con su comando exacto en `progress/current.md` (sección F-038):
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados (`init.sh`) | PENDIENTE_INIT |
-| Cobertura de líneas cambiadas | PENDIENTE_COBERTURA |
+| Tests ejecutados (`init.sh`) | **6614 passed, 223 skipped**, 0 failed (de ellos 170 de F-038: 69 + 36 + 65) |
+| Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 32 líneas cambiadas cubiertas (32/32, umbral 80%, nivel estandar; diff desde 4dfe8c70b5, merge-base con main)` |
 | Mutación (`harness.mutacion`, 2 workers, HEAD `9a738095ec3f2a6a091627b9afc2b6f79f0a7cff`) | 14 generados (campaña completa: < 20), **13 muertos, 1 superviviente** (`<= 0` → `<= 1`, hueco real: test nuevo, reverificado en serie: 2 fallos), 0 timeouts, 3011,4 s. Detalle: `progress/mutacion_F-038.md` |
 | Mutación SQL manual (1 worker, `47cc859a654fd7a5066231af861d8e3c7e4ff559`) | **24 mutantes, 24 muertos**; tabla en el anexo de `progress/mutacion_F-038.md`, script `progress/mutacion_sql_F-038.py` |
-| Tiempo de la suite | PENDIENTE_TIEMPO |
-| `bash harness/init.sh` | PENDIENTE_INIT_RESULTADO |
+| Tiempo de la suite | 905,70 s con cobertura dentro de `init.sh` (0:15:05); 286,21 s sin cobertura |
+| `bash harness/init.sh` | **ENTORNO LISTO**, exit 0, sobre HEAD `496f56d` (todas las comprobaciones OK; `PUERTA TAMAÑO`: requirements 144/150, design 249/250, impl 163/220). El commit posterior solo rellena esta tabla y marca T10 |

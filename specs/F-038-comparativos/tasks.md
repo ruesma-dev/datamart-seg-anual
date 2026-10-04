@@ -19,7 +19,7 @@ la base es MANUAL del humano. **D1 aprobado (2026-10-04): dos fases.** Fase 2
 - [x] T7: Párrafo de `docs/ARCHITECTURE.md` («Semántica Sigrid»): ficticias por CIF y nombre, importes sin IVA (`dco.totbas`), atípico 10×/100.000 €, enlace por `comlin.ctride`  |  Verificación: el reviewer lo lee contra design §2
 - [x] T8: `azure-apps/datamart_seg_anual.md`: los dos objetos nuevos de `compras` y la nota de `compras.contratos.comparativo_id`; commit en ESE repositorio (sin push)  |  Verificación: `git -C C:/Users/pgris/PycharmProjects/azure-apps log -1 --stat`
 - [x] T9: Campaña de mutación del arnés sobre `domain/comparativos.py` y análisis de supervivientes en el informe  |  Verificación: `python -m harness.mutacion --feature F-038`
-- [ ] T10: Ejecutar `bash harness/init.sh` en verde (pytest, cobertura de líneas cambiadas, tamaño de spec e informes)  |  Verificación: `bash harness/init.sh`
+- [x] T10: Ejecutar `bash harness/init.sh` en verde (pytest, cobertura de líneas cambiadas, tamaño de spec e informes)  |  Verificación: `bash harness/init.sh`
 
 ## Fase 2 · objetivo, líneas de los dos lados, firmas
 
