@@ -159,3 +159,168 @@ def test_f038_setup_no_toca_lo_existente() -> None:
         "compras.fn_tipo_documento",
     ):
         assert texto.count(f"CREATE OR REPLACE FUNCTION {funcion}(") == 1, funcion
+
+
+# ===========================================================================
+# T3 · 08_comparativos.sql, parte 1: guarda y comparativo_ofertas
+# ===========================================================================
+
+#: Las columnas de `compras.comparativo_ofertas`, EN SU ORDEN (design §4).
+COLUMNAS_OFERTAS = (
+    "oferta_id",
+    "invitacion_id",
+    "comparativo_id",
+    "posicion",
+    "codigo_oferta",
+    "fecha_oferta",
+    "proveedor_id",
+    "proveedor_codigo",
+    "proveedor_nombre",
+    "proveedor_cif",
+    "es_ficticia",
+    "familia_ficticia",
+    "estado_id",
+    "estado_codigo",
+    "estado",
+    "es_ganadora",
+    "importe_ofertado_documento",
+    "importe_ofertado_lineas",
+    "n_lineas",
+)
+
+
+def _ejecutable_08() -> str:
+    return _compacto(_texto(RUTA_COMPARATIVOS))
+
+
+def _bloque(tabla: str) -> str:
+    texto = _ejecutable_08()
+    inicio = texto.index(f"DROP TABLE IF EXISTS compras.{tabla} CASCADE")
+    fin = texto.index(f"ALTER TABLE compras.{tabla} ADD PRIMARY KEY")
+    return texto[inicio:fin]
+
+
+def _proyeccion(tabla: str, primera: str, desde: str) -> str:
+    """El SELECT final del bloque: de su primera columna al FROM principal."""
+    bloque = _bloque(tabla)
+    inicio = bloque.index(primera)
+    return bloque[inicio : bloque.index(desde, inicio)]
+
+
+def _columnas(proyeccion: str) -> list[str]:
+    return re.findall(r"\bAS ([a-z_]+)\b", proyeccion)
+
+
+def _proyeccion_ofertas() -> str:
+    return _proyeccion(
+        "comparativo_ofertas", "SELECT d.ide AS oferta_id", "FROM raw.comprv p"
+    )
+
+
+def test_f038_ofertas_r2_columnas_en_su_orden() -> None:
+    assert tuple(_columnas(_proyeccion_ofertas())) == COLUMNAS_OFERTAS
+
+
+def test_f038_ofertas_r2_grano_una_fila_por_oferta_incluidas_las_ficticias() -> None:
+    texto = _ejecutable_08()
+    assert "ALTER TABLE compras.comparativo_ofertas ADD PRIMARY KEY (oferta_id)" in texto
+    bloque = _bloque("comparativo_ofertas")
+    assert "FROM raw.comprv p JOIN raw.dco d ON d.ide = p.docide" in bloque
+    assert "JOIN raw.con c ON c.ide = d.ide" in bloque
+    principal = bloque[bloque.index("FROM raw.comprv p") :]
+    sin_subconsultas = re.sub(r"\((?:[^()]|\([^()]*\))*\)", "()", principal)
+    assert " WHERE " not in sin_subconsultas, (
+        "un WHERE en el FROM principal cambia el grano: R2 publica TODAS las "
+        "ofertas, incluidas las ficticias"
+    )
+
+
+def test_f038_ofertas_r3_proveedor_de_dco_entide() -> None:
+    proyeccion = _proyeccion_ofertas()
+    for esperado in (
+        "NULLIF(d.entide, 0) AS proveedor_id",
+        "NULLIF(TRIM(d.entcod), '') AS proveedor_codigo",
+        "NULLIF(TRIM(d.entres), '') AS proveedor_nombre",
+        "NULLIF(TRIM(d.entcif), '') AS proveedor_cif",
+    ):
+        assert esperado in proyeccion, esperado
+
+
+def test_f038_prvide_r3_el_sql_no_lee_comprv_prvide() -> None:
+    """`comprv.prvide` está informado en el 18 %: quien una por ahí pierde
+    el 82 % de las ofertas (F-072, medido en origen)."""
+    assert "prvide" not in _ejecutable_08().lower()
+
+
+def test_f038_totdoc_r12_el_sql_no_lee_dco_totdoc() -> None:
+    """`dco.totdoc` lleva IVA (R-COMPRAS-SIN-IVA): el importe es `totbas`."""
+    assert "totdoc" not in _ejecutable_08().lower()
+
+
+def test_f038_ofertas_r8_marca_la_ficticia_con_la_funcion_del_dominio() -> None:
+    bloque = _bloque("comparativo_ofertas")
+    assert "compras.fn_familia_ficticia(d.entcif, d.entres)" in bloque
+    proyeccion = _proyeccion_ofertas()
+    assert "ff.familia IS NOT NULL AS es_ficticia" in proyeccion
+    assert "ff.familia AS familia_ficticia" in proyeccion
+
+
+def test_f038_ofertas_r4_estado_tip_12_por_la_pareja() -> None:
+    bloque = _bloque("comparativo_ofertas")
+    assert (
+        "LEFT JOIN LATERAL compras.fn_estado_documento(12, c.est) est ON TRUE"
+        in bloque
+    )
+    assert "c.est AS estado_id" in _proyeccion_ofertas()
+
+
+def test_f038_ofertas_r15_la_ganadora_es_la_aceptada_definitivamente() -> None:
+    assert "COALESCE(c.est = 6, FALSE) AS es_ganadora" in _proyeccion_ofertas()
+
+
+def test_f038_ofertas_r12_importes_documento_sin_iva_y_lineas() -> None:
+    proyeccion = _proyeccion_ofertas()
+    assert "d.totbas::NUMERIC(18, 2) AS importe_ofertado_documento" in proyeccion
+    assert "li.importe_lineas AS importe_ofertado_lineas" in proyeccion
+    bloque = _bloque("comparativo_ofertas")
+    lineas = re.search(r"LEFT JOIN \( ?(SELECT .*?) ?\) li ON li\.docide = d\.ide", bloque)
+    assert lineas is not None, "faltan las líneas agregadas de `raw.dcopro`"
+    sub = lineas.group(1)
+    assert "FROM raw.dcopro lp WHERE lp.comlinide > 0 GROUP BY lp.docide" in sub, (
+        "solo cuentan las líneas de oferta de una línea del comparativo"
+    )
+    assert "SUM(lp.tot)::NUMERIC(18, 2) AS importe_lineas" in sub
+
+
+def test_f038_ofertas_indices() -> None:
+    texto = _ejecutable_08()
+    for columna in ("comparativo_id", "proveedor_id", "familia_ficticia"):
+        assert re.search(
+            rf"CREATE INDEX \w+ ON compras\.comparativo_ofertas \({columna}\)", texto
+        ), columna
+
+
+def test_f038_guarda_r21_dos_contratos_rompen_el_build() -> None:
+    """Un comparativo con dos `ctride` distintos > 0 hace fallar el build.
+
+    Hoy 0 (medido el 2026-10-04): es una guarda, no un `MIN` silencioso que
+    elija uno de los dos contratos sin decirlo.
+    """
+    texto = _ejecutable_08()
+    assert texto.index("DO $$") < texto.index("CREATE TABLE"), (
+        "la guarda va LO PRIMERO: si falla, no se ha tirado ninguna tabla"
+    )
+    guarda = texto[texto.index("DO $$") : texto.index("END $$;")]
+    assert "FROM raw.comlin l WHERE l.ctride > 0 GROUP BY l.comide" in guarda
+    assert "HAVING count(DISTINCT l.ctride) > 1" in guarda
+    assert "IF v_casos > 0 THEN RAISE EXCEPTION" in guarda
+
+
+def test_f038_guarda_cabecera_dice_que_construye_y_de_que_lee() -> None:
+    texto = _texto(RUTA_COMPARATIVOS)
+    assert texto.startswith(
+        "-- etl_sigrid/infrastructure/postgres/sql/compras/08_comparativos.sql"
+    )
+    cabecera = texto[: texto.index("DO $$")]
+    for nombre in ("compras.comparativo_ofertas", "compras.comparativos", "raw.comprv"):
+        assert nombre in cabecera, nombre
