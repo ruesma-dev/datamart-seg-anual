@@ -108,3 +108,138 @@ ALTER TABLE compras.comparativo_ofertas ADD PRIMARY KEY (oferta_id);
 CREATE INDEX idx_com_cof_cmp ON compras.comparativo_ofertas (comparativo_id);
 CREATE INDEX idx_com_cof_prv ON compras.comparativo_ofertas (proveedor_id);
 CREATE INDEX idx_com_cof_fam ON compras.comparativo_ofertas (familia_ficticia);
+
+-- ---------------------------------------------------------------------------
+-- COMPARATIVOS · una fila por comparativo de raw.com, con cuatro agregados.
+--
+-- GRANO: los agregados van por comparativo y entran con LEFT JOIN, así que ni
+-- multiplican ni pierden filas: un comparativo sin ofertas (319), sin líneas
+-- (264) o sin firmas se publica igual, con recuentos a 0 e importes a NULL.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.comparativos CASCADE;
+CREATE TABLE compras.comparativos AS
+WITH ofertas AS (
+    -- 1 · OFERTAS. Las ficticias cuentan en `n_ofertas` y en la mayor oferta
+    -- (para juzgar el atípico) pero NUNCA en las reales, la mínima, la
+    -- máxima ni el ahorro: el `FILTER` de cada una lo dice.
+    SELECT o.comparativo_id,
+           count(*) AS n_ofertas,
+           count(*) FILTER (WHERE NOT o.es_ficticia) AS n_ofertas_reales,
+           count(*) FILTER (WHERE NOT o.es_ficticia AND o.importe_ofertado_documento > 0) AS n_ofertas_reales_con_importe,
+           count(*) FILTER (WHERE o.es_ganadora) AS n_ofertas_ganadoras,
+           MIN(o.importe_ofertado_documento) FILTER (WHERE NOT o.es_ficticia AND o.importe_ofertado_documento > 0) AS minima_real,
+           MAX(o.importe_ofertado_documento) FILTER (WHERE NOT o.es_ficticia AND o.importe_ofertado_documento > 0) AS maxima_real,
+           MAX(o.importe_ofertado_documento) AS mayor_oferta
+    FROM compras.comparativo_ofertas o
+    GROUP BY o.comparativo_id
+),
+ganadora AS (
+    -- La ganadora SOLO si es única (R15): con dos, no se elige una y la
+    -- ganadora y sus importes quedan a NULL (`n_ofertas_ganadoras` lo dice).
+    SELECT o.comparativo_id, o.oferta_id, o.proveedor_id, o.proveedor_nombre,
+           o.importe_ofertado_documento, o.importe_ofertado_lineas
+    FROM compras.comparativo_ofertas o
+    JOIN ofertas a ON a.comparativo_id = o.comparativo_id AND a.n_ofertas_ganadoras = 1
+    WHERE o.es_ganadora
+),
+lineas AS (
+    -- 2 · LÍNEAS DEL CONCURSO: el adjudicado (C) y el contrato. La guarda R21
+    -- de arriba ya garantizó un solo `ctride` > 0 por comparativo.
+    SELECT l.comide AS comparativo_id,
+           SUM(COALESCE(l.can, 0) * COALESCE(l.pre, 0))::NUMERIC(18, 2) AS importe_adjudicado_lineas,
+           MAX(NULLIF(l.ctride, 0)) AS contrato_id
+    FROM raw.comlin l
+    GROUP BY l.comide
+),
+contratado AS (
+    -- 3 · CONTRATADO (D), del CONTRATO: se repite en los comparativos que lo
+    -- comparten (3.960 contratos vienen de varios).
+    SELECT cl.contrato_id,
+           SUM(cl.importe)::NUMERIC(18, 2) AS importe_contratado
+    FROM compras.contrato_lineas cl
+    GROUP BY cl.contrato_id
+),
+firmas AS (
+    -- 4 · FIRMAS. `fir = 0` es la firma PENDIENTE (y viene sin fecha).
+    -- `estado_es_final`: el estado actual del comparativo es el estado final
+    -- (`estfin`) de su circuito, o sea, el circuito se cerró.
+    SELECT f.conide AS comparativo_id,
+           count(*) AS n_firmas,
+           count(*) FILTER (WHERE f.fir = 0) AS n_firmas_pendientes,
+           bool_or(f.estfin = fc.est) AS estado_es_final
+    FROM raw.confir f
+    JOIN raw.com fm ON fm.ide = f.conide
+    JOIN raw.con fc ON fc.ide = f.conide
+    GROUP BY f.conide
+),
+ultima_firma AS (
+    -- La última FIRMADA por fecha y hora; `ide` desempata.
+    SELECT DISTINCT ON (f.conide)
+           f.conide AS comparativo_id,
+           compras.fn_sigrid_date(f.fec) AS fecha,
+           f.usu AS usuario
+    FROM raw.confir f
+    WHERE f.fir <> 0
+    ORDER BY f.conide, f.fec DESC NULLS LAST, f.hor DESC NULLS LAST, f.ide DESC
+)
+SELECT m.ide AS comparativo_id,
+    c.cod                                   AS codigo_comparativo,
+    c.res                                   AS nombre_comparativo,
+    compras.fn_sigrid_date(c.fec)           AS fecha_alta,        -- alta en Sigrid, 100 %
+    NULLIF(m.obride, 0)                     AS obra_id,
+    ob.cod                                  AS codigo_obra,
+    ob.res                                  AS nombre_obra,
+    fo.empresa_id                           AS empresa_id,
+    fo.clave_obra                           AS clave_obra,
+    NULLIF(m.natide, 0)                     AS actividad_id,
+    a.res                                   AS actividad,
+    c.est                                   AS estado_id,         -- tipo 46: el comparativo
+    est.codigo_estado                       AS estado_codigo,
+    est.nombre_estado                       AS estado,
+    li.contrato_id                          AS contrato_id,
+    cc.cod                                  AS codigo_contrato,
+    compras.fn_sigrid_date(cc.fec)          AS fecha_contrato,
+    COALESCE(oft.n_ofertas, 0)               AS n_ofertas,
+    COALESCE(oft.n_ofertas_reales, 0)        AS n_ofertas_reales,
+    COALESCE(oft.n_ofertas_reales_con_importe, 0) AS n_ofertas_reales_con_importe,
+    COALESCE(oft.n_ofertas_ganadoras, 0)     AS n_ofertas_ganadoras,
+    g.oferta_id                             AS oferta_ganadora_id,
+    g.proveedor_id                          AS proveedor_ganador_id,
+    g.proveedor_nombre                      AS proveedor_ganador_nombre,
+    g.importe_ofertado_documento            AS importe_ofertado_documento_ganadora,  -- A
+    g.importe_ofertado_lineas               AS importe_ofertado_lineas_ganadora,     -- B
+    li.importe_adjudicado_lineas            AS importe_adjudicado_lineas,            -- C
+    -- Literales = FACTOR_ATIPICO y MINIMO_ATIPICO del dominio (R16). Sin
+    -- `ELSE`: NULL cuando no hay oferta con importe con que comparar.
+    CASE WHEN oft.mayor_oferta > 0 THEN li.importe_adjudicado_lineas > 10 * oft.mayor_oferta AND li.importe_adjudicado_lineas > 100000 END AS adjudicado_atipico,
+    ct.importe_contratado                   AS importe_contratado,                   -- D
+    -- El ahorro del concurso, solo con dos o más ofertas REALES con importe.
+    CASE WHEN oft.n_ofertas_reales_con_importe >= 2 THEN oft.minima_real END AS oferta_real_minima,
+    CASE WHEN oft.n_ofertas_reales_con_importe >= 2 THEN oft.maxima_real END AS oferta_real_maxima,
+    CASE WHEN oft.n_ofertas_reales_con_importe >= 2 THEN oft.maxima_real - oft.minima_real END AS ahorro_concurso,
+    COALESCE(fi.n_firmas, 0)                AS n_firmas,
+    COALESCE(fi.n_firmas_pendientes, 0)     AS n_firmas_pendientes,
+    -- Solo cuando el circuito se cerró: fuera de los estados de firma la
+    -- fecha de aprobación NO existe, y quien firmó el último paso de un
+    -- comparativo rechazado no lo «aprobó».
+    CASE WHEN fi.estado_es_final THEN uf.fecha END AS fecha_aprobacion,
+    CASE WHEN fi.estado_es_final THEN uf.usuario END AS aprobado_por
+FROM raw.com m
+JOIN raw.con c ON c.ide = m.ide
+LEFT JOIN raw.con ob ON ob.ide = NULLIF(m.obride, 0)
+LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = NULLIF(m.obride, 0)
+LEFT JOIN raw.auxpronat a ON a.ide = NULLIF(m.natide, 0)
+LEFT JOIN LATERAL compras.fn_estado_documento(46, c.est) est ON TRUE
+LEFT JOIN ofertas oft ON oft.comparativo_id = m.ide
+LEFT JOIN ganadora g ON g.comparativo_id = m.ide
+LEFT JOIN lineas li ON li.comparativo_id = m.ide
+LEFT JOIN raw.con cc ON cc.ide = li.contrato_id
+LEFT JOIN contratado ct ON ct.contrato_id = li.contrato_id
+LEFT JOIN firmas fi ON fi.comparativo_id = m.ide
+LEFT JOIN ultima_firma uf ON uf.comparativo_id = m.ide;
+
+ALTER TABLE compras.comparativos ADD PRIMARY KEY (comparativo_id);
+CREATE INDEX idx_com_cmp_obra ON compras.comparativos (obra_id);
+CREATE INDEX idx_com_cmp_ctr  ON compras.comparativos (contrato_id);
+CREATE INDEX idx_com_cmp_act  ON compras.comparativos (actividad_id);
+CREATE INDEX idx_com_cmp_est  ON compras.comparativos (estado_id);

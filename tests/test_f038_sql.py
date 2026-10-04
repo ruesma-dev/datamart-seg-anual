@@ -324,3 +324,316 @@ def test_f038_guarda_cabecera_dice_que_construye_y_de_que_lee() -> None:
     cabecera = texto[: texto.index("DO $$")]
     for nombre in ("compras.comparativo_ofertas", "compras.comparativos", "raw.comprv"):
         assert nombre in cabecera, nombre
+
+
+
+# ===========================================================================
+# T4 · 08_comparativos.sql, parte 2: compras.comparativos
+# ===========================================================================
+
+#: Las columnas de `compras.comparativos`, EN SU ORDEN (design §4).
+COLUMNAS_COMPARATIVOS = (
+    "comparativo_id",
+    "codigo_comparativo",
+    "nombre_comparativo",
+    "fecha_alta",
+    "obra_id",
+    "codigo_obra",
+    "nombre_obra",
+    "empresa_id",
+    "clave_obra",
+    "actividad_id",
+    "actividad",
+    "estado_id",
+    "estado_codigo",
+    "estado",
+    "contrato_id",
+    "codigo_contrato",
+    "fecha_contrato",
+    "n_ofertas",
+    "n_ofertas_reales",
+    "n_ofertas_reales_con_importe",
+    "n_ofertas_ganadoras",
+    "oferta_ganadora_id",
+    "proveedor_ganador_id",
+    "proveedor_ganador_nombre",
+    "importe_ofertado_documento_ganadora",
+    "importe_ofertado_lineas_ganadora",
+    "importe_adjudicado_lineas",
+    "adjudicado_atipico",
+    "importe_contratado",
+    "oferta_real_minima",
+    "oferta_real_maxima",
+    "ahorro_concurso",
+    "n_firmas",
+    "n_firmas_pendientes",
+    "fecha_aprobacion",
+    "aprobado_por",
+)
+
+#: Lo que `com` trae VACÍO en origen (R5): siete fechas y cinco campos.
+CAMPOS_VACIOS_DE_COM = (
+    "fecent", "feclim", "fecsum", "feccon", "fecinirec", "fecfinrec", "fecdiv",
+    "ppoide", "prmide", "pexide", "tipsub", "horlim",
+)
+
+
+def _proyeccion_comparativos() -> str:
+    return _proyeccion(
+        "comparativos", "SELECT m.ide AS comparativo_id", "FROM raw.com m"
+    )
+
+
+def _cte(nombre: str) -> str:
+    """El cuerpo de una CTE del bloque de `compras.comparativos`."""
+    bloque = _bloque("comparativos")
+    inicio = bloque.index(f" {nombre} AS (")
+    profundidad = 0
+    for i in range(bloque.index("(", inicio), len(bloque)):
+        profundidad += {"(": 1, ")": -1}.get(bloque[i], 0)
+        if profundidad == 0:
+            return bloque[inicio : i + 1]
+    raise AssertionError(f"CTE {nombre} sin cerrar")
+
+
+def test_f038_r1_columnas_en_su_orden() -> None:
+    assert tuple(_columnas(_proyeccion_comparativos())) == COLUMNAS_COMPARATIVOS
+
+
+def test_f038_r1_grano_una_fila_por_comparativo() -> None:
+    texto = _ejecutable_08()
+    assert "ALTER TABLE compras.comparativos ADD PRIMARY KEY (comparativo_id)" in texto
+    bloque = _bloque("comparativos")
+    desde = "FROM raw.com m JOIN raw.con c ON c.ide = m.ide"
+    principal = bloque[bloque.index(desde) + len(desde) :]
+    sin_subconsultas = re.sub(r"\((?:[^()]|\([^()]*\))*\)", "()", principal)
+    assert " WHERE " not in sin_subconsultas
+    assert " JOIN " not in sin_subconsultas.replace("LEFT JOIN", ""), (
+        "después de `raw.con` todo es LEFT JOIN: ningún comparativo se pierde"
+    )
+
+
+def test_f038_r1_indices() -> None:
+    texto = _ejecutable_08()
+    for columna in ("obra_id", "contrato_id", "actividad_id", "estado_id"):
+        assert re.search(
+            rf"CREATE INDEX \w+ ON compras\.comparativos \({columna}\)", texto
+        ), columna
+
+
+def test_f038_r4_estado_tip_46_por_la_pareja() -> None:
+    bloque = _bloque("comparativos")
+    assert (
+        "LEFT JOIN LATERAL compras.fn_estado_documento(46, c.est) est ON TRUE" in bloque
+    )
+    assert "c.est AS estado_id" in _proyeccion_comparativos()
+    assert "raw.conest" not in _ejecutable_08(), (
+        "ninguna traducción une solo por estado: se usa la función (R4)"
+    )
+
+
+def test_f038_r5_fecha_alta_de_con_y_nada_de_los_campos_vacios_de_com() -> None:
+    assert "compras.fn_sigrid_date(c.fec) AS fecha_alta" in _proyeccion_comparativos()
+    ejecutable = _ejecutable_08().lower()
+    for campo in CAMPOS_VACIOS_DE_COM:
+        assert not re.search(rf"\b{campo}\b", ejecutable), campo
+
+
+def test_f038_r6_actividad_de_auxpronat() -> None:
+    bloque = _bloque("comparativos")
+    assert "LEFT JOIN raw.auxpronat a ON a.ide = NULLIF(m.natide, 0)" in bloque
+    proyeccion = _proyeccion_comparativos()
+    assert "NULLIF(m.natide, 0) AS actividad_id" in proyeccion
+    assert "a.res AS actividad" in proyeccion
+
+
+def test_f038_r7_obra_con_empresa_y_clave() -> None:
+    bloque = _bloque("comparativos")
+    assert "LEFT JOIN raw.con ob ON ob.ide = NULLIF(m.obride, 0)" in bloque
+    assert (
+        "LEFT JOIN maestro.v_obra_fichas fo ON fo.obra_id = NULLIF(m.obride, 0)"
+        in bloque
+    )
+    proyeccion = _proyeccion_comparativos()
+    for esperado in (
+        "NULLIF(m.obride, 0) AS obra_id",
+        "ob.cod AS codigo_obra",
+        "ob.res AS nombre_obra",
+        "fo.empresa_id AS empresa_id",
+        "fo.clave_obra AS clave_obra",
+    ):
+        assert esperado in proyeccion, esperado
+
+
+def test_f038_r14_ninguna_columna_se_llama_importe_a_secas() -> None:
+    columnas = _columnas(_proyeccion_comparativos()) + _columnas(_proyeccion_ofertas())
+    assert "importe" not in columnas
+    assert not re.search(r"\bAS importe\b", _ejecutable_08())
+
+
+def test_f038_r13_las_cuatro_magnitudes_con_su_nombre() -> None:
+    proyeccion = _proyeccion_comparativos()
+    for esperado in (
+        "g.importe_ofertado_documento AS importe_ofertado_documento_ganadora",
+        "g.importe_ofertado_lineas AS importe_ofertado_lineas_ganadora",
+        "li.importe_adjudicado_lineas AS importe_adjudicado_lineas",
+        "ct.importe_contratado AS importe_contratado",
+    ):
+        assert esperado in proyeccion, esperado
+    lineas = _cte("lineas")
+    assert (
+        "SUM(COALESCE(l.can, 0) * COALESCE(l.pre, 0))::NUMERIC(18, 2) "
+        "AS importe_adjudicado_lineas" in lineas
+    )
+    contratado = _cte("contratado")
+    assert "FROM compras.contrato_lineas cl GROUP BY cl.contrato_id" in contratado
+    assert "SUM(cl.importe)::NUMERIC(18, 2) AS importe_contratado" in contratado
+    assert "LEFT JOIN contratado ct ON ct.contrato_id = li.contrato_id" in _bloque(
+        "comparativos"
+    )
+
+
+def test_f038_r15_ganadora_solo_si_es_unica() -> None:
+    ofertas = _cte("ofertas")
+    assert "count(*) FILTER (WHERE o.es_ganadora) AS n_ofertas_ganadoras" in ofertas
+    ganadora = _cte("ganadora")
+    assert "a.n_ofertas_ganadoras = 1" in ganadora, (
+        "con dos ganadoras no se elige una: ganadora e importes a NULL (R15)"
+    )
+    assert "WHERE o.es_ganadora" in ganadora
+    assert "LEFT JOIN ganadora g ON g.comparativo_id = m.ide" in _bloque("comparativos")
+    proyeccion = _proyeccion_comparativos()
+    assert "g.oferta_id AS oferta_ganadora_id" in proyeccion
+    assert "g.proveedor_id AS proveedor_ganador_id" in proyeccion
+    assert "g.proveedor_nombre AS proveedor_ganador_nombre" in proyeccion
+
+
+def test_f038_r16_atipico_con_los_umbrales_del_dominio() -> None:
+    proyeccion = _proyeccion_comparativos()
+    esperado = (
+        "CASE WHEN oft.mayor_oferta > 0 THEN "
+        f"li.importe_adjudicado_lineas > {FACTOR_ATIPICO} * oft.mayor_oferta "
+        f"AND li.importe_adjudicado_lineas > {int(MINIMO_ATIPICO)} "
+        "END AS adjudicado_atipico"
+    )
+    assert esperado in proyeccion, (
+        "el atípico no lleva los umbrales del dominio (R16): "
+        f"se esperaba «{esperado}»"
+    )
+    assert "MAX(o.importe_ofertado_documento) AS mayor_oferta" in _cte("ofertas"), (
+        "la mayor oferta para el atípico es la de TODAS las ofertas"
+    )
+
+
+def test_f038_r18_recuentos_de_ofertas() -> None:
+    ofertas = _cte("ofertas")
+    for esperado in (
+        "count(*) AS n_ofertas",
+        "count(*) FILTER (WHERE NOT o.es_ficticia) AS n_ofertas_reales",
+        "count(*) FILTER (WHERE NOT o.es_ficticia AND "
+        "o.importe_ofertado_documento > 0) AS n_ofertas_reales_con_importe",
+    ):
+        assert esperado in ofertas, esperado
+    assert "LEFT JOIN ofertas oft ON oft.comparativo_id = m.ide" in _bloque(
+        "comparativos"
+    )
+    proyeccion = _proyeccion_comparativos()
+    for columna in (
+        "n_ofertas", "n_ofertas_reales", "n_ofertas_reales_con_importe",
+        "n_ofertas_ganadoras",
+    ):
+        assert f"COALESCE(oft.{columna}, 0) AS {columna}" in proyeccion, columna
+
+
+def test_f038_r19_ahorro_solo_con_ofertas_reales_con_importe() -> None:
+    ofertas = _cte("ofertas")
+    filtro = "FILTER (WHERE NOT o.es_ficticia AND o.importe_ofertado_documento > 0)"
+    assert f"MIN(o.importe_ofertado_documento) {filtro} AS minima_real" in ofertas
+    assert f"MAX(o.importe_ofertado_documento) {filtro} AS maxima_real" in ofertas
+    proyeccion = _proyeccion_comparativos()
+    condicion = "CASE WHEN oft.n_ofertas_reales_con_importe >= 2 THEN"
+    assert f"{condicion} oft.minima_real END AS oferta_real_minima" in proyeccion
+    assert f"{condicion} oft.maxima_real END AS oferta_real_maxima" in proyeccion
+    assert (
+        f"{condicion} oft.maxima_real - oft.minima_real END AS ahorro_concurso"
+        in proyeccion
+    )
+
+
+def test_f038_r20_contrato_por_comlin_ctride() -> None:
+    lineas = _cte("lineas")
+    assert "MAX(NULLIF(l.ctride, 0)) AS contrato_id" in lineas
+    assert "FROM raw.comlin l GROUP BY l.comide" in lineas
+    bloque = _bloque("comparativos")
+    assert "LEFT JOIN lineas li ON li.comparativo_id = m.ide" in bloque
+    assert "LEFT JOIN raw.con cc ON cc.ide = li.contrato_id" in bloque
+    proyeccion = _proyeccion_comparativos()
+    assert "li.contrato_id AS contrato_id" in proyeccion
+    assert "cc.cod AS codigo_contrato" in proyeccion
+    assert "compras.fn_sigrid_date(cc.fec) AS fecha_contrato" in proyeccion
+    ejecutable = _ejecutable_08()
+    assert "ctr.comide" not in ejecutable and "raw.ctr " not in ejecutable, (
+        "el enlace es `comlin.ctride` (18.633 comparativos), no la cabecera "
+        "del contrato (56 %) (R20)"
+    )
+
+
+def test_f038_r23_firmas_y_fecha_de_aprobacion() -> None:
+    firmas = _cte("firmas")
+    for esperado in (
+        "count(*) AS n_firmas",
+        "count(*) FILTER (WHERE f.fir = 0) AS n_firmas_pendientes",
+        "bool_or(f.estfin = fc.est) AS estado_es_final",
+        "FROM raw.confir f JOIN raw.com fm ON fm.ide = f.conide "
+        "JOIN raw.con fc ON fc.ide = f.conide",
+    ):
+        assert esperado in firmas, esperado
+    ultima = _cte("ultima_firma")
+    assert "SELECT DISTINCT ON (f.conide)" in ultima
+    assert "WHERE f.fir <> 0" in ultima, "la última FIRMADA: las pendientes no cuentan"
+    assert "ORDER BY f.conide, f.fec DESC NULLS LAST, f.hor DESC NULLS LAST, f.ide DESC" in ultima
+    proyeccion = _proyeccion_comparativos()
+    bloque = _bloque("comparativos")
+    assert "LEFT JOIN firmas fi ON fi.comparativo_id = m.ide" in bloque
+    assert "LEFT JOIN ultima_firma uf ON uf.comparativo_id = m.ide" in bloque
+    assert "COALESCE(fi.n_firmas, 0) AS n_firmas" in proyeccion
+    assert "COALESCE(fi.n_firmas_pendientes, 0) AS n_firmas_pendientes" in proyeccion
+    assert (
+        "CASE WHEN fi.estado_es_final THEN uf.fecha END AS fecha_aprobacion"
+        in proyeccion
+    )
+    assert (
+        "CASE WHEN fi.estado_es_final THEN uf.usuario END AS aprobado_por"
+        in proyeccion
+    )
+
+
+@pytest.mark.parametrize(
+    ("tabla", "proyeccion", "alias_definidos"),
+    [
+        (
+            "comparativo_ofertas",
+            "_proyeccion_ofertas",
+            {"compras", "p", "d", "c", "li", "ff", "est"},
+        ),
+        (
+            "comparativos",
+            "_proyeccion_comparativos",
+            {"compras", "m", "c", "ob", "fo", "a", "est", "oft", "g", "li", "cc",
+             "ct", "fi", "uf"},
+        ),
+    ],
+)
+def test_f038_la_proyeccion_solo_usa_alias_del_from(
+    tabla: str, proyeccion: str, alias_definidos: set[str]
+) -> None:
+    """Un alias mal escrito no rompe ningún test de texto, pero sí el build."""
+    usados = set(re.findall(r"\b([a-z]+)\.[a-z_]+", globals()[proyeccion]()))
+    assert usados <= alias_definidos, usados - alias_definidos
+    bloque = _bloque(tabla)
+    for alias in alias_definidos - {"compras"}:
+        definido = (
+            rf"(?:FROM|JOIN) (?:LATERAL )?[a-z_.]+(?:\([^()]*\))? {alias} (?:ON|JOIN|LEFT|CROSS)"
+            rf"|\) {alias} (?:ON|LEFT|CROSS)"
+        )
+        assert re.search(definido, bloque), f"alias `{alias}` sin definir en el FROM"
