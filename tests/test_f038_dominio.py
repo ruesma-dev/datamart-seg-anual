@@ -231,6 +231,10 @@ def test_f038_r16_umbrales() -> None:
         (Decimal("50000"), Decimal("10"), False),
         # Por encima del mínimo pero no 10×
         (Decimal("500000"), Decimal("400000"), False),
+        # Mayor oferta POSITIVA pero menor que 1 €: sí se juzga (superviviente
+        # `<= 1` de la campaña de mutación del 2026-10-04)
+        (Decimal("200000"), Decimal("0.50"), True),
+        (Decimal("50000"), Decimal("0.01"), False),
         # Sin oferta con importe con que comparar: NULL, no False
         (Decimal("500000"), Decimal("0"), None),
         (Decimal("500000"), Decimal("-5"), None),

@@ -18,7 +18,7 @@ la base es MANUAL del humano. **D1 aprobado (2026-10-04): dos fases.** Fase 2
 - [x] T6: Fichas de `comparativos` y `comparativo_ofertas` en `config/diccionario/compras.yaml` con lo que exige design §6; ficha de `contratos.comparativo_id` (R22) y relaciones de `contratos`/`albaranes`; en `00_global.yaml` `version` +1, P5 respondible y las cuatro preguntas del acceptance 13 (R24); `tests/test_f038_diccionario.py`  |  Verificación: `python -m pytest tests/test_f038_diccionario.py tests/test_f006_fichas.py tests/test_f006_formato.py tests/test_f006_cobertura.py -q`
 - [x] T7: Párrafo de `docs/ARCHITECTURE.md` («Semántica Sigrid»): ficticias por CIF y nombre, importes sin IVA (`dco.totbas`), atípico 10×/100.000 €, enlace por `comlin.ctride`  |  Verificación: el reviewer lo lee contra design §2
 - [x] T8: `azure-apps/datamart_seg_anual.md`: los dos objetos nuevos de `compras` y la nota de `compras.contratos.comparativo_id`; commit en ESE repositorio (sin push)  |  Verificación: `git -C C:/Users/pgris/PycharmProjects/azure-apps log -1 --stat`
-- [ ] T9: Campaña de mutación del arnés sobre `domain/comparativos.py` y análisis de supervivientes en el informe  |  Verificación: `python -m harness.mutacion --feature F-038`
+- [x] T9: Campaña de mutación del arnés sobre `domain/comparativos.py` y análisis de supervivientes en el informe  |  Verificación: `python -m harness.mutacion --feature F-038`
 - [ ] T10: Ejecutar `bash harness/init.sh` en verde (pytest, cobertura de líneas cambiadas, tamaño de spec e informes)  |  Verificación: `bash harness/init.sh`
 
 ## Fase 2 · objetivo, líneas de los dos lados, firmas
