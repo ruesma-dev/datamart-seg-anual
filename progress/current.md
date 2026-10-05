@@ -12,6 +12,16 @@
 
 ## 2026-10-04 · F-038 · `in_progress` · Fase 1 IMPLEMENTADA (review 1: solo papeleo, atendido); Fase 2 con spec cerrada (D4 decidida), sin implementar · el comparativo de ofertas
 
+**FASE 1 DESPLEGADA por el líder el 2026-10-05, por orden del humano** (tras la
+nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen
+`r20261005-0907` y job comprobado; `build-compras` a mano SUCCESS (265,8 s, sub-paso
+`comparativos` 29,3 s / 20.380 filas); `apply-grants` SUCCESS; `publicar-diccionario`
+**v42** (194 objetos, 1.492 columnas); MCP reiniciado (`--0000014`);
+`check-diccionario` OK (v42). **T23** (MCP, solo lectura): 20.380 comparativos,
+18.633 con contrato, ahorro 72.731.298 EUR en 6.905, 52 atípicos, 32.898 ofertas
+ficticias de 71.306: todo dentro de la previsión. Falta T24 (las cuatro preguntas
+al MCP, el humano). La Fase 2 sigue en la rama.
+
 ### Implementer · Fase 1 (T1-T10), 2026-10-04
 
 Informe: `progress/impl_F-038.md`. T1-T10 hechas con un commit cada una (T9 en
