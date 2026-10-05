@@ -45,10 +45,12 @@ Decisiones y desviaciones (justificadas en el informe, §2):
   relativa se mide sobre el PRECIO de la oferta (la spec no decía sobre qué).
 - Lo ANTERIOR a la ABC incluye Estudios en sus dos formas (`MASTER_ESTUDIO` y
   `ESTUDIO`), no solo `MASTER_PRE_ABC`.
-- Dentro de una versión, el elemento es el de igual `dncpro_id` aunque no case
-  (R29 literal); solo sin él se busca por precio.
-- `casa_base` NULL = la partida no tiene descompuesto en ninguna versión que la
-  regla admite; falso = lo tiene y no casa.
+- **Review Fase 2 pasada 1 (CHANGES_REQUESTED) atendida el 2026-10-05**:
+  · **Decisión del humano (2026-10-05, «primero a y si no b»)**: en cada versión
+  admitida, el elemento de igual `dncpro_id` si casa; si no casa o no existe,
+  el que case por precio en esa partida y versión. · `casa_base` NULL solo si
+  la partida no tiene descompuesto en NINGUNA versión; el resto que no casa,
+  falso. · Cifras medidas en Azure (solo lectura, SQL de la rama) en la 4 y la T25.
 - Tests de otras features por consecuencia directa: `test_f123_origenes.py`
   (09 es el lector declarado de `descompuestos`), `test_f079` (inventario de
   funciones), `test_f047_steps`/`f073`/`f080` (lista de ficheros) y la regla
@@ -75,17 +77,19 @@ Decisiones y desviaciones (justificadas en el informe, §2):
    `SELECT (SELECT count(*) FROM compras.comparativo_lineas), (SELECT count(*) FROM compras.comparativo_oferta_lineas), (SELECT count(*) FROM compras.comparativo_objetivo), (SELECT count(*) FROM compras.comparativo_firmas);`
    → ≈ 198.600 (= `raw.comlin`), ≈ 786.700, ≈ 11.420, ≈ 66.500; y la de D4:
    `SELECT base_regla, casa_base, split_part(origen_base, ' ', 1) AS origen, count(*) FROM compras.comparativo_oferta_lineas WHERE base_regla IS NOT NULL GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;`
-   → total ≈ 83.329; `casa_base` cierto ≈ **24.263** (ABC/ABC ≈ 11.409; ABC con
-   origen anterior ≈ 5.468; ESTUDIOS ≈ 7.386); falso + NULL ≈ 59.066. Si «casa
-   con la ABC» sale claramente por debajo, la causa candidata es la tercera
-   decisión de arriba (el `dncpro_id` manda aunque no case): avisar, no tocar.
+   → medido el 2026-10-05 con el SQL de la rama (Azure, solo lectura): total
+   **84.084**; cierto **24.425** (ABC·ABC 11.409; ABC con origen anterior 5.468
+   = 4.982 `MASTER_PRE_ABC` + 473 `MASTER_ESTUDIO` + 13 `ESTUDIO`; ESTUDIOS
+   7.548 = 7.463 `MASTER_ESTUDIO` + 85 `ESTUDIO`); falso **59.570** (ABC 24.752,
+   4.382 de ellas con `origen_base` ABC; ESTUDIOS 34.818); NULL **89** (ABC 83,
+   ESTUDIOS 6). Crecerá un poco con los datos de cada noche.
 5. **T25** · el caso de la 0696:
    `SELECT o.* FROM compras.comparativo_objetivo o JOIN compras.comparativos c USING (comparativo_id) WHERE c.comparativo_id = 2754136;`
    → `importe_objetivo` 94.853,91, `porcentaje_objetivo` 5, `base_regla` ABC; y
    `SELECT linea_oferta_id, precio, porcentaje_descuento, precio_base, origen_base, casa_base FROM compras.comparativo_oferta_lineas WHERE oferta_id = 2754139;`
    → 939265 y 952250 con `precio` 66,215, `precio_base` 69,70, `origen_base`
-   'ABC v3', `casa_base` cierto; 962172 (26,60) con `casa_base` falso y
-   `precio_base` 28,97 (la ABC, si su necesidad está en ella) o NULL: nunca 28,00.
+   'ABC v3', `casa_base` cierto (la 952250 trae 66,214999); 962172 (26,60) con
+   `casa_base` falso, `precio_base` y `origen_base` NULL (medido el 2026-10-05).
 6. **T24 bis** · reiniciar el MCP tras publicar la v43 y preguntarle, sin
    explicarle nada: «¿quién firmó como JG el comparativo X?» y «¿cuál es el
    objetivo del comparativo X y contra qué base?» → usan

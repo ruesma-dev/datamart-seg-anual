@@ -36,15 +36,19 @@ base: los tests leen el texto del SQL. T20-T25 son MANUAL del humano (§5).
    con ABC y sin master 0 sería tratar Estudios como posterior. Nunca entran
    `MASTER_PLANIF_JO` (salvo la propia ABC) ni `PLANIF_JO`; además
    `fase_num <= fase_abc`.
-3. **El elemento de una versión es el de igual `dncpro_id` AUNQUE NO CASE**
-   (R29 literal: «el de igual `dncpro_id` y, si no lo hay, el que cumpla…»).
-   Solo sin él se busca por precio. Si la cifra de «casa con la ABC» sale muy
-   por debajo de 11.409 en la verificación MANUAL, esta es la causa candidata
-   (la medición de la spec pudo buscar por precio en toda la partida): se avisa,
-   no se cambia sin decisión.
-4. **`casa_base`**: cierto si la versión elegida casa; falso si la partida
-   tiene descompuesto en alguna versión que la regla admite y ninguna casa;
-   NULL si no lo tiene («sin descompuesto: NULL», R30). Si nada casa, la base
+3. **DECISIÓN DEL HUMANO (2026-10-05, «primero a y si no b»; review Fase 2
+   pasada 1, cambio 2)**: en cada versión admitida por D4, el elemento es el de
+   igual `dncpro_id` si casa; si no casa o no existe, el que case por precio
+   entre los de esa partida y versión; si ninguno casa, el de igual `dncpro_id`
+   (sin casar). En `elemento`: `ORDER BY …, c.casa DESC, c.por_dncpro DESC,
+   c.orden`. El orden entre versiones no cambia. (Antes: el `dncpro_id` mandaba
+   aunque no casara, R29 literal; casaban 23.361 y «con la ABC» 9.955.)
+4. **`casa_base`** (review, cambio 1): cierto si la versión elegida casa; falso
+   («no casa») si la partida tiene descompuesto en ALGUNA versión, la admita D4
+   o no, y ninguna admitida casa; NULL solo si no tiene descompuesto en
+   NINGUNA (`con_descompuesto` = `EXISTS` sobre `descompuestos.lineas` de su
+   obra y partida, sin filtro de versión). Antes salía de `candidatas` y daba
+   NULL a 35.701 líneas «no casa» (`spec_F-038.md` §7). Si nada casa, la base
    publicada es el elemento de la versión de la REGLA (la ABC, o Estudios), y
    `precio_base`/`origen_base` quedan NULL si en ella no se identifica elemento.
    `base_regla` = `ABC`/`ESTUDIOS` por la obra, el mismo `CASE` que
@@ -179,6 +183,27 @@ reiniciar el MCP tras publicar la v43.
   versión vigente a la fecha del comparativo (Negocio).
 - Para cerrar: review de la Fase 2, y después las MANUAL del humano.
 
+## 7 · Review Fase 2 · pasada 1 (CHANGES_REQUESTED), atendida el 2026-10-05
+
+Cambio 2 decidido por el humano (§2.3) y cambio 1 (§2.4) en `09` (`c96dfa9`);
+cambio 3, las cifras: medidas en Azure en SOLO LECTURA (psycopg directo,
+`transaction_read_only = on`, nunca el cliente del ETL) con el SQL de la rama,
+la temporal como CTE y `fn_porcentaje_dto` en línea; 119,5 s. **84.084** líneas
+OBJETIVO con %: cierto **24.425** (ABC 11.409 · anterior 5.468 · ESTUDIOS
+7.548), falso **59.570**, NULL **89**. La 0696: 939265 y 952250 `ABC v3` 69,70
+cierto; 962172 falso, sin base. Van a las fichas, a la MANUAL 4 y a la T25.
+RED de los tests nuevos contra el SQL y las fichas de `ada7bec`:
+```
+FAILED tests/test_f038_sql.py::test_f038_r29_base_el_elemento_por_dncpro_y_si_no_casa_el_que_case
+FAILED tests/test_f038_sql.py::test_f038_r30_base_columnas_precio_origen_y_casa
+2 failed, 66 deselected in 0.08s
+FAILED tests/test_f038_diccionario.py::test_f038_r28_r30_la_ficha_de_las_lineas_de_oferta_lo_dice[24.425]
+FAILED tests/test_f038_diccionario.py::test_f038_r31_la_ficha_del_objetivo_da_las_cifras_y_el_desfase[24.425]
+```
+Mutación: el dominio y el step no cambian (mismo alcance, 13 mutantes): la
+campaña del arnés sigue valiendo. La SQL se relanzó: 27/27 (M36 es ahora la
+regla de antes; M50 y M51 vigilan el cambio 1).
+
 ## Evidencias
 
 | Evidencia | Valor real |
@@ -186,6 +211,6 @@ reiniciar el MCP tras publicar la v43.
 | Tests ejecutados (`init.sh`) | **6786 passed, 227 skipped**, 0 failed (de ellos 307 de F-038: 123 + 68 + 116) |
 | Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 14 líneas cambiadas cubiertas (14/14, umbral 80%, nivel estandar; diff desde e9c5507390, merge-base con main)` |
 | Mutación (`harness.mutacion`, **1 worker**, HEAD `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2`) | Alcance 84 líneas (dominio 65, step 19). **13 generados, 13 muertos, 0 supervivientes**, 0 timeouts, 0 sin veredicto; 3665,0 s; línea base 419,4 s, media 281,9 s/mutante. Ningún superviviente que analizar. Detalle: `progress/mutacion_F-038.md` |
-| Mutación SQL manual (1 worker, `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2`) | **25 mutantes (M25-M49), 25 muertos**; tabla `fichero:línea`, original -> mutado y nº de fallos en el anexo de `progress/mutacion_F-038.md`; script `progress/mutacion_sql_F-038_fase2.py`. Línea base 0 fallos antes y después (1073 passed) |
+| Mutación SQL manual (1 worker, `c96dfa9503e6407febdc2ff9fe228de970bb0376`, tras la review) | **27 mutantes (M25-M51), 27 muertos** (antes 25/25 sobre `d2d1d34`); tabla `fichero:línea`, original -> mutado y nº de fallos en el anexo de `progress/mutacion_F-038.md`; script `progress/mutacion_sql_F-038_fase2.py`. Línea base 0 fallos antes y después (1082 passed) |
 | Tiempo de la suite | 2434,06 s con cobertura dentro de `init.sh` (0:40:34, máquina cargada); 1001,17 s sin cobertura |
 | `bash harness/init.sh` | **ENTORNO LISTO**, exit 0, sobre HEAD `5bcb2e8` (todas OK; `PUERTA TAMAÑO`: requirements 144/150, design 249/250, impl 180/220). El commit posterior solo rellena esta tabla y marca T19 |

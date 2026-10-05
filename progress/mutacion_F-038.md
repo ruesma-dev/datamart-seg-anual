@@ -40,13 +40,17 @@ Ninguno: cada mutación aplicada la cazó al menos un test.
 
 `harness.mutacion` solo muta Python y la lógica de la Fase 2 vive sobre todo en
 SQL. Script versionado: `progress/mutacion_sql_F-038_fase2.py` (mutantes =
-sustituciones de texto exactas). Worktree desechable `git worktree add --detach`
-de `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2` (el SQL no ha cambiado desde
-entonces), **1 worker, en serie**, tests `test_f038_sql`, `test_f038_dominio`,
+sustituciones de texto exactas). **Relanzada tras la review de la Fase 2
+(pasada 1)** sobre un worktree desechable `git worktree add --detach` de
+`c96dfa9503e6407febdc2ff9fe228de970bb0376` (las correcciones del SQL), **1
+worker, en serie**, tests `test_f038_sql`, `test_f038_dominio`,
 `test_f038_diccionario` y `test_f006_fichas` sin `-x`. Línea base antes y
-después: 0 fallos (1073 passed, 221 skipped). **25 mutantes, 25 muertos, 0
-supervivientes.** Columna «fallos» = nº de tests FAILED. La campaña de la Fase 1
-(M01-M24, 24/24) está en `progress/mutacion_F-038_fase1.md`.
+después: 0 fallos (1082 passed, 221 skipped). **27 mutantes, 27 muertos, 0
+supervivientes.** M36 es ahora la regla de ANTES (el `dncpro_id` manda aunque
+no case); M50 y M51 vigilan el cambio 1 (`casa_base` NULL). La primera pasada
+(25/25 sobre `d2d1d34`) queda en el historial de git. Columna «fallos» = nº de
+tests FAILED. La campaña de la Fase 1 (M01-M24) está en
+`progress/mutacion_F-038_fase1.md`.
 
 | Id | fichero:línea | original -> mutado | fallos |
 |---|---|---|---|
@@ -61,21 +65,25 @@ supervivientes.** Columna «fallos» = nº de tests FAILED. La campaña de la Fa
 | M33 | `09_comparativos_detalle.sql:142` | `AND d.fase_num <= ob.fase_abc)` -> `AND d.fase_num >= 0)` | 1 |
 | M34 | `09_comparativos_detalle.sql:142` | `'MASTER_ESTUDIO', 'ESTUDIO', 'MASTER_PRE_ABC')` -> `'MASTER_ESTUDIO', 'ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')` | 1 |
 | M35 | `09_comparativos_detalle.sql:143` | `OR (ob.fase_abc IS NULL AND d.origen IN ('MASTER_ESTUDIO', 'ESTUDIO'))` -> `OR (ob.fase_abc IS NULL)` | 1 |
-| M36 | `09_comparativos_detalle.sql:158` | `c.por_dncpro DESC, c.casa DESC, c.orden` -> `c.casa DESC, c.por_dncpro DESC, c.orden` | 1 |
-| M37 | `09_comparativos_detalle.sql:175` | `e.casa DESC, e.fase_num DESC, e.origen` -> `e.casa DESC, e.fase_num ASC, e.origen` | 1 |
-| M38 | `09_comparativos_detalle.sql:174` | `WHERE e.casa OR e.es_primera_abc OR ob.fase_abc IS NULL` -> `WHERE TRUE` | 1 |
-| M39 | `09_comparativos_detalle.sql:200` | `WHEN cd.linea_oferta_id IS NOT NULL THEN FALSE END AS casa_base` -> `ELSE FALSE END AS casa_base` | 1 |
+| M36 | `09_comparativos_detalle.sql:161` | `c.casa DESC, c.por_dncpro DESC, c.orden` -> `c.por_dncpro DESC, c.casa DESC, c.orden` | 1 |
+| M37 | `09_comparativos_detalle.sql:178` | `e.casa DESC, e.fase_num DESC, e.origen` -> `e.casa DESC, e.fase_num ASC, e.origen` | 1 |
+| M38 | `09_comparativos_detalle.sql:177` | `WHERE e.casa OR e.es_primera_abc OR ob.fase_abc IS NULL` -> `WHERE TRUE` | 1 |
+| M39 | `09_comparativos_detalle.sql:209` | `WHEN cd.linea_oferta_id IS NOT NULL THEN FALSE END AS casa_base` -> `ELSE FALSE END AS casa_base` | 1 |
 | M40 | `09_comparativos_detalle.sql:138` | `COALESCE(d.dncpro_id = ob.dncpro_id, FALSE)` -> `COALESCE(d.producto_id = ob.dncpro_id, FALSE)` | 1 |
-| M41 | `09_comparativos_detalle.sql:225` | `ORDER BY o.fecha_oferta DESC NULLS LAST, o.oferta_id DESC` -> `ORDER BY o.fecha_oferta ASC NULLS LAST, o.oferta_id DESC` | 1 |
-| M42 | `09_comparativos_detalle.sql:246` | `CASE WHEN cp.n_porcentajes = 1 THEN` -> `CASE WHEN cp.n_porcentajes >= 1 THEN` | 1 |
-| M43 | `09_comparativos_detalle.sql:236` | `FILTER (WHERE l.casa_base)` -> `FILTER (WHERE l.casa_base IS NOT NULL)` | 1 |
-| M44 | `09_comparativos_detalle.sql:254` | `WHERE ob.orden = 1;` -> `WHERE ob.orden >= 1;` | 1 |
-| M45 | `09_comparativos_detalle.sql:275` | `COALESCE(f.fir = 0, FALSE)` -> `COALESCE(f.fir = 1, FALSE)` | 1 |
-| M46 | `09_comparativos_detalle.sql:279` | `JOIN raw.com m ON m.ide = f.conide;` -> `LEFT JOIN raw.com m ON m.ide = f.conide;` | 1 |
+| M41 | `09_comparativos_detalle.sql:234` | `ORDER BY o.fecha_oferta DESC NULLS LAST, o.oferta_id DESC` -> `ORDER BY o.fecha_oferta ASC NULLS LAST, o.oferta_id DESC` | 1 |
+| M42 | `09_comparativos_detalle.sql:255` | `CASE WHEN cp.n_porcentajes = 1 THEN` -> `CASE WHEN cp.n_porcentajes >= 1 THEN` | 1 |
+| M43 | `09_comparativos_detalle.sql:245` | `FILTER (WHERE l.casa_base)` -> `FILTER (WHERE l.casa_base IS NOT NULL)` | 1 |
+| M44 | `09_comparativos_detalle.sql:263` | `WHERE ob.orden = 1;` -> `WHERE ob.orden >= 1;` | 1 |
+| M45 | `09_comparativos_detalle.sql:284` | `COALESCE(f.fir = 0, FALSE)` -> `COALESCE(f.fir = 1, FALSE)` | 1 |
+| M46 | `09_comparativos_detalle.sql:288` | `JOIN raw.com m ON m.ide = f.conide;` -> `LEFT JOIN raw.com m ON m.ide = f.conide;` | 1 |
 | M47 | `09_comparativos_detalle.sql:76` | `CREATE TEMP TABLE _f038_obra_abc ON COMMIT DROP AS` -> `CREATE TEMP TABLE _f038_obra_abc AS` | 1 |
-| M48 | `09_comparativos_detalle.sql:199` | `CASE WHEN el.es_primera_abc THEN 'ABC' ELSE el.origen END \|\| ' v' \|\| el.fase_num` -> `el.origen \|\| ' v' \|\| el.fase_num` | 1 |
-| M49 | `09_comparativos_detalle.sql:226` | `FROM compras.comparativo_ofertas o\n    WHERE o.familia_ficticia = 'OBJETIVO'` -> `FROM compras.comparativo_ofertas o\n    WHERE o.es_ficticia` | 1 |
+| M48 | `09_comparativos_detalle.sql:208` | `CASE WHEN el.es_primera_abc THEN 'ABC' ELSE el.origen END \|\| ' v' \|\| el.fase_num` -> `el.origen \|\| ' v' \|\| el.fase_num` | 1 |
+| M49 | `09_comparativos_detalle.sql:235` | `FROM compras.comparativo_ofertas o\n    WHERE o.familia_ficticia = 'OBJETIVO'` -> `FROM compras.comparativo_ofertas o\n    WHERE o.es_ficticia` | 1 |
+| M50 | `09_comparativos_detalle.sql:188` | `WHERE d.obra_id = ob.obra_id AND d.partida_id = ob.partida_id` -> `WHERE d.obra_id = ob.obra_id` | 1 |
+| M51 | `09_comparativos_detalle.sql:184` | `    SELECT ob.linea_oferta_id\n    FROM objetivo ob\n    WHERE EXISTS (\n        SELECT 1 FROM descompuestos.lineas d\n        WHERE d.obra_id = ob.obra_id AND d.partida_id = ob.partida_id\n    )\n` -> `    SELECT DISTINCT c.linea_oferta_id FROM candidatas c\n` | 1 |
 
 **Límite declarado**: los tests leen el TEXTO del SQL, así que matan cualquier
-desviación del texto esperado; no prueban que el SQL corra ni sus cifras. Eso es
-MANUAL del humano tras el despliegue (cifras de D4 y T25 en `progress/current.md`).
+desviación del texto esperado; no prueban que el SQL corra ni sus cifras (eso se
+midió en Azure en solo lectura, `progress/impl_F-038.md` §7, y es MANUAL tras el
+despliegue). M47 es equivalente en ejecución (la temporal muere igual al cerrar
+la conexión) y muere porque el test fija el texto (review Fase 2 pasada 1).
