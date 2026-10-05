@@ -1139,3 +1139,68 @@ def test_f038_r31_objetivo_regla_de_la_obra_y_parte_del_importe_que_casa() -> No
 def test_f038_r31_objetivo_la_proyeccion_solo_usa_alias_del_from() -> None:
     usados = set(re.findall(r"\b([a-z]+)\.[a-z_]+", _proyeccion_objetivo()))
     assert usados <= {"ob", "cp", "ab"}, usados
+
+
+# ===========================================================================
+# FASE 2 · T15 · compras.comparativo_firmas (R33, D3)
+# ===========================================================================
+
+#: Las columnas de `compras.comparativo_firmas`, EN SU ORDEN (design §5).
+COLUMNAS_FIRMAS = (
+    "firma_id",
+    "comparativo_id",
+    "circuito",
+    "escalon",
+    "usuario",
+    "fecha",
+    "hora",
+    "pendiente",
+    "firma_digital_valida",
+    "estado_final_id",
+)
+
+
+def _proyeccion_firmas() -> str:
+    return _proyeccion_09(
+        "comparativo_firmas", "SELECT f.ide AS firma_id", "FROM raw.confir f"
+    )
+
+
+def test_f038_r33_firmas_columnas_en_su_orden() -> None:
+    assert tuple(_columnas(_proyeccion_firmas())) == COLUMNAS_FIRMAS
+
+
+def test_f038_r33_firmas_grano_una_fila_por_confir_de_un_comparativo() -> None:
+    texto = _ejecutable_09()
+    assert "ALTER TABLE compras.comparativo_firmas ADD PRIMARY KEY (firma_id)" in texto
+    bloque = _bloque_09("comparativo_firmas")
+    assert "FROM raw.confir f JOIN raw.com m ON m.ide = f.conide;" in bloque, (
+        "solo las firmas de un comparativo (`conide` en `raw.com`), todas"
+    )
+
+
+def test_f038_r33_firmas_circuito_escalon_usuario_y_estado_de_la_firma() -> None:
+    proyeccion = _proyeccion_firmas()
+    for esperado in (
+        "f.conide AS comparativo_id",
+        "f.cod AS circuito",
+        "f.rol AS escalon",
+        "f.usu AS usuario",
+        "compras.fn_sigrid_date(f.fec) AS fecha",
+        "f.hor AS hora",
+        # Las mismas definiciones que `n_firmas_pendientes` de 08 (R23)
+        "COALESCE(f.fir = 0, FALSE) AS pendiente",
+        "COALESCE(f.firok = 1, FALSE) AS firma_digital_valida",
+        "f.estfin AS estado_final_id",
+    ):
+        assert esperado in proyeccion, esperado
+    usados = set(re.findall(r"\b([a-z]+)\.[a-z_]+", proyeccion))
+    assert usados <= {"f", "compras"}, usados
+
+
+def test_f038_r33_firmas_indices() -> None:
+    texto = _ejecutable_09()
+    for columna in ("comparativo_id", "usuario"):
+        assert re.search(
+            rf"CREATE INDEX \w+ ON compras\.comparativo_firmas \({columna}\)", texto
+        ), columna

@@ -254,3 +254,30 @@ LEFT JOIN _f038_obra_abc ab ON ab.obra_id = cm.obra_id
 WHERE ob.orden = 1;
 
 ALTER TABLE compras.comparativo_objetivo ADD PRIMARY KEY (comparativo_id);
+
+-- ---------------------------------------------------------------------------
+-- LAS FIRMAS · una fila por firma (raw.confir) de un comparativo, TODAS (R33,
+-- D3). Es el circuito escalón a escalón: «la firma del jefe de grupo» no es
+-- una columna, son filas, y un escalón se REPITE tras un rechazo (5.375
+-- comparativos). `pendiente` y la fecha llevan las mismas definiciones que
+-- `n_firmas_pendientes` y `fecha_aprobacion` de 08. El circuito entre familias
+-- (`deffir`, `dbo.log`) es F-085.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.comparativo_firmas CASCADE;
+CREATE TABLE compras.comparativo_firmas AS
+SELECT f.ide AS firma_id,
+    f.conide                                AS comparativo_id,
+    f.cod                                   AS circuito,     -- COMVAL, COAVAL...
+    f.rol                                   AS escalon,      -- JEFO, JG, DCOM...
+    f.usu                                   AS usuario,      -- login de Sigrid
+    compras.fn_sigrid_date(f.fec)           AS fecha,
+    f.hor                                   AS hora,
+    COALESCE(f.fir = 0, FALSE)              AS pendiente,
+    COALESCE(f.firok = 1, FALSE)            AS firma_digital_valida,
+    f.estfin                                AS estado_final_id
+FROM raw.confir f
+JOIN raw.com m ON m.ide = f.conide;
+
+ALTER TABLE compras.comparativo_firmas ADD PRIMARY KEY (firma_id);
+CREATE INDEX idx_com_cfi_cmp ON compras.comparativo_firmas (comparativo_id);
+CREATE INDEX idx_com_cfi_usu ON compras.comparativo_firmas (usuario);
