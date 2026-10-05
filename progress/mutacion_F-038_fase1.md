@@ -1,5 +1,8 @@
-<!-- progress/mutacion_F-038.md -->
-# F-038 · Campaña de mutación
+<!-- progress/mutacion_F-038_fase1.md -->
+# F-038 · Campaña de mutación · Fase 1
+
+> Informe de la Fase 1, íntegro, apartado al lanzar la campaña de la Fase 2
+> (que la herramienta escribe en `progress/mutacion_F-038.md`).
 
 Generado por `python -m harness.mutacion --feature F-038` el 2026-10-04 17:00.
 

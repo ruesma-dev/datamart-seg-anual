@@ -10,7 +10,7 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-04 · F-038 · `in_progress` · Fase 1 IMPLEMENTADA (review 1: solo papeleo, atendido); Fase 2 con spec cerrada (D4 decidida), sin implementar · el comparativo de ofertas
+## 2026-10-04 · F-038 · `in_progress` · Fase 1 DESPLEGADA (2026-10-05); Fase 2 IMPLEMENTADA (2026-10-05), pendiente de REVIEW · el comparativo de ofertas
 
 **FASE 1 DESPLEGADA por el líder el 2026-10-05, por orden del humano** (tras la
 nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen
@@ -22,17 +22,75 @@ nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen
 ficticias de 71.306: todo dentro de la previsión. Falta T24 (las cuatro preguntas
 al MCP, el humano). La Fase 2 sigue en la rama.
 
-### Implementer · Fase 2 (T11-T19), EN CURSO desde el 2026-10-05
+### Implementer · Fase 2 (T11-T19), 2026-10-05 · IMPLEMENTADA, pendiente de REVIEW
 
 Abierta por el humano el 2026-10-05. Rama `feature/F-038-comparativos` desde
-`main` `e9c5507`. Hechas: T11 (dominio), T12 (`fn_porcentaje_dto`), T13
-(`09`: líneas de los dos lados y la base de D4). Hasta T17 (fichas y enmienda
-de F-006) quedan en rojo, a propósito y solo ellos, tres tests de F-006: la
-puerta «ficha o pendiente» y el recuento de objetos del diseño.
+`main` `e9c5507`. Informe: `progress/impl_F-038.md` (el de la Fase 1, íntegro,
+en `progress/impl_F-038_fase1.md`). T11-T19 con un commit cada una, más uno de
+consecuencias en tests de otras features. Ni un SQL contra ninguna base.
+
+**Lo que entra**: `compras.comparativo_lineas`, `comparativo_oferta_lineas` (con
+la base del coste objetivo según D4), `comparativo_objetivo`,
+`comparativo_firmas` y `compras.fn_porcentaje_dto`; sub-paso `09` de
+`build_compras` (cuenta `comparativo_oferta_lineas`); diccionario **versión 43**.
+
+**Diccionario del árbol tras F-038 Fase 2 (version 43): 199 objetos, 1538
+columnas, 92 de consumo** (cuatro tablas y una función nuevas en `compras`).
+
+Decisiones y desviaciones (justificadas en el informe, §2):
+- «Casa» = |precio − base × (1 − %/100)| ≤ 0,011 + 0,002 × |precio|: la
+  relativa se mide sobre el PRECIO de la oferta (la spec no decía sobre qué).
+- Lo ANTERIOR a la ABC incluye Estudios en sus dos formas (`MASTER_ESTUDIO` y
+  `ESTUDIO`), no solo `MASTER_PRE_ABC`.
+- Dentro de una versión, el elemento es el de igual `dncpro_id` aunque no case
+  (R29 literal); solo sin él se busca por precio.
+- `casa_base` NULL = la partida no tiene descompuesto en ninguna versión que la
+  regla admite; falso = lo tiene y no casa.
+- Tests de otras features por consecuencia directa: `test_f123_origenes.py`
+  (09 es el lector declarado de `descompuestos`), `test_f079` (inventario de
+  funciones), `test_f047_steps`/`f073`/`f080` (lista de ficheros) y la regla
+  `R-SIGRID-CON` (`confir.cod`, `dcopro.res`). `docs/ARCHITECTURE.md` gana un
+  párrafo (el lector cruzado de `descompuestos`).
+
+**MANUAL del humano de la Fase 2, EN ORDEN, tras el APROBADO del reviewer**
+(nadie más los ejecuta; los comandos exactos y lo que debe salir):
+1. **T20** · merge a `main`; imagen desde `main`:
+   `powershell -NoProfile -File infra/70_build_image.ps1`, luego
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm` y
+   `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`
+   → el tag nuevo.
+2. **T21** · la nocturna (00:00 UTC; publica la v43 ella sola) o, como en la
+   Fase 1, a mano: `python main.py build-compras`, `python main.py apply-grants`
+   y `python main.py publicar-diccionario`. `python main.py status` → SUCCESS;
+   `python main.py timings --last 1` → `build_compras` como mucho ~2-3 min más
+   (sub-paso `comparativos_detalle`). Un fallo «relation
+   descompuestos.lineas does not exist» = base sin `descompuestos`: parar.
+3. **T22** · (solo lectura) `python main.py check-declarados`,
+   `python main.py check-unicidad`, `python main.py check-relaciones` y
+   `python main.py check-diccionario` → código 0 los cuatro (v43).
+4. **Cifras contra la previsión** (solo lectura; desviación > 5 % se para y se avisa):
+   `SELECT (SELECT count(*) FROM compras.comparativo_lineas), (SELECT count(*) FROM compras.comparativo_oferta_lineas), (SELECT count(*) FROM compras.comparativo_objetivo), (SELECT count(*) FROM compras.comparativo_firmas);`
+   → ≈ 198.600 (= `raw.comlin`), ≈ 786.700, ≈ 11.420, ≈ 66.500; y la de D4:
+   `SELECT base_regla, casa_base, split_part(origen_base, ' ', 1) AS origen, count(*) FROM compras.comparativo_oferta_lineas WHERE base_regla IS NOT NULL GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;`
+   → total ≈ 83.329; `casa_base` cierto ≈ **24.263** (ABC/ABC ≈ 11.409; ABC con
+   origen anterior ≈ 5.468; ESTUDIOS ≈ 7.386); falso + NULL ≈ 59.066. Si «casa
+   con la ABC» sale claramente por debajo, la causa candidata es la tercera
+   decisión de arriba (el `dncpro_id` manda aunque no case): avisar, no tocar.
+5. **T25** · el caso de la 0696:
+   `SELECT o.* FROM compras.comparativo_objetivo o JOIN compras.comparativos c USING (comparativo_id) WHERE c.comparativo_id = 2754136;`
+   → `importe_objetivo` 94.853,91, `porcentaje_objetivo` 5, `base_regla` ABC; y
+   `SELECT linea_oferta_id, precio, porcentaje_descuento, precio_base, origen_base, casa_base FROM compras.comparativo_oferta_lineas WHERE oferta_id = 2754139;`
+   → 939265 y 952250 con `precio` 66,215, `precio_base` 69,70, `origen_base`
+   'ABC v3', `casa_base` cierto; 962172 (26,60) con `casa_base` falso y
+   `precio_base` 28,97 (la ABC, si su necesidad está en ella) o NULL: nunca 28,00.
+6. **T24 bis** · reiniciar el MCP tras publicar la v43 y preguntarle, sin
+   explicarle nada: «¿quién firmó como JG el comparativo X?» y «¿cuál es el
+   objetivo del comparativo X y contra qué base?» → usan
+   `compras.comparativo_firmas` y `compras.comparativo_objetivo`.
 
 ### Implementer · Fase 1 (T1-T10), 2026-10-04
 
-Informe: `progress/impl_F-038.md`. T1-T10 hechas con un commit cada una (T9 en
+Informe: `progress/impl_F-038_fase1.md`. T1-T10 hechas con un commit cada una (T9 en
 dos). `bash harness/init.sh`: ENTORNO LISTO (6614 passed; cobertura 32/32
 líneas cambiadas). Mutación: 13/14 muertos y el superviviente cazado con test
 nuevo; SQL manual 24/24. Pendiente: REVIEW. Fase 2 (T11-T19, T25) FUERA. Decisiones y
