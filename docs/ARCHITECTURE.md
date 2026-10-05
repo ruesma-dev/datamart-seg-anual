@@ -289,6 +289,14 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     comparativo con dos contratos hace fallar el build (guarda `RAISE
     EXCEPTION`, hoy 0 casos). La fecha de aprobación es la de la última firma
     solo cuando `con.est` es el `estfin` de su circuito.
+  - **Fase 2 (`09_comparativos_detalle.sql`): `dcopro.dto` es TEXTO** con coma
+    decimal y negativos (recargos), convertido por `compras.fn_porcentaje_dto`
+    con el patrón del dominio. La base del coste objetivo lee
+    `descompuestos.lineas` —el único SQL fuera de `sql/descompuestos/` que lo
+    hace— y `build_compras` corre ANTES que `build_descompuestos`: usa el
+    descompuesto de la noche anterior (la primera ABC y el master 0 están
+    congelados). Regla D4: la primera ABC si casa; si no, la versión anterior
+    más reciente que case; nunca una posterior; sin ABC, solo Estudios.
 
 ## Acceso a datos
 

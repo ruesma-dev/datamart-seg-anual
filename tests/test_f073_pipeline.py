@@ -62,6 +62,8 @@ FICHEROS_COMPRAS = [
     "07_texto.sql",
     # F-038: el comparativo de ofertas, al final.
     "08_comparativos.sql",
+    # F-038 Fase 2: el detalle (líneas, objetivo y firmas), décimo.
+    "09_comparativos_detalle.sql",
 ]
 
 

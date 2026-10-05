@@ -1540,3 +1540,38 @@ reales; mutación arnés 1/1 y manual 47/47 muertos; `init.sh` 6.423 passed.
 
 QUEDA del humano: T9 merge e imagen, T10 nocturna, T11 diccionario v41 y MCP, T12
 comprobación dirigida. Comandos en `progress/current.md`.
+
+---
+
+## F-038 · El comparativo de ofertas al completo en `compras` · 2026-10-05
+
+Rama `feature/F-038-comparativos`. `sdd=true`, rigor `estandar`, prioridad 1 (el
+humano, 2026-10-04). Spec en `specs/F-038-comparativos/`, mediciones en
+`progress/spec_F-038.md` y `progress/explore_F-038_ejemplos_objetivo.md`, informe en
+`progress/impl_F-038.md`, reviews en `progress/review_F-038_fase1.md` y
+`progress/review_F-038.md`. Hecha en DOS fases (D1).
+
+**Fase 1** (APROBADA en pasada 2; desplegada el 2026-10-05, imagen
+`r20261005-0907`, diccionario v42): `compras.comparativos` (estado, actividad,
+fechas, aprobado por, contrato por `comlin.ctride`, las CUATRO magnitudes de importe
+sin IVA con nombre propio, 52 adjudicados atípicos marcados, ahorro del concurso
+solo con ofertas reales) y `compras.comparativo_ofertas` (una fila por oferta, con
+las FICTICIAS de planificación marcadas: CIF falso, o CIF vacío con nombre de
+familia). En Azure: 20.380 comparativos, 18.633 con contrato, ahorro 72,7 M en
+6.905, 32.898 ofertas ficticias de 71.306.
+
+**Fase 2** (APROBADA en pasada 2; sin desplegar): `comparativo_lineas`,
+`comparativo_oferta_lineas` (lo ofertado por proveedor línea a línea),
+`comparativo_objetivo` y `comparativo_firmas` (D3, una fila por firma). El coste
+objetivo: base = el DESCOMPUESTO (no las ofertas ficticias) de la primera ABC si
+casa; si no, la versión anterior más reciente que case; nunca posterior; sin ABC
+solo Estudios; si no casa, «no casa» (D4, humano 2026-10-04). El elemento: el de
+igual `dncpro_id` si casa, si no el que case por precio (humano 2026-10-05). Casan
+24.425 de 84.084 líneas OBJETIVO con %. Diccionario v43. Lee `descompuestos` desde
+`compras` (la noche anterior).
+
+Para Negocio: la base parece ser la versión VIGENTE al hacer el comparativo; 12.351
+líneas casarían con una posterior y 21.789 de obras sin ABC con otra versión.
+
+QUEDA: despliegue de la Fase 2 (imagen, `build-compras`, diccionario v43, MCP, T25 la
+0696) y la T24 de la Fase 1 (las cuatro preguntas al MCP).

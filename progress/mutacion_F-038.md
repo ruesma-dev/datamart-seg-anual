@@ -1,96 +1,89 @@
 <!-- progress/mutacion_F-038.md -->
 # F-038 · Campaña de mutación
 
-Generado por `python -m harness.mutacion --feature F-038` el 2026-10-04 17:00.
+Generado por `python -m harness.mutacion --feature F-038` el 2026-10-05 14:44.
 
 ## Alcance
 
-Origen del diff: **rama** (`4dfe8c70b52d3774a8a302c5d0abae185157a509` .. `feature/F-038-comparativos`).
+Origen del diff: **rama** (`e9c5507390fffa56229a5ae825442cf09e136930` .. `feature/F-038-comparativos`).
 
 | Fichero | Líneas en alcance |
 |---|---|
-| `etl_sigrid/application/steps/build_compras_step.py` | 16 |
-| `etl_sigrid/domain/comparativos.py` | 119 |
-| **Total** | **135** |
+| `etl_sigrid/application/steps/build_compras_step.py` | 19 |
+| `etl_sigrid/domain/comparativos.py` | 65 |
+| **Total** | **84** |
 
 ## Totales
 
 | Métrica | Valor |
 |---|---|
-| Mutantes generados | 14 |
-| Mutantes evaluados | 14 |
+| Mutantes generados | 13 |
+| Mutantes evaluados | 13 |
 | Muertos | 13 |
-| Supervivientes | 1 |
+| Supervivientes | 0 |
 | Timeouts | 0 |
 | Sin veredicto (base rota) | 0 |
-| Tiempo total | 3011.4 s |
-| SHA de HEAD medido | `9a738095ec3f2a6a091627b9afc2b6f79f0a7cff` |
-| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-038_7itw3jy2/wk_0` | 393.6 |
-| Línea base (s) — `C:/Users/pgris/AppData/Local/Temp/mutacion_F-038_7itw3jy2/wk_1` | 397.7 |
-| Media por mutante evaluado (s) | 215.1 |
-| Timeout efectivo por mutante (s) | 796 — derivado de la línea base × 2.0 |
+| Tiempo total | 3665.0 s |
+| SHA de HEAD medido | `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2` |
+| Línea base (s) — `.` | 419.4 |
+| Media por mutante evaluado (s) | 281.9 |
+| Timeout efectivo por mutante (s) | 839 — derivado de la línea base × 2.0 |
 | Suelo configurado (s) | 120 |
-| Workers | 2 |
+| Workers | 1 |
 | Muestreo | no: campaña completa |
 
 ## Supervivientes
 
-Cada superviviente es una línea que ningún test comprueba de verdad, o una mutación equivalente. Distinguirlo es trabajo del implementer: ningún análisis puede quedarse sin completar al cerrar la feature.
+Ninguno: cada mutación aplicada la cazó al menos un test.
 
-### 1. `etl_sigrid/domain/comparativos.py:117` [entero]
+## Anexo · campaña MANUAL sobre el SQL de la Fase 2 (no la genera `harness.mutacion`)
 
-- Original: `if adjudicado is None or mayor_oferta is None or mayor_oferta <= 0:`
-- Mutado:   `if adjudicado is None or mayor_oferta is None or mayor_oferta <= 1:`
-
-#### Análisis del implementer
-
-> Por qué ningún test lo caza: los casos de `test_f038_r16_es_adjudicado_atipico`
-> usaban como mayor oferta 0, -5 o importes de 10 € para arriba; ninguno caía en
-> (0, 1], que es justo la franja donde `<= 0` y `<= 1` discrepan. **Hueco real,
-> no equivalente**: una mayor oferta de 0,50 € SÍ permite juzgar el atípico
-> (el SQL hace `CASE WHEN mayor_oferta > 0`), y el mutante devolvería NULL.
-> Decisión: **test nuevo** en `tests/test_f038_dominio.py`, dos casos con mayor
-> oferta 0,50 € (→ True) y 0,01 € (→ False). Reverificado a mano en serie sobre
-> el árbol: con el mutante, `2 failed, 67 passed`; sin él, `69 passed`.
-
-## Anexo · campaña MANUAL sobre el SQL (no la genera `harness.mutacion`)
-
-`harness.mutacion` solo muta Python y la lógica de F-038 vive sobre todo en SQL.
-Script versionado: `progress/mutacion_sql_F-038.py` (mutantes = sustituciones de
-texto exactas). Worktree desechable `git worktree add --detach` de
-`47cc859a654fd7a5066231af861d8e3c7e4ff559` (el SQL no ha cambiado desde entonces),
-**1 worker, en serie**, tests `test_f038_sql`, `test_f038_dominio`,
-`test_f038_diccionario`, `test_f084_sql` y `test_f006_fichas` sin `-x`. Línea
-base antes y después: 0 fallos (934 passed). **24 mutantes, 24 muertos, 0
-supervivientes.** Columna «fallos» = nº de tests FAILED.
+`harness.mutacion` solo muta Python y la lógica de la Fase 2 vive sobre todo en
+SQL. Script versionado: `progress/mutacion_sql_F-038_fase2.py` (mutantes =
+sustituciones de texto exactas). **Relanzada tras la review de la Fase 2
+(pasada 1)** sobre un worktree desechable `git worktree add --detach` de
+`c96dfa9503e6407febdc2ff9fe228de970bb0376` (las correcciones del SQL), **1
+worker, en serie**, tests `test_f038_sql`, `test_f038_dominio`,
+`test_f038_diccionario` y `test_f006_fichas` sin `-x`. Línea base antes y
+después: 0 fallos (1082 passed, 221 skipped). **27 mutantes, 27 muertos, 0
+supervivientes.** M36 es ahora la regla de ANTES (el `dncpro_id` manda aunque
+no case); M50 y M51 vigilan el cambio 1 (`casa_base` NULL). La primera pasada
+(25/25 sobre `d2d1d34`) queda en el historial de git. Columna «fallos» = nº de
+tests FAILED. La campaña de la Fase 1 (M01-M24) está en
+`progress/mutacion_F-038_fase1.md`.
 
 | Id | fichero:línea | original -> mutado | fallos |
 |---|---|---|---|
-| M01 | `00_setup.sql:124` | `x.c NOT IN ('A99999999', 'A00000000')` -> `x.c NOT IN ('A99999999')` | 1 |
-| M02 | `00_setup.sql:128` | `WHEN x.n ~ 'CUATRIM' THEN` -> `WHEN x.n ~ 'CUATRI' THEN` | 1 |
-| M03 | `00_setup.sql:114` | `'[^A-Z0-9]+', ' ', 'g'` -> `'[^A-Z]+', ' ', 'g'` | 1 |
-| M04 | `00_setup.sql:125` | `'PLANIFICACION DE ESPACIOS') > 0 THEN NULL` -> `... >= 0 THEN NULL` | 1 |
-| M05 | `00_setup.sql:133` | `WHEN x.c = 'A00000000' THEN 'OFICINA_TECNICA'` -> `... THEN 'OBJETIVO'` | 1 |
-| M06 | `08_comparativos.sql:51` | `WHERE l.ctride > 0` (guarda) -> `WHERE l.ctride >= 0` | 1 |
-| M07 | `08_comparativos.sql:53` | `HAVING count(DISTINCT l.ctride) > 1` -> `... > 2` | 1 |
-| M08 | `08_comparativos.sql:84` | `COALESCE(c.est = 6, FALSE)` -> `COALESCE(c.est = 5, FALSE)` | 1 |
-| M09 | `08_comparativos.sql:85` | `d.totbas::NUMERIC(18, 2)` -> `d.totdoc::NUMERIC(18, 2)` | 2 |
-| M10 | `08_comparativos.sql:98` | `WHERE lp.comlinide > 0` -> `WHERE lp.comlinide >= 0` | 1 |
-| M11 | `08_comparativos.sql:105` | `fn_estado_documento(12, c.est)` -> `fn_estado_documento(46, c.est)` | 1 |
-| M12 | `08_comparativos.sql:127` | `FILTER (WHERE NOT o.es_ficticia) AS n_ofertas_reales` -> `FILTER (WHERE o.es_ficticia) ...` | 1 |
-| M13 | `08_comparativos.sql:130` | `MIN(...) FILTER (WHERE NOT o.es_ficticia AND ` -> `MIN(...) FILTER (WHERE ` | 1 |
-| M14 | `08_comparativos.sql:142` | `a.n_ofertas_ganadoras = 1` -> `a.n_ofertas_ganadoras >= 1` | 1 |
-| M15 | `08_comparativos.sql:214` | `> 10 * oft.mayor_oferta` -> `> 3 * oft.mayor_oferta` | 1 |
-| M16 | `08_comparativos.sql:219` | `>= 2 THEN oft.maxima_real - oft.minima_real` -> `>= 1 THEN ...` | 1 |
-| M17 | `08_comparativos.sql:182` | `WHERE f.fir <> 0` -> `WHERE f.fir = 0` | 1 |
-| M18 | `08_comparativos.sql:183` | `f.fec DESC NULLS LAST` -> `f.fec ASC NULLS LAST` | 1 |
-| M19 | `08_comparativos.sql:225` | `CASE WHEN fi.estado_es_final THEN uf.fecha END` -> `CASE WHEN TRUE THEN uf.fecha END` | 1 |
-| M20 | `08_comparativos.sql:231` | `LEFT JOIN raw.auxpronat a ON` -> `JOIN raw.auxpronat a ON` | 3 |
-| M21 | `08_comparativos.sql:169` | `bool_or(f.estfin = fc.est)` -> `bool_and(f.estfin = fc.est)` | 1 |
-| M22 | `08_comparativos.sql:90` | `JOIN raw.con c ON c.ide = d.ide` -> `JOIN raw.con c ON c.ide = p.ide` | 1 |
-| M23 | `08_comparativos.sql:168` | `FILTER (WHERE f.fir = 0) AS n_firmas_pendientes` -> `FILTER (WHERE f.fir = 1) ...` | 1 |
-| M24 | `08_comparativos.sql:237` | `ct.contrato_id = li.contrato_id` -> `ct.contrato_id = m.ide` | 1 |
+| M25 | `00_setup.sql:152` | `WHEN t ~ '^-?[0-9]+(,[0-9]+)?%$' THEN` -> `WHEN t ~ '^-?[0-9]+(,[0-9]+)?%' THEN` | 1 |
+| M26 | `00_setup.sql:152` | `replace(replace(t, '%', ''), ',', '.')::NUMERIC` -> `replace(t, '%', '')::NUMERIC` | 1 |
+| M27 | `09_comparativos_detalle.sql:62` | `FROM raw.comlin l\nLEFT JOIN raw.dncpro n` -> `FROM raw.comlin l\nJOIN raw.dncpro n` | 1 |
+| M28 | `09_comparativos_detalle.sql:57` | `NULLIF(n.paride, 0)` -> `NULLIF(n.ide, 0)` | 1 |
+| M29 | `09_comparativos_detalle.sql:106` | `WHERE lp.comlinide > 0` -> `WHERE lp.comlinide >= 0` | 1 |
+| M30 | `09_comparativos_detalle.sql:79` | `WHERE d.es_primera_abc\nGROUP BY d.obra_id` -> `WHERE d.es_vigente\nGROUP BY d.obra_id` | 2 |
+| M31 | `09_comparativos_detalle.sql:124` | `WHERE lo.familia_ficticia = 'OBJETIVO' AND lo.porcentaje_descuento IS NOT NULL` -> `WHERE lo.es_ficticia AND lo.porcentaje_descuento IS NOT NULL` | 1 |
+| M32 | `09_comparativos_detalle.sql:139` | `<= 0.011 + 0.002 * abs(ob.precio)` -> `<= 0.011 + 0.02 * abs(ob.precio)` | 1 |
+| M33 | `09_comparativos_detalle.sql:142` | `AND d.fase_num <= ob.fase_abc)` -> `AND d.fase_num >= 0)` | 1 |
+| M34 | `09_comparativos_detalle.sql:142` | `'MASTER_ESTUDIO', 'ESTUDIO', 'MASTER_PRE_ABC')` -> `'MASTER_ESTUDIO', 'ESTUDIO', 'MASTER_PRE_ABC', 'MASTER_PLANIF_JO')` | 1 |
+| M35 | `09_comparativos_detalle.sql:143` | `OR (ob.fase_abc IS NULL AND d.origen IN ('MASTER_ESTUDIO', 'ESTUDIO'))` -> `OR (ob.fase_abc IS NULL)` | 1 |
+| M36 | `09_comparativos_detalle.sql:161` | `c.casa DESC, c.por_dncpro DESC, c.orden` -> `c.por_dncpro DESC, c.casa DESC, c.orden` | 1 |
+| M37 | `09_comparativos_detalle.sql:178` | `e.casa DESC, e.fase_num DESC, e.origen` -> `e.casa DESC, e.fase_num ASC, e.origen` | 1 |
+| M38 | `09_comparativos_detalle.sql:177` | `WHERE e.casa OR e.es_primera_abc OR ob.fase_abc IS NULL` -> `WHERE TRUE` | 1 |
+| M39 | `09_comparativos_detalle.sql:209` | `WHEN cd.linea_oferta_id IS NOT NULL THEN FALSE END AS casa_base` -> `ELSE FALSE END AS casa_base` | 1 |
+| M40 | `09_comparativos_detalle.sql:138` | `COALESCE(d.dncpro_id = ob.dncpro_id, FALSE)` -> `COALESCE(d.producto_id = ob.dncpro_id, FALSE)` | 1 |
+| M41 | `09_comparativos_detalle.sql:234` | `ORDER BY o.fecha_oferta DESC NULLS LAST, o.oferta_id DESC` -> `ORDER BY o.fecha_oferta ASC NULLS LAST, o.oferta_id DESC` | 1 |
+| M42 | `09_comparativos_detalle.sql:255` | `CASE WHEN cp.n_porcentajes = 1 THEN` -> `CASE WHEN cp.n_porcentajes >= 1 THEN` | 1 |
+| M43 | `09_comparativos_detalle.sql:245` | `FILTER (WHERE l.casa_base)` -> `FILTER (WHERE l.casa_base IS NOT NULL)` | 1 |
+| M44 | `09_comparativos_detalle.sql:263` | `WHERE ob.orden = 1;` -> `WHERE ob.orden >= 1;` | 1 |
+| M45 | `09_comparativos_detalle.sql:284` | `COALESCE(f.fir = 0, FALSE)` -> `COALESCE(f.fir = 1, FALSE)` | 1 |
+| M46 | `09_comparativos_detalle.sql:288` | `JOIN raw.com m ON m.ide = f.conide;` -> `LEFT JOIN raw.com m ON m.ide = f.conide;` | 1 |
+| M47 | `09_comparativos_detalle.sql:76` | `CREATE TEMP TABLE _f038_obra_abc ON COMMIT DROP AS` -> `CREATE TEMP TABLE _f038_obra_abc AS` | 1 |
+| M48 | `09_comparativos_detalle.sql:208` | `CASE WHEN el.es_primera_abc THEN 'ABC' ELSE el.origen END \|\| ' v' \|\| el.fase_num` -> `el.origen \|\| ' v' \|\| el.fase_num` | 1 |
+| M49 | `09_comparativos_detalle.sql:235` | `FROM compras.comparativo_ofertas o\n    WHERE o.familia_ficticia = 'OBJETIVO'` -> `FROM compras.comparativo_ofertas o\n    WHERE o.es_ficticia` | 1 |
+| M50 | `09_comparativos_detalle.sql:188` | `WHERE d.obra_id = ob.obra_id AND d.partida_id = ob.partida_id` -> `WHERE d.obra_id = ob.obra_id` | 1 |
+| M51 | `09_comparativos_detalle.sql:184` | `    SELECT ob.linea_oferta_id\n    FROM objetivo ob\n    WHERE EXISTS (\n        SELECT 1 FROM descompuestos.lineas d\n        WHERE d.obra_id = ob.obra_id AND d.partida_id = ob.partida_id\n    )\n` -> `    SELECT DISTINCT c.linea_oferta_id FROM candidatas c\n` | 1 |
 
 **Límite declarado**: los tests leen el TEXTO del SQL, así que matan cualquier
-desviación del texto esperado; no prueban que el SQL corra ni sus cifras. Eso es
-MANUAL del humano tras la nocturna (T21-T23).
+desviación del texto esperado; no prueban que el SQL corra ni sus cifras (eso se
+midió en Azure en solo lectura, `progress/impl_F-038.md` §7, y es MANUAL tras el
+despliegue). M47 es equivalente en ejecución (la temporal muere igual al cerrar
+la conexión) y muere porque el test fija el texto (review Fase 2 pasada 1).
