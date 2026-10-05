@@ -47,6 +47,8 @@ STEPS = {
             "07_texto.sql",
             # F-038: el comparativo de ofertas y sus ofertas, al final.
             "08_comparativos.sql",
+            # F-038 Fase 2: las líneas de los dos lados, el objetivo y las firmas.
+            "09_comparativos_detalle.sql",
         ],
     ),
     "build_retenciones": (
@@ -138,7 +140,21 @@ def test_f038_r1_build_compras_cuenta_los_comparativos(pg) -> None:
 
     _step("build_compras").run()
 
-    assert doble.contados[-1] == ("compras", "comparativos")
+    assert ("compras", "comparativos") in doble.contados
+
+
+def test_f038_r26_build_compras_cuenta_las_lineas_de_oferta_al_final(pg) -> None:
+    """El sub-paso `09` cuenta `compras.comparativo_oferta_lineas`: es el grueso
+    (~787 k filas) y la tabla que puede salir mal sin que nada falle (si el
+    filtro `comlinide > 0` o la unión con las ofertas se rompiera)."""
+    doble = pg("build_compras", _PgFalso())
+
+    _step("build_compras").run()
+
+    assert doble.contados[-2:] == [
+        ("compras", "comparativos"),
+        ("compras", "comparativo_oferta_lineas"),
+    ]
 
 
 @pytest.mark.parametrize("nombre", list(STEPS))
