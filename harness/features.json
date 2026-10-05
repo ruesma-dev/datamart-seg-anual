@@ -1930,6 +1930,23 @@
       "rigor": "estandar",
       "priority": 1,
       "branch": "feature/F-123-descompuestos-regla-origenes"
+    },
+    {
+      "id": "F-125",
+      "title": "El codigo 2 (codigo alternativo) y el documento de necesidades de compra en albaranes y descompuestos",
+      "description": "Pedida por el humano el 2026-10-05, a raiz del correo de Juan Romero sobre albaranes (RE: «Albaranes en Sigrid: que es el codigo alternativo de las lineas (p. ej. MOMOSA)», 2026-10-05 17:47). Juan: el «codigo alternativo» de la linea es el CODIGO 2 (`cod2` en Sigrid, rotulado «Codigo alternativo» en las tablas de lineas), que el jefe de obra usa para orientarse en sus compras y agrupar o filtrar en el DOCUMENTO DE PLANIFICACION DE COMPRAS (DPC); valores como MOMOSA. El humano: «el cod2 y el documento de necesidades de compra tambien hay que leerlo para el datamart, de forma que se lea de albaranes y de la planificacion de compras (descompuestos fase 0) y creo que en el resto de descompuestos». ESTADO HOY, visto por el lider el 2026-10-05: `raw.dcapro` (lineas de albaran) se ingiere con `cod2` (no esta en `exclude_columns`), pero `compras.albaran_lineas` (`sql/compras/01_documentos.sql`) NO publica ni el codigo 2 ni el enlace al documento de necesidades (Juan y el humano dicen que ~6 % de las lineas lo llevan; en que campo, por medir: `docoritip`/`linoriide` u otro). En `descompuestos.lineas`: `codigo_alternativo` ya existe (PLANIF_JO = `dncpro.cod2`; master y ESTUDIO = campo 7 del texto `des`) y `dncpro_id` la linea de necesidad (PLANIF_JO la propia; master, campo 36; ESTUDIO nunca); NO se publica el DOCUMENTO de necesidades (`dnc`, la cabecera: `obr.dncide`). QUE HACER: medir donde vive el enlace al documento y a la linea de necesidad en `dcapro`, su cobertura y si cuadra con `dncpro`; publicar en `compras.albaran_lineas` el codigo 2 y el documento y la linea de necesidad; en `descompuestos` comprobar que el codigo alternativo es el codigo 2 en los cuatro origenes y anadir el documento de necesidades donde haya linea de necesidad; fichas del diccionario con el nombre de negocio «codigo 2» y su uso por el jefe de obra.",
+      "acceptance": [
+        "Medido en solo lectura donde enlaza una linea de albaran (`dcapro`) con el documento y la linea de necesidad de compra, con su cobertura (en torno al 6 % segun Negocio) y si cuadra con `dncpro`",
+        "`compras.albaran_lineas` publica el codigo 2 (`cod2`) y el documento y la linea de necesidad de compra, con su ficha",
+        "En `descompuestos.lineas` el codigo alternativo se publica y documenta como el codigo 2 en todos los origenes, y el documento de necesidades acompana a la linea de necesidad donde exista (PLANIF_JO y master)",
+        "Las fichas del diccionario explican que es el codigo 2 (lo pone el jefe de obra para agrupar o filtrar sus compras en el DPC) y que es el documento de necesidades de compra",
+        "Contrastado con el caso de Juan: un albaran de MOMOSA con lineas sin contrato muestra su codigo 2"
+      ],
+      "status": "pending",
+      "sdd": true,
+      "rigor": "estandar",
+      "priority": 4,
+      "branch": "feature/F-125-codigo2-documento-necesidades"
     }
   ]
 }

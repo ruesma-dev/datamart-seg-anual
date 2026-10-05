@@ -3,7 +3,7 @@
 
 **Fichero generado por `harness/backlog.py` a partir de `harness/features.json`. No lo edites a mano**: edita el JSON y vuelve a generarlo (lo hace solo `bash harness/init.sh`).
 
-Resumen: **113 features**, 65 abiertas, 48 terminadas.
+Resumen: **114 features**, 66 abiertas, 48 terminadas.
 
 En curso: **F-038**.
 
@@ -16,6 +16,7 @@ En curso: **F-038**.
 | F-067 | Compras por el MCP: estados y fechas de contratos y facturas, sus condiciones, los comparativos con sus ofertas, las actividades del proveedor y el enlace con pagos | 2 | pendiente | critico | `feature/F-067-compras-seguimiento-mcp` |
 | F-085 | Quien aprobo que y cuando: el circuito de firma de confir y las 300.438 firmas digitales de dbo.log, las dos fuentes de la misma pregunta | 3 | pendiente | estandar | `feature/F-085-quien-aprobo-que-y-cuando` |
 | F-111 | Los nombres de partida se resuelven por codigo en los niveles del arbol y en la dimension de costes indirectos: 10.593 filas con un escalon con el nombre de otra partida | 4 | spec lista | estandar | `feature/F-111-nombres-partida-por-ancestro` |
+| F-125 | El codigo 2 (codigo alternativo) y el documento de necesidades de compra en albaranes y descompuestos | 4 | pendiente | estandar | `feature/F-125-codigo2-documento-necesidades` |
 | F-121 | El recurso principal de cada recurso auxiliar (campo extendido «Recurso asociado» de Sigrid): a que trabajador va cada vehiculo | 5 | pendiente | estandar | `feature/F-121-recurso-principal-auxiliar` |
 | F-114 | Rescatar dos peticiones de `mcp-bbdd` que solo vivian en la rama `dev`: la regla de las columnas `_raw` y el orden de magnitud de `stg.presupuesto` | 6 | pendiente | estandar | `feature/F-114-avisos-mcp-rescatados` |
 | F-106 | Traer al seguimiento las demas empresas (UTE, Porsan...): cada obra desde la perspectiva de SU empresa, sin consolidar | 7 | pendiente | estandar | `feature/F-106-obras-por-empresa` |
@@ -161,6 +162,12 @@ estado **pendiente** · prioridad 3 · rigor `estandar` · SDD sí · rama `feat
 estado **spec lista** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-111-nombres-partida-por-ancestro`
 
 Decision D3 del humano sobre la spec de F-109 (2026-09-26). Medido por el spec-author de F-109 el 2026-09-25 en solo lectura: `mart.v_pbi_dim_partida_niveles` resuelve el NOMBRE de cada escalon del arbol por `(obra, codigo_partida)` con `MAX`, y como el codigo se repite dentro de la obra (5.202 pares: arboles paralelos, subcapitulos copiados bajo cada bloque o fase, un capitulo por contrato...), 10.593 filas (4.657 del seguimiento) ensenan algun escalon con el nombre de otra partida. `cierre.v_pbi_dim_subcategoria_ci` y el detalle de costes indirectos agrupan por codigo: 22 filas con nombre ajeno, y las dos fases de la 0444 caen en el mismo grupo `CI.1`. NO duplica importes: solo etiquetas. QUE HACER: resolver el nombre de cada escalon por el ANCESTRO real (`capitulo_padre_id`/ruta, por `partida_id`) y no por codigo, en `mart` y en `cierre`; decidir con Negocio si fundir las fases de la 0444 en `CI.1` es lo que quiere. Afecta a las etiquetas del Arbol Presupuesto de Power BI: contrastar antes y despues.
+
+### F-125 · El codigo 2 (codigo alternativo) y el documento de necesidades de compra en albaranes y descompuestos
+
+estado **pendiente** · prioridad 4 · rigor `estandar` · SDD sí · rama `feature/F-125-codigo2-documento-necesidades`
+
+Pedida por el humano el 2026-10-05, a raiz del correo de Juan Romero sobre albaranes (RE: «Albaranes en Sigrid: que es el codigo alternativo de las lineas (p. ej. MOMOSA)», 2026-10-05 17:47). Juan: el «codigo alternativo» de la linea es el CODIGO 2 (`cod2` en Sigrid, rotulado «Codigo alternativo» en las tablas de lineas), que el jefe de obra usa para orientarse en sus compras y agrupar o filtrar en el DOCUMENTO DE PLANIFICACION DE COMPRAS (DPC); valores como MOMOSA. El humano: «el cod2 y el documento de necesidades de compra tambien hay que leerlo para el datamart, de forma que se lea de albaranes y de la planificacion de compras (descompuestos fase 0) y creo que en el resto de descompuestos». ESTADO HOY, visto por el lider el 2026-10-05: `raw.dcapro` (lineas de albaran) se ingiere con `cod2` (no esta en `exclude_columns`), pero `compras.albaran_lineas` (`sql/compras/01_documentos.sql`) NO publica ni el codigo 2 ni el enlace al documento de necesidades (Juan y el humano dicen que ~6 % de las lineas lo llevan; en que campo, por medir: `docoritip`/`linoriide` u otro). En `descompuestos.lineas`: `codigo_alternativo` ya existe (PLANIF_JO = `dncpro.cod2`; master y ESTUDIO = campo 7 del texto `des`) y `dncpro_id` la linea de necesidad (PLANIF_JO la propia; master, campo 36; ESTUDIO nunca); NO se publica el DOCUMENTO de necesidades (`dnc`, la cabecera: `obr.dncide`). QUE HACER: medir donde vive el enlace al documento y a la linea de necesidad en `dcapro`, su cobertura y si cuadra con `dncpro`; publicar en `compras.albaran_lineas` el codigo 2 y el documento y la linea de necesidad; en `descompuestos` comprobar que el codigo alternativo es el codigo 2 en los cuatro origenes y anadir el documento de necesidades donde haya linea de necesidad; fichas del diccionario con el nombre de negocio «codigo 2» y su uso por el jefe de obra.
 
 ### F-121 · El recurso principal de cada recurso auxiliar (campo extendido «Recurso asociado» de Sigrid): a que trabajador va cada vehiculo
 
