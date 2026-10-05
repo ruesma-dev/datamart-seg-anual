@@ -1031,3 +1031,111 @@ def test_f038_lineas_la_proyeccion_de_09_solo_usa_alias_del_from(
             f"alias `{alias}` sin definir en el FROM final"
         )
 
+
+# ===========================================================================
+# FASE 2 · T14 · compras.comparativo_objetivo (R31)
+# ===========================================================================
+
+#: Las columnas de `compras.comparativo_objetivo`, EN SU ORDEN (design §5).
+COLUMNAS_OBJETIVO = (
+    "comparativo_id",
+    "oferta_objetivo_id",
+    "n_ofertas_objetivo",
+    "importe_objetivo",
+    "porcentaje_objetivo",
+    "base_regla",
+    "pct_importe_casa_base",
+)
+
+
+def _proyeccion_objetivo() -> str:
+    return _proyeccion_09(
+        "comparativo_objetivo", "SELECT ob.comparativo_id AS comparativo_id",
+        "FROM objetivas ob",
+    )
+
+
+def test_f038_r31_objetivo_columnas_en_su_orden() -> None:
+    assert tuple(_columnas(_proyeccion_objetivo())) == COLUMNAS_OBJETIVO
+
+
+def test_f038_r31_objetivo_grano_un_comparativo_con_oferta_objetivo() -> None:
+    texto = _ejecutable_09()
+    assert (
+        "ALTER TABLE compras.comparativo_objetivo ADD PRIMARY KEY (comparativo_id)"
+        in texto
+    )
+    objetivas = _cte_09("comparativo_objetivo", "objetivas")
+    assert (
+        "FROM compras.comparativo_ofertas o WHERE o.familia_ficticia = 'OBJETIVO'"
+        in objetivas
+    )
+    assert "count(*) OVER (PARTITION BY o.comparativo_id) AS n_ofertas_objetivo" in objetivas
+    bloque = _bloque_09("comparativo_objetivo")
+    assert bloque.rstrip().endswith("WHERE ob.orden = 1;"), (
+        "UNA fila por comparativo: la oferta objetivo elegida"
+    )
+
+
+def test_f038_r31_objetivo_la_mas_reciente_por_fecha_y_luego_ide() -> None:
+    objetivas = _cte_09("comparativo_objetivo", "objetivas")
+    assert (
+        "row_number() OVER (PARTITION BY o.comparativo_id ORDER BY "
+        "o.fecha_oferta DESC NULLS LAST, o.oferta_id DESC) AS orden" in objetivas
+    ), "la OBJETIVO más reciente (`con.fec`) y, a igual fecha, la de mayor ide"
+
+
+def test_f038_r31_objetivo_importe_y_porcentaje_solo_si_es_unico() -> None:
+    proyeccion = _proyeccion_objetivo()
+    assert "ob.oferta_id AS oferta_objetivo_id" in proyeccion
+    assert "ob.n_ofertas_objetivo AS n_ofertas_objetivo" in proyeccion
+    assert "ob.importe_ofertado_documento AS importe_objetivo" in proyeccion, (
+        "el importe del objetivo es su DOCUMENTO, sin IVA (`dco.totbas`)"
+    )
+    assert (
+        "CASE WHEN cp.n_porcentajes = 1 THEN cp.porcentaje END AS porcentaje_objetivo"
+        in proyeccion
+    )
+    con_porcentaje = _cte_09("comparativo_objetivo", "con_porcentaje")
+    for esperado in (
+        "count(DISTINCT l.porcentaje_descuento) AS n_porcentajes",
+        "MAX(l.porcentaje_descuento) AS porcentaje",
+        "FROM compras.comparativo_oferta_lineas l WHERE l.familia_ficticia = 'OBJETIVO' "
+        "AND l.porcentaje_descuento IS NOT NULL GROUP BY l.oferta_id",
+    ):
+        assert esperado in con_porcentaje, esperado
+
+
+def test_f038_r31_objetivo_regla_de_la_obra_y_parte_del_importe_que_casa() -> None:
+    proyeccion = _proyeccion_objetivo()
+    regla = (
+        f"CASE WHEN ab.fase_abc IS NOT NULL THEN '{base_regla(True)}' "
+        f"ELSE '{base_regla(False)}' END AS base_regla"
+    )
+    assert regla in proyeccion, "la misma regla que las líneas, la del dominio"
+    assert (
+        "ROUND(100 * cp.importe_casa_base / NULLIF(cp.importe_con_porcentaje, 0), 2) "
+        "AS pct_importe_casa_base" in proyeccion
+    )
+    con_porcentaje = _cte_09("comparativo_objetivo", "con_porcentaje")
+    assert "SUM(l.importe_ofertado_linea) AS importe_con_porcentaje" in con_porcentaje
+    assert (
+        "COALESCE(SUM(l.importe_ofertado_linea) FILTER (WHERE l.casa_base), 0) "
+        "AS importe_casa_base" in con_porcentaje
+    )
+    bloque = _bloque_09("comparativo_objetivo")
+    for union in (
+        "LEFT JOIN con_porcentaje cp ON cp.oferta_id = ob.oferta_id",
+        "LEFT JOIN compras.comparativos cm ON cm.comparativo_id = ob.comparativo_id",
+        "LEFT JOIN _f038_obra_abc ab ON ab.obra_id = cm.obra_id",
+    ):
+        assert union in bloque, union
+    texto = _ejecutable_09()
+    assert texto.index("CREATE TABLE compras.comparativo_oferta_lineas") < texto.index(
+        "CREATE TABLE compras.comparativo_objetivo"
+    ), "el objetivo agrega las líneas: va detrás de ellas"
+
+
+def test_f038_r31_objetivo_la_proyeccion_solo_usa_alias_del_from() -> None:
+    usados = set(re.findall(r"\b([a-z]+)\.[a-z_]+", _proyeccion_objetivo()))
+    assert usados <= {"ob", "cp", "ab"}, usados

@@ -206,3 +206,51 @@ LEFT JOIN con_descompuesto cd ON cd.linea_oferta_id = lo.linea_oferta_id;
 ALTER TABLE compras.comparativo_oferta_lineas ADD PRIMARY KEY (linea_oferta_id);
 CREATE INDEX idx_com_col_ofe ON compras.comparativo_oferta_lineas (oferta_id);
 CREATE INDEX idx_com_col_cln ON compras.comparativo_oferta_lineas (comparativo_linea_id);
+
+-- ---------------------------------------------------------------------------
+-- EL OBJETIVO · una fila por comparativo con oferta OBJETIVO (R31). Medido:
+-- 12.259 ofertas OBJETIVO en 11.420 comparativos; 1.126 tienen dos o tres, y
+-- vale la MÁS RECIENTE. Su importe es su documento, sin IVA; su porcentaje,
+-- el de sus líneas si es uno solo (7.399 tienen uno, 48 varios, 4.813
+-- ninguno); y `pct_importe_casa_base`, la parte del importe de sus líneas con
+-- porcentaje cuya base del descompuesto casa (D4).
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS compras.comparativo_objetivo CASCADE;
+CREATE TABLE compras.comparativo_objetivo AS
+WITH objetivas AS (
+    SELECT o.comparativo_id AS comparativo_id,
+           o.oferta_id AS oferta_id,
+           o.importe_ofertado_documento AS importe_ofertado_documento,
+           count(*) OVER (PARTITION BY o.comparativo_id) AS n_ofertas_objetivo,
+           row_number() OVER (PARTITION BY o.comparativo_id ORDER BY o.fecha_oferta DESC NULLS LAST, o.oferta_id DESC) AS orden
+    FROM compras.comparativo_ofertas o
+    WHERE o.familia_ficticia = 'OBJETIVO'
+),
+con_porcentaje AS (
+    -- Las líneas con porcentaje de cada oferta OBJETIVO: cuántos % distintos
+    -- traen y qué parte de su importe casa con la base.
+    SELECT l.oferta_id AS oferta_id,
+           count(DISTINCT l.porcentaje_descuento) AS n_porcentajes,
+           MAX(l.porcentaje_descuento) AS porcentaje,
+           SUM(l.importe_ofertado_linea) AS importe_con_porcentaje,
+           COALESCE(SUM(l.importe_ofertado_linea) FILTER (WHERE l.casa_base), 0) AS importe_casa_base
+    FROM compras.comparativo_oferta_lineas l
+    WHERE l.familia_ficticia = 'OBJETIVO' AND l.porcentaje_descuento IS NOT NULL
+    GROUP BY l.oferta_id
+)
+SELECT ob.comparativo_id AS comparativo_id,
+    ob.oferta_id                            AS oferta_objetivo_id,
+    ob.n_ofertas_objetivo                   AS n_ofertas_objetivo,
+    ob.importe_ofertado_documento           AS importe_objetivo,
+    -- Con dos o más % distintos no se elige uno: NULL.
+    CASE WHEN cp.n_porcentajes = 1 THEN cp.porcentaje END AS porcentaje_objetivo,
+    -- La regla de la OBRA, la misma que llevan sus líneas.
+    CASE WHEN ab.fase_abc IS NOT NULL THEN 'ABC' ELSE 'ESTUDIOS' END AS base_regla,
+    ROUND(100 * cp.importe_casa_base / NULLIF(cp.importe_con_porcentaje, 0), 2) AS pct_importe_casa_base
+FROM objetivas ob
+LEFT JOIN con_porcentaje cp ON cp.oferta_id = ob.oferta_id
+LEFT JOIN compras.comparativos cm ON cm.comparativo_id = ob.comparativo_id
+LEFT JOIN _f038_obra_abc ab ON ab.obra_id = cm.obra_id
+WHERE ob.orden = 1;
+
+ALTER TABLE compras.comparativo_objetivo ADD PRIMARY KEY (comparativo_id);
