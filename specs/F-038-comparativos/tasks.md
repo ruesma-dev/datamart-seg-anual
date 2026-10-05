@@ -23,7 +23,7 @@ la base es MANUAL del humano. **D1 aprobado (2026-10-04): dos fases.** Fase 2
 
 ## Fase 2 · objetivo, líneas de los dos lados, firmas
 
-- [ ] T11: Dominio Fase 2: `PATRON_DTO`, `parse_porcentaje_dto`, `TOLERANCIA_*`, `casa_con_base` y `base_regla` (ABC si la obra tiene primera ABC, si no ESTUDIOS), con tests de los `dto` medidos y de las tres líneas de la 0696 (R27, R29)  |  Verificación: `python -m pytest tests/test_f038_dominio.py -q`
+- [x] T11: Dominio Fase 2: `PATRON_DTO`, `parse_porcentaje_dto`, `TOLERANCIA_*`, `casa_con_base` y `base_regla` (ABC si la obra tiene primera ABC, si no ESTUDIOS), con tests de los `dto` medidos y de las tres líneas de la 0696 (R27, R29)  |  Verificación: `python -m pytest tests/test_f038_dominio.py -q`
 - [ ] T12: `compras.fn_porcentaje_dto` en `00_setup.sql` con el patrón del dominio, sin `EXCEPTION` (R27)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k dto`
 - [ ] T13: `sql/compras/09_comparativos_detalle.sql`: `comparativo_lineas` y `comparativo_oferta_lineas` con la base del descompuesto según D4 (R25, R26, R29, R30, R32)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k "lineas or base"`
 - [ ] T14: `09`: `compras.comparativo_objetivo` (R31)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k objetivo`
