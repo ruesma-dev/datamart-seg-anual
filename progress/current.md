@@ -10,7 +10,16 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-04 · F-038 · `in_progress` · Fase 1 DESPLEGADA (2026-10-05); Fase 2 IMPLEMENTADA (2026-10-05), pendiente de REVIEW · el comparativo de ofertas
+## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA en pasada 2, SIN DESPLEGAR · el comparativo de ofertas
+
+> **Cerrada el 2026-10-05.** Fase 2 APROBADA por el reviewer en la pasada 2
+> (`progress/review_F-038.md`), con la regla del elemento decidida por el humano
+> («primero a y si no b»): casan 24.425 de 84.084 líneas OBJETIVO con %, reproducido
+> en Azure. `init.sh` 6.795 passed. Resumen en `progress/history.md`. Queda el
+> despliegue de la Fase 2 (MANUAL de abajo).
+
+### Antes
+
 
 **FASE 1 DESPLEGADA por el líder el 2026-10-05, por orden del humano** (tras la
 nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen

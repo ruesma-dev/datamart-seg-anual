@@ -582,7 +582,7 @@
         "Se responde por el MCP, sin explicarle nada: cuantos comparativos hay por actividad, cuanto se ahorro en el concurso, quien aprobo un comparativo y cuando, y si un comparativo acabo en contrato",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "rigor": "estandar",
       "priority": 1,
