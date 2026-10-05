@@ -208,9 +208,9 @@ regla de antes; M50 y M51 vigilan el cambio 1).
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados (`init.sh`) | **6786 passed, 227 skipped**, 0 failed (de ellos 307 de F-038: 123 + 68 + 116) |
+| Tests ejecutados (`init.sh`) | **6795 passed, 227 skipped**, 0 failed (de ellos 316 de F-038: 123 + 68 + 125), tras la review |
 | Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 14 líneas cambiadas cubiertas (14/14, umbral 80%, nivel estandar; diff desde e9c5507390, merge-base con main)` |
 | Mutación (`harness.mutacion`, **1 worker**, HEAD `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2`) | Alcance 84 líneas (dominio 65, step 19). **13 generados, 13 muertos, 0 supervivientes**, 0 timeouts, 0 sin veredicto; 3665,0 s; línea base 419,4 s, media 281,9 s/mutante. Ningún superviviente que analizar. Detalle: `progress/mutacion_F-038.md` |
 | Mutación SQL manual (1 worker, `c96dfa9503e6407febdc2ff9fe228de970bb0376`, tras la review) | **27 mutantes (M25-M51), 27 muertos** (antes 25/25 sobre `d2d1d34`); tabla `fichero:línea`, original -> mutado y nº de fallos en el anexo de `progress/mutacion_F-038.md`; script `progress/mutacion_sql_F-038_fase2.py`. Línea base 0 fallos antes y después (1082 passed) |
-| Tiempo de la suite | 2434,06 s con cobertura dentro de `init.sh` (0:40:34, máquina cargada); 1001,17 s sin cobertura |
-| `bash harness/init.sh` | **ENTORNO LISTO**, exit 0, sobre HEAD `5bcb2e8` (todas OK; `PUERTA TAMAÑO`: requirements 144/150, design 249/250, impl 180/220). El commit posterior solo rellena esta tabla y marca T19 |
+| Tiempo de la suite | 1646,70 s con cobertura dentro de `init.sh` (0:27:26; antes de la review 2434,06 s con la máquina cargada); 1001,17 s sin cobertura |
+| `bash harness/init.sh` | **ENTORNO LISTO**, exit 0, sobre HEAD `1023052` tras la review (todas OK; cobertura 14/14; `PUERTA TAMAÑO`: impl 216/220, review 140/140). El commit posterior solo rellena esta tabla |
