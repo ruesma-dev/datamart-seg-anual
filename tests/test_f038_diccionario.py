@@ -335,6 +335,8 @@ def test_f038_r35_los_importes_y_precios_llevan_unidad_y_agregacion() -> None:
         # La base del objetivo y su cobertura de D4
         "D4", "primera ABC", "ANTERIOR", "posterior", "Estudios",
         "24.263", "83.329", "29,1 %", "12.351", "21.789",
+        # La cifra con la regla PUBLICADA (review de la Fase 2, cambio 3)
+        "24.425", "84.084", "29,0 %", "59.570", "2026-10-05",
         # Lee `descompuestos` de la noche anterior
         "descompuestos.lineas", "noche anterior", "build_descompuestos",
     ],
@@ -345,7 +347,8 @@ def test_f038_r28_r30_la_ficha_de_las_lineas_de_oferta_lo_dice(frase: str) -> No
 
 @pytest.mark.parametrize(
     "frase",
-    ["29,1 %", "24.263", "noche anterior", "descompuestos", "D4", "12.259", "1.126"],
+    ["29,1 %", "24.263", "noche anterior", "descompuestos", "D4", "12.259", "1.126",
+     "24.425", "84.084", "29,0 %"],
 )
 def test_f038_r31_la_ficha_del_objetivo_da_las_cifras_y_el_desfase(frase: str) -> None:
     assert frase in _texto("compras.comparativo_objetivo"), frase
@@ -361,6 +364,12 @@ def test_f038_r28_descuento_texto_y_porcentaje() -> None:
     assert "TEXTO" in texto and "coma" in texto
     porcentaje = _columna("compras.comparativo_oferta_lineas", "porcentaje_descuento")
     assert porcentaje.agregacion == "no_sumable" and porcentaje.nulo_significa
+
+
+def test_f038_r30_casa_base_nulo_solo_sin_descompuesto_en_ninguna_version() -> None:
+    columna = _columna("compras.comparativo_oferta_lineas", "casa_base")
+    assert "NINGUNA version" in normalizado(columna.nulo_significa)
+    assert "la admita la regla o no" in normalizado(columna.significado)
 
 
 def test_f038_r30_las_columnas_de_la_base_dicen_su_nulo() -> None:

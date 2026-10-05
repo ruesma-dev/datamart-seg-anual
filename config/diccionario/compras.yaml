@@ -2832,15 +2832,23 @@ objetos:
       la de la version ANTERIOR a la ABC mas reciente que case; nunca una
       posterior. En las obras sin ABC, solo Estudios (el master 0, o la
       Descomposicion de coste donde no lo hay). Si no casa, se publica la de
-      la regla con `casa_base` falso. Medido: casan **24.263 de 83.329 lineas
-      (29,1 %)**. De las que no, **12.351** casarian con una version posterior
-      a la ABC y **21.789** de obras sin ABC con otra version del master: las
-      fechas apuntan a que la base real es la version VIGENTE al hacer el
-      comparativo, y Negocio puede ampliar la regla. Un `casa_base` falso no
-      es un error del dato. Dentro de la partida, el elemento es el de igual
-      linea de necesidad (`dncpro_id`) y, si no lo hay, el que case: por
-      producto no se puede (la 0696 usa el mismo producto para un vallado de
-      69,70 y una malla de 28,97).
+      la regla con `casa_base` falso. Dentro de cada version, el elemento es
+      el de igual linea de necesidad (`dncpro_id`) si casa; si no casa o no lo
+      hay, el que case por precio en esa partida y version (decision del
+      humano, 2026-10-05). Por producto no se puede: la 0696 usa el mismo
+      producto para un vallado de 69,70 y una malla de 28,97.
+
+      **Medido con esta regla publicada el 2026-10-05** (el SQL de este objeto,
+      en solo lectura): de **84.084** lineas OBJETIVO con porcentaje casan
+      **24.425 (29,0 %)**: 11.409 con la primera ABC, 5.468 con una version
+      anterior y 7.548 con Estudios en obras sin ABC; **59.570** no casan
+      (`casa_base` falso) y **89** no tienen descompuesto en su partida
+      (`casa_base` NULL). La spec lo previo el 2026-10-04 sobre 83.329: casan
+      24.263 (29,1 %), y de las que no, **12.351** casarian con una version
+      posterior a la ABC y **21.789** de obras sin ABC con otra version del
+      master: las fechas apuntan a que la base real es la version VIGENTE al
+      hacer el comparativo, y Negocio puede ampliar la regla. Un `casa_base`
+      falso no es un error del dato.
 
       **Lee el descompuesto de la noche anterior**: `build_compras` corre antes
       que `build_descompuestos`. La primera ABC y el master 0 estan
@@ -2940,11 +2948,11 @@ objetos:
       casa_base:
         significado: >-
           Cierto si base x (1 - %) da el precio con la tolerancia (D4). Falso
-          si la partida tiene descompuesto en las versiones que admite la
-          regla pero no casa ninguna.
+          («no casa») si la partida tiene descompuesto en alguna version, la
+          admita la regla o no, y ninguna de las que admite casa.
         nulo_significa: >-
           La linea no es OBJETIVO con porcentaje, o su partida no tiene
-          descompuesto en ninguna version que admita la regla.
+          descompuesto en NINGUNA version (89 lineas el 2026-10-05).
     relaciones:
       - de: oferta_id
         a: compras.comparativo_ofertas.oferta_id
@@ -2975,8 +2983,9 @@ objetos:
       **CONTRA QUE BASE (D4)**: `base_regla` dice si la obra tiene primera ABC
       (`ABC`) o no (`ESTUDIOS`), y `pct_importe_casa_base` que parte del
       importe de sus lineas con porcentaje reproduce base x (1 - %) del
-      descompuesto. Medido sobre todas las lineas: casan 24.263 de 83.329
-      (29,1 %). Un porcentaje bajo NO es un error: la regla es la que decidio
+      descompuesto. Medido con la regla publicada el 2026-10-05: casan 24.425
+      de 84.084 lineas (29,0 %); la spec lo previo el 2026-10-04 en 24.263 de
+      83.329 (29,1 %). Un porcentaje bajo NO es un error: la regla es la que decidio
       el humano (la primera ABC, o una version anterior; nunca una
       posterior; Estudios en obras sin ABC) y Negocio puede ampliarla. El
       detalle linea a linea esta en `compras.comparativo_oferta_lineas`.

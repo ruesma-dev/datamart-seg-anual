@@ -945,16 +945,19 @@ def test_f038_r30_base_nunca_una_version_posterior_a_la_abc() -> None:
     assert not re.search(r"fase_num (>|>=) ", ejecutable), "nunca una posterior"
 
 
-def test_f038_r29_base_el_elemento_por_dncpro_y_si_no_el_que_casa() -> None:
+def test_f038_r29_base_el_elemento_por_dncpro_y_si_no_casa_el_que_case() -> None:
+    """Decisión del humano (2026-10-05, «primero a y si no b»): el de igual
+    `dncpro_id` si casa; si no casa o no existe, el que case por precio en esa
+    partida y versión; si ninguno casa, el de igual `dncpro_id` sin casar."""
     candidatas = _cte_09("comparativo_oferta_lineas", "candidatas")
     assert "COALESCE(d.dncpro_id = ob.dncpro_id, FALSE) AS por_dncpro" in candidatas
     elemento = _cte_09("comparativo_oferta_lineas", "elemento")
     assert "SELECT DISTINCT ON (c.linea_oferta_id, c.origen, c.fase_num)" in elemento
     assert "WHERE c.por_dncpro OR c.casa" in elemento
     assert (
-        "ORDER BY c.linea_oferta_id, c.origen, c.fase_num, c.por_dncpro DESC, "
-        "c.casa DESC, c.orden" in elemento
-    ), "el de igual dncpro_id manda; si no lo hay, el que case"
+        "ORDER BY c.linea_oferta_id, c.origen, c.fase_num, c.casa DESC, "
+        "c.por_dncpro DESC, c.orden" in elemento
+    ), "casar manda; entre los que casan (o ninguno), el de igual dncpro_id"
 
 
 def test_f038_r30_base_d4_la_abc_si_casa_si_no_la_anterior_mas_reciente() -> None:
@@ -986,9 +989,15 @@ def test_f038_r30_base_columnas_precio_origen_y_casa() -> None:
         "LEFT JOIN con_descompuesto cd ON cd.linea_oferta_id = lo.linea_oferta_id",
     ):
         assert union in bloque, union
-    assert "SELECT DISTINCT c.linea_oferta_id FROM candidatas c" in _cte_09(
-        "comparativo_oferta_lineas", "con_descompuesto"
-    ), "sin descompuesto en su partida, `casa_base` NULL (R30)"
+    con_descompuesto = _cte_09("comparativo_oferta_lineas", "con_descompuesto")
+    assert (
+        "SELECT ob.linea_oferta_id FROM objetivo ob WHERE EXISTS ( SELECT 1 FROM "
+        "descompuestos.lineas d WHERE d.obra_id = ob.obra_id AND d.partida_id = "
+        "ob.partida_id )" in con_descompuesto
+    ), "NULL solo sin descompuesto en NINGUNA versión de su partida (R30)"
+    assert "candidatas" not in con_descompuesto, (
+        "contra el descompuesto entero, no contra las versiones que admite D4"
+    )
 
 
 def test_f038_r32_lineas_el_detalle_no_cuenta_ofertantes_minima_ni_ahorro() -> None:

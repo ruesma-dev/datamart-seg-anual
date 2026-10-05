@@ -143,9 +143,12 @@ candidatas AS (
        OR (ob.fase_abc IS NULL AND d.origen IN ('MASTER_ESTUDIO', 'ESTUDIO'))
 ),
 elemento AS (
-    -- Dentro de cada versión, EL elemento (R29): el de igual `dncpro_id` y,
-    -- si no lo hay, el que case. Por producto no se puede: la 0696 usa el
-    -- mismo producto para un vallado de 69,70 y una malla de 28,97.
+    -- Dentro de cada versión, EL elemento (R29; decisión del humano del
+    -- 2026-10-05, «primero a y si no b»): el de igual `dncpro_id` si casa; si
+    -- no casa o no lo hay, el que case por precio entre los de esa partida y
+    -- versión; si ninguno casa, el de igual `dncpro_id` (sin casar). Por
+    -- producto no se puede: la 0696 usa el mismo producto para un vallado de
+    -- 69,70 y una malla de 28,97.
     SELECT DISTINCT ON (c.linea_oferta_id, c.origen, c.fase_num)
            c.linea_oferta_id AS linea_oferta_id,
            c.origen AS origen,
@@ -155,7 +158,7 @@ elemento AS (
            c.casa AS casa
     FROM candidatas c
     WHERE c.por_dncpro OR c.casa
-    ORDER BY c.linea_oferta_id, c.origen, c.fase_num, c.por_dncpro DESC, c.casa DESC, c.orden
+    ORDER BY c.linea_oferta_id, c.origen, c.fase_num, c.casa DESC, c.por_dncpro DESC, c.orden
 ),
 elegida AS (
     -- D4: entre las versiones cuyo elemento casa, la de mayor `fase_num`: la
@@ -175,9 +178,15 @@ elegida AS (
     ORDER BY e.linea_oferta_id, e.casa DESC, e.fase_num DESC, e.origen
 ),
 con_descompuesto AS (
-    -- Las líneas cuya partida SÍ tiene descompuesto en alguna versión
-    -- admitida: sin él, `casa_base` es NULL y no falso (R30).
-    SELECT DISTINCT c.linea_oferta_id FROM candidatas c
+    -- Las líneas cuya partida tiene descompuesto en ALGUNA versión, de
+    -- cualquier origen, admitida o no por D4: sin él, `casa_base` es NULL
+    -- («sin descompuesto», R30); con él y sin casar, falso («no casa»).
+    SELECT ob.linea_oferta_id
+    FROM objetivo ob
+    WHERE EXISTS (
+        SELECT 1 FROM descompuestos.lineas d
+        WHERE d.obra_id = ob.obra_id AND d.partida_id = ob.partida_id
+    )
 )
 SELECT lo.linea_oferta_id AS linea_oferta_id,
     lo.oferta_id                            AS oferta_id,

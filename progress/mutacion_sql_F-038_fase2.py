@@ -60,8 +60,11 @@ MUTANTES = [
     ("M35", "09_comparativos_detalle.sql",
      "OR (ob.fase_abc IS NULL AND d.origen IN ('MASTER_ESTUDIO', 'ESTUDIO'))",
      "OR (ob.fase_abc IS NULL)", "sin ABC entra cualquier versión"),
-    ("M36", "09_comparativos_detalle.sql", "c.por_dncpro DESC, c.casa DESC, c.orden",
-     "c.casa DESC, c.por_dncpro DESC, c.orden", "el precio manda sobre el dncpro_id"),
+    # Tras la review de la Fase 2 (decisión del humano del 2026-10-05): casar
+    # manda y, entre los que casan, el de igual dncpro_id. El mutante es la
+    # regla de antes (el dncpro_id manda aunque no case).
+    ("M36", "09_comparativos_detalle.sql", "c.casa DESC, c.por_dncpro DESC, c.orden",
+     "c.por_dncpro DESC, c.casa DESC, c.orden", "el dncpro_id manda aunque no case"),
     ("M37", "09_comparativos_detalle.sql", "e.casa DESC, e.fase_num DESC, e.origen",
      "e.casa DESC, e.fase_num ASC, e.origen", "la anterior MÁS ANTIGUA antes que la ABC"),
     ("M38", "09_comparativos_detalle.sql",
@@ -95,6 +98,16 @@ MUTANTES = [
      "FROM compras.comparativo_ofertas o\n    WHERE o.familia_ficticia = 'OBJETIVO'",
      "FROM compras.comparativo_ofertas o\n    WHERE o.es_ficticia",
      "el objetivo puede ser cualquier ficticia"),
+    # Review de la Fase 2, cambio 1: NULL solo sin descompuesto en NINGUNA versión.
+    ("M50", "09_comparativos_detalle.sql",
+     "WHERE d.obra_id = ob.obra_id AND d.partida_id = ob.partida_id",
+     "WHERE d.obra_id = ob.obra_id", "con descompuesto = la obra tiene alguno"),
+    ("M51", "09_comparativos_detalle.sql",
+     "    SELECT ob.linea_oferta_id\n    FROM objetivo ob\n    WHERE EXISTS (\n"
+     "        SELECT 1 FROM descompuestos.lineas d\n"
+     "        WHERE d.obra_id = ob.obra_id AND d.partida_id = ob.partida_id\n    )\n",
+     "    SELECT DISTINCT c.linea_oferta_id FROM candidatas c\n",
+     "NULL también con descompuesto fuera de las versiones de D4 (la lectura de antes)"),
 ]
 
 
