@@ -34,9 +34,14 @@ from etl_sigrid.domain.comparativos import (
     FACTOR_ATIPICO,
     MINIMO_ATIPICO,
     NO_ALFANUMERICO,
+    ORIGENES_ANTERIORES_ABC,
+    ORIGENES_ESTUDIOS,
+    PATRON_DTO,
     PATRONES_FAMILIA,
     TILDES_DESTINO,
     TILDES_ORIGEN,
+    TOLERANCIA_ABS,
+    TOLERANCIA_REL,
 )
 
 DIRECTORIO_SQL = (
@@ -637,3 +642,29 @@ def test_f038_la_proyeccion_solo_usa_alias_del_from(
             rf"|\) {alias} (?:ON|LEFT|CROSS)"
         )
         assert re.search(definido, bloque), f"alias `{alias}` sin definir en el FROM"
+
+
+
+# ===========================================================================
+# FASE 2 · T12 · `compras.fn_porcentaje_dto` (R27)
+# ===========================================================================
+
+
+def test_f038_r27_dto_la_funcion_usa_el_patron_del_dominio() -> None:
+    """El patrón del SQL ES `PATRON_DTO`: si cambia un lado, esto se pone rojo."""
+    cuerpo = _funcion("compras.fn_porcentaje_dto")
+    assert "compras.fn_porcentaje_dto(t TEXT) RETURNS NUMERIC" in cuerpo
+    assert f"WHEN t ~ '{PATRON_DTO}' THEN" in cuerpo, (
+        f"el patrón del SQL no es el del dominio («{PATRON_DTO}»): {cuerpo}"
+    )
+    assert "replace(replace(t, '%', ''), ',', '.')::NUMERIC" in cuerpo
+
+
+def test_f038_r27_dto_sin_exception_ni_cero_ni_else() -> None:
+    """Lo que no casa es NULL: sin `EXCEPTION` (el patrón garantiza el cast),
+    sin `ELSE` (un cero mentiría) e `IMMUTABLE`."""
+    cuerpo = _funcion("compras.fn_porcentaje_dto")
+    assert "IMMUTABLE" in cuerpo
+    assert "EXCEPTION" not in cuerpo.upper()
+    assert " ELSE " not in cuerpo
+    assert "COALESCE" not in cuerpo.upper()
