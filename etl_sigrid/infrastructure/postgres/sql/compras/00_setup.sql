@@ -86,3 +86,54 @@ LANGUAGE sql IMMUTABLE AS $$
         ELSE 'OTRO'
     END;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- F-038 (2026-10-04) · LA OFERTA FICTICIA DEL COMPARATIVO
+--
+-- Dentro de un comparativo hay ofertas de proveedores INVENTADOS: el
+-- OBJETIVO, la OFICINA TÉCNICA, la PLANIFICACIÓN (cuatrimestral, fase 0, ABC).
+-- Contarlas como reales estropea el número de ofertantes, la oferta más
+-- barata y el ahorro del concurso. Medido el 2026-10-04: 32.896 ficticias,
+-- 1.298,8 M€ sin IVA, el 45 % del ofertado.
+--
+-- EL CRITERIO (R8-R10): ficticia = CIF falso, o CIF vacío y nombre de
+-- familia; con CIF real, nunca. El CIF falso SOLO cubre el 30 %: 172
+-- entidades ficticias tienen el CIF vacío. La familia la dice el NOMBRE DE LA
+-- OFERTA (`dco.entres`), normalizado, porque los nombres vienen con y sin
+-- tilde, con guion o asteriscos («OBJETIVO-RUESMA», «*OBJETIVO*»).
+--
+-- LOS LITERALES NO SE CAMBIAN AQUÍ (R11). Viven escritos una sola vez en
+-- `etl_sigrid/domain/comparativos.py`, probados con los nombres medidos, y
+-- `tests/test_f038_sql.py` comprueba que estas dos funciones llevan LOS
+-- MISMOS: patrones en su orden, CIF falsos, exclusiones y normalización.
+-- Un nombre de ficticia nuevo se añade allí y aquí, en el mismo commit.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION compras.fn_normalizar_nombre(p_texto TEXT)
+RETURNS TEXT
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT btrim(regexp_replace(translate(upper(COALESCE(p_texto, '')), 'ÁÉÍÓÚÜÑ', 'AEIOUUN'), '[^A-Z0-9]+', ' ', 'g'));
+$$;
+
+-- La familia ficticia de una oferta, o NULL si la oferta es REAL. El orden de
+-- las ramas es el del dominio: CIF real → real; nombre excluido → real;
+-- primera familia que case; si ninguna y el CIF es falso, la de su CIF.
+CREATE OR REPLACE FUNCTION compras.fn_familia_ficticia(p_cif TEXT, p_nombre TEXT)
+RETURNS TEXT
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE
+        WHEN x.c <> '' AND x.c NOT IN ('A99999999', 'A00000000') THEN NULL
+        WHEN strpos(x.n, 'PLANIFICACION DE ESPACIOS') > 0 THEN NULL
+        WHEN x.n ~ '(^| )OBJE' THEN 'OBJETIVO'
+        WHEN x.n ~ 'OFICINA TE' THEN 'OFICINA_TECNICA'
+        WHEN x.n ~ 'CUATRIM' THEN 'CUATRIMESTRAL'
+        WHEN x.n ~ 'FASE ?0( |$)|PLANIFICACION 0$' THEN 'FASE_0'
+        WHEN x.n ~ '(^| )ABC( |$)' THEN 'ABC'
+        WHEN x.n ~ 'PLANIF' THEN 'PLANIFICACION'
+        WHEN x.c = 'A99999999' THEN 'OBJETIVO'
+        WHEN x.c = 'A00000000' THEN 'OFICINA_TECNICA'
+    END
+    FROM (
+        SELECT upper(btrim(COALESCE(p_cif, ''))) AS c,
+               compras.fn_normalizar_nombre(p_nombre) AS n
+    ) x;
+$$;

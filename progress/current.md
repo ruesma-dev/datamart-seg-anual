@@ -10,6 +10,91 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-04 · F-038 · `in_progress` · Fase 1 IMPLEMENTADA (review 1: solo papeleo, atendido); Fase 2 con spec cerrada (D4 decidida), sin implementar · el comparativo de ofertas
+
+**FASE 1 DESPLEGADA por el líder el 2026-10-05, por orden del humano** (tras la
+nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen
+`r20261005-0907` y job comprobado; `build-compras` a mano SUCCESS (265,8 s, sub-paso
+`comparativos` 29,3 s / 20.380 filas); `apply-grants` SUCCESS; `publicar-diccionario`
+**v42** (194 objetos, 1.492 columnas); MCP reiniciado (`--0000014`);
+`check-diccionario` OK (v42). **T23** (MCP, solo lectura): 20.380 comparativos,
+18.633 con contrato, ahorro 72.731.298 EUR en 6.905, 52 atípicos, 32.898 ofertas
+ficticias de 71.306: todo dentro de la previsión. Falta T24 (las cuatro preguntas
+al MCP, el humano). La Fase 2 sigue en la rama.
+
+### Implementer · Fase 1 (T1-T10), 2026-10-04
+
+Informe: `progress/impl_F-038.md`. T1-T10 hechas con un commit cada una (T9 en
+dos). `bash harness/init.sh`: ENTORNO LISTO (6614 passed; cobertura 32/32
+líneas cambiadas). Mutación: 13/14 muertos y el superviviente cazado con test
+nuevo; SQL manual 24/24. Pendiente: REVIEW. Fase 2 (T11-T19, T25) FUERA. Decisiones y
+desviaciones (justificadas en el informe, §2):
+- `aprobado_por` lleva la MISMA condición que `fecha_aprobacion` (circuito
+  cerrado): R23 solo condiciona la fecha, pero publicar como «aprobó» a quien
+  firmó el último paso de un rechazado es una cifra plausible y falsa.
+- Tests de otras features tocados por necesidad: `test_f073_pipeline.py` y
+  `test_f080_pipeline.py` (lista completa de ficheros de `build_compras`),
+  `test_f006_reglas.py` (P1-P22; P5 respondible: 18/2/2) y la enmienda del
+  recuento de objetos (194) en `specs/F-006-mcp-azure/design_detalle.md`.
+- Patrón FASE_0 afinado a `FASE ?0( |$)|PLANIFICACION 0$` («FASE 05» no es fase 0).
+
+**Diccionario del árbol tras F-038 Fase 1 (version 42): 194 objetos, 1492
+columnas, 88 de consumo** (dos tablas y dos funciones nuevas en `compras`).
+
+**MANUAL del humano, EN ORDEN, tras el APROBADO del reviewer** (nadie más los ejecuta):
+1. **T20** · merge a `main`; imagen desde `main`:
+   `powershell -NoProfile -File infra/70_build_image.ps1`, luego
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm` y
+   `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`
+   → debe salir el tag nuevo.
+2. **T21** · dejar correr la nocturna (00:00 UTC; publica la v42 del diccionario
+   ella sola). `python main.py status` → `run-all` SUCCESS;
+   `python main.py timings --last 1` → `build_compras` como mucho ~1 min más
+   que la noche anterior. Si falla en el sub-paso `comparativos` con
+   «F-038 R21», un comparativo tiene dos contratos: parar y avisar.
+3. **T22** · (solo lectura) `python main.py check-declarados`,
+   `python main.py check-unicidad`, `python main.py check-relaciones` y
+   `python main.py check-diccionario` → los cuatro con código 0.
+4. **T23** · (solo lectura) `SELECT count(*), count(contrato_id), sum(ahorro_concurso), count(ahorro_concurso), count(*) FILTER (WHERE adjudicado_atipico) FROM compras.comparativos;`
+   → ≈ recuento de `raw.com` (20.378), ≈ 18.600, ≈ 72,7 M€, ≈ 6.900, ≈ 52; y
+   `SELECT familia_ficticia, count(*) FROM compras.comparativo_ofertas GROUP BY 1;`
+   → ≈ 32.900 ficticias (no NULL). Resultado aquí; una desviación > 5 % se para y se avisa.
+5. **T24** · reiniciar el MCP y preguntarle, sin explicarle nada: comparativos
+   por actividad; ahorro del concurso; quién aprobó el comparativo X y cuándo;
+   ¿acabó en contrato el comparativo X? → las cuatro usan `compras.comparativos`
+   y citan la frescura de `build_compras`.
+
+### Spec (spec-author)
+
+> **Aprobado por el humano el 2026-10-04**: D1 (dos fases), D3 (firmas por
+> escalón aquí, Fase 2) y la Fase 1 tal cual. **D2 corregida por el humano**: la
+> base del objetivo es el descompuesto de la primera ABC o, si no hay, el de
+> Estudios. Remedido: esa regla reproduce el objetivo en el **22,6 %** de las
+> líneas (cualquier versión del descompuesto, 73,0 %; la 0696 de la captura sí
+> casa con la ABC v3). **D4 DECIDIDA por el humano el 2026-10-04**: la ABC si casa; si no, una
+> versión ANTERIOR que case (la más reciente); nunca posterior; en obras sin ABC,
+> solo Estudios; si no casa, «no casa» (24.263 de 83.329 líneas casan). Negocio
+> puede ampliarla. La Fase 2 espera a que el humano la abra. Detalle:
+> `progress/spec_F-038.md` §3 y §7.
+
+Spec-author: `specs/F-038-comparativos/` (requirements 149/150, design 249/250,
+25 tareas) y mediciones nuevas en `progress/spec_F-038.md`. Rama
+`feature/F-038-comparativos` desde `main`. Solo lecturas (Sigrid por
+`sigrid-api`; Postgres de Azure, tamaños y una consulta cronometrada). Estado de
+la feature sin tocar (`pending`); acceptance **3 y 4 ajustados** porque la
+medición los contradice (ver abajo).
+
+**Lo que cambia la medición** (detalle y cifras en `progress/spec_F-038.md` §1-§3):
+- El «no cuadran» de las cuatro magnitudes era sobre todo el **IVA** (`dco.totdoc`
+  lleva IVA; se publica `dco.totbas`). Sin IVA, la ganadora cuadra con sus líneas
+  en el 99,6 % y con el adjudicado en el 89,8 %.
+- El adjudicado no tiene dos atípicos sino **52 que suman 602,5 M€ de 1.246,2**.
+- El ahorro del concurso con solo ofertas reales: **6.904 comparativos, 72,7 M€**
+  (no 15.597 / 186,5: metían las ficticias y el IVA).
+- Ficticia: el CIF falso solo cubre el 30 %; criterio = CIF falso o (CIF vacío y
+  nombre de familia): 32.896 ofertas, el 45 % del ofertado.
+
+**Decisiones** (primera ronda, ya contestadas arriba): D1, D2 y D3. Sigue abierta D4.
 
 
 ## 2026-10-03 · F-113 · CERRADA (`done`, APROBADO en pasada 2) · la categoría CD/CI/CP por el capítulo · SIN DESPLEGAR: quedan T9-T12 del humano
@@ -23,8 +108,17 @@
 > comprobado a las 22:36 UTC con `az containerapp job show` -> `r20261004-0031`.
 > **Diccionario y MCP NO se tocaron a mano**: la nocturna publica el diccionario al
 > final de `run-all` con el de su imagen, así que la del 04-10 (00:00 UTC) aplica
-> F-113 y publica la v41 ella sola. Queda: T10 comprobar la nocturna, reiniciar el
-> MCP (T11) y T12.
+> F-113 y publica la v41 ella sola.
+>
+> **T10-T12 HECHAS por el líder el 2026-10-04 ~17:50 UTC.** Nocturna del 04-10:
+> `build_mart` y `build_cierre` SUCCESS, `publicar_diccionario` **v41** (06:22 UTC)
+> y `apply_grants` SUCCESS. MCP reiniciado (`ca-mcp-bbdd-dev--0000014`).
+> `check-diccionario` desde `main` (worktree desechable): 190/190 y lo publicado
+> es lo del árbol (v41, hash 2a41e083e421). T12 (solo lectura): global CD 287.734 /
+> CI 64.307 / CP 8.421 / OTRO 34.745 = la previsión EXACTA; 0 partidas de
+> `AVDA_FRANCIA`/`P1414_*` en CI; 0 partidas de raíces `PD`/`MP`/`LEV`/`GG`/`MC`/
+> posventa fuera de OTRO; 0462 Venta Real en CI 25.002; 229 INDIRECTOS 2011 8.121.
+> **F-113 cerrada del todo.**
 
 Spec aprobada por el humano el 2026-10-03 (D1 = A, D2 = ligero: T13-T15 fuera).
 Alcance del implementer: T1-T8; T9-T12 son MANUAL del humano. Tarea en curso:

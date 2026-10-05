@@ -60,6 +60,8 @@ FICHEROS_COMPRAS = [
     "05_vencimientos.sql",
     "06_pago_factura.sql",
     "07_texto.sql",
+    # F-038: el comparativo de ofertas, al final.
+    "08_comparativos.sql",
 ]
 
 

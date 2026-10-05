@@ -438,7 +438,11 @@ ESTADOS_BATERIA = ("respondible", "parcial", "bloqueada")
 
 #: El recuento honesto de `requirements.md` §9: de 18 preguntas, 13 se
 #: responden hoy, 3 se responden a medias y 2 no se pueden responder.
-PARCIALES = {"P3", "P5", "P14"}
+#:
+#: F-038 (2026-10-04): P5 pasa a respondible —el comparativo ya existe como
+#: objeto— y entran P19-P22, las cuatro del acceptance 13 de F-038. Quedan 18
+#: respondibles, 2 parciales y 2 bloqueadas de 22.
+PARCIALES = {"P3", "P14"}
 BLOQUEADAS = {"P4", "P17"}
 
 
@@ -449,7 +453,7 @@ def _bateria():
 def test_f006_r39_bateria_estan_las_dieciocho_preguntas() -> None:
     ids = [p["id"] for p in _bateria()]
 
-    assert ids == [f"P{n}" for n in range(1, 19)], ids
+    assert ids == [f"P{n}" for n in range(1, 23)], ids
 
 
 def test_f006_r39_bateria_cada_pregunta_dice_que_seria_correcto() -> None:
@@ -470,7 +474,7 @@ def test_f006_r41_bateria_el_recuento_honesto_es_trece_tres_y_dos() -> None:
 
     assert por_estado["parcial"] == PARCIALES
     assert por_estado["bloqueada"] == BLOQUEADAS
-    assert len(por_estado["respondible"]) == 13
+    assert len(por_estado["respondible"]) == 18
 
 
 def test_f006_r41_bateria_lo_no_respondible_dice_que_feature_lo_desbloquea() -> None:

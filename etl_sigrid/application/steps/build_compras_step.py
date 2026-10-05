@@ -11,8 +11,10 @@ Encadena los archivos SQL en orden:
     05_vencimientos.sql- efectos de pago de la factura (F-080)
     06_pago_factura.sql- forma de pago de la factura y control contra contrato
     07_texto.sql       - el memo de la pestaña «Texto», íntegro y partido
+    08_comparativos.sql- el comparativo de ofertas y sus ofertas (F-038)
 
-Solo lee de `raw.*`. No necesita `stg` ni `mart`.
+Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
+`build_maestros`, que corre antes en `run-all`). No necesita `stg` ni `mart`.
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). `build-compras` ejecutaba
 su SQL **en línea dentro del comando**, sin step, y por eso **no dejaba fila en
@@ -45,7 +47,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los ocho ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los nueve ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` a propósito: es DATO, no lógica. Así se puede leer sin
 #: entrar en el bucle y —lo que lo motivó— se puede sustituir en un test para
@@ -103,6 +105,18 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="07_texto.sql",
         target_schema="compras",
         target_table="documento_comentarios",
+    ),
+    # F-038: `compras.comparativo_ofertas` y `compras.comparativos`. Va al
+    # final porque lee `compras.contrato_lineas` (01) y las funciones de
+    # `00_setup.sql`. Cuenta `comparativos`, la del grano (una fila por
+    # comparativo de `raw.com`): las ofertas no existen sin comparativo. Si la
+    # guarda R21 salta (un comparativo con dos contratos), el paso falla con
+    # el nombre de este sub-paso y el mensaje de la guarda.
+    _SubStep(
+        name="comparativos",
+        sql_file="08_comparativos.sql",
+        target_schema="compras",
+        target_table="comparativos",
     ),
 )
 

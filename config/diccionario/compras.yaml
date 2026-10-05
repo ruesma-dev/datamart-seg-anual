@@ -278,10 +278,15 @@ objetos:
         nulo_significa: El contrato no llevaba CIF informado.
       comparativo_id:
         significado: >-
-          Comparativo de ofertas del que salio el contrato. Solo queda el
-          identificador: el comparativo NO esta modelado en el datamart, aunque
-          sus tablas de origen si estan ingeridas. Es F-038.
-        nulo_significa: El contrato no viene de un comparativo.
+          Comparativo de ofertas que figura en la CABECERA del contrato
+          (`ctr.comide`). **NO sirve para «¿acabo en contrato el comparativo
+          X?»**: solo cubre el 56 % de los comparativos con contrato, y una
+          columna por contrato no puede guardar los varios comparativos de los
+          que sale un contrato (3.960). Para esa pregunta esta
+          `compras.comparativos.contrato_id`, que lee las lineas del
+          comparativo (`comlin.ctride`, 18.633 comparativos). Se deja como esta
+          porque es lo que dice el contrato (F-038).
+        nulo_significa: La cabecera del contrato no nombra ningun comparativo.
         agregacion: no_sumable
       estado_id:
         significado: >-
@@ -335,6 +340,12 @@ objetos:
         cardinalidad: "N:1"
         porque: >-
           Para el nombre y el cliente de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
+      - de: comparativo_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el comparativo que nombra la cabecera del contrato. Para ir del
+          comparativo al contrato, al reves, usa `compras.comparativos.contrato_id`.
     ejemplos_preguntas:
       - Que contratos tiene abiertos la obra X y con quien
       - Con que proveedores tiene contrato la obra X
@@ -461,7 +472,9 @@ objetos:
         nulo_significa: La entrega no se vincula a un contrato desde la cabecera.
         agregacion: no_sumable
       comparativo_id:
-        significado: Comparativo de ofertas de origen. No esta modelado (F-038).
+        significado: >-
+          Comparativo de ofertas de origen que figura en la cabecera del
+          documento. El comparativo esta en `compras.comparativos` (F-038).
         nulo_significa: El documento no viene de un comparativo.
         agregacion: no_sumable
       proveedor_id:
@@ -484,6 +497,10 @@ objetos:
         a: compras.contratos.contrato_id
         cardinalidad: "N:1"
         porque: Para saber contra que compromiso se esta entregando.
+      - de: comparativo_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: Para el comparativo de ofertas del que viene la entrega.
     ejemplos_preguntas:
       - Que albaranes ha traido el proveedor P este mes
 
@@ -2260,3 +2277,456 @@ objetos:
       - Que fue lo ultimo que se dijo de la factura X
       - Quien escribio el ultimo comentario del contrato C
       - Que comentarios escribio el usuario U este mes
+
+  comparativos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El COMPARATIVO DE OFERTAS de Sigrid (F-038): el documento en el que se
+      invita a varios proveedores, se comparan sus ofertas y se adjudica. Una
+      fila por comparativo, con su obra, su ACTIVIDAD (`com.natide`), su
+      estado, su contrato, cuantas ofertas tuvo, el ahorro del concurso y
+      quien lo aprobo y cuando. El detalle oferta a oferta esta en
+      `compras.comparativo_ofertas`.
+
+      **CUATRO IMPORTES, Y NINGUNO ES «EL» IMPORTE DEL COMPARATIVO** (decision
+      del humano el 2026-09-18: «quiero todos, no uno»). Todos SIN IVA. Si la
+      pregunta no precisa, se dan los cuatro con su nombre:
+      (A) `importe_ofertado_documento_ganadora`, el documento de la oferta
+      ganadora (`dco.totbas`); (B) `importe_ofertado_lineas_ganadora`, la suma
+      de sus lineas; (C) `importe_adjudicado_lineas`, las lineas del concurso
+      (`comlin.can x pre`); (D) `importe_contratado`, las lineas del contrato.
+      Cuadre medido el 2026-10-04 sobre los 17.876 comparativos con una sola
+      ganadora: A=B al euro en el **99,6 %**, A=C en el **89,8 %** y A=D en el
+      **41 %**. D no cuadra por grano: un contrato sale de varios comparativos
+      y evoluciona despues. El «no cuadran» de la medicion de septiembre era,
+      sobre todo, el IVA: medido sobre el total del documento, que lo lleva.
+
+      **EL ADJUDICADO TIENE 52 ATIPICOS QUE SON LA MITAD DEL TOTAL.** Medido el
+      2026-10-04: 52 comparativos cuyo adjudicado supera 10 veces su mayor
+      oferta y 100.000 EUR suman **602,5 M€ de 1.246,2 M€** (el 1610000 solo,
+      363,2 M€ contra una oferta maxima de 2.200 EUR). No se borran: se marcan
+      en `adjudicado_atipico`. «El adjudicado total» se da SIEMPRE con y sin
+      ellos: sin ellos son **641,0 M€**. Y siguen dentro, sin sanear, **14.585**
+      lineas con precio 0 y **4.206** lineas negativas (-22,2 M€).
+
+      **EL AHORRO DEL CONCURSO SOLO CUENTA OFERTAS REALES**: los
+      **6.904** comparativos con dos o mas ofertas reales con importe ahorran
+      **72,7 M€** (sin IVA). Las cifras anteriores (15.597 comparativos, 186,5
+      M€) metian las ofertas ficticias y el IVA.
+
+      **LO QUE `com` NO TRAE, para que nadie lo busque**: las siete fechas
+      (`fecent`, `feclim`, `fecsum`, `feccon`, `fecinirec`, `fecfinrec`,
+      `fecdiv`) estan vacias en origen --entre las cuatro que tienen algo, 136
+      valores en 20.261 documentos-- y `ppoide`, `prmide`, `pexide`, `tipsub` y
+      `horlim` estan a 0 en todos. La fecha de alta es `con.fec` (100 %).
+
+      **DOS TRAMPAS DE `dbo.log`, la otra fuente de firmas de Sigrid** (no
+      ingerida; este objeto usa `confir`): `log.ide` NO es el documento, es la
+      clave del propio log --el enlace es `(cod, emp, tip)` y unir por `ide` da
+      118 coincidencias que parecen un join--; y `log.res` NO es la actividad,
+      es el NOMBRE del comparativo. La actividad es `actividad`, de
+      `com.natide`.
+    grano: >-
+      Una fila por comparativo de `raw.com` (20.378 el 2026-10-04), incluidos
+      los que no tienen ofertas (319), lineas (264) o firmas.
+      `comparativo_id` es clave primaria declarada.
+    clave_negocio: [comparativo_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      comparativo_id:
+        significado: Identificador del comparativo en Sigrid (`com.ide` = `con.ide`).
+        agregacion: no_sumable
+      codigo_comparativo: Codigo del comparativo tal y como se ve en Sigrid.
+      nombre_comparativo: >-
+        Titulo del comparativo (`con.res`), escrito a mano: suele nombrar el
+        oficio («MOVIMIENTO DE TIERRAS», «PINTURA»), pero es texto libre. Para
+        agrupar por oficio esta `actividad`.
+      fecha_alta:
+        significado: >-
+          Fecha de alta del comparativo en Sigrid (`con.fec`), informada al 100
+          %. Es la fecha de CREACION del documento; no es la del cambio de
+          estado (eso no se guarda) ni la de aprobacion (`fecha_aprobacion`).
+        agregacion: no_sumable
+      obra_id:
+        significado: >-
+          Obra del comparativo (`com.obride`), la ficha de la empresa del
+          documento, como en el resto de `compras` (F-102).
+        nulo_significa: El comparativo no se imputa a ninguna obra.
+        agregacion: no_sumable
+      codigo_obra: Codigo de obra tal y como se teclea en Sigrid.
+      nombre_obra: Nombre legible de la obra, de `con.res`.
+      empresa_id:
+        significado: Empresa de la ficha de obra, de `maestro.v_obra_fichas`.
+        nulo_significa: El comparativo no tiene obra.
+        agregacion: no_sumable
+      clave_obra:
+        significado: Clave legible y unica de la obra, `empresa-codigo` ('1-0581').
+        nulo_significa: El comparativo no tiene obra.
+      actividad_id:
+        significado: >-
+          La ACTIVIDAD del comparativo (`com.natide` -> `auxpronat`): que se
+          compra (DRENAJE Y URBANIZACION, SUMINISTRO DE MATERIALES,
+          SUBCONTRATA...). Informada en el 99,25 % y casa al 100 %.
+        nulo_significa: El comparativo no tiene actividad informada.
+        agregacion: no_sumable
+      actividad:
+        significado: >-
+          Nombre de la actividad. Es el eje para «cuantos comparativos por
+          actividad»; NO lo es `nombre_comparativo`, que es texto libre.
+        nulo_significa: El comparativo no tiene actividad informada.
+      estado_id:
+        significado: >-
+          Codigo interno del estado del DOCUMENTO (`con.est`), que solo
+          significa algo dentro del tipo 46 (comparativo). Para filtrar, usa
+          `estado` o `estado_codigo`.
+        agregacion: no_sumable
+      estado_codigo:
+        significado: >-
+          Mnemonico del estado del comparativo en el catalogo del tipo 46.
+          Filtra por aqui y no por el literal.
+        nulo_significa: El estado no figura en el catalogo del tipo 46.
+      estado:
+        significado: >-
+          Estado del comparativo traducido por la PAREJA (46, estado). Medido
+          el 2026-10-04: APROBADO 18.801 de 20.378; el resto se reparte entre
+          EN ELABORACION, APROBADO UTE, Aprobado Dir. Compras, los rechazos y
+          los propuestos.
+        nulo_significa: El estado no figura en el catalogo del tipo 46.
+      contrato_id:
+        significado: >-
+          El contrato en el que acabo el comparativo, leido de las LINEAS del
+          comparativo (`comlin.ctride`): 18.633 comparativos. Es la columna
+          para «¿acabo en contrato?». NO uses `compras.contratos.comparativo_id`
+          para eso: es la cabecera del contrato (`ctr.comide`) y solo cubre el
+          56 %. Un comparativo tiene como mucho un contrato (el build falla si
+          no); un contrato puede venir de varios comparativos (3.960).
+        nulo_significa: >-
+          El comparativo no tiene ninguna linea adjudicada a contrato: no acabo
+          (todavia) en contrato.
+        agregacion: no_sumable
+      codigo_contrato:
+        significado: Codigo del contrato, de `con.cod`.
+        nulo_significa: El comparativo no acabo en contrato.
+      fecha_contrato:
+        significado: Fecha de alta del contrato, de `con.fec`.
+        nulo_significa: El comparativo no acabo en contrato.
+        agregacion: no_sumable
+      n_ofertas:
+        significado: >-
+          Ofertas del comparativo, INCLUIDAS las ficticias de planificacion.
+          Para «cuantos proveedores ofertaron» usa `n_ofertas_reales`.
+        agregacion: suma
+      n_ofertas_reales:
+        significado: Ofertas de proveedores reales (no ficticias).
+        agregacion: suma
+      n_ofertas_reales_con_importe:
+        significado: >-
+          Ofertas reales con importe de documento mayor que 0. Son las que
+          entran en `oferta_real_minima`, `oferta_real_maxima` y
+          `ahorro_concurso`.
+        agregacion: suma
+      n_ofertas_ganadoras:
+        significado: >-
+          Ofertas en estado «Aceptada definitivamente» (`con.est = 6`, tipo
+          12). Lo normal es 1; con 0 no hay ganadora, y con mas de una NO se
+          elige: la ganadora y sus importes quedan a NULL.
+        agregacion: suma
+      oferta_ganadora_id:
+        significado: La oferta ganadora, si es unica (`compras.comparativo_ofertas.oferta_id`).
+        nulo_significa: Ninguna ganadora, o mas de una (`n_ofertas_ganadoras`).
+        agregacion: no_sumable
+      proveedor_ganador_id:
+        significado: Proveedor de la oferta ganadora (`dco.entide`).
+        nulo_significa: Ninguna ganadora, o mas de una, o la ganadora sin proveedor.
+        agregacion: no_sumable
+      proveedor_ganador_nombre:
+        significado: Nombre del proveedor en la oferta ganadora (`dco.entres`).
+        nulo_significa: Ninguna ganadora, o mas de una.
+      importe_ofertado_documento_ganadora:
+        significado: >-
+          (A) El documento de la oferta ganadora, SIN IVA (`dco.totbas`).
+          Ganadoras medidas el 2026-10-04: 17.878, 589,1 M€.
+        nulo_significa: Ninguna ganadora, o mas de una.
+        unidad: EUR
+        agregacion: suma
+      importe_ofertado_lineas_ganadora:
+        significado: >-
+          (B) La suma de las lineas de la oferta ganadora que responden a una
+          linea del comparativo, SIN IVA. Cuadra con (A) en el 99,6 %.
+        nulo_significa: Ninguna ganadora, mas de una, o la ganadora sin lineas.
+        unidad: EUR
+        agregacion: suma
+      importe_adjudicado_lineas:
+        significado: >-
+          (C) Lo ADJUDICADO en las lineas del concurso, `SUM(comlin.can x
+          comlin.pre)`, SIN IVA: 1.246,2 M€ en total, de los que 602,5 M€ son
+          de los 52 atipicos. Sumalo SIEMPRE con y sin `adjudicado_atipico`.
+          Lleva sin sanear 14.585 lineas con precio 0 y 4.206 negativas.
+        nulo_significa: El comparativo no tiene lineas.
+        unidad: EUR
+        agregacion: suma
+      adjudicado_atipico:
+        significado: >-
+          Cierto si el adjudicado supera 10 veces la MAYOR oferta del
+          comparativo (de todas, tambien las ficticias) y 100.000 EUR. Un corte
+          y no una lista: con 3 veces en vez de 10 salen 65 en vez de 52. El
+          importe se publica igual; esta marca sirve para quitarlo de las
+          sumas.
+        nulo_significa: >-
+          No se puede juzgar: el comparativo no tiene ninguna oferta con
+          importe mayor que 0, o no tiene lineas. Medido: 11 comparativos de
+          mas de 100.000 EUR sin oferta con importe (3,0 M€).
+      importe_contratado:
+        significado: >-
+          (D) Lo CONTRATADO: suma de las lineas del contrato del comparativo
+          (`compras.contrato_lineas`), SIN IVA. **ES DEL CONTRATO, NO DEL
+          COMPARATIVO**: se repite en todos los comparativos que comparten
+          contrato (3.960 contratos vienen de varios). Sumarlo entre
+          comparativos lo cuenta varias veces; para un total, suma por
+          `contrato_id` DISTINTO.
+        nulo_significa: El comparativo no acabo en contrato, o el contrato no tiene lineas.
+        unidad: EUR
+        agregacion: no_sumable
+      oferta_real_minima:
+        significado: La oferta REAL mas barata (documento, SIN IVA), sin ficticias.
+        nulo_significa: Menos de dos ofertas reales con importe.
+        unidad: EUR
+        agregacion: suma
+      oferta_real_maxima:
+        significado: La oferta REAL mas cara (documento, SIN IVA), sin ficticias.
+        nulo_significa: Menos de dos ofertas reales con importe.
+        unidad: EUR
+        agregacion: suma
+      ahorro_concurso:
+        significado: >-
+          El ahorro del concurso: oferta real mas cara menos la mas barata, SIN
+          IVA, solo cuando hay dos o mas ofertas reales con importe. Las
+          ofertas ficticias NUNCA entran (entre ellas darian otros 63,5 M€ que
+          no son ahorro de nada). No es el ahorro sobre el objetivo.
+        nulo_significa: >-
+          Menos de dos ofertas reales con importe: no hubo concurso que medir.
+        unidad: EUR
+        agregacion: suma
+      n_firmas:
+        significado: Firmas del circuito de aprobacion (`confir`) del comparativo.
+        agregacion: suma
+      n_firmas_pendientes:
+        significado: >-
+          Firmas PENDIENTES (`confir.fir = 0`, que ademas no tienen fecha).
+          Medido: 6.498 firmas pendientes.
+        agregacion: suma
+      fecha_aprobacion:
+        significado: >-
+          La fecha de la ULTIMA firma del circuito, solo cuando el estado
+          actual del comparativo es el estado final (`estfin`) de sus firmas,
+          o sea, cuando el circuito se cerro (APROBADO, APROBADO UTE, Aprobado
+          Dir. Compras). Desde el alta tarda de media 19,8 dias.
+        nulo_significa: >-
+          El comparativo no esta en un estado final de firma (EN ELABORACION,
+          PROPUESTO, RECHAZADO...): para esos estados la fecha de aprobacion NO
+          EXISTE, y Sigrid no guarda cuando cambio el estado. No es un dato
+          que falte, es un dato que no hay.
+        agregacion: no_sumable
+      aprobado_por:
+        significado: >-
+          Login de quien firmo el ultimo paso del circuito (`confir.usu`), con
+          la misma condicion que `fecha_aprobacion`. Es el usuario de Sigrid,
+          no el nombre de la persona. Quien firmo cada escalon (JEFO, JG, DCOM)
+          es de la Fase 2 de F-038.
+        nulo_significa: >-
+          El comparativo no esta en un estado final de firma: quien firmo el
+          ultimo paso de un comparativo rechazado no lo «aprobo».
+    relaciones:
+      - de: comparativo_id
+        a: compras.comparativo_ofertas.comparativo_id
+        cardinalidad: "1:N"
+        porque: Para las ofertas una a una, con su proveedor, su importe y si es ficticia.
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el contrato en que acabo el comparativo. Varios comparativos
+          pueden acabar en el mismo contrato.
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: Para el nombre, la empresa y el cliente de la obra.
+    ejemplos_preguntas:
+      - Cuantos comparativos hay por actividad
+      - Cuanto se ahorro en los concursos de la obra X
+      - Quien aprobo el comparativo X y cuando
+      - Acabo en contrato el comparativo X
+      - Cuanto se adjudico en comparativos este ano, con y sin atipicos
+      - Que comparativos estan pendientes de firma
+
+  comparativo_ofertas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      TODAS las ofertas de cada comparativo, una fila por oferta, con su
+      proveedor, su importe SIN IVA, su estado (rechazada, aceptada,
+      pendiente...) y si es FICTICIA.
+
+      **LAS OFERTAS FICTICIAS.** Dentro de un comparativo hay ofertas de
+      proveedores INVENTADOS por la propia Ruesma --el OBJETIVO, la OFICINA
+      TECNICA, la PLANIFICACION (cuatrimestral, fase 0, ABC)--, que sirven de
+      referencia. Contarlas como reales estropea el numero de ofertantes, la
+      oferta mas barata y el ahorro. Medido el 2026-10-04: **32.896 ficticias
+      de 71.302 ofertas, 1.298,8 M€ sin IVA, el 45 % del ofertado**. Para
+      cualquier pregunta de mercado, filtra `NOT es_ficticia`.
+
+      **EL CRITERIO**: ficticia = CIF falso (`A99999999` u `A00000000`), o CIF
+      vacio Y nombre de familia; con CIF real, nunca. El CIF falso SOLO cubre
+      el **30 %**: **172** entidades ficticias tienen el CIF vacio, y la misma
+      entidad firma como OBJETIVO, OFICINA TECNICA o PLANIFICADO. La familia la
+      dice el NOMBRE de la oferta, normalizado (sin tildes ni signos), y la
+      regla vive escrita una sola vez en `etl_sigrid/domain/comparativos.py`.
+      Una ficticia con un nombre NUEVO y CIF vacio entraria como real: la
+      consulta de control es mirar las ofertas con `proveedor_cif` nulo y
+      `NOT es_ficticia` agrupadas por `proveedor_nombre`.
+
+      **EL IMPORTE ES `dco.totbas`, la base SIN IVA**; `dco.totdoc` lleva IVA
+      y no se publica. **EL PROVEEDOR ES `dco.entide`** (99,86 %); el del
+      invitado (`comprv.prvide`) solo esta al 18 % y unir por el pierde el 82
+      % de las ofertas.
+    grano: >-
+      Una fila por oferta invitada (`raw.comprv`, cuyo documento de oferta es
+      unico), incluidas las ficticias. `oferta_id` es clave primaria declarada.
+    clave_negocio: [oferta_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      oferta_id:
+        significado: Identificador del documento de oferta en Sigrid (`dco.ide` = `con.ide`).
+        agregacion: no_sumable
+      invitacion_id:
+        significado: Identificador de la invitacion al proveedor (`comprv.ide`).
+        agregacion: no_sumable
+      comparativo_id:
+        significado: Comparativo al que pertenece la oferta.
+        agregacion: no_sumable
+      posicion:
+        significado: Posicion de la oferta dentro del comparativo (`comprv.pos`).
+        agregacion: no_sumable
+      codigo_oferta: Codigo del documento de oferta en Sigrid.
+      fecha_oferta:
+        significado: Fecha de alta de la oferta en Sigrid (`con.fec`).
+        agregacion: no_sumable
+      proveedor_id:
+        significado: >-
+          Proveedor de la oferta, de `dco.entide` y NUNCA de `comprv.prvide`
+          (18 %). En las ficticias es la entidad inventada.
+        nulo_significa: La oferta no tiene proveedor informado.
+        agregacion: no_sumable
+      proveedor_codigo:
+        significado: Codigo de la entidad en la oferta (`dco.entcod`).
+        nulo_significa: La oferta no trae codigo de entidad.
+      proveedor_nombre:
+        significado: >-
+          Nombre del proveedor TAL Y COMO VA EN LA OFERTA (`dco.entres`). Es
+          el que decide la familia ficticia, no el maestro de proveedores.
+        nulo_significa: La oferta no trae nombre.
+      proveedor_cif:
+        significado: CIF del proveedor en la oferta (`dco.entcif`).
+        nulo_significa: >-
+          La oferta no trae CIF: es un proveedor real sin CIF (13.998 ofertas)
+          o una ficticia sin CIF falso (23.078); `es_ficticia` los separa.
+      es_ficticia:
+        significado: >-
+          Cierto si la oferta es de un proveedor inventado (OBJETIVO, OFICINA
+          TECNICA, PLANIFICACION...). Ver el criterio en la descripcion.
+      familia_ficticia:
+        significado: >-
+          Que referencia es la oferta ficticia, decidida por el nombre en este
+          orden: OBJETIVO, OFICINA_TECNICA, CUATRIMESTRAL, FASE_0, ABC,
+          PLANIFICACION. Con CIF falso y un nombre que no dice nada,
+          `A99999999` es OBJETIVO y `A00000000` OFICINA_TECNICA.
+        nulo_significa: La oferta es REAL.
+        valores: [OBJETIVO, OFICINA_TECNICA, CUATRIMESTRAL, FASE_0, ABC, PLANIFICACION]
+      estado_id:
+        significado: >-
+          Codigo interno del estado de la oferta (`con.est`), que solo
+          significa algo en el tipo 12. Usa `estado` o `estado_codigo`.
+        agregacion: no_sumable
+      estado_codigo:
+        significado: Mnemonico del estado de la oferta en el catalogo del tipo 12.
+        nulo_significa: El estado no figura en el catalogo del tipo 12.
+      estado:
+        significado: >-
+          Resultado de la oferta: Rechazada, Aceptada definitivamente,
+          Pendiente, Recibida, Precios solicitados.
+        nulo_significa: El estado no figura en el catalogo del tipo 12.
+      es_ganadora:
+        significado: >-
+          Cierto si la oferta esta «Aceptada definitivamente» (`con.est = 6`,
+          tipo 12). Medido: 4 ganadoras ficticias (0,1 M€).
+      importe_ofertado_documento:
+        significado: >-
+          (A) Total del documento de oferta SIN IVA (`dco.totbas`). Sumarlo
+          sin filtrar `es_ficticia` mezcla mercado y referencias inventadas.
+        unidad: EUR
+        agregacion: suma
+      importe_ofertado_lineas:
+        significado: >-
+          (B) Suma de las lineas de la oferta que responden a una linea del
+          comparativo, SIN IVA. El precio de la linea ya es neto: su descuento
+          no se vuelve a aplicar.
+        nulo_significa: La oferta no tiene lineas de comparativo.
+        unidad: EUR
+        agregacion: suma
+      n_lineas:
+        significado: Lineas de la oferta que responden a una linea del comparativo.
+        agregacion: suma
+    relaciones:
+      - de: comparativo_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: Para la cabecera del comparativo, su obra, su actividad y su contrato.
+    ejemplos_preguntas:
+      - Que proveedores ofertaron en el comparativo X y cuanto
+      - Que ofertas son ficticias en el comparativo X
+      - A cuantos comparativos se presento el proveedor P y cuantos gano
+
+  fn_normalizar_nombre:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras: la usa `compras.fn_familia_ficticia`.
+    descripcion: >-
+      Normaliza el nombre de una oferta para reconocer la familia ficticia:
+      mayusculas, sin tildes, todo lo que no sea letra o cifra a un espacio.
+      Sus literales son los de `etl_sigrid/domain/comparativos.py` (F-038).
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_familia_ficticia:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. `compras.comparativo_ofertas` ya
+      publica su resultado en `es_ficticia` y `familia_ficticia`.
+    descripcion: >-
+      Decide si una oferta es ficticia y de que familia, por su CIF y su
+      nombre: CIF real, real; nombre excluido, real; si no, la primera familia
+      cuyo patron case con el nombre normalizado; si ninguna y el CIF es falso,
+      la de su CIF. La regla y sus literales viven escritos una sola vez en
+      `etl_sigrid/domain/comparativos.py` (F-038), y un test comprueba que el
+      SQL lleva los mismos.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []

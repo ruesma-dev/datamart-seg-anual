@@ -74,6 +74,11 @@ GRUPO_B_FUNCIONES = (
     # mismo que las otras tres: se llama desde el SQL del build, y las dos
     # tablas ya publican el estado traducido en sus columnas.
     "compras.fn_estado_documento",
+    # F-038 (2026-10-04): la regla de la oferta ficticia, con los literales del
+    # dominio. Se llaman desde `08_comparativos.sql`, y
+    # `compras.comparativo_ofertas` ya publica su resultado en columnas.
+    "compras.fn_normalizar_nombre",
+    "compras.fn_familia_ficticia",
     # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
     # `contabilidad`, por lo mismo que la de `personal`.
     "contabilidad.fn_fecha",

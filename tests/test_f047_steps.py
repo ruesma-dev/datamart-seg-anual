@@ -45,6 +45,8 @@ STEPS = {
             "05_vencimientos.sql",
             "06_pago_factura.sql",
             "07_texto.sql",
+            # F-038: el comparativo de ofertas y sus ofertas, al final.
+            "08_comparativos.sql",
         ],
     ),
     "build_retenciones": (
@@ -128,6 +130,15 @@ def test_f047_r4_encadena_sus_sql_en_orden(nombre: str, pg) -> None:
 
     assert resultado.status == StepStatus.SUCCESS
     assert doble.ejecutados == STEPS[nombre][2]
+
+
+def test_f038_r1_build_compras_cuenta_los_comparativos(pg) -> None:
+    """El sub-paso `08` cuenta `compras.comparativos`, la tabla del grano R1."""
+    doble = pg("build_compras", _PgFalso())
+
+    _step("build_compras").run()
+
+    assert doble.contados[-1] == ("compras", "comparativos")
 
 
 @pytest.mark.parametrize("nombre", list(STEPS))

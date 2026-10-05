@@ -264,6 +264,31 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   cuenta; `CIERRE` y `APERTURA` no se suman nunca (`R-SALDO-CONTABLE`). La
   fecha del mayor es `apu.fec` (la del asiento difiere en 297 apuntes de 2017)
   y la obra sale solo del centro del apunte por `maestro.centros_coste`.
+- **EL COMPARATIVO TRAE OFERTAS INVENTADAS, Y SUS IMPORTES SON SIN IVA
+  (F-038).** `compras.comparativos` y `compras.comparativo_ofertas`
+  (`sql/compras/08_comparativos.sql`) leen `com`, `comprv`, `dco`, `dcopro`,
+  `comlin` y `confir`. Cuatro cosas del origen que hay que saber:
+  - **Ofertas ficticias.** Dentro de un comparativo hay ofertas de proveedores
+    inventados (OBJETIVO, OFICINA TÉCNICA, PLANIFICACIÓN cuatrimestral, fase 0
+    o ABC): 32.896 de 71.302, el 45 % del ofertado. Ficticia = CIF falso
+    (`A99999999`, `A00000000`) o CIF vacío y nombre de familia; con CIF real,
+    nunca. El CIF solo cubre el 30 %, así que la familia la da el **nombre de
+    la oferta** (`dco.entres`) normalizado. La regla vive una vez en
+    `domain/comparativos.py` y `compras.fn_familia_ficticia` lleva sus mismos
+    literales (test). Las ficticias se publican, marcadas, y no entran nunca en
+    las ofertas reales, la mínima, la máxima ni el `ahorro_concurso`.
+  - **Sin IVA: `dco.totbas`, nunca `dco.totdoc`.** El proveedor es
+    `dco.entide` (99,86 %), nunca `comprv.prvide` (18 %). `dcopro.tot = can ×
+    pre`: el precio ya es neto y `dto` no se vuelve a aplicar.
+  - **El adjudicado atípico es un corte, no una lista:** `comlin.can × pre`
+    mayor que 10 veces la mayor oferta y que 100.000 € (52 comparativos, 602,5
+    M€ de 1.246,2). Se marca (`adjudicado_atipico`) y no se borra; los
+    umbrales viven en el dominio.
+  - **El contrato sale de `comlin.ctride`** (18.633 comparativos), no de
+    `ctr.comide` (56 %): un contrato viene de varios comparativos (3.960), y un
+    comparativo con dos contratos hace fallar el build (guarda `RAISE
+    EXCEPTION`, hoy 0 casos). La fecha de aprobación es la de la última firma
+    solo cuando `con.est` es el `estfin` de su circuito.
 
 ## Acceso a datos
 
