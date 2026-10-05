@@ -146,14 +146,26 @@ def _texto(valor: object) -> str:
 # ===========================================================================
 
 
+#: Los SQL de fuera de `sql/descompuestos/` que SI leen el esquema, cada uno con
+#: la feature que lo decidio. F-038 Fase 2 (2026-10-05): la base del coste
+#: objetivo es el descompuesto de la primera ABC (D4); su design §8 lo declara
+#: como el primer lector de fuera. Lee `origen`, `fase_num`, `es_primera_abc`,
+#: `dncpro_id` y `precio` de `descompuestos.lineas`.
+LECTORES_DE_FUERA = {"09_comparativos_detalle.sql"}
+
+
 def test_f123_r1_nadie_fuera_del_esquema_lo_lee() -> None:
-    """Ningun SQL fuera de `sql/descompuestos/` nombra el esquema: `stg`, `mart`
-    y `cierre` no cambian porque no lo leen (comprobado el 2026-10-02)."""
+    """Ningun SQL fuera de `sql/descompuestos/` nombra el esquema salvo los
+    lectores DECLARADOS: `stg`, `mart` y `cierre` no cambian porque no lo leen
+    (comprobado el 2026-10-02). Un lector nuevo tiene que entrar en la lista."""
     fuera = [r for r in DIR_SQL.rglob("*.sql") if DIR_DES not in r.parents]
     assert fuera, "no encuentro los SQL de las otras capas"
+    lectores = set()
     for ruta in fuera:
         texto = _compactar(ruta.read_text(encoding="utf-8"))
-        assert not re.search(r"\bdescompuestos\.", texto), f"{ruta.name} lee descompuestos"
+        if re.search(r"\bdescompuestos\.", texto):
+            lectores.add(ruta.name)
+    assert lectores == LECTORES_DE_FUERA, f"leen descompuestos: {sorted(lectores)}"
 
 
 def test_f123_r2_el_estado_del_incremental_intacto() -> None:
