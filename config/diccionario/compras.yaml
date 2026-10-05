@@ -2535,7 +2535,7 @@ objetos:
           Login de quien firmo el ultimo paso del circuito (`confir.usu`), con
           la misma condicion que `fecha_aprobacion`. Es el usuario de Sigrid,
           no el nombre de la persona. Quien firmo cada escalon (JEFO, JG, DCOM)
-          es de la Fase 2 de F-038.
+          esta en `compras.comparativo_firmas`.
         nulo_significa: >-
           El comparativo no esta en un estado final de firma: quien firmo el
           ultimo paso de un comparativo rechazado no lo «aprobo».
@@ -2544,6 +2544,18 @@ objetos:
         a: compras.comparativo_ofertas.comparativo_id
         cardinalidad: "1:N"
         porque: Para las ofertas una a una, con su proveedor, su importe y si es ficticia.
+      - de: comparativo_id
+        a: compras.comparativo_lineas.comparativo_id
+        cardinalidad: "1:N"
+        porque: Para las lineas del concurso una a una, con su partida y lo adjudicado.
+      - de: comparativo_id
+        a: compras.comparativo_objetivo.comparativo_id
+        cardinalidad: "1:1"
+        porque: Para el coste objetivo del comparativo y si casa con su base del descompuesto.
+      - de: comparativo_id
+        a: compras.comparativo_firmas.comparativo_id
+        cardinalidad: "1:N"
+        porque: Para quien firmo cada escalon del circuito y cuando.
       - de: contrato_id
         a: compras.contratos.contrato_id
         cardinalidad: "N:1"
@@ -2686,10 +2698,424 @@ objetos:
         a: compras.comparativos.comparativo_id
         cardinalidad: "N:1"
         porque: Para la cabecera del comparativo, su obra, su actividad y su contrato.
+      - de: oferta_id
+        a: compras.comparativo_oferta_lineas.oferta_id
+        cardinalidad: "1:N"
+        porque: Para las lineas de la oferta, con su descuento y, en el OBJETIVO, su base.
     ejemplos_preguntas:
       - Que proveedores ofertaron en el comparativo X y cuanto
       - Que ofertas son ficticias en el comparativo X
       - A cuantos comparativos se presento el proveedor P y cuantos gano
+
+  comparativo_lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Las LINEAS DEL CONCURSO de cada comparativo (F-038, Fase 2): lo que se
+      pide y lo que se adjudica, una fila por linea de `comlin`, con su
+      cantidad, su precio adjudicado, el contrato en que acabo y la PARTIDA de
+      su necesidad (`dncpro.paride`), que es la llave hacia el descompuesto.
+      Todo SIN IVA. Lo que oferto cada proveedor en cada linea esta en
+      `compras.comparativo_oferta_lineas`.
+
+      Sumadas por comparativo dan
+      `compras.comparativos.importe_adjudicado_lineas` (salvo el redondeo al
+      centimo de cada linea), y llevan sus mismas trampas: 14.585 lineas con
+      precio 0, 4.206 negativas y los 52 comparativos con adjudicado atipico,
+      que son la mitad del total. «El adjudicado» se da con y sin ellos
+      (`compras.comparativos.adjudicado_atipico`).
+    grano: >-
+      Una fila por linea de comparativo de `raw.comlin` (198.626 el
+      2026-10-04). `linea_id` es clave primaria declarada.
+    clave_negocio: [linea_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      linea_id:
+        significado: Identificador de la linea del comparativo en Sigrid (`comlin.ide`).
+        agregacion: no_sumable
+      comparativo_id:
+        significado: Comparativo al que pertenece la linea (`comlin.comide`).
+        agregacion: no_sumable
+      numero_linea:
+        significado: Numero de la linea dentro del comparativo (`comlin.numlin`).
+        agregacion: no_sumable
+      posicion:
+        significado: Posicion de la linea en el comparativo (`comlin.pos`).
+        agregacion: no_sumable
+      contrato_id:
+        significado: >-
+          Contrato al que se adjudico la linea (`comlin.ctride`). Todas las
+          lineas de un comparativo van al mismo contrato: el build falla si no.
+        nulo_significa: La linea no esta adjudicada a ningun contrato.
+        agregacion: no_sumable
+      linea_necesidad_id:
+        significado: >-
+          La linea de necesidad de compra de la que sale (`comlin.dncproide` =
+          `dncpro.ide`), la planificacion de compras de la obra. Es el
+          `dncpro_id` de `descompuestos.lineas`.
+        nulo_significa: La linea no viene de una necesidad de compra.
+        agregacion: no_sumable
+      partida_id:
+        significado: >-
+          Partida de la necesidad (`dncpro.paride`): la llave hacia
+          `descompuestos.lineas` y hacia la base del coste objetivo.
+        nulo_significa: La linea no viene de una necesidad, o la necesidad no tiene partida.
+        agregacion: no_sumable
+      linea_oferta_ganadora_id:
+        significado: >-
+          La linea de oferta a la que apunta la adjudicacion (`comlin.dcoproide`),
+          en `compras.comparativo_oferta_lineas.linea_oferta_id`.
+        nulo_significa: La linea no apunta a ninguna linea de oferta.
+        agregacion: no_sumable
+      cantidad:
+        significado: Cantidad adjudicada (`comlin.can`), 0 si no viene. Mezcla unidades.
+        agregacion: no_sumable
+      precio:
+        significado: Precio unitario adjudicado (`comlin.pre`), SIN IVA, 0 si no viene.
+        unidad: EUR
+        agregacion: no_sumable
+      importe_adjudicado:
+        significado: >-
+          `cantidad x precio` de la linea, SIN IVA, redondeado al centimo.
+          Sumalo SIEMPRE con y sin los comparativos de `adjudicado_atipico`.
+        unidad: EUR
+        agregacion: suma
+    relaciones:
+      - de: comparativo_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: Para la cabecera del comparativo, su obra, su actividad y si su adjudicado es atipico.
+      - de: contrato_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "N:1"
+        porque: Para el contrato al que se adjudico la linea.
+      - de: partida_id
+        a: descompuestos.lineas.partida_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para el descompuesto de la partida. Tiene una copia por ORIGEN y por
+          version: filtra el origen y la version antes de unir, nunca sumes
+          origenes distintos.
+    ejemplos_preguntas:
+      - Que se adjudico linea a linea en el comparativo X
+      - Que lineas del comparativo X acabaron en el contrato C
+      - Cuanto se adjudico en comparativos por partida en la obra X
+
+  comparativo_oferta_lineas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Lo que OFERTO cada proveedor en cada linea del comparativo (F-038, Fase
+      2): una fila por linea de oferta que responde a una linea del concurso
+      (`dcopro` con `comlinide > 0`), de TODAS las ofertas, con la ficticia
+      marcada como en `compras.comparativo_ofertas`. Para cualquier pregunta
+      de mercado, filtra `NOT es_ficticia`: las ficticias no cuentan en el
+      numero de ofertantes, la oferta minima ni el ahorro.
+
+      **EL DESCUENTO ES TEXTO.** `descuento_texto` es `dcopro.dto` tal cual:
+      TEXTO con coma decimal ('10,08%'), y tratarlo como numero revienta. El
+      numero esta en `porcentaje_descuento`. Hay porcentajes NEGATIVOS: son un
+      recargo, no un descuento. Y el `precio` YA es neto:
+      `importe_ofertado_linea` es `cantidad x precio` en las 786.710 lineas
+      medidas, y el porcentaje es el que produjo ese precio, no uno que haya
+      que volver a aplicar.
+
+      **LA BASE DEL COSTE OBJETIVO (D4, decidida por el humano el
+      2026-10-04).** En las lineas de la oferta OBJETIVO con porcentaje (83.329
+      medidas), `precio_base` es el precio del elemento de
+      `descompuestos.lineas`, de su obra y su partida, del que sale el
+      objetivo: precio = base x (1 - %), con 0,011 EUR + 0,2 % del precio de
+      tolerancia. La base es la de la primera ABC del master si casa; si no,
+      la de la version ANTERIOR a la ABC mas reciente que case; nunca una
+      posterior. En las obras sin ABC, solo Estudios (el master 0, o la
+      Descomposicion de coste donde no lo hay). Si no casa, se publica la de
+      la regla con `casa_base` falso. Dentro de cada version, el elemento es
+      el de igual linea de necesidad (`dncpro_id`) si casa; si no casa o no lo
+      hay, el que case por precio en esa partida y version (decision del
+      humano, 2026-10-05). Por producto no se puede: la 0696 usa el mismo
+      producto para un vallado de 69,70 y una malla de 28,97.
+
+      **Medido con esta regla publicada el 2026-10-05** (el SQL de este objeto,
+      en solo lectura): de **84.084** lineas OBJETIVO con porcentaje casan
+      **24.425 (29,0 %)**: 11.409 con la primera ABC, 5.468 con una version
+      anterior y 7.548 con Estudios en obras sin ABC; **59.570** no casan
+      (`casa_base` falso) y **89** no tienen descompuesto en su partida
+      (`casa_base` NULL). La spec lo previo el 2026-10-04 sobre 83.329: casan
+      24.263 (29,1 %), y de las que no, **12.351** casarian con una version
+      posterior a la ABC y **21.789** de obras sin ABC con otra version del
+      master: las fechas apuntan a que la base real es la version VIGENTE al
+      hacer el comparativo, y Negocio puede ampliar la regla. Un `casa_base`
+      falso no es un error del dato.
+
+      **Lee el descompuesto de la noche anterior**: `build_compras` corre antes
+      que `build_descompuestos`. La primera ABC y el master 0 estan
+      congelados, asi que el desfase no cambia la base; si
+      `build_descompuestos` falla, la base es la de otra noche.
+    grano: >-
+      Una fila por linea de oferta de `raw.dcopro` que responde a una linea
+      del comparativo (`comlinide > 0`), de una oferta de
+      `compras.comparativo_ofertas` (~787.000 el 2026-10-04).
+      `linea_oferta_id` es clave primaria declarada.
+    clave_negocio: [linea_oferta_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      linea_oferta_id:
+        significado: Identificador de la linea de oferta en Sigrid (`dcopro.ide`).
+        agregacion: no_sumable
+      oferta_id:
+        significado: Oferta a la que pertenece la linea (`compras.comparativo_ofertas`).
+        agregacion: no_sumable
+      comparativo_id:
+        significado: Comparativo de su oferta.
+        agregacion: no_sumable
+      comparativo_linea_id:
+        significado: >-
+          La linea del concurso a la que responde (`dcopro.comlinide`), en
+          `compras.comparativo_lineas.linea_id`.
+        agregacion: no_sumable
+      producto_id:
+        significado: >-
+          Producto de compras de la linea (`dcopro.proide`). No identifica el
+          elemento del descompuesto: un mismo producto sirve para cosas
+          distintas.
+        nulo_significa: La linea no trae producto.
+        agregacion: no_sumable
+      descripcion:
+        significado: Descripcion de la linea tal y como la escribio el proveedor (`dcopro.res`).
+      unidad_medida:
+        significado: Unidad de medida de la linea (`dcopro.unimed`), vacia si no la trae.
+      cantidad:
+        significado: Cantidad ofertada (`dcopro.can`), 0 si no viene. Mezcla unidades.
+        agregacion: no_sumable
+      precio:
+        significado: >-
+          Precio unitario ofertado (`dcopro.pre`), SIN IVA y YA NETO: el
+          descuento de la linea ya esta aplicado. 0 si no viene.
+        unidad: EUR
+        agregacion: no_sumable
+      importe_ofertado_linea:
+        significado: >-
+          Importe de la linea (`dcopro.tot` = `cantidad x precio`), SIN IVA.
+          Sumado por oferta da `importe_ofertado_lineas` de
+          `compras.comparativo_ofertas`. Sumarlo sin filtrar `es_ficticia`
+          mezcla mercado y referencias inventadas.
+        unidad: EUR
+        agregacion: suma
+      descuento_texto:
+        significado: >-
+          El descuento TAL CUAL lo guarda Sigrid (`dcopro.dto`): TEXTO con coma
+          decimal y el signo %, como '10,08%' o '-168%'. Convertirlo a numero
+          por las bravas revienta; usa `porcentaje_descuento`. Vacio cuando la
+          linea no trae descuento (el 88 % de las lineas).
+      porcentaje_descuento:
+        significado: >-
+          El descuento en tanto por cien (10,08 = 10,08 %), de
+          `compras.fn_porcentaje_dto`. Negativo = RECARGO. Es el que produjo el
+          precio, que ya es neto: no se vuelve a aplicar.
+        nulo_significa: La linea no trae descuento, o su texto no tiene la forma `-12,5%`.
+        agregacion: no_sumable
+      es_ficticia:
+        significado: Cierto si la oferta de la linea es ficticia (`compras.comparativo_ofertas.es_ficticia`).
+      familia_ficticia:
+        significado: La familia ficticia de su oferta (OBJETIVO, OFICINA_TECNICA...).
+        nulo_significa: La oferta es REAL.
+        valores: [OBJETIVO, OFICINA_TECNICA, CUATRIMESTRAL, FASE_0, ABC, PLANIFICACION]
+      base_regla:
+        significado: >-
+          La regla de la base de la obra (D2): `ABC` si la obra tiene primera
+          ABC en el master; si no, `ESTUDIOS`.
+        nulo_significa: La linea no es de una oferta OBJETIVO con porcentaje.
+        valores: [ABC, ESTUDIOS]
+      precio_base:
+        significado: >-
+          Precio del elemento del descompuesto que sirve de base (D4): el que
+          casa o, si ninguno casa, el de la version de la regla.
+        nulo_significa: >-
+          La linea no es OBJETIVO con porcentaje, o en su partida no se
+          identifica el elemento: ni por la linea de necesidad ni por un
+          precio que case.
+        unidad: EUR
+        agregacion: no_sumable
+      origen_base:
+        significado: >-
+          De donde sale la base: el origen y la version del descompuesto, como
+          'ABC v3', 'MASTER_PRE_ABC v2', 'MASTER_ESTUDIO v0' o 'ESTUDIO v0'.
+        nulo_significa: No hay `precio_base`.
+      casa_base:
+        significado: >-
+          Cierto si base x (1 - %) da el precio con la tolerancia (D4). Falso
+          («no casa») si la partida tiene descompuesto en alguna version, la
+          admita la regla o no, y ninguna de las que admite casa.
+        nulo_significa: >-
+          La linea no es OBJETIVO con porcentaje, o su partida no tiene
+          descompuesto en NINGUNA version (89 lineas el 2026-10-05).
+    relaciones:
+      - de: oferta_id
+        a: compras.comparativo_ofertas.oferta_id
+        cardinalidad: "N:1"
+        porque: Para el proveedor, el estado y el importe de documento de la oferta.
+      - de: comparativo_linea_id
+        a: compras.comparativo_lineas.linea_id
+        cardinalidad: "N:1"
+        porque: Para comparar lo ofertado con lo adjudicado en la misma linea, y su partida.
+    ejemplos_preguntas:
+      - Que oferto cada proveedor en cada linea del comparativo X
+      - Que descuento sobre que base lleva el objetivo del comparativo X
+      - Que lineas del objetivo no casan con el descompuesto de la obra X
+
+  comparativo_objetivo:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El COSTE OBJETIVO de cada comparativo (F-038, Fase 2): la oferta
+      ficticia OBJETIVO que Ruesma mete en el comparativo como referencia,
+      una fila por comparativo que la tiene. Medido el 2026-10-04: 12.259
+      ofertas OBJETIVO en 11.420 comparativos; 1.126 tienen dos o tres, y
+      vale la MAS RECIENTE. Su importe es su documento, SIN IVA; su
+      porcentaje, el de sus lineas si es uno solo (7.399 con uno, 48 con
+      varios, 4.813 sin ninguno).
+
+      **CONTRA QUE BASE (D4)**: `base_regla` dice si la obra tiene primera ABC
+      (`ABC`) o no (`ESTUDIOS`), y `pct_importe_casa_base` que parte del
+      importe de sus lineas con porcentaje reproduce base x (1 - %) del
+      descompuesto. Medido con la regla publicada el 2026-10-05: casan 24.425
+      de 84.084 lineas (29,0 %); la spec lo previo el 2026-10-04 en 24.263 de
+      83.329 (29,1 %). Un porcentaje bajo NO es un error: la regla es la que decidio
+      el humano (la primera ABC, o una version anterior; nunca una
+      posterior; Estudios en obras sin ABC) y Negocio puede ampliarla. El
+      detalle linea a linea esta en `compras.comparativo_oferta_lineas`.
+
+      Lee `descompuestos` de la noche anterior: `build_compras` corre antes
+      que `build_descompuestos`.
+    grano: >-
+      Una fila por comparativo con al menos una oferta OBJETIVO.
+      `comparativo_id` es clave primaria declarada.
+    clave_negocio: [comparativo_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      comparativo_id:
+        significado: El comparativo (`compras.comparativos.comparativo_id`).
+        agregacion: no_sumable
+      oferta_objetivo_id:
+        significado: >-
+          La oferta OBJETIVO elegida: la de fecha de alta mas reciente y, a
+          igual fecha, la de mayor identificador.
+        agregacion: no_sumable
+      n_ofertas_objetivo:
+        significado: Cuantas ofertas OBJETIVO tiene el comparativo (1, 2 o 3).
+        agregacion: suma
+      importe_objetivo:
+        significado: >-
+          El documento de la oferta OBJETIVO, SIN IVA (`dco.totbas`). Ejemplo,
+          la 0696 (comparativo 2754136): 94.853,91 EUR.
+        unidad: EUR
+        agregacion: suma
+      porcentaje_objetivo:
+        significado: >-
+          El porcentaje de las lineas de la oferta OBJETIVO, en tanto por cien,
+          cuando todas las que lo traen llevan el mismo.
+        nulo_significa: Sus lineas no traen porcentaje, o traen varios distintos.
+        agregacion: no_sumable
+      base_regla:
+        significado: >-
+          La regla de la base de la obra del comparativo: `ABC` si la obra
+          tiene primera ABC en el master; si no, `ESTUDIOS`.
+        valores: [ABC, ESTUDIOS]
+      pct_importe_casa_base:
+        significado: >-
+          Porcentaje (0-100) del importe de las lineas con porcentaje de la
+          oferta OBJETIVO cuya base del descompuesto casa (D4).
+        nulo_significa: La oferta OBJETIVO no tiene lineas con porcentaje.
+        agregacion: no_sumable
+    relaciones:
+      - de: comparativo_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "1:1"
+        porque: Para la obra, la actividad, el contrato y las demas magnitudes del comparativo.
+      - de: oferta_objetivo_id
+        a: compras.comparativo_ofertas.oferta_id
+        cardinalidad: "N:1"
+        porque: Para la oferta OBJETIVO como oferta, con su estado y su fecha.
+    ejemplos_preguntas:
+      - Cual es el coste objetivo del comparativo X y con que porcentaje
+      - En que comparativos de la obra X el objetivo no casa con su base
+      - Cuanto se adjudico por encima o por debajo del objetivo
+
+  comparativo_firmas:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El CIRCUITO DE FIRMAS de cada comparativo, escalon a escalon (F-038,
+      Fase 2, D3): una fila por firma de `confir`, con su circuito (COMVAL, el
+      normal; COAVAL, las ampliaciones; y variantes UTE, JEFINST, DIRGEN y
+      DIRPRO), su escalon (JEFO, JG, DCOM...), quien firmo y cuando. Medido el
+      2026-10-04: 66.469 firmas de comparativo, 6.498 pendientes.
+
+      **«LA FIRMA DEL JEFE DE GRUPO» NO ES UNA FILA**: un escalon se REPITE
+      cuando el comparativo vuelve tras un rechazo (5.375 comparativos
+      repiten escalon). Para «quien firmo como JG» toma la ultima FIRMADA de
+      ese escalon por `fecha` y `hora`; para quien APROBO el comparativo, usa
+      `compras.comparativos.aprobado_por`. El campo `ord` (orden obligatorio)
+      de Sigrid vale 0 siempre y no se publica: el orden lo da la fecha. El
+      circuito entre familias (`deffir`, `dbo.log`) es F-085.
+    grano: >-
+      Una fila por firma de `raw.confir` de un comparativo (`conide` en
+      `raw.com`). `firma_id` es clave primaria declarada.
+    clave_negocio: [firma_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      firma_id:
+        significado: Identificador de la firma en Sigrid (`confir.ide`).
+        agregacion: no_sumable
+      comparativo_id:
+        significado: Comparativo firmado (`confir.conide`).
+        agregacion: no_sumable
+      circuito:
+        significado: >-
+          Codigo del proceso de firma (`confir.cod`): COMVAL el circuito
+          normal, COAVAL el de las ampliaciones, y sus variantes.
+      escalon:
+        significado: >-
+          El rol que firma en ese paso (`confir.rol`): JEFO (jefe de obra), JG
+          (jefe de grupo), DCOM (direccion de compras) y otros.
+      usuario:
+        significado: Login de Sigrid de quien firma (`confir.usu`), no el nombre de la persona.
+      fecha:
+        significado: Fecha de la firma (`confir.fec`).
+        nulo_significa: La firma esta pendiente (6 pendientes medidas si tienen fecha).
+        agregacion: no_sumable
+      hora:
+        significado: Hora de la firma (`confir.hor`), para ordenar firmas del mismo dia.
+        agregacion: no_sumable
+      pendiente:
+        significado: >-
+          Cierto si la firma esta PENDIENTE (`confir.fir = 0`). Es la misma
+          definicion que `compras.comparativos.n_firmas_pendientes`.
+      firma_digital_valida:
+        significado: Cierto si la firma esta marcada como firmada OK (`confir.firok = 1`).
+      estado_final_id:
+        significado: >-
+          Estado del comparativo (`con.est`, tipo 46) en que deja el documento
+          el circuito al cerrarse (`confir.estfin`). Cuando el estado actual del
+          comparativo es este, el circuito se cerro (`fecha_aprobacion`).
+        agregacion: no_sumable
+    relaciones:
+      - de: comparativo_id
+        a: compras.comparativos.comparativo_id
+        cardinalidad: "N:1"
+        porque: Para el estado del comparativo, su obra y su fecha de aprobacion.
+    ejemplos_preguntas:
+      - Quien firmo cada escalon del comparativo X y cuando
+      - Que comparativos tiene pendientes de firma el usuario U
+      - Cuanto tarda de media cada escalon en firmar
 
   fn_normalizar_nombre:
     tipo: funcion
@@ -2723,6 +3149,28 @@ objetos:
       la de su CIF. La regla y sus literales viven escritos una sola vez en
       `etl_sigrid/domain/comparativos.py` (F-038), y un test comprueba que el
       SQL lleva los mismos.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_porcentaje_dto:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. `compras.comparativo_oferta_lineas`
+      ya publica su resultado en `porcentaje_descuento`.
+    descripcion: >-
+      Convierte el descuento de una linea de oferta (`dcopro.dto`, TEXTO con
+      coma decimal como '10,08%', y negativo si es un recargo) a numero en
+      tanto por cien. Lo que no casa con el patron es NULL, nunca un error ni
+      un cero. El patron vive escrito una sola vez en
+      `etl_sigrid/domain/comparativos.py` (F-038), y un test comprueba que el
+      SQL lleva el mismo.
     grano: null
     clave_negocio: []
     paso_etl: build_compras

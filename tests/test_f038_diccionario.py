@@ -23,7 +23,14 @@ import yaml
 
 from etl_sigrid.infrastructure.diccionario.cargador_yaml import cargar_diccionario
 from tests._texto import contiene, normalizado
-from tests.test_f038_sql import COLUMNAS_COMPARATIVOS, COLUMNAS_OFERTAS
+from tests.test_f038_sql import (
+    COLUMNAS_COMPARATIVOS,
+    COLUMNAS_FIRMAS,
+    COLUMNAS_LINEAS,
+    COLUMNAS_OBJETIVO,
+    COLUMNAS_OFERTA_LINEAS,
+    COLUMNAS_OFERTAS,
+)
 
 RAIZ = Path(__file__).resolve().parents[1]
 DIR_DICCIONARIO = RAIZ / "config" / "diccionario"
@@ -232,7 +239,8 @@ def test_f038_r22_albaranes_comparativo_id_ya_no_dice_no_modelado() -> None:
 
 
 def test_f038_r24_la_version_sube() -> None:
-    assert _global()["version"] == 42
+    """42 con la Fase 1 (publicada el 2026-10-05); 43 con la Fase 2 (T17)."""
+    assert _global()["version"] == 43
 
 
 def test_f038_r24_p5_pasa_a_respondible() -> None:
@@ -263,3 +271,153 @@ def test_f038_r24_las_cuatro_preguntas_del_acceptance_13(id_: str, clave: str) -
         "la respuesta cita la frescura de `build_compras` (T24)"
     )
     assert "R-FRESCURA" in pregunta["reglas_implicadas"]
+
+
+# ===========================================================================
+# FASE 2 · R28, R31, R34, R35 · las fichas de los cuatro objetos del detalle
+# ===========================================================================
+
+
+@pytest.mark.parametrize(
+    ("nombre", "clave", "columnas"),
+    [
+        ("compras.comparativo_lineas", ("linea_id",), COLUMNAS_LINEAS),
+        (
+            "compras.comparativo_oferta_lineas",
+            ("linea_oferta_id",),
+            COLUMNAS_OFERTA_LINEAS,
+        ),
+        ("compras.comparativo_objetivo", ("comparativo_id",), COLUMNAS_OBJETIVO),
+        ("compras.comparativo_firmas", ("firma_id",), COLUMNAS_FIRMAS),
+    ],
+)
+def test_f038_r35_ficha_con_grano_clave_y_todas_sus_columnas(
+    nombre: str, clave: tuple[str, ...], columnas: tuple[str, ...]
+) -> None:
+    ficha = _ficha(nombre)
+    assert ficha.tipo == "tabla" and ficha.capa == "consumo"
+    assert ficha.paso_etl == "build_compras" and ficha.refresco == "nocturno"
+    assert ficha.clave_negocio == clave
+    assert ficha.grano and ficha.ejemplos_preguntas and ficha.relaciones
+    assert tuple(c.nombre for c in ficha.columnas) == columnas
+
+
+def test_f038_r27_la_funcion_del_dto_tiene_ficha() -> None:
+    ficha = _ficha("compras.fn_porcentaje_dto")
+    assert ficha.tipo == "funcion" and ficha.capa == "operacion"
+    assert "etl_sigrid/domain/comparativos.py" in normalizado(ficha.descripcion)
+
+
+def test_f038_r14_fase_2_ninguna_columna_se_llama_importe_a_secas() -> None:
+    for nombre in (
+        "compras.comparativo_lineas", "compras.comparativo_oferta_lineas",
+        "compras.comparativo_objetivo", "compras.comparativo_firmas",
+    ):
+        assert "importe" not in {c.nombre for c in _ficha(nombre).columnas}, nombre
+
+
+def test_f038_r35_los_importes_y_precios_llevan_unidad_y_agregacion() -> None:
+    for nombre in (
+        "compras.comparativo_lineas", "compras.comparativo_oferta_lineas",
+        "compras.comparativo_objetivo",
+    ):
+        for columna in _ficha(nombre).columnas:
+            if columna.nombre.startswith(("importe_", "precio")):
+                assert columna.unidad == "EUR", f"{nombre}.{columna.nombre}"
+                assert columna.agregacion, f"{nombre}.{columna.nombre}"
+
+
+@pytest.mark.parametrize(
+    "frase",
+    [
+        # R28: el dto es texto con coma decimal, el precio ya es neto, negativos
+        "TEXTO", "coma decimal", "revienta", "neto", "recargo",
+        # La base del objetivo y su cobertura de D4
+        "D4", "primera ABC", "ANTERIOR", "posterior", "Estudios",
+        "24.263", "83.329", "29,1 %", "12.351", "21.789",
+        # La cifra con la regla PUBLICADA (review de la Fase 2, cambio 3)
+        "24.425", "84.084", "29,0 %", "59.570", "2026-10-05",
+        # Lee `descompuestos` de la noche anterior
+        "descompuestos.lineas", "noche anterior", "build_descompuestos",
+    ],
+)
+def test_f038_r28_r30_la_ficha_de_las_lineas_de_oferta_lo_dice(frase: str) -> None:
+    assert frase in _texto("compras.comparativo_oferta_lineas"), frase
+
+
+@pytest.mark.parametrize(
+    "frase",
+    ["29,1 %", "24.263", "noche anterior", "descompuestos", "D4", "12.259", "1.126",
+     "24.425", "84.084", "29,0 %"],
+)
+def test_f038_r31_la_ficha_del_objetivo_da_las_cifras_y_el_desfase(frase: str) -> None:
+    assert frase in _texto("compras.comparativo_objetivo"), frase
+
+
+@pytest.mark.parametrize("frase", ["5.375", "rechazo", "`ord`", "F-085", "6.498"])
+def test_f038_r34_la_ficha_de_firmas_lo_dice(frase: str) -> None:
+    assert frase in _texto("compras.comparativo_firmas"), frase
+
+
+def test_f038_r28_descuento_texto_y_porcentaje() -> None:
+    texto = normalizado(_columna("compras.comparativo_oferta_lineas", "descuento_texto").significado)
+    assert "TEXTO" in texto and "coma" in texto
+    porcentaje = _columna("compras.comparativo_oferta_lineas", "porcentaje_descuento")
+    assert porcentaje.agregacion == "no_sumable" and porcentaje.nulo_significa
+
+
+def test_f038_r30_casa_base_nulo_solo_sin_descompuesto_en_ninguna_version() -> None:
+    columna = _columna("compras.comparativo_oferta_lineas", "casa_base")
+    assert "NINGUNA version" in normalizado(columna.nulo_significa)
+    assert "la admita la regla o no" in normalizado(columna.significado)
+
+
+def test_f038_r30_las_columnas_de_la_base_dicen_su_nulo() -> None:
+    for columna in ("base_regla", "precio_base", "origen_base", "casa_base"):
+        assert _columna("compras.comparativo_oferta_lineas", columna).nulo_significa, columna
+    assert _columna("compras.comparativo_oferta_lineas", "base_regla").valores == (
+        "ABC", "ESTUDIOS",
+    )
+    assert _columna("compras.comparativo_objetivo", "base_regla").valores == (
+        "ABC", "ESTUDIOS",
+    )
+
+
+@pytest.mark.parametrize(
+    ("ficha", "de", "a", "cardinalidad"),
+    [
+        ("compras.comparativo_lineas", "comparativo_id",
+         "compras.comparativos.comparativo_id", "N:1"),
+        ("compras.comparativo_lineas", "contrato_id",
+         "compras.contratos.contrato_id", "N:1"),
+        ("compras.comparativo_lineas", "partida_id",
+         "descompuestos.lineas.partida_id", "N:N"),
+        ("compras.comparativo_oferta_lineas", "oferta_id",
+         "compras.comparativo_ofertas.oferta_id", "N:1"),
+        ("compras.comparativo_oferta_lineas", "comparativo_linea_id",
+         "compras.comparativo_lineas.linea_id", "N:1"),
+        ("compras.comparativo_objetivo", "comparativo_id",
+         "compras.comparativos.comparativo_id", "1:1"),
+        ("compras.comparativo_objetivo", "oferta_objetivo_id",
+         "compras.comparativo_ofertas.oferta_id", "N:1"),
+        ("compras.comparativo_firmas", "comparativo_id",
+         "compras.comparativos.comparativo_id", "N:1"),
+        ("compras.comparativos", "comparativo_id",
+         "compras.comparativo_lineas.comparativo_id", "1:N"),
+        ("compras.comparativos", "comparativo_id",
+         "compras.comparativo_objetivo.comparativo_id", "1:1"),
+        ("compras.comparativos", "comparativo_id",
+         "compras.comparativo_firmas.comparativo_id", "1:N"),
+    ],
+)
+def test_f038_r35_relaciones_de_la_fase_2(
+    ficha: str, de: str, a: str, cardinalidad: str
+) -> None:
+    relaciones = {(r.de, r.a): r.cardinalidad for r in _ficha(ficha).relaciones}
+    assert relaciones.get((de, a)) == cardinalidad, (ficha, de, a)
+
+
+def test_f038_r33_aprobado_por_remite_a_las_firmas() -> None:
+    texto = normalizado(_columna("compras.comparativos", "aprobado_por").significado)
+    assert "compras.comparativo_firmas" in texto
+    assert "Fase 2" not in texto

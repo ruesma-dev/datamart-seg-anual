@@ -12,9 +12,16 @@ Encadena los archivos SQL en orden:
     06_pago_factura.sql- forma de pago de la factura y control contra contrato
     07_texto.sql       - el memo de la pestaña «Texto», íntegro y partido
     08_comparativos.sql- el comparativo de ofertas y sus ofertas (F-038)
+    09_comparativos_detalle.sql - sus líneas, el objetivo y las firmas (F-038)
 
 Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
 `build_maestros`, que corre antes en `run-all`). No necesita `stg` ni `mart`.
+
+`09` lee además `descompuestos.lineas` (la base del coste objetivo), y es el
+único SQL fuera de `sql/descompuestos/` que lo hace. `build_descompuestos`
+corre DESPUÉS en `run-all` y este paso no lo declara en `depends_on` a
+propósito: lee el descompuesto de la noche anterior, y la primera ABC y el
+master 0 —las versiones que dan la base— están congeladas (F-038, design §1).
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). `build-compras` ejecutaba
 su SQL **en línea dentro del comando**, sin step, y por eso **no dejaba fila en
@@ -47,7 +54,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los nueve ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los diez ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` a propósito: es DATO, no lógica. Así se puede leer sin
 #: entrar en el bucle y —lo que lo motivó— se puede sustituir en un test para
@@ -117,6 +124,17 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="08_comparativos.sql",
         target_schema="compras",
         target_table="comparativos",
+    ),
+    # F-038 Fase 2: las líneas del concurso y de las ofertas (con la base del
+    # coste objetivo en el descompuesto), el objetivo y las firmas. Va detrás
+    # de `08` porque lee `comparativo_ofertas` y `comparativos`. Cuenta
+    # `comparativo_oferta_lineas`, el grueso (~787 k filas) y la que puede
+    # salir mal sin que nada falle.
+    _SubStep(
+        name="comparativos_detalle",
+        sql_file="09_comparativos_detalle.sql",
+        target_schema="compras",
+        target_table="comparativo_oferta_lineas",
     ),
 )
 

@@ -1,163 +1,216 @@
 <!-- progress/impl_F-038.md -->
-# F-038 · Informe del implementer · Fase 1 (T1-T10)
+# F-038 · Informe del implementer · Fase 2 (T11-T19)
 
-Implementer, 2026-10-04. Rama `feature/F-038-comparativos`. Spec aprobada por el
-humano el 2026-10-04 (D1 dos fases, Fase 1 tal cual). **Fase 2 (T11-T19, T25)
-FUERA**. T20-T24 son MANUAL del humano (§5). Ni un SQL contra ninguna base: los
-tests leen el texto del SQL.
+Implementer, 2026-10-05. Rama `feature/F-038-comparativos` desde `main` `e9c5507`
+(la Fase 1 ya mergeada y desplegada). Abierta por el humano el 2026-10-05; D3
+(firmas aquí) y D4 (la base del objetivo) decididas el 2026-10-04. **El informe
+de la Fase 1, íntegro, está en `progress/impl_F-038_fase1.md`** (movido para que
+este quepa en su tope; sus decisiones siguen valiendo). Ni un SQL contra ninguna
+base: los tests leen el texto del SQL. T20-T25 son MANUAL del humano (§5).
 
 ## 1 · Qué cambió
 
 | Fichero | Qué |
 |---|---|
-| `etl_sigrid/domain/comparativos.py` (nuevo) | Oráculo: `CIF_FALSOS`, `PATRONES_FAMILIA` (6, en orden), `EXCLUSIONES`, literales de normalización, `FACTOR_ATIPICO`/`MINIMO_ATIPICO`; `normalizar_nombre`, `familia_ficticia`, `es_adjudicado_atipico` |
-| `sql/compras/00_setup.sql` | + `compras.fn_normalizar_nombre` y `compras.fn_familia_ficticia` al final (nada existente cambia) |
-| `sql/compras/08_comparativos.sql` (nuevo) | Guarda R21 (`DO $$ ... RAISE EXCEPTION`, lo primero), `compras.comparativo_ofertas` (19 col.) y `compras.comparativos` (36 col.), columnas e índices de design §4 |
-| `application/steps/build_compras_step.py` | `SUB_PASOS` + `comparativos` (`08`, cuenta `compras.comparativos`); docstring |
-| `config/diccionario/compras.yaml` | Fichas de las dos tablas y las dos funciones; `contratos.comparativo_id` reescrita (R22) y `albaranes.comparativo_id`; relaciones `contratos`/`albaranes` → `comparativos` |
-| `config/diccionario/00_global.yaml` | `version` 42; `esquemas.compras`; P5 → respondible; P19-P22; `confir.fec` en el punto 3 de `R-SIGRID-CON` |
-| `docs/ARCHITECTURE.md` | Párrafo «Semántica Sigrid»: ficticias, sin IVA, atípico, contrato por `comlin.ctride` |
-| `azure-apps/datamart_seg_anual.md` | Sección F-038 (commit `6a2bbde` en ESE repositorio, sin push) |
-| Tests nuevos | `test_f038_dominio.py` (69), `test_f038_sql.py` (36), `test_f038_diccionario.py` (65) |
-| Tests de otras features (ver §2.3) | `test_f047_steps.py`, `test_f073_pipeline.py`, `test_f080_pipeline.py`, `test_f006_reglas.py`, `test_f079_stg_consultable.py` |
-| Otros | `specs/F-006-mcp-azure/design_detalle.md` (enmienda: 194 objetos); `progress/current.md`; `progress/mutacion_F-038.md`; `progress/mutacion_sql_F-038.py` |
+| `etl_sigrid/domain/comparativos.py` | + `PATRON_DTO`, `TOLERANCIA_ABS`/`_REL`, `ORIGENES_ESTUDIOS`, `ORIGENES_ANTERIORES_ABC`; `parse_porcentaje_dto`, `casa_con_base`, `base_regla` |
+| `sql/compras/00_setup.sql` | + `compras.fn_porcentaje_dto` al final (patrón del dominio, sin `EXCEPTION` ni `ELSE`) |
+| `sql/compras/09_comparativos_detalle.sql` (nuevo) | `comparativo_lineas` (11 col.), temporal `_f038_obra_abc`, `comparativo_oferta_lineas` (18 col., la base de D4), `comparativo_objetivo` (7 col.), `comparativo_firmas` (10 col.) |
+| `application/steps/build_compras_step.py` | `SUB_PASOS` + `comparativos_detalle` (`09`, cuenta `comparativo_oferta_lineas`); docstring |
+| `config/diccionario/compras.yaml` | Cuatro fichas de tabla y la de `fn_porcentaje_dto`; relaciones de `comparativos` y `comparativo_ofertas` hacia el detalle; `aprobado_por` remite a las firmas |
+| `config/diccionario/00_global.yaml` | `version` 43 con su changelog; `esquemas.compras`; `R-SIGRID-CON` punto 3 gana `confir.cod` y `dcopro.res` |
+| `docs/ARCHITECTURE.md` | Un párrafo en «Semántica Sigrid»: `dto` texto, lector cruzado de `descompuestos`, D4 |
+| `azure-apps/datamart_seg_anual.md` | Fase 1 desplegada y Fase 2 (commit `f3dca46` en ESE repositorio, sin push) |
+| Tests | `test_f038_dominio.py` (+54 → 123), `test_f038_sql.py` (+32 → 68), `test_f038_diccionario.py` (+51 → 116); `test_f047_steps.py` (+1) |
+| Tests de otras features (§2.6) | `test_f073_pipeline.py`, `test_f080_pipeline.py`, `test_f079_stg_consultable.py`, `test_f123_origenes.py` |
+| Otros | `specs/F-006-mcp-azure/design_detalle.md` (enmienda: 199 objetos); `progress/current.md`; `progress/mutacion_F-038.md`; `progress/mutacion_sql_F-038_fase2.py` |
 
 ## 2 · Decisiones y desviaciones
 
-1. **`aprobado_por` con la misma condición que `fecha_aprobacion`** (circuito
-   cerrado: `con.est` es un `estfin` de sus firmas). R23 solo condiciona la
-   fecha; literal, `aprobado_por` publicaría como «aprobó» a quien firmó el
-   último paso de un comparativo RECHAZADO: cifra plausible y falsa. Es la
-   lectura de acceptance 5 («para los aprobados»). Si el reviewer o el humano
-   lo quieren literal, es quitar un `CASE` y su test.
-2. **Patrón FASE_0 afinado**: `FASE ?0( |$)|PLANIFICACION 0$` en vez de
-   `FASE ?0|...` (design §3 lo permite «solo con los nombres medidos»): «FASE 05»
-   no es la fase 0; los tres nombres medidos casan igual.
-3. **Tests de otras features tocados, todos por consecuencia directa de la spec**:
-   las listas completas de ficheros de `build_compras` (`test_f073_pipeline`,
-   `test_f080_pipeline`, como hizo F-080 con F-073); la batería de F-006
-   (`test_f006_reglas`: P1-P22, P5 respondible → 18/2/2, que pide R24); el
-   inventario de funciones fuera de consumo (`test_f079`); y el recuento de
-   objetos en el design de F-006 (194), como hizo F-118.
-4. **`R-SIGRID-CON` gana `confir.fec`**: `08` lee `f.fec` de `raw.confir` sin
-   pasar por `con`, y el test de F-006 deriva esa lista del SQL.
-5. Detalles de SQL: `ORDER BY f.fec DESC NULLS LAST, f.hor DESC NULLS LAST,
-   f.ide DESC` (en `DESC`, Postgres pone los NULL primero); alias `oft` y no
-   `of` (palabra clave); `importe_adjudicado_lineas` NULL si no hay líneas.
-6. Proceso: la primera línea base de mutación salió en ROJO (4 tests de otras
-   features rotos por mis cambios, invisibles en mis subconjuntos); arreglados
-   en `9a73809` antes de la campaña. Lección: correr la suite entera antes de mutar.
+1. **La tolerancia relativa se mide sobre el PRECIO de la oferta**:
+   `|precio − base × (1 − %/100)| ≤ 0,011 + 0,002 × |precio|`. La spec da
+   «0,011 € + 0,2 %» sin decir de qué; el precio es el dato que se intenta
+   reproducir y la diferencia con medirla sobre el esperado es de segundo orden.
+2. **Lo ANTERIOR a la ABC es Estudios en sus dos formas y `MASTER_PRE_ABC`**
+   (`ORIGENES_ANTERIORES_ABC`). F-123 hizo de `MASTER_ESTUDIO` y `ESTUDIO` dos
+   formas de lo mismo (Estudios, versión 0); dejar fuera `ESTUDIO` en una obra
+   con ABC y sin master 0 sería tratar Estudios como posterior. Nunca entran
+   `MASTER_PLANIF_JO` (salvo la propia ABC) ni `PLANIF_JO`; además
+   `fase_num <= fase_abc`.
+3. **DECISIÓN DEL HUMANO (2026-10-05, «primero a y si no b»; review Fase 2
+   pasada 1, cambio 2)**: en cada versión admitida por D4, el elemento es el de
+   igual `dncpro_id` si casa; si no casa o no existe, el que case por precio
+   entre los de esa partida y versión; si ninguno casa, el de igual `dncpro_id`
+   (sin casar). En `elemento`: `ORDER BY …, c.casa DESC, c.por_dncpro DESC,
+   c.orden`. El orden entre versiones no cambia. (Antes: el `dncpro_id` mandaba
+   aunque no casara, R29 literal; casaban 23.361 y «con la ABC» 9.955.)
+4. **`casa_base`** (review, cambio 1): cierto si la versión elegida casa; falso
+   («no casa») si la partida tiene descompuesto en ALGUNA versión, la admita D4
+   o no, y ninguna admitida casa; NULL solo si no tiene descompuesto en
+   NINGUNA (`con_descompuesto` = `EXISTS` sobre `descompuestos.lineas` de su
+   obra y partida, sin filtro de versión). Antes salía de `candidatas` y daba
+   NULL a 35.701 líneas «no casa» (`spec_F-038.md` §7). Si nada casa, la base
+   publicada es el elemento de la versión de la REGLA (la ABC, o Estudios), y
+   `precio_base`/`origen_base` quedan NULL si en ella no se identifica elemento.
+   `base_regla` = `ABC`/`ESTUDIOS` por la obra, el mismo `CASE` que
+   `base_regla()` del dominio (una obra sin obra_id cae en ESTUDIOS).
+5. **La primera ABC por obra va a una tabla TEMPORAL** (`_f038_obra_abc`,
+   `ON COMMIT DROP`, como `_lote` de `descompuestos/03`): la usan las líneas y
+   el objetivo, y así `descompuestos.lineas` se recorre una vez para ese
+   cálculo. `09` es UNA transacción: si falla, lo de anoche sigue publicado.
+6. **Tests de otras features tocados, todos por consecuencia directa de la
+   spec**: `test_f123_origenes.py::r1` decía «nadie fuera de
+   `sql/descompuestos/` lo lee» (design §8 lo anticipa: «F-123 R1 lo daba por
+   hecho»); ahora exige que el conjunto de lectores sea EXACTAMENTE
+   `{09_comparativos_detalle.sql}`. Las listas de ficheros de `build_compras`
+   (`f073`, `f080`), el inventario de funciones (`f079`) y la regla
+   `R-SIGRID-CON`, que el test de F-006 deriva del SQL (09 lee `confir.cod` y
+   `dcopro.res` sin pasar por `con`).
+7. **Fichas sin `nulo_significa` donde el SQL proyecta texto crudo** de `raw`
+   (`usuario`, `hora`, `descripcion`, `unidad_medida`, `descuento_texto`): la
+   puerta de F-006 lo exige, porque Sigrid guarda cadena vacía, no NULL.
+8. **`docs/ARCHITECTURE.md`** no estaba en las tareas de la Fase 2; se le
+   añade un párrafo porque leer `descompuestos` desde `compras`, antes de que se
+   construya, es un hecho de arquitectura que de otro modo solo diría el SQL.
+9. **El paso NO declara `build_descompuestos` en `depends_on`**: lo dice la
+   spec (lee la noche anterior). En una base recién creada sin `descompuestos`,
+   el sub-paso `09` fallaría con su nombre, igual que fallaría `03_views.sql`
+   sin `maestro.v_obra_fichas` (design §8); 00-08 quedan publicados.
+10. Proceso: escribí tests con `python -` y heredocs, y dos veces se colaron
+    caracteres (`\b` como retroceso, CRLF): corregidos antes de su commit y
+    verificados con `git diff`. Lección: ficheros de test por Write/Edit.
 
 ## 3 · Fase RED (rigor `estandar`)
 
-Requisitos centrales de design §7 de la Fase 1: R3, R8-R11, R12, R14, R15, R16,
-R19, R20, R21. Trazas reales, recortadas a sus líneas de resultado.
+Requisitos centrales de design §7 de la Fase 2: R27, R29, R32 (y R25, R26, R30,
+R31, R33 con su tarea). Trazas reales, recortadas a sus líneas de resultado.
 
-**T1 · R8-R11, R16** — `python -m pytest tests/test_f038_dominio.py -q --tb=line`
-contra un esqueleto con las constantes vacías y las funciones en
-`raise NotImplementedError` (antes, sin módulo: `ModuleNotFoundError: No module
-named 'etl_sigrid.domain.comparativos'`):
+**T11 · R27, R29** — `python -m pytest tests/test_f038_dominio.py -q --tb=line`
+contra un esqueleto (constantes vacías, funciones en `raise NotImplementedError`):
 ```
+E   AssertionError: assert '' == '^-?[0-9]+(,[0-9]+)?%$'
 E   NotImplementedError
-FAILED tests/test_f038_dominio.py::test_f038_r8_r9_familia_de_los_nombres_medidos[None-OBJETIVO-RUESMA-OBJETIVO]
-FAILED tests/test_f038_dominio.py::test_f038_r8_r10_ofertas_reales[None-MAT PLANIFICACION DE ESPACIOS, S.L.]
-FAILED tests/test_f038_dominio.py::test_f038_r16_umbrales - assert 0 == 10
-FAILED tests/test_f038_dominio.py::test_f038_r16_es_adjudicado_atipico[adjudicado0-mayor0-True]
-66 failed, 1 passed in 0.24s
+FAILED tests/test_f038_dominio.py::test_f038_r27_el_patron_del_dto_es_el_medido
+FAILED tests/test_f038_dominio.py::test_f038_r27_parse_porcentaje_dto_de_los_textos_medidos[15%-esperado0]
+FAILED tests/test_f038_dominio.py::test_f038_r27_lo_que_no_casa_es_none_y_no_cero[None]
+FAILED tests/test_f038_dominio.py::test_f038_r29_las_tolerancias_de_la_medicion
+FAILED tests/test_f038_dominio.py::test_f038_r29_casa_con_base_en_los_bordes_de_la_tolerancia[0-0.011-True]
+FAILED tests/test_f038_dominio.py::test_f038_r29_base_regla - NotImplementedE...
+54 failed, 69 passed in 0.22s
 ```
-Verde con el módulo: `67 passed in 0.20s` (69 tras el test del superviviente).
+Verde: `123 passed in 0.21s`. Los 16 casos de `casa_con_base` son las tres
+líneas de la 0696 y los seis ejemplos de `explore_F-038_ejemplos_objetivo.md`.
 
-**T2 · R11 (literales SQL = dominio)** —
-`python -m pytest tests/test_f038_sql.py -q --tb=line -k "setup or literales"`:
+**T12 · R27 (SQL = dominio)** — `python -m pytest tests/test_f038_sql.py -q --tb=line -k dto`:
 ```
-AssertionError: `compras.fn_familia_ficticia` tiene que estar definida exactamente UNA vez en `compras/00_setup.sql`
-FAILED tests/test_f038_sql.py::test_f038_r11_literales_patrones_de_familia_en_su_orden
-FAILED tests/test_f038_sql.py::test_f038_r11_literales_cif_falsos - Assertion...
-FAILED tests/test_f038_sql.py::test_f038_r11_literales_exclusiones - Assertio...
-6 failed, 1 passed in 0.08s
+E   AssertionError: `compras.fn_porcentaje_dto` tiene que estar definida exactamente UNA vez en `compras/00_setup.sql`
+FAILED tests/test_f038_sql.py::test_f038_r27_dto_la_funcion_usa_el_patron_del_dominio
+FAILED tests/test_f038_sql.py::test_f038_r27_dto_sin_exception_ni_cero_ni_else
+2 failed, 36 deselected in 0.20s
 ```
 
-**T3 · R3, R12, R21** —
-`python -m pytest tests/test_f038_sql.py -q --tb=line -k "ofertas or guarda or prvide or totdoc"`:
+**T13 · R25, R26, R29, R30, R32** —
+`python -m pytest tests/test_f038_sql.py -q --tb=line -k "lineas or base"`:
 ```
-AssertionError: SQL no encontrado: ...\sql\compras\08_comparativos.sql
-FAILED tests/test_f038_sql.py::test_f038_ofertas_r3_proveedor_de_dco_entide
-FAILED tests/test_f038_sql.py::test_f038_prvide_r3_el_sql_no_lee_comprv_prvide
-FAILED tests/test_f038_sql.py::test_f038_totdoc_r12_el_sql_no_lee_dco_totdoc
-FAILED tests/test_f038_sql.py::test_f038_ofertas_r12_importes_documento_sin_iva_y_lineas
-FAILED tests/test_f038_sql.py::test_f038_guarda_r21_dos_contratos_rompen_el_build
-12 failed, 7 deselected in 0.15s
+E   AssertionError: SQL no encontrado: ...\sql\compras\09_comparativos_detalle.sql
+FAILED tests/test_f038_sql.py::test_f038_r25_lineas_columnas_en_su_orden - As...
+FAILED tests/test_f038_sql.py::test_f038_r29_base_primera_abc_de_la_obra_por_es_primera_abc
+FAILED tests/test_f038_sql.py::test_f038_r29_base_casa_con_la_tolerancia_del_dominio
+FAILED tests/test_f038_sql.py::test_f038_r30_base_nunca_una_version_posterior_a_la_abc
+FAILED tests/test_f038_sql.py::test_f038_r30_base_d4_la_abc_si_casa_si_no_la_anterior_mas_reciente
+FAILED tests/test_f038_sql.py::test_f038_r32_lineas_el_detalle_no_cuenta_ofertantes_minima_ni_ahorro
+18 failed, 1 passed, 37 deselected in 1.13s
 ```
-Que los vetos (R3 `prvide`, R12 `totdoc`) muerden de verdad con el fichero
-presente lo prueba la campaña SQL: M09 (`totbas` → `totdoc`) muere con 2 fallos.
+Primer verde con el fichero: `2 failed, 17 passed` (el marcador de la
+proyección final también abría la CTE `objetivo`; el helper pasó a `rindex`).
+Que los vetos muerden con el fichero presente (nunca una posterior, el filtro
+OBJETIVO, la tolerancia) lo prueba la campaña SQL (§4): M32-M35, M38, M31.
 
-**T4 · R14, R15, R16, R19, R20** — `python -m pytest tests/test_f038_sql.py -q --tb=line`
-(con la parte 1 ya escrita, sin el bloque de `compras.comparativos`):
+**T14 · R31** — `python -m pytest tests/test_f038_sql.py -q --tb=line -k objetivo`:
 ```
-ValueError: substring not found
-FAILED tests/test_f038_sql.py::test_f038_r14_ninguna_columna_se_llama_importe_a_secas
-FAILED tests/test_f038_sql.py::test_f038_r15_ganadora_solo_si_es_unica - Valu...
-FAILED tests/test_f038_sql.py::test_f038_r16_atipico_con_los_umbrales_del_dominio
-FAILED tests/test_f038_sql.py::test_f038_r19_ahorro_solo_con_ofertas_reales_con_importe
-FAILED tests/test_f038_sql.py::test_f038_r20_contrato_por_comlin_ctride - Val...
-15 failed, 19 passed in 0.15s
+E   ValueError: substring not found
+FAILED tests/test_f038_sql.py::test_f038_r31_objetivo_columnas_en_su_orden - ...
+FAILED tests/test_f038_sql.py::test_f038_r31_objetivo_la_mas_reciente_por_fecha_y_luego_ide
+FAILED tests/test_f038_sql.py::test_f038_r31_objetivo_importe_y_porcentaje_solo_si_es_unico
+6 failed, 1 passed, 57 deselected in 0.71s
 ```
-Verde: `34 passed` (36 tras los tests de alias y de los JOIN, añadidos al
-descubrir un `oftt.` que ningún test de texto veía).
 
-**T5** — `python -m pytest tests/test_f047_steps.py -q --tb=line`:
+**T15 · R33** — `python -m pytest tests/test_f038_sql.py -q --tb=line -k firmas`:
+```
+E   AssertionError: assert 'ALTER TABLE compras.comparativo_firmas ADD PRIMARY KEY (firma_id)' in ' DROP TABLE ...
+FAILED tests/test_f038_sql.py::test_f038_r33_firmas_columnas_en_su_orden - Va...
+FAILED tests/test_f038_sql.py::test_f038_r33_firmas_grano_una_fila_por_confir_de_un_comparativo
+4 failed, 1 passed, 63 deselected in 0.66s
+```
+
+**T16** — `python -m pytest tests/test_f047_steps.py tests/test_f073_pipeline.py tests/test_f080_pipeline.py -q --tb=line`:
 `FAILED ...test_f047_r4_encadena_sus_sql_en_orden[build_compras]`,
-`FAILED ...test_f038_r1_build_compras_cuenta_los_comparativos`, `2 failed, 21 passed`.
+`FAILED ...test_f038_r26_build_compras_cuenta_las_lineas_de_oferta_al_final`, `6 failed, 40 passed`.
 
-**T6 · R22, R24** — `python -m pytest tests/test_f038_diccionario.py -q --tb=line`:
-`FAILED ...test_f038_r22_contratos_comparativo_id_remite_al_objeto_nuevo`,
-`FAILED ...test_f038_r24_la_version_sube`, `FAILED ...test_f038_r24_p5_pasa_a_respondible`,
-`65 failed in 0.90s`.
+**T17 · R28, R31, R34, R35** — `python -m pytest tests/test_f038_diccionario.py -q --tb=line`:
+`FAILED ...test_f038_r24_la_version_sube`, `FAILED ...test_f038_r35_ficha_con_grano_clave_y_todas_sus_columnas[compras.comparativo_lineas-...]`,
+`FAILED ...test_f038_r34_la_ficha_de_firmas_lo_dice[5.375]`, `52 failed, 64 passed in 6.43s`.
 
 ## 4 · Verificaciones
 
-- Subconjuntos por tarea, todos verdes tras cada commit (ver §3).
-- Suite entera sin cobertura, antes de mutar (`python -m pytest tests -q -x`):
-  `6612 passed, 223 skipped in 286.21s`.
-- `bash harness/init.sh`: ver «Evidencias».
-- NO verificado (no se puede sin base): que el SQL corra en Postgres y sus
-  cifras. Riesgos a mirar en T21: tipos de `raw` (`confir.hor`, `dco.totbas`),
-  `translate` con tildes (fichero UTF-8, lo lee `execute_sql_file` en UTF-8) y
-  la guarda R21 (hoy 0 casos medidos).
+- Subconjuntos por tarea, verdes tras cada commit (§3).
+- Suite entera sin cobertura antes de mutar (`python -m pytest tests -q -p no:cacheprovider`):
+  primero `3 failed, 6783 passed` (las tres consecuencias de §2.6:
+  `test_f123_origenes` r1, `R-SIGRID-CON` y los recuentos de `current.md`),
+  arregladas en `656e202` y `d2d1d34`; después, verde (ver «Evidencias»).
+- Campaña del arnés: dos intentos ABORTADOS por la propia herramienta antes de
+  evaluar nada («LÍNEA BASE SIN TERMINAR»: la suite limpia pasó de 600 s con 4 y
+  con 2 workers; la máquina estaba cargada por campañas de otros proyectos). La
+  válida es la tercera, en serie (`--workers 1`), sobre `d2d1d34`.
+- NO verificado (no se puede sin base): que `09` corra en Postgres, su tiempo y
+  sus cifras. Riesgos a mirar en la MANUAL: tipos de `raw` (`dcopro.dto` texto,
+  `confir.hor`), el coste de leer `descompuestos.lineas` (~4,5 M filas; la
+  temporal y `candidatas` lo recorren), y la cifra de D4 (§2.3).
 
 ## 5 · MANUAL del humano, en orden, tras el APROBADO del reviewer
 
-Copiadas con su comando exacto en `progress/current.md` (sección F-038):
-1. **T20** · merge a `main`; `powershell -NoProfile -File infra/70_build_image.ps1`;
-   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm`;
-   `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv` → el tag nuevo.
-2. **T21** · nocturna (00:00 UTC, publica la v42). `python main.py status` →
-   `run-all` SUCCESS; `python main.py timings --last 1` → `build_compras` ≲ +1 min.
-   Fallo en el sub-paso `comparativos` con «F-038 R21» = comparativo con dos
-   contratos: parar y avisar.
-3. **T22** · `python main.py check-declarados`, `check-unicidad`,
-   `check-relaciones`, `check-diccionario` → código 0 los cuatro.
-4. **T23** · `SELECT count(*), count(contrato_id), sum(ahorro_concurso), count(ahorro_concurso), count(*) FILTER (WHERE adjudicado_atipico) FROM compras.comparativos;`
-   → ≈ 20.378, ≈ 18.600, ≈ 72,7 M€, ≈ 6.900, ≈ 52;
-   `SELECT familia_ficticia, count(*) FROM compras.comparativo_ofertas GROUP BY 1;`
-   → ≈ 32.900 no NULL. Desviación > 5 %: parar y avisar.
-5. **T24** · reiniciar el MCP; cuatro preguntas (actividad, ahorro, quién aprobó
-   y cuándo, ¿acabó en contrato?) → `compras.comparativos` y frescura de `build_compras`.
+Copiadas con su comando exacto y lo que debe salir en `progress/current.md`
+(sección F-038, «Implementer · Fase 2»): **T20** merge e imagen; **T21** nocturna
+o `build-compras` + `apply-grants` + `publicar-diccionario` a mano, con
+`timings` (+2-3 min); **T22** las cuatro puertas `check-*` (R36); **cifras de
+D4** (recuentos de las cuatro tablas y el reparto de `casa_base`: ≈ 24.263 de
+83.329 casan); **T25** la 0696 (comparativo 2754136, oferta 2754139); y
+reiniciar el MCP tras publicar la v43.
 
 ## 6 · Fuera de alcance / lo que falta
 
-- Fase 2 entera (objetivo, líneas de los dos lados, firmas por escalón): D4
-  decidida el 2026-10-04; espera a que el humano la abra.
-- `ingest` nueva, `compras.contratos` sin cambios de columnas (R22 es solo ficha).
-- Para cerrar: review, y después T20-T24 del humano.
+- Vistas por actividad y proveedor (F-067); circuito entre familias, `deffir`
+  y `dbo.log` (F-085); `comlinpar` (0 filas); ingesta nueva; ampliar D4 a la
+  versión vigente a la fecha del comparativo (Negocio).
+- Para cerrar: review de la Fase 2, y después las MANUAL del humano.
+
+## 7 · Review Fase 2 · pasada 1 (CHANGES_REQUESTED), atendida el 2026-10-05
+
+Cambio 2 decidido por el humano (§2.3) y cambio 1 (§2.4) en `09` (`c96dfa9`);
+cambio 3, las cifras: medidas en Azure en SOLO LECTURA (psycopg directo,
+`transaction_read_only = on`, nunca el cliente del ETL) con el SQL de la rama,
+la temporal como CTE y `fn_porcentaje_dto` en línea; 119,5 s. **84.084** líneas
+OBJETIVO con %: cierto **24.425** (ABC 11.409 · anterior 5.468 · ESTUDIOS
+7.548), falso **59.570**, NULL **89**. La 0696: 939265 y 952250 `ABC v3` 69,70
+cierto; 962172 falso, sin base. Van a las fichas, a la MANUAL 4 y a la T25.
+RED de los tests nuevos contra el SQL y las fichas de `ada7bec`:
+```
+FAILED tests/test_f038_sql.py::test_f038_r29_base_el_elemento_por_dncpro_y_si_no_casa_el_que_case
+FAILED tests/test_f038_sql.py::test_f038_r30_base_columnas_precio_origen_y_casa
+2 failed, 66 deselected in 0.08s
+FAILED tests/test_f038_diccionario.py::test_f038_r28_r30_la_ficha_de_las_lineas_de_oferta_lo_dice[24.425]
+FAILED tests/test_f038_diccionario.py::test_f038_r31_la_ficha_del_objetivo_da_las_cifras_y_el_desfase[24.425]
+```
+Mutación: el dominio y el step no cambian (mismo alcance, 13 mutantes): la
+campaña del arnés sigue valiendo. La SQL se relanzó: 27/27 (M36 es ahora la
+regla de antes; M50 y M51 vigilan el cambio 1).
 
 ## Evidencias
 
 | Evidencia | Valor real |
 |---|---|
-| Tests ejecutados (`init.sh`) | **6614 passed, 223 skipped**, 0 failed (de ellos 170 de F-038: 69 + 36 + 65) |
-| Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 32 líneas cambiadas cubiertas (32/32, umbral 80%, nivel estandar; diff desde 4dfe8c70b5, merge-base con main)` |
-| Mutación (`harness.mutacion`, 2 workers, HEAD `9a738095ec3f2a6a091627b9afc2b6f79f0a7cff`) | 14 generados (campaña completa: < 20), **13 muertos, 1 superviviente** (`<= 0` → `<= 1`, hueco real: test nuevo, reverificado en serie: 2 fallos), 0 timeouts, 3011,4 s. Detalle: `progress/mutacion_F-038.md` |
-| Mutación SQL manual (1 worker, `47cc859a654fd7a5066231af861d8e3c7e4ff559`) | **24 mutantes, 24 muertos**; tabla en el anexo de `progress/mutacion_F-038.md`, script `progress/mutacion_sql_F-038.py` |
-| Tiempo de la suite | 905,70 s con cobertura dentro de `init.sh` (0:15:05); 286,21 s sin cobertura |
-| `bash harness/init.sh` | **ENTORNO LISTO**, exit 0, sobre HEAD `496f56d` (todas las comprobaciones OK; `PUERTA TAMAÑO`: requirements 144/150, design 249/250, impl 163/220). El commit posterior solo rellena esta tabla y marca T10 |
+| Tests ejecutados (`init.sh`) | **6795 passed, 227 skipped**, 0 failed (de ellos 316 de F-038: 123 + 68 + 125), tras la review |
+| Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 14 líneas cambiadas cubiertas (14/14, umbral 80%, nivel estandar; diff desde e9c5507390, merge-base con main)` |
+| Mutación (`harness.mutacion`, **1 worker**, HEAD `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2`) | Alcance 84 líneas (dominio 65, step 19). **13 generados, 13 muertos, 0 supervivientes**, 0 timeouts, 0 sin veredicto; 3665,0 s; línea base 419,4 s, media 281,9 s/mutante. Ningún superviviente que analizar. Detalle: `progress/mutacion_F-038.md` |
+| Mutación SQL manual (1 worker, `c96dfa9503e6407febdc2ff9fe228de970bb0376`, tras la review) | **27 mutantes (M25-M51), 27 muertos** (antes 25/25 sobre `d2d1d34`); tabla `fichero:línea`, original -> mutado y nº de fallos en el anexo de `progress/mutacion_F-038.md`; script `progress/mutacion_sql_F-038_fase2.py`. Línea base 0 fallos antes y después (1082 passed) |
+| Tiempo de la suite | 1646,70 s con cobertura dentro de `init.sh` (0:27:26; antes de la review 2434,06 s con la máquina cargada); 1001,17 s sin cobertura |
+| `bash harness/init.sh` | **ENTORNO LISTO**, exit 0, sobre HEAD `1023052` tras la review (todas OK; cobertura 14/14; `PUERTA TAMAÑO`: impl 216/220, review 140/140). El commit posterior solo rellena esta tabla |

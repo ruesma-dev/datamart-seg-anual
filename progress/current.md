@@ -10,7 +10,24 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-04 · F-038 · `in_progress` · Fase 1 IMPLEMENTADA (review 1: solo papeleo, atendido); Fase 2 con spec cerrada (D4 decidida), sin implementar · el comparativo de ofertas
+## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA en pasada 2, SIN DESPLEGAR · el comparativo de ofertas
+
+> **Cerrada el 2026-10-05.** Fase 2 APROBADA por el reviewer en la pasada 2
+> (`progress/review_F-038.md`), con la regla del elemento decidida por el humano
+> («primero a y si no b»): casan 24.425 de 84.084 líneas OBJETIVO con %, reproducido
+> en Azure. `init.sh` 6.795 passed. Resumen en `progress/history.md`. Queda el
+> despliegue de la Fase 2 (MANUAL de abajo).
+>
+> **Fase 2 DESPLEGADA por el líder el 2026-10-05 a las 23:01 UTC, por orden del
+> humano** (opción a): merge a `main` `d8163db`; imagen `r20261006-0054`, job
+> comprobado. La nocturna del 06-10 construye las tablas nuevas de `compras` y
+> publica el diccionario **v43** ella sola. **PENDIENTE DEL LÍDER tras la nocturna
+> (lo pidió el humano)**: comprobar que `build_compras` y `publicar_diccionario`
+> salieron SUCCESS (v43), `check-diccionario` OK, REINICIAR EL MCP y la T25 (la
+> 0696) y las cifras de D4 en solo lectura.
+
+### Antes
+
 
 **FASE 1 DESPLEGADA por el líder el 2026-10-05, por orden del humano** (tras la
 nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen
@@ -22,9 +39,82 @@ nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen
 ficticias de 71.306: todo dentro de la previsión. Falta T24 (las cuatro preguntas
 al MCP, el humano). La Fase 2 sigue en la rama.
 
+### Implementer · Fase 2 (T11-T19), 2026-10-05 · IMPLEMENTADA, pendiente de REVIEW
+
+Abierta por el humano el 2026-10-05. Rama `feature/F-038-comparativos` desde
+`main` `e9c5507`. Informe: `progress/impl_F-038.md` (el de la Fase 1, íntegro,
+en `progress/impl_F-038_fase1.md`). T11-T19 con un commit cada una, más uno de
+consecuencias en tests de otras features. Ni un SQL contra ninguna base.
+`bash harness/init.sh`: ENTORNO LISTO (6786 passed; cobertura 14/14 líneas
+cambiadas). Mutación del dominio 13/13 muertos (1 worker; con 4 y 2 la línea
+base no cabía en 600 s); SQL manual 25/25. Pendiente: REVIEW de la Fase 2.
+
+**Lo que entra**: `compras.comparativo_lineas`, `comparativo_oferta_lineas` (con
+la base del coste objetivo según D4), `comparativo_objetivo`,
+`comparativo_firmas` y `compras.fn_porcentaje_dto`; sub-paso `09` de
+`build_compras` (cuenta `comparativo_oferta_lineas`); diccionario **versión 43**.
+
+**Diccionario del árbol tras F-038 Fase 2 (version 43): 199 objetos, 1538
+columnas, 92 de consumo** (cuatro tablas y una función nuevas en `compras`).
+
+Decisiones y desviaciones (justificadas en el informe, §2):
+- «Casa» = |precio − base × (1 − %/100)| ≤ 0,011 + 0,002 × |precio|: la
+  relativa se mide sobre el PRECIO de la oferta (la spec no decía sobre qué).
+- Lo ANTERIOR a la ABC incluye Estudios en sus dos formas (`MASTER_ESTUDIO` y
+  `ESTUDIO`), no solo `MASTER_PRE_ABC`.
+- **Review Fase 2 pasada 1 (CHANGES_REQUESTED) atendida el 2026-10-05**:
+  · **Decisión del humano (2026-10-05, «primero a y si no b»)**: en cada versión
+  admitida, el elemento de igual `dncpro_id` si casa; si no casa o no existe,
+  el que case por precio en esa partida y versión. · `casa_base` NULL solo si
+  la partida no tiene descompuesto en NINGUNA versión; el resto que no casa,
+  falso. · Cifras medidas en Azure (solo lectura, SQL de la rama) en la 4 y la T25.
+- Tests de otras features por consecuencia directa: `test_f123_origenes.py`
+  (09 es el lector declarado de `descompuestos`), `test_f079` (inventario de
+  funciones), `test_f047_steps`/`f073`/`f080` (lista de ficheros) y la regla
+  `R-SIGRID-CON` (`confir.cod`, `dcopro.res`). `docs/ARCHITECTURE.md` gana un
+  párrafo (el lector cruzado de `descompuestos`).
+
+**MANUAL del humano de la Fase 2, EN ORDEN, tras el APROBADO del reviewer**
+(nadie más los ejecuta; los comandos exactos y lo que debe salir):
+1. **T20** · merge a `main`; imagen desde `main`:
+   `powershell -NoProfile -File infra/70_build_image.ps1`, luego
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm` y
+   `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev --query "properties.template.containers[0].image" -o tsv`
+   → el tag nuevo.
+2. **T21** · la nocturna (00:00 UTC; publica la v43 ella sola) o, como en la
+   Fase 1, a mano: `python main.py build-compras`, `python main.py apply-grants`
+   y `python main.py publicar-diccionario`. `python main.py status` → SUCCESS;
+   `python main.py timings --last 1` → `build_compras` como mucho ~2-3 min más
+   (sub-paso `comparativos_detalle`). Un fallo «relation
+   descompuestos.lineas does not exist» = base sin `descompuestos`: parar.
+3. **T22** · (solo lectura) `python main.py check-declarados`,
+   `python main.py check-unicidad`, `python main.py check-relaciones` y
+   `python main.py check-diccionario` → código 0 los cuatro (v43).
+4. **Cifras contra la previsión** (solo lectura; desviación > 5 % se para y se avisa):
+   `SELECT (SELECT count(*) FROM compras.comparativo_lineas), (SELECT count(*) FROM compras.comparativo_oferta_lineas), (SELECT count(*) FROM compras.comparativo_objetivo), (SELECT count(*) FROM compras.comparativo_firmas);`
+   → ≈ 198.600 (= `raw.comlin`), ≈ 786.700, ≈ 11.420, ≈ 66.500; y la de D4:
+   `SELECT base_regla, casa_base, split_part(origen_base, ' ', 1) AS origen, count(*) FROM compras.comparativo_oferta_lineas WHERE base_regla IS NOT NULL GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;`
+   → medido el 2026-10-05 con el SQL de la rama (Azure, solo lectura): total
+   **84.084**; cierto **24.425** (ABC·ABC 11.409; ABC con origen anterior 5.468
+   = 4.982 `MASTER_PRE_ABC` + 473 `MASTER_ESTUDIO` + 13 `ESTUDIO`; ESTUDIOS
+   7.548 = 7.463 `MASTER_ESTUDIO` + 85 `ESTUDIO`); falso **59.570** (ABC 24.752,
+   4.382 de ellas con `origen_base` ABC; ESTUDIOS 34.818); NULL **89** (ABC 83,
+   ESTUDIOS 6). Crecerá un poco con los datos de cada noche.
+5. **T25** · el caso de la 0696:
+   `SELECT o.* FROM compras.comparativo_objetivo o JOIN compras.comparativos c USING (comparativo_id) WHERE c.comparativo_id = 2754136;`
+   → `importe_objetivo` 94.853,91, `porcentaje_objetivo` 5, `base_regla` ABC; y
+   `SELECT linea_oferta_id, precio, porcentaje_descuento, precio_base, origen_base, casa_base FROM compras.comparativo_oferta_lineas WHERE oferta_id = 2754139;`
+   → 939265 y 952250 con `precio` 66,215, `precio_base` 69,70, `origen_base`
+   'ABC v3', `casa_base` cierto (la 952250 trae 66,214999); 962172 (26,60) con
+   `casa_base` falso, `precio_base` y `origen_base` NULL (medido el 2026-10-05).
+6. **T24 bis** · reiniciar el MCP tras publicar la v43 y preguntarle, sin
+   explicarle nada: «¿quién firmó como JG el comparativo X?» y «¿cuál es el
+   objetivo del comparativo X y contra qué base?» → usan
+   `compras.comparativo_firmas` y `compras.comparativo_objetivo`.
+
 ### Implementer · Fase 1 (T1-T10), 2026-10-04
 
-Informe: `progress/impl_F-038.md`. T1-T10 hechas con un commit cada una (T9 en
+Informe: `progress/impl_F-038_fase1.md`. T1-T10 hechas con un commit cada una (T9 en
 dos). `bash harness/init.sh`: ENTORNO LISTO (6614 passed; cobertura 32/32
 líneas cambiadas). Mutación: 13/14 muertos y el superviviente cazado con test
 nuevo; SQL manual 24/24. Pendiente: REVIEW. Fase 2 (T11-T19, T25) FUERA. Decisiones y

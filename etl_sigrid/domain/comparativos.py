@@ -24,6 +24,11 @@ OFICINA TECNICA, OBJETIVO y PLANIFICADO. La familia la dice el NOMBRE de la
 oferta (`dco.entres`). Ficticia = CIF falso **o** (CIF vacío **y** nombre de
 familia). Con CIF real, nunca.
 
+FASE 2 (R27, R29, D4): el patrón del descuento de la línea (`dcopro.dto`, que
+es TEXTO), la tolerancia con que el precio OBJETIVO «casa» con su base del
+descompuesto y la regla de la base (ABC o ESTUDIOS). Los ejecuta
+`sql/compras/09_comparativos_detalle.sql` con estos mismos literales.
+
 Capa `domain`: sin un solo import de infraestructura ni de configuración.
 """
 
@@ -71,6 +76,37 @@ NO_ALFANUMERICO = "[^A-Z0-9]+"
 FACTOR_ATIPICO = 10
 MINIMO_ATIPICO = Decimal("100000")
 
+# ---------------------------------------------------------------------------
+# FASE 2 · el porcentaje de la línea y la base del objetivo (R27, R29, D4)
+# ---------------------------------------------------------------------------
+
+#: El formato de `dcopro.dto`, que es TEXTO: coma decimal, signo opcional
+#: (los negativos son recargos) y el `%` al final. Medido el 2026-10-04: las
+#: 95.808 líneas que lo traen lo cumplen todas. Lo que no case es NULL, nunca
+#: un error ni un cero; por eso `compras.fn_porcentaje_dto` no necesita
+#: `EXCEPTION`: el patrón ya garantiza el cast.
+PATRON_DTO = r"^-?[0-9]+(,[0-9]+)?%$"
+
+#: «Casa» = base × (1 − %) da el precio de la línea OBJETIVO con 0,011 € más
+#: el 0,2 % del precio de tolerancia: la de la medición de D4 (24.263 de
+#: 83.329 líneas casan). La absoluta cubre el redondeo a céntimos de precios
+#: de cuatro decimales; la relativa, los importes grandes (A2: 124.367,21
+#: contra 124.367,19).
+TOLERANCIA_ABS = Decimal("0.011")
+TOLERANCIA_REL = Decimal("0.002")
+
+#: Los orígenes de `descompuestos.lineas` que son ESTUDIOS: el master 0 o, en
+#: las obras sin master 0, la Descomposición de coste (F-123). Es la única
+#: base de una obra SIN primera ABC (D4: «en ese caso no casa; dependerá de
+#: Negocio cambiarlo»).
+ORIGENES_ESTUDIOS: tuple[str, ...] = ("MASTER_ESTUDIO", "ESTUDIO")
+
+#: Lo que es ANTERIOR a la primera ABC en una obra que la tiene: Estudios y
+#: las versiones del master previas a la ABC. NUNCA `MASTER_PLANIF_JO` (la ABC
+#: y lo que viene detrás) salvo la propia ABC, ni la planificación de hoy
+#: (`PLANIF_JO`): D4 dice «nunca una posterior».
+ORIGENES_ANTERIORES_ABC: tuple[str, ...] = ORIGENES_ESTUDIOS + ("MASTER_PRE_ABC",)
+
 _TABLA_TILDES = str.maketrans(TILDES_ORIGEN, TILDES_DESTINO)
 
 
@@ -117,3 +153,32 @@ def es_adjudicado_atipico(
     if adjudicado is None or mayor_oferta is None or mayor_oferta <= 0:
         return None
     return adjudicado > FACTOR_ATIPICO * mayor_oferta and adjudicado > MINIMO_ATIPICO
+
+
+def parse_porcentaje_dto(texto: str | None) -> Decimal | None:
+    """El porcentaje de `dcopro.dto` en tanto por cien, o None si no casa.
+
+    `'10,08%'` → 10.08, `'-168%'` → −168 (un recargo). Sin recortar espacios,
+    igual que el `~` de Postgres: `' 15%'` no casa. `fullmatch`, y no
+    `search`, porque el `$` de `re` admite un salto de línea final y el de
+    Postgres no.
+    """
+    if texto is None or re.fullmatch(PATRON_DTO, texto) is None:
+        return None
+    return Decimal(texto[:-1].replace(",", "."))
+
+
+def casa_con_base(precio: Decimal, precio_base: Decimal, pct: Decimal) -> bool:
+    """True si `precio_base × (1 − pct/100)` da `precio` con la tolerancia.
+
+    La tolerancia es `TOLERANCIA_ABS + TOLERANCIA_REL × |precio|`, sobre el
+    precio de la oferta, que es el dato que se intenta reproducir. Un `pct`
+    negativo es un recargo y sube la base.
+    """
+    esperado = precio_base * (1 - pct / 100)
+    return abs(precio - esperado) <= TOLERANCIA_ABS + TOLERANCIA_REL * abs(precio)
+
+
+def base_regla(obra_tiene_primera_abc: bool) -> str:
+    """La regla de la base de una obra (D2 del humano): `ABC` o `ESTUDIOS`."""
+    return "ABC" if obra_tiene_primera_abc else "ESTUDIOS"

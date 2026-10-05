@@ -137,3 +137,18 @@ LANGUAGE sql IMMUTABLE AS $$
                compras.fn_normalizar_nombre(p_nombre) AS n
     ) x;
 $$;
+
+-- F-038 Fase 2 (R27) · El porcentaje de descuento de una línea de oferta.
+-- `dcopro.dto` es TEXTO con coma decimal ('10,08%'), con negativos (recargos):
+-- tratarlo como número revienta. El patrón es `PATRON_DTO` de
+-- `etl_sigrid/domain/comparativos.py` (lo fija un test). Lo que no casa es
+-- NULL, nunca un error ni un cero; sin `EXCEPTION` porque el patrón ya
+-- garantiza que el cast no falla. El precio de la línea YA es neto: este
+-- porcentaje es el que lo produjo, no uno que haya que volver a aplicar.
+CREATE OR REPLACE FUNCTION compras.fn_porcentaje_dto(t TEXT)
+RETURNS NUMERIC
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE
+        WHEN t ~ '^-?[0-9]+(,[0-9]+)?%$' THEN replace(replace(t, '%', ''), ',', '.')::NUMERIC
+    END;
+$$;

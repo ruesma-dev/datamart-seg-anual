@@ -182,6 +182,13 @@ infraestructura.
 > funciones auxiliares, `fn_normalizar_nombre` y `fn_familia_ficticia`. El
 > inventario pasa a **194 objetos**, las columnas descritas fuera de `raw` de
 > 1437 a **1492** (36 + 19) y las fichas de consumo suben en dos.
+>
+> **Enmienda del 2026-10-05 (F-038, el comparativo de ofertas, Fase 2).**
+> Entran cuatro tablas de `compras` --`comparativo_lineas`,
+> `comparativo_oferta_lineas`, `comparativo_objetivo` y `comparativo_firmas`--
+> y una funcion auxiliar, `fn_porcentaje_dto`. El inventario pasa a **199
+> objetos**, las columnas descritas de 1492 a **1538** (11 + 18 + 7 + 10) y las
+> fichas de consumo suben en cuatro.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

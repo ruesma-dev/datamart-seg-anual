@@ -28,12 +28,20 @@ from etl_sigrid.domain.comparativos import (
     FACTOR_ATIPICO,
     MINIMO_ATIPICO,
     NO_ALFANUMERICO,
+    ORIGENES_ANTERIORES_ABC,
+    ORIGENES_ESTUDIOS,
+    PATRON_DTO,
     PATRONES_FAMILIA,
     TILDES_DESTINO,
     TILDES_ORIGEN,
+    TOLERANCIA_ABS,
+    TOLERANCIA_REL,
+    base_regla,
+    casa_con_base,
     es_adjudicado_atipico,
     familia_ficticia,
     normalizar_nombre,
+    parse_porcentaje_dto,
 )
 
 CIF_OBJETIVO = "A99999999"
@@ -247,3 +255,152 @@ def test_f038_r16_es_adjudicado_atipico(
     adjudicado: Decimal | None, mayor: Decimal | None, esperado: bool | None
 ) -> None:
     assert es_adjudicado_atipico(adjudicado, mayor) is esperado
+
+
+# ===========================================================================
+# FASE 2 · R27 · el porcentaje de descuento de la línea (`dcopro.dto`, TEXTO)
+#
+# Medido (progress/spec_F-038.md §3): 95.808 de 794.946 líneas lo traen, y su
+# formato es SIEMPRE `^-?[0-9]+(,[0-9]+)?%$`: coma decimal y negativos
+# (recargos). Lo que no case es NULL, nunca un error ni un cero.
+# ===========================================================================
+
+
+def test_f038_r27_el_patron_del_dto_es_el_medido() -> None:
+    assert PATRON_DTO == r"^-?[0-9]+(,[0-9]+)?%$"
+    for prohibido in ("(?", "\m", "\M", "\b", "\d", "'"):
+        assert prohibido not in PATRON_DTO, prohibido
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        # Los de design §3
+        ("15%", Decimal("15")),
+        ("10,08%", Decimal("10.08")),
+        ("-168%", Decimal("-168")),
+        # Los de los ejemplos de D4 (explore_F-038_ejemplos_objetivo.md) y la 0696
+        ("5%", Decimal("5")),
+        ("7,29%", Decimal("7.29")),
+        ("5,73%", Decimal("5.73")),
+        ("0%", Decimal("0")),
+    ],
+)
+def test_f038_r27_parse_porcentaje_dto_de_los_textos_medidos(
+    texto: str, esperado: Decimal
+) -> None:
+    resultado = parse_porcentaje_dto(texto)
+    assert isinstance(resultado, Decimal)
+    assert resultado == esperado
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "", None, "5", "5.5%", "10+5%", "%", "-%", ",5%", "5,%", "1,2,3%",
+        "--5%", "+5%", " 15%", "15% ", "15%\n", "15 %", "5%%",
+    ],
+)
+def test_f038_r27_lo_que_no_casa_es_none_y_no_cero(texto: str | None) -> None:
+    assert parse_porcentaje_dto(texto) is None
+
+
+# ===========================================================================
+# FASE 2 · R29 · ¿casa el precio OBJETIVO con su base del descompuesto?
+#
+# «Casa» = base × (1 − %) da el precio de la línea con 0,011 € + 0,2 % de
+# tolerancia (la de la medición de D4). Los casos son los MEDIDOS: las tres
+# líneas de la 0696 (captura de Elena Díaz) y los seis ejemplos de
+# `progress/explore_F-038_ejemplos_objetivo.md`.
+# ===========================================================================
+
+
+def test_f038_r29_las_tolerancias_de_la_medicion() -> None:
+    assert TOLERANCIA_ABS == Decimal("0.011")
+    assert TOLERANCIA_REL == Decimal("0.002")
+
+
+@pytest.mark.parametrize(
+    ("precio", "base", "pct", "esperado"),
+    [
+        # 0696 · líneas 939265 y 952250: 69,70 × 0,95 = 66,215 (ABC v3) → casa
+        ("66.215", "69.70", "5", True),
+        # 0696 · línea 962172: 26,60 contra el 28,97 del descompuesto → NO casa
+        ("26.60", "28.97", "5", False),
+        # ... casaría con 28,00, pero ese precio no está en ningún descompuesto
+        ("26.60", "28.00", "5", True),
+        # A1 · 0700, ABC v3: 3.482,00 × 0,9271 = 3.228,16 → casa con la ABC
+        ("3228.16", "3482.00", "7.29", True),
+        # A2 · 0707, ABC v4: 131.926,58 × 0,9427 = 124.367,19 (2 céntimos: la
+        # tolerancia relativa) → casa; la v8 posterior (122.500) no
+        ("124367.21", "131926.58", "5.73", True),
+        ("124367.21", "122500.00", "5.73", False),
+        # B1 · 0700: la ABC (17,50) no casa; la ANTERIOR v2 (10,80) sí
+        ("10.0127", "17.50", "7.29", False),
+        ("10.0127", "10.80", "7.29", True),
+        # B2 · 0706: la ABC (92,50) no casa; la ANTERIOR v2 (98,00) sí
+        ("90.1112", "92.50", "8.05", False),
+        ("90.1112", "98.00", "8.05", True),
+        # C1 · 0702: la ABC (13,50) no casa; casaría una POSTERIOR (10,00), que
+        # D4 no mira nunca: esta función solo dice si casa, no qué versión vale
+        ("9.70", "13.50", "3", False),
+        ("9.70", "10.00", "3", True),
+        # C2 · 0709: la ABC (4,20) no casa; la POSTERIOR v6 (3,20) sí
+        ("2.9533", "4.20", "7.71", False),
+        ("2.9533", "3.20", "7.71", True),
+        # Un % negativo es un RECARGO: 10 × (1 + 1,68) = 26,80
+        ("26.80", "10.00", "-168", True),
+        ("10.00", "26.80", "-168", False),
+    ],
+)
+def test_f038_r29_casa_con_base_en_los_casos_medidos(
+    precio: str, base: str, pct: str, esperado: bool
+) -> None:
+    assert casa_con_base(Decimal(precio), Decimal(base), Decimal(pct)) is esperado
+
+
+@pytest.mark.parametrize(
+    ("precio", "base", "esperado"),
+    [
+        # Tolerancia ABSOLUTA (precio 0: la relativa no aporta): 0,011 casa,
+        # 0,012 no; por encima y por debajo
+        ("0", "0.011", True),
+        ("0", "0.012", False),
+        ("0", "-0.011", True),
+        ("0", "-0.012", False),
+        # Tolerancia RELATIVA sobre el precio: 100 → 0,011 + 0,200 = 0,211
+        ("100", "100.211", True),
+        ("100", "100.212", False),
+        ("100", "99.789", True),
+        ("100", "99.788", False),
+        # Precio negativo (líneas de abono): la tolerancia usa su valor absoluto
+        ("-100", "-100.211", True),
+        ("-100", "-100.212", False),
+    ],
+)
+def test_f038_r29_casa_con_base_en_los_bordes_de_la_tolerancia(
+    precio: str, base: str, esperado: bool
+) -> None:
+    assert casa_con_base(Decimal(precio), Decimal(base), Decimal("0")) is esperado
+
+
+# ===========================================================================
+# FASE 2 · R29 · la regla de la base (D2, D4): ABC si la obra tiene primera ABC
+# ===========================================================================
+
+
+def test_f038_r29_base_regla() -> None:
+    assert base_regla(True) == "ABC"
+    assert base_regla(False) == "ESTUDIOS"
+
+
+def test_f038_r29_los_origenes_de_estudios_y_los_anteriores_a_la_abc() -> None:
+    """Estudios es el master 0 (`MASTER_ESTUDIO`) o, en las obras sin master 0,
+    la Descomposición de coste (`ESTUDIO`) (F-123). Lo ANTERIOR a la ABC es
+    Estudios y las versiones `MASTER_PRE_ABC`; `MASTER_PLANIF_JO` y `PLANIF_JO`
+    nunca son anteriores (D4: «nunca una posterior»)."""
+    assert ORIGENES_ESTUDIOS == ("MASTER_ESTUDIO", "ESTUDIO")
+    assert ORIGENES_ANTERIORES_ABC == ("MASTER_ESTUDIO", "ESTUDIO", "MASTER_PRE_ABC")
+    for posterior in ("MASTER_PLANIF_JO", "PLANIF_JO"):
+        assert posterior not in ORIGENES_ANTERIORES_ABC
+        assert posterior not in ORIGENES_ESTUDIOS

@@ -79,6 +79,9 @@ GRUPO_B_FUNCIONES = (
     # `compras.comparativo_ofertas` ya publica su resultado en columnas.
     "compras.fn_normalizar_nombre",
     "compras.fn_familia_ficticia",
+    # F-038 Fase 2 (2026-10-05): el descuento de la linea, con el patron del
+    # dominio. `compras.comparativo_oferta_lineas` ya publica su resultado.
+    "compras.fn_porcentaje_dto",
     # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
     # `contabilidad`, por lo mismo que la de `personal`.
     "contabilidad.fn_fecha",
