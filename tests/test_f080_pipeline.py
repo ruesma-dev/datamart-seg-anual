@@ -44,6 +44,8 @@ FICHEROS_COMPRAS = [
     "05_vencimientos.sql",
     "06_pago_factura.sql",
     "07_texto.sql",
+    # F-038 añade un noveno al final: el comparativo de ofertas.
+    "08_comparativos.sql",
 ]
 
 #: Lo que cada sub-paso nuevo declara como objeto a contar.
