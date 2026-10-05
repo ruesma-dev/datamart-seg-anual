@@ -42,7 +42,9 @@ from etl_sigrid.domain.comparativos import (
     TILDES_ORIGEN,
     TOLERANCIA_ABS,
     TOLERANCIA_REL,
+    base_regla,
 )
+from tests._texto import normalizado
 
 DIRECTORIO_SQL = (
     Path(__file__).resolve().parents[1]
@@ -668,3 +670,364 @@ def test_f038_r27_dto_sin_exception_ni_cero_ni_else() -> None:
     assert "EXCEPTION" not in cuerpo.upper()
     assert " ELSE " not in cuerpo
     assert "COALESCE" not in cuerpo.upper()
+
+
+
+# ===========================================================================
+# FASE 2 · T13 · 09_comparativos_detalle.sql: las líneas de los dos lados y la
+# base del objetivo en el descompuesto (R25, R26, R29, R30, R32)
+# ===========================================================================
+
+RUTA_DETALLE = DIRECTORIO_SQL / "09_comparativos_detalle.sql"
+
+#: Las columnas de `compras.comparativo_lineas`, EN SU ORDEN (design §5).
+COLUMNAS_LINEAS = (
+    "linea_id",
+    "comparativo_id",
+    "numero_linea",
+    "posicion",
+    "contrato_id",
+    "linea_necesidad_id",
+    "partida_id",
+    "linea_oferta_ganadora_id",
+    "cantidad",
+    "precio",
+    "importe_adjudicado",
+)
+
+#: Las columnas de `compras.comparativo_oferta_lineas`, EN SU ORDEN (design §5).
+COLUMNAS_OFERTA_LINEAS = (
+    "linea_oferta_id",
+    "oferta_id",
+    "comparativo_id",
+    "comparativo_linea_id",
+    "producto_id",
+    "descripcion",
+    "unidad_medida",
+    "cantidad",
+    "precio",
+    "importe_ofertado_linea",
+    "descuento_texto",
+    "porcentaje_descuento",
+    "es_ficticia",
+    "familia_ficticia",
+    "base_regla",
+    "precio_base",
+    "origen_base",
+    "casa_base",
+)
+
+
+def _ejecutable_09() -> str:
+    return _compacto(_texto(RUTA_DETALLE))
+
+
+def _bloque_09(tabla: str) -> str:
+    texto = _ejecutable_09()
+    inicio = texto.index(f"DROP TABLE IF EXISTS compras.{tabla} CASCADE")
+    fin = texto.index(f"ALTER TABLE compras.{tabla} ADD PRIMARY KEY")
+    return texto[inicio:fin]
+
+
+def _cte_09(tabla: str, nombre: str) -> str:
+    """El cuerpo de una CTE del bloque de `compras.<tabla>` en `09`."""
+    bloque = _bloque_09(tabla)
+    inicio = bloque.index(f" {nombre} AS (")
+    profundidad = 0
+    for i in range(bloque.index("(", inicio), len(bloque)):
+        profundidad += {"(": 1, ")": -1}.get(bloque[i], 0)
+        if profundidad == 0:
+            return bloque[inicio : i + 1]
+    raise AssertionError(f"CTE {nombre} sin cerrar")
+
+
+def _proyeccion_09(tabla: str, primera: str, desde: str) -> str:
+    """El SELECT FINAL del bloque: la ÚLTIMA aparición de su primera columna
+    (las CTE de delante pueden empezar igual)."""
+    bloque = _bloque_09(tabla)
+    inicio = bloque.rindex(primera)
+    return bloque[inicio : bloque.index(desde, inicio)]
+
+
+def _proyeccion_lineas() -> str:
+    return _proyeccion_09(
+        "comparativo_lineas", "SELECT l.ide AS linea_id", "FROM raw.comlin l"
+    )
+
+
+def _proyeccion_oferta_lineas() -> str:
+    return _proyeccion_09(
+        "comparativo_oferta_lineas",
+        "SELECT lo.linea_oferta_id AS linea_oferta_id",
+        "FROM lineas_oferta lo",
+    )
+
+
+def _obra_abc() -> str:
+    texto = _ejecutable_09()
+    inicio = texto.index("CREATE TEMP TABLE _f038_obra_abc")
+    return texto[inicio : texto.index(";", inicio)]
+
+
+def test_f038_lineas_cabecera_dice_que_construye_de_que_lee_y_el_desfase() -> None:
+    texto = _texto(RUTA_DETALLE)
+    assert texto.startswith(
+        "-- etl_sigrid/infrastructure/postgres/sql/compras/09_comparativos_detalle.sql"
+    )
+    cabecera = normalizado(texto[: texto.index("DROP TABLE")])
+    for nombre in (
+        "compras.comparativo_lineas", "compras.comparativo_oferta_lineas",
+        "compras.comparativo_objetivo", "compras.comparativo_firmas",
+        "descompuestos.lineas", "build_descompuestos", "NOCHE ANTERIOR",
+    ):
+        assert nombre in cabecera, nombre
+
+
+# --- R25 · compras.comparativo_lineas ---------------------------------------
+
+
+def test_f038_r25_lineas_columnas_en_su_orden() -> None:
+    assert tuple(_columnas(_proyeccion_lineas())) == COLUMNAS_LINEAS
+
+
+def test_f038_r25_lineas_grano_una_fila_por_comlin_y_partida_de_su_necesidad() -> None:
+    texto = _ejecutable_09()
+    assert "ALTER TABLE compras.comparativo_lineas ADD PRIMARY KEY (linea_id)" in texto
+    bloque = _bloque_09("comparativo_lineas")
+    desde = "FROM raw.comlin l LEFT JOIN raw.dncpro n ON n.ide = NULLIF(l.dncproide, 0);"
+    assert desde in bloque, "una fila por `raw.comlin`; la partida, por LEFT JOIN"
+    proyeccion = _proyeccion_lineas()
+    for esperado in (
+        "l.comide AS comparativo_id",
+        "l.numlin AS numero_linea",
+        "l.pos AS posicion",
+        "NULLIF(l.ctride, 0) AS contrato_id",
+        "NULLIF(l.dncproide, 0) AS linea_necesidad_id",
+        "NULLIF(n.paride, 0) AS partida_id",
+        "NULLIF(l.dcoproide, 0) AS linea_oferta_ganadora_id",
+        "COALESCE(l.can, 0)::NUMERIC(20, 6) AS cantidad",
+        "COALESCE(l.pre, 0)::NUMERIC(20, 6) AS precio",
+        "(COALESCE(l.can, 0) * COALESCE(l.pre, 0))::NUMERIC(18, 2) AS importe_adjudicado",
+    ):
+        assert esperado in proyeccion, esperado
+
+
+def test_f038_r25_lineas_indices() -> None:
+    texto = _ejecutable_09()
+    for columna in ("comparativo_id", "contrato_id", "partida_id"):
+        assert re.search(
+            rf"CREATE INDEX \w+ ON compras\.comparativo_lineas \({columna}\)", texto
+        ), columna
+
+
+# --- R26, R27 · compras.comparativo_oferta_lineas ---------------------------
+
+
+def test_f038_r26_oferta_lineas_columnas_en_su_orden() -> None:
+    assert tuple(_columnas(_proyeccion_oferta_lineas())) == COLUMNAS_OFERTA_LINEAS
+
+
+def test_f038_r26_oferta_lineas_grano_lineas_de_comparativo_de_ofertas_de_r2() -> None:
+    texto = _ejecutable_09()
+    assert (
+        "ALTER TABLE compras.comparativo_oferta_lineas ADD PRIMARY KEY (linea_oferta_id)"
+        in texto
+    )
+    lineas = _cte_09("comparativo_oferta_lineas", "lineas_oferta")
+    assert (
+        "FROM raw.dcopro lp JOIN compras.comparativo_ofertas o ON o.oferta_id = lp.docide "
+        "WHERE lp.comlinide > 0" in lineas
+    ), "solo las líneas que responden a una línea del comparativo, de ofertas de R2"
+    for esperado in (
+        "lp.ide AS linea_oferta_id",
+        "o.oferta_id AS oferta_id",
+        "o.comparativo_id AS comparativo_id",
+        "lp.comlinide AS comparativo_linea_id",
+        "NULLIF(lp.proide, 0) AS producto_id",
+        "lp.res AS descripcion",
+        "lp.unimed AS unidad_medida",
+        "COALESCE(lp.can, 0)::NUMERIC(20, 6) AS cantidad",
+        "COALESCE(lp.pre, 0)::NUMERIC(20, 6) AS precio",
+        "lp.tot::NUMERIC(18, 2) AS importe_ofertado_linea",
+        "o.es_ficticia AS es_ficticia",
+        "o.familia_ficticia AS familia_ficticia",
+    ):
+        assert esperado in lineas, esperado
+
+
+def test_f038_r27_lineas_el_dto_literal_y_su_porcentaje_por_la_funcion() -> None:
+    lineas = _cte_09("comparativo_oferta_lineas", "lineas_oferta")
+    assert "lp.dto AS descuento_texto" in lineas
+    assert "compras.fn_porcentaje_dto(lp.dto) AS porcentaje_descuento" in lineas
+    assert "replace(" not in _ejecutable_09(), (
+        "el porcentaje se convierte en UNA función (R27), no en línea"
+    )
+
+
+def test_f038_r26_oferta_lineas_indices() -> None:
+    texto = _ejecutable_09()
+    for columna in ("oferta_id", "comparativo_linea_id"):
+        assert re.search(
+            rf"CREATE INDEX \w+ ON compras\.comparativo_oferta_lineas \({columna}\)",
+            texto,
+        ), columna
+
+
+# --- R29, R30 · la base del objetivo en el descompuesto (D4) ----------------
+
+
+def test_f038_r29_base_primera_abc_de_la_obra_por_es_primera_abc() -> None:
+    abc = _obra_abc()
+    assert "ON COMMIT DROP" in abc, "temporal: vive lo que la transacción del fichero"
+    assert (
+        "SELECT d.obra_id, MIN(d.fase_num) AS fase_abc FROM descompuestos.lineas d "
+        "WHERE d.es_primera_abc GROUP BY d.obra_id" in abc
+    )
+    texto = _ejecutable_09()
+    assert texto.index("CREATE TEMP TABLE _f038_obra_abc") < texto.index(
+        "CREATE TABLE compras.comparativo_oferta_lineas"
+    )
+
+
+def test_f038_r29_base_solo_lineas_objetivo_con_porcentaje_y_su_regla() -> None:
+    objetivo = _cte_09("comparativo_oferta_lineas", "objetivo")
+    assert (
+        "WHERE lo.familia_ficticia = 'OBJETIVO' AND lo.porcentaje_descuento IS NOT NULL"
+        in objetivo
+    )
+    regla = (
+        f"CASE WHEN ab.fase_abc IS NOT NULL THEN '{base_regla(True)}' "
+        f"ELSE '{base_regla(False)}' END AS base_regla"
+    )
+    assert regla in objetivo, f"la regla no es la del dominio: «{regla}»"
+
+
+def test_f038_r29_base_obra_del_comparativo_y_partida_de_su_linea() -> None:
+    objetivo = _cte_09("comparativo_oferta_lineas", "objetivo")
+    for esperado in (
+        "LEFT JOIN compras.comparativo_lineas cl ON cl.linea_id = lo.comparativo_linea_id",
+        "LEFT JOIN compras.comparativos cm ON cm.comparativo_id = lo.comparativo_id",
+        "LEFT JOIN _f038_obra_abc ab ON ab.obra_id = cm.obra_id",
+        "cm.obra_id AS obra_id",
+        "cl.partida_id AS partida_id",
+        "cl.linea_necesidad_id AS dncpro_id",
+    ):
+        assert esperado in objetivo, esperado
+    candidatas = _cte_09("comparativo_oferta_lineas", "candidatas")
+    assert (
+        "JOIN descompuestos.lineas d ON d.obra_id = ob.obra_id "
+        "AND d.partida_id = ob.partida_id" in candidatas
+    )
+
+
+def test_f038_r29_base_casa_con_la_tolerancia_del_dominio() -> None:
+    candidatas = _cte_09("comparativo_oferta_lineas", "candidatas")
+    esperado = (
+        "COALESCE(abs(ob.precio - d.precio * (1 - ob.pct / 100)) <= "
+        f"{TOLERANCIA_ABS} + {TOLERANCIA_REL} * abs(ob.precio), FALSE) AS casa"
+    )
+    assert esperado in candidatas, f"«casa» no es la del dominio: «{esperado}»"
+
+
+def test_f038_r30_base_nunca_una_version_posterior_a_la_abc() -> None:
+    """D4: con ABC, la ABC y lo ANTERIOR; sin ABC, solo Estudios. Nunca más."""
+    candidatas = _cte_09("comparativo_oferta_lineas", "candidatas")
+    anteriores = ", ".join(f"'{o}'" for o in ORIGENES_ANTERIORES_ABC)
+    estudios = ", ".join(f"'{o}'" for o in ORIGENES_ESTUDIOS)
+    assert (
+        "WHERE (ob.fase_abc IS NOT NULL AND (d.es_primera_abc OR d.origen IN "
+        f"({anteriores})) AND d.fase_num <= ob.fase_abc) "
+        f"OR (ob.fase_abc IS NULL AND d.origen IN ({estudios}))" in candidatas
+    )
+    ejecutable = _ejecutable_09()
+    for posterior in ("'MASTER_PLANIF_JO'", "'PLANIF_JO'", "es_vigente", "es_ultima"):
+        assert posterior not in ejecutable, posterior
+    assert not re.search(r"fase_num (>|>=) ", ejecutable), "nunca una posterior"
+
+
+def test_f038_r29_base_el_elemento_por_dncpro_y_si_no_el_que_casa() -> None:
+    candidatas = _cte_09("comparativo_oferta_lineas", "candidatas")
+    assert "COALESCE(d.dncpro_id = ob.dncpro_id, FALSE) AS por_dncpro" in candidatas
+    elemento = _cte_09("comparativo_oferta_lineas", "elemento")
+    assert "SELECT DISTINCT ON (c.linea_oferta_id, c.origen, c.fase_num)" in elemento
+    assert "WHERE c.por_dncpro OR c.casa" in elemento
+    assert (
+        "ORDER BY c.linea_oferta_id, c.origen, c.fase_num, c.por_dncpro DESC, "
+        "c.casa DESC, c.orden" in elemento
+    ), "el de igual dncpro_id manda; si no lo hay, el que case"
+
+
+def test_f038_r30_base_d4_la_abc_si_casa_si_no_la_anterior_mas_reciente() -> None:
+    elegida = _cte_09("comparativo_oferta_lineas", "elegida")
+    assert "SELECT DISTINCT ON (e.linea_oferta_id)" in elegida
+    assert "WHERE e.casa OR e.es_primera_abc OR ob.fase_abc IS NULL" in elegida, (
+        "si ninguna casa, la de la REGLA (la ABC o Estudios), nunca otra anterior"
+    )
+    assert (
+        "ORDER BY e.linea_oferta_id, e.casa DESC, e.fase_num DESC, e.origen" in elegida
+    ), "entre las que casan, la de mayor fase: la ABC y si no la anterior más reciente"
+
+
+def test_f038_r30_base_columnas_precio_origen_y_casa() -> None:
+    proyeccion = _proyeccion_oferta_lineas()
+    for esperado in (
+        "ob.base_regla AS base_regla",
+        "el.precio AS precio_base",
+        "CASE WHEN el.es_primera_abc THEN 'ABC' ELSE el.origen END || ' v' || "
+        "el.fase_num AS origen_base",
+        "CASE WHEN el.casa THEN TRUE WHEN cd.linea_oferta_id IS NOT NULL THEN FALSE "
+        "END AS casa_base",
+    ):
+        assert esperado in proyeccion, esperado
+    bloque = _bloque_09("comparativo_oferta_lineas")
+    for union in (
+        "LEFT JOIN objetivo ob ON ob.linea_oferta_id = lo.linea_oferta_id",
+        "LEFT JOIN elegida el ON el.linea_oferta_id = lo.linea_oferta_id",
+        "LEFT JOIN con_descompuesto cd ON cd.linea_oferta_id = lo.linea_oferta_id",
+    ):
+        assert union in bloque, union
+    assert "SELECT DISTINCT c.linea_oferta_id FROM candidatas c" in _cte_09(
+        "comparativo_oferta_lineas", "con_descompuesto"
+    ), "sin descompuesto en su partida, `casa_base` NULL (R30)"
+
+
+def test_f038_r32_lineas_el_detalle_no_cuenta_ofertantes_minima_ni_ahorro() -> None:
+    """Ofertantes, mínima y ahorro viven en `compras.comparativos` (08), con
+    las ficticias fuera; el detalle no los recalcula sin ese filtro."""
+    columnas = set(_columnas(_ejecutable_09()))
+    for prohibida in (
+        "n_ofertas", "n_ofertas_reales", "oferta_real_minima", "oferta_real_maxima",
+        "ahorro_concurso", "minima_real", "maxima_real",
+    ):
+        assert prohibida not in columnas, prohibida
+    assert "MIN(" not in _ejecutable_09().replace("MIN(d.fase_num)", "")
+    lineas = _cte_09("comparativo_oferta_lineas", "lineas_oferta")
+    assert "o.es_ficticia AS es_ficticia" in lineas, (
+        "cada línea lleva si su oferta es ficticia, para poder filtrarla"
+    )
+
+
+def test_f038_r14_lineas_ninguna_columna_se_llama_importe_a_secas() -> None:
+    assert not re.search(r"\bAS importe\b", _ejecutable_09())
+
+
+@pytest.mark.parametrize(
+    ("tabla", "proyeccion", "alias_definidos"),
+    [
+        ("comparativo_lineas", "_proyeccion_lineas", {"l", "n"}),
+        ("comparativo_oferta_lineas", "_proyeccion_oferta_lineas", {"lo", "ob", "el", "cd"}),
+    ],
+)
+def test_f038_lineas_la_proyeccion_de_09_solo_usa_alias_del_from(
+    tabla: str, proyeccion: str, alias_definidos: set[str]
+) -> None:
+    """Un alias mal escrito no rompe ningún test de texto, pero sí el build."""
+    usados = set(re.findall(r"\b([a-z]+)\.[a-z_]+", globals()[proyeccion]()))
+    assert usados <= alias_definidos, usados - alias_definidos
+    bloque = _bloque_09(tabla)
+    final = bloque[bloque.rindex("FROM "):]
+    for alias in alias_definidos:
+        assert re.search(rf"(?:FROM|JOIN) [a-z_.]+ {alias}\b", final), (
+            f"alias `{alias}` sin definir en el FROM final"
+        )
+

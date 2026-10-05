@@ -22,6 +22,14 @@ nocturna del 05-10, terminada a las 04:35 UTC): merge a `main` `dda0dc5`; imagen
 ficticias de 71.306: todo dentro de la previsión. Falta T24 (las cuatro preguntas
 al MCP, el humano). La Fase 2 sigue en la rama.
 
+### Implementer · Fase 2 (T11-T19), EN CURSO desde el 2026-10-05
+
+Abierta por el humano el 2026-10-05. Rama `feature/F-038-comparativos` desde
+`main` `e9c5507`. Hechas: T11 (dominio), T12 (`fn_porcentaje_dto`), T13
+(`09`: líneas de los dos lados y la base de D4). Hasta T17 (fichas y enmienda
+de F-006) quedan en rojo, a propósito y solo ellos, tres tests de F-006: la
+puerta «ficha o pendiente» y el recuento de objetos del diseño.
+
 ### Implementer · Fase 1 (T1-T10), 2026-10-04
 
 Informe: `progress/impl_F-038.md`. T1-T10 hechas con un commit cada una (T9 en
