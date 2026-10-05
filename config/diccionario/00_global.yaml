@@ -462,7 +462,16 @@
 # ofertas reales, el adjudicado atipico marcado y el contrato por las lineas del
 # comparativo. P5 pasa a respondible y entran P19-P22.
 
-version: 42
+# version 43 (F-038, 2026-10-05): EL COMPARATIVO DE OFERTAS, Fase 2. Cuatro
+# tablas nuevas en `compras` --`comparativo_lineas`, `comparativo_oferta_lineas`,
+# `comparativo_objetivo` y `comparativo_firmas`-- y una funcion auxiliar,
+# `fn_porcentaje_dto`. El descuento de la linea es TEXTO con coma decimal; la
+# base del coste objetivo es el descompuesto segun D4 (la primera ABC si casa,
+# si no una version anterior, nunca una posterior; Estudios en obras sin ABC),
+# leido de la noche anterior; y la firma de cada escalon es una fila, no una
+# columna.
+
+version: 43
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1358,7 +1367,11 @@ esquemas:
       (`compras.formas_pago`), que es la DIMENSION: dice que formas de pago
       existen, no con cual se pago un documento concreto. Y desde F-038 el
       comparativo de ofertas (`compras.comparativos`) con todas sus ofertas
-      (`compras.comparativo_ofertas`), las ficticias marcadas.
+      (`compras.comparativo_ofertas`), las ficticias marcadas; sus lineas de
+      los dos lados (`compras.comparativo_lineas`,
+      `compras.comparativo_oferta_lineas`), el coste objetivo contra su base
+      del descompuesto (`compras.comparativo_objetivo`) y las firmas escalon
+      a escalon (`compras.comparativo_firmas`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]

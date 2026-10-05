@@ -29,7 +29,7 @@ la base es MANUAL del humano. **D1 aprobado (2026-10-04): dos fases.** Fase 2
 - [x] T14: `09`: `compras.comparativo_objetivo` (R31)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k objetivo`
 - [x] T15: `09`: `compras.comparativo_firmas` (R33)  |  Verificación: `python -m pytest tests/test_f038_sql.py -q -k firmas`
 - [x] T16: `SUB_PASOS` + `09` (cuenta `comparativo_oferta_lineas`) y `tests/test_f047_steps.py`  |  Verificación: `python -m pytest tests/test_f047_steps.py -q`
-- [ ] T17: Fichas de Fase 2 (R28, R34, R35) y `version` +1  |  Verificación: `python -m pytest tests/test_f038_diccionario.py tests/test_f006_fichas.py -q`
+- [x] T17: Fichas de Fase 2 (R28, R34, R35) y `version` +1  |  Verificación: `python -m pytest tests/test_f038_diccionario.py tests/test_f006_fichas.py -q`
 - [ ] T18: `azure-apps/datamart_seg_anual.md` con los objetos de Fase 2; commit en ese repositorio  |  Verificación: `git -C C:/Users/pgris/PycharmProjects/azure-apps log -1 --stat`
 - [ ] T19: Mutación del dominio de Fase 2 y `bash harness/init.sh` en verde  |  Verificación: `python -m harness.mutacion --feature F-038` y `bash harness/init.sh`
 
