@@ -17,6 +17,14 @@
 > («primero a y si no b»): casan 24.425 de 84.084 líneas OBJETIVO con %, reproducido
 > en Azure. `init.sh` 6.795 passed. Resumen en `progress/history.md`. Queda el
 > despliegue de la Fase 2 (MANUAL de abajo).
+>
+> **Fase 2 DESPLEGADA por el líder el 2026-10-05 a las 23:01 UTC, por orden del
+> humano** (opción a): merge a `main` `d8163db`; imagen `r20261006-0054`, job
+> comprobado. La nocturna del 06-10 construye las tablas nuevas de `compras` y
+> publica el diccionario **v43** ella sola. **PENDIENTE DEL LÍDER tras la nocturna
+> (lo pidió el humano)**: comprobar que `build_compras` y `publicar_diccionario`
+> salieron SUCCESS (v43), `check-diccionario` OK, REINICIAR EL MCP y la T25 (la
+> 0696) y las cifras de D4 en solo lectura.
 
 ### Antes
 
