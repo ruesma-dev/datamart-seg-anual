@@ -28,6 +28,9 @@ Abierta por el humano el 2026-10-05. Rama `feature/F-038-comparativos` desde
 `main` `e9c5507`. Informe: `progress/impl_F-038.md` (el de la Fase 1, íntegro,
 en `progress/impl_F-038_fase1.md`). T11-T19 con un commit cada una, más uno de
 consecuencias en tests de otras features. Ni un SQL contra ninguna base.
+`bash harness/init.sh`: ENTORNO LISTO (6786 passed; cobertura 14/14 líneas
+cambiadas). Mutación del dominio 13/13 muertos (1 worker; con 4 y 2 la línea
+base no cabía en 600 s); SQL manual 25/25. Pendiente: REVIEW de la Fase 2.
 
 **Lo que entra**: `compras.comparativo_lineas`, `comparativo_oferta_lineas` (con
 la base del coste objetivo según D4), `comparativo_objetivo`,

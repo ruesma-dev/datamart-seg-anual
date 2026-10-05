@@ -152,7 +152,11 @@ FAILED tests/test_f038_sql.py::test_f038_r33_firmas_grano_una_fila_por_confir_de
 - Suite entera sin cobertura antes de mutar (`python -m pytest tests -q -p no:cacheprovider`):
   primero `3 failed, 6783 passed` (las tres consecuencias de §2.6:
   `test_f123_origenes` r1, `R-SIGRID-CON` y los recuentos de `current.md`),
-  arregladas en `656e202` y en el commit del informe; después, ver «Evidencias».
+  arregladas en `656e202` y `d2d1d34`; después, verde (ver «Evidencias»).
+- Campaña del arnés: dos intentos ABORTADOS por la propia herramienta antes de
+  evaluar nada («LÍNEA BASE SIN TERMINAR»: la suite limpia pasó de 600 s con 4 y
+  con 2 workers; la máquina estaba cargada por campañas de otros proyectos). La
+  válida es la tercera, en serie (`--workers 1`), sobre `d2d1d34`.
 - NO verificado (no se puede sin base): que `09` corra en Postgres, su tiempo y
   sus cifras. Riesgos a mirar en la MANUAL: tipos de `raw` (`dcopro.dto` texto,
   `confir.hor`), el coste de leer `descompuestos.lineas` (~4,5 M filas; la
@@ -177,4 +181,11 @@ reiniciar el MCP tras publicar la v43.
 
 ## Evidencias
 
-PENDIENTE: se completa al terminar la campaña de mutación y `init.sh`.
+| Evidencia | Valor real |
+|---|---|
+| Tests ejecutados (`init.sh`) | **6786 passed, 227 skipped**, 0 failed (de ellos 307 de F-038: 123 + 68 + 116) |
+| Cobertura de líneas cambiadas | `PUERTA COBERTURA: 100.0% de 14 líneas cambiadas cubiertas (14/14, umbral 80%, nivel estandar; diff desde e9c5507390, merge-base con main)` |
+| Mutación (`harness.mutacion`, **1 worker**, HEAD `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2`) | Alcance 84 líneas (dominio 65, step 19). **13 generados, 13 muertos, 0 supervivientes**, 0 timeouts, 0 sin veredicto; 3665,0 s; línea base 419,4 s, media 281,9 s/mutante. Ningún superviviente que analizar. Detalle: `progress/mutacion_F-038.md` |
+| Mutación SQL manual (1 worker, `d2d1d34d94a1d344c0015033b3fa5dd023fbc9a2`) | **25 mutantes (M25-M49), 25 muertos**; tabla `fichero:línea`, original -> mutado y nº de fallos en el anexo de `progress/mutacion_F-038.md`; script `progress/mutacion_sql_F-038_fase2.py`. Línea base 0 fallos antes y después (1073 passed) |
+| Tiempo de la suite | 2434,06 s con cobertura dentro de `init.sh` (0:40:34, máquina cargada); 1001,17 s sin cobertura |
+| `bash harness/init.sh` | **ENTORNO LISTO**, exit 0, sobre HEAD `5bcb2e8` (todas OK; `PUERTA TAMAÑO`: requirements 144/150, design 249/250, impl 180/220). El commit posterior solo rellena esta tabla y marca T19 |
