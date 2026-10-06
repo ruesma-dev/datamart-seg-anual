@@ -1,140 +1,140 @@
 <!-- progress/review_F-067.md -->
-Revisión completa (pasada 1): `git diff main...HEAD` sobre `b393c8b`; fuera, por ser del líder, `10021ba`, `1bfa8a8`, `b5b6ac3`, `d4bf384` y `7a5a8d9`
+Revisión incremental desde 1a6e40f (pasada 2): el delta es `e45fbad`, `b575935`, `6f08f97` y `9eeb9b5`. La pasada 1 revisó entero `main...b393c8b` y está íntegra en `git show 1a6e40f:progress/review_F-067.md`
 
 # F-067 · Review · foto diaria de estados, condiciones del contrato y código 2
 
-**Veredicto: CHANGES_REQUESTED.** Solo hay que arreglar papeleo y un
-comentario. El código, el SQL, los tests y las dos campañas los he verificado y
-están bien, y las cifras de la spec las he reproducido en Azure.
+**Veredicto: APPROVED** (pasada 2). Los dos cambios de la pasada 1 están hechos.
+`reset-compras` ya no puede borrar la historia: lo he comprobado **ejecutando su
+SQL real** contra un Postgres 16 desechable, no solo leyendo el texto.
 
-**Rigor:** `critico`, declarado: RED, cobertura, mutación sin supervivientes, RM5, MANUAL.
+**Rigor:** `critico`, declarado: RED, cobertura, mutación, RM5, MANUAL.
 
-## Lo que se ha verificado
+## Pasada 2 · delta `1a6e40f..9eeb9b5`
 
-- **La foto (`11`)**: lo ejecutable no tiene ni `DROP`, ni `TRUNCATE`, ni
-  `DELETE` (test con `\b`, y M17 → 4 fallos). Las tablas se crean con `IF NOT
-  EXISTS`, sin FK, así que ningún `DROP ... CASCADE` de `compras` se las lleva;
-  `--full` solo trunca `raw` (`ingest_raw_step.py:272`). Los pasos 1-6 van en el
-  orden del design §3. **Relanzar la misma noche no escribe nada**: `v_obs <=
-  v_ult → RETURN` antes de cualquier `UPDATE` (test; M04 lo mata). El tramo se
-  cierra por `ide`+`tip` con `IS DISTINCT FROM` y el desaparecido no se reabre.
-  El índice único parcial impide dos tramos abiertos. El `INSERT` lleva
-  `observado_antes = v_ult` y `es_linea_base = (v_ult IS NULL)`. Lo he comparado
-  paso a paso con `aplicar_foto`, cambio de tipo incluido, y es igual.
-- **La guarda del 98 % NO se ha debilitado.** `d698881` solo toca el DOMINIO, y
-  lo que quita (`n_abiertos > 0 and`) es redundante: con 0 abiertos queda
-  `len < 0`. Lo he comprobado por fuerza bruta (n 0-299, v 0-399): 0
-  discrepancias entre el original, el mutante `>= 0` y la versión nueva. El SQL
-  no cambia desde T4 (`de51611`, `e032831`), y un test fija su texto exacto,
-  `IF v_abiertos > 0 AND v_actual < 0.98 * v_abiertos THEN RAISE EXCEPTION`,
-  antes del primer `UPDATE`. M05, M06 y M07 mueren.
-- **Delphi**: época `1899-12-30` y `v > 0`, la misma que `EPOCA_DELPHI` (test);
-  M01, con la de SQL Server, muere. En Azure, `max(tiemod)` = 2026-10-05 15:44.
-- **D2**: la vista saca la antigüedad de `h.desde` (Madrid), sin `tiemod` (test
-  de veto). Las fichas dicen que `tiemod` NO es el cambio de estado.
-- **Columnas al final** en `contratos` (5) y en las tres tablas de líneas (3).
-  Ninguna existente se mueve (`test_f084_sql`, R12, R17). `necesidad_id` va
-  detrás de `factor`. **Sello intacto**: `git diff main...HEAD --stat --
-  sql/descompuestos/` solo devuelve `06_views.sql`.
-- **En Azure, SOLO LECTURA** (psycopg directo, `transaction_read_only = on`,
-  sesión en UTC). `raw.con._ingested_at` es `timestamp DEFAULT now()` y se carga
-  entera cada noche (min y max a 2 min). 44/15: 185.754, con `ide` único. El
-  SELECT de `contratos` con su lateral da 19.081 filas: 19.072 con forma de pago
-  y 6.333 con retención (5 % en 6.277). `dcapro`: 1.162.871 / 357.349 /
-  378.010, y todas casan con `dncpro`. `dnc`: 277, 271 de ellas las de su obra.
-  `necesidad_id` va por `dncpro_pkey` (Index Scan). Coincide con la previsión de
-  T19.
-- Los tests ajustados de F-006/038/073/079/120 no pierden exigencia; ningún
-  commit del implementer toca `features.json` (los cambios son del líder).
+- **Cambio 1, hecho.** Las MANUAL T16-T23 están en `current.md` en orden, cada
+  una con su comando y lo que debe salir, copiadas de `impl` §6. El punto previo
+  sobre `reset-compras` ya no hace falta: está decidido y hecho.
+- **Cambio 2, hecho.** El comentario de `11:86-90` dice ahora que la excepción
+  revierte SOLO ese fichero y que `00`-`10` ya están confirmados. Es lo que pasa
+  en realidad, y no cambia nada ejecutable.
+- **`reset-compras` (decisión del 2026-10-06, opción a).** El comando ejecuta
+  `SQL_RESET_COMPRAS`, un `DO` que borra por catálogo, con `CASCADE`: primero
+  vistas y materializadas, luego tablas `r`/`p` **menos** `TABLAS_PERSISTENTES`,
+  y al final las funciones. No contiene `DROP SCHEMA`, `DROP INDEX`, `TRUNCATE`
+  ni `DELETE`. Un `CASCADE` no puede arrastrar las dos tablas por ninguna vía:
+  ellas no dependen de nada de `compras`, ni por FK ni por función en
+  `CHECK`/`DEFAULT`. Un `CASCADE` sobre otra tabla o función solo se llevaría
+  dependientes, y una tabla solo puede perder una FK o un `DEFAULT`, nunca
+  desaparecer entera. Barrido del repo: los únicos `DROP SCHEMA` que quedan son
+  `cierre` y `retenciones` (`main.py:4011` y `5205`). El `DROP DATABASE` de
+  `scripts/extraer_planif_cuatrimestral.py` es de otra base (`sigrid_planif`),
+  ya existía y no se toca. El parche histórico ya no borra nada: lanza
+  `ClickException`.
+- **Ejecutado de verdad** (Postgres 16.4 local en mi scratchpad, puerto propio,
+  borrado al terminar; nada contra Azure). Corrí el **SQL REAL** de
+  `11_historial_estados.sql` y de `SQL_RESET_COMPRAS` sobre un `raw.con` de
+  prueba:
+  - Noche 1: 100 tramos de línea base, y los comparativos (46) quedan fuera.
+    Relanzada: no escribe nada.
+  - Noche 2: 3 firmas más un estado a NULL dan 4 CAMBIO. Hay 2 DESAPARECIDO (el
+    borrado y el del tipo viejo) y 3 altas (2 nuevas más el cambio de tipo). El
+    tramo nuevo lleva `observado_antes` igual a la noche 1, y
+    `es_linea_base` falso.
+  - Noche 3, con 91 de 101: `RAISE EXCEPTION` y nada escrito. Noche 4, con 99
+    de 101 (98,0 %): pasa.
+  - **Reset**, con una FK `contrato_lineas → contratos`, una vista que une la
+    foto con `contratos`, una materializada, una función y una vista de OTRO
+    esquema que lee la foto: antes 107 tramos y 3 fotos, **después 107 y 3**.
+    Siguen la PK, el `CHECK`, el índice único parcial y la vista del otro
+    esquema. En `compras` no queda nada más.
+  - Build tras el reset: no escribe (misma ingesta) y recrea
+    `v_estado_documentos` (99 filas). El doble reset es idempotente.
+- **Tests** (`test_f067_reset.py`, 8): fijan el texto del SQL, que no haya
+  `DROP SCHEMA` ni `DROP INDEX`, el orden, que el comando ejecute exactamente
+  ese SQL con un commit, y el veto a `DROP SCHEMA compras` en todo
+  `*.py/sql/ps1/sh`. Es un doble mínimo de conexión y cursor: solo
+  `connection`, `cursor`, `execute` y `commit`, que existen en el real.
+- **Cobertura 97,4 % (74/76).** Las 2 líneas sin cubrir son el cuerpo nuevo de
+  `reset_compras` en `patches/main_py_patch_compras.py`, un parche histórico que
+  nada importa ni ejecuta: no es código vivo. El código vivo (módulo del reset,
+  `main.reset_compras`, el dominio y el step) está al 100 %, y el total pasa el
+  umbral. Lo acepto.
+- **Mutación** (RM1): el alcance ha crecido a 329 líneas en 5 ficheros (el
+  dominio, el step, `compras_reset_sql.py`, `main.py` y el parche).
+  `generar_mutantes` sobre HEAD da 45 (todos del dominio) y 0 en las otras
+  cuatro. Lo he recalculado: es cálculo puro. He reejecutado
+  `mutacion_dominio_F-067.py` en una copia de HEAD: **45/45 muertos**, base 276
+  passed. La campaña MANUAL del reset (R1-R6, 6/6) la he reproducido en una
+  copia: **R1** (sin `NOT IN`), **R4** (sin `CASCADE`) y **R6** (una sola
+  conservada) dan **+1 fallo cada uno sobre la base**. En la copia, la base ya
+  traía 1 fallo, el test del comando: es del entorno, porque el worktree no
+  tiene `.env`; en el árbol real pasan los 8. La tabla del informe no trae la
+  línea de cada mutante, y es lo único que le falta; con el texto exacto se
+  reproduce igual. El informe tampoco nombra el parche (8 líneas, 0 mutantes).
+- **RED** de `reset`: `2 failed, 6 passed` según `impl` (el comando y el veto).
+  Concuerda con lo que el veto cazaba antes, en `main.py` y en el parche.
+- Los documentos `README_COMPRAS_C1_C2.md`, `LEEME_INTEGRACION.md`,
+  `ARCHITECTURE.md`, las dos fichas y `azure-apps` (`e5ad1cb`) dicen ya que
+  `reset-compras` conserva la foto.
 
-## Checkpoints
+## Checkpoints (pasada 2)
 
-**C1** [x] `bash harness/init.sh` sobre `b393c8b`: **6.976 passed, 226
-skipped** (56 min), `COBERTURA [OK] 100 %` (66/66). Su único `[KO]` fue el
-TAMAÑO de ESTE informe, que escribía mientras corría (174 > 140); ya está
-recortado, y `python -m harness.tamano --feature F-067`: dentro (review 140/140) · [x] los
-ficheros del arnés existen.
+**C1** [x] `bash harness/init.sh` sobre `9eeb9b5`: **ENTORNO LISTO**, 6.984 passed (45 min) · [x]
+ficheros del arnés.
 **C2** [x] una sola `in_progress` · [x] rama `feature/F-067-…` · [x]
-`current.md` refleja el estado real · [x] `history.md`: no aplica todavía.
-**C3** [x] hexagonal: el dominio solo usa la librería estándar y el SQL está en
-`sql/compras/10_`/`11_` · [x] primera línea con la ruta · [x] sin `print`, sin
-secretos y sin dependencias nuevas · [x] Sigrid: `tip` 44/15 y la pareja (tipo,
-estado) de F-084. Ámbito, fase e importes: N/A, porque no toca `stg`, `mart` ni
-importes.
+`current.md` es el estado real · [x] `history.md`: no aplica todavía.
+**C3** [x] hexagonal: el SQL vive en `infrastructure/postgres/`, que solo
+construye texto, y el dominio solo da el literal · [x] primera línea con la
+ruta · [x] sin `print`, secretos ni dependencias nuevas · [x] Sigrid: sin
+cambios desde la pasada 1.
 **C3 bis** N/A: no toca `docs/referencia/`. **C4 ter** N/A: no hay
 `rutas_sensibles.json`.
-**C4** [x] R1-R29 con `test_f067_rN_*` en verde; R28 (puertas en la base) y R30
-son MANUAL · [x] sin red ni BBDD · **[ ] las MANUAL no están en `current.md`
-con su comando** (cambio 1) · [x] no hay dobles nuevos.
-**C4 bis** [x] rigor declarado · [x] RED con traza real, y la T4 reproducida en
-un worktree de `de51611` con el test de `e032831`: «7 failed, 1 passed», como el
-informe · [x] cobertura `[OK]` · [x] alcance y mutantes recalculados · [x]
-> 60 s: **la campaña del arnés NO se ha reejecutado** (15.340 s según el
-informe); a cambio, recálculo más RM4 · [x] coste por mutante 306,8 × 4 =
-1.227 s, coherente con la base de ~1.090 s · [x] sin «NO VÁLIDA» y «Sin
-veredicto» 0 · [x] RM1 · [x] RM2 · [x] RM5 · [x] RM6 · [x] tabla SQL con línea,
-texto exacto y fallos, reproducida · [x] los supervivientes y el timeout tienen
-su análisis · [x] «Evidencias» con los workers · [x] ningún N/A sin motivo.
-**C5** [x] T1-T15 `[x]`, con un commit `F-067 Tn` cada una (T16-T23 son MANUAL)
-· [x] árbol limpio (worktrees borrados) · [x] `features.json` real.
+**C4** [x] R1-R29 más el `reset` con tests en verde · [x] sin red ni BBDD · [x]
+**MANUAL en `current.md` con su comando y lo que debe salir** · [x] el doble
+nuevo solo imita métodos que existen en el real.
+**C4 bis** [x] rigor declarado · [x] RED · [x] cobertura `[OK]` 97,4 % · [x]
+alcance y mutantes recalculados · [x] la campaña del arnés no se ha
+reejecutado (15.340 s, > 60 s); en su lugar, recálculo más RM4 sobre HEAD · [x]
+coste por mutante coherente (pasada 1) · [x] sin «NO VÁLIDA» · [x] RM1 · [x]
+RM2 · [x] RM5 (el equivalente `>= 0`, demostrado en la pasada 1, ya no existe)
+· [x] RM6: nada defensivo se ha quitado en el delta · [x] tablas MANUAL con su
+texto exacto, reproducidas (SQL 40/40 en la pasada 1; reset R1, R4 y R6 ahora)
+· [x] 0 supervivientes · [x] «Evidencias» · [x] ningún N/A sin motivo.
+**C5** [x] T1-T15 `[x]` con sus commits; el delta lleva `F-067:` (correcciones
+de la review) · [x] árbol limpio (worktree y Postgres local borrados) · [x]
+`features.json` refleja el estado real, y el delta no lo toca.
 
-## Mutación (verificación independiente)
+## Pasada 1 · resumen (íntegra en `1a6e40f`)
 
-- **Recálculo** (`harness.alcance` + `generar_mutantes`): sobre `d088327`, 235
-  líneas (33 + 202) y 50 mutantes, como el informe. Los 4 supervivientes y el
-  timeout existen con el mismo operador y el mismo texto (l. 121, 125, 173 y
-  176). Sobre HEAD: 239 líneas y 45 mutantes.
-- **RM1**: lo medido (`d088327`) no es HEAD; después cambió el dominio
-  (`d698881`). **RM4**: he reejecutado `progress/mutacion_dominio_F-067.py` en
-  una copia de HEAD: **45/45 muertos, base 276 passed**, como declara el informe.
-  El step da 0 mutantes en las dos versiones.
-- **RM3**: ningún equivalente sale muerto. **RM5**: el equivalente `>= 0` lo he
-  demostrado arriba por fuerza bruta, y además ya no existe. **RM6**: lo que se
-  quitó es una condición redundante, no una guarda contra `None`. `n_abiertos`
-  es una suma de unos (l. 120), así que nunca es negativo, y el SQL mantiene
-  `v_abiertos > 0` sobre un `count(*)`.
-- **Campaña SQL**: `mutacion_sql_F-067.py` reejecutado entero en un worktree de
-  HEAD: **40/40 muertos, con el nº de fallos idéntico fila a fila** (M05 → 1,
-  M17 → 4, M21 → 1…). Base 1.199 passed: las 1.197 del informe más los 2 tests
-  de `d698881`.
+Verificado entonces, y el delta no lo toca: la foto (sin `DROP`/`TRUNCATE`/
+`DELETE`, idempotente, cierre por `ide`+`tip` con `IS DISTINCT FROM`, índice
+único parcial) igual que el oráculo; la guarda del 98 % sin debilitar (el SQL
+se fija por su texto exacto; lo quitado del dominio era redundante, comprobado
+por fuerza bruta); la época de Delphi; D2 (la antigüedad sale de la foto, nunca
+de `tiemod`); las columnas al final y el sello de `descompuestos` intacto; las
+cifras de T19 reproducidas en Azure en SOLO LECTURA (185.754 documentos,
+6.333/19.072 contratos, 1.162.871/357.349/378.010 líneas, 277 DPC); la campaña
+SQL 40/40 reproducida fila a fila; la RED de T4 reproducida.
 
 ## Cobertura requisito → test (`tests/test_f067_*.py`)
 
-R1 `r1_*` (5) · R2 (8) · R3 · R4 (4) · R5 (7) · R6 (7) · R7 (4) · R8 (9) · R9
-(5) · R10 (4) · R11 (2) · R12 (3) · R13 (3) · R14 (9) · R15-R16 · R17-R18 (5) ·
-R19 (5) · R20-R21 (3) · R22-R25 (7) · R26-R27 (4) · R28 (2) más T18 · R29 por
-lectura (ARCHITECTURE y `azure-apps` en `5a66c79`) · R30 MANUAL T21.
+R1 (5) · R2 (8) · R3 · R4 (4) · R5 (7) · R6 (7) · R7 (4) · R8 (9, más 8 de
+`reset`) · R9 (5) · R10 (4) · R11 (2) · R12 (3) · R13 (3) · R14 (9) · R15-R16 ·
+R17-R18 (5) · R19 (5) · R20-R21 (3) · R22-R25 (7) · R26-R27 (4) · R28 (2) más
+T18 · R29 por lectura · R30 MANUAL T21.
 
 ## Cambios requeridos
 
-1. **`progress/current.md` l. 103-106**: copiar las MANUAL de `impl_F-067.md`
-   §6 **en orden, con su comando exacto y lo que debe salir**, como F-113 y
-   F-038. Ahora solo hay un resumen y un puntero (C4; mismo motivo de rechazo
-   que F-123 en su pasada 1). El primer punto, la **decisión sobre
-   `reset-compras`**, que `impl` §6 pone como precondición de T16.
-2. **`sql/compras/11_historial_estados.sql:86-88`**: «La excepción revierte el
-   build entero de la noche» es **falso**. Cada sub-paso es su propia
-   transacción (`postgres_client.py:1454` y el bucle de
-   `build_compras_step.py`), así que `00`-`10` ya están confirmados y solo se
-   revierte la foto. Hay que corregirlo: «revierte este fichero: no se toma la
-   foto; el resto de `compras` ya se ha reconstruido». Es lo que leerá quien
-   opere esa noche. Ningún test fija ese comentario.
+Ninguno. Quedan las MANUAL T16-T23 del humano (`current.md`).
 
 ## Para el líder y el humano (no bloquea)
 
-- **`reset-compras` borra la historia** (`DROP SCHEMA compras CASCADE`,
-  `main.py:4933`), y lo **recomiendan** `README_COMPRAS_C1_C2.md:53` y
-  `LEEME_INTEGRACION.md:21`. El implementer hizo bien en no tocarlo (fuera del
-  design). Hay que decidirlo ANTES de desplegar: que el comando excluya las dos
-  tablas o se niegue, y corregir esos dos documentos.
-- **Riesgo de la spec (R5)**: un documento que falta una noche, por una ingesta
-  a medias que pasa la guarda (≤ 2 %, unos 3.700), se cierra como DESAPARECIDO y
-  al reaparecer pierde `antiguedad_es_minima`: su antigüedad vuelve a contar
-  desde cero. Con `--full` es improbable, pero no tiene vuelta atrás.
-- T23 (`NOT h.es_linea_base`) cuenta también las altas, no solo los cambios.
-
-## Automejora (propuesta, no aplicada)
-
-En `reviewer.md` o C3: «tabla PERSISTENTE en un esquema que se reconstruye →
-buscar en todo el repo (CLI, scripts, `infra/`, README) `DROP SCHEMA <esquema>`
-o un reset». El veto de R8 solo mira quién NOMBRA las tablas.
+- **R5 (de la spec)**: un documento ausente una noche, en una ingesta a medias
+  que no llega a saltar la guarda (≤ 2 %), pierde `antiguedad_es_minima` al
+  reaparecer. Con `--full` es improbable, pero no tiene vuelta atrás.
+- T23 (`NOT h.es_linea_base`) cuenta también las altas. `reset-compras` borra las funciones con `CASCADE`. Si algún día una tabla
+  persistente usa una función de `compras` en un `CHECK` o un `DEFAULT`, el
+  reset le quitaría esa restricción en silencio. Hoy no pasa (verificado).
+- **Automejora (propuesta)**: en `reviewer.md`, «tabla PERSISTENTE en un esquema
+  que se reconstruye → buscar en todo el repo `DROP SCHEMA <esquema>` o un
+  reset», y si hay un Postgres local, ejecutar el SQL destructivo de verdad.
