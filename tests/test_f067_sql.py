@@ -411,7 +411,11 @@ def test_f067_r10_estado_documentos_la_antiguedad_sale_de_la_foto_en_madrid() ->
         "((now() AT TIME ZONE 'Europe/Madrid')::date "
         "- (h.desde AT TIME ZONE 'Europe/Madrid')::date) AS dias_en_estado" in proyeccion
     ), "los días se calculan al consultar, con la fecha de Madrid: avanzan solos"
-    assert "h.es_linea_base AS antiguedad_es_minima" in proyeccion
+    # Elemento EXACTO de la proyección y no subcadena: `NOT h.es_linea_base AS
+    # antiguedad_es_minima` contiene la cadena buena y sobrevivió a la campaña
+    # manual del SQL (M21) mientras el test buscaba con `in`.
+    elementos = [e.strip() for e in re.split(r",(?![^()]*\))", proyeccion)]
+    assert "h.es_linea_base AS antiguedad_es_minima" in elementos, elementos
 
 
 def test_f067_r10_estado_documentos_nunca_usa_tiemod() -> None:
