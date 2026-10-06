@@ -827,7 +827,8 @@
         "Confirmado con el dato delante, no por el nombre, que `act`/`auxacttip` es lo que Negocio llama actividad del proveedor; si no lo es, localizado lo que si lo sea",
         "Sobre las tablas que F-066 dejo en raw (PFfir, auxfam, act, auxacttip, actent, actseg): decidido y escrito cuales suben a stg y a la superficie de consumo, y con que grano",
         "Lo que se ingiera llega con su ficha en el diccionario y, si sube a la superficie de consumo, con su vista y su clave declarada",
-        "Probado que responde al menos una pregunta de negocio que hoy no se puede responder: por ejemplo el gasto agrupado por familia de producto, o los proveedores de una actividad concreta en una obra"
+        "Probado que responde al menos una pregunta de negocio que hoy no se puede responder: por ejemplo el gasto agrupado por familia de producto, o los proveedores de una actividad concreta en una obra",
+        "(De F-067, D4 del humano 2026-10-06) Un proveedor se puede buscar por actividad (`conact` -> `auxpronat`), no solo por historico de contratos; la ficha declara que «validada» no existe en Sigrid (`homolo` = 0 en todos) y que lo mas cercano son los certificados con caducidad de `prvcer`"
       ],
       "status": "pending",
       "sdd": true,
@@ -1012,7 +1013,7 @@
         "compras.contratos publica el estado actual con su nombre (conest), forma de pago y retencion; la penalizacion queda como pregunta a Compras (no hay campo)",
         "Existe una FOTO DIARIA de estados (documento, tipo, estado, fecha) para contratos y facturas, construida en el datamart (guardada por tramos desde/hasta, persistente: --full no la toca) y sobre ella la vista del estado actual con su antiguedad; 'mas de tres semanas' se responde por el MCP con certeza desde el dia 21 tras el despliegue (la linea base es un minimo). AJUSTADO POR LA SPEC (2026-10-06): con.tiemod NO es proxy de la antiguedad del estado -medido: la firma no lo mueve en el 85 % de los comparativos- y, si se publica, es solo 'fecha de ultima modificacion' (D2)",
         "Los comparativos por actividad y por proveedor adjudicatario se responden con compras.comparativos de F-038 (actividad_id 99,2 %, ganadora unica 87,7 %; 1.535 proveedores ganadores con mas de una actividad, medido el 2026-10-06): aqui solo fichas y preguntas de aceptacion, sin objetos nuevos",
-        "Un proveedor se puede buscar por actividad validada, no solo por historico de contratos",
+        "MOVIDO A F-055 por decision del humano (D4, 2026-10-06): proveedores por actividad (`conact`); «validada» no existe en Sigrid (`homolo` = 0). F-067 no lo implementa",
         "La FOTO DIARIA de estados da la fecha de cambio de estado de la factura (el estado, la fecha de la propia factura y el cruce con los pagos YA estan: estado y fecha_factura los publico F-083 en compras.facturas, el cruce con pagos lo publico F-080 en compras.vencimientos; aqui no se reimplementan)",
         "Cada objeto nuevo con su ficha en el diccionario y su clave declarada; check-unicidad y check-declarados en verde",
         "Probado con Compras: las cuatro preguntas del correo respondidas por el conector MCP",
@@ -1022,7 +1023,7 @@
         "(De F-125) Las fichas del diccionario explican que es el codigo 2 (lo pone el jefe de obra para agrupar o filtrar sus compras en el DPC) y que es el documento de necesidades de compra",
         "(De F-125) Contrastado con el caso de Juan: un albaran de MOMOSA con lineas sin contrato muestra su codigo 2 (medido: AC26/28510 y AC26/28514, lineas sin contrato con codigo 2 'MOMOSA')"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
