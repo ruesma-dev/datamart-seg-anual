@@ -311,8 +311,10 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     (test). El resto de `compras` se rehace con `DROP ... CASCADE` y no las
     toca porque no dependen de nada del esquema; `--full` solo trunca `raw`.
     **Si alguien las borra, la historia se pierde**: no hay copia en Sigrid, y
-    vuelve a empezar desde una línea base nueva. Ojo con `python main.py
-    reset-compras`, que hace `DROP SCHEMA compras CASCADE` y se las llevaría.
+    vuelve a empezar desde una línea base nueva. Por eso `python main.py
+    reset-compras` (decisión del 2026-10-06) ya no tira el esquema: borra sus
+    vistas, tablas y funciones y CONSERVA estas dos (un test veta cualquier
+    borrado del esquema `compras` entero en el código del repositorio).
   - **Guardas**: sin `raw.con` más nuevo que la última foto no se escribe nada
     (relanzar el build es inocuo); si los documentos presentes son menos del
     98 % de los tramos abiertos, `RAISE EXCEPTION` y el build falla sin

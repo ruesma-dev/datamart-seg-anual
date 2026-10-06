@@ -188,3 +188,23 @@ mutada la contenía; ahora compara el elemento exacto (`cc8113a`). Columna
 **Límite declarado**: los tests leen el TEXTO del SQL; matan cualquier
 desviación del texto esperado pero no prueban que el SQL corra ni sus cifras.
 Eso es MANUAL tras el despliegue (T17-T20 de `tasks.md`).
+
+## `reset-compras` conserva la foto (decisión del 2026-10-06)
+
+Alcance nuevo: `main.py` (16 líneas), `domain/historial_estados.py` (5, la
+constante `TABLAS_PERSISTENTES`) y `infrastructure/postgres/compras_reset_sql.py`
+(62). `harness.mutacion.generar_mutantes` sobre esas líneas: **0 mutantes**
+(no hay operadores mutables: llamadas, constantes de texto y un `join`). Como
+la lógica está en el SQL del reset, 6 sustituciones a mano contra
+`tests/test_f067_reset.py`, 1 worker, en el árbol y restaurando el fichero:
+
+| Id | original -> mutado | fallos |
+|---|---|---|
+| R1 | `AND c.relname NOT IN ({_CONSERVADAS})` -> (quitado) | 1 |
+| R2 | `c.relkind IN ('r', 'p')` -> `c.relkind IN ('r')` | 1 |
+| R3 | `c.relkind IN ('v', 'm')` -> `c.relkind IN ('v')` | 1 |
+| R4 | `DROP TABLE IF EXISTS compras.%I CASCADE` -> sin `CASCADE` | 1 |
+| R5 | `n.nspname = 'compras'` (funciones) -> `'public'` | 1 |
+| R6 | `_CONSERVADAS` del dominio -> solo `'historial_estados'` | 1 |
+
+**6/6 muertos, 0 supervivientes.**

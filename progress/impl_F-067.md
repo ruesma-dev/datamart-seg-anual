@@ -56,13 +56,26 @@ Ni `descompuestos.lineas` ni `00/01/02/03` cambian: no retrocea nada.
 - **Fechas de la vista en `Europe/Madrid`**, `dias_en_estado` con la fecha de
   Madrid de hoy menos la de `desde`; calculado al consultar.
 
+- **`reset-compras` CONSERVA la foto (decisión del humano del 2026-10-06,
+  delegada en el líder, opción a)**: ya no tira el esquema; ejecuta
+  `SQL_RESET_COMPRAS` (`infrastructure/postgres/compras_reset_sql.py`): borra
+  vistas, tablas (menos `TABLAS_PERSISTENTES` del dominio) y funciones, con
+  `CASCADE`; los índices de las dos mueren solo con su tabla.
+  `tests/test_f067_reset.py` (8) lo vigila, con un veto a borrar el esquema
+  `compras` entero en todo `*.py/*.sql/*.ps1/*.sh` del repositorio (por eso
+  el parche histórico `patches/main_py_patch_compras.py` ya no borra nada).
+  Corregidos `README_COMPRAS_C1_C2.md`, `LEEME_INTEGRACION.md`,
+  `ARCHITECTURE.md`, `azure-apps` y las dos fichas. RED: `2 failed, 6 passed`
+  (el comando ejecutaba el borrado del esquema; el veto cazaba `main.py` y el
+  parche). Mutación: el generador de `harness.mutacion` da **0 mutantes** en
+  las líneas nuevas (`main.py`, el dominio y el módulo nuevo); a mano, 6 sobre
+  el SQL del reset (sin `NOT IN`, sin `'p'`, sin `'m'`, sin `CASCADE`, otro
+  esquema, una sola conservada): **6/6 muertos** (`progress/mutacion_F-067.md`).
+
 ## 3 · Hallazgos para el líder (fuera del alcance de la spec, NO tocados)
 
-1. **`python main.py reset-compras` hace `DROP SCHEMA compras CASCADE`** y se
-   llevaría las dos tablas persistentes (R8: «ninguna se borra jamás»). No lo
-   usa la nocturna ni ningún script de `infra/`; está documentado en
-   `ARCHITECTURE.md` y en `azure-apps`. Propuesta: que `reset-compras` excluya
-   esas dos tablas o se niegue. Decide el humano; `main.py` no está en la spec.
+1. `reset-compras` borraba el esquema `compras` entero: resuelto, ver §2
+   (decisión del 2026-10-06).
 2. `scripts/compras_setup.py` hace `DROP TABLE raw."<tabla>" CASCADE`: sobre
    `raw.dncpro` se llevaría las dos vistas de `descompuestos`. Script de puesta
    en marcha antiguo, no de la nocturna.
@@ -126,7 +139,6 @@ de escribir el código; después, en verde.
    `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm`;
    `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev
    --query "properties.template.containers[0].image" -o tsv` → el tag nuevo.
-   **Antes de nada, decidir el hallazgo 1 de §3** (`reset-compras`).
 2. **T17** Dejar correr la nocturna (00:00 UTC): toma la LÍNEA BASE.
    `python main.py status` → `run-all` SUCCESS; `python main.py timings
    --last 1` → `build_compras` < +1 min sobre la noche anterior.

@@ -131,6 +131,8 @@ QUIEN_PUEDE_NOMBRARLAS = {
     "application/steps/build_compras_step.py",
     "domain/historial_estados.py",
     "infrastructure/postgres/sql/compras/11_historial_estados.sql",
+    # `reset-compras`: el que las PROTEGE (importa `TABLAS_PERSISTENTES`).
+    "infrastructure/postgres/compras_reset_sql.py",
 }
 
 

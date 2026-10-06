@@ -3376,7 +3376,8 @@ objetos:
       EXISTE: `concam` no audita el estado y `confir` no tiene firmas de
       contrato. **ES HISTORIA QUE NO SE RECONSTRUYE**: el resto de `compras` se
       rehace cada noche y esta tabla no; si se borrara, la historia volveria a
-      empezar de cero, porque no hay copia en Sigrid. **LA HISTORIA EMPIEZA EL
+      empezar de cero, porque no hay copia en Sigrid. Tampoco la borra `python
+      main.py reset-compras`, que vacia el resto del esquema y la conserva. **LA HISTORIA EMPIEZA EL
       DIA DEL DESPLIEGUE** de F-067: lo anterior no esta. La primera foto es la
       LINEA BASE (`es_linea_base`): «ya estaba en ese estado; desde cuando, no
       se sabe». **La foto de un dia D** se reconstruye con `desde <= D AND (hasta
@@ -3467,7 +3468,7 @@ objetos:
       despliegue) y si la historia tiene HUECOS (una noche sin fila es una
       noche en que la foto no se tomo, y el cambio de esos dias se vio con dos
       noches de ventana). **NO SE RECONSTRUYE**, como
-      `compras.historial_estados`.
+      `compras.historial_estados`, y `reset-compras` tambien la conserva.
     grano: Una fila por foto tomada. Clave `observado_en`.
     clave_negocio: [observado_en]
     paso_etl: build_compras

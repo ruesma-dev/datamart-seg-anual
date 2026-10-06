@@ -50,7 +50,10 @@ python main.py inspect-albaranes-sin-facturar --obra 0707
 ```
 
 `build-compras` NO requiere stage: lee de raw directamente.
-Para reconstruir: `reset-compras` + `build-compras`.
+Para reconstruir: `reset-compras` + `build-compras`. Desde F-067
+(2026-10-06) `reset-compras` **conserva la historia de estados**
+(`compras.historial_estados` e `historial_estados_fotos`, la foto diaria que no
+existe en Sigrid): borra el resto del esquema, no el esquema entero.
 
 ## Modelo
 

@@ -98,10 +98,6 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
 **MANUAL del humano, EN ORDEN (copia de `progress/impl_F-067.md` §6, con su
 comando y lo que debe salir)**:
 
-0. **PENDIENTE · decisión del humano sobre `reset-compras`**: hoy hace `DROP
-   SCHEMA compras CASCADE` y se llevaría las dos tablas persistentes de la foto
-   (R8: «jamás»); lo recomiendan `README_COMPRAS_C1_C2.md:53` y
-   `LEEME_INTEGRACION.md:21`. Precondición de T16: decidir antes de desplegar.
 1. **T16** Merge a `main`; imagen y job:
    `powershell -NoProfile -File infra/70_build_image.ps1`;
    `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm`;

@@ -48,6 +48,11 @@ UMBRAL_PRESENCIA: Decimal = Decimal("0.98")
 MOTIVOS_CIERRE: tuple[str, ...] = ("CAMBIO", "DESAPARECIDO")
 _CAMBIO, _DESAPARECIDO = MOTIVOS_CIERRE
 
+#: Las dos tablas PERSISTENTES de `compras` (las de la foto). Nada las borra:
+#: ni la nocturna ni `reset-compras`, que desde el 2026-10-06 (decisión del
+#: humano, opción a) vacía el resto del esquema y las conserva.
+TABLAS_PERSISTENTES: tuple[str, ...] = ("historial_estados", "historial_estados_fotos")
+
 #: La época de las fechas serie de Sigrid (`con.tiemod`): la de Delphi. SQL
 #: Server convierte el mismo número con 1900-01-01 y da dos días más.
 EPOCA_DELPHI: date = date(1899, 12, 30)
