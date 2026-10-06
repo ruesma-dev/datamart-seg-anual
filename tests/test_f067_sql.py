@@ -24,7 +24,14 @@ import re
 from functools import cache
 from pathlib import Path
 
-from etl_sigrid.domain.historial_estados import EPOCA_DELPHI
+import pytest
+
+from etl_sigrid.domain.historial_estados import (
+    EPOCA_DELPHI,
+    MOTIVOS_CIERRE,
+    TIPOS_HISTORIAL,
+    UMBRAL_PRESENCIA,
+)
 
 DIRECTORIO_SQL = (
     Path(__file__).resolve().parents[1]
@@ -90,3 +97,234 @@ def test_f067_r14_tiempo_cero_y_negativo_son_nulo_y_la_hora_es_decimal() -> None
     assert "+ v * INTERVAL '1 day' END" in cuerpo, (
         "la parte decimal es la hora: multiplicar por un día la conserva"
     )
+
+
+# ===========================================================================
+# R1-R8 · `11_historial_estados.sql`: las dos tablas persistentes y la foto
+# ===========================================================================
+
+RUTA_HISTORIAL = DIRECTORIO_SQL / "compras" / "11_historial_estados.sql"
+
+#: Las columnas de cada tabla persistente, EN ORDEN (design §3).
+COLUMNAS_HISTORIAL = (
+    "documento_id",
+    "tipo_documento_codigo",
+    "estado_id",
+    "desde",
+    "hasta",
+    "observado_antes",
+    "es_linea_base",
+    "motivo_cierre",
+)
+COLUMNAS_FOTOS = (
+    "observado_en",
+    "tomada_en",
+    "es_linea_base",
+    "n_documentos",
+    "n_cambios",
+    "n_altas",
+    "n_desaparecidos",
+)
+
+#: Los únicos ficheros de `etl_sigrid/` que pueden nombrar las tablas de la foto.
+QUIEN_PUEDE_NOMBRARLAS = {
+    "application/steps/build_compras_step.py",
+    "domain/historial_estados.py",
+    "infrastructure/postgres/sql/compras/11_historial_estados.sql",
+}
+
+
+def _ejecutable_historial() -> str:
+    return _sin_comentarios(_texto(RUTA_HISTORIAL))
+
+
+def _definicion_tabla(nombre: str) -> str:
+    """El cuerpo del `CREATE TABLE IF NOT EXISTS <nombre> (...)`, sin comentarios."""
+    texto = re.sub(r"--[^\n]*", " ", _texto(RUTA_HISTORIAL))
+    marca = f"CREATE TABLE IF NOT EXISTS {nombre} ("
+    assert marca in texto, f"`{nombre}` no se crea con CREATE TABLE IF NOT EXISTS"
+    inicio = texto.index(marca) + len(marca)
+    profundidad, fin = 1, inicio
+    while profundidad:
+        profundidad += (texto[fin] == "(") - (texto[fin] == ")")
+        fin += 1
+    return re.sub(r"\s+", " ", texto[inicio : fin - 1])
+
+
+def _columnas_de(definicion: str) -> list[str]:
+    partes, actual, profundidad = [], [], 0
+    for caracter in definicion:
+        profundidad += (caracter == "(") - (caracter == ")")
+        if caracter == "," and profundidad == 0:
+            partes.append("".join(actual))
+            actual = []
+        else:
+            actual.append(caracter)
+    partes.append("".join(actual))
+    return [
+        p.split()[0] for p in partes
+        if p.strip() and p.split()[0].upper() not in ("PRIMARY", "CHECK", "UNIQUE")
+    ]
+
+
+def _bloque_do() -> str:
+    ejecutable = _compacto(_texto(RUTA_HISTORIAL))
+    inicio = ejecutable.index("DO $$")
+    return ejecutable[inicio : ejecutable.index("END $$;", inicio)]
+
+
+def _paso(bloque: str, inicio: str, fin: str = "GET DIAGNOSTICS") -> str:
+    desde = bloque.index(inicio)
+    return bloque[desde : bloque.index(fin, desde)]
+
+
+@pytest.mark.parametrize("palabra", ["DROP", "TRUNCATE", "DELETE"])
+def test_f067_r8_veto_el_fichero_no_borra_ni_vacia_nada(palabra: str) -> None:
+    """La historia no existe en Sigrid: lo que se borre no vuelve."""
+    assert not re.search(rf"\b{palabra}\b", _ejecutable_historial(), re.IGNORECASE), (
+        f"`11_historial_estados.sql` contiene `{palabra}`: las dos tablas de la "
+        "foto son historia que no se puede recuperar (R8)"
+    )
+
+
+def test_f067_r8_veto_ningun_otro_sql_ni_step_nombra_las_tablas_de_la_foto() -> None:
+    """Fuera de su fichero, nadie las toca: ni un DROP ... CASCADE de otro build."""
+    raiz = DIRECTORIO_SQL.parents[2]
+    nombran = {
+        ruta.relative_to(raiz).as_posix()
+        for patron in ("**/*.sql", "**/*.py")
+        for ruta in raiz.glob(patron)
+        # En el SQL cuenta lo ejecutable: un comentario que cita el fichero
+        # del dominio no toca las tablas.
+        if "historial_estados" in (
+            _sin_comentarios(ruta.read_text(encoding="utf-8"))
+            if ruta.suffix == ".sql" else ruta.read_text(encoding="utf-8")
+        )
+    }
+    assert "infrastructure/postgres/sql/compras/11_historial_estados.sql" in nombran
+    assert nombran <= QUIEN_PUEDE_NOMBRARLAS, sorted(nombran - QUIEN_PUEDE_NOMBRARLAS)
+
+
+def test_f067_r8_historial_la_cabecera_avisa_de_que_no_se_reconstruyen() -> None:
+    texto = _texto(RUTA_HISTORIAL)
+    cabecera = re.sub(r"\s+", " ", texto[: texto.index("CREATE TABLE")])
+    assert "NO SE RECONSTRUYEN" in cabecera
+    assert "NO SE PUEDE RECUPERAR" in cabecera
+
+
+def test_f067_r1_historial_columnas_clave_e_indice_del_tramo_abierto() -> None:
+    definicion = _definicion_tabla("compras.historial_estados")
+    assert tuple(_columnas_de(definicion)) == COLUMNAS_HISTORIAL
+    assert "PRIMARY KEY (documento_id, desde)" in definicion
+    ejecutable = _compacto(_texto(RUTA_HISTORIAL))
+    assert (
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_hist_est_abierto ON "
+        "compras.historial_estados (documento_id) WHERE hasta IS NULL" in ejecutable
+    ), "sin el índice parcial, dos tramos abiertos duplicarían la vista"
+
+
+def test_f067_r5_historial_el_check_lleva_los_motivos_del_dominio() -> None:
+    definicion = _definicion_tabla("compras.historial_estados")
+    check = re.search(
+        r"motivo_cierre TEXT CHECK \(motivo_cierre IN \(([^)]*)\)\)", definicion
+    )
+    assert check, definicion
+    assert tuple(re.findall(r"'([A-Z_]+)'", check.group(1))) == MOTIVOS_CIERRE
+
+
+def test_f067_r8_historial_fotos_columnas_y_clave() -> None:
+    definicion = _definicion_tabla("compras.historial_estados_fotos")
+    assert tuple(_columnas_de(definicion)) == COLUMNAS_FOTOS
+    assert "observado_en TIMESTAMPTZ PRIMARY KEY" in definicion
+    assert "tomada_en TIMESTAMPTZ NOT NULL DEFAULT now()" in definicion
+
+
+def test_f067_r8_historial_las_tablas_no_se_crean_sin_if_not_exists() -> None:
+    ejecutable = _compacto(_texto(RUTA_HISTORIAL))
+    assert not re.search(r"CREATE TABLE compras\.", ejecutable), (
+        "un CREATE TABLE sin IF NOT EXISTS falla la segunda noche o, peor, "
+        "invita a anteponerle un DROP"
+    )
+
+
+def test_f067_r1_foto_los_tipos_del_sql_son_los_del_dominio() -> None:
+    tipos = re.findall(r"\btip IN \(([^)]*)\)", _bloque_do())
+    assert len(tipos) == 2, "el recuento de la guarda y el INSERT filtran los tipos"
+    for lista in tipos:
+        assert tuple(int(x) for x in lista.split(",")) == TIPOS_HISTORIAL
+
+
+def test_f067_r7_foto_sin_ingesta_nueva_no_escribe_nada() -> None:
+    bloque = _bloque_do()
+    assert "SELECT max(c._ingested_at) INTO v_obs FROM raw.con c;" in bloque
+    assert (
+        "SELECT max(f.observado_en) INTO v_ult FROM compras.historial_estados_fotos f;"
+        in bloque
+    )
+    guarda = "IF v_obs IS NULL OR v_obs <= v_ult THEN"
+    assert guarda in bloque
+    tras = bloque[bloque.index(guarda) :]
+    assert tras.index("RETURN;") < tras.index("END IF;") < tras.index("UPDATE")
+
+
+def test_f067_r6_foto_la_guarda_del_98_es_la_del_dominio_y_para_el_build() -> None:
+    bloque = _bloque_do()
+    guarda = (
+        f"IF v_abiertos > 0 AND v_actual < {UMBRAL_PRESENCIA} * v_abiertos "
+        "THEN RAISE EXCEPTION"
+    )
+    assert guarda in bloque, bloque
+    assert (
+        "SELECT count(*) INTO v_abiertos FROM compras.historial_estados h "
+        "WHERE h.hasta IS NULL;" in bloque
+    )
+    assert bloque.index(guarda) < bloque.index("UPDATE"), "la guarda va antes de escribir"
+
+
+def test_f067_r2_foto_cierra_los_cambiados_por_ide_y_tipo_con_is_distinct_from() -> None:
+    paso = _paso(_bloque_do(), f"SET hasta = v_obs, motivo_cierre = '{MOTIVOS_CIERRE[0]}'")
+    assert "FROM raw.con c WHERE h.hasta IS NULL" in paso
+    assert "AND c.ide = h.documento_id AND c.tip = h.tipo_documento_codigo" in paso
+    assert "AND c.est IS DISTINCT FROM h.estado_id;" in paso
+
+
+def test_f067_r5_foto_cierra_los_desaparecidos_por_ide_y_tipo() -> None:
+    paso = _paso(_bloque_do(), f"SET hasta = v_obs, motivo_cierre = '{MOTIVOS_CIERRE[1]}'")
+    assert "WHERE h.hasta IS NULL AND NOT EXISTS ( SELECT 1 FROM raw.con c" in paso
+    assert "WHERE c.ide = h.documento_id AND c.tip = h.tipo_documento_codigo )" in paso
+
+
+def test_f067_r4_foto_abre_tramos_con_linea_base_solo_en_la_primera() -> None:
+    paso = _paso(_bloque_do(), "INSERT INTO compras.historial_estados (")
+    assert "SELECT c.ide, c.tip, c.est, v_obs, NULL, v_ult, (v_ult IS NULL), NULL" in paso
+    assert (
+        "AND NOT EXISTS ( SELECT 1 FROM compras.historial_estados h "
+        "WHERE h.documento_id = c.ide AND h.hasta IS NULL )" in paso
+    ), "un documento con tramo abierto no abre otro"
+
+
+def test_f067_r2_foto_los_pasos_van_en_el_orden_del_design() -> None:
+    bloque = _bloque_do()
+    orden = [
+        bloque.index("motivo_cierre = 'CAMBIO'"),
+        bloque.index("motivo_cierre = 'DESAPARECIDO'"),
+        bloque.index("INSERT INTO compras.historial_estados ("),
+        bloque.index("INSERT INTO compras.historial_estados_fotos ("),
+    ]
+    assert orden == sorted(orden), (
+        "cerrar los cambiados, luego los desaparecidos, luego abrir y al final "
+        "registrar la foto: en otro orden, un cambiado se cerraría como "
+        "desaparecido o no se le abriría tramo"
+    )
+
+
+def test_f067_r8_foto_registra_los_contadores() -> None:
+    bloque = _bloque_do()
+    assert "GET DIAGNOSTICS v_cambios = ROW_COUNT;" in bloque
+    assert "GET DIAGNOSTICS v_desaparecid = ROW_COUNT;" in bloque
+    assert "GET DIAGNOSTICS v_insertados = ROW_COUNT;" in bloque
+    assert (
+        "VALUES (v_obs, (v_ult IS NULL), v_actual, v_cambios, "
+        "v_insertados - v_cambios, v_desaparecid);" in bloque
+    )
+

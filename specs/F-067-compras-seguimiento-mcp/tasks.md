@@ -13,7 +13,7 @@ más lo que quede de T11-T15.
 
 - [x] T1: `etl_sigrid/domain/historial_estados.py` (`TIPOS_HISTORIAL`, `UMBRAL_PRESENCIA`, `MOTIVOS_CIERRE`, `EPOCA_DELPHI`, `Tramo`, `FotoIncompletaError`, `aplicar_foto`, `dias_en_estado`, `fecha_delphi`) con `tests/test_f067_dominio.py` y los casos de design §8 (R1-R7, R10, R14)  |  Verificación: `python -m pytest tests/test_f067_dominio.py -q` (RED antes, traza en el informe)
 - [x] T2: `compras.fn_sigrid_tiempo` al final de `sql/compras/00_setup.sql` con la época del dominio (R14)  |  Verificación: `python -m pytest tests/test_f067_sql.py -q -k tiempo`
-- [ ] T3: `sql/compras/11_historial_estados.sql`: cabecera, las dos tablas persistentes, el bloque `DO` de la foto (design §3, pasos 1-6) sin `DROP`/`TRUNCATE`/`DELETE` (R1-R8)  |  Verificación: `python -m pytest tests/test_f067_sql.py -q -k "historial or foto or veto"`
+- [x] T3: `sql/compras/11_historial_estados.sql`: cabecera, las dos tablas persistentes, el bloque `DO` de la foto (design §3, pasos 1-6) sin `DROP`/`TRUNCATE`/`DELETE` (R1-R8)  |  Verificación: `python -m pytest tests/test_f067_sql.py -q -k "historial or foto or veto"`
 - [ ] T4: `11`: `compras.v_estado_documentos` (R9-R11)  |  Verificación: `python -m pytest tests/test_f067_sql.py -q -k estado_documentos`
 - [ ] T5: `01_documentos.sql`, CONTRATOS: `forma_pago_id`, `forma_pago`, `retencion_garantia_porcentaje`, `retencion_garantia_concepto`, `fecha_ultima_modificacion` al final (R12-R14)  |  Verificación: `python -m pytest tests/test_f067_sql.py tests/test_f084_sql.py -q`
 - [ ] T6: `SUB_PASOS` + `11` (cuenta `historial_estados`), docstring, y `tests/test_f047_steps.py`  |  Verificación: `python -m pytest tests/test_f047_steps.py -q`
