@@ -216,4 +216,4 @@ h.es_linea_base`): el test buscaba con `in`; ahora compara el elemento exacto.
 | Mutantes Python (`harness.mutacion`) | 50 generados, 44 muertos, 5 supervivientes + 1 timeout, todos cerrados; re-verificación 45/45 muertos, **0 supervivientes** |
 | Mutantes SQL (a mano) | 40 generados, 40 muertos, **0 supervivientes** |
 | Tiempo de la suite | 2.258 s con cobertura (`init.sh`); 470 s sin ella |
-| `init.sh` final | sobre `b575935` (review 1 + `reset-compras`): ENTORNO LISTO; 6984 passed, 226 skipped en 2.192 s; cobertura 97,4 % (74/76; las 2 sin cubrir, el `raise` del parche histórico); impl 219/220 |
+| `init.sh` final | sobre `b575935` (review 1 + `reset-compras`): ENTORNO LISTO; 6984 passed, 226 skipped en 2.192 s; cobertura 97,4 % (74/76: `compras_reset_sql.py`, dominio, step y `reset_compras` al 100 %; las 2 restantes son del parche histórico, que la suite no importa); impl 219/220 |
