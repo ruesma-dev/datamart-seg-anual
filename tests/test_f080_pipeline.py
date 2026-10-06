@@ -48,6 +48,8 @@ FICHEROS_COMPRAS = [
     "08_comparativos.sql",
     # F-038 Fase 2: el detalle (líneas, objetivo y firmas), décimo.
     "09_comparativos_detalle.sql",
+    # F-067: la foto diaria de estados, la última (sus tablas no se reconstruyen).
+    "11_historial_estados.sql",
 ]
 
 #: Lo que cada sub-paso nuevo declara como objeto a contar.
