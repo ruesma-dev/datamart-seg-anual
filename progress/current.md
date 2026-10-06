@@ -84,6 +84,10 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
   v44 con P23 (parcial, F-067) y P24-P26. Ajustados los recuentos que fijan
   `test_f006_reglas` (26 preguntas: 21/3/2) y `test_f038_r24` (`>= 43`).
 
+- [x] T12 `docs/ARCHITECTURE.md`. [x] T13 `azure-apps/datamart_seg_anual.md`,
+  commit propio en ese repositorio (rama `master`, sin push).
+- [ ] T14 campaña de mutación (en curso).
+
 **Diccionario del árbol tras F-067 (en curso): 204 objetos, 1589 columnas, 96
 de consumo.**
 
