@@ -118,11 +118,15 @@ def aplicar_foto(
         ide: valor for ide, valor in actuales.items() if valor[0] in TIPOS_HISTORIAL
     }
     n_abiertos = sum(1 for t in tramos if t.hasta is None)
-    if n_abiertos > 0 and len(vigentes) < UMBRAL_PRESENCIA * n_abiertos:
+    # Sin tramos abiertos (la línea base) la comparación es `n < 0`, que nunca
+    # se cumple: no hace falta preguntar antes si hay alguno. El SQL lo escribe
+    # explícito (`v_abiertos > 0 AND ...`) y es lo mismo; aquí, escrito así, la
+    # campaña de mutación no tiene un mutante equivalente que justificar.
+    if len(vigentes) < UMBRAL_PRESENCIA * n_abiertos:
         raise FotoIncompletaError(
             f"la ingesta trae {len(vigentes)} documentos de los tipos "
             f"{TIPOS_HISTORIAL} y la historia tiene {n_abiertos} tramos abiertos: "
-            f"menos del {UMBRAL_PRESENCIA * 100} %. No se toma la foto."
+            f"menos del {UMBRAL_PRESENCIA:.0%}. No se toma la foto."
         )
 
     resultado: list[Tramo] = []

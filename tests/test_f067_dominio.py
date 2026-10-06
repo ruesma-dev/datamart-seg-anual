@@ -286,7 +286,9 @@ def test_f067_r6_con_el_97_9_por_ciento_la_foto_falla() -> None:
     with pytest.raises(FotoIncompletaError) as error:
         aplicar_foto(_mil_abiertos(), actuales, T2, T1)
 
-    assert "979" in str(error.value) and "1000" in str(error.value)
+    mensaje = str(error.value)
+    assert "trae 979 documentos" in mensaje and "tiene 1000 tramos abiertos" in mensaje
+    assert "menos del 98%." in mensaje, mensaje
 
 
 def test_f067_r6_con_el_98_por_ciento_justo_la_foto_pasa() -> None:
@@ -314,6 +316,15 @@ def test_f067_r6_los_tramos_cerrados_no_cuentan_como_abiertos() -> None:
     assert aplicar_foto(_mil_abiertos() + cerrados, actuales, T3, T2) is not None
 
 
+def test_f067_r6_con_un_solo_tramo_abierto_tambien_hay_guarda() -> None:
+    """El borde de abajo: UN tramo abierto y ningún documento es una ingesta
+    vacía, no un desaparecido. Lo cazó la campaña de mutación (`> 0` → `> 1`
+    sobrevivía: ningún caso tenía exactamente un tramo abierto y cero
+    documentos)."""
+    with pytest.raises(FotoIncompletaError):
+        aplicar_foto([_abierto(1, CONTRATO, ENVIADO)], {}, T2, T1)
+
+
 def test_f067_r6_en_la_linea_base_no_hay_guarda() -> None:
     """Sin tramos abiertos no hay contra qué medir: la primera foto pasa."""
     assert aplicar_foto([], {}, T1, None) == []
@@ -336,6 +347,24 @@ def test_f067_r8_el_resumen_cuenta_documentos_cambios_altas_y_desaparecidos() ->
 
     assert resumir_foto(tramos, T2) == ResumenFoto(
         n_documentos=62, n_cambios=1, n_altas=1, n_desaparecidos=1
+    )
+
+
+def test_f067_r8_cambios_y_desaparecidos_se_cuentan_por_separado() -> None:
+    """Con cifras DISTINTAS: tres cambios, un desaparecido y dos altas. Con uno
+    de cada, contar «cerrados que no son CAMBIO» daba el mismo 1 y el mutante
+    sobrevivía a la campaña."""
+    antes = [_abierto(i, CONTRATO, ENVIADO) for i in (1, 2, 3, 4)] + [
+        _abierto(100 + i, FACTURA, FIRMADO) for i in range(60)
+    ]
+    actuales = {1: (CONTRATO, FIRMADO), 2: (CONTRATO, FIRMADO), 3: (CONTRATO, FIRMADO)}
+    actuales |= {8: (FACTURA, 1), 9: (FACTURA, 1)}
+    actuales |= {100 + i: (FACTURA, FIRMADO) for i in range(60)}
+
+    tramos = aplicar_foto(antes, actuales, T2, T1)
+
+    assert resumir_foto(tramos, T2) == ResumenFoto(
+        n_documentos=65, n_cambios=3, n_altas=2, n_desaparecidos=1
     )
 
 
