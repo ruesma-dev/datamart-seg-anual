@@ -39,7 +39,7 @@ timeout` (IP pública del puesto, probablemente fuera del firewall); lo de
 `raw` se midió en Sigrid y lo de `compras`/`descompuestos` por el MCP. Nada que
 bloquee la spec.
 
-### Implementer (2026-10-06) · EN CURSO · D1 una entrega, D2-D4 según recomendación
+### Implementer (2026-10-06) · IMPLEMENTADA, pendiente de REVIEW · D1 una entrega, D2-D4 según recomendación
 
 Precondición: `bash harness/init.sh` en verde al empezar (6795 passed, 227
 skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
@@ -92,7 +92,18 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
   dos tests nuevos y una simplificación (`d698881`) y re-verificados con el
   mismo generador (45/45 muertos). SQL a mano: 40/40 sobre `cc8113a`.
   Detalle en `progress/mutacion_F-067.md`.
-- [ ] T15 `bash harness/init.sh` (en curso).
+- [x] T15 `bash harness/init.sh` en verde: 6976 passed, cobertura de líneas
+  cambiadas 100 % (66/66), impl dentro del tope.
+
+**Para el líder, antes del despliegue (hallazgo, fuera de la spec)**: `python
+main.py reset-compras` hace `DROP SCHEMA compras CASCADE` y se llevaría las dos
+tablas persistentes de la foto (R8 dice «jamás»). No lo usa la nocturna; decide
+el humano si se blinda. Detalle en `progress/impl_F-067.md` §3.
+
+**MANUAL del humano (T16-T23), en orden y con su comando y lo que debe salir**:
+`progress/impl_F-067.md` §6 (merge e imagen; la nocturna toma la LÍNEA BASE;
+las cuatro puertas `check-*`; cifras de T19 contra la previsión; segunda noche;
+MCP reiniciado y P23-P26; correo a Compras; a los 21 días, P23 a respondible).
 
 **Diccionario del árbol tras F-067 (en curso): 204 objetos, 1589 columnas, 96
 de consumo.**

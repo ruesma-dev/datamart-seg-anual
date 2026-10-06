@@ -16,7 +16,7 @@ mal una noche se queda mal para siempre, y lo que no escriba se pierde.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -38,7 +38,7 @@ from etl_sigrid.domain.historial_estados import (
 CONTRATO, FACTURA, ALBARAN = 44, 15, 14
 ENVIADO, FIRMADO = 3, 7
 
-T1 = datetime(2026, 10, 7, 0, 41, tzinfo=timezone.utc)
+T1 = datetime(2026, 10, 7, 0, 41, tzinfo=UTC)
 T2 = T1 + timedelta(days=1)
 T3 = T2 + timedelta(days=1)
 
@@ -68,7 +68,7 @@ def test_f067_r1_los_tipos_son_contrato_y_factura() -> None:
 
 
 def test_f067_r6_el_umbral_es_el_98_por_ciento() -> None:
-    assert UMBRAL_PRESENCIA == Decimal("0.98")
+    assert Decimal("0.98") == UMBRAL_PRESENCIA
 
 
 def test_f067_r5_los_dos_motivos_de_cierre() -> None:
@@ -76,7 +76,7 @@ def test_f067_r5_los_dos_motivos_de_cierre() -> None:
 
 
 def test_f067_r14_la_epoca_es_la_de_delphi() -> None:
-    assert EPOCA_DELPHI == date(1899, 12, 30)
+    assert date(1899, 12, 30) == EPOCA_DELPHI
 
 
 # ===========================================================================
