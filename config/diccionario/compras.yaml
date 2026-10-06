@@ -701,7 +701,25 @@ objetos:
         cardinalidad: "N:1"
         porque: >-
           Para el nombre, el cliente, la empresa y la clave de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
+      - de: necesidad_id
+        a: compras.necesidades.necesidad_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el documento de necesidades (el DPC de la obra) del que sale la
+          linea. Cubre el 32,5 % de las lineas de albaran: el resto no viene de
+          una necesidad.
+      - de: necesidad_linea_id
+        a: descompuestos.v_pbi_planif_jo.dncpro_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para la linea de la planificacion de compras del jefe de obra de la
+          que sale la entrega: lo planificado (cantidad, precio, fecha maxima)
+          frente a lo entregado, y el codigo 2 de origen. N:N porque la clave
+          de la vista no es `dncpro_id`: agrega cada lado por esa linea de
+          necesidad antes de unir, o los importes se duplican.
     ejemplos_preguntas:
+      - Que hemos recibido con codigo 2 MOMOSA en la obra X
+      - Que lineas de albaran vienen de la planificacion de compras del jefe de obra
       - Que tenemos entregado y sin facturar en la obra X
 
   facturas:
@@ -3588,3 +3606,77 @@ objetos:
       - Que contratos llevan mas de tres semanas enviados sin firmar
       - Cuanto lleva la factura X en su estado actual
       - Que facturas llevan mas de un mes sin aprobar
+
+  necesidades:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El DOCUMENTO DE NECESIDADES DE COMPRA de Sigrid (`dnc`, F-067), que en
+      Ruesma es el DOCUMENTO DE PLANIFICACION DE COMPRAS (DPC) de la obra: el
+      jefe de obra planifica en el que va a comprar, con su codigo 2 para
+      agruparlo, y de sus lineas cuelgan los comparativos, contratos,
+      albaranes y facturas. Es UNO POR OBRA: 271 de los 277 son el documento
+      de su obra (`es_la_de_la_obra`), con el codigo y el nombre de la obra.
+      Sus LINEAS estan en `descompuestos.v_pbi_planif_jo` (`dncpro_id`).
+      **No se publica su estado**: los 277 estan «En curso» en Sigrid, asi que
+      el estado no informa de nada.
+    grano: Una fila por documento de necesidades (`raw.dnc`). Clave `necesidad_id`.
+    clave_negocio: [necesidad_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      necesidad_id:
+        significado: >-
+          Identificador del documento en Sigrid (`dnc.ide`, `con.ide`). Es el
+          `necesidad_id` de las lineas de contrato, albaran y factura.
+        agregacion: no_sumable
+      codigo_necesidad:
+        significado: >-
+          Codigo del documento tal y como se ve en Sigrid; es el de la obra
+          (por ejemplo `0727.0`).
+      nombre:
+        significado: Nombre del documento en Sigrid, que es el de la obra.
+      fecha_alta:
+        significado: Fecha de alta del documento en Sigrid (`con.fec`), ya tipada.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no tiene fecha de alta para el documento.
+      obra_id:
+        significado: >-
+          La obra del documento (`dnc.obride`), la ficha de su empresa como en
+          el resto de `compras`. 274 de los 277 la tienen.
+        agregacion: no_sumable
+        nulo_significa: El documento no esta asignado a ninguna obra.
+      codigo_obra:
+        significado: Codigo de la obra tal y como se teclea en Sigrid.
+        nulo_significa: El documento no tiene obra.
+      nombre_obra:
+        significado: Nombre legible de la obra, de `con.res`.
+        nulo_significa: El documento no tiene obra.
+      es_la_de_la_obra:
+        significado: >-
+          Verdadero si la obra apunta a este documento como SU documento de
+          necesidades (`obr.dncide`): 271 de 277. Los demas son documentos
+          huerfanos o de prueba; sus lineas no estan en
+          `descompuestos.v_pbi_planif_jo`, que solo lee el de la obra.
+        agregacion: no_sumable
+      n_lineas:
+        significado: >-
+          Cuantas lineas de necesidad tiene el documento (`raw.dncpro`); 0 si
+          ninguna.
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el nombre, la empresa y la clave de la obra (F-102).
+      - de: necesidad_id
+        a: compras.albaran_lineas.necesidad_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para lo entregado que sale de este DPC. Igual con
+          `compras.contrato_lineas` y `compras.factura_lineas`.
+    ejemplos_preguntas:
+      - Cual es el documento de planificacion de compras de la obra X
+      - Cuantas lineas tiene la planificacion de compras de cada obra

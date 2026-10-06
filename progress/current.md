@@ -65,7 +65,11 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
   T5). `test_f006_punteros` queda rojo hasta T8: las fichas citan
   `compras.necesidades`.
 
-**Diccionario del árbol tras F-067 (en curso): 203 objetos, 1578 columnas, 95
+- [x] T8 `compras.necesidades` (`10_necesidades.sql`) + sub-paso `10` +
+  ficha y relaciones de R25 (la de `v_pbi_planif_jo.dncpro_id` es `N:N`: la
+  clave de la vista es `(obra_id, partida_id, orden)`, lo exige el validador).
+
+**Diccionario del árbol tras F-067 (en curso): 204 objetos, 1587 columnas, 96
 de consumo.**
 
 

@@ -589,3 +589,70 @@ def test_f067_r17_albaran_lineas_indice_por_la_linea_de_necesidad() -> None:
         "CREATE INDEX idx_com_alblin_ncl ON compras.albaran_lineas (necesidad_linea_id);"
         in _compacto(_texto(RUTA_DOCUMENTOS))
     )
+
+
+# ===========================================================================
+# R19 · `compras.necesidades`: el documento de necesidades (DPC) de la obra
+# ===========================================================================
+
+RUTA_NECESIDADES = DIRECTORIO_SQL / "compras" / "10_necesidades.sql"
+COLUMNAS_NECESIDADES = (
+    "necesidad_id",
+    "codigo_necesidad",
+    "nombre",
+    "fecha_alta",
+    "obra_id",
+    "codigo_obra",
+    "nombre_obra",
+    "es_la_de_la_obra",
+    "n_lineas",
+)
+
+
+def _necesidades() -> str:
+    return _compacto(_texto(RUTA_NECESIDADES)).strip()
+
+
+def test_f067_r19_necesidades_se_reconstruye_como_el_resto_de_compras() -> None:
+    texto = _necesidades()
+    assert texto.startswith(
+        "DROP TABLE IF EXISTS compras.necesidades CASCADE; "
+        "CREATE TABLE compras.necesidades AS SELECT "
+    ), texto[:120]
+    assert "ALTER TABLE compras.necesidades ADD PRIMARY KEY (necesidad_id);" in texto
+
+
+def test_f067_r19_necesidades_columnas_en_orden() -> None:
+    alias = _alias_del_select(_necesidades(), " FROM raw.dnc d ")
+    assert tuple(alias) == COLUMNAS_NECESIDADES, alias
+
+
+def test_f067_r19_necesidades_una_fila_por_dnc_con_su_concepto() -> None:
+    texto = _necesidades()
+    assert "d.ide AS necesidad_id" in texto
+    assert " FROM raw.dnc d JOIN raw.con c ON c.ide = d.ide " in texto
+    assert "c.cod AS codigo_necesidad" in texto and "c.res AS nombre" in texto
+    assert "compras.fn_sigrid_date(c.fec) AS fecha_alta" in texto
+
+
+def test_f067_r19_necesidades_obra_y_si_es_la_de_la_obra() -> None:
+    texto = _necesidades()
+    assert "NULLIF(d.obride, 0) AS obra_id" in texto
+    assert "LEFT JOIN raw.con obr_con ON obr_con.ide = NULLIF(d.obride, 0)" in texto
+    assert "LEFT JOIN raw.obr o ON o.ide = NULLIF(d.obride, 0)" in texto
+    assert "COALESCE(o.dncide = d.ide, FALSE) AS es_la_de_la_obra" in texto
+
+
+def test_f067_r19_necesidades_cuenta_sus_lineas_sin_multiplicar() -> None:
+    texto = _necesidades()
+    assert "COALESCE(nl.n, 0) AS n_lineas" in texto
+    assert (
+        "LEFT JOIN ( SELECT p.dncide, count(*) AS n FROM raw.dncpro p "
+        "GROUP BY p.dncide ) nl ON nl.dncide = d.ide" in texto
+    ), "agregado ANTES de unir: un JOIN a las líneas multiplicaría la cabecera"
+
+
+def test_f067_r24_necesidades_no_publica_el_estado() -> None:
+    """Los 277 están «En curso»: un estado que no informa no se publica."""
+    assert "est" not in _alias_del_select(_necesidades(), " FROM raw.dnc d ")
+    assert "con.est" not in _necesidades() and "c.est" not in _necesidades()

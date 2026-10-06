@@ -193,9 +193,11 @@ infraestructura.
 > **Enmienda del 2026-10-06 (F-067, la foto diaria de estados y el código 2).**
 > Entran las dos primeras tablas PERSISTENTES de `compras`
 > (`historial_estados` e `historial_estados_fotos`, que no se reconstruyen),
-> la vista `v_estado_documentos` y la función auxiliar `fn_sigrid_tiempo`. El
-> inventario pasa a **203 objetos**, las columnas descritas de 1538 a **1564**
-> (8 + 7 + 11) y las fichas de consumo suben en tres.
+> la vista `v_estado_documentos`, la tabla `necesidades` (el documento de
+> planificación de compras) y la función auxiliar `fn_sigrid_tiempo`. El
+> inventario pasa a **204 objetos**, las columnas descritas de 1538 a **1587**
+> (8 + 7 + 11 + 9 nuevas, 5 en `contratos` y 3 en cada tabla de líneas) y las
+> fichas de consumo suben en cuatro.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

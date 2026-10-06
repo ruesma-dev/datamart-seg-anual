@@ -13,6 +13,7 @@ Encadena los archivos SQL en orden:
     07_texto.sql       - el memo de la pestaña «Texto», íntegro y partido
     08_comparativos.sql- el comparativo de ofertas y sus ofertas (F-038)
     09_comparativos_detalle.sql - sus líneas, el objetivo y las firmas (F-038)
+    10_necesidades.sql - el documento de necesidades de compra, el DPC (F-067)
     11_historial_estados.sql - la FOTO DIARIA de estados (F-067), PERSISTENTE
 
 Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
@@ -87,7 +88,8 @@ SUB_PASOS: tuple[_SubStep, ...] = (
     _SubStep(name="views", sql_file="03_views.sql"),
     # F-073: la dimensión de formas de pago. Ya NO es la última y ya la lee
     # alguien: F-080 la cablea a la factura en `06_pago_factura.sql`, que va
-    # detrás por eso. El cableado a `compras.contratos` sigue siendo de F-067.
+    # detrás por eso. El cableado a `compras.contratos` lo hizo F-067 en `01`,
+    # leyendo `raw.auxpag` porque esta dimensión se construye después.
     _SubStep(
         name="formas_pago",
         sql_file="04_formas_pago.sql",
@@ -144,6 +146,14 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="09_comparativos_detalle.sql",
         target_schema="compras",
         target_table="comparativo_oferta_lineas",
+    ),
+    # F-067 (con F-125): el documento de necesidades de compra (DPC) de cada
+    # obra. Solo lee `raw`; cuenta su única tabla (~277 filas).
+    _SubStep(
+        name="necesidades",
+        sql_file="10_necesidades.sql",
+        target_schema="compras",
+        target_table="necesidades",
     ),
     # F-067: la foto diaria de estados. El ÚLTIMO a propósito: no lee nada de
     # `compras` (solo `raw.con` y sus dos tablas), y sus tablas no se
