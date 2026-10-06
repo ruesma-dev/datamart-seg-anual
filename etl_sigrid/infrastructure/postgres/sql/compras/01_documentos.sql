@@ -62,6 +62,19 @@
 --     modificación del DOCUMENTO, no la fecha del cambio de estado. La foto
 --     diaria que lo daría de verdad es F-067; por eso F-084 no publica ninguna
 --     columna de antigüedad, y la ficha lo dice en vez de insinuar un proxy.
+--
+-- F-067 (2026-10-06) · LAS CONDICIONES DEL CONTRATO. El bloque CONTRATOS gana
+-- CINCO columnas al final —`forma_pago_id`, `forma_pago`,
+-- `retencion_garantia_porcentaje`, `retencion_garantia_concepto` y
+-- `fecha_ultima_modificacion`— y ni una de las quince de siempre se mueve.
+--
+--   · LA ANTIGÜEDAD DEL ESTADO YA SE SABE, pero NO aquí: la da la foto diaria
+--     (`11_historial_estados.sql`, `compras.v_estado_documentos`) desde el día
+--     del despliegue. `fecha_ultima_modificacion` es `con.tiemod`, la última
+--     modificación del DOCUMENTO, y NO la fecha del cambio de estado (D2 del
+--     humano): medido, la firma no la mueve en el 85 % de los comparativos.
+--   · LA PENALIZACIÓN NO ES UN CAMPO de Sigrid (`ctr` no la tiene): solo
+--     aparece en el texto del contrato, `compras.documento_texto`, en 9.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -89,18 +102,48 @@ SELECT
     -- F-073 en `maestro.obras` y F-083 en `compras.facturas`.
     con.est                                 AS estado_id,        -- código interno del tipo 44
     est.codigo_estado                       AS estado_codigo,    -- mnemónico: EPF, FIR, TER…
-    est.nombre_estado                       AS estado            -- estado_id ya traducido (tipo 44)
+    est.nombre_estado                       AS estado,           -- estado_id ya traducido (tipo 44)
+    -- F-067: las CONDICIONES del contrato y su última modificación, también
+    -- AL FINAL y por el mismo motivo. Ver la cabecera del fichero.
+    NULLIF(c.pagide, 0)                     AS forma_pago_id,    -- ctr.pagide -> auxpag
+    pag.res                                 AS forma_pago,       -- nombre de la forma de pago
+    ret.porcentaje                          AS retencion_garantia_porcentaje,  -- 5 = 5 %
+    ret.concepto                            AS retencion_garantia_concepto,
+    compras.fn_sigrid_tiempo(con.tiemod)    AS fecha_ultima_modificacion  -- NO es el cambio de estado
 FROM raw.ctr c
 JOIN raw.con con          ON con.ide = c.ide
 LEFT JOIN raw.con obr_con ON obr_con.ide = NULLIF(c.obride, 0)
 LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(c.entide, 0)
+-- F-067: de `raw.auxpag` y no de `compras.formas_pago`, que se construye en
+-- `04_formas_pago.sql`, después de este fichero. LEFT: 9 de 19.081 contratos
+-- no tienen forma de pago (medido el 2026-10-06).
+LEFT JOIN raw.auxpag pag  ON pag.ide = NULLIF(c.pagide, 0)
 -- La traducción del estado, con su tipo de documento y su guarda de grano,
 -- vive UNA sola vez en `compras.fn_estado_documento` (`00_setup.sql`) y la
 -- comparten este bloque y el de FACTURAS: es el criterio 6 de F-084.
 -- `LEFT ... ON TRUE` porque un contrato cuyo estado no casara con el catálogo
 -- se publica igual, con el literal a NULL. Hoy no le pasa a ninguno: 0
 -- huérfanos de 18.978, medido el 2026-09-16.
-LEFT JOIN LATERAL compras.fn_estado_documento(44, con.est) est ON TRUE;
+LEFT JOIN LATERAL compras.fn_estado_documento(44, con.est) est ON TRUE
+-- F-067 (R13): la RETENCIÓN DE GARANTÍA, de los recargos y retenciones del
+-- contrato (`raw.ctrrec`) cuyo concepto tiene código `RET%`: 6.333 contratos
+-- (558368 «Retención garantía 5 % (sobre base imponible)» en 6.172). Los demás
+-- conceptos de `ctrrec` son IRPF o van sin código y NO son la retención. El
+-- `LIMIT 1` con `ORDER BY` es la guarda de grano: hoy UN contrato tiene dos, y
+-- gana la de menor `pos`. `valpor` viene en tanto por uno (0,05) y se publica
+-- en tanto por cien (5). Va DETRÁS del lateral del estado, que `test_f084_sql`
+-- lee como el primero; y sin `WHERE`, porque el FROM externo no puede tenerlo
+-- (el universo de contratos no se filtra, F-084): la correlación va en el ON.
+LEFT JOIN LATERAL (
+    SELECT ROUND((r.valpor * 100)::NUMERIC, 4) AS porcentaje,
+           x.res                               AS concepto
+    FROM   raw.ctrrec r
+    JOIN   raw.con x ON x.ide = r.recide
+                    AND r.docide = c.ide
+                    AND x.cod LIKE 'RET%'
+    ORDER  BY r.pos, r.ide
+    LIMIT  1
+) ret ON TRUE;
 
 ALTER TABLE compras.contratos ADD PRIMARY KEY (contrato_id);
 CREATE INDEX idx_com_ctr_obra ON compras.contratos (obra_id);

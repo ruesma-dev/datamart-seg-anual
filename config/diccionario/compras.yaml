@@ -330,6 +330,52 @@ objetos:
         nulo_significa: >-
           Igual que en `estado_codigo`: el estado no casa con el catalogo del
           tipo 44. Hoy, ningun contrato.
+      forma_pago_id:
+        significado: >-
+          Forma de pago pactada en el contrato (`ctr.pagide`, F-067), el
+          identificador de `compras.formas_pago`: alli estan su plazo y su
+          medio de pago. Informada en 19.072 de 19.081 contratos (2026-10-06).
+        agregacion: no_sumable
+        nulo_significa: El contrato no tiene forma de pago informada en Sigrid.
+      forma_pago:
+        significado: >-
+          Nombre de la forma de pago del contrato (`auxpag.res`), que suele
+          llevar el plazo dentro: "CONFIRMING CH 60 dias". Para el medio de
+          pago, une `forma_pago_id` con `compras.formas_pago`.
+        nulo_significa: >-
+          El contrato no tiene forma de pago, o la que tiene no esta en el
+          catalogo.
+      retencion_garantia_porcentaje:
+        significado: >-
+          Porcentaje de RETENCION DE GARANTIA del contrato, en tanto por cien
+          (5 es un 5 %), del recargo del contrato (`ctrrec`) cuyo concepto
+          tiene codigo `RET...`: 6.333 contratos, casi todos al 5 %. Si hubiera
+          dos, el de menor posicion (hoy un solo contrato). No es la retencion
+          ya practicada en dinero, que esta en el esquema `retenciones`.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: >-
+          El contrato no lleva retencion de garantia (no tiene concepto `RET`
+          entre sus recargos). Los demas conceptos (IRPF, sin codigo) no son
+          retencion de garantia.
+      retencion_garantia_concepto:
+        significado: >-
+          Nombre del concepto de la retencion de garantia, por ejemplo
+          «Retención garantía 5 % (sobre base imponible)»: dice sobre que base
+          se calcula.
+        nulo_significa: El contrato no lleva retencion de garantia.
+      fecha_ultima_modificacion:
+        significado: >-
+          Fecha y hora de la ULTIMA MODIFICACION del contrato en Sigrid
+          (`con.tiemod`, fecha serie de Delphi convertida por
+          `compras.fn_sigrid_tiempo`). **NO es la fecha del cambio de estado**
+          (D2 del humano, F-067): cualquier edicion la mueve y la firma NO la
+          mueve; medido el 2026-10-06, en el 85 % de los comparativos firmados
+          la ultima firma es posterior a esta fecha. Asi que no sirve ni como
+          cota de cuando cambio el estado. La antiguedad del estado esta en
+          `compras.v_estado_documentos`.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no tiene fecha de modificacion para el contrato.
     relaciones:
       - de: contrato_id
         a: compras.contrato_lineas.contrato_id
@@ -3369,7 +3415,7 @@ objetos:
       `antiguedad_es_minima` verdadero, y entonces `dias_en_estado` es un
       MINIMO («lleva al menos N dias»), no la antiguedad exacta. **En cuanto
       ese minimo supera 21, «mas de tres semanas» es una respuesta cierta**,
-      porque si lleva al menos 22 dias lleva mas de 21; por debajo, en la linea
+      porque un minimo mayor que 21 ya es mas de tres semanas; por debajo, en la linea
       base, no se sabe y hay que decirlo. **El cambio ocurrio entre
       `cambio_observado_tras` y `en_estado_desde`**, no a una hora exacta: la
       foto se toma una vez por noche. Los dias se calculan AL CONSULTAR, en

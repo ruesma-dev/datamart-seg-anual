@@ -55,7 +55,9 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
   el commit que lo crea (la puerta de cobertura exige ficha o pendiente); T11
   queda para `contratos`, `comparativos` y `00_global.yaml`.
 
-**Diccionario del árbol tras F-067 (en curso): 203 objetos, 1564 columnas, 95
+- [x] T5 cinco columnas al final de `compras.contratos` (+ fichas de columna).
+
+**Diccionario del árbol tras F-067 (en curso): 203 objetos, 1569 columnas, 95
 de consumo.**
 
 

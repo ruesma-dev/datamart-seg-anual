@@ -425,3 +425,93 @@ def test_f067_r11_estado_documentos_dice_de_cuando_es_la_ultima_foto() -> None:
         "((SELECT max(f.observado_en) FROM compras.historial_estados_fotos f) "
         "AT TIME ZONE 'Europe/Madrid') AS ultima_foto" in _proyeccion_vista()
     )
+
+
+# ===========================================================================
+# R12-R14 · `compras.contratos`: condiciones y última modificación, AL FINAL
+# ===========================================================================
+
+RUTA_DOCUMENTOS = DIRECTORIO_SQL / "compras" / "01_documentos.sql"
+
+#: Las quince de siempre (doce de antes + las tres de F-084), en su orden.
+COLUMNAS_CONTRATO_DE_SIEMPRE = (
+    "contrato_id", "codigo_contrato", "serie", "descripcion", "fecha", "obra_id",
+    "codigo_obra", "nombre_obra", "proveedor_id", "proveedor_nombre",
+    "proveedor_cif", "comparativo_id", "estado_id", "estado_codigo", "estado",
+)
+#: Las cinco de F-067, DETRÁS y en este orden (design §5).
+COLUMNAS_CONTRATO_NUEVAS = (
+    "forma_pago_id",
+    "forma_pago",
+    "retencion_garantia_porcentaje",
+    "retencion_garantia_concepto",
+    "fecha_ultima_modificacion",
+)
+
+
+def _bloque(nombre: str) -> str:
+    """El texto ejecutable compactado del bloque que construye `nombre`."""
+    texto = _texto(RUTA_DOCUMENTOS)
+    inicio = texto.index(f"DROP TABLE IF EXISTS {nombre} CASCADE")
+    fin = texto.index(f"ALTER TABLE {nombre} ADD PRIMARY KEY", inicio)
+    return _compacto(texto[inicio:fin])
+
+
+def _alias_del_select(bloque: str, desde: str) -> list[str]:
+    """Los `AS <alias>` de la proyección, hasta el `FROM` externo."""
+    return re.findall(r"\bAS ([a-z_0-9]+)\b", bloque[: bloque.index(desde)])
+
+
+def test_f067_r12_contratos_las_nuevas_van_al_final_y_las_de_siempre_no_se_mueven() -> None:
+    alias = _alias_del_select(_bloque("compras.contratos"), " FROM raw.ctr c ")
+    assert tuple(alias) == COLUMNAS_CONTRATO_DE_SIEMPRE + COLUMNAS_CONTRATO_NUEVAS, alias
+
+
+def test_f067_r12_contratos_la_forma_de_pago_del_contrato() -> None:
+    bloque = _bloque("compras.contratos")
+    assert "NULLIF(c.pagide, 0) AS forma_pago_id" in bloque
+    assert "pag.res AS forma_pago" in bloque
+    assert "LEFT JOIN raw.auxpag pag ON pag.ide = NULLIF(c.pagide, 0)" in bloque, (
+        "de `raw.auxpag` y no de `compras.formas_pago`, que se construye en 04 "
+        "(después); LEFT para no perder contratos sin forma de pago"
+    )
+
+
+def _lateral_retencion(bloque: str) -> str:
+    inicio = bloque.index("LEFT JOIN LATERAL ( SELECT")
+    return bloque[inicio : bloque.index(") ret ON TRUE", inicio) + len(") ret ON TRUE")]
+
+
+def test_f067_r13_contratos_la_retencion_es_el_concepto_ret_de_menor_pos() -> None:
+    lateral = _lateral_retencion(_bloque("compras.contratos"))
+    assert "FROM raw.ctrrec r JOIN raw.con x ON x.ide = r.recide" in lateral
+    assert "AND r.docide = c.ide" in lateral
+    assert "AND x.cod LIKE 'RET%'" in lateral
+    assert lateral.endswith("ORDER BY r.pos, r.ide LIMIT 1 ) ret ON TRUE"), (
+        "el LIMIT 1 es la guarda de grano (un contrato tiene dos); sin ORDER BY "
+        "elegiría una al azar"
+    )
+
+
+def test_f067_r13_contratos_el_porcentaje_va_en_tanto_por_cien() -> None:
+    lateral = _lateral_retencion(_bloque("compras.contratos"))
+    assert "ROUND((r.valpor * 100)::NUMERIC, 4) AS porcentaje" in lateral
+    assert "x.res AS concepto" in lateral
+    bloque = _bloque("compras.contratos")
+    assert "ret.porcentaje AS retencion_garantia_porcentaje" in bloque
+    assert "ret.concepto AS retencion_garantia_concepto" in bloque
+
+
+def test_f067_r13_contratos_el_lateral_del_estado_sigue_siendo_el_primero() -> None:
+    """`test_f084_sql.py` lee el PRIMER `LEFT JOIN LATERAL` como el del estado."""
+    bloque = _bloque("compras.contratos")
+    assert bloque.index("LEFT JOIN LATERAL compras.fn_estado_documento(44, con.est)") < (
+        bloque.index("LEFT JOIN LATERAL ( SELECT")
+    )
+
+
+def test_f067_r14_contratos_la_ultima_modificacion_es_tiemod_con_su_funcion() -> None:
+    assert (
+        "compras.fn_sigrid_tiempo(con.tiemod) AS fecha_ultima_modificacion"
+        in _bloque("compras.contratos")
+    )
