@@ -1555,6 +1555,31 @@ objetos:
     relaciones: []
     ejemplos_preguntas: []
 
+  fn_sigrid_tiempo:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. La tabla que la usa ya publica la
+      fecha convertida (`compras.contratos.fecha_ultima_modificacion`): no hay
+      que llamarla para consultar.
+    descripcion: >-
+      Convierte una FECHA SERIE de Sigrid —como `con.tiemod`, la ultima
+      modificacion del documento— en fecha y hora: dias desde el 1899-12-30
+      (la epoca de Delphi) con la hora en la parte decimal; 46300,537627 es el
+      2026-10-05 a las 12:54:10. El 0 sale NULL. **Trampa medida el
+      2026-10-06**: SQL Server convierte el mismo numero con la epoca
+      1900-01-01 y da DOS DIAS MAS; la buena es esta. Y `con.tiemod` NO es la
+      fecha del cambio de estado: la antiguedad del estado esta en
+      `compras.v_estado_documentos` (F-067).
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
   vencimientos:
     tipo: tabla
     capa: consumo
