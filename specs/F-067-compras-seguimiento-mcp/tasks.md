@@ -28,7 +28,7 @@ más lo que quede de T11-T15.
 ## Fichas, documentos y cierre
 
 - [x] T11: Fichas de `historial_estados`, `historial_estados_fotos`, `v_estado_documentos`, `contratos` (R10, R11, R14-R16) y `comparativos` (R26); `00_global.yaml` `version` +1, comentario de versión y P23-P26 (R27)  |  Verificación: `python -m pytest tests/test_f067_diccionario.py tests/test_f006_fichas.py tests/test_f006_formato.py tests/test_f006_cobertura.py -q`
-- [ ] T12: `docs/ARCHITECTURE.md`: tablas persistentes de `compras` (no se reconstruyen, `--full` no las toca, qué pasa si se borran), foto por tramos, fecha de Delphi de `tiemod` (R29)  |  Verificación: el reviewer lo lee contra design §2 y §9
+- [x] T12: `docs/ARCHITECTURE.md`: tablas persistentes de `compras` (no se reconstruyen, `--full` no las toca, qué pasa si se borran), foto por tramos, fecha de Delphi de `tiemod` (R29)  |  Verificación: el reviewer lo lee contra design §2 y §9
 - [ ] T13: `azure-apps/datamart_seg_anual.md`: objetos y columnas nuevos de `compras` y `descompuestos`; commit en ESE repositorio, sin push (R29)  |  Verificación: `git -C C:/Users/pgris/PycharmProjects/azure-apps log -1 --stat`
 - [ ] T14: Campaña de mutación COMPLETA sobre `domain/historial_estados.py` y análisis de supervivientes en el informe  |  Verificación: `python -m harness.mutacion --feature F-067`
 - [ ] T15: Ejecutar `bash harness/init.sh` en verde (pytest, cobertura de líneas cambiadas, tamaño de spec e informes)  |  Verificación: `bash harness/init.sh`
