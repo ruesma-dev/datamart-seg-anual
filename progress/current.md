@@ -86,7 +86,13 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
 
 - [x] T12 `docs/ARCHITECTURE.md`. [x] T13 `azure-apps/datamart_seg_anual.md`,
   commit propio en ese repositorio (rama `master`, sin push).
-- [ ] T14 campaña de mutación (en curso).
+- [x] T14 mutación. `harness.mutacion` sobre `d088327` (50 mutantes, 4
+  workers, `--timeout 1800`: con el suelo de 120 s la línea base no cabía en
+  600 s con 4 workers): 44 muertos, 5 supervivientes y 1 timeout, cerrados con
+  dos tests nuevos y una simplificación (`d698881`) y re-verificados con el
+  mismo generador (45/45 muertos). SQL a mano: 40/40 sobre `cc8113a`.
+  Detalle en `progress/mutacion_F-067.md`.
+- [ ] T15 `bash harness/init.sh` (en curso).
 
 **Diccionario del árbol tras F-067 (en curso): 204 objetos, 1589 columnas, 96
 de consumo.**
