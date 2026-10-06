@@ -39,6 +39,17 @@ timeout` (IP pública del puesto, probablemente fuera del firewall); lo de
 `raw` se midió en Sigrid y lo de `compras`/`descompuestos` por el MCP. Nada que
 bloquee la spec.
 
+### Implementer (2026-10-06) · EN CURSO · D1 una entrega, D2-D4 según recomendación
+
+Precondición: `bash harness/init.sh` en verde al empezar (6795 passed, 227
+skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
+`progress/impl_F-067.md`.
+
+- [x] T1 dominio (`domain/historial_estados.py`, 45 tests). Decisión: además
+  de lo del design §4, `ResumenFoto`/`resumir_foto` como oráculo de los
+  contadores de `historial_estados_fotos` (R8): altas = tramos abiertos en la
+  foto − cambios.
+
 
 ## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA en pasada 2, SIN DESPLEGAR · el comparativo de ofertas
 
