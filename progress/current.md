@@ -10,7 +10,12 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-06 · F-067 (con F-125) · SPEC ESCRITA, pendiente de aprobación del humano
+## 2026-10-07 · F-067 · CERRADA (`done`, APROBADO en pasada 2) · Compras por el MCP (con F-125) · SIN DESPLEGAR
+
+> Cerrada el 2026-10-07. Resumen en `progress/history.md`. MANUAL abajo.
+
+### Antes
+
 
 Spec en `specs/F-067-compras-seguimiento-mcp/` (requirements 131/150, design
 243/250, 23 tareas). Mediciones y porqués en `progress/spec_F-067.md`. Rama

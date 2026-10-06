@@ -1575,3 +1575,35 @@ líneas casarían con una posterior y 21.789 de obras sin ABC con otra versión.
 
 QUEDA: despliegue de la Fase 2 (imagen, `build-compras`, diccionario v43, MCP, T25 la
 0696) y la T24 de la Fase 1 (las cuatro preguntas al MCP).
+
+---
+
+## F-067 · Compras por el MCP: foto diaria de estados, condiciones del contrato, código 2 y documento de necesidades · 2026-10-07
+
+Rama `feature/F-067-compras-seguimiento-mcp`. `sdd=true`, rigor `critico`, prioridad 2.
+ABSORBIÓ F-125 (humano, 2026-10-05). APROBADA en pasada 2 (`progress/review_F-067.md`;
+la 1 pidió papeleo, un comentario y decidir `reset-compras`). Spec en
+`specs/F-067-compras-seguimiento-mcp/`, mediciones en `progress/spec_F-067.md`,
+informe en `progress/impl_F-067.md`. Decisiones del humano (2026-10-06): D1 una
+entrega, D2 `tiemod` publicada con advertencia y nunca como antigüedad del estado, D3
+código 2 y necesidad también en contratos y facturas, D4 proveedores por actividad a
+F-055.
+
+Hecho: FOTO DIARIA de estados de contratos (44) y facturas (15) por TRAMOS, en las
+dos primeras tablas PERSISTENTES de `compras` (`historial_estados`,
+`historial_estados_fotos`): nunca DROP/TRUNCATE/DELETE, `--full` no las toca, guarda
+del 98 % contra ingesta a medias, idempotente la misma noche; `v_estado_documentos`
+con la antigüedad del estado desde la foto. `reset-compras` las CONSERVA (decisión del
+líder por delegación del humano, opción a). Contratos: forma de pago, retención de
+garantía y última modificación (`fn_sigrid_tiempo`, época Delphi 1899-12-30). Código
+2 y necesidad (`dcapro.dncide`/`dncproide`: 32,5 % de las líneas, 5,1 % sin contrato)
+al final de líneas de albarán, contrato y factura; `compras.necesidades` (el DPC de la
+obra); `necesidad_id` en las vistas de PLANIF_JO y master. Diccionario v44.
+
+Verificado: cifras de la spec reproducidas en Azure por el reviewer; mutación Python
+45/45 y SQL 40/40 sin supervivientes; `init.sh` 6.984 passed.
+
+QUEDA: despliegue (la primera nocturna toma la LÍNEA BASE; «más de tres semanas» se
+responde a los 21 días), MCP, comprobaciones, carta a Compras y la pregunta de la
+penalización. Riesgo aceptado de la spec: un documento ausente una noche pierde su
+antigüedad al reaparecer.
