@@ -76,6 +76,9 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
   F-120» (D8 protege justo esto: columnas nuevas al final). `git diff main
   --stat -- sql/descompuestos/` = solo `06_views.sql`.
 
+- [x] T10 «código 2» en `descompuestos` (R23) y `tests/test_f067_diccionario.py`
+  (R22-R25, R28). Las fichas de `compras` de R22/R24/R25 entraron en T7/T8.
+
 **Diccionario del árbol tras F-067 (en curso): 204 objetos, 1589 columnas, 96
 de consumo.**
 

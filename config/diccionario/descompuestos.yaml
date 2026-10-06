@@ -171,8 +171,16 @@ objetos:
         significado: Unidad del elemento (campo 5; `dncpro.unimed`).
       codigo_alternativo:
         significado: >-
-          Codigo alternativo (campo 7), que en las lineas sincronizadas con la
-          planificacion es `dncpro.cod2`: el codigo de la partida.
+          El «CODIGO 2» de Sigrid (rotulado «Codigo alternativo»; F-067), y lo
+          es en los cuatro origenes: en ESTUDIO y en las versiones del master es
+          el campo 7 del texto, y en PLANIF_JO es `dncpro.cod2`. Lo pone el JEFE
+          DE OBRA para agrupar o filtrar sus compras en el documento de
+          planificacion de compras (DPC), y viaja de la linea de necesidad a la
+          compra: es el mismo `codigo_alternativo` de `compras.albaran_lineas`.
+          **En el master es el de la fecha de la version**: medido el
+          2026-10-06 en una obra, el 98,4 % de las lineas del master enlazadas
+          a la planificacion traen el mismo que hoy; el resto se edito despues.
+          Texto libre sin normalizar.
       tipo_elemento_codigo:
         significado: El tipo de elemento tal cual lo guarda Sigrid (campo 16).
         nulo_significa: >-
@@ -532,7 +540,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del elemento, libre por obra en Estudios.'}
       descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
       unidad: {significado: 'Unidad del elemento en el descompuesto.'}
-      codigo_alternativo: {significado: 'Codigo alternativo del elemento (campo 7).'}
+      codigo_alternativo: {significado: 'El «codigo 2» del elemento (campo 7 del texto; ver `descompuestos.lineas`).'}
       tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
@@ -578,7 +586,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del producto de compras de la linea (`con.cod`).'}
       descripcion: {significado: 'Descripcion de la linea de planificacion (`dncpro.res`).'}
       unidad: {significado: 'Unidad de la linea de planificacion (`dncpro.unimed`).'}
-      codigo_alternativo: {significado: 'Codigo alternativo de la linea (`dncpro.cod2`).'}
+      codigo_alternativo: {significado: 'El «codigo 2» de la linea (`dncpro.cod2`): lo pone el jefe de obra para agrupar o filtrar sus compras en el DPC y viaja al albaran (F-067).'}
       naturaleza_codigo: {significado: 'Codigo de la naturaleza del producto (`auxpronat.cod`).'}
       naturaleza: {significado: 'Nombre de la naturaleza del producto (`auxpronat.res`).'}
       rendimiento: {significado: 'Cantidad por unidad de partida, sin el factor (`dncpro.canren`).', agregacion: no_sumable}
@@ -634,7 +642,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del elemento (el del producto si viene de la planificacion).'}
       descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
       unidad: {significado: 'Unidad del elemento en el descompuesto.'}
-      codigo_alternativo: {significado: 'Codigo alternativo (= `dncpro.cod2` si esta enlazada).'}
+      codigo_alternativo: {significado: 'El «codigo 2» de la linea en la fecha de la version (campo 7; = `dncpro.cod2` si esta enlazada y no se edito despues).'}
       tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
@@ -694,7 +702,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del elemento, libre por obra en Estudios.'}
       descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
       unidad: {significado: 'Unidad del elemento en el descompuesto.'}
-      codigo_alternativo: {significado: 'Codigo alternativo del elemento (campo 7).'}
+      codigo_alternativo: {significado: 'El «codigo 2» del elemento (campo 7 del texto; ver `descompuestos.lineas`).'}
       tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}

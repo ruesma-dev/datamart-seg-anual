@@ -23,7 +23,7 @@ más lo que quede de T11-T15.
 - [x] T7: `01_documentos.sql`: `codigo_alternativo`, `necesidad_id`, `necesidad_linea_id` al final de `albaran_lineas` (y, con D3, de `contrato_lineas` y `factura_lineas`), índice (R17, R18)  |  Verificación: `python -m pytest tests/test_f067_sql.py -q -k lineas`
 - [x] T8: `sql/compras/10_necesidades.sql`: `compras.necesidades` (R19) y `SUB_PASOS` + `10` (cuenta `necesidades`) antes de `11`  |  Verificación: `python -m pytest tests/test_f067_sql.py tests/test_f047_steps.py -q -k "necesidades or steps"`
 - [x] T9: `sql/descompuestos/06_views.sql`: `necesidad_id` al final de `v_pbi_planif_jo` y `v_pbi_master_planif_jo` por subconsulta escalar (R20, R21)  |  Verificación: `python -m pytest tests/test_f067_sql.py tests/test_f097_descompuestos.py -q` y `git diff main --stat -- etl_sigrid/infrastructure/postgres/sql/descompuestos/` (solo `06_views.sql`)
-- [ ] T10: Fichas de `albaran_lineas` (y D3), `necesidades` y `descompuestos.yaml` (R22-R25)  |  Verificación: `python -m pytest tests/test_f067_diccionario.py tests/test_f006_fichas.py tests/test_f006_formato.py tests/test_f006_cobertura.py -q`
+- [x] T10: Fichas de `albaran_lineas` (y D3), `necesidades` y `descompuestos.yaml` (R22-R25)  |  Verificación: `python -m pytest tests/test_f067_diccionario.py tests/test_f006_fichas.py tests/test_f006_formato.py tests/test_f006_cobertura.py -q`
 
 ## Fichas, documentos y cierre
 
