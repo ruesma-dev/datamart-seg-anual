@@ -55,6 +55,14 @@ bloquee la spec.
 > (lo pidió el humano)**: comprobar que `build_compras` y `publicar_diccionario`
 > salieron SUCCESS (v43), `check-diccionario` OK, REINICIAR EL MCP y la T25 (la
 > 0696) y las cifras de D4 en solo lectura.
+>
+> **HECHO por el líder el 2026-10-06 ~07:20 UTC.** Nocturna del 06-10: `build_compras`
+> SUCCESS (02:55-03:07, 3.961.918 filas) y `publicar_diccionario` **v43** (04:21,
+> 199 objetos). MCP reiniciado (`--0000014`), sirve la v43. Cifras (MCP, solo
+> lectura): casan 24.431 (11.409 con la ABC), no casan 59.588, sin descompuesto 89;
+> 66.535 firmas; 11.403 objetivos: lo medido el 05-10 más los datos de un día.
+> `check-diccionario` NO se pudo pasar: el puesto no llega al Postgres (timeout,
+> IP fuera del firewall); queda para cuando el humano añada la regla.
 
 ### Antes
 
