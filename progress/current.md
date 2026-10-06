@@ -10,6 +10,36 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-06 · F-067 (con F-125) · SPEC ESCRITA, pendiente de aprobación del humano
+
+Spec en `specs/F-067-compras-seguimiento-mcp/` (requirements 131/150, design
+243/250, 23 tareas). Mediciones y porqués en `progress/spec_F-067.md`. Rama
+`feature/F-067-compras-seguimiento-mcp`. Hallazgos que cambian la ficha (ya
+llevados a su `acceptance` 2, 3, 8 y 12): el albarán enlaza con la necesidad
+**directamente** (`dcapro.dncide`/`dncproide`, 32,5 % de las líneas; el «6 %»
+de Negocio son las líneas sin contrato, 5,1 %); el código 2 viaja de la
+necesidad al albarán (igual en el 99,9 %); `con.tiemod` **no** sirve de proxy de
+la antigüedad del estado (la firma no lo mueve en el 85 % de los comparativos) y
+es una fecha de Delphi que SQL Server lee con dos días de más; el acceptance 3
+ya lo responde `compras.comparativos` de F-038.
+
+**Decisiones abiertas para el humano** (recomendación en negrita; detalle en
+`progress/spec_F-067.md` §4):
+
+- **D1** una entrega o dos → **una**, con la foto primero (la historia cuenta
+  desde el despliegue); si dos, Fase 1 = foto + contratos.
+- **D2** publicar `tiemod` como `fecha_ultima_modificacion` del contrato →
+  **sí, con su advertencia, y nunca como antigüedad del estado**.
+- **D3** código 2 y necesidad también en líneas de contrato y factura → **sí**.
+- **D4** «proveedores por actividad validada» (acceptance 4) a F-055 → **sí**;
+  si se aprueba, el líder ajusta el acceptance 4 de F-067 y el de F-055.
+
+**Aviso de herramienta**: `psycopg` directo al Postgres de Azure dio `connection
+timeout` (IP pública del puesto, probablemente fuera del firewall); lo de
+`raw` se midió en Sigrid y lo de `compras`/`descompuestos` por el MCP. Nada que
+bloquee la spec.
+
+
 ## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA en pasada 2, SIN DESPLEGAR · el comparativo de ofertas
 
 > **Cerrada el 2026-10-05.** Fase 2 APROBADA por el reviewer en la pasada 2
