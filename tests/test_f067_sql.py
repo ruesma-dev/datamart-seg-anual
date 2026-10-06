@@ -656,3 +656,51 @@ def test_f067_r24_necesidades_no_publica_el_estado() -> None:
     """Los 277 están «En curso»: un estado que no informa no se publica."""
     assert "est" not in _alias_del_select(_necesidades(), " FROM raw.dnc d ")
     assert "con.est" not in _necesidades() and "c.est" not in _necesidades()
+
+
+# ===========================================================================
+# R20-R21 · `necesidad_id` en las dos vistas de planificación de `descompuestos`
+# ===========================================================================
+
+RUTA_VISTAS_DES = DIRECTORIO_SQL / "descompuestos" / "06_views.sql"
+SUBCONSULTA_NECESIDAD = (
+    "(SELECT NULLIF(n.dncide, 0) FROM raw.dncpro n WHERE n.ide = lineas.dncpro_id) "
+    "AS necesidad_id"
+)
+VISTAS_CON_NECESIDAD = {
+    "v_pbi_planif_jo": "PLANIF_JO",
+    "v_pbi_master_planif_jo": "MASTER_PLANIF_JO",
+}
+
+
+def _vista_des(vista: str) -> str:
+    texto = _compacto(_texto(RUTA_VISTAS_DES))
+    inicio = texto.index(f"CREATE OR REPLACE VIEW descompuestos.{vista} AS SELECT ")
+    return texto[inicio : texto.index(";", inicio)]
+
+
+@pytest.mark.parametrize(("vista", "origen"), sorted(VISTAS_CON_NECESIDAD.items()))
+def test_f067_r20_descompuestos_necesidad_id_al_final_por_subconsulta(
+    vista: str, origen: str
+) -> None:
+    """Subconsulta escalar por la PK de `raw.dncpro`, y NO un JOIN: el `FROM
+    descompuestos.lineas WHERE origen = ...` de la vista no cambia (R24 de
+    F-097). Lee `raw` y no `compras.necesidades`: el `DROP ... CASCADE`
+    nocturno de `compras` se llevaría la vista por delante."""
+    cuerpo = _vista_des(vista)
+    assert cuerpo.endswith(
+        f"factor, {SUBCONSULTA_NECESIDAD} FROM descompuestos.lineas WHERE origen = '{origen}'"
+    ), cuerpo[-300:]
+    assert "compras." not in cuerpo
+
+
+@pytest.mark.parametrize("vista", ["v_pbi_estudio", "v_pbi_master_estudio"])
+def test_f067_r20_descompuestos_las_vistas_de_estudios_no_cambian(vista: str) -> None:
+    """ESTUDIO y MASTER_ESTUDIO no tienen línea de necesidad (`dncpro_id`)."""
+    assert "necesidad_id" not in _vista_des(vista)
+
+
+def test_f067_r21_descompuestos_cuatro_vistas_y_ninguna_tabla() -> None:
+    ejecutable = _compacto(_texto(RUTA_VISTAS_DES))
+    assert ejecutable.count("CREATE OR REPLACE VIEW") == 4
+    assert "CREATE TABLE" not in ejecutable and "ALTER TABLE" not in ejecutable

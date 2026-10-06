@@ -69,7 +69,14 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
   ficha y relaciones de R25 (la de `v_pbi_planif_jo.dncpro_id` es `N:N`: la
   clave de la vista es `(obra_id, partida_id, orden)`, lo exige el validador).
 
-**Diccionario del árbol tras F-067 (en curso): 204 objetos, 1587 columnas, 96
+- [x] T9 `necesidad_id` al final de `v_pbi_planif_jo` y
+  `v_pbi_master_planif_jo` (subconsulta escalar a `raw.dncpro`). Desviación
+  justificada: `test_f120_r18` exigía `factor` como ÚLTIMA columna de esas
+  vistas, en contra de R20; se ajusta a «`factor` es la última de las de
+  F-120» (D8 protege justo esto: columnas nuevas al final). `git diff main
+  --stat -- sql/descompuestos/` = solo `06_views.sql`.
+
+**Diccionario del árbol tras F-067 (en curso): 204 objetos, 1589 columnas, 96
 de consumo.**
 
 

@@ -24,6 +24,15 @@
 --
 -- `factor` (F-120) va la ULTIMA (D8): `CREATE OR REPLACE VIEW` solo admite
 -- columnas nuevas al final. La vista de F-123 va al final del fichero.
+--
+-- F-067 (con F-125, R20): `necesidad_id`, el DOCUMENTO de necesidades de compra
+-- (el DPC de la obra, `compras.necesidades`) de la linea de necesidad, va
+-- DETRAS de `factor` en las dos vistas que tienen `dncpro_id` (PLANIF_JO y
+-- MASTER_PLANIF_JO). Por SUBCONSULTA ESCALAR a la PK de `raw.dncpro` y no por
+-- JOIN, para que el `FROM descompuestos.lineas WHERE origen = ...` (R24) no
+-- cambie; y leyendo `raw`, NO `compras.necesidades`, porque `build_compras`
+-- hace `DROP ... CASCADE` cada noche y se llevaria estas vistas. Ni la tabla
+-- `descompuestos.lineas` ni los ficheros del sello cambian: no retrocea nada.
 -- ============================================================================
 
 CREATE OR REPLACE VIEW descompuestos.v_pbi_estudio AS
@@ -43,7 +52,8 @@ SELECT
     rendimiento, precio, importe_unitario, cantidad_total, importe_total,
     dncpro_id, producto_id, proveedor_recomendado_id, contrato_id,
     contrato_linea_id, fecha_maxima, grupo_planificacion_id, nivel, es_nivel_padre,
-    factor
+    factor,
+    (SELECT NULLIF(n.dncide, 0) FROM raw.dncpro n WHERE n.ide = lineas.dncpro_id) AS necesidad_id
 FROM descompuestos.lineas WHERE origen = 'PLANIF_JO';
 
 CREATE OR REPLACE VIEW descompuestos.v_pbi_master_planif_jo AS
@@ -53,7 +63,8 @@ SELECT
     tipo_elemento_codigo, tipo_elemento, naturaleza_codigo, naturaleza,
     rendimiento, precio, importe_unitario, cantidad_total, importe_total,
     es_porcentaje, porcentaje, base_porcentaje, dncpro_id, producto_id,
-    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor
+    es_primera_abc, es_vigente, es_ultima, tipo_version, texto_version, factor,
+    (SELECT NULLIF(n.dncide, 0) FROM raw.dncpro n WHERE n.ide = lineas.dncpro_id) AS necesidad_id
 FROM descompuestos.lineas WHERE origen = 'MASTER_PLANIF_JO';
 
 CREATE OR REPLACE VIEW descompuestos.v_pbi_master_estudio AS
