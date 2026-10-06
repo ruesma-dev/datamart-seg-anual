@@ -1022,7 +1022,7 @@
         "(De F-125) Las fichas del diccionario explican que es el codigo 2 (lo pone el jefe de obra para agrupar o filtrar sus compras en el DPC) y que es el documento de necesidades de compra",
         "(De F-125) Contrastado con el caso de Juan: un albaran de MOMOSA con lineas sin contrato muestra su codigo 2 (medido: AC26/28510 y AC26/28514, lineas sin contrato con codigo 2 'MOMOSA')"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "critico",
       "priority": 2,
