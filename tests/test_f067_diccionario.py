@@ -161,3 +161,125 @@ def test_f067_r25_relaciones_del_albaran_con_la_necesidad() -> None:
 
 def test_f067_r25_la_necesidad_va_a_su_obra() -> None:
     assert ("obra_id", "maestro.obras.obra_id", "N:1") in _relaciones("compras.necesidades")
+
+
+# ===========================================================================
+# R10 · R11 · la antigüedad del estado
+# ===========================================================================
+
+
+def _ficha_entera(nombre: str) -> str:
+    ficha = _ficha(nombre)
+    partes = [ficha.descripcion, ficha.grano or ""]
+    partes += [f"{c.significado} {c.nulo_significa or ''}" for c in ficha.columnas]
+    partes += list(ficha.ejemplos_preguntas or [])
+    return _plano(" ".join(partes))
+
+
+def test_f067_r10_la_linea_base_es_un_minimo_y_21_dias_lo_hacen_cierto() -> None:
+    texto = _plano(_ficha("compras.v_estado_documentos").descripcion)
+    assert "minimo" in texto and "al menos n dias" in texto
+    assert "en cuanto ese minimo supera 21, «mas de tres semanas» es una respuesta cierta" in texto
+    assert "estado_codigo = 'epf'" in texto and "dias_en_estado > 21" in texto
+
+
+def test_f067_r11_el_cambio_ocurrio_entre_dos_fotos_y_la_historia_empieza_al_desplegar() -> None:
+    texto = _plano(_ficha("compras.v_estado_documentos").descripcion)
+    assert (
+        "el cambio ocurrio entre `cambio_observado_tras` y `en_estado_desde`**, "
+        "no a una hora exacta" in texto
+    )
+    assert "la historia empieza el dia del despliegue" in texto
+    assert "la historia empieza el dia del despliegue" in _plano(
+        _ficha("compras.historial_estados").descripcion
+    )
+
+
+def test_f067_r8_la_ficha_avisa_de_que_la_historia_no_se_reconstruye() -> None:
+    for nombre in ("compras.historial_estados", "compras.historial_estados_fotos"):
+        assert "no se reconstruye" in _plano(_ficha(nombre).descripcion), nombre
+
+
+# ===========================================================================
+# R14 · R15 · R16 · la ficha del contrato
+# ===========================================================================
+
+
+def test_f067_r14_la_ultima_modificacion_no_es_el_cambio_de_estado() -> None:
+    texto = _texto_columna("compras.contratos", "fecha_ultima_modificacion")
+    assert "no es la fecha del cambio de estado" in texto
+    assert "con.tiemod" in texto and "85 %" in texto
+    assert "compras.v_estado_documentos" in texto
+
+
+def test_f067_r15_la_penalizacion_no_es_un_campo() -> None:
+    texto = _plano(_ficha("compras.contratos").descripcion)
+    assert "penalizacion no es un campo de sigrid" in texto
+    assert "compras.documento_texto" in texto and "9 contratos" in texto
+
+
+def test_f067_r16_la_antiguedad_ya_no_es_imposible_y_remite_a_la_vista() -> None:
+    texto = _ficha_entera("compras.contratos")
+    assert "no se puede saber" not in texto
+    assert "compras.v_estado_documentos" in _plano(_ficha("compras.contratos").descripcion)
+    ejemplos = [_plano(e) for e in _ficha("compras.contratos").ejemplos_preguntas]
+    tres_semanas = [e for e in ejemplos if "tres semanas" in e]
+    assert tres_semanas and all("no" not in e.split() for e in tres_semanas), tres_semanas
+
+
+def test_f067_r12_las_condiciones_del_contrato_tienen_ficha() -> None:
+    for columna in ("forma_pago_id", "forma_pago", "retencion_garantia_porcentaje",
+                    "retencion_garantia_concepto", "fecha_ultima_modificacion"):
+        assert _columna("compras.contratos", columna).significado
+    assert "tanto por cien" in _texto_columna("compras.contratos", "retencion_garantia_porcentaje")
+
+
+# ===========================================================================
+# R26 · los comparativos ya responden el acceptance 3
+# ===========================================================================
+
+
+def test_f067_r26_comparativos_por_actividad_y_adjudicatarios_repetidos() -> None:
+    ejemplos = " | ".join(_plano(e) for e in _ficha("compras.comparativos").ejemplos_preguntas)
+    assert "por actividad" in ejemplos
+    assert "mas de una actividad" in ejemplos
+    texto = _plano(_ficha("compras.comparativos").descripcion)
+    assert "877" in texto and "contrato_id" in texto
+
+
+# ===========================================================================
+# R27 · `00_global.yaml`: versión y preguntas de aceptación
+# ===========================================================================
+
+
+def _pregunta(identificador: str) -> dict:
+    for pregunta in _diccionario().global_raw["preguntas_aceptacion"]:
+        if pregunta["id"] == identificador:
+            return pregunta
+    raise AssertionError(f"no está la pregunta {identificador}")
+
+
+def test_f067_r27_la_version_sube_a_44() -> None:
+    assert str(_diccionario().version) == "44"
+
+
+def test_f067_r27_p23_tres_semanas_parcial_hasta_21_dias_despues() -> None:
+    p23 = _pregunta("P23")
+    assert p23["estado"] == "parcial" and p23["bloqueada_por"] == "F-067"
+    assert "compras.v_estado_documentos" in p23["objetos_esperados"]
+    respuesta = _plano(p23["respuesta_correcta"])
+    assert "minimo" in respuesta and "dia del despliegue" in respuesta
+
+
+@pytest.mark.parametrize(
+    ("identificador", "objeto"),
+    [
+        ("P24", "compras.historial_estados"),
+        ("P25", "compras.comparativos"),
+        ("P26", "compras.albaran_lineas"),
+    ],
+)
+def test_f067_r27_p24_a_p26_respondibles(identificador: str, objeto: str) -> None:
+    pregunta = _pregunta(identificador)
+    assert pregunta["estado"] == "respondible"
+    assert objeto in pregunta["objetos_esperados"]

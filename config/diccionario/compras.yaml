@@ -208,8 +208,7 @@ objetos:
       `importe_contrato`, que no existe. El importe comprometido esta en
       `compras.v_pbi_contrato_consumo.importe_contratado`.
 
-      **LO QUE SE PUEDE Y LO QUE NO SE PUEDE RESPONDER CON EL ESTADO (F-084,
-      2026-09-16). Las dos mitades importan, y la segunda mas.**
+      **EL ESTADO (F-084, 2026-09-16) Y SU ANTIGUEDAD (F-067, 2026-10-06).**
 
       **SI se puede: en que estado esta cada contrato.** Desde F-084 esta
       tabla publica `estado`, `estado_codigo` y `estado_id`. «Que contratos
@@ -217,16 +216,24 @@ objetos:
       `estado_codigo = 'EPF'`: son **818**, de **567 proveedores** y **241
       obras**, medido el 2026-09-16.
 
-      **NO se puede: cuanto lleva un contrato en ese estado.** El datamart no
-      guarda cuando cambio el estado —no hay foto diaria, la traera F-067— y
-      en el origen la unica aproximacion es `con.tiemod`, la ultima
-      modificacion del DOCUMENTO, que **no es la fecha del cambio de estado**:
-      a un contrato enviado en 2019 al que se le tocara una linea ayer
-      `con.tiemod` le da un dia. Ademas `con.tiemod` **no esta publicado en
-      esta tabla ni en ninguna otra del datamart**: vive en `raw`, que el MCP
-      no consulta. Asi que a «cuantos llevan mas de tres semanas enviados» la
-      respuesta correcta hoy es **no se puede saber**, acompanada de los 818
-      que estan en «Enviado»; cualquier numero de dias que se de sera falso.
+      **Y CUANTO LLEVA EN ESE ESTADO, desde F-067: en
+      `compras.v_estado_documentos`**, no aqui. Sigrid no guarda cuando cambio
+      el estado, asi que el datamart toma una FOTO DIARIA de estados desde el
+      dia del despliegue de F-067 (`compras.historial_estados`). La
+      antiguedad de lo que ya estaba en su estado ese dia es un MINIMO, y
+      «mas de tres semanas enviado» es una respuesta cierta en cuanto ese
+      minimo supera 21 dias; la vista lo explica. **NO uses
+      `fecha_ultima_modificacion` (`con.tiemod`) para la antiguedad: NO es la
+      fecha del cambio de estado**, es la ultima modificacion del documento,
+      y la firma no la mueve.
+
+      **LAS CONDICIONES (F-067)**: forma de pago (`forma_pago_id`,
+      `forma_pago`) y retencion de garantia (`retencion_garantia_porcentaje`,
+      `retencion_garantia_concepto`). **La penalizacion no es un campo de
+      Sigrid**: el contrato no la tiene en ninguna columna, y solo aparece
+      escrita en el texto libre del contrato (`compras.documento_texto`, en 9
+      contratos de los 1.624 con texto, medido el 2026-10-06). Para buscarla
+      hay que leer ese texto; Compras tiene pendiente decir donde la anota.
 
       **Y NO LO BUSQUES EN EL CIRCUITO DE FIRMA: para el contrato esta vacio.**
       Parece la via natural —«enviado sin firmar» suena a firmas— y no lo es:
@@ -398,9 +405,10 @@ objetos:
       - Que contratos estan enviados y sin firmar
       - Cuantos contratos hay en cada estado, y cuantos sin firmar todavia
       - >-
-        Que contratos llevan mas de tres semanas enviados sin firmar (OJO: los
-        ENVIADOS si se pueden listar, el «mas de tres semanas» NO: ver la
-        descripcion de la tabla)
+        Que contratos llevan mas de tres semanas enviados sin firmar (con
+        `compras.v_estado_documentos`: la antiguedad cuenta desde el despliegue
+        de la foto diaria)
+      - Que forma de pago y que retencion de garantia tiene el contrato C
 
   contrato_lineas:
     tipo: tabla
@@ -2492,6 +2500,18 @@ objetos:
       118 coincidencias que parecen un join--; y `log.res` NO es la actividad,
       es el NOMBRE del comparativo. La actividad es `actividad`, de
       `com.natide`.
+
+      **POR ACTIVIDAD Y POR ADJUDICATARIO (F-067, acceptance 3 del correo de
+      Compras)**: las dos preguntas se responden aqui, sin otro objeto.
+      «Comparativos por actividad»: agrupar por `actividad`
+      (`actividad_id` informado en el 99,2 %). «Proveedores adjudicatarios con
+      comparativos de distintas actividades»: agrupar por
+      `proveedor_ganador_id` (ganadora unica en el 87,7 %) y contar
+      actividades distintas; medido el 2026-10-06, 1.535 de 4.188 proveedores
+      ganadores tienen comparativos de mas de una actividad. **Ojo**: 877
+      comparativos tienen contrato y NO tienen ganadora unica; su proveedor
+      sale del contrato, por `contrato_id`, y no de `proveedor_ganador_id`.
+      Las actividades «validadas» del proveedor no existen en Sigrid (F-055).
     grano: >-
       Una fila por comparativo de `raw.com` (20.378 el 2026-10-04), incluidos
       los que no tienen ofertas (319), lineas (264) o firmas.
@@ -2731,6 +2751,7 @@ objetos:
         cardinalidad: "N:1"
         porque: Para el nombre, la empresa y el cliente de la obra.
     ejemplos_preguntas:
+      - Que proveedores ganan comparativos de mas de una actividad
       - Cuantos comparativos hay por actividad
       - Cuanto se ahorro en los concursos de la obra X
       - Quien aprobo el comparativo X y cuando
