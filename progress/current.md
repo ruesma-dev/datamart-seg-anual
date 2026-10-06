@@ -95,15 +95,52 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
 - [x] T15 `bash harness/init.sh` en verde: 6976 passed, cobertura de líneas
   cambiadas 100 % (66/66), impl dentro del tope.
 
-**Para el líder, antes del despliegue (hallazgo, fuera de la spec)**: `python
-main.py reset-compras` hace `DROP SCHEMA compras CASCADE` y se llevaría las dos
-tablas persistentes de la foto (R8 dice «jamás»). No lo usa la nocturna; decide
-el humano si se blinda. Detalle en `progress/impl_F-067.md` §3.
+**MANUAL del humano, EN ORDEN (copia de `progress/impl_F-067.md` §6, con su
+comando y lo que debe salir)**:
 
-**MANUAL del humano (T16-T23), en orden y con su comando y lo que debe salir**:
-`progress/impl_F-067.md` §6 (merge e imagen; la nocturna toma la LÍNEA BASE;
-las cuatro puertas `check-*`; cifras de T19 contra la previsión; segunda noche;
-MCP reiniciado y P23-P26; correo a Compras; a los 21 días, P23 a respondible).
+0. **PENDIENTE · decisión del humano sobre `reset-compras`**: hoy hace `DROP
+   SCHEMA compras CASCADE` y se llevaría las dos tablas persistentes de la foto
+   (R8: «jamás»); lo recomiendan `README_COMPRAS_C1_C2.md:53` y
+   `LEEME_INTEGRACION.md:21`. Precondición de T16: decidir antes de desplegar.
+1. **T16** Merge a `main`; imagen y job:
+   `powershell -NoProfile -File infra/70_build_image.ps1`;
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm`;
+   `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → el tag nuevo.
+2. **T17** Dejar correr la nocturna (00:00 UTC): toma la LÍNEA BASE de la foto
+   y publica el diccionario v44. `python main.py status` → `run-all` SUCCESS;
+   `python main.py timings --last 1` → `build_compras` < +1 min sobre la noche
+   anterior.
+3. **T18** (solo lectura) `python main.py check-declarados`, `python main.py
+   check-unicidad`, `python main.py check-relaciones` y `python main.py
+   check-diccionario` → los cuatro con código 0.
+4. **T19** (solo lectura), resultado en este fichero; desviación > 5 %: parar
+   y avisar:
+   - `SELECT * FROM compras.historial_estados_fotos;` → una fila,
+     `es_linea_base` verdadero, `n_documentos` ≈ 185.800.
+   - `SELECT count(*), count(codigo_alternativo), count(necesidad_linea_id)
+     FROM compras.albaran_lineas;` → ≈ 1.163.000 / 357.000 / 378.000.
+   - `SELECT count(*) FROM compras.necesidades;` → ≈ 277.
+   - `SELECT count(retencion_garantia_porcentaje), count(forma_pago_id) FROM
+     compras.contratos;` → ≈ 6.330 / 19.070.
+5. **T20** (solo lectura, segunda noche) `SELECT observado_en, n_cambios,
+   n_altas, n_desaparecidos FROM compras.historial_estados_fotos ORDER BY 1;`
+   → dos filas; cambios del orden de decenas a cientos (no miles).
+6. **T21** Reiniciar el MCP (cachea el diccionario) y hacerle, sin explicarle
+   nada, P23-P26 y el caso de Juan → las respuestas usan
+   `compras.v_estado_documentos`, `compras.comparativos` y
+   `compras.albaran_lineas`; P23 dice que la antigüedad es un mínimo que
+   empieza el día del despliegue; `AC26/28510` de MOMOSA muestra
+   `codigo_alternativo = 'MOMOSA'` en líneas sin contrato.
+7. **T22** Correo a Compras y a Juan Romero: qué se responde ya, que «más de
+   tres semanas» es cierto desde el día 21 tras el despliegue, que la
+   penalización no es un campo (¿dónde la escriben?) y que «actividad
+   validada» no existe en Sigrid (D4, F-055) → correo enviado, anotado aquí.
+8. **T23** (solo lectura, a los 21 días) `SELECT count(*), count(*) FILTER
+   (WHERE c.fecha_ultima_modificacion >= h.desde - interval '1 day') FROM
+   compras.historial_estados h JOIN compras.contratos c ON c.contrato_id =
+   h.documento_id WHERE NOT h.es_linea_base;` → resultado aquí; P23 pasa a
+   `respondible` en el `00_global.yaml` siguiente.
 
 **Diccionario del árbol tras F-067 (en curso): 204 objetos, 1589 columnas, 96
 de consumo.**

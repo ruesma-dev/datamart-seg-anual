@@ -85,7 +85,9 @@ BEGIN
 
     -- 2 · La guarda contra una ingesta a medias (R6): una `raw.con` a medias
     -- cerraría como DESAPARECIDOS miles de documentos vivos, y eso no se
-    -- deshace. La excepción revierte el build entero de la noche.
+    -- deshace. La excepción revierte SOLO ESTE FICHERO: no se toma la foto y
+    -- el paso sale FAILED. El resto de `compras` (`00`-`10`) ya está
+    -- reconstruido y confirmado: cada sub-paso es su propia transacción.
     SELECT count(*) INTO v_actual FROM raw.con c WHERE c.tip IN (44, 15);
     SELECT count(*) INTO v_abiertos FROM compras.historial_estados h WHERE h.hasta IS NULL;
     IF v_abiertos > 0 AND v_actual < 0.98 * v_abiertos THEN
