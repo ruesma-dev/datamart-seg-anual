@@ -3282,7 +3282,15 @@ objetos:
           siguiente) o DESAPARECIDO (el documento ya no esta en Sigrid).
         valores: [CAMBIO, DESAPARECIDO]
         nulo_significa: El tramo esta abierto, con `hasta` a NULL.
-    relaciones: []
+    relaciones:
+      - de: documento_id
+        a: compras.v_estado_documentos.documento_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el estado actual traducido de un documento con historia. Los
+          desaparecidos no estan en la vista. Para ir a la cabecera, filtra
+          antes `tipo_documento_codigo` (44 a `compras.contratos.contrato_id`,
+          15 a `compras.facturas.factura_id`).
     ejemplos_preguntas:
       - Cuando cambio de estado la factura X y por que estados ha pasado
       - Cuantos contratos han pasado a firmado esta semana
@@ -3346,3 +3354,116 @@ objetos:
     ejemplos_preguntas:
       - Desde cuando hay historia de estados de contratos y facturas
       - Ha habido alguna noche sin foto de estados
+
+  v_estado_documentos:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El estado ACTUAL de cada contrato y cada factura y CUANTO LLEVA en el,
+      sacado de la foto diaria (`compras.historial_estados`, F-067). Es la
+      respuesta a «que contratos llevan mas de tres semanas enviados y sin
+      firmar»: `estado_codigo = 'EPF' AND tipo_documento = 'CONTRATO' AND
+      dias_en_estado > 21`. **LA HISTORIA EMPIEZA EL DIA DEL DESPLIEGUE**: lo
+      que estaba en su estado antes de la primera foto lleva
+      `antiguedad_es_minima` verdadero, y entonces `dias_en_estado` es un
+      MINIMO («lleva al menos N dias»), no la antiguedad exacta. **En cuanto
+      ese minimo supera 21, «mas de tres semanas» es una respuesta cierta**,
+      porque si lleva al menos 22 dias lleva mas de 21; por debajo, en la linea
+      base, no se sabe y hay que decirlo. **El cambio ocurrio entre
+      `cambio_observado_tras` y `en_estado_desde`**, no a una hora exacta: la
+      foto se toma una vez por noche. Los dias se calculan AL CONSULTAR, en
+      hora de Madrid; `ultima_foto` dice de cuando es la ultima foto, y si se
+      ha quedado atras la historia se ha parado. **NO uses
+      `compras.contratos.fecha_ultima_modificacion` (`con.tiemod`) para esto**:
+      es la ultima modificacion del documento y NO es la fecha del cambio de
+      estado (la firma no la mueve).
+    grano: >-
+      Una fila por documento de contrato o factura presente en la ultima foto:
+      su tramo abierto. Clave `documento_id`.
+    clave_negocio: [documento_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: >-
+          El documento (`con.ide`): es el `contrato_id` de `compras.contratos`
+          o el `factura_id` de `compras.facturas`, segun `tipo_documento`.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo de documento de Sigrid, 44 contrato o 15 factura.
+        agregacion: no_sumable
+        valores: [44, 15]
+      tipo_documento:
+        significado: >-
+          CONTRATO o FACTURA. Filtra por aqui antes de unir con la cabecera:
+          los dos tipos comparten la columna `documento_id`.
+        valores: [CONTRATO, FACTURA]
+      estado_id:
+        significado: >-
+          Codigo interno del estado (`con.est`); solo significa algo con su
+          tipo de documento. Para filtrar, usa `estado_codigo`.
+        agregacion: no_sumable
+        nulo_significa: El documento no tiene estado en Sigrid.
+      estado_codigo:
+        significado: >-
+          Mnemonico del estado, lo estable para filtrar: en contratos PFP, EPF
+          (enviado pendiente de firma), RFP, COMD, FIR, TER, RES; en facturas
+          los de `compras.facturas.estado_codigo`.
+        nulo_significa: >-
+          El estado no casa con el catalogo de su tipo, o el documento no tiene
+          estado.
+      estado:
+        significado: >-
+          Nombre del estado, traducido por la pareja (tipo, estado) contra el
+          catalogo de Sigrid, igual que en `compras.contratos` y `compras.facturas`.
+        nulo_significa: Igual que en `estado_codigo`.
+      en_estado_desde:
+        significado: >-
+          Fecha y hora (Madrid) de la primera foto que vio el documento en este
+          estado. En la linea base es el dia del despliegue, no el del cambio.
+        agregacion: no_sumable
+      cambio_observado_tras:
+        significado: >-
+          Fecha y hora (Madrid) de la foto anterior: el cambio ocurrio entre
+          esta y `en_estado_desde`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Linea base: el documento ya estaba en ese estado el dia del
+          despliegue y no se sabe desde cuando.
+      antiguedad_es_minima:
+        significado: >-
+          Verdadero si el tramo es de la LINEA BASE: `dias_en_estado` es
+          entonces un minimo («al menos N dias»). Falso: el cambio se vio, y los
+          dias son exactos con la ventana de una noche.
+        agregacion: no_sumable
+      dias_en_estado:
+        significado: >-
+          Dias de calendario (Madrid) desde `en_estado_desde` hasta hoy. Un
+          MINIMO si `antiguedad_es_minima`. Se calcula al consultar.
+        unidad: dias
+        agregacion: no_sumable
+      ultima_foto:
+        significado: >-
+          Fecha y hora (Madrid) de la ultima foto tomada. Si no es de la ultima
+          noche, la foto se ha parado y `dias_en_estado` sigue contando sin
+          haber mirado si el estado cambio.
+        agregacion: no_sumable
+        nulo_significa: Todavia no se ha tomado ninguna foto.
+    relaciones:
+      - de: documento_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para la cabecera del contrato (proveedor, obra). Solo las filas de
+          `tipo_documento` CONTRATO; filtra antes.
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para la cabecera de la factura (proveedor, fechas). Solo las filas de
+          `tipo_documento` FACTURA; filtra antes.
+    ejemplos_preguntas:
+      - Que contratos llevan mas de tres semanas enviados sin firmar
+      - Cuanto lleva la factura X en su estado actual
+      - Que facturas llevan mas de un mes sin aprobar

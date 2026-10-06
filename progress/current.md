@@ -49,6 +49,14 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
   de lo del design §4, `ResumenFoto`/`resumir_foto` como oráculo de los
   contadores de `historial_estados_fotos` (R8): altas = tramos abiertos en la
   foto − cambios.
+- [x] T2 `compras.fn_sigrid_tiempo` (+ ficha). [x] T3 las dos tablas
+  persistentes y el `DO` de la foto (+ fichas). [x] T4 `v_estado_documentos`
+  (+ ficha). Desviación de orden, justificada: la ficha de cada objeto entra en
+  el commit que lo crea (la puerta de cobertura exige ficha o pendiente); T11
+  queda para `contratos`, `comparativos` y `00_global.yaml`.
+
+**Diccionario del árbol tras F-067 (en curso): 203 objetos, 1564 columnas, 95
+de consumo.**
 
 
 ## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA en pasada 2, SIN DESPLEGAR · el comparativo de ofertas

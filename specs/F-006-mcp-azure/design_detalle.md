@@ -189,6 +189,13 @@ infraestructura.
 > y una funcion auxiliar, `fn_porcentaje_dto`. El inventario pasa a **199
 > objetos**, las columnas descritas de 1492 a **1538** (11 + 18 + 7 + 10) y las
 > fichas de consumo suben en cuatro.
+>
+> **Enmienda del 2026-10-06 (F-067, la foto diaria de estados y el código 2).**
+> Entran las dos primeras tablas PERSISTENTES de `compras`
+> (`historial_estados` e `historial_estados_fotos`, que no se reconstruyen),
+> la vista `v_estado_documentos` y la función auxiliar `fn_sigrid_tiempo`. El
+> inventario pasa a **203 objetos**, las columnas descritas de 1538 a **1564**
+> (8 + 7 + 11) y las fichas de consumo suben en tres.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

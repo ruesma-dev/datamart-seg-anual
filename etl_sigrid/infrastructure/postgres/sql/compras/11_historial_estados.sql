@@ -137,3 +137,34 @@ BEGIN
     )
     VALUES (v_obs, (v_ult IS NULL), v_actual, v_cambios, v_insertados - v_cambios, v_desaparecid);
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- `compras.v_estado_documentos` (R9-R11): el estado ACTUAL de cada documento
+-- de la foto y cuánto lleva en él, del tramo abierto. Se calcula AL
+-- CONSULTAR: los días avanzan solos y `ultima_foto` dice si la historia se ha
+-- parado. En un tramo de LÍNEA BASE `dias_en_estado` es un MÍNIMO («lleva al
+-- menos N días»): en cuanto pasa de 21, «más de tres semanas» es cierto. El
+-- cambio ocurrió entre `cambio_observado_tras` y `en_estado_desde`, no a una
+-- hora exacta. Fechas en hora de Madrid. `con.tiemod` no entra aquí (D2).
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE VIEW compras.v_estado_documentos AS
+SELECT
+    h.documento_id,
+    h.tipo_documento_codigo,
+    CASE h.tipo_documento_codigo WHEN 44 THEN 'CONTRATO' WHEN 15 THEN 'FACTURA' END AS tipo_documento,
+    h.estado_id,
+    est.codigo_estado                                  AS estado_codigo,
+    est.nombre_estado                                  AS estado,
+    (h.desde AT TIME ZONE 'Europe/Madrid')             AS en_estado_desde,
+    (h.observado_antes AT TIME ZONE 'Europe/Madrid')   AS cambio_observado_tras,
+    h.es_linea_base                                    AS antiguedad_es_minima,
+    ((now() AT TIME ZONE 'Europe/Madrid')::date
+     - (h.desde AT TIME ZONE 'Europe/Madrid')::date)   AS dias_en_estado,
+    ((SELECT max(f.observado_en) FROM compras.historial_estados_fotos f)
+     AT TIME ZONE 'Europe/Madrid')                     AS ultima_foto
+FROM compras.historial_estados h
+-- La traducción por la PAREJA (tipo, estado), con su guarda de grano, es la
+-- de `compras.contratos` y `compras.facturas` (F-084). LEFT: un estado fuera
+-- de catálogo se publica igual, con el literal a NULL.
+LEFT JOIN LATERAL compras.fn_estado_documento(h.tipo_documento_codigo, h.estado_id) est ON TRUE
+WHERE h.hasta IS NULL;
