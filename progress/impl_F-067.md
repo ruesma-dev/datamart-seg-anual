@@ -204,4 +204,4 @@ h.es_linea_base`): el test buscaba con `in`; ahora compara el elemento exacto.
 | Mutantes Python (`harness.mutacion`) | 50 generados, 44 muertos, 5 supervivientes + 1 timeout, todos cerrados; re-verificación 45/45 muertos, **0 supervivientes** |
 | Mutantes SQL (a mano) | 40 generados, 40 muertos, **0 supervivientes** |
 | Tiempo de la suite | 2.258 s con cobertura (`init.sh`); 470 s sin ella |
-| `init.sh` final | PASADA_FINAL |
+| `init.sh` final | sobre `c946706`: ENTORNO LISTO; 6976 passed, 226 skipped en 2.090 s; cobertura 100 % (66/66); impl 207/220 |
