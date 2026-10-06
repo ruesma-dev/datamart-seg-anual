@@ -75,6 +75,16 @@
 --     humano): medido, la firma no la mueve en el 85 % de los comparativos.
 --   · LA PENALIZACIÓN NO ES UN CAMPO de Sigrid (`ctr` no la tiene): solo
 --     aparece en el texto del contrato, `compras.documento_texto`, en 9.
+--
+-- F-067 (con F-125, D3) · EL CÓDIGO 2 Y LA NECESIDAD DE COMPRA. Las TRES
+-- tablas de líneas (contrato, albarán, factura) ganan al final
+-- `codigo_alternativo` (`cod2`), `necesidad_id` (`dncide`) y
+-- `necesidad_linea_id` (`dncproide`). El «código alternativo» de Sigrid es el
+-- CÓDIGO 2: lo pone el jefe de obra para agrupar o filtrar sus compras en el
+-- documento de planificación de compras (DPC, `raw.dnc`) y viaja de la línea
+-- de necesidad al albarán (igual en el 99,9 % de las 295.210 enlazadas). El
+-- enlace a la necesidad es DIRECTO por `dncide`/`dncproide`, no por
+-- `docoritip`/`linoriide`: 378.010 de 1.162.871 líneas de albarán (32,5 %).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -164,7 +174,12 @@ SELECT
     COALESCE(l.pre, 0)::NUMERIC(20, 6)      AS precio,
     COALESCE(l.tot, 0)::NUMERIC(18, 2)      AS importe,          -- sin IVA
     COALESCE(l.ivacuo, 0)::NUMERIC(18, 2)   AS cuota_iva,
-    COALESCE(l.canser, 0)::NUMERIC(20, 6)   AS cantidad_servida
+    COALESCE(l.canser, 0)::NUMERIC(20, 6)   AS cantidad_servida,
+    -- F-067 (D3): el CÓDIGO 2 y la NECESIDAD de compra, AL FINAL. Ver la
+    -- cabecera del fichero. Vacío y 0 de Sigrid son NULL.
+    NULLIF(btrim(l.cod2), '')               AS codigo_alternativo,  -- «código 2»
+    NULLIF(l.dncide, 0)                     AS necesidad_id,        -- dnc: el DPC
+    NULLIF(l.dncproide, 0)                  AS necesidad_linea_id   -- dncpro
 FROM raw.ctrpro l
 WHERE EXISTS (SELECT 1 FROM raw.ctr c WHERE c.ide = l.docide);
 
@@ -229,7 +244,12 @@ SELECT
         ELSE
             ROUND((COALESCE(l.tot, 0)
                    * (1 - COALESCE(l.canfac, 0) / l.can))::NUMERIC, 2)
-    END                                     AS importe_pendiente_facturar
+    END                                     AS importe_pendiente_facturar,
+    -- F-067 (D3): el CÓDIGO 2 y la NECESIDAD de compra, AL FINAL. Ver la
+    -- cabecera del fichero. Vacío y 0 de Sigrid son NULL.
+    NULLIF(btrim(l.cod2), '')               AS codigo_alternativo,  -- «código 2»
+    NULLIF(l.dncide, 0)                     AS necesidad_id,        -- dnc: el DPC
+    NULLIF(l.dncproide, 0)                  AS necesidad_linea_id   -- dncpro
 FROM raw.dcapro l
 WHERE EXISTS (SELECT 1 FROM raw.dca a WHERE a.ide = l.docide);
 
@@ -238,6 +258,8 @@ CREATE INDEX idx_com_alblin_alb ON compras.albaran_lineas (albaran_id);
 CREATE INDEX idx_com_alblin_obr ON compras.albaran_lineas (obra_id);
 CREATE INDEX idx_com_alblin_par ON compras.albaran_lineas (partida_id);
 CREATE INDEX idx_com_alblin_ctl ON compras.albaran_lineas (contrato_linea_id);
+-- F-067: el albarán se cruza con su línea de necesidad (`descompuestos`, PLANIF_JO).
+CREATE INDEX idx_com_alblin_ncl ON compras.albaran_lineas (necesidad_linea_id);
 
 -- ---------------------------------------------------------------------------
 -- FACTURAS (series FR/FRGG = factura, AB/ABGG = abono)
@@ -308,7 +330,12 @@ SELECT
     CASE WHEN l.docoritip = 14 THEN NULLIF(l.linoriide, 0) END AS albaran_linea_id,
     CASE WHEN l.docoritip = 14 THEN NULLIF(l.docoriide, 0) END AS albaran_id,
     CASE WHEN l.docoritip = 44 THEN NULLIF(l.linoriide, 0) END AS contrato_linea_id,
-    CASE WHEN l.docoritip = 44 THEN NULLIF(l.docoriide, 0) END AS contrato_id_directo
+    CASE WHEN l.docoritip = 44 THEN NULLIF(l.docoriide, 0) END AS contrato_id_directo,
+    -- F-067 (D3): el CÓDIGO 2 y la NECESIDAD de compra, AL FINAL. Ver la
+    -- cabecera del fichero. Vacío y 0 de Sigrid son NULL.
+    NULLIF(btrim(l.cod2), '')               AS codigo_alternativo,  -- «código 2»
+    NULLIF(l.dncide, 0)                     AS necesidad_id,        -- dnc: el DPC
+    NULLIF(l.dncproide, 0)                  AS necesidad_linea_id   -- dncpro
 FROM raw.dcfpro l
 WHERE EXISTS (SELECT 1 FROM raw.dcf f WHERE f.ide = l.docide);
 

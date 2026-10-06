@@ -466,6 +466,31 @@ objetos:
           Cuanta de la cantidad contratada se ha entregado ya. Es el avance del
           contrato en unidades fisicas, no en dinero.
         agregacion: suma
+      codigo_alternativo:
+        significado: >-
+          El «CODIGO 2» de la linea (`ctrpro.cod2`, rotulado «Codigo
+          alternativo» en Sigrid; F-067). Lo pone el JEFE DE OBRA para agrupar
+          o filtrar sus compras en el documento de planificacion de compras
+          (DPC) y viaja de la linea de necesidad a la linea de compra: igual en
+          el 99,9 % de las 295.210 lineas de albaran enlazadas a una necesidad.
+          Tambien se teclea a mano sin necesidad. Es TEXTO LIBRE sin
+          normalizar (`HORMIGON`, `HORM`, `HORM.`...): agrupar por el exige
+          mirar antes sus valores. Informado en 151.082 de 246.103 lineas de contrato (61,4 %, 2026-10-06).
+        nulo_significa: La linea no lleva codigo 2 (vacio en Sigrid).
+      necesidad_id:
+        significado: >-
+          El documento de NECESIDADES de compra (el DPC de la obra,
+          `compras.necesidades`) del que sale la linea, por el enlace DIRECTO
+          `ctrpro.dncide`. Se publica igual que en albaranes y facturas (D3).
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una necesidad de compra.
+      necesidad_linea_id:
+        significado: >-
+          La LINEA de necesidad (`ctrpro.dncproide`, `raw.dncpro`) de la que
+          sale la linea: la misma `dncpro_id` de
+          `descompuestos.v_pbi_planif_jo`, la planificacion del jefe de obra.
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una linea de necesidad.
     relaciones:
       - de: contrato_id
         a: compras.contratos.contrato_id
@@ -636,6 +661,31 @@ objetos:
           sobrefacturacion, no un cero.
         unidad: EUR
         agregacion: suma
+      codigo_alternativo:
+        significado: >-
+          El «CODIGO 2» de la linea (`dcapro.cod2`, rotulado «Codigo
+          alternativo» en Sigrid; F-067). Lo pone el JEFE DE OBRA para agrupar
+          o filtrar sus compras en el documento de planificacion de compras
+          (DPC) y viaja de la linea de necesidad a la linea de compra: igual en
+          el 99,9 % de las 295.210 lineas de albaran enlazadas a una necesidad.
+          Tambien se teclea a mano sin necesidad. Es TEXTO LIBRE sin
+          normalizar (`HORMIGON`, `HORM`, `HORM.`...): agrupar por el exige
+          mirar antes sus valores. Informado en 357.349 de 1.162.871 lineas de albaran (30,7 %), y en 2026 en el 41,6 %.
+        nulo_significa: La linea no lleva codigo 2 (vacio en Sigrid).
+      necesidad_id:
+        significado: >-
+          El documento de NECESIDADES de compra (el DPC de la obra,
+          `compras.necesidades`) del que sale la linea, por el enlace DIRECTO
+          `dcapro.dncide`. Medido el 2026-10-06: 378.010 de 1.162.871 lineas (32,5 %), las que vienen de contrato en el 85,6 % y las que no en el 5,1 % (el «6 %» de Negocio).
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una necesidad de compra.
+      necesidad_linea_id:
+        significado: >-
+          La LINEA de necesidad (`dcapro.dncproide`, `raw.dncpro`) de la que
+          sale la linea: la misma `dncpro_id` de
+          `descompuestos.v_pbi_planif_jo`, la planificacion del jefe de obra.
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una linea de necesidad.
     relaciones:
       - de: albaran_id
         a: compras.albaranes.albaran_id
@@ -890,6 +940,31 @@ objetos:
         significado: Contrato que se factura directamente, sin albaran de por medio.
         nulo_significa: La linea no se factura directamente contra un contrato.
         agregacion: no_sumable
+      codigo_alternativo:
+        significado: >-
+          El «CODIGO 2» de la linea (`dcfpro.cod2`, rotulado «Codigo
+          alternativo» en Sigrid; F-067). Lo pone el JEFE DE OBRA para agrupar
+          o filtrar sus compras en el documento de planificacion de compras
+          (DPC) y viaja de la linea de necesidad a la linea de compra: igual en
+          el 99,9 % de las 295.210 lineas de albaran enlazadas a una necesidad.
+          Tambien se teclea a mano sin necesidad. Es TEXTO LIBRE sin
+          normalizar (`HORMIGON`, `HORM`, `HORM.`...): agrupar por el exige
+          mirar antes sus valores. Informado en 262.579 de 1.099.136 lineas de factura (23,9 %, 2026-10-06). Para «gasto por codigo 2» es esta tabla, filtrando FACTURA y ABONO en la cabecera.
+        nulo_significa: La linea no lleva codigo 2 (vacio en Sigrid).
+      necesidad_id:
+        significado: >-
+          El documento de NECESIDADES de compra (el DPC de la obra,
+          `compras.necesidades`) del que sale la linea, por el enlace DIRECTO
+          `dcfpro.dncide`. Se publica igual que en albaranes y contratos (D3).
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una necesidad de compra.
+      necesidad_linea_id:
+        significado: >-
+          La LINEA de necesidad (`dcfpro.dncproide`, `raw.dncpro`) de la que
+          sale la linea: la misma `dncpro_id` de
+          `descompuestos.v_pbi_planif_jo`, la planificacion del jefe de obra.
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una linea de necesidad.
     relaciones:
       - de: factura_id
         a: compras.facturas.factura_id

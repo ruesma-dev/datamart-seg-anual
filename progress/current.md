@@ -57,7 +57,15 @@ skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
 
 - [x] T5 cinco columnas al final de `compras.contratos` (+ fichas de columna).
 
-**Diccionario del árbol tras F-067 (en curso): 203 objetos, 1569 columnas, 95
+- [x] T6 sub-paso `11` (y, en un commit aparte, las listas de
+  `test_f073_pipeline`/`test_f080_pipeline`, que se quedaron rojas en T6).
+- [x] T7 código 2 y necesidad al final de las tres tablas de líneas (D3) +
+  fichas de columna; `HASH_01_DOCUMENTOS` de `test_f073_sql` recalculado (el
+  guardián lo pedía: «si cambia es porque lo toca F-067»; estaba rojo desde
+  T5). `test_f006_punteros` queda rojo hasta T8: las fichas citan
+  `compras.necesidades`.
+
+**Diccionario del árbol tras F-067 (en curso): 203 objetos, 1578 columnas, 95
 de consumo.**
 
 

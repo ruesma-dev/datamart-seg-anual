@@ -515,3 +515,77 @@ def test_f067_r14_contratos_la_ultima_modificacion_es_tiemod_con_su_funcion() ->
         "compras.fn_sigrid_tiempo(con.tiemod) AS fecha_ultima_modificacion"
         in _bloque("compras.contratos")
     )
+
+
+# ===========================================================================
+# R17-R18 · el código 2 y la necesidad en las tres tablas de líneas (D3)
+# ===========================================================================
+
+#: Las columnas de siempre de cada tabla de líneas, EN ORDEN.
+LINEAS_DE_SIEMPRE = {
+    "compras.contrato_lineas": (
+        "linea_id", "contrato_id", "producto_id", "descripcion", "unidad_medida",
+        "partida_id", "centro_coste_id", "cantidad", "precio", "importe",
+        "cuota_iva", "cantidad_servida",
+    ),
+    "compras.albaran_lineas": (
+        "linea_id", "albaran_id", "obra_id", "partida_id", "producto_id",
+        "descripcion", "unidad_medida", "centro_coste_id", "cantidad", "precio",
+        "importe", "cuota_iva", "cantidad_facturada", "contrato_linea_id",
+        "contrato_id_linea", "importe_pendiente_facturar",
+    ),
+    "compras.factura_lineas": (
+        "linea_id", "factura_id", "obra_id", "partida_id", "producto_id",
+        "descripcion", "unidad_medida", "centro_coste_id", "cantidad", "precio",
+        "importe", "cuota_iva", "albaran_linea_id", "albaran_id",
+        "contrato_linea_id", "contrato_id_directo",
+    ),
+}
+FROM_DE_LINEAS = {
+    "compras.contrato_lineas": " FROM raw.ctrpro l ",
+    "compras.albaran_lineas": " FROM raw.dcapro l ",
+    "compras.factura_lineas": " FROM raw.dcfpro l ",
+}
+COLUMNAS_CODIGO_2 = ("codigo_alternativo", "necesidad_id", "necesidad_linea_id")
+#: El FROM de cada tabla de líneas, tal cual: ni un JOIN que multiplique ni un
+#: filtro que quite filas.
+UNIVERSO_DE_LINEAS = {
+    "compras.contrato_lineas": (
+        "FROM raw.ctrpro l WHERE EXISTS (SELECT 1 FROM raw.ctr c WHERE c.ide = l.docide);"
+    ),
+    "compras.albaran_lineas": (
+        "FROM raw.dcapro l WHERE EXISTS (SELECT 1 FROM raw.dca a WHERE a.ide = l.docide);"
+    ),
+    "compras.factura_lineas": (
+        "FROM raw.dcfpro l WHERE EXISTS (SELECT 1 FROM raw.dcf f WHERE f.ide = l.docide);"
+    ),
+}
+
+
+@pytest.mark.parametrize("tabla", sorted(LINEAS_DE_SIEMPRE))
+def test_f067_r17_lineas_las_tres_nuevas_al_final(tabla: str) -> None:
+    alias = _alias_del_select(_bloque(tabla), FROM_DE_LINEAS[tabla])
+    assert tuple(alias) == LINEAS_DE_SIEMPRE[tabla] + COLUMNAS_CODIGO_2, alias
+
+
+@pytest.mark.parametrize("tabla", sorted(LINEAS_DE_SIEMPRE))
+def test_f067_r17_lineas_vacio_y_cero_son_nulo(tabla: str) -> None:
+    bloque = _bloque(tabla)
+    assert "NULLIF(btrim(l.cod2), '') AS codigo_alternativo" in bloque
+    assert "NULLIF(l.dncide, 0) AS necesidad_id" in bloque
+    assert "NULLIF(l.dncproide, 0) AS necesidad_linea_id" in bloque
+
+
+@pytest.mark.parametrize("tabla", sorted(LINEAS_DE_SIEMPRE))
+def test_f067_r18_lineas_el_universo_no_cambia(tabla: str) -> None:
+    """Columnas nuevas, ni una fila más ni menos: el `WHERE EXISTS` de siempre."""
+    bloque = _bloque(tabla)
+    desde_el_from = bloque[bloque.index(FROM_DE_LINEAS[tabla]) :]
+    assert desde_el_from.strip() == UNIVERSO_DE_LINEAS[tabla], desde_el_from
+
+
+def test_f067_r17_albaran_lineas_indice_por_la_linea_de_necesidad() -> None:
+    assert (
+        "CREATE INDEX idx_com_alblin_ncl ON compras.albaran_lineas (necesidad_linea_id);"
+        in _compacto(_texto(RUTA_DOCUMENTOS))
+    )
