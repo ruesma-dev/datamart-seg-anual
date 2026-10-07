@@ -10,7 +10,49 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-07 · F-067 · CERRADA (`done`, APROBADO en pasada 2) · Compras por el MCP (con F-125) · SIN DESPLEGAR
+## 2026-10-07 · ESTADO AL CERRAR LA SESIÓN (leer primero)
+
+**En producción** (imagen del job `r20261007-0850`, desde `main` 540d1ee;
+diccionario **v44**, 204 objetos, publicado el 07-10 07:04 UTC; MCP
+`ca-mcp-bbdd-dev--0000014` reiniciado; `main` y `dev` subidos a GitHub):
+- **F-123** (Estudios = master 0 `MASTER_ESTUDIO`; `ESTUDIO` solo sin master 0).
+- **F-113** (categoría CD/CI/CP por el capítulo: raíz por prefijo, intermedio exacto).
+- **F-038** Fases 1 y 2 (comparativos, ofertas, cuatro importes sin IVA, ahorro,
+  ficticias, objetivo sobre el descompuesto con D4, firmas por escalón).
+- **F-067** con F-125 absorbida (foto diaria de estados de contratos y facturas,
+  condiciones del contrato, código 2 y documento de necesidades). **La LÍNEA BASE
+  de la foto se tomó el 2026-10-07 ~07:02 UTC**: «más de tres semanas enviado» se
+  responde de verdad desde el **2026-10-28**.
+
+**Lo primero de la próxima sesión (líder):**
+- F-067 T20: comprobar que la nocturna del 08-10 hizo AVANZAR la foto
+  (`compras.historial_estados_fotos` con dos noches; tramos cerrados y abiertos) y
+  repasar las cifras de T19 (`progress/impl_F-067.md` §6) en solo lectura.
+
+**Pendiente del humano:**
+- **Reconectar Microsoft 365** (sesión caducada el 06-10) y pedir al líder que pase
+  al backlog los últimos correos de Juan Romero.
+- Avisar a Juan Romero y Elena Díaz de F-123 (filtrar por `MASTER_INICIAL` da 0 filas;
+  la herramienta de Juan hay que regenerarla).
+- Escribir a Compras (y a Juan) sobre F-067: qué se responde ya, que la antigüedad del
+  estado cuenta desde el 07-10, y preguntar DÓNDE escriben la PENALIZACIÓN del contrato.
+- Probar con el MCP las preguntas de comparativos (F-038) y de F-067 (P23-P26).
+- Llevar a Negocio la regla del objetivo (D4 de F-038): casa el 29 %; 12.351 líneas
+  casarían con una versión posterior y 21.789 de obras sin ABC con otra versión
+  (ejemplos en `progress/explore_F-038_ejemplos_objetivo.md`).
+- PD/MP y el resto de raíces en OTRO: «se dejan con su esquema, lo veremos más
+  adelante» (su coste no entra en el cierre y su venta sí; medido en la sesión).
+- `azure-apps`: commits locales sin remoto (`2288386`, `50200a9`, `6a2bbde`,
+  `f3dca46` y el de F-067).
+- Red del puesto: el 06-10 una red bloqueaba el 5432 hacia Azure con la IP ya en el
+  firewall; se arregló cambiando de red (memoria «IP del puesto y firewall»).
+
+**Cola** (prioridad): F-037 tesorería (2) · F-085 quién aprobó qué y cuándo (3) ·
+F-111 spec lista, falta aprobarla (4) · F-121 recurso principal del auxiliar (5) ·
+F-114 (6) · F-106 (7) · F-104 (8) · F-055 ejes del proveedor, con «proveedor por
+actividad» movido desde F-067 (9) · F-096 y F-122 (10) · F-036 oficio y categoría (11).
+
+## 2026-10-07 · F-067 · CERRADA (`done`, APROBADO en pasada 2) · Compras por el MCP (con F-125) · DESPLEGADA el 07-10 (`r20261007-0850`)
 
 > Cerrada el 2026-10-07. Resumen en `progress/history.md`. MANUAL abajo.
 >
@@ -157,7 +199,7 @@ comando y lo que debe salir)**:
 de consumo.**
 
 
-## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA en pasada 2, SIN DESPLEGAR · el comparativo de ofertas
+## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA y DESPLEGADA (06-10, verificada) · el comparativo de ofertas
 
 > **Cerrada el 2026-10-05.** Fase 2 APROBADA por el reviewer en la pasada 2
 > (`progress/review_F-038.md`), con la regla del elemento decidida por el humano
@@ -342,7 +384,7 @@ medición los contradice (ver abajo).
 **Decisiones** (primera ronda, ya contestadas arriba): D1, D2 y D3. Sigue abierta D4.
 
 
-## 2026-10-03 · F-113 · CERRADA (`done`, APROBADO en pasada 2) · la categoría CD/CI/CP por el capítulo · SIN DESPLEGAR: quedan T9-T12 del humano
+## 2026-10-03 · F-113 · CERRADA (`done`, APROBADO en pasada 2) · la categoría CD/CI/CP por el capítulo · DESPLEGADA y VERIFICADA el 04-10
 
 > **Cerrada el 2026-10-03** con APROBADO del reviewer (`progress/review_F-113.md`; la
 > pasada 1 pidió solo tests de R14/R15), `init.sh` en verde (6.423 passed). Resumen
@@ -512,7 +554,7 @@ descompuesto `PLANIF_JO`; el texto del ámbito 3 no se borra; `MASTER_PRE_ABC` y
 `v_pbi_estudio`). Son 44 obras sin master 0 (11 con master sin versión 0 con
 descompuesto, la 0713 entre ellas, y 33 sin ningún master).
 
-## 2026-10-02 · ESTADO AL CERRAR LA SESIÓN (leer primero)
+## 2026-10-02 · Estado al cerrar la sesión del 02-10 (HISTORIA: lo vigente está arriba)
 
 **En producción** (imagen del job `r20261002-0835`, desde `main` fe676dc;
 diccionario **v39**; MCP revisión 0000014, reiniciado y sirviendo la v39; la
