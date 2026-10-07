@@ -15,7 +15,7 @@
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 
-**Tarea en curso**: T10. T1-T9 hechas (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
+**Tarea en curso**: T11. T1-T10 hechas (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
 
 **Incidencias de entorno (no de la spec)**:
 - `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
@@ -58,6 +58,12 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
   índice por `empleado_id` en `00_setup.sql`.
 - T7 toca además `tests/test_f101_cabecera_parte.py` (su lista de sub-pasos de
   personal) y el recuento de `CREATE TABLE IF NOT EXISTS` de `test_f057_r27` (4 -> 5).
+- T10 corrige además la ficha de `raw.confir`, que afirmaba que «ninguna tabla de
+  Sigrid» guarda el cambio de estado (misma afirmación falsa que R26 corrige en
+  `compras`); conserva «cambio de estado», que fija `test_f066_r14_*`.
+- NO se tocan (D7, son de F-067 y van con F-132): la ficha de `compras.contratos`
+  (l. ~220, «Sigrid no guarda cuando cambio el estado»), las de
+  `historial_estados*`/`v_estado_documentos` y la fila de F-067 en azure-apps.
 
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 

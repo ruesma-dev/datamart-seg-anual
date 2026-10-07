@@ -485,7 +485,18 @@
 # (el DPC de la obra) y `necesidad_id` en dos vistas de `descompuestos`.
 # Preguntas P23-P26.
 
-version: 44
+# version 45 (F-085, 2026-10-07): QUIEN APROBO QUE Y CUANDO. `raw.rac` se
+# ingiere SIN el filtro `asiide <> 0` (es el registro de PROCESOS de Sigrid) y
+# entra `raw.usu` sin credenciales, sin DNI y sin correo (las 72 tablas). Dos
+# tablas nuevas: `compras.documento_procesos` (una fila por paso de factura,
+# contrato, comparativo y obra, con estados de origen y destino traducidos,
+# login y nombre, fecha y hora; historia NETA) y `personal.usuarios_sigrid` (el
+# usuario con su empleado y su DNI). Corrige lo que decian las fichas de
+# `raw.rac`, `raw.confir`, `compras.comparativos` y `compras.comparativo_firmas`:
+# la fecha del cambio de estado SI esta en Sigrid, en `rac`. `R-SIGRID-CON`
+# declara los campos propios de `rac` y `usu`.
+
+version: 45
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
