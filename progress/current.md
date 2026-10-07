@@ -32,6 +32,9 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 - `init.sh` de arranque, 2.ª vez, árbol limpio en 08f14cb: **VERDE**, 6.984 passed
   y 226 skipped en 4.324,88 s (1 h 12 min, máquina cargada).
 
+**Diccionario del árbol tras F-085: 207 objetos, 1619 columnas, 98 de consumo**
+(versión 45; sin publicar).
+
 **Desviaciones respecto a la spec** (justificadas):
 - La ficha de `raw.usu` entra en T4 y no en T10: sin ella, en cuanto `usu` está en
   `tables_sigrid.yaml` fallan las biyecciones ficha <-> tabla de F-006/F-066.
@@ -69,6 +72,13 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 - `tests/test_f067_diccionario.py::test_f067_r27_la_version_sube_a_44` fijaba la
   versión EXACTA (== 44): pasa a `>= 44`, como hacen las demás features.
 - azure-apps: commit local `e08a3bb` (solo `datamart_seg_anual.md`), sin push.
+- La suite COMPLETA destapó lo que las verificaciones por tarea no veían:
+  `test_f073_pipeline` (otra lista de sub-pasos de compras), `test_f108` (lista
+  aprobada de claves alternativas: se añade `personal.usuarios_sigrid` `[[login]]`,
+  que pide el design §7, y se QUITA `(documento_id, orden)` de `documento_procesos`,
+  que no pedía), `test_f006_stg_trampas` (un «22 de 233» en un `nulo_significa`) y
+  `test_f006_contexto` (los recuentos del diccionario en este fichero).
+  Suite completa sin cobertura tras el ajuste: 7.132 passed, 228 skipped, 18 min 57 s.
 
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 

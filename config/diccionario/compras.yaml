@@ -3766,9 +3766,9 @@ objetos:
     grano: >-
       Una fila por paso de `raw.rac` de un documento de las familias FACTURA
       (15), CONTRATO (44), COMPARATIVO (46) u OBRA (42). `paso_id` es clave
-      primaria declarada; `(documento_id, orden)` tambien es unica.
+      primaria declarada; `(documento_id, orden)` tambien es unica, porque
+      `orden` numera los pasos de cada documento.
     clave_negocio: [paso_id]
-    claves_alternativas: [[documento_id, orden]]
     paso_etl: build_compras
     refresco: nocturno
     columnas:

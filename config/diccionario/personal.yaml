@@ -1047,9 +1047,10 @@ objetos:
         agregacion: no_sumable
       login:
         significado: >-
-          Login de Sigrid (`usu.cod`) sin espacios a los lados. Para casar con
-          `compras.documento_procesos.usuario`, comparar
-          `UPPER(login) = UPPER(TRIM(usuario))`.
+          Login de Sigrid (`usu.cod`) sin espacios a los lados. Es clave
+          alternativa (unica sin distinguir mayusculas; la comprueba
+          `check-unicidad`). Para casar con `compras.documento_procesos.usuario`,
+          comparar `UPPER(login) = UPPER(TRIM(usuario))`.
       nombre:
         significado: >-
           **DATO PERSONAL (autorizado el 2026-10-07).** Nombre del usuario en su
@@ -1059,7 +1060,7 @@ objetos:
         significado: Verdadero si el usuario esta desactivado en Sigrid (`usu.tipdes <> 0`).
       codigo_empleado:
         significado: Codigo de empleado de la ficha de usuario (`usu.codemp`).
-        nulo_significa: El usuario no tiene codigo de empleado (22 de 233).
+        nulo_significa: El usuario no tiene codigo de empleado en su ficha de Sigrid.
       empleado_id:
         significado: >-
           La ficha de empleado (`con.ide`, tipo 43) cuyo codigo es el
