@@ -13,6 +13,16 @@
 ## 2026-10-07 · F-067 · CERRADA (`done`, APROBADO en pasada 2) · Compras por el MCP (con F-125) · SIN DESPLEGAR
 
 > Cerrada el 2026-10-07. Resumen en `progress/history.md`. MANUAL abajo.
+>
+> **DESPLEGADA por el líder el 2026-10-07, por orden del humano** (la nocturna del
+> 07-10 ya había corrido con la imagen anterior, terminada a las 04:38): merge a
+> `main` `540d1ee`; imagen `r20261007-0850`, job comprobado; `build-compras` a mano
+> SUCCESS (444,8 s; `necesidades` 277 filas; `historial_estados` 185.942: **la
+> LÍNEA BASE de la foto se tomó el 2026-10-07 ~07:02 UTC**); `build-descompuestos`
+> SUCCESS (151,7 s, vistas con `necesidad_id`); `apply-grants`; `publicar-diccionario`
+> **v44** (204 objetos, 1.589 columnas); `check-diccionario` OK (v44); MCP reiniciado
+> (`--0000014`, Healthy). Quedan: segunda noche (la foto avanza), las cifras de T19
+> en solo lectura, las preguntas al MCP, la carta a Compras y la penalización.
 
 ### Antes
 
