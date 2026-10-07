@@ -11,8 +11,9 @@ Encadena los archivos SQL en orden:
     03_partes.sql              - F-101: una fila por CABECERA de parte (6.886)
     04_recursos_tipos_hora.sql - F-101: los precios de la ficha del recurso
     05_views.sql               - `v_pbi_horas_obra_mes`, solo `unidad = 'HORA'`
+    06_usuarios_sigrid.sql     - F-085: los usuarios de Sigrid con su empleado y DNI
 
-Lee de `raw.*` (res, con, conest, auxrestip, emp, hmo, hmores, auxhor, reshor)
+Lee de `raw.*` (res, con, conest, auxrestip, emp, hmo, hmores, auxhor, reshor, usu)
 y de **una** cosa
 fuera de `raw`: `stg.obras`, para marcar qué líneas caen dentro del universo
 del seguimiento. Eso, y solo eso, es lo que fija `depends_on = ["build_stg"]`.
@@ -51,7 +52,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los seis ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los siete ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` por lo mismo que en `build_compras_step` y
 #: `build_retenciones_step`: es DATO, y sustituirla en un test es lo único que
@@ -89,6 +90,15 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         target_table="recursos_tipos_hora",
     ),
     _SubStep(name="views", sql_file="05_views.sql"),
+    # F-085: los usuarios de Sigrid con su empleado y su DNI. Solo lee `raw`
+    # (usu, con, emp), así que su sitio es indiferente; va al final para no
+    # mover los demás. Cuenta su única tabla (233 filas).
+    _SubStep(
+        name="usuarios_sigrid",
+        sql_file="06_usuarios_sigrid.sql",
+        target_schema="personal",
+        target_table="usuarios_sigrid",
+    ),
 )
 
 

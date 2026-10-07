@@ -303,7 +303,8 @@ def test_f085_r3_compras_no_lee_ninguna_columna_excluida_de_usu() -> None:
 
 
 def _usuarios() -> str:
-    return _compacto(_texto(RUTA_USUARIOS))
+    """El SQL ejecutable de `06`, sin el COMMENT ON TABLE (que es prosa)."""
+    return _compacto(_texto(RUTA_USUARIOS)).split("COMMENT ON TABLE")[0]
 
 
 def test_f085_r17_la_tabla_se_crea_en_el_setup_sin_drop() -> None:

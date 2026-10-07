@@ -14,7 +14,7 @@ Rama `feature/F-085-quien-aprobo-que-y-cuando`. Un commit por tarea (`F-085 Tn: 
 
 - [x] T5: `sql/compras/12_documento_procesos.sql` según design §5 (R6-R14, R16)  |  Verificación: `python -m pytest tests/test_f085_sql.py -q`
 - [x] T6: `build_compras_step.py`: `SUB_PASOS` + `12` detrás de `11`, cuenta `compras.documento_procesos`; docstring; `tests/test_f047_steps.py` («`12` es el último»)  |  Verificación: `python -m pytest tests/test_f047_steps.py tests/test_f085_sql.py -q`
-- [ ] T7: `sql/personal/00_setup.sql` (tabla) y `sql/personal/06_usuarios_sigrid.sql` según design §6 (R17-R21); `build_personal_step.py` + `06` al final; `FICHEROS_PERSONAL` de `tests/test_f057_personal.py`  |  Verificación: `python -m pytest tests/test_f057_personal.py tests/test_f085_sql.py -q`
+- [x] T7: `sql/personal/00_setup.sql` (tabla) y `sql/personal/06_usuarios_sigrid.sql` según design §6 (R17-R21); `build_personal_step.py` + `06` al final; `FICHEROS_PERSONAL` de `tests/test_f057_personal.py`  |  Verificación: `python -m pytest tests/test_f057_personal.py tests/test_f085_sql.py -q`
 
 ## Diccionario y documentos
 

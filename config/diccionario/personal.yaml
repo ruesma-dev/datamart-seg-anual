@@ -996,3 +996,92 @@ objetos:
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
+
+  usuarios_sigrid:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      **LOS USUARIOS DE SIGRID CON SU PERSONA** (F-085): una fila por usuario
+      de Sigrid (233 el 2026-10-07) con su login, su nombre, si esta
+      desactivado y, cuando se puede, el EMPLEADO que es y su DNI. Es lo que
+      convierte en persona el login que publican `compras.documento_procesos`
+      (quien lanzo cada paso), `compras.comparativo_firmas` y
+      `compras.comparativos.aprobado_por`. El login casa con todos ellos **en
+      mayusculas y sin espacios**: es unico asi (233 de 233), pero en
+      `documento_procesos` hay logins escritos con otras mayusculas.
+
+      **CONTIENE DATOS PERSONALES: nombre y DNI.** Autorizados por el
+      responsable del dato: el DNI del esquema `personal` el 2026-09-18 («el
+      dni puede salir, no es un problema») y el nombre y el DNI de los
+      usuarios el 2026-10-07 (D4 de F-085: «luego querre saber quien lo ha
+      hecho por nombre»). Por eso vive en `personal`, el esquema que se da o
+      se quita con un GRANT, y no en `compras`, que solo publica login y
+      nombre. **Lo que NO sube**: ninguna credencial (contraseña, firma
+      digital, politica de la clave, identificadores de seguridad y de
+      certificado), ni el correo, ni los comentarios. No es que esten vacios:
+      la ingesta no los trae.
+
+      **EL EMPLEADO SE BUSCA POR EL CODIGO DE EMPLEADO del usuario** en las
+      fichas de empleado de Sigrid: si hay una, esa; si hay varias (una por
+      empresa del grupo), la UNICA de la empresa 1; si no, nulo. Medido el
+      2026-10-07: 211 usuarios con codigo de empleado, 210 casan con alguna
+      ficha, 189 con una sola y 21 con varias (las 21 con exactamente una en la
+      empresa 1). El DNI es el de esa ficha de empleado (204 usuarios): el campo
+      DNI de la ficha de usuario de Sigrid esta vacio en los 233.
+
+      **Relacion con `personal.recursos`**: por `empleado_id`. No es 1:1: un
+      empleado puede tener varios recursos (uno por empresa) y muchos recursos
+      no son personas.
+    grano: >-
+      Una fila por usuario de Sigrid (`raw.usu`). `usuario_id` es clave
+      primaria declarada y `login` es unico sin distinguir mayusculas (indice
+      unico sobre `UPPER(login)`).
+    clave_negocio: [usuario_id]
+    claves_alternativas: [[login]]
+    paso_etl: build_personal
+    refresco: nocturno
+    columnas:
+      usuario_id:
+        significado: Identificador del usuario en Sigrid (`usu.ide`).
+        agregacion: no_sumable
+      login:
+        significado: >-
+          Login de Sigrid (`usu.cod`) sin espacios a los lados. Para casar con
+          `compras.documento_procesos.usuario`, comparar
+          `UPPER(login) = UPPER(TRIM(usuario))`.
+      nombre:
+        significado: >-
+          **DATO PERSONAL (autorizado el 2026-10-07).** Nombre del usuario en su
+          ficha de Sigrid (`usu.res`), tal y como lo escribieron.
+        nulo_significa: La ficha de usuario no tiene nombre.
+      desactivado:
+        significado: Verdadero si el usuario esta desactivado en Sigrid (`usu.tipdes <> 0`).
+      codigo_empleado:
+        significado: Codigo de empleado de la ficha de usuario (`usu.codemp`).
+        nulo_significa: El usuario no tiene codigo de empleado (22 de 233).
+      empleado_id:
+        significado: >-
+          La ficha de empleado (`con.ide`, tipo 43) cuyo codigo es el
+          `codigo_empleado`: la unica, o la de la empresa 1 si hay una por
+          empresa. Es el `empleado_id` de `personal.recursos`.
+        nulo_significa: >-
+          Sin codigo de empleado, sin ficha con ese codigo, o con varias fichas
+          y ninguna unica de la empresa 1.
+        agregacion: no_sumable
+      dni:
+        significado: >-
+          **DATO PERSONAL (autorizado el 2026-09-18 y el 2026-10-07).** DNI de
+          la ficha de empleado (`emp.dni`), el mismo que `personal.recursos.dni`.
+        nulo_significa: El usuario no tiene empleado, o el empleado no tiene DNI.
+    relaciones:
+      - de: empleado_id
+        a: personal.recursos.empleado_id
+        cardinalidad: "N:N"
+        porque: >-
+          Los recursos (horas, partes, precios) de la persona del usuario. Un
+          empleado puede tener mas de un recurso.
+    ejemplos_preguntas:
+      - Como se llama el usuario de Sigrid jmvargas y cual es su DNI
+      - Que usuarios de Sigrid estan desactivados
+      - Que recursos tiene la persona que aprobo la factura X

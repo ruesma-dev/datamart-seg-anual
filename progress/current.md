@@ -15,7 +15,7 @@
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 
-**Tarea en curso**: T7. T1-T6 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
+**Tarea en curso**: T8. T1-T7 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
 
 **Incidencias de entorno (no de la spec)**:
 - `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
@@ -50,6 +50,14 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 - T6 toca además `tests/test_f080_pipeline.py` (su lista de ficheros de compras, como
   la de `test_f047_steps.py`) y quita de la docstring del dominio la mención al
   fichero de F-067: `test_f067_r8_veto_*` prohíbe nombrar sus tablas fuera de su lista.
+- SQL de `06`: el empleado se resuelve con un CTE `empleados` AGRUPADO por código
+  (una fila por código, `COUNT(*) = 1` o la única de la empresa 1) unido por
+  `LEFT JOIN`, en vez del `LEFT JOIN LATERAL` del design §6: misma regla y mismo
+  «nunca multiplica», pero lee `raw.con` UNA vez y no una por usuario (233
+  barridos de una tabla de millones de filas). Índice único `UPPER(login)` (R20) e
+  índice por `empleado_id` en `00_setup.sql`.
+- T7 toca además `tests/test_f101_cabecera_parte.py` (su lista de sub-pasos de
+  personal) y el recuento de `CREATE TABLE IF NOT EXISTS` de `test_f057_r27` (4 -> 5).
 
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 

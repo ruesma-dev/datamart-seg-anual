@@ -30,7 +30,7 @@
 -- 2026-09-18 por `sigrid-api` en solo lectura. Nada se supone.
 --
 -- Idempotente: `CREATE ... IF NOT EXISTS` aquí, `TRUNCATE` + `INSERT` en 01 a
--- 04, `DROP VIEW IF EXISTS` + `CREATE VIEW` en 05. **Aquí no se dropea ninguna
+-- 04 y en 06, `DROP VIEW IF EXISTS` + `CREATE VIEW` en 05. **Aquí no se dropea ninguna
 -- tabla**: un DROP se llevaría por delante los GRANT y dejaría al consumidor
 -- sin la tabla hasta el siguiente `apply_grants`. Por eso las columnas que se
 -- añaden a una tabla que ya existe van con `ALTER TABLE ... ADD COLUMN IF NOT
@@ -278,3 +278,33 @@ CREATE INDEX IF NOT EXISTS idx_personal_tipos_hora_recurso
     ON personal.recursos_tipos_hora (recurso_id);
 CREATE INDEX IF NOT EXISTS idx_personal_tipos_hora_tipo
     ON personal.recursos_tipos_hora (tipo_hora_id);
+
+
+-- ---------------------------------------------------------------------------
+-- personal.usuarios_sigrid — los USUARIOS de Sigrid con su persona (F-085)
+--
+-- Una fila por fila de `raw.usu` (233 el 2026-10-07). Convierte en persona el
+-- login que publican `compras.documento_procesos`, `comparativo_firmas` y
+-- `comparativos.aprobado_por`. DATOS PERSONALES autorizados (nombre y DNI, D4
+-- de F-085, 2026-10-07): por eso vive aqui y no en `compras`. Sin ninguna
+-- credencial ni contacto: `raw.usu` no los trae. Lo llena
+-- `06_usuarios_sigrid.sql`.
+--
+-- El login es UNICO SIN DISTINGUIR MAYUSCULAS (233 de 233, medido): el indice
+-- unico lo fija, y si Sigrid diera de alta dos logins iguales asi, el build de
+-- `personal` fallaria en vez de publicar un casado ambiguo.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS personal.usuarios_sigrid (
+    usuario_id       INTEGER   PRIMARY KEY,
+    login            TEXT      NOT NULL,
+    nombre           TEXT,
+    desactivado      BOOLEAN   NOT NULL,
+    codigo_empleado  TEXT,
+    empleado_id      INTEGER,
+    dni              TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_personal_usuarios_login
+    ON personal.usuarios_sigrid (UPPER(login));
+CREATE INDEX IF NOT EXISTS idx_personal_usuarios_empleado
+    ON personal.usuarios_sigrid (empleado_id);
