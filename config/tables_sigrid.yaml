@@ -675,6 +675,37 @@ tables:
     # fecha, cantidad e importe por linea. Sin ella no se puede responder
     # "horas por obra", que es lo que F-057 tiene que construir.
 
+  - source_table: usu
+    target_table: usu
+    id_column: ide
+    incremental_column: null   # medido 2026-10-07 contra sigrid_tablas.md: `usu` no tiene tiemod
+    where: null
+    exclude_columns:
+      - cla       # CREDENCIAL: la contrasena (225 informadas)
+      - fir       # CREDENCIAL: el codigo de firma digital (133 informadas)
+      - feccla    # CREDENCIAL: fecha de cambio de la clave (politica de la clave)
+      - diascla   # CREDENCIAL: dias para cambiar la clave (politica de la clave)
+      - sid       # CREDENCIAL: Security ID (vacio hoy)
+      - cerid     # CREDENCIAL: certificado digital (vacio hoy)
+      - dni       # DNI vacio en las 233 filas; el de la persona sale de `raw.emp`
+      - ele       # correo electronico: contacto no autorizado (vacio hoy)
+      - com       # texto libre: comentario (Texto ilimitado)
+      - resdes    # texto libre: comentario de desactivacion
+    # USUARIOS DE SIGRID (F-085, D4 del humano del 2026-10-07: «luego querre
+    # saber quien lo ha hecho por nombre»). 233 filas, 24 columnas. Traduce a
+    # persona el login de `rac.usu` (y de `confir.usu`): `cod` es el login,
+    # `res` el nombre y `codemp` el codigo de empleado. Lo publica
+    # `compras.documento_procesos` (login y nombre) y `personal.usuarios_sigrid`
+    # (empleado y DNI, solo en el esquema autorizado para datos personales).
+    #
+    # POR QUE ESTAS DIEZ EXCLUSIONES: las seis primeras son credenciales o
+    # metadatos de credencial y NUNCA entran; viven una vez en
+    # `etl_sigrid/domain/documento_procesos.py::COLUMNAS_CREDENCIALES_USU` y
+    # `tests/test_f085_sql.py` falla si alguna deja de estar aqui. `dni` esta
+    # vacio y el correo y los textos libres no hacen falta. Asi `raw.usu` queda
+    # legible por el rol del MCP como el resto de `raw`, sin nada sensible.
+    # Coste: 233 filas, menos de un segundo de ingesta.
+
   # ===========================================================================
   # MODULO CONTABILIDAD (F-066, tanda K) -- la otra version de la verdad
   #
