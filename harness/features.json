@@ -1338,6 +1338,7 @@
         "El modelo cubre las cuatro familias (comparativo, factura, contrato y obra) desde UNA fuente, `rac` (el registro de procesos de Sigrid), y su ficha declara la cobertura medida de cada una: facturas 99,94 %, contratos 97,1 %, comparativos 97,0 % y obras 72,2 % (el resto, documentos que no han salido de su estado inicial), y por que confir (DOCVAL sin una firma) y dbo.log no son la fuente",
         "`raw.rac` se ingiere SIN el filtro `asiide <> 0` y sin `tex`, con el coste medido contra la nocturna real (4 h 37 min 44 s el 2026-10-07, ya por encima de las 4 h de referencia), y retenciones.apuntes_contables da el mismo resultado que antes",
         "La factura FR26/10025 da en compras.documento_procesos los cuatro pasos de la ventana Procesos de Sigrid (jmvargas, jmvargas, ialvarez, jmsanchez) con su estado de origen y destino, al segundo",
+        "D4 del humano (2026-10-07): se ingiere `usu` SIN credenciales (cla, fir, feccla, diascla, sid, cerid) y el censo pasa a 72 tablas; compras.documento_procesos publica el login Y el nombre del usuario con su cobertura declarada (137 de 192 logins, 93,0 % de las filas; los no resueltos con nombre NULL); el DNI y el enlace al empleado van SOLO en personal.usuarios_sigrid",
         "dbo.log NO se ingiere en esta feature: la firma digital, el alta, las modificaciones y los pasos deshechos quedan para F-105"
       ],
       "status": "pending",

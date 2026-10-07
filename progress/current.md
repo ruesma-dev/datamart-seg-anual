@@ -10,7 +10,15 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-07 · F-085: spec escrita (spec-author), pendiente de aprobación
+## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
+
+**Enmienda tras la aprobación (2026-10-07)**: D1-D8 decididas; **D4 cambia**: se ingiere
+`usu` sin credenciales (`cla`, `fir`, `feccla`, `diascla`, `sid`, `cerid`; además `dni`
+vacío, correo y textos), censo 71 → 72; `compras.documento_procesos` publica login Y
+nombre (93,0 % de las filas, casando el login en mayúsculas); DNI y empleado solo en
+`personal.usuarios_sigrid`. Spec, `acceptance` y `progress/spec_F-085.md` §8 enmendados.
+D7: el líder ficha la feature que saca la antigüedad del estado de `rac`. El `status`
+lo cambia el líder.
 
 Rama `feature/F-085-quien-aprobo-que-y-cuando`. Spec en
 `specs/F-085-quien-aprobo-que-y-cuando/` y mediciones en

@@ -217,8 +217,8 @@ Eso es la trazabilidad de F-105, que ya existe en el backlog para ingerir
   `raw.confir`. Se resuelve a persona en la tabla `usu` de Sigrid (233 filas:
   `cod` login, `res` nombre, `codemp` empleado… **y `cla` contraseña y `dni`**):
   137 de los 192 logins de estas familias están en ella (93 % de las filas).
-  `usu` no se ingiere y no se propone ingerirla aquí: si se quiere el nombre, es
-  `personal` y F-105 (D4).
+  Propuesta inicial: no ingerirla. **El humano la cambió (D4, §8)**: se ingiere
+  sin credenciales y el nombre sale en `compras`.
 - `rol` (49 filas) traduce los códigos de rol (`JEFO` jefe de obra, `JG` jefe de
   grupo, `DCOMPRAS`…), pero `rac` no dice con qué rol actuó cada usuario: el rol
   sale del NOMBRE del proceso («Aprobar factura Jefe Grupo Aldara») y del estado
@@ -249,3 +249,45 @@ D8 `conpro`/`rol` sin ingerir.
 3. Se añade la reproducción de la FR26/10025 como prueba de aceptación.
 
 El `status` NO cambia (`pending`): la spec la aprueba el humano.
+
+## 8. Aprobada por el humano (2026-10-07), con D4 cambiada
+
+Decisiones finales, todas del humano: **D1** quitar el filtro de `raw.rac`, sí
+· **D2** familias 15, 44, 46 y 42, sí · **D3** `tex` excluida, sí · **D4
+CAMBIA**: «luego querré saber quién lo ha hecho por nombre; no veo problema en
+que además del login salga el nombre o el DNI para casarlo luego» · **D5**
+`dbo.log` en F-105, sí · **D6** `confir` sin cambios, sí · **D7** F-067 no se
+toca aquí; el líder ficha una feature aparte que saca la antigüedad del estado
+de `rac` y retira la foto tras 1-2 semanas de contraste, sí · **D8** sin
+`conpro` ni `rol`, sí.
+
+**Cómo queda D4**: se ingiere `usu` (censo 71 → 72) sin credenciales;
+`compras.documento_procesos` publica `usuario` (login) y `nombre_usuario`
+(`usu.res`); el DNI y el enlace al empleado van SOLO en
+`personal.usuarios_sigrid`, bajo el GRANT por esquema de `personal`.
+
+**Medido para D4 el 2026-10-07** (solo lectura; ningún valor de credencial se
+leyó, solo recuentos y longitudes):
+
+- `usu`, campo a campo contra `azure-apps/sigrid_tablas.md` (bloque `usu`,
+  ~l. 21726) y contra el dato, 233 filas: `cla` contraseña (225 informadas, hasta
+  34 caracteres) · `fir` firma digital (133, 6 caracteres no numéricos: un
+  código de firma) · `feccla` y `diascla`, la política de la clave (228 y 2) ·
+  `sid` Security ID y `cerid` certificado (0 y 0). **Las seis son credenciales
+  o metadatos de credencial y se excluyen.** Además se excluyen `dni` (**vacío
+  en las 233**), `ele` correo (vacío, contacto no autorizado), `com` y `resdes`
+  (texto libre).
+- **El DNI no está en `usu`**: sale de `raw.emp` por el empleado. `codemp`
+  informado en 211; casa con un empleado (`con` tipo 43 por `cod`) en 210: 189
+  con una sola ficha y 21 con varias (una por empresa), las 21 con exactamente
+  una en la empresa 1 (regla: preferir la empresa 1). 204 de esos empleados
+  tienen DNI. En 2 de los 21 ambiguos las fichas tienen DNI distinto: la regla
+  de la empresa 1 lo resuelve sin mezclar.
+- **El login hay que casarlo sin distinguir mayúsculas**: exacto casan 133 de
+  192 logins (919.823 filas, 91,0 %); en mayúsculas y sin espacios, 137
+  (939.885 filas, 93,0 %). En `usu` no hay dos logins iguales así normalizados.
+- `raw.usu` queda legible por el MCP como el resto de `raw`: sin credenciales,
+  sin DNI y sin correo; login y nombre ya salen en `compras`.
+
+La spec (`requirements.md`, `design.md`, `tasks.md`) está enmendada con D4 y
+con D1-D8 marcadas como decididas. El `acceptance` de F-085 recoge D4.
