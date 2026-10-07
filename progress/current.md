@@ -30,8 +30,10 @@ diccionario **v44**, 204 objetos, publicado el 07-10 07:04 UTC; MCP
   repasar las cifras de T19 (`progress/impl_F-067.md` §6) en solo lectura.
 
 **Pendiente del humano:**
-- **Reconectar Microsoft 365** (sesión caducada el 06-10) y pedir al líder que pase
-  al backlog los últimos correos de Juan Romero.
+- ~~Reconectar Microsoft 365 y pasar al backlog los correos de Juan~~ HECHO el
+  07-10 (sección siguiente). Queda contestar a Juan con la priorización (la pide
+  al final de su correo de comparativos) y decirle que la cabecera del DPC ya se
+  publica (`compras.necesidades`, F-067).
 - Avisar a Juan Romero y Elena Díaz de F-123 (filtrar por `MASTER_INICIAL` da 0 filas;
   la herramienta de Juan hay que regenerarla).
 - Escribir a Compras (y a Juan) sobre F-067: qué se responde ya, que la antigüedad del
@@ -47,10 +49,35 @@ diccionario **v44**, 204 objetos, publicado el 07-10 07:04 UTC; MCP
 - Red del puesto: el 06-10 una red bloqueaba el 5432 hacia Azure con la IP ya en el
   firewall; se arregló cambiando de red (memoria «IP del puesto y firewall»).
 
-**Cola** (prioridad): F-037 tesorería (2) · F-085 quién aprobó qué y cuándo (3) ·
-F-111 spec lista, falta aprobarla (4) · F-121 recurso principal del auxiliar (5) ·
-F-114 (6) · F-106 (7) · F-104 (8) · F-055 ejes del proveedor, con «proveedor por
-actividad» movido desde F-067 (9) · F-096 y F-122 (10) · F-036 oficio y categoría (11).
+**Cola** (prioridad, reordenada el 07-10 con los correos de Juan delante, por
+decisión del humano; el resto de abiertas, +8 sin cambiar su orden): F-129 objetivo
+contra la oferta de referencia (2) · F-128 importes de cabecera de factura (3) ·
+F-127 mayor analítico (4) · F-092 catálogo de productos, ampliada (5) · F-126 cuenta
+analítica de cada línea (6) · F-131 cantidades del DPC (7) · F-130 condiciones y
+texto de la oferta (8) · F-090 adjuntos, ampliada a comparativos y ofertas (9) ·
+F-037 tesorería (10) · F-085 (11) · F-111 spec lista, falta aprobarla (12) · F-121 (13).
+
+## 2026-10-07 · Backlog: los correos de Juan Romero del 06-10
+
+Cuatro correos «Datamart: …» del 06-10 (los de partes, dedicación y portal son de
+otros proyectos). Reparto y orden aprobados por el humano el 07-10 («si, esta ok»),
+fichados en la rama `chore/backlog-correos-juan-2026-10-06`:
+- **F-129** (nueva, crítica): el objetivo del comparativo contra la oferta de
+  referencia del propio comparativo (oficina técnica o planificado ABC); es la
+  respuesta de Negocio a la regla D4 de F-038 (casa el 29 %). Lleva el aviso de que
+  el concurso se hace en Excel (`n_ofertas_reales`/`ahorro_concurso`).
+- **F-128** (nueva): importes de cabecera de la factura y `dcfrec`, para cuadrar
+  retenciones contra el mayor.
+- **F-127** (nueva, crítica): mayor analítico (`apa`) y saldos; deuda del 24-09.
+  Ojo con datos personales en las CP.
+- **F-092** (ampliada, pasa a sdd): maestro de artículos por empresa, árbol de
+  naturalezas y vínculo con la cuenta analítica.
+- **F-126** (nueva): cuenta analítica de cada línea de compra y control contra catálogo.
+- **F-131** (nueva): cantidades del DPC por línea (la cabecera ya está, F-067).
+- **F-130** (nueva): condiciones (`dco`, `dcorec`) y texto de comparativo y oferta.
+- **F-090** (ampliada): índice de gráficos asociados de comparativos y ofertas.
+
+Nada medido en Sigrid al fichar: lo mide cada spec.
 
 ## 2026-10-07 · F-067 · CERRADA (`done`, APROBADO en pasada 2) · Compras por el MCP (con F-125) · DESPLEGADA el 07-10 (`r20261007-0850`)
 
