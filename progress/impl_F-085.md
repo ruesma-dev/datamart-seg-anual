@@ -91,8 +91,6 @@ FAILED tests/test_f085_dominio.py::test_f085_r14_normalizar_login[ Magomez -MAGO
 FAILED tests/test_f085_dominio.py::test_f085_r11_la_fr26_10025_sale_en_su_orden
 FAILED tests/test_f085_dominio.py::test_f085_r12_la_fr26_10025_encaja_paso_a_paso
 FAILED tests/test_f085_dominio.py::test_f085_r13_dias_entre_pasos_de_la_fr26_10025
-FAILED tests/test_f085_dominio.py::test_f085_r13_redondeo_a_la_mitad_hacia_arriba_como_postgres
-FAILED tests/test_f085_dominio.py::test_f085_r12_un_salto_no_encaja - NotImpl...
 FAILED tests/test_f085_dominio.py::test_f085_r18_varias_fichas_se_queda_la_de_la_empresa_1
   (... 34 en total; los 4 que pasan son las constantes: familias, credenciales,
   empresa preferente y el `momento` de la dataclass)
@@ -112,11 +110,9 @@ FAILED tests/test_f085_sql.py::test_f085_r3_ninguna_credencial_de_usu_se_ingiere
 FAILED tests/test_f085_sql.py::test_f085_r4_el_censo_pasa_a_72_sin_conpro_rol_ni_log
 FAILED tests/test_f085_sql.py::test_f085_r6_las_familias_del_in_son_las_del_dominio
 FAILED tests/test_f085_sql.py::test_f085_r11_el_orden_de_la_cadena_es_el_del_dominio
-FAILED tests/test_f085_sql.py::test_f085_r14_el_login_casa_normalizado_por_los_dos_lados
 FAILED tests/test_f085_sql.py::test_f085_r18_el_empleado_es_la_regla_del_dominio
 FAILED tests/test_f085_sql.py::test_f085_r20_ninguna_credencial_ni_contacto_en_personal
 FAILED tests/test_f085_diccionario.py::test_f085_r22_ficha_de_documento_procesos_con_todas_sus_columnas
-FAILED tests/test_f085_diccionario.py::test_f085_r24_ficha_de_usuarios_sigrid_con_todas_sus_columnas
 FAILED tests/test_f085_diccionario.py::test_f085_r26_comparativos_ya_no_dice_que_sigrid_no_guarda_el_cambio
   (... extracto: 79 en total)
 SKIPPED [1] tests\test_f085_diccionario.py:229: azure-apps no esta junto a este repositorio
@@ -194,4 +190,18 @@ crea `raw.usu` y recarga `raw.rac` entera; comprobar con `check-raw-recuentos`.
 
 ## Evidencias
 
-PENDIENTE de la verificación final (se completa abajo).
+| Evidencia | Valor real (medido) |
+|---|---|
+| Tests ejecutados | **7.132 passed, 228 skipped, 0 failed** (`bash harness/init.sh`, 2026-10-07, HEAD `aa5b10f`); 120 nuevos de F-085 |
+| Cobertura de líneas cambiadas | **100,0 %** (74/74, umbral 80 %): `PUERTA COBERTURA` de `init.sh` |
+| Mutación (muestreo del nivel estándar: 20 de 49, semilla 20260820) | **20 evaluados, 20 muertos, 0 supervivientes, 0 timeouts**: `progress/mutacion_F-085.md` |
+| Tiempo de la suite | 3.127,7 s (52 min) con cobertura y la campaña de mutación compitiendo; sin cobertura y sin campaña, 1.136,9 s (18 min 57 s) |
+| `init.sh` final | ver la línea siguiente, la escribe el implementer tras el último commit |
+
+Notas: la campaña corrió en paralelo (2 workers, `--timeout 3600` fijado a
+mano porque con la máquina saturada la línea base no cabía en los 600 s por
+defecto: midió 1.549,6 y 1.571,8 s). Los 20 mutantes muestreados cayeron en
+`documento_procesos.py`; las líneas de `SUB_PASOS` de los dos steps (datos)
+estaban en el alcance (30 de 221) y no salieron en la muestra. El modo
+paralelo puede dar falsos muertos (memoria del proyecto); la reverificación
+en serie solo se exige en rigor crítico.
