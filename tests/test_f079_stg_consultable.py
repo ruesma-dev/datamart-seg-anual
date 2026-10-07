@@ -82,6 +82,9 @@ GRUPO_B_FUNCIONES = (
     # F-038 Fase 2 (2026-10-05): el descuento de la linea, con el patron del
     # dominio. `compras.comparativo_oferta_lineas` ya publica su resultado.
     "compras.fn_porcentaje_dto",
+    # F-067 (2026-10-06): la fecha serie de Delphi con su hora (`con.tiemod`).
+    # `compras.contratos.fecha_ultima_modificacion` ya publica su resultado.
+    "compras.fn_sigrid_tiempo",
     # F-056 (2026-09-26): la copia local de la conversion de fecha del esquema
     # `contabilidad`, por lo mismo que la de `personal`.
     "contabilidad.fn_fecha",

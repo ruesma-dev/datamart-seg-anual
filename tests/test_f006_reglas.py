@@ -442,7 +442,12 @@ ESTADOS_BATERIA = ("respondible", "parcial", "bloqueada")
 #: F-038 (2026-10-04): P5 pasa a respondible —el comparativo ya existe como
 #: objeto— y entran P19-P22, las cuatro del acceptance 13 de F-038. Quedan 18
 #: respondibles, 2 parciales y 2 bloqueadas de 22.
-PARCIALES = {"P3", "P14"}
+#:
+#: F-067 (2026-10-06): entran P23-P26, las del correo de Compras y la de Juan
+#: Romero. P23 («más de tres semanas») es PARCIAL hasta 21 días después del
+#: desplegar la foto diaria; P24-P26 se responden ya. Quedan 21 respondibles,
+#: 3 parciales y 2 bloqueadas de 26.
+PARCIALES = {"P3", "P14", "P23"}
 BLOQUEADAS = {"P4", "P17"}
 
 
@@ -453,7 +458,7 @@ def _bateria():
 def test_f006_r39_bateria_estan_las_dieciocho_preguntas() -> None:
     ids = [p["id"] for p in _bateria()]
 
-    assert ids == [f"P{n}" for n in range(1, 23)], ids
+    assert ids == [f"P{n}" for n in range(1, 27)], ids
 
 
 def test_f006_r39_bateria_cada_pregunta_dice_que_seria_correcto() -> None:
@@ -474,7 +479,7 @@ def test_f006_r41_bateria_el_recuento_honesto_es_trece_tres_y_dos() -> None:
 
     assert por_estado["parcial"] == PARCIALES
     assert por_estado["bloqueada"] == BLOQUEADAS
-    assert len(por_estado["respondible"]) == 18
+    assert len(por_estado["respondible"]) == 21
 
 
 def test_f006_r41_bateria_lo_no_respondible_dice_que_feature_lo_desbloquea() -> None:

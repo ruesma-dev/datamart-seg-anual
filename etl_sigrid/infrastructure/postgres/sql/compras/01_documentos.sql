@@ -62,6 +62,29 @@
 --     modificación del DOCUMENTO, no la fecha del cambio de estado. La foto
 --     diaria que lo daría de verdad es F-067; por eso F-084 no publica ninguna
 --     columna de antigüedad, y la ficha lo dice en vez de insinuar un proxy.
+--
+-- F-067 (2026-10-06) · LAS CONDICIONES DEL CONTRATO. El bloque CONTRATOS gana
+-- CINCO columnas al final —`forma_pago_id`, `forma_pago`,
+-- `retencion_garantia_porcentaje`, `retencion_garantia_concepto` y
+-- `fecha_ultima_modificacion`— y ni una de las quince de siempre se mueve.
+--
+--   · LA ANTIGÜEDAD DEL ESTADO YA SE SABE, pero NO aquí: la da la foto diaria
+--     (`11_historial_estados.sql`, `compras.v_estado_documentos`) desde el día
+--     del despliegue. `fecha_ultima_modificacion` es `con.tiemod`, la última
+--     modificación del DOCUMENTO, y NO la fecha del cambio de estado (D2 del
+--     humano): medido, la firma no la mueve en el 85 % de los comparativos.
+--   · LA PENALIZACIÓN NO ES UN CAMPO de Sigrid (`ctr` no la tiene): solo
+--     aparece en el texto del contrato, `compras.documento_texto`, en 9.
+--
+-- F-067 (con F-125, D3) · EL CÓDIGO 2 Y LA NECESIDAD DE COMPRA. Las TRES
+-- tablas de líneas (contrato, albarán, factura) ganan al final
+-- `codigo_alternativo` (`cod2`), `necesidad_id` (`dncide`) y
+-- `necesidad_linea_id` (`dncproide`). El «código alternativo» de Sigrid es el
+-- CÓDIGO 2: lo pone el jefe de obra para agrupar o filtrar sus compras en el
+-- documento de planificación de compras (DPC, `raw.dnc`) y viaja de la línea
+-- de necesidad al albarán (igual en el 99,9 % de las 295.210 enlazadas). El
+-- enlace a la necesidad es DIRECTO por `dncide`/`dncproide`, no por
+-- `docoritip`/`linoriide`: 378.010 de 1.162.871 líneas de albarán (32,5 %).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -89,18 +112,48 @@ SELECT
     -- F-073 en `maestro.obras` y F-083 en `compras.facturas`.
     con.est                                 AS estado_id,        -- código interno del tipo 44
     est.codigo_estado                       AS estado_codigo,    -- mnemónico: EPF, FIR, TER…
-    est.nombre_estado                       AS estado            -- estado_id ya traducido (tipo 44)
+    est.nombre_estado                       AS estado,           -- estado_id ya traducido (tipo 44)
+    -- F-067: las CONDICIONES del contrato y su última modificación, también
+    -- AL FINAL y por el mismo motivo. Ver la cabecera del fichero.
+    NULLIF(c.pagide, 0)                     AS forma_pago_id,    -- ctr.pagide -> auxpag
+    pag.res                                 AS forma_pago,       -- nombre de la forma de pago
+    ret.porcentaje                          AS retencion_garantia_porcentaje,  -- 5 = 5 %
+    ret.concepto                            AS retencion_garantia_concepto,
+    compras.fn_sigrid_tiempo(con.tiemod)    AS fecha_ultima_modificacion  -- NO es el cambio de estado
 FROM raw.ctr c
 JOIN raw.con con          ON con.ide = c.ide
 LEFT JOIN raw.con obr_con ON obr_con.ide = NULLIF(c.obride, 0)
 LEFT JOIN raw.con prv_con ON prv_con.ide = NULLIF(c.entide, 0)
+-- F-067: de `raw.auxpag` y no de `compras.formas_pago`, que se construye en
+-- `04_formas_pago.sql`, después de este fichero. LEFT: 9 de 19.081 contratos
+-- no tienen forma de pago (medido el 2026-10-06).
+LEFT JOIN raw.auxpag pag  ON pag.ide = NULLIF(c.pagide, 0)
 -- La traducción del estado, con su tipo de documento y su guarda de grano,
 -- vive UNA sola vez en `compras.fn_estado_documento` (`00_setup.sql`) y la
 -- comparten este bloque y el de FACTURAS: es el criterio 6 de F-084.
 -- `LEFT ... ON TRUE` porque un contrato cuyo estado no casara con el catálogo
 -- se publica igual, con el literal a NULL. Hoy no le pasa a ninguno: 0
 -- huérfanos de 18.978, medido el 2026-09-16.
-LEFT JOIN LATERAL compras.fn_estado_documento(44, con.est) est ON TRUE;
+LEFT JOIN LATERAL compras.fn_estado_documento(44, con.est) est ON TRUE
+-- F-067 (R13): la RETENCIÓN DE GARANTÍA, de los recargos y retenciones del
+-- contrato (`raw.ctrrec`) cuyo concepto tiene código `RET%`: 6.333 contratos
+-- (558368 «Retención garantía 5 % (sobre base imponible)» en 6.172). Los demás
+-- conceptos de `ctrrec` son IRPF o van sin código y NO son la retención. El
+-- `LIMIT 1` con `ORDER BY` es la guarda de grano: hoy UN contrato tiene dos, y
+-- gana la de menor `pos`. `valpor` viene en tanto por uno (0,05) y se publica
+-- en tanto por cien (5). Va DETRÁS del lateral del estado, que `test_f084_sql`
+-- lee como el primero; y sin `WHERE`, porque el FROM externo no puede tenerlo
+-- (el universo de contratos no se filtra, F-084): la correlación va en el ON.
+LEFT JOIN LATERAL (
+    SELECT ROUND((r.valpor * 100)::NUMERIC, 4) AS porcentaje,
+           x.res                               AS concepto
+    FROM   raw.ctrrec r
+    JOIN   raw.con x ON x.ide = r.recide
+                    AND r.docide = c.ide
+                    AND x.cod LIKE 'RET%'
+    ORDER  BY r.pos, r.ide
+    LIMIT  1
+) ret ON TRUE;
 
 ALTER TABLE compras.contratos ADD PRIMARY KEY (contrato_id);
 CREATE INDEX idx_com_ctr_obra ON compras.contratos (obra_id);
@@ -121,7 +174,12 @@ SELECT
     COALESCE(l.pre, 0)::NUMERIC(20, 6)      AS precio,
     COALESCE(l.tot, 0)::NUMERIC(18, 2)      AS importe,          -- sin IVA
     COALESCE(l.ivacuo, 0)::NUMERIC(18, 2)   AS cuota_iva,
-    COALESCE(l.canser, 0)::NUMERIC(20, 6)   AS cantidad_servida
+    COALESCE(l.canser, 0)::NUMERIC(20, 6)   AS cantidad_servida,
+    -- F-067 (D3): el CÓDIGO 2 y la NECESIDAD de compra, AL FINAL. Ver la
+    -- cabecera del fichero. Vacío y 0 de Sigrid son NULL.
+    NULLIF(btrim(l.cod2), '')               AS codigo_alternativo,  -- «código 2»
+    NULLIF(l.dncide, 0)                     AS necesidad_id,        -- dnc: el DPC
+    NULLIF(l.dncproide, 0)                  AS necesidad_linea_id   -- dncpro
 FROM raw.ctrpro l
 WHERE EXISTS (SELECT 1 FROM raw.ctr c WHERE c.ide = l.docide);
 
@@ -186,7 +244,12 @@ SELECT
         ELSE
             ROUND((COALESCE(l.tot, 0)
                    * (1 - COALESCE(l.canfac, 0) / l.can))::NUMERIC, 2)
-    END                                     AS importe_pendiente_facturar
+    END                                     AS importe_pendiente_facturar,
+    -- F-067 (D3): el CÓDIGO 2 y la NECESIDAD de compra, AL FINAL. Ver la
+    -- cabecera del fichero. Vacío y 0 de Sigrid son NULL.
+    NULLIF(btrim(l.cod2), '')               AS codigo_alternativo,  -- «código 2»
+    NULLIF(l.dncide, 0)                     AS necesidad_id,        -- dnc: el DPC
+    NULLIF(l.dncproide, 0)                  AS necesidad_linea_id   -- dncpro
 FROM raw.dcapro l
 WHERE EXISTS (SELECT 1 FROM raw.dca a WHERE a.ide = l.docide);
 
@@ -195,6 +258,8 @@ CREATE INDEX idx_com_alblin_alb ON compras.albaran_lineas (albaran_id);
 CREATE INDEX idx_com_alblin_obr ON compras.albaran_lineas (obra_id);
 CREATE INDEX idx_com_alblin_par ON compras.albaran_lineas (partida_id);
 CREATE INDEX idx_com_alblin_ctl ON compras.albaran_lineas (contrato_linea_id);
+-- F-067: el albarán se cruza con su línea de necesidad (`descompuestos`, PLANIF_JO).
+CREATE INDEX idx_com_alblin_ncl ON compras.albaran_lineas (necesidad_linea_id);
 
 -- ---------------------------------------------------------------------------
 -- FACTURAS (series FR/FRGG = factura, AB/ABGG = abono)
@@ -265,7 +330,12 @@ SELECT
     CASE WHEN l.docoritip = 14 THEN NULLIF(l.linoriide, 0) END AS albaran_linea_id,
     CASE WHEN l.docoritip = 14 THEN NULLIF(l.docoriide, 0) END AS albaran_id,
     CASE WHEN l.docoritip = 44 THEN NULLIF(l.linoriide, 0) END AS contrato_linea_id,
-    CASE WHEN l.docoritip = 44 THEN NULLIF(l.docoriide, 0) END AS contrato_id_directo
+    CASE WHEN l.docoritip = 44 THEN NULLIF(l.docoriide, 0) END AS contrato_id_directo,
+    -- F-067 (D3): el CÓDIGO 2 y la NECESIDAD de compra, AL FINAL. Ver la
+    -- cabecera del fichero. Vacío y 0 de Sigrid son NULL.
+    NULLIF(btrim(l.cod2), '')               AS codigo_alternativo,  -- «código 2»
+    NULLIF(l.dncide, 0)                     AS necesidad_id,        -- dnc: el DPC
+    NULLIF(l.dncproide, 0)                  AS necesidad_linea_id   -- dncpro
 FROM raw.dcfpro l
 WHERE EXISTS (SELECT 1 FROM raw.dcf f WHERE f.ide = l.docide);
 

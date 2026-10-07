@@ -471,7 +471,21 @@
 # leido de la noche anterior; y la firma de cada escalon es una fila, no una
 # columna.
 
-version: 43
+# version 44 (F-067, 2026-10-06): LA FOTO DIARIA DE ESTADOS Y EL CODIGO 2.
+# Corrige lo que decian la 24 (F-084) y la ficha de `compras.contratos`: la
+# antiguedad del estado de un contrato o una factura YA NO es «no se puede
+# saber»; SE SABE DESDE EL DESPLIEGUE de F-067, por una foto diaria guardada
+# por tramos (`compras.historial_estados`, `historial_estados_fotos`), las dos
+# primeras tablas PERSISTENTES de `compras`: no se reconstruyen. Encima,
+# `compras.v_estado_documentos` da el estado actual y los dias que lleva (un
+# MINIMO en la linea base). `con.tiemod` se publica como
+# `contratos.fecha_ultima_modificacion` y NO es la fecha del cambio de estado.
+# `contratos` gana forma de pago y retencion de garantia; las tres tablas de
+# lineas, el «codigo 2» y la necesidad de compra; entra `compras.necesidades`
+# (el DPC de la obra) y `necesidad_id` en dos vistas de `descompuestos`.
+# Preguntas P23-P26.
+
+version: 44
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1371,7 +1385,11 @@ esquemas:
       los dos lados (`compras.comparativo_lineas`,
       `compras.comparativo_oferta_lineas`), el coste objetivo contra su base
       del descompuesto (`compras.comparativo_objetivo`) y las firmas escalon
-      a escalon (`compras.comparativo_firmas`).
+      a escalon (`compras.comparativo_firmas`). Desde F-067, la FOTO DIARIA
+      de estados de contratos y facturas (`compras.historial_estados`, que NO
+      se reconstruye, y `compras.v_estado_documentos` con los dias en el
+      estado) y el documento de planificacion de compras
+      (`compras.necesidades`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -1836,6 +1854,70 @@ preguntas_aceptacion:
       `compras.contratos.comparativo_id`, que es la cabecera del contrato y
       solo cubre el 56 %: con ella responderia NO en miles de casos en que es
       SI. Cita la fecha de build de `build_compras`.
+    reglas_implicadas: [R-FRESCURA]
+    estado: respondible
+
+  # P23-P26 (F-067): las preguntas del correo de Compras y la de Juan Romero.
+  - id: P23
+    pregunta: Que contratos llevan mas de tres semanas enviados y sin firmar
+    objetos_esperados:
+      - compras.v_estado_documentos
+      - compras.contratos
+    respuesta_correcta: >-
+      Filtra `compras.v_estado_documentos` por `tipo_documento = 'CONTRATO'`,
+      `estado_codigo = 'EPF'` y `dias_en_estado > 21`, y une con
+      `compras.contratos` para proveedor y obra. Dice que la antiguedad cuenta
+      desde el dia del despliegue de la foto diaria: si `antiguedad_es_minima`,
+      los dias son un MINIMO, asi que «mas de 21» es cierto pero «menos de 21»
+      no se sabe. NO usa `fecha_ultima_modificacion` (`con.tiemod`). Cita
+      `ultima_foto` y la fecha de build de `build_compras`.
+    reglas_implicadas: [R-FRESCURA]
+    estado: parcial
+    bloqueada_por: F-067
+    nota: >-
+      Pasa a `respondible` 21 dias despues del despliegue de F-067: hasta
+      entonces ningun minimo de la linea base supera 21 y la respuesta
+      correcta es la lista de enviados con «al menos N dias».
+
+  - id: P24
+    pregunta: Cuando cambio de estado la factura X y por que estados ha pasado
+    objetos_esperados:
+      - compras.historial_estados
+      - compras.v_estado_documentos
+    respuesta_correcta: >-
+      Lee los tramos de `compras.historial_estados` del documento, ordenados
+      por `desde`, traduciendo el estado con `compras.v_estado_documentos` o
+      `compras.facturas`. Da cada cambio como una VENTANA (entre
+      `observado_antes` y `desde`), no como una hora exacta, y dice que antes
+      del despliegue de F-067 no hay historia (tramo de linea base).
+    reglas_implicadas: [R-FRESCURA]
+    estado: respondible
+
+  - id: P25
+    pregunta: >-
+      Cuantos comparativos hay por actividad, y que proveedores ganan
+      comparativos de varias actividades
+    objetos_esperados:
+      - compras.comparativos
+    respuesta_correcta: >-
+      Agrupa `compras.comparativos` por `actividad`, y por
+      `proveedor_ganador_id` contando actividades distintas. Avisa de los 877
+      comparativos con contrato y sin ganadora unica, cuyo proveedor sale de
+      `contrato_id`. No habla de actividades «validadas»: no existen en Sigrid.
+    reglas_implicadas: [R-FRESCURA]
+    estado: respondible
+
+  - id: P26
+    pregunta: Que hemos recibido con el codigo 2 MOMOSA en el albaran AC26/28510
+    objetos_esperados:
+      - compras.albaran_lineas
+      - compras.albaranes
+    respuesta_correcta: >-
+      Busca el albaran por `codigo_albaran` y lista sus lineas de
+      `compras.albaran_lineas` con su `codigo_alternativo` («codigo 2», que
+      pone el jefe de obra en el DPC), su `necesidad_id` y si vienen de
+      contrato (`contrato_linea_id`). Sabe que el codigo 2 es texto libre sin
+      normalizar.
     reglas_implicadas: [R-FRESCURA]
     estado: respondible
 

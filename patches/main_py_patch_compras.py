@@ -76,13 +76,14 @@ def build_compras() -> None:
 
 @cli.command("reset-compras")
 def reset_compras() -> None:
-    """Elimina el schema compras. Lanza después `build-compras`."""
-    pg = _get_pg()
-    with pg.connection() as conn, conn.cursor() as cur:
-        cur.execute("DROP SCHEMA IF EXISTS compras CASCADE")
-        conn.commit()
-    click.secho("Schema compras eliminado. Lanza `python main.py build-compras`.",
-                fg="green")
+    """Parche histórico (C1/C2). NO es el comando vigente: el de `main.py`
+    conserva la foto diaria de F-067 (`compras.historial_estados` y
+    `historial_estados_fotos`) y borra solo el resto del esquema. Este parche
+    ya no borra nada: aplicarlo hoy borraría la historia."""
+    raise click.ClickException(
+        "Parche obsoleto: usa `python main.py reset-compras`, que conserva la "
+        "foto diaria de estados (F-067)."
+    )
 
 
 @cli.command("inspect-contrato-consumo")

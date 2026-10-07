@@ -421,6 +421,12 @@ def test_f120_r17_master_inserta_el_factor() -> None:
 @pytest.mark.parametrize("vista", VISTAS_CON_FACTOR)
 def test_f120_r18_factor_ultima_columna_de_cada_vista(vista: str) -> None:
     cuerpo = _bloque(VISTAS, f"CREATE OR REPLACE VIEW descompuestos.{vista} AS", " FROM descompuestos.lineas")
+    # F-067 (R20, 2026-10-06) añade `necesidad_id` DETRÁS de `factor` en las dos
+    # vistas con línea de necesidad, por subconsulta escalar: es justo lo que D8
+    # protegía (`CREATE OR REPLACE VIEW` solo admite columnas nuevas al final).
+    # `factor` sigue siendo la última de las de F-120; lo de F-067 lo fija
+    # `tests/test_f067_sql.py`.
+    cuerpo = re.split(r",\s*\(SELECT NULLIF\(n\.dncide, 0\)", cuerpo)[0]
     columnas = [c.strip() for c in cuerpo.replace("SELECT", "", 1).split(",")]
     assert columnas[-1] == "factor"
     assert columnas.count("factor") == 1

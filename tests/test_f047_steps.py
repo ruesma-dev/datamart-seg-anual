@@ -49,6 +49,11 @@ STEPS = {
             "08_comparativos.sql",
             # F-038 Fase 2: las líneas de los dos lados, el objetivo y las firmas.
             "09_comparativos_detalle.sql",
+            # F-067: el documento de necesidades de compra (DPC).
+            "10_necesidades.sql",
+            # F-067: la foto diaria de estados, la ÚLTIMA: no depende de nada
+            # del esquema y no se reconstruye.
+            "11_historial_estados.sql",
         ],
     ),
     "build_retenciones": (
@@ -151,9 +156,35 @@ def test_f038_r26_build_compras_cuenta_las_lineas_de_oferta_al_final(pg) -> None
 
     _step("build_compras").run()
 
-    assert doble.contados[-2:] == [
+    # F-067 añade sub-pasos detrás: lo que se defiende es que `09` cuenta su
+    # tabla justo después de `08`, no que sea la última.
+    i = doble.contados.index(("compras", "comparativos"))
+    assert doble.contados[i : i + 2] == [
         ("compras", "comparativos"),
         ("compras", "comparativo_oferta_lineas"),
+    ]
+
+
+def test_f067_r8_build_compras_cuenta_la_historia_de_estados_al_final(pg) -> None:
+    """El sub-paso `11` es el último y cuenta `compras.historial_estados`: los
+    tramos de la foto diaria, que crecen cada noche con los cambios y nunca
+    bajan. Si una noche bajaran, alguien las ha borrado."""
+    doble = pg("build_compras", _PgFalso())
+
+    _step("build_compras").run()
+
+    assert doble.ejecutados[-1] == "11_historial_estados.sql"
+    assert doble.contados[-1] == ("compras", "historial_estados")
+
+
+def test_f067_r19_build_compras_cuenta_las_necesidades_antes_de_la_foto(pg) -> None:
+    doble = pg("build_compras", _PgFalso())
+
+    _step("build_compras").run()
+
+    assert doble.contados[-2:] == [
+        ("compras", "necesidades"),
+        ("compras", "historial_estados"),
     ]
 
 
