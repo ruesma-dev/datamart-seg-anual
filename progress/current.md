@@ -15,7 +15,7 @@
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 
-**Tarea en curso**: T5. T1-T4 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
+**Tarea en curso**: T6. T1-T5 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
 
 **Incidencias de entorno (no de la spec)**:
 - `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
@@ -37,6 +37,16 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
   `tables_sigrid.yaml` fallan las biyecciones ficha <-> tabla de F-006/F-066.
 - `specs/F-006-mcp-azure/design_detalle.md` gana su enmienda de inventario
   (205 -> 207 objetos): lo exige `test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos`.
+- La ficha de `compras.documento_procesos` entra con su SQL (T5), no en T8: la puerta
+  de cobertura exige ficha o pendiente, y la lista de pendientes no puede crecer.
+  Igual con `personal.usuarios_sigrid` en T7.
+- `R-SIGRID-CON` (00_global) declara `rac.fec`, `rac.res`, `usu.cod` y `usu.res`: el
+  barrido de F-006 deriva de nuestro SQL los campos propios de cada tabla de `raw`.
+- SQL de `12`: `encaja_con_anterior` usa `IS NOT DISTINCT FROM` (no `=`) para que
+  sea falso y no nulo si un estado viniera nulo, igual que el `==` del dominio;
+  `dias_desde_anterior` redondea `EXTRACT(EPOCH ...)::NUMERIC / 86400` (aritmética
+  exacta, como el `Decimal` del oráculo); `make_time` con casts a `INT` explícitos.
+  Mismo resultado que el design §5 con los datos medidos (`est1`/`est2` nunca nulos).
 
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 

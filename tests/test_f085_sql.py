@@ -286,7 +286,8 @@ def test_f085_r16_sin_documento_no_entra() -> None:
 
 
 def test_f085_d4_compras_no_publica_dni_ni_empleado() -> None:
-    compacto = _procesos().lower()
+    # El COMMENT ON TABLE dice, a propósito, dónde está el DNI: se mira el resto.
+    compacto = _procesos().split("COMMENT ON TABLE")[0].lower()
     for prohibido in ("dni", "raw.emp", "codemp", "empleado"):
         assert prohibido not in compacto, f"`{prohibido}` va solo en `personal` (D4)"
 
