@@ -10,6 +10,45 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-07 · F-085: spec escrita (spec-author), pendiente de aprobación
+
+Rama `feature/F-085-quien-aprobo-que-y-cuando`. Spec en
+`specs/F-085-quien-aprobo-que-y-cuando/` y mediciones en
+`progress/spec_F-085.md` (solo lectura: Sigrid por `sigrid-api`, Azure por el
+MCP). `status` sigue `pending`; el `acceptance` se REESCRIBIÓ (ver abajo).
+
+**El hallazgo**: la ventana «Procesos» de la captura de Carmen Calle es `rac`.
+Sin filtro tiene 2.517.791 pasos con proceso, estado origen→destino, login,
+fecha y hora; la FR26/10025 da exactamente las cuatro filas de la captura. Cubre
+facturas 99,94 %, contratos 97,1 %, comparativos 97,0 % y obras 72,2 % (el
+resto no ha salido del estado inicial). `dbo.log` deja de hacer falta (ope 5 =
+ejecutar proceso, 3 = modificación, 30 = deshacer, 24 = firma digital) y
+`confir` DOCVAL (facturas) son peticiones de firma nunca firmadas.
+
+**Propuesta**: quitar el filtro `asiide <> 0` de `raw.rac` (F-095 ya filtra en
+SQL) y publicar `compras.documento_procesos`, una fila por paso. Censo sigue en
+71 tablas.
+
+**Decisiones que debe validar el humano** (recomendación en design §8): D1
+quitar el filtro · D2 solo las cuatro familias · D3 `tex` excluida (hay correos
+pegados con datos de terceros) · D4 login, sin nombre · D5 `dbo.log` a F-105 ·
+D6 `confir` sin cambios · D7 F-067 no se toca · D8 sin `conpro` ni `rol`.
+
+**Para el líder (F-067, no tocado)**: la premisa «la fecha del cambio de estado
+no existe en Sigrid» es FALSA: el último paso de `rac` coincide con `con.est` en
+el 99,96 % de facturas y 99,99 % de contratos, con fecha exacta desde 2008. Los
+809 contratos en EPF tienen fecha de envío exacta (785 > 21 días). Proponer una
+feature para que `v_estado_documentos` salga de `rac`. Detalle:
+`progress/spec_F-085.md` §2.
+
+**Aviso de ventana**: la nocturna del 07-10 duró **4 h 37 min 44 s**, ya por
+encima de las 4 h de referencia (la ficha decía 19 min de margen). F-085 suma
+~3 min de ingesta.
+
+**`acceptance` ajustado**: el criterio 3 («si se ingiere `dbo.log`… 19 min de
+margen») contradecía la medición en sus dos premisas; ahora: `rac` sin filtro,
+FR26/10025 reproducida, `dbo.log` a F-105.
+
 ## 2026-10-07 · ESTADO AL CERRAR LA SESIÓN (leer primero)
 
 **En producción** (imagen del job `r20261007-0850`, desde `main` 540d1ee;
