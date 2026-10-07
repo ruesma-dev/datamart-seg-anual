@@ -1341,7 +1341,7 @@
         "D4 del humano (2026-10-07): se ingiere `usu` SIN credenciales (cla, fir, feccla, diascla, sid, cerid) y el censo pasa a 72 tablas; compras.documento_procesos publica el login Y el nombre del usuario con su cobertura declarada (137 de 192 logins, 93,0 % de las filas; los no resueltos con nombre NULL); el DNI y el enlace al empleado van SOLO en personal.usuarios_sigrid",
         "dbo.log NO se ingiere en esta feature: la firma digital, el alta, las modificaciones y los pasos deshechos quedan para F-105"
       ],
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "rigor": "estandar",
       "priority": 11,

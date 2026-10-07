@@ -10,6 +10,29 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-07 · F-085: implementación (implementer) · EN CURSO
+
+`status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
+T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
+
+**Tarea en curso**: T1.
+
+**Incidencias de entorno (no de la spec)**:
+- `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
+  `test_f006_el_barrido_ve_todos_los_modulos_que_declaran_dataclasses`, causado
+  por el propio implementer (creó `domain/documento_procesos.py` mientras la suite
+  corría: el barrido de dataclasses lo vio en el fuente sin haberlo importado).
+  Ese test pasa aislado (177 passed). Fichero retirado y `init.sh` relanzado sobre
+  el árbol limpio.
+- La máquina está SATURADA (campañas de mutación y suites de otros proyectos en
+  paralelo): la suite va a ~1 % por minuto. Para no ensuciar la verificación de
+  arranque, el trabajo se hace en un worktree aparte (rama temporal
+  `trabajo/F-085` desde 08f14cb) y se lleva a `feature/F-085-...` por fast-forward
+  cuando el `init.sh` de arranque termine. Ningún commit va a `dev` ni a `main`.
+
+**Desviaciones respecto a la spec** (justificadas):
+- (se irán anotando aquí)
+
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 
 **Enmienda tras la aprobación (2026-10-07)**: D1-D8 decididas; **D4 cambia**: se ingiere
