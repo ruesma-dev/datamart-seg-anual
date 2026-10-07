@@ -612,7 +612,13 @@ def test_f073_r22_el_comment_avisa_de_que_el_plazo_no_es_un_numero() -> None:
 #: para que los dos bloques compartan una sola traducción (criterio 6 de
 #: F-084). Que el guardián salte dos veces en el mismo día es lo que se le
 #: pide: cada vez ha obligado a decir qué feature toca el fichero y por qué.
-HASH_01_DOCUMENTOS = "5cc72676ef3919ef58b979537307a117c37c75d9b9440c88d312ec9e09979f9a"
+#:
+#: **RECALCULADO POR F-067 el 2026-10-06**, la feature que el guardián
+#: nombraba: CONTRATOS gana al final la forma de pago, la retención de garantía
+#: y la última modificación (cinco columnas), y las tres tablas de líneas el
+#: código 2 y la necesidad (tres cada una, D3). Ninguna columna de siempre se
+#: mueve; lo fijan `tests/test_f084_sql.py` y `tests/test_f067_sql.py`.
+HASH_01_DOCUMENTOS = "4d05e3088c4782c1625fde42b4299772c95a51974a5549440ec5d58198e74fd1"
 
 #: Los dos ficheros del SELLO. Tocar una coma fuerza la reconstrucción completa
 #: de las 921 obras la noche siguiente (R25).

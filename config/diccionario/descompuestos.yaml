@@ -171,8 +171,16 @@ objetos:
         significado: Unidad del elemento (campo 5; `dncpro.unimed`).
       codigo_alternativo:
         significado: >-
-          Codigo alternativo (campo 7), que en las lineas sincronizadas con la
-          planificacion es `dncpro.cod2`: el codigo de la partida.
+          El «CODIGO 2» de Sigrid (rotulado «Codigo alternativo»; F-067), y lo
+          es en los cuatro origenes: en ESTUDIO y en las versiones del master es
+          el campo 7 del texto, y en PLANIF_JO es `dncpro.cod2`. Lo pone el JEFE
+          DE OBRA para agrupar o filtrar sus compras en el documento de
+          planificacion de compras (DPC), y viaja de la linea de necesidad a la
+          compra: es el mismo `codigo_alternativo` de `compras.albaran_lineas`.
+          **En el master es el de la fecha de la version**: medido el
+          2026-10-06 en una obra, el 98,4 % de las lineas del master enlazadas
+          a la planificacion traen el mismo que hoy; el resto se edito despues.
+          Texto libre sin normalizar.
       tipo_elemento_codigo:
         significado: El tipo de elemento tal cual lo guarda Sigrid (campo 16).
         nulo_significa: >-
@@ -532,7 +540,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del elemento, libre por obra en Estudios.'}
       descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
       unidad: {significado: 'Unidad del elemento en el descompuesto.'}
-      codigo_alternativo: {significado: 'Codigo alternativo del elemento (campo 7).'}
+      codigo_alternativo: {significado: 'El «codigo 2» del elemento (campo 7 del texto; ver `descompuestos.lineas`).'}
       tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
@@ -578,7 +586,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del producto de compras de la linea (`con.cod`).'}
       descripcion: {significado: 'Descripcion de la linea de planificacion (`dncpro.res`).'}
       unidad: {significado: 'Unidad de la linea de planificacion (`dncpro.unimed`).'}
-      codigo_alternativo: {significado: 'Codigo alternativo de la linea (`dncpro.cod2`).'}
+      codigo_alternativo: {significado: 'El «codigo 2» de la linea (`dncpro.cod2`): lo pone el jefe de obra para agrupar o filtrar sus compras en el DPC y viaja al albaran (F-067).'}
       naturaleza_codigo: {significado: 'Codigo de la naturaleza del producto (`auxpronat.cod`).'}
       naturaleza: {significado: 'Nombre de la naturaleza del producto (`auxpronat.res`).'}
       rendimiento: {significado: 'Cantidad por unidad de partida, sin el factor (`dncpro.canren`).', agregacion: no_sumable}
@@ -595,6 +603,7 @@ objetos:
       grupo_planificacion_id: {significado: 'Grupo de planificacion de compra (`dncpro.gpcide`).', agregacion: no_sumable}
       nivel: {significado: 'Nivel de la linea en la planificacion (`dncpro.niv`).', agregacion: no_sumable}
       es_nivel_padre: {significado: 'La linea es un nivel padre (`dncpro.nivpad`).'}
+      necesidad_id: {significado: 'El DOCUMENTO de necesidades de compra de la linea (`dncpro.dncide`, F-067): el DPC de la obra, ficha en `compras.necesidades`.', agregacion: no_sumable, nulo_significa: 'La linea de necesidad no apunta a ningun documento (0 en Sigrid).'}
       factor: {significado: 'El FACTOR de la linea (F-120): `dncpro.faccan` si `dncpro.factip` = 1, 1 si es 0. Lo lleva el importe unitario, no la cantidad.', agregacion: no_sumable, nulo_significa: 'Un `dncpro.factip` que no es 0 ni 1 (hay uno, 646): sin importe unitario.'}
     relaciones:
       - de: obra_id
@@ -633,7 +642,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del elemento (el del producto si viene de la planificacion).'}
       descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
       unidad: {significado: 'Unidad del elemento en el descompuesto.'}
-      codigo_alternativo: {significado: 'Codigo alternativo (= `dncpro.cod2` si esta enlazada).'}
+      codigo_alternativo: {significado: 'El «codigo 2» de la linea en la fecha de la version (campo 7; = `dncpro.cod2` si esta enlazada y no se edito despues).'}
       tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}
@@ -653,6 +662,7 @@ objetos:
       es_ultima: {significado: 'TRUE en la mayor version del master de la obra.'}
       tipo_version: {significado: 'Tipo de la version por su texto, la regla de mart.', valores: [ABC, Planif Inicial, Cuatrimestral, Cierre mensual, Sin clasificar]}
       texto_version: {significado: 'El texto de la version (`obrfasamb.tex`).'}
+      necesidad_id: {significado: 'El DOCUMENTO de necesidades de compra de la linea de necesidad enlazada (`dncpro.dncide` de su `dncpro_id`, F-067): el DPC de la obra, ficha en `compras.necesidades`. Es el de HOY, no el de la fecha de la version.', agregacion: no_sumable, nulo_significa: 'La linea del master no esta enlazada a una linea de necesidad, o esa linea ya no existe en Sigrid.'}
       factor: {significado: 'El FACTOR de la linea en la version (campo 14 `factor x rendimiento`, F-120); 1 si no tiene.', agregacion: no_sumable, nulo_significa: 'Campo 14 vacio o raro, o version aun no retroceada con F-120.'}
     relaciones:
       - de: obra_id
@@ -692,7 +702,7 @@ objetos:
       codigo_elemento: {significado: 'Codigo del elemento, libre por obra en Estudios.'}
       descripcion: {significado: 'Descripcion del elemento en el descompuesto.'}
       unidad: {significado: 'Unidad del elemento en el descompuesto.'}
-      codigo_alternativo: {significado: 'Codigo alternativo del elemento (campo 7).'}
+      codigo_alternativo: {significado: 'El «codigo 2» del elemento (campo 7 del texto; ver `descompuestos.lineas`).'}
       tipo_elemento_codigo: {significado: 'El tipo de elemento tal cual en Sigrid (campo 16).'}
       tipo_elemento: {significado: 'El tipo traducido (D8; 3 OTROS y 11 SUBCONTRATA, provisionales).'}
       naturaleza_codigo: {significado: 'Codigo de naturaleza del elemento (campo 11).'}

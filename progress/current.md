@@ -10,6 +10,143 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-07 · F-067 · CERRADA (`done`, APROBADO en pasada 2) · Compras por el MCP (con F-125) · SIN DESPLEGAR
+
+> Cerrada el 2026-10-07. Resumen en `progress/history.md`. MANUAL abajo.
+
+### Antes
+
+
+Spec en `specs/F-067-compras-seguimiento-mcp/` (requirements 131/150, design
+243/250, 23 tareas). Mediciones y porqués en `progress/spec_F-067.md`. Rama
+`feature/F-067-compras-seguimiento-mcp`. Hallazgos que cambian la ficha (ya
+llevados a su `acceptance` 2, 3, 8 y 12): el albarán enlaza con la necesidad
+**directamente** (`dcapro.dncide`/`dncproide`, 32,5 % de las líneas; el «6 %»
+de Negocio son las líneas sin contrato, 5,1 %); el código 2 viaja de la
+necesidad al albarán (igual en el 99,9 %); `con.tiemod` **no** sirve de proxy de
+la antigüedad del estado (la firma no lo mueve en el 85 % de los comparativos) y
+es una fecha de Delphi que SQL Server lee con dos días de más; el acceptance 3
+ya lo responde `compras.comparativos` de F-038.
+
+**Decisiones abiertas para el humano** (recomendación en negrita; detalle en
+`progress/spec_F-067.md` §4):
+
+- **D1** una entrega o dos → **una**, con la foto primero (la historia cuenta
+  desde el despliegue); si dos, Fase 1 = foto + contratos.
+- **D2** publicar `tiemod` como `fecha_ultima_modificacion` del contrato →
+  **sí, con su advertencia, y nunca como antigüedad del estado**.
+- **D3** código 2 y necesidad también en líneas de contrato y factura → **sí**.
+- **D4** «proveedores por actividad validada» (acceptance 4) a F-055 → **sí**;
+  si se aprueba, el líder ajusta el acceptance 4 de F-067 y el de F-055.
+
+**Aviso de herramienta**: `psycopg` directo al Postgres de Azure dio `connection
+timeout` (IP pública del puesto, probablemente fuera del firewall); lo de
+`raw` se midió en Sigrid y lo de `compras`/`descompuestos` por el MCP. Nada que
+bloquee la spec.
+
+### Implementer (2026-10-06) · IMPLEMENTADA, pendiente de REVIEW · D1 una entrega, D2-D4 según recomendación
+
+Precondición: `bash harness/init.sh` en verde al empezar (6795 passed, 227
+skipped, 18 min). Tarea en curso y decisiones, abajo; informe final en
+`progress/impl_F-067.md`.
+
+- [x] T1 dominio (`domain/historial_estados.py`, 45 tests). Decisión: además
+  de lo del design §4, `ResumenFoto`/`resumir_foto` como oráculo de los
+  contadores de `historial_estados_fotos` (R8): altas = tramos abiertos en la
+  foto − cambios.
+- [x] T2 `compras.fn_sigrid_tiempo` (+ ficha). [x] T3 las dos tablas
+  persistentes y el `DO` de la foto (+ fichas). [x] T4 `v_estado_documentos`
+  (+ ficha). Desviación de orden, justificada: la ficha de cada objeto entra en
+  el commit que lo crea (la puerta de cobertura exige ficha o pendiente); T11
+  queda para `contratos`, `comparativos` y `00_global.yaml`.
+
+- [x] T5 cinco columnas al final de `compras.contratos` (+ fichas de columna).
+
+- [x] T6 sub-paso `11` (y, en un commit aparte, las listas de
+  `test_f073_pipeline`/`test_f080_pipeline`, que se quedaron rojas en T6).
+- [x] T7 código 2 y necesidad al final de las tres tablas de líneas (D3) +
+  fichas de columna; `HASH_01_DOCUMENTOS` de `test_f073_sql` recalculado (el
+  guardián lo pedía: «si cambia es porque lo toca F-067»; estaba rojo desde
+  T5). `test_f006_punteros` queda rojo hasta T8: las fichas citan
+  `compras.necesidades`.
+
+- [x] T8 `compras.necesidades` (`10_necesidades.sql`) + sub-paso `10` +
+  ficha y relaciones de R25 (la de `v_pbi_planif_jo.dncpro_id` es `N:N`: la
+  clave de la vista es `(obra_id, partida_id, orden)`, lo exige el validador).
+
+- [x] T9 `necesidad_id` al final de `v_pbi_planif_jo` y
+  `v_pbi_master_planif_jo` (subconsulta escalar a `raw.dncpro`). Desviación
+  justificada: `test_f120_r18` exigía `factor` como ÚLTIMA columna de esas
+  vistas, en contra de R20; se ajusta a «`factor` es la última de las de
+  F-120» (D8 protege justo esto: columnas nuevas al final). `git diff main
+  --stat -- sql/descompuestos/` = solo `06_views.sql`.
+
+- [x] T10 «código 2» en `descompuestos` (R23) y `tests/test_f067_diccionario.py`
+  (R22-R25, R28). Las fichas de `compras` de R22/R24/R25 entraron en T7/T8.
+
+- [x] T11 ficha de `contratos` (R14-R16: ya no dice «no se puede saber»,
+  remite a la vista, penalización), `comparativos` (R26), `00_global.yaml`
+  v44 con P23 (parcial, F-067) y P24-P26. Ajustados los recuentos que fijan
+  `test_f006_reglas` (26 preguntas: 21/3/2) y `test_f038_r24` (`>= 43`).
+
+- [x] T12 `docs/ARCHITECTURE.md`. [x] T13 `azure-apps/datamart_seg_anual.md`,
+  commit propio en ese repositorio (rama `master`, sin push).
+- [x] T14 mutación. `harness.mutacion` sobre `d088327` (50 mutantes, 4
+  workers, `--timeout 1800`: con el suelo de 120 s la línea base no cabía en
+  600 s con 4 workers): 44 muertos, 5 supervivientes y 1 timeout, cerrados con
+  dos tests nuevos y una simplificación (`d698881`) y re-verificados con el
+  mismo generador (45/45 muertos). SQL a mano: 40/40 sobre `cc8113a`.
+  Detalle en `progress/mutacion_F-067.md`.
+- [x] T15 `bash harness/init.sh` en verde: 6976 passed, cobertura de líneas
+  cambiadas 100 % (66/66), impl dentro del tope.
+
+**MANUAL del humano, EN ORDEN (copia de `progress/impl_F-067.md` §6, con su
+comando y lo que debe salir)**:
+
+1. **T16** Merge a `main`; imagen y job:
+   `powershell -NoProfile -File infra/70_build_image.ps1`;
+   `powershell -NoProfile -File infra/85_update_job.ps1 -Tag rYYYYMMDD-HHmm`;
+   `az containerapp job show -g rg-datamart-seg-dev -n caj-datamart-seg-dev
+   --query "properties.template.containers[0].image" -o tsv` → el tag nuevo.
+2. **T17** Dejar correr la nocturna (00:00 UTC): toma la LÍNEA BASE de la foto
+   y publica el diccionario v44. `python main.py status` → `run-all` SUCCESS;
+   `python main.py timings --last 1` → `build_compras` < +1 min sobre la noche
+   anterior.
+3. **T18** (solo lectura) `python main.py check-declarados`, `python main.py
+   check-unicidad`, `python main.py check-relaciones` y `python main.py
+   check-diccionario` → los cuatro con código 0.
+4. **T19** (solo lectura), resultado en este fichero; desviación > 5 %: parar
+   y avisar:
+   - `SELECT * FROM compras.historial_estados_fotos;` → una fila,
+     `es_linea_base` verdadero, `n_documentos` ≈ 185.800.
+   - `SELECT count(*), count(codigo_alternativo), count(necesidad_linea_id)
+     FROM compras.albaran_lineas;` → ≈ 1.163.000 / 357.000 / 378.000.
+   - `SELECT count(*) FROM compras.necesidades;` → ≈ 277.
+   - `SELECT count(retencion_garantia_porcentaje), count(forma_pago_id) FROM
+     compras.contratos;` → ≈ 6.330 / 19.070.
+5. **T20** (solo lectura, segunda noche) `SELECT observado_en, n_cambios,
+   n_altas, n_desaparecidos FROM compras.historial_estados_fotos ORDER BY 1;`
+   → dos filas; cambios del orden de decenas a cientos (no miles).
+6. **T21** Reiniciar el MCP (cachea el diccionario) y hacerle, sin explicarle
+   nada, P23-P26 y el caso de Juan → las respuestas usan
+   `compras.v_estado_documentos`, `compras.comparativos` y
+   `compras.albaran_lineas`; P23 dice que la antigüedad es un mínimo que
+   empieza el día del despliegue; `AC26/28510` de MOMOSA muestra
+   `codigo_alternativo = 'MOMOSA'` en líneas sin contrato.
+7. **T22** Correo a Compras y a Juan Romero: qué se responde ya, que «más de
+   tres semanas» es cierto desde el día 21 tras el despliegue, que la
+   penalización no es un campo (¿dónde la escriben?) y que «actividad
+   validada» no existe en Sigrid (D4, F-055) → correo enviado, anotado aquí.
+8. **T23** (solo lectura, a los 21 días) `SELECT count(*), count(*) FILTER
+   (WHERE c.fecha_ultima_modificacion >= h.desde - interval '1 day') FROM
+   compras.historial_estados h JOIN compras.contratos c ON c.contrato_id =
+   h.documento_id WHERE NOT h.es_linea_base;` → resultado aquí; P23 pasa a
+   `respondible` en el `00_global.yaml` siguiente.
+
+**Diccionario del árbol tras F-067 (en curso): 204 objetos, 1589 columnas, 96
+de consumo.**
+
+
 ## 2026-10-05 · F-038 · CERRADA (`done`): Fase 1 APROBADA y DESPLEGADA; Fase 2 APROBADA en pasada 2, SIN DESPLEGAR · el comparativo de ofertas
 
 > **Cerrada el 2026-10-05.** Fase 2 APROBADA por el reviewer en la pasada 2
@@ -25,6 +162,14 @@
 > (lo pidió el humano)**: comprobar que `build_compras` y `publicar_diccionario`
 > salieron SUCCESS (v43), `check-diccionario` OK, REINICIAR EL MCP y la T25 (la
 > 0696) y las cifras de D4 en solo lectura.
+>
+> **HECHO por el líder el 2026-10-06 ~07:20 UTC.** Nocturna del 06-10: `build_compras`
+> SUCCESS (02:55-03:07, 3.961.918 filas) y `publicar_diccionario` **v43** (04:21,
+> 199 objetos). MCP reiniciado (`--0000014`), sirve la v43. Cifras (MCP, solo
+> lectura): casan 24.431 (11.409 con la ABC), no casan 59.588, sin descompuesto 89;
+> 66.535 firmas; 11.403 objetivos: lo medido el 05-10 más los datos de un día.
+> `check-diccionario` NO se pudo pasar: el puesto no llega al Postgres (timeout,
+> IP fuera del firewall); queda para cuando el humano añada la regla.
 
 ### Antes
 

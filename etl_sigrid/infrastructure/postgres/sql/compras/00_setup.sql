@@ -152,3 +152,24 @@ LANGUAGE sql IMMUTABLE AS $$
         WHEN t ~ '^-?[0-9]+(,[0-9]+)?%$' THEN replace(replace(t, '%', ''), ',', '.')::NUMERIC
     END;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- F-067 (2026-10-06) · LA FECHA SERIE DE SIGRID, CON SU HORA (`con.tiemod`).
+--
+-- `tiemod` es un número de DELPHI: días desde 1899-12-30 y la hora en la parte
+-- decimal (46300,537627 = 2026-10-05 12:54:10). OJO, MEDIDO: SQL Server, con
+-- `CAST(... AS datetime)`, usa la época 1900-01-01 y da DOS DÍAS MÁS —el
+-- 2026-10-07, imposible el día de la medición—. La época es `EPOCA_DELPHI` de
+-- `etl_sigrid/domain/historial_estados.py` (lo fija `tests/test_f067_sql.py`).
+-- El 0 de Sigrid es NULL. Es la misma época que `personal.fn_fecha_serie`
+-- (F-101), que descarta la hora; esta la conserva.
+--
+-- `con.tiemod` NO ES LA FECHA DEL CAMBIO DE ESTADO (D2 del humano): es la
+-- última modificación del documento, y la firma no la mueve. La antigüedad del
+-- estado sale de la foto diaria (`11_historial_estados.sql`).
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION compras.fn_sigrid_tiempo(v DOUBLE PRECISION)
+RETURNS TIMESTAMP
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE WHEN v > 0 THEN TIMESTAMP '1899-12-30' + v * INTERVAL '1 day' END;
+$$;

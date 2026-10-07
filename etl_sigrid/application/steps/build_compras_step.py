@@ -13,6 +13,8 @@ Encadena los archivos SQL en orden:
     07_texto.sql       - el memo de la pestaña «Texto», íntegro y partido
     08_comparativos.sql- el comparativo de ofertas y sus ofertas (F-038)
     09_comparativos_detalle.sql - sus líneas, el objetivo y las firmas (F-038)
+    10_necesidades.sql - el documento de necesidades de compra, el DPC (F-067)
+    11_historial_estados.sql - la FOTO DIARIA de estados (F-067), PERSISTENTE
 
 Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
 `build_maestros`, que corre antes en `run-all`). No necesita `stg` ni `mart`.
@@ -22,6 +24,14 @@ Lee de `raw.*` y, como `03_views.sql`, de `maestro.v_obra_fichas` (de
 corre DESPUÉS en `run-all` y este paso no lo declara en `depends_on` a
 propósito: lee el descompuesto de la noche anterior, y la primera ABC y el
 master 0 —las versiones que dan la base— están congeladas (F-038, design §1).
+
+`11` es distinto de todos los demás (F-067): sus dos tablas
+(`historial_estados` e `historial_estados_fotos`) NO se reconstruyen. Son la
+historia de estados de contratos y facturas, que no existe en Sigrid; el SQL
+las crea con `CREATE TABLE IF NOT EXISTS`, nunca las borra ni las vacía, y
+cada noche les añade la foto de la ingesta. Va el último porque no depende de
+nada del esquema; si un sub-paso anterior falla, esa noche no hay foto y se ve
+en `historial_estados_fotos` (un hueco), no se pierde lo ya guardado.
 
 POR QUÉ EXISTE ESTE FICHERO (F-047, absorbe F-044). `build-compras` ejecutaba
 su SQL **en línea dentro del comando**, sin step, y por eso **no dejaba fila en
@@ -54,7 +64,7 @@ class _SubStep:
     target_table: str | None = None
 
 
-#: Los diez ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
+#: Los ficheros SQL, EN ORDEN, y de qué tabla se cuentan filas.
 #:
 #: Vive fuera de `run()` a propósito: es DATO, no lógica. Así se puede leer sin
 #: entrar en el bucle y —lo que lo motivó— se puede sustituir en un test para
@@ -78,7 +88,8 @@ SUB_PASOS: tuple[_SubStep, ...] = (
     _SubStep(name="views", sql_file="03_views.sql"),
     # F-073: la dimensión de formas de pago. Ya NO es la última y ya la lee
     # alguien: F-080 la cablea a la factura en `06_pago_factura.sql`, que va
-    # detrás por eso. El cableado a `compras.contratos` sigue siendo de F-067.
+    # detrás por eso. El cableado a `compras.contratos` lo hizo F-067 en `01`,
+    # leyendo `raw.auxpag` porque esta dimensión se construye después.
     _SubStep(
         name="formas_pago",
         sql_file="04_formas_pago.sql",
@@ -135,6 +146,26 @@ SUB_PASOS: tuple[_SubStep, ...] = (
         sql_file="09_comparativos_detalle.sql",
         target_schema="compras",
         target_table="comparativo_oferta_lineas",
+    ),
+    # F-067 (con F-125): el documento de necesidades de compra (DPC) de cada
+    # obra. Solo lee `raw`; cuenta su única tabla (~277 filas).
+    _SubStep(
+        name="necesidades",
+        sql_file="10_necesidades.sql",
+        target_schema="compras",
+        target_table="necesidades",
+    ),
+    # F-067: la foto diaria de estados. El ÚLTIMO a propósito: no lee nada de
+    # `compras` (solo `raw.con` y sus dos tablas), y sus tablas no se
+    # reconstruyen. Cuenta `historial_estados`, los tramos: crecen cada noche
+    # con los cambios y nunca bajan; si un día bajaran, alguien las ha borrado.
+    # Si la guarda del 98 % salta (ingesta a medias), el paso falla con el
+    # nombre de este sub-paso y la foto no se toma.
+    _SubStep(
+        name="historial_estados",
+        sql_file="11_historial_estados.sql",
+        target_schema="compras",
+        target_table="historial_estados",
     ),
 )
 

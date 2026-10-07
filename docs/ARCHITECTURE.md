@@ -297,6 +297,43 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     descompuesto de la noche anterior (la primera ABC y el master 0 están
     congelados). Regla D4: la primera ABC si casa; si no, la versión anterior
     más reciente que case; nunca una posterior; sin ABC, solo Estudios.
+- **LA FECHA DEL CAMBIO DE ESTADO NO EXISTE EN SIGRID: LA DA UNA FOTO DIARIA
+  QUE NO SE RECONSTRUYE (F-067).** `concam` no audita `con.est` y `confir` no
+  tiene firmas de contrato, así que `sql/compras/11_historial_estados.sql`
+  toma cada noche una foto de `con.est` de contratos (tip 44) y facturas (15)
+  y la guarda **por tramos** (documento, estado, `desde`, `hasta`): la foto de
+  un día D es `desde <= D < COALESCE(hasta, ∞)`. Unos 186.000 tramos de línea
+  base y < 50.000 filas al año, frente a 68 M al año de una fila por documento
+  y día. Lo que cambia en la arquitectura:
+  - **`compras.historial_estados` e `historial_estados_fotos` son las dos
+    primeras tablas PERSISTENTES de `compras`.** Se crean con `CREATE TABLE IF
+    NOT EXISTS` y el fichero no tiene ni `DROP`, ni `TRUNCATE`, ni `DELETE`
+    (test). El resto de `compras` se rehace con `DROP ... CASCADE` y no las
+    toca porque no dependen de nada del esquema; `--full` solo trunca `raw`.
+    **Si alguien las borra, la historia se pierde**: no hay copia en Sigrid, y
+    vuelve a empezar desde una línea base nueva. Por eso `python main.py
+    reset-compras` (decisión del 2026-10-06) ya no tira el esquema: borra sus
+    vistas, tablas y funciones y CONSERVA estas dos (un test veta cualquier
+    borrado del esquema `compras` entero en el código del repositorio).
+  - **Guardas**: sin `raw.con` más nuevo que la última foto no se escribe nada
+    (relanzar el build es inocuo); si los documentos presentes son menos del
+    98 % de los tramos abiertos, `RAISE EXCEPTION` y el build falla sin
+    escribir (una ingesta a medias cerraría miles de tramos como
+    DESAPARECIDOS). La regla vive en `domain/historial_estados.py` y el SQL
+    lleva sus literales (test).
+  - **Una noche perdida no se recupera**: si `build_compras` falla, el cambio
+    de esos días se ve con dos noches de ventana (`observado_antes`), y el hueco
+    queda en `historial_estados_fotos`. La historia empieza el día del
+    despliegue; la primera foto es la línea base y su antigüedad es un mínimo.
+  - **`con.tiemod` es una fecha de Delphi** (días desde 1899-12-30, hora en la
+    parte decimal; `compras.fn_sigrid_tiempo`). SQL Server la lee con época
+    1900-01-01 y da dos días más. Se publica como
+    `contratos.fecha_ultima_modificacion` y **no** es la fecha del cambio de
+    estado: la firma no la mueve.
+  - **El código 2 y la necesidad** (`cod2`, `dncide`, `dncproide`) van al final
+    de las tres tablas de líneas; `compras.necesidades` es el DPC de la obra.
+    En `descompuestos`, `necesidad_id` entra solo en dos VISTAS, por
+    subconsulta a `raw.dncpro`: tocar `lineas` o el sello retrocearía el master.
 
 ## Acceso a datos
 

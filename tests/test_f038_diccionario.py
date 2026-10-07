@@ -239,8 +239,9 @@ def test_f038_r22_albaranes_comparativo_id_ya_no_dice_no_modelado() -> None:
 
 
 def test_f038_r24_la_version_sube() -> None:
-    """42 con la Fase 1 (publicada el 2026-10-05); 43 con la Fase 2 (T17)."""
-    assert _global()["version"] == 43
+    """42 con la Fase 1 (publicada el 2026-10-05); 43 con la Fase 2 (T17).
+    Despues solo puede subir: F-067 la lleva a 44 (2026-10-06)."""
+    assert _global()["version"] >= 43
 
 
 def test_f038_r24_p5_pasa_a_respondible() -> None:

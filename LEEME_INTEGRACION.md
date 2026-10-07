@@ -18,7 +18,7 @@ build-cierre, build-maestros, inspect-todo*, find-obra, etc. — CERO perdidos).
 Añadidos 5 al final, antes del if __name__:
 
     build-compras                  construye el schema compras (4 SQL)
-    reset-compras                  DROP SCHEMA compras
+    reset-compras                  vacía compras SALVO la historia de estados (F-067)
     inspect-contrato-consumo       --codigo / --obra / --umbral 90
     inspect-proveedores-obra       --obra 0707 [--anio 2026]
     inspect-albaranes-sin-facturar [--obra] [--proveedor]

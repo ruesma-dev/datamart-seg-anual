@@ -208,8 +208,7 @@ objetos:
       `importe_contrato`, que no existe. El importe comprometido esta en
       `compras.v_pbi_contrato_consumo.importe_contratado`.
 
-      **LO QUE SE PUEDE Y LO QUE NO SE PUEDE RESPONDER CON EL ESTADO (F-084,
-      2026-09-16). Las dos mitades importan, y la segunda mas.**
+      **EL ESTADO (F-084, 2026-09-16) Y SU ANTIGUEDAD (F-067, 2026-10-06).**
 
       **SI se puede: en que estado esta cada contrato.** Desde F-084 esta
       tabla publica `estado`, `estado_codigo` y `estado_id`. «Que contratos
@@ -217,16 +216,24 @@ objetos:
       `estado_codigo = 'EPF'`: son **818**, de **567 proveedores** y **241
       obras**, medido el 2026-09-16.
 
-      **NO se puede: cuanto lleva un contrato en ese estado.** El datamart no
-      guarda cuando cambio el estado —no hay foto diaria, la traera F-067— y
-      en el origen la unica aproximacion es `con.tiemod`, la ultima
-      modificacion del DOCUMENTO, que **no es la fecha del cambio de estado**:
-      a un contrato enviado en 2019 al que se le tocara una linea ayer
-      `con.tiemod` le da un dia. Ademas `con.tiemod` **no esta publicado en
-      esta tabla ni en ninguna otra del datamart**: vive en `raw`, que el MCP
-      no consulta. Asi que a «cuantos llevan mas de tres semanas enviados» la
-      respuesta correcta hoy es **no se puede saber**, acompanada de los 818
-      que estan en «Enviado»; cualquier numero de dias que se de sera falso.
+      **Y CUANTO LLEVA EN ESE ESTADO, desde F-067: en
+      `compras.v_estado_documentos`**, no aqui. Sigrid no guarda cuando cambio
+      el estado, asi que el datamart toma una FOTO DIARIA de estados desde el
+      dia del despliegue de F-067 (`compras.historial_estados`). La
+      antiguedad de lo que ya estaba en su estado ese dia es un MINIMO, y
+      «mas de tres semanas enviado» es una respuesta cierta en cuanto ese
+      minimo supera 21 dias; la vista lo explica. **NO uses
+      `fecha_ultima_modificacion` (`con.tiemod`) para la antiguedad: NO es la
+      fecha del cambio de estado**, es la ultima modificacion del documento,
+      y la firma no la mueve.
+
+      **LAS CONDICIONES (F-067)**: forma de pago (`forma_pago_id`,
+      `forma_pago`) y retencion de garantia (`retencion_garantia_porcentaje`,
+      `retencion_garantia_concepto`). **La penalizacion no es un campo de
+      Sigrid**: el contrato no la tiene en ninguna columna, y solo aparece
+      escrita en el texto libre del contrato (`compras.documento_texto`, en 9
+      contratos de los 1.624 con texto, medido el 2026-10-06). Para buscarla
+      hay que leer ese texto; Compras tiene pendiente decir donde la anota.
 
       **Y NO LO BUSQUES EN EL CIRCUITO DE FIRMA: para el contrato esta vacio.**
       Parece la via natural —«enviado sin firmar» suena a firmas— y no lo es:
@@ -330,6 +337,52 @@ objetos:
         nulo_significa: >-
           Igual que en `estado_codigo`: el estado no casa con el catalogo del
           tipo 44. Hoy, ningun contrato.
+      forma_pago_id:
+        significado: >-
+          Forma de pago pactada en el contrato (`ctr.pagide`, F-067), el
+          identificador de `compras.formas_pago`: alli estan su plazo y su
+          medio de pago. Informada en 19.072 de 19.081 contratos (2026-10-06).
+        agregacion: no_sumable
+        nulo_significa: El contrato no tiene forma de pago informada en Sigrid.
+      forma_pago:
+        significado: >-
+          Nombre de la forma de pago del contrato (`auxpag.res`), que suele
+          llevar el plazo dentro: "CONFIRMING CH 60 dias". Para el medio de
+          pago, une `forma_pago_id` con `compras.formas_pago`.
+        nulo_significa: >-
+          El contrato no tiene forma de pago, o la que tiene no esta en el
+          catalogo.
+      retencion_garantia_porcentaje:
+        significado: >-
+          Porcentaje de RETENCION DE GARANTIA del contrato, en tanto por cien
+          (5 es un 5 %), del recargo del contrato (`ctrrec`) cuyo concepto
+          tiene codigo `RET...`: 6.333 contratos, casi todos al 5 %. Si hubiera
+          dos, el de menor posicion (hoy un solo contrato). No es la retencion
+          ya practicada en dinero, que esta en el esquema `retenciones`.
+        unidad: "%"
+        agregacion: no_sumable
+        nulo_significa: >-
+          El contrato no lleva retencion de garantia (no tiene concepto `RET`
+          entre sus recargos). Los demas conceptos (IRPF, sin codigo) no son
+          retencion de garantia.
+      retencion_garantia_concepto:
+        significado: >-
+          Nombre del concepto de la retencion de garantia, por ejemplo
+          «Retención garantía 5 % (sobre base imponible)»: dice sobre que base
+          se calcula.
+        nulo_significa: El contrato no lleva retencion de garantia.
+      fecha_ultima_modificacion:
+        significado: >-
+          Fecha y hora de la ULTIMA MODIFICACION del contrato en Sigrid
+          (`con.tiemod`, fecha serie de Delphi convertida por
+          `compras.fn_sigrid_tiempo`). **NO es la fecha del cambio de estado**
+          (D2 del humano, F-067): cualquier edicion la mueve y la firma NO la
+          mueve; medido el 2026-10-06, en el 85 % de los comparativos firmados
+          la ultima firma es posterior a esta fecha. Asi que no sirve ni como
+          cota de cuando cambio el estado. La antiguedad del estado esta en
+          `compras.v_estado_documentos`.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no tiene fecha de modificacion para el contrato.
     relaciones:
       - de: contrato_id
         a: compras.contrato_lineas.contrato_id
@@ -352,9 +405,10 @@ objetos:
       - Que contratos estan enviados y sin firmar
       - Cuantos contratos hay en cada estado, y cuantos sin firmar todavia
       - >-
-        Que contratos llevan mas de tres semanas enviados sin firmar (OJO: los
-        ENVIADOS si se pueden listar, el «mas de tres semanas» NO: ver la
-        descripcion de la tabla)
+        Que contratos llevan mas de tres semanas enviados sin firmar (con
+        `compras.v_estado_documentos`: la antiguedad cuenta desde el despliegue
+        de la foto diaria)
+      - Que forma de pago y que retencion de garantia tiene el contrato C
 
   contrato_lineas:
     tipo: tabla
@@ -420,6 +474,31 @@ objetos:
           Cuanta de la cantidad contratada se ha entregado ya. Es el avance del
           contrato en unidades fisicas, no en dinero.
         agregacion: suma
+      codigo_alternativo:
+        significado: >-
+          El «CODIGO 2» de la linea (`ctrpro.cod2`, rotulado «Codigo
+          alternativo» en Sigrid; F-067). Lo pone el JEFE DE OBRA para agrupar
+          o filtrar sus compras en el documento de planificacion de compras
+          (DPC) y viaja de la linea de necesidad a la linea de compra: igual en
+          el 99,9 % de las 295.210 lineas de albaran enlazadas a una necesidad.
+          Tambien se teclea a mano sin necesidad. Es TEXTO LIBRE sin
+          normalizar (`HORMIGON`, `HORM`, `HORM.`...): agrupar por el exige
+          mirar antes sus valores. Informado en 151.082 de 246.103 lineas de contrato (61,4 %, 2026-10-06).
+        nulo_significa: La linea no lleva codigo 2 (vacio en Sigrid).
+      necesidad_id:
+        significado: >-
+          El documento de NECESIDADES de compra (el DPC de la obra,
+          `compras.necesidades`) del que sale la linea, por el enlace DIRECTO
+          `ctrpro.dncide`. Se publica igual que en albaranes y facturas (D3).
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una necesidad de compra.
+      necesidad_linea_id:
+        significado: >-
+          La LINEA de necesidad (`ctrpro.dncproide`, `raw.dncpro`) de la que
+          sale la linea: la misma `dncpro_id` de
+          `descompuestos.v_pbi_planif_jo`, la planificacion del jefe de obra.
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una linea de necesidad.
     relaciones:
       - de: contrato_id
         a: compras.contratos.contrato_id
@@ -590,6 +669,31 @@ objetos:
           sobrefacturacion, no un cero.
         unidad: EUR
         agregacion: suma
+      codigo_alternativo:
+        significado: >-
+          El «CODIGO 2» de la linea (`dcapro.cod2`, rotulado «Codigo
+          alternativo» en Sigrid; F-067). Lo pone el JEFE DE OBRA para agrupar
+          o filtrar sus compras en el documento de planificacion de compras
+          (DPC) y viaja de la linea de necesidad a la linea de compra: igual en
+          el 99,9 % de las 295.210 lineas de albaran enlazadas a una necesidad.
+          Tambien se teclea a mano sin necesidad. Es TEXTO LIBRE sin
+          normalizar (`HORMIGON`, `HORM`, `HORM.`...): agrupar por el exige
+          mirar antes sus valores. Informado en 357.349 de 1.162.871 lineas de albaran (30,7 %), y en 2026 en el 41,6 %.
+        nulo_significa: La linea no lleva codigo 2 (vacio en Sigrid).
+      necesidad_id:
+        significado: >-
+          El documento de NECESIDADES de compra (el DPC de la obra,
+          `compras.necesidades`) del que sale la linea, por el enlace DIRECTO
+          `dcapro.dncide`. Medido el 2026-10-06: 378.010 de 1.162.871 lineas (32,5 %), las que vienen de contrato en el 85,6 % y las que no en el 5,1 % (el «6 %» de Negocio).
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una necesidad de compra.
+      necesidad_linea_id:
+        significado: >-
+          La LINEA de necesidad (`dcapro.dncproide`, `raw.dncpro`) de la que
+          sale la linea: la misma `dncpro_id` de
+          `descompuestos.v_pbi_planif_jo`, la planificacion del jefe de obra.
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una linea de necesidad.
     relaciones:
       - de: albaran_id
         a: compras.albaranes.albaran_id
@@ -605,7 +709,25 @@ objetos:
         cardinalidad: "N:1"
         porque: >-
           Para el nombre, el cliente, la empresa y la clave de la obra. Por aqui salen tambien la empresa y la `clave_obra` de la ficha (F-102). `maestro.obras.obra_principal_id` no sirve para agregar hechos de otras empresas: cada documento se queda con la ficha de SU empresa, y sumar por la ficha de Ruesma meteria lo de la UTE en la obra de Ruesma, que no se consolida.
+      - de: necesidad_id
+        a: compras.necesidades.necesidad_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el documento de necesidades (el DPC de la obra) del que sale la
+          linea. Cubre el 32,5 % de las lineas de albaran: el resto no viene de
+          una necesidad.
+      - de: necesidad_linea_id
+        a: descompuestos.v_pbi_planif_jo.dncpro_id
+        cardinalidad: "N:N"
+        porque: >-
+          Para la linea de la planificacion de compras del jefe de obra de la
+          que sale la entrega: lo planificado (cantidad, precio, fecha maxima)
+          frente a lo entregado, y el codigo 2 de origen. N:N porque la clave
+          de la vista no es `dncpro_id`: agrega cada lado por esa linea de
+          necesidad antes de unir, o los importes se duplican.
     ejemplos_preguntas:
+      - Que hemos recibido con codigo 2 MOMOSA en la obra X
+      - Que lineas de albaran vienen de la planificacion de compras del jefe de obra
       - Que tenemos entregado y sin facturar en la obra X
 
   facturas:
@@ -844,6 +966,31 @@ objetos:
         significado: Contrato que se factura directamente, sin albaran de por medio.
         nulo_significa: La linea no se factura directamente contra un contrato.
         agregacion: no_sumable
+      codigo_alternativo:
+        significado: >-
+          El «CODIGO 2» de la linea (`dcfpro.cod2`, rotulado «Codigo
+          alternativo» en Sigrid; F-067). Lo pone el JEFE DE OBRA para agrupar
+          o filtrar sus compras en el documento de planificacion de compras
+          (DPC) y viaja de la linea de necesidad a la linea de compra: igual en
+          el 99,9 % de las 295.210 lineas de albaran enlazadas a una necesidad.
+          Tambien se teclea a mano sin necesidad. Es TEXTO LIBRE sin
+          normalizar (`HORMIGON`, `HORM`, `HORM.`...): agrupar por el exige
+          mirar antes sus valores. Informado en 262.579 de 1.099.136 lineas de factura (23,9 %, 2026-10-06). Para «gasto por codigo 2» es esta tabla, filtrando FACTURA y ABONO en la cabecera.
+        nulo_significa: La linea no lleva codigo 2 (vacio en Sigrid).
+      necesidad_id:
+        significado: >-
+          El documento de NECESIDADES de compra (el DPC de la obra,
+          `compras.necesidades`) del que sale la linea, por el enlace DIRECTO
+          `dcfpro.dncide`. Se publica igual que en albaranes y contratos (D3).
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una necesidad de compra.
+      necesidad_linea_id:
+        significado: >-
+          La LINEA de necesidad (`dcfpro.dncproide`, `raw.dncpro`) de la que
+          sale la linea: la misma `dncpro_id` de
+          `descompuestos.v_pbi_planif_jo`, la planificacion del jefe de obra.
+        agregacion: no_sumable
+        nulo_significa: La linea no viene de una linea de necesidad.
     relaciones:
       - de: factura_id
         a: compras.facturas.factura_id
@@ -1547,6 +1694,31 @@ objetos:
       fecha de verdad, tratando el 0 como ausencia de fecha y no como el ano 0.
       Es la conversion que hace que a partir de `compras` las fechas ya sean
       comparables.
+    grano: null
+    clave_negocio: []
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas: {}
+    relaciones: []
+    ejemplos_preguntas: []
+
+  fn_sigrid_tiempo:
+    tipo: funcion
+    capa: operacion
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Funcion auxiliar del build de compras. La tabla que la usa ya publica la
+      fecha convertida (`compras.contratos.fecha_ultima_modificacion`): no hay
+      que llamarla para consultar.
+    descripcion: >-
+      Convierte una FECHA SERIE de Sigrid —como `con.tiemod`, la ultima
+      modificacion del documento— en fecha y hora: dias desde el 1899-12-30
+      (la epoca de Delphi) con la hora en la parte decimal; 46300,537627 es el
+      2026-10-05 a las 12:54:10. El 0 sale NULL. **Trampa medida el
+      2026-10-06**: SQL Server convierte el mismo numero con la epoca
+      1900-01-01 y da DOS DIAS MAS; la buena es esta. Y `con.tiemod` NO es la
+      fecha del cambio de estado: la antiguedad del estado esta en
+      `compras.v_estado_documentos` (F-067).
     grano: null
     clave_negocio: []
     paso_etl: build_compras
@@ -2328,6 +2500,18 @@ objetos:
       118 coincidencias que parecen un join--; y `log.res` NO es la actividad,
       es el NOMBRE del comparativo. La actividad es `actividad`, de
       `com.natide`.
+
+      **POR ACTIVIDAD Y POR ADJUDICATARIO (F-067, acceptance 3 del correo de
+      Compras)**: las dos preguntas se responden aqui, sin otro objeto.
+      «Comparativos por actividad»: agrupar por `actividad`
+      (`actividad_id` informado en el 99,2 %). «Proveedores adjudicatarios con
+      comparativos de distintas actividades»: agrupar por
+      `proveedor_ganador_id` (ganadora unica en el 87,7 %) y contar
+      actividades distintas; medido el 2026-10-06, 1.535 de 4.188 proveedores
+      ganadores tienen comparativos de mas de una actividad. **Ojo**: 877
+      comparativos tienen contrato y NO tienen ganadora unica; su proveedor
+      sale del contrato, por `contrato_id`, y no de `proveedor_ganador_id`.
+      Las actividades «validadas» del proveedor no existen en Sigrid (F-055).
     grano: >-
       Una fila por comparativo de `raw.com` (20.378 el 2026-10-04), incluidos
       los que no tienen ofertas (319), lineas (264) o firmas.
@@ -2567,6 +2751,7 @@ objetos:
         cardinalidad: "N:1"
         porque: Para el nombre, la empresa y el cliente de la obra.
     ejemplos_preguntas:
+      - Que proveedores ganan comparativos de mas de una actividad
       - Cuantos comparativos hay por actividad
       - Cuanto se ahorro en los concursos de la obra X
       - Quien aprobo el comparativo X y cuando
@@ -3178,3 +3363,342 @@ objetos:
     columnas: {}
     relaciones: []
     ejemplos_preguntas: []
+
+  historial_estados:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      La FOTO DIARIA de estados de contratos (tipo 44) y facturas (tipo 15),
+      guardada POR TRAMOS: cada fila dice que un documento estuvo en un estado
+      desde una foto hasta otra (F-067). Es lo unico del datamart que sabe
+      CUANDO cambio de estado un documento, porque en Sigrid esa fecha NO
+      EXISTE: `concam` no audita el estado y `confir` no tiene firmas de
+      contrato. **ES HISTORIA QUE NO SE RECONSTRUYE**: el resto de `compras` se
+      rehace cada noche y esta tabla no; si se borrara, la historia volveria a
+      empezar de cero, porque no hay copia en Sigrid. Tampoco la borra `python
+      main.py reset-compras`, que vacia el resto del esquema y la conserva. **LA HISTORIA EMPIEZA EL
+      DIA DEL DESPLIEGUE** de F-067: lo anterior no esta. La primera foto es la
+      LINEA BASE (`es_linea_base`): «ya estaba en ese estado; desde cuando, no
+      se sabe». **La foto de un dia D** se reconstruye con `desde <= D AND (hasta
+      IS NULL OR hasta > D)`. Para el estado ACTUAL y los dias que lleva, usa
+      `compras.v_estado_documentos`, que ya hace la cuenta. Y NO uses
+      `compras.contratos.fecha_ultima_modificacion` como fecha del cambio de
+      estado: es la ultima modificacion del documento, que la firma no mueve.
+    grano: >-
+      Una fila por TRAMO: un documento en un estado entre dos fotos. Clave
+      `(documento_id, desde)`. Como mucho UN tramo abierto (`hasta` NULL) por
+      documento, y lo garantiza un indice unico parcial.
+    clave_negocio: [documento_id, desde]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: >-
+          El documento de Sigrid (`con.ide`): un `contrato_id` de
+          `compras.contratos` si `tipo_documento_codigo` es 44 y un
+          `factura_id` de `compras.facturas` si es 15.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: >-
+          Tipo de documento de Sigrid (`con.tip`): 44 contrato, 15 factura. Solo
+          esos dos; el comparativo no esta porque sus firmas ya tienen fecha.
+        agregacion: no_sumable
+        valores: [44, 15]
+      estado_id:
+        significado: >-
+          Codigo interno del estado (`con.est`), CRUDO: solo significa algo con
+          su tipo de documento. Traducido esta en `compras.v_estado_documentos`.
+        agregacion: no_sumable
+        nulo_significa: El documento no tenia estado en Sigrid en esa foto.
+      desde:
+        significado: >-
+          Primera foto que vio el documento en este estado. **El cambio ocurrio
+          entre `observado_antes` y `desde`, no a una hora exacta**: la foto es
+          diaria, con la ingesta de la noche.
+        agregacion: no_sumable
+      hasta:
+        significado: >-
+          Primera foto que ya no lo vio en este estado (por un cambio o porque
+          desaparecio de Sigrid).
+        agregacion: no_sumable
+        nulo_significa: Es el tramo VIGENTE, el documento sigue en ese estado.
+      observado_antes:
+        significado: >-
+          La foto anterior a `desde`: el cambio ocurrio despues de este
+          instante. Si la nocturna fallo una noche, la ventana es de dos dias.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Tramo de la LINEA BASE: el documento ya estaba en ese estado el dia
+          del despliegue y no se sabe desde cuando.
+      es_linea_base:
+        significado: >-
+          Verdadero en los tramos abiertos por la PRIMERA foto: su `desde` es el
+          dia del despliegue, no el del cambio, asi que la antiguedad que dan es
+          un MINIMO («lleva al menos N dias»).
+        agregacion: no_sumable
+      motivo_cierre:
+        significado: >-
+          Por que se cerro el tramo: CAMBIO (paso a otro estado, y hay un tramo
+          siguiente) o DESAPARECIDO (el documento ya no esta en Sigrid).
+        valores: [CAMBIO, DESAPARECIDO]
+        nulo_significa: El tramo esta abierto, con `hasta` a NULL.
+    relaciones:
+      - de: documento_id
+        a: compras.v_estado_documentos.documento_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el estado actual traducido de un documento con historia. Los
+          desaparecidos no estan en la vista. Para ir a la cabecera, filtra
+          antes `tipo_documento_codigo` (44 a `compras.contratos.contrato_id`,
+          15 a `compras.facturas.factura_id`).
+    ejemplos_preguntas:
+      - Cuando cambio de estado la factura X y por que estados ha pasado
+      - Cuantos contratos han pasado a firmado esta semana
+      - En que estado estaba el contrato C el dia D
+
+  historial_estados_fotos:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      Una fila por cada FOTO DIARIA tomada de los estados de contratos y
+      facturas (F-067), con sus contadores. Sirve para dos cosas: saber DESDE
+      CUANDO hay historia (la primera fila, la linea base, es el dia del
+      despliegue) y si la historia tiene HUECOS (una noche sin fila es una
+      noche en que la foto no se tomo, y el cambio de esos dias se vio con dos
+      noches de ventana). **NO SE RECONSTRUYE**, como
+      `compras.historial_estados`, y `reset-compras` tambien la conserva.
+    grano: Una fila por foto tomada. Clave `observado_en`.
+    clave_negocio: [observado_en]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      observado_en:
+        significado: >-
+          El instante que retrata la foto: la ultima carga de `raw.con` de esa
+          noche. Es el `desde` de los tramos que abrio y el `hasta` de los que
+          cerro.
+        agregacion: no_sumable
+      tomada_en:
+        significado: >-
+          Cuando corrio el build que tomo la foto. Si va muy por detras de
+          `observado_en`, el build se relanzo a mano.
+        agregacion: no_sumable
+      es_linea_base:
+        significado: >-
+          Verdadero solo en la primera foto, la del despliegue: sus tramos no
+          saben desde cuando estaban en su estado.
+        agregacion: no_sumable
+      n_documentos:
+        significado: >-
+          Documentos de contrato y factura presentes en Sigrid esa noche (unos
+          185.800 el 2026-10-06), que es tambien los tramos vigentes tras la foto.
+        agregacion: no_sumable
+      n_cambios:
+        significado: >-
+          Documentos que cambiaron de estado desde la foto anterior. Del orden
+          de decenas a cientos por noche; miles es sospechoso.
+        agregacion: suma
+      n_altas:
+        significado: >-
+          Documentos nuevos (o que reaparecen) desde la foto anterior. En la
+          linea base son todos.
+        agregacion: suma
+      n_desaparecidos:
+        significado: >-
+          Documentos que ya no estan en Sigrid desde la foto anterior (borrados).
+          Una ingesta a medias no llega aqui: si faltara mas del 2 %, el build
+          falla y no toma la foto.
+        agregacion: suma
+    relaciones: []
+    ejemplos_preguntas:
+      - Desde cuando hay historia de estados de contratos y facturas
+      - Ha habido alguna noche sin foto de estados
+
+  v_estado_documentos:
+    tipo: vista
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El estado ACTUAL de cada contrato y cada factura y CUANTO LLEVA en el,
+      sacado de la foto diaria (`compras.historial_estados`, F-067). Es la
+      respuesta a «que contratos llevan mas de tres semanas enviados y sin
+      firmar»: `estado_codigo = 'EPF' AND tipo_documento = 'CONTRATO' AND
+      dias_en_estado > 21`. **LA HISTORIA EMPIEZA EL DIA DEL DESPLIEGUE**: lo
+      que estaba en su estado antes de la primera foto lleva
+      `antiguedad_es_minima` verdadero, y entonces `dias_en_estado` es un
+      MINIMO («lleva al menos N dias»), no la antiguedad exacta. **En cuanto
+      ese minimo supera 21, «mas de tres semanas» es una respuesta cierta**,
+      porque un minimo mayor que 21 ya es mas de tres semanas; por debajo, en la linea
+      base, no se sabe y hay que decirlo. **El cambio ocurrio entre
+      `cambio_observado_tras` y `en_estado_desde`**, no a una hora exacta: la
+      foto se toma una vez por noche. Los dias se calculan AL CONSULTAR, en
+      hora de Madrid; `ultima_foto` dice de cuando es la ultima foto, y si se
+      ha quedado atras la historia se ha parado. **NO uses
+      `compras.contratos.fecha_ultima_modificacion` (`con.tiemod`) para esto**:
+      es la ultima modificacion del documento y NO es la fecha del cambio de
+      estado (la firma no la mueve).
+    grano: >-
+      Una fila por documento de contrato o factura presente en la ultima foto:
+      su tramo abierto. Clave `documento_id`.
+    clave_negocio: [documento_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      documento_id:
+        significado: >-
+          El documento (`con.ide`): es el `contrato_id` de `compras.contratos`
+          o el `factura_id` de `compras.facturas`, segun `tipo_documento`.
+        agregacion: no_sumable
+      tipo_documento_codigo:
+        significado: Tipo de documento de Sigrid, 44 contrato o 15 factura.
+        agregacion: no_sumable
+        valores: [44, 15]
+      tipo_documento:
+        significado: >-
+          CONTRATO o FACTURA. Filtra por aqui antes de unir con la cabecera:
+          los dos tipos comparten la columna `documento_id`.
+        valores: [CONTRATO, FACTURA]
+      estado_id:
+        significado: >-
+          Codigo interno del estado (`con.est`); solo significa algo con su
+          tipo de documento. Para filtrar, usa `estado_codigo`.
+        agregacion: no_sumable
+        nulo_significa: El documento no tiene estado en Sigrid.
+      estado_codigo:
+        significado: >-
+          Mnemonico del estado, lo estable para filtrar: en contratos PFP, EPF
+          (enviado pendiente de firma), RFP, COMD, FIR, TER, RES; en facturas
+          los de `compras.facturas.estado_codigo`.
+        nulo_significa: >-
+          El estado no casa con el catalogo de su tipo, o el documento no tiene
+          estado.
+      estado:
+        significado: >-
+          Nombre del estado, traducido por la pareja (tipo, estado) contra el
+          catalogo de Sigrid, igual que en `compras.contratos` y `compras.facturas`.
+        nulo_significa: Igual que en `estado_codigo`.
+      en_estado_desde:
+        significado: >-
+          Fecha y hora (Madrid) de la primera foto que vio el documento en este
+          estado. En la linea base es el dia del despliegue, no el del cambio.
+        agregacion: no_sumable
+      cambio_observado_tras:
+        significado: >-
+          Fecha y hora (Madrid) de la foto anterior: el cambio ocurrio entre
+          esta y `en_estado_desde`.
+        agregacion: no_sumable
+        nulo_significa: >-
+          Linea base: el documento ya estaba en ese estado el dia del
+          despliegue y no se sabe desde cuando.
+      antiguedad_es_minima:
+        significado: >-
+          Verdadero si el tramo es de la LINEA BASE: `dias_en_estado` es
+          entonces un minimo («al menos N dias»). Falso: el cambio se vio, y los
+          dias son exactos con la ventana de una noche.
+        agregacion: no_sumable
+      dias_en_estado:
+        significado: >-
+          Dias de calendario (Madrid) desde `en_estado_desde` hasta hoy. Un
+          MINIMO si `antiguedad_es_minima`. Se calcula al consultar.
+        unidad: dias
+        agregacion: no_sumable
+      ultima_foto:
+        significado: >-
+          Fecha y hora (Madrid) de la ultima foto tomada. Si no es de la ultima
+          noche, la foto se ha parado y `dias_en_estado` sigue contando sin
+          haber mirado si el estado cambio.
+        agregacion: no_sumable
+        nulo_significa: Todavia no se ha tomado ninguna foto.
+    relaciones:
+      - de: documento_id
+        a: compras.contratos.contrato_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para la cabecera del contrato (proveedor, obra). Solo las filas de
+          `tipo_documento` CONTRATO; filtra antes.
+      - de: documento_id
+        a: compras.facturas.factura_id
+        cardinalidad: "1:1"
+        porque: >-
+          Para la cabecera de la factura (proveedor, fechas). Solo las filas de
+          `tipo_documento` FACTURA; filtra antes.
+    ejemplos_preguntas:
+      - Que contratos llevan mas de tres semanas enviados sin firmar
+      - Cuanto lleva la factura X en su estado actual
+      - Que facturas llevan mas de un mes sin aprobar
+
+  necesidades:
+    tipo: tabla
+    capa: consumo
+    consumo_recomendado: true
+    descripcion: >-
+      El DOCUMENTO DE NECESIDADES DE COMPRA de Sigrid (`dnc`, F-067), que en
+      Ruesma es el DOCUMENTO DE PLANIFICACION DE COMPRAS (DPC) de la obra: el
+      jefe de obra planifica en el que va a comprar, con su codigo 2 para
+      agruparlo, y de sus lineas cuelgan los comparativos, contratos,
+      albaranes y facturas. Es UNO POR OBRA: 271 de los 277 son el documento
+      de su obra (`es_la_de_la_obra`), con el codigo y el nombre de la obra.
+      Sus LINEAS estan en `descompuestos.v_pbi_planif_jo` (`dncpro_id`).
+      **No se publica su estado**: los 277 estan «En curso» en Sigrid, asi que
+      el estado no informa de nada.
+    grano: Una fila por documento de necesidades (`raw.dnc`). Clave `necesidad_id`.
+    clave_negocio: [necesidad_id]
+    paso_etl: build_compras
+    refresco: nocturno
+    columnas:
+      necesidad_id:
+        significado: >-
+          Identificador del documento en Sigrid (`dnc.ide`, `con.ide`). Es el
+          `necesidad_id` de las lineas de contrato, albaran y factura.
+        agregacion: no_sumable
+      codigo_necesidad:
+        significado: >-
+          Codigo del documento tal y como se ve en Sigrid; es el de la obra
+          (por ejemplo `0727.0`).
+      nombre:
+        significado: Nombre del documento en Sigrid, que es el de la obra.
+      fecha_alta:
+        significado: Fecha de alta del documento en Sigrid (`con.fec`), ya tipada.
+        agregacion: no_sumable
+        nulo_significa: Sigrid no tiene fecha de alta para el documento.
+      obra_id:
+        significado: >-
+          La obra del documento (`dnc.obride`), la ficha de su empresa como en
+          el resto de `compras`. 274 de los 277 la tienen.
+        agregacion: no_sumable
+        nulo_significa: El documento no esta asignado a ninguna obra.
+      codigo_obra:
+        significado: Codigo de la obra tal y como se teclea en Sigrid.
+        nulo_significa: El documento no tiene obra.
+      nombre_obra:
+        significado: Nombre legible de la obra, de `con.res`.
+        nulo_significa: El documento no tiene obra.
+      es_la_de_la_obra:
+        significado: >-
+          Verdadero si la obra apunta a este documento como SU documento de
+          necesidades (`obr.dncide`): 271 de 277. Los demas son documentos
+          huerfanos o de prueba; sus lineas no estan en
+          `descompuestos.v_pbi_planif_jo`, que solo lee el de la obra.
+        agregacion: no_sumable
+      n_lineas:
+        significado: >-
+          Cuantas lineas de necesidad tiene el documento (`raw.dncpro`); 0 si
+          ninguna.
+        agregacion: suma
+    relaciones:
+      - de: obra_id
+        a: maestro.obras.obra_id
+        cardinalidad: "N:1"
+        porque: >-
+          Para el nombre, la empresa y la clave de la obra (F-102).
+      - de: necesidad_id
+        a: compras.albaran_lineas.necesidad_id
+        cardinalidad: "1:N"
+        porque: >-
+          Para lo entregado que sale de este DPC. Igual con
+          `compras.contrato_lineas` y `compras.factura_lineas`.
+    ejemplos_preguntas:
+      - Cual es el documento de planificacion de compras de la obra X
+      - Cuantas lineas tiene la planificacion de compras de cada obra

@@ -150,6 +150,7 @@ from etl_sigrid.domain.tiemod import (
 )
 from etl_sigrid.domain.ventana import formatear_ventana
 from etl_sigrid.infrastructure.logging_config import configure_logging, get_logger
+from etl_sigrid.infrastructure.postgres.compras_reset_sql import SQL_RESET_COMPRAS
 from etl_sigrid.infrastructure.postgres.conninfo import (
     make_admin_conninfo_provider,
     make_conninfo_provider,
@@ -4927,13 +4928,24 @@ def build_compras() -> None:
 
 @cli.command("reset-compras")
 def reset_compras() -> None:
-    """Elimina el schema compras. Lanza después `build-compras`."""
+    """Vacía el esquema compras SALVO la foto diaria. Lanza después `build-compras`.
+
+    F-067 (decisión del 2026-10-06): ya no borra el esquema entero. Borra sus
+    vistas, tablas y funciones y CONSERVA `compras.historial_estados` y
+    `compras.historial_estados_fotos`, la historia de estados que no existe en
+    Sigrid y no se puede recuperar. El SQL vive en
+    `etl_sigrid/infrastructure/postgres/compras_reset_sql.py`.
+    """
     pg = _get_pg()
     with pg.connection() as conn, conn.cursor() as cur:
-        cur.execute("DROP SCHEMA IF EXISTS compras CASCADE")
+        cur.execute(SQL_RESET_COMPRAS)
         conn.commit()
-    click.secho("Schema compras eliminado. Lanza `python main.py build-compras`.",
-                fg="green")
+    click.secho(
+        "compras vaciado SALVO la foto diaria (historial_estados e "
+        "historial_estados_fotos, que se conservan). Lanza `python main.py "
+        "build-compras`.",
+        fg="green",
+    )
 
 
 @cli.command("inspect-contrato-consumo")
