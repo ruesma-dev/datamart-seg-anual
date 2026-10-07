@@ -2,7 +2,7 @@
 #
 # Fichas del esquema `raw`: la copia de Sigrid, tabla a tabla.
 #
-# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 71 tablas con
+# **A NIVEL DE OBJETO, NO DE COLUMNA** (DA-2 de la spec). Son 72 tablas con
 # cientos de campos de cuatro letras cuyo diccionario completo —tipos, indices y
 # referencias— vive en `azure-apps/sigrid_tablas.md`. Cada ficha remite alli con
 # el `grep` de su bloque. Lo que SI se documenta aqui es lo que ese documento no
@@ -1482,6 +1482,28 @@ objetos:
 
       **Se trae entera desde F-101 (2026-09-23)**, incluido `tex`, el texto libre de la linea: informado en 13.390 de 330.941 lineas (4,05 %). Es texto libre y **puede llevar nombres de persona AQUI**, en `raw.hmores`: el rol de consulta tiene lectura sobre esta tabla (no esta revocada como `reshor`), y esa exposicion la acepto el responsable del dato el 2026-09-23, con dos atenuantes: el servidor MCP no expone `raw` en su lista blanca, y los nombres ya eran legibles en `raw.con`. Su superficie de consulta es `personal.partes_lineas.texto_linea`.
     grano: Una fila por linea de parte --recurso, obra y fecha--, identificada por `ide`.
+    clave_negocio: [ide]
+    paso_etl: ingest_raw
+    refresco: nocturno
+    columnas: {}
+
+  usu:
+    tipo: tabla
+    capa: origen
+    consumo_recomendado: false
+    motivo_no_consumo: >-
+      Es la ficha de usuarios de Sigrid en bruto. El login y el nombre de quien hizo cada paso ya estan en `compras.documento_procesos`, y el usuario con su empleado y su DNI en `personal.usuarios_sigrid`.
+    descripcion: >-
+      **USUARIOS DE SIGRID** (F-085; 233 filas el 2026-10-07): una fila por usuario, con su login (`cod`), su nombre (`res`), su codigo de empleado (`codemp`), si esta desactivado (`tipdes`) y sus roles, delegaciones y obras permitidas en texto. No cuelga de `con`: `cod` y `res` son campos propios de esta tabla. Es lo que traduce a persona los logins de `rac`, `confir` y del resto de Sigrid. Entro en la ingesta por decision del humano del 2026-10-07 (D4 de F-085: «luego querre saber quien lo ha hecho por nombre»).
+
+      **SIN CREDENCIALES, SIN DNI Y SIN CORREO**, y por eso es legible por el rol del MCP como el resto de `raw`: el login y el nombre ya se publican en `compras`. El DNI de la ficha de usuario esta vacio en las 233 filas; el de la persona sale de su ficha de empleado y se publica solo en `personal.usuarios_sigrid`. La lista de credenciales vive una vez en `etl_sigrid/domain/documento_procesos.py` y un test falla si alguna deja de estar excluida.
+
+      **Que significa cada columna**: esta ficha no las documenta (DA-2). El diccionario completo de campos, tipos e indices esta en `azure-apps/sigrid_tablas.md`, en el bloque `usu`, y se localiza con `grep -n "^| usu " azure-apps/sigrid_tablas.md`. No se copia aqui porque seria una segunda version que acabaria divergiendo.
+
+      **Como se carga.** El job nocturno arranca `run-all --full` --lo fija el `CMD` del `Dockerfile`, y `infra/80_create_job.ps1` avisa de que el alcance esta escrito ahi y en ningun sitio mas--, asi que cada noche la tabla se **recarga entera** desde Sigrid: lo que cambio ayer en Sigrid esta aqui esta manana. No tiene columna de ultima modificacion.
+
+      **No se traen** 10 columnas: la contraseña (`cla`), la firma digital (`fir`), la politica de la clave (`feccla`, `diascla`), los identificadores de seguridad y de certificado (`sid`, `cerid`), el DNI vacio (`dni`), el correo (`ele`) y los dos textos libres (`com`, `resdes`). Preguntar por ellas aqui no devuelve nulo, devuelve "columna inexistente".
+    grano: Una fila por usuario de Sigrid, identificada por `ide`.
     clave_negocio: [ide]
     paso_etl: ingest_raw
     refresco: nocturno

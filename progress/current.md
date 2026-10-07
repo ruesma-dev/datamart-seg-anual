@@ -15,7 +15,7 @@
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 
-**Tarea en curso**: T4. T1-T3 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
+**Tarea en curso**: T5. T1-T4 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
 
 **Incidencias de entorno (no de la spec)**:
 - `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
@@ -29,9 +29,14 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
   arranque, el trabajo se hace en un worktree aparte (rama temporal
   `trabajo/F-085` desde 08f14cb) y se lleva a `feature/F-085-...` por fast-forward
   cuando el `init.sh` de arranque termine. Ningún commit va a `dev` ni a `main`.
+- `init.sh` de arranque, 2.ª vez, árbol limpio en 08f14cb: **VERDE**, 6.984 passed
+  y 226 skipped en 4.324,88 s (1 h 12 min, máquina cargada).
 
 **Desviaciones respecto a la spec** (justificadas):
-- (se irán anotando aquí)
+- La ficha de `raw.usu` entra en T4 y no en T10: sin ella, en cuanto `usu` está en
+  `tables_sigrid.yaml` fallan las biyecciones ficha <-> tabla de F-006/F-066.
+- `specs/F-006-mcp-azure/design_detalle.md` gana su enmienda de inventario
+  (205 -> 207 objetos): lo exige `test_f006_r24_el_diseno_declara_el_recuento_real_de_objetos`.
 
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 

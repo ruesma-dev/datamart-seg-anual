@@ -199,6 +199,14 @@ infraestructura.
 > (8 + 7 + 11 + 9 nuevas, 5 en `contratos`, 3 en cada tabla de líneas y
 > `necesidad_id` en dos vistas de `descompuestos`) y las
 > fichas de consumo suben en cuatro.
+>
+> **Enmienda del 2026-10-07 (F-085, quién aprobó qué y cuándo).** Entra
+> `raw.usu` (los usuarios de Sigrid, sin credenciales; el censo de `raw` pasa a
+> 72 tablas) y el inventario pasa a **205 objetos**; con las dos tablas
+> publicadas, `compras.documento_procesos` (el historial de procesos de
+> `raw.rac`) y `personal.usuarios_sigrid` (el usuario con su empleado y su
+> DNI), a **207 objetos**. Las columnas descritas suben de 1589 a **1619**
+> (23 + 7) y las fichas de consumo en dos.
 
 Punto de partida: `config/diccionario_datos.yaml` del prototipo `mcp-bbdd`
 (1.083 líneas, 34 fichas). Se conserva su espíritu —ficha con `descripcion`,

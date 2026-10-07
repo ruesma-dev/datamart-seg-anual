@@ -891,13 +891,13 @@ def test_f095_r29_declarados_y_pendientes() -> None:
 
 def test_f095_r31_arquitectura_y_azure_apps() -> None:
     arquitectura = DOC_ARQUITECTURA.read_text(encoding="utf-8")
-    for termino in ("71 tablas", "`rac`", "F-095", "cueretide", "SALDO_INICIAL",
+    for termino in ("72 tablas", "`rac`", "F-095", "cueretide", "SALDO_INICIAL",
                     "retenciones.saldo_contable", "fin de obra"):
         assert termino in arquitectura, f"ARCHITECTURE.md no dice «{termino}»"
     if not DOC_AZURE_APPS.exists():
         pytest.skip("azure-apps no esta junto a este repositorio")
     texto = DOC_AZURE_APPS.read_text(encoding="utf-8")
-    for termino in ("71 tablas", "`rac`", "F-095", *(f"retenciones.{o}" for o in OBJETOS_NUEVOS)):
+    for termino in ("72 tablas", "`rac`", "F-095", *(f"retenciones.{o}" for o in OBJETOS_NUEVOS)):
         assert termino in texto, f"azure-apps no dice «{termino}» (R31)"
 
 

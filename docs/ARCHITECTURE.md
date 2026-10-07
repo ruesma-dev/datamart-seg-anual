@@ -356,9 +356,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
   Azure. Hoy **lee y valida, no carga** a `aux.*`: las tablas destino y el
   esquema de los libros no están definidos todavía.
 
-### Qué se copia de Sigrid: 71 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095)
+### Qué se copia de Sigrid: 72 tablas, y qué NO está ahí (F-066, F-074, F-080, F-102, F-107, F-095, F-085)
 
-`config/tables_sigrid.yaml` declara **71 tablas**: eran 31, F-066 las dejó en 56
+`config/tables_sigrid.yaml` declara **72 tablas**: eran 31, F-066 las dejó en 56
 el 2026-09-06, F-074 sumó nueve más el 2026-09-09, F-080 otras tres el
 2026-09-11 —`auxnap`, `auxban` y `rpa`, el bloque de pago del efecto y las
 remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que da
