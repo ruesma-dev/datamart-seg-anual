@@ -260,7 +260,8 @@ def _pregunta(identificador: str) -> dict:
 
 
 def test_f067_r27_la_version_sube_a_44() -> None:
-    assert str(_diccionario().version) == "44"
+    # F-085 la sube a 45: lo que se fija es que F-067 la subio.
+    assert int(_diccionario().version) >= 44
 
 
 def test_f067_r27_p23_tres_semanas_parcial_hasta_21_dias_despues() -> None:

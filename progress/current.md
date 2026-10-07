@@ -15,7 +15,7 @@
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 
-**Tarea en curso**: T11. T1-T10 hechas (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
+**Tarea en curso**: T15-T16 (informe y verificación final). T1-T11 hechas; T12-T14 son MANUAL del humano (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
 
 **Incidencias de entorno (no de la spec)**:
 - `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
@@ -64,6 +64,11 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 - NO se tocan (D7, son de F-067 y van con F-132): la ficha de `compras.contratos`
   (l. ~220, «Sigrid no guarda cuando cambio el estado»), las de
   `historial_estados*`/`v_estado_documentos` y la fila de F-067 en azure-apps.
+  En `docs/ARCHITECTURE.md` el titular del punto de F-067 lleva solo una nota de
+  que su premisa la corrige F-085.
+- `tests/test_f067_diccionario.py::test_f067_r27_la_version_sube_a_44` fijaba la
+  versión EXACTA (== 44): pasa a `>= 44`, como hacen las demás features.
+- azure-apps: commit local `e08a3bb` (solo `datamart_seg_anual.md`), sin push.
 
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 

@@ -298,7 +298,9 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     congelados). Regla D4: la primera ABC si casa; si no, la versión anterior
     más reciente que case; nunca una posterior; sin ABC, solo Estudios.
 - **LA FECHA DEL CAMBIO DE ESTADO NO EXISTE EN SIGRID: LA DA UNA FOTO DIARIA
-  QUE NO SE RECONSTRUYE (F-067).** `concam` no audita `con.est` y `confir` no
+  QUE NO SE RECONSTRUYE (F-067).** *(Premisa corregida por F-085 el
+  2026-10-07: la fecha SÍ está en Sigrid, en `rac`; ver el punto siguiente. La
+  foto sigue y su relevo es F-132.)* `concam` no audita `con.est` y `confir` no
   tiene firmas de contrato, así que `sql/compras/11_historial_estados.sql`
   toma cada noche una foto de `con.est` de contratos (tip 44) y facturas (15)
   y la guarda **por tramos** (documento, estado, `desde`, `hasta`): la foto de
@@ -334,6 +336,23 @@ ver «Los descompuestos: el primer esquema incremental», más abajo.
     de las tres tablas de líneas; `compras.necesidades` es el DPC de la obra.
     En `descompuestos`, `necesidad_id` entra solo en dos VISTAS, por
     subconsulta a `raw.dncpro`: tocar `lineas` o el sello retrocearía el master.
+- **QUIÉN APROBÓ QUÉ Y CUÁNDO SALE DE `rac`, EL REGISTRO DE PROCESOS (F-085).**
+  `sql/compras/12_documento_procesos.sql` publica `compras.documento_procesos`:
+  una fila por paso de factura, contrato, comparativo y obra (~1,01 M), con el
+  proceso, los estados de origen y destino traducidos por la pareja tipo-estado
+  (`fn_estado_documento`), el login y el nombre (`raw.usu`, casado en mayúsculas
+  y sin espacios), la fecha y la hora, el `orden` en su documento, `es_ultimo`,
+  `encaja_con_anterior` y los días desde el paso anterior. Se reconstruye cada
+  noche y va DETRÁS de la foto de F-067. La regla (familias, orden, hora válida,
+  login) vive una vez en `domain/documento_procesos.py` y el SQL lleva sus
+  literales (test). Es historia NETA: «Deshacer proceso» borra el paso.
+  - **Los datos personales se quedan en `personal`**: `compras` publica login y
+    nombre; el empleado y el DNI van en `personal.usuarios_sigrid`
+    (`personal/06_usuarios_sigrid.sql`), bajo el GRANT por esquema de F-057.
+  - **`raw.usu` no trae ninguna credencial**: la lista de las seis vive en el
+    dominio (`COLUMNAS_CREDENCIALES_USU`) y un test falla si alguna deja de
+    estar en `exclude_columns`. Ni `dbo.log` (F-105), ni `conpro`, ni `rol`
+    entran.
 
 ## Acceso a datos
 
@@ -365,9 +384,16 @@ remesas—, F-102 una el 2026-09-23 —`auxemp`, las 38 empresas del grupo, que 
 nombre a la empresa de cada obra y de cada recurso— y F-107 otra el 2026-09-24
 —`caa`, las 184.234 cuentas analíticas, que traduce la contrapartida del recurso
 y la cuenta de su ficha de tipos de hora; leerla entera cuesta 4,3 s—, F-095 otra
-el 2026-09-24 —`rac`, la contabilización de documentos, el único enlace
-documento -> asiento, y la **única que se trae filtrada**: `where: asiide <> 0`,
-755.086 de 2.505.089 filas—, además de recuperar la columna `con.tex` (el memo del documento,
+el 2026-09-24 —`rac`, el registro de procesos de Sigrid y el único enlace
+documento -> asiento, que entró filtrada a `asiide <> 0` (755.086 de 2.505.089
+filas) y que **F-085 trae entera desde el 2026-10-07** (2.517.791 filas, sin su
+texto libre `tex`: los pasos de comprobar y aprobar son el historial de procesos
+que publica `compras.documento_procesos`)— y F-085 la última, `usu`, los 233
+usuarios de Sigrid **sin credenciales, sin DNI y sin correo** (diez columnas
+excluidas; la lista de credenciales vive una vez en
+`domain/documento_procesos.py` y un test falla si alguna entra), que traduce el
+login a persona en `compras.documento_procesos` (nombre) y en
+`personal.usuarios_sigrid` (empleado y DNI). Además de recuperar la columna `con.tex` (el memo del documento,
 informado en el 65,5 % de las facturas; traerlo cuesta +26 % de tiempo de
 lectura sobre `con`, medio minuto de la ventana nocturna).
 Las 25 que entraron el primer día vienen en tres grupos, y ninguna se supuso: todo lo
@@ -471,15 +497,17 @@ escrita la condición para levantarla.
 **Lo que Sigrid NO guarda**, medido dos veces y escrito aquí para que nadie
 vuelva a buscarlo:
 
-- **No hay histórico de cambios de estado** de contratos ni de facturas. La
-  tabla de auditoría registra 1,5 M de cambios de forma de pago y de fecha de
-  factura desde 2017, y **ni uno solo del campo de estado**. Lo que hay es el
-  estado actual (`con.est`), su nombre **por tipo de documento** (`conest`: la
-  misma cifra significa cosas distintas en un contrato y en una factura), el
-  alta (`con.fec`) y la última modificación (`con.tiemod`, ya en
-  `raw.con._source_tiemod`) como aproximación de su antigüedad. El histórico lo
-  construye F-067 como foto diaria sobre `raw`, y empieza a contar el día que se
-  despliegue.
+- **El histórico de cambios de estado SÍ está, en `rac`** (corregido por F-085
+  el 2026-10-07; aquí se decía lo contrario). La tabla de auditoría (`concam`)
+  registra 1,5 M de cambios de forma de pago y de fecha de factura desde 2017 y
+  **ni uno solo del campo de estado**, y por eso se concluyó que no existía;
+  pero `rac`, el registro de procesos, guarda cada paso con su estado de origen
+  y de destino, su usuario, su fecha y su hora desde 2008. Lo publica
+  `compras.documento_procesos`, con los estados traducidos **por tipo de
+  documento** (`conest`: la misma cifra significa cosas distintas en un
+  contrato y en una factura). Es la historia NETA: «Deshacer proceso» borra el
+  paso; la bruta está en `dbo.log` (F-105). La foto diaria de F-067 sigue
+  construyéndose; su relevo por `rac` es F-132.
 - **Los contratos no pasan por el circuito de firma** (`confir`): sus 69.993
   firmas son de comparativos, facturas y obras, y las de factura vienen sin
   fecha. `PFfir` y `logfirdoc`, donde el backlog esperaba encontrarlo, están
