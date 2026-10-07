@@ -302,13 +302,17 @@ def test_f095_r10_veta_apu_obr_y_cen_obride() -> None:
 # ===========================================================================
 
 
-def test_f095_r9_rac_declarada_con_filtro() -> None:
+def test_f095_r9_rac_declarada_sin_filtro_desde_f085() -> None:
+    """F-095 la declaro con `where: asiide <> 0` ([H4] 755.086 de 2.505.089
+    filas). F-085 (D1, 2026-10-07) quita el filtro: los pasos sin asiento son
+    el historial de procesos. `retenciones` sigue filtrando en su SQL
+    (`test_f085_r5_*`)."""
     rac = _tablas().get("rac")
     assert rac is not None, "raw.rac no esta declarada en tables_sigrid.yaml (R9)"
     assert rac["source_table"] == "rac"
     assert rac["id_column"] == "ide"
     assert rac["incremental_column"] is None, "`rac` no tiene tiemod"
-    assert rac["where"] == "asiide <> 0", "[H4] 755.086 de 2.505.089 filas"
+    assert rac["where"] is None, "F-085 D1: `rac` se ingiere entera"
     assert rac["exclude_columns"] == ["tex"]
 
 
