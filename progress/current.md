@@ -20,10 +20,15 @@ nombre (93,0 % de las filas, casando el login en mayúsculas); DNI y empleado so
 D7: el líder ficha la feature que saca la antigüedad del estado de `rac`. El `status`
 lo cambia el líder.
 
+**Líder (2026-10-07)**: F-085 → `spec_ready`. Fichada **F-132** (antigüedad del
+estado desde `rac`, foto de F-067 retirada tras 1-2 semanas de contraste; prioridad
+11, detrás de F-085). D5: `dbo.log` en F-105, sin cambiar su prioridad. Siguiente:
+implementer de F-085.
+
 Rama `feature/F-085-quien-aprobo-que-y-cuando`. Spec en
 `specs/F-085-quien-aprobo-que-y-cuando/` y mediciones en
 `progress/spec_F-085.md` (solo lectura: Sigrid por `sigrid-api`, Azure por el
-MCP). `status` sigue `pending`; el `acceptance` se REESCRIBIÓ (ver abajo).
+MCP). `status` `spec_ready` desde la aprobación; el `acceptance` se REESCRIBIÓ (ver abajo).
 
 **El hallazgo**: la ventana «Procesos» de la captura de Carmen Calle es `rac`.
 Sin filtro tiene 2.517.791 pasos con proceso, estado origen→destino, login,
