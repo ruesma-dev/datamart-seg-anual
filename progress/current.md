@@ -15,7 +15,7 @@
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 
-**Tarea en curso**: T16 (`init.sh` final). T1-T11 y T15 hechas; T12-T14 son MANUAL del humano (comandos en `progress/impl_F-085.md` §6). Mutación: 20/20 muertos (`progress/mutacion_F-085.md`) (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
+**Estado**: implementación TERMINADA, pendiente del reviewer. T1-T11, T15 y T16 hechas (`init.sh` final VERDE sobre `1ced67b`: 7.132 passed, cobertura 100 %); T12-T14 son MANUAL del humano (comandos en `progress/impl_F-085.md` §6). Mutación: 20/20 muertos (`progress/mutacion_F-085.md`) (T9, la ficha de `personal.usuarios_sigrid`, entró con su SQL en el commit de T7). T1 hecha (RED: `progress/impl_F-085.md`).
 
 **Incidencias de entorno (no de la spec)**:
 - `bash harness/init.sh` de arranque, 1.ª vez: ROJO por

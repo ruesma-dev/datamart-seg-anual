@@ -196,7 +196,7 @@ crea `raw.usu` y recarga `raw.rac` entera; comprobar con `check-raw-recuentos`.
 | Cobertura de líneas cambiadas | **100,0 %** (74/74, umbral 80 %): `PUERTA COBERTURA` de `init.sh` |
 | Mutación (muestreo del nivel estándar: 20 de 49, semilla 20260820) | **20 evaluados, 20 muertos, 0 supervivientes, 0 timeouts**: `progress/mutacion_F-085.md` |
 | Tiempo de la suite | 3.127,7 s (52 min) con cobertura y la campaña de mutación compitiendo; sin cobertura y sin campaña, 1.136,9 s (18 min 57 s) |
-| `init.sh` final | ver la línea siguiente, la escribe el implementer tras el último commit |
+| `init.sh` final | **VERDE** sobre HEAD `1ced67b` (2026-10-08): 7.132 passed, 228 skipped en 1.630,6 s (27 min), cobertura 100 % (74/74), tamaño impl 207/220, sin ningún KO |
 
 Notas: la campaña corrió en paralelo (2 workers, `--timeout 3600` fijado a
 mano porque con la máquina saturada la línea base no cabía en los 600 s por

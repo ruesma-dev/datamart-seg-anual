@@ -29,4 +29,4 @@ Rama `feature/F-085-quien-aprobo-que-y-cuando`. Un commit por tarea (`F-085 Tn: 
 - [ ] T13: MANUAL (humano). Cobertura (R30): `SELECT familia, COUNT(DISTINCT documento_id), AVG((encaja_con_anterior)::int), AVG((nombre_usuario IS NOT NULL)::int) FROM compras.documento_procesos GROUP BY familia;`, el último paso contra `raw.con.est` (`WHERE es_ultimo`, esperado ≥ 99,9 %) y, tras `python main.py build-personal`, `SELECT COUNT(*), COUNT(empleado_id), COUNT(dni) FROM personal.usuarios_sigrid;` → 233 / 210 / ~204  |  Verificación: MANUAL (humano)
 - [ ] T14: MANUAL (humano). R31: `SELECT COUNT(*), COUNT(obra_id), SUM(importe) FROM retenciones.apuntes_contables;` antes y después (`python main.py build-retenciones`), y `python main.py check-raw-recuentos` en verde para `rac` y `usu`  |  Verificación: MANUAL (humano)
 - [x] T15: `progress/impl_F-085.md` (≤ 220 líneas) con trazas RED, resultados de T12-T14 y el aviso de ventana  |  Verificación: `python -m harness.tamano --feature F-085`
-- [ ] T16: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
+- [x] T16: Ejecutar `bash harness/init.sh` en verde  |  Verificación: `bash harness/init.sh`
