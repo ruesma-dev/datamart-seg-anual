@@ -15,7 +15,7 @@
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
 
-**Tarea en curso**: T6. T1-T5 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
+**Tarea en curso**: T7. T1-T6 hechas. T1 hecha (RED: `progress/impl_F-085.md`).
 
 **Incidencias de entorno (no de la spec)**:
 - `bash harness/init.sh` de arranque, 1.ª vez: ROJO por
@@ -47,6 +47,9 @@ T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
   `dias_desde_anterior` redondea `EXTRACT(EPOCH ...)::NUMERIC / 86400` (aritmética
   exacta, como el `Decimal` del oráculo); `make_time` con casts a `INT` explícitos.
   Mismo resultado que el design §5 con los datos medidos (`est1`/`est2` nunca nulos).
+- T6 toca además `tests/test_f080_pipeline.py` (su lista de ficheros de compras, como
+  la de `test_f047_steps.py`) y quita de la docstring del dominio la mención al
+  fichero de F-067: `test_f067_r8_veto_*` prohíbe nombrar sus tablas fuera de su lista.
 
 ## 2026-10-07 · F-085: spec escrita (spec-author) y APROBADA por el humano con D4 cambiada
 

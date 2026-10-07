@@ -17,7 +17,7 @@ LA REGLA LA EJECUTA SQL (`sql/compras/12_documento_procesos.sql` y
 como oráculo puro: los literales —las familias, el orden de desempate, la
 normalización del login, la empresa preferente— viven aquí y
 `tests/test_f085_sql.py` comprueba que el SQL lleva LOS MISMOS. Mismo patrón
-que `domain/historial_estados.py` (F-067).
+que el oráculo de la foto diaria de F-067 y que `domain/comparativos.py` (F-038).
 
 Y AQUÍ VIVE LA LISTA DE CREDENCIALES de la tabla `usu` de Sigrid (contraseña,
 firma digital, política de la clave, identificadores de seguridad y de
