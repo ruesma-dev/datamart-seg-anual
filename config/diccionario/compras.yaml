@@ -2532,7 +2532,8 @@ objetos:
         significado: >-
           Fecha de alta del comparativo en Sigrid (`con.fec`), informada al 100
           %. Es la fecha de CREACION del documento; no es la del cambio de
-          estado (eso no se guarda) ni la de aprobacion (`fecha_aprobacion`).
+          estado (cada paso, con su fecha y hora, esta en
+          `compras.documento_procesos`) ni la de aprobacion (`fecha_aprobacion`).
         agregacion: no_sumable
       obra_id:
         significado: >-
@@ -2710,9 +2711,10 @@ objetos:
           Dir. Compras). Desde el alta tarda de media 19,8 dias.
         nulo_significa: >-
           El comparativo no esta en un estado final de firma (EN ELABORACION,
-          PROPUESTO, RECHAZADO...): para esos estados la fecha de aprobacion NO
-          EXISTE, y Sigrid no guarda cuando cambio el estado. No es un dato
-          que falte, es un dato que no hay.
+          PROPUESTO, RECHAZADO...): para esos estados la fecha de APROBACION NO
+          EXISTE. No es un dato que falte, es un dato que no hay. Cuando paso
+          el comparativo a su estado actual, y quien lo hizo, si se sabe: es el
+          paso con `es_ultimo` en `compras.documento_procesos` (F-085).
         agregacion: no_sumable
       aprobado_por:
         significado: >-
@@ -3248,8 +3250,12 @@ objetos:
       repiten escalon). Para «quien firmo como JG» toma la ultima FIRMADA de
       ese escalon por `fecha` y `hora`; para quien APROBO el comparativo, usa
       `compras.comparativos.aprobado_por`. El campo `ord` (orden obligatorio)
-      de Sigrid vale 0 siempre y no se publica: el orden lo da la fecha. El
-      circuito entre familias (`deffir`, `dbo.log`) es F-085.
+      de Sigrid vale 0 siempre y no se publica: el orden lo da la fecha. Los
+      PROCESOS del comparativo --validar, aprobacion del jefe de grupo,
+      adjudicacion, rechazos-- con su estado de origen y de destino, quien y
+      cuando, estan en `compras.documento_procesos` (F-085), igual que los de
+      facturas, contratos y obras: las firmas de aqui son el detalle escalon a
+      escalon, con las PENDIENTES.
     grano: >-
       Una fila por firma de `raw.confir` de un comparativo (`conide` en
       `raw.com`). `firma_id` es clave primaria declarada.

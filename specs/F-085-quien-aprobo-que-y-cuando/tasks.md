@@ -18,8 +18,8 @@ Rama `feature/F-085-quien-aprobo-que-y-cuando`. Un commit por tarea (`F-085 Tn: 
 
 ## Diccionario y documentos
 
-- [ ] T8: ficha `compras.documento_procesos` (R22, R23) y correcciones de `comparativos.fecha_aprobacion` y `comparativo_firmas` (R26); `test_f085_diccionario.py`  |  Verificación: `python -m pytest tests/test_f085_diccionario.py tests/test_f006_fichas.py tests/test_f006_formato.py tests/test_f006_cobertura.py tests/test_f038*.py -q`
-- [ ] T9: ficha `personal.usuarios_sigrid` (R24) en `config/diccionario/personal.yaml`  |  Verificación: `python -m pytest tests/test_f085_diccionario.py tests/test_f057_personal.py tests/test_f006_fichas.py tests/test_f006_cobertura.py -q`
+- [x] T8: ficha `compras.documento_procesos` (R22, R23) y correcciones de `comparativos.fecha_aprobacion` y `comparativo_firmas` (R26); `test_f085_diccionario.py`  |  Verificación: `python -m pytest tests/test_f085_diccionario.py tests/test_f006_fichas.py tests/test_f006_formato.py tests/test_f006_cobertura.py tests/test_f038*.py -q`
+- [x] T9: ficha `personal.usuarios_sigrid` (R24) en `config/diccionario/personal.yaml`  |  Verificación: `python -m pytest tests/test_f085_diccionario.py tests/test_f057_personal.py tests/test_f006_fichas.py tests/test_f006_cobertura.py -q`
 - [ ] T10: fichas `raw.rac` y `raw.usu` (R25) y `00_global.yaml` `version` +1 con su comentario (R27)  |  Verificación: `python -m pytest tests/test_f085_diccionario.py tests/test_f095_retenciones_contables.py tests/test_f006_fichas.py -q`
 - [ ] T11: `docs/ARCHITECTURE.md` («Qué se copia»: `rac` sin filtro, `usu` sin credenciales; «Lo que Sigrid NO guarda») y `../azure-apps/datamart_seg_anual.md` (72 tablas, `rac`, `usu`, los dos objetos; commit local aparte en `azure-apps`) (R28)  |  Verificación: `python -m pytest tests/test_f085_diccionario.py tests/test_f095_retenciones_contables.py -q`
 
