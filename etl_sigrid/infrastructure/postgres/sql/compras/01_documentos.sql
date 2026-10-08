@@ -68,9 +68,9 @@
 -- `retencion_garantia_porcentaje`, `retencion_garantia_concepto` y
 -- `fecha_ultima_modificacion`— y ni una de las quince de siempre se mueve.
 --
---   · LA ANTIGÜEDAD DEL ESTADO SE SABE, pero NO aquí: la da
---     `compras.v_estado_documentos` desde `rac` (F-132,
---     `13_estado_documentos.sql`). `fecha_ultima_modificacion` es `con.tiemod`, la última
+--   · LA ANTIGÜEDAD DEL ESTADO YA SE SABE, pero NO aquí: la da la foto diaria
+--     (`11_historial_estados.sql`, `compras.v_estado_documentos`) desde el día
+--     del despliegue. `fecha_ultima_modificacion` es `con.tiemod`, la última
 --     modificación del DOCUMENTO, y NO la fecha del cambio de estado (D2 del
 --     humano): medido, la firma no la mueve en el 85 % de los comparativos.
 --   · LA PENALIZACIÓN NO ES UN CAMPO de Sigrid (`ctr` no la tiene): solo

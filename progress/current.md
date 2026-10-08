@@ -47,9 +47,12 @@ construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
     comando solo lee y convierte filas.
   - T10 corrige además tres textos que la spec no lista y que la premisa o la
     vista vieja dejaban falsos, SOLO en comentarios o docstrings (ni una línea
-    ejecutable): la cabecera de `01_documentos.sql` («la da la foto diaria»),
-    el docstring de `compras_reset_sql.py` («la única vista que las lee») y el
-    de `reset-compras` en `main.py` («historia que no existe en Sigrid»).
+    ejecutable): el docstring de `compras_reset_sql.py` («la única vista que
+    las lee») y el de `reset-compras` en `main.py` («historia que no existe en
+    Sigrid»). La cabecera de `01_documentos.sql` («la antigüedad la da la foto
+    diaria») se dejó COMO ESTABA: la spec dice que `01` no se toca y su texto
+    entero está fijado por huella en `test_f073_sql` r23 (el primer `init.sh`
+    tras T11 salió rojo por eso). Queda anotado para quien toque `01`.
 
 
 ## 2026-10-08 · F-132 · SPEC ESCRITA (spec-author), `pending` a la espera de aprobación · la antigüedad del estado desde `rac`
