@@ -2061,7 +2061,7 @@
         "Se responde por el MCP, sin explicarle nada: «¿qué contratos llevan más de tres semanas enviados sin firmar y desde cuándo?» con la fecha real del envío y avisando de los envíos antiguos sin cerrar (785 de 809 pasan de 21 días; solo 23 son de 2025 en adelante)",
         "bash harness/init.sh en verde y veredicto APROBADO del reviewer"
       ],
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "rigor": "estandar",
       "priority": 11,

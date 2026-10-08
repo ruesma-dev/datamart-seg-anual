@@ -119,3 +119,13 @@ zombis; esto es un dato para Compras, no un error.
    DESPLEGAR». Se añaden al criterio 4.
 
 El `status` NO cambia (`pending`).
+
+## 7. Aprobada por el humano (2026-10-08)
+
+El humano aprobó la spec el 2026-10-08 («ok») con D1-D8 tal como las recomienda
+`design.md` §8: D1 dos fases (A ahora; B tras el contraste) · D2 historia NETA de
+`rac` · D3 comparativos dentro, obras fuera · D4 columnas de R2 · D5 los 75 fuera de
+proceso sin fecha y con la cota `cambio_posterior_a` · D6 14 noches (hasta el
+2026-10-22) y 0 `DISCREPANCIA` sin explicar · D7 recomendación previa BORRAR, que se
+decide al final con el contraste delante · D8 contraste a demanda, no en la nocturna.
+Se implementa la FASE A; la B espera a la decisión del humano.
