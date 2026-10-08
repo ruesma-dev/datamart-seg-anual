@@ -35,6 +35,7 @@ Capa `domain`: sin un solo import de infraestructura ni de configuración.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Final
@@ -60,6 +61,25 @@ ESTADOS_INICIALES: Final[dict[int, frozenset[int]]] = {
 #: De dónde sale `en_estado_desde` (R4-R6), en el orden en que se decide.
 ORIGENES_FECHA: Final[tuple[str, ...]] = ("PASO", "ALTA", "FUERA_DE_PROCESO")
 _PASO, _ALTA, _FUERA_DE_PROCESO = ORIGENES_FECHA
+
+#: Cómo se explica cada cambio que vio la foto (R13), en ORDEN DE PRIORIDAD:
+#: la primera que se cumple es la clase.
+CLASES_CAMBIO: Final[tuple[str, ...]] = (
+    "PASO",
+    "DESHECHO",
+    "VUELTA_AL_INICIAL",
+    "FUERA_DE_PROCESO",
+    "DISCREPANCIA",
+)
+#: Cómo se explica un documento con pasos en la ventana que la foto NO vio
+#: cambiar (R14), también en orden de prioridad.
+CLASES_NO_VISTO: Final[tuple[str, ...]] = ("ALTA", "IDA_Y_VUELTA", "DISCREPANCIA")
+_DESHECHO, _VUELTA_AL_INICIAL, _DISCREPANCIA = (
+    CLASES_CAMBIO[1],
+    CLASES_CAMBIO[2],
+    CLASES_CAMBIO[4],
+)
+_IDA_Y_VUELTA = CLASES_NO_VISTO[1]
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,3 +141,83 @@ def dias_en_estado(desde: datetime | None, hoy: date) -> int | None:
     if desde is None:
         return None
     return (hoy - desde.date()).days
+
+
+# ---------------------------------------------------------------------------
+# El contraste con la foto diaria de F-067 (R13, R14). Aquí `momento` va con
+# zona (UTC), como las fotos: el SQL del contraste ya entrega
+# `momento AT TIME ZONE 'Europe/Madrid'`. Un paso SIN momento (uno solo en
+# toda `documento_procesos` el 2026-10-08) no cae en ninguna ventana: no se
+# sabe si fue antes o después de una foto.
+# ---------------------------------------------------------------------------
+
+
+def _hasta(pasos: Sequence[PasoEstado], fin: datetime) -> list[PasoEstado]:
+    """Los pasos con `momento <= fin`, en el orden de su cadena."""
+    return sorted(
+        (p for p in pasos if p.momento is not None and p.momento <= fin),
+        key=lambda p: p.orden,
+    )
+
+
+def clasificar_cambio(
+    tipo: int,
+    estado_nuevo: int | None,
+    inicio: datetime,
+    fin: datetime,
+    pasos: Sequence[PasoEstado],
+) -> str:
+    """Cómo explica `rac` un cambio que vio la foto (R13).
+
+    La ventana del cambio es (`inicio`, `fin`] = (`observado_antes`, `desde`]
+    del tramo nuevo. En este orden:
+
+    - PASO: un paso con destino `estado_nuevo` y `momento` dentro de la ventana.
+    - DESHECHO: el último paso con `momento <= fin` ya lleva a `estado_nuevo`
+      (se deshicieron los posteriores: la historia NETA de `rac`).
+    - VUELTA_AL_INICIAL: ningún paso `<= fin` y `estado_nuevo` inicial del tipo.
+    - FUERA_DE_PROCESO: el último paso `<= fin` lleva a otro estado y ningún
+      paso posterior a `fin` lleva a `estado_nuevo`.
+    - DISCREPANCIA: cualquier otro caso (p. ej. el paso existe, pero DESPUÉS
+      de la foto que ya vio el estado: reloj o zona horaria).
+    """
+    if any(
+        p.destino == estado_nuevo and p.momento is not None and inicio < p.momento <= fin
+        for p in pasos
+    ):
+        return _PASO
+    previos = _hasta(pasos, fin)
+    if previos and previos[-1].destino == estado_nuevo:
+        return _DESHECHO
+    if not previos:
+        if estado_nuevo in ESTADOS_INICIALES.get(tipo, frozenset()):
+            return _VUELTA_AL_INICIAL
+        return _DISCREPANCIA
+    if any(
+        p.destino == estado_nuevo and p.momento is not None and p.momento > fin
+        for p in pasos
+    ):
+        return _DISCREPANCIA
+    return _FUERA_DE_PROCESO
+
+
+def clasificar_no_visto(
+    estado_foto: int | None,
+    abierto_en_la_foto: bool,
+    fin: datetime,
+    pasos: Sequence[PasoEstado],
+) -> str:
+    """Cómo explica `rac` los pasos de la ventana que la foto NO vio (R14).
+
+    - ALTA: la foto de `fin` le abrió tramo (no de línea base): lo vio nacer
+      ya en su estado.
+    - IDA_Y_VUELTA: el último paso con `momento <= fin` deja el documento en
+      `estado_foto` (se deshizo y se rehízo entre dos fotos).
+    - DISCREPANCIA: cualquier otro caso.
+    """
+    if abierto_en_la_foto:
+        return CLASES_NO_VISTO[0]
+    previos = _hasta(pasos, fin)
+    if previos and previos[-1].destino == estado_foto:
+        return _IDA_Y_VUELTA
+    return _DISCREPANCIA
