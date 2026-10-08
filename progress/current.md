@@ -15,14 +15,24 @@ Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera 
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
 construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
 
-- **Tarea en curso**: T3 (13_estado_documentos.sql). Hechas: T1, T2. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
+- **Tarea en curso**: T4 (sub-paso `estado_documentos`). Hechas: T1-T3. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
 - **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
   para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
   `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
   hace en el worktree `../datamart-seg-anual-wt-f132` (rama temporal
   `trabajo/F-132` desde 4d25fcb) y se lleva a `feature/F-132-estado-desde-rac`
   por fast-forward. Ningún commit va a `dev` ni a `main`.
-- **Desviaciones respecto a la spec**: ninguna por ahora.
+- **Diccionario del árbol tras F-132: 207 objetos, 1623 columnas, 98 de consumo**
+  (la vista pasa de 11 a 15 columnas; versión sin publicar).
+- **Desviaciones respecto a la spec** (justificadas):
+  - La ficha reescrita de `compras.v_estado_documentos` entra en T3, con su SQL, y
+    no en T8: la orden del líder es «ficha en el mismo commit que el objeto». Con
+    ella pasan a T3 la retirada de los tests de la vista de F-067
+    (`test_f067_sql` r9-r11, que era de T5, y `test_f067_diccionario` r10 y la
+    parte de la vista de r11, que eran de T9): describían la vista vieja.
+  - La ficha nueva NO declara relación `paso_id` -> `documento_procesos`: el
+    validador R5 de F-006 la rechaza (la clave de la vista es `documento_id`);
+    el camino se explica en la columna.
 
 
 ## 2026-10-08 · F-132 · SPEC ESCRITA (spec-author), `pending` a la espera de aprobación · la antigüedad del estado desde `rac`
