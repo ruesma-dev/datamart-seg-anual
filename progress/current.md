@@ -10,6 +10,43 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
+## 2026-10-08 · F-132 · SPEC ESCRITA (spec-author), `pending` a la espera de aprobación · la antigüedad del estado desde `rac`
+
+Spec en `specs/F-132-estado-desde-rac/` (requirements 150/150, design 246/250,
+21 tareas: Fase A T1-T15, Fase B T16-T21). Mediciones en `progress/spec_F-132.md`
+(solo lectura, sesión `read_only` contra Azure). Rama `feature/F-132-estado-desde-rac`
+desde `main` 43a50b9. `init.sh` de arranque VERDE (7.133 passed, 50 min).
+`acceptance` reescrito (criterios 1-5) porque la medición lo matiza; `status` sin tocar.
+
+**Lo que cambia la ficha**:
+- `rac` fecha al segundo el 99,4 % de contratos, facturas y comparativos; los
+  1.248 sin pasos están en su estado inicial (fecha = día de alta); 75 cambiaron
+  fuera de proceso y no se pueden fechar (se da la cota «después de»).
+- **Lo que solo ve la foto es un FLUJO, no ~70 documentos**: en la única noche
+  contrastable (07→08-10) 9 de los 230 cambios son pasos DESHECHOS y 3 contratos
+  volvieron a PFP sin un paso; 5 contratos se deshicieron y rehicieron el mismo
+  día sin que la foto lo viera. 0 DISCREPANCIA. Con historia NETA todo queda
+  explicado, pero sin foto el deshacer no se fecha hasta F-105 (`dbo.log`).
+- **Corrige el encargo**: la 2.ª observación de la foto es la NOCTURNA del 08-10
+  (observado 00:03:01, tomada 03:26:34 UTC); el `build-compras` de las 10:19 no
+  escribió nada (sin `raw.con` nueva). La del 09-10 aún no ha corrido.
+- 809 contratos EPF, 785 con más de 21 días, pero solo 23 de 2025 en adelante:
+  ~760 envíos antiguos sin cerrar (dato para Compras, no error).
+- Coste: la vista 0,8 s al consultar y < 1 s de build; la foto < 1 min por noche
+  (retirarla ahorra eso y 20 MB). El contraste es un comando a demanda: 0 min de
+  nocturna (la del 08-10 duró 4 h 40 min).
+
+**Decisiones abiertas para el humano** (detalle y cifras en `design.md` §8;
+recomendación en negrita): **D1** dos fases (A: vista + contraste + textos; B:
+retirada) · **D2** historia NETA de `rac` · **D3** comparativos dentro, obras
+fuera · **D4** la vista cambia de columnas (fuera las tres de la foto; dentro
+`origen_fecha`, `cambio_posterior_a`, código y quién dio el paso) · **D5** fuera
+de proceso sin fecha y con cota · **D6** 14 noches (hasta el 2026-10-22) y 0
+DISCREPANCIA sin explicar · **D7** (al final del contraste) recomendación previa
+**BORRAR** la foto con un comando que lanza el humano; alternativas congelar o
+conservarla como detector de deshechos hasta F-105 · **D8** contraste a demanda,
+no en la nocturna.
+
 ## 2026-10-08 · F-085 · CERRADA (`done`, APROBADO en pasada 2) · quién aprobó qué y cuándo (`rac`) · DESPLEGADA el 08-10 (`r20261008-1204`)
 
 > **DESPLEGADA por el líder el 2026-10-08, por orden del humano** («integra y
