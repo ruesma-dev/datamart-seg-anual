@@ -35,9 +35,10 @@ Capa `domain`: sin un solo import de infraestructura ni de configuración.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 from typing import Final
 
 #: Las familias de la vista (`con.tip`) y su nombre publicado (D3 del humano):
@@ -221,3 +222,109 @@ def clasificar_no_visto(
     if previos and previos[-1].destino == estado_foto:
         return _IDA_Y_VUELTA
     return _DISCREPANCIA
+
+
+# ---------------------------------------------------------------------------
+# El informe del contraste (R15): una fila por noche, tipo, grupo y clase.
+# ---------------------------------------------------------------------------
+
+#: Los dos grupos del informe: lo que la foto VIO cambiar (R13) y los pasos de
+#: la ventana que NO vio (R14). Comparten DISCREPANCIA, y por eso se separan.
+GRUPOS_CONTRASTE: Final[tuple[str, ...]] = ("CAMBIO", "NO VISTO")
+
+#: Los `documento_id` de DISCREPANCIA que se imprimen por noche, como mucho.
+MAX_DISCREPANCIAS_POR_NOCHE: Final[int] = 50
+
+
+@dataclass(frozen=True, slots=True)
+class Contrastado:
+    """Un documento de una noche del contraste, ya clasificado."""
+
+    observado_en: datetime
+    tipo: int
+    grupo: str
+    clase: str
+    documento_id: int
+
+
+def contrastar(
+    cambios: Iterable[tuple[int, int, int | None, datetime, datetime]],
+    no_vistos: Iterable[tuple[int, int, int | None, bool, datetime]],
+    pasos: Mapping[int, Sequence[PasoEstado]],
+) -> list[Contrastado]:
+    """Clasifica cada cambio y cada no visto con sus pasos (R13, R14).
+
+    `cambios` son `(documento_id, tipo, estado_nuevo, inicio, fin)` y
+    `no_vistos`, `(documento_id, tipo, estado_foto, abierto_en_la_foto, fin)`:
+    las filas de `SQL_CAMBIOS` y `SQL_NO_VISTOS`. La noche es `fin`.
+    """
+    resultado = [
+        Contrastado(
+            fin, tipo, GRUPOS_CONTRASTE[0],
+            clasificar_cambio(tipo, estado, inicio, fin, pasos.get(ide, ())), ide,
+        )
+        for ide, tipo, estado, inicio, fin in cambios
+    ]
+    resultado += [
+        Contrastado(
+            fin, tipo, GRUPOS_CONTRASTE[1],
+            clasificar_no_visto(estado, abierto, fin, pasos.get(ide, ())), ide,
+        )
+        for ide, tipo, estado, abierto, fin in no_vistos
+    ]
+    return resultado
+
+
+def _utc(momento: datetime) -> str:
+    return momento.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _orden_clase(grupo: str, clase: str) -> int:
+    clases = CLASES_CAMBIO if grupo == GRUPOS_CONTRASTE[0] else CLASES_NO_VISTO
+    return clases.index(clase)
+
+
+def discrepancias(contrastados: Sequence[Contrastado]) -> int:
+    """Cuántos documentos quedan sin explicar: el código de salida es 1 si > 0."""
+    return sum(1 for c in contrastados if c.clase == _DISCREPANCIA)
+
+
+def formatear_contraste(
+    contrastados: Sequence[Contrastado], noches: Sequence[datetime]
+) -> str:
+    """La tabla del contraste por noche (UTC), tipo, grupo y clase (R15).
+
+    `noches` son las fotos posteriores a la línea base: una noche sin nada que
+    contrastar se dice, no se omite. Detrás, los `documento_id` de cada
+    DISCREPANCIA (como mucho `MAX_DISCREPANCIAS_POR_NOCHE` por noche) y el total.
+    """
+    cuenta = Counter(
+        (c.observado_en, FAMILIAS_ESTADO.get(c.tipo, str(c.tipo)), c.grupo, c.clase)
+        for c in contrastados
+    )
+    lineas = ["observado_en (UTC)  | tipo        | grupo    | clase             | documentos"]
+    for noche in sorted(set(noches) | {c.observado_en for c in contrastados}):
+        filas = sorted(
+            (k for k in cuenta if k[0] == noche),
+            key=lambda k: (k[1], GRUPOS_CONTRASTE.index(k[2]), _orden_clase(k[2], k[3])),
+        )
+        if not filas:
+            lineas.append(f"{_utc(noche)} | sin cambios ni pasos que contrastar")
+        for clave in filas:
+            _, tipo, grupo, clase = clave
+            lineas.append(
+                f"{_utc(noche)} | {tipo:<11} | {grupo:<8} | {clase:<17} | {cuenta[clave]}"
+            )
+    discrepantes: dict[datetime, list[int]] = {}
+    for c in contrastados:
+        if c.clase == _DISCREPANCIA:
+            discrepantes.setdefault(c.observado_en, []).append(c.documento_id)
+    for noche in sorted(discrepantes):
+        ids = sorted(discrepantes[noche])
+        texto = ", ".join(str(i) for i in ids[:MAX_DISCREPANCIAS_POR_NOCHE])
+        resto = len(ids) - MAX_DISCREPANCIAS_POR_NOCHE
+        lineas.append(
+            f"DISCREPANCIA {_utc(noche)}: {texto}" + (f" (y {resto} más)" if resto > 0 else "")
+        )
+    lineas.append(f"Resultado: {discrepancias(contrastados)} DISCREPANCIA sin explicar.")
+    return "\n".join(lineas)

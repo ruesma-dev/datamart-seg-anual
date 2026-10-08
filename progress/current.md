@@ -15,7 +15,7 @@ Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera 
 D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
 construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
 
-- **Tarea en curso**: T5-T7 (contraste). Hechas: T1-T4. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
+- **Tarea en curso**: T8 (fichas). Hechas: T1-T7. `init.sh` de arranque sobre 4d25fcb: VERDE (7.133 passed, 228 skipped, 46 min 57 s).
 - **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
   para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
   `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
@@ -33,6 +33,18 @@ construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
   - La ficha nueva NO declara relación `paso_id` -> `documento_procesos`: el
     validador R5 de F-006 la rechaza (la clave de la vista es `documento_id`);
     el camino se explica en la columna.
+  - `contraste-estados` lee con `PostgresClient.filas_solo_lectura` (transacción
+    `READ ONLY` + `statement_timeout` con `SET LOCAL`, la vía única del
+    repositorio) en vez de abrir una conexión con `read_only = True`: misma
+    garantía, la impone el motor. Para `SQL_PASOS` (`= ANY(%s)`) el método gana
+    un `params` opcional que solo viaja si se pasa.
+  - Cuatro consultas, no tres: `SQL_FOTOS` (las fotos y cuál es la línea base)
+    hace falta para R16 y para decir qué noches no tuvieron nada que contrastar.
+  - La tabla del informe lleva una columna `grupo` (CAMBIO / NO VISTO) además de
+    noche, tipo y clase: DISCREPANCIA existe en los dos grupos.
+  - La agregación y el formato del informe viven en el dominio (`contrastar`,
+    `formatear_contraste`, `discrepancias`), como `formatear_recuentos`; el
+    comando solo lee y convierte filas.
 
 
 ## 2026-10-08 · F-132 · SPEC ESCRITA (spec-author), `pending` a la espera de aprobación · la antigüedad del estado desde `rac`

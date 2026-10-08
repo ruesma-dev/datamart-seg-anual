@@ -4948,6 +4948,91 @@ def reset_compras() -> None:
     )
 
 
+
+@cli.command("contraste-estados")
+@click.option(
+    "--timeout",
+    default=300,
+    show_default=True,
+    help="Segundos por consulta (SET LOCAL statement_timeout).",
+)
+def contraste_estados_cmd(timeout: int) -> None:
+    """
+    Contrasta la foto diaria de estados (F-067) con `rac` (F-132). SOLO LECTURA.
+
+    Desde F-132 la antigüedad del estado la publica `compras.v_estado_documentos`
+    a partir del último paso de `rac`; la foto sigue tomándose como RESPALDO
+    hasta que el humano, con este contraste delante, decida si se retira (D7).
+
+    Cada cambio que vio la foto se explica con `rac` como PASO, DESHECHO,
+    VUELTA_AL_INICIAL o FUERA_DE_PROCESO, y cada documento con pasos en la
+    ventana que la foto no vio cambiar, como ALTA o IDA_Y_VUELTA. Lo que no
+    casa es DISCREPANCIA: sus `documento_id` se imprimen y el comando sale con
+    código 1. Sin ninguna foto después de la línea base, sale con 0 sin
+    clasificar nada.
+
+    Se recalcula ENTERO sobre todas las noches cada vez (la foto guarda todas
+    y `rac` es la historia completa) y no corre en la nocturna (D8). Es la
+    historia NETA: un paso deshecho DESPUÉS de una noche cambia la clase de esa
+    noche al recalcular (de PASO a DESHECHO).
+
+    Las cuatro consultas van en transacciones READ ONLY con su
+    statement_timeout (el SQL, en `contraste_estados_sql.py`): las tablas de la
+    foto no se pueden recuperar y el servidor es compartido con producción.
+    """
+    from etl_sigrid.domain.estado_documentos import (
+        PasoEstado,
+        contrastar,
+        discrepancias,
+        formatear_contraste,
+    )
+    from etl_sigrid.infrastructure.logging_config import get_logger
+    from etl_sigrid.infrastructure.postgres.contraste_estados_sql import (
+        SQL_CAMBIOS,
+        SQL_FOTOS,
+        SQL_NO_VISTOS,
+        SQL_PASOS,
+    )
+
+    logger = get_logger("contraste-estados")
+    click.echo("Contraste foto diaria <-> rac · SOLO LECTURA, transacciones READ ONLY")
+    pg = _get_pg()
+
+    noches = [
+        observado for observado, es_linea_base, _ in pg.filas_solo_lectura(SQL_FOTOS, timeout)
+        if not es_linea_base
+    ]
+    if not noches:
+        click.echo(
+            "No hay ninguna foto posterior a la línea base: nada que contrastar."
+        )
+        logger.info("contraste_estados_sin_fotos")
+        return
+
+    cambios = pg.filas_solo_lectura(SQL_CAMBIOS, timeout)
+    no_vistos = pg.filas_solo_lectura(SQL_NO_VISTOS, timeout)
+    ids = sorted({fila[0] for fila in cambios} | {fila[0] for fila in no_vistos})
+    pasos: dict[int, list[PasoEstado]] = {}
+    if ids:
+        for documento_id, orden, destino, momento in pg.filas_solo_lectura(
+            SQL_PASOS, timeout, (ids,)
+        ):
+            pasos.setdefault(documento_id, []).append(PasoEstado(orden, destino, momento))
+
+    contrastados = contrastar(cambios, no_vistos, pasos)
+    click.echo(formatear_contraste(contrastados, noches))
+    n_discrepancias = discrepancias(contrastados)
+    logger.info(
+        "contraste_estados_hecho",
+        noches=len(noches),
+        cambios=len(cambios),
+        no_vistos=len(no_vistos),
+        discrepancias=n_discrepancias,
+    )
+    if n_discrepancias:
+        raise SystemExit(1)
+
+
 @cli.command("inspect-contrato-consumo")
 @click.option("--codigo", "codigo_contrato", type=str, default=None,
               help="Código de contrato (ej. CTSB25/0709)")

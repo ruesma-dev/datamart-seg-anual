@@ -1095,7 +1095,9 @@ class PostgresClient:
             fila = cur.fetchone()
             return tuple(fila) if fila else ()
 
-    def filas_solo_lectura(self, sql_text: str, timeout_s: int) -> list[tuple]:
+    def filas_solo_lectura(
+        self, sql_text: str, timeout_s: int, params: Sequence[Any] | None = None
+    ) -> list[tuple]:
         """Ejecuta un `SELECT` de diagnóstico y devuelve sus filas (F-042).
 
         La transacción va **`READ ONLY`** con su `statement_timeout`, las dos con
@@ -1108,6 +1110,9 @@ class PostgresClient:
         alternativa era que cada uno abriera su conexión y emitiera sus propias
         sentencias previas. Ahí es donde una de las dos copias se deja el
         `transaction_read_only` un martes por la tarde.
+
+        `params` (F-132) viaja al `execute` solo si se pasa: sin él la llamada
+        es la de siempre, y un `%` literal del texto no se toma por marcador.
         """
         from etl_sigrid.infrastructure.postgres.unicidad_sql import (
             sentencias_previas,
@@ -1118,7 +1123,10 @@ class PostgresClient:
                 with conn.cursor() as cur:
                     for previa in sentencias_previas(timeout_s):
                         cur.execute(previa)
-                    cur.execute(sql_text)
+                    if params is None:
+                        cur.execute(sql_text)
+                    else:
+                        cur.execute(sql_text, params)
                     filas = list(cur.fetchall())
                 conn.commit()
             except Exception:

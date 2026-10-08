@@ -16,7 +16,7 @@ ventana de la foto (`observado_antes`, `desde`] en UTC.
 from __future__ import annotations
 
 import ast
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -50,11 +50,11 @@ def test_f132_r11_familias_de_la_vista() -> None:
 
 
 def test_f132_r11_estados_iniciales_medidos() -> None:
-    assert ESTADOS_INICIALES == {
+    assert {
         15: frozenset({1, 20}),
         44: frozenset({1}),
         46: frozenset({1, 11, 100}),
-    }
+    } == ESTADOS_INICIALES
     assert set(ESTADOS_INICIALES) == set(FAMILIAS_ESTADO)
 
 
@@ -218,7 +218,6 @@ def test_f132_r7_cambio_posterior_a_solo_en_fuera_de_proceso() -> None:
 # R13 · cada cambio que vio la foto, clasificado contra `rac`
 # ===========================================================================
 
-UTC = timezone.utc
 #: Octubre y septiembre de 2026 van en horario de verano: Madrid = UTC+2.
 CEST = timezone(timedelta(hours=2))
 
