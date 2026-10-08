@@ -10,7 +10,26 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-08 · F-085 · CERRADA (`done`, APROBADO en pasada 2) · quién aprobó qué y cuándo (`rac`) · SIN DESPLEGAR
+## 2026-10-08 · F-085 · CERRADA (`done`, APROBADO en pasada 2) · quién aprobó qué y cuándo (`rac`) · DESPLEGADA el 08-10 (`r20261008-1204`)
+
+> **DESPLEGADA por el líder el 2026-10-08, por orden del humano** («integra y
+> despliega… actualiza diccionario, y reinicia mcp»; T12-T14 hechos en Azure en vez de
+> en local, por esa orden): merge a `main` `a9500bb` y espejo en `dev` `66ee564`;
+> imagen `r20261008-1204`, job comprobado. `ingest --table rac --full` SUCCESS
+> (2.518.253 filas, ~3 min de lectura + 69 s de firma) y `usu` (233; `delO` sin
+> problema). `build-compras` SUCCESS (516,7 s; `documento_procesos` 1.010.427 filas en
+> 40,2 s; la foto de F-067 tomó una observación más a las 10:19 UTC) · `build-personal`
+> SUCCESS (`usuarios_sigrid` 233) · `apply-grants` · `publicar-diccionario` **v45**
+> (207 objetos, 1.619 columnas) · `check-diccionario` OK · MCP reiniciado
+> (`--0000014`, Healthy, sirve la v45). **Verificado por el MCP**: la FR26/10025 da los
+> 4 pasos de la captura al segundo, con nombre en los cuatro; documentos/pasos/% con
+> nombre: FACTURA 166.852/873.674/93,2 · CONTRATO 18.540/69.065/91,1 · COMPARATIVO
+> 19.828/63.197/92,8 · OBRA 666/4.491/99,6. **T14**: `build-retenciones` con `rac`
+> entera → `retenciones.apuntes_contables` IDÉNTICA (49.675 filas, 34.456 con obra,
+> 8.962.209,81 EUR, misma huella md5 fila a fila). `check-raw-recuentos`: `rac` y `usu`
+> bien; NO CONFORME solo por deriva diurna de `hmo`, `conact` y `auxban` (+7, +4, +1
+> filas desde la nocturna). `azure-apps` `86f6085`. **Queda**: comprobar la nocturna
+> del 09-10 (`timings`: +4 a +7 min previstos) y el `git push` del humano.
 
 > Cerrada el 2026-10-08 (`progress/review_F-085.md`, `init.sh` 7.133 passed). Resumen
 > en `progress/history.md`. **Rama sin integrar en `main`**: merge y despliegue, por
