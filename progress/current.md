@@ -9,6 +9,21 @@
 > su resumen en `progress/history.md`, y el detalle vive en los informes
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
+## 2026-10-08 · F-132 · EN IMPLEMENTACIÓN (implementer), FASE A · `in_progress`
+
+Solo la Fase A (T1-T15 de `specs/F-132-estado-desde-rac/tasks.md`); la B espera a
+D7 del humano tras el contraste (hasta el 2026-10-22). La foto de F-067 sigue
+construyéndose igual: ni DROP, ni TRUNCATE, ni DELETE sobre sus dos tablas.
+
+- **Tarea en curso**: T1 (dominio, RED primero).
+- **Entorno**: `init.sh` de arranque lanzado sobre 4d25fcb en el árbol principal;
+  para no ensuciarlo (el barrido de dataclasses de F-006 ve módulos nuevos de
+  `domain/` si aparecen con la suite corriendo, como pasó en F-085), el trabajo se
+  hace en el worktree `../datamart-seg-anual-wt-f132` (rama temporal
+  `trabajo/F-132` desde 4d25fcb) y se lleva a `feature/F-132-estado-desde-rac`
+  por fast-forward. Ningún commit va a `dev` ni a `main`.
+- **Desviaciones respecto a la spec**: ninguna por ahora.
+
 
 ## 2026-10-08 · F-132 · SPEC ESCRITA (spec-author), `pending` a la espera de aprobación · la antigüedad del estado desde `rac`
 
