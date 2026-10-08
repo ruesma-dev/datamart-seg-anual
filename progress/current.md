@@ -10,7 +10,19 @@
 > `impl_*`/`review_*`/`incidencia_*` de `progress/` y en las specs.
 
 
-## 2026-10-07 · F-085: implementación (implementer) · EN CURSO
+## 2026-10-08 · F-085 · CERRADA (`done`, APROBADO en pasada 2) · quién aprobó qué y cuándo (`rac`) · SIN DESPLEGAR
+
+> Cerrada el 2026-10-08 (`progress/review_F-085.md`, `init.sh` 7.133 passed). Resumen
+> en `progress/history.md`. **Rama sin integrar en `main`**: merge y despliegue, por
+> orden del humano. **MANUAL pendiente del humano**, en orden: T12-T14 de
+> `progress/impl_F-085.md` §6 en el Postgres LOCAL/dev (FR26/10025 con sus 4 pasos y
+> nombre; coberturas y 233/210/~204 en `personal.usuarios_sigrid`; retenciones
+> idénticas antes y después; `check-raw-recuentos`; tiempos; vigilar `usu.delO`).
+> Después, despliegue: imagen y job, nocturna (o build a mano), `publicar-diccionario`
+> v45, reiniciar el MCP. Coste: +4 a +7 min sobre una nocturna que ya va 38 min por
+> encima de las 4 h. Siguiente en la cola: **F-132** (estado desde `rac`, prioridad 11).
+
+### Implementación (historia)
 
 `status` → `in_progress`. Tareas de `specs/F-085-quien-aprobo-que-y-cuando/tasks.md`:
 T1-T11 de código y documentos, T12-T14 MANUAL (humano), T15 informe, T16 init.
