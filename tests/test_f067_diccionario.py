@@ -256,12 +256,9 @@ def test_f067_r27_la_version_sube_a_44() -> None:
     assert int(_diccionario().version) >= 44
 
 
-def test_f067_r27_p23_tres_semanas_parcial_hasta_21_dias_despues() -> None:
-    p23 = _pregunta("P23")
-    assert p23["estado"] == "parcial" and p23["bloqueada_por"] == "F-067"
-    assert "compras.v_estado_documentos" in p23["objetos_esperados"]
-    respuesta = _plano(p23["respuesta_correcta"])
-    assert "minimo" in respuesta and "dia del despliegue" in respuesta
+# P23 «parcial hasta 21 días después del despliegue»: RETIRADO por F-132. La
+# fecha del envío sale de `rac` y P23 ya es respondible; lo fija
+# `tests/test_f132_diccionario.py::test_f132_r20_p23_respondible_con_la_fecha_del_envio`.
 
 
 @pytest.mark.parametrize(

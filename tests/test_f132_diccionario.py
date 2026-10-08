@@ -215,3 +215,59 @@ def test_f132_r19_conest_ya_no_dice_que_nadie_guarde_el_cuando() -> None:
     assert "tiemod" not in texto and "ultima modificacion" not in texto
     assert "rac" in texto and "compras.v_estado_documentos" in texto
     assert "lo resolvera f-067" not in texto
+
+
+# ===========================================================================
+# R20 · `00_global.yaml`: versión 46, esquema `compras`, P23 y P24
+# ===========================================================================
+
+
+def _global() -> dict:
+    return _diccionario().global_raw
+
+
+def _pregunta(identificador: str) -> dict:
+    for pregunta in _global()["preguntas_aceptacion"]:
+        if pregunta["id"] == identificador:
+            return pregunta
+    raise AssertionError(f"no está la pregunta {identificador}")
+
+
+def test_f132_r20_la_version_sube_a_46_con_su_historia() -> None:
+    assert int(_diccionario().version) >= 46
+    texto = (DIR_DICCIONARIO / "00_global.yaml").read_text(encoding="utf-8")
+    historia = texto.split("\nversion:", 1)[0]
+    assert "# version 46 (F-132, 2026-10-08)" in historia
+
+
+def test_f132_r20_el_esquema_compras_cita_la_vista_desde_rac() -> None:
+    texto = _plano(_global()["esquemas"]["compras"]["para_que_sirve"])
+    assert "compras.v_estado_documentos" in texto
+    assert "rac" in texto and "f-132" in texto
+    assert "con los dias en el estado" not in texto
+
+
+def test_f132_r20_p23_respondible_con_la_fecha_del_envio() -> None:
+    p23 = _pregunta("P23")
+    assert p23["estado"] == "respondible"
+    assert "bloqueada_por" not in p23
+    assert "nota" not in p23, "la nota decía cuándo dejaba de ser parcial"
+    assert "compras.v_estado_documentos" in p23["objetos_esperados"]
+    respuesta = _plano(p23["respuesta_correcta"])
+    assert "estado_codigo = 'epf'" in respuesta and "dias_en_estado > 21" in respuesta
+    assert "en_estado_desde" in respuesta and "fecha del envio" in respuesta
+    assert "envios antiguos" in respuesta and "sin cerrar" in respuesta
+    for viejo in ("minimo", "despliegue", "ultima_foto", "antiguedad_es_minima"):
+        assert viejo not in respuesta, viejo
+
+
+def test_f132_r20_p24_espera_documento_procesos() -> None:
+    p24 = _pregunta("P24")
+    assert p24["estado"] == "respondible"
+    assert p24["objetos_esperados"][0] == "compras.documento_procesos"
+    respuesta = _plano(p24["respuesta_correcta"])
+    assert "compras.documento_procesos" in respuesta and "orden" in respuesta
+    assert "historia neta" in respuesta
+    assert "ventana" not in respuesta.split("deshech")[0], (
+        "el cambio se da con su fecha y hora, no como una ventana entre fotos"
+    )

@@ -496,7 +496,20 @@
 # la fecha del cambio de estado SI esta en Sigrid, en `rac`. `R-SIGRID-CON`
 # declara los campos propios de `rac` y `usu`.
 
-version: 45
+# version 46 (F-132, 2026-10-08): LA ANTIGUEDAD DEL ESTADO SALE DE `rac`.
+# `compras.v_estado_documentos` ya no lee la foto diaria: la fecha es la del
+# ultimo paso de `compras.documento_procesos` (al segundo y con quien lo dio),
+# el dia de alta si no hay pasos y el estado es inicial, y ninguna (con la cota
+# `cambio_posterior_a`) en los ~75 cambiados fuera de proceso. Cambia de
+# columnas (fuera `cambio_observado_tras`, `antiguedad_es_minima` y
+# `ultima_foto`; dentro `codigo_documento`, `origen_fecha`,
+# `cambio_posterior_a` y el paso con su usuario) y gana los comparativos. Es la
+# historia NETA. La foto (`historial_estados*`) queda como RESPALDO mientras
+# dura el contraste (`contraste-estados`). P23 pasa a respondible con la fecha
+# real del envio y P24 lee `compras.documento_procesos`. Corrige las fichas de
+# `contratos`, `historial_estados*`, `fn_sigrid_tiempo` y `raw.conest`.
+
+version: 46
 base: sigrid_dm
 titulo: Datamart de seguimiento anual de obra
 
@@ -1396,11 +1409,13 @@ esquemas:
       los dos lados (`compras.comparativo_lineas`,
       `compras.comparativo_oferta_lineas`), el coste objetivo contra su base
       del descompuesto (`compras.comparativo_objetivo`) y las firmas escalon
-      a escalon (`compras.comparativo_firmas`). Desde F-067, la FOTO DIARIA
-      de estados de contratos y facturas (`compras.historial_estados`, que NO
-      se reconstruye, y `compras.v_estado_documentos` con los dias en el
-      estado) y el documento de planificacion de compras
-      (`compras.necesidades`).
+      a escalon (`compras.comparativo_firmas`). Desde F-085, el historial de
+      procesos de cada documento (`compras.documento_procesos`, de `rac`), y
+      desde F-132 el estado actual de contratos, facturas y comparativos y
+      desde cuando estan en el (`compras.v_estado_documentos`, sacado de
+      `rac`). La FOTO DIARIA de estados de F-067 (`compras.historial_estados`,
+      que NO se reconstruye) queda como respaldo en contraste. Y el documento
+      de planificacion de compras (`compras.necesidades`).
     consumo_recomendado: true
     refresco: nocturno
     pasos_etl: [build_compras]
@@ -1877,30 +1892,28 @@ preguntas_aceptacion:
     respuesta_correcta: >-
       Filtra `compras.v_estado_documentos` por `tipo_documento = 'CONTRATO'`,
       `estado_codigo = 'EPF'` y `dias_en_estado > 21`, y une con
-      `compras.contratos` para proveedor y obra. Dice que la antiguedad cuenta
-      desde el dia del despliegue de la foto diaria: si `antiguedad_es_minima`,
-      los dias son un MINIMO, asi que «mas de 21» es cierto pero «menos de 21»
-      no se sabe. NO usa `fecha_ultima_modificacion` (`con.tiemod`). Cita
-      `ultima_foto` y la fecha de build de `build_compras`.
+      `compras.contratos` para proveedor y obra. Da `en_estado_desde` como la
+      fecha del envio (sale de `rac`, al segundo) y quien lo envio. Avisa de
+      los envios antiguos sin cerrar: la mayoria de esos contratos se enviaron
+      hace años y nadie los cerro en Sigrid (el 2026-10-08, 785 de 809, y solo
+      23 enviados de 2025 en adelante), asi que los separa por fecha de envio.
+      NO usa `fecha_ultima_modificacion` (`con.tiemod`). Cita la fecha de
+      build de `build_compras`.
     reglas_implicadas: [R-FRESCURA]
-    estado: parcial
-    bloqueada_por: F-067
-    nota: >-
-      Pasa a `respondible` 21 dias despues del despliegue de F-067: hasta
-      entonces ningun minimo de la linea base supera 21 y la respuesta
-      correcta es la lista de enviados con «al menos N dias».
+    estado: respondible
 
   - id: P24
     pregunta: Cuando cambio de estado la factura X y por que estados ha pasado
     objetos_esperados:
+      - compras.documento_procesos
       - compras.historial_estados
-      - compras.v_estado_documentos
     respuesta_correcta: >-
-      Lee los tramos de `compras.historial_estados` del documento, ordenados
-      por `desde`, traduciendo el estado con `compras.v_estado_documentos` o
-      `compras.facturas`. Da cada cambio como una VENTANA (entre
-      `observado_antes` y `desde`), no como una hora exacta, y dice que antes
-      del despliegue de F-067 no hay historia (tramo de linea base).
+      Lee los pasos de `compras.documento_procesos` de la factura, ordenados
+      por `orden`: cada uno con su estado de origen y de destino, la fecha y la
+      hora (Madrid) y quien lo dio. Dice que es la historia NETA: un paso
+      deshecho en Sigrid ya no esta; mientras exista la foto diaria
+      (`compras.historial_estados`, respaldo de F-132) puede decir en que noche
+      se vio deshacer, como una ventana entre dos fotos.
     reglas_implicadas: [R-FRESCURA]
     estado: respondible
 
